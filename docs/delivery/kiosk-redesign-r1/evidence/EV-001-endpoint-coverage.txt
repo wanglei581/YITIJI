@@ -1,0 +1,4 @@
+kiosk 路由数: 107
+后端端点数: 471
+前端端点引用总数: 1820
+未命中: 3 GET /local/terminal-identity | POST /print | POST /local/print/wake

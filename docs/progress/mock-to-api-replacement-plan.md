@@ -307,5 +307,5 @@ Phase 7 后端上线后，此字段返回 `false`，前端自动隐藏提示条�
 ## 关联文档
 
 - [API v1 设计文档](../api/api-v1-design.md)
-- [Phase 7 正式 DTO 定义](./data-model-phase7.md)
-- [合作机构权限矩阵](./partner-permission-matrix.md)
+- [Phase 7 正式 DTO 定义](../product/data-model-phase7.md)
+- [合作机构权限矩阵](../product/partner-permission-matrix.md)

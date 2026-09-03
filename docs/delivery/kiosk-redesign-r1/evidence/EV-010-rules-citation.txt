@@ -1,0 +1,18 @@
+G1-02 引证记录  2026-09-02  revision 23464350f
+源：51 页原型头部「真话边界」区块 + docs/compliance/compliance-boundary.md
+
+规则与失败行为的载体：每张原型 HTML 头部注释含 route / state / api /
+fallback / 真话边界 五段，逐条写明本页的业务规则、状态取值、
+数据来源端点、以及取不到数据时的降级表现。
+例（30-my-profile.html）：
+  「非法 screen / state 一律 fail-closed 落 invalid，不静默切回默认页」
+  「summary 失败 → error：卡片保留入口但数量显示「—」，不拿上次数字冒充当前账号」
+例（11-arrival-code.html）：
+  「verifying 仅表示正在请求校验，不会自动变成 success」
+  「7 位永不提交；非法字符不能形成合法提交」
+
+合规红线：docs/compliance/compliance-boundary.md（§4.5 企业展示、
+  §8.2 补贴不代办、§8.3 权益不换取简历、第 443 行 AI 不得自动
+  投递/预约/报名/签到）。
+
+判定：G1-02 PASS。合规文档或原型头部变更后需复核。

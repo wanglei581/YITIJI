@@ -1,27 +1,128 @@
 # 下一步任务
 
-## 当前候选：隐私遮挡真实产物链（2026-09-03）
+## 当前主线：51 页新稿迁移（2026-09-02 建立，取代下方全部历史队列的优先级）
 
-产品负责人当天明确：必须真做出遮挡后的文件，不是产品决策要停在「只评估不产出」。交付矩阵 [kiosk-delivery-matrix-2026-08.md](../product/kiosk-delivery-matrix-2026-08.md) 把这一行标为 P0 第 1 位（「补三步：渲染遮挡 PDF → files.upload → 回填 resultFileId」），没有标成产品决策。
+**边界与判定（project-delivery-governance G2/G3 逐页版）。** 已核实的事实基线（`6d74c2f17` 重算图谱后）：
 
-- [x] **后端（本刀，分支 `feat/pii-redaction-revive`，未合入、未部署）**：把 PR #566 按文件移植到最新 `origin/main`，不 merge/rebase 落后 535 提交的老分支。`pii_redact` 对文字层 PDF 生成派生件并回填 `resultFileId`；扫描件 / 无坐标诚实 `not_supported` 且零文件。`verify:pii-redaction` 39 项全绿（核心判据未削弱），已接双 CI job。前端未动。
-- [ ] **前端（PR #565，不在本刀）**：一体机材料检查页仍按评估态 stub 说话。后端已能给 `redactedFileId` / 签名 `redactedFileUrl` / `claim` 之后，需要另一条把预览、打印源和文案接到真实产物，并删掉「当前版本不生成遮挡后的新文件」那句。
-- [ ] **扫描件 / 图片遮挡（二级，未开工）**：本刀只做文字层 PDF。OCR 路径仍无坐标（百度 `accurate_basic` 不返回 location），会如实 `not_supported`。
+| 层 | 结果 | 取证方式 |
+|---|---|---|
+| kiosk 路由注册 | 107 / 107 | `docs/graph/graph.json`（含 lazy 路由修复） |
+| 原型 `data-route` → 运行时路由 | 95 / 95 | 51 页属性提取 + 参数化匹配 |
+| 前端端点引用 → 后端存在 | 1820 / 1820 | 剥 `/api/v1` 前缀后比对 471 个端点 |
+| **运行时页面 ↔ 新稿 51 页** | **1 / 51** | `KioskRoot.tsx` 的 `QX_MIGRATED_ROUTES` 集合（当前只有 `/print/pickup-claim`） |
+
+> **取证方式已更正（2026-09-02）**：本行原写 `0 / 51`，取证用 `grep -rl kiosk-redesign-2026-08 apps/kiosk/src`。
+> 该命令现在命中 5 个文件，但其中 4 处是**注释里的视觉真值指针**（`HomePage.tsx:2`、`tokens.css:3`、
+> `pickup-claim-qx.css:6`、`KioskRoot.tsx:150`），只有 1 页真正换了实现。**注释不是实现** ——
+> 用它当分母会随注释增加而虚涨。唯一权威登记是 `KioskRoot.tsx` 里的 `QX_MIGRATED_ROUTES`：
+> 该集合决定哪些路由退出旧 `KioskLayout` 外壳，改错了页面会当场两套色系打架，因此它不可能悄悄漂移。
+
+**结论：不需要新建后端端点。** 全部剩余工作是逐页把新稿实现进运行时。当前边界判定：`LOCAL BUILD GO` / `PRODUCTION NO-GO`（51 页只落地 1 页，不具备商用交付条件）。
+
+**已完成（2026-09-02，均为本地候选，未部署、未真机）：**
+
+- [x] **图谱解析器修复（`6d74c2f17`）** —— 补 `React.lazy()` 路由与单文件多 controller 解析，kiosk 路由由误报的 86 更正为真实 **107**。按 CLAUDE.md §14「图谱和代码对不上以代码为准、那是脚本 bug」，改的是 `scripts/project-graph/` 而非 `docs/graph/` 产物。**基于旧图谱算过的任何覆盖率结论都要按 107 重算。**
+- [x] **51 页原型入库（`2d9f73c1b`）** —— 关闭硬阻塞 **BL-04**（此前 `git ls-files` = 0，无版本历史可回滚）。9.9MB / 53 个 HTML 加被引用资源；682MB 截图证据以目录级 `.gitignore` 排除；入库后从 worktree 位置重渲三页验证相对资源路径正常。
+- [x] **接口声明对齐（`859163498`）** —— 51 页原型标注的端点 **90/90 命中真实后端端点**，同批更正此前两处误判。
+- [x] **duplex 契约外露（`f9d1890ea`）** —— `MemberPrintOrderItem` 补 `duplex`（此前采集/计价/落库都有、唯独对外契约没有，用户付了双面的钱看不到），同批更正字段审计两条误判。
+- [x] **青序流光设计地基（`1135e251d`）** —— `styles/qingxu/` 四个 token/原语文件 + `components/qingxu/QxPageFrame.tsx` + `scripts/dev/shot-route.sh` 截图链路。顺带修掉 `--print-*` 令牌链断裂：**92 处 `var(--print-line)` 一直解析不到值、边框实际没渲染**，而 typecheck 与 lint 全绿——这正是验收标准第 5 条「不靠『编辑成功』判断」要防的。
+- [x] **取件码页迁移（`e8a468fca` + `23464350f`）** —— 51 页替换的第一块样板，含 duplex 前端显示与虚拟数字键盘（一体机无物理键盘，Kiosk 模式不得依赖系统输入法）。
+- [x] **交付治理包（`2f92deb44`）** —— `docs/delivery/kiosk-redesign-r1/` 七闸门；当前 G0/G1 PARTIAL、**G2 NO_GO**、G3–G6 PENDING，`overall_verdict: NO_GO`。硬阻塞 BL-01/02/03/05 仍 OPEN。
+- [x] **文档清理（2026-09-02）** —— 候选池 252 份核出零阻塞引用 135 份，实删 **65 份**（`superpowers/plans` 35 / `specs` 17 / `reviews` 13），保留 187 份；删除前后各跑一次互链复查均为空，无死链、未改任何链接。台账见 [`../reviews/doc-cleanup-inventory-2026-09-02.md`](../reviews/doc-cleanup-inventory-2026-09-02.md)。**副作用**：`docs/graph/graph.json` 与 `orphans.md` 现含 65 条已不存在的路径，属自动产物滞后，下次改路由/端点/模型时跑 `pnpm graph` 即刷新。
+
+**单页验收标准（六条全过才算这一页完成，缺一条记 PARTIAL 不记完成）：**
+
+1. 运行时页面按对应原型实现：版式、交互、状态覆盖一致。
+2. 原型头部声明的每个 `?state=` 在运行时都有真实对应状态；无真实数据来源的状态不得伪造成功（`CLAUDE.md §9` 不伪造能力）。
+3. 该页 `data-route` 目标全部可达，无死链。
+4. `node scripts/project-graph-query.mjs file <改动文件>` 列出的门禁全部通过 + 对应 app typecheck 干净。
+5. 1080×1920 实测截图与原型并排比对（不靠「编辑成功」判断；空白带与内容像素量要量）。
+6. 合规红线复核：按钮文案白名单、岗位/招聘会只做第三方入口、无平台内投递收简历。
+
+**禁止事项：** 不删原型上的接口名与字段名标注（那是给开发看的功能说明，不是冗余文案）；不为降低工作量删减入口；缺失能力写进本文件并保留入口标注真实状态。
+
+
+### ⚠️ 合入前必须拆分本分支（2026-09-02 记）
+
+`claude/project-readiness-review-959ffe` 已累积 15 个提交，横跨设计地基、
+奔图参数、AI 契约、文档清理、打印订单展示等多个主题。
+`verify:profile-print-orders-inkpaper` 是**批次范围守卫**——只要 diff 碰了
+`apps/kiosk/src/pages/profile/me/printOrders/` 或 `MyPrintOrdersPage.tsx`，
+就对 `origin/main...HEAD` 的整个 diff 做 allowlist 检查。本分支因此必红。
+
+**这不是缺陷，是门禁在说真话。** 合入前按主题拆成聚焦 PR：
+
+| PR | 内容 | 触发批次守卫？ |
+|---|---|---|
+| 1 | 图谱解析器修复（lazy 路由 + 多控制器） | 否 |
+| 2 | 51 页原型入库 + 接口声明对齐 + 文档清理 | 否 |
+| 3 | 青序流光设计地基 + 取件码页迁移 + 余量吸收 | 否 |
+| 4 | 奔图开放 API 取值对齐（shared + terminal-agent） | 否 |
+| 5 | AI 简历报告内容结构 + 契约漂移门禁 | 否 |
+| 6 | duplex 外露 + 打印订单展示优惠/退款额 | **是**，须单独成 PR 且 diff 只含白名单文件 |
+| 7 | 交付治理包 | 否 |
+
+**不得靠给 allowlist 加行来绕过第 6 条**——那会让这条守卫失去意义。
+
+### 待产品负责人裁决（阻塞对应批次）
+
+1. **10 张原型（42–51）是空壳**：内容交给外部脚本渲染，被引用的 14 个
+   sidecar JS/CSS 在仓库里不存在（已核实非 gitignore 所致）。影响 22 条路由。
+   这几批开工前必须先补齐这些文件。
+2. **`/ai/plan`（373 行真页面）、`/resume/export`、两个 `freshman-insights`
+   共 4 条路由没有对应新稿**——补稿还是保持现状？
+3. **`02-services.html` 无对应路由**，`11-arrival-code` 与 `33-pickup-code`
+   抢同一条路由——以谁为准？
+4. **AI 报告将持久化简历原文摘录**（遮盖后、≤3.4KB、随 24h TTL 清理）。
+   此前 `AiResumeResult.payloadJson` 只存分数与建议。这是数据留存范围的实质变化，
+   需签字，并可能要在授权文案里加一句。
+5. **mock-only 字段**（`onsiteServices` / `admissionMethod` / `tagline`）：
+   补数据源，还是移除展示？两份 2026-08 评审已给过同一个二选一。
+6. **`GET /me/summary` 后端不存在**：新建端点，还是改说明书走三个列表读 total？
+
+### 待真机验证（产品负责人在 Windows 侧执行）
+
+- **双面长边/短边的实际翻页方向** —— 名字只是名字，搞反了用户拿到的装订方向就是错的
+- 本地驱动能否真正控制彩色打印（CLAUDE.md §3 标着待验证）
+- 卡纸 / 缺纸 / 缺粉的恢复路径
+- 断网重连后打印队列是否保留
+- 向奔图厂家确认：开放 API 的彩色 mode 取值是否存在（V1.0 文档全文无彩色取值）
+
+### 奔图开放 API 彩色 mode：三处措辞仍不一致（2026-09-02 盘点发现，属 PR 4 范围）
+
+同一件事在三处写了两种**语义不同**的结论，会让下一个人得出相反判断：
+
+| 位置 | 现在怎么写 | 隐含结论 |
+|---|---|---|
+| `packages/shared/src/types/print.ts:100-107` | 「`color` **无对应 wire 取值** …… 走开放 API 时彩色**不可用**（不是"待实现"，是协议侧没有该取值）」 | 协议**不存在**该能力 |
+| `apps/terminal-agent/src/printer/types.ts:76-77`（字段级注释） | 「Pantum 开放 API：`black_white` → `"bw"`；`color` → **TODO（待厂家确认）**」 | 确认后**就能做** |
+| `docs/device/pantum-api-design.md:87` | 「⚠️ **TODO** \| 待奔图厂家确认，**禁止假设为 `"color"`**」 | 确认后**就能做** |
+
+注意 `terminal-agent/types.ts` **自己内部就冲突**：同文件 47–48 行的块注释写「彩色不可用」，
+76–77 行的字段注释写「TODO 待厂家确认」。
+
+**这不是文字洁癖**：两种读法决定「云打印彩色」是**永久不做**还是**排期待做**，直接影响 Phase 8.1 之后的
+路线与对外能力承诺（CLAUDE.md §3 要求硬件能力与开放 API 能力分开描述，正是为了防这类混读）。
+**收口方式**：厂家回复前，三处统一改成同一句可证伪表述 ——「V1.0 文档只定义 `"bw"`；彩色取值未公开，
+未取得厂家书面确认前开放 API 路径不提供彩色，禁止假设为 `"color"`」；拿到回复后再一次性改三处。
+本轮只记录，**未改任何代码**（本任务只允许改 `docs/`）。
+
+**批次队列（按业务闭环切，每批完成即形成一条端到端可走通路径）：**
+
+| 批次 | 页数 | 端点引用面 | 状态 |
+|---|---|---|---|
+| 一 · 打印扫描主链路 | 12 | 531 | **执行中** |
+| 二 · 简历与材料 | 8 | 382 | 待开始 |
+| 三 · 我的与账号 | 10 | 479 | 待开始 |
+| 四 · 岗位·招聘会·企业 | 8 | 451 | 待开始 |
+| 五 · 首页·AI·其它 | 13 | 411 | 待开始 |
+
+逐页台账见 `docs/reviews/wiring-ledger-2026-09-02.md`。
+
 
 ## 当前候选：F0.5 发布可观测性（2026-09-01）
 
 - [x] **F0.5 管理端计划与 Agent 运行版本观察（PR #744 已合并至 `main`，未部署）**：仅对明确 `active` 的 Windows 终端创建、启用、暂停或取消观察计划；激活事务会再次确认全部静态目标仍为 `enabled + active`。Agent 通过独立端点读取本终端计划，并只读安装目录 `manifest.json` 的 `productVersion` 回报运行版本。该阶段不下载、不验包、不安装、不控制 Windows 服务、不创建计划任务、不执行远程 PowerShell，也不自动更新。`版本匹配` 仅表示 manifest 版本字符串与计划目标相同，**不代表** MSI/EXE 字节、哈希、Authenticode 签名或证书链已经由 Agent 验证。+5 additive schema 模型已登记，两条新增 `verify:*` 已接入 CI，合并前四项 CI 全绿。后续生产迁移、F0.5 部署、KSK-001 操作和任何 updater 功能均需新的具名授权。
-
-## 招聘闭环分期（2026-09-02 定性，不卡上线）
-
-产品负责人已定性「招聘闭环是必要能力，取得人力资源服务许可证后启用」。**本条不进交付阻塞清单** —— 它不卡当前上线，且第 4 刀的前置是许可证到手。分期方案与组件复用矩阵见 [recruitment-closure-license-gated-plan-2026-09.md](../product/recruitment-closure-license-gated-plan-2026-09.md)。
-
-- [x] **第 1 刀：资质闸门（2026-09-02 完成，未部署）**：`PlatformQualification` 模型 + `src/common/recruitment-capability.ts` fail-closed 判据 + `verify:recruitment-capability-gate`（63 PASS，双 CI job 已接线）。刻意不是环境变量也不是管理员可点的 boolean；门禁断言模块零 `process.env`、不导出 set/enable/toggle 类函数、**闸门零调用点**。两套迁移对空库 deploy 成功且 `migrate diff` 无差异。
-- [x] **第 2 刀（后端部分）：`JobApplication` 已完成（2026-09-02，PR #745，未合未部署）**：§4.4 口径修订已获具名授权（落为 [compliance-boundary.md §4.4A](../compliance/compliance-boundary.md)）。已交付本人维度模型 + `/me/job-applications` 读写 + `verify:job-application-track`（122 PASS，双 CI job 已接线）+ 个人信息导出接入。按方案 §3 **建法二**建模（`channel` / `statusSource` 服务端恒定、`resumeFileId`/`consentId` 恒空且门禁断言），拿证时加取值即可，无需新建表或迁移数据。
-- [ ] **第 2 刀（前端部分）：等新 UI，不在当前运行时做**。曾并入 `/me/activity` 第三个 Tab，被四条门禁拦下后撤回：`verify-fusion-w5` 逐字节冻结 `profileEntries.ts`、`verify-user-center-wave0` 硬断言 Profile **恰好 22 个**已接真目的地（**Wave 0 产品决策，不是技术阈值**）、`verify-profile-inkpaper-home` 断言 CSS import 集合封闭、`verify-profile-commercial-first-batch` 级联。落点改为新 UI 的 3 屏：`39-member-records`（加求职进度分类）、`27-browse-detail`（加「记录一次投递」）、`41-member-privacy`（导出清单补一项）。**前置**：这 3 个文件目前只在 `claude/project-readiness-review` 分支上，需等其合入 `main`。若产品负责人决定在当前运行时先上，需要一份 Wave 0 例外授权（22→23）。
-- [ ] **第 3 刀：小程序求职进度对齐后端**：现为 `wx.getStorageSync` 本地存储，换设备即丢。走小程序专用 worktree + 契约门禁。第 2 刀之后。
-- [ ] **第 4 刀：形态 A（平台内投递）** —— **取得许可证之后才启动**。前置还包括方案 §5 的义务清单逐项交付、法务复核、以及至少一个真实企业客户愿意作为收件方（当前系统内不存在企业账号与收件箱）。
-- [ ] **待签字**：方案 §7「即使拿证也不做」的永久边界清单（代投 / 候选人筛选 / 面试邀约 / Offer 管理 / 主动推荐）。未签字前 `CLAUDE.md` §2 八条按全量禁止执行，不得自行按分类放宽。
 
 ## 交付阻塞清单（2026-08-19 建立，只放**卡上线**的，勾完即可放机器收真钱）
 
@@ -34,13 +135,13 @@
 - [x] **A1 岗位匹配无简历前置门禁** —— 已合入 #737
 - [x] **A2 模拟面试 / 合同审查触屏传不了文件** —— 已合入 #738
 - [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；但 2026-08-22 生产只读核验确认 PM2 实际进程环境没有 `NODE_ENV`，集中生产门禁未获启用证据，转为 B1 前置阻塞
-- [x] **A4 断电卡单核查状态机** —— 已合入 #740（`main@2e7b4fc52`）。Admin `POST /admin/print-jobs/:id/verify-outcome` 已在代码里；**未部署**。推送/工单仍不做。告警处理（确认/静默/关闭 + 退款失败单退出）在分支 `fix/grok-admin-alert-20260903`，未合入、未部署
+- [x] **A4 断电卡单核查状态机** —— 已合入 #740（`main@2e7b4fc52`）。Admin `POST /admin/print-jobs/:id/verify-outcome` 已在代码里；**未部署**。推送/工单仍不做；告警仍是实时派生
 
 ### B. 需你方动手（共 3 条，非代码）
 
 - [x] **B1 生产启动环境收口（2026-09-01，未部署）** —— 实时只读核验确认运行进程、PM2 当前记录和 PM2 dump 均为 `NODE_ENV=production`；以现网 `.env` 运行完整 `assertProductionRuntimeGates()` 通过，API 本机/公网 `health` 与 `health/ready` 均为 200，Redis `PONG`，PM2 online 且 `unstable_restarts=0`。原计划中的环境修复已经完成，本轮不做无收益重启。部署版本唯一真源仍为 `DEPLOY_SOURCE.txt`：生产实际是 `771d53e2ceb257a684cf0d8657c4844045de509e`，仍落后于当前 `origin/main`；PM2 遗留 `COMMIT=942c695a` 不作为发布版本依据。后续如要发布，仍须按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 获得“精确 SHA + 备份 + additive migration + 受控发布”授权；不得直接打开 `DEPLOY_API_ENABLED`。
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
-- [ ] **B3 Windows + 奔图真机验收** —— 2026-08-31 已完成 KSK-001 空队列、本地 SQLite、维护态启动、9527、云端心跳 `0.4.10` 与无出纸收尾，服务已恢复 `Stopped / Manual`；仍未执行「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」。Draft PR #743 的 `0.4.11@988bb869` 已取得五项 CI 全绿；Windows workflow 已做到候选只构建一次、冻结 source SHA/版本/三文件 SHA-256，并让 upgrade、fresh EXE、fresh MSI 和最终下载 artifact 消费同一字节。Mac 独立下载 artifact id `9751461440` 后重算 EXE/MSI/manifest 大小和 SHA-256，均与 `candidate-identity.json` 完全一致，因此源码/CI/同字节 provenance 阻塞已关闭。候选仍未 Authenticode 签名，当前不得升级在役终端；下一步必须落实企业签名、时间戳和签名者指纹验证，并建立可审计 Windows 执行入口，再单独申请维护态无打印升级。**不要在现场机运行会创建测试 ProgramData 的 CI 生命周期脚本**。无打印升级通过后才另行申请真实出纸授权，并按 `docs/device/windows-host-acceptance-runbook.md` 留订单号/任务号/出纸照片
+- [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
 
 ### 已清（2026-08-19 当日）
 
@@ -49,7 +150,7 @@
 10 页裸英文报错（#732）· 入口直达（#733）· 打印未确认假陈述（#734，CI 中）·
 首页域按真实能力说话（#735，CI 中）
 
-> 最后更新：2026-08-31。生产只读核验：`771d53e2` 部署于 2026-08-18，PM2 自该次部署持续 online、ready=200、PostgreSQL health 正常，Kiosk/Admin/Partner 为独立构建；这不等于当前 `origin/main` 已部署。Windows Agent Draft PR #743 的 `0.4.11@988bb869` 已推送，五项 CI 全绿，同字节 upgrade/fresh/download provenance 已由 artifact 独立哈希复核关闭；但候选仍未 Authenticode 签名、未建立可审计 Windows 执行入口、未安装或真机出纸。生产岗位 / 招聘会 / 政策公开列表仍为 0，Windows + 奔图现场闭环仍未验收。
+> 最后更新：2026-08-22。生产只读核验：`771d53e2` 部署于 2026-08-18，PM2 自该次部署持续 online、ready=200、PostgreSQL health 正常，Kiosk/Admin/Partner 为独立构建；这不等于当前 `origin/main` 已部署。生产岗位 / 招聘会 / 政策公开列表仍为 0，Windows + 奔图现场闭环仍未验收。
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 
@@ -63,7 +164,7 @@
 
 - [ ] **`EndUserAuthGuard` 的 Redis 等待未加界**：C 端会员端点在 Redis 不可达时单请求实测 **23.6 秒**后返回 500。它的 fail-closed 判定本身是**正确**的（Redis 就是会员会话真源，读不到就该拒绝，绝不能改成放行），问题只在耗时与错误码不诚实：应收敛为有界等待 + 明确的 503/`MEMBER_SESSION_STORE_UNAVAILABLE`，而不是让每个请求把连接占满 23 秒再塌成通用 500。修的时候**不得改变「拒绝」这个判定**。
 - [ ] **`admin-orgs.service.ts` 的 `invalidateAccountSession` 在 Redis 故障时造成「看起来失败其实成功了」**：账号启停 / 改密 / 换邮箱的数据库更新已提交后，缓存失效调用抛错 → 端点返回 500，管理员以为没生效；重试时因为状态已经是目标值会跳过整个分支，反而**连缓存失效也不做了**。当前只在 `/health` 里如实声明为 `internal-console-redis-actions=unavailable`，代码未改。修的时候要一并想清楚「部分 Redis 故障（写失败读成功）」下最长 60s 的陈旧缓存窗口如何处置。
-- [ ] **`admin-ops.service.ts` 告警 `take: 50` 硬截断**：响应体无 `total`、无 `truncated` 标记，被截掉的条数在接口层无法察觉（来源批次实测 73 条只回 50 条）。批量故障恰恰是最需要看全的场景。本批未碰。
+- [ ] **`admin-ops.service.ts:203` 告警 `take: 50` 硬截断**：响应体无 `total`、无 `truncated` 标记，被截掉的条数在接口层无法察觉（来源批次实测 73 条只回 50 条）。批量故障恰恰是最需要看全的场景。本批未碰。
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
@@ -87,58 +188,12 @@
 > 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
 > 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
 
-## 2026-09-03 视觉真值裁决：青序流光（kiosk-redesign-2026-08）取代 V6
-
-> **产品负责人 2026-09-03 明确裁决：`docs/design/kiosk-redesign-2026-08/` 的 51 页
-> 「青序流光」是项目后面正式上线用的前端页面。**
->
-> 本条**取代**下方「2026-08-12 V6 + 双后台统一施工队列」与第 178 行「首页真值是
-> `kiosk-ai-os-v3-2026-08/01-home-v6.html`」的口径。
-
-### 为什么必须写在这里
-
-2026-09-03 当天出现了三套壳同时施工同一个页面的局面（取件码页 `/print/pickup-claim`）：
-
-| 来源 | 用的壳 |
-|---|---|
-| `main` 现状 | `PrintPageFrame`（`kiosk-proto-2026-07`，87 页，2026-08-04 入库） |
-| PR #741（2026-08-19 创建） | V6 壳 `KioskFullscreenShell`（`kiosk-ai-os-v3-2026-08`，56 页，2026-08-18 入库） |
-| `claude/project-readiness-review-959ffe` | `QxPageFrame`（`kiosk-redesign-2026-08`，57 页，**2026-09-03 入库**） |
-
-三方都以为自己在按当前口径施工，因为**口径在会话里改过、文档里没改**。谁最后合并谁就
-覆盖前一个人的活 —— 不是文本冲突，是界面变成另一个样子。本条就是为了让下一个接手的人
-（或模型）照文档施工不会再撞第四次。
-
-### 三套设计稿的处置
-
-| 目录 | 处置 |
-|---|---|
-| `kiosk-redesign-2026-08`（青序流光，51 页） | **正式上线视觉真值。新页面与改版一律按它施工。** |
-| `kiosk-ai-os-v3-2026-08`（V6） | 降为设计参考。**保留文件，不删**；已投入的 V6 运行时切片（A1/A2.1 等）不回滚，按页逐步迁到青序流光 |
-| `kiosk-proto-2026-07`（7 月 87 屏） | 维持现状：CI 回归基线，不是施工目标 |
-
-**三套目录都保留，一个都不删** —— 产品负责人明确要求不得删除已设计的 UI 页面。
-
-### 直接影响
-
-- PR #741（到机码核销页换 V6 壳）与本裁决冲突，须关闭或改造为青序流光后再提
-- `claude/project-readiness-review-959ffe` 上的青序流光地基（`apps/kiosk/src/styles/qingxu/`、
-  `components/qingxu/QxPageFrame.tsx`）方向正确，可按簇提取
-- **裁决后第一张页面（验收探针）**：`/print/pickup-claim` 已在分支 `slice/pickup-claim-qingxu`
-  迁到青序流光（未合入、未部署）。合入后须在 Windows 真机验「取件码 + 出纸」最小物理闭环，
-  再决定后续 50 页怎么迁。不要把本地浏览器截图写成真机已通过。
-- 下方 V6 队列（A1/A2/C0 等）中**尚未开工**的条目按青序流光重排；已完成条目保留为历史记录
-
----
-
-## 2026-08-12 V6 + 双后台统一施工队列（**已非当前优先级**）
-
-> ⚠️ **2026-09-03 口径更正**：产品负责人已定性 **`docs/design/kiosk-redesign-2026-08/`（青序流光，51 屏）是当前真值，上线前端页面全部出自这套**；V6（`kiosk-ai-os-v3-2026-08`）不再是目标。本节的 V6 施工队列作为历史记录保留，**不要照它排下一刀**。同一页面若在 main（`PrintPageFrame`/kiosk-proto）、V6 壳、青序流光壳（`QxPageFrame`）之间不一致，一律以青序流光为准。
+## 2026-08-12 V6 + 双后台统一施工队列（当前优先级）
 
 > 用户口径中的 V6 对应仓库历史目录 `kiosk-ai-os-v3-2026-08`；命名不影响实施。完整页面矩阵、双后台裁决与商用定义见 [`2026-08-12-v6-commercial-product-audit.md`](../reviews/2026-08-12-v6-commercial-product-audit.md)。下列顺序覆盖下方较早的 W1–W8 泛化队列；每个窗口仍须单独范围、文件预算、评审、验证和 progress 更新。
 
 - [x] **A0 第一批原型确定性修正**：P03/P06 QR 居中；P05 390×844；P39 手机扫码入口先到 P06 创建会话；P06 `source` 白名单。仅设计原型，未冒充生产接线。
-- [~] **A1 第一条 V6 运行时纵切（已本地冻结并完成最新 main 集成复验）**：A1 已以 `260f4f6ba73d7faa1a98079af207686607531fc6` 本地冻结并通过 Claude 最终完整差异终审；与 `origin/main@3a926c97` 的本地语义集成 merge `993bf6631fdbad72ece973a0cebe7590922ec96a` 也已通过 Claude `FINAL: PASS`。同树 Node 22 门禁保持 W2 **30/30**、W4 **27/27**、W5 **21/21**、W6 **104/104** 与 P1 **83/83 capture OK**；`/`、`/print-scan`、真实招聘会/本机状态双面板、手机扫码上传正确中继、`/toolbox` 与智慧校园 8 条 URL fail-closed 均保留，取件二维码/HID 扫码能力也未覆盖这些合同。target 73 仍仅是 pre-call gate 证据；七个打印页的自动 `horizontalOverflow` 已被通用 DOM 合同分类为局部 `nav.ui-kiosk-steps` 滚动容器误报，检测器实际 diff 已获 Claude `FINAL: PASS`，并以 `6db200c0a27862c30a883f27d04f77ce5f2d4dba` 本地冻结。真实 TRTC、短信与生产 Agent 扫码/手机确认、正式 AppID、Windows/Pantum、PG/Redis/COS、密钥、法务采购、CI、生产和真机均未完成。（2026-09-03 更正：原文此处写 BOS，是陈旧的样板尾句。生产运行时门禁 `production-runtime-gates.ts` 强制 `FILE_STORAGE_DRIVER` 必须为 **cos**，法务备案 `launch-review-submissions.md:109` 登记的也是腾讯云 COS；仓库中不存在任何「必须百度 BOS」的要求。相关的 PR #583 已据此关闭。）
+- [~] **A1 第一条 V6 运行时纵切（已本地冻结并完成最新 main 集成复验）**：A1 已以 `260f4f6ba73d7faa1a98079af207686607531fc6` 本地冻结并通过 Claude 最终完整差异终审；与 `origin/main@3a926c97` 的本地语义集成 merge `993bf6631fdbad72ece973a0cebe7590922ec96a` 也已通过 Claude `FINAL: PASS`。同树 Node 22 门禁保持 W2 **30/30**、W4 **27/27**、W5 **21/21**、W6 **104/104** 与 P1 **83/83 capture OK**；`/`、`/print-scan`、真实招聘会/本机状态双面板、手机扫码上传正确中继、`/toolbox` 与智慧校园 8 条 URL fail-closed 均保留，取件二维码/HID 扫码能力也未覆盖这些合同。target 73 仍仅是 pre-call gate 证据；七个打印页的自动 `horizontalOverflow` 已被通用 DOM 合同分类为局部 `nav.ui-kiosk-steps` 滚动容器误报，检测器实际 diff 已获 Claude `FINAL: PASS`，并以 `6db200c0a27862c30a883f27d04f77ce5f2d4dba` 本地冻结。真实 TRTC、短信与生产 Agent 扫码/手机确认、正式 AppID、Windows/Pantum、PG/Redis/BOS、密钥、法务采购、CI、生产和真机均未完成。
 - [~] **A2 身份/会话/文件（仅 A2.1 登录切片已完成）**：A2.1 现有 `/login` V6 最小收口已以 `1149fef0db4bad3bb05c4157f863c6753ae8ea42` 本地冻结并通过 Claude 最终完整差异终审；其余 P03/P04/P05/P40 的 legal version、session lifecycle、upload/takeaway 与 provenance 尚未完成，W1-D4 durable staging cap 未完成前手机上传不得宣称商用 GO。
 - [ ] **A3 打印/扫描交易履约**：P06/P07/P08/P39/P41 的 quote/reservation/order/payment/PrintTask attempt/device outcome/refund；小程序到机码只能授权并绑定订单，付款后服务端幂等创建 `pending` PrintTask，PrintTask 的 `claimed` 仍只由 Agent 写；不得把订单 `pickupStatus=claimed` 与 Agent 任务租约混成同一状态机。
 - [ ] **A4–A7 业务纵切**：简历与 AI 资产 → 招聘/招聘会/政策来源 → 我的/权益 → 默认关闭能力；所有输出先生成真实 artifact，再允许打印/保存/带走；智慧校园首页可见但深链 fail-closed。
@@ -229,7 +284,7 @@
 
 ## P0 设计执行：线上 Kiosk 以 7 月 75 屏原型为视觉真值
 
-> ⚠️ **2026-08-22 口径**：本节是 **2026-08-05 前后的历史实施记录**，不是下一刀任务书。现行施工看本文上面的「交付阻塞清单」。**（2026-09-03 更正：原文这里还指向「2026-08-12 V6 + 双后台统一施工队列」，而 V6 已不再是目标 —— 当前真值是 `docs/design/kiosk-redesign-2026-08/`（青序流光）。该队列节已在本文上方标注「已非当前优先级」。）**7 月 75 屏只作 CI 回归基线；首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。
+> ⚠️ **2026-08-22 口径**：本节是 **2026-08-05 前后的历史实施记录**，不是下一刀任务书。现行施工看本文上面的「交付阻塞清单」和「2026-08-12 V6 + 双后台统一施工队列」。7 月 75 屏只作 CI 回归基线；首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。
 
 （历史正文，已作废，勿当现行任务）当时开发视觉基线曾切回：[7 月 75 屏原型](../design/kiosk-proto-2026-07/README.md)。`docs/design/kiosk-ai-os-prototype-2026-08/` 已于 2026-08-22 按产品负责人确认删除，不再作为任何设计输入。所有改造继续复用现有路由、API、设备门禁、支付打印扫描链路和公共终端隐私安全，不按静态原型补造能力。
 
@@ -733,7 +788,7 @@
 - [~] **首期服务中心与能力开关**（2026-07-10 部分完成）：首页"打印扫描"组标题已接入 `/print-scan` 服务中心（新增 `ServiceGroup.titleTo` 字段，其余分组零行为变更）；`/print-scan` 已展示文档打印、**手机扫码上传（新增，已接真）**、材料扫描、照片打印，证件照 / 格式转换 / 签名盖章仍为 MVP 说明页占位；**新增"我的打印记录"快捷入口区**，指向既有 `/me/documents`、`/me/print-orders`、`/me/feedback?category=print` 三个页面（未登录时由目标页自行引导登录，浏览器走查确认无崩溃）。**未做**：材料包 / 云上传（第三方网盘）能力卡片、~~真正的 FeatureGate / DeviceCapability / Admin 可配置能力开关~~（已于 2026-07-11 Task 10 完成：`TerminalCapability` 模型 + Admin「打印扫描运维 → 设备能力」配置页 + Kiosk 服务中心消费下发，见 current-progress Task 10 条目）；U 盘导入已在 `PrintUploadPage.tsx` 的 `usb` tab 单独接线，见下方"首期 U 盘导入"条目，不在此处的能力卡片矩阵范围内。
 - [x] **首期基础打印闭环**（2026-07-13 只读核实，文档滞后于代码的假阴性修正）：只读复核确认文档打印、图片打印、简历打印、求职材料打印、招聘会资料打印均已统一走 `services/api/src/print-jobs/print-jobs.service.ts` 建单，落真实 `PrintTask`（`pending -> claimed -> printing -> completed/failed/cancelled` 状态机 + `PrintTaskStatusLog`），支付状态（`Order.payStatus`）与打印状态（`PrintTask.status`）已解耦、互不混用（见 `schema.prisma` 对应字段注释）。Kiosk 侧 `PrintConfirmPage`/`PrintPreviewPage`（文档/图片通用）、`ResumeExportPage`/`ResumeGeneratePreviewPage`（简历）、`JobMaterialLibraryPage`（求职材料）、`FairMaterialsPage`（招聘会资料）均调用同一 `/print/confirm` 建单路径；`PrintProgressPage` 展示排队/已领取/打印中/完成/失败的安全文案，`PrintDonePage` 提供失败原因展示与「重试打印」按钮（回跳确认页重新建单，非直接改状态）。本项只代表运行时代码链路已闭合；不代表 Windows 真机、扫描 U 盘外设、材料包等仍在建的独立能力已完成，也不改变本板块其余现场验收 / 未开工项的状态。
 - [x] **首期手机扫码上传 / 云上传 / 安全取件**（2026-07-10，当前分支，代码 + 本地 verify + 浏览器走查级）：复用既有简历上传的 `UploadSessionsService`/`UploadSessionQrPanel`/`PhoneUploadPage` 会话机制（不新建上传体系），purpose 白名单开放 `print_doc`；`PrintUploadPage` 的"扫码上传"tab 已从占位文案接入真实二维码面板，支持 `?tab=qr` 直达预选；手机/其他联网设备打开同一链接上传即视为"云上传"（**非**第三方网盘 OAuth 集成，范围已收窄声明）；confirm 时按 `print_doc` 用途签发 30 分钟 HMAC 内容 URL，与 `kiosk-upload` 同款契约，供后续建打印任务直接复用；"安全取件码"复用既有 `Order.pickupCode` + `pickupCodeVisibleFor`，未新造概念。会员绑定后按 `print_doc` 落短期 `system_short` 保存（非简历 90 天默认）。验证：`verify:upload-sessions` 新增 4 组断言全过，API/Kiosk/shared typecheck + lint 全绿，浏览器走查确认路由 / tab 预选 / 面板渲染 / 错误态优雅降级，简历上传原有入口回归无影响。**未验证**：本地 Prisma migrate/db push 在当前环境报通用 schema engine 错误（与本轮代码无关，环境问题），未能起真实 DB+Redis 做端到端"手机上传→确认→建打印任务"浏览器实跑；未预生产、未真机。顺带发现一个 pre-existing 缺陷（resume.txt 未被服务端正确拒绝）已派发独立任务，未在本轮修复。
-- [x] **首期 AI 文件体检**（2026-07-11，`feature/material-check-real` + `feature/material-check-followups`，代码 + 本地 verify + 真实全栈联调级 + Codex 三轮独立复审 READY(92/100) + 收尾复审 READY(94/100)，已通过 PR #185 合入远端 `main`（`93ca6161`），未部署）：`pii_scan` 已从"只查文件名"改为真实内容扫描（PDF 文字层/OCR 兜底、DOCX 真实解析），空白页检测已上线（PDF 渲染分支，真实 pdfjs 渲染验证过）。详见 `docs/progress/current-progress.md` 2026-07-11 集成收口与三批交付条目。`FileObject.mimeType` 魔数校验和第三方 OCR/AI 披露文案已随收尾分支一并合入。**`pii_redact` 已不再是评估态 stub**（2026-09-03 按文件移植 PR #566 到最新 main，见本文件顶部「隐私遮挡真实产物链」）；`normalize_a4` 仍是评估态 stub。COS 直传视频及 >32MB 对象仍按已披露边界不嗅探，材料包仍是独立未开工任务。
+- [x] **首期 AI 文件体检**（2026-07-11，`feature/material-check-real` + `feature/material-check-followups`，代码 + 本地 verify + 真实全栈联调级 + Codex 三轮独立复审 READY(92/100) + 收尾复审 READY(94/100)，已通过 PR #185 合入远端 `main`（`93ca6161`），未部署）：`pii_scan` 已从"只查文件名"改为真实内容扫描（PDF 文字层/OCR 兜底、DOCX 真实解析），空白页检测已上线（PDF 渲染分支，真实 pdfjs 渲染验证过）。详见 `docs/progress/current-progress.md` 2026-07-11 集成收口与三批交付条目。`FileObject.mimeType` 魔数校验和第三方 OCR/AI 披露文案已随收尾分支一并合入；`normalize_a4`/`pii_redact` 仍是评估态 stub，COS 直传视频及 >32MB 对象仍按已披露边界不嗅探，材料包仍是独立未开工任务。
 - [ ] **材料包**（独立子问题，未开工）：可从我的简历、我的文档、招聘会资料、求职材料中选择多文件，支持 AI 建议组合、逐项参数、顺序打印、子任务失败单独重试。需要新建 `MaterialPackage`/`MaterialPackTask` 数据模型（`docs/product/print-scan-commercial-plan.md` 已有草案）、决定多文件打印任务如何落地（扩展 `PrintTask` 支持多文件，还是加一层"批次"包住多个单文件 `PrintTask`）、Kiosk 从零建多选 UI（当前"我的文档"等页面均无多选组件）。
 - [x] **上传内容魔数校验**（2026-07-11 发现，同日在 `feature/material-check-followups` 完成并通过 PR #185 合入远端 `main`（`93ca6161`），未部署）：新增 `services/api/src/files/content-sniff.ts` 共享嗅探器（手写签名，`file-type` npm 为 ESM-only 不可用），接入 `FilesService.upload()`/`writeRawUpload()`/`completeUpload()` 三个持字节位点，拒绝码 `FILE_CONTENT_MISMATCH`；`verify:cos:files`（57 项）/`verify:upload-sessions` 已接双 CI。已披露残留：COS 直传 `video/*` 与 >32MB 对象不嗅探（无 Range 读取）；判别为签名/容器级启发式非结构级证明；两处历史手写嗅探留 TODO 未合并。详见 current-progress.md 2026-07-11 第三批与集成收口条目。
 - [~] **首期真实扫描**（2026-07-10 代码闭环 + **2026-07-27 方案 B1 体验诚实化** + **同日 Windows SMB 预发库交付旁证**）：SMB 面板扫描 + Agent 目录监听主路线（**非** TWAIN）。B1 已预发；预发库多笔 `ScanTask.completed`+PDF（代表 `cms31h42w002yyga8di19zmdi`）。规格：`docs/superpowers/specs/2026-07-27-kiosk-scan-ux-honesty-design.md` / 现场包 `docs/device/gate-0k-smb-scan-field-acceptance.md`。**仍未做**：`scanWatchFolder` 健康上报（B2）；TWAIN 一点即扫（Spike C）；多终端共享打印机。未宣称整机商用全清单勾完。

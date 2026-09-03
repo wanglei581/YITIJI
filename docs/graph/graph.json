@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 476,
+    "endpointCount": 479,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -7579,6 +7579,56 @@
       },
       {
         "controller": "services/api/src/jobs/jobs.controller.ts",
+        "handler": "JobsController.archivePartnerDataSource",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "Job",
+          "JobDataQualitySnapshot",
+          "JobFair",
+          "JobSource",
+          "Organization",
+          "PolicyPost",
+          "SyncLog"
+        ],
+        "path": "/api/v1/partner/data-sources/:id/archive",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/jobs/jobs-partner.service.ts"
+        ],
+        "services": [
+          "JobsPartnerService"
+        ]
+      },
+      {
+        "controller": "services/api/src/jobs/jobs.controller.ts",
+        "handler": "JobsController.rotatePartnerDataSourceCredential",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Job",
+          "JobDataQualitySnapshot",
+          "JobFair",
+          "JobSource",
+          "Organization",
+          "PolicyPost",
+          "SyncLog"
+        ],
+        "path": "/api/v1/partner/data-sources/:id/rotate-credential",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/jobs/jobs-partner.service.ts"
+        ],
+        "services": [
+          "JobsPartnerService"
+        ]
+      },
+      {
+        "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.togglePartnerDataSource",
         "method": "PATCH",
         "models": [
@@ -7604,6 +7654,31 @@
         ],
         "services": [
           "JobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/jobs/jobs.controller.ts",
+        "handler": "JobsController.unarchivePartnerDataSource",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "Job",
+          "JobDataQualitySnapshot",
+          "JobFair",
+          "JobSource",
+          "Organization",
+          "PolicyPost",
+          "SyncLog"
+        ],
+        "path": "/api/v1/partner/data-sources/:id/unarchive",
+        "roles": [
+          "partner"
+        ],
+        "serviceFiles": [
+          "services/api/src/jobs/jobs-partner.service.ts"
+        ],
+        "services": [
+          "JobsPartnerService"
         ]
       },
       {
@@ -13078,7 +13153,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 38,
+      "reachableFileCount": 39,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -13120,13 +13195,16 @@
             "GET /partner/sync-logs",
             "PATCH /partner/companies/:param",
             "PATCH /partner/companies/:param/publish",
+            "PATCH /partner/data-sources/:param/archive",
             "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
             "PATCH /partner/fairs/:param",
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
             "POST /partner/companies/import",
             "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
@@ -13151,12 +13229,15 @@
             "GET /partner/jobs/quality-summary",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
             "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
             "PATCH /partner/fairs/:param",
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
             "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
@@ -13181,12 +13262,15 @@
             "GET /partner/jobs/quality-summary",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
             "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
             "PATCH /partner/fairs/:param",
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
             "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
@@ -13256,12 +13340,15 @@
             "GET /partner/jobs/quality-summary",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
             "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
             "PATCH /partner/fairs/:param",
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
             "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
@@ -13286,12 +13373,15 @@
             "GET /partner/jobs/quality-summary",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
             "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
             "PATCH /partner/fairs/:param",
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
             "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
@@ -13327,12 +13417,15 @@
             "GET /partner/jobs/quality-summary",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
             "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
             "PATCH /partner/fairs/:param",
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
             "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
@@ -13358,7 +13451,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 39
+      "sourceFileCount": 40
     }
   },
   "dataModel": {
@@ -13640,6 +13733,7 @@
         "usedBy": [
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/materials/materials.service.ts",
+          "services/api/src/materials/pii-redaction.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts"
@@ -14257,7 +14351,7 @@
         ]
       },
       {
-        "fieldCount": 10,
+        "fieldCount": 11,
         "name": "PiiFinding",
         "relations": [
           "DocumentProcessTask"
@@ -15928,6 +16022,9 @@
     "apps/kiosk/src/pages/print/printUsageEstimate.ts": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs"
     ],
+    "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/print/styles/print-cashier.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
       "apps/kiosk/scripts/verify-print-cta-contrast.mjs"
@@ -17062,6 +17159,7 @@
     ],
     "apps/terminal-agent/src/agent/heartbeat.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
     ],
     "apps/terminal-agent/src/agent/network-diagnostics.ts": [
@@ -17144,7 +17242,8 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/terminal-agent/src/printer/image-to-pdf.ts": [
-      "apps/terminal-agent/scripts/verify-image-scale-truth.ts"
+      "apps/terminal-agent/scripts/verify-image-scale-truth.ts",
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
     ],
     "apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
@@ -17152,6 +17251,9 @@
     "apps/terminal-agent/src/printer/print.ts": [
       "apps/terminal-agent/scripts/verify-image-scale-truth.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
+    ],
+    "apps/terminal-agent/src/runtime-version.ts": [
+      "apps/terminal-agent/scripts/verify-local-qr-proxy.ts"
     ],
     "apps/terminal-agent/src/usb/usb-files.ts": [
       "apps/terminal-agent/scripts/verify-usb-import-agent.ts"
@@ -18459,6 +18561,7 @@
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-resume-extraction.ts"
     ],
     "services/api/src/ai/resume/ocr/pdf-page-renderer.ts": [
@@ -18584,6 +18687,7 @@
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-data-request-contract.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
@@ -18599,6 +18703,7 @@
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
@@ -19055,8 +19160,10 @@
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
@@ -19090,6 +19197,7 @@
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-conversion.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-sign.ts",
@@ -19474,10 +19582,21 @@
     ],
     "services/api/src/materials/materials.service.ts": [
       "services/api/scripts/verify-materials-processing.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
     "services/api/src/materials/materials.types.ts": [
       "services/api/scripts/verify-print-param-suggestion.ts"
+    ],
+    "services/api/src/materials/pii-redaction.service.ts": [
+      "services/api/scripts/verify-materials-processing.ts",
+      "services/api/scripts/verify-pii-redaction.ts"
+    ],
+    "services/api/src/materials/pii-redaction.util.ts": [
+      "services/api/scripts/verify-pii-redaction.ts"
+    ],
+    "services/api/src/materials/pii-scan.util.ts": [
+      "services/api/scripts/verify-pii-redaction.ts"
     ],
     "services/api/src/materials/print-param-suggestion.rules.ts": [
       "services/api/scripts/verify-print-param-suggestion.ts"
@@ -20165,6 +20284,7 @@
       "services/api/scripts/verify-partner-stats-contract.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility-authoring.ts",
       "services/api/scripts/verify-policy-eligibility.ts",
@@ -20298,6 +20418,7 @@
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
@@ -20324,6 +20445,7 @@
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
@@ -21383,6 +21505,7 @@
           "apps/kiosk/src/pages/print/components/MaterialCheckPresentation.tsx",
           "apps/kiosk/src/pages/print/print-prototype.css",
           "apps/kiosk/src/pages/print/printMaterialSession.ts",
+          "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
           "apps/kiosk/src/pages/print/styles/print-upload.css",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
@@ -23987,9 +24110,11 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/src/agent/heartbeat.ts",
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/local-api/origin-guard.ts",
-          "apps/terminal-agent/src/local-api/qr-login-server.ts"
+          "apps/terminal-agent/src/local-api/qr-login-server.ts",
+          "apps/terminal-agent/src/runtime-version.ts"
         ],
         "missing": []
       },
@@ -24027,6 +24152,7 @@
         "files": [
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
+          "apps/terminal-agent/src/printer/image-to-pdf.ts",
           "apps/terminal-agent/src/printer/print-with-pdf-to-printer.ts"
         ],
         "missing": []
@@ -27963,7 +28089,10 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/resume/ocr/ocr.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/materials/materials.service.ts",
+          "services/api/src/materials/pii-redaction.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts"
@@ -29075,6 +29204,34 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:payment-real-channels"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/resume/ocr/ocr.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/materials/pii-redaction.service.ts",
+          "services/api/src/materials/pii-redaction.util.ts",
+          "services/api/src/materials/pii-scan.util.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pii-redaction.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pii-redaction"
       ],
       "wired": true
     },
@@ -30916,9 +31073,7 @@
         "file": "apps/admin/scripts/verify-partner-account-delete-ui.mjs",
         "kind": "gate",
         "mentions": [
-          "docs/progress/current-progress.md",
           "docs/reviews/ci-gate-exemption-cleanup-backlog-2026-09-02.md",
-          "docs/superpowers/plans/2026-07-16-partner-account-member-safe-removal.md",
           "scripts/ci-gate-exemptions.json",
           "scripts/verify-ci-gate-coverage.mjs"
         ],
@@ -30933,8 +31088,7 @@
         "mentions": [
           ".ccg/tasks/archive/2026-07/admin-initial-phone-binding-20260715/requirements.md",
           ".ccg/tasks/archive/2026-07/admin-initial-phone-binding-reconcile-20260715/requirements.md",
-          "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
-          "docs/superpowers/plans/2026-07-15-admin-credential-recovery-and-auth-verify-safety.md"
+          "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
         ],
         "risk": "high",
         "scope": "admin",
@@ -30945,9 +31099,7 @@
         "file": "apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
         "kind": "test",
         "mentions": [
-          "apps/admin/package.json",
-          "docs/superpowers/plans/2026-07-18-partner-account-dual-auth-removal-implementation.md",
-          "docs/superpowers/plans/2026-07-26-partner-account-phone-transfer-ux.md"
+          "apps/admin/package.json"
         ],
         "risk": "high",
         "scope": "admin",
@@ -30958,12 +31110,11 @@
         "file": "apps/kiosk/src/App.tsx",
         "kind": "component",
         "mentions": [
-          "docs/reviews/agency-project-structure-review.md",
           "docs/reviews/legacy-capability-inventory-2026-08-16.md"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/reviews/agency-project-structure-review.md、docs/reviews/legacy-capability-inventory-2026-08-16.md"
+        "why": "仅被文档提及：docs/reviews/legacy-capability-inventory-2026-08-16.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -31057,7 +31208,6 @@
           "docs/reviews/legacy-capability-inventory-2026-08-16.md",
           "docs/reviews/v6-missing-pages-plan-2026-08-16.md",
           "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
-          "docs/superpowers/plans/2026-07-26-home-job-fairs-print-scan-visual-balance.md",
           "docs/superpowers/specs/2026-07-27-kiosk-scan-ux-honesty-design.md"
         ],
         "risk": "high",
@@ -31159,6 +31309,7 @@
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+          "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "docs/design/kiosk-v6-migration-matrix.md"
         ],
         "risk": "high",
@@ -31206,15 +31357,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/acceptance/wave1-resume-optimize-preprod-acceptance.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/business/AI求职打印服务终端-B2G-B2B2C方案-专家评审报告.md",
         "kind": "doc",
         "mentions": [],
@@ -31251,7 +31393,43 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/job-link-risk-analysis.md",
+        "file": "docs/delivery/kiosk-redesign-r1/handover.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/delivery/kiosk-redesign-r1/initiative.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/delivery/kiosk-redesign-r1/release-plan.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/delivery/kiosk-redesign-r1/scope.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/delivery/kiosk-redesign-r1/uat-signoff.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31359,15 +31537,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/product/miniapp-life-circle-plan-v0.1.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/product/miniprogram-phase-a-prototype-changelist-2026-07.md",
         "kind": "doc",
         "mentions": [],
@@ -31378,15 +31547,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/product/operation-manual-benchmark-plan.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/product/pii-redaction-decision-2026-08.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31413,34 +31573,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/2026-08-18-expert-panel-review.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/agency-phase2-closeout-review.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/agency-project-structure-review.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/ai-resume-phase0-contract-lock-review.md",
+        "file": "docs/reviews/branch-split-plan-2026-09-02.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31458,7 +31591,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/codex-phase0-followup.md",
+        "file": "docs/reviews/kiosk-management-requirements-2026-09-02.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31467,7 +31600,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/dev-status-consolidation-2026-07-17.md",
+        "file": "docs/reviews/page-audit-print-2026-09-02.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31476,7 +31609,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/empty-catalogs-root-cause-2026-08-16.md",
+        "file": "docs/reviews/page-audit-resume-profile-2026-09-02.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31485,79 +31618,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/f1-d2-prime-cgroup-consistency-root-cause-2026-08-01.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/global-seamless-data-refresh-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/kiosk-page-split-backlog.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/me-resumes-actions-hardening.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/me-resumes-page.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/my-documents-delete-action.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/operating-charter-2026-08-16.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/phase6.5-data-chain-review.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/profile-print-feedback-link.md",
+        "file": "docs/reviews/partner-capability-inventory-2026-09-02.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31602,159 +31663,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/self-assessment-v1-review-scope.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/reviews/task-card-x1-n2-n4-admin-fe-split.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-18-benefit-activities-real-validation.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-18-profile-notifications-feedback-p1.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-20-project-normalization-p0.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-22-admin-file-lifecycle-view.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-22-cos-lifecycle-privacy-acceptance.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-22-file-assets-gate2-readiness-recheck.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-22-file-assets-trial-acceptance.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-26-user-file-upload-flow.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-29-ai-resume-commercial-closure.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-29-ai-resume-diagnosis-config-ui.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-29-ai-resume-diagnosis-context-phase1.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-29-ai-resume-overall-assessment-implementation.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-29-global-seamless-data-refresh.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-29-job-materials-commercial-closure.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-06-29-resume-phone-qr-upload-closure.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-03-deploy-data-safety-gate.md",
         "kind": "doc",
         "mentions": [],
@@ -31764,43 +31672,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-03-resume-optimize-wave2-layout.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-03-resume-template-fill-wave3.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-03-resume-voice-wave4.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-10-real-scan-implementation-plan.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-10-remaining-work-report-and-roadmap.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31828,24 +31700,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-12-isolated-production-p0-launch.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-12-node20-pdf-renderer-compatibility.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-12-ocr-live-renderer-verify.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -31926,15 +31780,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-14-assistant-voice-consultation-restore.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md",
         "kind": "doc",
         "mentions": [],
@@ -31953,33 +31798,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-15-admin-billing-description-editor.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-15-admin-credential-recovery-and-auth-verify-safety.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-15-admin-partner-warm-theme-governance.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-15-production-deployment-integrated.md",
         "kind": "doc",
         "mentions": [],
@@ -31990,42 +31808,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-15-terminal-fleet-f0-overview.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-16-admin-partner-phone-transfer.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-16-partner-account-member-safe-removal.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-17-dependency-security-remediation-main.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-18-partner-account-dual-auth-removal-implementation.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -32079,33 +31861,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-25-partner-email-login-alias.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-26-home-job-fairs-print-scan-visual-balance.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-26-partner-account-phone-transfer-ux.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md",
         "kind": "doc",
         "mentions": [],
@@ -32116,15 +31871,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/plans/2026-07-29-p0-1b-kiosk-session-warning.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/plans/2026-07-30-agent-loop-ci-gates-implementation.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -32169,78 +31915,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-06-22-cos-lifecycle-privacy-acceptance-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-06-29-ai-resume-overall-assessment-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-06-29-job-materials-commercial-closure-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-06-29-smart-campus-toolbox-home-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-03-resume-optimize-wave2-layout-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-03-resume-template-fill-wave3-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-03-resume-voice-wave4-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-12-ocr-live-renderer-verify-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/specs/2026-07-12-preprod-test-print-seed-guard-design.md",
         "kind": "doc",
         "mentions": [],
@@ -32268,25 +31942,7 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-14-assistant-voice-consultation-restore-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-15-admin-billing-description-editor-design.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -32305,24 +31961,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/specs/2026-07-16-f1-release-provenance-manifest-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-16-partner-account-member-safe-removal-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-26-partner-account-phone-transfer-ux-design.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",

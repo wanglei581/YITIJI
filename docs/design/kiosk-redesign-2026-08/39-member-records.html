@@ -8,7 +8,7 @@
   route: /me/resumes | /me/favorites | /me/ai-records | /me/activity | /me/activity/:id
   state: resumes-{login,loading,error,empty,ready} | favorites-{login,loading,error,empty,ready}
          | ai-records-{login,loading,error,empty,ready,delete-confirm,delete-expired,deleting,delete-success,delete-failure}
-         | activity-{login,loading,error,browse-empty,jump-empty,applications-empty,browse-ready,jump-ready,applications-ready}
+         | activity-{login,loading,error,browse-empty,jump-empty,browse-ready,jump-ready}
          | activity-detail-{login,loading,error,not-found,detail}
   api: GET /api/v1/me/resumes?pageSize=50（仅元数据）；GET /api/v1/me/favorites（type/cursor/pageSize，客户端逐页最多 10 页 500 条）；
        GET /api/v1/me/ai-records?pageSize=50 与 GET /api/v1/me/job-ai-sessions?pageSize=50 并行读取，
@@ -134,7 +134,6 @@ a{text-decoration:none;color:inherit}button{font:inherit;color:inherit;border:0;
 .tabbar{display:grid;gap:10px;flex:none}
 .tabbar.n4{grid-template-columns:repeat(4,1fr)}
 .tabbar.n2{grid-template-columns:repeat(2,1fr)}
-.tabbar.n3{grid-template-columns:repeat(3,1fr)}
 .tab{min-height:64px;padding:0 12px;border:1px solid var(--line2);border-radius:18px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:9px;font-size:20px;font-weight:750}
 .tab i{font-style:normal;min-width:34px;height:32px;padding:0 9px;border-radius:11px;background:var(--paper);color:var(--ink3);font-size:16px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
 .tab.on{background:var(--tealsoft);border-color:#8dc4b5;color:var(--teal2)}
@@ -343,13 +342,11 @@ var VIEWS = {
     truth:'删除后不可恢复；删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。'
   },
   'activity': {
-    tab:'足迹', tabHint:'浏览·跳转·进度', route:'/me/activity', pill:'浏览与跳转记录',
-    states:['login','loading','error','browse-empty','jump-empty','applications-empty','browse-ready','jump-ready','applications-ready'], def:'login',
-    eyebrow:'MY ACTIVITY', ask:'看过什么、去过哪个来源、自己记了哪些进度，<em>都能回看</em>。',
-    // 前两个 Tab 与第三个性质不同，文案必须同时说清，少说一半就是误导：
-    //   浏览 / 跳转 = 系统观测到的动作；求职进度 = 用户本人写下来的。
-    doing:'浏览与跳转只记录<b>动作本身</b>；求职进度<b>由你自己填写</b>。',
-    truth:'本终端不参与投递，也不掌握来源平台的处理结果；求职进度仅你可见，不会提供给企业或来源机构。'
+    tab:'足迹', tabHint:'浏览与跳转', route:'/me/activity', pill:'浏览与跳转记录',
+    states:['login','loading','error','browse-empty','jump-empty','browse-ready','jump-ready'], def:'login',
+    eyebrow:'MY ACTIVITY', ask:'看过什么、去过哪个来源，<em>都能回看</em>。',
+    doing:'只记录<b>浏览与打开来源入口</b>这两个动作本身。',
+    truth:'投递 / 预约结果以来源平台为准，本系统不记录也不参与。'
   },
   'activity-detail': {
     tab:null, parentTab:'activity', route:'/me/activity/:id', pill:'记录详情',
@@ -453,10 +450,7 @@ var GUIDE = {
   'empty-resumes':[['怎么产生','登录后上传或生成','游客上传不会自动绑定到账号'],['这里显示什么','只有元数据','不展示简历原文或诊断正文'],['留存','原始简历短留存','到期后无法恢复']],
   'empty-favorites':[['怎么产生','在详情页点收藏','岗位 / 招聘会 / 政策都可以收藏'],['这里显示什么','只有收藏行为','不含投递或预约结果'],['去哪儿办','来源平台','投递与预约都在来源平台完成']],
   'empty-ai-records':[['怎么产生','用过 AI 服务之后','诊断、优化、规划、参会准备都会记'],['这里显示什么','只有服务元数据','不展示提示词或模型原始输出'],['可以删除','两步确认','删除后不可恢复']],
-  'empty-activity':[['怎么产生','浏览或打开来源入口','这两个动作分开记录'],['这里显示什么','动作本身','不记录投递、预约或签到结果'],['谁能看到','只有本人','退出后本机不留明细']],
-  /* 求职进度专用：不能复用上面那条 —— 它写着「不记录投递结果」，而本 Tab 恰恰
-     就是投递记录，只不过是**用户自己写的**。同屏两句自相矛盾就是误导。 */
-  'empty-applications':[['怎么产生','你自己填写','本终端不会替你自动记录'],['这里显示什么','你填的公司、岗位与进度','来源平台的处理结果本终端不掌握'],['谁能看到','只有本人','不会提供给企业或来源机构']]
+  'empty-activity':[['怎么产生','浏览或打开来源入口','这两个动作分开记录'],['这里显示什么','动作本身','不记录投递、预约或签到结果'],['谁能看到','只有本人','退出后本机不留明细']]
 };
 function guide(key){
   var items = GUIDE[key] || GUIDE.login;
@@ -691,61 +685,13 @@ function activityRow(r, kind){
     +'<span class="row-main"><span class="row-title">'+r.title+'</span><span class="row-sub">'+meta+'</span></span>'
     +'<span class="row-arrow">'+svg('arrow')+'</span></a>';
 }
-/* 求职进度（compliance-boundary.md §4.4A）：用户**本人自填**的记事本。
-   与上面两组数据性质不同 —— 那两组是系统观测到的动作，这一组是用户自己敲进来的。
-   因此没有 source / action 字段：来源平台的处理结果本终端不掌握，也不展示。 */
-var APPLICATION_ROWS = [
-  {id:'a1', company:'示例科技有限公司', position:'岗位进度示例 A', status:'面试中', ico:'chat', tone:'clay', at:'你填写的投递时间 07-02'},
-  {id:'a2', company:'示例数据服务公司', position:'岗位进度示例 B', status:'已投递', ico:'send', tone:'', at:'你填写的投递时间 07-05'},
-  {id:'a3', company:'示例设计工作室', position:'岗位进度示例 C', status:'意向中', ico:'star', tone:'wheat', at:'尚未填写投递时间'}
-];
-function applicationRow(r){
-  return '<div class="row" data-testid="'+SCREEN+'-application-'+r.id+'">'
-    +'<span class="row-ico '+r.tone+'">'+svg(r.ico)+'</span>'
-    +'<span class="row-main"><span class="row-title">'+r.position+' · '+r.company+'</span>'
-    +'<span class="row-sub">'+r.status+' · '+r.at+'</span></span></div>';
-}
 function activityTabs(tab, empty){
-  return tabbar(3, [
+  return tabbar(2, [
     {label:'浏览记录', count:empty?0:BROWSE_ROWS.length, on:tab==='browse', testid:SCREEN+'-activity-tab-browse', href:href('activity', empty?'browse-empty':'browse-ready'), route:'/me/activity'},
-    {label:'外部跳转记录', count:empty?0:JUMP_ROWS.length, on:tab==='jump', testid:SCREEN+'-activity-tab-jump', href:href('activity', empty?'jump-empty':'jump-ready'), route:'/me/activity?tab=jump'},
-    {label:'求职进度', count:empty?0:APPLICATION_ROWS.length, on:tab==='applications', testid:SCREEN+'-activity-tab-applications', href:href('activity', empty?'applications-empty':'applications-ready'), route:'/me/activity?tab=applications'}
+    {label:'外部跳转记录', count:empty?0:JUMP_ROWS.length, on:tab==='jump', testid:SCREEN+'-activity-tab-jump', href:href('activity', empty?'jump-empty':'jump-ready'), route:'/me/activity?tab=jump'}
   ]);
 }
 function activityBody(tab, empty){
-  /* 求职进度是**用户自填**的记事本，与浏览 / 跳转（系统观测到的动作）性质不同，
-     所以摘要行与底部法务提示都不能复用那两个 Tab 的文案 —— 那两句说的是
-     「本系统不记录投递结果」，对本 Tab 会变成误导：这里确实有投递信息，
-     只不过是用户自己写的，不是平台掌握的。 */
-  if(tab==='applications'){
-    if(empty){
-      return {layout:'empty', html:
-        summary('clay','route','求职进度','0','由你自己填写；本终端不参与投递，也不掌握来源平台的结果',['进度 0'])
-        + activityTabs(tab, true)
-        + previewList(
-            startRow('brief','','先去看岗位','在岗位详情点「去来源平台投递」，回来再记一笔','查看岗位','26-browse-list.html','/jobs',SCREEN+'-start-jobs')
-            /* 原型没有独立的手填表单屏，所以这里**不做「手动添加」的按钮承诺** ——
-               点进去只会到某个站内岗位详情，和文案自相矛盾。改成如实说明这条能力存在、
-               入口待建，宁可少给一个入口也不给一个说话不算数的入口。 */
-            + pendingRow('/me/activity?tab=applications', SCREEN+'-start-manual', '',
-                '投了本站没有的岗位？', '也可以自己填公司与岗位名记一笔 · 手填入口待建设'),
-            '在岗位详情页投完之后，从那里把这次投递记进来。<b>空就是空</b>，本页不会替你造进度。',
-            '从这里开始')
-        + guide('empty-applications')
-        + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
-                  link('查看岗位','26-browse-list.html','/jobs',SCREEN+'-primary',{primary:true,icon:'arrow'})])};
-    }
-    return {layout:'list5', html:
-      fixtureNote('下面三条是排版占位，不是你填过的内容')
-      + summary('clay','route','求职进度','—','全部由你自己填写；本终端不参与投递，也不掌握来源平台的结果',['数量由接口返回','当前显示 '+APPLICATION_ROWS.length+' 行'])
-      + activityTabs(tab, false)
-      + '<section class="list" data-testid="'+SCREEN+'-application-list" data-evidence-fixture="synthetic" aria-label="求职进度（排版示例）">'
-      + APPLICATION_ROWS.map(applicationRow).join('')
-      + '<div class="list-foot legal">求职进度<b>由你本人填写，仅你可见</b>；本终端不参与投递，也不掌握来源平台的处理结果，更不会把这些记录提供给企业或来源机构。</div>'
-      + '</section>'
-      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
-                link('查看岗位','26-browse-list.html','/jobs',SCREEN+'-primary',{primary:true,icon:'arrow'})])};
-  }
   if(empty){
     var browse = tab==='browse';
     var starts = browse
@@ -888,14 +834,12 @@ function renderBody(view, state, tab){
     return {layout:'list', html:aiRecordsBody(state)};
   }
   if(view==='activity'){
-    if(state==='login') return loginState('activity','登录后查看本人记录','游客模式不保存跨会话浏览记录，也不保存你自己填写的求职进度；公共一体机不在本机留存这些明细。');
+    if(state==='login') return loginState('activity','登录后查看本人记录','游客模式不保存跨会话浏览记录；公共一体机也不在本机留存浏览历史。');
     if(state==='loading') return loadingState('activity','正在加载本人记录');
     if(state==='error') return errorState('activity','loading','记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。');
     if(state==='browse-empty') return activityBody('browse', true);
     if(state==='jump-empty') return activityBody('jump', true);
-    if(state==='applications-empty') return activityBody('applications', true);
     if(state==='jump-ready') return activityBody('jump', false);
-    if(state==='applications-ready') return activityBody('applications', false);
     return activityBody('browse', false);
   }
   if(state==='login') return loginState('activity-detail','登录后查看本人记录','游客模式不保存跨会话浏览记录，这条记录只对本人可见。');
@@ -941,11 +885,7 @@ function render(view, state, tab){
   document.getElementById('eyebrow').textContent = v.eyebrow;
   document.getElementById('ask').innerHTML = v.ask;
   document.getElementById('doing').innerHTML = v.doing;
-  // pill 原本按 view 固定。activity 现在有三个 Tab，固定成「浏览与跳转记录」会在
-  // 求职进度 Tab 上和同屏标题、摘要卡自相矛盾 —— 顶部说「浏览与跳转」，下面列的却是
-  // 用户自填的投递进度。按 state 分辨。
-  document.getElementById('pill-text').textContent =
-    (view === 'activity' && /^applications-/.test(state)) ? '求职进度' : v.pill;
+  document.getElementById('pill-text').textContent = v.pill;
   document.getElementById('pill-dot').className = 'dot' + (state==='loading' || state==='deleting' ? ' breathe' : '');
   document.getElementById('truth-copy').textContent = v.truth;
   document.getElementById('back').href = view==='activity-detail' ? href('activity','browse-ready') : keep('30-my-profile.html');

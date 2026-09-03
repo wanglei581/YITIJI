@@ -535,20 +535,6 @@ function errClass(){var k=rawParam('err');return has(ERR_CLASS,k)?k:'unspecified
 function taskGuide(title,items){
   return '<section class="card"><div class="blk-h">'+svg('info',24)+title+'</div><div class="task-guide">'+items.map(function(item){return '<div class="guide-item"><span class="guide-k">'+item[0]+'</span><span class="guide-v">'+item[1]+'</span></div>';}).join('')+'</div></section>';
 }
-/* 「自己记一笔」入口。
-   放这里而不是底部动作条：动作条已有「收藏」+「生成投递二维码」，一体机上再塞
-   第三个按钮会挤。也不能放进 nextSteps() —— 那个块只在 not-found /
-   source-unavailable 两个错误态渲染，刚投完的人根本看不到（初版放错了，已改）。
-   文案主语必须是**用户**：本终端不参与投递，也不掌握来源平台的处理结果，
-   所以只能说「你自己记一笔」，不能写成平台代投或代跟踪。 */
-function trackEntry(){
-  /* 标题不用「在来源平台投完之后」：这个块出现在**还没投**的详情页上，
-     那种说法时态提前，读起来像投递流程的下一步。改成不预设你已经投过。
-     文案也不承诺「创建」——原型里没有手填表单屏，这里只是通往「我的 · 求职进度」的路。 */
-  return altList('想自己记录投递进展',
-    altRow('doc','39-member-records.html?view=activity&state=applications-ready','/me/activity?tab=applications',
-      '去「足迹」页的求职进度','在来源平台投过之后，可以自己记一笔方便回看。只有你自己看得到；本终端不参与投递，也不掌握对方的处理结果。','track'),true);
-}
 function ordinaryGuide(){return taskGuide('查看岗位时重点核对',[['岗位原文','工作内容、任职要求和地点以来源平台原文为准。'],['来源四要素','确认来源平台、同步时间、外部编号与有效期限。'],['外部操作','收藏和扫码不会在本机形成投递或录用结果。']]);}
 function aiGuide(){return taskGuide('AI 分析不会改变的事实',[['岗位仍可查看','AI 失败不影响原文、收藏和来源平台入口。'],['结果可追溯','解释只基于岗位字段；匹配只读取你选择的简历。'],['决定权在你','结果只帮助准备，不预测录用，不替你投递。']]);}
 /* 坏链接的三步重进指引：只讲怎么回到正常入口，不重复上面那段「为什么不回落默认详情」，也不编岗位字段 */
@@ -640,14 +626,14 @@ function invalidAiLinkView(from,g){
 var VIEWS={
   'default':function(){
     return fixtureBand('本页字段是原型示例 · 合成数据，接入后才会换成真实岗位内容。')
-      +'<div class="scroll">'+hero(true)+tilesBlock(true)+contentBlock(true)+sourceBlock(true,false)+aiEntry()+trackEntry()+ordinaryGuide()+'</div>'+ctaBar('open');
+      +'<div class="scroll">'+hero(true)+tilesBlock(true)+contentBlock(true)+sourceBlock(true,false)+aiEntry()+ordinaryGuide()+'</div>'+ctaBar('open');
   },
   /* 列表示例行点进来的合成数据态：整屏内容都是排版占位，用 data-evidence-fixture 标死，
      身份行直接并进顶部那条常显横幅，不再另铺一段说明墙 */
   'detail-example':function(){
     return fixtureBand('原型示例 · 合成数据，本页字段是排版占位，不是任何一条真实岗位。')
       +'<div class="scroll" data-evidence-fixture="synthetic" data-testid="'+SCREEN+'-fixture-body">'
-      +hero(true)+tilesBlock(true)+contentBlock(true)+sourceBlock(true,false)+aiEntry()+trackEntry()+ordinaryGuide()+'</div>'+ctaBar('open');
+      +hero(true)+tilesBlock(true)+contentBlock(true)+sourceBlock(true,false)+aiEntry()+ordinaryGuide()+'</div>'+ctaBar('open');
   },
   'loading':function(){
     var line=function(w,m){return '<div class="skel-line" style="width:'+w+'%'+(m?';margin-top:16px':'')+'"></div>';};
