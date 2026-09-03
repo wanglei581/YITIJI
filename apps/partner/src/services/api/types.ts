@@ -83,11 +83,13 @@ export interface CreateDataSourcePayload {
  *
  *   - webhook 源：`credential` 留空 = 服务端生成新密钥；传值 = 使用自带密钥。
  *   - api 源：`credential` 必填（上游 token 只能由机构从来源平台取得）。
+ *   - `confirmPhrase` 必填，空 body 会被服务端拒绝。
  *
  * 只上行、不回显；前端不得把该值写入 localStorage 或日志。
  */
 export interface RotateDataSourceCredentialPayload {
   credential?: string
+  confirmPhrase: 'ROTATE_CREDENTIAL'
 }
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────

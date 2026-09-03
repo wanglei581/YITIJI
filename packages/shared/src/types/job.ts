@@ -268,7 +268,14 @@ export interface PartnerDataSourceView {
  *   - `api` 接入模式不返回任何密钥：上游 token 由机构自己从来源平台取得，
  *     平台无法代为签发，只负责加密保存。
  *   - 轮换后旧密钥**立即失效**（库里单值覆盖，无双密钥灰度窗口）。
+ *   - 请求必须带 {@link ROTATE_CREDENTIAL_CONFIRMATION}；空 body 不会生成新密钥。
+ *   - 归档源禁止轮换。紧急停止接收推送请归档（partner 不能 toggle 管理员托管源）。
  */
+export const ROTATE_CREDENTIAL_CONFIRMATION = 'ROTATE_CREDENTIAL' as const
+
+/** Webhook 自填密钥写入下限。验签路径不使用本常量，避免存量短密钥推送全挂。 */
+export const WEBHOOK_SECRET_MIN_LENGTH = 32
+
 export interface PartnerDataSourceCredentialRotationResult {
   id: string
   accessMode: AccessMode

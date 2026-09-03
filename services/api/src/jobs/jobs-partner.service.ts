@@ -17,6 +17,14 @@ import { JobQualityService } from '../job-ai/job-quality.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
 import type { CreateDataSourceDto, RotateDataSourceCredentialDto } from './dto/data-source.dto'
+import {
+  assertCredentialRotationConfirmed,
+  assertCredentialRotationNotArchived,
+  assertCredentialRotationOrgRateLimit,
+  assertCredentialRotationSourceCooldown,
+  assertWebhookSecretStrength,
+  normalizeOptionalSecret,
+} from './data-source-credential-policy'
 import type { ImportJobItemDto } from './dto/import-jobs.dto'
 import type { ImportFairsDto } from './dto/import-fairs.dto'
 import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
@@ -171,8 +179,12 @@ export class JobsPartnerService {
     if (accessMode === 'api' && !dto.endpoint) {
       throw new BadRequestException({ error: { code: 'API_ENDPOINT_REQUIRED', message: 'API 数据源必须填写 endpoint' } })
     }
+    const suppliedCredential = normalizeOptionalSecret(dto.credential)
+    if (accessMode === 'webhook' && suppliedCredential) {
+      assertWebhookSecretStrength(suppliedCredential)
+    }
     const webhookSecretOnce = accessMode === 'webhook'
-      ? (dto.credential ?? generateWebhookSecret())
+      ? (suppliedCredential ?? generateWebhookSecret())
       : undefined
     const source = await this.prisma.jobSource.create({
       data: {
@@ -186,7 +198,7 @@ export class JobsPartnerService {
         authType: accessMode === 'api' ? dto.authType : undefined,
         // API/Webhook 必须由 Admin 完成风险检查后启用；文件/手工来源可立即使用。
         enabled: !isAdminManagedAccessMode(accessMode),
-        encryptedCredential: accessMode === 'api' && dto.credential ? encryptSecret(dto.credential) : undefined,
+        encryptedCredential: accessMode === 'api' && suppliedCredential ? encryptSecret(suppliedCredential) : undefined,
         webhookSecret: webhookSecretOnce ? encryptSecret(webhookSecretOnce) : undefined,
         webhookSecretRotatedAt: webhookSecretOnce ? new Date() : undefined,
       },
@@ -200,7 +212,7 @@ export class JobsPartnerService {
       payload: {
         accessMode,
         sourceKind,
-        credentialConfigured: Boolean(dto.credential || webhookSecretOnce),
+        credentialConfigured: Boolean(suppliedCredential || webhookSecretOnce),
         enabled: source.enabled,
         activationManagedBy: isAdminManagedAccessMode(accessMode) ? 'admin' : 'partner',
       },
@@ -271,8 +283,9 @@ export class JobsPartnerService {
    * 没有双密钥灰度窗口——sync.service 校验 HMAC 时只会解出当前这一个值。
    * 所以调用方（Partner 控制台）必须提示机构先与对接方约好切换时间。
    *
-   * 允许在 enabled=false / 待管理员启用 / 已归档状态下轮换：
-   * 轮换是纯粹的降风险动作，不会启用任何东西，也不改 enabled / archivedAt。
+   * 停用但未归档时允许轮换：API/Webhook 创建后是 enabled=false，机构必须能在
+   * 管理员启用前补发密钥。归档则禁止——归档是受害机构的自助止血（置 enabled=false
+   * 且冻结密钥），不把 toggle 权限放给 partner。
    */
   async rotatePartnerDataSourceCredential(
     id: string,
@@ -288,9 +301,14 @@ export class JobsPartnerService {
     }
     const org = await this.getEnabledPartnerOrg(user.orgId)
     assertDataSourceCapability(org.type, source.accessMode, source.sourceKind)
+    assertCredentialRotationConfirmed(dto.confirmPhrase)
+    assertCredentialRotationNotArchived(source.archivedAt)
+    assertCredentialRotationSourceCooldown(source)
+    await assertCredentialRotationOrgRateLimit(this.prisma, user.orgId)
 
     const rotatedAt = new Date()
     let webhookSecretOnce: string | undefined
+    const suppliedCredential = normalizeOptionalSecret(dto.credential)
 
     // 并发轮换必须打成冲突，不能各写各的（丢失更新）。
     //
@@ -315,7 +333,8 @@ export class JobsPartnerService {
 
     if (source.accessMode === 'webhook') {
       // 留空则服务端用 CSPRNG 生成；传值则用机构自带密钥（对方系统密钥不可改时）。
-      webhookSecretOnce = dto.credential ?? generateWebhookSecret()
+      if (suppliedCredential) assertWebhookSecretStrength(suppliedCredential)
+      webhookSecretOnce = suppliedCredential ?? generateWebhookSecret()
       assertRotationWon(await this.prisma.jobSource.updateMany({
         where: casWhere,
         data: {
@@ -325,7 +344,7 @@ export class JobsPartnerService {
       }))
     } else if (source.accessMode === 'api') {
       // 上游 token 只能由机构从来源平台取得，平台无法代为签发，所以必填。
-      if (!dto.credential) {
+      if (!suppliedCredential) {
         throw new BadRequestException({
           error: {
             code: 'CREDENTIAL_REQUIRED',
@@ -336,7 +355,7 @@ export class JobsPartnerService {
       assertRotationWon(await this.prisma.jobSource.updateMany({
         where: casWhere,
         data: {
-          encryptedCredential: encryptSecret(dto.credential),
+          encryptedCredential: encryptSecret(suppliedCredential),
           webhookSecretRotatedAt: rotatedAt,
         },
       }))
@@ -359,7 +378,7 @@ export class JobsPartnerService {
       payload: {
         accessMode: source.accessMode,
         // 只记"轮换发生过"与来源，绝不记密钥本身或其任何片段/摘要。
-        secretOrigin: dto.credential ? 'partner_supplied' : 'server_generated',
+        secretOrigin: suppliedCredential ? 'partner_supplied' : 'server_generated',
         rotatedAt: rotatedAt.toISOString(),
         previousRotatedAt: source.webhookSecretRotatedAt?.toISOString() ?? null,
         oldCredentialInvalidatedImmediately: true,
