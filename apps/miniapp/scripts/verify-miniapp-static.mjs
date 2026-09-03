@@ -105,6 +105,11 @@ const allowedTopLevel = new Set([
   'pages',
   'project.config.json',
   'scripts',
+  // tools/ 放需要本机开发者工具才能跑的东西（devtools-probe.mjs）。
+  // 为什么不放 scripts/：verify-ci-gate-coverage.mjs 按**路径**枚举门禁脚本
+  // （apps/*/scripts/*.mjs），不看文件名——放进去会被算成「未接线门禁」把 CI 打红。
+  // 已同步加进 project.config.json 的 packOptions.ignore，不进小程序包。
+  'tools',
   'sitemap.json',
   'utils',
 ])
