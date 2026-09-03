@@ -177,7 +177,7 @@ export const kioskRouter = createBrowserRouter([
       },
       { path: 'me/notifications',  element: <MyNotificationsPage /> },
       { path: 'me/feedback',       element: <MyFeedbackPage /> },
-      // 账号设置轻量版（只读状态 + 协议入口 + 退出/切换账号；不做换绑/注销）
+      // 账号设置：只读状态 + 协议入口 + 退出/切换账号 + 换绑（验证码隐藏显示，不做注销）
       { path: 'me/settings',       element: <MySettingsPage /> },
       { path: 'me/privacy-requests', element: <MyPrivacyRequestsPage /> },
       // 帮助中心（静态 FAQ；仅描述已上线能力）

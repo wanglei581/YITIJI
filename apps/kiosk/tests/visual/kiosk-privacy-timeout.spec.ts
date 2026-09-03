@@ -18,7 +18,9 @@ const SENSITIVE_SESSION_KEYS = [
   'ai-job-print:current-print-material-check',
   'ai-job-print:current-ai-resume',
   'ai-job-print:job-material-draft:v1',
+  'self_assessment_session_v1',
 ] as const
+const EMPTY_SENSITIVE_SESSION = SENSITIVE_SESSION_KEYS.map(() => null)
 
 function registerKioskShell(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
@@ -420,7 +422,7 @@ test('anonymous interview state is hard-cleared and browser back cannot restore 
     (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
     SENSITIVE_SESSION_KEYS,
   )
-  expect.soft(storedAfterDeadline).toEqual([null, null, null])
+  expect.soft(storedAfterDeadline).toEqual(EMPTY_SENSITIVE_SESSION)
 
   await page.goBack({ waitUntil: 'domcontentloaded' })
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_000 }).toBe('/')
@@ -429,7 +431,7 @@ test('anonymous interview state is hard-cleared and browser back cannot restore 
     (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
     SENSITIVE_SESSION_KEYS,
   )
-  expect.soft(storedAfterBack).toEqual([null, null, null])
+  expect.soft(storedAfterBack).toEqual(EMPTY_SENSITIVE_SESSION)
 })
 
 test('older sensitive history entries are sanitized after a privacy boundary @privacy-kiosk', async ({ page, api }) => {
@@ -566,7 +568,7 @@ test('privacy clear remains fail-closed when session storage rejects the boundar
     (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
     SENSITIVE_SESSION_KEYS,
   )
-  expect(storedAfterDeadline).toEqual([null, null, null])
+  expect(storedAfterDeadline).toEqual(EMPTY_SENSITIVE_SESSION)
   await page.evaluate(() => {
     window.name = 'external-origin-clobber-simulation'
   })
@@ -790,7 +792,7 @@ test('entering screensaver clears the session and establishes a history boundary
     (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
     SENSITIVE_SESSION_KEYS,
   )
-  expect(storedOnScreensaver).toEqual([null, null, null])
+  expect(storedOnScreensaver).toEqual(EMPTY_SENSITIVE_SESSION)
 
   await page.keyboard.press('Enter')
   await page.waitForURL((url) => url.pathname === '/')
@@ -839,7 +841,7 @@ test('returning to a visible tab immediately compensates for throttled privacy t
     (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
     SENSITIVE_SESSION_KEYS,
   )
-  expect(storedAfterVisibility).toEqual([null, null, null])
+  expect(storedAfterVisibility).toEqual(EMPTY_SENSITIVE_SESSION)
 })
 
 test('a newer stored boundary overrides an older sanitized landing entry @privacy-kiosk', async ({ page, api }) => {
@@ -1001,7 +1003,106 @@ test('a BFCache pageshow restore is fail-closed before reuse @privacy-kiosk', as
     (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
     SENSITIVE_SESSION_KEYS,
   )
-  expect(storedAfterRestore).toEqual([null, null, null])
+  expect(storedAfterRestore).toEqual(EMPTY_SENSITIVE_SESSION)
+})
+
+test('self-assessment leftover is wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  const summary = '上一游客的倾向参考摘要，下一位不该看见'
+  const session = {
+    answers: { collaboration: { 0: 'A' } },
+    consent: { nonSensitive: true, sensitive: false },
+    consentVersion: 'sa-consent-v1.2026-08-16',
+    taskId: 'privacy-sa-task',
+    result: {
+      taskId: 'privacy-sa-task',
+      status: 'completed',
+      dimensions: [
+        { key: 'collaboration', label: '协作偏好', strength: 4, note: '隐私回归解读', evidenceQuestionIdx: [0] },
+      ],
+      summary,
+      providerName: 'mock-llm',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    },
+  }
+
+  await page.goto('/')
+  await page.evaluate(({ key, value }) => {
+    sessionStorage.setItem(key, JSON.stringify(value))
+  }, { key: 'self_assessment_session_v1', value: session })
+  await page.goto('/resume/self-assessment/result')
+  await expect(page.locator('[data-kiosk-screen="resume-self-assessment-result"]')).toBeVisible()
+  await expect(page.getByText(summary, { exact: false })).toBeVisible()
+
+  await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
+
+  expect(new URL(page.url()).pathname).toBe('/')
+  const leftover = await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1'))
+  expect(leftover).toBeNull()
+  await expect(page.getByText(summary, { exact: false })).toHaveCount(0)
+})
+
+test('guest local favorites are wiped by the hard privacy deadline @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  await page.goto('/')
+  await page.evaluate(() => {
+    window.localStorage.setItem('kiosk:jobFavorites:v1', JSON.stringify(['job-secret-previous-visitor']))
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL('http://127.0.0.1:4187/')
+
+  const before = await page.evaluate(() => window.localStorage.getItem('kiosk:jobFavorites:v1'))
+  expect(before).toContain('job-secret-previous-visitor')
+
+  await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
+
+  expect(new URL(page.url()).pathname).toBe('/')
+  const after = await page.evaluate(() => window.localStorage.getItem('kiosk:jobFavorites:v1'))
+  expect(after).toBeNull()
+})
+
+test('signed-in rebind overlay hides the OTP on the public screen @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/ai-consents/status', {
+    status: 200,
+    json: { success: true, data: [] },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', {
+    status: 200,
+    json: { success: true, data: [] },
+  })
+  api.respond('POST', '/api/v1/member/auth/logout', {
+    status: 200,
+    json: { success: true, data: { loggedOut: true } },
+  })
+  api.respond('POST', '/api/v1/member/auth/step-up/sms-code', {
+    status: 200,
+    json: {
+      success: true,
+      data: { challengeId: 'privacy-rebind-challenge', expiresInSeconds: 300, cooldownSeconds: 60 },
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/me/settings')
+  await expect(page.locator('[data-kiosk-screen="member-settings"]')).toBeVisible()
+  await page.getByRole('button', { name: /换绑手机号/ }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByRole('button', { name: '发送验证码', exact: true }).click()
+  const otp = page.getByLabel('当前手机号验证码，已隐藏显示')
+  await expect(otp).toBeVisible()
+  await expect(otp).toHaveAttribute('type', 'password')
+  await otp.fill('654321')
+  await expect(otp).toHaveValue('654321')
+  await expect(page.locator('input[type="password"]')).toHaveCount(1)
+  await expect(page.getByText('654321', { exact: true })).toHaveCount(0)
+})
+
+test('sign-stamp page does not echo the stamp image @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  await page.goto('/print-scan/sign')
+  await expect(page.locator('[data-w2-page="print-scan-sign"]')).toBeVisible()
+  await expect(page.locator('img[src*="stamp"], img[alt*="印章"], img[alt*="签名"]')).toHaveCount(0)
 })
 
 test('mobile QR login is exempt from the kiosk hard privacy deadline @privacy-mobile', async ({ page, api }) => {

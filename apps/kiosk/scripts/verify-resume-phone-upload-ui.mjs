@@ -234,6 +234,18 @@ assertIncludes(optimize, 'FilePreviewDialog', 'optimized resumes open inside the
 assertIncludes(selfAssessment, 'FilePreviewDialog', 'self-assessment PDFs open inside the Kiosk privacy root')
 assertNotIncludes(optimize, "window.open(exported.signedUrl", 'optimized resumes do not escape to a new browser tab')
 assertNotIncludes(selfAssessment, 'target="_blank"', 'self-assessment PDFs do not escape to a new browser tab')
+assertIncludes(selfAssessment, 'useSelfAssessmentIdleExit', 'self-assessment pages share the 60s public-screen idle exit')
+{
+  const idleHook = read('src/pages/resume/useSelfAssessmentIdleExit.ts')
+  assertIncludes(idleHook, 'clearSession()', 'self-assessment idle exit clears the session')
+  assertIncludes(idleHook, "navigate('/')", 'self-assessment idle exit returns home')
+  assertIncludes(idleHook, 'IDLE_TIMEOUT_MS', 'self-assessment idle exit uses the 60s public-screen timeout')
+  const idleCalls = (selfAssessment.match(/useSelfAssessmentIdleExit/g) || []).length
+  if (idleCalls < 5) {
+    throw new Error(`self-assessment idle exit must cover intro/quiz/result/history (found ${idleCalls} mentions)`)
+  }
+  console.log('PASS self-assessment idle exit covers all four public-screen pages')
+}
 assertIncludes(panel, 'QRCodeSVG', 'QR panel renders real QR')
 assertIncludes(panel, 'confirmUploadSession', 'Kiosk confirmation is explicit')
 assertIncludes(panel, 'requiresKioskConfirmation', 'panel understands confirmation state')

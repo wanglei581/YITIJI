@@ -40,10 +40,10 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
-| **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 12 |
+| **protected** | 硬名单，即使零引用也不得删除 | 7 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 13 |
 | **medium** | 只被文档或其它文件提及 | 8 |
-| **low** | 全仓零提及 | 123 |
+| **low** | 全仓零提及 | 126 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（123）
+## low — 全仓零提及（126）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -82,7 +82,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusMockAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 文档（119）
+### 文档（122）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -95,6 +95,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/design/kiosk-ai-orchestration-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-orchestration-2026-08/_RESUME-NOTE.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-os-fusion-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/design/kiosk-redesign-2026-08/DESIGN-PHASE2-RESUME.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/device/release-batching-2026-08-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/patent/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/patent/对接清单.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -108,6 +109,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/reviews/agency-phase2-closeout-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/agency-project-structure-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/ai-resume-phase0-contract-lock-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/ci-gate-exemption-cleanup-backlog-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/codex-phase0-followup.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/dev-status-consolidation-2026-07-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/empty-catalogs-root-cause-2026-08-16.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -124,6 +126,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/reviews/project-normalization-local-tools-landing.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-task-evidence-triage.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/real-file-print-2026-08-17/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/self-assessment-v1-review-scope.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/task-card-x1-n2-n4-admin-fe-split.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-06-18-benefit-activities-real-validation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-06-18-profile-notifications-feedback-p1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -232,7 +235,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（12）
+## high — 仍被 CI / 门禁 / 包脚本引用（13）
 
 ### 页面/组件（6）
 
@@ -245,13 +248,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-prod-build-config.mjs、apps/kiosk/scripts/verify-runtime-terminal-identity.mjs |
 | `apps/kiosk/src/pages/home/serviceGroups.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-jobfair-checkin.mjs、apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs |
 
-### 门禁脚本（3）
+### 门禁脚本（4）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/admin/scripts/verify-partner-account-delete-ui.mjs` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json、scripts/verify-ci-gate-coverage.mjs |
-| `apps/kiosk/scripts/verify-jobfairs-terminal-priority.mjs` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json |
-| `scripts/verify-self-assessment-r3-pick.mjs` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json |
+| `services/api/scripts/verify-change-password.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json、services/api/scripts/run-verify-change-password.mjs、services/api/scripts/verify-change-password-target-guard.ts |
+| `services/api/scripts/verify-wave2-account-rebind.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs、scripts/ci-gate-exemptions.json |
+| `services/api/scripts/verify-wave3-print-aftercare.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json |
 
 ### 样式（2）
 
@@ -269,7 +273,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## protected — 硬名单，即使零引用也不得删除（4）
+## protected — 硬名单，即使零引用也不得删除（7）
 
 这些路径即使零引用也**不得删除**。它们的价值不在「被代码引用」，
 而在作为回归基线、目标设计或产权归属。
@@ -282,3 +286,11 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/design/kiosk-ai-os-v3-2026-08/STATUS.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 当前 V6 目标设计，是「将要实现」而不是「已被引用」 |
 | `docs/design/kiosk-ai-os-v3-2026-08/backlog-triage-2026-08-09.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 当前 V6 目标设计，是「将要实现」而不是「已被引用」 |
 | `docs/design/kiosk-ai-os-v3-2026-08/phase2-home-pilot-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 当前 V6 目标设计，是「将要实现」而不是「已被引用」 |
+
+### 门禁脚本（3）
+
+| 路径 | 判定依据 |
+| --- | --- |
+| `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ Windows 硬件链路（打印机 / 扫描仪 / U 盘） |
+| `apps/terminal-agent/scripts/verify-scan-deletion-audit.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ Windows 硬件链路（打印机 / 扫描仪 / U 盘） |
+| `apps/terminal-agent/scripts/verify-task-reliability.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ Windows 硬件链路（打印机 / 扫描仪 / U 盘） |

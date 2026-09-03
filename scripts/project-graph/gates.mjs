@@ -18,7 +18,11 @@ import path from 'node:path'
 import { importSpecifiers, readJson, readText, sorted, stripComments, trackedFiles } from './repo.mjs'
 
 const GATE_DIR_PATTERN = /^(?:scripts\/|(?:apps|services|packages)\/[^/]+\/scripts\/)/
-const GATE_EXT_PATTERN = /\.(mjs|cjs|js)$/
+// 两个扩展名模式**必须同步**：GATE_EXT_PATTERN 决定「哪些文件算门禁」，
+// scriptFilesInCommand 的正则决定「package.json 的命令指向了哪个门禁文件」。
+// 只改一边的后果实测过：加 .ts 后收录 428 条，但命令匹配仍只认 .mjs/.cjs/.js，
+// 于是 261 条 .ts 门禁全被判为「写完没接线」，verify:ci-gate-coverage 直接红。
+const GATE_EXT_PATTERN = /\.(mjs|cjs|js|ts)$/
 
 /** 仓库里全部「门禁脚本候选」文件（排除 docs/ 下的原型静态资源）。 */
 export function gateScriptFiles() {
@@ -29,6 +33,12 @@ export function gateScriptFiles() {
   // run-serial-commands.mjs 时实际踩到。补一个前导斜杠让两种路径同构。
   return trackedFiles().filter((file) => {
     const path = `/${file}`
+    // .ts 只收 verify-* ：scripts/ 下的 .ts 里混着维护脚本、夹具与测试靶子
+    //（clear-import-rawdata.ts / release-provenance-fixture.ts /
+    //  change-password-verify-target.ts），它们不是门禁，被当成「写完没接线的门禁」
+    // 只会制造噪音。.mjs 沿用原有口径不动，避免改变已稳定的 167 条判定。
+    const base = file.slice(file.lastIndexOf('/') + 1)
+    if (file.endsWith('.ts') && !base.startsWith('verify-')) return false
     return (
       GATE_DIR_PATTERN.test(file) &&
       GATE_EXT_PATTERN.test(file) &&
@@ -70,7 +80,7 @@ export function workspacePackages() {
 /** 从一条 npm script 命令里解析出它执行的脚本文件（相对包目录）。 */
 function scriptFilesInCommand(command, packageDir, fileSet) {
   const found = new Set()
-  for (const [, raw] of command.matchAll(/([\w./-]+\.(?:mjs|cjs|js))/g)) {
+  for (const [, raw] of command.matchAll(/([\w./-]+\.(?:mjs|cjs|js|ts))/g)) {
     const candidates = [
       path.posix.normalize(packageDir ? `${packageDir}/${raw}` : raw),
       path.posix.normalize(raw),
@@ -220,7 +230,10 @@ const NEGATION_CONTEXT =
 export function extractAssertedPaths(gateFile, fileSet, dirIndex, packageDirs = []) {
   const text = stripComments(readText(gateFile))
   const packageDir = path.posix.dirname(path.posix.dirname(gateFile))
-  const primaryBases = ['', packageDir, path.posix.dirname(packageDir)].filter((b) => b !== '.')
+  // 相对 import（../x、./x）的基准是**门禁文件自己所在目录**，不是包目录。
+  // 少了这一项，`from '../src/y'` 会被拼成 services/src/y（少一层），永远命中不了。
+  const gateDir = path.posix.dirname(gateFile)
+  const primaryBases = [gateDir, '', packageDir, path.posix.dirname(packageDir)].filter((b) => b !== '.')
   const fallbackBases = packageDirs.filter((dir) => dir && !primaryBases.includes(dir))
 
   const files = new Set()
@@ -234,19 +247,35 @@ export function extractAssertedPaths(gateFile, fileSet, dirIndex, packageDirs = 
     if (BUILD_ARTIFACT.test(literal)) continue
 
     const looksLikeFile = ASSERTABLE_EXT.test(literal)
-    const looksLikeDir = !looksLikeFile && /^(src|scripts|prisma|public|docs)\//.test(literal)
-    if (!looksLikeFile && !looksLikeDir) continue
+    // ES import 说明符**不带扩展名**：`from '../src/x/y.mapper'`。
+    // 只认带扩展名的字面量，会让「门禁 import 了某个源文件」这类边一条都抽不出来 ——
+    // 实测后果：verify-member-data-export.ts 第 17 行直接 import 了
+    // member-data-export.mapper，图谱却报该文件只被一条 .mjs 门禁断言。
+    // 有人（我）照图谱决定跑哪些门禁，因此漏测，CI 才红。
+    const looksLikeRelImport = !looksLikeFile && /^\.{1,2}\//.test(literal)
+    const looksLikeDir = !looksLikeFile && !looksLikeRelImport && /^(src|scripts|prisma|public|docs)\//.test(literal)
+    if (!looksLikeFile && !looksLikeDir && !looksLikeRelImport) continue
 
     let hit = false
+    // 无扩展名的相对 import 依次试这些后缀（含目录 index），命中即建边。
+    const suffixes = looksLikeRelImport
+      ? ['.ts', '.tsx', '.mts', '.mjs', '.js', '/index.ts', '/index.mjs', '']
+      : ['']
     for (const base of primaryBases) {
-      const candidate = path.posix.normalize(base ? `${base}/${literal}` : literal)
-      if (fileSet.has(candidate)) {
-        files.add(candidate)
+      let matched = null
+      for (const suffix of suffixes) {
+        const candidate = path.posix.normalize(base ? `${base}/${literal}${suffix}` : `${literal}${suffix}`)
+        if (fileSet.has(candidate)) { matched = candidate; break }
+      }
+      if (matched) {
+        files.add(matched)
         hit = true
         break
       }
-      if (dirIndex.has(candidate)) {
-        dirs.add(candidate)
+      // 目录断言仍按原字面量判定（无扩展名后缀只用于文件解析）
+      const asDir = path.posix.normalize(base ? `${base}/${literal}` : literal)
+      if (dirIndex.has(asDir)) {
+        dirs.add(asDir)
         hit = true
         break
       }
@@ -353,8 +382,12 @@ export function gateHelperModules(fileSet) {
     // a) 真正的 import 图
     for (const spec of importSpecifiers(text)) {
       if (!spec.startsWith('.')) continue
-      const resolved = path.posix.normalize(path.posix.join(dir, spec))
-      if (fileSet.has(resolved)) helpers.add(resolved)
+      // 与 extractAssertedPaths 同一个坑：ES import 不带扩展名，
+      // 只试原样会让 .ts helper 认不出来，进而被误判成「写完没接线的门禁」。
+      const base = path.posix.normalize(path.posix.join(dir, spec))
+      for (const suffix of ['', '.ts', '.tsx', '.mts', '.mjs', '.js', '/index.ts', '/index.mjs']) {
+        if (fileSet.has(`${base}${suffix}`)) { helpers.add(`${base}${suffix}`); break }
+      }
     }
 
     // b) + c) 字符串里提到的同族脚本文件名（spawn 路径 / 源码比对素材）

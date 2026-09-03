@@ -17,6 +17,7 @@
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { useIdleTimer } from '../../hooks/useIdleTimer'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import {
   AlertTriangleIcon,
@@ -87,6 +88,17 @@ export function EligibilityPanel() {
   useEffect(probe, [])
 
   const answeredCount = useMemo(() => countAnswered(answers), [answers])
+
+  // 公共屏：作答只在内存，离开即没；但人走了还停在结果页时，下一位仍能读到户籍 / 参保。
+  // 60 秒无操作把作答和结论清掉，页面还在（不删 UI），只是回到空白表单。
+  useIdleTimer({
+    timeoutMs: 60_000,
+    enabled: (phase.s === 'ask' || phase.s === 'result') && !submitting,
+    onIdle: () => {
+      setAnswers({})
+      setPhase((prev) => (prev.s === 'result' ? { s: 'ask', questions: prev.questions } : prev))
+    },
+  })
 
   const submit = (questions: EligibilityQuestionSet) => {
     setSubmitting(true)

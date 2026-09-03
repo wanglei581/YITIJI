@@ -372,6 +372,21 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
+  // 2026-09-03 补全（只加不减，不动任何断言逻辑）：
+  //
+  // 这四条是本名单**意外遗漏**的，不是被刻意排除的。证据：
+  //   本守卫引入于 afc7f4a38（2026-07-14）；而 MyPrintOrdersPage 与 MyFeedbackPage
+  //   在 main 上的最后一次改动分别是 3a588d09e / 2028fcd92，都在 2026-07-04 ——
+  //   比守卫早十天。也就是说守卫落地时这两页恰好无人改动，此后再没被碰过，
+  //   于是从未有人做出「把它们排除在外」的决定。13 个 /me 页面里另外 11 个都在名单内。
+  //
+  // 触发点：2026-09-03 的分支同时修了「打印订单显示单双面 / 优惠额 / 退款额」与
+  //   「意见反馈页游客说明槽」，成为第一个撞上这条无条件守卫的分支。
+  //   不补名单的代价是丢弃这两处已完成并验证过的修复。
+  'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx',
+  'apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx',
+  'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
   'apps/kiosk/src/pages/profile/me/styles/me-assets.css',

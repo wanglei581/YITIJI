@@ -94,6 +94,27 @@ assertContains('src/auth/kioskSensitiveSession.ts', 'clearKioskSensitiveSession'
 assertContains('src/auth/kioskSensitiveSession.ts', 'clearPrintMaterialSession()', 'Sensitive session cleanup clears print material session')
 assertContains('src/auth/kioskSensitiveSession.ts', 'clearAiResumeSession()', 'Sensitive session cleanup clears AI resume session')
 assertContains('src/auth/kioskSensitiveSession.ts', 'clearJobMaterialDraft()', 'Sensitive session cleanup clears job material draft')
+assertContains('src/auth/kioskSensitiveSession.ts', 'clearSelfAssessmentSession()', 'Sensitive session cleanup clears self-assessment answers/results')
+assertContains('src/auth/kioskSensitiveSession.ts', 'SELF_ASSESSMENT_SESSION_KEY', 'Self-assessment sessionStorage key is registered for leftover detection')
+assertContains('src/auth/kioskSensitiveSession.ts', 'clearKioskSharedDeviceResidue', 'Kiosk exposes shared-device residue cleanup for guest local favorites')
+assertContains('src/auth/kioskSensitiveSession.ts', 'hasLocalFavorites()', 'Leftover detection includes guest local favorites')
+assertContains('src/auth/AuthContext.tsx', 'clearKioskSharedDeviceResidue()', 'Logout clears guest local favorites so the next visitor cannot see them')
+{
+  const auth = read('src/auth/AuthContext.tsx')
+  const loginStart = auth.indexOf('const login = useCallback')
+  const logoutStart = auth.indexOf('const logout = useCallback')
+  const afterLogout = auth.indexOf('useEffect(', logoutStart + 1)
+  const login = auth.slice(loginStart, logoutStart)
+  const logout = afterLogout > logoutStart ? auth.slice(logoutStart, afterLogout) : auth.slice(logoutStart)
+  if (login.includes('clearKioskSharedDeviceResidue')) {
+    fail('login() must not clear local favorites (merge-to-account needs them)')
+  }
+  pass('login() preserves guest local favorites for merge-to-account')
+  if (!logout.includes('clearKioskSharedDeviceResidue()')) {
+    fail('logout() must clear guest local favorites')
+  }
+  pass('logout() clears guest local favorites')
+}
 assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', 'saveJobMaterialDraft', 'Job material page saves login draft through helper')
 assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', 'readJobMaterialDraft', 'Job material page restores login draft through helper')
 assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', 'clearJobMaterialDraft', 'Job material page clears login draft after generation')
