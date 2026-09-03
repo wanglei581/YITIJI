@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path'
 import { encryptSecret, decryptSecret } from '../../common/crypto/secret-cipher'
 import { LLM_PRESETS, isLlmVendor, type LlmVendor } from './llm-presets'
 import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
+import { auditTextHash, type AiConfigApiKeyAction, type LlmConfigAuditSnapshot } from './ai-config-audit'
 
 export interface LlmConfig {
   vendor:       LlmVendor
@@ -450,6 +451,57 @@ export class LlmConfigService {
   isReady(feature: AiModelFeatureKey = 'assistant_chat'): boolean {
     const cfg = this.cache[this.resolveFeature(feature)]
     return cfg.enabled && Boolean(cfg.apiKeyEncrypted)
+  }
+
+  // ── 审计（安全空白补齐）──────────────────────────────────
+  //
+  // 为什么审计写在 controller 而不是这里：本服务是**零依赖**的纯配置存储
+  // （constructor 不吃任何 provider），verify-ai-config / verify-ai-feature-keys /
+  // verify-print-param-suggestion / verify-llm-connectivity 都直接 `new LlmConfigService()`。
+  // 往构造函数里塞 AuditService 会把这四个门禁全部打红，而且 actor（是谁改的）
+  // 只有请求上下文才知道，服务层拿不到。
+  // 因此这里只提供**已脱敏**的快照与密钥动作判定，落审计由 ai-config.controller.ts 完成
+  // —— 与 admin-toolbox.controller.ts 的 toolbox_config.update 是同一套写法。
+
+  /**
+   * 取审计用快照。返回值构造时就已脱敏：不含 apiKey 明文/密文，也不含
+   * systemPrompt / roleScope 全文（只有字符数与内容哈希）。
+   */
+  getAuditSnapshot(feature: AiModelFeatureKey = 'assistant_chat'): LlmConfigAuditSnapshot {
+    const effective = this.resolveFeature(feature)
+    const cfg = this.cache[effective]
+    return {
+      vendor: cfg.vendor,
+      model: cfg.model,
+      baseURL: cfg.baseURL,
+      temperature: cfg.temperature,
+      enabled: cfg.enabled,
+      systemPromptChars: cfg.systemPrompt.length,
+      systemPromptHash: auditTextHash(cfg.systemPrompt),
+      roleScopeChars: cfg.roleScope.length,
+      roleScopeHash: auditTextHash(cfg.roleScope),
+      forbiddenWords: [...cfg.forbiddenWords],
+      apiKeyConfigured: Boolean(cfg.apiKeyEncrypted),
+      // 注意读的是 cache[feature] 而不是 cache[effective]：
+      // 「本键是否已被单独配置」问的是这个键自己的状态，不是父键的。
+      explicitlyConfigured: this.cache[feature].explicitlyConfigured,
+      effectiveFeature: effective,
+    }
+  }
+
+  /**
+   * 判断本次 patch 对 apiKey 做了什么。**必须在 update() 之前调用**（比较基准是现值）。
+   *
+   * 返回值只有动作枚举。明文比较只在内存里发生，既不返回、不落日志、不进审计
+   * —— 见 ai-config-audit.ts 开头的铁律。
+   */
+  describeApiKeyChange(feature: AiModelFeatureKey, apiKey: string | undefined): AiConfigApiKeyAction {
+    if (apiKey === undefined) return 'absent'
+    const configured = Boolean(this.cache[this.resolveFeature(feature)].apiKeyEncrypted)
+    if (apiKey === '') return configured ? 'cleared' : 'unchanged'
+    if (!configured) return 'set'
+    // 提交了与现值逐字相同的密钥 → 如实记「未变更」，不谎报一次轮换。
+    return this.getApiKey(feature) === apiKey ? 'unchanged' : 'rotated'
   }
 
   // ── 更新 ──────────────────────────────────────────────────

@@ -18,6 +18,11 @@ import {
 } from '../llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import {
+  RESUME_STRUCTURE_PROMPT_RULES,
+  sanitizeContentBlocks,
+  sanitizeIssues,
+} from './llm-resume-evidence'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
@@ -26,8 +31,11 @@ import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-l
 //
 // - 复用 LlmConfigService 的 resume_diagnosis 功能级加密凭证，不引入任何 SDK，用全局 fetch。
 // - 单轮调用：固定 6 评分维度 + 可执行建议 + 风险表述提醒 + 修改优先级建议；严格 JSON，非法重试一次。
+// - S25 增结构：内容结构（contentBlocks）+ 问题证据（issues）。清洗规则与对应提示词
+//   条款在 ./llm-resume-evidence.ts，本文件只做编排（文件体积见 CLAUDE.md §8）。
 // - 合规：低 temperature 求稳；禁止编造经历 / 招聘结果·匹配程度·代投推荐·企业筛选类结论；
-//   风险提醒只针对简历「文本表达」，严禁年龄/性别/婚育/地域/学历歧视等敏感判断；建议不回贴原文。
+//   风险提醒只针对简历「文本表达」，严禁年龄/性别/婚育/地域/学历歧视等敏感判断；
+//   只有 contentBlocks[].lines 与 issues[].evidence[].quote 可逐字引原文，且逐行回配校验。
 // - 安全：出错只记 status / 状态码，**绝不记 prompt / 提取文本 / 请求·响应正文**。
 // ============================================================
 
@@ -71,20 +79,34 @@ const DIAGNOSIS_GUARD_TERMS = [
   j('候选人', '筛选'),
 ]
 
+/**
+ * 诊断提示词条款（不带序号；序号在 DIAGNOSIS_SYSTEM_PROMPT 里按数组下标生成）。
+ *
+ * 第 11 条在 S25 被重写：旧文本是「不得整段回贴简历原文」，与新增的
+ * contentBlocks / issues[].evidence 直接冲突 —— 那两类结构的全部价值就在于
+ * **逐字引用原文**。新文本把禁令收窄成它真正要防的东西（整份回贴），
+ * 并把「哪里可以逐字引、引多少」写死成可校验的上限。
+ */
+const DIAGNOSIS_RULES: readonly string[] = [
+  '只输出一个 JSON 对象，不要任何解释、前后缀或代码块标记。',
+  'JSON 形如：{"sections":[{"key":"basic","label":"基础信息完整度","score":8,"maxScore":10}],"suggestions":["..."],"riskNotes":["..."],"priorities":[{"focus":"...","reason":"..."}],"contentBlocks":[{"key":"experience","lines":["..."]}],"issues":[{"dim":"quantification","title":"...","evidence":[{"blockKey":"experience","quote":"..."}],"impact":"...","fixIt":"..."}]}。',
+  `sections 必须且只能包含这 6 个维度（key 固定）：${DIAGNOSIS_DIMENSIONS.map((d) => `${d.key}(${d.label})`).join('、')}；每项 maxScore 固定为 10，score 为 0~10 的整数。`,
+  'suggestions：3~6 条具体、可执行的中文改进建议，针对该简历真实内容。',
+  'riskNotes：0~5 条「简历文本表达风险」提醒，只针对文本表达问题（如经历时间线表述不连续、成果缺少量化描述、职责描述过于笼统、求职目标不够明确、联系方式缺失或格式不清）。严禁涉及年龄、性别、婚育、地域、学历歧视等敏感判断，严禁暗示录用或面试结果；无明显风险时给空数组 []。',
+  'priorities：2~4 条「修改优先级建议」，按重要性从高到低排序，每条形如 {"focus":"要先改什么","reason":"为什么"}。',
+  '不得编造简历中不存在的经历、学历、技能或成果；信息不足时在 suggestions / riskNotes 中如实指出需补充。',
+  '「岗位关键词覆盖」只评估简历文本是否覆盖常见岗位表达，不做任何匹配程度类结论或代投 / 推荐类结论。',
+  '若收到诊断重点维度或目标方向，只能用于调整 suggestions / priorities 的关注重点与排序；不得裁剪 sections，必须完整 6 维输出。',
+  '目标岗位、行业或场景只用于评估简历表达是否清晰覆盖相关准备方向，不得输出任何招聘结果类结论、匹配程度类结论、代投或推荐类结论、企业筛选类结论，也不得做“保过”类承诺。',
+  '所有内容只服务于求职者本人修改简历参考。只有 contentBlocks[].lines 与 issues[].evidence[].quote 这两处可以逐字引用简历原文，且必须按下面的条数与字数上限分块摘录；'
+    + '除这两处外不得回贴原文，也不得把整份简历原样抄进任何字段。',
+  ...RESUME_STRUCTURE_PROMPT_RULES,
+]
+
 const DIAGNOSIS_SYSTEM_PROMPT = [
   '你是「AI 求职打印服务终端」的简历诊断引擎，只依据用户提供的简历文本做客观诊断。',
   '严格要求：',
-  '1. 只输出一个 JSON 对象，不要任何解释、前后缀或代码块标记。',
-  '2. JSON 形如：{"sections":[{"key":"basic","label":"基础信息完整度","score":8,"maxScore":10}],"suggestions":["..."],"riskNotes":["..."],"priorities":[{"focus":"...","reason":"..."}]}。',
-  `3. sections 必须且只能包含这 6 个维度（key 固定）：${DIAGNOSIS_DIMENSIONS.map((d) => `${d.key}(${d.label})`).join('、')}；每项 maxScore 固定为 10，score 为 0~10 的整数。`,
-  '4. suggestions：3~6 条具体、可执行的中文改进建议，针对该简历真实内容。',
-  '5. riskNotes：0~5 条「简历文本表达风险」提醒，只针对文本表达问题（如经历时间线表述不连续、成果缺少量化描述、职责描述过于笼统、求职目标不够明确、联系方式缺失或格式不清）。严禁涉及年龄、性别、婚育、地域、学历歧视等敏感判断，严禁暗示录用或面试结果；无明显风险时给空数组 []。',
-  '6. priorities：2~4 条「修改优先级建议」，按重要性从高到低排序，每条形如 {"focus":"要先改什么","reason":"为什么"}。',
-  '7. 不得编造简历中不存在的经历、学历、技能或成果；信息不足时在 suggestions / riskNotes 中如实指出需补充。',
-  '8. 「岗位关键词覆盖」只评估简历文本是否覆盖常见岗位表达，不做任何匹配程度类结论或代投 / 推荐类结论。',
-  '9. 若收到诊断重点维度或目标方向，只能用于调整 suggestions / priorities 的关注重点与排序；不得裁剪 sections，必须完整 6 维输出。',
-  '10. 目标岗位、行业或场景只用于评估简历表达是否清晰覆盖相关准备方向，不得输出任何招聘结果类结论、匹配程度类结论、代投或推荐类结论、企业筛选类结论，也不得做“保过”类承诺。',
-  '11. 所有内容只服务于求职者本人修改简历参考，不得整段回贴简历原文。',
+  ...DIAGNOSIS_RULES.map((rule, index) => `${index + 1}. ${rule}`),
 ].join('\n')
 
 const RETRY_HINT =
@@ -193,6 +215,10 @@ export class LlmResumeService {
     // 诊断只看简历「文本表达」，姓名 / 手机 / 身份证 / 邮箱 / 住址对结论没有贡献，
     // 没有理由原样出境到第三方模型。遮盖失败不阻塞诊断（见 llm-input-mask.ts 说明）。
     const text = maskUserTextForLlmText((extractedText ?? '').slice(0, MAX_DIAGNOSIS_INPUT_CHARS), 'resume_diagnosis')
+    // 只送前 MAX_DIAGNOSIS_INPUT_CHARS 字符 → 后面的内容块会整块缺席。不说出来，
+    // 用户会把「没送进模型」读成「简历里没有这几块」（CLAUDE.md §9 不伪造能力）。
+    // ai.service.ts 已就同一事实下发 extractionNotice 告警，这里是报告体内的同源标记。
+    const truncatedInput = (extractedText ?? '').length > MAX_DIAGNOSIS_INPUT_CHARS
     const baseMessages: ChatMessage[] = [
       { role: 'system', content: DIAGNOSIS_SYSTEM_PROMPT },
       { role: 'user', content: buildDiagnosisUserPrompt(text, context) },
@@ -205,8 +231,14 @@ export class LlmResumeService {
         cfg.baseURL, apiKey, cfg.model, DIAGNOSIS_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, context?.onLlmCall,
       )
-      const report = this.parseReport(raw, cfg.forbiddenWords)
-      if (report) return report
+      // 防编造校验基准是 text（**送出去的那一份**，已截断已遮盖），不是 extractedText。
+      // 与 llm-job-fit / llm-resume-optimize 同一条不变量：引文必须能在模型看得到的
+      // 文本里找到；拿未遮盖原文去校验等于自己放宽这条不变量。
+      const report = this.parseReport(raw, cfg.forbiddenWords, text)
+      if (report) {
+        if (truncatedInput) report.truncatedInput = true
+        return report
+      }
       this.logger.warn(`resume diagnose: invalid JSON output (attempt ${attempt}/2)`)
     }
 
@@ -286,7 +318,7 @@ export class LlmResumeService {
 
   // ── 解析 + 强校验结构化报告 ─────────────────────────────────────────────────
 
-  private parseReport(raw: string, forbiddenWords: string[]): ResumeReport | null {
+  private parseReport(raw: string, forbiddenWords: string[], maskedText: string): ResumeReport | null {
     const jsonStr = this.extractJson(raw)
     if (!jsonStr) return null
     let parsed: unknown
@@ -334,10 +366,22 @@ export class LlmResumeService {
     // priorities 合法数量 2~4：清洗后恰好 1 条视为无效输出（触发重试）；0 条则不附带、由前端回退。
     if (priorities.length === 1) return null
 
+    // ── S25 新增结构：内容结构 + 问题证据 ──────────────────────────────────
+    //
+    // 失败纪律（最重要的一条）：上面 sections / suggestions / priorities 的严格度
+    // **一字未改**，这两类新字段单独清洗，不合法就不附带 —— 与 riskNotes 的
+    // 「有内容才附带」同构。最坏情况退回今天的报告形态，成功率与今天完全一致；
+    // 绝不因为模型不会摘原文就把一份本可用的报告判失败。
+    const contentBlocks = sanitizeContentBlocks(obj['contentBlocks'], maskedText)
+    // issues 依赖 contentBlocks：证据只能落在已校验的行上，块没了问题也不成立。
+    const issues = sanitizeIssues(obj['issues'], contentBlocks, blocked)
+
     const report: ResumeReport = { sections, suggestions }
     // 风险/优先列表只在有内容时附带；缺失由前端兼容（隐藏风险卡 / 优先项回退按低分派生）。
     if (riskNotes.length > 0) report.riskNotes = riskNotes
     if (priorities.length >= 2) report.priorities = priorities
+    if (contentBlocks.length > 0) report.contentBlocks = contentBlocks
+    if (issues.length > 0) report.issues = issues
     return report
   }
 

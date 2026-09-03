@@ -1,5 +1,5 @@
 import type {
-  AdminAiLogEntry, AdminAiUsage, AdminAiLogsResult, JobSourceQualitySummary,
+  AdminAiLogEntry, AdminAiUsage, AdminAiLogsQuery, AdminAiLogsResult, JobSourceQualitySummary,
   AiOperation, AiOperationCost,
 } from './types'
 
@@ -79,10 +79,25 @@ export const adminAiMockAdapter = {
     return computeUsage(MOCK_LOG_ENTRIES)
   },
 
-  async getAiLogs(limit = 100): Promise<AdminAiLogsResult> {
+  /**
+   * mock 必须实现与后端**同样的服务端筛选语义**（先筛后切页，total 是匹配总数）。
+   * 否则 mock 模式下页面看起来一切正常，切到 http 才暴露分页/计数不一致。
+   */
+  async getAiLogs(query: AdminAiLogsQuery = {}): Promise<AdminAiLogsResult> {
     await delay()
-    const entries = MOCK_LOG_ENTRIES.slice(0, limit)
-    return { total: MOCK_LOG_ENTRIES.length, entries }
+    const limit = Math.min(Math.max(query.limit ?? 100, 1), 500)
+    const offset = Math.max(query.offset ?? 0, 0)
+    const startAt = query.startAt ? Date.parse(query.startAt) : null
+    const endAt = query.endAt ? Date.parse(query.endAt) : null
+    const matched = MOCK_LOG_ENTRIES.filter((entry) => {
+      if (query.operation && entry.operation !== query.operation) return false
+      if (query.status && entry.status !== query.status) return false
+      const at = Date.parse(entry.createdAt)
+      if (startAt !== null && at < startAt) return false
+      if (endAt !== null && at >= endAt) return false
+      return true
+    })
+    return { total: matched.length, entries: matched.slice(offset, offset + limit), limit, offset }
   },
 
   async getAdminJobQualitySummary(): Promise<JobSourceQualitySummary[]> {

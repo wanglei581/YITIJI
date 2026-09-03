@@ -7,12 +7,19 @@ import { JwtService } from '@nestjs/jwt'
 import { AsrService } from '../asr/asr.service'
 import { AiService } from './ai.service'
 import type { AiResultRequester } from './ai.service'
-import { AiLogService } from './ai-log.service'
+import {
+  AiLogService,
+  AI_LOG_STATUSES,
+  AI_OPERATIONS,
+  MAX_LOG_LIMIT,
+  isAiLogStatus,
+  isAiOperation,
+} from './ai-log.service'
 import { AuditService } from '../audit/audit.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
-import type { AdminAiUsage, AdminAiLogsResult } from './ai-log.service'
+import type { AdminAiUsage, AdminAiLogsResult, AiLogStatus, AiOperation } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
 import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
@@ -446,12 +453,87 @@ export class AiController {
     return await this.logService.getUsage(this.aiService.getProviderName())
   }
 
+  /**
+   * AI 调用日志列表（仅元数据）。
+   *
+   * 筛选一律在**服务端**做：此前只有 limit，Admin 页固定拉 100 条再在浏览器里过滤，
+   * 低频能力（contractReview 等）没挤进这 100 条就显示为空 —— 页面在说假话。
+   *
+   * 非法筛选值一律 400，不静默忽略（与 assertValidFeatureKey 同口径）：
+   * 静默忽略会让运营以为「筛过了、没有数据」，而实际是筛选根本没生效。
+   *
+   * ⚠️ 响应里没有 endUserId：AI 日志不暴露调用者身份，是合规设计，别加。
+   */
   @Get('admin/ai/logs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  async getAiLogs(@Query('limit') limitStr?: string): Promise<AdminAiLogsResult> {
-    const limit = limitStr !== undefined ? Number(limitStr) : 100
-    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 500) : 100
-    return await this.logService.getLogs(safeLimit)
+  async getAiLogs(
+    @Query('operation') operation?: string,
+    @Query('status') status?: string,
+    @Query('startAt') startAt?: string,
+    @Query('endAt') endAt?: string,
+    @Query('limit') limitStr?: string,
+    @Query('offset') offsetStr?: string,
+  ): Promise<AdminAiLogsResult> {
+    const range = {
+      startAt: parseLogDateFilter(startAt, 'startAt'),
+      endAt: parseLogDateFilter(endAt, 'endAt'),
+    }
+    if (range.startAt && range.endAt && range.startAt.getTime() >= range.endAt.getTime()) {
+      throw badLogFilter('startAt 必须早于 endAt')
+    }
+    return await this.logService.getLogs({
+      operation: parseLogOperationFilter(operation),
+      status: parseLogStatusFilter(status),
+      startAt: range.startAt,
+      endAt: range.endAt,
+      limit: parseLogNumberFilter(limitStr, 'limit', 1, MAX_LOG_LIMIT),
+      offset: parseLogNumberFilter(offsetStr, 'offset', 0, Number.MAX_SAFE_INTEGER),
+    })
   }
+}
+
+// ─── /admin/ai/logs 筛选参数解析 ────────────────────────────────
+// 空字符串一律视为「未提供」：前端把 select 清空时会带 `?operation=` 过来，
+// 那不是非法值，是不筛。
+
+function badLogFilter(message: string): BadRequestException {
+  return new BadRequestException({ error: { code: 'AI_LOG_FILTER_INVALID', message } })
+}
+
+function parseLogOperationFilter(value: string | undefined): AiOperation | undefined {
+  if (value === undefined || value === '') return undefined
+  if (!isAiOperation(value)) {
+    throw badLogFilter(`未知的 operation。合法取值：${AI_OPERATIONS.join(', ')}`)
+  }
+  return value
+}
+
+function parseLogStatusFilter(value: string | undefined): AiLogStatus | undefined {
+  if (value === undefined || value === '') return undefined
+  if (!isAiLogStatus(value)) {
+    throw badLogFilter(`未知的 status。合法取值：${AI_LOG_STATUSES.join(', ')}`)
+  }
+  return value
+}
+
+function parseLogDateFilter(value: string | undefined, field: string): Date | undefined {
+  if (value === undefined || value === '') return undefined
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) throw badLogFilter(`${field} 不是合法时间（需 ISO 8601）`)
+  return parsed
+}
+
+function parseLogNumberFilter(
+  value: string | undefined,
+  field: string,
+  min: number,
+  max: number,
+): number | undefined {
+  if (value === undefined || value === '') return undefined
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw badLogFilter(`${field} 必须是 ${min}–${max} 之间的整数`)
+  }
+  return parsed
 }
