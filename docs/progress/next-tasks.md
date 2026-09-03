@@ -4,9 +4,9 @@
 
 产品负责人当天明确：必须真做出遮挡后的文件，不是产品决策要停在「只评估不产出」。交付矩阵 [kiosk-delivery-matrix-2026-08.md](../product/kiosk-delivery-matrix-2026-08.md) 把这一行标为 P0 第 1 位（「补三步：渲染遮挡 PDF → files.upload → 回填 resultFileId」），没有标成产品决策。
 
-- [x] **后端（本刀，分支 `feat/pii-redaction-revive`，未合入、未部署）**：把 PR #566 按文件移植到最新 `origin/main`，不 merge/rebase 落后 535 提交的老分支。`pii_redact` 对文字层 PDF 生成派生件并回填 `resultFileId`；扫描件 / 无坐标诚实 `not_supported` 且零文件。`verify:pii-redaction` 39 项全绿（核心判据未削弱），已接双 CI job。前端未动。
-- [ ] **前端（PR #565，不在本刀）**：一体机材料检查页仍按评估态 stub 说话。后端已能给 `redactedFileId` / 签名 `redactedFileUrl` / `claim` 之后，需要另一条把预览、打印源和文案接到真实产物，并删掉「当前版本不生成遮挡后的新文件」那句。
-- [ ] **扫描件 / 图片遮挡（二级，未开工）**：本刀只做文字层 PDF。OCR 路径仍无坐标（百度 `accurate_basic` 不返回 location），会如实 `not_supported`。
+- [x] **后端（PR #766 已合入 `main`，未部署）**：`pii_redact` 对文字层 PDF 生成派生件并回填 `resultFileId`；扫描件 / 无坐标诚实 `not_supported` 且零文件。`verify:pii-redaction` 39 项全绿（核心判据未削弱），已接双 CI job。
+- [x] **前端文案（本刀，分支 `feat/pii-redaction-honest-copy`，未合入、未部署）**：一体机预览 / 确认 / 材料检查按后端 5 个 `claim` 分别说话，不再写「当前版本不生成新文件」。有派生件时打印改用遮挡后文件。呈现层视觉（强制预览核对页 / 青序流光稿 13）不在本刀。
+- [ ] **扫描件 / 图片遮挡（二级，未开工）**：文字层 PDF 之外，OCR 路径仍无坐标（百度 `accurate_basic` 不返回 location），会如实 `not_supported`。
 
 ## 当前候选：F0.5 发布可观测性（2026-09-01）
 

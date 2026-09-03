@@ -144,6 +144,24 @@ export const COMPLIANCE_FORBIDDEN_TERMS = [
 ] as const
 
 /**
+ * 隐私遮挡的能力天花板(docs/product/pii-redaction-decision-2026-08.md §3.3)。
+ *
+ * 独立于上面的招聘 CTA 禁词:合同审查安全闸门按字节镜像 `COMPLIANCE_FORBIDDEN_TERMS`,
+ * 把「已遮挡」塞进那份招聘清单会把镜像打红,也会把两类完全不同的禁词混在一起。
+ * 本机没有能力承诺「这份文件不含隐私内容」——遮挡只能盖住检出来的位置,检不出来的
+ * (OCR 漏字 / 证件号被拆成多个 item / 旋转页 / 低清扫描)一样盖不住;而复检用的是
+ * 同一个检测器,系统性漏检两遍都漏。因此以下三类无条件承诺禁止出现在用户可见文案里。
+ *
+ * 消费方:`scripts/verify-compliance-copy.mjs` 与 `verify:pii-redaction-contract`
+ * 都用文本解析读取本块,格式变动 fail-closed。
+ */
+export const COMPLIANCE_PII_REDACTION_FORBIDDEN_TERMS = [
+  '已遮挡',
+  '已无隐私信息',
+  '隐私已保护',
+] as const
+
+/**
  * 禁词匹配正则,额外覆盖已知变体(如「平台内投递」)。
  * 扫描脚本优先用本清单而非逐字 includes,避免变体绕过。
  * 注意:命中不等于违规,还要过 COMPLIANCE_EXEMPTION_MARKERS 判定。
@@ -156,6 +174,16 @@ export const COMPLIANCE_FORBIDDEN_TERM_PATTERNS: readonly RegExp[] = [
   /企业收简历/,
   /候选人管理/,
   /一键报名/,
+]
+
+/**
+ * 隐私遮挡天花板正则。唯一允许的说法是带限定的「已遮挡你确认的 N 处」——
+ * 它交代了范围(只有你确认的那几处)。裸的「已遮挡」是无条件承诺,禁止出现,故用否定前瞻。
+ */
+export const COMPLIANCE_PII_REDACTION_FORBIDDEN_PATTERNS: readonly RegExp[] = [
+  /已遮挡(?!你确认的)/,
+  /已?无隐私(?:信息|内容)/,
+  /隐私已(?:保护|清除|移除)/,
 ]
 
 /**
