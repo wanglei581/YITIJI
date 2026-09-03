@@ -470,9 +470,30 @@ export interface AdminAiUsage {
   costCollectionSince: string
 }
 
+/**
+ * AI 日志筛选条件（后端真相源：services/api/src/ai/ai-log.service.ts AdminAiLogsQuery）。
+ *
+ * 筛选必须走服务端：页面此前固定拉最近 100 条再在浏览器里过滤，
+ * contractReview 这类低频能力没挤进这 100 条就显示为空 —— 页面在说假话。
+ * 后端 where 走已有索引 @@index([operation, createdAt]) / @@index([status, createdAt])。
+ */
+export interface AdminAiLogsQuery {
+  operation?: AiOperation
+  status?: AiLogStatus
+  /** ISO 8601；含 */
+  startAt?: string
+  /** ISO 8601；不含 */
+  endAt?: string
+  limit?: number
+  offset?: number
+}
+
 export interface AdminAiLogsResult {
+  /** 匹配筛选条件的**总行数**，不是本页条数。 */
   total: number
   entries: AdminAiLogEntry[]
+  limit: number
+  offset: number
 }
 
 // ─── Import Batches ────────────────────────────────────────────────────────────

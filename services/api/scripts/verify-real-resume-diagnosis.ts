@@ -24,6 +24,45 @@ import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.s
 import { LlmResumeProvider } from '../src/ai/providers/llm.provider'
 
 const SENTINEL = 'ZZ_DIAG_SENTINEL_77'
+/** 简历原文里的手机号；送模型前会被遮盖成 [手机号_N]，模型看不到它（用例 20）。 */
+const PHONE_RAW = '13800001111'
+
+// ── S25：内容结构 / 问题证据的固定素材（引文必须逐字出自 defaultText）────────
+const LINE_TITLE = '姓名 张三 ZZ_DIAG_SENTINEL_77'
+const LINE_OBJECTIVE = '求职意向 前端工程师'
+const LINE_EXPERIENCE = '工作经历 2019-2024 ABC 高级前端'
+const LINE_SKILL = '技能 TypeScript React NestJS'
+/** 超过 80 字上限的真实行（用来验证截断后仍能回配成功）。 */
+const LONG_LINE = '负责社群运营与用户增长，'.repeat(9)
+
+/** 一份合法的 contentBlocks + issues（引文全部出自 defaultText）。 */
+function structurePayload() {
+  return {
+    contentBlocks: [
+      { key: 'basic', lines: [LINE_TITLE] },
+      { key: 'objective', lines: [LINE_OBJECTIVE] },
+      { key: 'experience', lines: [LINE_EXPERIENCE] },
+      { key: 'skill', lines: [LINE_SKILL] },
+    ],
+    issues: [
+      {
+        id: '模型自拟的脏 id"><script>',
+        dim: 'quantification',
+        title: '经历没有交代结果',
+        evidence: [{ blockKey: 'experience', quote: 'ABC 高级前端' }], // 片段引用 → 服务端回配整行
+        impact: '读的人看不到你做成了什么。',
+        fixIt: '每条后面补一句可核实的结果。',
+      },
+      {
+        dim: 'keyword',
+        title: '技能只列了名词',
+        evidence: [{ blockKey: 'skill', quote: LINE_SKILL }],
+        impact: '读的人看不出你到什么熟练度。',
+        fixIt: '每项技能后面补一句你用它做过什么。',
+      },
+    ],
+  }
+}
 
 function pass(message: string) {
   console.log(`  PASS ${message}`)
@@ -143,7 +182,11 @@ async function main(): Promise<void> {
   const unconfiguredProvider = new LlmResumeProvider(new LlmResumeService(unconfiguredConfig as never), new LlmResumeGenerateService(unconfiguredConfig as never), new LlmResumeOptimizeService(unconfiguredConfig as never))
 
   // 受控提取桩：按 fileId 返回提取结果（默认成功，文本含哨兵）
-  const defaultText = `姓名 张三 ${SENTINEL}\n求职意向 前端工程师\n工作经历 2019-2024 ABC 高级前端\n技能 TypeScript React NestJS`
+  //
+  // S25：文本里放了一个真实形态的手机号 PHONE_RAW。它在送模型前会被
+  // maskUserTextForLlmText 换成 [手机号_N] 占位符，**模型永远看不到原号**。
+  // 用例 20 用它证明「防编造校验的基准是送出去的那一份遮盖文本，不是原文」。
+  const defaultText = `姓名 张三 ${SENTINEL}\n手机 ${PHONE_RAW}\n求职意向 前端工程师\n工作经历 2019-2024 ABC 高级前端\n技能 TypeScript React NestJS`
   const extractionByFileId = new Map<string, unknown>()
   const fakeExtraction = {
     extractResumeText: async ({ fileId }: { fileId: string }) =>
@@ -197,6 +240,17 @@ async function main(): Promise<void> {
     createdTaskIds.push(r.taskId)
     return r
   }
+
+  // S25：内容结构用例的专用文本 = 默认文本 + 一条超 80 字的真实长行
+  const structText = `${defaultText}\n${LONG_LINE}`
+  extractionByFileId.set('struct-file', {
+    ok: true,
+    fileId: 'struct-file',
+    text: structText,
+    textSource: 'docx',
+    confidence: 'high',
+    charCount: structText.length,
+  })
 
   // 提取失败用例
   extractionByFileId.set('img-file', {
@@ -528,6 +582,234 @@ async function main(): Promise<void> {
     assert(
       r16e.status === 'completed' && !r16e.extractionNotice,
       `16e. 无警告的文字层简历不下发 extractionNotice，got ${JSON.stringify(r16e.extractionNotice ?? null)}`,
+    )
+
+    // ══════════════════════════════════════════════════════════════════════
+    // S25 内容结构（contentBlocks）+ 问题证据（issues）
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ── 17. 正常路径：内容结构与问题证据落进报告，label/顺序/id/lineIndex 由服务端定 ──
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      ...structurePayload(),
+    }) }])
+    const r17 = await submit('struct-file', null)
+    const blocks17 = r17.report?.contentBlocks ?? []
+    const issues17 = r17.report?.issues ?? []
+    assert(
+      r17.status === 'completed' &&
+        blocks17.map((b) => b.key).join(',') === 'basic,objective,experience,skill' &&
+        blocks17.every((b) => b.lines.length === 1),
+      `17a. contentBlocks 按 canonical 顺序输出、只保留有内容的块，got ${blocks17.map((b) => b.key).join(',')}`,
+    )
+    assert(
+      blocks17.find((b) => b.key === 'experience')?.label === '工作经历' &&
+        blocks17.find((b) => b.key === 'skill')?.label === '技能',
+      '17b. label 用服务端 canonical 值（模型未给 label 也不影响）',
+    )
+    assert(
+      issues17.length === 2 &&
+        issues17[0].id === 'I1' && issues17[1].id === 'I2' &&
+        !JSON.stringify(issues17).includes('<script>'),
+      `17c. issue id 由服务端分配为 I1/I2，模型自拟的脏 id 被丢弃，got ${issues17.map((i) => i.id).join(',')}`,
+    )
+    const ev17 = issues17[0]?.evidence?.[0]
+    assert(
+      issues17[0]?.dim === 'quantification' &&
+        ev17?.blockKey === 'experience' &&
+        ev17?.lineIndex === 0 &&
+        ev17?.quote === LINE_EXPERIENCE,
+      `17d. 模型只发 {blockKey,quote}（且只是片段），lineIndex 由服务端回配、quote 被整行覆盖，got ${JSON.stringify(ev17 ?? null)}`,
+    )
+    assert(
+      issues17.every((i) => i.evidence.every((e) => {
+        const blk = blocks17.find((b) => b.key === e.blockKey)
+        return !!blk && e.lineIndex >= 0 && e.lineIndex < blk.lines.length && blk.lines[e.lineIndex] === e.quote
+      })),
+      '17e. 每条证据的 lineIndex 都落在同 key 块的 lines 范围内且与 quote 一致（无悬空下标）',
+    )
+    assert(
+      r17.report?.sections.length === 6 && (r17.report?.suggestions.length ?? 0) > 0,
+      '17f. 新字段不影响既有 sections / suggestions',
+    )
+
+    // ── 18. 防编造：不在简历文本里的行被丢弃；整块编造的块不出现 ──────────────
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      contentBlocks: [
+        { key: 'experience', lines: ['我在字节跳动做过三年架构师', LINE_EXPERIENCE] },
+        { key: 'project', lines: ['主导了一个百万级用户的中台项目'] },
+        { key: 'nope_not_a_block', lines: [LINE_SKILL] },
+      ],
+    }) }])
+    const r18 = await submit('struct-file', null)
+    const blocks18 = r18.report?.contentBlocks ?? []
+    assert(
+      r18.status === 'completed' &&
+        blocks18.length === 1 &&
+        blocks18[0].key === 'experience' &&
+        blocks18[0].lines.length === 1 &&
+        blocks18[0].lines[0] === LINE_EXPERIENCE,
+      `18. 编造行被丢弃、整块编造的块不出现、未知块 key 被忽略，got ${JSON.stringify(blocks18)}`,
+    )
+
+    // ── 19. 失败纪律：新字段非法**不得**让整份报告失败 ────────────────────────
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      priorities: [
+        { focus: '补充成果量化', reason: '缺少可衡量结果' },
+        { focus: '明确求职目标', reason: '意向方向不清晰' },
+      ],
+      contentBlocks: 'not-an-array',
+      issues: 42,
+    }) }])
+    const before19 = llmCallCount
+    const r19 = await submit('struct-file', null)
+    assert(
+      r19.status === 'completed' &&
+        llmCallCount === before19 + 1 &&
+        r19.report?.sections.length === 6 &&
+        (r19.report?.suggestions.length ?? 0) > 0 &&
+        (r19.report?.priorities?.length ?? 0) === 2 &&
+        r19.report?.contentBlocks === undefined &&
+        r19.report?.issues === undefined,
+      '19a. contentBlocks/issues 非法时不重试、不失败：报告照常 completed，只是不附带这两个字段',
+    )
+    // issues 依赖 contentBlocks：块整体不合法时，问题也不能凭空存在
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      contentBlocks: [{ key: 'experience', lines: ['整段编造的经历'] }],
+      issues: structurePayload().issues,
+    }) }])
+    const r19b = await submit('struct-file', null)
+    assert(
+      r19b.status === 'completed' &&
+        r19b.report?.contentBlocks === undefined &&
+        r19b.report?.issues === undefined,
+      '19b. 所有块都被判编造时 issues 一并不附带（证据无处落脚，不做无证据的问题）',
+    )
+
+    // ── 20. 防编造基准是「送模型的那份遮盖文本」，不是简历原文 ────────────────
+    //
+    // 原文里有真实手机号，送模型前被换成 [手机号_N]。模型只可能抄到占位符那一版；
+    // 拿原文当基准就会把原号引文也放行 —— 那等于自己放宽这条不变量。
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      contentBlocks: [{ key: 'basic', lines: [`手机 ${PHONE_RAW}`, '手机 [手机号_1]'] }],
+    }) }])
+    const r20 = await submit('struct-file', null)
+    const lines20 = r20.report?.contentBlocks?.[0]?.lines ?? []
+    assert(
+      r20.status === 'completed' &&
+        lines20.length === 1 &&
+        lines20[0] === '手机 [手机号_1]' &&
+        !JSON.stringify(r20.report ?? {}).includes(PHONE_RAW),
+      `20a. 原文手机号引文被拒、遮盖后占位符引文被放行（校验基准=送出去的那一份），got ${JSON.stringify(lines20)}`,
+    )
+    const row20 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId: r20.taskId, kind: 'parse' } } })
+    assert(
+      !!row20 && !row20.payloadJson.includes(PHONE_RAW) && row20.payloadJson.includes('[手机号_1]'),
+      '20b. 落库 payloadJson 里只有遮盖后的片段，真实手机号不入库（内容结构新增的留存面已被遮盖收口）',
+    )
+
+    // ── 21. 上限二次强制（提示词写了，校验层也必须再强制一次）──────────────────
+    const nineRealLines = [
+      '姓名 张三', SENTINEL, '求职意向', '前端工程师', '工作经历',
+      '2019-2024', 'ABC 高级前端', '技能 TypeScript', 'React NestJS',
+    ]
+    const manyIssues = Array.from({ length: 10 }, (_, i) => ({
+      dim: 'experience',
+      title: `问题标题 ${i}`,
+      evidence: nineRealLines.slice(0, 5).map((quote) => ({ blockKey: 'experience', quote })),
+      impact: '读的人看不出重点。',
+      fixIt: '把这一行改写得更具体。',
+    }))
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      contentBlocks: [
+        { key: 'experience', lines: nineRealLines },
+        { key: 'selfintro', lines: [LONG_LINE] },
+      ],
+      issues: manyIssues,
+    }) }])
+    const r21 = await submit('struct-file', null)
+    const exp21 = r21.report?.contentBlocks?.find((b) => b.key === 'experience')
+    const intro21 = r21.report?.contentBlocks?.find((b) => b.key === 'selfintro')
+    assert(exp21?.lines.length === 6, `21a. 每块 lines ≤ 6 行，got ${exp21?.lines.length}`)
+    assert(
+      intro21?.lines[0]?.length === 80 && LONG_LINE.startsWith(intro21?.lines[0] ?? ''),
+      `21b. 单行 ≤ 80 字（截断后仍是原文前缀、回配依然成立），got ${intro21?.lines[0]?.length}`,
+    )
+    assert((r21.report?.issues?.length ?? 0) === 8, `21c. issues ≤ 8 条，got ${r21.report?.issues?.length}`)
+    assert(
+      (r21.report?.issues ?? []).every((i) => i.evidence.length <= 3) &&
+        (r21.report?.issues?.[0]?.evidence.length ?? 0) === 3,
+      `21d. 每条 evidence ≤ 3 处，got ${r21.report?.issues?.[0]?.evidence.length}`,
+    )
+    assert(
+      (r21.report?.issues ?? []).map((i) => i.id).join(',') === 'I1,I2,I3,I4,I5,I6,I7,I8',
+      '21e. id 按输出顺序连续分配，不留空洞',
+    )
+
+    // ── 22. issues 的三段自撰文案必须过合规拦截词；维度不得漂移 ────────────────
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      contentBlocks: structurePayload().contentBlocks,
+      issues: [
+        { dim: 'experience', title: `这会拉低${GUARD_TERM_HIRE}`, evidence: [{ blockKey: 'experience', quote: LINE_EXPERIENCE }], impact: '正常影响', fixIt: '正常改法' },
+        { dim: 'experience', title: '正常标题', evidence: [{ blockKey: 'experience', quote: LINE_EXPERIENCE }], impact: `${GUARD_TERM_MATCH}偏低`, fixIt: '正常改法' },
+        { dim: 'experience', title: '正常标题二', evidence: [{ blockKey: 'experience', quote: LINE_EXPERIENCE }], impact: '正常影响', fixIt: `建议${GUARD_TERM_HIRE}优化` },
+        { dim: '生造维度', title: '维度漂移', evidence: [{ blockKey: 'experience', quote: LINE_EXPERIENCE }], impact: '正常影响', fixIt: '正常改法' },
+        { dim: 'experience', title: '证据编造', evidence: [{ blockKey: 'experience', quote: '我拿过全国一等奖' }], impact: '正常影响', fixIt: '正常改法' },
+        { dim: 'experience', title: '证据指错块', evidence: [{ blockKey: 'education', quote: LINE_EXPERIENCE }], impact: '正常影响', fixIt: '正常改法' },
+        { dim: 'objective', title: '求职目标只写了愿望', evidence: [{ blockKey: 'objective', quote: LINE_OBJECTIVE }], impact: '读的人看不出你想去哪个岗位。', fixIt: '开头写明求职方向。' },
+      ],
+    }) }])
+    const r22 = await submit('struct-file', null)
+    const issues22 = r22.report?.issues ?? []
+    const flat22 = JSON.stringify(issues22)
+    assert(
+      r22.status === 'completed' &&
+        issues22.length === 1 &&
+        issues22[0].dim === 'objective' &&
+        !flat22.includes(GUARD_TERM_HIRE) &&
+        !flat22.includes(GUARD_TERM_MATCH),
+      `22. title/impact/fixIt 命中拦截词、dim 漂移、证据编造、证据指错块的条目全部丢弃，干净条目保留，got ${issues22.length} 条`,
+    )
+
+    // ── 23. truncatedInput：只送了前 12000 字符必须如实标记在报告体内 ──────────
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+    }) }])
+    const r23 = await submit('long-pdf-file', null)
+    assert(
+      r23.status === 'completed' && r23.report?.truncatedInput === true,
+      `23a. 输入被截断时 report.truncatedInput=true（否则用户会把「没送进模型」读成「简历里没有这几块」），got ${String(r23.report?.truncatedInput)}`,
+    )
+    setResponses([{ status: 200, content: validReportJson() }])
+    const r23b = await submit('struct-file', null)
+    assert(
+      r23b.status === 'completed' && r23b.report?.truncatedInput === undefined,
+      `23b. 未截断时不附带 truncatedInput（缺省即未截断），got ${String(r23b.report?.truncatedInput)}`,
+    )
+
+    // ── 24. 旧报告（无 contentBlocks/issues）仍合法：additive 可选未破坏兼容 ────
+    setResponses([{ status: 200, content: validReportJson() }])
+    const r24 = await submit('docx-file', null)
+    assert(
+      r24.status === 'completed' &&
+        r24.report?.contentBlocks === undefined &&
+        r24.report?.issues === undefined &&
+        r24.report?.sections.length === 6,
+      '24. 模型完全不返回新字段时报告照常成功（新结构是 additive，不是新的失败点）',
     )
   } finally {
     if (createdTaskIds.length) {
