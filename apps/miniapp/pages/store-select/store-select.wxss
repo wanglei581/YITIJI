@@ -76,10 +76,17 @@
 }
 
 /* 服务点列表 */
+/* 给固定底栏留位。实测（390pt 模拟器）：.bottom-bar 高 197px，
+   而滚动内容零垫底——滑到底时最后 197px 被压在栏下面，最后一个服务点点不到。
+   底栏内容是 rpx 排的，197px @390pt ≈ 380rpx，所以垫底也用 rpx 跟着缩放；
+   var(--sab) 单列，因为模拟器里 env(safe-area-inset-bottom) 恒为 0，
+   真机全面屏才有值，不能把它算进那 380rpx 里。
+   删掉这条：列表最后一项被底栏遮住，用户以为没加载出来。 */
 .store-list {
   display: flex;
   flex-direction: column;
   gap: 24rpx;
+  padding-bottom: calc(400rpx + var(--sab));
 }
 
 .store-item {
@@ -250,13 +257,20 @@
 }
 
 /* 底部确认栏 */
+/* 2026-09-03 补安全区。原来是 padding: 24rpx，320pt 下底部只有 ~9.6px，
+   全面屏（iPhone X 及以后 / 大多数安卓全面屏）的 home indicator 会压住按钮。
+   全仓按「position:fixed + bottom:0」属性枚举扫出 6 个族群，其中三个用了
+   .actionbar 以外的类名——上一轮按 .actionbar **类名**扫的 26 页把它们全漏了。
+   （第六个 privacy 的 .su-mask 是全屏遮罩不是底栏，属误报，未动。）
+   写法对齐 app.wxss 的 .actionbar：calc(原内距 + var(--sab))。
+   删掉 var(--sab)：全面屏上按钮被 home indicator 压住，点不准。 */
 .bottom-bar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   background: var(--card-bg, #ffffff);
-  padding: 24rpx;
+  padding: 24rpx 24rpx calc(24rpx + var(--sab));
   box-shadow: 0 -4rpx 12rpx rgba(0,0,0,0.06);
   display: flex;
   align-items: center;
