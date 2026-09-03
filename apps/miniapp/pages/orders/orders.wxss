@@ -119,6 +119,15 @@
   font-variant-numeric: tabular-nums;
 }
 .oc-btns { display: flex; gap: 14rpx; }
+/* 一体机历史任务的说明文字。不是按钮：它没有可点的去处，
+   做成按钮样子等于又给一次点击预期。 */
+.oc-note {
+  flex: 1;
+  align-self: center;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--ink-faint, var(--ink-soft));
+}
 .oc-btn {
   height: 64rpx;
   padding: 0 24rpx;

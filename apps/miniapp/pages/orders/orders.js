@@ -79,6 +79,11 @@ function toUiItem(item) {
                : null
   return {
     id:          item.id,
+    // 列表把两套 id 空间拼在一起：cloud 段来自 Order（toView 只发 taskStatus），
+    // legacy 段来自 PrintTask（select 里带 status）。详情端点 requireOwned() 只查
+    // prisma.order，拿 PrintTask.id 去打必回 PRINT_ORDER_NOT_FOUND。
+    // 所以「订单详情」只能对 Order 行开放；这个判别位和下面到机码那行用的是同一个。
+    cloudOrder:  !item.status,
     orderNo:     item.orderNo || item.id,
     store:       item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端',
     title:       item.fileName || '打印文件',
@@ -217,6 +222,8 @@ Page({
   detail(e) {
     const item = this.data.filtered.find(o => o.id === e.currentTarget.dataset.id)
     if (!item) return
+    // 兜一道：一体机任务没有线上详情，点了只会 404。按钮本身已按 cloudOrder 隐藏。
+    if (!item.cloudOrder) return
     wx.navigateTo({ url: `/pages/order-detail/order-detail?orderId=${encodeURIComponent(item.id)}` })
   },
 
