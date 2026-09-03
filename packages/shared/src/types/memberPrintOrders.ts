@@ -12,7 +12,7 @@
 // - 空列表返回 []，不伪造订单数量。
 // ============================================================
 
-import type { ColorMode, PrintTaskStatus } from './print'
+import type { ColorMode, DuplexMode, PrintTaskStatus } from './print'
 import type { BillingPageSource, OrderPayStatus, PaymentSource } from './payment'
 
 /** 我的打印订单：会员名下一条打印任务（仅安全元数据）。 */
@@ -30,6 +30,18 @@ export interface MemberPrintOrderItem {
   copies: number | null
   /** 黑白 / 彩色（来自 paramsJson）；缺省 / 非法为 null */
   colorMode: ColorMode | null
+  /**
+   * 单双面（来自 paramsJson）；缺省 / 非法为 null。
+   *
+   * 补于 2026-09-02：下单侧一直采集并按终端能力计价、落进
+   * `Order.printParamsJson` / `PrintTask.paramsJson`，但对外契约漏了它，
+   * 用户付了双面的钱却在「我的 → 打印订单」看不到，补打/申诉时无法复现参数。
+   *
+   * **必须容错 null**：paramsJson 是无 schema 的 JSON 字符串列，
+   * 本字段补充之前建的历史任务不含 duplex 键。null = 来源未记录，
+   * 前端只能显示「未记录」，**不得默认显示成「单面」**（CLAUDE.md §9 不伪造能力）。
+   */
+  duplex: DuplexMode | null
   /** 纸张幅面（来自 paramsJson，当前机型固定 A4）；缺省为 null */
   paperSize: string | null
   // ── 支付字段（P0a 支付域，无 live 网关；可选以保持向后兼容）：关联 Order 才有值；历史无 Order 一律 null ──
