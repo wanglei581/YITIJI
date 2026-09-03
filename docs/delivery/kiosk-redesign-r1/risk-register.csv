@@ -1,0 +1,2 @@
+risk_id,category,description,probability,impact,mitigation,contingency,owner,due_date,status,acceptance_ref
+RISK-001,delivery,TBD,medium,high,TBD,TBD,TBD,TBD,OPEN,

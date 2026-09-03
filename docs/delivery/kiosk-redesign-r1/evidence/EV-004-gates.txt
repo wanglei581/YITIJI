@@ -1,0 +1,13 @@
+G2-02 证据：门禁与类型检查  revision 23464350f  环境 local  执行 Claude
+
+$ node apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs
+ALL PASS fusion W2 print/scan contract
+
+$ node apps/kiosk/scripts/verify-scan-input-safety.mjs
+verify-scan-input-safety passed (6 files checked)
+
+$ node services/api/scripts/verify-backend-p0-contracts.mjs
+All backend P0 contract checks passed.
+
+
+边界：仅覆盖本次改动的 3 个文件（KioskNumpad.tsx / PrintPickupClaimPage.tsx / HomePage.tsx），不代表全仓库通过。

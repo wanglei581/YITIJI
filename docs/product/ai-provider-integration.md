@@ -51,7 +51,7 @@ AI Provider（可切换）
 
 - AI 处理结果（诊断报告、优化建议）**只返回给提交该简历的用户本人**
 - 服务端不将简历内容、AI 分析结果推送给企业或任何第三方
-- 处理完成后，原始简历文件按数据清理策略自动删除（见 [file-security.md](../compliance/file-security.md)）
+- 处理完成后，原始简历文件按数据清理策略自动删除（见 [file-retention-and-cos-lifecycle.md](../compliance/file-retention-and-cos-lifecycle.md)）
 - AI 日志脱敏：日志系统只记录 taskId、provider、耗时、状态，不记录简历内容
 
 ---

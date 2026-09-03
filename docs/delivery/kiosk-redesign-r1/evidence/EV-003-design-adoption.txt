@@ -1,0 +1,17 @@
+G2-01 证据：运行时按新稿实现的页面数
+取证时间 2026-09-02  revision 23464350f
+
+命令与结果：
+  grep -rl 'kiosk-redesign-2026-08'  apps/kiosk/src  →  1 个文件
+  grep -rl 'kiosk-ai-os-v3-2026-08'  apps/kiosk/src  →  12 个文件
+  grep -rl 'kiosk-proto-2026-07'     apps/kiosk/src  →  3 个文件
+
+命中的那 1 个文件是 apps/kiosk/src/pages/home/HomePage.tsx，
+只在文件头注释里把「视觉真值」指向新稿，并明确写着
+「本页当前实现仍停在 V6 版式，属待迁移项」。
+
+因此 **按新稿实现的页面数为 0/51**；这 1 处命中是迁移标注，不是实现。
+（本注释由本次会话加入，取证时须与实现区分，不得据此判为已迁移。）
+
+对照：docs/README.md 曾称「运行时目前只有 / 与 /print-scan 是新版」——
+与上述结果不符，属过期陈述。

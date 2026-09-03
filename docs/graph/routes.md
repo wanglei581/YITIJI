@@ -428,16 +428,16 @@ flowchart LR
   app["partner"]
   app --> _root_["/<br/>1 页 · 1 端点"]
   app --> account["/account<br/>1 页 · 0 端点"]
-  app --> companies["/companies<br/>1 页 · 22 端点"]
-  app --> fairs["/fairs<br/>1 页 · 18 端点"]
-  app --> jobs["/jobs<br/>1 页 · 18 端点"]
+  app --> companies["/companies<br/>1 页 · 25 端点"]
+  app --> fairs["/fairs<br/>1 页 · 21 端点"]
+  app --> jobs["/jobs<br/>1 页 · 21 端点"]
   app --> login["/login<br/>1 页 · 0 端点"]
   app --> policy["/policy<br/>1 页 · 9 端点"]
   app --> profile["/profile<br/>1 页 · 1 端点"]
-  app --> smart_campus["/smart-campus<br/>1 页 · 18 端点"]
-  app --> sources["/sources<br/>1 页 · 18 端点"]
+  app --> smart_campus["/smart-campus<br/>1 页 · 21 端点"]
+  app --> sources["/sources<br/>1 页 · 21 端点"]
   app --> stats["/stats<br/>1 页 · 0 端点"]
-  app --> sync_logs["/sync-logs<br/>1 页 · 18 端点"]
+  app --> sync_logs["/sync-logs<br/>1 页 · 21 端点"]
   app --> terminals["/terminals<br/>1 页 · 0 端点"]
 ```
 
@@ -445,16 +445,16 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | `/` | DashboardPage | `apps/partner/src/routes/dashboard/index.tsx` | 1 | — |
 | `/account` | AccountPage | `apps/partner/src/routes/account/index.tsx` | 0 | — |
-| `/companies` | CompaniesPage | `apps/partner/src/routes/companies/index.tsx` | 22 | — |
-| `/fairs` | FairsPage | `apps/partner/src/routes/fairs/index.tsx` | 18 | — |
-| `/jobs` | JobsPage | `apps/partner/src/routes/jobs/index.tsx` | 18 | — |
+| `/companies` | CompaniesPage | `apps/partner/src/routes/companies/index.tsx` | 25 | — |
+| `/fairs` | FairsPage | `apps/partner/src/routes/fairs/index.tsx` | 21 | — |
+| `/jobs` | JobsPage | `apps/partner/src/routes/jobs/index.tsx` | 21 | — |
 | `/login` | LoginPage | `apps/partner/src/routes/login/index.tsx` | 0 | 1 |
 | `/policy` | PolicyPage | `apps/partner/src/routes/policy/index.tsx` | 9 | — |
 | `/profile` | ProfilePage | `apps/partner/src/routes/profile/index.tsx` | 1 | — |
-| `/smart-campus` | SmartCampusPage | `apps/partner/src/routes/smart-campus/index.tsx` | 18 | — |
-| `/sources` | SourcesPage | `apps/partner/src/routes/sources/index.tsx` | 18 | — |
+| `/smart-campus` | SmartCampusPage | `apps/partner/src/routes/smart-campus/index.tsx` | 21 | — |
+| `/sources` | SourcesPage | `apps/partner/src/routes/sources/index.tsx` | 21 | — |
 | `/stats` | StatsPage | `apps/partner/src/routes/stats/index.tsx` | 0 | — |
-| `/sync-logs` | SyncLogsPage | `apps/partner/src/routes/sync-logs/index.tsx` | 18 | — |
+| `/sync-logs` | SyncLogsPage | `apps/partner/src/routes/sync-logs/index.tsx` | 21 | — |
 | `/terminals` | TerminalsPage | `apps/partner/src/routes/terminals/index.tsx` | 0 | — |
 
 <details>
@@ -462,20 +462,20 @@ flowchart LR
 
 **`/`** → `PUT /partner/profile`
 
-**`/companies`** → `GET /partner/companies`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/companies/:param`、`PATCH /partner/companies/:param/publish`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/companies/import`、`POST /partner/data-sources`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/companies`** → `GET /partner/companies`、`GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/companies/:param`、`PATCH /partner/companies/:param/publish`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/companies/import`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/fairs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/fairs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/jobs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/jobs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
 **`/policy`** → `DELETE /partner/policies/:param`、`GET /partner/policies`、`GET /partner/policies/:param/eligibility-rules`、`GET /policies/eligibility-questions`、`PATCH /partner/policies/:param`、`PATCH /partner/policies/:param/publish`、`POST /partner/policies`、`POST /partner/policies/:param/eligibility-preview`、`PUT /partner/policies/:param/eligibility-rules`
 
 **`/profile`** → `PUT /partner/profile`
 
-**`/smart-campus`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/smart-campus`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/sources`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/sources`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
-**`/sync-logs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
+**`/sync-logs`** → `GET /partner/data-sources`、`GET /partner/data-sources/capabilities`、`GET /partner/excel/mapping-rule`、`GET /partner/fairs`、`GET /partner/jobs`、`GET /partner/jobs/quality-summary`、`GET /partner/smart-campus/terminals`、`GET /partner/sync-logs`、`PATCH /partner/data-sources/:param/archive`、`PATCH /partner/data-sources/:param/toggle`、`PATCH /partner/data-sources/:param/unarchive`、`PATCH /partner/fairs/:param`、`PATCH /partner/fairs/:param/publish`、`PATCH /partner/jobs/:param`、`PATCH /partner/jobs/:param/publish`、`POST /partner/data-sources`、`POST /partner/data-sources/:param/rotate-credential`、`POST /partner/excel/:param/confirm`、`POST /partner/fairs/import`、`POST /partner/jobs/import`、`PUT /partner/smart-campus/terminals/:param/config`
 
 </details>
