@@ -58,9 +58,13 @@ function formatPrice(cents) {
 
 // 到机码格式化：每 2 位一组方便阅读，如 "AB-C3-9M"
 function fmtCode(raw) {
+  // 与 print-pickup 的 formatCode 同形：String() 包装 + groups 判空。
+  // 原版对纯空白串（replace 后为空，match 返回 null）和数字入参直接 THROW，
+  // 一行数据异常会中断整个列表渲染。同一函数全仓三份实现，以 print-pickup 版为准。
   if (!raw) return ''
-  const s = raw.replace(/\s/g, '').toUpperCase()
-  return s.match(/.{1,2}/g).join('-')
+  const s = String(raw).replace(/\s/g, '').toUpperCase()
+  const groups = s.match(/.{1,2}/g)
+  return groups ? groups.join('-') : ''
 }
 
 // 后端 item → UI 展示对象

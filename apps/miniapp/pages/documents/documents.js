@@ -6,13 +6,18 @@ const auth = require('../../utils/auth')
 const uploadNames = require('../../utils/upload-name')
 
 function formatSize(bytes) {
-  const n = Number(bytes) || 0
+  // 缺失/非法不显示假值：undefined→'0 B'、'abc'→'0 B' 都是把「不知道」说成「0」。
+  // 契约里 sizeBytes 恒有，走到这里代表异常响应/降级——空着比假数字诚实。
+  const n = Number(bytes)
+  if (!Number.isFinite(n) || n < 0) return ''
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
 function formatTime(value) {
+  // null/undefined 不进 Date：new Date(null) 是 1970-01-01，假日期比空更糟
+  if (value === null || value === undefined || value === '') return ''
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return ''
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -75,6 +80,8 @@ Page({
       { key: 'derived', label: '派生成果' },
     ],
     all: [],
+    nextCursor: null,
+    loadingMore: false,
     filtered: [],
     loading: true,
     loadError: '',
@@ -93,16 +100,25 @@ Page({
     this.loadDocuments()
   },
 
-  loadDocuments() {
-    this.setData({ loading: true, loadError: '' })
-    api.getMyDocuments({ pageSize: 50 })
+  loadDocuments(append = false) {
+    // 2026-09-03 修复「不显示文件」：此前只取第一页 50 条即止——unwrapList 早就把
+    // nextCursor 挂在返回数组上（utils/api.js），这里拿到就丢。第 51 份文件起
+    // 永远不出现，页面还写着「最近 · 50 个文件」让人以为只有这么多。
+    // 打印场景（证件正反、简历多版本、证书、合同）极易超过 50 份。
+    // 分页写法对照 orders.js 的 _load（同一套 cursor 约定）。
+    if (append && (!this.data.nextCursor || this.data.loadingMore)) return
+    const cursor = append ? this.data.nextCursor : null
+    this.setData(append ? { loadingMore: true } : { loading: true, loadError: '' })
+    api.getMyDocuments({ pageSize: 50, ...(cursor ? { cursor } : {}) })
       .then((items) => {
-        const all = (items || []).map(toView)
-        this.setData({ all, loading: false })
+        const page = (items || []).map(toView)
+        const all = append ? [...this.data.all, ...page] : page
+        this.setData({ all, loading: false, loadingMore: false, nextCursor: (items && items.nextCursor) || null })
         this.applyFilter(this.data.activeFilter, all)
       })
       .catch((err) => this.setData({
         loading: false,
+        loadingMore: false,
         loadError: (err && err.message) || '加载文档失败，请稍后重试',
       }))
   },
@@ -110,6 +126,10 @@ Page({
   applyFilter(key, source) {
     const all = source || this.data.all
     this.setData({ filtered: key === 'all' ? all : all.filter((item) => item.type === key) })
+  },
+
+  onReachBottom() {
+    this.loadDocuments(true)
   },
 
   setFilter(e) {

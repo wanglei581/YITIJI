@@ -6,8 +6,14 @@ const auth = require('../../utils/auth')
 function relDate(iso) {
   try {
     const d = new Date(iso)
+    // Invalid Date 不会 throw，try/catch 拦不住——不早退的话会落进 M/D 拼接分支
+    // 渲染出「NaN/NaN」。iOS JSC 对 'YYYY-MM-DD HH:mm:ss' 空格格式解析失败而
+    // Android 能解析，同一串双端表现不同，这不是理论输入。
+    if (Number.isNaN(d.getTime())) return ''
     const now = new Date()
-    const diffDays = Math.floor((now - d) / 86400000)
+    // clamp 到 ≥0：手机系统时间比服务端慢（手动校时/时区错设）时 diff 为负，
+    // 否则显示「-1 天前」。
+    const diffDays = Math.max(0, Math.floor((now - d) / 86400000))
     const hh = String(d.getHours()).padStart(2, '0')
     const mm = String(d.getMinutes()).padStart(2, '0')
     if (diffDays === 0) return '今天 ' + hh + ':' + mm

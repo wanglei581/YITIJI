@@ -107,17 +107,30 @@ Page({
     this._load()
   },
 
-  async _load() {
+  onReachBottom() {
+    this._load(true)
+  },
+
+  async _load(append = false) {
+    if (append && (!this._nextCursor || this._loadingMore)) return
+    this._loadingMore = append
     if (!auth.isLoggedIn()) {
       this._all = []
       this.setData({ loginRequired: true, groups: [], loading: false, loadError: '' })
       return
     }
-    this.setData({ loginRequired: false, loading: true, loadError: '' })
+    // append 时不进整页 loading：那会把已渲染的列表打回加载态闪一下
+    this.setData(append ? { loginRequired: false } : { loginRequired: false, loading: true, loadError: '' })
     try {
-      const list = await api.getMyAiRecords({ pageSize: 50 })
-      this._all = (list || []).map(mapRecord)
+      // 2026-09-03：同 documents 的「50 条静默截断」——nextCursor 一直被丢弃，
+      // 第 51 条起永远不显示。分页写法对照 orders.js / documents.js。
+      const cursor = append ? this._nextCursor : null
+      const list = await api.getMyAiRecords({ pageSize: 50, ...(cursor ? { cursor } : {}) })
+      const page = (list || []).map(mapRecord)
+      this._all = append ? [...this._all, ...page] : page
+      this._nextCursor = (list && list.nextCursor) || null
       this._applyFilter(this.data.activeFilter)
+      this._loadingMore = false
       this.setData({ loading: false })
     } catch (err) {
       if (err && err.statusCode === 401) {

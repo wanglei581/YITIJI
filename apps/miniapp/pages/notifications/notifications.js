@@ -41,6 +41,8 @@ Page({
       { id: 'system', label: '系统' },
     ],
     all: [],
+    nextCursor: null,
+    loadingMore: false,
     list: [],
     loading: true,
     loadError: '',
@@ -57,18 +59,29 @@ Page({
     this.loadNotifications()
   },
 
-  loadNotifications() {
-    this.setData({ loading: true, loadError: '' })
-    api.getMyNotifications({ pageSize: 50 })
+  loadNotifications(append = false) {
+    // 2026-09-03：同 documents 的「50 条静默截断」修复——nextCursor 一直被丢弃，
+    // 第 51 条起永远不显示。分页写法对照 orders.js / documents.js。
+    if (append && (!this.data.nextCursor || this.data.loadingMore)) return
+    const cursor = append ? this.data.nextCursor : null
+    this.setData(append ? { loadingMore: true } : { loading: true, loadError: '' })
+    api.getMyNotifications({ pageSize: 50, ...(cursor ? { cursor } : {}) })
       .then((page) => {
-        const all = ((page && page.items) || []).map(toView)
-        this.setData({ all, loading: false })
+        const items = ((page && page.items) || []).map(toView)
+        const all = append ? [...this.data.all, ...items] : items
+        this.setData({ all, loading: false, loadingMore: false,
+          nextCursor: (page && page.nextCursor) || null })
         this.applyFilter(this.data.activeFilter, all)
       })
       .catch((err) => this.setData({
         loading: false,
-        loadError: (err && err.message) || '加载通知失败，请稍后重试',
+        loadingMore: false,
+    loadError: (err && err.message) || '加载通知失败，请稍后重试',
       }))
+  },
+
+  onReachBottom() {
+    this.loadNotifications(true)
   },
 
   applyFilter(filter, source) {
