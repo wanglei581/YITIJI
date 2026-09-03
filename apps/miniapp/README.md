@@ -83,6 +83,7 @@ normalize / print-pricing / pickup-qrcode / storage / config / mock-data → 无
 
 - 仓库内 `project.config.json` 使用已注册的正式 AppID；AppID 是公开工程标识，秘钥和私有配置仍严禁入库。
 - 正式发布前须在微信公众平台配置 `https://zyidai.cn` 的 request/uploadFile/downloadFile 合法域名。
+- **正式发布前须在微信公众平台「用户隐私保护指引」里把"麦克风"列入采集清单**（语音说简历用）。`app.json` 的 `permission['scope.record'].desc` 只是授权弹窗文案，**不能代替**后台声明；未声明则真机上 `RecorderManager.start` 直接失败，而开发者工具与 `tools/voice-degrade-falsify.mjs` 一概测不出来——这类后台配置只能靠人核对。
 - 不使用微信云开发；API 统一走 `utils/request.js` 和 `utils/api.js`。
 
 ## 离线门禁
