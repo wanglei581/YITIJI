@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>输入到机码 · 职易达</title>
+<link rel="stylesheet" href="kimi-full-coverage-v2/design-system/kiosk-motion.css">
+<!--
+  route: /print/pickup-claim
+  state: idle | verifying | invalid-or-expired | locked | network-error | success | legacy | hid
+  api: POST print/jobs/claim-pickup（服务端校验为唯一真值；本原型不发任何真实请求）
+  码制事实（与 packages/shared/src/pickupCode.ts 一致）：
+    新签发码 = 恰好 8 位纯数字 /^[0-9]{8}$/
+    存量历史码 = 恰好 10 位，字符集 23456789ABCDEFGHJKMNPQRSTUVWXYZ（31 字符，无 0/1/I/L/O）
+    受理 = 新码 ∪ 历史码；输入最大长度 10，不阻断历史码
+  提交规则（与 PrintPickupClaimPage.tsx 一致）：
+    8 位纯数字读满后 → 输入静默 250ms 才提交（防截断数字前缀历史码）
+    第 9/10 位在 250ms 内到达 → 取消 8 位提交
+    合法 8 位按 确认/Enter → 立即提交
+    合法 10 位历史码读满 → 立即提交
+    7 位永不提交；非法字符不能形成合法提交
+  verifying 仅表示「正在请求校验」，不会自动变成 success；
+  success 只是 ?state=success 静态演示态，不由计时器或点击伪造。
+  hid = 嵌入式扫码器以 USB HID 键盘方式输入，不代表「扫码器在线」。
+  原型演示控制：本页状态仅通过 ?state= 切换，标注「原型演示控制」，不含生产业务逻辑。
+  演示控制可见性：仅 ?debug=1 时出现。无参数 / ?state= / ?capture=1 / ?flat=1 等产品 URL 下，
+    演示按钮与面板保持 hidden + inert + aria-hidden，并被 CSS display:none!important 兜底——
+    不可见、不占位、不命中、不可聚焦、不进可访问树。debug=1 只解除演示控制本身，不改任何业务正文与 data-state。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;
+  background:var(--paper);overflow:hidden;display:flex;flex-direction:column;}
+.serif{font-family:"Songti SC","STSong","SimSun",serif;}
+a{color:inherit;text-decoration:none;}
+button{font:inherit;border:0;background:none;cursor:pointer;color:inherit;}
+button:disabled,button[aria-disabled="true"]{cursor:default;}
+
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;
+  background:var(--surface);border-bottom:1px solid var(--line);}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;background:var(--paper);}
+.logo{flex:none;display:flex;align-items:center;gap:12px;}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px;}
+.topbar .sp{flex:1;}
+.pill-neutral{flex:none;display:flex;align-items:center;height:56px;padding:0 24px;
+  border-radius:28px;background:var(--paper);border:1px solid var(--line-2);
+  color:var(--ink-2);font-size:19px;font-weight:600;}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;}
+
+/* 标题 */
+.head{flex:none;padding:22px 44px 0;}
+.head .no{font-size:19px;letter-spacing:5px;color:var(--teal-d);font-weight:700;margin-bottom:8px;}
+.head h1{font-size:44px;font-weight:700;letter-spacing:1px;}
+.head .sub{margin-top:8px;font-size:21px;color:var(--ink-2);line-height:1.5;}
+
+/* 码格 */
+.codebox{flex:none;margin:18px 44px 0;display:flex;align-items:center;justify-content:center;gap:12px;}
+.cb{width:112px;height:128px;border-radius:20px;background:var(--surface);border:2px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;font-size:56px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--ink);}
+.cb.filled{border-color:var(--teal);}
+.cb.cur{border-color:var(--teal);background:var(--teal-soft);color:var(--teal-d);}
+.cb.err{border-color:var(--cinnabar);background:var(--cinnabar-soft);}
+.codebox.legacy{gap:10px;}
+.codebox.legacy .cb{width:84px;height:112px;font-size:44px;border-radius:16px;}
+
+/* 有效期行（以服务端返回为准） */
+.expire{flex:none;margin:12px 44px 0;text-align:center;font-size:19px;color:var(--ink-3);}
+.expire b{color:var(--teal-d);font-variant-numeric:tabular-nums;}
+
+/* 安心行 */
+.easy{flex:none;margin:12px 44px 0;display:flex;justify-content:center;gap:26px;
+  font-size:19px;color:var(--teal-d);font-weight:600;}
+.easy span{display:flex;align-items:center;gap:8px;}
+
+/* 非法输入提示（本地校验，非服务端错误态） */
+.illegal{flex:none;margin:12px 44px 0;display:none;align-items:center;gap:12px;
+  padding:16px 26px;border-radius:16px;background:var(--cinnabar-soft);color:var(--cinnabar-d);
+  font-size:20px;font-weight:600;line-height:1.5;}
+.illegal.show{display:flex;}
+
+/* 状态条（校验中 / 错误） */
+.state-strip{flex:none;margin:14px 44px 0;display:flex;align-items:center;gap:14px;
+  padding:20px 28px;border-radius:18px;font-size:22px;font-weight:600;line-height:1.5;}
+.state-strip.checking{background:var(--teal-soft);color:var(--teal-d);}
+.state-strip.error{background:var(--cinnabar-soft);color:var(--cinnabar-d);}
+.state-strip .sub{font-size:18px;font-weight:500;opacity:.8;}
+
+/* 键盘 */
+.kb{flex:none;margin:18px 44px 0;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:20px 26px;}
+.kb.inert{opacity:.5;}
+.kb.inert .key{pointer-events:none;}
+.kb-note{text-align:center;font-size:19px;color:var(--ink-3);margin-bottom:14px;line-height:1.5;}
+.kb-note b{color:var(--slate-d);font-weight:600;}
+.kb-row{display:flex;gap:14px;margin-bottom:14px;justify-content:center;}
+.kb-row:last-child{margin-bottom:0;}
+.key{flex:1;height:100px;border-radius:18px;background:var(--paper);border:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:700;color:var(--ink);}
+.key.fn{background:var(--deep);color:var(--emerald);font-size:22px;font-weight:600;letter-spacing:1px;}
+.key.abc{background:var(--slate-soft);color:var(--slate-d);font-size:22px;font-weight:700;letter-spacing:1px;}
+.key.ok{background:var(--teal);color:#fff;font-size:26px;font-weight:700;letter-spacing:2px;}
+.key.ok[aria-disabled="true"]{background:var(--paper);border:1px dashed var(--line-2);color:var(--ink-3);}
+
+/* 历史码字母键盘（字符集 23456789ABCDEFGHJKMNPQRSTUVWXYZ，与 shared/pickupCode.ts 一致） */
+.kb.alpha .key{font-size:32px;height:92px;}
+.kb.alpha .key.fn{font-size:20px;flex:1.15;}
+.kb.alpha .key.abc{font-size:21px;}
+.kb.alpha .key.ok{font-size:24px;}
+
+/* HID 扫码卡（方向B：扫码器读手机码，USB HID 键盘输入） */
+.hid-card{flex:none;margin:20px 44px 0;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:36px 38px;display:flex;gap:32px;align-items:center;}
+.hid-stage{flex:none;width:260px;height:260px;border-radius:26px;position:relative;
+  background:linear-gradient(180deg,var(--deep-2),var(--deep));display:flex;align-items:center;justify-content:center;}
+.hid-corner{position:absolute;width:46px;height:46px;border:4px solid var(--emerald);}
+.hid-corner.tl{top:28px;left:28px;border-right:none;border-bottom:none;border-radius:12px 0 0 0;}
+.hid-corner.tr{top:28px;right:28px;border-left:none;border-bottom:none;border-radius:0 12px 0 0;}
+.hid-corner.bl{bottom:28px;left:28px;border-right:none;border-top:none;border-radius:0 0 0 12px;}
+.hid-corner.br{bottom:28px;right:28px;border-left:none;border-top:none;border-radius:0 0 12px 0;}
+.hid-phone{width:82px;height:142px;border-radius:15px;border:3px solid rgba(46,230,168,.7);
+  display:flex;align-items:center;justify-content:center;}
+.hid-main{flex:1;min-width:0;}
+.hid-t{font-size:30px;font-weight:800;line-height:1.35;}
+.hid-s{margin-top:12px;font-size:21px;color:var(--ink-2);line-height:1.65;}
+.hid-s b{color:var(--teal-d);}
+.hid-echo{margin-top:18px;min-height:64px;border-radius:14px;background:var(--paper);border:1px dashed var(--line-2);
+  display:flex;align-items:center;padding:14px 24px;font-size:20px;color:var(--ink-3);gap:12px;line-height:1.5;}
+.hid-echo .sdot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--ink-3);}
+
+/* 两种扫码对比卡（方向 A/B 消歧） */
+.ab-card{flex:none;margin:20px 44px 0;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-md);padding:24px 30px;}
+.ab-t{font-size:22px;font-weight:700;margin-bottom:14px;}
+.ab-cols{display:flex;gap:14px;}
+.ab-col{flex:1;border-radius:16px;padding:18px 20px;font-size:19px;line-height:1.6;}
+.ab-col b{display:block;font-size:21px;margin-bottom:6px;}
+.ab-col.a{background:var(--teal-soft);color:var(--teal-d);outline:2px solid var(--teal);}
+.ab-col.b{background:var(--slate-soft);color:var(--slate-d);}
+
+/* 锁定/网络大卡 */
+.block-card{flex:none;margin:20px 44px 0;border-radius:var(--r-lg);padding:36px 40px;}
+.block-card.locked{background:var(--cinnabar-soft);border:1.5px solid var(--cinnabar);}
+.block-card.net{background:var(--slate-soft);border:1.5px solid var(--slate);}
+.block-head{display:flex;align-items:center;gap:20px;}
+.block-ico{flex:none;width:84px;height:84px;border-radius:24px;background:#fff;
+  display:flex;align-items:center;justify-content:center;}
+.block-t{font-size:30px;font-weight:800;line-height:1.35;}
+.block-t small{display:block;font-size:20px;font-weight:600;opacity:.75;margin-top:5px;}
+.block-body{margin-top:18px;font-size:21px;line-height:1.65;color:var(--ink-2);}
+.block-body b{color:var(--ink);}
+.block-actions{margin-top:22px;display:flex;gap:18px;}
+.btn{height:92px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:10px;
+  font-size:24px;font-weight:700;letter-spacing:1px;}
+.btn.primary{flex:1.4;background:var(--teal);color:#fff;}
+.btn.staff{flex:1.4;background:var(--clay);color:#fff;}
+.btn.ghost{flex:1;background:var(--surface);border:1.5px solid var(--line-2);color:var(--ink-2);}
+.proto-note{margin-top:16px;font-size:18px;color:var(--ink-3);line-height:1.55;}
+
+/* 成功卡 */
+.win-card{flex:none;margin:20px 44px 0;background:var(--surface);border:1.5px solid var(--teal);
+  border-radius:var(--r-lg);padding:36px 40px;}
+.win-head{display:flex;align-items:center;gap:20px;}
+.win-ico{flex:none;width:84px;height:84px;border-radius:50%;background:var(--teal);
+  display:flex;align-items:center;justify-content:center;}
+.win-t{font-size:31px;font-weight:800;}
+.win-t small{display:block;font-size:20px;font-weight:600;color:var(--ink-3);margin-top:5px;}
+.win-file{margin-top:20px;display:flex;align-items:center;gap:18px;padding:20px 24px;
+  border-radius:18px;background:var(--teal-soft);}
+.win-file .fm{flex:1;min-width:0;}
+.win-file .fn{font-size:23px;font-weight:700;}
+.win-file .fs{margin-top:4px;font-size:19px;color:var(--teal-d);}
+.win-steps{margin-top:20px;display:flex;align-items:center;gap:12px;}
+.ws{flex:1;display:flex;align-items:center;gap:12px;background:var(--paper);border-radius:16px;
+  padding:16px 18px;font-size:20px;color:var(--ink-2);line-height:1.5;}
+.ws b{color:var(--ink);}
+.ws-no{flex:none;width:38px;height:38px;border-radius:50%;background:var(--teal);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;}
+.ws-arrow{flex:none;font-size:22px;color:var(--ink-3);}
+
+/* 安全提示条 */
+.safe-strip{flex:none;margin:18px 44px 0;display:flex;align-items:center;gap:14px;
+  padding:18px 26px;border-radius:18px;background:var(--teal-soft);font-size:20px;color:var(--teal-d);font-weight:600;line-height:1.5;}
+
+/* 三码消歧 */
+.vs{flex:none;margin:18px 44px 0;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-md);padding:22px 28px;}
+.vs-t{font-size:21px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+.vs-cols{display:flex;gap:12px;}
+.vs-col{flex:1;border-radius:14px;padding:16px 18px;font-size:17px;line-height:1.55;background:var(--teal-soft);color:var(--teal-d);}
+.vs-col b{display:block;font-size:19px;margin-bottom:4px;}
+.vs-col.cur{outline:2px solid var(--teal);}
+
+/* 出路条 */
+.outs{flex:none;margin:16px 44px 0;background:var(--surface);border:1px dashed var(--line-2);
+  border-radius:var(--r-md);padding:18px 24px;display:flex;align-items:center;gap:16px;}
+.outs .q{flex:none;font-size:20px;font-weight:700;}
+.outs .items{flex:1;display:flex;gap:12px;}
+.out-chip{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:64px;
+  border-radius:16px;background:var(--paper);border:1px solid var(--line);font-size:19px;font-weight:600;
+  color:var(--ink-2);white-space:nowrap;}
+.out-chip b{color:var(--ink);}
+
+.navbar{flex:none;margin-top:auto;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600;}
+.nav-item.on .ni{color:var(--teal-d);}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal);}
+
+/* 原型演示控制 */
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;
+  background:rgba(11,36,30,.88);color:#2ee6a8;border-radius:0 14px 14px 0;border:none;
+  writing-mode:vertical-lr;letter-spacing:4px;font-size:15px;font-weight:700;padding:18px 8px;}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;
+  background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:18px 16px;
+  flex-direction:column;gap:8px;box-shadow:8px 0 32px rgba(0,0,0,.3);}
+.demo-panel.show{display:flex;}
+.demo-panel .dp-t{color:#2ee6a8;font-size:14px;font-weight:700;letter-spacing:2px;margin-bottom:4px;}
+.demo-panel a{display:block;color:#f2efe4;font-size:15px;padding:8px 14px;
+  border-radius:10px;background:rgba(255,255,255,.06);white-space:nowrap;}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:#2ee6a8;font-weight:700;}
+/* 产品页面零污染：没有 ?debug=1 就彻底不存在（不可见/不占位/不命中/不聚焦） */
+html:not(.debug) [data-proto-control]{display:none!important;}
+[data-proto-control][hidden]{display:none!important;}
+
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="topbar">
+    <a class="back m-press" href="10-print-hub.html" aria-label="返回打印扫描">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <span class="pill-neutral">到机码验证</span>
+    <div class="clock" id="clock">--:--</div>
+  </div>
+
+  <!-- 动态主体 -->
+  <div id="body-root" data-screen="arrival-code" data-state="idle" data-testid="arrival-code-state-idle"
+       style="flex:1;display:flex;flex-direction:column;min-height:0;"></div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span class="ni">首页</span>
+    </a>
+    <a class="nav-item" href="05-ai-cockpit.html">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
+      <span class="ni">AI 顾问</span>
+    </a>
+    <a class="nav-item" href="30-my-profile.html">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
+      <span class="ni">我的</span>
+    </a>
+  </nav>
+
+  <!-- 原型演示控制 -->
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="tab"
+          aria-label="打开原型演示控制面板" hidden inert aria-hidden="true" tabindex="-1">演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="panel"
+       aria-label="原型演示控制" hidden inert aria-hidden="true">
+    <div class="dp-t">原型演示控制</div>
+    <a href="?state=idle" data-s="idle">idle 输码</a>
+    <a href="?state=verifying" data-s="verifying">verifying 校验中</a>
+    <a href="?state=invalid-or-expired" data-s="invalid-or-expired">invalid-or-expired 无效/过期</a>
+    <a href="?state=locked" data-s="locked">locked 锁定</a>
+    <a href="?state=network-error" data-s="network-error">network-error 网络异常</a>
+    <a href="?state=success" data-s="success">success 校验通过</a>
+    <a href="?state=legacy" data-s="legacy">legacy 历史码输入</a>
+    <a href="?state=hid" data-s="hid">hid 扫码器读手机码</a>
+  </div>
+
+</div>
+<script>
+function tick(){var d=new Date(),h=d.getHours(),m=d.getMinutes();
+  document.getElementById('clock').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+tick();setInterval(tick,10000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);
+  document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
+fit();addEventListener('resize',fit);
+var q=new URLSearchParams(location.search);
+if(q.get('flat')==='1')document.documentElement.setAttribute('data-flat','1');
+var SCREEN='arrival-code';
+var state=q.get('state')||'idle';
+
+/* ================= 原型演示控制闸门（只影响演示控制自身） =================
+   非 debug：不解除 hidden/inert/aria-hidden，也不绑定任何事件——产品页面上等同不存在。
+   ?debug=1：解除隐藏，按钮可见；点击才展开面板。面板内状态链接始终带 debug=1，
+   并保留当前 flat / capture，换一屏不丢参数。此闸门不读写任何业务状态。 */
+(function protoControlGate(){
+  var tab=document.getElementById('demo-tab'),panel=document.getElementById('demo-panel');
+  if(!tab||!panel||q.get('debug')!=='1')return;
+  document.documentElement.classList.add('debug');
+  [tab,panel].forEach(function(el){
+    el.removeAttribute('hidden');el.removeAttribute('inert');
+    el.removeAttribute('aria-hidden');el.removeAttribute('tabindex');
+  });
+  tab.setAttribute('aria-controls','demo-panel');
+  tab.setAttribute('aria-expanded','false');
+  tab.addEventListener('click',function(){
+    tab.setAttribute('aria-expanded',panel.classList.toggle('show')?'true':'false');
+  });
+  panel.querySelectorAll('a[data-s]').forEach(function(a){
+    var p=new URLSearchParams();
+    p.set('state',a.getAttribute('data-s'));
+    p.set('debug','1');
+    if(q.get('flat')!==null)p.set('flat',q.get('flat'));
+    if(q.get('capture')!==null)p.set('capture',q.get('capture'));
+    a.setAttribute('href','?'+p.toString());
+    if(a.getAttribute('data-s')===state)a.classList.add('on');
+  });
+})();
+
+/* ================= DEMO_DATA：仅用于静态原型状态展示 =================
+   仅服务 ?state= 演示，不是生产默认值，也不是接口失败时的回退值。
+   生产环境过期时间来自服务端 pickupCodeExpiresAt 字段。 */
+var DEMO_DATA={
+  expiresAt:'2026-08-27 14:32',   // 演示值：对应服务端 pickupCodeExpiresAt
+  code:'48291637',                // 演示值：8 位新码（恰好 8 位纯数字）
+  legacy:'K8X2M9P4Q7',            // 演示值：10 位历史码（31 字符集）
+  order:{no:'DEMO-20260824-001',amountYuan:'¥3.50',files:'简历_2026.pdf 等 2 份 · 共 3 页'},
+  /* released 是服务端字段：true=已支付/免费→进打印队列（15-print-fulfill.html）；
+     false=未支付→去现场支付（32-cashier.html）。静态演示固定选 false 分支，不让用户自选。 */
+  released:false
+};
+var EXPIRES_AT=DEMO_DATA.expiresAt, DEMO_CODE=DEMO_DATA.code, DEMO_LEGACY=DEMO_DATA.legacy;
+
+/* ================= 码制与提交规则（与 packages/shared/src/pickupCode.ts 一致） ================= */
+var PATTERN_NEW=/^[0-9]{8}$/;                                  // 新码：恰好 8 位纯数字
+var PATTERN_LEGACY=/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/;  // 历史码：恰好 10 位 31 字符集
+var MAX_INPUT=10;                                              // 输入最大长度（不阻断历史码）
+var SETTLE_MS=250;                                             // 8 位读满后的静默窗口
+
+var root=document.getElementById('body-root');
+function mark(st){
+  root.setAttribute('data-state',st);
+  root.setAttribute('data-testid',SCREEN+'-state-'+st);
+}
+function pulse(txt){return '<span class="m-pulse"><span class="mp-dots" aria-hidden="true"><i></i><i></i><i></i></span>'+txt+'</span>';}
+var ICO_LOCK='<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#963227" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+var ICO_NET='<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#35608f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16.5a5 5 0 0 1 6 0"/><path d="M12 20h.01"/><path d="M4 4l16 16" stroke-opacity=".6"/></svg>';
+var ICO_OK='<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+var ICO_QR='<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#2ee6a8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h3v3h-3zM20 14v6h-6"/></svg>';
+
+/* ---------- 公共片段 ---------- */
+function head(sub){
+  return '<div class="head"><div class="no">ARRIVAL CODE</div>'+
+    '<h1 class="serif">输入你的到机码</h1><div class="sub">'+sub+'</div></div>';
+}
+function boxHTML(code,cur,err,legacy){
+  var n=legacy?10:8,html='';
+  for(var i=0;i<n;i++){
+    var ch=code&&code[i]?code[i]:'';
+    var cls='cb'+(ch?' filled':'')+((!ch&&i===(code?code.length:0)&&cur)?' cur m-caret':'')+(err?' err':'');
+    html+='<div class="'+cls+'">'+ch+'</div>';
+  }
+  return html;
+}
+function boxes(code,cur,err,legacy){
+  return '<div class="codebox'+(legacy?' legacy':'')+'" id="codebox">'+boxHTML(code,cur,err,legacy)+'</div>';
+}
+function expireLine(){
+  return '<div class="expire">这串码有效至 <b>'+EXPIRES_AT+'</b>（以服务端返回的过期时间为准，过期会明确提示）</div>';
+}
+function easy(){
+  return '<div class="easy">'+
+    '<span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>输错可以改，不作废</span>'+
+    '<span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>这一步不收钱</span>'+
+    '<span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3L4 14h6l-1 7 9-11h-6l1-7z"/></svg>输满稍停自动校验，也可按「确认校验」</span></div>';
+}
+
+/* ---------- 键盘与提交逻辑（原型内真实执行，不发任何真实请求） ---------- */
+var entered='';
+var kbMode='numeric';   // numeric = 8 位新码；alpha = 10 位历史码
+var settleTimer=null;   // 8 位静默观察定时器：仅计时防误提交，不伪造任何业务结果
+
+function numKb(inert){
+  var rows=[['1','2','3'],['4','5','6'],['7','8','9']];
+  var h='<div class="kb'+(inert?' inert':'')+'" data-testid="'+SCREEN+'-keyboard"><div class="kb-note">'+
+    (inert?'正在校验，键盘暂时不可用——校验结果出来后会自动恢复。'
+          :'新码是 <b>8 位纯数字</b>：输满 8 位稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>10 位旧码</b>点左下角「输入历史码」。')+'</div>';
+  rows.forEach(function(r){h+='<div class="kb-row">'+r.map(function(k){
+    return '<button type="button" class="key m-press" data-key="'+k+'"'+(inert?' aria-disabled="true"':'')+'>'+k+'</button>';}).join('')+'</div>';});
+  h+='<div class="kb-row"><button type="button" class="key abc m-press" data-key="__legacy"'+(inert?' aria-disabled="true"':'')+'>输入历史码</button>'+
+     '<button type="button" class="key m-press" data-key="0"'+(inert?' aria-disabled="true"':'')+'>0</button>'+
+     '<button type="button" class="key fn m-press" data-key="__del"'+(inert?' aria-disabled="true"':'')+'>⌫ 删除</button></div>';
+  h+='<div class="kb-row"><button type="button" class="key ok m-press" id="kb-confirm" data-key="__confirm" aria-disabled="true">✓ 确认校验（输满 8 位可用）</button></div></div>';
+  return h;
+}
+function alphaKb(inert){
+  var rows=[['2','3','4','5','6','7','8','9'],['A','B','C','D','E','F','G','H'],['J','K','M','N','P','Q','R','S'],['T','U','V','W','X','Y','Z']];
+  var h='<div class="kb alpha'+(inert?' inert':'')+'" data-testid="'+SCREEN+'-keyboard"><div class="kb-note">历史码一共 <b>10 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键——不用担心认错。读满 10 位自动校验。</div>';
+  rows.forEach(function(r,i){
+    h+='<div class="kb-row">'+r.map(function(k){
+      return '<button type="button" class="key m-press" data-key="'+k+'"'+(inert?' aria-disabled="true"':'')+'>'+k+'</button>';}).join('');
+    if(i===3)h+='<button type="button" class="key fn m-press" data-key="__del"'+(inert?' aria-disabled="true"':'')+'>⌫ 删除</button>';
+    h+='</div>';
+  });
+  h+='<div class="kb-row"><button type="button" class="key abc m-press" style="flex:1" data-key="__back"'+(inert?' aria-disabled="true"':'')+'>← 回到 8 位新码键盘</button>'+
+      '<button type="button" class="key ok m-press" style="flex:1" id="kb-confirm" data-key="__confirm" aria-disabled="true">✓ 确认校验</button></div></div>';
+  return h;
+}
+
+/* 受理判定：新码 ∪ 历史码 */
+function isLegal(code){return PATTERN_NEW.test(code)||PATTERN_LEGACY.test(code);}
+
+/* 非法输入提示（本地校验提示，不是服务端错误态） */
+function showIllegal(){
+  var el=document.getElementById('illegal-hint');
+  if(el)el.classList.add('show');
+}
+function hideIllegal(){
+  var el=document.getElementById('illegal-hint');
+  if(el)el.classList.remove('show');
+}
+
+/* 提交（原型只做 ?state=verifying 演示跳转；生产由 POST claim-pickup 决定成败） */
+var submitLock=false;  // 提交锁：扫码器附带的 Enter 不得造成重复提交
+function submitNow(){
+  if(submitLock||!isLegal(entered))return false;
+  submitLock=true;
+  if(settleTimer){clearTimeout(settleTimer);settleTimer=null;}
+  try{localStorage.setItem('__demo_submit_count',String((parseInt(localStorage.getItem('__demo_submit_count')||'0',10)||0)+1));}catch(e){}
+  location.search='?state=verifying';
+  return true;
+}
+
+/* 输入处理：8 位读满后静默 250ms 才提交；第 9/10 位到达即取消（防截断数字前缀历史码） */
+function onInput(ch){
+  if(entered.length>=MAX_INPUT)return;
+  entered+=ch;
+  hideIllegal();
+  renderBoxes();
+  if(entered.length===9||entered.length===10){
+    if(settleTimer){clearTimeout(settleTimer);settleTimer=null;} // 取消 8 位待提交
+  }
+  if(entered.length===10){
+    if(PATTERN_LEGACY.test(entered)){submitNow();return;}
+    showIllegal(); // 10 位但含非法字符（如 0/1），不能形成合法提交
+  }else if(PATTERN_NEW.test(entered)){
+    if(settleTimer)clearTimeout(settleTimer);
+    settleTimer=setTimeout(function(){
+      if(PATTERN_NEW.test(entered))submitNow();
+    },SETTLE_MS);
+  }else if(settleTimer){clearTimeout(settleTimer);settleTimer=null;}
+  updateConfirm();
+}
+function onDel(){
+  entered=entered.slice(0,-1);
+  if(settleTimer){clearTimeout(settleTimer);settleTimer=null;}
+  hideIllegal();
+  renderBoxes();
+  updateConfirm();
+}
+function onConfirm(){
+  if(isLegal(entered)){submitNow();return;}
+  if(entered.length>0)showIllegal();
+}
+function updateConfirm(){
+  var b=document.getElementById('kb-confirm');
+  if(!b)return;
+  var ok=isLegal(entered);
+  b.setAttribute('aria-disabled',ok?'false':'true');
+  b.textContent=ok?'✓ 确认校验':('✓ 确认校验（'+(kbMode==='alpha'?'输满 10 位可用':'输满 8 位可用')+'）');
+}
+function renderBoxes(){
+  var box=document.getElementById('codebox');
+  /* hid 态没有码格，改为更新回声行 */
+  var echo=document.getElementById('hid-echo-code');
+  if(echo)echo.textContent=entered?('已接收 '+entered.length+' 位：'+entered):'';
+  if(!box)return;
+  /* 出现字母或超过 8 位即按历史码 10 格显示，不阻断也不截断 */
+  var legacy=kbMode==='alpha'||/[A-Z]/.test(entered)||entered.length>8;
+  box.classList.toggle('legacy',legacy);
+  box.innerHTML=boxHTML(entered,true,false,legacy);
+}
+function bindKb(){
+  document.querySelectorAll('.kb .key').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var k=btn.getAttribute('data-key');
+      if(k==='__del'){onDel();return;}
+      if(k==='__legacy'){location.search='?state=legacy';return;}
+      if(k==='__back'){location.search='?state=idle';return;}
+      if(k==='__confirm'){onConfirm();return;}
+      onInput(k);
+    });
+  });
+}
+/* 物理键盘 / HID（USB 键盘模拟）输入：idle、legacy、hid 三态都受理；
+   字符集 = 新旧码并集（33 字符），不因屏幕显示数字键盘而丢弃历史码字母；与触屏走同一提交规则 */
+var INPUT_ALPHABET=/^[0123456789ABCDEFGHJKMNPQRSTUVWXYZ]$/;
+document.addEventListener('keydown',function(e){
+  if(state!=='idle'&&state!=='legacy'&&state!=='hid')return;
+  var k=e.key;
+  if(k==='Backspace'){onDel();e.preventDefault();return;}
+  if(k==='Enter'){onConfirm();e.preventDefault();return;}
+  if(/^[0-9a-zA-Z]$/.test(k)){
+    var ch=k.toUpperCase();
+    if(!INPUT_ALPHABET.test(ch))return;
+    onInput(ch);
+  }
+});
+
+function vsCard(cur){
+  return '<div class="vs" data-testid="'+SCREEN+'-list"><div class="vs-t">'+
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>'+
+    '三种码，别搞混</div><div class="vs-cols">'+
+    '<div class="vs-col'+(cur==='arrival'?' cur':'')+'"><b>到机码 · 本页用</b>8 位纯数字（旧码 10 位），对应一笔打印订单。</div>'+
+    '<div class="vs-col"><b>上传码 · 手机传文件用</b>在手机上传页出示，有效期以服务端返回为准。</div>'+
+    '<div class="vs-col"><b>取件凭证码 · 取纸/补打用</b>打印完成后才有，给工作人员核验或代取——本页不输它。</div></div></div>';
+}
+function outs(){
+  return '<div class="outs"><div class="q">码找不到了？</div><div class="items">'+
+    '<span class="out-chip"><b>回手机小程序看</b>·「我的 → 打印订单」</span>'+
+    '<a class="out-chip m-press" href="?state=hid"><b>用机身扫码区</b>·免输码</a>'+
+    '<a class="out-chip m-press" href="06-help.html"><b>问工作人员</b>·帮你查订单</a></div></div>';
+}
+function illegalHint(){
+  return '<div class="illegal" id="illegal-hint" data-testid="'+SCREEN+'-fallback">'+
+    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#963227" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>'+
+    '<span>这不是一枚有效的码：新码是 8 位纯数字，历史码是 10 位且不含 0、O、1、I、L。请核对后再试。</span></div>';
+}
+
+/* ---------- 状态 ---------- */
+function rIdle(){
+  mark('idle');
+  kbMode='numeric';entered='';
+  root.style.justifyContent='space-between';
+  root.innerHTML=head('在手机小程序<b>「我的 → 打印订单」</b>里拿到的那串码，新码是 <b>8 位纯数字</b>。输入后这台机器会认领你的打印订单。')+
+    boxes('',true,false,false)+expireLine()+easy()+illegalHint()+numKb(false)+vsCard('arrival')+outs();
+  bindKb();
+}
+function rVerifying(){
+  mark('verifying');
+  root.style.justifyContent='space-between';
+  /* verifying 仅表示「正在请求校验」：静态演示，不会自动变成 success */
+  root.innerHTML=head('正在请服务端校验这串码，<b>稍等片刻</b>。')+
+    boxes(DEMO_CODE,false,false,false)+
+    '<div class="state-strip checking" data-testid="'+SCREEN+'-fallback">'+pulse('正在校验，请稍候')+'</div>'+
+    numKb(true)+vsCard('arrival');
+}
+function rInvalid(){
+  mark('invalid-or-expired');
+  root.style.justifyContent='space-between';
+  root.innerHTML=head('这串码<b>没通过校验</b>。')+
+    boxes(DEMO_CODE,false,true,false)+
+    '<div class="state-strip error" data-testid="'+SCREEN+'-fallback"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#963227" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>'+
+    '<span>到机码无效或已过期<br><span class="sub">不存在、已过期或不属于这台机器的码，都会显示这一句——不提示具体原因，是为了防止有人试探别人的码。</span></span></div>'+
+    '<div style="margin:0 44px;display:flex;gap:18px;">'+
+    '<a class="btn primary m-press" style="flex:1.4" href="?state=idle" data-testid="'+SCREEN+'-primary">清除，重新输入</a>'+
+    '<a class="btn ghost m-press" style="flex:1" href="06-help.html">查看取码说明 / 找工作人员</a></div>'+ 
+    vsCard('arrival')+outs();
+}
+function rLocked(){
+  mark('locked');
+  root.style.justifyContent='space-between';
+  root.innerHTML=head('输错次数太多，<b>这台机器已临时锁定输码</b>。')+
+    '<div class="block-card locked m-fade-in" data-testid="'+SCREEN+'-fallback"><div class="block-head">'+
+    '<div class="block-ico">'+ICO_LOCK+'</div>'+
+    '<div class="block-t">临时锁定，约 15 分钟后自动解除<small>10 分钟内连续输错次数过多触发</small></div></div>'+
+    '<div class="block-body">这是为了防止有人在公共机器上反复试码。<b>锁定 15 分钟后自动解除</b>，你的码不会因为锁定而作废，到时候再输就行。有疑问可以找工作人员帮你排查。</div>'+
+    '<div class="block-actions">'+
+    '<a class="btn ghost m-press" href="01-home.html">先回首页</a>'+
+    '<a class="btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">联系工作人员获取帮助</a></div>'+
+    '<div class="proto-note">原型演示：锁定由服务端按终端维度执行（10 分钟窗口累计失败达阈值 → 固定锁定 15 分钟后自动解除）；本页面仅展示界面状态。</div></div>'+
+    vsCard('arrival')+outs();
+}
+function rNetwork(){
+  mark('network-error');
+  root.style.justifyContent='space-between';
+  root.innerHTML=head('网络异常，<b>暂时连不上服务器</b>。')+
+    boxes(DEMO_CODE,false,false,false)+
+    '<div class="block-card net m-fade-in" data-testid="'+SCREEN+'-fallback"><div class="block-head">'+
+    '<div class="block-ico">'+ICO_NET+'</div>'+
+    '<div class="block-t">连不上服务器，没法校验<small>你的码不会因为网络问题作废</small></div></div>'+
+    '<div class="block-body">可能是本机网络临时中断。可以<b>稍等片刻重试</b>；如果一直连不上，找工作人员检查机器网络。</div>'+
+    '<div class="block-actions">'+
+    '<a class="btn primary m-press" href="?state=verifying" data-testid="'+SCREEN+'-primary">重试校验</a>'+
+    '<a class="btn ghost m-press" href="06-help.html">联系工作人员</a></div></div>'+
+    vsCard('arrival')+outs();
+}
+function rSuccess(){
+  mark('success');
+  root.style.justifyContent='space-between';
+  /* success 只表示「服务端已认领订单」：永远由服务端校验结果驱动，本原型不用计时器或点击伪造。
+     released 分支由 DEMO_DATA.released 静态选定（false=未支付→现场支付；true=已支付/免费→打印队列），用户不能自选。 */
+  var O=DEMO_DATA.order;
+  var branch=DEMO_DATA.released?{
+      line:'这笔订单<b>已支付（或为免费订单）</b>，已进入打印队列。',
+      steps:'<div class="ws"><span class="ws-no">1</span><span>订单<b>已认领</b></span></div><div class="ws-arrow" aria-hidden="true">→</div>'+
+            '<div class="ws"><span class="ws-no">2</span><span>进入<b>打印队列</b></span></div><div class="ws-arrow" aria-hidden="true">→</div>'+
+            '<div class="ws"><span class="ws-no">3</span><span>出纸后<b>核对页数</b>再离开</span></div>',
+      ctaHref:'15-print-fulfill.html',ctaTxt:'去看打印进度 →'
+    }:{
+      line:'这笔订单<b>还没支付</b>，下一步去收银台现场支付。',
+      steps:'<div class="ws"><span class="ws-no">1</span><span>订单<b>已认领</b></span></div><div class="ws-arrow" aria-hidden="true">→</div>'+
+            '<div class="ws"><span class="ws-no">2</span><span>去收银台<b>现场支付</b></span></div><div class="ws-arrow" aria-hidden="true">→</div>'+
+            '<div class="ws"><span class="ws-no">3</span><span>支付完成<b>开始打印</b></span></div>',
+      ctaHref:'32-cashier.html',ctaTxt:'去现场支付 →'
+    };
+  root.innerHTML=head('校验通过，<b>打印订单已认领</b>。')+
+    '<div class="win-card m-fade-in"><div class="win-head">'+
+    '<div class="win-ico">'+ICO_OK+'</div>'+
+    '<div class="win-t">码对了，订单已认领<small>'+branch.line+'</small></div></div>'+
+    '<div class="win-file" data-testid="'+SCREEN+'-list">'+
+    '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2.5H6a1.5 1.5 0 0 0-1.5 1.5v16a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 2.5V8h5.5"/></svg>'+
+    '<div class="fm"><div class="fn">打印订单 '+O.no+'</div><div class="fs">'+O.files+' · 金额 '+O.amountYuan+'</div></div></div>'+
+    '<div class="win-steps">'+branch.steps+'</div>'+
+    '<div class="block-actions">'+
+    '<a class="btn ghost m-press" style="flex:1" href="?state=idle">再输一个码</a>'+
+    '<a class="btn primary m-press" style="flex:1.6" href="'+branch.ctaHref+'" data-testid="'+SCREEN+'-primary">'+branch.ctaTxt+'</a></div></div>'+
+    '<div class="safe-strip"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>'+
+    '<span>结束会话或闲置超时后，会<b>清除本机登录态和临时会话信息</b>，下一个人无法查看。订单与文件按服务端留存期限管理。</span></div>'+
+    vsCard('arrival');
+}
+function rLegacy(){
+  mark('legacy');
+  kbMode='alpha';entered=DEMO_LEGACY.slice(0,3);
+  root.style.justifyContent='space-between';
+  root.innerHTML=head('旧码在这里输：<b>10 位带字母的历史码</b>（早前下单拿到的）。新码（8 位纯数字）请回新码键盘。')+
+    boxes(entered,true,false,true)+expireLine()+easy()+illegalHint()+alphaKb(false)+vsCard('arrival');
+  bindKb();updateConfirm();
+}
+function rHid(){
+  mark('hid');
+  entered='';
+  root.style.justifyContent='space-between';
+  root.innerHTML=head('不用手输：<b>把手机上的码，对准机身扫码区</b>。')+
+    '<div class="hid-card m-fade-in"><div class="hid-stage" aria-hidden="true">'+
+    '<span class="hid-corner tl m-scan-corner"></span><span class="hid-corner tr m-scan-corner"></span>'+
+    '<span class="hid-corner bl m-scan-corner"></span><span class="hid-corner br m-scan-corner"></span>'+
+    '<div class="hid-phone">'+ICO_QR+'</div></div>'+
+    '<div class="hid-main"><div class="hid-t">请出示手机上的码</div>'+
+    '<div class="hid-s">打开小程序里的到机码页面，把手机屏幕对准<b>机身侧面的扫码区</b>。扫码器以 USB 键盘方式把码输入进来，走和手输同一套校验规则。</div>'+
+    '<div class="hid-echo" data-testid="'+SCREEN+'-fallback"><span class="sdot" aria-hidden="true"></span><span id="hid-echo-code">等待扫码输入…（扫码器扫到会自动填入并校验）</span></div></div></div>'+
+    '<div class="ab-card" data-testid="'+SCREEN+'-list"><div class="ab-t">两种「扫码」不是一回事</div><div class="ab-cols">'+
+    '<div class="ab-col a"><b>本页：机器读你的手机</b>机身扫码区读取你手机上的到机码，扫到自动校验。</div>'+
+    '<div class="ab-col b"><b>另一处：你用手机扫屏幕</b>手机传文件、扫码登录是扫这台机器的屏幕，去「文件来源」页。</div></div></div>'+
+    '<div style="margin:0 44px;display:flex;gap:18px;">'+
+    '<a class="btn ghost m-press" style="flex:1" href="?state=idle" data-testid="'+SCREEN+'-primary">还是手输吧</a>'+
+    '<a class="btn ghost m-press" style="flex:1" href="06-help.html">扫不出来？求助</a></div>'+
+    vsCard('arrival');
+}
+
+var R={'idle':rIdle,'verifying':rVerifying,'invalid-or-expired':rInvalid,'locked':rLocked,
+  'network-error':rNetwork,'success':rSuccess,'legacy':rLegacy,'hid':rHid};
+(R[state]||rIdle)();
+</script>
+</body>
+</html>

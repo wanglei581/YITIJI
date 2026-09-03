@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>简历决策工作台 · 职易达</title>
+  <!--
+    宿主：简历决策工作台（一个宿主承接四条真实 route）
+    route: /resume/job-fit          screen=job-fit
+           /resume/job-fit/actions  screen=actions
+           /resume/career-plan      screen=career-plan
+           /resume/templates        screen=templates
+    state: 由 ?screen= 与 ?state= 共同表达；静态状态仅用于验收与原型演示，不请求 API、不推进业务完成。
+    api: JobFitPage / JobFitActionsPage / CareerPlanPage / ResumeTemplateLibraryPage 的真实 React 合同。
+    真话边界：无 taskId、本人授权、来源岗位或服务端返回时，一律不展示个人结果、岗位、企业、匹配分、打印件或完成状态。
+    fallback: 任何无法确认的 AI 或打印状态都保留返回/重试/材料准备的真实下一步；不伪造恢复时间或成功。
+    真话披露：底部 truth-bar 压成单行（本人使用 / 服务端状态 / 本机会话边界 + 使用说明入口），
+              不再用三列等权说明墙，也不在主内容区铺等权治理卡；主内容只放真实产品结构与诚实槽位。
+
+    原型控件可见性（demo-tab / demo-panel）：
+      - 只有 ?debug=1 才显示。JS 读到 debug=1 时设 <html data-debug="1">，
+        再移除下面的 hidden / disabled / aria-hidden 并绑定打开交互。
+      - 普通 state/screen/capture/flat URL 下三重兜底：HTML 的 hidden + disabled +
+        tabindex="-1" 防 JS 执行前闪现；CSS 的 html:not([data-debug="1"]) 段落钉死
+        零尺寸、不可见、不可点、不参与布局；JS 在非 debug 分支不绑定任何交互。
+      - 这两个元素带 data-proto-control="true"，供截图与验收脚本按属性排除。
+  -->
+  <link rel="stylesheet" href="kimi-full-coverage-v2/design-system/kiosk-motion.css">
+  <link rel="stylesheet" href="resume-decision-workspace.css">
+</head>
+<body>
+  <div id="stage">
+    <header class="topbar">
+      <a class="back m-press" href="16-service-hubs.html?hub=resume" data-route="/resume-service" aria-label="返回简历服务">‹</a>
+      <div class="brand"><span class="brand-mark">职</span><span>职易达</span></div>
+      <div class="top-space"></div>
+      <div class="status"><i></i><span id="status-copy">以当前任务与服务端返回为准</span></div>
+      <time id="clock" class="clock">--:--</time>
+    </header>
+
+    <section class="hero">
+      <div class="xq m-face-ring">青</div>
+      <div class="hero-copy">
+        <div id="eyebrow" class="eyebrow">RESUME DECISION</div>
+        <h1 id="hero-title">先把目标说清，<em>再决定下一步。</em></h1>
+        <p id="hero-copy">岗位匹配、行动建议、职业规划和版式参考都基于真实任务与本人授权。</p>
+      </div>
+    </section>
+
+    <main id="workspace" class="workspace" data-screen="resume-decision-job-fit" data-state="missing-task" data-testid="resume-decision-job-fit-state-missing-task"></main>
+
+    <footer class="truth-bar" data-testid="resume-decision-truth">
+      <span class="tb-ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v6.2c0 4.4-3.1 7.6-7.5 8.8-4.4-1.2-7.5-4.4-7.5-8.8V6z"/></svg></span>
+      <p><b>只供本人准备</b>不提供给企业 · 结果以服务端返回为准 · 结束会话清除本机登录态</p>
+      <a class="tb-help m-press" href="06-help.html" data-route="/help" data-testid="resume-decision-truth-help">使用说明</a>
+    </footer>
+    <nav class="navbar" aria-label="全局导航">
+      <a class="m-press" href="01-home.html" data-route="/">首页</a>
+      <a class="m-press" href="05-ai-cockpit.html" data-route="/assistant">AI 顾问</a>
+      <a class="m-press" href="30-my-profile.html" data-route="/profile">我的</a>
+    </nav>
+    <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" aria-expanded="false" aria-controls="demo-panel" hidden aria-hidden="true" tabindex="-1" disabled>演示</button>
+    <aside class="demo-panel" id="demo-panel" data-proto-control="true" aria-label="原型演示控制" hidden aria-hidden="true" tabindex="-1"></aside>
+  </div>
+  <script src="resume-decision-workspace.js"></script>
+</body>
+</html>

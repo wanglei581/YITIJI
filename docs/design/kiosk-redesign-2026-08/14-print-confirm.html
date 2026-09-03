@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>报价确认 · 职易达</title>
+<!--
+  route: /print/confirm
+  state: 正常访问可达 —— missing-context | invalid-context | quoting | quote-failed | capability-invalid-params
+         仅 ?debug=1 可达 —— quoted | benefit-unverified | zero-amount（合成排版演示，CTA 全禁用）
+  api:  POST /api/v1/orders/quote → PrintOrderQuote { amountCents, billablePages, billingPageSource, priceLines }
+        —— 报价不落库；金额与计费页数**只认服务端返回**，前端绝不本地估算
+        POST /api/v1/print/jobs  → 确认后真实建单（返回 taskId / orderId），零元单同样先建单
+        GET  /api/v1/print/price-config → 公开只读价目，仅用于口径说明
+        彩色 / 双面报价必带 terminalId：后端按该终端能力登记 fail-closed 复核，未验证参数直接拒绝报价
+  金额边界: 所有金额位在 [data-quote-slot] 内；未知金额显示自然状态文案且禁止建单。
+            静态原型里**没有任何真实报价**，所以会摆出金额的三屏（quoted / benefit-unverified / zero-amount）
+            只在 ?debug=1 下作为合成排版演示渲染：金额位带 data-quote-demo="layout-only"，
+            旁边常驻「不是服务端报价」，所有可能建单 / 付款的 CTA 一律禁用且不指向 32-cashier。
+            每个金额位旁常驻来源说明（真实链路的金额来自服务端 orders/quote）
+  权益边界: 核销结果未通过时按原价显示，绝不先按抵扣后的价格呈现
+  出口:    金额 > 0 → /print/cashier；服务端报价为 0 → 仍然先建单，再由收银页 releasePickupOrder 释放，
+           不存在「不建单直接出纸」的路径
+  fallback: quote 失败 → quote-failed，可重试或改参数；无 file/params 上下文 → missing-context；
+            交接参数没通过登记核对 → invalid-context（绝不回落 quoted/default）
+  交接上下文: 本页只消费**登记过**的非敏感交接参数 source / fileId / pages / copies / duplex / color。
+            地址栏键名白名单 QUERY_ALLOW = source / fileId / pages / copies / duplex / color / state / debug / flat / coupon。
+            ?coupon= 只切优惠券折叠行的**设计状态**：未登记取值或非 debug 下的合成态一律回落
+            unavailable（「功能尚未接通」），不冒充真实可核销能力。
+            白名单以外的键名（token / signedUrl / printFileUrl 这类凭证最常从这儿溜进来）、
+            同名键重复出现（URLSearchParams.get 只取第一个，剩下的会安静留在地址栏），
+            以及登记键上挟带的不可回显取值（safeVal 拒绝的长串 / 带 / : ? 的签名链接），
+            一律 fail-closed 到 invalid-context，并立刻 history.replaceState 把地址换成
+            只含安全登记参数的 URL。这些键名与取值**不进 DOM、不进属性、不进错误文案、不留在地址栏**。
+            URL fragment（#...）：任何非空 # 片段一律判为不可信输入 —— 不解析、不按键名拆、不做白名单，
+            也不因为「看着无害」就放行。渲染任何业务 DOM 之前先 history.replaceState 把地址换成
+            pathname + ?state=invalid-context（debug=1 / flat=1 按同一条安全规则保留，其余 query 一律不留），
+            地址栏里不留 #；它的原文与解码结果不进 DOM、不进属性、不进错误文案、不进 console。
+            登记表两条：
+              1) source=interview-report + fileId=iv_rep_5c1d8f2a
+                 → 模拟面试练习报告_前端开发工程师.pdf · PDF · 209 KB · 3 页（对齐 29-interview-training.html 的 PFILE 夹具）
+              2) 打印台默认文档 求职简历.pdf · PDF · 3 页（未登记文件编号与大小）——
+                 只在显式 ?state= 请求某一屏时当**排版夹具**用，不再是无参进入的默认结果
+            登记表以外的来源 / 文件编号、只给半边的交接、与登记不符的页数、非 1 的份数、
+            越界的 duplex（single|double）或 color（bw|color）、未登记的 ?state= 取值
+            → 一律 invalid-context，不按地址栏猜文件名 / 页数 / 大小，也不静默回落到默认那一份。
+            duplex=double 或 color=color 属登记取值但本机未通过真机验证 → 强制 capability-invalid-params。
+            带交接参数且未显式指定 ?state= 时落 quoting（刚交接进来，这一单还没有报价）；
+            不带交接参数且未指定 ?state= 时落 missing-context —— 静态原型没有服务端报价，
+            无参进入不能自己摆出一份文件加一个金额。13/18/19/20/23/37/38 的无参入口因此都改落空态，
+            38-member-assets 的 ?state=quoted 与 s3-print-scan 的 quoted / zero-amount 跳转断言会随之变红，
+            这是「静态页不冒充真实报价」的代价，不是回归。
+  真实合同: 正式 React 由 apps/kiosk/src/pages/print/PrintConfirmPage.tsx 从 location.state 读
+            file(PrintFileState) + params(PrintJobParams)，InterviewReportPage.handlePrint 用
+            navigate('/print/confirm',{state:{file,params}}) 交接。本页地址栏里的取值只是
+            **静态登记夹具的选择键**，不是文件本身；printFileUrl / signedUrl 一律不进地址栏、
+            不进任何可见文本、不进 data 属性。本页不建单、不扣费、不支付、不出纸、不产生取件码。
+  内部链接: 所有演示 / 重试 / 状态切换链接都带走已通过核对的交接参数；面试报告来源的返回口是
+            29-interview-training.html?state=report-print-handoff（不是通用上传 / 预览）。
+            该返回链接**不带 data-route**：s3-print-scan 的 expectedRoutesForLocalHref 静态宿主表
+            没有登记 29-interview-training.html，带上 data-route 会让 F12 误判为「未登记的本地宿主」。
+            等该表补登 29 之后，这条链接应改回 data-route="/interview/report"。
+  原型演示控制：本页状态仅通过 ?state= 与交接参数切换；页面无计时器推进业务状态
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.xq{flex:none;margin:16px 44px 0;border-radius:36px;padding:22px 42px 20px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{flex:none;width:100px;height:100px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:46px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:8px}
+.xq-ask{font-size:38px;line-height:1.3;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:10px;font-size:21px;line-height:1.55;color:rgba(242,239,228,.72)}
+.xq-doing b{color:#fff;font-weight:600}
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec{flex:none;padding:0 44px;margin-top:20px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:10px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 30px}
+.state{border-radius:var(--r-lg);padding:24px 34px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:700}
+.state-p{margin-top:12px;font-size:21px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.plan{margin-top:16px;display:flex;flex-direction:column;gap:11px}
+.plan li{list-style:none;display:flex;gap:12px;align-items:flex-start;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.plan .sq{flex:none;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-top:9px}
+.reason{margin-top:8px;font-size:18px;line-height:1.5;color:var(--wheat-d);font-weight:600}
+.btn{min-height:72px;padding:0 30px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:600;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{opacity:.55;cursor:default}
+.truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:26px}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.navbar{flex:none;height:120px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+.nav-item.on .ni{color:var(--teal-d)}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal)}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.press:active{transform:scale(.985)}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:140px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:16px;flex-direction:column;gap:8px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 16px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.sec.last{margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.chip{min-height:48px;padding:0 18px;border-radius:14px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:9px;font-size:18px;color:var(--ink-2);font-weight:600}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.chip.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.meta{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap}
+.pgrp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 24px}
+.pgrp h4{font-size:22px;font-weight:700;display:flex;align-items:center;gap:12px}
+.pgrp .state-p{font-size:19px;margin-top:10px}
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+.steps-bar{flex:none;margin:12px 44px 0;display:flex;gap:10px}
+.step{flex:1;height:56px;border-radius:18px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:10px;font-size:19px;font-weight:600;color:var(--ink-3)}
+.step.on{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.step.done{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.step i{width:24px;height:24px;border-radius:50%;background:currentColor;opacity:.26;font-style:normal;flex:none}
+/* ---------------------------------------------------------------- 核对区
+   旧稿把文件、页数、份数、颜色、单双面挤在右侧 388px 窄栏里换行，中间那块
+   info 状态卡却 flex:1 撑出近 500px 浅绿空洞，主确认动作被推到底栏边上。
+   现在核对内容吃满整幅：一行文件身份 + 一张 3x2 参数网格，参数一眼扫完；
+   不可用的参数就地标红，不必再单开一段说明。 */
+.rev{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 30px}
+.rev-file{display:flex;align-items:center;gap:20px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.rf-ic{flex:none;width:76px;height:76px;border-radius:24px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.rf-m{flex:1;min-width:0}
+.rf-m>b{display:block;font-size:30px;font-weight:700;line-height:1.24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rf-m span{display:block;margin-top:7px;font-size:20px;line-height:1.4;color:var(--ink-3)}
+.rev-grid{margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.rev-grid>div{min-height:80px;border-radius:20px;background:var(--paper);border:1px solid var(--line);padding:10px 20px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.rev-grid>div>span{font-size:19px;line-height:1.2;color:var(--ink-3)}
+.rev-grid>div>b{font-size:26px;font-weight:700;line-height:1.26}
+.rev-grid>div.off{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.rev-grid>div.off>span,.rev-grid>div.off>b{color:var(--cinnabar-d)}
+/* 文件编号是登记夹具值，按可读的等宽偏好排，但不缩到看不清 */
+.rev-grid>div>b.id{font-size:22px;letter-spacing:.5px;word-break:break-all}
+/* 夹具声明常驻在文件条里：说清屏幕上的文件名/大小/页数/编号是本页登记的，不是真实链路结果 */
+.rf-m .fx{display:block;margin-top:6px;font-size:17px;line-height:1.4;color:var(--ink-3)}
+.rf-m .fx b{font-weight:700;color:var(--ink-2)}
+/* ---------------------------------------------------------------- 费用区 */
+.fee{display:flex;gap:18px;align-items:stretch}
+.fee>.amount-card{flex:none;width:432px;display:flex;flex-direction:column;justify-content:center}
+.fee>.lines{flex:1;min-width:0;margin-top:0;display:flex;flex-direction:column;justify-content:center}
+.amount-card{background:linear-gradient(158deg,var(--deep-2),var(--deep));border-radius:var(--r-lg);padding:22px 32px;color:#f2efe4;position:relative;overflow:hidden}
+.amount-card::after{content:"";position:absolute;right:-110px;bottom:-130px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.14),transparent 65%)}
+.amount-lb{font-size:19px;letter-spacing:3px;color:rgba(242,239,228,.55);position:relative;z-index:1}
+.amount{margin-top:8px;display:flex;align-items:baseline;gap:8px;position:relative;z-index:1}
+.amount .cur{font-size:34px;font-weight:700;color:var(--emerald)}
+.amount .num{font-size:70px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;line-height:1}
+.amount.amount-message .num{font-size:34px;line-height:1.25;letter-spacing:0}
+.amount-src{margin-top:12px;font-size:18px;line-height:1.55;color:rgba(242,239,228,.72);position:relative;z-index:1}
+.amount-src b{color:#fff;font-weight:600}
+.lines{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:2px 26px}
+.line{display:flex;align-items:center;gap:16px;padding:13px 0;border-bottom:1px solid var(--line);font-size:21px}
+.line:last-child{border-bottom:0}
+.line .lb{flex:1;color:var(--ink-2)}
+.line .vl{flex:none;font-weight:700;font-variant-numeric:tabular-nums}
+.line .vl.slot{color:var(--ink-3)}
+/* 优惠券折叠行：主画布只放这一行（72-80px），券列表在同页面板里，不铺进主流程。
+   默认恒为「尚未接通」；available/selected/repricing/failed/locked/zero 只在
+   ?debug=1&coupon= 下作为**设计状态**出现，正常打开一律看不到。 */
+.coupon{display:flex;align-items:center;gap:14px;min-height:72px;max-height:80px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:0 22px}
+.coupon .c-ic{flex:none;width:48px;height:48px;border-radius:16px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.coupon[data-coupon=reprice-failed] .c-ic{background:rgba(193,74,52,.1);color:var(--bad)}
+.coupon .c-m{flex:1;min-width:0}
+.coupon .c-m b{display:block;font-size:20px;font-weight:700}
+.coupon .c-m span{display:block;margin-top:3px;font-size:16px;line-height:1.4;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.coupon .c-cut{flex:none;font-size:22px;font-weight:700;color:var(--teal-d);font-variant-numeric:tabular-nums}
+.coupon .c-act{flex:none;min-height:56px;display:flex;align-items:center;padding:0 22px;border:1px solid var(--teal-d);border-radius:14px;color:var(--teal-d);font-size:17px;font-weight:700}
+.coupon .c-tag{flex:none;padding:7px 14px;border-radius:999px;background:var(--teal-soft);color:var(--teal-d);font-size:15px}
+.coupon-why{margin-top:8px;padding:0 22px 0 84px;font-size:16px;line-height:1.5;color:var(--ink-3)}
+/* 同页选择面板（设计态）：单列单选卡，卡片 >=96px，底部确认条固定在面板内。
+
+   1080x1920 内必须**整块可见**：此前面板整体随内容长高，把确认按钮顶到了页面
+   底部说明条和导航栏下面，只露出上沿，免费次数卡也被切掉。
+   现在改成「面板自身定高 + 选项区内部滚动 + 底栏 flex:none」：
+   面板总高 = 头 72 + 页签 64 + 列表 108 + 底栏 86 + 上下边框 2 = 332px（box-sizing
+   全局 border-box，以上都是外框高）。
+
+   高度史（每一次都是实看抓到的重叠，不是拍脑袋）：
+     560/320 → 确认按钮被事实说明条横穿；
+     440/216 → 加上「原价 / 优惠券抵扣」两行明细后总高又涨回去，按钮再次被横穿；
+     332/108 → 当前值。列表 108 减去 12px 下内边距正好 96 = **一张整卡**，
+     首屏完整显示当前关键卡，其余券在**面板内部**滚动查看；页面本身不出现纵向滚动。
+
+   列表是唯一 flex:1 的子项，头/页签/底栏都是 flex:none —— 内容再涨也只会挤列表，
+   确认按钮永远不会被压掉或推出可视区。 */
+.c-sheet{margin-top:10px;display:flex;flex-direction:column;max-height:332px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.c-sheet-hd{flex:none;display:flex;align-items:center;justify-content:space-between;padding:10px 22px 6px;font-size:20px;font-weight:700}
+.c-tabs{flex:none;display:flex;gap:10px;padding:0 22px 8px}
+.c-tab{min-height:56px;display:flex;align-items:center;padding:0 20px;border:1px solid var(--line);border-radius:14px;font-size:17px;color:var(--ink-2)}
+.c-tab[aria-selected=true]{border-color:var(--teal-d);background:var(--teal-soft);color:var(--teal-d);font-weight:700}
+.c-list{flex:1;min-height:0;max-height:108px;display:flex;flex-direction:column;gap:12px;padding:0 22px 12px;overflow-y:auto}
+.c-card{flex:none;min-height:96px;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:14px 18px;border:1px solid var(--line);border-radius:16px}
+.c-card[aria-checked=true]{border-color:var(--teal-d);background:var(--teal-soft)}
+.c-card[aria-disabled=true]{opacity:.62}
+.c-card b{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+.c-kind{padding:2px 10px;border-radius:999px;background:var(--wheat-soft);color:var(--wheat-d);font-size:14px;font-style:normal;font-weight:600}
+.c-card span{font-size:16px;line-height:1.4;color:var(--ink-3)}
+.c-card .c-no{color:var(--bad)}
+.c-foot{flex:none;padding:10px 22px 12px;border-top:1px solid var(--line)}
+.c-confirm{width:100%;min-height:64px;display:flex;align-items:center;justify-content:center;border-radius:16px;background:var(--teal-d);color:#fff;font-size:20px;font-weight:700}
+/* quoted 屏一旦挂上券折叠行（现在恒挂），纵向就多出一整块内容，sec03 的两个按钮会被
+   固定事实说明条横穿 —— 实看在 14-unavailable 上抓到。事实条与 nav 不能动，
+   所以收紧的是内容留白：coupon-compact 覆盖所有 quoted 券态，
+   coupon-open 在面板展开时叠加同一档（面板本身还要再占 332px）。 */
+#body-root.coupon-open .sec,#body-root.coupon-compact .sec{margin-top:14px}
+#body-root.coupon-open .sec-label,#body-root.coupon-compact .sec-label{margin-bottom:6px}
+#body-root.coupon-open .xq,#body-root.coupon-compact .xq{margin-top:12px}
+/* 未接通 / 游客 / 锁定这几档的常驻原因行是两行文字，压一档字号与上边距。
+   不缩触控目标，也不删这句话 —— 它是「为什么点不动」的常驻可见依据。 */
+#body-root.coupon-compact .coupon-why{margin-top:6px;font-size:15px;line-height:1.45}
+.benefit{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 22px}
+.benefit.warn{background:var(--wheat-soft);border-color:transparent}
+.b-ic{flex:none;width:56px;height:56px;border-radius:18px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.benefit.warn .b-ic{background:rgba(169,120,31,.16);color:var(--wheat-d)}
+.b-m{flex:1;min-width:0}
+.b-m b{display:block;font-size:21px;font-weight:700}
+.b-m span{display:block;margin-top:5px;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.benefit.warn .b-m span{color:var(--wheat-d)}
+/* ---------------------------------------------------------------- 行动区
+   主确认动作紧跟核对结果，收在自己的卡片里；卡片下方留一段呼吸位，
+   不再贴着底部说明条和全局导航。 */
+.cfm{background:var(--surface);border:1.5px solid var(--line-2);border-radius:var(--r-lg);padding:18px 28px 20px}
+.cfm[data-tone=warn]{background:var(--wheat-soft);border-color:#e0cfa4}
+.cfm[data-tone=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.cfm-flow{display:flex;align-items:center;gap:12px}
+.cfm-flow .cs{flex:1;min-height:76px;border-radius:20px;background:var(--paper);border:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 20px}
+.cfm-flow .cs b{font-size:22px;font-weight:700;line-height:1.2}
+.cfm-flow .cs span{font-size:17px;line-height:1.3;color:var(--ink-3)}
+.cfm-flow .cs.on{background:var(--deep);border-color:transparent;color:#f2efe4}
+.cfm-flow .cs.on span{color:rgba(242,239,228,.66)}
+.cfm-flow .ar{flex:none;width:22px;display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.cfm-note{margin-top:14px;font-size:21px;line-height:1.55;color:var(--ink-2)}
+.cfm-note b{color:var(--ink);font-weight:600}
+.cfm-reason{margin-top:12px;font-size:19px;font-weight:600;line-height:1.4;color:var(--wheat-d)}
+.cfm-act{margin-top:16px;display:flex;gap:16px}
+.cfm-act .btn{flex:1}
+.emptybox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:20px;line-height:1.6;color:var(--ink-2);padding:26px 0}
+.emptybox .ei{width:96px;height:96px;border-radius:30px;background:var(--paper);border:1px dashed var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+/* ---------------------------------------------------------------- invalid-context 版面
+   失败理由是这一屏唯一会变长的一段：核对对不上那几条一两行就写完，# 片段那条要占
+   五行。它下面的「这一趟没有发生什么」和行动区都是固定高度，理由一长就把行动卡整个
+   顶下去 —— 1080x1920 实测最多压到底部说明条上 70px，两个按钮被说明条切开。
+   这一屏因此把段间距交给剩余空间：行动卡始终停在说明条上方，多出来的白平均分到段与
+   段之间；理由长到默认留白也放不下时，再由 fit-compact 收一档卡片留白。
+   只动留白，不动文案、不动核对结果，也不影响其他状态。 */
+#body-root[data-state=invalid-context] .sec+.sec{margin-top:auto}
+#body-root[data-state=invalid-context] .sec.last{margin-bottom:24px}
+#body-root.fit-compact .sec{margin-top:14px}
+#body-root.fit-compact .sec-label{margin-bottom:6px}
+#body-root.fit-compact .state{padding:18px 30px}
+#body-root.fit-compact .pgrp{padding:14px 22px}
+#body-root.fit-compact .plan{margin-top:12px;gap:8px}
+#body-root.fit-compact .cfm{padding:14px 28px 16px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="13-print-desk.html?state=preview" data-route="/print/preview" aria-label="返回预览与参数"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">第 4 步 / 共 4 步 · 报价确认</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif" aria-hidden="true">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow">QUOTE &amp; CONFIRM</div>
+        <div class="xq-ask serif" id="xq-ask">这笔<em>多少钱</em>，服务端说了算。</div>
+        <div class="xq-doing" id="xq-doing">金额和计费页数都由服务端返回。<b>本机不估价、不打折、不替你承诺优惠。</b></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="steps-bar" id="steps"></div>
+
+  <main class="body" id="body-root" data-screen="print-confirm" data-state="quoted" data-testid="print-confirm-state-quoted"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="print-confirm-truth">
+    <div><b>金额</b>只认服务端返回的正式报价；静态原型不预设单价，屏幕上的金额位都是占位。</div>
+    <div><b>权益</b>核销要等服务端结果；没通过就按原价走，不会先按抵扣算给你看。</div>
+    <div><b>建单</b>点确认才会真正建单，零元单也一样先建单，再走后面的流程。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true">
+    <div class="dp-t">原型演示控制</div>
+    <a href="?state=missing-context" data-s="missing-context">missing-context</a>
+    <a href="?state=quoting" data-s="quoting">quoting</a>
+    <a href="?state=quoted" data-s="quoted">quoted</a>
+    <a href="?state=quote-failed" data-s="quote-failed">quote-failed</a>
+    <a href="?state=capability-invalid-params" data-s="capability-invalid-params">capability-invalid-params</a>
+    <a href="?state=benefit-unverified" data-s="benefit-unverified">benefit-unverified</a>
+    <a href="?state=zero-amount" data-s="zero-amount">zero-amount</a>
+    <a href="?state=invalid-context" data-s="invalid-context">invalid-context</a>
+    <div class="dp-t">优惠券设计态（合成态需 debug=1）</div>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=unavailable" data-s="coupon-unavailable">coupon:unavailable（默认）</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=guest" data-s="coupon-guest">coupon:guest</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=empty" data-s="coupon-empty">coupon:empty</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=expired" data-s="coupon-expired">coupon:expired</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=available" data-s="coupon-available">coupon:available</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=selected" data-s="coupon-selected">coupon:selected</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=repricing" data-s="coupon-repricing">coupon:repricing</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=reprice-failed" data-s="coupon-reprice-failed">coupon:reprice-failed</a>
+    <a href="?state=quoted&amp;debug=1&amp;coupon=locked" data-s="coupon-locked">coupon:locked</a>
+    <a href="?state=zero-amount&amp;debug=1&amp;coupon=zero-payable" data-s="coupon-zero">coupon:zero-payable</a>
+    <div class="dp-t">交接夹具</div>
+    <a href="?source=interview-report&amp;fileId=iv_rep_5c1d8f2a&amp;pages=3&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">面试报告交接</a>
+    <a href="?source=resume-optimize&amp;fileId=rsm_opt_9d4b71e6&amp;pages=2&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">简历优化导出</a>
+    <a href="?source=resume-generate&amp;fileId=rsm_draft_3a17c9f2&amp;pages=1&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">生成 · 原样草稿</a>
+    <a href="?source=resume-generate&amp;fileId=rsm_gen_6b28d40a&amp;pages=1&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">生成 · PDF 导出</a>
+    <a href="?source=job-material&amp;fileId=jm_campus_cover_letter_8f31c0&amp;pages=2&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">材料 · 校招自荐信</a>
+    <a href="?source=job-material&amp;fileId=jm_experienced_cover_letter_8f31c0&amp;pages=2&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">材料 · 社招求职信</a>
+    <a href="?source=job-material&amp;fileId=jm_interview_thank_you_8f31c0&amp;pages=2&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">材料 · 面试感谢信</a>
+    <a href="?source=job-material&amp;fileId=jm_portfolio_cover_8f31c0&amp;pages=2&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">材料 · 作品集封面</a>
+    <a href="?source=job-material&amp;fileId=jm_job_fair_checklist_8f31c0&amp;pages=1&amp;copies=1&amp;duplex=single&amp;color=bw" data-s="handoff-ok">材料 · 招聘会清单</a>
+    <a href="?source=interview-report&amp;fileId=iv_rep_unknown" data-s="handoff-bad">交接核对失败</a>
+    <a href="?source=job-material&amp;fileId=jm_campus_cover_letter_8f31c0&amp;pages=1" data-s="handoff-bad">交接页数不符</a>
+    <a href="?source=resume-optimize&amp;fileId=jm_portfolio_cover_8f31c0" data-s="handoff-bad">跨来源串编号</a>
+  </div>
+</div>
+<script>
+var SCREEN='print-confirm';
+var STATES=['missing-context','invalid-context','quoting','quoted','quote-failed','capability-invalid-params','benefit-unverified','zero-amount'];
+/* 这三屏会在屏幕上摆出金额和一单「可以确认」的订单。静态原型拿不到服务端报价，
+   摆出来就是替服务端下结论，所以它们只在 ?debug=1 下作为合成排版演示渲染：
+   金额标 layout-only，可能建单 / 付款的 CTA 全部禁用，也不指向收银台。 */
+var SYNTHETIC_STATES=['quoted','benefit-unverified','zero-amount'];
+
+/* ── 交接夹具登记表 ───────────────────────────────────────────────────────────
+   本页是打印链路的**消费者**：文件与打印参数由上一步交进来，不由本页自己造。
+   静态原型没有真实的路由传参，所以只认下面这张登记表 —— 地址栏里的 source/fileId
+   只是**选哪一条登记夹具**的键，不是文件本身。表外的来源与文件编号一律停在
+   invalid-context：不按地址栏猜文件名、页数、大小，也不静默回落到默认那一份。
+   两条登记都是本原型的合成夹具，不是任何一次真实上传或真实生成的结果。 */
+var DOC_DEFAULT={
+ key:'print-desk',
+ name:'求职简历.pdf',
+ kind:'PDF 文档',
+ size:null,
+ pages:3,
+ fileId:null,
+ from:'打印台默认文档（本页排版夹具，未登记文件编号与大小）',
+ backHref:'13-print-desk.html?state=preview',
+ backRoute:'/print/preview',
+ backLabel:'返回改参数',
+ changeLabel:'去改参数',
+ backAria:'返回预览与参数',
+ fixTitle:'改回黑白单面就能继续',
+ fixNote:'回上一步把颜色改成<b>黑白</b>、单双面改成<b>单面</b>，再回来重新获取报价。'
+};
+/* 登记表按 **来源 + 文件编号成对** 组织：一个来源可以交进来不止一份文件（求职材料工坊
+   就有五个模板各出一份），所以只按 source 命中一条是错的 —— 那等于让「材料工坊」这个
+   词自己决定屏幕上显示哪一份文件名和页数。docs 里的键就是该来源登记过的文件编号，
+   地址栏里的 fileId 必须逐字命中其中一个，否则一律 invalid-context。
+   每条的 filename / size / pages 都与上游那一页显示的同一份合成夹具逐字段对齐；
+   signedUrl 与 printFileUrl 不在这里，也不该在这里。
+   backHref 指回**交进来的那一屏**；上游那几屏是原型的受控夹具态（只在 debug=1 / capture=1
+   下可达），所以回链带 debug=1 —— 这是那一屏真实的可达方式，不是给它伪造一个正式入口。 */
+var HANDOFF_SOURCES={
+ 'interview-report':{
+  label:'模拟面试打印交接',
+  entry:'从模拟面试的练习报告交接进来',
+  /* 与 29-interview-training.html 的 PFILE 逐字段对齐：filename / sizeBytes 214016(=209 KB) /
+     pageCount 3 / mimeType application/pdf。 */
+  docs:{
+   'iv_rep_5c1d8f2a':{
+    name:'模拟面试练习报告_前端开发工程师.pdf',
+    kind:'PDF 文档',
+    size:'209 KB',
+    pages:3,
+    from:'由模拟面试的打印交接带过来',
+    backHref:'29-interview-training.html?state=report-print-handoff',
+    backRoute:null,
+    backLabel:'返回面试报告',
+    changeLabel:'返回面试报告',
+    backAria:'返回模拟面试报告的打印交接',
+    fixTitle:'回面试报告重新交接',
+    fixNote:'这份练习报告只登记了<b>黑白单面</b>。地址里的取值超出已验证范围，回面试报告重新交接再报价。'
+   }
+  }
+ },
+ /* 与 23-resume-optimize.html 的 EXPORT_FILE 逐字段对齐：sizeBytes 118784(=116 KB)、pageCount 2。
+    那一页只有 **PDF** 这一种格式登记了打印身份：DOCX / TXT / MD 的导出返回的是原格式 fileId，
+    真实合同里打印用的是服务端另渲染的一份同内容 PDF，两者的文件编号不是同一个，
+    所以那三种格式在上游就禁用打印，这里也没有对应登记。 */
+ 'resume-optimize':{
+  label:'简历优化导出交接',
+  entry:'从简历优化的 PDF 导出交接进来',
+  docs:{
+   'rsm_opt_9d4b71e6':{
+    name:'优化版简历_张示例.pdf',
+    kind:'PDF 文档',
+    size:'116 KB',
+    pages:2,
+    from:'由简历优化的 PDF 导出交接带过来',
+    backHref:'23-resume-optimize.html?debug=1&screen=editor&state=ready&taskId=RPT-2026-0830-A&export=ready',
+    backRoute:'/resume/optimize',
+    backLabel:'返回简历优化',
+    changeLabel:'返回简历优化',
+    backAria:'返回简历优化的导出交接',
+    fixTitle:'回简历优化重新交接',
+    fixNote:'这份优化版只登记了<b>黑白单面</b>。地址里的取值超出已验证范围，回简历优化重新交接再报价。'
+   }
+  }
+ },
+ /* 与 24-resume-generate.html 的两份 PDF 夹具逐字段对齐：原样草稿 79872(=78 KB)、1 页；
+    AI 生成导出 98304(=96 KB)、1 页。「导出成功」和「下载链接过期」握的是**同一份文件**
+    （过期的只是下载那条签名链接），所以共用同一个文件编号，不另编一个。 */
+ 'resume-generate':{
+  label:'简历生成交接',
+  entry:'从 AI 简历生成的 PDF 文件交接进来',
+  docs:{
+   'rsm_draft_3a17c9f2':{
+    name:'简历草稿（未经AI润色）_张示例.pdf',
+    kind:'PDF 文档',
+    size:'78 KB',
+    pages:1,
+    from:'由 AI 简历生成的原样草稿交接带过来',
+    backHref:'24-resume-generate.html?debug=1&state=draft-ready',
+    backRoute:'/resume/generate',
+    backLabel:'返回简历生成',
+    changeLabel:'返回简历生成',
+    backAria:'返回 AI 简历生成的原样草稿',
+    fixTitle:'回简历生成重新交接',
+    fixNote:'这份原样草稿只登记了<b>黑白单面</b>。地址里的取值超出已验证范围，回简历生成重新交接再报价。'
+   },
+   'rsm_gen_6b28d40a':{
+    name:'AI简历_张示例.pdf',
+    kind:'PDF 文档',
+    size:'96 KB',
+    pages:1,
+    from:'由 AI 简历生成的 PDF 导出交接带过来',
+    backHref:'24-resume-generate.html?debug=1&state=export-ready',
+    backRoute:'/resume/generate',
+    backLabel:'返回简历生成',
+    changeLabel:'返回简历生成',
+    backAria:'返回 AI 简历生成的导出结果',
+    fixTitle:'回简历生成重新交接',
+    fixNote:'这份导出件只登记了<b>黑白单面</b>。地址里的取值超出已验证范围，回简历生成重新交接再报价。'
+   }
+  }
+ },
+ /* 与 25-material-workshop.html 的五个模板逐字段对齐：单页清单 96256(=94 KB)、1 页，
+    其余四份 132096(=129 KB)、2 页。五份各有各的文件编号，**不能只按来源命中一份** ——
+    否则用户生成的是《作品集封面》，这一页却摊开《校招自荐信》的文件名和页数。 */
+ 'job-material':{
+  label:'求职材料工坊交接',
+  entry:'从求职材料工坊的五个模板之一交接进来',
+  docs:{
+   'jm_campus_cover_letter_8f31c0':{
+    name:'校招自荐信.pdf',kind:'PDF 文档',size:'129 KB',pages:2,
+    from:'由求职材料工坊《校招自荐信》交接带过来',
+    backHref:'25-material-workshop.html?state=generated&tpl=campus-cover-letter'
+   },
+   'jm_experienced_cover_letter_8f31c0':{
+    name:'社招求职信.pdf',kind:'PDF 文档',size:'129 KB',pages:2,
+    from:'由求职材料工坊《社招求职信》交接带过来',
+    backHref:'25-material-workshop.html?state=generated&tpl=experienced-cover-letter'
+   },
+   'jm_interview_thank_you_8f31c0':{
+    name:'面试感谢信.pdf',kind:'PDF 文档',size:'129 KB',pages:2,
+    from:'由求职材料工坊《面试感谢信》交接带过来',
+    backHref:'25-material-workshop.html?state=generated&tpl=interview-thank-you'
+   },
+   'jm_portfolio_cover_8f31c0':{
+    name:'作品集封面.pdf',kind:'PDF 文档',size:'129 KB',pages:2,
+    from:'由求职材料工坊《作品集封面》交接带过来',
+    backHref:'25-material-workshop.html?state=generated&tpl=portfolio-cover'
+   },
+   'jm_job_fair_checklist_8f31c0':{
+    name:'招聘会材料清单.pdf',kind:'PDF 文档',size:'94 KB',pages:1,
+    from:'由求职材料工坊《招聘会材料清单》交接带过来',
+    backHref:'25-material-workshop.html?state=generated&tpl=job-fair-checklist'
+   }
+  },
+  /* 五份共用同一组回程文案，逐条重写只会让登记表更容易写歪。 */
+  defaults:{
+   backRoute:'/resume/materials',
+   backLabel:'返回材料工坊',
+   changeLabel:'返回材料工坊',
+   backAria:'返回求职材料工坊的打印交接',
+   fixTitle:'回材料工坊重新交接',
+   fixNote:'求职材料只登记了<b>黑白单面</b>。地址里的取值超出已验证范围，回材料工坊重新交接。'
+  }
+ }
+};
+/* 把 source / fileId 补进每条登记，并套用来源级默认文案；登记表里没写的字段一律留空，
+   不在这里替它编一个。 */
+(function(){
+ var src,g,fid,d,k;
+ for(src in HANDOFF_SOURCES){
+  if(!Object.prototype.hasOwnProperty.call(HANDOFF_SOURCES,src))continue;
+  g=HANDOFF_SOURCES[src];
+  for(fid in g.docs){
+   if(!Object.prototype.hasOwnProperty.call(g.docs,fid))continue;
+   d=g.docs[fid];d.key=src;d.fileId=fid;d.sourceLabel=g.label;
+   if(g.defaults)for(k in g.defaults){if(!(k in d))d[k]=g.defaults[k]}
+   if(!('backRoute' in d))d.backRoute=null;
+  }
+ }
+})();
+var HANDOFF_KEYS=['source','fileId','pages','copies','duplex','color'];
+var COPIES_REGISTERED=['1'];
+var DUPLEX_LABEL={single:'单面',double:'长边双面'};
+var COLOR_LABEL={bw:'黑白',color:'彩色'};
+var VERIFIED_PARAMS={color:'bw',duplex:'single'};
+/* 只用来演示「能力受限」这一屏的登记越界取值；不代表本机支持这两项。 */
+var CAP_DEMO={color:'color',duplex:'double'};
+
+var Q=new URLSearchParams(location.search);
+var DEBUG=Q.get('debug')==='1',FLAT=Q.get('flat')==='1';
+
+/* ── 地址栏 fragment（#...）─────────────────────────────────────────────────────
+   # 后面的内容不会发到服务端、也不进服务端日志，所以它是签名链接、打印凭证和一次性
+   令牌最常被塞进去的地方（#token=... / #signedUrl=... / #printFileUrl=...）。
+   本页对它只做一件事：**只要非空就整条判为不可信输入** —— 不解析、不按 key=value 拆、
+   不做白名单，也不因为它看着像锚点、像人畜无害的短词就放行（「看着无害」本身就是
+   最常见的伪装）。这里只算出一个布尔值：fragment 的原文与解码结果一律不落全局变量、
+   不进 DOM、不进属性、不进错误文案、不进 console。
+   空 fragment（地址只以一个 # 结尾）不算非空，按原样放过，不动既有合同。 */
+var HAS_FRAGMENT=(function(){
+ var h=location.hash;
+ if(typeof h==='string'&&h.length>1) return true;
+ /* 兜底：个别宿主会把 location.hash 归一化掉，这里只看原始地址里 # 后面还有没有东西。 */
+ var raw=String(location.href||''),at=raw.indexOf('#');
+ return at>=0&&at<raw.length-1;
+})();
+
+/* ── 地址栏键名白名单 ───────────────────────────────────────────────────────────
+   本页只认下面这几个键。白名单以外的键名（token / signedUrl / printFileUrl 这类
+   凭证最常从这儿溜进来），以及同名键重复出现（URLSearchParams.get 只取第一个，
+   剩下那几个会安静地留在地址栏里），一律 fail-closed。
+   它们的键名和取值都不进 DOM、不进属性、不进错误文案 —— 连「你传的是哪个键」
+   都不回显，因为键名本身也可能是凭证的一半。 */
+var QUERY_ALLOW=['source','fileId','pages','copies','duplex','color','state','debug','flat','coupon'];
+/* 只用来把「像凭证的键名」这件事说清楚；拦截由白名单负责，这条正则不承担拦截职责。 */
+var SENSITIVE_KEY=/token|secret|sign|url|uri|href|link|key|pass|auth|credential|cookie|session|jwt|otp|ticket|access|bearer/i;
+/* 取值安全线：登记夹具的选择键都是短标识（interview-report / iv_rep_5c1d8f2a /
+   jm_experienced_cover_letter_8f31c0 / quote-failed / 3 / bw ...）。超出这个形状的取值
+   一律既不回显、也不留在地址栏 —— 长数字串可能是付款码，带 / : ? . % = 的可能是签名链接。
+   上限 40 是按**已登记的最长文件编号 34 字符**定的（jm_experienced_cover_letter_8f31c0），
+   留一点余量而已；真正挡住凭证的是字符集（签名链接、JWT 的分隔符全在集合外）和长数字串这两条。 */
+function safeVal(v){v=String(v==null?'':v);return /^[A-Za-z0-9_-]{1,40}$/.test(v)&&!/\d{8,}/.test(v)}
+function scanQuery(){
+ var r={badKey:false,badValue:false,sensitive:false},seen={},keys=[],i,k,v;
+ Q.forEach(function(val,key){keys.push(key)});
+ for(i=0;i<keys.length;i++){
+  k=keys[i];
+  if(QUERY_ALLOW.indexOf(k)<0){r.badKey=true;if(SENSITIVE_KEY.test(k))r.sensitive=true;continue}
+  if(Object.prototype.hasOwnProperty.call(seen,k))r.badKey=true;
+  seen[k]=true;
+  /* 空取值不算挟带（?source= 这种由业务核对去报「只给了一半」），非空但不可回显的才算。 */
+  v=Q.get(k);
+  if(v!==null&&v!==''&&!safeVal(v))r.badValue=true;
+ }
+ r.dirty=r.badKey||r.badValue;
+ return r;
+}
+var QSCAN=scanQuery();
+/* 清地址栏赶在渲染之前：只写死安全取值（state=invalid-context 加规范化后的 debug/flat），
+   一个字符都不从原地址回显。写进去的这条地址不带 #，也不带任何其他 query，
+   所以原地址里的 fragment 和表外参数会被一起丢掉。
+   replaceState 在某些宿主会抛（例如 file:// 的不透明源），捕获后就不再声称「已清掉」。 */
+var URL_CLEANED=false;
+if(QSCAN.dirty||HAS_FRAGMENT){
+ var safeQ=['state=invalid-context'];
+ if(DEBUG)safeQ.push('debug=1');
+ if(FLAT)safeQ.push('flat=1');
+ try{history.replaceState(null,'',location.pathname+'?'+safeQ.join('&'));URL_CLEANED=true}catch(e){}
+}
+/* fragment 的失败文案整句写死：不回显它的取值，连「你传了什么形状」都不提 ——
+   # 后面的键名本身也可能是凭证的一半。 */
+function fragmentReason(){
+ return '地址里带了 # 之后的内容。本页把<b>任何非空 # 片段</b>都当作不可信输入：不解析、不做白名单，也不按它的内容判断该显示哪一份文件。'+
+  '# 后面的东西不会发给服务端、也不进服务端日志，正是签名链接、打印凭证和一次性令牌最常被塞进去的地方，所以这里一律停住，而不是挑出「看着无害」的那几个放行。'+
+  (URL_CLEANED
+   ?'地址栏已经就地换成不带 # 的安全地址，它的原文不会显示在屏幕上，也不会带去下一步。'
+   :'它的原文不会显示在屏幕上，也不会带去下一步。');
+}
+function dirtyReason(){
+ var head=QSCAN.sensitive
+  ?'地址里带了本页没有登记的参数，其中有像凭证、签名链接那样的键名。'
+  :QSCAN.badKey
+   ?'地址里带了本页登记表以外的参数，或者同一个参数出现了不止一次。'
+   :'地址里有参数的取值不像本页登记过的编号或状态 —— 太长，或者带了本页不接受的字符。';
+ return head+
+  '本页只认来源、文件编号、页数、份数、单双面、颜色和页面状态这几个登记参数，取值也只认登记过的那几种，其余一概不看、不显示，也不会带去下一步。'+
+  (URL_CLEANED?'地址栏里那几个取值已经就地清掉了，屏幕上和地址栏里都不会再出现它们。':'屏幕上不会出现它们的取值。');
+}
+/* 回显地址栏取值前先过同一条取值安全线（safeVal）：不合规的既不进 DOM，
+   也已经被 replaceState 从地址栏清掉，两头口径一致。 */
+function shown(v){return safeVal(v)?String(v):'（取值不合规，已省略）'}
+
+function parseContext(){
+ var used=[],i;
+ for(i=0;i<HANDOFF_KEYS.length;i++) if(Q.get(HANDOFF_KEYS[i])!==null) used.push(HANDOFF_KEYS[i]);
+ function bad(reason){return {ok:false,reason:reason}}
+ /* 完全不带交接参数 = 打印台既有默认流程，用默认登记夹具（13/18/19/20/23/37/38 都走这条）。 */
+ if(!used.length) return {ok:true,handoff:false,doc:DOC_DEFAULT,copies:'1',duplex:'single',color:'bw'};
+ var src=Q.get('source'),fid=Q.get('fileId');
+ if(!src||!fid) return bad('这次的交接只给了一半：来源与文件编号必须同时给出，本页才知道该显示哪一份文件。');
+ /* 打印台默认文档只在「完全不带交接参数」时成立：它没有登记文件编号，
+    用交接参数点名它等于要本页替一份没有身份的文件下结论。 */
+ if(src===DOC_DEFAULT.key) return bad('打印台默认文档没有登记文件编号，只能不带交接参数、按打印流程一步步走进来。');
+ if(!Object.prototype.hasOwnProperty.call(HANDOFF_SOURCES,src)) return bad('来源「'+shown(src)+'」不在本页的登记表里，本页不认识它对应哪一份文件。');
+ var grp=HANDOFF_SOURCES[src];
+ /* 成对核对：来源对上了还不够，文件编号必须逐字命中这条来源登记过的某一份。
+    一个来源可以登记多份（材料工坊五个模板），所以这里不允许「按来源退回第一份」。 */
+ if(!Object.prototype.hasOwnProperty.call(grp.docs,fid)) return bad('文件编号「'+shown(fid)+'」不在来源「'+shown(src)+'」登记的文件里，本页不会按编号去猜文件名和页数。');
+ var doc=grp.docs[fid];
+ var pages=Q.get('pages');
+ if(pages!==null&&pages!==String(doc.pages)) return bad('地址里的页数「'+shown(pages)+'」与登记夹具的 '+doc.pages+' 页对不上。');
+ var copies=Q.get('copies');if(copies===null)copies='1';
+ if(COPIES_REGISTERED.indexOf(copies)<0) return bad('本页只登记了 1 份的排版夹具，没有「'+shown(copies)+' 份」对应的登记结果。');
+ var duplex=Q.get('duplex');if(duplex===null)duplex='single';
+ if(!Object.prototype.hasOwnProperty.call(DUPLEX_LABEL,duplex)) return bad('单双面取值「'+shown(duplex)+'」不在登记范围（single / double）内。');
+ var color=Q.get('color');if(color===null)color='bw';
+ if(!Object.prototype.hasOwnProperty.call(COLOR_LABEL,color)) return bad('颜色取值「'+shown(color)+'」不在登记范围（bw / color）内。');
+ return {ok:true,handoff:true,doc:doc,copies:copies,duplex:duplex,color:color};
+}
+var CTX=parseContext();
+var rawState=Q.get('state');
+/* fragment 排在最前面：# 后面的内容一律不可信，后面的交接参数再合法也不放行 ——
+   带着 #token=... 进来的那一次，本页不能因为 source/fileId 对得上就照常报价。 */
+if(HAS_FRAGMENT)
+ CTX={ok:false,reason:fragmentReason()};
+/* 键名核对排在业务核对前面：表外参数可能挟带凭证，业务取值再合法也不能放行。 */
+else if(QSCAN.dirty)
+ CTX={ok:false,reason:dirtyReason()};
+/* 未登记的 ?state= 同样 fail-closed：旧写法是静默改写成 quoted，等于替用户下了「有一单可确认」的结论。 */
+else if(CTX.ok&&rawState!==null&&STATES.indexOf(rawState)<0)
+ CTX={ok:false,reason:'页面状态「'+shown(rawState)+'」不在本页登记的状态里。'};
+/* 会摆出金额的三屏在正常访问下不给：这台机器上没有真实报价，给了就是拿写死的数字冒充它。 */
+else if(CTX.ok&&!DEBUG&&SYNTHETIC_STATES.indexOf(rawState)>=0)
+ CTX={ok:false,reason:'「已报价」「权益未抵扣」「零元单」这三屏会在屏幕上摆出金额，还摆出一单看着能确认的订单。这台机器上没有真实的报价结果，本页不拿写死的数字冒充它，所以这三屏只在原型演示模式里当排版看，正常打开一律停在这一屏。'};
+var DOC=CTX.ok?CTX.doc:DOC_DEFAULT;
+/* 优惠券设计状态：默认 unavailable。未登记取值、或非 debug 下请求合成态，一律回落
+   unavailable —— 正常打开这一页永远只会看到「功能尚未接通」，看不到任何可减价的样子。
+   （两张表必须定义在这里：var 只提升声明不提升赋值，放到下面的构建区会读到 undefined。） */
+var COUPON_STATES=['unavailable','guest','empty','expired','available','selected','repricing','reprice-failed','locked','zero-payable'];
+var COUPON_SYNTHETIC=['available','selected','repricing','reprice-failed','locked','zero-payable','expired','empty'];
+var rawCoupon=Q.get('coupon');
+var COUPON=(rawCoupon!==null&&COUPON_STATES.indexOf(rawCoupon)>=0
+ &&(DEBUG||COUPON_SYNTHETIC.indexOf(rawCoupon)<0))?rawCoupon:'unavailable';
+
+/* 本页所有自链接都把**已通过核对**的交接参数带走；核对没通过时什么都不带，
+   免得把一组坏参数继续传下去。签名链接与打印凭证从来不在这组参数里。 */
+function ctxQuery(){
+ var p=[];
+ if(CTX.ok&&CTX.handoff)
+  p=['source='+encodeURIComponent(DOC.key),'fileId='+encodeURIComponent(DOC.fileId),
+     'pages='+DOC.pages,'copies='+CTX.copies,'duplex='+CTX.duplex,'color='+CTX.color];
+ if(DEBUG)p.push('debug=1');
+ if(FLAT)p.push('flat=1');
+ return p;
+}
+function selfQuery(state){return '?'+['state='+state].concat(ctxQuery()).join('&')}
+function selfPage(state){return '14-print-confirm.html'+selfQuery(state)}
+/* 效果参数：默认取本次交接的取值；只有在「直接指定 capability-invalid-params 演示」时，
+   才按登记的越界取值渲染那一屏（demo=true 会在小标题里写明是演示，不冒充真实交接）。 */
+function effParams(state){
+ var c=CTX.ok?CTX.color:'bw',d=CTX.ok?CTX.duplex:'single',demo=false;
+ if(state==='capability-invalid-params'&&c===VERIFIED_PARAMS.color&&d===VERIFIED_PARAMS.duplex){
+  c=CAP_DEMO.color;d=CAP_DEMO.duplex;demo=true;
+ }
+ return {color:c,duplex:d,demo:demo,colorOff:c!==VERIFIED_PARAMS.color,duplexOff:d!==VERIFIED_PARAMS.duplex};
+}
+function capBlocked(){var p=effParams('');return p.colorOff||p.duplexOff}
+function backSecondary(label){
+ return {href:DOC.backHref,route:DOC.backRoute,label:label||DOC.backLabel};
+}
+var ICO={
+ warn:'<path d="M12 3.6 2.8 19.4h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ gift:'<rect x="3" y="8.5" width="18" height="12" rx="2.5"/><path d="M3 12.5h18M12 8.5v12"/><path d="M12 8.5S10.5 4 8 4a2.4 2.4 0 0 0 0 4.5zM12 8.5S13.5 4 16 4a2.4 2.4 0 0 1 0 4.5z"/>',
+ file:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ empty:'<rect x="3.5" y="6" width="17" height="13" rx="2.5"/><path d="M3.5 10h17"/>',
+ chev:'<path d="M9 5l7 7-7 7"/>'
+};
+function svg(n,s,w){return '<svg width="'+(w||30)+'" height="'+(w||30)+'" viewBox="0 0 24 24" fill="none" stroke="'+s+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+function stepsBar(active){
+ /* 没有上下文时四步一律中性：这一趟到底走没走过前三步，本页并不知道，
+    不能因为版式好看就把「选文件 / 材料检查」标成已完成。 */
+ var n=active==='none';
+ var S=[['选文件',n?'':'done'],['材料检查',n?'':'done'],['预览与参数',n?'':'done'],['报价确认',n?'':'on']];
+ var h='';for(var i=0;i<S.length;i++)h+='<div class="step '+S[i][1]+'"><i aria-hidden="true"></i>'+S[i][0]+'</div>';
+ return h;
+}
+function amountCard(num,lb,src,demo){
+ var known=/^\d+\.\d{2}$/.test(num);
+ var dm=demo?' data-quote-demo="layout-only"':'';
+ return '<div class="amount-card"'+(demo?' data-evidence-fixture="synthetic"':'')+dm+'><div class="amount-lb">'+lb+'</div>'+
+  '<div class="amount'+(known?'':' amount-message')+'" data-quote-slot="true" data-quote-status="'+(known?'known':'unavailable')+'"'+dm+' data-testid="print-confirm-amount">'+
+  (known?'<span class="cur">¥</span>':'')+'<span class="num">'+num+'</span></div>'+
+  '<div class="amount-src" data-disclaimer="true" data-testid="print-confirm-amount-source">'+src+'</div></div>';
+}
+function lines(rows){
+ var h='';for(var i=0;i<rows.length;i++)h+='<div class="line"><span class="lb">'+rows[i][0]+'</span><span class="vl'+(rows[i][2]?' slot':'')+'"'+(rows[i][2]?' data-quote-slot="true"':'')+'>'+rows[i][1]+'</span></div>';
+ return '<div class="lines" data-testid="'+SCREEN+'-list">'+h+'</div>';
+}
+/* 核对区：文件身份一行 + 参数网格一屏扫完。文件与参数取值全部来自本次交接的**登记夹具**，
+   本页只做核对与呈现，不在这里改参数，也不替服务端判断哪一项能不能打。
+   cells 里带 off 的项是按本机已验证能力拒绝的那几项，就地标红，不另开说明段。
+   最后一格是文件编号：登记过就写编号，没登记就写「未登记」，绝不为了版式好看编一个出来。 */
+function paramCells(state){
+ var p=effParams(state);
+ return [['纸张','A4'],['页面方向','纵向'],
+  ['颜色',COLOR_LABEL[p.color]+(p.colorOff?' · 暂不可用':''),p.colorOff],
+  ['单双面',DUPLEX_LABEL[p.duplex]+(p.duplexOff?' · 暂不可用':''),p.duplexOff],
+  ['版式','1 版/页'],['缩放','适合页面'],
+  ['页范围','全部 '+DOC.pages+' 页'],['份数',(CTX.ok?CTX.copies:'1')+' 份'],
+  ['文件编号',DOC.fileId||'未登记',false,true]];
+}
+function reviewCard(state){
+ var cells=paramCells(state),h='',i;
+ for(i=0;i<cells.length;i++)
+  h+='<div'+(cells[i][2]?' class="off"':'')+'><span>'+cells[i][0]+'</span><b'+(cells[i][3]?' class="id"':'')+'>'+cells[i][1]+'</b></div>';
+ return '<div class="rev" data-evidence-fixture="synthetic" data-fixture-key="'+DOC.key+'" data-testid="'+SCREEN+'-review">'+
+  '<div class="rev-file"><span class="rf-ic">'+svg('file','currentColor',36)+'</span>'+
+  '<span class="rf-m"><b>'+DOC.name+'</b><span>'+DOC.kind+(DOC.size?' · '+DOC.size:'')+' · 全部 '+DOC.pages+' 页 · '+DOC.from+'</span>'+
+  '<span class="fx" data-disclaimer="true"><b>登记夹具</b>：文件名、大小、页数与编号由本页登记；真实页面由上一步直接交进来，不写进地址栏。</span></span></div>'+
+  '<div class="rev-grid">'+h+'</div></div>';
+}
+function sec(no,title,hint,inner,cls){
+ return '<section class="sec'+(cls?' '+cls:'')+'"><div class="sec-label"><span class="no serif">'+no+'</span>'+
+  '<span class="t">'+title+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'+inner+'</section>';
+}
+function feeBlock(card,rows){return '<div class="fee">'+card+lines(rows)+'</div>'}
+function pageSrcCard(){
+ return '<div class="pgrp"><h4>计费页数怎么来的</h4><div class="state-p">计费页数和计价依据都由服务端报价返回。本机不按屏幕上看到的页数自己计算。</div></div>';
+}
+/* warn=true 那一版演示的是「核销没通过时按原价显示」的排版。本屏没有真的核销过，
+   所以文案只说这是排版演示，绝不写成「服务端返回核销未通过」那种既成结论。 */
+/* ---------------------------------------------------------------- 优惠券
+   产品要求「付款时留出优惠券入口」。但服务端 BenefitGrant 没有打印适用范围、
+   券面值、折扣率、门槛或上限，打印订单核销还是 REDEEM_PRINT_ORDER_UNSUPPORTED
+   fail-closed。所以：
+     - 默认（含正常打开、非 debug）恒为 unavailable：说「尚未接通」，不给可点减价；
+     - available / selected / repricing / reprice-failed / locked / zero-payable
+       只在 ?debug=1&coupon=<state> 下出现，且屏上明写这是**设计状态**；
+     - 未登录只说「看不到」，绝不说成「你没有券」。
+   金额三元组（原价/抵扣/实付）在设计态里也整组写死在同一个夹具对象里，
+   不做 原价-面值 这种本地算式 —— 正式前端同样只允许整组读服务端响应。 */
+/* 主金额（大字）与明细小计 = 用户这一单**实际要付**的钱。
+   选中优惠（selected）时必须等于 COUPON_FIXTURE.payableAmountCents，否则会出现
+   「大字 ¥2.00，券行却写原价 2.00 / 抵扣 1.00 / 实付 1.00」的自相矛盾。
+   两个数都只从 COUPON_FIXTURE 取，不另写常量、不在这里做减法。 */
+function fxYuan(c){return (c/100).toFixed(2)}
+function mainAmount(){
+ return COUPON==='selected'?fxYuan(COUPON_FIXTURE.payableAmountCents):fxYuan(COUPON_FIXTURE.originalAmountCents);
+}
+/* 设计态夹具：三个金额同源于这一个对象。 */
+var COUPON_FIXTURE={source:'mock',couponId:'CPN-DEMO-8',originalAmountCents:200,discountCents:100,payableAmountCents:100};
+var COUPON_OPTIONS=[
+ {id:'CPN-DEMO-8',kind:'优惠券',title:'打印立减 1 元',sub:'面值 ¥1.00 · 有效期至 2026-12-31',ok:true,why:null},
+ {id:'FQ-DEMO-2',kind:'免费次数',title:'免费打印 2 次',sub:'剩余 2 次 · 有效期至 2026-10-01',ok:true,why:null},
+ {id:'PKG-DEMO-1',kind:'服务额度',title:'求职服务包额度',sub:'剩余 3 次',ok:false,why:'服务端裁定本单不适用（品类不符）'},
+ {id:'CPN-OLD-3',kind:'优惠券',title:'开学季立减 2 元',sub:'面值 ¥2.00',ok:false,why:'有效期已于 2026-06-30 结束',expired:true}
+];
+function couponText(k){
+ switch(k){
+  case 'guest':return ['登录后查看你的优惠券','券挂在你本人账号下；未登录只是看不到，不代表没有。'];
+  case 'empty':return ['本单暂无可使用优惠券','你名下没有仍在有效期、且可用于打印的券。'];
+  case 'expired':return ['名下 1 张券已过期','过期的券不会被扣掉，可在「我的 · 我的权益」查看。'];
+  case 'available':return ['本单有 2 张券可用','能否用于本单由服务端裁定，本机不预判抵扣金额。'];
+  case 'selected':return ['打印立减 1 元','原价 ¥2.00 · 实付 ¥1.00'];
+  case 'repricing':return ['正在按新的优惠重新核价…','核价完成前不能付款，避免按旧金额扣款。'];
+  case 'reprice-failed':return ['重新核价失败，付款已暂停','仍按上一次已确认的 ¥2.00 显示；可重试，不会按未确认的金额扣款。'];
+  case 'locked':return ['优惠已锁定','本单已开始支付，金额与优惠在服务端锁定；如需更换请先关闭当前支付码。'];
+  case 'zero-payable':return ['本单无需优惠','本单应付 0 元，服务端对免费单不接受核销，你的权益不会被扣。'];
+  default:return ['本单暂无可使用优惠券','优惠券功能尚未接通：服务端还没有下发券面值与适用范围，本机不替你预判，也不试算抵扣。'];
+ }
+}
+function couponRight(k){
+ if(k==='guest')return '<span class="c-act">去登录</span>';
+ if(k==='available'||k==='selected'||k==='expired')return '<span class="c-act">'+(k==='selected'?'更换':'选择')+'</span>';
+ if(k==='reprice-failed')return '<span class="c-act">重新核价</span>';
+ if(k==='unavailable'||k==='empty'||k==='zero-payable')return '<span class="c-tag">不使用优惠券</span>';
+ return '';
+}
+/* 面板是否展开。展开时本屏的主体是「选券」，次要卡片让位（见 V['quoted']）。 */
+function couponSheetOpen(){return COUPON==='available'||COUPON==='selected'||COUPON==='expired'}
+function couponSheet(k){
+ if(k!=='available'&&k!=='selected'&&k!=='expired')return '';
+ var usable=[],blocked=[];
+ for(var i=0;i<COUPON_OPTIONS.length;i++){(COUPON_OPTIONS[i].ok?usable:blocked).push(COUPON_OPTIONS[i])}
+ var showUsable=k!=='expired';
+ var rows='';
+ if(showUsable){
+  rows+='<div class="c-card" role="radio" aria-checked="'+(k==='selected'?'false':'true')+'"><b><span>不使用优惠券</span></b><span>按原价支付，你的券保留到下次。</span></div>';
+  for(var j=0;j<usable.length;j++){var o=usable[j];
+   rows+='<div class="c-card" role="radio" aria-checked="'+(k==='selected'&&o.id===COUPON_FIXTURE.couponId?'true':'false')+'"><b><span>'+o.title+'</span><em class="c-kind">'+o.kind+'</em></b><span>'+o.sub+'</span></div>';}
+ }else{
+  for(var m=0;m<blocked.length;m++){var b=blocked[m];
+   rows+='<div class="c-card" role="radio" aria-checked="false" aria-disabled="true"><b><span>'+b.title+'</span><em class="c-kind">'+b.kind+'</em></b><span>'+b.sub+'</span><span class="c-no">'+(b.expired?'已过期 · ':'')+b.why+'</span></div>';}
+ }
+ return '<div class="c-sheet" data-evidence-fixture="synthetic"><div class="c-sheet-hd"><span>选择优惠券</span><span class="c-tab">取消</span></div>'+
+  '<div class="c-tabs"><span class="c-tab" role="tab" aria-selected="'+(showUsable?'true':'false')+'">可用 '+usable.length+'</span>'+
+  '<span class="c-tab" role="tab" aria-selected="'+(showUsable?'false':'true')+'">不可用 '+blocked.length+'</span></div>'+
+  '<div class="c-list">'+rows+'</div>'+
+  '<div class="c-foot"><span class="c-confirm">'+(k==='selected'?'确认使用并重新核价':'确认不使用优惠券')+'</span></div></div>';
+}
+/* 折叠行 + （设计态下的）同页面板。synthetic 状态一律带 data-evidence-fixture。 */
+function couponBlock(){
+ var k=COUPON;
+ var t=couponText(k);
+ var cut=(k==='selected'||k==='locked')?'<span class="c-cut">−¥1.00</span>':'';
+ var syn=COUPON_SYNTHETIC.indexOf(k)>=0;
+ return '<div class="coupon" data-coupon="'+k+'" data-testid="print-confirm-coupon"'+(syn?' data-evidence-fixture="synthetic"':'')+'>'+
+  '<span class="c-ic">'+svg('gift','currentColor',24)+'</span>'+
+  '<span class="c-m"><b>'+t[0]+'</b><span>'+t[1]+'</span></span>'+cut+couponRight(k)+'</div>'+
+  (k==='unavailable'||k==='guest'||k==='locked'?'<div class="coupon-why">'+(k==='locked'?'锁定后不可更换；如需换券请先关闭当前支付码。':'本机只展示、不试算、不抵扣，你的券不会因此被扣掉。')+'</div>':'')+
+  couponSheet(k);
+}
+function benefitCard(warn){
+ return '<div class="benefit'+(warn?' warn':'')+'"><span class="b-ic">'+svg('gift','currentColor',24)+'</span>'+
+  '<span class="b-m"><b>'+(warn?'演示：权益没能核销的版面':'会员权益')+'</b><span>'+(warn?'这一屏演示的是核销没通过时该怎么显示。本屏没有查过、也没有核销过任何权益，屏幕上的结果不代表你的权益真实状态。':'登录后由服务端核销。核销结果没回来之前，按原价显示。')+'</span></span></div>';
+}
+var ARROW='<span class="ar">'+svg('chev','currentColor',20)+'</span>';
+function flow(steps){
+ var h='';
+ for(var i=0;i<steps.length;i++){
+  if(i)h+=ARROW;
+  h+='<div class="cs'+(steps[i][2]?' on':'')+'"><b>'+steps[i][0]+'</b><span>'+steps[i][1]+'</span></div>';
+ }
+ return '<div class="cfm-flow">'+h+'</div>';
+}
+/* 行动区：紧跟核对与费用结果，主按钮在自己的卡片里，卡片和底部说明条之间留呼吸位。
+   opt.reason 存在时同时用作置灰理由（常驻可见）和主按钮的可访问名后缀。 */
+function confirmBlock(opt){
+ var b=opt.primary,prim;
+ if(b.href)prim='<a class="btn primary press" style="flex:1.6" href="'+b.href+'"'+(b.route?' data-route="'+b.route+'"':'')+' data-testid="'+SCREEN+'-primary">'+b.label+'</a>';
+ else prim='<span class="btn primary" role="button" aria-disabled="true" style="flex:1.6" data-testid="'+SCREEN+'-primary" aria-label="'+b.label+'（'+opt.reason+'）">'+b.label+'</span>';
+ var sec2=opt.secondary;
+ var ghost='<a class="btn ghost press" href="'+sec2.href+'"'+(sec2.route?' data-route="'+sec2.route+'"':'')+(sec2.testid?' data-testid="'+sec2.testid+'"':'')+'>'+sec2.label+'</a>';
+ return '<div class="cfm"'+(opt.tone?' data-tone="'+opt.tone+'"':'')+'>'+
+  (opt.flow||'')+
+  '<div class="cfm-note">'+opt.note+'</div>'+
+  (opt.reason?'<div class="cfm-reason" data-testid="'+SCREEN+'-disabled-reason">'+opt.reason+'</div>':'')+
+  '<div class="cfm-act">'+ghost+prim+'</div></div>';
+}
+/* 01 区右上角的来源提示：把「这一份是哪来的、是不是登记夹具」写在标题行，不额外占一行高度。 */
+function fixtureHint(extra){
+ var from=CTX.ok&&CTX.handoff?('来自'+DOC.sourceLabel):'打印台默认文档';
+ return (extra?extra+' · ':'')+'登记夹具 · '+from;
+}
+/* 三步流程条只留给 quoting：那一屏是真的在等报价，「点确认才建单」是对下一步的预告。
+   三屏合成排版演示不给流程条 —— 一个点不动的屏幕上，高亮的「创建订单」是最后一个
+   还在暗示「这一单是活的」的元素；那块高度让给常驻可见的禁用理由更值。 */
+var FLOW_PAY=flow([['创建订单','点确认才建单',true],['完成付款','付款成功才排队'],['开始打印','出纸口取件']]);
+/* 登记清单从登记表算出来，不手写：手写的那份迟早和表里的登记对不上，
+   而这一屏正是用来解释「本页只认哪几对」的，说错等于把 fail-closed 的理由说反。
+   每条只给来源和份数 —— 把每份文件名都列出来会把这一屏撑成一堵说明墙，
+   把后面「这一趟没有发生什么」和出口挤出屏幕；共同的参数口径合并成末尾一句。 */
+function registeredList(){
+ var parts=[],total=0,src,g,fid,n;
+ for(src in HANDOFF_SOURCES){
+  if(!Object.prototype.hasOwnProperty.call(HANDOFF_SOURCES,src))continue;
+  g=HANDOFF_SOURCES[src];n=0;
+  for(fid in g.docs){if(Object.prototype.hasOwnProperty.call(g.docs,fid))n++}
+  total+=n;parts.push(src+' '+n+' 份');
+ }
+ return '<li><span class="sq"></span><span>已登记 '+parts.length+' 个来源、共 '+total+' 份文件：'+parts.join(' · ')+'。</span></li>'+
+  '<li><span class="sq"></span><span><b>来源与文件编号必须成对命中</b>，页数也要对上；本页只登记了 1 份、单面、黑白这一组参数。</span></li>';
+}
+var V={};
+V['missing-context']=function(){
+ return sec('01','这一页现在没有任务','缺少文件与参数上下文',
+  '<div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('empty','currentColor',28)+'没有待确认的打印任务</div>'+
+  '<div class="state-p">这一页要有<b>已选好的文件和参数</b>才能报价。现在两样都不在，所以屏幕上<b>没有金额，也没有可以确认的订单</b>。</div>'+
+  '<div class="state-p">这里不放示例金额，免得你以为真有一单在等着付款。</div>'+
+  (CTX.ok&&CTX.handoff?'<div class="state-p">地址里虽然带了来源与文件编号，但<b>这一屏是被显式请求的空态</b>：本页不会把它当成一单待确认的任务，也不会显示文件与金额。</div>':'')+
+  '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip">没有金额可显示</span></div></div>'+
+  '<div class="pgrp" style="margin-top:16px"><h4>常见的三种情况</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span>从旧链接或收藏夹直接打开这一页，中间那几步没走。</span></li>'+
+  '<li><span class="sq"></span><span>上一趟已经办完，这台机器把上一位用户的文件和参数清掉了。</span></li>'+
+  '<li><span class="sq"></span><span>离开太久，本机按公共终端规则清了会话，需要重新开始。</span></li></ul></div>')+
+  sec('02','重新走一遍要准备什么','回上一步就能补齐',
+  '<div class="grid2">'+
+  '<div class="pgrp"><h4>需要的两样上下文</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span>要打印的文件：本机上传、手机传来或扫描生成都行。</span></li>'+
+  '<li><span class="sq"></span><span>这一份的打印参数：纸张、页面方向、颜色、单双面、版式、缩放、页范围和份数。</span></li>'+
+  '<li><span class="sq"></span><span>两样齐了才能向服务端要这一单的正式报价。</span></li></ul></div>'+
+  '<div class="pgrp"><h4>回去重走不会重复收费</h4>'+
+  '<div class="state-p">刚才这一趟<b>没有创建订单，也没有扣款</b>，所以重新选文件不会产生第二笔费用。</div>'+
+  '<div class="state-p">想核对以前的单子，可以去「我的打印订单」按订单号查。</div></div></div>')+
+  sec('03','现在可以去哪','',confirmBlock({
+   note:'先回上一步把文件和参数选好，<b>回到这一页才会有正式报价</b>。',
+   secondary:{href:'38-member-assets.html?state=orders-ready',route:'/me/print-orders',label:'我的打印订单'},
+   primary:{href:'12-file-source.html',route:'/print/upload',label:'重新选文件'}}),'last');
+};
+/* invalid-context：交接参数没通过登记核对时唯一的落点。
+   这一屏**不显示任何文件信息**，因为本页此刻并不知道该显示哪一份；
+   旧写法会把未知取值静默改写成 quoted，等于替用户宣布「有一单可以确认」。 */
+V['invalid-context']=function(){
+ var reason=CTX.ok
+  ?'这一次没有真的核对失败：本屏是从演示面板或地址栏直接指定的失败态。'
+  :CTX.reason;
+ return sec('01','这一单没法确认','交接内容没通过登记核对',
+  '<div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('lock','currentColor',28)+'交接内容没通过核对</div>'+
+  '<div class="state-p" data-testid="'+SCREEN+'-invalid-reason">'+reason+'</div>'+
+  '<div class="state-p">本页<b>只显示登记过的那几份文件</b>。对不上的时候不按地址栏猜文件名、页数和大小，也<b>不退回默认那一份</b>假装一切正常。</div>'+
+  '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip">没有金额可显示</span><span class="chip">没有文件信息可显示</span></div></div>'+
+  '<div class="pgrp" style="margin-top:16px"><h4>本页登记了哪几种进来的方式</h4><ul class="plan">'+
+  registeredList()+
+  '<li><span class="sq"></span><span>不带交接参数进来：直接停在空态；打印台默认文档只在演示里当排版夹具，没有登记编号与大小。</span></li>'+
+  '<li><span class="sq"></span><span>其余取值一律停在这一屏。</span></li></ul></div>')+
+  sec('02','这一趟没有发生什么','停在这里只花时间，不花钱',
+  '<div class="grid2">'+
+  '<div class="pgrp"><h4>没有产生任何结果</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span>没有创建打印订单，也没有订单号。</span></li>'+
+  '<li><span class="sq"></span><span>没有扣款，也没有向任何支付通道发起过收款。</span></li>'+
+  '<li><span class="sq"></span><span>没有生成打印任务，打印机不会因为这一屏动一下。</span></li>'+
+  '<li><span class="sq"></span><span>没有产生可以取件的凭证，出纸口不会有东西等着你拿。</span></li></ul></div>'+
+  '<div class="pgrp"><h4>为什么不先给你一份默认文件</h4>'+
+  '<div class="state-p">按地址栏随便认一份，屏幕上会立刻多出文件名、页数和金额，但那一份<b>很可能不是你要打的东西</b>。</div>'+
+  '<div class="state-p">到了付款和出纸那一步，错的那一份也会照样打出来、照样收钱。所以这里宁可先停住，让你自己确认从哪进来。</div>'+
+  '<div class="meta"><span class="chip">不猜文件</span><span class="chip">不套默认值</span><span class="chip">不预告金额</span></div></div></div>')+
+  sec('03','现在可以去哪','回到有文件的那一步',confirmBlock({
+   tone:'error',
+   note:'重新从<b>有文件的那一步</b>进来，这一页才会有可以确认的一单。这一趟<b>没有创建订单，也没有扣款</b>。',
+   secondary:{href:'13-print-desk.html?state=missing-context',route:'/print/material-check',label:'返回打印台'},
+   primary:{href:'12-file-source.html',route:'/print/upload',label:'重新选文件'}}),'last');
+};
+V['quoting']=function(){
+ return sec('01','核对打印内容',fixtureHint(),reviewCard('quoting'))+
+  sec('02','费用明细','正在向服务端要这一单的报价',
+   feeBlock(amountCard('正在获取金额','本次应付','金额确认前不会创建订单，也不会扣款。'),
+    [['计费页数','正在计算',true],['计价来源','正在获取',true],['权益抵扣','等报价返回',true],['小计','等待报价',true]])+
+   '<div class="meta"><span class="chip"><span class="dot16 breathe"></span>正在获取报价</span><span class="chip">尚未创建订单</span><span class="chip">尚未扣费</span></div>')+
+  sec('03','确认并付款','金额确认后才可继续',confirmBlock({
+   flow:FLOW_PAY,
+   note:'文件和参数已经保留。<b>金额确认前不会创建订单，也不会扣款。</b>',
+   reason:'金额尚未确认 —— 报价回来之前不能建单',
+   secondary:backSecondary(),
+   primary:{label:'获取报价后可继续'}}),'last');
+};
+/* 只在 ?debug=1 下可达：屏幕上摆出金额的排版演示。金额卡、明细行、券折叠行、
+   确认动作都在，但金额标成 layout-only，确认动作禁用，也不指向收银台 ——
+   这台机器上没有真实报价，就不能给出「点一下就能付款」的样子。
+   计费口径 / 会员权益那排次要卡片已让位给券入口与确认动作（见下方注释）。 */
+V['quoted']=function(){
+ var sheetOpen=couponSheetOpen();
+ return sec('01','核对打印内容',fixtureHint('合成排版演示'),reviewCard('quoted'))+
+  sec('02','费用明细','演示排版 · 屏上金额是写死的夹具',
+   '<div data-evidence-fixture="synthetic">'+
+   feeBlock(amountCard(mainAmount(),'演示金额（不是报价）','这个数字是本页写死的<b>排版夹具</b>，不是服务端报价。本屏不会建单，也不会进入付款。',true),
+    [['计费页数',DOC.pages+' 页（夹具）',true],['计价来源','排版夹具，未向服务端要过价',true],
+     /* 选中券时把原价与抵扣拆开摆明细，主金额只显示实付 —— 三个数同源于 COUPON_FIXTURE。 */
+     ['原价',fxYuan(COUPON_FIXTURE.originalAmountCents)+'（夹具）',true],
+     (COUPON==='selected'
+      ? ['优惠券抵扣','−'+fxYuan(COUPON_FIXTURE.discountCents)+'（设计态夹具，非真实优惠）',true]
+      : ['单价','演示中不显示',true]),
+     ['小计',mainAmount()+'（夹具）',true]])+'</div>'+
+   '<div style="margin-top:16px">'+couponBlock()+'</div>',
+   /* 券折叠行挂上来之后，这一屏放不下「计费口径 + 会员权益」那排次要卡片：
+      收起态它把 sec03 的两个按钮顶到事实说明条下面，展开态更是直接挤掉确认按钮。
+      两者都是辅助信息，而 sec03 的确认动作和券入口是主操作 —— 让位的必须是它们。
+      （权益卡的完整版式仍可在 ?state=benefit-unverified 那一屏看到，演示价值不丢。） */
+   /* 面板展开时 02 自己就是最后一节，接管 .sec.last 的收尾留白。 */
+   sheetOpen?'last':'')+
+  /* 面板展开时**不渲染** sec03。
+     它是次要的确认说明区，展开态下会被顶到页面事实说明条下面、只露出一截文字，
+     形成背景内容穿透（说明条不动、也不该动，所以让内容退出，而不是把内容塞到它下面）。
+     这一态的主操作就是面板里的「确认使用并重新核价」：选券没定下来之前，
+     再摆一个「确认并去付款」本来也是自相矛盾的。
+     面板收起后 sec03 原样恢复，一个字都不改。 */
+  (sheetOpen?'':sec('03','确认并付款','演示排版 · 这一步点不动',confirmBlock({
+   tone:'warn',
+   note:'真实链路里，确认后会创建订单并进入付款，<b>付款完成后才开始打印</b>。<b>本屏是排版演示，这一步点不动。</b>',
+   reason:'合成排版演示 —— 屏上金额不是服务端报价，本屏不能建单，也不会进入付款',
+   secondary:backSecondary(),
+   primary:{label:'确认并去付款（演示中不可点）'}}),'last'));
+};
+V['quote-failed']=function(){
+ return sec('01','核对打印内容',fixtureHint('文件和参数都保留着'),reviewCard('quote-failed'))+
+  sec('02','费用明细','这一次没有拿到报价',
+   feeBlock(amountCard('金额暂不可用','本次应付','未获取到金额，本次不会创建订单或发起支付。'),
+    [['计费页数','未获取',true],['计价来源','未获取',true],['权益抵扣','未获取',true],['小计','无法显示',true]])+
+   '<div class="grid2" style="margin-top:16px">'+
+   '<div class="pgrp"><h4>可能的原因</h4><ul class="plan">'+
+   '<li><span class="sq"></span><span>本机与服务端之间网络中断。</span></li>'+
+   '<li><span class="sq"></span><span>参数里有本机没验过的项，服务端直接拒绝报价。</span></li></ul></div>'+
+   '<div class="pgrp"><h4>这一趟保留了什么</h4>'+
+   '<div class="state-p">文件、参数和这一步的上下文都还在。<b>本次没有创建订单，也不会扣款。</b></div>'+
+   '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip">文件与参数保留</span></div></div></div>')+
+  sec('03','现在可以怎么办','重试或改参数',confirmBlock({
+   tone:'error',
+   note:'重新报价只是再问服务端一次，<b>不会重复建单，也不会重复扣款</b>。改过参数之后同样要重新报价。',
+   secondary:backSecondary(),
+   primary:{href:selfPage('quoting'),route:'/print/confirm',label:'重新报价'}}),'last');
+};
+V['capability-invalid-params']=function(){
+ var p=effParams('capability-invalid-params');
+ var rows=[];
+ if(p.colorOff)rows.push(['颜色',COLOR_LABEL[p.color]+' · 暂不可用']);
+ if(p.duplexOff)rows.push(['单双面',DUPLEX_LABEL[p.duplex]+' · 暂不可用']);
+ rows.push(['计价来源','未出报价',true]);rows.push(['小计','无法显示',true]);
+ return sec('01','核对打印内容',p.demo?'演示：按登记的越界取值展示拦截':'标红的项本机暂不可用',reviewCard('capability-invalid-params'))+
+  sec('02','费用明细','参数不可用时服务端不出报价',
+   feeBlock(amountCard('金额暂不可用','本次应付','当前参数不可用，请修改后重新获取报价。'),rows)+
+   '<div class="grid2" style="margin-top:16px">'+
+   '<div class="pgrp"><h4>为什么'+(p.colorOff&&p.duplexOff?'这两项':'这一项')+'被挡下</h4>'+
+   (p.colorOff?'<div class="reason">本机彩色打印尚未通过真机验证，暂不能按彩色下单</div>':'')+
+   (p.duplexOff?'<div class="reason">本机长边双面尚未通过真机验证，暂不能按双面下单；短边双面同样必须以终端能力返回为准</div>':'')+'</div>'+
+   '<div class="pgrp"><h4>'+DOC.fixTitle+'</h4>'+
+   '<div class="state-p">'+DOC.fixNote+'</div>'+
+   '<div class="meta"><span class="chip">未建单</span><span class="chip">未扣费</span><span class="chip warn">回到黑白单面可继续</span></div></div></div>')+
+  sec('03','确认并付款','参数修改后才可继续',confirmBlock({
+   tone:'warn',
+   note:'当前参数被服务端按本机能力登记拒绝，<b>这一页拿不到金额，也不会创建订单</b>。',
+   reason:'参数回到黑白单面再报价，才能确认这一单',
+   secondary:backSecondary(DOC.changeLabel),
+   primary:{label:'参数回到黑白单面后可确认'}}),'last');
+};
+/* 只在 ?debug=1 下可达：演示「核销没通过就按原价显示」的排版。本屏没有查过权益，
+   所以既不说「服务端返回核销未通过」，也不给一个能按原价付款的按钮。
+   「去我的权益」保留可点 —— 它只是去看权益状态，既不建单也不付款。 */
+V['benefit-unverified']=function(){
+ return sec('01','核对打印内容',fixtureHint('合成排版演示'),reviewCard('benefit-unverified'))+
+  sec('02','费用明细','演示排版 · 按原价显示的版面',
+   '<div data-evidence-fixture="synthetic">'+
+   feeBlock(amountCard('2.00','演示金额（不是报价）','这个数字是本页写死的<b>排版夹具</b>，不是服务端报价。本屏没有做过权益核销，也不能建单。',true),
+    [['计费页数',DOC.pages+' 页（夹具）',true],['计价来源','排版夹具，未向服务端要过价',true],['权益抵扣','本屏没有核销过',true],['小计','2.00（夹具）',true]])+'</div>'+
+   '<div class="grid2" style="margin-top:16px">'+benefitCard(true)+
+   '<div class="pgrp" data-disclaimer="true"><h4>为什么不先按抵扣后的价显示</h4>'+
+   '<div class="state-p">真实链路里核销没通过时，本机<b>不会先按抵扣后的价格显示给你看</b> —— 免得你以为便宜了才下单，付款时又变回原价。</div></div></div>')+
+  sec('03','确认并付款','演示排版 · 这一步点不动',confirmBlock({
+   tone:'warn',
+   note:'真实链路里可以<b>按实际原价</b>继续付款。<b>本屏是排版演示，这一步点不动。</b>',
+   reason:'合成排版演示 —— 本屏没有核销结果，屏上金额也不是服务端报价，不能建单',
+   secondary:{href:'31-benefits.html',route:'/me/benefits',label:'去我的权益',testid:'print-confirm-benefits'},
+   primary:{label:'按实际原价继续（演示中不可点）'}}),'last');
+};
+/* 只在 ?debug=1 下可达：演示零金额那一屏的版面。屏上的 0 是写死的夹具，
+   不是服务端返回的零金额结果 —— 所以这里既不建单，也不释放任何打印任务。 */
+V['zero-amount']=function(){
+ return sec('01','核对打印内容',fixtureHint('合成排版演示'),reviewCard('zero-amount'))+
+  sec('02','费用明细','演示排版 · 零金额的版面',
+   '<div data-evidence-fixture="synthetic">'+
+   feeBlock(amountCard('0.00','演示金额（不是报价）','屏上这个 0 是本页写死的<b>排版夹具</b>，不是服务端返回的零金额结果。本屏不会建单，也不会释放打印。',true),
+    [['计费页数','演示中不显示',true],['计价来源','排版夹具，未向服务端要过价',true],['明细','演示：零金额的版面',true],['小计','0.00（夹具）',true]])+'</div>'+
+   '<div style="margin-top:16px">'+couponBlock()+'</div>'+
+   '<div class="grid2" style="margin-top:16px">'+pageSrcCard()+
+   '<div class="pgrp" data-testid="'+SCREEN+'-fallback"><h4>零元单也要先建单</h4>'+
+   '<div class="state-p">真实链路里确认后仍会建单再释放打印，<b>不存在「不建单直接出纸」的路径</b>。本屏是排版演示，不建单。</div></div></div>')+
+  sec('03','确认并建单','演示排版 · 这一步点不动',confirmBlock({
+   tone:'warn',
+   note:'真实链路里金额为 0 时，<b>确认后仍会创建打印订单</b>，再直接进入打印流程。<b>本屏是排版演示，这一步点不动。</b>',
+   reason:'合成排版演示 —— 屏上的 0 不是服务端结果，本屏不会建单，也不会释放打印',
+   secondary:backSecondary(),
+   primary:{label:'确认并建单（演示中不可点）'}}),'last');
+};
+var PILL={
+ 'missing-context':['warn','没有待确认的任务'],
+ 'invalid-context':['bad','交接内容未通过核对'],
+ 'quoting':['','正在计算本次费用'],
+ 'quoted':['warn','演示排版 · 不是真实报价'],
+ 'quote-failed':['bad','报价失败 · 未建单'],
+ 'capability-invalid-params':['bad','打印参数暂不可用'],
+ 'benefit-unverified':['warn','演示排版 · 权益未抵扣的版面'],
+ 'zero-amount':['warn','演示排版 · 零金额的版面']
+};
+var ASK={
+ 'missing-context':['这一页<em>没有任务</em>。','没有选好的文件和参数，我没法要价。回上一步重新走一遍。'],
+ 'invalid-context':['这一单<em>没法确认</em>。','交接内容没通过登记核对：我不猜是哪一份文件，也不会退回默认那一份。'],
+ 'quoting':['正在<em>计算本次费用</em>。','金额确认前不会创建订单，也不会扣款。'],
+ 'quoted':['这一屏是<em>排版演示</em>。','屏幕上的金额是写死的夹具，不是服务端报价；这里不能建单，也不会进入付款。'],
+ 'quote-failed':['暂时<em>无法获取报价</em>。','文件和参数已保留，本次没有创建订单。'],
+ 'capability-invalid-params':['这些参数<em>暂不可用</em>。','请改为黑白、单面后重新获取报价。'],
+ 'benefit-unverified':['这一屏演示<em>权益没抵扣</em>时的版面。','本屏没有核销过任何权益，屏上金额也不是服务端报价，这里不能建单。'],
+ 'zero-amount':['这一屏是<em>零金额排版演示</em>。','屏幕上的 0 是写死的夹具，不是服务端返回的结果；本屏不会建单。']
+};
+function render(st){
+ var root=document.getElementById('body-root');
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ /* 券面板展开的那几屏收紧纵向留白，保证面板连同确认按钮整块落在 1080x1920 内。
+    quoted 只要挂了券折叠行（现在恒挂）就整体收一档，否则收起态的 sec03
+    两个按钮会被固定事实说明条横穿。 */
+ root.classList.toggle('coupon-open',couponSheetOpen());
+ root.classList.toggle('coupon-compact',st==='quoted');
+ root.setAttribute('data-coupon-state',COUPON);
+ root.innerHTML=V[st]();
+ document.getElementById('steps').innerHTML=stepsBar(st==='missing-context'||st==='invalid-context'?'none':'on');
+ var p=document.getElementById('pill');
+ p.className='pill'+(PILL[st][0]?' '+PILL[st][0]:'');
+ document.getElementById('pill-txt').textContent=PILL[st][1];
+ document.getElementById('pill-dot').className='dot'+(st==='quoting'?' breathe':'');
+ document.getElementById('xq-ask').innerHTML=ASK[st][0];
+ document.getElementById('xq-doing').innerHTML=ASK[st][1];
+ var links=document.querySelectorAll('#demo-panel a');
+ for(var i=0;i<links.length;i++) links[i].className=(links[i].getAttribute('data-s')===st?'on':'');
+ fitBody(st);
+}
+/* 版面自检：只读几何，只挂一个收紧档。invalid-context 的失败理由长短不一，默认留白
+   放不下最长那条时，行动卡会压到底部说明条上。这里量的是「行动区连同它的下边距是否
+   还在正文框里」，超了就收一档留白（见样式表末尾的 fit-compact）。
+   不改 data-state、不改文案、不碰交接核对与报价链路，其余状态一律原样。 */
+function fitBody(st){
+ var root=document.getElementById('body-root');
+ root.classList.remove('fit-compact');
+ if(st!=='invalid-context')return;
+ var last=root.querySelector('.sec.last');
+ if(!last)return;
+ var mb=parseFloat(getComputedStyle(last).marginBottom)||0;
+ if(last.offsetTop+last.offsetHeight+mb>root.offsetTop+root.clientHeight+2)
+  root.classList.add('fit-compact');
+}
+/* 顶栏返回口跟着来源走：从面试报告交接进来的，不能假装能回到通用上传 / 预览。
+   这条链接刻意不带 data-route，原因见文件头「内部链接」一节。 */
+if(CTX.ok&&CTX.handoff){
+ var backEl=document.querySelector('.back');
+ backEl.setAttribute('href',DOC.backHref);
+ backEl.setAttribute('aria-label',DOC.backAria);
+ if(!DOC.backRoute)backEl.removeAttribute('data-route');
+}
+/* 演示面板同样带走已核对的交接参数；invalid-context 那条故意指向一个**真的对不上**的
+   文件编号，让人看到的是真实推导出来的失败态，而不是硬塞的一屏。 */
+if(DEBUG)document.documentElement.classList.add('debug');
+document.querySelectorAll('#demo-panel a').forEach(function(a){
+ var key=a.getAttribute('data-s'),extra=ctxQuery();
+ if(key==='handoff-ok')a.href='?'+['source=interview-report','fileId=iv_rep_5c1d8f2a','pages=3','copies=1','duplex=single','color=bw'].concat(DEBUG?['debug=1']:[]).concat(FLAT?['flat=1']:[]).join('&');
+ else if(key==='handoff-bad'||key==='invalid-context')a.href='?'+['source=interview-report','fileId=iv_rep_unknown'].concat(DEBUG?['debug=1']:[]).concat(FLAT?['flat=1']:[]).join('&');
+ else a.href='?'+['state='+key].concat(extra).join('&');
+});
+/* 状态判定顺序：核对不过 → invalid-context；能力越界 → capability-invalid-params；
+   其余按 ?state=；没写 ?state= 时，带交接的落 quoting（还没报价），
+   不带交接的落 missing-context —— 没有交接就没有这一单，不能自己摆出一份文件加一个金额。 */
+var st;
+if(!CTX.ok) st='invalid-context';
+else if(capBlocked()) st='capability-invalid-params';
+else if(rawState!==null) st=rawState;
+else st=CTX.handoff?'quoting':'missing-context';
+render(st);
+/* 原型演示控制（非产品功能）：只切 data-state，不驱动任何业务结果 */
+document.getElementById('demo-tab').addEventListener('click',function(){
+  document.getElementById('demo-panel').classList.toggle('show');
+});
+/* 时钟：仅刷新顶栏时间文本，不改 data-state、不推进任何业务状态 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(FLAT)document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

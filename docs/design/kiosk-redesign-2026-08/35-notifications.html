@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>消息通知 ｜ 职易达</title>
+<!--
+  route: /me/notifications | /notifications
+  state: login | loading | error | all-empty | unread-empty | ready-all | ready-unread | operation-busy | operation-toast
+  api: GET /api/v1/me/notifications?pageSize=50[&unreadOnly=true] → { items, nextCursor, total, unreadCount }；
+       PATCH /api/v1/me/notifications/read-all → { updated }；
+       PATCH /api/v1/me/notifications/:kind/:id/read（kind = personal | broadcast）；
+       DELETE /api/v1/me/notifications/:kind/:id → { deleted }
+  fallback: 未登录只引导登录，不展示任何消息；未连接真实服务或没有会员令牌时显示「当前没有可读取的消息」，绝不伪造消息；
+            操作失败按接口结果提示「操作失败，请稍后重试」/「删除失败，请稍后重试」，列表保持原样；
+            本页没有实时推送，消息在进入本页或完成一次操作后重新读取。
+  note: /notifications 与 /me/notifications 是同一个页面组件，唯一差异是未登录时的登录返回地址（?compat=1 演示该差异）；
+        本批次不为兼容 route 新建第二份 HTML。
+        跳转边界：只有 relatedType=feedback_ticket 且带 relatedId 的消息行可以跳到 /me/feedback?ticket=<relatedId>；
+        本页不提供任何页面级反馈入口（React 侧没有「整页去反馈」这项能力），ready / empty 的主操作只回「我的」。
+  原型演示控制：仅用 ?state= 与 ?compat= 切换；ready 中的条目是排版示例，不代表真实账号数据。
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;
+  --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
+  --teal:#1f9e86;--teal2:#157a67;--tealsoft:#e0f2ec;
+  --slate:#3f68b0;--slate2:#35608f;--slatesoft:#e6ecf7;
+  --clay:#b8683c;--clay2:#9e5330;--claysoft:#f7ebe1;
+  --plum:#7a5a86;--plum2:#6b4a77;--plumsoft:#efe8f2;
+  --wheat:#a9781f;--wheat2:#8a6219;--wheatsoft:#f3ecda;
+  --line:#e3ddcb;--line2:#d4cdb6;--bad:#b23a2e;--badsoft:#f6e4e1;
+  --ease:cubic-bezier(.22,1,.36,1);
+  /* 与 00–15 定稿页同名令牌（值一致，供后续统一改名） */
+  --ink-2:var(--ink2);--ink-3:var(--ink3);--deep-2:var(--deep2);--emerald:var(--green);
+  --teal-d:var(--teal2);--teal-soft:var(--tealsoft);--slate-d:var(--slate2);--slate-soft:var(--slatesoft);
+  --clay-d:var(--clay2);--clay-soft:var(--claysoft);--plum-d:var(--plum2);--plum-soft:var(--plumsoft);
+  --wheat-d:var(--wheat2);--wheat-soft:var(--wheatsoft);--cinnabar:var(--bad);--cinnabar-soft:var(--badsoft);
+  --line-2:var(--line2);--ease-out:var(--ease);
+  --r-lg:32px;--r-md:24px;--r-sm:18px;--tap-min:48px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);overflow:hidden}
+a{text-decoration:none;color:inherit}button{font:inherit;color:inherit;border:0;background:none}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.press{transition:transform 140ms var(--ease),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;transform-origin:center center;
+  background:radial-gradient(900px 420px at 86% 6%,rgba(31,158,134,.07),transparent 60%),radial-gradient(820px 500px at -6% 58%,rgba(122,90,134,.05),transparent 56%),var(--paper)}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+
+.topbar{height:104px;flex:none;padding:0 36px;display:flex;align-items:center;gap:18px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{width:64px;height:64px;display:grid;place-items:center;border-radius:20px;border:1px solid var(--line2);background:var(--paper)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--deep);color:var(--green);font-size:24px;font-weight:800}
+.logo-name{font-size:26px;font-weight:800;letter-spacing:1px}
+.sp{flex:1}
+.pill{height:54px;padding:0 22px;border-radius:27px;display:flex;align-items:center;gap:10px;border:1px solid var(--line2);background:var(--paper);color:var(--ink2);font-size:19px;font-weight:700}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--teal)}
+.pill .dot.breathe{animation:breathe 2.2s var(--ease) infinite}
+.clock{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.xq{margin:22px 42px 0;padding:28px 38px;border-radius:34px;flex:none;background:linear-gradient(158deg,var(--deep2),var(--deep));color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-150px;top:-150px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.15),transparent 66%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{width:88px;height:88px;flex:none;border-radius:50%;display:grid;place-items:center;border:1.5px solid rgba(46,230,168,.4);background:rgba(46,230,168,.1);color:var(--green);font-size:40px}
+.xq-eyebrow{font-size:17px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:7px}
+.xq-ask{font-size:37px;line-height:1.28;font-weight:800}
+.xq-ask em{font-style:normal;color:var(--green)}
+.xq-doing{font-size:20px;line-height:1.5;color:rgba(242,239,228,.74);margin-top:9px}
+.xq-doing b{color:#fff;font-weight:700}
+
+
+.body{flex:1;min-height:0;padding:20px 42px 16px;display:grid;gap:14px;overflow:hidden}
+/* 每种布局的 1fr 都落在**主内容**上，不再落到说明栅格上 */
+.body.state-layout{grid-template-rows:auto minmax(0,1fr) auto auto}          /* banner · 主内容 · 说明 · 操作 */
+.body.empty-layout{grid-template-rows:auto auto minmax(0,1fr) auto auto}     /* 概览 · 筛选 · 主内容 · 说明 · 操作 */
+.body.list-guide-layout{grid-template-rows:auto auto auto minmax(0,1fr) auto auto} /* 示例条 · 概览 · 筛选 · 列表 · 说明 · 操作 */
+
+.card,.state{background:var(--surface);border:1px solid var(--line);border-radius:26px}
+.card{padding:24px 26px}
+
+/* 状态横幅：取代「小卡片 + 大片空白」的居中焦点卡 */
+.banner{flex:none;display:flex;align-items:center;gap:20px;padding:20px 24px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.banner-ico{width:72px;height:72px;flex:none;border-radius:22px;display:grid;place-items:center;background:var(--slatesoft);color:var(--slate2)}
+.banner-ico svg{width:34px;height:34px}
+.banner-ico[data-tone=lock]{background:var(--plumsoft);color:var(--plum2)}
+.banner-ico[data-tone=warn]{background:var(--badsoft);color:var(--bad)}
+.banner-ico[data-tone=calm]{background:var(--tealsoft);color:var(--teal2)}
+.banner-main{flex:1;min-width:0}
+.banner-t{display:block;font-size:28px;font-weight:800;line-height:1.28}
+.banner-p{display:block;margin-top:7px;font-size:19px;line-height:1.5;color:var(--ink3)}
+.banner-p b{color:var(--ink2)}
+.banner-mini{flex:none;display:flex;flex-direction:column;gap:6px;text-align:right}
+.banner-mini i{font-style:normal;font-size:17px;font-weight:700;color:var(--ink2)}
+
+/* 接口回填结构位与骨架条 */
+.slot{display:inline-flex;align-items:center;min-height:32px;padding:0 11px;border-radius:10px;border:1px dashed var(--line2);background:var(--surface);color:var(--ink3);font-size:16px;font-weight:700}
+.slot.lock{border-style:solid;background:#efeade;color:#6d7069}
+.skel{height:22px;border-radius:8px;background:#ece7d9}
+.skel.t{width:54%}
+.skel.s{display:block;width:36%;height:18px;margin-top:12px}
+.row.off{background:#efeade;border-color:#ddd8c8}
+.row-ico[data-tone=off]{background:#ded9cb;color:#6d7069}
+
+.summary{display:flex;align-items:center;gap:20px;padding:20px 26px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.summary-ico{width:66px;height:66px;flex:none;border-radius:20px;display:grid;place-items:center;background:var(--tealsoft);color:var(--teal2)}
+.summary-ico svg{width:32px;height:32px}
+.summary-ico.plum{background:var(--plumsoft);color:var(--plum2)}
+.summary-ico.clay{background:var(--claysoft);color:var(--clay2)}
+.summary-ico.slate{background:var(--slatesoft);color:var(--slate2)}
+.summary-main{flex:1;min-width:0}
+.summary-main b{display:block;font-size:19px;color:var(--ink3);font-weight:700}
+.summary-main strong{display:block;font-size:34px;font-weight:800;line-height:1.2;margin-top:2px}
+.summary-main span{display:block;margin-top:4px;font-size:17px;color:var(--ink3);line-height:1.45}
+.summary-mini{display:flex;flex-direction:column;gap:6px;flex:none;text-align:right}
+.summary-mini i{font-style:normal;font-size:17px;font-weight:700;color:var(--ink2)}
+
+.tabbar{display:grid;gap:10px;flex:none}
+.tabbar.n4{grid-template-columns:repeat(4,1fr)}
+.tabbar.n2{grid-template-columns:repeat(2,1fr)}
+.tab{min-height:64px;padding:0 12px;border:1px solid var(--line2);border-radius:18px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:9px;font-size:20px;font-weight:750}
+.tab i{font-style:normal;min-width:34px;height:32px;padding:0 9px;border-radius:11px;background:var(--paper);color:var(--ink3);font-size:16px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.tab.on{background:var(--tealsoft);border-color:#8dc4b5;color:var(--teal2)}
+.tab.on i{background:#fff;color:var(--teal2)}
+
+.list{min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:26px;overflow-y:auto;scrollbar-width:none}
+.list::-webkit-scrollbar{display:none}
+/* 任务行按产品尺寸排：可以吃掉一部分剩余高度，但有上限，避免把一行撑成只装 90px 内容的空壳。
+   flex-basis 保持 auto、不收缩，条目多时照常滚动，不会把行压扁。 */
+/* flex-shrink 必须是 1，且列表内的行要有一个比 .row 更低的下限：
+   原来是 flex:1 0 auto + min-height:132px，行既不能压缩、又有硬下限，
+   内容一多列表卡就直接把底注裁掉（空列表/失败态实测被切 13~61px）。
+   下限只在卡片装不下时才生效，正常状态下行仍然按 flex-grow 撑到上限，版面不变。 */
+.list>.row{flex:1 1 auto;min-height:104px;max-height:220px}
+.fixture{flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:15px;background:var(--wheatsoft);color:var(--wheat2);font-size:17px;font-weight:750;line-height:1.35}
+.fixture svg{width:21px;height:21px;flex:none}
+/* fixture 里的整句必须包在一个 span 里：裸文本 + <b> 会被 flex 拆成多个 flex item，一句话被切成几列。 */
+.fixture>span{min-width:0}
+.row{min-height:132px;padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--paper);display:flex;align-items:center;gap:16px}
+.row.tap{cursor:pointer;width:100%;text-align:left}
+.row.flag{border-color:#d9b8b2;background:#fdf4f2}
+.row-ico{width:58px;height:58px;flex:none;border-radius:17px;display:grid;place-items:center;background:var(--tealsoft);color:var(--teal2)}
+.row-ico svg{width:28px;height:28px}
+.row-ico.slate{background:var(--slatesoft);color:var(--slate2)}
+.row-ico.clay{background:var(--claysoft);color:var(--clay2)}
+.row-ico.plum{background:var(--plumsoft);color:var(--plum2)}
+.row-ico.wheat{background:var(--wheatsoft);color:var(--wheat2)}
+.row-main{flex:1;min-width:0}
+.row-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.row-title{display:block;font-size:22px;font-weight:800;line-height:1.3}
+.row-sub{display:block;margin-top:6px;font-size:17px;color:var(--ink3);line-height:1.45}
+.row-arrow{width:40px;height:40px;flex:none;display:grid;place-items:center;color:var(--ink3)}
+.row-arrow svg{width:22px;height:22px}
+.chip{height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;background:var(--paper);border:1px solid var(--line2);color:var(--ink2);font-size:16px;font-weight:750}
+.st{height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:var(--tealsoft);color:var(--teal2)}
+.st.wait{background:var(--wheatsoft);color:var(--wheat2)}
+.st.run{background:var(--slatesoft);color:var(--slate2)}
+.st.bad{background:var(--badsoft);color:var(--bad)}
+.acts{display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end;flex:none;max-width:392px}
+.small{min-height:56px;padding:0 16px;border-radius:16px;border:1px solid var(--line2);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font-size:17px;font-weight:750}
+.small svg{width:19px;height:19px}
+.small.primary{background:var(--deep);border-color:var(--deep);color:#fff}
+.small.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.small[aria-disabled="true"]{background:#e6e2d7;border-color:#dcd7c9;color:#84867e}
+.reason{display:block;margin-top:8px;font-size:16px;line-height:1.4;color:var(--wheat2);font-weight:700}
+.legal{flex:none;padding:14px 18px;}
+.list-foot{flex:none;padding:14px 18px;border-radius:16px;background:rgba(11,36,30,.045);color:var(--ink2);font-size:17px;line-height:1.5}
+.note{padding:16px 20px;border-radius:18px;background:var(--tealsoft);color:var(--ink2);font-size:18px;line-height:1.55}
+.note.warn{background:var(--wheatsoft);color:var(--wheat2)}
+.note.bad{background:var(--badsoft);color:var(--bad)}
+.dl{display:grid;gap:10px;margin-top:18px}
+.dl>div{display:flex;align-items:baseline;gap:16px;padding:14px 18px;border-radius:16px;background:var(--paper);border:1px solid var(--line)}
+.dl dt{font-size:18px;color:var(--ink3);width:150px;flex:none;font-weight:700}
+.dl dd{font-size:20px;font-weight:750;line-height:1.4}
+.detail-head{display:flex;align-items:center;gap:18px}
+.detail-head .row-ico{width:70px;height:70px}
+.guide{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.guide-item{padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);display:flex;flex-direction:column;justify-content:center}
+.guide-k{font-size:16px;font-weight:800;color:var(--teal2);letter-spacing:1px}
+.guide-t{margin-top:8px;font-size:21px;font-weight:800;line-height:1.3}
+.guide-p{margin-top:7px;font-size:17px;line-height:1.5;color:var(--ink3)}
+.detail-head h2{font-size:31px;font-weight:800;line-height:1.28}
+.detail-head p{margin-top:6px;font-size:18px;color:var(--ink3)}
+
+.toast{flex:none;display:flex;align-items:center;gap:12px;padding:18px 26px;border-radius:22px;background:var(--deep);color:#f2efe4;font-size:21px;font-weight:800;line-height:1.4}
+.toast svg{width:24px;height:24px;flex:none;color:var(--green)}
+.toast[data-tone="bad"]{background:var(--badsoft);color:var(--bad);border:1px solid #e2b7b0}
+.toast[data-tone="bad"] svg{color:var(--bad)}
+/* 演示态提示条：读起来必须像一条「提示 / toast」，而不是又一条和示例条同款的说明带；
+   文案里仍然写清「这是版式演示、没有发出请求」，不冒充真实操作结果。 */
+.toast[data-tone="demo"]{background:var(--deep);color:#f6f2e6;border:1px solid rgba(46,230,168,.34);
+  box-shadow:0 14px 34px rgba(11,36,30,.16);font-size:19px;font-weight:750}
+.toast[data-tone="demo"] svg{color:var(--wheat)}
+.toast .tag{flex:none;padding:5px 13px;border-radius:11px;background:var(--wheatsoft);color:var(--wheat2);font-size:16px;font-weight:800;letter-spacing:1px}
+.body.state-layout.has-toast{grid-template-rows:auto auto minmax(0,1fr) auto auto}
+.body.empty-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
+.body.list-guide-layout.has-toast{grid-template-rows:auto auto auto auto minmax(0,1fr) auto auto}
+.ctabar{display:flex;gap:14px;flex:none}
+.btn{min-height:72px;padding:0 30px;border-radius:22px;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid var(--line2);background:var(--surface);font-size:22px;font-weight:800}
+.btn svg{width:24px;height:24px}
+.btn.primary{background:var(--deep);border-color:var(--deep);color:#fff;flex:1.7}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff;flex:1.7}
+.btn[aria-disabled="true"]{background:#dcd8cc;border-color:#dcd8cc;color:#77796f}
+.cta-note{flex:1;display:flex;align-items:center;font-size:17px;line-height:1.45;color:var(--ink3)}
+
+.truth{height:58px;flex:none;padding:0 44px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);color:var(--ink3);font-size:17px}
+.truth b{color:var(--ink2)}
+.navbar{height:112px;flex:none;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--ink3);font-size:19px;font-weight:700}
+.nav-item.on{color:var(--teal2)}
+.nav-item svg{width:30px;height:30px}
+
+.demo-tab,.demo-panel{display:none}
+html.debug .demo-tab{display:block;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:54px;min-height:150px;border-radius:0 16px 16px 0;background:rgba(11,36,30,.9);color:var(--green);writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+html.debug .demo-panel.show{display:flex;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;padding:14px;flex-direction:column;gap:6px;max-height:1600px;overflow:auto;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96)}
+.demo-panel a{min-height:48px;padding:0 14px;display:flex;align-items:center;border-radius:12px;background:rgba(255,255,255,.07);color:#fff;font-size:16px;white-space:nowrap}
+.demo-panel .dp-t{color:var(--green);font-size:15px;letter-spacing:2px;padding:4px 6px}
+
+@keyframes breathe{50%{opacity:.36;transform:scale(.76)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+html.flat *,html.flat *::before,html.flat *::after{animation:none!important;transition:none!important}
+.notice-row{align-items:flex-start;padding:16px 20px}
+.notice-body{margin-top:8px;font-size:19px;line-height:1.55;color:var(--ink2)}
+.notice-time{margin-left:10px;font-size:16px;color:var(--ink3)}
+.unread-dot{width:11px;height:11px;border-radius:50%;background:var(--teal);flex:none}
+.row-foot{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px}
+/* 操作按钮抬到 56px 之后，把消息行的内边距与按钮上边距各收一点，
+   行的自然高度保持不变，四条消息仍然一屏排得下。 */
+.notice-row .row-foot{margin-top:10px}
+</style>
+</head>
+<body><div id="viewport"><div id="stage">
+  <header class="topbar">
+    <a class="back press" href="30-my-profile.html" data-route="/profile" data-testid="notifications-back" aria-label="返回我的"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill"><span class="dot" id="pill-dot"></span><span id="pill-text">消息通知</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq"><div class="xq-row">
+    <div class="xq-face serif">青</div>
+    <div class="xq-main">
+      <div class="xq-eyebrow">NOTIFICATIONS</div>
+      <h1 class="xq-ask serif">本人设备与服务消息，<em>都在这里</em>。</h1>
+      <div class="xq-doing" id="doing">只显示<b>本人的打印、AI、文件与系统消息</b>；本页没有实时推送。</div>
+    </div>
+  </div></section>
+
+  <main class="body" id="body-root" data-screen="notifications" data-state="login" data-testid="notifications-state-login" data-compat="0" data-route-alias="/me/notifications" aria-live="polite"></main>
+
+  <div class="truth"><b>本人可见</b><span>消息只对当前登录账号可见；本页不推送广告，也不代表来源平台的处理结果。</span></div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/" data-testid="notifications-nav-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>首页</a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant" data-testid="notifications-nav-assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a>
+    <a class="nav-item on press" href="30-my-profile.html" data-route="/profile" aria-current="page" data-testid="notifications-nav-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a>
+  </nav>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" hidden>演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="true" hidden></div>
+</div></div>
+<script>
+/* 原型脚本：只做状态渲染与切态演示；不发请求，不伪造消息或操作结果。 */
+var SCREEN = 'notifications';
+var STATES = ['login','loading','error','all-empty','unread-empty','ready-all','ready-unread','operation-busy','operation-toast'];
+
+var ICO = {
+  bell:'<path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  print:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/>',
+  spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  chat:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  wrench:'<path d="M14.7 6.3a4 4 0 0 0 5 5L21 12l-9 9-3-3 9-9z"/><path d="M3 21l4-4"/>',
+  megaphone:'<path d="M3 11v2a2 2 0 0 0 2 2h2l7 4V5L7 9H5a2 2 0 0 0-2 2z"/><path d="M18 8a4 4 0 0 1 0 8"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  arrow:'<path d="M9 18l6-6-6-6"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  lock:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  warn:'<path d="M12 3 2.8 20h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+  doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>'
+};
+function svg(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[n]||ICO.info)+'</svg>'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+var q = new URLSearchParams(location.search);
+var DEBUG = q.get('debug')==='1';
+/* debug 只在已经是 debug 会话时继续传递，绝不写进普通 URL */
+function keep(url){ return DEBUG ? url + (url.indexOf('?')<0?'?':'&') + 'debug=1' : url; }
+function href(state, extra){ return keep('35-notifications.html?state='+state+(extra?'&'+extra:'')); }
+
+/* 分类映射对齐 kiosk CATEGORY_META：print / ai / feedback / maintenance / notice / system */
+var CAT = {
+  print:['打印','print','wheat'],
+  ai:['AI服务','spark',''],
+  feedback:['反馈','chat','plum'],
+  maintenance:['维护','wrench','slate'],
+  notice:['公告','megaphone','clay'],
+  system:['系统','bell','clay']
+};
+/* 六类消息是本页的完整分类表：登录 / 加载失败 / 空态都按同一张表画结构位，
+   不再只挑其中四类，避免用户以为「登录后只有这四种消息」。 */
+var CAT_ORDER = ['print','ai','feedback','maintenance','notice','system'];
+/* 排版示例条目：合成状态由页面级示例条（fixtureNote）与 data-evidence-fixture 声明一次，
+   不在每一行里重复写「用于演示排版」。行本身按真实通知该有的样子排：分类 + 标题 + 一句话正文 + 时间结构位；
+   但不写入任何取件码、券、金额、维护时间、邮箱或其它无法证实的具体事实。 */
+var ITEMS = [
+  {id:'n1', kind:'personal', cat:'print', unread:true,  title:'打印订单状态更新', body:'你的一笔打印订单状态有变化，具体进度以服务端返回为准。'},
+  {id:'n2', kind:'personal', cat:'ai', unread:true,  title:'AI 服务记录更新', body:'一条 AI 服务任务的处理状态有变化，可在「我的」里查看服务记录。'},
+  /* 反馈有新回复设为未读：未读筛选下必须能看到「可跳转那一类」的排版，否则未读态只剩两条同构行。 */
+  {id:'n3', kind:'personal', cat:'feedback', unread:true, related:'feedback_ticket', relatedId:'example-ticket', title:'反馈有新回复', body:'你提交的一条反馈有新的回复，点开可以进入本人反馈详情。'},
+  {id:'n4', kind:'broadcast', cat:'notice', unread:false, title:'服务公告', body:'服务规则或开放时间有更新，具体内容以公告正文为准。'}
+];
+
+function ctaBar(parts){ return '<div class="ctabar">'+parts.join('')+'</div>'; }
+function link(label, target, route, testid, opts){
+  opts = opts || {};
+  return '<a class="btn press'+(opts.primary?' primary':'')+'" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'+(opts.icon?svg(opts.icon):'')+label+'</a>';
+}
+function deadPrimary(label, reason, testid){
+  return '<span class="btn primary" aria-disabled="true" aria-label="'+esc(label+'（'+reason+'）')+'" data-testid="'+testid+'">'+label+'</span>';
+}
+/* 状态横幅：横向排布，不再把一张小卡片摊在整屏中央 */
+function banner(tone, ico, title, desc, minis){
+  return '<section class="banner" data-testid="'+SCREEN+'-fallback" data-kind="'+tone+'"><span class="banner-ico" data-tone="'+tone+'">'+svg(ico)+'</span>'
+    +'<span class="banner-main"><span class="banner-t">'+title+'</span><span class="banner-p">'+desc+'</span></span>'
+    +(minis?'<span class="banner-mini">'+minis.map(function(m){return '<i>'+esc(m)+'</i>';}).join('')+'</span>':'')
+    +'</section>';
+}
+function slot(text, cls){ return '<span class="slot'+(cls?' '+cls:'')+'">'+esc(text)+'</span>'; }
+/* 分类结构行：登录 / 失败态展示「本页会显示哪几类消息」，但不写任何条目内容 */
+function catRow(cat, mode){
+  var meta = CAT[cat], tid = SCREEN+'-cat-'+cat;
+  var tail = mode==='lock'
+    ? '<span class="small" aria-disabled="true" data-testid="'+tid+'-locked" aria-label="'+esc(meta[0]+'消息：登录后才会显示')+'">'+svg('lock')+'登录后显示</span>'
+    : '<span class="small" aria-disabled="true" data-testid="'+tid+'-off" aria-label="'+esc(meta[0]+'消息：本次没有取到')+'">'+svg('warn')+'本次未取到</span>';
+  return '<div class="row off" data-notification-category="'+cat+'" data-slot-mode="'+mode+'" data-testid="'+tid+'">'
+    +'<span class="row-ico" data-tone="off">'+svg(meta[1])+'</span>'
+    +'<span class="row-main"><span class="row-title">'+meta[0]+'消息</span>'
+    +'<span class="row-sub" style="display:flex;gap:9px;flex-wrap:wrap;margin-top:9px">'+slot(mode==='lock'?'标题登录后显示':'—','lock')+slot('时间','lock')+'</span></span>'
+    +'<span class="acts">'+tail+'</span></div>';
+}
+function skelRow(i){
+  return '<div class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
+    +'<span class="row-ico" data-tone="off"></span>'
+    +'<span class="row-main"><span class="skel t"></span><span class="skel s"></span></span>'
+    +'<span class="acts"><span class="skel" style="width:110px;height:50px;border-radius:16px"></span></span></div>';
+}
+function previewList(inner, foot, label){
+  return '<section class="list" data-testid="'+SCREEN+'-list" aria-label="'+esc(label)+'">'+inner
+    +'<div class="list-foot legal">'+foot+'</div></section>';
+}
+var GUIDE = {
+  login:[['隐私','只对本人可见','退出或超时后，本机不保留任何消息明细'],['登录方式','手机号 + 验证码','也可以在登录页用手机扫码登录'],['边界','不推送广告','消息只来自本机服务与系统公告']],
+  loading:[['读取范围','只读当前账号','不会展示其他账号的消息'],['显示规则','不闪回旧消息','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会改动已读状态']],
+  error:[['数据','已有消息不受影响','这次加载失败不会删除任何消息'],['先试这个','检查网络后重试','重试不会重复标记已读'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']],
+  ready:[['刷新方式','进入本页时读取','本页没有实时推送，完成一次操作后会重新读取'],['已读与删除','以服务端结果为准','操作失败会明确提示，列表保持原样'],['跳转边界','只有关联反馈的那条消息可跳转','其它消息与页面级按钮都不进反馈']],
+  empty:[['怎么产生','服务状态有更新时','打印、AI、文件与系统消息都会出现在这里'],['刷新方式','进入本页时读取','本页没有实时推送，操作后会重新读取'],['谁能看到','只有本人','退出后本机不留明细']]
+};
+function guide(key){
+  return '<section class="guide" aria-label="说明">'+(GUIDE[key]||GUIDE.login).map(function(it){
+    return '<div class="guide-item"><div class="guide-k">'+it[0]+'</div><div class="guide-t">'+it[1]+'</div><div class="guide-p">'+it[2]+'</div></div>';
+  }).join('')+'</section>';
+}
+function fixtureNote(){
+  return '<div class="fixture" data-testid="'+SCREEN+'-fixture-note">'+svg('info')+'<span>排版示例，不代表真实账号数据；下面每条消息的标题、正文与时间都由服务端返回</span></div>';
+}
+
+function itemsFor(state){
+  if(state==='ready-unread') return ITEMS.filter(function(i){return i.unread;});
+  if(state==='operation-toast') return ITEMS.map(function(i){ var c={}; for(var k in i) c[k]=i[k]; c.unread=false; return c; });
+  return ITEMS;
+}
+function unreadFor(state){ return state==='operation-toast' ? 0 : ITEMS.filter(function(i){return i.unread;}).length; }
+
+function noticeRow(item, busy){
+  var meta = CAT[item.cat] || CAT.system;
+  var tid = SCREEN+'-item-'+item.id;
+  var readBtn = item.unread
+    ? (busy
+      ? '<span class="small" aria-disabled="true" data-testid="'+tid+'-read" aria-label="标记已读（演示版式：本页没有发出请求，服务端数据不会改变）">'+svg('check')+'已读</span>'
+      : '<a class="small press" href="'+href('operation-busy','op=read')+'" data-route="/me/notifications" data-testid="'+tid+'-read" aria-label="把这条消息标记为已读">'+svg('check')+'已读</a>')
+    : '';
+  var delBtn = busy
+    ? '<span class="small" aria-disabled="true" data-testid="'+tid+'-delete" aria-label="删除这条消息（演示版式：本页没有发出请求，服务端数据不会改变）">'+svg('x')+'删除</span>'
+    : '<a class="small press" href="'+href('operation-busy','op=delete')+'" data-route="/me/notifications" data-testid="'+tid+'-delete" aria-label="删除这条消息">'+svg('x')+'删除</a>';
+  /* 只有 relatedType=feedback_ticket 且带 relatedId 的行才有跳转，且必须把 relatedId 带成 ticket 参数。 */
+  var relatedBtn = (item.related==='feedback_ticket' && item.relatedId)
+    ? '<a class="small primary press" href="'+esc(keep('40-member-feedback.html?state=detail-ready&ticket='+encodeURIComponent(item.relatedId)))+'" data-route="/me/feedback?ticket='+esc(item.relatedId)+'" data-testid="'+tid+'-feedback" aria-label="查看这条消息关联的本人反馈">'+svg('chat')+'查看相关反馈'+svg('arrow')+'</a>'
+    : '';
+  return '<div class="row notice-row" data-notification-kind="'+item.kind+'" data-notification-category="'+item.cat+'" data-notification-read="'+(item.unread?'unread':'read')+'"'+(item.related?' data-notification-related="'+item.related+'"':'')+(item.relatedId?' data-notification-related-id="'+esc(item.relatedId)+'"':'')+'>'
+    +'<span class="row-ico '+meta[2]+'">'+svg(meta[1])+'</span>'
+    +'<span class="row-main">'
+    +'<span class="row-head">'+(item.unread?'<span class="unread-dot" aria-label="未读"></span>':'')+'<span class="row-title">'+item.title+'</span><span class="chip">'+meta[0]+'</span>'+(item.kind==='broadcast'?'<span class="chip">全站公告</span>':'')+'</span>'
+    /* 页级示例条已经写明「每条消息的标题、正文与时间都由服务端返回」，
+       每一行不再挂一遍「时间由接口回填」。 */
+    +'<span class="notice-body">'+item.body+'</span>'
+    +'<span class="row-foot">'+relatedBtn+readBtn+delBtn+'</span>'
+    +'</span></div>';
+}
+
+/* 筛选条只负责筛选；「全部已读」是页面级主操作，放在底部 CTA，不再重复出现两次 */
+function opsBar(state, unread, total){
+  var unreadOnly = state==='ready-unread' || state==='unread-empty';
+  var tabs = [
+    {label:'全部', count:total, on:!unreadOnly, testid:SCREEN+'-tab-all', href:href(state==='unread-empty'?'all-empty':'ready-all')},
+    {label:'未读', count:unread, on:unreadOnly, testid:SCREEN+'-tab-unread', href:href(state==='all-empty'?'unread-empty':'ready-unread')}
+  ];
+  return '<div class="tabbar n2" role="group" aria-label="消息筛选">'+tabs.map(function(t){
+      return '<a class="tab press'+(t.on?' on':'')+'" href="'+esc(t.href)+'" data-route="/me/notifications" data-testid="'+t.testid+'"'+(t.on?' aria-current="true"':'')+'>'+t.label+'<i>'+t.count+'</i></a>';
+    }).join('')+'</div>';
+}
+function summaryBar(unread, total, note){
+  return '<section class="summary" aria-label="消息通知概览"><span class="summary-ico clay">'+svg('bell')+'</span>'
+    +'<span class="summary-main"><b>消息中心</b><strong>'+unread+'</strong><span>未读消息来自本人打印、AI、文件与系统状态</span></span>'
+    +'<span class="summary-mini"><i>当前 '+total+'</i><i>'+esc(note)+'</i></span></section>';
+}
+function readAllCta(unread, busy){
+  if(busy) return deadPrimary('正在标记全部已读…（演示版式）','演示态：本页没有发出请求，服务端的已读状态不会改变',SCREEN+'-primary');
+  if(unread===0) return '<span class="btn primary" aria-disabled="true" aria-label="全部已读（当前没有未读消息）" data-testid="'+SCREEN+'-primary">'+svg('check')+'全部已读</span>';
+  return '<a class="btn primary press" href="'+href('operation-busy','op=read-all')+'" data-route="/me/notifications" data-testid="'+SCREEN+'-primary" aria-label="把全部消息标记为已读">'+svg('check')+'全部标记为已读</a>';
+}
+
+function listBody(state){
+  var busy = state==='operation-busy';
+  var unread = unreadFor(state);
+  var items = itemsFor(state);
+  var list = '<section class="list" data-testid="'+SCREEN+'-list" data-evidence-fixture="synthetic" aria-label="消息通知（排版示例）">'
+    + items.map(function(i){ return noticeRow(i, busy); }).join('')
+    + '<div class="list-foot legal">只有与本人反馈关联的消息可以跳到反馈详情；其它消息不提供额外跳转，也不代表来源平台的处理结果。</div>'
+    + '</section>';
+  /* 页面级不提供反馈入口：反馈详情只能从关联那条消息进去。 */
+  return fixtureNote() + summaryBar(unread, items.length, '本页无实时推送') + opsBar(state, unread, items.length)
+    + list + guide('ready') + ctaBar([
+      link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+      readAllCta(unread, busy)
+    ]);
+}
+
+function emptyBody(state){
+  var unreadOnly = state==='unread-empty';
+  var rows = CAT_ORDER.map(function(c){
+    var meta = CAT[c];
+    return '<div class="row" data-notification-category="'+c+'" data-slot-mode="empty" data-testid="'+SCREEN+'-cat-'+c+'">'
+      +'<span class="row-ico '+meta[2]+'">'+svg(meta[1])+'</span>'
+      +'<span class="row-main"><span class="row-title">'+meta[0]+'消息</span>'
+      +'<span class="row-sub">'+({print:'打印任务的进度、异常与取件提醒',ai:'AI 服务任务完成或失败的提醒',feedback:'本人反馈有新回复时的提醒',maintenance:'这台机器的维护与停用通知',notice:'服务公告与规则变更',system:'账号与安全相关的系统消息'})[c]+'</span></span>'
+      +'<span class="acts">'+slot('暂无','lock')+'</span></div>';
+  }).join('');
+  return summaryBar(0, 0, '本页无实时推送') + opsBar(state, 0, 0)
+    + previewList(rows, (unreadOnly?'未读筛选下没有消息；':'')+'设备和服务状态有更新时，消息会按上面这几类出现在这里。<b>空就是空</b>，本页不会造消息让页面好看。',
+        '会出现在这里的消息类型')
+    + guide('empty') + ctaBar([
+      link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+      unreadOnly
+        ? link('看全部消息', href('all-empty'), '/me/notifications', SCREEN+'-primary',{primary:true,icon:'bell'})
+        : link('去我的记录','39-member-records.html?view=ai-records','/me/ai-records',SCREEN+'-primary',{primary:true,icon:'arrow'})
+    ]);
+}
+
+function renderBody(state, compat){
+  if(state==='login'){
+    var from = compat ? '/notifications' : '/me/notifications';
+    return {layout:'state', html:
+      banner('lock','lock','登录后查看本人消息','公共一体机不会在未登录时展示任何消息标题或内容。<b>下面是登录后会出现的消息类型。</b>',['未读 —','共 —'])
+      + previewList(CAT_ORDER.map(function(c){return catRow(c,'lock');}).join(''),
+          '登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>；服务端的订单、文件与消息按各自留存期限管理。',
+          '登录后会出现的消息类型')
+      + guide('login')
+      + ctaBar([
+        link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+        '<a class="btn primary press" href="'+esc(keep('03-login-gate.html?from='+encodeURIComponent(from)))+'" data-route="/login" data-login-from="'+esc(from)+'" data-testid="'+SCREEN+'-primary">手机号登录</a>'
+      ])};
+  }
+  if(state==='loading'){
+    return {layout:'state', html:
+      banner('calm','clock','正在加载本人消息','正在读取当前账号的消息。<b>返回前一律显示「—」</b>，不会闪回上一位用户的消息。',['未读 —','正在安全读取'])
+      + previewList([0,1,2,3,4].map(skelRow).join(''),
+          '这次读取失败不会改动任何已读状态，也不会删除消息。','正在加载的消息占位')
+      + guide('loading')
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                deadPrimary('消息还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary')])};
+  }
+  if(state==='error'){
+    return {layout:'state', html:
+      banner('warn','warn','消息这次没有加载出来','当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以一律显示「—」；已读状态和已有消息不会因为这次失败而改变。',['未读 —','本次未取到'])
+      + previewList(CAT_ORDER.map(function(c){return catRow(c,'error');}).join(''),
+          '重试不会重复标记已读，也不会删除消息。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的消息类型')
+      + guide('error')
+      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+                link('重新加载', href('loading'), '/me/notifications', SCREEN+'-primary',{primary:true})])};
+  }
+  if(state==='all-empty' || state==='unread-empty') return {layout:'empty', html: emptyBody(state)};
+  return {layout:'list-guide', html: listBody(state)};
+}
+
+var LAYOUT = {state:'state-layout', empty:'empty-layout', 'list-guide':'list-guide-layout'};
+function render(state, compat){
+  var out = renderBody(state, compat);
+  var root = document.getElementById('body-root');
+  root.className = 'body ' + (LAYOUT[out.layout] || 'state-layout');
+  root.dataset.state = state;
+  root.dataset.testid = SCREEN + '-state-' + state;
+  root.dataset.compat = compat ? '1' : '0';
+  root.dataset.routeAlias = compat ? '/notifications' : '/me/notifications';
+  /* 提交中与成功态都只作为**版式演示**保留：静态原型没有发过请求，不能声称真的提交或标记成功。
+     这一屏要能一眼看出「这里出现了一条提示（toast）」，所以它长成深色提示条 + 演示态标签，
+     而不是又一条和示例条同款的浅色说明带。 */
+  var toast = state==='operation-toast'
+    ? '「全部已读」成功后的提示样式；本页没有发出任何请求，也没有真的改动已读状态。'
+    : state==='operation-busy'
+    /* 提交中同样是普通点击就能进的一屏，所以披露必须和结果态一样显眼，
+       不能只靠页底那行小字。 */
+    ? '「全部标记为已读」提交中的版式；本页没有发出任何请求，服务端的已读状态不会改变。'
+    : '';
+  if(toast) root.className += ' has-toast';
+  root.innerHTML = (toast
+      ? '<div class="toast" role="status" data-tone="demo" data-demo-state="true" data-testid="'+SCREEN+'-toast">'+svg('info')
+        + '<b class="tag">演示态</b><span>'+toast+'</span></div>'
+      : '') + out.html;
+  document.getElementById('pill-dot').className = 'dot' + (state==='loading' || state==='operation-busy' ? ' breathe' : '');
+  document.getElementById('doing').innerHTML =
+      state==='operation-toast' ? '这一屏是<b>版式演示</b>：静态原型不会真的标记已读，也不会改动服务端状态。'
+    : state==='operation-busy'  ? '这一屏是<b>演示版式</b>：静态原型没有发出请求，也不会改动服务端的已读状态。'
+    : '只显示<b>本人的打印、AI、文件与系统消息</b>；本页没有实时推送。';
+}
+
+if(q.get('flat')==='1') document.documentElement.classList.add('flat');
+if(DEBUG) document.documentElement.classList.add('debug');
+var state = q.get('state'); if(STATES.indexOf(state)<0) state = 'login';
+render(state, q.get('compat')==='1');
+
+function fit(){ var k=Math.min(innerWidth/1080, innerHeight/1920); var s=document.getElementById('stage'); if('zoom' in s.style) s.style.zoom=k; else s.style.transform='scale('+k+')'; }
+addEventListener('resize', fit); fit();
+function tick(){ var d=new Date(); document.getElementById('clock').textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick, 10000);
+
+/* 演示面板只在 ?debug=1 时填充并解除 hidden；普通 URL 下既不可见也不可聚焦。 */
+if(DEBUG){
+  var tab = document.getElementById('demo-tab'), panel = document.getElementById('demo-panel');
+  panel.innerHTML = '<div class="dp-t">原型演示控制</div>' + STATES.map(function(x){ return '<a href="?debug=1&state='+x+'">'+x+'</a>'; }).join('')
+    + '<a href="?debug=1&state=login&compat=1">login (compat /notifications)</a>';
+  tab.hidden = false; panel.hidden = false;
+  tab.onclick = function(){ panel.classList.toggle('show'); };
+}
+</script>
+</body></html>

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>隐私与数据请求 ｜ 职易达</title>
+<!--
+  route: /me/privacy-requests
+  state: login | loading | error | empty | history-ready | revoke-confirm | submitting | success | failure
+  api: GET /api/v1/me/data-requests → { items }（本人请求记录）；
+       POST /api/v1/me/data-requests { requestType: "revoke_consent" }，请求头带一次性幂等键（前端生成 UUID）→ 新建的请求记录
+  fallback: 未登录只引导登录；未连接真实后端时隐私数据请求直接失败，不做本地假提交；
+            提交失败按服务端返回信息提示，列表保持原样。
+  对接口径（对齐正式实现 apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx
+            与 services/api/src/member-privacy/member-data-request.service.ts）：
+            撤回授权是**同步**的。服务端 createConsentRevocation 在同一个事务里把 job_ai 授权置为已撤回，
+            并直接创建一条 status=completed 的请求记录；没有队列、没有 pending 轮询。
+            前端 submitRevoke 只在这一次 POST 往返期间置 busy：返回成功即显示已撤回，失败即提示重试。
+            因此本原型的 submitting 只能表示「等待 POST 返回」这一段版式，
+            不得声称请求已进入服务端队列，也不得承诺「离开后仍会有结果返回」。
+  note: 一体机本波只开放「撤回岗位 AI 授权」。导出需要完成安全验证（step-up）并由后台生成，一体机不提供提交与下载入口；
+        账号注销暂未开放，后端会直接拒绝该类请求。因此导出与注销在本页是**不可点选的说明项**，不是禁用按钮，也不画任何提交入口。
+        撤回授权不会删除简历、文档、打印订单或收藏。
+        revoke-confirm 点「确认撤回」只能进入 submitting（等待 POST 返回的版式），
+        submitting 期间确认与取消都锁定；success / failure 是 POST 返回之后的结果态，
+        本原型把它们保留为可直达的取证状态，但任何一次确认点击都不得直接落到结果态。
+        submitting / success / failure 三态都是静态版式：没有发出任何请求，授权状态不会被改动。
+  原型演示控制：仅用 ?state= 切换；请求记录是排版示例，不代表真实账号数据。
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;
+  --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
+  --teal:#1f9e86;--teal2:#157a67;--tealsoft:#e0f2ec;
+  --slate:#3f68b0;--slate2:#35608f;--slatesoft:#e6ecf7;
+  --clay:#b8683c;--clay2:#9e5330;--claysoft:#f7ebe1;
+  --plum:#7a5a86;--plum2:#6b4a77;--plumsoft:#efe8f2;
+  --wheat:#a9781f;--wheat2:#8a6219;--wheatsoft:#f3ecda;
+  --line:#e3ddcb;--line2:#d4cdb6;--bad:#b23a2e;--badsoft:#f6e4e1;
+  --ease:cubic-bezier(.22,1,.36,1);
+  /* 与 00–15 定稿页同名令牌（值一致，供后续统一改名） */
+  --ink-2:var(--ink2);--ink-3:var(--ink3);--deep-2:var(--deep2);--emerald:var(--green);
+  --teal-d:var(--teal2);--teal-soft:var(--tealsoft);--slate-d:var(--slate2);--slate-soft:var(--slatesoft);
+  --clay-d:var(--clay2);--clay-soft:var(--claysoft);--plum-d:var(--plum2);--plum-soft:var(--plumsoft);
+  --wheat-d:var(--wheat2);--wheat-soft:var(--wheatsoft);--cinnabar:var(--bad);--cinnabar-soft:var(--badsoft);
+  --line-2:var(--line2);--ease-out:var(--ease);
+  --r-lg:32px;--r-md:24px;--r-sm:18px;--tap-min:48px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);overflow:hidden}
+a{text-decoration:none;color:inherit}button{font:inherit;color:inherit;border:0;background:none}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.press{transition:transform 140ms var(--ease),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;transform-origin:center center;
+  background:radial-gradient(900px 420px at 86% 6%,rgba(31,158,134,.07),transparent 60%),radial-gradient(820px 500px at -6% 58%,rgba(122,90,134,.05),transparent 56%),var(--paper)}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+
+.topbar{height:104px;flex:none;padding:0 36px;display:flex;align-items:center;gap:18px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{width:64px;height:64px;display:grid;place-items:center;border-radius:20px;border:1px solid var(--line2);background:var(--paper)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--deep);color:var(--green);font-size:24px;font-weight:800}
+.logo-name{font-size:26px;font-weight:800;letter-spacing:1px}
+.sp{flex:1}
+.pill{height:54px;padding:0 22px;border-radius:27px;display:flex;align-items:center;gap:10px;border:1px solid var(--line2);background:var(--paper);color:var(--ink2);font-size:19px;font-weight:700}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--teal)}
+.pill .dot.breathe{animation:breathe 2.2s var(--ease) infinite}
+.clock{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.xq{margin:22px 42px 0;padding:28px 38px;border-radius:34px;flex:none;background:linear-gradient(158deg,var(--deep2),var(--deep));color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-150px;top:-150px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.15),transparent 66%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{width:88px;height:88px;flex:none;border-radius:50%;display:grid;place-items:center;border:1.5px solid rgba(46,230,168,.4);background:rgba(46,230,168,.1);color:var(--green);font-size:40px}
+.xq-eyebrow{font-size:17px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:7px}
+.xq-ask{font-size:37px;line-height:1.28;font-weight:800}
+.xq-ask em{font-style:normal;color:var(--green)}
+.xq-doing{font-size:20px;line-height:1.5;color:rgba(242,239,228,.74);margin-top:9px}
+.xq-doing b{color:#fff;font-weight:700}
+
+
+.body{flex:1;min-height:0;padding:20px 42px 16px;display:grid;gap:14px;overflow:hidden}
+/* 每种布局的 1fr 都落在**主内容**上，不再落到说明栅格上 */
+.body.state-layout{grid-template-rows:auto minmax(0,1fr) auto auto}   /* banner · 主内容 · 说明 · 操作 */
+.body.list-layout{grid-template-rows:auto auto minmax(0,1fr) auto}
+.body.detail-layout{grid-template-rows:auto minmax(0,1fr) auto}
+
+.card,.state{background:var(--surface);border:1px solid var(--line);border-radius:26px}
+.card{padding:24px 26px}
+
+/* 状态横幅：取代「小卡片 + 大片空白」的居中焦点卡 */
+.banner{flex:none;display:flex;align-items:center;gap:20px;padding:20px 24px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.banner-ico{width:72px;height:72px;flex:none;border-radius:22px;display:grid;place-items:center;background:var(--slatesoft);color:var(--slate2)}
+.banner-ico svg{width:34px;height:34px}
+.banner-ico[data-tone=lock]{background:var(--plumsoft);color:var(--plum2)}
+.banner-ico[data-tone=warn]{background:var(--badsoft);color:var(--bad)}
+.banner-ico[data-tone=calm]{background:var(--tealsoft);color:var(--teal2)}
+.banner-main{flex:1;min-width:0}
+.banner-t{display:block;font-size:28px;font-weight:800;line-height:1.28}
+.banner-p{display:block;margin-top:7px;font-size:19px;line-height:1.5;color:var(--ink3)}
+.banner-p b{color:var(--ink2)}
+.banner-mini{flex:none;display:flex;flex-direction:column;gap:6px;text-align:right}
+.banner-mini i{font-style:normal;font-size:17px;font-weight:700;color:var(--ink2)}
+
+/* 接口回填结构位与骨架条 */
+.slot{display:inline-flex;align-items:center;min-height:32px;padding:0 11px;border-radius:10px;border:1px dashed var(--line2);background:var(--surface);color:var(--ink3);font-size:16px;font-weight:700}
+.slot.lock{border-style:solid;background:#efeade;color:#6d7069}
+.skel{height:22px;border-radius:8px;background:#ece7d9}
+.skel.t{width:54%}
+.skel.s{display:block;width:36%;height:18px;margin-top:12px}
+.row.off{background:#efeade;border-color:#ddd8c8}
+.row-ico[data-tone=off]{background:#ded9cb;color:#6d7069}
+.focus{min-height:0;display:grid;place-items:center;text-align:center;padding:36px}
+.focus-in{max-width:700px}
+.focus-ico{width:110px;height:110px;border-radius:32px;display:grid;place-items:center;margin:0 auto 24px;background:var(--slatesoft);color:var(--slate)}
+.focus-ico svg{width:52px;height:52px}
+.focus-ico.warn{background:var(--badsoft);color:var(--bad)}
+.focus-ico.calm{background:var(--tealsoft);color:var(--teal2)}
+.focus-ico.lock{background:var(--plumsoft);color:var(--plum2)}
+.focus h3{font-size:32px;font-weight:800;margin-bottom:14px}
+.focus p{font-size:21px;line-height:1.68;color:var(--ink3)}
+.focus-list{margin:26px auto 0;max-width:660px;display:flex;flex-direction:column;gap:10px;text-align:left}
+.focus-list div{display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:16px;background:var(--paper);border:1px solid var(--line);font-size:19px;line-height:1.4;color:var(--ink2);font-weight:650}
+.focus-list svg{width:22px;height:22px;flex:none;color:var(--teal2)}
+.focus-list b{color:var(--ink);font-weight:800}
+.focus .line{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:19px;font-weight:700;color:var(--ink2)}
+
+.summary{display:flex;align-items:center;gap:20px;padding:20px 26px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.summary-ico{width:66px;height:66px;flex:none;border-radius:20px;display:grid;place-items:center;background:var(--tealsoft);color:var(--teal2)}
+.summary-ico svg{width:32px;height:32px}
+.summary-ico.plum{background:var(--plumsoft);color:var(--plum2)}
+.summary-ico.clay{background:var(--claysoft);color:var(--clay2)}
+.summary-ico.slate{background:var(--slatesoft);color:var(--slate2)}
+.summary-main{flex:1;min-width:0}
+.summary-main b{display:block;font-size:19px;color:var(--ink3);font-weight:700}
+.summary-main strong{display:block;font-size:34px;font-weight:800;line-height:1.2;margin-top:2px}
+.summary-main span{display:block;margin-top:4px;font-size:17px;color:var(--ink3);line-height:1.45}
+.summary-mini{display:flex;flex-direction:column;gap:6px;flex:none;text-align:right}
+.summary-mini i{font-style:normal;font-size:17px;font-weight:700;color:var(--ink2)}
+
+.tabbar{display:grid;gap:10px;flex:none}
+.tabbar.n4{grid-template-columns:repeat(4,1fr)}
+.tabbar.n2{grid-template-columns:repeat(2,1fr)}
+.tab{min-height:64px;padding:0 12px;border:1px solid var(--line2);border-radius:18px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:9px;font-size:20px;font-weight:750}
+.tab i{font-style:normal;min-width:34px;height:32px;padding:0 9px;border-radius:11px;background:var(--paper);color:var(--ink3);font-size:16px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.tab.on{background:var(--tealsoft);border-color:#8dc4b5;color:var(--teal2)}
+.tab.on i{background:#fff;color:var(--teal2)}
+
+.list{min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:26px;overflow-y:auto;scrollbar-width:none}
+.list::-webkit-scrollbar{display:none}
+/* 任务行按产品尺寸排：可以吃掉一部分剩余高度，但有上限；封顶之后的余量落在列表底部，
+   而不是把每一行撑成只装 80px 内容的空壳。
+   flex-basis 保持 auto、不收缩，条目多时照常滚动，不会把行压扁。 */
+/* flex-shrink 必须是 1，且列表内的行要有一个比 .row 更低的下限：
+   原来是 flex:1 0 auto + min-height:132px，行既不能压缩、又有硬下限，
+   内容一多列表卡就直接把底注裁掉（空列表/失败态实测被切 13~61px）。
+   下限只在卡片装不下时才生效，正常状态下行仍然按 flex-grow 撑到上限，版面不变。 */
+.list>.row{flex:1 1 auto;min-height:104px;max-height:200px}
+.fixture{flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:15px;background:var(--wheatsoft);color:var(--wheat2);font-size:17px;font-weight:750;line-height:1.35}
+.fixture svg{width:21px;height:21px;flex:none}
+.fixture>span{min-width:0}
+.row{min-height:132px;padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--paper);display:flex;align-items:center;gap:16px}
+.row.tap{cursor:pointer;width:100%;text-align:left}
+.row.flag{border-color:#d9b8b2;background:#fdf4f2}
+.row-ico{width:58px;height:58px;flex:none;border-radius:17px;display:grid;place-items:center;background:var(--tealsoft);color:var(--teal2)}
+.row-ico svg{width:28px;height:28px}
+.row-ico.slate{background:var(--slatesoft);color:var(--slate2)}
+.row-ico.clay{background:var(--claysoft);color:var(--clay2)}
+.row-ico.plum{background:var(--plumsoft);color:var(--plum2)}
+.row-ico.wheat{background:var(--wheatsoft);color:var(--wheat2)}
+.row-main{flex:1;min-width:0}
+.row-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.row-title{display:block;font-size:22px;font-weight:800;line-height:1.3}
+.row-sub{display:block;margin-top:6px;font-size:17px;color:var(--ink3);line-height:1.45}
+.row-arrow{width:40px;height:40px;flex:none;display:grid;place-items:center;color:var(--ink3)}
+.row-arrow svg{width:22px;height:22px}
+.chip{height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;background:var(--paper);border:1px solid var(--line2);color:var(--ink2);font-size:16px;font-weight:750}
+.st{height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:var(--tealsoft);color:var(--teal2)}
+.st.wait{background:var(--wheatsoft);color:var(--wheat2)}
+.st.run{background:var(--slatesoft);color:var(--slate2)}
+.st.bad{background:var(--badsoft);color:var(--bad)}
+.acts{display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end;flex:none;max-width:392px}
+.small{min-height:56px;padding:0 16px;border-radius:16px;border:1px solid var(--line2);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font-size:17px;font-weight:750}
+.small svg{width:19px;height:19px}
+.small.primary{background:var(--deep);border-color:var(--deep);color:#fff}
+.small.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.small[aria-disabled="true"]{background:#e6e2d7;border-color:#dcd7c9;color:#84867e}
+.reason{display:block;margin-top:8px;font-size:16px;line-height:1.4;color:var(--wheat2);font-weight:700}
+.legal{flex:none;padding:14px 18px;}
+.list-foot{flex:none;margin-top:auto;padding:14px 18px;border-radius:16px;background:rgba(11,36,30,.045);color:var(--ink2);font-size:17px;line-height:1.5}
+.note{padding:16px 20px;border-radius:18px;background:var(--tealsoft);color:var(--ink2);font-size:18px;line-height:1.55}
+.note.warn{background:var(--wheatsoft);color:var(--wheat2)}
+.note.bad{background:var(--badsoft);color:var(--bad)}
+.dl{display:grid;gap:10px;margin-top:18px}
+.dl>div{display:flex;align-items:baseline;gap:16px;padding:14px 18px;border-radius:16px;background:var(--paper);border:1px solid var(--line)}
+.dl dt{font-size:18px;color:var(--ink3);width:150px;flex:none;font-weight:700}
+.dl dd{font-size:20px;font-weight:750;line-height:1.4}
+.detail-head{display:flex;align-items:center;gap:18px}
+.detail-head .row-ico{width:70px;height:70px}
+.guide{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.guide-item{padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);display:flex;flex-direction:column;justify-content:center}
+.guide-k{font-size:16px;font-weight:800;color:var(--teal2);letter-spacing:1px}
+.guide-t{margin-top:8px;font-size:21px;font-weight:800;line-height:1.3}
+.guide-p{margin-top:7px;font-size:17px;line-height:1.5;color:var(--ink3)}
+.detail-head h2{font-size:31px;font-weight:800;line-height:1.28}
+.detail-head p{margin-top:6px;font-size:18px;color:var(--ink3)}
+
+.toast{flex:none;display:flex;align-items:center;gap:12px;padding:18px 26px;border-radius:22px;background:var(--deep);color:#f2efe4;font-size:21px;font-weight:800;line-height:1.4}
+.toast svg{width:24px;height:24px;flex:none;color:var(--green)}
+.toast[data-tone="bad"]{background:var(--badsoft);color:var(--bad);border:1px solid #e2b7b0}
+.toast[data-tone="bad"] svg{color:var(--bad)}
+/* 演示态提示条：读起来像一条「提示 / toast」，不要和示例条长成同一款说明带；
+   文案里仍然写清「这是版式演示、没有发出请求」，不冒充真实操作结果。 */
+.toast[data-tone="demo"]{background:var(--deep);color:#f6f2e6;border:1px solid rgba(46,230,168,.34);
+  box-shadow:0 14px 34px rgba(11,36,30,.16);font-size:19px;font-weight:750}
+.toast[data-tone="demo"] svg{color:var(--wheat)}
+.body.state-layout.has-toast{grid-template-rows:auto auto minmax(0,1fr) auto auto}
+.body.list-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto}
+.ctabar{display:flex;gap:14px;flex:none}
+.btn{min-height:72px;padding:0 30px;border-radius:22px;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid var(--line2);background:var(--surface);font-size:22px;font-weight:800}
+.btn svg{width:24px;height:24px}
+.btn.primary{background:var(--deep);border-color:var(--deep);color:#fff;flex:1.7}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff;flex:1.7}
+.btn[aria-disabled="true"]{background:#dcd8cc;border-color:#dcd8cc;color:#77796f}
+.cta-note{flex:1;display:flex;align-items:center;font-size:17px;line-height:1.45;color:var(--ink3)}
+
+.truth{height:58px;flex:none;padding:0 44px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);color:var(--ink3);font-size:17px}
+.truth b{color:var(--ink2)}
+.navbar{height:112px;flex:none;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--ink3);font-size:19px;font-weight:700}
+.nav-item.on{color:var(--teal2)}
+.nav-item svg{width:30px;height:30px}
+
+.demo-tab,.demo-panel{display:none}
+html.debug .demo-tab{display:block;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:54px;min-height:150px;border-radius:0 16px 16px 0;background:rgba(11,36,30,.9);color:var(--green);writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+html.debug .demo-panel.show{display:flex;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;padding:14px;flex-direction:column;gap:6px;max-height:1600px;overflow:auto;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96)}
+.demo-panel a{min-height:48px;padding:0 14px;display:flex;align-items:center;border-radius:12px;background:rgba(255,255,255,.07);color:#fff;font-size:16px;white-space:nowrap}
+.demo-panel .dp-t{color:var(--green);font-size:15px;letter-spacing:2px;padding:4px 6px}
+
+@keyframes breathe{50%{opacity:.36;transform:scale(.76)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+html.flat *,html.flat *::before,html.flat *::after{animation:none!important;transition:none!important}
+.notice-row{align-items:flex-start}
+.notice-body{margin-top:8px;font-size:19px;line-height:1.55;color:var(--ink2)}
+.notice-time{margin-top:9px;font-size:16px;color:var(--ink3)}
+.unread-dot{width:11px;height:11px;border-radius:50%;background:var(--teal);flex:none}
+.row-foot{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px}
+.opsbar{flex:none;display:flex;align-items:center;gap:12px}
+.opsbar .tabbar{flex:1}
+.readall{min-height:64px;padding:0 22px;border-radius:18px;border:1px solid var(--line2);background:var(--surface);display:inline-flex;align-items:center;gap:9px;font-size:19px;font-weight:800;flex:none}
+.readall svg{width:22px;height:22px}
+.readall[aria-disabled="true"]{background:#e6e2d7;border-color:#dcd7c9;color:#84867e}
+/* 能力卡 · 记录区(1fr) · 说明 · 操作。原来最上面还压着一张「本页范围」长说明卡，
+   而那段话在顶部 xq、底部诚实说明和能力卡自己的说明里各写过一遍，属于重复技术说明，已删。 */
+.body.privacy-layout{grid-template-rows:auto minmax(0,1fr) auto auto}
+.body.privacy-layout.has-toast{grid-template-rows:auto auto minmax(0,1fr) auto auto}
+/* 结果态多一张「撤回后的授权状态」卡：提示条 · 结果 · 能力 · 记录(1fr) · 说明 · 操作 */
+.body.privacy-layout.success-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
+.privacy-layout .list{gap:10px}
+.privacy-layout .list .row{min-height:100px;max-height:170px}
+/* 记录卡被 1fr 拉长时，底注不能再用 margin-top:auto 钉在卡底：行高封顶后，
+   余量会全部堆在最后一行和底注之间，中间空出一大块。让底注跟着行走，
+   余量落到卡片底部的呼吸区。 */
+.privacy-layout .list-foot{margin-top:0;padding:10px 16px;font-size:16px}
+.privacy-layout .fixture{padding:9px 16px}
+.caps{display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:26px}
+.cap{display:flex;align-items:center;gap:16px;padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--paper);min-height:118px}
+.cap.off{background:#eeeade;border-color:#ddd8c8}
+.cap-main{flex:1;min-width:0}
+.cap-t{display:block;font-size:22px;font-weight:800;line-height:1.3}
+.cap-p{display:block;margin-top:7px;font-size:16px;line-height:1.5;color:var(--ink3)}
+.cap.off .cap-t{color:#6d7069}
+.cap-flag{flex:none;height:38px;padding:0 14px;border-radius:12px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:#ded9cb;color:#6d7069}
+/* 确认弹层挂在 #stage 上：覆盖顶栏与底栏，aria-modal 才是真的；背景内容同时置 inert */
+.overlay{position:absolute;inset:0;z-index:70;display:grid;place-items:center;background:rgba(11,36,30,.58)}
+#overlay-root:empty{display:none}
+.dialog{width:760px;max-width:92%;padding:36px 40px;border-radius:32px;background:var(--surface);border:1px solid var(--line)}
+.dialog h2{font-size:31px;font-weight:800;line-height:1.3}
+.dialog p{margin-top:14px;font-size:20px;line-height:1.65;color:var(--ink2)}
+.dialog .toast{margin-top:20px}
+.dialog .dialog-cta{margin-top:28px;display:flex;gap:14px}
+.dialog .btn{flex:1}
+</style>
+</head>
+<body><div id="viewport"><div id="stage">
+  <header class="topbar" id="topbar-root">
+    <a class="back press" href="30-my-profile.html?screen=settings" data-route="/me/settings" data-testid="member-privacy-back" aria-label="返回账号设置"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill"><span class="dot" id="pill-dot"></span><span>隐私与数据请求</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq" id="xq-root"><div class="xq-row">
+    <div class="xq-face serif">青</div>
+    <div class="xq-main">
+      <div class="xq-eyebrow">PRIVACY &amp; DATA</div>
+      <h1 class="xq-ask serif">授权由你决定，<em>随时可以撤回</em>。</h1>
+      <div class="xq-doing" id="doing">一体机本页只开放<b>撤回岗位 AI 授权</b>；撤回不会删除简历、文档、打印订单或收藏。</div>
+    </div>
+  </div></section>
+
+  <main class="body" id="body-root" data-screen="member-privacy" data-state="login" data-testid="member-privacy-state-login" aria-live="polite"></main>
+
+  <div class="truth" id="truth-root"><b>诚实说明</b><span>结束会话只清除本机登录态与临时会话信息；服务端的订单、文件与记录按各自留存期限管理。导出需完成安全验证且一体机未开放，账号注销暂未开放，本页不提供这两类提交入口。</span></div>
+
+  <nav class="navbar" id="navbar-root" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/" data-testid="member-privacy-nav-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>首页</a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant" data-testid="member-privacy-nav-assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a>
+    <a class="nav-item on press" href="30-my-profile.html" data-route="/profile" aria-current="page" data-testid="member-privacy-nav-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a>
+  </nav>
+
+  <!-- 确认弹层挂在 stage 层，才能真正盖住顶栏与底栏 -->
+  <div id="overlay-root"></div>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" hidden>演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="true" hidden></div>
+</div></div>
+<script>
+/* 原型脚本：状态渲染与切态演示；不发请求，不伪造撤回结果。 */
+var SCREEN = 'member-privacy';
+var STATES = ['login','loading','error','empty','history-ready','revoke-confirm','submitting','success','failure'];
+
+var ICO = {
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  shieldOff:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M4 4l16 16"/>',
+  download:'<path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>',
+  trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  lock:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  warn:'<path d="M12 3 2.8 20h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'
+};
+function svg(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[n]||ICO.info)+'</svg>'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+var q = new URLSearchParams(location.search);
+var DEBUG = q.get('debug')==='1';
+/* 开发者说明（排版示例 / 接口回填等取证口径）默认不占用普通用户的版面，
+   只有取证或调试会话才显示；普通页面只留一处简短必要事实提示。 */
+var DEV = DEBUG || q.get('capture')==='1';
+/* debug 只在已经是 debug 会话时继续传递，绝不写进普通 URL */
+function keep(url){ return DEBUG ? url + (url.indexOf('?')<0?'?':'&') + 'debug=1' : url; }
+function href(state){ return keep('41-member-privacy.html?state='+state); }
+var SETTINGS_HREF = '30-my-profile.html?screen=settings';
+
+/* 文案取自 packages/shared MEMBER_DATA_REQUEST_* （会员端与管理端共用的诚实文案 SSOT）。
+   同一段边界只写一处：整页范围写在顶部 xq 与底部诚实说明，逐类边界写在下面的 TYPE_HINT。 */
+var TYPE_LABEL = {
+  revoke_consent:'撤回岗位 AI 授权',
+  export:'导出账号与业务元数据清单',
+  del:'账号注销（暂未开放）'
+};
+var TYPE_HINT = {
+  revoke_consent:'提交后会立即撤回岗位 AI 授权；请求会记入处理记录。再次使用岗位 AI 时需重新确认授权。',
+  export:'导出需完成安全验证（step-up），并由后台生成短期私有元数据包。一体机本波不提供提交与下载入口，不伪造「已自动打包下载」。包内含文件清单、AI 记录、打印订单、收藏、你自己填写的求职进度等摘要，不含文件原文与简历正文全文。',
+  del:'账号注销暂未开放。系统不会通过此入口删除简历、文档、打印订单或收藏。'
+};
+var STATUS_LABEL = {pending:'待处理', handling:'处理中', ready:'可下载', completed:'已完成', expired:'已过期', failed:'处理失败', rejected:'已驳回', cancelled:'已取消'};
+
+/* 三条覆盖三种处理状态的排版：已完成 / 处理中 / 待处理。只有一种请求类型能在一体机上提交，
+   所以类型不变，变的是状态渲染；不写任何提交时间或服务端返回值。 */
+/* 一体机只会产生「撤回岗位 AI 授权」这一类记录，而服务端的 createConsentRevocation
+   是同一个事务里改授权 + 直接写 status=completed，没有队列。所以撤回记录**只可能**是已完成；
+   这里挂 handling / pending 等于在列表里自创一条服务端不存在的异步链路。 */
+var HISTORY = [
+  {id:'h1', type:'revoke_consent', status:'completed'},
+  {id:'h2', type:'revoke_consent', status:'completed'},
+  {id:'h3', type:'revoke_consent', status:'completed'}
+];
+var STATUS_TONE = {completed:'', handling:' run', pending:' wait', ready:' run', expired:' wait', failed:' bad', rejected:' bad', cancelled:' wait'};
+
+function ctaBar(parts){ return '<div class="ctabar">'+parts.join('')+'</div>'; }
+function link(label, target, route, testid, opts){
+  opts = opts || {};
+  return '<a class="btn press'+(opts.primary?' primary':'')+(opts.danger?' danger':'')+'" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'+(opts.icon?svg(opts.icon):'')+label+'</a>';
+}
+function deadBtn(label, reason, testid, primary){
+  return '<span class="btn'+(primary?' primary':'')+'" aria-disabled="true" aria-label="'+esc(label+'（'+reason+'）')+'" data-testid="'+testid+'">'+label+'</span>';
+}
+/* 状态横幅：横向排布，不再把一张小卡片摊在整屏中央 */
+function banner(tone, ico, title, desc, minis){
+  return '<section class="banner" data-testid="'+SCREEN+'-fallback" data-kind="'+tone+'"><span class="banner-ico" data-tone="'+tone+'">'+svg(ico)+'</span>'
+    +'<span class="banner-main"><span class="banner-t">'+title+'</span><span class="banner-p">'+desc+'</span></span>'
+    +(minis?'<span class="banner-mini">'+minis.map(function(m){return '<i>'+esc(m)+'</i>';}).join('')+'</span>':'')
+    +'</section>';
+}
+function slot(text, cls){ return '<span class="slot'+(cls?' '+cls:'')+'">'+esc(text)+'</span>'; }
+function previewList(inner, foot, label){
+  return '<section class="list" data-testid="'+SCREEN+'-list" aria-label="'+esc(label)+'">'+inner
+    +'<div class="list-foot legal">'+foot+'</div></section>';
+}
+/* 能力结构行：登录 / 失败态只画「这一页能做什么、不能做什么」，不写任何请求记录 */
+var CAP_STRUCT = [
+  ['shieldOff','撤回岗位 AI 授权','撤回后再次使用岗位 AI 需要重新确认；不影响简历、文档、订单与收藏','avail'],
+  ['download','导出账号与业务元数据清单','需完成安全验证并由后台生成，<b>一体机不提供提交与下载入口</b>','off'],
+  ['trash','账号注销','<b>暂未开放</b>，后端会直接拒绝该类请求','off'],
+  ['list','本人请求记录','提交过的隐私数据请求与当前处理状态','avail']
+];
+function capSlotRow(s, mode, i){
+  var tid = SCREEN+'-cap-slot-'+i;
+  var tail = s[3]==='off'
+    ? '<span class="cap-flag">暂未开放</span>'
+    : mode==='lock'
+      ? '<span class="small" aria-disabled="true" data-testid="'+tid+'-locked" aria-label="'+esc(s[1]+'：登录后才能使用')+'">'+svg('lock')+'登录后可用</span>'
+      : '<span class="small" aria-disabled="true" data-testid="'+tid+'-off" aria-label="'+esc(s[1]+'：本次没有取到')+'">'+svg('warn')+'本次未取到</span>';
+  return '<div class="row off" data-slot-mode="'+mode+'" data-capability-state="'+(s[3]==='off'?'unavailable':'available')+'" data-testid="'+tid+'">'
+    +'<span class="row-ico" data-tone="off">'+svg(s[0])+'</span>'
+    +'<span class="row-main"><span class="row-title">'+s[1]+'</span><span class="row-sub">'+s[2]+'</span></span>'
+    +'<span class="acts">'+tail+'</span></div>';
+}
+function capStructList(mode){
+  return CAP_STRUCT.map(function(s,i){ return capSlotRow(s, mode, i); }).join('');
+}
+function skelRow(i){
+  return '<div class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
+    +'<span class="row-ico" data-tone="off"></span>'
+    +'<span class="row-main"><span class="skel t"></span><span class="skel s"></span></span>'
+    +'<span class="acts"><span class="skel" style="width:110px;height:50px;border-radius:16px"></span></span></div>';
+}
+var GUIDE = {
+  login:[['隐私','只对本人可见','请求记录与账号绑定，退出后本机不留明细'],['可做什么','撤回岗位 AI 授权','撤回后再次使用岗位 AI 需重新确认'],['不会发生','不删除已有资产','简历、文档、打印订单与收藏都不受影响']],
+  loading:[['读取范围','只读当前账号','不会展示其他账号的请求记录'],['显示规则','不闪回旧记录','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会改动授权状态']],
+  history:[['撤回范围','只影响岗位 AI 授权','不影响简历诊断、打印、收藏或已保存文件'],['再次使用','需要重新确认','下次用岗位 AI 时会再次请求授权'],['记录','只留处理记录','不会因此删除任何已有资产']],
+  error:[['授权状态','未被改动','这次加载失败不会撤回或恢复任何授权'],['先试这个','检查网络后重试','重试不会重复提交请求'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']]
+};
+function guide(key){
+  return '<section class="guide" aria-label="说明">'+(GUIDE[key]||GUIDE.login).map(function(it){
+    return '<div class="guide-item"><div class="guide-k">'+it[0]+'</div><div class="guide-t">'+it[1]+'</div><div class="guide-p">'+it[2]+'</div></div>';
+  }).join('')+'</section>';
+}
+function fixtureNote(){
+  return '<div class="fixture" data-testid="'+SCREEN+'-fixture-note">'+svg('info')+'<span>'
+    + (DEV ? '排版示例，不代表真实账号数据；每条记录的提交时间与处理状态都由服务端返回'
+           : '每条记录的提交时间与处理状态都由服务端返回')
+    + '</span></div>';
+}
+
+/* 空态不把上面那张能力卡的三行再画一遍（那是「能提交什么」，不是「记录里有什么」）。
+   这里画的是**一条请求记录本身的字段结构**：类型 / 提交时间 / 处理状态 / 可见范围，
+   值一律接口回填，不写任何具体请求。 */
+var RECORD_STRUCT = [
+  ['shieldOff','请求类型','一体机只会产生「撤回岗位 AI 授权」这一类记录'],
+  ['clock','提交时间','由服务端返回，本机不本地留存明细'],
+  ['list','处理状态','撤回提交成功即为「已完成」，一律以服务端返回为准'],
+  ['lock','可见范围','只对本人可见，退出或超时后本机不保留']
+];
+function emptyHistoryList(){
+  return previewList(RECORD_STRUCT.map(function(s,i){
+      return '<div class="row off" data-slot-mode="empty" data-record-field="'+i+'" data-testid="'+SCREEN+'-record-slot-'+i+'">'
+        +'<span class="row-ico" data-tone="off">'+svg(s[0])+'</span>'
+        +'<span class="row-main"><span class="row-title">'+s[1]+'</span><span class="row-sub">'+s[2]+'</span></span>'
+        +'<span class="acts">'+slot(DEV?'接口回填':'待服务端返回')+'</span></div>';
+    }).join(''),
+    '还没有提交过隐私数据请求，所以这里是空的。<b>空就是空</b>，本页不会造记录让页面好看。提交上面的「撤回岗位 AI 授权」之后，记录会按这几个字段出现在这一页。',
+    '暂无请求记录 · 一条记录会包含的字段');
+}
+/* 导出与注销按真实边界渲染为「不可点选的说明项」：不是禁用按钮，也不提供任何提交入口。
+   mode: 'open' 可提交 · 'dialog' 确认弹层已打开 · 'revoked' 结果态里回显撤回后的授权状态。
+   'revoked' 不是装饰：撤回之后这一页最该回答的就是「岗位 AI 现在是什么状态」，
+   所以结果态保留这张卡，而不是把版面留空。 */
+function capabilityCard(mode){
+  var revoked = mode === 'revoked';
+  var revoke = mode === 'dialog'
+    ? '<span class="small" aria-disabled="true" data-testid="'+SCREEN+'-revoke-entry" aria-label="撤回岗位 AI 授权（确认弹层已打开，请先在弹层内选择）">'+svg('shieldOff')+'撤回授权</span>'
+    : revoked
+      ? '<span class="cap-flag" data-testid="'+SCREEN+'-revoke-entry">已撤回 · 下次使用时重新确认</span>'
+      : '<a class="small primary" href="'+href('revoke-confirm')+'" data-route="/me/privacy-requests" data-testid="'+SCREEN+'-revoke-entry" aria-label="撤回岗位 AI 授权，需要二次确认">'+svg('shieldOff')+'撤回授权</a>';
+  return '<section class="caps" data-testid="'+SCREEN+'-capabilities" aria-label="可提交与暂未开放的请求">'
+    + '<div class="cap'+(revoked?' off':'')+'" data-capability="revoke_consent" data-capability-state="'+(revoked?'revoked':'available')+'">'
+    + '<span class="row-ico plum">'+svg('shieldOff')+'</span>'
+    + '<span class="cap-main"><span class="cap-t">'+TYPE_LABEL.revoke_consent+'</span><span class="cap-p">'+TYPE_HINT.revoke_consent+'</span></span>'
+    + '<span class="acts">'+revoke+'</span></div>'
+    + '<div class="cap off" data-capability="export" data-capability-state="unavailable">'
+    + '<span class="row-ico slate">'+svg('download')+'</span>'
+    + '<span class="cap-main"><span class="cap-t">'+TYPE_LABEL.export+'</span><span class="cap-p">'+TYPE_HINT.export+'</span></span>'
+    + '<span class="cap-flag">一体机未开放</span></div>'
+    + '<div class="cap off" data-capability="delete" data-capability-state="unavailable">'
+    + '<span class="row-ico slate">'+svg('trash')+'</span>'
+    + '<span class="cap-main"><span class="cap-t">'+TYPE_LABEL.del+'</span><span class="cap-p">'+TYPE_HINT.del+'</span></span>'
+    + '<span class="cap-flag">暂未开放</span></div>'
+    + '</section>';
+}
+function historyRow(item){
+  return '<div class="row" data-request-type="'+item.type+'" data-request-status="'+item.status+'">'
+    + '<span class="row-ico plum">'+svg('shieldOff')+'</span>'
+    /* 顶部 fixture 一条已经说明「提交时间与处理状态都由服务端返回」，
+       这里不再逐行重复同一句披露，只留把这一行区分开的字段位。 */
+    + '<span class="row-main"><span class="row-title">'+TYPE_LABEL[item.type]+'</span>'
+    + '<span class="row-foot">'+slot('提交时间')+slot('请求编号')+'</span></span>'
+    + '<span class="st'+(STATUS_TONE[item.status]||' wait')+'">'+STATUS_LABEL[item.status]+'</span></div>';
+}
+function historyCard(items){
+  return '<section class="list" data-testid="'+SCREEN+'-list" data-evidence-fixture="synthetic" aria-label="'+(DEV?'我的请求记录（排版示例）':'我的请求记录')+'">'
+    + fixtureNote()
+    + items.map(historyRow).join('')
+    + '<div class="list-foot legal">请求记录只显示本人提交的隐私数据请求；撤回授权不会删除简历、文档、打印订单或收藏。</div>'
+    + '</section>';
+}
+/* 成功态只作为**版式演示**保留：静态原型没有发过请求，不能声称授权真的被撤回。
+   顶部那条演示态提示条已经把「这是演示、没有发过请求」说清楚了，这里就不再重复一遍，
+   只保留结果版面本身 + 一句边界说明。 */
+function successCard(){
+  return '<section class="banner" data-testid="'+SCREEN+'-success-result" data-demo-state="true">'
+    + '<span class="banner-ico" data-tone="calm">'+svg('check')+'</span>'
+    /* 标题里保留一处「版式演示」即可。原来这里还写了「这一屏演示服务端返回成功之后的版面」，
+       右侧再挂「版式演示 / 非真实结果」两枚角标，同屏把同一句免责讲了三遍。 */
+    + '<span class="banner-main"><span class="banner-t">撤回请求已完成（版式演示）</span>'
+    + '<span class="banner-p"><b>撤回不会删除简历、文档、打印订单或收藏</b>；真实结果一律以服务端返回为准。</span></span>'
+    + '<span class="banner-mini"><i>影响范围</i><i>仅岗位 AI</i></span></section>';
+}
+function dialog(busy){
+  var cancel = busy
+    ? '<span class="btn" aria-disabled="true" data-testid="'+SCREEN+'-cancel" aria-label="取消（演示版式：正式前端在等待这一次 POST 返回期间不可取消）">取消</span>'
+    : '<a class="btn press" href="'+href('history-ready')+'" data-route="/me/privacy-requests" data-testid="'+SCREEN+'-cancel">取消</a>';
+  /* 确认只能进入 submitting：结果由服务端返回，确认点击本身不得直接落到 success / failure。 */
+  var confirm = busy
+    ? deadBtn('提交中…（演示版式）','演示态：本页没有发出请求，岗位 AI 授权没有被改动',SCREEN+'-primary', true)
+    : link('确认撤回', href('submitting'), '/me/privacy-requests', SCREEN+'-primary', {danger:true, icon:'shieldOff'});
+  /* submitting 期间确认与取消都锁定，但必须留一个**不声称结果**的安全出口，
+     否则弹层背景被置为 inert 之后这一屏就没有任何可点的落点了。 */
+  var escape = busy
+    ? '<a class="btn press" href="'+href('history-ready')+'" data-route="/me/privacy-requests" data-testid="'+SCREEN+'-leave" '
+      + 'aria-label="关闭这个演示版式并返回请求记录（本页没有发出请求，也没有待返回的结果）">关闭演示，返回请求记录</a>'
+    : '';
+  return '<div class="overlay" data-overlay="true" data-testid="'+SCREEN+'-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-t">'
+    + '<h2 id="dlg-t">'+(busy?'提交中（演示版式）':'确认撤回岗位 AI 授权')+'</h2>'
+    /* 提交中这一屏普通点击就能进，而且背景已被置为 inert，
+       所以披露只能放在弹层里最显眼的位置，不能留在页面别处。 */
+    + (busy?'<div class="toast" role="status" data-tone="demo" data-demo-state="true" data-testid="'+SCREEN+'-dialog-demo">'+svg('info')
+        + '<span>演示态：这里只展示等待服务端返回时的版式。本页<u>没有发出任何请求</u>，岗位 AI 授权没有被改动。</span></div>':'')
+    + '<p>'+TYPE_HINT.revoke_consent+'</p>'
+    + '<p>撤回不会删除简历、文档、打印订单或收藏；也不等于账号注销。</p>'
+    + (busy
+        ? '<p>对接口径：正式前端点「确认撤回」后只等这一次提交返回——<b>成功即完成撤回</b>（服务端在同一个事务里改授权并写入一条「已完成」记录），失败提示稍后重试。<b>没有排队等待的中间状态</b>，也没有「已提交、稍后另行出结果」的异步请求。</p>'
+        : '<p>点「确认撤回」后会提交一次请求并等待返回：<b>成功即完成撤回</b>，失败会提示稍后重试；本页不会提前显示成功。</p>')
+    + '<div class="dialog-cta">'+cancel+confirm+'</div>'
+    + (escape?'<div class="dialog-cta" style="margin-top:14px">'+escape+'</div>':'')
+    + '</div></div>';
+}
+
+function renderBody(state){
+  if(state==='login'){
+    return {layout:'state', html:
+      banner('lock','lock','登录后查看与提交隐私请求','公共一体机不会在未登录时展示任何授权状态或请求记录。<b>下面是这一页的真实能力范围。</b>',['记录 —','登录后回填'])
+      + previewList(capStructList('lock'),
+          '登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>；服务端的订单、文件与记录按各自留存期限管理，不会因此删除。',
+          '登录后可用的隐私请求能力')
+      + guide('login')
+      + ctaBar([link('返回账号设置', SETTINGS_HREF, '/me/settings', SCREEN+'-back-settings'),
+          '<a class="btn primary press" href="'+esc(keep('03-login-gate.html?from='+encodeURIComponent('/me/privacy-requests')))+'" data-route="/login" data-login-from="/me/privacy-requests" data-testid="'+SCREEN+'-primary">手机号登录</a>'])};
+  }
+  if(state==='loading'){
+    return {layout:'state', html:
+      banner('calm','clock','正在加载请求记录','正在读取当前账号的隐私请求记录。<b>返回前一律显示「—」</b>，不会闪回上一位用户的记录。',['记录 —','正在安全读取'])
+      /* 骨架条数对齐这一页真实的四条能力行，读完之后不会出现「行数突然变多」的跳动。 */
+      + previewList([0,1,2,3].map(skelRow).join(''),'这次读取失败不会撤回或恢复任何授权，也不会改动已提交的请求。','正在加载的请求记录占位')
+      + guide('loading')
+      + ctaBar([link('返回账号设置', SETTINGS_HREF, '/me/settings', SCREEN+'-back-settings'),
+          deadBtn('记录还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary', true)])};
+  }
+  if(state==='error'){
+    return {layout:'state', html:
+      banner('warn','warn','请求记录这次没有加载出来','当前记录没有更新。<b>本次加载失败不会撤回或恢复任何授权</b>；字段一律显示「—」，不拿上一次的内容冒充当前账号。',['记录 —','本次未取到'])
+      + previewList(capStructList('error'),
+          '重试不会重复提交请求。多次重试仍失败时，可以让现场工作人员协助处理。','本次未取到的请求记录结构')
+      + guide('error')
+      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help'),
+          link('重新加载', href('loading'), '/me/privacy-requests', SCREEN+'-primary', {primary:true})])};
+  }
+  var dialogOpen = state==='revoke-confirm' || state==='submitting';
+  if(state==='success'){
+    /* 新完成的这条排在最上面；列表长度保持和其它状态一致，不因为成功态就多撑出一行。 */
+    var completedItems = [{id:'h0', type:'revoke_consent', status:'completed'}].concat(HISTORY.slice(0, HISTORY.length-1));
+    /* 结果态同样要回答「现在授权是什么状态」，所以保留能力卡（撤回项回显为已撤回）。
+       少了这张卡时，结果态比 history-ready 少一屏内容，记录卡被拉长后中间空出 400px。 */
+    return {layout:'privacySuccess', html: successCard() + capabilityCard('revoked') + historyCard(completedItems) + guide('history')
+      + ctaBar([link('返回账号设置', SETTINGS_HREF, '/me/settings', SCREEN+'-back-settings'),
+          link('查看请求记录', href('history-ready'), '/me/privacy-requests', SCREEN+'-primary', {primary:true, icon:'list'})])};
+  }
+  var empty = state==='empty';
+  var cta = ctaBar([
+    link('返回账号设置', SETTINGS_HREF, '/me/settings', SCREEN+'-back-settings'),
+    dialogOpen
+      ? deadBtn('撤回岗位 AI 授权','确认弹层已打开，请先在弹层内选择',SCREEN+'-revoke-cta', true)
+      : link('撤回岗位 AI 授权', href('revoke-confirm'), '/me/privacy-requests', SCREEN+'-primary', {primary:true, icon:'shieldOff'})
+  ]);
+  return {layout:'privacy', dialog: dialogOpen ? dialog(state==='submitting') : '',
+    html: capabilityCard(dialogOpen ? 'dialog' : 'open') + (empty ? emptyHistoryList() : historyCard(HISTORY)) + guide('history') + cta};
+}
+
+var LAYOUT = {state:'state-layout', privacy:'privacy-layout', privacySuccess:'privacy-layout success-layout'};
+var BG_IDS = ['topbar-root','xq-root','body-root','truth-root','navbar-root'];
+function setBackgroundInert(on){
+  for(var i=0;i<BG_IDS.length;i++){
+    var el = document.getElementById(BG_IDS[i]);
+    if(!el) continue;
+    if(on){ el.setAttribute('inert',''); el.setAttribute('aria-hidden','true'); }
+    else { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); }
+    /* inert 之后背景控件已经按不动了，按压反馈也要一起收掉：
+       否则幕布后面仍然是一排「看着能按、其实点不动」的按钮，弹层期间唯一有反馈的
+       只应该是弹层自己的按钮。恢复时原样加回 .press。 */
+    var nodes = el.querySelectorAll(on ? '.press' : '.press-inert');
+    for(var j=0;j<nodes.length;j++){
+      nodes[j].classList.toggle('press', !on);
+      nodes[j].classList.toggle('press-inert', on);
+    }
+  }
+}
+function render(state){
+  var out = renderBody(state);
+  var root = document.getElementById('body-root');
+  root.className = 'body ' + (LAYOUT[out.layout] || 'state-layout');
+  root.dataset.state = state;
+  root.dataset.testid = SCREEN + '-state-' + state;
+  /* 结果态只作为**版式演示**保留：静态原型没有发过请求，不能声称授权真的被撤回。 */
+  var toast = '', tone = '';
+  if(state==='success'){ toast = '演示态：这是「撤回成功」后的版式；本页没有发出任何请求，授权状态没有被改动。'; tone = 'demo'; }
+  if(state==='failure'){ toast = '演示态：这是「提交失败」的版式（正式前端会提示稍后重试）；本页没有发出任何请求，授权状态没有被改动。'; tone = 'demo'; }
+  if(toast) root.className += ' has-toast';
+  root.innerHTML = (toast
+      ? '<div class="toast" role="status" data-tone="'+tone+'" data-demo-state="true" data-testid="'+SCREEN+'-toast">'+svg('info')+'<span>'+toast+'</span></div>'
+      : '') + out.html;
+  /* 弹层挂到 stage 层，盖住顶栏与底栏；同时把背景内容置为 inert，焦点不会掉到幕布后面 */
+  document.getElementById('overlay-root').innerHTML = out.dialog || '';
+  setBackgroundInert(Boolean(out.dialog));
+  document.getElementById('pill-dot').className = 'dot' + (state==='loading' || state==='submitting' ? ' breathe' : '');
+  document.getElementById('doing').innerHTML =
+      (state==='success'||state==='failure'||state==='submitting')
+        ? '这一屏是<b>版式演示</b>：静态原型不会真的撤回授权，也不会写入任何请求记录。'
+        : '一体机本页只开放<b>撤回岗位 AI 授权</b>；撤回不会删除简历、文档、打印订单或收藏。';
+}
+
+if(q.get('flat')==='1') document.documentElement.classList.add('flat');
+if(DEBUG) document.documentElement.classList.add('debug');
+var state = q.get('state'); if(STATES.indexOf(state)<0) state = 'login';
+render(state);
+
+function fit(){ var k=Math.min(innerWidth/1080, innerHeight/1920); var s=document.getElementById('stage'); if('zoom' in s.style) s.style.zoom=k; else s.style.transform='scale('+k+')'; }
+addEventListener('resize', fit); fit();
+function tick(){ var d=new Date(); document.getElementById('clock').textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick, 10000);
+/* 演示面板只在 ?debug=1 时填充并解除 hidden；普通 URL 下既不可见也不可聚焦。 */
+if(DEBUG){
+  var demoTab = document.getElementById('demo-tab'), panel = document.getElementById('demo-panel');
+  panel.innerHTML = '<div class="dp-t">原型演示控制</div>' + STATES.map(function(x){ return '<a href="?debug=1&state='+x+'">'+x+'</a>'; }).join('');
+  demoTab.hidden = false; panel.hidden = false;
+  demoTab.onclick = function(){ panel.classList.toggle('show'); };
+}
+</script>
+</body></html>

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>权益与活动 · 职易达</title>
+<!--
+  宿主：权益与活动共享工作台（024 / 032 / 033 共用一个青序流光宿主）
+  route: /me/benefits     —— screen=benefits    （会员台账）
+         /activities      —— screen=activities  （可匿名浏览）
+         /activities/:id  —— screen=activity    （可匿名浏览，领取需登录）
+  state: benefits:   list | signed-out | loading | empty | error
+         activities: list | loading | empty | error
+         activity:   detail | signed-out | claim-pending | claim-success | claim-error | ended | sold-out
+  api:  GET  /api/v1/me/benefits              —— 本人权益台账（名称/来源活动/有效期/状态）
+        GET  /api/v1/activities?page          —— 活动列表；结束与领完由服务端标注
+        GET  /api/v1/activities/:id           —— 活动详情 + eligibility（确定性判定，零 LLM）
+        POST /api/v1/activities/:id/claim     —— 领取；成功、失败、重复领取均以服务端返回为准，幂等
+        对齐 apps/kiosk/src/pages/benefits/* 与 compliance-boundary §八
+  fallback: 领取失败 / 结束 / 领完 → 明确原因 + 返回台账或活动列表，不重试成假成功
+  真话边界：
+    ① benefits:list 展示完整的 MemberBenefitItem 结构位，不预置真实优惠券名称、次数、金额或有效期；
+       类型、状态、来源、额度与有效期字段全部由服务端回填，结构示例只在 debug 模式开放。
+    ② 不承诺「免费打印 / 免费扫描 / 免费优化 / 免费生成」；只有服务端实际返回额度时才显示总量与剩余量。
+       是否收费、收多少，以活动说明与现场公示价、服务端报价为准。
+    ③ 资格由确定性接口与官方规则判定；AI 只解释已经返回的规则，不判定你是否符合条件。
+    ④ 补贴类只做说明、清单与官方入口，不承诺补贴到账，不代办申请（compliance §8.2）。
+    ⑤ 权益不换取简历、不回流候选人数据；企业赞助只体现为品牌露出（compliance §8.3）。
+  ai-mode: AI-EXPLAIN（覆盖矩阵 024 / 032 / 033）
+  ai-input: 仅本页已返回的活动规则、权益状态与失败原因
+  ai-consent: 页内不放 AI 生成控件；用户主动去底栏「AI 顾问」才进入 AI
+  ai-output: 只把规则和状态解释成人话，并给出人工处理建议；不改变资格、领取与核销结果
+  ai-failure: 不适用（本页不发起 AI 调用）
+  ai-fallback: 规则原文常驻可读，看不懂可找现场工作人员
+  ai-persistence: 本页不生成 AI 记录
+  原型演示控制：状态只通过 ?screen= 与 ?state= 切换（?debug=1 显示演示面板）
+  验收范围：静态原型表现；不证明 React 接线、API 可用、真实活动数据、领取或核销
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#6b857c;
+  --deep:#0b241e;--deep-2:#123a30;--emerald:#2ee6a8;
+  --teal:#1f9e86;--teal-d:#157a67;--teal-soft:#e0f2ec;
+  --slate:#3f68b0;--slate-d:#35608f;--slate-soft:#e6ecf7;
+  --wheat:#a9781f;--wheat-d:#8a6219;--wheat-soft:#f3ecda;
+  --plum:#7a5a86;--plum-d:#6b4a77;--plum-soft:#efe8f2;
+  --cinnabar:#b23a2e;--cinnabar-d:#963227;--cinnabar-soft:#f6e4e1;
+  --line:#e3ddcb;--line-2:#d4cdb6;--r:8px;--r-s:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif}
+a{color:inherit;text-decoration:none}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer;text-align:left}
+ul{list-style:none}
+.press{transition:transform 140ms cubic-bezier(.2,.8,.2,1),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+
+.topbar{flex:none;height:100px;display:flex;align-items:center;gap:16px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--paper);display:flex;align-items:center;justify-content:center}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:46px;height:46px;border-radius:var(--r);background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:700}
+.logo-name{font-size:25px;font-weight:700;letter-spacing:2px}
+.sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:52px;padding:0 18px;border-radius:var(--r);background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:18px;font-weight:600;max-width:600px;white-space:nowrap;overflow:hidden}
+.pill .dot{width:11px;height:11px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:23px;font-weight:600;font-variant-numeric:tabular-nums}
+
+.taskhead{flex:none;margin:18px 40px 0;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+.th-t{font-size:38px;font-weight:700;letter-spacing:1px;display:flex;align-items:center;gap:14px}
+.th-t::before{content:"";flex:none;width:8px;height:34px;border-radius:2px;background:linear-gradient(180deg,var(--emerald),var(--teal))}
+.th-s{flex:1;min-width:260px;font-size:20px;line-height:1.4;color:var(--ink-2)}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 40px}
+.scroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-top:16px;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.center{justify-content:center}
+.sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:2px}
+.sec-h .t{font-size:25px;font-weight:700}
+.sec-h .hint{margin-left:auto;font-size:18px;color:var(--ink-3);font-weight:600}
+
+.tabs{flex:none;display:flex;gap:10px;margin-top:16px}
+.tab{flex:1;min-height:66px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--surface);display:flex;align-items:center;justify-content:center;gap:10px;font-size:21px;font-weight:700;color:var(--ink-2)}
+.tab[aria-current=page]{background:var(--deep);border-color:transparent;color:var(--emerald)}
+
+.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.list::-webkit-scrollbar{display:none}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.item-link{display:flex;align-items:center;gap:18px;padding:20px 22px;min-height:186px}
+.item-ic{flex:none;width:60px;height:60px;border-radius:var(--r);background:var(--plum-soft);color:var(--plum-d);display:flex;align-items:center;justify-content:center}
+.item-ic[data-tone=teal]{background:var(--teal-soft);color:var(--teal-d)}
+.item-ic[data-tone=wheat]{background:var(--wheat-soft);color:var(--wheat-d)}
+.item-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+.item-t{font-size:25px;font-weight:700;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.item-sub{display:flex;gap:8px 22px;flex-wrap:wrap;font-size:19px;color:var(--ink-2)}
+.item-sub span{display:inline-flex;align-items:center;gap:7px}
+.item-note{font-size:17px;color:var(--slate-d);background:var(--slate-soft);border-radius:var(--r-s);padding:8px 12px;align-self:flex-start}
+.item-go{flex:none;min-height:64px;padding:0 22px;border-radius:var(--r);background:var(--deep);color:var(--emerald);font-size:21px;font-weight:700;display:inline-flex;align-items:center;gap:9px}
+.item.off .item-go{background:var(--paper);border:1px solid var(--line-2);color:var(--ink-3)}
+.tag{min-height:40px;padding:0 12px;border-radius:var(--r-s);font-size:17px;font-weight:600;display:inline-flex;align-items:center;background:var(--slate-soft);color:var(--slate-d)}
+.tag.teal{background:var(--teal-soft);color:var(--teal-d)}
+.tag.warn{background:var(--wheat-soft);color:var(--wheat-d)}
+.tag.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.tag.plum{background:var(--plum-soft);color:var(--plum-d)}
+.slot{display:inline-block;min-width:92px;border-bottom:2px dotted var(--line-2);color:var(--ink-3);font-weight:400}
+.slot.big{min-width:300px;font-weight:700;color:var(--ink-3)}
+.slot.wide{min-width:360px}
+.item-note .slot{border-bottom-color:#b9c9e0;color:var(--slate-d)}
+
+.card{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px 24px}
+.blk-h{display:flex;align-items:center;gap:12px;font-size:24px;font-weight:700;margin-bottom:14px}
+.blk-h .hint{margin-left:auto;font-size:18px;font-weight:600;color:var(--ink-3)}
+.kv{display:flex;flex-direction:column;gap:12px}
+.kv-row{display:flex;gap:16px;align-items:flex-start;font-size:20px;line-height:1.5}
+.kv-k{flex:none;width:140px;color:var(--ink-3);font-weight:600}
+.kv-v{flex:1;min-width:0;color:var(--ink-2)}
+.rules{display:flex;flex-direction:column;gap:9px}
+.rule{display:flex;gap:10px;font-size:19px;line-height:1.5;color:var(--ink-2)}
+.rule i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--teal);margin-top:9px}
+.rule.no i{background:var(--wheat)}
+.explain{border-left:4px solid var(--plum)}
+.explain .blk-h{color:var(--plum-d)}
+
+.state{flex:none;display:flex;flex-direction:column;gap:16px;padding:42px 34px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state[data-kind=lock]{background:var(--plum-soft);border-color:#ddd0e3}
+.state-h{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700}
+.state-p{font-size:21px;line-height:1.6;color:var(--ink-2);max-width:880px}
+.state-p b{color:var(--ink)}
+.state-acts{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+.skel-row{min-height:172px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:22px}
+.skel-line{height:20px;border-radius:var(--r-s);background:#eee9db}
+
+.state.tight{padding:32px 32px;gap:12px}
+.alt{flex:none;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.alt.fill{flex:1;min-height:0;display:flex;flex-direction:column}
+.alt.fill .alt-row{flex:1;min-height:0}
+.alt-h{padding:14px 20px;font-size:20px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line);background:var(--paper)}
+.alt-row{display:flex;align-items:center;gap:16px;padding:16px 20px;min-height:148px;border-bottom:1px solid var(--line)}
+.alt-row:last-child{border-bottom:0}
+.alt.compact .alt-row{min-height:116px}
+.alt-ic{flex:none;width:56px;height:56px;border-radius:var(--r);background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.alt-tx{flex:1;min-width:0}
+.alt-t{display:block;font-size:23px;font-weight:700}
+.alt-d{display:block;margin-top:5px;font-size:18px;line-height:1.4;color:var(--ink-2)}
+.alt-go{flex:none;color:var(--teal-d);display:flex;align-items:center}
+
+.ctabar{flex:none;margin-top:14px;display:flex;gap:14px;align-items:center}
+.btn{min-height:76px;padding:0 26px;border-radius:var(--r);display:inline-flex;align-items:center;justify-content:center;gap:11px;font-size:24px;font-weight:700;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{opacity:.55}
+.ctabar .btn{flex:1}
+.ctabar .btn.narrow{flex:none;min-width:210px}
+.ctabar .why{flex:1.15;font-size:17px;line-height:1.4;color:var(--wheat-d);font-weight:600}
+
+.truth{flex:none;min-height:58px;padding:11px 40px;border-top:1px solid var(--line);display:flex;align-items:center;gap:16px;margin-top:14px}
+.truth p{flex:1;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.truth a{flex:none;min-height:48px;padding:0 14px;border-radius:var(--r-s);display:inline-flex;align-items:center;font-size:17px;font-weight:600;color:var(--teal-d)}
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+
+.demo-tab,.demo-panel{display:none}
+.demo-tab.on{display:inline-flex;position:absolute;left:0;top:300px;min-height:56px;padding:0 16px;align-items:center;background:var(--deep);color:var(--emerald);font-size:18px;border-radius:0 var(--r) var(--r) 0}
+.demo-panel.on{display:block;position:absolute;left:0;top:0;width:300px;height:100%;background:rgba(11,36,30,.96);color:#e7efe9;padding:16px;overflow-y:auto;z-index:9}
+.demo-panel a{min-height:48px;padding:8px 10px;font-size:17px;border-bottom:1px solid rgba(231,239,233,.14);display:flex;align-items:center}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="backlink" href="30-my-profile.html" data-route="/profile" aria-label="返回我的"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <span class="logo"><span class="logo-mark serif">职</span><span class="logo-name">职易达</span></span>
+    <span class="sp"></span>
+    <span class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">权益与资格均由服务端判定</span></span>
+    <span class="clock" id="clock">--:--</span>
+  </header>
+
+  <section class="taskhead">
+    <h1 class="th-t" id="task-title">我的权益</h1>
+    <p class="th-s" id="task-sub">名称、有效期与可用状态都由服务端返回；是否收费以活动说明与现场核价为准。</p>
+  </section>
+
+  <main class="body" id="body-root" data-screen="benefits" data-state="list" data-testid="benefits-state-list"></main>
+
+  <div class="truth">
+    <p><b>权益只对应本机服务与打印，不等于政府补贴到账。</b>补贴类只提供说明、材料清单与官方申请入口；本机不代办、不收取额外费用。</p>
+    <a href="06-help.html" data-route="/help">遇到问题</a>
+  </div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制"></div>
+</div>
+<script>
+(function(){
+'use strict';
+var ICON={
+  gift:'<rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5v8h14v-8M12 8.5V21"/><path d="M12 8.5S10.5 4 8 4a2.2 2.2 0 0 0 0 4.5zM12 8.5S13.5 4 16 4a2.2 2.2 0 0 1 0 4.5z"/>',
+  flag:'<path d="M6 21V3.6"/><path d="M6 4.6h12.4l-2.6 4.2 2.6 4.2H6"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.4l3.4 2"/>',
+  build:'<rect x="4" y="3.5" width="12" height="17" rx="1.6"/><path d="M16 9h4v11.5M7.5 7.5h5M7.5 11.5h5M7.5 15.5h5"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  right:'<path d="M9 5l7 7-7 7"/>',
+  lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+  alert:'<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.6M12 17.4h.01"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/>',
+  empty:'<rect x="3.5" y="6" width="17" height="13" rx="2"/><path d="M3.5 11h17M9 15h6"/>',
+  ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  print:'<path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="7.5" rx="1.8"/><path d="M7 14.5h10V21H7z"/>',
+  spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  policy:'<path d="M5 3h14v18H5z"/><path d="M8 7.5h8M8 12h8M8 16.5h5"/>',
+  book:'<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M17 7.5h2V20"/>'
+};
+function svg(n,s,w){return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[n]+'</svg>';}
+function slot(t,cls){return '<span class="slot'+(cls?' '+cls:'')+'">'+t+'</span>';}
+function kvRow(k,v){return '<div class="kv-row"><span class="kv-k">'+k+'</span><span class="kv-v">'+v+'</span></div>';}
+var BENEFIT_TYPES={coupon:'优惠券',free_quota:'免费次数',package_entitlement:'套餐额度',subsidy_eligibility_hint:'政策资格提示'};
+var BENEFIT_STATUS={active:'可用',used_up:'已用完',expired:'已过期',revoked:'已撤销'};
+var BENEFIT_SOURCE={platform:'平台',campus:'校园',gov:'政府',fair:'招聘会',partner:'合作机构'};
+function benefitContractRow(type,status,tone){
+  var quota=type==='subsidy_eligibility_hint'
+    ? '不适用 · 仅提供政策说明、材料清单与官方入口'
+    : '总量 '+slot('接口回填')+' · 剩余 '+slot('接口回填');
+  return '<li class="item" data-benefit-type="'+type+'" data-benefit-status="'+status+'">'
+    +'<div class="item-link"><span class="item-ic" data-tone="'+tone+'">'+svg(type==='subsidy_eligibility_hint'?'policy':'gift',28)+'</span>'
+    +'<span class="item-tx"><span class="item-t">'+BENEFIT_TYPES[type]+' · '+slot('权益名称','big')
+    +'<span class="tag '+(status==='active'?'teal':status==='revoked'?'bad':'warn')+'">'+BENEFIT_STATUS[status]+'</span></span>'
+    +'<span class="item-sub"><span>来源 '+slot(BENEFIT_SOURCE[type==='coupon'?'platform':type==='free_quota'?'campus':type==='package_entitlement'?'partner':'gov'])+'</span>'
+    +'<span>有效期 '+slot('接口回填')+'</span></span><span class="item-note">'+quota+'；说明与状态都以服务端返回为准</span></span>'
+    +'<span class="item-go" style="background:var(--paper);border:1px solid var(--line-2);color:var(--ink-3)">只读</span></div></li>';
+}
+
+function tabs(cur){
+  return '<div class="tabs">'
+    +'<a class="tab press" href="31-benefits.html" data-route="/me/benefits"'+(cur==='benefits'?' aria-current="page"':'')+' data-testid="tab-benefits">'+svg('gift',24)+'我的权益</a>'
+    +'<a class="tab press" href="31-benefits.html?screen=activities" data-route="/activities"'+(cur==='activities'?' aria-current="page"':'')+' data-testid="tab-activities">'+svg('flag',24)+'可参加的活动</a>'
+    +'</div>';
+}
+function ledgerRules(){
+  return '<section class="card"><div class="blk-h">'+svg('check',24)+'资格、核销与收费由谁说了算<span class="hint">与本机是否有权益无关</span></div>'
+    +'<div class="rules">'
+    +'<span class="rule"><i></i><span>是否符合条件：由服务端按主办方的官方规则逐条比对后返回，本机与小青都<b>不替你判定资格</b>。</span></span>'
+    +'<span class="rule"><i></i><span>能不能用、还能不能再用：以<b>核销时服务端返回的结果</b>为准，本页不预判、不写「剩余 N 次」。</span></span>'
+    +'<span class="rule no"><i></i><span>是否收费、收多少：以活动说明与现场公示价为准；补贴类只给说明与官方入口，<b>本机不代办</b>。</span></span>'
+    +'</div></section>';
+}
+function plainServiceAlts(){
+  return altList('没有权益也照常可用的服务',
+    altRow('print','10-print-hub.html','/print-scan','打印与扫描','A4 黑白或彩色，价格以现场公示与服务端报价为准。','print','benefits')
+    +altRow('spark','16-service-hubs.html?hub=resume','/resume-service','AI 简历服务','诊断、逐条优化、生成与材料工坊，都不需要权益。','resume','benefits')
+    +altRow('book','29-interview-training.html','/interview/setup','模拟面试与训练','练完看逐题反馈，是否保存由你决定。','interview','benefits')
+    +altRow('policy','48-policy-workspace.html','/renshi','就业政策与补贴指引','政策原文与官方申请入口，本机不代办、不收代办费。','policy','benefits'),
+    false,'fill');
+}
+function activityRow(i,tone,tag,cta,off){
+  return '<li class="item'+(off?' off':'')+'"><a class="item-link press" href="31-benefits.html?screen=activity'+(off?'&state='+off:'')+'" data-route="/activities/:id" data-testid="activities-row-'+i+'">'
+    +'<span class="item-ic" data-tone="'+tone+'">'+svg('flag',28)+'</span>'
+    +'<span class="item-tx"><span class="item-t">'+slot('活动名称','big')+(tag?'<span class="tag '+tone+'">'+tag+'</span>':'')+'</span>'
+    +'<span class="item-sub"><span>'+svg('build',20)+'主办方 '+slot('—')+'</span><span>'+svg('clock',20)+'活动时间 '+slot('—')+'</span></span>'
+    +'<span class="item-note">参与条件与是否收费，以活动说明与现场核价为准</span></span>'
+    +'<span class="item-go">'+cta+svg('right',20)+'</span></a></li>';
+}
+function stateBlock(kind,icon,title,desc,acts,tid,cls){
+  return '<div class="state'+(cls?' '+cls:'')+'" data-kind="'+kind+'" data-testid="'+(tid||'benefits')+'-fallback"><div class="state-h">'+svg(icon,32)+title+'</div>'
+    +'<p class="state-p">'+desc+'</p>'+(acts?'<div class="state-acts">'+acts+'</div>':'')+'</div>';
+}
+function altRow(ic,href,route,t,d,tid,sc){
+  return '<a class="alt-row press" href="'+href+'" data-route="'+route+'" data-testid="'+sc+'-alt-'+tid+'">'
+    +'<span class="alt-ic">'+svg(ic,26)+'</span><span class="alt-tx"><span class="alt-t">'+t+'</span><span class="alt-d">'+d+'</span></span>'
+    +'<span class="alt-go">'+svg('right',24)+'</span></a>';
+}
+function altList(head,rows,compact,cls){return '<div class="alt'+(compact?' compact':'')+(cls?' '+cls:'')+'"><div class="alt-h">'+head+'</div>'+rows+'</div>';}
+function serviceAlts(sc){
+  return altList('权益可以用在这些服务上',
+    altRow('print','10-print-hub.html','/print-scan','打印与扫描','实际价格以现场公示与服务端报价为准。','print',sc)
+    +altRow('spark','16-service-hubs.html?hub=resume','/resume-service','AI 简历服务','诊断、优化、生成与材料工坊。','resume',sc)
+    +altRow('policy','48-policy-workspace.html','/renshi','就业政策与补贴指引','政策原文与官方申请入口，本机不代办。','policy',sc),true);
+}
+function activityDetail(){
+  return '<section class="card"><h2 class="item-t" style="font-size:32px">'+slot('活动名称','big')+'</h2>'
+    +'<div class="kv" style="margin-top:16px">'
+    +kvRow('主办方',slot('—','wide'))
+    +kvRow('活动时间',slot('—','wide'))
+    +kvRow('参与方式',slot('—','wide'))
+    +kvRow('费用说明','是否收费、收多少，'+slot('以活动说明为准')+'；本机服务另按现场公示与服务端报价结算。')
+    +'</div></section>'
+    +'<section class="card"><div class="blk-h">'+svg('book',24)+'活动说明<span class="hint">原文由主办方提供</span></div><div class="kv">'
+    +kvRow('活动内容',slot('—','wide'))
+    +kvRow('权益内容',slot('—','wide'))
+    +kvRow('领取与使用',slot('—','wide'))
+    +'</div></section>'
+    +'<section class="card"><div class="blk-h">'+svg('check',24)+'参与条件<span class="hint">由接口与官方规则确定性判定</span></div>'
+    +'<div class="rules">'
+    +'<span class="rule"><i></i>条件一 '+slot('—','wide')+'</span>'
+    +'<span class="rule"><i></i>条件二 '+slot('—','wide')+'</span>'
+    +'<span class="rule no"><i></i>是否符合，由服务端逐条比对后返回；本机与小青都<b>不替你判定资格</b>。</span>'
+    +'</div></section>'
+    +'<section class="card explain"><div class="blk-h">'+svg('info',24)+'看不懂规则可以问 AI 顾问</div>'
+    +'<p class="state-p" style="font-size:20px">小青只把<b>上面这些已经返回的规则</b>讲成人话，并告诉你该找谁处理。它不会改变你的资格、不会替你领取，也不会承诺任何补贴到账。</p></section>';
+}
+
+var VIEWS={
+  'benefits:list':function(){
+    return tabs('benefits')
+      +'<div class="scroll" data-testid="benefits-ledger">'
+      +'<div class="sec-h"><span class="t">权益台账完整结构</span><span class="hint">四类权益 · 四种状态 · 五类来源均有合同</span></div>'
+      +'<div class="fixture" data-testid="benefits-fixture-note">'+svg('info',22)+'结构演示：名称、描述、额度、来源和有效期不使用任何真实账号数据，全部保留为接口回填位。</div>'
+      +'<ul class="list" data-testid="benefits-list">'
+      +benefitContractRow('coupon','active','teal')
+      +benefitContractRow('free_quota','used_up','wheat')
+      +benefitContractRow('package_entitlement','expired','plum')
+      +benefitContractRow('subsidy_eligibility_hint','revoked','')
+      +'</ul>'
+      +ledgerRules()
+      +'</div>'
+      +'<div class="ctabar"><p class="why">列表只读；能否使用以核销时服务端的最新状态为准。</p>'
+      +'<a class="btn primary press" href="31-benefits.html?screen=activities" data-route="/activities" data-testid="benefits-primary">'+svg('flag',22)+'看可参加的活动</a></div>';
+  },
+  'benefits:signed-out':function(){
+    return tabs('benefits')
+      +'<div class="scroll center">'+stateBlock('lock','lock','权益台账需要先登录',
+        '权益绑定在<b>你本人的账号</b>上。公共终端不会凭匿名会话显示任何人的权益，也不会替你领取。',
+        '<a class="btn ghost press" href="31-benefits.html?screen=activities" data-route="/activities">先看看有哪些活动</a>'
+        +'<a class="btn primary press" href="03-login-gate.html" data-route="/login" data-testid="benefits-primary">去登录</a>')
+      +serviceAlts('benefits')+'</div>';
+  },
+  'benefits:loading':function(){
+    var line=function(w,m){return '<div class="skel-line" style="width:'+w+'%'+(m?';margin-top:18px':'')+'"></div>';};
+    return tabs('benefits')
+      +'<div class="scroll"><div class="sec-h"><span class="t">正在取你的权益台账</span><span class="hint">未返回前不显示条数</span></div>'
+      +'<div class="list"><div class="skel-row">'+line(44)+line(64,1)+line(38,1)+'</div>'
+      +'<div class="skel-row">'+line(50)+line(58,1)+line(42,1)+'</div>'
+      +'<div class="skel-row">'+line(40)+line(66,1)+line(36,1)+'</div></div>'
+      +'<p style="font-size:19px;color:var(--ink-3);line-height:1.5">只显示整体等待，不画百分比，也不显示上一次的权益。</p></div>'
+      +'<div class="ctabar"><a class="btn ghost press" href="30-my-profile.html" data-route="/profile" data-testid="benefits-primary">返回我的</a></div>';
+  },
+  'benefits:empty':function(){
+    return tabs('benefits')
+      +'<div class="scroll center">'+stateBlock('info','empty','你现在没有可用的权益',
+        '没有就是没有。本机<b>不会造几张券让这一页看起来热闹</b>。可以去看看正在进行的活动，符合条件的可以领取。',
+        '<a class="btn ghost press" href="10-print-hub.html" data-route="/print-scan">直接去打印</a>'
+        +'<a class="btn primary press" href="31-benefits.html?screen=activities" data-route="/activities" data-testid="benefits-primary">看可参加的活动</a>')
+      +serviceAlts('benefits')+'</div>';
+  },
+  'benefits:error':function(){
+    return tabs('benefits')
+      +'<div class="scroll center">'+stateBlock('error','alert','权益台账这次没取到',
+        '请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或被核销，你会白跑一趟。',
+        '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员</a>'
+        +'<a class="btn primary press" href="31-benefits.html?state=loading" data-route="/me/benefits" data-testid="benefits-primary">重新加载</a>')
+      +serviceAlts('benefits')+'</div>';
+  },
+  'activities:list':function(){
+    return tabs('activities')
+      +'<div class="scroll"><div class="sec-h"><span class="t">正在进行与即将开始</span><span class="hint">共 '+slot('—')+' 条 · 每页 10 条</span></div>'
+      +'<ul class="list" data-testid="activities-list">'
+      +activityRow(1,'teal','','查看活动','')
+      +activityRow(2,'wheat','名额有限','查看活动','')
+      +activityRow(3,'teal','','查看活动','')
+      +activityRow(4,'teal','','查看活动','')
+      +activityRow(5,'wheat','名额有限','查看活动','')
+      +activityRow(6,'teal','','查看活动','')
+      +'</ul></div>'
+      +'<div class="ctabar"><p class="why">活动是否收费、名额是否还有，以主办方说明和服务端返回为准。</p>'
+      +'<a class="btn primary narrow press" href="31-benefits.html" data-route="/me/benefits" data-testid="activities-primary">回我的权益</a></div>';
+  },
+  'activities:loading':function(){
+    var line=function(w,m){return '<div class="skel-line" style="width:'+w+'%'+(m?';margin-top:18px':'')+'"></div>';};
+    return tabs('activities')
+      +'<div class="scroll"><div class="sec-h"><span class="t">正在取活动列表</span><span class="hint">未返回前不显示条数</span></div>'
+      +'<div class="list"><div class="skel-row">'+line(46)+line(62,1)+line(40,1)+'</div>'
+      +'<div class="skel-row">'+line(52)+line(56,1)+line(44,1)+'</div>'
+      +'<div class="skel-row">'+line(42)+line(64,1)+line(38,1)+'</div></div></div>'
+      +'<div class="ctabar"><a class="btn ghost press" href="31-benefits.html" data-route="/me/benefits" data-testid="activities-primary">回我的权益</a></div>';
+  },
+  'activities:empty':function(){
+    return tabs('activities')
+      +'<div class="scroll center">'+stateBlock('info','empty','现在没有正在进行的活动',
+        '活动由主办方发布，<b>没有就是没有</b>。有新的活动时，这一页会直接出现，不需要你反复刷新。',
+        '<a class="btn ghost press" href="28-jobfair-enhanced.html" data-route="/job-fairs">看看招聘会</a>'
+        +'<a class="btn primary press" href="31-benefits.html" data-route="/me/benefits" data-testid="activities-primary">回我的权益</a>',
+        'activities')
+      +serviceAlts('activities')+'</div>';
+  },
+  'activities:error':function(){
+    return tabs('activities')
+      +'<div class="scroll center">'+stateBlock('error','alert','活动列表这次没取到',
+        '请求失败。本机<b>不拿旧的活动顶替</b>，避免你按已经结束的规则白跑一趟。',
+        '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员</a>'
+        +'<a class="btn primary press" href="31-benefits.html?screen=activities&state=loading" data-route="/activities" data-testid="activities-primary">重新加载</a>',
+        'activities')
+      +serviceAlts('activities')+'</div>';
+  },
+  'activity:detail':function(){
+    return '<div class="scroll">'+activityDetail()+serviceAlts('activity')+'</div>'
+      +'<div class="ctabar"><a class="btn ghost narrow press" href="31-benefits.html?screen=activities" data-route="/activities">返回活动列表</a>'
+      +'<a class="btn primary press" href="31-benefits.html?screen=activity&state=claim-pending" data-route="/activities/:id" data-testid="activity-primary">领取这项权益</a></div>';
+  },
+  'activity:signed-out':function(){
+    return '<div class="scroll">'+activityDetail()+serviceAlts('activity')+'</div>'
+      +'<div class="ctabar"><p class="why">领取要确认是你本人，匿名会话没法验证身份；规则和条件不登录也能完整看。</p>'
+      +'<a class="btn primary narrow press" href="03-login-gate.html" data-route="/login" data-testid="activity-primary">登录后领取</a></div>';
+  },
+  'activity:claim-pending':function(){
+    return '<div class="scroll center">'+stateBlock('info','clock','正在提交领取请求',
+      '请求已经发出，<b>结果由服务端返回</b>。这中间不显示进度百分比，也不会先给你一张券再回头撤销。<br>如果长时间没有结果，可以返回台账查看，重复提交不会重复发放。',
+      '','activity')
+      +'</div><div class="ctabar"><a class="btn ghost press" href="31-benefits.html" data-route="/me/benefits" data-testid="activity-primary">返回我的权益</a></div>';
+  },
+  'activity:claim-success':function(){
+    return '<div class="scroll center">'+stateBlock('info','check','服务端确认领取成功',
+      '这条权益已经写进你的台账。<b>具体名称、适用服务和有效期以台账里的字段为准</b>；使用时还要经过一次核销，核销结果同样以服务端返回为准。',
+      '<a class="btn ghost press" href="31-benefits.html?screen=activities" data-route="/activities">继续看别的活动</a>'
+      +'<a class="btn primary press" href="31-benefits.html" data-route="/me/benefits" data-testid="activity-primary">去我的权益查看</a>','activity')
+      +serviceAlts('activity')+'</div>';
+  },
+  'activity:claim-error':function(){
+    return '<div class="scroll center">'+stateBlock('error','alert','这次没有领取成功',
+      '服务端返回了失败，可能是不符合条件、已经领过，或者活动状态刚刚变了。<b>失败就是失败</b>，本机不会先显示成功再默默回滚。',
+      '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员核对</a>'
+      +'<a class="btn primary press" href="31-benefits.html?screen=activity" data-route="/activities/:id" data-testid="activity-primary">看清条件再试一次</a>','activity')
+      +'</div>';
+  },
+  'activity:ended':function(){
+    return '<div class="scroll center">'+stateBlock('warn','clock','这个活动已经结束',
+      '主办方标注的活动时间已经过去，所以<b>不再提供领取入口</b>。已经领到的权益不受影响，仍按它自己的有效期使用。',
+      '<a class="btn ghost press" href="31-benefits.html" data-route="/me/benefits">看我已有的权益</a>'
+      +'<a class="btn primary press" href="31-benefits.html?screen=activities" data-route="/activities" data-testid="activity-primary">看还在进行的活动</a>','activity')
+      +serviceAlts('activity')+'</div>';
+  },
+  'activity:sold-out':function(){
+    return '<div class="scroll center">'+stateBlock('warn','ban','这个活动的名额已经领完',
+      '名额由主办方设定，服务端返回<b>已无可领名额</b>。本机不排队、不预约、不承诺补发；如果主办方后续追加，活动会重新开放。',
+      '<a class="btn ghost press" href="31-benefits.html" data-route="/me/benefits">看我已有的权益</a>'
+      +'<a class="btn primary press" href="31-benefits.html?screen=activities" data-route="/activities" data-testid="activity-primary">看别的活动</a>','activity')
+      +serviceAlts('activity')+'</div>';
+  }
+};
+
+var PILL={
+  'benefits:list':['ok','权益台账 · 完整字段结构'],
+  'benefits:signed-out':['warn','未登录，不显示任何人的权益'],
+  'benefits:loading':['','正在取本人权益台账'],
+  'benefits:empty':['','当前没有可用权益'],
+  'benefits:error':['bad','权益台账这次没取到'],
+  'activities:loading':['','正在取活动列表'],
+  'activities:empty':['','当前没有正在进行的活动'],
+  'activities:error':['bad','活动列表这次没取到'],
+  'activity:claim-pending':['','已提交，等服务端返回'],
+  'activity:claim-success':['ok','服务端已确认本次领取'],
+  'activity:claim-error':['bad','本次领取未成功'],
+  'activity:ended':['warn','活动已结束'],
+  'activity:sold-out':['warn','名额已领完'],
+  'activity:signed-out':['warn','领取需要先登录']
+};
+var HEAD={
+  'benefits:list':['我的权益','名称、有效期与可用状态都由服务端返回；是否收费以活动说明与现场核价为准。'],
+  'benefits:signed-out':['我的权益','公共终端不凭匿名会话显示任何人的权益。'],
+  'benefits:loading':['我的权益','未返回前不显示条数，也不显示上一次的权益。'],
+  'benefits:empty':['我的权益','没有可用权益时保持空态，不造券填页面。'],
+  'benefits:error':['我的权益','取不到就不显示，避免你按过期权益白跑。'],
+  'activities:list':['可参加的活动','活动由主办方发布；参与条件与费用以活动说明为准。'],
+  'activities:loading':['可参加的活动','未返回前不显示条数。'],
+  'activities:empty':['可参加的活动','没有正在进行的活动时保持空态。'],
+  'activities:error':['可参加的活动','取不到就不显示，不拿旧活动顶替。'],
+  'activity:detail':['活动详情','条件由服务端确定性判定，小青只解释规则。'],
+  'activity:signed-out':['活动详情','规则可以先看；领取要确认是你本人。'],
+  'activity:claim-pending':['领取中','结果由服务端返回，不先显示成功。'],
+  'activity:claim-success':['领取成功','以台账字段和核销结果为准。'],
+  'activity:claim-error':['领取失败','失败原因由服务端返回，不掩盖。'],
+  'activity:ended':['活动已结束','不再提供领取入口。'],
+  'activity:sold-out':['名额已领完','不排队、不预约、不承诺补发。']
+};
+
+var params=new URLSearchParams(location.search);
+var screen=params.get('screen')||'benefits';
+if(screen!=='benefits'&&screen!=='activities'&&screen!=='activity')screen='benefits';
+var state=params.get('state')||(screen==='activity'?'detail':'list');
+var key=screen+':'+state;
+if(!VIEWS[key]){state=screen==='activity'?'detail':'list';key=screen+':'+state;}
+var root=document.getElementById('body-root');
+root.setAttribute('data-screen',screen);
+root.setAttribute('data-state',state);
+root.setAttribute('data-testid',screen+'-state-'+state);
+root.innerHTML=VIEWS[key]();
+if(PILL[key]){
+  var p=document.getElementById('pill');
+  p.className='pill'+(PILL[key][0]?' '+PILL[key][0]:'');
+  document.getElementById('pill-txt').textContent=PILL[key][1];
+}
+if(HEAD[key]){
+  document.getElementById('task-title').textContent=HEAD[key][0];
+  document.getElementById('task-sub').textContent=HEAD[key][1];
+}
+var back=document.getElementById('backlink');
+if(screen==='activities'){back.setAttribute('href','31-benefits.html');back.setAttribute('data-route','/me/benefits');back.setAttribute('aria-label','返回我的权益');}
+if(screen==='activity'){back.setAttribute('href','31-benefits.html?screen=activities');back.setAttribute('data-route','/activities');back.setAttribute('aria-label','返回活动列表');}
+
+function tick(){var d=new Date();document.getElementById('clock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
+fit();addEventListener('resize',fit);
+
+if(params.get('debug')==='1'){
+  var tab=document.getElementById('demo-tab'),panel=document.getElementById('demo-panel'),html='';
+  for(var k in VIEWS){
+    var parts=k.split(':');
+    html+='<a href="31-benefits.html?debug=1&screen='+parts[0]+'&state='+parts[1]+'">'+k+'</a>';
+  }
+  panel.innerHTML=html;tab.classList.add('on');
+  tab.addEventListener('click',function(){panel.classList.toggle('on');});
+}
+})();
+</script>
+</body>
+</html>

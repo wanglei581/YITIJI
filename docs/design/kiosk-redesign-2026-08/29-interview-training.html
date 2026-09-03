@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>模拟面试 · 职易达</title>
+<!-- /interview/setup | /interview/session | /interview/report | /interview/tips | /interview/reports, static states via ?state= -->
+<!-- 唯一状态源：STATES 列表 + RENDER[state]，一个状态只有一个渲染函数；渲染完不再有第二段脚本改写已渲染的 DOM。
+     时长取值只有 3/5/8（与 shared 的 InterviewDuration 一致）。
+     简历来源三条通道（手机扫码冻结入口 / U 盘 / 本机文件桌面验证）作为 setup-resume-* 子状态，
+     面板内切换只重绘该面板并 replaceState，不刷新页面，因此已填的岗位 / 行业不会丢。
+     打印出口：report-print-ready（服务端已返回真实文件）→ report-print-handoff（摊开交接内容）
+     → 14-print-confirm.html?source=interview-report&fileId=&pages=&copies=&duplex=&color=。
+     交接内容对齐 InterviewReportPage.handlePrint：正式 React 用 navigate('/print/confirm',{state:{file,params}})
+     传真实 file 对象与 makePrintParams，printFileUrl 与 signedUrl 一律不进地址栏；
+     本页静态跳转只带非敏感的 fileId / 页数 / 打印参数 / 来源，用来说明交接内容，不是已接通的打印链路。
+     未拿到真实文件前不进入打印确认，也不显示取件码 / 出纸 / 支付结果。 -->
+<!-- 原型演示控制：默认完全不渲染；仅 ?debug=1 注入演示按钮与面板（data-proto-control="true"），面板链接保留 debug=1 及现有 flat/capture -->
+<link rel="stylesheet" href="kimi-full-coverage-v2/design-system/kiosk-motion.css"><style>
+:root{--paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;--deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;--teal:#1f9e86;--teal2:#157a67;--soft:#e0f2ec;--line:#e3ddcb;--line2:#d4cdb6;--red:#963227;--redsoft:#f6e4e1}*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}a{color:inherit;text-decoration:none}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}#stage{position:absolute;left:50%;top:50%;width:1080px;height:1920px;display:flex;flex-direction:column;overflow:hidden;transform-origin:center;background:var(--paper)}.top{height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}.back{display:grid;place-items:center;width:64px;height:64px;border:1px solid var(--line2);border-radius:20px;background:var(--paper);font-size:42px}.logo{display:flex;gap:12px;align-items:center}.mark{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--green);font-size:24px;font-weight:800}.brand{font-size:26px;font-weight:800;letter-spacing:2px}.space{flex:1}.pill{display:flex;align-items:center;gap:10px;height:52px;padding:0 22px;border-radius:26px;background:var(--soft);color:var(--teal2);font-size:19px;font-weight:800}.pill i{width:12px;height:12px;border-radius:50%;background:var(--teal)}.clock{font-size:24px;font-weight:800}.hero{position:relative;overflow:hidden;margin:24px 44px 0;padding:31px 40px;border-radius:36px;background:linear-gradient(158deg,var(--deep2),var(--deep) 68%);color:#f2efe4}.hero:after{content:"";position:absolute;right:-145px;top:-145px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}.hero-row{position:relative;z-index:1;display:flex;align-items:center;gap:25px}.face{display:grid;place-items:center;width:102px;height:102px;flex:none;border:1.5px solid rgba(46,230,168,.42);border-radius:50%;background:rgba(46,230,168,.1);color:var(--green);font-family:"Songti SC",serif;font-size:47px}.face.live{box-shadow:0 0 0 11px rgba(46,230,168,.11);animation:pulse 1.8s ease-in-out infinite}.eyebrow{margin-bottom:8px;color:rgba(242,239,228,.55);font-size:17px;font-weight:700;letter-spacing:5px}.ask{font-size:37px;line-height:1.3;font-weight:800}.ask em{font-style:normal;color:var(--green)}.doing{margin-top:10px;color:rgba(242,239,228,.76);font-size:20px;line-height:1.55}.doing b{color:#fff}.body{display:flex;flex:1;min-height:0;flex-direction:column;justify-content:space-between;gap:16px;padding:22px 44px 20px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}.body::-webkit-scrollbar{display:none}.card{padding:24px 29px;border:1px solid var(--line);border-radius:29px;background:var(--surface)}.head{display:flex;align-items:baseline;justify-content:space-between;gap:16px}.head b{font-size:26px}.head span{font-size:18px;color:var(--ink3)}.copy{margin-top:8px;color:var(--ink2);font-size:19px;line-height:1.56}.fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}.field{padding:17px 18px;border:1px solid var(--line);border-radius:20px;background:var(--paper)}.field small{display:block;margin-bottom:9px;color:var(--ink3);font-size:16px;font-weight:800;letter-spacing:1px}.field b{font-size:21px}.chips{display:flex;gap:11px;flex-wrap:wrap;margin-top:13px}.chip{display:flex;align-items:center;justify-content:center;min-height:57px;padding:0 18px;border:1.5px solid var(--line2);border-radius:18px;background:var(--paper);font-size:19px;font-weight:800}.chip.on{border-color:var(--teal);background:var(--soft);color:var(--teal2)}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.step{min-height:135px;padding:20px;border:1px solid var(--line);border-radius:21px;background:var(--paper)}.step small{color:var(--teal2);font-size:16px;font-weight:800}.step b{display:block;margin-top:10px;font-size:21px}.step p{margin-top:7px;color:var(--ink2);font-size:17px;line-height:1.45}.session-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.counter{display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--line);border-radius:18px;background:var(--paper);font-size:20px;font-weight:800}.counter i{width:11px;height:11px;border-radius:50%;background:var(--teal)}.question{margin-top:18px;padding:24px;border:1px solid var(--line);border-radius:23px;background:var(--paper)}.question small{display:block;color:var(--ink3);font-size:17px;font-weight:800;letter-spacing:2px}.question p{margin-top:12px;font-size:28px;line-height:1.45;font-weight:800}.answers{display:flex;flex-direction:column;gap:11px;margin-top:16px}.answer{display:flex;gap:14px;align-items:center;min-height:70px;padding:15px 18px;border:1px solid var(--line);border-radius:19px;background:var(--surface);font-size:20px;text-align:left}.answer i{width:27px;height:27px;flex:none;border:2px solid var(--line2);border-radius:50%}.voicebox{display:flex;align-items:center;justify-content:center;min-height:230px;padding:25px;text-align:center;border:1px solid var(--line);border-radius:24px;background:var(--paper)}.wave{display:flex;align-items:center;justify-content:center;gap:9px;height:86px}.wave i{width:13px;height:31px;border-radius:8px;background:var(--teal);animation:wave 1s ease-in-out infinite}.wave i:nth-child(2){height:59px;animation-delay:.12s}.wave i:nth-child(3){height:82px;animation-delay:.24s}.wave i:nth-child(4){height:54px;animation-delay:.36s}.wave i:nth-child(5){height:31px;animation-delay:.48s}.record{display:inline-flex;align-items:center;gap:10px;margin-top:13px;color:var(--red);font-size:21px;font-weight:800}.record.load{color:var(--teal2)}.record.load i{background:var(--teal)}.record i{width:13px;height:13px;border-radius:50%;background:var(--red);animation:pulse 1.3s ease-in-out infinite}.notice{display:flex;gap:14px;padding:18px 21px;border:1px solid var(--line);border-radius:20px;background:var(--paper);color:var(--ink2);font-size:18px;line-height:1.52}.notice i{display:grid;place-items:center;width:29px;height:29px;flex:none;border-radius:50%;background:var(--soft);color:var(--teal2);font-style:normal;font-weight:800}.notice.danger{border-color:#d9b4aa;background:var(--redsoft)}.notice.danger i{background:#fff;color:var(--red)}.report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.report{min-height:145px;padding:19px;border:1px solid var(--line);border-radius:21px;background:var(--paper)}.report i{display:grid;place-items:center;width:35px;height:35px;border-radius:11px;background:var(--soft);color:var(--teal2);font-style:normal;font-weight:800}.report b{display:block;margin-top:12px;font-size:20px}.report p{margin-top:7px;color:var(--ink2);font-size:17px;line-height:1.45}.empty{display:grid;place-items:center;min-height:330px;text-align:center}.empty .e{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 18px;border-radius:24px;background:var(--soft);color:var(--teal2);font-size:32px}.empty h2{font-size:29px}.empty p{max-width:540px;margin:12px auto 0;color:var(--ink2);font-size:19px;line-height:1.6}.rail{display:flex;justify-content:center;gap:24px;padding:15px 20px;border:1px dashed var(--line2);border-radius:18px;background:rgba(11,36,30,.035);color:var(--ink3);font-size:17px}.rail span:before{content:"·";margin-right:8px;color:var(--teal2);font-weight:800}.actions{display:flex;gap:16px;padding:20px 44px;background:var(--surface);border-top:1px solid var(--line)}.btn{display:flex;align-items:center;justify-content:center;min-height:72px;flex:1;padding:0 18px;border:1.5px solid var(--line2);border-radius:22px;background:var(--surface);font-size:21px;font-weight:800;text-align:center}.btn.primary{border-color:var(--deep);background:var(--deep);color:#fff}.btn.primary em{margin-left:9px;color:var(--green);font-style:normal}.nav{display:flex;height:112px;background:var(--surface);border-top:1px solid var(--line)}.nav a{display:flex;flex:1;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--ink3)}.nav a.on{color:var(--teal2);border-top:6px solid var(--teal)}.demo-tab,.demo-panel{display:none}html.debug .demo-tab{position:absolute;z-index:90;left:0;top:50%;transform:translateY(-50%);display:block;width:56px;min-height:170px;border-radius:0 16px 16px 0;background:rgba(11,36,30,.9);color:var(--green);font-size:16px;font-weight:800;letter-spacing:4px;writing-mode:vertical-lr}html.debug .demo-panel.show{position:absolute;z-index:91;left:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;width:262px;max-height:1780px;overflow:auto;padding:16px;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96)}.demo-panel .dp-t{color:var(--green);font-size:15px;font-weight:800;letter-spacing:2px}.demo-panel a{padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.08);color:#f2efe4;font-size:14px}.demo-panel a.on{background:rgba(46,230,168,.2);color:var(--green);font-weight:800}@keyframes pulse{50%{opacity:.45;transform:scale(.88)}}@keyframes wave{50%{transform:scaleY(.52);opacity:.5}}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}.flat *{box-shadow:none!important;filter:none!important}
+</style><style>.hero-row>div:last-child{flex:1;min-width:0}#body[data-state^="setup"]{justify-content:flex-start}.field input{display:block;width:100%;min-height:56px;padding:0;border:0;background:transparent;font:inherit;font-size:21px;color:var(--ink);outline:none}.field input::placeholder{color:var(--ink3);font-weight:400}.field input:focus{outline:3px solid rgba(31,158,134,.32);outline-offset:4px;border-radius:8px}#body[data-state="session-text"]{justify-content:space-between;gap:14px}.product-support{padding:22px 30px}.product-support .head{margin-bottom:16px}.product-support-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.product-support-item{min-height:124px;padding:17px 18px;border:1px solid var(--line);border-radius:20px;background:var(--paper)}.product-support-item small{display:block;color:var(--teal2);font-size:16px;font-weight:800}.product-support-item b{display:block;margin-top:8px;font-size:20px}.product-support-item p{margin-top:7px;color:var(--ink2);font-size:17px;line-height:1.45}.history-list{display:flex;flex-direction:column;margin-top:15px;border-top:1px solid var(--line)}.history-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0;border-bottom:1px solid var(--line)}.history-row small{display:block;color:var(--teal2);font-size:16px;font-weight:800}.history-row b{display:block;margin-top:7px;font-size:21px}.history-row p{margin-top:6px;color:var(--ink2);font-size:17px;line-height:1.45}.history-controls{display:flex;gap:10px;flex:none}.history-action{display:flex;align-items:center;justify-content:center;min-width:94px;min-height:54px;padding:0 14px;border:1.5px solid var(--line2);border-radius:17px;background:var(--paper);font-size:18px;font-weight:800}.history-action.remove{color:var(--red);border-color:#d9b4aa}.history-action.remove.confirm{background:var(--redsoft)}.faq-row{margin-top:12px;border-top:1px solid var(--line)}.faq-row button{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:58px;text-align:left;font-size:19px;font-weight:800}.faq-row p{padding:0 0 15px;color:var(--ink2);font-size:18px;line-height:1.52}.checklist{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:14px}.check{display:flex;align-items:flex-start;gap:11px;min-height:64px;padding:12px;border:1px solid var(--line);border-radius:17px;background:var(--paper);font-size:17px;font-weight:800;text-align:left}.check i{display:grid;place-items:center;width:24px;height:24px;flex:none;border:2px solid var(--line2);border-radius:8px;font-style:normal}.check.on{border-color:var(--teal);background:var(--soft);color:var(--teal2)}.check.on i{border-color:var(--teal);background:var(--teal);color:#fff}.mini-list{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}.mini-list div{padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--paper)}.mini-list small{display:block;color:var(--teal2);font-size:15px;font-weight:800}.mini-list p{margin-top:7px;color:var(--ink2);font-size:17px;line-height:1.43}.statusbar{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:18px 22px;border:1px solid var(--line);border-radius:24px;background:var(--surface)}.statusbar div{min-width:0}.statusbar small{display:block;color:var(--ink3);font-size:16px;font-weight:800;letter-spacing:1px}.statusbar b{display:block;margin-top:8px;font-size:22px;line-height:1.25}.statusbar b.ok{color:var(--teal2)}.statusbar b.off{color:var(--red)}.optlist{display:flex;flex-direction:column;gap:11px;margin-top:15px}.opt{display:flex;align-items:center;gap:16px;width:100%;min-height:92px;padding:15px 20px;border:1.5px solid var(--line2);border-radius:21px;background:var(--paper);text-align:left}.opt.go{border-color:var(--teal);background:var(--soft)}.opt>i{display:grid;place-items:center;width:46px;height:46px;flex:none;border-radius:15px;background:var(--surface);color:var(--teal2);font-style:normal;font-size:20px;font-weight:800}.opt .t{flex:1;min-width:0}.opt .t b{display:block;font-size:21px}.opt .t p{margin-top:5px;color:var(--ink2);font-size:17px;line-height:1.4}.opt>em{flex:none;color:var(--ink3);font-style:normal;font-size:26px;font-weight:800}.opt.go>em{color:var(--teal2)}.empty.tight{min-height:0;padding:22px 29px}.empty.tight h2{font-size:27px}.empty.tight .e{width:64px;height:64px;margin-bottom:14px;font-size:29px}.empty.tight p{max-width:660px}.empty.bad .e{background:var(--redsoft);color:var(--red)}.res-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}.res-tab{display:flex;flex-direction:column;justify-content:center;gap:6px;min-height:92px;padding:14px 17px;border:1.5px solid var(--line2);border-radius:19px;background:var(--paper);text-align:left}.res-tab b{font-size:20px}.res-tab small{color:var(--ink3);font-size:16px;line-height:1.35}.res-tab[aria-pressed="true"]{border-color:var(--teal);background:var(--soft);color:var(--teal2)}.res-tab[aria-pressed="true"] small{color:var(--teal2)}.res-panel{margin-top:14px;padding:19px 21px;border:1px solid var(--line);border-radius:20px;background:var(--paper)}.rp-h{display:flex;align-items:baseline;justify-content:space-between;gap:14px;font-size:21px;font-weight:800}.rp-h span{flex:none;color:var(--ink3);font-size:17px;font-weight:700}.res-p{margin-top:9px;color:var(--ink2);font-size:17px;line-height:1.5}.res-p b{color:var(--ink)}.res-acts{display:flex;flex-wrap:wrap;gap:11px;margin-top:14px}.res-btn{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:0 21px;border:1.5px solid var(--line2);border-radius:17px;background:var(--surface);font-size:18px;font-weight:800;text-align:center}.res-btn.go{border-color:var(--teal);background:var(--soft);color:var(--teal2)}.res-btn.warn{border-color:#d9b4aa;background:var(--redsoft);color:var(--red)}.qrbox{display:flex;gap:20px;align-items:flex-start;margin-top:13px}.qrfake{display:grid;place-items:center;width:182px;height:182px;flex:none;border:1.5px dashed var(--line2);border-radius:18px;background:repeating-linear-gradient(45deg,#efeadb,#efeadb 9px,#e5dfcb 9px,#e5dfcb 18px);color:var(--ink3);font-size:16px;font-weight:800;line-height:1.45;text-align:center}.qsteps{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}.qstep{display:flex;gap:11px;align-items:flex-start;color:var(--ink2);font-size:17px;line-height:1.45}.qstep b{color:var(--ink)}.qstep i{display:grid;place-items:center;width:27px;height:27px;flex:none;border-radius:50%;background:var(--soft);color:var(--teal2);font-style:normal;font-size:15px;font-weight:800}.bar{height:14px;margin-top:15px;border-radius:8px;background:#e6e0cd;overflow:hidden}.bar i{display:block;width:46%;height:100%;border-radius:8px;background:var(--teal)}.filerow{display:flex;align-items:center;gap:15px;margin-top:12px;padding:14px 17px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}.filerow>i{display:grid;place-items:center;width:54px;height:54px;flex:none;border-radius:16px;background:var(--soft);color:var(--teal2);font-style:normal;font-size:18px;font-weight:800}.filerow .fm{flex:1;min-width:0}.filerow .fm b{display:block;font-size:20px}.filerow .fm p{margin-top:5px;color:var(--ink3);font-size:16px;line-height:1.4}.pv{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:14px}.pvpage{position:relative;min-height:212px;padding:16px 16px 30px;border:1px solid var(--line2);border-radius:14px;background:#fff;overflow:hidden}.pvpage span{position:absolute;left:0;right:0;bottom:0;padding:6px;background:var(--paper);color:var(--ink3);font-size:14px;font-weight:800;text-align:center}.pvline{height:9px;margin-bottom:10px;border-radius:5px;background:#ece7d8}.answer-input,.tarea{display:block;width:100%;margin-top:13px;padding:17px 19px;border:1.5px solid var(--line2);border-radius:19px;background:var(--paper);font:inherit;line-height:1.5;color:var(--ink);resize:none}.answer-input{min-height:150px;font-size:20px}.tarea{min-height:200px;font-size:23px}.answer-input::placeholder{color:var(--ink3)}.answer-input:focus,.tarea:focus{outline:3px solid rgba(31,158,134,.32);outline-offset:2px}.tbar{display:flex;align-items:center;flex-wrap:wrap;gap:11px;margin-top:13px}.tbar .cnt{margin-left:auto;color:var(--ink3);font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}.msg{margin-top:13px;padding:13px 18px;border:1px solid #d9b4aa;border-radius:16px;background:var(--redsoft);color:var(--red);font-size:17px;font-weight:800;line-height:1.45}.msg[hidden]{display:none}.history-action[aria-live]{color:var(--ink3);border-style:dashed}.fields.kv{gap:12px}.fields.kv3{grid-template-columns:repeat(3,1fr)}.fields.kv .field:last-child:nth-child(odd){grid-column:1/-1}.fields.kv .field{padding:14px 16px}.fields.kv .field small{margin-bottom:6px;font-size:15px;letter-spacing:.5px}.fields.kv .field b{font-size:19px;line-height:1.4}.fields.kv .field b.mono{font-size:17px;line-height:1.45;word-break:break-all}</style></head><body><div id="stage"><header class="top"><a class="back" href="16-service-hubs.html?hub=interview" aria-label="返回面试服务">‹</a><div class="logo"><div class="mark">职</div><div class="brand">职易达</div></div><div class="space"></div><div class="pill"><i></i>模拟练习</div><time class="clock" id="clock">--:--</time></header><section class="hero"><div class="hero-row"><div class="face" id="face">青</div><div><div class="eyebrow">MOCK INTERVIEW</div><div class="ask" id="ask"></div><div class="doing" id="doing"></div></div></div></section><main class="body" id="body" data-screen="interview" data-state="setup" data-testid="interview-state-setup"></main><div class="actions" id="actions"></div><nav class="nav" aria-label="全局导航"><a href="01-home.html">首页</a><a href="05-ai-cockpit.html">AI 顾问</a><a href="30-my-profile.html">我的</a></nav></div><script>
+(function(){
+'use strict';
+var stage=document.getElementById('stage'),body=document.getElementById('body'),actions=document.getElementById('actions'),
+    face=document.getElementById('face'),ask=document.getElementById('ask'),doing=document.getElementById('doing'),clock=document.getElementById('clock');
+function fit(){stage.style.transform='translate(-50%,-50%) scale('+Math.min(innerWidth/1080,innerHeight/1920)+')'}
+fit();addEventListener('resize',fit);
+function tick(){var d=new Date;clock.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+tick();setInterval(tick,10000);
+
+var qs=new URLSearchParams(location.search);
+var DEBUG=qs.get('debug')==='1',FLAT=qs.get('flat')==='1',CAPTURE=qs.get('capture');
+if(FLAT)document.documentElement.classList.add('flat');
+if(DEBUG)document.documentElement.classList.add('debug');
+
+/* ── 唯一状态源 ───────────────────────────────────────────────────────────────
+   每个状态只有一个渲染函数；渲染完不再有第二段脚本改写已渲染的 DOM。
+   （旧版先画 5/10/15 分钟再由后置脚本覆写成 3/5/8，那是两个互相矛盾的来源，已删。
+     时长取值只有 3/5/8，与 shared 的 InterviewDuration 一致。） */
+var STATES=['setup','setup-resume-phone','setup-resume-usb','setup-resume-local','setup-resume-uploading',
+  'setup-resume-ready','setup-resume-failed','setup-resume-preview',
+  'session-text','session-voice','mic-denied',
+  'transcript-review','transcript-empty','transcript-failed',
+  'network-error','session-expired',
+  'report-pending','report-loading','report-ready','report-unavailable',
+  'report-print-pending','report-print-ready','report-print-handoff','report-print-failed',
+  'reports-guest','reports-loading','reports-empty-member','reports-ready',
+  'reports-deleting','reports-delete-done','reports-delete-failed','reports-error',
+  'tips','ai-down'];
+var ALIAS={report:'report-ready','reports-empty':'reports-guest'};
+var rawState=qs.get('state')||'setup';
+var state=Object.prototype.hasOwnProperty.call(ALIAS,rawState)?ALIAS[rawState]:rawState;
+
+function urlFor(s){var p=new URLSearchParams(location.search);p.set('state',s);return '?'+p.toString()}
+function go(s){location.search=urlFor(s)}
+function mark(s){body.dataset.state=s;body.dataset.testid='interview-state-'+s}
+function base(t,d){ask.innerHTML=t;doing.innerHTML=d;face.classList.remove('live')}
+/* p=true 走主按钮；同屏出现第二个次要按钮时传 tid，避免 interview-fallback 撞名。 */
+function btn(h,t,p,tid){return '<a class="btn '+(p?'primary':'')+'" href="'+urlFor(h)+'" data-testid="'+(p?'interview-primary':(tid||'interview-fallback'))+'">'+t+(p?'<em>→</em>':'')+'</a>'}
+function link(h,t,p){return '<a class="btn '+(p?'primary':'')+'" href="'+h+'" '+(p?'data-testid="interview-primary"':'data-testid="interview-fallback"')+'>'+t+(p?'<em>→</em>':'')+'</a>'}
+function act(id,t,p){return '<button type="button" class="btn '+(p?'primary':'')+'" id="'+id+'" '+(p?'data-testid="interview-primary"':'data-testid="interview-fallback"')+'>'+t+(p?'<em>→</em>':'')+'</button>'}
+function rail(){return '<div class="rail"><span>只供本人练习参考</span><span>不发送给任何企业</span><span>不预测录用结果</span></div>'}
+function statusbar(label,items){var h='<section class="statusbar" aria-label="'+label+'">';
+  for(var i=0;i<items.length;i++)h+='<div><small>'+items[i][0]+'</small><b'+(items[i][2]?' class="'+items[i][2]+'"':'')+'>'+items[i][1]+'</b></div>';
+  return h+'</section>'}
+function optlist(rows){var h='<div class="optlist">';
+  for(var i=0;i<rows.length;i++){var r=rows[i];
+    h+=(r.href?'<a class="opt'+(r.go?' go':'')+'" href="'+r.href+'">':'<button class="opt'+(r.go?' go':'')+'" type="button"'+(r.id?' id="'+r.id+'"':'')+'>')
+      +'<i>'+r.k+'</i><div class="t"><b>'+r.t+'</b><p>'+r.d+'</p></div><em>›</em>'+(r.href?'</a>':'</button>');}
+  return h+'</div>'}
+function steps(rows){var h='<div class="steps" style="margin-top:16px">';
+  for(var i=0;i<rows.length;i++)h+='<div class="step"><small>'+rows[i][0]+'</small><b>'+rows[i][1]+'</b><p>'+rows[i][2]+'</p></div>';
+  return h+'</div>'}
+function mini(rows){var h='<div class="mini-list">';
+  for(var i=0;i<rows.length;i++)h+='<div><small>'+rows[i][0]+'</small><p>'+rows[i][1]+'</p></div>';
+  return h+'</div>'}
+
+/* ── setup：本场练习设置 + 简历来源真实操作区 ─────────────────────────────────
+   简历来源是三条**已存在**的通道：手机扫码（冻结入口，不在本页新做手机端页面）、
+   U 盘导入、本机文件（桌面验证）。三条最终都落到同一次上传，拿到 fileId 之后
+   才作为 CreateInterviewInput.resumeFileId 带进这场练习。 */
+var RES='idle';
+var RES_STATE={idle:'setup',phone:'setup-resume-phone',usb:'setup-resume-usb',local:'setup-resume-local',
+  uploading:'setup-resume-uploading',ready:'setup-resume-ready',failed:'setup-resume-failed',preview:'setup-resume-preview'};
+var RES_FROM={};for(var rk in RES_STATE)RES_FROM[RES_STATE[rk]]=rk;
+var CHANNELS=[['phone','手机扫码上传','把简历传到这台机器'],['usb','U 盘导入','只读取你插入的这只盘'],['local','本机文件（桌面验证）','一体机默认不走这条']];
+
+function choiceGroup(label,values,selected){
+  var h='<div class="copy" style="margin-top:16px">'+label+'</div><div class="chips" data-choice="'+label+'">';
+  for(var i=0;i<values.length;i++)h+='<button type="button" class="chip'+(values[i]===selected?' on':'')+'" aria-pressed="'+(values[i]===selected)+'">'+values[i]+'</button>';
+  return h+'</div>'}
+function pvPages(n){var h='<div class="pv">';
+  for(var i=0;i<n;i++){h+='<div class="pvpage">';
+    for(var j=0;j<7;j++)h+='<div class="pvline" style="width:'+(96-((i*13+j*17)%42))+'%"></div>';
+    h+='<span>第 '+(i+1)+' 页 · 排版示意</span></div>'}
+  return h+'</div>'}
+
+/* 打印版文件夹具：字段与 InterviewPrintResponse（packages/shared/src/types/mockInterview.ts）逐个对应。
+   取值是本原型的合成夹具，不是任何一次真实生成的结果；filename 按服务端模板
+   `模拟面试练习报告_{position}.pdf` 写，expiresAt 是 signedUrl 的到期时间（uploaded.signedUrlExpiresAt），
+   不是文件留存期限。printFileUrl 是系统 HMAC content URL，只给 /print/jobs 用，页面上不展示完整串。 */
+var PFILE={
+  fileId:'iv_rep_5c1d8f2a',
+  filename:'模拟面试练习报告_前端开发工程师.pdf',
+  mimeType:'application/pdf',
+  sizeBytes:214016,
+  pageCount:3,
+  signedUrl:'一次性签名链接（预览 / 下载用，不展示完整串）',
+  expiresAt:'今天 10:24',
+  printFileUrl:'系统 HMAC content URL（仅 /print/jobs 可用，不进地址栏）'
+};
+function kb(n){return n<1048576?Math.max(1,Math.round(n/1024))+' KB':(n/1048576).toFixed(1)+' MB'}
+function fieldRows(rows,cols){var h='<div class="fields kv'+(cols===3?' kv3':'')+'">';
+  for(var i=0;i<rows.length;i++)h+='<div class="field"><small>'+rows[i][0]+'</small><b'+(rows[i][2]?' class="mono"':'')+'>'+rows[i][1]+'</b></div>';
+  return h+'</div>'}
+/* 静态跳转只带非敏感参数：fileId / 页数 / 打印参数 / 来源。签名链接与 printFileUrl 一律不进 URL。 */
+function printHandoffHref(){
+  return '14-print-confirm.html?source=interview-report&fileId='+encodeURIComponent(PFILE.fileId)
+    +'&pages='+PFILE.pageCount+'&copies=1&duplex=single&color=bw'}
+
+function resumePanel(){
+  var chan=(RES==='phone'||RES==='usb'||RES==='local')?RES:'';
+  var h='<div class="res-tabs" role="group" aria-label="简历来源">';
+  for(var i=0;i<CHANNELS.length;i++){var c=CHANNELS[i];
+    var on=(chan===c[0])||(RES==='uploading'&&false);
+    h+='<button type="button" class="res-tab" data-res="'+c[0]+'" aria-pressed="'+(on?'true':'false')+'"><b>'+c[1]+'</b><small>'+c[2]+'</small></button>'}
+  h+='</div>';
+
+  if(RES==='idle'){
+    h+='<div class="res-panel"><div class="rp-h">还没有选来源<span>不上传也能开始练习</span></div>'
+      +'<p class="res-p">选一条来源，本机才会真正去取文件。没有简历时按<b>通用问题</b>练习，不会因此少一道题。</p></div>';
+  }else if(RES==='phone'){
+    h+='<div class="res-panel"><div class="rp-h">手机扫码上传<span>沿用既有手机入口 · 本页不做第二套手机页</span></div>'
+      +'<div class="qrbox"><div class="qrfake">示意图形<br>扫不出结果</div><div class="qsteps">'
+      +'<div class="qstep"><i>1</i><span>手机打开相机或微信扫一扫，对准屏幕上的码。</span></div>'
+      +'<div class="qstep"><i>2</i><span>手机上会打开既有上传页 <b>/upload/phone</b>，在那里选好简历文件。</span></div>'
+      +'<div class="qstep"><i>3</i><span>传完后回到这台机器，<b>由你在这一页确认</b>，才带进本场练习。</span></div>'
+      +'</div></div>'
+      +'<p class="res-p">这台机器不显示「扫了没」——手机走到哪一步本机看不到，只有确认这一下是真的。</p>'
+      +'<div class="res-acts"><button type="button" class="res-btn go" data-res="upload">手机已传完，在本机确认</button>'
+      +'<button type="button" class="res-btn" data-res="idle">取消这张码</button></div></div>';
+  }else if(RES==='usb'){
+    h+='<div class="res-panel"><div class="rp-h">U 盘导入<span>只读取你插入的这只盘</span></div>'
+      +'<p class="res-p">插入 U 盘后由本机列出可导入文件。下面是<b>列表条目结构</b>，不是这台机器上真实存在的文件。</p>'
+      +'<div class="filerow"><i>PDF</i><div class="fm"><b>示例条目结构 · 文件名</b><p>大小、修改时间、页数由本机读盘后填入</p></div>'
+      +'<button type="button" class="res-btn go" data-res="upload">导入</button></div>'
+      +'<div class="filerow"><i>DOC</i><div class="fm"><b>示例条目结构 · 文件名</b><p>不支持的格式会在导入前被挡下并说明原因</p></div>'
+      +'<button type="button" class="res-btn" data-res="upload">导入</button></div>'
+      +'<div class="res-acts"><button type="button" class="res-btn" data-res="idle">换一种来源</button></div></div>';
+  }else if(RES==='local'){
+    h+='<div class="res-panel"><div class="rp-h">本机文件（桌面验证）<span>一体机默认不走这条</span></div>'
+      +'<p class="res-p">这条来源会打开系统文件选择框，<b>一体机全屏模式下不使用</b>；保留它是为了在桌面浏览器验证同一条上传链路。</p>'
+      +'<div class="res-acts"><button type="button" class="res-btn go" data-res="upload">选择文件（桌面）</button>'
+      +'<button type="button" class="res-btn" data-res="idle">换一种来源</button></div></div>';
+  }else if(RES==='uploading'){
+    h+='<div class="res-panel"><div class="rp-h">正在上传<span>进度由上传接口返回</span></div>'
+      +'<p class="res-p">上传完成前不显示文件名、页数和有效期，也不会把这份文件当成本场练习已选用的简历。</p>'
+      +'<div class="bar" role="progressbar" aria-label="简历上传进度" aria-valuetext="上传中"><i></i></div>'
+      +'<div class="res-acts"><button type="button" class="res-btn" data-res="idle">取消上传</button></div></div>';
+  }else if(RES==='ready'){
+    h+='<div class="res-panel"><div class="rp-h">已选用一份简历<span>字段全部来自上传接口</span></div>'
+      +'<div class="filerow"><i>PDF</i><div class="fm"><b>文件名由上传接口返回</b><p>大小 · 页数 · 有效期同样来自服务端，本页不估算</p></div></div>'
+      +'<p class="res-p">这场练习会带上它的 <b>fileId</b>（对应 CreateInterviewInput.resumeFileId）。移除后按通用问题练习。</p>'
+      +'<div class="res-acts"><button type="button" class="res-btn go" data-res="preview">完整预览</button>'
+      +'<button type="button" class="res-btn" data-res="idle">替换这一份</button>'
+      +'<button type="button" class="res-btn warn" data-res="idle">移除，不用简历</button></div></div>';
+  }else if(RES==='failed'){
+    h+='<div class="res-panel"><div class="rp-h">这份简历没有上传成功<span>失败原因由接口返回</span></div>'
+      +'<p class="res-p">常见原因：超过大小上限、格式不支持、上传会话已过期或网络中断。本页不保留上一次的文件，也不把失败写成「已使用」。</p>'
+      +'<div class="res-acts"><button type="button" class="res-btn go" data-res="upload">重试上传</button>'
+      +'<button type="button" class="res-btn" data-res="idle">换一种来源</button>'
+      +'<button type="button" class="res-btn" data-res="idle">不用简历继续</button></div></div>';
+  }else{
+    h+='<div class="res-panel"><div class="rp-h">完整预览<span>短期签名链接 · 只对本人开放</span></div>'
+      +'<p class="res-p">预览走这份文件的短期签名 URL。下面是<b>分页排版示意</b>，不是文件里的内容。</p>'
+      +pvPages(3)
+      +'<div class="res-acts"><button type="button" class="res-btn" data-res="ready">关闭预览</button></div></div>';
+  }
+  return h;
+}
+function resumeActions(){
+  if(RES==='uploading')return act('res-cancel','取消上传')+act('res-fail','演示：上传失败')+act('res-ok','演示：上传成功',true);
+  if(RES==='ready')return act('res-preview','完整预览')+btn('session-text','创建并开始练习',true);
+  if(RES==='failed')return act('res-retry','重试上传')+btn('session-text','不用简历，开始练习',true);
+  if(RES==='preview')return act('res-close','关闭预览')+btn('session-text','用这份简历开始练习',true);
+  return btn('tips','先看面试技巧')+btn('session-text','创建并开始练习',true);
+}
+function paintResume(){
+  var zone=document.getElementById('resume-zone');
+  if(!zone)return;
+  zone.innerHTML='<div class="head"><b>简历（可选）</b><span>'+(RES==='ready'?'已选用 1 份':'不上传也能开始')+'</span></div>'+resumePanel();
+  actions.innerHTML=resumeActions();
+  bindResume();
+}
+function setResume(p){
+  RES=p;
+  var s=RES_STATE[p];
+  mark(s);
+  try{history.replaceState(null,'',urlFor(s))}catch(e){}
+  paintResume();
+}
+function bindResume(){
+  var zone=document.getElementById('resume-zone');
+  if(zone)zone.querySelectorAll('[data-res]').forEach(function(el){
+    el.onclick=function(){var v=el.getAttribute('data-res');setResume(v==='upload'?'uploading':v)}});
+  var m={'res-cancel':'idle','res-fail':'failed','res-ok':'ready','res-preview':'preview','res-retry':'uploading','res-close':'ready'};
+  for(var id in m)(function(id,p){var b=document.getElementById(id);if(b)b.onclick=function(){setResume(p)}})(id,m[id]);
+}
+
+function setup(){
+  RES=RES_FROM[state]||'idle';
+  mark(RES_STATE[RES]);
+  base('面试前，<em>先设置一场练习</em>。','选定岗位、面试官和时长后才创建会话；语音能否使用，还要由服务与麦克风能力实际确认。');
+  body.innerHTML=statusbar('本场练习条件',[['文字回答','可用','ok'],['语音回答','需先检测'],['练习报告','完成后生成']])
+    +'<section class="card"><div class="head"><b>本场练习设置</b><span>与 CreateInterviewInput 字段一致</span></div>'
+    +'<div class="fields"><label class="field"><small>目标岗位（必填，最多 50 字）</small>'
+    +'<input id="interview-position" maxlength="50" placeholder="输入岗位，例：前端开发工程师"></label>'
+    +'<label class="field"><small>行业（必填，最多 30 字）</small>'
+    +'<input id="interview-industry" maxlength="30" placeholder="输入或从就业行业清单选择"></label></div>'
+    +choiceGroup('岗位快捷项（只是快捷值，可自由输入）',['前端开发工程师','行政专员','市场运营','机械工程师','会计','销售代表'],'')
+    +choiceGroup('面试官类型',['HR 初筛','业务主管','技术面试官','校招面试官','终面负责人'],'HR 初筛')
+    +choiceGroup('经验',['应届生','1 年以内','1-3 年','3-5 年','5 年以上','转行求职'],'应届生')
+    +choiceGroup('难度',['轻松练习','标准面试','压力面试'],'标准面试')
+    +choiceGroup('时长',['3 分钟','5 分钟','8 分钟'],'5 分钟')
+    +choiceGroup('交互方式',['纯文字','语音回合（文字兜底）'],'纯文字')
+    +'</section>'
+    +'<section class="card product-support" id="resume-zone"></section>'
+    +'<section class="card"><div class="head"><b>练习会经历三步</b><span>按实际状态推进</span></div>'
+    +steps([['第 1 步','创建配置','记录岗位、难度和时长，不等于已经生成题目。'],
+            ['第 2 步','逐题作答','文字是硬兜底；语音需转写后由你确认。'],
+            ['第 3 步','生成练习报告','报告只在真实会话完成后生成，不给固定评分。']])+'</section>'
+    +'<section class="notice"><i>i</i><div><b>模拟面试不是企业面试。</b>不代表任何企业、不会发出面试邀请，也不用于候选人筛选或录用判断。</div></section>'
+    +rail();
+  paintResume();
+  body.querySelectorAll('[data-choice] .chip').forEach(function(x){x.onclick=function(){
+    x.parentNode.querySelectorAll('.chip').forEach(function(c){c.classList.remove('on');c.setAttribute('aria-pressed','false')});
+    x.classList.add('on');x.setAttribute('aria-pressed','true');
+    if(x.parentNode.getAttribute('data-choice').indexOf('岗位快捷项')===0)document.getElementById('interview-position').value=x.textContent}});
+}
+
+/* ── 作答 ─────────────────────────────────────────────────────────────────── */
+var QUESTION='请讲一段你最有代表性的项目经历：当时的目标、你的职责和结果分别是什么？';
+function answerBox(id){return '<textarea class="answer-input" id="'+id+'" maxlength="2000" aria-label="本题回答" placeholder="在这里输入你的回答，最多 2000 字"></textarea>'}
+
+function sessionText(){
+  mark('session-text');
+  base('第 2 题，<em>用真实经历回答</em>。','文字输入始终可用；题目、剩余时间与下一题只能由当前会话返回，不能用静态内容冒充真实进度。');
+  body.innerHTML='<section class="card"><div class="session-head"><div><div class="head"><b>模拟面试 · 前端开发工程师</b></div>'
+    +'<p class="copy">业务主管 · 本场第 2 题 / 目标 5 题</p></div><div class="counter"><i></i>剩余 08:42</div></div>'
+    +'<div class="question"><small>AI 面试官提问</small><p>'+QUESTION+'</p></div></section>'
+    +'<section class="card"><div class="head"><b>我的回答</b><span>文字输入 · 最多 2000 字</span></div>'
+    +answerBox('answer-text')
+    +'<div class="tbar"><button type="button" class="res-btn go" id="ans-submit">提交回答</button>'
+    +'<a class="res-btn" href="'+urlFor('session-voice')+'">改用语音回答</a>'
+    +'<a class="res-btn" href="'+urlFor('session-text')+'">跳过此题（记为未作答，下一题）</a>'+'<a class="res-btn" href="'+urlFor('report-pending')+'">结束本场</a>'
+    +'<span class="cnt" id="ans-count">0 / 2000</span></div>'
+    +'<p class="msg" id="ans-err" role="alert" hidden>还没有输入内容。请先写下回答，或选择「跳过此题」。</p></section>'
+    +'<section class="card"><div class="head"><b>回答时可以这样组织</b><span>只作本题提示</span></div>'
+    +mini([['背景','先交代项目要解决什么问题。'],['行动','突出你本人做了哪些关键工作。'],['结果','只使用自己能核实的成果和数字。']])+'</section>'
+    +'<section class="notice"><i>i</i><div>提交后才请求下一题。网络失败时保留可见的错误和重试入口，不把「正在分析」无限停留在页面上。</div></section>'
+    +rail();
+  actions.innerHTML=btn('setup','结束本场练习')+btn('session-voice','改用语音回答',true);
+  bindAnswer('answer-text','ans-count','ans-err','ans-submit','network-error');
+}
+function bindAnswer(ta,cnt,err,sub,next){
+  var t=document.getElementById(ta),c=document.getElementById(cnt),e=document.getElementById(err),b=document.getElementById(sub);
+  if(!t)return;
+  t.addEventListener('input',function(){c.textContent=t.value.length+' / 2000';if(t.value.trim())e.hidden=true});
+  if(b)b.onclick=function(){if(!t.value.trim()){e.hidden=false;t.focus();return}go(next)};
+}
+
+function sessionVoice(){
+  mark('session-voice');
+  base('现在，<em>说出你的回答</em>。','语音路径是「显式开始录音 → 转写 → 你确认文本 → 提交」；不是后台持续监听，也不会跳过确认。');
+  face.classList.add('live');
+  body.innerHTML=statusbar('语音回答状态',[['麦克风','已检测','ok'],['录音','进行中'],['转写','结束后开始']])
+    +'<section class="card"><div class="session-head"><div><div class="head"><b>模拟面试 · 前端开发工程师</b></div>'
+    +'<p class="copy">业务主管 · 第 2 题 / 目标 5 题 · 官方播报失败时可用浏览器语音兜底</p></div>'
+    +'<div class="counter"><i></i>麦克风已检测</div></div>'
+    +'<div class="question"><small>AI 面试官提问</small><p>'+QUESTION+'</p></div></section>'
+    +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
+    +'<div class="record"><i></i>正在记录你的回答 · 00:18 / 00:58</div>'
+    +'<p class="copy">点「结束回答」后才上传这段音频进行转写；转写文本出现后，你可以修改再提交。</p></div></section>'
+    +'<section class="card"><div class="head"><b>转写返回的三种结果</b><span>成功不是默认值</span></div>'
+    +'<div class="res-acts"><a class="res-btn go" href="'+urlFor('transcript-review')+'">返回文本 · 去确认</a>'
+    +'<a class="res-btn" href="'+urlFor('transcript-empty')+'">返回空文本</a>'
+    +'<a class="res-btn warn" href="'+urlFor('transcript-failed')+'">转写失败</a></div>'
+    +'<p class="res-p">三条都不会自动记为已回答；只有你确认过的文本才提交。</p></section>'
+    +'<section class="notice"><i>i</i><div><b>语音失败不阻塞练习。</b>没有麦克风、未授权、语音服务未启用或转写失败时，都会回到文字输入并显示实际原因。</div></section>'
+    +rail();
+  actions.innerHTML=btn('session-text','改用文字输入')+btn('transcript-review','结束回答并转写',true);
+}
+
+function denied(){
+  mark('mic-denied');
+  base('麦克风暂时<em>不能使用</em>。','这是设备或权限状态，不把「没有授权」误写成「正在录音」或「语音服务已经准备好」。');
+  body.innerHTML=statusbar('当前能力状态',[['语音回答','不可用','off'],['文字回答','可用','ok'],['本题','尚未提交']])
+    +'<section class="card"><div class="head"><b>这一题现在怎么继续</b><span>三条路都在本页</span></div>'
+    +optlist([{k:'字',t:'改用文字输入回答本题',d:'文字不依赖麦克风，是本场练习的主路径。',href:urlFor('session-text'),go:true},
+              {k:'检',t:'重新检测麦克风',d:'插好设备或改过权限后再检测，由检测结果决定是否放开语音。',id:'mic-retry'},
+              {k:'练',t:'先看回答结构提示',d:'公开的 STAR 方法与准备清单不依赖语音能力。',href:urlFor('tips')}])+'</section>'
+    +'<section class="card"><div class="head"><b>用文字答这一题</b><span>不依赖麦克风</span></div>'
+    +answerBox('answer-mic')
+    +'<div class="tbar"><button type="button" class="res-btn go" id="mic-submit">提交回答</button>'
+    +'<a class="res-btn" href="'+urlFor('session-text')+'">跳过此题（记为未作答，下一题）</a>'+'<a class="res-btn" href="'+urlFor('report-pending')+'">结束本场</a>'
+    +'<span class="cnt" id="mic-count">0 / 2000</span></div>'
+    +'<p class="msg" id="mic-err" role="alert" hidden>还没有输入内容。请先写下回答，或选择「跳过此题」。</p></section>'
+    +'<section class="card"><div class="head"><b>重新检测前先排查</b><span>三项常见原因</span></div>'
+    +mini([['浏览器权限','站点麦克风权限被拒绝或未询问。'],['音频输入','当前设备没有可用音频输入。'],['设备占用','麦克风被其他程序占用未释放。']])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>不预报恢复时间，也不显示「正在录音」。是否恢复语音模式以重新检测的实际结果为准。</div></section>'
+    +rail();
+  actions.innerHTML=btn('session-text','用文字继续',true)+btn('session-voice','查看语音步骤');
+  bindAnswer('answer-mic','mic-count','mic-err','mic-submit','network-error');
+  var r=document.getElementById('mic-retry');if(r)r.onclick=function(){go('session-voice')};
+}
+
+/* ── 转写确认：可编辑 + 恢复原文 + 确认 + 异常 ───────────────────────────────
+   ASR 返回文本 ≠ 本轮回答。必须由用户在这一页改完再确认，
+   提交时把「是否改过」如实带出去（transcriptEdited）。 */
+var TRANSCRIPT='我负责了页面组件拆分和性能优化，重点解决了首屏加载慢的问题，最后把主要操作路径做得更清楚。';
+function review(){
+  mark('transcript-review');
+  base('请先<em>确认转写文本</em>。','系统不能替你把识别结果当作最终回答；改完并确认之后，才作为本轮文字提交。');
+  body.innerHTML=statusbar('转写确认状态',[['语音转写','已返回','ok'],['本轮回答','未提交'],['文本','未修改']])
+    +'<section class="card"><div class="head"><b>转写结果</b><span>可直接修改 · 触屏键盘可用</span></div>'
+    +'<textarea class="tarea" id="tr-text" maxlength="2000" aria-label="转写文本，可编辑"></textarea>'
+    +'<div class="tbar"><button type="button" class="res-btn" id="tr-restore">恢复原文</button>'
+    +'<button type="button" class="res-btn" id="tr-clear">清空重写</button>'
+    +'<a class="res-btn" href="'+urlFor('session-voice')+'">重新录音再转写</a>'
+    +'<span class="cnt" id="tr-count">0 / 2000</span></div>'
+    +'<p class="msg" id="tr-err" role="alert" hidden>确认文本不能为空。请修改后再确认，或选择重新录音、改用文字输入。</p>'
+    +'<p class="res-p">改动只发生在这一页。提交时会如实带上「本轮为语音输入」与「文本是否被你改过」，不会把识别原文冒充成你确认过的回答。</p></section>'
+    +'<section class="card"><div class="head"><b>确认前核对这三处</b><span>识别最容易出错的地方</span></div>'
+    +mini([['人名与数字','数量、比例和时间最容易听错。'],['专业词与缩写','技术名词按你原本的说法改回。'],['被吞掉的句子','补上没被识别到的关键一句。']])+'</section>'
+    +'<section class="card"><div class="head"><b>转写不正常时</b><span>两种真实返回</span></div>'
+    +'<div class="res-acts"><a class="res-btn" href="'+urlFor('transcript-empty')+'">返回的是空文本</a>'
+    +'<a class="res-btn warn" href="'+urlFor('transcript-failed')+'">转写请求失败</a>'
+    +'<a class="res-btn" href="'+urlFor('session-text')+'">改用文字输入重写</a></div></section>'
+    +'<section class="notice"><i>i</i><div><b>音频转写不等于语音能力评估。</b>练习报告不据此评价语速、语调或情绪稳定性；本场只按你确认后的文本做内容练习。</div></section>'
+    +rail();
+  actions.innerHTML=btn('session-voice','重新录音')+act('tr-submit','确认并提交',true);
+  var t=document.getElementById('tr-text'),c=document.getElementById('tr-count'),e=document.getElementById('tr-err'),
+      dirty=body.querySelectorAll('.statusbar b')[2];
+  t.value=TRANSCRIPT;
+  function sync(){c.textContent=t.value.length+' / 2000';
+    var changed=t.value!==TRANSCRIPT;
+    dirty.textContent=changed?'已修改':'未修改';dirty.className=changed?'ok':'';
+    if(t.value.trim())e.hidden=true}
+  sync();
+  t.addEventListener('input',sync);
+  document.getElementById('tr-restore').onclick=function(){t.value=TRANSCRIPT;sync();t.focus()};
+  document.getElementById('tr-clear').onclick=function(){t.value='';sync();t.focus()};
+  document.getElementById('tr-submit').onclick=function(){
+    if(!t.value.trim()){e.hidden=false;t.focus();return}
+    // 提交这一题 → 回作答态继续下一题；结束整场由「结束本场」出口负责。
+    // 原来直接 go('report-pending')，导致提交一题就结束全场，5 题走不到第 3 题。
+    go('session-text')};
+}
+function transcriptEmpty(){
+  mark('transcript-empty');
+  base('这段录音<em>没有转写出文字</em>。','返回空文本不是成功。本页不会拿一句占位内容替你回答，也不会把这一题记成已作答。');
+  body.innerHTML=statusbar('转写结果状态',[['语音转写','返回为空','off'],['本轮回答','未提交'],['已答的题','不受影响','ok']])
+    +'<section class="card empty tight bad"><div><div class="e">!</div><h2>转写文本为空</h2>'
+    +'<p>常见原因是没录到声音、环境太吵，或说话时长太短。音频不会保留，这一次转写作废。</p></div></section>'
+    +'<section class="card"><div class="head"><b>选一条继续</b><span>三条都不丢已答的题</span></div>'
+    +optlist([{k:'录',t:'重新录音再转写',d:'离麦克风近一点，说完整一段再结束。',href:urlFor('session-voice'),go:true},
+              {k:'字',t:'改用文字输入这一题',d:'文字不挑环境噪音，是本场练习的硬兜底。',href:urlFor('session-text')},
+              {k:'跳',t:'跳过这一题',d:'跳过会如实记为未作答，报告里不会补写内容；跳过后进入下一题。',href:urlFor('session-text')}])+'</section>'
+    +'<section class="notice"><i>i</i><div>空文本也不会提交给面试官；只有你确认过的非空文本才作为本轮回答。</div></section>'
+    +rail();
+  actions.innerHTML=btn('session-text','改用文字输入')+btn('session-voice','重新录音',true);
+}
+function transcriptFailed(){
+  mark('transcript-failed');
+  base('这段录音<em>没有转写成功</em>。','转写失败只影响这一次；不能把失败写成「已提交」，也不能把未启用的语音服务说成正在识别。');
+  body.innerHTML=statusbar('转写失败后的状态',[['语音转写','请求失败','off'],['本轮回答','未提交'],['文字输入','可用','ok']])
+    +'<section class="card"><div class="head"><b>失败原因决定下一步</b><span>按接口返回区分</span></div>'
+    +steps([['原因 A','语音服务未启用','本机直接回退文字输入，不再提供录音入口。'],
+            ['原因 B','网络或超时','可以重新录音再试一次，音频不会重复上传。'],
+            ['原因 C','音频不合要求','时长过短或格式不符时，重新录一段更完整的回答。']])+'</section>'
+    +'<section class="card"><div class="head"><b>现在可以做</b><span>都不影响已答的题</span></div>'
+    +optlist([{k:'字',t:'改用文字输入这一题',d:'服务未启用时这是唯一可用路径，也是最稳的一条。',href:urlFor('session-text'),go:true},
+              {k:'录',t:'重新录音再转写一次',d:'只重发这一次请求，不重复创建会话。',href:urlFor('session-voice')}])+'</section>'
+    +'<section class="card"><div class="head"><b>直接用文字答这一题</b><span>不必等语音恢复</span></div>'
+    +answerBox('answer-fail')
+    +'<div class="tbar"><button type="button" class="res-btn go" id="fail-submit">提交回答</button>'
+    +'<a class="res-btn" href="'+urlFor('session-text')+'">跳过此题（记为未作答，下一题）</a>'+'<a class="res-btn" href="'+urlFor('report-pending')+'">结束本场</a>'
+    +'<span class="cnt" id="fail-count">0 / 2000</span></div>'
+    +'<p class="msg" id="fail-err" role="alert" hidden>还没有输入内容。请先写下回答，或选择「跳过此题」。</p></section>'
+    +'<section class="notice danger"><i>!</i><div>音频不会留在本机，也不会在失败后偷偷重试；是否恢复语音以实际服务状态为准。</div></section>'
+    +rail();
+  actions.innerHTML=btn('session-voice','重新录音')+btn('session-text','改用文字输入',true);
+  bindAnswer('answer-fail','fail-count','fail-err','fail-submit','network-error');
+}
+
+/* ── 网络失败：重试后按三种真实返回分流 ───────────────────────────────────── */
+function net(){
+  mark('network-error');
+  base('这一题暂时<em>没有提交成功</em>。','网络中断只影响本次请求；保留你能看到的错误、重试和文字回退，不能假装面试官已经收到回答。');
+  body.innerHTML=statusbar('本次提交状态',[['本题回答','提交失败','off'],['下一题','未获取'],['练习报告','未生成']])
+    +'<section class="card"><div class="head"><b>重试提交本题</b><span>只重发这一次请求</span></div>'
+    +'<p class="copy">重试不会重复创建会话，也不会重复提交上一题。服务端只会返回下面三种结果之一，本页按结果分流。</p>'
+    +'<div class="res-acts"><a class="res-btn go" href="'+urlFor('session-text')+'">重试成功 · 取到下一题</a>'
+    +'<a class="res-btn" href="'+urlFor('report-pending')+'">重试成功 · 本场已答完</a>'
+    +'<a class="res-btn warn" href="'+urlFor('session-expired')+'">会话已过期</a></div></section>'
+    +'<section class="card"><div class="head"><b>这三种结果分别意味着</b><span>页面各走各的路</span></div>'
+    +steps([['取到下一题','回到作答页','本题按服务端返回记为已提交，题号前进一题。'],
+            ['本场已答完','进入报告生成','不再出题，转去请求本场练习报告。'],
+            ['会话已过期','回到练习设置','旧会话不能续答，需要重新创建一场练习。']])+'</section>'
+    +'<section class="card"><div class="head"><b>不想重试的话</b><span>两条不挑网络的路</span></div>'
+    +optlist([{k:'字',t:'改用文字输入重新回答',d:'语音转写连续失败时，文字是不挑网络质量的兜底。',href:urlFor('session-text')},
+              {k:'练',t:'先按 STAR 整理这题要点',d:'公开技巧页可以先写清背景、行动和结果，恢复后再提交。',href:urlFor('tips')}])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>失败时不自动跳到「报告已生成」，也不承诺本场回答已经保存。</div></section>'
+    +rail();
+  actions.innerHTML=btn('session-text','返回文字回答')+btn('session-voice','重新语音作答',true);
+}
+function sessionExpired(){
+  mark('session-expired');
+  base('这一场练习<em>已经过期</em>。','会话过期由服务端判定。过期后不能续答，也不能把没答完的一场说成已完成。');
+  body.innerHTML=statusbar('会话状态',[['本场会话','已过期','off'],['未提交的回答','已失效'],['已生成的报告','不受影响','ok']])
+    +'<section class="card empty tight bad"><div><div class="e">!</div><h2>会话已过期，需要重新创建</h2>'
+    +'<p>公共终端上的练习会话有有效期。过期之后旧的题目和未提交的回答都不能继续使用。</p></div></section>'
+    +'<section class="card"><div class="head"><b>接下来</b><span>选一条</span></div>'
+    +optlist([{k:'练',t:'重新创建一场练习',d:'岗位、面试官、时长可以沿用刚才的选择，重新填一次即可。',href:urlFor('setup'),go:true},
+              {k:'录',t:'查看本人练习记录',d:'过期前已经生成过的报告仍按服务端留存规则保留。',href:urlFor('reports-loading')}])+'</section>'
+    +'<section class="card"><div class="head"><b>这一场留下了什么</b><span>按服务端记录</span></div>'
+    +'<div class="fields"><div class="field"><small>已提交的回答</small><b>按服务端记录保留</b></div>'
+    +'<div class="field"><small>未提交的这一题</small><b>不保留</b></div>'
+    +'<div class="field"><small>本场练习报告</small><b>未生成则不会补生成</b></div>'
+    +'<div class="field"><small>上传过的简历</small><b>按文件留存期限管理</b></div></div>'
+    +'<p class="res-p">过期只影响能不能继续答题，不代表已提交的内容被删除；具体留存以服务端为准。</p></section>'
+    +'<section class="notice"><i>i</i><div>本页不保留上一场的题目和回答，也不会把它们并进新的一场。</div></section>'
+    +rail();
+  actions.innerHTML=btn('reports-loading','查看练习记录')+btn('setup','重新创建练习',true);
+}
+
+/* ── 报告 ─────────────────────────────────────────────────────────────────── */
+function pending(){
+  mark('report-pending');
+  base('本场结束后，<em>正在生成报告</em>。','只有完成真实会话后才能请求报告；超时或失败要回到可重试状态，而不是展示固定评分。');
+  body.innerHTML=statusbar('报告生成状态',[['本场作答','已结束','ok'],['练习报告','生成中'],['评分与录用判断','不提供']])
+    +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
+    +'<div class="record load"><i></i>正在请求本场练习报告</div></div></section>'
+    +'<section class="card"><div class="head"><b>报告只归纳这些</b><span>来自本场已确认作答</span></div>'
+    +steps([['会写','你确认过的回答','缺失的题不会被补造。'],
+            ['不写','录用与通过率','不预测结果，也不给企业推荐。'],
+            ['不写','语速语调评价','只按文本内容做复盘。']])+'</section>'
+    +'<section class="card"><div class="head"><b>等待时可以先做</b><span>不影响本次生成</span></div>'
+    +optlist([{k:'技',t:'查看公开面试技巧',d:'准备清单与 STAR 方法随时可读。',href:urlFor('tips')},
+              {k:'回',t:'返回本场练习',d:'回到文字作答页查看这一场。',href:urlFor('session-text')}])+'</section>'
+    +rail();
+  actions.innerHTML=btn('session-text','返回本场练习')+btn('report-loading','继续查看状态',true);
+}
+function reportLoading(){
+  mark('report-loading');
+  base('正在核对<em>报告状态</em>。','报告必须由本场会话和当前凭证读取；加载中不展示上一次内容，也不提前放开打印。');
+  body.innerHTML=statusbar('报告读取状态',[['报告内容','读取中'],['打印版','未生成'],['固定评分','不提供']])
+    +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
+    +'<div class="record load"><i></i>正在读取本场练习报告</div></div></section>'
+    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由服务端决定</span></div>'
+    +steps([['结果 A','报告已返回','显示内容，并放开生成打印版。'],
+            ['结果 B','报告不可用','未生成、已过期或无权限。'],
+            ['结果 C','读取失败','停留在可重试状态。']])+'</section>'
+    +'<section class="card"><div class="head"><b>等待时可以先做</b><span>不依赖本次读取</span></div>'
+    +optlist([{k:'技',t:'查看公开面试技巧',d:'STAR 结构与准备清单随时可读。',href:urlFor('tips')},
+              {k:'回',t:'返回本场练习',d:'回到文字作答页继续这一场。',href:urlFor('session-text')}])+'</section>'
+    +rail();
+  actions.innerHTML=btn('report-unavailable','查看不可用状态')+btn('report-ready','演示已返回的结构',true);
+}
+function reportReady(){
+  mark('report-ready');
+  base('报告用于<em>复盘练习</em>。','下面是报告返回后的完整信息结构示例，不代表当前会话已有这些结论；真实内容以服务端响应为准。');
+  body.innerHTML=statusbar('报告与打印状态',[['报告内容','已返回','ok'],['打印版','未生成'],['录用预测','不提供']])
+    +'<section class="card"><div class="head"><b>本场练习报告</b><span>已返回 · 示例字段结构</span></div>'
+    +'<p class="copy">综合表现、五项能力、风险、高频问题、STAR 建议与准备清单均应来自本场真实作答；不评价语速、语调，也不预测是否录用。</p></section>'
+    +'<section class="report-grid"><div class="report"><i>总</i><b>综合表现概览</b><p>练习表现等级只用于本人复盘，不代表通过率或录用结果。</p></div>'
+    +'<div class="report"><i>5</i><b>五项能力维度</b><p>表达、岗位理解、经历细节、专业能力与应变分别呈现。</p></div>'
+    +'<div class="report"><i>问</i><b>下一轮准备</b><p>风险提示、高频问题与 STAR 建议帮助继续练习。</p></div></section>'
+    +'<section class="card"><div class="head"><b>报告包含的复盘区</b><span>按服务端返回显示</span></div>'
+    +mini([['风险点','提示待核对或补充的表达内容。'],['高频问题','展示问题、考察点与回答思路。'],['STAR 建议','按背景、任务、行动、结果组织。']])
+    +'<div class="checklist"><button class="check" type="button"><i>✓</i>面试前准备清单由报告返回</button>'
+    +'<button class="check" type="button"><i>✓</i>打印版生成后才进入打印流程</button></div></section>'
+    +'<section class="notice"><i>i</i><div><b>打印不会先假装成功。</b>只有服务端成功生成真实文件后，才会进入已有打印确认流程；失败时仍停留在报告页并显示原因。</div></section>'
+    +rail();
+  actions.innerHTML=btn('reports-loading','查看历史报告')+btn('report-print-pending','生成打印版',true);
+}
+function reportUnavailable(){
+  mark('report-unavailable');
+  base('这份报告暂时<em>不能查看</em>。','报告可能尚未生成、已经过期，或当前账号没有访问权限；不能用固定内容替代实际结果。');
+  body.innerHTML='<section class="card empty tight bad"><div><div class="e">!</div><h2>报告不存在或已过期</h2>'
+    +'<p>没有真实报告数据时，不显示评分、打印成功或可下载文件。</p></div></section>'
+    +'<section class="card"><div class="head"><b>对上原因，再选一条路</b><span>三种常见情况</span></div>'
+    +optlist([{k:'未',t:'还没有完成过练习',d:'先设置一场练习并完成作答，报告才会生成。',href:urlFor('setup'),go:true},
+              {k:'过',t:'报告已过期或换了入口',d:'登录后从本人练习记录重新进入。',href:urlFor('reports-loading')},
+              {k:'权',t:'当前账号没有访问权限',d:'报告只对本人开放，公共设备需重新确认身份。',href:urlFor('reports-guest')}])+'</section>'
+    +'<section class="card"><div class="head"><b>不受影响的入口</b><span>随时可用</span></div>'
+    +mini([['面试技巧','公开准备方法不依赖报告。'],['文字练习','重新开始一场文字作答。'],['本人记录','登录后查看历史列表。']])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>公共设备直接打开或刷新后，原会话是否仍有效以服务端校验为准；不要把这一页理解为报告已被保存。</div></section>'
+    +rail();
+  actions.innerHTML=btn('reports-guest','查看报告历史')+btn('setup','重新开始练习',true);
+}
+function reportPrintPending(){
+  mark('report-print-pending');
+  base('正在生成<em>打印版文件</em>。','此时报告内容已读取，但打印文件尚未生成；不能显示取件码、已出纸或支付成功。');
+  body.innerHTML=statusbar('打印版生成状态',[['报告内容','已读取','ok'],['打印文件','生成中'],['取件码','未产生']])
+    +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
+    +'<div class="record load"><i></i>正在生成报告打印版</div></div></section>'
+    +'<section class="card"><div class="head"><b>生成成功后才往下走</b><span>沿用既有打印流程</span></div>'
+    +steps([['下一步','拿到真实文件','服务端返回文件名、页数、大小和有效期。'],
+            ['再下一步','进入打印确认','由已有 /print/confirm 报价流程接手，本页不确认参数。'],
+            ['最后','按真实结果出纸','出纸与取件码由打印流程返回，本页不预告。']])+'</section>'
+    +'<section class="card"><div class="head"><b>不想等可以先做</b><span>不影响本次生成</span></div>'
+    +optlist([{k:'报',t:'返回报告继续复盘',d:'报告内容已读取，可以先看结论区。',href:urlFor('report-ready')},
+              {k:'录',t:'查看本人练习记录',d:'登录后按服务端返回显示历史列表。',href:urlFor('reports-loading')}])+'</section>'
+    +'<section class="notice"><i>i</i><div>生成失败时停留在本页并给出重试，不创建虚假打印任务、取件码或支付成功提示。</div></section>'
+    +rail();
+  actions.innerHTML=btn('report-print-failed','演示生成失败')+btn('report-print-ready','演示生成成功',true);
+}
+function reportPrintReady(){
+  mark('report-print-ready');
+  base('打印版<em>已经生成</em>。','这一步只证明服务端产出了真实文件；份数、单双面、金额和出纸都由打印确认流程负责，本页不代答。');
+  body.innerHTML=statusbar('打印版文件状态',[['打印文件','已生成','ok'],['打印任务','未创建'],['取件码','未产生']])
+    +'<section class="card"><div class="head"><b>服务端返回的这份文件</b><span>InterviewPrintResponse 字段</span></div>'
+    +'<div class="filerow"><i>PDF</i><div class="fm"><b>filename：'+PFILE.filename+'</b>'
+    +'<p>pageCount '+PFILE.pageCount+' 页 · sizeBytes '+kb(PFILE.sizeBytes)+' · mimeType '+PFILE.mimeType+'</p></div></div>'
+    +fieldRows([['文件编号 fileId',PFILE.fileId,1],['有效期 expiresAt',PFILE.expiresAt],
+                ['预览 signedUrl',PFILE.signedUrl,1],['打印凭证 printFileUrl',PFILE.printFileUrl,1]])
+    +'<p class="res-p">这一组是<b>本原型的合成夹具</b>，只说明字段位置与取值形态；真实取值由 <b>POST /mock-interviews/{sessionId}/report/print</b> 返回。</p>'
+    +'<p class="res-p" style="margin-top:14px">打印版预览（<b>分页排版示意</b>，不是文件里的内容；真实预览走 signedUrl）：</p>'
+    +pvPages(PFILE.pageCount)+'</section>'
+    +'<section class="card"><div class="head"><b>接下来在打印确认页发生</b><span>本页不预告结果</span></div>'
+    +steps([['第 1 步','服务端报价','份数与单双面按当时可用能力显示，金额只认服务端返回。'],
+            ['第 2 步','确认后建单','确认参数才创建打印任务，零元单同样先建单。'],
+            ['第 3 步','按真实结果出纸','出纸与取件码由打印流程返回。']])+'</section>'
+    +'<section class="notice"><i>i</i><div><b>expiresAt 是签名预览链接的到期时间</b>，不是文件留存期限；过期后要重新生成打印版。signedUrl 只供你自己预览下载，建单一律走 printFileUrl；本页不缓存旧链接，也不会显示已打印、已出纸或取件码。</div></section>'
+    +rail();
+  actions.innerHTML=btn('report-ready','返回报告')+btn('report-print-pending','重新生成',false,'interview-regenerate')
+    +btn('report-print-handoff','查看打印交接内容',true);
+}
+/* 打印交接：把交给 /print/confirm 的那一份摊开给人看。
+   对齐 InterviewReportPage.handlePrint —— 真实页面用 navigate('/print/confirm', { state: { file, params } })
+   传对象，签名链接不进地址栏；本页的静态跳转只带 fileId / 页数 / 打印参数，不冒充已接通的打印链路。 */
+function reportPrintHandoff(){
+  mark('report-print-handoff');
+  base('去打印前，<em>先看清交出去的是什么</em>。','这一屏只是把交接内容摊开；打印任务、金额和取件码都还没有产生，按下去也只是进入打印确认页。');
+  body.innerHTML=statusbar('交接前的状态',[['打印文件','已生成','ok'],['交接内容','已列出','ok'],['打印任务','未创建']])
+    +'<section class="card"><div class="head"><b>交给打印确认的 file 对象</b><span>InterviewReportPage.handlePrint</span></div>'
+    +fieldRows([['name',PFILE.filename,1],['size',kb(PFILE.sizeBytes)],['pages',String(PFILE.pageCount)],
+                ['fileId',PFILE.fileId,1],['fileUrl（= printFileUrl）',PFILE.printFileUrl,1],['mimeType',PFILE.mimeType]])
+    +'<p class="res-p">这六个字段来自上一屏那份文件；<b>printFileUrl 没有返回时按钮不放行</b>，页面停在报告页并显示原因，不会拿预览链接顶替。</p></section>'
+    +'<section class="card"><div class="head"><b>同时交出去的打印参数</b><span>makePrintParams({copies:1,duplex:\'single\',color:\'bw\'})</span></div>'
+    +fieldRows([['copies','1 份'],['duplex','simplex（单面）'],['colorMode','black_white（黑白）'],
+                ['paperSize','A4'],['pageRange','all'],['pagesPerSheet','1']],3)
+    +'<p class="res-p">这些只是<b>进入打印确认页时的初值</b>；份数、单双面、颜色在那一页还能改，金额也在那里按真实页数由服务端报价。</p></section>'
+    +'<section class="notice danger"><i>!</i><div><b>正式 React 用路由 state 传这一份，printFileUrl 绝不进地址栏。</b>'
+    +'本原型的跳转只带 <b>fileId、页数与打印参数</b>（source=interview-report），是用来说明交接内容，'
+    +'<b>不是已经接通的打印链路</b>；点进去看到的是打印确认页自己的静态夹具，不代表这份报告已经排进打印。</div></section>'
+    +'<section class="card"><div class="head"><b>按下去之后不会发生的事</b><span>三条边界</span></div>'
+    +mini([['不会','立即创建打印任务或扣费。'],['不会','出现取件码或出纸结果。'],['不会','把签名链接留在浏览器地址栏。']])+'</section>'
+    +rail();
+  actions.innerHTML=btn('report-print-ready','返回文件')
+    +'<a class="btn primary" href="'+printHandoffHref()+'" data-route="/print/confirm" data-testid="interview-primary">去打印确认<em>→</em></a>';
+}
+function reportPrintFailed(){
+  mark('report-print-failed');
+  base('打印版暂时<em>没有生成成功</em>。','没有得到真实文件时，报告仍可阅读；不能把失败写成「已发送到打印机」。');
+  body.innerHTML=statusbar('打印失败后的状态',[['打印版文件','生成失败','off'],['打印任务','未创建'],['本场报告','仍可阅读','ok']])
+    +'<section class="card"><div class="head"><b>选一条继续</b><span>失败不影响报告</span></div>'
+    +optlist([{k:'重',t:'重试生成打印版',d:'只重新请求这份文件，不重算报告、不覆盖记录。',href:urlFor('report-print-pending'),go:true},
+              {k:'报',t:'返回报告继续复盘',d:'屏幕上阅读同样有效，不必等打印。',href:urlFor('report-ready')},
+              {k:'练',t:'转去练下一题',d:'用公开技巧继续准备，不占用本次生成。',href:urlFor('tips')}])+'</section>'
+    +'<section class="card"><div class="head"><b>重试只做三件事</b><span>范围很窄</span></div>'
+    +steps([['会做','重新请求文件','只针对这份报告的打印版。'],
+            ['会做','保留当前报告','屏幕上的内容不会被清掉。'],
+            ['会做','沿用原有报告','不重新生成本场会话报告。']])+'</section>'
+    +'<section class="card"><div class="head"><b>这次失败不会造成</b><span>三条边界</span></div>'
+    +mini([['不会','出现取件码或出纸结果。'],['不会','产生支付或扣费。'],['不会','覆盖本场练习报告。']])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>只有服务端返回真实文件后，才会进入已有打印确认流程。</div></section>'
+    +rail();
+  actions.innerHTML=btn('report-ready','返回报告')+btn('report-print-pending','重试生成',true);
+}
+
+/* ── 本人练习记录 ─────────────────────────────────────────────────────────── */
+function reportsGuest(){
+  mark('reports-guest');
+  base('你的练习记录，<em>登录后才可长期查看</em>。','游客报告仅按当前会话与短期凭证读取；登录后的本人历史列表是另一条受账号保护的路径。');
+  body.innerHTML='<section class="card empty tight"><div><div class="e">⌁</div><h2>登录后可保存练习报告</h2>'
+    +'<p>游客模式的报告短期有效（约 2 小时）；登录后报告按服务端规则保存 7 天。</p></div></section>'
+    +'<section class="card"><div class="head"><b>两种身份的差别</b><span>按真实账号确认</span></div>'
+    +'<div class="fields"><div class="field"><small>游客模式</small><b>仅本场短期有效</b></div>'
+    +'<div class="field"><small>登录之后</small><b>本人记录可回看</b></div></div>'
+    +mini([['当前练习','以本场短期会话凭证读取。'],['本人历史','登录后才请求并显示列表。'],['查看与打印','仅对服务端确认的报告开放。']])+'</section>'
+    +'<section class="card"><div class="head"><b>现在可以做</b><span>不登录也能继续</span></div>'
+    +optlist([{k:'练',t:'直接开始一场练习',d:'不登录也能用文字完成作答。',href:urlFor('setup'),go:true},
+              {k:'录',t:'查看登录后的记录状态',d:'列表是否有内容由真实账号决定。',href:urlFor('reports-loading')}])+'</section>'
+    +'<section class="notice"><i>i</i><div>登录入口、保存期限和是否可查看均由真实账号与服务端决定；本页不把当前会话当作已保存记录。</div></section>'
+    +rail();
+  actions.innerHTML=btn('setup','开始新练习',true)+btn('reports-loading','查看登录后状态');
+}
+function reportsLoading(){
+  mark('reports-loading');
+  base('正在读取<em>本人练习记录</em>。','只有当前账号的真实列表返回后，才能显示报告、查看或删除操作；加载中不能沿用静态示例。');
+  body.innerHTML=statusbar('记录读取状态',[['本人列表','读取中'],['查看报告','未开放'],['删除记录','未开放']])
+    +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
+    +'<div class="record load"><i></i>正在读取本人练习报告</div></div></section>'
+    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由服务端决定</span></div>'
+    +steps([['结果 A','有本人记录','逐条显示，仅本人可见。'],
+            ['结果 B','登录后为空','显示空态，不填充演示数据。'],
+            ['结果 C','读取失败','显示错误并保留重试入口。']])+'</section>'
+    +'<section class="card"><div class="head"><b>等待时可以先做</b><span>不依赖本次读取</span></div>'
+    +optlist([{k:'练',t:'开始一场新的练习',d:'新练习不必等历史列表返回。',href:urlFor('setup')},
+              {k:'技',t:'查看公开面试技巧',d:'准备清单与 STAR 方法随时可读。',href:urlFor('tips')}])+'</section>'
+    +rail();
+  actions.innerHTML=btn('reports-error','查看加载失败')+btn('reports-ready','演示已加载列表',true);
+}
+function reportsEmptyMember(){
+  mark('reports-empty-member');
+  base('登录后，<em>还没有练习报告</em>。','这是「本人已登录但列表为空」的状态，和游客未登录不同；不填充演示成绩或历史记录。');
+  body.innerHTML='<section class="card empty tight"><div><div class="e">⌁</div><h2>还没有练习报告</h2>'
+    +'<p>完成一次模拟面试后，这里会显示服务端确认属于当前账号的练习报告。</p></div></section>'
+    +'<section class="card"><div class="head"><b>第一份报告怎么来</b><span>三步</span></div>'
+    +steps([['第 1 步','设置一场练习','选岗位、面试官类型和时长。'],
+            ['第 2 步','逐题完成作答','文字回答即可，语音需另行检测。'],
+            ['第 3 步','生成练习报告','完成后由服务端生成并归入本人记录。']])+'</section>'
+    +'<section class="card"><div class="head"><b>现在可以做</b><span>都不依赖历史</span></div>'
+    +optlist([{k:'练',t:'开始模拟面试',d:'完成一场后再回到这里查看。',href:urlFor('setup'),go:true},
+              {k:'技',t:'先看面试技巧',d:'准备清单可以先勾选整理。',href:urlFor('tips')}])+'</section>'
+    +'<section class="notice"><i>i</i><div>当前没有本人记录，因此不展示固定分数、示例报告或可打印文件。</div></section>'
+    +rail();
+  actions.innerHTML=btn('setup','开始模拟面试',true)+btn('reports-guest','查看游客边界');
+}
+function historyRows(mode){
+  var one='<div class="history-row"><div><small>示例记录结构</small><b>前端开发工程师 · 业务主管</b>'
+    +'<p>岗位、时长、时间和报告存在性均由当前账号记录返回。</p></div><div class="history-controls">';
+  if(mode==='ready')one+='<a class="history-action" href="'+urlFor('report-ready')+'" data-testid="interview-history-view">查看</a>'
+    +'<button class="history-action remove" type="button" data-testid="interview-history-delete" aria-label="删除这条练习记录">删除</button>';
+  else if(mode==='deleting')one+='<span class="history-action" aria-live="polite">删除中…</span>';
+  else one+='<a class="history-action" href="'+urlFor('report-ready')+'">查看</a>'
+    +'<a class="history-action" href="'+urlFor('reports-ready')+'">返回列表</a>';
+  one+='</div></div>';
+  var two='<div class="history-row"><div><small>示例记录结构</small><b>行政专员 · HR 初筛</b>'
+    +'<p>这条记录尚未生成报告，因此不展示查看或打印按钮。</p></div>'
+    +'<div class="history-controls"><button class="history-action" type="button" aria-disabled="true">报告未生成</button></div></div>';
+  return '<div class="history-list">'+one+(mode==='failed'?'':two)+'</div>';
+}
+function reportsReady(){
+  mark('reports-ready');
+  base('登录后，<em>只查看自己的报告</em>。','下面展示已加载历史列表的产品结构，不代表当前账号真的有这些成绩或记录；实际内容由服务端返回。');
+  body.innerHTML=statusbar('记录列表状态',[['本人列表','已返回','ok'],['查看','仅限有报告的记录'],['删除','需二次确认']])
+    +'<section class="card"><div class="head"><b>练习报告</b><span>已登录 · 本人记录</span></div>'
+    +'<p class="copy">仅有真实报告的记录显示「查看」。没有报告的记录不应被伪装成可打印或有评分。</p>'
+    +historyRows('ready')+'</section>'
+    +'<section class="card"><div class="head"><b>列表上的三个动作</b><span>各自的前提</span></div>'
+    +steps([['动作 1','查看报告','只对已生成报告的记录开放。'],
+            ['动作 2','生成打印版','进入报告页后才请求打印文件。'],
+            ['动作 3','删除记录','二次确认后才向服务端发起。']])+'</section>'
+    +'<section class="notice"><i>i</i><div><b>删除需要再次确认。</b>确认后才请求删除本人记录；服务端确认成功才从列表移除，失败时保留原列表并显示实际错误。</div></section>'
+    +rail();
+  actions.innerHTML=btn('setup','开始新练习',true)+btn('reports-empty-member','查看空记录状态');
+  var remove=body.querySelector('[data-testid="interview-history-delete"]');
+  remove.onclick=function(){
+    if(remove.dataset.confirm==='1'){go('reports-deleting')}
+    else{remove.dataset.confirm='1';remove.textContent='再次确认删除';remove.classList.add('confirm');
+      remove.setAttribute('aria-label','再次点击确认删除这条练习记录')}};
+}
+function reportsDeleting(){
+  mark('reports-deleting');
+  base('正在<em>请求删除这条记录</em>。','删除请求已发出，但服务端还没有确认。没确认之前，这条记录仍然留在列表里。');
+  body.innerHTML=statusbar('删除进行状态',[['本次操作','请求中'],['目标记录','仍在列表','ok'],['报告文件','未清理']])
+    +'<section class="card"><div class="head"><b>练习报告</b><span>删除请求中 · 记录保留</span></div>'
+    +'<p class="copy">这条记录暂时不能再点删除或查看，避免重复发起同一次删除；其它记录不受影响。</p>'
+    +historyRows('deleting')+'</section>'
+    +'<section class="card voicebox"><div><div class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
+    +'<div class="record load"><i></i>等待服务端确认删除结果</div></div></section>'
+    +'<section class="card"><div class="head"><b>返回结果只会是三种</b><span>由服务端决定</span></div>'
+    +steps([['结果 A','确认删除','这条记录从本人列表移除，其它记录不动。'],['结果 B','删除失败','记录留在原处，显示服务端返回的原因。'],['结果 C','请求超时','按失败处理，仍需你再次确认后才重发。']])+'</section>'
+    +'<section class="notice"><i>i</i><div>页面不会先把这一行从列表里抹掉。删除是否发生，只以服务端返回为准。</div></section>'
+    +rail();
+  actions.innerHTML=btn('reports-delete-failed','演示删除失败')+btn('reports-delete-done','演示删除成功',true);
+}
+function reportsDeleteDone(){
+  mark('reports-delete-done');
+  base('这条记录<em>已经删除</em>。','服务端确认删除后列表才更新。删除只发生在你自己的记录上，不影响其它记录和已打印的纸质件。');
+  body.innerHTML=statusbar('删除结果状态',[['本次操作','删除成功','ok'],['目标记录','已从列表移除'],['其它记录','未受影响','ok']])
+    +'<section class="card"><div class="head"><b>练习报告</b><span>已登录 · 本人记录</span></div>'
+    +'<p class="copy">刚才那条记录已经不在列表里。剩下的记录按服务端返回顺序显示。</p>'
+    +'<div class="history-list"><div class="history-row"><div><small>示例记录结构</small><b>行政专员 · HR 初筛</b>'
+    +'<p>这条记录尚未生成报告，因此不展示查看或打印按钮。</p></div>'
+    +'<div class="history-controls"><button class="history-action" type="button" aria-disabled="true">报告未生成</button></div></div>'
+    +'<div class="history-row"><div><small>示例记录结构</small><b>市场运营 · 技术面试官</b>'
+    +'<p>其它记录不受这次删除影响，顺序仍按服务端返回。</p></div>'
+    +'<div class="history-controls"><a class="history-action" href="'+urlFor('report-ready')+'">查看</a>'
+    +'<button class="history-action remove" type="button" aria-label="删除这条练习记录">删除</button></div></div></div></section>'
+    +'<section class="card"><div class="head"><b>接下来可以</b><span>选一条</span></div>'
+    +optlist([{k:'练',t:'再练一场同岗位的面试',d:'配置可以重新选，题目由服务恢复后的会话返回。',href:urlFor('setup'),go:true},{k:'技',t:'先看公开面试技巧',d:'准备清单与 STAR 方法不依赖历史记录。',href:urlFor('tips')}])+'</section>'
+    +'<section class="card"><div class="head"><b>删除之后</b><span>三条边界</span></div>'
+    +mini([['已删除','这份练习报告不再出现在你的记录里。'],['不影响','已经打印出来的纸质件不会被收回。'],['不撤销','删除无法在本页撤销，需要重新练习才会有新报告。']])+'</section>'
+    +'<section class="notice"><i>i</i><div>删除动作已记入你的账号操作日志；本页不代表服务端清理文件的具体时点。</div></section>'
+    +rail();
+  actions.innerHTML=btn('setup','开始新练习')+btn('reports-ready','返回记录列表',true);
+}
+function reportsDeleteFailed(){
+  mark('reports-delete-failed');
+  base('删除请求<em>没有完成</em>。','服务端没有确认删除前，原记录仍应保留；不能先从列表移除再假装操作已经成功。');
+  body.innerHTML=statusbar('删除结果状态',[['本次操作','删除失败','off'],['目标记录','仍在列表','ok'],['报告文件','未清理']])
+    +'<section class="card"><div class="head"><b>练习报告</b><span>删除失败 · 记录保留</span></div>'
+    +'<p class="copy">服务端未确认前，原记录仍保留在列表中。重试仍需再次确认，真实结果由服务端返回决定。</p>'
+    +historyRows('failed')+'</section>'
+    +'<section class="card"><div class="head"><b>重试删除会经历</b><span>三步都要真实结果</span></div>'
+    +steps([['第 1 步','再次点击删除','仍需二次确认，不沿用上一次。'],
+            ['第 2 步','等待服务端返回','返回前列表保持原样。'],
+            ['第 3 步','按结果更新列表','确认成功才移除这条记录。']])+'</section>'
+    +'<section class="card"><div class="head"><b>接下来可以</b><span>选一条</span></div>'
+    +optlist([{k:'回',t:'返回记录列表再确认',d:'重试删除仍需二次确认，不自动重复请求。',href:urlFor('reports-ready'),go:true},
+              {k:'报',t:'先查看这份报告',d:'删除失败不影响报告是否仍可阅读。',href:urlFor('report-ready')}])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>页面不会声称已清理，也不会隐藏任何未确认删除的记录。</div></section>'
+    +rail();
+  actions.innerHTML=btn('reports-ready','返回记录列表')+btn('setup','开始新练习',true);
+}
+function reportsError(){
+  mark('reports-error');
+  base('历史报告暂时<em>没有加载完成</em>。','网络或服务异常时，不能把上一次展示内容当成当前结果，也不能清空后假装删除成功。');
+  body.innerHTML='<section class="card empty tight bad"><div><div class="e">!</div><h2>暂时无法加载练习报告</h2>'
+    +'<p>请检查网络后重试。没有拿到本人列表时，不显示任何固定历史、报告评分或删除结果。</p></div></section>'
+    +statusbar('加载失败后的状态',[['本人列表','未返回','off'],['已有记录','未被清空','ok'],['删除结果','未确认']])
+    +'<section class="card"><div class="head"><b>这次失败没有改动什么</b><span>两条事实</span></div>'
+    +'<div class="fields"><div class="field"><small>本人记录</small><b>未被改动</b></div>'
+    +'<div class="field"><small>删除操作</small><b>未被执行</b></div></div></section>'
+    +'<section class="card"><div class="head"><b>选一条继续</b><span>不必停在错误页</span></div>'
+    +optlist([{k:'重',t:'重试加载本人记录',d:'按实际响应显示列表、空态或错误。',href:urlFor('reports-loading'),go:true},
+              {k:'练',t:'直接开始一场新练习',d:'新练习不依赖历史列表是否可读。',href:urlFor('setup')},
+              {k:'技',t:'查看公开面试技巧',d:'准备清单与 STAR 方法离线可读。',href:urlFor('tips')}])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>服务端恢复后重新获取；在此之前不隐藏、不合并、不推断任何本人记录。</div></section>'
+    +rail();
+  actions.innerHTML=btn('tips','查看面试技巧')+btn('reports-loading','重试加载',true);
+}
+
+/* ── 技巧 / AI 不可用 / 非法参数 ─────────────────────────────────────────── */
+function tips(){
+  mark('tips');
+  base('先把<em>准备方法</em>练熟。','这是公开的面试准备工作台，不把静态技巧伪装成根据你的简历自动生成的建议。');
+  body.innerHTML='<section class="card"><div class="head"><b>面试前准备清单</b><span id="tip-progress">0 / 6 已完成</span></div>'
+    +'<div class="checklist"><button class="check" type="button"><i></i>背景调研与岗位关键词</button>'
+    +'<button class="check" type="button"><i></i>准备真实经历与细节</button>'
+    +'<button class="check" type="button"><i></i>练习 1 分钟自我介绍</button>'
+    +'<button class="check" type="button"><i></i>核对材料、时间和路线</button>'
+    +'<button class="check" type="button"><i></i>确认线上设备与网络</button>'
+    +'<button class="check" type="button"><i></i>把问题写成 STAR 结构</button></div></section>'
+    +'<section class="card"><div class="head"><b>回答一题的基本结构</b><span>STAR 练习法</span></div>'
+    +steps([['S / T','说清背景和任务','交代情境、目标和你承担的角色。'],
+            ['A','说明你的行动','聚焦本人做了什么，不只讲团队。'],
+            ['R','核对真实结果','数字和成果由本人核实，不用编造。']])+'</section>'
+    +'<section class="card"><div class="head"><b>高频问题应对</b><span>点开看回答思路</span></div>'
+    +'<div class="faq-row"><button type="button" data-testid="interview-tip-faq">请简单自我介绍一下？<span>＋</span></button>'
+    +'<p hidden><b>回答结构：</b>我是谁 + 我做过什么 + 一个真实核心成绩 + 为什么适合目标岗位。不要逐条背诵简历或编造经历。</p></div>'
+    +'<div class="faq-row"><button type="button">你为什么想应聘这个岗位？<span>＋</span></button>'
+    +'<p hidden><b>回答结构：</b>说明岗位理解、自己的对应能力和希望解决的问题，避免只说「想找一份工作」。</p></div>'
+    +mini([['30 秒','身份、核心优势、岗位动机。'],['1 分钟','加上一段真实经历和成果。'],['3 分钟','补充两三段经历与发展方向。']])+'</section>'
+    +'<section class="notice"><i>i</i><div>这份技巧不构成个性化职业建议。想让 AI 根据真实材料辅助练习时，需要先完成可用性检查并在真实流程中创建会话。</div></section>'
+    +rail();
+  actions.innerHTML=btn('setup','设置一场练习',true)+link('05-ai-cockpit.html','AI顾问');
+  body.querySelectorAll('.check').forEach(function(x){x.onclick=function(){
+    x.classList.toggle('on');x.querySelector('i').textContent=x.classList.contains('on')?'✓':'';
+    document.getElementById('tip-progress').textContent=body.querySelectorAll('.check.on').length+' / 6 已完成'}});
+  body.querySelectorAll('.faq-row button').forEach(function(x){x.onclick=function(){
+    var p=x.parentNode.querySelector('p'),open=p.hidden;p.hidden=!open;x.querySelector('span').textContent=open?'－':'＋'}});
+}
+function down(){
+  mark('ai-down');
+  base('AI 面试官暂时<em>不能出题</em>。','AI 不可用时不创建假会话、不生成假报告；仅保留不依赖模型的准备内容与真实的通用题目单路径。');
+  body.innerHTML=statusbar('当前能力状态',[['AI 出题与追问','不可用','off'],['练习报告','不可生成','off'],['文字练习与技巧','可用','ok']])
+    +'<section class="card"><div class="head"><b>不靠 AI 也能练的三件事</b><span>现在就能开始</span></div>'
+    +optlist([{k:'1',t:'用 STAR 结构写一题',d:'公开清单可勾选，写完自己核对背景、行动与结果。',href:urlFor('tips'),go:true},
+              {k:'2',t:'练 1 分钟自我介绍',d:'照准备清单逐条对照，不需要模型点评。',href:urlFor('tips')},
+              {k:'3',t:'查看练习说明与设置项',d:'服务恢复后可直接按这套配置创建会话。',href:urlFor('setup')}])+'</section>'
+    +'<section class="card"><div class="head"><b>恢复后才重新开放</b><span>现在都不做</span></div>'
+    +steps([['恢复后','按配置出题','针对岗位和面试官类型生成题目。'],
+            ['恢复后','追问与澄清','根据你的回答继续提问。'],
+            ['恢复后','生成练习报告','完成会话后才请求报告。']])+'</section>'
+    +'<section class="card"><div class="head"><b>能力边界</b><span>恢复前后不同</span></div>'
+    +mini([['仍可用','公开技巧、准备清单与文字练习。'],
+           ['受限','通用题目单只在已有真实会话时按规则提供，且不含点评。'],
+           ['不可用','针对本场配置的出题、追问与报告。']])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>恢复时间以实际服务状态或现场公告为准；「通用题目单」不是模拟面试的等价替代，不展示通过率或评分。</div></section>'
+    +rail();
+  actions.innerHTML=btn('tips','查看面试技巧')+btn('setup','返回练习说明',true);
+}
+function illegalState(){
+  mark('illegal');
+  base('这个页面链接<em>不能使用</em>。','地址里的状态参数不属于模拟面试工作台；本机不会静默切回设置页，避免把坏链接误看成正常结果。');
+  body.innerHTML='<section class="card empty tight bad"><div><div class="e">!</div><h2>页面参数无效</h2>'
+    +'<p>请从面试服务的有效入口重新进入。当前没有创建练习、提交回答或生成报告。</p></div></section>'
+    +'<section class="card"><div class="head"><b>可以继续</b><span>选择一个有效入口</span></div>'
+    +optlist([{k:'练',t:'打开练习设置',d:'重新选择岗位、面试官、经验、难度、时长和回答方式。',href:urlFor('setup'),go:true},
+              {k:'回',t:'返回面试服务',d:'重新选择模拟面试、技巧或本人报告入口。',href:'16-service-hubs.html?hub=interview'}])+'</section>'
+    +'<section class="notice danger"><i>!</i><div>坏链接不会被解释为真实会话状态，也不会沿用上一位使用者的练习内容。</div></section>'
+    +rail();
+  actions.innerHTML=link('16-service-hubs.html?hub=interview','返回面试服务')+btn('setup','打开练习设置',true);
+}
+
+var RENDER={'session-text':sessionText,'session-voice':sessionVoice,'mic-denied':denied,
+  'transcript-review':review,'transcript-empty':transcriptEmpty,'transcript-failed':transcriptFailed,
+  'network-error':net,'session-expired':sessionExpired,
+  'report-pending':pending,'report-loading':reportLoading,'report-ready':reportReady,'report-unavailable':reportUnavailable,
+  'report-print-pending':reportPrintPending,'report-print-ready':reportPrintReady,
+  'report-print-handoff':reportPrintHandoff,'report-print-failed':reportPrintFailed,
+  'reports-guest':reportsGuest,'reports-loading':reportsLoading,'reports-empty-member':reportsEmptyMember,
+  'reports-ready':reportsReady,'reports-deleting':reportsDeleting,'reports-delete-done':reportsDeleteDone,
+  'reports-delete-failed':reportsDeleteFailed,'reports-error':reportsError,tips:tips,'ai-down':down};
+for(var i=0;i<STATES.length;i++)if(STATES[i].indexOf('setup')===0)RENDER[STATES[i]]=setup;
+(RENDER[state]||illegalState)();
+
+/* ---------- 原型演示控制：仅 debug=1 注入 DOM，普通 / ?state / ?capture / ?flat 及组合 URL 一律不渲染 ---------- */
+if(DEBUG){
+  var demoHref=function(s){var p=new URLSearchParams();p.set('state',s);p.set('debug','1');
+    if(FLAT)p.set('flat','1');if(CAPTURE!==null)p.set('capture',CAPTURE);return '?'+p.toString()};
+  var tab=document.createElement('button');
+  tab.type='button';tab.className='demo-tab';tab.setAttribute('data-proto-control','true');
+  tab.setAttribute('aria-label','打开原型演示控制面板');tab.setAttribute('aria-expanded','false');tab.textContent='演示';
+  var panel=document.createElement('div');
+  panel.className='demo-panel';panel.setAttribute('data-proto-control','true');panel.setAttribute('aria-label','原型演示控制');
+  panel.innerHTML='<div class="dp-t">状态</div>'+STATES.map(function(s){
+    return '<a href="'+demoHref(s)+'" data-proto-control="true" data-s="'+s+'"'+(s===state?' class="on"':'')+'>'+s+'</a>'}).join('');
+  tab.addEventListener('click',function(){var open=panel.classList.toggle('show');tab.setAttribute('aria-expanded',open?'true':'false')});
+  stage.appendChild(tab);stage.appendChild(panel);
+}
+})();
+</script></body></html>

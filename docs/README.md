@@ -44,7 +44,7 @@ V6 的**逐页迁移矩阵**（原型页 ↔ 实现文件 ↔ 当前风格 ↔ �
 
 **小程序**：没有独立原型目录。页面级体验以 `apps/miniapp/` 正式源码为准。
 
-**禁止清理**：`design/kiosk-redesign-2026-08/` 是产品负责人指定保留的一体机新原型整目录，不得删除、归档或当作垃圾。当前是 **工作区 untracked、有意未入库**（负责人未点名提交）；`git ls-tree origin/main` 看不到 ≠ 可删。旁路脚本 `apps/kiosk/scripts/design-shot.mjs` 同样未入库。禁止 `git add -A` 把这两处顺手带进提交。
+**禁止清理**：`design/kiosk-redesign-2026-08/` 是产品负责人指定保留的一体机新原型整目录，不得删除、归档或当作垃圾。**2026-09-03 已入库**（84 文件，纯新增），此前「工作区 untracked、有意未入库」的说法自该日起不再成立。快照取自 `claude/project-readiness-review-959ffe` 的 tip，与该分支逐字节一致；该分支自己的 `docs/reviews/branch-split-plan-2026-09-02.md` 已把这批文件列为 P2 建议首批拆出，本次即执行那一步。
 
 ### 只读历史目录 —— 不得从中提取业务口径
 
