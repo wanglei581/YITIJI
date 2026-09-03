@@ -59,10 +59,23 @@ for (const forbidden of ['标记支付失败', 'updateOrderStatus']) {
 }
 pass('orders page has no unauthorized payment/status mutation actions')
 
-if (/detail\.payStatus\s*===\s*'unpaid'\s*&&/.test(page)) {
-  pass('offline mark-paid entry is pinned to server-returned payStatus === unpaid')
+// 整行匹配，不是子串匹配。
+//
+// 第一版写的是 /detail\.payStatus\s*===\s*'unpaid'\s*&&/，独立审查指出它挡不住
+// 把条件拓宽成 `(detail.payStatus === 'unpaid' || detail.payStatus === 'paying') &&` ——
+// 子串仍在，正则照绿，而入口会渲染在后端必拒的订单上。后果被 markPaid 的
+// unpaid→paid 单向转换兜住（不会重复收款），但界面会摆一个点了必失败的按钮。
+//
+// 改为锚定整行：该守卫必须独占一行，且行内除这一个比较外不得有 || 或其它 payStatus 比较。
+const guardLine = page
+  .split('\n')
+  .find((line) => line.includes('detail.payStatus') && line.includes('setMarkPaidOpen') === false && /&&\s*\($/.test(line.trim()))
+if (!guardLine) {
+  fail('offline mark-paid entry must render only when server-returned payStatus is unpaid (guard line not found)')
+} else if (!/^\{detail\.payStatus === 'unpaid' && \($/.test(guardLine.trim())) {
+  fail(`offline mark-paid entry guard must be exactly \`detail.payStatus === 'unpaid'\`, found: ${guardLine.trim()}`)
 } else {
-  fail('offline mark-paid entry must render only when server-returned payStatus is unpaid')
+  pass('offline mark-paid entry is pinned to server-returned payStatus === unpaid (whole-line match)')
 }
 
 if (

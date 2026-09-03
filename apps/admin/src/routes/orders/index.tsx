@@ -102,7 +102,12 @@ function fmt(iso: string | null): string {
 }
 
 function amountText(amountCents: number, currency: string): string {
-  if (amountCents <= 0) return '未计费'
+  // 0 元 ≠ 未计费。系统里存在合法的 0 元单：会员权益抵扣、0 元活动、
+  // paymentSource === 'free' 的免费单 —— 它们是「已定价为 0」，不是「还没定价」。
+  // 此前 `<= 0` 一律兜成「未计费」，把两件事说成一件，运营无法判断这单是免费
+  // 还是计费流程出了问题。负值才是真异常，单独如实标出而不是伪装成未计费。
+  if (amountCents === 0) return '¥ 0.00（免费）'
+  if (amountCents < 0) return `金额异常（${amountCents}）`
   return `${currency === 'CNY' ? '¥' : currency} ${(amountCents / 100).toFixed(2)}`
 }
 
