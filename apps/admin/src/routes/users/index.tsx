@@ -1,4 +1,9 @@
-import type { AdminUserListItem, AdminUserListResult, AdminUserListQuery } from '@ai-job-print/shared'
+import type {
+  AdminUserListItem,
+  AdminUserListResult,
+  AdminUserListQuery,
+  AdminUserStatusChangeResult,
+} from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState } from '@ai-job-print/ui'
 import { RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
@@ -7,11 +12,16 @@ import { ApiHttpError } from '../../services/api/client'
 import { Page } from '../Page'
 import { Pagination, useTableState } from '../components/DataTable'
 import { UserDetailDrawer } from './UserDetailDrawer'
+import { UserStatusDialog, type UserStatusDialogTarget, type UserStatusIntent } from './UserStatusDialog'
 import {
   buildAdminUserQuery,
+  canDisableUser,
+  canRestoreUser,
   EMPTY_USER_FILTERS,
   formatUserDateTime,
   hasUserFilters,
+  USER_STATUS_LABELS,
+  userDisplayName,
   type UserFilterState,
 } from './userPresentation'
 
@@ -35,10 +45,10 @@ function TableSkeleton() {
   )
 }
 
-function StatusPill({ enabled }: { enabled: boolean }) {
+function StatusPill({ status }: { status: AdminUserListItem['status'] }) {
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${enabled ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
-      {enabled ? '正常' : '已停用'}
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${status === 'active' ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
+      {USER_STATUS_LABELS[status]}
     </span>
   )
 }
@@ -53,7 +63,10 @@ export default function UsersPage() {
   const [listError, setListError] = useState<ApiHttpError | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [statusTarget, setStatusTarget] = useState<UserStatusDialogTarget | null>(null)
+  const [statusNotice, setStatusNotice] = useState<string | null>(null)
   const requestSequence = useRef(0)
+  const statusTriggerRef = useRef<HTMLButtonElement | null>(null)
   const setPageRef = useRef(setPage)
   const pageSizeChangePendingRef = useRef(false)
   const detailTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -130,6 +143,32 @@ export default function UsersPage() {
     requestAnimationFrame(() => detailTriggerRef.current?.focus())
   }
 
+  const openStatusDialog = (user: AdminUserListItem, intent: UserStatusIntent, trigger: HTMLButtonElement) => {
+    statusTriggerRef.current = trigger
+    setStatusNotice(null)
+    setStatusTarget({ user, intent })
+  }
+
+  const closeStatusDialog = () => {
+    setStatusTarget(null)
+    requestAnimationFrame(() => statusTriggerRef.current?.focus())
+  }
+
+  // 就地替换该行而不是整表重拉：状态变更的权威结果就在响应体里，
+  // 重拉一次反而会在筛选了「正常」时让刚停用的行凭空消失，看起来像操作失败。
+  const applyStatusChange = (result: AdminUserStatusChangeResult, intent: UserStatusIntent) => {
+    setResult((current) => ({
+      ...current,
+      items: current.items.map((item) => (item.id === result.user.id ? result.user : item)),
+    }))
+    const name = userDisplayName(result.user)
+    setStatusNotice(
+      result.changed
+        ? `已${intent === 'disable' ? '停用' : '恢复'}「${name}」，操作已记入审计日志。`
+        : `「${name}」已处于${intent === 'disable' ? '停用' : '正常'}状态，本次未做改动。`,
+    )
+  }
+
   const filtered = hasUserFilters(applied)
   const retryable = listError === null || listError.status === 0 || listError.status >= 500
   const listErrorTitle = listError?.status === 403 ? '无权查看用户列表' : '用户列表加载失败'
@@ -182,6 +221,22 @@ export default function UsersPage() {
         </form>
       </Card>
 
+      {statusNotice && (
+        <div
+          role="status"
+          className="mb-4 flex items-center justify-between gap-4 rounded-lg bg-success-bg px-4 py-3 text-sm text-success-fg"
+        >
+          <span>{statusNotice}</span>
+          <button
+            type="button"
+            onClick={() => setStatusNotice(null)}
+            className="shrink-0 rounded px-2 py-1 text-xs font-medium underline-offset-2 hover:underline"
+          >
+            知道了
+          </button>
+        </div>
+      )}
+
       <Card className="overflow-hidden">
         {state === 'loading' && <TableSkeleton />}
         {state === 'error' && (
@@ -216,20 +271,42 @@ export default function UsersPage() {
               <tbody className="divide-y divide-neutral-100">
                 {result.items.map((user) => (
                   <tr key={user.id} className="text-neutral-700 hover:bg-neutral-50/70">
-                    <td className="px-4 py-3 font-medium text-neutral-900">{user.nickname?.trim() || '未设置昵称'}</td>
+                    <td className="px-4 py-3 font-medium text-neutral-900">{userDisplayName(user)}</td>
                     <td className="px-4 py-3 font-mono text-xs">{user.maskedPhone}</td>
-                    <td className="px-4 py-3"><StatusPill enabled={user.enabled} /></td>
+                    <td className="px-4 py-3"><StatusPill status={user.status} /></td>
                     <td className="px-4 py-3">{user.lastLoginAt ? formatUserDateTime(user.lastLoginAt) : '暂无登录记录'}</td>
                     <td className="px-4 py-3">{formatUserDateTime(user.createdAt)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={(event) => openDetail(user, event.currentTarget)}
-                        aria-label={`查看用户 ${user.nickname?.trim() || '未设置昵称'} 的详情`}
-                        className="rounded-lg px-3 py-1.5 text-sm font-medium text-primary-700 hover:bg-primary-50"
-                      >
-                        查看详情
-                      </button>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={(event) => openDetail(user, event.currentTarget)}
+                          aria-label={`查看用户 ${userDisplayName(user)} 的详情`}
+                          className="rounded-lg px-3 py-1.5 text-sm font-medium text-primary-700 hover:bg-primary-50"
+                        >
+                          查看详情
+                        </button>
+                        {canDisableUser(user) && (
+                          <button
+                            type="button"
+                            onClick={(event) => openStatusDialog(user, 'disable', event.currentTarget)}
+                            aria-label={`停用用户 ${userDisplayName(user)}`}
+                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                          >
+                            停用
+                          </button>
+                        )}
+                        {canRestoreUser(user) && (
+                          <button
+                            type="button"
+                            onClick={(event) => openStatusDialog(user, 'restore', event.currentTarget)}
+                            aria-label={`恢复用户 ${userDisplayName(user)}`}
+                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-primary-700 hover:bg-primary-50"
+                          >
+                            恢复
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -252,6 +329,12 @@ export default function UsersPage() {
         endUserId={selectedId}
         onClose={closeDetail}
         onMissing={() => setRefreshKey((value) => value + 1)}
+      />
+
+      <UserStatusDialog
+        target={statusTarget}
+        onClose={closeStatusDialog}
+        onSuccess={applyStatusChange}
       />
     </Page>
   )
