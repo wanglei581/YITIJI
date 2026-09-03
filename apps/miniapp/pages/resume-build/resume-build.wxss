@@ -159,3 +159,5 @@
 
 /* actionbar 里主按钮占更大权重 */
 .rb-grow { flex: 1.6; }
+
+.rb-voice-go { margin-top: 16rpx; }

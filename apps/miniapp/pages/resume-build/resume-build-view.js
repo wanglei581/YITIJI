@@ -5,7 +5,7 @@
 // 拆开的直接原因是 CLAUDE.md §8 的单文件阈值——页面 js 光是六段表单的
 // 交互加三条 API 链路就已经顶到 500 行。
 
-const model = require('./resume-build-model')
+const model = require('../../utils/resume-build-model')
 
 /** 六段的标题与说明。副标题里的上限数字直接引用 DTO 镜像，不另抄一份。 */
 function steps() {

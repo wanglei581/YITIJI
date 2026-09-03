@@ -24,6 +24,7 @@
     "pages/fair-materials/fair-materials",
     "pages/policy-detail/policy-detail",
     "pages/resume-build/resume-build",
+    "pages/resume-voice/resume-voice",
     "pages/resume-upload/resume-upload",
     "pages/resume-diagnose/resume-diagnose",
     "pages/resume-optimize/resume-optimize",
@@ -92,6 +93,11 @@
         "text": "我的"
       }
     ]
+  },
+  "permission": {
+    "scope.record": {
+      "desc": "把你说的话转成文字，用来填写简历。音频只用于本次转写，不会保存，不给企业，不用于声纹。"
+    }
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",

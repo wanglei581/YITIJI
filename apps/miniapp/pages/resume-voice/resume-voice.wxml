@@ -1,0 +1,197 @@
+<!--pages/resume-voice/resume-voice.wxml-->
+<!--
+  蓝领语音简历 v1。引导式一问一录，不是一次录完，也不是 LLM 自由采访。
+  转写从未自动视为事实：每题必须「说得对 / 重说 / 改一下」三选一。
+  电话没有语音入口。AI 挂了的出路在 resume-build 的 draft 导出。
+-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">语音说简历</view>
+  </view>
+
+  <!-- ── 录音同意：独立勾选，不能和隐私政策打包 ── -->
+  <block wx:if="{{phase === 'consent'}}">
+  <view class="content has-bar">
+    <view class="pagehead rise-d1">
+      <view class="ph-title">先说清楚录音怎么用</view>
+      <view class="ph-sub">不同意也可以继续，改用手打，功能还在。</view>
+    </view>
+
+    <view class="card rise-d2"><view class="card-inner">
+      <view class="cs-head">
+        <text class="ficon i-info cs-ic"></text>
+        <text class="cs-title">录音只做这四件事</text>
+      </view>
+      <view class="cs-list">
+        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">只把你说的话转成文字，方便填简历。</text></view>
+        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">不保存音频。转写完这段录音就丢掉。</text></view>
+        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">不给企业。本平台不代收简历，也不代为投递。</text></view>
+        <view class="cs-item"><text class="ficon i-check cs-dot"></text><text class="cs-text">不用于声纹识别，也不拿去训练。</text></view>
+      </view>
+    </view></view>
+
+    <view class="card rise-d3"><view class="card-inner">
+      <view class="cbox tap" hover-class="tap-press" bindtap="toggleConsent"
+            role="checkbox" aria-checked="{{consentChecked}}"
+            aria-label="{{consentChecked ? '已同意录音转写' : '同意录音转写，必选才能试音'}}">
+        <view class="cb {{consentChecked ? 'on' : ''}}"><text wx:if="{{consentChecked}}" class="ficon i-check"></text></view>
+        <view class="cb-body">
+          <view class="cb-title">我同意按上面四条使用麦克风（必选才能录音）</view>
+          <view class="cb-desc">这是录音同意，不是隐私政策。不勾选就用手打，简历照样能做。</view>
+        </view>
+      </view>
+    </view></view>
+
+    <view class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <text>正经题目前会先试音 5 到 10 秒。对不上就改手打，不会让你白说三分钟。</text>
+    </view>
+    <view class="compliance-note">简历内容由你本人确认并负责。</view>
+    <view class="spacer-lg"></view>
+  </view>
+
+  <view wx:if="{{phase === 'consent'}}" class="actionbar">
+    <view class="btn lg ghost tap" hover-class="tap-press" bindtap="refuseVoice" role="button" aria-label="不用语音，用手打">用手打</view>
+    <view class="btn lg primary rv-grow tap" hover-class="tap-press" bindtap="agreeVoice" role="button" aria-label="同意并试音">同意并试音</view>
+  </view>
+  </block>
+
+  <!-- ── 强制试音 ── -->
+  <block wx:elif="{{phase === 'probe'}}">
+  <view class="content has-bar">
+    <view class="pagehead rise-d1">
+      <view class="ph-title">先试一下麦克风</view>
+      <view class="ph-sub">大约 5 到 10 秒。这段话不会写进简历。</view>
+    </view>
+    <view class="card rise-d2"><view class="card-inner">
+      <view class="rv-prompt">请用普通话说：</view>
+      <view class="rv-quote">我叫张三，在北京找工作</view>
+      <view class="rv-fine">换上你自己的名字和城市也行。说完请看字：是你说的，才能继续。</view>
+    </view></view>
+
+    <view wx:if="{{recError}}" class="notice warn">
+      <text class="ficon i-warning n-ic"></text>
+      <text>{{recError}}</text>
+    </view>
+
+    <view wx:if="{{recStatus === 'transcribing'}}" class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <text>正在转成文字，请稍候…</text>
+    </view>
+
+    <view wx:if="{{recStatus === 'ready'}}" class="card"><view class="card-inner">
+      <view class="rv-label">识别到的文字</view>
+      <view class="rv-echo">{{transcript}}</view>
+      <view class="rv-fine">没对上就点「不是」。两次都不对，后面改成手打。</view>
+    </view></view>
+
+    <view class="rv-textline tap" hover-class="tap-press" bindtap="refuseVoice" role="button" aria-label="不用语音，改用手打">不用语音，改用手打</view>
+    <view class="compliance-note">试音内容不会保存，也不会写进简历。</view>
+    <view class="spacer-lg"></view>
+  </view>
+
+  <view wx:if="{{phase === 'probe'}}" class="actionbar">
+    <block wx:if="{{recStatus === 'recording'}}">
+      <view class="btn lg ghost tap" hover-class="tap-press" bindtap="stopRec" role="button" aria-label="结束试音">结束 {{recSeconds}}s / {{recMax}}s</view>
+    </block>
+    <block wx:elif="{{recStatus === 'ready'}}">
+      <view class="btn lg ghost tap" hover-class="tap-press" bindtap="probeNo" role="button" aria-label="不是我说的">不是</view>
+      <view class="btn lg primary rv-grow tap" hover-class="tap-press" bindtap="probeYes" role="button" aria-label="对，是我说的">对，是我说的</view>
+    </block>
+    <block wx:else>
+      <view class="btn lg primary rv-grow tap {{recStatus === 'transcribing' ? 'disabled' : ''}}" hover-class="tap-press"
+            bindtap="startRec" role="button" aria-label="开始试音">
+        {{recStatus === 'transcribing' ? '正在转写…' : (transcript ? '再试一次' : '开始试音')}}
+      </view>
+    </block>
+  </view>
+  </block>
+
+  <!-- ── 一问一录 ── -->
+  <block wx:else>
+    <view class="content has-bar">
+      <view wx:if="{{textOnlyReason}}" class="notice warn">
+        <text class="ficon i-warning n-ic"></text>
+        <text>{{textOnlyReason}}</text>
+      </view>
+
+      <view class="pagehead rise-d1">
+        <view class="ph-title">{{qTitle}}</view>
+        <view class="ph-sub">已确认 {{confirmedCount}} 项 · 第 {{qIndex + 1}} / {{qTotal}} 题</view>
+      </view>
+
+      <view class="card rise-d2"><view class="card-inner">
+        <view class="rv-prompt">{{qPrompt}}</view>
+        <view wx:if="{{qExample}}" class="rv-fine">{{qExample}}</view>
+        <view wx:if="{{qHint}}" class="rv-fine">{{qHint}}</view>
+        <view wx:if="{{qSensitive}}" class="notice warn rv-in">
+          <text class="ficon i-warning n-ic"></text>
+          <text>大厅里旁人能听见，请手动输入。</text>
+        </view>
+      </view></view>
+
+      <view wx:if="{{recError}}" class="notice warn">
+        <text class="ficon i-warning n-ic"></text>
+        <text>{{recError}}</text>
+      </view>
+
+      <view wx:if="{{recStatus === 'transcribing'}}" class="notice info">
+        <text class="ficon i-info n-ic"></text>
+        <text>正在转成文字，请稍候…</text>
+      </view>
+
+      <view wx:if="{{qVoice && recStatus === 'ready'}}" class="card"><view class="card-inner">
+        <view class="rv-label">识别到的文字（确认前不会写进简历）</view>
+        <view wx:if="{{!editing}}" class="rv-echo">{{transcript}}</view>
+        <textarea wx:else class="rv-input rv-area" value="{{editText}}" maxlength="{{qMaxLen}}"
+                  auto-height bindinput="onEditInput" placeholder-class="rv-ph"></textarea>
+        <view class="rv-fine">说得对才算数。已经确认的题目，后面失败也不会改回去。</view>
+      </view></view>
+
+      <view wx:if="{{!qVoice}}" class="card"><view class="card-inner">
+        <view class="rv-label">{{qTitle}}</view>
+        <input wx:if="{{qKeyboard === 'number'}}" class="rv-input" type="number" value="{{typedText}}"
+               maxlength="{{qMaxLen}}" placeholder="请输入" placeholder-class="rv-ph" bindinput="onTypedInput" />
+        <textarea wx:else class="rv-input rv-area" value="{{typedText}}" maxlength="{{qMaxLen}}"
+                  auto-height placeholder="请输入" placeholder-class="rv-ph" bindinput="onTypedInput"></textarea>
+      </view></view>
+
+      <view wx:if="{{qVoice && recStatus === 'ready' && !editing}}" class="rv-textline tap" hover-class="tap-press"
+            bindtap="startEdit" role="button" aria-label="改一下，弹键盘">改一下（弹键盘）</view>
+      <view wx:if="{{qVoice && recStatus !== 'recording' && recStatus !== 'transcribing'}}" class="rv-textline tap" hover-class="tap-press"
+            bindtap="typeThisQuestion" role="button" aria-label="这一题改用手打">这一题改用手打</view>
+      <view class="rv-textline tap" hover-class="tap-press" bindtap="goTypedForm" role="button" aria-label="改用完整文字表单">改用完整文字表单</view>
+
+      <view class="compliance-note">转写文字必须你本人确认。本平台不代收简历，也不代为投递。</view>
+      <view class="spacer-lg"></view>
+    </view>
+
+    <view class="actionbar">
+      <block wx:if="{{qVoice && recStatus === 'recording'}}">
+        <view class="btn lg primary rv-grow tap" hover-class="tap-press" bindtap="stopRec" role="button" aria-label="结束录音">
+          结束录音 {{recSeconds}}s / {{recMax}}s
+        </view>
+      </block>
+      <block wx:elif="{{qVoice && recStatus === 'ready'}}">
+        <view class="btn lg ghost tap" hover-class="tap-press" bindtap="retryRec" role="button" aria-label="重说一遍">重说一遍</view>
+        <view class="btn lg primary rv-grow tap" hover-class="tap-press" bindtap="confirmTranscript" role="button" aria-label="说得对">说得对</view>
+      </block>
+      <block wx:elif="{{!qVoice}}">
+        <view wx:if="{{qSkippable}}" class="btn lg ghost tap" hover-class="tap-press" bindtap="skipQuestion" role="button" aria-label="跳过">跳过</view>
+        <view class="btn lg primary rv-grow tap" hover-class="tap-press" bindtap="confirmTyped" role="button" aria-label="确认写入">确认</view>
+      </block>
+      <block wx:else>
+        <view wx:if="{{qSkippable}}" class="btn lg ghost tap" hover-class="tap-press" bindtap="skipQuestion" role="button" aria-label="跳过">跳过</view>
+        <view class="btn lg primary rv-grow tap {{recStatus === 'transcribing' ? 'disabled' : ''}}" hover-class="tap-press"
+              bindtap="startRec" role="button" aria-label="开始录音">
+          {{recStatus === 'transcribing' ? '正在转写…' : '开始录音'}}
+        </view>
+      </block>
+    </view>
+  </block>
+</view>

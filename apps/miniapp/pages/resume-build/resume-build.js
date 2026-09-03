@@ -2,7 +2,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
-const model = require('./resume-build-model')
+const model = require('../../utils/resume-build-model')
 const view = require('./resume-build-view')
 
 /** 三段可重复条目的规格。key 就是 data 里的数组名，wxml 通过 data-group 指过来。 */
@@ -51,6 +51,8 @@ Page({
     failMsg: '',
     /** 历史结果只读展示：不重新调用 AI，也不在这一页覆盖它 */
     historyMode: false,
+    /** 从语音向导交接过来：失败态文案走「按你说的原话」，缺项最多展示 3 条 */
+    fromVoice: false,
 
     step: 0,
     steps: view.steps(),
@@ -103,6 +105,7 @@ Page({
 
     this._token = ''
     this._taskId = ''
+    if (options && options.from === 'voice' && this._hydrateFromVoice()) return
     // 首屏就给一条教育、一条经历，省掉「先点加号」这一步；留空不填也能提交。
     this.setData({ eduRows: [model.emptyEducation()], expRows: [model.emptyExperience()] })
   },
@@ -237,7 +240,7 @@ Page({
           return
         }
         this._resumeRaw = res.resume
-        this.setData({ phase: 'done', result: view.toResultView(res) })
+        this.setData({ phase: 'done', result: this._resultView(res) })
         wx.pageScrollTo({ scrollTop: 0, duration: 200 })
       })
       .catch((err) => {
@@ -312,7 +315,7 @@ Page({
           return
         }
         this._resumeRaw = res.resume
-        this.setData({ phase: 'done', result: view.toResultView(res) })
+        this.setData({ phase: 'done', result: this._resultView(res) })
       })
       .catch((err) => {
         if (this._gone) return
@@ -497,4 +500,56 @@ Page({
   },
 
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
+
+  goVoice() {
+    const form = this._form()
+    const dirty = Boolean(String((form.basic && form.basic.name) || '').trim()
+      || String((form.intention && form.intention.position) || '').trim())
+    const open = () => {
+      wx.navigateTo({
+        url: '/pages/resume-voice/resume-voice',
+        fail() { wx.showToast({ title: '页面打开失败', icon: 'none' }) },
+      })
+    }
+    if (!dirty) { open(); return }
+    wx.showModal({
+      title: '改用语音填写',
+      content: '语音是从头一题一问，这边已经填的内容不会带过去。文字入口仍在。',
+      confirmText: '去语音',
+      cancelText: '留下',
+      success: (r) => { if (r.confirm) open() },
+    })
+  },
+
+  _resultView(res) {
+    const result = view.toResultView(res)
+    if (this.data.fromVoice && result.missingHints && result.missingHints.length > 3) {
+      result.missingHints = result.missingHints.slice(0, 3)
+    }
+    return result
+  },
+
+  _hydrateFromVoice() {
+    const handoff = storage.get(storage.KEYS.RESUME_VOICE_HANDOFF)
+    storage.remove(storage.KEYS.RESUME_VOICE_HANDOFF)
+    if (!handoff || !handoff.form) return false
+    const form = handoff.form
+    this.setData({
+      fromVoice: true,
+      basic: form.basic || { name: '', phone: '', email: '', city: '' },
+      intention: form.intention || { position: '', city: '', jobType: '', salary: '' },
+      eduRows: (form.eduRows && form.eduRows.length) ? form.eduRows : [model.emptyEducation()],
+      expRows: (form.expRows && form.expRows.length) ? form.expRows : [model.emptyExperience()],
+      projRows: form.projRows || [],
+      skillsText: form.skillsText || '',
+      certsText: form.certsText || '',
+      selfIntro: form.selfIntro || '',
+      skillChips: model.parseList(form.skillsText),
+      certChips: model.parseList(form.certsText),
+    }, () => {
+      this._syncSteps()
+      this.submit()
+    })
+    return true
+  },
 })

@@ -62,6 +62,7 @@ Page({
           // 原文就是「AI 只润色，不编造」，在 service 层强制。入口处先把预期封住，
           // 用户才不会带着「AI 会替我写经历」的期待进去。
           { id: 'build',     icon: 'plus',        title: '生成简历', desc: '从零填写，AI 只润色不编造', accent: 'cyan'  },
+          { id: 'voice',     icon: 'comment',     title: '语音说简历', desc: '一题一问，看字确认再生成', accent: 'plum'  },
           { id: 'diagnose',  icon: 'file-search', title: '简历诊断', desc: '逐条给出问题与依据', accent: 'plum'  },
           { id: 'optimize',  icon: 'edit',        title: '简历优化', desc: '改写前后对照可选用', accent: 'teal'  },
           // 放「准备材料」而不是 AI 组：这条链全程无模型，服务端按模板 + 你填的字段
@@ -180,6 +181,7 @@ Page({
       // undefined，wx.navigateTo 不会被调用，卡片变成静默死按钮（用户会以为是
       // 自己没点准，反复去戳）。id 与 groups 里的 id 必须逐字对应。
       build:     '/pages/resume-build/resume-build',
+      voice:     '/pages/resume-voice/resume-voice',
       diagnose:  '/pages/resume-diagnose/resume-diagnose',
       optimize:  '/pages/resume-optimize/resume-optimize',
       documents: '/pages/documents/documents',

@@ -37,6 +37,19 @@
         <view class="qing-go"><text class="ficon i-right"></text></view>
       </view>
 
+      <view class="info-card" style="margin-top:22rpx">
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapService"
+              data-url="/pages/resume-voice/resume-voice"
+              role="button" aria-label="语音说简历，一题一问，看字确认后再生成">
+          <view class="info-icon soft-indigo"><text class="ficon i-comment"></text></view>
+          <view class="info-copy">
+            <text class="info-title">语音说简历</text>
+            <text class="info-desc">一题一问，看字确认后再生成</text>
+          </view>
+          <view class="info-arrow"><text class="ficon i-right"></text></view>
+        </view>
+      </view>
+
       <view class="section-head">
         <text class="section-title">常用服务</text>
         <text class="section-more text-action" bindtap="tapLifeCircle" role="button" aria-label="查看 AI 百宝箱">AI 百宝箱</text>

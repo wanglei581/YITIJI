@@ -45,14 +45,15 @@
       <view class="btn lg ghost block tap" hover-class="tap-press"
             bindtap="backToForm" role="button" aria-label="回去检查填写内容">回去检查填写内容</view>
       <view wx:if="{{!historyMode}}" class="btn lg ghost-ink block tap {{exporting ? 'disabled' : ''}}" hover-class="tap-press"
-            bindtap="tapExportDraft" role="button" aria-label="按填写内容导出未润色版本">
-        {{exporting ? '正在排版…' : '按填写内容导出（未润色）'}}
+            bindtap="tapExportDraft" role="button" aria-label="{{fromVoice ? '按你说的原话出稿' : '按填写内容导出未润色版本'}}">
+        {{exporting ? '正在排版…' : (fromVoice ? '按你说的原话出稿' : '按填写内容导出（未润色）')}}
       </view>
     </view>
 
     <view wx:if="{{!historyMode}}" class="notice warn">
       <text class="ficon i-info n-ic"></text>
-      <text>「按填写内容导出」不经过 AI：把你刚才填的内容原样排版成文件，一个字都不改，也不会替你补写空着的段落。</text>
+      <text wx:if="{{fromVoice}}">这次按你说的原话排版，一个字都不改。文件上会标明不是 AI 写的。</text>
+      <text wx:else>「按填写内容导出」不经过 AI：把你刚才填的内容原样排版成文件，一个字都不改，也不会替你补写空着的段落。</text>
     </view>
   </view>
 
@@ -227,6 +228,12 @@
         <view class="ph-title">{{steps[step].title}}</view>
         <view class="ph-sub">第 {{step + 1}} / {{steps.length}} 段 · {{steps[step].sub}}</view>
       </view>
+
+      <view wx:if="{{step === 0}}" class="card rise-d1"><view class="card-inner">
+        <view class="rb-row-title">也可以一题一题说</view>
+        <view class="rb-fine">每句转成文字后你自己确认，确认前不会写进简历。电话请手打。文字填写入口一直留在这一页。</view>
+        <view class="btn lg ghost block tap rb-voice-go" hover-class="tap-press" bindtap="goVoice" role="button" aria-label="用语音说一份">用语音说一份</view>
+      </view></view>
 
       <view wx:if="{{step === 0}}" class="notice info">
         <text class="ficon i-info n-ic"></text>

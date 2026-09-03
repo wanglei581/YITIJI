@@ -118,7 +118,8 @@
     "POST /resume/job-fit/consent",
     "POST /resume/parse",
     "POST /resume/self-assessment",
-    "POST /resume/self-assessment/:p/print"
+    "POST /resume/self-assessment/:p/print",
+    "POST /resume/voice/transcribe"
   ],
   "knownMissing": {
     "DELETE /community/comments/:p/like": "同上，取消评论点赞。",

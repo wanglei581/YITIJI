@@ -1,7 +1,7 @@
 // 从零建简历 · 数据模型层：上限常量、空行工厂、校验、提交/导出 payload 组装。
 //
-// 拆出来的原因是 CLAUDE.md §8 的单文件阈值：页面 js 已经承担 6 段表单的交互
-// 与三条 API 链路，再把 DTO 镜像塞进去会直接越过 500 行。
+// 放在 utils/ 而不是 pages/resume-build/：静态门禁禁止页面 require 兄弟页面，
+// pages/resume-voice 必须和文字表单走同一份 DTO 镜像，不能再抄一份。
 //
 // 这里的每个上限都不是拍脑袋定的，是 services/api/src/ai/dto/resume-generate.dto.ts
 // 的逐条镜像。后端全局 ValidationPipe 是 whitelist + forbidNonWhitelisted：

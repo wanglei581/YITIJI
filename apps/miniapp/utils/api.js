@@ -1077,6 +1077,32 @@ const api = {
     });
   },
 
+  /**
+   * 简历语音转写。multipart 字段名必须是 audio——wx.uploadFile 默认 name 是 file，
+   * 不覆盖的话后端 FileInterceptor('audio') 收不到，回 AUDIO_MISSING。
+   *
+   * 成功裸响应 { text, providerName }。失败不要吞成通用错误，按业务码分流：
+   *   ASR_NOT_CONFIGURED  服务端没配 ASR，整场改手打
+   *   ASR_FAILED          没听清 / 音频过长，可重录或手打这一题
+   *   AUDIO_MISSING       没带上音频
+   *   INVALID_AUDIO_FORMAT 不是 RIFF/WAVE
+   * 音频不落库；转写文本也从未自动视为事实，必须用户确认后再写入表单。
+   *
+   * @param {string} filePath RecorderManager.onStop 给出的临时 wav 路径
+   * @returns {Promise<{text:string, providerName:string}>}
+   */
+  transcribeResumeVoice(filePath) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('语音转写'));
+    return uploadFile('/resume/voice/transcribe', filePath, {
+      name: 'audio',
+      needAuth: true,
+      timeout: config.aiTimeout,
+    }).then((res) => ({
+      text: res && typeof res.text === 'string' ? res.text : '',
+      providerName: (res && res.providerName) || '',
+    }));
+  },
+
   // ---------- 求职材料模板 ----------
   // **这条链全程无 LLM**：服务端按模板 + 用户填写的字段直接渲染 PDF
   // （job-materials.service.ts 里没有任何模型调用）。所以页面不得挂 AI 标识、

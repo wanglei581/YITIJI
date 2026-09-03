@@ -23,6 +23,11 @@ const KEYS = {
   // 读取报告的唯一凭证。面试是多回合流程,中途退出页面后要能回到同一会话,
   // 所以必须落地。注意这是 x-interview-access-token,与简历的 token 是两套。
   INTERVIEW_SESSION: 'zyd_interview_session',
+
+  // 语音说简历 → 从零建简历 的一次性交接。
+  // 只在 wizard 走完、即将 redirect 到 resume-build 时写入，resume-build 读完即删。
+  // 不复用 RESUME_TASK：那是解析任务凭证，写进去会把诊断/优化五页指到 kind 不对的任务上。
+  RESUME_VOICE_HANDOFF: 'zyd_resume_voice_handoff',
 };
 
 function get(key, fallback = null) {
