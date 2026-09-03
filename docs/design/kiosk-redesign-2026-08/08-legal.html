@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>协议与隐私 · 职易达</title>
+<!--
+  route: /legal/:doc（apps/kiosk/src/pages/legal/LegalDocPage.tsx）
+  doc: user（= React 的 terms，本页同时接受 ?doc=terms 别名）| privacy；两份文档结构不同，不共用一套章节。
+  state: ready | loading | not-found | error
+  数据来源（唯一）：`GET /kiosk/legal/{docType}`，docType = terms_of_service | privacy_policy，
+    返回 { content, publishedAt }。**版本号与生效日期只能来自 publishedAt**，静态原型一律不填。
+  正文边界（本页唯一正确说法）：
+    条款正文由运营方发布、经服务端返回；本静态页只交付**阅读排版**（文档切换、章节目录、字号、返回来源），
+    不预置条款正文，不写版本号 / 生效日期 / 主体承诺，也不拿一份文本同时冒充两份文档。
+    取不到正文时进入 error，**不用旧文本或兜底文案顶上**，因为那会让用户以为自己读到了现行条款。
+  已知与运行时的差异（迁移时须对齐，不在页面上装作已一致）：
+    当前 React 对未知 doc 参数会回落到「用户服务协议」，并在请求失败时静默使用内置草稿；
+    本设计要求改为：未知 doc → not-found，取不到正文 → error 并给重试，二者都不静默顶替。
+  返回来源：?from= 只认受控键 home / login / profile / help，未知一律回首页，不接受任意路径。
+  ai-mode: AI-EXPLAIN（COVERAGE-MATRIX 005）
+  ai-input: 当前正在阅读的那一章的**服务端正文**；正文没取到时该入口在 React 侧必须禁用
+  ai-consent: 用户主动点「用大白话讲这一章」才进入 /assistant
+  ai-output: 通俗转述与举例，可忽略；**不构成法律结论**，不改变条款效力，不判定用户是否符合某条
+  ai-failure: AI 顾问不可用不影响阅读、切换文档、切换章节、调字号与返回来源
+  ai-fallback: 章节目录 + 原文阅读 + 字号调整 + 现场工作人员
+  ai-persistence: 本页不产生 AI 记录
+  原型演示控制: ?doc= 切文档；?state= 切展示状态；?sec= 选章节；?from= 受控返回；
+                ?capture=1 冻结时钟；?flat=1 关非必要动效；?debug=1 显演示面板。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f5e9de;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --plum:#7a5a86; --plum-d:#6b4a77; --plum-soft:#efe8f2;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --skel:#eae7dc;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;text-align:left}
+a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:16px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.fs-btn{flex:none;width:64px;height:60px;border-radius:18px;border:1px solid var(--line-2);background:var(--paper);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--ink-2);font-size:22px}
+.fs-now{flex:none;min-width:78px;height:60px;border-radius:18px;background:var(--paper);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.scrollarea{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;display:flex;flex-direction:column;scrollbar-width:thin;
+  scrollbar-color:var(--line-2,#d4cdb6) transparent}
+/* 触屏上必须看得见「还有内容」——公共终端用户不会去试探能不能滑。
+   原来是 overflow:hidden：条款一长就被静默裁掉，而这一页要求用户「阅读并同意」。 */
+.scrollarea::-webkit-scrollbar{width:10px}
+.scrollarea::-webkit-scrollbar-thumb{background:var(--line-2,#d4cdb6);border-radius:6px}
+.scrollarea::-webkit-scrollbar-track{background:transparent}
+.sec{flex:none;padding:0 44px;margin-top:24px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+
+.tabs{display:flex;gap:14px}
+.tab{flex:1;min-height:92px;border-radius:26px;background:var(--surface);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;gap:12px;font-size:26px;font-weight:700;color:var(--ink-2)}
+.tab[aria-current=page]{background:var(--deep);border-color:var(--deep);color:var(--emerald)}
+
+.dochead{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;gap:24px}
+.dochead .di{flex:none;width:86px;height:86px;border-radius:26px;display:flex;align-items:center;justify-content:center}
+.dochead-main{flex:1;min-width:0}
+.dochead-eyebrow{font-size:17px;letter-spacing:4px;color:var(--ink-3);font-weight:700}
+.dochead-title{margin-top:6px;font-size:36px;font-weight:700;letter-spacing:1px}
+.dochead-sum{margin-top:8px;font-size:20px;line-height:1.55;color:var(--ink-2)}
+.dochead-meta{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:17px;color:var(--ink-3)}
+.dochead-meta b{color:var(--wheat-d);font-weight:700}
+
+.reader{display:flex;gap:18px;align-items:stretch}
+.toc{flex:none;width:322px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px 16px;display:flex;flex-direction:column;gap:8px}
+.toc-t{font-size:17px;letter-spacing:3px;color:var(--ink-3);font-weight:700;padding:6px 12px 8px}
+.toc-item{display:flex;align-items:center;gap:12px;min-height:76px;padding:10px 14px;border-radius:18px;font-size:21px;font-weight:600;color:var(--ink-2);line-height:1.35}
+.toc-item .tn{flex:none;width:40px;height:40px;border-radius:12px;background:var(--paper);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ink-3);font-weight:700}
+.toc-item[aria-current=true]{background:var(--deep);color:var(--emerald)}
+.toc-item[aria-current=true] .tn{background:rgba(46,230,168,.16);border-color:transparent;color:var(--emerald)}
+
+.docbody{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:30px 34px;font-size:calc(20px * var(--legal-scale,1))}
+.docbody h2{font-size:calc(30px * var(--legal-scale,1));font-weight:700;line-height:1.3}
+.docbody .lead{margin-top:10px;font-size:calc(20px * var(--legal-scale,1));line-height:1.6;color:var(--ink-2)}
+.docbody .cover-t{margin-top:22px;font-size:calc(19px * var(--legal-scale,1));font-weight:700;color:var(--teal-d);letter-spacing:1px}
+.docbody ul{margin-top:10px;list-style:none;display:flex;flex-direction:column;gap:10px}
+.docbody li{display:flex;gap:12px;font-size:calc(20px * var(--legal-scale,1));line-height:1.55;color:var(--ink-2)}
+.docbody li .sq{flex:none;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-top:calc(9px * var(--legal-scale,1))}
+.slot{margin-top:22px;border-radius:var(--r-md);background:var(--wheat-soft);border:1px solid #e6d8b4;padding:20px 24px}
+.slot-t{display:flex;align-items:center;gap:10px;font-size:calc(21px * var(--legal-scale,1));font-weight:700;color:var(--wheat-d)}
+.slot-p{margin-top:8px;font-size:calc(19px * var(--legal-scale,1));line-height:1.6;color:var(--ink-2)}
+.slot-p b{color:var(--ink);font-weight:600}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 28px}
+.card h3{font-size:25px;font-weight:700;display:flex;align-items:center;gap:12px}
+.card .ci{flex:none;width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.card p{margin-top:12px;font-size:20px;line-height:1.58;color:var(--ink-2)}
+.card p b{color:var(--ink);font-weight:600}
+.card p.fine{font-size:18px;color:var(--ink-3);line-height:1.5}
+.grid2 .card{min-height:228px;display:flex;flex-direction:column}
+.inbtn{margin-top:auto;min-height:76px;padding:0 24px;border-radius:22px;background:var(--deep);color:var(--emerald);display:inline-flex;align-items:center;justify-content:center;gap:10px;font-size:22px;font-weight:700}
+
+.bigpick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pick{min-height:240px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-lg);padding:28px 30px;display:flex;flex-direction:column;gap:12px}
+.pick .ci{flex:none;width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center}
+.pick-t{font-size:28px;font-weight:700}
+.pick-d{font-size:20px;line-height:1.55;color:var(--ink-2)}
+.pick-secs{margin-top:6px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;font-size:18px;line-height:1.4;color:var(--ink-3)}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.grid3 .card{min-height:236px}
+
+.state{border-radius:var(--r-lg);padding:32px 36px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state-h{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700}
+.state-p{margin-top:12px;font-size:21px;line-height:1.62;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+
+.sk{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 30px;display:flex;flex-direction:column;gap:14px}
+.sk .b{background:var(--skel);border-radius:10px}
+.sk .h{height:34px;width:44%}
+.sk .l{height:22px}
+.sk .w90{width:90%}.sk .w76{width:76%}.sk .w64{width:64%}.sk .w82{width:82%}
+.sktoc{flex:none;width:322px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px 16px;display:flex;flex-direction:column;gap:10px}
+.sktoc .r{height:72px;background:var(--skel);border-radius:16px}
+
+.ctabar{flex:none;padding:22px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.btn{min-height:104px;padding:0 26px;border-radius:24px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:25px;font-weight:700;text-align:center;flex:1}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:26px;background:var(--paper)}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:6px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back" id="back" href="01-home.html" aria-label="返回首页">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <button type="button" class="fs-btn" id="fs-down" aria-label="缩小正文字号" data-testid="legal-font-smaller">A−</button>
+    <div class="fs-now" id="fs-now" aria-live="polite">100%</div>
+    <button type="button" class="fs-btn" id="fs-up" aria-label="放大正文字号" data-testid="legal-font-larger">A＋</button>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <main class="body" id="body-root" data-screen="legal" data-state="ready" data-testid="legal-state-ready">
+    <div class="scrollarea" id="scrollarea"></div>
+    <div class="ctabar" id="ctabar"></div>
+  </main>
+
+  <div class="truth" data-disclaimer="true" data-testid="legal-truth">
+    <div><b>正文从哪来</b>条款正文由运营方发布、经服务端返回；本设计页只做阅读排版，不预置条款正文，也不填版本号和生效日期。</div>
+    <div><b>怎么算数</b>以运营方正式发布的版本为准。取不到正文时这里会明说取不到，不会拿旧文本顶上让你误以为读到了现行条款。</div>
+  </div>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"><div class="dp-t">原型演示控制</div></div>
+</div>
+<script>
+var SCREEN='legal';
+var STATES=['ready','loading','not-found','error'];
+var ICO={
+ file:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+ shield:'<path d="M12 3.2l7.4 2.8v5.4c0 4.6-3.1 8.2-7.4 9.4-4.3-1.2-7.4-4.8-7.4-9.4V6z"/><path d="M8.8 12.1l2.2 2.2 4.2-4.4"/>',
+ warn:'<path d="M12 4.6L21 19.4H3z"/><path d="M12 10v4.6M12 17.2h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ spark:'<path d="M12 3.2l1.9 5 5.1 1.9-5.1 1.9L12 17l-1.9-5L5 10.1l5.1-1.9z"/>',
+ server:'<rect x="3.5" y="4" width="17" height="6.5" rx="2"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="2"/><path d="M7 7.2h.01M7 16.8h.01"/>',
+ desk:'<path d="M21 10c0 7-9 12.5-9 12.5S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3.1"/>',
+ refresh:'<path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.4V10h-5.6"/>',
+ arrow:'<path d="M5 12h13M12.5 6l6 6-6 6"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6.6V12l3.6 2.1"/>'
+};
+function svg(n,w,s){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+var q=new URLSearchParams(location.search);
+
+/* 两份文档：标题、定位、摘要、章节数与章节结构都不同，不共用一套内容。
+   章节标题与「本节涵盖」是**结构与范围描述**，不是条款正文，也不构成承诺。 */
+var DOCS={
+ user:{key:'user',title:'用户服务协议',eyebrow:'TERMS OF SERVICE',icon:'file',
+  tone:['var(--slate-soft)','var(--slate-d)'],
+  sum:'约定你和这台机器之间的服务关系：能办什么、要不要登录、你答应什么、AI 结果怎么算、打印怎么收费。',
+  secs:[
+   {t:'一、服务说明',lead:'先划清这台机器提供什么、不提供什么。',
+    cover:['列出本机上线的服务范围','写明它不是网络招聘平台这条边界','说明岗位与招聘会只是第三方来源入口']},
+   {t:'二、账号与登录',lead:'讲清游客和登录的区别，以及公共设备为什么会自动退出。',
+    cover:['游客可用的范围','登录后记录归属与可见范围','公共终端会话结束的时机']},
+   {t:'三、用户承诺',lead:'你上传材料时要遵守的几条。',
+    cover:['材料为本人所有或已获授权','内容真实、不含违法信息','不上传涉及他人隐私或侵权的文件']},
+   {t:'四、AI 服务的性质',lead:'把 AI 结果的效力说清楚，避免误解。',
+    cover:['结果只基于你提供的内容','只作参考，可以不采纳','不构成任何招聘结果承诺']},
+   {t:'五、收费与打印',lead:'钱和纸怎么算。',
+    cover:['按现场公示价目执行','确认输出后耗材即发生消耗','确认前请核对打印参数']},
+   {t:'六、其他',lead:'未写到的部分怎么处理。',
+    cover:['未尽事宜以现场公示为准','以运营方正式发布版本为准','两者不一致时以正式发布版本为准']}
+  ]},
+ privacy:{key:'privacy',title:'隐私政策',eyebrow:'PRIVACY POLICY',icon:'shield',
+  tone:['var(--teal-soft)','var(--teal-d)'],
+  sum:'说明这台机器怎么处理你的个人信息：收什么、拿去做什么、存多久、你能怎么删、找谁问。',
+  secs:[
+   {t:'一、我们收集的信息',lead:'只列真的会收到的那几类。',
+    cover:['登录用的手机号','你主动上传的简历与材料','服务过程中产生的记录']},
+   {t:'二、信息如何使用',lead:'用途范围，以及明确不做的事。',
+    cover:['只用于你本次发起的处理','不进入任何简历库','不推送给企业或第三方招聘方']},
+   {t:'三、保存期限与自动清理',lead:'不同材料存多久，按哪种规则删。',
+    cover:['高敏与未登录上传的材料按短期期限到期删除','会员材料的默认期限与可延长范围','会话信息在退出或超时后清除']},
+   {t:'四、您的权利',lead:'你能对自己的数据做什么。',
+    cover:['本人可查看、下载、删除','数据仅本人可见','管理员因运维访问会留审计日志']},
+   {t:'五、联系我们',lead:'有疑问找谁。',
+    cover:['现场工作人员','终端公示的运营方联系方式','正式版本以运营方发布为准']}
+  ]}
+};
+/* 受控返回来源：只认这四个键，未知一律回首页，不接受任意路径。 */
+var FROM={
+ home:{href:'01-home.html',label:'返回首页',route:'/'},
+ login:{href:'03-login-gate.html',label:'返回登录',route:'/login'},
+ profile:{href:'30-my-profile.html',label:'返回我的',route:'/profile'},
+ help:{href:'06-help.html',label:'返回帮助',route:'/help'}
+};
+var fromKey=q.get('from')||'';
+if(!FROM[fromKey])fromKey='home';
+var BACK=FROM[fromKey];
+
+/* doc fail-closed：user / terms（React 别名）/ privacy 之外一律 not-found，不猜也不默认给一份。 */
+var rawDoc=q.get('doc');
+var docKey=(rawDoc==='terms')?'user':rawDoc;
+var docKnown=!!DOCS[docKey];
+if(rawDoc===null)docKey='user';
+var DOC=DOCS[docKey]||DOCS.user;
+
+function tabs(active){
+ return '<div class="tabs" role="group" aria-label="法律文档">'+
+  '<a class="tab" href="?doc=user&from='+fromKey+'" data-testid="legal-doc-user"'+(active==='user'?' aria-current="page"':'')+'>'+svg('file',26)+'用户服务协议</a>'+
+  '<a class="tab" href="?doc=privacy&from='+fromKey+'" data-testid="legal-doc-privacy"'+(active==='privacy'?' aria-current="page"':'')+'>'+svg('shield',26)+'隐私政策</a>'+
+  '</div>';
+}
+function docHead(d,extra){
+ return '<div class="dochead"><span class="di" style="background:'+d.tone[0]+';color:'+d.tone[1]+'">'+svg(d.icon,38)+'</span>'+
+  '<div class="dochead-main"><div class="dochead-eyebrow">'+d.eyebrow+'</div>'+
+  '<div class="dochead-title serif">'+d.title+'</div>'+
+  '<div class="dochead-sum">'+d.sum+'</div>'+
+  '<div class="dochead-meta"><span>共 '+d.secs.length+' 章</span><span>'+(extra||'版本与生效日期：<b>以正式发布版本为准</b>，本页不填')+'</span></div>'+
+  '</div></div>';
+}
+function reader(d,secIndex){
+ var toc='<div class="toc" data-testid="legal-list"><div class="toc-t">章节目录</div>';
+ for(var i=0;i<d.secs.length;i++){
+  toc+='<a class="toc-item" href="?doc='+d.key+'&sec='+i+'&from='+fromKey+'"'+(i===secIndex?' aria-current="true"':'')+' data-testid="legal-sec-'+i+'"><span class="tn">'+(i+1)+'</span>'+d.secs[i].t+'</a>';
+ }
+ toc+='</div>';
+ var s=d.secs[secIndex];
+ var cov='';
+ for(var j=0;j<s.cover.length;j++){cov+='<li><span class="sq"></span><span>'+s.cover[j]+'</span></li>'}
+ var body='<div class="docbody" id="docbody"><h2 class="serif">'+s.t+'</h2>'+
+  '<div class="lead">'+s.lead+'</div>'+
+  '<div class="cover-t">本节涵盖</div><ul>'+cov+'</ul>'+
+  '<div class="slot"><div class="slot-t">'+svg('server',24)+'条款正文由服务端返回</div>'+
+  '<div class="slot-p">这是设计稿，<b>不预置条款正文</b>，也不写版本号和生效日期 —— 免得你把示意文字当成现行条款。上线后这一块显示的是运营方发布的正文。</div></div>'+
+  '</div>';
+ return '<div class="reader">'+toc+body+'</div>';
+}
+/* not-found 用的大选择卡：带前三章标题，让用户在点之前就知道两份文档不是同一个东西。 */
+function pickCard(key,tone){
+ var d=DOCS[key],pre='';
+ for(var i=0;i<3&&i<d.secs.length;i++){pre+='<span>· '+d.secs[i].t+'</span>'}
+ pre+='<span>· 等共 '+d.secs.length+' 章</span>';
+ return '<a class="pick" href="?doc='+key+'&from='+fromKey+'" data-testid="legal-pick-'+key+'">'+
+  '<span class="ci" style="background:var(--'+tone+'-soft);color:var(--'+tone+'-d)">'+svg(d.icon,30)+'</span>'+
+  '<span class="pick-t">'+d.title+'</span>'+
+  '<span class="pick-d">'+d.sum+'</span>'+
+  '<span class="pick-secs">'+pre+'</span></a>';
+}
+
+var V={};
+V['ready']=function(sec){
+ return {
+  pill:null,
+  body:'<section class="sec">'+tabs(DOC.key)+'</section>'+
+   '<section class="sec">'+docHead(DOC)+'</section>'+
+   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">按章节读</span><span class="hint">点左边换一章</span></div>'+
+    reader(DOC,sec)+'</section>'+
+   '<section class="sec"><div class="grid2">'+
+    '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>哪一版算数</h3>'+
+    '<p>以<b>运营方正式发布</b>的版本为准。本机显示的更新日期来自发布记录，不由本页写死。</p>'+
+    '<p class="fine">对条款有疑问，可以找现场工作人员，或按「联系我们」里的方式联系运营方。</p></div>'+
+    '<div class="card"><h3><span class="ci" style="background:var(--plum-soft);color:var(--plum-d)">'+svg('spark',26)+'</span>看不懂这一章</h3>'+
+    '<p class="fine">AI 顾问只做<b>通俗转述</b>：不改条款效力，不构成法律结论，也不判定你符不符合某一条。</p>'+
+    '<a class="inbtn" href="05-ai-cockpit.html" data-route="/assistant" data-testid="legal-ai-explain">用大白话讲这一章'+svg('arrow',22)+'</a></div>'+
+    '</div></section>',
+  cta:'<a class="btn ghost" href="'+BACK.href+'" data-route="'+BACK.route+'">'+BACK.label+'</a>'+
+   '<a class="btn primary" style="flex:1.3" href="?doc='+(DOC.key==='user'?'privacy':'user')+'&from='+fromKey+'" data-testid="legal-primary">'+
+   (DOC.key==='user'?'去读隐私政策':'去读用户服务协议')+'</a>'
+ };
+};
+V['loading']=function(){
+ return {
+  pill:null,
+  body:'<section class="sec">'+tabs(DOC.key)+'</section>'+
+   '<section class="sec">'+docHead(DOC,'正在取正文，<b>取到之前不显示任何条款</b>')+'</section>'+
+   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">正在取正文</span><span class="hint">槽位，不是内容</span></div>'+
+    '<div class="reader"><div class="sktoc">'+
+    '<div class="r"></div><div class="r"></div><div class="r"></div><div class="r"></div><div class="r"></div><div class="r"></div>'+
+    '</div><div class="sk" style="flex:1"><span class="b h"></span><span class="b l w90"></span><span class="b l w82"></span><span class="b l w76"></span><span class="b l w90"></span><span class="b l w64"></span><span class="b l w82"></span><span class="b l w76"></span></div></div></section>'+
+   '<section class="sec"><div class="state" data-kind="warn">'+
+    '<div class="state-h"><span class="'+(q.get('capture')==='1'?'':'breathe')+'">'+svg('clock','28')+'</span>为什么不先显示点什么</div>'+
+    '<div class="state-p">法律文本<b>不能拿旧版本或示意文字先顶上</b>：你会以为自己读到了现行条款。所以取到之前这里只放槽位。</div>'+
+    '<div class="state-p">取不到会明确告诉你取不到，并给一个重试入口。</div></div></section>',
+  cta:'<a class="btn ghost" href="'+BACK.href+'" data-route="'+BACK.route+'">'+BACK.label+'</a>'+
+   '<a class="btn ghost" style="flex:1.3" href="?doc='+DOC.key+'&state=ready&from='+fromKey+'" data-testid="legal-primary">已取到，进入阅读</a>'
+ };
+};
+V['not-found']=function(){
+ return {
+  pill:null,
+  body:'<section class="sec"><div class="state" data-kind="warn" data-testid="legal-fallback">'+
+    '<div class="state-h">'+svg('warn','28')+'没有这份文档</div>'+
+    '<div class="state-p">地址里指的这份文档<b>不在本机的受控清单里</b>。本页只有下面两份，<b>不会随便挑一份给你看</b> —— 拿错文档比看不到更麻烦。</div>'+
+    '<div class="state-p">你之前在读的那一份<b>没有被改动</b>；点下面任意一份即可继续。</div></div></section>'+
+   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">本机只有这两份</span><span class="hint">点一份开始读</span></div>'+
+    '<div class="bigpick">'+
+    pickCard('user','slate')+pickCard('privacy','teal')+
+    '</div></section>'+
+   '<section class="sec"><div class="grid3">'+
+    '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>为什么不默认给一份</h3>'+
+    '<p>协议和隐私政策<b>不是同一份</b>。地址不对时默认打开其中一份，你可能一直在读另一份还以为读对了。</p></div>'+
+    '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('info',26)+'</span>读完回哪里</h3>'+
+    '<p>左上角和下面的返回按钮，会回到<b>你进来的那一页</b>；来路不明时统一回首页，不会把你甩到别处。</p></div>'+
+    '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('desk',26)+'</span>要找别的文件</h3>'+
+    '<p>屏幕上只提供这两份。其他材料请找<b>现场工作人员</b>，或按运营方公示的方式联系。</p></div>'+
+    '</div></section>'+
+   '<section class="sec"><div class="state" data-kind="warn">'+
+    '<div class="state-h">'+svg('info','28')+'这一页不影响你办事</div>'+
+    '<div class="state-p">协议页只是阅读入口。<b>已经创建的打印任务、订单和到机码都不受影响</b>，你可以直接返回继续办原来的事。</div></div></section>',
+  cta:'<a class="btn ghost" href="'+BACK.href+'" data-route="'+BACK.route+'">'+BACK.label+'</a>'+
+   '<a class="btn primary" style="flex:1.3" href="?doc=user&from='+fromKey+'" data-testid="legal-primary">读用户服务协议</a>'
+ };
+};
+V['error']=function(){
+ return {
+  pill:null,
+  body:'<section class="sec">'+tabs(DOC.key)+'</section>'+
+   '<section class="sec"><div class="state" data-kind="error" data-testid="legal-fallback">'+
+    '<div class="state-h">'+svg('warn','28')+'正文没取到</div>'+
+    '<div class="state-p">这次没能把《'+DOC.title+'》的正文取回来。<b>这里不会拿旧文本或示意文字顶上</b> —— 你读到的必须是现行版本，否则不如不显示。</div>'+
+    '<div class="state-p">这不影响你继续用这台机器；只是<b>暂时读不到这份文档</b>。</div></div></section>'+
+   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">可以这样做</span><span class="hint">三条都不用等</span></div>'+
+    '<div class="grid2">'+
+    '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('refresh',26)+'</span>再取一次</h3>'+
+    '<p>多数是一次性的网络波动，<b>重试一下</b>通常就能读到。</p>'+
+    '<a class="inbtn" href="?doc='+DOC.key+'&state=loading&from='+fromKey+'" data-testid="legal-retry">重新取正文'+svg('arrow',22)+'</a></div>'+
+    '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('desk',26)+'</span>现在就要看</h3>'+
+    '<p>找<b>现场工作人员</b>索取现行版本，或按运营方公示的方式联系。</p>'+
+    '<p class="fine">屏幕这边不会替你转达，也不会自动记录这次读取失败。</p></div>'+
+    '</div></section>'+
+   '<section class="sec"><div class="grid2">'+
+    '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('file',26)+'</span>换一份试试</h3>'+
+    '<p>两份文档<b>分别取</b>。这一份取不到，另一份不一定也取不到。</p>'+
+    '<a class="inbtn" href="?doc='+(DOC.key==='user'?'privacy':'user')+'&from='+fromKey+'" data-testid="legal-switch">'+(DOC.key==='user'?'去取隐私政策':'去取用户服务协议')+svg('arrow',22)+'</a></div>'+
+    '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>要不要紧</h3>'+
+    '<p>读不到条款<b>不改变已经生效的条款</b>，也不影响你已经创建的任务；它只是这次没显示出来。</p></div>'+
+    '</div></section>'+
+   '<section class="sec"><div class="state" data-kind="warn">'+
+    '<div class="state-h">'+svg('clock','28')+'什么时候能读到</div>'+
+    '<div class="state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。要现在就看到现行版本，请找现场工作人员索取。</div></div></section>',
+  cta:'<a class="btn ghost" href="'+BACK.href+'" data-route="'+BACK.route+'">'+BACK.label+'</a>'+
+   '<a class="btn primary" style="flex:1.3" href="?doc='+DOC.key+'&state=loading&from='+fromKey+'" data-testid="legal-primary">'+svg('refresh','26')+'重新取正文</a>'
+ };
+};
+
+var root=document.getElementById('body-root');
+/* 字号：真实生效于正文区，90%–120%，四档，不做动画。声明必须早于首次 render。 */
+var scale=100;
+function applyScale(){
+ var el=document.getElementById('docbody');
+ if(el)el.style.setProperty('--legal-scale',(scale/100).toString());
+ document.getElementById('fs-now').textContent=scale+'%';
+}
+function render(state,sec){
+ var view=(state==='ready')?V['ready'](sec):V[state]();
+ root.setAttribute('data-state',state);
+ root.setAttribute('data-testid',SCREEN+'-state-'+state);
+ document.getElementById('scrollarea').innerHTML=view.body;
+ document.getElementById('ctabar').innerHTML=view.cta;
+ var b=document.getElementById('back');
+ b.setAttribute('href',BACK.href);
+ b.setAttribute('aria-label',BACK.label);
+ applyScale();
+}
+
+/* 未知 state 回落到 ready；?doc 不在受控清单 → not-found；?sec 越界 → 第一章。 */
+var state=q.get('state');
+if(STATES.indexOf(state)<0)state='ready';
+if(!docKnown&&rawDoc!==null)state='not-found';
+var sec=parseInt(q.get('sec'),10);
+if(!(sec>=0&&sec<DOC.secs.length))sec=0;
+render(state,sec);
+
+document.getElementById('fs-down').addEventListener('click',function(){scale=Math.max(90,scale-10);applyScale()});
+document.getElementById('fs-up').addEventListener('click',function(){scale=Math.min(120,scale+10);applyScale()});
+
+var panel=document.getElementById('demo-panel');
+function addDemo(label,href,on){var a=document.createElement('a');a.href=href;a.textContent=label;if(on)a.className='on';panel.appendChild(a)}
+addDemo('user · ready','?debug=1&doc=user',state==='ready'&&DOC.key==='user');
+addDemo('privacy · ready','?debug=1&doc=privacy',state==='ready'&&DOC.key==='privacy');
+addDemo('user · loading','?debug=1&doc=user&state=loading',state==='loading');
+addDemo('user · error','?debug=1&doc=user&state=error',state==='error');
+addDemo('not-found','?debug=1&doc=__none__',state==='not-found');
+addDemo('from=login','?debug=1&doc=user&from=login',fromKey==='login');
+if(q.get('debug')==='1')document.documentElement.classList.add('debug');
+document.getElementById('demo-tab').addEventListener('click',function(){panel.classList.toggle('show')});
+function tick(){
+ if(q.get('capture')==='1'){document.getElementById('clock').textContent='--:--';return}
+ var d=new Date();
+ document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(q.get('flat')==='1')document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

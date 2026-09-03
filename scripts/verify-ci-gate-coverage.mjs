@@ -112,21 +112,39 @@ for (const rel of packageFiles) {
 // 本门禁强制覆盖的脚本前缀。
 //
 // ⚠ 这个前缀表本身就是一份硬编码清单 —— 也就是本门禁要消灭的那种东西。
-//   之所以暂时只收 verify: / ui:，是因为 test:* 有一批正在被别的分支接线
-//   （kiosk test:browser:truth），现在纳入会和它冲突。
+//   收进来一个前缀，等于宣布「该前缀下的脚本默认必须进 CI」；因此每次放开都必须
+//   先实测放开后会有哪些脚本掉出闭包，并在同一批里给它们接线或登记豁免。
+//   单独改这一行会让它们立刻命中下面 B-4 段的「未登记豁免」而直接把 CI 打红。
 //
-//   截至 2026-08-16，以下 test:* / audit:* / typecheck:* 脚本同样没有任何
-//   CI job 执行，属于**已知未纳管**，不是已覆盖：
-//     @ai-job-print/kiosk::test:browser
-//     @ai-job-print/kiosk::test:browser:fusion
+//   ── 2026-09-02 复核（上一版这段清单写于 2026-08-16，已过期，本次全部重测）──
+//
+//   'typecheck' 与 'test' 的原阻塞点 —— kiosk test:browser:truth「正由另一分支接线」——
+//   已消失：它已在 ci.yml 接线。但「阻塞点消失」不等于「可以放开」，实测如下。
+//
+//   放开 'test'：还剩 4 条会掉出闭包，**尚不能放开**。
+//     @ai-job-print/kiosk::test:browser          body = `playwright test`（跑全量 spec），
+//                                                与已分片接线的 :smoke/:w1..:w6 等重叠
+//     @ai-job-print/kiosk::test:browser:fusion   纯聚合别名 = smoke && w1..w6，
+//                                                7 个子门禁全部已在 CI → 适用 redundant-alias，
+//                                                且该类别的前提由下面 B-5 段机器复核
 //     @ai-job-print/kiosk::test:browser:p1-evidence
-//     @ai-job-print/kiosk::test:browser:truth        ← 正由另一分支接线
 //     @ai-job-print/kiosk::test:visual
-//     @ai-job-print/api::audit:cloud-upload-capability-usage
-//     (root)::typecheck:refresh
+//   其余 test:*（smoke / w1..w6 / privacy / warning / contract-review / scan-safety /
+//   mic-capability / truth）均已在 CI 闭包内。
+//   卡在哪：后三条的正确归宿（接线 vs manual-acceptance）取决于 Playwright 在 CI runner
+//   上的可用性、耗时、稳定性，以及与已分片接线部分的覆盖重叠程度 —— 需实跑评估，
+//   未评估前不猜。这是一个待产品负责人拍板的排期项，不是本门禁的缺陷。
 //
-//   后续动作：等 test:browser:truth 接线落地后，把 'test' 加进本表，
-//   再按同样规则给剩下几条登记豁免或接线。改这里请一并更新上面这段清单。
+//   放开 'typecheck'：实测 **0 条掉出闭包**（本轮把 packages/refresh 的 typecheck
+//   接进 ci.yml 之后；在此之前唯一掉出的是 ai-job-print-terminal::typecheck:refresh）。
+//   也就是说这个前缀现在随时可以放开，放开还能顺带把「refresh typecheck 被人删掉」
+//   变成 CI 红。未在本轮一并执行，是因为它超出本次授权范围，留作独立排期。
+//
+//   放开 'audit'：还剩 1 条 —— @ai-job-print/api::audit:cloud-upload-capability-usage。
+//   它是「审计报告」还是「可门禁化的断言」未查证，未查证前不放开。
+//
+//   改这一行请一并重测并更新上面这段清单（重测方法：把新前缀加进本表跑一遍本脚本，
+//   看 B-4 段报出哪些「未被任何 CI job 执行」）。
 const ENFORCED_PREFIXES = ['verify', 'ui']
 const isGate = (scriptName) =>
   ENFORCED_PREFIXES.some((prefix) => scriptName.startsWith(`${prefix}:`))
@@ -424,11 +442,42 @@ const VALID_UNWIRED_CATEGORIES = new Set([
   'broken-pending-deletion',
   // 门禁断言的功能确实没实现：现在接线会让 CI 红，须先修功能或改断言
   'broken-pending-fix',
+  // 2026-09-03 新增：补 .ts 支持后第一次可见的存量未接线脚本。
+  // 与上面两类的区别是**尚未判定** —— 还没逐条跑过，不知道是该接线还是该删。
+  // 这个类别只允许在「图谱可见范围扩大」这种一次性事件后使用，且必须逐条还账。
+  'newly-visible-pending-triage',
 ])
 
 // 这个上限同样只允许调低。想加新的未接线脚本，先还掉一条旧的。
 // 3（2026-08-18，图谱首次扫描）：全部为「跑起来就红」的存量欠账，逐条登记在案。
-const MAX_UNWIRED = 3
+// 3 → 1（2026-09-02）：本批还掉两条，按「还几条降几格」降两格。
+//   ① verify-jobfairs-terminal-priority.mjs —— 复核发现豁免理由把因果写反了：
+//      功能（terminalId 透传）端到端完整，坏的是门禁自己的正则（#652 重构后没跟着改）。
+//      修正则后 4/4 PASS，已起脚本名并接进 ci.yml。
+//   ② verify-self-assessment-r3-pick.mjs —— 一次性 cherry-pick 守卫，服务对象 PR #486
+//      已 squash 合入 main（03c30bdcd）。它按 merge-base(HEAD, origin/main)..HEAD 取增量提交，
+//      在 main 上该 range 恒为空、在任何新分支上都不含 #486 的 commit，因此恒抛
+//      ERR_ASSERTION，结构上不可能接线。已删除脚本文件本身。
+// 13（2026-09-03，**分母变了，不是新增欠账**）：此前 gates.mjs 的 GATE_EXT_PATTERN 是
+//   /\.(mjs|cjs|js)$/ —— 不含 .ts。于是 services/api/scripts/ 下 261 条 .ts 门禁
+//   **一条都没进过图谱**（旧图谱收录 167 条，全是 .mjs）。CLAUDE.md §14 让人「改文件前
+//   查图谱看被哪些门禁断言」，而它对 58% 的门禁系统性失明，且不声明自己看不见。
+//   本次补上 .ts 之后，这 13 条一直存在、一直没接线的脚本才第一次可见。
+//   **它们不是本次新增的欠账，是本次第一次被看见的欠账。**
+//   其中约 3 条根本不是门禁（fixture / 维护脚本：change-password-verify-target.ts、
+//   clear-import-rawdata.ts、release-provenance-fixture.ts），其余是写完没接线的真门禁。
+//   逐条接线或登记是独立任务（接上去很可能直接红），不在本刀范围。
+//   从这个新基线起，「只允许调低」照旧生效。
+// 13 → 10（2026-09-03）：terminal-agent 三条从未跑过的门禁实跑全绿后接线，
+//   按「还几条降几格」降三格。断言对象都在，注入桩/临时 SQLite/loopback HTTP，
+//   不依赖 Windows 真机；已起 verify:* 脚本名并改 ci.yml 为 pnpm run。
+// 10 → 1（2026-09-03，triage 收口）：api 侧两条（wave2 账号重绑 23 断言、wave3 打印善后
+//   7 断言）实跑全绿后接线；verify-change-password.ts 是**误判出账** —— 它早经
+//   run-verify-change-password.mjs launcher 在 CI 一直跑着，图谱看不见是 gates.mjs 的
+//   字面量正则不认 .ts（本批已修），修好后回归 helper 分类。至此 newly-visible 六条
+//   全部还清。剩下的 1 = verify-partner-account-delete-ui.mjs（断言互相矛盾的存量，
+//   登记为 broken-pending-deletion）。
+const MAX_UNWIRED = 1
 
 const unwiredRegistry = exemptionsFile.unwiredScripts || []
 /** @type {Map<string, object>} */

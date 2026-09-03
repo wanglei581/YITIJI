@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>手机接力 · 职易达</title>
+<!--
+  宿主：S11 手机接力（手机端，一个宿主承接两条真实 route）
+  route: /member/qr-login   screen=qr-login      —— apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx
+         /upload/phone      screen=phone-upload  —— apps/kiosk/src/pages/upload/PhoneUploadPage.tsx
+
+  为什么这两条共用一个宿主：它们是同一件事的两半 —— 用户拿自己的手机替一体机完成一步，
+  然后**必须回到一体机**才能继续。两条 route 的信息结构完全同构（我在替哪台机器做事 /
+  这一步做什么 / 这一步的时限 / 做完之后回哪去），版式拆成两份只会让"回一体机"这句
+  关键出口被写成两种口径。
+
+  为什么不套一体机壳层：这两条 route 的用户拿的是自己的手机，不是 27 寸竖屏。
+  1080×1920 的 topbar / navbar / 大字阶在 390px 上会挤成一团，而且手机端**不应该**出现
+  首页、AI 顾问、我的这三个入口 —— 它不是第二个 App，它只有一个任务。
+
+  尺寸口径：宽度是 max-width:390px + width:100%（390 是上限不是固定值，360 / 375 的真机
+  不能横向溢出）；高度用 min-height/height:100dvh，并保留 100vh 作旧内核回落；顶底补
+  env(safe-area-inset-*)。证据模式 ?capture=1 把舞台钉死成 390×844 并清零安全区，
+  保证同一份源码重跑逐字节可复现。
+
+  ?screen= / ?state= / ?purpose= / ?limit= 都是**原型演示控制，不属于产品逻辑**：生产里
+  screen 是两条独立 route，state 由服务端返回与用户操作决定，purpose 由一体机在 URL
+  fragment 里带过来（真实实现读 location.hash）。
+  ?flat=1 关非必要动效，?debug=1 显演示面板，?capture=1 固定时钟与倒计时、暂停循环动画。
+  ?cooldown=active 与 ?code=usable|none 同样只是原型演示控制，生产没有对应物 ——
+  它们钉住的是两个与 state **正交**的事实，详见下面"演示分支"。
+  静态页不发任何请求：表单校验、格式与体积拦截是真前端逻辑；提交后的状态推进是原型演示。
+
+  ── 真实合同（本页按它落笔，不美化）──────────────────────────────────────
+  【扫码登录 /member/qr-login】
+    · 票据总寿命：QR_TICKET_TTL = 180 秒（member-qr-login.service.ts:14）。
+      但状态接口回的 expiresInSeconds 是**剩余**秒数（status() 现读 Redis TTL），不是 180 ——
+      用户看屏、举手机、扫码、等页面加载都要花时间，打开手机时不可能还剩满 3 分钟。
+      所以本页按 status.expiresInSeconds 显示剩余值，并同屏写清"自一体机生成起共 180 秒"，
+      禁止写成"打开手机后还有 3 分钟"。刷新二维码的动作在一体机上，本页只显示读到的数。
+    · deviceLabel 是**可选**字段（QrLoginStatusResult.deviceLabel?，create 时 cleanOptional
+      会把空串抹成 undefined）。ready 与 confirmed 都必须给它留展示位；读不到名称时
+      如实写"一体机名称未提供"并让用户核对面前那台机器上的二维码，绝不编一个名字填上去。
+    · 发码是一次**会失败的请求**，不是本地开关（member-auth.service.ts sendSmsCode）：
+        成功  → { sent:true, cooldownSeconds:60（COOLDOWN，:29）, expiresInSeconds:300（CODE_TTL，:27）}
+        SMS_SEND_FAILED（502）→ 短信通道没发出去。这条路径上服务端会把**刚写进去的验证码
+                                和冷却一起删掉**，所以之前收到的码同样作废，必须重新获取；
+                                也正因为冷却被删了，可以立刻重试。
+        SMS_TOO_FREQUENT / SMS_IP_LIMIT / SMS_DEVICE_LIMIT / SMS_PROVIDER_RATE_LIMIT（429）
+                              → "稍后再试"这一档。
+        SMS_DAILY_LIMIT / SMS_PROVIDER_PHONE_DAILY_LIMIT（429）→ "明天再试"这一档。
+      本页因此把发码拆成 send-loading / send-error / send-limited / code-sent 四态：
+      **只有拿到成功回执**才锁号、才起 60 秒倒计时、才写"验证码已发送"。
+      频控档不报"还要等多少秒"：冷却是在上一次请求时开始计的，本页读不到它还剩多久。
+    · 没成功发过码时，验证码输入框与确认按钮一律不可用 —— 没有码可填，
+      让人填一串数字再回一句"验证码不正确"是页面在骗人。
+    · **"发过码"和"此刻有码可填"是两件事**，本页用两个独立事实表示（phone-relay.js 的
+      S.locked 与 S.hasUsableCode），合成一个布尔量会漏掉一整条真实路径：
+        locked        = 这一页确实成功发出过一次验证码 → 锁号、脱敏回显、按钮改写"重新获取"；
+        hasUsableCode = 服务端此刻**还可能**留着一条码 → 验证码输入框与确认按钮才允许启用。
+      漏掉的那条：验证码过期或被作废之后点"重新获取"，那一次请求同样可能被频控挡下 ——
+      locked 仍然成立，可一条能填的码都没有。只看 locked 的页面会在那一屏把输入框和确认
+      按钮放开，请人去填一个根本不存在的码。所以 canConfirm 要求两个事实同时成立，
+      codeInputEnabled 只认 hasUsableCode；两者都**不**按"当前状态在不在某张清单里"判 ——
+      按状态清单判会在 confirm-code-expired →"重新获取"被挡下（状态已跑到 send-limited）
+      那一屏重新放开控件。
+      打掉 hasUsableCode 的场景：confirm-code-expired / confirm-code-locked（服务端已经没有
+      那条码）、send-error（SMS_SEND_FAILED 把验证码和冷却一起删了）、换号、确认成功
+      （getAndDelIfEquals 已经消费掉它）。confirm-unknown **不动**它：那条码有没有被消费，
+      本页不知道，这一屏本来就整个冻住，不需要替服务端下结论。
+      频控（send-limited）也**不动**它：那次请求什么都没改变。
+    · 确认结果只有 confirmed 一种（ConfirmQrLoginResult.status: 'confirmed'）。手机端**没有**
+      拿到任何登录态：一体机还要自己调 /local/qr-login/claim 才真正登录。
+      所以成功屏只能写"已确认，请回一体机继续"，禁止写"登录成功 / 已登录 / 已进入一体机"。
+    · 手机这一步做的是"完成手机号验证 + 确认本次一体机登录请求"。短信验证码能证明的只是
+      这个手机号在这台手机上收得到码，**不能**证明本人正站在那台一体机前面 ——
+      页面不得把它写成到场证明，只能提醒用户"只确认自己刚才亲手扫的那台机器"。
+    · claim 不是走过场：一体机轮询到 confirmed 后才去 claim，claim 会失败（ScanQrLoginPanel
+      的 catch 分支会清掉二维码要求重扫）。手机无从知道那一步的结果，所以成功屏同样禁止写
+      "一体机会自己完成登录 / 会自动进入你的账号"；只能把人送回一体机按屏幕上的结果继续。
+    · 协议勾选的时点：在一体机上、**创建票据之前**。ScanQrLoginPanel.refresh() 里 !agreed
+      直接 return 不发 create；claim 时服务端按当前有效版本落同意快照
+      （member-qr-login.service.ts:181 与 member-auth.service.ts:146 的注释）。
+      不是"claim 之后再勾一次"，本页任何文案与注释都不得那样写。
+    · 失败路径必须按"用户的下一步"拆开，不能压成一个 error 串：
+        状态没读到（网络等）        → 可以"重新检查二维码"再读一次（status-error）；
+        票据已不能再确认            → QR_LOGIN_NOT_FOUND / ALREADY_CLAIMED /
+                                       ALREADY_CONFIRMED / TICKET_INVALID，服务端已不可能
+                                       再 confirm 成功，本页不给重试按钮，只送回一体机
+                                       （ticket-expired）；
+        短信验证码这一类失败    → 三种服务端结论、三条不同的下一步，必须拆成三个状态；
+                                       三种都**不影响二维码票据**（票据那一侧的失败走
+                                       ticket-expired），绝不能写成"二维码失效"：
+          验证码填错了              → SMS_CODE_INVALID（confirm-code-invalid）。
+                                       verifySmsCodeForUser 用 getAndDelIfEquals，**只有相等
+                                       才删**，回 'mismatched' 能断定的只有一句：这一次比较
+                                       **没有消费掉**那条验证码。它还剩多少有效期、还能再错
+                                       几次，回执里都没有，本页读不到 —— 所以保留锁号与
+                                       hasUsableCode，只清错误输入，文案写成"可以核对短信里
+                                       最新的一条后再试，但它仍受有效期和尝试次数限制"。
+                                       页面不得替服务端保证它此刻一定还有效，也不得把重新
+                                       获取说成一步多余的操作。重发按钮照旧受 60 秒冷却约束。
+          验证码过期或不存在        → SMS_CODE_EXPIRED（confirm-code-expired）。
+                                       codeStatus === 'missing'，服务端已经没有这条码
+                                       （超过 CODE_TTL=300 秒 / 已用过一次 / 此前被作废）。
+                                       重填同一条只会再失败，所以清空输入、**禁用验证码输入框**，
+                                       明确必须重新获取。
+          试得太多次被作废          → SMS_CODE_LOCKED（confirm-code-locked）。
+                                       attempts 超过 VERIFY_MAX_ATTEMPTS=5 时服务端**主动
+                                       del 掉 codeKey 与 attemptKey**，当前验证码已被销毁。
+                                       同样清空并禁用输入，明确必须重新获取；这不是封号，
+                                       重新获取一条就能继续。
+        确认请求发出去、结果没回来  → **既不能当成失败、也不能当成成功**（confirm-unknown）：
+                                       不清验证码、不给"再确认一次"，先送回一体机看屏幕，
+                                       另留一个明确动作"重新检查这张二维码"（就是再读一次
+                                       status）。盲重试的代价：那次确认可能早就生效了。
+    · 缺票据（?ticketId 为空）在真实实现里**没有重试按钮** —— 没有票据可查。本页照实画。
+
+  【手机上传 /upload/phone】
+    · 会话时限：SESSION_TTL_SECONDS = 10 * 60（upload-sessions.service.ts:87），即 600 秒。
+      但手机端 URL fragment 里只有 sessionId / token / purpose（buildPhoneUploadUrl），
+      **没有 expiresAt** —— 本页无从知道已经过去多久。所以只能写"自一体机生成起 10 分钟内有效"，
+      禁止写成"还剩 10 分钟"或画倒计时。
+    · 单文件上限：MAX_SESSION_UPLOAD_BYTES = 10MB（同文件:90）。这一档比按用途的服务端上限
+      （20MB）更紧，会话上限先生效，所以页面统一写 10MB。
+    · **purpose 是不可信输入**。它来自 URL fragment，用户随手就能改掉；而
+      GET /upload-sessions/:sessionId 要 x-upload-session-control header，手机端根本没有
+      控制令牌（fragment 里只有 sessionId / token / purpose）——
+      也就是说，**上传成功之前本页无法核对真实用途**。由此三条：
+        ① 上传前一律按保守通用档：CreateUploadSessionDto @IsIn 白名单三个用途
+           （resume_upload / print_doc / contract_upload）的**安全交集** = PDF / JPG / PNG，
+           体积 10MB。同屏写明"最终用途与允许格式由系统对这次上传的核对结果决定"。
+           代价要写在明处：真实用途若是简历或合同，Word 文档会被本页挡下，
+           页面必须直接告诉用户"回一体机按那一步的说明操作"，不能让人对着灰按钮猜。
+        ② fragment 里的用途只作为**未确认提示**露出来（"链接里写着可能是…，本页无法核对，
+           也不按它决定任何事"），并且**不写进 data-***：进了 data-* 就成了取证与断言
+           照着读的"结论"。stage 上只有 data-purpose="unconfirmed" 或服务端确认后的真值，
+           另配 data-purpose-confirmed="0|1"。
+        ③ 一句话原则：**提示只能用来收紧，不能用来放宽**。signature_image 因此照样拦死
+           （见下条），因为拦死不需要核对，放行才需要。
+    · 用途在**服务端回执里**才第一次确定：POST /upload-sessions/:id/files 成功返回的是
+      UploadSessionStatusResponse，带着服务端存的 purpose。本页用内部字段
+      demoConfirmedPurpose 模拟它，只有它有值时才显示真实用途、对应格式和留存时长。
+      明确的服务端**错误**回执里没有 purpose，手机端也读不到 GET status，
+      所以那些状态一律保持未确认口径 —— 这一点比"错误后也显示用途"更保守，是有意的。
+    · 服务端各用途允许格式（files/file-validation.ts 的 PURPOSE_POLICY，白名单是 **MIME**，
+      再加"扩展名必须与 MIME 一致"防伪装）：
+        resume_upload    PDF / DOC / DOCX / JPG / PNG / WEBP（服务端还含服务端自产的 txt / md）
+        print_doc        PDF / JPG / PNG
+        contract_upload  PDF / DOC / DOCX / JPG / PNG / WEBP
+        signature_image  JPG / PNG —— 但见下条
+      本页只在**确认之后**用这张表说话；确认之前用它们的交集。
+    · 前端校验的分寸：本页做**手机端预检**（空文件、10MB、后缀白名单、浏览器给出的
+      类型白名单与"类型 ↔ 后缀"一致性），拦下的文件一个字节都不发出去；但浏览器给的类型只是
+      自述，服务端拿到真实字节还会重新检查一遍。所以预检通过只能说"已发出"，
+      不得写成"已通过校验"。浏览器不给类型时（安卓部分文件管理器 / WebView）按后缀继续，
+      同时如实说明只做了后缀预检，不承诺一定能成功。
+      原始类型标识（application/pdf 这类串）是工程内部标识，**不进用户可见 DOM**：
+      页面只说"PDF 文档 / JPG 图片"这类中文说法；类型与后缀对不上、以及浏览器不给类型
+      这两个 fixture 照常保留。
+    · signature_image 是**诚实不可用态**：文件校验层允许它，UploadSessionsService 的
+      SUPPORTED_UPLOAD_SESSION_PURPOSES 也含它，但 CreateUploadSessionDto 的
+      @IsIn(['resume_upload','print_doc','contract_upload']) 白名单不含该值，
+      会话在 DTO 校验就被 400 拦掉，根本发不出来。
+      本页因此不给它画任何可成功的路径，只画"这条链路当前不可用 + 现场用一体机完成"。
+      现场那条出路只许写已验证存在的一条：SignStampPage 第 2 步的"本机上传"
+      （accept="image/jpeg,image/png"），走不通就返回上一步或请现场工作人员协助。
+      同一步里的签名画布当前还是预留区（那一页自己写着"触屏手写将在校准后开放"），
+      把印章放进扫描仪盖章这条链路在代码里不存在 —— 两条都未验证，不得写进用户可见文案。
+    · 上传失败必须按"服务端到底说了什么"拆成四类，因为下一步完全不同：
+        service-error（**服务端明确回了失败**）：文件检查没过或存储没写成。
+          服务端在 files.upload 抛错时会把会话从 uploading 退回 pending
+          （upload-sessions.service.ts:257），原链接**可能**仍然可用 —— 只说可能（那一步是
+          best-effort，且二维码本身还有时限）；选择区保持可用，允许重选重试。
+          **不含网络中断**：网络中断没有服务端结论。
+        session-expired（**服务端明确回了死码**）：UPLOAD_SESSION_EXPIRED / NOT_PENDING /
+          NOT_FOUND / UPLOAD_TOKEN_INVALID，服务端已不会再收这个会话的文件，选择区必须禁用，
+          只能回一体机刷新。但**不得笼统说"文件没发出去"**：NOT_PENDING 的意思恰恰是
+          这个二维码之前已经用过，那一次很可能是成功的 —— 只能说"系统没有接收刚才这一次"，
+          之前那次的结果回一体机核对。
+        upload-in-progress（UPLOAD_SESSION_UPLOAD_IN_PROGRESS）：服务端上传锁还被占着
+          （setNxEx，UPLOAD_LOCK_TTL_SECONDS = 30）。**不能劝重选**：正在处理的那一次
+          可能马上成功，再塞一份进来只会让"一体机上该确认哪一份"更难说清。
+          只能等 + 回一体机核对。
+        outcome-unknown（**没有服务端结论**）：网络断开、切后台、回执丢失。
+          既不能说已接收，也不能说没接收；选择区禁用以杜绝盲目重传，
+          正确的下一步只有一个 —— 回一体机看屏幕，需要就在一体机上刷新二维码。
+      另有 invalid：**只**表示链接缺 sessionId / token，与"过期 / 已用过"无关。
+      注意 invalid **不包含**"用途读不懂"：用途本来就只是提示，因为一个提示词不认识
+      就把整条链路判死，是本页越权（当前 React 的 ready 判定含 purposeConfig，见下）。
+    · 上传成功在合同上只等于 status: uploaded。文件**没有**去一体机、**没有**进打印队列、
+      **没有**被留下来 —— 是否使用要用户在一体机上按 confirm。
+      但这句合同不能原样上屏：服务端、上传会话都是工程内部说法（同 ⑪ 那条），对着手机屏幕
+      的人读不出下一步。成功屏首要文案固定为："系统已收到这份文件，请回一体机确认使用"，
+      并另起一句写清它**尚未进入本次任务**，也没有开始打印或简历处理。
+      成功屏同样不再断言"一体机上还没有出现这份文件"—— 那是另一台设备此刻的状态，
+      本页看不到。
+    · 留存必须分两种情况写，不能笼统写"到期自动清理"，**也不能反过来承诺"到期即已删除"**：
+        未确认就过期 / 被取消 → cleanupAbandonedFile 走 forceDelete，但它**不是到点自动跑
+                                  的定时任务** —— 只在一体机那边发生动作时被调用（getStatus
+                                  读到已过期 :173 / confirm 撞上已过期 :282 / 一体机上取消 :335），
+                                  而且文件一旦绑到会员（endUserId 或 ownerType==='user'）
+                                  就直接 return 跳过，改按自己的留存策略走。
+                                  所以本页只写三件站得住的事：没在一体机确认的文件**不会**
+                                  进入本次任务，也不会进入会员资料；系统按短期留存策略处理，
+                                  后续状态核对或取消时**可能**触发清理；二维码到期**不代表**
+                                  文件已经立即删除。不写具体删除时点，也不给任何"到期就一定
+                                  清掉"的期限承诺 —— 清理只在别人来动这个会话时才可能发生。
+        确认之后按用途留存 → resume_upload 会员绑定后 months_3 = 90 天，可在"我的文档"改；
+                              未登录的临时上传按 system_short + 高敏 = 1 小时；
+                              print_doc 按 system_short + 普通 = 24 小时；
+                              contract_upload 固定 2 小时（CONTRACT_REVIEW_TTL_MS），
+                              自**原始上传时刻**起算，会员绑定不重置也不延长，系统锁定不可改。
+      注意后一条**按用途分档**，所以只有服务端确认了用途才能写具体数字；
+      未确认时只能写"按系统核定的用途留存，时长以一体机上那一步的说明为准"。
+
+  ── 状态注册表（改动必须同步 phone-relay.js 顶部的同名清单）──────────────
+  QR-LOGIN（16）  missing-ticket · checking · status-error · ticket-expired · ready ·
+                  device-missing · send-loading · send-error · send-limited · code-sent ·
+                  confirming · confirm-code-invalid · confirm-code-expired ·
+                  confirm-code-locked · confirm-unknown · confirmed
+                  （confirm-code-* 三条对应 verifySmsCodeForUser 的三种结论：
+                    invalid 这次比较没消费掉那条码，核对短信最新一条后可再试，但仍受有效期
+                    与尝试次数限制；expired / locked 服务端已经没有那条码，必须重新获取。
+                    三条都不影响二维码票据。）
+  PHONE-UPLOAD（13）invalid · idle · uploading · upload-in-progress · outcome-unknown ·
+                  empty-error · too-large · type-error · content-type-error ·
+                  service-error · session-expired · success · signature-blocked
+  拆分依据只有一条：**用户能做的下一步不同，就必须是不同状态**。
+
+  演示分支（不属于产品逻辑，只为把每条真实分叉走一遍）：
+    发码  手机号末四位 0000 → send-error；1111 → send-limited（稍后）；
+          2222 → send-limited（明天）；其余 → 成功
+    确认  验证码 000000 → confirm-code-invalid（这次比较没消费掉那条码）；
+          333333 → confirm-code-expired；444444 → confirm-code-locked（这两条必须重新获取）；
+          111111 → ticket-expired；222222 → confirm-unknown；其余 → confirmed
+    上传  文件名含 busy → upload-in-progress；unknown → outcome-unknown；
+          fail → service-error；expired → session-expired；其余 → success
+    ?limit=tomorrow 直接进 send-limited 的"明天"口径；?purpose= 只喂未确认提示，
+    成功屏用它模拟服务端回执里的 purpose（生产里那个值来自回执体，与 fragment 无关）。
+    另有两个与 state 正交的事实 fixture，用来把交互才走得到的画面钉成可直达、可重跑复现：
+      ?cooldown=active   把重发冷却钉成固定 DEMO_COOLDOWN_REMAIN 秒（真实交互路径照旧一秒
+                         一跳），拍 confirm-code-* 与 send-limited 上"重新获取还在倒计时"
+                         这一屏。冷却只可能来自一次成功发码，所以它同时置 locked，
+                         但**不**改 hasUsableCode —— 冷却只说明上一次发码成功过，
+                         不说明那条码现在还在。
+      ?code=usable|none  直接指定"服务端此刻还有没有一条可用验证码"（同时置 locked），
+                         用来直达 send-limited 的两种真实处境：
+                           usable —— 旧码没被消费（比如刚填错过一次），重发却被挡下；
+                           none   —— 旧码已过期或已被作废，重发又被挡下（一条都没有）。
+
+  ── 设计修正（与当前 React 的刻意差异，迁移时按本设计改）─────────────────
+  ① PhoneUploadPage 成功屏现在把文件说成"已上传"到那台一体机。文件并没有到过一体机。
+     本页改成"系统已收到这份文件，请回一体机确认使用"，并另写一句"尚未进入本次任务，
+     也没有开始打印或简历处理"。两句都不使用工程内部说法，也不去断言一体机屏幕上此刻
+     显示什么 —— 那是另一台设备的状态，本页读不到。
+  ② PhoneUploadPage 页脚现写"到期自动清理"。它把"未确认"和"确认后→按用途留存
+     90 天 / 24 小时 / 2 小时"两条完全不同的规则压成一句，用户读完会以为文件一定会消失。
+     本页拆成两条事实分别写，并且只在服务端确认用途后才写具体时长。
+     未确认那条不得反向承诺"到期即已删除"：cleanupAbandonedFile 只在一体机侧动作时才被
+     调用（读状态读到过期 / confirm 撞上过期 / 一体机上取消），且已绑定会员的文件直接跳过 ——
+     二维码到期只说明链接不能再上传。本页只写"不会进入本次任务或会员资料；系统按短期留存
+     策略处理，后续状态核对或取消时可能触发清理"，另单列一条"到期不等于已删除"。
+     这里同样不许出现任何听起来有期限的清理承诺：没人来动这个会话，清理就一直不发生。
+  ③ MobileQrLoginPage 在票据还没读到时就显示"就业服务大厅 · 当前一体机"这个写死的机器名。
+     本机对是哪台一体机一无所知（deviceLabel 由 status 接口返回，且可能为空）。本页在识别
+     完成前只写"尚未识别一体机"；识别完成但服务端没给名称时写"一体机名称未提供"并让用户
+     核对面前的二维码 —— 两种情况都不填假名字。
+  ④ MobileQrLoginPage 固定写"二维码 3 分钟内有效"，忽略了 status.expiresInSeconds 这个
+     **剩余**秒数。本页按剩余值显示，并同屏标明总寿命 180 秒。
+  ⑤ MobileQrLoginPage 把所有失败都塞进同一个 error 串，并且只要有 ticketId 就给"重新检查
+     二维码"。本页按"能不能自救"拆成 status-error（可重试）/ ticket-expired（不可重试，回
+     一体机）/ confirm-code-invalid（这次比较没消费掉那条码，核对最新一条后可再试，但仍受
+     有效期与尝试次数限制）/ confirm-code-expired 与 confirm-code-locked（那条码已经没了，
+     必须重新获取，验证码输入框一并禁用）/ confirm-unknown（结果未知，不许盲重试）六条路径。
+  ⑥ PhoneUploadPage 的 signature_image 用途配置齐全（noun / accept / helper），页面会渲染成
+     一条看起来能走通的上传流程，但一体机根本发不出这个 purpose 的会话。本页改成明写不可用，
+     只引导回一体机"签名盖章"第 2 步用"本机上传"选已有的 JPG / PNG；不虚构触屏手写或扫描盖章。
+     不可用态连壳层文案一起改：顶栏与页脚不再写"传完回一体机确认 / 一次性上传链接"，
+     否则整屏其他位置仍在承诺一个根本发不出来的上传。
+  ⑦ PhoneUploadPage 只按 10MB 拦一道，别的全丢给服务端，失败后统一一句"上传失败，请重新扫码
+     或稍后重试"。本页补上空文件、后缀、类型三道预检，并把失败按"服务端到底说了什么"拆成
+     四类（可重试 / 需刷新 / 正在处理 / 结果未知）；同时明说预检不能代替服务端校验。
+  ⑧ PhoneUploadPage 用 fragment 里的 purpose 决定 accept、文案与 ready 判定
+     （`ready = Boolean(sessionId && uploadToken && purposeConfig)`）。那个值可以被改，
+     本页改成：确认前一律用三用途交集 PDF / JPG / PNG，用途只作未确认提示，
+     且不因为用途读不懂就判链接失效。
+  ⑨ MobileQrLoginPage 的发码是"点了就当发出去了"。本页拆出 send-loading / send-error /
+     send-limited，只有成功回执才锁号、起倒计时、写"已发送"；没成功发过码时验证码输入
+     和确认按钮都不可用。并且把"发过码"与"此刻有码可填"拆成两个独立事实
+     （locked / hasUsableCode，见上面发码那一节）—— 迁移时必须一起搬：只搬 locked，
+     会在"过期后重新获取又被频控挡下"那一屏把输入框和确认按钮重新放开。
+  ⑩ 两页都不出现 ticketId / sessionId / uploadToken。手机可能被人凑过来看，令牌不上屏。
+  ⑪ 失败屏不展示服务端错误码，也不展示任何工程内部名（接口名、DTO 名、常量名、原始 MIME 串）。
+     详细码只留在脚本的内部状态（phone-relay.js 的 S.errCode），不上屏也不写进 data-*：
+     进了 DOM 就等于进了截图。生产同口径 —— uploadSessions.ts 的 uploadSessionUserMessage
+     把 code 映射成中文后只回中文，从不把 code 拼进用户可见文案。
+  ⑫ 主操作从"滚动区内 position:sticky 吸底"改成"滚动区外的固定操作位"。吸底那版浮在正文
+     上面：验证码失败这一屏在 390×844 上，错误原因和验证码输入框正好被按钮压住。改成 .body
+     的兄弟节点后，滚动区高度已扣掉它，任何一行都不会永远藏在按钮底下；同时错误说明提到
+     机器卡正下方，机器卡在"已发码 / 有错误"时收成一行 —— 原因与下一步一起落在首屏。
+
+  ── 无障碍 ────────────────────────────────────────────────────────────
+  · 任务区外层不挂 aria-live：每张状态卡自带 role="status" / role="alert"，
+    再套一层区域级 live region 会让同一句话被读两遍。
+  · 手机号发码后输入框会被脱敏回显取代，此时标题不能再留 for="qr-phone"（控件已不存在，
+    悬空 label 点上去没有落点）：改用普通标题 + 回显区 aria-labelledby 指回它。
+  · 任意可点区域 ≥48px，主操作 ≥56px；不可用状态用 aria-disabled 表达，
+    输入类控件另加 disabled（读屏与触控要一致）。
+
+  ── 真话边界 ──────────────────────────────────────────────────────────
+  · 一体机名称、剩余秒数、文件名与体积在静态页里是字段演示（源码里的 DEMO_* 常量），
+    不代表任何真实设备、真实票据或真实文件；界面上不写"演示 / 测试 / 示例"这类词。
+  · 本页不接 AI：这两条 route 在生产里也没有任何 AI 元素，加一个只会把接力路径拉长。
+  · 本页是静态设计资产。它只证明版式、状态拆分与文案口径，不代表 React 页面、
+    接口联调、真机浏览器或上线完成。
+-->
+<link rel="stylesheet" href="phone-relay.css">
+</head>
+<body>
+<div id="stage" data-screen="qr-login" data-state="checking" data-purpose="none" data-purpose-confirmed="0">
+
+  <header class="relaybar">
+    <span class="seal serif" aria-hidden="true">职</span>
+    <div class="rb-copy">
+      <b>职易达</b>
+      <small id="rb-sub">手机确认登录</small>
+    </div>
+    <span class="rb-tag" id="rb-tag">手机接力</span>
+  </header>
+  <div class="wave" aria-hidden="true"></div>
+
+  <main class="body">
+    <div class="flow" id="flow"></div>
+  </main>
+
+  <!-- 固定操作位：在滚动区之外，所以永远不会盖住正文。上传屏没有主操作时留空，:empty 收掉。 -->
+  <div class="ctadock" id="cta"></div>
+
+  <p class="foot">
+    <span class="ic" id="foot-ic" aria-hidden="true"></span>
+    <span id="foot-copy">—</span>
+  </p>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制面板">演示</button>
+  <aside class="demo-panel" id="demo-panel" data-proto-control="true" aria-label="原型演示控制"></aside>
+</div>
+<script src="phone-relay.js"></script>
+</body>
+</html>

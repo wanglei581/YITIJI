@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会话守卫 · 职易达</title>
+<!--
+  route: /session-timeout（apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx）
+  state: warning | warning-no-continue | clearing | cleared | continue-failed
+  数据来源（KioskSessionControlContext）：
+    warning = { sourcePath, exitTo, canContinue, deadlineAt }
+    continueSession() → 回到 **warning.sourcePath**；hardClear() → 清除本机会话；clearToScreensaver() → 回待机
+  「我还在，继续使用」的落点（KioskPrivacyGuard.tsx:352-405，本页第一条硬约束）：
+    · 来源页是 pendingWarning.sourcePath —— 弹这一屏之前用户所在的那一页，不是首页；
+    · 运行时的回法是 navigate(-1)（回退到 sourceHistoryIndex 那一条 history entry），
+      所以落点必然等于 sourcePath；
+    · 守卫不过就 fail-closed：pendingWarning 为空、已过 deadlineAt、sourceHistoryIndex 为空、
+      或当前 history 位置不等于 sourceHistoryIndex+1 → 直接 hardClear() 回首页并清场。
+    静态页没有 history，所以用 ?from= 演示这条来源：?from= 走与 /login 同一套安全校验
+    （/ 开头、不含 //、反斜线、控制字符，且不是 /session-timeout 自身），再经**唯一一张
+    route → 静态 HTML 白名单**换成本仓库里真实存在的页面。白名单里没有的 route 一律
+    fail-closed 回 01-home.html，并在屏幕上写清「为什么回的是首页」——
+    绝不允许出现「显示来源是 /resume/optimize、点下去却回首页」这种自相矛盾。
+    页面上展示的来源、guard-from 里的文案、按钮的 href 与 data-route 全部来自同一个 resolver。
+  倒计时口径：由 deadlineAt 与**本机时钟**相减得到，纯前端。
+    没有离人传感器，没有服务端倒计时，没有摄像头判人 —— 这三样这台机器都没有，页面不得画。
+  清除口径（本页唯一正确说法）：
+    结束会话清除的是**本机登录态与临时会话信息**；
+    已创建的打印/扫描任务继续运行，账号内的文档、订单、AI 记录按**服务端留存期限**管理。
+    静态页不声称真的清掉了服务端订单或文件，cleared 也只代表本机清场例程返回了成功。
+  AI 边界: 本 route 为 AI-NONE。AI 不判定会话超时、清场是否完成、任务是否仍在运行。
+  原型演示控制: ?state= 只切换展示状态；?from= 演示来源页（同时决定「继续使用」按钮的 href 与 data-route）；
+                ?capture=1 冻结倒计时；?flat=1 关非必要动效；?debug=1 显演示面板。
+                页内换状态会保留 from / debug / flat / capture。倒计时到 0 不自动跳转、不代替执行清场。
+                示例：?state=warning&from=%2Fresume%2Foptimize → 继续使用落到 23-resume-optimize.html；
+                      ?state=warning&from=%2Fnot%2Fmapped     → fail-closed 回 01-home.html 并写明原因。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:560px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.scrollarea{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+/* 触屏可供性：公共终端用户不会主动试探能不能滑，滚动条必须常驻可见。 */
+.scrollarea{scrollbar-width:thin;scrollbar-color:var(--line-2,#d4cdb6) transparent}
+.scrollarea::-webkit-scrollbar{width:10px}
+.scrollarea::-webkit-scrollbar-thumb{background:var(--line-2,#d4cdb6);border-radius:6px}
+.scrollarea::-webkit-scrollbar-track{background:transparent}
+.sec{flex:none;padding:0 44px;margin-top:30px}
+.sec.last{margin-bottom:20px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+
+/* 主状态块：倒计时 + 一句话结论 */
+.guard{display:flex;align-items:center;gap:48px;padding:94px 54px;border-radius:44px;background:linear-gradient(158deg,var(--deep-2),var(--deep) 70%);color:#f2efe4;position:relative;overflow:hidden}
+.guard::after{content:"";position:absolute;right:-150px;top:-150px;width:440px;height:440px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.guard-num{flex:none;width:360px;height:360px;border-radius:50%;border:2px solid rgba(46,230,168,.32);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;z-index:1}
+.guard-num b{font-size:168px;line-height:1;font-weight:700;color:var(--emerald);font-variant-numeric:tabular-nums}
+.guard-num span{margin-top:14px;font-size:20px;color:rgba(242,239,228,.66);text-align:center;line-height:1.4;padding:0 26px}
+.guard-main{flex:1;min-width:0;position:relative;z-index:1}
+.guard-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:12px}
+.guard-title{font-size:50px;line-height:1.24;font-weight:700;letter-spacing:1px}
+.guard-title em{font-style:normal;color:var(--emerald)}
+.guard-copy{margin-top:14px;font-size:21px;line-height:1.6;color:rgba(242,239,228,.76)}
+.guard-copy b{color:#fff;font-weight:600}
+.guard-from{margin-top:18px;display:inline-flex;align-items:center;flex-wrap:wrap;gap:8px 10px;min-height:48px;padding:0 18px;border-radius:16px;background:rgba(255,253,248,.09);border:1px solid rgba(255,253,248,.16);font-size:19px;color:rgba(242,239,228,.8)}
+.guard-from b{color:var(--emerald);font-weight:700}
+
+.state{border-radius:var(--r-lg);padding:30px 36px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700}
+.state-p{margin-top:12px;font-size:21px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.grid3 .card{min-height:300px}
+.grid3 .card h3{font-size:23px;line-height:1.3}
+.grid3 .card p{font-size:20px;line-height:1.65}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:30px 32px}
+.card h3{font-size:25px;font-weight:700;display:flex;align-items:center;gap:12px}
+.card .ci{flex:none;width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.card ul{margin-top:14px;list-style:none;display:flex;flex-direction:column;gap:11px}
+.card li{display:flex;gap:12px;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.card .sq{flex:none;width:10px;height:10px;border-radius:3px;margin-top:9px}
+.card li b{color:var(--ink);font-weight:600}
+.card p{margin-top:12px;font-size:19px;line-height:1.55;color:var(--ink-3)}
+
+.ctabar{flex:none;padding:28px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.btn{min-height:118px;padding:0 30px;border-radius:24px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:26px;font-weight:700;text-align:center;flex:1}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn.danger{background:var(--cinnabar);color:#fff}
+.btn[aria-disabled=true]{cursor:default}
+.btn.primary[aria-disabled=true]{background:#dfe4e0;color:#5f716a}
+.truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:26px;background:var(--paper)}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:6px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">本机计时 · 不依赖网络</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <main class="body" id="body-root" data-screen="session-guard" data-state="warning" data-testid="session-guard-state-warning">
+    <div class="scrollarea" id="scrollarea"></div>
+    <div class="ctabar" id="ctabar"></div>
+  </main>
+
+  <div class="truth" data-disclaimer="true" data-testid="session-guard-truth">
+    <div><b>倒计时</b>由本机时钟执行，不依赖网络与 AI；这台机器没有离人传感器，也不做人脸判断。</div>
+    <div><b>清除范围</b>结束会话清除本机登录态与临时会话信息；服务端的订单与文件按留存期限管理。</div>
+    <div><b>已创建的任务</b>打印/扫描任务在服务端继续运行，不会因为这次清场被取消。</div>
+  </div>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"><div class="dp-t">原型演示控制</div></div>
+</div>
+<script>
+var SCREEN='session-guard';
+var STATES=['warning','warning-no-continue','clearing','cleared','continue-failed'];
+var ICO={
+ broom:'<path d="M15.5 3.5l5 5"/><path d="M13 6L5.5 13.5 4 20l6.5-1.5L18 11"/><path d="M9 10l5 5"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ server:'<rect x="3.5" y="4" width="17" height="6.5" rx="2"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="2"/><path d="M7 7.2h.01M7 16.8h.01"/>',
+ warn:'<path d="M12 4.6L21 19.4H3z"/><path d="M12 10v4.6M12 17.2h.01"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.3"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ printer:'<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>',
+ eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3.2"/>'
+};
+function svg(n,s,w){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+
+var q=new URLSearchParams(location.search);
+/* ── 来源页解析：唯一 resolver ────────────────────────────────────
+   ① 安全校验（与 src/auth/returnPath.ts isSafeInternalPath 同口径，静态页更严一档）；
+   ② route → 本仓库真实存在的静态 HTML（下表按 COVERAGE-MATRIX 的宿主分账写死）；
+   ③ 查不到就 fail-closed 回 01-home.html，并如实说明原因。
+   页面里所有「回到来源页」的展示与链接都必须用这个结果，不许各写各的。 */
+function hasControlChar(p){
+ for(var i=0;i<p.length;i++){var c=p.charCodeAt(i);if(c<32||c===127)return true}
+ return false;
+}
+function isSafeInternalPath(p){
+ if(typeof p!=='string'||p==='')return false;
+ if(p.charAt(0)!=='/')return false;
+ if(p.indexOf('//')>=0)return false;
+ if(p.indexOf('\\')>=0)return false;
+ if(hasControlChar(p))return false;
+ if(p==='/session-timeout'||p.indexOf('/session-timeout')===0)return false;
+ return true;
+}
+/* route → 静态宿主。左边是 routes/index.tsx 的真实 route，右边是本目录里真实存在的文件。 */
+var ROUTE_HOST={
+ '/':'01-home.html',
+ '/login':'03-login-gate.html',
+ '/assistant':'05-ai-cockpit.html',
+ '/help':'06-help.html',
+ '/session-resume':'07-session-resume.html',
+ '/error-offline':'09-system-state.html',
+ '/print-scan':'10-print-hub.html',
+ '/print-scan/convert':'19-img2pdf.html',
+ '/print-scan/sign':'20-sign-stamp.html',
+ '/print/pickup-claim':'11-arrival-code.html',
+ '/print/upload':'12-file-source.html',
+ '/print/material-check':'13-print-desk.html',
+ '/print/preview':'13-print-desk.html',
+ '/print/confirm':'14-print-confirm.html',
+ '/print/cashier':'32-cashier.html',
+ '/print/progress':'15-print-fulfill.html',
+ '/print/done':'15-print-fulfill.html',
+ '/scan/start':'18-scan-workbench.html',
+ '/scan/settings':'18-scan-workbench.html',
+ '/scan/progress':'18-scan-workbench.html',
+ '/scan/result':'18-scan-workbench.html',
+ '/resume-service':'16-service-hubs.html?hub=resume',
+ '/resume/source':'21-resume-triage.html',
+ '/resume/parse':'21-resume-triage.html',
+ '/resume/report':'22-resume-report.html',
+ '/resume/optimize':'23-resume-optimize.html',
+ '/resume/optimize/compare':'23-resume-optimize.html',
+ '/resume/generate':'24-resume-generate.html',
+ '/resume/generate/preview':'24-resume-generate.html',
+ '/resume/materials':'25-material-workshop.html',
+ '/resume/templates':'46-resume-decision-workspace.html?screen=templates',
+ '/resume/job-fit':'46-resume-decision-workspace.html?screen=job-fit',
+ '/resume/job-fit/actions':'46-resume-decision-workspace.html?screen=actions',
+ '/resume/career-plan':'46-resume-decision-workspace.html?screen=career-plan',
+ '/resume/self-assessment/intro':'34-self-assessment.html',
+ '/resume/self-assessment/questions':'34-self-assessment.html',
+ '/resume/self-assessment/result':'34-self-assessment.html',
+ '/resume/self-assessment/history':'34-self-assessment.html',
+ '/jobs':'26-browse-list.html',
+ '/jobs/online-platforms':'45-online-platform-directory.html',
+ '/jobs-service':'16-service-hubs.html?hub=jobs',
+ '/companies':'43-company-directory.html?screen=list',
+ '/offline-agencies':'42-offline-agency-directory.html?screen=list',
+ '/job-fairs':'28-jobfair-enhanced.html',
+ '/job-fairs/checkin':'28-jobfair-enhanced.html',
+ '/fairs-service':'16-service-hubs.html?hub=fairs',
+ '/campus':'49-campus-workspace.html?screen=campus',
+ '/campus/welcome':'49-campus-workspace.html?screen=welcome',
+ '/interview-service':'16-service-hubs.html?hub=interview',
+ '/interview/setup':'29-interview-training.html',
+ '/interview/session':'29-interview-training.html',
+ '/interview/report':'29-interview-training.html',
+ '/interview/tips':'29-interview-training.html',
+ '/interview/reports':'29-interview-training.html',
+ '/policy-service':'16-service-hubs.html?hub=policy',
+ '/renshi':'48-policy-workspace.html',
+ '/toolbox':'50-capability-zone-workspace.html?screen=toolbox',
+ '/smart-campus':'50-capability-zone-workspace.html?screen=campus',
+ '/smart-campus/welcome':'50-capability-zone-workspace.html?screen=campus-welcome',
+ '/contract-review':'47-contract-review-workspace.html?screen=home',
+ '/contract-review/processing':'47-contract-review-workspace.html?screen=processing',
+ '/contract-review/result':'47-contract-review-workspace.html?screen=result',
+ '/profile':'30-my-profile.html',
+ '/me/settings':'30-my-profile.html',
+ '/me/print-orders':'38-member-assets.html',
+ '/me/documents':'38-member-assets.html',
+ '/me/resumes':'39-member-records.html?view=resumes',
+ '/me/favorites':'39-member-records.html?view=favorites',
+ '/me/ai-records':'39-member-records.html?view=ai-records',
+ '/me/activity':'39-member-records.html?view=activity',
+ '/me/benefits':'31-benefits.html',
+ '/activities':'31-benefits.html',
+ '/me/notifications':'35-notifications.html',
+ '/notifications':'35-notifications.html?compat=1',
+ '/me/feedback':'40-member-feedback.html',
+ '/me/privacy-requests':'41-member-privacy.html'
+};
+/* 带 :id 的 route 用前缀补一层，仍然只映射到真实存在的宿主 */
+var ROUTE_PREFIX=[
+ ['/legal/','08-legal.html'],
+ ['/print-scan/feature/','10-print-hub.html'],
+ ['/me/activity/','39-member-records.html?view=activity-detail'],
+ ['/activities/','31-benefits.html'],
+ ['/jobs/','27-browse-detail.html'],
+ ['/companies/','43-company-directory.html?screen=company'],
+ ['/offline-agencies/','42-offline-agency-directory.html?screen=agency'],
+ ['/job-fairs/','28-jobfair-enhanced.html'],
+ ['/smart-campus/service/','50-capability-zone-workspace.html?screen=campus-service']
+];
+function resolveFrom(){
+ var raw=q.get('from');
+ var given=(raw!==null&&raw!=='');
+ if(!given)return {given:false,safe:'',route:'/',host:'01-home.html',known:false,reason:'没有读到来源页'};
+ if(!isSafeInternalPath(raw))return {given:true,safe:'',route:'/',host:'01-home.html',known:false,reason:'来源参数不合法'};
+ var path=raw.split('#')[0].split('?')[0];
+ var host=ROUTE_HOST[path];
+ if(!host){
+  for(var i=0;i<ROUTE_PREFIX.length;i++){
+   if(path.indexOf(ROUTE_PREFIX[i][0])===0){host=ROUTE_PREFIX[i][1];break}
+  }
+ }
+ if(!host)return {given:true,safe:raw,route:'/',host:'01-home.html',known:false,reason:'来源页不在本原型的静态映射表里'};
+ return {given:true,safe:raw,route:path,host:host,known:true,reason:''};
+}
+var SRC=resolveFrom();
+/* guard-from 上那句话：来源、落点、为什么，三样必须同时说清楚 */
+var FROM_LABEL=SRC.known
+ ? '<b>'+SRC.route+'</b>（静态稿对应 '+SRC.host.split('?')[0]+'）'
+ : '<b>首页</b>（'+SRC.reason+'，按 fail-closed 处理）';
+
+/* 倒计时块：数字来自 deadlineAt − 本机时钟；?capture=1 冻结，便于逐字节复现的证据截图 */
+function guardBlock(o){
+ return '<section class="sec"><div class="guard">'+
+  '<div class="guard-num" role="group" aria-label="本机剩余计时"><b id="count">'+o.num+'</b><span id="count-unit">'+o.unit+'</span></div>'+
+  '<div class="guard-main"><div class="guard-eyebrow">SESSION GUARD</div>'+
+  '<div class="guard-title serif">'+o.title+'</div>'+
+  '<div class="guard-copy">'+o.copy+'</div>'+
+  (o.from?'<div class="guard-from">'+svg('info','currentColor',22)+'继续后回到 '+FROM_LABEL+'</div>':'')+
+  '</div></div></section>';
+}
+/* 页内状态跳转：保留 from / debug / flat / capture，换一屏不丢来源 */
+function Q(state){
+ var s='?state='+state;
+ if(SRC.given&&SRC.safe)s+='&from='+encodeURIComponent(SRC.safe);
+ if(q.get('debug')==='1')s+='&debug=1';
+ if(q.get('flat')==='1')s+='&flat=1';
+ if(q.get('capture')==='1')s+='&capture=1';
+ return s;
+}
+/* 「继续使用」按钮：href、data-route、可读名称全部来自同一个 resolver。
+   来源未知时按钮直说回首页 —— 不做「写着来源页、点了回首页」这种事。 */
+function continueBtn(){
+ return '<a class="btn primary" style="flex:1.5" href="'+SRC.host+'" data-route="'+SRC.route+'" data-testid="session-guard-primary" aria-label="'+
+  (SRC.known?'我还在，继续使用，回到 '+SRC.route:'我还在，继续使用；'+SRC.reason+'，只能回首页重新进入')+'">'+
+  (SRC.known?'我还在，继续使用':'我还在，继续使用（回首页）')+'</a>';
+}
+/* 非倒计时状态复用同一块头图：圆形换成状态字形，避免这些屏只剩一条窄提示条 */
+function heroGlyph(o){
+ return '<section class="sec"><div class="guard"'+(o.fallback?' data-testid="'+SCREEN+'-fallback"':'')+'>'+
+  '<div class="guard-num'+(o.spin?' breathe':'')+'" role="img" aria-label="'+o.alt+'">'+svg(o.icon,'currentColor',132)+'</div>'+
+  '<div class="guard-main"><div class="guard-eyebrow">SESSION GUARD</div>'+
+  '<div class="guard-title serif">'+o.title+'</div>'+
+  '<div class="guard-copy">'+o.copy+'</div>'+
+  (o.foot?'<div class="guard-from">'+svg('info','currentColor',22)+o.foot+'</div>':'')+
+  '</div></div></section>';
+}
+function whatClears(){
+ return '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这次会清掉什么</span><span class="hint">分成本机和服务端两笔账</span></div>'+
+  '<div class="grid2">'+
+  '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('broom','currentColor',26)+'</span>本机会清除</h3><ul>'+
+  '<li><span class="sq" style="background:var(--wheat)"></span><span><b>登录态或本次匿名会话</b>，下次要重新验证</span></li>'+
+  '<li><span class="sq" style="background:var(--wheat)"></span><span>本次上传的<b>文件缓存与预览</b></span></li>'+
+  '<li><span class="sq" style="background:var(--wheat)"></span><span>AI 顾问（小青）对话与<b>没提交的填写内容</b></span></li>'+
+  '<li><span class="sq" style="background:var(--wheat)"></span><span>浏览与选择留下的<b>临时上下文</b></span></li>'+
+  '</ul></div>'+
+  '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('server','currentColor',26)+'</span>不因此清除</h3><ul>'+
+  '<li><span class="sq" style="background:var(--teal)"></span><span>已创建的<b>打印 / 扫描任务</b>继续运行</span></li>'+
+  '<li><span class="sq" style="background:var(--teal)"></span><span>账号里的文档、订单、AI 记录按<b>服务端留存期限</b>管理</span></li>'+
+  '<li><span class="sq" style="background:var(--teal)"></span><span>已下过单的<b>到机码</b>照常能用</span></li>'+
+  '</ul><p>要删账号里的文件或记录，请登录后到「我的」里自己删除，那才是真正的删除请求。</p></div>'+
+  '</div></section>';
+}
+/* 三问：现场最常出现的三种误解，就地回答，不写成说明书 */
+var ASKS=[
+ ['我只是在看屏幕上的字','点「我还在，继续使用」就行。刚才填到一半的内容<b>不会因此丢掉</b>。','var(--teal-soft)','#157a67','eye'],
+ ['我的打印订单会不会没了','不会。订单在服务端，清场只动这台机器。带到机码回来，或登录后到「我的 · 打印订单」查。','var(--slate-soft)','#35608f','printer'],
+ ['纸还在机器上','屏幕能清干净，<b>纸不会自己收走</b>。离开前请把原件和打印件一起带走。','var(--wheat-soft)','#8a6219','warn']
+];
+function askRow(no){
+ var h='';
+ for(var i=0;i<ASKS.length;i++){var a=ASKS[i];
+  h+='<div class="card"><h3><span class="ci" style="background:'+a[2]+';color:'+a[3]+'">'+svg(a[4],'currentColor',26)+'</span>'+a[0]+'</h3><p>'+a[1]+'</p></div>';
+ }
+ return '<section class="sec last"><div class="sec-label"><span class="no serif">'+(no||'02')+'</span><span class="t">现场最常问的三件事</span><span class="hint">就地回答，不用找人</span></div>'+
+  '<div class="grid3">'+h+'</div></section>';
+}
+
+var V={};
+V['warning']=function(){
+ return {body:guardBlock({num:'60',unit:'秒后按本机计时清场',from:true,
+   title:'还在用吗？<br><em>没操作</em>有一会儿了',
+   copy:'这是公共终端的隐私保护。<b>时间一到，本机上这趟留下的东西会被清掉</b>；已经交给服务端的任务和账号数据不受影响。'})+
+   (SRC.given&&!SRC.known?'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-source-note">'+
+    '<div class="state-h">'+svg('info','currentColor',28)+'这次读不到可用的来源页</div>'+
+    '<div class="state-p">'+SRC.reason+'，所以「继续使用」<b>只能回首页</b>，按钮上也是这么写的。运行时遇到同类情况（来源丢失、已过截止、history 位置对不上）会直接清场回首页，不会假装还能原地继续。</div></div></section>':'')+
+   whatClears()+askRow('02'),
+  cta:'<button type="button" class="btn danger" data-go="'+Q('clearing')+'" data-testid="session-guard-clear">结束并清除本机会话</button>'+
+   continueBtn()};
+};
+V['warning-no-continue']=function(){
+ return {body:guardBlock({num:'60',unit:'秒后按本机计时清场',from:false,
+   title:'这次<em>不能</em>就地继续',
+   copy:'会话守卫这次没有给出「继续使用」的许可 —— 通常是本次会话已经到了最长安全时限。<b>你可以立刻结束并清场，也可以等计时走完。</b>'})+
+   '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('lock','currentColor',28)+'为什么没有「继续使用」</div>'+
+   '<div class="state-p">公共终端的会话有一个<b>最长时限</b>，到点就必须清场，不能靠反复点「继续」无限延长。这不是故障，也不是你操作错了。</div>'+
+   '<div class="state-p">'+(SRC.known?'来源页是 <b>'+SRC.route+'</b>，它还在，但这次守卫没有给出就地继续的许可 —— 清场后重新进入即可。':'本次也没有读到可用的来源页（'+SRC.reason+'）。')+'</div>'+
+   '<div class="state-p">清场之后重新登录即可继续；<b>账号里已经保存的东西不会因此消失。</b></div></div></section>'+
+   whatClears(),
+  // 本态的全部意义是「必须先清场」。原来的「返回首页」是 href="01-home.html"，
+  // 点了直接回首页而不清场——登录态会留在公共机上，与本屏文案直接冲突。
+  // 去掉逃生口：唯一出口就是清场；清场完成后本来就会回到可用状态。
+  cta:'<button type="button" class="btn danger" style="flex:1" data-go="'+Q('clearing')+'" data-testid="session-guard-primary">结束并清除本机会话</button>'};
+};
+V['clearing']=function(){
+ return {body:heroGlyph({icon:'broom',spin:true,fallback:true,alt:'正在清除本机会话',
+   title:'正在<em>清除</em>本机会话',
+   copy:'清的是<b>这台机器上的登录态与临时会话信息</b>。这一步由本机清场例程执行，<b>结果由它返回</b>，本页不提前写成已完成，也不去删服务端的订单或文件。',
+   foot:'清完回首页还是回待机屏，由会话守卫的 <b>exitTo</b> 决定'})+
+   whatClears()+askRow('02'),
+  cta:'<a class="btn ghost" href="01-home.html" data-route="/" data-testid="session-guard-primary">返回首页</a>'};
+};
+V['cleared']=function(){
+ return {body:heroGlyph({icon:'check',fallback:true,alt:'本机会话已清除',
+   title:'本机会话<em>已清除</em>',
+   copy:'本机清场例程返回了成功：<b>这台机器上的登录态与临时会话信息已经清掉</b>，下一位使用者看不到你这一趟的内容。这一条只说明本机这一侧。',
+   foot:'服务端的订单、文件和记录<b>没有被这次操作删除</b>，按各自留存期限管理'})+
+   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">接下来可以做什么</span><span class="hint">都不需要联系工作人员</span></div>'+
+   '<div class="grid2">'+
+   '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('printer','currentColor',26)+'</span>刚才的打印任务还在</h3>'+
+   '<p>已创建的任务在服务端继续走。带着到机码回到打印扫描入口，或者到「我的 · 打印订单」里按订单号查。</p></div>'+
+   '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('lock','currentColor',26)+'</span>要看账号里的东西</h3>'+
+   '<p>重新登录即可。文档、订单、AI 记录仍在你名下，<b>只有本人可见</b>。</p></div>'+
+   '</div></section>'+
+   '<section class="sec last"><div class="sec-label"><span class="no serif">02</span><span class="t">离开前再看一眼</span><span class="hint">屏幕清得掉，桌面上的东西清不掉</span></div>'+
+   '<div class="grid3">'+
+   '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('warn','currentColor',26)+'</span>纸别落在机器上</h3><p>扫描仪玻璃板、送稿器和出纸口里的<b>纸不会自己收走</b>，请带走原件和打印件。</p></div>'+
+   '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('printer','currentColor',26)+'</span>还没出纸就走了</h3><p>任务在服务端排队，<b>到机码仍然有效</b>。回来时在打印扫描入口重新核销即可。</p></div>'+
+   '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('eye','currentColor',26)+'</span>担心别人看到</h3><p>屏幕内容已清，本机不留历史文件。<b>下一位使用者从空白会话开始。</b></p></div>'+
+   '</div></section>',
+  cta:'<a class="btn ghost" href="03-login-gate.html" data-route="/login">重新登录</a>'+
+   '<a class="btn primary" style="flex:1.5" href="01-home.html" data-route="/" data-testid="session-guard-primary">返回首页</a>'};
+};
+V['continue-failed']=function(){
+ return {body:heroGlyph({icon:'warn',fallback:true,alt:'继续使用没有成功',
+   title:'没能<em>就地继续</em>',
+   copy:'「继续使用」这一步没有走通：'+(SRC.known?'来源页是 <b>'+SRC.route+'</b>，但守卫这次不认它':'本来就没有读到可用的来源页')+'。可能是已经过了截止时间，也可能是浏览记录的位置对不上 —— <b>本页不推测具体原因</b>。',
+   foot:'运行时这条路是 <b>fail-closed</b>：守卫不通过就直接清场回首页，不会停在一个「还能继续」的假象上'})+
+   '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-source-note">'+
+   '<div class="state-h">'+svg('info','currentColor',28)+'这一屏为什么单列出来</div>'+
+   '<div class="state-p">continueSession() 的守卫（pendingWarning 为空、已过 deadlineAt、history 位置对不上）任何一条不满足，运行时都会调 <b>hardClear()</b>：清本机会话并回首页。设计稿把这条路径画出来，是为了让它可被验收，<b>不是</b>声称此刻内容还留着。</div>'+
+   '<div class="state-p">清除范围与下面「这次会清掉什么」完全一致：只动这台机器，服务端的任务和账号数据不受影响。</div></div></section>'+
+   whatClears()+askRow('02'),
+  cta:'<a class="btn ghost" href="03-login-gate.html" data-route="/login">重新登录</a>'+
+   '<a class="btn primary" style="flex:1.5" href="01-home.html" data-route="/" data-testid="session-guard-primary">返回首页重新开始</a>'};
+};
+
+var PILL={
+ 'warning':['warn','闲置提醒 · 本机计时'],
+ 'warning-no-continue':['warn','已到最长安全时限'],
+ 'clearing':['','正在清除本机会话'],
+ 'cleared':['ok','本机会话已清除'],
+ 'continue-failed':['bad','继续使用未成功']
+};
+
+var root=document.getElementById('body-root');
+var COUNT_FROM=60,timer=null;
+function render(state){
+ var view=V[state]();
+ root.setAttribute('data-state',state);
+ root.setAttribute('data-testid',SCREEN+'-state-'+state);
+ document.getElementById('scrollarea').innerHTML=view.body;
+ document.getElementById('ctabar').innerHTML=view.cta;
+ var p=document.getElementById('pill');
+ p.className='pill'+(PILL[state][0]?' '+PILL[state][0]:'');
+ document.getElementById('pill-txt').textContent=PILL[state][1];
+ document.getElementById('pill-dot').className='dot'+(state==='clearing'?' breathe':'');
+ document.querySelectorAll('[data-go]').forEach(function(b){
+  b.addEventListener('click',function(){location.href=b.getAttribute('data-go')});
+ });
+ startCount();
+}
+/* 本机倒计时：真实的本地计时，不自动跳转、不代替执行清场；?capture=1 冻结以便复现截图 */
+function startCount(){
+ if(timer){clearInterval(timer);timer=null}
+ var el=document.getElementById('count');
+ if(!el||q.get('capture')==='1')return;
+ var left=COUNT_FROM;
+ timer=setInterval(function(){
+  left-=1;
+  if(left<=0){
+   clearInterval(timer);timer=null;
+   el.textContent='0';
+   var u=document.getElementById('count-unit');
+   if(u)u.textContent='计时已到，真实实现在此执行本机清场';
+   return;
+  }
+  el.textContent=String(left);
+ },1000);
+}
+var state=q.get('state');
+if(STATES.indexOf(state)<0)state='warning';
+render(state);
+
+var panel=document.getElementById('demo-panel');
+for(var i=0;i<STATES.length;i++){
+ var a=document.createElement('a');
+ var href=Q(STATES[i]);
+ if(href.indexOf('debug=1')<0)href+='&debug=1';
+ a.href=href;a.textContent=STATES[i];
+ if(STATES[i]===state)a.className='on';
+ panel.appendChild(a);
+}
+if(q.get('debug')==='1')document.documentElement.classList.add('debug');
+document.getElementById('demo-tab').addEventListener('click',function(){panel.classList.toggle('show')});
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(q.get('flat')==='1')document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

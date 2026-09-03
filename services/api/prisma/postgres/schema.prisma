@@ -49,6 +49,8 @@ model Terminal {
   scanTasks    ScanTask[]
   scanDeletionAudits TerminalScanDeletionAudit[]
   capabilities TerminalCapability[]
+  releaseTargets AgentReleaseTarget[]
+  activeReleaseObservationAssignment ActiveReleaseObservationAssignment?
 
   @@index([orgId])
   @@index([enabled])
@@ -236,6 +238,101 @@ model TerminalHeartbeat {
   @@index([terminalId, createdAt])
 }
 
+// ── F0.5 Agent release observation ─────────────────────────────────────────
+//
+// This is deliberately a control-plane observation model, not an updater.
+// Artifacts contain identity only. They never contain a URL, command, token or
+// any install instruction. A terminal can only read its own active target and
+// report the version fact it is currently running.
+model AgentReleaseArtifact {
+  id                         String   @id @default(cuid())
+  version                    String
+  targetPlatform             String   @default("windows-x64")
+  packageSha256              String
+  runtimeManifestSha256      String
+  signerTrustLevel           String
+  signerCertificateThumbprint String?
+  observationProtocolVersion String   @default("release-observation-v1")
+  createdBy                  String?
+  createdAt                  DateTime @default(now())
+
+  plans AgentReleasePlan[]
+
+  @@unique([version, packageSha256])
+  @@index([createdAt])
+}
+
+model AgentReleasePlan {
+  id                   String   @id @default(cuid())
+  artifactId           String
+  artifact             AgentReleaseArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  status               String   @default("draft")
+  version              Int      @default(1)
+  reason               String
+  observationEndsAt    DateTime
+  createdBy            String?
+  activatedBy          String?
+  activatedAt          DateTime?
+  pausedBy             String?
+  pausedAt             DateTime?
+  cancelledBy          String?
+  cancelledAt          DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  targets AgentReleaseTarget[]
+  activeAssignments ActiveReleaseObservationAssignment[]
+
+  @@index([status, observationEndsAt])
+  @@index([createdAt])
+}
+
+model AgentReleaseTarget {
+  id                   String   @id @default(cuid())
+  planId               String
+  plan                 AgentReleasePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  terminalId           String
+  terminal             Terminal @relation(fields: [terminalId], references: [id], onDelete: Restrict)
+  orgIdSnapshot        String?
+  batchNumber          Int      @default(1)
+  createdAt            DateTime @default(now())
+
+  observation TerminalReleaseObservation?
+  activeAssignment ActiveReleaseObservationAssignment?
+
+  @@unique([planId, terminalId])
+  @@index([terminalId, createdAt])
+}
+
+// Enforces the F0.5 invariant that a terminal can observe at most one active
+// plan. The terminal primary key is the database-level concurrency guard.
+model ActiveReleaseObservationAssignment {
+  terminalId String @id
+  terminal   Terminal @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  planId     String
+  plan       AgentReleasePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  targetId   String @unique
+  target     AgentReleaseTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([planId])
+}
+
+model TerminalReleaseObservation {
+  id                         String   @id @default(cuid())
+  targetId                   String   @unique
+  target                     AgentReleaseTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  seenPlanId                 String
+  seenPlanVersion            Int
+  runtimeVersion             String?
+  observationProtocolVersion String
+  observedAt                 DateTime
+  receivedAt                 DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([observedAt])
+}
+
 // ── PrintTaskStatusLog ────────────────────────────────────────────────────────
 
 model PrintTaskStatusLog {
@@ -248,6 +345,41 @@ model PrintTaskStatusLog {
   createdAt  DateTime  @default(now())
 
   @@index([taskId, createdAt])
+}
+
+// ── AlertDisposition ──────────────────────────────────────────────────────────
+// 派生告警没有自己的行（见 admin-ops listDerivedAlerts）：每次列表都是现算的。
+// 不能在 Terminal / PrintTask 上加「已确认」字段：
+//   - 一台终端同时可能离线或打印机异常，两种告警主体不同；
+//   - 静默 TTL、episode、操作者是运营态，不是设备/任务域；
+//   - 退款排除失败告警必须读 Order.payStatus，禁止为了消警去写 printOutcome。
+// 本表只存处理态。告警是否仍在发生，永远以实时派生结果为准。
+model AlertDisposition {
+  id           String    @id @default(cuid())
+  // 稳定键：`${alertType}:${subjectId}`。不含时间、心跳 id、严重级别——
+  // 那些会在同一条故障持续期间变化，不能当确认挂载点。
+  subjectKey   String    @unique
+  alertType    String    // terminal_offline | printer_issue | print_failed
+  subjectId    String    // Terminal.id 或 PrintTask.id
+  // 区分「同一主体上一次故障」和「恢复后又发生」。
+  // terminal_offline = lastSeen ISO（持续离线期间不变）
+  // printer_issue = `${printerStatus}:${lastHealthyAt ISO}`（不能用最新心跳时间）
+  // print_failed = PrintTask.id（一次性事件）
+  episodeToken String
+  action       String    // acknowledged | silenced | closed | reopened
+  actorId      String?
+  note         String?
+  silencedUntil DateTime?
+  // 历史字段：旧版本在「本次派生结果里没看见」时写它，那是用缺席反推恢复，
+  // 会把仍在 firing 的告警标成已恢复。现在没有任何读路径再写它；
+  // 残留旧值按「处置已失效」处理（回到待处理），方向仍在安全一侧。
+  // 恢复后再发作由 episodeToken 变化负责，不依赖本字段。
+  recoveredAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([alertType, subjectId])
+  @@index([recoveredAt])
 }
 
 // ── Order ───────────────────────────────────────────────────────────────────
@@ -671,6 +803,7 @@ model EndUser {
   dataRequests    UserDataRequest[]
   scanTasks       ScanTask[]
   contractReviewTasks ContractReviewTask[]
+  jobApplications JobApplication[]
 
   @@index([status])
 }
@@ -805,6 +938,9 @@ model Job {
   companyProfileId String?
   companyProfile   CompanyProfile? @relation(fields: [companyProfileId], references: [id], onDelete: SetNull)
   aiRecommendations JobAiRecommendation[]
+  // 用户自填求职进度的可选关联（§4.4A）。岗位侧只被反向引用，绝不读取本关系做
+  // 任何按岗位 / 企业的投递聚合 —— 那等于重建候选人漏斗，§4.4A 明令禁止。
+  jobApplications   JobApplication[]
   qualitySnapshots  JobDataQualitySnapshot[]
 
   // 审核/发布
@@ -995,6 +1131,7 @@ model FileObject {
   // 该文件产生的打印任务（血缘终点：实际出纸）。
   printTasks  PrintTask[]
   qualificationEvidence QualificationRecord[] @relation("QualificationEvidence")
+  platformQualificationEvidence PlatformQualification[] @relation("PlatformQualificationEvidence")
   onlinePlatformLogos OnlinePlatformDirectory[] @relation("OnlinePlatformLogo")
   onlinePlatformEvidence OnlinePlatformDirectory[] @relation("OnlinePlatformEvidence")
 
@@ -1781,6 +1918,70 @@ model Favorite {
   @@index([targetType, targetId])
 }
 
+// ── JobApplication ────────────────────────────────────────────────────────────
+// 用户**本人自填**的求职进度。合规依据：compliance-boundary.md §4.4A（2026-09-02
+// 经产品负责人具名授权）。
+//
+// 这**不是**平台内投递。判定原则是「合法性由谁写的决定，不由字段名决定」：
+// 本人手填的「已投递」是个人求职记事本；企业 / 来源平台 / 本平台写入的同名状态
+// 才是招聘闭环数据，那个需要人力资源服务许可证，并另受
+// src/common/recruitment-capability.ts 的闸门管控，与本表无关。
+//
+// 因此本表**没有任何第三方写入路径** —— 没有回流入口，就没有招聘闭环。
+//
+// 为什么不给 Favorite / BrowseLog / ExternalJumpLog 扩状态列（§4.4A 明令禁止）：
+// 那三张表的合规定性是「只记录浏览与打开入口，不记录结果」，给它们加状态字段会
+// 直接推翻已写入对外公示文案的口径。自填进度必须是独立模型。
+//
+// channel / statusSource 是**前向兼容槽位**，不是开关：无证期各自只接受一个取值，
+// 由 verify:job-application-track 断言；将来取得许可证后新增取值即可接入平台内
+// 投递，无需新建表、无需迁移历史数据（设计依据见分期方案 §3 建法二）。
+model JobApplication {
+  id            String   @id @default(cuid())
+  endUserId     String
+  endUser       EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+
+  /// 无证期唯一合法取值 'external_self_reported'（用户自报的站外投递）。
+  /// 取得许可证后新增 'platform'。白名单在服务端，不接受前端传值。
+  channel       String   @default("external_self_reported")
+
+  /// 关联本站岗位时非空。岗位下架 / 删除不应抹掉用户自己的记录，故 SetNull 而非 Cascade
+  /// —— 快照字段已把展示所需信息留在本行，记录仍然可读。
+  jobId         String?
+  job           Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  /// 展示快照。jobId 非空时由服务端从「已审核已发布」岗位派生，前端不得伪造；
+  /// jobId 为空时为用户自述（他在站外投的岗位，本站可能根本没有）。
+  companyName   String
+  positionTitle String
+  sourceName    String?
+
+  /// intention | applied | interviewing | offered | rejected
+  /// 与小程序 job-tracker 五列看板逐字一致，便于第 3 刀把本地存储对齐到本表。
+  status        String   @default("intention")
+
+  /// 无证期唯一合法取值 'self_reported'。取得许可证后新增 'employer_feedback'。
+  statusSource  String   @default("self_reported")
+
+  note          String?
+  /// 用户自述的投递时间，可为空；不是系统观测到的事实。
+  selfReportedAt     DateTime?
+
+  /// 前向兼容空槽位：无证期**恒为 null 且无任何写入路径**，由门禁断言。
+  /// 刻意不建到 FileObject 的外键 —— 建了就意味着「简历与投递已可关联」，
+  /// 而本阶段的事实是二者之间不存在任何链路。取得许可证后再补外键，属 additive。
+  resumeFileId  String?
+  /// 同上。将来指向 PIPL 第二十三条要求的「单独同意」记录。
+  consentId     String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([endUserId, status, updatedAt])
+  @@index([endUserId, createdAt])
+  @@index([jobId])
+}
+
 // ── BenefitGrant ──────────────────────────────────────────────────────────────
 // Phase C-2C: 会员权益底座（只读展示底座，暂不接发放/核销真实逻辑、不接支付）。
 //
@@ -2400,6 +2601,52 @@ model QualificationRecord {
 
   @@index([organizationId, status, validUntil])
   @@index([appliesToBranchId])
+  @@index([evidenceFileId])
+  @@index([archivedAt])
+}
+
+// ── PlatformQualification ────────────────────────────────────────────────────
+// **平台自身**的行政许可 / 资质记录。当前唯一关心的类型是人力资源服务许可证。
+//
+// 为什么不复用上面的 QualificationRecord：
+//   后者的 organizationId 是指向 Organization 的**必填** FK，而 Organization 在本
+//   系统里的语义是「来源机构 / 合作机构」（种子数据为高校、人力资源公司），平台自己
+//   不是其中一员。为复用而插入一条代表平台自身的 Organization，会让它进入以机构为
+//   维度的所有列表、统计、审核与发布路径，需要逐处排除 —— 这正是
+//   src/common/content-trust.ts 文件头记录的那类事故的成因。
+//
+// 本表**只承载资质事实**，不承载任何招聘闭环业务数据；建表本身不解锁任何能力。
+// 判据、错误码与「为什么不是一个开关」见 src/common/recruitment-capability.ts，
+// 门禁 verify:recruitment-capability-gate。
+//
+// 有效期语义与 Job.validThrough **方向相反**，不要照搬：岗位缺有效期是数据质量问题，
+// 按缺失即过期会误杀在招岗位，故放行；许可证缺有效期是**无法证明许可有效**，故拒绝。
+model PlatformQualification {
+  id                 String    @id @default(cuid())
+  /// 能力键。当前唯一取值 'hr_service_license'（人力资源服务许可证）。
+  qualificationType  String
+  licenseNumber      String?
+  issuerName         String?
+  jurisdiction       String?
+  /// 判据要求二者都非空且 validFrom <= now < validUntil，缺任一即拒绝。
+  validFrom          DateTime?
+  validUntil         DateTime?
+  /// pending / approved / rejected / revoked。只有 approved 参与判据，其余一律拒绝。
+  status             String    @default("pending")
+  evidenceFileId     String?
+  evidenceFile       FileObject? @relation("PlatformQualificationEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
+  verificationSource String?
+  /// 双人复核：录入人与核验人必须是不同管理员。本波只留字段，写入路径在拿证批次交付。
+  submittedBy        String?
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  rejectReason       String?
+  notes              String?
+  archivedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([qualificationType, status, validUntil])
   @@index([evidenceFileId])
   @@index([archivedAt])
 }

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>校园招聘专区 · 职易达</title>
+<!--
+  宿主：校园招聘共享工作台（一个宿主承接两条真实 route，不拆多份 HTML）
+  route: /campus          screen=campus  —— 台账 035
+         /campus/welcome  screen=welcome —— 台账 036
+  screen/state: ?screen= 与 ?state= 都是**原型演示控制，不属于产品逻辑**。
+         生产里 /campus 与 /campus/welcome 是两条独立 route，而 /campus 的五个任务分区
+         （企业速览 / 参展企业 / 导览图 / AI 参会准备 / 打印服务）是 CampusPage 的组件内部
+         state，本来就没有 query 参数；这里用 ?state= 表达，只为逐态取证与直达演示。
+         ?src= 只带非敏感的来源标识（fair-appointment / venue-nav），用来保证「点哪个入口
+         就显示哪个入口的来源上下文」。?flat=1 关闭非必要动效，?debug=1 显示演示面板，
+         ?capture=1 固定时钟与循环动画相位。
+         静态原型只切视图，不发任何请求、不推进业务、不生成 AI 结果。
+  文件： policy-campus-workspaces.js = 两个宿主共用的壳层；campus-workspace.js = 本宿主的
+         视图与状态注册表。共享 JS 曾单文件 1498 行、超出本项目 800 行硬上限，按职责拆开。
+
+  ── 真实 React / API 合同 ──────────────────────────────────────────────
+  CampusPage（apps/kiosk/src/pages/campus/CampusPage.tsx）
+      GET /api/v1/job-fairs（有 terminalId 时透传，后端按本校 / 未结束优先排序）
+          → 过滤 isCampusFair(theme==='campus'|'campus_corp' 或名称/主办方/简介/来源
+            命中 校园|校招|高校|大学|学院|应届|毕业生|双选|校企)
+          → 无 terminalId 时按 campusScore 取最像校园双选会的一场作专区主体
+      次级数据并行取，且**各自 catch 成空值，失败不阻断主任务**：
+          GET /api/v1/job-fairs/:id/companies → FairCompanyDTO[]
+          GET /api/v1/job-fairs/:id/zones     → FairZoneDTO[]
+          GET /api/v1/job-fairs/:id/stats     → FairLiveStatsDTO | null
+          FairLiveStatsDTO 里 checkedInCompanies / browseCount / scanCount 都是
+          `number | null`，类型注释写明「null 表示无可证明统计源，前端须渲染
+          「暂无数据」而非 0」——本页据此单列 stats-unavailable 一屏。
+      recordBrowse('job_fair', id) 在主体招聘会真实加载后上报；
+      recordExternalJump('job_fair', id, 'external_appointment') 只记录
+          「打开来源平台预约入口」这个动作 —— 预约结果由来源平台掌握，本系统不记录。
+      出口：/job-fairs/:id/companies/:companyId、/job-fairs/:id/map、
+           /job-fairs/:id/materials、/job-fairs/:id/visit-plan、/resume/source、/jobs。
+  CampusWelcomePage（apps/kiosk/src/pages/placeholders/CampusWelcomePage.tsx）
+      当前只渲染一个 KioskStatePanel：「当前没有独立迎新招聘内容」+ 返回 /campus。
+      它与受终端能力开关控制的 /smart-campus/welcome 是**两条不同 route**；
+      本页不复制智慧校园的签到、校园卡、网络与迎新办理流程，也不从这里跳转办理。
+
+  ── 设计修正（与当前 React 的刻意差异，迁移时按本设计改）─────────────
+  ① 现 React 把「没有校园主题场次」和「接口请求失败」合并成同一个 ErrorState
+     （message 固定为「暂无校园招聘会数据，请稍后再试」）。本设计拆成
+     no-campus-data 与 request-error 两屏：前者接口成功返回但零校园场次，
+     属内容进度；后者接口未成功返回，本页没有任何场次可展示。合并会让运营
+     无法判断到底是没录数据还是服务挂了。
+  ② 现 React 的 ErrorState onRetry 实际是 navigate('/')，把「重试」做成了回首页。
+     本设计的重试是**页面内重新请求**，并且先回到 loading —— 不从失败态直接跳就绪态，
+     静态原型不伪造一次成功的请求。次级数据同理：参展名单与展区各有
+     companies-retrying / zones-retrying 一屏，不允许点「重新读取」直接变成功。
+  ③ 次级数据（参展企业 / 展区 / 活动资料）的「确无数据」与「暂不可用」分成两屏，
+     不共用一句「暂无」——空名单和读不到对用户是两件事。
+  ④ **没有选定的招聘会就没有任务上下文**：loading / no-campus-data / request-error 三态
+     一律不挂招聘会上下文条，五个任务分区渲染成**没有 href 的置灰控件 + 常显原因**，
+     不给可点的预约按钮，也不生成任何二维码。任何交互都进不去虚构的招聘会、企业详情
+     或成功态。
+  ⑤ AI 参会准备是**确认 → 交接**，不是本页生成：确认使用本次上传的简历后，主操作变成
+     真实可点的链接，指向既有的 /job-fairs/:id/visit-plan（data-route 上是真实 route，
+     用户可见文案写「去参会准备页生成」，不把路径印给用户看）。静态原型不生成任何清单内容。
+     主按钮不允许「可点但无动作」，也不允许给出示例结果。
+     用户可见承诺按 FairVisitPlanPage / FairVisitPlanResponse 的真实能力对齐：
+       · 输出 = summary / fairHighlights / priorityCompanies(companyName+reason) /
+         preparationChecklist / questionsToAsk / onsiteTips —— 没有展位号，也没有时间安排；
+       · 真实页只有「生成 / 重新生成 / 打印」，**没有编辑入口**，所以不承诺结果可编辑；
+       · 失败可能发生在**模型已被调用之后**（fair-visit-plan.service.ts 的 usage.callCount>0
+         时仍写失败用量），所以 ai-unavailable 不写成「从未发送」；
+       · 成功结果按 AI_RESUME_RESULT_TTL_HOURS 保留，默认 24 小时。
+  ⑥ /campus/welcome 只保留**一个业务出口**：返回 /campus。顶栏返回键与主操作指向同一处；
+     不再放「查看全部招聘会」等扩大出口，也不放任何 AI 或智慧校园入口。
+     这一屏做成**紧凑空态**：一句「没有独立迎新招聘内容」+ 一句去哪看 + 返回后能看到什么
+     （三条纯文字，不是链接）+ 唯一主操作。不解释内部路由历史，不写实现文档。
+
+  ── 真话边界（本页逐条自检）───────────────────────────────────────────
+  ① 招聘会名称、日期、场馆、企业、岗位、展位、统计与来源三要素一律 .slot 占位，
+     不预置任何示例招聘会或企业内容；活动类型「校园双选」是 theme 枚举的真实取值。
+  ② 预约与投递一律「扫码预约 · 去来源平台办理」：本系统不接收简历、不转交企业、
+     不记录预约或投递结果，也不判断来源平台的真实性。
+  ③ 无真实图源不留灰块：主办方没提交平面图时整块换成诚实状态，不用别场的图代替。
+  ④ 没有选定招聘会时不挂招聘会上下文条，不给可点的预约按钮，任务分区一律置灰。
+  ⑤ 统计字段为 null 时显示「暂无数据」，**不显示为 0**：0 是一个结论，「没取到」不是。
+  ⑥ 导航二维码只生成入口，本机不做路线规划，也不能确认用户是否到场（无签到回执）。
+  ⑦ 活动资料只来自主办方上传的真实 FairMaterial，本机不生成日程、名册或导览图；
+     份数与价格在既有打印确认页由服务端给出，本页不显示「已打印」「已出纸」。
+  ⑧ /campus/welcome 只做紧凑诚实空态 + 唯一返回出口，不放任何 AI 行动入口。
+
+  ai-mode: AI-CONTEXT（035 参会准备；036 不放页内 AI 控件）
+  ai-input: 已选定的真实招聘会及其企业 / 岗位公开信息 + 本次会话里可访问的本人简历解析任务；
+            两者缺一即 ai-context-missing，不生成任何内容
+  ai-consent: 本页只保存 DOM 内的本次生成确认；真实链复用会话里已有的最小凭证
+            （FairVisitPlanPage 读 readAiResumeSession()，清场即删），不同步给企业、
+            主办方或来源平台。凭证名称属实现细节，只写在本注释里，不出现在用户界面
+  ai-output: 可重新生成、可打印的参会准备内容（本场重点、优先了解的企业与理由、准备清单、
+            可提问题、现场通用提示）；由既有 /job-fairs/:id/visit-plan 生成并展示。
+            真实页没有编辑入口，因此本页不承诺「结果可编辑」；输出也不含展位号与时间安排。
+            本页只做确认与交接，不判断来源真实性、不预测预约或投递结果、不估录用概率、
+            不向企业推荐候选人
+  ai-failure: ai-context-missing（本次没有可用简历）、ai-unavailable（这次没能生成）；
+            不拿旧结果顶替。请求**可能已送达模型之后才失败**，是否计入用量以服务端记录为准，
+            不写成「从未发送」
+  ai-fallback: 自己看参展企业、自己看导览图与展区、扫码预约、打印活动资料与自备材料 ——
+            四条路径都不经过模型，AI 失败时全部照常可用
+  ai-persistence: 成功结果按服务端规则保留，默认 24 小时（AI_RESUME_RESULT_TTL_HOURS）；
+            本页不预告结果、不预扣，也不显示任何未发生的记录
+  验收范围：静态原型表现；不证明 React 接线、API 可用、招聘会数据存在、AI 生成可用、
+           二维码生成、打印、部署、Windows Agent 或奔图真机完成
+-->
+<link rel="stylesheet" href="policy-campus-workspaces.css">
+</head>
+<body data-host="campus">
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back-link" href="16-service-hubs.html?hub=fairs" data-route="/fairs-service" aria-label="返回招聘会服务"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">—</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="taskhead" aria-labelledby="task-title">
+    <h1 class="th-t" id="task-title">校园招聘专区</h1>
+    <p class="th-s" id="task-sub">—</p>
+  </section>
+
+  <div id="fairstrip-host"></div>
+  <div id="tabbar-host"></div>
+
+  <main class="body" id="body-root" data-screen="campus" data-state="ready-overview" data-testid="campus-state-ready-overview"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="campus-truth">
+    <div><b>第三方 / 官方校招信息入口</b>预约与投递一律前往来源平台办理；本系统不接收简历、不转交企业、不记录预约或投递结果，也不做平台内招聘闭环。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
+</div>
+<script src="policy-campus-workspaces.js"></script>
+<script src="campus-workspace.js"></script>
+</body>
+</html>

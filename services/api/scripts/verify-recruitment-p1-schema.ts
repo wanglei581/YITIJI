@@ -107,8 +107,35 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *     富文本 content + 一个 audience 单标签，两者都不可机读；前台展示的
  *     「申领条件」是硬编码模板，与该条政策无关。判定为确定性比对（证据 E2），
  *     支持 unknown 三态，不接模型 —— 政策口径不得由 AI 编造。
+ * - 96（本次，F0.5 Windows Agent 发布可观测性，+5）：
+ *     AgentReleaseArtifact                —— 不可变的观察目标身份与兼容性边界。
+ *     AgentReleasePlan                    —— 管理员创建、启停或取消的只读观察计划。
+ *     AgentReleaseTarget                  —— 计划中显式冻结的终端目标。
+ *     ActiveReleaseObservationAssignment  —— 每终端至多一个有效观察计划的索引。
+ *     TerminalReleaseObservation          —— Agent 上报的最新本机运行时事实。
+ *   该阶段不下发制品、不下载、不安装、不控制 Windows 服务；版本匹配不代表制品或签名验真。
+ * - 98（本次，招聘闭环分期第 1、2 刀，+2）：
+ *     PlatformQualification —— **平台自身**的行政许可事实（当前只关心人力资源服务
+ *     许可证）。刻意不复用 QualificationRecord：后者 organizationId 必填且指向
+ *     Organization（语义为来源 / 合作机构），插一条代表平台自身的机构行会污染所有
+ *     以机构为维度的列表、统计、审核与发布路径。建表本身不解锁任何能力 —— 判据在
+ *     src/common/recruitment-capability.ts，且当前零调用点。
+ *     JobApplication —— 用户**本人自填**的求职进度（compliance-boundary.md §4.4A）。
+ *     不是平台内投递：没有任何第三方写入路径，没有对外读取接口，不按岗位 / 企业聚合。
+ *     channel / statusSource 由服务端恒定写入；resumeFileId / consentId 为前向兼容
+ *     空槽位，无证期恒空且无写入路径。门禁 verify:job-application-track。
+ * - 99（本次，Admin 派生告警可处置，+1）：
+ *     AlertDisposition —— 派生告警的处置态（确认 / 静默 / 关闭 / 重开）。
+ *   告警本身仍是实时派生、不落库；本模型只承载「谁在什么时候处置过哪一条」。
+ *   为什么不给 Terminal / PrintTask 加字段：一台终端同时可能有「离线」与「打印机异常」
+ *   两类告警，处置态不能挤在同一列；静默 TTL、episode、操作者属于运营处理域，
+ *   不属于设备域或打印任务域。
+ *   挂载键是 `${type}:${entityId}`（Terminal.id / PrintTask.id 重算不变，故稳定），
+ *   另加 episodeToken 区分「恢复后又发生」——刻意不把时间 / 心跳 id / 离线分钟数
+ *   编进主键，那些值在同一条故障持续期间会变。
+ *   处置只压制提醒，**不代表问题已修复**：界面对仍在 firing 的条目显示「已确认（仍在发生）」。
  */
-const EXPECTED_MODEL_COUNT = 91
+const EXPECTED_MODEL_COUNT = 99
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>机器状态 · 职易达</title>
+<!--
+  route: /error-offline（apps/kiosk/src/pages/placeholders/ErrorOfflinePage.tsx）
+  state: unknown（默认）| checking | partial | offline | ready-example
+  当前可直接探测的数据来源（别的一律显示未检测 / 随业务请求确认）：
+    1) 服务器可达性 = `GET /api/v1/health`（5s 超时）+ navigator.onLine；React 每 10s 自动重试，
+       并监听 online 事件；成功后 replace 回 location.state.from（须过 isSafeInternalPath），否则回 /。
+    2) 打印机 = 公开只读 `GET /terminals/:terminalId/printer-status`（后端按 **5 分钟心跳窗** 算 isOnline）。
+       useTerminalDeviceStatus 的硬约束：只有 isOnline===true 且 printerStatus∈ready 才可显示就绪；
+       null / unknown / 心跳过期 / 请求失败 / 未配置终端 → 未知或离线，**default 分支不得返回在线**。
+  本机拿不到、因此本页永不展示的东西（MOTION-SPEC §M5 硬件边界 + hook 注释）：
+    - 耗材：Agent 不上报墨粉与纸量（tonerKnown=false），屏幕上不出现任何耗材百分比。
+    - 扫码器：USB HID 键盘模拟，**没有在线遥测**，不得表现「扫码器在线」。
+    - 摄像头：软件链路未接通，不给状态徽章。
+    - 麦克风：软件链路存在、真机待验，仅浏览器探测到可用设备时启用，**没有固定在线状态**。
+    - U 盘打印 / 扫描到 U 盘：打印机自带能力，**未做真机验收**（COVERAGE-MATRIX 016 明确禁止宣称已通过）。
+    - 恢复时间：不预告「预计几点恢复」，不画维护进度时间线，不宣称已经联系或已经上报给运维。
+  完整状态轴：API/网络、Terminal Agent、打印机、扫描接收目录、U 盘网桥、支付通道、AI 服务、岗位/招聘会数据。
+  默认态口径：没检测过就是 unknown，**不得默认渲染成正常/在线**；ready-example 只作布局示例并显著标注。
+  ai-mode: AI-EXPLAIN（COVERAGE-MATRIX 016）——本页**不放页内 AI 控件**：
+    设备与网络状态只认 health 与 printer-status，AI 不得判定、补写或推测；求助走帮助页与现场人工。
+  原型演示控制: ?state= 切展示状态；?capture=1 冻结时钟；?flat=1 关非必要动效；?debug=1 显演示面板。
+                「重新检测」在静态原型里只做状态演示跳转，不发起任何请求。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f5e9de;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --plum:#7a5a86; --plum-d:#6b4a77; --plum-soft:#efe8f2;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;text-align:left}
+a:focus-visible,button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.pill.ex{background:var(--plum-soft);color:var(--plum-d);border-color:transparent}.pill.ex .dot{background:var(--plum)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.scrollarea{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column}
+/* 触屏可供性：公共终端用户不会主动试探能不能滑，滚动条必须常驻可见。 */
+.scrollarea{scrollbar-width:thin;scrollbar-color:var(--line-2,#d4cdb6) transparent}
+.scrollarea::-webkit-scrollbar{width:10px}
+.scrollarea::-webkit-scrollbar-thumb{background:var(--line-2,#d4cdb6);border-radius:6px}
+.scrollarea::-webkit-scrollbar-track{background:transparent}
+.sec{flex:none;padding:0 44px;margin-top:24px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+
+.hero{border-radius:40px;background:linear-gradient(158deg,var(--deep-2),var(--deep) 72%);color:#f2efe4;padding:40px 46px;display:flex;align-items:center;gap:40px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-140px;top:-160px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.14),transparent 66%)}
+.hero-glyph{flex:none;width:206px;height:206px;border-radius:50%;border:2px solid rgba(46,230,168,.3);display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
+.hero-main{flex:1;min-width:0;position:relative;z-index:1}
+.hero-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:10px}
+.hero-title{font-size:46px;line-height:1.24;font-weight:700;letter-spacing:1px}
+.hero-title em{font-style:normal;color:var(--emerald)}
+.hero-copy{margin-top:14px;font-size:21px;line-height:1.6;color:rgba(242,239,228,.78)}
+.hero-copy b{color:#fff;font-weight:600}
+.hero-note{margin-top:16px;display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:8px 20px;border-radius:16px;background:rgba(255,253,248,.09);border:1px solid rgba(255,253,248,.17);font-size:19px;color:rgba(242,239,228,.82)}
+.hero-note b{color:var(--emerald);font-weight:700}
+
+.synth{display:flex;align-items:center;gap:16px;min-height:84px;padding:14px 26px;border-radius:22px;background:var(--plum-soft);border:1px solid #ddd0e3}
+.synth .si{flex:none;width:52px;height:52px;border-radius:16px;background:var(--plum);color:#fff;display:flex;align-items:center;justify-content:center}
+.synth-t{font-size:22px;font-weight:700;color:var(--plum-d)}
+.synth-d{margin-top:4px;font-size:19px;line-height:1.5;color:var(--ink-2)}
+.synth-d b{color:var(--ink);font-weight:600}
+
+.caps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cap{min-height:112px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 26px;display:flex;align-items:center;gap:20px}
+.cap .ci{flex:none;width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center}
+.cap-main{flex:1;min-width:0}
+.cap-name{font-size:25px;font-weight:700}
+.cap-dep{margin-top:6px;font-size:19px;line-height:1.45;color:var(--ink-3)}
+.verdict{flex:none;min-width:168px;min-height:60px;padding:0 22px;border-radius:18px;display:inline-flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-3)}
+.verdict[data-tone=ok]{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.verdict[data-tone=warn]{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.verdict[data-tone=bad]{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.verdict[data-tone=ex]{background:var(--plum-soft);border-color:transparent;color:var(--plum-d)}
+
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 28px}
+.card h3{font-size:24px;font-weight:700;display:flex;align-items:center;gap:12px;line-height:1.3}
+.card .ci{flex:none;width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.card p{margin-top:12px;font-size:19px;line-height:1.58;color:var(--ink-2)}
+.card p b{color:var(--ink);font-weight:600}
+.grid3 .card{min-height:238px}
+
+.ctabar{flex:none;padding:22px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.btn{min-height:104px;padding:0 26px;border-radius:24px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:25px;font-weight:700;text-align:center;flex:1}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:26px;background:var(--paper)}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:6px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back" href="01-home.html" aria-label="返回首页">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">还没检测</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <main class="body" id="body-root" data-screen="system-state" data-state="unknown" data-testid="system-state-state-unknown">
+    <div class="scrollarea" id="scrollarea"></div>
+    <div class="ctabar" id="ctabar"></div>
+  </main>
+
+  <div class="truth" data-disclaimer="true" data-testid="system-state-truth">
+    <div><b>怎么判断</b>完整列出八个系统轴；当前只对有真实探测入口的轴给结果，其余写未检测或随业务请求确认，<b>不会默认写成正常</b>。</div>
+    <div><b>这是设计稿</b>本页状态由地址栏参数指定，用于设计验收，不是这台机器的真实读数；「重新检测」在这里只切换演示状态。</div>
+  </div>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"><div class="dp-t">原型演示控制</div></div>
+</div>
+<script>
+var SCREEN='system-state';
+var STATES=['unknown','checking','partial','offline','ready-example'];
+var ICO={
+ question:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.5"/><path d="M12 17h.01"/>',
+ radar:'<path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.4V10h-5.6"/><circle cx="12" cy="12" r="2.4"/>',
+ wifioff:'<path d="M3 4l18 18"/><path d="M5.2 9.6a13 13 0 0 1 3.6-2.2M2.2 6.3A17 17 0 0 1 6 3.9M12 19.6h.01"/><path d="M8.6 14.2a7 7 0 0 1 2.2-1.3M15 10.2a13 13 0 0 1 3.8 2.2"/>',
+ half:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18"/>',
+ layout:'<rect x="3.5" y="4" width="17" height="16" rx="2.4"/><path d="M3.5 9.6h17M9.6 9.6V20"/>',
+ upload:'<path d="M12 16.5V5.4"/><path d="M7.8 9.6L12 5.4l4.2 4.2"/><path d="M4.5 15.5v2.6a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.6"/>',
+ spark:'<path d="M12 3.2l1.9 5 5.1 1.9-5.1 1.9L12 17l-1.9-5L5 10.1l5.1-1.9z"/>',
+ briefcase:'<rect x="3" y="7.5" width="18" height="12" rx="2.4"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3 12.5h18"/>',
+ printer:'<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>',
+ usb:'<path d="M12 20.5V6.6"/><path d="M9.4 9.2L12 6.6l2.6 2.6"/><rect x="9.2" y="20.5" width="5.6" height="0.2"/><path d="M12 13.6l3.6-2.1V8.6M12 16.4l-3.4-2V11.4"/>',
+ warn:'<path d="M12 4.6L21 19.4H3z"/><path d="M12 10v4.6M12 17.2h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ scan:'<path d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5"/><path d="M4 12h16"/>',
+ gauge:'<path d="M4 17.5a8.5 8.5 0 1 1 16 0"/><path d="M12 17.5l3.6-4.6"/>',
+ clockoff:'<circle cx="12" cy="12" r="9"/><path d="M12 6.8V12l3 1.8"/><path d="M4 4l16 16"/>',
+ desk:'<path d="M21 10c0 7-9 12.5-9 12.5S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3.1"/>'
+};
+function svg(n,w,s){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+var q=new URLSearchParams(location.search);
+
+/* 八个系统轴；判定只有「未检测 / 检测中 / 本次可达 / 本次不可达 / 未取得 / 未验证 / 随请求确认 / 示例」。
+   没有「正常」「在线」这类会被当成保证的词。没有独立健康接口的轴不伪造绿灯。 */
+var CAPS=[
+ {icon:'upload',tone:['var(--slate-soft)','var(--slate-d)'],name:'API / 网络',dep:'GET /api/v1/health + 浏览器网络状态'},
+ {icon:'desk',tone:['var(--teal-soft)','var(--teal-d)'],name:'Terminal Agent',dep:'通过终端心跳与设备状态间接确认；没有独立绿灯'},
+ {icon:'printer',tone:['var(--teal-soft)','var(--teal-d)'],name:'打印机',dep:'读取终端打印机状态；未知与离线必须分开'},
+ {icon:'scan',tone:['var(--slate-soft)','var(--slate-d)'],name:'扫描接收目录',dep:'平台任务依赖 SMB 接收与本地投递；本页暂无独立探测'},
+ {icon:'usb',tone:['var(--wheat-soft)','var(--wheat-d)'],name:'U 盘网桥',dep:'本地 /local/usb/status；Windows 真机流程仍未验收'},
+ {icon:'gauge',tone:['var(--clay-soft)','var(--clay-d)'],name:'支付通道',dep:'没有独立健康接口，只能在收银台随真实请求确认'},
+ {icon:'spark',tone:['var(--plum-soft)','var(--plum-d)'],name:'AI 服务',dep:'没有统一健康接口，按具体 AI 任务请求确认'},
+ {icon:'briefcase',tone:['var(--slate-soft)','var(--slate-d)'],name:'岗位 / 招聘会数据',dep:'列表请求分别确认；可达不代表有已发布数据'}
+];
+var JUDGE={
+ 'unknown':[['未检测','q'],['未检测','q'],['未检测','q'],['未检测','q'],['未验证','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
+ 'checking':[['检测中','q'],['检测中','q'],['检测中','q'],['未检测','q'],['未验证','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
+ 'partial':[['本次可达','ok'],['未取得','warn'],['未取得','warn'],['未检测','q'],['未验证','q'],['随请求确认','q'],['随请求确认','q'],['随请求确认','q']],
+ 'offline':[['本次不可达','bad'],['未取得','warn'],['未取得','warn'],['未检测','q'],['未验证','q'],['未取得','warn'],['未取得','warn'],['未取得','warn']],
+ 'ready-example':[['示例：可达','ex'],['示例：可达','ex'],['示例：就绪','ex'],['示例：可达','ex'],['未验证','q'],['示例：可达','ex'],['示例：可达','ex'],['示例：有数据','ex']]
+};
+function capList(state){
+ var j=JUDGE[state],h='';
+ for(var i=0;i<CAPS.length;i++){var c=CAPS[i];
+  h+='<div class="cap"><span class="ci" style="background:'+c.tone[0]+';color:'+c.tone[1]+'">'+svg(c.icon,28)+'</span>'+
+   '<div class="cap-main"><div class="cap-name">'+c.name+'</div><div class="cap-dep">'+c.dep+'</div></div>'+
+   '<span class="verdict"'+(j[i][1]==='q'?'':' data-tone="'+j[i][1]+'"')+'>'+j[i][0]+'</span></div>';
+ }
+ return '<div class="caps" data-testid="system-state-list">'+h+'</div>';
+}
+/* 三张「本机不会替你猜」的卡：固定不变，是这台机器真实的能力缺口，不随状态改写。 */
+function limitCards(no){
+ return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">这三件事，屏幕不会替你猜</span><span class="hint">说不了就不说</span></div>'+
+  '<div class="grid3">'+
+  '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('scan',26)+'</span>有些部件报不了状态</h3>'+
+  '<p>扫码器当键盘用，<b>插着不等于能用</b>，真读到码才知道；摄像头软件还没接通。所以不给它们发状态徽章。</p></div>'+
+  '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('gauge',26)+'</span>耗材数值拿不到</h3>'+
+  '<p>终端不上报墨粉和纸量，这里<b>永远不出现墨粉百分比</b>。缺纸缺粉以打印机面板上的提示为准。</p></div>'+
+  '<div class="card"><h3><span class="ci" style="background:var(--cinnabar-soft);color:var(--cinnabar-d)">'+svg('clockoff',26)+'</span>不预告什么时候好</h3>'+
+  '<p>屏幕上<b>不写「预计几点恢复」</b>。什么时候好由现场和服务端决定，写个时间只会让你白等。</p></div>'+
+  '</div></section>';
+}
+function capSection(state,no,hint){
+ return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">八个系统状态轴</span><span class="hint">'+hint+'</span></div>'+
+  capList(state)+'</section>';
+}
+
+var V={};
+V['unknown']=function(){
+ return {
+  pill:['','还没检测'],
+  body:'<section class="sec"><div class="hero">'+
+    '<div class="hero-glyph" role="img" aria-label="本机状态未检测">'+svg('question','104')+'</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-title serif">这台机器<em>还没检测</em></div>'+
+    '<div class="hero-copy">本页<b>不会默认写成正常</b>：没检测过就是没检测过，检测不到就是取不到 —— 不拿一排绿点让你以为一切都好，结果白跑一趟。</div>'+
+    '<div class="hero-note">'+svg('info',22)+'这次开机后<b>还没检测过</b>，点下面的重新检测</div>'+
+    '</div></div></section>'+
+   capSection('unknown','01','检测之后才有判定')+limitCards('02'),
+  cta:'<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
+   '<a class="btn ghost" href="06-help.html" data-route="/help">帮助与求助</a>'+
+   '<a class="btn primary" style="flex:1.3" href="?state=checking" data-testid="system-state-primary">'+svg('radar','26')+'重新检测</a>'
+ };
+};
+V['checking']=function(){
+ return {
+  pill:['','正在检测'],
+  body:'<section class="sec"><div class="hero">'+
+    '<div class="hero-glyph'+(q.get('capture')==='1'?'':' breathe')+'" role="img" aria-label="正在检测本机状态">'+svg('radar','104')+'</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-title serif">正在<em>检测</em></div>'+
+    '<div class="hero-copy">先检测<b>API / 网络、终端心跳和打印机状态</b>；扫描目录、U 盘、支付、AI、岗位数据没有统一探测的，明确保留为未检测或随请求确认。</div>'+
+    '<div class="hero-note">'+svg('info',22)+'检测<b>不会打断</b>你已经创建的打印任务</div>'+
+    '</div></div></section>'+
+   capSection('checking','01','等这次结果')+limitCards('02'),
+  cta:'<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
+   '<a class="btn ghost" href="06-help.html" data-route="/help">帮助与求助</a>'+
+   '<a class="btn ghost" style="flex:1.3" href="?state=unknown" data-testid="system-state-primary">回到未检测</a>'
+ };
+};
+V['partial']=function(){
+ return {
+  pill:['warn','部分取不到'],
+  body:'<section class="sec"><div class="hero">'+
+    '<div class="hero-glyph" role="img" aria-label="部分状态取不到">'+svg('half','104')+'</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-title serif">连得上，但<em>有几项取不到</em></div>'+
+    '<div class="hero-copy">这次检测里，本机<b>连得上服务器</b>；打印机那边的心跳和状态<b>没取到</b>。取不到不等于坏了，也不等于好着 —— 所以这里写「未取得」。</div>'+
+    '<div class="hero-note">'+svg('info',22)+'能不能出纸，<b>要到打印那一步才知道</b>；先别在这里下结论</div>'+
+    '</div></div></section>'+
+   capSection('partial','01','最近一次检测：示例时间')+limitCards('02'),
+  cta:'<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
+   '<a class="btn ghost" href="06-help.html" data-route="/help">帮助与求助</a>'+
+   '<a class="btn primary" style="flex:1.3" href="?state=checking" data-testid="system-state-primary">'+svg('radar','26')+'重新检测</a>'
+ };
+};
+V['offline']=function(){
+ return {
+  pill:['bad','连不上服务器'],
+  body:'<section class="sec"><div class="hero" data-testid="system-state-fallback">'+
+    '<div class="hero-glyph" role="img" aria-label="本机连不上服务器">'+svg('wifioff','104')+'</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE</div>'+
+    '<div class="hero-title serif">和服务器<em>连不上</em></div>'+
+    '<div class="hero-copy">上传、算价、AI 和来源信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就把你送回刚才那一页。</div>'+
+    '<div class="hero-note">'+svg('info',22)+'已经交出去的打印任务<b>不会因此取消</b>，到机码照常有效</div>'+
+    '</div></div></section>'+
+   capSection('offline','01','最近一次检测：示例时间')+limitCards('02'),
+  cta:'<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
+   '<a class="btn ghost" href="06-help.html" data-route="/help">帮助与求助</a>'+
+   '<a class="btn primary" style="flex:1.3" href="?state=checking" data-testid="system-state-primary">'+svg('radar','26')+'重新检测</a>'
+ };
+};
+V['ready-example']=function(){
+ return {
+  pill:['ex','布局示例'],
+  body:'<section class="sec"><div class="synth" data-testid="system-state-synthetic">'+
+    '<span class="si">'+svg('layout',26)+'</span><div>'+
+    '<div class="synth-t">布局示例 · 合成状态</div>'+
+    '<div class="synth-d">这一屏用来看<b>都取到时的排版</b>，<b>不代表真实设备</b>：本页没有发起任何检测，下面的判定是写死的示例值。</div>'+
+    '</div></div></section>'+
+   '<section class="sec"><div class="hero">'+
+    '<div class="hero-glyph" role="img" aria-label="布局示例：各项都取到时的样子">'+svg('layout','104')+'</div>'+
+    '<div class="hero-main"><div class="hero-eyebrow">SYSTEM STATE · SAMPLE</div>'+
+    '<div class="hero-title serif">都取到时<em>长这样</em></div>'+
+    '<div class="hero-copy">真实页面里只有<b>连得上服务器</b>、且<b>打印机心跳与状态都取到</b>时才这样显示；<b>任何一项取不到就退回未知</b>。</div>'+
+    '<div class="hero-note">'+svg('warn',22)+'这是示例值，<b>不是这台机器现在的读数</b></div>'+
+    '</div></div></section>'+
+   capSection('ready-example','01','示例值，非真实读数')+limitCards('02'),
+  cta:'<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
+   '<a class="btn ghost" href="06-help.html" data-route="/help">帮助与求助</a>'+
+   '<a class="btn primary" style="flex:1.3" href="?state=unknown" data-testid="system-state-primary">回到未检测</a>'
+ };
+};
+
+var root=document.getElementById('body-root');
+function render(state){
+ var view=V[state]();
+ root.setAttribute('data-state',state);
+ root.setAttribute('data-testid',SCREEN+'-state-'+state);
+ document.getElementById('scrollarea').innerHTML=view.body;
+ document.getElementById('ctabar').innerHTML=view.cta;
+ var p=document.getElementById('pill');
+ p.className='pill'+(view.pill[0]?' '+view.pill[0]:'');
+ document.getElementById('pill-txt').textContent=view.pill[1];
+ document.getElementById('pill-dot').className='dot'+(state==='checking'&&q.get('capture')!=='1'?' breathe':'');
+}
+/* 未知 state 一律回落到 unknown —— 本页最弱、最诚实的那一档，绝不落到 ready-example。 */
+var state=q.get('state');
+if(STATES.indexOf(state)<0)state='unknown';
+render(state);
+
+var panel=document.getElementById('demo-panel');
+for(var i=0;i<STATES.length;i++){
+ var a=document.createElement('a');
+ a.href='?debug=1&state='+STATES[i];a.textContent=STATES[i];
+ if(STATES[i]===state)a.className='on';
+ panel.appendChild(a);
+}
+if(q.get('debug')==='1')document.documentElement.classList.add('debug');
+document.getElementById('demo-tab').addEventListener('click',function(){panel.classList.toggle('show')});
+function tick(){
+ if(q.get('capture')==='1'){document.getElementById('clock').textContent='--:--';return}
+ var d=new Date();
+ document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(q.get('flat')==='1')document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

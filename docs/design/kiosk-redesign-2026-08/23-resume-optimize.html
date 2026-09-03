@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>简历优化建议 · 职易达</title>
+<link rel="stylesheet" href="kimi-full-coverage-v2/design-system/kiosk-motion.css">
+<!--
+  S25 · AI 简历优化工作台（青序流光，1080x1920 单 HTML 宿主）
+  route: /resume/optimize              —— COVERAGE-MATRIX 065（screen=optimize，默认）
+         /resume/optimize/compare      —— COVERAGE-MATRIX 066（screen=compare）
+         两条 route 共用本文件的同一套建议数据与同一份裁决状态，不新建第二个业务页面。
+         screen=editor|final / 原件预览层都是**同一工作台内的一层**，不是第三条 route。
+         React 宿主：apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx
+                     apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx
+
+  ── S25 返修的那几件事 ────────────────────────────────────────────────
+   1. 前后对照必须**完整显示**：左原文、右改写，逐字差异用「划掉 / 下划线加粗 / 换写法」
+      三种形状标出来，不是只换个颜色。
+   2. 新增事实必须**逐项确认**才能采纳：机械对照抽出「改写里有、原文里没有」的数字与词，
+      一条一条确认，没确认完 —— 采纳按钮停用，这一条也**进不了裁决草稿**（草稿退回原文）。
+   3. 批量动作：可采纳的全部采纳（跳过有待确认事实的）／其余保留原文／清空全部裁决。
+   4. 裁决草稿预览：把每条的裁决临时拼成一份阅读草稿，逐条标出用的是哪一版。
+      **它不是简历最终稿**，也不写进 optimizedResume —— 采纳/保留/自己写全是阅读决策。
+   5. 上传原件预览（**迁移目标，非已接通能力**）：PDF 多页（首页/末页可达）、缩放、
+      适应宽度、适应整页、图片旋转；DOCX 不做忠实渲染，改成诚实替代。
+      当前读取端点不返回任何原件凭证，落地前必须补受控预览令牌或按本人身份重新取件，
+      不得凭 taskId 猜文件 —— 页面上用「迁移目标」带写明这一点。
+   6. 会话恢复 / 清场：会话里只有编号和一次性令牌 —— 恢复时建议能重新读回，
+      **裁决不恢复**；清场后编号和令牌一并清掉，页面回到没有上下文。
+
+  ── 查询契约（进入时的初始状态；进来之后的切换都在页内，不再跳地址）──────
+    ?screen=optimize|compare|editor|final 工作台内的四层（editor 是结构化编辑与导出，final 是建议草稿预览）
+    ?state=no-context|loading|ready|empty|read-error|optimize-failed|unavailable|illegal
+    ?taskId=<x>                          严格 ^[A-Za-z0-9_-]{1,24}$
+    ?i=<1..N>                            compare 的当前条目
+    ?src=pdf|image|docx|no-file|expired|render-failed   上传原件预览层
+    ?p / ?fit / ?z / ?rot                仅 src=pdf|image：页码 1..N、page|width、
+                                         1|1.5|2|3 倍、0|90|180|270（旋转只对 image 开放）
+    ?export=ready|no-print|failed        editor 的导出结果（未登记值 = 还没导出）
+    ?format=pdf|docx|txt|md              导出格式（未登记值按 pdf）；只有 pdf 登记了打印身份
+    ?sess=restored|cleared               会话恢复 / 清场演示
+    ?capture=1 / ?debug=1                夹具可达门 + 技术披露门；?flat=1 截图去动效
+    rename（S19 → S25）：state=example → state=ready；新增 empty / read-error /
+                        optimize-failed / illegal 四态（S19 的 error 一态拆成三态）
+    fail-closed（一律不回显 URL 原文）：
+      · 未登记的 screen 或 state → screen=optimize + state=illegal，main 标 data-fallback="1"
+      · 非法 taskId → 按「没有编号」处理，收敛为 no-context 并标 fallback
+      · ready / empty 是合成夹具，裸地址不可达 → 收敛为 no-context
+      · loading / ready / empty / compare / final 都要求合法 taskId，否则收敛为 no-context
+      · 越界或非数字的 i → 回第 1 条并标 fallback
+      · 未登记的 src、非 ready 态带 src、越界 p / fit / z、对 pdf 用 rot、
+        没有 src 却带 p/fit/z/rot → 丢弃该参数并标 fallback
+      · 未登记的 sess → 丢弃并标 fallback
+
+  ── 真实合同（来源：代码，不是想象）────────────────────────────────────
+    读取     GET /resume/records/:taskId/optimize → ResumeOptimizeResponse
+             （services/api/src/ai/ai.controller.ts:191；kiosk 侧 aiHttpAdapter.ts:219）
+             { taskId, status, modules?[{title, before, after}], failReason?,
+               providerName?, optimizedResume? }
+             凭证与报告同源：会员 Authorization，匿名 x-resume-access-token
+             （aiHttpAdapter.ts:43，绝不进 URL query）。**query 里的 taskId 不是授权。**
+    模块     ResumeOptimizeModule 只有 { title, before, after }
+             （packages/shared/src/types/ai.ts:154-161）。
+             **合同里没有的**：reason（改写理由）、单条重生成端点、逐条裁决落库端点、
+             新增事实清单。所以本页把这三样如实标成本页产物：
+               · 「这版改了什么」是本页夹具写死的说明，不是服务端返回的 reason；
+               · 没有「换一版」按钮 —— 没有单条重生成端点，画一个点不动的按钮更糟；
+               · 裁决只活在本页变量里，刷新即回待定；结构化编辑区直接使用服务端返回的 optimizedResume。
+    裁决语义 undecided / adopt / keep 三态可反复切换，取自 ResumeOptimizeComparePage.tsx
+             的 ModuleDecision；本设计按产品要求补第四种 custom（自己写）。
+             该文件顶部的 UNSAVED_NOTICE 是硬要求：不许出现暗示已保存的完成态计数，
+             也不许造「个人简历_v2.pdf」这种不存在的产物 —— 本页逐字遵守。
+    真正的落地 能进入导出的是优化页上的「优化版简历」结构化编辑区（optimizedResume →
+             POST /resume/generate/export）。逐条裁决不会流进这个编辑区，页面上明写这一点。
+             本静态原型把编辑区、5 组排版、模板、AI 精简 / 调整排版 / 撤销、
+             PDF / Word / TXT / Markdown 导出和打印凭证门禁画成**设计目标**；
+             未逐项核对当前 React 实现，不写「完整对齐」。版式预览是本页画的示意，不是导出渲染。
+    演示模式 服务端 AI_PROVIDER=mock 时 providerName='mock'，此时左栏那句
+             「你写的（原件不会被改）」是**关于用户的假断言** —— 演示结果里的原句
+             用户根本没写过。本页所有 before 一律标「合成样本」，不写「你写的」。
+    失败分治 React 侧把 outage（能力不可用）与本次读取失败分开
+             （ResumeOptimizeComparePage.tsx isAiOutage 分支），并把
+             status!=='completed' 与 modules 为空分别给不同文案。本设计据此分成
+             unavailable / read-error / optimize-failed / empty 四态。
+
+  ── 事实纪律（改数据前先读这一段）───────────────────────────────────────
+    第 1–5 条：after 只允许重排 / 删减 before 里**已经逐字写明**的事实。禁止出现
+    before 没有的数字、日期、比例、规模、学校、公司、证书、奖项、薪资、工具名。
+    第 6 条是**特意放进来的越界样例**：after 里有原文没有的「主导」「5000」「季度之星」。
+    它的存在只有一个目的 —— 证明「新增事实拦截」是真的会拦。页面上明写这是越界样例，
+    不把它当成正常建议。
+  ── 机械对照的边界 ────────────────────────────────────────────────────
+    factTokens / riskOf 只做两件事：① 抽出阿拉伯数字串；② 匹配 FACT_WORDS 这张示例词表。
+    词表之外的事实测不出来，所以页面只写「机械对照」，绝不写「已校验」或「事实无误」。
+    真实链路必须由服务端对结构化字段逐项比对（optimizedResume 的防编造校验），
+    前端不得替代。
+
+  ── diff ──────────────────────────────────────────────────────────────
+    页内自算 LCS（tokenize / diffOps / mergeRuns），零外部库：
+    删除＝划掉＋红底，新增＝下划线＋加粗＋绿底，删除紧挨新增记为替换＝黄底，其余为保留。
+    三种差异都是**形状 + 底色 + 图例文字**三重编码，不靠颜色单独承担信息。
+    DEC='custom' 时右栏对照的是**你写的那版**，同一套 diff 逻辑。
+
+  ── AI 契约（DESIGN-SYSTEM §7.1 六项）──────────────────────────────────
+    ai-mode:        AI-DIRECT
+    ai-input:       本人已解析简历的原文片段（modules[].before）；没有编号就没有输入，
+                    本页不编造建议。合成夹具只在 capture/debug 门内可达。
+    ai-consent:     授权发生在 /resume/source 上传/扫描环节；本页不二次扩大授权。
+                    读取凭本人凭证放行，地址栏里的编号不构成授权。
+    ai-output:      逐条改写建议，标 AI 生成；每条都可采纳 / 保留原文 / 自己写，可反复改判；
+                    新增事实必须逐项确认才能采纳，也才进得了裁决草稿。
+    ai-failure:     unavailable（能力未接通）、read-error（本次读取失败）、
+                    optimize-failed（这次没生成出来）、empty（通了但一条候选都没有）、
+                    no-context（没有输入）五分，不合并成「再试一次」。
+    ai-fallback:    手动改写清单 + 手动逐项修改入口，全程零模型；AI 失败不阻断
+                    查看原文、看原件、打印、扫描和返回上传。
+    ai-persistence: 真实链路里优化结果归属服务端 AI 记录；逐条裁决不落库，结构化编辑内容仅在
+                    成功导出时形成真实文件。本页只用会话里的编号和一次性令牌恢复读取，裁决刷新即回待定；
+                    待机 / 超时清场后编号与令牌一并清掉。本页不写任何本机存储。
+
+  ── 边界 ────────────────────────────────────────────────────────────────
+    静态设计原型。不接 React / API / 模型 / 打印 / 硬件，页内不发起任何请求、不写本机存储。
+    全部建议、原文与原件都是合成样本，不代表任何真实简历或 AI 结果。
+    本页无手机 H5、无二维码、无 phone 入口，S25 不新增。
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;
+  --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
+  --teal:#1f9e86;--teal2:#157a67;--soft:#e0f2ec;
+  --blue:#3f68b0;--blue2:#35608f;--bluesoft:#e6ecf7;
+  --wheat:#a9781f;--wheat2:#8a6219;--wheatsoft:#f3ecda;
+  --line:#e3ddcb;--line2:#d4cdb6;--bad:#b23a2e;--bad2:#963227;--badsoft:#f6e4e1;
+  --dur-instant:120ms;--dur-quick:240ms;--ease-out:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;text-align:left}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;transform-origin:center center;
+  background:radial-gradient(900px 420px at 88% 3%,rgba(31,158,134,.07),transparent 60%),var(--paper)}
+
+.topbar{flex:none;height:104px;padding:0 34px;display:flex;align-items:center;gap:20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{width:64px;height:64px;flex:none;display:grid;place-items:center;border-radius:20px;border:1px solid var(--line2);background:var(--paper)}
+.brand{flex:none;display:flex;align-items:center;gap:12px}
+.brand i{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--deep);color:var(--green);font-size:24px;font-weight:800;font-style:normal}
+.brand b{font-size:25px;font-weight:800;letter-spacing:1px}
+.sp{flex:1}
+.pill{flex:none;height:54px;padding:0 22px;border-radius:27px;display:flex;align-items:center;gap:10px;border:1px solid var(--line2);background:var(--paper);color:var(--ink2);font-size:19px;font-weight:700}
+.clock{flex:none;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+.task{flex:none;margin:16px 36px 0;padding:18px 26px;border-radius:26px;display:flex;align-items:center;gap:20px;position:relative;overflow:hidden;
+  background:linear-gradient(150deg,var(--deep2),var(--deep) 72%);color:#f2efe4}
+.task::after{content:"";position:absolute;right:-120px;top:-130px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 66%)}
+.task-ic{flex:none;width:60px;height:60px;border-radius:20px;display:grid;place-items:center;position:relative;z-index:1;
+  background:rgba(46,230,168,.12);border:1px solid rgba(46,230,168,.36);color:var(--green)}
+.task-tx{flex:1;min-width:0;position:relative;z-index:1}
+.task-tx h1{font-size:29px;font-weight:800;line-height:1.24;letter-spacing:.5px}
+.task-tx p{margin-top:6px;font-size:19px;line-height:1.4;color:rgba(242,239,228,.74)}
+.task-tag{flex:none;position:relative;z-index:1;min-height:46px;padding:0 20px;display:flex;align-items:center;border-radius:16px;
+  background:rgba(255,255,255,.1);color:#f2efe4;font-size:19px;font-weight:800}
+
+.bar{display:none;flex:none;margin:12px 36px 0;padding:13px 20px;border-radius:18px;align-items:center;gap:14px;font-size:18px;font-weight:700;line-height:1.4}
+.bar.show{display:flex}
+.bar i{flex:none;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-style:normal;font-size:18px}
+.bar.fx{background:var(--wheatsoft);border:1px solid #e6d8b4;color:var(--wheat2)}
+.bar.fx i{background:#e8dcbe}
+.bar.se{background:var(--bluesoft);border:1px solid #c6d3ea;color:var(--blue2)}
+.bar.se i{background:#d6e0f2}
+
+.work{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:12px 36px 0;overflow:hidden}
+/* flex 默认允许收缩。卡片被压扁但里面的内容不会跟着缩，结果就是内容顶出卡片边框、
+   被下一张卡盖住半截 —— 会话恢复条一出现，屏幕矮了 90px，这件事就真的发生过。
+   所以卡片一律不收缩，高度按内容走；要让出空间时，只能由**里面有滚动列表**的那张卡出。 */
+.sec{flex:none;min-height:0;display:flex;flex-direction:column;padding:18px 22px;border:1px solid var(--line);border-radius:24px;background:var(--surface)}
+/* 装着 .mods 列表的那张卡是唯一可伸可缩的：多出来的高度它吃，短了也由它让，
+   让出的部分由列表自己滚动吸收，不会把任何按钮挤出边框。 */
+.work>.sec:has(.mods){flex:1 1 auto}
+/* 最后一张卡只涨不缩：屏幕有余量时它把页脚上方的空带吃掉，屏幕紧张时它一步不退。 */
+.work>.sec:last-child:not(.jumpsec){flex:1 0 auto}
+.sec-h{flex:none;display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
+.sec-h h2{font-size:25px;font-weight:800}
+.sec-h small{margin-left:auto;font-size:17px;color:var(--ink3);font-weight:700}
+.lead{font-size:20px;line-height:1.54;color:var(--ink2)}
+.lead b{color:var(--ink);font-weight:800}
+
+.rows{flex:1;min-height:0;display:grid;gap:11px}
+.row{display:flex;align-items:center;gap:16px;min-height:88px;padding:12px 18px;border:1px solid var(--line);border-radius:19px;background:var(--paper)}
+.row i.ic{flex:none;width:50px;height:50px;border-radius:16px;display:grid;place-items:center;background:var(--soft);color:var(--teal2);font-style:normal}
+.row .tx{flex:1;min-width:0}
+.row .tx b{display:block;font-size:21px;font-weight:800}
+.row .tx span{display:block;margin-top:4px;font-size:18px;line-height:1.38;color:var(--ink3)}
+.row .go{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line2);background:var(--surface);color:var(--ink3)}
+button.row{width:100%;cursor:not-allowed}
+.row[aria-disabled="true"]{background:#f1eee5;border-style:dashed}
+.row[aria-disabled="true"] i.ic{background:#e8e3d5;color:#a9b8b1}
+.row[aria-disabled="true"] .tx b{color:#8d9d96}
+
+.checks{flex:1;min-height:0;display:grid;gap:9px}
+.check{display:flex;align-items:center;gap:15px;min-height:66px;padding:8px 16px;border:1px solid var(--line);border-radius:17px;background:var(--paper);
+  font-size:19px;line-height:1.38;color:var(--ink2)}
+.check i{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line2);
+  color:var(--teal2);font-style:normal;font-size:18px;font-weight:800}
+
+
+/* ── 建议总览列表 ─────────────────────────────────────────────── */
+.mods{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;display:flex;flex-direction:column;gap:10px}
+.mods::-webkit-scrollbar{display:none}
+.mod{flex:none;display:flex;align-items:center;gap:16px;min-height:92px;padding:11px 18px;border:1px solid var(--line);border-radius:19px;background:var(--paper);width:100%}
+.mod i.no{flex:none;width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:var(--soft);color:var(--teal2);font-style:normal;font-size:21px;font-weight:800}
+.mod .tx{flex:1;min-width:0}
+.mod .tx b{display:block;font-size:21px;font-weight:800}
+.mod .tx span{display:block;margin-top:4px;font-size:17px;line-height:1.36;color:var(--ink3)}
+.mod .tx span.warn{color:var(--bad)}
+.mod .go{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line2);background:var(--surface);color:var(--ink3)}
+.chip{flex:none;min-height:42px;padding:0 15px;display:flex;align-items:center;border-radius:13px;font-size:17px;font-weight:800;
+  background:var(--surface);border:1px solid var(--line2);color:var(--ink3)}
+.chip[data-d="adopt"]{background:var(--soft);border-color:var(--teal);color:var(--teal2)}
+.chip[data-d="keep"]{background:var(--bluesoft);border-color:#c6d3ea;color:var(--blue2)}
+.chip[data-d="custom"]{background:var(--wheatsoft);border-color:#e6d8b4;color:var(--wheat2)}
+
+/* ── 确定性计数条 ─────────────────────────────────────────────── */
+.stat{flex:none;display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:9px}
+.st{min-height:70px;padding:7px 9px;border:1px solid var(--line);border-radius:16px;background:var(--paper);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.st u{font-size:16px;font-weight:700;color:var(--ink3);text-decoration:none}
+.st b{font-size:25px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1}
+.st b small{font-size:16px;font-weight:700;color:var(--ink3)}
+.st[data-d="adopt"]{background:var(--soft);border-color:rgba(31,158,134,.4)}
+.st[data-d="keep"]{background:var(--bluesoft);border-color:#c6d3ea}
+.st[data-d="custom"]{background:var(--wheatsoft);border-color:#e6d8b4}
+.seg{flex:none;display:grid;gap:6px;margin-bottom:12px}
+.seg u{display:block;height:14px;border-radius:5px;background:var(--line);text-decoration:none}
+.seg u[data-d="adopt"]{background:var(--teal)}
+.seg u[data-d="keep"]{background:var(--blue)}
+.seg u[data-d="custom"]{background:var(--wheat)}
+.seg u.now{box-shadow:inset 0 0 0 3px var(--deep)}
+
+/* ── 批量动作 ─────────────────────────────────────────────────── */
+.batch{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.bx{min-height:82px;padding:8px 12px;border-radius:18px;border:1px solid var(--line2);background:var(--paper);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;
+  font-size:20px;font-weight:800;color:var(--ink);line-height:1.2}
+.bx small{font-size:15px;font-weight:700;color:var(--ink3);line-height:1.25}
+.bx[data-tone="danger"]{border-color:#ecd5cf;background:#fbf4f2;color:var(--bad2)}
+.bx[data-tone="danger"] small{color:var(--bad2)}
+.bx[aria-disabled="true"]{border-style:dashed;color:#8d9d96;cursor:not-allowed}
+.bx[aria-disabled="true"] small{color:#8d9d96}
+
+/* ── 前后对照 ─────────────────────────────────────────────────── */
+.cmpsec{flex:0 1 auto;min-height:0;overflow:hidden}
+.jumpsec{flex:none;margin-top:auto}
+.cscroll{flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;display:flex;flex-direction:column}
+.cscroll::-webkit-scrollbar{display:none}
+.cmp{flex:none;min-height:172px;display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:11px}
+.pane{min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:19px;background:var(--paper);padding:13px 16px}
+.pane.new{background:var(--soft);border-color:rgba(31,158,134,.35)}
+.pane-h{flex:none;display:flex;align-items:center;gap:9px;margin-bottom:8px;font-size:17px;font-weight:800;color:var(--ink3)}
+.pane.new .pane-h{color:var(--teal2)}
+.pane-h em{margin-left:auto;font-style:normal;font-size:15px;font-weight:800;padding:4px 9px;border-radius:9px;background:var(--surface);border:1px solid var(--line2);color:var(--ink3)}
+.dtext{flex:1;min-height:0;font-size:21px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;overflow-wrap:anywhere}
+.pane.new .dtext{color:var(--ink)}
+.dtext del{text-decoration:line-through;text-decoration-thickness:2px;background:var(--badsoft);color:var(--bad2);border-radius:6px;padding:0 3px}
+.dtext ins{text-decoration:underline;text-decoration-thickness:2px;background:#bfe8d6;color:var(--teal2);border-radius:6px;padding:0 3px;font-weight:800}
+.dtext del.rep,.dtext ins.rep{background:#f0e2bd;color:var(--wheat2)}
+.pane textarea{flex:1;width:100%;min-height:0;padding:10px 14px;border:1px solid var(--line2);border-radius:14px;background:var(--surface);
+  font:inherit;font-size:21px;line-height:1.5;color:var(--ink);resize:none}
+
+.legend{flex:none;display:flex;align-items:center;gap:9px;margin-bottom:10px;font-size:16px;font-weight:700;color:var(--ink3)}
+.legend .lg{min-height:40px;padding:0 11px;display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:13px;background:var(--paper)}
+.legend .lg del,.legend .lg ins,.legend .lg em,.legend .lg b{font-size:16px;font-weight:800;padding:1px 5px;border-radius:5px;font-style:normal}
+.legend .lg del{text-decoration:line-through;text-decoration-thickness:2px;background:var(--badsoft);color:var(--bad2)}
+.legend .lg ins{text-decoration:underline;text-decoration-thickness:2px;background:#bfe8d6;color:var(--teal2)}
+.legend .lg em{background:#f0e2bd;color:var(--wheat2)}
+
+.mrow{flex:none;display:flex;gap:11px;margin-bottom:10px}
+.mx{flex:1;min-height:56px;padding:8px 14px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;border:1px solid var(--line);
+  border-radius:16px;background:var(--paper);font-size:17px;line-height:1.3;font-weight:700;color:var(--ink2)}
+.mx b{font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.mx.ok{background:var(--soft);border-color:rgba(31,158,134,.35);color:var(--teal2)}
+.mx.ok b{color:var(--teal2)}
+.mx.bad{background:var(--badsoft);border-color:#ecd5cf;color:var(--bad2)}
+.mx.bad b{color:var(--bad2)}
+
+.wnote{flex:none;padding:11px 16px;border:1px solid var(--line);border-radius:17px;background:var(--paper);margin-bottom:10px}
+.wnote b{display:block;font-size:17px;font-weight:800;color:var(--ink2);margin-bottom:5px}
+.wnote span{display:block;font-size:17px;line-height:1.42;color:var(--ink3);padding-left:22px;text-indent:-22px}
+.wnote span+span{margin-top:3px}
+
+/* ── 待确认事实：逐项确认，没确认完不能采纳 ───────────────────── */
+.facts{flex:none;margin-bottom:10px;padding:11px 16px;border:1px solid #ecd5cf;border-radius:17px;background:#fbf4f2}
+.facts>b{display:block;font-size:18px;font-weight:800;color:var(--bad2);margin-bottom:8px}
+.facts .flist{display:flex;flex-direction:column;gap:8px}
+.fitem{display:flex;align-items:center;gap:12px;min-height:56px;padding:6px 12px;border-radius:13px;background:var(--surface);border:1px solid #ecd5cf}
+.fitem .ft{flex:1;min-width:0;font-size:18px;line-height:1.3;color:var(--ink2)}
+.fitem .ft b{font-weight:800;color:var(--ink)}
+.fitem .fb{flex:none;min-height:48px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:var(--paper);
+  font-size:17px;font-weight:800;color:var(--ink2);display:flex;align-items:center;gap:7px}
+.fitem[data-ok="1"]{border-color:rgba(31,158,134,.45);background:var(--soft)}
+.fitem[data-ok="1"] .fb{background:var(--teal2);border-color:var(--teal2);color:#f2efe4}
+.facts .fnote{margin-top:8px;font-size:16px;line-height:1.4;color:var(--bad2);font-weight:700}
+
+.outcome{flex:none;margin-bottom:10px;padding:11px 16px;border:1px solid var(--line);border-radius:17px;background:var(--paper)}
+.outcome .oh{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.outcome .oh b{font-size:17px;font-weight:800;color:var(--ink2)}
+.outcome .oh .chip{min-height:32px;padding:0 11px;font-size:15px}
+.outcome p{font-size:19px;line-height:1.5;color:var(--ink)}
+.outcome[data-blocked="1"]{background:#fbf4f2;border-color:#ecd5cf}
+.outcome[data-blocked="1"] p{color:var(--ink2)}
+.guard{flex:none;display:flex;align-items:center;gap:13px;padding:11px 16px;border:1px solid #e6d8b4;border-radius:17px;background:var(--wheatsoft);
+  color:var(--wheat2);font-size:16px;line-height:1.38;font-weight:700;margin-bottom:10px}
+.guard i{flex:none;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#e8dcbe;font-style:normal;font-size:17px;font-weight:800}
+.guard.stop{background:var(--badsoft);border-color:#ecd5cf;color:var(--bad2)}
+.guard.stop i{background:#eccdc6}
+
+.acts{flex:none;display:flex;gap:12px;margin-top:11px}
+.scrollhint{flex:none;margin-top:9px;padding:7px 14px;border-radius:12px;background:var(--soft);border:1px solid #bfe3d7;
+  color:var(--teal2);font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px}
+.act{flex:1;min-height:90px;border-radius:20px;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:22px;font-weight:800;text-align:center;line-height:1.2}
+.act small{font-size:15px;font-weight:600;color:var(--ink3)}
+.act[aria-pressed="true"]{background:var(--deep);border-color:var(--deep);color:#f6f3e8}
+.act[aria-pressed="true"] small{color:rgba(242,239,228,.7)}
+.act[aria-disabled="true"]{background:var(--paper);border-style:dashed;color:#6f7a72;cursor:not-allowed}
+.act[aria-disabled="true"] small{color:#6f7a72}
+
+.jump{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.jcard{min-height:104px;padding:9px 14px;border:1px solid var(--line);border-radius:17px;background:var(--paper);
+  display:flex;align-items:center;gap:12px;text-align:left}
+.jcard .jt{flex:1;min-width:0}
+.jcard .jt b{display:block;font-size:18px;font-weight:800;color:var(--ink);line-height:1.2}
+.jcard .jt span{display:block;margin-top:3px;font-size:15px;color:var(--ink3);font-weight:700;line-height:1.25}
+.jcard .jt span.warn{color:var(--bad)}
+.jcard[aria-current="true"]{border-color:var(--deep);background:var(--surface);box-shadow:inset 0 0 0 2px var(--deep)}
+.jcard i{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line2);
+  color:var(--teal2);font-style:normal;font-size:17px;font-weight:800}
+.jcard .chip{min-height:34px;padding:0 11px;font-size:15px}
+.jcard[data-risk="1"] i{background:var(--badsoft);border-color:#ecd5cf;color:var(--bad)}
+
+/* ── 保存 / 生成：写清真实前提，按钮一律不可用 ─────────────────── */
+.save{flex:none;display:flex;align-items:center;gap:16px}
+.sbtn{flex:none;min-height:78px;min-width:240px;padding:0 20px;border-radius:19px;border:1px solid var(--deep);background:var(--deep);
+  color:#f6f3e8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:21px;font-weight:800}
+.sbtn small{font-size:15px;font-weight:700;color:rgba(246,243,232,.72)}
+/* 能点的就画成能点的。只有真的停用（aria-disabled）才用虚线灰底 —— 之前两者同一个样子，
+   「编辑优化版简历」看起来像坏掉的按钮，实际是本页最重要的出口。 */
+.sbtn[aria-disabled=true]{border:1px dashed var(--line2);background:var(--paper);color:#6f7a72;cursor:not-allowed}
+.sbtn[aria-disabled=true] small{color:#8b968f}
+.need{flex:1;min-width:0;display:grid;gap:4px}
+.need span{font-size:16px;line-height:1.38;color:var(--ink3);font-weight:700;padding-left:20px;text-indent:-20px}
+.exits{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:11px}
+
+/* ── 结构化编辑 / 排版 / 导出：与真实 ResumeOptimizePage 对齐 ───── */
+.edit-shell{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(360px,.75fr);gap:12px}
+.edit-main,.edit-side{min-height:0;overflow-y:auto;scrollbar-width:none}.edit-main::-webkit-scrollbar,.edit-side::-webkit-scrollbar{display:none}
+.edit-main,.side-card{padding:17px 19px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}
+.edit-side{display:flex;flex-direction:column;gap:10px}.edit-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}.edit-head .tx{flex:1}
+.edit-head>.tx>b{font-size:23px}.edit-head p{margin-top:4px;font-size:16px;line-height:1.4;color:var(--ink3)}
+.edit-head p b{font-size:inherit;font-weight:800;color:var(--ink2)}
+.edit-sec{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.edit-sec:first-of-type{margin-top:10px;padding-top:0;border-top:0}
+.edit-sec>h4{font-size:18px;font-weight:800;color:var(--teal2);letter-spacing:.5px}
+.edit-sec[data-now="1"]>h4::after{content:"　正在编辑";font-size:14px;color:var(--ink3);font-weight:700}
+.edit-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.edit-tab{min-height:48px;padding:0 14px;border:1px solid var(--line2);border-radius:13px;background:var(--paper);font-size:16px;font-weight:800}
+.edit-tab[aria-pressed=true]{background:var(--deep);border-color:var(--deep);color:#fff}
+.edit-field{display:flex;flex-direction:column;gap:6px;margin-top:10px}.edit-field span{font-size:15px;font-weight:800;color:var(--ink2)}
+.edit-field input,.edit-field textarea{width:100%;min-height:54px;padding:11px 13px;border:1px solid var(--line2);border-radius:13px;background:var(--paper);font:inherit;font-size:17px;color:var(--ink);resize:none}
+.side-card h3{font-size:20px}.side-card>p{margin-top:4px;font-size:15px;line-height:1.38;color:var(--ink3)}
+.ctl{margin-top:9px;display:flex;align-items:center;gap:10px}
+.ctl>span{flex:none;width:50px;font-size:15px;font-weight:800;color:var(--ink3)}
+.ctl-row{flex:1;min-width:0;display:flex;gap:6px}
+.ctl-btn{flex:1;min-height:48px;padding:0 8px;border:1px solid var(--line2);border-radius:12px;background:var(--paper);font-size:15px;font-weight:800;text-align:center}
+.ctl-btn[aria-pressed=true]{background:var(--soft);border-color:var(--teal);color:var(--teal2)}
+.tpl-list,.ai-grid,.fmt-grid{display:grid;gap:7px;margin-top:10px}.tpl-list{grid-template-columns:1fr}.ai-grid{grid-template-columns:1fr 1fr}.fmt-grid{grid-template-columns:repeat(4,1fr)}
+.tpl-btn,.ai-btn,.fmt-btn{min-height:50px;padding:8px 10px;border:1px solid var(--line2);border-radius:12px;background:var(--paper);font-size:15px;font-weight:800;text-align:center}
+.tpl-btn[aria-pressed=true],.fmt-btn[aria-pressed=true]{background:var(--deep);border-color:var(--deep);color:#fff}.tpl-btn small{display:block;margin-top:3px;font-size:12px;font-weight:700;color:var(--ink3)}
+.tpl-btn[aria-pressed=true] small{color:rgba(255,255,255,.7)}.undo{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin-top:8px;padding:0 12px;
+  border:1px solid var(--teal);border-radius:12px;background:var(--soft);color:var(--teal2);font-size:16px;font-weight:800}
+.export-state{margin-top:10px;padding:10px 12px;border:1px solid #bfe3d7;border-radius:12px;background:var(--soft);font-size:15px;line-height:1.4;color:var(--teal2)}
+.export-state.warn{border-color:#e2d3ae;background:var(--wheatsoft);color:var(--wheat2)}
+
+/* ── 常驻「裁决不落库」告知条：与 ResumeOptimizeComparePage 的 UNSAVED_NOTICE 同义 ──
+   不可关闭、出现在用户做第一个裁决之前，防止「已采纳 4 条」被读成「已经改进简历」。 */
+.unsaved{flex:none;display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;padding:13px 16px;
+  border:1px solid #e2d3ae;border-left:4px solid var(--wheat);border-radius:16px;background:var(--wheatsoft);color:var(--wheat2)}
+.unsaved i{flex:none;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:#e8dcbe;font-style:normal;font-size:17px;font-weight:800}
+.unsaved p{flex:1;min-width:0;font-size:17px;line-height:1.42;font-weight:700}
+.unsaved p b{color:#6f4f13}
+
+/* ── 版式预览：14 个排版按钮按下去必须有看得见的结果 ──────────────
+   之前这一列只有 4 个输入框，下面 700px 是空的，而排版参数按了没有任何反馈。
+   预览按当前 fontScale / lineSpacing / margin / columns / accent 即时重排，
+   内容与上面的字段同源，改一个字这里跟着变。 */
+.epv{flex:1 1 auto;min-height:300px;display:flex;flex-direction:column;padding:17px 19px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}
+.epv-h{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+.epv-h b{font-size:19px}
+.epv-h span{flex:1;font-size:15px;line-height:1.35;color:var(--ink3);font-weight:700}
+.epv-paper{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;border:1px solid var(--line2);border-radius:14px;background:#fff;color:#23302c}
+.epv-paper::-webkit-scrollbar{display:none}
+.epv-sec{break-inside:avoid;margin-bottom:.85em}
+.epv-sec[data-now="1"]{background:rgba(46,230,168,.10);box-shadow:0 0 0 6px rgba(46,230,168,.10);border-radius:6px}
+.epv-sec b{display:block;font-weight:800;letter-spacing:.5px;margin-bottom:.2em}
+.epv-sec p{margin:.12em 0;color:#3c4a45}
+.epv-sec p u{text-decoration:none;color:#8a9691;margin-right:.5em}
+
+.cta{flex:none;display:flex;gap:14px;padding:12px 36px 0}
+.btn{flex:1;min-height:92px;padding:0 20px;border-radius:24px;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);
+  display:flex;align-items:center;justify-content:center;gap:11px;font-size:24px;font-weight:800;text-align:center;line-height:1.24}
+.btn.primary{background:var(--deep);border-color:var(--deep);color:#f6f3e8}
+.btn[aria-disabled="true"]{background:#eceadf;border-color:var(--line);color:#96a49d;cursor:not-allowed}
+button.btn{width:100%}
+.why{display:none;flex:none;padding:9px 36px 0;font-size:17px;font-weight:700;line-height:1.4;color:var(--ink2)}
+.why.show{display:block}
+.truth{flex:none;display:flex;align-items:center;gap:11px;margin-top:11px;padding:12px 36px;border-top:1px solid var(--line);background:var(--paper);
+  font-size:17px;line-height:1.4;color:var(--ink3)}
+.truth i{flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line2);font-style:normal;font-size:15px;font-weight:800}
+.navbar{flex:none;height:112px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.navbar a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink3);font-size:19px;font-weight:700}
+.navbar a svg{width:32px;height:32px}
+
+/* ══ 浮层：最终稿预览 / 上传原件预览 ═════════════════════════════ */
+.ov{position:absolute;inset:0;z-index:30;display:none}
+.ov.on{display:block}
+.pv{position:absolute;inset:0;background:rgba(11,36,30,.55);display:flex;align-items:center;justify-content:center;padding:0 32px;
+  animation:pvIn var(--dur-quick) var(--ease-out) both}
+@keyframes pvIn{from{opacity:0}}
+.pv-box{width:100%;max-height:1520px;display:flex;flex-direction:column;border-radius:26px;overflow:hidden;background:var(--surface);border:1px solid var(--line2)}
+.pv-hd{flex:none;padding:18px 22px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line)}
+.pv-hd b{font-size:24px;font-weight:800}
+.pv-hd .cl{margin-left:auto;min-height:56px;padding:0 22px;border-radius:18px;display:flex;align-items:center;gap:9px;
+  background:var(--paper);border:1px solid var(--line2);font-size:20px;font-weight:800}
+.pv-warn{flex:none;margin:14px 22px 0;padding:12px 16px;border-radius:15px;background:var(--wheatsoft);border:1px solid #e2d3ae;
+  color:var(--wheat2);font-size:17px;line-height:1.44;font-weight:700}
+.fin{flex:1;min-height:0;margin:12px 22px 0;padding:16px 18px;border-radius:17px;border:1px solid var(--line);background:#fff;
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;display:flex;flex-direction:column;gap:11px}
+.fin::-webkit-scrollbar{display:none}
+.fin .fh{flex:none;display:flex;align-items:baseline;gap:10px}
+.fin .fh b{font-size:21px;font-weight:800}
+.fin .fh span{margin-left:auto;font-size:16px;color:var(--ink3);font-weight:700}
+.fb-item{flex:none;padding:10px 14px;border-radius:14px;background:#faf7ef;border:1px solid var(--line)}
+.fb-item .fbh{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+.fb-item .fbh b{font-size:18px;font-weight:800}
+.fb-item .fbh .chip{min-height:32px;padding:0 11px;font-size:15px}
+.fb-item p{font-size:19px;line-height:1.5;color:var(--ink)}
+.fb-item[data-blocked="1"]{background:#fbf4f2;border-color:#ecd5cf}
+.fb-item[data-blocked="1"] p{color:var(--ink2)}
+.fb-item .blockwhy{display:block;margin-top:5px;font-size:16px;line-height:1.4;color:var(--bad2);font-weight:700}
+.pv-act{flex:none;margin:12px 22px 18px;display:flex;align-items:center;gap:14px}
+
+/* ══ 上传原件查看器（与 22 同一套） ══════════════════════════════ */
+.sv{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--paper);animation:pvIn var(--dur-quick) var(--ease-out) both}
+.sv-hd{flex:none;height:104px;padding:0 24px;display:flex;align-items:center;gap:16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.sv-hd .ti{flex:none;width:56px;height:56px;border-radius:18px;display:grid;place-items:center;background:var(--soft);color:var(--teal2)}
+.sv-hd .tt{min-width:0}
+.sv-hd .tt b{display:block;font-size:25px;font-weight:800;line-height:1.3}
+.sv-hd .tt span{display:block;margin-top:3px;font-size:17px;color:var(--ink3)}
+.sv-fx{flex:none;height:46px;padding:0 14px;border-radius:14px;display:flex;align-items:center;gap:8px;background:var(--wheatsoft);
+  border:1px solid #e2d3ae;color:var(--wheat2);font-size:17px;font-weight:800}
+.sv-cl{flex:none;margin-left:auto;min-height:64px;padding:0 24px;border-radius:20px;display:flex;align-items:center;gap:10px;
+  background:var(--deep);color:#f2efe4;font-size:21px;font-weight:800}
+.sv-tb{flex:none;background:var(--surface);border-bottom:1px solid var(--line)}
+.sv-tr{height:84px;padding:0 24px;display:flex;align-items:center;gap:12px}
+.sv-tr+.sv-tr{border-top:1px solid var(--line)}
+.sv-tr .sp2{flex:1}
+.tbtn{min-height:60px;min-width:60px;padding:0 20px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:9px;
+  font-size:20px;font-weight:800;background:var(--paper);border:1px solid var(--line2);color:var(--ink)}
+.tbtn[aria-pressed="true"]{background:var(--deep);border-color:var(--deep);color:#f2efe4}
+.tbtn[aria-disabled="true"]{background:#eceadf;border-color:var(--line);color:#9aa8a1;cursor:not-allowed}
+.tread{flex:none;min-height:60px;padding:0 18px;border-radius:18px;display:flex;align-items:center;background:var(--soft);
+  border:1px solid #bfe3d7;color:var(--teal2);font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.sv-view{flex:1;min-height:0;position:relative}
+.sv-canvas{position:absolute;inset:0;overflow:auto;background:#16352c;touch-action:pan-x pan-y;overscroll-behavior:contain;scrollbar-width:none}
+.sv-canvas::-webkit-scrollbar{display:none}
+.sv-pad{min-width:100%;min-height:100%;display:flex;padding:26px}
+.sv-doc{margin:auto;flex:none;position:relative}
+.sv-sheet{position:absolute;left:50%;top:50%;background:#fff;overflow:hidden}
+.sv-sheet .bar2{position:absolute;border-radius:4px;display:block}
+.sv-sheet .bar2.d{background:#8a8474}
+.sv-sheet .bar2.m{background:#b0aa99}
+.sv-sheet .bar2.r{background:#ddd7c6}
+.sv-sheet .photo{position:absolute;inset:0;background:#b8b2a2}
+.sv-sheet .paper2{position:absolute;background:#fff;box-shadow:0 6px 26px rgba(0,0,0,.22)}
+.sv-doc .cm{position:absolute;width:36px;height:36px;border:0 solid rgba(46,230,168,.92);display:block}
+.sv-doc .cm[data-corner="tl"]{left:0;top:0;border-left-width:5px;border-top-width:5px}
+.sv-doc .cm[data-corner="tr"]{right:0;top:0;border-right-width:5px;border-top-width:5px}
+.sv-doc .cm[data-corner="bl"]{left:0;bottom:0;border-left-width:5px;border-bottom-width:5px}
+.sv-doc .cm[data-corner="br"]{right:0;bottom:0;border-right-width:5px;border-bottom-width:5px}
+.sv-rail{position:absolute;pointer-events:none}
+.sv-rail.x{left:26px;right:26px;bottom:10px;height:7px}
+.sv-rail.y{top:26px;bottom:26px;right:10px;width:7px}
+.sv-rail u{position:absolute;display:block;border-radius:4px;background:rgba(242,239,228,.6);text-decoration:none}
+.sv-rail.x u{top:0;height:7px}
+.sv-rail.y u{left:0;width:7px}
+.srcgap{flex:none;display:flex;align-items:flex-start;gap:12px;padding:12px 24px;background:var(--bluesoft);border-bottom:1px solid #c6d3ea;color:var(--blue2)}
+.srcgap .tagx{flex:none;min-height:34px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;background:#d6e0f2;font-size:16px;font-weight:800;font-style:normal}
+.srcgap p{flex:1;min-width:0;font-size:17px;line-height:1.42;font-weight:700}
+.srcgap p b{color:#28477a}
+.srcgap.inbox{margin:13px 22px 0;padding:13px 17px;border:1px solid #c6d3ea;border-radius:16px}
+.sv-ft{flex:none;min-height:96px;padding:14px 24px;display:flex;align-items:center;gap:16px;background:var(--surface);border-top:1px solid var(--line)}
+.sv-ft .ccip{flex:none;min-height:44px;padding:0 16px;border-radius:14px;display:flex;align-items:center;background:var(--soft);color:var(--teal2);font-size:18px;font-weight:800}
+.sv-ft .cctx{flex:1;min-width:0;font-size:18px;line-height:1.4;color:var(--ink2)}
+.sv-ft .cctx b{font-weight:800;color:var(--ink)}
+.sv-notice{max-height:1240px}
+.sv-notice .nh{flex:none;padding:20px 22px 0;display:flex;align-items:center;gap:16px}
+.sv-notice .nh .ni{flex:none;width:62px;height:62px;border-radius:20px;display:grid;place-items:center;background:var(--badsoft);color:var(--bad)}
+.sv-notice .nh b{flex:1;min-width:0;font-size:25px;font-weight:800;line-height:1.3}
+.sv-notice .nwhy{flex:none;margin:13px 22px 0;padding:15px 17px;border-radius:16px;background:#faf7ef;border:1px solid var(--line);
+  font-size:19px;line-height:1.48;color:var(--ink2)}
+.sv-notice .nrows{flex:1;min-height:0;margin:13px 22px 0;display:grid;gap:10px;grid-auto-rows:minmax(0,1fr)}
+.sv-notice .nkeep{flex:none;margin:13px 22px 20px;padding:13px 17px;border-radius:16px;background:#f3f7f4;border:1px solid #dfe9e3;
+  font-size:18px;line-height:1.44;color:var(--ink2)}
+.sv-notice .nkeep b{font-weight:800;color:var(--ink)}
+
+.demo-tab,.demo-panel{display:none}
+html.debug .demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;display:block;width:56px;min-height:168px;
+  border-radius:0 16px 16px 0;background:rgba(11,36,30,.9);color:var(--green);writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:800}
+html.debug .demo-panel.show{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:flex;flex-direction:column;gap:6px;
+  width:330px;padding:16px;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96);max-height:1300px;overflow:auto}
+.demo-panel .dp-t{color:var(--green);font-size:15px;font-weight:800;letter-spacing:2px}
+.demo-panel a{min-height:48px;display:flex;align-items:center;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.08);color:#f2efe4;font-size:17px}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after{animation:none!important;transition:none!important}
+</style>
+</head>
+<body>
+<div id="viewport">
+<main id="stage" data-screen="resume-optimize" data-view="optimize" data-route="/resume/optimize" data-state="no-context" data-testid="resume-optimize-main">
+
+  <header class="topbar">
+    <button type="button" class="back m-press" id="back" data-testid="resume-optimize-back" aria-label="返回">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <span class="brand"><i class="serif">职</i><b>职易达</b></span>
+    <span class="sp"></span>
+    <span class="pill" id="pill">AI 简历服务</span>
+    <span class="clock" id="clock">--:--</span>
+  </header>
+
+  <section class="task">
+    <span class="task-ic" aria-hidden="true">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17.5L14.5 7l2.5 2.5L6.5 20H4z"/><path d="M14.5 7l2-2a1.8 1.8 0 0 1 2.5 2.5l-2 2"/><path d="M13.5 3.5l1.2 1.2M19.5 12.5l1.2 1.2"/></svg>
+    </span>
+    <div class="task-tx"><h1 id="tk-title">简历优化建议</h1><p id="tk-sub">建议只改表达，事实由你确认，随时可以保留原文。</p></div>
+    <span class="task-tag" id="tk-tag">无建议</span>
+  </section>
+
+  <div class="bar fx" id="exbar"><i aria-hidden="true">样</i><span id="exbar-tx">合成样本 · 不代表任何真实简历或 AI 结果</span></div>
+  <div class="bar se" id="sessbar"><i aria-hidden="true">话</i><span id="sessbar-tx"></span></div>
+
+  <div class="work" id="work" data-testid="resume-optimize-state-no-context"></div>
+
+  <p class="why" id="why"></p>
+  <div class="cta" id="cta" data-testid="resume-optimize-cta"></div>
+
+  <p class="truth" data-disclaimer="true" data-testid="resume-optimize-truth"><i aria-hidden="true">i</i><span id="truth-tx">静态设计原型：本页不连接真实简历或模型，裁决只留在本页，不写入账号、不生成文件。</span></p>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a href="01-home.html" data-route="/" data-testid="resume-optimize-nav-home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>首页</a>
+    <a href="05-ai-cockpit.html" data-route="/assistant" data-testid="resume-optimize-nav-advisor">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a>
+    <a href="30-my-profile.html" data-route="/profile" data-testid="resume-optimize-nav-profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a>
+  </nav>
+
+  <div class="ov" id="overlay"></div>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="1" aria-label="打开原型演示控制">演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="1" aria-label="原型演示控制（不属于产品逻辑）">
+    <span class="dp-t">原型演示控制 · 非产品逻辑</span>
+    <a href="?debug=1&amp;state=no-context">总览 · no-context</a>
+    <a href="?debug=1&amp;state=loading&amp;taskId=RPT-2026-0830-A">总览 · loading</a>
+    <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A">总览 · ready</a>
+    <a href="?debug=1&amp;state=empty&amp;taskId=RPT-2026-0830-A">总览 · empty（无候选）</a>
+    <a href="?debug=1&amp;state=read-error&amp;taskId=RPT-2026-0830-A">总览 · read-error</a>
+    <a href="?debug=1&amp;state=optimize-failed&amp;taskId=RPT-2026-0830-A">总览 · optimize-failed</a>
+    <a href="?debug=1&amp;state=unavailable">总览 · unavailable</a>
+    <a href="?debug=1&amp;state=illegal">总览 · illegal</a>
+    <a href="?debug=1&amp;screen=compare&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;i=1">逐条对照 · 第 1 条</a>
+    <a href="?debug=1&amp;screen=compare&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;i=6">逐条对照 · 第 6 条（越界样例）</a>
+    <a href="?debug=1&amp;screen=editor&amp;state=ready&amp;taskId=RPT-2026-0830-A">优化版编辑与导出</a>
+    <a href="?debug=1&amp;screen=editor&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;export=ready">导出成功 · 可打印</a>
+    <a href="?debug=1&amp;screen=editor&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;export=no-print">导出成功 · 无打印凭证</a>
+    <a href="?debug=1&amp;screen=editor&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;export=ready&amp;format=docx">导出成功 · DOCX 暂不开放打印</a>
+    <a href="?debug=1&amp;screen=final&amp;state=ready&amp;taskId=RPT-2026-0830-A">建议草稿预览</a>
+    <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;src=pdf">原件预览 · PDF</a>
+    <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;src=image">原件预览 · 图片</a>
+    <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;src=docx">原件预览 · DOCX</a>
+    <a href="?debug=1&amp;state=ready&amp;taskId=RPT-2026-0830-A&amp;sess=restored">会话恢复</a>
+    <a href="?debug=1&amp;sess=cleared">会话清场</a>
+  </div>
+
+</main>
+</div>
+<script>
+(function () {
+'use strict';
+
+/* ════════ 1. 参数解析：未登记值一律 fail-closed，不猜、不回显 ════════ */
+var q = new URLSearchParams(location.search);
+var CAPTURE = q.get('capture') === '1';
+var DEBUG   = q.get('debug') === '1';
+var TECH    = CAPTURE || DEBUG;
+if (q.get('flat') === '1' || CAPTURE) document.documentElement.setAttribute('data-flat', '1');
+if (DEBUG) document.documentElement.classList.add('debug');
+
+var SCREEN = 'resume-optimize';
+var SELF   = '23-resume-optimize.html';
+var VIEWS  = ['optimize', 'compare', 'editor', 'final'];
+var STATES = ['no-context','loading','ready','empty','read-error','optimize-failed','unavailable','illegal'];
+var ROUTE  = { optimize:'/resume/optimize', compare:'/resume/optimize/compare', editor:'/resume/optimize', final:'/resume/optimize' };
+var FIXTURE_STATES = ['ready','empty'];
+var NEED_TASK = ['loading','ready','empty','read-error','optimize-failed'];
+
+var fallback = false;
+var wantView  = q.get('screen');
+var wantState = q.get('state');
+var viewBad  = wantView !== null && VIEWS.indexOf(wantView) < 0;
+var stateBad = wantState !== null && STATES.indexOf(wantState) < 0;
+if (viewBad || stateBad) fallback = true;
+var view  = viewBad ? 'optimize' : (wantView || 'optimize');
+var state = (viewBad || stateBad) ? 'illegal' : (wantState || 'no-context');
+
+/* 编号只接受严格字符集。不合法 == 没带；编号本身不是授权 —— 真实链路按会员登录态
+   或匿名一次性令牌判本人，地址栏带一个编号读不到别人的结果。 */
+var rawRid = q.get('taskId');
+var RID = rawRid && /^[A-Za-z0-9_-]{1,24}$/.test(rawRid) ? rawRid : null;
+var ridBad = !!rawRid && !RID;
+if (ridBad) fallback = true;
+
+/* 夹具门：ready / empty 只在 capture=1 或 debug=1 下可达。 */
+if (FIXTURE_STATES.indexOf(state) >= 0 && !TECH) { state = 'no-context'; fallback = true; }
+/* 没有合法编号就没有可读的东西：一律收敛为 no-context，不画读不到的等待或结果屏。 */
+if (NEED_TASK.indexOf(state) >= 0 && !RID) { state = 'no-context'; fallback = true; }
+/* compare / final 是结果之上的层，没有结果就没有它们。 */
+if (view !== 'optimize' && state !== 'ready') { view = 'optimize'; if (state === 'ready') fallback = true; }
+
+var SESS = ['restored', 'cleared'];
+var rawSess = q.get('sess');
+var sess = rawSess === null ? null : (SESS.indexOf(rawSess) < 0 ? (fallback = true, null) : rawSess);
+/* 清场就是清场：编号和一次性令牌都没了，页面必须回到没有上下文。 */
+if (sess === 'cleared') { state = 'no-context'; view = 'optimize'; RID = null; }
+
+/* ── 上传原件预览层 ─────────────────────────────────────────── */
+var SRC_MODES = ['pdf','image','docx','no-file','expired','render-failed'];
+var SRC_FILE = {
+  pdf:   { kind:'PDF',  pages:3, w:1000, h:1414, rotatable:false, meta:'PDF · 共 3 页 · A4 竖版' },
+  image: { kind:'图片', pages:1, w:1000, h:1778, rotatable:true,  meta:'图片 · 单页 · 手机拍摄比例' }
+};
+var ZOOMS = ['1','1.5','2','3'];
+var ROTS  = ['0','90','180','270'];
+var rawSrc = q.get('src');
+var srcMode = rawSrc === null ? null : (SRC_MODES.indexOf(rawSrc) < 0 ? (fallback = true, null) : rawSrc);
+if (srcMode && state !== 'ready') { srcMode = null; fallback = true; }
+var srcFile = srcMode ? (SRC_FILE[srcMode] || null) : null;
+var pageNo = 1, fitMode = 'page', zoomLv = '1', rotDeg = '0';
+var rawPage = q.get('p'), rawFit = q.get('fit'), rawZoom = q.get('z'), rawRot = q.get('rot');
+if (srcFile) {
+  if (rawPage !== null) { var pn = /^[0-9]{1,3}$/.test(rawPage) ? Number(rawPage) : 0;
+    if (pn >= 1 && pn <= srcFile.pages) pageNo = pn; else fallback = true; }
+  if (rawFit !== null) { if (rawFit === 'page' || rawFit === 'width') fitMode = rawFit; else fallback = true; }
+  if (rawZoom !== null) { if (ZOOMS.indexOf(rawZoom) >= 0) zoomLv = rawZoom; else fallback = true; }
+  if (rawRot !== null) { if (srcFile.rotatable && ROTS.indexOf(rawRot) >= 0) rotDeg = rawRot; else fallback = true; }
+} else if (rawPage !== null || rawFit !== null || rawZoom !== null || rawRot !== null) {
+  fallback = true;
+}
+
+var stage   = document.getElementById('stage');
+var work    = document.getElementById('work');
+var cta     = document.getElementById('cta');
+var why     = document.getElementById('why');
+var exbar   = document.getElementById('exbar');
+var sessbar = document.getElementById('sessbar');
+var sessTx  = document.getElementById('sessbar-tx');
+var overlay = document.getElementById('overlay');
+var back    = document.getElementById('back');
+var tkTitle = document.getElementById('tk-title');
+var tkSub   = document.getElementById('tk-sub');
+var tkTag   = document.getElementById('tk-tag');
+var truthTx = document.getElementById('truth-tx');
+var pill    = document.getElementById('pill');
+
+function fit(){ var k = Math.min(innerWidth/1080, innerHeight/1920);
+  if ('zoom' in stage.style) stage.style.zoom = k; else stage.style.transform = 'scale(' + k + ')'; }
+addEventListener('resize', fit); fit();
+
+var clock = document.getElementById('clock');
+if (CAPTURE) clock.textContent = '09:30';
+else { var tick = function(){ var d=new Date(), h=d.getHours(), m=d.getMinutes();
+  clock.textContent = (h<10?'0':'')+h+':'+(m<10?'0':'')+m; }; tick(); setInterval(tick, 10000); }
+
+/* ════════ 2. 图标 ════════ */
+var P = {
+  report:'<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5z"/><path d="M14 2.5v5h5"/><path d="M8.5 13h7M8.5 17h4.5"/>',
+  upload:'<path d="M12 16.5V4.5"/><path d="M7.5 9L12 4.5 16.5 9"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>',
+  folder:'<path d="M3.5 6.5h6l2 2.5h9v10a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 19z"/>',
+  pen:'<path d="M4 17.5L14.5 7l2.5 2.5L6.5 20H4z"/><path d="M14.5 7l2-2a1.8 1.8 0 0 1 2.5 2.5l-2 2"/>',
+  print:'<path d="M7 8.5V3.5h10v5"/><rect x="4" y="8.5" width="16" height="7.5" rx="2"/><path d="M7 13.5h10V21H7z"/>',
+  scan:'<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M4 12h16"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.2 2.6c-.6.2-.8.7-.8 1.3v.4M12 16.6v.2"/>',
+  refresh:'<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/>',
+  go:'<path d="M9 6l6 6-6 6"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  doc:'<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5z"/><path d="M14 2.5v5h5"/><path d="M8.5 13h7M8.5 17h4.5"/>',
+  check:'<path d="M4.5 12.5l5 5 10-11"/>',
+  prev:'<path d="M15 5l-7 7 7 7"/>',
+  next:'<path d="M9 5l7 7-7 7"/>',
+  fitpage:'<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8 7.5h8M8 12h8M8 16.5h5"/>',
+  fitwidth:'<path d="M3 8.5v7M21 8.5v7"/><path d="M3 12h18"/><path d="M7 8.5L3.5 12 7 15.5M17 8.5l3.5 3.5-3.5 3.5"/>',
+  zoomin:'<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20.5 20.5M8.5 11h5M11 8.5v5"/>',
+  zoomout:'<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20.5 20.5M8.5 11h5"/>',
+  rotate:'<path d="M20 11.5a8 8 0 1 1-2.4-5.7"/><path d="M20 3.5V8h-4.5"/>',
+  image:'<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.7"/><path d="M4.5 17l4.5-4.5 3.5 3.5 3-2.5 4 3.5"/>',
+  broken:'<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5z"/><path d="M14 2.5v5h5"/><path d="M9.5 12l5 5M14.5 12l-5 5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6.8V12l3.4 2.2"/>',
+  slash:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>'
+};
+function ic(n, s, w){ return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(P[n]||'')+'</svg>'; }
+var GO = '<span class="go" aria-hidden="true">'+ic('go',22,2.3)+'</span>';
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function withRid(file, extra){
+  var p = [];
+  if (RID) p.push('taskId=' + encodeURIComponent(RID));
+  if (extra) p.push(extra);
+  return p.length ? file + '?' + p.join('&') : file;
+}
+function rowLink(href, icon, title, desc, tid, route){
+  return '<a class="row m-press" href="'+esc(href)+'"'+(route?' data-route="'+esc(route)+'"':'')+' data-testid="'+tid+'">'
+    + '<i class="ic">'+ic(icon,24)+'</i><span class="tx"><b>'+title+'</b><span>'+desc+'</span></span>'+GO+'</a>';
+}
+function rowDead(icon, title, desc, tid, reason){
+  return '<button type="button" class="row" aria-disabled="true" data-testid="'+tid+'" aria-label="'+esc(title+'（'+reason+'）')+'">'
+    + '<i class="ic">'+ic(icon,24)+'</i><span class="tx"><b>'+title+'</b><span>'+desc+'</span></span></button>';
+}
+function btn(href, label, primary, tid, route){
+  return '<a class="btn m-press'+(primary?' primary':'')+'" href="'+esc(href)+'"'+(route?' data-route="'+esc(route)+'"':'')+' data-testid="'+tid+'">'+label+'</a>';
+}
+function btnAct(id, label, primary, tid, disabled){
+  return '<button type="button" class="btn m-press'+(primary?' primary':'')+'" id="'+id+'" data-testid="'+tid+'"'
+    + (disabled ? ' aria-disabled="true"' : '') + '>'+label+'</button>';
+}
+
+/* ════════ 3. 合成建议夹具 ════════
+   第 1–5 条守事实纪律：after 只重排 / 删减 before 里逐字写明的内容。
+   第 6 条是**特意放进来的越界样例**：after 有原文没有的「主导」「5000」「季度之星」，
+   用来证明新增事实拦截真的会拦。页面上明写它是越界样例。 */
+var MODS = [
+  { t:'工作经历 · 社群运营', s:'工作经历',
+    b:'负责社群运营，维护用户关系，日常维护 3 个用户社群共 1200 人；月活跃用户从 600 增至 780。',
+    a:'维护 3 个用户社群共 1200 人；月活跃用户从 600 增至 780。',
+    w:['删掉「负责」「维护用户关系」这类看不出你做了什么的话','3、1200、600、780 都照抄原文，没有新增，也没有换算'] },
+  { t:'技能 · 办公软件', s:'技能',
+    b:'熟练使用 Office 办公软件，Excel 会用数据透视表和 VLOOKUP，PPT 做过路演材料。',
+    a:'Excel：数据透视表、VLOOKUP；PPT：路演材料。',
+    w:['把「熟练使用办公软件」换成原文里已经写明的工具','原文没写过的工具不会出现在这里'] },
+  { t:'求职意向', s:'求职意向',
+    b:'希望找一份稳定的工作，用户运营或者社群运营都可以。',
+    a:'求职方向：用户运营 / 社群运营。',
+    w:['把「找一份稳定的工作」换成岗位方向','期望城市和到岗时间原文里没有，需要你自己补，这里不替你写'] },
+  { t:'教育经历', s:'教育经历',
+    b:'XX 大学 市场营销 本科 2019.09-2023.06',
+    a:'XX 大学 · 市场营销 · 本科 · 2019.09-2023.06',
+    w:['只统一了分隔符，学校、专业、学历、起止时间一个字都没动','原文没有奖项和证书，这里也不会出现'] },
+  { t:'自我评价', s:'自我评价',
+    b:'本人性格开朗，工作认真负责，交接文档一直是我在整理和更新。',
+    a:'交接文档由我整理并持续更新。',
+    w:['删掉没有例子支撑的性格形容','只留下原文里能对上的那一件事'] },
+  { t:'项目经历 · 用户增长（越界样例）', s:'项目经历', bad:true,
+    b:'参与用户增长项目，月活跃用户从 600 增至 780。',
+    a:'主导用户增长项目，月活跃用户从 600 提升至 780，累计新增 5000 名用户，并获评季度之星。',
+    w:['这一条是特意放进来的越界样例：改写里出现了原文没有的事实','正常建议不应该这样 —— 它在这里只为演示「新增事实拦截」真的会拦'] }
+];
+var DEC    = ['','','','','',''];   /* '' | adopt | keep | custom */
+var CUSTOM = ['','','','','',''];   /* 自己写的文本，只活在本页变量，刷新即丢 */
+var OKFACT = [{},{},{},{},{},{}];   /* 逐项确认过的事实标记，同样只活在本页 */
+var DLABEL = { adopt:'已采纳', keep:'保留原文', custom:'自己写', '':'待定' };
+var cur = 0, editing = false, finalOpen = false;
+var EDIT_SECTIONS=['基本信息','求职意向','个人总结','教育经历','工作经历','项目经历','技能证书'];
+var EDIT_DATA=[
+  [['姓名','王同学'],['手机号','138****1234'],['邮箱','user@example.com'],['所在城市','杭州']],
+  [['目标岗位','用户运营 / 社群运营'],['期望城市','杭州'],['到岗时间','可协商']],
+  [['个人总结','3 年用户运营与社群维护经验，擅长活动执行、用户分层与数据复盘。']],
+  [['学校与专业','XX 大学 · 市场营销 · 本科'],['起止时间','2019.09-2023.06']],
+  [['公司 / 项目','某互联网公司 · 用户运营'],['起止时间','2023.07-至今'],['职责与成果','维护 3 个用户社群共 1200 人；月活跃用户从 600 增至 780。']],
+  [['项目名称','用户增长项目'],['项目说明','参与活动策划、用户召回与数据复盘。']],
+  [['技能','Excel 数据透视表、VLOOKUP；PPT 路演材料'],['证书','按本人真实证书填写；没有可留空']]
+];
+var editSection=0;
+var LAYOUT={fontScale:'standard',lineSpacing:'standard',margin:'normal',accent:'blue',columns:'1'};
+var EXPORTS=['pdf','docx','txt','md'],exportFormat=EXPORTS.indexOf(q.get('format'))>=0?q.get('format'):'pdf';
+var exportState=['ready','no-print','failed'].indexOf(q.get('export'))>=0?q.get('export'):'';
+/* ── 导出成果的合成文件对象 ──────────────────────────────────────────────
+   四种格式各有各的文件名、大小和页数（非 PDF 在真实合同里 pageCount 恒为 0，
+   那是「没有分页概念」，不是「零页」）。这四条都是本页的合成夹具，不是任何一次真实导出。
+
+   **只有 PDF 这一条登记了可以交给打印确认页的文件身份。** 原因写在这里，免得以后
+   有人「顺手把另外三种也接上」：真实导出返回的是**原格式**的 fileId（DOCX / TXT / MD），
+   而打印用的是服务端另渲染的一份同内容 PDF，那份 PDF 的 fileId 当前**接口没有返回**
+   （只给了一条 printFileUrl）。把原格式的 fileId 当成那份 PDF 的身份交出去，
+   等于替服务端断言两个不同对象是同一个 —— 下游按编号取到的可能根本不是打印的那一份。
+   所以非 PDF 在这里如实禁用打印，并写清缺的是什么；查看与手机保存不受影响。 */
+var EXPORT_FILE={
+ pdf: {filename:'优化版简历_张示例.pdf', sizeBytes:118784, pageCount:2,
+       mimeType:'application/pdf', fileId:'rsm_opt_9d4b71e6', printable:true},
+ docx:{filename:'优化版简历_张示例.docx', sizeBytes:24576, pageCount:0,
+       mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+       fileId:'rsm_opt_docx_2c60ab', printable:false},
+ txt: {filename:'优化版简历_张示例.txt', sizeBytes:4096, pageCount:0,
+       mimeType:'text/plain', fileId:'rsm_opt_txt_71f4de', printable:false},
+ md:  {filename:'优化版简历_张示例.md', sizeBytes:5120, pageCount:0,
+       mimeType:'text/markdown', fileId:'rsm_opt_md_9ab305', printable:false}
+};
+function exportFile(){return EXPORT_FILE[exportFormat]||EXPORT_FILE.pdf;}
+function sizeText(n){return n<1024*1024?Math.max(1,Math.round(n/1024))+' KB':(n/1024/1024).toFixed(1)+' MB';}
+function fileMetaLine(f){
+ return f.filename+'　·　'+sizeText(f.sizeBytes)+'　·　'
+  +(f.pageCount>0?f.pageCount+' 页':'无分页概念（pageCount 0）')+'　·　'+f.mimeType;
+}
+/* 打印交接只带**登记过的**这几项：来源、文件编号、页数和打印参数。
+   signedUrl / printFileUrl 一个都不进地址栏 —— 真实页面用路由 state 传文件对象。
+   黑白单面是本机当前唯一已验证的组合，所以静态交接固定按它走。 */
+function printHandoffHref(f){
+ return '14-print-confirm.html?source=resume-optimize&fileId='+encodeURIComponent(f.fileId)
+  +'&pages='+f.pageCount+'&copies=1&duplex=single&color=bw';
+}
+var selectedTemplate='resume-template-clean',lastAiAction='';
+
+/* 词表之外的事实测不出来，所以页面只写「机械对照」，不写「已校验」。 */
+var FACT_WORDS = ['Excel','VLOOKUP','PPT','Office','Word','数据透视表','路演','报表',
+  '大学','学院','本科','硕士','专科','市场营销','用户运营','社群运营','活动策划',
+  '证书','资格证','普通话','英语','四级','六级','奖','万','主导','负责人','季度之星','环比','同比'];
+function factTokens(s){
+  var out = [], seen = {}, i;
+  var t = String(s || '').replace(/[０-９]/g, function(d){ return String.fromCharCode(d.charCodeAt(0) - 65248); });
+  var up = t.toUpperCase();
+  var nums = t.match(/\d+(?:[.．]\d+)*/g) || [];
+  for (i = 0; i < nums.length; i++) { if (!seen['#'+nums[i]]) { seen['#'+nums[i]] = 1; out.push('数字 ' + nums[i]); } }
+  for (i = 0; i < FACT_WORDS.length; i++) {
+    if (up.indexOf(FACT_WORDS[i].toUpperCase()) >= 0 && !seen['w'+FACT_WORDS[i]]) {
+      seen['w'+FACT_WORDS[i]] = 1; out.push(FACT_WORDS[i]);
+    }
+  }
+  return out;
+}
+/* after 里出现、before 里没有的事实标记 —— 这些必须由本人逐项确认。 */
+function riskOf(i, afterText){
+  var before = {}, tb = factTokens(MODS[i].b), ta = factTokens(afterText), out = [], k;
+  for (k = 0; k < tb.length; k++) before[tb[k]] = 1;
+  for (k = 0; k < ta.length; k++) if (!before[ta[k]] && out.indexOf(ta[k]) < 0) out.push(ta[k]);
+  return out;
+}
+/* 「没找到」和「找到了但你已经确认过」是两件事，不能共用一句话。
+   都说成「未发现新增事实」，等于把用户亲手确认过的三处抹掉，屏幕上就多了一句假话。 */
+function factLine(pendingCount, totalCount){
+  if (pendingCount) return '待确认事实 ' + pendingCount + ' 处';
+  if (totalCount)   return '新增事实 ' + totalCount + ' 处已由你确认';
+  return '机械对照未发现新增事实';
+}
+function chosenText(i){
+  if (DEC[i] === 'adopt')  return MODS[i].a;
+  if (DEC[i] === 'custom') return CUSTOM[i] || MODS[i].b;
+  return MODS[i].b;
+}
+/* 这一条当前这版还剩几项事实没确认。0 才允许采纳、才进得了裁决草稿。 */
+function pendingOf(i, text){
+  var risk = riskOf(i, text), out = [], k;
+  for (k = 0; k < risk.length; k++) if (!OKFACT[i][risk[k]]) out.push(risk[k]);
+  return out;
+}
+function charCount(s){ return String(s || '').replace(/\s/g, '').length; }
+function counts(){
+  var c = { adopt:0, keep:0, custom:0, todo:0 }, i;
+  for (i = 0; i < DEC.length; i++) { if (DEC[i]) c[DEC[i]]++; else c.todo++; }
+  return c;
+}
+function riskyCount(){
+  var n = 0, i;
+  for (i = 0; i < MODS.length; i++) if (pendingOf(i, MODS[i].a).length) n++;
+  return n;
+}
+
+/* ── 可读 diff：页内自算 LCS，零外部库 ─────────────────────────── */
+function tokenize(s){ return String(s || '').match(/[A-Za-z0-9]+(?:[.．][A-Za-z0-9]+)*|\s+|[\s\S]/g) || []; }
+function diffOps(A, B){
+  var n = A.length, m = B.length, i, j, dp = [];
+  for (i = 0; i <= n; i++) { dp.push([]); for (j = 0; j <= m; j++) dp[i][j] = 0; }
+  for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--)
+    dp[i][j] = A[i] === B[j] ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  var ops = []; i = 0; j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { ops.push(['=', A[i]]); i++; j++; }
+    else if (dp[i+1][j] >= dp[i][j+1]) { ops.push(['-', A[i]]); i++; }
+    else { ops.push(['+', B[j]]); j++; }
+  }
+  while (i < n) { ops.push(['-', A[i]]); i++; }
+  while (j < m) { ops.push(['+', B[j]]); j++; }
+  return ops;
+}
+function mergeRuns(ops){
+  var runs = [], i, last;
+  for (i = 0; i < ops.length; i++) {
+    last = runs[runs.length - 1];
+    if (last && last.t === ops[i][0]) last.s += ops[i][1];
+    else runs.push({ t: ops[i][0], s: ops[i][1], rep: false });
+  }
+  for (i = 0; i < runs.length - 1; i++) {
+    if ((runs[i].t === '-' && runs[i+1].t === '+') || (runs[i].t === '+' && runs[i+1].t === '-')) {
+      runs[i].rep = true; runs[i+1].rep = true;
+    }
+  }
+  return runs;
+}
+function diffCount(runs, t){ var n = 0, i; for (i = 0; i < runs.length; i++) if (runs[i].t === t) n += charCount(runs[i].s); return n; }
+function diffHtml(runs, side){
+  var h = '', i, r;
+  for (i = 0; i < runs.length; i++) {
+    r = runs[i];
+    if (r.t === '=') h += esc(r.s);
+    else if (r.t === '-' && side === 'b') h += '<del'+(r.rep?' class="rep"':'')+'>'+esc(r.s)+'</del>';
+    else if (r.t === '+' && side === 'a') h += '<ins'+(r.rep?' class="rep"':'')+'>'+esc(r.s)+'</ins>';
+  }
+  return h;
+}
+
+/* ?i= 也 fail-closed：越界或非纯数字一律回到第 1 条。 */
+var idxBad = false;
+(function(){
+  var raw = q.get('i');
+  if (raw === null) return;
+  var n = parseInt(raw, 10);
+  if (String(n) === raw && n >= 1 && n <= MODS.length) cur = n - 1;
+  else { idxBad = true; fallback = true; }
+})();
+
+/* ════════ 4. 零模型回退：手动改写清单 + 出口 ════════ */
+var HOWTO = [
+  '先改诊断报告里排在最前面的那一条',
+  '每段经历只保留一个最想被看到的结果',
+  '把「负责」换成你实际做到的动作',
+  '数字只写你自己核对过的',
+  '技能写工具名称，再写做到什么程度',
+  '删掉与目标岗位无关的段落',
+  '同一件事不要在两个板块重复写',
+  '改完通读一遍，再导出 PDF'
+];
+function howto(){
+  var h = '<section class="sec"><div class="sec-h"><h2>不用 AI，也能自己改</h2><small>8 步 · 零模型</small></div>'
+    + '<div class="checks" style="grid-template-rows:repeat(8,minmax(0,1fr))" data-testid="'+SCREEN+'-fallback">';
+  for (var i = 0; i < HOWTO.length; i++) h += '<div class="check"><i>'+(i+1)+'</i><span>'+HOWTO[i]+'</span></div>';
+  return h + '</div></section>';
+}
+function exits(tag){
+  return '<section class="sec"><div class="sec-h"><h2>不靠这一步，也能继续</h2><small>三条都不动你的原件</small></div>'
+    + '<div class="rows" style="grid-template-rows:repeat(3,minmax(0,1fr))" data-testid="'+SCREEN+'-list">'
+    + rowLink(withRid('22-resume-report.html'),'report','返回诊断报告','看清楚要改哪几处，再决定怎么改',SCREEN+'-'+tag+'-report','/resume/report')
+    + rowLink('24-resume-generate.html','pen','手动逐项修改','自己填写并原样导出草稿，不经过模型',SCREEN+'-'+tag+'-manual','/resume/generate')
+    + rowLink('39-member-records.html?view=resumes','folder','打开我的简历','查看和整理已保存的版本',SCREEN+'-'+tag+'-my-resumes','/me/ai-records')
+    + '</div></section>';
+}
+
+/* ════════ 5. 计数条 / 分段条 / 保存前提 ════════ */
+function statCell(d, label, value){
+  return '<span class="st"'+(d?' data-d="'+d+'"':'')+' data-k="'+label+'"><u>'+label+'</u><b>'+value+'</b></span>';
+}
+function statHtml(c){
+  return '<div class="stat" data-testid="'+SCREEN+'-counts">'
+    + statCell('', '已决定', (MODS.length - c.todo) + '<small>/' + MODS.length + '</small>')
+    + statCell('adopt', '采纳', c.adopt)
+    + statCell('keep', '保留原文', c.keep)
+    + statCell('custom', '自己写', c.custom)
+    + statCell('', '待确认事实', riskyCount())
+    + '</div>';
+}
+function segHtml(active){
+  var h = '<div class="seg" style="grid-template-columns:repeat('+MODS.length+',1fr)" aria-hidden="true">', i;
+  for (i = 0; i < MODS.length; i++) h += '<u'+(DEC[i]?' data-d="'+DEC[i]+'"':'')+(active===i?' class="now"':'')+'></u>';
+  return h + '</div>';
+}
+/* 常驻、不可关闭：用户做第一个裁决之前就必须读到「这只是阅读决策」。
+   与 ResumeOptimizeComparePage.tsx 的 UNSAVED_NOTICE 同义 —— 那条是产品负责人的硬要求。 */
+function unsavedBar(){
+  return '<div class="unsaved" data-testid="'+SCREEN+'-unsaved" role="note"><i aria-hidden="true">!</i>'
+    + '<p><b>采纳 / 保留原文 / 自己写只是你的阅读决策草稿。</b>它不保存、不写进「优化版简历」，'
+    + '也不会生成新的简历文件，离开本页就没有了。要真正改到能导出的那一版，'
+    + '请进下面的「优化版简历」编辑区改 —— <b>只有编辑区里的内容会进入导出文件</b>。</p></div>';
+}
+/* 逐条裁决不单独落库；真实落地走 optimizedResume 结构化编辑与导出。 */
+function saveBlock(extra){
+  return '<section class="sec"><div class="sec-h"><h2>优化版简历编辑与导出</h2><small>唯一可导出的工作区</small></div>'
+    + '<div class="save">'
+    + '<button type="button" class="sbtn m-press" id="open-editor" data-testid="'+SCREEN+'-save">'
+    + '<span>编辑优化版简历</span><small>排版 · 模板 · 导出</small></button>'
+    + '<div class="need" id="'+SCREEN+'-save-need" data-testid="'+SCREEN+'-save-need">'
+    + '<span>· 上面的裁决不会被带进编辑区：编辑区打开的是服务端返回的 optimizedResume 原样内容</span>'
+    + '<span>· 想用的改法要在编辑区里自己改进对应字段 —— 只有编辑区的内容进入导出</span>'
+    + '<span>· PDF / Word / TXT / Markdown 各自生成一份真实文件；打印还要服务端给出 printFileUrl</span>'
+    + '</div></div>' + (extra || '') + '</section>';
+}
+
+/* ════════ 6. 状态屏（optimize 总览） ════════ */
+var R = {};
+
+R['no-context'] = function(){
+  tkSub.textContent = sess === 'cleared'
+    ? '这台机器刚做过清场，编号和一次性令牌都已清掉。'
+    : '还没有可优化的建议，先给我一份已解析的简历。';
+  tkTag.textContent = '无建议';
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>当前没有可优化的建议</h2></div>'
+    + '<p class="lead">优化建议基于一份<b>已完成解析的本人简历</b>，并且要凭本人凭证才读得到 —— '
+    + '地址栏里带一个编号不等于有权限。这次进入没有可用的编号，所以没有原文可以对照，也不会凭空生成建议。'
+    + (ridBad ? '（地址里的编号不在允许的字符范围内，已按没有编号处理，也不会把它显示出来。）' : '')
+    + (TECH ? '（读取端点 GET /resume/records/:taskId/optimize，匿名走 x-resume-access-token 请求头）' : '')
+    + '</p></section>'
+    + exits('empty') + howto();
+  cta.innerHTML = btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source')
+    + btn('24-resume-generate.html','手动逐项修改',false,SCREEN+'-secondary','/resume/generate');
+  why.className = 'why';
+  truthTx.textContent = '静态设计原型：本页不连接真实简历或模型，也不会自动出现建议。';
+};
+
+R['loading'] = function(){
+  tkSub.textContent = '正在等待优化结果，原文不会被改动。';
+  tkTag.textContent = '生成中';
+  /* 刻意不画一排灰色骨架条：那半屏浅色占位既没有信息，也让屏幕看起来是空的。
+     等待期间真正有用的是「这一步在等什么」和「现在能做什么」。 */
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>正在等待优化结果</h2><small>整体等待</small></div>'
+    + '<p class="lead"><span class="m-pulse"><span class="mp-dots" aria-hidden="true"><i></i><i></i><i></i></span>正在处理</span>　'
+    + '这是一次性返回的处理：结果要么回来，要么失败，中间没有可显示的阶段，'
+    + '所以这里<b>没有百分比，也没有逐条生成动画</b>。结果回来后你再逐条决定。</p></section>'
+    + '<section class="sec"><div class="sec-h"><h2>等结果时可以先做的</h2><small>三条随时能走</small></div>'
+    + '<div class="rows" style="grid-template-rows:repeat(3,minmax(0,1fr))" data-testid="'+SCREEN+'-list">'
+    + rowLink(withRid('22-resume-report.html'),'report','回看诊断报告','先想清楚哪几处最想改',SCREEN+'-wait-report','/resume/report')
+    + rowLink('24-resume-generate.html','pen','手动逐项修改','不等 AI，自己填写并原样导出草稿',SCREEN+'-wait-manual','/resume/generate')
+    + rowLink('10-print-hub.html','print','先去打印别的文件','等建议不影响打印和扫描',SCREEN+'-wait-print','/print-scan')
+    + '</div></section>'
+    + howto();
+  cta.innerHTML = btn(withRid('22-resume-report.html'),'返回诊断报告',false,SCREEN+'-secondary','/resume/report')
+    + btnAct('noop-loading','正在生成建议',true,SCREEN+'-primary',true);
+  why.className = 'why show';
+  why.textContent = '结果还没回来，现在还不知道有没有候选，所以下一步先不给出口。';
+  truthTx.textContent = '静态设计原型：这一屏只表达等待状态，不会因为时间过去就自动出现结果。';
+};
+
+R['empty'] = function(){
+  tkSub.textContent = '服务通了，但这次一条改写候选都没生成出来。';
+  tkTag.textContent = '无候选';
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>这次没有可对照的改写候选</h2></div>'
+    + '<p class="lead">优化能力<b>是通的</b>：请求正常返回，只是这一次一条候选都没有。'
+    + '常见原因是这份简历的原文片段太少，不足以给出有依据的改写。'
+    + '这<b>不是读取失败，也不是能力未接通</b> —— 那两种情况各有各的一屏。'
+    + '本页不会为了把版面填满而编几条建议出来。</p></section>'
+    + '<section class="sec"><div class="sec-h"><h2>接下来可以做的</h2></div>'
+    + '<div class="rows" style="grid-template-rows:repeat(3,minmax(0,1fr))" data-testid="'+SCREEN+'-list">'
+    + rowLink('21-resume-triage.html','upload','补充内容后重新解析','经历写详细一些，候选才有东西可比',SCREEN+'-empty-source','/resume/source')
+    + rowLink('24-resume-generate.html','pen','手动逐项修改','不经过模型，自己写一版',SCREEN+'-empty-manual','/resume/generate')
+    + rowLink(withRid('22-resume-report.html'),'report','回看诊断报告','先确认要改哪几处',SCREEN+'-empty-report','/resume/report')
+    + '</div></section>'
+    + howto();
+  cta.innerHTML = btn(withRid('22-resume-report.html'),'返回诊断报告',false,SCREEN+'-secondary','/resume/report')
+    + btn('24-resume-generate.html','手动逐项修改',true,SCREEN+'-primary','/resume/generate');
+  why.className = 'why show';
+  why.textContent = '没有候选就没有可裁决的东西：逐条对照、批量动作和裁决草稿这一路都先不给入口。';
+  truthTx.textContent = '静态设计原型：这一屏表达「本次无候选」，本页不连接真实简历或模型。';
+};
+
+R['read-error'] = function(){
+  tkSub.textContent = '这次没能取到优化结果，你的原文一个字都没动。';
+  tkTag.textContent = '读取失败';
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>这次没能取到优化结果</h2></div>'
+    + '<p class="lead">常见原因：本次办理会话已经结束、结果已按留存期清理，或者读取中途断开。'
+    + '<b>读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。</b>'
+    + '拿不到结果和「没有结果」是两件事，这一屏说的是前者。</p></section>'
+    + '<section class="sec"><div class="sec-h"><h2>接下来可以做的</h2></div>'
+    + '<div class="rows" style="grid-template-rows:repeat(3,minmax(0,1fr))" data-testid="'+SCREEN+'-list">'
+    + rowLink(withRid(SELF,'state=loading'),'refresh','再读一次','重新向这台机器要一次结果',SCREEN+'-err-retry','/resume/optimize')
+    + rowLink(withRid('22-resume-report.html'),'report','返回诊断报告','报告还在，先看要改哪几处',SCREEN+'-err-report','/resume/report')
+    + rowLink('06-help.html','help','找工作人员','连着几次都失败时的人工出口',SCREEN+'-err-help','/help')
+    + '</div></section>'
+    + howto();
+  cta.innerHTML = btn(withRid('22-resume-report.html'),'返回诊断报告',false,SCREEN+'-secondary','/resume/report')
+    + btn(withRid(SELF,'state=loading'),'再读一次',true,SCREEN+'-primary','/resume/optimize');
+  why.className = 'why show';
+  why.textContent = '读取失败时不给逐条对照入口：点进去只会再失败一次。';
+  truthTx.textContent = '静态设计原型：这一屏只表达读取失败，本页不会重试真实接口。';
+};
+
+R['optimize-failed'] = function(){
+  tkSub.textContent = '这次没能生成建议，你的原文一个字都没动。';
+  tkTag.textContent = '生成失败';
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>这次没能生成建议</h2></div>'
+    + '<p class="lead">失败原因由服务端原样带过来（示例：<b>处理超时，请稍后重试</b>）。'
+    + '和「读取失败」不同：请求到了，处理没跑完。<b>原文和已上传的文件都保持原样。</b>'
+    + '这一屏<b>一条建议都不给</b> —— 没跑出来就是没有，不拿通用话术顶替。</p></section>'
+    + '<section class="sec"><div class="sec-h"><h2>接下来可以做的</h2></div>'
+    + '<div class="rows" style="grid-template-rows:repeat(3,minmax(0,1fr))" data-testid="'+SCREEN+'-list">'
+    + rowLink(withRid(SELF,'state=loading'),'refresh','再试一次','重新提交同一份简历，不会覆盖原件',SCREEN+'-fail-retry','/resume/optimize')
+    + rowLink('24-resume-generate.html','pen','手动逐项修改','自己填写并原样导出草稿，不经过模型',SCREEN+'-fail-manual','/resume/generate')
+    + rowLink('06-help.html','help','找工作人员','连着几次都失败时的人工出口',SCREEN+'-fail-help','/help')
+    + '</div></section>'
+    + howto();
+  cta.innerHTML = btn('24-resume-generate.html','手动逐项修改',false,SCREEN+'-secondary','/resume/generate')
+    + btn(withRid(SELF,'state=loading'),'再试一次',true,SCREEN+'-primary','/resume/optimize');
+  why.className = 'why show';
+  why.textContent = '生成失败不影响你自己动手改：手动逐项修改这条路全程不经过模型。';
+  truthTx.textContent = '静态设计原型：这一屏只表达生成失败，本页不连接真实模型。';
+};
+
+R['unavailable'] = function(){
+  tkSub.textContent = 'AI 优化当前不可用，手动改写这条路照常能走。';
+  tkTag.textContent = '未接通';
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>AI 优化建议当前不可用</h2></div>'
+    + '<p class="lead">这台机器还没有接通优化能力，<b>不是你的简历有问题</b>。'
+    + '逐条改写候选只能由模型产出，这次产不出来；但诊断报告、手动修改、查看原件、打印和扫描都不受影响。'
+    + (TECH ? '（演示模式下 aiMockAdapter 直接拒绝，不返回任何「读过你简历」的结论）' : '')
+    + '</p></section>'
+    + exits('down') + howto();
+  cta.innerHTML = btn(withRid('22-resume-report.html'),'返回诊断报告',false,SCREEN+'-secondary','/resume/report')
+    + btn('24-resume-generate.html','手动逐项修改',true,SCREEN+'-primary','/resume/generate');
+  why.className = 'why show';
+  why.textContent = '这里不套「手动也能得到同一份候选」的说法：没有等价的手动路径，只有「自己动手改」这条另一条路。';
+  truthTx.textContent = '静态设计原型：这一屏表达能力未接通，本页不会探测真实服务，也不代表线上状态。';
+};
+
+R['illegal'] = function(){
+  tkSub.textContent = '地址里的参数不在登记范围内，已按不可用处理。';
+  tkTag.textContent = '参数不合法';
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>这个地址不能用来打开优化建议</h2></div>'
+    + '<p class="lead">本页只认登记过的页面、状态与编号格式。收到没登记的值时一律按不可用处理，'
+    + '<b>也不会把地址里的原文显示出来</b>，避免把外部输入原样搬到屏幕上。</p></section>'
+    + exits('bad') + howto();
+  cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
+    + btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source');
+  why.className = 'why';
+  truthTx.textContent = '静态设计原型：这一屏是参数兜底，本页不连接真实简历或模型。';
+};
+
+/* ════════ 7. ready · 建议总览 ════════ */
+function renderOverview(){
+  exbar.classList.add('show');
+  tkTitle.textContent = '简历优化建议';
+  tkSub.textContent = '共 ' + MODS.length + ' 条建议，逐条由你决定采纳、保留还是自己写。';
+  tkTag.textContent = '建议已读取';
+  var c = counts(), list = '', i;
+  for (i = 0; i < MODS.length; i++) {
+    var pend = pendingOf(i, MODS[i].a);
+    list += '<button type="button" class="mod m-press" data-open="'+i+'" data-testid="'+SCREEN+'-mod-'+(i+1)+'"'
+      + ' data-decision="'+(DEC[i]||'todo')+'" data-pending="'+pend.length+'"'
+      + ' aria-label="'+esc('第 '+(i+1)+' 条 '+MODS[i].t+'，当前 '+DLABEL[DEC[i]])+'">'
+      + '<i class="no">'+(i+1)+'</i><span class="tx"><b>'+esc(MODS[i].t)+'</b>'
+      + '<span'+(pend.length?' class="warn"':'')+'>原文 '+charCount(MODS[i].b)+' 字 → 建议 '+charCount(MODS[i].a)+' 字 · '
+      + factLine(pend.length, riskOf(i, MODS[i].a).length) + '</span></span>'
+      + '<span class="chip" data-d="'+DEC[i]+'">'+DLABEL[DEC[i]]+'</span>' + GO + '</button>';
+  }
+  work.innerHTML =
+    '<section class="sec m-fade-in"><div class="sec-h"><h2>这份简历有 '+MODS.length+' 处可以改</h2>'
+    + '<small>合成样本</small></div>'
+    + unsavedBar()
+    + '<p class="lead">建议<b>只改表达</b>：正常情况下只会重排、删减你原文里已经写过的内容，'
+    + '不新增学校、公司、证书、时间、薪资、获奖。'
+    + '一旦机械对照发现改写里有原文没有的事实，那一条的「采纳」会停用，要你<b>逐项确认</b>之后才能用。</p>'
+    + statHtml(c) + segHtml(-1)
+    + '<div class="batch" data-testid="'+SCREEN+'-batch">'
+    + '<button type="button" class="bx m-press" id="bx-adopt" data-testid="'+SCREEN+'-batch-adopt">'
+    + '可采纳的全部采纳<small>跳过有待确认事实的那几条</small></button>'
+    + '<button type="button" class="bx m-press" id="bx-keep" data-testid="'+SCREEN+'-batch-keep">'
+    + '其余保留原文<small>把还没决定的都记为保留</small></button>'
+    + '<button type="button" class="bx m-press" id="bx-clear" data-tone="danger" data-testid="'+SCREEN+'-batch-clear">'
+    + '清空全部裁决<small>全部回到待定</small></button>'
+    + '</div></section>'
+    + '<section class="sec"><div class="sec-h"><h2>全部建议</h2><small>点一条进入同页对照</small></div>'
+    + '<div class="mods" data-clip="1" data-testid="'+SCREEN+'-list">' + list + '</div></section>'
+    + saveBlock('<div class="exits">'
+      + rowLink('24-resume-generate.html','pen','自己动手改','不经过模型的填写路径',SCREEN+'-ex-manual','/resume/generate')
+      + rowLink(withRid('22-resume-report.html'),'report','回看诊断报告','确认哪几条最该改',SCREEN+'-ex-report','/resume/report')
+      + '</div>');
+  cta.innerHTML =
+    '<button type="button" class="btn m-press" id="open-src" data-testid="'+SCREEN+'-source-open">看上传原件</button>'
+    + '<button type="button" class="btn m-press" id="open-final" data-testid="'+SCREEN+'-final-open">裁决草稿预览</button>'
+    + '<button type="button" class="btn primary m-press" id="open-compare" data-testid="'+SCREEN+'-primary">逐条处理这 '+MODS.length+' 条</button>';
+  why.className = 'why show';
+  why.innerHTML = '「待确认事实」来自本页的机械对照：只比对数字和示例词表命中的词，'
+    + '<b>不是通用事实校验</b>，词表之外的编造它测不出来。'
+    + '<span data-testid="'+SCREEN+'-session">本次会话只记住编号和一次性令牌；裁决不写会话，刷新即回待定。</span>';
+  truthTx.textContent = '静态设计原型：建议为合成样本；裁决只是阅读决策，不写入账号、不进 optimizedResume、不生成文件、不打印。';
+}
+
+/* 全部段落一次给出、就地编辑，对齐 React 的 OptimizedResumeEditor（那边也是单栏可滚、
+   没有分页标签）。上面的标签页只做段内跳转和预览定位，不再把其余段落藏起来。 */
+function editorFields(){
+  return EDIT_SECTIONS.map(function(sec,i){
+    var body=EDIT_DATA[i].map(function(f,j){
+      var id=' data-edit-sec="'+i+'" data-edit-value="'+j+'"';
+      return '<label class="edit-field"><span>'+esc(f[0])+'</span>'
+        +(f[1].length>38?'<textarea rows="3"'+id+'>'+esc(f[1])+'</textarea>':'<input value="'+esc(f[1])+'"'+id+'>')
+        +'</label>';
+    }).join('');
+    return '<div class="edit-sec" id="es-'+i+'"'+(i===editSection?' data-now="1"':'')+'><h4>'+esc(sec)+'</h4>'+body+'</div>';
+  }).join('');
+}
+function control(label,key,choices){
+  return '<div class="ctl"><span>'+label+'</span><div class="ctl-row">'+choices.map(function(c){return '<button type="button" class="ctl-btn" data-layout="'+key+'" data-value="'+c[0]+'" aria-pressed="'+(String(LAYOUT[key])===String(c[0]))+'">'+c[1]+'</button>';}).join('')+'</div></div>';
+}
+/* 版式预览：14 个排版按钮按下去要看得见结果，内容与上面的字段同源。
+   预览只是把同一份结构化内容按当前参数重排，不是服务端渲染出来的 PDF —— 页内写明这一点。 */
+var PV_FS={compact:15,standard:17,large:19.5},PV_LS={compact:1.3,standard:1.55,relaxed:1.8},
+    PV_MG={narrow:14,normal:22,wide:34},PV_AC={blue:'#35608f',green:'#157a67',slate:'#4a5a55'};
+function editorPreview(){
+  var st='font-size:'+PV_FS[LAYOUT.fontScale]+'px;line-height:'+PV_LS[LAYOUT.lineSpacing]
+    +';padding:'+PV_MG[LAYOUT.margin]+'px'+(LAYOUT.columns==='2'?';column-count:2;column-gap:20px':'');
+  var body=EDIT_SECTIONS.map(function(sec,i){
+    return '<div class="epv-sec"'+(i===editSection?' data-now="1"':'')+'>'
+      +'<b style="color:'+PV_AC[LAYOUT.accent]+'">'+esc(sec)+'</b>'
+      +EDIT_DATA[i].map(function(f,j){
+        return '<p><u>'+esc(f[0])+'</u><span data-pvv="'+i+'-'+j+'">'+esc(f[1])+'</span></p>';
+      }).join('')+'</div>';
+  }).join('');
+  return '<div class="epv" data-testid="'+SCREEN+'-editor-preview"'
+    +' data-layout="'+LAYOUT.fontScale+'/'+LAYOUT.lineSpacing+'/'+LAYOUT.margin+'/'+LAYOUT.accent+'/'+LAYOUT.columns+'栏">'
+    +'<div class="epv-h"><b>版式预览</b><span>页面示意，不是导出渲染；分页以导出文件为准。</span></div>'
+    +'<div class="epv-paper" style="'+st+'">'+body+'</div></div>';
+}
+function exportResult(){
+  var f=exportFile();
+  if(exportState==='ready') return '<div class="export-state" data-testid="'+SCREEN+'-export-file"'
+    +' data-file-id="'+esc(f.fileId)+'" data-pages="'+f.pageCount+'"><b>优化版 '+exportFormat.toUpperCase()+' 已生成</b><br>'
+    +esc(fileMetaLine(f))+'<br>文件编号 '+esc(f.fileId)+'（合成夹具，不是真实导出结果）。'
+    +(f.printable
+      ?'signedUrl 与 printFileUrl 都不进地址栏，打印交接只带文件编号与打印参数。'
+      :'<b>这一份暂时进不了打印</b>：真实接口这次返回的是 '+exportFormat.toUpperCase()
+        +' 原文件的编号，打印要用的是服务端另渲染的那份同内容 PDF，而那份 PDF 的<b>文件编号接口没有返回</b>。'
+        +'编号对不上就不能交接，所以这里如实关掉打印；查看和手机保存照常。')
+    +'</div>';
+  if(exportState==='no-print') return '<div class="export-state warn"><b>真实文件已生成，但打印链接未就绪</b><br>'
+    +esc(fileMetaLine(f))+'<br>signedUrl 可用于查看或手机保存；没有 printFileUrl，打印必须保持禁用。</div>';
+  if(exportState==='failed') return '<div class="export-state warn"><b>本次导出失败</b><br>没有真实文件，不显示预览、保存或打印入口；可继续编辑后重试。</div>';
+  return '';
+}
+function renderEditor(){
+  exbar.classList.add('show');
+  tkTitle.textContent='优化版简历编辑与导出';
+  tkSub.textContent='结构化修改内容，调整排版和模板，再选择真实导出格式。';
+  tkTag.textContent=exportState==='ready'?'文件已生成':exportState==='no-print'?'打印凭证未就绪':'编辑中';
+  work.innerHTML='<div class="edit-shell"><section class="edit-main"><div class="edit-head"><div class="tx"><b>优化版简历</b><p>这里编辑的是服务端返回的 optimizedResume 原样内容；<b>上一页的裁决不会自动写进来</b>，要用的改法请在这里手工改。修改后旧导出物失效，需重新导出。</p></div><span class="chip" data-d="'+(exportState==='ready'?'adopt':'custom')+'">'+(exportState==='ready'?'与已导出文件一致':exportState==='no-print'?'文件已生成 · 缺打印凭证':'未导出改动')+'</span></div>'+
+    '<div class="edit-tabs">'+EDIT_SECTIONS.map(function(s,i){return '<button type="button" class="edit-tab" data-section="'+i+'" aria-pressed="'+(i===editSection)+'">'+s+'</button>';}).join('')+'</div>'+editorFields()+'</section>'+
+    '<aside class="edit-side"><section class="side-card"><h3>排版调整</h3><p>5 组参数对应共享合同 defaultLayout，改动即时反映在下方预览。</p>'+control('字号','fontScale',[['compact','紧凑'],['standard','标准'],['large','放大']])+control('行距','lineSpacing',[['compact','紧凑'],['standard','标准'],['relaxed','舒展']])+control('页边距','margin',[['narrow','窄'],['normal','标准'],['wide','宽']])+control('主色','accent',[['blue','蓝'],['green','绿'],['slate','灰']])+control('栏数','columns',[['1','单栏'],['2','双栏']])+'</section>'+
+    '<section class="side-card"><h3>简历模板</h3><p>模板来自服务端；读取失败仍可用默认排版导出。</p><div class="tpl-list"><button type="button" class="tpl-btn" aria-pressed="'+(selectedTemplate==='resume-template-clean')+'" data-template-id="resume-template-clean">清爽通用简历模板<small>clean · 简历优化与现场打印</small></button></div></section>'+
+    '<section class="side-card"><h3>AI 辅助调整</h3><p>只调表达密度与排版，不新增经历或事实。</p><div class="ai-grid"><button type="button" class="ai-btn" data-ai="condense">AI 精简</button><button type="button" class="ai-btn" data-ai="reformat">AI 调整排版</button></div>'+(lastAiAction?'<button type="button" class="undo" id="undo-ai">撤销 AI 调整</button><div class="export-state">已执行：'+(lastAiAction==='condense'?'AI 精简':'AI 调整排版')+'。导出物已失效，需要重新导出。</div>':'')+'</section>'+
+    '<section class="side-card"><h3>导出格式</h3><div class="fmt-grid">'+[['pdf','PDF'],['docx','Word'],['txt','TXT'],['md','Markdown']].map(function(f){return '<button type="button" class="fmt-btn" data-format="'+f[0]+'" aria-pressed="'+(exportFormat===f[0])+'">'+f[1]+'</button>';}).join('')+'</div><p>PDF 可直接预览，也是当前<b>唯一能交给打印确认</b>的格式；Word / TXT / Markdown 供下载编辑，'
+    +'打印要用服务端另渲染的同内容 PDF，而那份 PDF 的文件编号接口还没返回，所以暂不开放。</p>'+exportResult()+'</section>'+editorPreview()+'</aside></div>';
+  var left='<button type="button" class="btn m-press" id="open-overview" data-testid="'+SCREEN+'-editor-back">返回建议总览</button>';
+  if(exportState==='ready'){
+    var xf=exportFile();
+    /* 裸 href 会落到打印确认页的「没有任务」空态：那一页只认登记过的来源 + 文件编号成对。
+       PDF 这一份登记过，所以带齐 source / fileId / pages 和打印参数交过去；
+       另外三种格式的打印身份服务端还没给，按钮如实禁用，理由常驻可见。 */
+    cta.innerHTML=left+'<button type="button" class="btn m-press" id="view-export" data-testid="'+SCREEN+'-export-preview">查看或手机保存 '+exportFormat.toUpperCase()+'</button>'
+      +(xf.printable
+        ?'<a class="btn primary m-press" href="'+esc(printHandoffHref(xf))+'" data-route="/print/confirm" data-testid="'+SCREEN+'-primary">去打印优化版</a>'
+        :'<button type="button" class="btn primary" aria-disabled="true" data-testid="'+SCREEN+'-primary" aria-label="'+esc(exportFormat.toUpperCase()+' 暂不开放打印，待服务端返回打印 PDF 文件编号')+'">'+exportFormat.toUpperCase()+' 暂不开放打印</button>');
+  }
+  else if(exportState==='no-print') cta.innerHTML=left+'<button type="button" class="btn m-press" id="view-export" data-testid="'+SCREEN+'-export-preview">查看或手机保存 '+exportFormat.toUpperCase()+'</button><button type="button" class="btn primary" aria-disabled="true" data-testid="'+SCREEN+'-primary">打印链接未就绪</button>';
+  else cta.innerHTML=left+'<button type="button" class="btn primary m-press" id="do-export" data-testid="'+SCREEN+'-primary">导出 '+exportFormat.toUpperCase()+'</button>';
+  why.className='why show';
+  why.innerHTML='结构化内容、排版、模板或导出格式改变后，都必须重新生成文件。'
+    +(exportState==='ready'&&!exportFile().printable
+      ?'<b>'+exportFormat.toUpperCase()+' 暂不开放打印：待服务端返回打印 PDF 的文件编号。</b>现在这条接口只给原格式文件的编号，拿它冒充打印用的那份 PDF，下游按编号取到的可能不是同一个文件。改用 PDF 导出即可现在打印。'
+      :'只有真实 printFileUrl 就绪、并且拿到那份文件自己的编号，才进入打印确认。');
+  truthTx.textContent='静态设计原型：编辑内容为合成样本，版式预览由本页绘制；本屏是设计目标，未逐项核对当前 React 实现，也不代表接口、模型、文件或打印已在线。';
+}
+
+/* ════════ 8. ready · 逐条对照 ════════ */
+function renderCompare(){
+  exbar.classList.add('show');
+  tkTitle.textContent = '逐条裁决';
+  tkSub.textContent = '每条都可以采纳、保留原文或自己写，随时改判。';
+  tkTag.textContent = '第 ' + (cur + 1) + ' / ' + MODS.length + ' 条';
+
+  var m = MODS[cur], c = counts(), i;
+  var why2 = '';
+  for (i = 0; i < m.w.length; i++) why2 += '<span>· ' + esc(m.w[i]) + '</span>';
+
+  var isCustom = DEC[cur] === 'custom' && CUSTOM[cur];
+  var shown = isCustom ? CUSTOM[cur] : m.a;
+  var runs = mergeRuns(diffOps(tokenize(m.b), tokenize(shown)));
+  var pendA = pendingOf(cur, m.a);                 /* AI 版还欠几项确认 */
+  var pendShown = pendingOf(cur, shown);           /* 当前展示的这版还欠几项 */
+  var canAdopt = pendA.length === 0;
+
+  var leftPane =
+    '<div class="pane" data-side="before"><div class="pane-h">优化前 · 原文<em>合成样本</em></div>'
+    + '<p class="dtext" data-testid="'+SCREEN+'-before">' + diffHtml(runs, 'b') + '</p></div>';
+  var rightPane = editing
+    ? '<div class="pane new" data-side="after"><div class="pane-h">自己写这一条<em>只留在本页</em></div>'
+      + '<textarea id="editor" data-testid="'+SCREEN+'-editor" aria-label="自己改写这一条">' + esc(CUSTOM[cur] || m.b) + '</textarea></div>'
+    : '<div class="pane new" data-side="after"><div class="pane-h">' + (isCustom ? '优化后 · 你写的这版' : '优化后 · 建议改写')
+      + '<em>' + (isCustom ? '本人撰写' : 'AI 生成内容') + '</em></div>'
+      + '<p class="dtext" data-testid="'+SCREEN+'-after">' + diffHtml(runs, 'a') + '</p></div>';
+
+  var legend =
+    '<div class="legend" data-testid="'+SCREEN+'-legend"><span>对照图例</span>'
+    + '<span class="lg"><del>删掉</del>删除</span>'
+    + '<span class="lg"><ins>加上</ins>新增</span>'
+    + '<span class="lg"><em>换写法</em>替换</span>'
+    + '<span class="lg"><b>不变</b>保留</span></div>';
+
+  var same = m.b === shown;
+  var factChip = pendShown.length
+    ? '<span class="mx bad">待你确认 <b>'+pendShown.length+'</b> 处：'+esc(pendShown.join('、'))+'</span>'
+    : '<span class="mx ok">'+factLine(0, riskOf(cur, shown).length)+'</span>';
+  var metrics =
+    '<div class="mrow" data-testid="'+SCREEN+'-metrics" data-same="'+(same?1:0)+'"'
+    + ' data-del="'+diffCount(runs,'-')+'" data-ins="'+diffCount(runs,'+')+'">'
+    + '<span class="mx">字数 <b>'+charCount(m.b)+'</b> → <b>'+charCount(shown)+'</b></span>'
+    + '<span class="mx">删除 <b>'+diffCount(runs,'-')+'</b> 字 · 新增 <b>'+diffCount(runs,'+')+'</b> 字</span>'
+    + factChip + '</div>';
+
+  /* 待确认事实：逐项列出，逐项确认。没确认完 —— 采纳停用，裁决草稿也用不上这一版。 */
+  var facts = '';
+  /* 待确认事实取两版的并集：AI 那一版的新事实要确认才能采纳；
+     你自己写进去的新事实也要确认，否则那一条同样进不了裁决草稿。 */
+  var allRisk = riskOf(cur, m.a).slice();
+  if (shown !== m.a) {
+    var extra = riskOf(cur, shown);
+    for (i = 0; i < extra.length; i++) if (allRisk.indexOf(extra[i]) < 0) allRisk.push(extra[i]);
+  }
+  if (allRisk.length) {
+    var fl = '';
+    for (i = 0; i < allRisk.length; i++) {
+      var tk = allRisk[i], ok = !!OKFACT[cur][tk];
+      fl += '<div class="fitem" data-fact="'+esc(tk)+'" data-ok="'+(ok?1:0)+'">'
+        + '<span class="ft"><b>'+esc(tk)+'</b> —— 改写里有，原文里没有</span>'
+        + '<button type="button" class="fb m-press" data-confirm="'+esc(tk)+'"'
+        + ' aria-pressed="'+(ok?'true':'false')+'" data-testid="'+SCREEN+'-fact-'+i+'"'
+        + ' aria-label="'+esc((ok?'已确认：':'确认属实：')+tk)+'">'
+        + (ok ? ic('check',20,2.4)+'已确认' : '我确认属实') + '</button></div>';
+    }
+    facts = '<div class="facts" data-testid="'+SCREEN+'-facts" data-total="'+allRisk.length+'" data-pending="'+pendA.length+'">'
+      + '<b>待确认事实 '+allRisk.length+' 处 · 还差 '+(pendA.length + pendShown.filter(function(x){ return pendA.indexOf(x) < 0; }).length)+' 处</b>'
+      + '<div class="flist">'+fl+'</div>'
+      + '<div class="fnote">每一处都要你本人确认属实，才能采纳这一版；确认不了的，用「自己写」把它删掉。'
+      + '未确认完的条目也<b>不会进入裁决草稿</b>，草稿里那一条退回原文。</div></div>';
+  }
+
+  var actions = editing
+    ? '<div class="acts">'
+      + '<button type="button" class="act m-press" id="act-save" data-testid="'+SCREEN+'-act-save"><span>用这段</span><small>记为「自己写」，只留本页</small></button>'
+      + '<button type="button" class="act m-press" id="act-cancel" data-testid="'+SCREEN+'-act-cancel"><span>取消</span><small>不改这一条</small></button>'
+      + '</div>'
+    : '<div class="acts">'
+      + '<button type="button" class="act m-press" id="act-adopt" data-testid="'+SCREEN+'-act-adopt"'
+      + (canAdopt ? ' aria-pressed="'+(DEC[cur]==='adopt')+'"' : ' aria-disabled="true" aria-describedby="'+SCREEN+'-guard"')
+      + '><span>采纳</span><small>'+(canAdopt ? '用建议这版' : '有 '+pendA.length+' 处事实待确认')+'</small></button>'
+      + '<button type="button" class="act m-press" id="act-keep" data-testid="'+SCREEN+'-act-keep" aria-pressed="'+(DEC[cur]==='keep')+'"><span>保留原文</span><small>这条不改</small></button>'
+      + '<button type="button" class="act m-press" id="act-custom" data-testid="'+SCREEN+'-act-custom" aria-pressed="'+(DEC[cur]==='custom')+'"><span>自己写</span><small>用你的话改</small></button>'
+      + '</div>';
+
+  var guard = canAdopt
+    ? '<div class="guard" id="'+SCREEN+'-guard" data-testid="'+SCREEN+'-guard" data-kind="note"><i aria-hidden="true">!</i>'
+      + '<span>机械对照只比对数字和示例词表命中的词，<b>不等于事实已核实</b>；'
+      + 'AI 不会替你新增学校、公司、证书、时间、薪资或获奖，数字请你自己再看一眼。</span></div>'
+    : '<div class="guard stop" id="'+SCREEN+'-guard" data-testid="'+SCREEN+'-guard" data-kind="stop"><i aria-hidden="true">!</i>'
+      + '<span>这版里出现了原文没有的事实：'+esc(allRisk.join('、'))+'。'
+      + '<b>「采纳」已停用</b>，也进不了裁决草稿 —— 上面逐项确认完才会解锁。</span></div>';
+
+  var jump = '';
+  for (i = 0; i < MODS.length; i++) {
+    var pi = pendingOf(i, MODS[i].a).length;
+    jump += '<button type="button" class="jcard m-press" data-j="'+i+'" aria-current="'+(i===cur)+'"'
+      + ' data-risk="'+(pi?1:0)+'" data-testid="'+SCREEN+'-jump-'+(i+1)+'"'
+      + ' aria-label="'+esc('第 '+(i+1)+' 条 '+MODS[i].s+' '+DLABEL[DEC[i]]+(pi?'，有 '+pi+' 处事实待确认':''))+'">'
+      + '<i aria-hidden="true">'+(i+1)+'</i><span class="jt"><b>'+MODS[i].s+'</b>'
+      + '<span'+(pi?' class="warn"':'')+'>'+charCount(MODS[i].b)+' → '+charCount(MODS[i].a)+' 字'
+      + (pi ? ' · 待确认 '+pi : '') + '</span></span>'
+      + '<span class="chip" data-d="'+DEC[i]+'">'+DLABEL[DEC[i]]+'</span></button>';
+  }
+
+  /* 决策的直接后果就近可见：这一条现在会以哪一版进裁决草稿。
+     事实没确认完的，这里明写「退回原文」—— 拦截不是只体现在一个灰按钮上。 */
+  var outText = chosenText(cur), outPend = pendingOf(cur, outText), outBlocked = outPend.length > 0;
+  var outLabel = outBlocked ? '退回原文' : (DEC[cur] ? DLABEL[DEC[cur]] : '待定 · 暂用原文');
+  if (outBlocked) outText = m.b;
+  var outcome =
+    '<div class="outcome" data-blocked="'+(outBlocked?1:0)+'" data-used="'+(outBlocked?'before':(DEC[cur]||'before'))+'"'
+    + ' data-testid="'+SCREEN+'-outcome"><div class="oh"><b>这一条在裁决草稿里会显示为</b>'
+    + '<span class="chip" data-d="'+(outBlocked?'':(DEC[cur]||''))+'">'+outLabel+'</span></div>'
+    + '<p>'+esc(outText)+'</p></div>';
+
+  work.innerHTML =
+    '<section class="sec cmpsec m-fade-in"><div class="sec-h"><h2>第 '+(cur+1)+' / '+MODS.length+' 条 · '+esc(m.t)+'</h2>'
+    + '<small>合成样本</small></div>'
+    + unsavedBar()
+    + statHtml(c) + segHtml(cur)
+    + '<div class="cscroll" data-clip="1" data-testid="'+SCREEN+'-compare-body">'
+    + '<div class="cmp" data-testid="'+SCREEN+'-compare">' + leftPane + rightPane + '</div>'
+    + legend + metrics
+    + '<div class="wnote"><b>这版改了什么（本页夹具说明，不是服务端返回的理由）</b>'+why2+'</div>'
+    + outcome + facts + guard + '</div>' + actions + '</section>'
+    + '<section class="sec jumpsec"><div class="sec-h"><h2>全部 '+MODS.length+' 条</h2><small>点一条直接跳过去</small></div>'
+    + '<div class="jump" data-testid="'+SCREEN+'-jumps">' + jump + '</div></section>';
+
+  var atFirst = cur === 0, atLast = cur === MODS.length - 1;
+  cta.innerHTML =
+    btnAct('go-prev','上一条',false,SCREEN+'-prev',atFirst)
+    + btnAct('go-next','下一条',false,SCREEN+'-next',atLast)
+    + '<button type="button" class="btn m-press" id="open-final" data-testid="'+SCREEN+'-final-open">裁决草稿预览</button>'
+    + '<button type="button" class="btn primary m-press" id="open-overview" data-testid="'+SCREEN+'-primary">回建议总览</button>';
+
+  why.className = 'why show';
+  why.textContent = editing
+    ? '正在自己写这一条：写完点「用这段」，只保存在本页；你写进去的数字同样会走一遍机械对照。'
+    : !canAdopt ? '这一条的「采纳」已停用：机械对照发现建议里有原文没有的事实，逐项确认后才解锁。'
+    : atFirst ? '这是第 1 条，没有上一条。裁决可以反复改，随时回来重选。'
+    : atLast ? '这是最后一条，没有下一条。裁决只是阅读决策；能导出的那一版在总览页的「优化版简历编辑与导出」里改。'
+    : '裁决可以反复改；改完回建议总览，再看裁决草稿。';
+  truthTx.textContent = '静态设计原型：左右两栏都是合成样本；裁决只是阅读决策，不写入账号、不进 optimizedResume、不生成文件、不打印。';
+}
+
+/* ════════ 9. 裁决草稿预览（浮层，不是新 route，也不是「最终稿」） ════════ */
+function finalOverlay(){
+  var c = counts(), i, items = '', usable = 0, blocked = 0;
+  for (i = 0; i < MODS.length; i++) {
+    var text = chosenText(i), pend = pendingOf(i, text), blockedItem = pend.length > 0;
+    var label = blockedItem ? '退回原文' : (DEC[i] ? DLABEL[DEC[i]] : '待定 · 暂用原文');
+    if (blockedItem) { text = MODS[i].b; blocked++; } else if (DEC[i]) usable++;
+    items += '<div class="fb-item" data-blocked="'+(blockedItem?1:0)+'" data-used="'+(blockedItem?'before':(DEC[i]||'before'))+'"'
+      + ' data-testid="'+SCREEN+'-final-item-'+(i+1)+'">'
+      + '<div class="fbh"><b>'+esc(MODS[i].s)+'</b><span class="chip" data-d="'+(blockedItem?'':(DEC[i]||''))+'">'+label+'</span></div>'
+      + '<p>'+esc(text)+'</p>'
+      + (blockedItem ? '<span class="blockwhy">这一条还有 '+pend.length+' 处事实没确认（'+esc(pend.join('、'))+'），'
+          + '所以草稿里用的是原文，不是那一版改写。</span>' : '')
+      + '</div>';
+  }
+  return '<div class="pv" data-testid="'+SCREEN+'-final" role="dialog" aria-modal="true" aria-label="裁决草稿预览"'
+    + ' data-usable="'+usable+'" data-blocked="'+blocked+'" data-todo="'+c.todo+'">'
+    + '<div class="pv-box"><div class="pv-hd"><b>裁决草稿预览</b>'
+    + '<button type="button" class="cl m-press" id="final-close" data-testid="'+SCREEN+'-final-close">'+ic('close',22,2.3)+'关闭</button></div>'
+    + '<p class="pv-warn">这是<b>阅读决策草稿，不是简历最终稿</b>：按你当前的裁决临时拼出来，不保存、不写进 optimizedResume，离开本页就没有了。'
+    + '真正能导出的那一版在「优化版简历」编辑区里 —— 你在这里决定要用的改法，还要到编辑区手工改进对应字段。</p>'
+    + '<div class="fin" data-clip="1" data-testid="'+SCREEN+'-final-body">'
+    + '<div class="fh"><b>按当前裁决临时拼出的阅读草稿</b><span>已决定 '+(MODS.length-c.todo)+' / '+MODS.length
+    + ' · 因事实未确认退回原文 '+blocked+' 条</span></div>' + items + '</div>'
+    + '<div class="pv-act">'
+    + '<button type="button" class="sbtn m-press" id="final-editor" data-testid="'+SCREEN+'-final-save"><span>进入优化版编辑</span><small>在那里改才进得了导出</small></button>'
+    + '<button type="button" class="sbtn" aria-disabled="true" data-testid="'+SCREEN+'-final-print" aria-describedby="'+SCREEN+'-final-need"><span>打印建议草稿</span><small>没有真实文件</small></button>'
+    + '<div class="need" id="'+SCREEN+'-final-need" data-testid="'+SCREEN+'-final-need">'
+    + '<span>· 逐条裁决没有独立落库接口，这份拼接草稿既不算已保存，也不会进 optimizedResume</span>'
+    + '<span>· 真实文件只由编辑区的 optimizedResume 导出，不打印这份阅读草稿</span>'
+    + '<span>· 本页不显示价格，也不做任何支付；打印计费在打印台按真实文件页数算</span>'
+    + '</div></div></div></div>';
+}
+
+/* ════════ 10. 上传原件预览（与 22 同一套查看器） ════════ */
+var SHEET_SPECS = {
+  'pdf-1': [['t',380],['s',540],['s',430],['rule'],['h',200],['b',820],['b',770],['b',810],['b',600],
+            ['gap'],['h',230],['b',830],['b',740],['b',800],['b',660],['b',780],
+            ['gap'],['h',180],['b',810],['b',700],['b',790],['b',620],
+            ['gap'],['h',210],['b',800],['b',750],['b',690],
+            ['gap'],['h',170],['b',820],['b',640]],
+  'pdf-2': [['h',240],['b',830],['b',780],['b',700],['b',810],
+            ['gap'],['h',200],['b',820],['b',760],['b',640],
+            ['gap'],['h',260],['b',800],['b',840],['b',720],['b',790],['b',610],
+            ['gap'],['h',190],['b',810],['b',730],['b',800],['b',680],
+            ['gap'],['h',220],['b',790],['b',820],['b',700],['b',590],
+            ['gap'],['h',160],['b',810]],
+  'pdf-3': [['h',210],['b',820],['b',750],['b',800],
+            ['gap'],['h',250],['b',810],['b',690],['b',780],['b',620],
+            ['gap'],['h',180],['b',830],['b',740],['b',660],
+            ['gap'],['rule'],['h',230],['b',800],['b',770],['b',690],['b',810],['b',560],
+            ['gap'],['h',200],['b',820],['b',700],['b',780],['b',640],
+            ['gap'],['h',170],['b',790]],
+  'image-1':[['t',360],['s',500],['s',420],['rule'],['h',200],['b',820],['b',780],['b',700],['b',810],
+            ['gap'],['h',240],['b',830],['b',760],['b',800],['b',650],['b',790],
+            ['gap'],['h',190],['b',810],['b',720],['b',780],['b',600],
+            ['gap'],['h',220],['b',800],['b',770],['b',690],['b',820],
+            ['gap'],['h',170],['b',810],['b',730],['b',660]]
+};
+var BAR_H = { t:44, s:20, rule:3, h:28, b:18 };
+var BAR_ADV = { t:76, s:34, rule:50, h:48, b:38, gap:26 };
+var BAR_TONE = { t:'d', s:'m', rule:'r', h:'d', b:'m' };
+function sheetBars(spec, x, y0, k){
+  var out = '', y = y0;
+  for (var i = 0; i < spec.length; i++) {
+    var kind = spec[i][0];
+    if (kind !== 'gap') {
+      var w = Math.round((spec[i][1] || 820) * k);
+      out += '<i class="bar2 '+BAR_TONE[kind]+'" style="left:'+x+'px;top:'+Math.round(y)+'px;width:'+w+'px;height:'+Math.round(BAR_H[kind])+'px"></i>';
+    }
+    y += BAR_ADV[kind];
+  }
+  return out;
+}
+function sheetInner(mode, pg){
+  if (mode === 'image') {
+    return '<span class="photo" aria-hidden="true"></span>'
+      + '<span class="paper2" style="left:62px;top:132px;width:880px;height:1520px;transform:rotate(-1.4deg)">'
+      + sheetBars(SHEET_SPECS['image-1'], 66, 96, 0.94) + '</span>';
+  }
+  return sheetBars(SHEET_SPECS['pdf-' + pg] || SHEET_SPECS['pdf-1'], 90, 104, 1);
+}
+function svToolbar(f){
+  var last = f.pages, prevOn = pageNo > 1, nextOn = pageNo < last;
+  var zi = ZOOMS.indexOf(zoomLv), ri = ROTS.indexOf(rotDeg);
+  var nav = function(on, dir, label, icon, whyTx){
+    if (!on) return '<button type="button" class="tbtn" aria-disabled="true" data-testid="'+SCREEN+'-source-page-'+dir+'"'
+      + ' aria-label="'+esc(label+'（'+whyTx+'）')+'">'+ic(icon,24,2.3)+label+'</button>';
+    return '<button type="button" class="tbtn m-press" data-page="'+(pageNo + (dir==='next'?1:-1))+'"'
+      + ' data-testid="'+SCREEN+'-source-page-'+dir+'" aria-label="'+esc(label)+'">'+ic(icon,24,2.3)+label+'</button>';
+  };
+  var fitBtn = function(key, label, icon){
+    return '<button type="button" class="tbtn m-press" data-fit="'+key+'" aria-pressed="'+(fitMode===key?'true':'false')+'"'
+      + ' data-testid="'+SCREEN+'-source-fit-'+key+'" aria-label="'+esc(label)+'">'+ic(icon,24)+label+'</button>';
+  };
+  var zoomBtn = function(delta, dir, label, icon, whyTx){
+    var idx = zi + delta;
+    if (idx < 0 || idx >= ZOOMS.length) return '<button type="button" class="tbtn" aria-disabled="true"'
+      + ' data-testid="'+SCREEN+'-source-zoom-'+dir+'" aria-label="'+esc(label+'（'+whyTx+'）')+'">'+ic(icon,24)+label+'</button>';
+    return '<button type="button" class="tbtn m-press" data-zoom="'+ZOOMS[idx]+'" data-testid="'+SCREEN+'-source-zoom-'+dir+'"'
+      + ' aria-label="'+esc(label)+'">'+ic(icon,24)+label+'</button>';
+  };
+  var bound = zi === 0 ? ' · 最小' : (zi === ZOOMS.length - 1 ? ' · 最大' : '');
+  var rowA = '<div class="sv-tr">'
+    + nav(prevOn,'prev','上一页','prev', last === 1 ? '这份原件只有一页' : '已经是第一页')
+    + '<span class="tread" data-testid="'+SCREEN+'-source-page-indicator" data-page="'+pageNo+'" data-pages="'+last+'" aria-live="polite">'
+    + '第 '+pageNo+' 页 / 共 '+last+' 页</span>'
+    + nav(nextOn,'next','下一页','next', last === 1 ? '这份原件只有一页' : '已经是最后一页')
+    + '<span class="sp2"></span>';
+  if (f.rotatable) {
+    rowA += '<button type="button" class="tbtn m-press" data-rot="'+ROTS[(ri+1)%ROTS.length]+'" data-testid="'+SCREEN+'-source-rotate"'
+      + ' aria-label="'+esc('顺时针旋转 90 度，当前 '+rotDeg+' 度')+'">'+ic('rotate',24)+'旋转</button>'
+      + '<span class="tread" data-testid="'+SCREEN+'-source-rot-readout" data-rot="'+rotDeg+'">当前 '+rotDeg+'°</span>';
+  }
+  return '<div class="sv-tb" data-testid="'+SCREEN+'-source-toolbar">' + rowA + '</div>'
+    + '<div class="sv-tr">' + fitBtn('page','适应整页','fitpage') + fitBtn('width','适应宽度','fitwidth')
+    + '<span class="sp2"></span>'
+    + zoomBtn(-1,'out','缩小','zoomout','已经是最小倍数')
+    + '<span class="tread" data-testid="'+SCREEN+'-source-zoom-readout" data-zoom="'+zoomLv+'">'
+    + Number(zoomLv).toFixed(1) + ' 倍' + bound + '</span>'
+    + zoomBtn(1,'in','放大','zoomin','已经是最大倍数') + '</div></div>';
+}
+/* 原件预览这一层是**迁移目标**，不是已接通的能力：
+   GET /resume/records/:taskId/optimize 只回建议文本，不回原件凭证（packages/shared ResumeOptimizeResponse 里没有文件字段）。
+   所以这里不画「点一下就能看到你上传的那份」，而是把缺口写在最显眼的位置。 */
+function srcGapNote(inBox){
+  return '<div class="srcgap'+(inBox?' inbox':'')+'" data-testid="'+SCREEN+'-source-contract-gap" role="note">'
+    + '<i class="tagx">迁移目标</i>'
+    + '<p>当前读取端点只返回优化建议，<b>不返回原件的任何文件凭证</b>。要真正打开你上传的那一份，'
+    + '服务端必须另发一个<b>受控的一次性预览令牌</b>，或按你本人的登录态重新取一次自己的文件；'
+    + '<b>地址栏里的 taskId 只是编号，既不是授权，也不能用来定位文件</b> —— 本页不凭它去猜任何文件。</p></div>';
+}
+function sourceViewer(f){
+  var marks = '', i;
+  for (i = 0; i < 4; i++) marks += '<i class="cm" data-corner="'+['tl','tr','bl','br'][i]+'" aria-hidden="true"></i>';
+  return '<div class="sv" data-testid="'+SCREEN+'-source-preview" data-src-mode="viewer" role="dialog" aria-modal="true" aria-label="上传原件预览">'
+    + '<div class="sv-hd"><span class="ti" aria-hidden="true">'+ic(srcMode==='image'?'image':'doc',26)+'</span>'
+    + '<span class="tt"><b>上传原件预览</b><span>'+f.meta+'</span></span>'
+    + '<span class="sv-fx" data-testid="'+SCREEN+'-source-fixture">合成占位 · 不是你上传的文件</span>'
+    + '<button type="button" class="sv-cl m-press" id="src-close" data-testid="'+SCREEN+'-source-close">'+ic('close',22,2.3)+'关闭</button></div>'
+    + srcGapNote(false)
+    + svToolbar(f)
+    + '<div class="sv-view"><div class="sv-canvas" data-scroll="preview" data-clip="1" data-testid="'+SCREEN+'-source-canvas">'
+    + '<div class="sv-pad"><div class="sv-doc" data-testid="'+SCREEN+'-source-doc" data-page="'+pageNo+'" data-pages="'+f.pages+'" data-rot="'+rotDeg+'">'
+    + '<div class="sv-sheet" data-testid="'+SCREEN+'-source-sheet">' + sheetInner(srcMode, pageNo) + '</div>' + marks + '</div></div></div>'
+    + '<span class="sv-rail x" data-testid="'+SCREEN+'-source-rail-x" aria-hidden="true"><u></u></span>'
+    + '<span class="sv-rail y" data-testid="'+SCREEN+'-source-rail-y" aria-hidden="true"><u></u></span></div>'
+    + '<div class="sv-ft" data-testid="'+SCREEN+'-source-crosscheck"><span class="ccip">对照</span>'
+    + '<span class="cctx"><b>建议改的是表达，原件里的事实以这一页为准。</b>'
+    + '一边看原件一边核对：改写里出现原文没有的数字或名称时，「采纳」会停用，要你逐项确认。</span></div></div>';
+}
+var NOTICE = {
+  'docx': { icon:'doc', title:'这份原件是 DOCX，屏幕上不做翻页预览',
+    why:'终端里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
+    keep:'<b>优化建议不受影响</b>：候选已经读出来了，就在这一层下面。',
+    rows:[
+      ['dead','print','打印这份原件','静态原型没有真实文件凭证','-source-alt-print'],
+      ['link','21-resume-triage.html','upload','返回简历来源，转成 PDF 再上传一次','PDF 能直接翻页预览','/resume/source','-source-alt-source'],
+      ['link','10-print-hub.html','print','去打印 / 扫描其他材料','打印扫描不依赖预览，照常可用','/print-scan','-source-alt-print-hub'],
+      ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
+    ] },
+  'no-file': { icon:'slash', title:'这次没有可预览的原件',
+    why:'优化结果按编号读取，原件预览要另外一份带时效的文件访问凭证，这次进入没有拿到。原件是否还在服务端保留，这一屏看不出来，也不做判断。',
+    keep:'这<b>不是建议读取失败</b>：候选已经在下面了。',
+    rows:[
+      ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
+      ['link','39-member-records.html','folder','打开我的简历记录','从记录里挑一份带原件的','/me/ai-records','-source-alt-records'],
+      ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
+    ] },
+  'expired': { icon:'clock', title:'原件的临时访问链接已过期',
+    why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还在服务端保留，这一屏都看不出来，也不做判断。',
+    keep:'这<b>不是建议读取失败</b>：候选已经在下面了。',
+    rows:[
+      ['dead','refresh','再取一次原件','静态原型不会真的重新取件','-source-alt-retry'],
+      ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
+      ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
+    ] },
+  'render-failed': { icon:'broken', title:'原件取到了，但这一层没能把它显示出来',
+    why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还在服务端保留。',
+    keep:'<b>优化建议不受影响</b>：候选就在这一层下面。',
+    rows:[
+      ['dead','refresh','再显示一次','静态原型不会真的重新渲染','-source-alt-retry'],
+      ['link','10-print-hub.html','print','去打印 / 扫描','不经过预览也能把材料出纸','/print-scan','-source-alt-print-hub'],
+      ['link','21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析','/resume/source','-source-alt-source'],
+      ['close','','doc','关闭这一层，继续逐条裁决','建议和你已做的裁决都还在','-source-alt-close']
+    ] }
+};
+function sourceNotice(mode){
+  var N = NOTICE[mode], rows = '', i;
+  for (i = 0; i < N.rows.length; i++) {
+    var r = N.rows[i];
+    if (r[0] === 'dead') rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '静态原型没有真实文件');
+    else if (r[0] === 'close') rows += '<button type="button" class="row m-press" id="src-close-row" data-testid="'+SCREEN+r[5]+'">'
+      + '<i class="ic">'+ic(r[2],24)+'</i><span class="tx"><b>'+r[3]+'</b><span>'+r[4]+'</span></span>'+GO+'</button>';
+    else rows += rowLink(r[1], r[2], r[3], r[4], SCREEN + r[6], r[5]);
+  }
+  return '<div class="pv" data-testid="'+SCREEN+'-source-preview" data-src-mode="notice" role="dialog" aria-modal="true"'
+    + ' aria-label="'+esc(N.title)+'"><div class="pv-box sv-notice">'
+    + '<div class="pv-hd"><b>上传原件预览</b>'
+    + '<button type="button" class="cl m-press" id="src-close" data-testid="'+SCREEN+'-source-close">'+ic('close',22,2.3)+'关闭</button></div>'
+    + '<div class="nh"><span class="ni" aria-hidden="true">'+ic(N.icon,30)+'</span><b>'+N.title+'</b></div>'
+    + '<p class="nwhy" data-testid="'+SCREEN+'-source-reason">'+N.why+'</p>'
+    + srcGapNote(true)
+    + '<div class="nrows">'+rows+'</div>'
+    + '<div class="nkeep" data-testid="'+SCREEN+'-source-intact">'+N.keep+'</div></div></div>';
+}
+function layoutSource(){
+  var canvas = document.querySelector('[data-testid="'+SCREEN+'-source-canvas"]');
+  if (!canvas || !srcFile) return;
+  var doc = canvas.querySelector('.sv-doc'), sheet = canvas.querySelector('.sv-sheet');
+  var pad = 26 * 2;
+  var boxW = canvas.clientWidth - pad, boxH = canvas.clientHeight - pad;
+  var turned = rotDeg === '90' || rotDeg === '270';
+  var natW = turned ? srcFile.h : srcFile.w, natH = turned ? srcFile.w : srcFile.h;
+  var k = fitMode === 'width' ? (boxW / natW) : Math.min(boxW / natW, boxH / natH);
+  k *= Number(zoomLv);
+  doc.style.width = Math.round(natW * k) + 'px';
+  doc.style.height = Math.round(natH * k) + 'px';
+  sheet.style.width = srcFile.w + 'px';
+  sheet.style.height = srcFile.h + 'px';
+  sheet.style.transform = 'translate(-50%,-50%) rotate('+rotDeg+'deg) scale('+k+')';
+  doc.setAttribute('data-scale', k.toFixed(4));
+  canvas.scrollLeft = 0; canvas.scrollTop = 0;
+  var railX = document.querySelector('[data-testid="'+SCREEN+'-source-rail-x"]');
+  var railY = document.querySelector('[data-testid="'+SCREEN+'-source-rail-y"]');
+  var paint = function(){
+    var sx = canvas.scrollWidth - canvas.clientWidth, sy = canvas.scrollHeight - canvas.clientHeight;
+    var one = function(rail, over, size, pos, prop){
+      if (!rail) return;
+      rail.style.display = over > 1 ? 'block' : 'none';
+      if (over <= 1) return;
+      var frac = size / (size + over), len = Math.max(48, Math.round(rail[prop === 'left' ? 'clientWidth' : 'clientHeight'] * frac));
+      var room = (prop === 'left' ? rail.clientWidth : rail.clientHeight) - len;
+      rail.firstChild.style[prop === 'left' ? 'width' : 'height'] = len + 'px';
+      rail.firstChild.style[prop] = Math.round(room * (pos / over)) + 'px';
+    };
+    one(railX, sx, canvas.clientWidth, canvas.scrollLeft, 'left');
+    one(railY, sy, canvas.clientHeight, canvas.scrollTop, 'top');
+  };
+  canvas.addEventListener('scroll', paint, { passive:true });
+  paint();
+}
+
+/* ════════ 11. 渲染与绑定 ════════ */
+function paintOverlay(){
+  overlay.innerHTML = '';
+  overlay.classList.remove('on');
+  overlay.removeAttribute('data-kind');
+  overlay.removeAttribute('data-src');
+  if (srcMode) {
+    overlay.innerHTML = srcFile ? sourceViewer(srcFile) : sourceNotice(srcMode);
+    overlay.setAttribute('data-kind', 'source');
+    overlay.setAttribute('data-src', srcMode);
+    overlay.classList.add('on');
+  } else if (finalOpen) {
+    overlay.innerHTML = finalOverlay();
+    overlay.setAttribute('data-kind', 'final');
+    overlay.classList.add('on');
+  }
+  /* 浮层打开时底层整体退出交互：不是靠一层挡住，是底下真的不接受输入了。 */
+  var under = [document.querySelector('.topbar'), document.querySelector('.task'), exbar, sessbar, work, why, cta,
+    document.querySelector('.truth'), document.querySelector('.navbar')];
+  for (var u = 0; u < under.length; u++) {
+    if (!under[u]) continue;
+    if (overlay.classList.contains('on')) { under[u].setAttribute('inert',''); under[u].setAttribute('aria-hidden','true'); }
+    else { under[u].removeAttribute('inert'); under[u].removeAttribute('aria-hidden'); }
+  }
+  if (srcMode && srcFile) layoutSource();
+  bindOverlay();
+}
+
+function render(){
+  exbar.classList.remove('show');
+  sessbar.classList.remove('show');
+  why.className = 'why';
+  why.textContent = '';
+  tkTitle.textContent = '简历优化建议';
+  pill.textContent = 'AI 简历服务';
+
+  if (state === 'ready') {
+    if (view === 'compare') renderCompare(); else if(view === 'editor') renderEditor(); else renderOverview();
+  } else {
+    R[state]();
+    view = 'optimize';
+  }
+
+  if (sess === 'restored') {
+    sessbar.classList.add('show');
+    sessTx.textContent = '会话恢复：这台机器上还留着这次的简历编号和一次性令牌，已按它重新读回建议。'
+      + '逐条裁决没有恢复 —— 裁决不写会话，刷新即回到待定。';
+  } else if (sess === 'cleared') {
+    sessbar.classList.add('show');
+    sessTx.textContent = '会话已清场：待机 / 超时把编号和一次性令牌一并清掉了，所以这一屏回到没有上下文。'
+      + '重新上传或从「我的」里打开一份记录，就能再拿到编号。';
+  }
+
+  stage.setAttribute('data-view', view);
+  stage.setAttribute('data-route', ROUTE[view]);
+  stage.setAttribute('data-state', state);
+  stage.setAttribute('data-context', RID ? 'task' : 'none');
+  stage.setAttribute('data-sess', sess || 'none');
+  stage.setAttribute('data-final', finalOpen ? '1' : '0');
+  stage.setAttribute('data-src', srcMode || 'none');
+  if (state === 'ready') {
+    stage.setAttribute('data-cur', String(cur + 1));
+    stage.setAttribute('data-dec', DEC.join('|'));
+  }
+  if (fallback) stage.setAttribute('data-fallback', '1'); else stage.removeAttribute('data-fallback');
+  work.setAttribute('data-testid', SCREEN + '-state-' + state);
+
+  back.setAttribute('aria-label', (view === 'compare' || view === 'editor') ? '返回建议总览' : '返回诊断报告');
+  bindMain();
+  paintOverlay();
+  markScroll();
+}
+
+/* 滚动区如实标注：能滚就说还有几条在下面，并把「最后一条够不够得着」交给门禁验。 */
+function markScroll(){
+  var list = work.querySelectorAll('.mods,.cscroll'), n;
+  for (n = 0; n < list.length; n++) {
+    var sc = list[n];
+    var over = sc.scrollHeight - sc.clientHeight;
+    sc.setAttribute('data-overflow', over > 1 ? String(over) : '0');
+    var kids = sc.children, hidden = 0, box = sc.getBoundingClientRect(), i;
+    for (i = 0; i < kids.length; i++) {
+      var r = kids[i].getBoundingClientRect();
+      if (r.bottom > box.bottom + 1 || r.top < box.top - 1) hidden++;
+    }
+    sc.setAttribute('data-hidden-items', String(hidden));
+    /* 能滚就说清楚下面还有东西，别让截断看起来像被切掉了 */
+    if (sc.className.indexOf('cscroll') >= 0 && over > 1) {
+      var tip = document.createElement('div');
+      tip.className = 'scrollhint';
+      tip.setAttribute('data-testid', SCREEN + '-scroll-hint');
+      tip.textContent = '▾ 这一条内容较多，下滑还能看到 ' + hidden + ' 项（含事实确认与提示）';
+      sc.parentNode.insertBefore(tip, sc.nextSibling);
+    }
+  }
+}
+
+function on(id, fn){ var e = document.getElementById(id); if (e) e.addEventListener('click', fn); }
+function setDecision(i, d){
+  if (d === 'adopt' && pendingOf(i, MODS[i].a).length) return false;   /* 事实没确认完，采纳不生效 */
+  DEC[i] = (DEC[i] === d ? '' : d);
+  return true;
+}
+
+function bindMain(){
+  back.onclick = function(){
+    if (state === 'ready' && view === 'compare') { view = 'optimize'; editing = false; render(); return; }
+    location.href = withRid('22-resume-report.html');
+  };
+  var mods = work.querySelectorAll('[data-open]'), i;
+  for (i = 0; i < mods.length; i++) mods[i].addEventListener('click', function(){
+    cur = parseInt(this.getAttribute('data-open'), 10); view = 'compare'; editing = false; render();
+  });
+  var js = work.querySelectorAll('[data-j]');
+  for (i = 0; i < js.length; i++) js[i].addEventListener('click', function(){
+    cur = parseInt(this.getAttribute('data-j'), 10); editing = false; render();
+  });
+  var fbs = work.querySelectorAll('[data-confirm]');
+  for (i = 0; i < fbs.length; i++) fbs[i].addEventListener('click', function(){
+    var tk = this.getAttribute('data-confirm');
+    if (OKFACT[cur][tk]) delete OKFACT[cur][tk]; else OKFACT[cur][tk] = 1;
+    render();
+  });
+  on('act-adopt', function(){
+    if (this.getAttribute('aria-disabled') === 'true') return;   /* 停用就是停用，点了没有副作用 */
+    setDecision(cur, 'adopt'); editing = false; render();
+  });
+  on('act-keep', function(){ setDecision(cur, 'keep'); editing = false; render(); });
+  on('act-custom', function(){ editing = true; render(); });
+  on('act-save', function(){
+    var t = document.getElementById('editor').value.replace(/\s+/g, ' ').trim();
+    if (t) { CUSTOM[cur] = t; DEC[cur] = 'custom'; }
+    editing = false; render();
+  });
+  on('act-cancel', function(){ editing = false; render(); });
+  on('go-prev', function(){ if (cur > 0) { cur--; editing = false; render(); } });
+  on('go-next', function(){ if (cur < MODS.length - 1) { cur++; editing = false; render(); } });
+  on('open-compare', function(){ view = 'compare'; editing = false; render(); });
+  on('open-overview', function(){ view = 'optimize'; editing = false; render(); });
+  on('open-editor', function(){ view = 'editor'; editing = false; exportState = ''; render(); });
+  on('open-final', function(){ finalOpen = true; render(); });
+  on('open-src', function(){ srcMode = 'pdf'; srcFile = SRC_FILE.pdf; pageNo = 1; fitMode = 'page'; zoomLv = '1'; rotDeg = '0'; render(); });
+  var sections=work.querySelectorAll('[data-section]');
+  for(i=0;i<sections.length;i++)sections[i].addEventListener('click',function(){
+    editSection=Number(this.getAttribute('data-section'));
+    var tabs=work.querySelectorAll('[data-section]'),k;
+    for(k=0;k<tabs.length;k++)tabs[k].setAttribute('aria-pressed',String(Number(tabs[k].getAttribute('data-section'))===editSection));
+    var secs=work.querySelectorAll('.edit-sec'),pvs=work.querySelectorAll('.epv-sec');
+    for(k=0;k<secs.length;k++){if(k===editSection)secs[k].setAttribute('data-now','1');else secs[k].removeAttribute('data-now');}
+    for(k=0;k<pvs.length;k++){if(k===editSection)pvs[k].setAttribute('data-now','1');else pvs[k].removeAttribute('data-now');}
+    var box=work.querySelector('.edit-main'),tgt=document.getElementById('es-'+editSection);
+    if(box&&tgt)box.scrollTop=Math.max(0,tgt.offsetTop-box.offsetTop-8);
+    var pvbox=work.querySelector('.epv-paper');
+    if(pvbox&&pvs[editSection])pvbox.scrollTop=Math.max(0,pvs[editSection].offsetTop-pvbox.offsetTop-6);
+  });
+  var editValues=work.querySelectorAll('[data-edit-value]');
+  for(i=0;i<editValues.length;i++)editValues[i].addEventListener('input',function(){
+    var si=Number(this.getAttribute('data-edit-sec')),j=Number(this.getAttribute('data-edit-value'));
+    EDIT_DATA[si][j][1]=this.value;
+    var cell=work.querySelector('[data-pvv="'+si+'-'+j+'"]');
+    if(cell)cell.textContent=this.value;              /* 版式预览与字段同源，边打字边跟着变 */
+    if(exportState){                                   /* 上一份导出物已经作废，卡片不能继续留在屏幕上 */
+      var pos=this.selectionStart,box=work.querySelector('.edit-main'),top=box?box.scrollTop:0;
+      exportState=''; render();
+      var box2=work.querySelector('.edit-main');
+      if(box2)box2.scrollTop=top;
+      var back=work.querySelector('[data-edit-sec="'+si+'"][data-edit-value="'+j+'"]');
+      if(back){back.focus();try{back.setSelectionRange(pos,pos);}catch(e){}}
+    }
+  });
+  var layouts=work.querySelectorAll('[data-layout]');
+  for(i=0;i<layouts.length;i++)layouts[i].addEventListener('click',function(){LAYOUT[this.getAttribute('data-layout')]=this.getAttribute('data-value');exportState='';render();});
+  var formats=work.querySelectorAll('[data-format]');
+  for(i=0;i<formats.length;i++)formats[i].addEventListener('click',function(){exportFormat=this.getAttribute('data-format');exportState='';render();});
+  var templates=work.querySelectorAll('[data-template-id]');
+  for(i=0;i<templates.length;i++)templates[i].addEventListener('click',function(){selectedTemplate=this.getAttribute('data-template-id');exportState='';render();});
+  var ai=work.querySelectorAll('[data-ai]');
+  for(i=0;i<ai.length;i++)ai[i].addEventListener('click',function(){lastAiAction=this.getAttribute('data-ai');exportState='';render();});
+  on('undo-ai',function(){lastAiAction='';exportState='';render();});
+  on('do-export',function(){exportState='ready';render();});
+  on('view-export',function(){why.className='why show';why.textContent='真实页面会打开文件预览，并提供手机保存 signedUrl；静态原型不生成二维码或真实文件。';});
+  /* 批量动作：可采纳的全部采纳（跳过事实未确认的）／其余保留原文／清空。 */
+  on('bx-adopt', function(){
+    var n = 0, skip = 0, k;
+    for (k = 0; k < MODS.length; k++) {
+      if (pendingOf(k, MODS[k].a).length) { skip++; continue; }
+      if (DEC[k] !== 'adopt') { DEC[k] = 'adopt'; n++; }
+    }
+    render();
+    why.className = 'why show';
+    why.textContent = '已采纳 ' + n + ' 条；跳过 ' + skip + ' 条 —— 那几条的改写里有原文没有的事实，'
+      + '要逐项确认后才能采纳。批量动作不会绕过这道拦截。';
+  });
+  on('bx-keep', function(){
+    var n = 0, k;
+    for (k = 0; k < MODS.length; k++) if (!DEC[k]) { DEC[k] = 'keep'; n++; }
+    render();
+    why.className = 'why show';
+    why.textContent = '已把 ' + n + ' 条还没决定的记为「保留原文」。裁决可以反复改，随时逐条回去重选。';
+  });
+  on('bx-clear', function(){
+    var k;
+    for (k = 0; k < MODS.length; k++) { DEC[k] = ''; CUSTOM[k] = ''; OKFACT[k] = {}; }
+    render();
+    why.className = 'why show';
+    why.textContent = '已清空全部裁决，连事实确认标记一起清掉 —— 回到刚读到建议时的样子。';
+  });
+}
+
+function bindOverlay(){
+  on('final-close', function(){ finalOpen = false; render(); });
+  on('final-editor', function(){ finalOpen=false;view='editor';exportState='';render(); });
+  var closeSrc = function(){ srcMode = null; srcFile = null; render(); };
+  on('src-close', closeSrc);
+  on('src-close-row', closeSrc);
+  var tb = overlay.querySelectorAll('[data-page],[data-fit],[data-zoom],[data-rot]'), i;
+  for (i = 0; i < tb.length; i++) tb[i].addEventListener('click', function(){
+    if (this.getAttribute('aria-disabled') === 'true') return;
+    if (this.hasAttribute('data-page')) pageNo = parseInt(this.getAttribute('data-page'), 10);
+    if (this.hasAttribute('data-fit'))  fitMode = this.getAttribute('data-fit');
+    if (this.hasAttribute('data-zoom')) zoomLv = this.getAttribute('data-zoom');
+    if (this.hasAttribute('data-rot'))  rotDeg = this.getAttribute('data-rot');
+    paintOverlay();
+  });
+}
+
+/* 首屏：如果 URL 直接指向最终稿，就先把那一层打开。 */
+if (view === 'final' && state === 'ready') { finalOpen = true; view = 'optimize'; }
+render();
+
+var tab = document.getElementById('demo-tab'), panel = document.getElementById('demo-panel');
+tab.addEventListener('click', function(){ panel.classList.toggle('show'); });
+})();
+</script>
+</body>
+</html>

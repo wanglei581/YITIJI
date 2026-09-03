@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>打印扫描 · 职易达</title>
+<!--
+  route: /print-scan（服务 Hub） + /print-scan/feature/:key（能力说明页，当前只有 key=id-photo）
+  state: capability-loading | default | capability-error | locked | device-off | feature-id-photo | feature-not-found
+  api:  GET /api/v1/terminals/:terminalId/capabilities   —— 能力探测轴（匿名只读，只回 configured=true 的键）
+        GET /api/v1/terminals/:terminalId/printer-status —— 一体机(MFP)轴，fail-closed：null / 心跳过期 / 请求失败一律不算在线
+  两轴分治（对齐 apps/kiosk/src/pages/print-scan/printHubContent.ts 与 PrintScanHomePage.tsx:345-385）：
+    ① 探测轴优先。probe !== ok（loading / error）→ 七张能力卡**一律不开**，含证件照说明页；
+       badge：loading = 「检查中」，error = 「暂不开放任务 · 服务状态无法确认」。
+    ② 能力配置覆盖。CAPABILITY_STATUS_NOTES：testing=测试中，暂未对用户开放 / maintenance=维护中，暂时不可用 /
+       unsupported=本终端不支持该能力 / not_verified=待验收，暂未开放。
+    ③ MFP 轴 unavailable = 确定出不了纸（敢说哪几项停）；unknown = 读不到状态，不敢声称离线。
+  到机码例外: 到机码核销**不在** CARD_CAPABILITY_KEY 里，也不随 MFP 轴停用 —— 它核销的是已存在订单，不是新建本机任务；
+             探测失败时仍可点，但卡面如实写「这台机器现在出不了纸」。
+  到机码位数: 8 位数字新码 + 10 位字母数字历史码（与 11-arrival-code.html 冻结页、COVERAGE-MATRIX §四.4 一致）。
+             ⚠ 运行时 PrintScanHomePage.tsx:252 的卡面文案仍写「10 位到机码」，属跨批次待修债，本设计不跟随该旧文案。
+  fallback: 任何锁定/异常态保留「联系工作人员」实体出口（≥56px）；不显示打印机就绪、纸量、扫描仪就绪等未证实结论
+  未来 production route 对照：页内所有跳转带 data-route
+  原型演示控制：本页状态仅通过 ?state= 切换，标注「原型演示控制」，不含生产业务逻辑；页面无计时器推进业务状态
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.xq{flex:none;margin:20px 44px 0;border-radius:36px;padding:28px 42px 26px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{flex:none;width:100px;height:100px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:46px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:8px}
+.xq-ask{font-size:38px;line-height:1.3;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:10px;font-size:21px;line-height:1.55;color:rgba(242,239,228,.72)}
+.xq-doing b{color:#fff;font-weight:600}
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec{flex:none;padding:0 44px;margin-top:24px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 30px}
+.state{border-radius:var(--r-lg);padding:28px 34px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:700}
+.state-p{margin-top:12px;font-size:21px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.plan{margin-top:16px;display:flex;flex-direction:column;gap:11px}
+.plan li{list-style:none;display:flex;gap:12px;align-items:flex-start;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.plan .sq{flex:none;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-top:9px}
+.reason{margin-top:8px;font-size:18px;line-height:1.5;color:var(--wheat-d);font-weight:600}
+.btn{min-height:72px;padding:0 30px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:600;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn.danger{background:var(--cinnabar);color:#fff}
+.btn[aria-disabled=true]{opacity:.55;cursor:default}
+.ctabar{flex:none;margin-top:auto;padding:20px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.ctabar .btn{flex:1}
+.truth{flex:none;padding:16px 44px 18px;border-top:1px solid var(--line);display:flex;gap:26px}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+.nav-item.on .ni{color:var(--teal-d)}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal)}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.press:active{transform:scale(.985)}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:140px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:16px;flex-direction:column;gap:8px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 16px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.sec.fill{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.last{margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.chip{min-height:48px;padding:0 18px;border-radius:14px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:9px;font-size:18px;color:var(--ink-2);font-weight:600}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.chip.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.meta{margin-top:14px;display:flex;gap:12px;flex-wrap:wrap}
+.kv{display:flex;flex-direction:column;gap:10px}
+.kv>div{display:flex;gap:12px;font-size:19px;color:var(--ink-2)}
+.kv>div>span:first-child{flex:none;width:120px;color:var(--ink-3)}
+.kv b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.pgrp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:20px 24px}
+.pgrp h4{font-size:22px;font-weight:700;display:flex;align-items:center;gap:12px}
+.pgrp h4 span{margin-left:auto;font-size:18px;font-weight:400;color:var(--ink-3)}
+.pgrp .state-p{font-size:19px;margin-top:10px}
+.blk{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px 28px}
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+.src{display:flex;align-items:center;gap:22px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 26px;width:100%;text-align:left}
+.src-icon{flex:none;width:78px;height:78px;border-radius:24px;display:flex;align-items:center;justify-content:center}
+.src-main{flex:1;min-width:0}
+.src-name{font-size:27px;font-weight:700;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tag{flex:none;font-size:15px;font-weight:600;color:var(--teal-d);background:var(--teal-soft);border-radius:9px;padding:3px 11px}
+.src-desc{margin-top:6px;font-size:19px;color:var(--ink-2);line-height:1.5}
+.src-desc b{color:var(--ink);font-weight:600}
+.src-go{flex:none;width:64px;height:64px;border-radius:50%;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center}
+.src[aria-disabled=true]{opacity:.62}
+.src[aria-disabled=true] .src-go{background:var(--line-2);color:var(--ink-3)}
+.cap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 18px 16px;display:flex;flex-direction:column;text-align:left;min-height:196px}
+.cap-icon{width:56px;height:56px;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.cap-name{display:block;font-size:23px;font-weight:700;line-height:1.3}
+.cap-desc{display:block;margin-top:6px;font-size:17px;color:var(--ink-3);line-height:1.45;flex:1}
+.cap-foot{margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:16px;color:var(--teal-d);font-weight:600;line-height:1.35}
+.cap[aria-disabled=true]{opacity:.6}
+.cap[aria-disabled=true] .cap-foot{color:var(--wheat-d)}
+.sec.grow{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.grow .grid3{flex:1;min-height:0;grid-template-rows:1fr 1fr auto}
+.cap.wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:22px;min-height:126px;padding:18px 26px}
+.cap.wide .cap-icon{margin-bottom:0}
+.cap.wide .cap-body{flex:1;min-width:0}
+.cap.wide .cap-desc{flex:none}
+.cap.wide .cap-foot{margin-top:0;flex:none}
+.badge-off{display:inline-flex;align-items:center;min-height:34px;padding:0 11px;border-radius:11px;background:var(--wheat-soft);color:var(--wheat-d);font-size:15px;font-weight:700;line-height:1.3}
+.notecard{background:var(--surface);border:1px dashed var(--line-2);border-radius:var(--r-md);padding:18px 20px;display:flex;gap:13px;align-items:flex-start;text-align:left;min-height:126px}
+.note-ic{flex:none;width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:var(--slate-soft);color:var(--slate-d)}
+.notecard b{display:block;font-size:20px;font-weight:700}
+.notecard span.d{display:block;margin-top:5px;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.note-go{display:block;margin-top:8px;font-size:17px;font-weight:600;color:var(--teal-d)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="01-home.html" data-route="/" aria-label="返回首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">能力与设备状态以办理时确认</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif" aria-hidden="true">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow">PRINT &amp; SCAN</div>
+        <div class="xq-ask serif" id="xq-ask">你的文件，<em>现在在哪</em>？</div>
+        <div class="xq-doing" id="xq-doing">打印、扫描、图片转 PDF、签名盖章都在这台机器上。<b>能不能办，进入后按真实状态确认。</b></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="body" id="body-root" data-screen="print-hub" data-state="default" data-testid="print-hub-state-default"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="print-hub-truth">
+    <div><b>价格</b>以服务端报价为准，本机不预设单价，也不提供促销承诺。</div>
+    <div><b>纸张</b>只按 A4 出纸；彩色与自动双面需本机真机验证后由管理员开放。</div>
+    <div><b>隐私</b>结束会话或闲置超时清除本机登录态与临时会话信息；文件与订单按服务端留存期限管理。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true">
+    <div class="dp-t">原型演示控制</div>
+    <a href="?state=capability-loading" data-s="capability-loading">capability-loading</a>
+    <a href="?state=default" data-s="default">default</a>
+    <a href="?state=capability-error" data-s="capability-error">capability-error</a>
+    <a href="?state=locked" data-s="locked">locked</a>
+    <a href="?state=device-off" data-s="device-off">device-off</a>
+    <a href="?state=feature-id-photo" data-s="feature-id-photo">feature-id-photo</a>
+    <a href="?state=feature-not-found" data-s="feature-not-found">feature-not-found</a>
+  </div>
+</div>
+<script>
+var SCREEN='print-hub';
+var STATES=['capability-loading','default','capability-error','locked','device-off','feature-id-photo','feature-not-found'];
+var ICO={
+ phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10 5h4"/><path d="M9 14.5l3 3 3-3"/><path d="M12 17.5v-6"/>',
+ usb:'<path d="M9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8"/><rect x="5" y="8" width="14" height="12" rx="3"/><path d="M12 12v4"/>',
+ code:'<rect x="3" y="4" width="18" height="14" rx="2.5"/><path d="M7 9.5h2M11 9.5h2M15 9.5h2M7 13.5h6"/><path d="M9 21l3-3 3 3"/>',
+ doc:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ scan:'<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/>',
+ img:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15.5l-4.5-4.5L8 19.5"/>',
+ sign:'<path d="M4 20h16"/><path d="M6.5 16.5l8.8-8.8a2.1 2.1 0 0 1 3 3l-8.8 8.8-3.7.7.7-3.7z"/>',
+ idcard:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="9" cy="11" r="2.4"/><path d="M5.5 16.4c.7-1.6 2-2.4 3.5-2.4s2.8.8 3.5 2.4M15 10h4M15 14h3"/>',
+ photo:'<rect x="2.5" y="6" width="19" height="14" rx="2.5"/><circle cx="12" cy="13" r="3.4"/><path d="M8 6l1.4-2h5.2L16 6"/>',
+ copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4H5.5A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
+ arrow:'<path d="M9 5l7 7-7 7"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ files:'<path d="M8 3.5h6l4 4V17a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2z"/><path d="M14 3.5v4h4"/><path d="M4 7v11.5A2.5 2.5 0 0 0 6.5 21H16"/>'
+};
+function svg(n,s,w){return '<svg width="'+(w||30)+'" height="'+(w||30)+'" viewBox="0 0 24 24" fill="none" stroke="'+s+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+
+/* 八张能力卡：key 与 CARD_CAPABILITY_KEY 对齐；探测轴不通过时全部关闭 */
+var CAPS=[
+ {key:'doc-print',capKey:'document_print',n:'文档打印',ic:'doc',bg:'var(--teal-soft)',st:'#157a67',
+  d:'PDF / JPG / PNG 上传，先过材料检查再设参数。',foot:'A4 · 黑白单面',
+  href:'12-file-source.html?source=document&tab=file',route:'/print/upload',mfp:true},
+ {key:'phone-upload',capKey:'phone_upload',n:'手机扫码上传',ic:'phone',bg:'var(--slate-soft)',st:'#35608f',
+  d:'手机扫屏幕上的码，把文件传进这台机器。',foot:'不用登录 · 不占打印机',
+  href:'12-file-source.html?source=document&tab=qr&mode=transfer',route:'/print/upload',mfp:false},
+ {key:'usb-import',capKey:'usb_import',n:'U 盘导入打印',ic:'usb',bg:'var(--slate-soft)',st:'#35608f',
+  d:'从 U 盘根目录选一份文件，导入后继续材料检查与打印。',foot:'本地网桥已实现 · Windows 真机未验收',
+  href:'12-file-source.html?source=document&tab=usb&mode=transfer',route:'/print/upload',mfp:false},
+ {key:'photo-print',capKey:'document_print',n:'照片打印',ic:'photo',bg:'var(--clay-soft)',st:'#9e5330',
+  d:'照片上传后设参数打印，与文档同一条流程。',foot:'与文档打印同链路',
+  href:'12-file-source.html?source=document&tab=file&category=photo',route:'/print/upload',mfp:true},
+ {key:'scan',capKey:'scan',n:'材料扫描',ic:'scan',bg:'var(--slate-soft)',st:'#35608f',
+  d:'纸质材料扫成 PDF，扫描动作在奔图面板上做。',foot:'面板手动扫描 · 无一键启动',
+  href:'18-scan-workbench.html',route:'/scan/start',mfp:true},
+ {key:'convert',capKey:'format_convert',n:'格式转换',ic:'img',bg:'var(--teal-soft)',st:'#157a67',
+  d:'多张 JPG / PNG 合并成一份 PDF，顺序自己排。',foot:'最多 20 张 · 单张 ≤10MB',
+  href:'19-img2pdf.html',route:'/print-scan/convert',mfp:false},
+ {key:'sign',capKey:'signature_stamp',n:'签名盖章',ic:'sign',bg:'var(--clay-soft)',st:'#9e5330',
+  d:'签名或印章图片叠到 PDF 指定位置，生成新 PDF。',foot:'图像合成，不是电子签名',
+  href:'20-sign-stamp.html',route:'/print-scan/sign',mfp:false},
+ {key:'id-photo',capKey:'id_photo',n:'证件照',ic:'idcard',bg:'var(--wheat-soft)',st:'#8a6219',
+  d:'本机尚未开放，先看说明和替代路径。',foot:'说明页 · 未开放',wide:true,
+  href:'10-print-hub.html?state=feature-id-photo',route:'/print-scan/feature/id-photo',mfp:false}
+];
+/* CAPABILITY_STATUS_NOTES 逐字对齐运行时 */
+var NOTES={testing:'测试中，暂未对用户开放',maintenance:'维护中，暂时不可用',unsupported:'本终端不支持该能力',not_verified:'待验收，暂未开放'};
+/* opts: probe='ok'|'loading'|'error'；overrides={capKey:status}；mfp='ready'|'unavailable' */
+function capCard(c,opts){
+ var closed=false,badge='';
+ if(opts.probe!=='ok'){closed=true;badge=opts.probe==='loading'?'检查中':'暂不开放任务 · 服务状态无法确认'}
+ else{
+  var ov=opts.overrides&&opts.overrides[c.capKey];
+  if(ov){closed=true;badge=NOTES[ov]}
+  else if(opts.mfp==='unavailable'&&c.mfp){closed=true;badge='这台机器现在出不了纸'}
+ }
+ var foot=closed?'<span class="cap-foot"><span class="badge-off">'+badge+'</span></span>':'<span class="cap-foot">'+c.foot+'</span>';
+ var body=c.wide
+  ?'<span class="cap-icon" style="background:'+c.bg+'">'+svg(c.ic,c.st,32)+'</span>'+
+   '<span class="cap-body"><span class="cap-name">'+c.n+'</span><span class="cap-desc">'+c.d+'</span></span>'+foot
+  :'<span class="cap-icon" style="background:'+c.bg+'">'+svg(c.ic,c.st,32)+'</span>'+
+   '<span class="cap-name">'+c.n+'</span><span class="cap-desc">'+c.d+'</span>'+foot;
+ var cls='cap'+(c.wide?' wide':'');
+ if(closed) return '<div class="'+cls+'" role="group" aria-disabled="true" data-testid="print-hub-cap-'+c.key+'" aria-label="'+c.n+'（'+badge+'）">'+body+'</div>';
+ return '<a class="'+cls+' press" href="'+c.href+'" data-route="'+c.route+'" data-testid="print-hub-cap-'+c.key+'">'+body+'</a>';
+}
+function capGrid(opts){
+ var h='';for(var i=0;i<CAPS.length;i++)h+=capCard(CAPS[i],opts);
+ return '<div class="grid3">'+h+'</div>';
+}
+/* 到机码：不在能力键内，永不随探测/MFP 轴整卡停用 */
+function arrivalCard(mfpNote){
+ return '<a class="src press" href="11-arrival-code.html" data-route="/print/pickup-claim" data-testid="print-hub-primary" data-arrival="true">'+
+  '<span class="src-icon" style="background:var(--clay-soft)">'+svg('code','#9e5330',42)+'</span>'+
+  '<span class="src-main"><span class="src-name">到机码核销<span class="tag">不是取件码</span></span>'+
+  '<span class="src-desc">手机上下过单拿到的 <b>8 位数字到机码</b>；早期发出的 <b>10 位字母数字历史码</b>同样能用。扫码或手输都行。</span>'+
+  (mfpNote?'<span class="reason">'+mfpNote+'</span>':'')+'</span>'+
+  '<span class="src-go">'+svg('arrow','currentColor',28)+'</span></a>';
+}
+function quickLinks(){
+ return '<div class="grid3">'+
+  '<a class="notecard press" href="38-member-assets.html?state=documents-ready" data-route="/me/documents" data-testid="print-hub-quick-documents">'+
+  '<span class="note-ic">'+svg('files','currentColor',26)+'</span><span><b>我的文档</b><span class="d">已上传 / 生成的文件</span><span class="note-go">查看 →</span></span></a>'+
+  '<a class="notecard press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders" data-testid="print-hub-quick-orders">'+
+  '<span class="note-ic">'+svg('doc','currentColor',26)+'</span><span><b>打印订单</b><span class="d">任务状态与取件凭证码</span><span class="note-go">查看 →</span></span></a>'+
+  '<div class="notecard" role="group" data-testid="print-hub-copy-note" data-disclaimer="true">'+
+  '<span class="note-ic" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('copy','currentColor',26)+'</span>'+
+  '<span><b>复印</b><span class="d">请直接在奔图机器面板上操作。本机网页没有复印流程，也不代收费。</span></span></div>'+
+  '</div>';
+}
+function axisChips(opts){
+ var cap=opts.probe==='ok'?'<span class="chip ok">能力配置 · 已读取</span>':(opts.probe==='loading'?'<span class="chip">能力配置 · 读取中</span>':'<span class="chip bad">能力配置 · 读不到</span>');
+ var mfp=opts.probe!=='ok'?'<span class="chip">一体机状态 · 未查询</span>':(opts.mfp==='unavailable'?'<span class="chip warn">一体机 · 确认离线</span>':'<span class="chip">一体机状态 · 以办理时确认</span>');
+ return '<div class="meta" style="margin:0 0 14px" data-testid="print-hub-axes">'+cap+mfp+'<span class="chip">纸张 · 仅 A4</span><span class="chip">彩色 / 双面 · 未验证</span><span class="chip">U 盘网桥 · Windows 真机未验收</span></div>';
+}
+function hubBody(opts,leadHtml){
+ return (leadHtml||'')+
+  '<section class="sec grow"><div class="sec-label"><span class="no serif">01</span><span class="t">要办什么</span><span class="hint">'+opts.hint+'</span></div>'+
+  (leadHtml?'':axisChips(opts))+capGrid(opts)+'</section>'+
+  '<section class="sec last"><div class="sec-label"><span class="no serif">02</span><span class="t">已下过单 · 我的文件</span><span class="hint">到机码不受能力配置管辖</span></div>'+
+  arrivalCard(opts.mfpNote)+'<div style="height:16px"></div>'+quickLinks()+'</section>';
+}
+var V={};
+V['capability-loading']=function(){
+ return hubBody({probe:'loading',hint:'正在读取本机能力配置'},
+  '<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h"><span class="dot16 breathe"></span>正在检查本机能力</div>'+
+  '<div class="state-p">读到配置之前，八项能力<b>一律不开</b>。这不是坏了，是不想让你点进去才发现办不了。到机码核销不受影响。</div></div></section>');
+};
+V['default']=function(){
+ return hubBody({probe:'ok',mfp:'ready',hint:'能力已读取，具体状态进入后确认'});
+};
+V['capability-error']=function(){
+ return hubBody({probe:'error',hint:'能力配置读取失败'},
+  '<section class="sec"><div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('info','currentColor',28)+'服务状态无法确认</div>'+
+  '<div class="state-p">暂时无法确认这台机器开放了哪些服务，因此<b>八项能力先不开放</b>，避免你点进去后才发现办不了。</div>'+
+  '<div class="state-p">已经下单的用户仍可使用到机码核销，不受本次读取失败影响。</div></div></section>');
+};
+V['locked']=function(){
+ return hubBody({probe:'ok',mfp:'ready',hint:'部分能力被管理员关闭',
+  overrides:{document_print:'maintenance',scan:'maintenance',id_photo:'not_verified'}},
+  '<section class="sec"><div class="state" data-kind="lock" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('lock','currentColor',28)+'有几项被管理员关掉了</div>'+
+  '<div class="state-p">卡面上的理由直接来自能力配置，不是本机猜的。不受影响的项照常进。</div></div></section>');
+};
+V['device-off']=function(){
+ return hubBody({probe:'ok',mfp:'unavailable',hint:'一体机确认离线',
+  mfpNote:'这台机器现在出不了纸；到机码可以核销，但要等能出纸时再取。'},
+  '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('info','currentColor',28)+'打印扫描一体机离线 —— 要出纸的停了，其余照常</div>'+
+  '<div class="state-p">这一条来自设备状态轮询的<b>确定离线</b>结果。手机扫码上传、格式转换、签名盖章不经过这台打印机，照常可用。</div></div></section>');
+};
+V['feature-id-photo']=function(){
+ return '<section class="sec"><div class="state" data-kind="warn" data-testid="print-hub-idphoto-unavailable">'+
+  '<div class="state-h">'+svg('idcard','currentColor',28)+'证件照：本机尚未开放</div>'+
+  '<div class="state-p">这项只有说明，<b>没有可用流程</b>。本机不做尺寸裁切、底色处理、版面排布，也不生成证件照成品。</div>'+
+  '<div class="state-p" data-disclaimer="true">开放前不提供换底色、自动排版和成品生成，免得你按着不存在的流程走一遍。</div></div></section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">现在可以怎么办</span></div>'+
+  '<a class="src press" href="12-file-source.html?source=document&amp;tab=file&amp;category=photo" data-route="/print/upload" data-testid="print-hub-idphoto-fallback">'+
+  '<span class="src-icon" style="background:var(--teal-soft)">'+svg('photo','#157a67',40)+'</span>'+
+  '<span class="src-main"><span class="src-name">已经有证件照文件<span class="tag">现在可用</span></span>'+
+  '<span class="src-desc">相册里已有的证件照，传进来<b>按普通照片打印</b>。尺寸和底色以你手上的原图为准。</span></span>'+
+  '<span class="src-go">'+svg('arrow','currentColor',28)+'</span></a>'+
+  '<div style="height:16px"></div>'+
+  '<a class="src press" href="18-scan-workbench.html" data-route="/scan/start" data-testid="print-hub-idphoto-scan">'+
+  '<span class="src-icon" style="background:var(--slate-soft)">'+svg('scan','#35608f',40)+'</span>'+
+  '<span class="src-main"><span class="src-name">纸质照片想留电子版</span>'+
+  '<span class="src-desc">在奔图面板上扫成 PDF，回本机取走。<b>扫描不做裁切和底色处理。</b></span></span>'+
+  '<span class="src-go">'+svg('arrow','currentColor',28)+'</span></a></section>'+
+  '<section class="sec fill last"><div class="pgrp" style="height:100%"><h4>开放后会做什么<span>规划，不是承诺</span></h4>'+
+  '<ul class="plan"><li><span class="sq"></span><span>选常见规格与底色（一寸 / 二寸 / 小一寸）。</span></li>'+
+  '<li><span class="sq"></span><span>按纸张规格自动排版，确认张数后进入打印流程。</span></li>'+
+  '<li><span class="sq"></span><span>证件照属敏感文件，按短期留存策略清理。</span></li></ul></div></section>'+
+  '<div class="ctabar"><a class="btn ghost press" href="10-print-hub.html" data-route="/print-scan">返回打印扫描</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="12-file-source.html?source=document&amp;tab=file&amp;category=photo" data-route="/print/upload" data-testid="'+SCREEN+'-primary">先用照片打印</a></div>';
+};
+V['feature-not-found']=function(){
+ return '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('info','currentColor',28)+'没有这项能力说明</div>'+
+  '<div class="state-p">地址里带了一个本机<b>不认识的能力名称</b>。当前只有「证件照」一项有说明页。</div>'+
+  '<div class="state-p">多半是旧二维码或旧链接。回打印扫描首页重新选一次即可。</div></div></section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">可以直接去的地方</span></div>'+quickLinks()+'</section>'+
+  '<section class="sec grow last"><div class="sec-label"><span class="no serif">02</span><span class="t">本机现在有哪些能力说明</span><span class="hint">只有证件照一项</span></div>'+
+  '<div class="blk" style="flex:1"><div class="state-h">'+svg('idcard','currentColor',28)+'证件照说明</div>'+
+  '<div class="state-p">目前只有证件照提供未开放说明和替代路径。其他陌生名称不会进入办理流程，请回打印扫描首页重新选择。</div>'+
+  '<div class="meta"><a class="chip press" href="10-print-hub.html?state=feature-id-photo" data-route="/print-scan/feature/id-photo">看证件照说明</a>'+
+  '<a class="chip press" href="10-print-hub.html" data-route="/print-scan">回打印扫描首页</a></div></div></section>'+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="10-print-hub.html" data-route="/print-scan" data-testid="'+SCREEN+'-primary">返回打印扫描</a></div>';
+};
+var PILL={
+ 'capability-loading':['','正在读取本机能力'],
+ 'default':['','能力与设备状态以办理时确认'],
+ 'capability-error':['bad','服务状态无法确认 · 任务暂不开放'],
+ 'locked':['warn','部分能力已被管理员关闭'],
+ 'device-off':['warn','一体机离线 · 出纸类暂停'],
+ 'feature-id-photo':['warn','证件照尚未开放'],
+ 'feature-not-found':['warn','能力说明不存在']
+};
+var ASK={
+ 'capability-loading':['正在确认<em>这台机器</em>能做什么。','读到配置之前八项一律不开。到机码核销不受影响。'],
+ 'default':['你的文件，<em>现在在哪</em>？','打印、扫描、图片转 PDF、签名盖章都在这台机器上。<b>能不能办，进入后按真实状态确认。</b>'],
+ 'capability-error':['本机能力<em>没读到</em>。','读不到就不放行 —— 七项全关。到机码核销的是已有订单，不受影响。'],
+ 'locked':['有几项<em>被关掉了</em>。','理由直接来自能力配置，不是我猜的。'],
+ 'device-off':['这台机器<em>出不了纸</em>。','要打印机的停了，不用打印机的照常。'],
+ 'feature-id-photo':['证件照<em>还没开放</em>。','我不会假装能给你排版出图；下面是真的能走的两条路。'],
+ 'feature-not-found':['这个能力名<em>我不认识</em>。','大概率是旧链接。回打印扫描首页重新选一次。']
+};
+function render(st){
+ var root=document.getElementById('body-root');
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ root.innerHTML=V[st]();
+ var p=document.getElementById('pill');
+ p.className='pill'+(PILL[st][0]?' '+PILL[st][0]:'');
+ document.getElementById('pill-txt').textContent=PILL[st][1];
+ document.getElementById('pill-dot').className='dot'+(st==='capability-loading'?' breathe':'');
+ document.getElementById('xq-ask').innerHTML=ASK[st][0];
+ document.getElementById('xq-doing').innerHTML=ASK[st][1];
+ var links=document.querySelectorAll('#demo-panel a');
+ for(var i=0;i<links.length;i++) links[i].className=(links[i].getAttribute('data-s')===st?'on':'');
+}
+var q=new URLSearchParams(location.search);
+if(q.get('debug')==='1'){document.documentElement.classList.add('debug');document.querySelectorAll('#demo-panel a').forEach(function(a){a.href='?debug=1&state='+a.getAttribute('data-s')})}
+var st=q.get('state');
+if(STATES.indexOf(st)<0) st=q.get('key')?'feature-not-found':'default';
+render(st);
+/* 原型演示控制（非产品功能）：只切 data-state，不驱动任何业务结果 */
+document.getElementById('demo-tab').addEventListener('click',function(){
+  document.getElementById('demo-panel').classList.toggle('show');
+});
+/* 时钟：仅刷新顶栏时间文本，不改 data-state、不推进任何业务状态 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(new URLSearchParams(location.search).get('flat')==='1')document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

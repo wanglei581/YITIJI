@@ -809,6 +809,8 @@ export class AdminOrgsService {
       select: {
         id: true, name: true, type: true, contact: true, contactPhone: true,
         sceneTemplate: true, enabledModulesJson: true, enabled: true, createdAt: true,
+        contentTrustStatus: true, contentTrustReason: true, contentTrustReviewedAt: true,
+        archivedAt: true,
         _count: {
           select: { jobSources: true, users: { where: { role: 'partner', deletedAt: null } } },
         },
@@ -826,6 +828,10 @@ export class AdminOrgsService {
       sceneTemplate: o.sceneTemplate,
       enabledModules: parseModules(o.enabledModulesJson),
       enabled: o.enabled,
+      contentTrustStatus: o.contentTrustStatus,
+      contentTrustReason: o.contentTrustReason,
+      contentTrustReviewedAt: o.contentTrustReviewedAt ? o.contentTrustReviewedAt.toISOString() : null,
+      archived: o.archivedAt != null,
       createdAt: o.createdAt.toISOString(),
       sourceCount: o._count.jobSources,
       accountCount: o._count.users,

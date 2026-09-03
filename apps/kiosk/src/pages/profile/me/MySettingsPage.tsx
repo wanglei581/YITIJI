@@ -11,6 +11,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
+import { useIdleTimer } from '../../../hooks/useIdleTimer'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
@@ -102,6 +103,20 @@ function PhoneRebindOverlay({
   const [newOtp, setNewOtp] = useState('')
   const newPhoneRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => () => {
+    setOldOtp('')
+    setNewOtp('')
+    setNewPhone('')
+    setStepUpToken('')
+  }, [])
+
+  // 换绑不是完成本单所需的最小切片：大厅屏上的 6 位码只给 45 秒，超时关层并清内存。
+  useIdleTimer({
+    timeoutMs: 45_000,
+    enabled: step !== 'done',
+    onIdle: onCancel,
+  })
+
   const handle = async (fn: () => Promise<void>) => {
     setErr(null); setBusy(true)
     try { await fn() } catch (e: unknown) {
@@ -117,7 +132,7 @@ function PhoneRebindOverlay({
   const step2 = () => handle(async () => {
     if (!challenge || oldOtp.length !== 6) { setErr('请输入6位验证码'); return }
     const g = await verifyPhoneRebindStepUp(token, challenge.challengeId, oldOtp)
-    setStepUpToken(g.stepUpToken); setStep('send_new')
+    setStepUpToken(g.stepUpToken); setOldOtp(''); setStep('send_new')
     setTimeout(() => newPhoneRef.current?.focus(), 50)
   })
 
@@ -130,7 +145,7 @@ function PhoneRebindOverlay({
   const step4 = () => handle(async () => {
     if (newOtp.length !== 6) { setErr('请输入6位验证码'); return }
     await submitPhoneRebind(token, stepUpToken, newPhone, newOtp)
-    setStep('done')
+    setNewOtp(''); setStep('done')
   })
 
   return (
@@ -150,9 +165,19 @@ function PhoneRebindOverlay({
 
         {step === 'verify_old' && (
           <>
-            <p className="mt-2 text-sm text-neutral-500">已发送至 {phoneMasked}，输入6位验证码继续</p>
-            <input type="tel" inputMode="numeric" maxLength={6} placeholder="6位验证码" value={oldOtp} onChange={(e) => setOldOtp(e.target.value.replace(/\D/g, ''))}
-              className="mt-3 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center text-2xl tracking-widest outline-none focus:border-primary-400" autoFocus />
+            <p className="mt-2 text-sm text-neutral-500">已发送至 {phoneMasked}，输入6位验证码继续。验证码在本屏隐藏显示。</p>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="6位验证码"
+              value={oldOtp}
+              onChange={(e) => setOldOtp(e.target.value.replace(/\D/g, ''))}
+              autoComplete="one-time-code"
+              aria-label="当前手机号验证码，已隐藏显示"
+              className="me-otp-mask mt-3 w-full min-h-14 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center text-2xl tracking-widest outline-none focus:border-primary-400"
+              autoFocus
+            />
             <div className="mt-4 flex gap-3">
               <Button variant="secondary" className="flex-1" onClick={onCancel}>取消</Button>
               <Button className="flex-1" disabled={busy || oldOtp.length !== 6} onClick={step2}>{busy ? '验证中…' : '下一步'}</Button>
@@ -174,9 +199,19 @@ function PhoneRebindOverlay({
 
         {step === 'verify_new' && (
           <>
-            <p className="mt-2 text-sm text-neutral-500">已发送至 {newPhone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}，输入6位验证码确认换绑</p>
-            <input type="tel" inputMode="numeric" maxLength={6} placeholder="6位验证码" value={newOtp} onChange={(e) => setNewOtp(e.target.value.replace(/\D/g, ''))}
-              className="mt-3 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center text-2xl tracking-widest outline-none focus:border-primary-400" autoFocus />
+            <p className="mt-2 text-sm text-neutral-500">已发送至 {newPhone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}，输入6位验证码确认换绑。验证码在本屏隐藏显示。</p>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="6位验证码"
+              value={newOtp}
+              onChange={(e) => setNewOtp(e.target.value.replace(/\D/g, ''))}
+              autoComplete="one-time-code"
+              aria-label="新手机号验证码，已隐藏显示"
+              className="me-otp-mask mt-3 w-full min-h-14 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center text-2xl tracking-widest outline-none focus:border-primary-400"
+              autoFocus
+            />
             <div className="mt-4 flex gap-3">
               <Button variant="secondary" className="flex-1" onClick={onCancel}>取消</Button>
               <Button className="flex-1" disabled={busy || newOtp.length !== 6} onClick={step4}>{busy ? '换绑中…' : '确认换绑'}</Button>

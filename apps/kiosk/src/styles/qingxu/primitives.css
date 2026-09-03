@@ -1,0 +1,120 @@
+/* 青序流光 · 基础件：按钮、卡片、列表行、占位、状态块
+ *
+ * 这些类的尺寸全部来自原型实测值，不是拍的。改之前先确认 51 页里对应处怎么写。
+ */
+
+/* ── 按钮 ─────────────────────────────────────────────────────
+   四种角色，用途固定：
+     primary  一屏只能有一个，指向这一步的正确出口
+     teal     次要但仍是前进方向（继续付款、看进度）
+     ghost    退出、返回、放弃
+     danger   会清空或结束会话的动作
+   禁止用颜色表达"更重要"以外的意思，例如拿 danger 当强调。 */
+.qx-btn {
+  min-height: var(--qx-btn-h);
+  padding: 0 26px;
+  border-radius: var(--qx-r);
+  display: inline-flex; align-items: center; justify-content: center; gap: 11px;
+  font-family: var(--qx-sans); font-size: 24px; font-weight: 700;
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-surface); color: var(--qx-ink);
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+.qx-btn:disabled { opacity: .48; cursor: not-allowed; }
+.qx-btn:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
+.qx-btn[data-variant='primary'] { min-height: var(--qx-btn-h-lg); background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-paper); }
+.qx-btn[data-variant='teal']    { background: var(--qx-teal-soft); border-color: var(--qx-teal); color: var(--qx-teal-d); }
+.qx-btn[data-variant='ghost']   { background: var(--qx-paper); }
+.qx-btn[data-variant='danger']  { background: var(--qx-cinnabar); border-color: var(--qx-cinnabar); color: var(--qx-on-solid); }
+
+/* ── 卡片 ───────────────────────────────────────────────────── */
+.qx-card {
+  flex: none;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  padding: 20px 22px;
+}
+/* 需要用户立刻动手的那一张：左侧强调边，其余保持安静。一屏最多一张。 */
+.qx-card[data-live='true'] { border-color: var(--qx-teal); box-shadow: inset 3px 0 0 var(--qx-teal); }
+
+/* ── 分区标题 ────────────────────────────────────────────────── */
+.qx-sec-h { display: flex; align-items: baseline; gap: 14px; margin-bottom: 2px; }
+.qx-sec-h .t { font-size: 25px; font-weight: 700; }
+.qx-sec-h .hint { margin-left: auto; font-size: 17px; color: var(--qx-ink-3); }
+
+/* ── 列表行 ─────────────────────────────────────────────────── */
+.qx-rows { border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); overflow: hidden; }
+.qx-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 20px; min-height: var(--qx-row-h);
+  border-bottom: 1px solid var(--qx-line);
+  width: 100%; text-align: left;
+  background: transparent; border-left: 0; border-right: 0; border-top: 0;
+  color: inherit; font: inherit; cursor: pointer;
+}
+.qx-rows > :last-child { border-bottom: 0; }
+.qx-row-ic {
+  flex: none; width: 52px; height: 52px; border-radius: var(--qx-r);
+  background: var(--qx-paper); border: 1px solid var(--qx-line); color: var(--qx-ink-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.qx-row-tx { flex: 1; min-width: 0; }
+.qx-row-t { display: block; font-size: 22px; font-weight: 700; }
+.qx-row-d { display: block; margin-top: 4px; font-size: 18px; line-height: 1.4; color: var(--qx-ink-3); }
+.qx-row-go { flex: none; color: var(--qx-ink-3); }
+
+/* ── 占位：服务端还没返回的值 ─────────────────────────────────
+   这是"不伪造能力"在视觉上的落点：位置画出来，值留空并显式标注，
+   绝不拿默认值、上一次的值或编造值填充。 */
+.qx-slot {
+  display: inline-block; min-width: 64px;
+  border-bottom: 2px dotted var(--qx-line-2);
+  color: var(--qx-ink-3); font-weight: 400;
+}
+
+/* ── 等宽数字 ───────────────────────────────────────────────── */
+.qx-num { font-family: var(--qx-mono); font-variant-numeric: tabular-nums; }
+
+/* ── 状态块：空 / 错 / 提示 ───────────────────────────────────── */
+.qx-state {
+  display: flex; gap: 18px; align-items: flex-start;
+  padding: 22px 24px; border-radius: var(--qx-r);
+  border: 1px solid var(--qx-line); background: var(--qx-surface);
+}
+.qx-state-ic { flex: none; width: 56px; height: 56px; border-radius: var(--qx-r); display: flex; align-items: center; justify-content: center; }
+.qx-state[data-tone='empty'] .qx-state-ic { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-state[data-tone='error'] { border-color: var(--qx-cinnabar); }
+.qx-state[data-tone='error'] .qx-state-ic { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+.qx-state[data-tone='info']  .qx-state-ic { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
+.qx-state-t { font-size: 24px; font-weight: 700; }
+.qx-state-d { margin-top: 6px; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+
+/* ── 底部操作条 ─────────────────────────────────────────────── */
+.qx-ctabar {
+  flex: none; display: flex; align-items: center; gap: 18px;
+  padding: 18px var(--qx-gutter);
+  border-top: 1px solid var(--qx-line); background: var(--qx-surface);
+}
+.qx-ctabar .why { flex: 1; margin: 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+
+/* ── 余量吸收 ─────────────────────────────────────────────────
+ * 一体机是 1080×1920 定高屏，内容不足时底部会留一大片空白——这在
+ * 27 寸竖屏上非常显眼，看起来像页面没做完。
+ *
+ * 规则：**每一页必须指定一块吸收余量的元素**，给它加 .qx-grow。
+ * 选哪一块有讲究，按优先级：
+ *   1. 主操作区（键盘、大按钮组）——长高等于触控目标变大，是纯收益
+ *   2. 列表/滚动区——多露出一两行真实内容
+ *   3. 主视觉块（大图、进度）
+ * **不要**选说明文字块或注脚——把文字撑开只会让行距变得莫名其妙。
+ *
+ * 也不要用塞占位内容的方式填满：没有真实数据就不该有内容
+ * （CLAUDE.md §9 不伪造能力）。余量是布局问题，不是内容问题。
+ */
+.qx-grow { flex: 1 1 auto; min-height: 0; }
+
+/* 吸收块内部若是网格（如数字键盘），行高随之等分拉伸 */
+.qx-grow > .knp,
+.qx-grow .qx-grow-inner { flex: 1 1 auto; min-height: 0; }

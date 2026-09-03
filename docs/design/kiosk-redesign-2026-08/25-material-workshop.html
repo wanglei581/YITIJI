@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>求职材料工坊 · 职易达</title>
+<!--
+  宿主：求职材料工坊（069 唯一青序流光宿主）
+  route: /resume/materials
+  state: select | signed-out | loading | error | empty | submitting
+         | generated | generated-no-print | demo-result | failed | illegal
+  api:  GET  /api/v1/job-materials/templates
+        POST /api/v1/job-materials/generate
+        对齐 JobMaterialLibraryPage.tsx 与 packages/shared/src/types/jobMaterials.ts
+
+  ── 真话边界 ──────────────────────────────────────────────────────
+    ① 模板目录可以查看；生成前必须登录。未登录时先保存当前模板与表单草稿，再去登录，
+       **登录态确实有效才提交**；登录过期同样退回登录，草稿不丢。
+    ② 姓名 / 目标岗位为空**不进 submitting**：就地标红、聚焦到第一个出错的字段，请求根本不发。
+    ③ 不承诺「生成不收钱 / 免费生成 / 打印只收纸张费」；价格一律以现场公示与服务端报价为准。
+    ④ 生成中不画百分比、不画阶段点、不倒计时；完成只认 POST 返回的真实文件对象。
+    ⑤ 产物的文件名、页数、大小、留存期限、签名链接与打印凭证全部按服务端返回展示；
+       没有 printFileUrl 就**只禁打印**，查看 / 预览 / 我的文档照常。
+    ⑥ 生成成功后再动表单，屏幕上必须分得清「已生成的那一份」和「改过的新草稿」——
+       新草稿必须重新生成才有新文件，旧文件不会跟着变。
+    ⑦ 材料是给求职者本人带走的，本机不代投递、不把材料发送给任何单位。
+
+  ── 契约字段（JobMaterialGenerateResponse，packages/shared/src/types/jobMaterials.ts）──
+    templateId / templateTitle / documentType / fileId / filename / mimeType /
+    sizeBytes / pageCount / signedUrl / signedUrlExpiresAt / fileExpiresAt /
+    previewUrlPath / downloadUrlPath / printFileUrl?
+    其中 printFileUrl 是**系统 HMAC content URL，仅供 /print/jobs 使用，mock 模式不返回**。
+    本页展示的取值是合成夹具，不是任何一次真实生成的结果。
+
+  ── 打印出口 ──────────────────────────────────────────────────────
+    对齐 JobMaterialLibraryPage.printGenerated：交给打印确认的是
+    { name, size, pages, fileId, fileUrl: printFileUrl, mimeType } +
+    makePrintParams({ copies:1, duplex, color:'bw' })。
+    真实页面用**路由 state** 传，不把签名链接放进地址栏；本原型先把这份交接内容摊开给人看，
+    再用只带 **source + fileId** / 页数 / 打印参数的静态链接跳到打印确认页 —— 不拿一个裸 href
+    假装已经接线。那一页按「来源 + 文件编号」**成对**认文件，所以 source 写错、
+    或者只给 source 不给对应的 fileId，都会停在它的 invalid-context，不会退回默认那一份。
+    单双面本原型固定 single：黑白单面是本机当前唯一已验证的组合，也是打印确认页登记了
+    报价夹具的那一组；按「2 页所以双面」送过去只会撞在它的能力受限屏上。
+
+  ── 受控夹具参数 ───────────────────────────────────────────────────
+    ?tpl=<templateId>  指定「已生成」这几屏演示的是五个模板中的哪一份（默认第一份）。
+                       未登记的取值按未指定处理并标 fallback，不猜。
+
+  ── fail-closed ───────────────────────────────────────────────────
+    · 未登记的 state → illegal 屏，root 标 data-fallback="1"，不回显地址栏原文
+    · 未登记的 auth → 按**未登录**处理（取严不取宽）并标 fallback
+    · 需要登录态的 state（submitting / generated / generated-no-print / demo-result）
+      在 auth 非 in 时收敛为 signed-out
+    · 预览层参数（p / fit / z）越界一律丢弃并标 fallback；没有真实文件时预览层不可达
+
+  capability: 固定模板 + 用户手填字段生成 PDF；当前后端没有 LLM 调用，不得写成 AI 撰写。
+  input: templateId + applicantName + targetRole + targetOrganization? + keyStrengths? + notes?
+  persistence: http 模式成功后文件进入本人文档；demo 模式不保存真实文件且不可打印。
+               草稿在真实页面走 sessionStorage（10 分钟有效），本原型只放在内存里。
+  原型演示控制：初始状态由 ?state= 给定，之后的切换来自页内真实交互（?debug=1 显示演示面板）；
+               页面没有任何计时器推进业务状态。
+  验收范围：静态原型表现；不证明 React 接线、API 可用、真实模型、真实 PDF 或打印链路
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink-2:#3d5a52;--ink-3:#6b857c;
+  --deep:#0b241e;--emerald:#2ee6a8;
+  --teal:#1f9e86;--teal-d:#157a67;--teal-soft:#e0f2ec;
+  --slate:#3f68b0;--slate-d:#35608f;--slate-soft:#e6ecf7;
+  --wheat:#a9781f;--wheat-d:#8a6219;--wheat-soft:#f3ecda;
+  --plum:#7a5a86;--plum-d:#6b4a77;--plum-soft:#efe8f2;
+  --cinnabar:#b23a2e;--cinnabar-d:#963227;--cinnabar-soft:#f6e4e1;
+  --line:#e3ddcb;--line-2:#d4cdb6;--r:8px;--r-s:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif}
+a{color:inherit;text-decoration:none}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer;text-align:left}
+ul{list-style:none}
+.press{transition:transform 140ms cubic-bezier(.2,.8,.2,1),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+
+.topbar{flex:none;height:100px;display:flex;align-items:center;gap:16px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--paper);display:flex;align-items:center;justify-content:center}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:46px;height:46px;border-radius:var(--r);background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:700}
+.logo-name{font-size:25px;font-weight:700;letter-spacing:2px}
+.sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:52px;padding:0 18px;border-radius:var(--r);background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:18px;font-weight:600;max-width:560px;white-space:nowrap;overflow:hidden}
+.pill .dot{width:11px;height:11px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}.pill.bad .dot{background:var(--cinnabar)}
+.pill.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}.pill.ok .dot{background:var(--teal)}
+.clock{flex:none;font-size:23px;font-weight:600;font-variant-numeric:tabular-nums}
+
+.taskhead{flex:none;margin:18px 40px 0;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+.th-t{font-size:38px;font-weight:700;letter-spacing:1px;display:flex;align-items:center;gap:14px}
+.th-t::before{content:"";flex:none;width:8px;height:34px;border-radius:2px;background:linear-gradient(180deg,var(--emerald),var(--teal))}
+.th-s{flex:1;min-width:260px;font-size:20px;line-height:1.4;color:var(--ink-2)}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 40px}
+.scroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-top:16px;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.center{justify-content:center}
+.sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:2px}
+.sec-h .no{font-size:19px;font-weight:700;color:var(--teal-d);letter-spacing:2px}
+.sec-h .t{font-size:25px;font-weight:700}
+.sec-h .hint{margin-left:auto;font-size:18px;color:var(--ink-3);font-weight:600}
+
+.filters{display:flex;gap:9px;overflow-x:auto;padding:2px 0;scrollbar-width:none}.filters::-webkit-scrollbar{display:none}
+.filter{flex:none;min-height:50px;padding:0 17px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);font-size:17px;font-weight:700;color:var(--ink-2)}
+.filter[aria-pressed=true]{background:var(--deep);border-color:var(--deep);color:#fff}
+.workspace{flex:1;min-height:0;display:grid;grid-template-columns:410px 1fr;gap:14px;margin-top:12px}
+.catalog,.detail{min-height:0;overflow-y:auto;scrollbar-width:none}.catalog::-webkit-scrollbar,.detail::-webkit-scrollbar{display:none}
+.catalog{display:flex;flex-direction:column;gap:10px}
+.template{flex:1 1 auto;max-height:224px;padding:15px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.template[aria-pressed=true]{border-color:var(--teal);background:var(--teal-soft);box-shadow:inset 0 0 0 1px var(--teal)}
+.template b{display:block;font-size:21px}.template p{margin-top:5px;font-size:16px;line-height:1.4;color:var(--ink-2)}
+.template .use{display:block;margin-top:6px;font-size:15px;line-height:1.38;color:var(--ink-3)}
+.tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.tags i{font-style:normal;padding:5px 9px;border-radius:var(--r-s);background:var(--paper);border:1px solid var(--line);font-size:14px;color:var(--ink-3)}
+/* 分类筛掉的那几份不凭空消失：给一排能直接跳回去的入口，比留一片空白有用。 */
+.others{flex:none;padding:14px 16px;border:1px dashed var(--line-2);border-radius:var(--r);background:var(--paper)}
+.others>b{display:block;font-size:17px;font-weight:700;color:var(--ink-2)}
+.others>p{margin-top:4px;font-size:15px;line-height:1.4;color:var(--ink-3)}
+.others .list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.others .list button{min-height:52px;padding:0 14px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface);font-size:17px;font-weight:700;color:var(--ink-2)}
+.others .list button i{font-style:normal;flex:none;font-size:14px;color:var(--ink-3)}
+
+.detail{display:flex;flex-direction:column;padding:19px 20px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.detail h2{font-size:27px}.detail>.desc{margin-top:6px;font-size:17px;line-height:1.45;color:var(--ink-2)}
+.tmeta{flex:none;display:flex;gap:1px;margin-top:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--line);overflow:hidden}
+.tmeta div{flex:1;min-width:0;padding:9px 14px;background:var(--paper)}
+.tmeta u{display:block;text-decoration:none;font-size:14px;font-weight:700;color:var(--ink-3)}
+.tmeta b{display:block;margin-top:2px;font-size:16px;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+.tmeta div:first-child{flex:1.35}
+.form{flex:none;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;gap:12px;margin-top:14px}
+.form.grow{flex:1;grid-template-rows:min-content min-content minmax(0,1fr) minmax(0,1.1fr)}
+.field{display:flex;flex-direction:column;gap:7px;min-height:0}.field.wide{grid-column:1/-1}
+.field span{font-size:16px;font-weight:700;color:var(--ink-2)}.field em{font-style:normal;color:var(--cinnabar)}
+.field input,.field textarea{width:100%;min-height:58px;padding:12px 14px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--paper);font:inherit;font-size:18px;color:var(--ink);resize:none}
+.field.wide textarea{flex:1;min-height:110px}
+.field input:focus,.field textarea:focus{outline:3px solid rgba(31,158,134,.35);outline-offset:1px;border-color:var(--teal)}
+/* 校验失败就地说清楚：红框 + 一句话 + 焦点落在第一个出错的字段，不靠一句总提示打发。 */
+.field [aria-invalid=true]{border-color:var(--cinnabar);background:#fdf4f2}
+.field .fe{display:none;font-size:15px;font-weight:700;color:var(--cinnabar-d)}
+.field.bad .fe{display:block}
+
+.after{flex:none;margin-top:13px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--paper);display:flex;align-items:center;gap:10px}
+.after>b{flex:none;font-size:16px;font-weight:700;color:var(--teal-d)}
+.after .st{flex:1;min-width:0;display:flex;align-items:center;gap:9px;font-size:16px;line-height:1.35;color:var(--ink-2)}
+.after .st>i{flex:none;width:26px;height:26px;border-radius:var(--r-s);background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:15px;font-weight:700}
+.after .sep{flex:none;color:var(--ink-3)}
+.banner{flex:none;display:flex;align-items:flex-start;gap:12px;margin-top:13px;padding:13px 16px;border-radius:var(--r);border:1px solid var(--line);border-left:4px solid var(--teal);background:var(--paper)}
+.banner i{flex:none;width:32px;height:32px;border-radius:var(--r-s);display:flex;align-items:center;justify-content:center;background:var(--teal-soft);color:var(--teal-d)}
+.banner .bx{flex:1;min-width:0;font-size:17px;line-height:1.45;color:var(--ink-2)}
+.banner .bx b{color:var(--ink)}
+.banner.warn{border-left-color:var(--wheat);background:var(--wheat-soft);border-color:#e6d8b4}
+.banner.warn i{background:#e8dcbe;color:var(--wheat-d)}
+.banner.warn .bx{color:var(--wheat-d)}.banner.warn .bx b{color:#6f4f13}
+.banner.bad{border-left-color:var(--cinnabar);background:var(--cinnabar-soft);border-color:#e8c9c3}
+.banner.bad i{background:#f0d5d0;color:var(--cinnabar-d)}
+.banner.bad .bx{color:var(--cinnabar-d)}.banner.bad .bx b{color:#7d281f}
+
+/* ── 真实文件卡：契约字段逐项摊开，不用一句「已生成」代替 ───────────── */
+.filecard{flex:none;margin-top:13px;border:1px solid #b9ddd2;border-radius:var(--r);background:var(--teal-soft);overflow:hidden}
+.filecard[data-tone=warn]{border-color:#e2d3ae;background:var(--wheat-soft)}
+.filecard[data-tone=demo]{border-color:#ddd0e3;background:var(--plum-soft)}
+.fc-h{display:flex;align-items:center;gap:13px;padding:14px 16px;border-bottom:1px solid rgba(16,48,43,.09)}
+.fc-h .ic{flex:none;width:48px;height:48px;border-radius:var(--r);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--teal-d)}
+.fc-h .tx{flex:1;min-width:0}
+.fc-h .tx b{display:block;font-size:21px;font-weight:700}
+.fc-h .tx span{display:block;margin-top:3px;font-size:16px;line-height:1.35;color:var(--ink-2)}
+.fc-h .badge{flex:none;min-height:38px;padding:0 12px;display:flex;align-items:center;border-radius:var(--r-s);background:var(--surface);font-size:15px;font-weight:700;color:var(--teal-d)}
+.fc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(16,48,43,.09)}
+.fc-grid div{padding:8px 16px;background:var(--surface)}
+.fc-grid div:last-child:nth-child(odd){grid-column:1/-1}
+.fc-grid u{display:block;text-decoration:none;font-size:14px;font-weight:700;color:var(--ink-3);letter-spacing:.4px}
+.fc-grid b{display:block;margin-top:3px;font-size:17px;font-weight:700;color:var(--ink);word-break:break-all}
+.fc-grid b.off{color:var(--cinnabar-d)}
+.fc-foot{padding:9px 16px;font-size:15px;line-height:1.4;color:var(--ink-2);background:var(--surface);border-top:1px solid rgba(16,48,43,.09)}
+/* 有结果卡时表单收窄一点，让文件卡整张留在首屏，不用先滚动才看得到留存期与凭证 */
+.detail.has-file .field.wide textarea{min-height:76px}
+.detail.has-file .field input,.detail.has-file .field textarea{min-height:52px}
+.fc-acts{display:flex;gap:10px;padding:12px 16px;background:var(--surface);border-top:1px solid rgba(16,48,43,.09)}
+.small{flex:1;min-height:56px;padding:0 16px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--paper);font-size:18px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;color:var(--ink)}
+.small.primary{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.small[aria-disabled=true]{background:#eceadf;border-color:var(--line);color:#96a49d;cursor:not-allowed}
+.reason{padding:0 16px 12px;font-size:15px;line-height:1.4;color:var(--wheat-d);font-weight:700;background:var(--surface)}
+
+.state{flex:none;display:flex;flex-direction:column;gap:16px;padding:40px 34px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state[data-kind=lock]{background:var(--plum-soft);border-color:#ddd0e3}
+.state-h{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700}
+.state-p{font-size:21px;line-height:1.6;color:var(--ink-2);max-width:860px}
+.state-p b{color:var(--ink)}
+.state-acts{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+
+.draft{margin-top:2px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.draft-h{padding:12px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);background:var(--paper);font-size:19px;font-weight:700}
+.draft-h span{margin-left:auto;min-height:38px;padding:0 12px;display:flex;align-items:center;border-radius:var(--r-s);background:var(--teal-soft);color:var(--teal-d);font-size:15px}
+.draft-rows{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.draft-rows div{padding:10px 18px;background:var(--surface)}
+.draft-rows div:last-child:nth-child(odd){grid-column:1/-1}
+.draft-rows u{display:block;text-decoration:none;font-size:14px;font-weight:700;color:var(--ink-3)}
+.draft-rows b{display:block;margin-top:2px;font-size:17px;font-weight:700}
+.draft-rows b.empty{color:var(--ink-3);font-weight:600}
+
+.alt{flex:none;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.alt-h{padding:14px 20px;font-size:20px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line);background:var(--paper)}
+.alt-row{display:flex;align-items:center;gap:16px;padding:16px 20px;min-height:134px;border-bottom:1px solid var(--line);width:100%}
+.alt-row:last-child{border-bottom:0}
+.alt-ic{flex:none;width:56px;height:56px;border-radius:var(--r);background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.alt-tx{flex:1;min-width:0}
+.alt-t{display:block;font-size:23px;font-weight:700}
+.alt-d{display:block;margin-top:5px;font-size:18px;line-height:1.4;color:var(--ink-2)}
+.alt-go{flex:none;color:var(--teal-d);display:flex;align-items:center}
+
+.whyline{flex:none;margin-top:12px;font-size:17px;line-height:1.4;font-weight:600;color:var(--wheat-d)}
+.whyline b{color:#6f4f13}
+.ctabar{flex:none;margin-top:12px;display:flex;gap:14px;align-items:center}
+.ctabar.four .btn{flex:1;min-width:0;padding:0 12px;font-size:21px}
+.btn{min-height:76px;padding:0 26px;border-radius:var(--r);display:inline-flex;align-items:center;justify-content:center;gap:11px;font-size:24px;font-weight:700;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{background:#eceadf;border:1px solid var(--line);color:#96a49d;cursor:not-allowed}
+.ctabar .btn{flex:1}
+.ctabar .btn.narrow{flex:none;min-width:210px}
+.ctabar .why{flex:1.15;font-size:17px;line-height:1.4;color:var(--wheat-d);font-weight:600}
+
+.truth{flex:none;min-height:58px;padding:11px 40px;border-top:1px solid var(--line);display:flex;align-items:center;gap:16px;margin-top:14px}
+.truth p{flex:1;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.truth a{flex:none;min-height:48px;padding:0 14px;border-radius:var(--r-s);display:inline-flex;align-items:center;font-size:17px;font-weight:600;color:var(--teal-d)}
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+
+/* ── 浮层：完整 PDF 全屏预览 / 打印交接 ───────────────────────────── */
+.layer{display:none;position:absolute;inset:0;z-index:35;background:var(--paper);flex-direction:column}
+.layer.on{display:flex}
+.ly-h{flex:none;height:100px;padding:0 24px;display:flex;align-items:center;gap:16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.ly-h .ic{flex:none;width:54px;height:54px;border-radius:var(--r);background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.ly-h .tx{flex:1;min-width:0}
+.ly-h .tx b{display:block;font-size:24px;font-weight:700}
+.ly-h .tx span{display:block;margin-top:2px;font-size:17px;color:var(--ink-3)}
+.ly-cl{flex:none;min-height:64px;padding:0 22px;border-radius:var(--r);background:var(--deep);color:#f2efe4;font-size:20px;font-weight:700;display:flex;align-items:center;gap:9px}
+.ly-note{flex:none;display:flex;align-items:flex-start;gap:12px;padding:12px 24px;background:var(--slate-soft);border-bottom:1px solid #c6d3ea;color:var(--slate-d)}
+.ly-note i{flex:none;min-height:34px;padding:0 12px;display:inline-flex;align-items:center;border-radius:var(--r-s);background:#d6e0f2;font-style:normal;font-size:15px;font-weight:700}
+.ly-note p{flex:1;min-width:0;font-size:17px;line-height:1.4;font-weight:600}
+.ly-tb{flex:none;background:var(--surface);border-bottom:1px solid var(--line)}
+.ly-tr{height:80px;padding:0 24px;display:flex;align-items:center;gap:11px}
+.ly-tr+.ly-tr{border-top:1px solid var(--line)}
+.ly-tr .sp2{flex:1}
+.tbtn{min-height:58px;min-width:58px;padding:0 18px;border-radius:var(--r);display:flex;align-items:center;justify-content:center;gap:9px;font-size:19px;font-weight:700;background:var(--paper);border:1px solid var(--line-2);color:var(--ink)}
+.tbtn[aria-pressed=true]{background:var(--deep);border-color:var(--deep);color:#f2efe4}
+.tbtn[aria-disabled=true]{background:#eceadf;border-color:var(--line);color:#9aa8a1;cursor:not-allowed}
+.tread{flex:none;min-height:58px;padding:0 16px;border-radius:var(--r);display:flex;align-items:center;background:var(--teal-soft);border:1px solid #bfe3d7;color:var(--teal-d);font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.ly-view{flex:1;min-height:0;position:relative}
+.ly-canvas{position:absolute;inset:0;overflow:auto;background:#16352c;scrollbar-width:none;overscroll-behavior:contain}
+.ly-canvas::-webkit-scrollbar{display:none}
+.ly-pad{min-width:100%;min-height:100%;display:flex;padding:24px}
+.ly-doc{margin:auto;flex:none;position:relative;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.28)}
+.ly-sheet{position:absolute;left:0;top:0;transform-origin:0 0;background:#fff;overflow:hidden}
+.ly-sheet i{position:absolute;display:block;border-radius:3px}
+.ly-sheet i.d{background:#8a8474}.ly-sheet i.m{background:#b0aa99}.ly-sheet i.r{background:#ddd7c6}
+.ly-ft{flex:none;min-height:92px;padding:14px 24px;display:flex;align-items:center;gap:16px;background:var(--surface);border-top:1px solid var(--line)}
+.ly-ft .cc{flex:none;min-height:44px;padding:0 14px;border-radius:var(--r-s);display:flex;align-items:center;background:var(--teal-soft);color:var(--teal-d);font-size:17px;font-weight:700}
+.ly-ft p{flex:1;min-width:0;font-size:17px;line-height:1.4;color:var(--ink-2)}
+.ly-ft p b{color:var(--ink)}
+
+.layer[data-kind=print]{background:rgba(11,36,30,.55);justify-content:flex-end}
+.sheet{flex:none;max-height:1180px;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);border-top:1px solid var(--line-2);border-radius:18px 18px 0 0;box-shadow:0 -14px 40px rgba(11,36,30,.28)}
+.hand{flex:none;min-height:0;overflow-y:auto;padding:18px 24px;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.hand::-webkit-scrollbar{display:none}
+.hand-g{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.hand-g>b{display:block;padding:12px 16px;font-size:19px;font-weight:700;background:var(--paper);border-bottom:1px solid var(--line)}
+.hand-rows{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.hand-rows div{padding:10px 16px;background:var(--surface)}
+.hand-rows div:last-child:nth-child(odd){grid-column:1/-1}
+.hand-rows u{display:block;text-decoration:none;font-size:14px;font-weight:700;color:var(--ink-3)}
+.hand-rows b{display:block;margin-top:2px;font-size:17px;font-weight:700;word-break:break-all}
+.ly-act{flex:none;display:flex;gap:14px;padding:14px 24px 18px;border-top:1px solid var(--line);background:var(--surface)}
+.ly-act .btn{flex:1}
+
+.demo-tab,.demo-panel{display:none}
+.demo-tab.on{display:inline-flex;position:absolute;left:360px;top:22px;min-height:56px;padding:0 16px;align-items:center;background:var(--deep);color:var(--emerald);font-size:18px;border-radius:var(--r);z-index:30}
+.demo-panel.on{display:block;position:absolute;left:0;top:0;width:300px;height:100%;background:rgba(11,36,30,.96);color:#e7efe9;padding:16px;overflow-y:auto;z-index:31}
+.demo-panel a{min-height:48px;padding:8px 10px;font-size:17px;border-bottom:1px solid rgba(231,239,233,.14);display:flex;align-items:center}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="16-service-hubs.html?hub=resume" data-route="/resume-service" aria-label="返回简历服务"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <span class="logo"><span class="logo-mark serif">职</span><span class="logo-name">职易达</span></span>
+    <span class="sp"></span>
+    <span class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">固定模板生成 · 不冒充 AI 撰写</span></span>
+    <span class="clock" id="clock">--:--</span>
+  </header>
+
+  <section class="taskhead">
+    <h1 class="th-t" id="task-title">求职材料库</h1>
+    <p class="th-s" id="task-sub">选择已发布模板，填写真实信息后生成本人可查看、可打印的 PDF。</p>
+  </section>
+
+  <main class="body" id="body-root" data-screen="material-workshop" data-state="select" data-testid="material-workshop-state-select"></main>
+
+  <div class="truth">
+    <p><b>材料只交给你本人。</b>模板生成不调用 AI，不代投递、不把材料发送给任何单位；打印费用以现场公示与服务端报价为准。</p>
+    <a href="06-help.html" data-route="/help">遇到问题</a>
+  </div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+
+  <div class="layer" id="layer" aria-hidden="true"></div>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制"></div>
+</div>
+<script>
+(function(){
+'use strict';
+var SCREEN='material-workshop';
+var SELF='25-material-workshop.html';
+var ICON={
+  mail:'<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.6 6.6L12 13l8.4-6.4"/>',
+  cover:'<rect x="4.5" y="3" width="15" height="18" rx="1.8"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  doc:'<path d="M6.5 3.5h7l4.5 4.5v12h-11.5z"/><path d="M13.5 3.5V8H18M9 12.5h6M9 16h4"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  right:'<path d="M9 5l7 7-7 7"/>',
+  lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+  alert:'<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.6M12 17.4h.01"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.4l3.4 2"/>',
+  print:'<path d="M7 9V3.5h10V9"/><rect x="3.5" y="9" width="17" height="7.5" rx="1.8"/><path d="M7 14.5h10V21H7z"/>',
+  pen:'<path d="M14.5 4.5l5 5L9 20H4v-5z"/><path d="M12.5 6.5l5 5"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  folder:'<path d="M3.5 6.5h6l2 2.5h9v10a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 19z"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  prev:'<path d="M15 5l-7 7 7 7"/>',
+  next:'<path d="M9 5l7 7-7 7"/>',
+  fitpage:'<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8 7.5h8M8 12h8M8 16.5h5"/>',
+  fitwidth:'<path d="M3 8.5v7M21 8.5v7"/><path d="M3 12h18"/><path d="M7 8.5L3.5 12 7 15.5M17 8.5l3.5 3.5-3.5 3.5"/>',
+  zoomin:'<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20.5 20.5M8.5 11h5M11 8.5v5"/>',
+  zoomout:'<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20.5 20.5M8.5 11h5"/>'
+};
+function svg(n,s,w){return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[n]+'</svg>';}
+function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ════════ 1. 真实目录：5 个已发布文档模板 + 8 个分类 + 5 个字段 ════════
+   模板、分类、字段全部照抄 packages/shared/src/types/jobMaterials.ts 与
+   JobMaterialLibraryPage.tsx；简历版式模板（resume_template）由简历优化页消费，
+   getJobMaterialTemplates 会把它过滤掉，所以这里就是 5 份，不多编一份撑场面。 */
+var FILTERS=['全部','求职信','感谢信','作品集','材料清单','校招','社招','通用'];
+var TEMPLATES=[
+  {id:'campus-cover-letter',type:'求职信',title:'校招自荐信',out:'校招自荐信.pdf',desc:'适合应届生在校招现场快速生成一页自荐材料。',tags:['校招','通用'],for:'应届毕业生、校园招聘会、宣讲会后补充材料'},
+  {id:'experienced-cover-letter',type:'求职信',title:'社招求职信',out:'社招求职信.pdf',desc:'围绕岗位要求、过往成果和匹配理由生成正式求职信。',tags:['社招','通用'],for:'社招求职、岗位咨询、线下招聘会沟通'},
+  {id:'interview-thank-you',type:'感谢信',title:'面试感谢信',out:'面试感谢信.pdf',desc:'面试后整理感谢与补充说明，方便用户自行发送。',tags:['面试','通用'],for:'面试结束后的跟进、补充说明、二次沟通准备'},
+  {id:'portfolio-cover',type:'作品集',title:'作品集封面',out:'作品集封面.pdf',desc:'为设计、内容、运营岗位生成简洁作品集封面页。',tags:['设计岗','运营岗'],for:'作品集打印、现场展示、材料装订首页'},
+  {id:'job-fair-checklist',type:'材料清单',title:'招聘会材料清单',out:'招聘会材料清单.pdf',desc:'生成参加招聘会前的材料准备清单，减少遗漏。',tags:['招聘会','通用'],for:'招聘会现场打印、面试前检查、材料整理'}
+];
+var FORM=[
+  ['applicantName','姓名',true,'例：王同学',40,false],
+  ['targetRole','目标岗位',true,'例：前端开发工程师',60,false],
+  ['targetOrganization','目标单位',false,'例：某科技公司 / 某高校招聘会',80,false],
+  ['keyStrengths','核心亮点',false,'例：React 项目经验、校级竞赛、数据分析能力',280,true],
+  ['notes','补充说明',false,'例：希望语气稳重，突出实习经历',220,true]
+];
+
+/* ════════ 2. 查询契约与 fail-closed ════════ */
+var q=new URLSearchParams(location.search);
+var DEBUG=q.get('debug')==='1';
+var STATES=['select','signed-out','loading','error','empty','submitting','generated','generated-no-print','demo-result','failed'];
+var AUTHS=['in','out','expired'];
+var NEED_AUTH=['submitting','generated','generated-no-print','demo-result'];
+var fallback=false;
+
+var rawState=q.get('state');
+var state=rawState===null?'select':(STATES.indexOf(rawState)>=0?rawState:(fallback=true,'illegal'));
+/* 受控夹具参数：五个模板各出一份文件，「已生成」这几屏演示的是哪一份必须能指定，
+   否则只有第一个模板可达，另外四份的文件名、页数和文件编号谁都验不到。
+   取值只认 TEMPLATES 里登记的 id；不认的按未指定处理并标 fallback，不猜。 */
+var rawTpl=q.get('tpl');
+var TPL_IDX=0;
+if(rawTpl!==null){
+  var ti=-1,tj;
+  for(tj=0;tj<TEMPLATES.length;tj++)if(TEMPLATES[tj].id===rawTpl)ti=tj;
+  if(ti>=0)TPL_IDX=ti;else fallback=true;
+}
+/* 未登记的 auth 取严不取宽：按未登录处理，绝不因为看不懂就放行。 */
+var rawAuth=q.get('auth');
+var AUTH=rawAuth===null?'in':(AUTHS.indexOf(rawAuth)>=0?rawAuth:(fallback=true,'out'));
+if(state==='signed-out'&&AUTH==='in')AUTH='out';
+if(NEED_AUTH.indexOf(state)>=0&&AUTH!=='in'){state='signed-out';fallback=true;}
+
+var filter='全部',selected=0,submitted=null,dirty=false,loginBanner='';
+var formValues={applicantName:'',targetRole:'',targetOrganization:'',keyStrengths:'',notes:''};
+var fieldErr={};
+var DRAFT=null;
+var HAS_FILE={'generated':1,'generated-no-print':1,'demo-result':1};
+var PREFILL={'submitting':1,'generated':1,'generated-no-print':1,'demo-result':1};
+
+/* 演示用的表单初值：只有「已提交 / 已生成」这几屏才预填，否则空表单。 */
+if(PREFILL[state]){
+  formValues.applicantName='王同学';formValues.targetRole='用户运营专员';
+  formValues.targetOrganization='某科技公司 · 校园招聘';
+  formValues.keyStrengths='3 个用户社群共 1200 人；月活跃从 600 增至 780';
+  submitted={idx:TPL_IDX,values:JSON.parse(JSON.stringify(formValues))};
+  selected=TPL_IDX;
+}
+
+/* ════════ 3. 契约字段夹具（JobMaterialGenerateResponse）════════
+   取值是合成夹具，不是任何一次真实生成；页面上逐处标注。 */
+function fileOf(){
+  var t=TEMPLATES[submitted?submitted.idx:selected];
+  var pages=t.id==='job-fair-checklist'?1:2;
+  return {
+    templateId:t.id,templateTitle:t.title,documentType:t.id,
+    fileId:'jm_' + t.id.replace(/-/g,'_') + '_8f31c0',
+    filename:t.out,mimeType:'application/pdf',
+    sizeBytes:pages===1?96256:132096,pageCount:pages,
+    signedUrl:'一次性签名链接（30 分钟内有效，不展示完整串）',
+    signedUrlExpiresAt:'今天 10:02',
+    fileExpiresAt:'2026-11-29 09:32',
+    previewUrlPath:'/files/'+t.id+'/preview-url',
+    downloadUrlPath:'/files/'+t.id+'/download-url',
+    printFileUrl:state==='generated'?'系统 HMAC content URL（仅 /print/jobs 可用）':null
+  };
+}
+function kb(n){return n<1024*1024?Math.max(1,Math.round(n/1024))+' KB':(n/1024/1024).toFixed(1)+' MB';}
+
+/* ════════ 4. 目录与表单 ════════ */
+function filterBar(){
+  return '<nav class="filters" aria-label="求职材料分类">'+FILTERS.map(function(f){
+    return '<button type="button" class="filter press" data-filter="'+esc(f)+'" aria-pressed="'+(filter===f)+'">'+esc(f)+'</button>';
+  }).join('')+'</nav>';
+}
+function visibleTemplates(){return TEMPLATES.filter(function(t){return filter==='全部'||t.type===filter||t.tags.indexOf(filter)>=0;});}
+function templateCard(t){
+  var idx=TEMPLATES.indexOf(t),on=idx===selected;
+  return '<button type="button" class="template press" data-template="'+idx+'" aria-pressed="'+on+'" data-testid="'+SCREEN+'-template-'+t.id+'">'
+    +'<b>'+esc(t.title)+'</b><p>'+esc(t.desc)+'</p>'
+    +'<span class="use">适用：'+esc(t['for'])+'</span>'
+    +'<span class="tags"><i>'+esc(t.type)+'</i>'+t.tags.map(function(x){return '<i>'+esc(x)+'</i>';}).join('')+'</span></button>';
+}
+function othersBlock(list){
+  var rest=TEMPLATES.filter(function(t){return list.indexOf(t)<0;});
+  if(!rest.length)return '';
+  return '<div class="others" data-testid="'+SCREEN+'-others"><b>不在「'+esc(filter)+'」里的还有 '+rest.length+' 份</b>'
+    +'<p>它们没有被删掉，只是被当前分类筛掉了。点一份可以直接切回全部并选中它。</p><div class="list">'
+    +rest.map(function(t){return '<button type="button" class="press" data-jump="'+TEMPLATES.indexOf(t)+'">'+esc(t.title)+'<i>'+esc(t.type)+'</i></button>';}).join('')
+    +'</div></div>';
+}
+function fields(){
+  return FORM.map(function(f){
+    var value=esc(formValues[f[0]]),bad=!!fieldErr[f[0]];
+    var attrs=' data-field="'+f[0]+'" maxlength="'+f[4]+'" placeholder="'+esc(f[3])+'"'
+      +(bad?' aria-invalid="true" aria-describedby="fe-'+f[0]+'"':'');
+    return '<label class="field'+(f[5]?' wide':'')+(bad?' bad':'')+'">'
+      +'<span>'+esc(f[1])+(f[2]?'<em> *</em>':'')+' · 最多 '+f[4]+' 字</span>'
+      +(f[5]?'<textarea rows="3"'+attrs+'>'+value+'</textarea>':'<input value="'+value+'"'+attrs+'>')
+      +'<span class="fe" id="fe-'+f[0]+'" role="alert">'+(bad?esc(fieldErr[f[0]]):'')+'</span></label>';
+  }).join('');
+}
+/* 生成之后会发生什么：三步都是真实链路上的事，压成一条，不铺成三张说明卡。 */
+function afterFlow(){
+  return '<div class="after" data-testid="'+SCREEN+'-after"><b>生成后</b>'
+    +'<span class="st"><i>1</i>返回真实文件对象</span><span class="sep">›</span>'
+    +'<span class="st"><i>2</i>进我的文档，可全屏看完整 PDF</span><span class="sep">›</span>'
+    +'<span class="st"><i>3</i>服务端给出 printFileUrl 才能去打印</span></div>';
+}
+function ensureSelectedVisible(){
+  var list=visibleTemplates();
+  if(list.length&&list.indexOf(TEMPLATES[selected])<0)selected=TEMPLATES.indexOf(list[0]);
+  return list;
+}
+function workspace(extra,hasFile){
+  var list=ensureSelectedVisible(),t=TEMPLATES[selected];
+  return filterBar()+'<div class="workspace">'
+    +'<section class="catalog" aria-label="模板目录">'
+    +(list.length?list.map(templateCard).join('')+othersBlock(list)
+      :'<div class="state" data-kind="warn"><div class="state-h">'+svg('info',28)+'该分类暂无模板</div>'
+       +'<p class="state-p">切换其他分类查看，空列表不使用内置假模板填充。</p></div>'+othersBlock(list))
+    +'</section>'
+    +'<aside class="detail'+(hasFile?' has-file':'')+'"><div class="sec-h"><span class="no">'+(hasFile?(dirty?'已改动':'已生成'):'正在准备')+'</span>'
+    +'<span class="hint">'+(hasFile?'表单仍可继续改':'一次生成一份 PDF')+'</span></div>'
+    +'<h2>'+esc(t.title)+'</h2>'
+    +'<p class="desc">'+esc(t['for'])+'。模板只组合你填写的字段，不读取简历，不调用 AI。</p>'
+    +'<div class="tmeta" data-testid="'+SCREEN+'-template-meta">'
+    +'<div><u>输出文件名</u><b>'+esc(t.out)+'</b></div>'
+    +'<div><u>材料类型</u><b>'+esc(t.type)+'</b></div>'
+    +'<div><u>可填字段</u><b>'+FORM.length+' 项（2 项必填）</b></div>'
+    +'<div><u>页数</u><b>由服务端返回</b></div></div>'
+    +'<div class="form'+(hasFile?'':' grow')+'">'+fields()+'</div>'+(extra||'')+(hasFile?'':afterFlow())+'</aside></div>';
+}
+
+/* ════════ 5. 真实文件卡 + 出口 ════════ */
+function fileCard(mode){
+  var f=fileOf(),demo=mode==='demo',noPrint=mode==='no-print';
+  var tone=demo?'demo':(noPrint?'warn':'ok');
+  var head=demo?['演示对象 · 未保存真实文件','演示模式返回的是占位对象，不进我的文档，也没有打印凭证。']
+    :noPrint?['真实 PDF 已生成 · 打印凭证未就绪','文件已进入我的文档，可查看、可预览；没有 printFileUrl 时只禁打印。']
+    :['真实 PDF 已生成 · 已进入我的文档','下面每一项都取自 POST /job-materials/generate 的返回字段。'];
+  var rows=[
+    ['文件名',esc(f.filename),0],['页数',f.pageCount+' 页',0],
+    ['大小',kb(f.sizeBytes),0],['类型',esc(f.mimeType),0],
+    ['文件编号 fileId',esc(f.fileId),0],
+    ['查看链接 signedUrl',demo?'演示对象无签名链接':esc(f.signedUrl),demo?1:0],
+    ['签名链接有效期 signedUrlExpiresAt',demo?'—':esc(f.signedUrlExpiresAt),demo?1:0],
+    ['文件留存到 fileExpiresAt',demo?'不保存':esc(f.fileExpiresAt),demo?1:0],
+    ['预览路径 previewUrlPath',demo?'—':esc(f.previewUrlPath),demo?1:0],
+    ['打印凭证 printFileUrl',f.printFileUrl?esc(f.printFileUrl):'未返回（打印保持禁用）',f.printFileUrl?0:1]
+  ];
+  var grid=rows.map(function(r){return '<div><u>'+r[0]+'</u><b'+(r[2]?' class="off"':'')+'>'+r[1]+'</b></div>';}).join('');
+  var canPrint=!!f.printFileUrl;
+  var reason=canPrint&&!demo?''
+    :'<p class="reason" id="'+(demo?'rz-preview':'rz-print')+'">'
+      +(demo?'演示模式没有真实文件：预览、我的文档和打印都停用，页面不拿一个示例文件冒充结果。'
+        :'服务端这次没有返回 printFileUrl。文件本身是真的，可以看、可以留在我的文档里；只有打印这一步必须等到凭证就绪。')
+      +'</p>';
+  var dirtyBar=dirty?'<div class="banner warn" data-testid="'+SCREEN+'-stale"><i aria-hidden="true">'+svg('alert',20)+'</i>'
+    +'<span class="bx"><b>表单已经改过了，下面这份文件还是上一次生成的那一版。</b>'
+    +'它对应你提交时的「'+esc(TEMPLATES[submitted.idx].title)+'」和当时填的内容，不会跟着新草稿变。'
+    +'想要按现在这份草稿出文件，必须<b>重新生成</b>。</span></div>':'';
+  return dirtyBar
+    +'<div class="filecard" data-tone="'+tone+'" data-print-ready="'+(canPrint?1:0)+'" data-stale="'+(dirty?1:0)+'" data-testid="'+SCREEN+'-file">'
+    +'<div class="fc-h"><span class="ic">'+svg('doc',24)+'</span>'
+    +'<span class="tx"><b>'+head[0]+'</b><span>'+head[1]+'</span></span>'
+    +'<span class="badge">'+(demo?'演示对象':(dirty?'上一版':'当前文件'))+'</span></div>'
+    +'<div class="fc-grid">'+grid+'</div>'
+    +'<p class="fc-foot">字段取自 JobMaterialGenerateResponse；本页取值是<b>合成夹具</b>，不是某次真实生成的结果。</p>'
+    +reason+'</div>';
+}
+function manualFallback(){
+  return altList('模板生成不可用时仍可处理',
+    altRow('print','12-file-source.html','/print/upload','打印已有材料','U 盘、手机传输或扫描原件都可以，不依赖模板目录。','print')
+    +altRow('spark','21-resume-triage.html','/resume/source','先做一次简历诊断','诊断和材料模板是两条链路，这条现在照常可用。','diagnose')
+    +altRow('folder','38-member-assets.html?state=documents-ready','/me/documents','翻我的文档里已有的材料','此前生成过的材料不受这次影响；登录后可以查看、预览和打印。','docs')
+    +altRow('pen','05-ai-cockpit.html','/assistant','向 AI顾问要通用写作建议','顾问建议不等于生成文件，也不会自动保存。','points'));
+}
+function altList(head,rows){return '<div class="alt"><div class="alt-h">'+head+'</div>'+rows+'</div>';}
+function altRow(ic,href,route,t,d,tid){
+  return '<a class="alt-row press" href="'+esc(href)+'" data-route="'+esc(route)+'" data-testid="'+SCREEN+'-alt-'+tid+'">'
+    +'<span class="alt-ic">'+svg(ic,26)+'</span><span class="alt-tx"><span class="alt-t">'+esc(t)+'</span><span class="alt-d">'+esc(d)+'</span></span>'
+    +'<span class="alt-go">'+svg('right',24)+'</span></a>';
+}
+function stateBlock(kind,icon,title,desc,acts){
+  return '<div class="state" data-kind="'+kind+'" data-testid="'+SCREEN+'-fallback"><div class="state-h">'+svg(icon,32)+title+'</div>'
+    +'<p class="state-p">'+desc+'</p>'+(acts?'<div class="state-acts">'+acts+'</div>':'')+'</div>';
+}
+function snapshotBlock(snap,title,chip){
+  if(!snap)return '';
+  var t=TEMPLATES[snap.idx],rows=FORM.map(function(f){
+    var v=snap.values[f[0]];
+    return '<div><u>'+esc(f[1])+'</u><b'+(v?'':' class="empty"')+'>'+(v?esc(v):'未填')+'</b></div>';
+  }).join('');
+  return '<div class="draft" data-testid="'+SCREEN+'-snapshot"><div class="draft-h">'+esc(title)+'：'+esc(t.title)
+    +'<span>'+esc(chip)+'</span></div><div class="draft-rows">'+rows+'</div></div>';
+}
+function draftBlock(){
+  if(!DRAFT)return '';
+  var t=TEMPLATES[DRAFT.idx],rows=FORM.map(function(f){
+    var v=DRAFT.values[f[0]];
+    return '<div><u>'+esc(f[1])+'</u><b'+(v?'':' class="empty"')+'>'+(v?esc(v):'未填')+'</b></div>';
+  }).join('');
+  return '<div class="draft" data-testid="'+SCREEN+'-draft"><div class="draft-h">草稿已保存：'+esc(t.title)
+    +'<span>'+svg('check',18,2.4)+' 登录后原样带回</span></div><div class="draft-rows">'+rows+'</div></div>';
+}
+/* 状态事实网格：只列这一屏已经确定的事，复用 .draft 的键值版式，不写推测也不写说明墙。 */
+function factBlock(title,chip,rows,tid){
+  return '<div class="draft" data-testid="'+SCREEN+'-'+tid+'"><div class="draft-h">'+esc(title)
+    +(chip?'<span>'+esc(chip)+'</span>':'')+'</div><div class="draft-rows">'
+    +rows.map(function(r){return '<div><u>'+esc(r[0])+'</u><b'+(r[2]?' class="empty"':'')+'>'+esc(r[1])+'</b></div>';}).join('')
+    +'</div></div>';
+}
+/* 恢复路径压成一条横排编号条（沿用 afterFlow 的 .after 版式），不铺成三张说明卡。 */
+function pathStrip(label,steps,tid){
+  return '<div class="after" data-testid="'+SCREEN+'-'+tid+'"><b>'+esc(label)+'</b>'
+    +steps.map(function(x,i){return '<span class="st"><i>'+(i+1)+'</i>'+esc(x)+'</span>';}).join('<span class="sep">›</span>')
+    +'</div>';
+}
+/* 目录本身不需要登录，所以「回模板目录」在未登录/失败态都是真实可用的出口。 */
+function catalogRow(auth){
+  return altRow('doc',SELF+'?state=select'+(auth?'&auth='+auth:''),'/resume/materials','只看模板目录',
+    '目录和字段说明不需要登录，先看清要填什么再决定。','catalog');
+}
+function loginBannerHtml(){
+  if(!loginBanner)return '';
+  var bad=loginBanner==='expired';
+  return '<div class="banner'+(bad?' warn':'')+'" data-testid="'+SCREEN+'-login-banner"><i aria-hidden="true">'+svg(bad?'alert':'check',20,2.3)+'</i>'
+    +'<span class="bx">'+(bad
+      ?'<b>刚才那次登录没有拿到有效会话。</b>草稿还在，重新登录后再提交；会话没通过之前，本页不会把内容发出去。'
+      :'<b>登录完成，草稿已原样带回。</b>确认下面的内容无误，再点「生成可打印版」——登录本身不会自动替你提交。')
+    +'</span></div>';
+}
+
+/* ════════ 6. 各状态 ════════ */
+var VIEWS={
+'select':function(){
+  return '<div class="scroll">'+workspace(loginBannerHtml(),false)+'</div>'
+    +'<div class="ctabar"><p class="why">姓名和目标岗位为必填；未登录时会先保存当前模板与表单草稿再去登录，'
+    +'登录态确认有效后才提交。</p>'
+    +'<button type="button" class="btn primary press" id="do-generate" data-testid="'+SCREEN+'-primary">生成可打印版</button></div>';
+},
+'signed-out':function(){
+  var dt=DRAFT?TEMPLATES[DRAFT.idx]:null;
+  var filled=DRAFT?FORM.filter(function(f){return !!DRAFT.values[f[0]];}).length:0;
+  return '<div class="scroll">'
+    +stateBlock('lock','lock','材料工坊需要先登录',
+      (DRAFT?'你刚选的模板和填过的内容<b>已经保存成草稿</b>，登录后回到这里会原样带回。':'生成的 PDF 会进入本人文档，因此提交前需要登录。')
+      +'公共终端不凭匿名会话读写任何人的材料；真实页面把草稿放在 sessionStorage，10 分钟内有效。',
+      '<a class="btn ghost press" href="01-home.html" data-route="/">回首页</a>'
+      +'<button type="button" class="btn primary press" id="do-login" data-testid="'+SCREEN+'-primary">去登录</button>')
+    +(DRAFT?draftBlock():'')
+    +factBlock('登录会带回什么',DRAFT?'草稿已保存':'当前没有草稿',[
+      ['当前草稿',DRAFT?('已保存 · '+dt.title+' · 已填 '+filled+'/'+FORM.length+' 个字段'):'还没有 —— 本页还没填过任何字段',!DRAFT],
+      ['会带回','你选的模板与已填字段，原样回到这一页'],
+      ['不会带回','简历原文、历史材料，或别人留在本机的草稿'],
+      ['保存位置','sessionStorage · 10 分钟内有效，超时按未填处理'],
+      ['提交时机','登录态确认有效后，你再点一次「生成可打印版」才提交'],
+      ['本页不做','替你自动生成、代投递或把材料发给任何单位']
+    ],'signed-out-facts')
+    +factBlock('目录里现在有这些模板','看模板不需要登录',TEMPLATES.map(function(t){return [t.type,t.title];}),'signed-out-catalog')
+    +pathStrip('登录后',['回到这一页','草稿原样带回','你确认后才提交'],'signed-out-path')
+    +altList('不登录也能做的',
+      altRow('print','12-file-source.html','/print/upload','直接打印你自己带来的文件','U 盘、手机传输或扫描原件，都不需要账号。','print')
+      +altRow('spark','21-resume-triage.html','/resume/source','先做一次简历诊断','诊断结果当场看，是否保存由你决定。','diagnose')
+      +catalogRow('out'))
+    +'</div>';
+},
+'loading':function(){
+  return '<div class="scroll">'+stateBlock('info','clock','正在读取已发布的求职材料模板',
+    '读取完成前不显示模板名称或数量；读取失败和空列表是两个独立状态。','')
+    +factBlock('这一刻已经确定的事','读取中',[
+      ['请求','GET /api/v1/job-materials/templates 已发出'],
+      ['模板数量','返回前不显示，也不写「加载中 5 个」'],
+      ['本机缓存','没有 —— 不拿上一次的列表顶替这一次'],
+      ['表单','读到模板之后才可以填写'],
+      ['已生成文件','本次读取不影响我的文档里已有的材料'],
+      ['费用','读取目录不产生任何费用']
+    ],'loading-facts')
+    +factBlock('返回后只有三种结果','由服务端决定',[
+      ['有已发布模板','进入模板目录，可以选模板填字段'],
+      ['返回 0 条','空状态，不拿示例模板补位'],
+      ['读取失败','停在可重试状态，仍不显示模板名']
+    ],'loading-outcomes')
+    +manualFallback()
+    +'</div><div class="ctabar"><a class="btn ghost press" href="16-service-hubs.html?hub=resume" data-route="/resume-service" data-testid="'+SCREEN+'-primary">返回简历服务</a></div>';
+},
+'error':function(){
+  return '<div class="scroll">'+stateBlock('error','alert','模板列表读取失败',
+    '这次没有读到模板。不会拿内置默认模板或上一次缓存冒充当前列表。',
+    '<button type="button" class="btn primary press" id="go-loading">重新读取</button>')
+    +factBlock('这次失败没有造成什么','范围很窄',[
+      ['没有','用内置默认模板或示例模板顶替'],
+      ['没有','显示上一次读到的列表'],
+      ['没有','生成文件、打印任务或费用'],
+      ['没有','改动我的文档里已有的材料'],
+      ['仍可用','打印、扫描与简历诊断三条链路'],
+      ['仍可用','我的文档里此前生成过的材料'],
+      ['自动重试','没有 —— 只有你点「重新读取」才会再请求一次'],
+      ['错误原文','不显示在公共屏幕上，只说明这次读不到']
+    ],'error-scope')
+    +pathStrip('重新读取会',['只重发这一次目录请求','不改动你填过的字段','读到才显示模板名'],'error-path')
+    +manualFallback()+'</div>';
+},
+'empty':function(){
+  return '<div class="scroll">'+stateBlock('warn','info','当前没有已发布的求职材料模板',
+    '读取成功，但服务端返回的已发布模板数量为 0。发布后会自动出现在这里。',
+    '<button type="button" class="btn primary press" id="go-loading" data-testid="'+SCREEN+'-primary">重新读取一次</button>')
+    +factBlock('空列表和读取失败不是一回事','已读取成功',[
+      ['接口','已返回，没有报错'],
+      ['已发布模板','0 条'],
+      ['原因','模板尚未发布，或已发布的被全部下架'],
+      ['本机不会','拿示例模板或旧模板补位'],
+      ['你的字段','还没有可填的表单，因此本页不保存草稿'],
+      ['已生成过的材料','不受影响，仍在我的文档里'],
+      ['费用','没有产生任何生成或打印费用'],
+      ['恢复方式','模板发布后目录自动出现，不需要你做设置']
+    ],'empty-facts')
+    +pathStrip('模板发布后',['目录里自动出现','你选模板填字段','生成可打印 PDF'],'empty-path')
+    +manualFallback()+'</div>';
+},
+'submitting':function(){
+  var t=TEMPLATES[submitted?submitted.idx:selected];
+  return '<div class="scroll">'+stateBlock('info','clock','正在生成《'+esc(t.title)+'》这一份 PDF',
+    '请求已经提交，姓名和目标岗位都已校验通过。没有阶段进度和预计时间；'
+    +'返回真实文件对象前不显示文件名、页数或打印入口。','')
+    +snapshotBlock(submitted||{idx:selected,values:formValues},'这次提交的内容','只发这些字段，不含简历原文')
+    +factBlock('这一刻的确切状态','等待服务端返回',[
+      ['请求','POST /api/v1/job-materials/generate 已发出'],
+      ['已校验','姓名与目标岗位非空，校验不过根本不会发出'],
+      ['还没有','文件名、页数、大小、留存期限与打印凭证'],
+      ['不显示','百分比、阶段点或预计完成时间'],
+      ['返回表单','只是回到表单页；这次请求是否已到服务端，以返回为准'],
+      ['成功之后','文件进我的文档，打印仍要等真实 printFileUrl'],
+      ['失败之后','停在失败页并保留你填的字段，不用示例文件顶替'],
+      ['本页不会','代投递，也不会把这份材料发给任何单位']
+    ],'submitting-facts')
+    +factBlock('这次用的是哪一份模板',t.type,[
+      ['模板编号 templateId',t.id],
+      ['模板名称 templateTitle',t.title],
+      ['文档类型 documentType',t.id],
+      ['预期输出',t.out+'（最终 filename 以服务端返回为准）'],
+      ['适用场景',t.for],
+      ['本次不发送','简历原文与历史材料，只发上面这几个字段']
+    ],'submitting-template')
+    +pathStrip('接下来',['服务端返回文件对象','文件卡摊开真实字段','有凭证才放行打印'],'submitting-path')
+    +'</div><div class="ctabar"><button type="button" class="btn ghost press" id="back-form" data-testid="'+SCREEN+'-primary">返回表单</button></div>';
+},
+'generated':function(){
+  return '<div class="scroll">'+workspace(fileCard('ok'),true)+'</div>'+resultCta();
+},
+'generated-no-print':function(){
+  return '<div class="scroll">'+workspace(fileCard('no-print'),true)+'</div>'+resultCta();
+},
+'demo-result':function(){
+  return '<div class="scroll">'+workspace(fileCard('demo'),true)+'</div>'+resultCta(true);
+},
+'failed':function(){
+  return '<div class="scroll">'+stateBlock('error','alert','这次没能生成出来',
+    '服务端没有返回真实文件对象。可能是必填字段不完整、模板已停用或文件生成失败。'
+    +'<b>本机不会用一个示例文件冒充成功结果</b>。',
+    '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员</a>'
+    +'<button type="button" class="btn primary press" id="back-form" data-testid="'+SCREEN+'-primary">改一改再试一次</button>')
+    +factBlock('这次失败的确切范围','失败只影响这一份',[
+      ['没有产生','任何 PDF 文件'],
+      ['没有产生','打印任务、取件码或费用'],
+      ['仍然保留','你刚才填的字段，改一改就能再试'],
+      ['没有改动','我的文档里此前生成过的材料'],
+      ['可能原因','必填不完整 / 模板已停用 / 文件生成失败'],
+      ['判断依据','以服务端返回为准，本页不猜具体原因'],
+      ['自动重试','没有 —— 由你决定改不改内容再提交一次'],
+      ['错误原文','不显示在公共屏幕上，只给可继续的路径']
+    ],'failed-scope')
+    +pathStrip('再试一次会',['沿用你填的内容','重新提交这一份','成功才出现文件卡'],'failed-path')
+    +manualFallback()+'</div>';
+},
+'illegal':function(){
+  return '<div class="scroll">'+stateBlock('warn','info','这个地址不能用来打开求职材料工坊',
+    '本页只认登记过的状态与登录态取值。收到没登记的值时一律按不可用处理，'
+    +'<b>也不会把地址里的原文显示出来</b>，避免把外部输入原样搬到屏幕上。',
+    '<a class="btn ghost press" href="01-home.html" data-route="/">回首页</a>'
+    +'<button type="button" class="btn primary press" id="back-form" data-testid="'+SCREEN+'-primary">回到模板目录</button>')
+    +factBlock('本页怎么处理地址参数','取严不取宽',[
+      ['登记过的状态',STATES.join(' / ')],
+      ['没登记的状态','按不可用处理，不猜你本来想去哪一屏'],
+      ['没登记的登录态','按未登录处理，不因为看不懂就放行'],
+      ['地址里的原文','不回显到屏幕上'],
+      ['这一次没有','创建草稿、发出请求或生成任何文件'],
+      ['继续方式','用下面的入口重新进入，或回首页重走一遍']
+    ],'illegal-facts')
+    +pathStrip('回到模板目录后',['目录重新读取','你选模板填字段','确认无误再生成'],'illegal-path')
+    +manualFallback()+'</div>';
+}
+};
+function resultCta(demo){
+  var f=fileOf(),canPrint=!!f.printFileUrl&&!demo,canFile=!demo;
+  var why=(dirty
+      ?'<b>新草稿还没有对应的文件</b>：改动只在表单里，重新生成才会有新的 PDF；下面三个出口指向的仍是上一版。'
+      :'这一份是刚生成的文件；改动模板或任何字段之后都要重新生成。')
+    +(demo?'演示模式不保存真实文件，预览、我的文档与打印全部停用。'
+      :(f.printFileUrl?'':'本次没有 printFileUrl，<b>只有打印被禁用</b>，查看与我的文档不受影响。'));
+  var docsLabel=dirty?'我的文档（上一版）':'我的文档';
+  return '<p class="whyline" data-testid="'+SCREEN+'-why">'+why+'</p><div class="ctabar four">'
+    +'<button type="button" class="btn ghost press" id="do-generate" data-testid="'+SCREEN+'-regenerate">'
+      +(dirty?'按新草稿重新生成':'重新生成一份')+'</button>'
+    +(canFile
+      ?'<button type="button" class="btn ghost press" id="open-preview" data-testid="'+SCREEN+'-preview">'+svg('eye',22)+'全屏预览 PDF</button>'
+      :'<span class="btn" aria-disabled="true" aria-describedby="rz-preview" data-testid="'+SCREEN+'-preview">'+svg('eye',22)+'演示无文件可预览</span>')
+    +(canFile
+      ?'<a class="btn ghost press" href="38-member-assets.html?state=documents-ready" data-route="/me/documents" data-testid="'+SCREEN+'-docs">'+svg('folder',22)+esc(docsLabel)+'</a>'
+      :'<span class="btn" aria-disabled="true" aria-describedby="rz-preview" data-testid="'+SCREEN+'-docs">'+svg('folder',22)+'不进我的文档</span>')
+    +(canPrint
+      ?'<button type="button" class="btn primary press" id="open-print" data-testid="'+SCREEN+'-primary">'+svg('print',22)+'去打印材料</button>'
+      :'<span class="btn" aria-disabled="true" aria-describedby="rz-print" data-testid="'+SCREEN+'-primary">'+svg('print',22)+'打印凭证未就绪</span>')
+    +'</div>';
+}
+
+var PILL={
+  'select':['','固定模板生成 · 不冒充 AI 撰写'],
+  'signed-out':['warn','会员功能，需要先登录'],
+  'loading':['','正在读取已发布模板'],'error':['bad','模板列表读取失败'],'empty':['warn','当前没有已发布模板'],
+  'submitting':['','正在生成 PDF'],'generated':['ok','真实文件已生成 · 可打印'],
+  'generated-no-print':['warn','文件已生成 · 打印凭证未就绪'],'demo-result':['warn','演示结果 · 无真实文件'],
+  'failed':['bad','本次文件生成失败'],'illegal':['warn','地址参数不合法 · 已按不可用处理']
+};
+var SUB={
+  'select':'选择已发布模板，填写真实信息后生成本人可查看、可打印的 PDF。',
+  'signed-out':'公共终端不凭匿名会话读取任何人的材料；草稿先留着，登录有效才提交。',
+  'loading':'返回前不展示模板名称或数量。','error':'读取失败不伪装成空列表。','empty':'读取成功，但已发布模板数量为 0。',
+  'submitting':'真实文件返回前不显示文件名和打印入口。',
+  'generated':'文件已进入本人文档；打印仍要求真实 printFileUrl。',
+  'generated-no-print':'文件存在，但没有打印凭证就不进入打印确认。',
+  'demo-result':'演示模式不保存真实文件。','failed':'失败就是失败，不用示例文件顶替结果。',
+  'illegal':'不回显地址栏原文，也不猜你想去哪一屏。'
+};
+
+/* ════════ 7. 浮层：完整 PDF 预览 / 打印交接 ════════ */
+var SHEET={w:1000,h:1414};
+var PAGE_SPEC={
+  1:[['t',420],['s',560],['s',430],['r'],['h',210],['b',820],['b',770],['b',810],['b',600],
+     ['g'],['h',240],['b',830],['b',740],['b',800],['b',660],['b',780],
+     ['g'],['h',190],['b',810],['b',700],['b',790],['b',620],
+     ['g'],['h',220],['b',800],['b',750],['b',690]],
+  2:[['h',250],['b',830],['b',780],['b',700],['b',810],
+     ['g'],['h',200],['b',820],['b',760],['b',640],
+     ['g'],['h',260],['b',800],['b',840],['b',720],['b',790],['b',610],
+     ['g'],['h',180],['b',810],['b',730]]
+};
+var BH={t:46,s:20,r:3,h:28,b:18},BA={t:80,s:34,r:52,h:50,b:38,g:28},BT={t:'d',s:'m',r:'r',h:'d',b:'m'};
+var ZOOMS=[1,1.5,2],pageNo=1,fitMode='page',zoomLv=1,layerKind=null;
+
+var rawP=q.get('p'),rawFit=q.get('fit'),rawZ=q.get('z');
+if(rawP!==null||rawFit!==null||rawZ!==null){
+  /* 没有真实文件时预览层不可达；带上参数也只当作非法输入丢掉。 */
+  if(!HAS_FILE[state]||state==='demo-result')fallback=true;
+  else{
+    if(rawP!==null){var pn=/^[0-9]{1,2}$/.test(rawP)?Number(rawP):0;if(pn>=1&&pn<=fileOf().pageCount)pageNo=pn;else fallback=true;}
+    if(rawFit!==null){if(rawFit==='page'||rawFit==='width')fitMode=rawFit;else fallback=true;}
+    if(rawZ!==null){var zn=Number(rawZ);if(ZOOMS.indexOf(zn)>=0)zoomLv=zn;else fallback=true;}
+  }
+}
+function sheetBars(pg){
+  var spec=PAGE_SPEC[pg]||PAGE_SPEC[1],out='',y=104,i,k;
+  for(i=0;i<spec.length;i++){
+    k=spec[i][0];
+    if(k!=='g')out+='<i class="'+BT[k]+'" style="left:90px;top:'+Math.round(y)+'px;width:'+(spec[i][1]||820)+'px;height:'+BH[k]+'px"></i>';
+    y+=BA[k];
+  }
+  return out;
+}
+function previewLayer(){
+  var f=fileOf(),last=f.pageCount,zi=ZOOMS.indexOf(zoomLv);
+  var nav=function(on,dir,label,icon,why){
+    if(!on)return '<button type="button" class="tbtn" aria-disabled="true" data-testid="'+SCREEN+'-pv-'+dir+'" aria-label="'+esc(label+'（'+why+'）')+'">'+svg(icon,22,2.2)+label+'</button>';
+    return '<button type="button" class="tbtn press" data-page="'+(pageNo+(dir==='next'?1:-1))+'" data-testid="'+SCREEN+'-pv-'+dir+'" aria-label="'+esc(label)+'">'+svg(icon,22,2.2)+label+'</button>';
+  };
+  var zoom=function(delta,dir,label,icon,why){
+    var idx=zi+delta;
+    if(idx<0||idx>=ZOOMS.length)return '<button type="button" class="tbtn" aria-disabled="true" data-testid="'+SCREEN+'-pv-'+dir+'" aria-label="'+esc(label+'（'+why+'）')+'">'+svg(icon,22)+label+'</button>';
+    return '<button type="button" class="tbtn press" data-zoom="'+ZOOMS[idx]+'" data-testid="'+SCREEN+'-pv-'+dir+'" aria-label="'+esc(label)+'">'+svg(icon,22)+label+'</button>';
+  };
+  var fit=function(key,label,icon){
+    return '<button type="button" class="tbtn press" data-fit="'+key+'" aria-pressed="'+(fitMode===key)+'" data-testid="'+SCREEN+'-pv-fit-'+key+'">'+svg(icon,22)+label+'</button>';
+  };
+  return '<div class="ly-h"><span class="ic">'+svg('doc',24)+'</span>'
+    +'<span class="tx"><b>'+esc(f.filename)+'</b><span>'+f.pageCount+' 页 · '+kb(f.sizeBytes)+' · '+esc(f.mimeType)+'</span></span>'
+    +'<button type="button" class="ly-cl press" id="ly-close" data-testid="'+SCREEN+'-pv-close">'+svg('close',20,2.3)+'关闭</button></div>'
+    +'<div class="ly-note"><i>合成占位</i><p>这是按页数画出来的版面占位，不是你那份 PDF 的真实渲染。'
+    +'真实页面用 previewUrlPath 换一次性链接后再渲染，链接不进地址栏。</p></div>'
+    +'<div class="ly-tb"><div class="ly-tr">'
+    +nav(pageNo>1,'prev','上一页','prev',last===1?'这份材料只有一页':'已经是第一页')
+    +'<span class="tread" data-testid="'+SCREEN+'-pv-page" data-page="'+pageNo+'" data-pages="'+last+'" aria-live="polite">第 '+pageNo+' 页 / 共 '+last+' 页</span>'
+    +nav(pageNo<last,'next','下一页','next',last===1?'这份材料只有一页':'已经是最后一页')
+    +'<span class="sp2"></span>'+fit('page','适应整页','fitpage')+fit('width','适应宽度','fitwidth')+'</div>'
+    +'<div class="ly-tr">'+zoom(-1,'out','缩小','zoomout','已经是最小倍数')
+    +'<span class="tread" data-testid="'+SCREEN+'-pv-zoom" data-zoom="'+zoomLv+'">'+zoomLv.toFixed(1)+' 倍</span>'
+    +zoom(1,'in','放大','zoomin','已经是最大倍数')+'<span class="sp2"></span>'
+    +'<span class="tread">'+esc(f.previewUrlPath)+'</span></div></div>'
+    +'<div class="ly-view"><div class="ly-canvas" data-testid="'+SCREEN+'-pv-canvas"><div class="ly-pad">'
+    +'<div class="ly-doc" data-testid="'+SCREEN+'-pv-doc"><div class="ly-sheet">'+sheetBars(pageNo)+'</div></div>'
+    +'</div></div></div>'
+    +'<div class="ly-ft"><span class="cc">留存到 '+esc(f.fileExpiresAt)+'</span>'
+    +'<p><b>这份材料只交给你本人。</b>本机不会替你发给任何单位；留在我的文档里，也可以现在就去打印。</p>'
+    +(f.printFileUrl
+      ?'<button type="button" class="tbtn press" id="to-print" data-testid="'+SCREEN+'-pv-print">'+svg('print',22)+'去打印材料</button>'
+      :'<span class="tbtn" aria-disabled="true" data-testid="'+SCREEN+'-pv-print">'+svg('print',22)+'打印凭证未就绪</span>')
+    +'</div>';
+}
+function printLayer(){
+  var f=fileOf();
+  var pairs=[['文件名 name',f.filename],['大小 size',kb(f.sizeBytes)],['页数 pages',f.pageCount],
+    ['文件编号 fileId',f.fileId],['打印地址 fileUrl',f.printFileUrl||'未返回'],['类型 mimeType',f.mimeType]];
+  /* 单双面固定走**单面**：黑白单面是本机当前唯一已验证的组合，打印确认页也只按这一组
+     登记了报价夹具。拿「2 页所以默认双面」把材料送过去，只会撞在那一页的能力受限屏上，
+     用户看到的是一句「这台机器暂不支持」，而不是报价 —— 那不是更真实，是白跑一趟。
+     真要双面，在打印确认页按真实能力改，这里不替它先斩后奏。 */
+  var params=[['份数 copies','1'],['双面 duplex','single（单面 · 本机已验证）'],['颜色 color','bw（黑白 · 本机已验证）']];
+  /* 打印确认页认的键是 source，不是 src；而且 source 与 fileId 必须**成对**命中它的登记表。
+     以前这里写的 src= 那一页根本不认，等于带着一组永远对不上的参数跳过去。 */
+  var href='14-print-confirm.html?source=job-material&fileId='+encodeURIComponent(f.fileId)
+    +'&pages='+f.pageCount+'&copies=1&duplex=single&color=bw';
+  return '<div class="sheet"><div class="ly-h"><span class="ic">'+svg('print',24)+'</span>'
+    +'<span class="tx"><b>交给打印确认的就是这些</b><span>对齐 JobMaterialLibraryPage.printGenerated 的交接内容</span></span>'
+    +'<button type="button" class="ly-cl press" id="ly-close" data-testid="'+SCREEN+'-hand-close">'+svg('close',20,2.3)+'关闭</button></div>'
+    +'<div class="hand" data-testid="'+SCREEN+'-handoff">'
+    +'<div class="hand-g"><b>文件对象 file</b><div class="hand-rows">'
+    +pairs.map(function(p){return '<div><u>'+esc(p[0])+'</u><b>'+esc(p[1])+'</b></div>';}).join('')+'</div></div>'
+    +'<div class="hand-g"><b>打印参数 makePrintParams</b><div class="hand-rows">'
+    +params.map(function(p){return '<div><u>'+esc(p[0])+'</u><b>'+esc(p[1])+'</b></div>';}).join('')+'</div></div>'
+    +'<div class="banner"><i aria-hidden="true">'+svg('info',20)+'</i><span class="bx">'
+    +'<b>真实页面用路由 state 传这一份，不把 printFileUrl 放进地址栏。</b>'
+    +'本原型的跳转只带来源、fileId、页数和打印参数，用来说明交接内容，不是已经接通的打印链路；'
+    +'份数、单双面和颜色在打印确认页还能改，计费也在那里按真实页数算。</span></div></div>'
+    +'<div class="ly-act"><button type="button" class="btn ghost press" id="ly-close-2">再看看文件</button>'
+    +'<a class="btn primary press" href="'+esc(href)+'" data-route="/print/confirm" data-testid="'+SCREEN+'-to-print-confirm">'
+    +svg('print',22)+'去打印确认</a></div></div>';
+}
+
+/* ════════ 8. 渲染与交互 ════════ */
+var root=document.getElementById('body-root');
+var layer=document.getElementById('layer');
+function layoutPreview(){
+  var canvas=root.parentNode.querySelector('.ly-canvas');
+  if(!canvas)return;
+  var doc=canvas.querySelector('.ly-doc'),sheet=canvas.querySelector('.ly-sheet');
+  var boxW=canvas.clientWidth-48,boxH=canvas.clientHeight-48;
+  var k=(fitMode==='width'?boxW/SHEET.w:Math.min(boxW/SHEET.w,boxH/SHEET.h))*zoomLv;
+  doc.style.width=Math.round(SHEET.w*k)+'px';
+  doc.style.height=Math.round(SHEET.h*k)+'px';
+  sheet.style.width=SHEET.w+'px';sheet.style.height=SHEET.h+'px';
+  sheet.style.transform='scale('+k+')';
+  canvas.scrollLeft=0;canvas.scrollTop=0;
+}
+function paintLayer(){
+  layer.classList.remove('on');layer.removeAttribute('data-kind');
+  layer.innerHTML='';
+  if(layerKind==='preview'){layer.innerHTML=previewLayer();layer.setAttribute('data-kind','preview');layer.classList.add('on');}
+  else if(layerKind==='print'){layer.innerHTML=printLayer();layer.setAttribute('data-kind','print');layer.classList.add('on');}
+  var under=[document.querySelector('.topbar'),document.querySelector('.taskhead'),root,document.querySelector('.truth'),document.querySelector('.navbar')];
+  for(var i=0;i<under.length;i++){
+    if(!under[i])continue;
+    if(layerKind){under[i].setAttribute('inert','');under[i].setAttribute('aria-hidden','true');}
+    else{under[i].removeAttribute('inert');under[i].removeAttribute('aria-hidden');}
+  }
+  layer.setAttribute('aria-hidden',layerKind?'false':'true');
+  if(layerKind==='preview')layoutPreview();
+  bindLayer();
+}
+function render(){
+  root.setAttribute('data-state',state);
+  root.setAttribute('data-testid',SCREEN+'-state-'+state);
+  root.setAttribute('data-auth',AUTH);
+  root.setAttribute('data-dirty',dirty?'1':'0');
+  if(fallback)root.setAttribute('data-fallback','1');else root.removeAttribute('data-fallback');
+  root.innerHTML=VIEWS[state]();
+  var p=document.getElementById('pill');
+  /* 改过表单之后顶栏也要跟着改口径：屏幕上不能一边写「已生成」一边其实是上一版。 */
+  var pillTone=PILL[state]&&PILL[state][0]?PILL[state][0]:'';
+  var pillTxt=PILL[state]?PILL[state][1]:'求职材料工坊';
+  var subTxt=SUB[state]||'';
+  if(state==='select'&&AUTH!=='in'){
+    pillTone='warn';
+    pillTxt=AUTH==='expired'?'登录已过期 · 生成前需重新登录':'未登录 · 生成前会先存草稿去登录';
+    subTxt='模板目录随便看；点「生成可打印版」时才需要登录，草稿不会丢。';
+  }
+  if(dirty&&HAS_FILE[state]){
+    pillTone='warn';pillTxt='上一版文件可用 · 新草稿未生成';
+    subTxt='改动只在表单里；预览、我的文档和打印指向的仍是上一版文件。';
+  }
+  p.className='pill'+(pillTone?' '+pillTone:'');
+  document.getElementById('pill-txt').textContent=pillTxt;
+  document.getElementById('task-sub').textContent=subTxt;
+  bindMain();
+  paintLayer();
+}
+
+function markDirty(){
+  if(HAS_FILE[state]&&submitted&&!dirty){dirty=true;}
+}
+function bindMain(){
+  var i,els;
+  els=root.querySelectorAll('[data-field]');
+  for(i=0;i<els.length;i++)els[i].addEventListener('input',function(){
+    var key=this.getAttribute('data-field');
+    formValues[key]=this.value;
+    if(fieldErr[key]&&this.value.trim()){          /* 改对了就把红框收掉，不留着吓人 */
+      delete fieldErr[key];
+      var box=this.closest('.field');
+      if(box){box.classList.remove('bad');this.removeAttribute('aria-invalid');
+        var fe=box.querySelector('.fe');if(fe)fe.textContent='';}
+    }
+    if(HAS_FILE[state]&&submitted&&!dirty){markDirty();render();}
+  });
+  els=root.querySelectorAll('[data-filter]');
+  for(i=0;i<els.length;i++)els[i].addEventListener('click',function(){
+    filter=this.getAttribute('data-filter');ensureSelectedVisible();render();
+  });
+  els=root.querySelectorAll('[data-template]');
+  for(i=0;i<els.length;i++)els[i].addEventListener('click',function(){
+    var next=Number(this.getAttribute('data-template'));
+    if(next!==selected){selected=next;markDirty();}
+    render();
+  });
+  els=root.querySelectorAll('[data-jump]');
+  for(i=0;i<els.length;i++)els[i].addEventListener('click',function(){
+    var next=Number(this.getAttribute('data-jump'));
+    if(next!==selected){selected=next;markDirty();}
+    filter='全部';render();
+  });
+  on('do-generate',submit);
+  on('do-login',login);
+  on('back-form',function(){state='select';loginBanner='';render();});
+  on('go-loading',function(){state='loading';render();});
+  on('open-preview',function(){layerKind='preview';pageNo=1;fitMode='page';zoomLv=1;paintLayer();});
+  on('open-print',function(){layerKind='print';paintLayer();});
+}
+function bindLayer(){
+  on('ly-close',closeLayer);on('ly-close-2',closeLayer);
+  on('to-print',function(){layerKind='print';paintLayer();});
+  var els=layer.querySelectorAll('[data-page],[data-fit],[data-zoom]'),i;
+  for(i=0;i<els.length;i++)els[i].addEventListener('click',function(){
+    if(this.getAttribute('aria-disabled')==='true')return;
+    if(this.hasAttribute('data-page'))pageNo=Number(this.getAttribute('data-page'));
+    if(this.hasAttribute('data-fit'))fitMode=this.getAttribute('data-fit');
+    if(this.hasAttribute('data-zoom'))zoomLv=Number(this.getAttribute('data-zoom'));
+    paintLayer();
+  });
+}
+function closeLayer(){layerKind=null;paintLayer();}
+function on(id,fn){var e=document.getElementById(id);if(e)e.addEventListener('click',fn);}
+
+/* 校验 → 登录态 → 提交。三道门的顺序是固定的：
+   字段不合格连登录都不用问，请求也根本不发。 */
+function validate(){
+  fieldErr={};
+  var bad=[];
+  FORM.forEach(function(f){
+    if(f[2]&&!String(formValues[f[0]]||'').trim()){
+      fieldErr[f[0]]='请填写'+f[1]+'，这一项是生成 PDF 的必填内容';
+      bad.push(f[0]);
+    }
+  });
+  return bad;
+}
+function submit(){
+  var bad=validate();
+  if(bad.length){
+    render();
+    var first=root.querySelector('[data-field="'+bad[0]+'"]');
+    if(first){first.focus();if(first.scrollIntoView)first.scrollIntoView({block:'center'});}
+    return;                                     /* 不进 submitting，不发请求 */
+  }
+  if(AUTH!=='in'){                              /* 登录态无效：先存草稿再去登录 */
+    DRAFT={idx:selected,values:JSON.parse(JSON.stringify(formValues))};
+    loginBanner=AUTH==='expired'?'expired':'';
+    state='signed-out';render();return;
+  }
+  submitted={idx:selected,values:JSON.parse(JSON.stringify(formValues))};
+  dirty=false;state='submitting';render();
+}
+function login(){
+  /* 演示：登录返回后必须重新确认会话有效才继续。会话没通过就退回本屏，草稿不动。 */
+  AUTH='in';
+  if(DRAFT){selected=DRAFT.idx;formValues=JSON.parse(JSON.stringify(DRAFT.values));DRAFT=null;}
+  loginBanner='ok';state='select';render();
+}
+
+render();
+
+function tick(){var d=new Date();document.getElementById('clock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
+fit();addEventListener('resize',function(){fit();if(layerKind==='preview')layoutPreview();});
+
+if(DEBUG){
+  var tab=document.getElementById('demo-tab'),panel=document.getElementById('demo-panel'),html='';
+  var all=STATES.concat(['illegal']);
+  for(var k=0;k<all.length;k++)html+='<a href="'+SELF+'?debug=1&state='+all[k]+(all[k]==='signed-out'?'&auth=out':'')+'">'+all[k]+'</a>';
+  for(var t=0;t<TEMPLATES.length;t++)
+    html+='<a href="'+SELF+'?debug=1&state=generated&tpl='+TEMPLATES[t].id+'">已生成 · '+TEMPLATES[t].title+'</a>';
+  html+='<a href="'+SELF+'?debug=1&state=generated&tpl=nope">非法 tpl（fail-closed）</a>';
+  html+='<a href="'+SELF+'?debug=1&auth=out">select · 未登录</a>';
+  html+='<a href="'+SELF+'?debug=1&auth=expired">select · 登录已过期</a>';
+  html+='<a href="'+SELF+'?debug=1&state=nope">非法 state（fail-closed）</a>';
+  panel.innerHTML=html;tab.classList.add('on');
+  tab.addEventListener('click',function(){panel.classList.toggle('on');});
+}
+})();
+</script>
+</body>
+</html>

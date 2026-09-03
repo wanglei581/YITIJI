@@ -5,7 +5,8 @@
 // 绝不上传简历、不形成投递/招聘闭环，不与任何企业端数据关联。
 //
 // 登录会员的收藏走服务端 /me/favorites（见 FavoritesProvider）；本文件只服务
-// 未登录/匿名态。job 沿用既有 STORAGE_KEY，历史本机收藏不丢失。
+// 未登录/匿名态。job 沿用既有 STORAGE_KEY。公共一体机上本机收藏会在登出 /
+// 隐私清场时清掉，不把上一游客的意向留给下一位。
 //
 // 「合并到账号」：登录后由用户在「我的收藏」显式触发（幂等，不覆盖服务端收藏），
 // 合并成功后清空对应本机记录；不自动合并、不静默上传。
@@ -60,5 +61,27 @@ export function removeLocalFavorites(merged: Array<{ type: FavoriteTargetType; i
     const ids = new Set(merged.filter((m) => m.type === type).map((m) => m.id))
     if (ids.size === 0) continue
     write(type, readLocalFavorites(type).filter((x) => !ids.has(x)))
+  }
+}
+
+/** 本机是否还留着上一位游客的收藏（空数组 / 读失败都不算残留）。 */
+export function hasLocalFavorites(): boolean {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return false
+    return FAVORITE_TYPES.some((type) => readLocalFavorites(type).length > 0)
+  } catch {
+    return false
+  }
+}
+
+/** 隐私清场 / 登出时清空本机收藏，避免下一游客看见上一游客的心形标记。 */
+export function clearAllLocalFavorites(): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return
+    for (const type of FAVORITE_TYPES) {
+      window.localStorage.removeItem(STORAGE_KEYS[type])
+    }
+  } catch {
+    // 清不掉时 hasLocalFavorites 仍可能读到残留，下一次清场会再试。
   }
 }

@@ -27,6 +27,10 @@ import type {
   DeviceFleetConfigState,
   DeviceFleetConfigArea,
   DeviceFleetIssueKind,
+  CreateReleaseObservationPlanInput,
+  ReleaseObservationPlanRecord,
+  ReleaseObservationPlansResponse,
+  UpdateReleaseObservationPlanInput,
 } from './types'
 
 export type {
@@ -55,6 +59,10 @@ export type {
   DeviceFleetConfigState,
   DeviceFleetConfigArea,
   DeviceFleetIssueKind,
+  CreateReleaseObservationPlanInput,
+  ReleaseObservationPlanRecord,
+  ReleaseObservationPlansResponse,
+  UpdateReleaseObservationPlanInput,
 }
 
 interface AdminDeviceServiceInterface {
@@ -68,6 +76,14 @@ interface AdminDeviceServiceInterface {
   emergencyRevokeTerminal(terminalId: string, input: EmergencyRevokeTerminalInput): Promise<EmergencyRevokeTerminalResult>
   createTerminalBindCode(terminalId: string, ttlMinutes?: number): Promise<TerminalBindCodeCreated>
   createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated>
+  getReleaseObservationPlans(): Promise<ReleaseObservationPlansResponse>
+  createReleaseObservationPlan(input: CreateReleaseObservationPlanInput): Promise<ReleaseObservationPlanRecord>
+  updateReleaseObservationPlan(planId: string, input: UpdateReleaseObservationPlanInput): Promise<{
+    planId: string
+    status: 'active' | 'paused' | 'cancelled'
+    version: number
+    artifactVersion: string
+  }>
 }
 
 const adapter: AdminDeviceServiceInterface =
@@ -108,3 +124,12 @@ export const createTerminalBindCode = (terminalId: string, ttlMinutes?: number) 
 /** Admin 预创建 planned 设备资产；不签发 Agent 凭证。 */
 export const createPlannedTerminal = (input: CreatePlannedTerminalInput) =>
   adapter.createPlannedTerminal(input)
+
+/** F0.5 发布观察：仅显示与回报版本事实，不下载、不安装、不控制 Windows 服务。 */
+export const getReleaseObservationPlans = () => adapter.getReleaseObservationPlans()
+
+export const createReleaseObservationPlan = (input: CreateReleaseObservationPlanInput) =>
+  adapter.createReleaseObservationPlan(input)
+
+export const updateReleaseObservationPlan = (planId: string, input: UpdateReleaseObservationPlanInput) =>
+  adapter.updateReleaseObservationPlan(planId, input)

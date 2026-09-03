@@ -24,6 +24,7 @@
     "graph:check": "node scripts/generate-project-graph.mjs --check",
     "graph:query": "node scripts/project-graph-query.mjs",
     "verify:ci-gate-coverage": "node scripts/verify-ci-gate-coverage.mjs",
+    "verify:fixture-time-bombs": "node scripts/verify-fixture-time-bombs.mjs",
     "verify:repository-integrity": "node scripts/verify-repository-integrity.mjs",
     "verify:deploy-authorization-gate": "node scripts/verify-deploy-authorization-gate.mjs",
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",

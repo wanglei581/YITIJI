@@ -356,6 +356,12 @@ for (const marker of [
 ]) {
   assert.match(signStamp, new RegExp(marker), `sign-stamp retains ${marker}`)
 }
+assert.match(signStamp, /stamp\.name/, 'sign-stamp shows the uploaded filename after stamp upload')
+assert.doesNotMatch(
+  signStamp,
+  /<img[\s\S]{0,200}stamp\.(fileAccessUrl|fileUrl)/,
+  'sign-stamp does not echo the signature/stamp image on the public screen',
+)
 
 const printUpload = read('src/pages/print/PrintUploadPage.tsx')
 assert.match(

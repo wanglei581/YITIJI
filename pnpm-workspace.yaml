@@ -12,7 +12,15 @@ overrides:
   hono: 4.12.27
   multer: 2.2.0
   js-yaml: 4.3.1
-  fast-uri: 3.1.5
+  # fast-uri: 2026-09-02/03 新发四条 high，全部影响 <3.1.6、首修 3.1.6 ——
+  #   GHSA-5jgf-p345-68v8（IDN 规范化被跳过导致 host 混淆）
+  #   GHSA-f65p-4m7j-42xc（畸形 IPv6 导致 SSRF）
+  #   GHSA-fph4-wmhf-6fwf（重复主机名导致 SSRF）
+  #   GHSA-jqff-g426-hqxp（百分号编码 scheme 规范化导致 host 混淆）
+  # 原先钉的 3.1.5 当初本身就是安全修复，现在被新公告覆盖，必须再往前。
+  # 取 3.1.6（2026-08-23）而非昨日发布的 3.1.7：同样越过四条，且满足 minimumReleaseAge。
+  # 不取 4.x：跨大版本，fast-uri 是 ajv 的传递依赖，风险不成比例。
+  fast-uri: 3.1.6
   postcss: 8.5.18
   # nanoid: GHSA-28wg-ghj8-5hjv + GHSA-2v37-7h3g-55p8
   # postcss still requests the vulnerable 3.3.12 line; 3.3.18 fixes both loop conditions.
@@ -28,6 +36,33 @@ overrides:
   # 传递自 @prisma/config@7.8.0，它精确锁 7.1.5，所以只能靠 override 抬版本。
   # 这是跨大版本覆盖：升级 prisma 到自带 8.x 的版本后应删掉本条。
   deepmerge-ts@7.1.5: 8.0.0
+  # browserslist: GHSA-c83g-rgw3-j3cx（缓存无淘汰致内存无界增长）
+  #             + GHSA-73wf-gq98-2v4g（不可信 browserslist-stats.json 触发崩溃/原型写入）
+  # 两条都影响 <=4.28.6，首个修复版 4.28.7；这里钉 4.28 线最新的 4.28.8。
+  # 传递自 @vitejs/plugin-react → @babel/core → @babel/helper-compilation-targets，
+  # 三端都放在 devDependencies，生产 SPA 包不含这段，但门禁扫 full tree，high 就是红。
+  # patch 级升级，babel 只调 browserslist(query) / loadConfig，4.28.7 改的是缓存淘汰
+  # 与 normalizeStats 的键守卫，不动查询 DSL。
+  browserslist: 4.28.8
+  # mysql2: GHSA-3f6p-5ww8-9rcr（认证插件被降级到 mysql_clear_password，明文凭据泄露）
+  # 影响 <3.22.0，首个修复版 3.22.0。
+  # **不能钉 3.22.x**：mysql2 另有 GHSA-rgwj-5xj2-c3m3（medium，压缩协议 zlib 无界解压），
+  # 影响 <=3.23.0、首修 3.23.1。全局 override 会把整棵树锁死，钉 3.22.6 等于既没修这条、
+  # 又堵住将来解析到 3.23.1+。取 3.24.0（2026-08-23）同时越过两条公告；
+  # 不取当日发布的 3.24.3 是照顾仓库的 minimumReleaseAge 供应链策略。
+  # 载体路径（实测 pnpm why mysql2 --prod）：
+  #   api(dependencies) → @prisma/client → prisma → mysql2
+  # prisma 在 services/api 里确实是 devDependency，但 @prisma/client（生产依赖）把它作为
+  # optional peer 拉进来，pnpm 的 auto-install-peers 会实体化进 optionalDependencies，
+  # 而 optional 依赖**会进 --prod 树**。所以 mysql2 随生产依赖发布，不是「只在 dev」——
+  # 把 prisma 从 devDependencies 删掉也去不掉它，按「只在 dev」的理解去修会修错方向。
+  # 运行时不可达仍成立：API 进程连 PG/SQLite（@prisma/adapter-pg / adapter-libsql）时不
+  # require 它；但 prisma db pull / Studio 指向 mysql URL 会加载。
+  # 不走「已接受-不可达」而是照修：门禁只写死过一条例外（GHSA-qwww-vcr4-c8h2，
+  # 修它等于把三端迁到 React Router 8），本条有同 major 补丁，扩例外是改门禁政策而非修复。
+  # 同 major 升级，且比已有的 deepmerge-ts 7.1.5 → 8.0.0（同样来自 prisma@7.8.0，跨 major）更保守。
+  # 3.22 的行为变化就是漏洞修复本身：默认关掉 mysql_clear_password。
+  mysql2: 3.24.0
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true

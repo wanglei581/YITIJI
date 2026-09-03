@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>从零生成简历 · 职易达</title>
+<!--
+  S18 · AI 简历从零生成 + 生成预览闭环（青序流光，1080x1920 单 HTML 宿主）
+  route: /resume/generate          —— apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx
+         /resume/generate/preview  —— apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx
+
+  本页只做一件事：把用户口述/手填的真实资料收成结构化槽位，提交一次生成，然后在同一页
+  核对、就地改描述、导出、必要时进打印确认。**本页不做简历诊断**（那是 21/22 的线），
+  也不复制 23 的优化版流程。
+
+  查询契约：
+    ?state=<下方 33 态之一>   —— 仅本原型使用；夹具态必须带 capture=1 或 debug=1
+    ?seg=edu|exp|proj        —— 第 3 步内部分段（教育/经历/项目），不是独立状态
+    ?format=pdf|docx|txt|md  —— 导出格式夹具（默认 pdf）；未登记取值一律进 illegal 屏。
+                                只有 pdf 现在能进打印确认，理由见「导出」一节。
+    ?taskId=<x>              —— 39-member-records.html 的会员回看深链，映射到 /resume/generate/preview
+    ?capture=1 / ?debug=1    —— 夹具可达门 + 技术披露门；?flat=1 截图去动效
+    非法 state / 非法 seg → illegal（不回显原始参数）；夹具态裸地址 → session-lost / preview-no-result
+
+  真实合同（来源：代码，不是想象）：
+    字段      ResumeGenerateInput{ basic, intention, education[], experience[], projects[],
+              skills[], certificates[], selfIntro? }（packages/shared/src/types/ai.ts:289）。
+              上限来自 ResumeGeneratePage.tsx：education 6 / experience 8 / projects 6 /
+              skills 20 / certificates 15。四步是本静态宿主对 React 六步的合并，字段一个不少。
+    必填      只冻结两项：step0 basic.name、step1 intention.position
+              （ResumeGeneratePage.tsx canNext）。其余全部可空。
+    只提交    buildInput 过滤：教育要 school；经历要 company 且 role；项目要 name。
+              半空条目不提交 —— 页面必须把这件事写在行上，不能等提交后才发现少了。
+    防编造    LlmResumeGenerateService：LLM 只回按 index 对齐的润色文本
+              （summary/educationDesc/experienceDesc/projectDesc/skillsPolished），
+              学校/专业/学位/公司/职务/项目名/证书/时间段由服务端从输入逐字复制。
+              数组长度漂移即判非法。缺项由 computeMissingHints 确定性算出，AI 不代填。
+    缺失提示  computeMissingHints(llm-resume-generate.service.ts:81)：无联系方式 / 无教育 /
+              无经历且无项目 / 无技能 / 经历描述 <20 字。本页 hintsOf() 是它的逐条镜像，
+              页面上显示的每一条都是从当前内容算出来的，不是写死的文案。
+    语音      POST /resume/voice/transcribe（multipart WAV）→ { text, providerName }。
+              ResumeTranscriptConfirmDialog 的真实状态机：requesting_permission → recording
+              → transcribing → ready（可改）→ 确认写入。单次上限 58 秒，不保存原始音频，
+              **未确认前一个字都不写进表单**。没有声纹、没有实时通话、没有音量波形含义。
+    生成      POST /resume/generate 单次等待完整 completed/failed。没有字段流式到达，
+              没有百分比。能力未探测前 availability=unknown（aiOutage.ts fail-closed 口径）；
+              isAiOutage 只把**能力级**故障判成不可用，限流/参数错只是本次失败，必须留重试。
+    草稿      exportResumeDraft → POST /resume/generate/export { draft:true }，不经过模型，
+              服务端只做 pdfkit 排版，文件名前缀「简历草稿（未经AI润色）」。AI 挂掉照常可用，
+              但它**不是** AI 润色的等价物：没有润色、没有缺失提示，页面必须写清。
+    预览进入  只有两条：submit 返回 completed 且 resume 存在（router state），或带 taskId 由
+              服务端读回（getResumeGenerate，凭登录身份或匿名一次性令牌）。裸地址一律空态。
+    令牌      accessToken 只在提交响应返回一次（ai.ts:318 注释）。不上屏、不进地址栏、
+              不写本机存储 —— 本页对此只做中文陈述，DOM/URL 里不出现任何令牌形状的串。
+    导出      POST /resume/generate/export → { fileId, filename, sizeBytes, pageCount,
+              signedUrl, expiresAt, printFileUrl? }。**只有 pdf 有页数与版式/模板**；
+              docx/txt/md 的 pageCount 恒为 0，templateId 只对 pdf 生效。
+              signedUrl 是短时下载链接、会过期；打印只认 printFileUrl（系统 HMAC content URL），
+              signedUrl 进不了 /print/jobs。printFileUrl 缺失时只能下载或重导出，不进打印。
+    孤儿链    历史 /resume/export 没有页面入口，本页**不**把它做成一个正式新页面；
+              导出是 /resume/generate/preview 上的一段，不另起路由。
+
+  本页不伪造：任务号、provider 在线、生成完成、文件、页数、保存进账号、打印、支付、
+              实时通话、声纹、音量波形含义、百分比、匹配度/评分/通过率。
+  超出 React 的原型级处理只有一处并已标注：点被禁用的主操作时，本页把缺的必填项显式标红
+              （React 只是置灰按钮）。这是可用性处理，不改变提交条件。
+
+  原型演示控制：普通地址完全不渲染；仅 ?debug=1 注入（data-proto-control="true"），保留 debug/capture/flat。
+  技术披露（端点名、DTO 字段、React 文件名）只在 ?debug=1 / ?capture=1 下出现在夹具条里，
+  普通地址上一个都不显示。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer;text-align:inherit}
+input,textarea{font:inherit;color:inherit}
+
+/* ---------- 外壳 ---------- */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+.xq{flex:none;margin:16px 44px 0;border-radius:32px;padding:20px 34px 18px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-150px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:20px;position:relative;z-index:1}
+.xq-face{flex:none;width:80px;height:80px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:38px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:16px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:5px}
+.xq-ask{font-size:34px;line-height:1.26;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:8px;font-size:19px;line-height:1.5;color:rgba(242,239,228,.74)}
+.xq-doing b{color:#fff;font-weight:600}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec{flex:none;padding:0 44px;margin-top:16px}
+.sec.grow{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.grow>.card,.sec.grow>.state{flex:1;min-height:0}
+.sec.grow>.card{justify-content:space-evenly}
+.sec-label{display:flex;align-items:baseline;gap:14px;margin-bottom:10px}
+.sec-label .no{font-size:19px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:28px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto;text-align:right}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 26px;display:flex;flex-direction:column}
+.state{border-radius:var(--r-lg);padding:24px 30px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;justify-content:center}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:29px;font-weight:700;line-height:1.25}
+.state-p{margin-top:12px;font-size:21px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+
+.lb{display:inline}
+.btn{min-height:76px;padding:0 26px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:600;text-align:center;line-height:1.25}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{background:var(--line-2);color:#5d6a63;cursor:default}
+.ctabar{flex:none;padding:16px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.ctabar .btn{flex:1}
+.ctabar .btn.wide{flex:1.6}
+.cta-reason{flex:none;padding:0 44px;margin-bottom:12px;font-size:20px;font-weight:600;color:var(--wheat-d);display:flex;align-items:center;gap:10px;line-height:1.4}
+.cta-reason.bad{color:var(--cinnabar-d)}
+
+/* 底部只留一条：当前这一屏真正相关的那句话。三列固定说明条已撤掉 —— 每屏重复同样的
+   三段话既占地方，也把产品页做成了验收面板。 */
+.truth{flex:none;padding:14px 44px 15px;border-top:1px solid var(--line);background:var(--paper);display:flex;align-items:center;gap:14px}
+.truth i{flex:none;width:32px;height:32px;border-radius:11px;background:var(--surface);border:1px solid var(--line-2);color:var(--ink-3);font-style:normal;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.truth span{flex:1;min-width:0;font-size:18px;line-height:1.45;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.navbar{flex:none;height:112px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.nav-item .ni{font-size:20px;color:var(--ink-3);font-weight:600}
+
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+@keyframes k-pulse{0%,100%{opacity:.28;transform:scale(.86)}50%{opacity:1;transform:scale(1)}}
+.pulse{display:inline-flex;gap:8px;align-items:center;flex:none}
+.pulse i{width:12px;height:12px;border-radius:50%;background:var(--teal);display:block;animation:k-pulse 1600ms ease-in-out infinite}
+.pulse i:nth-child(2){animation-delay:200ms}.pulse i:nth-child(3){animation-delay:400ms}
+@keyframes k-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rise{animation:k-rise 240ms cubic-bezier(.22,1,.36,1) both}
+.press:active{transform:scale(.985)}
+/* 伪元素也要降级：`*` 选不中 ::before/::after，扫描光带正是画在伪元素上的。 */
+.flat,.flat *,.flat *::before,.flat *::after{animation:none!important;transition:none!important;box-shadow:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ---------- 四步进度 ---------- */
+.prog{flex:none;display:flex;gap:10px;padding:0 44px;margin-top:14px}
+.prog span{flex:1;display:flex;flex-direction:column;gap:7px;font-size:17px;font-weight:600;color:var(--ink-3)}
+.prog span u{display:block;height:9px;border-radius:5px;background:var(--line);text-decoration:none}
+.prog span[data-on="done"]{color:var(--teal-d)}.prog span[data-on="done"] u{background:var(--teal)}
+.prog span[data-on="now"]{color:var(--ink)}.prog span[data-on="now"] u{background:var(--deep)}
+
+/* ---------- 表单 ---------- */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.fgrid.one{grid-template-columns:1fr}
+.cmp p{white-space:pre-line}
+.field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.fl{display:flex;align-items:center;gap:9px;font-size:19px;font-weight:700;color:var(--ink-2)}
+.fl em{font-style:normal;font-size:16px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--wheat-soft);color:var(--wheat-d)}
+.fl i{margin-left:auto;font-style:normal;font-size:16px;font-weight:700;padding:3px 9px;border-radius:8px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-3)}
+.fl i[data-on="1"]{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d)}
+.fin{width:100%;min-height:74px;padding:0 18px;border:1px solid var(--line-2);border-radius:18px;background:var(--paper);font-size:22px}
+textarea.fin{padding:14px 18px;line-height:1.5;resize:none;min-height:104px}
+.fin::placeholder{color:var(--ink-3);opacity:.8}
+.fin[aria-invalid="true"]{border-color:var(--cinnabar);background:var(--cinnabar-soft)}
+.ferr{font-size:18px;font-weight:700;color:var(--cinnabar-d)}
+.chips{display:flex;flex-wrap:wrap;gap:9px}
+.chip2{min-height:52px;min-width:92px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center;border-radius:16px;border:1px solid var(--line-2);background:var(--paper);color:var(--ink-2);font-size:19px;font-weight:600}
+.chip2[aria-pressed="true"]{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);font-weight:700}
+.qh{display:flex;align-items:baseline;gap:10px;font-size:17px;font-weight:700;color:var(--ink-3);margin-bottom:7px}
+.qh b{color:var(--teal-d)}
+
+/* ---------- 分段 + 条目列表 ---------- */
+.seg{display:flex;gap:10px;margin-bottom:12px}
+.seg button{flex:1;min-height:64px;border-radius:18px;border:1px solid var(--line-2);background:var(--paper);font-size:21px;font-weight:700;color:var(--ink-2);display:flex;align-items:center;justify-content:center;gap:9px}
+.seg button[aria-selected="true"]{background:var(--deep);border-color:var(--deep);color:var(--emerald)}
+.seg button em{font-style:normal;font-size:17px;font-weight:700;opacity:.8}
+.vlist{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:12px;padding-right:4px}
+.ent{text-align:left;border:1px solid var(--line);border-radius:var(--r-md);background:var(--paper);padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.ent-h{display:flex;align-items:center;gap:12px}
+.ent-h b{font-size:21px;font-weight:700}
+.ent-h .st{font-size:17px;font-weight:700;padding:5px 12px;border-radius:11px}
+.ent-h .st.on{background:var(--teal-soft);color:var(--teal-d)}
+.ent-h .st.off{background:var(--wheat-soft);color:var(--wheat-d)}
+.ent-h .sp{flex:1}
+.iconbtn{flex:none;width:56px;height:56px;border-radius:17px;border:1px solid var(--line-2);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.iconbtn.warn{border-color:transparent;background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.addbtn{flex:none;min-height:68px;border-radius:20px;border:2px dashed var(--line-2);background:transparent;display:flex;align-items:center;justify-content:center;gap:10px;font-size:21px;font-weight:600;color:var(--ink-3)}
+.voicebtn{min-height:56px;padding:0 20px;border-radius:17px;border:1px solid var(--line-2);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;gap:10px;font-size:19px;font-weight:700;color:var(--teal-d)}
+.rowend{display:flex;align-items:center;gap:12px}
+.rowend .sp{flex:1}
+.rowend span.tip{font-size:17px;color:var(--ink-3);font-weight:600}
+
+/* ---------- 说明块 ---------- */
+.split{display:flex;gap:14px}
+.split>*{flex:1;min-width:0}
+.mini{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-md);padding:18px 20px;display:flex;flex-direction:column}
+.mini h4{font-size:22px;font-weight:700;display:flex;align-items:center;gap:10px}
+.mini p{margin-top:9px;font-size:19px;line-height:1.5;color:var(--ink-2)}
+.note{display:flex;gap:13px;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.note .sq{flex:none;width:9px;height:9px;border-radius:3px;background:var(--teal);margin-top:8px}
+.notes{display:flex;flex-direction:column;gap:12px}
+.notes.fill{flex:1;min-height:0;justify-content:space-evenly;gap:12px}
+.helper{display:flex;align-items:center;gap:14px;padding:12px 20px;border-radius:20px;background:var(--paper);border:1px solid var(--line-2)}
+.helper .ht{flex:1;min-width:0;font-size:19px;font-weight:600;color:var(--ink-2)}
+.hbtn{min-height:56px;padding:0 20px;border-radius:17px;background:var(--surface);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:9px;font-size:19px;font-weight:700;color:var(--ink)}
+.fx{display:flex;align-items:center;gap:12px;min-height:56px;padding:9px 20px;border-radius:18px;background:var(--wheat-soft);color:var(--wheat-d);font-size:18px;font-weight:600;line-height:1.4}
+.fx .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:9px;padding:4px 10px;font-size:16px;letter-spacing:1px}
+/* 行卡吃掉本区多余高度，但有上限 —— 再高就成了空心盒子；剩下的交给 space-evenly
+   摊成几条小缝，而不是堆在某一处。整卡的余量由 .sec.grow>.card 的 space-evenly 兜。 */
+.rows3{display:flex;flex-direction:column;gap:14px;flex:1;min-height:0;justify-content:space-evenly}
+.rows3>*{flex:1 1 auto;min-height:96px;max-height:150px}
+.orow .om>em{display:block;margin-top:6px;font-style:normal;font-size:17px;font-weight:700;color:var(--teal-d)}
+.orow{text-align:left;display:flex;align-items:center;gap:16px;min-height:88px;padding:13px 18px;border:1px solid var(--line);border-radius:20px;background:var(--paper)}
+.orow .oi{flex:none;width:62px;height:62px;border-radius:18px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.orow .om{flex:1;min-width:0}
+.orow .om>b{display:block;font-size:24px;font-weight:700}
+.orow .om>span{display:block;margin-top:6px;font-size:19px;line-height:1.4;color:var(--ink-3)}
+.orow .om>span b{font-weight:700;color:var(--ink-2)}
+.orow .go{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-3);display:flex;align-items:center;justify-content:center}
+.orow[aria-disabled=true]{border-style:dashed;background:var(--surface)}
+.orow[aria-disabled=true] .oi{background:var(--line);color:#5d6a63}
+.orow .off{flex:none;padding:6px 13px;border-radius:11px;background:var(--line);color:#4f5a54;font-size:17px;font-weight:700}
+
+/* ---------- 处理中主视觉 ---------- */
+/* 克制的科技感：一条来回的扫描线 + 三个呼吸点。没有百分比、没有预计时间、没有假波形。
+   降级（flat / reduced-motion）后扫描线停在顶边，读起来就是一条装饰亮边。 */
+.proc{flex:none;position:relative;overflow:hidden;border-radius:var(--r-lg);padding:26px 30px;min-height:184px;display:flex;align-items:center;background:linear-gradient(152deg,var(--deep-2) 0%,var(--deep) 72%);color:#f2efe4}
+.proc::after{content:"";position:absolute;right:-130px;top:-140px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.17),transparent 66%)}
+.proc .scan{position:absolute;left:26px;right:26px;top:18px;height:3px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--emerald),transparent);animation:k-scan 2600ms cubic-bezier(.45,0,.55,1) infinite}
+@keyframes k-scan{0%{transform:translateY(0);opacity:.4}50%{transform:translateY(140px);opacity:1}100%{transform:translateY(0);opacity:.4}}
+.proc-row{position:relative;z-index:1;display:flex;align-items:center;gap:22px;width:100%}
+.proc-ic{flex:none;width:88px;height:88px;border-radius:28px;background:rgba(46,230,168,.12);border:1.5px solid rgba(46,230,168,.42);color:var(--emerald);display:flex;align-items:center;justify-content:center}
+.proc-m{flex:1;min-width:0}
+.proc-m>b{display:block;font-size:30px;font-weight:700;line-height:1.24}
+.proc-m>span{display:block;margin-top:9px;font-size:21px;line-height:1.5;color:rgba(242,239,228,.78)}
+.proc .pulse i{background:var(--emerald)}
+
+/* ---------- 进程步骤：现在在哪一步、下一步是什么（不是进度百分比） ---------- */
+.steps{display:flex;flex-direction:column;gap:12px}
+.steps.fill{flex:1;min-height:0;justify-content:space-evenly}
+.steps.fill>.step{flex:1 1 auto;max-height:136px}
+.step{display:flex;align-items:center;gap:16px;min-height:92px;padding:14px 20px;border-radius:22px;border:1px solid var(--line);background:var(--paper)}
+.step .sn{flex:none;width:54px;height:54px;border-radius:17px;background:var(--surface);border:1px solid var(--line-2);color:var(--ink-3);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700}
+.step .sm{flex:1;min-width:0}
+.step .sm>b{display:block;font-size:23px;font-weight:700}
+.step .sm>span{display:block;margin-top:5px;font-size:19px;line-height:1.4;color:var(--ink-3)}
+.step .sx{flex:none;padding:7px 15px;border-radius:13px;font-size:17px;font-weight:700;background:var(--line);color:#4f5a54}
+.step[data-on=done]{border-color:transparent;background:var(--teal-soft)}
+.step[data-on=done] .sn{background:var(--teal);border-color:transparent;color:#fff}
+.step[data-on=done] .sx{background:var(--surface);color:var(--teal-d)}
+.step[data-on=now]{border-color:var(--deep);background:var(--surface)}
+.step[data-on=now] .sn{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.step[data-on=now] .sx{background:var(--deep);color:var(--emerald)}
+
+/* ---------- 内容计数（真数据，不是说明文字） ---------- */
+.tiles{display:flex;gap:12px}
+.tiles>div{flex:1;min-width:0;border-radius:22px;border:1px solid var(--line);background:var(--paper);padding:16px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.tiles>div>b{font-size:33px;font-weight:700;line-height:1}
+.tiles>div>span{font-size:18px;color:var(--ink-3);font-weight:600;text-align:center;line-height:1.3}
+.tiles>div[data-zero="1"]{background:var(--surface);border-style:dashed}
+.tiles>div[data-zero="1"] b{color:var(--ink-3)}
+
+/* ---------- 把文件带走：扫码保存到手机 ---------- */
+/* 公共终端不落本机（feature-scope.md §2.2 文件显示与公共终端隐私口径）：
+   PDF 页内看，要带走一律走短时签名链接的二维码，由本人手机保存。
+   静态稿只画取码位，不生成可扫描图形 —— 与 03-login-gate.html 同一口径。 */
+/* 取件模块是一块**紧凑横向工作区**：左边取码位、右边动作，两列自然高度并排。
+   这里刻意不给 flex:1 —— 让它吃掉整张卡的剩余高度，二维码占位就会被 stretch 成一个
+   接近整屏的空心框，那正是上一版被打回的问题。剩余高度交给卡片级 space-evenly。 */
+.take{display:flex;gap:16px;align-items:stretch}
+.qrslot{flex:none;width:322px;border-radius:var(--r-md);border:1px solid var(--line-2);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px 18px;text-align:center}
+.qrslot .qi{width:208px;height:208px;border-radius:26px;border:2px dashed var(--line-2);background:var(--paper);color:var(--ink-3);display:flex;align-items:center;justify-content:center}
+.qrslot>b{font-size:24px;font-weight:700}
+.qrslot>span{font-size:17px;line-height:1.45;color:var(--ink-3)}
+.qrslot>span b{color:var(--ink-2);font-weight:700}
+.take-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;justify-content:space-evenly}
+
+/* ---------- 语音 ---------- */
+.cmp{display:flex;gap:14px}
+.cmp>div{flex:1;min-width:0;border-radius:var(--r-md);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.cmp .raw{background:var(--paper);border:1px solid var(--line-2)}
+.cmp .pol{background:var(--teal-soft);border:1px solid var(--teal)}
+.cmp h5{font-size:18px;font-weight:700;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+.cmp .pol h5{color:var(--teal-d)}
+.cmp p{font-size:20px;line-height:1.5;color:var(--ink-2)}
+.cmp .add{background:var(--teal-soft);border:1px solid var(--teal)}
+.cmp .add h5{color:var(--teal-d)}
+
+/* ---------- 预览纸面 ---------- */
+.sheet{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;background:#fff;border:1px solid var(--line-2);border-radius:var(--r-md);padding:22px 26px;display:flex;flex-direction:column;gap:14px}
+.sh-top{display:flex;align-items:flex-end;gap:14px;padding-bottom:12px;border-bottom:2px solid var(--deep)}
+.sh-top b{font-size:32px;font-weight:700}
+.sh-top span{font-size:20px;color:var(--ink-2)}
+.sh-top em{margin-left:auto;font-style:normal;font-size:18px;color:var(--ink-3)}
+.sh-b{display:flex;flex-direction:column;gap:6px}
+.sh-b h3{font-size:19px;font-weight:700;color:var(--teal-d);letter-spacing:2px;display:flex;align-items:center;gap:10px}
+.sh-b p{font-size:19px;line-height:1.5;color:var(--ink-2)}
+.sh-b p b{color:var(--ink);font-weight:700}
+.tg{font-size:16px;font-weight:700;padding:3px 10px;border-radius:9px;letter-spacing:0}
+.tg.keep{background:var(--slate-soft);color:var(--slate-d)}
+.tg.pol{background:var(--teal-soft);color:var(--teal-d)}
+.hintlist{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;justify-content:space-evenly}
+.hrow{display:flex;align-items:center;gap:14px;min-height:76px;padding:11px 18px;border-radius:19px;background:var(--wheat-soft);border:1px solid #e6d8b4;color:var(--wheat-d);font-size:19px;line-height:1.4;font-weight:600}
+.hrow .hn{flex:none;width:40px;height:40px;border-radius:13px;background:#e8dcbe;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700}
+.hrow .hm{flex:1;min-width:0}
+.hrow .hgo{flex:none;min-height:52px;padding:0 16px;border-radius:15px;background:var(--surface);border:1px solid var(--line-2);color:var(--ink);font-size:18px;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+
+/* ---------- 文件 / 导出 ---------- */
+.fhead{display:flex;flex-direction:column;gap:14px}
+.fbox{display:flex;align-items:center;gap:18px}
+.fbox .fi{flex:none;width:76px;height:76px;border-radius:23px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.fbox .fi.mute{background:var(--paper);border:1px dashed var(--line-2);color:var(--ink-3)}
+.fbox .fm{flex:1;min-width:0;display:flex;flex-direction:column}
+.fbox .fm>.fn{font-size:26px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbox .fs{margin-top:7px;font-size:19px;color:var(--ink-3)}
+.fmts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;flex:1;min-height:0}
+.fmt{border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--paper);padding:16px 18px;display:flex;flex-direction:column;gap:7px;text-align:left}
+.fmt[aria-checked="true"]{border-color:var(--deep);background:var(--surface);box-shadow:inset 0 0 0 2px var(--deep)}
+.fmt{justify-content:space-evenly}
+.fmt b{font-size:23px;font-weight:700;display:flex;align-items:center;gap:10px}
+.fmt small{font-size:18px;line-height:1.45;color:var(--ink-3)}
+.fmt .fmeta{display:flex;align-items:baseline;gap:10px;font-size:17px;line-height:1.4}
+.fmt .fmeta .k{flex:none;color:var(--ink-3);font-weight:700}
+.fmt .fmeta .v{flex:1;min-width:0;color:var(--ink-2);font-weight:600}
+.fmt .pg{font-size:17px;font-weight:700;color:var(--slate-d);background:var(--slate-soft);border-radius:9px;padding:3px 10px}
+.lay{display:flex;flex-wrap:wrap;gap:9px}
+.meta{display:flex;gap:10px;flex-wrap:wrap}
+.chip{min-height:52px;padding:0 18px;border-radius:15px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:9px;font-size:19px;color:var(--ink-2);font-weight:600}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.chip.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.hr{height:1px;background:var(--line)}
+
+/* ---------- 原型演示控制（只在 debug=1 注入） ---------- */
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:5px;max-height:1840px;overflow:auto}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px;padding:2px 0 4px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:15px;padding:0 14px;border-radius:11px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="topback" href="21-resume-triage.html" data-route="/resume/source" aria-label="返回简历服务"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">第 1 步 / 共 4 步 · 基本信息</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif" aria-hidden="true">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow" id="xq-eyebrow">RESUME GENERATE</div>
+        <div class="xq-ask serif" id="xq-ask">从零写一份简历？</div>
+        <div class="xq-doing" id="xq-doing">我分四步问你，问完一次生成。</div>
+      </div>
+    </div>
+  </section>
+
+  <main class="body" id="body-root" data-screen="resume-generate" data-state="entry" data-route="/resume/generate" data-testid="resume-generate-state-entry"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="resume-generate-truth"><i aria-hidden="true">i</i><span id="truth-tx"></span></div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+</div>
+<script>
+/* ================= 常量与查询 ================= */
+var SCREEN='resume-generate';
+var Q=new URLSearchParams(location.search);
+var DEBUG=Q.get('debug')==='1';
+var CAPTURE=Q.get('capture')==='1';
+var FLAT=Q.get('flat')==='1';
+var TECH=DEBUG||CAPTURE;               /* 技术披露门：端点 / DTO / React 文件名只在这里出现 */
+var TASKID=Q.get('taskId');            /* 39-member-records.html 的会员回看深链 */
+
+/* 33 个业务状态。填写 → 生成 → 预览 → 导出，外加语音、降级与兜底。 */
+var STATES=[
+ 'entry','input-basic','input-intention','input-history','input-strengths','review',
+ 'validate-name','validate-position',
+ 'voice-recording','voice-transcribing','voice-confirm','voice-failed','voice-denied',
+ 'generating','generate-failed','ai-unavailable',
+ 'draft-exporting','draft-failed','draft-ready',
+ 'preview-no-result','preview-loading','preview-failed','preview-ready','preview-hints','preview-editing',
+ 'export-chooser','export-exporting','export-failed','export-ready','export-url-expired','export-print-unavailable',
+ 'session-lost','illegal'
+];
+/* 走 /resume/generate/preview 的状态（导出是预览页上的一段，不另起路由）。 */
+var PREVIEW_VIEW={
+ 'preview-no-result':1,'preview-loading':1,'preview-failed':1,'preview-ready':1,'preview-hints':1,'preview-editing':1,
+ 'export-chooser':1,'export-exporting':1,'export-failed':1,'export-ready':1,'export-url-expired':1,'export-print-unavailable':1
+};
+/* 夹具态：画面里出现了「本该由用户敲进去或由服务端返回、但这里是预置的」内容。
+   只在 ?capture=1 或 ?debug=1 下可达；普通地址一律 fail-closed，
+   免得有人把一张静态图当成「已经生成好了 / 已经导出了」的证据。 */
+var FIXTURE={
+ 'review':1,'generating':1,'generate-failed':1,'ai-unavailable':1,
+ 'draft-exporting':1,'draft-failed':1,'draft-ready':1,
+ 'voice-confirm':1,
+ 'preview-ready':1,'preview-hints':1,'preview-editing':1,
+ 'export-chooser':1,'export-exporting':1,'export-failed':1,'export-ready':1,'export-url-expired':1,'export-print-unavailable':1
+};
+/* 夹具内容的两种来源，标签必须说清是哪一种。 */
+var FIXKIND={
+ 'review':'form','generating':'form','generate-failed':'form','ai-unavailable':'form',
+ 'draft-exporting':'form','draft-failed':'form','draft-ready':'server',
+ 'voice-confirm':'server',
+ 'preview-ready':'server','preview-hints':'server','preview-editing':'server',
+ 'export-chooser':'server','export-exporting':'server','export-failed':'server',
+ 'export-ready':'server','export-url-expired':'server','export-print-unavailable':'server'
+};
+/* 只有这三个状态真的握着一份服务端确认过的文件，才允许出现指向打印确认的链接。 */
+var CAN_PRINT={'draft-ready':1,'export-ready':1};
+var SEGS={edu:1,exp:1,proj:1};
+var SEG=SEGS[Q.get('seg')]?Q.get('seg'):'exp';
+
+/* ================= 图标 ================= */
+var ICO={
+ pen:'<path d="M4 17.5L14.5 7l2.5 2.5L6.5 20H4z"/><path d="M14.5 7l2-2a1.8 1.8 0 0 1 2.5 2.5l-2 2"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>',
+ aim:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>',
+ case:'<rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M8.5 7.5V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5v2"/>',
+ star:'<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>',
+ mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/>',
+ micoff:'<path d="M15 5.5V6a3 3 0 0 0-6 0v5"/><path d="M5.5 11.5a6.5 6.5 0 0 0 10 5.5"/><path d="M12 18v3"/><path d="M4 4l16 16"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/>',
+ warn:'<path d="M12 3.6 2.8 19.4h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+ x:'<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2"/>',
+ file:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ print:'<path d="M7 8.5V3.5h10v5"/><rect x="4" y="8.5" width="16" height="7.5" rx="2"/><path d="M7 13.5h10V21H7z"/>',
+ down:'<path d="M12 4v12"/><path d="M6.5 10.5L12 16l5.5-5.5"/><path d="M4 20h16"/>',
+ refresh:'<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ trash:'<path d="M4.5 7h15"/><path d="M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7"/><path d="M6.5 7l1 12.5A1.5 1.5 0 0 0 9 21h6a1.5 1.5 0 0 0 1.5-1.5L17.5 7"/>',
+ book:'<path d="M4 4.5h6a3 3 0 0 1 3 3V21a2.5 2.5 0 0 0-2.5-2.5H4z"/><path d="M20 4.5h-6a3 3 0 0 0-3 3V21a2.5 2.5 0 0 1 2.5-2.5H20z"/>',
+ eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+ help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.2 2.6c-.6.2-.8.7-.8 1.3v.4M12 16.6v.2"/>',
+ go:'<path d="M9 6l6 6-6 6"/>',
+ back:'<path d="M15 6l-6 6 6 6"/>',
+ spark:'<path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9z"/><path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',
+ qr:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M13.5 13.5h3v3h-3zM20.5 13.5v3M17.5 20.5h3M13.5 20.5h.01"/>',
+ phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M10.5 5.5h3M12 18.2h.01"/>'
+};
+function svg(n,w,sw,col){return '<svg width="'+(w||30)+'" height="'+(w||30)+'" viewBox="0 0 24 24" fill="none" stroke="'+(col||'currentColor')+'" stroke-width="'+(sw||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+var GO='<span class="go" aria-hidden="true">'+svg('go',22,2.3)+'</span>';
+
+/* ================= 地址构造：跨状态深链一律是真链接 ================= */
+function to(state,extra){
+ var p=new URLSearchParams();
+ p.set('state',state);
+ if(extra)for(var k in extra){if(extra[k]===null)p.delete(k);else p.set(k,extra[k])}
+ if(DEBUG)p.set('debug','1');
+ if(CAPTURE)p.set('capture','1');
+ if(FLAT)p.set('flat','1');
+ return '24-resume-generate.html?'+p.toString();
+}
+function routeOf(st){return PREVIEW_VIEW[st]?'/resume/generate/preview':'/resume/generate'}
+function lab(x){return String(x).replace(/(^|>)([^<>]+)/g,function(m,pre,txt){return txt.trim()?pre+'<span class="lb">'+txt+'</span>':m})}
+/* 可访问名只能是纯文字：把标签剥掉、把引号转义，否则 aria-label 会被 svg 里的引号截断。 */
+function nameOf(x){return String(x).replace(/<[^>]*>/g,'').replace(/\s+/g,' ').replace(/"/g,'&quot;').trim()}
+function a(o){
+ return '<a class="'+(o.cls||'')+' press" href="'+o.href+'" data-route="'+o.route+'" data-testid="'+o.tid+'" aria-label="'+nameOf(o.al||o.label)+'">'+lab(o.html||o.label)+'</a>';
+}
+function b(o){
+ return '<button type="button" class="'+(o.cls||'')+' press" data-go="'+(o.go||'')+'"'+(o.act?' data-act="'+o.act+'"':'')+
+  (o.dis?' aria-disabled="true"':'')+' data-testid="'+o.tid+'" aria-label="'+nameOf(o.al||o.label)+'">'+lab(o.html||o.label)+'</button>';
+}
+function orow(o){
+ var inner='<span class="oi">'+svg(o.icon,26)+'</span><span class="om"><b>'+o.t+'</b><span>'+o.d+'</span></span>';
+ if(o.off)return '<div class="orow" aria-disabled="true" data-testid="'+o.tid+'">'+inner+'<span class="off">'+o.off+'</span></div>';
+ if(o.href)return a({cls:'orow',href:o.href,route:o.route,tid:o.tid,al:o.al||o.t,html:inner+GO});
+ return b({cls:'orow',go:o.go,act:o.act,tid:o.tid,al:o.al||o.t,html:inner+GO});
+}
+
+/* ================= 表单模型：只在内存，页面刷新即丢 ================= */
+function blank(){
+ return {basic:{name:'',phone:'',email:'',city:''},
+  intention:{position:'',city:'',jobType:'',salary:''},
+  education:[{school:'',major:'',degree:'',period:'',description:''}],
+  experience:[{company:'',role:'',period:'',description:''}],
+  projects:[],
+  skillsText:'',certsText:'',selfIntro:'',voiceDraft:'',editDraft:''};
+}
+/* 预置填写夹具：合成资料，不是任何真人的简历。手机号按公共终端规则脱敏显示。 */
+function seedFull(){
+ return {basic:{name:'张示例',phone:'138****5678',email:'',city:'长沙'},
+  intention:{position:'用户运营',city:'长沙',jobType:'全职',salary:'4-6k'},
+  education:[{school:'湖南XX职业技术学院',major:'市场营销',degree:'大专',period:'2021.09 - 2024.06',
+    description:'主修市场调研与消费者行为，参加过校园营销大赛。'}],
+  experience:[
+    {company:'某科技有限公司',role:'运营专员',period:'2024.07 - 2025.08',
+     description:'独立运营 3 个用户社群，负责日常内容排期与活动执行。'},
+    {company:'某文化传播公司',role:'运营助理',period:'2023.07 - 2023.09',
+     description:'整理活动物料与签到数据。'}],
+  projects:[{name:'社群活动周',role:'执行',description:'连续 5 天的活动排期与物料准备。'}],
+  skillsText:'Excel、社群运营、活动策划',certsText:'普通话二级甲等',selfIntro:'习惯把运营动作拆成可复核的步骤。'};
+}
+/* 只填了必填两项的稀疏夹具：用来演示缺失提示是**算出来的**，不是写死的一句话。 */
+function seedThin(){
+ return {basic:{name:'李示例',phone:'',email:'',city:''},
+  intention:{position:'仓储物流',city:'株洲',jobType:'',salary:''},
+  education:[{school:'',major:'',degree:'',period:'',description:''}],
+  experience:[{company:'某仓储服务公司',role:'理货员',period:'',description:'理货。'}],
+  projects:[],skillsText:'',certsText:'',selfIntro:''};
+}
+var F=blank();
+
+function splitList(s,cap){
+ var raw=String(s||'').split(/[,，、\n]/),out=[],i,t;
+ for(i=0;i<raw.length;i++){t=raw[i].replace(/\s+/g,' ').trim();if(t)out.push(t)}
+ return out.slice(0,cap);
+}
+/* buildInput 的镜像：只提交填了关键字段的条目。 */
+function kept(list,keys){
+ var out=[],i,j,ok;
+ for(i=0;i<list.length;i++){ok=true;for(j=0;j<keys.length;j++){if(!String(list[i][keys[j]]||'').trim())ok=false}if(ok)out.push(list[i])}
+ return out;
+}
+function keptEdu(){return kept(F.education,['school'])}
+function keptExp(){return kept(F.experience,['company','role'])}
+function keptProj(){return kept(F.projects,['name'])}
+function skills(){return splitList(F.skillsText,20)}
+function certs(){return splitList(F.certsText,15)}
+
+/* computeMissingHints 的逐条镜像（llm-resume-generate.service.ts:81）。
+   页面上每一条提示都是从当前内容算出来的，改一个字就会变。 */
+function hintsOf(){
+ var h=[],e=keptExp(),thin=0,i;
+ if(!F.basic.phone.trim()&&!F.basic.email.trim())h.push({t:'没填联系方式（手机号或邮箱），对方联系不上你',go:'input-basic'});
+ if(keptEdu().length===0)h.push({t:'没填教育经历，建议补上学校与专业',go:'input-history',seg:'edu'});
+ if(e.length===0&&keptProj().length===0)h.push({t:'没填实习/工作或项目经历，简历说服力会偏弱',go:'input-history',seg:'exp'});
+ if(skills().length===0)h.push({t:'没填技能，建议补上和目标岗位相关的技能',go:'input-strengths'});
+ for(i=0;i<e.length;i++){if(String(e[i].description||'').trim().length<20)thin++}
+ if(thin>0)h.push({t:thin+' 段经历描述太短，建议补上具体职责与成果（有数字写数字）',go:'input-history',seg:'exp'});
+ return h;
+}
+
+/* 润色映射：只对描述类文本，且逐条对齐；事实字段一个都不动。 */
+var POL={
+ 'main.summary':'用户运营方向。带过 3 个用户社群，负责内容排期与活动执行；习惯把运营动作拆成可复核的步骤。',
+ 'main.edu.0':'主修市场调研与消费者行为方向课程，参加过校园营销大赛。',
+ 'main.exp.0':'独立运营 3 个用户社群；负责日常内容排期，并跟进活动执行。',
+ 'main.exp.1':'整理活动物料，并汇总签到数据。',
+ 'main.proj.0':'负责连续 5 天的活动排期与物料准备。',
+ 'thin.summary':'求职方向：仓储物流。做过理货工作。',
+ 'thin.exp.0':'负责理货。'
+};
+var POLKEY='main';
+function pol(k,fallback){var v=POL[POLKEY+'.'+k];return v||fallback}
+
+/* ================= 候选词：点一下才算你的答案 ================= */
+var CHIPS={
+ 'basic.city':['长沙','株洲','湘潭','岳阳','衡阳','常德'],
+ 'intention.position':['用户运营','客服专员','销售顾问','行政文员','仓储物流','普工'],
+ 'intention.city':['长沙','株洲','湘潭','岳阳','衡阳','省内不限'],
+ 'intention.jobType':['全职','实习','兼职'],
+ 'intention.salary':['面议','3-4k','4-6k','6-8k','8k 以上'],
+ 'degree':['初中及以下','高中','职高','中专','技校/中技','高职专科','大专','本科','硕士','博士','境外学历','其他'],
+ 'skills':['Excel','Word','PPT','收银','客服沟通','社群运营','活动策划','驾驶证 C1','普通话二级'],
+ 'certs':['普通话二级甲等','机动车驾驶证 C1','计算机二级','会计从业','电工证','育婴师']
+};
+
+/* ================= 顶部文案 ================= */
+var STEP_OF={'input-basic':1,'validate-name':1,'input-intention':2,'validate-position':2,'input-history':3,
+ 'voice-recording':3,'voice-transcribing':3,'voice-confirm':3,'voice-failed':3,'voice-denied':3,'input-strengths':4};
+var PILL={
+ entry:['','从零生成 · 先看要问什么'],
+ 'input-basic':['','第 1 步 / 共 4 步 · 基本信息'],
+ 'validate-name':['bad','第 1 步 / 共 4 步 · 缺必填'],
+ 'input-intention':['','第 2 步 / 共 4 步 · 求职意向'],
+ 'validate-position':['bad','第 2 步 / 共 4 步 · 缺必填'],
+ 'input-history':['','第 3 步 / 共 4 步 · 经历'],
+ 'input-strengths':['','第 4 步 / 共 4 步 · 技能与自评'],
+ review:['ok','核对 · 准备提交一次'],
+ 'voice-recording':['warn','语音填写 · 正在录音'],
+ 'voice-transcribing':['warn','语音填写 · 正在转写'],
+ 'voice-confirm':['warn','语音填写 · 待你确认'],
+ 'voice-failed':['bad','语音填写 · 转写失败'],
+ 'voice-denied':['bad','语音填写 · 麦克风不可用'],
+ generating:['warn','生成中 · 等一次完整结果'],
+ 'generate-failed':['bad','本次生成失败 · 内容还在'],
+ 'ai-unavailable':['bad','AI 生成未接通 · 已填保留'],
+ 'draft-exporting':['warn','原样草稿 · 正在排版'],
+ 'draft-failed':['bad','原样草稿 · 导出失败'],
+ 'draft-ready':['ok','原样草稿 · 文件已就绪'],
+ 'preview-no-result':['','预览 · 没有可看的结果'],
+ 'preview-loading':['warn','预览 · 正在读回结果'],
+ 'preview-failed':['bad','预览 · 没能读回'],
+ 'preview-ready':['ok','预览 · 核对内容'],
+ 'preview-hints':['warn','预览 · 还有几处要补'],
+ 'preview-editing':['warn','预览 · 正在改这一段'],
+ 'export-chooser':['','导出 · 选格式'],
+ 'export-exporting':['warn','导出 · 正在生成文件'],
+ 'export-failed':['bad','导出 · 失败'],
+ 'export-ready':['ok','导出 · 文件已就绪'],
+ 'export-url-expired':['warn','导出 · 下载链接过期 · 仍可打印'],
+ 'export-print-unavailable':['warn','导出 · 缺打印链接（异常）'],
+ 'session-lost':['','已填内容已清除'],
+ illegal:['bad','无法识别的页面状态']
+};
+var ASK={
+ entry:['从零写一份简历？','我分四步问你，问完<b>一次生成</b>。AI 只整理你说的，不替你编。'],
+ 'input-basic':['先留下<em>能联系上你</em>的方式','这一步只有<b>姓名必填</b>，城市和联系方式点一下候选词就行。'],
+ 'validate-name':['姓名还<em>没填</em>','姓名是这份简历的第一行，<b>不填就没法往下走</b>。其它几项可以空着。'],
+ 'input-intention':['你想找<em>什么方向</em>的工作？','这一步只有<b>目标岗位必填</b>。城市、类型、薪资都能点选。'],
+ 'validate-position':['目标岗位还<em>没填</em>','岗位决定 AI 往哪个方向整理你的经历，<b>这一项必须有</b>。'],
+ 'input-history':['把<em>做过的事</em>说清楚','学校、公司、职务、时间由你填，AI 一个字都不会改。描述<b>可以说，不用打字</b>。'],
+ 'input-strengths':['还有<em>会什么</em>和<em>怎么做事</em>','技能和证书只填你真有的；自我评价写一两句，AI 帮你顺一下。'],
+ review:['提交前<em>你先核一遍</em>','点下面那颗按钮会提交<b>一次</b>。半空的条目不会提交，下面已经标出来了。'],
+ 'voice-recording':['你说，<em>我记</em>','正在录音。<b>说完点结束</b>，我把它转成文字给你看，你确认了才写进表单。'],
+ 'voice-transcribing':['正在<em>转成文字</em>','这一步在等服务端把这段录音转成文字。<b>没有百分比</b>，结果一次性回来。'],
+ 'voice-confirm':['转出来是这些，<em>对吗</em>？','可以直接改。<b>点「确认写入」之前，表单里一个字都不会变。</b>'],
+ 'voice-failed':['这段<em>没转出来</em>','可以重录一次，也可以直接用键盘打。<b>录音没有保存，表单也没有被改。</b>'],
+ 'voice-denied':['麦克风<em>用不了</em>','这台机器的麦克风没授权或不可用。<b>改用键盘照样能填完</b>，不影响生成。'],
+ generating:['正在<em>整理</em>你的资料','这是一次性返回：<b>没有百分比，也不会逐字段蹦出来</b>。结果回来才显示。'],
+ 'generate-failed':['这次<em>没生成出来</em>','服务本身是通的，<b>你填的内容一个字都没丢</b>，可以直接再来一次。'],
+ 'ai-unavailable':['AI 润色<em>没接通</em>','这台机器的生成能力当前不可用。<b>你填的都留着</b>，还能原样排版打印带走。'],
+ 'draft-exporting':['正在把你的原话<em>排成 PDF</em>','这条路<b>不经过模型</b>，服务端只做排版，所以 AI 挂了也能用。'],
+ 'draft-failed':['草稿<em>没导出来</em>','这次排版或上传没成功。<b>你填的内容还在</b>，可以直接重试。'],
+ 'draft-ready':['原样草稿<em>已经好了</em>','这份是<b>你自己写的原话</b>，没经过 AI，也没有缺失提示。'],
+ 'preview-no-result':['这里<em>没有</em>可看的结果','预览要有一次<b>已经完成的生成</b>。这次进来没带结果，我不会拿示例冒充你的简历。'],
+ 'preview-loading':['正在<em>读回</em>这条记录','用你的登录身份向服务端要这次结果。<b>读回来之前，不显示任何简历内容。</b>'],
+ 'preview-failed':['这条记录<em>没读回来</em>','可能已过留存期、不是本人，或者网络不通。<b>不拿别的结果凑数。</b>'],
+ 'preview-ready':['生成好了，<em>你核一遍</em>','事实字段和你填的<b>逐字一致</b>；被润色过的段落都打了标。'],
+ 'preview-hints':['还有<em>几处</em>建议补','这些提示是服务端按你填的内容<b>算出来</b>的，AI 不会替你补。'],
+ 'preview-editing':['这一段，<em>你说了算</em>','左边是你填的原话，右边是润色后的。<b>改完要点确认才算数。</b>'],
+ 'export-chooser':['要<em>哪种格式</em>？','<b>四种都能导出</b>；页数、版式和<b>打印入口</b>目前只有 PDF 有。'],
+ 'export-exporting':['正在<em>生成文件</em>','服务端在渲染并落库。<b>文件还没有，所以现在还不能下载或打印。</b>'],
+ 'export-failed':['文件<em>没生成出来</em>','这次导出失败了。<b>简历内容还在，可以直接重导出。</b>'],
+ 'export-ready':['文件<em>好了</em>','<b>扫码存进手机带走</b>，或者直接去打印 —— 下载和打印是两条链接。'],
+ 'export-url-expired':['<em>扫码取件</em>这条过期了','文件还在，<b>打印那条链接也还在</b>；只有手机取件要重导出一次。'],
+ 'export-print-unavailable':['这一份<em>暂时进不了打印</em>','服务端这次没给打印链接，属于异常。<b>PDF 正常导出时能打印</b>，下载还能用。'],
+ 'session-lost':['你填的内容<em>已经清掉了</em>','公共设备不留个人资料：刷新、返回或待机之后，<b>这一份要从头填</b>。'],
+ illegal:['<em>认不出</em>这个页面状态','地址里的状态没有登记。<b>我不猜你想去哪一步</b>，也不把原始参数回显在屏幕上。']
+};
+var EYEBROW={entry:'RESUME GENERATE',input:'SLOT FILLING',validate:'REQUIRED',voice:'VOICE INPUT',
+ generating:'GENERATING',generate:'GENERATE',ai:'AI DOWN',draft:'PLAIN DRAFT',
+ preview:'PREVIEW',export:'EXPORT',session:'SESSION',illegal:'FALLBACK',review:'REVIEW'};
+
+/* 底部那一条：按当前这一屏真正相关的事实给一句话，不再每屏重复同样的三段说明。 */
+var TRUTH={
+ fill:'AI 只<b>润色你写的描述</b>：学校、公司、职务、时间、证书按你填的逐字保留，不新增也不改写。',
+ voice:'语音只做<b>一次转写</b>，不保存原始音频，没有声纹、实时通话或音量分析；文字你确认过才写进表单。',
+ generate:'AI 只把描述说顺、写一段个人简介，<b>事实字段逐字保留</b>；缺的部分由服务端算出来提示你补，AI 不代填。',
+ draft:'原样草稿<b>不经过模型</b>：没有润色，也没有缺失提示，文件名里会直接标出来。',
+ preview:'这一页只显示服务端返回的<b>这一次结果</b>，不重新生成，也不替你保存。',
+ exporting:'导出只出文件，<b>不改内容</b>；页数、版式和<b>打印入口</b>目前都只有 PDF 有。',
+ file:'文件按<b>服务端留存期限</b>管理（登录后更长、不登录更短），<b>不承诺永久保留</b>；下载与打印是<b>两条各自计时</b>的签名链接。',
+ fallback:'公共设备只把填写内容放在内存里，<b>结束会话或闲置超时即清除</b>，不写进本机存储。'
+};
+var TRUTHOF={
+ entry:'fill','input-basic':'fill','input-intention':'fill','input-history':'fill','input-strengths':'fill',
+ review:'fill','validate-name':'fill','validate-position':'fill',
+ 'voice-recording':'voice','voice-transcribing':'voice','voice-confirm':'voice','voice-failed':'voice','voice-denied':'voice',
+ generating:'generate','generate-failed':'generate','ai-unavailable':'generate',
+ 'draft-exporting':'draft','draft-failed':'draft','draft-ready':'file',
+ 'preview-no-result':'preview','preview-loading':'preview','preview-failed':'preview',
+ 'preview-ready':'preview','preview-hints':'preview','preview-editing':'preview',
+ 'export-chooser':'exporting','export-exporting':'exporting','export-failed':'exporting',
+ 'export-ready':'file','export-url-expired':'file','export-print-unavailable':'file',
+ 'session-lost':'fallback',illegal:'fallback'
+};
+
+/* ================= 通用块 ================= */
+function secLabel(no,t,hint){
+ return '<div class="sec-label"><span class="no">'+no+'</span><span class="t">'+t+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>';
+}
+function stateBox(kind,icon,h,p,tid){
+ return '<div class="state rise" data-kind="'+kind+'"'+(tid?' data-testid="'+tid+'"':'')+'>'+
+  '<div class="state-h">'+svg(icon,32)+'<span>'+h+'</span></div><p class="state-p">'+p+'</p></div>';
+}
+function fixtureBar(st){
+ if(!FIXTURE[st])return '';
+ var kind=FIXKIND[st];
+ var what=kind==='server'
+  ? '服务端响应夹具 · 不可作为真实简历或文件'
+  : '预置填写夹具 · 不可作为真实简历或文件';
+ var why=kind==='server'
+  ? '这一屏里的简历正文、缺失提示、文件名、页数与链接有效期，真实链路里全部由服务端返回；这里是写死的。'
+  : '这一屏里表单已经填好的字样是原型预置的，不是任何人在这台机器上填的真实资料。';
+ return '<div class="sec"><div class="fx" data-testid="'+SCREEN+'-fixture"><span class="fx-b">演示</span>'+
+  '<span>'+what+'。'+why+(TECH?'（仅 capture=1 / debug=1 可达）':'')+'</span></div></div>';
+}
+function progBar(step){
+ var names=['基本信息','求职意向','经历','技能与自评'],h='',i,tag;
+ for(i=0;i<4;i++){
+  tag=(i+1)<step?'done':((i+1)===step?'now':'');
+  h+='<span'+(tag?' data-on="'+tag+'"':'')+'><u></u>'+(i+1)+' '+names[i]+'</span>';
+ }
+ return '<div class="prog" data-testid="'+SCREEN+'-progress" aria-label="填写进度：第 '+step+' 步，共 4 步">'+h+'</div>';
+}
+/* 每一屏都留两个真实出口：一体机上不能有走不出去的屏。 */
+function helperStrip(text,tid){
+ return '<div class="sec"><div class="helper">'+
+  '<span class="ht">'+text+'</span>'+
+  a({cls:'hbtn',href:'06-help.html',route:'/help',tid:tid+'-hs-help',label:svg('help',22)+'找工作人员',al:'找工作人员帮忙'})+
+  a({cls:'hbtn',href:'05-ai-cockpit.html',route:'/assistant',tid:tid+'-hs-ask',label:svg('spark',22)+'AI顾问',al:'AI顾问'})+
+  '</div></div>';
+}
+function ctabar(html){return '<div class="ctabar">'+html+'</div>'}
+function reason(text,bad){return '<p class="cta-reason'+(bad?' bad':'')+'" data-testid="'+SCREEN+'-disabled-reason">'+svg(bad?'warn':'info',24)+'<span>'+text+'</span></p>'}
+
+/* 处理中主视觉。扫描线是纯装饰，量白时不算内容 —— 空白只能靠真内容填。 */
+function proc(icon,title,sub,tid){
+ return '<div class="proc" data-testid="'+tid+'"><span class="scan" aria-hidden="true"></span>'+
+  '<span class="proc-row"><span class="proc-ic">'+svg(icon,42)+'</span>'+
+  '<span class="proc-m"><b>'+title+'</b><span>'+sub+'</span></span>'+
+  '<span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span></span></div>';
+}
+/* 现在在哪一步、下一步是什么。没有百分比、没有预计时间 —— 那两样这一页都不知道。 */
+function steps(list,tid){
+ var h='<div class="steps fill" data-testid="'+tid+'">',i,o;
+ for(i=0;i<list.length;i++){o=list[i];
+  h+='<div class="step"'+(o.on?' data-on="'+o.on+'"':'')+'><span class="sn">'+(o.on==='done'?svg('check',26):(i+1))+'</span>'+
+   '<span class="sm"><b>'+o.t+'</b><span>'+o.d+'</span></span><span class="sx">'+o.x+'</span></div>';
+ }
+ return h+'</div>';
+}
+/* 这次真正会提交 / 已经保住的条目数。是从表单算出来的，不是写死的文案。 */
+function tiles(tid){
+ var v=[['教育',keptEdu().length,'段'],['经历',keptExp().length,'段'],['项目',keptProj().length,'个'],
+        ['技能',skills().length,'项'],['证书',certs().length,'项']],h='',i;
+ for(i=0;i<v.length;i++){
+  h+='<div'+(v[i][1]?'':' data-zero="1"')+'><b>'+v[i][1]+'</b><span>'+v[i][0]+'（'+v[i][2]+'）</span></div>';
+ }
+ return '<div class="tiles" data-testid="'+tid+'">'+h+'</div>';
+}
+/* 取件位：二维码由这次导出的短时签名链接渲染，静态稿只画位置，不生成可扫描图形。 */
+function qrSlot(sub){
+ return '<div class="qrslot" data-testid="'+SCREEN+'-qr-slot" role="group" aria-label="扫码保存到手机">'+
+  '<span class="qi">'+svg('qr',86,1.6)+'</span><b>扫码保存到手机</b>'+
+  '<span>'+sub+'<b>静态设计稿不生成可扫描图形</b>，也不放示意图案冒充。</span></div>';
+}
+
+/* ================= 导出之后同时存在的三个对象 =================
+   一次导出会同时产生三样**各自独立**的东西。页面必须分别声明，谁也不许拿另一个推出来：
+
+     file      文件本体   services/api/src/ai/ai.service.ts exportGeneratedResume → FilesService.upload
+                          （assetCategory='optimized'）。寿命由**服务端留存期限**决定：登录会员按账号
+                          留存策略管理（可按规则延长），匿名 / system 只留短期。链接过期 ≠ 文件被删。
+     download  下载 URL   ResumeGenerateExportResponse.signedUrl + expiresAt
+                          （packages/shared/src/types/ai.ts）。对象存储签发，只做预览 / 扫码下载，
+                          **进不了 /print/jobs**；expiresAt 只描述这一条链接，不描述另外两样。
+     print     打印凭证   ResumeGenerateExportResponse.printFileUrl，由 services/api/src/files/signing.ts
+                          的 signFileUrl **另签**的系统 HMAC content URL，自带一套时钟（该模块默认 5 分钟），
+                          而且是可选字段 —— 这次可能压根没给。非 PDF 时它指向的还是**另一份**同内容 PDF。
+
+   下面这张表就是每一屏真正持有什么。打印入口只读 print，扫码取件位只读 download，
+   文件本体的说法只读 file —— 三条各自计时，任何一条都不许当成另一条的依据。 */
+var HELD={
+ 'draft-ready':{file:'retained',download:'live',print:'live'},
+ 'export-ready':{file:'retained',download:'live',print:'live'},
+ 'export-url-expired':{file:'retained',download:'expired',print:'live'},
+ 'export-print-unavailable':{file:'retained',download:'live',print:'absent'}
+};
+var CUR='';
+function held(k){var o=HELD[CUR];return o?o[k]:''}
+/* 页面上**唯一**的两个可用性判断，各自只看自己那一条凭证。
+   写成 canPrint(){return canTakeaway()}、或者互相取值，就是把两条时钟又焊回一起。
+   打印这一条有两种拦法，理由不同，不能混成一句「不能打印」：
+     nocred  这次压根没拿到打印链接（服务端异常）—— 重导出一次通常就有了；
+     noid    链接有，但那份打印 PDF **自己的文件编号**接口没返回（非 PDF 格式的常态）。
+             下游按「来源 + 文件编号」成对认文件，拿原格式的编号顶上去就是身份造假，
+             所以这一种重导出多少次都不会好，只能等服务端补字段，或者改用 PDF。 */
+function printBlock(){
+ if(held('print')!=='live')return 'nocred';
+ if(!curFile().printable)return 'noid';
+ return '';
+}
+function canPrint(){return !printBlock()}
+function canTakeaway(){return held('download')==='live'}
+
+var OBJTXT={
+ file:{retained:['','file','文件按服务端留存期限保留']},
+ download:{live:['ok','down','下载链接可用'],expired:['bad','clock','下载链接已过期']},
+ print:{live:['ok','check','打印链接已就绪'],absent:['bad','warn','这次没拿到打印链接']}
+};
+/* 打印那一枚状态标：链接就绪但这一份没有打印身份时，标签要说清缺的是编号不是链接，
+   否则屏幕上会一边写「打印链接已就绪」一边把打印按钮关着，看起来像页面自相矛盾。 */
+function printChipOver(){return printBlock()==='noid'?{print:'打印链接已就绪 · 缺打印 PDF 编号'}:null}
+/* 三个对象各出一枚状态标。文案可以按这一屏的语气微调，data-status 才是给人和门禁看的真值。 */
+function objChips(over){
+ var ks=['download','print','file'],h='',i,k,s,v;
+ for(i=0;i<ks.length;i++){
+  k=ks[i];s=held(k);v=OBJTXT[k][s];
+  h+='<span class="chip'+(v[0]?' '+v[0]:'')+'" data-testid="'+SCREEN+'-'+k+'-state" data-obj="'+k+'" data-status="'+s+'">'+
+   svg(v[1],22)+((over&&over[k])||v[2])+'</span>';
+ }
+ return h;
+}
+var NOID_TX='暂不开放打印：待服务端返回打印 PDF 的文件编号';
+/* 「去打印确认」这颗主按钮只认打印凭证 + 这一份的打印身份；两样齐了才交接，
+   交接只带来源、文件编号、页数和打印参数，签名链接与打印凭证一个都不进地址栏。 */
+function printPrimary(alt){
+ var r=printBlock(),f=curFile();
+ if(!r)return a({cls:'btn primary wide',href:printHref(f),route:'/print/confirm',tid:SCREEN+'-primary',label:svg('print',26)+'去打印确认'});
+ if(r==='noid')return b({cls:'btn primary wide',dis:1,tid:SCREEN+'-primary',
+   al:FMT.toUpperCase()+' '+NOID_TX,label:svg('print',26)+FMT.toUpperCase()+' 暂不开放打印'});
+ return alt;
+}
+/* 动作列表里的那条打印入口，同样两样都看，禁用理由也分开写。 */
+function printRow(tid){
+ var r=printBlock(),f=curFile();
+ if(!r)return orow({icon:'print',t:'去打印这一份',d:'走服务端另签的打印链接，交接只带文件编号和打印参数',href:printHref(f),route:'/print/confirm',tid:tid});
+ if(r==='noid')return orow({icon:'print',t:'去打印这一份',d:NOID_TX+'；换成 PDF 导出就能打',off:'暂不开放',tid:tid});
+ return orow({icon:'print',t:'去打印这一份',d:'没有打印链接，这次不能进打印确认',off:'不可用',tid:tid});
+}
+/* 取件位只认下载链接。过期就换成一条写死的说明行，并说清过期的是哪一条。 */
+function takeaway(sub,tid){
+ return canTakeaway()
+  ? qrSlot(sub)
+  : orow({icon:'qr',t:'扫码保存到手机',d:'这条下载链接已经过期，重导出之后才会有新的码',off:'已过期',tid:tid});
+}
+
+/* ================= 字段渲染 ================= */
+function fval(path){
+ var seg=path.split('.'),o=F,i;
+ for(i=0;i<seg.length-1;i++)o=o[seg[i]];
+ return String(o[seg[seg.length-1]]||'');
+}
+function fset(path,v){
+ var seg=path.split('.'),o=F,i;
+ for(i=0;i<seg.length-1;i++)o=o[seg[i]];
+ o[seg[seg.length-1]]=v;
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function field(o){
+ var v=o.value!==undefined?o.value:fval(o.path),on=v.trim()!=='';
+ return '<label class="field'+(o.grow?' grow':'')+'"><span class="fl">'+o.label+(o.req?'<em>必填</em>':'')+
+  '<i'+(on?' data-on="1"':'')+'>'+(on?'已填':'待填')+'</i></span>'+
+  (o.area
+   ? '<textarea class="fin" data-k="'+o.path+'" aria-label="'+o.label+'" placeholder="'+o.ph+'"'+(o.invalid?' aria-invalid="true"':'')+'>'+esc(v)+'</textarea>'
+   : '<input class="fin" type="text" data-k="'+o.path+'" aria-label="'+o.label+'" placeholder="'+o.ph+'" value="'+esc(v)+'"'+(o.invalid?' aria-invalid="true"':'')+'>')+
+  (o.err?'<span class="ferr">'+o.err+'</span>':'')+'</label>';
+}
+function chipRow(key,path,title,multi,tid){
+ var list=CHIPS[key],cur=multi?splitList(fval(path),99):[fval(path).trim()],h='',i,on;
+ h='<div class="qh">点一下就填进去 · <b>'+title+'</b><span>'+(multi?'可以多选，再点一次取消':'点第二次取消')+'</span></div><div class="chips">';
+ for(i=0;i<list.length;i++){
+  on=cur.indexOf(list[i])>=0;
+  h+='<button type="button" class="chip2 press" data-chip="'+path+'" data-multi="'+(multi?'1':'')+'" data-v="'+list[i]+'" aria-pressed="'+on+'" data-testid="'+tid+'-'+(i+1)+'" aria-label="'+title+'候选：'+list[i]+'">'+list[i]+'</button>';
+ }
+ return h+'</div>';
+}
+
+/* ================= 视图 ================= */
+var V={};
+
+V.entry=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','这四步我会问什么','只有 2 项必填')+
+  '<div class="rows3">'+
+   orow({icon:'user',t:'第 1 步 · 基本信息',d:'姓名（必填）、所在城市、手机号、邮箱',go:'input-basic',tid:SCREEN+'-plan-1'})+
+   orow({icon:'aim',t:'第 2 步 · 求职意向',d:'目标岗位（必填）、意向城市、工作类型、期望薪资',go:'input-intention',tid:SCREEN+'-plan-2'})+
+   orow({icon:'case',t:'第 3 步 · 经历',d:'教育最多 6 段、工作最多 8 段、项目最多 6 个；描述可以直接说',go:'input-history',tid:SCREEN+'-plan-3'})+
+   orow({icon:'star',t:'第 4 步 · 技能与自评',d:'技能最多 20 项、证书最多 15 项，再加一句自我评价',go:'input-strengths',tid:SCREEN+'-plan-4'})+
+  '</div></div></div>'+
+ '<div class="sec"><div class="split">'+
+   '<div class="mini"><h4>'+svg('check',24)+'AI 只润色，不编造</h4><p>学校、公司、学位、证书、时间和你写的数字，服务端从你的输入里逐字复制。AI 只把描述说顺，不会替你添一段没有的经历。</p></div>'+
+   '<div class="mini"><h4>'+svg('print',24)+'不想用 AI 也能出纸</h4><p>随时可以把已填内容<b>原样排成 PDF</b> 打印带走 —— 那条路不经过模型，但也没有润色和补充提示。</p></div>'+
+  '</div></div>'+
+ '<div class="sec"><div class="split">'+
+   a({cls:'orow',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-has-file',al:'我已经有简历文件，去做诊断',
+      html:'<span class="oi">'+svg('file',26)+'</span><span class="om"><b>我已经有简历文件</b><span>那边是上传与诊断，不是从零填</span></span>'+GO})+
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-mine',al:'打开我的简历',
+      html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>我的简历</b><span>之前生成过的版本在这里</span></span>'+GO})+
+  '</div></div>'+
+ ctabar(b({cls:'btn primary wide',go:'input-basic',tid:SCREEN+'-primary',label:svg('pen',26)+'开始填写（第 1 步）'}));
+};
+
+function fillShell(step,body,ctas,reasonHtml){
+ return progBar(step)+body+ctabar(ctas)+(reasonHtml||'');
+}
+
+function basicView(st){
+ var bad=st==='validate-name',empty=!F.basic.name.trim();
+ var body='<div class="sec grow"><div class="card">'+secLabel('01','基本信息','姓名必填，其余可空')+
+  '<div class="fgrid">'+
+   field({path:'basic.name',label:'姓名',req:true,ph:'请输入本人姓名',invalid:bad,err:bad?'必填：先填姓名才能继续':''})+
+   field({path:'basic.city',label:'所在城市',ph:'例：长沙'})+
+   field({path:'basic.phone',label:'手机号',ph:'写在简历上给对方联系你'})+
+   field({path:'basic.email',label:'邮箱',ph:'没有可以空着'})+
+  '</div><div style="margin-top:14px">'+chipRow('basic.city','basic.city','所在城市',false,SCREEN+'-chip-city')+'</div>'+
+  '<div class="split" style="margin-top:14px">'+
+   '<div class="mini"><h4>'+svg('info',24)+'这几项印在最上面</h4><p>姓名和联系方式是对方找到你的唯一入口。<b>写错一个数字，后面全白做</b> —— 这一栏值得你自己核一遍。</p></div>'+
+   '<div class="mini"><h4>'+svg('check',24)+'除了姓名都能空着</h4><p>城市、手机号、邮箱空着也能往下走。空着的话，生成之后会算一条提示让你回来补，<b>AI 不会替你编一个</b>。</p></div>'+
+  '</div></div></div>'+
+  helperStrip(bad?'不方便打字？让工作人员帮你填，或者让 AI顾问用语音带你走一遍。':'姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。',SCREEN+'-basic');
+ var ctas=a({cls:'btn ghost',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-back-source',label:svg('back',24)+'返回简历服务'})+
+  b({cls:'btn primary wide',go:empty?'validate-name':'input-intention',dis:empty,tid:SCREEN+'-primary',
+     label:'下一步：求职意向',al:empty?'下一步（姓名未填，暂时不能继续）':'下一步：求职意向'});
+ return fillShell(1,body,ctas,empty?reason(bad?'姓名还没填。上面那一栏已经标出来了，填完就能继续。':'姓名还没填，填完才能进下一步。其余三项可以空着。',bad):'');
+}
+V['input-basic']=function(){return basicView('input-basic')};
+V['validate-name']=function(){return basicView('validate-name')};
+
+function intentionView(st){
+ var bad=st==='validate-position',empty=!F.intention.position.trim();
+ var body='<div class="sec grow"><div class="card">'+secLabel('02','求职意向','目标岗位必填')+
+  '<div class="fgrid">'+
+   field({path:'intention.position',label:'目标岗位',req:true,ph:'例：用户运营',invalid:bad,err:bad?'必填：先填目标岗位':''})+
+   field({path:'intention.city',label:'意向城市',ph:'例：长沙'})+
+   field({path:'intention.jobType',label:'工作类型',ph:'点下面的选项，或自己写'})+
+   field({path:'intention.salary',label:'期望薪资',ph:'不写也行，面谈时再说'})+
+  '</div>'+
+  '<div style="margin-top:12px">'+chipRow('intention.position','intention.position','目标岗位',false,SCREEN+'-chip-position')+'</div>'+
+  '<div style="margin-top:12px">'+chipRow('intention.city','intention.city','意向城市',false,SCREEN+'-chip-icity')+'</div>'+
+  '<div style="margin-top:12px">'+chipRow('intention.jobType','intention.jobType','工作类型',false,SCREEN+'-chip-jobtype')+'</div>'+
+  '<div style="margin-top:12px">'+chipRow('intention.salary','intention.salary','期望薪资',false,SCREEN+'-chip-salary')+'</div>'+
+  '</div></div>'+
+  helperStrip('岗位写具体一点，AI 才知道往哪个方向整理你的经历。写「运营」不如写「用户运营」。',SCREEN+'-intent');
+ var ctas=b({cls:'btn ghost',go:'input-basic',tid:SCREEN+'-prev',label:svg('back',24)+'上一步'})+
+  b({cls:'btn primary wide',go:empty?'validate-position':'input-history',dis:empty,tid:SCREEN+'-primary',
+     label:'下一步：经历',al:empty?'下一步（目标岗位未填，暂时不能继续）':'下一步：经历'});
+ return fillShell(2,body,ctas,empty?reason(bad?'目标岗位还没填。可以直接点上面的候选词，也可以自己写。':'目标岗位还没填，填完才能进下一步。城市、类型、薪资都可以空着。',bad):'');
+}
+V['input-intention']=function(){return intentionView('input-intention')};
+V['validate-position']=function(){return intentionView('validate-position')};
+
+var SEGDEF={
+ edu:{list:'education',cap:6,name:'教育',keys:['school'],need:'缺学校'},
+ exp:{list:'experience',cap:8,name:'经历',keys:['company','role'],need:'缺公司或职务'},
+ proj:{list:'projects',cap:6,name:'项目',keys:['name'],need:'缺项目名称'}
+};
+function entryOk(kind,item){
+ var keys=SEGDEF[kind].keys,i;
+ for(i=0;i<keys.length;i++){if(!String(item[keys[i]]||'').trim())return false}
+ return true;
+}
+function entryCard(kind,item,i){
+ var d=SEGDEF[kind],ok=entryOk(kind,item),base=d.list+'.'+i+'.',h;
+ h='<div class="ent" data-testid="'+SCREEN+'-'+kind+'-'+i+'"><div class="ent-h"><b>'+d.name+' 第 '+(i+1)+' 条</b>'+
+  '<span class="st '+(ok?'on':'off')+'">'+(ok?'会提交':'不会提交 · '+d.need)+'</span><span class="sp"></span>'+
+  b({cls:'iconbtn warn',act:'del:'+kind+':'+i,tid:SCREEN+'-'+kind+'-del-'+i,label:svg('trash',24),al:'删除'+d.name+'第 '+(i+1)+' 条'})+
+  '</div>';
+ if(kind==='edu'){
+  h+='<div class="fgrid">'+
+    field({path:base+'school',label:'学校',req:true,ph:'例：湖南XX职业技术学院'})+
+    field({path:base+'major',label:'专业',ph:'例：市场营销'})+
+    field({path:base+'period',label:'起止时间',ph:'例：2021.09 - 2024.06'})+
+    field({path:base+'degree',label:'学历',ph:'点下面的选项，或自己写'})+
+   '</div><div style="margin-top:10px">'+chipRow('degree',base+'degree','学历',false,SCREEN+'-chip-degree-'+i)+'</div>'+
+   '<div class="fgrid one" style="margin-top:10px">'+field({path:base+'description',label:'在校情况（选填，AI 会润色）',area:true,ph:'主修课程、获奖、社团都可以说'})+'</div>';
+ }else if(kind==='exp'){
+  h+='<div class="fgrid">'+
+    field({path:base+'company',label:'公司 / 单位',req:true,ph:'例：某科技有限公司'})+
+    field({path:base+'role',label:'职位',req:true,ph:'例：运营专员'})+
+   '</div>'+
+   '<div class="fgrid one" style="margin-top:10px">'+
+    field({path:base+'period',label:'起止时间',ph:'例：2024.07 - 2025.08'})+
+    field({path:base+'description',label:'做了什么（AI 会润色，事实不改）',area:true,ph:'负责什么、用什么工具、做出什么结果，有数字写数字'})+
+   '</div>';
+ }else{
+  h+='<div class="fgrid">'+
+    field({path:base+'name',label:'项目名称',req:true,ph:'例：社群活动周'})+
+    field({path:base+'role',label:'担任角色',ph:'例：执行'})+
+   '</div>'+
+   '<div class="fgrid one" style="margin-top:10px">'+field({path:base+'description',label:'项目内容（AI 会润色，事实不改）',area:true,ph:'做了什么、你负责哪一段'})+'</div>';
+ }
+ h+='<div class="rowend"><span class="tip">'+svg('info',20)+' 描述这一栏可以说，不用打字</span><span class="sp"></span>'+
+  b({cls:'voicebtn',act:'voice:'+kind+':'+i,tid:SCREEN+'-'+kind+'-voice-'+i,label:svg('mic',22)+'语音填写',al:'用语音填写'+d.name+'第 '+(i+1)+' 条的描述'})+'</div>';
+ return h+'</div>';
+}
+V['input-history']=function(){
+ var d=SEGDEF[SEG],list=F[d.list],i,h='';
+ var counts={edu:keptEdu().length+'/'+F.education.length,exp:keptExp().length+'/'+F.experience.length,proj:keptProj().length+'/'+F.projects.length};
+ var segs='<div class="seg" role="tablist" aria-label="经历分类">';
+ var order=['edu','exp','proj'],k;
+ for(i=0;i<3;i++){k=order[i];
+  segs+='<button type="button" role="tab" class="press" data-seg="'+k+'" aria-selected="'+(k===SEG)+'" data-testid="'+SCREEN+'-seg-'+k+'" aria-label="切到'+SEGDEF[k].name+'，会提交 '+counts[k]+' 条">'+
+   SEGDEF[k].name+'<em>'+counts[k]+' 条会提交</em></button>';
+ }
+ segs+='</div>';
+ segs+='<div class="qh" data-testid="'+SCREEN+'-seg-note">描述这一栏可以说，不用打字 · <b>学校 / 公司 / 职务 / 时间只能你自己填</b>'+
+  '<span>AI 不会替你新增一段经历，也不会改你写的时间</span></div>';
+ for(i=0;i<list.length;i++)h+=entryCard(SEG,list[i],i);
+ if(!list.length){
+  h+='<div class="ent" data-testid="'+SCREEN+'-'+SEG+'-empty"><div class="ent-h"><b>还没有'+d.name+'</b>'+
+   '<span class="st off">这一类可以空着</span></div>'+
+   '<p class="note"><span class="sq"></span><span>空着也能生成，只是预览页会算出一条提示让你回来补 —— 那是按规则算的，不是 AI 编的。</span></p>'+
+   '<p class="note"><span class="sq"></span><span>'+(SEG==='proj'?'项目和工作经历只要有一样就行；社团活动、校内比赛、帮亲戚看店，只要是你真做过的都能写。':
+     (SEG==='edu'?'没读完也可以写：写到哪一年就是哪一年，AI 不会替你补一个学位。':'第一份工作、实习、寒暑假的兼职都算，写清楚做了什么比写头衔管用。'))+'</span></p>'+
+   '<p class="note"><span class="sq"></span><span>加进来之后，公司 / 职务这类关键字段填齐了才会真的提交，行上会直接标出来。</span></p></div>';
+ }
+ if(list.length<d.cap){
+  h+=b({cls:'addbtn',act:'add:'+SEG,tid:SCREEN+'-'+SEG+'-add',label:svg('plus',24)+'添加一段'+d.name+'（最多 '+d.cap+' 段）',al:'添加一段'+d.name});
+ }else{
+  h+='<div class="ent" data-testid="'+SCREEN+'-'+SEG+'-cap"><div class="ent-h"><b>已经到上限</b><span class="st off">最多 '+d.cap+' 段</span></div>'+
+   '<p class="note"><span class="sq"></span><span>再多就装不下一两页了。想加新的，先删掉一段旧的。</span></p></div>';
+ }
+ var body='<div class="sec grow"><div class="card">'+secLabel('03','经历','半空的条目不会提交')+segs+'<div class="vlist" data-testid="'+SCREEN+'-list">'+h+'</div></div></div>'+
+  helperStrip('一段经历不知道怎么讲？先问一句再写，比对着空框发呆快。',SCREEN+'-hist');
+ var ctas=b({cls:'btn ghost',go:'input-intention',tid:SCREEN+'-prev',label:svg('back',24)+'上一步'})+
+  b({cls:'btn primary wide',go:'input-strengths',tid:SCREEN+'-primary',label:'下一步：技能与自评'});
+ return fillShell(3,body,ctas,reason('三类都可以空着。上面标「不会提交」的条目，是关键字段还没填全 —— 提交时会跳过它，不会半截送出去。'));
+};
+
+V['input-strengths']=function(){
+ var sk=skills(),ce=certs();
+ var body='<div class="sec grow"><div class="card">'+secLabel('04','技能与自我评价','只填你真有的')+
+  '<div class="fgrid one">'+
+   field({path:'skillsText',label:'技能（逗号或换行分隔，最多 20 项 · 当前 '+sk.length+' 项）',area:true,ph:'例：Excel、社群运营、驾驶证 C1'})+
+  '</div>'+
+  '<div style="margin-top:10px">'+chipRow('skills','skillsText','技能',true,SCREEN+'-chip-skill')+'</div>'+
+  '<div class="fgrid one" style="margin-top:12px">'+
+   field({path:'certsText',label:'证书 / 资质（最多 15 项 · 当前 '+ce.length+' 项 · 只写真拿到手的）',area:true,ph:'例：普通话二级甲等'})+
+  '</div>'+
+  '<div style="margin-top:10px">'+chipRow('certs','certsText','证书',true,SCREEN+'-chip-cert')+'</div>'+
+  '<div class="fgrid one" style="margin-top:12px">'+
+   field({path:'selfIntro',label:'自我评价（选填，AI 会基于它润色个人简介）',area:true,ph:'一两句就够：你做事的方式'})+
+  '</div>'+
+  '<div class="rowend" style="margin-top:10px"><span class="tip">'+svg('info',20)+' 自我评价也可以直接说</span><span class="sp"></span>'+
+   b({cls:'voicebtn',act:'voice:intro:0',tid:SCREEN+'-intro-voice',label:svg('mic',22)+'语音填写',al:'用语音填写自我评价'})+'</div>'+
+  '</div></div>'+
+  helperStrip('证书这一栏别写没拿到的 —— 简历上写了对方就会问，AI 也不会替你圆。',SCREEN+'-str');
+ var ctas=b({cls:'btn ghost',go:'input-history',tid:SCREEN+'-prev',label:svg('back',24)+'上一步'})+
+  b({cls:'btn primary wide',go:'review',tid:SCREEN+'-primary',label:svg('eye',26)+'去核对'});
+ return fillShell(4,body,ctas);
+};
+
+V.review=function(){
+ var e=keptEdu(),x=keptExp(),p=keptProj(),sk=skills(),ce=certs(),h=hintsOf();
+ var skipEdu=F.education.length-e.length,skipExp=F.experience.length-x.length,skipProj=F.projects.length-p.length;
+ var skipped=skipEdu+skipExp+skipProj;
+ var line=function(t,v,go,seg,tid){
+  return orow({icon:'pen',t:t,d:v,go:go,act:seg?'seg:'+seg:'',tid:tid});
+ };
+ var body='<div class="sec grow"><div class="card">'+secLabel('05','提交前核对','点一行回去改')+
+  '<div class="vlist" data-testid="'+SCREEN+'-list">'+
+   line('基本信息',F.basic.name+(F.basic.city?' · '+F.basic.city:'')+(F.basic.phone?' · '+F.basic.phone:'')+(F.basic.email?' · '+F.basic.email:'')||'—','input-basic','',SCREEN+'-rv-basic')+
+   line('求职意向',[F.intention.position,F.intention.city,F.intention.jobType,F.intention.salary].filter(Boolean).join(' · '),'input-intention','',SCREEN+'-rv-intent')+
+   line('教育经历',e.length?e.length+' 段会提交'+(skipEdu?'，'+skipEdu+' 段半空会跳过':''):'空着（预览页会提示你补）','input-history','edu',SCREEN+'-rv-edu')+
+   line('工作 / 实习经历',x.length?x.length+' 段会提交'+(skipExp?'，'+skipExp+' 段半空会跳过':''):'空着（预览页会提示你补）','input-history','exp',SCREEN+'-rv-exp')+
+   line('项目经历',p.length?p.length+' 个会提交'+(skipProj?'，'+skipProj+' 个半空会跳过':''):'空着（选填）','input-history','proj',SCREEN+'-rv-proj')+
+   line('技能 / 证书',sk.length+' 项技能 · '+ce.length+' 项证书','input-strengths','',SCREEN+'-rv-skill')+
+   line('自我评价',F.selfIntro.trim()||'空着（AI 不会替你写一段没有的评价）','input-strengths','',SCREEN+'-rv-intro')+
+  '</div></div></div>'+
+  '<div class="sec"><div class="qh" style="margin-bottom:10px">这次会提交<span>'+(skipped?'另有 '+skipped+' 条半空条目会被跳过':'没有半空条目')+'</span></div>'+
+   tiles(SCREEN+'-rv-tiles')+
+   '<p class="note" style="margin-top:12px"><span class="sq"></span><span>点下面那颗按钮会提交<b>一次</b>，等一个完整结果回来。<b>事实字段照你填的原样保留</b>，AI 只把描述说顺、写一段个人简介。'+
+   (h.length?'生成之后预览页还会列出 <b>'+h.length+' 处</b>建议补的地方（'+h[0].t+'…），那不拦着你提交。':'按当前内容算，没有缺失提示。')+'</span></p></div>'+
+  helperStrip('核对这一步没有倒计时，慢慢看。看完再点生成，机器不会替你提交。',SCREEN+'-rv')+
+  ctabar(b({cls:'btn ghost',go:'input-strengths',tid:SCREEN+'-prev',label:svg('back',24)+'回去改'})+
+   b({cls:'btn primary wide',go:'generating',tid:SCREEN+'-primary',label:svg('spark',26)+'生成简历（提交一次）'}));
+ return body;
+};
+
+/* ---------- 语音 ---------- */
+var VCTX={kind:'exp',i:0,label:'工作内容',where:'某科技有限公司 · 运营专员'};
+function voiceHead(){
+ return '<div class="sec"><div class="helper"><span class="ht">'+svg('mic',22)+' 语音填写：<b>'+VCTX.label+'</b>'+(VCTX.where?' · '+VCTX.where:'')+'</span>'+
+  b({cls:'hbtn',go:'input-history',act:'seg:'+(VCTX.kind==='intro'?'exp':VCTX.kind),tid:SCREEN+'-voice-cancel',label:svg('x',22)+'取消，回去填写',al:'取消语音填写，回到填写页'})+
+  '</div></div>';
+}
+function voiceExits(tid){
+ return '<div class="sec"><div class="split">'+
+  a({cls:'orow',href:'06-help.html',route:'/help',tid:tid+'-help',al:'找工作人员帮忙',
+     html:'<span class="oi">'+svg('help',26)+'</span><span class="om"><b>让工作人员帮忙</b><span>说不顺、听不清，现场有人能搭把手</span></span>'+GO})+
+  a({cls:'orow',href:'05-ai-cockpit.html',route:'/assistant',tid:tid+'-ask',al:'AI顾问怎么说',
+     html:'<span class="oi">'+svg('spark',26)+'</span><span class="om"><b>问 AI顾问该怎么说</b><span>不知道一段经历怎么讲，可以先问一句</span></span>'+GO})+
+  '</div></div>';
+}
+V['voice-recording']=function(){
+ return voiceHead()+
+  '<div class="sec grow"><div class="card">'+secLabel('01','正在录音','说完点结束')+
+   proc('mic','已录 12 秒 · 单次最长 58 秒','正常说话就行，一句一句说；说完点下面的「结束录音」。',SCREEN+'-voice-elapsed')+
+   steps([
+    {on:'now',t:'说出这一段',d:'超过 58 秒会自动结束，直接去转写',x:'进行中'},
+    {t:'转成文字',d:'把这一段录音交给服务端转写',x:'下一步'},
+    {t:'你看一遍，可以直接改',d:'听着不对就改，或者重录一次',x:'等你'},
+    {t:'写进'+VCTX.label+'那一栏',d:'另起一行接在原来的内容后面，不覆盖',x:'之后'}
+   ],SCREEN+'-voice-steps')+
+   '<p class="note"><span class="sq"></span><span><b>这里不画声波</b>：不做音量分析，也没有实时通话或声纹识别；录音只用于这一次转写，<b>不保存原始音频</b>，转出来的文字你看过并确认，才写进表单。</span></p>'+
+   '</div></div>'+
+  voiceExits(SCREEN+'-vrec')+
+  ctabar(b({cls:'btn ghost',go:'input-history',act:'seg:exp',tid:SCREEN+'-voice-abandon',label:svg('x',24)+'放弃这次录音'})+
+   b({cls:'btn primary wide',go:'voice-transcribing',tid:SCREEN+'-primary',label:svg('check',26)+'结束录音，转成文字'}));
+};
+V['voice-transcribing']=function(){
+ return voiceHead()+
+  '<div class="sec grow"><div class="card">'+secLabel('01','正在转写','等一个完整结果')+
+   proc('spark','正在把这段录音转成文字','等服务端一次性返回转写结果。',SCREEN+'-voice-proc')+
+   steps([
+    {on:'done',t:'录音已结束',d:'这一段只用于这一次转写，不保存原始音频',x:'完成'},
+    {on:'now',t:'转成文字',d:'转写只是把你说的变成字，不是润色',x:'进行中'},
+    {t:'你看一遍，可以直接改',d:'转失败也不会往表单里塞半句凑数',x:'等你'},
+    {t:'写进'+VCTX.label+'那一栏',d:'另起一行接在原来的内容后面，不覆盖',x:'之后'}
+   ],SCREEN+'-voice-steps')+
+   '<p class="note"><span class="sq"></span><span><b>没有百分比</b>，也没有逐字蹦出来的效果 —— 结果一次性回来。转写没回来之前，<b>表单一个字都不会变</b>。</span></p>'+
+   '</div></div>'+
+  voiceExits(SCREEN+'-vtr')+
+  ctabar(b({cls:'btn ghost',go:'input-history',act:'seg:exp',tid:SCREEN+'-voice-abandon',label:svg('x',24)+'不等了，回去打字'})+
+   b({cls:'btn primary wide',go:'voice-confirm',tid:SCREEN+'-primary',label:svg('eye',26)+'转写结果回来了'}));
+};
+V['voice-confirm']=function(){
+ var t='独立运营 3 个用户社群，负责日常内容排期与活动执行，每周输出一次复盘表。';
+ /* 「确认之后这一栏会变成什么」是这一屏真正要给的答案 —— 追加而不是覆盖，写在屏幕上比写一句说明有用。 */
+ var tgt=VCTX.kind==='intro'?F.selfIntro
+   :((SEGDEF[VCTX.kind]&&F[SEGDEF[VCTX.kind].list][VCTX.i])?F[SEGDEF[VCTX.kind].list][VCTX.i].description:'');
+ var cur=String(tgt||'').trim();
+ var after=[cur,t.trim()].filter(Boolean).join('\n');
+ return voiceHead()+
+  '<div class="sec grow"><div class="card">'+secLabel('01','转出来是这些，你可以直接改','确认前不写进表单')+
+   '<div class="fgrid one">'+
+    field({path:'voiceDraft',value:t,label:'转写文字（可改）',area:true,ph:'转写结果会显示在这里'})+
+   '</div>'+
+   '<div class="cmp" style="margin-top:14px">'+
+    '<div class="raw"><h5>'+svg('pen',20)+VCTX.label+'现在的内容</h5><p data-testid="'+SCREEN+'-vc-before">'+esc(cur||'（这一栏现在是空的）')+'</p></div>'+
+    '<div class="add"><h5>'+svg('check',20)+'确认后会变成</h5><p data-testid="'+SCREEN+'-vc-after">'+esc(after)+'</p></div>'+
+   '</div>'+
+   '<div class="notes" style="margin-top:14px">'+
+    '<p class="note"><span class="sq"></span><span>这段文字会写进<b>'+VCTX.label+'</b>那一栏：原来有内容的话，它<b>另起一行接在后面</b>，不覆盖。点「不要这段」就当没发生过。</span></p>'+
+    '<p class="note"><span class="sq"></span><span>转写只是把你说的变成字，<b>不是 AI 润色</b>；这段录音本身不会被保存，你确认的是这些文字，不是那段声音。</span></p>'+
+   '</div></div></div>'+
+  helperStrip('听着不像你说的？直接在上面改，或者重录一次 —— 确认之前都不作数。',SCREEN+'-vc')+
+  ctabar(b({cls:'btn ghost',go:'input-history',act:'seg:exp',tid:SCREEN+'-voice-drop',label:svg('x',24)+'不要这段'})+
+   b({cls:'btn ghost',go:'voice-recording',tid:SCREEN+'-voice-again',label:svg('refresh',24)+'重录'})+
+   b({cls:'btn primary wide',go:'input-history',act:'apply-voice',tid:SCREEN+'-primary',label:svg('check',26)+'确认写入表单'}));
+};
+V['voice-failed']=function(){
+ return voiceHead()+
+  '<div class="sec grow"><div class="card">'+secLabel('01','这段没转出来','表单没有被改')+
+   stateBox('error','warn','没有识别到有效文字','可能是环境太吵、说得太轻，或者服务端这次没转成功。'+
+    '<b>录音没有保存，表单也没有写入任何内容。</b>换个方式再来一次就行。',SCREEN+'-voice-error')+
+   '<div class="rows3" style="margin-top:14px">'+
+    orow({icon:'mic',t:'再录一次',d:'离麦克风近一点，一句一句说，别一口气说完',go:'voice-recording',tid:SCREEN+'-vf-again'})+
+    orow({icon:'pen',t:'改用键盘打字',d:'回到经历那一栏自己写，一样能生成，不影响导出和打印',go:'input-history',act:'seg:exp',tid:SCREEN+'-vf-type'})+
+    orow({icon:'info',t:'先跳过这一段',d:'描述空着也能提交，预览页会算一条提示让你回来补',go:'input-history',act:'seg:exp',tid:SCREEN+'-vf-skip'})+
+   '</div></div></div>'+
+  voiceExits(SCREEN+'-vf')+
+  ctabar(b({cls:'btn ghost',go:'input-history',act:'seg:exp',tid:SCREEN+'-voice-back',label:svg('back',24)+'回去打字'})+
+   b({cls:'btn primary wide',go:'voice-recording',tid:SCREEN+'-primary',label:svg('mic',26)+'再录一次'}));
+};
+V['voice-denied']=function(){
+ return voiceHead()+
+  '<div class="sec grow"><div class="card">'+secLabel('01','麦克风用不了','这不影响填写和生成')+
+   stateBox('lock','micoff','麦克风没授权或不可用','这台机器的麦克风没有拿到授权，或者硬件当前不可用。'+
+    '<b>这和 AI 生成没有关系</b>：键盘照样能把四步填完，生成、导出、打印都不受影响。',SCREEN+'-voice-denied-box')+
+   '<div class="rows3" style="margin-top:14px">'+
+    orow({icon:'pen',t:'改用键盘打字',d:'回到经历那一栏自己写，四步照样填得完',go:'input-history',act:'seg:exp',tid:SCREEN+'-vd-type'})+
+    orow({icon:'info',t:'先跳过描述',d:'描述空着也能提交，预览页会算一条提示让你回来补',go:'input-history',act:'seg:exp',tid:SCREEN+'-vd-skip'})+
+    orow({icon:'help',t:'让工作人员看一下麦克风',d:'如果这台机器经常这样，现场可以处理',href:'06-help.html',route:'/help',tid:SCREEN+'-vd-help'})+
+   '</div></div></div>'+
+  '<div class="sec"><div class="split">'+
+   a({cls:'orow',href:'05-ai-cockpit.html',route:'/assistant',tid:SCREEN+'-vd-ask',al:'AI顾问该怎么写',
+      html:'<span class="oi">'+svg('spark',26)+'</span><span class="om"><b>问 AI顾问该怎么写</b><span>不知道一段经历怎么落笔，可以先问</span></span>'+GO})+
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-vd-mine',al:'打开我的简历',
+      html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>看看以前写过的</b><span>之前的版本可以照着改</span></span>'+GO})+
+  '</div></div>'+
+  ctabar(b({cls:'btn primary wide',go:'input-history',act:'seg:exp',tid:SCREEN+'-primary',label:svg('pen',26)+'改用键盘继续填'}));
+};
+
+/* ---------- 生成 / 降级 ---------- */
+function keptSummary(){
+ return keptEdu().length+' 段教育 · '+keptExp().length+' 段经历 · '+keptProj().length+' 个项目 · '+skills().length+' 项技能 · '+certs().length+' 项证书';
+}
+V.generating=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','正在整理你的资料','一次性返回，没有百分比')+
+  proc('spark','正在整理你填的资料','结果一次性回来：要么整份完成，要么这次失败。',SCREEN+'-gen-band')+
+  steps([
+   {on:'done',t:'你填的资料已经提交',d:keptSummary()+'；半空条目已经跳过了',x:'完成'},
+   {on:'now',t:'AI 整理描述、写个人简介',d:'学校、公司、职务、时间、证书原样带过去，它改不了',x:'进行中'},
+   {t:'你核对生成结果',d:'确认过再导出 —— 这一页不会自动保存、自动导出或自动打印',x:'等你'},
+   {t:'导出文件，或去打印',d:'PDF / DOCX / TXT / MD 四种都能进打印确认',x:'之后'}
+  ],SCREEN+'-gen-steps')+
+  '<p class="note"><span class="sq"></span><span>这是<b>一次性返回</b>的处理：<b>不会有百分比，也不会一段一段往外蹦</b>；这次要是失败，你填的一个字都不会丢。</span></p>'+
+  '</div></div>'+
+  helperStrip('不想等了，可以直接把已填内容原样排成 PDF 带走 —— 那条路不经过模型。',SCREEN+'-gen')+
+  ctabar(b({cls:'btn ghost',go:'draft-exporting',tid:SCREEN+'-gen-draft',label:svg('print',24)+'不等了，导原样草稿'})+
+   b({cls:'btn primary wide',go:'preview-ready',act:'seed-full',tid:SCREEN+'-primary',label:svg('eye',26)+'结果回来了，去预览'}));
+};
+V['generate-failed']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','这次没生成出来','内容一个字都没丢')+
+  stateBox('error','warn','本次生成失败','常见原因：处理超时、服务临时繁忙，或者填的内容太少不足以成篇。'+
+   '<b>这不是能力不可用</b> —— 服务本身是通的，直接再点一次就行。',SCREEN+'-fail-box')+
+  '<div class="qh" style="margin-top:16px">你填的内容<b>都还在</b><span>这次失败不清空任何一项</span></div>'+
+  tiles(SCREEN+'-fail-tiles')+
+  '<div class="rows3" style="margin-top:14px">'+
+   orow({icon:'refresh',t:'用同样的资料再试一次',d:'不改内容，直接重新提交一次',go:'generating',tid:SCREEN+'-ef-retry'})+
+   orow({icon:'pen',t:'先把经历写细一点再试',d:'描述太短的那几段补上职责和结果，更容易成篇',go:'input-history',act:'seg:exp',tid:SCREEN+'-ef-edit'})+
+   orow({icon:'print',t:'不等模型，导出原样草稿',d:'把你填的原话排成 PDF，不经过 AI，也没有润色',go:'draft-exporting',tid:SCREEN+'-ef-draft'})+
+  '</div></div></div>'+
+  helperStrip('连续失败两三次还是不行，就先导一份原样草稿带走，别在这里耗着。',SCREEN+'-ef')+
+  ctabar(b({cls:'btn ghost',go:'review',tid:SCREEN+'-prev',label:svg('back',24)+'回核对页'})+
+   b({cls:'btn primary wide',go:'generating',tid:SCREEN+'-primary',label:svg('refresh',26)+'再试一次'}));
+};
+V['ai-unavailable']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','AI 润色没接通','和「这次失败」不是一回事')+
+  stateBox('lock','lock','这台机器的生成能力当前不可用','不是你操作的问题，也<b>不是重试能解决</b>的 —— 这台机器还没接通生成能力。'+
+   '你填的内容<b>全部保留</b>，继续补充、上下翻页都照常。',SCREEN+'-down-box')+
+  '<div class="qh" style="margin-top:16px">你填的内容<b>全部保留</b><span>接通之后随时能生成</span></div>'+
+  tiles(SCREEN+'-down-tiles')+
+  '<div class="rows3" style="margin-top:14px">'+
+   orow({icon:'pen',t:'继续把四步填完',d:'内容是你的，先填对；接通之后随时能生成',go:'input-history',act:'seg:exp',tid:SCREEN+'-un-edit'})+
+   orow({icon:'print',t:'把已填内容原样排成 PDF',d:'不经过模型 —— 但也<b>没有润色</b>，<b>没有缺失提示</b>，文件名会照实标出来',go:'draft-exporting',tid:SCREEN+'-un-draft'})+
+   orow({icon:'spark',t:'AI 润色成文',d:'能力未接通，这次点了也不会有结果',off:'不可用',tid:SCREEN+'-un-blocked'})+
+  '</div></div></div>'+
+  helperStrip('这条提示只针对「AI 润色」。打印、扫描、复印、我的记录都照常用。',SCREEN+'-un')+
+  ctabar(b({cls:'btn ghost',go:'input-strengths',tid:SCREEN+'-prev',label:svg('back',24)+'回去接着填'})+
+   b({cls:'btn primary wide',go:'draft-exporting',tid:SCREEN+'-primary',label:svg('print',26)+'导出原样草稿'}));
+};
+
+/* 匿名导出的文件不会因为事后登录被补绑：服务端是在导出那一刻按当时的身份归档的，
+   之后再登录只对下一次生成 / 导出生效。页面不得暗示「登录后这一份会进我的简历」。 */
+function ownNote(){
+ return '<p class="note"><span class="sq"></span><span>没登录的话，这一份就是<b>本次会话的临时文件</b>；文件按<b>服务端留存期限</b>管理（登录后更长、不登录更短），<b>不随链接过期被删</b>。<b>事后登录也不会把它补绑进账号</b> —— 下次先登录再生成、再导出，服务端才能按账号归档。</span></p>';
+}
+function loginRow(tid){
+ return orow({icon:'user',t:'先登录，对下一次生效',d:'这一份不会因为登录补绑；登录之后再生成、再导出的才会归档',
+  href:'03-login-gate.html',route:'/login',tid:tid,al:'先去登录（只对下一次生成生效）'});
+}
+
+/* ---------- 原样草稿 ---------- */
+V['draft-exporting']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','正在把原话排成 PDF','不经过模型')+
+  proc('print','正在排版并上传','排的是你填的原话：'+keptSummary()+'。',SCREEN+'-draft-band')+
+  steps([
+   {on:'done',t:'已填内容已经交给排版',x:'完成',d:'半空条目同样跳过，和提交生成的口径一致'},
+   {on:'now',t:'服务端排成 A4 黑白 PDF',x:'进行中',d:'文件名里会直接写「未经AI润色」'},
+   {t:'拿到文件名、页数和链接',x:'下一步',d:'排完才有这些，现在都还不存在'},
+   {t:'扫码保存到手机，或去打印',x:'之后',d:'公共机器不落本机，要带走走手机'}
+  ],SCREEN+'-draft-steps')+
+  '<p class="note"><span class="sq"></span><span>服务端只做排版，<b>不调用任何模型</b>，所以 AI 没接通时这条路照样能走；文件还没生成完，现在<b>还不能下载，也不能打印</b>。排出来的是你的原话，<b>没有润色，也没有缺失提示</b>。</span></p>'+
+  '</div></div>'+
+  helperStrip('排版一直不出来，或者反复失败，可以叫工作人员来看一眼。',SCREEN+'-de')+
+  ctabar(b({cls:'btn ghost',go:'input-strengths',tid:SCREEN+'-prev',label:svg('back',24)+'回去改内容'})+
+   b({cls:'btn primary wide',go:'draft-ready',tid:SCREEN+'-primary',label:svg('check',26)+'排好了，看文件'}));
+};
+V['draft-failed']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','草稿没导出来','内容还在')+
+  stateBox('error','warn','这次排版或上传没成功','服务端<b>没有确认收到这份文件</b>，所以现在<b>没有任何可下载或可打印</b>的东西。'+
+   '你填的<b>内容还在</b>这一页上，直接重试就行。',SCREEN+'-draft-fail-box')+
+  '<div class="qh" style="margin-top:16px">这一次排的是<b>这些内容</b><span>重试排的还是它们</span></div>'+
+  tiles(SCREEN+'-draft-fail-tiles')+
+  '<div class="rows3" style="margin-top:14px">'+
+   orow({icon:'refresh',t:'重新导出草稿',d:'用同样的内容再排一次，不经过模型',go:'draft-exporting',tid:SCREEN+'-df-retry'})+
+   orow({icon:'spark',t:'试试 AI 润色成文',d:'如果生成能力是通的，这条路能给你更完整的一份',go:'generating',tid:SCREEN+'-df-ai'})+
+   orow({icon:'pen',t:'回去改内容',d:'内容改完再导，草稿排的就是新的',go:'input-strengths',tid:SCREEN+'-df-edit'})+
+  '</div></div></div>'+
+  helperStrip('草稿失败和 AI 失败是两回事：这条不经过模型，重试通常就好。',SCREEN+'-df')+
+  ctabar(b({cls:'btn ghost',go:'input-strengths',tid:SCREEN+'-prev',label:svg('back',24)+'回去改内容'})+
+   b({cls:'btn primary wide',go:'draft-exporting',tid:SCREEN+'-primary',label:svg('refresh',26)+'重新导出草稿'}));
+};
+V['draft-ready']=function(){
+ var f=DRAFT_FILE;
+ return '<div class="sec grow"><div class="card">'+secLabel('01','原样草稿已经好了','未经 AI 润色')+
+  '<div class="fhead"><div class="fbox"><span class="fi">'+svg('file',34)+'</span><span class="fm">'+
+   '<span class="fn" data-testid="'+SCREEN+'-draft-filename">'+f.name+'</span>'+
+   '<span class="fs" data-testid="'+SCREEN+'-draft-meta">'+f.meta+'（'+sizeText(f.sizeBytes)+' · '+f.mimeType+'）</span></span></div>'+
+  '<div class="meta">'+objChips()+
+   '<span class="chip" data-testid="'+SCREEN+'-draft-fileid">'+svg('file',22)+'文件编号 '+f.fileId+'</span>'+
+   '<span class="chip warn">'+svg('warn',22)+'未经 AI 润色</span>'+
+  '</div></div>'+
+  stateBox('warn','warn','这份是你写的原话，不是 AI 成品','里面<b>没有润色</b>，也<b>没有缺失提示</b> —— 那两样只有走生成才有。文件名里就写着「未经AI润色」，'+
+   '拿去投的时候你自己心里有数。',SCREEN+'-draft-warn')+
+  '<div class="qh">把这一份带走<span>两条路：扫码存进手机，或者直接去打印</span></div>'+
+  '<div class="take">'+takeaway('二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-draft-qr-blocked')+
+   '<div class="take-m">'+
+    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把这份带走，就用手机扫左边这张码。下载链接是一条<b>短时签名链接</b>，到期时间随这次导出由服务端给出；打印走另一条系统链接，<b>两条各自计时</b>。过期不代表文件没了，重导一次就有新链接。</span></p>'+
+    loginRow(SCREEN+'-draft-login')+
+    orow({icon:'spark',t:'还是想要润色版',d:'内容没变，回去提交一次生成就行',go:'generating',tid:SCREEN+'-draft-ai'})+
+    orow({icon:'pen',t:'再改改内容',d:'改完重导一次，草稿排的就是新的',go:'input-strengths',tid:SCREEN+'-draft-edit'})+
+   '</div></div>'+
+  ownNote()+
+  '</div></div>'+
+  ctabar(b({cls:'btn ghost',go:'draft-exporting',tid:SCREEN+'-draft-again',label:svg('refresh',24)+'重新导出'})+
+   printPrimary(b({cls:'btn primary wide',go:'draft-exporting',tid:SCREEN+'-primary',label:svg('refresh',26)+'重新导出拿打印链接'})));
+};
+
+/* ---------- 预览 ---------- */
+function sheetHtml(){
+ var e=keptEdu(),x=keptExp(),p=keptProj(),sk=skills(),ce=certs(),h,i;
+ h='<div class="sheet" data-testid="'+SCREEN+'-sheet">'+
+  '<div class="sh-top"><b>'+F.basic.name+'</b><span>'+[F.intention.position,F.intention.city].filter(Boolean).join(' · ')+'</span>'+
+   '<em>'+(F.basic.phone||F.basic.email||'联系方式待补')+'</em></div>'+
+  '<div class="sh-b"><h3>个人简介<span class="tg pol">AI 润色</span></h3><p>'+pol('summary','（你没填自我评价，AI 不替你写一段没有的）')+'</p></div>';
+ h+='<div class="sh-b"><h3>求职意向<span class="tg keep">原样保留</span></h3><p>'+
+  [F.intention.position,F.intention.city?'意向城市 '+F.intention.city:'',F.intention.jobType,F.intention.salary].filter(Boolean).join(' · ')+'</p></div>';
+ if(e.length){
+  h+='<div class="sh-b"><h3>教育经历<span class="tg keep">事实原样</span><span class="tg pol">描述润色</span></h3>';
+  for(i=0;i<e.length;i++){
+   h+='<p><b>'+[e[i].school,e[i].major,e[i].degree].filter(Boolean).join(' · ')+'</b>'+(e[i].period?' · '+e[i].period:'')+'</p>'+
+    (e[i].description?'<p>'+pol('edu.'+i,e[i].description)+'</p>':'');
+  }
+  h+='</div>';
+ }
+ if(x.length){
+  h+='<div class="sh-b"><h3>实习 / 工作经历<span class="tg keep">事实原样</span><span class="tg pol">描述润色</span></h3>';
+  for(i=0;i<x.length;i++){
+   h+='<p><b>'+x[i].company+' · '+x[i].role+'</b>'+(x[i].period?' · '+x[i].period:'')+'</p><p>'+pol('exp.'+i,x[i].description)+'</p>';
+  }
+  h+='</div>';
+ }
+ if(p.length){
+  h+='<div class="sh-b"><h3>项目经历<span class="tg keep">事实原样</span><span class="tg pol">描述润色</span></h3>';
+  for(i=0;i<p.length;i++){
+   h+='<p><b>'+p[i].name+(p[i].role?' · '+p[i].role:'')+'</b></p><p>'+pol('proj.'+i,p[i].description)+'</p>';
+  }
+  h+='</div>';
+ }
+ if(sk.length)h+='<div class="sh-b"><h3>技能<span class="tg pol">表达归一，未新增</span></h3><p>'+sk.join(' · ')+'</p></div>';
+ if(ce.length)h+='<div class="sh-b"><h3>证书 / 资质<span class="tg keep">原样保留</span></h3><p>'+ce.join(' · ')+'</p></div>';
+ return h+'</div>';
+}
+V['preview-no-result']=function(){
+ var withTask=Boolean(TASKID);
+ return '<div class="sec grow"><div class="card">'+secLabel('01','没有可预览的结果','不会拿示例冒充')+
+  stateBox('plain','info','这次进来没有带结果','预览要有一次<b>已经完成的生成</b>才能显示。'+
+   (withTask
+    ? '这个地址带了一条记录标识，真实链路里会凭你的登录身份或那次提交返回的一次性访问令牌向服务端读回；没有凭证读不回来，所以这一页<b>不显示任何简历内容</b>，也不会拿示例冒充你的简历。'
+    : '这次没有带结果，所以这一页<b>不显示任何简历内容</b>，也不会拿示例冒充你的简历。'),SCREEN+'-nores-box')+
+  '<div class="rows3" style="margin-top:16px">'+
+   orow({icon:'pen',t:'去填资料并生成',d:'四步，只有姓名和目标岗位必填，其余都能空着',go:'input-basic',tid:SCREEN+'-nr-fill'})+
+   orow({icon:'book',t:'打开我的简历',d:'登录之后，服务端留存期内的版本可以直接打开',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-nr-mine'})+
+   orow({icon:'file',t:'我已经有简历文件',d:'那边做上传与诊断，不是从零填',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-nr-file'})+
+  '</div>'+
+  '<div class="split" style="margin-top:14px">'+
+   '<div class="mini"><h4>'+svg('info',24)+'两种进得来的方式</h4><p>一是刚提交完、结果直接带过来；二是登录后从「我的简历」点进来。<b>直接敲地址进不来。</b></p></div>'+
+   '<div class="mini"><h4>'+svg('lock',24)+'为什么不先放点什么</h4><p>放一份示例在这里，你会以为那是你的简历。<b>宁可这一屏是空的</b>，也不放一份不属于你的内容。</p></div>'+
+  '</div></div></div>'+
+  helperStrip('公共设备不留个人资料。刷新、返回或待机之后要重新填，这是设计成这样的，不是出故障。',SCREEN+'-nr')+
+  ctabar(a({cls:'btn ghost',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-back-source',label:svg('back',24)+'返回简历服务'})+
+   b({cls:'btn primary wide',go:'input-basic',tid:SCREEN+'-primary',label:svg('pen',26)+'去填资料'}));
+};
+V['preview-loading']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','正在读回这条记录','读回来之前不显示内容')+
+  proc('book','正在向服务端要这次结果','读回来之前，这一页不显示任何简历内容。',SCREEN+'-preview-band')+
+  steps([
+   {on:'done',t:'带着这条记录的标识进来',x:'完成',d:'从「我的简历」点进来，或刚提交完'},
+   {on:'now',t:'凭你的身份向服务端读回',x:'进行中',d:'读的是你自己那一条，没有凭证读不回来'},
+   {t:'显示那一次的生成结果',x:'下一步',d:'内容和当时一模一样，不会重新生成一遍'},
+   {t:'你核对，再导出或去打印',x:'之后',d:'确认过再导出，这一页不替你保存'}
+  ],SCREEN+'-preview-steps')+
+  '<p class="note"><span class="sq"></span><span>读回来之前，<b>不显示任何简历内容</b>。读的是你自己那一条：凭登录身份，或那次提交返回的<b>一次性访问令牌</b> —— 它<b>不会显示在屏幕上</b>，也<b>不进地址栏</b>；读不回来就是读不回来，不拿别的结果凑数。</span></p>'+
+  '</div></div>'+
+  '<div class="sec"><div class="split">'+
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-pl-mine',al:'返回我的简历',
+      html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>返回我的简历</b><span>记录列表在那边</span></span>'+GO})+
+   a({cls:'orow',href:'06-help.html',route:'/help',tid:SCREEN+'-pl-help',al:'找工作人员',
+      html:'<span class="oi">'+svg('help',26)+'</span><span class="om"><b>一直读不出来？</b><span>现场有人能帮你看一眼</span></span>'+GO})+
+  '</div></div>'+
+  ctabar(b({cls:'btn ghost',go:'preview-failed',tid:SCREEN+'-pl-fail',label:svg('warn',24)+'没读回来'})+
+   b({cls:'btn primary wide',go:'preview-ready',act:'seed-full',tid:SCREEN+'-primary',label:svg('eye',26)+'读回来了，看结果'}));
+};
+V['preview-failed']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','这条记录没读回来','不拿别的结果凑数')+
+  stateBox('error','warn','读不回这次的生成结果','可能已经过了留存期、这条不属于当前登录的人，或者网络不通。'+
+   '<b>页面不会退而求其次</b>显示另一份结果，也<b>不会用示例填满</b>这一屏。',SCREEN+'-pf-box')+
+  '<div class="rows3" style="margin-top:16px">'+
+   orow({icon:'refresh',t:'再读一次',d:'网络原因的话，重试通常就好',go:'preview-loading',tid:SCREEN+'-pf-retry'})+
+   orow({icon:'pen',t:'重新填一份生成',d:'内容不长，四步就能填完；只有姓名和目标岗位必填',go:'input-basic',tid:SCREEN+'-pf-refill'})+
+   orow({icon:'book',t:'回我的简历看看别的',d:'其它还在留存期内的版本可以直接打开',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-pf-mine'})+
+  '</div>'+
+  '<div class="split" style="margin-top:14px">'+
+   '<div class="mini"><h4>'+svg('clock',24)+'可能是过了留存期</h4><p>生成结果按服务端的留存期限清理，到期是真的没有了。这一页<b>不会假装还留着一份</b>。</p></div>'+
+   '<div class="mini"><h4>'+svg('lock',24)+'也可能不是本人</h4><p>结果只认你的登录身份或那次提交的一次性令牌。换个人、换个账号，一律当它不存在。</p></div>'+
+  '</div></div></div>'+
+  helperStrip('留存期是服务端定的，过期就是真的没有了 —— 这一页不会假装还留着一份。',SCREEN+'-pf')+
+  ctabar(b({cls:'btn ghost',go:'input-basic',tid:SCREEN+'-pf-fill',label:svg('pen',24)+'重新填一份'})+
+   b({cls:'btn primary wide',go:'preview-loading',tid:SCREEN+'-primary',label:svg('refresh',26)+'再读一次'}));
+};
+V['preview-ready']=function(){
+ var h=hintsOf();
+ return '<div class="sec grow"><div class="card">'+secLabel('01','生成结果','事实字段与你填的逐字一致')+sheetHtml()+'</div></div>'+
+  '<div class="sec"><div class="helper">'+
+   '<span class="ht">润色只动<b>个人简介和各段描述</b>；学校 / 专业 / 学历 / 公司 / 职务 / 项目名 / 证书 / 时间段是逐字复制的。'+
+    (h.length?'另外还有 <b>'+h.length+' 处</b>按你填的内容算出来的建议补充。':'按当前内容算，没有缺失提示。')+'</span>'+
+   b({cls:'hbtn',go:'preview-editing',tid:SCREEN+'-pr-edit',label:svg('pen',22)+'改一段描述',al:'就地改一段描述'})+
+   b({cls:'hbtn',go:'preview-hints',tid:SCREEN+'-pr-hints',label:svg('warn',22)+(h.length?'看这 '+h.length+' 处':'看缺失提示'),al:'看还差哪几处'})+
+  '</div></div>'+
+  helperStrip('这一页只在屏幕上。没登录时导出的文件不会进你的账号，事后登录也不补绑 —— 要留底就先登录，再生成、再导出。',SCREEN+'-pr')+
+  ctabar(b({cls:'btn ghost',go:'input-basic',tid:SCREEN+'-pr-back',label:svg('back',24)+'回去改资料'})+
+   b({cls:'btn primary wide',go:'export-chooser',tid:SCREEN+'-primary',label:svg('down',26)+'内容没问题，去导出'}))+
+  reason('事实字段要改，得回填写页改 —— 这一页只让你改描述，而且每一次改都要你自己点确认。');
+};
+V['preview-hints']=function(){
+ var h=hintsOf(),i,rows='';
+ for(i=0;i<h.length;i++){
+  rows+='<div class="hrow"><span class="hn">'+(i+1)+'</span><span class="hm">'+h[i].t+'</span>'+
+   b({cls:'hgo',go:h[i].go,act:h[i].seg?'seg:'+h[i].seg:'',tid:SCREEN+'-hint-'+(i+1),label:'去补'+GO,al:'去补：'+h[i].t})+'</div>';
+ }
+ if(!h.length)rows='<div class="hrow"><span class="hn">'+svg('check',22)+'</span><span class="hm">按当前内容算，服务端没有给出缺失提示。</span></div>';
+ return '<div class="sec grow"><div class="card">'+secLabel('01','还差这几处','服务端算的，不是 AI 编的')+
+  '<div class="hintlist" style="margin-bottom:14px">'+rows+'</div>'+
+  stateBox('info','info','这些提示是怎么来的','按几条固定规则从你填的内容里算出来：没写联系方式、没写教育、没写经历也没写项目、没写技能、'+
+   '经历描述太短。<b>AI 不会替你把这些补上</b> —— 补了就等于编。',SCREEN+'-hint-why')+
+  '</div></div>'+
+  '<div class="sec"><div class="split">'+
+   b({cls:'orow',go:'preview-ready',tid:SCREEN+'-ph-back',al:'回到预览',
+      html:'<span class="oi">'+svg('eye',26)+'</span><span class="om"><b>先看看现在这份</b><span>不补也能导出，只是会薄一些</span></span>'+GO})+
+   a({cls:'orow',href:'05-ai-cockpit.html',route:'/assistant',tid:SCREEN+'-ph-ask',al:'AI顾问怎么补',
+      html:'<span class="oi">'+svg('spark',26)+'</span><span class="om"><b>不知道怎么补？</b><span>问 AI顾问，它给你举个例子</span></span>'+GO})+
+  '</div></div>'+
+  helperStrip('这几条都不拦着你导出，补不补你自己定。',SCREEN+'-ph')+
+  ctabar(b({cls:'btn ghost',go:'preview-ready',tid:SCREEN+'-ph-preview',label:svg('back',24)+'回预览'})+
+   b({cls:'btn primary wide',go:h.length?h[0].go:'preview-ready',act:h.length&&h[0].seg?'seg:'+h[0].seg:'',tid:SCREEN+'-primary',
+      label:svg('pen',26)+(h.length?'去补第 1 处':'没有要补的，回预览')}));
+};
+V['preview-editing']=function(){
+ var x=keptExp()[0]||{company:'—',role:'—',description:''};
+ return '<div class="sec grow"><div class="card">'+secLabel('01','改这一段描述','事实字段不在这里改')+
+  '<div class="helper" style="margin-bottom:12px"><span class="ht">'+svg('lock',22)+' <b>'+x.company+' · '+x.role+(x.period?' · '+x.period:'')+'</b> —— 这一行是事实字段，要改得回填写页改</span>'+
+   b({cls:'hbtn',go:'input-history',act:'seg:exp',tid:SCREEN+'-edit-facts',label:svg('pen',22)+'回填写页改',al:'回填写页修改事实字段'})+'</div>'+
+  '<div class="cmp" style="margin-bottom:12px">'+
+   '<div class="raw"><h5>'+svg('pen',20)+'你填的原话</h5><p data-testid="'+SCREEN+'-edit-raw">'+(x.description||'（这一段你没写描述）')+'</p></div>'+
+   '<div class="pol"><h5>'+svg('spark',20)+'AI 润色后</h5><p data-testid="'+SCREEN+'-edit-pol">'+pol('exp.0',x.description)+'</p></div>'+
+  '</div>'+
+  '<div class="fgrid one">'+
+   field({path:'editDraft',value:pol('exp.0',x.description),label:'改成你想要的样子（改完要点确认）',area:true,ph:'直接在这里改'})+
+  '</div>'+
+  '<p class="note" style="margin-top:12px"><span class="sq"></span><span>改完点「确认这一段」才写回预览。<b>不点就不算</b>，退出这一屏等于放弃这次修改。</span></p>'+
+  '</div></div>'+
+  helperStrip('拿不准怎么改？让 AI顾问看一眼，或者叫工作人员帮你顺一句。',SCREEN+'-pe')+
+  ctabar(b({cls:'btn ghost',go:'preview-ready',tid:SCREEN+'-edit-cancel',label:svg('x',24)+'放弃修改'})+
+   b({cls:'btn ghost',go:'preview-editing',act:'reset-edit',tid:SCREEN+'-edit-reset',label:svg('refresh',24)+'还原成原话'})+
+   b({cls:'btn primary wide',go:'preview-ready',tid:SCREEN+'-primary',label:svg('check',26)+'确认这一段'}));
+};
+
+/* ---------- 导出 ---------- */
+/* 四种格式都能导出，但**只有 PDF 现在能交给打印确认**。
+   ai.service.ts 对 pdf 直接签打印凭证；对 docx/txt/md 另渲染一份同内容 PDF 再签，
+   接口回来的却只有一条 printFileUrl —— **那份打印 PDF 自己的 fileId 没有返回**，
+   返回的 fileId 仍是原格式文件的。下游打印确认页按「来源 + 文件编号」成对认文件，
+   拿原格式的编号冒充那份 PDF，等于替服务端断言两个不同对象是同一个。
+   所以这里如实写成「暂不开放打印」，等服务端补上打印 PDF 的文件编号再开。
+   非 PDF 的 pageCount 恒为 0 —— 那是「没有分页概念」，与能不能打印是两件事，分开写。 */
+var FMTS=[
+ {k:'pdf',n:'PDF',d:'排版固定，打印出来就是屏幕上这样',pg:'有页数',p:'能进打印确认',v:'投简历、现场打印'},
+ {k:'docx',n:'DOCX',d:'Word 文档，回去还能自己接着改',pg:'页数 0',p:'暂不开放打印',v:'回家再改'},
+ {k:'txt',n:'TXT',d:'纯文字，粘进在线表单最省事',pg:'页数 0',p:'暂不开放打印',v:'网申填表'},
+ {k:'md',n:'MD',d:'Markdown，会用的人拿去二次排版',pg:'页数 0',p:'暂不开放打印',v:'自己再排版'}
+];
+var FMT='pdf';
+/* 导出成果的夹具事实。文件名扩展名、元信息与页数口径都跟着所选格式走 ——
+   写死 .pdf 会让用户选了 DOCX/TXT/MD 之后拿到一份自称 PDF 的文件。
+   非 PDF 的 pageCount 恒为 0（ai.service.ts:660-690），元信息里一个页数都不许出现。 */
+var FMTFILE={
+ pdf:{ext:'pdf',meta:'A4 · 1 页 · 约 96 KB',pages:'PDF 有真实页数',
+      sizeBytes:98304,pageCount:1,mime:'application/pdf',
+      fileId:'rsm_gen_6b28d40a',printable:true},
+ docx:{ext:'docx',meta:'Word 文档 · 页数 0 · 约 24 KB',pages:'页数固定是 0',
+      sizeBytes:24576,pageCount:0,
+      mime:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileId:'rsm_gen_docx_4e19b7',printable:false},
+ txt:{ext:'txt',meta:'纯文本 · 页数 0 · 约 4 KB',pages:'页数固定是 0',
+      sizeBytes:4096,pageCount:0,mime:'text/plain',
+      fileId:'rsm_gen_txt_08c3fa',printable:false},
+ md:{ext:'md',meta:'Markdown · 页数 0 · 约 5 KB',pages:'页数固定是 0',
+      sizeBytes:5120,pageCount:0,mime:'text/markdown',
+      fileId:'rsm_gen_md_5d72e1',printable:false}
+};
+function fileOf(k){
+ var f=FMTFILE[k]||FMTFILE.pdf;
+ return {name:'AI简历_张示例.'+f.ext,meta:f.meta,pages:f.pages,ext:f.ext,
+         sizeBytes:f.sizeBytes,pageCount:f.pageCount,mimeType:f.mime,
+         fileId:f.fileId,printable:f.printable};
+}
+/* 「原样草稿」是另一份文件：没经过 AI，文件名、大小、页数和编号都和导出件不一样，
+   不能共用一个编号 —— 下游按编号取件，编号相同就是两份文件互相冒充。 */
+var DRAFT_FILE={name:'简历草稿（未经AI润色）_张示例.pdf',meta:'A4 · 1 页 · 约 78 KB',
+ pages:'PDF 有真实页数',ext:'pdf',sizeBytes:79872,pageCount:1,
+ mimeType:'application/pdf',fileId:'rsm_draft_3a17c9f2',printable:true};
+/* 这一屏正在拿着哪一份文件：草稿屏是草稿那份，其余导出屏跟着当前格式走。 */
+function curFile(){return CUR==='draft-ready'?DRAFT_FILE:fileOf(FMT)}
+function sizeText(n){return n<1024*1024?Math.max(1,Math.round(n/1024))+' KB':(n/1024/1024).toFixed(1)+' MB'}
+/* 打印交接只带登记过的这几项：来源、文件编号、页数、份数、单双面、颜色。
+   signedUrl / printFileUrl 一个都不进地址栏。黑白单面是本机当前唯一已验证的组合。 */
+function printHref(f){
+ return '14-print-confirm.html?source=resume-generate&fileId='+encodeURIComponent(f.fileId)
+  +'&pages='+f.pageCount+'&copies=1&duplex=single&color=bw';
+}
+/* 「再导一份别的格式」列的是**另外三种**，不是写死的那三个字。 */
+function otherFmts(k){
+ var out=[],i;
+ for(i=0;i<FMTS.length;i++){if(FMTS[i].k!==k)out.push(FMTS[i].n)}
+ return out.join(' / ');
+}
+var LAYOUTS=['单栏','双栏','紧凑字号','标准字号','大字号'];
+var LAYOUT='单栏';
+function fmtCards(){
+ var h='<div class="fmts" role="radiogroup" aria-label="导出格式">',i,f;
+ for(i=0;i<FMTS.length;i++){f=FMTS[i];
+  h+='<button type="button" class="fmt press" role="radio" data-fmt="'+f.k+'" aria-checked="'+(f.k===FMT)+'" data-testid="'+SCREEN+'-fmt-'+f.k+'" aria-label="导出格式 '+f.n+'，'+f.pg+'，'+f.p+'">'+
+   '<b>'+svg('file',24)+'<span class="lb">'+f.n+'</span><span class="pg">'+f.pg+'</span></b>'+
+   '<small>'+f.d+'</small>'+
+   '<span class="fmeta"><span class="k">适合</span><span class="v">'+f.v+'</span></span>'+
+   '<span class="fmeta"><span class="k">打印</span><span class="v">'+f.p+'</span></span></button>';
+ }
+ return h+'</div>';
+}
+V['export-chooser']=function(){
+ var isPdf=FMT==='pdf',i,lay='';
+ for(i=0;i<LAYOUTS.length;i++){
+  lay+='<button type="button" class="chip2 press" data-lay="'+LAYOUTS[i]+'" aria-pressed="'+(LAYOUTS[i]===LAYOUT)+'"'+
+   (isPdf?'':' aria-disabled="true"')+' data-testid="'+SCREEN+'-lay-'+(i+1)+'" aria-label="版式 '+LAYOUTS[i]+(isPdf?'':'（当前格式不套版式）')+'">'+LAYOUTS[i]+'</button>';
+ }
+ return '<div class="sec grow"><div class="card">'+secLabel('01','选导出格式','四种都能打印')+fmtCards()+
+  '<div class="hr" style="margin:14px 0"></div>'+
+  '<div class="qh">版式 · <b>'+(isPdf?'只对 PDF 生效':'当前格式不套版式')+'</b><span>'+(isPdf?'影响导出与打印的排版':'DOCX / TXT / MD 由各自的渲染器出')+'</span></div>'+
+  '<div class="lay">'+lay+'</div>'+
+  '<p class="note" style="margin-top:14px"><span class="sq"></span><span data-testid="'+SCREEN+'-fmt-note">'+
+   (isPdf?'PDF 会给出<b>真实页数</b>，版式也只对它生效。':
+    '<b>'+FMT.toUpperCase()+' 的页数固定是 0</b>，也不套版式 —— 它没有分页概念。'+
+    '<b>这一份暂不开放打印</b>：打印要用服务端另出的一份同内容 PDF，而那份 PDF 的文件编号接口还没返回，编号对不上就不交接。')+
+   '</span></p>'+
+  '<p class="note" style="margin-top:12px"><span class="sq"></span><span>导出后给你的是一条<b>短时签名链接</b>，会过期，重导一次就有新链接；打印走服务端另签的凭证，<b>下载链接进不了打印</b>。</span></p>'+
+  '</div></div>'+
+  helperStrip('不确定要哪种？要打印或投简历就选 PDF；要回去自己改就选 DOCX。',SCREEN+'-ec')+
+  ctabar(b({cls:'btn ghost',go:'preview-ready',tid:SCREEN+'-ex-back',label:svg('back',24)+'回预览再看看'})+
+   b({cls:'btn primary wide',go:'export-exporting',tid:SCREEN+'-primary',label:svg('down',26)+'导出这一份'}));
+};
+V['export-exporting']=function(){
+ var f=FMT.toUpperCase(),isPdf=FMT==='pdf';
+ return '<div class="sec grow"><div class="card">'+secLabel('01','正在生成文件','完成前没有文件')+
+  proc('down','正在渲染 '+f+' 并落库','渲染、落库、再签一条短时下载链接 —— 这几步做完才有文件。',SCREEN+'-export-band')+
+  steps([
+   {on:'done',t:'内容你已经核对过',x:'完成',d:'导出不改内容，也不会再过一遍模型'},
+   {on:'now',t:'渲染 '+f+' 并落库',x:'进行中',
+    d:isPdf?'PDF 渲染完会带上真实页数':f+' 的页数固定是 0；打印时服务端另出一份同内容 PDF'},
+   {t:'签出下载链接与打印链接',x:'下一步',d:'两条链接不通用，下载链接进不了打印'},
+   {t:'扫码保存到手机，或去打印',x:'之后',d:isPdf?'PDF 能直接进打印确认':f+' 只能扫码带走；打印要等服务端返回打印 PDF 的文件编号'}
+  ],SCREEN+'-export-steps')+
+  '<p class="note"><span class="sq"></span><span>现在<b>还不能下载，也不能打印</b>；页数和文件大小要等真实结果，<b>这一页不估算</b>。这一步只等服务端出文件，<b>不收钱</b>，也不会自己去排打印队。</span></p>'+
+  '</div></div>'+
+  helperStrip('一直不出来？可以回去换个格式，或者叫工作人员来看一眼。',SCREEN+'-ee')+
+  ctabar(b({cls:'btn ghost',go:'export-failed',tid:SCREEN+'-ee-fail',label:svg('warn',24)+'这次失败了'})+
+   b({cls:'btn primary wide',go:'export-ready',tid:SCREEN+'-primary',label:svg('check',26)+'文件好了'}));
+};
+V['export-failed']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','文件没生成出来','简历内容还在')+
+  stateBox('error','warn','这次导出失败了','服务端<b>没有确认落库</b>，所以这次<b>没有产生任何文件</b>，也没有可用的下载或打印链接。'+
+   '你核对过的简历<b>内容还在</b>这一页上，直接重导就行。',SCREEN+'-exf-box')+
+  '<div class="rows3" style="margin-top:16px">'+
+   orow({icon:'refresh',t:'用同样的格式重导',d:'内容不变，再试一次；这一步不改内容，也不再过模型',go:'export-exporting',tid:SCREEN+'-xf-retry'})+
+   orow({icon:'file',t:'换个格式试试',d:'PDF 渲染最重，换 DOCX / TXT / MD 通常更快 —— 四种都能进打印',go:'export-chooser',tid:SCREEN+'-xf-fmt'})+
+   orow({icon:'eye',t:'先回预览核内容',d:'内容改完再导，导出的就是新的那一份',go:'preview-ready',tid:SCREEN+'-xf-preview'})+
+  '</div>'+
+  '<div class="qh" style="margin-top:16px">这次要导出的是<span>内容没变，重导的还是它</span></div>'+
+  '<div class="meta">'+
+   '<span class="chip">'+svg('file',22)+'格式 '+FMT.toUpperCase()+'</span>'+
+   '<span class="chip">'+svg('pen',22)+'版式 '+LAYOUT+'</span>'+
+   '<span class="chip">'+svg('check',22)+'内容 '+keptSummary()+'</span>'+
+  '</div></div></div>'+
+  helperStrip('导出失败不影响已经生成好的内容 —— 那份还在，重导一次就好。',SCREEN+'-xf')+
+  ctabar(b({cls:'btn ghost',go:'export-chooser',tid:SCREEN+'-xf-back',label:svg('back',24)+'回去换格式'})+
+   b({cls:'btn primary wide',go:'export-exporting',tid:SCREEN+'-primary',label:svg('refresh',26)+'重新导出'}));
+};
+V['export-ready']=function(){
+ var f=fileOf(FMT);
+ return '<div class="sec grow"><div class="card">'+secLabel('01','文件已经好了','扫码带走，或去打印')+
+  '<div class="fhead"><div class="fbox"><span class="fi">'+svg('file',34)+'</span><span class="fm">'+
+   '<span class="fn" data-testid="'+SCREEN+'-export-filename">'+f.name+'</span>'+
+   '<span class="fs" data-testid="'+SCREEN+'-export-meta">'+f.meta+'</span></span></div>'+
+  '<div class="meta">'+objChips(printChipOver())+
+   '<span class="chip" data-testid="'+SCREEN+'-export-pages">'+svg('file',22)+f.pages+'</span>'+
+   '<span class="chip" data-testid="'+SCREEN+'-export-fileid">'+svg('file',22)+'文件编号 '+f.fileId+'</span>'+
+   '<span class="chip">'+svg('file',22)+sizeText(f.sizeBytes)+' · '+f.mimeType+'</span>'+
+  '</div></div>'+
+  (f.printable?'':stateBox('warn','warn',FMT.toUpperCase()+' 这一份暂时进不了打印','打印链接服务端签了，'+
+   '但<b>打印用的是另渲染的一份同内容 PDF</b>，那份 PDF <b>自己的文件编号这次没有返回</b>。'+
+   '打印确认页按「来源 + 文件编号」成对认文件，拿这份 '+FMT.toUpperCase()+' 的编号顶上去，'+
+   '下游取到的可能根本不是要打印的那一份，所以这里不放行。<b>扫码取件和我的文档照常</b>；'+
+   '想现在就打印，回去导一份 PDF。',SCREEN+'-noid-box'))+
+  '<div class="qh">把这一份带走<span>'+(f.printable?'两条路：扫码存进手机，或者直接去打印':'扫码存进手机；打印要换 PDF 那一份')+'</span></div>'+
+  '<div class="take">'+takeaway('二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-export-qr-blocked')+
+   '<div class="take-m">'+
+    '<p class="note"><span class="sq"></span><span>公共机器<b>不提供下载到本机</b>：要把文件带走，就用手机扫左边这张码。到期时间随这次导出由服务端给出。打印走<b>另一条系统链接</b>，<b>两条各自计时、互不牵连</b> —— 下载那条过期了照样能打印，<b>下载链接也进不了打印</b>。</span></p>'+
+    loginRow(SCREEN+'-export-login')+
+    orow({icon:'file',t:'再导一份别的格式',d:FMT==='pdf'?otherFmts(FMT)+' 供下载编辑，暂不开放打印':'换成 PDF 就能直接打印；'+otherFmts(FMT)+' 只供下载编辑',go:'export-chooser',tid:SCREEN+'-export-fmt'})+
+    orow({icon:'refresh',t:'重新导出',d:'改过内容，或者链接过期了，都点这里',go:'export-exporting',tid:SCREEN+'-export-again'})+
+   '</div></div>'+
+  ownNote()+
+  '</div></div>'+
+  ctabar(b({cls:'btn ghost',go:'preview-ready',tid:SCREEN+'-ex-preview',label:svg('back',24)+'回预览'})+
+   printPrimary(b({cls:'btn primary wide',go:'export-exporting',tid:SCREEN+'-primary',label:svg('refresh',26)+'重新导出拿打印链接'})));
+};
+/* 这一屏只表示**下载 signedUrl 过期**（storage.service.ts 的下载签名有自己的 TTL）。
+   打印走的是另一条系统 HMAC content URL（signing.ts），两条签名各自计时、互不牵连，
+   所以这里**保留真实打印入口**，只关掉扫码取件；文件实体按服务端留存期限管理，没有被删。 */
+V['export-url-expired']=function(){
+ var f=fileOf(FMT);
+ return '<div class="sec grow"><div class="card">'+secLabel('01','扫码取件的链接过期了','打印那条还在')+
+  '<div class="fhead"><div class="fbox"><span class="fi mute">'+svg('clock',34)+'</span><span class="fm">'+
+   '<span class="fn" data-testid="'+SCREEN+'-export-filename">'+f.name+'</span>'+
+   '<span class="fs" data-testid="'+SCREEN+'-export-meta">'+f.meta+'</span></span></div>'+
+  '<div class="meta">'+objChips(printBlock()==='noid'?{print:'打印链接仍可用 · 缺打印 PDF 编号'}:{print:'打印链接仍可用'})+
+   '<span class="chip" data-testid="'+SCREEN+'-export-fileid">'+svg('file',22)+'文件编号 '+f.fileId+'</span>'+
+   '<span class="chip" data-testid="'+SCREEN+'-export-pages">'+svg('file',22)+f.pages+' · '+sizeText(f.sizeBytes)+'</span>'+
+  '</div></div>'+
+  stateBox('warn','clock','过期的是下载那一条，不是文件','下载和打印是<b>两条各自计时的签名链接</b>，一条到期不影响另一条。'+
+   '这次<b>手机扫码取件用不了</b>了，<b>去打印确认照常</b>。文件本身按<b>服务端留存期限</b>管理，'+
+   '<b>不是随链接一起被删</b>；想再扫码带走，重导出一次就有新的下载链接。',SCREEN+'-exp-box')+
+  '<div class="qh">现在能做什么<span>打印照旧；要手机取件就重导出</span></div>'+
+  '<div class="rows3">'+
+   orow({icon:'refresh',t:'重导出，拿新的下载链接',d:'不重新生成，只重新出一次文件；新链接出来就能再扫码带走',go:'export-exporting',tid:SCREEN+'-xe-again'})+
+   takeaway('二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-xe-qr-blocked')+
+   orow({icon:'eye',t:'先回预览看一眼内容',d:'确认没问题再导，导出的就是你核对过的这一份',go:'preview-ready',tid:SCREEN+'-xe-preview'})+
+  '</div>'+
+  '</div></div>'+
+  helperStrip('链接留得短是有意的：这是公共设备，挂太久等于把你的简历放在外面。',SCREEN+'-xe')+
+  ctabar(b({cls:'btn ghost',go:'export-exporting',tid:SCREEN+'-xe-back',label:svg('refresh',24)+'重新导出拿新链接'})+
+   printPrimary(b({cls:'btn primary wide',go:'export-exporting',tid:SCREEN+'-primary',label:svg('refresh',26)+'重新导出拿打印链接'})));
+};
+
+/* 这一屏**显式钉在 TXT 异常夹具**上（路由进入时同时把 FMT 置为 txt）：它演示的是
+   「服务端这次没给打印链接」，不是某个格式的常态。 */
+V['export-print-unavailable']=function(){
+ var f=fileOf('txt');
+ return '<div class="sec grow"><div class="card">'+secLabel('01','这次没拿到打印链接','异常兜底，不是常态')+
+  '<div class="fhead"><div class="fbox"><span class="fi mute">'+svg('file',34)+'</span><span class="fm">'+
+   '<span class="fn" data-testid="'+SCREEN+'-export-filename">'+f.name+'</span>'+
+   '<span class="fs" data-testid="'+SCREEN+'-export-meta">'+f.meta+'</span></span></div>'+
+  '<div class="meta">'+objChips()+
+   '<span class="chip">'+svg('pen',22)+'非 PDF 页数固定是 0</span>'+
+  '</div></div>'+
+  stateBox('warn','warn','没有打印链接就不放行','打印只认服务端签的系统链接。这次导出没给，所以这一页<b>不放打印入口</b> —— '+
+   '<b>不会拿下载链接顶上去</b>，那条链接打印服务不认。缺的只是打印那一条：<b>手机扫码取件照常能用</b>，'+
+   '文件也按<b>服务端留存期限</b>保留着。<b>这一屏演示的是「连链接都没给」这种异常</b>，'+
+   '和 TXT / DOCX / MD <b>平时那种「有链接但没有打印 PDF 编号」是两回事</b>：'+
+   '那一种重导出也不会好，只能换成 PDF，或者等服务端把打印 PDF 的文件编号补上。',SCREEN+'-xp-box')+
+  '<div class="qh">这一份还能带走<span>扫码存进手机；打印要等重导出拿到链接</span></div>'+
+  '<div class="take">'+takeaway('下载还能用：二维码由这次导出的<b>短时签名链接</b>渲染。',SCREEN+'-xp-qr-blocked')+
+   '<div class="take-m">'+
+    orow({icon:'refresh',t:'重导出一次',d:'再要一次打印链接，通常这次就有了',go:'export-exporting',tid:SCREEN+'-xp-again'})+
+    orow({icon:'file',t:'换成 PDF 再导',d:'PDF 是唯一有真实页数、也是当前唯一能进打印确认的格式',go:'export-chooser',tid:SCREEN+'-xp-pdf'})+
+    printRow(SCREEN+'-xp-blocked')+
+   '</div></div>'+
+  '</div></div>'+
+  helperStrip('只想把文件带走的话，扫码现在就能存进手机，不用非得打印。',SCREEN+'-xp')+
+  ctabar(b({cls:'btn ghost',go:'export-chooser',tid:SCREEN+'-xp-back',label:svg('back',24)+'回去换格式'})+
+   printPrimary(b({cls:'btn primary wide',go:'export-exporting',tid:SCREEN+'-primary',label:svg('refresh',26)+'重新导出'})));
+};
+
+/* ---------- 兜底 ---------- */
+V['session-lost']=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','已填内容已经清除','公共设备的设计如此')+
+  stateBox('plain','lock','这一份要从头填','填写内容只放在这台机器的内存里，<b>刷新、返回、待机或超时之后就没了</b>，也<b>不会写进本机存储</b>。'+
+   '这是公共一体机的隐私设计，<b>不是出故障</b>。'+(TASKID?'（这个地址还带了一条记录标识，但没有凭证也读不回来。）':''),SCREEN+'-sl-box')+
+  '<div class="qh" style="margin-top:16px">重新填只要<b>四步</b><span>只有姓名和目标岗位必填</span></div>'+
+  steps([
+   {t:'基本信息',d:'姓名必填，城市和联系方式点候选词就行',x:'第 1 步'},
+   {t:'求职意向',d:'目标岗位必填，城市 / 类型 / 薪资都能点选',x:'第 2 步'},
+   {t:'经历',d:'教育、工作、项目三类，都可以空着；描述能直接说',x:'第 3 步'},
+   {t:'技能与自评',d:'只填你真有的，写一两句就够',x:'第 4 步'}
+  ],SCREEN+'-sl-steps')+
+  '</div></div>'+
+  '<div class="sec"><div class="split">'+
+   a({cls:'orow',href:'39-member-records.html?view=resumes',route:'/profile/records?view=resumes',tid:SCREEN+'-sl-mine',al:'打开我的简历',
+      html:'<span class="oi">'+svg('book',26)+'</span><span class="om"><b>打开我的简历</b><span>登录之后，服务端留存期内的版本还在</span></span>'+GO})+
+   a({cls:'orow',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-sl-source',al:'返回简历服务',
+      html:'<span class="oi">'+svg('file',26)+'</span><span class="om"><b>返回简历服务</b><span>上传、诊断、优化都在那一页</span></span>'+GO})+
+  '</div></div>'+
+  ctabar(a({cls:'btn ghost',href:'16-service-hubs.html',route:'/services',tid:SCREEN+'-sl-hub',label:svg('back',24)+'返回服务大厅'})+
+   b({cls:'btn primary wide',go:'input-basic',tid:SCREEN+'-primary',label:svg('pen',26)+'重新填一份'}));
+};
+V.illegal=function(){
+ return '<div class="sec grow"><div class="card">'+secLabel('01','认不出这个页面状态','不回显原始参数')+
+  stateBox('error','warn','地址里的状态没有登记','这一页只认自己登记过的状态。收到没登记的值时，<b>我不猜你想去哪一步</b>，'+
+   '也<b>不把地址里的原始参数显示在屏幕上</b>。常见原因：地址被改过、扫到了旧的二维码，或者从一个已经改版的入口跳过来 —— '+
+   '这几种都不会丢东西，只是这一屏认不出来。',SCREEN+'-il-box')+
+  '<div class="rows3" style="margin-top:16px">'+
+   orow({icon:'pen',t:'从第 1 步开始填',d:'姓名和目标岗位是仅有的两个必填，其余都能空着',go:'input-basic',tid:SCREEN+'-il-fill'})+
+   orow({icon:'file',t:'返回简历服务',d:'上传、诊断、优化、从零生成都在那一页',href:'21-resume-triage.html',route:'/resume/source',tid:SCREEN+'-il-source'})+
+   orow({icon:'help',t:'找工作人员',d:'反复跳到这一屏的话，现场可以处理',href:'06-help.html',route:'/help',tid:SCREEN+'-il-help'})+
+  '</div>'+
+  '<div class="split" style="margin-top:14px">'+
+   '<div class="mini"><h4>'+svg('info',24)+'不会丢东西</h4><p>只是这一屏认不出地址里的状态。你之前填的、生成的、导出的都不受这一屏影响。</p></div>'+
+   '<div class="mini"><h4>'+svg('lock',24)+'为什么不猜一个</h4><p>猜错一步，你可能以为自己在改这份简历、其实在改另一份。<b>认不出就停下来问你</b>。</p></div>'+
+  '</div></div></div>'+
+  helperStrip('这一屏不产生任何提交、生成、导出或打印，也不会替你恢复上一次的内容。',SCREEN+'-il')+
+  ctabar(a({cls:'btn ghost',href:'01-home.html',route:'/',tid:SCREEN+'-il-home',label:svg('back',24)+'回首页'})+
+   b({cls:'btn primary wide',go:'input-basic',tid:SCREEN+'-primary',label:svg('pen',26)+'从第 1 步开始'}));
+};
+
+/* ================= 渲染 ================= */
+var root=document.getElementById('body-root');
+function render(st){
+ CUR=st; /* 这一屏持有什么，只从 HELD 表读；视图里不许再各自拍脑袋判断可用性。 */
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-route',routeOf(st));
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ root.innerHTML=fixtureBar(st)+V[st]();
+ var rz=root.querySelector('.cta-reason'),cb=root.querySelector('.ctabar');
+ if(rz&&cb)root.insertBefore(rz,cb);
+ var p=document.getElementById('pill');
+ p.className='pill'+(PILL[st][0]?' '+PILL[st][0]:'');
+ document.getElementById('pill-txt').textContent=PILL[st][1];
+ document.getElementById('pill-dot').className='dot'+(/^(generating|voice-recording|voice-transcribing|draft-exporting|export-exporting|preview-loading)$/.test(st)?' breathe':'');
+ document.getElementById('xq-ask').innerHTML=ASK[st][0];
+ /* 副标题不能一屏之内和下面的禁用按钮打架：非 PDF 的导出没有「直接去打印」这条路，
+    这里就不能照着通用文案写「或者直接去打印」。 */
+ document.getElementById('xq-doing').innerHTML=
+  (st==='export-ready'&&!curFile().printable)
+   ? '<b>扫码存进手机带走</b>。这一份<b>暂不开放打印</b>：打印要用服务端另出的同内容 PDF，那份 PDF 的文件编号还没返回。'
+   : ASK[st][1];
+ document.getElementById('xq-eyebrow').textContent=EYEBROW[st.split('-')[0]]||'RESUME GENERATE';
+ document.getElementById('truth-tx').innerHTML=TRUTH[TRUTHOF[st]];
+ var back=document.getElementById('topback');
+ if(PREVIEW_VIEW[st]){back.setAttribute('href','21-resume-triage.html');back.setAttribute('aria-label','返回简历服务（这次结果不会带走）')}
+ else{back.setAttribute('href','21-resume-triage.html');back.setAttribute('aria-label','返回简历服务')}
+ bind();
+ if(DEBUG)markDemo(st);
+}
+/* 切状态前先把输入框里的值收回内存，不然翻页就丢 —— React 用 useState，这里手动收。 */
+function harvest(){
+ var list=root.querySelectorAll('[data-k]'),i;
+ for(i=0;i<list.length;i++)fset(list[i].getAttribute('data-k'),list[i].value);
+}
+function bind(){
+ var i,list;
+ list=root.querySelectorAll('[data-go],[data-act]');
+ for(i=0;i<list.length;i++){
+  list[i].addEventListener('click',function(){
+   if(this.getAttribute('aria-disabled')==='true')return;
+   harvest();
+   var act=this.getAttribute('data-act')||'',go=this.getAttribute('data-go')||'';
+   if(act.indexOf('seg:')===0)SEG=act.slice(4);
+   if(act==='add:edu')F.education.push({school:'',major:'',degree:'',period:'',description:''});
+   if(act==='add:exp')F.experience.push({company:'',role:'',period:'',description:''});
+   if(act==='add:proj')F.projects.push({name:'',role:'',description:''});
+   if(act.indexOf('del:')===0){
+    var d=act.split(':'),lname=SEGDEF[d[1]].list;
+    F[lname].splice(Number(d[2]),1);
+   }
+   if(act.indexOf('voice:')===0){
+    var v=act.split(':');
+    VCTX.kind=v[1];VCTX.i=Number(v[2]);
+    if(v[1]==='intro'){VCTX.label='自我评价';VCTX.where=''}
+    else if(v[1]==='exp'){var e=F.experience[VCTX.i]||{};VCTX.label='工作内容';VCTX.where=[e.company,e.role].filter(Boolean).join(' · ')||'这一段还没填公司和职务'}
+    else if(v[1]==='edu'){var u=F.education[VCTX.i]||{};VCTX.label='在校情况';VCTX.where=u.school||'这一段还没填学校'}
+    else{var j=F.projects[VCTX.i]||{};VCTX.label='项目内容';VCTX.where=j.name||'这个项目还没填名称'}
+    render('voice-recording');return;
+   }
+   if(act==='apply-voice'){
+    /* 只有点了「确认写入」才落到表单，而且是另起一行追加，不覆盖原内容。 */
+    var txt=String(F.voiceDraft||'');F.voiceDraft='';
+    var tgt=VCTX.kind==='intro'?null:(SEGDEF[VCTX.kind]?F[SEGDEF[VCTX.kind].list][VCTX.i]:null);
+    if(VCTX.kind==='intro')F.selfIntro=[F.selfIntro.trim(),txt.trim()].filter(Boolean).join('\n');
+    else if(tgt)tgt.description=[String(tgt.description||'').trim(),txt.trim()].filter(Boolean).join('\n');
+    SEG=VCTX.kind==='intro'?SEG:VCTX.kind;
+    render(VCTX.kind==='intro'?'input-strengths':'input-history');return;
+   }
+   if(act==='seed-full'){F=seedFull();POLKEY='main'}
+   if(go)render(go);else render(root.getAttribute('data-state'));
+  });
+ }
+ list=root.querySelectorAll('[data-seg]');
+ for(i=0;i<list.length;i++){
+  list[i].addEventListener('click',function(){harvest();SEG=this.getAttribute('data-seg');render('input-history')});
+ }
+ list=root.querySelectorAll('[data-chip]');
+ for(i=0;i<list.length;i++){
+  list[i].addEventListener('click',function(){
+   harvest();
+   var path=this.getAttribute('data-chip'),v=this.getAttribute('data-v'),multi=this.getAttribute('data-multi')==='1';
+   if(multi){
+    var cur=splitList(fval(path),99),at=cur.indexOf(v);
+    if(at>=0)cur.splice(at,1);else cur.push(v);
+    fset(path,cur.join('、'));
+   }else{
+    fset(path,fval(path).trim()===v?'':v);
+   }
+   render(root.getAttribute('data-state'));
+  });
+ }
+ list=root.querySelectorAll('[data-fmt]');
+ for(i=0;i<list.length;i++){
+  list[i].addEventListener('click',function(){FMT=this.getAttribute('data-fmt');render('export-chooser')});
+ }
+ list=root.querySelectorAll('[data-lay]');
+ for(i=0;i<list.length;i++){
+  list[i].addEventListener('click',function(){
+   if(this.getAttribute('aria-disabled')==='true')return;
+   LAYOUT=this.getAttribute('data-lay');render('export-chooser');
+  });
+ }
+ /* 输入即时刷新「已填 / 待填」与计数，但不重绘整屏（重绘会丢焦点）。 */
+ list=root.querySelectorAll('[data-k]');
+ for(i=0;i<list.length;i++){
+  list[i].addEventListener('input',function(){
+   fset(this.getAttribute('data-k'),this.value);
+   var mark=this.parentNode.querySelector('.fl i');
+   if(mark){if(this.value.trim()){mark.setAttribute('data-on','1');mark.textContent='已填'}else{mark.removeAttribute('data-on');mark.textContent='待填'}}
+   var st=root.getAttribute('data-state'),prim=root.querySelector('[data-testid="'+SCREEN+'-primary"]');
+   if(prim&&(st==='input-basic'||st==='validate-name'))prim.setAttribute('aria-disabled',F.basic.name.trim()?'false':'true');
+   if(prim&&(st==='input-intention'||st==='validate-position'))prim.setAttribute('aria-disabled',F.intention.position.trim()?'false':'true');
+  });
+ }
+}
+
+/* ================= 路由：夹具门 + fail-closed ================= */
+function resolveState(){
+ var raw=Q.get('state');
+ if(Q.get('seg')!==null&&!SEGS[Q.get('seg')])return 'illegal';
+ if(Q.get('format')!==null&&FMTFILE[Q.get('format')]===undefined)return 'illegal';
+ if(raw===null||raw===''){
+  if(TASKID!==null)return 'preview-no-result';   /* 39 的会员回看深链：没有凭证就是空态 */
+  return 'entry';
+ }
+ if(STATES.indexOf(raw)<0)return 'illegal';
+ if(FIXTURE[raw]&&!(CAPTURE||DEBUG))return PREVIEW_VIEW[raw]?'preview-no-result':'session-lost';
+ return raw;
+}
+var START=resolveState();
+/* 夹具态要有内容才成立：稀疏夹具只给 preview-hints（用来证明提示是算出来的）。 */
+if(FIXTURE[START]){
+ if(START==='preview-hints'){F=seedThin();POLKEY='thin'}
+ else{F=seedFull();POLKEY='main'}
+}
+/* 导出格式可以由地址栏指定，方便逐个格式核对「能不能打印」这条判断；
+   未登记取值在 resolveState 就已经拦成 illegal，这里只处理登记过的。 */
+if(Q.get('format')!==null&&FMTFILE[Q.get('format')]!==undefined)FMT=Q.get('format');
+/* 这一屏演示的是「服务端没给打印链接」，夹具显式钉在 TXT 上，不受 ?format= 影响。 */
+if(START==='export-print-unavailable')FMT='txt';
+render(START);
+
+/* ================= 原型演示控制：仅 debug=1 才注入 DOM ================= */
+var demoPanel=null;
+function markDemo(st){
+ if(!demoPanel)return;
+ var links=demoPanel.querySelectorAll('a'),i;
+ for(i=0;i<links.length;i++)links[i].className=(links[i].getAttribute('data-proto-state')===st?'on':'');
+}
+if(DEBUG){
+ document.documentElement.classList.add('debug');
+ var tab=document.createElement('button');
+ tab.type='button';tab.className='demo-tab';tab.setAttribute('data-proto-control','true');
+ tab.setAttribute('aria-label','打开原型演示控制面板');tab.setAttribute('aria-expanded','false');
+ tab.textContent='演示';
+ demoPanel=document.createElement('div');
+ demoPanel.className='demo-panel';demoPanel.setAttribute('data-proto-control','true');
+ demoPanel.setAttribute('aria-label','原型演示控制');
+ var t=document.createElement('div');t.className='dp-t';t.textContent='原型演示控制（非产品功能）';demoPanel.appendChild(t);
+ for(var n=0;n<STATES.length;n++){
+  var link=document.createElement('a');
+  link.href=to(STATES[n]);link.textContent=STATES[n];
+  link.setAttribute('data-proto-state',STATES[n]);
+  demoPanel.appendChild(link);
+ }
+ /* 导出格式那三种「暂不开放打印」的屏，光靠状态名进不去，得连格式一起指定。 */
+ var t2=document.createElement('div');t2.className='dp-t';t2.textContent='导出格式（export-ready）';demoPanel.appendChild(t2);
+ var FKS=['pdf','docx','txt','md'];
+ for(var g=0;g<FKS.length;g++){
+  var fl=document.createElement('a');
+  fl.href=to('export-ready')+'&format='+FKS[g];
+  fl.textContent='export-ready · '+FKS[g].toUpperCase();
+  demoPanel.appendChild(fl);
+ }
+ var fbad=document.createElement('a');
+ fbad.href=to('export-ready')+'&format=nope';fbad.textContent='非法 format（fail-closed）';
+ demoPanel.appendChild(fbad);
+ document.getElementById('stage').appendChild(tab);
+ document.getElementById('stage').appendChild(demoPanel);
+ tab.addEventListener('click',function(){
+  var open=!demoPanel.classList.contains('show');
+  demoPanel.classList.toggle('show',open);
+  tab.setAttribute('aria-expanded',open?'true':'false');
+ });
+ markDemo(START);
+}
+
+/* 时钟：只刷新顶栏时间文本，不改 data-state，也不推进任何业务状态。 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(FLAT)document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

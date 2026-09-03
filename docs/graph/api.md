@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`466` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`476` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -38,8 +38,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/alerts` | AdminOpsController.listAlerts | admin | AdminOpsService | PrintTask<br/>Terminal |
-| GET | `/api/v1/admin/print-tasks` | AdminOpsController.listPrintTasks | admin | AdminOpsService | PrintTask<br/>Terminal |
+| GET | `/api/v1/admin/alerts` | AdminOpsController.listAlerts | admin | AdminOpsService | AlertDisposition<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat |
+| POST | `/api/v1/admin/alerts/disposition` | AdminOpsController.disposeAlert | admin | AdminAlertActionsService | AlertDisposition<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat<br/>User |
+| GET | `/api/v1/admin/print-tasks` | AdminOpsController.listPrintTasks | admin | AdminOpsService | AlertDisposition<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat |
 
 ## `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts`
 
@@ -317,6 +318,15 @@
 | POST | `/api/v1/jobs/:id/ai/explain` | JobAiController.explain | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 | POST | `/api/v1/jobs/:id/ai/match` | JobAiController.match | — | GovernedJobFitService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 | POST | `/api/v1/jobs/ai/recommendations` | JobAiController.recommendations | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
+
+## `services/api/src/job-applications/job-applications.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/me/job-applications` | JobApplicationsController.list | — | — | — |
+| POST | `/api/v1/me/job-applications` | JobApplicationsController.create | — | JobApplicationsService | Job<br/>JobApplication |
+| DELETE | `/api/v1/me/job-applications/:id` | JobApplicationsController.remove | — | — | — |
+| PATCH | `/api/v1/me/job-applications/:id` | JobApplicationsController.update | — | JobApplicationsService | Job<br/>JobApplication |
 
 ## `services/api/src/job-materials/job-materials.controller.ts`
 
@@ -811,6 +821,14 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/printers` | AdminPrintersController.list | admin | — | — |
 
+## `services/api/src/terminals/admin-release-observation.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.list | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| POST | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.create | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| PATCH | `/api/v1/admin/release-observation-plans/:planId` | AdminReleaseObservationController.update | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+
 ## `services/api/src/terminals/admin-terminals.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -858,6 +876,8 @@
 | GET | `/api/v1/terminals/:terminalId/config` | TerminalsController.getTerminalConfig | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PUT | `/api/v1/terminals/:terminalId/heartbeat` | TerminalsController.heartbeat | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/terminals/:terminalId/printer-status` | TerminalsController.getTerminalPrinterStatus | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PUT | `/api/v1/terminals/:terminalId/release-observation` | TerminalsController.reportReleaseObservation | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| GET | `/api/v1/terminals/:terminalId/release-observation-plan` | TerminalsController.getReleaseObservationPlan | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
 | POST | `/api/v1/terminals/:terminalId/scan-deletion-audits` | TerminalsController.reportScanDeletionAudit | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/:terminalId/tasks/claim` | TerminalsController.claimTasks | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/:terminalId/toolbox-events` | TerminalsController.recordToolboxLaunchEvent | — | TerminalToolboxService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |

@@ -1,5 +1,20 @@
 # 下一步任务
 
+## 当前候选：F0.5 发布可观测性（2026-09-01）
+
+- [x] **F0.5 管理端计划与 Agent 运行版本观察（PR #744 已合并至 `main`，未部署）**：仅对明确 `active` 的 Windows 终端创建、启用、暂停或取消观察计划；激活事务会再次确认全部静态目标仍为 `enabled + active`。Agent 通过独立端点读取本终端计划，并只读安装目录 `manifest.json` 的 `productVersion` 回报运行版本。该阶段不下载、不验包、不安装、不控制 Windows 服务、不创建计划任务、不执行远程 PowerShell，也不自动更新。`版本匹配` 仅表示 manifest 版本字符串与计划目标相同，**不代表** MSI/EXE 字节、哈希、Authenticode 签名或证书链已经由 Agent 验证。+5 additive schema 模型已登记，两条新增 `verify:*` 已接入 CI，合并前四项 CI 全绿。后续生产迁移、F0.5 部署、KSK-001 操作和任何 updater 功能均需新的具名授权。
+
+## 招聘闭环分期（2026-09-02 定性，不卡上线）
+
+产品负责人已定性「招聘闭环是必要能力，取得人力资源服务许可证后启用」。**本条不进交付阻塞清单** —— 它不卡当前上线，且第 4 刀的前置是许可证到手。分期方案与组件复用矩阵见 [recruitment-closure-license-gated-plan-2026-09.md](../product/recruitment-closure-license-gated-plan-2026-09.md)。
+
+- [x] **第 1 刀：资质闸门（2026-09-02 完成，未部署）**：`PlatformQualification` 模型 + `src/common/recruitment-capability.ts` fail-closed 判据 + `verify:recruitment-capability-gate`（63 PASS，双 CI job 已接线）。刻意不是环境变量也不是管理员可点的 boolean；门禁断言模块零 `process.env`、不导出 set/enable/toggle 类函数、**闸门零调用点**。两套迁移对空库 deploy 成功且 `migrate diff` 无差异。
+- [x] **第 2 刀（后端部分）：`JobApplication` 已完成（2026-09-02，PR #745，未合未部署）**：§4.4 口径修订已获具名授权（落为 [compliance-boundary.md §4.4A](../compliance/compliance-boundary.md)）。已交付本人维度模型 + `/me/job-applications` 读写 + `verify:job-application-track`（122 PASS，双 CI job 已接线）+ 个人信息导出接入。按方案 §3 **建法二**建模（`channel` / `statusSource` 服务端恒定、`resumeFileId`/`consentId` 恒空且门禁断言），拿证时加取值即可，无需新建表或迁移数据。
+- [ ] **第 2 刀（前端部分）：等新 UI，不在当前运行时做**。曾并入 `/me/activity` 第三个 Tab，被四条门禁拦下后撤回：`verify-fusion-w5` 逐字节冻结 `profileEntries.ts`、`verify-user-center-wave0` 硬断言 Profile **恰好 22 个**已接真目的地（**Wave 0 产品决策，不是技术阈值**）、`verify-profile-inkpaper-home` 断言 CSS import 集合封闭、`verify-profile-commercial-first-batch` 级联。落点改为新 UI 的 3 屏：`39-member-records`（加求职进度分类）、`27-browse-detail`（加「记录一次投递」）、`41-member-privacy`（导出清单补一项）。**前置**：这 3 个文件目前只在 `claude/project-readiness-review` 分支上，需等其合入 `main`。若产品负责人决定在当前运行时先上，需要一份 Wave 0 例外授权（22→23）。
+- [ ] **第 3 刀：小程序求职进度对齐后端**：现为 `wx.getStorageSync` 本地存储，换设备即丢。走小程序专用 worktree + 契约门禁。第 2 刀之后。
+- [ ] **第 4 刀：形态 A（平台内投递）** —— **取得许可证之后才启动**。前置还包括方案 §5 的义务清单逐项交付、法务复核、以及至少一个真实企业客户愿意作为收件方（当前系统内不存在企业账号与收件箱）。
+- [ ] **待签字**：方案 §7「即使拿证也不做」的永久边界清单（代投 / 候选人筛选 / 面试邀约 / Offer 管理 / 主动推荐）。未签字前 `CLAUDE.md` §2 八条按全量禁止执行，不得自行按分类放宽。
+
 ## 交付阻塞清单（2026-08-19 建立，只放**卡上线**的，勾完即可放机器收真钱）
 
 > 建立原因：产品负责人问「到底还剩多少问题、是不是处理不完了」。本节只列**阻塞交付**的，
@@ -11,11 +26,11 @@
 - [x] **A1 岗位匹配无简历前置门禁** —— 已合入 #737
 - [x] **A2 模拟面试 / 合同审查触屏传不了文件** —— 已合入 #738
 - [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；但 2026-08-22 生产只读核验确认 PM2 实际进程环境没有 `NODE_ENV`，集中生产门禁未获启用证据，转为 B1 前置阻塞
-- [x] **A4 断电卡单核查状态机** —— 已合入 #740（`main@2e7b4fc52`）。Admin `POST /admin/print-jobs/:id/verify-outcome` 已在代码里；**未部署**。推送/工单仍不做；告警仍是实时派生
+- [x] **A4 断电卡单核查状态机** —— 已合入 #740（`main@2e7b4fc52`）。Admin `POST /admin/print-jobs/:id/verify-outcome` 已在代码里；**未部署**。推送/工单仍不做。告警处理（确认/静默/关闭 + 退款失败单退出）在分支 `fix/grok-admin-alert-20260903`，未合入、未部署
 
 ### B. 需你方动手（共 3 条，非代码）
 
-- [ ] **B1 生产启动环境修复后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。PM2 实际进程环境未设置 `NODE_ENV=production`，而集中安全门禁、生产 CORS/CSP 与 trust proxy 都依赖该值；**先修 PM2 启动环境并受控重启，确认进程仍 online、ready=200 且门禁真实执行，再按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 申请精确 SHA 发布**。不得直接把 `DEPLOY_API_ENABLED` 打开
+- [x] **B1 生产启动环境收口（2026-09-01，未部署）** —— 实时只读核验确认运行进程、PM2 当前记录和 PM2 dump 均为 `NODE_ENV=production`；以现网 `.env` 运行完整 `assertProductionRuntimeGates()` 通过，API 本机/公网 `health` 与 `health/ready` 均为 200，Redis `PONG`，PM2 online 且 `unstable_restarts=0`。原计划中的环境修复已经完成，本轮不做无收益重启。部署版本唯一真源仍为 `DEPLOY_SOURCE.txt`：生产实际是 `771d53e2ceb257a684cf0d8657c4844045de509e`，仍落后于当前 `origin/main`；PM2 遗留 `COMMIT=942c695a` 不作为发布版本依据。后续如要发布，仍须按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 获得“精确 SHA + 备份 + additive migration + 受控发布”授权；不得直接打开 `DEPLOY_API_ENABLED`。
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
 - [ ] **B3 Windows + 奔图真机验收** —— 2026-08-31 已完成 KSK-001 空队列、本地 SQLite、维护态启动、9527、云端心跳 `0.4.10` 与无出纸收尾，服务已恢复 `Stopped / Manual`；仍未执行「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」。Draft PR #743 的 `0.4.11@988bb869` 已取得五项 CI 全绿；Windows workflow 已做到候选只构建一次、冻结 source SHA/版本/三文件 SHA-256，并让 upgrade、fresh EXE、fresh MSI 和最终下载 artifact 消费同一字节。Mac 独立下载 artifact id `9751461440` 后重算 EXE/MSI/manifest 大小和 SHA-256，均与 `candidate-identity.json` 完全一致，因此源码/CI/同字节 provenance 阻塞已关闭。候选仍未 Authenticode 签名，当前不得升级在役终端；下一步必须落实企业签名、时间戳和签名者指纹验证，并建立可审计 Windows 执行入口，再单独申请维护态无打印升级。**不要在现场机运行会创建测试 ProgramData 的 CI 生命周期脚本**。无打印升级通过后才另行申请真实出纸授权，并按 `docs/device/windows-host-acceptance-runbook.md` 留订单号/任务号/出纸照片
 
@@ -40,7 +55,7 @@
 
 - [ ] **`EndUserAuthGuard` 的 Redis 等待未加界**：C 端会员端点在 Redis 不可达时单请求实测 **23.6 秒**后返回 500。它的 fail-closed 判定本身是**正确**的（Redis 就是会员会话真源，读不到就该拒绝，绝不能改成放行），问题只在耗时与错误码不诚实：应收敛为有界等待 + 明确的 503/`MEMBER_SESSION_STORE_UNAVAILABLE`，而不是让每个请求把连接占满 23 秒再塌成通用 500。修的时候**不得改变「拒绝」这个判定**。
 - [ ] **`admin-orgs.service.ts` 的 `invalidateAccountSession` 在 Redis 故障时造成「看起来失败其实成功了」**：账号启停 / 改密 / 换邮箱的数据库更新已提交后，缓存失效调用抛错 → 端点返回 500，管理员以为没生效；重试时因为状态已经是目标值会跳过整个分支，反而**连缓存失效也不做了**。当前只在 `/health` 里如实声明为 `internal-console-redis-actions=unavailable`，代码未改。修的时候要一并想清楚「部分 Redis 故障（写失败读成功）」下最长 60s 的陈旧缓存窗口如何处置。
-- [ ] **`admin-ops.service.ts:203` 告警 `take: 50` 硬截断**：响应体无 `total`、无 `truncated` 标记，被截掉的条数在接口层无法察觉（来源批次实测 73 条只回 50 条）。批量故障恰恰是最需要看全的场景。本批未碰。
+- [ ] **`admin-ops.service.ts` 告警 `take: 50` 硬截断**：响应体无 `total`、无 `truncated` 标记，被截掉的条数在接口层无法察觉（来源批次实测 73 条只回 50 条）。批量故障恰恰是最需要看全的场景。本批未碰。
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
@@ -64,7 +79,50 @@
 > 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
 > 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
 
-## 2026-08-12 V6 + 双后台统一施工队列（当前优先级）
+## 2026-09-03 视觉真值裁决：青序流光（kiosk-redesign-2026-08）取代 V6
+
+> **产品负责人 2026-09-03 明确裁决：`docs/design/kiosk-redesign-2026-08/` 的 51 页
+> 「青序流光」是项目后面正式上线用的前端页面。**
+>
+> 本条**取代**下方「2026-08-12 V6 + 双后台统一施工队列」与第 178 行「首页真值是
+> `kiosk-ai-os-v3-2026-08/01-home-v6.html`」的口径。
+
+### 为什么必须写在这里
+
+2026-09-03 当天出现了三套壳同时施工同一个页面的局面（取件码页 `/print/pickup-claim`）：
+
+| 来源 | 用的壳 |
+|---|---|
+| `main` 现状 | `PrintPageFrame`（`kiosk-proto-2026-07`，87 页，2026-08-04 入库） |
+| PR #741（2026-08-19 创建） | V6 壳 `KioskFullscreenShell`（`kiosk-ai-os-v3-2026-08`，56 页，2026-08-18 入库） |
+| `claude/project-readiness-review-959ffe` | `QxPageFrame`（`kiosk-redesign-2026-08`，57 页，**2026-09-03 入库**） |
+
+三方都以为自己在按当前口径施工，因为**口径在会话里改过、文档里没改**。谁最后合并谁就
+覆盖前一个人的活 —— 不是文本冲突，是界面变成另一个样子。本条就是为了让下一个接手的人
+（或模型）照文档施工不会再撞第四次。
+
+### 三套设计稿的处置
+
+| 目录 | 处置 |
+|---|---|
+| `kiosk-redesign-2026-08`（青序流光，51 页） | **正式上线视觉真值。新页面与改版一律按它施工。** |
+| `kiosk-ai-os-v3-2026-08`（V6） | 降为设计参考。**保留文件，不删**；已投入的 V6 运行时切片（A1/A2.1 等）不回滚，按页逐步迁到青序流光 |
+| `kiosk-proto-2026-07`（7 月 87 屏） | 维持现状：CI 回归基线，不是施工目标 |
+
+**三套目录都保留，一个都不删** —— 产品负责人明确要求不得删除已设计的 UI 页面。
+
+### 直接影响
+
+- PR #741（到机码核销页换 V6 壳）与本裁决冲突，须关闭或改造为青序流光后再提
+- `claude/project-readiness-review-959ffe` 上的青序流光地基（`apps/kiosk/src/styles/qingxu/`、
+  `components/qingxu/QxPageFrame.tsx`）方向正确，可按簇提取
+- 下方 V6 队列（A1/A2/C0 等）中**尚未开工**的条目按青序流光重排；已完成条目保留为历史记录
+
+---
+
+## 2026-08-12 V6 + 双后台统一施工队列（**已非当前优先级**）
+
+> ⚠️ **2026-09-03 口径更正**：产品负责人已定性 **`docs/design/kiosk-redesign-2026-08/`（青序流光，51 屏）是当前真值，上线前端页面全部出自这套**；V6（`kiosk-ai-os-v3-2026-08`）不再是目标。本节的 V6 施工队列作为历史记录保留，**不要照它排下一刀**。同一页面若在 main（`PrintPageFrame`/kiosk-proto）、V6 壳、青序流光壳（`QxPageFrame`）之间不一致，一律以青序流光为准。
 
 > 用户口径中的 V6 对应仓库历史目录 `kiosk-ai-os-v3-2026-08`；命名不影响实施。完整页面矩阵、双后台裁决与商用定义见 [`2026-08-12-v6-commercial-product-audit.md`](../reviews/2026-08-12-v6-commercial-product-audit.md)。下列顺序覆盖下方较早的 W1–W8 泛化队列；每个窗口仍须单独范围、文件预算、评审、验证和 progress 更新。
 
@@ -160,7 +218,7 @@
 
 ## P0 设计执行：线上 Kiosk 以 7 月 75 屏原型为视觉真值
 
-> ⚠️ **2026-08-22 口径**：本节是 **2026-08-05 前后的历史实施记录**，不是下一刀任务书。现行施工看本文上面的「交付阻塞清单」和「2026-08-12 V6 + 双后台统一施工队列」。7 月 75 屏只作 CI 回归基线；首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。
+> ⚠️ **2026-08-22 口径**：本节是 **2026-08-05 前后的历史实施记录**，不是下一刀任务书。现行施工看本文上面的「交付阻塞清单」。**（2026-09-03 更正：原文这里还指向「2026-08-12 V6 + 双后台统一施工队列」，而 V6 已不再是目标 —— 当前真值是 `docs/design/kiosk-redesign-2026-08/`（青序流光）。该队列节已在本文上方标注「已非当前优先级」。）**7 月 75 屏只作 CI 回归基线；首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。
 
 （历史正文，已作废，勿当现行任务）当时开发视觉基线曾切回：[7 月 75 屏原型](../design/kiosk-proto-2026-07/README.md)。`docs/design/kiosk-ai-os-prototype-2026-08/` 已于 2026-08-22 按产品负责人确认删除，不再作为任何设计输入。所有改造继续复用现有路由、API、设备门禁、支付打印扫描链路和公共终端隐私安全，不按静态原型补造能力。
 

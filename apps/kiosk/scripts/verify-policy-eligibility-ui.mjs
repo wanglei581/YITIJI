@@ -247,6 +247,20 @@ check(
   'F1. 作答不写入任何本地存储（服务端亦零持久化）',
 )
 check(
+  panelCode.includes('useIdleTimer') &&
+    /timeoutMs:\s*60_000/.test(panelCode) &&
+    /setAnswers\(\{\}\)/.test(panelCode) &&
+    /prev\.s === 'result' \? \{ s: 'ask'/.test(panelCode),
+  'F1b. 闲置 60 秒清作答并离开结果页（页面保留，不把户籍/参保留给下一位）',
+)
+{
+  const fixtureNoIdle = 'const [answers, setAnswers] = useState({})'
+  check(
+    !(/useIdleTimer/.test(fixtureNoIdle) && /timeoutMs:\s*60_000/.test(fixtureNoIdle)),
+    '自检3. F1b 在「没有闲置清场」的夹具上会报警',
+  )
+}
+check(
   !/searchParams\.set|history\.(push|replace)State/.test(eligibilityCode),
   'F2. 作答不进 URL',
 )

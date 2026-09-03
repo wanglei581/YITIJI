@@ -1,0 +1,14 @@
+# 截图证据不进 git：kimi-full-coverage-v2/evidence 单目录 643MB，
+# review-2026-08-23 另有 38MB，两者合计是 51 页 HTML 的 200 倍。
+# 例外：evidence/s24-resume-triage-final/fixtures 被 21-resume-triage.html
+# 直接引用（3.1MB），不入库会导致该页资源 404，故显式放行。
+kimi-full-coverage-v2/evidence/*
+!kimi-full-coverage-v2/evidence/s24-resume-triage-final/
+kimi-full-coverage-v2/evidence/s24-resume-triage-final/*
+!kimi-full-coverage-v2/evidence/s24-resume-triage-final/fixtures/
+
+review-2026-08-23/
+
+# assets 只保留被 HTML 引用的两张背景图；shot-*.png / test-*.png 是截图产物
+assets/shot-*
+assets/test-*

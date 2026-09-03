@@ -80,6 +80,7 @@ jobs:
         run: |
           pnpm verify:repository-integrity
           pnpm verify:ci-gate-coverage
+          pnpm verify:fixture-time-bombs
 
       - name: Deploy authorization gate
         # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
@@ -124,6 +125,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
           pnpm --filter @ai-job-print/kiosk verify:jobfair-size
+          pnpm --filter @ai-job-print/kiosk verify:jobfairs-terminal-priority
           pnpm --filter @ai-job-print/kiosk verify:kiosk-runtime-error-boundary
           pnpm --filter @ai-job-print/kiosk verify:kiosk-visual-unity
           pnpm --filter @ai-job-print/kiosk verify:print-cta-contrast
@@ -224,6 +226,13 @@ jobs:
           pnpm --filter @ai-job-print/admin typecheck
           pnpm --filter @ai-job-print/partner typecheck
           pnpm --filter terminal-agent typecheck
+          # packages/refresh 是 admin / partner 共用的刷新层（ci.yml:105 verify:refresh-safe、
+          # :110 verify:partner-refresh-safe 都依赖它），但它的 TS 源码此前从未进过任何 CI
+          # typecheck 批次 —— 运行期契约有 verify:runtime 守（:138），类型回退却无人拦。
+          # 元门禁抓不到它，因为 typecheck: 前缀不在 ENFORCED_PREFIXES（见
+          # scripts/verify-ci-gate-coverage.mjs 的前缀表注释）。2026-09-02 本地实跑
+          # tsc --noEmit 干净后接线。
+          pnpm --filter @ai-job-print/refresh typecheck
 
       - name: Build
         # 三端生产构建门禁要求 VITE_API_MODE=http；Kiosk 还要求数字人构建期开关，
@@ -292,13 +301,13 @@ jobs:
           pnpm run verify:scan-watcher
           pnpm run verify:scan-input-health
           # Temp directory + temp SQLite fault injection; no production scan folder or Windows dependency.
-          pnpm exec ts-node scripts/verify-scan-deletion-audit.ts
+          pnpm run verify:scan-deletion-audit
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
-          pnpm exec ts-node scripts/verify-task-reliability.ts
+          pnpm run verify:task-reliability
           # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
-          pnpm exec ts-node scripts/verify-print-monitor-truth.ts
+          pnpm run verify:print-monitor-truth
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
           pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
@@ -311,6 +320,9 @@ jobs:
           pnpm run verify:installer-inputs
           pnpm run verify:printer-config
           pnpm run verify:local-print-wake
+          # F0.5 仅观察边界：静态确认 Agent 没有下载、安装、服务控制或任何
+          # 制品身份回传能力；不触发 Windows API、打印机或本地 Agent。
+          pnpm run verify:release-observation-boundary
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
@@ -345,6 +357,9 @@ jobs:
         # finally 清理失败,残留 approved+published 测试招聘会泄漏到公开前台
         # (/campus、/job-fairs)。各脚本已用稳定 tag 在下次运行前预清残留,
         # 但前提仍是串行,切勿改成并行。
+        # 本步内部改为跑完再汇总（scripts/lib/run-serial-commands.mjs）：
+        # 单条失败不中断后续命令，全部结束后按失败清单非零退出。
+        # 跨 step 依赖仍 fail-fast；禁止 continue-on-error 与并行。
         env:
           VITE_API_MODE: http
           VITE_API_BASE_URL: /api/v1
@@ -352,6 +367,9 @@ jobs:
           VITE_TERMINAL_ID: KSK-001
           VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
+          # ⚠ 下面的 CI_SERIAL_COMMANDS 终止行必须顶格（YAML 剥掉公共缩进后）且无尾随空白。
+          # 改缩进、留尾随空格或让 YAML 重排都会让 heredoc 一路吞到文件末尾并**静默丢内容**。
+          node scripts/lib/run-serial-commands.mjs <<'CI_SERIAL_COMMANDS'
           # ── S0 后端 AI 底座门禁（#617）─────────────────────────────
           # 这四条 import services/api/src，会传递依赖到 Prisma 客户端，
           # 因此必须放在「Prepare fresh SQLite db」之后——先前误放进上面的
@@ -478,6 +496,13 @@ jobs:
           # 事故背景:治理清单裁定「未授权不进入生产」的机构,其岗位仍被推上生产公网 ——
           # 因为闸门只存在于管理端只读视图,发布路径零引用。同样是纯内存假 Prisma。
           pnpm --filter @ai-job-print/api verify:content-trust-publish-gate
+          # 招聘闭环能力闸门:未取得并核验人力资源服务许可证时,受管控能力一律不可用。
+          # 判据来自资质记录本身而非某个 boolean —— 同样是为了避免 content-trust
+          # 那起「字段建好了但闸门没装在门上」的事故。当前闸门零调用点,门禁一并断言。
+          pnpm --filter @ai-job-print/api verify:recruitment-capability-gate
+          # 我的求职进度：必须一直是「用户自填的记事本」。断言渠道/状态来源由服务端恒定写入、
+          # 简历与同意槽位恒空且无写入路径、无第三方回流与对外读取入口、无按企业聚合。
+          pnpm --filter @ai-job-print/api verify:job-application-track
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
@@ -664,6 +689,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:toolbox-micro-app-platform
           pnpm --filter @ai-job-print/api verify:toolbox-preprod-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-review-workflow
+          # F0.5 仅观察契约：需要已生成的 Prisma client，故必须位于
+          # 「Prepare fresh SQLite db」之后；不下载、安装或控制终端服务。
+          pnpm --filter @ai-job-print/api verify:release-observation-contract
           # ── GATE-WIRE 接线（#647 修好的漂移门禁，第二批）──────────────
           # 这 5 条都 import services/api/src（src 引用数 1 / 3 / 1 / 11 / 4），
           # 会传递依赖到 Prisma 客户端，因此必须留在本步（「Prepare fresh
@@ -678,6 +706,13 @@ jobs:
           # 但会员会话与 BullMQ 需要**真实** Redis —— 本 job 的 redis:7-alpine
           # service 提供。同形状的 verify:member-assets-c2d 已在本步长期绿。
           pnpm --filter @ai-job-print/api verify:job-favorites-http
+          # ── 2026-09-03 triage 接线：两条此前从没跑过的门禁（图谱补 .ts 支持后第一次可见）──
+          # wave2 账号重绑 23 断言 / wave3 打印善后 7 断言，实测全绿后接入。
+          # （同批登记的 verify-change-password.ts 是误判：它早经 run-verify-change-password.mjs
+          #   launcher 在本步 662 行一直跑着，图谱看不见是因为 launcher 命令串里没有 .ts 文件名。）
+          pnpm --filter @ai-job-print/api verify:wave2-account-rebind
+          pnpm --filter @ai-job-print/api verify:wave3-print-aftercare
+          CI_SERIAL_COMMANDS
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
@@ -777,7 +812,12 @@ jobs:
           node -r @swc-node/register prisma/seed.ts
           node -r @swc-node/register prisma/seed-fairs.ts
       - name: Core verify suites on PG
+        # 与 SQLite Verify suites 相同：本步内部跑完再汇总，但仍必须串行。
+        # 禁止并行 / continue-on-error；跨 step（install → generate → migrate → verify）仍 fail-fast。
         run: |
+          # ⚠ 下面的 CI_SERIAL_COMMANDS 终止行必须顶格（YAML 剥掉公共缩进后）且无尾随空白。
+          # 改缩进、留尾随空格或让 YAML 重排都会让 heredoc 一路吞到文件末尾并**静默丢内容**。
+          node scripts/lib/run-serial-commands.mjs <<'CI_SERIAL_COMMANDS'
           # 与 SQLite job 同源的静态门禁：P39 迁移保真不依赖数据库形态，
           # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
           pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
@@ -830,6 +870,11 @@ jobs:
           # 发布闸门（见 build-and-verify 同名条目）：PG 侧同样跑一遍，
           # 因为 preview 的 sourceOrgId in/notIn 下推会生成 SQL，两种 provider 都要回归。
           pnpm --filter @ai-job-print/api verify:content-trust-publish-gate
+          # 能力闸门（见 build-and-verify 同名条目）：PG 侧同样跑一遍，
+          # 断言里含两份 schema 的模型形状比对，provider 切换后要保持一致。
+          pnpm --filter @ai-job-print/api verify:recruitment-capability-gate
+          # 求职进度（见 build-and-verify 同名条目）：断言含两份 schema 形状比对，PG 侧同样跑。
+          pnpm --filter @ai-job-print/api verify:job-application-track
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
@@ -903,6 +948,7 @@ jobs:
           # KIOSK-DEBT 三处前端欠账。纯读 apps/kiosk 源码、不连库，
           # 放这里是为了两个 job 都拦得住（同 #635 对 self-assessment 门禁的处置）。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
+          CI_SERIAL_COMMANDS
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest

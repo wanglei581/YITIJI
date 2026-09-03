@@ -59,8 +59,11 @@ function assert(label: string, condition: boolean, detail?: string): void {
 
 // 服务端用真实 new Date() 判有效期,所以固定夹具取「远早于/远晚于今天」的两端,
 // 不受运行日期影响。
-const PAST = new Date('2026-07-01T00:00:00Z')
-const FUTURE = new Date('2026-12-31T00:00:00Z')
+//
+// 2026-09-02 修正:原值 2026-07-01 / 2026-12-31 本身就是定时炸弹——FUTURE 一过新年
+// 就会让 j-future 变成「已过期」。取端点到 2000 / 2099,这条门禁才真的与运行日期无关。
+const PAST = new Date('2000-01-01T00:00:00Z')
+const FUTURE = new Date('2099-12-31T00:00:00Z')
 
 // ── 内存假 Prisma ─────────────────────────────────────────────────────────────
 
@@ -234,8 +237,12 @@ function fairRow(id: string, opts: Partial<Row> = {}): Row {
     reviewedBy: null,
     reviewedAt: null,
     rejectReason: null,
-    startAt: new Date('2026-09-01T01:00:00Z'),
-    endAt: new Date('2026-09-01T09:00:00Z'),
+    // 默认必须用 PAST/FUTURE,不能写死具体日期。原来写死 2026-09-01 01:00Z~09:00Z,
+    // 于是 2026-09-01 09:00Z 之后 f-ok / f-nourl 全部变「已结束」,这条门禁对任何人恒红
+    // (本文件 5 条断言同时挂:excluded.expired 由 1 变 3、候选里没了 f-ok、标题断言取空、
+    // 批量发布 0、落库仍为 draft)。需要「已结束」的夹具在调用处显式覆盖 endAt,如 f-ended。
+    startAt: PAST,
+    endAt: FUTURE,
     syncTime: new Date('2026-06-01T00:00:00Z'),
     ...opts,
   }
@@ -268,7 +275,7 @@ function buildFixture() {
   ])
   const jobFair = makeTable([
     fairRow('f-ok'),                                                    // 未结束
-    fairRow('f-ended', { endAt: new Date('2026-07-02T09:00:00Z'), startAt: PAST }), // 已结束
+    fairRow('f-ended', { endAt: PAST, startAt: PAST }), // 已结束（用 PAST 而非字面量：字面量会随运行日期改变含义）
     fairRow('f-nourl', { sourceUrl: '' }),
   ])
   const policyPost = makeTable([])

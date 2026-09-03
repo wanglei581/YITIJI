@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>截图拼版</title>
+<!-- 一次性渲染多个页面供单次无头截图：?p=页面1,页面2,页面3 -->
+<style>
+body{margin:0;background:#3a3a3a;font-family:monospace;}
+.frame{width:540px;margin:0 auto 8px;background:#fff;}
+.frame .cap{height:28px;line-height:28px;color:#2ee6a8;font-size:14px;text-align:center;background:#0b241e;}
+.frame iframe{width:540px;height:960px;border:0;display:block;background:#f5f2e9;}
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<script>
+var q=new URLSearchParams(location.search);
+var list=(q.get('p')||'').split(',').filter(Boolean);
+var wrap=document.getElementById('wrap');
+list.forEach(function(name){
+  var d=document.createElement('div');d.className='frame';
+  var c=document.createElement('div');c.className='cap';c.textContent=name;
+  var f=document.createElement('iframe');f.src=name+'.html?flat=1';
+  d.appendChild(c);d.appendChild(f);wrap.appendChild(d);
+});
+</script>
+</body>
+</html>

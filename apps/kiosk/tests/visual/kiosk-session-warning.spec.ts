@@ -847,6 +847,7 @@ const SENSITIVE_SESSION_KEYS_ALL = [
   'ai-job-print:current-ai-resume',
   'ai-job-print:current-print-material-check',
   'ai-job-print:job-material-draft:v1',
+  'self_assessment_session_v1',
 ] as const
 
 const IDLE_WINDOW_SETTLE_MS = 7_000

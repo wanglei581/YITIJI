@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>我的文档与打印订单 ｜ 职易达</title>
+<!--
+  route: /me/documents | /me/print-orders
+  state: documents-login | documents-loading | documents-empty | documents-ready | documents-error |
+         documents-access-loading | documents-access-expired | documents-access-error | documents-access-ready |
+         orders-login   | orders-loading   | orders-empty   | orders-ready   | orders-error
+  api: GET /api/v1/me/documents      → { items, nextCursor, total }
+       GET /api/v1/me/print-orders   → { items, nextCursor, total }
+  fallback: 未登录只引导登录并带 ?from=；加载失败保留重试与「联系工作人员」；空列表不造数据；
+            不可预览格式诚实降级，不声称已生成预览。
+  真话边界（本批次修复要点）：
+    ① ready 的每一行都是**接口回填结构位**：文件名、格式页数、时间、留存期限、订单状态一律不写死，
+       不出现任何看起来像真实账号的文件名、订单号或状态结论。
+    ② 数量与筛选计数在接口返回前一律显示「—」，不拿上一次的数字冒充当前账号。
+    ③ 登录 / 加载 / 空 / 失败四态都保留完整的任务结构（两域切换 + 分类 + 行结构 + 下一步），
+       不做「一张小卡片 + 大片空白」。
+    ④ 结束会话只清除本机登录态与临时会话信息；已提交到服务端的订单与文件按各自留存期限管理。
+  原型演示控制：仅用 ?state= 切换；?filter= 只影响分类高亮；?debug=1 才显示演示面板。
+    普通 URL 默认 documents-login；ready 演示夹具（结构位列表 + 分类计数 + 演示提示条）
+    只在 ?debug=1 下渲染。普通会话请求 documents-ready / orders-ready 一律按域降级到
+    documents-login / orders-login，域不变、只降到该域的登录态，不静默换到另一个域。
+  验收范围：静态版式；不证明 React 接线、接口可用或真实账号数据。
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;
+  --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
+  --teal:#1f9e86;--teal2:#157a67;--tealsoft:#e0f2ec;
+  --slate:#3f68b0;--slate2:#35608f;--slatesoft:#e6ecf7;
+  --clay:#b8683c;--clay2:#9e5330;--claysoft:#f7ebe1;
+  --plum:#7a5a86;--plum2:#6b4a77;--plumsoft:#efe8f2;
+  --wheat:#a9781f;--wheat2:#8a6219;--wheatsoft:#f3ecda;
+  --line:#e3ddcb;--line2:#d4cdb6;--bad:#b23a2e;--badsoft:#f6e4e1;
+  --ease:cubic-bezier(.22,1,.36,1);
+  /* 与 00–15 定稿页同名令牌（值一致，供后续统一改名） */
+  --ink-2:var(--ink2);--ink-3:var(--ink3);--deep-2:var(--deep2);--emerald:var(--green);
+  --teal-d:var(--teal2);--teal-soft:var(--tealsoft);--slate-d:var(--slate2);--slate-soft:var(--slatesoft);
+  --clay-d:var(--clay2);--clay-soft:var(--claysoft);--wheat-d:var(--wheat2);--wheat-soft:var(--wheatsoft);
+  --cinnabar:var(--bad);--cinnabar-soft:var(--badsoft);--line-2:var(--line2);--ease-out:var(--ease);
+  --r-lg:32px;--r-md:24px;--r-sm:18px;--tap-min:48px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);overflow:hidden}
+a{text-decoration:none;color:inherit}button{font:inherit;color:inherit;border:0;background:none}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;transform-origin:center center;
+  background:radial-gradient(900px 420px at 86% 6%,rgba(31,158,134,.07),transparent 60%),
+             radial-gradient(820px 500px at -6% 58%,rgba(184,104,60,.045),transparent 56%),var(--paper)}
+.serif{font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif}
+.press{transition:transform 140ms var(--ease),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+
+.topbar{height:104px;flex:none;padding:0 36px;display:flex;align-items:center;gap:18px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{width:64px;height:64px;flex:none;display:grid;place-items:center;border-radius:20px;border:1px solid var(--line2);background:var(--paper)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--deep);color:var(--green);font-size:24px;font-weight:800}
+.logo-name{font-size:26px;font-weight:800;letter-spacing:1px}
+.sp{flex:1}
+.pill{height:54px;padding:0 22px;border-radius:27px;display:flex;align-items:center;gap:10px;border:1px solid var(--line2);font-size:19px;font-weight:700;background:var(--paper);color:var(--ink2)}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--teal);flex:none}
+.dot.breathe{animation:breathe 2.2s var(--ease) infinite}
+.clock{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.xq{margin:22px 42px 0;padding:26px 38px;border-radius:34px;flex:none;background:linear-gradient(158deg,var(--deep2),var(--deep));color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-150px;top:-150px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.15),transparent 66%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{width:88px;height:88px;flex:none;border-radius:50%;display:grid;place-items:center;border:1.5px solid rgba(46,230,168,.4);background:rgba(46,230,168,.1);color:var(--green);font-size:40px}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:17px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:7px}
+.xq-ask{font-size:36px;line-height:1.28;font-weight:800}
+.xq-ask em{font-style:normal;color:var(--green)}
+.xq-doing{font-size:20px;line-height:1.5;color:rgba(242,239,228,.74);margin-top:8px}
+.xq-doing b{color:#fff;font-weight:700}
+
+.tabs{margin:18px 42px 0;display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:none}
+.tab-domain{min-height:72px;border:1px solid var(--line2);border-radius:20px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:12px;font-size:22px;font-weight:800}
+.tab-domain svg{width:26px;height:26px}
+.tab-domain.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+
+/* ── 主体网格：任何状态都是「结构 + 1fr 主内容 + 说明 + 操作」 ── */
+.body{flex:1;min-height:0;padding:18px 42px 16px;display:grid;gap:14px;overflow:hidden}
+.body.state-layout{grid-template-rows:auto minmax(0,1fr) auto auto}
+.body.ready-layout{grid-template-rows:auto auto minmax(0,1fr) auto auto}
+
+.fixture{flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:15px;background:var(--wheatsoft);color:var(--wheat2);font-size:17px;font-weight:700;line-height:1.35}
+.fixture svg{width:21px;height:21px;flex:none}
+.fixture>span{min-width:0}
+
+.banner{flex:none;display:flex;align-items:center;gap:20px;padding:20px 24px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.banner-ico{width:72px;height:72px;flex:none;border-radius:22px;display:grid;place-items:center;background:var(--slatesoft);color:var(--slate2)}
+.banner-ico svg{width:34px;height:34px}
+.banner-ico[data-tone=lock]{background:var(--plumsoft);color:var(--plum2)}
+.banner-ico[data-tone=warn]{background:var(--badsoft);color:var(--bad)}
+.banner-ico[data-tone=calm]{background:var(--tealsoft);color:var(--teal2)}
+.banner-main{flex:1;min-width:0}
+.banner-t{display:block;font-size:28px;font-weight:800;line-height:1.28}
+.banner-p{display:block;margin-top:7px;font-size:19px;line-height:1.5;color:var(--ink3)}
+.banner-p b{color:var(--ink2)}
+.banner-mini{flex:none;display:flex;flex-direction:column;gap:6px;text-align:right}
+.banner-mini i{font-style:normal;font-size:17px;font-weight:700;color:var(--ink2)}
+
+.chips{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.chip{min-height:60px;padding:0 14px;border:1px solid var(--line2);border-radius:18px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:9px;font-size:20px;font-weight:700}
+.chip i{font-style:normal;min-width:34px;height:32px;padding:0 9px;border-radius:11px;background:var(--paper);color:var(--ink3);font-size:16px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.chip.on{background:var(--tealsoft);border-color:#8dc4b5;color:var(--teal2)}
+.chip.on i{background:#fff;color:var(--teal2)}
+
+.list{min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:26px;overflow-y:auto;scrollbar-width:none}
+.list::-webkit-scrollbar{display:none}
+/* 任务行按产品尺寸排：可以吃掉一部分剩余高度，但有上限；封顶之后的余量落在列表底部，
+   而不是把每一行撑成「260–330px 里只装 90px 内容」的空壳。
+   flex-basis 保持 auto、不收缩，条目多时照常滚动，不会把行压扁。 */
+/* 同 39：行高上限抬到 220px，列表卡底部的余量从 169px 降到 160px。 */
+/* flex-shrink 必须是 1，且列表内的行要有一个比 .row 更低的下限：
+   原来是 flex:1 0 auto + min-height:132px，行既不能压缩、又有硬下限，
+   内容一多列表卡就直接把底注裁掉（空列表/失败态实测被切 13~61px）。
+   下限只在卡片装不下时才生效，正常状态下行仍然按 flex-grow 撑到上限，版面不变。 */
+.list>.row{flex:1 1 auto;min-height:104px}
+.row{flex:1 1 auto;min-height:132px;max-height:220px;padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--paper);display:flex;align-items:center;gap:16px}
+.row.off{background:#efeade;border-color:#ddd8c8}
+.row-ico{width:58px;height:58px;flex:none;border-radius:17px;display:grid;place-items:center;background:var(--slatesoft);color:var(--slate2)}
+.row-ico svg{width:28px;height:28px}
+.row-ico[data-tone=clay]{background:var(--claysoft);color:var(--clay2)}
+.row-ico[data-tone=teal]{background:var(--tealsoft);color:var(--teal2)}
+.row-ico[data-tone=off]{background:#ded9cb;color:#6d7069}
+.row-main{flex:1;min-width:0}
+.row-title{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:800;line-height:1.3}
+.row-sub{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:9px}
+.row-actions{flex:none;display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end;max-width:330px}
+/* 行内角色标：说明这一行是「哪一类结果位」，本身不是任何一条真实记录。 */
+.role{flex:none;height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;
+  background:var(--slatesoft);color:var(--slate2);font-size:16px;font-weight:800;letter-spacing:.5px}
+.role[data-tone=teal]{background:var(--tealsoft);color:var(--teal2)}
+.role[data-tone=clay]{background:var(--claysoft);color:var(--clay2)}
+.role[data-tone=wheat]{background:var(--wheatsoft);color:var(--wheat2)}
+.small{min-height:56px;padding:0 16px;border-radius:16px;border:1px solid var(--line2);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font-size:17px;font-weight:700}
+.small svg{width:19px;height:19px}
+.small.primary{background:var(--deep);border-color:var(--deep);color:#fff}
+.small[aria-disabled=true]{background:#e6e2d7;border-color:#dcd7c9;color:#84867e}
+
+/* 接口回填结构位与骨架条 */
+.slot{display:inline-flex;align-items:center;min-height:32px;padding:0 11px;border-radius:10px;border:1px dashed var(--line2);background:var(--surface);color:var(--ink3);font-size:16px;font-weight:700}
+.slot.wide{min-width:280px}
+.slot.lock{border-style:solid;background:#efeade;color:#6d7069}
+.skel{height:22px;border-radius:8px;background:#ece7d9}
+.skel.t{width:52%}
+.skel.s{width:34%;margin-top:12px;height:18px}
+
+.list-foot{flex:none;padding:14px 18px;border-radius:16px;background:rgba(11,36,30,.045);color:var(--ink2);font-size:17px;line-height:1.5}
+.list-foot b{color:var(--ink)}
+
+.guide{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.guide-item{padding:15px 18px;border:1px solid var(--line);border-radius:20px;background:var(--surface);display:flex;flex-direction:column;justify-content:center}
+.guide-k{font-size:16px;font-weight:800;color:var(--teal2);letter-spacing:1px}
+.guide-t{margin-top:6px;font-size:20px;font-weight:800;line-height:1.3}
+.guide-p{margin-top:5px;font-size:16px;line-height:1.5;color:var(--ink3)}
+
+.ctabar{flex:none;display:flex;gap:14px}
+.btn{flex:1;min-height:84px;padding:0 24px;border-radius:22px;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid var(--line2);background:var(--surface);font-size:22px;font-weight:800;text-align:center}
+.btn svg{width:24px;height:24px;flex:none}
+.btn.primary{flex:1.5;background:var(--deep);border-color:var(--deep);color:#fff}
+.btn[aria-disabled=true]{background:#dcd8cc;border-color:#dcd8cc;color:#77796f}
+
+.truth{height:58px;flex:none;padding:0 42px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);color:var(--ink3);font-size:17px}
+.truth b{color:var(--ink2)}
+.navbar{height:112px;flex:none;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:19px;font-weight:700;color:var(--ink3)}
+.nav-item.on{color:var(--teal2)}
+.nav-item svg{width:30px;height:30px}
+
+.demo-tab,.demo-panel{display:none}
+html.debug .demo-tab{display:block;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:54px;min-height:150px;border-radius:0 16px 16px 0;background:rgba(11,36,30,.9);color:var(--green);writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+html.debug .demo-panel.show{display:flex;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;padding:14px;flex-direction:column;gap:6px;max-height:1600px;overflow:auto;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96)}
+.demo-panel a{min-height:48px;padding:0 14px;display:flex;align-items:center;border-radius:12px;background:rgba(255,255,255,.07);color:#fff;font-size:16px;white-space:nowrap}
+.demo-panel .dp-t{color:var(--green);font-size:15px;letter-spacing:2px;padding:4px 6px}
+
+@keyframes breathe{50%{opacity:.38;transform:scale(.78)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+html.flat *,html.flat *::before,html.flat *::after{animation:none!important;transition:none!important}
+</style>
+</head>
+<body><div id="viewport"><div id="stage">
+  <header class="topbar">
+    <a class="back press" href="30-my-profile.html" data-route="/profile" data-testid="member-assets-back" aria-label="返回我的"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill"><span class="dot" id="pill-dot"></span><span id="pill-text">本人服务记录</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq"><div class="xq-row">
+    <div class="xq-face serif" aria-hidden="true">青</div>
+    <div class="xq-main">
+      <div class="xq-eyebrow">MY FILES &amp; ORDERS</div>
+      <h1 class="xq-ask serif" id="ask">只看<em>你自己的记录</em>。</h1>
+      <div class="xq-doing" id="doing">文档和打印订单分开管理。<b>未登录不展示任何个人内容。</b></div>
+    </div>
+  </div></section>
+
+  <nav class="tabs" id="tabs" aria-label="记录分域"></nav>
+
+  <main class="body" id="body-root" data-screen="member-assets" data-state="documents-login" data-testid="member-assets-state-documents-login" aria-live="polite"></main>
+
+  <div class="truth"><b>本人可见</b><span>这里只显示当前登录账号的文档与打印订单；数量与状态一律由服务端返回。</span></div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/" data-testid="member-assets-nav-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>首页</a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant" data-testid="member-assets-nav-assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a>
+    <a class="nav-item on press" href="30-my-profile.html" data-route="/profile" aria-current="page" data-testid="member-assets-nav-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a>
+  </nav>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" hidden>演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="true" hidden></div>
+</div></div>
+<script>
+/* 原型脚本：只做状态渲染与切态演示；不发请求，不伪造文件、订单、数量或状态结论。 */
+var SCREEN = 'member-assets';
+var STATES = ['documents-login','documents-loading','documents-empty','documents-ready','documents-error',
+              'documents-access-loading','documents-access-expired','documents-access-error','documents-access-ready',
+              'orders-login','orders-loading','orders-empty','orders-ready','orders-error'];
+
+var ICO = {
+  doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  order:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6"/>',
+  lock:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  empty:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 11h18M8 6V3h8v3"/>',
+  warn:'<path d="M12 3 2.8 20h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+  print:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/>',
+  scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M3 12h18"/>',
+  sign:'<path d="M3 19c3-1 4-6 7-6s3 4 6 3 3-4 5-4"/><path d="M14 4l3 3-7 7-3 1 1-3z"/>',
+  spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  eye:'<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>',
+  up:'<path d="M12 20V5M6 11l6-6 6 6"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  refresh:'<path d="M20 11a8 8 0 1 0-.6 4"/><path d="M20 5v6h-6"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.4"/><path d="M12 17.2h.01"/>'
+};
+function svg(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[n]||ICO.info)+'</svg>'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+var q = new URLSearchParams(location.search);
+var DEBUG = q.get('debug')==='1';
+/* debug 只在已经是 debug 会话时继续传递，绝不写进普通 URL */
+function keep(url){ return DEBUG ? url + (url.indexOf('?')<0?'?':'&') + 'debug=1' : url; }
+function href(state, extra){ return keep('38-member-assets.html?state='+state+(extra?'&'+extra:'')); }
+
+function slot(text, cls){ return '<span class="slot'+(cls?' '+cls:'')+'">'+esc(text)+'</span>'; }
+function fixtureNote(text){
+  /* 整句包在一个 span 里：flex 容器里的裸文本会被拆成多个 flex item，一句话被切成几列。 */
+  return '<div class="fixture" data-testid="'+SCREEN+'-fixture-note">'+svg('info')+'<span>'+esc(text)+'</span></div>';
+}
+function banner(tone, ico, title, desc, minis){
+  return '<section class="banner" data-testid="'+SCREEN+'-fallback"><span class="banner-ico" data-tone="'+tone+'">'+svg(ico)+'</span>'
+    + '<span class="banner-main"><span class="banner-t">'+title+'</span><span class="banner-p">'+desc+'</span></span>'
+    + (minis?'<span class="banner-mini">'+minis.map(function(m){return '<i>'+esc(m)+'</i>';}).join('')+'</span>':'')
+    + '</section>';
+}
+function ctaBar(parts){ return '<div class="ctabar">'+parts.join('')+'</div>'; }
+function link(label, target, route, testid, opts){
+  opts = opts || {};
+  return '<a class="btn press'+(opts.primary?' primary':'')+'" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'
+    + (opts.icon?svg(opts.icon):'')+label+'</a>';
+}
+function deadPrimary(label, reason, testid){
+  return '<span class="btn primary" aria-disabled="true" aria-label="'+esc(label+'（'+reason+'）')+'" data-testid="'+testid+'">'+label+'</span>';
+}
+function accessState(suffix, intent){
+  var isPrint=intent==='print', action=isPrint?'用于打印':'预览';
+  var back=link('返回文档列表',href('documents-ready'),'/me/documents',SCREEN+'-back-documents',{icon:'back'});
+  if(suffix==='access-loading') return {layout:'state',html:
+    banner('calm','clock','正在为这份文件取得新的访问链接','列表里<b>不保存长期可用的文件地址</b>。每次'+action+'前都要凭本人登录态向服务端重新取得短期链接。',['用途：'+action,'文件身份不进 URL'])+
+    listWrap([0,1,2].map(skelRow).join(''),'获取期间不会建立打印订单，也不会修改文件。','访问链接获取中')+
+    guide('loading')+ctaBar([back,deadPrimary('正在取得访问链接','服务端尚未返回，不能继续',SCREEN+'-primary')])};
+  if(suffix==='access-expired') return {layout:'state',html:
+    banner('warn','warn','刚取得的访问链接已经过期','短期链接过期不等于文件一定被删除。页面会<b>重新向服务端申请</b>，不会继续使用旧地址。',['用途：'+action,'旧链接已弃用'])+
+    listWrap(slotRow('documents',0,'error'),'文件是否仍在、能否重新签发，只以这次服务端返回为准。','链接过期后的处理')+
+    guide('error')+ctaBar([back,link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
+  if(suffix==='access-error') return {layout:'state',html:
+    banner('warn','warn','这次没有取得可用链接','可能是网络失败、文件已到期或已被清理；本页<b>不替服务端猜具体原因</b>，也不沿用上一次的链接。',['用途：'+action,'未创建新订单'])+
+    listWrap(slotRow('documents',0,'error'),'失败不会删除文件；反复失败时可联系现场工作人员核对。','访问链接获取失败')+
+    guide('error')+ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
+  return {layout:'state',html:
+    banner('calm','info',isPrint?'打印凭证已就绪':'预览链接已就绪',isPrint
+      ? '真实 React 会把 <b>fileId、printFileUrl 与默认打印参数</b>通过路由内存态交给打印确认页；这些值不进地址栏。'
+      : '真实 React 会在当前页面打开短期预览链接；关闭预览后仍停留在本人文档列表。',['用途：'+action,'短期有效'])+
+    listWrap(readyRow('documents',0),isPrint?'进入打印确认后仍会重新报价；此刻还没有订单。':'预览只读，不改变文件保存期限。','访问链接交接成功')+
+    guide('ready-documents')+ctaBar([back,isPrint
+      ? link('进入打印确认','14-print-confirm.html?state=quoted','/print/confirm',SCREEN+'-primary',{primary:true,icon:'print'})
+      : link('返回文档列表',href('documents-ready'),'/me/documents',SCREEN+'-primary',{primary:true,icon:'eye'})])};
+}
+
+/* ── 两域切换 ─────────────────────────────────────────────── */
+var DOMAIN = {
+  documents:{label:'我的文档', ico:'doc', route:'/me/documents', pill:'我的文档',
+    ask:'你的文件，<em>随时接着办</em>。', tone:'',
+    filters:[['all','全部'],['printable','可打印'],['scan','扫描件']]},
+  orders:{label:'打印订单', ico:'order', route:'/me/print-orders', pill:'我的打印订单',
+    ask:'打印到哪一步，<em>一眼看清</em>。', tone:'clay',
+    filters:[['all','全部'],['active','进行中'],['done','已完成']]}
+};
+function renderTabs(kind, suffix){
+  document.getElementById('tabs').innerHTML = ['documents','orders'].map(function(k){
+    var d = DOMAIN[k];
+    return '<a class="tab-domain press'+(k===kind?' on':'')+'" href="'+href(k+'-'+suffix)+'" data-route="'+d.route+'"'
+      + ' data-testid="'+SCREEN+'-tab-'+k+'"'+(k===kind?' aria-current="true"':'')+'>'+svg(d.ico)+d.label+'</a>';
+  }).join('');
+}
+
+/* ── 行结构：一律接口回填，不写死任何文件名 / 订单号 / 状态 ── */
+function slotRow(kind, i, mode){
+  var d = DOMAIN[kind], docs = kind==='documents';
+  var acts;
+  if(mode==='lock'){
+    acts = '<span class="small" aria-disabled="true" data-testid="'+SCREEN+'-row-'+i+'-locked" aria-label="登录后才能操作这一项">'+svg('lock')+'登录后可用</span>';
+  } else if(mode==='error'){
+    acts = '<span class="small" aria-disabled="true" data-testid="'+SCREEN+'-row-'+i+'-off" aria-label="本次没有取到这一项，暂时不可操作">'+svg('warn')+'本次未取到</span>';
+  } else if(docs){
+    acts = '<a class="small press" href="'+href('documents-access-loading','intent=preview')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-preview">'+svg('eye')+'预览</a>'
+         + '<a class="small primary press" href="'+href('documents-access-loading','intent=print')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-print">'+svg('print')+'用于打印</a>';
+  } else {
+    acts = '<a class="small press" href="'+keep('15-print-fulfill.html')+'" data-route="/print/progress" data-testid="'+SCREEN+'-row-'+i+'-progress">'+svg('clock')+'查看进度</a>'
+         + '<a class="small primary press" href="'+href('documents-ready')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-again">'+svg('print')+'从文档发起新打印</a>';
+  }
+  var subs = docs
+    ? [slot('格式与页数'), slot('保存时间'), slot('留存期限')]
+    : [slot('订单号'), slot('打印参数'), slot('处理状态')];
+  if(mode==='lock') subs = [slot('登录后显示','lock'), slot('登录后显示','lock')];
+  if(mode==='error') subs = [slot('—'), slot('—')];
+  return '<div class="row'+(mode==='lock'||mode==='error'?' off':'')+'" data-server-slot="'+(docs?'document':'print-order')+'"'
+    + (mode?' data-slot-mode="'+mode+'"':'')+' data-testid="'+SCREEN+'-row-'+i+'">'
+    + '<span class="row-ico" data-tone="'+(mode==='lock'||mode==='error'?'off':(docs?'':'clay'))+'">'+svg(docs?'doc':'order')+'</span>'
+    + '<span class="row-main"><span class="row-title">'+(mode==='lock'?slot('文件名登录后显示','lock'):mode==='error'?slot('—'):slot(docs?'文件名 · 接口回填':'打印内容 · 接口回填','wide'))+'</span>'
+    + '<span class="row-sub">'+subs.join('')+'</span></span>'
+    + '<span class="row-actions">'+acts+'</span></div>';
+}
+/* ── ready 的结果位：四行不是四条同款骨架，而是四个**不同角色**的结果位。
+   角色（最近保存 / 生成的材料 / 扫描件 / 已签章文件；进行中 / 计费待确认 / 已完成 / 已结束）
+   是结构分类，不是任何一条真实记录；每个角色的字段组合与可用动作各不相同，值一律接口回填。 */
+var READY_ROLES = {
+  documents:[
+    {role:'最近保存', tone:'', ico:'doc', title:'文件名 · 接口回填', subs:['格式与页数','保存时间','留存期限'], act:'print'},
+    {role:'生成的材料', tone:'teal', ico:'spark', title:'材料名称 · 接口回填', subs:['生成方式','保存时间','留存期限'], act:'print'},
+    {role:'扫描件', tone:'clay', ico:'scan', title:'扫描件名称 · 接口回填', subs:['扫描页数','保存时间'], act:'print'},
+    {role:'已签章文件', tone:'wheat', ico:'sign', title:'文件名 · 接口回填', subs:['签章时间','留存期限'], act:'sign'}
+  ],
+  orders:[
+    {role:'进行中', tone:'clay', ico:'clock', title:'打印内容 · 接口回填', subs:['订单号','打印参数','处理状态'], act:'again'},
+    {role:'计费待确认', tone:'wheat', ico:'card', title:'打印内容 · 接口回填', subs:['订单号','计费明细'], act:'again'},
+    {role:'已完成', tone:'teal', ico:'print', title:'打印内容 · 接口回填', subs:['订单号','完成时间','打印份数'], act:'again'},
+    {role:'已结束', tone:'', ico:'order', title:'打印内容 · 接口回填', subs:['订单号','结束原因'], act:'again'}
+  ]
+};
+function readyRow(kind, i){
+  var r = READY_ROLES[kind][i], docs = kind==='documents';
+  var first = docs
+    ? '<a class="small press" href="'+href('documents-access-loading','intent=preview')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-preview">'+svg('eye')+'预览</a>'
+    : '<a class="small press" href="'+keep('15-print-fulfill.html')+'" data-route="/print/progress" data-testid="'+SCREEN+'-row-'+i+'-progress">'+svg('clock')+'查看进度</a>';
+  var second = r.act==='sign'
+    ? '<a class="small primary press" href="'+keep('20-sign-stamp.html?state=placing')+'" data-route="/print-scan/sign" data-testid="'+SCREEN+'-row-'+i+'-sign">'+svg('sign')+'继续签章</a>'
+    : r.act==='print'
+    ? '<a class="small primary press" href="'+href('documents-access-loading','intent=print')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-print">'+svg('print')+'用于打印</a>'
+    : '<a class="small primary press" href="'+href('documents-ready')+'" data-route="/me/documents" data-testid="'+SCREEN+'-row-'+i+'-again">'+svg('print')+'从文档发起新打印</a>';
+  return '<div class="row" data-server-slot="'+(docs?'document':'print-order')+'" data-slot-role="'+esc(r.role)+'" data-testid="'+SCREEN+'-row-'+i+'">'
+    + '<span class="row-ico" data-tone="'+(docs?'':'clay')+'">'+svg(r.ico)+'</span>'
+    + '<span class="row-main"><span class="row-title"><span class="role" data-tone="'+r.tone+'">'+esc(r.role)+'</span>'+slot(r.title,'wide')+'</span>'
+    + '<span class="row-sub">'+r.subs.map(function(s){return slot(s);}).join('')+'</span></span>'
+    + '<span class="row-actions">'+first+second+'</span></div>';
+}
+function skelRow(i){
+  return '<div class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
+    + '<span class="row-ico" data-tone="off"></span>'
+    + '<span class="row-main"><span class="skel t"></span><span class="skel s" style="display:block"></span></span>'
+    + '<span class="row-actions"><span class="skel" style="width:120px;height:52px;border-radius:16px"></span></span></div>';
+}
+function stepRow(i, ico, tone, title, desc, label, target, route, testid){
+  return '<a class="row press" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'
+    + '<span class="row-ico" data-tone="'+tone+'">'+svg(ico)+'</span>'
+    + '<span class="row-main"><span class="row-title">'+esc(title)+'</span>'
+    + '<span class="row-sub"><span style="font-size:17px;color:var(--ink3);line-height:1.45">'+esc(desc)+'</span></span></span>'
+    + '<span class="row-actions"><span class="small primary">'+esc(label)+'</span></span></a>';
+}
+function listWrap(inner, foot, label){
+  return '<section class="list" data-testid="'+SCREEN+'-list" aria-label="'+esc(label)+'">'+inner
+    + '<div class="list-foot">'+foot+'</div></section>';
+}
+/* 分类计数一律显示「—」：接口没返回之前不写任何数字，也不拿排版行数冒充真实数量 */
+function chips(kind, filter){
+  var d = DOMAIN[kind];
+  return '<div class="chips" role="group" aria-label="'+esc(d.label)+'分类">'+d.filters.map(function(f){
+    var on = f[0]===filter;
+    return '<a class="chip press'+(on?' on':'')+'" href="'+href(kind+'-ready','filter='+f[0])+'" data-route="'+d.route+'?filter='+f[0]+'"'
+      + ' data-testid="'+SCREEN+'-filter-'+f[0]+'"'+(on?' aria-current="true"':'')+'>'+f[1]+'<i>—</i></a>';
+  }).join('')+'</div>';
+}
+
+var GUIDE = {
+  login:[['隐私','未登录不显示','公共终端不会展示文件名、订单号或取件凭证'],['登录方式','手机号 + 验证码','也可以在登录页用手机扫码登录'],['不登录也能用','打印与扫描','当场办完的打印、扫描不需要账号']],
+  loading:[['读取范围','只读当前账号','不会展示其他账号的文件与订单'],['显示规则','不闪回旧列表','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会删除任何文件或订单']],
+  error:[['数据','已有内容不受影响','这次加载失败不会删除任何文件或订单'],['先试这个','检查网络后重试','重试不会重复创建订单'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']],
+  'empty-documents':[['怎么产生','上传或扫描之后','手机传输、U 盘、本机扫描都可以'],['能做什么','预览、打印、签名盖章','从同一份文件继续办'],['留存','按服务端期限管理','到期后无法恢复，需要请提前打印']],
+  'empty-orders':[['怎么产生','确认打印并建单后','订单在收银台确认后建立'],['能看到什么','处理进度与结果','状态一律由服务端返回'],['再打印','会新建订单','重新核价后建立一笔新订单']],
+  'ready-documents':[['字段来源','全部接口回填','本页不写死任何文件名或时间'],['继续办理','从同一文件接着办','预览、打印、签名盖章共用一份文件'],['留存','按服务端期限管理','到期或删除后无法再打开']],
+  'ready-orders':[['字段来源','全部接口回填','本页不写死任何订单号或状态'],['状态','以服务端为准','支付、打印与退款都要重新查询确认'],['再打印','会新建订单','重新选参数并重新核价']]
+};
+function guide(key){
+  return '<section class="guide" aria-label="说明">'+(GUIDE[key]||GUIDE.login).map(function(it){
+    return '<div class="guide-item"><div class="guide-k">'+it[0]+'</div><div class="guide-t">'+it[1]+'</div><div class="guide-p">'+it[2]+'</div></div>';
+  }).join('')+'</section>';
+}
+
+/* ── 各状态 ───────────────────────────────────────────────── */
+function viewFor(kind, suffix, filter){
+  var d = DOMAIN[kind], docs = kind==='documents';
+  if(docs && suffix.indexOf('access-')===0) return accessState(suffix, q.get('intent')==='print'?'print':'preview');
+  if(suffix==='login'){
+    return {layout:'state', html:
+      banner('lock','lock','登录后查看'+d.label, '公共一体机不会在未登录时展示文件名、订单号或取件凭证。<b>下面是登录后会出现的内容结构。</b>', ['共 —','登录后回填'])
+      + listWrap([0,1,2,3].map(function(i){return slotRow(kind,i,'lock');}).join(''),
+          '登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>，已提交到服务端的文件与订单按各自留存期限管理。','登录后会出现的内容结构')
+      + guide('login')
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                '<a class="btn primary press" href="'+keep('03-login-gate.html?from='+encodeURIComponent(d.route))+'" data-route="/login" data-login-from="'+esc(d.route)+'" data-testid="'+SCREEN+'-primary">手机号登录</a>'])};
+  }
+  if(suffix==='loading'){
+    return {layout:'state', html:
+      banner('calm','clock','正在加载'+d.label, '正在读取本人记录。<b>返回前一律显示「—」</b>，不会闪回上一位用户的列表。', ['共 —','正在安全读取'])
+      + listWrap([0,1,2,3,4].map(skelRow).join(''),
+          '读取失败不会删除任何文件或订单；页面也不会用上一次的数字冒充当前账号。','正在加载的列表占位')
+      + guide('loading')
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                deadPrimary('记录还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary')])};
+  }
+  if(suffix==='empty'){
+    /* 空态给 4 条真实可办的事：行按产品尺寸排，不再用 3 行去撑满整块列表高度。 */
+    var steps = docs
+      ? stepRow(0,'up','','从手机或 U 盘添加文件','支持常见文档与图片，添加后可预览和打印','添加文件','12-file-source.html','/print/upload',SCREEN+'-start-upload')
+        + stepRow(1,'scan','clay','扫描纸质材料','把纸质简历或证明扫成 PDF，留在我的文档里','去扫描','18-scan-workbench.html?state=setup','/scan/start',SCREEN+'-start-scan')
+        + stepRow(2,'sign','teal','给已有文件签名盖章','在文件上放签名或印章后再打印','去签章','20-sign-stamp.html?state=placing','/print-scan/sign',SCREEN+'-start-sign')
+        + stepRow(3,'card','','用手机把文件传过来','在手机上打开传输页，文件直接落到这台机器','去传输','51-phone-relay.html','/print/phone-relay',SCREEN+'-start-relay')
+      : stepRow(0,'print','clay','发起一次打印','选文件、定参数、确认价格后建立订单','去打印','10-print-hub.html','/print-scan',SCREEN+'-start-print')
+        + stepRow(1,'doc','','先从我的文档选文件','已保存的文件可以直接拿来打印','去文档',href('documents-ready'),'/me/documents',SCREEN+'-start-docs')
+        + stepRow(2,'clock','teal','已经打过但没看到？','订单状态由服务端返回，可稍后重新加载',' 重新加载',href('orders-loading'),'/me/print-orders',SCREEN+'-start-reload')
+        + stepRow(3,'help','','订单对不上，找现场工作人员','报订单号即可，由工作人员协助核对','联系工作人员','06-help.html','/help',SCREEN+'-start-help');
+    return {layout:'state', html:
+      banner('','empty', docs?'还没有保存的文档':'还没有打印订单',
+        docs?'这个账号下没有已保存的文件。<b>空就是空</b>，本页不会造几条记录让页面好看。'
+            :'这个账号下没有建立过打印订单。<b>空就是空</b>，本页不会造几条记录让页面好看。', ['共 0'])
+      + listWrap(steps, docs?'添加或扫描之后，可以回到这里继续预览、打印和签名盖章。':'确认打印并建单后，可以回到这里查看处理进度与结果。',
+          docs?'从这里开始添加文件':'从这里开始打印')
+      + guide('empty-'+kind)
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                docs ? link('添加文件','12-file-source.html','/print/upload',SCREEN+'-primary',{primary:true,icon:'up'})
+                     : link('发起打印','10-print-hub.html','/print-scan',SCREEN+'-primary',{primary:true,icon:'print'})])};
+  }
+  if(suffix==='error'){
+    return {layout:'state', html:
+      banner('warn','warn', (docs?'文档':'订单')+'这次没有加载出来',
+        '当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以字段一律显示「—」；已有的文件和订单不会因为这次失败而消失。', ['共 —','本次未取到'])
+      + listWrap([0,1,2,3].map(function(i){return slotRow(kind,i,'error');}).join(''),
+          '重试不会重复创建订单，也不会改动已有文件。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的列表结构')
+      + guide('error')
+      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+                link('重新加载', href(kind+'-loading'), d.route, SCREEN+'-primary',{primary:true,icon:'refresh'})])};
+  }
+  /* ready：主内容优先，四行是四类**结果位**（角色不同、字段组合不同），值一律接口回填 */
+  return {layout:'ready', html:
+    fixtureNote(docs
+      ? '结构演示：下面四行是「最近保存 / 生成的材料 / 扫描件 / 已签章文件」四类结果位，文件名、时间与留存期限都由接口回填，本页不显示任何真实账号数据。'
+      : '结构演示：下面四行是「进行中 / 计费待确认 / 已完成 / 已结束」四类结果位，订单号、参数与状态都由接口回填，本页不显示任何真实账号数据。')
+    + chips(kind, filter)
+    + listWrap([0,1,2,3].map(function(i){return readyRow(kind,i);}).join(''),
+        docs ? '文件到期或被删除后将无法打开；<b>需要长期保留请自己另存或打印</b>。'
+             : '再次打印会重新选择文件、确认参数与价格，并<b>建立一笔新订单</b>。',
+        docs?'我的文档（接口回填结构）':'我的打印订单（接口回填结构）')
+    + guide('ready-'+kind)
+    + ctaBar([
+        /* 左键固定为「返回我的」：原来在 documents:ready 态被换成「扫描纸质材料」，
+           那一态就没有回个人中心的出口了，和其它所有态不一致。 */
+        link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+        docs ? link('添加新文件','12-file-source.html','/print/upload',SCREEN+'-primary',{primary:true,icon:'up'})
+             : link('发起新打印','10-print-hub.html','/print-scan',SCREEN+'-primary',{primary:true,icon:'print'})])};
+}
+
+function render(state, filter){
+  var kind = state.indexOf('orders-')===0 ? 'orders' : 'documents';
+  var suffix = state.replace(/^(documents|orders)-/, '');
+  var d = DOMAIN[kind];
+  var out = viewFor(kind, suffix, filter);
+  var root = document.getElementById('body-root');
+  root.className = 'body ' + (out.layout==='ready' ? 'ready-layout' : 'state-layout');
+  root.dataset.state = state;
+  root.dataset.testid = SCREEN + '-state-' + state;
+  root.innerHTML = out.html;
+  renderTabs(kind, suffix);
+  document.getElementById('pill-text').textContent = d.pill;
+  document.getElementById('pill-dot').className = 'dot' + (suffix==='loading' ? ' breathe' : '');
+  document.getElementById('ask').innerHTML = d.ask;
+  document.getElementById('doing').innerHTML =
+      suffix.indexOf('access-')===0 ? '每次预览或打印前都要重新取得短期访问链接；<b>旧链接不会被继续使用</b>。'
+    : suffix==='login'    ? '登录后才会显示你的个人记录；<b>未登录不展示任何文件名或订单号</b>。'
+    : suffix==='loading'  ? '正在读取最新记录，<b>返回前一律显示「—」</b>。'
+    : suffix==='empty'    ? (kind==='documents' ? '还没有保存的文件。<b>先添加或扫描一份</b>，之后可以从这里继续办。' : '还没有打印订单。<b>确认打印并建单后</b>，可以从这里查看进度。')
+    : suffix==='error'    ? '列表这次没有更新，<b>重试不会重复创建记录</b>。'
+    : (kind==='documents' ? '预览、打印和签名盖章，<b>从同一份文件继续</b>。' : '进行中的订单优先显示，<b>完成后仍可查看结果</b>。');
+}
+
+if(q.get('flat')==='1') document.documentElement.classList.add('flat');
+if(DEBUG) document.documentElement.classList.add('debug');
+var st = q.get('state'); if(STATES.indexOf(st)<0) st = 'documents-login';
+/* ready 是演示夹具态：只有 ?debug=1 才渲染。普通会话按域降级到该域的登录态，
+   documents-ready→documents-login、orders-ready→orders-login，不跨域改写。 */
+if(!DEBUG && (/-ready$/.test(st)||/documents-access-/.test(st))) st = st.indexOf('orders-')===0?'orders-login':'documents-login';
+var filter = q.get('filter'); var kindNow = st.indexOf('orders-')===0?'orders':'documents';
+var keys = DOMAIN[kindNow].filters.map(function(f){return f[0];});
+if(keys.indexOf(filter)<0) filter = 'all';
+render(st, filter);
+
+function fit(){ var k=Math.min(innerWidth/1080, innerHeight/1920); var s=document.getElementById('stage'); if('zoom' in s.style) s.style.zoom=k; else s.style.transform='scale('+k+')'; }
+addEventListener('resize', fit); fit();
+function tick(){ var d=new Date(); document.getElementById('clock').textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick, 10000);
+
+/* 演示面板只在 ?debug=1 时填充并解除 hidden；普通 URL 下既不可见也不可聚焦。 */
+if(DEBUG){
+  var tab = document.getElementById('demo-tab'), panel = document.getElementById('demo-panel');
+  panel.innerHTML = '<div class="dp-t">原型演示控制</div>' + STATES.map(function(x){ return '<a href="?debug=1&state='+x+'">'+x+'</a>'; }).join('');
+  tab.hidden = false; panel.hidden = false;
+  tab.onclick = function(){ panel.classList.toggle('show'); };
+}
+</script>
+</body></html>

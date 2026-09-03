@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 签约风险提示 · 职易达</title>
+<!--
+  宿主：AI 签约风险提示工作台（一个宿主承接三条真实 route，不拆三份 HTML）
+  route: /contract-review              screen=home        —— 台账 103
+         /contract-review/processing   screen=processing  —— 台账 104
+         /contract-review/result       screen=result      —— 台账 105
+  state: 由 ?screen= 与 ?state= 共同表达；?flat=1 关闭非必要动效，?debug=1 显示演示面板。
+         静态原型只切视图，不发任何请求、不推进业务、不生成 AI 结果。
+
+  ── 能力受控（这三条 route 的第一事实） ────────────────────────────────
+  apps/kiosk/src/routes/index.tsx 的 contractReviewEnabled = import.meta.env
+  .VITE_ENABLE_CONTRACT_REVIEW === 'true'；apps/kiosk/.env.example 里它是 false。
+  未显式授予时三条 route 一律 <Navigate to="/" replace/>，深链也回首页。
+  因此 screen=home&state=controlled-off 是本宿主的默认态与真实默认行为；
+  其余状态表达「终端已单独授权开启后」的产品合同，不代表已经上线或已开放。
+
+  ── 真实 React / API 合同（逐屏对应） ───────────────────────────────────
+  103 ContractReviewHomePage
+      GET  /api/v1/contract-reviews/consent-scope → ConsentScope
+           { consentVersion, consentScopeHash, disclaimer{ id,version,content,publishedAt },
+             disclosures{ processorIdentityAndContact, processingPurposeAndMethod[],
+             dataCategories[], entrustedProcessingRoles[],
+             retention{ maximumHours, sessionDeletionFirst }, dataSubjectRights[],
+             sensitivePersonalInformation{...} } }
+           dataCategories 是稳定编码（source_file / ocr_text / ai_review_result），
+           由 describeDataCategories() 翻成中文，不把机器码念给用户。
+      通道：手机扫码上传（UploadSessionQrPanel，purpose=contract_upload，单个 ≤10MB）为一体机主通道；
+           本机文件（kiosk-upload 代理，≤15MB）标注为桌面 / E2E 验证通道。
+      POST /api/v1/contract-reviews  ← createContractReview(FromSource)
+           匿名需附 x-contract-review-source-file-proof；缺凭证时前端先报
+           「这份合同还缺少确认凭证，请重新扫码上传」，不发请求。
+      合同类型 ContractType: labor_contract | internship_agreement | non_compete | offer
+  104 ContractReviewProcessingPage
+      GET  /api/v1/contract-reviews/:id 轮询（2500ms），ContractReviewTaskView
+      POST /api/v1/contract-reviews/:id/confirm （awaiting_confirmation 时由用户确认页数 / OCR 覆盖）
+      DELETE /api/v1/contract-reviews/:id （取消审查）
+      状态只用 CONTRACT_REVIEW_STATUSES 中真实存在的：uploaded/queued/extracting/
+      awaiting_confirmation/rule_checking/ai_analyzing/safety_reviewing/completed/failed/
+      cancelled/expired。进度只用 progress.completedPages / totalPages 与 estimatedSeconds，
+      不做百分比、不做倒计时、不自动推进阶段。
+      设计修正：现 React 在 queued 时会把 extracting 预点亮成「进行中」，本设计不预点亮；
+      迁移时按本设计改为 queued → 全部阶段待进行。
+  105 ContractReviewResultPage
+      结果来自 contractReviewSession（内存态，刷新 / 换用户即失效 → 未找到审查结果）
+      ContractReviewResult { priorityCheckCount, attentionCount, insufficientInfoCount,
+        coverage: complete|truncated, ocrConfidence, disclaimerVersion, rulePackVersion,
+        generatedByAi, findings[] }
+      ContractReviewFinding { priority, category, title, evidence{ pageNumber, excerpt },
+        explanation, basisRef, verificationQuestion, uncertainty, source }
+      POST /api/v1/contract-reviews/:id/report → 报告 PDF，随后进入既有 /print/confirm；
+      构建开关 VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT 默认 false → 打印按钮置灰。
+      DELETE /api/v1/contract-reviews/:id （结束并删除）
+
+  ── 真话边界（本页逐条自检） ───────────────────────────────────────────
+  ① 不出现任何百分比进度、倒计时、固定用时或「即将完成」；阶段只按服务端返回切换。
+  ② 不出现「合法 / 违法 / 有效 / 无效 / 可以签 / 不要签」一类结论；只给可核验的风险提示。
+  ③ 不写「会话结束自动删除服务端文件」；留存只按 consent scope 的最长保留时限表述，
+     删除结果以删除请求的真实返回为准，失败时诚实说明仍可能处于短期保留状态。
+  ④ 服务端返回的名称、页数、条数、摘录、依据一律用字段占位（.slot），不预置任何示例合同内容。
+     枚举字段例外：识别质量（高 / 中 / 低）、覆盖（完整 / 部分）、合同类型按当前 ?state= 声明的服务端
+     分支取真实枚举值 —— 状态名本身就是「服务端返回了哪一支」的声明，不是编造的用户内容。
+     风险提示条目的「法律依据」在服务端未返回 basisRef 时整行不渲染（React FindingCard 已如此实现）。
+  ⑤ AI 不可用 / 失败时不生成任何结果，提供重新尝试、通用签约条文自查、12333 与执业律师、
+     返回材料服务四条非 AI 退路；AI 不改变文件、支付、打印、身份或设备事实。
+  ⑥ 打印仍走既有报价 / 打印确认链路，本页不显示「已打印」「已出纸」「已付款」。
+  ⑦ 岗位与招聘会合规红线继续适用：本页无任何投递、收简历或企业闭环入口。
+
+  ai-mode: AI-DIRECT（103--105，仅在真实 capability 开启后生效；默认关闭时按 S-CONTROL）
+  ai-input: 用户本次选择的合同文件（扫码上传或本机文件）+ 用户选择的合同类型
+  ai-consent: 提交前必须勾选本次知情同意（consentVersion / consentScopeHash / disclaimerVersion）；
+              授权只覆盖本次任务，不扩展到其他文件或历史记录
+  ai-output: 可核验的风险提示 —— 每条含原文摘录与页码、说明、法律依据、条款类别、局限性与建议追问
+  ai-failure: 未开放 / 超时 / 上游不可用 / 回包不可解析 / 提取失败 / 安全门拒绝，均按服务端
+              failureReason 白名单文案诚实呈现；未登记的码走通用兜底文案，不回显机器码
+  ai-fallback: 重新尝试、通用签约条文自查（不针对本人合同）、12333 与执业律师、返回材料服务
+  ai-persistence: 合同原件与结果按 consent scope 的最长保留时限管理；本机不保存副本
+  验收范围：静态原型表现；不证明 React 接线、API 可用、模型开放、算法备案、支付、打印或真机
+-->
+<link rel="stylesheet" href="contract-review-workspace.css">
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back-link" href="16-service-hubs.html?hub=resume" data-route="/resume-service" aria-label="返回简历与材料服务"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="capchip" id="capchip"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/></svg><span id="capchip-txt">受控能力</span></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">本机未开放</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="taskhead" aria-labelledby="task-title">
+    <h1 class="th-t" id="task-title">AI 签约风险提示</h1>
+    <p class="th-s" id="task-sub">上传合同，AI 给出可对回原文的风险提示；不判断合同效力。</p>
+  </section>
+
+  <main class="body" id="body-root" data-screen="contract-home" data-state="controlled-off" data-testid="contract-home-state-controlled-off"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="contract-truth">
+    <div><b>隐私提示</b>合同原件、识别文字与结果按知情同意中的最长保留时限管理；本机不保存副本，删除以服务端返回为准。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
+</div>
+<script src="contract-review-workspace.js"></script>
+</body>
+</html>

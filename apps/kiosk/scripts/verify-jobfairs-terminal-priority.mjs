@@ -33,7 +33,18 @@ if (/const\s+terminalId\s*=\s*getTerminalId\(\)/.test(src)) {
   fail('2. 页面请求前未读取 terminalId')
 }
 
-if (/getJobFairs\(\s*terminalId\s*\?\s*\{\s*terminalId\s*\}\s*:\s*undefined\s*\)/.test(src)) {
+// 接受两种等价的接线形态。原来只认第一种逐字形式,而 #652(6210efa07)为了同时
+// 下推 status/keyword/pageSize,把调用改成了对象字面量 + 展开——功能没坏,是这条
+// 正则过期了,却被登记成「功能缺口」,险些诱导后来人把展开式改回三元式、连带毁掉
+// #652 的筛选下推。
+//   形态一(campus / home 仍在用): getJobFairs(terminalId ? { terminalId } : undefined)
+//   形态二(本页):                 getJobFairs({ ...(terminalId ? { terminalId } : {}), ... })
+// 形态二里的 [^;]{0,200}? 是必需的界:不加界用 [\s\S]*? 会跨过闭合花括号和后续语句,
+// 于是「调用里删掉 terminalId、但文件别处还有同形展开」这种真实回退会被判成通过——
+// 那正是本门禁唯一要防的事。已对该负例实测:加界版拦得住,无界版假绿。
+if (
+  /getJobFairs\(\s*(?:terminalId\s*\?\s*\{\s*terminalId\s*\}\s*:\s*undefined|\{[^;]{0,200}?\.\.\.\(\s*terminalId\s*\?\s*\{\s*terminalId\s*\}\s*:\s*\{\}\s*\))/.test(src)
+) {
   pass('3. getJobFairs 透传 terminalId 参数')
 } else {
   fail('3. getJobFairs 未按 terminalId 透传参数')

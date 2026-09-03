@@ -20,6 +20,10 @@ import type {
   AuditLogListResponse,
   AuditLogListQuery,
   DeviceFleetOverview,
+  CreateReleaseObservationPlanInput,
+  ReleaseObservationPlanRecord,
+  ReleaseObservationPlansResponse,
+  UpdateReleaseObservationPlanInput,
 } from './types'
 import type { ReviewAction, PublishAction } from './review-types'
 
@@ -152,6 +156,18 @@ export const adminHttpAdapter = {
 
   createPlannedTerminal: (input: CreatePlannedTerminalInput) =>
     postData<PlannedTerminalCreated>('/admin/terminals', input),
+
+  getReleaseObservationPlans: () =>
+    getData<ReleaseObservationPlansResponse>('/admin/release-observation-plans'),
+
+  createReleaseObservationPlan: (input: CreateReleaseObservationPlanInput) =>
+    postData<ReleaseObservationPlanRecord>('/admin/release-observation-plans', input),
+
+  updateReleaseObservationPlan: (planId: string, input: UpdateReleaseObservationPlanInput) =>
+    patchData<{ planId: string; status: 'active' | 'paused' | 'cancelled'; version: number; artifactVersion: string }>(
+      `/admin/release-observation-plans/${encodeURIComponent(planId)}`,
+      input,
+    ),
 
   // ── 终端机构归属（绑定/解绑）──────────────────────────────────────────────
   getOrgOptions: () =>

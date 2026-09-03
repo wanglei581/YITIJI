@@ -35,6 +35,7 @@ import {
 } from './terminal-utils'
 import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types'
+import { ReleaseObservationService, type AdminReleaseObservationView } from './release-observation.service'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ export interface AdminTerminalView {
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
+  releaseObservation: AdminReleaseObservationView | null
 }
 
 export interface AdminOrganizationOption {
@@ -178,6 +180,7 @@ export class TerminalAdminService {
     private readonly prisma: PrismaService,
     private readonly agent: TerminalAgentService,
     private readonly toolbox: TerminalToolboxService,
+    private readonly releases: ReleaseObservationService,
   ) {}
 
   listTerminals() {
@@ -273,6 +276,13 @@ export class TerminalAdminService {
             createdAt: true,
           },
         },
+        releaseTargets: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            observation: true,
+            plan: { include: { artifact: true } },
+          },
+        },
       },
     })
 
@@ -280,6 +290,11 @@ export class TerminalAdminService {
       const hb = t.heartbeats[0]
       const lastHeartbeatAt = hb?.createdAt ?? null
       const lastSeen = lastHeartbeatAt ?? t.registeredAt
+      // A newer draft must not visually hide an older active plan for the
+      // same terminal. There can be at most one active plan by API policy.
+      const releaseTarget = t.releaseTargets.find((target) =>
+        target.plan.status === 'active' && target.plan.observationEndsAt > new Date(now),
+      ) ?? t.releaseTargets[0]
       return {
         id: t.id,
         terminalCode: t.terminalCode,
@@ -305,6 +320,9 @@ export class TerminalAdminService {
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,
         diskFreeGb: hb?.diskFreeGb ?? null,
+        releaseObservation: releaseTarget
+          ? this.releases.toAdminObservation(releaseTarget)
+          : null,
       }
     })
 

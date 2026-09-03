@@ -194,6 +194,14 @@ const user: AuthedUser = { userId: 'admin-1', role: 'admin' } as AuthedUser
 
 const NOW = new Date('2026-08-17T00:00:00Z')
 
+/**
+ * 招聘会场次夹具的时间端点。**不要写死具体日期** —— 写死的那天一到，
+ * 「未结束」的夹具就变成「已结束」，断言对所有人恒红。
+ * 取到 2000 / 2099 让判定与运行日期无关。
+ */
+const FAR_PAST = new Date('2000-01-01T00:00:00Z')
+const FAR_FUTURE = new Date('2099-12-31T00:00:00Z')
+
 /** 唯一允许发布的形态 */
 const ORG_TRUSTED = 'org-trusted'
 /** 事故形态:字段从未被回填(nullable,null) —— 正是腾讯样本机构的状态 */
@@ -244,9 +252,15 @@ function contentRow(id: string, sourceOrgId: string, extra: Row = {}): Row {
     syncTime: new Date('2026-08-01T00:00:00Z'),
     createdAt: NOW,
     updatedAt: NOW,
-    // JobFair 专有:mapper 会无条件 toISOString(),缺了会在**放行**路径炸掉
-    startAt: new Date('2026-09-01T01:00:00Z'),
-    endAt: new Date('2026-09-01T09:00:00Z'),
+    // JobFair 专有:mapper 会无条件 toISOString(),缺了会在**放行**路径炸掉。
+    //
+    // 2026-09-03 修正:原值写死 2026-09-01 01:00Z~09:00Z,该时刻一过,
+    // fair-trusted 就被 job-validity 判为「已结束」而从预览候选里消失,
+    // 「招聘会预览同样只剩可信条目」断言恒红——与 verify-publish-expiry-completeness
+    // 挂掉的是同一类定时炸弹(同一个写死日期,同一天到期)。
+    // 端点取到 2000 / 2099,这条门禁才真的与运行日期无关。
+    startAt: FAR_PAST,
+    endAt: FAR_FUTURE,
     venue: '示例会场',
     ...extra,
   }

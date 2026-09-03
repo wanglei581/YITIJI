@@ -32,8 +32,8 @@ export function ScreensaverPage() {
   const privacyBoundary = routeState?.privacyBoundary
 
   // 进入待机宣传屏即重置（Phase C-1 + C-2A）：屏保意味着用户已离开，
-  // 清会员登录态 + 打印材料 / AI 简历最小会话（含匿名 accessToken），
-  // 为下一位用户重置内存与 sessionStorage 残留。logout / clear 均幂等。
+  // 清会员登录态 + 打印材料 / AI 简历 / 自我探索会话（含匿名 accessToken），
+  // logout 会再清匿名本机收藏。logout / clear 均幂等。
   useEffect(() => {
     clearKioskSensitiveSession()
     logout()
