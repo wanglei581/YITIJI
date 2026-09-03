@@ -124,8 +124,18 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *     不是平台内投递：没有任何第三方写入路径，没有对外读取接口，不按岗位 / 企业聚合。
  *     channel / statusSource 由服务端恒定写入；resumeFileId / consentId 为前向兼容
  *     空槽位，无证期恒空且无写入路径。门禁 verify:job-application-track。
+ * - 99（本次，Admin 派生告警可处置，+1）：
+ *     AlertDisposition —— 派生告警的处置态（确认 / 静默 / 关闭 / 重开）。
+ *   告警本身仍是实时派生、不落库；本模型只承载「谁在什么时候处置过哪一条」。
+ *   为什么不给 Terminal / PrintTask 加字段：一台终端同时可能有「离线」与「打印机异常」
+ *   两类告警，处置态不能挤在同一列；静默 TTL、episode、操作者属于运营处理域，
+ *   不属于设备域或打印任务域。
+ *   挂载键是 `${type}:${entityId}`（Terminal.id / PrintTask.id 重算不变，故稳定），
+ *   另加 episodeToken 区分「恢复后又发生」——刻意不把时间 / 心跳 id / 离线分钟数
+ *   编进主键，那些值在同一条故障持续期间会变。
+ *   处置只压制提醒，**不代表问题已修复**：界面对仍在 firing 的条目显示「已确认（仍在发生）」。
  */
-const EXPECTED_MODEL_COUNT = 98
+const EXPECTED_MODEL_COUNT = 99
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)

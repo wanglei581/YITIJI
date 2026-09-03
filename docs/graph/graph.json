@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 472,
+    "endpointCount": 476,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -6503,6 +6503,60 @@
         ],
         "services": [
           "MemberFeedbackService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-applications/job-applications.controller.ts",
+        "handler": "JobApplicationsController.list",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/me/job-applications",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/job-applications/job-applications.controller.ts",
+        "handler": "JobApplicationsController.create",
+        "method": "POST",
+        "models": [
+          "Job",
+          "JobApplication"
+        ],
+        "path": "/api/v1/me/job-applications",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/job-applications/job-applications.service.ts"
+        ],
+        "services": [
+          "JobApplicationsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-applications/job-applications.controller.ts",
+        "handler": "JobApplicationsController.remove",
+        "method": "DELETE",
+        "models": [],
+        "path": "/api/v1/me/job-applications/:id",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/job-applications/job-applications.controller.ts",
+        "handler": "JobApplicationsController.update",
+        "method": "PATCH",
+        "models": [
+          "Job",
+          "JobApplication"
+        ],
+        "path": "/api/v1/me/job-applications/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/job-applications/job-applications.service.ts"
+        ],
+        "services": [
+          "JobApplicationsService"
         ]
       },
       {
@@ -13308,7 +13362,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 97,
+    "modelCount": 99,
     "models": [
       {
         "fieldCount": 7,
@@ -13592,7 +13646,7 @@
         ]
       },
       {
-        "fieldCount": 32,
+        "fieldCount": 33,
         "name": "EndUser",
         "relations": [
           "AiResumeResult",
@@ -13608,6 +13662,7 @@
           "FeedbackTicket",
           "FileObject",
           "JobAiSession",
+          "JobApplication",
           "MemberLegalConsent",
           "MemberNotification",
           "PrintTask",
@@ -13800,13 +13855,14 @@
         ]
       },
       {
-        "fieldCount": 45,
+        "fieldCount": 46,
         "name": "FileObject",
         "relations": [
           "DocumentProcessTask",
           "EndUser",
           "FairMaterialPrintBridge",
           "OnlinePlatformDirectory",
+          "PlatformQualification",
           "PrintTask",
           "QualificationRecord",
           "User"
@@ -13868,11 +13924,12 @@
         ]
       },
       {
-        "fieldCount": 46,
+        "fieldCount": 47,
         "name": "Job",
         "relations": [
           "CompanyProfile",
           "JobAiRecommendation",
+          "JobApplication",
           "JobDataQualitySnapshot",
           "JobSource",
           "OfflineAgencyBranch",
@@ -13887,6 +13944,7 @@
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/job-ai/job-context.service.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/job-applications/job-applications.service.ts",
           "services/api/src/job-sync/job-sync.service.ts",
           "services/api/src/jobs/job-requirement-stats.service.ts",
           "services/api/src/jobs/jobs-admin.service.ts",
@@ -13921,6 +13979,18 @@
           "services/api/src/job-ai/governed-job-fit.service.ts",
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts"
+        ]
+      },
+      {
+        "fieldCount": 17,
+        "name": "JobApplication",
+        "relations": [
+          "EndUser",
+          "Job"
+        ],
+        "usedBy": [
+          "services/api/src/job-applications/job-applications.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
@@ -14197,6 +14267,16 @@
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 19,
+        "name": "PlatformQualification",
+        "relations": [
+          "FileObject"
+        ],
+        "usedBy": [
+          "services/api/src/common/recruitment-capability.ts"
         ]
       },
       {
@@ -17113,6 +17193,9 @@
     "scripts/ci-gate-exemptions.json": [
       "scripts/verify-ci-gate-coverage.mjs"
     ],
+    "scripts/fixture-time-bomb-baseline.json": [
+      "scripts/verify-fixture-time-bombs.mjs"
+    ],
     "scripts/generate-project-graph.mjs": [
       "scripts/project-graph/orphans.mjs"
     ],
@@ -17121,6 +17204,9 @@
     ],
     "scripts/project-graph-query.mjs": [
       "scripts/project-graph/orphans.mjs"
+    ],
+    "scripts/verify-fixture-time-bombs.mjs": [
+      "scripts/verify-fixture-time-bombs.mjs"
     ],
     "services/api/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -21333,6 +21419,25 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:deploy-authorization-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "scripts/fixture-time-bomb-baseline.json",
+          "scripts/verify-fixture-time-bombs.mjs"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-fixture-time-bombs.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:fixture-time-bombs"
       ],
       "wired": true
     },
