@@ -41,7 +41,27 @@
 | 配置 Webhook 推送 | ⚠️ 需管理员启用 | ⚠️ 需管理员启用 | ⚠️ 需管理员启用 | ❌ 当前无招聘会 Webhook | ❌ |
 | 手动触发同步 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 查看同步日志 | ✅ 本机构 | ✅ 本机构 | ✅ 本机构 | ✅ 本机构 | ✅ 本机构 |
-| 删除数据源 | ❌ 未上线，P1 改为归档 | ❌ | ❌ | ❌ | ❌ |
+| 删除数据源 | ❌ 不做，已改为归档（见下行） | ❌ | ❌ | ❌ | ❌ |
+| 归档 / 取消归档数据源 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 轮换凭证（webhook / API） | ⚠️ 见下方说明 | ⚠️ | ⚠️ | ⚠️ | ❌ 无凭证型接入 |
+
+**2026-09-03 回填**：上表原先只有「删除数据源 ❌ 未上线，P1 改为归档」一行，而归档、
+取消归档、凭证轮换三个能力已随 `3af16d78c` / `a1d44e1ea` 上线，矩阵未同步。本节声明自己是
+「权限为后台 RBAC 实现依据」，滞后会让人按旧表判断权限，故补齐。
+
+- **不做删除**：`SyncLog.sourceId` / `ImportBatch.sourceId` / `FieldMappingRule.sourceId` 三个外键
+  均非空，硬删要么触发约束失败，要么级联抹掉 CLAUDE.md §11/§12 要求留存的同步与导入历史；
+  `Job.sourceId` / `JobFair.sourceId` 可空，硬删会让已导入内容失去来源归属，而 §10 要求岗位详情
+  必须展示来源机构与同步时间。归档同时置 `enabled=false`，采集侧本就以 `enabled` 为门控。
+- **归档不可被 Admin 打穿**：`job-sync.service.ts:setSourceEnabled` 对 `archivedAt != null` 拒
+  `SOURCE_ARCHIVED`；Admin 接入通道页把「已归档」与「待启用」分开显示，且对归档行不渲染启用按钮。
+  取消归档只清 `archivedAt`，**不自动恢复 `enabled`**，避免静默恢复采集。
+- **轮换的实际可用性按接入方式而非机构类型判定**，由 `assertDataSourceCapability(org.type,
+  accessMode, sourceKind)` 执行：webhook 源留空 body 由服务端 CSPRNG 生成并**只返回一次**；
+  API 源必须自带上游 token（平台无法代为签发）；excel / csv / json / manual 无凭证概念，拒
+  `DATA_SOURCE_HAS_NO_CREDENTIAL`。并发轮换以 `webhookSecretRotatedAt` 做 CAS，未命中抛
+  `CREDENTIAL_ROTATION_CONFLICT`，不做丢失更新。**旧密钥立即失效，无双密钥窗口** ——
+  机构须与对接方协调切换窗口。
 
 ---
 
