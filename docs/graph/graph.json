@@ -10412,7 +10412,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 409,
+      "reachableFileCount": 416,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -11921,13 +11921,12 @@
           ],
           "path": "/print/pickup-claim",
           "styles": [
-            "apps/kiosk/src/pages/print/print-prototype.css",
-            "apps/kiosk/src/pages/print/styles/print-cashier.css",
-            "apps/kiosk/src/pages/print/styles/print-material-check.css",
-            "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
-            "apps/kiosk/src/pages/print/styles/print-preview-params.css",
-            "apps/kiosk/src/pages/print/styles/print-progress-result.css",
-            "apps/kiosk/src/pages/print/styles/print-upload.css"
+            "apps/kiosk/src/components/kiosk-numpad/kiosk-numpad.css",
+            "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13075,7 +13074,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 429
+      "sourceFileCount": 437
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -15028,6 +15027,11 @@
     ],
     "apps/kiosk/scripts/lib/fusion-baseline-contract.mjs": [
       "apps/kiosk/scripts/verify-fusion-baseline.mjs"
+    ],
+    "apps/kiosk/scripts/lib/shell-chrome-contract.mjs": [
+      "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
     "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -21325,6 +21329,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
           "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
           "apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx",
           "apps/kiosk/src/index.css",
@@ -22074,6 +22079,7 @@
           "apps/kiosk/src/services"
         ],
         "files": [
+          "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/main.tsx",
           "apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx",
@@ -22148,6 +22154,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
           "apps/kiosk/src/hooks/useKioskStageFit.ts",
           "apps/kiosk/src/index.css",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
@@ -24026,12 +24033,10 @@
       },
       "file": "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "helper": false,
-      "inCi": true,
-      "package": "terminal-agent",
-      "scriptNames": [
-        "terminal-agent::verify:print-monitor-truth"
-      ],
-      "wired": true
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -24127,12 +24132,10 @@
       },
       "file": "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "helper": false,
-      "inCi": true,
-      "package": "terminal-agent",
-      "scriptNames": [
-        "terminal-agent::verify:scan-deletion-audit"
-      ],
-      "wired": true
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -24192,12 +24195,10 @@
       },
       "file": "apps/terminal-agent/scripts/verify-task-reliability.ts",
       "helper": false,
-      "inCi": true,
-      "package": "terminal-agent",
-      "scriptNames": [
-        "terminal-agent::verify:task-reliability"
-      ],
-      "wired": true
+      "inCi": false,
+      "package": "apps/terminal-agent",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -24229,7 +24230,7 @@
         "missing": []
       },
       "file": "apps/terminal-agent/scripts/verify-usb-import-agent.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "terminal-agent",
       "scriptNames": [
@@ -25161,7 +25162,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-admin-fairs.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -25905,7 +25906,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-benefit-redemption.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -26004,7 +26005,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-career-plan.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -26052,7 +26053,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-change-password.ts",
-      "helper": true,
+      "helper": false,
       "inCi": false,
       "package": "services/api",
       "scriptNames": [],
@@ -26204,7 +26205,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-contract-review-contract.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -26566,7 +26567,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-fair-company-positions.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -26601,7 +26602,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-fair-info-fields.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -26671,7 +26672,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-fair-visit-plan.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -26977,7 +26978,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-governed-job-fit.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -26995,7 +26996,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-http-exception-filter.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27065,7 +27066,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-internal-auth-phone.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27113,7 +27114,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-job-ai-backend.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27168,7 +27169,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-job-ai-privacy.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27356,7 +27357,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-job-fit-governance.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27376,7 +27377,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-job-fit-print.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27397,7 +27398,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-job-fit.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27480,7 +27481,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-job-materials.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27689,7 +27690,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-jobfair-venue-guide.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -27753,7 +27754,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-kiosk-cashier-ui.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -28033,7 +28034,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-member-assets.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -28225,7 +28226,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-member-data-request-truth.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -28420,7 +28421,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-member-step-up.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -28538,7 +28539,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-ocr-baidu-live.ts",
-      "helper": true,
+      "helper": false,
       "inCi": false,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -28831,7 +28832,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-partner-excel-import.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29022,7 +29023,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-payment-flow.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29063,7 +29064,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-payment-real-channels.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29258,7 +29259,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-print-jobs.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29371,7 +29372,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-print-scan-first-release.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29394,7 +29395,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-print-sign.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29430,7 +29431,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-production-real-services.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29449,7 +29450,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-production-runtime-gates.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29471,7 +29472,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29650,7 +29651,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-recruitment-p1-preflight.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -29883,7 +29884,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-refund-real-channels.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -30053,7 +30054,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-resume-generate.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -30542,7 +30543,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-toolbox-ai-skill-intents.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -30778,7 +30779,7 @@
         "missing": []
       },
       "file": "services/api/scripts/verify-upload-sessions.ts",
-      "helper": true,
+      "helper": false,
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
@@ -30806,13 +30807,11 @@
         ]
       },
       "file": "services/api/scripts/verify-wave2-account-rebind.ts",
-      "helper": true,
-      "inCi": true,
-      "package": "@ai-job-print/api",
-      "scriptNames": [
-        "@ai-job-print/api::verify:wave2-account-rebind"
-      ],
-      "wired": true
+      "helper": false,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -30829,12 +30828,10 @@
       },
       "file": "services/api/scripts/verify-wave3-print-aftercare.ts",
       "helper": false,
-      "inCi": true,
-      "package": "@ai-job-print/api",
-      "scriptNames": [
-        "@ai-job-print/api::verify:wave3-print-aftercare"
-      ],
-      "wired": true
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -31147,6 +31144,18 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+          "docs/design/kiosk-v6-migration-matrix.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/services/api/smartCampus.ts",
         "kind": "component",
         "mentions": [],
@@ -31183,6 +31192,46 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+      },
+      {
+        "detail": "文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过",
+        "file": "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
+        "kind": "gate",
+        "mentions": [
+          ".github/workflows/ci.yml",
+          "docs/design/kiosk-ai-os-v3-2026-08/wiring-map.md",
+          "docs/product/codex-handoff-plan-2026-08.md",
+          "docs/progress/current-progress.md",
+          "docs/reviews/2026-08-11-backend-buildout-spec.md",
+          "scripts/ci-gate-exemptions.json"
+        ],
+        "risk": "protected",
+        "scope": "verify",
+        "why": "Windows 硬件链路（打印机 / 扫描仪 / U 盘）"
+      },
+      {
+        "detail": "文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过",
+        "file": "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
+        "kind": "gate",
+        "mentions": [
+          ".github/workflows/ci.yml",
+          "scripts/ci-gate-exemptions.json"
+        ],
+        "risk": "protected",
+        "scope": "verify",
+        "why": "Windows 硬件链路（打印机 / 扫描仪 / U 盘）"
+      },
+      {
+        "detail": "文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过",
+        "file": "apps/terminal-agent/scripts/verify-task-reliability.ts",
+        "kind": "gate",
+        "mentions": [
+          ".github/workflows/ci.yml",
+          "scripts/ci-gate-exemptions.json"
+        ],
+        "risk": "protected",
+        "scope": "verify",
+        "why": "Windows 硬件链路（打印机 / 扫描仪 / U 盘）"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
@@ -32317,6 +32366,46 @@
         "risk": "low",
         "scope": "docs",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过",
+        "file": "services/api/scripts/verify-change-password.ts",
+        "kind": "gate",
+        "mentions": [
+          ".ccg/tasks/archive/2026-07/admin-password-security/requirements.md",
+          ".ccg/tasks/archive/2026-07/f1-admin-credential-sync-main-20260715/plan.md",
+          "docs/superpowers/plans/2026-07-15-admin-credential-recovery-and-auth-verify-safety.md",
+          "docs/superpowers/plans/2026-07-18-partner-account-dual-auth-removal-implementation.md",
+          "scripts/ci-gate-exemptions.json",
+          "services/api/scripts/run-verify-change-password.mjs",
+          "services/api/scripts/verify-change-password-target-guard.ts"
+        ],
+        "risk": "high",
+        "scope": "verify",
+        "why": "仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json、services/api/scripts/run-verify-change-password.mjs、services/api/scripts/verify-change-password-target-guard.ts"
+      },
+      {
+        "detail": "文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过",
+        "file": "services/api/scripts/verify-wave2-account-rebind.ts",
+        "kind": "gate",
+        "mentions": [
+          "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+          "scripts/ci-gate-exemptions.json"
+        ],
+        "risk": "high",
+        "scope": "verify",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs、scripts/ci-gate-exemptions.json"
+      },
+      {
+        "detail": "文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过",
+        "file": "services/api/scripts/verify-wave3-print-aftercare.ts",
+        "kind": "gate",
+        "mentions": [
+          "scripts/ci-gate-exemptions.json"
+        ],
+        "risk": "high",
+        "scope": "verify",
+        "why": "仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json"
       }
     ]
   }

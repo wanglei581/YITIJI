@@ -2,9 +2,12 @@
 
 > **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。
 
+2026-09-03 **裁决后第一张页面迁移 / 验收探针（分支 `slice/pickup-claim-qingxu`，未合入、未部署）**。从冻结分支 `claude/project-readiness-review-959ffe` 按文件取最终态，把 `/print/pickup-claim` 迁到青序流光（`QxPageFrame` + `pickup-claim-qx.css` + 页内 `KioskNumpad`）。`KioskRoot` 只加 `QX_MIGRATED_ROUTES` / `isQxRoute`，让该路由退出旧 `KioskLayout` 顶栏和底栏，避免与青序壳叠成双壳。壳层门禁不再逐字匹配 `hideHeader={isCampusZone}`，判据集中到 `shell-chrome-contract.mjs`。本地 1080×1920 已看 idle / 错误 / HID 三态，h1 为 `#10302b` 不是暖褐 `#1A1714`。这不等于 Windows 真机「取件码 + 出纸」已通过；合入后再按 B3 验物理闭环。未改 `apps/miniapp/**`、后端、硬件链路。
+
 2026-09-03 **6 条 newly-visible 门禁 triage 全部还清（api 侧 + 误判更正，与下一条同一批）**。api 侧两条实跑全绿后接线：`verify:wave2-account-rebind`（23 断言）、`verify:wave3-print-aftercare`（7 断言）。**一条是误判出账**：`verify-change-password.ts` 被登记为「从没跑过」，实际它早经 `run-verify-change-password.mjs` launcher 在 CI 一直跑着（专用 SQLite 库 + 绝对路径标记双重守卫，39 断言）——图谱看不见它，是 `gates.mjs` 的 helper 字面量正则只认 mjs/cjs/js、不认 launcher spawn 的 `.ts` 路径，即图谱的**第四个盲区**，本批已修（triage 过程中我一度重复接线并造出 package.json duplicate key，发现原 launcher 后已撤回）。`MAX_UNWIRED` 按实际降到 **1**（仅剩 `verify-partner-account-delete-ui.mjs` 断言矛盾存量）。至此 2026-09-03 图谱补 `.ts` 支持暴露的六条待判定欠账全部清零。未合入、未部署。
 
 2026-09-03 **terminal-agent 三条从未跑过的 verify 脚本 triage 后接线（未合入、未部署）**。图谱补 `.ts` 支持后第一次可见、登记在 `newly-visible-pending-triage` 的三条：`verify-print-monitor-truth` / `verify-scan-deletion-audit` / `verify-task-reliability`。断言对象都在（`monitorPrintJob` / `sweepUnclaimedDir` / `processPatch` 等）。macOS 上用 `ts-node` 实跑三条全部 exit 0，不依赖 Windows 真机（注入 platform/clock/WMI/dispatch、临时 SQLite、loopback HTTP）。已起 `verify:*` 脚本名，CI「Terminal Agent verify suites」由 `pnpm exec ts-node scripts/...` 改为 `pnpm run verify:*`，从 `unwiredScripts` 删除这三条，`MAX_UNWIRED` 13→10。未改断言、未改 `services/api`、未 commit。
+
 
 2026-09-03 **一体机公共屏账户资源泄漏收口（分支 `fix/kiosk-account-resource-exposure`，未合入、未部署）**。不删任何已设计页面。核实后：**签名盖章页印章图本来就不回显**（只显示文件名；合成 PDF 预览是当场出纸半程，仍走 180s 闲置清场）。**换绑入口确实存在**（`routes/index.tsx` 旧注释「不做换绑」是错的），6 位验证码曾以明文大字打在大厅屏上。**自我探索**作答/解读写在 `self_assessment_session_v1`，不在清场名单里，结果页也没有 60 秒闲置，刷新后下一位能回看。**游客本机收藏**写 localStorage，首页闲置被当成空操作，下一游客能看见上一游客的心形。政策条件核对作答本来就不落盘，但结果页会回显「依据你填的：户籍/参保」，人走了还停在该页时下一位能读到。修复：换绑 OTP 隐藏显示 + 45 秒关层；自我探索键进入 `clearKioskSensitiveSession`，四页共用 60 秒闲置清会话；游客收藏在 logout/清场时清掉（login 保留以便合并到账号）；条件核对 60 秒闲置清作答并退回空白表单。未改 `apps/miniapp/**`，未放宽权限。
 

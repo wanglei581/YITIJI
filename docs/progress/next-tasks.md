@@ -116,6 +116,9 @@
 - PR #741（到机码核销页换 V6 壳）与本裁决冲突，须关闭或改造为青序流光后再提
 - `claude/project-readiness-review-959ffe` 上的青序流光地基（`apps/kiosk/src/styles/qingxu/`、
   `components/qingxu/QxPageFrame.tsx`）方向正确，可按簇提取
+- **裁决后第一张页面（验收探针）**：`/print/pickup-claim` 已在分支 `slice/pickup-claim-qingxu`
+  迁到青序流光（未合入、未部署）。合入后须在 Windows 真机验「取件码 + 出纸」最小物理闭环，
+  再决定后续 50 页怎么迁。不要把本地浏览器截图写成真机已通过。
 - 下方 V6 队列（A1/A2/C0 等）中**尚未开工**的条目按青序流光重排；已完成条目保留为历史记录
 
 ---

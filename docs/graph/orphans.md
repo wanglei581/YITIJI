@@ -40,8 +40,8 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
-| **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 10 |
+| **protected** | 硬名单，即使零引用也不得删除 | 7 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 14 |
 | **medium** | 只被文档或其它文件提及 | 8 |
 | **low** | 全仓零提及 | 126 |
 
@@ -235,7 +235,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（10）
+## high — 仍被 CI / 门禁 / 包脚本引用（14）
 
 ### 页面/组件（6）
 
@@ -248,17 +248,21 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-prod-build-config.mjs、apps/kiosk/scripts/verify-runtime-terminal-identity.mjs |
 | `apps/kiosk/src/pages/home/serviceGroups.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-jobfair-checkin.mjs、apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs |
 
-### 门禁脚本（1）
+### 门禁脚本（4）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/admin/scripts/verify-partner-account-delete-ui.mjs` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json、scripts/verify-ci-gate-coverage.mjs |
+| `services/api/scripts/verify-change-password.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json、services/api/scripts/run-verify-change-password.mjs、services/api/scripts/verify-change-password-target-guard.ts |
+| `services/api/scripts/verify-wave2-account-rebind.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs、scripts/ci-gate-exemptions.json |
+| `services/api/scripts/verify-wave3-print-aftercare.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json |
 
-### 样式（2）
+### 样式（3）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
+| `apps/kiosk/src/pages/print/styles/print-pickup-claim.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
 ### 测试（1）
@@ -270,7 +274,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## protected — 硬名单，即使零引用也不得删除（4）
+## protected — 硬名单，即使零引用也不得删除（7）
 
 这些路径即使零引用也**不得删除**。它们的价值不在「被代码引用」，
 而在作为回归基线、目标设计或产权归属。
@@ -283,3 +287,11 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/design/kiosk-ai-os-v3-2026-08/STATUS.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 当前 V6 目标设计，是「将要实现」而不是「已被引用」 |
 | `docs/design/kiosk-ai-os-v3-2026-08/backlog-triage-2026-08-09.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 当前 V6 目标设计，是「将要实现」而不是「已被引用」 |
 | `docs/design/kiosk-ai-os-v3-2026-08/phase2-home-pilot-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 当前 V6 目标设计，是「将要实现」而不是「已被引用」 |
+
+### 门禁脚本（3）
+
+| 路径 | 判定依据 |
+| --- | --- |
+| `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ Windows 硬件链路（打印机 / 扫描仪 / U 盘） |
+| `apps/terminal-agent/scripts/verify-scan-deletion-audit.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ Windows 硬件链路（打印机 / 扫描仪 / U 盘） |
+| `apps/terminal-agent/scripts/verify-task-reliability.ts` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ Windows 硬件链路（打印机 / 扫描仪 / U 盘） |

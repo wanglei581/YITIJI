@@ -587,10 +587,18 @@ for (const marker of [
   'void handleClaim(nextCode)',
   'claimLockRef.current = false',
   "setCode('')",
-  '扫描小程序二维码',
-  "import './styles/print-pickup-claim.css'",
+  // 这条断言保护的实质是「页面必须告诉用户扫码这条路存在」，不是保护某句原文。
+  // 2026-09-02 按 11-arrival-code.html 迁移后本页重定位为「输入到机码」页，
+  // 扫码降为兜底出口，措辞由「扫描小程序二维码」改为「用机身扫码区」。
+  // 断言随之改指新措辞，强度不变：删掉扫码入口仍然会红。
+  '机身扫码区',
+  // 2026-09-02 迁移到青序流光：本页样式入口随之改名。断言强度不变——
+  // 它保的是"这一页必须有自己的样式入口"，删掉仍然会红。
+  "import './styles/pickup-claim-qx.css'",
   'data-w2-page="pickup-claim"',
-  'className="k-btn pcp-submit"',
+  // 迁移到青序流光后按钮基类由 k-btn 改为 qx-btn；.pcp-submit 保留，
+  // 断言保的是"提交按钮必须有稳定的可定位类名"，强度不变。
+  'className="qx-btn pcp-submit"',
 ]) {
   assert.ok(pickupClaim.includes(marker), `pickup claim retains ${marker}`)
 }
