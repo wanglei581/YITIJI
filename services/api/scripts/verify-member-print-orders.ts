@@ -211,7 +211,14 @@ async function main() {
 
     // ── 5. 不返回敏感字段 ───────────────────────────────────────
     const allItems = [...listA, ...listB]
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
+    // 这是默认拒绝白名单：任何新增响应键都必须先过一次人工审查才能加进来。
+    // 加键 = 一次外露决定，不是维护动作。加之前问：它含 PII 吗？含凭证吗？
+    // 含文件定位符吗？三个都不含才可以。
+    //   duplex（2026-09-02 审查通过）：用户自己选的打印参数，与 copies /
+    //   colorMode / paperSize 同类。之前它被采集、计价、落进 printParamsJson，
+    //   却没有外露——用户付了双面的钱却在「我的 → 打印订单」看不到，
+    //   补打与申诉也无法复现参数。
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
