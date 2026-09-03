@@ -74,36 +74,6 @@
       "script": "apps/admin/scripts/verify-partner-account-delete-ui.mjs",
       "category": "broken-pending-deletion",
       "reason": "本次扫描里唯一一对自相矛盾的断言，也是流程信号而不只是死代码：本门禁断言 src/routes/partners/PartnerAccountDeletionDialog.tsx 必须存在且含 role=\"alertdialog\"，而同目录 verify-partner-account-action-ui.mjs:104 断言的恰恰是该文件必须不存在。该文件确已删除，本门禁实跑 4 条断言全 FAIL（exit 1）。两条门禁的作者互相不知道对方存在，只有被接线的那条在跑。不要接线 —— 接线只会让 CI 红。正确处置是删除本文件，等产品负责人逐条确认孤儿清单后另开 PR 执行。"
-    },
-    {
-      "script": "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
-      "category": "newly-visible-pending-triage",
-      "reason": "2026-09-03 补 .ts 支持后**第一次可见**的存量欠账，不是新增。此前 gates.mjs 的 GATE_EXT_PATTERN 不含 .ts，services/api 与 terminal-agent 下的 .ts 门禁一条都没进过图谱。这条脚本一直存在、一直没有 package.json 脚本名，因此从写完那天起就没跑过。尚未逐条运行判定它是该接线还是该删 —— 那是独立任务，接上去很可能直接红。"
-    },
-    {
-      "script": "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
-      "category": "newly-visible-pending-triage",
-      "reason": "2026-09-03 补 .ts 支持后**第一次可见**的存量欠账，不是新增。此前 gates.mjs 的 GATE_EXT_PATTERN 不含 .ts，services/api 与 terminal-agent 下的 .ts 门禁一条都没进过图谱。这条脚本一直存在、一直没有 package.json 脚本名，因此从写完那天起就没跑过。尚未逐条运行判定它是该接线还是该删 —— 那是独立任务，接上去很可能直接红。"
-    },
-    {
-      "script": "apps/terminal-agent/scripts/verify-task-reliability.ts",
-      "category": "newly-visible-pending-triage",
-      "reason": "2026-09-03 补 .ts 支持后**第一次可见**的存量欠账，不是新增。此前 gates.mjs 的 GATE_EXT_PATTERN 不含 .ts，services/api 与 terminal-agent 下的 .ts 门禁一条都没进过图谱。这条脚本一直存在、一直没有 package.json 脚本名，因此从写完那天起就没跑过。尚未逐条运行判定它是该接线还是该删 —— 那是独立任务，接上去很可能直接红。"
-    },
-    {
-      "script": "services/api/scripts/verify-change-password.ts",
-      "category": "newly-visible-pending-triage",
-      "reason": "2026-09-03 补 .ts 支持后**第一次可见**的存量欠账，不是新增。此前 gates.mjs 的 GATE_EXT_PATTERN 不含 .ts，services/api 与 terminal-agent 下的 .ts 门禁一条都没进过图谱。这条脚本一直存在、一直没有 package.json 脚本名，因此从写完那天起就没跑过。尚未逐条运行判定它是该接线还是该删 —— 那是独立任务，接上去很可能直接红。"
-    },
-    {
-      "script": "services/api/scripts/verify-wave2-account-rebind.ts",
-      "category": "newly-visible-pending-triage",
-      "reason": "2026-09-03 补 .ts 支持后**第一次可见**的存量欠账，不是新增。此前 gates.mjs 的 GATE_EXT_PATTERN 不含 .ts，services/api 与 terminal-agent 下的 .ts 门禁一条都没进过图谱。这条脚本一直存在、一直没有 package.json 脚本名，因此从写完那天起就没跑过。尚未逐条运行判定它是该接线还是该删 —— 那是独立任务，接上去很可能直接红。"
-    },
-    {
-      "script": "services/api/scripts/verify-wave3-print-aftercare.ts",
-      "category": "newly-visible-pending-triage",
-      "reason": "2026-09-03 补 .ts 支持后**第一次可见**的存量欠账，不是新增。此前 gates.mjs 的 GATE_EXT_PATTERN 不含 .ts，services/api 与 terminal-agent 下的 .ts 门禁一条都没进过图谱。这条脚本一直存在、一直没有 package.json 脚本名，因此从写完那天起就没跑过。尚未逐条运行判定它是该接线还是该删 —— 那是独立任务，接上去很可能直接红。"
     }
   ]
 }

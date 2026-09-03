@@ -3,6 +3,8 @@ import http from 'node:http'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
 import { allowedOrigins } from '../src/local-api/origin-guard'
 import type { AgentConfig } from '../src/agent/types'
+import { sendHeartbeat } from '../src/agent/heartbeat'
+import { AGENT_RUNTIME_VERSION } from '../src/runtime-version'
 
 const ALLOWED_ORIGIN = 'http://localhost:5173'
 const DENIED_ORIGIN = 'http://evil.example'
@@ -77,6 +79,12 @@ async function startBackendStub(): Promise<{ baseUrl: string; records: RecordedR
         return
       }
 
+      if (req.method === 'PUT' && req.url === '/api/v1/terminals/terminal-qr-1/heartbeat') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ acknowledged: true }))
+        return
+      }
+
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: false, error: { code: 'NOT_FOUND', message: 'not found' } }))
     })().catch((error) => {
@@ -140,7 +148,7 @@ async function main(): Promise<void> {
     apiBaseUrl: backend.baseUrl,
     terminalCode: 'T-LOCAL-QR',
     printerName: 'Test Printer',
-    agentVersion: 'verify',
+    agentVersion: 'legacy-config-version',
     terminalId: 'terminal-qr-1',
     agentToken: 'agent-token-secret',
     localApiPort: 0,
@@ -148,7 +156,21 @@ async function main(): Promise<void> {
     localApiBridgeToken: BRIDGE_TOKEN,
   }
 
-  const handle = startQrLoginLocalServer(config)
+  const localServerOptions: NonNullable<Parameters<typeof startQrLoginLocalServer>[1]> = {
+    getPanelStatus: () => ({
+      runtimeVersion: '0.4.11',
+      terminalCode: `${config.terminalCode}<script>alert(1)</script>`,
+      serviceState: 'running',
+      cloudConnected: true,
+      lastHeartbeatAt: '2026-08-10T13:51:05.434Z',
+      printerStatus: 'ready',
+      localTaskDatabaseAvailable: true,
+      scanInputStatus: 'ready',
+      scanInputReason: 'ready',
+      credentialStatus: 'ready',
+    }),
+  }
+  const handle = startQrLoginLocalServer(config, localServerOptions)
   assert.ok(handle, 'local QR server should start with terminal credentials')
   await new Promise((resolve) => setTimeout(resolve, 50))
   const address = handle.server.address()
@@ -157,6 +179,52 @@ async function main(): Promise<void> {
   const localBase = `http://127.0.0.1:${address.port}`
 
   try {
+    const panel = await fetch(`${localBase}/local/panel`)
+    const panelHtml = await panel.text()
+    assert.equal(panel.status, 200, 'local status panel must allow a top-level loopback GET without Origin')
+    assert.match(panel.headers.get('content-type') ?? '', /^text\/html; charset=utf-8$/i)
+    assert.equal(panel.headers.get('cache-control'), 'no-store')
+    assert.equal(panel.headers.get('x-frame-options'), 'DENY')
+    assert.equal(panel.headers.get('referrer-policy'), 'no-referrer')
+    assert.match(panel.headers.get('content-security-policy') ?? '', /default-src 'none'/)
+    for (const expected of [
+      'AI Job Print Terminal',
+      '0.4.11',
+      'T-LOCAL-QR',
+      '&lt;script&gt;alert(1)&lt;/script&gt;',
+      '后台服务运行中',
+    ]) {
+      assert.ok(panelHtml.includes(expected), `local panel must render ${expected}`)
+    }
+    for (const secret of [
+      config.agentToken!,
+      config.terminalId!,
+      config.apiBaseUrl,
+      config.printerName,
+      'claim_token_',
+    ]) {
+      assert.ok(!panelHtml.includes(secret), `local panel must not expose ${secret}`)
+    }
+    assert.ok(!panelHtml.includes('<script>alert(1)</script>'), 'local panel must escape dynamic text')
+
+    const panelMutation = await fetch(`${localBase}/local/panel`, { method: 'POST' })
+    assert.equal(panelMutation.status, 405, 'local panel must remain read-only')
+
+    assert.equal(AGENT_RUNTIME_VERSION, '0.4.11', 'runtime version must come from the deployed package')
+    assert.equal(await sendHeartbeat({ config }), true, 'heartbeat fixture must be acknowledged')
+    const heartbeatRecord = backend.records.find((record) => record.url.endsWith('/heartbeat'))
+    assert.ok(heartbeatRecord, 'heartbeat request should be recorded')
+    assert.equal(
+      (heartbeatRecord.body as { agentVersion?: string }).agentVersion,
+      AGENT_RUNTIME_VERSION,
+      'heartbeat must report the immutable runtime package version',
+    )
+    assert.notEqual(
+      (heartbeatRecord.body as { agentVersion?: string }).agentVersion,
+      config.agentVersion,
+      'preserved legacy config must not overwrite the upgraded runtime version',
+    )
+
     const deniedIdentity = await getJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/terminal-identity`,
       DENIED_ORIGIN,
@@ -262,9 +330,9 @@ async function main(): Promise<void> {
   }
 }
 
-// Agent 侧未配置令牌 → 整个 /local/qr-login/* 分支 fail-closed，
-// 即使客户端带上"正确"的令牌也必须 403（对齐 verify-usb-import-agent.ts Part 3）。
-async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
+// 新安装不需要在 MSI 中携带静态令牌：白名单 Origin 先领取短时本机会话，
+// 再访问受保护路由；任意客户端自带的静态令牌仍必须 fail-closed。
+async function verifyDynamicBridgeSession(): Promise<void> {
   const backend = await startBackendStub()
   const config: AgentConfig = {
     apiBaseUrl: backend.baseUrl,
@@ -304,7 +372,33 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
     assert.equal(denied.status, 403, 'unconfigured bridge token must fail closed even with a client-side token')
     assert.equal(denied.json.error.code, 'LOCAL_QR_BRIDGE_TOKEN_INVALID')
 
-    console.log('verify-local-qr-proxy: unconfigured-token instance fail-closed ok')
+    const deniedSession = await fetch(`${localBase}/local/bridge/session`, {
+      method: 'POST',
+      headers: { Origin: DENIED_ORIGIN },
+    })
+    assert.equal(deniedSession.status, 403, 'non-allowlisted Origin must not obtain a local session')
+
+    const sessionResponse = await fetch(`${localBase}/local/bridge/session`, {
+      method: 'POST',
+      headers: { Origin: ALLOWED_ORIGIN },
+    })
+    assert.equal(sessionResponse.status, 200, 'allowlisted Origin may obtain a short-lived local session')
+    const sessionEnvelope = await sessionResponse.json() as {
+      success: true
+      data: { token: string; expiresInSeconds: number }
+    }
+    assert.match(sessionEnvelope.data.token, /^[A-Za-z0-9_-]{40,}$/)
+    assert.equal(sessionEnvelope.data.expiresInSeconds, 300)
+
+    const created = await postJson<{ success: true; data: { ticketId: string } }>(
+      `${localBase}/local/qr-login/create`,
+      { returnTo: '/me' },
+      { bridgeToken: sessionEnvelope.data.token },
+    )
+    assert.equal(created.status, 200, 'dynamic local session must authorize QR ticket creation')
+    assert.equal(created.json.data.ticketId, TICKET_ID)
+
+    console.log('verify-local-qr-proxy: dynamic Origin-bound bridge session ok')
   } finally {
     await handle.close()
     await backend.close()
@@ -312,7 +406,7 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
 }
 
 main()
-  .then(() => verifyUnconfiguredTokenFailClosed())
+  .then(() => verifyDynamicBridgeSession())
   .catch((error) => {
     console.error(error)
     process.exit(1)

@@ -121,7 +121,7 @@ async function main(): Promise<void> {
       fs.writeFileSync(imagePath, makePng(testCase.pixelWidth, testCase.pixelHeight, testCase.dpi))
 
       // ── 'fit'：历史行为，必须无回归（等比铺满 A4）────────────────────
-      const fitPdf = await imageToPdf(imagePath, 'fit')
+      const fitPdf = await imageToPdf(imagePath, { scale: 'fit' })
       const fitPlacement = readPlacement(fitPdf)
       fs.rmSync(fitPdf, { force: true })
       check(fitPlacement !== null, `${testCase.label}: fit 未解析到摆放矩阵`)
@@ -138,7 +138,7 @@ async function main(): Promise<void> {
       }
 
       // ── 'actual'：按声明 DPI 还原物理尺寸，绝不放大 ──────────────────
-      const actualPdf = await imageToPdf(imagePath, 'actual')
+      const actualPdf = await imageToPdf(imagePath, { scale: 'actual' })
       const actualPlacement = readPlacement(actualPdf)
       fs.rmSync(actualPdf, { force: true })
       check(actualPlacement !== null, `${testCase.label}: actual 未解析到摆放矩阵`)
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
     // ── print.ts 必须把 scale 透传下来，否则这里再对也没用 ─────────────
     const printSource = fs.readFileSync(path.join(__dirname, '../src/printer/print.ts'), 'utf8')
     check(
-      /imageToPdf\(\s*filePath\s*,[^)]*scale/.test(printSource),
+      /imageToPdf\(\s*filePath\s*,\s*\{[\s\S]*?scale:/.test(printSource),
       'print.ts 调用 imageToPdf 时未透传 scale —— 参数在这一层就被丢了',
     )
   } finally {

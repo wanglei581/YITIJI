@@ -45,6 +45,7 @@ import { print } from '../printer/print'
 import {
   getPrinterPreflight,
   getPrintJobStatus,
+  hasPrintServiceCompletionEvent,
   type PrinterPreflight,
   type PrintJobMonitorStatus,
 } from './wmi'
@@ -418,6 +419,7 @@ export async function executeTask(
       tempFilePath,
       resolvedPrinter,
       task.params as Partial<PrintJobParams>,
+      { correlationId: task.taskId },
     )
 
     // ── Step 5+6: Record outcome + PATCH terminal status ──────────────────
@@ -451,6 +453,7 @@ export async function executeTask(
         task.taskId,
         30_000,
         1_500,
+        { dispatchedAtMs: Date.parse(result.startedAt) },
       )
 
       // Log monitor warn regardless of failed/completed (covers Retained timeout detail).
@@ -547,6 +550,12 @@ interface MonitorDependencies {
   ) => Promise<{ status: PrintJobMonitorStatus; rawStatus?: string }>
   sleep?: (ms: number) => Promise<void>
   now?: () => number
+  dispatchedAtMs?: number
+  queryCompletionEvent?: (
+    printerName: string,
+    taskId: string,
+    dispatchedAtMs: number,
+  ) => Promise<boolean>
 }
 
 /**
@@ -578,6 +587,7 @@ export async function monitorPrintJob(
   const queryStatus = dependencies.queryStatus ?? getPrintJobStatus
   const wait = dependencies.sleep ?? sleep
   const now = dependencies.now ?? Date.now
+  const queryCompletionEvent = dependencies.queryCompletionEvent ?? hasPrintServiceCompletionEvent
 
   if (platform !== 'win32') {
     return unconfirmedOutcome(
@@ -590,8 +600,16 @@ export async function monitorPrintJob(
   // is indistinguishable from DocumentName mismatch or query/driver failure.
   const NOT_FOUND_LIMIT = 5
 
+  const dispatchedAtMs = Number.isFinite(dependencies.dispatchedAtMs)
+    ? Math.max(0, dependencies.dispatchedAtMs as number)
+    : now()
+  // `dispatchedAtMs` scopes PrintService evidence to this task dispatch. The
+  // monitor timeout starts only after the print command has returned, otherwise
+  // slow rendering/spooling can consume the entire observation window before
+  // the first queue poll.
   const deadline = now() + timeoutMs
   let paperEmptyCount = 0
+  let paperEmptySeen = false
   let notFoundCount = 0
   let activeJobSeenOnce = false
   let seenRetainedOnce = false  // Pantum 'Printing, Retained' indeterminate flag
@@ -603,6 +621,7 @@ export async function monitorPrintJob(
 
     switch (status) {
       case 'paper_empty':
+        paperEmptySeen = true
         paperEmptyCount++
         notFoundCount = 0
         // Require 2 consecutive PaperOut confirmations before declaring failure.
@@ -637,6 +656,9 @@ export async function monitorPrintJob(
         seenRetainedOnce = true
         notFoundCount = 0
         paperEmptyCount = 0
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
         break
 
       case 'completed':
@@ -652,6 +674,17 @@ export async function monitorPrintJob(
         break
 
       case 'not_found':
+        // A small job can finish and leave a non-retained queue before the
+        // first Get-PrintJob sample. Event 307 is stronger evidence than queue
+        // visibility when it carries this exact taskId after dispatch.
+        if (paperEmptySeen) {
+          return unconfirmedOutcome(
+            'the job disappeared after a paper-empty signal; completion cannot be confirmed',
+          )
+        }
+        if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
         if (activeJobSeenOnce) {
           // The matching job was observed active and then removed. This confirms
           // the Windows spooler lifecycle only, not physical paper delivery.
@@ -669,7 +702,11 @@ export async function monitorPrintJob(
         break
 
       case 'unknown':
-        // Query failure — don't penalise; keep waiting.
+        // Get-PrintJob can fail independently of the Operational event log.
+        // Preserve fail-closed behaviour but accept an exact post-dispatch 307.
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
         paperEmptyCount = 0
         break
     }

@@ -301,13 +301,13 @@ jobs:
           pnpm run verify:scan-watcher
           pnpm run verify:scan-input-health
           # Temp directory + temp SQLite fault injection; no production scan folder or Windows dependency.
-          pnpm exec ts-node scripts/verify-scan-deletion-audit.ts
+          pnpm run verify:scan-deletion-audit
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
-          pnpm exec ts-node scripts/verify-task-reliability.ts
+          pnpm run verify:task-reliability
           # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
-          pnpm exec ts-node scripts/verify-print-monitor-truth.ts
+          pnpm run verify:print-monitor-truth
           # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
           pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
@@ -706,6 +706,12 @@ jobs:
           # 但会员会话与 BullMQ 需要**真实** Redis —— 本 job 的 redis:7-alpine
           # service 提供。同形状的 verify:member-assets-c2d 已在本步长期绿。
           pnpm --filter @ai-job-print/api verify:job-favorites-http
+          # ── 2026-09-03 triage 接线：两条此前从没跑过的门禁（图谱补 .ts 支持后第一次可见）──
+          # wave2 账号重绑 23 断言 / wave3 打印善后 7 断言，实测全绿后接入。
+          # （同批登记的 verify-change-password.ts 是误判：它早经 run-verify-change-password.mjs
+          #   launcher 在本步 662 行一直跑着，图谱看不见是因为 launcher 命令串里没有 .ts 文件名。）
+          pnpm --filter @ai-job-print/api verify:wave2-account-rebind
+          pnpm --filter @ai-job-print/api verify:wave3-print-aftercare
           CI_SERIAL_COMMANDS
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────

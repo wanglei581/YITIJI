@@ -32,7 +32,7 @@
 
 - [x] **B1 生产启动环境收口（2026-09-01，未部署）** —— 实时只读核验确认运行进程、PM2 当前记录和 PM2 dump 均为 `NODE_ENV=production`；以现网 `.env` 运行完整 `assertProductionRuntimeGates()` 通过，API 本机/公网 `health` 与 `health/ready` 均为 200，Redis `PONG`，PM2 online 且 `unstable_restarts=0`。原计划中的环境修复已经完成，本轮不做无收益重启。部署版本唯一真源仍为 `DEPLOY_SOURCE.txt`：生产实际是 `771d53e2ceb257a684cf0d8657c4844045de509e`，仍落后于当前 `origin/main`；PM2 遗留 `COMMIT=942c695a` 不作为发布版本依据。后续如要发布，仍须按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 获得“精确 SHA + 备份 + additive migration + 受控发布”授权；不得直接打开 `DEPLOY_API_ENABLED`。
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
-- [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
+- [ ] **B3 Windows + 奔图真机验收** —— 2026-08-31 已完成 KSK-001 空队列、本地 SQLite、维护态启动、9527、云端心跳 `0.4.10` 与无出纸收尾，服务已恢复 `Stopped / Manual`；仍未执行「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」。Draft PR #743 的 `0.4.11@988bb869` 已取得五项 CI 全绿；Windows workflow 已做到候选只构建一次、冻结 source SHA/版本/三文件 SHA-256，并让 upgrade、fresh EXE、fresh MSI 和最终下载 artifact 消费同一字节。Mac 独立下载 artifact id `9751461440` 后重算 EXE/MSI/manifest 大小和 SHA-256，均与 `candidate-identity.json` 完全一致，因此源码/CI/同字节 provenance 阻塞已关闭。候选仍未 Authenticode 签名，当前不得升级在役终端；下一步必须落实企业签名、时间戳和签名者指纹验证，并建立可审计 Windows 执行入口，再单独申请维护态无打印升级。**不要在现场机运行会创建测试 ProgramData 的 CI 生命周期脚本**。无打印升级通过后才另行申请真实出纸授权，并按 `docs/device/windows-host-acceptance-runbook.md` 留订单号/任务号/出纸照片
 
 ### 已清（2026-08-19 当日）
 
@@ -41,7 +41,7 @@
 10 页裸英文报错（#732）· 入口直达（#733）· 打印未确认假陈述（#734，CI 中）·
 首页域按真实能力说话（#735，CI 中）
 
-> 最后更新：2026-08-22。生产只读核验：`771d53e2` 部署于 2026-08-18，PM2 自该次部署持续 online、ready=200、PostgreSQL health 正常，Kiosk/Admin/Partner 为独立构建；这不等于当前 `origin/main` 已部署。生产岗位 / 招聘会 / 政策公开列表仍为 0，Windows + 奔图现场闭环仍未验收。
+> 最后更新：2026-08-31。生产只读核验：`771d53e2` 部署于 2026-08-18，PM2 自该次部署持续 online、ready=200、PostgreSQL health 正常，Kiosk/Admin/Partner 为独立构建；这不等于当前 `origin/main` 已部署。Windows Agent Draft PR #743 的 `0.4.11@988bb869` 已推送，五项 CI 全绿，同字节 upgrade/fresh/download provenance 已由 artifact 独立哈希复核关闭；但候选仍未 Authenticode 签名、未建立可审计 Windows 执行入口、未安装或真机出纸。生产岗位 / 招聘会 / 政策公开列表仍为 0，Windows + 奔图现场闭环仍未验收。
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 
@@ -79,7 +79,50 @@
 > 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
 > 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
 
-## 2026-08-12 V6 + 双后台统一施工队列（当前优先级）
+## 2026-09-03 视觉真值裁决：青序流光（kiosk-redesign-2026-08）取代 V6
+
+> **产品负责人 2026-09-03 明确裁决：`docs/design/kiosk-redesign-2026-08/` 的 51 页
+> 「青序流光」是项目后面正式上线用的前端页面。**
+>
+> 本条**取代**下方「2026-08-12 V6 + 双后台统一施工队列」与第 178 行「首页真值是
+> `kiosk-ai-os-v3-2026-08/01-home-v6.html`」的口径。
+
+### 为什么必须写在这里
+
+2026-09-03 当天出现了三套壳同时施工同一个页面的局面（取件码页 `/print/pickup-claim`）：
+
+| 来源 | 用的壳 |
+|---|---|
+| `main` 现状 | `PrintPageFrame`（`kiosk-proto-2026-07`，87 页，2026-08-04 入库） |
+| PR #741（2026-08-19 创建） | V6 壳 `KioskFullscreenShell`（`kiosk-ai-os-v3-2026-08`，56 页，2026-08-18 入库） |
+| `claude/project-readiness-review-959ffe` | `QxPageFrame`（`kiosk-redesign-2026-08`，57 页，**2026-09-03 入库**） |
+
+三方都以为自己在按当前口径施工，因为**口径在会话里改过、文档里没改**。谁最后合并谁就
+覆盖前一个人的活 —— 不是文本冲突，是界面变成另一个样子。本条就是为了让下一个接手的人
+（或模型）照文档施工不会再撞第四次。
+
+### 三套设计稿的处置
+
+| 目录 | 处置 |
+|---|---|
+| `kiosk-redesign-2026-08`（青序流光，51 页） | **正式上线视觉真值。新页面与改版一律按它施工。** |
+| `kiosk-ai-os-v3-2026-08`（V6） | 降为设计参考。**保留文件，不删**；已投入的 V6 运行时切片（A1/A2.1 等）不回滚，按页逐步迁到青序流光 |
+| `kiosk-proto-2026-07`（7 月 87 屏） | 维持现状：CI 回归基线，不是施工目标 |
+
+**三套目录都保留，一个都不删** —— 产品负责人明确要求不得删除已设计的 UI 页面。
+
+### 直接影响
+
+- PR #741（到机码核销页换 V6 壳）与本裁决冲突，须关闭或改造为青序流光后再提
+- `claude/project-readiness-review-959ffe` 上的青序流光地基（`apps/kiosk/src/styles/qingxu/`、
+  `components/qingxu/QxPageFrame.tsx`）方向正确，可按簇提取
+- 下方 V6 队列（A1/A2/C0 等）中**尚未开工**的条目按青序流光重排；已完成条目保留为历史记录
+
+---
+
+## 2026-08-12 V6 + 双后台统一施工队列（**已非当前优先级**）
+
+> ⚠️ **2026-09-03 口径更正**：产品负责人已定性 **`docs/design/kiosk-redesign-2026-08/`（青序流光，51 屏）是当前真值，上线前端页面全部出自这套**；V6（`kiosk-ai-os-v3-2026-08`）不再是目标。本节的 V6 施工队列作为历史记录保留，**不要照它排下一刀**。同一页面若在 main（`PrintPageFrame`/kiosk-proto）、V6 壳、青序流光壳（`QxPageFrame`）之间不一致，一律以青序流光为准。
 
 > 用户口径中的 V6 对应仓库历史目录 `kiosk-ai-os-v3-2026-08`；命名不影响实施。完整页面矩阵、双后台裁决与商用定义见 [`2026-08-12-v6-commercial-product-audit.md`](../reviews/2026-08-12-v6-commercial-product-audit.md)。下列顺序覆盖下方较早的 W1–W8 泛化队列；每个窗口仍须单独范围、文件预算、评审、验证和 progress 更新。
 
@@ -175,7 +218,7 @@
 
 ## P0 设计执行：线上 Kiosk 以 7 月 75 屏原型为视觉真值
 
-> ⚠️ **2026-08-22 口径**：本节是 **2026-08-05 前后的历史实施记录**，不是下一刀任务书。现行施工看本文上面的「交付阻塞清单」和「2026-08-12 V6 + 双后台统一施工队列」。7 月 75 屏只作 CI 回归基线；首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。
+> ⚠️ **2026-08-22 口径**：本节是 **2026-08-05 前后的历史实施记录**，不是下一刀任务书。现行施工看本文上面的「交付阻塞清单」。**（2026-09-03 更正：原文这里还指向「2026-08-12 V6 + 双后台统一施工队列」，而 V6 已不再是目标 —— 当前真值是 `docs/design/kiosk-redesign-2026-08/`（青序流光）。该队列节已在本文上方标注「已非当前优先级」。）**7 月 75 屏只作 CI 回归基线；首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。
 
 （历史正文，已作废，勿当现行任务）当时开发视觉基线曾切回：[7 月 75 屏原型](../design/kiosk-proto-2026-07/README.md)。`docs/design/kiosk-ai-os-prototype-2026-08/` 已于 2026-08-22 按产品负责人确认删除，不再作为任何设计输入。所有改造继续复用现有路由、API、设备门禁、支付打印扫描链路和公共终端隐私安全，不按静态原型补造能力。
 

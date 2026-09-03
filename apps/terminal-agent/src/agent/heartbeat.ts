@@ -21,7 +21,7 @@
  */
 
 import os from 'os'
-import type { AgentConfig, HeartbeatPayload, HeartbeatResponse } from './types'
+import type { AgentConfig, HeartbeatPayload, HeartbeatResponse, PrinterStatus } from './types'
 import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
@@ -29,6 +29,7 @@ import { getPrinterStatus, getDiskFreeGB } from './wmi'
 import { collectNetworkDiagnostics } from './network-diagnostics'
 import { observeReleasePlan } from './release-observation'
 import { log, warn, err } from '../logger'
+import { AGENT_RUNTIME_VERSION } from '../runtime-version'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,25 @@ export interface HeartbeatOptions {
   failureCounter?: { count: number }
   /** False when local SQLite task DB is unavailable; printing must be disabled. */
   localTaskDatabaseAvailable?: boolean
+  /** Receives a PII-safe connectivity snapshot for the loopback status panel. */
+  onObservation?: (observation: HeartbeatObservation) => void
+}
+
+export interface HeartbeatObservation {
+  connected: boolean
+  observedAt: string
+  printerStatus: PrinterStatus
+}
+
+function notifyObservation(
+  callback: HeartbeatOptions['onObservation'],
+  observation: HeartbeatObservation,
+): void {
+  try {
+    callback?.(observation)
+  } catch {
+    warn('heartbeat: local status observer failed')
+  }
 }
 
 /**
@@ -84,16 +104,26 @@ export interface HeartbeatOptions {
  * Never throws.
  */
 export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean> {
-  const { config, onConfigUpdate, failureCounter } = options
+  const { config, onConfigUpdate, failureCounter, onObservation } = options
   const localTaskDatabaseAvailable = options.localTaskDatabaseAvailable ?? true
 
   if (!config.terminalId || !config.agentToken) {
     warn('heartbeat: skipping — not registered yet')
+    notifyObservation(onObservation, {
+      connected: false,
+      observedAt: new Date().toISOString(),
+      printerStatus: 'unknown',
+    })
     return false
   }
 
   if (isUnauthorized()) {
     warn('heartbeat: skipping — credential unauthorized (re-bind required)')
+    notifyObservation(onObservation, {
+      connected: false,
+      observedAt: new Date().toISOString(),
+      printerStatus: 'unknown',
+    })
     return false
   }
 
@@ -109,7 +139,7 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     status: localTaskDatabaseAvailable ? 'online' : 'agent_degraded',
     printerStatus,
     diskFreeGB,
-    agentVersion: config.agentVersion,
+    agentVersion: AGENT_RUNTIME_VERSION,
     ipAddress: getIpAddress(),
     macAddress: getMacAddress(),
     reportedAt: new Date().toISOString(),
@@ -123,6 +153,11 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
       payload,
     )
     log(`heartbeat: ✓ acknowledged`)
+    notifyObservation(onObservation, {
+      connected: true,
+      observedAt: payload.reportedAt,
+      printerStatus,
+    })
 
     if (failureCounter) failureCounter.count = 0
 
@@ -142,6 +177,11 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
       writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
       err('heartbeat: ✗ unauthorized — credential revoked/invalid; claim/print stopped (re-bind required)')
       if (failureCounter) failureCounter.count += 1
+      notifyObservation(onObservation, {
+        connected: false,
+        observedAt: payload.reportedAt,
+        printerStatus,
+      })
       return false
     }
 
@@ -154,6 +194,12 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
         err(`heartbeat: ${failureCounter.count} consecutive failures — check backend connectivity`)
       }
     }
+
+    notifyObservation(onObservation, {
+      connected: false,
+      observedAt: payload.reportedAt,
+      printerStatus,
+    })
 
     return false
   }

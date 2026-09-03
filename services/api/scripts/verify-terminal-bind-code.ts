@@ -105,9 +105,11 @@ assert(
 )
 assert(!/\[string\]\$AgentToken\b/.test(installer), 'installer must not accept long-lived -AgentToken CLI input')
 assert(
-  installer.includes(
-    'Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted.',
-  ),
+  installer.includes('[switch]$BindCodeFromStandardInput') &&
+    installer.includes('if ($BindCodeFromStandardInput) { $bindCodeFlowCount++ }') &&
+    installer.includes(
+      'Provide -PromptForBindCode, -BindCodeFromStandardInput (GUI), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted.',
+    ),
   'installer fail-closes when no supported credential source is provided',
 )
 assert(

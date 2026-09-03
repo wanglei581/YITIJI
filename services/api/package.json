@@ -57,6 +57,8 @@
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:miniapp-cloud-print-m2": "node -r @swc-node/register scripts/verify-miniapp-cloud-print-m2.ts",
     "verify:isolated-verification-database": "node -r @swc-node/register scripts/verify-isolated-verification-database.ts",
+    "verify:wave2-account-rebind": "node -r @swc-node/register scripts/verify-wave2-account-rebind.ts",
+    "verify:wave3-print-aftercare": "node -r @swc-node/register scripts/verify-wave3-print-aftercare.ts",
     "verify:profile-commercial-first-batch-acceptance": "node -r @swc-node/register scripts/verify-profile-commercial-first-batch-acceptance.ts",
     "verify:order": "node -r @swc-node/register scripts/verify-order.ts",
     "verify:pricing": "node -r @swc-node/register scripts/verify-pricing.ts",
