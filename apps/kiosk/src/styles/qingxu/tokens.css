@@ -1,0 +1,69 @@
+/* 青序流光 · 设计令牌
+ *
+ * 来源：docs/design/kiosk-redesign-2026-08/ 的 51 张原型。
+ * 这些值不是我挑的——40 张原型的 :root 逐字相同，这是它们的共识值，
+ * 逐字抄过来，不做"顺手优化"。改这里等于改 51 页的视觉真值，先回去改原型。
+ *
+ * 为什么不复用 --print-* / --k-*：
+ *   那条链是坏的。--print-line 等声明在 :root，但依赖的 --k-line 定义在后代
+ *   元素 [data-visual-theme='service-desk'] 上，:root 查不到 → 整条声明作废 →
+ *   全仓 92 处 var(--print-line) 静默变成无边框（见 print-prototype.css 的注释）。
+ *   新前端不接那条链，令牌全部自带字面值，不依赖任何上游作用域。
+ */
+:root {
+  /* 纸与墨 */
+  --qx-paper:      #f5f2e9;
+  --qx-surface:    #fffdf8;
+  --qx-ink:        #10302b;
+  --qx-ink-2:      #3d5a52;
+  --qx-ink-3:      #6b857c;
+  --qx-deep:       #0b241e;
+  --qx-deep-2:     #123a30;
+
+  /* 主色：青 */
+  --qx-emerald:    #2ee6a8;
+  --qx-teal:       #1f9e86;
+  --qx-teal-d:     #157a67;
+  --qx-teal-soft:  #e0f2ec;
+
+  /* 语义色：信息 / 提醒 / 次要 / 危险。四组各带 deep 与 soft，用途固定不混用 */
+  --qx-slate:      #3f68b0;
+  --qx-slate-d:    #35608f;
+  --qx-slate-soft: #e6ecf7;
+  --qx-wheat:      #a9781f;
+  --qx-wheat-d:    #8a6219;
+  --qx-wheat-soft: #f3ecda;
+  --qx-plum:       #7a5a86;
+  --qx-plum-d:     #6b4a77;
+  --qx-plum-soft:  #efe8f2;
+  --qx-cinnabar:   #b23a2e;
+  --qx-cinnabar-d: #963227;
+  --qx-cinnabar-soft: #f6e4e1;
+
+  /* 深底之上的状态色。语义色（--qx-wheat / --qx-cinnabar）是为浅底设计的，
+     压在 --qx-deep 顶栏上对比度不够，故单列一组提亮版本。 */
+  --qx-on-deep-warn: #e8b45c;
+  --qx-on-deep-bad:  #e88b7d;
+  /* 反白文字：用于 deep / cinnabar 等深色实底之上 */
+  --qx-on-solid:     #ffffff;
+
+  /* 描边与圆角 */
+  --qx-line:   #e3ddcb;
+  --qx-line-2: #d4cdb6;
+  --qx-r:      8px;
+  --qx-r-s:    6px;
+
+  /* 字族：标题宋体、正文黑体、数字等宽。
+     等宽用于所有会被逐位核对的数字——取件码、订单号、金额、数量。 */
+  --qx-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --qx-sans:  'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  --qx-mono:  ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* 触控尺寸：27 寸竖屏站立操作。CLAUDE.md §9 规定主按钮 ≥56px、可点区 ≥48px。
+     这里给的是原型实测值，比底线更宽松，不要往下调。 */
+  --qx-tap-min:     48px;   /* 任何可点区域的绝对下限 */
+  --qx-btn-h:       76px;   /* 常规按钮 */
+  --qx-btn-h-lg:    96px;   /* 主操作与数字键盘 */
+  --qx-row-h:      104px;   /* 列表行 */
+  --qx-gutter:      40px;   /* 页面左右留白 */
+}

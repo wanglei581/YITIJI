@@ -137,12 +137,34 @@ const legacyHexAllowlist = new Set([
 // 早先这里的 offenders 样例是不过滤 allowlist 直接收集的，于是 2 处真违规会
 // 报成「总计 146」并举冻结债务文件当例子，把人指向根本不需要动的文件。
 let frozenHex = 0
+// 令牌定义文件必须写字面 hex——那是它的职责，令牌总得从某处取到值。
+// 本文件头第 4 条早就写着「token 定义文件除外」，只是此前没有实现。
+//
+// 豁免范围卡死为「只做令牌声明」的文件：整份内容除注释外只能是
+// `:root { --x: value }` 这类声明块，出现任何选择器规则即不豁免。
+// 判定用 isTokenDefinitionFile() 逐文件实算，不靠路径白名单——
+// 靠路径白名单就会变成一个口子：谁把业务样式塞进 tokens.css 都能蒙混过关。
+const isTokenDefinitionFile = (source) => {
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').trim()
+  if (!stripped) return false
+  const blocks = [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  if (blocks.length === 0) return false
+  return blocks.every(([, selector, body]) => {
+    if (selector.trim() !== ':root') return false
+    return body
+      .split(';')
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .every((d) => d.startsWith('--'))
+  })
+}
+
 const offenders = []
 const unexpectedHexFiles = new Set()
 for (const file of pageCssFiles) {
   const text = readFileSync(file, 'utf8')
   const rel = relative(kioskRoot, file)
-  const frozen = legacyHexAllowlist.has(rel)
+  const frozen = legacyHexAllowlist.has(rel) || isTokenDefinitionFile(text)
   for (const match of text.matchAll(hexRe)) {
     const look = text.slice(Math.max(0, match.index - 40), match.index)
     if (/var\([^)]*,\s*$/.test(look)) continue
