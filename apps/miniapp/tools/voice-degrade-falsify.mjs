@@ -11,10 +11,14 @@
  *   R5 降级后连过全部题目：qVoice 恒 false，且没有一题卡住不前进
  *   R6 正常态确有语音题（反恒真对照——否则上面那条什么都没证明）
  *   R7 敏感题（手机号）任何状态下都不开语音
+ *   R9 授权查询挂死（success/fail 都不触发）时，5 秒内退化成整场手打，
+ *      而不是让用户点完「同意并试音」对着不动的页面等
  *
  * 它证明不了（必须真机，别拿这份当验收）：
  *   RecorderManager 真实采集产物、iOS/Android 授权弹窗时序、拒绝后二次引导、
  *   60s 上限与弱网 uploadFile、基础库版本差异、大厅噪声与口音。
+ *   隐私指引未声明麦克风时，微信底层到底抛什么错误码、是 fail 还是整个挡下——
+ *   R8 只证明「挂死」这一种形态有兜底，不证明真机上就是这种形态。
  *
  * 用法（开发者工具须已 `cli auto --project <本目录> --auto-port 9520` 常驻）：
  *   MP_AUTOMATOR=/path/to/miniprogram-automator node tools/voice-degrade-falsify.mjs --port 9520
@@ -174,6 +178,27 @@ anyVoice.length > 0 ? ok('正常态确有语音题 ' + anyVoice.length + ' 道 �
 const sensVoice = norm.filter(t => t.sens === true && t.v === true)
 sensVoice.length === 0 ? ok('敏感题一道都没开语音', norm.filter(t=>t.sens).map(t=>t.q).join('/') || '(无敏感题)')
                        : bad('敏感题开了语音: ' + JSON.stringify(sensVoice.map(t => t.q)))
+
+console.log('R9 授权查询挂死时必须退化成手打，不得让人干等')
+await fresh({ phase: 'consent', consentChecked: true })
+await mp.evaluate(function () {
+  // 故意换成两个回调都不触发的桩：隐私指引未声明麦克风时观察到过这种形态
+  wx.__origGetSetting = wx.getSetting
+  wx.getSetting = function () {}
+})
+await call('agreeVoice')
+let hung = null
+const t0 = Date.now()
+for (let i = 0; i < 14; i++) {
+  await new Promise(z => setTimeout(z, 700))
+  hung = await read()
+  if (hung.textOnly === true || hung.phase === 'probe') break
+}
+const elapsed = Date.now() - t0
+await mp.evaluate(function () { if (wx.__origGetSetting) wx.getSetting = wx.__origGetSetting })
+hung && hung.textOnly === true
+  ? ok('挂死 ' + elapsed + 'ms 后退化成整场手打', JSON.stringify(hung.reason))
+  : bad('卡住不动：点完「同意并试音」既没进试音也没降级', JSON.stringify(hung))
 
 await mp.disconnect()
 console.log(`\n${pass} PASS / ${fail} FAIL`)

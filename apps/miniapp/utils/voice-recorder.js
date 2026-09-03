@@ -67,24 +67,36 @@ function ensureRecordAuth() {
       resolve(false)
       return
     }
+    // getSetting 不弹框、正常几十毫秒就回。但当公众平台「用户隐私保护指引」
+    // 没把麦克风列入采集清单时，微信底层可能把隐私相关调用整个挡下——
+    // 观察到的形态不止 fail，还有 success/fail 都不触发。那样这个 Promise
+    // 永不落定，调用方的 .then 不执行，用户点完「同意并试音」原地没反应。
+    // 挂住必须退化成「当作没授权」，走整场手打；不能让人对着不动的页面等。
+    // 只给 getSetting 设时限：authorize 会弹系统框等用户按，给它设时限
+    // 会在用户还在读弹框时误判成拒绝。
+    let settled = false
+    const finish = (v) => { if (!settled) { settled = true; resolve(v) } }
+    const guard = setTimeout(() => finish(false), 5000)
     wx.getSetting({
       success(res) {
+        clearTimeout(guard)
+        if (settled) return
         const setting = (res && res.authSetting) || {}
         if (setting['scope.record'] === true) {
-          resolve(true)
+          finish(true)
           return
         }
         if (setting['scope.record'] === false) {
-          resolve(false)
+          finish(false)
           return
         }
         wx.authorize({
           scope: 'scope.record',
-          success() { resolve(true) },
-          fail() { resolve(false) },
+          success() { finish(true) },
+          fail() { finish(false) },
         })
       },
-      fail() { resolve(false) },
+      fail() { clearTimeout(guard); finish(false) },
     })
   })
 }
