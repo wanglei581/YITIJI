@@ -62,6 +62,9 @@ const COLLECTION_MODELS = [
   'benefitGrant',
   'browseLog',
   'externalJumpLog',
+  // 求职进度（compliance-boundary.md §4.4A）。加进导出链路就必须同时加进本清单，
+  // 否则假 prisma 上没有这个委托，mapper 调 findMany 直接 undefined。
+  'jobApplication',
   'memberNotification',
   'feedbackTicket',
   'userAiConsent',
@@ -99,6 +102,10 @@ function dualUserFixtures(): FixtureStore {
     benefitGrant: [],
     browseLog: [],
     externalJumpLog: [],
+    jobApplication: [
+      { ...base('application-one', 'member-one'), channel: 'self_reported_offsite', jobId: null, companyName: '目标公司', positionTitle: '目标岗位', sourceName: null, status: 'applied', statusSource: 'user_self_reported', note: null, selfReportedAt: date(3) },
+      { ...base('application-two', 'member-two'), channel: 'self_reported_offsite', jobId: null, companyName: 'OTHER_MEMBER_SECRET', positionTitle: '他人岗位', sourceName: null, status: 'applied', statusSource: 'user_self_reported', note: null, selfReportedAt: date(4) },
+    ],
     memberNotification: [
       { ...base('notice-one', 'member-one'), title: '通知', content: '导出已受理，旧联系方式 13900000000', category: 'system', relatedType: null, isRead: false, readAt: null, deletedAt: null },
     ],
@@ -331,7 +338,7 @@ async function verifyWhitelistEnvelope(): Promise<void> {
   assert.equal(envelope.generatedAt, date(17).toISOString())
   assert.equal(envelope.requestId, 'request-one')
   assert.deepEqual(Object.keys(envelope.sections), [
-    'account', 'files', 'aiRecords', 'printOrders', 'favorites', 'benefits',
+    'account', 'files', 'aiRecords', 'printOrders', 'favorites', 'jobApplications', 'benefits',
     'activity', 'notifications', 'feedback', 'consents', 'requests',
   ])
   assertNoSensitiveExportData(envelope)
