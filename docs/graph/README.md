@@ -42,13 +42,13 @@ node scripts/project-graph-query.mjs model PrintTask
 | HTTP 端点（services/api） | 476 |
 | Prisma 模型 | 99 |
 | 门禁脚本文件 | 411 |
-| ├ 其中辅助库（被别的门禁 import） | 75 |
-| ├ 已在 package.json 里有脚本名 | 370 |
-| ├ 在 CI 执行闭包里 | 363 |
-| └ **无脚本名，从未被执行** | 7 |
+| ├ 其中辅助库（被别的门禁 import） | 114 |
+| ├ 已在 package.json 里有脚本名 | 375 |
+| ├ 在 CI 执行闭包里 | 368 |
+| └ **无脚本名，从未被执行** | 1 |
 | 被至少一条门禁断言的文件 | 1231 |
-| 孤儿候选 · protected（不得删） | 7 |
-| 孤儿候选 · high（仍被 CI/门禁引用） | 14 |
+| 孤儿候选 · protected（不得删） | 4 |
+| 孤儿候选 · high（仍被 CI/门禁引用） | 11 |
 | 孤儿候选 · medium（仅文档提及） | 8 |
 | 孤儿候选 · low（全仓零提及） | 126 |
 

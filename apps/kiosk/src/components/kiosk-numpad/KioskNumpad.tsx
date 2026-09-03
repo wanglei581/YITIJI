@@ -37,12 +37,16 @@ export function KioskNumpad({
     onChange(next)
   }
 
+  // key 参数（React 的 key，不是本函数名）：DIGITS.map 产出的是列表，缺 key 会在
+  // 控制台刷 unique-key warning。公共终端上控制台噪音本身不致命，但这一页是裁决后
+  // 第一张迁移页、后续 50 页要照它抄，把警告一起抄过去代价会放大 50 倍。
   const key = (
     text: string,
     onPress: () => void,
     extra?: { className?: string; ariaLabel?: string; disabled?: boolean },
   ) => (
     <button
+      key={text}
       type="button"
       className={`knp-key${extra?.className ? ` ${extra.className}` : ''}`}
       disabled={disabled || extra?.disabled}

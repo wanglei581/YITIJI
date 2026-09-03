@@ -17,7 +17,7 @@
 
 ──────────────────────────────────────────────────────────────────────
 
-## 无脚本名：文件存在，但从未被执行（7）
+## 无脚本名：文件存在，但从未被执行（1）
 
 判定：文件在 `scripts/` 下、不是被别的门禁 import 的辅助库、且没有任何
 workspace 包的 `package.json` scripts 指向它。
@@ -25,12 +25,6 @@ workspace 包的 `package.json` scripts 指向它。
 | 门禁脚本 | 断言文件数 |
 | --- | --- |
 | `apps/admin/scripts/verify-partner-account-delete-ui.mjs` | 3 |
-| `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` | 3 |
-| `apps/terminal-agent/scripts/verify-scan-deletion-audit.ts` | 5 |
-| `apps/terminal-agent/scripts/verify-task-reliability.ts` | 7 |
-| `services/api/scripts/verify-change-password.ts` | 13 |
-| `services/api/scripts/verify-wave2-account-rebind.ts` | 7 |
-| `services/api/scripts/verify-wave3-print-aftercare.ts` | 5 |
 
 ──────────────────────────────────────────────────────────────────────
 
