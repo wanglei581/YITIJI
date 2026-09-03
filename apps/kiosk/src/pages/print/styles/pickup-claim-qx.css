@@ -1,0 +1,173 @@
+/* 取件码页 · 青序流光专属样式
+ *
+ * 地基已有的（按钮、卡片、列表行、占位、状态块、操作条）不在这里重复定义，
+ * 只写这一页特有的东西：码位格、安心提示、键盘卡、三码对照、兜底出口。
+ *
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/11-arrival-code.html
+ */
+
+/* ── 码位格 ───────────────────────────────────────────────────
+   真实 input 透明覆盖在格子之上：HID 扫码器与物理键盘照旧直接写入它，
+   点格子即聚焦它，用户看到的是下面这排格子。
+   不能用 display:none —— 那样扫码器就没有落点了。 */
+.pcp-input-section { display: flex; flex-direction: column; gap: 12px; }
+.pcp-label { font-size: 21px; font-weight: 700; color: var(--qx-ink-2); }
+.pcp-input-wrap { position: relative; }
+
+.pcp-input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  padding: 0; border: 0; outline: none;
+  background: transparent; color: transparent; caret-color: transparent;
+  font-size: 16px; cursor: pointer;
+}
+.pcp-input:focus,
+.pcp-input:focus-visible { outline: none; box-shadow: none; }
+
+.pcp-codebox {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  min-height: 128px;
+}
+.pcp-cb {
+  flex: 1 1 0;
+  width: 112px; max-width: 112px; min-width: 0; height: 128px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--qx-line-2);
+  border-radius: 20px;
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  font-size: 56px; font-weight: 700;
+  font-family: var(--qx-mono); font-variant-numeric: tabular-nums;
+  transition: border-color .16s ease, background-color .16s ease;
+}
+.pcp-cb.is-filled { border-color: var(--qx-teal); }
+.pcp-cb.is-cur { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.pcp-cb.is-err { border-color: var(--qx-cinnabar); }
+/* 键盘焦点必须可见（可访问性）：焦点在透明覆盖层上时高亮当前格 */
+.pcp-input-wrap:focus-within .pcp-cb.is-cur {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--qx-teal) 26%, transparent);
+}
+/* 10 位历史码要在同样宽度里排下 */
+.pcp-codebox--legacy { gap: 10px; }
+.pcp-codebox--legacy .pcp-cb { width: 84px; height: 112px; border-radius: 16px; font-size: 44px; }
+
+.pcp-counter {
+  align-self: flex-end;
+  margin-top: 4px;
+  font-family: var(--qx-mono); font-variant-numeric: tabular-nums;
+  font-size: 19px; font-weight: 700; color: var(--qx-ink-3);
+}
+.pcp-counter--full { color: var(--qx-teal-d); }
+
+/* HID 回声：运行时扫码落在本页 input，idle 必须告诉用户「机器在等扫」。
+   文案来自 11-arrival-code.html 的 hid-echo（#hid-echo-code）。 */
+.pcp-scan-echo {
+  margin: 0;
+  min-height: var(--qx-tap-min);
+  display: flex;
+  align-items: center;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: var(--qx-paper);
+  border: 1px dashed var(--qx-line-2);
+  color: var(--qx-ink-3);
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+/* ── 三条安心提示 ─────────────────────────────────────────────
+   说的是本页行为，不是服务端数据，所以可以写死。
+   站在机器前的人最担心的就是「输错了这码是不是就废了」。 */
+.pcp-easy {
+  display: flex; flex-wrap: wrap; gap: 10px 28px; justify-content: center;
+  margin: 0; padding: 0; list-style: none;
+  color: var(--qx-teal-d); font-size: 20px; font-weight: 650;
+}
+.pcp-easy li::before { content: '✓ '; }
+
+/* ── 键盘卡 ─────────────────────────────────────────────────── */
+.pcp-keypad-card {
+  padding: 22px 24px 24px;
+  display: flex; flex-direction: column;
+}
+/* 本页由键盘卡吸收余量：站着输码时，键越大越好按。
+   四行等分拉伸，但每键不低于 96px（触控下限）。 */
+.pcp-keypad-card .knp {
+  flex: 1 1 auto; min-height: 0;
+  grid-template-rows: repeat(4, minmax(96px, 1fr));
+}
+.pcp-keypad-note {
+  margin: 0 0 16px; text-align: center;
+  font-size: 19px; line-height: 1.5; color: var(--qx-ink-3);
+}
+.pcp-keypad-note b { color: var(--qx-ink); font-weight: 750; }
+
+/* ── 三种码对照 ───────────────────────────────────────────────
+   现场最高频的求助是「我手上这串码是哪种」——到机码、上传码、
+   取件凭证码长得像，用途完全不同。 */
+.pcp-ab-t { margin: 0 0 14px; font-family: var(--qx-serif); font-size: 25px; font-weight: 700; }
+.pcp-ab-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pcp-ab-col {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: 14px;
+  background: var(--qx-paper);
+}
+.pcp-ab-col.is-current { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.pcp-ab-col b { font-size: 20px; font-weight: 750; color: var(--qx-ink); }
+.pcp-ab-col span { font-size: 17px; line-height: 1.5; color: var(--qx-ink-3); }
+
+/* ── 兜底出口 ─────────────────────────────────────────────────
+   真正卡住的人需要另一条路，不是把同一条路再讲一遍。 */
+.pch-title { margin: 0 0 12px; font-size: 22px; font-weight: 700; }
+.pch-outs { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.pch-outs li {
+  display: flex; align-items: baseline; gap: 8px;
+  min-height: var(--qx-tap-min); padding: 12px 18px;
+  border: 1px solid var(--qx-line); border-radius: 12px; background: var(--qx-paper);
+}
+.pch-outs b { font-size: 19px; font-weight: 700; color: var(--qx-ink); }
+.pch-outs span { font-size: 16px; color: var(--qx-ink-3); }
+
+/* ── 错误与忙态 ─────────────────────────────────────────────── */
+.pcp-error {
+  padding: 16px 20px; border-radius: var(--qx-r);
+  border: 1px solid var(--qx-cinnabar); background: var(--qx-cinnabar-soft);
+  color: var(--qx-cinnabar-d); font-size: 20px; font-weight: 650;
+}
+.pcp-spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 3px solid currentColor; border-top-color: transparent;
+  animation: pcp-spin .8s linear infinite;
+}
+@keyframes pcp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pcp-spinner { animation: none; } }
+
+/* ── 成功态 ─────────────────────────────────────────────────── */
+.pickup-claim-success { gap: 18px; }
+
+/* Windows 横屏窄高（1280×720 流体视口，舞台缩放关闭）。
+   青序原型 11-arrival-code.html 只有 1080×1920，没有取消这条生产约束：
+   主操作必须留在可视区内，用户按得到「确认校验 / 进入现场支付」。
+   旧 print-pickup-claim.css 同名媒体查询还在，但本页已经不 import 它。 */
+@media (max-height: 900px) and (orientation: landscape) {
+  .qx-stage:has(.pickup-claim-page),
+  .qx-stage:has(.pickup-claim-success) {
+    max-height: 100%;
+  }
+
+  .pickup-claim-page { gap: 10px; padding-top: 8px; }
+  .pcp-codebox { min-height: 72px; gap: 8px; }
+  .pcp-cb { width: 64px; max-width: 64px; height: 72px; font-size: 32px; border-radius: 12px; }
+  .pcp-codebox--legacy { gap: 6px; }
+  .pcp-codebox--legacy .pcp-cb { width: 48px; max-width: 48px; height: 64px; font-size: 24px; border-radius: 10px; }
+  .pcp-scan-echo { min-height: 48px; padding: 8px 14px; font-size: 16px; }
+  .pcp-easy { font-size: 16px; gap: 6px 16px; }
+  .pcp-keypad-card { padding: 12px 16px 14px; }
+  .pcp-keypad-note { margin-bottom: 8px; font-size: 15px; }
+  .pcp-keypad-card .knp { grid-template-rows: repeat(4, minmax(56px, 1fr)); }
+  .pcp-ab, .pcp-help { padding: 12px 16px; }
+  .pcp-ab-t { margin-bottom: 8px; font-size: 20px; }
+  .pcp-ab-col { padding: 10px 12px; }
+  .pch-title { margin-bottom: 8px; font-size: 18px; }
+  .pickup-claim-success { gap: 10px; }
+}

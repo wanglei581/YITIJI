@@ -1,0 +1,56 @@
+/* KioskNumpad —— 复用打印域既有令牌，不引入新调色板 */
+.knp {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+.knp-key {
+  min-height: 96px;
+  border-radius: 18px;
+  border: 1px solid var(--qx-line, var(--print-line));
+  background: var(--qx-paper, var(--print-paper));
+  color: var(--qx-ink, var(--print-ink));
+  font-size: 34px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, transform 0.14s;
+}
+.knp-key:active:not(:disabled) {
+  transform: scale(0.975);
+  background: var(--print-teal-soft);
+  border-color: var(--qx-teal, var(--print-teal));
+}
+.knp-key:focus-visible {
+  outline: 3px solid var(--qx-teal, var(--print-teal));
+  outline-offset: 2px;
+}
+.knp-key:disabled { opacity: 0.42; cursor: default; }
+.knp-fn { font-size: 22px; font-weight: 700; }
+.knp-del { background: var(--qx-teal-deep, var(--print-teal-deep)); color: var(--qx-on-solid, #fff); border-color: var(--qx-teal-deep, var(--print-teal-deep)); }
+@media (prefers-reduced-motion: reduce) {
+  .knp-key { transition: none; }
+  .knp-key:active:not(:disabled) { transform: none; }
+}
+/* Windows 横屏调试形态下压缩，与页面既有 landscape 收窄口径一致 */
+@media (max-height: 900px) and (orientation: landscape) {
+  .knp { gap: 10px; margin-top: 14px; }
+  .knp-key { min-height: 64px; font-size: 26px; }
+  .knp-fn { font-size: 18px; }
+}
+
+/* 左下角替换键（如取件码页的「输入历史码」）：它是一次模式选择，
+   不是数字输入，所以视觉上要能和数字键区分，但不能抢主按钮的重量。 */
+.knp-key.knp-alt {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--print-teal-deep, #14705e);
+  background: color-mix(in srgb, var(--print-teal, #1f9e86) 8%, transparent);
+  border-color: color-mix(in srgb, var(--print-teal, #1f9e86) 30%, transparent);
+}
+.knp-key.knp-alt.is-on {
+  color: var(--qx-on-solid, #fff);
+  background: var(--print-teal-deep, #14705e);
+  border-color: var(--print-teal-deep, #14705e);
+}

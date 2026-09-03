@@ -41,7 +41,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 10 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 11 |
 | **medium** | 只被文档或其它文件提及 | 8 |
 | **low** | 全仓零提及 | 126 |
 
@@ -235,7 +235,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（10）
+## high — 仍被 CI / 门禁 / 包脚本引用（11）
 
 ### 页面/组件（6）
 
@@ -254,11 +254,12 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | --- | --- |
 | `apps/admin/scripts/verify-partner-account-delete-ui.mjs` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json、scripts/verify-ci-gate-coverage.mjs |
 
-### 样式（2）
+### 样式（3）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
+| `apps/kiosk/src/pages/print/styles/print-pickup-claim.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
 ### 测试（1）

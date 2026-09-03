@@ -109,6 +109,8 @@ test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', as
   await page.goto('/print/pickup-claim')
   const input = page.getByLabel('到机码输入框')
   await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
+  // idle 态必须给出扫码等待提示。文案来自 11-arrival-code.html hid-echo；
+  // 运行时没有独立 hid 页，HID 打进本页 input，所以这句在 idle 可见。
   await expect(page.getByText('等待扫码输入')).toBeVisible()
   await assertNoHorizontalOverflow(page)
   await input.pressSequentially('AB2C7M9P3K', { delay: 5 })
@@ -143,8 +145,11 @@ test('pickup controls remain readable in Windows landscape @pickup-landscape', a
   await page.goto('/print/pickup-claim')
 
   const input = page.getByLabel('到机码输入框')
-  const submit = page.getByRole('button', { name: '确认取件' })
-  const help = page.getByText('怎么找到机码？')
+  // 11-arrival-code.html 主按钮是「确认校验」，不是旧壳「确认取件」。
+  // 行为不变：横屏下提交控件必须可见、高度 ≥56px。
+  const submit = page.getByRole('button', { name: '确认校验' })
+  // 同稿 outs()：「码找不到了？」取代旧壳「怎么找到机码？」；仍是找不到码时的兜底说明。
+  const help = page.getByText('码找不到了？')
   await expect(input).toBeVisible()
   await expect(submit).toBeVisible()
   await expect(help).toBeVisible()

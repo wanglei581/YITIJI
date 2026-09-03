@@ -11,6 +11,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkShellChromeProp } from './lib/shell-chrome-contract.mjs'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(kioskRoot, '..', '..')
@@ -80,10 +81,17 @@ expect(/visualTheme="service-desk"/.test(root), 'KioskRoot 全路由固定 servi
 expect(/presentation="fusion-youth"/.test(root), 'KioskRoot 全路由固定 fusion-youth')
 expect(!root.includes('SERVICE_DESK_EXACT_ROUTES'), '无 SERVICE_DESK 路由白名单分叉')
 expect(!/visualTheme=\{isServiceDeskRoute/.test(root), '无 legacy/service-desk 三元切换')
+// 与 verify:fusion-shell / verify:kiosk-runtime-error-boundary 用同一判据。
+// 原先三处各自逐字匹配 hideHeader={isCampusZone}，新增一条同样合法的遮蔽条件
+// （isQxRoute）会让三条门禁一起误红。判据与故障注入自测见
+// scripts/lib/shell-chrome-contract.mjs 文件头。
+for (const propName of ['hideHeader', 'hideBottomNav']) {
+  const chrome = checkShellChromeProp(root, propName)
+  expect(chrome.ok, `KioskRoot ${propName}：${chrome.reason ?? ''}`)
+}
 expect(
-  /hideHeader=\{isCampusZone\}/.test(root) &&
-    /hideBottomNav=\{isCampusZone \|\| usesPageActionbar\}/.test(root),
-  '校园专区隐藏共享顶栏，行动条流程页以页面操作栏替代共享底栏'
+  checkShellChromeProp(root, 'hideBottomNav').disjuncts?.includes('usesPageActionbar') === true,
+  '行动条流程页以页面操作栏替代共享底栏（usesPageActionbar 必须仍是判据之一）'
 )
 expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(root), '共享顶栏始终拉取真实设备状态')
 expect(root.includes('<KioskTopbarStatus'), '共享顶栏注入时钟+设备状态胶囊')
