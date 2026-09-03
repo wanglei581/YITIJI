@@ -28,6 +28,9 @@
 //   GET   /partner/data-sources         — 本机构数据源列表
 //   POST  /partner/data-sources         — 新增数据源(API/Excel/Webhook)
 //   PATCH /partner/data-sources/:id/toggle — 启停数据源
+//   POST  /partner/data-sources/:id/rotate-credential — 轮换凭证(新密钥仅回一次)
+//   PATCH /partner/data-sources/:id/archive   — 归档数据源(同时停用)
+//   PATCH /partner/data-sources/:id/unarchive — 取消归档(不自动恢复启用)
 // ============================================================
 
 import {
@@ -59,7 +62,8 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { ImportFairsDto } from './dto/import-fairs.dto'
 import { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
-import { CreateDataSourceDto } from './dto/data-source.dto'
+import { CreateDataSourceDto, RotateDataSourceCredentialDto } from './dto/data-source.dto'
+import { JobsPartnerService } from './jobs-partner.service'
 import { JobQualityService } from '../job-ai/job-quality.service'
 import { FairCompanyPrintService } from './fair-company-print.service'
 import { JobRequirementStatsService } from './job-requirement-stats.service'
@@ -92,6 +96,10 @@ export class JobsController {
     private readonly jobQuality: JobQualityService,
     private readonly fairCompanyPrint: FairCompanyPrintService,
     private readonly jobRequirementStats: JobRequirementStatsService,
+    // 数据源生命周期(轮换/归档)直接打到 JobsPartnerService，不再经 JobsService 门面转发：
+    // 门面是被 Kiosk/Admin/Partner 共用的高频冲突点，这几个端点是纯 Partner 语义，
+    // 多一层同名透传只会让"改哪一层"更难判断。控制器本来就已注入多个子服务。
+    private readonly jobsPartner: JobsPartnerService,
   ) {}
 
   // ── Kiosk ───────────────────────────────────────────────────────────────────
@@ -366,6 +374,54 @@ export class JobsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.jobsService.togglePartnerDataSource(id, user)
+  }
+
+  /**
+   * 轮换数据源凭证。
+   *
+   * 用 POST 而非 PATCH：每次调用都生成一个新的凭证状态，不是幂等的字段更新——
+   * 重复调用会得到不同的新密钥，并让上一次刚发出去的那个立即失效。
+   *
+   * 响应里的 `webhookSecretOnce` 是**唯一一次**能看到新密钥的机会，
+   * 此后所有 GET /partner/data-sources 都只回 credentialConfigured / credentialRotatedAt。
+   */
+  @Post('partner/data-sources/:id/rotate-credential')
+  // 签发密钥的端点，限速兜底：正常人工轮换一分钟内不会超过几次，
+  // 而被盗用的 partner token 靠反复轮换就能把对方的线上对接打断，限速能压住爆炸半径。
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  rotatePartnerDataSourceCredential(
+    @Param('id') id: string,
+    @Body() dto: RotateDataSourceCredentialDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsPartner.rotatePartnerDataSourceCredential(id, dto, user)
+  }
+
+  /**
+   * 归档数据源（退役路径；平台不做物理删除，理由见 JobsPartnerService.archivePartnerDataSource）。
+   * 归档同时置 enabled=false，停止 Webhook 接收与 API 拉取；不下架已发布内容。
+   */
+  @Patch('partner/data-sources/:id/archive')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  archivePartnerDataSource(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsPartner.archivePartnerDataSource(id, true, user)
+  }
+
+  /** 取消归档。只清 archivedAt，不自动恢复 enabled——重新进数据必须是显式动作。 */
+  @Patch('partner/data-sources/:id/unarchive')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  unarchivePartnerDataSource(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsPartner.archivePartnerDataSource(id, false, user)
   }
 
   @Get('partner/jobs')
