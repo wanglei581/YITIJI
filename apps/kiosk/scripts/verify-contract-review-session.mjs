@@ -20,6 +20,10 @@ assert.match(store, /export function clearContractReviewSession\(\): void/)
 assert.doesNotMatch(store, /localStorage|sessionStorage|indexedDB|document\.cookie|history\./)
 
 assert.match(cleanup, /clearContractReviewSession\(\)/)
+assert.match(cleanup, /clearSelfAssessmentSession\(\)/)
+assert.match(cleanup, /SELF_ASSESSMENT_SESSION_KEY/)
+assert.match(cleanup, /clearKioskSharedDeviceResidue/)
+assert.match(cleanup, /hasLocalFavorites\(\)/)
 assert.match(
   auth,
   /const login = useCallback\([\s\S]*?clearKioskSensitiveSession\(\)[\s\S]*?setUser\(next\)/,

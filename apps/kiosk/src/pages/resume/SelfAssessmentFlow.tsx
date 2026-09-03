@@ -5,9 +5,9 @@
 // - 工具性质说明：非临床 / 非诊断 / 本人自助参考；不沿用 MBTI / 大五 / DISC / 霍兰德标签
 // - 答案原文不入库：仅存 SHA-256(answers JSON)
 // - 不向企业 / 合作机构 / Partner / Admin 推送结果
-// - 闲置 60 秒自动退出（公共一体机）
+// - 闲置 60 秒自动退出（公共一体机；同意/答题/结果/记录四页共用）
 // - 同意 / 撤回 / 删除只在结果页主行动区显式操作
-// - 闲置恢复：写 sessionStorage 让回到页面时能恢复进度
+// - 同一人 60 秒内可用 sessionStorage 恢复进度；登出 / 隐私清场会清掉，不留给下一位
 //
 // ── S2-7 接线（接线矩阵 §四 S2-7 / §2.2 P28 行）─────────────────────────────
 // 本页的分工在接线时必须一直成立，它是「AI 是加速器不是前置条件」的落点：
@@ -54,7 +54,6 @@ import {
 } from '../../services/api/selfAssessment'
 import {
   CONSENT_ITEMS,
-  IDLE_TIMEOUT_MS,
   SELF_ASSESSMENT_CONSENT_VERSION,
   SENSITIVE_QUESTIONS,
   clearSession,
@@ -68,6 +67,7 @@ import {
   saveSession,
   type SelfAssessmentSession,
 } from './selfAssessmentSession'
+import { useSelfAssessmentIdleExit } from './useSelfAssessmentIdleExit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
@@ -126,6 +126,7 @@ function GuardedButton({
 export function SelfAssessmentIntroPage() {
   const navigate = useNavigate()
   const session = useMemo(() => loadSession(), [])
+  useSelfAssessmentIdleExit()
   const [consent, setConsent] = useState(
     session.consentVersion === SELF_ASSESSMENT_CONSENT_VERSION
       ? session.consent
@@ -226,29 +227,9 @@ export function SelfAssessmentQuizPage() {
     const d = questions.dimensions[0]
     return { dim: d.key, idx: d.questions[0].idx }
   })
-  const idleTimer = useRef<number | null>(null)
+  useSelfAssessmentIdleExit(consentOk)
 
   useEffect(() => { if (consentOk) saveSession({ ...session, answers }) }, [answers, consentOk, session])
-
-  // 闲置 60 秒自动退出
-  const resetIdle = useCallback(() => {
-    if (idleTimer.current) window.clearTimeout(idleTimer.current)
-    idleTimer.current = window.setTimeout(() => {
-      clearSession()
-      navigate('/')
-    }, IDLE_TIMEOUT_MS)
-  }, [navigate])
-  useEffect(() => {
-    resetIdle()
-    const onTick = () => resetIdle()
-    window.addEventListener('pointerdown', onTick)
-    window.addEventListener('keydown', onTick)
-    return () => {
-      if (idleTimer.current) window.clearTimeout(idleTimer.current)
-      window.removeEventListener('pointerdown', onTick)
-      window.removeEventListener('keydown', onTick)
-    }
-  }, [resetIdle])
 
   const { done, total } = progress(questions, answers)
   const dim = SELF_ASSESSMENT_DIMENSIONS.find((d) => d.key === cursor.dim)
@@ -396,6 +377,7 @@ export function SelfAssessmentResultPage() {
   const [printed, setPrinted] = useState<{ fileId: string; signedUrl: string; printFileUrl?: string; filename: string; pageCount: number; sizeBytes: number } | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useSelfAssessmentIdleExit(inflight === null && !printing && !withdrawing && !previewOpen)
 
   const result = session.result ?? null
   const taskId = session.taskId ?? result?.taskId ?? linkedTaskId
@@ -753,6 +735,7 @@ function DimensionCard({ d, aiFailed }: { d: SelfAssessmentDimensionResult; aiFa
 export function SelfAssessmentHistoryPage() {
   const navigate = useNavigate()
   const session = useMemo(() => loadSession(), [])
+  useSelfAssessmentIdleExit()
   const current = session.taskId ?? session.result?.taskId ?? null
   const consentedAt = formatDateTime(session.consentedAt)
   const expiresAt = formatDateTime(session.result?.expiresAt)
