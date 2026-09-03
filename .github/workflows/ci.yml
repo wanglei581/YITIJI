@@ -226,6 +226,13 @@ jobs:
           pnpm --filter @ai-job-print/admin typecheck
           pnpm --filter @ai-job-print/partner typecheck
           pnpm --filter terminal-agent typecheck
+          # packages/refresh 是 admin / partner 共用的刷新层（ci.yml:105 verify:refresh-safe、
+          # :110 verify:partner-refresh-safe 都依赖它），但它的 TS 源码此前从未进过任何 CI
+          # typecheck 批次 —— 运行期契约有 verify:runtime 守（:138），类型回退却无人拦。
+          # 元门禁抓不到它，因为 typecheck: 前缀不在 ENFORCED_PREFIXES（见
+          # scripts/verify-ci-gate-coverage.mjs 的前缀表注释）。2026-09-02 本地实跑
+          # tsc --noEmit 干净后接线。
+          pnpm --filter @ai-job-print/refresh typecheck
 
       - name: Build
         # 三端生产构建门禁要求 VITE_API_MODE=http；Kiosk 还要求数字人构建期开关，

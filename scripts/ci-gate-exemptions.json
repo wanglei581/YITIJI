@@ -74,11 +74,6 @@
       "script": "apps/admin/scripts/verify-partner-account-delete-ui.mjs",
       "category": "broken-pending-deletion",
       "reason": "本次扫描里唯一一对自相矛盾的断言，也是流程信号而不只是死代码：本门禁断言 src/routes/partners/PartnerAccountDeletionDialog.tsx 必须存在且含 role=\"alertdialog\"，而同目录 verify-partner-account-action-ui.mjs:104 断言的恰恰是该文件必须不存在。该文件确已删除，本门禁实跑 4 条断言全 FAIL（exit 1）。两条门禁的作者互相不知道对方存在，只有被接线的那条在跑。不要接线 —— 接线只会让 CI 红。正确处置是删除本文件，等产品负责人逐条确认孤儿清单后另开 PR 执行。"
-    },
-    {
-      "script": "scripts/verify-self-assessment-r3-pick.mjs",
-      "category": "broken-pending-fix",
-      "reason": "职业测评 R3 选题门禁。实跑直接抛 ERR_ASSERTION 退出，断言未通过。讽刺的是本文件顶部的注释正把 verify:self-assessment「写完之后长期无人执行」当作 B 段存在的理由 —— 那条已在 services/api 接线，而根目录这个同族脚本仍然没有名字，同一个坑在兄弟文件上复现了一次。接线前须先查清断言与当前实现的差异。"
     }
   ]
 }
