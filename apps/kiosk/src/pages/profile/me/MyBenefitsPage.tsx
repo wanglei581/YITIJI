@@ -72,6 +72,7 @@ export function MyBenefitsPage() {
   return (
     <div className="me-inkdetail me-inkdetail-benefits h-full">
       <MeListShell
+      signedOutDescription="这里存的是你名下的权益与活动核销记录。是否有可用权益由服务端判定，不登录无法确认身份。"
         title="我的权益"
         subtitle="本人优惠券、免费次数、服务额度与政策资格提示"
         loginFrom="/me/benefits"
