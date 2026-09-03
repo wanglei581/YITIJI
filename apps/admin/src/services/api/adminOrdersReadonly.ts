@@ -71,6 +71,29 @@ export interface ListAdminOrdersReadonlyParams {
   pageSize: number
 }
 
+/**
+ * 线下 / 人工确认收款的合法来源。
+ *
+ * 后端 `AdminMarkPaidDto` 用 `@IsIn(['offline','manual_confirmed'])` 钉死，
+ * `AdminOrderActionsController` 再用 `ADMIN_ALLOWED_PAYMENT_SOURCES` 做一层防御。
+ * `free` 只由 0 元建单自动产生，`wechat / alipay / sandbox / voucher` 各有专属入账路径，
+ * **本前端绝不新增取值**。
+ */
+export type AdminOrderMarkPaidSource = 'offline' | 'manual_confirmed'
+
+/**
+ * `POST /admin/orders/:id/mark-paid` 的返回。
+ *
+ * 后端返回的是完整 Order 行（含 `pickupCode` / `paidBy` 等只读订单视图刻意裁掉的列）。
+ * 这里**只声明本页会读的入账结论字段**，避免把那些列重新带进 Admin 前端。
+ * 入账结果一律以这些服务端值为准，前端不推断、不本地拼接。
+ */
+export interface AdminOrderMarkPaidResult {
+  payStatus: string
+  paymentSource: string | null
+  paidAt: string | null
+}
+
 export interface AdminOrderRefundResult {
   refund: {
     refundNo: string
@@ -89,6 +112,8 @@ interface AdminOrdersReadonlyService {
   list(params: ListAdminOrdersReadonlyParams): Promise<AdminOrderReadonlyPage>
   getById(id: string): Promise<AdminOrderReadonlyDetail>
   refundOrder(id: string, refundReason: string): Promise<AdminOrderRefundResult>
+  /** 线下 / 人工确认收款入账；仅 `payStatus==='unpaid'` 的订单可成功，其余由后端拒绝并回错误码。 */
+  markPaidOrder(id: string, paymentSource: AdminOrderMarkPaidSource): Promise<AdminOrderMarkPaidResult>
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -155,6 +180,8 @@ const httpAdapter: AdminOrdersReadonlyService = {
   getById: (id) => get<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}`),
   refundOrder: (id, refundReason) =>
     post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund`, { refundReason }),
+  markPaidOrder: (id, paymentSource) =>
+    post<AdminOrderMarkPaidResult>(`/admin/orders/${encodeURIComponent(id)}/mark-paid`, { paymentSource }),
 }
 
 const now = () => new Date().toISOString()
@@ -207,17 +234,54 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   ],
 }
 
+/**
+ * mock 模式下的可变订单态。
+ *
+ * mock 的 `getById` 原本恒返回同一份冻结对象，若收款入账后仍读回 `unpaid`，
+ * 界面会出现「提示已入账、状态却还是未支付」的假象。开发期看到的状态必须和
+ * 刚刚执行的动作自洽 —— 但这仍然只是本地假数据，**不能当作端点已验证**。
+ */
+let mockDetailState: AdminOrderReadonlyDetail = { ...MOCK_DETAIL }
+/** 只读订单视图不返回 paymentSource（真实后端亦然），mock 单独记一份用于复刻幂等/冲突分支。 */
+let mockPaymentSource: AdminOrderMarkPaidSource | null = null
+
 const mockAdapter: AdminOrdersReadonlyService = {
   async list(params) {
     return {
-      items: [MOCK_DETAIL],
+      items: [mockDetailState],
       pagination: { page: params.page, pageSize: params.pageSize, total: 1, totalPages: 1 },
     }
   },
   async getById() {
-    return MOCK_DETAIL
+    return mockDetailState
+  },
+  async markPaidOrder(_id, paymentSource) {
+    // 复刻后端状态机：仅 unpaid 可入账；已 paid 同来源幂等回放，异来源冲突。
+    if (mockDetailState.payStatus === 'paid') {
+      if (mockPaymentSource === paymentSource) {
+        return { payStatus: 'paid', paymentSource, paidAt: mockDetailState.updatedAt }
+      }
+      throw new ApiHttpError('ORDER_ALREADY_PAID', '订单已入账', 400)
+    }
+    if (mockDetailState.payStatus !== 'unpaid') {
+      throw new ApiHttpError('ORDER_INVALID_TRANSITION', '当前状态不可入账', 400)
+    }
+    const paidAt = now()
+    mockPaymentSource = paymentSource
+    mockDetailState = { ...mockDetailState, payStatus: 'paid', refundEligible: true, updatedAt: paidAt }
+    return { payStatus: 'paid', paymentSource, paidAt }
   },
   async refundOrder(_id, refundReason) {
+    const refundedAt = now()
+    // list/getById 现在读可变态，退款也必须落回同一份，否则会出现「已退款却仍显示已支付」。
+    mockDetailState = {
+      ...mockDetailState,
+      payStatus: 'refunded',
+      refundEligible: false,
+      refundedAt,
+      refundReason,
+      updatedAt: refundedAt,
+    }
     return {
       refund: {
         refundNo: `RFD-${MOCK_DETAIL.orderNo}`,
@@ -226,9 +290,9 @@ const mockAdapter: AdminOrdersReadonlyService = {
         channel: 'offline',
         channelRefundNo: null,
         reason: refundReason,
-        createdAt: now(),
+        createdAt: refundedAt,
       },
-      order: { orderNo: MOCK_DETAIL.orderNo, payStatus: 'refunded', refundedAmountCents: 0, refundedAt: now() },
+      order: { orderNo: MOCK_DETAIL.orderNo, payStatus: 'refunded', refundedAmountCents: 0, refundedAt },
       idempotent: false,
     }
   },

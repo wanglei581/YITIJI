@@ -82,6 +82,25 @@ export class OrderStatusService {
     }
     // 只允许 unpaid → paid；refunded / failed 不可再转 paid。
     if (order.payStatus !== 'unpaid') throw new BadRequestException('ORDER_INVALID_TRANSITION')
+
+    // 取件窗口已关的单不得入账 —— 这是一条资损防线，不是状态洁癖。
+    //
+    // 场景（2026-09-03 对抗性审查实证）：小程序云打印单 pickupCodeExpiresAt 过期后，
+    // 惰性关单只在会员 listCloud 时跑，Admin 订单列表不跑它，于是该单在后台仍显示
+    // unpaid、仍出现「确认收款」。现场收了现金标记已付后，用户到机认领时
+    // pickup-order.service.ts:69 判过期，而那里的 payStatus 写的是
+    // `=== 'unpaid' ? 'closed' : payStatus` —— 已 paid 的单保持 paid，同时
+    // pickupStatus 变 expired 且 printTaskId 仍为 null，Agent 的 claimableWhere
+    // 永远看不到它。结果是钱记下了、纸永远出不来，只能退款重下单。
+    //
+    // 只拒「有截止时间且已过」：一体机现场单不写 pickupCodeExpiresAt（为 null），
+    // 按 null 也拒会误伤现场收款这条主链路。
+    if (order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= new Date()) {
+      throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
+    }
+    if (order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled') {
+      throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
+    }
     // free 只能用于零额免费单，杜绝把付费单伪装成免费。
     if (paymentSource === 'free' && order.amountCents !== 0) {
       throw new BadRequestException('FREE_REQUIRES_ZERO_AMOUNT')
@@ -89,9 +108,21 @@ export class OrderStatusService {
 
     // CAS 落库 + 取件码唯一冲突有界重试：预检后仍可能与并发请求撞码（唯一索引拦截抛 P2002），
     // 仅该情况换码重试；CAS 未命中(count=0)与其它错误不重试、不吞。耗尽仍撞码 → 明确错误码，不落 500。
+    // 已有 pickupCodeHash 的单不再另铸一枚明文码。
+    //
+    // 小程序云打印建单只写 pickupCodeHash + pickupCodeEnc（真码只存哈希与密文），
+    // 不写 Order.pickupCode；而认领是按 pickupCodeHash 查的
+    // （pickup-order.service.ts:56）。此前 markPaid 无条件再铸一枚写进 pickupCode，
+    // 那枚码没有对应哈希，任何人拿它到机认领都会 PICKUP_CODE_INVALID —— 现场会表现为
+    // 「系统给的码无效，用户自己手机里的码才有效」。
+    //
+    // 全仓已确认没有任何按 Order.pickupCode 明文列的认领查询（唯一一处
+    // findUnique({ where: { pickupCode } }) 是本文件生成时的查重），因此对这类单
+    // 保持该列为 null 不影响任何链路。
+    const mintPickupCode = order.pickupCodeHash == null
     let settled = false
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = await this.generateUniquePickupCode(this.prisma)
+      const pickupCode = mintPickupCode ? await this.generateUniquePickupCode(this.prisma) : null
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
@@ -101,7 +132,8 @@ export class OrderStatusService {
             paymentSource,
             paidAt: new Date(),
             paidBy: operatorId ?? 'system',
-            pickupCode,
+            // 只在本单没有 pickupCodeHash 时写；否则真码在 hash/enc 里，另铸会造出幽灵码。
+            ...(mintPickupCode ? { pickupCode } : {}),
           },
         })
       } catch (e) {
