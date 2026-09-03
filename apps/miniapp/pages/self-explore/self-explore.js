@@ -110,6 +110,10 @@ Page({
     result: null,
     radarPx: 300,
     radarHeightPx: 276,
+    radarCanvasPx: 208,
+    radarCanvasHeightPx: 215,
+    // 维度名排在 canvas 外面；坐标与绘制共用 radar.labelAnchors()，见 radar.js 顶部说明
+    radarLabels: [],
     radarDrawable: false,
     radarStatus: 'pending', // pending | ready | error
     canManage: false,
@@ -148,7 +152,11 @@ Page({
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
       radarPx,
-      radarHeightPx: Math.round(radarPx * 0.92),
+      radarHeightPx: Math.round(radarPx * 0.82),
+      // 画布比舞台窄：标签排在画布**外面**的余量里。
+      // 画布铺满舞台的话，形状顶点和标签会重叠，标签还会顶到卡片边缘。
+      radarCanvasPx: Math.round(radarPx * 0.62),
+      radarCanvasHeightPx: Math.round(radarPx * 0.82 * 0.78),
     })
 
     const taskId = trimmed(opts.taskId)
@@ -549,8 +557,14 @@ Page({
         return
       }
       try {
-        radar.paintRadar(target.node, dims, { width: this.data.radarPx, height: this.data.radarHeightPx })
-        this.setData({ radarStatus: 'ready' })
+        radar.paintRadar(target.node, dims, { width: this.data.radarCanvasPx, height: this.data.radarCanvasHeightPx })
+        // 标签位置和顶点角度同源：radar.labelAnchors() 与 paintRadar 内部用的是同一个 angleOf。
+        // 分开各算一套的话，改了顶点起始角度、文字就会和形状错开。
+        const anchors = radar.labelAnchors()
+        this.setData({
+          radarStatus: 'ready',
+          radarLabels: dims.map((d, i) => ({ key: d.key || String(i), label: d.label, ...anchors[i] })),
+        })
       } catch (_) {
         this.setData({ radarStatus: 'error' })
       }

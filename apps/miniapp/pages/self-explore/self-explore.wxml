@@ -164,16 +164,22 @@
       <view class="card card-inner rise-d2">
         <view class="sec-t">五维强度</view>
 
-        <view class="radar-wrap" wx:if="{{radarDrawable && radarStatus !== 'error'}}">
+        <!-- 标签排在 canvas 外面（绝对定位，坐标由 radar.labelAnchors() 与绘制共用同一套角度）。
+             canvas 里一个字都不写：画布文字不吃页面字阶令牌、在不同 DPR 上糊、还会被边界裁掉。
+             数值不在这里重复——下面的条形列表已经逐项写了 N/5，图只负责「形状」。 -->
+        <view class="radar-stage" wx:if="{{radarDrawable && radarStatus !== 'error'}}"
+              style="width:{{radarPx}}px;height:{{radarHeightPx}}px">
           <canvas
             type="2d"
             id="radar"
             class="radar-cv"
-            style="width:{{radarPx}}px;height:{{radarHeightPx}}px"
-            aria-label="五维倾向强度雷达图，具体数值见下方列表"
+            style="width:{{radarCanvasPx}}px;height:{{radarCanvasHeightPx}}px"
+            aria-label="五维倾向形态图，具体数值见下方列表"
           ></canvas>
-          <view class="radar-cap">五圈刻度由内到外为 1–5，中心为 0。图形只表示强度分值。</view>
+          <view wx:for="{{radarLabels}}" wx:key="key" class="radar-lb"
+                style="left:{{item.leftPct}}%;top:{{item.topPct}}%">{{item.label}}</view>
         </view>
+        <view class="radar-cap" wx:if="{{radarDrawable && radarStatus !== 'error'}}">外圈淡线是五维的均衡位置，形状偏向哪边就是这次作答更投入的方向。</view>
         <view wx:elif="{{!radarDrawable}}" class="radar-note">服务端返回的五维强度不完整，本次不绘制图形；下面的列表按服务端实际返回逐项显示。</view>
         <view wx:else class="radar-note">图形未能渲染，五个数值见下面的列表。</view>
 

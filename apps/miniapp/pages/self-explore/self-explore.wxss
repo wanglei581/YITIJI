@@ -157,3 +157,18 @@
 .ab-side { flex: 0 0 auto; }
 .ab-main { flex: 1; }
 .ab-ic { font-size: var(--fs-md); }
+
+/* 倾向形态图。标签在 canvas 外面：画布文字不吃字阶令牌、跨 DPR 会糊、会被边界裁。
+   删掉 .radar-stage 的 position:relative，五个标签会全部塌到卡片左上角。 */
+.radar-stage { position: relative; margin: 0 auto; }
+.radar-lb {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* 画布在舞台里居中；标签占舞台四周的余量 */
+.radar-stage .radar-cv { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
