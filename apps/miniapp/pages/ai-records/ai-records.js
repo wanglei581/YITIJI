@@ -114,14 +114,14 @@ Page({
   async _load(append = false) {
     if (append && (!this._nextCursor || this._loadingMore)) return
     this._loadingMore = append
-    if (!auth.isLoggedIn()) {
-      this._all = []
-      this.setData({ loginRequired: true, groups: [], loading: false, loadError: '' })
-      return
-    }
-    // append 时不进整页 loading：那会把已渲染的列表打回加载态闪一下
-    this.setData(append ? { loginRequired: false } : { loginRequired: false, loading: true, loadError: '' })
     try {
+      if (!auth.isLoggedIn()) {
+        this._all = []
+        this.setData({ loginRequired: true, groups: [], loading: false, loadError: '' })
+        return
+      }
+      // append 时不进整页 loading：那会把已渲染的列表打回加载态闪一下
+      this.setData(append ? { loginRequired: false } : { loginRequired: false, loading: true, loadError: '' })
       // 2026-09-03：同 documents 的「50 条静默截断」——nextCursor 一直被丢弃，
       // 第 51 条起永远不显示。分页写法对照 orders.js / documents.js。
       const cursor = append ? this._nextCursor : null
@@ -130,7 +130,6 @@ Page({
       this._all = append ? [...this._all, ...page] : page
       this._nextCursor = (list && list.nextCursor) || null
       this._applyFilter(this.data.activeFilter)
-      this._loadingMore = false
       this.setData({ loading: false })
     } catch (err) {
       if (err && err.statusCode === 401) {
@@ -139,6 +138,13 @@ Page({
       } else {
         this.setData({ loading: false, loadError: (err && err.message) || '加载记录失败，请稍后重试' })
       }
+    } finally {
+      // 必须在 finally 复位：未登录的提前 return 和两个 catch 分支原先都不复位，
+      // 于是「加载更多」失败一次之后，上面那道 _loadingMore guard 会把后续每一次
+      // 加载更多静默吞掉——列表永久停在 50 条，且不再报任何错。
+      // 本页是全仓唯一用实例字段（而非 data）做加载闸的列表页，
+      // documents / notifications / orders 都在 catch 里复位了 data.loadingMore。
+      this._loadingMore = false
     }
   },
 
