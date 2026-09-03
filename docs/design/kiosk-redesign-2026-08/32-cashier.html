@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>收银台 · 职易达</title>
+<!--
+  route: /print/cashier
+  state: no-order | session-expired | free-order | channel-loading | channel-empty | channel-failed |
+         pending | channel-selected | pending-qr | pending-scan | awaiting-code-confirmation | pending-verification |
+         paid | release-failed | display-expired-reconciling | expired | attempt-failed | attempt-channel-unknown |
+         order-failed | closed | refunding | partial-refunded | refunded
+  api:  GET  /api/v1/payment/channels           —— 进页先取已启用通道；多通道由用户显式选择后才出码
+        POST /api/v1/orders/:id/pay             —— 用户选定方式后出码（幂等复用支付尝试）{ attemptId, channel, qrCodeContent, expiresAt, orderPayStatus }
+        POST /api/v1/orders/:id/code-pay        —— 提交用户付款码（付款码只随本次请求提交）
+        GET  /api/v1/orders/:id/pay-status      —— 每 2.5s 轮询 PayStatusView（含惰性过期/关单，paid 后返回 pickupCode）
+        POST /api/v1/orders/:id/pay/reconcile   —— 真实通道兜底对账（回调丢失/延迟时按渠道账本核实）
+        POST /api/v1/print/jobs/:orderId/release—— 仅在服务端终态 paid（或零元单已建单）后释放出纸
+  状态映射真值（对齐 apps/kiosk/src/pages/print/cashierStatus.ts deriveCashierView）：
+        canProceed 仅 payStatus==='paid' 为 true；unpaid/paying/closed/failed/refunded/refunding/partial_refunded 一律不放行
+        attempt.status=expired（收款码过期，可重新出码） ≠ order.payStatus=closed（订单关闭，禁止重新出码）
+        付款码尝试 expired → 「支付状态待核实」，不判成败、禁止重复扫码
+        本地 expiresAt 到点 → 「收款码到期核验中」，不等于渠道已关单
+        pending 只负责选择服务端已启用通道；channel-selected 再选择屏上收款码 / 付款码
+        两层选择的锁定时点按**真实 React 行为**定，不按「点了哪个按钮」定：
+          选「屏上收款码」立刻 POST /orders/:id/pay 出码 → pending-qr：尝试已创建，此后同时锁定通道与方式
+          选「扫付款码」只是开始等本机扫码器读数 → pending-scan：**服务端尚未创建任何支付尝试**
+            （对齐 PrintCashierPage.selectPaymentMethod：只有 qr 分支调 issue()，code 分支只 setPaymentMethod
+              并清空 snapshot，isPaymentAttemptSelectionLocked(null) 恒为 false）
+            所以 pending-scan 只能说「通道已选」，不能说「尝试已创建 / 两者已锁定」；
+            读满 18 位并提交前，通道与扫码方式都仍可改回
+          提交付款码（POST /orders/:id/code-pay）返回后才进入 awaiting-code-confirmation：
+            尝试已创建，从这一刻起通道与方式一起锁定
+        未决态「刷新付款结果」只重新查询当前订单，不预判跳到 paid / expired / failed
+  金额与优惠锁（对齐 cashierStatus.ts isOrderAmountLocked；与「支付方式锁」是两把锁）：
+        支付尝试一经创建，服务端就把订单金额与优惠快照进这次尝试 → 金额与优惠**单调锁定**：
+        expired / attempt-failed / closed / 通道未知一律保持锁定，绝不因为「这次没付成」解锁
+        支付方式锁（PICKER_OFF）不同：屏上码显示到期后仍可重选通道与方式、重新出码
+        所以失败或过期之后允许在**同一订单内**重新出码 / 重试支付，但只能沿用已锁定的金额与优惠
+        要改打印参数或换优惠券，只能**重新下单**（回 12-file-source.html 从文件源重走一遍）
+        **锁定态一律不得链回 14-print-confirm.html** —— 确认页会重新报价、重新建单，
+        那正是绕开收银台只读券摘要换券的后门；顶栏返回同样受这把锁约束
+  通道契约真值（对齐 services/api/src/payment/online-payment.service.ts availableChannels / requireChannel）：
+        availableChannels() 可能返回 0 / 1 / 多个通道；枚举取值只有 sandbox | wechat | alipay
+        零通道 → ONLINE_PAYMENT_DISABLED：一律不出码，落到 channel-empty
+        单通道 → 服务端直接用该通道（requireChannel 的 only 分支），页面不摆一个假的「二选一」
+        多通道 → PAY_CHANNEL_REQUIRED：必须用户显式选择，前端绝不替用户默认选一个真实资金通道
+        指定了未启用通道 → PAY_CHANNEL_NOT_ENABLED：页面不渲染、不提及该通道
+        sandbox 必须明示「非真实收款」，不得伪装成线上收款（对齐 cashierStatus.ts PAY_CHANNEL_LABEL）
+  原型通道 fixture（静态原型模拟服务端事实，不是产品参数）：
+        ?channels=wechat,alipay | wechat | alipay | sandbox | none（缺省=微信+支付宝两通道都已启用）
+        ?channel=<通道>  —— 模拟「服务端返回的本次支付尝试所属通道」，不是用户偏好
+        ?order=free      —— 模拟零元单（amountCents<=0），只对 release-failed 生效；free-order 恒为零元
+        ?attempted=1     —— 模拟「服务端这一单已经创建过支付尝试」，用于失败/过期之后的重试出码路径
+                            （pending / channel-selected）；它只会让金额与优惠更锁，不会解锁任何东西
+        已创建支付尝试的状态（pending-qr / awaiting-code-confirmation / pending-verification /
+        display-expired-reconciling / expired / attempt-failed / release-failed）缺 ?channel 时 fail closed →
+        attempt-channel-unknown，**绝不默认微信**；页面所有自链接必须把该通道原样带走
+        通道已选但尚未创建尝试的状态（channel-selected / pending-scan）缺 ?channel 时回落到 pending
+        （单通道时直接取唯一通道）：它们没有尝试可谈，不许谎称「本次通道未确认」；自链接同样必须带走通道
+  两种扫码分治（不得合成同一状态/同一动画）：
+        A 用户手机扫本机屏幕二维码 —— 本机**没有「已扫码」可观测态**，只能等服务端终态
+        B 本机嵌入式扫码器（USB HID 键盘）读用户付款码 —— 信号是 keydown/input，提交后仍只认服务端结果
+  付款码安全: 付款码是 18 位纯数字、等同现金，只存在于内存 ref 中；
+        **绝不进入 DOM、URL、日志或本地存储**，页面只显示「已读多少位」，本原型连位数占位符都不用数字表示
+  零元单:   amountCents<=0 不经过支付，但**订单已经真实建立**，收银页只负责 release，不存在「未建单直接出纸」
+        零元单释放失败 = release-failed + order=free：**只说未收款，绝不声称已付款**，重试只重建打印任务
+  金额边界: 金额位在 [data-quote-slot] 内，静态原型只放占位；来源说明常驻
+  fallback: 通道为空 / 取通道失败 / 通道不可用 → 不出码，显示订单号 + 联系工作人员
+        本次通道未知 → 不出码、不判成败、不猜通道，回订单列表重进
+  原型演示控制：本页状态仅通过 ?state= 与上面的通道 fixture 切换；页面无计时器推进业务状态，无倒计时驱动成功
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.xq{flex:none;margin:20px 44px 0;border-radius:36px;padding:28px 42px 26px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{flex:none;width:100px;height:100px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:46px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:8px}
+.xq-ask{font-size:38px;line-height:1.3;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:10px;font-size:21px;line-height:1.55;color:rgba(242,239,228,.72)}
+.xq-doing b{color:#fff;font-weight:600}
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec{flex:none;padding:0 44px;margin-top:24px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 30px}
+.state{border-radius:var(--r-lg);padding:28px 34px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:700}
+.state-p{margin-top:12px;font-size:21px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.plan{margin-top:16px;display:flex;flex-direction:column;gap:11px}
+.plan li{list-style:none;display:flex;gap:12px;align-items:flex-start;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.plan .sq{flex:none;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-top:9px}
+.reason{margin-top:8px;font-size:18px;line-height:1.5;color:var(--wheat-d);font-weight:600}
+.btn{min-height:72px;padding:0 30px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:600;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn.danger{background:var(--cinnabar);color:#fff}
+.btn[aria-disabled=true]{opacity:.55;cursor:default}
+.ctabar{flex:none;margin-top:auto;padding:20px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.ctabar .btn{flex:1}
+.truth{flex:none;padding:16px 44px 18px;border-top:1px solid var(--line);display:flex;gap:26px}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+.nav-item.on .ni{color:var(--teal-d)}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal)}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.press:active{transform:scale(.985)}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:140px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:16px;flex-direction:column;gap:8px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 16px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.sec.fill{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.last{margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.chip{min-height:48px;padding:0 18px;border-radius:14px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:9px;font-size:18px;color:var(--ink-2);font-weight:600}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.chip.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.meta{margin-top:14px;display:flex;gap:12px;flex-wrap:wrap}
+.kv{display:flex;flex-direction:column;gap:10px}
+.kv>div{display:flex;gap:12px;font-size:19px;color:var(--ink-2)}
+.kv>div>span:first-child{flex:none;width:120px;color:var(--ink-3)}
+.kv b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.pgrp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:20px 24px}
+.pgrp h4{font-size:22px;font-weight:700;display:flex;align-items:center;gap:12px}
+.pgrp h4 span{margin-left:auto;font-size:18px;font-weight:400;color:var(--ink-3)}
+.pgrp .state-p{font-size:19px;margin-top:10px}
+.blk{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px 28px}
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+.sec.grow{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.fill>.card,.sec.fill>.chs,.sec.fill>.grid3,.sec.fill>.grid2,.sec.fill>.blk,.sec.fill>.state,.sec.grow>.card,.sec.grow>.chs,.sec.grow>.grid3,.sec.grow>.grid2,.sec.grow>.blk{flex:1;min-height:0}
+.sec.grow>.state{flex:1;display:flex;flex-direction:column}
+.sec.grow>.state .meta{margin-top:auto}
+.sec.grow>.card{display:flex;flex-direction:column}
+.modes{flex:none;margin:16px 44px 0;display:flex;gap:12px}
+.pay-picker{display:flex;gap:12px;min-width:0}
+.pay-picker.channels{flex:1.05}.pay-picker.methods{flex:1.35}
+.picker-label{flex:none;display:flex;align-items:center;padding:0 8px;font-size:18px;font-weight:700;color:var(--ink-3)}
+.channel{flex:1;min-height:88px;border-radius:20px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 16px;font-size:21px;font-weight:700;text-align:center}
+.channel.on{background:var(--teal-soft);border-color:#a9d9ca;color:var(--teal-d)}
+.channel[aria-disabled=true]{opacity:.55}
+.channel .cd{font-size:16px;font-weight:600;color:var(--wheat-d)}
+.picker-note{flex:1;min-height:88px;border-radius:20px;background:var(--paper);border:1px dashed var(--line-2);display:flex;align-items:center;justify-content:center;padding:0 18px;font-size:19px;font-weight:600;color:var(--ink-3);text-align:center}
+.mode{flex:1;min-height:88px;border-radius:20px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 22px;text-align:left}
+.mode.on{background:var(--deep);border-color:transparent;color:#f2efe4}
+.mode .mi{flex:none;width:52px;height:52px;border-radius:16px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.mode.on .mi{background:rgba(46,230,168,.16);color:var(--emerald)}
+.mode b{display:block;font-size:22px;font-weight:700}
+.mode span.d{display:block;margin-top:4px;font-size:17px;color:var(--ink-3)}
+.mode.on span.d{color:rgba(242,239,228,.65)}
+.mode[aria-disabled=true]{opacity:.55}
+.paywrap{display:flex;gap:24px;align-items:flex-start}
+.paycol{flex:none;width:372px}
+.amount-card{background:linear-gradient(158deg,var(--deep-2),var(--deep));border-radius:var(--r-lg);padding:24px 30px;color:#f2efe4;position:relative;overflow:hidden}
+.amount-card::after{content:"";position:absolute;right:-110px;bottom:-130px;width:330px;height:330px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.14),transparent 65%)}
+.amount-lb{font-size:19px;letter-spacing:3px;color:rgba(242,239,228,.55)}
+.amount{margin-top:6px;display:flex;align-items:baseline;gap:8px;position:relative;z-index:1}
+.amount .cur{font-size:32px;font-weight:700;color:var(--emerald)}
+.amount .num{font-size:62px;font-weight:800;letter-spacing:2px;font-variant-numeric:tabular-nums;line-height:1}
+.amount.amount-message .num{font-size:32px;line-height:1.25;letter-spacing:0}
+.amount-src{margin-top:10px;font-size:18px;line-height:1.5;color:rgba(242,239,228,.72);position:relative;z-index:1}
+.amount-src b{color:#fff;font-weight:600}
+/* 价目明细（只读券摘要的三个数）。放进金额卡里，因为它们解释的就是卡上那个大字；
+   顺带把左栏原本空着的那段高度用起来 —— 这四行原先挂在右栏订单信息的 kv 里，
+   把整节推高 144px，收尾卡因此被挤出自己的卡片边界（1080x1920 探针实测最坏 152.2px，
+   pending-scan 更是直接画到底部事实说明条上 26.6px）。 */
+.amount-ledger{margin-top:18px;padding-top:16px;border-top:1px solid rgba(46,230,168,.26);display:flex;flex-direction:column;gap:9px;position:relative;z-index:1}
+.amount-ledger>div{display:flex;align-items:baseline;gap:14px;font-size:19px;line-height:1.35;color:rgba(242,239,228,.7)}
+.amount-ledger>div>span{flex:1;min-width:0}
+.amount-ledger>div>b{flex:none;font-weight:700;color:#f2efe4;font-variant-numeric:tabular-nums}
+.amount-ledger>div[data-coupon-row=payable]>span{color:rgba(242,239,228,.92)}
+.amount-ledger>div[data-coupon-row=payable]>b{color:var(--emerald)}
+.amount-ledger .lg-lb{display:block;margin-bottom:2px;font-size:16px;letter-spacing:2px;line-height:1.4;color:rgba(242,239,228,.5)}
+.amount-ledger .lg-fix{display:block;font-size:16px;line-height:1.45;color:rgba(242,239,228,.5)}
+.qr{width:372px;height:372px;border-radius:26px;background:#fff;border:1px solid var(--line-2);padding:28px;display:flex;align-items:center;justify-content:center;position:relative}
+.qr-grid{width:100%;height:100%;display:grid;grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);gap:4px}
+.qr-grid i{background:var(--deep);border-radius:2px}
+.qr-grid i.o{background:transparent}
+.qr-corner{position:absolute;width:38px;height:38px;border:5px solid var(--teal)}
+.qr-corner.tl{left:10px;top:10px;border-right:0;border-bottom:0;border-radius:12px 0 0 0}
+.qr-corner.tr{right:10px;top:10px;border-left:0;border-bottom:0;border-radius:0 12px 0 0}
+.qr-corner.bl{left:10px;bottom:10px;border-right:0;border-top:0;border-radius:0 0 0 12px}
+.qr-corner.br{right:10px;bottom:10px;border-left:0;border-top:0;border-radius:0 0 12px 0}
+.qr-cap{margin-top:12px;font-size:18px;line-height:1.5;color:var(--ink-3);text-align:center}
+.side{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.hid{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-lg);padding:24px 26px}
+.hid h4{font-size:23px;font-weight:700}
+.hid-field{margin-top:14px;min-height:88px;border-radius:18px;background:var(--paper);border:1.5px dashed var(--line-2);display:flex;align-items:center;gap:14px;padding:0 22px;font-size:22px;color:var(--ink-3)}
+.caret{width:3px;height:34px;background:var(--teal);flex:none}
+.slots{display:flex;gap:7px;flex-wrap:wrap}
+.slots i{width:26px;height:34px;border-radius:7px;background:var(--line);font-style:normal}
+.slots i.on{background:var(--teal)}
+.ab{display:flex;gap:16px}
+.ab>div{flex:1;background:var(--paper);border:1px solid var(--line-2);border-radius:18px;padding:16px 20px}
+.ab b{display:block;font-size:19px;font-weight:700;margin-bottom:6px}
+.ab span{font-size:17px;line-height:1.5;color:var(--ink-3)}
+.pickup{display:flex;gap:10px;margin-top:12px}
+.pickup i{flex:1;height:88px;border-radius:18px;background:var(--paper);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:36px;font-weight:800;color:var(--ink-3)}
+.bignote{display:flex;align-items:center;gap:16px;background:var(--wheat-soft);border-radius:var(--r-md);padding:20px 26px;font-size:21px;line-height:1.5;color:var(--wheat-d);font-weight:700}
+.orderno{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px;margin-top:8px}
+.sec.grow>.paywrap{flex:1;min-height:0;align-items:stretch}
+.closure{flex:1;min-height:0;display:flex;flex-direction:column}
+.closure>.card{flex:1;min-height:0;display:flex;flex-direction:column;padding-top:24px;padding-bottom:24px}
+.closure-flow{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.closure-flow>div{padding:18px 4px 0;border-top:1px solid var(--line-2)}
+.closure-flow b{display:block;font-size:19px;line-height:1.35}
+.closure-flow span{display:block;margin-top:7px;font-size:17px;line-height:1.45;color:var(--ink-3)}
+
+.paycol>.pgrp{margin-top:14px}
+.cta-reason{flex:none;padding:0 44px 12px;font-size:19px;font-weight:600;color:var(--wheat-d)}
+.emptybox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:20px;line-height:1.6;color:var(--ink-2)}
+.emptybox .ei{width:96px;height:96px;border-radius:30px;background:var(--paper);border:1px dashed var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <!-- 顶栏返回的静态默认值取**锁定态**（fail-closed）：render() 之前无法判断这一单有没有创建过
+         支付尝试，「不知道」不等于「没有」，默认就不该指向可以重新报价换券的确认页。 -->
+    <a class="back press" id="back-link" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders" aria-label="返回我的打印订单"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">等待支付 · 未确认</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif" aria-hidden="true">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow">CASHIER</div>
+        <div class="xq-ask serif" id="xq-ask">付款<em>成没成</em>，服务端说了算。</div>
+        <div class="xq-doing" id="xq-doing">屏幕上这张码，<b>本机看不到你扫没扫</b>。只有服务端支付状态变成已付，才会去出纸。</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="modes" id="modes"></div>
+
+  <main class="body" id="body-root" data-screen="cashier" data-state="pending" data-testid="cashier-state-pending"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="cashier-truth">
+    <div><b>付款安全</b>请勿重复付款；页面会在系统确认结果后更新。付款码不会在屏幕上完整显示或保存。</div>
+    <div><b>金额确认</b>只有订单金额明确后才会生成收款码或读取付款码。</div>
+    <div id="truth-abnormal"><b>异常处理</b>结果长时间未更新时，请先查看你的支付账单，再联系工作人员。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true">
+    <div class="dp-t">优惠券只读摘要（设计态需 debug=1）</div>
+    <a href="?state=pending&amp;coupon=none" data-q="state=pending&amp;coupon=none">coupon:none（默认）</a>
+    <a href="?state=pending&amp;debug=1&amp;coupon=selected" data-q="state=pending&amp;debug=1&amp;coupon=selected">coupon:selected（可返回改券）</a>
+    <a href="?state=pending-qr&amp;channel=wechat&amp;debug=1&amp;coupon=locked" data-q="state=pending-qr&amp;channel=wechat&amp;debug=1&amp;coupon=locked">coupon:locked（已出码）</a>
+    <a href="?state=expired&amp;channel=wechat&amp;debug=1&amp;coupon=selected" data-q="state=expired&amp;channel=wechat&amp;debug=1&amp;coupon=selected">coupon:selected + 已过期（锁优先）</a>
+    <a href="?state=free-order&amp;debug=1&amp;coupon=zero-payable" data-q="state=free-order&amp;debug=1&amp;coupon=zero-payable">coupon:zero-payable</a>
+    <div class="dp-t">原型演示控制</div>
+    <a href="?state=no-order" data-q="state=no-order">no-order</a>
+    <a href="?state=session-expired" data-q="state=session-expired">session-expired</a>
+    <a href="?state=free-order" data-q="state=free-order">free-order</a>
+    <a href="?state=channel-loading" data-q="state=channel-loading">channel-loading</a>
+    <a href="?state=channel-empty" data-q="state=channel-empty">channel-empty</a>
+    <a href="?state=channel-failed" data-q="state=channel-failed">channel-failed</a>
+    <a href="?state=pending" data-q="state=pending">pending</a>
+    <a href="?state=channel-selected&channel=wechat" data-q="state=channel-selected&channel=wechat">channel-selected</a>
+    <a href="?state=pending-qr&channel=wechat" data-q="state=pending-qr&channel=wechat">pending-qr</a>
+    <a href="?state=pending-scan&channel=wechat" data-q="state=pending-scan&channel=wechat">pending-scan</a>
+    <a href="?state=awaiting-code-confirmation&channel=wechat" data-q="state=awaiting-code-confirmation&channel=wechat">awaiting-code-confirmation</a>
+    <a href="?state=pending-verification&channel=wechat" data-q="state=pending-verification&channel=wechat">pending-verification</a>
+    <a href="?state=paid&channel=wechat" data-q="state=paid&channel=wechat">paid</a>
+    <a href="?state=release-failed&channel=wechat" data-q="state=release-failed&channel=wechat">release-failed</a>
+    <a href="?state=release-failed&order=free" data-q="state=release-failed&order=free">release-failed · 零元单</a>
+    <a href="?state=display-expired-reconciling&channel=wechat" data-q="state=display-expired-reconciling&channel=wechat">display-expired-reconciling</a>
+    <a href="?state=expired&channel=wechat" data-q="state=expired&channel=wechat">expired</a>
+    <a href="?state=attempt-failed&channel=alipay" data-q="state=attempt-failed&channel=alipay">attempt-failed</a>
+    <a href="?state=pending&attempted=1" data-q="state=pending&attempted=1">pending · 已创建过尝试（重试出码）</a>
+    <a href="?state=attempt-channel-unknown" data-q="state=attempt-channel-unknown">attempt-channel-unknown</a>
+    <a href="?state=order-failed&channel=wechat" data-q="state=order-failed&channel=wechat">order-failed</a>
+    <a href="?state=closed&channel=wechat" data-q="state=closed&channel=wechat">closed</a>
+    <a href="?state=refunding&channel=alipay" data-q="state=refunding&channel=alipay">refunding</a>
+    <a href="?state=partial-refunded&channel=wechat" data-q="state=partial-refunded&channel=wechat">partial-refunded</a>
+    <a href="?state=refunded&channel=wechat" data-q="state=refunded&channel=wechat">refunded</a>
+    <div class="dp-t">通道 fixture</div>
+    <a href="?state=pending&channels=wechat" data-q="state=pending&channels=wechat">仅微信</a>
+    <a href="?state=pending&channels=alipay" data-q="state=pending&channels=alipay">仅支付宝</a>
+    <a href="?state=pending&channels=sandbox" data-q="state=pending&channels=sandbox">仅测试通道</a>
+    <a href="?state=pending&channels=none" data-q="state=pending&channels=none">零通道</a>
+    <a href="?state=pending-qr&channels=none&channel=wechat" data-q="state=pending-qr&channels=none&channel=wechat">零通道强出码</a>
+    <a href="?state=pending-qr" data-q="state=pending-qr">缺通道参数</a>
+    <a href="?state=pending-qr&channel=alipay" data-q="state=pending-qr&channel=alipay">支付宝出码</a>
+  </div>
+</div>
+<script>
+var SCREEN='cashier';
+var STATES=['no-order','session-expired','free-order','channel-loading','channel-empty','channel-failed','pending','channel-selected','pending-qr','pending-scan','awaiting-code-confirmation','pending-verification','paid','release-failed','display-expired-reconciling','expired','attempt-failed','attempt-channel-unknown','order-failed','closed','refunding','partial-refunded','refunded'];
+var q=new URLSearchParams(location.search);
+/* 通道枚举与展示名对齐服务端 ONLINE_PAYMENT_CHANNELS 与 cashierStatus.ts PAY_CHANNEL_LABEL。
+   顺序即渲染顺序；sandbox 必须自带「非真实收款」说明。 */
+var ALL_CHANNELS=['wechat','alipay','sandbox'];
+var CHANNEL_LABEL={wechat:'微信支付',alipay:'支付宝',sandbox:'测试支付通道'};
+var CHANNEL_NOTE={sandbox:'非真实收款'};
+/* 与支付无关的状态：不查通道，也不摆通道按钮 */
+var CHANNEL_FREE={'no-order':1,'session-expired':1,'free-order':1};
+/* 这些状态要出码 / 读码 / 重试支付：零通道时必须落到 channel-empty，绝不出码 */
+var NEEDS_CHANNEL={'pending':1,'channel-selected':1,'pending-qr':1,'pending-scan':1,'expired':1,'attempt-failed':1};
+/* 支付尝试已经创建（不论它还在跑、已过期还是已失败）：通道未知就 fail closed
+   （attempt-channel-unknown），绝不默认微信。
+   expired 也在表内 —— 屏上那张码是 POST /orders/:id/pay 出的，码能过期就证明尝试真的创建过，
+   金额与优惠在那一刻已被服务端快照；此前漏登记，导致 expired 缺通道时不 fail closed，
+   也导致它不被当成「已锁定」，一路留着回确认页换券的后门。
+   pending-scan 不在表内 —— 那时只是在等扫码器读数，服务端还没有任何支付尝试。 */
+var ATTEMPT_CREATED={'pending-qr':1,'awaiting-code-confirmation':1,'pending-verification':1,'display-expired-reconciling':1,'expired':1,'attempt-failed':1,'release-failed':1};
+/* 订单已经离开「从未支付过」的初始态，或本机根本证明不了它没付过 → 一律按锁定处理（fail-closed）：
+   session-expired 读不到 pay-status（不知道 ≠ 没有），attempt-channel-unknown 已有尝试只是通道不明。 */
+var ORDER_SETTLED={'session-expired':1,'attempt-channel-unknown':1,'paid':1,'order-failed':1,'closed':1,'refunding':1,'partial-refunded':1,'refunded':1};
+/* 通道已选、尝试尚未创建：缺通道时回去重选通道（单通道直接取唯一通道），
+   不谎称「本次通道未确认」—— 那句话只对已经有尝试在跑的订单才成立。 */
+var CHANNEL_SELECTED_ONLY={'channel-selected':1,'pending-scan':1};
+/* 允许显示「本次通道」的状态；其余状态一律不提通道名 */
+var CHANNEL_SHOWN={'channel-selected':1,'pending-qr':1,'pending-scan':1,'awaiting-code-confirmation':1,'pending-verification':1,'display-expired-reconciling':1,'paid':1,'release-failed':1,'expired':1,'attempt-failed':1,'order-failed':1,'closed':1,'refunding':1,'partial-refunded':1,'refunded':1};
+function parseChannels(raw){
+ if(raw===null) return ['wechat','alipay'];
+ var picked=String(raw).split(',').map(function(s){return s.trim()});
+ return ALL_CHANNELS.filter(function(c){return picked.indexOf(c)>=0});
+}
+/* 单一真值：先定 fixture（服务端事实），再定这一页能渲染什么。
+   任何「缺参数就猜一个通道」的写法都必须走到这里 fail closed。 */
+function resolveFixture(){
+ var st=q.get('state');
+ if(STATES.indexOf(st)<0) st='pending';
+ var st0=st;
+ var order=(st==='free-order'||(st==='release-failed'&&q.get('order')==='free'))?'free':'paid';
+ var status='ready',list=[];
+ if(CHANNEL_FREE[st]||order==='free') status='not-applicable';
+ else if(st==='channel-loading') status='loading';
+ else if(st==='channel-failed') status='failed';
+ else if(st!=='channel-empty') list=parseChannels(q.get('channels'));
+ if(status==='ready'&&!list.length&&NEEDS_CHANNEL[st]) st='channel-empty';
+ var raw=q.get('channel');
+ var ch=list.indexOf(raw)>=0?raw:'';
+ if(st==='pending'&&list.length===1){st='channel-selected';ch=list[0]}
+ else if(CHANNEL_SELECTED_ONLY[st]&&!ch) {if(list.length===1) ch=list[0]; else st='pending'}
+ if(ATTEMPT_CREATED[st]&&order!=='free'&&!ch) st='attempt-channel-unknown';
+ if(!CHANNEL_SHOWN[st]) ch='';
+ /* 金额与优惠锁：单调 + fail-closed。用 st0（进页时声明的状态）和 st（回落之后的状态）**一起**判断 ——
+    `?state=expired&channels=none` 会回落成 channel-empty，但那一单确确实实创建过支付尝试，
+    锁不能跟着状态一起回落掉。?attempted=1 与 debug 下的 ?coupon=locked 都是「服务端已有尝试」
+    的显式声明：只会让锁更紧，没有任何一条分支能解锁。 */
+ var locked=!!(ATTEMPT_CREATED[st0]||ORDER_SETTLED[st0]||ATTEMPT_CREATED[st]||ORDER_SETTLED[st]||
+  q.get('attempted')==='1'||(q.get('debug')==='1'&&q.get('coupon')==='locked'));
+ return {state:st,channel:ch,label:ch?CHANNEL_LABEL[ch]:'',list:list,status:status,order:order,locked:locked};
+}
+var FIX=resolveFixture();
+/* 本页自链接统一出口：把当前 fixture（通道 / 通道清单 / 零元单）原样带走。
+   刷新、确认、对账、重试都必须经过它，缺参回落默认值在这里就不可能发生。 */
+function selfLink(state,opts){
+ opts=opts||{};
+ var parts=['state='+state];
+ var ch=Object.prototype.hasOwnProperty.call(opts,'channel')?opts.channel:FIX.channel;
+ if(ch) parts.push('channel='+ch);
+ var order=Object.prototype.hasOwnProperty.call(opts,'order')?opts.order:FIX.order;
+ if(order==='free') parts.push('order=free');
+ if(FIX.status==='ready'&&FIX.list.join(',')!=='wechat,alipay') parts.push('channels='+(FIX.list.length?FIX.list.join(','):'none'));
+ /* 锁必须跟着链接走：重新出码 / 重试支付会跳回 pending，锁要是丢在上一页，
+    下一屏就会重新长出「返回改参数」，等于换券后门原地复活。 */
+ if(FIX.locked) parts.push('attempted=1');
+ /* 券夹具同样原样带走：否则「已锁定的优惠」会在重试一次之后凭空消失，
+    演示出来的正好是这次要禁掉的行为。 */
+ if(DEBUG) parts.push('debug=1');
+ if(COUPON!=='none') parts.push('coupon='+COUPON);
+ return '32-cashier.html?'+parts.join('&');
+}
+function channelNames(list){
+ return (list||FIX.list).map(function(c){return CHANNEL_LABEL[c]}).join('或');
+}
+var ICO={
+ qr:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14h1M14 20h3M20 18v3"/>',
+ scanner:'<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/>',
+ warn:'<path d="M12 3.6 2.8 19.4h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2"/>',
+ back:'<path d="M4 12h13M9 7l-5 5 5 5"/><path d="M20 5v14"/>',
+ empty:'<rect x="3.5" y="6" width="17" height="13" rx="2.5"/><path d="M3.5 10h17"/>'
+};
+function svg(n,s,w){return '<svg width="'+(w||30)+'" height="'+(w||30)+'" viewBox="0 0 24 24" fill="none" stroke="'+s+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+/* 固定位图，仅示意二维码形状，不编码任何内容；用 #/. 表示以免被误读成数字串 */
+var QRBITS='###..#.###.#...###...##.#.#.###.##...#...#.####..#.####....###...###.##..##.#..#..##.#..####.#.#.####..#...##..##.###.#.##';
+function qrGrid(){var h='';for(var i=0;i<121;i++)h+='<i class="'+(QRBITS.charAt(i)==='#'?'':'o')+'"></i>';return h}
+function qrBlock(dim,label){
+ return '<div class="qr" role="img" aria-label="'+label+'"'+(dim?' style="opacity:.24"':'')+'><div class="qr-grid">'+qrGrid()+'</div>'+
+  (dim?'':'<span class="qr-corner tl"></span><span class="qr-corner tr"></span><span class="qr-corner bl"></span><span class="qr-corner br"></span>')+'</div>';
+}
+/* 两层选择：先选服务端**已启用**通道，再选扫码方式；**支付尝试创建之后**两层才一起锁定。
+   locked 由 PICKER_OFF 决定，pending-scan 故意不在其中：等扫码器读数时尚未创建尝试，两层都还能改。
+   只渲染 FIX.list 里的通道 —— 没启用的通道既不出按钮，也不出现在文案里。 */
+function channelPicker(locked){
+ var inner;
+ if(!FIX.list.length){
+  var note=FIX.status==='loading'?'正在读取本机可用的支付通道':
+           FIX.status==='failed'?'暂时读不到本机可用的支付通道':
+           FIX.status==='not-applicable'?'本次不涉及付款':'本机未启用任何支付通道';
+  inner='<div class="picker-note" data-testid="cashier-channel-note">'+note+'</div>';
+ }else{
+  inner=FIX.list.map(function(key){
+   var label=CHANNEL_LABEL[key];
+   var on=FIX.channel===key;
+   var note=CHANNEL_NOTE[key]?'<span class="cd">'+CHANNEL_NOTE[key]+'</span>':'';
+   var body=label+note;
+   var why=FIX.state==='attempt-channel-unknown'?'本次通道未确认，不能选择':
+           (FIX.state==='expired'||FIX.state==='attempt-failed')?'这次支付尝试已经结束，请用下方按钮重新发起':
+           FIX.channel?'本次支付已锁定，不能切换':'当前不可选择';
+   if(locked) return '<div class="channel'+(on?' on':'')+'" role="group" aria-disabled="true" data-channel="'+key+'" data-testid="cashier-channel-'+key+'" aria-label="'+label+'（'+why+'）"'+(on?' aria-current="true"':'')+'>'+body+'</div>';
+   return '<a class="channel press'+(on?' on':'')+'" href="'+selfLink('channel-selected',{channel:key})+'" data-route="/print/cashier" data-channel="'+key+'" data-testid="cashier-channel-'+key+'"'+(on?' aria-current="true"':'')+'>'+body+'</a>';
+  }).join('');
+ }
+ return '<div class="pay-picker channels"><span class="picker-label">支付通道</span>'+inner+'</div>';
+}
+function modePicker(active,off){
+ var inner;
+ if(!FIX.list.length){
+  inner='<div class="picker-note" data-testid="cashier-mode-note">'+(FIX.status==='not-applicable'?'本次不需要扫码':'没有可用支付通道，暂不能扫码')+'</div>';
+ }else{
+  inner=[['qr','qr','手机扫屏幕上的码','你用手机扫这台机器的屏幕','pending-qr'],
+         ['code','scanner','出示你的付款码','本机扫码器读你手机上的付款码','pending-scan']].map(function(m){
+   var inner2='<span class="mi">'+svg(m[1],'currentColor',26)+'</span><span><b>'+m[2]+'</b><span class="d">'+m[3]+'</span></span>';
+   if(off) return '<div class="mode'+(active===m[0]?' on':'')+'" role="group" aria-disabled="true" data-mode="'+m[0]+'" data-testid="cashier-mode-'+m[0]+'" aria-label="'+m[2]+'（当前不可选）"'+(active===m[0]?' aria-current="true"':'')+'>'+inner2+'</div>';
+   return '<a class="mode press'+(active===m[0]?' on':'')+'" href="'+selfLink(m[4])+'" data-route="/print/cashier" data-mode="'+m[0]+'" data-testid="cashier-mode-'+m[0]+'"'+(active===m[0]?' aria-current="true"':'')+'>'+inner2+'</a>';
+  }).join('');
+ }
+ return '<div class="pay-picker methods"><span class="picker-label">扫码方式</span>'+inner+'</div>';
+}
+function paymentPicker(method,locked,methodsOff){
+ return channelPicker(locked)+modePicker(method,locked||methodsOff);
+}
+/* 本次通道只在服务端已确认时才写进订单信息，未确认就整行不出现 */
+function channelRow(){
+ return FIX.label?'<div><span>支付通道</span><b data-testid="cashier-selected-channel">'+FIX.label+'</b></div>':'';
+}
+function amountCard(num,lb,src){
+ var known=/^\d+\.\d{2}$/.test(num);
+ return '<div class="amount-card"><div class="amount-lb">'+lb+'</div>'+
+  '<div class="amount'+(known?'':' amount-message')+'" data-quote-slot="true" data-quote-status="'+(known?'known':'unavailable')+'" data-testid="cashier-amount">'+
+  (known?'<span class="cur">¥</span>':'')+'<span class="num">'+num+'</span></div>'+
+  '<div class="amount-src" data-disclaimer="true" data-testid="cashier-amount-source">'+src+'</div>'+couponLedger(known)+'</div>';
+}
+/* ---------------------------------------------------------------- 优惠券（只读）
+   收银台不提供选券入口：支付尝试一旦创建，服务端已把金额快照进尝试，换券会让
+   用户确认过的金额与实际扣款对不上。所以这里只承载「原价 / 抵扣 / 最终应付」三行只读摘要。
+
+   默认（无 ?coupon= 或非 debug）**不渲染任何抵扣行** —— 服务端订单没有优惠快照
+   （没有 quoteId、没有券预占），凭空画一行「已抵扣」就是虚构优惠。
+   `?debug=1&coupon=selected|locked` 只作为**设计状态**演示未来合同的版面。
+   三个金额同源于 COUPON_FIXTURE 这一个对象，不做 原价-面值 的本地算式。
+
+   状态词与 14-print-confirm.html 和 React `PrintCouponState` 统一为 `selected`
+   （原来这里叫 `applied`，同一件事两个名字，截图器按 `selected` 取图就会拍到没变化的
+   默认屏，人以为"设计没做"）。全站只保留 selected 一个词。 */
+var COUPON_STATES=['none','selected','locked','zero-payable'];
+var COUPON_FIXTURE={source:'mock',couponId:'CPN-DEMO-8',originalAmountCents:200,discountCents:100,payableAmountCents:100};
+var rawCoupon=q.get('coupon');
+var DEBUG=q.get('debug')==='1';
+var COUPON=(rawCoupon!==null&&COUPON_STATES.indexOf(rawCoupon)>=0&&(DEBUG||rawCoupon==='none'))?rawCoupon:'none';
+/* 锁优先：对齐 resolvePrintCouponState —— paymentAttemptLocked 分支排在所有分支最前面。
+   本单一旦创建过支付尝试，selected（还能改的「已选」）就不再成立，只能是 locked。 */
+if(FIX.locked&&COUPON==='selected') COUPON='locked';
+function yuan(c){return '¥'+(c/100).toFixed(2)}
+/* 主金额（大字）= 用户这一单**实际要付**的钱。
+   选中优惠时它必须等于 COUPON_FIXTURE.payableAmountCents，否则会出现
+   「大字 ¥2.00，明细却写原价 2.00 / 抵扣 1.00 / 实付 1.00」的自相矛盾 ——
+   终审就是这么抓到的。数值只从 COUPON_FIXTURE 取，不另写常量、不在这里做减法。
+   none / zero-payable 保持各屏原有的排版示例金额。 */
+function mainAmount(){
+ return (COUPON==='selected'||COUPON==='locked')
+  ? yuan(COUPON_FIXTURE.payableAmountCents).replace('¥','')
+  : yuan(COUPON_FIXTURE.originalAmountCents).replace('¥','');
+}
+/* 只读价目明细：原价 / 抵扣 / 最终应付，三个数同源于 COUPON_FIXTURE，渲染在金额卡内部。
+   none 一行都不画（没有真实优惠）；零元单也不画（0 元没有可抵扣的原价，那一单只需要一句结论）。
+   「（设计态夹具，非真实优惠）」原先跟在抵扣数字后面，那串字在 372px 的金额卡里放不下会被
+   overflow:hidden 静默切掉，所以改成明细底部的一行注脚 —— 它现在管的是上面三个数，
+   比只标注抵扣一行更严：这一组金额整组都不是真实优惠。 */
+function couponLedger(known){
+ if(COUPON==='none')return '';
+ if(COUPON==='zero-payable')return '';
+ var f=COUPON_FIXTURE;
+ return '<div class="amount-ledger" data-evidence-fixture="synthetic" data-testid="cashier-coupon-ledger">'+
+  /* 大字是「金额暂不可用」时，紧跟着三个具体金额会自相矛盾，所以这里补一句它们是什么：
+     已锁定的订单 → 这就是重新出码时仍会收的那笔（和 .amount-src 那句同一件事）；
+     未锁定的订单（读通道失败 / 未启用通道）→ 只是本单价目，本次并不会发起支付。
+     大字本身是金额时不加这行 —— 「最终应付」等于上面那个数，一看就知道是它的明细。 */
+  (known?'':'<span class="lg-lb">'+(FIX.locked?'本单已锁定的价目':'本单价目明细')+'</span>')+
+  '<div data-coupon-row="original"><span>原价</span><b>'+yuan(f.originalAmountCents)+'</b></div>'+
+  '<div data-coupon-row="discount"><span>优惠券抵扣</span><b>−'+yuan(f.discountCents)+'</b></div>'+
+  '<div data-coupon-row="payable"><span>最终应付</span><b>'+yuan(f.payableAmountCents)+'</b></div>'+
+  '<span class="lg-fix" data-disclaimer="true">以上三个金额是设计态夹具，非真实优惠</span></div>';
+}
+/* 只读优惠状态行。none 时返回空串 —— 没有真实优惠就一行都不画。
+   「这张券现在还能不能换」是订单属性，和支付通道 / 支付状态并排读最自然，所以它留在
+   右栏订单信息里，只占一行；三个金额则跟着大字走（见 couponLedger）。 */
+function couponRows(){
+ if(COUPON==='none')return '';
+ if(COUPON==='zero-payable')
+  return '<div data-coupon-row="zero"><span>优惠券</span><b>本单应付 0 元，无需使用优惠券</b></div>';
+ /* 这一行认的是 FIX.locked（服务端有没有创建过支付尝试），不是券夹具那个词：
+    `?state=expired&coupon=selected` 这类组合下，夹具说「已选可改」而订单其实已锁，
+    照夹具画就会在一个已经出过码的订单上写「可返回确认页修改优惠券」。 */
+ return (FIX.locked
+  ? '<div data-coupon-row="locked"><span>优惠状态</span><b>已锁定 · 本单已创建支付尝试，不可更换优惠券；改券只能重新下单</b></div>'
+  : '<div data-coupon-row="editable"><span>优惠状态</span><b>尚未出码 · 可返回确认页修改优惠券</b></div>');
+}
+/* 券摘要在场时，侧栏那张「第二遍解释」卡整块让位（为什么分两步 / 还可以改通道 /
+   还能改 / 安全提示 / 请稍候 …）—— 它们讲的都是上面状态块已经讲过的事，而这一屏
+   现在多了一组价目明细。不让位的话，收尾卡会被挤出自己的卡片边界（探针实测最坏
+   152.2px），pending-scan 甚至直接画到底部事实说明条上。
+   这和锁定态那条让位规则是同一条（见 lockedNote），不是新规则。
+   让位的只有「第二遍」解释卡：订单信息、取件凭证码、状态块与 CTA 一律不动。 */
+function aside(html){return COUPON==='none'?(html||''):''}
+function orderInfo(extra){
+ return '<div class="pgrp" data-evidence-fixture="synthetic"><h4>订单信息 <span class="chip">界面排版示例</span></h4><div class="kv" style="margin-top:12px">'+
+  '<div><span>订单号</span><b>当前打印订单</b></div>'+
+  '<div><span>内容</span><b>求职简历.pdf · 3 页 · 1 份</b></div>'+
+  '<div><span>参数</span><b>A4 · 黑白 · 单面</b></div>'+couponRows()+(extra||'')+'</div></div>';
+}
+/* 「改参数 / 改券」的唯一出口。锁定后**不给**回确认页这条路：确认页会重新报价、重新建单，
+   而这一单的金额与优惠已经被服务端快照进支付尝试，回去改只会让用户确认过的价和实际扣款对不上。
+   锁定态给的是诚实出路 —— 重新下单，从文件源重走一遍（对齐 PrintCashierPage：
+   amountLocked 时顶栏走 uploadPath，不透传旧订单 state）。 */
+function paramsBackCta(){
+ return FIX.locked
+  ? '<a class="btn ghost press" href="12-file-source.html" data-route="/print/upload">改参数需重新下单</a>'
+  : '<a class="btn ghost press" href="14-print-confirm.html" data-route="/print/confirm">返回改参数</a>';
+}
+/* 锁定态的同一句话，四个屏共用：能重来的是支付，不能改的是金额与优惠。
+   一段讲完「还能改什么 / 不能改什么 / 想改怎么办」—— 锁定态的侧栏解释卡因此整块让位，
+   讲两遍会把收尾卡压到底部事实说明条上（1080x1920 探针实测 -76.8px）。 */
+function lockedNote(){
+ return '<div class="state-p">这一单<b>已经创建过支付尝试</b>：可以换支付通道和扫码方式重新发起，但金额与优惠已被服务端锁定，只能沿用；要改打印参数或换优惠券，只能<b>重新下单</b>，从选文件那一步重走一遍。</div>';
+}
+function ctaDisabled(label,reason,secondary){
+ return '<div class="cta-reason" data-testid="'+SCREEN+'-disabled-reason">'+reason+'</div>'+
+  '<div class="ctabar">'+secondary+'<span class="btn primary" role="button" aria-disabled="true" style="flex:1.6" data-testid="'+SCREEN+'-primary" aria-label="'+label+'（'+reason+'）">'+label+'</span></div>';
+}
+/* 终态类页面统一骨架：大状态块 + 订单信息 + 说明 */
+/* 终态骨架：状态块 → 金额 / 订单两栏 → 收尾说明卡（判定依据 + 没有发生什么） */
+function closerCard(basis){
+ return '<section class="sec last closure"><div class="card"><div><h4 style="font-size:24px;font-weight:700">接下来怎么办</h4>'+
+  '<div class="state-p">'+basis+'</div></div><div class="closure-flow">'+
+  '<div><b>1. 看清本页结果</b><span>先确认是等待、成功、失败、关闭还是退款。</span></div>'+
+  '<div><b>2. 不重复付款</b><span>结果异常或长时间未更新时，先查看支付账单。</span></div>'+
+  '<div><b>3. 按底部按钮继续</b><span>当前可用的处理动作已经放在屏幕下方。</span></div>'+
+  '</div></div></section>';
+}
+/* 待支付两态专用收尾卡 */
+function closerScan(basis){
+ return '<section class="sec last closure"><div class="card"><div><h4 style="font-size:24px;font-weight:700">付款提示</h4>'+
+  '<div class="state-p">'+basis+'</div></div><div class="closure-flow">'+
+  '<div><b>1. 核对金额</b><span>正式使用时只认当前订单返回的实际金额。</span></div>'+
+  '<div><b>2. 只操作一次</b><span>请勿重复扫码或重复出示手机付款码。</span></div>'+
+  '<div><b>3. 等待结果确认</b><span>付款码不会完整显示或保存在这台机器上。</span></div>'+
+  '</div></div></section>';
+}
+function terminalView(kind,icon,title,paras,chips,extraSide,amountLb,amountSrc,amountNum,sideExtra,basis){
+ return '<section class="sec"><div class="state" data-kind="'+kind+'" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg(icon,'currentColor',28)+title+'</div>'+paras+
+  (chips?'<div class="meta">'+chips+'</div>':'')+'</div></section>'+
+  /* 解释卡挂左栏，不挂右栏：左栏只有一张 372px 金额卡（181~208px），右栏订单信息本来就更高，
+     再往右栏叠一张卡，两栏差距只会更大，而 .paywrap 的高度取两栏较高的那个 —— 多出来的高度
+     全部由下面 flex:1 的收尾卡承担。单通道那两屏正是这么被压破卡片边界的
+     （?state=pending&channels=sandbox 探针实测 +8.2px）。挂左栏等于用掉本来空着的那段高度。 */
+  '<section class="sec"><div class="paywrap"><div class="paycol">'+
+  amountCard(amountNum||'金额暂不可用',amountLb,amountSrc)+aside(sideExtra)+'</div>'+
+  '<div class="side">'+orderInfo(extraSide)+'</div></div></section>'+
+  closerCard(basis||'请按页面提示处理；支付结果长时间未更新时，先查看支付账单。');
+}
+var V={};
+V['no-order']=function(){
+ return '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('empty','currentColor',28)+'没有待支付的订单</div>'+
+  '<div class="state-p">收银台要有<b>已经建好的订单</b>才能收款。你可能是从旧链接直接进来的，或者这一单已经办完了。</div>'+
+  '<div class="state-p">想查已经下过的单，去「我的打印订单」；想重新打，回选文件那一步。</div></div></section>'+
+  '<section class="sec grow last"><div class="card"><div class="emptybox"><span class="ei">'+svg('empty','currentColor',40)+'</span>'+
+  '<span>没有订单上下文。<br><b>这里不显示金额，也不出码 —— 出一张扫不通的码只会让你白扫。</b></span></div></div></section>'+
+  '<div class="ctabar"><a class="btn ghost press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="12-file-source.html" data-route="/print/upload" data-testid="'+SCREEN+'-primary">重新发起打印</a></div>';
+};
+V['session-expired']=function(){
+ return terminalView('warn','clock','当前支付页面已失效',
+  '<div class="state-p">订单仍然保留，请从「我的打印订单」重新进入。<b>重新进入不会重复扣款。</b></div>',
+  '<span class="chip warn">当前页面已失效</span><span class="chip">订单仍保留</span>',
+  '<div><span>下一步</span><b>从订单列表重新进入</b></div>',
+  '本次应付','金额暂不可用，请重新进入订单查看。')+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders" data-testid="'+SCREEN+'-primary">从我的打印订单重进</a></div>';
+};
+V['free-order']=function(){
+ return terminalView('info','check','本次无需付款',
+  '<div class="state-p">订单已经创建，可以直接开始打印。</div>',
+  '<span class="chip ok">订单已建立</span><span class="chip">无需付款</span><span class="chip">本次未收款</span><span class="chip">待释放出纸</span>',
+  '<div><span>收款情况</span><b>本次未收款</b></div><div><span>下一步</span><b>开始打印</b></div>',
+  '本次应付','系统报价为 0，本次未收款。','0.00')+
+  '<div class="ctabar"><a class="btn ghost press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="15-print-fulfill.html?free=1" data-route="/print/progress" data-testid="'+SCREEN+'-primary">开始打印</a></div>';
+};
+V['channel-loading']=function(){
+ return terminalView('info','clock','正在加载支付方式',
+  '<div class="state-p">读到本机已启用的支付通道后，才会列出可选项；再选择扫屏幕码或出示付款码。<b>没读到之前不会替你选。</b></div>',
+  '<span class="chip">正在加载</span><span class="chip">尚未发起支付</span>',
+  '<div><span>支付状态</span><b>尚未发起支付</b></div>',
+  '本次应付','正在读取订单金额。')+
+  ctaDisabled('支付方式加载后可继续','支付方式仍在加载',paramsBackCta());
+};
+V['channel-empty']=function(){
+ return terminalView('lock','lock','当前设备暂不支持在线付款',
+  '<div class="state-p">订单已保留，本次没有发起支付。请联系工作人员处理。</div>',
+  '<span class="chip bad">暂不支持在线付款</span><span class="chip">订单已保留</span>',
+  '<div><span>可用通道</span><b>无</b></div><div><span>本机是否扣款</span><b>否</b></div>',
+  '本次应付','金额暂不可用，本次不会发起支付。')+
+  '<div class="ctabar"><a class="btn ghost press" href="12-file-source.html" data-route="/print/upload">改天再打</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="06-help.html" data-route="/help" data-testid="'+SCREEN+'-primary">联系工作人员</a></div>';
+};
+V['channel-failed']=function(){
+ return terminalView('error','warn','支付方式加载失败',
+  '<div class="state-p">本次没有发起支付，请重试。</div>',
+  '<span class="chip bad">加载失败</span><span class="chip">尚未发起支付</span>',
+  '<div><span>通道请求</span><b>失败</b></div><div><span>本机是否扣款</span><b>否</b></div>',
+  '本次应付','金额暂不可用，本次不会发起支付。')+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('channel-loading')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重新读取支付通道</a></div>';
+};
+V['pending']=function(){
+ /* 失败 / 过期之后重试出码，也会落到这一屏（selfLink 把 attempted=1 带了过来）。
+    那时订单已经创建过支付尝试：能重选的是通道与扫码方式，金额与优惠不在其中。 */
+ var re=FIX.locked;
+ return terminalView('info','info',re?'请重新选择支付通道':'请先选择支付通道',
+  /* 锁定态同样收短一档：两步选择的锁定时点交给下面的 lockedNote 一起讲，
+     不收的话收尾卡会顶到禁用原因行上（探针实测 +1.4px）。 */
+  '<div class="state-p">本机当前已启用'+channelNames()+'，请在上方选一个。'+(re?'':'<b>选定通道后再选扫码方式，创建支付尝试后两者都会锁定。</b>')+'</div>'+
+  (re?lockedNote():''),
+  (re?'<span class="chip warn">上一次尝试已结束</span><span class="chip">金额与优惠已锁定</span>':'<span class="chip ok">尚未发起支付</span>')+'<span class="chip">先选通道</span>',
+  '<div><span>支付状态</span><b>'+(re?'上一次尝试已结束，本次尚未重新出码':'尚未发起')+'</b></div><div><span>下一步</span><b>选择一个支付通道</b></div>',
+  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount(),
+  re?'':'<div class="pgrp"><h4>为什么分两步选择</h4><div class="state-p">支付通道决定由哪个支付平台收款；扫码方式决定是你扫屏幕，还是本机读取你的付款码。</div></div>',
+  re?'上一次支付尝试已结束，本次尚未重新出码；金额与优惠沿用本单已锁定的结果。':'当前尚未创建支付尝试；请先选择支付通道。')+
+  ctaDisabled('选择上方支付通道','尚未选择支付通道',paramsBackCta());
+};
+V['channel-selected']=function(){
+ var label=FIX.label;
+ var only=FIX.list.length===1;
+ var others=channelNames(FIX.list.filter(function(c){return c!==FIX.channel}));
+ var sandbox=FIX.channel==='sandbox';
+ return terminalView('info','info',only?'本机只启用了一个支付通道':'通道已选，请选择扫码方式',
+  /* 锁定态把这段收短一档：重试语义交给下面的 lockedNote 讲，这里只留「两种扫码方式各自何时锁」。
+     不收的话，单通道 + 设计态券明细那一组合会把收尾卡压到只剩 3px 余量（探针实测）。 */
+  (FIX.locked
+   /* 锁定态把测试通道声明并进同一段：多一段就多一个段间距，
+      sandbox + 设计态券那一组合正好因此顶到禁用原因行上（探针实测 +13.4px）。 */
+   ? '<div class="state-p">当前用'+label+'。现在选“手机扫屏幕上的码”或“出示你的付款码”，<b>前者会立刻出码</b>。'+(sandbox?'<b>'+label+'不会真实收款</b>，只用于内部联调。':'')+'</div>'
+   : '<div class="state-p">'+(only?'本机当前只启用了'+label+'，已经直接用它。':'当前选择'+label+'。')+'现在选择“手机扫屏幕上的码”或“出示你的付款码”。<b>选屏幕上的码会立刻出码并锁定通道与方式；选付款码只是开始等扫码器读数，读满并提交后才锁定。</b></div>')+
+  (FIX.locked?lockedNote():'')+
+  ((sandbox&&!FIX.locked)?'<div class="state-p"><b>'+label+'不会真实收款</b>，只用于内部联调；正式对外营业不会出现这个通道。</div>':''),
+  /* 锁定态整排收掉状态 chip：通道名与「已锁定」这两件事，顶栏状态条（重新出码 · 金额与优惠已锁定）、
+     上面的正文和右侧订单信息都已经各讲一遍，第四遍要多占一整行，正好把收尾卡顶到禁用原因行上。
+     通道的 data-testid 随之落到订单信息那一行（channelRow），不会因为收 chip 而丢。 */
+  FIX.locked?'':'<span class="chip ok" data-testid="cashier-selected-channel">'+label+'</span><span class="chip">尚未创建尝试</span>',
+  (FIX.locked?channelRow():'<div><span>支付通道</span><b>'+label+'</b></div>')+'<div><span>下一步</span><b>选择扫码方式</b></div>',
+  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount(),
+  FIX.locked?'':'<div class="pgrp"><h4>'+(only?'为什么只有一个':'还可以改通道')+'</h4><div class="state-p">'+(only?'页面只列出本机已启用的支付通道；没启用的不会摆在这里让你白点。':'本次还没有向支付平台发起收款，所以仍可改选'+others+'；出码或提交付款码之后才锁定。')+'</div></div>',
+  '通道已选，但支付尝试尚未创建；请选择扫码方式。')+
+  ctaDisabled('选择上方扫码方式','尚未选择扫码方式',only?paramsBackCta():'<a class="btn ghost press" href="'+selfLink('pending',{channel:''})+'" data-route="/print/cashier">重新选通道</a>');
+};
+V['pending-qr']=function(){
+ return '<section class="sec"><div class="paywrap" data-evidence-fixture="synthetic"><div class="paycol">'+qrBlock(false,'收款码排版示例，不可扫码')+
+  '<div class="qr-cap"><b>界面排版示例 · 不可扫码</b><br>这张码属于'+FIX.label+'，只能用'+FIX.label+'扫；接入真实支付接口后显示可用收款码</div></div>'+
+  '<div class="side">'+amountCard(mainAmount(),'本次应付','排版示例金额；正式前端必须绑定订单真实金额。')+
+  orderInfo(channelRow()+'<div><span>支付状态</span><b>等待付款</b></div>')+
+  /* 底部事实说明条已经写着「页面会在系统确认结果后更新」，主按钮本身就是「刷新付款结果」，
+     所以券摘要在场时这张卡整块让位。这一屏的金额卡在右栏，让位的高度正好抵掉明细的高度。 */
+  aside('<div class="pgrp"><h4>付款完成后</h4><div class="state-p">页面会自动确认结果。长时间未更新时，可以手动刷新，刷新仍然查这一次'+FIX.label+'的结果。</div></div>')+
+  '</div></div></section>'+
+  closerScan('支付尝试已经创建。请勿切换方式、重复付款或重新下单。')+
+  '<div class="ctabar"><a class="btn ghost press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders">查看我的订单</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('pending-qr')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">刷新付款结果</a></div>';
+};
+V['pending-scan']=function(){
+ return '<section class="sec"><div class="paywrap" data-evidence-fixture="synthetic"><div class="paycol">'+
+  '<div class="hid" data-testid="cashier-hid-field"><h4>请出示'+FIX.label+'付款码</h4>'+
+  '<div class="state-p">把'+FIX.label+'的付款码对准设备扫码窗口，读满十八位后会自动提交。<b>现在还没有向支付平台发起收款。</b></div>'+
+  '<div class="hid-field"><span class="caret breathe" aria-hidden="true"></span><span>等待扫码器输入…</span></div>'+
+  '<div class="state-p" style="margin-top:14px">已读位数（付款码共十八位）</div>'+
+  '<div class="slots" role="img" aria-label="付款码读取进度：已读零位，共十八位"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>'+
+  '<div class="reason" data-disclaimer="true" style="color:var(--ink-3);font-weight:400">付款码不会在屏幕上完整显示或保存。</div></div>'+
+  /* 「安全提示」跟着扫码框走，留在左栏：这一屏右栏叠了金额卡 + 订单信息 + 两张解释卡（探针实测 816.6px），
+     左栏只有一张 454.4px 的扫码卡，空着 362px；而 .paywrap 取两栏较高的那个，多出来的高度全部由
+     下面 flex:1 的收尾卡承担，卡片边界因此被压破 15.6px。这句话本来就是说给正在出示付款码的人听的。 */
+  aside('<div class="pgrp"><h4>安全提示</h4><div class="state-p">读满后只提交一次。请勿重复出示付款码。</div></div>')+'</div>'+
+  '<div class="side">'+amountCard(mainAmount(),'本次应付','排版示例金额；正式前端必须绑定订单真实金额。')+
+  orderInfo(channelRow()+'<div><span>扫码方式</span><b>出示付款码</b></div><div><span>支付状态</span><b>尚未提交付款码</b></div>')+
+  /* 这张卡和左栏那张「安全提示」说的话，下面的「付款提示」收尾卡逐条讲过：仍可改回屏幕码 /
+     换通道（基准句）、只操作一次（第 2 条）、付款码不完整显示或保存（第 3 条 + 上面 .hid 里的那行）。
+     所以券摘要在场时两张一起整块让位，信息一条不少。 */
+  aside('<div class="pgrp"><h4>还能改</h4><div class="state-p">本次还没有发起支付，所以通道和扫码方式都仍可改：可以改回屏幕上的码，也可以在上方换一个通道。付款码提交之后才会锁定。</div></div>')+
+  '</div></div></section>'+
+  closerScan('读满十八位并提交后才会向支付平台发起；在那之前仍可改回屏幕上的码或更换通道。')+
+  '<div class="ctabar"><a class="btn ghost press" href="'+selfLink('pending-qr')+'" data-route="/print/cashier">改用扫屏幕的码</a>'+
+  '<span class="btn primary" role="button" aria-disabled="true" style="flex:1.6" data-testid="'+SCREEN+'-primary" aria-label="等扫码器读满十八位后才会提交（当前未连接扫码器，尚未发起支付）">等待读取付款码</span></div>';
+};
+V['awaiting-code-confirmation']=function(){
+ return terminalView('info','clock','正在确认付款结果',
+  '<div class="state-p">支付平台正在确认。<b>请勿重复出示付款码或重新下单。</b></div>',
+  '<span class="chip">确认中</span><span class="chip warn">请勿重复出示</span>',
+  channelRow()+'<div><span>付款码</span><b>已提交，不会保存在页面</b></div><div><span>支付状态</span><b>正在确认</b></div>',
+  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount())+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('awaiting-code-confirmation')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">刷新付款结果</a></div>';
+};
+V['pending-verification']=function(){
+ return terminalView('warn','warn','付款结果暂未确认',
+  '<div class="state-p">请先查看你的'+FIX.label+'账单，<b>不要重复付款</b>。仍无法确认时请联系工作人员。</div>',
+  '<span class="chip warn">结果未确认</span><span class="chip bad">请勿重复扫码</span>',
+  channelRow()+'<div><span>本次支付</span><b>结果暂未确认</b></div><div><span>下一步</span><b>先查'+FIX.label+'账单</b></div>',
+  '本次应付','排版示例金额；正式前端必须绑定订单真实金额。',mainAmount())+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员核实</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('pending-verification')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">再次刷新结果</a></div>';
+};
+V['paid']=function(){
+ return '<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
+  '<div class="state-h">'+svg('check','currentColor',28)+'付款成功</div>'+
+  '<div class="state-p">系统已确认付款，正在准备打印。</div></div></section>'+
+  '<section class="sec"><div class="paywrap" data-evidence-fixture="synthetic"><div class="paycol">'+
+  amountCard(mainAmount(),'已付金额','排版示例金额；正式前端必须绑定支付结果。')+'</div>'+
+  '<div class="side">'+orderInfo(channelRow()+'<div><span>支付状态</span><b>已付款</b></div><div><span>下一步</span><b>开始打印</b></div>')+
+  '<div class="pgrp"><h4>取件凭证码</h4>'+
+  '<div class="state-p" data-testid="cashier-pickup-code" data-pickup-status="pending"><b>取件凭证正在生成</b><br>生成后会显示在订单详情中；暂未生成时也可以查看打印进度。</div></div>'+
+  '</div></div></section>'+
+  closerCard('可以直接查看打印进度；取件凭证生成后会同步显示在订单详情中。')+
+  '<div class="ctabar"><a class="btn ghost press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="15-print-fulfill.html" data-route="/print/progress" data-testid="'+SCREEN+'-primary">去看打印进度</a></div>';
+};
+V['release-failed']=function(){
+ if(FIX.order==='free'){
+  /* 零元单：订单真实存在，但本机从头到尾没收过钱 —— 这里只能说未收款 */
+  return terminalView('warn','warn','本次无需付款，但打印任务还没建立',
+   '<div class="state-p">订单已经创建，<b>本机没有向你收过钱</b>，只是这次创建打印任务没有完成。</div>'+
+   '<div class="state-p">重试只会重新创建同一个打印任务，<b>不会发起收款，也不会另开新订单</b>。</div>',
+   '<span class="chip ok">订单已建立</span><span class="chip">本次未收款</span><span class="chip warn">打印任务待恢复</span>',
+   '<div><span>收款情况</span><b>本次未收款</b></div><div><span>打印任务</span><b>尚未建立</b></div>',
+   '本次应付','系统报价为 0，本次未收款。','0.00',
+   '<div class="pgrp"><h4>会不会扣钱</h4><div class="state-p">这一单报价为 0，本来就不收款；重试只重新创建打印任务。</div></div>',
+   '本次未收款；当前只恢复打印任务，不进入收款流程。')+
+   '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+   '<a class="btn primary press" style="flex:1.6" href="'+selfLink('release-failed')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重试创建打印任务</a></div>';
+ }
+ return terminalView('warn','warn','付款已确认，打印任务尚未建立',
+  '<div class="state-p">服务端已经确认这笔'+FIX.label+'付款成功，但本次创建打印任务没有完成。<b>不要重新付款</b>，请重试创建同一打印任务。</div>',
+  '<span class="chip ok">已付款</span><span class="chip warn">打印任务待恢复</span>',
+  channelRow()+'<div><span>支付状态</span><b>已付款（服务端确认）</b></div><div><span>打印任务</span><b>尚未建立</b></div>',
+  '已付金额','排版示例金额；正式前端必须绑定支付结果。',mainAmount(),
+  '<div class="pgrp"><h4>为什么不会重新收款</h4><div class="state-p">这里只重试服务端的幂等任务释放，不会再次创建支付尝试。</div></div>',
+  '付款已经完成；当前只恢复打印任务，不再进入收款流程。')+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('release-failed')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重试创建打印任务</a></div>';
+};
+V['display-expired-reconciling']=function(){
+ return '<section class="sec"><div class="bignote" data-testid="'+SCREEN+'-fallback">'+svg('clock','currentColor',30)+
+  '正在确认付款结果，请勿重复支付。</div></section>'+
+  '<section class="sec"><div class="paywrap"><div class="paycol">'+qrBlock(true,'收款码显示期已过，正在核验')+
+  '<div class="qr-cap">收款码已停止显示</div></div>'+
+  '<div class="side" data-evidence-fixture="synthetic">'+amountCard(mainAmount(),'本次应付','排版示例金额；正式前端必须绑定订单真实金额。')+
+  orderInfo(channelRow()+'<div><span>支付状态</span><b>正在确认</b></div>')+
+  /* 「请勿重复付款」在下面那张 grow 状态块里已经是整屏最大的一句，这里让位不丢信息。 */
+  aside('<div class="pgrp"><h4>请稍候</h4><div class="state-p">你可能刚好在最后一秒完成付款。确认结果前，请勿再次支付。</div></div>')+
+  '</div></div></section>'+
+  '<section class="sec grow last"><div class="state" data-kind="warn" data-disclaimer="true">'+
+  '<div class="state-h">'+svg('warn','currentColor',26)+'请勿重复付款</div>'+
+  '<div class="state-p">结果未确认前再次付款，可能产生重复扣款。仍未更新时请查看支付账单。</div>'+
+  '<div class="meta"><span class="chip warn">正在确认</span><span class="chip bad">勿重复支付</span></div></div></section>'+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('display-expired-reconciling')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">刷新付款结果</a></div>';
+};
+V['expired']=function(){
+ return terminalView('warn','clock','屏上收款码已过期',
+  '<div class="state-p">服务端确认这次收款码已经过期，并且没有收到这笔钱。<b>订单本身还在，可以重新出一张码。</b></div>'+
+  '<div class="state-p">这和「订单已超时关闭」不是一回事：那种情况订单已经关了，不能再出码。</div>'+
+  lockedNote(),
+  '<span class="chip warn">收款码过期</span><span class="chip ok">订单未关闭</span><span class="chip">可重新出码</span><span class="chip">金额与优惠已锁定</span>',
+  channelRow()+'<div><span>收款码状态</span><b>已过期（服务端确认）</b></div><div><span>订单状态</span><b>未关闭，可重新出码</b></div>',
+  '本次应付','金额暂不可用；重新出码仍按本单已锁定的应付金额收款。')+
+  '<div class="ctabar">'+paramsBackCta()+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('pending',{channel:''})+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重新出一张收款码</a></div>';
+};
+V['attempt-failed']=function(){
+ var multi=FIX.list.length>1;
+ return terminalView('error','warn','这次支付尝试没有完成',
+  '<div class="state-p">服务端确认上一次'+FIX.label+'支付尝试已经失败，<b>旧码不能再扣款</b>。订单本身仍未关闭，可以重新发起一次。</div>'+
+  lockedNote(),
+  '<span class="chip bad">旧尝试已失败</span><span class="chip ok">订单未关闭</span><span class="chip">可重新支付</span><span class="chip">金额与优惠已锁定</span>',
+  channelRow()+'<div><span>支付尝试</span><b>失败（服务端确认）</b></div><div><span>订单状态</span><b>未关闭，可重试</b></div>',
+  '本次应付','金额暂不可用；重试仍按本单已锁定的应付金额收款。')+
+  /* 三个动作对应三件不同的事，缺一件就会把用户逼回确认页：重试（沿用锁定金额）、
+     换通道或找人、以及唯一能改参数换券的诚实出路 —— 重新下单。 */
+  '<div class="ctabar">'+(multi?'<a class="btn ghost press" href="'+selfLink('pending',{channel:''})+'" data-route="/print/cashier">换个支付通道</a>':'<a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>')+
+  paramsBackCta()+
+  '<a class="btn primary press" style="flex:1.6" href="'+selfLink('channel-selected')+'" data-route="/print/cashier" data-testid="'+SCREEN+'-primary">重新用'+FIX.label+'支付</a></div>';
+};
+/* 已经有支付尝试、却拿不到它属于哪个通道：不猜、不出码、不判成败 */
+V['attempt-channel-unknown']=function(){
+ return terminalView('warn','warn','这一单用的哪个支付通道，本机没确认',
+  '<div class="state-p">本机没有拿到这次支付使用的支付通道，所以<b>不出码，也不判断这次付款成没成</b>。</div>'+
+  '<div class="state-p">请从「我的打印订单」重新进入这一单查看最新结果。<b>已经付过的钱不会因为这个页面丢失。</b></div>',
+  '<span class="chip warn">通道未确认</span><span class="chip">不出码</span><span class="chip">不判成败</span>',
+  '<div><span>支付通道</span><b>本机未确认</b></div><div><span>能否出码</span><b>否</b></div>',
+  '本次应付','金额暂不可用，请重新进入订单查看。',null,
+  '<div class="pgrp"><h4>为什么不替你挑一个</h4><div class="state-p">猜错会让你扫到一张不属于这一单的码，也可能把别人的付款结果当成你的。宁可这里停住。</div></div>',
+  '通道未确认时一律不出码、不判成败，请从订单列表重进。')+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders" data-testid="'+SCREEN+'-primary">从我的打印订单重进</a></div>';
+};
+V['order-failed']=function(){
+ return terminalView('error','warn','订单支付已失败',
+  '<div class="state-p">服务端把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>如支付账单有扣款记录，请联系工作人员核对。</div>',
+  '<span class="chip bad">订单支付失败</span><span class="chip">禁止重新付款</span>',
+  channelRow()+'<div><span>订单支付状态</span><b>失败（服务端确认）</b></div><div><span>能否再付</span><b>不能，需重新下单</b></div>',
+  '原应付金额','金额暂不可用，请到订单详情查看记录。')+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="12-file-source.html" data-route="/print/upload" data-testid="'+SCREEN+'-primary">重新发起打印</a></div>';
+};
+V['closed']=function(){
+ return terminalView('error','warn','订单已超时关闭',
+  '<div class="state-p">服务端确认这张订单已经关闭。这张订单不能再出收款码，也不能继续支付。</div>'+
+  '<div class="state-p">要打的话，回去重新发起一次打印，重新报价、重新下单。如果你的支付账单里确实有这一笔，请拿订单号找工作人员核对。</div>',
+  '<span class="chip bad">订单已关闭</span><span class="chip">不能再出码</span>',
+  channelRow()+'<div><span>订单状态</span><b>已关闭（服务端确认）</b></div><div><span>能否再付</span><b>不能，需重新下单</b></div>',
+  '原应付金额','金额暂不可用，请到订单详情查看记录。')+
+  '<div class="ctabar"><a class="btn ghost press" href="06-help.html" data-route="/help">拿订单号找工作人员</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="12-file-source.html" data-route="/print/upload" data-testid="'+SCREEN+'-primary">重新发起打印</a></div>';
+};
+V['refunding']=function(){
+ return terminalView('warn','back','这一单正在退款',
+  '<div class="state-p">服务端返回订单处于<b>退款处理中</b>。退款尚未完成，这类订单一律不放行出纸。</div>'+
+  '<div class="state-p">退款到账时间以支付渠道为准，本机不预告到账时间，也不代为催办。</div>',
+  '<span class="chip warn">退款处理中</span><span class="chip">不放行出纸</span>',
+  channelRow()+'<div><span>订单状态</span><b>退款处理中（服务端确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
+  '原订单金额','退款金额与到账时间以支付渠道账单为准，本机不预告。')+
+  '<div class="ctabar"><a class="btn ghost press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="06-help.html" data-route="/help" data-testid="'+SCREEN+'-primary">联系工作人员</a></div>';
+};
+V['partial-refunded']=function(){
+ return terminalView('warn','back','这一单发生了部分退款',
+  '<div class="state-p">服务端返回订单处于<b>部分退款</b>状态。订单金额只退回了一部分，但这类订单仍然一律不放行出纸。</div>'+
+  '<div class="state-p">具体退款金额、剩余金额与到账结果以订单详情和支付渠道账单为准。本机不自行计算，也不提供继续支付或继续打印入口。</div>',
+  '<span class="chip warn">部分退款</span><span class="chip">不放行出纸</span>',
+  channelRow()+'<div><span>订单状态</span><b>部分退款（服务端确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
+  '原订单金额','已退金额与剩余金额以服务端订单详情为准，本机不估算。')+
+  '<div class="ctabar"><a class="btn ghost press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders">查看订单详情</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="06-help.html" data-route="/help" data-testid="'+SCREEN+'-primary">联系工作人员</a></div>';
+};
+V['refunded']=function(){
+ return terminalView('error','back','这一单已经退款',
+  '<div class="state-p">服务端返回订单<b>退款已完成</b>。这张订单不能再出纸；如需打印，请重新发起一张新订单。</div>'+
+  '<div class="state-p">实际到账以支付渠道账单为准，本机不预告到账时间。</div>',
+  '<span class="chip bad">退款已完成</span><span class="chip">不放行出纸</span>',
+  channelRow()+'<div><span>订单状态</span><b>已退款（服务端确认）</b></div><div><span>能否出纸</span><b>否</b></div>',
+  '原订单金额','退款结果以支付渠道账单为准，本机不预告到账时间。')+
+  '<div class="ctabar"><a class="btn ghost press" href="38-member-assets.html?state=orders-ready" data-route="/me/print-orders">我的打印订单</a>'+
+  '<a class="btn primary press" style="flex:1.6" href="12-file-source.html" data-route="/print/upload" data-testid="'+SCREEN+'-primary">重新发起打印</a></div>';
+};
+var PILL={
+ 'no-order':['warn','没有待支付的订单'],'session-expired':['warn','支付会话已过期'],'free-order':['ok','无需付款 · 订单已建立'],
+ 'channel-loading':['','正在读支付通道'],'channel-empty':['bad','未启用任何支付通道'],'channel-failed':['bad','支付通道读取失败'],
+ 'pending':['','请选择支付通道'],'channel-selected':['','通道已选 · 请选择扫码方式'],'pending-qr':['','等待支付 · 未确认'],'pending-scan':['','等待读取付款码 · 未发起支付'],'awaiting-code-confirmation':['','渠道确认中 · 未确认'],
+ 'pending-verification':['warn','支付状态待核实'],'paid':['ok','服务端确认已付'],'release-failed':['warn','已付款 · 打印任务待恢复'],'display-expired-reconciling':['warn','收款码到期核验中'],
+ 'expired':['warn','收款码已过期'],'attempt-failed':['bad','旧支付尝试已失败'],'attempt-channel-unknown':['warn','支付通道未确认'],'order-failed':['bad','订单支付已失败'],'closed':['bad','订单已超时关闭'],'refunding':['warn','退款处理中'],'partial-refunded':['warn','订单已部分退款'],'refunded':['bad','退款已完成']
+};
+/* 随 fixture 变化的顶栏文案：零元单不能顶着「已付款」 */
+function pillFor(st){
+ if(FIX.locked&&(st==='pending'||st==='channel-selected')) return ['warn','重新出码 · 金额与优惠已锁定'];
+ if(st==='release-failed'&&FIX.order==='free') return ['warn','无需付款 · 打印任务待恢复'];
+ if(st==='channel-selected'&&FIX.list.length===1) return ['','唯一可用通道 · 请选择扫码方式'];
+ return PILL[st];
+}
+var ASK={
+ 'no-order':['这里<em>没有订单</em>。','没有订单就没有收款。回上一步重新发起，或去我的打印订单查。'],
+ 'session-expired':['这单的<em>会话过期了</em>。','订单还在服务端，只是这台机器暂时查不到。重新进一次就行。'],
+ 'free-order':['这一单<em>不用付款</em>。','服务端报价为 0。<b>订单已经建好了</b>，我只负责把任务释放给打印机。'],
+ 'channel-loading':['正在看<em>能怎么付</em>。','读到已启用的通道之前不出码，免得你扫到一张废码。'],
+ 'channel-empty':['这台机器<em>收不了款</em>。','管理员还没开通任何收款方式。订单在，钱没扣。'],
+ 'channel-failed':['支付通道<em>没读到</em>。','读不到就不出码。这个状态下没有任何扣款发生。'],
+ 'pending':['先选<em>支付通道</em>。','选完通道再选扫码方式。创建尝试前都可以改。'],
+ 'channel-selected':['再选<em>扫码方式</em>。','通道已经选好。选屏幕上的码会立刻出码并锁定；选付款码要等机器读满并提交后才锁定。'],
+ 'pending-qr':['付款<em>成没成</em>，服务端说了算。','屏幕上这张码，<b>本机看不到你扫没扫</b>。只有服务端支付状态变成已付，才会去出纸。'],
+ 'pending-scan':['这次是<em>机器扫你</em>。','把手机付款码对准扫码窗口。<b>现在还没有发起支付</b>，读满并提交后才送出，送出也不代表付成了。'],
+ 'awaiting-code-confirmation':['码送出去了，<em>等回话</em>。','别重复出示，也别重新下单。结果只认服务端。'],
+ 'pending-verification':['结果<em>还没定</em>。','渠道可能还在处理。<b>先核实，别重复扫码。</b>'],
+ 'paid':['服务端说<em>已付</em>。','这是服务端确认的最终结果，不是我猜的。接下来创建并查看打印任务。'],
+ 'release-failed':['钱已付，<em>任务没建成</em>。','不要再付款。这里只重试创建同一打印任务。'],
+ 'attempt-channel-unknown':['这一单<em>走哪个通道，我没确认</em>。','没确认就不出码、不判成败。从我的打印订单重新进这一单。'],
+ 'display-expired-reconciling':['这张码<em>不显示了</em>。','但不代表渠道已经关单。<b>先对账，未确认前别重复支付。</b>'],
+ 'expired':['收款码<em>过期了</em>。','订单还在，重新出一张码就行。'],
+ 'attempt-failed':['旧尝试<em>已经失败</em>。','服务端确认旧码不能再扣款，订单还在，可以重新选择。'],
+ 'order-failed':['订单支付<em>已经失败</em>。','这是订单终态，不能再付；要打印请重新下单。'],
+ 'closed':['订单<em>已经关了</em>。','不能再付。要打的话重新来一次。'],
+ 'refunding':['这单<em>正在退款</em>。','退款尚未完成，不能出纸。到账时间以渠道为准。'],
+ 'partial-refunded':['这单<em>只退了一部分</em>。','部分退款后同样不能出纸。金额只认服务端订单详情与支付渠道账单。'],
+ 'refunded':['这单<em>已经退款</em>。','退款完成，不能出纸；需要打印请重新下单。']
+};
+/* 随 fixture 变化的小青台词：零元单不能说「钱已付」，单通道不能说「选一个」 */
+function askFor(st){
+ if(FIX.locked&&(st==='pending'||st==='channel-selected')) return ['这一单<em>再付一次</em>。','上一次尝试已经结束。<b>金额和优惠沿用这一单已经锁定的结果</b>，通道和扫码方式可以重新选；要改参数或换券，只能重新下单。'];
+ if(st==='release-failed'&&FIX.order==='free') return ['这一单<em>本来就没收钱</em>，任务没建成。','本次未收款。这里只重试创建同一打印任务，不会向你收款。'];
+ if(st==='pending') return ['先选<em>支付通道</em>。','本机已启用'+channelNames()+'。选完再选扫码方式，创建尝试前都可以改。'];
+ if(st==='channel-selected'&&FIX.list.length===1) return ['本机只有<em>'+FIX.label+'</em>。','没启用的通道不会摆出来。选屏幕上的码会立刻出码并锁定；选付款码要等读满并提交后才锁定。'];
+ return ASK[st];
+}
+var MODE={'pending':'','channel-selected':'','pending-qr':'qr','pending-scan':'code','awaiting-code-confirmation':'code','pending-verification':'code','display-expired-reconciling':'qr','expired':'qr','attempt-failed':'qr','channel-loading':''};
+/* 两层选择的锁定表：只有支付尝试真的创建之后（pending-qr / 付款码已提交），或订单已进终态，才锁。
+   pending-scan 故意不在表内 —— 那时只是在等扫码器读数，服务端还没有任何支付尝试。 */
+var PICKER_OFF={'no-order':1,'session-expired':1,'free-order':1,'channel-loading':1,'channel-empty':1,'channel-failed':1,'pending-qr':1,'awaiting-code-confirmation':1,'pending-verification':1,'paid':1,'release-failed':1,'display-expired-reconciling':1,'expired':1,'attempt-failed':1,'attempt-channel-unknown':1,'order-failed':1,'closed':1,'refunding':1,'partial-refunded':1,'refunded':1};
+function render(){
+ var st=FIX.state;
+ var root=document.getElementById('body-root');
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-channel',FIX.channel);
+ root.setAttribute('data-order',FIX.order);
+ root.setAttribute('data-channel-status',FIX.status);
+ root.setAttribute('data-available-channels',FIX.list.join(','));
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ root.innerHTML=V[st]();
+ document.getElementById('modes').innerHTML=paymentPicker(MODE[st]||'',!!PICKER_OFF[st],st==='pending');
+ var pill=pillFor(st),ask=askFor(st);
+ var p=document.getElementById('pill');
+ p.className='pill'+(pill[0]?' '+pill[0]:'');
+ document.getElementById('pill-txt').textContent=pill[1];
+ document.getElementById('pill-dot').className='dot'+((st==='awaiting-code-confirmation'||st==='channel-loading')?' breathe':'');
+ document.getElementById('xq-ask').innerHTML=ask[0];
+ document.getElementById('xq-doing').innerHTML=ask[1];
+ /* 只让用户去查这一次真的可能扣款的账单；通道未知时不点名任何一家 */
+ var billing=FIX.channel||(FIX.list.length===1?FIX.list[0]:'');
+ document.getElementById('truth-abnormal').innerHTML=billing==='sandbox'
+  ?'<b>异常处理</b>本次走的是测试支付通道，不产生真实账单；结果长时间未更新时请联系工作人员。'
+  :'<b>异常处理</b>结果长时间未更新时，请先查看你的'+(billing?CHANNEL_LABEL[billing]:'支付')+'账单，再联系工作人员。';
+ /* 顶栏返回与「改参数」CTA 认同一把锁，不再各写一张状态清单（旧清单漏了 expired /
+    attempt-failed，顶栏就成了绕开只读券摘要回确认页换券的后门）：
+      · 没有订单 → 没有确认页可回，回选文件那一步；
+      · 金额与优惠已锁定 → 回我的打印订单（对齐 PrintCashierPage 锁定后不回 /print/confirm）；
+      · 其余（这一单从未创建过支付尝试）→ 才允许回报价确认页。 */
+ var back=document.getElementById('back-link');
+ var target=st==='no-order'?['12-file-source.html','/print/upload','返回选择文件']
+  :FIX.locked?['38-member-assets.html?state=orders-ready','/me/print-orders','返回我的打印订单']
+  :['14-print-confirm.html','/print/confirm','返回报价确认'];
+ back.href=target[0];
+ back.setAttribute('data-route',target[1]);
+ back.setAttribute('aria-label',target[2]);
+ var here=location.search.replace(/^\?/,'').split('&').filter(function(kv){return kv&&kv.indexOf('debug=')!==0&&kv.indexOf('flat=')!==0}).join('&');
+ var links=document.querySelectorAll('#demo-panel a');
+ for(var i=0;i<links.length;i++) links[i].className=(links[i].getAttribute('data-q')===here?'on':'');
+}
+if(q.get('debug')==='1'){document.documentElement.classList.add('debug');document.querySelectorAll('#demo-panel a').forEach(function(a){a.href='?debug=1&'+a.getAttribute('data-q')})}
+render();
+/* 原型演示控制（非产品功能）：只切 data-state，不驱动任何业务结果 */
+document.getElementById('demo-tab').addEventListener('click',function(){
+  document.getElementById('demo-panel').classList.toggle('show');
+});
+/* 时钟：仅刷新顶栏时间文本，不改 data-state、不推进任何业务状态 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(new URLSearchParams(location.search).get('flat')==='1')document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

@@ -275,7 +275,7 @@ function buildFixture() {
   ])
   const jobFair = makeTable([
     fairRow('f-ok'),                                                    // 未结束
-    fairRow('f-ended', { endAt: new Date('2026-07-02T09:00:00Z'), startAt: PAST }), // 已结束
+    fairRow('f-ended', { endAt: PAST, startAt: PAST }), // 已结束（用 PAST 而非字面量：字面量会随运行日期改变含义）
     fairRow('f-nourl', { sourceUrl: '' }),
   ])
   const policyPost = makeTable([])

@@ -23,7 +23,7 @@ import type { MemberDataRequestStatus, MemberDataRequestType } from './member-pr
  * 必须与 `MemberDataExportMapper` 白名单一致；不得否认订单/文件等已在导出包中的分区。
  */
 export const MEMBER_DATA_REQUEST_SCOPE =
-  '一体机本页仅开放「撤回岗位 AI 授权」。账号注销暂未开放；数据导出在一体机端尚未开放。后台若执行导出，打包内容为会员相关元数据清单（账号摘要、文件清单、AI 服务记录摘要、打印订单、收藏、权益、浏览与外跳、通知、反馈、授权与历史请求），不含文件原文二进制与简历正文全文。撤回或注销入口不会删除简历、文档、打印订单或收藏。'
+  '一体机本页仅开放「撤回岗位 AI 授权」。账号注销暂未开放；数据导出在一体机端尚未开放。后台若执行导出，打包内容为会员相关元数据清单（账号摘要、文件清单、AI 服务记录摘要、打印订单、收藏、权益、浏览与外跳、求职进度、通知、反馈、授权与历史请求），不含文件原文二进制与简历正文全文。撤回或注销入口不会删除简历、文档、打印订单或收藏。'
 
 export const MEMBER_DATA_REQUEST_TYPE_LABEL: Record<MemberDataRequestType, string> = {
   export: '导出账号与业务元数据清单',
@@ -33,7 +33,7 @@ export const MEMBER_DATA_REQUEST_TYPE_LABEL: Record<MemberDataRequestType, strin
 
 export const MEMBER_DATA_REQUEST_TYPE_HINT: Record<MemberDataRequestType, string> = {
   export:
-    '导出需完成安全验证（step-up），并由后台生成短期私有元数据包。一体机本波不提供提交与下载入口，不伪造「已自动打包下载」。包内含文件清单、AI 记录、打印订单、收藏等摘要，不含文件原文与简历正文全文。',
+    '导出需完成安全验证（step-up），并由后台生成短期私有元数据包。一体机本波不提供提交与下载入口，不伪造「已自动打包下载」。包内含文件清单、AI 记录、打印订单、收藏、你自己填写的求职进度等摘要，不含文件原文与简历正文全文。',
   delete: '账号注销暂未开放。系统不会通过此入口删除简历、文档、打印订单或收藏。',
   revoke_consent:
     '提交后会立即撤回岗位 AI 授权；请求会记入处理记录。再次使用岗位 AI 时需重新确认授权。',

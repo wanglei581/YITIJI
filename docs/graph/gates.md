@@ -59,7 +59,7 @@ workspace 包的 `package.json` scripts 指向它。
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 746 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 752 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1087,6 +1087,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>scripts/fixture-time-bomb-baseline.json/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `scripts/fixture-time-bomb-baseline.json` | `verify-fixture-time-bombs.mjs` |
+
+</details>
+
+<details>
 <summary><code>scripts/generate-project-graph.mjs/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -1114,6 +1123,15 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
+<summary><code>scripts/verify-fixture-time-bombs.mjs/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `scripts/verify-fixture-time-bombs.mjs` | `verify-fixture-time-bombs.mjs` |
+
+</details>
+
+<details>
 <summary><code>services/api/package.json/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
@@ -1123,17 +1141,19 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/prisma/</code> — 7 个文件</summary>
+<summary><code>services/api/prisma/</code> — 9 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `services/api/prisma/migrations/20260711120000_add_fair_material_print_bridge/migration.sql` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs` |
 | `services/api/prisma/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql` | `verify-profile-commercial-first-batch.mjs` |
+| `services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql` | `verify-release-observation-contract.mjs` |
 | `services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs` |
 | `services/api/prisma/postgres/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/prisma/postgres/migrations/20260805132000_repair_notification_legal_defaults/migration.sql` | `verify-fusion-w4.mjs` |
-| `services/api/prisma/postgres/schema.prisma` | `verify-fusion-w4.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs` |
-| `services/api/prisma/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs` |
+| `services/api/prisma/postgres/migrations/20260901090000_add_agent_release_observation/migration.sql` | `verify-release-observation-contract.mjs` |
+| `services/api/prisma/postgres/schema.prisma` | `verify-fusion-w4.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-release-observation-contract.mjs` |
+| `services/api/prisma/schema.prisma` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-release-observation-contract.mjs` |
 
 </details>
 
@@ -1178,7 +1198,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 84 个文件</summary>
+<summary><code>services/api/src/</code> — 86 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1265,6 +1285,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/storage/object-key.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs` |
 | `services/api/src/sync/sync.controller.ts` | `verify-backend-p0-contracts.mjs` |
 | `services/api/src/sync/sync.service.ts` | `verify-backend-p0-contracts.mjs` |
+| `services/api/src/terminals/release-observation.service.ts` | `verify-release-observation-contract.mjs` |
+| `services/api/src/terminals/terminals.controller.ts` | `verify-release-observation-contract.mjs` |
 | `services/api/src/upload-sessions/upload-sessions.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs` |
 
 </details>

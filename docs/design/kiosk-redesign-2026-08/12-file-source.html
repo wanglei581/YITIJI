@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>选择文件来源 · 职易达</title>
+<!--
+  S17 · 打印文件搬运闭环（青序流光，1080x1920 单 HTML 宿主）
+  route: /print/upload —— apps/kiosk/src/pages/print/PrintUploadPage.tsx
+
+  本页只做一件事：把要打印的文件搬进这次办理，确认成唯一「当前文件」，然后交给
+  /print/material-check（13-print-desk.html）。**本页不做 AI 简历诊断**，也不复制
+  21-resume-triage.html 的目标岗位 / 维度 / 解析流程 —— 那是另一条业务线的入口。
+
+  查询契约（与 React 逐项对齐）：
+    ?source=document|resume   —— resume 只表示「打印简历」，不进 AI 诊断
+    ?tab=file|qr|usb          —— 初始通道，非法值回落 file
+    ?mode=transfer            —— 入口已选定通道，直达该通道，不再问第二遍
+    ?category=photo           —— 照片打印入口（PrintUploadPage 也接受 router state）
+    ?state=<下方 38 态之一>    —— 仅本原型使用；夹具态必须带 capture=1 或 debug=1
+    ?capture=1 / ?debug=1     —— 夹具可达门；?flat=1 截图去动效
+    ?cancel=ok|fail           —— 取消会话的**服务端答复夹具**。phone-cancelled 只认 ok，
+                                phone-cancel-failed 只认 fail；缺这个参数一律 fail-closed 到
+                                missing-file，静态页不许自己「取消成功」。
+    ?pick=0|1|2               —— 这次拿到的是哪一份（本机 0=PDF / 1=图片；U 盘 0/1/2）。缺省 0，
+                                所以不带这个参数时页面与改版前完全一致。
+    ?preview=<下表之一>        —— **预览夹具入口**，只在 capture=1 / debug=1 下生效，且只在真的
+                                握着（或挂着）一份文件的状态上生效：local-ready / usb-ready /
+                                phone-confirmed / phone-uploaded / phone-cancel-failed /
+                                local-rejected。其余一律不开预览。
+                                open | page2 | last | fit-page | fit-width | zoom | rotate
+                                unavailable（预览取不到）| expired（预览链接过期）| unsupported（不收的格式）
+
+  完整预览合同（本轮返修的主题）：
+    为什么要有      只给文件名和大小，用户没法确认「带走的是不是这一份、有没有传错页、照片是不是歪的」。
+                  所以本页必须能在**同一个 HTML 宿主**里把这份文件**完整**看一遍，再决定要不要往下走。
+    宿主与隔离      near-full-stage 模态覆盖整屏；打开时顶栏 / 小青条 / 正文 / 页脚 / 底栏全部 inert +
+                  aria-hidden，既点不到也 Tab 不到；焦点进入模态并在模态内循环；Esc 或「关闭」退出。
+                  预览**不导航、不改地址、不写任何存储**，所以关掉之后通道、当前文件、手机确认态原样还在。
+    PDF           真实可滚动 viewport + scene + 完整页面：页码、上一页 / 下一页（到边界禁用并常驻原因）、
+                  适应整页、适应宽度、放大 / 缩小、旋转 90°、拖动或滚动平移到上下左右与四角。
+                  「适应整页」必须整页四边都在可视区内 —— **不许只显示半页**，最后一页必须可达。
+    图片          初始按「适应整页」contain，四边完整可见；同样支持放大、旋转、平移。
+    DOCX          这条打印上传路由**只收 PDF / JPG / PNG**，Word 既不上传也不预览，更**不做格式转换渲染**——
+                  不拿一个转出来的样子冒充你的原文件。只诚实说明，并给出「另存为 PDF / JPG / PNG」的做法。
+    预览失败       取不到预览 / 预览链接过期只说**暂时看不了**，并明确保留事实：文件还在本次办理里，
+                  上传没有失败，文件没有丢，也没有被删除。**不借预览失败改写文件或会话状态。**
+    演示内容       预览里的页面和图片是**固定原型数据 / 演示文件，不是真实用户文件**：模态内常驻标记，
+                  每一页页脚和水印再标一次；普通产品地址一律 fail-closed，看不到这些内容。
+    不做什么       不解析、不判页数结论、不做隐私检查、不做 AI 诊断、不出签名链接、不显示任何凭据。
+
+  真实合同（来源：代码，不是想象）：
+    单文件      PrintUploadPage useState<UploadedFile|null> —— 本次办理只持有一个已选文件，
+                没有多文件队列，也不存在「一次传 2 份」。
+    体积上限    本机 / U 盘 15MB（PRINT_UPLOAD_MAX_MB=15 = min(print_doc 20MB, 代理 15MB)）；
+                手机上传 10MB（uploadSessions.ts: FILE_TOO_LARGE = 「文件超过 10MB」）。两个数不一样。
+    手机会话    packages/shared UploadSessionStatus = pending|uploading|uploaded|confirmed|expired|cancelled。
+                **没有「已扫码」这个服务端信号**；本机看不到用户扫没扫。
+                uploaded 之后必须在一体机点确认（POST /upload-sessions/:id/confirm）才算数。
+                刷新二维码前先 DELETE 撤销旧会话（UploadSessionQrPanel: revokePreviousSession）。
+                连续 3 次轮询失败或 NOT_FOUND/EXPIRED → 本机按已过期处理。
+    取消语义    upload-sessions.service.ts cancel()：已 confirmed 的会话**不能取消**（400
+                UPLOAD_SESSION_CONFIRMED）；未 confirmed 的会话取消时会走 cleanupAbandonedFile()，
+                对**匿名 / 未归属**的本次临时上传调 files.forceDelete()（best-effort，.catch 吞错），
+                对已有 endUserId / ownerType='user' 的文件**直接跳过不删**。expire 路径（同文件
+                第 173、282 行）走的是同一个 cleanupAbandonedFile。所以本页对取消 / 过期的唯一诚实
+                说法是**「按服务端清理规则处理」**：既不能承诺必删或立即删，也不能承诺不删。
+    取消失败    **静态原型只定义正确产品合同，不代表 React 已经这么做。** 现状 React
+                UploadSessionQrPanel.tsx:281-290 的 handleCancel 用 `catch {}` 吞掉 DELETE 失败，
+                并在 finally 里无条件 setQr(null)/setStatus(null)/setError(null) —— 取消失败也会
+                清掉本机会话与待确认文件。这是**后续对接阻塞项**，不是本页已修好的东西。
+    本机上传    本机通道是一次整份往返，**没有任何取消/中止通道**：请求送出之后，没有一个前端
+                动作能让服务端停下来，也没有服务端答复能证明它停下来了。所以 local-uploading
+                **不提供「取消本次上传」**，只留等待 / 求助 / 退出本页；local-cancelled **只对应
+                一种情况**：系统文件窗口被关掉、上传还没开始。两者不共用一个出口。
+                现状 React PrintUploadPage.tsx:748-756 的次按钮在 uploading 期间仍写「取消」且
+                不禁用，点了只 navigate('/')。这是**后续对接阻塞项**，不是本页已修好的东西。
+    U 盘        浏览器不读盘。Terminal Agent 在 127.0.0.1:9527 枚举，只下发一次性 safeId；
+                /local/usb/files 每次都会重建 safeId 注册表，旧 safeId 作废（410）。
+                未配置 VITE_TERMINAL_AGENT_BRIDGE_TOKEN → 未接通；配置了但连不上 → Agent 离线。这两件事不一样。
+    系统文件框  <input type=file> 只是桌面浏览器的验证 / 兼容路径，**不是公共一体机的首选**
+                （CLAUDE.md §17 禁止一体机出现系统级弹窗）。
+    云盘        没有任何真实 OAuth 合同 —— 本页把它标成「尚未接入」，只给「先下到手机再扫码上传」的老实办法。
+    纸质原件    React 已有 /scan/start 入口；这不是第四种上传 tab，而是先建立扫描会话、去奔图面板扫描，完成后取得文件。
+    已有材料    登录用户可从 /me/documents 查看已保存文档，也可从最近打印文件继续；未登录、空、加载失败和链接过期由会员宿主处理。
+    出口        navigate('/print/material-check', { state:{ file, source } }) 必须带 file，
+                所以**没有当前文件时主操作一律禁用**。
+
+  本页不伪造：有效二维码、设备在线、上传百分比、剩余秒数、安全弹出 U 盘、AI 结果、
+              任务号、文件、成功结论，也不说「会话结束即删除服务端文件」。
+  解析 / 页数 / PII 检查属于第 13 页，本页不预告结论。
+
+  原型演示控制：普通地址完全不渲染；仅 ?debug=1 注入（data-proto-control="true"），并保留 debug/capture/flat。
+  旧地址兼容：13-print-desk.html 的返回键仍指向 ?state=received（该文件不在本批白名单内），
+              经 LEGACY 映射后按夹具态门禁处理。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:560px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.xq{flex:none;margin:18px 44px 0;border-radius:34px;padding:24px 40px 22px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:22px;position:relative;z-index:1}
+.xq-face{flex:none;width:92px;height:92px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:42px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:17px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:6px}
+.xq-ask{font-size:36px;line-height:1.28;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:9px;font-size:20px;line-height:1.5;color:rgba(242,239,228,.74)}
+.xq-doing b{color:#fff;font-weight:600}
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec{flex:none;padding:0 44px;margin-top:20px}
+.sec.grow{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.grow>.card,.sec.grow>.state{flex:1;min-height:0}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:12px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:30px;font-weight:700;display:flex;align-items:center;gap:10px}
+.sec-label .hint{font-size:20px;color:var(--ink-3);margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:28px 30px;display:flex;flex-direction:column}
+.state{border-radius:var(--r-lg);padding:28px 34px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state[data-kind=plain]{background:var(--surface);border-color:var(--line)}
+.state-h{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700;line-height:1.25}
+.state-p{margin-top:14px;font-size:22px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.btn{min-height:72px;padding:0 28px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:600;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{opacity:.55;cursor:default}
+.ctabar{flex:none;margin-top:auto;padding:18px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.ctabar .btn{flex:1}
+.cta-reason{flex:none;padding:0 44px 10px;margin-top:16px;font-size:21px;font-weight:600;color:var(--wheat-d);display:flex;align-items:center;gap:10px}
+.truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:24px}
+.truth div{flex:1;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.navbar{flex:none;height:116px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.nav-item .ni{font-size:20px;color:var(--ink-3);font-weight:600}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.press:active{transform:scale(.985)}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:5px;max-height:1820px;overflow:auto}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px;padding:2px 0 4px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:15px;padding:0 14px;border-radius:11px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- 来源卡片 ---------- */
+.chs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ch{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px 22px 22px;display:flex;flex-direction:column;text-align:left;min-height:230px}
+.ch.on{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-soft)}
+.ch-ic{width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;flex:none}
+.ch-n{font-size:26px;font-weight:700;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ch-d{margin-top:10px;font-size:20px;line-height:1.5;color:var(--ink-3);flex:1}
+.ch-f{margin-top:12px;font-size:19px;font-weight:600;color:var(--teal-d)}
+.ch[aria-disabled=true]{opacity:.62}.ch[aria-disabled=true] .ch-f{color:var(--wheat-d)}
+.tag{flex:none;font-size:15px;font-weight:600;color:var(--teal-d);background:var(--teal-soft);border-radius:9px;padding:3px 10px}
+.tag.mut{color:var(--ink-3);background:var(--paper);border:1px solid var(--line-2)}
+
+/* ---------- 二维码 ---------- */
+.qr-wrap{display:flex;gap:34px;align-items:center;flex:1;min-height:0}
+.qr{flex:none;width:340px;height:340px;border-radius:26px;background:#fff;border:1px solid var(--line-2);padding:22px;display:flex;align-items:center;justify-content:center;position:relative}
+.qr-grid{width:100%;height:100%;display:grid;grid-template-columns:repeat(11,1fr);grid-template-rows:repeat(11,1fr);gap:4px}
+.qr-grid i{background:var(--deep);border-radius:2px}
+.qr-grid i.o{background:transparent}
+.qr-corner{position:absolute;width:36px;height:36px;border:5px solid var(--teal)}
+.qr-corner.tl{left:9px;top:9px;border-right:0;border-bottom:0;border-radius:12px 0 0 0}
+.qr-corner.tr{right:9px;top:9px;border-left:0;border-bottom:0;border-radius:0 12px 0 0}
+.qr-corner.bl{left:9px;bottom:9px;border-right:0;border-top:0;border-radius:0 0 0 12px}
+.qr-corner.br{right:9px;bottom:9px;border-left:0;border-top:0;border-radius:0 0 12px 0}
+.qr-mask{position:absolute;left:22px;right:22px;top:50%;transform:translateY(-50%);text-align:center;font-size:20px;font-weight:700;color:var(--ink-2);background:rgba(255,253,248,.94);padding:14px 8px;border-radius:14px;line-height:1.4}
+.qr-side{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-evenly;align-self:stretch;padding:4px 0}
+.qr-side h3{font-size:28px;font-weight:700;line-height:1.3}
+.steps{margin-top:14px;display:flex;flex-direction:column;gap:14px}
+.steps li{list-style:none;display:flex;gap:14px;font-size:21px;line-height:1.5;color:var(--ink-2)}
+.steps .n{flex:none;width:30px;height:30px;border-radius:10px;background:var(--teal-soft);color:var(--teal-d);font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.chip{min-height:52px;padding:0 20px;border-radius:14px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:10px;font-size:20px;color:var(--ink-2);font-weight:600}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.chip.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.meta{margin-top:14px;display:flex;gap:12px;flex-wrap:wrap}
+
+/* ---------- 文件行 / 列表 ---------- */
+.flist{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:10px;justify-content:flex-start}
+.qr.dim .qr-grid i{background:var(--ink-3)}
+.qr.dim .qr-grid i.o{background:transparent}
+.qr.blank{border-style:dashed;flex-direction:column;gap:16px;color:var(--ink-3);text-align:center}
+.qr.blank .qb-t{font-size:22px;font-weight:700;color:var(--ink-2);line-height:1.4}
+.qr.blank .qb-s{font-size:18px;line-height:1.45;padding:0 10px}
+.frow{display:flex;align-items:center;gap:18px;padding:15px 16px;border-radius:20px;border:1px solid transparent;min-height:88px}
+.frow.pick{border-color:var(--line);background:var(--paper)}
+.frow.on{border-color:var(--teal);background:var(--teal-soft)}
+.frow.dim{opacity:.66}
+.f-ic{flex:none;width:58px;height:58px;border-radius:18px;background:var(--slate-soft);color:var(--slate-d);display:flex;align-items:center;justify-content:center}
+.f-ic.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.f-m{flex:1;min-width:0;display:flex;flex-direction:column}
+.f-n{font-size:24px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f-s{margin-top:6px;font-size:20px;color:var(--ink-3)}
+.f-tag{flex:none;min-height:48px;padding:0 16px;border-radius:14px;display:flex;align-items:center;font-size:18px;font-weight:700;white-space:nowrap}
+.f-tag.ok{background:var(--teal-soft);color:var(--teal-d)}
+.f-tag.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.f-tag.doing{background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2)}
+.f-tag.pickable{background:var(--deep);color:var(--emerald)}
+
+/* ---------- 当前文件卡 ---------- */
+.now{display:flex;align-items:center;gap:20px}
+.now-ic{flex:none;width:80px;height:80px;border-radius:24px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.now-m{flex:1;min-width:0;display:flex;flex-direction:column}
+.now-n{font-size:29px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.now-s{margin-top:8px;font-size:21px;color:var(--ink-3)}
+.now-act{flex:none;display:flex;gap:12px}
+.sbtn{min-height:60px;min-width:120px;padding:0 20px;border-radius:18px;border:1px solid var(--line-2);background:var(--paper);display:inline-flex;align-items:center;justify-content:center;gap:9px;font-size:20px;font-weight:600;color:var(--ink)}
+.sbtn.warn{border-color:transparent;background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.outrow{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap}
+.outrow .sbtn{flex:1 1 0;min-width:0}
+
+/* ---------- 说明 / 夹具 ---------- */
+.emptybox{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;font-size:22px;line-height:1.6;color:var(--ink-2);padding:16px 0}
+.emptybox .ei{width:92px;height:92px;border-radius:28px;background:var(--paper);border:1px dashed var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.emptybox b{color:var(--ink)}
+.fx{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 20px;border-radius:18px;background:var(--wheat-soft);color:var(--wheat-d);font-size:18px;font-weight:600;line-height:1.4}
+.fx .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:9px;padding:4px 10px;font-size:16px;letter-spacing:1px}
+.note{display:flex;gap:14px;font-size:21px;line-height:1.55;color:var(--ink-2)}
+.note .sq{flex:none;width:9px;height:9px;border-radius:3px;background:var(--teal);margin-top:9px}
+.notes{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+.hr{height:1px;background:var(--line);margin:16px 0}
+.split{display:flex;gap:16px}
+.split>*{flex:1;min-width:0}
+.mini{background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-md);padding:22px 24px}
+.mini h4{font-size:23px;font-weight:700;display:flex;align-items:center;gap:10px}
+.mini p{margin-top:10px;font-size:20px;line-height:1.55;color:var(--ink-2)}
+.spread{justify-content:space-evenly}
+.sec.grow>.card{justify-content:space-evenly}
+.pvopen{width:100%;margin-top:16px;justify-content:center}
+
+/* ---------- 完整预览：同一宿主内的 near-full-stage 模态 ---------- */
+.pv{position:absolute;inset:0;z-index:95;background:rgba(6,20,17,.76);opacity:0;transition:opacity 240ms cubic-bezier(.22,1,.36,1)}
+.pv.pv-in{opacity:1}
+.pv-box{position:absolute;inset:14px;border-radius:30px;background:var(--surface);display:flex;flex-direction:column;overflow:hidden}
+.pv-head{flex:none;height:160px;display:flex;align-items:center;gap:20px;padding:0 28px;border-bottom:1px solid var(--line)}
+.pv-ic{flex:none;width:76px;height:76px;border-radius:24px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.pv-ic.warn{background:var(--wheat-soft);color:var(--wheat-d)}
+.pv-hm{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.pv-t{display:block;max-width:100%;font-size:32px;font-weight:700;line-height:1.24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-s{display:block;max-width:100%;margin-top:8px;font-size:21px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-close{flex:none;min-height:76px;min-width:156px;padding:0 26px;border-radius:22px;background:var(--deep);color:var(--emerald);font-size:24px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:10px}
+.pv-fx{flex:none;height:88px;display:flex;align-items:center;gap:14px;padding:0 28px;background:var(--wheat-soft);color:var(--wheat-d);font-size:19px;font-weight:600;line-height:1.36}
+.pv-fx .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:9px;padding:5px 12px;font-size:16px;letter-spacing:1px;white-space:nowrap}
+.pv-view{flex:1;min-height:0;position:relative;overflow:auto;background:var(--deep);touch-action:none;cursor:grab;outline:none}
+.pv-view.grabbing{cursor:grabbing}
+.pv-view.still{overflow:hidden;touch-action:auto;cursor:default;display:flex;align-items:stretch;justify-content:center;padding:26px 30px}
+.pv-scene{position:relative}
+.pv-page{position:absolute;left:50%;top:50%;background:#fff;overflow:hidden}
+.pv-paper{position:absolute;left:0;top:0;transform-origin:0 0;background:#fff;overflow:hidden}
+.pv-bar{flex:none;height:260px;border-top:1px solid var(--line);padding:16px 24px;display:flex;flex-direction:column;gap:10px}
+.pv-row{flex:none;display:flex;align-items:center;gap:12px;height:76px}
+.pvb{flex:none;min-height:76px;min-width:104px;padding:0 20px;border-radius:20px;border:1px solid var(--line-2);background:var(--paper);color:var(--ink);font-size:23px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:10px;white-space:nowrap}
+.pvb.wide{flex:1 1 0;min-width:0}
+.pvb.on{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.pvb[aria-disabled=true]{opacity:.5}
+.pv-info{flex:1 1 0;min-width:0;height:76px;border-radius:20px;background:var(--paper);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;gap:10px;font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;padding:0 12px;white-space:nowrap;overflow:hidden}
+.pv-reason{flex:none;height:32px;display:flex;align-items:center;gap:8px;font-size:19px;font-weight:600;color:var(--wheat-d)}
+.pv-card{width:100%;max-width:940px;background:var(--surface);border-radius:var(--r-lg);padding:32px 36px;display:flex;flex-direction:column;justify-content:space-evenly;gap:16px}
+.pv-chips{display:flex;gap:14px;flex-wrap:wrap}
+.pv-chips>span{flex:1 1 0;min-width:0;min-height:72px;padding:12px 20px;border-radius:20px;display:flex;flex-direction:column;justify-content:center;gap:4px;font-size:20px;font-weight:600;line-height:1.35}
+.pv-chips .yes{background:var(--teal-soft);color:var(--teal-d)}
+.pv-chips .no{background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.pv-chips b{font-size:22px;font-weight:800}
+.pv-card .state-h{font-size:31px}
+.pv-card .state-p{font-size:22px;margin-top:0}
+.pv-keep{display:flex;align-items:center;gap:14px;min-height:72px;padding:14px 22px;border-radius:20px;background:var(--teal-soft);color:var(--teal-d);font-size:21px;font-weight:600;line-height:1.45}
+
+/* 页面内容（自然尺寸绘制，再整体缩放） */
+.pp{position:absolute;inset:0;padding:64px 68px;color:#16211d;font-size:23px;line-height:1.62;display:flex;flex-direction:column}
+.pp-wm{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%) rotate(-22deg);font-size:104px;font-weight:800;letter-spacing:14px;color:rgba(31,158,134,.13);white-space:nowrap;pointer-events:none}
+.pp-name{font-size:52px;font-weight:800;letter-spacing:6px}
+.pp-meta{margin-top:14px;font-size:22px;color:#4b6058}
+.pp-rule{height:3px;background:#16211d;margin:22px 0 8px}
+.pp-h{font-size:29px;font-weight:800;margin-top:26px;padding-left:16px;border-left:7px solid #1f9e86;line-height:1.2}
+.pp-p{margin-top:12px}
+.pp-p b{font-weight:700}
+.pp-li{margin-top:10px;padding-left:26px;position:relative}
+.pp-li::before{content:"";position:absolute;left:6px;top:14px;width:9px;height:9px;border-radius:3px;background:#1f9e86}
+.pp-foot{margin-top:auto;padding-top:20px;border-top:1px solid #cfd8d4;font-size:20px;color:#5c706a;display:flex;justify-content:space-between;gap:20px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="topback" href="10-print-hub.html" data-route="/print-scan" aria-label="返回打印扫描"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">第 1 步 / 共 4 步 · 选文件</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif" aria-hidden="true">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow" id="xq-eyebrow">FILE SOURCE</div>
+        <div class="xq-ask serif" id="xq-ask">文件<em>怎么进来</em>？</div>
+        <div class="xq-doing" id="xq-doing">本机选、手机扫码传、U 盘导入，选一条就行。</div>
+      </div>
+    </div>
+  </section>
+
+  <main class="body" id="body-root" data-screen="file-source" data-state="source-chooser" data-testid="file-source-state-source-chooser"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="file-source-truth">
+    <div><b>二维码</b>只是让你的手机打开上传页。本机<b>看不到你扫没扫</b>，只认服务端返回的会话状态。</div>
+    <div><b>U 盘</b>由这台终端的本地服务读取并逐份上传；网页不直接访问磁盘，也<b>没有「安全弹出」按钮</b>。</div>
+    <div><b>留存</b>结束会话或闲置超时只清除本机登录态与临时会话信息；已上传文件与订单按服务端留存期限管理，<b>不承诺永久保留</b>。</div>
+  </div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+</div>
+<script>
+/* ================= 常量与查询 ================= */
+var SCREEN='file-source';
+var Q=new URLSearchParams(location.search);
+var DEBUG=Q.get('debug')==='1';
+var CAPTURE=Q.get('capture')==='1';
+var FLAT=Q.get('flat')==='1';
+var SRC=Q.get('source')==='resume'?'resume':'document';
+var IS_RESUME=SRC==='resume';
+var TABQ=Q.get('tab');
+var TAB=(TABQ==='qr'||TABQ==='usb')?TABQ:'file';
+var TRANSFER=!IS_RESUME&&Q.get('mode')==='transfer';
+/* 取消会话的服务端答复夹具：只有 ok / fail 两个合法值，其它一律当没给。 */
+var CANCELQ=Q.get('cancel');
+var CANCEL_FX=(CANCELQ==='ok'||CANCELQ==='fail')?CANCELQ:null;
+var PHOTO=Q.get('category')==='photo';
+/* 这次拿到的是哪一份（本机 0/1，U 盘 0/1/2）。缺省 0 —— 不带这个参数时与改版前完全一致。 */
+var PICKQ=Q.get('pick');
+var PICK=/^[0-9]$/.test(PICKQ||'')?parseInt(PICKQ,10):0;
+/* 预览夹具入口：只在原型演示模式下生效，普通产品地址一律看不到演示文件内容。 */
+var PV_MODES={open:1,page2:1,last:1,'fit-page':1,'fit-width':1,zoom:1,rotate:1,unavailable:1,expired:1,unsupported:1};
+var PREVQ=Q.get('preview');
+var PREVIEW=(PREVQ&&PV_MODES[PREVQ]&&(CAPTURE||DEBUG))?PREVQ:null;
+
+/* 38 个业务状态。三条通道 + 三个共享兜底。 */
+var STATES=[
+ 'source-chooser','missing-file','unknown',
+ 'local-guide','local-picking','local-cancelled','local-rejected','local-oversize','local-unreadable','local-uploading','local-upload-failed','local-ready',
+ 'phone-generating','phone-gen-failed','phone-ready','phone-waiting','phone-uploading','phone-status-unknown','phone-expired','phone-uploaded','phone-confirming','phone-confirm-failed','phone-confirmed','phone-cancel-requesting','phone-cancel-failed','phone-cancelled',
+ 'usb-unavailable','usb-agent-offline','usb-wait','usb-detecting','usb-empty','usb-list','usb-read-failed','usb-selected','usb-safeid-expired','usb-importing','usb-import-failed','usb-ready'
+];
+
+/* 夹具态：画面里出现了「服务端本该返回、但这里是写死的」文件名 / 列表 / 会话值。
+   这些状态只在 ?capture=1 或 ?debug=1 下可达；普通地址一律 fail-closed 到 missing-file，
+   免得有人把一个静态页当成「已经传上去了」的证据。 */
+var FIXTURE={
+ 'local-picking':1,'local-rejected':1,'local-oversize':1,'local-unreadable':1,'local-uploading':1,'local-upload-failed':1,'local-ready':1,
+ 'phone-ready':1,'phone-waiting':1,'phone-uploading':1,'phone-status-unknown':1,'phone-expired':1,'phone-uploaded':1,'phone-confirming':1,'phone-confirm-failed':1,'phone-confirmed':1,'phone-cancel-requesting':1,'phone-cancel-failed':1,'phone-cancelled':1,
+ 'usb-list':1,'usb-selected':1,'usb-safeid-expired':1,'usb-importing':1,'usb-import-failed':1,'usb-ready':1
+};
+/* 已经握着一份「当前文件」的状态：此时不允许再摆来源切换器（换来源必须先显式删掉这一份）。 */
+var HAS_FILE={'local-ready':1,'usb-ready':1,'phone-confirmed':1};
+/* 只有这三个状态能放行到材料检查。 */
+var CAN_CONTINUE=HAS_FILE;
+
+/* 旧地址兼容：13-print-desk.html 的返回键仍指向 ?state=received，该文件不在本批白名单内。 */
+var LEGACY={'normal':'source-chooser','received':'local-ready','uploading':'local-uploading','upload-failed':'local-upload-failed','format-rejected':'local-rejected','expired':'phone-expired','usb-failed':'usb-read-failed'};
+
+/* ================= 图标 ================= */
+var ICO={
+ phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10 5h4"/><path d="M9 14.5l3 3 3-3"/><path d="M12 17.5v-6"/>',
+ usb:'<path d="M9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8"/><rect x="5" y="8" width="14" height="12" rx="3"/><path d="M12 12v4"/>',
+ folder:'<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2l2 2.5h7.8A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',
+ file:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ cloud:'<path d="M7 19h10.5a3.5 3.5 0 0 0 .4-6.98A5.5 5.5 0 0 0 7.2 10.6 4.2 4.2 0 0 0 7 19z"/><path d="M4 4l16 16"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2"/>',
+ warn:'<path d="M12 3.6 2.8 19.4h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/>',
+ up:'<path d="M12 20V5"/><path d="M6 11l6-6 6 6"/><path d="M4 21h16"/>',
+ x:'<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+ swap:'<path d="M4 8h13l-4-4"/><path d="M20 16H7l4 4"/>',
+ link:'<path d="M10 13a4 4 0 0 0 5.7.4l2.6-2.6a4 4 0 0 0-5.7-5.7L11.4 6.3"/><path d="M14 11a4 4 0 0 0-5.7-.4l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.2-1.2"/>',
+ eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'
+};
+function svg(n,s,w,sw){return '<svg width="'+(w||30)+'" height="'+(w||30)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="'+(sw||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+
+/* ================= 地址构造：状态跳转一律是真链接 ================= */
+function to(state,extra){
+ var p=new URLSearchParams();
+ p.set('state',state);
+ if(SRC!=='document')p.set('source',SRC);
+ if(TRANSFER)p.set('mode','transfer');
+ if(PHOTO)p.set('category','photo');
+ if(PICK)p.set('pick',String(PICK));
+ if(extra)for(var k in extra){if(extra[k]===null)p.delete(k);else p.set(k,extra[k])}
+ if(DEBUG)p.set('debug','1');
+ if(CAPTURE)p.set('capture','1');
+ if(FLAT)p.set('flat','1');
+ return '12-file-source.html?'+p.toString();
+}
+function a(o){
+ return '<a class="'+(o.cls||'')+' press" href="'+o.href+'" data-route="'+(o.route||'/print/upload')+'" data-testid="'+o.tid+'" aria-label="'+(o.al||o.label)+'">'+(o.html||o.label)+'</a>';
+}
+
+/* ================= 二维码：固定位图，不编码任何内容 ================= */
+var QRBITS='###..#.###.#...###...##.#.#.###.##...#...#.####..#.####....###...###.##..##.#..#..##.#..####.#.#.####..#...##..##.###.#.##';
+function qrGrid(){var h='';for(var i=0;i<121;i++){h+='<i class="'+(QRBITS.charAt(i)==='#'?'':'o')+'"></i>'}return h}
+function qr(kind){
+ /* kind: live(示意) | dim(过期/失效) | blank(还没有码)
+    blank 不画网格 —— 画出来就像「码已经出来了」；dim 不用 opacity 压暗，压到浅灰就等于什么都没画。 */
+ if(kind==='blank'){
+  return '<div class="qr blank" role="img" aria-label="尚未生成上传二维码（本页不画占位码图形）" data-testid="'+SCREEN+'-qr">'+
+   svg('phone','currentColor',72,1.6)+'<span class="qb-t">码还没出来</span>'+
+   '<span class="qb-s">拿到服务端下发的一次性链接之后<br>这里才会出现二维码</span></div>';
+ }
+ var label=kind==='dim'?'已失效的上传二维码（原型示意图形，不可扫描，不编码真实内容）'
+   :'手机上传二维码（原型示意图形，不可扫描，不编码真实内容）';
+ return '<div class="qr'+(kind==='dim'?' dim':'')+'" role="img" aria-label="'+label+'" data-testid="'+SCREEN+'-qr">'+
+  '<div class="qr-grid">'+qrGrid()+'</div>'+
+  (kind==='live'?'<span class="qr-corner tl"></span><span class="qr-corner tr"></span><span class="qr-corner bl"></span><span class="qr-corner br"></span>':'')+
+  (kind==='live'?'':'<div class="qr-mask">这张码已失效</div>')+
+ '</div>';
+}
+
+/* ================= 固定演示数据（不是接口返回值） ================= */
+/* 一份「演示文件」= 名字 + 大小 + 能不能预览 + 预览时的自然尺寸。文件名、大小和预览内容
+   共用同一个来源，免得列表里写 PDF、预览里画成别的东西。w/h 是自然像素尺寸：PDF 用 96dpi
+   的 A4（794x1123），图片用二寸证件照比例（827x1063）。 */
+var USB_VOL='KINGSTON 32G';
+var DOCS={
+ 'resume-pdf':  {n:'求职简历-王雷.pdf', s:'2.4 MB · PDF', kind:'pdf',  pages:3, w:794, h:1123},
+ 'idphoto':     {n:'证件照-蓝底.jpg',   s:'780 KB · JPG', kind:'image',pages:1, w:827, h:1063},
+ 'transcript':  {n:'成绩单-2026.pdf',   s:'5.1 MB · PDF', kind:'pdf',  pages:2, w:794, h:1123},
+ 'phone-pdf':   {n:'简历-手机上传.pdf', s:'1.6 MB · PDF', kind:'pdf',  pages:2, w:794, h:1123},
+ 'thesis-docx': {n:'毕业论文终稿.docx', s:'3.8 MB · DOCX',kind:'docx', pages:0, w:0,   h:0}
+};
+function fx(f){return f.d?{n:DOCS[f.d].n,s:DOCS[f.d].s,d:f.d,ok:f.ok,bad:f.bad}:f}
+var FX_LOCAL=[
+ {d:'resume-pdf',ok:1},
+ {d:'idphoto',ok:1},
+ {d:'thesis-docx',bad:'格式不收'},
+ {n:'身份证正反面.png',s:'18.6 MB · PNG',bad:'超过 15MB'},
+ {n:'扫描件_0912.pdf',s:'大小未知 · PDF',bad:'读不出来'}
+];
+var FX_USB=[{d:'resume-pdf'},{d:'idphoto'},{d:'transcript'}];
+var FX_PHONE=DOCS['phone-pdf'];
+/* 本机通道只有前两行能收下，所以越界的 pick 一律落回第 0 份，不凭地址凭空造出第三种文件。 */
+function LDOC(){return DOCS[FX_LOCAL[(PICK===1?1:0)].d]}
+function UDOC(){return DOCS[FX_USB[(PICK>=0&&PICK<FX_USB.length)?PICK:0].d]}
+
+/* ================= 组件 ================= */
+function fixtureBar(what){
+ return '<div class="fx" data-testid="'+SCREEN+'-fixture" role="note">'+
+  '<span class="fx-b">演示</span><span>服务端响应夹具 · 不可作为真实文件 —— '+what+'是写死的原型数据，不是接口返回值，也不是本机此刻真读到的东西。</span></div>';
+}
+function statusCard(kind,icon,title,paras,chips,tid){
+ var h='<div class="state" data-kind="'+kind+'" data-testid="'+(tid||SCREEN+'-status')+'">'+
+  '<div class="state-h">'+(icon==='dot'?'<span class="dot16 breathe"></span>':svg(icon,'currentColor',28,2.1))+'<span>'+title+'</span></div>';
+ for(var i=0;i<paras.length;i++)h+='<div class="state-p">'+paras[i]+'</div>';
+ if(chips&&chips.length){h+='<div class="meta">';for(var j=0;j<chips.length;j++)h+='<span class="chip '+(chips[j][0]||'')+'">'+(chips[j][2]?svg(chips[j][2],'currentColor',22):'')+'<span>'+chips[j][1]+'</span></span>';h+='</div>'}
+ return h+'</div>';
+}
+var CH_DEF={
+ file:{n:'本机选文件',ic:'folder',bg:'var(--clay-soft)',st:'#9e5330',
+   d:'弹系统文件窗口挑一份。<b>这条是桌面浏览器的验证 / 兼容路径</b>，公共一体机上不推荐先用它。',
+   f:'PDF / JPG / PNG · 单份 ≤ 15MB',st2:'local-guide'},
+ qr:{n:'手机扫码上传',ic:'phone',bg:'var(--teal-soft)',st:'#157a67',tag:'一体机首选',
+   d:'手机扫屏幕上的码，打开上传页选文件。不用登录，也不用装软件。',
+   f:'PDF / JPG / PNG · 单份 ≤ 10MB',st2:'phone-generating'},
+ usb:{n:'U 盘导入',ic:'usb',bg:'var(--slate-soft)',st:'#35608f',
+   d:'插右侧 USB 口，本地服务列出根目录里的文件，你在屏幕上选。',
+   f:'PDF / JPG / PNG · 单份 ≤ 15MB',st2:'usb-wait'}
+};
+/* usbMode: ok | unavailable | offline */
+function channels(active,usbMode,keys){
+ var order=keys||['qr','file','usb'],h='<div class="chs" data-testid="'+SCREEN+'-channels">';
+ for(var i=0;i<order.length;i++){
+  var k=order[i],c=CH_DEF[k],dis=false,d=c.d,f=c.f,tag=c.tag;
+  if(k==='usb'&&usbMode==='unavailable'){dis=true;d='这台终端没有配置 U 盘导入的本地令牌，所以这条通道不能用。';f='本机未接通 · 重试也没用';tag=null}
+  if(k==='usb'&&usbMode==='offline'){dis=true;d='本地令牌配好了，但现在连不上这台机器的 Terminal Agent。和「未配置」不是一回事。';f='Agent 离线 · 可以重试';tag=null}
+  var body='<span class="ch-ic" style="background:'+c.bg+'">'+svg(c.ic,c.st,32)+'</span>'+
+   '<span class="ch-n"><span>'+c.n+'</span>'+(tag?'<span class="tag">'+tag+'</span>':'')+(k==='file'?'<span class="tag mut">桌面验证</span>':'')+'</span>'+
+   '<span class="ch-d"><span>'+d+'</span></span><span class="ch-f">'+f+'</span>';
+  if(dis)h+='<div class="ch" role="group" aria-disabled="true" data-testid="'+SCREEN+'-ch-'+k+'" aria-label="'+c.n+'（'+f+'）">'+body+'</div>';
+  else h+='<a class="ch press'+(active===k?' on':'')+'" href="'+to(c.st2)+'" data-route="/print/upload" data-testid="'+SCREEN+'-ch-'+k+'" aria-label="'+c.n+'（'+f+'）"'+(active===k?' aria-current="true"':'')+'>'+body+'</a>';
+ }
+ return h+'</div>';
+}
+/* 完整预览入口：文件名和大小说不清「是不是这一份、有没有传错页、照片正不正」，
+   所以每一处握着文件的地方都给一个能把它整份看完的入口。按钮不导航，只在本页开模态。 */
+function pvOpenBtn(label,al){
+ return '<button type="button" class="btn ghost press pvopen" data-testid="'+SCREEN+'-preview-open" aria-label="'+al+'">'+
+  svg('eye','currentColor',24)+'<span>'+label+'</span></button>';
+}
+function nowFile(o){
+ /* 唯一当前文件卡：永远只有一份，永远带完整预览 / 删除 / 更换 */
+ var d=o.doc;
+ return '<div class="card" data-testid="'+SCREEN+'-file-card"><div class="now">'+
+  '<span class="now-ic">'+svg('file','currentColor',38)+'</span>'+
+  '<span class="now-m"><span class="now-n">'+d.n+'</span><span class="now-s">'+d.s+' · '+o.from+'</span></span>'+
+  '<span class="now-act">'+
+   a({cls:'sbtn',href:to(o.back),tid:SCREEN+'-replace',label:svg('swap','currentColor',22)+'更换',al:'更换当前文件（回到'+o.backName+'）'})+
+   a({cls:'sbtn warn',href:to(o.back),tid:SCREEN+'-delete',label:svg('x','currentColor',22)+'删除',al:'删除当前文件并回到'+o.backName})+
+  '</span></div>'+
+  pvOpenBtn('打开完整预览 · 逐页看清楚再打印','打开完整预览：'+d.n)+
+  '<div class="hr"></div>'+
+  '<div class="note"><span class="sq"></span><span>本次办理<b>只带这一份</b>。这台机器一次只记得住一份已选文件，没有多文件队列，也不会一次传两份。</span></div>'+
+  '<div class="note" style="margin-top:10px"><span class="sq"></span><span>页数、可打印性和敏感信息检查在<b>下一步（材料检查）</b>做，这一页不预告结论。</span></div>'+
+  nextSteps('下一步「材料检查」会做什么',['识别页数，判断这份能不能按当前参数打。','扫一遍敏感信息，提示你要不要遮挡。','都过了才进打印参数设置。'])+
+ '</div>';
+}
+function listCard(title,hint,rowsHtml,tid){
+ return '<div class="card" data-testid="'+(tid||SCREEN+'-list')+'" style="flex:1;min-height:0">'+
+  '<div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">'+title+'</span><span class="hint">'+hint+'</span></div>'+
+  '<div class="flist">'+rowsHtml+'</div></div>';
+}
+function frow(o){
+ var inner='<span class="f-ic'+(o.bad?' bad':'')+'">'+svg('file','currentColor',26)+'</span>'+
+  '<span class="f-m"><span class="f-n">'+o.n+'</span><span class="f-s">'+o.s+'</span></span>'+
+  '<span class="f-tag '+o.tagCls+'">'+o.tag+'</span>';
+ if(o.href)return '<a class="frow pick press'+(o.on?' on':'')+'" href="'+o.href+'" data-route="/print/upload" data-testid="'+o.tid+'" aria-label="选择 '+o.n+'（'+o.s+'）">'+inner+'</a>';
+ return '<div class="frow'+(o.dim?' dim':'')+(o.on?' on':'')+'" data-testid="'+o.tid+'">'+inner+'</div>';
+}
+function ctaBar(secondary,primary){return '<div class="ctabar" data-testid="'+SCREEN+'-ctabar">'+secondary+primary+'</div>'}
+function primaryLink(label,href,route,tid){
+ return a({cls:'btn primary',href:href,route:route||'/print/upload',tid:tid||SCREEN+'-primary',label:label});
+}
+function primaryOff(label,reason){
+ return '<span class="btn primary" role="button" aria-disabled="true" style="flex:1.6" data-testid="'+SCREEN+'-primary" aria-label="'+label+'（'+reason+'）">'+label+'</span>';
+}
+function reasonLine(reason){return '<div class="cta-reason" data-testid="'+SCREEN+'-disabled-reason">'+svg('info','currentColor',22)+'<span>'+reason+'</span></div>'}
+function ghost(label,href,route,tid,al){return a({cls:'btn ghost',href:href,route:route||'/print/upload',tid:tid,label:label,al:al||label})}
+function helpMini(text){
+ return '<div class="split">'+a({cls:'mini press',href:'06-help.html',route:'/help',tid:SCREEN+'-help-link',
+  html:'<h4>'+svg('info','currentColor',22)+'<span>卡住了？找人帮忙</span></h4><p>'+text+'</p>',al:'联系工作人员'})+'</div>';
+}
+function tailCard(icon,title,body,stepsTitle,steps,foot){
+ return '<section class="sec grow"><div class="card">'+
+  '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:25px">'+svg(icon,'currentColor',24)+'<span>'+title+'</span></span></div>'+
+  '<div class="note"><span class="sq"></span><span>'+body+'</span></div></div>'+
+  nextSteps(stepsTitle,steps)+
+  '<div class="note"><span class="sq"></span><span>'+foot+'</span></div></div></section>';
+}
+/* 取消的结果由服务端给出，不是用户在屏幕上选的。这一行是**原型演示**：让审阅者分别看到
+   两种答复各自的屏幕。静态页自己不会走到「已作废」——必须显式带上答复夹具。 */
+function cancelOutcomeRow(){
+ return '<div class="mini" data-testid="'+SCREEN+'-cancel-outcome">'+
+  '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由服务端给出</span></h4>'+
+  '<p>不是你在这一屏选的。下面两个是<b>原型演示按钮</b>，只用来分别看到两种答复的屏幕；本页<b>不会自己变成「已作废」</b>。</p>'+
+  '<div class="outrow">'+
+   a({cls:'sbtn warn',href:to('phone-cancel-failed',{cancel:'fail'}),tid:SCREEN+'-outcome-fail',label:svg('warn','currentColor',22)+'演示：没能作废',al:'原型演示：服务端答复没能作废'})+
+   a({cls:'sbtn',href:to('phone-cancelled',{cancel:'ok'}),tid:SCREEN+'-outcome-ok',label:svg('check','currentColor',22)+'演示：确认已作废',al:'原型演示：服务端答复确认已作废'})+
+  '</div></div>';
+}
+var EXIT=function(){return ghost('退出 · 回打印扫描','10-print-hub.html','/print-scan',SCREEN+'-exit','退出选文件，回到打印扫描')};
+var HELP=function(){return ghost('联系工作人员','06-help.html','/help',SCREEN+'-help','联系工作人员')};
+
+/* 「换一条通道」行：只在手里没有文件时给。有文件时换来源必须先删掉那一份。 */
+function switchRow(active){
+ return '<div data-testid="'+SCREEN+'-switch">'+
+  '<div class="sec-label"><span class="no serif">02</span><span class="t">换一条通道也行</span><span class="hint">当前：'+CH_DEF[active].n+'</span></div>'+
+  channels(active,'ok')+'</div>';
+}
+function existingSourceLinks(no){
+ return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">文件不在手机或 U 盘？</span><span class="hint">两条真实入口</span></div><div class="split">'+
+  a({cls:'mini',href:'18-scan-workbench.html',route:'/scan/start',tid:SCREEN+'-scan-source',al:'扫描纸质原件',
+    html:'<h4>'+svg('scan','currentColor',22)+'<span>扫描纸质原件</span></h4><p>先建扫描会话，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>'})+
+  a({cls:'mini',href:'38-member-assets.html?state=documents-login',route:'/me/documents',tid:SCREEN+'-member-source',al:'从我的文档或最近打印文件选择',
+    html:'<h4>'+svg('file','currentColor',22)+'<span>我的文档 / 最近打印</span></h4><p>登录后查看已保存材料和最近打印文件。进入打印前会重新取得<b>有效访问链接</b>，过期或失败会明确提示。</p>'})+
+  '</div></section>';
+}
+/* 单文件状态里那条列表只有一行，靠留白撑不满竖屏；补一段「接下来会发生什么」是真内容，不是装饰。 */
+function nextSteps(title,items){
+ var h='<div><div class="sec-label" style="margin-bottom:8px"><span class="t" style="font-size:24px">'+title+'</span></div><ul class="steps">';
+ for(var i=0;i<items.length;i++)h+='<li><span class="n">'+(i+1)+'</span><span>'+items[i]+'</span></li>';
+ return h+'</ul></div>';
+}
+
+/* ================= 各状态 ================= */
+var V={};
+
+V['source-chooser']=function(){
+ return '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">文件从哪来</span><span class="hint">选一条，下面跟着换</span></div>'+
+  channels(TAB==='usb'?'usb':(TAB==='qr'?'qr':null),'ok')+'</section>'+
+  existingSourceLinks('02')+
+  '<section class="sec"><div class="split">'+
+   '<div class="mini"><h4>'+svg('cloud','currentColor',22)+'<span>第三方网盘尚未接入</span></h4><p>本机不做百度网盘 / 微信文件的授权登录 —— 公共终端上登录你的网盘账号不安全。<b>但你自己存过的材料一直在</b>：登录后从「我的文档」直接选，不用重传。没存过的，先在手机上下到本地，再用上面的手机扫码上传。</p></div>'+
+   '<div class="mini"><h4>'+svg('info','currentColor',22)+'<span>两个上限不一样</span></h4><p>手机上传单份 <b>≤ 10MB</b>；本机选和 U 盘导入单份 <b>≤ 15MB</b>。都只收 PDF / JPG / PNG，Word / Excel / 压缩包不收。</p></div>'+
+  '</div></section>'+
+  '<section class="sec grow"><div class="card"><div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:25px">当前文件</span><span class="hint">0 份</span></div>'+
+   '<div class="note"><span class="sq"></span><span>还没有文件。三条通道任选一条把文件搬进来，文件名会出现在这里。</span></div></div>'+
+   nextSteps('搬进来之后',['服务端校验格式和大小，确认落库。','文件名和大小显示在这一栏。','下一步「材料检查」才会亮起来。'])+
+   '<div class="note"><span class="sq"></span><span><b>没有文件就进不了材料检查</b>，所以下一步先按住不放。</span></div></div></section>'+
+  reasonLine('这一步还没有文件，先用上面任一通道把文件搬进来')+
+  ctaBar(EXIT(),primaryOff(IS_RESUME?'下一步：材料检查':'下一步：材料检查','还没有任何文件'));
+};
+
+V['missing-file']=function(){
+ return '<section class="sec">'+statusCard('warn','warn','这一步没有可用的文件上下文',[
+  '你打开的地址要求的是一个<b>需要真实文件</b>的状态，但本次办理里没有文件 —— 静态原型不会替你挑一份，也不会凭地址就说「已经传好了」。',
+  '这<b>不代表服务端删了什么</b>。重新从下面任一条通道搬一份进来就能接着走。'
+ ],[['warn','fail-closed · 不放行到材料检查','lock']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">重新选一条通道</span><span class="hint">三条都能走</span></div>'+
+  channels(null,'ok')+'</section>'+
+  tailCard('info','为什么会看到这一屏','本页把<b>带文件名 / 文件列表 / 会话结果</b>的状态当成演示夹具，<b>只在原型演示模式下渲染</b>。普通地址直接要这些状态，一律落到这里。','重新搬一份进来要几步',['上面挑一条通道。','按那条通道的提示把文件送到服务端。','服务端确认之后它成为当前文件。'],'这一屏<b>不代表出错</b>，只代表本次办理里现在是空的。')+
+  reasonLine('本次办理里没有文件，材料检查按住不放')+
+  ctaBar(EXIT(),primaryOff('下一步：材料检查','缺少文件上下文'));
+};
+
+V['unknown']=function(){
+ return '<section class="sec">'+statusCard('error','x','无法识别的页面状态',[
+  '地址里给的状态本页不认识。<b>我不猜你想去哪一步</b>，也<b>不把地址里的原始参数回显到屏幕上</b>。',
+  '当前办理类型已经归一为「'+(IS_RESUME?'简历打印':'文档打印')+'」，其余不合法的参数直接丢掉。'
+ ],[['bad','fail-closed','lock']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">从头选一条通道</span><span class="hint">这是本页唯一的正经入口</span></div>'+
+  channels(null,'ok')+'</section>'+
+  tailCard('info','本页只做搬运','把要打印的文件搬进这次办理，确认成<b>唯一当前文件</b>，然后交给材料检查。<b>不做 AI 简历诊断</b>，也不在这里解析内容。','本页在整条打印流程里的位置',['第 1 步（就是这一页）：把文件搬进来。','第 2 步：材料检查，看页数与敏感信息。','第 3 步设打印参数，第 4 步确认出纸。'],'简历诊断、优化、生成是另一条业务线，<b>不从这一页进</b>。')+
+  reasonLine('先回到来源选择，再往下走')+
+  ctaBar(EXIT(),primaryLink('回到来源选择',to('source-chooser'),'/print/upload'));
+};
+
+/* ---------- 本机通道 ---------- */
+V['local-guide']=function(){
+ return '<section class="sec">'+statusCard('plain','folder','本机选文件：桌面验证 / 兼容路径',[
+  '这条会弹出<b>系统文件窗口</b>。一体机上不推荐先用它 —— 系统弹窗会盖住流程，公共屏也不该暴露本机目录。',
+  '桌面浏览器验证、或者手机和 U 盘都不方便时再用。<b>单份 ≤ 15MB，只收 PDF / JPG / PNG。</b>'
+ ],[['','PDF / JPG / PNG','file'],['','单份 ≤ 15MB','info']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow"><div class="card spread" style="flex:1">'+
+   '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">点下面这一下会发生什么</span></div>'+
+   '<ul class="steps"><li><span class="n">1</span><span>浏览器弹出系统文件窗口，你挑<b>一份</b>文件。</span></li>'+
+   '<li><span class="n">2</span><span>选中即上传，服务端校验格式和大小。</span></li>'+
+   '<li><span class="n">3</span><span>服务端确认后，文件名出现在「当前文件」里。</span></li></ul></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span><b>第三方网盘尚未接入</b>：公共终端不做网盘授权登录。你自己传过或生成过的材料在「我的文档」里，登录即可直接选用；其余先下到手机再扫码上传。</span></div>'+
+   '<div class="note"><span class="sq"></span><span><b>关掉这个系统窗口</b>不会上传任何东西，也不会改变本次办理里已经有的当前文件。</span></div></div>'+
+  '</div></section>'+
+  '<section class="sec">'+switchRow('file')+'</section>'+
+  reasonLine('还没选文件，材料检查按住不放')+
+  ctaBar(EXIT(),primaryLink('打开文件窗口',to('local-picking'),'/print/upload'));
+};
+
+V['local-picking']=function(){
+ var rows='';
+ for(var i=0;i<FX_LOCAL.length;i++){var f=fx(FX_LOCAL[i]);
+  rows+=frow(f.ok?{n:f.n,s:f.s,tag:'选这份',tagCls:'pickable',href:to('local-uploading',{pick:String(i)}),tid:SCREEN+'-local-file-'+i}
+   :{n:f.n,s:f.s,tag:f.bad,tagCls:'bad',bad:1,href:to(f.bad==='格式不收'?'local-rejected':(f.bad==='超过 15MB'?'local-oversize':'local-unreadable')),tid:SCREEN+'-local-file-'+i});
+ }
+ return '<section class="sec">'+fixtureBar('下面这个目录和五份文件')+'</section>'+
+  '<section class="sec"><div class="note"><span class="sq"></span><span>真实一体机这一步是<b>系统文件窗口</b>；静态原型不能弹系统窗口，所以用同页受控列表演示「你挑了哪一份」。<b>一次只能选一个。</b></span></div></section>'+
+  '<section class="sec grow">'+listCard('系统文件窗口（演示目录：下载）','5 项 · 一次选一个',
+   rows+nextSteps('挑中之后会怎样',['选中即上传，服务端校验格式和大小。','不合格的当场说清楚为什么，不会偷偷收下。','合格的落库成功后成为当前文件。']))+'</section>'+
+  reasonLine('还没选定文件，材料检查按住不放')+
+  ctaBar(ghost('取消这次选择',to('local-cancelled'),'/print/upload',SCREEN+'-cancel-pick','取消这次选择'),primaryOff('下一步：材料检查','还没选定文件'));
+};
+
+/* 这一屏只有一个来源：local-picking 的「取消这次选择」，也就是系统文件窗口被关掉、上传还没开始。
+   上传一旦开始就不再有出口通到这里 —— 那时候一次点击证明不了服务端已经停手。 */
+V['local-cancelled']=function(){
+ return '<section class="sec">'+statusCard('plain','info','你取消了文件窗口',[
+  '这一屏只对应<b>一种情况</b>：系统文件窗口被关掉，<b>上传还没开始</b>。所以这一步<b>还是没有文件</b>，也<b>没有产生任何上传</b>，服务端那边什么也没发生。',
+  '<b>上传一旦开始就到不了这一屏</b> —— 那一步本页没有取消动作，只能等服务端给结果。现在可以再打开一次窗口，或者换一条通道，手机扫码通常比在一体机上翻目录快。'
+ ],[['','关掉窗口 · 未开始上传','check']],SCREEN+'-status')+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">接着走哪条</span><span class="hint">三条都还在</span></div>'+
+  channels('file','ok')+'</section>'+
+  tailCard('info','本机通道的定位','系统文件窗口是<b>桌面验证 / 兼容路径</b>，不是公共一体机的首选。一体机上优先手机扫码。','为什么一体机上更推荐手机扫码',['不用在公共屏上翻本机目录。','系统弹窗不会盖住流程。','要打的文件本来就多半在你手机里。'],'桌面浏览器验证、或者手机和 U 盘都不方便时，<b>本机通道照样能走</b>。')+
+  reasonLine('这一步还没有文件，材料检查按住不放')+
+  ctaBar(EXIT(),primaryLink('再打开一次文件窗口',to('local-picking'),'/print/upload'));
+};
+
+function localReject(kind){
+ var map={
+  rejected:{f:fx(FX_LOCAL[2]),h:'这份格式不收',k:'error',
+    p1:'服务端只收 <b>PDF、JPG、PNG</b>。Word / Excel / PPT / 压缩包一律不收，<b>这一份没有被上传</b>。',
+    p2:'Word 先另存为 PDF 再传就行。',c:[['bad','DOCX 不在收件范围','warn']]},
+  oversize:{f:fx(FX_LOCAL[3]),h:'这份超过 15MB',k:'warn',
+    p1:'本机与 U 盘通道单份上限 <b>15MB</b>，这一份 18.6MB，<b>没有被上传</b>。',
+    p2:'照片可以在手机相册里选「较小尺寸」再传；扫描件可以降一档分辨率。',c:[['warn','本机 / U 盘 ≤ 15MB','info'],['','手机上传 ≤ 10MB','phone']]},
+  unreadable:{f:fx(FX_LOCAL[4]),h:'这份读不出来',k:'error',
+    p1:'文件为空或者大小取不到，<b>不会硬着头皮上传</b>一份连大小都读不出的东西。',
+    p2:'多半是文件还在同步、或者已经被移走了。换一份，或者重新导出一次。',c:[['bad','大小未知','warn']]}
+ },m=map[kind];
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard(m.k,'warn',m.h,[m.p1,m.p2],m.c,SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+listCard('被挡下的这一份','未上传',
+    frow({n:m.f.n,s:m.f.s,tag:m.f.bad,tagCls:'bad',bad:1,tid:SCREEN+'-blocked-file'})+
+    (kind==='rejected'?pvOpenBtn('这份为什么不能用','为什么这份不能用：'+m.f.n+'（这条路由不收也不预览 Word）'):'')+
+    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>当前文件仍然是<b>空的</b>。<br>回到窗口再挑一份合规的就能接着走。</span></div>'+
+    nextSteps('挑一份能收的',['PDF 最稳，排版不会跑。','手机拍的照片选 JPG / PNG。','单份控制在 15MB 以内。']))+'</section>'+
+  reasonLine('这一份没被收下，当前文件还是空的')+
+  ctaBar(ghost('换一条通道',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),
+    primaryLink('回窗口再挑一份',to('local-picking'),'/print/upload'));
+}
+V['local-rejected']=function(){return localReject('rejected')};
+V['local-oversize']=function(){return localReject('oversize')};
+V['local-unreadable']=function(){return localReject('unreadable')};
+
+/* 上传请求已经送出去了：本页没有取消通道，也没有服务端答复能证明它停下来了。所以这一屏
+   不摆「取消本次上传」，更不通向 local-cancelled（那一屏说的是「没有产生任何上传」）。
+   留下的三条路都是真的：等结果、叫人、退出本页。 */
+V['local-uploading']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('info','dot','正在上传，请稍候',[
+   '这一份是<b>一次性整份送出</b>，<b>服务端不回传进度</b>。所以这里不画进度条，也不说还剩几秒 —— 那种数字只能是编的。',
+   '<b>这一步没有「取消本次上传」这个动作</b>：请求已经送出去了，能不能停下来只有服务端知道，本机<b>不拿一次点击冒充服务端已经停手</b>。<b>结果出来之前我不说已经成功</b>，成功或失败都会明确告诉你，失败那一屏可以直接重试。'
+  ],[['','没有可确认的百分比','info'],['warn','本页无取消动作','lock'],['','上传中别拔 U 盘、别关手机页','warn']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+listCard('这一份','上传中',
+    frow({n:LDOC().n,s:LDOC().s,tag:'正在上传',tagCls:'doing',tid:SCREEN+'-uploading-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>服务端确认落库之前，<b>当前文件仍然是空的</b>。<br>退出这一页<b>不会</b>让服务端停下来，也不会让它更快。</span></div>'+nextSteps('接下来只有三种结果',['成功：服务端确认落库，文件名进入「当前文件」。','失败：明确说没送上去，那一屏可以直接重试。','一直不结束：叫工作人员来看，别反复点。']))+'</section>'+
+  '<section class="sec">'+helpMini('上传一直不结束，或者反复失败，可以叫工作人员来看一眼。')+'</section>'+
+  reasonLine('上传结果还没确认，材料检查按住不放')+
+  ctaBar(EXIT(),primaryOff('下一步：材料检查','上传结果未确认'));
+};
+
+V['local-upload-failed']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('error','warn','上传没成功',[
+   '服务端<b>没有确认收到</b>这一份，所以当前文件还是空的。常见原因是本机网络断了，或者服务端暂时不可用。',
+   '<b>你刚才挑的那一份还在</b>，直接重试就行，不用重新翻目录。'
+  ],[['bad','服务端未确认','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+listCard('这一份','上传失败',
+    frow({n:LDOC().n,s:LDOC().s,tag:'上传失败',tagCls:'bad',bad:1,tid:SCREEN+'-failed-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>重试还是不行的话，换手机扫码那条通道往往能绕开本机网络问题。</span></div>'+nextSteps('重试会怎么走',['还是用你刚才挑的那一份。','把刚才那一份重新整份送一次。','成功就直接出现在当前文件里。']))+'</section>'+
+  reasonLine('上传失败，当前文件仍然是空的')+
+  ctaBar(HELP(),primaryLink('重试上传',to('local-uploading'),'/print/upload'));
+};
+
+V['local-ready']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('info','check','服务端已确认收到',[
+   '下面这个文件名和大小是<b>服务端确认落库后回给本机的结果</b>，不是本机自己记的。',
+   '这就是本次办理的<b>唯一当前文件</b>。不满意可以删掉或更换，满意就去材料检查。'
+  ],[['ok','服务端已确认','check'],['','本机上传','folder']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+nowFile({doc:LDOC(),from:'本机选文件',back:'local-picking',backName:'本机文件窗口'})+'</section>'+
+  '<section class="sec"><div class="mini"><h4>'+svg('swap','currentColor',22)+'<span>想换一条来源？</span></h4><p>先按上面的<b>删除</b>。换来源必须显式删掉这一份 —— 本页不做静默替换，免得你到下一步才发现带的是另一份。</p></div></section>'+
+  ctaBar(EXIT(),primaryLink('下一步：材料检查','13-print-desk.html','/print/material-check'));
+};
+
+/* ---------- 手机通道 ---------- */
+V['phone-generating']=function(){
+ return '<section class="sec">'+statusCard('plain','dot','正在向服务端要一张上传码',[
+  '还没拿到码，所以<b>这里不先放一张假的图</b>。真实页面画的是服务端下发的一次性链接。',
+  '拿到之后用手机相机或微信扫一扫对准屏幕就行，不用登录，也不用装软件。'
+ ],[['','正在向服务端要码','link'],['','单份 ≤ 10MB','phone']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow"><div class="card" style="flex:1"><div class="qr-wrap">'+qr('blank')+
+   '<div class="qr-side"><div><h3>码还没出来</h3>'+
+   '<ul class="steps"><li><span class="n">1</span><span>服务端生成会话与一次性上传链接。</span></li>'+
+   '<li><span class="n">2</span><span>本机把链接画成二维码。</span></li>'+
+   '<li><span class="n">3</span><span>你扫码、选文件、点上传。</span></li></ul></div>'+
+   '<div class="meta"><span class="chip">'+svg('clock','currentColor',22)+'有效期以服务端返回时间为准</span><span class="chip">PDF / JPG / PNG</span></div></div>'+
+  '</div></div></section>'+
+  '<section class="sec">'+switchRow('qr')+'</section>'+
+  reasonLine('码还没出来，材料检查按住不放')+
+  ctaBar(EXIT(),primaryOff('下一步：材料检查','还没有文件'));
+};
+
+V['phone-gen-failed']=function(){
+ return '<section class="sec">'+statusCard('error','warn','二维码没生成出来',[
+  '向服务端要上传会话失败了，所以<b>这里没有码</b>。本机<b>不会先出一张假码</b>再补 —— 那会让你白扫一次。',
+  '<b>没有任何文件被接收</b>。重试一次，或者改用本机 / U 盘那两条通道。'
+ ],[['bad','会话创建失败','warn'],['','没有文件被接收','check']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow"><div class="card spread" style="flex:1">'+
+   '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">可能是什么原因</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>这台机器到服务端的网络断了。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>服务端上传会话服务暂时不可用。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>会员态失效，需要回一体机重新登录或改用临时上传。</span></div></div></div>'+
+   '<div class="note"><span class="sq"></span><span>重试是安全的：<b>这一步不会产生重复文件</b>，因为还没有任何文件进来。</span></div>'+
+  '</div></section>'+
+  '<section class="sec">'+switchRow('qr')+'</section>'+
+  reasonLine('还没有上传会话，材料检查按住不放')+
+  ctaBar(HELP(),primaryLink('重新生成二维码',to('phone-generating'),'/print/upload'));
+};
+
+function phoneQrCard(kind,title,sideHtml){
+ return '<div class="card" style="flex:1"><div class="qr-wrap">'+qr(kind)+
+  '<div class="qr-side"><div><h3>'+title+'</h3>'+sideHtml+'</div>'+
+  '<div class="meta"><span class="chip">'+svg('phone','currentColor',22)+'单份 ≤ 10MB</span><span class="chip">PDF / JPG / PNG</span></div></div></div></div>';
+}
+V['phone-ready']=function(){
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+  '<section class="sec">'+statusCard('plain','phone','用手机对准左边这张码',[
+   '本机<b>看不到你扫没扫</b> —— 服务端根本不给这种信号。只有它真收到文件，下面才会变。',
+   '有效期以<b>服务端返回的到期时间</b>为准，不由屏幕自己倒数判定。'
+  ],[['','会话状态：pending','clock']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+phoneQrCard('live','扫码 → 选文件 → 上传',
+   '<ul class="steps"><li><span class="n">1</span><span>手机打开相机或微信扫一扫，对准屏幕。</span></li>'+
+   '<li><span class="n">2</span><span>在手机上选好文件，点「上传」。</span></li>'+
+   '<li><span class="n">3</span><span>服务端收到后，<b>回到这台机器点确认</b>才算数。</span></li></ul>'+
+   '<div class="note" style="margin-top:12px"><span class="sq"></span><span>码是<b>原型示意图形，不可扫描</b>，不编码任何真实内容。</span></div>')+'</section>'+
+  '<section class="sec">'+helpMini('手机扫不出来、或者扫开之后打不开页面，找工作人员帮忙。')+'</section>'+
+  reasonLine('还没有文件上来，材料检查按住不放')+
+  ctaBar(ghost('刷新二维码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','刷新二维码（先撤销旧会话）'),primaryOff('下一步：材料检查','还没有文件'));
+};
+
+V['phone-waiting']=function(){
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+  '<section class="sec">'+statusCard('plain','dot','码已经出来了，在等服务端的消息',[
+   '本机在轮询会话状态。<b>看不到你扫没扫</b>，也<b>不模拟手机端的动作</b>——手机那边点了什么，这台机器一概不知道。',
+   '手机上传完，下面会出现文件名，那时候才需要你回来点确认。'
+  ],[['','会话状态：pending','clock'],['','扫没扫这件事本机不知道','info']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+phoneQrCard('live','等手机把文件送上来',
+   '<div class="notes"><div class="note"><span class="sq"></span><span>手机端选文件、上传，都发生在<b>你的手机上</b>，本机只等服务端结果。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>刷新会<b>先撤销旧会话</b>再出新码，旧码立刻作废，不会同时有两张有效码。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>码是<b>原型示意图形，不可扫描</b>。</span></div></div>')+'</section>'+
+  '<section class="sec">'+helpMini('等太久没反应，或者手机那边报错，找工作人员帮忙。')+'</section>'+
+  reasonLine('还没有文件上来，材料检查按住不放')+
+  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryOff('下一步：材料检查','还没有文件'));
+};
+
+V['phone-uploading']=function(){
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+  '<section class="sec">'+statusCard('info','dot','手机正在上传',[
+   '服务端把这次会话标成 uploading。文件还在路上，<b>没有可确认的百分比</b>，所以不画进度条，也不说还剩几秒。',
+   '这时候<b>别关手机上那个页面</b>。传完之后，你还要在这台机器上点一次确认。'
+  ],[['','会话状态：uploading','clock'],['','没有进度百分比','info']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+phoneQrCard('live','传完之后要回这台机器确认',
+   '<ul class="steps"><li><span class="n">1</span><span>手机把文件送到服务端。</span></li>'+
+   '<li><span class="n">2</span><span>服务端确认落库，状态转为 uploaded。</span></li>'+
+   '<li><span class="n">3</span><span><b>你在这台机器上点确认</b>，才成为当前文件。</span></li></ul>'+
+   '<div class="note" style="margin-top:12px"><span class="sq"></span><span>uploaded 不等于可以继续 —— <b>没确认就不放行</b>。</span></div>')+'</section>'+
+  '<section class="sec">'+helpMini('手机上传卡住不动，可以取消重来，也可以叫工作人员。')+'</section>'+
+  reasonLine('文件还在路上，材料检查按住不放')+
+  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryOff('下一步：材料检查','上传还没完成'));
+};
+
+V['phone-status-unknown']=function(){
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+  '<section class="sec">'+statusCard('warn','warn','会话状态取不到了',[
+   '本机连着几次问不到这次会话的状态。<b>这不代表码已经失效</b>，也<b>不等于已过期</b>——只是本机现在不知道。',
+   '可以再问一次；连着问不到，本机就按已过期处理，重新出一张码更省事。'
+  ],[['warn','状态未知 ≠ 已过期','info'],['','连续 3 次失败按过期处理','clock']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+phoneQrCard('live','这张码可能还活着，也可能没了',
+   '<div class="notes"><div class="note"><span class="sq"></span><span>本机<b>不猜</b>。屏幕上不会因为问不到就写「已失效」。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>本机<b>没有因此取消或作废任何东西</b>；这一屏也<b>不替服务端说</b>文件现在是什么状态。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>重新出码会<b>先撤销这一张</b>，不会留两张有效码。</span></div></div>')+'</section>'+
+  '<section class="sec">'+helpMini('二维码扫不出来、或者一直问不到状态，找工作人员帮忙。')+'</section>'+
+  reasonLine('状态未知，材料检查按住不放')+
+  ctaBar(ghost('重新出一张码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','重新出一张码（先撤销旧会话）'),primaryLink('再查一次状态',to('phone-waiting'),'/print/upload'));
+};
+
+V['phone-expired']=function(){
+ return '<section class="sec">'+fixtureBar('二维码图形与下面的会话状态')+'</section>'+
+  '<section class="sec">'+statusCard('warn','clock','这张上传码过期了',[
+   '服务端确认这次会话已到期，<b>旧二维码不再接收文件</b>。过期由服务端结果判定，不是屏幕自己数到零。',
+   '重新出一张就行。过期前<b>还没确认</b>的那份临时上传，<b>按服务端的清理规则处理</b>；<b>此前已确认、已归档的文件不受影响</b>。'
+  ],[['warn','会话状态：expired','clock']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+phoneQrCard('dim','这张已经不能用了',
+   '<div class="notes"><div class="note"><span class="sq"></span><span>本次办理里<b>还没有当前文件</b>，所以下一步仍然按住不放。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>重新出码会先把这一张<b>作废掉</b>，避免两张码同时有效。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>手机上那个旧页面刷新后会提示回一体机重新扫码。</span></div></div>')+'</section>'+
+  '<section class="sec">'+helpMini('重新出码还是不行，或者手机上打不开上传页，找工作人员帮忙。')+'</section>'+
+  reasonLine('码已过期且没有当前文件，材料检查按住不放')+
+  ctaBar(ghost('改用 U 盘导入',to('usb-wait'),'/print/upload',SCREEN+'-switch-source','改用 U 盘导入'),primaryLink('重新出一张码',to('phone-generating'),'/print/upload'));
+};
+
+V['phone-uploaded']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('info','check','手机传上来一份，等你确认',[
+   '文件名和大小是<b>服务端回给本机的结果</b>。<b>uploaded 还不算数</b>——必须你在这台机器上确认，它才成为本次办理的当前文件。',
+   '不是你要的那一份？点取消，回手机重新传。'
+  ],[['ok','会话状态：uploaded','check'],['warn','未确认 · 不能继续','lock']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow"><div class="card" data-testid="'+SCREEN+'-file-card" style="flex:1"><div class="now">'+
+   '<span class="now-ic">'+svg('file','currentColor',38)+'</span>'+
+   '<span class="now-m"><span class="now-n">'+FX_PHONE.n+'</span><span class="now-s">'+FX_PHONE.s+' · 手机扫码上传</span></span>'+
+   '<span class="now-act">'+a({cls:'sbtn warn',href:to('phone-cancel-requesting'),tid:SCREEN+'-delete',label:svg('x','currentColor',22)+'不要这份',al:'不要这份，取消本次上传会话'})+'</span>'+
+   '</div>'+pvOpenBtn('打开完整预览 · 先看清是不是这一份','打开完整预览：'+FX_PHONE.n)+'<div class="hr"></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>确认这一下<b>要你在这台机器上点</b>；确认之前它<b>不进这次办理</b>。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>本次办理只带一份。确认后想换，得先在当前文件卡上删掉。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>页数和敏感信息检查在<b>下一步</b>做，这里不预告结论。</span></div></div>'+
+   nextSteps('点「确认使用这份文件」之后',['本机请服务端把它收进本次办理。','它成为唯一当前文件，手机端那页可以关了。','下一步「材料检查」才会亮起来。'])+
+  '</div></section>'+
+  reasonLine('还没确认，材料检查按住不放')+
+  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryLink('确认使用这份文件',to('phone-confirming'),'/print/upload'));
+};
+
+V['phone-confirming']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('info','dot','正在确认这份文件',[
+   '本机正在请服务端把这份文件收进本次办理。<b>结果没回来之前，它还不是当前文件。</b>',
+   '这一步<b>没有百分比</b>可显示，成功或失败都会明确告诉你。'
+  ],[['','正在向服务端确认','link']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+listCard('等待确认结果','确认中',
+    frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'确认中',tagCls:'doing',tid:SCREEN+'-confirming-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('check','currentColor',38)+'</span><span>确认成功后它才成为<b>唯一当前文件</b>，<br>那时下一步才会亮起来。</span></div>'+nextSteps('确认成功之后',['这份文件进入本次办理。','手机上那个上传页就可以关了。','下一步「材料检查」才会亮起来。']))+'</section>'+
+  '<section class="sec">'+helpMini('确认一直转圈，多半是网络问题，可以叫工作人员。')+'</section>'+
+  reasonLine('确认结果还没回来，材料检查按住不放')+
+  ctaBar(ghost('取消这次上传会话',to('phone-cancel-requesting'),'/print/upload',SCREEN+'-cancel','取消这次上传会话'),primaryOff('下一步：材料检查','确认结果未返回'));
+};
+
+V['phone-confirm-failed']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('error','warn','确认失败',[
+   '这份文件<b>没有进入本次办理</b>。多半是会话已经过期或被占用，也可能是本机到服务端的网络断了。',
+   '可以直接重试确认；还是不行就<b>刷新二维码重新传</b>一次。'
+  ],[['bad','确认未成功','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+listCard('这一份','确认失败',
+    frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'确认失败',tagCls:'bad',bad:1,tid:SCREEN+'-failed-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>重试确认<b>不会产生第二份文件</b>。<br>会话若已失效，重新出码是更快的路。</span></div>'+nextSteps('两条路',['直接重试确认，不会多出一份文件。','会话已经失效的话，重新出码再传一次。','两条都不通就叫工作人员。']))+'</section>'+
+  reasonLine('确认失败，当前文件仍然是空的')+
+  ctaBar(ghost('重新出一张码',to('phone-generating'),'/print/upload',SCREEN+'-refresh','重新出一张码（先撤销旧会话）'),primaryLink('重试确认',to('phone-confirming'),'/print/upload'));
+};
+
+V['phone-confirmed']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('info','check','已确认，这就是本次办理要打的文件',[
+   '文件名和大小是<b>服务端回给本机的结果</b>，确认动作也已经落到服务端。',
+   '这是本次办理的<b>唯一当前文件</b>。要换就先删掉，不做静默替换。'
+  ],[['ok','会话状态：confirmed','check'],['','手机扫码上传','phone']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+nowFile({doc:FX_PHONE,from:'手机扫码上传',back:'phone-generating',backName:'手机扫码通道'})+'</section>'+
+  '<section class="sec"><div class="mini"><h4>'+svg('info','currentColor',22)+'<span>手机那边可以关了</span></h4><p>确认之后手机上那个上传页就没用了。<b>本机不会再从那个会话拿第二份文件。</b></p></div></section>'+
+  ctaBar(EXIT(),primaryLink('下一步：材料检查','13-print-desk.html','/print/material-check'));
+};
+
+/* 取消是一次请求，不是一个按钮效果。答复回来之前，这份文件还挂在会话上。 */
+V['phone-cancel-requesting']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和会话结果')+'</section>'+
+  '<section class="sec">'+statusCard('info','dot','正在取消这次上传会话',[
+   '本机已经把取消请求发给服务端，<b>答复还没回来</b>。这期间刚才那份文件<b>仍然挂在这次会话上</b>，本机不替服务端下结论。',
+   '成功或失败都会明确告诉你。<b>没成功，这一屏就不宣布作废</b>；这份文件也不会从屏幕上无声消失。'
+  ],[['','等服务端答复','clock'],['warn','未作废 · 也未确认','lock']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+listCard('这一份还挂着','取消处理中',
+    frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'等答复',tagCls:'doing',tid:SCREEN+'-pending-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('clock','currentColor',38)+'</span><span>答复回来之前，这一屏<b>既不说已经作废</b>，<br>也不说这份已经进了本次办理。</span></div>'+
+    nextSteps('两种答复各自会怎样',['服务端确认作废：旧码不再收文件，这份不进本次办理。','服务端没能作废：这份仍旧留着，你可以重试，也可以回去把它确认掉。','两种都不会让本次办理里凭空多出一份文件。']))+'</section>'+
+  '<section class="sec">'+cancelOutcomeRow()+'</section>'+
+  reasonLine('取消结果还没回来，材料检查按住不放')+
+  ctaBar(EXIT(),primaryOff('下一步：材料检查','取消结果未返回'));
+};
+
+/* 取消失败：不清会话、不清待确认文件、不宣称旧码失效、不许直接开新会话。 */
+V['phone-cancel-failed']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和会话结果')+'</section>'+
+  '<section class="sec">'+statusCard('error','warn','这次会话没能取消',[
+   '服务端<b>没有确认作废</b>。所以本机<b>不说旧二维码已经失效</b>，也<b>不清掉这次会话</b> —— 刚才传上来的那份<b>还留着，等你处理</b>。',
+   '这时候<b>先不要开新的码</b>。旧会话到底作废没有还不知道，这会儿再建一个，容易出现两张码同时有效。'
+  ],[['bad','取消未成功','warn'],['warn','这份仍待确认','clock']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+listCard('这一份还留着','未作废',
+    frow({n:FX_PHONE.n,s:FX_PHONE.s+' · 手机扫码上传',tag:'仍待确认',tagCls:'doing',tid:SCREEN+'-kept-file'})+
+    pvOpenBtn('打开完整预览 · 看清楚再决定','打开完整预览：'+FX_PHONE.n)+
+    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>重试取消<b>不会把这一份弄丢</b>。<br>还是失败的话，它照样留在这里等你决定。</span></div>'+
+    nextSteps('你可以走两条路',['再试一次取消。还是不行，这一份也不会丢。','或者不取消了，回去把这一份确认成本次办理要打的文件。','两条都不通就叫工作人员，别在这里反复点。']))+'</section>'+
+  '<section class="sec">'+helpMini('取消一直不成功，多半是本机到服务端的网络断了，可以叫工作人员来看。')+'</section>'+
+  reasonLine('这一份还没确认，材料检查按住不放')+
+  ctaBar(ghost('保留这份 · 回去确认',to('phone-uploaded'),'/print/upload',SCREEN+'-keep','保留这份文件，回去确认它'),primaryLink('重试取消',to('phone-cancel-requesting'),'/print/upload'));
+};
+
+V['phone-cancelled']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个会话结果')+'</section>'+
+  '<section class="sec">'+statusCard('plain','info','这次上传会话已作废',[
+   '服务端确认这次会话<b>已经作废</b>，<b>旧二维码不再接收文件</b>。本次办理里<b>还是没有文件</b>。',
+   '这次<b>还没确认</b>的那份临时上传，<b>按服务端的清理规则处理</b> —— 可能被清掉，也可能按归属留着。本机<b>不替服务端下结论</b> —— 这一屏既不宣布它已经没了，也不保证它一定还留着。',
+   '<b>此前已确认、已归档的文件不受影响</b> —— 已经确认过的会话本来就取消不了。'
+  ],[['','会话状态：cancelled','check']],SCREEN+'-status')+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">接着走哪条</span><span class="hint">三条都还在</span></div>'+
+  channels('qr','ok')+'</section>'+
+  tailCard('phone','再来一次也行','重新出码会建一个<b>新的会话</b>，和刚才作废的那个没有关系，不会串文件。','重新出码之后',['服务端建一个全新的上传会话。','本机把新链接画成新的二维码。','旧码就算还没到期也已经作废了。'],'这次没确认的临时上传<b>按服务端清理规则处理</b>；<b>此前已确认、已归档的文件不受影响</b>。')+
+  reasonLine('这一步还没有文件，材料检查按住不放')+
+  ctaBar(EXIT(),primaryLink('重新出一张码',to('phone-generating'),'/print/upload'));
+};
+
+/* ---------- U 盘通道 ---------- */
+V['usb-unavailable']=function(){
+ return '<section class="sec">'+statusCard('lock','lock','这台机器没接通 U 盘导入',[
+  '本终端<b>没有配置 U 盘导入的本地令牌</b>，所以这条通道锁着。<b>这不是重试能解决的</b>，得由运维在这台机器上补配置。',
+  '插着的 U 盘<b>不会被本机读取</b>，也没有任何文件被复制走。'
+ ],[['warn','本机未配置 · 重试无效','lock']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">还能用的两条路</span><span class="hint">U 盘那格是锁着的</span></div>'+
+  channels(null,'unavailable')+'</section>'+
+  tailCard('info','和「Agent 离线」不是一回事','未配置 = 这台机器从来没打开过这条通道；Agent 离线 = 配置有，但本地服务此刻连不上。<b>后者才值得重试。</b>','这条通道要接通需要什么',['这台机器装好并跑着 Terminal Agent。','Kiosk 侧配好与 Agent 一致的本地令牌。','两边对上之后 U 盘那一格才会解锁。'],'这三件事都得由运维在机器上做，<b>你在这一屏点什么都不会改变它</b>。')+
+  reasonLine('这一步还没有文件，材料检查按住不放')+
+  ctaBar(HELP(),primaryLink('改用手机扫码上传',to('phone-generating'),'/print/upload'));
+};
+
+V['usb-agent-offline']=function(){
+ return '<section class="sec">'+statusCard('error','warn','连不上本机的 Terminal Agent',[
+  '这台机器<b>配了</b> U 盘导入，但现在连不上本地读盘服务。<b>和「未配置」不是一回事</b>——这个可以重试。',
+  '在 Agent 回来之前，本机<b>不去猜 U 盘里有什么</b>，也不显示上一次的列表。'
+ ],[['bad','本地文件服务连不上','warn'],['','可以重试','clock']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">重试，或者换一条</span><span class="hint">两条通道不受影响</span></div>'+
+  channels(null,'offline')+'</section>'+
+  tailCard('info','重试是安全的','读盘请求<b>不写 U 盘</b>，只列根目录。重试不会改动你盘上的任何东西。','重试会做什么',['本机再向这台机器的本地文件服务问一次。','连上了就重新列一次 U 盘根目录。','还是连不上，就换手机扫码那条通道。'],'连不上期间本机<b>不去猜 U 盘里有什么</b>，也不显示上一次的列表。')+
+  reasonLine('这一步还没有文件，材料检查按住不放')+
+  ctaBar(ghost('改用手机扫码上传',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),primaryLink('重试连接本地服务',to('usb-detecting'),'/print/upload'));
+};
+
+V['usb-wait']=function(){
+ return '<section class="sec">'+statusCard('plain','usb','把 U 盘插进右侧 USB 口',[
+  '还<b>没有检测到 U 盘</b>。插上之后本地服务会列出<b>根目录</b>里能打印的文件，你在屏幕上选一份。',
+  '本机<b>不会自动读整盘</b>，也不进子文件夹。想传的文件请先放到 U 盘最外层。'
+ ],[['','只读根目录','usb'],['','PDF / JPG / PNG · ≤ 15MB','file']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow"><div class="card spread" style="flex:1">'+
+   '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">插上之后会发生什么</span></div>'+
+   '<ul class="steps"><li><span class="n">1</span><span>本地服务发现可移动磁盘。</span></li>'+
+   '<li><span class="n">2</span><span>列出根目录里的 PDF / JPG / PNG，每份配一个<b>一次性标识</b>。</span></li>'+
+   '<li><span class="n">3</span><span>你选一份，本地服务把它上传到服务端。</span></li></ul></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>网页<b>不直接访问磁盘</b>，也拿不到你盘上的绝对路径。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>整个过程<b>只读不写</b>，不会往你的 U 盘里放东西。</span></div></div>'+
+  '</div></section>'+
+  '<section class="sec">'+switchRow('usb')+'</section>'+
+  reasonLine('还没检测到 U 盘，材料检查按住不放')+
+  ctaBar(EXIT(),primaryLink('我插好了，去读一次',to('usb-detecting'),'/print/upload'));
+};
+
+V['usb-detecting']=function(){
+ return '<section class="sec">'+statusCard('plain','dot','正在读 U 盘',[
+  '本地服务在列根目录。<b>不画进度条</b>——读盘这件事没有可确认的百分比，编一个只会误导人。',
+  '每份文件会拿到一个<b>一次性标识</b>；每次重新读都会换一批，旧的当场作废。'
+ ],[['','正在读 U 盘根目录','link'],['','一次性标识','lock']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow"><div class="card spread" style="flex:1">'+
+   '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">这一步在做什么</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>只列<b>根目录</b>里的 PDF / JPG / PNG，不进子文件夹。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>超过 15MB 的不列出来 —— 列了你也传不上去。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>读盘期间<b>请不要拔盘</b>。</span></div></div></div>'+
+   nextSteps('读完之后',['列表按文件名排序显示出来。','你点其中一份，它被标为已选中。','再点导入，本地服务才开始读字节。'])+
+   '<div class="note"><span class="sq"></span><span>读完之前本机<b>不显示任何文件名</b>，也不拿上一次的列表凑数。</span></div>'+
+  '</div></section>'+
+  '<section class="sec">'+helpMini('读盘一直不出结果，可能是盘或接口的问题，叫工作人员看看。')+'</section>'+
+  reasonLine('还在读盘，材料检查按住不放')+
+  ctaBar(ghost('取消，换一条通道',to('source-chooser'),'/print/upload',SCREEN+'-switch-source','取消读盘，换一条通道'),primaryOff('下一步：材料检查','还没有文件'));
+};
+
+V['usb-empty']=function(){
+ return '<section class="sec">'+statusCard('warn','warn','这个 U 盘里没有能用的文件',[
+  '根目录里<b>没有找到</b> PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在子文件夹里、或者单份超过 15MB。',
+  '在电脑上把文件<b>另存成 PDF 放到最外层</b>，再插一次就能看到了。'
+ ],[['warn','根目录 0 个可用文件','usb']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow"><div class="card spread" style="flex:1">'+
+   '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">对号入座</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span><b>简历是 DOCX</b> —— Word 里「另存为 PDF」，再放回 U 盘最外层。</span></div>'+
+   '<div class="note"><span class="sq"></span><span><b>文件在子文件夹里</b> —— 本机只读根目录，拖到最外层。</span></div>'+
+   '<div class="note"><span class="sq"></span><span><b>单份超过 15MB</b> —— 降一档分辨率再导出。</span></div></div></div>'+
+   '<div class="note"><span class="sq"></span><span>手边没有电脑的话，<b>手机扫码上传</b>通常比折腾 U 盘快。</span></div>'+
+  '</div></section>'+
+  '<section class="sec">'+switchRow('usb')+'</section>'+
+  reasonLine('U 盘里没有可用文件，材料检查按住不放')+
+  ctaBar(EXIT(),primaryLink('换个 U 盘再读一次',to('usb-detecting'),'/print/upload'));
+};
+
+V['usb-list']=function(){
+ var rows='';
+ for(var i=0;i<FX_USB.length;i++){var u=fx(FX_USB[i]);
+  rows+=frow({n:u.n,s:u.s,tag:'选这份',tagCls:'pickable',href:to('usb-selected',{pick:String(i)}),tid:SCREEN+'-usb-file-'+i});
+ }
+ rows+=nextSteps('选中之后会怎样',['这一份被标为已选中，其它的不动。','点「导入这一份」，本地服务才开始读字节。','读完传到服务端，落库成功才算数。'])+
+  '<div class="note"><span class="sq"></span><span>只列<b>根目录</b>里的 PDF / JPG / PNG，最多 200 个；超过 15MB 的不列。子文件夹里的东西不在这里。</span></div>';
+ return '<section class="sec">'+fixtureBar('下面这个盘名和三份文件')+'</section>'+
+  '<section class="sec"><div class="note"><span class="sq"></span><span>每一份都带一个<b>一次性标识</b>。选中即消费，<b>重新读盘会换一批</b>，旧的当场作废。一次只能选一个。</span></div></section>'+
+  '<section class="sec grow">'+listCard('U 盘根目录（演示盘名：'+USB_VOL+'）','3 项 · 一次选一个',rows)+'</section>'+
+  reasonLine('还没选定文件，材料检查按住不放')+
+  ctaBar(ghost('重新读一次盘',to('usb-detecting'),'/print/upload',SCREEN+'-refresh','重新读一次盘'),primaryOff('下一步：材料检查','还没选定文件'));
+};
+
+V['usb-read-failed']=function(){
+ return '<section class="sec">'+statusCard('error','warn','读 U 盘失败',[
+  '本地服务连上了，但这次<b>没能列出文件</b>。可能是盘没插稳、文件系统不认识，或者刚才被拔了。',
+  '重新插一次再读。本机<b>不显示上一次的列表</b>——免得你选中一份其实已经不在盘上的文件。'
+ ],[['bad','读盘失败','warn'],['','不显示缓存列表','check']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow"><div class="card spread" style="flex:1">'+
+   '<div><div class="sec-label" style="margin-bottom:10px"><span class="t" style="font-size:24px">先试这几步</span></div>'+
+   '<div class="notes"><div class="note"><span class="sq"></span><span>拔出来再插一次，插到底。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>换一个 USB 口。</span></div>'+
+   '<div class="note"><span class="sq"></span><span>盘是 exFAT / NTFS / FAT32 之外的格式，本机认不出来。</span></div></div></div>'+
+   '<div class="note"><span class="sq"></span><span><b>没有任何文件被读取或上传。</b>你的 U 盘内容没有被改动。</span></div>'+
+  '</div></section>'+
+  '<section class="sec">'+switchRow('usb')+'</section>'+
+  reasonLine('这次没读出文件，材料检查按住不放')+
+  ctaBar(HELP(),primaryLink('重新读一次 U 盘',to('usb-detecting'),'/print/upload'));
+};
+
+V['usb-selected']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('plain','check','选中了这一份，还没导入',[
+   '<b>只导入这一份</b>，U 盘上其它文件不会被读走，也不会发给任何人。',
+   '点导入之后，本地服务把它读出来传到服务端。<b>导入完成前它还不是当前文件。</b>'
+  ],[['','一次性标识已锁定','lock'],['','只动这一份','check']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+listCard('准备导入','1 项 · 选中',
+    frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'已选中',tagCls:'ok',on:1,tid:SCREEN+'-selected-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('usb','currentColor',38)+'</span><span>选错了？回列表<b>重选一份</b>就行，<br>这一步还没有任何东西被上传。</span></div>'+nextSteps('点「导入这一份」之后',['本地服务用一次性标识把它读出来。','读出来的字节传到服务端校验落库。','落库成功它才成为当前文件。']))+'</section>'+
+  reasonLine('还没导入，材料检查按住不放')+
+  ctaBar(ghost('回列表重选',to('usb-list'),'/print/upload',SCREEN+'-back-list','回 U 盘列表重选'),primaryLink('导入这一份',to('usb-importing'),'/print/upload'));
+};
+
+V['usb-safeid-expired']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('warn','clock','这一份的一次性标识已经失效',[
+   '刚才那次读盘的标识<b>已经作废</b>——每次重新读盘都会换一批，旧的当场失效。这是防止选中一份其实已经不在盘上的文件。',
+   '<b>没有任何文件被导入。</b>重新读一次盘，在新列表里再选一次就行。'
+  ],[['warn','一次性标识已失效','lock'],['','没有文件被导入','check']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+listCard('失效的这一份','需要重选',
+    frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'标识失效',tagCls:'bad',bad:1,dim:1,tid:SCREEN+'-expired-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('clock','currentColor',38)+'</span><span>本机<b>不拿旧列表凑数</b>。<br>重新读盘之后你看到的才是盘上此刻真有的东西。</span></div>'+nextSteps('重新读盘之后',['本地服务重新列一次根目录。','每份文件换一个新的一次性标识。','你在新列表里重选，旧的彻底作废。']))+'</section>'+
+  reasonLine('标识失效，需要重新读盘再选')+
+  ctaBar(ghost('改用手机扫码上传',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),primaryLink('重新读一次 U 盘',to('usb-detecting'),'/print/upload'));
+};
+
+V['usb-importing']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('info','dot','正在从 U 盘导入',[
+   '本地服务在把这一份读出来传到服务端。<b>没有可确认的中间进度</b>，所以不画百分比，也不说还剩几秒。',
+   '<b>这期间不要拔 U 盘。</b>结果出来之前它还不是当前文件。'
+  ],[['','导入中','clock'],['warn','别拔 U 盘','usb']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+listCard('这一份','导入中',
+    frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'导入中',tagCls:'doing',tid:SCREEN+'-importing-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('up','currentColor',38)+'</span><span>服务端确认之前，<b>当前文件仍然是空的</b>。<br>这一步不解析内容，也不看页数。</span></div>'+nextSteps('导入完成之后',['服务端确认落库并回文件名。','它成为本次办理的唯一当前文件。','那时候才可以拔 U 盘。']))+'</section>'+
+  '<section class="sec">'+helpMini('导入长时间不结束，先别拔盘，叫工作人员来处理。')+'</section>'+
+  reasonLine('导入结果还没确认，材料检查按住不放')+
+  ctaBar(ghost('取消，回列表',to('usb-list'),'/print/upload',SCREEN+'-cancel','取消导入，回 U 盘列表'),primaryOff('下一步：材料检查','导入结果未确认'));
+};
+
+V['usb-import-failed']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('error','warn','这一份没导进来',[
+   '服务端<b>没有确认收到</b>。多半是这份的<b>一次性标识已经失效</b>（读盘刷新过），也可能是本机到服务端的网络断了。',
+   '<b>还没有发起任何解析。</b>重新读一次盘，在新列表里再选一次最稳。'
+  ],[['bad','导入失败','warn'],['','当前文件仍为空','info']],SCREEN+'-fallback')+'</section>'+
+  '<section class="sec grow">'+listCard('这一份','导入失败',
+    frow({n:UDOC().n,s:UDOC().s+' · '+USB_VOL,tag:'导入失败',tagCls:'bad',bad:1,tid:SCREEN+'-failed-file'})+
+    '<div class="emptybox"><span class="ei">'+svg('warn','currentColor',38)+'</span><span>反复失败的话，把文件<b>拷到手机上扫码传</b>往往更快。</span></div>'+nextSteps('重新读盘再选一次',['本地服务重列根目录，换一批一次性标识。','你在新列表里重选一份。','这样不会撞上已经失效的旧标识。']))+'</section>'+
+  reasonLine('导入失败，当前文件仍然是空的')+
+  ctaBar(ghost('改用手机扫码上传',to('phone-generating'),'/print/upload',SCREEN+'-switch-source','改用手机扫码上传'),primaryLink('重新读盘再选一次',to('usb-detecting'),'/print/upload'));
+};
+
+V['usb-ready']=function(){
+ return '<section class="sec">'+fixtureBar('下面这个文件名和大小')+'</section>'+
+  '<section class="sec">'+statusCard('info','check','导入完成，可以拔 U 盘了',[
+   '文件名和大小是<b>服务端确认落库后回给本机的结果</b>。系统已经读完这份文件，<b>可以拔出 U 盘</b>。',
+   '本机<b>没有「安全弹出」按钮</b>——网页管不了操作系统的卷挂载，给一个假按钮不如说清楚。'
+  ],[['ok','服务端已确认','check'],['','可以拔出 U 盘','usb']],SCREEN+'-status')+'</section>'+
+  '<section class="sec grow">'+nowFile({doc:UDOC(),from:'U 盘导入 · '+USB_VOL,back:'usb-list',backName:'U 盘列表'})+'</section>'+
+  '<section class="sec"><div class="mini"><h4>'+svg('usb','currentColor',22)+'<span>U 盘上的东西没被改</span></h4><p>整个过程<b>只读不写</b>。这一份被复制到服务端，你盘上的原件<b>还在原地</b>。</p></div></section>'+
+  ctaBar(EXIT(),primaryLink('下一步：材料检查','13-print-desk.html','/print/material-check'));
+};
+
+/* ================= 完整预览：同一 HTML 宿主内的 near-full-stage 模态 ================= */
+/* 只做一件事：把这次办理里那一份文件**完整**看一遍。不解析、不判页数、不做隐私检查、不做 AI 诊断。
+   预览不导航、不改地址、不写任何存储，所以关掉之后通道、当前文件和手机确认态原样还在。
+   页面内容是**固定原型数据 / 演示文件**，模态里常驻标记，每页页脚和水印再标一次。 */
+var PV_STEPS=[0.5,0.75,1,1.25,1.5,2,3];
+var PV_PAD=16;
+/* 只有真的握着（或挂着）一份文件的状态才谈得上预览。其余状态即使地址里写了 preview 也不开。 */
+var PV_ALLOW={'local-ready':1,'usb-ready':1,'phone-confirmed':1,'phone-uploaded':1,'phone-cancel-failed':1,'local-rejected':1};
+var PV_INERT=['.topbar','.xq','#body-root','.truth','.navbar'];
+var pv=null,pvEl=null,pvView=null,pvBack=null,STAGE_SCALE=1;
+
+/* ---------- 页面内容：真文字，不是灰色占位块 ---------- */
+function ppFoot(no,total){
+ return '<div class="pp-foot"><span>第 '+no+' 页 / 共 '+total+' 页</span><span>原型演示文件 · 不是真实用户文件</span></div>';
+}
+function ppBody(no){
+ if(no===1){
+  return '<div class="pp-name">王　雷</div>'+
+   '<div class="pp-meta">求职意向：前端页面开发　·　所在城市：合肥　·　138****5678　·　wang****@163.com</div>'+
+   '<div class="pp-rule"></div>'+
+   '<h3 class="pp-h">教育经历</h3>'+
+   '<p class="pp-p">2022.09 — 2026.06　合肥某某职业技术学院　计算机应用技术</p>'+
+   '<p class="pp-p">主修：网页设计与制作、数据库应用、计算机网络、软件测试基础。</p>'+
+   '<p class="pp-p">在校三年获校级奖学金，参与过院系官网改版的页面还原工作。</p>'+
+   '<h3 class="pp-h">专业技能</h3>'+
+   '<div class="pp-li">熟悉页面结构与样式编写，能按设计稿独立还原静态页面。</div>'+
+   '<div class="pp-li">能看懂后台返回的数据结构，按字段把内容渲染到页面上。</div>'+
+   '<div class="pp-li">会用版本管理工具协作提交，能把改动说明写清楚。</div>'+
+   '<div class="pp-li">办公软件熟练，能整理数据表格并导出成规范文档。</div>'+
+   '<h3 class="pp-h">校内实践</h3>'+
+   '<p class="pp-p">院系迎新页面改版：负责首屏与信息区的页面还原和小屏适配。</p>'+
+   '<p class="pp-p">课程作业管理小工具：独立完成列表、筛选和详情三个页面。</p>'+
+   '<p class="pp-p">校园开放日志愿者：负责现场引导与材料分发，累计服务 40 小时。</p>';
+ }
+ if(no===2){
+  return '<h3 class="pp-h" style="margin-top:0">实习经历</h3>'+
+   '<p class="pp-p"><b>2025.07 — 2025.12　某某网络科技有限公司　前端实习生</b></p>'+
+   '<div class="pp-li">按设计稿完成企业官网 6 个页面的还原，并做完小屏适配。</div>'+
+   '<div class="pp-li">配合同事整理页面组件，把重复写了三遍的卡片收成一份。</div>'+
+   '<div class="pp-li">跟进上线前的自查清单，逐条核对文案、链接和空状态。</div>'+
+   '<div class="pp-li">整理过一份常见问题文档，交接给后面接手的同学。</div>'+
+   '<p class="pp-p"><b>2025.03 — 2025.06　校内实训中心　页面维护助理</b></p>'+
+   '<div class="pp-li">维护实训中心通知页，处理排版错乱与图片缺失的问题。</div>'+
+   '<div class="pp-li">把纸质登记表整理成表格，减少了现场重复登记。</div>'+
+   '<h3 class="pp-h">工作方式</h3>'+
+   '<p class="pp-p">习惯先把要做的事列成清单，做完一条划掉一条，改动都留记录。</p>'+
+   '<p class="pp-p">遇到不确定的需求会先问清楚再动手，不猜着做。</p>';
+ }
+ return '<h3 class="pp-h" style="margin-top:0">项目经历</h3>'+
+  '<p class="pp-p"><b>校园二手书交换页面</b>　2025.09 — 2025.11</p>'+
+  '<div class="pp-li">完成列表、详情、发布三个页面，处理了空列表与加载失败两种情况。</div>'+
+  '<div class="pp-li">把图片压缩后再上传，页面打开速度明显变快。</div>'+
+  '<p class="pp-p"><b>院系迎新信息页</b>　2025.06 — 2025.08</p>'+
+  '<div class="pp-li">负责首屏与报到流程说明区，文字和图示都做了小屏适配。</div>'+
+  '<h3 class="pp-h">证书</h3>'+
+  '<p class="pp-p">全国计算机等级考试二级　·　英语四级　·　校级奖学金（三次）</p>'+
+  '<h3 class="pp-h">自我评价</h3>'+
+  '<p class="pp-p">做事有条理，愿意把重复的事情整理成能复用的东西。</p>'+
+  '<p class="pp-p">接受从基础工作做起，希望能长期做页面开发这一行。</p>';
+}
+function ppPdf(d,no){
+ return '<div class="pp"><div class="pp-wm">原型演示文件</div>'+ppBody(no)+ppFoot(no,d.pages)+'</div>';
+}
+function ppImage(){
+ /* 内联示意图形，零外部资源。深蓝描边是为了让「四边完整」在屏幕上一眼可验。 */
+ return '<svg width="827" height="1063" viewBox="0 0 827 1063" style="display:block" role="img" '+
+  'aria-label="演示证件照（原型示意图形，不是真实用户照片）">'+
+  '<defs><linearGradient id="pv-sky" x1="0" y1="0" x2="0" y2="1">'+
+  '<stop offset="0" stop-color="#3f86d6"/><stop offset="1" stop-color="#1b4a8e"/></linearGradient></defs>'+
+  '<rect x="0" y="0" width="827" height="1063" fill="url(#pv-sky)"/>'+
+  '<path d="M148 1063c0-178 119-289 265-289s266 111 266 289z" fill="#243240"/>'+
+  '<path d="M330 690h167v104H330z" fill="#e7cdb2"/>'+
+  '<ellipse cx="413" cy="466" rx="153" ry="190" fill="#f2d9be"/>'+
+  '<path d="M260 448c0-106 69-175 153-175s153 69 153 175c0 22-7 38-7 38s-20-76-59-97c-35-19-97-4-142 13-39 15-91 68-91 68s-7-8-7-22z" fill="#2b2320"/>'+
+  '<ellipse cx="358" cy="452" rx="15" ry="10" fill="#2b2320"/><ellipse cx="468" cy="452" rx="15" ry="10" fill="#2b2320"/>'+
+  '<path d="M383 556q30 20 60 0" fill="none" stroke="#b0714f" stroke-width="8" stroke-linecap="round"/>'+
+  '<path d="M330 786l83 44 84-44 40 20-124 66-123-66z" fill="#f5f7f9"/>'+
+  '<path d="M413 830l-26 44 26 30 27-30z" fill="#8e2f2a"/>'+
+  '<rect x="4" y="4" width="819" height="1055" fill="none" stroke="#0e2f5e" stroke-width="8"/>'+
+  '<text x="413" y="1014" text-anchor="middle" font-size="31" font-weight="700" fill="#e8f1fb">原型演示图片 · 不是真实用户照片</text>'+
+  '</svg>';
+}
+
+/* ---------- 几何：一次算清 fit-page / fit-width / 缩放 / 旋转 ---------- */
+function pvGeom(){
+ var d=pv.doc,vw=pvView.clientWidth,vh=pvView.clientHeight;
+ var q=(pv.rot%180)!==0,nw=q?d.h:d.w,nh=q?d.w:d.h;
+ var availW=Math.max(1,vw-PV_PAD*2),availH=Math.max(1,vh-PV_PAD*2);
+ var fitPage=Math.min(availW/nw,availH/nh),fitWidth=availW/nw;
+ var scale=pv.mode==='fit-page'?fitPage:(pv.mode==='fit-width'?fitWidth:pv.zoom);
+ return {vw:vw,vh:vh,nw:nw,nh:nh,fitPage:fitPage,fitWidth:fitWidth,scale:scale};
+}
+function pvLayout(anchor){
+ var g=pvGeom(),d=pv.doc;
+ var bw=Math.round(d.w*g.scale),bh=Math.round(d.h*g.scale);
+ var q=(pv.rot%180)!==0,ow=q?bh:bw,oh=q?bw:bh;
+ var sceneW=Math.max(g.vw,ow+PV_PAD*2),sceneH=Math.max(g.vh,oh+PV_PAD*2);
+ var scene=pvEl.querySelector('.pv-scene'),page=pvEl.querySelector('.pv-page'),paper=pvEl.querySelector('.pv-paper');
+ scene.style.width=sceneW+'px';scene.style.height=sceneH+'px';
+ page.style.width=bw+'px';page.style.height=bh+'px';
+ page.style.transform='translate(-50%,-50%) rotate('+pv.rot+'deg)';
+ paper.style.width=d.w+'px';paper.style.height=d.h+'px';paper.style.transform='scale('+(bw/d.w)+')';
+ pvView.scrollLeft=Math.max(0,(sceneW-g.vw)/2);
+ pvView.scrollTop=anchor==='top'?0:Math.max(0,(sceneH-g.vh)/2);
+ pvBar(g);
+}
+function pvPct(g){return Math.round(g.scale*100)+'%'}
+function pvBar(g){
+ var q=function(t){return pvEl.querySelector('[data-testid="'+SCREEN+'-preview-'+t+'"]')};
+ var multi=pv.doc.pages>1,reason='';
+ if(multi){
+  var prev=q('prev'),next=q('next');
+  var atFirst=pv.page<=1,atLast=pv.page>=pv.doc.pages;
+  prev.setAttribute('aria-disabled',atFirst?'true':'false');
+  next.setAttribute('aria-disabled',atLast?'true':'false');
+  q('pageinfo').textContent='第 '+pv.page+' 页 / 共 '+pv.doc.pages+' 页';
+  if(atFirst)reason='已经是第 1 页，没有上一页。';
+  if(atLast)reason='已经是最后一页，后面没有了。';
+ }
+ var zin=q('zoom-in'),zout=q('zoom-out');
+ var canIn=pvNextStep(1,g.scale)!==null,canOut=pvNextStep(-1,g.scale)!==null;
+ zin.setAttribute('aria-disabled',canIn?'false':'true');
+ zout.setAttribute('aria-disabled',canOut?'false':'true');
+ if(!canIn)reason='已经放到最大，'+pvPct(g)+' 到顶了。';
+ if(!canOut)reason='已经缩到最小，'+pvPct(g)+' 到底了。';
+ q('zoominfo').textContent=(pv.mode==='fit-page'?'整页 ':(pv.mode==='fit-width'?'适宽 ':''))+pvPct(g);
+ var fp=q('fit-page'),fw=q('fit-width');
+ fp.setAttribute('aria-pressed',pv.mode==='fit-page'?'true':'false');
+ fp.className='pvb wide'+(pv.mode==='fit-page'?' on':'');
+ fw.setAttribute('aria-pressed',pv.mode==='fit-width'?'true':'false');
+ fw.className='pvb wide'+(pv.mode==='fit-width'?' on':'');
+ q('rotate').setAttribute('aria-label','把页面再转 90 度（当前 '+pv.rot+' 度）');
+ var r=q('reason');
+ var canX=pvView.scrollWidth-pvView.clientWidth>1,canY=pvView.scrollHeight-pvView.clientHeight>1;
+ var pan=canX&&canY?'按住画面拖动可以看到上下左右和四个角。'
+  :canY?'按住画面上下拖动可以看到这一页的其余部分。'
+  :canX?'按住画面左右拖动可以看到这一页的其余部分。'
+  :'整页都在屏幕里，四边都看得见。';
+ r.textContent=reason||('当前 '+pvPct(g)+'；'+pan);
+}
+function pvNextStep(dir,cur){
+ var i;
+ if(dir>0){for(i=0;i<PV_STEPS.length;i++)if(PV_STEPS[i]>cur+0.005)return PV_STEPS[i];return null}
+ for(i=PV_STEPS.length-1;i>=0;i--)if(PV_STEPS[i]<cur-0.005)return PV_STEPS[i];
+ return null;
+}
+function pvSetPage(no){
+ if(no<1||no>pv.doc.pages)return;
+ pv.page=no;
+ pvEl.querySelector('.pv-paper').innerHTML=ppPdf(pv.doc,no);
+ pvLayout(pv.mode==='fit-width'?'top':'center');
+}
+
+/* ---------- 组装 ---------- */
+function pvBtn(tid,label,al,cls){
+ return '<button type="button" class="pvb'+(cls?' '+cls:'')+' press" data-testid="'+SCREEN+'-preview-'+tid+'"'+
+  ' aria-label="'+(al||label)+'">'+label+'</button>';
+}
+function pvFixtureBar(){
+ return '<div class="pv-fx" data-testid="'+SCREEN+'-preview-fixture" role="note"><span class="fx-b">演示</span>'+
+  '<span>固定原型数据 / 演示文件，<b>不是真实用户文件</b>。这里的页面和图片写死在原型里，不是任何人真实上传的文件，也不是这台机器此刻真读到的东西。</span></div>';
+}
+function pvFailCard(){
+ var na=pv.fail==='unavailable';
+ var title=na?'这份文件暂时看不了预览':'预览链接已经过期';
+ var p1=na?'预览要向服务端另取一份用来看的内容，<b>刚才这一次没取到</b>。可能是这台机器到服务端的网络断了，也可能是预览服务正忙。'
+          :'为了不让文件被随手转发，预览用的是<b>有有效期的临时链接</b>，时间到了就打不开了。重新打开预览会再取一条新的。';
+ return '<div class="pv-card" data-testid="'+SCREEN+'-preview-state" data-kind="'+pv.fail+'">'+
+  '<div><div class="state-h">'+svg('warn','currentColor',30,2.1)+'<span>'+title+'</span></div>'+
+  '<div class="state-p" style="margin-top:14px">'+p1+'</div></div>'+
+  '<div class="pv-keep">'+svg('check','currentColor',26)+
+   '<span><b>这份文件还在本次办理里。</b>上传<b>没有失败</b>，文件<b>没有丢</b>，也<b>没有被删除</b> —— 看不了的只是预览这一件事。</span></div>'+
+  '<div class="state-p">当前文件仍然是 <b>'+pv.doc.n+'</b>（'+pv.doc.s+'）。<b>看不到预览不影响下一步</b>：材料检查和打印照常走。</div>'+
+  nextSteps('现在可以怎么办',[
+   '关掉预览，这一屏和这份文件原样还在，能做的事一件不少。',
+   '过一会儿再打开一次预览，本机会重新取一次预览内容。',
+   '不放心这一份，也可以在上一屏直接删掉，重新搬一份进来。'])+
+  '<div class="mini" data-testid="'+SCREEN+'-preview-outcome">'+
+   '<h4>'+svg('info','currentColor',22)+'<span>这一步的结果由服务端给出</span></h4>'+
+   '<p>不是你在这一屏选的。下面两个是<b>原型演示按钮</b>，只用来分别看到两种答复的屏幕。</p>'+
+   '<div class="outrow">'+
+    '<button type="button" class="sbtn warn press" data-testid="'+SCREEN+'-preview-retry-fail" aria-label="原型演示：再取一次仍然取不到预览">'+svg('warn','currentColor',22)+'演示：还是取不到</button>'+
+    '<button type="button" class="sbtn press" data-testid="'+SCREEN+'-preview-retry-ok" aria-label="原型演示：这次取到了预览内容">'+svg('check','currentColor',22)+'演示：这次取到了</button>'+
+   '</div></div></div>';
+}
+function pvDocxCard(){
+ return '<div class="pv-card" data-testid="'+SCREEN+'-preview-state" data-kind="unsupported">'+
+  '<div><div class="state-h">'+svg('x','currentColor',30,2.1)+'<span>这条路由不收、也不预览 Word 文档</span></div>'+
+  '<div class="state-p" style="margin-top:14px">打印上传<b>只收 PDF / JPG / PNG</b>。<b>'+pv.doc.n+' 没有被上传</b>，本机也<b>不做格式转换</b> —— 不会拿一个转出来的样子冒充你的原文件，所以这里<b>什么都不画</b>。</div></div>'+
+  '<div class="pv-keep">'+svg('info','currentColor',26)+
+   '<span>Word 的排版换台机器就会跑版。<b>另存成 PDF 再传</b>，打出来才和你屏幕上看到的一样。</span></div>'+
+  '<div class="pv-chips"><span class="yes"><b>这条路由收</b><span>PDF · JPG · PNG</span></span>'+
+   '<span class="no"><b>不收</b><span>DOC / DOCX · XLS · PPT · 压缩包</span></span></div>'+
+  nextSteps('在电脑上三步就能换成能收的格式',[
+   '用 Word 打开这份文档，选「文件 → 另存为 / 导出」。',
+   '格式选 <b>PDF</b>；只要其中几页的话，也可以导成 <b>JPG / PNG</b>。',
+   '把新文件放回 U 盘最外层或存到手机里，回这一页重新选一次。'])+
+  '<div class="state-p">手边没有电脑，可以先在手机上把文档转成 PDF，再用<b>手机扫码上传</b>那条通道。</div></div>';
+}
+function pvBuild(){
+ var d=pv.doc,fail=pv.fail,docx=d.kind==='docx';
+ var head='<header class="pv-head">'+
+  '<span class="pv-ic'+((fail||docx)?' warn':'')+'">'+svg((fail||docx)?'warn':'file','currentColor',36)+'</span>'+
+  '<span class="pv-hm"><span class="pv-t" id="pv-title" data-testid="'+SCREEN+'-preview-name">'+d.n+'</span>'+
+  '<span class="pv-s" data-testid="'+SCREEN+'-preview-meta">'+d.s+' · '+pv.from+'</span></span>'+
+  '<button type="button" class="pv-close press" data-testid="'+SCREEN+'-preview-close" aria-label="关闭预览，回到刚才那一屏">'+
+  svg('x','currentColor',26)+'<span>关闭</span></button></header>';
+ var body,bar;
+ if(fail||docx){
+  body='<div class="pv-view still" data-testid="'+SCREEN+'-preview-canvas">'+(docx?pvDocxCard():pvFailCard())+'</div>';
+  bar='<div class="pv-bar" data-testid="'+SCREEN+'-preview-toolbar">'+
+   '<div class="pv-row"><span class="pv-info" data-testid="'+SCREEN+'-preview-zoominfo">'+(docx?'不预览 Word · 不做格式转换':'预览内容没取到 · 文件仍在本次办理里')+'</span></div>'+
+   '<div class="pv-row">'+pvBtn('close-2','知道了，回上一屏','关闭预览，回到刚才那一屏','wide')+'</div>'+
+   '<div class="pv-reason" data-testid="'+SCREEN+'-preview-reason">'+
+   (docx?'没有可显示的页面，所以这里没有页码、缩放和旋转。':'取不到预览内容，所以这里没有页码、缩放和旋转。')+'</div></div>';
+ }else{
+  body='<div class="pv-view" data-testid="'+SCREEN+'-preview-viewport" tabindex="0" aria-label="文件预览区，可以拖动或滚动查看整页">'+
+   '<div class="pv-scene" data-testid="'+SCREEN+'-preview-scene">'+
+   '<div class="pv-page" data-testid="'+SCREEN+'-preview-page"><div class="pv-paper">'+
+   (d.kind==='image'?ppImage():ppPdf(d,pv.page))+'</div></div></div></div>';
+  var rowA=d.pages>1
+   ? '<div class="pv-row">'+pvBtn('prev','‹ 上一页','看上一页','wide')+
+     '<span class="pv-info" data-testid="'+SCREEN+'-preview-pageinfo">第 1 页 / 共 '+d.pages+' 页</span>'+
+     pvBtn('next','下一页 ›','看下一页','wide')+'</div>'
+   : '<div class="pv-row"><span class="pv-info" data-testid="'+SCREEN+'-preview-pageinfo">单页图片 · 共 1 页</span></div>';
+  bar='<div class="pv-bar" data-testid="'+SCREEN+'-preview-toolbar">'+rowA+
+   '<div class="pv-row">'+pvBtn('fit-page','适应整页','整页显示，四边都看得见','wide')+
+   pvBtn('fit-width','适应宽度','按宽度铺满，上下滚动看','wide')+
+   pvBtn('zoom-out','缩小 −','缩小')+
+   '<span class="pv-info" data-testid="'+SCREEN+'-preview-zoominfo">整页</span>'+
+   pvBtn('zoom-in','放大 ＋','放大')+
+   pvBtn('rotate','旋转 90°','把页面再转 90 度')+'</div>'+
+   '<div class="pv-reason" data-testid="'+SCREEN+'-preview-reason"></div></div>';
+ }
+ pvEl.innerHTML='<div class="pv-box">'+head+pvFixtureBar()+body+bar+'</div>';
+ pvView=pvEl.querySelector('.pv-view');
+ pvWire(fail||docx);
+ if(!(fail||docx))pvLayout(pv.mode==='fit-width'?'top':'center');
+ var close=pvEl.querySelector('[data-testid="'+SCREEN+'-preview-close"]');
+ if(close)close.focus();
+}
+function pvWire(flatMode){
+ var on=function(tid,fn){
+  var el=pvEl.querySelector('[data-testid="'+SCREEN+'-preview-'+tid+'"]');
+  if(el)el.addEventListener('click',function(e){e.preventDefault();fn(el)});
+ };
+ on('close',function(){pvClose()});
+ on('close-2',function(){pvClose()});
+ if(flatMode){
+  on('retry-ok',function(){pv.fail=null;pvBuild()});
+  on('retry-fail',function(){pvBuild()});
+  return;
+ }
+ on('prev',function(el){if(el.getAttribute('aria-disabled')!=='true')pvSetPage(pv.page-1)});
+ on('next',function(el){if(el.getAttribute('aria-disabled')!=='true')pvSetPage(pv.page+1)});
+ on('fit-page',function(){pv.mode='fit-page';pvLayout('center')});
+ on('fit-width',function(){pv.mode='fit-width';pvLayout('top')});
+ on('zoom-in',function(el){if(el.getAttribute('aria-disabled')==='true')return;var n=pvNextStep(1,pvGeom().scale);if(n!==null){pv.mode='zoom';pv.zoom=n;pvLayout('center')}});
+ on('zoom-out',function(el){if(el.getAttribute('aria-disabled')==='true')return;var n=pvNextStep(-1,pvGeom().scale);if(n!==null){pv.mode='zoom';pv.zoom=n;pvLayout('center')}});
+ on('rotate',function(){pv.rot=(pv.rot+90)%360;pvLayout('center')});
+ /* 拖动平移：指针事件同时覆盖触控和鼠标；除以舞台缩放，保证 1:1 跟手。 */
+ var drag=null;
+ pvView.addEventListener('pointerdown',function(e){
+  if(e.target.closest('button'))return;
+  drag={x:e.clientX,y:e.clientY,l:pvView.scrollLeft,t:pvView.scrollTop,id:e.pointerId};
+  pvView.classList.add('grabbing');
+  try{pvView.setPointerCapture(e.pointerId)}catch(err){}
+ });
+ pvView.addEventListener('pointermove',function(e){
+  if(!drag||e.pointerId!==drag.id)return;
+  pvView.scrollLeft=drag.l-(e.clientX-drag.x)/STAGE_SCALE;
+  pvView.scrollTop=drag.t-(e.clientY-drag.y)/STAGE_SCALE;
+  e.preventDefault();
+ });
+ var end=function(e){
+  if(!drag||(e&&e.pointerId!==drag.id))return;
+  drag=null;pvView.classList.remove('grabbing');
+ };
+ pvView.addEventListener('pointerup',end);
+ pvView.addEventListener('pointercancel',end);
+}
+function pvInert(on){
+ var list=PV_INERT.slice();
+ var i,el,extra=document.querySelectorAll('[data-proto-control]');
+ for(i=0;i<list.length;i++){
+  el=document.querySelector(list[i]);
+  if(!el)continue;
+  if(on){el.setAttribute('inert','');el.setAttribute('aria-hidden','true')}
+  else{el.removeAttribute('inert');el.removeAttribute('aria-hidden')}
+ }
+ for(i=0;i<extra.length;i++){
+  if(on)extra[i].setAttribute('inert','');else extra[i].removeAttribute('inert');
+ }
+}
+function pvKey(e){
+ if(!pv)return;
+ if(e.key==='Escape'){e.preventDefault();pvClose();return}
+ if(e.key!=='Tab')return;
+ var f=[].slice.call(pvEl.querySelectorAll('button,[tabindex]:not([tabindex="-1"])'));
+ if(!f.length)return;
+ var first=f[0],last=f[f.length-1];
+ if(e.shiftKey&&(document.activeElement===first||!pvEl.contains(document.activeElement))){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
+function pvOpen(mode,st,instant){
+ if(pv)return;
+ if(!PV_ALLOW[st])return;
+ var doc=st==='local-ready'?LDOC():st==='usb-ready'?UDOC():st==='local-rejected'?DOCS['thesis-docx']:FX_PHONE;
+ /* 副标题同时说清这份文件此刻的「身份」：看过 ≠ 已确认。免得预览一关就以为已经放行。 */
+ var from=st==='local-ready'?'本机选文件 · 已是本次办理的当前文件'
+   :st==='usb-ready'?('U 盘导入 · '+USB_VOL+' · 已是本次办理的当前文件')
+   :st==='local-rejected'?'本机选文件 · 这一份没有被上传'
+   :st==='phone-uploaded'?'手机扫码上传 · 还没确认，看完仍要回上一屏确认'
+   :st==='phone-cancel-failed'?'手机扫码上传 · 取消没成功，这一份仍待确认'
+   :'手机扫码上传 · 已确认为本次办理的当前文件';
+ pv={doc:doc,from:from,page:1,mode:'fit-page',zoom:1,rot:0,fail:null,st:st};
+ if(mode==='page2')pv.page=Math.min(2,doc.pages||1);
+ if(mode==='last')pv.page=Math.max(1,doc.pages||1);
+ if(mode==='fit-width')pv.mode='fit-width';
+ if(mode==='zoom'){pv.mode='zoom';pv.zoom=2}
+ if(mode==='rotate')pv.rot=90;
+ if(mode==='unavailable'||mode==='expired')pv.fail=mode;
+ pvBack=document.activeElement;
+ pvEl=document.createElement('div');
+ pvEl.className='pv';pvEl.id='pv';
+ pvEl.setAttribute('role','dialog');pvEl.setAttribute('aria-modal','true');
+ pvEl.setAttribute('aria-labelledby','pv-title');
+ pvEl.setAttribute('data-testid',SCREEN+'-preview');
+ document.getElementById('stage').appendChild(pvEl);
+ pvInert(true);
+ pvBuild();
+ /* 地址直达的预览一开始就是打开的，所以不做入场过渡；按钮打开的才淡入（只动 opacity，不位移）。 */
+ if(instant)pvEl.classList.add('pv-in');
+ else requestAnimationFrame(function(){if(pvEl)pvEl.classList.add('pv-in')});
+ document.addEventListener('keydown',pvKey);
+}
+function pvClose(){
+ if(!pv)return;
+ document.removeEventListener('keydown',pvKey);
+ pvInert(false);
+ if(pvEl&&pvEl.parentNode)pvEl.parentNode.removeChild(pvEl);
+ pvEl=null;pvView=null;pv=null;
+ if(pvBack&&document.contains(pvBack))pvBack.focus();
+ pvBack=null;
+}
+
+/* ================= 顶栏胶囊与小青台词 ================= */
+var PILL={
+ 'source-chooser':['','第 1 步 / 共 4 步 · 选来源'],
+ 'missing-file':['warn','缺文件上下文 · 已拦下'],
+ 'unknown':['bad','状态无法识别 · 已拦下'],
+ 'local-guide':['','本机通道 · 桌面验证路径'],
+ 'local-picking':['','本机通道 · 选一份'],
+ 'local-cancelled':['','关掉文件窗口 · 未开始上传'],
+ 'local-rejected':['bad','格式不收 · 未上传'],
+ 'local-oversize':['warn','超过 15MB · 未上传'],
+ 'local-unreadable':['bad','读不出来 · 未上传'],
+ 'local-uploading':['','正在上传 · 无取消动作'],
+ 'local-upload-failed':['bad','上传失败 · 可重试'],
+ 'local-ready':['ok','已收到 1 份 · 可继续'],
+ 'phone-generating':['','正在要上传码'],
+ 'phone-gen-failed':['bad','出码失败 · 可重试'],
+ 'phone-ready':['','码已出 · 等手机上传'],
+ 'phone-waiting':['','等待中 · 看不到你扫没扫'],
+ 'phone-uploading':['','手机上传中 · 无百分比'],
+ 'phone-status-unknown':['warn','状态未知 ≠ 已过期'],
+ 'phone-expired':['warn','上传码已过期'],
+ 'phone-uploaded':['warn','已上传 · 待你确认'],
+ 'phone-confirming':['','确认中 · 结果未返回'],
+ 'phone-confirm-failed':['bad','确认失败 · 可重试'],
+ 'phone-confirmed':['ok','已确认 1 份 · 可继续'],
+ 'phone-cancel-requesting':['','取消中 · 答复未返回'],
+ 'phone-cancel-failed':['bad','取消失败 · 这份还留着'],
+ 'phone-cancelled':['','会话已作废 · 无文件'],
+ 'usb-unavailable':['warn','U 盘未接通 · 重试无效'],
+ 'usb-agent-offline':['bad','Agent 离线 · 可重试'],
+ 'usb-wait':['','等待插入 U 盘'],
+ 'usb-detecting':['','正在读盘 · 无百分比'],
+ 'usb-empty':['warn','根目录没有可用文件'],
+ 'usb-list':['','U 盘列表 · 一次选一个'],
+ 'usb-read-failed':['bad','读盘失败 · 不显示旧列表'],
+ 'usb-selected':['','已选中 · 还没导入'],
+ 'usb-safeid-expired':['warn','一次性标识已失效'],
+ 'usb-importing':['','导入中 · 别拔 U 盘'],
+ 'usb-import-failed':['bad','导入失败 · 可重试'],
+ 'usb-ready':['ok','已导入 1 份 · 可继续']
+};
+var ASK={
+ 'source-chooser':['文件<em>怎么进来</em>？','本机、手机、U 盘、纸质扫描都能进来；登录后还能直接用「我的文档」里存过的材料。第三方网盘不接入。'],
+ 'missing-file':['这一步<em>没有文件</em>。','我不替你挑一份，也不凭地址就说已经传好了。'],
+ 'unknown':['这个状态<em>我不认识</em>。','不猜你想去哪一步，也不把地址里的原始参数抄到屏幕上。'],
+ 'local-guide':['本机选文件是<em>兼容路径</em>。','会弹系统窗口。一体机上优先手机扫码，这条留给桌面验证。'],
+ 'local-picking':['挑<em>一份</em>就行。','一次只能选一个。选中即上传，服务端校验格式和大小。'],
+ 'local-cancelled':['窗口<em>关掉了</em>。','上传还没开始，没有产生任何上传。再打开一次，或者换条通道。'],
+ 'local-rejected':['这份<em>格式不收</em>。','只收 PDF / JPG / PNG。Word 先另存为 PDF。'],
+ 'local-oversize':['这份<em>太大了</em>。','本机与 U 盘单份 15MB 以内，手机通道是 10MB。'],
+ 'local-unreadable':['这份<em>读不出来</em>。','大小都取不到，不会硬着头皮上传。'],
+ 'local-uploading':['正在<em>送上去</em>。','一次性上传，没有进度百分比。这一步没有取消动作，等服务端给结果。'],
+ 'local-upload-failed':['<em>没送上去</em>。','服务端没确认收到。刚才挑的那份还在，直接重试。'],
+ 'local-ready':['收到了，<em>就这一份</em>。','服务端确认落库后回给本机的结果。可以去材料检查了。'],
+ 'phone-generating':['正在<em>要一张码</em>。','还没拿到就不先放假图。稍等一下。'],
+ 'phone-gen-failed':['码<em>没出来</em>。','没有任何文件被接收。重试，或者换条通道。'],
+ 'phone-ready':['<em>扫这张码</em>。','本机看不到你扫没扫，只认服务端收到文件。'],
+ 'phone-waiting':['在<em>等你手机</em>。','手机上传完，下面会出现文件名。'],
+ 'phone-uploading':['手机<em>正在传</em>。','没有百分比可显示。传完还要你回来点确认。'],
+ 'phone-status-unknown':['状态<em>问不到了</em>。','这不等于已过期。可以再问一次，或者重新出码。'],
+ 'phone-expired':['这张码<em>过期了</em>。','按服务端结果判定。重新出一张就行。'],
+ 'phone-uploaded':['传上来了，<em>等你确认</em>。','uploaded 还不算数，确认之后才进这次办理。'],
+ 'phone-confirming':['正在<em>确认</em>。','结果没回来之前，它还不是当前文件。'],
+ 'phone-confirm-failed':['<em>确认失败</em>。','这份没进本次办理。重试确认，或者重新出码。'],
+ 'phone-confirmed':['确认了，<em>就这一份</em>。','这是本次办理要打的文件。可以去材料检查了。'],
+ 'phone-cancel-requesting':['正在<em>取消</em>。','答复没回来之前，这份还挂着，我不说已经作废。'],
+ 'phone-cancel-failed':['<em>没取消掉</em>。','这份还留着。可以重试，也可以回去把它确认掉。'],
+ 'phone-cancelled':['会话<em>已作废</em>。','旧码不再收文件。本次办理里还是没有文件。'],
+ 'usb-unavailable':['U 盘这条<em>锁着</em>。','本机没配这条通道的令牌，重试也没用。'],
+ 'usb-agent-offline':['本地服务<em>连不上</em>。','和「未配置」不是一回事，这个可以重试。'],
+ 'usb-wait':['把 U 盘<em>插进来</em>。','只读根目录，不进子文件夹，也不自动读整盘。'],
+ 'usb-detecting':['正在<em>读盘</em>。','不画进度条。读完之前不显示任何文件名。'],
+ 'usb-empty':['盘里<em>没有能用的</em>。','根目录没有 PDF / JPG / PNG。多半是格式或位置的问题。'],
+ 'usb-list':['挑<em>一份</em>就行。','每份带一个一次性标识，重新读盘会换一批。'],
+ 'usb-read-failed':['<em>没读出来</em>。','重新插一次。我不显示上一次的列表。'],
+ 'usb-selected':['选中了，<em>还没导入</em>。','只动这一份，盘上其它文件不会被读走。'],
+ 'usb-safeid-expired':['这份的标识<em>失效了</em>。','没有文件被导入。重新读盘再选一次。'],
+ 'usb-importing':['正在<em>导入</em>。','这期间别拔 U 盘。没有中间进度可显示。'],
+ 'usb-import-failed':['<em>没导进来</em>。','多半是一次性标识失效了。重新读盘再选一次。'],
+ 'usb-ready':['导好了，<em>就这一份</em>。','可以拔 U 盘了。本机没有「安全弹出」按钮。']
+};
+var EYEBROW={local:'LOCAL FILE',phone:'PHONE UPLOAD',usb:'USB IMPORT'};
+
+/* ================= 渲染 ================= */
+function render(st){
+ var root=document.getElementById('body-root');
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ root.innerHTML=V[st]();
+ var p=document.getElementById('pill');
+ p.className='pill'+(PILL[st][0]?' '+PILL[st][0]:'');
+ document.getElementById('pill-txt').textContent=(IS_RESUME?'简历打印 · ':(PHOTO?'照片打印 · ':''))+PILL[st][1];
+ document.getElementById('pill-dot').className='dot'+(/-(uploading|generating|detecting|importing|confirming|requesting)$/.test(st)?' breathe':'');
+ document.getElementById('xq-ask').innerHTML=ASK[st][0];
+ var doing=ASK[st][1];
+ if(IS_RESUME&&st==='source-chooser')doing='这里只是<b>把简历文件搬进来打印</b>，不做 AI 诊断 —— 诊断在简历服务那条线上。';
+ document.getElementById('xq-doing').innerHTML=doing;
+ var pre=st.split('-')[0];
+ document.getElementById('xq-eyebrow').textContent=EYEBROW[pre]||'FILE SOURCE';
+ var back=document.getElementById('topback');
+ back.setAttribute('aria-label',HAS_FILE[st]?'返回打印扫描（当前文件不会带走）':'返回打印扫描');
+ /* 完整预览入口：只在本页开模态，不导航、不改地址，所以关掉之后这一屏原样还在。 */
+ var ob=root.querySelector('[data-testid="'+SCREEN+'-preview-open"]');
+ if(ob)ob.addEventListener('click',function(e){e.preventDefault();pvOpen('open',st)});
+}
+
+/* ================= 路由：夹具门 + fail-closed ================= */
+function resolveState(){
+ var raw=Q.get('state');
+ if(raw===null||raw===''){
+  /* 没有 state：按入口参数决定落点。入口只声明了通道（mode=transfer）就直达，不再问第二遍。 */
+  if(TRANSFER)return TAB==='qr'?'phone-generating':(TAB==='usb'?'usb-wait':'local-guide');
+  return 'source-chooser';
+ }
+ var st=LEGACY[raw]||raw;
+ if(STATES.indexOf(st)<0)return 'unknown';
+ if(FIXTURE[st]&&!(CAPTURE||DEBUG))return 'missing-file';
+ /* 取消结果由服务端给出。没有明确答复夹具就不给「已作废」，也不给「作废失败」——
+    刷新、直链、非法参数都不能让静态页自造一个成功或失败的结论。 */
+ if(st==='phone-cancelled'&&CANCEL_FX!=='ok')return 'missing-file';
+ if(st==='phone-cancel-failed'&&CANCEL_FX!=='fail')return 'missing-file';
+ return st;
+}
+var STATE=resolveState();
+render(STATE);
+/* 预览夹具入口：普通产品地址到不了这里（PREVIEW 已在上面按 capture/debug 归一为 null）。 */
+if(PREVIEW)pvOpen(PREVIEW==='unsupported'?'open':PREVIEW,STATE,true);
+
+/* ================= 原型演示控制：仅 debug=1 才注入 DOM ================= */
+if(DEBUG){
+ document.documentElement.classList.add('debug');
+ var tab=document.createElement('button');
+ tab.type='button';tab.className='demo-tab';tab.setAttribute('data-proto-control','true');
+ tab.setAttribute('aria-label','打开原型演示控制面板');tab.setAttribute('aria-expanded','false');
+ tab.textContent='演示';
+ var panel=document.createElement('div');
+ panel.className='demo-panel';panel.setAttribute('data-proto-control','true');
+ panel.setAttribute('aria-label','原型演示控制');
+ var t=document.createElement('div');t.className='dp-t';t.textContent='原型演示控制（非产品功能）';panel.appendChild(t);
+ var cur=document.getElementById('body-root').getAttribute('data-state');
+ for(var i=0;i<STATES.length;i++){
+  var link=document.createElement('a');
+  link.href=to(STATES[i]);link.textContent=STATES[i];
+  link.setAttribute('data-proto-state',STATES[i]);
+  if(STATES[i]===cur)link.className='on';
+  panel.appendChild(link);
+ }
+ document.getElementById('stage').appendChild(tab);
+ document.getElementById('stage').appendChild(panel);
+ tab.addEventListener('click',function(){
+  var open=!panel.classList.contains('show');
+  panel.classList.toggle('show',open);
+  tab.setAttribute('aria-expanded',open?'true':'false');
+ });
+}
+
+/* 时钟：只刷新顶栏时间文本，不改 data-state，也不推进任何业务状态。 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);STAGE_SCALE=s;document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(FLAT)document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

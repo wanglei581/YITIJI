@@ -1,0 +1,113 @@
+{
+  "renderer": "",
+  "rendererPath": "pdftoppm",
+  "dpi": 200,
+  "pageBox": "595x842pt (A4 nominal)",
+  "sources": [
+    {
+      "slug": "resume-specimen",
+      "role": "clean digital PDF shown for 简历_张明_2026.pdf (USB f=0 / local lf=1)",
+      "pdf": "resume-specimen.pdf",
+      "pdfSha256": "e9696c7b1a6f0596dfb205a03d58fefa2f1490eb3fb828874d9cbbe752e47d44",
+      "pdfBytes": 13255,
+      "pageCount": 3,
+      "pages": [
+        {
+          "page": 1,
+          "png": "resume-specimen-p1.png",
+          "sha256": "4917350eabe460759470d903c1dee6b489b0881482bd5f04905d21f549c46c43",
+          "bytes": 466315,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 1 -l 1 -singlefile <pdf> <stem>"
+        },
+        {
+          "page": 2,
+          "png": "resume-specimen-p2.png",
+          "sha256": "87886c030d51641240020d4eb1529b37bd54d1ff747322849ed043e3f6a28893",
+          "bytes": 435002,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 2 -l 2 -singlefile <pdf> <stem>"
+        },
+        {
+          "page": 3,
+          "png": "resume-specimen-p3.png",
+          "sha256": "97e439a1e3d3177e2674223f2dbfc9de4e5a665ea82ba120eeaede9dea9489c2",
+          "bytes": 284284,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 3 -l 3 -singlefile <pdf> <stem>"
+        }
+      ]
+    },
+    {
+      "slug": "resume-old-specimen",
+      "role": "the second, visibly different PDF shown for 求职简历_旧版.pdf (USB f=1)",
+      "pdf": "resume-old-specimen.pdf",
+      "pdfSha256": "f16c0fded1733a3fb620e677145159ae54d60b1c73787f23b91d159262001231",
+      "pdfBytes": 6829,
+      "pageCount": 2,
+      "pages": [
+        {
+          "page": 1,
+          "png": "resume-old-specimen-p1.png",
+          "sha256": "1d935de0dab07b6085e261187b1e02ea29a2e0db9d862c8e5f183402e1904d7a",
+          "bytes": 353611,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 1 -l 1 -singlefile <pdf> <stem>"
+        },
+        {
+          "page": 2,
+          "png": "resume-old-specimen-p2.png",
+          "sha256": "a9d4025a592686c222cf824df734a31f8d88f511373959b3f8acf19263736d5f",
+          "bytes": 284907,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 2 -l 2 -singlefile <pdf> <stem>"
+        }
+      ]
+    },
+    {
+      "slug": "scan-specimen",
+      "role": "the scanned sheets shown for the /scan handoff file 扫描件-简历-DEMO.pdf",
+      "pdf": "scan-specimen.pdf",
+      "pdfSha256": "fefce4871665694c9dbfce2b2b2a14aed12d1d236488fea7c7d35f219e7c9fdb",
+      "pdfBytes": 7509,
+      "pageCount": 2,
+      "pages": [
+        {
+          "page": 1,
+          "png": "scan-specimen-p1.png",
+          "sha256": "e69cda928caf545f5809e4591428ada0e08f932287b8efebe1bc7f4caad2f495",
+          "bytes": 524371,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 1 -l 1 -singlefile -gray <pdf> <stem>"
+        },
+        {
+          "page": 2,
+          "png": "scan-specimen-p2.png",
+          "sha256": "bd88e5e9611dfba0da7b5cffbd26a9b7141557c71ed6f43b42c2602a67613cab",
+          "bytes": 330339,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 2 -l 2 -singlefile -gray <pdf> <stem>"
+        }
+      ]
+    },
+    {
+      "slug": "photo-scan-specimen",
+      "role": "the raster document page shown for the image file 简历扫描件.jpg (USB f=2)",
+      "pdf": "photo-scan-specimen.pdf",
+      "pdfSha256": "6db1914f67847426b702f7b9472114898f13f71b5839565d8ce74aeccdbc5410",
+      "pdfBytes": 4404,
+      "pageCount": 1,
+      "pages": [
+        {
+          "page": 1,
+          "png": "photo-scan-specimen-p1.png",
+          "sha256": "fe9116f9e23713dd2e95fd739f7e469c662b508f732c55b2004a5dc635ae8a4c",
+          "bytes": 494140,
+          "pixels": "1653x2339",
+          "derivedBy": "pdftoppm -png -r 200 -f 1 -l 1 -singlefile -gray <pdf> <stem>"
+        }
+      ]
+    }
+  ],
+  "note": "Every PNG in this directory is the rasterised output of the PDF named beside it. Nothing here is drawn in the browser: the page loads these files. The PDFs are authored by make-fixtures.mjs with no creation date, no /ID and no producer string, so the whole chain is deterministic and the hashes below reproduce exactly on a rerun. Sanitized: no real person, employer, contact detail or document. Every page carries SPECIMEN in its own ink, so a crop of the viewport is still self-labelling even outside the UI that labels it."
+}

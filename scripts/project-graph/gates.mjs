@@ -22,14 +22,21 @@ const GATE_EXT_PATTERN = /\.(mjs|cjs|js)$/
 
 /** 仓库里全部「门禁脚本候选」文件（排除 docs/ 下的原型静态资源）。 */
 export function gateScriptFiles() {
-  return trackedFiles().filter(
-    (file) =>
+  // 前导斜杠归一化：这三条排除原先写成 file.includes('/scripts/lib/')，对
+  // services/api/scripts/lib/x.mjs 成立，但对**根级** scripts/lib/x.mjs 不成立
+  // （它前面没有斜杠）。于是根级的辅助模块会被当成「写完没接线的门禁」，
+  // 让 verify:ci-gate-coverage 报红 —— 2026-09-03 加根级 scripts/lib/
+  // run-serial-commands.mjs 时实际踩到。补一个前导斜杠让两种路径同构。
+  return trackedFiles().filter((file) => {
+    const path = `/${file}`
+    return (
       GATE_DIR_PATTERN.test(file) &&
       GATE_EXT_PATTERN.test(file) &&
-      !file.includes('/scripts/tests/') &&
-      !file.includes('/scripts/lib/') &&
-      !file.includes('/scripts/support/'),
-  )
+      !path.includes('/scripts/tests/') &&
+      !path.includes('/scripts/lib/') &&
+      !path.includes('/scripts/support/')
+    )
+  })
 }
 
 /** 找到某个文件所属的 workspace 包目录（含 package.json 的最近上级）。 */

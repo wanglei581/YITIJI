@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>格式转换 · 图片转 PDF · 职易达</title>
+<!--
+  route: /print-scan/convert（旧深链 /print/scan-convert 只做重定向，不新增页面）
+  api:  POST /api/v1/print/convert/images-to-pdf —— 可匿名；sources[{fileId,fileAccessUrl}] 的**有序顺序**就是 PDF 页序
+        返回 fileId / printFileUrl（30 分钟有效）/ fileMd5 / sizeBytes / pages；**单次请求没有百分比进度**
+  真实限制（对齐 services/api/src/print-conversion/print-conversion.service.ts）：
+        1–20 张；仅 JPG / PNG；单张 ≤ 10MB；总输入 ≤ 40MB；单图 ≤ 2500 万像素；
+        总像素 ≤ 2 亿；输出 ≤ 15MB；A4 一图一页（fit + 居中）
+  幂等:  Idempotency-Key → lock 120s / result 600s；同 key + 相同有序输入可恢复；
+        同 key + 不同输入 = IDEMPOTENCY_KEY_REUSED 冲突；进行中 = CONVERSION_IN_PROGRESS
+  留存:  已登录 → PDF 进「我的文档」，默认约 24 小时可手动延长；
+        未登录 → 后端以空 endUserId 落库，**不进「我的文档」**，只能在本次操作内直接继续；
+        公用终端**不提供下载到本机**
+  出口:  生成成功后进入 13-print-desk.html（/print/material-check），**不直达报价、支付或出纸**
+  目标设计（尚未接线，页面必须写明）：
+        · 列表选择 / 上移下移 / 旋转 90° / 删除 —— 旋转在当前接口里**没有字段**，
+          React 也没有接线，因此**不随本次请求发送**，也不会改变服务端生成的 PDF；
+        · 同一批输入复用同一个请求标识 —— 当前 React 每次点击都新建 key（见 README runtime gaps）
+  禁止:  不画百分比、不画进度条、不用计时器推进业务状态；
+        不显示金额 / 权益抵扣 / 支付入口 / 已打印 / 已出纸；
+        不把「看了一眼」写成「已保存」；预览失败只说预览这件事，不改写成果文件状态
+  夹具门: 除 empty 外全部状态都会说出固定文件名、固定图片、转换结果或请求标识 ——
+        只在 ?capture=1 / ?debug=1 下可达，普通产品地址一律回落 empty
+  原型演示控制：普通地址完全不渲染；仅 ?debug=1 注入（data-proto-control="true"）
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+img{-webkit-user-drag:none;user-drag:none}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+.topbar{flex:none;height:96px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:560px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.xq{flex:none;margin:16px 44px 0;border-radius:30px;padding:20px 34px 18px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:22px;position:relative;z-index:1}
+.xq-face{flex:none;width:78px;height:78px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:38px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:16px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:6px}
+.xq-ask{font-size:34px;line-height:1.28;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:8px;font-size:20px;line-height:1.5;color:rgba(242,239,228,.74)}
+.xq-doing b{color:#fff;font-weight:600}
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec{flex:none;padding:0 44px;margin-top:16px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:12px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:28px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto;font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px 26px}
+.state{border-radius:var(--r-lg);padding:22px 30px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:27px;font-weight:700}
+.state-p{margin-top:10px;font-size:20px;line-height:1.55;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.plan{margin-top:12px;display:flex;flex-direction:column;gap:9px}
+.plan li{list-style:none;display:flex;gap:12px;align-items:flex-start;font-size:19px;line-height:1.45;color:var(--ink-2)}
+.plan .sq{flex:none;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-top:8px}
+.btn{min-height:72px;padding:0 30px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:600;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{opacity:.55;cursor:default}
+.ctabar{flex:none;margin-top:auto;padding:16px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.ctabar .btn{flex:1}
+.cta-reason{flex:none;padding:0 44px 10px;font-size:19px;font-weight:600;color:var(--wheat-d)}
+.truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:26px}
+.truth div{flex:1;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.navbar{flex:none;height:112px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.nav-item .ni{font-size:20px;color:var(--ink-3);font-weight:600}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal)}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.press:active{transform:scale(.985)}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:140px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:6px;max-height:1760px;overflow:auto}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 16px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.sec.grow{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.last{margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.sec.grow>.grid2,.sec.grow>.grid3{flex:1;min-height:0}
+.sec.grow>.grid2{grid-auto-rows:minmax(0,1fr)}
+.chip{min-height:48px;padding:0 18px;border-radius:14px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:9px;font-size:18px;color:var(--ink-2);font-weight:600}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.chip.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.meta{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap}
+.kv{display:flex;flex-direction:column;gap:8px}
+.kv>div{display:flex;gap:12px;font-size:19px;color:var(--ink-2);line-height:1.35}
+.kv>div>span:first-child{flex:none;width:132px;color:var(--ink-3)}
+.kv b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+.pgrp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 20px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-height:0}
+.pgrp h4{font-size:21px;font-weight:700;display:flex;align-items:center;gap:12px}
+.pgrp h4 span{margin-left:auto;font-size:17px;font-weight:400;color:var(--ink-3)}
+.pgrp .state-p{font-size:19px;margin-top:0}
+.pgrp .plan,.pgrp .kv{flex:1;justify-content:space-evenly}
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+/* ---------- 待合并图片列表：固定区域内真实可滚动 ---------- */
+.lwrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 20px 12px;display:flex;flex-direction:column;gap:10px}
+.lhead{flex:none;display:flex;align-items:baseline;gap:14px;font-size:22px;font-weight:700}
+.lhead .sub{margin-left:auto;font-size:18px;font-weight:600;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.lrows{overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding-right:4px;touch-action:pan-y;overscroll-behavior:contain}
+.lrows::-webkit-scrollbar{width:10px}
+.lrows::-webkit-scrollbar-track{background:var(--paper);border-radius:5px}
+.lrows::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:5px}
+.irow{display:flex;align-items:center;gap:12px;height:116px;border-bottom:1px solid var(--line)}
+.irow:last-child{border-bottom:0}
+.ipick{flex:1;min-width:0;display:flex;align-items:center;gap:14px;text-align:left;height:100px;border-radius:18px;padding:0 10px;border:2px solid transparent;background:transparent}
+.ipick[aria-pressed=true]{border-color:var(--teal);background:var(--teal-soft)}
+.idx{flex:none;width:52px;height:52px;border-radius:16px;border:1px solid var(--line-2);background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.ipick[aria-pressed=true] .idx{background:var(--surface);border-color:var(--teal);color:var(--teal-d)}
+.ithumb{flex:none;width:76px;height:94px;border-radius:8px;border:1px solid var(--line-2);background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.ithumb img{display:block;object-fit:contain}
+.imeta{flex:1;min-width:0}
+.imeta b{display:block;font-size:21px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imeta span{display:block;margin-top:3px;font-size:17px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ibtn{flex:none;width:60px;height:60px;border-radius:18px;border:1px solid var(--line-2);background:var(--paper);display:flex;align-items:center;justify-content:center;color:var(--ink-2)}
+.ordline{flex:none;font-size:17px;line-height:1.4;color:var(--ink-3);padding-top:8px;border-top:1px solid var(--line)}
+.ordline b{color:var(--ink-2);font-weight:700;margin-right:8px}
+.ordline.sub{border-top:0;padding-top:6px;color:var(--wheat-d)}
+.ordline.sub b{color:var(--wheat-d)}
+.selbar{display:flex;gap:10px;margin-top:12px}
+.selbtn{flex:1;min-height:64px;border-radius:18px;border:1px solid var(--line-2);background:var(--surface);display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:20px;font-weight:600;color:var(--ink)}
+.selbtn.del{border-color:#e2c3bd;color:var(--cinnabar-d)}
+.selbtn[aria-disabled=true]{opacity:.42}
+.rotnote{margin-top:10px;font-size:17px;line-height:1.45;color:var(--wheat-d);font-weight:600}
+.addrow{display:flex;gap:16px;margin-top:16px}
+.add{flex:1;min-height:96px;border-radius:20px;border:2px dashed var(--line-2);background:var(--surface);display:flex;align-items:center;justify-content:center;gap:14px;font-size:21px;font-weight:600;color:var(--ink-2)}
+.add[aria-disabled=true]{opacity:.5}
+.fxbar{flex:none;margin:14px 44px 0;min-height:64px;display:flex;align-items:center;gap:14px;padding:10px 22px;border-radius:20px;background:var(--wheat-soft);color:var(--wheat-d);font-size:18px;font-weight:600;line-height:1.35}
+.fxbar .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:9px;padding:4px 11px;font-size:15px;letter-spacing:1px;white-space:nowrap}
+.emptybox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:20px;line-height:1.6;color:var(--ink-2)}
+.emptybox .ei{width:96px;height:96px;border-radius:30px;background:var(--paper);border:1px dashed var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+/* ---------- 空列表首屏：主任务在上，操作预期用示意图代替说明墙 ---------- */
+.epane{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 22px;display:flex;gap:22px;min-height:0}
+.epane>.ep-l{flex:1.06;min-width:0;display:flex;flex-direction:column;gap:10px}
+.epane>.ep-r{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.ep-h{flex:none;display:flex;align-items:baseline;gap:12px;font-size:21px;font-weight:700}
+.ep-h .r{margin-left:auto;font-size:17px;font-weight:600;color:var(--ink-3)}
+.ep-cap{flex:none;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.ep-cap b{color:var(--ink-2);font-weight:600}
+/* 三个添加来源各自一句话，就近贴在按钮下面，替掉原来那张「怎么把图加进来」长卡 */
+.srcnote{display:flex;gap:16px;margin-top:10px}
+.srcnote>div{flex:1;min-width:0;font-size:17px;line-height:1.42;color:var(--ink-3)}
+.srcnote b{color:var(--ink-2);font-weight:600}
+.srcnote em{font-style:normal;color:var(--wheat-d);font-weight:600}
+/* 空槽示意：和真实列表同一套行几何，内容留空并写明是空位，不摆任何文件名 */
+.ghostwrap{flex:1;min-height:0;border:1px dashed var(--line-2);border-radius:var(--r-md);background:var(--paper);padding:8px 14px;display:flex;flex-direction:column;justify-content:space-between}
+.grow-r{flex:1;min-height:0;max-height:124px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+.grow-r:last-child{border-bottom:0}
+.grow-r .gi{flex:none;width:50px;height:50px;border-radius:15px;border:1px dashed var(--line-2);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.grow-r .gt{flex:none;width:56px;height:70px;border-radius:8px;border:1px dashed var(--line-2);background:var(--surface)}
+.grow-r .gm{flex:1;min-width:0;font-size:17px;line-height:1.3;color:var(--ink-3)}
+.grow-r .gm b{display:block;font-size:19px;font-weight:600;color:var(--ink-2)}
+.grow-r .ga{flex:none;display:flex;gap:7px;color:var(--ink-3)}
+.grow-r .ga span{width:40px;height:40px;border-radius:12px;border:1px solid var(--line-2);background:var(--surface);display:flex;align-items:center;justify-content:center}
+.grow-r.on .gi{border-style:solid;border-color:var(--teal);color:var(--teal-d);background:var(--teal-soft)}
+.grow-r.on .ga span{border-color:var(--teal);color:var(--teal-d)}
+.grow-r.more .gm{font-size:18px}
+.grow-r.more .gi{border-radius:15px}
+/* 选中后才会打开的四个操作：这里只是示意，全部灰着，不是可点控件 */
+.ghostbar{flex:none;display:flex;gap:9px;margin-top:10px}
+.ghostbar span{flex:1;min-height:56px;border-radius:16px;border:1px solid var(--line-2);background:var(--paper);color:var(--ink-3);display:flex;align-items:center;justify-content:center;gap:7px;font-size:18px;font-weight:600;opacity:.72}
+.ghostbar span.off{flex:1.3;color:var(--wheat-d);border-color:#e6d8b4;background:var(--wheat-soft);opacity:1;white-space:nowrap}
+.epsteps{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between}
+.epstep{flex:1;min-height:0;display:flex;gap:13px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px}
+.epstep:last-child{border-bottom:0;padding-bottom:0}
+.epstep .sn{flex:none;width:42px;height:42px;border-radius:14px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700}
+.epstep .sb{flex:1;min-width:0;font-size:18px;line-height:1.45;color:var(--ink-2)}
+.epstep .sb b{display:block;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.epstep .sb em{font-style:normal;color:var(--wheat-d);font-weight:600}
+.limitbar{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 22px;display:flex;flex-direction:column;gap:10px}
+.limitbar .lb-h{display:flex;align-items:baseline;gap:12px;font-size:21px;font-weight:700}
+.limitbar .lb-h .r{margin-left:auto;font-size:17px;font-weight:600;color:var(--ink-3)}
+.limitbar .lb-c{display:flex;gap:10px;flex-wrap:wrap}
+.limitbar .lb-n{font-size:17px;line-height:1.45;color:var(--ink-3)}
+.limitbar .lb-n b{color:var(--wheat-d);font-weight:600}
+.sec.grow>.card{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.grow>.epane{flex:1;min-height:0;flex-direction:row}
+.sec.grow>.lwrap{flex:1;min-height:0}
+.sec.grow>.state{flex:1;display:flex;flex-direction:column;justify-content:space-between}
+/* ---------- U 盘来源未接线：能力边界工作台（只服务 usb-not-connected 这一个状态） ----------
+   这一屏讲的是"三个入口里接了哪两个"，不是错误页，所以不用拉高的空卡撑版面：
+   来源板按自然高度排，余量交给下面那张"现在能走哪两条"的路径卡吸收。 */
+.ub-src{justify-content:flex-start;gap:0;padding:22px 24px}
+.ub-src .ub-ic{flex:none;width:62px;height:62px;border-radius:20px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.ub-src h4.ub-n{display:block;margin-top:16px;font-size:24px;font-weight:700;line-height:1.25}
+.ub-src .chip{margin-top:14px;align-self:flex-start}
+.ub-src .ub-d{margin-top:16px;font-size:18px;line-height:1.5;color:var(--ink-2)}
+.ub-src .ub-d b{font-weight:600;color:var(--ink)}
+.ub-src .ub-to{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;color:var(--teal-d);line-height:1.3}
+.ub-src.off{border-style:dashed;border-color:var(--line-2);background:var(--paper)}
+.ub-src.off .ub-ic{background:var(--wheat-soft);color:var(--wheat-d);border:1px dashed #e0cf9f}
+.ub-src.off .ub-to{color:var(--wheat-d);border-top-style:dashed;border-top-color:var(--line-2)}
+/* 路径卡：两条真实路线各占一行，节点是标签不是按钮（无 href / 无 data-act / 无 role=button） */
+.ub-ways{padding:0;overflow:hidden}
+.ub-way{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:16px;padding:20px 26px}
+.ub-way+.ub-way{border-top:1px solid var(--line);background:var(--paper)}
+.ub-wh{flex:none;display:flex;align-items:baseline;gap:16px}
+.ub-wh b{font-size:23px;font-weight:700}
+.ub-wh span{margin-left:auto;font-size:18px;font-weight:600;color:var(--ink-3);text-align:right}
+.ub-flow{flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ub-node{min-height:86px;padding:10px 20px;border-radius:16px;background:var(--surface);border:1px solid var(--line-2);display:inline-flex;flex-direction:column;justify-content:center;gap:3px}
+.ub-node b{font-size:20px;font-weight:700;line-height:1.25;color:var(--ink-2);white-space:nowrap}
+.ub-node i{font-style:normal;font-size:17px;font-weight:600;line-height:1.25;color:var(--ink-3);white-space:nowrap}
+.ub-node.src{border-style:dashed}
+.ub-node.src b{color:var(--ink-3)}
+.ub-node.on{background:var(--teal-soft);border-color:transparent}
+.ub-node.on b{color:var(--teal-d)}
+.ub-node.on i{color:#3f8878}
+.ub-ar{flex:none;display:flex;align-items:center;color:var(--ink-3)}
+.ub-cut{min-height:86px;padding:0 20px;border-radius:16px;background:var(--wheat-soft);color:var(--wheat-d);display:inline-flex;align-items:center;gap:10px;font-size:19px;font-weight:700}
+.ub-note{flex:none;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.ub-note b{color:var(--wheat-d);font-weight:600}
+/* ---------- 完整预览（输入原图 / 输出 PDF）：同一 HTML 宿主内的 near-full-stage 模态 ---------- */
+.pv{position:absolute;inset:0;z-index:95;background:rgba(6,20,17,.78);opacity:0;transition:opacity 220ms cubic-bezier(.22,1,.36,1)}
+.pv.pv-in{opacity:1}
+.pv-box{position:absolute;inset:14px;border-radius:30px;background:var(--surface);display:flex;flex-direction:column;overflow:hidden}
+.pv-head{flex:none;height:132px;display:flex;align-items:center;gap:18px;padding:0 24px;border-bottom:1px solid var(--line)}
+.pv-ic{flex:none;width:68px;height:68px;border-radius:22px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.pv-ic.warn{background:var(--wheat-soft);color:var(--wheat-d)}
+.pv-hm{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.pv-t{display:block;max-width:100%;font-size:30px;font-weight:700;line-height:1.22;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-s{display:block;max-width:100%;margin-top:6px;font-size:19px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-close{flex:none;min-height:72px;min-width:148px;padding:0 22px;border-radius:22px;background:var(--deep);color:var(--emerald);font-size:23px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:10px}
+.pv-fx{flex:none;min-height:80px;display:flex;align-items:center;gap:13px;padding:8px 24px;background:var(--wheat-soft);color:var(--wheat-d);font-size:18px;font-weight:600;line-height:1.32}
+.pv-fx .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:9px;padding:4px 11px;font-size:15px;letter-spacing:1px;white-space:nowrap}
+.pv-view{flex:1;min-height:0;position:relative;overflow:auto;background:var(--deep);touch-action:none;cursor:grab;outline:none;user-select:none;-webkit-user-select:none}
+.pv-view.grabbing{cursor:grabbing}
+.pv-view.still{overflow:hidden;touch-action:auto;cursor:default;display:flex;align-items:center;justify-content:center;padding:22px 26px}
+.pv-scene{position:relative}
+.pv-page{position:absolute;left:50%;top:50%;background:#fff;overflow:hidden}
+.pv-paper{position:absolute;left:0;top:0;transform-origin:0 0;background:#fff;overflow:hidden}
+.pp-img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#fff}
+.pv-bar{flex:none;border-top:1px solid var(--line);padding:14px 22px 12px;display:flex;flex-direction:column;gap:10px}
+.pv-row{flex:none;display:flex;align-items:center;gap:11px;height:74px}
+.pvb{flex:none;min-height:74px;min-width:100px;padding:0 18px;border-radius:20px;border:1px solid var(--line-2);background:var(--paper);color:var(--ink);font-size:22px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:9px;white-space:nowrap}
+.pvb.wide{flex:1 1 0;min-width:0}
+.pvb.on{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.pvb[aria-disabled=true]{opacity:.5}
+.pv-info{flex:1 1 0;min-width:0;height:74px;border-radius:20px;background:var(--paper);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;gap:10px;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;padding:0 12px;white-space:nowrap;overflow:hidden}
+.pv-reason{flex:none;min-height:30px;display:flex;align-items:center;gap:8px;font-size:18px;font-weight:600;color:var(--wheat-d);line-height:1.3}
+.pv-card{width:100%;max-width:930px;max-height:100%;overflow:hidden;background:var(--surface);border-radius:var(--r-lg);padding:30px 34px;display:flex;flex-direction:column;justify-content:flex-start;gap:22px}
+.pv-card .state-h{font-size:29px}
+.pv-card .state-p{font-size:20px;margin-top:0}
+.pv-keep{display:flex;align-items:center;gap:14px;min-height:72px;padding:12px 20px;border-radius:20px;background:var(--teal-soft);color:var(--teal-d);font-size:19px;font-weight:600;line-height:1.4}
+/* ---------- 预览取不到：同一个阅读器，纸还在、内容没取到，不居中放一张卡片吊在深色空场里 ---------- */
+.pv-view.still.pvfail{align-items:stretch;justify-content:flex-start;flex-direction:column;gap:14px;padding:18px 22px}
+.pvf-note{flex:none;background:var(--surface);border-radius:var(--r-md);padding:16px 24px}
+.pvf-note .state-h{font-size:28px}
+.pvf-note .state-p{margin-top:8px;font-size:20px;line-height:1.5}
+.pvf-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+/* 纸的位置照旧留着，斜纹表示"这一页没有可显示的内容"——不是骨架屏，也不是正在加载 */
+.pvf-paper{position:relative;height:100%;aspect-ratio:210/297;max-width:100%;background:#fff;background-image:repeating-linear-gradient(135deg,rgba(16,48,43,.05) 0 10px,rgba(255,255,255,0) 10px 24px);border-radius:12px;border:2px dashed var(--line-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:26px;text-align:center}
+.pvf-paper .pi{flex:none;width:88px;height:88px;border-radius:28px;background:var(--wheat-soft);color:var(--wheat-d);display:flex;align-items:center;justify-content:center}
+.pvf-paper .pl{background:rgba(255,253,248,.97);border:1px solid var(--line);border-radius:22px;padding:22px 26px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:100%}
+.pvf-paper b{font-size:26px;font-weight:700;color:var(--ink)}
+.pvf-paper .ps{font-size:19px;line-height:1.5;color:var(--ink-3)}
+.pvf-paper .pn{position:absolute;left:18px;right:18px;bottom:16px;font-size:18px;font-weight:600;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pvf-foot{flex:none;display:flex;gap:14px}
+.pvf-card{flex:1;min-width:0;background:var(--surface);border-radius:var(--r-md);padding:15px 22px;display:flex;flex-direction:column;gap:8px}
+.pvf-card .kv,.pvf-card .plan{gap:10px}
+.pvf-card h4{flex:none;font-size:21px;font-weight:700;display:flex;align-items:center;gap:10px}
+.pvf-card .kv>div{font-size:18px}
+.pvf-card .kv>div>span:first-child{width:100px}
+.pvf-card .plan li{font-size:18px}
+.pvf-card.keep{background:var(--teal-soft)}
+.pvf-card.keep h4,.pvf-card.keep .kv>div,.pvf-card.keep .kv b{color:var(--teal-d)}
+.pvf-card.keep .kv>div>span:first-child{color:#3f8878}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="topback" href="10-print-hub.html" data-route="/print-scan" data-testid="img2pdf-back" aria-label="返回打印扫描"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">图片转 PDF · 最多 20 张</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif" aria-hidden="true">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow">IMAGES TO PDF</div>
+        <div class="xq-ask serif" id="xq-ask">几张图，<em>拼成一份 PDF</em>。</div>
+        <div class="xq-doing" id="xq-doing">只收 JPG / PNG，单张不超过 10 MB，一次最多 20 张。<b>顺序你自己排，一张一页，按 A4 排版。</b></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="body" id="body-root" data-screen="img2pdf" data-route="/print-scan/convert" data-legacy-route="/print/scan-convert" data-state="empty" data-testid="img2pdf-state-empty"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="img2pdf-truth">
+    <div><b>顺序</b>列表顺序就是提交顺序，也是 PDF 的页序：一张图一页，按 A4 排版，不裁切、不拼版。</div>
+    <div><b>进度</b>合成是一次性请求，服务端不回传进度，所以不画百分比，也不用计时器假装做完了。</div>
+    <div><b>留存</b>登录后 PDF 进「我的文档」，默认约 24 小时可延长；未登录不进「我的文档」，也不下载到这台公用机器。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+</div>
+<script>
+var SCREEN='img2pdf';
+var Q=new URLSearchParams(location.search);
+var DEBUG=Q.get('debug')==='1';
+var CAPTURE=Q.get('capture')==='1';
+var FLAT=Q.get('flat')==='1';
+var FIXTURE_OK=CAPTURE||DEBUG;
+var STATES=['empty','local-uploading','upload-format-rejected','upload-too-large','upload-failed',
+ 'usb-not-connected',
+ 'ready-one','ready-three','ready-selected-middle','limit-reached-20',
+ 'source-unavailable','source-expired','total-input-too-large','image-dimensions-invalid','output-too-large',
+ 'merging','conversion-in-progress','completed-auth','completed-anonymous',
+ 'output-preview-page2','output-preview-last','output-preview-zoomed','output-preview-failed',
+ 'known-failed','result-unknown','retrying-same-request','recovered-completed','idempotency-conflict'];
+/* 手机入口的既有目标 ?state=uploading 被逐字冻结（见 addRow）：保留别名，让它仍然落到本机上传那一屏。 */
+var ALIAS={uploading:'local-uploading'};
+var ICO={
+ img:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15.5l-4.5-4.5L8 19.5"/>',
+ up:'<path d="M12 19V5M6 11l6-6 6 6"/>',
+ down:'<path d="M12 5v14M18 13l-6 6-6-6"/>',
+ del:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10 5h4"/><path d="M9 14.5l3 3 3-3"/><path d="M12 17.5v-6"/>',
+ pdf:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ warn:'<path d="M12 3.6 2.8 19.4h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ printer:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/>',
+ eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3.2"/>',
+ rot:'<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 3v5h5"/>',
+ x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  key:'<circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/>'
+ ,usb:'<path d="M12 3v12M8 7l4-4 4 4M12 15l-3 3M12 15l3 3"/><circle cx="9" cy="19" r="1"/><rect x="14" y="18" width="2" height="2"/>'
+};
+function svg(n,s,w){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+s+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+/* ================= 固定原型图（三张明确不同的照片式 / 证件式插图） =================
+   全部是写死在本文件里的内嵌 SVG，不是真实用户文件，也不是接口返回的图片。
+   页面任何位置显示它们时都必须同时显示「固定原型数据」标记。 */
+var SVG0='<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200">'+
+ '<defs><linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b9adc"/><stop offset="1" stop-color="#2a5c9b"/></linearGradient>'+
+ '<radialGradient id="v" cx="0.5" cy="0.4" r="0.78"><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#0a2b50" stop-opacity="0.5"/></radialGradient>'+
+ '<linearGradient id="s" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#f3d2b6"/><stop offset="1" stop-color="#d7a483"/></linearGradient></defs>'+
+ '<rect width="900" height="1200" fill="url(#a)"/>'+
+ '<path d="M150 1200c0-196 128-308 300-308s300 112 300 308z" fill="#26313f"/>'+
+ '<path d="M356 906l94 128 94-128 62 30-156 196-156-196z" fill="#fcfcfa"/>'+
+ '<path d="M432 936h36l14 170-32 26-32-26z" fill="#93302c"/>'+
+ '<path d="M362 830h176v78c0 34-40 62-88 62s-88-28-88-62z" fill="#e2ab86"/>'+
+ '<ellipse cx="450" cy="612" rx="186" ry="228" fill="url(#s)"/>'+
+ '<path d="M266 578c0-152 82-238 184-238s184 86 184 238c-6-74-62-112-184-112s-178 38-184 112z" fill="#2c2119"/>'+
+ '<ellipse cx="384" cy="600" rx="21" ry="13" fill="#33363d"/><ellipse cx="516" cy="600" rx="21" ry="13" fill="#33363d"/>'+
+ '<path d="M356 552q28-22 58-6M486 546q30-16 58 6" stroke="#2c2119" stroke-width="13" fill="none" stroke-linecap="round"/>'+
+ '<path d="M450 632v58q0 15-18 19" stroke="#c4906c" stroke-width="9" fill="none" stroke-linecap="round"/>'+
+ '<path d="M406 754q44 26 88 0" stroke="#a85f4c" stroke-width="13" fill="none" stroke-linecap="round"/>'+
+ '<rect width="900" height="1200" fill="url(#v)"/></svg>';
+var SVG1='<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">'+
+ '<defs><linearGradient id="p" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#faf3e2"/><stop offset="1" stop-color="#efe3c8"/></linearGradient></defs>'+
+ '<rect width="1600" height="1200" fill="url(#p)"/>'+
+ '<rect x="44" y="44" width="1512" height="1112" fill="none" stroke="#b0873a" stroke-width="11"/>'+
+ '<rect x="74" y="74" width="1452" height="1052" fill="none" stroke="#d7bb80" stroke-width="4"/>'+
+ '<path d="M74 74h150v10H84v140H74z M1526 74h-150v10h140v140h10z M74 1126h150v-10H84v-140H74z M1526 1126h-150v-10h140v-140h10z" fill="#b0873a"/>'+
+ '<path d="M800 150l38 74 82 12-59 58 14 82-75-39-75 39 14-82-59-58 82-12z" fill="#c9a13f"/>'+
+ '<path d="M770 300l-34 96 64-26 64 26-34-96z" fill="#9c3b32"/>'+
+ '<text x="800" y="500" text-anchor="middle" font-family="Songti SC,STSong,SimSun,serif" font-size="128" font-weight="700" fill="#7a4a1c" letter-spacing="24">获奖证书</text>'+
+ '<rect x="470" y="556" width="660" height="5" fill="#c2a668"/>'+
+ '<text x="800" y="660" text-anchor="middle" font-family="Songti SC,STSong,SimSun,serif" font-size="52" fill="#5d503a">二〇二六年度 优秀毕业生</text>'+
+ '<rect x="300" y="740" width="1000" height="12" rx="6" fill="#cbbfa2"/>'+
+ '<rect x="300" y="800" width="1000" height="12" rx="6" fill="#cbbfa2"/>'+
+ '<rect x="300" y="860" width="700" height="12" rx="6" fill="#cbbfa2"/>'+
+ '<text x="330" y="1030" font-family="Songti SC,STSong,SimSun,serif" font-size="44" fill="#5d503a">颁发单位（原型示意）</text>'+
+ '<circle cx="1250" cy="990" r="104" fill="none" stroke="#a8302a" stroke-width="12"/>'+
+ '<path d="M1250 916l19 40 44 6-32 31 8 44-39-21-39 21 8-44-32-31 44-6z" fill="#a8302a"/>'+
+ '<text x="1250" y="1046" text-anchor="middle" font-family="Songti SC,STSong,SimSun,serif" font-size="40" fill="#a8302a" letter-spacing="8">证明专用</text></svg>';
+var SVG2=(function(){
+ var s='<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="1754" viewBox="0 0 1240 1754">'+
+  '<defs><linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fdfdfb"/><stop offset="0.62" stop-color="#f6f5ef"/><stop offset="1" stop-color="#e6e3d8"/></linearGradient></defs>'+
+  '<rect width="1240" height="1754" fill="#ded9cb"/><rect x="26" y="20" width="1188" height="1714" fill="url(#t)"/>'+
+  '<rect x="26" y="20" width="1188" height="150" fill="#e9eef5"/>'+
+  '<text x="620" y="112" text-anchor="middle" font-family="Songti SC,STSong,SimSun,serif" font-size="62" font-weight="700" fill="#25405c" letter-spacing="10">学生成绩登记表</text>'+
+  '<text x="80" y="230" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="34" fill="#4d5a68">姓名：（原型示意）　　学号：2026******</text>';
+ var cols=[80,640,860,1080,1160],y0=280,rh=94,rows=13,i,j;
+ s+='<rect x="80" y="'+y0+'" width="1080" height="'+rh+'" fill="#dde5ef"/>';
+ var head=['课程名称','学分','成绩','绩点'],hx=[100,700,900,1100];
+ for(j=0;j<4;j++)s+='<text x="'+hx[j]+'" y="'+(y0+60)+'" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="38" font-weight="700" fill="#25405c">'+head[j]+'</text>';
+ var names=['大学英语（三）','高等数学 B','数据结构','操作系统原理','人力资源管理','职业生涯规划','市场营销学','统计学基础','计算机网络','公共关系学','管理信息系统','毕业实习'];
+ var cr=['3.0','4.5','4.0','3.5','2.0','1.0','3.0','3.0','3.5','2.0','3.0','6.0'];
+ var sc=['92','86','95','88','91','97','84','89','93','90','87','优'];
+ var gp=['4.2','3.6','4.5','3.8','4.1','4.7','3.4','3.9','4.3','4.0','3.7','—'];
+ for(i=0;i<12;i++){
+  var y=y0+rh*(i+1);
+  if(i%2===1)s+='<rect x="80" y="'+y+'" width="1080" height="'+rh+'" fill="#f2f4f8"/>';
+  s+='<text x="100" y="'+(y+60)+'" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="36" fill="#2f3a45">'+names[i]+'</text>';
+  s+='<text x="700" y="'+(y+60)+'" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="36" fill="#2f3a45">'+cr[i]+'</text>';
+  s+='<text x="900" y="'+(y+60)+'" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="36" font-weight="700" fill="#1f5f4f">'+sc[i]+'</text>';
+  s+='<text x="1100" y="'+(y+60)+'" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="36" fill="#2f3a45">'+gp[i]+'</text>';
+ }
+ for(i=0;i<=rows;i++)s+='<rect x="80" y="'+(y0+rh*i)+'" width="1080" height="2" fill="#b9c4d1"/>';
+ for(j=0;j<cols.length;j++)s+='<rect x="'+cols[j]+'" y="'+y0+'" width="2" height="'+(rh*rows)+'" fill="#b9c4d1"/>';
+ s+='<rect x="1158" y="'+y0+'" width="2" height="'+(rh*rows)+'" fill="#b9c4d1"/>';
+ s+='<circle cx="1010" cy="1650" r="86" fill="none" stroke="#a8302a" stroke-width="10"/>'+
+  '<text x="1010" y="1666" text-anchor="middle" font-family="Songti SC,STSong,SimSun,serif" font-size="36" fill="#a8302a" letter-spacing="6">教务专用</text>'+
+  '<text x="90" y="1660" font-family="PingFang SC,Microsoft YaHei,sans-serif" font-size="32" fill="#6b7686">打印日期：原型示意，非真实成绩</text>'+
+  '<rect width="1240" height="1754" fill="#7a6a4a" opacity="0.05"/></svg>';
+ return s;
+})();
+var FXSVG=[SVG0,SVG1,SVG2];
+var FXSRC=[null,null,null];
+function fxSrc(i){if(!FXSRC[i])FXSRC[i]='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(FXSVG[i]);return FXSRC[i]}
+var FX=[
+ {n:'证件照-蓝底.jpg',t:'JPG',w:900,h:1200,b:1.2},
+ {n:'获奖证书.png',t:'PNG',w:1600,h:1200,b:2.1},
+ {n:'成绩单-2026.jpg',t:'JPG',w:1240,h:1754,b:1.6}
+];
+var LIM={imgs:20,single:10,total:40,px1:2500,pxAll:20000,out:15};
+function nameFor(k){
+ var f=k%3,r=Math.floor(k/3),base=FX[f].n;
+ if(r===0)return base;
+ var d=base.lastIndexOf('.');
+ return base.slice(0,d)+'-'+(r+1)+base.slice(d);
+}
+function mk(k,over){
+ var f=FX[k%3],it={f:k%3,n:nameFor(k),w:f.w,h:f.h,b:f.b,rot:0,bad:null};
+ if(over)for(var q in over)if(Object.prototype.hasOwnProperty.call(over,q))it[q]=over[q];
+ return it;
+}
+function seq(n,over){var a=[],i;for(i=0;i<n;i++)a.push(mk(i,over));return a}
+function mp(it){return Math.round(it.w*it.h/10000)/1}          /* 万像素 */
+function szText(it){return it.b.toFixed(1)+' MB · '+FX[it.f].t+' · '+it.w+'×'+it.h}
+function totBytes(){var s=0,i;for(i=0;i<M.items.length;i++)s+=M.items[i].b;return Math.round(s*10)/10}
+function totPx(){var s=0,i;for(i=0;i<M.items.length;i++)s+=mp(M.items[i]);return Math.round(s)}
+/* 提交给服务端的有序载荷：**必须**就是列表顺序。data-order / data-sent-payload 是它的机器可读镜像。 */
+function payloadOrder(){var a=[],i;for(i=0;i<M.items.length;i++)a.push(M.items[i].n);return a/*payload-order*/}
+/* 目标设计的载荷镜像：多带一个角度。它和 data-sent-payload 分开写，就是为了让"本次到底发了什么"一眼可查。 */
+function targetPayload(){var a=[],i;for(i=0;i<M.items.length;i++)a.push(M.items[i].n+'@'+M.items[i].rot+'deg');return a}
+/* 输入指纹：只由"有序文件名"算出。顺序一变指纹就变 —— 幂等冲突讲的就是这件事。FNV-1a，纯本机计算。 */
+function fpOfNames(list){
+ var s=list.join('|'),x=2166136261,i;
+ for(i=0;i<s.length;i++){x^=s.charCodeAt(i);x=(x*16777619)>>>0}
+ return 'FP-'+('0000000'+x.toString(16).toUpperCase()).slice(-8);
+}
+function fpOf(){return fpOfNames(payloadOrder())}
+var M={items:[],sel:null,req:'CV-20260830-0930-7K3D',out:null};
+var ST='empty';
+function initModel(st){
+ M.sel=null;M.out=null;M.items=[];
+ if(st==='ready-one')M.items=seq(1);
+ else if(st==='ready-three'||st==='merging'||st==='known-failed'||st==='result-unknown'||st==='retrying-same-request'||st==='conversion-in-progress')M.items=seq(3);
+ else if(st==='ready-selected-middle'){M.items=seq(3);M.sel=1}
+ else if(st==='local-uploading')M.items=seq(2);
+ else if(st==='upload-format-rejected'||st==='upload-too-large'||st==='upload-failed')M.items=seq(2);
+ else if(st==='limit-reached-20')M.items=seq(20);
+ else if(st==='source-unavailable'){M.items=seq(3);M.items[1].bad='missing'}
+ else if(st==='source-expired'){M.items=seq(3);M.items[2].bad='expired'}
+ else if(st==='total-input-too-large'){
+  M.items=seq(6);
+  var big=[[7.4,3000,4000],[7.9,4000,3000],[6.8,3400,4810],[7.2,3000,4000],[6.9,4000,3000],[6.2,3400,4810]];
+  for(var i=0;i<6;i++){M.items[i].b=big[i][0];M.items[i].w=big[i][1];M.items[i].h=big[i][2]}
+ }
+ else if(st==='image-dimensions-invalid'){M.items=seq(3);M.items[1].w=6000;M.items[1].h=5000;M.items[1].b=3.9;M.items[1].bad='pixels'}
+ else if(st==='output-too-large')M.items=seq(9);
+ else if(st==='idempotency-conflict'){M.items=seq(3);var t=M.items[0];M.items[0]=M.items[2];M.items[2]=t}
+ else if(st.indexOf('completed')===0||st.indexOf('output-preview')===0||st==='recovered-completed')M.items=seq(3);
+ if(st.indexOf('completed')===0||st.indexOf('output-preview')===0||st==='recovered-completed'){
+  M.out={n:'格式转换-3张图片.pdf',fid:'file_7a1c0d23e644b819',pages:3,mb:2.4,md5:'9f2c74a1b06d',ttl:30};
+ }
+}
+/* ================= 公共构件 ================= */
+function fxBar(){
+ return '<div class="fxbar" role="note" data-testid="'+SCREEN+'-fixture"><span class="fx-b">演示</span>'+
+  '<span>固定原型数据 —— 这一屏上的图片、文件名、请求标识和转换结果都写死在原型里，<b>不是真实用户文件</b>，也不是接口返回值。</span></div>';
+}
+function fitBox(w,h,rot,bw,bh){
+ var q=(rot%180)!==0,nw=q?h:w,nh=q?w:h,s=Math.min(bw/nw,bh/nh);
+ return {w:Math.max(1,Math.round(w*s)),h:Math.max(1,Math.round(h*s))};
+}
+function badTag(it){
+ if(it.bad==='missing')return '<span class="chip bad" style="min-height:34px;font-size:15px;padding:0 10px">服务端取不到这一张</span>';
+ if(it.bad==='expired')return '<span class="chip bad" style="min-height:34px;font-size:15px;padding:0 10px">本机的访问链接已过期</span>';
+ if(it.bad==='pixels')return '<span class="chip bad" style="min-height:34px;font-size:15px;padding:0 10px">像素超出单张上限</span>';
+ return '';
+}
+function row(it,i){
+ var sel=(M.sel===i),box=fitBox(it.w,it.h,it.rot,76,94);
+ return '<div class="irow'+(sel?' on':'')+'" data-testid="'+SCREEN+'-row-'+i+'" data-name="'+it.n+'" data-rot="'+it.rot+'" data-bad="'+(it.bad||'')+'">'+
+  '<button type="button" class="ipick press" data-act="pick:'+i+'" aria-pressed="'+(sel?'true':'false')+'" aria-label="选中第 '+(i+1)+' 张：'+it.n+'">'+
+   '<span class="idx">'+(i+1)+'</span>'+
+   '<span class="ithumb"><img data-testid="'+SCREEN+'-thumb-'+i+'" src="'+fxSrc(it.f)+'" alt="第 '+(i+1)+' 张 '+it.n+'（固定原型图）" style="width:'+box.w+'px;height:'+box.h+'px;transform:rotate('+it.rot+'deg)"></span>'+
+   '<span class="imeta"><b>'+it.n+'</b><span>'+szText(it)+(it.rot?' · 本机已转 '+it.rot+'°':'')+'</span></span>'+
+   badTag(it)+
+  '</button>'+
+  '<button type="button" class="ibtn press" data-act="look:'+i+'" aria-label="完整查看第 '+(i+1)+' 张：'+it.n+'">'+svg('eye','currentColor',26)+'</button>'+
+ '</div>';
+}
+function orderLine(){
+ var po=payloadOrder(),n=po.length,i;
+ if(!n)return '';
+ var tail=n>1?('，最后一项是第 '+n+' 页 '+po[n-1]):'';
+ var rots=[];
+ for(i=0;i<M.items.length;i++)if(M.items[i].rot)rots.push('第 '+(i+1)+' 页 '+M.items[i].rot+'°');
+ var rotLine=rots.length?('<div class="ordline sub" data-testid="'+SCREEN+'-target-payload" data-target-rot="'+rots.length+'">'+
+  '<b>目标设计</b>目标载荷会在每一页后面多带一个角度（'+rots.join('、')+'）。<b>本次实际发出的只有上面这个顺序</b>，角度没有发出去。</div>'):'';
+ return '<div class="ordline" data-testid="'+SCREEN+'-order" data-order="'+po.join(' | ')+'" data-sent-payload="'+po.join(' | ')+'" data-target-payload="'+targetPayload().join(' | ')+'">'+
+  '<b>提交顺序</b>下面这个顺序<b>就是</b>提交给服务端的顺序，也是 PDF 的页序：第 1 页 '+po[0]+tail+'（共 '+n+' 项）。</div>'+rotLine;
+}
+function listCard(hint,maxRows){
+ var n=M.items.length,h='',i;
+ for(i=0;i<n;i++)h+=row(M.items[i],i);
+ var vis=Math.min(maxRows||5,Math.max(1,n));
+ var hgt=vis*116-(vis===n?1:0);
+ return '<div class="lwrap" data-testid="'+SCREEN+'-list" data-count="'+n+'">'+
+  '<div class="lhead"><span>待合并图片</span><span class="sub" data-testid="'+SCREEN+'-counts">'+n+' / '+LIM.imgs+' 张 · 合计 '+totBytes().toFixed(1)+' MB / '+LIM.total+' MB · '+totPx()+' 万 / 2 亿像素</span></div>'+
+  '<div class="lrows" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="待合并图片列表，可上下滚动" style="height:'+hgt+'px">'+h+'</div>'+
+  orderLine()+'</div>';
+}
+/* 禁用原因指向：旋转 90° 是永久禁用，指向常驻的 #rotreason；上移 / 下移 / 移除是按状态禁用，
+   指向按状态渲染的 #selreason —— 这三个按钮只在 reason 非空（#selreason 已渲染）时才会禁用。 */
+function selBtn(act,ico,label,dis){
+ var why=(act==='rot'?'rotreason':'selreason');
+ return '<button type="button" class="selbtn press'+(act==='del'?' del':'')+'" data-act="'+act+'" data-testid="'+SCREEN+'-'+act+'"'+
+  (dis?' aria-disabled="true" aria-describedby="'+why+'"':'')+' aria-label="'+label+'">'+svg(ico,'currentColor',24)+label+'</button>';
+}
+function selBar(){
+ var has=M.sel!==null,n=M.items.length,i=M.sel;
+ var up=!has||i===0,down=!has||i===n-1;
+ var reason=!has?'先在上面选中一张图片，再排序或移除。'
+  :(up?'第 1 张已经在最前面，没有可以上移的位置。':(down?'第 '+n+' 张已经在最后，没有可以下移的位置。':''));
+ return '<div class="selbar" data-testid="'+SCREEN+'-selbar" data-sel="'+(has?i:'')+'">'+
+  selBtn('up','up','上移',up)+selBtn('down','down','下移',down)+
+  selBtn('rot','rot','旋转 90°',true)+selBtn('del','del','移除',!has)+'</div>'+
+  (reason?'<div class="rotnote" id="selreason" data-testid="'+SCREEN+'-selreason">'+reason+'</div>':'')+
+  '<div class="rotnote" id="rotreason" data-testid="'+SCREEN+'-rotnote">旋转 90° <b>当前不可用</b>：转换接口没有旋转字段，正式页面也未接线。按钮保持禁用，不会制造“已经旋转但导出没变化”的假操作。</div>';
+}
+/* addRow：手机入口（图标、禁用/启用字符串与结构）为冻结基线，逐字保持，不得改写。 */
+function addRow(disabled,reason){
+ var a='<span class="add" role="button" aria-disabled="true" aria-label="本机上传一张（'+reason+'）">'+svg('plus','currentColor',26)+'本机上传一张</span>'+ 
+       '<span class="add" role="button" aria-disabled="true" aria-label="手机扫码上传一张（'+reason+'）">'+svg('phone','currentColor',26)+'手机扫码上传一张</span>'+ 
+       '<span class="add" role="button" aria-disabled="true" aria-label="U 盘导入图片（'+reason+'）">'+svg('usb','currentColor',26)+'U 盘导入图片</span>';
+ var b='<button type="button" class="add press" data-act="add-local" data-route="/print-scan/convert" data-testid="img2pdf-add-local">'+svg('plus','currentColor',26)+'本机上传一张</button>'+ 
+       '<a class="add press" href="19-img2pdf.html?state=uploading" data-route="/print-scan/convert" data-testid="img2pdf-add-phone">'+svg('phone','currentColor',26)+'手机扫码上传一张</a>'+ 
+       '<a class="add press" href="19-img2pdf.html?state=usb-not-connected" data-route="/print-scan/convert" data-testid="img2pdf-add-usb">'+svg('usb','currentColor',26)+'U 盘导入图片</a>';
+ return '<div class="addrow">'+(disabled?a:b)+'</div>';
+}
+function retention(loggedIn){
+ return '<div class="pgrp" data-testid="'+SCREEN+'-retention" data-auth="'+(loggedIn?'in':'out')+'"><h4>生成之后放哪</h4><div class="state-p">'+(loggedIn
+  ? '转换生成的 PDF 会进<b>「我的文档」</b>，默认保存约 24 小时，可以在那一页手动延长保存期限。'
+  : '<b>未登录状态下生成的 PDF 不会进入「我的文档」</b>，只能在本次操作内直接继续；这是公用终端，也<b>不会下载到本机</b>。')+
+  '</div><div class="state-p">打印用的临时链接 <b>30 分钟内有效</b>，过期后回到这一页重新取一次。</div></div>';
+}
+function retentionShort(loggedIn){
+ return '<div class="pgrp" data-testid="'+SCREEN+'-retention" data-auth="'+(loggedIn?'in':'out')+'"><h4>生成之后放哪</h4><div class="state-p">'+(loggedIn
+  ? '生成的 PDF 会进<b>「我的文档」</b>，默认保存约 24 小时，可以在那一页手动延长。'
+  : '<b>未登录状态下生成的 PDF 不会进入「我的文档」</b>，只能在本次操作内直接继续；这是公用终端，也<b>不会下载到本机</b>。')+
+  '</div><div class="state-p">打印用的临时链接 <b>30 分钟内有效</b>。</div></div>';
+}
+function rules(){
+ return '<div class="pgrp" data-testid="'+SCREEN+'-rules"><h4>这里的规矩</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span>只收 JPG / PNG；单张不超过 '+LIM.single+' MB，也不超过 '+LIM.px1+' 万像素。</span></li>'+
+  '<li><span class="sq"></span><span>一次最多 '+LIM.imgs+' 张；合计不超过 '+LIM.total+' MB，也不超过 2 亿像素。</span></li>'+
+  '<li><span class="sq"></span><span>每张图片占一页，按 A4 排版；生成的 PDF 不超过 '+LIM.out+' MB。</span></li>'+
+  '<li><span class="sq"></span><span>顺序按你排的来，删掉一张后序号立刻重排。</span></li></ul></div>';
+}
+function rulesMini(){
+ return '<div class="pgrp" data-testid="'+SCREEN+'-rules"><h4>这里的规矩</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span>只收 JPG / PNG；单张 ≤ '+LIM.single+' MB、≤ '+LIM.px1+' 万像素。</span></li>'+
+  '<li><span class="sq"></span><span>一次最多 '+LIM.imgs+' 张；合计 ≤ '+LIM.total+' MB、≤ 2 亿像素；生成的 PDF ≤ '+LIM.out+' MB。</span></li></ul></div>';
+}
+function rulesShort(){
+ return '<div class="pgrp" data-testid="'+SCREEN+'-rules"><h4>这里的规矩</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span>只收 JPG / PNG；单张 ≤ '+LIM.single+' MB、≤ '+LIM.px1+' 万像素。</span></li>'+
+  '<li><span class="sq"></span><span>一次最多 '+LIM.imgs+' 张；合计 ≤ '+LIM.total+' MB、≤ 2 亿像素。</span></li>'+
+  '<li><span class="sq"></span><span>一张图一页，按 A4 排版；生成的 PDF ≤ '+LIM.out+' MB。</span></li></ul></div>';
+}
+function reqPanel(note){
+ return '<div class="pgrp" data-testid="'+SCREEN+'-req"><h4>本次请求标识</h4>'+
+  '<div class="kv"><div><span>请求标识</span><b data-testid="'+SCREEN+'-reqid" data-req="'+M.req+'">'+M.req+'</b></div>'+
+  '<div><span>输入指纹</span><b data-testid="'+SCREEN+'-fp" data-fp="'+fpOf()+'">'+fpOf()+'</b></div>'+
+  '<div><span>这批图片</span><b>'+M.items.length+' 张，按上面的顺序</b></div></div>'+
+  '<div class="state-p">指纹只由<b>有序</b>的文件名算出：顺序一变，指纹就变。'+(note||'同一批图片、同一个顺序，<b>始终用这一个标识</b>：重试、断线重连、恢复结果都靠它，服务端不会因此多生成一份。')+'</div></div>';
+}
+function outPanel(){
+ var o=M.out;
+ return '<div class="pgrp" data-testid="'+SCREEN+'-outfacts"><h4>这份文件</h4><div class="kv">'+
+  '<div><span>文件名</span><b>'+o.n+'</b></div>'+
+  '<div><span>文件标识</span><b data-testid="'+SCREEN+'-fileid">'+o.fid+'</b></div>'+
+  '<div><span>页数</span><b>'+o.pages+' 页（每张图一页）</b></div>'+
+  '<div><span>大小</span><b>'+o.mb.toFixed(1)+' MB（上限 '+LIM.out+' MB）</b></div>'+
+  '<div><span>校验值</span><b>'+o.md5+'…（服务端返回的前 12 位）</b></div>'+
+  '<div><span>打印链接</span><b>临时签名链接，'+o.ttl+' 分钟内有效</b></div></div></div>';
+}
+function band(kind,ico,title,ps,chips,breathe){
+ var h='',i;
+ for(i=0;i<ps.length;i++)h+='<div class="state-p">'+ps[i]+'</div>';
+ var ch='';
+ if(chips&&chips.length){ch='<div class="meta">';for(i=0;i<chips.length;i++)ch+='<span class="chip">'+chips[i]+'</span>';ch+='</div>'}
+ return '<div class="state" data-kind="'+kind+'" data-testid="'+SCREEN+'-band">'+
+  '<div class="state-h">'+(breathe?'<span class="dot16 breathe"></span>':svg(ico,'currentColor',27))+title+'</div>'+h+ch+'</div>';
+}
+function ctaOpen(secondary,label,href,route){
+ return '<div class="ctabar">'+secondary+
+  '<a class="btn primary press" style="flex:1.6" href="'+href+'" data-route="'+route+'" data-testid="'+SCREEN+'-primary">'+label+'</a></div>';
+}
+function ctaAct(secondary,label,act,flex){
+ return '<div class="ctabar">'+secondary+
+  '<button type="button" class="btn primary press" style="flex:'+(flex||1.6)+'" data-act="'+act+'" data-testid="'+SCREEN+'-primary">'+label+'</button></div>';
+}
+function ctaOff(label,reason,secondary){
+ return '<div class="cta-reason" data-testid="'+SCREEN+'-disabled-reason">'+reason+'</div>'+
+  '<div class="ctabar">'+secondary+
+  '<span class="btn primary" role="button" aria-disabled="true" style="flex:1.6" data-testid="'+SCREEN+'-primary" aria-label="'+label+'（'+reason+'）">'+label+'</span></div>';
+}
+var GHOST_HUB='<a class="btn ghost press" href="10-print-hub.html" data-route="/print-scan">返回打印扫描</a>';
+var GHOST_HELP='<a class="btn ghost press" href="06-help.html" data-route="/help">联系工作人员</a>';
+var GHOST_DOCS='<a class="btn ghost press" href="38-member-assets.html" data-route="/me/documents">查看我的文档</a>';
+var GHOST_LOGIN='<a class="btn ghost press" href="03-login-gate.html" data-route="/login">先登录再保存</a>';
+var EXIT_HREF='13-print-desk.html',EXIT_ROUTE='/print/material-check',EXIT_LABEL='拿这份 PDF 去打印';
+/* ================= 27 个业务状态 ================= */
+var V={};
+function editView(opts){
+ /* 可编辑主屏：状态说明（可选）+ 列表 + 选中操作 + 添加入口 + 两栏说明 + 主操作 */
+ var top=opts.band||'';
+ var rows=opts.maxRows||5;
+ var lock=opts.addDisabled;
+ return (top?'<section class="sec">'+top+'</section>':'')+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">'+opts.title+'</span><span class="hint">'+M.items.length+' / '+LIM.imgs+' 张 · 一张一页</span></div>'+
+  listCard(null,rows)+selBar()+addRow(!!lock,lock||'')+'</section>'+
+  '<section class="sec grow last"><div class="grid2">'+(opts.left||(opts.compact?retentionShort(true):retention(true)))+(opts.right||(opts.compact?rulesMini():rules()))+'</div></section>'+
+  opts.cta;
+}
+/* 空槽示意图：三行留空的槽位，只写"第几张 / 会成为第几页"，不摆任何文件名或缩略图。
+   它讲的是"加进来之后这一页会长成什么样"，不是"已经有内容了"。 */
+function ghostSlots(){
+ var h='',i;
+ for(i=0;i<3;i++){
+  h+='<div class="grow-r'+(i===1?' on':'')+'"><span class="gi">'+(i+1)+'</span><span class="gt" aria-hidden="true"></span>'+
+   '<span class="gm"><b>加进来的第 '+(i+1)+' 张</b>会成为 PDF 第 '+(i+1)+' 页</span>'+
+   '<span class="ga" aria-hidden="true"><span>'+svg('up','currentColor',20)+'</span><span>'+svg('down','currentColor',20)+'</span></span></div>';
+ }
+ h+='<div class="grow-r more"><span class="gi">'+svg('plus','currentColor',22)+'</span><span class="gt" aria-hidden="true"></span>'+
+  '<span class="gm"><b>继续添加</b>加满为止，一次最多 '+LIM.imgs+' 张</span></div>';
+ return '<div class="ghostwrap" data-testid="'+SCREEN+'-empty-slots" role="img" aria-label="示意图：加进来之后，列表里每一张都有序号，选中之后可以上移下移；序号就是 PDF 的页序，一次最多 '+LIM.imgs+' 张">'+h+'</div>'+
+  '<div class="ghostbar" aria-hidden="true"><span>'+svg('up','currentColor',20)+'上移</span><span>'+svg('down','currentColor',20)+'下移</span>'+
+  '<span class="off">'+svg('rot','currentColor',20)+'旋转不可用</span><span>'+svg('del','currentColor',20)+'移除</span></div>';
+}
+V['empty']=function(){
+ return '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">先加第一张图</span><span class="hint">一次一张，可连续添加</span></div>'+
+  addRow(false)+
+  '<div class="srcnote" data-testid="'+SCREEN+'-sources">'+
+  '<div>用<b>这台机器上的文件</b>，一次加一张。</div>'+
+  '<div>图在手机里就走这条，<b>传完回到这一页</b>接着排。</div>'+
+  '<div>U 盘里的图片<em>还不能直接进这个列表</em>，点开看还能怎么办。</div>'+
+  '</div></section>'+
+  '<section class="sec grow"><div class="sec-label"><span class="no serif">02</span><span class="t">加进来之后</span><span class="hint">还没有图片，列表现在是空的</span></div>'+
+  '<div class="card epane" data-testid="'+SCREEN+'-empty-pane">'+
+  '<div class="ep-l"><div class="ep-h"><span>列表会长成这样</span><span class="r">顺序 = 页序</span></div>'+
+  ghostSlots()+'</div>'+
+  '<div class="ep-r"><div class="ep-h"><span>接下来做三件事</span></div>'+
+  '<div class="epsteps">'+
+  '<div class="epstep"><span class="sn">1</span><span class="sb"><b>选中一张，排顺序</b>选中之后上移 / 下移立刻改写序号；移除之后剩下的序号也会重排，不留空位。</span></div>'+
+  '<div class="epstep"><span class="sn">2</span><span class="sb"><b>一张图占一页</b>按 A4 居中放大，不裁切也不拼版。<em>旋转 90° 当前不可用</em>，按钮一直保持禁用。</span></div>'+
+  '<div class="epstep"><span class="sn">3</span><span class="sb"><b>合成一份 PDF</b>一次性提交，服务端不回传中间进度，结果回来才算完成。</span></div>'+
+  '</div>'+
+  '<div class="ep-cap">左边是<b>空位示意</b>，不是已有文件。这一页<b>不替你排序</b>，也不按文件名或时间自动排。</div></div></div></section>'+
+  '<section class="sec last"><div class="card limitbar" data-testid="'+SCREEN+'-rules"><div class="lb-h"><span>这里的规矩</span><span class="r">超出的当场退回，不进列表</span></div>'+
+  '<div class="lb-c"><span class="chip">只收 JPG / PNG</span><span class="chip">单张 ≤ '+LIM.single+' MB</span><span class="chip">单张 ≤ '+LIM.px1+' 万像素</span>'+
+  '<span class="chip">一次最多 '+LIM.imgs+' 张</span><span class="chip">合计 ≤ '+LIM.total+' MB</span><span class="chip">生成的 PDF ≤ '+LIM.out+' MB</span></div>'+
+  '<div class="lb-n">上传<b>没拿到服务端确认</b>的那一张不会进列表，已经排好的顺序也不会被打乱。</div></div></section>'+
+  ctaOff('至少加一张图再合成','还没有图片，没有可合成的内容',GHOST_HUB);
+};
+function convertLabel(){return '合成 '+M.items.length+' 张为一份 PDF'}
+V['ready-one']=function(){
+ return editView({title:'排好顺序',maxRows:1,
+  cta:ctaAct(GHOST_HUB,convertLabel(),'convert')});
+};
+V['ready-three']=function(){
+ return editView({title:'排好顺序',
+  cta:ctaAct(GHOST_HUB,convertLabel(),'convert')});
+};
+V['ready-selected-middle']=function(){
+ return editView({title:'选中了第 2 张',compact:true,
+  band:band('info','info','选中第 '+(M.sel+1)+' 张：'+M.items[M.sel].n,
+   ['选中之后，当前可用操作只作用在这一张上：<b>上移 / 下移 / 移除</b>。旋转尚未接线，保持禁用；上移下移会立刻改写序号，也就改写了提交顺序。'],
+   []),
+  cta:ctaAct(GHOST_HUB,convertLabel(),'convert')});
+};
+V['local-uploading']=function(){
+ return '<section class="sec">'+band('info','info','正在上传这一张',
+  ['本机一次上传一张。<b>服务端不回传上传进度百分比</b>，所以这里不画进度条，也不写「还需几秒」。传成功之后它才会出现在下面的列表里。',
+   '这一张没确认成功之前，不会进列表，也不会改变已经排好的顺序。'],
+  ['一次一张','没有进度回传','结果未确认前不合成'],true)+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">'+(M.items.length?'已经在列表里的还在':'列表还是空的')+'</span><span class="hint">'+M.items.length+' / '+LIM.imgs+' 张</span></div>'+
+  (M.items.length?listCard(null,2):'<div class="card"><div class="state-p">列表里还没有别的图片。<b>这一张传成功之后会成为第 1 页</b>；没成功就什么都不会加进来。</div></div>')+
+  addRow(true,'这一张还在上传')+'</section>'+
+  '<section class="sec grow last"><div class="grid2">'+rules()+reqPanel('这一批还没提交，请求标识会在你点「合成」时随第一次请求一起用上。')+'</div></section>'+
+  ctaOff('上传完成后可合成','这一张还在上传，结果没确认前不合成','<button type="button" class="btn ghost press" data-act="cancel-upload">取消这一张</button>'+GHOST_HUB);
+};
+/* 能力边界工作台：先说清三个入口里接了哪两个，再把 U 盘里的图片**现在**真正能走的两条路画出来。
+   路径卡里的节点是标签不是控件（无 href / data-act / role=button），出口仍然只有底部那两个。
+   不新增页面、不新增出口，也不把 U 盘写成"已经能进待合并列表"。 */
+V['usb-not-connected']=function(){
+ var AR='<span class="ub-ar" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h13"/><path d="M12.5 6.5L19 12l-6.5 5.5"/></svg></span>';
+ function srcCard(off,ico,name,wired,desc,to){
+  return '<div class="pgrp ub-src'+(off?' off':'')+'" data-testid="'+SCREEN+'-src-'+ico+'" data-wired="'+(off?'no':'yes')+'">'+
+   '<span class="ub-ic" aria-hidden="true">'+svg(ico,'currentColor',30)+'</span>'+
+   '<h4 class="ub-n">'+name+'</h4>'+
+   '<span class="chip '+(off?'warn':'ok')+'">'+wired+'</span>'+
+   '<div class="ub-d">'+desc+'</div>'+
+   '<div class="ub-to">'+svg(off?'x':'check','currentColor',22)+'<span>'+to+'</span></div></div>';
+ }
+ return '<section class="sec">'+band('warn','warn','U 盘图片导入尚未接到转换列表',
+  ['这台机器可以从 U 盘导入文件去打印，但<b>图片转 PDF 这一页现在只接了本机上传和手机扫码上传</b>。'],
+  ['目标来源：U 盘','当前：还没接进这一页','不读取、不上传'],true)+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这一页接了哪些来源</span><span class="hint">三个入口，接进这一页的是 2 个</span></div>'+
+  '<div class="grid3" data-testid="'+SCREEN+'-sources">'+
+  srcCard(false,'plus','本机上传一张','已接进这一页',
+   '在这台机器上选文件，一次一张；<b>拿到服务端确认</b>之后它才成为列表里的一页。',
+   '进「待合并图片」列表')+
+  srcCard(false,'phone','手机扫码上传一张','已接进这一页',
+   '扫码在手机上选图，传完<b>回到这一页</b>接着排顺序，页序还是你自己定。',
+   '进「待合并图片」列表')+
+  srcCard(true,'usb','U 盘导入图片','还没接进这一页',
+   'U 盘里的图片还不能按你排好的顺序回到这个列表，所以这里<b>不放一个会把文件带错流程的按钮</b>。',
+   '到不了「待合并图片」列表')+
+  '</div></section>'+
+  '<section class="sec grow last"><div class="sec-label"><span class="no serif">02</span><span class="t">U 盘里的图片，现在能走这两条</span><span class="hint">两条都不会自动回到这个列表</span></div>'+
+  '<div class="card ub-ways" data-testid="'+SCREEN+'-usb-ways">'+
+  '<div class="ub-way" data-way="to-list"><div class="ub-wh"><b>要拼成一份 PDF</b><span>图片得先落到手机或这台机器上</span></div>'+
+  '<div class="ub-flow" role="img" aria-label="路线一：U 盘里的图片先拷到手机或本机，再在这一页上传，之后才会进入待合并图片列表">'+
+  '<span class="ub-node src"><b>U 盘</b><i>图片现在在这里</i></span>'+AR+'<span class="ub-node"><b>拷到手机或本机</b><i>这一步你自己做</i></span>'+AR+
+  '<span class="ub-node"><b>在这一页上传</b><i>本机或手机扫码</i></span>'+AR+'<span class="ub-node on"><b>进「待合并图片」列表</b><i>到这里才排得出页序</i></span></div>'+
+  '<div class="ub-note">拷进来之后<b>就和本机上传的那些图片一样</b>：一张一页，顺序还是你自己排。</div></div>'+
+  '<div class="ub-way" data-way="print-only"><div class="ub-wh"><b>只想把原图打出来</b><span>那是打印流程，不是这一页</span></div>'+
+  '<div class="ub-flow" role="img" aria-label="路线二：U 盘里的文件可以走通用的 U 盘导入打印，但那条路不会回到图片转 PDF 的待合并图片列表">'+
+  '<span class="ub-node src"><b>U 盘</b><i>图片现在在这里</i></span>'+AR+'<span class="ub-node"><b>通用「U 盘导入打印」</b><i>在「打印扫描」里</i></span>'+AR+
+  '<span class="ub-node"><b>那边的打印流程</b><i>另一条闭环</i></span><span class="ub-cut">'+svg('x','currentColor',22)+'不回到这个列表</span></div>'+
+  '<div class="ub-note">那条路<b>不会自动回到图片转 PDF 的待合并列表</b>，也就排不出页序；要拼成一份 PDF，还是得走上面那条。</div></div>'+
+  '</div></section>'+ctaAct(GHOST_HUB,'改用本机上传','add-local');
+};
+function rejectView(kind,title,ps,chips,detail){
+ return editView({title:'已经在列表里的还在',maxRows:2,compact:true,
+  band:band(kind,'warn',title,ps,chips),
+  right:'<div class="pgrp" data-testid="'+SCREEN+'-reject"><h4>刚才被拒的那一张</h4><div class="kv">'+detail+'</div>'+
+   '<div class="state-p"><b>它没有进列表</b>，已经排好的顺序也没被打乱。</div></div>',
+  left:rulesShort(),
+  cta:ctaAct('<button type="button" class="btn ghost press" data-act="convert">先用现有 2 张合成</button>','换一张再传','add-local',1.4)});
+}
+V['upload-format-rejected']=function(){
+ return rejectView('warn','这一张格式不收',
+  ['只收 <b>JPG / PNG</b>。刚才那张是 HEIC，<b>本机在上传前就挡下了</b>，没有发给服务端。',
+   'iPhone 拍的照片默认可能是 HEIC，在相册里选「兼容性最好」导出一次就变成 JPG 了。'],
+  ['仅 JPG / PNG','本机就挡下了','没有进列表'],
+  '<div><span>文件</span><b>IMG_2043.HEIC</b></div><div><span>原因</span><b>格式不支持，仅 JPG / PNG</b></div><div><span>是否入列</span><b>否</b></div>');
+};
+V['upload-too-large']=function(){
+ return rejectView('warn','这一张超过单张上限',
+  ['单张<b>不超过 '+LIM.single+' MB</b>。刚才那张 <b>12.6 MB</b>，本机在上传前就挡下了，没有发给服务端。',
+   '手机相机的原图常常超过这个大小，导出时选一个小一点的尺寸再传就行。'],
+  ['单张 ≤ '+LIM.single+' MB','本机就挡下了','没有进列表'],
+  '<div><span>文件</span><b>IMG_2044.JPG</b></div><div><span>大小</span><b>12.6 MB（上限 '+LIM.single+' MB）</b></div><div><span>是否入列</span><b>否</b></div>');
+};
+V['upload-failed']=function(){
+ return rejectView('error','这一张没传上去',
+  ['上传这一张的时候<b>没有拿到服务端的确认</b>：可能是这台机器到服务端的网络断了，也可能是存储正忙。',
+   '这一张<b>没有进列表</b>；已经在列表里的两张和它们的顺序都没受影响，重新选一次这张图再传即可。'],
+  ['没有拿到确认','没有进列表','已有顺序不受影响'],
+  '<div><span>文件</span><b>IMG_2045.JPG</b></div><div><span>结果</span><b>没有拿到服务端确认</b></div><div><span>是否入列</span><b>否</b></div>');
+};
+V['limit-reached-20']=function(){
+ return editView({title:'已经到上限',maxRows:3,compact:true,addDisabled:'已达 20 张上限',
+  right:rulesMini(),
+  band:band('warn','info','已经 '+LIM.imgs+' 张，加不了了',
+   ['一次最多合并 <b>'+LIM.imgs+' 张</b>，已经到上限。想换一张，先选中列表里的某一张再移除；图片更多就分两份 PDF 合成，打印时一起打。<b>添加入口已经停用。</b>'],
+   []),
+  cta:ctaAct(GHOST_HUB,convertLabel(),'convert')});
+};
+function serverRejectView(kind,title,ps,chips,right){
+ return editView({title:'图片和顺序都保留着',maxRows:2,compact:true,
+  band:band(kind,'warn',title,ps,chips),
+  left:rulesShort(),right:right,
+  cta:ctaAct(GHOST_HELP,'改完之后重试合成','convert')});
+}
+V['source-unavailable']=function(){
+ return serverRejectView('error','服务端取不到其中一张',
+  ['服务端回的是同一句话：<b>「部分图片不存在或已失效」</b>。本页<b>不替它猜具体原因</b>，只标出本机还知道的那一张：第 2 张。',
+   '这三张和你排的顺序<b>都还在</b>。把标红的那一张移除再补传一张，或者直接重试一次。'],
+  ['服务端：部分图片不存在或已失效','列表和顺序保留','没有生成任何 PDF'],
+  '<div class="pgrp"><h4>本机还知道的</h4><div class="kv">'+
+   '<div><span>受影响</span><b>第 2 张 '+M.items[1].n+'</b></div>'+
+   '<div><span>服务端原文</span><b>部分图片不存在或已失效</b></div>'+
+   '<div><span>其余两张</span><b>没有被删除，顺序不变</b></div></div>'+
+   '<div class="state-p">本页<b>不会</b>把这句话改写成「文件已被删除」——服务端没这么说。</div></div>');
+};
+V['source-expired']=function(){
+ return serverRejectView('warn','第 3 张的访问链接过期了',
+  ['未登录时，每张图片带的是<b>有有效期的临时访问链接</b>。第 3 张的那一条已经过期，服务端因此认不出它。',
+   '服务端回的仍然是<b>「部分图片不存在或已失效」</b>；本页判断成「过期」，靠的是<b>本机自己持有的那条链接已经到期</b>，不是服务端这么说的。'],
+  ['临时链接有有效期','列表和顺序保留','重新传这一张即可'],
+  '<div class="pgrp"><h4>本机还知道的</h4><div class="kv">'+
+   '<div><span>受影响</span><b>第 3 张 '+M.items[2].n+'</b></div>'+
+   '<div><span>本机判断</span><b>该图的临时访问链接已到期</b></div>'+
+   '<div><span>服务端原文</span><b>部分图片不存在或已失效</b></div></div>'+
+   '<div class="state-p">登录之后不再依赖这条临时链接，这类过期就不会发生。</div></div>');
+};
+V['total-input-too-large']=function(){
+ return serverRejectView('warn','这一批加起来太大了',
+  ['单张都没超 '+LIM.single+' MB，但<b>合计 '+totBytes().toFixed(1)+' MB</b>，超过了一次转换的 <b>'+LIM.total+' MB</b> 上限，所以服务端<b>一张都没转</b>。',
+   '这条限制只在服务端算得出来，所以本机没法在上传时提前拦下。移除几张，或者分两批合成。'],
+  ['合计 '+totBytes().toFixed(1)+' MB / '+LIM.total+' MB','一张都没转','列表和顺序保留'],
+  '<div class="pgrp"><h4>这一批的账</h4><div class="kv">'+
+   '<div><span>张数</span><b>'+M.items.length+' 张（上限 '+LIM.imgs+'）</b></div>'+
+   '<div><span>合计大小</span><b>'+totBytes().toFixed(1)+' MB（上限 '+LIM.total+' MB）</b></div>'+
+   '<div><span>合计像素</span><b>'+totPx()+' 万（上限 2 亿）</b></div></div>'+
+   '<div class="state-p">移除任意两张就能回到上限以内。</div></div>');
+};
+V['image-dimensions-invalid']=function(){
+ return serverRejectView('error','第 2 张的像素超出上限',
+  ['服务端读出第 2 张是 <b>6000×5000 = 3000 万像素</b>，超过<b>单张 '+LIM.px1+' 万像素</b>的上限，所以整批都没有转。',
+   '同一个错误码也用在「图片文件已损坏或格式不匹配」上；本页只说服务端读出来的这个尺寸，<b>不替它断定是坏文件</b>。'],
+  ['单张 ≤ '+LIM.px1+' 万像素','整批未转换','列表和顺序保留'],
+  '<div class="pgrp"><h4>服务端读到的</h4><div class="kv">'+
+   '<div><span>受影响</span><b>第 2 张 '+M.items[1].n+'</b></div>'+
+   '<div><span>尺寸</span><b>6000×5000（3000 万像素）</b></div>'+
+   '<div><span>上限</span><b>单张 '+LIM.px1+' 万像素</b></div></div>'+
+   '<div class="state-p">把这一张缩小后重新上传，或者直接移除它。</div></div>');
+};
+V['output-too-large']=function(){
+ return serverRejectView('warn','合出来的 PDF 太大了',
+  ['这 '+M.items.length+' 张的输入没超限，但<b>合成后的 PDF 超过了 '+LIM.out+' MB</b>，服务端因此判定失败，<b>没有留下这份 PDF</b>。',
+   '这一步只有合成之后才知道结果，所以之前没法提前提示。<b>你的图片和顺序都还在</b>：分两批合成通常就能过。'],
+  ['输出上限 '+LIM.out+' MB','没有留下这份 PDF','列表和顺序保留'],
+  '<div class="pgrp"><h4>服务端这次算出来的</h4><div class="kv">'+
+   '<div><span>输入</span><b>'+M.items.length+' 张，合计 '+totBytes().toFixed(1)+' MB</b></div>'+
+   '<div><span>输出</span><b>16.8 MB（上限 '+LIM.out+' MB）</b></div>'+
+   '<div><span>结果</span><b>已判定失败，未留存</b></div></div>'+
+   '<div class="state-p">建议先合前 5 张，再合后 4 张，打印时一起打。</div></div>');
+};
+function waitView(opts){
+ return '<section class="sec">'+opts.band+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">'+opts.title+'</span><span class="hint">'+M.items.length+' / '+LIM.imgs+' 张 · 顺序不变</span></div>'+
+  listCard(null,3)+'</section>'+
+  '<section class="sec grow last"><div class="grid2">'+(opts.left||reqPanel(opts.reqNote))+(opts.right||rules())+'</div></section>'+
+  opts.cta;
+}
+V['merging']=function(){
+ return waitView({title:'正在合成的就是这个顺序',
+  band:band('info','info','正在合成 PDF',
+   ['请求<b>已经发出去了</b>，按你排好的顺序合成一份 PDF，一张图一页。',
+    '这是一次性请求，<b>服务端不回传中间进度</b>，所以这里没有百分比、没有进度条，也没有「还需几秒」。结果回来之前，这一屏不会自己变。'],
+   ['一次性请求','无进度回传','结果回来才算完成'],true),
+  reqNote:'离开这一页<b>不会取消</b>这次合成；回来之后用<b>同一个请求标识</b>再查一次就行，不要另起一次新的。',
+  cta:ctaOff('合成完成后可继续','服务端还没返回合成结果',GHOST_HUB)});
+};
+V['conversion-in-progress']=function(){
+ return waitView({title:'这一批的顺序没有变',
+  band:band('lock','lock','上一次同标识的生成还在跑',
+   ['服务端回的是 <b>「上一次生成仍在进行中，请稍候重试」</b>：<b>'+M.req+'</b> 这个标识下已经有一次合成在跑了。',
+    '这时候<b>不能另起一次新的请求</b> —— 那会变成两次转换。正确做法是拿同一个标识<b>再查一次</b>，等它把结果给出来。'],
+   ['服务端：正在进行中','不新建请求','用同一标识再查']),
+  reqNote:'锁的有效期约 <b>120 秒</b>，结果缓存约 <b>10 分钟</b>。在这段时间里，同一个标识 + 同一批顺序<b>只会有一份结果</b>。',
+  cta:ctaAct(GHOST_HUB,'用同一个标识再查一次','recheck')});
+};
+function doneView(loggedIn,st){
+ var o=M.out;
+ return '<section class="sec">'+band('info','check','PDF 已生成',
+  ['服务端返回了合成结果：<b>'+o.n+'，共 '+o.pages+' 页</b>，页序与你排的顺序一致。'+
+   (loggedIn?'':'<b>你现在没登录，这份 PDF 不会进「我的文档」</b>，建议在这一趟里直接接着走完打印。')],
+  ['服务端已返回结果','一张图一页 · A4',loggedIn?'已进我的文档 · 约 24 小时':'未登录 · 不进我的文档'])+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这份 PDF 的每一页</span><span class="hint">'+o.pages+' 页 · 点开可逐页看完整</span></div>'+
+  '<div class="lwrap" data-testid="'+SCREEN+'-outlist"><div class="lhead"><span>页序与来源</span><span class="sub">'+o.pages+' 页 · 与提交顺序一致</span></div>'+
+  '<div class="lrows" style="height:348px" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="PDF 页序列表，可上下滚动">'+outRows()+'</div>'+
+  orderLine()+'</div>'+
+  '<div class="selbar"><button type="button" class="selbtn press" data-act="open-out" data-testid="'+SCREEN+'-preview-open" aria-label="逐页完整查看这份 PDF">'+svg('eye','currentColor',24)+'逐页完整查看这份 PDF</button></div></section>'+
+  '<section class="sec grow last"><div class="grid2">'+outPanel()+retention(loggedIn)+'</div></section>'+
+  ctaOpen(loggedIn?GHOST_DOCS:GHOST_LOGIN,EXIT_LABEL,EXIT_HREF,EXIT_ROUTE);
+}
+function outRows(){
+ var h='',i;
+ for(i=0;i<M.items.length;i++){
+  var it=M.items[i],box=fitBox(it.w,it.h,0,76,94);
+  h+='<div class="irow" data-testid="'+SCREEN+'-outrow-'+i+'" data-name="'+it.n+'">'+
+   '<button type="button" class="ipick press" data-act="open-out:'+(i+1)+'" aria-label="打开这份 PDF 的第 '+(i+1)+' 页（来自 '+it.n+'）">'+
+   '<span class="idx">'+(i+1)+'</span>'+
+   '<span class="ithumb"><img data-testid="'+SCREEN+'-outthumb-'+i+'" src="'+fxSrc(it.f)+'" alt="第 '+(i+1)+' 页，来自 '+it.n+'（固定原型图）" style="width:'+box.w+'px;height:'+box.h+'px"></span>'+
+   '<span class="imeta"><b>第 '+(i+1)+' 页</b><span>来自 '+it.n+' · 按 A4 居中放大，不裁切</span></span></button>'+
+   '<button type="button" class="ibtn press" data-act="open-out:'+(i+1)+'" aria-label="完整查看第 '+(i+1)+' 页">'+svg('eye','currentColor',26)+'</button></div>';
+ }
+ return h;
+}
+V['completed-auth']=function(){return doneView(true,'completed-auth')};
+V['completed-anonymous']=function(){return doneView(false,'completed-anonymous')};
+V['output-preview-page2']=function(){return doneView(true,'output-preview-page2')};
+V['output-preview-last']=function(){return doneView(true,'output-preview-last')};
+V['output-preview-zoomed']=function(){return doneView(true,'output-preview-zoomed')};
+V['output-preview-failed']=function(){return doneView(true,'output-preview-failed')};
+V['recovered-completed']=function(){
+ var o=M.out;
+ return '<section class="sec">'+band('info','check','用同一个标识把结果找回来了',
+  ['服务端在 <b>'+M.req+'</b> 这个标识下<b>已经有一份完成的结果</b>，刚才那一次其实做完了，只是回执没送到这台机器。',
+   '所以这里<b>没有生成第二份</b>：文件名、页数、页序都和原来那一次完全一样，只是重新签发了一条新的临时打印链接。'],
+  ['同一标识命中已完成结果','没有生成第二份','重新签发打印链接'])+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">这份 PDF 的每一页</span><span class="hint">'+o.pages+' 页 · 与当初提交的顺序一致</span></div>'+
+  '<div class="lwrap" data-testid="'+SCREEN+'-outlist"><div class="lhead"><span>页序与来源</span><span class="sub">'+o.pages+' 页 · 与提交顺序一致</span></div>'+
+  '<div class="lrows" style="height:348px" data-testid="'+SCREEN+'-scroll" tabindex="0" aria-label="PDF 页序列表，可上下滚动">'+outRows()+'</div>'+
+  orderLine()+'</div>'+
+  '<div class="selbar"><button type="button" class="selbtn press" data-act="open-out" data-testid="'+SCREEN+'-preview-open" aria-label="逐页完整查看这份 PDF">'+svg('eye','currentColor',24)+'逐页完整查看这份 PDF</button></div></section>'+
+  '<section class="sec grow last"><div class="grid2">'+outPanel()+reqPanel('恢复用的就是原来那个标识。它的结果缓存约 <b>10 分钟</b>，过了这个窗口再查就查不到了，那时才需要重新提交。')+'</div></section>'+
+  ctaOpen(GHOST_DOCS,EXIT_LABEL,EXIT_HREF,EXIT_ROUTE);
+};
+V['known-failed']=function(){
+ return waitView({title:'图片和顺序都保留着',
+  band:band('error','warn','这一次明确失败了',
+   ['服务端给了明确的失败回执：<b>「PDF 生成校验失败，请重试」</b>。<b>没有生成 PDF</b>，也没有半成品留在服务端。',
+    '你排好的 '+M.items.length+' 张图片和顺序<b>都还在</b>，不用重新传。明确失败之后这个标识已经被服务端释放，可以原样再提交一次。'],
+   ['服务端已明确失败','没有生成 PDF','列表和顺序保留']),
+  reqNote:'明确失败会把这个标识的占用<b>清掉</b>，所以用<b>同一个标识</b>原样重试是安全的，不会撞上「已被占用」。',
+  cta:ctaAct(GHOST_HELP,'用同一个标识重试合成','convert')});
+};
+V['result-unknown']=function(){
+ return waitView({title:'图片和顺序都保留着',
+  band:band('warn','warn','这一次的结果不知道',
+   ['请求发出去了，但<b>回执没有送到这台机器</b>（网络断了，或者等待超时）。所以现在有两种可能：服务端已经做完了，或者根本没做成。',
+    '在弄清楚之前，<b>不能直接再发一次新的请求</b> —— 如果上一次其实成功了，那就会变成两份 PDF。正确做法是拿<b>同一个请求标识</b>去查这一次的结果。'],
+   ['结果未知','不新建请求','用同一标识查询']),
+  reqNote:'服务端按这个标识缓存结果约 <b>10 分钟</b>：这段时间里查得到就说明上一次成功了，查不到才需要重新提交。',
+  cta:ctaAct(GHOST_HELP,'用同一个请求标识查这一次的结果','recheck')});
+};
+V['retrying-same-request']=function(){
+ return waitView({title:'图片和顺序都保留着',
+  band:band('info','info','正在用同一个标识再查一次',
+   ['正在拿 <b>'+M.req+'</b> 去问服务端这一次的结果。<b>没有新建请求</b>，也没有换标识，所以不会多出第二份 PDF。',
+    '这一屏<b>不会自己变成完成</b>：没有百分比，也没有计时器。只有你再点一次、服务端真的把结果给出来，它才会变。'],
+   ['同一请求标识','没有新建请求','不会自动变完成'],true),
+  reqNote:'查询用的标识和当初提交时<b>完全一样</b>：'+M.req+'。同一个标识 + 同一批顺序，服务端只会给出同一份结果。',
+  cta:ctaAct(GHOST_HELP,'再查一次这次的结果','recovered')});
+};
+V['idempotency-conflict']=function(){
+ return '<section class="sec">'+band('error','lock','这个标识已经用在另一批图片上了',
+  ['服务端拒绝了：<b>「该请求标识已用于另一批图片，请更换标识重试」</b>。<b>'+M.req+'</b> 之前提交的是另一个顺序，现在这一批和它对不上。',
+   '本页<b>就停在这里</b>：不自动换标识、不自动改回旧顺序，也不把这一批悄悄合并进上一次的结果。要继续，必须你自己挑一条路。'],
+  ['服务端已拒绝','没有生成任何 PDF','不自动替你决定'])+'</section>'+
+  '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">现在这一批的顺序</span><span class="hint">'+M.items.length+' / '+LIM.imgs+' 张 · 与上一次不同</span></div>'+
+  listCard(null,2)+'</section>'+
+  '<section class="sec grow last"><div class="grid2">'+
+  '<div class="pgrp"><h4>两批的差别</h4><div class="kv">'+
+  '<div><span>请求标识</span><b data-testid="'+SCREEN+'-reqid" data-req="'+M.req+'">'+M.req+'</b></div>'+
+  '<div><span>上一次</span><b>第 1 页 '+FX[0].n+' → 第 3 页 '+FX[2].n+'　指纹 '+fpOfNames([FX[0].n,FX[1].n,FX[2].n])+'</b></div>'+
+  '<div><span>这一次</span><b data-testid="'+SCREEN+'-fp" data-fp="'+fpOf()+'">第 1 页 '+M.items[0].n+' → 第 3 页 '+M.items[2].n+'　指纹 '+fpOf()+'</b></div>'+
+  '<div><span>服务端判定</span><b>同一个标识、两份不同的有序输入 —— 冲突</b></div></div>'+
+  '<div class="state-p">顺序不同就是不同的输入：第 1 页和第 3 页换了位置，指纹跟着变了。</div></div>'+
+  '<div class="pgrp"><h4>你可以怎么办</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span><b>恢复上一次的顺序</b>，再用这个标识去查那一次的结果。</span></li>'+
+  '<li><span class="sq"></span><span>或者<b>换一个新的请求标识</b>，把现在这一批当成新的一次提交。</span></li>'+
+  '<li><span class="sq"></span><span>两条路都要你点一下 —— 本页不会替你选。</span></li></ul></div></div></section>'+
+  '<div class="ctabar"><button type="button" class="btn ghost press" data-act="new-key" style="flex:1">换一个新标识重新提交</button>'+
+  '<button type="button" class="btn primary press" style="flex:1.6" data-act="restore-order" data-testid="'+SCREEN+'-primary">恢复上一次的顺序</button></div>';
+};
+/* ================= 顶栏状态与顾问文案 ================= */
+var PILL={
+ 'empty':['','图片转 PDF · 最多 20 张'],
+ 'local-uploading':['','正在上传 · 结果未确认'],
+ 'usb-not-connected':['warn','U 盘来源 · 待接线'],
+ 'upload-format-rejected':['warn','有图片未能加入 · 格式'],
+ 'upload-too-large':['warn','有图片未能加入 · 大小'],
+ 'upload-failed':['bad','有图片没传上去'],
+ 'ready-one':['','1 / 20 张 · 可合成'],
+ 'ready-three':['','3 / 20 张 · 可合成'],
+ 'ready-selected-middle':['','已选中第 2 张'],
+ 'limit-reached-20':['warn','已达 20 张上限'],
+ 'source-unavailable':['bad','服务端取不到其中一张'],
+ 'source-expired':['warn','有图片的访问链接过期'],
+ 'total-input-too-large':['warn','这一批合计超过 40 MB'],
+ 'image-dimensions-invalid':['bad','有图片像素超出上限'],
+ 'output-too-large':['warn','合成结果超过 15 MB'],
+ 'merging':['','正在合成 · 无进度回传'],
+ 'conversion-in-progress':['warn','同标识的生成还在跑'],
+ 'completed-auth':['ok','PDF 已生成 · 已进我的文档'],
+ 'completed-anonymous':['warn','已生成 · 未登录不留存'],
+ 'output-preview-page2':['ok','逐页查看 · 第 2 页'],
+ 'output-preview-last':['ok','逐页查看 · 最后一页'],
+ 'output-preview-zoomed':['ok','逐页查看 · 放大'],
+ 'output-preview-failed':['warn','预览取不到 · 文件还在'],
+ 'known-failed':['bad','明确失败 · 可原样重试'],
+ 'result-unknown':['warn','结果未知 · 需同标识查询'],
+ 'retrying-same-request':['','正在用同一标识再查'],
+ 'recovered-completed':['ok','已恢复 · 没有生成第二份'],
+ 'idempotency-conflict':['bad','同标识、不同输入 · 冲突']
+};
+var ASK={
+ 'empty':['几张图，<em>拼成一份 PDF</em>。','只收 JPG / PNG，单张不超过 10 MB，一次最多 20 张。<b>先加第一张。</b>'],
+ 'local-uploading':['正在<em>传这一张</em>。','一次一张，没有进度百分比可显示。<b>传成功它才进列表。</b>'],
+ 'usb-not-connected':['U 盘来源<em>还没接进来</em>。','入口和边界都写清楚了，但 U 盘里的图片现在还回不到这个列表。<b>这里不伪造可用。</b>'],
+ 'upload-format-rejected':['这张<em>加不进来</em>。','只收 JPG / PNG。<b>它没进列表，顺序没被打乱。</b>'],
+ 'upload-too-large':['这张<em>太大了</em>。','单张 10 MB 以内。<b>它没进列表，顺序没被打乱。</b>'],
+ 'upload-failed':['这张<em>没传上去</em>。','没拿到服务端确认。<b>它没进列表，已有的两张还在。</b>'],
+ 'ready-one':['先<em>一张</em>也行。','一张图一页。还想加就继续加，最多 20 张。'],
+ 'ready-three':['顺序<em>你自己排</em>。','选中一张就能上移下移；<b>列表顺序就是 PDF 页序。</b>'],
+ 'ready-selected-middle':['选中了<em>第 2 张</em>。','现在上移、下移和移除只作用在它身上；旋转尚未接线。'],
+ 'limit-reached-20':['已经<em>20 张了</em>。','到上限了。想换一张，先选中列表里的某一张再移除。'],
+ 'source-unavailable':['服务端<em>取不到一张</em>。','它只说「不存在或已失效」。<b>我不替它猜原因，也不说文件被删了。</b>'],
+ 'source-expired':['第 3 张的<em>链接过期了</em>。','未登录时图片带的是有有效期的临时链接。<b>重新传这一张就行。</b>'],
+ 'total-input-too-large':['这一批<em>加起来太大</em>。','单张都没超，合计超了 40 MB。<b>一张都没转，顺序还在。</b>'],
+ 'image-dimensions-invalid':['第 2 张<em>像素太多</em>。','6000×5000 超过单张 2500 万像素。<b>整批都没转。</b>'],
+ 'output-too-large':['合出来的<em>太大了</em>。','输出超过 15 MB，服务端没留下这份 PDF。<b>分两批通常就能过。</b>'],
+ 'merging':['正在<em>合成</em>。','一次性请求，没有进度回传。<b>结果出来之前我不说做完了。</b>'],
+ 'conversion-in-progress':['上一次<em>还在跑</em>。','同一个标识下已经有一次在合成。<b>不新建请求，拿同一个标识再查。</b>'],
+ 'completed-auth':['<em>合好了</em>。','3 张图 3 页，页序和你排的一样，已经进「我的文档」。'],
+ 'completed-anonymous':['<em>合好了</em>。','但<b>没登录，这份不会进「我的文档」</b>，这一趟里直接接着走完打印。'],
+ 'output-preview-page2':['正在看<em>第 2 页</em>。','每一页显示的就是那一张原图，页码在下面的工具条上。'],
+ 'output-preview-last':['这是<em>最后一页</em>。','到底了，「下一页」已经停用并说明了原因。'],
+ 'output-preview-zoomed':['<em>放大</em>看细节。','按住画面拖动，四个角都能看到。'],
+ 'output-preview-failed':['预览<em>取不到</em>。','<b>只是看不了这一眼</b>：文件在、页数在、打印链接也在。'],
+ 'known-failed':['这次<em>明确失败</em>。','图片和顺序都还在，不用重传。<b>用同一个标识原样重试。</b>'],
+ 'result-unknown':['结果<em>不知道</em>。','回执没送到。<b>不能直接再发一次，得拿同一个标识去查。</b>'],
+ 'retrying-same-request':['正在<em>再查一次</em>。','同一个请求标识，没有新建请求。<b>这一屏不会自己变成完成。</b>'],
+ 'recovered-completed':['<em>找回来了</em>。','上一次其实成功了。<b>没有生成第二份，页序一模一样。</b>'],
+ 'idempotency-conflict':['这个标识<em>对不上</em>。','同一个标识，顺序变了就是另一批输入。<b>我停在这里，等你决定。</b>']
+};
+/* ================= 渲染 ================= */
+function render(st){
+ var root=document.getElementById('body-root');
+ ST=st;
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ root.innerHTML=(st==='empty'?'':fxBar())+V[st]();
+ var p=document.getElementById('pill');
+ p.className='pill'+(PILL[st][0]?' '+PILL[st][0]:'');
+ document.getElementById('pill-txt').textContent=PILL[st][1];
+ document.getElementById('pill-dot').className='dot'+((st==='merging'||st==='local-uploading'||st==='retrying-same-request')?' breathe':'');
+ document.getElementById('xq-ask').innerHTML=ASK[st][0];
+ document.getElementById('xq-doing').innerHTML=ASK[st][1];
+ var links=document.querySelectorAll('#demo-panel a');
+ for(var i=0;i<links.length;i++)links[i].className=(links[i].getAttribute('data-s')===st?'on':'');
+}
+/* 只重画主体（保留滚动位置以外的一切）；不导航、不改地址、不写任何存储。 */
+function rerender(){
+ var sc=document.querySelector('.lrows'),top=sc?sc.scrollTop:0;
+ render(ST);
+ var sc2=document.querySelector('.lrows');
+ if(sc2&&top)sc2.scrollTop=top;
+}
+/* ================= 本机操作（真实点击驱动，绝不用计时器推进业务状态） ================= */
+function pickState(){
+ var n=M.items.length;
+ if(n===0)return 'empty';
+ if(n===1)return 'ready-one';
+ if(n>=LIM.imgs)return 'limit-reached-20';
+ if(M.sel===1&&n===3)return 'ready-selected-middle';
+ return 'ready-three';
+}
+var EDITABLE={'ready-one':1,'ready-three':1,'ready-selected-middle':1,'limit-reached-20':1};
+function reflow(){
+ if(EDITABLE[ST]){var ns=pickState();if(ns!==ST){render(ns);return}}
+ rerender();
+}
+function actOn(act){
+ var m;
+ if(act==='add-local'){
+  if(M.items.length>=LIM.imgs)return;
+  render('local-uploading');return;
+ }
+ if(act==='cancel-upload'){render(M.items.length?pickState():'empty');return}
+ if((m=/^pick:(\d+)$/.exec(act))){
+  var i=parseInt(m[1],10);
+  M.sel=(M.sel===i?null:i);
+  reflow();return;
+ }
+ if((m=/^look:(\d+)$/.exec(act))){var li=parseInt(m[1],10);pvOpen('input',{index:li,rot:M.items[li].rot});return}
+ if(act==='open-out'){pvOpen('output',{page:1});return}
+ if((m=/^open-out:(\d+)$/.exec(act))){pvOpen('output',{page:parseInt(m[1],10)});return}
+ if(act==='up'||act==='down'){
+  if(M.sel===null)return;
+  var d=act==='up'?-1:1,t=M.sel+d;
+  if(t<0||t>=M.items.length)return;
+  var tmp=M.items[M.sel];M.items[M.sel]=M.items[t];M.items[t]=tmp;M.sel=t;
+  reflow();return;
+ }
+ if(act==='rot'){
+  if(M.sel===null)return;
+  M.items[M.sel].rot=(M.items[M.sel].rot+90)%360;
+  reflow();return;
+ }
+ if(act==='del'){
+  if(M.sel===null)return;
+  M.items.splice(M.sel,1);
+  M.sel=null;
+  if(!M.items.length){render('empty');return}
+  reflow();return;
+ }
+ if(act==='convert'){render('merging');return}
+ if(act==='recheck'){render('retrying-same-request');return}
+ if(act==='recovered'){initModel('recovered-completed');render('recovered-completed');return}
+ if(act==='restore-order'){
+  var t2=M.items[0];M.items[0]=M.items[2];M.items[2]=t2;M.sel=null;
+  render('retrying-same-request');return;
+ }
+ if(act==='new-key'){M.req='CV-20260830-0931-2B9E';M.sel=null;render('merging');return}
+}
+document.getElementById('body-root').addEventListener('click',function(e){
+ var el=e.target.closest?e.target.closest('[data-act]'):null;
+ if(!el)return;
+ if(el.getAttribute('aria-disabled')==='true'){e.preventDefault();return}
+ e.preventDefault();
+ actOn(el.getAttribute('data-act'));
+});
+/* ================= 完整预览：输入原图 / 输出 PDF =================
+   同一 HTML 宿主内的 near-full-stage 模态。不导航、不改地址、不写任何存储，
+   所以关掉之后列表、选中项、排序和旋转原样还在。
+   这里没有解析任何 PDF、也没有解码任何图片：画面是把同一张固定原型图按 A4 摆进去，
+   证明的是产品合同与版面，不是渲染引擎，也不是签名预览链接。 */
+var PV_STEPS=[0.5,0.75,1,1.25,1.5,2,3];
+var PV_PAD=16;
+var PV_INERT=['.topbar','.xq','#body-root','.truth','.navbar'];
+var pv=null,pvEl=null,pvView=null,pvBack=null,STAGE_SCALE=1;
+function pvGeom(){
+ var d=pv.doc,vw=pvView.clientWidth,vh=pvView.clientHeight;
+ var q=(pv.rot%180)!==0,nw=q?d.h:d.w,nh=q?d.w:d.h;
+ var availW=Math.max(1,vw-PV_PAD*2),availH=Math.max(1,vh-PV_PAD*2);
+ var fitPage=Math.min(availW/nw,availH/nh),fitWidth=availW/nw;
+ var scale=pv.mode==='fit-page'?fitPage:(pv.mode==='fit-width'?fitWidth:pv.zoom);
+ return {vw:vw,vh:vh,nw:nw,nh:nh,fitPage:fitPage,fitWidth:fitWidth,scale:scale};
+}
+function pvLayout(anchor){
+ var g=pvGeom(),d=pv.doc;
+ var bw=Math.round(d.w*g.scale),bh=Math.round(d.h*g.scale);
+ var q=(pv.rot%180)!==0,ow=q?bh:bw,oh=q?bw:bh;
+ var sceneW=Math.max(g.vw,ow+PV_PAD*2),sceneH=Math.max(g.vh,oh+PV_PAD*2);
+ var scene=pvEl.querySelector('.pv-scene'),page=pvEl.querySelector('.pv-page'),paper=pvEl.querySelector('.pv-paper');
+ scene.style.width=sceneW+'px';scene.style.height=sceneH+'px';
+ page.style.width=bw+'px';page.style.height=bh+'px';
+ page.style.transform='translate(-50%,-50%) rotate('+pv.rot+'deg)';
+ paper.style.width=d.w+'px';paper.style.height=d.h+'px';paper.style.transform='scale('+(bw/d.w)+')';
+ pvView.scrollLeft=Math.max(0,(sceneW-g.vw)/2);
+ pvView.scrollTop=anchor==='top'?0:Math.max(0,(sceneH-g.vh)/2);
+ pvBar(g);
+}
+function pvPct(g){return Math.round(g.scale*100)+'%'}
+function pvQ(t){return pvEl.querySelector('[data-testid="'+SCREEN+'-preview-'+t+'"]')}
+function pvNextStep(dir,cur){
+ var i;
+ if(dir>0){for(i=0;i<PV_STEPS.length;i++)if(PV_STEPS[i]>cur+0.005)return PV_STEPS[i];return null}
+ for(i=PV_STEPS.length-1;i>=0;i--)if(PV_STEPS[i]<cur-0.005)return PV_STEPS[i];
+ return null;
+}
+/* 只在值真的变了才写 DOM：反复把同一个字符串 / 同一个 class 写回去，只会让浏览器一次次重画同一个圆角框。 */
+function setTxt(el,v){if(el&&el.textContent!==v)el.textContent=v}
+function setAttr(el,k,v){if(el&&el.getAttribute(k)!==v)el.setAttribute(k,v)}
+function setCls(el,v){if(el&&el.className!==v)el.className=v}
+function pvBar(g){
+ var d=pv.doc,multi=d.pages>1,reason='';
+ if(multi){
+  var prev=pvQ('prev'),next=pvQ('next');
+  var atFirst=pv.page<=1,atLast=pv.page>=d.pages;
+  setAttr(prev,'aria-disabled',atFirst?'true':'false');
+  setAttr(next,'aria-disabled',atLast?'true':'false');
+  setTxt(pvQ('pageinfo'),'第 '+pv.page+' 页 / 共 '+d.pages+' 页');
+  setTxt(pvQ('srcinfo'),'这一页来自 '+d.srcNames[pv.page-1]);
+  if(atFirst)reason='已经是第 1 页，没有上一页。';
+  if(atLast)reason='已经是最后一页，后面没有了。';
+ }
+ var zin=pvQ('zoom-in'),zout=pvQ('zoom-out');
+ var canIn=pvNextStep(1,g.scale)!==null,canOut=pvNextStep(-1,g.scale)!==null;
+ setAttr(zin,'aria-disabled',canIn?'false':'true');
+ setAttr(zout,'aria-disabled',canOut?'false':'true');
+ if(!canIn)reason='已经放到最大，'+pvPct(g)+' 到顶了。';
+ if(!canOut)reason='已经缩到最小，'+pvPct(g)+' 到底了。';
+ setTxt(pvQ('zoominfo'),(pv.mode==='fit-page'?'整页 ':(pv.mode==='fit-width'?'适宽 ':''))+pvPct(g));
+ var fp=pvQ('fit-page'),fw=pvQ('fit-width');
+ setAttr(fp,'aria-pressed',pv.mode==='fit-page'?'true':'false');
+ setCls(fp,'pvb wide'+(pv.mode==='fit-page'?' on':''));
+ setAttr(fw,'aria-pressed',pv.mode==='fit-width'?'true':'false');
+ setCls(fw,'pvb wide'+(pv.mode==='fit-width'?' on':''));
+ setAttr(pvQ('rotate'),'aria-label','把画面再转 90 度（当前 '+pv.rot+' 度）');
+ var canX=pvView.scrollWidth-pvView.clientWidth>1,canY=pvView.scrollHeight-pvView.clientHeight>1;
+ var pan=canX&&canY?'按住画面拖动可以看到上下左右和四个角。'
+  :canY?'按住画面上下拖动可以看到其余部分。'
+  :canX?'按住画面左右拖动可以看到其余部分。'
+  :'整幅都在屏幕里，四边都看得见。';
+ setTxt(pvQ('reason'),reason||('当前 '+pvPct(g)+'；'+pan));
+}
+function pvSetPage(no){
+ if(no<1||no>pv.doc.pages)return;
+ pv.page=no;
+ pvEl.querySelector('.pv-paper').innerHTML=pvPaperInner();
+ pvLayout(pv.mode==='fit-width'?'top':'center');
+}
+function pvPaperInner(){
+ var d=pv.doc;
+ if(d.kind==='input')return '<img class="pp-img" data-testid="'+SCREEN+'-preview-img" src="'+d.src+'" alt="'+d.n+' 的完整画面（固定原型图）">';
+ return '<img class="pp-img" data-testid="'+SCREEN+'-preview-img" src="'+d.srcs[pv.page-1]+'" alt="第 '+pv.page+' 页，来自 '+d.srcNames[pv.page-1]+'（固定原型图）">';
+}
+function pvBtn(tid,label,al,cls){
+ return '<button type="button" class="pvb'+(cls?' '+cls:'')+' press" data-testid="'+SCREEN+'-preview-'+tid+'" aria-label="'+(al||label)+'">'+label+'</button>';
+}
+function pvFixtureBar(){
+ return '<div class="pv-fx" data-testid="'+SCREEN+'-preview-fixture" role="note"><span class="fx-b">演示</span>'+
+  '<span>固定原型数据 / 演示图片，<b>不是真实用户文件</b>。这幅画面写死在原型里，不是接口返回值，也不是这台机器此刻真读到的内容。</span></div>';
+}
+/* 预览失败：还是同一个阅读器 —— 纸的位置、页数、文件事实和退出口都在原位，
+   只有"这一页画什么"取不到。绝不改写成果文件的状态，也不假装看到了内容。 */
+function pvFailCard(){
+ var o=M.out;
+ return '<div class="pvf-note" data-testid="'+SCREEN+'-preview-state" data-kind="unavailable">'+
+  '<div class="state-h">'+svg('warn','currentColor',28)+'<span>这份 PDF 暂时看不了预览</span></div>'+
+  '<div class="state-p">预览要向服务端另取一份用来看的内容，<b>刚才这一次没取到</b> —— 可能是这台机器到服务端的网络断了，也可能是预览服务正忙。<b>取不到的只是预览这一件事。</b></div></div>'+
+  '<div class="pvf-stage"><div class="pvf-paper" role="img" aria-label="预览位置：这份 PDF 共 '+o.pages+' 页，页面内容这一次没有取到，文件本身没有失败也没有丢">'+
+  '<div class="pl"><span class="pi">'+svg('warn','currentColor',42)+'</span>'+
+  '<b>这一页的内容没取到</b>'+
+  '<span class="ps">纸和页数都在原位，只是<b>画不出这一页</b>。<br>这里不放上一次的画面，也不拿别的内容顶替。</span></div>'+
+  '<span class="pn">共 '+o.pages+' 页 · 页序与你排的顺序一致</span></div></div>'+
+  '<div class="pvf-foot">'+
+  '<div class="pvf-card keep"><h4>'+svg('check','currentColor',24)+'文件本身没事</h4><div class="kv">'+
+  '<div><span>这份文件</span><b>'+o.n+'</b></div>'+
+  '<div><span>页数 / 大小</span><b>'+o.pages+' 页 · '+o.mb.toFixed(1)+' MB</b></div>'+
+  '<div><span>状态</span><b>已经生成，没有失败、没有丢</b></div>'+
+  '<div><span>打印链接</span><b>打印用的临时链接照样有效，'+o.ttl+' 分钟内可用</b></div></div></div>'+
+  '<div class="pvf-card"><h4>现在可以怎么办</h4><ul class="plan">'+
+  '<li><span class="sq"></span><span>关掉预览，这一屏和这份 PDF 原样还在。</span></li>'+
+  '<li><span class="sq"></span><span>过一会儿再打开一次，本机会重新取一次预览内容。</span></li>'+
+  '<li><span class="sq"></span><span>不想等就直接进下一步打印 —— 打印用的是文件本身，不是预览。</span></li></ul></div></div>';
+}
+function pvBuild(){
+ var d=pv.doc,fail=pv.fail;
+ var head='<header class="pv-head">'+
+  '<span class="pv-ic'+(fail?' warn':'')+'">'+svg(fail?'warn':(d.kind==='input'?'img':'pdf'),'currentColor',32)+'</span>'+
+  '<span class="pv-hm"><span class="pv-t" id="pv-title" data-testid="'+SCREEN+'-preview-name">'+d.n+'</span>'+
+  '<span class="pv-s" data-testid="'+SCREEN+'-preview-meta">'+d.sub+'</span></span>'+
+  '<button type="button" class="pv-close press" data-testid="'+SCREEN+'-preview-close" aria-label="关闭预览，回到刚才那一屏">'+
+  svg('x','currentColor',25)+'<span>关闭</span></button></header>';
+ var body,bar;
+ if(fail){
+  body='<div class="pv-view still pvfail" data-testid="'+SCREEN+'-preview-canvas">'+pvFailCard()+'</div>';
+  bar='<div class="pv-bar" data-testid="'+SCREEN+'-preview-toolbar">'+
+   '<div class="pv-row"><span class="pv-info" data-testid="'+SCREEN+'-preview-zoominfo">预览内容没取到 · 文件已生成且仍然有效</span>'+
+   pvBtn('close-2','知道了，回上一屏','关闭预览，回到刚才那一屏','wide')+'</div>'+
+   '<div class="pv-reason" data-testid="'+SCREEN+'-preview-reason">取不到预览内容，所以这里没有页码、缩放和旋转。</div></div>';
+ }else{
+  body='<div class="pv-view" data-testid="'+SCREEN+'-preview-viewport" tabindex="0" aria-label="预览区，可以拖动查看整幅画面">'+
+   '<div class="pv-scene" data-testid="'+SCREEN+'-preview-scene">'+
+   '<div class="pv-page" data-testid="'+SCREEN+'-preview-page"><div class="pv-paper">'+pvPaperInner()+'</div></div></div></div>';
+  var rowA=d.pages>1
+   ? '<div class="pv-row">'+pvBtn('prev','‹ 上一页','看上一页','wide')+
+     '<span class="pv-info" data-testid="'+SCREEN+'-preview-pageinfo">第 '+pv.page+' 页 / 共 '+d.pages+' 页</span>'+
+     pvBtn('next','下一页 ›','看下一页','wide')+'</div>'+
+     '<div class="pv-row" style="height:auto"><span class="pv-reason" data-testid="'+SCREEN+'-preview-srcinfo">这一页来自 '+d.srcNames[pv.page-1]+'</span></div>'
+   : '<div class="pv-row"><span class="pv-info" data-testid="'+SCREEN+'-preview-pageinfo">单张图片 · 共 1 幅</span>'+
+     '<span class="pv-info" data-testid="'+SCREEN+'-preview-srcinfo">'+d.dim+'</span></div>';
+  bar='<div class="pv-bar" data-testid="'+SCREEN+'-preview-toolbar">'+rowA+
+   '<div class="pv-row">'+pvBtn('fit-page','适应整页','整幅显示，四边都看得见','wide')+
+   pvBtn('fit-width','适应宽度','按宽度铺满，上下拖动看','wide')+
+   pvBtn('zoom-out','缩小 −','缩小')+
+   '<span class="pv-info" data-testid="'+SCREEN+'-preview-zoominfo">整页</span>'+
+   pvBtn('zoom-in','放大 ＋','放大')+
+   pvBtn('rotate','旋转 90°','把画面再转 90 度')+'</div>'+
+   '<div class="pv-reason" data-testid="'+SCREEN+'-preview-reason"></div></div>';
+ }
+ pvEl.innerHTML='<div class="pv-box">'+head+pvFixtureBar()+body+bar+'</div>';
+ pvView=pvEl.querySelector('.pv-view');
+ pvWire(fail);
+ if(!fail)pvLayout(pv.mode==='fit-width'?'top':'center');
+ var close=pvQ('close');
+ if(close)close.focus();
+}
+function pvWire(flatMode){
+ var on=function(tid,fn){var el=pvQ(tid);if(el)el.addEventListener('click',function(e){e.preventDefault();fn(el)})};
+ on('close',function(){pvClose()});
+ on('close-2',function(){pvClose()});
+ if(flatMode)return;
+ on('prev',function(el){if(el.getAttribute('aria-disabled')!=='true')pvSetPage(pv.page-1)});
+ on('next',function(el){if(el.getAttribute('aria-disabled')!=='true')pvSetPage(pv.page+1)});
+ on('fit-page',function(){pv.mode='fit-page';pvLayout('center')});
+ on('fit-width',function(){pv.mode='fit-width';pvLayout('top')});
+ on('zoom-in',function(el){if(el.getAttribute('aria-disabled')==='true')return;var n=pvNextStep(1,pvGeom().scale);if(n!==null){pv.mode='zoom';pv.zoom=n;pvLayout('center')}});
+ on('zoom-out',function(el){if(el.getAttribute('aria-disabled')==='true')return;var n=pvNextStep(-1,pvGeom().scale);if(n!==null){pv.mode='zoom';pv.zoom=n;pvLayout('center')}});
+ on('rotate',function(){pv.rot=(pv.rot+90)%360;pvLayout('center')});
+ /* 拖动平移：指针事件同时覆盖鼠标与触控；除以舞台缩放，保证 1:1 跟手。 */
+ var drag=null;
+ pvView.addEventListener('pointerdown',function(e){
+  if(e.target.closest&&e.target.closest('button'))return;
+  drag={x:e.clientX,y:e.clientY,l:pvView.scrollLeft,t:pvView.scrollTop,id:e.pointerId};
+  pvView.classList.add('grabbing');
+  var pts=(pvView.getAttribute('data-pointer')||'').split(',').filter(Boolean);
+  if(pts.indexOf(e.pointerType||'')<0)pts.push(e.pointerType||'');
+  pvView.setAttribute('data-pointer',pts.join(','));
+  try{pvView.setPointerCapture(e.pointerId)}catch(err){}
+ });
+ pvView.addEventListener('pointermove',function(e){
+  if(!drag||e.pointerId!==drag.id)return;
+  pvView.scrollLeft=drag.l-(e.clientX-drag.x)/STAGE_SCALE;
+  pvView.scrollTop=drag.t-(e.clientY-drag.y)/STAGE_SCALE;
+  e.preventDefault();
+ });
+ var end=function(e){
+  if(!drag||(e&&e.pointerId!==drag.id))return;
+  drag=null;pvView.classList.remove('grabbing');
+ };
+ pvView.addEventListener('dragstart',function(e){e.preventDefault()});
+ pvView.addEventListener('pointerup',end);
+ pvView.addEventListener('pointercancel',end);
+}
+function pvInert(on){
+ var i,el,extra=document.querySelectorAll('[data-proto-control]');
+ for(i=0;i<PV_INERT.length;i++){
+  el=document.querySelector(PV_INERT[i]);
+  if(!el)continue;
+  if(on){el.setAttribute('inert','');el.setAttribute('aria-hidden','true')}
+  else{el.removeAttribute('inert');el.removeAttribute('aria-hidden')}
+ }
+ for(i=0;i<extra.length;i++){if(on)extra[i].setAttribute('inert','');else extra[i].removeAttribute('inert')}
+}
+function pvKey(e){
+ if(!pv)return;
+ if(e.key==='Escape'){e.preventDefault();pvClose();return}
+ if(e.key!=='Tab')return;
+ var f=[].slice.call(pvEl.querySelectorAll('button,[tabindex]:not([tabindex="-1"])'));
+ if(!f.length)return;
+ var first=f[0],last=f[f.length-1];
+ if(e.shiftKey&&(document.activeElement===first||!pvEl.contains(document.activeElement))){e.preventDefault();last.focus()}
+ else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+}
+function inputDoc(i){
+ var it=M.items[i];
+ return {kind:'input',n:it.n,sub:szText(it)+' · 待合并的第 '+(i+1)+' 张'+(it.rot?' · 本机已转 '+it.rot+'°':'')+' · 本页不改动原图',dim:it.w+'×'+it.h+' 像素',
+  w:it.w,h:it.h,pages:1,src:fxSrc(it.f)};
+}
+function outputDoc(){
+ var srcs=[],names=[],i;
+ for(i=0;i<M.items.length;i++){srcs.push(fxSrc(M.items[i].f));names.push(M.items[i].n)}
+ return {kind:'output',n:M.out.n,sub:M.out.pages+' 页 · '+M.out.mb.toFixed(1)+' MB · 一张图一页 · A4 居中不裁切',
+  w:1240,h:1754,pages:M.out.pages,srcs:srcs,srcNames:names};
+}
+function pvOpen(which,opt){
+ if(pv)return;
+ if(!FIXTURE_OK)return;
+ opt=opt||{};
+ var d=which==='input'?inputDoc(opt.index):outputDoc();
+ pv={doc:d,page:opt.page||1,mode:'fit-page',zoom:1,rot:0,fail:!!opt.fail,kind:which};
+ if(opt.mode==='fit-width')pv.mode='fit-width';
+ if(opt.mode==='zoom'){pv.mode='zoom';pv.zoom=2}
+ if(opt.rot)pv.rot=opt.rot;
+ pvBack=document.activeElement;
+ pvEl=document.createElement('div');
+ pvEl.className='pv';pvEl.id='pv';
+ pvEl.setAttribute('role','dialog');pvEl.setAttribute('aria-modal','true');
+ pvEl.setAttribute('aria-labelledby','pv-title');
+ pvEl.setAttribute('data-testid',SCREEN+'-preview');
+ pvEl.setAttribute('data-kind',which);
+ document.getElementById('stage').appendChild(pvEl);
+ pvInert(true);
+ pvBuild();
+ if(opt.instant)pvEl.classList.add('pv-in');
+ else requestAnimationFrame(function(){if(pvEl)pvEl.classList.add('pv-in')});
+ document.addEventListener('keydown',pvKey);
+}
+function pvClose(){
+ if(!pv)return;
+ document.removeEventListener('keydown',pvKey);
+ pvInert(false);
+ if(pvEl&&pvEl.parentNode)pvEl.parentNode.removeChild(pvEl);
+ pvEl=null;pvView=null;pv=null;
+ if(pvBack&&document.contains(pvBack))pvBack.focus();
+ pvBack=null;
+}
+/* ================= 启动：状态解析与 fail-closed ================= */
+(function boot(){
+ var raw=Q.get('state'),st;
+ if(raw&&ALIAS[raw])raw=ALIAS[raw];
+ if(!raw)st='empty';
+ else if(STATES.indexOf(raw)<0)st='empty';        /* 认不出来就不猜，也不回显 */
+ else if(raw!=='empty'&&raw!=='usb-not-connected'&&!FIXTURE_OK)st='empty';   /* 普通产品地址买不到固定图片、文件名、结果或请求标识 */
+ else st=raw;
+ initModel(st);
+ render(st);
+ /* 原型演示控制：普通地址完全不渲染，只有 ?debug=1 才注入。 */
+ if(DEBUG){
+  document.documentElement.classList.add('debug');
+  var tab=document.createElement('button');
+  tab.type='button';tab.className='demo-tab';tab.id='demo-tab';
+  tab.setAttribute('aria-label','打开原型演示控制面板');
+  tab.setAttribute('data-proto-control','true');
+  tab.textContent='演示';
+  var panel=document.createElement('div');
+  panel.className='demo-panel';panel.id='demo-panel';
+  panel.setAttribute('aria-label','原型演示控制');
+  panel.setAttribute('data-proto-control','true');
+  var keep='&debug=1'+(CAPTURE?'&capture=1':'')+(FLAT?'&flat=1':'');
+  var h='<div class="dp-t">业务状态</div>',i;
+  for(i=0;i<STATES.length;i++)h+='<a href="?state='+STATES[i]+keep+'" data-s="'+STATES[i]+'">'+STATES[i]+'</a>';
+  panel.innerHTML=h;
+  var stage=document.getElementById('stage');
+  stage.appendChild(tab);stage.appendChild(panel);
+  tab.addEventListener('click',function(){panel.classList.toggle('show')});
+  var links=panel.querySelectorAll('a');
+  for(i=0;i<links.length;i++)links[i].className=(links[i].getAttribute('data-s')===st?'on':'');
+ }
+ /* 地址直达的输出预览一开始就是打开的，所以不做入场过渡。 */
+ if(FIXTURE_OK&&M.out){
+  if(st==='output-preview-page2')pvOpen('output',{page:2,instant:true});
+  else if(st==='output-preview-last')pvOpen('output',{page:M.out.pages,instant:true});
+  else if(st==='output-preview-zoomed')pvOpen('output',{page:1,mode:'zoom',instant:true});
+  else if(st==='output-preview-failed')pvOpen('output',{fail:true,instant:true});
+ }
+})();
+/* 时钟：只刷新顶栏时间文本，不改 data-state、不推进任何业务状态。 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){
+ STAGE_SCALE=Math.min(innerWidth/1080,innerHeight/1920);
+ document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+STAGE_SCALE+')';
+}
+fit();addEventListener('resize',fit);
+if(FLAT)document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

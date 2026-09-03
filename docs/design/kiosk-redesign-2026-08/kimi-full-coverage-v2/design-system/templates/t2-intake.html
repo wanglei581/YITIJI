@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>模板 T2 · 采集型 ｜ 青序流光 v2</title>
+<link rel="stylesheet" href="../kiosk-tokens.css">
+<link rel="stylesheet" href="../kiosk-components.css">
+<style>html,body{margin:0}</style>
+</head>
+<body>
+<!--
+route: /print/upload（示例；同源适用 /resume/source、/scan/start）
+state: 本模板只示范 normal 与隐藏的 failed 结构；uploading/relay-waiting 由真实宿主按请求和 upload-session 状态另行实现
+api: POST /api/v1/files/kiosk-upload → `{ fileId, filename, sizeBytes, mimeType, sha256, signedUrl, signedUrlExpiresAt, fileExpiresAt }`；POST /api/v1/upload-sessions → `{ sessionId, uploadUrl, uploadToken, controlToken, expiresAt }`，二维码内容由前端使用 `uploadUrl + sessionId + uploadToken` 构造，接口不返回 `qrCodeUrl`
+fallback: 上传通道不可用 → 该通道卡显示锁定态 + 原因常驻，其余通道保留
+-->
+<div id="viewport">
+<main id="stage" data-screen="t2" data-state="normal" data-testid="t2-state-normal">
+  <header class="k-topbar">
+    <a class="back" href="../../../10-print-hub.html" aria-label="返回打印扫描服务">←</a>
+    <span class="title">上传文件</span><span class="spacer"></span>
+  </header>
+
+  <section class="k-xiaoqing">
+    <span class="core">青</span>
+    <div><p class="q">文件<em>在哪里</em>？</p><p class="hint">支持 PDF / JPG / PNG，Word 暂不可直接打印</p></div>
+  </section>
+
+  <div class="k-scroll">
+    <section class="k-sec">
+      <div class="k-sec-head"><span class="no">01</span><h2>选择来源</h2></div>
+      <button class="k-card k-entry" type="button" data-testid="t2-primary">
+        <span class="icon"><!-- lucide: smartphone --></span>
+        <div class="txt"><p class="name">手机扫码传</p><p class="desc">用微信扫一扫，从手机选文件</p></div>
+      </button>
+      <button class="k-card k-entry" type="button">
+        <span class="icon" data-tone="clay"><!-- lucide: usb --></span>
+        <div class="txt"><p class="name">U 盘导入</p><p class="desc">仅在本终端检测到可用 U 盘通道时开放</p></div>
+      </button>
+      <a class="k-card k-entry" href="../../../18-scan-workbench.html">
+        <span class="icon" data-tone="sage"><!-- lucide: scan --></span>
+        <div class="txt"><p class="name">扫描纸质原件</p><p class="desc">按页面指引在奔图操作面板手动扫描，等待文件回传</p></div>
+      </a>
+    </section>
+
+    <!-- 失败态示例：格式不支持，诚实说明 + 去向 -->
+    <section class="k-sec" data-testid="t2-fallback" hidden>
+      <div class="k-state" data-kind="error">
+        <span class="ic">!</span>
+        <p class="t">这个格式暂时打不开</p>
+        <p class="d">Word 文档请先在手机上转成 PDF 再传；图片请用 JPG / PNG。</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="k-cta-bar">
+    <span class="grow"></span>
+    <a class="k-btn" data-kind="secondary" href="../../../10-print-hub.html">取消</a>
+  </div>
+  <nav class="k-navbar" aria-label="主导航"><a href="../../../01-home.html">首页</a><a href="../../../05-ai-cockpit.html">问小青</a><a href="../../../30-my-profile.html">我的</a></nav>
+</main>
+</div>
+</body>
+</html>

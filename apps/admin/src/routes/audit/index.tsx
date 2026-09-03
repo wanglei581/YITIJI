@@ -31,6 +31,10 @@ const ACTION_LABELS: Record<string, string> = {
   'user.disable':             '用户停用',
   'system.login':             '登录',
   'system.config_change':     '系统配置变更',
+  'alert.acknowledge':        '确认告警',
+  'alert.silence':            '静默告警',
+  'alert.close':              '关闭告警',
+  'alert.reopen':             '重新打开告警',
 }
 
 // 筛选下拉常用动作(全部为查询用,空 = 不筛选)

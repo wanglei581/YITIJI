@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>收银台 · 支付状态版式 ｜ 职易达</title>
+<!--
+  route: /print/cashier（历史六态版式页，不是收银台真值页）
+  当前生产页面：32-cashier.html —— 真实收银台状态机（通道选择、屏上收款码 / 付款码、惰性过期、退款等更大状态集）。
+  本页只保留「支付阶段版式」六态，用于版面走查与状态排版对照；任何支付判定都以收银台与服务端为准。
+  用户可见文案里不得出现「宿主」「32 号」等原型编号与内部实现词，一律写成「收银台」。
+  state: pending | confirming | paid | expired | reconciling | closed
+  api（真值定义，本页一律不调用）:
+       POST /api/v1/orders/:id/pay           → { attemptId, channel, status, qrCodeContent, expiresAt }
+       GET  /api/v1/orders/:id/pay-status    → { orderId, payStatus, latestAttempt }
+       POST /api/v1/orders/:id/pay/reconcile → 主动查单（回调丢失兜底，与回调同一条幂等入账路径）
+       GET  /api/v1/print/price-config       → { billingEnabled, items }
+  真话边界（本批次修复要点）：
+    ① 不写任何金额、订单号、支付方式、页数份数、倒计时与到账结论；全部渲染成「接口回填」结构位。
+    ② 收款码是**明确不可扫描的占位块**，不画二维码图样；真实收款码由 qrCodeContent 实时渲染。
+    ③ paid 只是版式示例，不代表任何真实支付结果，也不构成支付凭证。
+    ④ 不声称「未扣款 / 不会重复扣款 / 加密传输 / 付完自动出纸」；是否扣款、是否出纸都以支付平台账单与服务端返回为准。
+    ⑤ 六个状态全部有可点的返回路径与「联系工作人员」实体出口，不留死按钮。
+  原型演示控制：仅用 ?state= 切换；?debug=1 才显示演示面板；?fallback=1 演示 pending 的通道降级块。
+  验收范围：静态版式；不证明支付通道、金额、订单、出纸或退款可用。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','SimSun',serif;
+  --sans:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:var(--sans);color:var(--ink);overflow:hidden}
+a{text-decoration:none;color:inherit}button{font:inherit;color:inherit;border:0;background:none}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.press{transition:transform 140ms var(--ease),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;transform-origin:center center;
+  background:radial-gradient(900px 400px at 85% 8%,rgba(31,158,134,.06),transparent 60%),
+             radial-gradient(800px 500px at -5% 55%,rgba(184,104,60,.04),transparent 55%),var(--paper)}
+.serif{font-family:var(--serif)}
+
+/* ---------- 顶栏（同 10/15/30） ---------- */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:grid;place-items:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:grid;place-items:center;font-size:24px;font-weight:800}
+.logo-name{font-size:26px;font-weight:800;letter-spacing:2px}
+.sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:54px;padding:0 22px;border-radius:27px;font-size:19px;font-weight:700;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2)}
+.pill[data-tone=clay]{background:var(--clay-soft);border-color:transparent;color:var(--clay-d)}
+.pill[data-tone=teal]{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.pill[data-tone=slate]{background:var(--slate-soft);border-color:transparent;color:var(--slate-d)}
+.pill[data-tone=cinnabar]{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:currentColor;flex:none}
+.pill .dot.breathe{animation:breathe 2.4s var(--ease) infinite}
+@keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
+.clock{flex:none;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ---------- 任务意图带（同 10/15） ---------- */
+.xq{flex:none;margin:22px 42px 0;padding:28px 38px;border-radius:36px;background:linear-gradient(158deg,var(--deep-2),var(--deep));color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-150px;top:-150px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.15),transparent 66%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{flex:none;width:92px;height:92px;border-radius:50%;display:grid;place-items:center;border:1.5px solid rgba(46,230,168,.4);background:rgba(46,230,168,.1);color:var(--emerald);font-size:42px}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:17px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:8px}
+.xq-ask{font-size:38px;line-height:1.3;font-weight:800;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:9px;font-size:20px;line-height:1.5;color:rgba(242,239,228,.74)}
+.xq-doing b{color:#fff;font-weight:700}
+
+/* ---------- 主体网格 ---------- */
+.body{flex:1;min-height:0;padding:20px 42px 16px;display:grid;gap:14px;overflow:hidden;grid-template-rows:auto minmax(0,1fr) auto auto}
+.fixture{display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:16px;background:var(--wheat-soft);color:var(--wheat-d);font-size:17px;font-weight:750;line-height:1.4}
+.fixture svg{width:22px;height:22px;flex:none}
+.paygrid{min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.paycol{min-height:0;display:grid;gap:14px;grid-template-rows:auto minmax(0,1fr)}
+/* 尾块是「说明 / 降级提示」而不是主结构时，把 1fr 留给上面的主卡片，
+   提示条按自身高度贴在列底，避免整块提示被拉高后文字浮在顶部、下面全空。 */
+.paycol.tail-note{grid-template-rows:minmax(0,1fr) auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:24px 26px;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.card-h{flex:none;display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.card-h .t{font-size:25px;font-weight:800}
+.card-h .hint{margin-left:auto;font-size:17px;font-weight:700;color:var(--ink-3)}
+/* 失效印记放在卡头自己的位置上，不压在标题或说明文字上；标题右侧的 hint 仍然靠 margin-left:auto 推到最右 */
+.card-h .qrstamp{margin-left:12px}
+.card-p{margin-top:auto;padding-top:14px;font-size:17px;line-height:1.5;color:var(--ink-3)}
+.card-p b{color:var(--ink-2)}
+
+/* 接口回填结构位 */
+.slot{display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border-radius:10px;border:1px dashed var(--line-2);background:var(--paper);color:var(--ink-3);font-size:17px;font-weight:700}
+/* 金额块是这张卡的焦点：卡片被列高拉长时由它吃掉多余高度（有上限），字段表保持自己的节奏。 */
+.amount{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:104px;max-height:280px;border-radius:18px;background:var(--paper);border:1px dashed var(--line-2)}
+.amount .slot{border:0;background:none;font-size:26px;font-weight:800;color:var(--ink-2)}
+/* 字段表按自己的行距排：不再用剩余高度把字段之间撑成 130px 的空档。
+   卡片里多出来的高度交给上方的焦点块（金额 / 收款码 / 结果面板），不摊到字段行之间。 */
+.kv{list-style:none;margin-top:16px;flex:none;display:flex;flex-direction:column;gap:10px}
+.kv li{flex:none;display:flex;align-items:center;gap:14px;min-height:56px;font-size:19px;color:var(--ink-2)}
+.kv li+li{border-top:1px dashed var(--line);padding-top:10px}
+.kv li>span:first-child{flex:none;min-width:140px;color:var(--ink-3);font-weight:700}
+.kv li .slot{margin-left:auto}
+
+/* 收款码占位（明确不可扫描，不画二维码图样） */
+.qrslot{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:26px 20px;border-radius:20px;border:2px dashed var(--line-2);background:var(--paper);text-align:center;position:relative}
+.qrslot svg{width:76px;height:76px;color:var(--ink-3)}
+.qrslot b{font-size:24px;font-weight:800;color:var(--ink-2)}
+.qrslot span{max-width:360px;font-size:17px;line-height:1.55;color:var(--ink-3)}
+.qrslot u{text-decoration:none;color:var(--cinnabar-d);font-weight:800}
+.qrslot.off{background:#efeade;border-color:#ddd8c8}
+/* 失效印记：不再绝对定位、不再旋转压字。它只出现在卡头自己的位置上，
+   下面的占位块文字（含「不生成可扫码内容」这句合规文案）任何时候都完整可读。 */
+.qrstamp{display:inline-flex;align-items:center;padding:6px 16px;border:2.5px solid var(--clay);border-radius:12px;
+  color:var(--clay-d);font-size:19px;font-weight:800;letter-spacing:4px;background:var(--clay-soft)}
+
+/* 步骤结构 */
+.steps{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;gap:4px}
+.step{flex:1 1 auto;display:flex;gap:16px;align-items:center;padding:15px 0;min-height:96px;max-height:150px}
+.step+.step{border-top:1px dashed var(--line)}
+.step-ic{flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-size:21px;font-weight:800;background:var(--paper);color:var(--ink-3);border:1px solid var(--line-2)}
+.step-main{flex:1;min-width:0}
+/* 和 .act-t / .act-d 一样必须是块级：这两个是 <span>，漏掉 display:block 时标题与说明
+   会排进同一行内流，说明文字直接压在标题上（「支付请求已提交在收银台发起的…」）。 */
+.step-t{display:block;font-size:21px;font-weight:800;line-height:1.3}
+.step-d{display:block;margin-top:5px;font-size:17px;line-height:1.45;color:var(--ink-3)}
+
+/* 结果结构：这张面板是卡片的焦点块，卡片被列高拉长时由它吸收多余高度（有上限），
+   字段表不再被撑开。上限之外的余量落在卡片底部，形成一段可控的呼吸区。 */
+.result-row{flex:1 1 auto;display:flex;gap:20px;align-items:center;min-height:170px;max-height:340px;padding:22px 24px;border-radius:20px;background:var(--paper);border:1px solid var(--line)}
+.result-ic{flex:none;width:88px;height:88px;border-radius:50%;display:grid;place-items:center}
+.result-ic svg{width:40px;height:40px}
+.result-ic[data-tone=ok]{background:var(--teal-soft);color:var(--teal-d)}
+.result-ic[data-tone=warn]{background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.result-ic[data-tone=clay]{background:var(--clay-soft);color:var(--clay-d)}
+.result-main b{display:block;font-size:26px;font-weight:800;line-height:1.3}
+.result-main span{display:block;margin-top:8px;font-size:18px;line-height:1.55;color:var(--ink-3)}
+
+/* 下一步动作行：行高有上下限，不再靠拉高每一行去填满整列。
+   列里多出来的高度均摊成行距，而不是把每行撑成 300px 的空壳。 */
+.acts{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;justify-content:space-between}
+.act{flex:1 1 auto;min-height:112px;max-height:176px;padding:16px 20px;border-radius:20px;border:1px solid var(--line-2);background:var(--paper);display:flex;align-items:center;gap:16px}
+.act-ic{flex:none;width:54px;height:54px;border-radius:16px;display:grid;place-items:center;background:var(--teal-soft);color:var(--teal-d)}
+.act-ic svg{width:26px;height:26px}
+.act-ic[data-tone=slate]{background:var(--slate-soft);color:var(--slate-d)}
+.act-ic[data-tone=clay]{background:var(--clay-soft);color:var(--clay-d)}
+.act-main{flex:1;min-width:0}
+.act-t{display:block;font-size:21px;font-weight:800;line-height:1.3}
+.act-d{display:block;margin-top:5px;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.act-go{flex:none;width:36px;height:36px;display:grid;place-items:center;color:var(--teal-d)}
+.act-go svg{width:22px;height:22px}
+
+/* 通道降级 */
+.fallback{flex:none;display:flex;gap:16px;align-items:flex-start;padding:22px 24px;border-radius:20px;background:var(--cinnabar-soft);border:1px solid rgba(178,58,46,.32)}
+.fallback svg{flex:none;width:28px;height:28px;color:var(--cinnabar-d);margin-top:3px}
+.fallback b{display:block;font-size:21px;font-weight:800;color:var(--cinnabar-d)}
+.fallback p{margin-top:7px;font-size:18px;line-height:1.55;color:var(--ink-2)}
+.fallback .slot{margin-top:10px}
+
+/* 说明三联 */
+.guide{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.guide-item{padding:16px 20px;border:1px solid var(--line);border-radius:20px;background:var(--surface);display:flex;flex-direction:column;justify-content:center}
+.guide-k{font-size:16px;font-weight:800;color:var(--teal-d);letter-spacing:1px}
+.guide-t{margin-top:7px;font-size:20px;font-weight:800;line-height:1.3}
+.guide-p{margin-top:6px;font-size:16px;line-height:1.5;color:var(--ink-3)}
+
+/* 底部操作 */
+.ctabar{flex:none;display:flex;gap:14px}
+.btn{flex:1;min-height:88px;padding:0 26px;border-radius:22px;display:flex;align-items:center;justify-content:center;gap:11px;border:1px solid var(--line-2);background:var(--surface);font-size:23px;font-weight:800;text-align:center}
+.btn svg{width:24px;height:24px;flex:none}
+.btn.primary{flex:1.5;background:var(--deep);border-color:var(--deep);color:#fff}
+.btn.primary em{font-style:normal;color:var(--emerald)}
+
+.truth{flex:none;min-height:58px;padding:10px 42px;display:flex;align-items:center;gap:20px;border-top:1px solid var(--line);color:var(--ink-3);font-size:17px;line-height:1.45}
+.truth div{flex:1}
+.truth b{color:var(--ink-2);font-weight:700}
+.navbar{flex:none;height:112px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--ink-3);font-size:19px;font-weight:700}
+.nav-item svg{width:30px;height:30px}
+.nav-item.on{color:var(--teal-d)}
+
+/* 原型演示控制：普通 URL 下 display:none + hidden，既不可见也不可聚焦 */
+.demo-tab,.demo-panel{display:none}
+html.debug .demo-tab{display:block;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:54px;min-height:150px;border-radius:0 16px 16px 0;background:rgba(11,36,30,.9);color:var(--emerald);writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+html.debug .demo-panel.show{display:flex;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;padding:14px;flex-direction:column;gap:6px;max-height:1600px;overflow:auto;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96)}
+.demo-panel a{min-height:48px;padding:0 14px;display:flex;align-items:center;border-radius:12px;background:rgba(255,255,255,.07);color:#fff;font-size:16px;white-space:nowrap}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;letter-spacing:2px;padding:4px 6px}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+html.flat *,html.flat *::before,html.flat *::after{animation:none!important;transition:none!important}
+</style>
+</head>
+<body><div id="viewport"><div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back" href="32-cashier.html" data-route="/print/cashier" data-testid="cashier-back" aria-label="返回收银台"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot"></span><span id="pill-text">支付版式</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq"><div class="xq-row">
+    <div class="xq-face serif" aria-hidden="true">青</div>
+    <div class="xq-main">
+      <div class="xq-eyebrow" id="eyebrow">CASHIER</div>
+      <h1 class="xq-ask serif" id="ask">支付版式</h1>
+      <div class="xq-doing" id="doing">金额、收款码与到账结论都由服务端返回。</div>
+    </div>
+  </div></section>
+
+  <main class="body" id="body-root" data-screen="cashier" data-state="pending" data-testid="cashier-state-pending" aria-live="polite"></main>
+
+  <div class="truth">
+    <div><b>价格</b>以服务端核价与现场公示为准，本机不预设单价。</div>
+    <div><b>是否扣款、是否出纸</b>以支付平台账单与服务端返回为准，本页不下结论。</div>
+  </div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/" data-testid="cashier-nav-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>首页</a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant" data-testid="cashier-nav-assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile" data-testid="cashier-nav-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a>
+  </nav>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" hidden>演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="true" hidden></div>
+</div></div>
+<script>
+/* 原型脚本：只做版式渲染与切态演示；不发请求，不生成金额、订单号、收款码或到账结论。 */
+var SCREEN = 'cashier';
+var STATES = ['pending','confirming','paid','expired','reconciling','closed'];
+
+var ICO = {
+  scanOff:'<rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.5"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.5"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.5"/><path d="M14 14h3M20.5 17.5v3M14 20.5h3"/><path d="M2 22L22 2"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+  warn:'<path d="M12 3 2.8 20h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  print:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/>',
+  order:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.4"/><path d="M12 17.2h.01"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  arrow:'<path d="M9 18l6-6-6-6"/>',
+  refresh:'<path d="M20 11a8 8 0 1 0-.6 4"/><path d="M20 5v6h-6"/>',
+  ticket:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M9 6v12"/>'
+};
+function svg(n){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[n]||ICO.info)+'</svg>'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* debug 只在已经是 debug 会话时才继续传递，绝不污染普通 URL */
+var q = new URLSearchParams(location.search);
+var DEBUG = q.get('debug')==='1';
+/* 开发者说明（版式结构 / 排版示例 / 接口回填等取证口径）默认不占用普通用户的版面，
+   只有取证或调试会话才显示。普通页面只留一处简短必要事实提示。
+   注意：这只收敛「开发者怎么读这一屏」的措辞，不收敛支付诚实边界——
+   金额 / 订单 / 收款码 / 支付结果一律由服务端返回、不生成可扫码内容、
+   不伪造到账结论这几条，任何模式下都必须原样保留。 */
+var DEV = DEBUG || q.get('capture')==='1';
+function dev(plain, devText){ return DEV ? devText : plain; }
+function href(state, extra){
+  return '37-pay-states.html?state='+state+(extra?'&'+extra:'')+(DEBUG?'&debug=1':'');
+}
+function keep(url){
+  if(!DEBUG) return url;
+  return url + (url.indexOf('?')<0 ? '?' : '&') + 'debug=1';
+}
+
+/* ── 结构块 ─────────────────────────────────────────────── */
+function slot(text){ return '<span class="slot">'+esc(text||dev('待服务端返回','接口回填'))+'</span>'; }
+/* 一屏里可能同时有两张字段表（金额 + 收款码元信息），testid 必须分开：
+   每个状态只有一张主字段表叫 cashier-list，附属那张走自己的名字。 */
+function kv(rows, testid){
+  return '<ul class="kv" data-testid="'+(testid||SCREEN+'-list')+'">'+rows.map(function(r){
+    return '<li><span>'+esc(r[0])+'</span>'+slot(r[1])+'</li>';
+  }).join('')+'</ul>';
+}
+function fixtureNote(){
+  return '<div class="fixture" data-testid="'+SCREEN+'-fixture-note">'+svg('info')
+    +dev('金额、订单号、收款码与到账结论一律由服务端返回，本页不显示任何真实交易数据。',
+         '排版示例：金额、订单号、收款码与到账结论一律由服务端返回，本页不显示任何真实交易数据。')+'</div>';
+}
+function amountCard(){
+  return '<section class="card" data-testid="'+SCREEN+'-amount" data-evidence-fixture="synthetic" data-server-slot="amountCents">'
+    + '<div class="card-h"><span class="t">应付金额</span><span class="hint">服务端核价</span></div>'
+    + '<div class="amount">'+slot('待服务端核价返回')+'</div>'
+    + kv([['计费项',''],['单价 × 页数',''],['份数','']])
+    + '<p class="card-p">本机<b>不预设单价</b>；金额以下单时固化的计费明细为准，页面不缓存上一笔的数字。</p>'
+    + '</section>';
+}
+function qrCard(off, title, hint){
+  /* 失效印记只出现在卡头，不叠在占位块上：合规文案「不可扫码 / 不生成可扫码内容」必须始终完整可读。 */
+  return '<section class="card" data-testid="'+SCREEN+'-qr" data-evidence-fixture="synthetic">'
+    + '<div class="card-h"><span class="t">'+esc(title)+'</span>'
+    + (off?'<span class="qrstamp" data-testid="'+SCREEN+'-qr-stamp">已失效</span>':'')
+    + '<span class="hint">'+esc(hint)+'</span></div>'
+    + '<div class="qrslot'+(off?' off':'')+'" role="img" aria-label="收款码占位块：静态原型不生成可扫描的收款码">'
+    + svg('scanOff')
+    + '<b>'+(off?'这个收款码已失效':'收款码占位块')+'</b>'
+    + '<span>静态原型<u>不生成可扫码内容</u>，屏幕上没有可扫描的码。真实收款码由服务端实时下发。</span>'
+    + '</div>'
+    + kv([['剩余有效时间', off?'已过期，需重新出码':'有效期由服务端返回'],['支付方式',dev('待服务端返回','服务端已启用通道回填')]], SCREEN+'-qr-meta')
+    + '</section>';
+}
+function stepsCard(title, hint, steps){
+  return '<section class="card" data-testid="'+SCREEN+'-steps">'
+    + '<div class="card-h"><span class="t">'+esc(title)+'</span><span class="hint">'+esc(hint)+'</span></div>'
+    + '<div class="steps">'+steps.map(function(s,i){
+        return '<div class="step"><span class="step-ic">'+(i+1)+'</span>'
+          + '<span class="step-main"><span class="step-t">'+esc(s[0])+'</span><span class="step-d">'+esc(s[1])+'</span></span>'
+          + slot(dev('待服务端返回','状态接口回填'))+'</div>';
+      }).join('')+'</div>'
+    + '</section>';
+}
+function resultCard(title, hint, tone, ico, head, desc, rows){
+  return '<section class="card" data-testid="'+SCREEN+'-result" data-evidence-fixture="synthetic">'
+    + '<div class="card-h"><span class="t">'+esc(title)+'</span><span class="hint">'+esc(hint)+'</span></div>'
+    + '<div class="result-row"><span class="result-ic" data-tone="'+tone+'">'+svg(ico)+'</span>'
+    + '<span class="result-main"><b>'+esc(head)+'</b><span>'+esc(desc)+'</span></span></div>'
+    + kv(rows)
+    + '</section>';
+}
+function actsCard(title, hint, items){
+  return '<section class="card" data-testid="'+SCREEN+'-next">'
+    + '<div class="card-h"><span class="t">'+esc(title)+'</span><span class="hint">'+esc(hint)+'</span></div>'
+    + '<div class="acts">'+items.map(function(a){
+        return '<a class="act press" href="'+esc(keep(a[0]))+'" data-route="'+esc(a[1])+'" data-testid="'+SCREEN+'-next-'+a[2]+'">'
+          + '<span class="act-ic"'+(a[5]?' data-tone="'+a[5]+'"':'')+'>'+svg(a[4])+'</span>'
+          + '<span class="act-main"><span class="act-t">'+esc(a[3][0])+'</span><span class="act-d">'+esc(a[3][1])+'</span></span>'
+          + '<span class="act-go">'+svg('arrow')+'</span></a>';
+      }).join('')+'</div>'
+    + '</section>';
+}
+function fallbackCard(){
+  return '<aside class="fallback" data-testid="'+SCREEN+'-fallback">'+svg('warn')
+    + '<div><b>支付通道暂不可用</b>'
+    + '<p>当前拿不到可用的收款通道，屏幕上不会出现任何收款码。订单是否保留、金额是否变化，都以服务端返回为准；请联系现场工作人员协助处理。</p>'
+    + slot(dev('待服务端返回','订单号接口回填'))+'</div></aside>';
+}
+var GUIDE = {
+  pending:[['价格','服务端核价','本机不预设单价，也不做促销承诺'],['收款码','有效期由服务端给','过期后需要重新出码，金额以服务端返回为准'],['换人使用','先结束会话','收款码与订单只属于当前这次操作']],
+  /* 说明区只写「判断口径」，不重复右侧出口卡已经写过的动作。
+     原来这里的第三条和「主动查单」那张出口卡逐字相同，同屏出现两次。 */
+  confirming:[['为什么等','等支付平台回执','回执到达前，页面不给「已支付」结论'],['要不要重扫','先不要','重复扫码可能产生多笔支付尝试'],['这一屏','不会自动跳结论','状态不自动刷新，要看最新结果请用上面的出口']],
+  paid:[['这一屏是什么','版式示例','演示已支付时的版面，不是支付凭证'],['真实结果','以服务端为准','服务端确认到账后才允许释放出纸'],['取件码','服务端返回才展示','没有返回就不显示，也不本地生成']],
+  /* 第三条原来和「已经付过了？先查单」那张出口卡逐字相同，改写成本屏没讲过的边界。 */
+  expired:[['旧码','已经不可用','是否作废以支付平台与服务端返回为准'],['金额','重新核价','换码后的金额同样由服务端返回'],['续期','本页做不到','失效的码不能就地续期，只能回收银台重新出码']],
+  reconciling:[['查什么','支付平台账单','以账单为准，本页不判定成败'],['要多久','以服务端返回为准','页面不预告时间，也不自动改状态'],['查不到','保留订单','订单保持原样，可联系工作人员协助']],
+  closed:[['订单','已关闭','关闭原因与关闭时间由服务端返回'],['扣款','按账单核对','本页不下「未扣款」结论'],['旧订单','不会自动恢复','关闭后的订单不再接受支付，也不会自己重开']]
+};
+function guide(key){
+  return '<section class="guide" aria-label="说明">'+(GUIDE[key]||GUIDE.pending).map(function(it){
+    return '<div class="guide-item"><div class="guide-k">'+it[0]+'</div><div class="guide-t">'+it[1]+'</div><div class="guide-p">'+it[2]+'</div></div>';
+  }).join('')+'</section>';
+}
+function ctaBar(parts){ return '<div class="ctabar">'+parts.join('')+'</div>'; }
+function link(label, target, route, testid, opts){
+  opts = opts || {};
+  return '<a class="btn press'+(opts.primary?' primary':'')+'" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'
+    + (opts.icon?svg(opts.icon):'')+label+'</a>';
+}
+
+/* ── 头部文案 ───────────────────────────────────────────── */
+/* paid 的「已支付版式 / 这一屏演示『已支付』版式 / 静态原型不查询支付平台」不是开发者说明，
+   而是**不伪造成功**这条红线本身，任何模式下都不收敛。 */
+var PILL_DEV = {pending:' · 版式结构', confirming:' · 版式结构', paid:' · 排版示例',
+  expired:' · 版式结构', reconciling:' · 版式结构', closed:' · 版式结构'};
+var DOING_DEV = {pending:'金额、收款码与有效期都由服务端返回；<b>本页只展示版面结构</b>。'};
+var HEAD = {
+  pending:['clay','待支付','CASHIER · 待支付','先扫码付款，<em>再出纸</em>。','金额、收款码与有效期都由服务端返回。'],
+  confirming:['clay','到账确认中','CASHIER · 到账确认中','已提交支付，<em>正在等结果</em>。','结果由支付平台回执与服务端状态决定；<b>页面不提前给结论</b>。'],
+  paid:['teal','已支付版式','CASHIER · 已支付版式','这一屏演示<em>「已支付」版式</em>。','静态原型不查询支付平台；<b>屏幕上没有任何真实支付结果</b>。'],
+  expired:['clay','收款码失效','CASHIER · 收款码失效','这个收款码<em>不能再用了</em>。','订单是否仍可支付、金额是否变化，<b>都以服务端返回为准</b>。'],
+  reconciling:['slate','主动查单','CASHIER · 主动查单','按<em>支付平台账单</em>核对。','核对结果由服务端返回；<b>本页不判定成败，也不显示金额</b>。'],
+  closed:['cinnabar','订单已关闭','CASHIER · 订单关闭','这笔订单<em>已经关闭</em>。','是否发生扣款要按支付平台账单核对；<b>本页不下「未扣款」结论</b>。']
+};
+var BACK = {
+  pending:['14-print-confirm.html','/print/confirm','返回确认订单'],
+  confirming:[null,null,null],
+  paid:['32-cashier.html','/print/cashier','返回收银台'],
+  expired:['14-print-confirm.html','/print/confirm','返回确认订单'],
+  reconciling:[null,null,null],
+  closed:['10-print-hub.html','/print-scan','返回打印扫描']
+};
+
+/* ── 各状态主体 ─────────────────────────────────────────── */
+function bodyFor(state, fallback){
+  if(state==='pending'){
+    return {
+      main:'<div class="paygrid"><div class="paycol'+(fallback?' tail-note':'')+'">'+amountCard()
+        + (fallback ? fallbackCard() : qrCard(false,'收款码','不可扫描'))
+        + '</div>'
+        + (fallback
+            ? actsCard('付不了怎么办','都是可点的实体出口',[
+                ['06-help.html','/help','help',['找现场工作人员','报订单号，由工作人员协助处理'],'help','clay'],
+                ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','通道恢复后可以重新出码'],'refresh','slate'],
+                ['14-print-confirm.html','/print/confirm','confirm',['先改份数或参数','改动后会重新核价'],'order','slate'],
+                ['10-print-hub.html','/print-scan','hub',['先回打印扫描','订单是否保留以服务端返回为准'],'print','slate']
+              ])
+            : actsCard('付款时可以做什么','都是可点的实体出口',[
+                ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','通道选择与重新出码都在收银台完成'],'refresh',''],
+                ['14-print-confirm.html','/print/confirm','confirm',['返回修改份数或参数','改动后会重新核价'],'order','slate'],
+                ['06-help.html','/help','help',['扫不出来找工作人员','报订单号即可，不要重复扫码'],'help','clay'],
+                ['10-print-hub.html','/print-scan','hub',['先回打印扫描','订单是否保留以服务端返回为准'],'print','slate']
+              ]))
+        + '</div>',
+      guide:'pending',
+      cta:[
+        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('我付好了，查看结果', href('confirming'), '/print/cashier', SCREEN+'-primary', {primary:true, icon:'arrow'})
+      ]
+    };
+  }
+  if(state==='confirming'){
+    return {
+      main:'<div class="paygrid"><div class="paycol">'
+        + stepsCard(dev('到账进度','到账进度结构'),dev('状态由服务端返回','每一步的状态由接口回填'),[
+            ['支付请求已提交','在收银台发起的这一次支付尝试'],
+            ['等待支付平台回执','回执到达前不显示任何支付结论'],
+            ['服务端确认后释放出纸','服务端确认到账后才会释放打印任务']
+          ])
+        + resultCard('本次支付尝试',dev('不显示金额','结构位，不含金额'),'clay','clock','结果未知','支付平台回执还没有到；页面不会替服务端提前判定成功或失败。',
+            [['订单号',''],['支付尝试',''],['当前状态',dev('待服务端返回','接口回填')]])
+        + '</div>'
+        + actsCard('等待时可以做什么','都是可点的实体出口',[
+            ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['主动查单','按支付平台账单核对，结果以服务端为准'],'refresh','slate'],
+            ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','收银台会继续等服务端返回的支付结果'],'order',''],
+            ['06-help.html','/help','help',['等太久找工作人员','报订单号即可，不要重复扫码'],'help','clay'],
+            ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'ticket','slate']
+          ])
+        + '</div>',
+      guide:'confirming',
+      cta:[
+        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('主动查单', href('reconciling'), '/print/cashier', SCREEN+'-primary', {primary:true, icon:'refresh'})
+      ]
+    };
+  }
+  if(state==='paid'){
+    return {
+      main:'<div class="paygrid"><div class="paycol">'
+        + resultCard('支付结果版式',dev('非真实支付结果','排版示例'),'ok','check','已支付（版式示例）',
+            /* 顶部大标题已经写了「这一屏演示『已支付』版式 · 静态原型不查询支付平台，屏幕上没有任何真实支付结果」，
+               这里不再复述一遍，只补它没讲的那一条：这一屏不构成支付凭证。 */
+            '这一版面不构成支付凭证；是否真的到账、是否释放出纸，都以服务端返回为准。',
+            [['订单号',''],['支付方式',''],['打印内容',''],['取件码','服务端返回时才展示']])
+        + stepsCard('付款之后的真实链路',dev('状态由服务端返回','每一步的状态由接口回填'),[
+            ['服务端确认已到账','以支付平台回执或主动查单结果为准'],
+            ['释放打印任务','服务端释放成功后才会进入出纸'],
+            ['出纸与取件','进度以打印设备回流为准']
+          ])
+        + '</div>'
+        + actsCard('接下来去哪儿','都是可点的实体出口',[
+            ['15-print-fulfill.html','/print/progress','progress',['查看打印进度','进度以服务端与设备回流为准'],'print',''],
+            ['33-pickup-code.html','/print/pickup','pickup',['取件码页面','取件码只在服务端返回时展示'],'ticket','slate'],
+            ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'order','slate'],
+            ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','是否已到账以服务端返回为准'],'refresh','clay']
+          ])
+        + '</div>',
+      guide:'paid',
+      cta:[
+        link('返回收银台','32-cashier.html','/print/cashier',SCREEN+'-back-cashier',{icon:'back'}),
+        link('查看打印进度','15-print-fulfill.html','/print/progress',SCREEN+'-primary',{primary:true, icon:'print'})
+      ]
+    };
+  }
+  if(state==='expired'){
+    return {
+      main:'<div class="paygrid"><div class="paycol">'+amountCard()
+        + qrCard(true,'已失效的收款码','不可扫描')
+        + '</div>'
+        + actsCard('重新支付怎么走','都是可点的实体出口',[
+            ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','新的收款码与有效期由服务端返回'],'refresh',''],
+            ['14-print-confirm.html','/print/confirm','confirm',['先改份数或参数','改动后会重新核价'],'order','slate'],
+            ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['已经付过了？先查单','不要直接重付，先核对支付平台账单'],'ticket','clay'],
+            ['06-help.html','/help','help',['联系现场工作人员','报订单号即可，由工作人员协助处理'],'help','slate']
+          ])
+        + '</div>',
+      guide:'expired',
+      cta:[
+        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('回收银台重新出码','32-cashier.html','/print/cashier',SCREEN+'-primary',{primary:true, icon:'refresh'})
+      ]
+    };
+  }
+  if(state==='reconciling'){
+    return {
+      main:'<div class="paygrid"><div class="paycol">'
+        + stepsCard(dev('查单进度','查单进度结构'),dev('状态由服务端返回','每一步的状态由接口回填'),[
+            ['向支付平台核对账单','主动查单与支付回执走同一条入账路径'],
+            ['查到支付 → 由服务端入账','入账结果以服务端返回为准'],
+            ['没查到 → 订单保持原样','页面不改状态，也不判定失败']
+          ])
+        + resultCard('查单信息',dev('不显示金额','结构位，不含金额'),'slate','clock','结果未知',
+            '本页不显示查单结论。是否已支付、是否需要重新出码，都以服务端返回为准。',
+            [['订单号',''],['查单方式','支付平台账单核对'],['当前状态',dev('待服务端返回','接口回填')]])
+        + '</div>'
+        + actsCard('查单之后','都是可点的实体出口',[
+            ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','查单结果与是否重新出码都在收银台确认'],'refresh',''],
+            ['06-help.html','/help','help',['有争议找工作人员','报订单号，由工作人员协助核对'],'help','clay'],
+            ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'order','slate'],
+            ['10-print-hub.html','/print-scan','hub',['先回打印扫描','订单是否保留以服务端返回为准'],'print','slate']
+          ])
+        + '</div>',
+      guide:'reconciling',
+      cta:[
+        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('返回收银台','32-cashier.html','/print/cashier',SCREEN+'-primary',{primary:true, icon:'back'})
+      ]
+    };
+  }
+  return {
+    main:'<div class="paygrid"><div class="paycol tail-note">'
+      + resultCard('关单说明',dev('不显示金额与结论','结构位，不含金额与结论'),'warn','warn','订单已关闭',
+          '订单已经关闭，这台机器不会再为它出纸。是否发生过扣款，需要按支付平台账单与服务端核对结果确认。',
+          [['订单号',''],['关闭原因',''],['关闭时间',''],['是否扣款','以账单与服务端核对为准']])
+      + '<aside class="fallback" data-testid="'+SCREEN+'-fallback">'+svg('warn')
+      + '<div><b>手机显示已扣款？先别重复付</b>'
+      + '<p>先去查单，按支付平台账单核对；核对结果以服务端返回为准。有争议请联系现场工作人员，报订单号即可。</p>'
+      + slot(dev('待服务端返回','订单号接口回填'))+'</div></aside>'
+      + '</div>'
+      + actsCard('还能怎么办','都是可点的实体出口',[
+          ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['我已扣款，去查单','按支付平台账单核对，不要重复支付'],'refresh','clay'],
+          ['10-print-hub.html','/print-scan','hub',['重新下单打印','重新选文件并重新核价，会建立新订单'],'print',''],
+          ['06-help.html','/help','help',['联系现场工作人员','报订单号即可，由工作人员协助处理'],'help','slate'],
+          ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'ticket','slate']
+        ])
+      + '</div>',
+    guide:'closed',
+    cta:[
+      link('我已扣款，去查单', href('reconciling'), '/print/cashier', SCREEN+'-back-reconcile', {icon:'refresh'}),
+      link('重新下单打印','10-print-hub.html','/print-scan',SCREEN+'-primary',{primary:true, icon:'print'})
+    ]
+  };
+}
+
+/* ── 渲染 ───────────────────────────────────────────────── */
+function render(state, fallback){
+  var h = HEAD[state], out = bodyFor(state, fallback);
+  var root = document.getElementById('body-root');
+  root.dataset.state = state;
+  root.dataset.testid = SCREEN + '-state-' + state;
+  root.innerHTML = fixtureNote() + out.main + guide(out.guide) + ctaBar(out.cta);
+
+  var pill = document.getElementById('pill');
+  pill.setAttribute('data-tone', h[0]);
+  document.getElementById('pill-text').textContent = h[1] + (DEV ? (PILL_DEV[state]||'') : '');
+  document.getElementById('pill-dot').className = 'dot' + (state==='confirming'||state==='reconciling' ? ' breathe' : '');
+  document.getElementById('eyebrow').textContent = h[2];
+  document.getElementById('ask').innerHTML = h[3];
+  document.getElementById('doing').innerHTML = (DEV && DOING_DEV[state]) ? DOING_DEV[state] : h[4];
+
+  var back = document.getElementById('back');
+  var b = BACK[state];
+  back.setAttribute('href', keep(b[0] || '32-cashier.html'));
+  back.setAttribute('data-route', b[1] || '/print/cashier');
+  back.setAttribute('aria-label', b[2] || '返回收银台');
+}
+
+if(q.get('flat')==='1') document.documentElement.classList.add('flat');
+if(DEBUG) document.documentElement.classList.add('debug');
+var state = q.get('state'); if(STATES.indexOf(state)<0) state = 'pending';
+render(state, q.get('fallback')==='1');
+
+function fit(){ var k=Math.min(innerWidth/1080, innerHeight/1920); var s=document.getElementById('stage'); if('zoom' in s.style) s.style.zoom=k; else s.style.transform='scale('+k+')'; }
+addEventListener('resize', fit); fit();
+function tick(){ var d=new Date(); document.getElementById('clock').textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick, 10000);
+
+/* 演示面板只在 ?debug=1 时才被填充并解除 hidden；普通 URL 下既不可见也不可聚焦。 */
+if(DEBUG){
+  var tab = document.getElementById('demo-tab'), panel = document.getElementById('demo-panel');
+  panel.innerHTML = '<div class="dp-t">原型演示控制</div>'
+    + STATES.map(function(x){ return '<a href="?debug=1&state='+x+'">'+x+'</a>'; }).join('')
+    + '<a href="?debug=1&state=pending&fallback=1">pending (通道降级)</a>';
+  tab.hidden = false; panel.hidden = false;
+  tab.onclick = function(){ panel.classList.toggle('show'); };
+}
+</script>
+</body></html>

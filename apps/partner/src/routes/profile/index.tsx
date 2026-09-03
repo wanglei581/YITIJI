@@ -1,17 +1,33 @@
 import { useEffect, useState } from 'react'
 import {
   MODULE_LABELS,
+  ORG_CONTENT_TRUST_STATUS_LABELS,
+  ORG_CONTENT_TRUST_UNSET_LABEL,
   PROHIBITED_MODULES,
   SCENE_TEMPLATE_LABELS,
+  isOrgContentPublishable,
+  type OrgContentTrustStatus,
 } from '@ai-job-print/shared'
 import { Button, Card, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { Building2Icon, LockIcon, PencilIcon, SettingsIcon, XIcon } from 'lucide-react'
+import {
+  AlertCircleIcon,
+  AlertTriangleIcon,
+  Building2Icon,
+  CheckCircle2Icon,
+  LockIcon,
+  PencilIcon,
+  SettingsIcon,
+  ShieldAlertIcon,
+  ShieldCheckIcon,
+  XCircleIcon,
+  XIcon,
+} from 'lucide-react'
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
 
 // ─── 机构资料（审计修复：原 MOCK_PROFILE 硬编码已删除，全部走 /partner/profile 真实数据）──
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
-// 不再展示无数据来源的「资质/绑定终端/合作协议」假信息——这些域真实建模后再开放。
+// 内容信任状态（contentTrustStatus）为发布闸门依据，由平台管理员人工核验与标记。
 
 const ORG_TYPE_LABELS: Record<string, string> = {
   school: '高校 / 院校',
@@ -22,6 +38,24 @@ const ORG_TYPE_LABELS: Record<string, string> = {
   public_employment_service: '公共就业服务机构',
   aggregator: '数据聚合方',
   other: '其他机构',
+}
+
+function trustStatusLabel(status: OrgContentTrustStatus | null | undefined): string {
+  if (!status) return ORG_CONTENT_TRUST_UNSET_LABEL
+  return ORG_CONTENT_TRUST_STATUS_LABELS[status] ?? status
+}
+
+function trustStatusTone(status: OrgContentTrustStatus | null | undefined): 'success' | 'warning' | 'error' | 'default' {
+  if (status === 'active') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'suspended' || status === 'revoked') return 'error'
+  return 'default'
+}
+
+function fmtTime(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return Number.isFinite(d.getTime()) ? d.toLocaleString('zh-CN', { hour12: false }) : iso
 }
 
 export default function ProfilePage() {
@@ -90,6 +124,9 @@ export default function ProfilePage() {
     )
   }
 
+  const archived = profile.archived ?? false
+  const publishable = isOrgContentPublishable(profile.contentTrustStatus, archived)
+
   return (
     <Page
       title="机构资料"
@@ -124,6 +161,19 @@ export default function ProfilePage() {
                   : <StatusBadge dot status="error" label="已停用" />
               }
             />
+            <Row
+              label="内容信任"
+              value={
+                <div className="flex items-center gap-1.5">
+                  <StatusBadge
+                    dot
+                    status={trustStatusTone(profile.contentTrustStatus)}
+                    label={trustStatusLabel(profile.contentTrustStatus)}
+                  />
+                  {archived && <StatusBadge status="error" label="已归档" />}
+                </div>
+              }
+            />
             <Row label="接入时间" value={profile.createdAt.slice(0, 10)} />
           </div>
         </Card>
@@ -141,6 +191,128 @@ export default function ProfilePage() {
           </p>
         </Card>
       </div>
+
+      {/* 内容信任与发布权限（发布闸门依据） */}
+      <Card className="mt-6 p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <ShieldCheckIcon className="h-4 w-4 text-neutral-500" />
+          <h3 className="text-sm font-medium text-neutral-700">内容信任与发布权限</h3>
+          <div className="ml-auto flex items-center gap-1.5">
+            <StatusBadge
+              dot
+              status={trustStatusTone(profile.contentTrustStatus)}
+              label={trustStatusLabel(profile.contentTrustStatus)}
+            />
+            {archived && <StatusBadge status="error" label="已归档" />}
+          </div>
+        </div>
+
+        {/* 状态与发布后果说明 */}
+        {publishable ? (
+          <div className="rounded-lg border border-success/30 bg-success-bg p-4 text-xs text-success-fg">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" />
+              <div>
+                <p className="font-semibold text-success-fg">当前状态：内容可信（允许发布）</p>
+                <p className="mt-1 leading-relaxed text-neutral-600">
+                  机构内容信任核验已通过。审核通过的岗位、招聘会与政策内容可正常在终端发布上屏并对外展示。
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : archived ? (
+          <div className="rounded-lg border border-error/30 bg-error-bg p-4 text-xs text-error-fg">
+            <div className="flex items-start gap-2.5">
+              <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-error-fg" />
+              <div>
+                <p className="font-semibold text-error-fg">当前状态：已归档（禁止发布）</p>
+                <p className="mt-1 leading-relaxed text-neutral-600">
+                  当前机构处于已归档状态。根据平台发布安全闸门（fail-closed），已归档机构即使内容信任为可信，其内容也一律禁止发布上屏，终端用户不可见。
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : profile.contentTrustStatus === 'pending' ? (
+          <div className="rounded-lg border border-warning/30 bg-warning-bg p-4 text-xs text-warning-fg">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" />
+              <div>
+                <p className="font-semibold text-warning-fg">当前状态：待核验（暂不可发布）</p>
+                <p className="mt-1 leading-relaxed text-neutral-600">
+                  机构内容信任尚未完成平台核验。根据平台发布安全闸门（fail-closed），在此状态下，<strong>即使单条岗位、招聘会或政策内容已通过审核，也无法在终端发布上屏，终端用户暂不可见</strong>。
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : profile.contentTrustStatus === 'suspended' ? (
+          <div className="rounded-lg border border-error/30 bg-error-bg p-4 text-xs text-error-fg">
+            <div className="flex items-start gap-2.5">
+              <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-error-fg" />
+              <div>
+                <p className="font-semibold text-error-fg">当前状态：已暂停（禁止发布）</p>
+                <p className="mt-1 leading-relaxed text-neutral-600">
+                  机构内容信任已被平台管理员暂停。暂停期间所有新提交及待发布内容无法发布至终端对外展示。
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : profile.contentTrustStatus === 'revoked' ? (
+          <div className="rounded-lg border border-error/30 bg-error-bg p-4 text-xs text-error-fg">
+            <div className="flex items-start gap-2.5">
+              <XCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-error-fg" />
+              <div>
+                <p className="font-semibold text-error-fg">当前状态：已撤销（禁止发布）</p>
+                <p className="mt-1 leading-relaxed text-neutral-600">
+                  机构内容信任已被平台管理员撤销。该机构的所有内容均无法发布至终端对外展示。
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-700">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
+              <div>
+                <p className="font-semibold text-neutral-800">当前状态：未标记（暂不可发布）</p>
+                <p className="mt-1 leading-relaxed text-neutral-600">
+                  机构尚未标记内容信任状态。根据平台发布安全闸门（fail-closed），未标记机构的内容一律禁止发布，即使单条内容审核通过也不会在终端展示。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 详细核验信息 */}
+        <div className="mt-4 space-y-2.5 border-t border-neutral-100 pt-4 text-xs">
+          <Row label="信任状态" value={trustStatusLabel(profile.contentTrustStatus)} />
+          <Row
+            label="终端发布"
+            value={
+              publishable ? (
+                <span className="font-medium text-success-fg">允许发布（终端可见）</span>
+              ) : (
+                <span className="font-medium text-warning-fg">暂不可发布（终端不上屏）</span>
+              )
+            }
+          />
+          <Row label="核验时间" value={fmtTime(profile.contentTrustReviewedAt)} />
+          <Row label="核验依据" value={profile.contentTrustReason || <span className="text-neutral-400">无</span>} />
+        </div>
+
+        {/* 操作指引 */}
+        <div className="mt-4 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-500">
+          <p className="font-medium text-neutral-600">操作指引</p>
+          <p className="mt-1 leading-relaxed">
+            {publishable
+              ? '机构端无需额外操作，正常录入与维护岗位、招聘会或政策内容即可。'
+              : archived
+                ? '机构处于归档状态，如需恢复供稿与发布，请联系平台管理员解除归档并重新核验。'
+                : profile.contentTrustStatus === 'pending' || !profile.contentTrustStatus
+                  ? '内容信任由平台管理员依据合作协议与授权资质进行人工核验，请耐心等待平台审核（机构端无需且无法自助操作；如需加急请联系平台管理员）。'
+                  : '内容信任状态由平台管理员管理，如需了解详情或申请恢复，请联系平台管理员（机构端无法自助解除）。'}
+          </p>
+        </div>
+      </Card>
 
       {/* 场景与模块配置（真实数据） */}
       <Card className="mt-6 p-6">

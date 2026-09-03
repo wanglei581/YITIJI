@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>打印交付 · 职易达</title>
+<link rel="stylesheet" href="kimi-full-coverage-v2/design-system/kiosk-motion.css">
+<!--
+  route: /print/progress + /print/done
+  state: printing | completed | partial-output | paper-jam | out-of-paper |
+         paid-no-output | client-status-timeout | result-unconfirmed | refund-info
+  api: GET /print/jobs/:taskId（轮询 3 秒，Agent 硬件回流为唯一进度真值）
+       页数仅当真实 file.pages / billablePages 存在时展示「共 N 页」，无字段只显示「正在打印」
+       client-status-timeout = 前端连续查询 10 分钟无终态（仅前端表现层，不改服务端状态）
+       result-unconfirmed   = 服务端返回 failed + errorCode=PRINT_JOB_UNCONFIRMED
+       取件码仅在接口真实返回时展示；「再印一份」必须重新核价（orders/quote）
+  fallback: 任何异常态保留「联系工作人员/报障」实体出口（≥56px）
+  原型演示控制：本页状态仅通过 ?state= 切换，标注「原型演示控制」，不含生产业务逻辑
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;
+  background:var(--paper);overflow:hidden;display:flex;flex-direction:column;}
+.serif{font-family:"Songti SC","STSong","SimSun",serif;}
+a{color:inherit;text-decoration:none;}
+button{font:inherit;border:0;background:none;cursor:pointer;color:inherit;}
+a,button{-webkit-tap-highlight-color:transparent;}
+button:disabled{cursor:default;}
+
+/* ---------- 顶栏 ---------- */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;
+  background:var(--surface);border-bottom:1px solid var(--line);}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;background:var(--paper);}
+.logo{flex:none;display:flex;align-items:center;gap:12px;}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px;}
+.topbar .sp{flex:1;}
+.pill-status{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;
+  border-radius:28px;background:var(--teal-soft);color:var(--teal-d);font-size:19px;font-weight:600;}
+.pill-status.paid{background:var(--clay-soft);color:var(--clay-d);}
+.pill-status.warn{background:var(--wheat-soft);color:var(--wheat-d);}
+.pill-status.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;}
+
+/* ---------- 小青意图区 ---------- */
+.xq{flex:none;margin:22px 44px 0;border-radius:36px;padding:34px 44px 30px;
+  background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden;}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;
+  background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%);}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1;}
+.xq-face{flex:none;width:104px;height:104px;border-radius:50%;background:rgba(46,230,168,.1);
+  border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;
+  font-size:48px;color:var(--emerald);}
+.xq-main{flex:1;min-width:0;}
+.xq-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:8px;}
+.xq-ask{font-size:40px;line-height:1.32;font-weight:700;letter-spacing:1px;}
+.xq-ask em{font-style:normal;color:var(--emerald);}
+.xq-doing{margin-top:10px;font-size:22px;line-height:1.55;color:rgba(242,239,228,.72);}
+.xq-doing b{color:#fff;font-weight:600;}
+
+/* ---------- 区块 ---------- */
+.sec{flex:none;padding:0 44px;}
+.sec:first-child{margin-top:20px;}
+/* 任务区内联条：异常说明、费用边界、求助入口全部收进同一张任务卡，
+   不再让它们各占一节、被 space-between 摊出三段两百多像素的空白。 */
+.inbar{margin-top:20px;border-radius:20px;padding:20px 24px;border:1px solid var(--line);background:var(--paper);}
+.inbar.wheat{background:var(--wheat-soft);border-color:var(--wheat);}
+.inbar.bad{background:var(--cinnabar-soft);border-color:var(--cinnabar);}
+.inbar.deep{background:linear-gradient(158deg,var(--deep-2),var(--deep));border-color:var(--deep);color:#f2efe4;}
+.inbar-h{display:flex;align-items:center;gap:14px;font-size:24px;font-weight:700;line-height:1.25;}
+.inbar-h .ii{flex:none;width:52px;height:52px;border-radius:16px;background:#fff;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;}
+.inbar.wheat .ii{border-color:var(--wheat);}
+.inbar.bad .ii{border-color:var(--cinnabar);}
+.inbar.deep .ii{background:rgba(46,230,168,.12);border-color:transparent;}
+.inbar-h small{display:block;margin-top:4px;font-size:18px;font-weight:600;opacity:.75;}
+.inbar-b{margin-top:14px;font-size:21px;line-height:1.6;color:var(--ink-2);}
+.inbar.deep .inbar-b{color:rgba(242,239,228,.78);}
+.inbar-b b{color:var(--ink);font-weight:700;}
+.inbar.deep .inbar-b b{color:var(--emerald);}
+.inbar-kv{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;}
+.inbar-kv span{min-height:52px;padding:0 18px;border-radius:14px;background:var(--surface);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:8px;font-size:19px;font-weight:600;color:var(--ink-2);}
+.inbar-kv span b{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+.inbar-code{margin-top:14px;display:inline-block;font-size:18px;font-weight:600;letter-spacing:1px;padding:9px 18px;border-radius:10px;background:rgba(0,0,0,.12);}
+.inbar.deep .inbar-code{background:rgba(46,230,168,.12);color:var(--emerald);}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:16px;}
+.sec-label .t{font-size:28px;font-weight:700;}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto;}
+
+/* 任务卡 */
+.jobs-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:28px 34px;}
+.job{padding:20px 0;border-bottom:1px solid var(--line);}
+.job:first-child{padding-top:2px;}
+.job:last-child{border-bottom:none;padding-bottom:2px;}
+.job-top{display:flex;align-items:center;gap:18px;}
+.job-ico{flex:none;width:72px;height:72px;border-radius:20px;display:flex;align-items:center;justify-content:center;}
+.job-main{flex:1;min-width:0;}
+.job-name{font-size:26px;font-weight:700;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.job-sub{margin-top:6px;font-size:20px;color:var(--ink-3);}
+.job-state{flex:none;display:flex;align-items:center;gap:8px;font-size:21px;font-weight:700;
+  padding:14px 22px;border-radius:14px;min-height:56px;}
+.job-state.doing{color:var(--teal-d);background:var(--teal-soft);}
+.job-state.wait{color:var(--ink-3);background:var(--paper);border:1px solid var(--line-2);}
+.job-state.ok{color:#fff;background:var(--teal);}
+.job-state.err{color:#fff;background:var(--cinnabar);}
+
+/* 出纸口联动条 */
+.hw-bar{margin-top:22px;display:flex;align-items:center;gap:18px;border-radius:20px;
+  background:var(--deep);color:#f2efe4;padding:22px 28px;}
+.hw-light{flex:none;width:20px;height:20px;border-radius:50%;background:var(--emerald);
+  box-shadow:0 0 0 6px rgba(46,230,168,.18);animation:m-breathe 1600ms ease-in-out infinite;}
+.hw-txt{font-size:21px;line-height:1.55;}
+.hw-txt b{color:var(--emerald);font-weight:700;}
+
+/* 出纸动画区（位置引导，不代表进度） */
+.out-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:34px 40px;display:flex;align-items:center;gap:38px;}
+.out-stage{flex:none;width:250px;height:286px;border-radius:24px;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,var(--deep-2),var(--deep));display:flex;align-items:flex-end;justify-content:center;}
+.out-slot{position:absolute;top:28px;left:34px;right:34px;height:14px;border-radius:7px;background:rgba(46,230,168,.28);
+  box-shadow:0 0 18px rgba(46,230,168,.35);}
+.out-paper{position:absolute;top:44px;left:50%;margin-left:-72px;width:144px;height:196px;border-radius:6px;background:#fffdf8;}
+.out-paper::before{content:"";position:absolute;left:16px;right:16px;top:18px;height:10px;border-radius:5px;background:#d4cdb6;}
+.out-paper::after{content:"";position:absolute;left:16px;right:26px;top:42px;height:62px;border-radius:5px;
+  background:repeating-linear-gradient(180deg,#e3ddcb 0 8px,transparent 8px 16px);}
+.out-tray{position:absolute;bottom:22px;left:26px;right:26px;height:10px;border-radius:5px;background:rgba(242,239,228,.25);}
+.out-main{flex:1;min-width:0;}
+.out-status{font-size:36px;font-weight:800;line-height:1.25;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.out-status .pages{font-size:23px;font-weight:600;color:var(--ink-3);}
+.out-sub{margin-top:14px;font-size:22px;color:var(--ink-2);line-height:1.6;}
+.out-sub b{color:var(--teal-d);}
+
+/* 完成态 */
+.done-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:32px 36px;}
+.done-title{display:flex;align-items:center;gap:18px;font-size:30px;font-weight:700;margin-bottom:18px;}
+.big-ok{flex:none;width:64px;height:64px;border-radius:50%;background:var(--teal);
+  display:flex;align-items:center;justify-content:center;}
+.check-step{display:flex;gap:18px;padding:13px 0;align-items:flex-start;}
+.check-no{flex:none;width:48px;height:48px;border-radius:14px;background:var(--teal-soft);color:var(--teal-d);
+  display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;}
+.check-txt{font-size:22px;line-height:1.55;color:var(--ink-2);padding-top:8px;}
+.check-txt b{color:var(--ink);font-weight:700;}
+
+/* 取件码（仅接口返回时渲染） */
+.pickup-card{margin-top:22px;background:var(--deep);border-radius:var(--r-md);padding:26px 32px;
+  display:flex;align-items:center;gap:28px;color:#f2efe4;}
+.pickup-main{flex:1;min-width:0;}
+.pickup-t{font-size:23px;font-weight:700;}
+.pickup-s{margin-top:6px;font-size:19px;color:rgba(242,239,228,.65);line-height:1.5;}
+.pickup-code{flex:none;font-size:54px;font-weight:800;letter-spacing:8px;color:var(--emerald);
+  font-variant-numeric:tabular-nums;}
+
+/* 异常/未确认大卡 */
+.issue-card{background:var(--surface);border-radius:var(--r-lg);padding:34px 38px;border:1.5px solid var(--line-2);}
+.issue-card.wheat{background:var(--wheat-soft);border-color:var(--wheat);}
+.issue-card.bad{background:var(--cinnabar-soft);border-color:var(--cinnabar);}
+.issue-card.deep{background:linear-gradient(158deg,var(--deep-2),var(--deep));border-color:var(--deep);color:#f2efe4;}
+.issue-head{display:flex;align-items:center;gap:20px;}
+.issue-ico{flex:none;width:80px;height:80px;border-radius:24px;display:flex;align-items:center;justify-content:center;}
+.issue-t{font-size:31px;font-weight:800;line-height:1.3;}
+.issue-t small{display:block;font-size:20px;font-weight:600;opacity:.75;margin-top:5px;}
+.issue-body{margin-top:20px;font-size:22px;line-height:1.65;}
+.issue-body b{font-weight:700;}
+.issue-card.deep .issue-body{color:rgba(242,239,228,.78);}
+.issue-card.deep .issue-body b{color:var(--emerald);}
+.issue-code{margin-top:16px;display:inline-block;font-size:18px;font-weight:600;letter-spacing:1px;
+  padding:9px 18px;border-radius:10px;background:rgba(0,0,0,.12);}
+.issue-card.deep .issue-code{background:rgba(46,230,168,.12);color:var(--emerald);}
+
+/* 隐私清除卡 */
+.wipe-card{background:var(--surface);border:1.5px solid var(--cinnabar);border-radius:var(--r-lg);
+  padding:28px 34px;display:flex;align-items:center;gap:26px;}
+.wipe-card.idle{border-color:var(--line-2);}
+.wipe-main{flex:1;min-width:0;}
+.wipe-title{font-size:25px;font-weight:700;color:var(--cinnabar);display:flex;align-items:center;gap:12px;}
+.wipe-card.idle .wipe-title{color:var(--ink-2);}
+.wipe-sub{margin-top:9px;font-size:20px;color:var(--ink-3);line-height:1.55;}
+.wipe-count{flex:none;text-align:center;}
+.wipe-count .n{font-size:56px;font-weight:800;color:var(--cinnabar);font-variant-numeric:tabular-nums;line-height:1;}
+.wipe-count .u{font-size:18px;color:var(--ink-3);margin-top:6px;}
+
+/* 底部操作条 */
+.end-bar{flex:none;margin:0 44px 18px;display:flex;gap:18px;}
+.end-btn{height:96px;border-radius:28px;display:flex;align-items:center;justify-content:center;
+  gap:12px;font-size:25px;font-weight:700;letter-spacing:1px;}
+.end-btn.again{flex:1;background:var(--surface);border:1.5px solid var(--line-2);color:var(--ink-2);flex-direction:column;gap:2px;}
+.end-btn.again small{font-size:17px;font-weight:600;color:var(--ink-3);letter-spacing:0;}
+.end-btn.finish{flex:1.4;background:var(--cinnabar);color:#fff;}
+.end-btn.staff{flex:1.4;background:var(--clay);color:#fff;}
+.end-btn.ghost{flex:1;background:var(--surface);border:1.5px solid var(--line-2);color:var(--ink-2);}
+.end-btn.off{background:var(--paper);border:1.5px dashed var(--line-2);color:var(--ink-3);}
+.end-btn em{font-style:normal;opacity:.85;}
+
+/* 求助实体按钮（≥56px，字号≥22px） */
+.help-strip{display:flex;align-items:center;gap:18px;padding:20px 26px;border-radius:20px;
+  background:var(--paper);border:1px dashed var(--line-2);}
+.help-strip .txt{flex:1;font-size:21px;color:var(--ink-2);line-height:1.5;}
+.help-strip .txt b{color:var(--ink);}
+.help-btn{flex:none;display:flex;align-items:center;gap:10px;height:64px;padding:0 30px;border-radius:18px;
+  background:var(--slate);color:#fff;font-size:22px;font-weight:700;}
+
+/* 底部导航 */
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600;}
+.nav-item.on .ni{color:var(--teal-d);}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal);}
+
+/* 已清空覆盖层 */
+.clear-overlay{position:absolute;inset:0;background:var(--deep);display:none;z-index:100;
+  flex-direction:column;align-items:center;justify-content:center;gap:28px;color:#f2efe4;text-align:center;padding:0 80px;}
+.clear-overlay.show{display:flex;}
+.clear-face{width:140px;height:140px;border-radius:50%;background:rgba(46,230,168,.1);
+  border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;
+  font-size:64px;color:var(--emerald);}
+.clear-t{font-size:44px;font-weight:700;letter-spacing:2px;}
+.clear-s{font-size:23px;line-height:1.7;color:rgba(242,239,228,.7);}
+.clear-s b{color:var(--emerald);}
+
+/* 原型演示控制（非产品功能） */
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;
+  background:rgba(11,36,30,.88);color:#2ee6a8;border-radius:0 14px 14px 0;border:none;
+  writing-mode:vertical-lr;letter-spacing:4px;font-size:15px;font-weight:700;padding:18px 8px;}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;
+  background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:18px 16px;max-height:80%;
+  flex-direction:column;gap:8px;box-shadow:8px 0 32px rgba(0,0,0,.3);}
+.demo-panel.show{display:flex;}
+.demo-panel .dp-t{color:#2ee6a8;font-size:14px;font-weight:700;letter-spacing:2px;margin-bottom:4px;}
+.demo-panel a{display:block;color:#f2efe4;font-size:15px;padding:8px 14px;
+  border-radius:10px;background:rgba(255,255,255,.06);white-space:nowrap;}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:#2ee6a8;font-weight:700;}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important;}
+
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶栏 -->
+  <div class="topbar">
+    <a class="back m-press" href="01-home.html" aria-label="返回首页">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill-status paid" id="pill"><span class="m-dot breathe" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">已付 ¥3.50 · 只收纸张费</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </div>
+
+  <!-- 小青意图区 -->
+  <div class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif m-face-ring">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow">PRINT &amp; PICKUP</div>
+        <div class="xq-ask" id="xq-ask">支付成功，<em>正在出纸</em>。</div>
+        <div class="xq-doing" id="xq-doing">两份文件依次打印。你可以先在旁边等，不用贴着机器。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 动态主体（data-state / data-testid 随状态渲染更新） -->
+  <div id="body-root" data-screen="print-fulfill" data-state="printing" data-testid="print-fulfill-state-printing"
+       style="flex:1;display:flex;flex-direction:column;min-height:0;"></div>
+
+  <!-- 底部导航 -->
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span class="ni">首页</span>
+    </a>
+    <a class="nav-item" href="05-ai-cockpit.html">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
+      <span class="ni">AI 顾问</span>
+    </a>
+    <a class="nav-item" href="30-my-profile.html">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>
+      <span class="ni">我的</span>
+    </a>
+  </nav>
+
+  <!-- 已清空覆盖层（仅在本地清除例程真实执行后展示） -->
+  <div class="clear-overlay" id="clear-overlay" role="status">
+    <div class="clear-face serif">青</div>
+    <div class="clear-t">这趟办完了</div>
+    <div class="clear-s">这台机器上的文件预览与本页演示数据<b>已真实清除</b>。<br>愿你求职顺利，下次再见。</div>
+  </div>
+
+  <!-- 原型演示控制 -->
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true">
+    <div class="dp-t">原型演示控制</div>
+    <a href="?state=printing" data-s="printing">printing 打印中</a>
+    <a href="?state=completed" data-s="completed">completed 已完成</a>
+    <a href="?state=partial-output" data-s="partial-output">partial-output 部分出纸</a>
+    <a href="?state=paper-jam" data-s="paper-jam">paper-jam 卡纸</a>
+    <a href="?state=out-of-paper" data-s="out-of-paper">out-of-paper 缺纸</a>
+    <a href="?state=paid-no-output" data-s="paid-no-output">paid-no-output 已付未出</a>
+    <a href="?state=client-status-timeout" data-s="client-status-timeout">client-status-timeout 查询超时</a>
+    <a href="?state=result-unconfirmed" data-s="result-unconfirmed">result-unconfirmed 结果未确认</a>
+    <a href="?state=refund-info" data-s="refund-info">refund-info 退款说明</a>
+  </div>
+
+</div>
+<script>
+/* ================= 基础 ================= */
+function tick(){var d=new Date(),h=d.getHours(),m=d.getMinutes();
+  document.getElementById('clock').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+tick();setInterval(tick,10000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);
+  document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
+fit();addEventListener('resize',fit);
+var q=new URLSearchParams(location.search);
+if(q.get('debug')==='1'){document.documentElement.classList.add('debug');document.querySelectorAll('#demo-panel a').forEach(function(a){a.href='?debug=1&state='+a.getAttribute('data-s')})}
+if(q.get('flat')==='1')document.documentElement.setAttribute('data-flat','1');
+document.getElementById('demo-tab').onclick=function(){document.getElementById('demo-panel').classList.toggle('show');};
+
+/* ================= DEMO_DATA：仅用于静态原型状态展示 =================
+   以下取值只服务 ?state= 演示，不是生产默认值，也不是接口失败时的回退值。
+   生产环境全部字段来自 GET /print/jobs/:taskId 与 orders 域真实响应。 */
+var DEMO_DATA={
+  order:{amountYuan:'¥3.50',amountCents:350,no:'DEMO-20260824-001'},
+  jobs:[
+    {name:'简历_2026.pdf',sub:'A4 单面 · 普通纸 · 2 页 × 1 份',pages:2,ico:'doc',tone:'teal'},
+    {name:'身份证 · 已加水印',sub:'1:1 居中 · A4 · 1 页 × 1 份 · 「仅供求职使用」',pages:1,ico:'id',tone:'clay'}
+  ],
+  totalPages:3,        // 演示用：服务端 file.pages 之和；无该字段时界面只显示「正在打印」
+  pickupCode:'48291637'  // 演示用：仅当 /print/jobs/:taskId 返回取件码字段时才渲染
+};
+var ORDER=DEMO_DATA.order, JOBS=DEMO_DATA.jobs, TOTAL_PAGES=DEMO_DATA.totalPages, PICKUP_CODE=DEMO_DATA.pickupCode;
+var SCREEN='print-fulfill';
+var state=q.get('state')||'printing';
+document.querySelectorAll('.demo-panel a').forEach(function(a){
+  if(a.getAttribute('data-s')===state)a.classList.add('on');});
+
+/* ================= 图标 ================= */
+var ICO={
+  doc:'<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8L19 8v13.5H6z"/><path d="M14 2.5V8h5"/></svg>',
+  id:'<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9e5330" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16.5a3 3 0 0 1 6 0"/><path d="M14.5 9.5h4M14.5 13h4"/></svg>',
+  ok:'<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  warn:'<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#8a6219" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5L22 20H2z"/><path d="M12 10v4M12 17h.01"/></svg>',
+  jam:'<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#963227" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 13h10M7 16h10"/><path d="M6 17v4h12v-4"/></svg>',
+  paper:'<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#963227" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8v4H8z"/><path d="M5 7h14v10H5z"/><path d="M9 21h6"/></svg>',
+  help:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>',
+  shield:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/></svg>'
+};
+function pulse(txt){return '<span class="m-pulse"><span class="mp-dots" aria-hidden="true"><i></i><i></i><i></i></span>'+txt+'</span>';}
+
+/* ================= 渲染框架 ================= */
+var root=document.getElementById('body-root');
+var pill=document.getElementById('pill'),pillTxt=document.getElementById('pill-txt');
+var ask=document.getElementById('xq-ask'),doing=document.getElementById('xq-doing');
+function mark(st){
+  root.setAttribute('data-state',st);
+  root.setAttribute('data-testid',SCREEN+'-state-'+st);
+}
+function setPill(cls,txt){pill.className='pill-status '+cls;pillTxt.innerHTML=txt;}
+function jobRow(j,st,cls){
+  return '<div class="job"><div class="job-top">'+
+    '<div class="job-ico" style="background:var(--'+(j.tone==='teal'?'teal':'clay')+'-soft);">'+ICO[j.ico]+'</div>'+
+    '<div class="job-main"><div class="job-name">'+j.name+'</div><div class="job-sub">'+j.sub+'</div></div>'+
+    '<div class="job-state '+cls+'">'+st+'</div></div></div>';
+}
+function jobsCard(label,hint,rows){
+  return '<div class="sec"><div class="sec-label"><span class="t">'+label+'</span><span class="hint">'+hint+'</span></div>'+
+    '<div class="jobs-card" data-testid="'+SCREEN+'-list">'+rows+'</div></div>';
+}
+function helpStrip(txt,primary){
+  return '<div class="sec"><div class="help-strip" data-testid="'+SCREEN+'-fallback"><span class="txt">'+txt+'</span>'+
+    '<a class="help-btn m-press" href="06-help.html"'+(primary?' data-testid="'+SCREEN+'-primary"':'')+'>'+ICO.help+'联系工作人员</a></div></div>';
+}
+function endBar(html){return '<div class="end-bar">'+html+'</div>';}
+/* 一个完整任务区：出纸清单 + 异常说明 + 费用与订单边界，全部收在同一节里。
+   旧稿把这三样拆成三节，靠 space-between 摊开，中段被撑出两三段两百多像素的空白，
+   而「现在到底该做什么」反而散落在屏幕两头。 */
+function taskArea(label,hint,rows,inbars){
+  return '<div class="sec m-fade-in"><div class="sec-label"><span class="t">'+label+'</span><span class="hint">'+hint+'</span></div>'+
+    '<div class="jobs-card" data-testid="'+SCREEN+'-list">'+rows+'</div>'+(inbars||'')+'</div>';
+}
+function inbar(tone,ico,title,sub,body,kv,code,testid){
+  return '<div class="inbar '+tone+'"'+(testid?' data-testid="'+testid+'"':'')+'>'+
+    '<div class="inbar-h"><span class="ii">'+ico+'</span><span>'+title+(sub?'<small>'+sub+'</small>':'')+'</span></div>'+
+    '<div class="inbar-b">'+body+'</div>'+
+    (kv?'<div class="inbar-kv">'+kv+'</div>':'')+
+    (code?'<span class="inbar-code">'+code+'</span>':'')+'</div>';
+}
+/* 费用与订单边界：只写订单本身的确定事实 + 由谁裁决，不承诺退款、补打或到账。 */
+function moneyBar(extra){
+  return inbar('','<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3d5a52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 8.5L12 12l3.5-3.5M12 12v5M9.5 14h5"/></svg>',
+    '费用与订单边界','订单和支付记录都在，不会因为这次异常消失',
+    extra+'是否退款、退多少、多久到账，<b>以工作人员核查结果为准</b>，本机不承诺自动退款，也不会替你把费用改成别的数。',
+    '<span>订单 <b>'+ORDER.no+'</b></span><span>支付状态 <b>已支付 '+ORDER.amountYuan+'</b></span><span>退款状态 <b>未发起</b></span>');
+}
+function stepsCard(label,hint,steps){
+  var h='';
+  for(var i=0;i<steps.length;i++)h+='<div class="check-step"><span class="check-no">'+(i+1)+'</span><span class="check-txt">'+steps[i]+'</span></div>';
+  return '<div class="sec"><div class="sec-label"><span class="t">'+label+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'+
+    '<div class="done-card">'+h+'</div></div>';
+}
+
+/* ---- 状态：printing 打印中 ---- */
+function rPrinting(){
+  mark('printing');
+  // 零元单（系统报价为 0，本次未收款）不得套用已付文案 —— 见 32-cashier 的 free-order 态。
+  // 收款事实只能来自订单本身，不能因为共用同一屏就默认写成「支付成功」。
+  var isFree = q.get('free')==='1' || ORDER.amountYuan==='0.00';
+  if(isFree){
+    setPill('info','本次未收款 · 系统报价 0 元');
+    ask.innerHTML='订单已建立，<em>正在出纸</em>。';
+  }else{
+    setPill('paid','已付 '+ORDER.amountYuan+' · 只收纸张费');
+    ask.innerHTML='支付成功，<em>正在出纸</em>。';
+  }
+  doing.innerHTML='两份文件依次打印。你可以先在旁边等，不用贴着机器。';
+  root.style.justifyContent='space-between';
+  root.innerHTML=
+  '<div class="sec m-fade-in"><div class="sec-label"><span class="t">打印进度</span><span class="hint">状态来自打印服务，每 3 秒更新</span></div>'+
+    '<div class="jobs-card" data-testid="'+SCREEN+'-list">'+jobRow(JOBS[0],'打印中','doing')+jobRow(JOBS[1],'排队中','wait')+
+    '<div class="hw-bar"><span class="hw-light" aria-hidden="true"></span><span class="hw-txt">出纸口在<b>屏幕正下方</b>，机身灯亮绿 = 正在出纸。纸出来<b>直接拿</b>，不用等全部打完。</span></div></div></div>'+
+  '<div class="sec"><div class="out-card">'+
+    '<div class="out-stage" aria-hidden="true"><div class="out-slot"></div><div class="out-paper m-paper-guide"></div><div class="out-tray"></div></div>'+
+    '<div class="out-main"><div class="out-status">'+pulse('正在打印')+(TOTAL_PAGES?'<span class="pages">共 '+TOTAL_PAGES+' 页</span>':'')+'</div>'+
+    '<div class="out-sub">纸从<b>屏幕正下方出纸口</b>出来，出来一张拿一张也行，全部打完一起拿也行。页数来自服务端文件信息，不逐页播报。</div></div></div></div>'+
+  '<div class="sec"><div class="sec-label"><span class="t">你的文件，走完就清</span></div>'+
+    '<div class="wipe-card idle"><div class="wipe-main"><div class="wipe-title">'+ICO.shield+'打印期间不会清空</div>'+
+    '<div class="wipe-sub">全部打完、你拿走之后，才开始会话清空计时。倒计时不是催你走，你可以核对完再离开。</div></div></div></div>'+
+  helpStrip('卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。',true)+
+  endBar('<a class="end-btn again m-press" href="12-file-source.html" data-route="/print/upload" data-testid="print-fulfill-reprint">再印一份<small>重新选文件、核价并支付 · 不免费</small></a>'+
+         '<button type="button" class="end-btn finish off" disabled aria-disabled="true">还在打印，完成后才能结束清空</button>');
+}
+
+/* ---- 状态：completed 已完成 ---- */
+var wipeTimer=null;
+function rCompleted(){
+  mark('completed');
+  setPill('paid','已付 '+ORDER.amountYuan+' · 打印完成');
+  ask.innerHTML='都打好了，<em>从出纸口拿走</em>。';
+  doing.innerHTML='拿走前记得核一下页数和水印，少页当场能处理。';
+  root.style.justifyContent='space-between';
+  root.innerHTML=
+  '<div class="sec m-fade-in"><div class="sec-label"><span class="t">取件核对</span><span class="hint">共 '+TOTAL_PAGES+' 页</span></div>'+
+    '<div class="done-card"><div class="done-title"><span class="big-ok">'+ICO.ok+'</span>都打好了，拿走前核一下</div>'+
+    '<div class="check-step"><span class="check-no">1</span><span class="check-txt">从出纸口取走 <b>全部 '+TOTAL_PAGES+' 页</b>（简历 2 页 + 证件 1 页）。</span></div>'+
+    '<div class="check-step"><span class="check-no">2</span><span class="check-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span></div>'+
+    '<div class="check-step"><span class="check-no">3</span><span class="check-txt">证件页确认带 <b>「仅供求职使用」水印</b>，再离开。</span></div>'+
+    (PICKUP_CODE?
+      '<div class="pickup-card"><div class="pickup-main"><div class="pickup-t">取件码（仅接口返回时展示）</div>'+
+      '<div class="pickup-s">离开后再来取，或请工作人员凭码取。请勿拍照外传。</div></div>'+
+      '<div class="pickup-code">'+PICKUP_CODE+'</div></div>':'')+
+    '</div></div>'+
+  '<div class="sec"><div class="sec-label"><span class="t">你的文件，走完就清</span><span class="hint">空闲才计时 · 动一下就重置</span></div>'+
+    '<div class="wipe-card"><div class="wipe-main"><div class="wipe-title">'+ICO.shield+'空闲超时自动清空</div>'+
+    '<div class="wipe-sub">你不再操作这台机器后，本机上的文件预览和记录会被清除，下一个人看不到。也可以现在手动清。</div></div>'+
+    '<div class="wipe-count"><div class="n" id="wipe-n">60</div><div class="u">秒空闲后自动清空</div></div></div></div>'+
+  helpStrip('少了页、印花了、对内容有疑问？<b>现在处理最方便</b>。',false)+
+  endBar('<a class="end-btn again m-press" href="12-file-source.html" data-route="/print/upload" data-testid="print-fulfill-reprint">再印一份<small>重新选文件、核价并支付</small></a>'+
+         '<button type="button" class="end-btn finish m-press" id="btn-finish" data-testid="'+SCREEN+'-primary">我拿走了，结束并清空<em>→</em></button>');
+  document.getElementById('btn-finish').addEventListener('click',confirmWipe);
+  startIdleWipe(60);
+}
+/* 真实本地空闲计时：任何操作即重置；归零执行本地清除例程后展示覆盖层 */
+function startIdleWipe(sec){
+  var n=sec,el=document.getElementById('wipe-n');
+  function reset(){n=sec;if(el)el.textContent=n;}
+  ['pointerdown','keydown','touchstart'].forEach(function(e){addEventListener(e,reset);});
+  wipeTimer=setInterval(function(){
+    n=Math.max(0,n-1);if(el)el.textContent=n;
+    if(n<=0){clearInterval(wipeTimer);doLocalClear();}
+  },1000);
+}
+/* 手动两步确认：第一次点击转为确认态，再点执行本地清除 */
+function confirmWipe(){
+  var b=document.getElementById('btn-finish');
+  if(b.dataset.armed==='1'){doLocalClear();return;}
+  b.dataset.armed='1';b.innerHTML='再按一次，确认清空这台机器上的数据';
+}
+/* 本地清除例程：真实执行 localStorage/sessionStorage 清除后才展示完成层 */
+function doLocalClear(){
+  if(wipeTimer)clearInterval(wipeTimer);
+  try{localStorage.clear();sessionStorage.clear();}catch(e){}
+  document.getElementById('clear-overlay').classList.add('show');
+}
+
+/* ---- 状态：partial-output 只出一部分 ---- */
+function rPartial(){
+  mark('partial-output');
+  setPill('warn','已付 '+ORDER.amountYuan+' · 出了 2 / '+TOTAL_PAGES+' 页');
+  ask.innerHTML='出到一半<em>停了</em>，别急。';
+  doing.innerHTML='简历 2 页已经出来，证件那 1 页没出。<b>已出的可以先拿走</b>。';
+  root.style.justifyContent='space-between';
+  root.innerHTML=
+  taskArea('这一单现在的状态','已出 2 页 · 未出 1 页 · 订单保留',
+    jobRow(JOBS[0],'已出纸','ok')+jobRow(JOBS[1],'未出纸','err'),
+    inbar('wheat',ICO.warn,'只出了一部分','订单保留，未出的部分不会默默消失',
+      '先把<b>已出的 2 页</b>从出纸口拿走收好，再处理没出的 1 页。<b>不要自己拆机或硬拉纸</b>。',
+      '','', SCREEN+'-fallback')+
+    moneyBar('工作人员核查后可以<b>补打未出的部分</b>，或按核查结果处理费用。'))+
+  stepsCard('找工作人员之前先做这三件','当场处理最快',
+    ['把出纸口里<b>已经出来的 2 页</b>取走并收好，别留在机器上。',
+     '证件页确认带 <b>「仅供求职使用」水印</b>，缺水印一并告诉工作人员。',
+     '记下<b>订单号 '+ORDER.no+'</b>，补打和费用核查都靠它。'])+
+  endBar('<a class="end-btn ghost m-press" href="?state=refund-info">查看退款说明</a>'+
+         '<a class="end-btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">联系工作人员处理<em>→</em></a>');
+}
+
+/* ---- 通用：单故障任务区（卡纸 / 缺纸 / 已付未出） ---- */
+function rFault(cfg){
+  mark(cfg.st);
+  setPill('bad','已付 '+ORDER.amountYuan+' · '+cfg.pill);
+  ask.innerHTML=cfg.ask;
+  doing.innerHTML=cfg.doing;
+  root.style.justifyContent='space-between';
+  root.innerHTML=
+  taskArea('这一单现在的状态',cfg.hint,
+    jobRow(JOBS[0],cfg.job1[0],cfg.job1[1])+jobRow(JOBS[1],cfg.job2[0],cfg.job2[1]),
+    inbar('bad',cfg.ico,cfg.title,cfg.sub,cfg.body,'','',SCREEN+'-fallback')+
+    moneyBar(cfg.money))+
+  stepsCard('找工作人员之前先做这三件','当场处理最快',cfg.steps)+
+  endBar('<a class="end-btn ghost m-press" href="?state=refund-info">查看退款说明</a>'+
+         '<a class="end-btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">联系工作人员处理<em>→</em></a>');
+}
+
+/* ---- 状态：client-status-timeout 查询超时（前端判定，不改服务端） ---- */
+function rTimeout(){
+  mark('client-status-timeout');
+  setPill('warn','已付 '+ORDER.amountYuan+' · 状态查询中');
+  ask.innerHTML='暂时<em>查不到</em>打印结果。';
+  doing.innerHTML='这不代表成功或失败，只是本机暂时没拿到最新状态。';
+  root.style.justifyContent='space-between';
+  root.innerHTML=
+  taskArea('这一单现在的状态','本机连续查询 10 分钟没有拿到最终结果',
+    jobRow(JOBS[0],'状态查询中','wait')+jobRow(JOBS[1],'状态查询中','wait'),
+    inbar('wheat',ICO.warn,'状态暂未确认，请联系工作人员','本机连续查询 10 分钟没有拿到最终结果',
+      '这只是<b>查询超时</b>：服务端的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。可以先重新查询，或直接找工作人员现场确认。',
+      '','',SCREEN+'-fallback')+
+    moneyBar('这次到底出没出纸、要不要补打或退费，<b>都等工作人员现场核查</b>。'))+
+  stepsCard('这一刻你可以做的三件','赶时间就直接找人',
+    ['看一眼出纸口：<b>已经出来的纸先取走收好</b>，它和这次查询结果无关。',
+     '点右下角<b>重新查询状态</b>，这只是再问服务端一次，不会重下单、不会重复扣费。',
+     '还是查不到就把<b>订单号 '+ORDER.no+'</b> 告诉工作人员，后台能直接查这台机器。'])+
+  endBar('<a class="end-btn ghost m-press" href="?state=printing" data-testid="'+SCREEN+'-primary">重新查询状态</a>'+
+         '<a class="end-btn staff m-press" href="06-help.html">联系工作人员<em>→</em></a>');
+}
+
+/* ---- 状态：result-unconfirmed 结果未确认（服务端已登记） ---- */
+function rUnconfirmed(){
+  mark('result-unconfirmed');
+  setPill('bad','已付 '+ORDER.amountYuan+' · 结果未确认');
+  ask.innerHTML='这次打印<em>结果未确认</em>。';
+  doing.innerHTML='系统已经正式登记，工作人员核查后给出结论，不会让你自认倒霉。';
+  root.style.justifyContent='space-between';
+  root.innerHTML=
+  taskArea('这一单现在的状态','服务端已明确登记，等待人工核查',
+    jobRow(JOBS[0],'结果未确认','wait')+jobRow(JOBS[1],'结果未确认','wait'),
+    inbar('deep',ICO.jam,'打印结果未确认','服务端已明确登记，与「查询超时」不同',
+      '设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。系统不猜成功也不猜失败，已登记等待人工核查。你可以先离开，订单和登记记录都在。',
+      '','errorCode = PRINT_JOB_UNCONFIRMED',SCREEN+'-fallback')+
+    moneyBar('工作人员核查后会按真实结果处理：<b>补打或退款</b>。'))+
+  stepsCard('离开之前先做这三件','登记已经生成，不必守在机器旁',
+    ['把出纸口里<b>已经出来的纸取走收好</b>，它是核查时的实物依据。',
+     '记下<b>订单号 '+ORDER.no+'</b>，之后凭它查这次登记。',
+     '不要重新下单再打一次，<b>可能变成两笔费用</b>；补打由工作人员按登记处理。'])+
+  endBar('<a class="end-btn ghost m-press" href="?state=refund-info">查看退款说明</a>'+
+         '<a class="end-btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">联系工作人员核查<em>→</em></a>');
+}
+
+/* ---- 状态：refund-info 退款说明（只展示真实订单状态） ---- */
+function rRefund(){
+  mark('refund-info');
+  setPill('paid','订单 '+ORDER.no);
+  ask.innerHTML='钱的事，<em>一笔一笔说清楚</em>。';
+  doing.innerHTML='本页只展示订单的真实状态，不替你承诺结果。';
+  root.style.justifyContent='space-between';
+  root.innerHTML=
+  taskArea('这一单包含什么','共 '+TOTAL_PAGES+' 页 · '+ORDER.amountYuan,
+    jobRow(JOBS[0],'见下方说明','wait')+jobRow(JOBS[1],'见下方说明','wait'),
+    moneyBar('打印状态以你进来之前那一屏的提示为准（已完成 / 部分出纸 / 未确认等），本页不改判。'))+
+  stepsCard('要退款或补打，按这三步走','凭证就是订单号',
+    ['把<b>订单号 '+ORDER.no+'</b> 和这台机器的位置告诉现场工作人员。',
+     '说明实际拿到了几页、哪几页没出，<b>已出的纸请一并带上</b>。',
+     '由工作人员现场登记；<b>是否退款、退多少、多久到账，以核查结果为准</b>。'])+
+  '<div class="sec"><div class="help-strip" data-testid="'+SCREEN+'-fallback"><span class="txt">本机<b>不会自动退款</b>，也不会把支付异常写成打印状态。</span>'+
+    '<a class="help-btn m-press" href="06-help.html">'+ICO.help+'联系工作人员</a></div></div>'+
+  endBar('<button type="button" class="end-btn ghost m-press" onclick="history.back()">返回上一页</button>'+
+         '<a class="end-btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">找工作人员登记<em>→</em></a>');
+}
+
+/* ================= 路由 ================= */
+var R={
+  'printing':rPrinting,
+  'completed':rCompleted,
+  'partial-output':rPartial,
+  'paper-jam':function(){rFault({st:'paper-jam',pill:'卡纸',ask:'纸<em>卡住了</em>，别硬拉。',doing:'硬拉可能撕坏纸、伤到机器，交给我们来处理。',
+    ico:ICO.jam,title:'打印机卡纸',sub:'你的订单和已付金额都保留着',hint:'已出 1 份 · 后续中断 · 订单保留',
+    job1:['已出纸','ok'],job2:['打印中断','err'],
+    body:'请<b>不要自己打开机器或拽纸</b>。工作人员会取出卡纸并补打受影响的部分，已出的纸你先收好。',
+    money:'卡纸需要现场处理，工作人员取出卡纸后会<b>补打受影响的部分</b>。',
+    steps:['把出纸口里<b>已经出来的纸取走收好</b>，别留在机器上。',
+           '<b>不要自己开机盖、不要拽纸</b>：撕在里面更难取，也可能弄坏机器。',
+           '记下<b>订单号 '+ORDER.no+'</b>，补打时工作人员按它找这一单。']});},
+  'out-of-paper':function(){rFault({st:'out-of-paper',pill:'缺纸',ask:'机器里<em>没纸了</em>。',doing:'不是你操作的问题，纸匣空了，加纸后可以继续。',
+    ico:ICO.paper,title:'打印机缺纸',sub:'订单保留，加纸后可继续打印',hint:'已出 1 份 · 等待加纸 · 订单保留',
+    job1:['已出纸','ok'],job2:['等待加纸','wait'],
+    body:'纸匣已空，<b>剩下没打的部分会在加纸后继续</b>。已出的纸你可以先拿走。',
+    money:'加纸后继续打印<b>不需要重新下单</b>，这一单的支付记录照旧有效。',
+    steps:['把出纸口里<b>已经出来的纸取走收好</b>，剩下的加纸后继续。',
+           '叫现场工作人员<b>加纸</b>，这一步只能由他们做。',
+           '<b>不要重新下单再打一次</b>，那会变成两笔费用。']});},
+  'paid-no-output':function(){rFault({st:'paid-no-output',pill:'已付未出纸',ask:'付了钱，<em>一张纸都没出</em>。',doing:'别急，订单和支付记录都在，这件事一定会有人处理到底。',
+    ico:ICO.jam,title:'已支付，但没有出纸',sub:'支付记录与订单完整保留',hint:'两份都未出纸 · 支付记录保留',
+    job1:['未出纸','err'],job2:['未出纸','err'],
+    body:'可能原因：卡纸、缺纸或设备临时故障。<b>不要重复支付</b>。工作人员核查后会补打，或按真实结果处理费用。',
+    money:'工作人员核查后会<b>补打，或按真实结果处理费用</b>。',
+    steps:['<b>不要再付一次</b>：这一单已经付过，重复支付会多出一笔。',
+           '看一眼出纸口和纸匣，把看到的情况告诉工作人员。',
+           '记下<b>订单号 '+ORDER.no+'</b>，补打和退款都当场凭它登记。']});},
+  'client-status-timeout':rTimeout,
+  'result-unconfirmed':rUnconfirmed,
+  'refund-info':rRefund
+};
+(R[state]||rPrinting)();
+</script>
+</body>
+</html>

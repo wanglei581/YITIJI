@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>政策服务 · 职易达</title>
+<!--
+  宿主：政策服务共享工作台（一个宿主承接 /renshi 的五个任务面，不拆五份 HTML）
+  route: /renshi —— 台账 034（COVERAGE-MATRIX v5.0）
+  tab:   ?tab=policy | eligibility | social | register | notice
+         这是**产品真实 query**：apps/kiosk/src/pages/renshi/shared.ts 的 getInitialTab()
+         从 searchParams 读 tab，VALID_TABS 就是这五个值，非法值回落 'policy'。
+         16-service-hubs.html?hub=policy 已经在用 /renshi?tab=policy|social|register。
+  state: ?state= 是**原型演示控制，不属于产品逻辑**；它只表达「服务端这次返回了哪一支」，
+         不携带任何一项用户作答。?src= 只带**非敏感的来源标识**（政策条目 id / 内置指引 id），
+         用来保证「点 A 打开的就是 A 的来源二维码」，同样不携带任何个人内容。
+         ?flat=1 关闭非必要动效，?debug=1 显示演示面板，
+         ?capture=1 固定时钟与循环动画相位供确定性取证。
+         静态原型只切视图，不发任何请求、不推进业务、不生成 AI 结果。
+  文件： policy-campus-workspaces.js = 两个宿主共用的壳层（片段构造、统一状态渲染、
+         来源二维码弹层与焦点陷阱、演示面板、按压反馈、时钟与取证模式）；
+         policy-workspace.js = 本宿主的视图与状态注册表。共享 JS 曾单文件 1498 行、
+         超出本项目 800 行硬上限，按职责拆成上述两份，不用压缩或单行规避行数。
+
+  ── 真实 React / API 合同（逐 tab 对应）─────────────────────────────────
+  RenshiPage（apps/kiosk/src/pages/renshi/RenshiPage.tsx）
+      GET /api/v1/policies → { data: PolicyPostView[], pagination.total }
+          只读 approved + published。按 kind 分流：
+            kind='policy_guide' → 政策库条目（fromPublished → PolicyItem）
+            kind='notice'       → 政策公告
+          单页上限 200；total > 本次取回条数时页面必须如实说明，不静默截断。
+      政策库与本机 BUILTIN_GUIDES **分区渲染，绝不合并成一个数组**：
+          合并后政策库为空时页面照样满屏（内置指引常驻 5 条，其中
+          builtin-skill-training 的 audiences 含 'general'，任何身份筛选都命中），
+          运营录完种子政策无法判断到底进没进去。本设计因此把两个分区做成
+          两个独立标题 + 两套空态，且 policy-library-empty 一屏专门证明这件事。
+      身份筛选 AudienceKey: all | graduate | flexible | migrant | startup | hardship；
+          matchAudience = sel==='all' || audiences 命中 || audiences 含 'general'。
+      recordBrowse / recordExternalJump：只对**非 builtin** 条目上报；
+          只记录浏览与「打开来源入口」这个动作，不记录办理结果。
+  EligibilityPanel（?tab=eligibility）—— 两个端点，**零 LLM**
+      GET  /api/v1/policies/eligibility-questions → EligibilityQuestionSet
+           { questionSetVersion:'policy-eligibility-questions-v1', questions[9],
+             privacyNotice, disclaimer }；问项与取值一律服务端下发，前端不硬编码。
+      POST /api/v1/policies/eligibility-check { answers } → EligibilityCheckResult
+           用 POST 不用 GET：作答含户籍 / 参保 / 离职原因，不得进 URL 与网关日志。
+           空 answers 是合法调用，页面用它做**先探数据、再要个人信息**的探针。
+      两种「空」严格分开（eligibilityOutcome.ts 的恒等式）：
+           items.length === 0  ⟺ 库里没有可比对条目（录入进度，不是核对结论）
+           items 非空但全不符   ⟺ 这是核对结论
+           把前者说成后者，等于告诉一个人「你不符合任何政策」。
+      作答只在 React state：不写 localStorage / sessionStorage / URL query。
+           本原型同样只放 DOM 临时态，逐项由 shoot.mjs 断言。
+      打印核对清单当前**没有服务端通路**（policies 模块不引 FilesModule、无 pdf service，
+           且本能力对作答零持久化），因此按钮置灰 + 常显原因，不给假打印入口。
+  SocialPanel / RegisterPanel（?tab=social|register）
+      内置办事指引，无后端依赖；扫码入口只在 officialUrl 存在时渲染，
+      其余走 /print/upload。就业登记页只展示仓库现有地点与材料，是否支持线上办理或预约
+      以当地发布主体最新说明为准；本机不代办。
+  NoticePanel（?tab=notice）
+      与政策同一次 /policies 返回；空态与读取失败是两屏，不合并。
+
+  ── 设计修正（与当前 React 的刻意差异，迁移时按本设计改）───────────────
+  ① 来源措辞统一。builtinData.ts 现在写「官方入口示例：青岛人社」「通过官方入口或学校渠道
+     提交」「扫码进入官方平台」等。本系统**没有核验过任何一个外部链接的官方性**，这些措辞
+     容易被读成「已核验」。本设计把用户可见文案统一改成「参考入口 / 发布方提供的来源入口」，
+     并在每处扫码入口旁固定写「扫码前请核对机构和目标域名」。链接地址本身保留仓库现有取值，
+     不新增、不改站点；专有名词（国家政务服务平台、国家医保服务平台）照旧。
+  ①′ 办理方式措辞统一。builtinData.ts 的社保证明与社保卡两条写「只能线下」「必须本人到」，
+     那是替当地经办机构做了承诺 —— 本机只知道**自己没有配置线上入口**。用户可见文案统一改成
+     「本机暂未配置线上入口，办理方式以当地发布渠道为准」，就业登记同口径。
+  ② 来源二维码保留具体上下文。点哪一条就显示哪一条的来源类型、整理来源、目标域名与来源
+     链接（政策库条目的三要素由服务端返回，此时保持占位并写明原因），不做「所有入口都变成
+     一个泛化二维码」的处理。上下文只走 ?src= 的非敏感标识，不写 storage、不带个人作答。
+  ③ 二维码弹层做完整键盘可达：role=dialog + aria-modal，打开即把焦点移到关闭键，
+     Tab / Shift+Tab 只在卡片内循环，Escape 关闭并把焦点还给触发它的那颗按钮。
+  ④ 政策读取失败的「重新读取」先回 loading，不从失败态直接跳到就绪态 ——
+     静态原型不伪造一次成功的请求。
+
+  ── 真话边界（本页逐条自检）───────────────────────────────────────────
+  ① 政策库条目、公告、原文、来源三要素、条数一律 .slot 占位，**一条示例政策都不预置**，
+     也不显示任何可被读成「库里已经有几条」的数量。policy-ready 的政策库只渲染
+     **一条字段骨架**，说明「读到条目时长什么样」，不是「已经有这么一条」。
+     本机内置的 5 条通用办事指引、4 条社保指引、3 条就业登记项与 9 项条件核对问项
+     按仓库现有内容渲染（按「设计修正 ① / ①′」统一措辞）—— 它们是当前代码里的
+     确定内容，不是编造的样例。
+  ② 「政策库」与「通用办事指引」永远分区、各自空态；内置指引有内容
+     不得被读成政策库有内容。
+  ③ 外部入口只写「来源链接 / 参考入口」，一律配「先核对机构与目标域名」；
+     本系统未核验任何链接的官方性，不使用「官方入口已核验」一类表述。
+     来源地址缺失或不是有效网址时，二维码入口是**无 href 的置灰控件 + 常显原因**，
+     本机不猜地址、不补链接（source-missing / source-invalid 两屏）。
+  ④ 条件核对是服务端**确定性比对**：页面写「按政策原文逐条比对」，不写「AI 判定」。
+     结果屏里总体说明、逐条判定、判定说明、政策原文与免责说明**全部是空槽位**，
+     等服务端返回后原样填入；前端不拼「你符合 / 不符合」，也不预置任何一条判定行
+     （只有一条 data-cond="server-slot" 的结构槽）。至少答 1 项（不含「不确定」）才可比对。
+  ⑤ 小青（Assistant）的 skill 白名单里**没有政策场景**（advisorScenes.ts normalizeToolboxSkill
+     的 11 个取值不含 policy），所以本页任何状态都**不给可点的 AI 入口**：有原文的条目旁
+     只放一个克制的置灰控件「本条政策暂未接入小青」+ 一行原因，不带 ?intent=、不声称
+     携带政策上下文、不做整块 AI 说明板。看原文、来源二维码、身份筛选与条件核对
+     都不经过模型，也不因为它不可用而消失。
+  ⑥ 本机不代办、不收费、不承诺补贴到账，不保存身份证 / 银行卡 / 社保材料；
+     也不替当地经办机构承诺「只能线下办理」。
+  ⑦ 岗位与招聘会合规红线继续适用：本页无任何投递、收简历或企业闭环入口。
+
+  ai-mode: AI-NONE（现状）。COVERAGE-MATRIX v5.0 §1.3 把 034 归在 AI-CONTEXT，那是
+              「有政策专属技能之后」的目标态；按当前 advisorScenes.ts 的真实白名单，
+              本页没有任何可用 AI 入口，因此现状只能是 AI-NONE，等技能落地再回到
+              AI-CONTEXT。?tab=eligibility 的资格核对本来就是确定性零 LLM。
+  ai-input: 无 —— 没有可用入口，因此不向模型发送任何政策原文或个人作答
+  ai-consent: 不索取；本页不上传本人材料，也不携带跨任务上下文
+  ai-output: 无 —— 本页不生成任何 AI 内容，也不产生资格结论
+  ai-failure: 无政策原文可引用（context-missing）、小青连不上（ai-unavailable）；
+              两者与常态一样只置灰该控件并常显原因，不生成任何替代内容
+  ai-fallback: manual-view-source —— 直接看政策原文与来源；以及身份筛选、
+              通用办事指引、扫码打开来源链接、条件核对、上传自备材料打印
+  ai-persistence: 本页不生成 AI 记录；非 builtin 条目的浏览与「打开来源入口」按
+              BrowseLog / ExternalJumpLog 真实上报，不记录办理或投递结果
+  验收范围：静态原型表现；不证明 React 接线、API 可用、政策数据已录入、AI 顾问已接通、
+           打印、部署、Windows Agent 或奔图真机完成
+-->
+<link rel="stylesheet" href="policy-campus-workspaces.css">
+</head>
+<body data-host="policy">
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back-link" href="16-service-hubs.html?hub=policy" data-route="/policy-service" aria-label="返回政策服务"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">—</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="taskhead" aria-labelledby="task-title">
+    <h1 class="th-t" id="task-title">政策服务</h1>
+    <p class="th-s" id="task-sub">—</p>
+  </section>
+
+  <div id="tabbar-host"></div>
+
+  <main class="body" id="body-root" data-screen="renshi-policy" data-state="policy-ready" data-testid="renshi-policy-state-policy-ready"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="renshi-truth">
+    <div><b>仅信息指引 · 不代办</b>本机只做政策说明、材料清单、来源入口与打印辅助；不代申请、不收费、不承诺补贴到账，也不保存身份证、银行卡或社保材料。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
+</div>
+<script src="policy-campus-workspaces.js"></script>
+<script src="policy-workspace.js"></script>
+</body>
+</html>

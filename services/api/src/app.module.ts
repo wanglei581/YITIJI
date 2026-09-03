@@ -26,6 +26,7 @@ import { CompaniesModule } from './companies/companies.module'
 import { MemberAssetsModule } from './member-assets/member-assets.module'
 import { MockInterviewModule } from './mock-interview/mock-interview.module'
 import { MemberFavoritesModule } from './member-favorites/member-favorites.module'
+import { JobApplicationsModule } from './job-applications/job-applications.module'
 import { MemberBenefitsModule } from './member-benefits/member-benefits.module'
 import { BenefitActivitiesModule } from './benefit-activities/benefit-activities.module'
 import { MemberPrintOrdersModule } from './member-print-orders/member-print-orders.module'
@@ -104,6 +105,7 @@ const redisUrl = process.env['REDIS_URL']
     MemberAssetsModule,
     MockInterviewModule,
     MemberFavoritesModule,
+    JobApplicationsModule,
     MemberBenefitsModule,
     BenefitActivitiesModule,
     MemberNotificationsModule,

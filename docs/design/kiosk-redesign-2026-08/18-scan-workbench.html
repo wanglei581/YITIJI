@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>材料扫描 · 职易达</title>
+<!--
+  S16 · 扫描工作台闭环（静态设计稿，1080x1920 竖屏一体机）
+
+  route: /scan/start（setup） · /scan/settings（create-loading / create-failed / panel-instruction）
+         /scan/progress（waiting-delivery / polling / poll-failed / cancelling / cancelled / cancel-failed /
+                         cancel-race / cancel-conflict / cancel-recheck / cancel-race-unknown）
+         /scan/result（completed / completed-no-file / preview-loading / preview-ready / preview-failed /
+                       failed / expired）
+         另有两个不对应后端调用的兜底态：session-lost（刷新丢控制凭证）、blocked（链接参数不合法）
+
+  api（services/api/src/scan-tasks/scan-tasks.controller.ts）:
+        POST   /api/v1/scan/sessions          建会话 → scanTaskId / controlToken / expiresAt / instructions
+        GET    /api/v1/scan/sessions/:id      查状态（controlToken 走 X-Scan-Session-Control 请求头）
+        DELETE /api/v1/scan/sessions/:id      取消（同一请求头）
+        POST   /api/v1/terminals/:id/scan-sessions/deliver   仅 Terminal Agent 调用
+
+  预览合同（2026-08-27 返修：旧稿这一条写错了，已改）：
+        这一屏的会话按**匿名**建立，本机没有任何登录态，所以预览不可能走要登录的端点。
+        · 可看链接来自**扫描状态回执本身**：ScanSessionStatusResponse.file.fileUrl。
+          services/api/src/scan-tasks/scan-tasks.service.ts 的 getStatus() 用 signFileUrl() 现签，
+          形状是 /api/v1/files/:id/content?expires=&sig=（services/api/src/files/signing.ts）。
+          GET /files/:id/content **不挂 JwtAuthGuard**，只校验 HMAC 签名，所以匿名也能打开；
+          验签失败或已过期一律 401 FILE_SIGNATURE_INVALID「签名无效或已过期」，且不区分原因
+          （防探测）—— 见 services/api/src/files/files.controller.ts 的 content()。
+        · 本页**不调用** GET /api/v1/files/:id/preview-url：它先走 resolveRequester()，
+          匿名请求会被 401 AUTH_REQUIRED「需登录后访问文件」挡掉。旧稿把它写成本流程的
+          预览来源是错的；旧稿自造的 FILE_PREVIEW_EXPIRED 在仓库里根本不存在。
+        · 这条链接由**上一次回执**签发：本屏没有再签一次的入口，重新打开用的还是同一条。
+        · 预览打不开**只证明这一次没打开**（2026-08-27 第二次返修：旧稿据此反推文件仍在，是错的）。
+          /content 打不开至少有两种原因：验签失败或已过期（401 FILE_SIGNATURE_INVALID，且不区分原因），
+          以及验签通过后读内容失败。所以本页不拿预览失败去反推文件此刻是否仍可用 ——
+          它既不改判 completed 结论，也**不构成「文件还在」的证据**。
+        · 静态稿也没有 React router 的内存态：这一屏**带不走**这个 server file。所以不许写
+          「看不了也能直接拿去打印」「打印和 AI 识别直接用服务端文件」；出口只能说
+          「进入相应流程后重新选择或重新取得可用文件」。
+
+  硬件链路真值（唯一）：**用户在奔图操作面板上手动扫描 → 扫描到 SMB 共享目录 →
+        Terminal Agent 的 scanWatchFolder 监听并 deliver → 服务端入库**。
+        浏览器和 Agent 都没有「一键开始扫描」；没有页级扫描进度，没有逐页计数；
+        不存在盖板 / 无纸 / 卡纸 / ADF 进纸这类页级硬件事件，本页一律不画。
+        OCR / 文字识别不在扫描环节发生，只有结果进入「AI 简历识别」时才走识别。
+
+  状态合同（packages/shared/src/types/scanTask.ts · ScanTaskStatus）：
+        waiting | matched | completed | failed | expired | cancelled
+        ScanSessionStatusResponse.file 的类型是 `ScanSessionFileView | null`——**null 在合同内**。
+        services/api/src/scan-tasks/scan-tasks.service.ts 的 getStatus() 里：
+          · fileObject 查不到、或者已经 deletedAt 时，file 就是 null；
+          · 只有 scanType==='contract' 会因为文件不可用被降级成 expired，
+            resume / id / document 三类**照旧返回 completed + file:null**。
+        所以本页把这三种情况分开处理，不再一律当成合同违例：
+          A. completed + 六字段齐全  → completed，画文件卡（这条规则不变）
+          B. completed + file 为 null → completed-no-file：**合法终态**，服务端确认已完成、
+             但这次没有返回可用文件信息（可能已按留存规则清理）。不再无限轮询，
+             给「重新建会话 / 联系工作人员 / 返回打印扫描」三个终态出口。
+             页面不声称文件还在、不声称已被删除、也不声称可以恢复。
+          C. status 不在六种取值里，或 file 存在但字段不全（半个 ScanSessionFileView）
+             → 真的合同违例，按查询失败处理，不改判任务状态。
+
+  controlToken：只在页面内存变量里（对齐 ScanProgressPage.tsx 的 router state 口径）。
+        不上屏、不进 URL、不落 localStorage/sessionStorage。所以刷新 / 后退之后本机
+        无法再查询或取消该会话，只能落到 session-lost，绝不凭本地记录宣称成功。
+        sessionStorage 里**确实留了一条非敏感痕迹**：键 s16.scan.workbench.v1，值只有
+        {v, step, scanType}——用来判断本 tab 开过会话、刷新后该落 session-lost。
+        controlToken / taskId / 文件信息 / 服务端回执一律不写进任何浏览器存储。
+        所以 session-lost 那一屏不写「本机什么都没留」，只写留了哪两项、没留哪四项。
+
+  逐字段深比对的源码合同（门禁从源码抠出字面量，与本页内嵌副本逐字段比对，不等即 failed）：
+        packages/shared/src/types/scanTask.ts               ScanTaskStatus 六取值 / ScanSessionFileView 六字段 / file 可空
+        services/api/src/scan-tasks/scan-tasks.service.ts   SCAN_TYPE_INSTRUCTIONS 三类原文 / 只有 contract 类降级 expired /
+                                                            completed 文件卡的 fileObject 与 !deletedAt 守卫
+        services/api/src/files/signing.ts                   signFileUrl() 的签名内容 URL 形状（本页 CONTENT_URL_SHAPE）、
+                                                            verifyFileSignature() 的过期判定
+        services/api/src/files/files.controller.ts          /content 验签失败的 401 码与文案（本页 PREVIEW_FAIL）、
+                                                            /preview-url 匿名被挡的 401 AUTH_REQUIRED 码与文案（本页 PREVIEW_URL_ENDPOINT）
+  这四份的**未锚定范围**（门禁不冒充覆盖，改动仍要人复核）：存储后端与 COS 直传、上传 /
+  删除 / 留存 / 清理端点、审计写入、限流与守卫装配、raw-upload 的签名命名空间、
+  各处签名 TTL 的具体毫秒数、Nest 依赖注入与 DTO 校验。
+
+  只读引用的源码锚点（本页不复制它们的实现，只在文案口径上依赖它们；门禁把每一份的
+  sha256 记进 check-report / manifest / files.sha256 供漂移复核。它们没有可以整段嵌进
+  静态页的字面量合同，所以**不做深比较、也不冒充深比较**；其中三份另带「定点断言」，
+  断言范围以门禁里的 pinned 字段为准）：
+        services/api/src/scan-tasks/scan-tasks.controller.ts  四个端点与 controlToken 请求头名
+              定点断言：GET / DELETE 两条会话端点都从 X-Scan-Session-Control 取凭证
+        services/api/src/files/retention-policy.ts            留存档位与原始文件禁用 long_term
+        apps/terminal-agent/src/agent/scan-watcher.ts         未认领文件的 _unclaimed 隔离与清理
+        apps/kiosk/src/pages/scan/ScanProgressPage.tsx        controlToken 只走 router 内存态；自动轮询的节奏本页照抄
+              （单 timer / 进入等待先查一次 / 上一次落地后再排 3000ms / 终态清 timer）
+              定点断言：剥掉注释后不出现 localStorage / sessionStorage / document.cookie
+        apps/kiosk/src/pages/scan/ScanResultPage.tsx          结果页三个出口的真实交接口径
+              定点断言：同上，文件身份同样不进浏览器存储
+
+  演示夹具（原型专用，非产品功能）：
+        本页所有服务端结果都来自 ?fx= 声明的**响应夹具队列**，且只在 ?debug=1 或 ?capture=1 下可用。
+        队列按顺序、按调用种类严格消费：队首种类和当前调用不一致就不弹出，一律按「没有服务端响应」失败。
+        没有夹具时任何服务端调用都失败，永远到不了 completed。
+        演示模式下页面顶部常显「演示模式 · 服务端响应夹具 · 不可作为真实任务」，
+        合成编号与夹具文件都带 DEMO- 前缀和醒目标记。
+        本页没有 ?state= 这种状态开关；带上任何本页不认识的参数一律 fail-closed 到 blocked，
+        并且只列参数名、不回显取值。
+
+  演示模式只改一件事：在途状态的最短展示时间（1200ms → 4000ms），方便截图拍到在途态。
+        它不改变任何一次调用的结果；裸 URL 与演示模式跑同一套状态机。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer;text-align:left}
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.dbanner{flex:none;min-height:62px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;padding:10px 44px;background:var(--cinnabar-soft);border-bottom:1px solid #e8c9c3;color:var(--cinnabar-d);font-size:19px;line-height:1.4;font-weight:600}
+.dbanner .dtag{flex:none;height:38px;padding:0 14px;border-radius:12px;background:var(--cinnabar);color:#fff;display:inline-flex;align-items:center;font-size:17px;font-weight:700;letter-spacing:1px}
+.dbanner .dtext{flex:1;min-width:280px}
+.xq{flex:none;margin:18px 44px 0;border-radius:36px;padding:24px 40px 22px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{flex:none;width:92px;height:92px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:42px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:17px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:6px}
+.xq-ask{font-size:36px;line-height:1.3;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:9px;font-size:20px;line-height:1.55;color:rgba(242,239,228,.72)}
+.xq-doing b{color:#fff;font-weight:600}
+.xq-facts{position:relative;z-index:1;margin-top:16px;display:flex;gap:10px}
+.xq-facts span{flex:1;min-height:64px;border-radius:18px;background:rgba(255,253,248,.08);border:1px solid rgba(255,253,248,.12);padding:10px 16px;display:flex;align-items:center;font-size:17px;line-height:1.35;color:rgba(242,239,228,.82)}
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec{flex:none;padding:0 44px;margin-top:18px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:10px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:27px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+.state{border-radius:var(--r-lg);padding:22px 30px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:27px;font-weight:700}
+.state-p{margin-top:10px;font-size:20px;line-height:1.55;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.plan{margin-top:11px;display:flex;flex-direction:column;gap:9px}
+.plan li{list-style:none;display:flex;gap:12px;align-items:flex-start;font-size:19px;line-height:1.45;color:var(--ink-2)}
+.plan .sq{flex:none;width:10px;height:10px;border-radius:3px;background:var(--teal);margin-top:9px}
+.btn{min-height:80px;padding:0 26px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:600;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{opacity:.55;cursor:default}
+.ctabar{flex:none;margin-top:auto;padding:22px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.ctabar .btn{flex:1}
+.cta-reason{flex:none;padding:0 44px 10px;font-size:19px;font-weight:600;color:var(--wheat-d)}
+.truth{flex:none;padding:16px 44px 18px;border-top:1px solid var(--line);display:flex;gap:24px}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600;display:block}
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.press:active{transform:scale(.985)}
+/* 演示控件寄居在演示横幅里（横幅本身就是演示态才有的外壳），不再用绝对定位浮在正文上。
+   老做法是 left:0 垂直居中的竖标签 + 抽屉面板，在 ?debug=1 的自证屏上会压住卡片左沿和证据卡。
+   展开的预设条和标签同一行、横向滚动：换行成三排会把横幅撑高 143px，
+   正文整体下移之后 setup 那一屏的卡片就会压到置灰理由行和行动区上。 */
+.demo-tab{flex:none;min-height:48px;padding:0 18px;border-radius:14px;background:var(--cinnabar);color:#fff;display:inline-flex;align-items:center;gap:9px;font-size:17px;font-weight:700;letter-spacing:1px}
+.demo-panel{display:none;flex:0 1 320px;min-width:0;gap:8px;align-items:center;overflow-x:auto}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{flex:none;color:var(--cinnabar-d);font-size:15px;font-weight:700;letter-spacing:1px;white-space:nowrap}
+.demo-panel a{flex:none;display:inline-flex;align-items:center;min-height:44px;color:var(--cinnabar-d);font-size:15px;font-weight:600;padding:0 12px;border-radius:12px;background:var(--surface);border:1px solid #e8c9c3;white-space:nowrap}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.sec.grow{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec.last{margin-bottom:18px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+/* 两块内容不一样多的并排卡片按各自高度收住；余量交给版块之间的呼吸位，不在卡片里挖洞 */
+.grid2.top{align-items:start}
+.chip{min-height:46px;padding:0 16px;border-radius:14px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:9px;font-size:17px;color:var(--ink-2);font-weight:600}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.meta{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
+.kv{display:flex;flex-direction:column;gap:8px}
+.kv>div{display:flex;gap:12px;font-size:18px;color:var(--ink-2);line-height:1.35}
+.kv>div>span:first-child{flex:none;width:126px;color:var(--ink-3)}
+.kv b{font-weight:600;color:var(--ink);word-break:break-all}
+.pgrp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 22px;display:flex;flex-direction:column}
+.pgrp h4{font-size:21px;font-weight:700;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pgrp h4 .tagx{margin-left:auto;font-size:16px;font-weight:700;color:#fff;background:var(--cinnabar);border-radius:10px;padding:5px 11px;letter-spacing:.5px}
+.pgrp .state-p{font-size:18px;margin-top:8px}
+.pgrp .kv{margin-top:10px}
+/* foot 紧跟正文，不再 margin-top:auto —— 那会在等高卡片里挖出一段几百像素的内部空洞。 */
+.pgrp .foot{margin-top:12px;padding-top:12px;font-size:17px;line-height:1.4;color:var(--ink-3)}
+.pgrp .foot b{color:var(--ink-2);font-weight:600}
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+.sec.grow>.card,.sec.grow>.grid2,.sec.grow>.state,.sec.grow>.rstack,.sec.grow>.panel{flex:1;min-height:0}
+.sec.grow>.state{display:flex;flex-direction:column}
+.sec.grow>.state .meta{margin-top:auto}
+.sec.grow>.grid2>*{display:flex;flex-direction:column;gap:16px;min-height:0}
+.sec.grow>.grid2>*>.pgrp:last-child{flex:1}
+.sec.grow>.factwrap{flex:1;min-height:0;display:flex;flex-direction:column;gap:16px}
+.factwrap>.grid2{flex:none}
+.factwrap>.pgrp{flex:none}
+.plan.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 24px}
+.types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ty{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 22px 20px;display:flex;flex-direction:column;text-align:left;min-height:262px}
+.ty[aria-checked=true]{border-color:var(--teal);background:var(--teal-soft)}
+.ty-ic{width:62px;height:62px;border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;background:var(--slate-soft);color:var(--slate-d)}
+.ty[aria-checked=true] .ty-ic{background:var(--teal);color:#fff}
+.ty-n{font-size:24px;font-weight:700}
+.ty-d{margin-top:6px;font-size:17px;line-height:1.45;color:var(--ink-3);flex:1}
+.ty-chips{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.mini{min-height:36px;padding:0 11px;border-radius:10px;background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;font-size:15px;font-weight:600;color:var(--ink-3)}
+.mini.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.mini.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.mini.pick{background:var(--teal);border-color:transparent;color:#fff}
+.chain{display:flex;align-items:stretch;gap:10px}
+.link{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:13px 14px;display:flex;flex-direction:column;gap:6px}
+.link.on{background:var(--deep);border-color:transparent;color:#f2efe4}
+.link .li{width:42px;height:42px;border-radius:14px;background:var(--paper);color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+.link.on .li{background:rgba(46,230,168,.16);color:var(--emerald)}
+.link b{font-size:18px;font-weight:700}
+.link .lc{font-size:15px;line-height:1.35;color:var(--ink-3)}
+.link.on .lc{color:rgba(242,239,228,.66)}
+.link .who{margin-top:auto;font-size:14px;font-weight:600;color:var(--slate-d);background:var(--slate-soft);border-radius:9px;padding:4px 8px;align-self:flex-start}
+.link.on .who{background:rgba(46,230,168,.18);color:var(--emerald)}
+.arrow{flex:none;width:22px;display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.panel{display:flex;gap:20px;align-items:stretch}
+/* 面板示意图按自身内容收住：指引条目变多时它不跟着拉高，
+   否则这张深色插图内部会被撑出一段两百多像素的空当（keys 是浅色描边，不算内容）。 */
+.mfp{flex:none;align-self:flex-start;width:322px;border-radius:var(--r-lg);background:linear-gradient(168deg,var(--deep-2),var(--deep));padding:22px;display:flex;flex-direction:column;gap:14px;color:#f2efe4}
+.mfp-face{border-radius:18px;background:rgba(255,253,248,.06);border:1px solid rgba(255,253,248,.14);padding:16px;display:flex;flex-direction:column;gap:11px}
+.mfp-row{display:flex;gap:8px}
+.mfp-key{flex:1;height:42px;border-radius:10px;background:rgba(255,253,248,.1)}
+.mfp-key.hi{background:rgba(46,230,168,.34)}
+.mfp-screen{height:96px;border-radius:12px;background:rgba(46,230,168,.12);border:1px solid rgba(46,230,168,.3);display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--emerald);text-align:center;padding:0 14px;line-height:1.35}
+.mfp-cap{font-size:18px;line-height:1.5;color:rgba(242,239,228,.72)}
+.mfp-cap b{color:#fff}
+.psteps{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.pstep{display:flex;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 20px;align-items:flex-start}
+.pstep .n{flex:none;width:44px;height:44px;border-radius:14px;background:var(--teal-soft);color:var(--teal-d);font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center}
+/* 面板指引是这一屏的主任务正文：字号跟主任务信息走，不按脚注排。 */
+.pstep .pt{font-size:21px;line-height:1.45;color:var(--ink);padding-top:2px}
+.psrc{margin-top:auto;font-size:18px;color:var(--ink-3);line-height:1.45}
+/* 面板指引 / 扫描失败这两屏的「主操作提前」不靠把 .ctabar 挪到半屏实现：
+   本页几何门禁按「行动区以下不得有内容」判定，行动条一旦不是最后一块，
+   它下面的正文会被整片判成压到行动区。改法是压掉主任务与行动条之间的说明墙，
+   并让主任务本身占住主视野。 */
+/* ------------------------------------------------------------------ 结果页版式
+   2026-08-27 第三次返修。老版式两处不成立：
+     1. 预览被压成 316x258 的一小格线条稿 —— A4 只露得出半页多一点，
+        用户根本判断不出"要打印/识别的是不是这一份"，那预览就没有存在意义。
+     2. 六个合同字段（fileId / sha256 / fileUrl 里的 sig= 与 expires=）
+        直接印在公共屏的结果卡上。一体机放在大厅，这些是取文件的凭证，不是给路人看的。
+   现在：预览面板吃满内容区宽度，页面按 A4 比例整页显示（默认整页 100% 可见），
+   可翻页、可适应整页 / 适应宽度 / 放大 / 缩小。
+   2026-08-27 第四次返修：缩放不再是「只渲染看得见的那一块」——整页永远完整存在，
+   预览视口自己横纵可滚、可拖动，装不下的部分够得到；外层盒子尺寸恒定，所以照旧不跳版。
+   普通视图（含 ?capture=1 出图）只留 filename / mimeType / sizeBytes / 页数 / 来源；
+   六字段原样表、回执原样卡、出口与预览合同一并收进 ?debug=1 自证列，
+   自证列**追加在预览右侧**，不替换、不遮挡预览。 */
+.rstack{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.rmain{flex:1;min-height:0;display:flex;gap:14px;align-items:stretch}
+.pvpanel{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px}
+/* 预览头 = 紧凑文件信息区：第一行状态，第二行文件身份（只放用户判断得了的那几项） */
+.pvhead{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:8px 18px}
+.pvh-1{display:flex;align-items:center;gap:12px;min-height:40px}
+.pvh-ic{flex:none;width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--teal-soft);color:var(--teal-d)}
+.pvhead[data-kind=warn] .pvh-ic{background:var(--wheat-soft);color:var(--wheat-d)}
+.pvhead[data-kind=wait] .pvh-ic{background:var(--slate-soft);color:var(--slate-d)}
+.pvh-t{font-size:25px;font-weight:700;line-height:1.2;min-width:0}
+.pvh-chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pvh-chips .chip{min-height:40px;font-size:16px;padding:0 13px}
+.pvh-2{display:flex;align-items:center;gap:10px;margin-top:3px;min-height:26px;font-size:18px;color:var(--ink-2)}
+.pvh-2 b{font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pvh-2 .sep{color:var(--ink-3)}
+.pvh-2 .tagx{margin-left:auto;flex:none;font-size:15px;font-weight:700;color:#fff;background:var(--cinnabar);border-radius:9px;padding:4px 10px}
+/* 预览视口：外层盒子的尺寸照旧由 flex 定死（翻页 / 缩放都不会挪动这一屏的版面），
+   但内部现在是一个**真实的可横纵滚动视口**：整页始终完整存在于 .pvscene 里，
+   视口装不下的部分靠拖动 / 滚动够得着，不再把页面裁成固定一片再当成全部。 */
+.pvstage{flex:1;min-height:0;position:relative;display:flex}
+.pvport{flex:1;min-width:0;min-height:0;overflow:auto;
+        touch-action:pan-x pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+        background:#eae4d4;border:1px solid var(--line-2);border-radius:16px;scrollbar-width:thin}
+.pvport::-webkit-scrollbar{width:10px;height:10px}
+.pvport::-webkit-scrollbar-thumb{background:rgba(16,48,43,.3);border-radius:8px}
+.pvport::-webkit-scrollbar-track{background:transparent}
+.pvport[data-pannable=x],.pvport[data-pannable=y],.pvport[data-pannable=xy]{cursor:grab}
+.pvport.dragging{cursor:grabbing;user-select:none}
+/* 画布：至少等于视口，放得下整页时就等于整页 + 四周留白；纸张按非负坐标摆在里面 */
+.pvscene{position:relative;box-sizing:border-box}
+.pvscene[data-scene-mode=void]{width:100%;height:100%;padding:12px}
+/* 纸张：完整一页，宽高由 JS 按当前缩放档写死，块按整页坐标排，**不做任何裁切** */
+.pvpaper{position:absolute;left:0;top:0;background:#fff;overflow:hidden;border:2px solid #8f8672;border-radius:2px}
+.pvpaper .blk{position:absolute;border-radius:2px;background:#a49b85}
+.pvpaper .blk.d{background:#5f5a4d}
+.pvpaper .blk.m{background:#8d8672}
+.pvpaper .blk.a{background:var(--teal-d)}
+.pvpaper .blk.l{background:#c0b8a2}
+/* 「排版示意」这张标签钉在**视口**右上角、不在可滚动的纸上：
+   放大之后纸的四角都可能被拖出视野，标签跟着滚走就等于这条真话会消失。 */
+.pv-badge{position:absolute;top:9px;right:9px;max-width:calc(100% - 18px);z-index:3;
+  font-size:15px;font-weight:700;line-height:1.2;color:#fff;background:var(--cinnabar);border-radius:9px;padding:6px 11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 未打开 / 打开中 / 打不开：同一块大区域照旧留着，但一律不画任何冒充文件内容的东西。
+   竖向 space-between 把几条真话摊开，靠事实占位，不靠假页面占位。 */
+.pv-void{width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;
+         padding:22px 26px;border:2px dashed var(--line-2);border-radius:14px;background:var(--surface)}
+.pvv-h{display:flex;align-items:center;gap:14px;font-size:26px;font-weight:700;color:var(--ink)}
+.pvv-h .pvv-ic{flex:none;color:var(--ink-3)}
+.pvv-h .pvv-hx{margin-left:auto;font-size:16px;font-weight:600;color:var(--ink-3)}
+/* 每条事实拆成「要点 + 说明」两栏：一来读起来是清单不是段落，二来这块大区域左右都有字，
+   不会出现整条右侧竖列长期空着（三等分竖条空白门禁抓的就是那种"看着缺一块"）。 */
+.pvv-r{display:flex;align-items:flex-start;gap:14px;font-size:19px;line-height:1.45;color:var(--ink-2);
+       background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:13px 18px}
+.pvv-r .sq{flex:none;width:12px;height:12px;border-radius:3px;background:var(--teal);margin-top:9px}
+.pv-void[data-preview-void=failed] .pvv-r{background:var(--cinnabar-soft);border-color:#eed6d1}
+.pvv-r.bad .sq{background:var(--cinnabar)}
+.pvv-r .k{flex:none;width:40%;font-weight:700;color:var(--ink)}
+.pvv-r .v{flex:1;min-width:0}
+.pvv-r b{color:var(--ink);font-weight:700}
+.pvv-f{font-size:17px;line-height:1.45;color:var(--ink-3);border-top:1px solid var(--line);padding-top:10px}
+/* 预览控件条：翻页 + 缩放，全部 >=56px 触控；按钮尺寸不随状态变化，切换只换配色 */
+.pvbar{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:6px 14px}
+.pvb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pvbtn{min-width:56px;min-height:56px;padding:0 16px;border-radius:16px;border:1px solid var(--line-2);background:var(--paper);
+       display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:18px;font-weight:600;color:var(--ink)}
+.pvbtn[aria-disabled=true]{opacity:.4}
+.pvbtn.on{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.pvpage{flex:none;min-width:128px;text-align:center;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+/* 「可拖动查看」只在真的有平移余量时出现：没余量还挂着就是一句废话 */
+.pvhint{flex:none;min-height:40px;display:inline-flex;align-items:center;gap:8px;padding:0 14px;border-radius:14px;
+        background:var(--slate-soft);color:var(--slate-d);font-size:16px;font-weight:600;white-space:nowrap}
+.pvhint[hidden]{display:none}
+.pvsp{flex:1;min-width:8px}
+.pvb-cap{margin-top:5px;font-size:17px;line-height:1.32;color:var(--ink-3)}
+.pvb-cap b{color:var(--ink-2);font-weight:600}
+/* ?debug=1 自证列：追加在预览右边，预览不缩水成缩略图，也不被盖住 */
+.proofcol{flex:none;width:432px;display:flex;flex-direction:column;gap:9px;min-height:0}
+.proofcol .pfhd{flex:none;font-size:16px;font-weight:700;color:var(--cinnabar-d);background:var(--cinnabar-soft);border-radius:12px;padding:7px 13px;line-height:1.3}
+.proofcol .pgrp{padding:12px 15px}
+.proofcol .pgrp h4{font-size:19px}
+.proofcol .plan li{font-size:15px;line-height:1.35}
+.proofcol .plan{margin-top:8px;gap:7px}
+.proofcol .kv{gap:6px;margin-top:8px}
+.proofcol .kv>div{font-size:15px;line-height:1.3}
+.proofcol .kv>div>span:first-child{width:92px}
+.proofcol .pgrp .foot{font-size:14px;padding-top:8px;margin-top:8px;line-height:1.35}
+.tstrip{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 18px;font-size:18px;color:var(--ink-2)}
+.proofcol .tstrip{padding:9px 14px;font-size:16px;gap:9px}
+.tstrip b{color:var(--ink);font-weight:700}
+.tstrip .tagx{margin-left:auto;font-size:16px;font-weight:700;color:#fff;background:var(--cinnabar);border-radius:10px;padding:5px 11px}
+.actrow{display:flex;flex-direction:column;gap:10px}
+/* 三个出口横排：结果页的视觉主角是文件本身，出口收成一行，不再吃掉半屏 */
+.actrow.grid3{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}
+.actrow.grid3>*{min-width:0}
+.actrow.grid3 a,.actrow.grid3 .off{min-height:56px;align-items:flex-start;padding:9px 14px;font-size:19px;border-radius:16px;gap:11px}
+.actrow.grid3 a .ai,.actrow.grid3 .off .ai{width:36px;height:36px;border-radius:11px}
+.actrow.grid3 small{font-size:14px;line-height:1.32;margin-top:2px}
+.actrow.grid3 .offwrap{height:100%;gap:6px}
+.actrow.grid3 .offwrap>.off{flex:1}
+.actrow.grid3>a{height:100%}
+.actrow.grid3 .alt{min-height:48px;font-size:15px;padding:6px 14px;gap:8px;align-items:flex-start;line-height:1.3}
+.actrow.grid3 .alt svg{flex:none;margin-top:2px}
+.actrow.grid3 .off .offtag{margin-left:0;font-size:14px;padding:3px 8px;border-radius:8px}
+.actrow.grid3 .extitle{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.actrow a{display:flex;align-items:center;gap:14px;min-height:82px;border-radius:18px;border:1px solid var(--line-2);background:var(--surface);padding:0 22px;font-size:20px;font-weight:600}
+.actrow a .ai{flex:none;width:46px;height:46px;border-radius:14px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.actrow small{display:block;margin-top:3px;font-size:15px;font-weight:400;color:var(--ink-3)}
+.actrow .exbody{min-width:0;display:flex;flex-direction:column}
+.actrow .extitle{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.actrow .off{display:flex;align-items:center;gap:14px;width:100%;min-height:82px;border-radius:18px;border:1px dashed var(--line-2);background:var(--paper);padding:0 22px;font-size:20px;font-weight:600;color:var(--ink-2)}
+.actrow .off .ai{flex:none;width:46px;height:46px;border-radius:14px;background:var(--surface);border:1px solid var(--line-2);color:var(--ink-3);display:flex;align-items:center;justify-content:center}
+.actrow .off .offtag{flex:none;margin-left:auto;font-size:16px;font-weight:700;color:var(--wheat-d);background:var(--wheat-soft);border-radius:10px;padding:6px 12px;white-space:nowrap}
+.actrow .offwrap{display:flex;flex-direction:column;gap:8px}
+.actrow .alt{display:flex;align-items:center;gap:10px;min-height:62px;border-radius:14px;border:1px solid var(--line-2);background:var(--surface);padding:0 18px;font-size:17px;font-weight:600;color:var(--teal-d);line-height:1.35}
+.state.hero{padding:32px 36px}
+.state.hero .state-h{font-size:36px}
+.state.hero .state-p{font-size:25px;line-height:1.62;margin-top:14px}
+.state.hero .meta{margin-top:16px}
+.state.hero .meta .chip{min-height:56px;font-size:20px;padding:0 20px}
+.body.spread .pgrp{padding:22px 26px}
+.body.spread .pgrp h4{font-size:23px}
+.body.spread .pgrp .state-p{font-size:20px;line-height:1.6}
+.body.spread .plan li{font-size:20px;line-height:1.5}
+.body.spread .pgrp .foot{font-size:18px;padding-top:14px}
+.sec.grow>.pgrp{flex:1;min-height:0}
+.sec.grow>.grid2>.pgrp{min-height:0}
+/* 内容天然偏少的在途 / 终态屏：不撑满卡片，把余量分给版块之间的呼吸位 */
+.body.spread{justify-content:space-between}
+.body.spread>.ctabar{margin-top:0}
+.emptybox{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:20px;line-height:1.6;color:var(--ink-2);padding:16px}
+.emptybox .ei{width:88px;height:88px;border-radius:28px;background:var(--paper);border:1px dashed var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="10-print-hub.html" data-route="/print-scan" aria-label="返回打印扫描"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">第 1 步 · 选扫描类型</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif" aria-hidden="true">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow">SCAN VIA PANEL</div>
+        <div class="xq-ask serif" id="xq-ask">扫描这一步，<em>在机器面板上做</em>。</div>
+        <div class="xq-doing" id="xq-doing">屏幕上没有「开始扫描」这个按钮 —— <b>本机不能远程驱动扫描仪</b>。你在奔图面板上扫，文件回传到这里。</div>
+      </div>
+    </div>
+    <div class="xq-facts" id="xq-facts"></div>
+  </section>
+
+  <main class="body" id="body-root" data-screen="scan-workbench" data-state="setup" data-testid="scan-workbench-state-setup"></main>
+
+  <div class="truth" id="truth" data-disclaimer="true" data-testid="scan-workbench-truth">
+    <div><b>链路</b>奔图面板手动扫描 → 本机接收 → 本地投递 → 服务端保存，四段都走完才有文件。</div>
+    <div><b>不画什么</b>没有页级扫描进度与逐张计数，也不展示具体硬件故障原因。</div>
+    <div><b>留存与费用</b>留存按文件类型与服务端留存规则管理；价格只在打印流程里由服务端报价给出。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+</div>
+<script>
+var SCREEN='scan-workbench';
+/* 服务端状态合同副本 —— 逐项等于 packages/shared/src/types/scanTask.ts 的 ScanTaskStatus */
+var SERVER_STATUSES=['waiting','matched','completed','failed','expired','cancelled'];
+/* ScanSessionFileView 的字段合同副本；completed 必须整套带齐才认 */
+var FILE_FIELDS=['fileId','filename','sizeBytes','mimeType','sha256','fileUrl'];
+/* 面板指引单一事实源副本 —— 逐字等于 services/api/src/scan-tasks/scan-tasks.service.ts 的 SCAN_TYPE_INSTRUCTIONS。
+   本屏只开放 resume / id / document 三类；合同类扫描由「合同审阅」工作台发起，不在本屏重复开口子。 */
+var SCAN_TYPE_INSTRUCTIONS={
+ resume:['将简历原件正面朝上放入自动进纸器，或正面朝下对齐玻璃板左上角',
+         '在打印机操作面板打开「扫描」功能',
+         '选择扫描到网络 / SMB（本机已配置的接收目录）；简历建议黑白，文字更清晰',
+         '按「开始」扫描；完成后回到本屏幕等待自动识别，请勿关闭页面'],
+ id:['将证件正面朝下放在打印机玻璃板中央，取下订书钉并抚平',
+     '在打印机操作面板打开「扫描」功能，分辨率建议 300 DPI',
+     '选择扫描到网络 / SMB（本机已配置的接收目录）后按「开始」；正反面需翻面再扫一次',
+     '完成后回到本屏幕等待自动识别，请勿关闭页面'],
+ document:['多页材料放入自动进纸器，单页证书放在玻璃板上',
+           '在打印机操作面板打开「扫描」，并选择扫描到网络 / SMB（本机已配置的接收目录）',
+           '按「开始」扫描；整叠扫完后回到本屏幕等待自动生成 PDF，请勿关闭页面']
+};
+/* 留存口径来自 services/api/src/files/retention-policy.ts：
+     resume_scan  登录会员的简历扫描件按会员简历留存期管理；未登录为匿名临时文件。
+     id_scan      锁定 system_short，allowedPoliciesForFile 只允许这一档，不可延长。
+     print_doc    不在 MEMBER_DEFAULT_PURPOSES 里，始终按系统短期留存。
+   原始文件不支持 long_term（RETENTION_LONG_TERM_ORIGINAL_FORBIDDEN），
+   所以这一屏任何地方都不写「长期保存 / 永久保存 / 长期管理」。 */
+var TYPES=[
+ ['resume','简历扫描','扫描纸质简历生成 PDF，可进入 AI 识别与优化，也可拿去打印','resume',['支持 AI 简历识别|ok','生成 PDF|','面板 4 步|']],
+ ['id','证件扫描','扫描证件原件生成 PDF；证件类锁定为系统短期留存，不可延长保存期限','id',['高敏 · 短期留存|warn','生成 PDF|','正反面各扫一次|']],
+ ['document','普通文档','扫描通用材料生成 PDF；证书、成绩单、报到证这类都算','doc',['生成 PDF|','可拿去打印|','面板 3 步|']]
+];
+var TYPE_NAME={resume:'简历扫描',id:'证件扫描',document:'普通文档'};
+
+/* ---------------------------------------------------------------- 演示响应夹具
+   每个夹具带 kind：只有队首 kind 与当前调用一致时才弹出。不一致 / 队列空 / 非演示模式
+   一律返回 null，调用方按「本机没有收到服务端响应」处理，绝不合成成功。 */
+/* 预览合同副本：下面三项是从真实源码抠出来的字面量，门禁逐字段深比对（勿手改）。
+     CONTENT_URL_SHAPE     ← services/api/src/files/signing.ts 的 signFileUrl()
+     PREVIEW_FAIL          ← services/api/src/files/files.controller.ts 的 content() 验签失败 401
+     PREVIEW_URL_ENDPOINT  ← 同文件 accessUrl() 对匿名请求的 401 AUTH_REQUIRED（preview-url 这条
+                             端点要登录，所以本页的匿名流程用不了它，只能用回执里的 fileUrl） */
+var CONTENT_URL_SHAPE='/api/v1/files/:id/content?expires=&sig=';
+var PREVIEW_FAIL={code:'FILE_SIGNATURE_INVALID',message:'签名无效或已过期'};
+var PREVIEW_URL_ENDPOINT={path:'/api/v1/files/:id/preview-url',code:'AUTH_REQUIRED',message:'需登录后访问文件'};
+var DEMO_FILE={fileId:'DEMO-FILE-3C7A',filename:'扫描件-简历-DEMO.pdf',sizeBytes:874112,
+  mimeType:'application/pdf',sha256:'DEMO-SHA-NOT-REAL',
+  /* 真实回执里这里是服务端现签的内容 URL；夹具只给形状，不编造 expires / sig 的取值 */
+  fileUrl:'/api/v1/files/DEMO-FILE-3C7A/content?expires=…&sig=…（夹具不展开取值）'};
+/* ---------------------------------------------------- 预览排版示意夹具（原型专用）
+   这一屏不加载服务端文件（静态设计稿没有 router 内存态，也不发任何 HTTP），
+   但预览区必须让人看出「这是一份什么形状的东西、有几张、正文怎么排」——
+   看不出这些，预览就没有存在的理由，用户也判断不了要打印的是不是这一份。
+   所以这里放的是**版式骨架**：只有块，没有任何可读的字，页面右上角常挂
+   「排版示意 · 不是这份文件的真实页面」。它既不冒充这份扫描件的内容，
+   也不是原来那种「几根线」——三张纸各有各的结构（首页 / 时间轴 / 表格）。
+   坐标是页宽、页高的归一化比例。纵向刻意排密（相邻块的空当 <= 0.03 页高），
+   这样放大到最大档、只看得见页面中段时，也不会出现整片没有内容的空当。 */
+var PV_PAGE_W=620, PV_PAGE_H=877;        /* A4 1:1.4145 的名义尺寸，只用来算比例 */
+/* 缩放做成一条离散梯子，最低一档就是「适应整页」：
+   比整页更小没有意义（页面只会缩到视口中间一小块，四周全是空），所以第 0 档往下不给。
+   适应整页 / 适应宽度 是梯子上的两个具名档位，放大 / 缩小就是在梯子上走一格。 */
+var PV_LEVELS=[['page',1],['width',1],['width',1.25],['width',1.5625]];
+var PV_PAGES=(function(){
+ var A=[],B=[],C=[],i,y,e,r;
+ function put(a,x,yy,w,h,t){a.push([x,yy,w,h,t])}
+ /* 第 1 张 · 简历首页：姓名条 + 证件照位 + 四段正文 */
+ put(A,.08,.046,.30,.030,'d');put(A,.08,.088,.42,.0145,'m');put(A,.08,.1115,.32,.0145,'m');
+ put(A,.735,.043,.185,.090,'l');put(A,.08,.148,.84,.0055,'d');
+ var plan=[['h',.155],['l',.84],['l',.84],['l',.60],
+           ['h',.195],['l',.84],['l',.84],['l',.84],['l',.72],['l',.48],
+           ['h',.235],['l',.84],['l',.84],['l',.72],['l',.84],['l',.84],['l',.52],
+           ['h',.175],['l',.84],['l',.84],['l',.84],['l',.66],['l',.84],['l',.46],
+           ['h',.210],['l',.84],['l',.84],['l',.78],['l',.84],['l',.54],
+           ['r',.84],['f',.26]];
+ for(i=0;i<plan.length;i++){
+  y=.170+i*.0235;
+  if(plan[i][0]==='h'){put(A,.08,y,.026,.021,'a');put(A,.114,y,plan[i][1],.021,'d')}
+  else if(plan[i][0]==='r')put(A,.08,y,plan[i][1],.004,'m');
+  else if(plan[i][0]==='f')put(A,.08,y,plan[i][1],.0125,'l');
+  else put(A,.08,y,plan[i][1],.0135,'m');
+ }
+ /* 第 2 张 · 经历时间轴：左侧节点与竖线，右侧条目 */
+ put(B,.08,.046,.26,.026,'d');put(B,.08,.086,.84,.005,'m');
+ var bw=[.794,.794,.62,.794,.46];
+ for(e=0;e<5;e++){
+  var y0=.112+e*.141;
+  put(B,.08,y0,.020,.020,'a');put(B,.126,y0,.30,.020,'d');put(B,.70,y0,.22,.016,'m');
+  for(r=0;r<5;r++){y=y0+(r+1)*.0235;put(B,.088,y,.006,.0135,'l');put(B,.126,y,bw[r],.0135,'m')}
+ }
+ var t=.817;
+ put(B,.08,t,.026,.021,'a');put(B,.114,t,.20,.021,'d');
+ put(B,.08,t+.0235,.84,.0135,'m');put(B,.08,t+.047,.66,.0135,'m');
+ put(B,.08,t+.0705,.84,.004,'m');put(B,.62,t+.094,.30,.0125,'l');
+ /* 第 3 张 · 附件清单：三列表格 + 说明段 + 右下印章位 */
+ put(C,.08,.046,.30,.026,'d');put(C,.08,.086,.84,.005,'m');
+ put(C,.08,.108,.30,.020,'d');put(C,.42,.108,.24,.020,'d');put(C,.70,.108,.22,.020,'d');
+ for(i=0;i<12;i++){
+  y=.146+i*.030;
+  put(C,.08,y,.30,.014,'m');put(C,.42,y,.24,.014,'m');put(C,.70,y,.16,.014,'m');
+  put(C,.08,y+.021,.84,.003,'l');
+ }
+ put(C,.08,.518,.026,.021,'a');put(C,.114,.518,.22,.021,'d');
+ var cw=[.84,.84,.70,.84,.50];
+ for(i=0;i<5;i++)put(C,.08,.5455+i*.0235,cw[i],.0135,'m');
+ put(C,.66,.672,.26,.185,'l');
+ var cw2=[.52,.52,.52,.40,.52,.34,.52,.44];
+ for(i=0;i<8;i++)put(C,.08,.672+i*.0235,cw2[i],.0135,'m');
+ put(C,.08,.876,.84,.004,'m');put(C,.08,.898,.24,.0125,'l');
+ return [A,B,C];
+})();
+var FX={
+ 'create-ok':{kind:'create',ok:true},
+ 'create-busy':{kind:'create',ok:false,code:'SCAN_TERMINAL_BUSY',message:'该终端当前有正在进行的扫描，请稍后重试或联系工作人员'},
+ 'create-error':{kind:'create',ok:false,code:'NETWORK_ERROR',message:'网络连接失败，请稍后重试'},
+ 'poll-waiting':{kind:'poll',ok:true,status:'waiting'},
+ 'poll-matched':{kind:'poll',ok:true,status:'matched'},
+ 'poll-completed':{kind:'poll',ok:true,status:'completed',file:DEMO_FILE},
+ /* 合同内的合法回执：resume/id/document 的 completed 任务在 FileObject 查不到或已 deletedAt 时
+    服务端照旧返回 completed + file:null（只有 contract 类才降级成 expired）。 */
+ 'poll-completed-nofile':{kind:'poll',ok:true,status:'completed',file:null},
+ /* 真的越出合同：半个 ScanSessionFileView。服务端不会这么回，回了就是合同违例。 */
+ 'poll-completed-partial':{kind:'poll',ok:true,status:'completed',
+   file:{fileId:'DEMO-FILE-3C7A',filename:'扫描件-简历-DEMO.pdf',sizeBytes:874112,mimeType:'application/pdf',sha256:'',fileUrl:''}},
+ /* 真的越出合同：ScanTaskStatus 六种取值以外 */
+ 'poll-bogus-status':{kind:'poll',ok:true,status:'almost_done',file:null},
+ 'poll-scan-failed':{kind:'poll',ok:true,status:'failed',errorCode:'SCAN_UPLOAD_FAILED',errorMessage:'扫描文件处理失败，请重新扫描'},
+ 'poll-expired':{kind:'poll',ok:true,status:'expired'},
+ 'poll-cancelled':{kind:'poll',ok:true,status:'cancelled'},
+ 'poll-error':{kind:'poll',ok:false,code:'NETWORK_ERROR',message:'网络连接失败，请稍后重试'},
+ 'cancel-ok':{kind:'cancel',ok:true},
+ 'cancel-already-completed':{kind:'cancel',ok:false,code:'SCAN_TASK_ALREADY_COMPLETED',message:'任务已完成，无法取消'},
+ 'cancel-conflict':{kind:'cancel',ok:false,code:'SCAN_TASK_CANCEL_CONFLICT',message:'任务状态已变化，取消失败，请刷新重试'},
+ 'cancel-error':{kind:'cancel',ok:false,code:'NETWORK_ERROR',message:'网络连接失败，请稍后重试'},
+ /* preview 这一类夹具描述的是「打开回执里那条签名 URL」的结果，不是「另外去要一条链接」。 */
+ 'preview-ok':{kind:'preview',ok:true},
+ /* 签名过期是验签失败最常见的一种；错误码与文案原样取自 files.controller.ts，本页不自造。 */
+ 'preview-expired':{kind:'preview',ok:false,code:PREVIEW_FAIL.code,message:PREVIEW_FAIL.message},
+ 'preview-error':{kind:'preview',ok:false,code:'NETWORK_ERROR',message:'网络连接失败，请稍后重试'}
+};
+var NO_RESP={code:'NO_SERVER_RESPONSE',message:'本机没有收到服务端响应'};
+
+/* ------------------------------------------------------------------ 入口参数 */
+var ALLOWED_PARAMS=['debug','capture','fx','flat','mode'];
+var Q=new URLSearchParams(location.search);
+var DEBUG=Q.get('debug')==='1';
+var CAPTURE=Q.get('capture')==='1';
+var DEMO=DEBUG||CAPTURE;
+var BLOCK=null,FQ=[];
+/* 参数名做白名单清洗后才允许上屏；取值一律不回显 */
+function safeName(s){return /^[A-Za-z0-9_-]{1,24}$/.test(String(s))?String(s):'（不可显示的参数名）'}
+(function parseEntry(){
+ var unknown=[];
+ Q.forEach(function(v,k){if(ALLOWED_PARAMS.indexOf(k)<0&&unknown.indexOf(k)<0)unknown.push(k)});
+ if(unknown.length){BLOCK={why:'unknown-param',names:unknown.map(safeName),count:unknown.length};return}
+ var mode=Q.get('mode');
+ if(mode!==null&&mode!=='usb-panel'){BLOCK={why:'unknown-param',names:['mode'],count:1};return}
+ var raw=Q.get('fx');
+ if(raw===null)return;
+ if(!DEMO){BLOCK={why:'fixture-without-demo',names:['fx'],count:1};return}
+ var bad=0,ids=raw.split(',').map(function(s){return s.trim()}).filter(Boolean);
+ if(!ids.length){BLOCK={why:'empty-fixture',names:['fx'],count:0};return}
+ for(var i=0;i<ids.length;i++){
+  if(!FX[ids[i]]){bad++;continue}
+  FQ.push({id:ids[i],fx:FX[ids[i]]});
+ }
+ /* 没登记的夹具名一律不回显原文，只报个数 */
+ if(bad){FQ=[];BLOCK={why:'unknown-fixture',names:['fx'],count:bad}}
+})();
+
+/* -------------------------------------------------------------- 会话与状态机 */
+var SS_KEY='s16.scan.workbench.v1';   /* 只放非敏感的「本 tab 有没有开过会话」，不放凭证、不放编号、不放文件 */
+var CTL=null;                          /* controlToken：只在这个内存变量里；刷新即丢，页面据此 fail-closed */
+var seq=0;
+var S={step:'setup',scanType:null,taskId:null,instructions:null,polls:0,unknowns:0,
+       createTries:0,previewTries:0,lastStatus:null,lastErr:null,file:null,
+       preview:'none',cancelNote:null,busy:false,
+       /* 预览视图状态：只影响预览区内部怎么裁切显示，跟服务端结论、文件身份都无关。
+          默认 pvLevel=0 = 适应整页，也就是整页 100% 可见。 */
+       pvPage:1,pvLevel:0};
+function pvReset(){S.pvPage=1;S.pvLevel=0;pvResetPan()}
+
+function ssRead(){try{var v=sessionStorage.getItem(SS_KEY);return v?JSON.parse(v):null}catch(e){return null}}
+function ssWrite(){try{sessionStorage.setItem(SS_KEY,JSON.stringify({v:1,step:S.step,scanType:S.scanType}))}catch(e){}}
+function ssClear(){try{sessionStorage.removeItem(SS_KEY)}catch(e){}}
+
+var RESP_MS=DEMO?4000:1200;   /* 演示模式只放慢在途态的最短展示时长，不改变任何结果 */
+function inflight(next,fn){
+ S.busy=true;S.step=next;render();
+ setTimeout(function(){S.busy=false;fn();ssWrite();render()},RESP_MS);
+}
+function take(kind){
+ if(!DEMO||!FQ.length||FQ[0].fx.kind!==kind)return null;
+ return FQ.shift().fx;
+}
+function resetSession(){pollClear();pollOrigin='none';
+ CTL=null;S.scanType=null;S.taskId=null;S.instructions=null;S.polls=0;S.unknowns=0;
+ S.createTries=0;S.previewTries=0;S.lastStatus=null;S.lastErr=null;S.file=null;S.preview='none';S.cancelNote=null;pvReset();ssClear()}
+
+function doCreate(){
+ S.createTries++;
+ inflight('create-loading',function(){
+  var f=take('create');
+  if(!f||!f.ok){S.lastErr=f?{code:f.code,message:f.message}:NO_RESP;S.taskId=null;S.instructions=null;CTL=null;S.step='create-failed';return}
+  seq++;S.taskId='DEMO-SCAN-'+('000'+seq).slice(-4);
+  S.instructions=SCAN_TYPE_INSTRUCTIONS[S.scanType]||[];
+  CTL='(in-memory-only)';S.lastErr=null;S.lastStatus=null;S.step='panel-instruction';
+ });
+}
+/* 状态合同校验：
+   · file 为 null / undefined → 合同允许（ScanSessionStatusResponse.file 是 `… | null`）
+   · file 存在但字段不全 → 半个 ScanSessionFileView，越出合同
+   fileOk 只回答「这份 file 能不能画成文件卡」，不回答「合不合法」。 */
+function fileOk(f){if(!f)return false;for(var i=0;i<FILE_FIELDS.length;i++){var k=FILE_FIELDS[i];if(f[k]===undefined||f[k]===null||f[k]==='')return false}return true}
+function fileAbsent(f){return f===null||f===undefined}
+/* 本次未知是「收到回执但不合同」还是「本机没问到」——两屏的解释完全不同，别混着说。 */
+function violation(){return (S.lastErr&&S.lastErr.code==='CONTRACT_VIOLATION')?(S.lastErr.kind||'status'):null}
+function applyPoll(f,recheck){
+ S.polls++;
+ var unknownStep=recheck?'cancel-race-unknown':'poll-failed';
+ if(!f||!f.ok){S.unknowns++;S.lastErr=f?{code:f.code,message:f.message}:NO_RESP;S.step=unknownStep;return}
+ /* 下面两种是**收到了回执、但回执不符合当前合同**，和「本机没问到」不是一回事：
+    kind 记下是哪一种，屏上按各自的口径解释，不再一律说成查询失败。 */
+ if(SERVER_STATUSES.indexOf(f.status)<0){S.unknowns++;S.lastErr={code:'CONTRACT_VIOLATION',kind:'status',message:'服务端返回了状态合同以外的取值'};S.step=unknownStep;return}
+ if(f.status==='completed'&&!fileAbsent(f.file)&&!fileOk(f.file)){S.unknowns++;S.lastErr={code:'CONTRACT_VIOLATION',kind:'file',message:'服务端带回的文件信息只有一半，字段不全'};S.step=unknownStep;return}
+ S.unknowns=0;S.lastErr=null;S.lastStatus=f.status;
+ if(f.status==='completed'){
+  /* completed + file:null 是合同内的**合法终态**，不是违例，也不是「还在进行中」：
+     不改判成未知、不继续轮询，直接进 completed-no-file 这一屏给终态出口。 */
+  if(fileAbsent(f.file)){S.file=null;S.preview='none';S.step='completed-no-file';return}
+  S.file=f.file;S.preview='none';S.step='completed';return}
+ if(f.status==='failed'){S.lastErr={code:f.errorCode,message:f.errorMessage};S.step='failed';return}
+ if(f.status==='expired'){S.step='expired';return}
+ if(f.status==='cancelled'){S.step='cancelled';return}
+ S.step='waiting-delivery';   /* waiting / matched：任务仍在进行 */
+}
+/* ------------------------------------------------------------------ 自动查询
+   逐条对齐 apps/kiosk/src/pages/scan/ScanProgressPage.tsx 的运行时轮询：
+     · 只有**一个** timer，而且是 setTimeout 不是 setInterval —— 固定间隔在网络变慢时
+       会把请求堆叠成并发，而不是退避；
+     · 进入等待立刻查一次（React 里的 `void poll()`），不先干等一个间隔；
+     · 上一次查询**完全结束之后**才排下一次：waiting / matched、查询失败、回执不合同，
+       都按 POLL_INTERVAL_MS 再查；
+     · 终态（completed 含 file:null、failed、expired、cancelled）清 timer 并停下；
+       取消 / 补查 / 重扫 / 回起点 / 凭证丢失 / 链接被拒同样先清 timer。
+   in-flight 期间的点击和到期的 timer 一律不重入，所以任何时刻最多一个查询在途
+   （data-poll-max-concurrent 就是钉这一条的）。 */
+var POLL_INTERVAL_MS=3000;
+var POLL_AUTO_STEPS={'waiting-delivery':1,'poll-failed':1};   /* 仍在进行 / 这一次没问到：接着自动查 */
+var POLL_TERMINAL_STEPS={'completed':1,'completed-no-file':1,'failed':1,'expired':1,'cancelled':1};
+var pollTimer=null,pollInFlight=false,pollOrigin='none',pollLive=0;
+var PAUD={starts:0,ends:0,max:0,errors:0,retries:0};
+function pollClear(){if(pollTimer!==null){clearTimeout(pollTimer);pollTimer=null}}
+function pollSettle(){
+ pollClear();
+ if(!POLL_AUTO_STEPS[S.step])return;      /* 终态与取消 / 补查分支都落在这里停下 */
+ pollTimer=setTimeout(function(){pollTimer=null;PAUD.retries++;doPoll('auto')},POLL_INTERVAL_MS);
+}
+/* 一次查询的完整生命周期：清待执行 timer → 置在途 → 等回执 → 落状态 → 决定要不要再排 */
+function pollRun(origin,step,apply){
+ if(S.busy||pollInFlight)return false;
+ pollClear();                             /* 手动触发前先把待执行的自动查询清掉，不叠加 */
+ pollInFlight=true;pollOrigin=origin;pollLive++;
+ PAUD.starts++;if(pollLive>PAUD.max)PAUD.max=pollLive;
+ inflight(step,function(){
+  apply();
+  pollLive--;pollInFlight=false;PAUD.ends++;
+  if(S.step==='poll-failed'||S.step==='cancel-race-unknown')PAUD.errors++;
+  pollSettle();
+ });
+ return true;
+}
+function doPoll(origin){return pollRun(origin||'manual','polling',function(){applyPoll(take('poll'),false)})}
+/* 补查是取消竞态那一支的手动动作，不自动重排；但它如果落回等待页，等待页照旧自己查。 */
+function doRecheck(){return pollRun('recheck','cancel-recheck',function(){applyPoll(take('poll'),true)})}
+function doCancel(){
+ inflight('cancelling',function(){
+  var f=take('cancel');
+  if(!f){S.lastErr=NO_RESP;S.step='cancel-failed';return}
+  if(f.ok){S.lastStatus='cancelled';S.lastErr=null;S.cancelNote=null;S.step='cancelled';return}
+  S.lastErr={code:f.code,message:f.message};
+  if(f.code==='SCAN_TASK_ALREADY_COMPLETED'){S.cancelNote='already-completed';S.step='cancel-race';return}
+  if(f.code==='SCAN_TASK_CANCEL_CONFLICT'){S.cancelNote='conflict';S.step='cancel-conflict';return}
+  S.step='cancel-failed';
+ });
+}
+/* 匿名预览只有一个来源：completed 回执里的 file.fileUrl（那条 /content 签名 URL）。
+   没有它就没有可打开的东西，本页也**不会**改去调 preview-url —— 那条端点要登录，
+   匿名会被 401 AUTH_REQUIRED 挡掉。所以这里 fail-closed 直接不动，不发起任何调用。 */
+function doPreview(){
+ if(!S.file||!S.file.fileUrl)return;
+ S.previewTries++;
+ /* 每次重新打开都回到默认视图（第一张 · 适应整页 · 整页 100% 可见），
+    免得上一次缩放留下的裁切窗口被当成这份文件本来的样子。 */
+ pvReset();
+ inflight('preview-loading',function(){
+  var f=take('preview');
+  /* 验签失败 / 打不开都只影响预览这一件事：不动 S.file，不动 S.lastStatus，
+     也不画任何冒充这份文件内容的东西。 */
+  if(!f||!f.ok){S.lastErr=f?{code:f.code,message:f.message}:NO_RESP;S.preview='failed';S.step='preview-failed';return}
+  S.lastErr=null;S.preview='ready';S.step='preview-ready';
+ });
+}
+
+/* -------------------------------------------------------------------- 图标 */
+var ICO={
+ resume:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+ id:'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="9" cy="11" r="2.4"/><path d="M5.5 16.4c.7-1.6 2-2.4 3.5-2.4s2.8.8 3.5 2.4M15 10h4M15 14h3"/>',
+ doc:'<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/>',
+ folder:'<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2l2 2.5h7.8A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',
+ agent:'<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M9 16h6"/>',
+ cloud:'<path d="M7 18a4 4 0 0 1 .6-8 5.5 5.5 0 0 1 10.5 1.6A3.5 3.5 0 0 1 17.5 18z"/>',
+ printer:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/>',
+ warn:'<path d="M12 3.6 2.8 19.4h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/>',
+ spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ x:'<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+ chev:'<path d="M9 5l7 7-7 7"/>'
+};
+function svg(n,w){return '<svg width="'+(w||30)+'" height="'+(w||30)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+/* --------------------------------------------------------------- 通用积木 */
+var CHAIN=[['在面板扫描','放好纸，按开始','doc','你在打印机上按'],
+           ['本机接收','落到共享目录','folder','奔图 → 共享目录'],
+           ['本地投递','自动送往服务端','agent','本机终端程序'],
+           ['服务端保存','生成 PDF 才算数','cloud','服务端']];
+function chain(active){
+ var h='';
+ for(var i=0;i<CHAIN.length;i++){
+  h+='<div class="link'+(active===i?' on':'')+'"><span class="li">'+svg(CHAIN[i][2],24)+'</span><b>'+CHAIN[i][0]+'</b>'+
+     '<span class="lc">'+CHAIN[i][1]+'</span><span class="who">'+CHAIN[i][3]+'</span></div>';
+  if(i<CHAIN.length-1)h+='<span class="arrow">'+svg('chev',20)+'</span>';
+ }
+ return '<div class="chain" data-testid="scan-workbench-chain">'+h+'</div>';
+}
+function types(){
+ var h='';
+ for(var i=0;i<TYPES.length;i++){
+  var t=TYPES[i],on=S.scanType===t[0],c='';
+  for(var j=0;j<t[4].length;j++){var p=t[4][j].split('|');c+='<span class="mini'+(p[1]?' '+p[1]:'')+'">'+p[0]+'</span>'}
+  if(on)c+='<span class="mini pick">已选中</span>';
+  h+='<button type="button" class="ty press" role="radio" aria-checked="'+(on?'true':'false')+'" data-act="pick" data-type="'+t[0]+'" data-testid="scan-workbench-type-'+t[0]+'" aria-label="选择扫描类型：'+t[1]+'">'+
+   '<span class="ty-ic">'+svg(t[3],30)+'</span><span class="ty-n">'+t[1]+'</span><span class="ty-d">'+t[2]+'</span><span class="ty-chips">'+c+'</span></button>';
+ }
+ return '<div class="types" role="radiogroup" aria-label="扫描类型">'+h+'</div>';
+}
+var STATUS_CN={waiting:'（等待回传）',matched:'（已匹配到回传文件，仍在处理）',completed:'（已完成并带回文件）',
+ failed:'（处理失败）',expired:'（会话过期）',cancelled:'（已取消）'};
+/* 本机据服务端回执做了什么判断 —— 每个状态一句，写清「不改判 / 不猜 / 不认」 */
+var VERDICT={
+ 'create-loading':'等会话回执，不显示编号','create-failed':'不补编号，不进入等待',
+ 'panel-instruction':'只转达服务端指引',
+ 'polling':'回执没到，不改判','poll-failed':'查询失败，不改判、不猜结果',
+ 'cancelling':'取消回执没到，不下结论','cancelled':'服务端确认取消，本次会话没有文件',
+ 'cancel-failed':'取消没送到，不标成已取消','cancel-race':'取消未生效，必须补查才敢画文件',
+ 'cancel-conflict':'状态已变但不知变成什么，必须补查','cancel-recheck':'只认这一次补查回执',
+ 'cancel-race-unknown':'补查失败，标未知，不当成成功','completed':'回执与文件字段都齐，才画文件',
+ 'completed-no-file':'回执说已完成、file 为 null，按合法终态收尾，不画文件也不再轮询',
+ 'preview-loading':'只打开回执里的签名链接，不动结论','preview-ready':'签名链接此刻能打开，不改判扫描结论',
+ 'preview-failed':'预览没打开，不改判扫描结论，也不判断文件是否仍可用','failed':'按服务端返回的失败原样呈现',
+ 'expired':'按服务端返回的过期原样呈现'
+};
+function taskCard(extraRows){
+ var mark=S.taskId?markTag('演示合成编号',!S.file):'';
+ return '<div class="pgrp"'+(S.taskId?' data-evidence-fixture="synthetic"':'')+' data-testid="scan-workbench-task-card">'+
+  '<h4>这次会话'+mark+'</h4><div class="kv">'+
+  '<div><span>扫描类型</span><b>'+(S.scanType?TYPE_NAME[S.scanType]:'还没选')+'</b></div>'+
+  '<div><span>任务编号</span><b>'+(S.taskId?esc(S.taskId)+'（夹具合成，不可用于真实操作）':'没有任务编号')+'</b></div>'+
+  '<div><span>控制凭证</span><b>只在页面内存里，不上屏、不进链接、不落存储</b></div>'+
+  '<div><span>输出格式</span><b>PDF，由服务端生成</b></div>'+
+  '<div><span>本机存了什么</span><b>sessionStorage 只有 {v, step, scanType} 三项，凭证 / 编号 / 文件都不写</b></div>'+
+  '<div><span>已查询</span><b>'+S.polls+' 次</b></div>'+(extraRows||'')+'</div></div>';
+}
+function verdict(){
+ if(S.step==='waiting-delivery')return S.lastStatus?'任务仍在进行，不改判':'还没查过服务端，什么都不知道';
+ if(violation())return '回执不符合当前合同，不认它的结论，也不改判任务状态';
+ return VERDICT[S.step]||'按服务端回执呈现';
+}
+function evidenceCard(){
+ var st=S.lastStatus,er=S.lastErr,vio=violation();
+ /* 合同违例这两行不能沿用「没拿到回执」——回执确实到了，只是形状不对；
+    越界取值本身不回显，免得截图被当成一个真实存在的状态。 */
+ var stRow=st?esc(st)+STATUS_CN[st]:(vio==='status'?'有回执，但取值不在合同六种之内（原值不回显）'
+   :(vio==='file'?'completed（但同一份回执的 file 不合同）':'没有 —— 这次没拿到回执'));
+ var fileRow=S.file?'带齐 '+FILE_FIELDS.length+' 个字段'
+   :(S.step==='completed-no-file'?'null（合同允许的取值）'
+   :(vio==='file'?'回执带了 file，但字段不全（原值不回显）':'回执里没有文件'));
+ return '<div class="pgrp" data-testid="scan-workbench-evidence"><h4>服务端回执原样</h4><div class="kv">'+
+  '<div><span>status</span><b>'+stRow+'</b></div>'+
+  '<div><span>error</span><b>'+(er&&er.code?esc(er.code)+' · '+esc(er.message):'没有')+'</b></div>'+
+  '<div><span>file</span><b>'+fileRow+'</b></div>'+
+  '<div><span>本机判断</span><b>'+esc(verdict())+'</b></div></div>'+
+  '<div class="foot">这四行就是本屏结论的<b>全部依据</b>；服务端没说的，页面不会替它说。</div></div>';
+}
+function noteCard(title,body,foot){
+ return '<div class="pgrp"><h4>'+title+'</h4>'+body+'<div class="foot">'+foot+'</div></div>';
+}
+function planList(items,two){
+ var h='';for(var i=0;i<items.length;i++)h+='<li><span class="sq"></span><span>'+items[i]+'</span></li>';
+ return '<ul class="plan'+(two?' two':'')+'">'+h+'</ul>';
+}
+/* 「演示合成」醒目标记：一屏只挂一个 data-testid（避免重复 testid），
+   挂在这一屏真正会被当成凭据的东西上 —— 有文件就挂文件卡，没有就挂会话卡。 */
+function markTag(text,own){return '<span class="tagx"'+(own?' data-testid="scan-workbench-synthetic-mark"':'')+'>'+text+'</span>'}
+function fileCard(){
+ var f=S.file;
+ return '<div class="pgrp" data-evidence-fixture="synthetic" data-testid="scan-workbench-file-card">'+
+  '<h4>这份文件（ScanSessionFileView）'+markTag('演示夹具文件',true)+'</h4><div class="kv">'+
+  '<div><span>filename</span><b>'+esc(f.filename)+'</b></div>'+
+  '<div><span>mimeType</span><b>'+esc(f.mimeType)+'</b></div>'+
+  '<div><span>sizeBytes</span><b>'+f.sizeBytes+'（约 '+bytes(f.sizeBytes)+'）</b></div>'+
+  '<div><span>fileId</span><b>'+esc(f.fileId)+'</b></div>'+
+  '<div><span>sha256</span><b>'+esc(f.sha256)+'</b></div>'+
+  '<div><span>fileUrl</span><b>'+esc(f.fileUrl)+'</b></div></div></div>';
+}
+function bytes(n){return (n/1024).toFixed(0)+' KB'}
+function taskStrip(){
+ return '<div class="tstrip" data-evidence-fixture="synthetic"><span>任务 <b>'+esc(S.taskId)+'</b></span>'+
+  '<span>回执 <b>'+esc(S.lastStatus||'无')+'</b></span><span>已查询 <b>'+S.polls+'</b> 次</span>'+
+  markTag('演示合成编号',!S.file)+'</div>';
+}
+/* --------------------------------------------------- 结果出口合同（逐条对齐 React 运行时）
+   apps/kiosk/src/pages/scan/ScanResultPage.tsx：
+     handleResumeAI()   仅 scanType==='resume' 且有 file 时可点；
+                        navigate('/resume/parse',{state:{source:'scan',fileId,file:{…}}})。
+                        ResumeParsePage 只认 location.state.fileId，没有它就渲染「未找到简历文件」。
+     handlePrint()      navigate('/print/confirm',{state:{file:{fileId,fileUrl,…},params}})。
+                        PrintConfirmPage 没有 file 上下文会落到守卫分支；金额只读
+                        POST /orders/quote，没有 fileUrl 一律 unavailable，不显示任何价格。
+     handleDocuments()  isLoggedIn ? '/me/documents' : loginPathForCurrentLocation()。
+   三个交接都靠 React router 的**内存态**携带文件身份，不进 URL、不进浏览器存储。
+   静态设计稿没有这条内存通道，所以这一屏一律不假装已接通：
+     · 有真实起点可去的（打印）→ 去真实起点，并写清到了那边要**重新选择或重新取得可用文件**；
+     · 没有安全携带通道的（AI 识别 / 我的文档）→ 明确受控，写清受控原因与诚实替代。
+   出口一律不带 ?state= 这种演示开关，也不靠链接把文件带过去。
+   2026-08-27 第二次返修：出口文案不再以「文件在服务端」开头。上一次回执只说明**那一刻**
+   回执里带回了这份文件，不等于此刻仍可取用；何况这一屏根本带不走它。 */
+function exitOpen(id,icon,title,desc,href,route,aria){
+ return '<a class="press" href="'+href+'" data-route="'+route+'" data-exit="'+id+'" data-exit-mode="open"'+
+  ' data-testid="scan-workbench-exit-'+id+'" aria-label="'+esc(title)+'（'+esc(aria)+'）">'+
+  '<span class="ai">'+svg(icon,24)+'</span><span class="exbody"><span class="extitle">'+title+'</span><small>'+desc+'</small></span></a>';
+}
+function exitBlocked(id,icon,title,desc,why,alt){
+ return '<div class="offwrap" data-exit="'+id+'" data-exit-mode="blocked" data-exit-reason="'+esc(why)+'">'+
+  '<button type="button" class="off" aria-disabled="true" data-testid="scan-workbench-exit-'+id+'"'+
+  ' aria-label="'+esc(title)+'（暂不放行：'+esc(why)+'）">'+
+   '<span class="ai">'+svg(icon,24)+'</span><span class="exbody">'+
+   '<span class="extitle">'+title+'<span class="offtag">暂不放行</span></span><small>'+desc+'</small></span></button>'+
+  '<a class="press alt" href="'+alt[0]+'" data-route="'+alt[1]+'" data-exit-alt="'+id+'">'+svg('chev',20)+'<span>'+alt[2]+'</span></a></div>';
+}
+/* wide=true：三个出口横排成一行。结果页的视觉主角是文件本身，出口不再竖着吃掉半屏；
+   受控出口的原因与替代路径照旧完整写出，不因为收窄就删掉。 */
+function actions(wide){
+ var isResume=S.scanType==='resume';
+ return '<div class="actrow'+(wide?' grid3':'')+'" data-testid="scan-workbench-exits">'+
+  exitBlocked('ocr','spark','AI 简历识别',
+   isResume
+    /* 真实运行时怎么交接（router 内存态、fileId、/resume/parse）写在 ?debug=1 的自证列里：
+       那是给验收的人看的技术口径，普通用户只需要知道这里不放行、以及该去哪。 */
+    ? '静态设计稿没有把文件交给下一页的通道，所以不放行；要识别请到简历服务<b>重新取得可用文件</b>。'
+    : 'AI 简历识别只对<b>简历扫描</b>开放；这次扫的是「'+(S.scanType?TYPE_NAME[S.scanType]:'未选类型')+'」。',
+   isResume?'静态设计稿不跨页携带文件身份':'本次扫描类型不是简历扫描',
+   ['21-resume-triage.html','/resume/source',
+    isResume
+     ? '去简历服务重新上传：那边没有「选扫描件」这一项'
+     : '去简历服务上传一份简历，再做 AI 诊断'])+
+  exitOpen('print','printer','拿去打印',
+   '到打印流程要<b>重新选择或重新取得可用文件</b>；本静态稿不携带这份文件的身份。金额由服务端报价决定，本页不给价格。',
+   '12-file-source.html','/print/upload','进入打印流程，重新选择或重新取得可用文件')+
+  exitBlocked('docs','folder','收进「我的文档」',
+   '扫描会话按<b>匿名</b>建立，匿名扫描件不挂账号，<b>不会出现在「我的文档」</b>。',
+   '匿名会话的文件不进我的文档，事后登录也不会追溯归档',
+   ['03-login-gate.html','/login','先登录，再新建一次扫描会话 —— 归属在建会话那一刻就定了'])+
+  '</div>';
+}
+function bar(items,reason){
+ var h='';
+ for(var i=0;i<items.length;i++){
+  var it=items[i],grow=it.primary?' style="flex:1.5"':'',cls='btn '+(it.primary?'primary':'ghost')+' press';
+  var tid=it.primary?' data-testid="'+SCREEN+'-primary"':'';
+  if(it.href)h+='<a class="'+cls+'" href="'+it.href+'"'+(it.route?' data-route="'+it.route+'"':'')+grow+tid+'>'+it.label+'</a>';
+  else if(it.off)h+='<button type="button" class="'+cls+'" aria-disabled="true"'+grow+tid+' aria-label="'+it.label+'（'+esc(it.off)+'）">'+it.label+'</button>';
+  else h+='<button type="button" class="'+cls+'" data-act="'+it.act+'"'+grow+tid+'>'+it.label+'</button>';
+ }
+ return (reason?'<div class="cta-reason" data-testid="'+SCREEN+'-disabled-reason">'+esc(reason)+'</div>':'')+'<div class="ctabar">'+h+'</div>';
+}
+/* cls: true = 撑满剩余高度并收尾（grow last）；也可以直接给 'last' 之类的类名 */
+function sec(no,title,hint,inner,cls){
+ if(cls===true)cls='grow last';
+ var label=title?'<div class="sec-label">'+(no?'<span class="no serif">'+no+'</span>':'')+'<span class="t">'+title+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>':'';
+ return '<section class="sec'+(cls?' '+cls:'')+'">'+label+inner+'</section>';
+}
+function head(icon,text,breathe){
+ return '<div class="state-h">'+(breathe?'<span class="dot16 breathe"></span>':svg(icon,28))+esc(text)+'</div>';
+}
+function p(html){return '<div class="state-p">'+html+'</div>'}
+function chips(list){
+ var h='';for(var i=0;i<list.length;i++){var q=list[i].split('|');h+='<span class="chip'+(q[1]?' '+q[1]:'')+'">'+q[0]+'</span>'}
+ return '<div class="meta">'+h+'</div>';
+}
+function statePanel(kind,inner,variant){
+ return '<div class="state'+(variant?' '+variant:'')+'" data-kind="'+kind+'" data-testid="'+SCREEN+'-fallback">'+inner+'</div>';
+}
+/* 版块堆叠：按顺序渲染，'#' 自动顺延编号；标了 'grow' 的那块撑满剩余高度，
+   没标就让最后一块撑满。这样「主任务在前、自证在后」时不会在中间留大片空白。 */
+var LAYOUT='grow';   /* 'grow' = 最后一块撑满；'spread' = 版块之间均分余量。render() 每次重置。 */
+function stack(list,spread){
+ var rows=[],i;
+ for(i=0;i<list.length;i++)if(list[i])rows.push(list[i]);
+ var growAt=-1,n=0,out='';
+ if(spread)LAYOUT='spread';
+ for(i=0;i<rows.length;i++)if(rows[i][4]==='grow')growAt=i;
+ if(!spread&&growAt<0)growAt=rows.length-1;
+ for(i=0;i<rows.length;i++){
+  var r=rows[i],no=r[0]==='#'?('0'+(++n)):r[0];
+  out+=sec(no,r[1],r[2],r[3],(!spread&&i===growAt)?true:(i===rows.length-1?'last':''));
+ }
+ return out;
+}
+/* 演示自证区：会话事实、服务端回执原样、状态枚举与技术限制。
+   这些是给做验收的人看的，不是给来扫一份简历的人看的 —— 所以只在 ?debug=1 下渲染。
+   普通用户视图（含 ?capture=1 出图）只留：当前状态 / 当前事实 / 下一步。 */
+function proofSection(proof,extraRows){
+ if(!DEBUG)return null;
+ return ['','本屏自证 · 只在 ?debug=1 下显示','会话事实、服务端回执原样、状态枚举与技术限制',
+  '<div class="factwrap"><div class="grid2 top">'+taskCard(extraRows)+evidenceCard()+'</div>'+(proof||'')+'</div>'];
+}
+/* 状态类页面统一骨架：当前状态（主视野）→（链路位置）→ 下一步；自证只在演示模式下追加。
+   一律用 spread 排：卡片按内容收住，余量走版块之间的呼吸位，不靠拉伸卡片填满高度。 */
+function statusBody(kind,panelInner,chainIdx,chainTitle,chainHint,nextCards,proof,extraRows){
+ var cards=[],i;
+ for(i=0;i<(nextCards||[]).length;i++)if(nextCards[i])cards.push(nextCards[i]);
+ var next=cards.length?(cards.length>1?'<div class="grid2 top">'+cards.join('')+'</div>':cards[0]):null;
+ return stack([
+  ['','',null,statePanel(kind,panelInner,'hero')],
+  (chainIdx===null||DEBUG)?null:['#',chainTitle,chainHint,chain(chainIdx)],
+  (next&&!DEBUG)?['#','下一步','这一屏现在能做什么',next]:null,
+  proofSection(proof,extraRows)
+ ],true);
+}
+
+/* ------------------------------------------------------------------ 各状态 */
+var V={};
+V['setup']=function(){
+ var picked=Boolean(S.scanType);
+ return sec('01','要扫什么',picked?'已选「'+TYPE_NAME[S.scanType]+'」':'先选类型，再建会话',types())+
+  sec('02','这条链路长这样','四段都走完，文件才到你手上',chain(-1))+
+  sec('03','动手之前先看两件事','',
+   '<div class="grid2 top"><div>'+
+   noteCard('为什么屏幕上没有「开始扫描」',
+    p('这台一体机的扫描<b>只能在奔图自己的操作面板上启动</b>，网页不能远程驱动扫描仪。本机负责建会话、转达服务端指引、等文件回传。')+
+    p('所以这一屏不会有「一键扫描」，也不会有扫到第几张的进度。'),
+    '合同类材料的扫描从「合同审阅」工作台发起，本屏不重复开口子。')+
+   '</div><div>'+
+   noteCard('扫完之后这份 PDF 能干什么',
+    planList(['简历扫描件可以进 AI 识别，做诊断与优化。',
+              '拿去打印：到打印流程重新选定，由服务端报价后出纸。',
+              '留存按文件类型与服务端规则；本屏无登录步骤，匿名件不进「我的文档」。']),
+    '费用以办理时服务端报价与现场规则为准。')+
+   '</div></div>',true)+
+  bar([{href:'18-scan-workbench.html?mode=usb-panel',route:'/scan/start',label:'改用面板扫描到 U 盘'},
+       picked?{act:'create',primary:true,label:'建立扫描会话'}:{off:'还没有选扫描类型',primary:true,label:'建立扫描会话'}],
+      picked?'':'还没有选扫描类型 —— 选完才知道该给你哪一套面板指引');
+};
+V['usb-panel']=function(){
+ return stack([
+  ['01','在奔图面板选择「扫描到 U 盘」','这是打印机自己的独立能力，不经过平台扫描会话',
+   '<div class="grid2 top">'+
+   noteCard('面板上怎么做',
+    planList(['把 U 盘插到打印机支持的 USB 接口。',
+              '在奔图操作面板打开「扫描」，选择「扫描到 U 盘」。',
+              '按面板提示选择文件格式与保存位置，再开始扫描。',
+              '完成后先按面板提示安全结束，再拔出 U 盘。']),
+    '具体菜单名称、可选格式和 USB 接口位置以现场奔图面板为准。')+
+   noteCard('这条路与平台扫描的区别',
+    planList(['<b>不创建平台扫描任务</b>，所以本页没有任务编号。',
+              '<b>不显示扫描进度或结果</b>，成功失败只看打印机面板。',
+              '<b>不进入「我的文档」</b>，文件只保存在你的 U 盘。',
+              '当前尚未完成 Windows / 奔图真机验收，不能把这条说明当成真机通过。']),
+    '平台不会读取、上传或保留这次扫描产生的文件。')+
+   '</div>','grow'],
+  ['02','完成之后怎么继续','U 盘里的文件要重新导入才能在本机办理',
+   '<div class="grid2 top">'+
+   noteCard('要打印或继续加工',p('回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。'),'导入链路仍以 Terminal Agent 与本地令牌状态为准。')+
+   noteCard('面板没有这个选项',p('不要在本页反复点击。请联系工作人员确认机型、固件和现场 USB 配置。'),'本页不假设所有奔图固件都提供相同菜单。')+
+   '</div>']
+ ],true)+bar([{href:'06-help.html',route:'/help',label:'联系工作人员'},
+              {href:'10-print-hub.html',route:'/print-scan',primary:true,label:'完成后回打印扫描'}]);
+};
+V['create-loading']=function(){
+ return statusBody('info',
+  head('',' 正在建扫描会话',true)+
+  p('本机正在向服务端申请一次扫描会话。<b>会话建成之前，任务编号和面板指引都不显示</b> —— 显示了你也用不上，反而会照着一个不存在的编号去机器上操作。')+
+  p('这一步不碰扫描仪，也不会替你启动任何硬件。')+
+  chips(['正在等服务端回话','已尝试建会话 '+S.createTries+' 次','选中类型：'+(S.scanType?TYPE_NAME[S.scanType]:'未选择')]),
+  -1,'会话建成才算迈出第一步','这四段一段都还没开始',
+  [noteCard('会话建成之后会出现什么',
+    planList(['服务端发的任务编号，用来认领待会儿回传的文件。',
+              '按扫描类型定制的面板操作指引，本机原样转达。',
+              '一枚只存在页面内存里的控制凭证，用来查询和取消。']),
+    '这三样都由服务端下发，<b>本机一样都编不出来</b>。'),
+   noteCard('这一刻你可以做什么',
+    p('把要扫的纸先整理好、订书钉取掉，<b>但先别在面板上按开始</b> —— 会话还没建成，这时候扫出来的文件没人认领。')+
+    p('等待通常就是一两秒。一直转，多半是本机到服务端的网络有问题。'),
+    '这一刻页面还没有任何结论可写。')],
+  noteCard('本屏的技术限制',
+   planList(['不替你启动扫描：本机没有远程驱动扫描仪的通道。',
+             '不预先显示任何编号：编号只能由服务端下发。',
+             '合同类扫描由「合同审阅」工作台发起，本屏不开口子。']),
+   '这三条是页面的硬约束，不随重试次数改变。'))+
+  bar([{off:'请求还没回来',label:'返回选类型'},{off:'服务端还没返回会话',primary:true,label:'等服务端返回会话'}],
+      '请求还在路上 —— 这一刻页面不做任何判断，也不给你一个假的编号');
+};
+V['create-failed']=function(){
+ var e=S.lastErr||NO_RESP;
+ return statusBody('error',
+  head('warn','扫描会话没建成')+
+  p('服务端没有返回这次扫描会话：<b>'+esc(e.message)+'</b>（'+esc(e.code)+'）。')+
+  p('所以现在<b>没有任务编号，也没有面板指引</b>。会话是认领回传文件的凭据，没有它，扫出来的文件到了服务端也挂不上。')+
+  chips(['已尝试 '+S.createTries+' 次|warn','没有任务编号','本机没有文件']),
+  -1,'现在卡在建会话这一步','第一段还没开始',
+  [noteCard('接下来怎么办',
+    planList(['点右下角重试一次，多数是一次性的网络抖动。',
+              '连续失败就别在面板上扫了，扫了也没有会话认领。',
+              '叫工作人员看一眼这台机器到服务端的网络。']),
+    '重试不会产生任何副作用，<b>也不会自己变成成功</b>。'),
+   noteCard('为什么不给你一个编号',
+    p('编号是服务端发的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人认领。')+
+    p('所以这一屏宁可空着，也不给一个用不了的号。'),
+    '这一屏的空白是有意的，不是还没加载完。')],
+  noteCard('这一屏不会做的事',
+   planList(['不因为失败次数多就换一种说法。',
+             '不自动降级成「先扫着，回头再补会话」。',
+             '不把没建成的会话当成可用会话记下来。']),
+   '失败就是失败，页面只转达服务端说了什么。'))+
+  bar([{href:'06-help.html',route:'/help',label:'联系工作人员'},{act:'create',primary:true,label:'重试建会话'}]);
+};
+V['panel-instruction']=function(){
+ var ps='';
+ for(var i=0;i<S.instructions.length;i++)ps+='<div class="pstep"><span class="n">'+(i+1)+'</span><span class="pt">'+esc(S.instructions[i])+'</span></div>';
+ /* 这一屏只剩三段：面板上照着做的那几步（主视野）→ 链路位置 → 两条短要点，
+    最后才是行动条。旧稿在指引后面又摞了两张整段说明卡，主操作被一堵说明墙推远。 */
+ return stack([
+  ['01','照着做：全在机器面板上','服务端下发原文，本机不改写',
+  '<div class="panel">'+
+  '<div class="mfp"><div class="mfp-face"><div class="mfp-screen">在面板上选<br>扫描到 网络文件夹</div>'+
+  '<div class="mfp-row"><span class="mfp-key"></span><span class="mfp-key hi"></span><span class="mfp-key"></span></div>'+
+  '<div class="mfp-row"><span class="mfp-key"></span><span class="mfp-key"></span><span class="mfp-key"></span></div></div>'+
+  '<div class="mfp-cap">这是<b>奔图机器自己的操作面板</b>示意图，不是本机屏幕。扫描的每一步都在那上面按。</div></div>'+
+  '<div class="psteps" data-testid="scan-workbench-instructions">'+ps+
+  '<div class="psrc">以上 '+S.instructions.length+' 条按「'+TYPE_NAME[S.scanType]+'」下发，本机一字未改。扫完请回到这台屏幕，进入等待之后本机会自动查，别在面板前干等。</div></div></div>','grow'],
+  ['02','现在在第一段','链路位置，不是百分比',chain(0)],
+  DEBUG?null:['03','按完面板之后','这一屏只剩右下角那一下',
+   '<div class="grid2 top">'+
+   noteCard('回到这台屏幕点右下角',
+    planList(['点「我在面板扫完了，去等文件」。',
+              '进了等待页本机就每隔几秒自动查一次，你不用一直点。',
+              '文件回来之前不显示扫到第几张：链路上没有这种事件。']),
+    '合同类材料的扫描由「合同审阅」工作台发起，本屏不重复开口子。')+
+   noteCard('两个「取消」不是一回事',
+    planList(['左下角「取消，换类型」只是<b>本机丢掉这次会话</b>回到选类型，它<b>不向服务端发取消请求</b>。',
+              '真要取消这次会话，到等待页点「取消这次扫描」，由服务端确认。',
+              '会话还在服务端活着的时候，别在面板上重复扫。']),
+    '按你真正想要的那一个，别把两件事当成一件。')+
+   '</div>'],
+  (DEBUG?['','本屏自证 · 只在 ?debug=1 下显示','会话事实与本屏的技术限制',
+   '<div class="grid2 top">'+taskCard('<div><span>会话有效期</span><b>以服务端返回的 expiresAt 为准（演示夹具不展开具体时刻）</b></div>')+
+   noteCard('这一页不会做什么',
+    planList(['不替你启动扫描 —— 本机没有这个通道。',
+              '不显示扫到第几张 —— 没有页级事件可用。',
+              '不做文字识别 —— 识别在结果页另开。',
+              '不凭等待时长变成完成 —— 只有服务端回 completed 并带齐文件字段才变。']),
+    '这四条限制不随扫描类型变化，也不随重试次数变化。')+'</div>']:null)
+ ],true)+
+  bar([{act:'rescan',label:'取消，换类型'},{act:'wait',primary:true,label:'我在面板扫完了，去等文件'}]);
+};
+V['waiting-delivery']=function(){
+ var note=S.cancelNote==='conflict'?p('<b>上一次取消没有生效，服务端说这个任务还在进行中。</b>'):'';
+ return statusBody('info',
+  head('',' 正在等文件回传',true)+note+
+  p('面板扫完之后，文件还要经过本机接收和投递才到服务端。<b>这中间没有可显示的张数</b>，所以这里只告诉你服务端最近一次说了什么、已经查过几次。')+
+  p('<b>本机正在自动检查</b>：每隔几秒替你问一次服务端，有结果会自动切到对应的那一屏。想马上知道，点右下角<b>「立即检查」</b>就行。')+
+  /* 自动查询的节奏与 ScanProgressPage.tsx 一致：单 timer、上一次落地之后才排下一次。
+     所以这一屏的文案按「自动查、可插队」写，旧稿那套「全靠手点」的说法已经不成立。 */
+  chips(['正在自动检查|ok','已查询 '+S.polls+' 次','没有页级进度']),
+  S.lastStatus==='matched'?3:-1,'链路走到哪一段',
+  S.lastStatus==='matched'?'服务端已匹配到回传文件，停在最后一段':'服务端还没说收到，前三段停在哪本机不知道',
+  [noteCard('等太久怎么办',
+    p('先确认面板上那一次扫描是不是真的完成了。<b>面板没扫成，这里等多久也等不到文件。</b>')+
+    p('确认扫过了还是没回来，就叫工作人员看一眼共享目录。'),
+    '别重复扫，容易出两份；<b>是否产生打印费用，以进入打印流程后服务端的报价为准</b>。'),
+   noteCard('这一屏现在会做什么',
+    planList(['本机每隔几秒自动查一次，你什么都不用做。',
+              '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
+              '不想扫了就点「取消这次扫描」，取消成不成由服务端定。']),
+    '自动检查是一次<b>纯读取</b>：不会重扫，也不会改变服务端那边的任何东西。')],
+  noteCard('本屏的技术限制',
+   planList(['没有页级进度，也没有逐张计数：链路上没有这种事件。',
+             '不按等待时长推断结果，等多久都不会自动判定。',
+             '不展示具体硬件故障原因，本机收不到。']),
+   '这一屏只转达服务端最近一次说了什么。'))+
+  bar([{act:'cancel',label:'取消这次扫描'},{act:'poll',primary:true,label:'立即检查'}]);
+};
+V['polling']=function(){
+ return statusBody('info',
+  head('',' 正在查询服务端',true)+
+  p('本机正在问服务端：这次扫描现在是什么状态。<b>回执没回来之前，这一页不改任何判断</b>。')+
+  p('服务端只会回状态合同里的六种取值，本机按原样呈现，不做二次解释。')+
+  chips(['第 '+(S.polls+1)+' 次查询 · '+(pollOrigin==='manual'?'你点的立即检查':'本机自动检查'),'回执没到，不改判']),
+  -1,'这条链路走到哪','查询回来之前，这一屏不改判',
+  [noteCard('查完之后可能是哪几种',
+    planList(['还在等 —— 回到等待页，接着等。',
+              '已经好了 —— 出结果页，能看到这份文件。',
+              '没扫成 / 超时 / 已取消 —— 各自的结果页。',
+              '这次没问到 —— 老实说不知道，不改判。']),
+    '只有<b>服务端明确说完成、并且把文件信息一起带回来</b>，才会出结果页。'),
+   noteCard('这一刻你不用做什么',
+    p('等这一次问答回来就行，通常一两秒。<b>不用再去面板上扫一遍</b> —— 重复扫会产生两份文件。')+
+    p('这一次没有结论的话，本机会隔几秒自己再查一次。查询是一次纯读取：查多少次都不会重扫，也不会改变服务端那边的任何东西。'),
+    '正在等这次查询的回执。')],
+  noteCard('服务端只会回这六种状态',
+   planList(['waiting / matched → 任务仍在进行，留在等待页。',
+             'completed <b>且带齐文件字段</b> → 才画出结果文件。',
+             'failed / expired / cancelled → 各自的终态页。',
+             '查询本身失败 → 标未知，不改判任务状态。'],true),
+   '取值来自 ScanTaskStatus；本机按原样呈现，不做二次解释。'))+
+  bar([{off:'查询还没回来',label:'取消这次扫描'},{off:'查询还在路上',primary:true,label:'立即检查'}],
+      '正在等这次查询的回执 —— 这一刻不改判任务状态');
+};
+/* 「本机没问到」和「回执到了但不合同」是两件事，不能共用一套说法：
+   前者是这一次问答没成，后者是服务端确实答了、但答的形状不在合同里。
+   两者的共同点只有一条 —— 都不足以改判任务状态，所以轮询口径不变。 */
+V['poll-failed']=function(){
+ var vio=violation();
+ return statusBody('warn',
+  head('warn',vio?'收到回执，但它不符合当前状态合同':'查状态失败，任务仍按进行中处理')+
+  (vio
+   ? p('这一次<b>拿到了服务端回执</b>，但本机认不了它：<b>'+esc(S.lastErr.message)+'</b>（'+esc(S.lastErr.code)+'）。越界的原值不上屏。')+
+     p('<b>认不了的回执不拿来下结论</b> —— 不当成完成，也不当成失败，任务仍按进行中处理，下次再查。')
+   : p('这一次查询没拿到服务端回执：<b>'+esc(S.lastErr.message)+'</b>（'+esc(S.lastErr.code)+'）。')+
+     p('<b>查不到不等于扫描失败</b> —— 这一页不改判任务状态，还当它在进行中，下次继续查。'))+
+  chips([vio?'回执不符合合同|warn':'连续未知 '+S.unknowns+' 次|warn','已查询 '+S.polls+' 次','正在自动重试|warn']),
+  -1,'这条链路走到哪',vio?'回执不合同，位置一样定不下来':'这次没问到，位置就是不知道',
+  [noteCard('接下来怎么办',
+    vio
+     ? planList(['本机会隔几秒自动再查一次，结论以下一次合规回执为准。',
+                 '别回面板上重扫：这次任务在服务端多半还活着。',
+                 '这种回执多半是后端合同或中间层变了，请把这一屏交给工作人员留档。'])
+     : planList(['本机会隔几秒自动再查一次，网络一恢复就能拿到结论。',
+                 '别回面板上重扫：这次任务在服务端多半还活着。',
+                 '一直查不到就叫工作人员，后台能查这台机器的会话。']),
+    '别重复扫，容易出两份；<b>是否产生打印费用，以进入打印流程后服务端的报价为准</b>。'),
+   vio
+    ? noteCard('不合同不等于扫失败',
+       p('服务端<b>确实回话了</b>，只是这一句的形状不在约定里：'+
+         (vio==='file'?'说已完成，却只给了半个文件对象。':'给的状态不在约定的六种取值里。')+
+         '所以本机把它当成一次没有结论的问答。')+
+       p('任务本身在服务端该怎么走还怎么走，这一屏既不替它标失败，也不替它标完成。'),
+       '这一屏只报「这一句读不懂」，不把读不懂说成扫描出了问题。')
+    : noteCard('查不到不等于扫失败',
+       p('查询失败说的是<b>本机没问到</b>，不是服务端说这次扫描不行。任务在服务端该怎么走还怎么走。')+
+       p('所以这一屏不改判，也不会替服务端把它标成失败或完成。'),
+       '再查几次都查不到，这里还是这句「不知道」。')],
+  noteCard('本机不会做的事',
+   planList([vio?'不会拼凑半份回执，也不会替它补上缺的字段。':'不会因为查不到就判成失败，也不会判成完成。',
+             '不会自动重扫，也不会重复建会话。',
+             '不会凭等待时长推断任何结果。'],true),
+   '连续未知只是计数，不构成任何结论。'),
+  '<div><span>连续未知</span><b>'+S.unknowns+' 次</b></div>')+
+  bar([{href:'06-help.html',route:'/help',label:'联系工作人员'},{act:'poll',primary:true,label:'立即检查'}]);
+};
+V['cancelling']=function(){
+ return statusBody('info',
+  head('',' 正在发送取消请求',true)+
+  p('本机正在请求服务端取消这次会话。<b>服务端没回之前，页面不说已取消</b> —— 取消成不成功由服务端定。')+
+  p('如果这一刻文件刚好投递完成，取消就会来不及，那时以服务端结果为准。')+
+  chips(['取消回执没到','不提前下结论']),
+  -1,'这条链路走到哪','取消也可能来不及，以服务端为准',
+  [noteCard('等回执的时候别做什么',
+    p('别再去面板上扫一遍。<b>这次会话还没作废</b>，重复扫会让共享目录里多出一份没人认领的文件。')+
+    p('也别刷新这一页：控制凭证只在内存里，刷新之后连查询和取消都做不了了。'),
+    '正在等取消回执。'),
+   noteCard('取消之后可能是哪几种',
+    planList(['取消成功 —— 会话作废，本次会话拿不到文件。',
+              '晚了一步 —— 文件刚好扫完了，要再查一次才拿得到。',
+              '没生效 —— 任务还在跑，回到等待页接着等。',
+              '请求没送到 —— 任务照旧，页面不标成已取消。']),
+    '只有<b>「晚了一步」</b>那一种能把文件带回本次会话，而且必须补查确认。')],
+  noteCard('取消回执的四种取值',
+   planList(['cancel 成功 → status 置为 cancelled，本次任务不再挂上文件。',
+             'SCAN_TASK_ALREADY_COMPLETED → 取消未生效，需补查。',
+             'SCAN_TASK_CANCEL_CONFLICT → 状态已变，需补查。',
+             '没有回执 → 任务照旧，不标成已取消。'],true),
+   '取消是一次写操作，页面不会替它预判结果。'))+
+  bar([{off:'取消请求还没回来',label:'返回打印扫描'},{off:'取消请求还没回来',primary:true,label:'等取消回执'}],
+      '正在等取消回执 —— 这一刻既不说已取消，也不说已完成');
+};
+V['cancel-failed']=function(){
+ return statusBody('warn',
+  head('warn','取消请求没送到，任务仍按进行中处理')+
+  p('这一次取消没拿到服务端回执：<b>'+esc(S.lastErr.message)+'</b>（'+esc(S.lastErr.code)+'）。')+
+  p('<b>取消失败不等于任务被取消，也不等于任务失败。</b>会话在服务端还活着，本机不改判。')+
+  chips(['取消未生效|warn','任务仍在进行','本次会话暂无文件']),
+  -1,'这条链路走到哪','取消没送到，状态照旧',
+  [noteCard('两个选择，点哪个都行',
+    planList(['再取消一次 —— 网络恢复就能送到。',
+              '先查一下状态 —— 说不定文件已经扫回来了。',
+              '都不想点也可以就这么等着 —— 任务在服务端照旧走，但这一屏不会自己去查。']),
+    '两个动作都不会伪造结果，<b>结论一律以服务端回执为准</b>。'),
+   noteCard('为什么不直接标成已取消',
+    p('本机自说自话标成已取消，你就会以为扫了也没用；结果文件回来了，反而没人管。')+
+    p('会话在服务端还活着 —— 取消失败既不等于任务被取消，也不等于任务失败。'),
+    '这一屏不改判，状态照旧。')],
+  null)+
+  bar([{act:'poll',label:'立即检查'},{act:'cancel',primary:true,label:'再取消一次'}]);
+};
+V['cancelled']=function(){
+ return statusBody('warn',
+  head('x','这次扫描已取消')+
+  p('服务端确认<b>本次扫描任务已取消</b>。刚才那个任务编号已经作废，不能再用。')+
+  p('<b>本次会话没有可用文件</b> —— 就算你已经在面板上扫过，那一份也挂不到这个已取消的会话上，这里取不出来。需要重新建会话再扫一次。')+
+  chips(['服务端确认取消|warn','本次会话没有可用文件','编号已作废']),
+  -1,'链路停在这里','文件没有挂到本次会话',
+  [noteCard('这次会话停在什么位置',
+    planList(['服务端已确认取消，本次会话取不到文件。',
+              '这个编号不会再认领后来回传的任何文件。',
+              '是否产生费用，以办理时服务端报价与现场规则为准。']),
+    '重新开始很快：选类型 → 建会话 → 照面板指引扫。'),
+   noteCard('已经扫过了怎么办',
+    p('那一份本次会话认领不到。<b>后续到达的未认领文件，由终端与服务端按清理与留存规则处理</b> —— 这一屏不替它下结论，也不显示它的下落。')+
+    p('重扫之前把纸从进纸器里取回来；重新建会话之后如果查到文件，先核对一眼是不是你要的那份。'),
+    '需要哪份文件，以重新建会话后服务端给出的结果为准。')],
+  null)+
+  bar([{href:'10-print-hub.html',route:'/print-scan',label:'返回打印扫描'},{act:'rescan',primary:true,label:'重新选类型再扫一次'}]);
+};
+V['cancel-race']=function(){
+ return statusBody('warn',
+  head('warn','取消没生效：服务端说这次扫描已经完成')+
+  p('取消请求送到的时候，这次扫描<b>在服务端已经完成</b>（'+esc(S.lastErr.code)+'）。既然文件已经生成，就不能按取消处理。')+
+  p('但服务端这一句只说了「已完成」，<b>没有把文件信息带回来</b>。所以本机现在还画不出这份文件，必须再查一次状态。')+
+  chips(['取消未生效|warn','还没拿到文件信息','需要补查一次']),
+  3,'链路已经走完','但文件信息还没回到本机',
+  [noteCard('下一步：补查一次',
+    p('点右下角查一次最新状态。<b>补查是一次纯读取</b>，不会重扫，也不会改变服务端那边的任何东西。')+
+    p('补查拿到<b>带齐文件字段</b>的回执，才会进结果页。'),
+    '点多少次都不会产生副作用。'),
+   noteCard('本机不会做的事',
+    planList(['不凭一句「已完成」就画出一份文件来。',
+              '补查失败就老实说不知道，不会顺势当成成功。',
+              '不会把取消当成完成，也不会把完成当成取消。']),
+    '这次扫描在服务端已经完成，只是文件信息还没回到本机。')],
+  null)+
+  bar([{href:'10-print-hub.html',route:'/print-scan',label:'返回打印扫描'},{act:'recheck',primary:true,label:'查询服务端最新状态'}]);
+};
+V['cancel-conflict']=function(){
+ return statusBody('warn',
+  head('warn','取消失败：服务端说任务状态已经变了')+
+  p('服务端返回<b>'+esc(S.lastErr.code)+'</b>：在取消送到之前，这个会话的状态已经变过一次了。变成了什么，这一句没说，<b>本机不猜</b>。')+
+  /* P2：服务端这条错误的 message 原文里带「请刷新重试」，那是通用后端文案。
+     在这台一体机上照做会把只存在内存里的控制凭证丢掉，直接落到 session-lost。
+     所以用户可见的指引必须当场否掉刷新，并指向本页自己的补查按钮；
+     原文仍然保留在 ?debug=1 的「服务端回执原样」里，不做隐藏。 */
+  p('<b>先别刷新这一页。</b>服务端那句回执里带的「请刷新重试」是通用后端文案，在这台一体机上照做只会把控制凭证丢掉。要看最新状态，请点右下角的<b>「查询服务端最新状态」</b>。')+
+  chips(['取消未生效|warn','状态未知','别刷新 · 用本页补查|warn']),
+  -1,'这条链路走到哪','服务端只说变了，没说变成什么',
+  [noteCard('补查能拿到什么',
+    planList(['已完成并带齐文件 → 进结果页。',
+              '已完成但回执没带文件 → 合法终态，那一屏也不再轮询。',
+              '失败 / 过期 / 已取消 → 各自的结果页。',
+              '仍在等待 → 回到等待页，取消视为没生效。',
+              '补查也失败 → 老实标成未知，不会当成成功。']),
+    '只有<b>「已完成并带齐文件」</b>那一条会画出文件。'),
+   noteCard('为什么刷新在这台机器上行不通',
+    p('控制凭证只活在页面内存里，刷新或后退都会把它清掉。凭证一没，这个会话就<b>既查不了也取消不了</b>，页面只能落到「凭证已丢失」那一屏。')+
+    p('补查走的是同一枚内存凭证，是一次纯读取：不重扫、不改服务端那边的任何东西。'),
+    '所以这一屏的补查入口只有右下角那个按钮。')],
+  null)+
+  bar([{href:'10-print-hub.html',route:'/print-scan',label:'返回打印扫描'},{act:'recheck',primary:true,label:'查询服务端最新状态'}]);
+};
+V['cancel-recheck']=function(){
+ return statusBody('info',
+  head('',' 正在补查服务端状态',true)+
+  p('取消没生效，本机正在重新问服务端：这次扫描现在到底是什么状态。<b>回执没到之前，页面不下任何结论。</b>')+
+  p('上一次的取消回执不作为结论，它只说明取消这个动作没生效。')+
+  chips(['补查回执没到','不写结论']),
+  -1,'这条链路走到哪','以这一次补查回执为准',
+  [noteCard('这一刻你不用做什么',
+    p('等这一次问答回来就行。<b>别回面板上重扫</b> —— 服务端刚说过这次扫描已经完成了。')+
+    p('也别刷新：刷新之后控制凭证就没了，连补查都做不成。'),
+    '正在等补查回执。'),
+   noteCard('补查的规矩',
+    p('只认服务端这一次回的状态。<b>回「已完成」并且带齐文件信息，才画文件</b>；回不出来或者查不到，就标未知。')+
+    p('补查回来如果是失败、过期或者仍在等待，就按那一屏走 —— 不会因为刚才取消过就往「已完成」上靠。'),
+    '这是一次纯读取，<b>点多少次都不会产生副作用</b>。')],
+  null)+
+  bar([{off:'补查还没回来',label:'返回打印扫描'},{off:'补查还没回来',primary:true,label:'等补查回执'}],
+      '正在等补查回执 —— 这一刻不写结论');
+};
+V['cancel-race-unknown']=function(){
+ var vio=violation();
+ return statusBody('warn',
+  head('warn',vio?'补查收到回执，但它不符合当前状态合同':'补查没成功，这次扫描现在是什么状态：不知道')+
+  (vio
+   ? p('补查<b>拿到了服务端回执</b>，但本机认不了它：<b>'+esc(S.lastErr.message)+'</b>（'+esc(S.lastErr.code)+'）。越界的原值不上屏。')
+   : p('补查没拿到服务端回执：<b>'+esc(S.lastErr.message)+'</b>（'+esc(S.lastErr.code)+'）。'))+
+  p('服务端之前说过取消来不及，但<b>本机始终没拿到那份文件的信息</b>。所以这里既不写完成、也不写取消，就是不知道。')+
+  chips([vio?'回执不符合合同|warn':'连续未知 '+S.unknowns+' 次|warn','本机没有文件信息','不当成成功']),
+  -1,'这条链路走到哪',vio?'回执不合同，位置一样定不下来':'补查失败就不猜',
+  [noteCard('接下来怎么办',
+    planList([vio?'可以再补查一次，结论以下一次合规回执为准。':'再补查一次，网络恢复就能拿到结论。',
+              '不确定就找工作人员，后台能查这台机器的会话。',
+              '再补查多少次，这里也不会自己变成成功。']),
+    '这一屏<b>不会因为重试次数多就给你结论</b>。'),
+   noteCard('这份文件会在哪里',
+    p('文件如果真生成了，它在服务端。<b>能不能在「我的文档」里找到，取决于建这次会话时是不是已经登录</b> —— 归属在建会话那一刻就定了。')+
+    p('匿名建的会话，文件不挂账号，事后登录也不会追溯归档。'),
+    '留存按文件类型与服务端留存规则执行。')],
+  null,
+  '<div><span>连续未知</span><b>'+S.unknowns+' 次</b></div>')+
+  bar([{href:'06-help.html',route:'/help',label:'联系工作人员'},{act:'recheck',primary:true,label:'再补查一次'}]);
+};
+V['failed']=function(){
+ var e=S.lastErr||{code:'',message:'扫描处理失败，请重试'};
+ /* 失败屏首屏收口：服务端原样的失败原因、重扫要做什么、什么时候该找人，
+    三样紧挨着排在一起；链路位置退到后面。旧稿把「怎么办」压在链路图之后，
+    中间隔出一段空当，用户读到原因之后要跨过一张图才看到下一步。 */
+ return stack([
+  ['01','这次没扫成','服务端返回的原样结果',
+   statePanel('error',
+    head('x','扫描未完成')+
+    p('服务端返回这次扫描<b>处理失败</b>，回执里没有可用文件：'+esc(e.message)+(e.code?'（'+esc(e.code)+'）':'')+'。')+
+    p('失败原因由服务端给出，<b>本机不猜是纸的问题还是机器的问题</b>。这次会话没有可用文件，重扫要另建一个会话。')+
+    chips(['服务端确认失败|warn','本次会话没有文件','不自动重扫']),'hero')],
+  ['02','现在怎么办','右下角重扫，左下角找人',
+   '<div class="grid2 top">'+
+   noteCard('重扫一次要做的三件',
+    planList(['点右下角<b>「重新选类型再扫一次」</b>：重扫是<b>另建一个会话</b>，不是接着这一次。',
+              '把纸取回来抚平、订书钉取掉，再回到奔图面板上重扫。',
+              '拿到结果先核对一眼是不是这次要的那份。']),
+    '重扫不会自动开始，也不会沿用这次已经作废的会话。')+
+   noteCard('什么时候直接找工作人员',
+    planList(['同一份材料<b>连续失败两次</b>，就别自己再试了。',
+              '面板上按不动、报错或取不出纸，属于现场处理。',
+              '左下角<b>「联系工作人员」</b>随时可以点，不影响这次会话。']),
+    '本机收不到纸张与机器的故障事件，现场判断比在这一屏猜准。')+
+   '</div>'],
+  ['03','链路没走完','没有可用文件挂到本次会话',
+   chain(-1)+(DEBUG?'':'<div style="margin-top:16px">'+
+    noteCard('本机不会替服务端补话',
+     planList(['不猜纸张或机器故障原因，本机收不到这些事件。',
+               '不自动重扫，避免同一份材料出两份。',
+               '不说「稍后会好」，也不按等待时长改判结果。'],true),
+     '页面只原样转达服务端这一次说了什么。')+'</div>')],
+  proofSection(null)
+ ],true)+
+  bar([{href:'06-help.html',route:'/help',label:'联系工作人员'},{act:'rescan',primary:true,label:'重新选类型再扫一次'}]);
+};
+V['expired']=function(){
+ return statusBody('warn',
+  head('clock','扫描超时，会话已过期')+
+  p('这次会话在有效期内<b>没有等到任何回传文件</b>，服务端把它置为过期。常见情况是面板那一步没扫成，或者扫到了别的目录。')+
+  p('重新开始就行。<b>过期的会话不会再认领后来的文件</b>，所以别在这个编号上继续等。')+
+  chips(['服务端确认过期|warn','本次会话没有文件','编号已作废']),
+  -1,'链路停在哪','文件没有挂到本次会话',
+  [noteCard('下次少走弯路',
+    planList(['在面板上选「扫描到网络文件夹」，不要选 U 盘或邮件。',
+              '建好会话再去扫，别提前扫。',
+              '扫完回到这台屏幕，进入等待后本机会自动查，别干等。',
+              '证件正反面要翻面各扫一次。'],true),
+    '这台机器的接收目录已由管理员配好，<b>不用你填地址</b>。'),
+   noteCard('已经扫出去的那份呢',
+    p('如果面板那一步其实扫成了，文件会落到共享目录，但<b>这个过期会话认领不到它</b> —— 后续到达的未认领文件，由终端与服务端按清理与留存规则处理。')+
+    p('所以重新建一个会话再扫一次；如果查到文件，先核对一眼是不是你要的那份。'),
+    '重新建会话之后，面板上的操作要再做一遍。')],
+  null)+
+  bar([{href:'10-print-hub.html',route:'/print-scan',label:'返回打印扫描'},{act:'rescan',primary:true,label:'重新开始扫描'}]);
+};
+/* ------------------------------------------------------ 结果页：文件预览是主区域
+   2026-08-27 第三次返修。老版预览是 316x258 的一格线条稿，A4 只露得出半页多，
+   谁也判断不出这是不是自己那一份；同屏右列却把六个合同字段（含 fileUrl 里的
+   sig= / expires= 和 sha256）印在公共屏上。两件事一起改：
+     · 预览吃满内容区，按 A4 比例整页显示，默认整页 100% 可见，可翻页、可缩放；
+     · 普通视图只留文件名 / 格式 / 大小 / 张数 / 来源，凭证类字段全部退到 ?debug=1。 */
+
+/* 未打开 / 打开中 / 打不开：这块大区域照旧留着，但一律不画任何冒充文件内容的东西。
+   竖向 space-between 把几条真话摊开——大区域是用来说清"这一次到底发生了什么"，
+   不是用来摆假页面的。 */
+function pvVoid(kind,icon,title,hint,rows,foot){
+ var h='',i;
+ for(i=0;i<rows.length;i++)h+='<div class="pvv-r'+(kind==='failed'?' bad':'')+'"><span class="sq"></span>'+
+   '<span class="k">'+rows[i][0]+'</span><span class="v">'+rows[i][1]+'</span></div>';
+ return '<div class="pv-void" data-preview-void="'+kind+'">'+
+  '<div class="pvv-h"><span class="pvv-ic">'+svg(icon,34)+'</span><span>'+title+'</span>'+
+  '<span class="pvv-hx">'+hint+'</span></div>'+h+
+  '<div class="pvv-f">'+foot+'</div></div>';
+}
+function previewBox(){
+ if(S.preview==='ready'){
+  /* 纸张宽高与内部块由 layoutPreview() 按当前缩放档算好后写进去：**整页全画**，
+     一个块都不裁、不丢。装不下的部分由外层滚动视口负责，用户拖得到。 */
+  return '<div class="pvpaper" id="pvpaper" role="img" data-preview-page-box="1"'+
+   ' aria-label="扫描结果文件的排版示意图（第 '+S.pvPage+' 页，共 '+PV_PAGES.length+' 页），不是真实页面；可拖动查看整页"></div>';
+ }
+ if(S.step==='preview-loading'){
+  return pvVoid('loading','clock','正在打开这条签名链接','结果由服务端定',[
+   ['链接是哪来的','上一次回执带回来的那条，本页<b>不另外去要新链接</b>。'],
+   ['等的时候不放内容','这块区域不放内容，也不先摆一个假页面占位。'],
+   ['这一步只做打开','不动扫描任务本身的状态，也不动这份回执的结论。'],
+   ['能重新签一次吗','这条链接由上一次回执签发，本屏没有再签一次的入口。'],
+   /* 置灰原因写在这里而不是行动区上方那一行：那一行会把这四屏共用的外壳顶高一截，
+      从「打开预览」跳到在途态时整块预览会跟着挪位。 */
+   ['底下两个按钮呢','先锁住，免得同一条链接被重复请求。']],
+   '打开之后，这里会按 A4 比例把整页显示出来，可以翻页，也可以放大看清楚每一段。');
+ }
+ if(S.preview==='failed'){
+  var sig=S.lastErr&&S.lastErr.code===PREVIEW_FAIL.code;
+  return pvVoid('failed','warn','预览没打开：'+esc(S.lastErr.message),'错误原样来自服务端',[
+   ['扫描本身呢','<b>预览失败不等于扫描失败</b>：上一次回执说的是已完成。'],
+   ['那这份文件还能用吗','<b>也不能据此判断文件是否仍可用</b> —— 本机只知道这一次没打开。'],
+   ['这里为什么空着','不放占位图，免得被当成这份文件的真实内容。'],
+   [sig?'再点一次有用吗':'要不要再试一次',
+    sig
+     ? '签名由上一次回执签发，<b>本屏没有重新签一次的入口</b>：再点还是同一条链接。'
+     : '可以再点一次；连着打不开就别在这一屏耗着。']],
+   '错误码 <b>'+esc(S.lastErr.code)+'</b> 由服务端返回，本页只原样转达，不替它解释成别的意思。');
+ }
+ return pvVoid('idle','doc','还没有打开预览','这块区域是给文件用的',[
+  ['预览怎么来','走回执里那条签名链接，点了才打开，不预先加载。'],
+  ['打开之后是什么样','按 A4 比例整页显示，可以翻页，也可以放大。'],
+  ['看到的是真页面吗','是<b>排版示意</b>：静态设计稿不加载服务端文件。'],
+  ['为什么值得看一眼','先看清是不是你要的那一份，再决定下一步走哪个去向。']],
+  '这块区域的大小固定：打开、打不开、翻页、缩放都不会把这一屏的版面挪一次。');
+}
+/* 预览头 = 紧凑文件信息区。
+   只放用户判断得了的信息：文件名、格式、大小、来源。fileId / sha256 / fileUrl
+   （连同里面的 sig= 与 expires=）是取这份文件的凭证 —— 一体机摆在大厅，
+   这些不印在屏上，只在 ?debug=1 的自证列里出现。 */
+function pvHead(kind,icon,title,chipList){
+ var f=S.file,c='',i;
+ /* 标签里带 fit 标记的那一颗交给 layoutPreview() 按实测可见比例改写（见那里的注释） */
+ for(i=0;i<chipList.length;i++){
+  var q=chipList[i].split('|');
+  c+='<span class="chip'+(q[1]==='fit'?'':(q[1]?' '+q[1]:''))+'"'+(q[1]==='fit'?' data-preview-fit-chip="1"':'')+'>'+q[0]+'</span>';
+ }
+ var idn=DEBUG
+  ? '<b>这次回执带回的 PDF</b><span class="sep">·</span><span>文件名与六个合同字段见右侧自证列</span>'
+  : '<b>'+esc(f.filename)+'</b><span class="sep">·</span><span>'+esc(String(f.mimeType).split('/').pop().toUpperCase())+'</span>'+
+    '<span class="sep">·</span><span>'+bytes(f.sizeBytes)+'</span><span class="sep">·</span><span>服务端生成</span>'+
+    markTag('演示夹具文件',true);
+ return '<div class="pvhead" data-kind="'+kind+'" data-testid="scan-workbench-file-brief" data-evidence-fixture="synthetic">'+
+  '<div class="pvh-1"><span class="pvh-ic">'+svg(icon,24)+'</span><span class="pvh-t">'+title+'</span>'+
+  '<span class="pvh-chips">'+c+'</span></div><div class="pvh-2">'+idn+'</div></div>';
+}
+/* 预览控件条：翻页 + 适应整页 / 适应宽度 / 缩小 / 放大。
+   四个缩放控件与两个翻页控件只改预览内部的裁切窗口，不改任何盒子的尺寸；
+   预览没打开时它们一律 aria-disabled，页码显示破折号 —— 本机这时候并不知道有几张。 */
+function pvBtn(act,label,aria,on,off){
+ return '<button type="button" class="pvbtn'+(on?' on':'')+'" data-act="'+act+'"'+
+  (off?' aria-disabled="true"':'')+' data-testid="scan-workbench-'+act+'" aria-label="'+esc(aria)+'">'+label+'</button>';
+}
+function pvBar(){
+ var ready=S.preview==='ready',total=PV_PAGES.length;
+ var first=!ready||S.pvPage<=1,last=!ready||S.pvPage>=total;
+ var lv=S.pvLevel;
+ var pager=ready?('第 '+S.pvPage+' / '+total+' 页'):'第 － / － 页';
+ /* 图注承担三件事：链接出处、这次打开到底证明了什么、张数是夹具的不是这份文件的。
+    注意措辞不要写成「预览没打开」——那是失败语境的判据，写在正常态上会把两种状态混掉。 */
+ var cap=ready
+  ? '用的是上一次状态回执带回来的签名链接（服务端签发、有效期有限）：只说明这条链接此刻能打开，不代表后面的流程能沿用这份文件。张数来自原型夹具，不是这份扫描件的真实页数。'
+  : (S.cancelNote==='already-completed'
+     ? '这份结果是<b>取消未生效之后补查服务端</b>拿到的，不是本机把取消当成了完成。翻页与缩放的控件就在上面这一行，要先把预览打开才能用。'
+     : '翻页与缩放的控件就在上面这一行，要先把预览打开才能用。本机这时候也不知道这份文件有几张，所以页码位置先留着破折号。');
+ return '<div class="pvbar"><div class="pvb-row">'+
+  pvBtn('pvprev','上一页','上一页',false,first)+
+  '<span class="pvpage" data-preview-pager="1">'+pager+'</span>'+
+  pvBtn('pvnext','下一页','下一页',false,last)+
+  /* 这颗提示由 layoutPreview() 按实测的平移余量开关：没余量就不出现 */
+  '<span class="pvhint" data-preview-pan-hint="1" hidden>可拖动查看</span>'+
+  '<span class="pvsp"></span>'+
+  pvBtn('pvfit','适应整页','适应整页：整页完整显示',ready&&lv===0,!ready)+
+  pvBtn('pvwide','适应宽度','适应宽度：按视口宽度铺满',ready&&lv===1,!ready)+
+  pvBtn('pvout','缩小','缩小',false,!ready||lv<=0)+
+  pvBtn('pvin','放大','放大',false,!ready||lv>=PV_LEVELS.length-1)+
+  '</div><div class="pvb-cap">'+cap+'</div></div>';
+}
+/* completed / preview-* 共用结果外壳：紧凑文件信息条 → 大预览 → 控件条 → 三个出口。
+   ?debug=1 只是在预览**右边追加**一列自证，预览既不缩成缩略图，也不被盖住。 */
+function resultBody(kind,icon,title,chipList){
+ var proof=DEBUG
+  ? '<div class="proofcol" data-testid="scan-workbench-proof-col">'+
+    '<div class="pfhd">本屏自证 · 只在 ?debug=1 下显示 · 凭证类字段只出现在这一列</div>'+
+    taskStrip()+evidenceCard()+fileCard()+
+    noteCard('出口与预览合同',
+     planList(['AI 识别：仅 scanType=resume 且有 file 时可点，靠 router state 传 fileId。',
+               '打印：/print/confirm 需要 file 上下文；金额只读 POST /orders/quote。',
+               '我的文档：匿名会话文件 endUserId 为空，不进会员文件列表。',
+               /* 这一行的取值全部来自本页顶部的源码副本，门禁会拿它们跟
+                  signing.ts / files.controller.ts 抠出来的值逐字段比。
+                  两条 401 的中文原文不塞进这行（版面放不下）：
+                  FILE_SIGNATURE_INVALID 的原文写在预览失败那一屏，AUTH_REQUIRED 的在页首注释。 */
+               '预览只打开回执带回的 file.fileUrl（'+esc(CONTENT_URL_SHAPE)+'）；打不开 401 '+
+               PREVIEW_FAIL.code+'，本页不调 '+esc(PREVIEW_URL_ENDPOINT.path)+'（匿名 401 '+
+               PREVIEW_URL_ENDPOINT.code+'）。']),
+     '静态稿没有 router 内存态，所以三个出口按<b>受控 / 真实起点</b>两种方式呈现；预览不新增任何端点。')+'</div>'
+  : '';
+ return stack([
+  ['','',null,
+   '<div class="rstack"><div class="rmain"><div class="pvpanel">'+
+     pvHead(kind,icon,title,chipList)+
+     '<div class="pvstage">'+
+       '<div class="pvport" id="pvport" data-preview-viewport="1" data-pannable="none">'+
+         '<div class="pvscene" id="pvscene" data-preview-scene="1" data-scene-mode="'+(S.preview==='ready'?'paper':'void')+'">'+
+           previewBox()+
+         '</div>'+
+       '</div>'+
+       (S.preview==='ready'?'<span class="pv-badge" data-preview-mock-label="1">排版示意 · 不是这份文件的真实页面</span>':'')+
+     '</div>'+
+     pvBar()+
+   '</div>'+proof+'</div>'+actions(true)+'</div>','grow']
+ ]);
+}
+V['completed']=function(){
+ /* 取消竞态那一支的口径（补查才拿到、不是本机把取消当成完成）写在预览控件条的图注里：
+    放在那里两条分支的版头等高，点「打开预览」时整块预览不会跟着挪位。 */
+ return resultBody('ok','check','服务端回执：已完成，并带回文件',
+   ['status completed|ok','带齐 '+FILE_FIELDS.length+' 个文件字段|ok','已查询 '+S.polls+' 次'])+
+  bar([{act:'rescan',label:'再扫一份'},{act:'preview',primary:true,label:'打开预览'}]);
+};
+V['preview-loading']=function(){
+ return resultBody('wait','clock','正在打开预览',
+   ['已尝试打开预览 '+S.previewTries+' 次','不改判扫描结论|ok'])+
+  /* 不传 reason：置灰理由已经在预览区里逐条列着，两个按钮的 aria-label 也各自带着原因。
+     行动区上方那一行只在这一屏出现的话，四屏共用的结果外壳会高低不一。 */
+  bar([{off:'预览还在打开中',label:'再扫一份'},{off:'预览还在打开中',primary:true,label:'打开预览'}]);
+};
+/* 打开成功只说明**这条链接此刻能打开**，不说明后面的流程能沿用这份文件：
+   静态稿没有 router 内存态，出口一律要重新选择或重新取得可用文件。 */
+V['preview-ready']=function(){
+ return resultBody('ok','check','预览已打开',
+   ['签名链接此刻能打开|ok','整页完整显示|fit','不改判扫描结论'])+
+  bar([{act:'rescan',label:'再扫一份'},{href:'12-file-source.html',route:'/print/upload',primary:true,label:'去打印流程重新选文件'}]);
+};
+/* 2026-08-27 第二次返修：预览请求失败**只证明预览没打开**。
+   /content 打不开可能是验签失败或过期（401，且不区分原因），也可能是验签通过后读内容失败。
+   所以这一屏既不说「文件还在 / 没丢 / 不受影响」，也不说「看不了也能直接拿去打印」；
+   只给两条最小口径（不等于扫描失败 / 不能据此判断文件是否仍可用），去向交给出口行 ——
+   出口行就在同屏，已经写清「重新选择或重新取得可用文件 / 本静态稿不携带这份文件的身份」，
+   面板里不再复述一遍（同屏复读会被近义复读门禁抓，也会把结果页挤到出口行头上）。 */
+V['preview-failed']=function(){
+ var sig=S.lastErr.code===PREVIEW_FAIL.code;
+ /* 两条最小口径（不等于扫描失败 / 不能据此判断文件是否仍可用）与两条分支的差异说明
+    都写在 previewBox() 的失败分支里 —— 那块大区域现在就是承载它们的地方。
+    这里只留状态标题和几个短标签，不把同样的话再说一遍。 */
+ return resultBody('warn','warn','预览没打开',
+   ['已尝试打开预览 '+S.previewTries+' 次|warn','不改判扫描结论',
+    sig?'签名无效或已过期|warn':'本机没收到响应|warn','文件是否仍可用：本机没有依据|warn'])+
+  /* 主按钮要指向真正有用的那个动作：签名失效时再点也是同一条链接，把「去打印流程」放主位；
+     网络类失败才把「再打开一次」放主位。不这么分，正文说着「再点还是同一条链接」，
+     最大的那颗按钮却在劝你再点一次。
+     注意这颗主按钮只是**去打印流程的入口**，不是「把这份文件带过去」——出口行已经写清
+     到了那边要重新选择或重新取得可用文件。 */
+  (sig
+   ? bar([{act:'preview',label:'再打开一次'},
+          {href:'12-file-source.html',route:'/print/upload',primary:true,label:'去打印流程重新选文件'}])
+   : bar([{href:'12-file-source.html',route:'/print/upload',label:'不看预览，去打印流程'},
+          {act:'preview',primary:true,label:'再打开一次'}]));
+};
+/* 合法终态：服务端确认 completed，但 ScanSessionStatusResponse.file 是 null。
+   合同允许这个取值（见文件头 B 条），所以这里既不标合同违例，也不继续轮询；
+   只给终态出口，并且不声称文件还在、不声称已被删掉、不承诺能找回来。 */
+V['completed-no-file']=function(){
+ return stack([
+  ['','',null,statePanel('warn',
+   head('info','服务端说已完成，但这次回执里没有可用文件')+
+   p('服务端确认<b>这次扫描已经完成</b>，可是同一份回执里<b>没有带可用的文件信息</b>（file 为 null，这在状态合同里是允许的取值，不是服务端出错）。')+
+   p('这份文件此刻还在不在服务端，<b>本机没有依据判断</b>：可能已按留存规则清理，也可能是这一次回执没有带上它。页面不替服务端说它还在，不说它已被删掉，也不承诺能找回来。')+
+   p('所以本次会话到这里收尾。<b>再点也只会拿到同一句回执</b>，这一屏不再发起新的查询。')+
+   chips(['status completed|ok','回执里没有文件信息|warn','本次会话到此收尾']),'hero')],
+  ['#','现在能做什么','这是终态，不用再等',
+   '<div class="grid2 top">'+
+   noteCard('还需要这份材料',
+    planList(['重新建一次会话，再到面板上扫一遍 —— 那是另一次任务。',
+              '重扫之前把纸从进纸器里取回来，订书钉取掉。',
+              '这个编号问不出文件，反复点也是同一句回执。']),
+    '新会话交回来的是新扫的那一份，<b>不等于把这一次的结果找回来</b>。')+
+   noteCard('想弄清这份文件的下落',
+    p('找工作人员，后台能按这台机器的会话查这次任务和它的文件记录。<b>本屏只转达服务端这一次说了什么</b>，问不出更多。')+
+    p('归属在建会话那一刻就定了：这一屏没有登录步骤，会话按匿名建立，匿名扫描件不挂账号。'),
+    '留存按文件类型与服务端留存规则执行，本屏不替它下结论。')+
+   '</div>'],
+  proofSection(noteCard('为什么这不算合同违例',
+   planList(['ScanSessionStatusResponse.file 的类型本来就是 ScanSessionFileView 或 null。',
+             'getStatus() 里 FileObject 查不到、或者已经 deletedAt 时，file 就是 null。',
+             '只有 contract 类扫描会因文件不可用被降级成 expired，本屏这三类不会。',
+             '真正越出合同的是：六种取值以外的 status，或者只带一半字段的 file。'],true),
+   '所以按<b>合法终态</b>收尾；标成查询失败再接着轮询，反而是本机在编造一个不存在的进行中任务。'))
+ ],true)+
+  bar([{href:'10-print-hub.html',route:'/print-scan',label:'返回打印扫描'},
+       {href:'06-help.html',route:'/help',label:'联系工作人员'},
+       {act:'rescan',primary:true,label:'重新建会话再扫一次'}]);
+};
+V['session-lost']=function(){
+ var was=ssRead();
+ return stack([
+  ['','',null,statePanel('lock',
+   head('lock','页面刷新了，这次会话的控制凭证已经不在了')+
+   p('查询和取消扫描会话都要带一枚<b>控制凭证</b>。按安全口径，它只保存在页面内存里 —— 不写进链接，也不落浏览器存储。<b>页面一刷新或后退，它就没了。</b>')+
+   p('所以本机现在既查不到、也取消不了刚才那个会话。<b>这里不会拿本地记录冒充服务端结果</b>，不会说它成了，也不会说它没成。')+
+   chips(['凭证已丢失|warn','没有任务编号','本机没有文件']),'hero')],
+  ['#','现在能做什么','接不上的是这次会话，不是这台机器',
+   '<div class="grid2 top">'+
+   noteCard('重新开始就行',
+    planList(['重新建一次会话，再到面板上扫一次。',
+              '重扫之前先把纸从进纸器里取回来，别扫串了。',
+              '不确定就找工作人员，后台能查这台机器的会话。',
+              '证件类反复扫也不用担心，多的按系统短期留存到期清理。',
+              '刚才那个会话在服务端照旧走完它自己的流程，不受这里影响。']),
+    '重新开始不会影响刚才那个会话在服务端的结果。')+
+   noteCard('刚才那份文件会在哪里',
+    /* 和 cancel-race-unknown 那一屏统一写法：主语绑在条件后面，不留「文件在服务端」这种
+       脱离条件也读得通的正向断言。 */
+    p('刚才那次如果真的扫成了，它在服务端。<b>能不能在「我的文档」里找到，取决于建那次会话时是不是已经登录</b> —— 归属在建会话那一刻就定了。')+
+    p('这一屏没有登录步骤，会话按匿名建立；匿名扫描件不挂账号，事后登录也不会追溯归档。')+
+    p('留存也分档：简历扫描件按会员简历留存期，证件扫描件锁定为系统短期留存、不可延长。'),
+    /* P2：不写「本机什么都没留」——本 tab 确实留了 step / scanType 两项非敏感痕迹。
+       普通用户只需要知道留了哪两项、没留哪四项；?debug=1 的自证卡逐行给同一套事实。 */
+    '本机只在这个标签页里留了两样非敏感的：这次选的扫描类型、刷新前停在哪一步。凭证、编号、文件信息、服务端回执都没有写下来。')+
+   '</div>'],
+  DEBUG?['','本屏自证 · 只在 ?debug=1 下显示','本机记得什么、为什么这么设计',
+   '<div class="grid2 top">'+
+   '<div class="pgrp"><h4>本机还记得什么</h4><div class="kv">'+
+   '<div><span>存放位置</span><b>sessionStorage 一个键（本标签页关掉即失效）</b></div>'+
+   '<div><span>写进去的</span><b>只有 {v, step, scanType} 这三项，都不敏感</b></div>'+
+   '<div><span>扫描类型</span><b>'+(was&&was.scanType?TYPE_NAME[was.scanType]:'没有记录')+'</b></div>'+
+   '<div><span>刷新前停在</span><b>'+esc(was&&was.step?was.step:'没有记录')+'</b></div>'+
+   '<div><span>控制凭证</span><b>没有保存，也不写入浏览器存储</b></div>'+
+   '<div><span>任务编号</span><b>没有保存</b></div>'+
+   '<div><span>文件信息</span><b>没有保存</b></div>'+
+   '<div><span>服务端回执</span><b>没有保存</b></div></div>'+
+   '<div class="foot">这两项痕迹只用来判断本标签页开过会话、刷新后该落到这一屏；<b>它们既查不了状态也取消不了任务</b>。</div></div>'+
+   '<div class="pgrp"><h4>为什么要这么麻烦</h4>'+
+   p('控制凭证如果写进链接或浏览器存储，任何拿到这台机器、翻得到历史记录的人都能查看甚至取消别人的扫描会话。')+
+   p('一体机是公共设备，上一个人用完就走，浏览器里留下的东西下一个人也能翻到。')+
+   '<div class="foot">代价就是刷新之后接不上，<b>这个代价值得</b>。</div></div>'+
+   '</div>']:null
+ ],true)+
+  bar([{href:'10-print-hub.html',route:'/print-scan',label:'返回打印扫描'},{act:'rescan',primary:true,label:'清除记录，重新开始扫描'}]);
+};
+V['blocked']=function(){
+ var why={'unknown-param':'链接里带了本页不认识的参数','fixture-without-demo':'演示夹具参数只在演示模式下可用',
+  'empty-fixture':'演示夹具参数是空的','unknown-fixture':'演示夹具参数里有本页没有登记的名字'}[BLOCK.why];
+ var detail=BLOCK.why==='unknown-fixture'
+  ? '被拒绝的参数：<b>fx</b>，其中有 <b>'+BLOCK.count+'</b> 个名字本页没有登记。<b>这些名字本身也不回显</b>。'
+  : '被拒绝的参数：<b>'+BLOCK.names.map(esc).join('、')+'</b>。';
+ return stack([
+  ['','',null,statePanel('lock',
+   head('lock','这个链接不能用来打开扫描状态')+
+   p(esc(why)+'。'+detail)+
+   p('本页所有状态都由<b>真实操作加服务端回执</b>产生。链接里写什么状态、什么编号都不算数 —— 也正因为如此，这里只说被拒绝的参数名，<b>不回显它们的取值</b>。')+
+   p('被挡下来的只是这个链接。<b>这台机器、这次会话、服务端那边都没受影响</b>；从下面重新开始就行。')+
+   chips(['链接已被拒绝|warn','没有任务编号','本机没有文件']),'hero')],
+  ['#','现在能做什么','这一屏只是把不合法的链接挡下来',
+   '<div class="grid2 top">'+
+   noteCard('正常怎么打开这一屏',
+    planList(['从「打印扫描」进来，或者点下面的「从头开始扫描」。',
+              '选扫描类型 → 建会话 → 照面板指引扫 → 回到这台屏幕等自动检查的结果。',
+              '每一步都要真实操作或服务端回执，页面才往下走。',
+              '演示模式只写死服务端那一侧的回答；除了等待页的自动检查，其余每一步照旧要真点。',
+              '所以演示里也不存在「直接跳到已完成」这种路径。']),
+    '本页<b>没有</b>任何用链接切状态的开关，刷新之后也要重新建会话。')+
+   noteCard('本页只认这四个参数',
+    '<div class="kv">'+
+    '<div><span>debug</span><b>打开原型演示控制面板</b></div>'+
+    '<div><span>capture</span><b>截图模式：延长在途态展示时间，不改结果</b></div>'+
+    '<div><span>fx</span><b>服务端响应夹具队列，只在演示模式下可用</b></div>'+
+    '<div><span>flat</span><b>关闭阴影与动效，方便出图</b></div></div>'+
+    p('参数名会按白名单清洗后再上屏，<b>取值一个都不回显</b> —— 否则被拒绝的链接本身又成了一次信息泄露。'),
+    '除这四个之外，<b>任何参数都会把页面挡在这一屏</b>。')+
+   '</div>'],
+  DEBUG?['','本屏自证 · 只在 ?debug=1 下显示','为什么链接不能定状态',
+   '<div class="grid2 top">'+
+   '<div class="pgrp"><h4>如果链接能定状态</h4>'+
+   planList(['任何人都能造一个「已完成」的链接，页面就会画出一份根本不存在的文件。',
+             '刷新和后退会把旧参数再喂一遍，假结果被反复复活。',
+             '截图和演示会被当成真实凭据流出去。',
+             '真出了问题，谁也说不清那一屏到底是不是服务端说的。'])+
+   '<div class="foot">所以本页<b>没有</b>任何用链接切状态的开关。</div></div>'+
+   '<div class="pgrp"><h4>状态从哪来</h4>'+
+   p('选类型、建会话、去面板扫、回来查询 —— 每一步都要有一次真实操作，再加一次服务端回执，页面才动。')+
+   p('演示模式下也一样：夹具只是把服务端那一侧的回答写死，<b>除了等待页的自动检查，这一侧照旧要真点</b>；所以演示里也不存在「直接跳到已完成」这种路径。')+
+   '<div class="foot">这也是为什么<b>刷新之后要重新建会话</b>。</div></div>'+
+   '</div>']:null
+ ],true)+
+  bar([{href:'10-print-hub.html',route:'/print-scan',label:'返回打印扫描'},{act:'rescan',primary:true,label:'从头开始扫描'}]);
+};
+
+/* --------------------------------------------------------------- 顶栏与旁白 */
+var PILL={
+ 'setup':['','第 1 步 · 选扫描类型'],'create-loading':['','正在建扫描会话'],'create-failed':['bad','会话创建失败'],
+ 'panel-instruction':['','第 2 步 · 去面板操作'],'waiting-delivery':['','等待文件回传'],'polling':['','正在查询服务端'],
+ 'poll-failed':['warn','查状态失败 · 不改判'],'cancelling':['','正在发送取消请求'],'cancelled':['warn','扫描已取消'],
+ 'cancel-failed':['warn','取消未送达 · 不改判'],'cancel-race':['warn','取消未生效 · 需补查'],'cancel-conflict':['warn','取消失败 · 需补查'],
+ 'cancel-recheck':['','正在补查服务端状态'],'cancel-race-unknown':['warn','补查失败 · 状态未知'],
+ 'completed':['ok','服务端已回完成并带回文件'],'completed-no-file':['warn','已完成 · 回执里没有文件'],
+ 'preview-loading':['','正在打开预览'],'preview-ready':['ok','预览已打开'],
+ 'preview-failed':['warn','预览没打开 · 不改判扫描结论'],'failed':['bad','扫描未完成'],'expired':['warn','会话已过期'],
+ 'session-lost':['warn','控制凭证已随刷新丢失'],'blocked':['bad','链接参数已被拒绝']
+ ,'usb-panel':['warn','独立路径 · 扫描到 U 盘']
+};
+/* 合同违例走的是同两个 step，但顶栏和旁白不能跟着说「没查到」——回执是到了的。 */
+var PILL_VIO={
+ 'poll-failed':['warn','回执不合同 · 不改判'],
+ 'cancel-race-unknown':['warn','补查回执不合同 · 状态未知']
+};
+var ASK={
+ 'setup':['扫描这一步，<em>在机器面板上做</em>。','屏幕上没有「开始扫描」这个按钮 —— <b>本机不能远程驱动扫描仪</b>。你在奔图面板上扫，文件回传到这里。'],
+ 'create-loading':['正在<em>建会话</em>。','建成之前不给你任务编号 —— 免得你照着一个不存在的号去面板上操作。'],
+ 'create-failed':['会话<em>没建成</em>。','现在去面板扫也没用：文件回来了也没有会话认领它。'],
+ 'panel-instruction':['接下来<em>去机器面板上</em>。','下面几步都在那台奔图上按；扫完回这台屏幕，等待页会自动查。'],
+ 'waiting-delivery':['正在<em>等文件回来</em>。','我每隔几秒自动问一次服务端。面板、共享目录、本机投递这三段我都看不见，只能转达服务端那一头的回执。'],
+ 'polling':['正在<em>问服务端</em>。','回执没到之前，我不改任何判断。'],
+ 'poll-failed':['状态<em>没查到</em>。','查不到不等于扫失败。我不改判，过几秒自动再查。<b>别重复扫。</b>'],
+ 'cancelling':['正在<em>发取消请求</em>。','成不成由服务端定，我不提前说已取消。'],
+ 'cancelled':['已经<em>取消了</em>。','服务端确认任务已取消，<b>本次会话没有可用文件</b>。要扫就重新建一次会话。'],
+ 'cancel-failed':['取消<em>没送到</em>。','任务还在服务端活着，我不自说自话标成已取消。'],
+ 'cancel-race':['取消<em>晚了一步</em>。','服务端说已经完成，但没把文件带回来 —— 我得再查一次才敢画。'],
+ 'cancel-conflict':['取消<em>没成功</em>。','服务端只说状态变了，没说变成什么。我不猜，补查一次。'],
+ 'cancel-recheck':['正在<em>补查</em>。','只认这一次的回执，上一句取消回执不算结论。'],
+ 'cancel-race-unknown':['现在<em>不知道</em>。','补查也没成功。我不会顺势当成成功，也不当成取消。'],
+ 'completed':['文件<em>到了</em>。','服务端回了完成、也带齐了文件字段，我才画出来。'],
+ 'completed-no-file':['完成了，<em>可回执里没有文件</em>。','回执里 file 是空的。我不猜它还在不在服务端，这一屏也就到此为止。'],
+ 'preview-loading':['正在<em>打开预览</em>。','打不开也不会改判服务端刚才那句回执。'],
+ 'preview-ready':['预览<em>能看了</em>。','你看到的是版式骨架 —— <b>静态设计稿不加载服务端文件</b>，画不出这份扫描件上的字。'],
+ 'preview-failed':['预览<em>没打开</em>。','打不开的是这条链接，不是这次扫描；文件此刻还能不能用，我说不了。'],
+ 'failed':['这次<em>没扫成</em>。','原因以服务端返回为准。<span data-disclaimer="true">页面不猜具体纸张或机器故障原因。</span>'],
+ 'expired':['会话<em>过期了</em>。','有效期内没等到文件。重新开始就行。'],
+ 'session-lost':['刷新之后<em>接不上了</em>。','控制凭证只在内存里，重新建一次会话就能接着扫。'],
+ 'blocked':['这个链接<em>不算数</em>。','状态只能靠真实操作和服务端回执产生，链接里写什么都不认。']
+ ,'usb-panel':['文件<em>只进你的 U 盘</em>。','这条路不创建平台任务、不显示进度，也不进入「我的文档」。<b>以奔图面板提示为准。</b>']
+};
+var ASK_VIO={
+ 'poll-failed':['回执<em>读不懂</em>。','这一句不在约定里，我不认它，也不改判。<b>别重复扫。</b>'],
+ 'cancel-race-unknown':['现在<em>不知道</em>。','补查回来的那一句不在约定里。我不认它，既不当成完成，也不当成取消。']
+};
+
+/* 顶部这一行只给「这一屏最该知道的一句」，不再每一屏重复同样三条固定事实。
+   没有这一句的状态直接不渲染，把版面还给主任务。 */
+var FACT={
+ 'setup':'这台机器的接收目录已由管理员配好，面板上直接选就行，不用你填任何地址。',
+ 'waiting-delivery':'面板扫完就回到这台屏幕：本机每隔几秒自动查一次，有结果会自动切过去。',
+ /* completed / preview-* 四屏共用同一套结果外壳，这一行如果只在其中一屏出现，
+    版头就会高出一截，点「打开预览」时整块预览会跟着挪位。所以这四屏都不挂顶部事实行；
+    「不替你把文件带走」这层意思由预览控件条的图注和三个出口各自写清。 */
+ 'completed-no-file':'终态就停在这里：不会自动重查，也不会因为多点几次改口。',
+ 'session-lost':'一体机是公共设备：凭证留在浏览器里，下一个人也能翻到，所以宁可接不上。',
+ 'blocked':'刷新、后退、别人发来的旧链接都会落到这一屏 —— 这是默认行为，不是出错。'
+};
+
+/* --------------------------------------------------------- 预览排版与平移
+   2026-08-27 第四次返修。上一版的缩放是「只渲染看得见的那一块」：纸张盒子永远等于
+   可见窗口，越出窗口的块直接不渲染或按窗口裁短，offX=(pw-visW)/2、offY=0 写死。
+   那样版面确实不跳，但整页**只剩固定的一片**：放大之后页脚、右栏、印章位永远够不到，
+   预览也就答不了「要打印的是不是这一份」—— 它本来就是为了回答这个才存在的。
+   现在换成真视口：
+     · .pvport 自己 overflow:auto，横纵都能滚；触控走原生 pan，鼠标走指针拖动；
+     · .pvscene 至少等于视口，放得下整页时就等于整页加四周留白；
+     · .pvpaper 取当前缩放档下**完整一页**的尺寸，坐标恒为非负，整页的块一个不裁。
+   于是：适应整页正好没有平移余量（四边同时可见）；适应宽度只剩纵向余量（滚得到页底）；
+   再放大就横纵都有余量，top / bottom / left / right 四边都够得到。
+   缩放仍然**不用 CSS transform**：transform 之后越出的是祖先版面，几何门禁抓到的是真溢出；
+   这里的溢出只发生在自己的滚动容器内部，外层 stage 的 scrollWidth / scrollHeight 一动不动。 */
+var PV_PAD=12;      /* 纸张四周留白，算进 scene 尺寸，不靠 .pvport 的 padding —— 滚动容器的尾边 padding 各引擎不一致 */
+var PV_BD=2;        /* .pvpaper 的边框，box-sizing:border-box */
+var STAGE_SCALE=1;  /* fit() 写入：拖动时鼠标位移是屏幕像素，要除掉这个比例才是 stage 内的像素 */
+/* render() 每次重建 DOM，滚动位置不会自己带过来，所以平移位置记在这里，布局完再落回去 */
+var pvAnchor={fx:.5,fy:0};
+var pvDrag={on:false,id:null,x:0,y:0,l:0,t:0,count:0};
+
+function pvResetPan(){pvAnchor={fx:.5,fy:0}}   /* 横向居中、纵向回到页顶 */
+function pvKeepPan(){                          /* 缩放时保持视口中心，四边照旧够得到 */
+ var port=document.getElementById('pvport');
+ if(!port||!port.scrollWidth||!port.scrollHeight){pvResetPan();return}
+ pvAnchor={fx:(port.scrollLeft+port.clientWidth/2)/port.scrollWidth,
+           fy:(port.scrollTop+port.clientHeight/2)/port.scrollHeight};
+}
+/* 平移语义写到 root 上：都是几何数字与开关，不含 fileId / sha256 / fileUrl / 凭证 */
+function pvPanAttrs(){
+ var root=document.getElementById('body-root'),port=document.getElementById('pvport');
+ if(!root)return;
+ var maxX=0,maxY=0,sl=0,st=0;
+ if(port){
+  maxX=Math.max(0,port.scrollWidth-port.clientWidth);
+  maxY=Math.max(0,port.scrollHeight-port.clientHeight);
+  sl=port.scrollLeft;st=port.scrollTop;
+ }
+ var pan=((maxX>1?'x':'')+(maxY>1?'y':''))||'none';
+ root.setAttribute('data-preview-scroll-left',String(Math.round(sl)));
+ root.setAttribute('data-preview-scroll-top',String(Math.round(st)));
+ root.setAttribute('data-preview-max-scroll-x',String(Math.round(maxX)));
+ root.setAttribute('data-preview-max-scroll-y',String(Math.round(maxY)));
+ root.setAttribute('data-preview-pannable',pan);
+ root.setAttribute('data-preview-panning',pvDrag.on?'dragging':'idle');
+ root.setAttribute('data-preview-pans',String(pvDrag.count));
+ if(port)port.setAttribute('data-pannable',pan);
+ pvHint(pan!=='none');
+}
+/* 「可拖动查看」只在真的有余量时出现：没余量还挂着就是一句废话。
+   注意它必须在**量视口之前**定下来 —— 这颗标签会让控件条换行、把视口压矮 48px，
+   量完再切就会让刚写上去的 maxScrollY 立刻过期。 */
+function pvHint(on){
+ var hint=document.querySelector('[data-preview-pan-hint]');
+ if(hint)hint.hidden=!on;
+}
+/* 鼠标拖动平移。触控不接管：.pvport 的 touch-action:pan-x pan-y 把触控交给浏览器原生滚动，
+   比自己模拟跟手，也不会和惯性、边界回弹打架。 */
+function pvBindPan(port){
+ port.addEventListener('scroll',pvPanAttrs,{passive:true});
+ port.addEventListener('pointerdown',function(e){
+  if(e.pointerType==='touch')return;
+  if(e.button)return;
+  if(port.scrollWidth-port.clientWidth<=1&&port.scrollHeight-port.clientHeight<=1)return;
+  pvDrag.on=true;pvDrag.id=e.pointerId;pvDrag.x=e.clientX;pvDrag.y=e.clientY;
+  pvDrag.l=port.scrollLeft;pvDrag.t=port.scrollTop;pvDrag.count++;
+  port.classList.add('dragging');
+  try{port.setPointerCapture(e.pointerId)}catch(err){}
+  pvPanAttrs();e.preventDefault();
+ });
+ port.addEventListener('pointermove',function(e){
+  if(!pvDrag.on||e.pointerId!==pvDrag.id)return;
+  var s=STAGE_SCALE||1;
+  port.scrollLeft=pvDrag.l-(e.clientX-pvDrag.x)/s;
+  port.scrollTop=pvDrag.t-(e.clientY-pvDrag.y)/s;
+  e.preventDefault();
+ });
+ var stop=function(e){
+  if(!pvDrag.on)return;
+  if(e&&e.pointerId!==undefined&&e.pointerId!==pvDrag.id)return;
+  pvDrag.on=false;pvDrag.id=null;port.classList.remove('dragging');
+  pvPanAttrs();
+ };
+ port.addEventListener('pointerup',stop);
+ port.addEventListener('pointercancel',stop);
+ port.addEventListener('lostpointercapture',stop);
+}
+function layoutPreview(){
+ var root=document.getElementById('body-root');
+ if(!root)return;
+ var port=document.getElementById('pvport'),scene=document.getElementById('pvscene'),paper=document.getElementById('pvpaper');
+ root.setAttribute('data-preview-pages',String(PV_PAGES.length));
+ if(!port||!scene||!paper){
+  root.setAttribute('data-preview-page','0');
+  root.setAttribute('data-preview-visible','none');
+  root.setAttribute('data-preview-zoom','none');
+  pvPanAttrs();
+  return;
+ }
+ var lv=PV_LEVELS[S.pvLevel]||PV_LEVELS[0];
+ /* 两趟测量：滚动条一出现，clientWidth / clientHeight 就缩一圈；按缩之前的尺寸铺纸
+    会凭空多出一条横向余量。第二趟按真实内容盒重算一次即收敛。 */
+ function measure(){
+  var viewW=Math.max(40,port.clientWidth),viewH=Math.max(40,port.clientHeight);
+  var availW=Math.max(40,viewW-2*PV_PAD-2*PV_BD),availH=Math.max(40,viewH-2*PV_PAD-2*PV_BD);
+  var k=(lv[0]==='width'?(availW/PV_PAGE_W):Math.min(availW/PV_PAGE_W,availH/PV_PAGE_H))*lv[1];
+  var pw=PV_PAGE_W*k,ph=PV_PAGE_H*k;                /* 整页内容区 */
+  var boxW=pw+2*PV_BD,boxH=ph+2*PV_BD;              /* 含边框的纸张盒子 */
+  /* 装得下就让画布正好等于视口（纸居中，四周是视口自己的余量）——
+     这时候**一点平移余量都不留**，不然「整页完整显示」和「可拖动查看」会同时挂着；
+     装不下才补 PV_PAD，让拖到尽头时纸的边缘不贴着视口边。 */
+  return {viewW:viewW,viewH:viewH,pw:pw,ph:ph,boxW:boxW,boxH:boxH,
+          sceneW:boxW<=viewW?viewW:(boxW+2*PV_PAD),
+          sceneH:boxH<=viewH?viewH:(boxH+2*PV_PAD)};
+ }
+ function place(g){
+  scene.style.width=g.sceneW.toFixed(1)+'px';
+  scene.style.height=g.sceneH.toFixed(1)+'px';
+  /* scene 至少和纸一样大，所以这两个坐标恒为非负，纸永远整个落在 scene 里面 */
+  paper.style.left=((g.sceneW-g.boxW)/2).toFixed(1)+'px';
+  paper.style.top=((g.sceneH-g.boxH)/2).toFixed(1)+'px';
+  paper.style.width=g.boxW.toFixed(1)+'px';
+  paper.style.height=g.boxH.toFixed(1)+'px';
+ }
+ /* 先按试算结果定「可拖动查看」的显隐，再正式量：这颗标签一出现就会把控件条撑高、
+    把视口压矮，量在它前面写出来的滚动余量当场就是错的。 */
+ var g=measure();
+ pvHint(g.sceneW>g.viewW+1||g.sceneH>g.viewH+1);
+ g=measure();place(g);
+ var g2=measure();
+ if(Math.abs(g2.viewW-g.viewW)>0.5||Math.abs(g2.viewH-g.viewH)>0.5){g=g2;place(g)}
+ /* 整页的块一个不落地按整页坐标渲染：没有 offX / offY，没有按窗口裁短，没有跳过 */
+ var blocks=PV_PAGES[S.pvPage-1],h='',i,b;
+ for(i=0;i<blocks.length;i++){
+  b=blocks[i];
+  h+='<span class="blk '+b[4]+'" style="left:'+(b[0]*g.pw).toFixed(1)+'px;top:'+(b[1]*g.ph).toFixed(1)+
+     'px;width:'+Math.max(.6,b[2]*g.pw).toFixed(1)+'px;height:'+Math.max(.6,b[3]*g.ph).toFixed(1)+'px"></span>';
+ }
+ paper.innerHTML=h;
+ /* 可见比例 = 视口这一刻装得下整页的多少；适应整页应当正好是 1。
+    剩下的部分不是没画，是拖一下就到。 */
+ var ratio=(Math.min(g.boxW,g.viewW)/g.boxW)*(Math.min(g.boxH,g.viewH)/g.boxH);
+ var overX=g.boxW>g.viewW+.5,overY=g.boxH>g.viewH+.5;
+ paper.setAttribute('data-page-visible',ratio.toFixed(3));
+ /* data-page-crop 沿用旧名与旧取值（b / x / bx / none），但含义已经变了：
+    它标的是**视口这一刻装不下的方向**，不再是「被裁掉的边」—— 那些部分拖得到。 */
+ paper.setAttribute('data-page-crop',(overY||overX)?((overY?'b':'')+(overX?'x':'')):'none');
+ paper.setAttribute('data-page-blocks',String(blocks.length));
+ root.setAttribute('data-preview-page',String(S.pvPage));
+ root.setAttribute('data-preview-visible',ratio.toFixed(3));
+ root.setAttribute('data-preview-zoom',lv[0]+':'+lv[1].toFixed(3));
+ /* 把视口中心落回上一次的相对位置；换页 / 适应整页 / 适应宽度 / 重开预览前 pvAnchor 已被重置 */
+ var maxX=Math.max(0,g.sceneW-g.viewW),maxY=Math.max(0,g.sceneH-g.viewH);
+ port.scrollLeft=Math.max(0,Math.min(maxX,pvAnchor.fx*g.sceneW-g.viewW/2));
+ port.scrollTop=Math.max(0,Math.min(maxY,pvAnchor.fy*g.sceneH-g.viewH/2));
+ pvBindPan(port);
+ pvPanAttrs();
+ /* 「整页完整显示」这个标签必须跟着实测的可见比例走：只露出一部分还挂着它就是伪造。 */
+ var chip=root.querySelector('[data-preview-fit-chip]');
+ if(chip){
+  var whole=ratio>0.999;
+  chip.className='chip'+(whole?' ok':' warn');
+  chip.textContent=whole?'整页完整显示':'当前只显示这一页的一部分';
+ }
+}
+
+/* ------------------------------------------------------------------ 渲染 */
+function banner(){
+ var el=document.getElementById('dbanner');
+ if(!DEMO){if(el)el.parentNode.removeChild(el);return}
+ if(!el){el=document.createElement('div');el.id='dbanner';el.className='dbanner';el.setAttribute('data-testid','scan-workbench-demo-banner');
+  document.getElementById('stage').insertBefore(el,document.querySelector('.xq'))}
+ var withFx=Q.get('fx')!==null&&!BLOCK;
+ el.innerHTML='<span class="dtag">演示模式</span><span class="dtext">'+(withFx
+  ? '本页的服务端结果全部来自<b>服务端响应夹具</b>，编号与文件都带 DEMO 前缀，<b>不可作为真实任务</b>。'
+  : '未提供服务端响应夹具，<b>所有服务端请求一律按失败处理</b>，到不了完成态。')+'</span>';
+}
+function render(){
+ var root=document.getElementById('body-root'),st=S.step;
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ root.setAttribute('data-scan-type',S.scanType||'none');
+ root.setAttribute('data-task',S.taskId?'fixture':'none');
+ root.setAttribute('data-file',S.file?'fixture':'none');
+ root.setAttribute('data-server-status',S.lastStatus||'none');
+ root.setAttribute('data-polls',String(S.polls));
+ root.setAttribute('data-unknowns',String(S.unknowns));
+ root.setAttribute('data-create-tries',String(S.createTries));
+ root.setAttribute('data-preview-tries',String(S.previewTries));
+ root.setAttribute('data-preview',S.preview);
+ root.setAttribute('data-cancel-note',S.cancelNote||'none');
+ root.setAttribute('data-demo',DEBUG?'debug':(CAPTURE?'capture':'off'));
+ root.setAttribute('data-fixtures-left',String(FQ.length));
+ /* 自动查询的可审计语义：全是计数与开关，不含任务编号、凭证、文件身份。
+    间隔是合同值，演示模式也不改 —— 页面不给自己开一档看不见的加速。 */
+ root.setAttribute('data-poll-interval',String(POLL_INTERVAL_MS));
+ root.setAttribute('data-poll-origin',pollOrigin);
+ root.setAttribute('data-poll-in-flight',pollInFlight?'1':'0');
+ root.setAttribute('data-poll-timer-active',pollTimer!==null?'1':'0');
+ root.setAttribute('data-poll-starts',String(PAUD.starts));
+ root.setAttribute('data-poll-ends',String(PAUD.ends));
+ root.setAttribute('data-poll-max-concurrent',String(PAUD.max));
+ root.setAttribute('data-poll-terminal-stopped',(POLL_TERMINAL_STEPS[st]&&pollTimer===null)?'1':'0');
+ root.setAttribute('data-poll-errors',String(PAUD.errors));
+ root.setAttribute('data-poll-retries',String(PAUD.retries));
+ LAYOUT='grow';
+ root.innerHTML=V[st]();
+ root.className='body'+(LAYOUT==='spread'?' spread':'');
+ root.setAttribute('data-layout',LAYOUT);
+ /* 合同违例时顶栏与旁白改口径：回执到了，只是本机认不了它 */
+ var vio=violation();
+ var pillDef=(vio&&PILL_VIO[st])||PILL[st];
+ var askDef=(vio&&ASK_VIO[st])||ASK[st];
+ var pl=document.getElementById('pill');
+ pl.className='pill'+(pillDef[0]?' '+pillDef[0]:'');
+ document.getElementById('pill-txt').textContent=pillDef[1];
+ document.getElementById('pill-dot').className='dot'+(S.busy?' breathe':'');
+ document.getElementById('xq-ask').innerHTML=askDef[0];
+ document.getElementById('xq-doing').innerHTML=askDef[1];
+ var fx=document.getElementById('xq-facts'),ft=FACT[st]||'';
+ fx.innerHTML=ft?'<span>'+ft+'</span>':'';
+ fx.style.display=ft?'':'none';
+ /* 底部三列口径是一次性说明，只在起点和演示自证下出现，不每一屏复读 */
+ var tr=document.getElementById('truth');
+ if(tr)tr.style.display=(st==='setup')?'':'none';
+ /* 预览排版必须在版面定完之后算：视口高度是 flex 撑出来的，读得到真实像素才好裁 */
+ layoutPreview();
+}
+var ACTS={
+ pick:function(el){if(S.busy)return;pollClear();S.scanType=el.getAttribute('data-type');ssWrite();render()},
+ create:function(){if(S.busy||!S.scanType)return;pollClear();doCreate()},
+ /* 进入等待就立刻查一次（对齐 React 的 `void poll()`），不先干等一个间隔；
+    这一次落地之后由 pollSettle() 接着排后面的自动查询。 */
+ wait:function(){if(S.busy)return;pollClear();S.step='waiting-delivery';ssWrite();render();doPoll('auto')},
+ poll:function(){if(S.busy)return;doPoll('manual')},
+ recheck:function(){if(S.busy)return;doRecheck()},
+ cancel:function(){if(S.busy)return;pollClear();doCancel()},
+ preview:function(){if(S.busy)return;pollClear();doPreview()},
+ rescan:function(){if(S.busy)return;pollClear();resetSession();S.step='setup';ssWrite();render()},
+ /* 六个预览控件只改预览内部的显示尺寸与平移位置：不发请求、不动 S.file、不动 S.lastStatus，
+    也不改任何外层盒子的尺寸，所以点它们不会让这一屏的版面挪位。
+    换页与适应整页 / 适应宽度一律把平移复位；放大缩小保持视口中心，四边照旧够得到。 */
+ pvprev:function(){if(S.busy||S.preview!=='ready'||S.pvPage<=1)return;S.pvPage--;pvResetPan();render()},
+ pvnext:function(){if(S.busy||S.preview!=='ready'||S.pvPage>=PV_PAGES.length)return;S.pvPage++;pvResetPan();render()},
+ pvfit:function(){if(S.busy||S.preview!=='ready')return;S.pvLevel=0;pvResetPan();render()},
+ pvwide:function(){if(S.busy||S.preview!=='ready')return;S.pvLevel=1;pvResetPan();render()},
+ pvin:function(){if(S.busy||S.preview!=='ready'||S.pvLevel>=PV_LEVELS.length-1)return;pvKeepPan();S.pvLevel++;render()},
+ pvout:function(){if(S.busy||S.preview!=='ready'||S.pvLevel<=0)return;pvKeepPan();S.pvLevel--;render()}
+};
+document.addEventListener('click',function(e){
+ var el=e.target.closest?e.target.closest('[data-act]'):null;
+ if(!el)return;
+ var fn=ACTS[el.getAttribute('data-act')];
+ if(fn){e.preventDefault();fn(el)}
+});
+
+/* 首屏落点：参数不合法 → blocked；本 tab 开过会话但凭证已随刷新丢失 → session-lost；否则 setup */
+(function boot(){
+ banner();
+ if(BLOCK){S.step='blocked';render();return}
+ if(Q.get('mode')==='usb-panel'){S.step='usb-panel';render();return}
+ var prev=ssRead();
+ if(prev&&prev.step&&prev.step!=='setup'){S.step='session-lost';render();return}
+ ssClear();
+ render();
+})();
+
+/* 页面离开（刷新 / 后退 / 关标签页）就把待执行的自动查询清掉：不留后台定时器 */
+addEventListener('pagehide',pollClear);
+addEventListener('beforeunload',pollClear);
+
+/* 原型演示控制（非产品功能，只在 ?debug=1 下注入 DOM）：预置几条夹具队列的链接。
+   P2：控件寄居在演示横幅内部，和横幅说明同一行、横向滚动，展开几乎不改变横幅高度。
+   旧版是绝对定位的竖标签 + 抽屉面板，折叠时压住卡片左沿、展开时盖住整块自证区。 */
+if(DEBUG){
+ var presets=[['正常完成','create-ok,poll-waiting,poll-completed,preview-ok'],['建会话失败','create-busy'],
+  ['查状态失败','create-ok'],['扫描失败','create-ok,poll-scan-failed'],['会话过期','create-ok,poll-expired'],
+  ['取消成功','create-ok,cancel-ok'],['取消竞态·已完成','create-ok,cancel-already-completed,poll-completed'],
+  ['取消竞态·未知','create-ok,cancel-already-completed,poll-error'],['取消冲突·仍等待','create-ok,cancel-conflict,poll-waiting'],
+  ['预览签名失效·再开仍失败','create-ok,poll-completed,preview-expired,preview-error'],
+  ['完成但回执没带文件','create-ok,poll-completed-nofile'],
+  ['非法 status','create-ok,poll-bogus-status'],['文件字段只有一半','create-ok,poll-completed-partial']];
+ var host=document.getElementById('dbanner');
+ if(host){
+  var tab=document.createElement('button');
+  tab.type='button';tab.className='demo-tab';tab.id='demo-tab';tab.setAttribute('aria-label','展开或收起原型演示夹具预设');
+  tab.setAttribute('data-proto-control','true');tab.textContent='夹具预设';
+  var pnl=document.createElement('div');
+  pnl.className='demo-panel';pnl.id='demo-panel';pnl.setAttribute('aria-label','原型演示控制');pnl.setAttribute('data-proto-control','true');
+  var hh='<div class="dp-t">夹具预设 · 横向滑动</div>';
+  for(var i=0;i<presets.length;i++)hh+='<a href="?debug=1&fx='+encodeURIComponent(presets[i][1])+'">'+presets[i][0]+'</a>';
+  hh+='<a href="?debug=1">不给夹具（全失败）</a>';
+  pnl.innerHTML=hh;
+  host.appendChild(tab);host.appendChild(pnl);
+  tab.addEventListener('click',function(){pnl.classList.toggle('show')});
+ }
+}
+
+/* 时钟：仅刷新顶栏时间文本，不改 data-state、不推进任何业务状态 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+/* STAGE_SCALE 供预览拖动换算：鼠标位移是屏幕像素，scrollLeft/Top 是 stage 内的像素 */
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);STAGE_SCALE=s;document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(Q.get('flat')==='1')document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

@@ -136,7 +136,7 @@ export function AdminLayoutWrapper() {
   const [collapsed, setCollapsed] = useState(false)
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [authChecked, setAuthChecked] = useState(false)
-  // 通知角标 = 实时派生告警数(审计修复:原硬编码 3);加载失败显示 0,不显示假数字
+  // 通知角标 = 未处理的派生告警数（默认 view=open）；加载失败显示 0,不显示假数字
   const [alertCount, setAlertCount] = useState(0)
   const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
 
@@ -182,7 +182,7 @@ export function AdminLayoutWrapper() {
       userRole={user ? ROLE_LABEL[user.role] : ''}
       headerActions={
         <div className="flex items-center gap-3">
-          {/* 真实告警数(实时派生);点击进入告警中心。原 notificationCount prop 在自定义 headerActions 下不渲染,已移除死代码 */}
+          {/* 未处理告警数(实时派生的 open 视图);点击进入告警中心。已确认但仍在发生的不会从告警页消失。 */}
           <a
             href="/alerts"
             onClick={(e) => {
