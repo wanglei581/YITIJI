@@ -592,6 +592,9 @@ for (const marker of [
   // 扫码降为兜底出口，措辞由「扫描小程序二维码」改为「用机身扫码区」。
   // 断言随之改指新措辞，强度不变：删掉扫码入口仍然会红。
   '机身扫码区',
+  // 运行时没有独立 hid 页，HID 打进本页 input。idle 必须露出原型 hid-echo
+  // 的等待提示，否则扫码路径对站着的人是静默的。删掉这句仍然会红。
+  '等待扫码输入',
   // 2026-09-02 迁移到青序流光：本页样式入口随之改名。断言强度不变——
   // 它保的是"这一页必须有自己的样式入口"，删掉仍然会红。
   "import './styles/pickup-claim-qx.css'",
@@ -625,6 +628,12 @@ assert.match(
   pickupClaimCss,
   /@media \(max-height: 900px\) and \(orientation: landscape\)/,
   'pickup claim keeps a compact Windows landscape layout'
+)
+const pickupClaimQxCss = read('src/pages/print/styles/pickup-claim-qx.css')
+assert.match(
+  pickupClaimQxCss,
+  /@media \(max-height: 900px\) and \(orientation: landscape\)/,
+  'qingxu pickup claim CSS keeps the compact Windows landscape layout the page actually loads'
 )
 
 const scanPages = new Map([

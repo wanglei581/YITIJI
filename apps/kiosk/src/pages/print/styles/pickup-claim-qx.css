@@ -29,7 +29,8 @@
   min-height: 128px;
 }
 .pcp-cb {
-  width: 112px; height: 128px;
+  flex: 1 1 0;
+  width: 112px; max-width: 112px; min-width: 0; height: 128px;
   display: flex; align-items: center; justify-content: center;
   border: 2px solid var(--qx-line-2);
   border-radius: 20px;
@@ -57,6 +58,22 @@
   font-size: 19px; font-weight: 700; color: var(--qx-ink-3);
 }
 .pcp-counter--full { color: var(--qx-teal-d); }
+
+/* HID 回声：运行时扫码落在本页 input，idle 必须告诉用户「机器在等扫」。
+   文案来自 11-arrival-code.html 的 hid-echo（#hid-echo-code）。 */
+.pcp-scan-echo {
+  margin: 0;
+  min-height: var(--qx-tap-min);
+  display: flex;
+  align-items: center;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: var(--qx-paper);
+  border: 1px dashed var(--qx-line-2);
+  color: var(--qx-ink-3);
+  font-size: 20px;
+  line-height: 1.5;
+}
 
 /* ── 三条安心提示 ─────────────────────────────────────────────
    说的是本页行为，不是服务端数据，所以可以写死。
@@ -127,3 +144,30 @@
 
 /* ── 成功态 ─────────────────────────────────────────────────── */
 .pickup-claim-success { gap: 18px; }
+
+/* Windows 横屏窄高（1280×720 流体视口，舞台缩放关闭）。
+   青序原型 11-arrival-code.html 只有 1080×1920，没有取消这条生产约束：
+   主操作必须留在可视区内，用户按得到「确认校验 / 进入现场支付」。
+   旧 print-pickup-claim.css 同名媒体查询还在，但本页已经不 import 它。 */
+@media (max-height: 900px) and (orientation: landscape) {
+  .qx-stage:has(.pickup-claim-page),
+  .qx-stage:has(.pickup-claim-success) {
+    max-height: 100%;
+  }
+
+  .pickup-claim-page { gap: 10px; padding-top: 8px; }
+  .pcp-codebox { min-height: 72px; gap: 8px; }
+  .pcp-cb { width: 64px; max-width: 64px; height: 72px; font-size: 32px; border-radius: 12px; }
+  .pcp-codebox--legacy { gap: 6px; }
+  .pcp-codebox--legacy .pcp-cb { width: 48px; max-width: 48px; height: 64px; font-size: 24px; border-radius: 10px; }
+  .pcp-scan-echo { min-height: 48px; padding: 8px 14px; font-size: 16px; }
+  .pcp-easy { font-size: 16px; gap: 6px 16px; }
+  .pcp-keypad-card { padding: 12px 16px 14px; }
+  .pcp-keypad-note { margin-bottom: 8px; font-size: 15px; }
+  .pcp-keypad-card .knp { grid-template-rows: repeat(4, minmax(56px, 1fr)); }
+  .pcp-ab, .pcp-help { padding: 12px 16px; }
+  .pcp-ab-t { margin-bottom: 8px; font-size: 20px; }
+  .pcp-ab-col { padding: 10px 12px; }
+  .pch-title { margin-bottom: 8px; font-size: 18px; }
+  .pickup-claim-success { gap: 10px; }
+}

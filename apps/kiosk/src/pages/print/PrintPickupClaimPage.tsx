@@ -201,7 +201,7 @@ export function PrintPickupClaimPage() {
             </button>
             <button
               type="button"
-              className="qx-btn"
+              className="qx-btn pcs-primary"
               data-variant="primary"
               onClick={() => navigate(result.released ? '/print/progress' : '/print/cashier', {
                 state: result.released
@@ -328,6 +328,14 @@ export function PrintPickupClaimPage() {
               {code.length} / {codeCells.length}
             </div>
           </div>
+          {/* 运行时没有独立 hid 页：USB HID 扫码器就打进上面这层透明 input。
+              原型 11-arrival-code.html 把这句放在 ?state=hid 的 hid-echo 里；
+              本页 idle 即扫码落点，所以 idle 必须给出同一句等待提示，否则扫码路径对站着的人是静默的。 */}
+          <p className="pcp-scan-echo" aria-live="polite">
+            {code.length === 0
+              ? '等待扫码输入…（扫码器扫到会自动填入并校验）'
+              : `已接收 ${code.length} 位`}
+          </p>
         </div>
 
         {/* 三条安心提示。说的是本页行为，不是任何服务端数据，所以可以直接写死。
