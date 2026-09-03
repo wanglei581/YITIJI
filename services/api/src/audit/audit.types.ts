@@ -62,6 +62,7 @@ export type AuditAction =
   | 'alert.acknowledge'
   | 'alert.silence'
   | 'alert.close'
+  | 'alert.reopen'
 
 export type AuditTargetType =
   | 'auth'
