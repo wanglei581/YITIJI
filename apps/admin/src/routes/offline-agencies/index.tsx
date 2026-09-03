@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
-import { BuildingIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { BuildingIcon, PlusIcon, SearchIcon, ShieldCheckIcon, Trash2Icon } from 'lucide-react'
 import { Page } from '../Page'
 import { AgencyForm } from './AgencyForm'
+import { GovernanceDrawer } from './GovernanceDrawer'
 import { JobsDrawer } from './JobsDrawer'
 import { ReviewDialog } from './ReviewDialog'
 import {
@@ -77,6 +78,10 @@ export default function OfflineAgenciesPage() {
   const [reviewOpen,   setReviewOpen]   = useState(false)
   const [reviewTarget, setReviewTarget] = useState<AdminOfflineAgencyListItem | null>(null)
 
+  // 治理档案 / 资质 Drawer（只读，数据来自 /admin/recruitment-content/*）
+  const [govOpen,      setGovOpen]      = useState(false)
+  const [govTarget,    setGovTarget]    = useState<AdminOfflineAgencyListItem | null>(null)
+
   // 删除中
   const [deletingId,   setDeletingId]   = useState<string | null>(null)
 
@@ -124,6 +129,11 @@ export default function OfflineAgenciesPage() {
   const openReview = (row: AdminOfflineAgencyListItem) => {
     setReviewTarget(row)
     setReviewOpen(true)
+  }
+
+  const openGovernance = (row: AdminOfflineAgencyListItem) => {
+    setGovTarget(row)
+    setGovOpen(true)
   }
 
   const openJobs = (row: AdminOfflineAgencyListItem) => {
@@ -298,6 +308,15 @@ export default function OfflineAgenciesPage() {
                         >
                           编辑
                         </button>
+                        {/* 与审核动作并排：审核前先看得到资质与网点（CLAUDE.md §11 取证走审计端点） */}
+                        <button
+                          onClick={() => openGovernance(row)}
+                          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+                          title="查看治理档案与机构资质（只读）"
+                        >
+                          <ShieldCheckIcon className="h-3.5 w-3.5" />
+                          资质
+                        </button>
                         {row.reviewStatus !== 'approved' && (
                           <button
                             onClick={() => openReview(row)}
@@ -378,6 +397,13 @@ export default function OfflineAgenciesPage() {
             setRows((prev) => prev.map((r) => r.id === jobsAgency.id ? { ...r, jobCount: count } : r))
           }
         }}
+      />
+
+      {/* 治理档案 / 资质抽屉（只读） */}
+      <GovernanceDrawer
+        open={govOpen}
+        agency={govTarget}
+        onClose={() => { setGovOpen(false); setGovTarget(null) }}
       />
 
       {/* 审核对话框 */}
