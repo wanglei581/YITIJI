@@ -5,6 +5,10 @@
 export function omitWebhookSecretOnce<T extends { webhookSecretOnce?: string }>(
   source: T,
 ): Omit<T, 'webhookSecretOnce'> {
-  const { webhookSecretOnce: _once, ...rest } = source
+  // 用 delete 而非解构丢弃：解构写法会留下一个未使用变量，
+  // 而本仓 eslint 未配 `_` 前缀忽略，会被 no-unused-vars 判红。
+  // 不为这一处去放宽全局 lint 规则 —— 那等于为一个写法偏好拆掉一条真在起作用的检查。
+  const rest = { ...source }
+  delete (rest as { webhookSecretOnce?: string }).webhookSecretOnce
   return rest
 }

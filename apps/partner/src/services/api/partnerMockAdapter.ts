@@ -1,4 +1,5 @@
 import { ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
+import { omitWebhookSecretOnce } from '../../routes/sources/omitWebhookSecretOnce'
 import type {
   ConnStatus,
   PartnerDataSource,
@@ -177,7 +178,7 @@ export const partnerMockAdapter = {
   // Data Sources
   async getDataSources(): Promise<PartnerDataSource[]> {
     await delay()
-    return DATA_SOURCES.map(({ webhookSecretOnce: _once, ...row }) => row)
+    return DATA_SOURCES.map(omitWebhookSecretOnce)
   },
   async getDataSourceCapabilities(): Promise<PartnerDataSourceCapabilities> {
     await delay()
