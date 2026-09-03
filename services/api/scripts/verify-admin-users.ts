@@ -1,8 +1,20 @@
 /**
- * Admin 用户管理只读闭环验证。
+ * Admin 用户管理闭环验证。
  *
  * 覆盖真实 SQLite 列表/筛选、手机号隐私、详情留存统计、最近活动上限、
- * 敏感字段负向检查、审计上下文、Admin 鉴权元数据和只读边界。
+ * 敏感字段负向检查、审计上下文、Admin 鉴权元数据和写边界。
+ *
+ * ── 边界变更记录 ───────────────────────────────────────────────────────────
+ * 2026-09-02：本脚本原先断言 controller 只有 `['getDetail','list']` 两个 GET，
+ * 即「用户管理面全只读」。该断言咬的是**当时还没做**，不是永远不做：
+ *   - docs/product/feature-scope.md:216 把「用户列表、封禁、查看记录」列为 P1
+ *   - docs/product/commercial-grade-feature-plan-2026-07.md:234 原文是
+ *     「只读 GET /admin/users（…**封禁开关后置**），访问写审计」——「后置」是排期
+ *   - docs/product/user-center-commercial-closure-plan-2026-07.md:115 的状态图
+ *     直接写着 `Active --> Disabled: 管理员封禁`
+ * 现在补齐该 P1 能力，只读边界随之挪到 **disable / restore 两条写路径**：
+ * 除这两条外，controller 仍不得出现任何写方法，且这两条必须写审计、必须要求
+ * 非空 reason、必须同事务改 status + statusChangedAt。边界是挪位置，不是撤掉。
  *
  * Run: pnpm --filter @ai-job-print/api verify:admin-users
  */
@@ -59,7 +71,7 @@ async function expectCode(code: string, label: string, fn: () => Promise<unknown
 }
 
 async function main(): Promise<void> {
-  console.log('\n=== Admin 用户管理只读闭环验证 ===')
+  console.log('\n=== Admin 用户管理闭环验证 ===')
   await initFallbackDb()
 
   const prisma = new PrismaService()
@@ -71,8 +83,16 @@ async function main(): Promise<void> {
   const adminId = `admin_au_${suffix}`
   const endUserId = `eu_au_${suffix}`
   const disabledUserId = `eu_au_disabled_${suffix}`
+  // 状态变更专用夹具：与上面两个只读夹具隔离，避免停用/恢复动作污染既有断言。
+  const statusUserId = `eu_au_status_${suffix}`
+  const closingUserId = `eu_au_closing_${suffix}`
+  const anonymizedUserId = `eu_au_anon_${suffix}`
+  const statusUserIds = [statusUserId, closingUserId, anonymizedUserId]
   const phone = `139${Date.now().toString().slice(-8)}`
   const disabledPhone = `138${(Date.now() - 1).toString().slice(-8)}`
+  const statusPhone = `137${(Date.now() - 2).toString().slice(-8)}`
+  const closingPhone = `136${(Date.now() - 3).toString().slice(-8)}`
+  const anonymizedPhone = `135${(Date.now() - 4).toString().slice(-8)}`
   const now = new Date()
   const future = new Date(now.getTime() + 24 * 60 * 60 * 1000)
   const past = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -91,7 +111,7 @@ async function main(): Promise<void> {
     await prisma.aiResumeResult.deleteMany({ where: { endUserId: { in: [endUserId, disabledUserId] } } })
     await prisma.printTask.deleteMany({ where: { endUserId: { in: [endUserId, disabledUserId] } } })
     await prisma.fileObject.deleteMany({ where: { endUserId: { in: [endUserId, disabledUserId] } } })
-    await prisma.endUser.deleteMany({ where: { id: { in: [endUserId, disabledUserId] } } })
+    await prisma.endUser.deleteMany({ where: { id: { in: [endUserId, disabledUserId, ...statusUserIds] } } })
     await prisma.user.deleteMany({ where: { id: adminId } })
   }
 
@@ -127,6 +147,40 @@ async function main(): Promise<void> {
           enabled: false,
           createdAt: new Date('2026-07-01T01:00:00.000Z'),
           updatedAt: new Date('2026-07-02T01:00:00.000Z'),
+        },
+        {
+          id: statusUserId,
+          phoneHash: hashPhone(statusPhone),
+          phoneEnc: encryptPhone(statusPhone),
+          nickname: '状态变更会员丙',
+          enabled: true,
+          status: 'active',
+          createdAt: new Date('2026-07-03T01:00:00.000Z'),
+          updatedAt: new Date('2026-07-03T01:00:00.000Z'),
+        },
+        {
+          id: closingUserId,
+          phoneHash: hashPhone(closingPhone),
+          phoneEnc: encryptPhone(closingPhone),
+          nickname: '注销中会员丁',
+          enabled: false,
+          status: 'closing',
+          closingRequestedAt: new Date('2026-07-04T01:00:00.000Z'),
+          statusChangedAt: new Date('2026-07-04T01:00:00.000Z'),
+          createdAt: new Date('2026-07-04T01:00:00.000Z'),
+          updatedAt: new Date('2026-07-04T01:00:00.000Z'),
+        },
+        {
+          id: anonymizedUserId,
+          phoneHash: hashPhone(anonymizedPhone),
+          phoneEnc: encryptPhone(anonymizedPhone),
+          nickname: null,
+          enabled: false,
+          status: 'anonymized',
+          anonymizedAt: new Date('2026-07-05T01:00:00.000Z'),
+          statusChangedAt: new Date('2026-07-05T01:00:00.000Z'),
+          createdAt: new Date('2026-07-05T01:00:00.000Z'),
+          updatedAt: new Date('2026-07-05T01:00:00.000Z'),
         },
       ],
     })
@@ -188,8 +242,15 @@ async function main(): Promise<void> {
     pass('审计元数据忽略伪造转发头并限制长度')
 
     const disabled = await service.list({ page: 1, pageSize: 20, enabled: false }, context)
-    assert.equal(disabled.total, 1)
-    assert.equal(disabled.items[0]?.id, disabledUserId)
+    // 夹具里 enabled=false 的三位：历史停用、注销中、已匿名化。
+    // 用集合比对而不是 total===1 —— 后者只是在数夹具个数，加一个夹具就会假红；
+    // 集合比对才真正咬住「enabled 过滤器只返回停用账号、且一个不漏」。
+    assert.deepEqual(
+      disabled.items.map((item) => item.id).sort(),
+      [disabledUserId, closingUserId, anonymizedUserId].sort(),
+    )
+    assert.equal(disabled.total, 3)
+    assert.ok(disabled.items.every((item) => item.enabled === false), 'enabled=false 过滤器混入了启用账号')
     const registered = await service.list({
       page: 1,
       pageSize: 20,
@@ -205,7 +266,14 @@ async function main(): Promise<void> {
       data: { phoneEnc: 'corrupted-phone-ciphertext' },
     })
     const corruptedCipherList = await service.list({ page: 1, pageSize: 20, enabled: false }, context)
-    assert.equal(corruptedCipherList.items[0]?.maskedPhone, '***')
+    // 按 id 取而不是 items[0]：列表按 createdAt desc 排序，位置会随夹具增减漂移，
+    // 断言要咬的是「这一行降级了」，不是「它恰好排第一」。
+    const corruptedRow = corruptedCipherList.items.find((item) => item.id === disabledUserId)
+    assert.equal(corruptedRow?.maskedPhone, '***')
+    assert.ok(
+      corruptedCipherList.items.every((item) => item.id === disabledUserId || item.maskedPhone !== '***'),
+      '密文损坏的降级不应波及同页其它账号',
+    )
     const corruptedCipherDetail = await service.getDetail(disabledUserId, context)
     assert.equal(corruptedCipherDetail.user.maskedPhone, '***')
     pass('单条手机号密文损坏时列表与详情安全降级且不泄露密文')
@@ -286,6 +354,121 @@ async function main(): Promise<void> {
     assert.equal(logs.some((row) => row.payloadJson.includes(phone) || row.payloadJson.includes(hashPhone(phone))), false)
     pass('手机号搜索与详情查看写入脱敏审计和请求元数据')
 
+
+    // ── 停用 / 恢复闭环 ──────────────────────────────────────────────────────
+    // 边界从「全只读」挪到这两条写路径后，护栏改由下面这组断言承担。
+
+    const statusSnapshot = (id: string) => prisma.endUser.findUnique({
+      where: { id },
+      select: { enabled: true, status: true, statusChangedAt: true, phoneHash: true, phoneEnc: true },
+    })
+
+    await expectCode('ADMIN_USER_STATUS_REASON_REQUIRED', '纯空白原因的停用被拒绝', () =>
+      service.setStatus(statusUserId, 'disable', '   ', context))
+    await expectCode('ADMIN_USER_STATUS_REASON_REQUIRED', '超长原因的停用被拒绝', () =>
+      service.setStatus(statusUserId, 'disable', 'x'.repeat(201), context))
+    const beforeAnyChange = await statusSnapshot(statusUserId)
+    assert.equal(beforeAnyChange?.status, 'active')
+    assert.equal(beforeAnyChange?.enabled, true)
+    assert.equal(beforeAnyChange?.statusChangedAt, null)
+    assert.equal(await prisma.auditLog.count({ where: { targetId: statusUserId } }), 0)
+    pass('原因缺失时状态、statusChangedAt 与审计三者均未被写入')
+
+    await expectCode('ADMIN_USER_NOT_FOUND', '停用不存在的用户返回稳定错误码', () =>
+      service.setStatus(`eu_missing_${suffix}`, 'disable', '验证不存在的用户', context))
+
+    const disableResult = await service.setStatus(statusUserId, 'disable', '刷免费 AI 额度', context)
+    assert.equal(disableResult.changed, true)
+    assert.equal(disableResult.user.status, 'disabled')
+    assert.equal(disableResult.user.enabled, false)
+    const afterDisable = await statusSnapshot(statusUserId)
+    assert.equal(afterDisable?.enabled, false)
+    assert.equal(afterDisable?.status, 'disabled')
+    // statusChangedAt 不是可选装饰：member-step-up.service.ts:216 把它逐字编进
+    // step-up 授权票据并比对，漏写会让被停用者手里的票据继续有效。
+    assert.ok(afterDisable?.statusChangedAt instanceof Date, 'statusChangedAt 未被写入')
+    assert.equal(disableResult.statusChangedAt, afterDisable?.statusChangedAt?.toISOString())
+    pass('停用同事务写入 enabled=false、status=disabled 与 statusChangedAt')
+
+    const disableLogs = await prisma.auditLog.findMany({
+      where: { action: 'admin.user.disable', targetId: statusUserId },
+    })
+    assert.equal(disableLogs.length, 1, '停用必须写且只写一条审计')
+    const disableLog = disableLogs[0]!
+    assert.equal(disableLog.actorId, adminId)
+    assert.equal(disableLog.actorRole, 'admin')
+    assert.equal(disableLog.targetType, 'EndUser')
+    assert.equal(disableLog.ipAddress, context.ipAddress)
+    assert.equal(disableLog.userAgent, context.userAgent)
+    assert.equal(disableLog.requestId, context.requestId)
+    const disablePayload = JSON.parse(disableLog.payloadJson) as Record<string, unknown>
+    assert.equal(disablePayload['reason'], '刷免费 AI 额度')
+    assert.equal(disablePayload['fromStatus'], 'active')
+    assert.equal(disablePayload['toStatus'], 'disabled')
+    assert.equal(disableLog.payloadJson.includes(statusPhone), false, '审计 payload 泄露手机号')
+    assert.equal(disableLog.payloadJson.includes(hashPhone(statusPhone)), false)
+    pass('停用审计含操作人、请求元数据、原因与前后状态，且不含手机号')
+
+    const repeatDisable = await service.setStatus(statusUserId, 'disable', '再点一次', context)
+    assert.equal(repeatDisable.changed, false, '重复停用应幂等返回而不是报错')
+    assert.equal(repeatDisable.user.status, 'disabled')
+    assert.equal(repeatDisable.statusChangedAt, disableResult.statusChangedAt, '幂等调用不得推进 statusChangedAt')
+    assert.equal(
+      await prisma.auditLog.count({ where: { action: 'admin.user.disable', targetId: statusUserId } }),
+      1,
+      '重复停用不得产生第二条审计噪音',
+    )
+    pass('重复停用幂等返回、不推进时间戳、不重复留痕')
+
+    const restoreResult = await service.setStatus(statusUserId, 'restore', '申诉成立，恢复使用', context)
+    assert.equal(restoreResult.changed, true)
+    assert.equal(restoreResult.user.status, 'active')
+    assert.equal(restoreResult.user.enabled, true)
+    const afterRestore = await statusSnapshot(statusUserId)
+    assert.ok(afterRestore?.statusChangedAt instanceof Date)
+    assert.ok(
+      afterRestore!.statusChangedAt!.getTime() >= afterDisable!.statusChangedAt!.getTime(),
+      '恢复必须同样推进 statusChangedAt',
+    )
+    const restoreLogs = await prisma.auditLog.findMany({
+      where: { action: 'admin.user.restore', targetId: statusUserId },
+    })
+    assert.equal(restoreLogs.length, 1, '恢复必须同样写审计，不能只审停用')
+    const restorePayload = JSON.parse(restoreLogs[0]!.payloadJson) as Record<string, unknown>
+    assert.equal(restorePayload['reason'], '申诉成立，恢复使用')
+    assert.equal(restorePayload['fromStatus'], 'disabled')
+    assert.equal(restorePayload['toStatus'], 'active')
+    pass('恢复写入独立审计并同样推进 statusChangedAt')
+
+    // ── 不可恢复状态的护栏 ───────────────────────────────────────────────────
+    // 这两组断言是本次最容易在将来被「顺手优化」掉的部分。CAS 的 where 条件只是
+    // 实现手段，真正的护栏是这里：anonymized 账号的 phoneHash / phoneEnc 已经换成
+    // 墓碑值，「恢复」在物理上无法还原任何东西；closing 由隐私执行器推进，
+    // 管理员插一脚会让那条流水线状态错乱。删掉断言等于允许把已注销用户复活。
+    const anonBefore = await statusSnapshot(anonymizedUserId)
+    await expectCode('ADMIN_USER_STATUS_CONFLICT', '已匿名化注销的账号不能被恢复', () =>
+      service.setStatus(anonymizedUserId, 'restore', '尝试复活已注销账号', context))
+    await expectCode('ADMIN_USER_STATUS_CONFLICT', '已匿名化注销的账号不能被再次停用', () =>
+      service.setStatus(anonymizedUserId, 'disable', '尝试改已注销账号', context))
+    assert.deepEqual(await statusSnapshot(anonymizedUserId), anonBefore, '被拒绝的操作改动了 anonymized 账号')
+    assert.equal(await prisma.auditLog.count({ where: { targetId: anonymizedUserId } }), 0)
+    pass('anonymized 账号的停用与恢复均被拒，状态与审计零变动')
+
+    const closingBefore = await statusSnapshot(closingUserId)
+    await expectCode('ADMIN_USER_STATUS_CONFLICT', '注销中的账号不能被管理员恢复', () =>
+      service.setStatus(closingUserId, 'restore', '尝试恢复注销中账号', context))
+    await expectCode('ADMIN_USER_STATUS_CONFLICT', '注销中的账号不能被管理员停用', () =>
+      service.setStatus(closingUserId, 'disable', '尝试改注销中账号', context))
+    assert.deepEqual(await statusSnapshot(closingUserId), closingBefore, '被拒绝的操作改动了 closing 账号')
+    assert.equal(await prisma.auditLog.count({ where: { targetId: closingUserId } }), 0)
+    pass('closing 账号的停用与恢复均被拒，状态与审计零变动')
+
+    const statusList = await service.list({ page: 1, pageSize: 100 }, context)
+    const anonItem = statusList.items.find((item) => item.id === anonymizedUserId)
+    assert.equal(anonItem?.status, 'anonymized', '列表必须暴露真实 status 供 UI 判断可否恢复')
+    assert.equal(anonItem?.enabled, false)
+    pass('列表响应带回真实 status，UI 不必用 !enabled 猜测可恢复性')
+
     verifyControllerMetadata()
     verifyContractParity()
   } finally {
@@ -349,6 +532,14 @@ async function createActivityCapFixtures(
   })
 }
 
+/** 每个 handler 期望的 HTTP 动词。GET 之外的一律视为写路径，见下方写边界断言。 */
+const EXPECTED_ROUTE_VERBS: Record<string, number> = {
+  list: RequestMethod.GET,
+  getDetail: RequestMethod.GET,
+  disable: RequestMethod.POST,
+  restore: RequestMethod.POST,
+}
+
 function verifyControllerMetadata(): void {
   const guards = ((Reflect.getMetadata(GUARDS_METADATA, AdminUsersController) ?? []) as Function[]).map((guard) => guard.name)
   const roles = (Reflect.getMetadata(ROLES_KEY, AdminUsersController) ?? []) as UserRole[]
@@ -358,13 +549,22 @@ function verifyControllerMetadata(): void {
 
   const prototype = AdminUsersController.prototype as unknown as Record<string, unknown>
   const methods = Object.getOwnPropertyNames(prototype).filter((name) => name !== 'constructor')
-  assert.deepEqual(methods.sort(), ['getDetail', 'list'])
+  assert.deepEqual(methods.sort(), ['disable', 'getDetail', 'list', 'restore'])
   for (const name of methods) {
-    assert.equal(Reflect.getMetadata(METHOD_METADATA, prototype[name] as object), RequestMethod.GET)
+    assert.equal(
+      Reflect.getMetadata(METHOD_METADATA, prototype[name] as object),
+      EXPECTED_ROUTE_VERBS[name],
+      `${name} 的 HTTP 动词与预期不符`,
+    )
     const headers = (Reflect.getMetadata(HEADERS_METADATA, prototype[name] as object) ?? []) as Array<{ name: string; value: string }>
     assert.ok(headers.some((header) => header.name.toLowerCase() === 'cache-control' && header.value === 'no-store'))
   }
-  pass('Controller 仅暴露两个 Admin 鉴权 GET 方法且响应禁止缓存')
+
+  // 写边界：只允许 disable / restore 两条。想加第三条写路径必须先改这里，
+  // 顺带被迫回答「它写不写审计、要不要 reason」——这就是这条断言存在的意义。
+  const writeMethods = methods.filter((name) => EXPECTED_ROUTE_VERBS[name] !== RequestMethod.GET)
+  assert.deepEqual(writeMethods.sort(), ['disable', 'restore'])
+  pass('Controller 暴露 2 个 GET + disable/restore 两条写路径，动词与禁缓存头均正确')
 }
 
 function verifyContractParity(): void {
@@ -380,6 +580,9 @@ function verifyContractParity(): void {
     'recentActivities',
     'retentionNotice',
     'externalJumpCount',
+    'AdminUserStatusChangeRequest',
+    'AdminUserStatusChangeResult',
+    'AdminUserManagedStatus',
   ]
   for (const symbol of required) {
     assert.ok(shared.includes(symbol), `shared 契约缺少 ${symbol}`)
