@@ -16,7 +16,13 @@
 > 此后多条「缺 / 不存在」的判定已被主干实现推翻 —— 若照原文开工，会去重造已经存在的端点。
 > 本轮对 `origin/main@85eb7a3b4` 重验，**只订正「某端点 / 某能力存不存在」判定已经反转的条目**，
 > 原结论保留在括注里以便追溯；未标注订正的条目本轮复核仍然成立（含四个 `kiosk/*` 空壳桩、
-> `redactedFileId` 恒 null、会话钟零实现、`FileProvenance` / `OrderQuote` / `BenefitReservation` 全无）。
+> ~~`redactedFileId` 恒 null、~~会话钟零实现、`FileProvenance` / `OrderQuote` / `BenefitReservation` 全无）。
+>
+> **［2026-09-03 再订正］** 上面括注里的 `redactedFileId` 恒 null **已于 2026-09-03 失效** ——
+> PR #766 让 `pii_redact` 真的产出派生文件（`resultFileId` = `redaction.redactedFileId`），
+> 前端 claim 五态由 #771 跟进；受影响条目：§1.1 `06` s2、§11 A9、§12 第 2 条，均已就地订正。
+> 同日还把 §11 A7 与 §12 第 1 条里 `task-runner.ts` 的四个行号换成符号锚点 ——
+> 那四个行号已全部漂掉，其中 `:582-585` 当时指向的是函数参数默认值，与履约判定无关。
 > 已订正：§1.1 `39` / `41` claim / `41` wrongdoc、§4 `36`、§5 `21` 分页 / `21` 条件对照、
 > §8 `22` ai-down、§9 `04` s5 / `40` leftover、§11 A6 / A7 / A8 / A11 / B5 / B6 / B7 / B22 / B25、
 > §12 第 1 / 21 / 22 / 26 / 34 条。**行号会漂，订正条目一律以符号名与提交号为准。**
@@ -97,7 +103,7 @@ FileProvenance
 | `06` s2 材料体检（页数 / 清晰度 / 边距 / 幅面） | 上传后自动预检 | `POST /materials/tasks {kind:'inspection'}` + `GET /materials/tasks/:id` | ✅ | 匿名，30/min。匿名要收好返回的一次性 `accessToken`（或用 `x-material-task-token`）。**实质同步**：inspection 直接回 `completed`（`materials.service.ts:271`） |
 | `06` s2 隐私预检（身份证号等） | 扫出敏感信息并定位 | `POST /materials/tasks {kind:'pii_scan'}` | ✅ | 检出四类：`phone / email / id_card / address`（`pii-scan.util.ts:168-224`）。**snippet 已脱敏后才入库**。扫描版 PDF 只 OCR 前 `PII_SCAN_MAX_OCR_PAGES`（默认 3）页，截断时 `mode='partial'` 而不是 `'real'` —— 屏上必须照实说「只体检了前 N 页」 |
 | `06` s2「遮住这一处 / 全部取消 / 换一处」 | 逐条决定 keep/redact | `POST /materials/tasks/:id/pii-findings/decisions` | ✅ | body `{decisions:[{findingId, action:'keep'\|'redact'}]}`，最多 200 条 |
-| `06` s2「遮盖后继续」拿到打了码的新文件 | 遮盖后产出可打印文件 | `POST /materials/tasks {kind:'pii_redact'}` | ⚠️ | **端点在，但 `redactedFileId` 目前恒 `null`**（`materials.service.ts:617-634` 只回 `redactedCount/keptCount/pendingCount`）。也就是说**遮盖完拿不到新文件**，s2 走到 s3 会断。这是上线阻塞级别的半实现 |
+| `06` s2「遮盖后继续」拿到打了码的新文件 | 遮盖后产出可打印文件 | `POST /materials/tasks {kind:'pii_redact'}` | ✅ | ~~端点在，但 `redactedFileId` 目前恒 `null`（`materials.service.ts:617-634` 只回 `redactedCount/keptCount/pendingCount`）。也就是说遮盖完拿不到新文件，s2 走到 s3 会断。这是上线阻塞级别的半实现~~ **［2026-09-03 订正］该阻塞已关闭**：PR #766 让 `pii_redact` 真的产出派生 FileObject，`resultFileId` 回填 `redaction.redactedFileId`；`verify:pii-redaction` 的核心判据是「派生件用 `unpdf.extractText` 提取不出身份证号 / 手机号」。前端 claim 五态由 #771 落地。**真机打印链取派生件仍待实测**（见 A9） |
 | `06` s3 参数：黑白 / 彩色 | 打印色彩 | `PrintJobParamsDto.colorMode` | ⚠️ | 后端取值 `black_white \| color`；设计稿 `data-v="bw"`。**前端负责映射**，别把 `bw` 直接发出去 |
 | `06` s3 参数：单面 / 自动双面 / 长边翻 / 短边翻 | 双面模式 | `PrintJobParamsDto.duplex` | ⚠️ | 后端三值 `simplex \| duplex_long_edge \| duplex_short_edge`（`create-print-job.dto.ts:26-62`）。设计稿把「单双面」与「翻页边」拆成两个控件，前端要合成一个值 |
 | `06` s3 参数：方向 / 缩放 / 每面页数 | 版面 | `orientation: auto\|portrait\|landscape`、`scale: fit\|actual`、`pagesPerSheet: 1\|2\|4` | ⚠️ | 设计文案「跟随文件（纵向）」→ `auto`；「按原尺寸（100%）」→ `actual`；「缩放到 A4」→ `fit`。**`pagesPerSheet` 不影响价格**（`pricing.service.ts:23`） |
@@ -446,9 +452,9 @@ FileProvenance
 | A4 | **权益预占** | `06` s4→s5 之间 | buildout-spec **「权益预占」**：`BenefitReservation`（`quoteId @unique`、`held/committed/released`、`version` CAS）。预占只加 `quantityReserved`，提交时才 `quantityRemaining -= 1` 并建 `RedemptionRecord`。**两台终端争最后一次额度，最多一台成功** |
 | A5 | **月度周期余额 + 有效状态** | `24` s1、`06` s4 | buildout-spec **「③ 月度周期余额」**：`BenefitPeriodBalance`（`@@unique([benefitGrantId, periodKey])`，`Asia/Shanghai` 自然月，`[startsAt, endsAt)`，不结转，月中首领发整月 N 次）。`GET /me/benefits` 增 `balance{total, remaining, reserved, available, nextResetAt}` 与 `effectiveStatus`（**读时同步计算，不靠午夜 cron**） |
 | A6 | ~~止血：现有 `/orders/:id/redeem` 不得再按任意 Grant 整单免~~ **［2026-08-18 订正：已完成，勿重做］** | `06` s4 | **止血闸已在 main 上**：2026-08-17 `385a20632`(#683) 起，`benefit-redemption.service.ts:173-181` 在**任何写入之前**对 `order.type === 'print'` 直接抛 `REDEEM_PRINT_ORDER_UNSUPPORTED`（同一事务内拒绝，不会留半个核销；`resume_optimize` 等非订单核销 `orderId` 恒 null，不走这条路径、不受影响）。源码注释直接引本表 §12 第 1 条作为口径来源。**A6 到此为止，不要再写第二道止血**；A1–A5 的正式规则链（面值 / 抵扣上限 / 适用范围 / 预占 / 周期余额）仍全部未建，止血解除必须等它们，届时改成只接受**已提交的 Reservation**，历史 Grant 返回 `BENEFIT_RULE_MISSING` |
-| A7 | **履约判定与失败补偿** | `06` s6 六处境、`41` 全八屏 | buildout-spec **「⑥ 履约判定与失败补偿」**：`PrintTask` 增 `orderId / attemptNo / retryOfTaskId / complimentaryRetry / dispatchStage / outputOutcome / outputOutcomeSource / outcomeEvidenceJson`；新建 `PrintExceptionCase` 与 `RedemptionAdjustment`；`Order` 增 `fulfillmentStatus`。工作人员接口 `POST /admin/orders/:orderId/print-resolution`。**［2026-08-18 订正］原文这一句 ——「队列未出现 / 普通超时不得写 complete，见 `task-runner.ts:495`」—— 已不成立**：Agent 侧对四类不确定结果统一 fail-closed 成 `failed + PRINT_JOB_UNCONFIRMED`，`unconfirmedOutcome()` 是唯一出口 —— 非 Windows（`task-runner.ts:582-585`）、队列连续 5 次 not_found 且从未见过活动作业（`:662-668`）、监控硬超时含 Pantum `Printing, Retained` 态（`:679-704`）、崩溃后 `spooled`/`dispatching` 恢复（`:289-299`）；`apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 有覆盖。2026-08-09 `fbc762dd0`(fix: fail closed on unverified print outcomes) 落地、随 PR #570 于 08-10 进 main，本表成稿所据分支早于它。**A7 剩下的仍然要做**：`PrintTask` 的 attempt / 履约证据字段、`PrintExceptionCase` / `RedemptionAdjustment`、`Order.fulfillmentStatus`、上面那个工作人员接口，以及 Windows 真机对这条 fail-closed 行为的验收 —— **但不要再按「Agent 误报 completed」去修，那个洞已经堵上了** |
+| A7 | **履约判定与失败补偿** | `06` s6 六处境、`41` 全八屏 | buildout-spec **「⑥ 履约判定与失败补偿」**：`PrintTask` 增 `orderId / attemptNo / retryOfTaskId / complimentaryRetry / dispatchStage / outputOutcome / outputOutcomeSource / outcomeEvidenceJson`；新建 `PrintExceptionCase` 与 `RedemptionAdjustment`；`Order` 增 `fulfillmentStatus`。工作人员接口 `POST /admin/orders/:orderId/print-resolution`。**［2026-08-18 订正］原文这一句 ——「队列未出现 / 普通超时不得写 complete，见 `task-runner.ts:495`」—— 已不成立**：Agent 侧对四类不确定结果统一 fail-closed 成 `failed + PRINT_JOB_UNCONFIRMED`，`unconfirmedOutcome()` 是唯一出口 —— 非 Windows（`task-runner.ts` 的 `platform !== 'win32'` 分支）、队列连续 5 次 not_found 且从未见过活动作业（`notFoundCount >= NOT_FOUND_LIMIT`）、监控硬超时含 Pantum `Printing, Retained` 态（`if (seenRetainedOnce)` 起至函数末）、崩溃后 `spooled`/`dispatching` 恢复（Step 0 幂等检查内）；`apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 有覆盖。2026-08-09 `fbc762dd0`(fix: fail closed on unverified print outcomes) 落地、随 PR #570 于 08-10 进 main，本表成稿所据分支早于它。**A7 剩下的仍然要做**：`PrintTask` 的 attempt / 履约证据字段、`PrintExceptionCase` / `RedemptionAdjustment`、`Order.fulfillmentStatus`、上面那个工作人员接口，以及 Windows 真机对这条 fail-closed 行为的验收 —— **但不要再按「Agent 误报 completed」去修，那个洞已经堵上了** |
 | A8 | ~~自助取件核销端点~~ **［2026-08-18 订正：端点已存在，勿重造］** | `41` claim「确认认领」 | `POST /print/jobs/claim-pickup` 已于 2026-08-12 `c61b7e06f` 落地（`print-jobs.controller.ts:33-38` → `PickupOrderService.claim()`，限流 20/min）。**入参与原方案不同**：body 只有 `{code}`（10 位大写码，正则去掉了易混字符），终端走 `x-terminal-id` 头。原文「生产 `PrintPickupClaimPage.tsx:44` 已经在调这个不存在的路径」**不再成立** —— 页面与端点现在对得上。⚠️ **本轮只验了路由存在性**：幂等、单次有效、以及「订单 `paid` + 未退款 + 任务未终态 → CAS 置 `claimed`」是否都在 `PickupOrderService` 内，接线前请自行核对；若确有缺口，那是**补语义**不是**建端点** |
-| A9 | **PII 遮盖产物** | `06` s2「遮住这一处再继续」 | `POST /materials/tasks {kind:'pii_redact'}` 目前 `redactedFileId` 恒 `null`（`materials.service.ts:617-634`）。要真的产出一份打了码的新 FileObject 并回 `redactedFileId + printFileUrl`，否则 s2→s3 断链 |
+| A9 | **PII 遮盖产物** | `06` s2「遮住这一处再继续」 | ~~`POST /materials/tasks {kind:'pii_redact'}` 目前 `redactedFileId` 恒 `null`（`materials.service.ts:617-634`）。要真的产出一份打了码的新 FileObject 并回 `redactedFileId + printFileUrl`，否则 s2→s3 断链~~ **［2026-09-03 订正］产出侧已完成**（PR #766，`resultFileId` = `redaction.redactedFileId`，39 项断言含「派生件提取不出身份证号 / 手机号」两条核心判据；前端 claim 五态见 #771）。**A9 剩余项**：真机验证打印链取的是派生件而非原件，以及 `printFileUrl` 是否按派生件签发 |
 | A10 | **服务端会话钟** | `04` s3、`40` 六处境 | `POST /kiosk/sessions` / `:id/heartbeat` / `:id/extend` / `:id/end`。服务端持 `hintSec/graceSec`，**超时时吊销该会话签发的全部一次性 token**（`x-resume-access-token`、`X-Upload-Session-Control`、`X-Scan-Session-Control`、`x-payment-session-token`）。公共终端的隐私清场只靠前端计时不成立 |
 | A11 | ~~`GET /me/pending-tasks`~~ → **通用办理单恢复** **［2026-08-18 订正：同名端点已存在，勿重造］** | `04` s5 会话恢复 | `GET /me/pending-tasks` 已于 2026-08-09 `83588b8f1` 提交、随 PR #570 于 08-10 进 main（`member-print-orders.controller.ts:69-80`，`EndUserAuthGuard` + `no-store`，无任务回 `[]`）。原文「生产 `/session-resume` 已经在调它」现在是**正常接线**，不是假接真。**剩下的缺口是覆盖面不是端点**：当前只回会员本人可续办的打印任务，`ai_task` / `upload_session` 两类无来源，且匿名用户完全不适用。要做通用办理单恢复，应在 Errand 模型成立后**扩展这个端点**，不要另建同名的第二个 |
 | A12 | **站点配置下发面** | `01` / `02` / `04` / `21` / `39` / `41` 全站 | `GET /terminals/:id/config` 增 `site:{terminalNo, venueName, cityCode, serviceDeskLocation, serviceHours, supportPhone, peerTerminal, hotline, officialSiteUrl}`。**缺配置返回空串，不返回示例值** —— 前端已有兜底文案（`scripts/site-config.js` 的 `FALLBACK`） |
@@ -670,8 +676,8 @@ PY
    A7 那条依据的是 buildout-spec 的转述而非一手证据。
    **现已对 `origin/main@85eb7a3b4` 一手复核，且那个转述是错的**：`monitorPrintJob()` 的四类不确定
    结果全部 fail-closed 成 `failed + PRINT_JOB_UNCONFIRMED`，`unconfirmedOutcome()` 是唯一出口 ——
-   非 Windows（`:582-585`）、连续 5 次 not_found 且从未见过活动作业（`:662-668`）、
-   硬超时含 Pantum `Printing, Retained` 态（`:679-704`）、崩溃后 `spooled`/`dispatching` 恢复（`:289-299`）。
+   非 Windows（`platform !== 'win32'` 分支）、连续 5 次 not_found 且从未见过活动作业（`notFoundCount >= NOT_FOUND_LIMIT`）、
+   硬超时含 Pantum `Printing, Retained` 态（`if (seenRetainedOnce)` 起至函数末）、崩溃后 `spooled`/`dispatching` 恢复（Step 0 幂等检查内）。
    只有「显式 Complete/Printed」与「先见到活动作业、随后离开队列」两条才回 `failed:false`，
    且两处注释都写明这**只确认 Windows 打印后台生命周期，不证明纸真的到了用户手上**。
    `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 有覆盖（含非 Windows 路径）。
@@ -679,8 +685,19 @@ PY
    → 仍待做的是 Windows 真机验收，不是修「误报 completed」，见 A7。
 
 2. **`materials` 的 `pii_redact` 是否在别处真的产出了文件。**
-   我确认了 `materials.service.ts:617-634` 只回计数、`redactedFileId` 恒 null（这一点来自子代理读取的行号），
-   但**没有全量搜过是否存在另一条产出遮盖文件的路径**（比如由 Agent 侧完成）。A9 请以实测为准。
+   ~~我确认了 `materials.service.ts:617-634` 只回计数、`redactedFileId` 恒 null（这一点来自子代理读取的行号），
+   但**没有全量搜过是否存在另一条产出遮盖文件的路径**（比如由 Agent 侧完成）。A9 请以实测为准。~~
+
+   **［2026-09-03 订正：本条已不成立，原文保留在上面备查］** 后端现在**真的产出遮挡后的新文件**：
+   `materials.service.ts` 的 `pii_redact` 分支已把 `resultFileId` 回填成 `redaction.redactedFileId`
+   （原来恒 null）。落地于 PR #766（移植自 #566），带 `verify:pii-redaction` 39 项断言，
+   其中两条核心判据是「派生件用 `unpdf.extractText` 提取不出身份证号 / 手机号」——
+   即断言的是**提取不出来**，不是「代码里调了遮挡函数」。前端口径由 PR #771 跟进：
+   一体机按 `claim` 的五个取值（`redacted_verified` / `redacted_unverified` / `partial` /
+   `not_supported` / `nothing_to_redact`）分别说真话，不再统一宣称「已遮挡」。
+   原文引用的 `:617-634` 同样已漂 —— 该区间现在是 `requiredFields()` 的 switch，与遮挡无关；
+   按符号 `pii_redact` / `redactedFileId` 定位。
+   **仍需实测的部分没有变**：A9 的「派生件真的能打印、且打印链取的是派生件而非原件」仍应以真机为准。
 
 3. **各 `/print` 端点产出的 PDF 是否已经带 AIGC 标识。**
    设计 §3 要求「AI 生成内容含打印件必须带可见标识与文件元数据标识，每页恰好一次」。
