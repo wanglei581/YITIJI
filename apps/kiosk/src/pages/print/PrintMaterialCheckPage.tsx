@@ -25,6 +25,12 @@ import {
   type PrintFileState,
   type PrintMaterialSession,
 } from './printMaterialSession'
+import {
+  hasUsableRedactedFile,
+  parsePiiRedactionResult,
+  printFileAfterRedaction,
+  toMaterialRedactionSummary,
+} from './piiRedaction'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import {
   MaterialCheckPresentation,
@@ -52,12 +58,7 @@ interface NormalizeA4SummaryView {
   messages: Array<{ code: string; severity: InspectionMessageSeverity; text: string }>
 }
 
-interface PiiRedactionSummaryView {
-  canRedact: boolean
-  redactedFileId: string | null
-  resultFileCreated: boolean
-  message: string
-}
+
 
 function isPendingStatus(task: DocumentProcessTaskView): boolean {
   return task.status === 'pending' || task.status === 'processing'
@@ -119,18 +120,6 @@ function normalizeA4SummaryFromTask(task: DocumentProcessTaskView | null): Norma
   const canNormalize = typeof checks['canNormalize'] === 'boolean' ? checks['canNormalize'] : null
   const messages = normalizeInspectionMessages(checks)
   return { targetPaperSize, canNormalize, messages }
-}
-
-function piiRedactionSummaryFromTask(task: DocumentProcessTaskView | null): PiiRedactionSummaryView | null {
-  const checks = task?.result?.['checks']
-  if (!isRecord(checks)) return null
-  const messages = normalizeInspectionMessages(checks)
-  return {
-    canRedact: checks['canRedact'] === true,
-    redactedFileId: typeof checks['redactedFileId'] === 'string' ? checks['redactedFileId'] : null,
-    resultFileCreated: checks['resultFileCreated'] === true,
-    message: messages[0]?.text ?? '已完成遮挡产物评估，当前版本不生成新文件，打印仍使用原文件',
-  }
 }
 
 function normalizeInspectionMessages(checks: Record<string, unknown>): InspectionSummaryView['messages'] {
@@ -430,14 +419,12 @@ export function PrintMaterialCheckPage() {
       }, token, decidedTask.accessToken ?? piiTask.accessToken)
       persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: redactionTask })
       const readyRedaction = await waitForCompletedTask(redactionTask, token, redactionTask.accessToken)
-      assertTaskReady(readyRedaction, '遮挡产物评估')
-      const redaction = piiRedactionSummaryFromTask(readyRedaction) ?? undefined
-      if (redaction && !redaction.canRedact) {
-        persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: readyRedaction })
-        setError(redaction.message)
-        setStage('review')
-        return
-      }
+      assertTaskReady(readyRedaction, '隐私遮挡处理')
+      const parsed = parsePiiRedactionResult(readyRedaction)
+      const redaction = toMaterialRedactionSummary(parsed)
+      const printFile = hasUsableRedactedFile(parsed)
+        ? printFileAfterRedaction(file, parsed)
+        : file
 
       const materialCheck: MaterialCheckSummary = {
         inspectionTaskId: inspectionTask.id,
@@ -452,9 +439,16 @@ export function PrintMaterialCheckPage() {
         mode: isDemoTask(inspectionTask) || isDemoTask(normalizeTask) || isDemoTask(piiTask) || isDemoTask(readyRedaction) ? 'demo' : 'checked',
       }
 
-      persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: readyRedaction, materialCheck })
+      persistSession({
+        file: printFile,
+        inspectionTask,
+        normalizeTask: normalizeTask ?? undefined,
+        piiTask: decidedTask,
+        piiRedactTask: readyRedaction,
+        materialCheck,
+      })
       setStage('done')
-      navigate('/print/preview', { state: { file, materialCheck, source } })
+      navigate('/print/preview', { state: { file: printFile, materialCheck, source } })
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存隐私选择失败，请重试')
       setStage('review')
@@ -496,6 +490,8 @@ export function PrintMaterialCheckPage() {
         后端 materials.service.ts:267 返回的是 mode: 'basic_inspection'——
         只做格式、大小、页数与图片质量检查，**既没有 AI，也没有边距分析**。
         「AI」字样与「边距」承诺均已移除。恢复条件：接入真实模型或边距分析后再改回。
+        源分支 feat/kiosk-pii-redaction-contract 仍带着那句假文案；合入时只取它的
+        条件包装结构，不得把横幅改回「AI文件预检 / 自动检查格式、边距与打印风险」。
       */}
       <AiDriverBanner feature="文件预检" description="检查格式、大小、页数与图片质量" />
 

@@ -119,6 +119,9 @@
 
 逐页台账见 `docs/reviews/wiring-ledger-2026-09-02.md`。
 
+- [x] **后端（PR #766 已合入 `main`，未部署）**：`pii_redact` 对文字层 PDF 生成派生件并回填 `resultFileId`；扫描件 / 无坐标诚实 `not_supported` 且零文件。`verify:pii-redaction` 39 项全绿（核心判据未削弱），已接双 CI job。
+- [x] **前端文案（本刀，分支 `feat/pii-redaction-honest-copy`，未合入、未部署）**：一体机预览 / 确认 / 材料检查按后端 5 个 `claim` 分别说话，不再写「当前版本不生成新文件」。有派生件时打印改用遮挡后文件。呈现层视觉（强制预览核对页 / 青序流光稿 13）不在本刀。
+- [ ] **扫描件 / 图片遮挡（二级，未开工）**：文字层 PDF 之外，OCR 路径仍无坐标（百度 `accurate_basic` 不返回 location），会如实 `not_supported`。
 
 ## 当前候选：F0.5 发布可观测性（2026-09-01）
 

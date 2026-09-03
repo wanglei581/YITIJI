@@ -81,6 +81,20 @@ if (patterns.length !== terms.length) {
   hardFail(`禁词 ${terms.length} 项与正则 ${patterns.length} 项数量不一致,可能漏配变体`)
 }
 
+const piiTerms = [
+  ...sliceBlock(ssotSource, 'COMPLIANCE_PII_REDACTION_FORBIDDEN_TERMS', '[', ']').matchAll(/'([^']+)'/g),
+].map((m) => m[1])
+if (piiTerms.length === 0) hardFail('COMPLIANCE_PII_REDACTION_FORBIDDEN_TERMS 解析出 0 项')
+const piiPatternBody = sliceBlock(ssotSource, 'COMPLIANCE_PII_REDACTION_FORBIDDEN_PATTERNS', '[', ']')
+const piiPatterns = [...piiPatternBody.matchAll(/\/((?:[^/\\\n]|\\.)+)\//g)].map(
+  (m) => new RegExp(m[1], 'g')
+)
+if (piiPatterns.length === 0) hardFail('COMPLIANCE_PII_REDACTION_FORBIDDEN_PATTERNS 解析出 0 项')
+if (piiPatterns.length !== piiTerms.length) {
+  hardFail(`隐私遮挡禁词 ${piiTerms.length} 项与正则 ${piiPatterns.length} 项数量不一致,可能漏配变体`)
+}
+patterns.push(...piiPatterns)
+
 const markerBody = sliceBlock(ssotSource, 'COMPLIANCE_EXEMPTION_MARKERS', '{', '\n}')
 const markers = [...markerBody.matchAll(/'([^']+)'/g)].map((m) => m[1])
 if (markers.length === 0) hardFail('COMPLIANCE_EXEMPTION_MARKERS 解析出 0 项')
@@ -96,7 +110,7 @@ const LOOKBEHIND = Number(lookbehindMatch[1])
 console.log(`\n📋 合规文案禁词门禁`)
 console.log(`   SSOT: ${path.relative(root, SSOT)}`)
 console.log(
-  `   禁词 ${terms.length} 项 / 正则 ${patterns.length} 项 / 豁免标记 ${markers.length} 项 / 禁用声明标记 ${banMarkers.length} 项`
+  `   禁词 ${terms.length} 项 / 隐私遮挡禁词 ${piiTerms.length} 项 / 扫描正则 ${patterns.length} 项 / 豁免标记 ${markers.length} 项 / 禁用声明标记 ${banMarkers.length} 项`
 )
 console.log(`   扫描: ${SCAN_DIRS.join(' ')}\n`)
 
@@ -205,6 +219,11 @@ const probe = [
   // 禁用声明:连续列举多个禁词,最后一个已超出回看窗口,靠整行标记豁免
   { text: '素材文案禁止出现「一键投递 / 立即投递 / 平台投递」等违规用语。', shouldPass: true },
   { text: '文案不得出现一键报名', shouldPass: true },
+  // 隐私遮挡天花板:裸「已遮挡」禁止;带限定的「已遮挡你确认的 N 处」允许。
+  { text: '已遮挡全部隐私信息', shouldPass: false },
+  { text: '已遮挡你确认的 2 处', shouldPass: true },
+  { text: '本机已无隐私信息', shouldPass: false },
+  { text: '隐私已保护', shouldPass: false },
 ]
 
 let probeFailures = 0
