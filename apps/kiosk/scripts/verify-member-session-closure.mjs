@@ -251,4 +251,33 @@ assert(
   'MySettings 退出、切换账号、换绑完成均走同一隐私边界，并保留 /profile 与 /login 目的地语义',
 )
 
+assert(
+  /value=\{oldOtp\}/.test(mySettingsPage) &&
+    /value=\{newOtp\}/.test(mySettingsPage) &&
+    /type="password"/.test(mySettingsPage) &&
+    /me-otp-mask/.test(mySettingsPage) &&
+    /aria-label="当前手机号验证码，已隐藏显示"/.test(mySettingsPage) &&
+    /aria-label="新手机号验证码，已隐藏显示"/.test(mySettingsPage),
+  '换绑验证码在公共屏隐藏显示，不把 6 位码打在大厅屏幕上',
+)
+assert(
+  !/<input[^>]*type="tel"[^>]*value=\{oldOtp\}/.test(mySettingsPage) &&
+    !/<input[^>]*type="tel"[^>]*value=\{newOtp\}/.test(mySettingsPage) &&
+    !/<input[^>]*value=\{oldOtp\}[^>]*type="tel"/.test(mySettingsPage),
+  '换绑验证码输入不再用可见 tel 明文',
+)
+assert(
+  /timeoutMs:\s*45_000/.test(mySettingsPage) &&
+    /enabled:\s*step !== 'done'/.test(mySettingsPage) &&
+    /onIdle:\s*onCancel/.test(mySettingsPage),
+  '换绑弹层 45 秒无操作自动关闭并清内存',
+)
+{
+  const fixturePlainOtp = '<input type="tel" inputMode="numeric" maxLength={6} value={oldOtp} />'
+  assert(
+    /<input[^>]*type="tel"[^>]*value=\{oldOtp\}/.test(fixturePlainOtp),
+    '换绑验证码明文夹具确实会被「禁止 tel 明文」断言抓住',
+  )
+}
+
 console.log('\nALL PASS')

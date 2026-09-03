@@ -34,3 +34,7 @@
   width: 54px;
   height: 54px;
 }
+
+.me-inkdetail-settings .me-otp-mask {
+  -webkit-text-security: disc;
+}

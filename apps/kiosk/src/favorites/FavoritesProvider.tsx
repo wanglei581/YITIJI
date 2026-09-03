@@ -30,8 +30,8 @@ function emptySets(): IdSets {
  * 登录态门控（不破坏匿名浏览）：
  * - 登录会员：以服务端 /me/favorites 为 SSOT；登录后逐页拉全量 id 集合，toggle 走
  *   addFavorite/removeFavorite（乐观更新，失败回滚 + 提示）。
- * - 未登录 / 匿名：沿用本机 localStorage 收藏（历史收藏不丢），toggle 写本机；新增收藏时
- *   提示「登录后可同步到账号」，引导但不强制登录。
+ * - 未登录 / 匿名：本机 localStorage 收藏只服务当前这位游客；登出 / 隐私清场会清掉，
+ *   避免下一游客看见上一游客的心形。toggle 写本机；新增时提示「登录后可同步到账号」。
  * - 合并：登录后用户在「我的收藏」显式触发 mergeLocalToAccount（服务端 upsert 幂等去重，
  *   不覆盖服务端收藏；成功合并的本机记录清除，失败的保留下次再试）。
  *

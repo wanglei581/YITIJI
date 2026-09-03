@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { memberLogout } from '../services/auth/memberAuthApi'
 import { onMemberSessionExpired } from '../services/auth/memberSessionEvents'
 import { AuthContext, deriveDisplayName, type AuthContextValue, type AuthUser } from './context'
-import { clearKioskSensitiveSession } from './kioskSensitiveSession'
+import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from './kioskSensitiveSession'
 import { isLoginPath, loginPathForCurrentLocation } from './returnPath'
 
 /**
@@ -46,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = userRef.current?.token ?? null
     sessionExpiredRedirectingRef.current = false
     clearKioskSensitiveSession()
+    // 游客本机收藏不能跟 login() 一起清，否则没机会合并到账号。
+    clearKioskSharedDeviceResidue()
     // 先清本地状态，后端失败也不影响。
     userRef.current = null
     setUser(null)
