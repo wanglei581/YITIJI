@@ -51,6 +51,19 @@ function readCommandList() {
     failUsage('command list is empty (no runnable lines after skipping comments/blanks)')
   }
 
+  // 续行守卫：本 runner 按行切分，`\` 续行会被静默打碎成两条独立命令 —— 前半条语法
+  // 不完整而失败，后半条被当成一条命令执行，两者都不是作者本意，而且**看起来像是
+  // 那条 verify 自己挂了**，排错会走到完全错误的方向。
+  // 当前 366 条清单里一条续行都没有（实测），但没有守卫就等着有人哪天加一条。
+  // 宁可在这里红着停下，也不要静默改变语义。
+  const continued = commands.filter((command) => command.endsWith('\\'))
+  if (continued.length > 0) {
+    failUsage(
+      '命令清单不支持 `\\` 续行（按行切分会把它打碎）。请改写成单行：\n' +
+        continued.map((command) => `  ${command}`).join('\n'),
+    )
+  }
+
   return commands
 }
 
@@ -85,9 +98,13 @@ function main() {
   for (let i = 0; i < commands.length; i++) {
     const command = commands[i]
     const seq = i + 1
+    // ::group:: 让 366 条命令在 Actions 日志里可折叠 —— 「跑完再汇总」意味着
+    // 失败时日志更长，不折叠等于把一个可读性问题换成另一个。
+    process.stdout.write(`::group::[${seq}/${total}] ${command}\n`)
     process.stderr.write(`\n[${seq}/${total}] $ ${command}\n`)
 
     const { result, durationMs } = runCommand(command)
+    process.stdout.write('::endgroup::\n')
     const elapsed = formatDuration(durationMs)
 
     if (result.error) {
