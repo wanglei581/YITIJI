@@ -42,3 +42,19 @@ export class CreateDataSourceDto {
   @IsOptional() @IsString() @MinLength(8) @MaxLength(5000)
   credential?: string
 }
+
+/**
+ * `POST /partner/data-sources/:id/rotate-credential` 的请求体。
+ *
+ * 语义按 accessMode 分叉（服务端 rotatePartnerDataSourceCredential 强制）：
+ *   - `webhook`：`credential` 可选。留空 = 由服务端用 CSPRNG 生成新密钥；
+ *     传值 = 使用机构自带的密钥（对方系统已固定密钥时用）。
+ *   - `api`：`credential` **必填**。上游 token 只能由机构从来源平台取得，
+ *     平台不可能代为签发；这里只负责加密保存。
+ *
+ * 与 CreateDataSourceDto.credential 一样：只进不出，任何响应都不回显本字段原值。
+ */
+export class RotateDataSourceCredentialDto {
+  @IsOptional() @IsString() @MinLength(8) @MaxLength(5000)
+  credential?: string
+}

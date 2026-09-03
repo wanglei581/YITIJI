@@ -16,7 +16,7 @@ import { AuditService } from '../audit/audit.service'
 import { JobQualityService } from '../job-ai/job-quality.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
-import type { CreateDataSourceDto } from './dto/data-source.dto'
+import type { CreateDataSourceDto, RotateDataSourceCredentialDto } from './dto/data-source.dto'
 import type { ImportJobItemDto } from './dto/import-jobs.dto'
 import type { ImportFairsDto } from './dto/import-fairs.dto'
 import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
@@ -27,6 +27,7 @@ import {
   isAdminManagedAccessMode,
 } from './partner-capabilities'
 import {
+  type AccessMode,
   type PartnerDataSourceDto,
   type PartnerJobDto,
   type PartnerFairDto,
@@ -40,6 +41,57 @@ import {
   normalizeOptionalHttpUrl,
   fmtSyncTime,
 } from './jobs-shared'
+
+/**
+ * 数据源列表项 + 生命周期字段。
+ *
+ * 为什么在这里扩展而不是直接改 jobs-shared.ts 的 PartnerDataSourceDto：
+ * `prismaJobSourceToPartnerDto` 与 `PartnerDataSourceDto` 被 Kiosk/Admin 侧共用，
+ * 归档与轮换是 **Partner 独有** 的生命周期语义，不应该扩散到共享映射层。
+ * 契约形状与 packages/shared 的 PartnerDataSourceView 对齐（前端消费同一形状）。
+ */
+export interface PartnerDataSourceLifecycleDto extends PartnerDataSourceDto {
+  archived: boolean
+  archivedAt: string | null
+  credentialRotatedAt: string | null
+}
+
+/** JobSource 行里与生命周期有关的两列（不含任何密钥内容，可安全回显）。 */
+interface JobSourceLifecycleRow {
+  archivedAt: Date | null
+  webhookSecretRotatedAt: Date | null
+}
+
+/**
+ * 凭证轮换响应契约的本地副本。
+ *
+ * **契约源**：packages/shared/src/types/job.ts 的 PartnerDataSourceCredentialRotationResult
+ *
+ * 为什么不直接 import @ai-job-print/shared：services/api 走 commonjs + node
+ * moduleResolution，而 packages/shared 是 ESM-only（见 member-favorites.types.ts 顶部说明）。
+ * 字段变更必须同时改两处。
+ *
+ * 安全口径：`webhookSecretOnce` 只在轮换那一次响应出现，任何 GET 都不回显。
+ */
+export interface PartnerDataSourceCredentialRotationResult {
+  id: string
+  accessMode: AccessMode
+  credentialConfigured: boolean
+  rotatedAt: string
+  webhookSecretOnce?: string
+}
+
+function withLifecycle(
+  dto: PartnerDataSourceDto,
+  row: JobSourceLifecycleRow,
+): PartnerDataSourceLifecycleDto {
+  return {
+    ...dto,
+    archived: row.archivedAt != null,
+    archivedAt: row.archivedAt?.toISOString() ?? null,
+    credentialRotatedAt: row.webhookSecretRotatedAt?.toISOString() ?? null,
+  }
+}
 
 @Injectable()
 export class JobsPartnerService {
@@ -85,7 +137,7 @@ export class JobsPartnerService {
     }))
   }
 
-  async getPartnerDataSources(user: AuthedUser): Promise<PartnerDataSourceDto[]> {
+  async getPartnerDataSources(user: AuthedUser): Promise<PartnerDataSourceLifecycleDto[]> {
     if (!user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
@@ -94,7 +146,8 @@ export class JobsPartnerService {
       orderBy: { updatedAt: 'desc' },
     })
     const summaries = await this.getDataSourceSyncSummaries(user.orgId, sources.map((source) => source.id))
-    return sources.map((source) => prismaJobSourceToPartnerDto(source, summaries.get(source.id)))
+    // 归档源仍然列出（运营要看得见历史来源与它导过的数据），只是标记为已归档。
+    return sources.map((source) => withLifecycle(prismaJobSourceToPartnerDto(source, summaries.get(source.id)), source))
   }
 
   async getPartnerDataSourceCapabilities(user: AuthedUser) {
@@ -105,7 +158,7 @@ export class JobsPartnerService {
     return getPartnerCapabilities(org.type)
   }
 
-  async createPartnerDataSource(dto: CreateDataSourceDto, user: AuthedUser): Promise<PartnerDataSourceDto> {
+  async createPartnerDataSource(dto: CreateDataSourceDto, user: AuthedUser): Promise<PartnerDataSourceLifecycleDto> {
     if (!user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
@@ -153,13 +206,13 @@ export class JobsPartnerService {
       },
     })
     return {
-      ...prismaJobSourceToPartnerDto(source),
+      ...withLifecycle(prismaJobSourceToPartnerDto(source), source),
       webhookUrl: accessMode === 'webhook' ? `/api/v1/sync/webhook?source=${source.id}` : undefined,
       webhookSecretOnce,
     }
   }
 
-  async togglePartnerDataSource(id: string, user: AuthedUser): Promise<PartnerDataSourceDto> {
+  async togglePartnerDataSource(id: string, user: AuthedUser): Promise<PartnerDataSourceLifecycleDto> {
     if (!user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
@@ -177,6 +230,17 @@ export class JobsPartnerService {
         },
       })
     }
+    // 归档源不得被重新启用：归档的全部意义就是"停止进数据"，
+    // 允许 toggle 打开会让 archivedAt != null 且 enabled = true 的矛盾状态进库，
+    // 而下游（sync.service 只看 enabled、治理链只看 archivedAt）会各读一半，判断分叉。
+    if (source.archivedAt != null && !source.enabled) {
+      throw new BadRequestException({
+        error: {
+          code: 'DATA_SOURCE_ARCHIVED',
+          message: '数据源已归档，无法启用；请先取消归档',
+        },
+      })
+    }
     const updated = await this.prisma.jobSource.update({
       where: { id },
       data: { enabled: !source.enabled },
@@ -190,7 +254,202 @@ export class JobsPartnerService {
       targetId: id,
       payload: { enabled: updated.enabled },
     })
-    return prismaJobSourceToPartnerDto(updated, summaries.get(id))
+    return withLifecycle(prismaJobSourceToPartnerDto(updated, summaries.get(id)), updated)
+  }
+
+  /**
+   * 凭证轮换 —— 修复"密钥只写一次、丢了就永久废件"的上线阻塞。
+   *
+   * 安全口径（CLAUDE.md §12 / §18）：
+   *   - 新密钥经 AES-256-GCM（common/crypto/secret-cipher）加密后落库，沿用建源时同一套加解密，
+   *     不另起第二套密钥体系。
+   *   - webhook 模式的新密钥**只在本次响应返回一次**；库里存的是密文，
+   *     任何 GET（getPartnerDataSources）都只回 credentialConfigured / credentialRotatedAt。
+   *   - 明文只在本方法栈内存在，不写日志、不进审计 payload。
+   *
+   * 旧密钥的失效时机：**立即**。webhookSecret 是单值列，覆盖写即生效，
+   * 没有双密钥灰度窗口——sync.service 校验 HMAC 时只会解出当前这一个值。
+   * 所以调用方（Partner 控制台）必须提示机构先与对接方约好切换时间。
+   *
+   * 允许在 enabled=false / 待管理员启用 / 已归档状态下轮换：
+   * 轮换是纯粹的降风险动作，不会启用任何东西，也不改 enabled / archivedAt。
+   */
+  async rotatePartnerDataSourceCredential(
+    id: string,
+    dto: RotateDataSourceCredentialDto,
+    user: AuthedUser,
+  ): Promise<PartnerDataSourceCredentialRotationResult> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const source = await this.prisma.jobSource.findUnique({ where: { id } })
+    if (!source || source.orgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    assertDataSourceCapability(org.type, source.accessMode, source.sourceKind)
+
+    const rotatedAt = new Date()
+    let webhookSecretOnce: string | undefined
+
+    // 并发轮换必须打成冲突，不能各写各的（丢失更新）。
+    //
+    // 场景（2026-09-03 对抗性审查实证）：同一 webhook 源，两个已登录会话同时
+    // POST rotate-credential，此前两次都返回 200、各带一枚不同的新密钥，库里只留
+    // 最后写入的那一枚。先拿到响应的人把密钥交给对接方 → 推送全部 401，而两条审计
+    // 都显示轮换成功，事后无从判断哪一枚才是有效的。前端的 submitting 挡不住两个标签页。
+    //
+    // 判据用读到的 webhookSecretRotatedAt 做 compare-and-set：只有仍是我读到的那个值
+    // 才允许写。CAS 未命中即说明有人在我之前刚轮换过，直接拒绝，让调用方重取当前状态。
+    const casWhere = { id, webhookSecretRotatedAt: source.webhookSecretRotatedAt }
+    const assertRotationWon = (res: { count: number }) => {
+      if (res.count === 0) {
+        throw new BadRequestException({
+          error: {
+            code: 'CREDENTIAL_ROTATION_CONFLICT',
+            message: '该数据源刚刚已被轮换，本次未生效；请刷新后确认当前密钥再决定是否再次轮换',
+          },
+        })
+      }
+    }
+
+    if (source.accessMode === 'webhook') {
+      // 留空则服务端用 CSPRNG 生成；传值则用机构自带密钥（对方系统密钥不可改时）。
+      webhookSecretOnce = dto.credential ?? generateWebhookSecret()
+      assertRotationWon(await this.prisma.jobSource.updateMany({
+        where: casWhere,
+        data: {
+          webhookSecret: encryptSecret(webhookSecretOnce),
+          webhookSecretRotatedAt: rotatedAt,
+        },
+      }))
+    } else if (source.accessMode === 'api') {
+      // 上游 token 只能由机构从来源平台取得，平台无法代为签发，所以必填。
+      if (!dto.credential) {
+        throw new BadRequestException({
+          error: {
+            code: 'CREDENTIAL_REQUIRED',
+            message: 'API 数据源轮换必须提供新的凭证（平台无法代为签发上游 token）',
+          },
+        })
+      }
+      assertRotationWon(await this.prisma.jobSource.updateMany({
+        where: casWhere,
+        data: {
+          encryptedCredential: encryptSecret(dto.credential),
+          webhookSecretRotatedAt: rotatedAt,
+        },
+      }))
+    } else {
+      // excel / csv / json / manual 没有任何凭证概念，轮换无意义。
+      throw new BadRequestException({
+        error: {
+          code: 'DATA_SOURCE_HAS_NO_CREDENTIAL',
+          message: '该接入方式不使用凭证，无需轮换',
+        },
+      })
+    }
+
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'data_source.credential_rotate',
+      targetType: 'job_source',
+      targetId: id,
+      payload: {
+        accessMode: source.accessMode,
+        // 只记"轮换发生过"与来源，绝不记密钥本身或其任何片段/摘要。
+        secretOrigin: dto.credential ? 'partner_supplied' : 'server_generated',
+        rotatedAt: rotatedAt.toISOString(),
+        previousRotatedAt: source.webhookSecretRotatedAt?.toISOString() ?? null,
+        oldCredentialInvalidatedImmediately: true,
+      },
+    })
+
+    return {
+      id,
+      accessMode: source.accessMode as PartnerDataSourceCredentialRotationResult['accessMode'],
+      credentialConfigured: true,
+      rotatedAt: rotatedAt.toISOString(),
+      webhookSecretOnce,
+    }
+  }
+
+  /**
+   * 归档 / 取消归档数据源 —— 数据源的退役路径。
+   *
+   * ## 为什么是归档而不是物理删除
+   *
+   * 1. **三条必填外键指回来**：`SyncLog.sourceId`、`ImportBatch.sourceId`、
+   *    `FieldMappingRule.sourceId` 都是非空 `String`（prisma/schema.prisma:1557/1586/1642）。
+   *    硬删要么被外键约束挡下，要么必须级联删掉同步日志与导入批次——
+   *    那正是 CLAUDE.md §11/§12 要求必须留存的记录。
+   * 2. **会打断已导内容的来源链**：`Job.sourceId` / `JobFair.sourceId` 可空，硬删只能置空，
+   *    而 CLAUDE.md §10 要求岗位详情展示来源机构与同步时间；置空后这些已发布内容
+   *    就成了追不回源头的孤儿数据。
+   * 3. **产品口径早已定过**：docs/product/partner-permission-matrix.md:44
+   *    「删除数据源 ❌ 未上线，P1 改为归档」，五类机构全部不开放删除。
+   * 4. **归档语义在下游已经生效**：治理链 recruitment-wave2-plan.ts:183 已经把
+   *    `source.archivedAt` 判为 `source_archived` 发布阻断原因——字段和语义都是现成的，
+   *    这里只是补上写入口，不是新造一套状态机。
+   *
+   * ## 归档做什么、不做什么
+   *
+   * 做：置 `archivedAt` 并同时 `enabled = false`。停止进数据这一步不需要改 sync 侧代码——
+   * Webhook 接收（sync.service.ts:87 的 `!source.enabled`）与 API 拉取
+   * （job-sync.service.ts:183/224/340）本来就以 enabled 为闸门。
+   *
+   * 不做：**不下架已发布的岗位/招聘会**。批量下架是独立的、需要单独确认的管理员动作
+   * （job-sync.service 的 `unpublishSourceContent`，带影响面预览），
+   * 且现有 verify 明确断言"停用来源不得级联下架已发布内容"。归档沿用同一口径。
+   *
+   * 取消归档只清 `archivedAt`，**不自动恢复 enabled**：重新进数据必须是一次显式动作
+   * （API/Webhook 走管理员 setSourceEnabled，文件/手工来源走 partner 自助 toggle）。
+   */
+  async archivePartnerDataSource(
+    id: string,
+    archived: boolean,
+    user: AuthedUser,
+  ): Promise<PartnerDataSourceLifecycleDto> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const source = await this.prisma.jobSource.findUnique({ where: { id } })
+    if (!source || source.orgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    assertDataSourceCapability(org.type, source.accessMode, source.sourceKind)
+
+    const alreadyInTargetState = (source.archivedAt != null) === archived
+    if (alreadyInTargetState) {
+      const summaries = await this.getDataSourceSyncSummaries(user.orgId, [id])
+      return withLifecycle(prismaJobSourceToPartnerDto(source, summaries.get(id)), source)
+    }
+
+    const updated = await this.prisma.jobSource.update({
+      where: { id },
+      data: archived
+        ? { archivedAt: new Date(), enabled: false }
+        : { archivedAt: null },
+    })
+    const summaries = await this.getDataSourceSyncSummaries(user.orgId, [id])
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: archived ? 'data_source.archive' : 'data_source.unarchive',
+      targetType: 'job_source',
+      targetId: id,
+      payload: {
+        accessMode: source.accessMode,
+        fromEnabled: source.enabled,
+        toEnabled: updated.enabled,
+        archivedAt: updated.archivedAt?.toISOString() ?? null,
+        // 说清这次动作没碰内容：已发布岗位/招聘会保持原状,下架是另一条需单独确认的路径。
+        publishedContentUntouched: true,
+      },
+    })
+    return withLifecycle(prismaJobSourceToPartnerDto(updated, summaries.get(id)), updated)
   }
 
   async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]> {

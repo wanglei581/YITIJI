@@ -13,6 +13,8 @@ import type {
   UpdatePartnerJobInput,
   UpdatePartnerFairInput,
   CreateDataSourcePayload,
+  RotateDataSourceCredentialPayload,
+  PartnerDataSourceCredentialRotationResult,
   ExcelPreviewResult,
   ExcelConfirmResult,
   FieldMappingRuleResult,
@@ -149,6 +151,17 @@ export const partnerHttpAdapter = {
     patch<PartnerDataSource>(`/partner/data-sources/${id}/toggle`, {}),
   createDataSource: (payload: CreateDataSourcePayload) =>
     post<PartnerDataSource>('/partner/data-sources', payload),
+  // POST(不是 PATCH):每次调用都签发新凭证并让上一个立即失效,不是幂等更新。
+  // 响应里的 webhookSecretOnce 是唯一一次能拿到新密钥的机会,调用方必须当场交给用户。
+  rotateDataSourceCredential: (id: string, payload: RotateDataSourceCredentialPayload) =>
+    post<PartnerDataSourceCredentialRotationResult>(
+      `/partner/data-sources/${encodeURIComponent(id)}/rotate-credential`,
+      payload,
+    ),
+  archiveDataSource: (id: string) =>
+    patch<PartnerDataSource>(`/partner/data-sources/${encodeURIComponent(id)}/archive`, {}),
+  unarchiveDataSource: (id: string) =>
+    patch<PartnerDataSource>(`/partner/data-sources/${encodeURIComponent(id)}/unarchive`, {}),
 
   // Jobs
   getPartnerJobs: () =>
