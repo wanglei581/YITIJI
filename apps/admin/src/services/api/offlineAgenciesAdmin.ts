@@ -9,7 +9,6 @@
 // ============================================================
 
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
-import { MOCK_SOURCE_ORG_ROTATION } from './offlineAgencyGovernance'
 import { authHeader, redirectToLogin } from '../auth'
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────────
@@ -95,6 +94,20 @@ export interface OfflineAgencyInput {
   description?: string | null
   website?: string | null
   logoUrl?: string | null
+  /**
+   * 来源机构 Organization.id；**可空**，且 schema 里没有外键。
+   *
+   * 后端一直支持（create-offline-agency.dto.ts 的 `@IsOptional() @IsString() sourceOrgId`，
+   * adminCreate / adminUpdate 都往 data 里写这一列），只是前端此前没有声明也没有表单字段，
+   * 于是本页新建的每一条机构 sourceOrgId 恒为 null，资质抽屉永远停在「没有来源机构」那一态。
+   *
+   * 语义按 offline-agencies.service.ts adminPublish 的发布闸门读：
+   *   - 有值 → 发布时必须 assertOrgContentTrustActive（contentTrustStatus='active' 且未归档）；
+   *   - null → Admin 自录的线下机构目录，不存在「来源机构信任」这个决策对象，不套闸门。
+   * 传 null 是**明确清空**（DTO 的 @IsOptional 放行 null，Prisma 写 null）；
+   * 传 undefined 才是「不修改」。
+   */
+  sourceOrgId?: string | null
 }
 
 export interface OfflineAgencyJobInput {
@@ -289,10 +302,11 @@ const mockAdapter: OfflineAgenciesAdminServiceInterface = {
       reviewStatus: 'pending',
       publishStatus: 'draft',
       jobCount: 0,
-      // mock-only：真后端的 sourceOrgId 由外部供稿链路写入，本地表单没有这个字段。
-      // 这里按固定顺序轮流分配，只为让治理档案抽屉的「有资质 / 无资质 /
-      // 机构不存在 / 接口失败 / 无来源机构」几种表现都能被人工点到。
-      sourceOrgId: MOCK_SOURCE_ORG_ROTATION[mockAgencies.length % MOCK_SOURCE_ORG_ROTATION.length] ?? null,
+      // 按表单实际选择写入。此处**不得**再按固定顺序轮流分配来源机构：
+      // 那是表单还没有该字段时为了让治理档案抽屉的几种表现能被人工点到而做的
+      // mock-only 兜底，如今它会把「管理员明确留空」篡改成「系统替你绑了一个」。
+      // 抽屉五态的人工可达性改由 AgencyForm 的 mock 剧本选项承担（见该文件 MOCK_SCRIPT_ORGS）。
+      sourceOrgId: input.sourceOrgId ?? null,
       createdAt: now(),
       updatedAt: now(),
     }
