@@ -80,6 +80,7 @@ jobs:
         run: |
           pnpm verify:repository-integrity
           pnpm verify:ci-gate-coverage
+          pnpm verify:fixture-time-bombs
 
       - name: Deploy authorization gate
         # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
@@ -348,6 +349,9 @@ jobs:
         # finally 清理失败,残留 approved+published 测试招聘会泄漏到公开前台
         # (/campus、/job-fairs)。各脚本已用稳定 tag 在下次运行前预清残留,
         # 但前提仍是串行,切勿改成并行。
+        # 本步内部改为跑完再汇总（scripts/lib/run-serial-commands.mjs）：
+        # 单条失败不中断后续命令，全部结束后按失败清单非零退出。
+        # 跨 step 依赖仍 fail-fast；禁止 continue-on-error 与并行。
         env:
           VITE_API_MODE: http
           VITE_API_BASE_URL: /api/v1
@@ -355,6 +359,9 @@ jobs:
           VITE_TERMINAL_ID: KSK-001
           VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
+          # ⚠ 下面的 CI_SERIAL_COMMANDS 终止行必须顶格（YAML 剥掉公共缩进后）且无尾随空白。
+          # 改缩进、留尾随空格或让 YAML 重排都会让 heredoc 一路吞到文件末尾并**静默丢内容**。
+          node scripts/lib/run-serial-commands.mjs <<'CI_SERIAL_COMMANDS'
           # ── S0 后端 AI 底座门禁（#617）─────────────────────────────
           # 这四条 import services/api/src，会传递依赖到 Prisma 客户端，
           # 因此必须放在「Prepare fresh SQLite db」之后——先前误放进上面的
@@ -691,6 +698,7 @@ jobs:
           # 但会员会话与 BullMQ 需要**真实** Redis —— 本 job 的 redis:7-alpine
           # service 提供。同形状的 verify:member-assets-c2d 已在本步长期绿。
           pnpm --filter @ai-job-print/api verify:job-favorites-http
+          CI_SERIAL_COMMANDS
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
@@ -790,7 +798,12 @@ jobs:
           node -r @swc-node/register prisma/seed.ts
           node -r @swc-node/register prisma/seed-fairs.ts
       - name: Core verify suites on PG
+        # 与 SQLite Verify suites 相同：本步内部跑完再汇总，但仍必须串行。
+        # 禁止并行 / continue-on-error；跨 step（install → generate → migrate → verify）仍 fail-fast。
         run: |
+          # ⚠ 下面的 CI_SERIAL_COMMANDS 终止行必须顶格（YAML 剥掉公共缩进后）且无尾随空白。
+          # 改缩进、留尾随空格或让 YAML 重排都会让 heredoc 一路吞到文件末尾并**静默丢内容**。
+          node scripts/lib/run-serial-commands.mjs <<'CI_SERIAL_COMMANDS'
           # 与 SQLite job 同源的静态门禁：P39 迁移保真不依赖数据库形态，
           # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
           pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
@@ -921,6 +934,7 @@ jobs:
           # KIOSK-DEBT 三处前端欠账。纯读 apps/kiosk 源码、不连库，
           # 放这里是为了两个 job 都拦得住（同 #635 对 self-assessment 门禁的处置）。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
+          CI_SERIAL_COMMANDS
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest

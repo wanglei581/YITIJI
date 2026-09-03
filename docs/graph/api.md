@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`466` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`471` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -811,6 +811,14 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/printers` | AdminPrintersController.list | admin | — | — |
 
+## `services/api/src/terminals/admin-release-observation.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.list | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| POST | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.create | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| PATCH | `/api/v1/admin/release-observation-plans/:planId` | AdminReleaseObservationController.update | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+
 ## `services/api/src/terminals/admin-terminals.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -858,6 +866,8 @@
 | GET | `/api/v1/terminals/:terminalId/config` | TerminalsController.getTerminalConfig | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PUT | `/api/v1/terminals/:terminalId/heartbeat` | TerminalsController.heartbeat | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/terminals/:terminalId/printer-status` | TerminalsController.getTerminalPrinterStatus | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PUT | `/api/v1/terminals/:terminalId/release-observation` | TerminalsController.reportReleaseObservation | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| GET | `/api/v1/terminals/:terminalId/release-observation-plan` | TerminalsController.getReleaseObservationPlan | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
 | POST | `/api/v1/terminals/:terminalId/scan-deletion-audits` | TerminalsController.reportScanDeletionAudit | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/:terminalId/tasks/claim` | TerminalsController.claimTasks | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/:terminalId/toolbox-events` | TerminalsController.recordToolboxLaunchEvent | — | TerminalToolboxService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |

@@ -92,6 +92,11 @@ function fakePrisma(rows: PlatformQualificationFacts[]): PlatformQualificationRe
   }
 }
 
+// time-bomb-ok-file: 时间从参数注入，不读真实时钟。src/common/recruitment-capability.ts
+// 的每个判定函数都以 `now: Date` 为显式参数（这是刻意设计：让「许可证到期自动失效」
+// 能被时间边界用例证明），本文件所有断言都把下面这个 NOW 常量传进去。
+// 因此 2027-01-01 之类的夹具日期只与 NOW 比较，相对关系不随运行日期改变。
+// （由 verify:fixture-time-bombs 要求具名声明）
 const NOW = new Date('2026-09-02T00:00:00.000Z')
 const d = (iso: string): Date => new Date(iso)
 

@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 466,
+    "endpointCount": 471,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -3335,6 +3335,87 @@
         ],
         "services": [
           "RecruitmentContentReadService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-release-observation.controller.ts",
+        "handler": "AdminReleaseObservationController.list",
+        "method": "GET",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/admin/release-observation-plans",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-release-observation.controller.ts",
+        "handler": "AdminReleaseObservationController.create",
+        "method": "POST",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/admin/release-observation-plans",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-release-observation.controller.ts",
+        "handler": "AdminReleaseObservationController.update",
+        "method": "PATCH",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/admin/release-observation-plans/:planId",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
         ]
       },
       {
@@ -9212,6 +9293,56 @@
       },
       {
         "controller": "services/api/src/terminals/terminals.controller.ts",
+        "handler": "TerminalsController.reportReleaseObservation",
+        "method": "PUT",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/terminals/:terminalId/release-observation",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/terminals.controller.ts",
+        "handler": "TerminalsController.getReleaseObservationPlan",
+        "method": "GET",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/terminals/:terminalId/release-observation-plan",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/terminals.controller.ts",
         "handler": "TerminalsController.reportScanDeletionAudit",
         "method": "POST",
         "models": [
@@ -9518,7 +9649,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 134,
+      "reachableFileCount": 135,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -10195,7 +10326,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 137
+      "sourceFileCount": 138
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -13150,8 +13281,20 @@
     }
   },
   "dataModel": {
-    "modelCount": 91,
+    "modelCount": 96,
     "models": [
+      {
+        "fieldCount": 7,
+        "name": "ActiveReleaseObservationAssignment",
+        "relations": [
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "Terminal"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ]
+      },
       {
         "fieldCount": 19,
         "name": "AdAsset",
@@ -13216,6 +13359,41 @@
         "usedBy": [
           "services/api/src/advisor/advisor-retention.task.ts",
           "services/api/src/advisor/advisor.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 11,
+        "name": "AgentReleaseArtifact",
+        "relations": [
+          "AgentReleasePlan"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 18,
+        "name": "AgentReleasePlan",
+        "relations": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleaseTarget"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 10,
+        "name": "AgentReleaseTarget",
+        "relations": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleasePlan",
+          "Terminal",
+          "TerminalReleaseObservation"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
         ]
       },
       {
@@ -14164,9 +14342,11 @@
         ]
       },
       {
-        "fieldCount": 22,
+        "fieldCount": 24,
         "name": "Terminal",
         "relations": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseTarget",
           "Organization",
           "PrintTask",
           "ScanTask",
@@ -14190,6 +14370,7 @@
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
+          "services/api/src/terminals/release-observation.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
@@ -14238,6 +14419,16 @@
         ],
         "usedBy": [
           "services/api/src/terminals/terminals-agent.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 10,
+        "name": "TerminalReleaseObservation",
+        "relations": [
+          "AgentReleaseTarget"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
         ]
       },
       {
@@ -16906,6 +17097,9 @@
     "services/api/prisma/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
+    ],
     "services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
@@ -16916,14 +17110,19 @@
     "services/api/prisma/postgres/migrations/20260805132000_repair_notification_legal_defaults/migration.sql": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
+    "services/api/prisma/postgres/migrations/20260901090000_add_agent_release_observation/migration.sql": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-release-observation-contract.mjs"
     ],
     "services/api/prisma/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-release-observation-contract.mjs"
     ],
     "services/api/scripts/d2-same-host/governance.mjs": [
       "services/api/scripts/d2-same-host/verify-governance-invocation.mjs"
@@ -17350,6 +17549,12 @@
     ],
     "services/api/src/sync/sync.service.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "services/api/src/terminals/release-observation.service.ts": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
+    ],
+    "services/api/src/terminals/terminals.controller.ts": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
     ],
     "services/api/src/upload-sessions/upload-sessions.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -20789,6 +20994,22 @@
         "files": [],
         "missing": []
       },
+      "file": "apps/terminal-agent/scripts/verify-release-observation-boundary.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:release-observation-boundary"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
       "file": "apps/terminal-agent/scripts/verify-windows-service-recovery.mjs",
       "helper": true,
       "inCi": true,
@@ -21577,6 +21798,29 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:import-review-reset"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql",
+          "services/api/prisma/postgres/migrations/20260901090000_add_agent_release_observation/migration.sql",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/src/terminals/release-observation.service.ts",
+          "services/api/src/terminals/terminals.controller.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-release-observation-contract.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:release-observation-contract"
       ],
       "wired": true
     }

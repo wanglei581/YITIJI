@@ -14,6 +14,10 @@ import {
   resolveRecruitmentWave2Target,
 } from '../src/recruitment-content/recruitment-wave2-target'
 
+// time-bomb-ok-file: 时间从参数注入，不读真实时钟。本文件所有断言的"现在"都由
+// NOW / FUTURE 两个常量显式传给被测函数（如 assertRecruitmentWave2ExecutionWindow(
+// production, FUTURE)），FUTURE 取 NOW + 1h；资质有效期等字段也只与这两个常量比较。
+// 因此所有日期字面量的相对关系与运行日期无关。
 const NOW = new Date('2026-08-10T00:00:00.000Z')
 const FUTURE = new Date('2026-08-10T01:00:00.000Z')
 const SNAPSHOT_SHA = 'a'.repeat(64)
