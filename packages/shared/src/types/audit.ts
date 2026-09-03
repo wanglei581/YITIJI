@@ -62,6 +62,10 @@ export type AuditAction =
   | 'system.config_change'
   | 'print_job.admin_abandon'
   | 'print_job.admin_verify_outcome'
+  | 'alert.acknowledge'
+  | 'alert.silence'
+  | 'alert.close'
+  | 'alert.reopen'
 
 export type AuditTargetType =
   | 'auth'
@@ -78,6 +82,7 @@ export type AuditTargetType =
   | 'toolbox_config'
   | 'terminal'
   | 'print_task'
+  | 'derived_alert'
 
 /** 单条审计返回。actorRole 冗余,actor 被禁用后仍可追溯。 */
 export interface AuditLogRecord {
