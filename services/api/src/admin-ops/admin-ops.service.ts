@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { isHealthyPrinterStatus } from '../terminals/printer-status'
+import {
+  matchesView,
+  resolveHandlingState,
+  type AlertHandlingState,
+  type AlertListView,
+} from './derived-alert-identity'
+import { collectDerivedAlerts } from './derived-alerts'
 
 // ============================================================
 // AdminOpsService — 阶段1E:Admin 运营视图(打印任务流水 + 派生告警)
@@ -8,15 +14,11 @@ import { isHealthyPrinterStatus } from '../terminals/printer-status'
 // 合规/诚实约束:
 //   - 打印任务只回安全元数据:绝不返回 fileUrl / fileMd5 / paramsJson 原文 /
 //     errorMessage(可能含内部细节);归属只回 member/anonymous,不回 endUserId。
-//   - 无支付域(Order/PaymentAttempt 属 Phase C-5 未建),不编造金额/支付状态。
-//   - 告警为**实时派生**(终端离线 / 打印机异常 / 近 24h 打印失败),
-//     无独立 Alert 模型 → 不支持确认/处理流转,前端如实说明。
+//   - 告警仍是实时派生(终端离线 / 打印机异常 / 近 24h 打印失败)。
+//     处理态落 AlertDisposition，确认不等于故障消失。
+//   - GET 只读：告警列表端点不写数据库。恢复与否只能正向查证，
+//     不能用「本次查询没看见」推断（见 listDerivedAlerts 注释）。
 // ============================================================
-
-/** 与 terminals.service 同口径:lastSeen 距今 < 3 分钟 = 在线。 */
-const ONLINE_WINDOW_MS = 3 * 60 * 1000
-/** 打印失败告警回看窗口。 */
-const FAILED_LOOKBACK_MS = 24 * 60 * 60 * 1000
 
 export interface AdminPrintTaskItem {
   id: string
@@ -34,15 +36,44 @@ export interface AdminPrintTaskItem {
 }
 
 export interface AdminAlertItem {
-  /** 派生告警的合成 id(类型 + 目标),仅用于前端 key。 */
+  /** 稳定身份 = `${type}:${subjectId}`，也是确认挂载点。 */
   id: string
+  subjectKey: string
+  episodeToken: string
   type: 'terminal_offline' | 'printer_issue' | 'print_failed'
   severity: 'error' | 'warning'
   title: string
   detail: string
   terminalCode: string | null
   occurredAt: string
+  /** 列表只含当前仍在发生的告警；已恢复的不会出现。 */
+  conditionState: 'firing'
+  handlingState: AlertHandlingState
+  acknowledgedAt: string | null
+  silencedUntil: string | null
+  note: string | null
 }
+
+export interface AdminAlertsResult {
+  data: AdminAlertItem[]
+  derivedAt: string
+  /** 当前仍在发生的告警总数(精确计数,不受列表上限影响)。 */
+  firingCount: number
+  /** 本次实际派生出的条数;小于 firingCount 即说明被截断。 */
+  listedCount: number
+  /**
+   * 截断说明。非 null 时界面必须如实提示「列表不是全部」,
+   * 并且必须说明下面三个处理态计数只覆盖已列出的部分(CLAUDE.md §9)。
+   */
+  truncation: { type: 'print_failed'; omitted: number; cap: number } | null
+  /** 以下计数只统计本次已列出的告警。 */
+  openCount: number
+  acknowledgedCount: number
+  suppressedCount: number
+}
+
+/** SQLite 的绑定变量上限保守取值;subjectKey in (...) 按此分批,避免长列表炸参数。 */
+const DISPOSITION_LOOKUP_CHUNK = 300
 
 type ParsedParams = {
   fileName: string | null
@@ -71,13 +102,6 @@ function parseSafeParams(paramsJson: string): ParsedParams {
     colorMode: p['colorMode'] === 'black_white' || p['colorMode'] === 'color' ? p['colorMode'] : null,
     paperSize: typeof p['paperSize'] === 'string' && p['paperSize'].length > 0 ? p['paperSize'] : null,
   }
-}
-
-const PRINTER_STATUS_LABELS: Record<string, string> = {
-  offline: '打印机离线',
-  paper_empty: '打印机缺纸',
-  error: '打印机故障',
-  not_found: '打印机未找到',
 }
 
 @Injectable()
@@ -143,86 +167,103 @@ export class AdminOpsService {
 
   // ── 派生告警(告警中心页数据源)───────────────────────────────────────────
 
-  async listDerivedAlerts(): Promise<{ data: AdminAlertItem[]; derivedAt: string }> {
-    const now = Date.now()
-    const alerts: AdminAlertItem[] = []
+  /**
+   * 派生告警列表。这是 GET 端点,只读——不写 AlertDisposition。
+   *
+   * 为什么删掉原来的「不在本次派生结果里就写 recoveredAt」:
+   *   缺席不是恢复的证据。一条告警没出现在本次结果里,可能是真恢复,也可能是被
+   *   列表上限截断,还可能是这一跳查询本身没覆盖到。用缺席反推恢复,会把仍在
+   *   firing 的告警标成已恢复,并且在它重新进入列表时把操作员的确认 / 关闭
+   *   无声撤销(resolveHandlingState 看到 recoveredAt != null 就回 open)。
+   *
+   *   删掉之后「恢复后再发作」仍然是对的:那由 episodeToken 负责——离线用 lastSeen、
+   *   打印机异常用 printerStatus+lastHealthyAt、打印失败用 PrintTask.id,
+   *   任何一次真实恢复都会让下一轮故障拿到新 token,旧处置自然失效。
+   *   也就是说恢复判定是从正面数据算出来的,不是从「没看见」推断出来的。
+   */
+  async listDerivedAlerts(view: AlertListView = 'open'): Promise<AdminAlertsResult> {
+    const now = new Date()
+    const collected = await collectDerivedAlerts(this.prisma, now)
+    const derived = collected.alerts
 
-    // 1) 终端离线 + 打印机异常(取每台终端最近一次心跳)
-    const terminals = await this.prisma.terminal.findMany({
-      select: {
-        id: true,
-        terminalCode: true,
-        registeredAt: true,
-        heartbeats: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { createdAt: true, printerStatus: true },
-        },
-      },
-    })
-    for (const t of terminals) {
-      const lastHeartbeat = t.heartbeats[0]
-      const lastSeen = lastHeartbeat?.createdAt ?? t.registeredAt
-      const offlineMs = now - lastSeen.getTime()
-      if (offlineMs >= ONLINE_WINDOW_MS) {
-        const minutes = Math.floor(offlineMs / 60000)
-        alerts.push({
-          id: `terminal_offline:${t.id}`,
-          type: 'terminal_offline',
-          // 离线超 30 分钟视为 error,短时离线 warning
-          severity: offlineMs >= 30 * 60 * 1000 ? 'error' : 'warning',
-          title: `终端 ${t.terminalCode} 离线`,
-          detail: `最近一次心跳在 ${minutes} 分钟前(${lastSeen.toISOString().slice(0, 16).replace('T', ' ')})`,
-          terminalCode: t.terminalCode,
-          occurredAt: lastSeen.toISOString(),
-        })
-      } else if (lastHeartbeat?.printerStatus && !isHealthyPrinterStatus(lastHeartbeat.printerStatus)) {
-        const label = PRINTER_STATUS_LABELS[lastHeartbeat.printerStatus] ?? `打印机状态异常(${lastHeartbeat.printerStatus})`
-        alerts.push({
-          id: `printer_issue:${t.id}`,
-          type: 'printer_issue',
-          severity: lastHeartbeat.printerStatus === 'paper_empty' ? 'warning' : 'error',
-          title: `终端 ${t.terminalCode} ${label}`,
-          detail: `终端在线,但最近心跳上报打印机状态为 ${lastHeartbeat.printerStatus}`,
-          terminalCode: t.terminalCode,
-          occurredAt: lastHeartbeat.createdAt.toISOString(),
-        })
+    // 只按本次确实派生出来的 subjectKey 取处置行,读取范围随列表有界。
+    const rows = await this.findDispositions(derived.map((alert) => alert.subjectKey))
+    const byKey = new Map(rows.map((row) => [row.subjectKey, row]))
+    const items: AdminAlertItem[] = derived.map((alert) => {
+      const row = byKey.get(alert.subjectKey) ?? null
+      const handlingState = resolveHandlingState(row, alert.episodeToken, now)
+      const activeRow = handlingState === 'open' ? null : row
+      return {
+        id: alert.id,
+        subjectKey: alert.subjectKey,
+        episodeToken: alert.episodeToken,
+        type: alert.type,
+        severity: alert.severity,
+        title: alert.title,
+        detail: alert.detail,
+        terminalCode: alert.terminalCode,
+        occurredAt: alert.occurredAt,
+        conditionState: 'firing',
+        handlingState,
+        acknowledgedAt: activeRow && handlingState !== 'open' ? activeRow.updatedAt.toISOString() : null,
+        silencedUntil: handlingState === 'silenced' && activeRow?.silencedUntil
+          ? activeRow.silencedUntil.toISOString()
+          : null,
+        note: activeRow?.note ?? null,
       }
-    }
-
-    // 2) 近 24h 打印失败任务
-    const failedTasks = await this.prisma.printTask.findMany({
-      where: {
-        status: 'failed',
-        updatedAt: { gte: new Date(now - FAILED_LOOKBACK_MS) },
-        // SQL 的 NOT IN 不匹配 NULL，必须显式收未核查任务，否则普通失败告警会全灭。
-        OR: [
-          { printOutcome: null },
-          { printOutcome: { notIn: ['printed', 'not_printed'] } },
-        ],
-      },
-      select: {
-        id: true,
-        errorCode: true,
-        updatedAt: true,
-        terminal: { select: { terminalCode: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 50,
     })
-    for (const task of failedTasks) {
-      alerts.push({
-        id: `print_failed:${task.id}`,
-        type: 'print_failed',
-        severity: 'warning',
-        title: `打印任务失败${task.errorCode ? `(${task.errorCode})` : ''}`,
-        detail: `任务 ${task.id}${task.terminal?.terminalCode ? ` · 终端 ${task.terminal.terminalCode}` : ''},失败于 ${task.updatedAt.toISOString().slice(0, 16).replace('T', ' ')}`,
-        terminalCode: task.terminal?.terminalCode ?? null,
-        occurredAt: task.updatedAt.toISOString(),
-      })
+
+    let openCount = 0
+    let acknowledgedCount = 0
+    let suppressedCount = 0
+    for (const item of items) {
+      if (item.handlingState === 'open') openCount += 1
+      else if (item.handlingState === 'acknowledged') acknowledgedCount += 1
+      else suppressedCount += 1
     }
 
-    alerts.sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
-    return { data: alerts, derivedAt: new Date(now).toISOString() }
+    return {
+      data: items.filter((item) => matchesView(item.handlingState, view)),
+      derivedAt: now.toISOString(),
+      // 精确总数,不是「本次列出了几条」。截断时二者不等,由 truncation 如实说明。
+      firingCount: collected.firingTotal,
+      listedCount: items.length,
+      truncation: collected.omitted > 0
+        ? { type: 'print_failed' as const, omitted: collected.omitted, cap: collected.cap }
+        : null,
+      openCount,
+      acknowledgedCount,
+      suppressedCount,
+    }
+  }
+
+  /** 分批按 subjectKey 取处置行,避免超长 in (...) 触碰 SQLite 绑定变量上限。 */
+  private async findDispositions(subjectKeys: string[]) {
+    const out: Array<{
+      subjectKey: string
+      action: string
+      episodeToken: string
+      recoveredAt: Date | null
+      silencedUntil: Date | null
+      note: string | null
+      updatedAt: Date
+    }> = []
+    for (let i = 0; i < subjectKeys.length; i += DISPOSITION_LOOKUP_CHUNK) {
+      const chunk = subjectKeys.slice(i, i + DISPOSITION_LOOKUP_CHUNK)
+      const rows = await this.prisma.alertDisposition.findMany({
+        where: { subjectKey: { in: chunk } },
+        select: {
+          subjectKey: true,
+          action: true,
+          episodeToken: true,
+          recoveredAt: true,
+          silencedUntil: true,
+          note: true,
+          updatedAt: true,
+        },
+      })
+      out.push(...rows)
+    }
+    return out
   }
 }

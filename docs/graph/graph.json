@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 475,
+    "endpointCount": 476,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -558,8 +558,10 @@
         "handler": "AdminOpsController.listAlerts",
         "method": "GET",
         "models": [
+          "AlertDisposition",
           "PrintTask",
-          "Terminal"
+          "Terminal",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/admin/alerts",
         "roles": [
@@ -570,6 +572,29 @@
         ],
         "services": [
           "AdminOpsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/admin-ops.controller.ts",
+        "handler": "AdminOpsController.disposeAlert",
+        "method": "POST",
+        "models": [
+          "AlertDisposition",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalHeartbeat",
+          "User"
+        ],
+        "path": "/api/v1/admin/alerts/disposition",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/admin-ops/admin-alert-actions.service.ts"
+        ],
+        "services": [
+          "AdminAlertActionsService"
         ]
       },
       {
@@ -3103,8 +3128,10 @@
         "handler": "AdminOpsController.listPrintTasks",
         "method": "GET",
         "models": [
+          "AlertDisposition",
           "PrintTask",
-          "Terminal"
+          "Terminal",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/admin/print-tasks",
         "roles": [
@@ -13335,7 +13362,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 98,
+    "modelCount": 99,
     "models": [
       {
         "fieldCount": 7,
@@ -13478,6 +13505,15 @@
         "usedBy": [
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/ai-result.cleanup.task.ts"
+        ]
+      },
+      {
+        "fieldCount": 12,
+        "name": "AlertDisposition",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/admin-ops/admin-alert-actions.service.ts",
+          "services/api/src/admin-ops/admin-ops.service.ts"
         ]
       },
       {
@@ -14298,6 +14334,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
@@ -14437,7 +14474,7 @@
           "TerminalScanDeletionAudit"
         ],
         "usedBy": [
-          "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/content/content.service.ts",
@@ -14498,6 +14535,7 @@
           "Terminal"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -14600,6 +14638,7 @@
           "ReviewDecision"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/admin-alert-actions.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
           "services/api/src/auth/auth.service.ts",
@@ -18087,9 +18126,18 @@
     "services/api/src/activity/me-activity.controller.ts": [
       "services/api/scripts/verify-activity-logs.ts"
     ],
+    "services/api/src/admin-ops/admin-alert-actions.service.ts": [
+      "services/api/scripts/verify-admin-ops.ts"
+    ],
+    "services/api/src/admin-ops/admin-ops.controller.ts": [
+      "services/api/scripts/verify-admin-ops.ts"
+    ],
     "services/api/src/admin-ops/admin-ops.service.ts": [
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-outcome.ts"
+    ],
+    "services/api/src/admin-ops/derived-alerts.ts": [
+      "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
       "services/api/scripts/verify-admin-order-filters.ts"
@@ -18488,6 +18536,7 @@
       "services/api/scripts/verify-activity-logs.ts",
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-orders-refund.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-admin-pending-dispose.ts",
@@ -18720,6 +18769,7 @@
     ],
     "services/api/src/common/filters/http-exception.filter.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-error-observability.ts",
@@ -18746,6 +18796,7 @@
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
     "services/api/src/common/guards/jwt-auth.guard.ts": [
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -18767,6 +18818,7 @@
       "services/api/scripts/verify-member-auth.ts"
     ],
     "services/api/src/common/guards/roles.guard.ts": [
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -18812,6 +18864,7 @@
     ],
     "services/api/src/common/redis/redis.service.ts": [
       "services/api/scripts/verify-activity-logs.ts",
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -25102,7 +25155,15 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/admin-ops/admin-alert-actions.service.ts",
+          "services/api/src/admin-ops/admin-ops.controller.ts",
           "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
