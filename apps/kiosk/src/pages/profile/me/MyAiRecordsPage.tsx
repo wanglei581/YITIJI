@@ -207,6 +207,7 @@ export function MyAiRecordsPage() {
       )}
 
       <MeListShell
+      signedOutDescription="这里存的是你用过的 AI 服务记录——简历诊断、优化、生成、面试训练的结果，登录后才能跨会话找回。"
         title="AI服务记录"
         subtitle="本人 AI 简历、岗位匹配、职业规划与参会准备服务记录（仅元数据）"
         loginFrom="/me/ai-records"
