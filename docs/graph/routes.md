@@ -92,7 +92,7 @@ flowchart LR
 | `/print/done` | PrintDonePage | `apps/kiosk/src/pages/print/PrintDonePage.tsx` | 11 | 7 |
 | `/print/material-check` | PrintMaterialCheckPage | `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 11 | 6 |
 | `/print/params` | Navigate | — _(重定向)_ | 0 | — |
-| `/print/pickup-claim` | PrintPickupClaimPage | `apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx` | 11 | 7 |
+| `/print/pickup-claim` | PrintPickupClaimPage | `apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx` | 11 | 6 |
 | `/print/preview` | PrintPreviewPage | `apps/kiosk/src/pages/print/PrintPreviewPage.tsx` | 11 | 6 |
 | `/print/progress` | PrintProgressPage | `apps/kiosk/src/pages/print/PrintProgressPage.tsx` | 11 | 6 |
 | `/print/scan-convert` | Navigate | — _(重定向)_ | 0 | — |

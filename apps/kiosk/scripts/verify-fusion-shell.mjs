@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import ts from 'typescript'
+import { checkShellChromeProp } from './lib/shell-chrome-contract.mjs'
 
 const packageRootUrl = new URL('../', import.meta.url)
 
@@ -278,10 +279,17 @@ for (const [label, pattern] of [
   ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!usesFluidViewport\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
-  ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],
-  ['campus/actionbar nav replacement', /hideBottomNav\s*=\s*\{\s*isCampusZone\s*\|\|\s*usesPageActionbar\s*\}/],
 ]) {
   assert.match(shellBody, pattern, `KioskShell must preserve ${label}`)
+}
+
+// 壳层遮蔽（顶栏/底部导航）—— 断言的是规则本身，不是当前恰好有哪几项。
+// 见 lib/shell-chrome-contract.mjs 文件头：原先逐字匹配 `hideHeader={isCampusZone}`，
+// 新增一条形状完全相同的合法条件就会误红。判据与故障注入自测在
+// scripts/tests/shell-chrome-contract.test.mjs。
+for (const propName of ['hideHeader', 'hideBottomNav']) {
+  const result = checkShellChromeProp(shellBody, propName)
+  assert.ok(result.ok, `KioskShell ${propName}: ${result.reason ?? ''}`)
 }
 const responsiveHomeFor = (viewportW, viewportH) =>
   viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)

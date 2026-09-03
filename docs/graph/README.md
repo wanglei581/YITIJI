@@ -33,7 +33,7 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 86 | 429 | 409 |
+| kiosk | `apps/kiosk` | 86 | 437 | 416 |
 | admin | `apps/admin` | 37 | 138 | 135 |
 | partner | `apps/partner` | 13 | 39 | 38 |
 
@@ -46,9 +46,9 @@ node scripts/project-graph-query.mjs model PrintTask
 | ├ 已在 package.json 里有脚本名 | 375 |
 | ├ 在 CI 执行闭包里 | 368 |
 | └ **无脚本名，从未被执行** | 1 |
-| 被至少一条门禁断言的文件 | 1230 |
+| 被至少一条门禁断言的文件 | 1231 |
 | 孤儿候选 · protected（不得删） | 4 |
-| 孤儿候选 · high（仍被 CI/门禁引用） | 10 |
+| 孤儿候选 · high（仍被 CI/门禁引用） | 11 |
 | 孤儿候选 · medium（仅文档提及） | 8 |
 | 孤儿候选 · low（全仓零提及） | 126 |
 
@@ -78,7 +78,7 @@ flowchart LR
   admin -->|"/api/v1"| api
   partner -->|"/api/v1"| api
   api --> db
-  gates -.->|"断言 1230 个文件"| kiosk
+  gates -.->|"断言 1231 个文件"| kiosk
   gates -.-> admin
   gates -.-> partner
   gates -.-> api

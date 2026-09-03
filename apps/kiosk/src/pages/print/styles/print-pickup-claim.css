@@ -1,32 +1,20 @@
 [data-kiosk-presentation='fusion-youth'] .pickup-claim-page {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr);
-  grid-template-areas:
-    'lead help'
-    'input help'
-    'hint help'
-    'submit help';
-  align-content: start;
-  gap: 16px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   padding: 0 var(--print-page-gutter) 36px;
+  overflow-y: auto;
 }
 
-[data-kiosk-presentation='fusion-youth'] .pickup-claim-page[data-claim-state='error'] {
-  grid-template-areas:
-    'lead help'
-    'input help'
-    'error help'
-    'submit help';
-}
+/* error 态不再需要重排具名网格：单栏纵向流里错误块就地插入 */
 
 [data-kiosk-presentation='fusion-youth'] .pickup-claim-page[data-claim-state='error'] .pcp-format-hint {
   display: none;
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-lead {
-  grid-area: lead;
   display: flex;
   align-items: center;
   gap: 22px;
@@ -84,7 +72,6 @@
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-input-section {
-  grid-area: input;
   padding: 24px 26px 26px;
   border: 1px solid var(--print-line);
   border-radius: 20px;
@@ -103,20 +90,21 @@
 [data-kiosk-presentation='fusion-youth'] .pcp-input-wrap { position: relative; }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-input {
+  /* 真实输入框覆盖在码位格上、完全透明：
+     扫码器（HID 键盘）与物理键盘仍直接写入它，点格子即聚焦它，
+     但用户看到的是下面那排格子。不能用 display:none —— 那样扫码器就没有落点了。 */
+  position: absolute;
+  inset: 0;
   width: 100%;
-  min-height: 96px;
-  padding: 0 118px 0 24px;
-  border: 2px solid var(--print-line);
-  border-radius: 16px;
+  height: 100%;
+  padding: 0;
+  border: 0;
   outline: none;
-  background: var(--print-paper);
-  color: var(--print-ink);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font-size: 16px;
+  cursor: pointer;
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-input::placeholder {
@@ -126,16 +114,15 @@
   letter-spacing: .05em;
 }
 
-[data-kiosk-presentation='fusion-youth'] .pcp-input:focus {
-  border-color: var(--print-teal);
-  background: var(--print-surface);
-  box-shadow: 0 0 0 5px rgb(31 158 134 / 14%);
+[data-kiosk-presentation='fusion-youth'] .pcp-input:focus { outline: none; }
+
+/* 键盘焦点仍要可见（可访问性）：焦点落在覆盖层上时，高亮当前码位格。 */
+[data-kiosk-presentation='fusion-youth'] .pcp-input:focus-visible + .pcp-codebox .pcp-cb.is-cur,
+[data-kiosk-presentation='fusion-youth'] .pcp-input-wrap:focus-within .pcp-cb.is-cur {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--print-teal) 26%, transparent);
 }
 
-[data-kiosk-presentation='fusion-youth'] .pcp-input.pcp-input--error {
-  border-color: var(--print-error);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--print-error) 14%, transparent);
-}
+[data-kiosk-presentation='fusion-youth'] .pcp-input.pcp-input--error { outline: none; }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-counter {
   position: absolute;
@@ -157,7 +144,6 @@
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-format-hint {
-  grid-area: hint;
   margin: 0;
   padding: 2px 4px;
   color: var(--print-muted);
@@ -172,7 +158,6 @@
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-error {
-  grid-area: error;
   padding: 14px 18px;
   border: 1px solid color-mix(in srgb, var(--print-error) 28%, transparent);
   border-radius: 14px;
@@ -184,7 +169,6 @@
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-submit.k-btn {
-  grid-area: submit;
   width: 100%;
 }
 
@@ -198,7 +182,6 @@
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-help {
-  grid-area: help;
   align-self: stretch;
   padding: 28px 26px;
   border: 1px solid var(--print-line);
@@ -321,7 +304,6 @@
   [data-kiosk-presentation='fusion-youth'] .pcp-lead-text { font-size: 15px; line-height: 1.45; }
   [data-kiosk-presentation='fusion-youth'] .pcp-input-section { padding: 13px 16px 14px; border-radius: 14px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-label { margin-bottom: 7px; font-size: 15px; }
-  [data-kiosk-presentation='fusion-youth'] .pcp-input { min-height: 64px; padding-inline: 18px 96px; border-radius: 12px; font-size: 25px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-counter { right: 14px; padding: 6px 9px; font-size: 13px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-format-hint { font-size: 14px; line-height: 1.4; }
   [data-kiosk-presentation='fusion-youth'] .pcp-error { padding: 9px 12px; border-radius: 10px; font-size: 14px; }
@@ -376,7 +358,6 @@
   [data-kiosk-presentation='fusion-youth'] .pcp-lead-icon { width: 54px; height: 54px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-lead-text { font-size: 16px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-input-section { padding: 16px; }
-  [data-kiosk-presentation='fusion-youth'] .pcp-input { min-height: 72px; padding-right: 90px; font-size: 24px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-counter { right: 12px; font-size: 13px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-submit.k-btn { min-height: 60px; font-size: 18px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-help { padding: 22px 20px; }
@@ -389,3 +370,123 @@
 @media (prefers-reduced-motion: reduce) {
   [data-kiosk-presentation='fusion-youth'] .pcp-spinner { animation-duration: 1.8s; }
 }
+
+
+/* ── 码位格：站着操作时要一眼看出还差几位 ───────────────────── */
+[data-kiosk-presentation='fusion-youth'] .pcp-codebox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 128px;
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-cb {
+  width: 112px;
+  height: 128px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--print-line);
+  border-radius: 20px;
+  background: var(--print-surface);
+  color: var(--print-ink);
+  font-size: 56px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: border-color .16s ease, background-color .16s ease;
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-cb.is-filled { border-color: var(--print-teal); }
+[data-kiosk-presentation='fusion-youth'] .pcp-cb.is-cur {
+  border-color: var(--print-teal);
+  background: var(--print-teal-soft);
+  color: var(--print-teal-deep);
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-cb.is-err { border-color: var(--print-error); }
+/* 10 位历史码要在同样宽度里排下，格子收窄 */
+[data-kiosk-presentation='fusion-youth'] .pcp-codebox--legacy { gap: 10px; }
+[data-kiosk-presentation='fusion-youth'] .pcp-codebox--legacy .pcp-cb {
+  width: 84px;
+  height: 112px;
+  border-radius: 16px;
+  font-size: 44px;
+}
+
+/* ── 三条安心提示：说的是本页行为，不是服务端数据 ───────────── */
+[data-kiosk-presentation='fusion-youth'] .pcp-easy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--print-teal-deep);
+  font-size: 20px;
+  font-weight: 650;
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-easy li::before { content: '✓ '; }
+
+/* ── 键盘卡：把说明、键盘与确认收成一组，不再各自散开 ───────── */
+[data-kiosk-presentation='fusion-youth'] .pcp-keypad-card {
+  padding: 22px 24px 24px;
+  border: 1px solid var(--print-line);
+  border-radius: 20px;
+  background: var(--print-surface);
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-keypad-note {
+  margin: 0 0 16px;
+  text-align: center;
+  color: var(--print-muted);
+  font-size: 19px;
+  line-height: 1.5;
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-keypad-note b { color: var(--print-ink); font-weight: 750; }
+
+/* ── 三种码对照：现场最高频的求助是「我手上这串是哪种码」───── */
+[data-kiosk-presentation='fusion-youth'] .pcp-ab {
+  padding: 20px 22px 22px;
+  border: 1px solid var(--print-line);
+  border-radius: 20px;
+  background: var(--print-surface);
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-ab-t { margin: 0 0 14px; font-family: var(--print-serif); font-size: 25px; font-weight: 700; }
+[data-kiosk-presentation='fusion-youth'] .pcp-ab-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+[data-kiosk-presentation='fusion-youth'] .pcp-ab-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--print-line);
+  border-radius: 14px;
+  background: var(--print-paper);
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-ab-col.is-current {
+  border-color: var(--print-teal);
+  background: var(--print-teal-soft);
+}
+[data-kiosk-presentation='fusion-youth'] .pcp-ab-col b { font-size: 20px; font-weight: 750; color: var(--print-ink); }
+[data-kiosk-presentation='fusion-youth'] .pcp-ab-col span { font-size: 17px; line-height: 1.5; color: var(--print-muted); }
+
+/* ── 兜底出口：卡住的人需要另一条路，不是把同一条路再讲一遍 ── */
+[data-kiosk-presentation='fusion-youth'] .pch-outs { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
+[data-kiosk-presentation='fusion-youth'] .pch-outs li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 1px solid var(--print-line);
+  border-radius: 12px;
+  background: var(--print-paper);
+}
+[data-kiosk-presentation='fusion-youth'] .pch-outs b { font-size: 19px; font-weight: 700; color: var(--print-ink); }
+[data-kiosk-presentation='fusion-youth'] .pch-outs span { font-size: 16px; color: var(--print-muted); }
+
+@media (max-width: 900px) {
+  [data-kiosk-presentation='fusion-youth'] .pcp-ab-cols { grid-template-columns: 1fr; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-cb { width: 76px; height: 92px; font-size: 40px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-codebox--legacy .pcp-cb { width: 58px; height: 78px; font-size: 30px; }
+}
+
+[data-kiosk-presentation='fusion-youth'] .pch-outs li::before { content: none; }
+[data-kiosk-presentation='fusion-youth'] .pch-outs li { padding: 12px 18px; min-height: 56px; }

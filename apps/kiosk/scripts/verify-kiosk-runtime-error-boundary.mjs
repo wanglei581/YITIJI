@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { checkShellChromeProp } from './lib/shell-chrome-contract.mjs'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
@@ -64,7 +65,17 @@ for (const path of [
 ]) {
   assert.ok(root.includes(`'${path}'`), `actionbar route must replace global bottom nav: ${path}`)
 }
-assert.match(root, /hideBottomNav=\{(?:isCampusZone\s*\|\|\s*)?usesPageActionbar\}/)
+// 本门禁只关心一件事：带自有操作条的路由必须替换掉全局底部导航（否则页面底部
+// 会同时出现两条操作栏）。原先逐字匹配整个表达式，等于顺带锁死了「还能有哪些
+// 遮蔽条件」——那不是本门禁的职责，2026-09-02 新增 isQxRoute 时因此误红。
+// 现在只断言 usesPageActionbar 确实是其中一个判据；表达式整体是否合法由
+// verify:fusion-shell 用同一个 checkShellChromeProp 负责。
+const navChrome = checkShellChromeProp(root, 'hideBottomNav')
+assert.ok(navChrome.ok, `KioskRoot hideBottomNav: ${navChrome.reason ?? ''}`)
+assert.ok(
+  navChrome.disjuncts.includes('usesPageActionbar'),
+  'hideBottomNav must keep usesPageActionbar as a disjunct, or actionbar routes render two stacked bars',
+)
 
 // ---- 业务页的错误文案（2026-08-18 专家评审：10 个页面甩英文技术串）----
 //

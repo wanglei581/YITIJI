@@ -146,6 +146,20 @@ function KioskShell() {
 
   // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI顾问/我的」底部导航，
   // 由页面自带顶栏 + 返回箭头承载导航。
+  // ── 青序流光已迁移路由 ────────────────────────────────────────
+  // 这些页已按 docs/design/kiosk-redesign-2026-08/ 的新稿重做，自带 QxPageFrame
+  // 提供的顶栏、页头与操作条。它们必须退出 KioskLayout 的旧外壳——
+  // 后者带 presentation="fusion-youth"，即暖褐配色（--k-ink #1A1714）；
+  // 与青序流光（#10302b）叠在同一页上就是两套色系打架，正是上一代 V6
+  // "只迁移了一半所以效果不好"的成因。
+  //
+  // 逐页加进来，不做一次性大爆炸替换：51 页全部迁完后，KioskLayout 与旧样式
+  // 一并删除，这个集合也随之消失。
+  const QX_MIGRATED_ROUTES = new Set<string>([
+    '/print/pickup-claim',
+  ])
+  const isQxRoute = QX_MIGRATED_ROUTES.has(pathname)
+
   const isCampusZone = pathname === '/campus'
   const v6Shell = V6_SHELL_ROUTES.get(pathname) ?? null
   const isV6Route = v6Shell !== null
@@ -163,8 +177,8 @@ function KioskShell() {
       density="touch"
       presentation="fusion-youth"
       viewport={isCompactViewport ? 'mobile' : 'kiosk'}
-      hideHeader={isCampusZone}
-      hideBottomNav={isCampusZone || usesPageActionbar}
+      hideHeader={isCampusZone || isQxRoute}
+      hideBottomNav={isCampusZone || isQxRoute || usesPageActionbar}
       brandMark={isV6Route ? '职' : undefined}
       brandTitle={v6DomainTitle ?? (isV6Route ? '职易达' : `就业服务大厅 · ${terminalCode}`)}
       brandSubtitle={
