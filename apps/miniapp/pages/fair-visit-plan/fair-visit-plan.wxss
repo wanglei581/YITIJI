@@ -6,7 +6,12 @@
 
 /* 底部操作条用的是 60px 的 .btn.lg，比全局 .content.has-bar 预留的 80px 高，
    不加这一条，结果页最后一行会被操作条压住。 */
-.vp-body { padding-bottom: calc(108px + var(--sab)); }
+/* 选择器必须是 .content.has-bar 而不是 .vp-body：
+   .vp-body 特异性 (0,1,0) 输给 app.wxss 的 .content.has-bar (0,2,0)，
+   写的 108px **从未生效**，实际一直是全局的 80px，而底栏比 80px 高。
+   同特异性时页面 wxss 后加载才赢——print-preview / resume-build /
+   fair-company-detail 都是这么写的，本页当初写失手了。 */
+.content.has-bar { padding-bottom: calc(108px + var(--sab)); }
 
 /* ── 空态 / 失败态（与 jobs 页同口径，全局没有这几个类，必须页内定义）── */
 .empty-wrap {
