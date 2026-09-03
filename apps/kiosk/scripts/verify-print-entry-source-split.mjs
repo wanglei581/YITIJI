@@ -86,7 +86,7 @@ assert(
   uploadPage.includes("navigate('/print/material-check', { state: { file, source } })") &&
     materialCheckPage.includes('source?: PrintMaterialSource') &&
     materialCheckPage.includes('state?.source ?? session?.source') &&
-    materialCheckPage.includes("navigate('/print/preview', { state: { file, materialCheck, source } })") &&
+    /navigate\('\/print\/preview',\s*\{\s*state:\s*\{\s*file(?:: printFile)?,\s*materialCheck,\s*source\s*\}\s*\}\)/.test(materialCheckPage) &&
     previewPage.includes('source?: PrintMaterialSource') &&
     previewPage.includes('locationState?.source ?? restoredSession?.source') &&
     previewPage.includes("navigate('/print/confirm', { state: { file, params, materialCheck, source } })") &&

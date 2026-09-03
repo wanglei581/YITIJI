@@ -378,10 +378,14 @@ jobs:
           pnpm --filter @ai-job-print/api verify:assistant-provider-label
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:ai-feature-keys
+          # 2026-09-03 新增：断言 shared 与 API 两侧 AI 类型契约一致，
+          # 并钉住 ApiKeyChange 的封闭字段集（apiKey 审计铁律的第二道防线）。
+          pnpm --filter @ai-job-print/api verify:ai-contract-mirror
           pnpm --filter @ai-job-print/api verify:aigc-pdf-metadata
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:pii-redaction-contract
           pnpm --filter @ai-job-print/kiosk verify:file-display-truth
           pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
           pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry

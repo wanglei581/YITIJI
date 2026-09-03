@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { isISO8601 } from 'class-validator'
 import type { Prisma } from '../generated/prisma/client'
 import { AuditService } from '../audit/audit.service'
@@ -12,6 +19,9 @@ import type {
   AdminUserListItem,
   AdminUserListQuery,
   AdminUserListResult,
+  AdminUserManagedStatus,
+  AdminUserStatusChangeResult,
+  AdminUserStatusIntent,
 } from './admin-users.types'
 
 const RETENTION_NOTICE =
@@ -24,17 +34,54 @@ const USER_LIST_SELECT = {
   nickname: true,
   phoneEnc: true,
   enabled: true,
+  status: true,
   lastLoginAt: true,
   createdAt: true,
 } as const
+
+const STATUS_SELECT = { ...USER_LIST_SELECT, statusChangedAt: true } as const
 
 interface UserListRow {
   id: string
   nickname: string | null
   phoneEnc: string
   enabled: boolean
+  status: string
   lastLoginAt: Date | null
   createdAt: Date
+}
+
+/**
+ * 管理员可写的两条状态迁移。
+ *
+ * `from` 是 CAS 的前置条件，不是装饰：它把 closing / anonymized 挡在门外。
+ * 已匿名化的账号手机号密文已换成墓碑值，「恢复」无法还原任何东西；
+ * 注销中的账号由隐私执行器推进，管理员插一脚会让那条流水线状态错乱。
+ */
+const STATUS_TRANSITIONS = {
+  disable: { from: 'active', to: 'disabled', enabled: false, action: 'admin.user.disable' },
+  restore: { from: 'disabled', to: 'active', enabled: true, action: 'admin.user.restore' },
+} as const satisfies Record<
+  AdminUserStatusIntent,
+  { from: AdminUserManagedStatus; to: AdminUserManagedStatus; enabled: boolean; action: string }
+>
+
+const STATUS_CONFLICT_MESSAGES: Record<string, string> = {
+  closing: '该账号正在注销流程中，不能由管理员改变状态',
+  anonymized: '该账号已匿名化注销，无法恢复',
+}
+
+/** 仅用于把事务内的 CAS 失败与「审计写不进去」区分开，不会外泄成 HTTP 响应。 */
+class StatusTransitionConflictError extends Error {}
+
+function normalizeReason(reason: string): string {
+  const trimmed = typeof reason === 'string' ? reason.trim() : ''
+  if (trimmed.length < 2 || trimmed.length > 200) {
+    throw new BadRequestException({
+      error: { code: 'ADMIN_USER_STATUS_REASON_REQUIRED', message: '请填写 2-200 字的操作原因' },
+    })
+  }
+  return trimmed
 }
 
 function dateRangeError(): BadRequestException {
@@ -79,6 +126,7 @@ function toListItem(row: UserListRow): AdminUserListItem {
     nickname: row.nickname,
     maskedPhone,
     enabled: row.enabled,
+    status: row.status as AdminUserListItem['status'],
     lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   }
@@ -183,6 +231,106 @@ export class AdminUsersService {
     })
 
     return { user, stats, recentActivities, retentionNotice: RETENTION_NOTICE }
+  }
+
+  /**
+   * 停用 / 恢复终端用户。
+   *
+   * 三条不变量，改这个方法前请先读懂它们：
+   *
+   * 1. `enabled`、`status`、`statusChangedAt` 必须同事务一起写。
+   *    `statusChangedAt` 被 member-step-up.service.ts:216 编进 step-up 授权票据并逐字比对，
+   *    漏写会让被停用者手里的票据继续有效 —— 状态改了，权限没收回。
+   *
+   * 2. 审计与状态变更同事务（audit.writeRequired，不是 write）。
+   *    权限动作没有「改了但查不到是谁改的」这种中间态：审计插不进去就连状态一起回滚。
+   *
+   * 3. CAS 的 where 带 `status: from`。这是挡住 closing / anonymized 的唯一屏障，
+   *    别把它简化成 `where: { id }`。
+   */
+  async setStatus(
+    endUserId: string,
+    intent: AdminUserStatusIntent,
+    reason: string,
+    auditContext: AdminUserAuditContext,
+  ): Promise<AdminUserStatusChangeResult> {
+    const transition = STATUS_TRANSITIONS[intent]
+    const normalizedReason = normalizeReason(reason)
+
+    const current = await this.prisma.endUser.findUnique({
+      where: { id: endUserId },
+      select: STATUS_SELECT,
+    })
+    if (!current) {
+      throw new NotFoundException({
+        error: { code: 'ADMIN_USER_NOT_FOUND', message: '用户不存在' },
+      })
+    }
+
+    // 幂等：已经是目标状态就直接回执，不报错也不写审计。
+    // 重复点击不产生新事实；为它补一条审计只会稀释真正那次停用记录的追责价值。
+    if (current.status === transition.to) {
+      return {
+        user: toListItem(current),
+        changed: false,
+        statusChangedAt: current.statusChangedAt?.toISOString() ?? null,
+      }
+    }
+    if (current.status !== transition.from) throw this.statusConflict(current.status)
+
+    const now = new Date()
+    let updated: (UserListRow & { statusChangedAt: Date | null }) | null
+    try {
+      updated = await this.prisma.$transaction(async (tx) => {
+        const changed = await tx.endUser.updateMany({
+          where: { id: endUserId, status: transition.from },
+          data: { enabled: transition.enabled, status: transition.to, statusChangedAt: now },
+        })
+        if (changed.count !== 1) throw new StatusTransitionConflictError()
+
+        await this.audit.writeRequired(tx, {
+          ...auditContext,
+          action: transition.action,
+          targetType: 'EndUser',
+          targetId: endUserId,
+          payload: {
+            reason: normalizedReason,
+            fromStatus: transition.from,
+            toStatus: transition.to,
+          },
+        })
+
+        return tx.endUser.findUnique({ where: { id: endUserId }, select: STATUS_SELECT })
+      })
+    } catch (error) {
+      if (error instanceof StatusTransitionConflictError) throw this.statusConflict(current.status)
+      // 走到这里说明事务已回滚，账号状态没有变。审计不可用时宁可拒绝操作，
+      // 也不留下一次无法追责的停用。
+      LOGGER.error(`账号状态变更事务失败 endUserId=${endUserId} intent=${intent}: ${(error as Error).message}`)
+      throw new ServiceUnavailableException({
+        error: { code: 'ADMIN_USER_AUDIT_UNAVAILABLE', message: '状态变更未能写入审计，已回滚，请稍后重试' },
+      })
+    }
+
+    if (!updated) {
+      throw new NotFoundException({
+        error: { code: 'ADMIN_USER_NOT_FOUND', message: '用户不存在' },
+      })
+    }
+    return {
+      user: toListItem(updated),
+      changed: true,
+      statusChangedAt: updated.statusChangedAt?.toISOString() ?? null,
+    }
+  }
+
+  private statusConflict(currentStatus: string): ConflictException {
+    return new ConflictException({
+      error: {
+        code: 'ADMIN_USER_STATUS_CONFLICT',
+        message: STATUS_CONFLICT_MESSAGES[currentStatus] ?? '账号当前状态不支持该操作，请刷新后重试',
+      },
+    })
   }
 
   private async writeRequiredAudit(args: Parameters<AuditService['write']>[0]): Promise<void> {

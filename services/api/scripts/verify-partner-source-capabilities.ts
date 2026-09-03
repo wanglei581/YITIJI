@@ -1,11 +1,16 @@
 import 'dotenv/config'
-import { ForbiddenException } from '@nestjs/common'
+import { ForbiddenException, HttpException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import { JobSyncService } from '../src/job-sync/job-sync.service'
 import type { AuditService } from '../src/audit/audit.service'
 import type { JobQualityService } from '../src/job-ai/job-quality.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { decryptSecret, encryptSecret } from '../src/common/crypto/secret-cipher'
+import { webhookSecretStrengthIssue } from '../src/common/crypto/webhook-secret-strength'
+import { ROTATE_CREDENTIAL_CONFIRMATION } from '../src/jobs/data-source-credential-policy'
+import { resolveAuthScopedTracker } from '../src/common/throttler/terminal-throttle'
+import type { RotateDataSourceCredentialDto } from '../src/jobs/dto/data-source.dto'
 
 process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-partner-source-capabilities-key-32-bytes-minimum'
 
@@ -28,6 +33,30 @@ async function expectForbidden(run: () => Promise<unknown>, message: string): Pr
     throw error
   }
   throw new Error(`${message}: expected ForbiddenException`)
+}
+
+function errorCodeOf(error: unknown): string | undefined {
+  if (error instanceof HttpException) {
+    const body = error.getResponse()
+    if (body && typeof body === 'object' && 'error' in body) {
+      return (body as { error?: { code?: string } }).error?.code
+    }
+  }
+  return undefined
+}
+
+async function expectCode(run: () => Promise<unknown>, code: string, message: string): Promise<void> {
+  try {
+    await run()
+  } catch (error) {
+    const actual = errorCodeOf(error)
+    if (actual === code) {
+      pass(message)
+      return
+    }
+    throw new Error(`${message}: expected ${code}, got ${actual ?? (error instanceof Error ? error.message : 'unknown')}`)
+  }
+  throw new Error(`${message}: expected ${code}`)
 }
 
 async function main(): Promise<void> {
@@ -152,6 +181,112 @@ async function main(): Promise<void> {
     await expectForbidden(
       () => partner.importFairs({ items: [] }, partnerUser(orgIds.hr)),
       'Licensed HR agency cannot import job fairs',
+    )
+
+    expect(webhookSecretStrengthIssue('12345678') === 'too_short', '8-char webhook secret is too_short')
+    expect(webhookSecretStrengthIssue('a'.repeat(32)) === 'low_entropy', '32 identical chars are low_entropy')
+    expect(webhookSecretStrengthIssue('0123456789abcdef0123456789abcdef') === null, '32-char hex meets the write-path bar')
+    expect(decryptSecret(encryptSecret('short8ch')) === 'short8ch', '8-char secret still round-trips; verify path must not reject it')
+    pass('Webhook secret strength is write-path only; short secrets still decrypt')
+
+    const sameJwtIp1 = resolveAuthScopedTracker({ ip: '203.0.113.10', headers: { authorization: 'Bearer stolen-jwt' } })
+    const sameJwtIp2 = resolveAuthScopedTracker({ ip: '198.51.100.20', headers: { authorization: 'Bearer stolen-jwt' } })
+    const otherJwt = resolveAuthScopedTracker({ ip: '203.0.113.10', headers: { authorization: 'Bearer other-jwt' } })
+    expect(sameJwtIp1 === sameJwtIp2, 'auth-scoped tracker must ignore IP when Authorization is present')
+    expect(sameJwtIp1 !== otherJwt, 'different JWTs must not share the rotation throttle bucket')
+    pass('Credential rotation throttle tracker is per JWT, not per IP')
+
+    const hr = partnerUser(orgIds.hr)
+    await expectCode(
+      () => partner.createPartnerDataSource(
+        { name: 'Too short webhook', accessMode: 'webhook', sourceKind: 'hr_company', credential: '12345678' },
+        hr,
+      ),
+      'WEBHOOK_SECRET_TOO_SHORT',
+      'Write path rejects 8-char webhook secrets',
+    )
+    await expectCode(
+      () => partner.createPartnerDataSource(
+        { name: 'Low entropy webhook', accessMode: 'webhook', sourceKind: 'hr_company', credential: 'a'.repeat(32) },
+        hr,
+      ),
+      'WEBHOOK_SECRET_LOW_ENTROPY',
+      'Write path rejects low-entropy webhook secrets',
+    )
+    const strongWebhook = await partner.createPartnerDataSource(
+      { name: 'Strong webhook', accessMode: 'webhook', sourceKind: 'hr_company', credential: '0123456789abcdef0123456789abcdef' },
+      hr,
+    )
+    expect(strongWebhook.webhookSecretOnce === '0123456789abcdef0123456789abcdef', 'supplied webhook secret is returned once')
+    pass('32-char hex webhook secret is accepted on write')
+
+    await expectCode(
+      () => partner.rotatePartnerDataSourceCredential(strongWebhook.id, {} as RotateDataSourceCredentialDto, hr),
+      'CREDENTIAL_ROTATION_CONFIRMATION_REQUIRED',
+      'Empty rotate body cannot mint a new webhook secret',
+    )
+
+    await partner.archivePartnerDataSource(strongWebhook.id, true, hr)
+    await expectCode(
+      () => partner.rotatePartnerDataSourceCredential(
+        strongWebhook.id,
+        { confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION },
+        hr,
+      ),
+      'DATA_SOURCE_ARCHIVED',
+      'Archived sources cannot be rotated — archive is the freeze/止血 path',
+    )
+    await partner.archivePartnerDataSource(strongWebhook.id, false, hr)
+
+    const agedAt = new Date(Date.now() - 20 * 60 * 1000)
+    await prisma.jobSource.update({
+      where: { id: strongWebhook.id },
+      data: { createdAt: agedAt, webhookSecretRotatedAt: agedAt },
+    })
+    const rotated = await partner.rotatePartnerDataSourceCredential(
+      strongWebhook.id,
+      { confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION },
+      hr,
+    )
+    expect(typeof rotated.webhookSecretOnce === 'string' && rotated.webhookSecretOnce.length >= 32, 'confirmed rotate returns a new secret once')
+    await expectCode(
+      () => partner.rotatePartnerDataSourceCredential(
+        strongWebhook.id,
+        { confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION },
+        hr,
+      ),
+      'CREDENTIAL_ROTATION_COOLDOWN',
+      'Aged source cannot be rotated twice inside the cooldown window',
+    )
+
+    const school = partnerUser(orgIds.school)
+    const schoolSourceIds: string[] = []
+    for (let i = 0; i < 4; i += 1) {
+      const created = await partner.createPartnerDataSource(
+        { name: `School webhook ${i}`, accessMode: 'webhook', sourceKind: 'school' },
+        school,
+      )
+      schoolSourceIds.push(created.id)
+      await prisma.jobSource.update({
+        where: { id: created.id },
+        data: { createdAt: agedAt, webhookSecretRotatedAt: agedAt },
+      })
+    }
+    for (let i = 0; i < 3; i += 1) {
+      await partner.rotatePartnerDataSourceCredential(
+        schoolSourceIds[i]!,
+        { confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION },
+        school,
+      )
+    }
+    await expectCode(
+      () => partner.rotatePartnerDataSourceCredential(
+        schoolSourceIds[3]!,
+        { confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION },
+        school,
+      ),
+      'CREDENTIAL_ROTATION_RATE_LIMITED',
+      'Org-level rotation cap stops a stolen JWT from burning every webhook in one window',
     )
   } finally {
     await prisma.job.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })

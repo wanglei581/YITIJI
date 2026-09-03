@@ -87,6 +87,43 @@ export class MockAiProvider implements AiProvider {
           { focus: '明确求职目标', reason: '求职意向不清晰，HR 难快速判断匹配方向' },
           { focus: '补齐岗位关键词', reason: '简历文本对常见岗位表达覆盖偏低' },
         ],
+        // S25 内容结构 / 问题证据：演示模式必须与真实模式**同一报告形态**，
+        // 否则前端要为 mock 单独兼容一套。
+        //
+        // ⚠️ mock 没有简历文本，这里的 lines 与 quote 都是**合成样本**：
+        // 姓名写成「演示」、公司/学校写成「演示 XX」，不含任何真实个人信息。
+        // 真实链路的引文由服务端逐行回配「送模型的那份遮盖文本」校验，
+        // mock 走不到那条校验 —— 演示标记由 providerName='mock' 承担。
+        contentBlocks: [
+          { key: 'basic', label: '基础信息', lines: ['演示用户 · 求职者', '邮箱：演示内容，原文这一行是空的'] },
+          { key: 'objective', label: '求职目标', lines: ['希望找一份稳定的工作，运营方向都可以。（演示内容）'] },
+          { key: 'education', label: '教育经历', lines: ['演示大学 计算机科学与技术 本科 2021-2025'] },
+          { key: 'experience', label: '工作经历', lines: [
+            '演示科技公司 · 运营专员 · 2023.07-2025.08',
+            '负责社群运营，维护用户关系，日常维护 3 个用户社群。',
+          ] },
+          { key: 'skill', label: '技能', lines: ['熟练使用 Office 办公软件', 'Excel 会用数据透视表和 VLOOKUP'] },
+        ],
+        issues: [
+          {
+            id: 'I1', dim: 'basic', title: '邮箱一栏是空的',
+            evidence: [{ blockKey: 'basic', lineIndex: 1, quote: '邮箱：演示内容，原文这一行是空的' }],
+            impact: '只留一个联系方式时，对方换一种方式就联系不到你。',
+            fixIt: '把常用邮箱补在手机号后面，两个都留。',
+          },
+          {
+            id: 'I2', dim: 'quantification', title: '职责句停在「负责什么」，没有交代结果',
+            evidence: [{ blockKey: 'experience', lineIndex: 1, quote: '负责社群运营，维护用户关系，日常维护 3 个用户社群。' }],
+            impact: '读的人只知道你被安排做什么，看不到你做成了什么。',
+            fixIt: '每条后面补一句结果，把「负责」换成你实际做到的动作。',
+          },
+          {
+            id: 'I3', dim: 'keyword', title: '技能写成了程度词，工具名和熟练度分在两行',
+            evidence: [{ blockKey: 'skill', lineIndex: 0, quote: '熟练使用 Office 办公软件' }],
+            impact: '「熟练使用」这类词没有信息量，读的人要往下翻才知道你会什么。',
+            fixIt: '合并成「Excel：数据透视表、VLOOKUP」这种写法。',
+          },
+        ],
       },
     }
   }

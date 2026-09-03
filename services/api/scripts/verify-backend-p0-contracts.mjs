@@ -103,8 +103,59 @@ check(
     "code: 'DATA_SOURCE_ADMIN_MANAGED'",
     "assertPartnerDataTypeCapability(org.type, 'job')",
     "assertPartnerDataTypeCapability(org.type, 'fair')",
+    'assertCredentialRotationConfirmed',
+    'assertCredentialRotationNotArchived',
+    'assertCredentialRotationOrgRateLimit',
+    'assertWebhookSecretStrength',
   ]),
   'API/Webhook start disabled and Partner write paths enforce capability rules',
+)
+
+const dataSourceDto = read('services/api/src/jobs/dto/data-source.dto.ts')
+const credentialPolicy = read('services/api/src/jobs/data-source-credential-policy.ts')
+const webhookStrength = read('services/api/src/common/crypto/webhook-secret-strength.ts')
+const jobsController = read('services/api/src/jobs/jobs.controller.ts')
+const sharedJobTypes = read('packages/shared/src/types/job.ts')
+const rotateDrawer = read('apps/partner/src/routes/sources/RotateCredentialDrawer.tsx')
+check(
+  containsAll(dataSourceDto, ["@Equals(ROTATE_CREDENTIAL_CONFIRMATION)", 'confirmPhrase']) &&
+    containsAll(credentialPolicy, ["export const ROTATE_CREDENTIAL_CONFIRMATION = 'ROTATE_CREDENTIAL' as const"]) &&
+    containsAll(sharedJobTypes, ["export const ROTATE_CREDENTIAL_CONFIRMATION = 'ROTATE_CREDENTIAL' as const"]) &&
+    containsAll(rotateDrawer, ['confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION']),
+  'Rotate-credential confirmation phrase is required and kept in sync across DTO / policy / shared / Partner UI',
+)
+check(
+  containsAll(jobsController, ['AuthScopedThrottle(3', 'rotate-credential']) &&
+    containsAll(read('services/api/src/common/throttler/terminal-throttle.ts'), ['resolveAuthScopedTracker', 's:${digest(authorization)}']),
+  'Rotate-credential throttle is per Authorization digest, not per IP',
+)
+check(
+  containsAll(webhookStrength, ['export const WEBHOOK_SECRET_MIN_LENGTH = 32', 'low_entropy']) &&
+    containsAll(sharedJobTypes, ['export const WEBHOOK_SECRET_MIN_LENGTH = 32']) &&
+    !webhookService.includes('assertWebhookSecretStrength') &&
+    !webhookService.includes('WEBHOOK_SECRET_MIN_LENGTH'),
+  'Webhook secret strength is write-path only; HMAC verify does not reject existing short secrets',
+)
+check(
+  // 断言行为，不是写法。
+  //
+  // 原先第二个条件钉的是字面量 'webhookSecretOnce: _once'（解构丢弃写法）。
+  // 但本仓 eslint 未配 `_` 前缀忽略，那个写法必被 no-unused-vars 判红 ——
+  // 于是门禁和 lint 互相矛盾：满足门禁就过不了 lint，反之亦然。
+  // 改为断言这个函数**确实把该字段去掉了**：既接受解构丢弃，也接受 delete 写法，
+  // 但必须出现该字段名且返回值不再包含它（通过 Omit 返回类型钉住）。
+  containsAll(partnerSources, ['omitWebhookSecretOnce(newSource)', 'listSafe']) &&
+    // 光有 Omit 返回类型不够 —— 故障注入实测：把 delete 那一行删掉后，
+    // 函数变成原样返回，而 tsc **不报错**（Omit 是结构性类型，多一个属性仍可赋值），
+    // 门禁也放行。所以必须另外钉住「确实存在一处删除动作」。
+    // 两种合法写法都接受：解构丢弃（webhookSecretOnce: _ 开头的变量）或 delete。
+    containsAll(read('apps/partner/src/routes/sources/omitWebhookSecretOnce.ts'), [
+      "Omit<T, 'webhookSecretOnce'>",
+    ]) &&
+    /delete\s*\([^)]*\)\.webhookSecretOnce|webhookSecretOnce:\s*_/.test(
+      read('apps/partner/src/routes/sources/omitWebhookSecretOnce.ts'),
+    ),
+  'Partner list state strips webhookSecretOnce after create',
 )
 check(
   containsAll(syncAdminController, [

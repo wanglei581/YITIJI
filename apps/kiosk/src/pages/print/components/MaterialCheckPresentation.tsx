@@ -163,7 +163,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
 
               {props.findings.length > 0 && (
                 <p className="w2-material-redaction-note">
-                  当前版本会记录你的保留/遮挡选择并完成遮挡评估，但尚不生成遮挡后文件；进入确认页前会再次提示，打印仍使用原文件。
+                  选择遮挡后，系统会尝试生成遮挡后的文件；能否生成、打印用哪一份，会按实际处理结论告知。
                 </p>
               )}
 

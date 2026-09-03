@@ -202,7 +202,7 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
         keptCount: 0,
         pendingCount: 0,
         warnings: [],
-        messages: [{ code: 'MOCK_PII_REDACT', severity: 'info', text: '流程演示模式，当前版本不生成遮挡后文件，打印仍使用原文件' }],
+        messages: [{ code: 'MOCK_PII_REDACT', severity: 'info', text: '流程演示模式，未连接后端，不会生成遮挡后文件，打印仍使用原文件' }],
       },
     }
   }

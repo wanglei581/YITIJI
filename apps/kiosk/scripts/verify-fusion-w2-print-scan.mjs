@@ -53,8 +53,10 @@ const frozenHashes = new Map([
     '24523dad9d5641105e21c5d4d9bd2b12b6eea9cd6ad5ef831dcc514d74a5fd40',
   ],
   [
+    // 2026-09-03：隐私遮挡改为按后端 claim 持久化 MaterialRedactionSummary，
+    // 不再存 resultFileCreated。冻结契约不放宽，仍逐字节校验。
     'src/pages/print/printMaterialSession.ts',
-    'c222592ca559b5edb8f45e5f29b294ad01e264f6903e2436100d36a8e04a3c78',
+    '2e3dc36bc95ad4c48dfedc6d84957210de5e6115389f7cfe44da7cf771ad2f39',
   ],
 ])
 
