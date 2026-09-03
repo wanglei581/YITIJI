@@ -157,13 +157,16 @@ export class JobSyncController {
     hasEndpoint: boolean
     hasCredential: boolean
     hasResponseConfig: boolean
+    // 归档标记：Admin 必须看得见，否则已归档的源在列表里与「待启用」无异，
+    // 会被误点「审批并启用」（服务端现已拒绝，但界面不该先给出一个必被拒的动作）。
+    archived: boolean
   }[]>> {
     const sources = await this.service['prisma'].jobSource.findMany({
       select: {
         id: true, name: true, orgId: true,
         sourceKind: true, accessMode: true,
         org: { select: { name: true } },
-        syncFreq: true, enabled: true,
+        syncFreq: true, enabled: true, archivedAt: true,
         lastSyncAt: true, lastSyncStatus: true,
         endpoint: true, encryptedCredential: true, webhookSecret: true, responseConfig: true,
       },
@@ -179,6 +182,7 @@ export class JobSyncController {
         org: { name: string }
         syncFreq: string
         enabled: boolean
+        archivedAt: Date | null
         lastSyncAt: Date | null
         lastSyncStatus: string | null
         endpoint: string | null
@@ -194,6 +198,7 @@ export class JobSyncController {
         accessMode: s.accessMode,
         syncFreq: s.syncFreq,
         enabled: s.enabled,
+        archived: s.archivedAt != null,
         lastSyncAt: s.lastSyncAt?.toISOString() ?? null,
         lastSyncStatus: s.lastSyncStatus ?? null,
         hasEndpoint: Boolean(s.endpoint),

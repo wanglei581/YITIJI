@@ -1,7 +1,10 @@
 import type {
+  ConnStatus,
   PartnerDataSource,
   PartnerDataSourceCapabilities,
   CreateDataSourcePayload,
+  RotateDataSourceCredentialPayload,
+  PartnerDataSourceCredentialRotationResult,
   PartnerJobRecord,
   PartnerJobQualitySummary,
   PartnerFairRecord,
@@ -193,6 +196,56 @@ export const partnerMockAdapter = {
       s.id === id
         ? { ...s, connStatus: s.connStatus === 'disabled' ? 'connected' : 'disabled' }
         : s
+    )
+    return DATA_SOURCES.find((s) => s.id === id)!
+  },
+  /**
+   * Mock 轮换。刻意复刻真实端点的两条关键语义，避免 mock 模式把人教坏：
+   *   1. webhook 源才回 `webhookSecretOnce`；api 源必须自带 credential，否则抛错。
+   *   2. 新密钥只在本次返回值里出现，绝不写回 DATA_SOURCES（列表永远不回显密钥）。
+   */
+  async rotateDataSourceCredential(
+    id: string,
+    payload: RotateDataSourceCredentialPayload,
+  ): Promise<PartnerDataSourceCredentialRotationResult> {
+    await delay()
+    const source = DATA_SOURCES.find((s) => s.id === id)
+    if (!source) throw new Error('DATA_SOURCE_NOT_FOUND')
+    if (source.accessMode !== 'webhook' && source.accessMode !== 'api') {
+      throw new Error('DATA_SOURCE_HAS_NO_CREDENTIAL')
+    }
+    if (source.accessMode === 'api' && !payload.credential) {
+      throw new Error('CREDENTIAL_REQUIRED')
+    }
+    const rotatedAt = new Date().toISOString()
+    DATA_SOURCES = DATA_SOURCES.map((s) =>
+      s.id === id ? { ...s, credentialConfigured: true, credentialRotatedAt: rotatedAt } : s
+    )
+    return {
+      id,
+      accessMode: source.accessMode,
+      credentialConfigured: true,
+      rotatedAt,
+      webhookSecretOnce: source.accessMode === 'webhook'
+        ? (payload.credential ?? `mock_rotated_secret_${Date.now().toString(36)}`)
+        : undefined,
+    }
+  },
+  async archiveDataSource(id: string): Promise<PartnerDataSource> {
+    await delay()
+    // 归档同时停用，与服务端一致（enabled=false 才是真正停止进数据的闸门）。
+    DATA_SOURCES = DATA_SOURCES.map((s) =>
+      s.id === id
+        ? { ...s, archived: true, archivedAt: new Date().toISOString(), connStatus: 'disabled' as ConnStatus }
+        : s
+    )
+    return DATA_SOURCES.find((s) => s.id === id)!
+  },
+  async unarchiveDataSource(id: string): Promise<PartnerDataSource> {
+    await delay()
+    // 取消归档不自动恢复启用，与服务端一致。
+    DATA_SOURCES = DATA_SOURCES.map((s) =>
+      s.id === id ? { ...s, archived: false, archivedAt: null } : s
     )
     return DATA_SOURCES.find((s) => s.id === id)!
   },
