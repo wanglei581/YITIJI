@@ -1,7 +1,9 @@
 <view class="home-page">
   <view style="height:{{statusBarHeight}}px"></view>
 
-  <view class="home-head">
+  <!-- padding-right 让开微信胶囊：本行右侧的按钮实测整个落在胶囊矩形内，点不到。
+       值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，不能写死 rpx。 -->
+  <view class="home-head" style="padding-right:{{capsuleInsetRight}}px">
     <!-- 原为「方块 logo + 主标题 + 副标题」的 B 端 header 写法，
          与下方「晚上好，同学」构成两个自我介绍区块叠在一起。
          收敛成一行品牌字：C 端小程序顶部要克制，把注意力让给问候与主功能。 -->

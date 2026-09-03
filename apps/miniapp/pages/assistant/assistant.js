@@ -30,6 +30,9 @@ function iconForRoute(route) {
 Page({
   data: {
     statusBarHeight: 20,
+    // 胶囊右让（px）。实测本页 .as-more 落在胶囊 [296,383] 内的 [346,376]，点不到。
+    // 由 app.js 运行时算，不写死 rpx——胶囊位置随机型变。
+    capsuleInsetRight: 94,
     sessionId: '',
     messages: [
       {
@@ -53,7 +56,11 @@ Page({
 
   onLoad() {
     const fallback = () => (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()).statusBarHeight
-    this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20 })
+    this.setData({
+      statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20,
+      // 见 data.capsuleInsetRight 的说明：本页右上角的「更多」按钮实测整个落在胶囊里
+      capsuleInsetRight: (app.globalData && app.globalData.capsuleInsetRight) || 94,
+    })
   },
 
   back() {

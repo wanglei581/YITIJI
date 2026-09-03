@@ -4,7 +4,8 @@
  * 所以不进 CI、不挂 verify:static 链；它是「人要看一眼」时的替代手段。
  *
  * **为什么放在 tools/ 而不是 scripts/**：verify-ci-gate-coverage.mjs 按**路径**枚举
- * 门禁脚本（apps/*/scripts/*.mjs），**不看文件名**——放进 scripts/ 就会被算成
+ * 门禁脚本（apps 下各端的 scripts 目录里的 .mjs），**不看文件名**——放进 scripts/ 就会被算成
+ * 「注意：这里刻意不写那个 glob 的字面形式——它含有 星号+斜杠，会提前闭合本块注释。」
  * 「未接线门禁」，把 MAX_UNWIRED 1/1 顶破、CI 直接红。豁免表的合法类别只有
  * broken-pending-deletion / broken-pending-fix，探针两头都不沾，不能登记，
  * 也不该为它抬上限或强行起一个 verify:* 名（那会让它进 CI，而 CI 上没有开发者工具）。
@@ -14,7 +15,7 @@
  * 静态门禁覆盖逻辑、合规文案、数据契约；能不能显示出来它一概不知道。
  *
  * 用法：
- *   node scripts/devtools-probe.mjs --route /pages/store-select/store-select \
+ *   node tools/devtools-probe.mjs --route /pages/store-select/store-select \
  *     --data '{"loading":false,"stores":[...]}' --shot /tmp/a.png \
  *     --measure '.actionbar .btn'
  *
@@ -74,7 +75,7 @@ async function main() {
     console.error('装到别处再用 NODE_PATH 指过来，例如：')
     console.error('  mkdir -p /tmp/mp && cd /tmp/mp && npm i miniprogram-automator')
     console.error('  MP_AUTOMATOR=/tmp/mp/node_modules/miniprogram-automator \\')
-    console.error('    node scripts/devtools-probe.mjs --route /pages/x/x')
+    console.error('    node tools/devtools-probe.mjs --route /pages/x/x')
     process.exit(2)
   }
 
@@ -148,6 +149,33 @@ async function main() {
       console.log('canvas:', JSON.stringify(px))
       if (px.probe === 'ok' && px.nonBlankPct < 1) {
         console.error('FAIL: 画布几乎全空，绘制没生效')
+        process.exitCode = 1
+      }
+    }
+
+    // --capsule：把选择器命中的盒子和微信胶囊做相交判定。
+    // 胶囊是系统绘制的，压在页面之上；自定义顶栏的右侧按钮若落进它的矩形，
+    // 用户点不到——而这在模拟器截图上**看起来完全正常**（胶囊是另一层）。
+    // app.js 已经在用同一个 API 算导航栏高度，仓内有先例。
+    const capsuleSel = arg('capsule')
+    if (capsuleSel) {
+      const cap = await mp.evaluate((s) => new Promise((res) => {
+        const c = wx.getMenuButtonBoundingClientRect()
+        wx.createSelectorQuery().selectAll(s).boundingClientRect((r) => {
+          res({ capsule: { l: c.left, r: c.right, t: c.top, b: c.bottom }, boxes: r || [] })
+        }).exec()
+      }), capsuleSel)
+      const c = cap.capsule
+      const hit = (cap.boxes || []).filter((b) =>
+        b.left < c.r && b.right > c.l && b.top < c.b && b.bottom > c.t)
+      console.log('capsule:', JSON.stringify({
+        capsule: { l: Math.round(c.l), r: Math.round(c.r), t: Math.round(c.t), b: Math.round(c.b) },
+        boxes: (cap.boxes || []).map((b) => ({
+          l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) })),
+        overlapping: hit.length,
+      }))
+      if (hit.length) {
+        console.error(`FAIL: ${hit.length} 个可点元素与微信胶囊重叠，用户点不到`)
         process.exitCode = 1
       }
     }

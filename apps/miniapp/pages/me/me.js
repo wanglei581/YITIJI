@@ -14,6 +14,11 @@ function countFromResult(res) {
 Page({
   data: {
     statusBarHeight: 20,
+    // 胶囊右让。2026-09-03 实测：本页顶栏右侧按钮**整个落在微信胶囊矩形内**
+    // （390pt 上胶囊 [296,383]，按钮 [329,374]），用户点不到，而模拟器截图看不出来
+    // ——胶囊是系统绘制的另一层。值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，
+    // 不能在 wxss 里写死：胶囊位置随机型与系统版本变。
+    capsuleInsetRight: 94,
     isLoggedIn: false,
     user: null,
     // 概览计数（真实数据接入前为占位 0，不伪造已完成状态）
@@ -36,7 +41,10 @@ Page({
   },
 
   onLoad() {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this.setData({
+      statusBarHeight: app.globalData.statusBarHeight || 20,
+      capsuleInsetRight: app.globalData.capsuleInsetRight || 94,
+    })
   },
 
   onShow() {

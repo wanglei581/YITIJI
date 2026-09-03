@@ -1,5 +1,7 @@
 <view class="as-wrap">
-  <view class="as-top">
+  <!-- padding-right 让开微信胶囊：本行右侧的按钮实测整个落在胶囊矩形内，点不到。
+       值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，不能写死 rpx。 -->
+  <view class="as-top" style="padding-right:{{capsuleInsetRight}}px">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="as-row">
       <view class="as-back tap" hover-class="tap-press" bindtap="back">

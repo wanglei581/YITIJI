@@ -23,6 +23,11 @@ function todayStr() {
 Page({
   data: {
     statusBarHeight: 20,
+    // 胶囊右让。2026-09-03 实测：本页顶栏右侧按钮**整个落在微信胶囊矩形内**
+    // （390pt 上胶囊 [296,383]，按钮 [329,374]），用户点不到，而模拟器截图看不出来
+    // ——胶囊是系统绘制的另一层。值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，
+    // 不能在 wxss 里写死：胶囊位置随机型与系统版本变。
+    capsuleInsetRight: 94,
     isLoggedIn: false,
     userName: '同学',
     greetWord: '你好',
@@ -46,6 +51,7 @@ Page({
     const g = app.globalData || {}
     this.setData({
       statusBarHeight: g.statusBarHeight || 20,
+      capsuleInsetRight: g.capsuleInsetRight || 94,
       greetWord: greetWord(),
       todayStr: todayStr(),
     })
