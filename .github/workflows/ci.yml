@@ -80,6 +80,7 @@ jobs:
         run: |
           pnpm verify:repository-integrity
           pnpm verify:ci-gate-coverage
+          pnpm verify:fixture-time-bombs
 
       - name: Deploy authorization gate
         # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
