@@ -442,6 +442,10 @@ const VALID_UNWIRED_CATEGORIES = new Set([
   'broken-pending-deletion',
   // 门禁断言的功能确实没实现：现在接线会让 CI 红，须先修功能或改断言
   'broken-pending-fix',
+  // 2026-09-03 新增：补 .ts 支持后第一次可见的存量未接线脚本。
+  // 与上面两类的区别是**尚未判定** —— 还没逐条跑过，不知道是该接线还是该删。
+  // 这个类别只允许在「图谱可见范围扩大」这种一次性事件后使用，且必须逐条还账。
+  'newly-visible-pending-triage',
 ])
 
 // 这个上限同样只允许调低。想加新的未接线脚本，先还掉一条旧的。
@@ -454,7 +458,17 @@ const VALID_UNWIRED_CATEGORIES = new Set([
 //      已 squash 合入 main（03c30bdcd）。它按 merge-base(HEAD, origin/main)..HEAD 取增量提交，
 //      在 main 上该 range 恒为空、在任何新分支上都不含 #486 的 commit，因此恒抛
 //      ERR_ASSERTION，结构上不可能接线。已删除脚本文件本身。
-const MAX_UNWIRED = 1
+// 13（2026-09-03，**分母变了，不是新增欠账**）：此前 gates.mjs 的 GATE_EXT_PATTERN 是
+//   /\.(mjs|cjs|js)$/ —— 不含 .ts。于是 services/api/scripts/ 下 261 条 .ts 门禁
+//   **一条都没进过图谱**（旧图谱收录 167 条，全是 .mjs）。CLAUDE.md §14 让人「改文件前
+//   查图谱看被哪些门禁断言」，而它对 58% 的门禁系统性失明，且不声明自己看不见。
+//   本次补上 .ts 之后，这 13 条一直存在、一直没接线的脚本才第一次可见。
+//   **它们不是本次新增的欠账，是本次第一次被看见的欠账。**
+//   其中约 3 条根本不是门禁（fixture / 维护脚本：change-password-verify-target.ts、
+//   clear-import-rawdata.ts、release-provenance-fixture.ts），其余是写完没接线的真门禁。
+//   逐条接线或登记是独立任务（接上去很可能直接红），不在本刀范围。
+//   从这个新基线起，「只允许调低」照旧生效。
+const MAX_UNWIRED = 13
 
 const unwiredRegistry = exemptionsFile.unwiredScripts || []
 /** @type {Map<string, object>} */

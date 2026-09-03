@@ -654,6 +654,12 @@ Claude Code 每次开发前必须：
    产出在 `docs/graph/`（人读的分册 + 可 diff 的 `graph.json`）。改动了路由、端点、
    Prisma 模型或门禁之后，顺手 `pnpm graph` 重跑一次。
 
+   **图谱是预筛，不是权威。** 它只覆盖 `verify-*` 的 `.mjs`/`.ts` 门禁，并且只能抽出
+   静态可见的引用（详见 [docs/graph/README.md](docs/graph/README.md) 末节的边界）。
+   **图谱没报某条门禁，不构成不跑它的理由** —— CI 的全量门禁才是权威。
+   2026-09-03 实测过一次代价：当时 `GATE_EXT_PATTERN` 不含 `.ts`，261 条 API 侧门禁
+   一条都没进过图谱；有人照图谱决定跑哪些门禁，漏测，CI 才红。
+
    **图谱和代码对不上时，以代码为准，并且那是脚本的 bug —— 请修 `scripts/project-graph/`，
    不要手改 `docs/graph/` 里的产物**（手改会在下次生成时被直接覆盖）。
    图谱明确不保证什么，见 [docs/graph/README.md](docs/graph/README.md) 末节的七条边界。
