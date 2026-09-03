@@ -201,19 +201,59 @@ function collectRoutePaths() {
   return paths.filter((path) => OWNED_PREFIX.test(path.slice(1)))
 }
 
+function git(args) {
+  return execFileSync('git', args, {
+    cwd: WORKSPACE_ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+}
+function canResolveGitRef(ref) {
+  try { git(['rev-parse', '--verify', `${ref}^{commit}`]); return true } catch { return false }
+}
+function canResolveMergeBase(baseRef) {
+  try { git(['merge-base', baseRef, 'HEAD']); return true } catch { return false }
+}
+function ensureMergeBase(baseRef) {
+  if (canResolveMergeBase(baseRef)) return
+  // CI checks this job out at depth 1, so the merge-base is usually absent until deepened.
+  git(['fetch', '--no-tags', '--deepen=50', 'origin'])
+  if (!canResolveMergeBase(baseRef)) throw new Error(`无法解析 ${baseRef}...HEAD 的 merge-base`)
+}
+function tryResolveBase(ref) {
+  const remoteRef = `origin/${ref}`
+  if (canResolveGitRef(remoteRef)) return remoteRef
+  // Shallow CI checkouts (`actions/checkout` defaults to depth 1) carry no
+  // remote-tracking ref for the base branch; fetch just enough to name it.
+  try { git(['fetch', '--no-tags', '--depth=1', 'origin', `${ref}:refs/remotes/origin/${ref}`]) } catch { return null }
+  return canResolveGitRef(remoteRef) ? remoteRef : null
+}
+function resolveDiffBase() {
+  const githubBaseRef = process.env.GITHUB_BASE_REF?.trim()
+  // pull_request runs name their target branch; push/workflow_dispatch fall back to main.
+  for (const ref of [githubBaseRef, 'main'].filter(Boolean)) {
+    const base = tryResolveBase(ref)
+    if (base) return base
+  }
+  throw new Error('无法解析 diff base：origin/main 不存在，且 GITHUB_BASE_REF 未提供或无法获取')
+}
 function changedFiles() {
-  // Earlier waves are frozen as commits before W4. Scope this guard to the
-  // current integration worktree instead of reclassifying committed W2/W3
-  // changes against the historical W1 baseline as W4 violations.
-  const tracked = execFileSync('git', ['diff', '--name-only', 'HEAD'], {
-    cwd: WORKSPACE_ROOT,
-    encoding: 'utf8',
-  })
-  const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
-    cwd: WORKSPACE_ROOT,
-    encoding: 'utf8',
-  })
-  return [...new Set(`${tracked}\n${untracked}`.split('\n').map((item) => item.trim()).filter(Boolean))]
+  // Compare the whole branch against its merge base, not just the dirty worktree.
+  // `git diff HEAD` reports only uncommitted edits, and CI always checks out a clean
+  // tree — that made this guard a permanent no-op there while still firing locally.
+  const diffBase = resolveDiffBase()
+  ensureMergeBase(diffBase)
+  const committed = git(['diff', '--name-only', `${diffBase}...HEAD`])
+  const unstaged = git(['diff', '--name-only'])
+  const staged = git(['diff', '--cached', '--name-only'])
+  const untracked = git(['ls-files', '--others', '--exclude-standard'])
+  return [...new Set(
+    [committed, unstaged, staged, untracked]
+      .join('\n')
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )]
 }
 
 function collectTsx(dir) {
