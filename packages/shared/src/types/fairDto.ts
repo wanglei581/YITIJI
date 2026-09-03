@@ -80,14 +80,34 @@ export interface FairCompanyDTO {
   fairId: string
   companyName: string
   industry: string
-  scale: CompanyScale
+  /**
+   * 员工规模 —— **来源方的原始展示文本**，原样透传，不做分桶。
+   *
+   * 后端 schema 注释即写明这是展示文本（如 "1200+"），真实取值形如
+   * '1200+' / '300+' / '50-500' / '<50' / '>2000' / '5000+'。此前这里是
+   * CompanyScale 五值枚举，适配层把认不出的值兜底成 'medium'，结果是
+   * **每一家**企业都被标成「中型企业（100-999人）」——含真实规模 >2000 的。
+   *
+   * 这是对第三方来源信息的篡改：把来源说的 ">2000" 显示成 "100-999人"。
+   * 岗位/招聘会数据只做来源信息入口（CLAUDE.md §10），不得改写来源事实。
+   * 来源没给就是 null，页面显示「规模未提供」，不猜。
+   */
+  scale: string | null
   description?: string
   boothNumber?: string
   zoneId?: string
   zoneName?: string
   positions: FairCompanyPositionDTO[]
   sourceUrl?: string
-  checkinStatus: CompanyCheckinStatus
+  /**
+   * 招聘会现场签到状态 —— **系统当前不追踪签到，接口不返回此字段，实际恒为
+   * undefined**。保留字段是因为将来若真接了签到设备，这里是它的落点。
+   *
+   * 必须是可选的：此前它是必填，适配层被迫硬造 'pending'，页面把这个占位
+   * 当事实渲染成「未签到」chip——对每家企业断言了系统不掌握的状态。
+   * 类型必填 = 断言"每家企业都有签到状态"，而这句话是假的。
+   */
+  checkinStatus?: CompanyCheckinStatus
   checkinTime?: string
   /** 合规提示文字（必须在企业详情页展示） */
   applyNote: string
