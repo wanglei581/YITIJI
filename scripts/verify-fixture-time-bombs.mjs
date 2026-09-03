@@ -63,6 +63,35 @@ const EXEMPT = /time-bomb-ok:/
  */
 const EXEMPT_FILE = /time-bomb-ok-file:/
 
+
+/**
+ * 日期构造的年份识别。**必须覆盖所有写法** —— 只认一种写法的门禁等于没有门禁：
+ *   new Date('2026-…')  new Date("2026-…")  new Date(`2026-…`)
+ *   Date.parse('2026-…')                     new Date(2026, 8, 1)
+ * 初版只写了 new Date\('，双引号一写就整条绕过（已实测复现）。这是本仓库
+ * 反复出现的同一类缺陷：门禁只认作者自己习惯的那种写法。
+ *
+ * 返回该片段里出现的所有年份（数字）。
+ */
+const DATE_YEAR_PATTERNS = [
+  /new Date\(\s*['"`](\d{4})-/g,
+  /Date\.parse\(\s*['"`](\d{4})-/g,
+  /new Date\(\s*(\d{4})\s*,/g,
+]
+
+function dateYears(text) {
+  const years = []
+  for (const re of DATE_YEAR_PATTERNS) {
+    for (const m of text.matchAll(new RegExp(re.source, 'g'))) years.push(Number(m[1]))
+  }
+  return years
+}
+
+/** 年份是否落在"危险带"（今天是过去还是未来，取决于你哪天读它）。 */
+function inDangerZone(year) {
+  return year > SAFE_PAST_MAX && year < SAFE_FUTURE_MIN
+}
+
 let failed = 0
 let checkedFiles = 0
 let checkedSites = 0
@@ -115,11 +144,13 @@ for (const full of files) {
 
   // ── 规则 1：端点常量本身必须够远 ────────────────────────────────
   for (const m of src.matchAll(
-    /const\s+(PAST|FAR_PAST|FUTURE|FAR_FUTURE)\s*=\s*new Date\('(\d{4})-/g,
+    /const\s+(PAST|FAR_PAST|FUTURE|FAR_FUTURE)\s*=\s*([^\n]+)/g,
   )) {
+    const [, name, expr] = m
+    const years = dateYears(expr)
+    if (years.length === 0) continue
     checkedSites += 1
-    const [, name, yearText] = m
-    const year = Number(yearText)
+    const year = years[0]
     const isPast = name.endsWith('PAST')
     const ok = isPast ? year <= SAFE_PAST_MAX : year >= SAFE_FUTURE_MIN
     // 豁免同样适用于端点常量：mock 时钟的脚本里，端点是相对脚本自己的 NOW 取值的
@@ -139,11 +170,13 @@ for (const full of files) {
   // ── 规则 2：时效字段不许写危险带字面量 ──────────────────────────
   lines.forEach((line, i) => {
     for (const field of VALIDITY_FIELDS) {
-      const m = line.match(new RegExp(`\\b${field}:\\s*new Date\\('(\\d{4})-`))
-      if (!m) continue
+      const at = line.search(new RegExp(`\\b${field}:`))
+      if (at === -1) continue
+      const years = dateYears(line.slice(at))
+      if (years.length === 0) continue
       checkedSites += 1
-      const year = Number(m[1])
-      if (year <= SAFE_PAST_MAX || year >= SAFE_FUTURE_MIN) continue
+      const year = years.find(inDangerZone)
+      if (year === undefined) continue
       if (EXEMPT.test(line) || EXEMPT.test(lines[i - 1] ?? '')) continue
       fail(
         `${rel}:${i + 1} 的 ${field} 写死危险带日期`,
