@@ -343,9 +343,9 @@ var VIEWS = {
     truth:'删除后不可恢复；删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。'
   },
   'activity': {
-    tab:'足迹', tabHint:'浏览与跳转', route:'/me/activity', pill:'浏览与跳转记录',
+    tab:'足迹', tabHint:'浏览·跳转·进度', route:'/me/activity', pill:'浏览与跳转记录',
     states:['login','loading','error','browse-empty','jump-empty','applications-empty','browse-ready','jump-ready','applications-ready'], def:'login',
-    eyebrow:'MY ACTIVITY', ask:'看过什么、去过哪个来源、投到哪一步，<em>都能回看</em>。',
+    eyebrow:'MY ACTIVITY', ask:'看过什么、去过哪个来源、自己记了哪些进度，<em>都能回看</em>。',
     // 前两个 Tab 与第三个性质不同，文案必须同时说清，少说一半就是误导：
     //   浏览 / 跳转 = 系统观测到的动作；求职进度 = 用户本人写下来的。
     doing:'浏览与跳转只记录<b>动作本身</b>；求职进度<b>由你自己填写</b>。',
@@ -695,9 +695,9 @@ function activityRow(r, kind){
    与上面两组数据性质不同 —— 那两组是系统观测到的动作，这一组是用户自己敲进来的。
    因此没有 source / action 字段：来源平台的处理结果本终端不掌握，也不展示。 */
 var APPLICATION_ROWS = [
-  {id:'a1', company:'示例科技有限公司', position:'前端开发工程师', status:'面试中', ico:'chat', tone:'clay', at:'你填写的投递时间 07-02'},
-  {id:'a2', company:'示例数据服务公司', position:'数据分析师', status:'已投递', ico:'send', tone:'', at:'你填写的投递时间 07-05'},
-  {id:'a3', company:'示例设计工作室', position:'视觉设计师', status:'意向中', ico:'star', tone:'wheat', at:'尚未填写投递时间'}
+  {id:'a1', company:'示例科技有限公司', position:'岗位进度示例 A', status:'面试中', ico:'chat', tone:'clay', at:'你填写的投递时间 07-02'},
+  {id:'a2', company:'示例数据服务公司', position:'岗位进度示例 B', status:'已投递', ico:'send', tone:'', at:'你填写的投递时间 07-05'},
+  {id:'a3', company:'示例设计工作室', position:'岗位进度示例 C', status:'意向中', ico:'star', tone:'wheat', at:'尚未填写投递时间'}
 ];
 function applicationRow(r){
   return '<div class="row" data-testid="'+SCREEN+'-application-'+r.id+'">'
@@ -724,15 +724,19 @@ function activityBody(tab, empty){
         + activityTabs(tab, true)
         + previewList(
             startRow('brief','','先去看岗位','在岗位详情点「去来源平台投递」，回来再记一笔','查看岗位','26-browse-list.html','/jobs',SCREEN+'-start-jobs')
-            + startRow('route','clay','手动记一条','投了本站没有的岗位，也可以自己添加公司与岗位名','手动添加','27-browse-detail.html','/jobs/example-1',SCREEN+'-start-manual'),
-            '在来源平台投递之后，回到这里点「记录一次投递」。<b>空就是空</b>，本页不会替你造进度。',
+            /* 原型没有独立的手填表单屏，所以这里**不做「手动添加」的按钮承诺** ——
+               点进去只会到某个站内岗位详情，和文案自相矛盾。改成如实说明这条能力存在、
+               入口待建，宁可少给一个入口也不给一个说话不算数的入口。 */
+            + pendingRow('/me/activity?tab=applications', SCREEN+'-start-manual', '',
+                '投了本站没有的岗位？', '也可以自己填公司与岗位名记一笔 · 手填入口待建设'),
+            '在岗位详情页投完之后，从那里把这次投递记进来。<b>空就是空</b>，本页不会替你造进度。',
             '从这里开始')
         + guide('empty-applications')
         + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
                   link('查看岗位','26-browse-list.html','/jobs',SCREEN+'-primary',{primary:true,icon:'arrow'})])};
     }
     return {layout:'list5', html:
-      fixtureNote('内容由你本人填写')
+      fixtureNote('下面三条是排版占位，不是你填过的内容')
       + summary('clay','route','求职进度','—','全部由你自己填写；本终端不参与投递，也不掌握来源平台的结果',['数量由接口返回','当前显示 '+APPLICATION_ROWS.length+' 行'])
       + activityTabs(tab, false)
       + '<section class="list" data-testid="'+SCREEN+'-application-list" data-evidence-fixture="synthetic" aria-label="求职进度（排版示例）">'
@@ -884,7 +888,7 @@ function renderBody(view, state, tab){
     return {layout:'list', html:aiRecordsBody(state)};
   }
   if(view==='activity'){
-    if(state==='login') return loginState('activity','登录后查看本人记录','游客模式不保存跨会话浏览记录；公共一体机也不在本机留存浏览历史。');
+    if(state==='login') return loginState('activity','登录后查看本人记录','游客模式不保存跨会话浏览记录，也不保存你自己填写的求职进度；公共一体机不在本机留存这些明细。');
     if(state==='loading') return loadingState('activity','正在加载本人记录');
     if(state==='error') return errorState('activity','loading','记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。');
     if(state==='browse-empty') return activityBody('browse', true);
@@ -937,7 +941,11 @@ function render(view, state, tab){
   document.getElementById('eyebrow').textContent = v.eyebrow;
   document.getElementById('ask').innerHTML = v.ask;
   document.getElementById('doing').innerHTML = v.doing;
-  document.getElementById('pill-text').textContent = v.pill;
+  // pill 原本按 view 固定。activity 现在有三个 Tab，固定成「浏览与跳转记录」会在
+  // 求职进度 Tab 上和同屏标题、摘要卡自相矛盾 —— 顶部说「浏览与跳转」，下面列的却是
+  // 用户自填的投递进度。按 state 分辨。
+  document.getElementById('pill-text').textContent =
+    (view === 'activity' && /^applications-/.test(state)) ? '求职进度' : v.pill;
   document.getElementById('pill-dot').className = 'dot' + (state==='loading' || state==='deleting' ? ' breathe' : '');
   document.getElementById('truth-copy').textContent = v.truth;
   document.getElementById('back').href = view==='activity-detail' ? href('activity','browse-ready') : keep('30-my-profile.html');
