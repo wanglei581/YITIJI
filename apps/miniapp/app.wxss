@@ -923,3 +923,37 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .i-check-circle { -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23000%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M21.801%2010A10%2010%200%201%201%2017%203.335%27%2F%3E%3Cpath%20d%3D%27m9%2011%203%203L22%204%27%2F%3E%3C%2Fsvg%3E"); mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23000%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M21.801%2010A10%2010%200%201%201%2017%203.335%27%2F%3E%3Cpath%20d%3D%27m9%2011%203%203L22%204%27%2F%3E%3C%2Fsvg%3E"); }
 .i-wallet { -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23000%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M19%207V4a1%201%200%200%200-1-1H5a2%202%200%200%200%200%204h15a1%201%200%200%201%201%201v4h-3a2%202%200%200%200%200%204h3a1%201%200%200%200%201-1v-2a1%201%200%200%200-1-1%27%2F%3E%3Cpath%20d%3D%27M3%205v14a2%202%200%200%200%202%202h15a1%201%200%200%200%201-1v-4%27%2F%3E%3C%2Fsvg%3E"); mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23000%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M19%207V4a1%201%200%200%200-1-1H5a2%202%200%200%200%200%204h15a1%201%200%200%201%201%201v4h-3a2%202%200%200%200%200%204h3a1%201%200%200%200%201-1v-2a1%201%200%200%200-1-1%27%2F%3E%3Cpath%20d%3D%27M3%205v14a2%202%200%200%200%202%202h15a1%201%200%200%200%201-1v-4%27%2F%3E%3C%2Fsvg%3E"); }
 
+
+/* ── 窄屏底栏 ────────────────────────────────────────────────
+   .btn / .btn.lg 都是 white-space:nowrap + min-width:auto，压不下去；
+   两颗并排时 min-content 之和会超过 .actionbar 的可用宽（W − 32）。
+
+   2026-09-03 按「两颗按钮并排」这个先验全量扫过 26 个含 .actionbar 的页面，
+   320pt 下确定溢出 5 处（含 1 处临界）：
+     self-explore 结果态       溢 34px   重新作答 + 生成并去打印（后者还带图标）
+     self-explore 答题最后一组  溢 31px   返回说明 + 提交并生成参考
+     fair-detail 无来源链接     溢 18px   收藏 + 提醒 + 来源链接暂不可用
+     resume-build 预览态       溢 15px   返回修改 + 导出并去打印
+     career-plan done          溢 3px    重新生成 + 生成建议单去打印
+     job-materials 填表        临界 ~1px  换模板 + 生成并去打印
+   其余 21 页所有态都放得下。
+
+   **这 5 处全在「不是默认的那个态」上**——有链接的 fair-detail、history 的
+   career-plan、非最后一组的 self-explore、填写中的 resume-build 都不溢出。
+   逐页目测会全部漏掉；是按「两颗 .btn.lg 并排 + 合计 min-content」算出来的。
+
+   只在 <375pt 生效：375 及以上现状是好的，不为了救窄屏把宽屏也做小。
+   收紧内边距与 gap 就够，不缩字号、不改文案（受合规白名单约束）、不竖排。
+   320pt 不只是老 SE——iPhone 开「显示与亮度 → 更大文字」后逻辑宽度也是 320pt。
+
+   删掉这一段会怎样：上面 5 处在 320pt 上按钮末字被屏幕切掉。
+   （@media 在小程序 wxss 可用，home.wxss / launch.wxss 已有先例。）
+
+   **只收 .btn.lg，不收裸 .btn**：fair-detail 的「提醒我」是 class="btn remind-btn"，
+   页面给了 padding: 0 18rpx（320pt 下 7.7px）。`.actionbar .btn`(0,2,0) 会盖掉
+   页面的 `.remind-btn`(0,1,0)，把按钮反而撑宽 16.6px —— 该页从溢 17.1px 变成
+   溢 17.7px，越修越糟。career-plan（普通 .btn，溢 3px）与 fair-detail 各自页内处理。 */
+@media (max-width: 374px) {
+  .actionbar { gap: 10px; }
+  .actionbar .btn.lg { padding: 0 18px; }
+}
