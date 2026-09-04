@@ -1,0 +1,474 @@
+/* ============================================================================
+   phone-relay.css · S11 手机接力（390×844 手机端）
+   宿主：51-phone-relay.html —— 真实 route /member/qr-login 与 /upload/phone
+
+   为什么不套一体机壳层：这两条 route 的用户拿的是自己的手机，不是 27 寸竖屏。
+   1080×1920 的 topbar / navbar / 大字阶在 390px 宽度上会挤成一团，
+   所以这里只继承青序流光的**语言**（纸色、深绿、青绿、宋体标题、克制层级、
+   按压反馈），版式全部按手机重排：没有底部三 Tab、没有第二套导航、没有"我的"。
+
+   触控：任意可点 ≥48px，主操作 ≥56px；可点文字 ≥15px，正文 ≥13px。
+   动效：只用 transform / opacity；prefers-reduced-motion 与 ?flat=1 一律静态。
+   资源：零外部字体、零外部图片、零 CDN —— 全部内联 SVG 与系统字体族。
+   ========================================================================== */
+
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink2:#3d5a52; --muted:#65746d;
+  --line:#e3ddcb; --line2:#d4cdb6;
+  --deep:#0b241e; --deep2:#123a30; --emerald:#2ee6a8; --emerald-2:#78edc5;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f1ea;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --dur-instant:120ms; --dur-quick:240ms; --ease-out:cubic-bezier(.22,1,.36,1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{
+  display:flex;min-height:100%;justify-content:center;align-items:flex-start;
+  background:#e8e3d3;color:var(--ink);font-family:var(--sans);
+}
+button,input{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+.serif{font-family:var(--serif)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* 尺寸口径：390 是**上限**不是固定值 —— 真机上还有 360 / 375 这些更窄的屏，
+   写死 390px 会在它们上面横向溢出。高度用 dvh：手机浏览器的地址栏会收起展开，
+   100vh 在 iOS Safari 上算的是"地址栏收起后"的高度，页面一进来就比可视区高一截。
+   两行连写是渐进增强：不认识 dvh 的旧内核吃前一行的 vh，认识的用后一行覆盖。 */
+#stage{
+  position:relative;display:flex;overflow:hidden;
+  width:100%;max-width:390px;flex:0 1 auto;flex-direction:column;
+  min-height:100vh;min-height:100dvh;
+  height:100vh;height:100dvh;
+  background:var(--paper);
+}
+/* 取证：capture 固定成 390×844，不受视口、地址栏与安全区影响，保证逐字节可复现。 */
+html[data-capture="1"] #stage{width:390px;max-width:390px;height:844px;min-height:844px}
+
+/* ── 顶部接力条：常驻提示"这一页只为一体机服务"，不是第二个 App 的首页 ───── */
+/* 顶部安全区：刘海屏 / 灵动岛下面这条深色栏是整页最靠上的元素，
+   不补 env() 的话"职易达"会被挖孔压住。 */
+.relaybar{
+  position:relative;display:flex;overflow:hidden;flex:0 0 auto;align-items:center;gap:11px;
+  padding:16px 18px 20px;
+  padding-top:calc(16px + env(safe-area-inset-top,0px));
+  background:linear-gradient(152deg,var(--deep2),var(--deep) 72%);color:#f2efe4;
+}
+.relaybar::after{
+  content:"";position:absolute;right:-70px;top:-86px;width:220px;height:220px;
+  border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.17),transparent 66%);
+}
+.seal{
+  display:grid;width:38px;height:38px;flex:0 0 auto;place-items:center;
+  border-radius:11px;background:linear-gradient(145deg,#4af0b8,#21ba89);
+  color:var(--deep);font-size:21px;font-weight:900;
+}
+.rb-copy{position:relative;z-index:1;min-width:0;flex:1}
+.rb-copy b{display:block;font-family:var(--serif);font-size:16px;font-weight:800;letter-spacing:1.5px}
+.rb-copy small{display:block;margin-top:2px;overflow:hidden;color:rgba(242,239,228,.6);font-size:12.5px;text-overflow:ellipsis;white-space:nowrap}
+.rb-tag{
+  position:relative;z-index:1;display:inline-flex;flex:0 0 auto;align-items:center;height:26px;
+  padding:0 11px;border:1px solid rgba(46,230,168,.34);border-radius:13px;
+  color:var(--emerald-2);font-size:12px;font-weight:700;letter-spacing:.5px;
+}
+.wave{position:relative;height:12px;flex:0 0 auto;background:var(--paper)}
+.wave::before{
+  content:"";position:absolute;right:0;left:0;top:-14px;height:26px;
+  background:var(--deep);clip-path:ellipse(72% 48% at 50% 0);
+}
+
+/* ── 任务区：唯一纵向流，页面内不出现第二个滚动容器 ──────────────────────── */
+/* 软键盘弹起时可视区被压掉一半，这一层必须还能滚 —— min-height:0 是关键：
+   没有它，flex 子项的最小尺寸是内容高度，overflow-y:auto 会失效，
+   用户就会卡在"看得见输入框、看不见下一步"的死局里。 */
+.body{display:flex;min-height:0;flex:1;flex-direction:column}
+.flow{
+  display:flex;height:100%;min-height:0;flex-direction:column;gap:12px;
+  overflow-y:auto;overscroll-behavior:contain;scroll-padding-bottom:24px;
+  -webkit-overflow-scrolling:touch;padding:14px 18px;
+}
+.grow{flex:1 1 auto;min-height:0}
+
+/* ── 一体机身份卡（qr-login 的"你要登录哪台机器"）───────────────────────── */
+.devcard{
+  position:relative;display:flex;flex:0 0 auto;flex-direction:column;align-items:center;
+  overflow:hidden;padding:20px 20px 18px;border-radius:22px;
+  background:linear-gradient(158deg,var(--deep2),var(--deep) 74%);color:#f2efe4;text-align:center;
+}
+.devcard::after{
+  content:"";position:absolute;left:-58px;bottom:-92px;width:200px;height:200px;
+  border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.15),transparent 64%);
+}
+.devcard>*{position:relative;z-index:1}
+.dev-copy{display:flex;min-width:0;flex-direction:column;align-items:center}
+.dev-glyph{
+  display:grid;width:60px;height:60px;flex:0 0 auto;place-items:center;
+  border:1px solid rgba(46,230,168,.4);border-radius:19px;
+  background:rgba(46,230,168,.11);color:var(--emerald);
+}
+.dev-name{margin-top:12px;font-family:var(--serif);font-size:21px;font-weight:800;line-height:1.3;letter-spacing:1px}
+.dev-desc{margin-top:8px;color:rgba(242,239,228,.72);font-size:13.5px;line-height:1.6}
+.dev-chip{
+  display:inline-flex;min-height:30px;align-items:center;margin-top:13px;padding:4px 13px;
+  border:1px solid rgba(46,230,168,.3);border-radius:15px;background:rgba(46,230,168,.09);
+  color:var(--emerald-2);font-size:12.5px;line-height:1.45;
+}
+.dev-chip b{color:#fff;font-weight:800}
+/* 没拿到机器名称时不要把标题撑成大字号:那一行写的是"没有名称",不是名称本身 */
+.devcard[data-device="unknown"] .dev-name{font-size:18px;color:rgba(242,239,228,.9);letter-spacing:.5px}
+
+/* 紧凑机器卡：已经发过码、或屏上正压着一条错误说明时用。
+   核对"是不是这台机器"是发码之前那一步的事;之后还占着 300px,
+   只会把错误原因和"验证码填哪里"一起顶出 844 的首屏。 */
+.devcard[data-compact="1"]{
+  flex-direction:row;align-items:center;gap:12px;
+  padding:12px 14px;border-radius:18px;text-align:left;
+}
+.devcard[data-compact="1"] .dev-glyph{width:44px;height:44px;border-radius:14px}
+.devcard[data-compact="1"] .dev-copy{flex:1;align-items:flex-start}
+.devcard[data-compact="1"] .dev-name{margin-top:0;font-size:16px;letter-spacing:.5px}
+.devcard[data-compact="1"] .dev-desc{margin-top:2px;font-size:12px;line-height:1.45}
+.devcard[data-compact="1"] .dev-chip{margin-top:6px;min-height:0;padding:3px 10px;font-size:11.5px}
+/* 卡内核对提示:左对齐,因为它是一句要照着做的话,不是标语 */
+.dev-note{
+  display:flex;align-items:flex-start;gap:8px;margin-top:12px;padding:9px 11px;
+  border:1px solid rgba(242,239,228,.16);border-radius:12px;background:rgba(255,253,248,.07);
+  color:rgba(242,239,228,.82);font-size:12.5px;line-height:1.55;text-align:left;
+}
+.dev-note .ic{flex:0 0 auto;margin-top:1px;color:var(--emerald-2)}
+
+/* ── 通用状态卡：检查中 / 失败 / 已确认 / 链接失效 ─────────────────────── */
+.statecard{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:26px 22px;border:1px solid var(--line);border-radius:22px;
+  background:var(--surface);text-align:center;
+}
+.statecard .glyph{
+  display:grid;width:64px;height:64px;flex:0 0 auto;place-items:center;
+  border-radius:20px;background:var(--teal-soft);color:var(--teal-d);
+}
+.statecard[data-kind="warn"] .glyph{background:var(--wheat-soft);color:var(--wheat-d)}
+.statecard[data-kind="error"] .glyph{background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.statecard[data-kind="done"] .glyph{background:var(--teal-soft);color:var(--teal-d)}
+.statecard h2{margin-top:15px;font-family:var(--serif);font-size:19px;font-weight:800;line-height:1.36}
+.statecard p{margin-top:9px;max-width:280px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.statecard .spin{animation:pr-spin 1.1s linear infinite}
+
+/* ── 三步条：只写"接下来怎么做"，不是进度，不表达已完成 ─────────────────── */
+.steps{
+  display:flex;flex:0 0 auto;align-items:stretch;gap:6px;padding:11px 12px;
+  border:1px dashed var(--line2);border-radius:16px;background:var(--surface);
+}
+.steps li{
+  display:flex;min-width:0;flex:1;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;list-style:none;text-align:center;
+}
+.steps .no{
+  display:grid;width:22px;height:22px;place-items:center;border-radius:50%;
+  background:var(--teal-soft);color:var(--teal-d);font-size:12px;font-weight:800;
+}
+.steps .tx{color:var(--ink2);font-size:12.5px;font-weight:650;line-height:1.35}
+.steps .arrow{display:flex;flex:0 0 auto;align-items:center;color:var(--line2)}
+
+/* ── 表单：手机号 + 验证码 ───────────────────────────────────────────── */
+.formcard{
+  display:flex;flex-direction:column;gap:9px;padding:16px;
+  border:1px solid var(--line);border-radius:22px;background:var(--surface);
+}
+.f-label{font-size:13px;font-weight:800;letter-spacing:.4px}
+.f-label+.f-label{margin-top:4px}
+.field{
+  display:flex;min-height:54px;align-items:center;overflow:hidden;
+  border:1px solid var(--line2);border-radius:14px;background:var(--paper);
+}
+.field:focus-within{border-color:var(--teal);background:var(--surface)}
+.prefix{
+  align-self:stretch;display:flex;align-items:center;padding:0 12px;
+  border-right:1px solid var(--line2);color:var(--muted);font-size:14px;font-weight:800;
+}
+.field .ic{margin-left:12px;color:var(--muted)}
+.input{min-width:0;height:52px;flex:1;padding:0 13px;border:0;outline:0;background:transparent;font-size:17px;letter-spacing:1px}
+.input::placeholder{color:#9baaa4;letter-spacing:0}
+.coderow{display:flex;gap:9px}
+.coderow .field{min-width:0;flex:1}
+.sendbtn{
+  display:flex;min-width:104px;min-height:54px;align-items:center;justify-content:center;
+  padding:0 12px;border:1px solid var(--line2);border-radius:14px;
+  background:var(--paper);color:var(--teal-d);font-size:14.5px;font-weight:750;
+  transition:transform var(--dur-instant) var(--ease-out);
+}
+.sendbtn:active{transform:scale(.97)}
+.sendbtn[aria-disabled="true"]{color:var(--muted);background:#f0eee6;opacity:.7}
+/* 已发码后手机号锁定为脱敏回显：公共场合不再把 11 位号码留在屏幕上 */
+.lockrow{
+  display:flex;min-height:54px;align-items:center;gap:10px;padding:0 12px 0 14px;
+  border:1px solid var(--line2);border-radius:14px;background:#f1efe6;
+}
+.lockrow .num{flex:1;font-size:17px;font-weight:700;letter-spacing:1.5px}
+.lockrow .ic{color:var(--muted)}
+.changebtn{
+  display:flex;min-height:48px;align-items:center;padding:0 12px;border-radius:12px;
+  color:var(--teal-d);font-size:13.5px;font-weight:750;text-decoration:underline;
+  text-underline-offset:3px;transition:transform var(--dur-instant) var(--ease-out);
+}
+.changebtn:active{transform:scale(.97)}
+.dots{flex:1;color:var(--ink2);font-size:19px;font-weight:800;letter-spacing:5px}
+/* 「发码按钮为什么点不动」那一条的固定容器。
+   它必须是一个能按 data-testid 找到、又能单独换 innerHTML 的节点：用户正在上面的
+   手机号输入框里改号码，整屏重绘会把光标和焦点一起弄丢。
+   display:contents 让它自己不生成盒子 —— 里面的提示条照旧是 .formcard 的直接 flex 子项，
+   空的时候既不占位、也不多吃一份 gap。 */
+.sendblock{display:contents}
+
+/* ── 首屏错误块：排在机器卡正下方，绝不塞进表单里 ──────────────────────
+   为什么单独立一块：验证码错、发码被限、结果未知这三条，用户必须先读到原因、
+   再看到下一步该点哪里。塞进表单尾部时，390×844 上它正好落在主按钮那一带,
+   人读完提示反而找不到输入框 —— 这就是这次要修的那个遮挡。 */
+.alertblock{
+  display:flex;flex:0 0 auto;align-items:flex-start;gap:10px;
+  padding:12px 13px;border:1px solid;border-radius:16px;
+}
+.alertblock .ic{flex:0 0 auto;margin-top:1px}
+.alertblock>div{min-width:0;flex:1}
+.alertblock b{display:block;font-size:14.5px;font-weight:800;line-height:1.4}
+.alertblock span{display:block;margin-top:4px;font-size:12.5px;line-height:1.6}
+.alertblock[data-tone="error"]{border-color:#e2b3ac;background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.alertblock[data-tone="warn"]{border-color:#e0c78f;background:var(--wheat-soft);color:#704316}
+
+/* ── 提示条：成功 / 失败 / 中性 ─────────────────────────────────────── */
+.notice{
+  display:flex;flex:0 0 auto;align-items:flex-start;gap:8px;padding:10px 12px;
+  border-radius:12px;font-size:13px;line-height:1.55;
+}
+.notice .ic{flex:0 0 auto;margin-top:1px}
+.notice[data-tone="ok"]{border:1px solid #9ed2c4;background:var(--teal-soft);color:#0b4c40}
+.notice[data-tone="warn"]{border:1px solid #e0c78f;background:var(--wheat-soft);color:#704316}
+.notice[data-tone="error"]{border:1px solid #e2b3ac;background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.notice[data-tone="calm"]{border:1px solid var(--line);background:var(--paper);color:var(--muted)}
+
+/* ── 主操作 ────────────────────────────────────────────────────────── */
+/* 从"滚动区里的吸底块"改成"滚动区外的固定操作位"。
+   原来那版是 position:sticky 挂在 .flow 内部：它确实一直停在拇指位置，
+   但它是**浮在正文上面**的 —— 表单再多一条错误说明，被压住的就是错误原因
+   和验证码输入框本身（验证码失败那几屏在 390×844 上就是这么被遮住的）。
+   现在它是 .body 的兄弟节点：滚动区的高度里已经扣掉了它，
+   正文再长也只会往上滚，不会有任何一行永远藏在按钮底下。
+   代价是它不再"划到底让位给事实表"，换来的是没有任何内容会被盖住 —— 值。
+   上传屏没有主操作，这一块渲染成空字符串，:empty 直接收掉，不留一条空边框。 */
+.ctadock{
+  position:relative;z-index:2;
+  display:flex;flex:0 0 auto;flex-direction:column;gap:7px;
+  padding:10px 18px 12px;border-top:1px solid var(--line);background:var(--paper);
+}
+.ctadock:empty{display:none}
+.btn{
+  display:flex;min-height:58px;align-items:center;justify-content:center;gap:8px;
+  border-radius:16px;font-size:18px;font-weight:800;letter-spacing:2px;
+  transition:transform var(--dur-instant) var(--ease-out);
+}
+.btn:active{transform:scale(.985)}
+.btn.primary{background:var(--teal);color:#fffdf8;box-shadow:0 6px 16px rgba(31,158,134,.26)}
+.btn.primary[aria-disabled="true"]{background:#c9d4cf;color:#6f817a;box-shadow:none}
+.btn.ghost{min-height:52px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);font-size:16px;letter-spacing:1px}
+.reason{color:var(--muted);font-size:12.5px;line-height:1.5;text-align:center}
+
+/* ── 上传：去处行 / 选择区 / 文件行 / 状态卡 ────────────────────────── */
+.target{
+  display:flex;flex:0 0 auto;align-items:flex-start;gap:9px;padding:11px 13px;
+  border:1px solid var(--line);border-radius:14px;background:var(--surface);
+  color:var(--ink2);font-size:13px;line-height:1.5;
+}
+.target .ic{flex:0 0 auto;margin-top:1px;color:var(--teal-d)}
+.target b{font-weight:750}
+/* 未经核对的提示单独降一级：它读起来必须明显不如上面那句正文有分量,
+   因为它来自 URL 里一个用户可以改掉的值,页面不按它决定任何事。 */
+.target .unsure{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.5}
+.target[data-confirmed="1"]{border-color:#9ed2c4;background:var(--teal-soft);color:#0b4c40}
+.target[data-confirmed="1"] .ic{color:var(--teal-d)}
+.picker{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:18px;border:2px dashed rgba(31,158,134,.45);border-radius:20px;
+  background:var(--teal-soft);color:var(--teal-d);text-align:center;cursor:pointer;
+  transition:transform var(--dur-instant) var(--ease-out),border-color var(--dur-quick) var(--ease-out);
+}
+.picker:active{transform:scale(.985)}
+.picker .ic{color:var(--teal-d)}
+.picker b{font-size:17.5px;font-weight:800;letter-spacing:.5px}
+.picker .hint{max-width:270px;color:#4d6a61;font-size:12.5px;line-height:1.6}
+.picker .pill{
+  display:flex;min-height:48px;align-items:center;justify-content:center;
+  margin-top:2px;padding:0 26px;border-radius:24px;
+  background:var(--teal);color:#fffdf8;font-size:15.5px;font-weight:750;letter-spacing:1px;
+}
+.picker[aria-disabled="true"]{
+  border-color:var(--line2);background:#f0eee6;color:var(--muted);cursor:default;
+}
+.picker[aria-disabled="true"] .ic{color:var(--muted)}
+.picker[aria-disabled="true"] .pill{background:#c9d4cf;color:#6f817a}
+.picker[aria-disabled="true"] .hint{color:var(--muted)}
+/* dead = 二维码已失效:与"上传中"用同一套禁用尺寸,但染成失败色,
+   免得用户以为再等一会儿就能点 */
+.picker[data-mode="dead"]{border-style:solid;border-color:#e2b3ac;background:var(--cinnabar-soft);color:var(--cinnabar-d)}
+.picker[data-mode="dead"] .ic{color:var(--cinnabar-d)}
+.picker[data-mode="dead"] .hint{color:#8d4a40}
+.picker[data-mode="dead"] .pill{background:#d8c3bf;color:#7c4139}
+/* wait = 系统里已有一次上传在处理;unknown = 上一次的结果还不确定。
+   两者都不是失败,所以不能染成失败色 —— 染红会让人以为"传砸了要重来",
+   而这两种情况下重来恰恰是最坏的动作。用麦色:停一下,别动。 */
+.picker[data-mode="wait"],.picker[data-mode="unknown"]{
+  border-style:solid;border-color:#e0c78f;background:var(--wheat-soft);color:var(--wheat-d);
+}
+.picker[data-mode="wait"] .ic,.picker[data-mode="unknown"] .ic{color:var(--wheat-d)}
+.picker[data-mode="wait"] .hint,.picker[data-mode="unknown"] .hint{color:#7a5a22}
+.picker[data-mode="wait"] .pill,.picker[data-mode="unknown"] .pill{background:#e4d3ab;color:#6b4f14}
+.filebox{
+  display:flex;flex:0 0 auto;flex-direction:column;gap:8px;padding:12px 13px;
+  border:1px solid var(--line);border-radius:16px;background:var(--surface);
+}
+.fb-head{display:flex;align-items:center;font-size:13px;font-weight:800}
+.fb-head span{margin-left:auto;color:var(--muted);font-weight:650}
+.filerow{display:flex;align-items:center;gap:10px}
+.filerow .fi{
+  display:grid;width:40px;height:40px;flex:0 0 auto;place-items:center;
+  border-radius:11px;background:var(--wheat-soft);color:var(--wheat-d);
+}
+.filerow .meta{min-width:0;flex:1}
+.filerow .meta b{display:block;overflow:hidden;font-size:14.5px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+.filerow .meta small{display:block;margin-top:2px;color:var(--muted);font-size:12px}
+.rmbtn{
+  display:grid;width:48px;height:48px;flex:0 0 auto;place-items:center;
+  border:1px solid var(--line2);border-radius:12px;background:var(--paper);color:var(--muted);
+  transition:transform var(--dur-instant) var(--ease-out);
+}
+.rmbtn:active{transform:scale(.94)}
+.rmbtn[aria-disabled="true"]{opacity:.45}
+.empty{
+  display:flex;min-height:44px;align-items:center;justify-content:center;
+  border:1px dashed var(--line2);border-radius:12px;color:var(--muted);font-size:13px;
+}
+.progress{
+  display:flex;flex:0 0 auto;flex-direction:column;gap:9px;padding:13px 14px;
+  border:1px solid var(--line);border-radius:16px;background:var(--surface);
+}
+.pg-head{display:flex;align-items:center;gap:9px;font-size:14.5px}
+.pg-head b{font-weight:800}
+.pg-head span{margin-left:auto;color:var(--muted);font-size:12.5px}
+/* 轨道只表达"没开始 / 正在进行 / 结束状态"三件事：没有百分比，也不画假阶段 */
+.track{height:8px;overflow:hidden;border-radius:4px;background:#e9e6da}
+.track i{display:block;height:100%;border-radius:4px}
+.track i[data-fill="idle"]{width:100%;background:repeating-linear-gradient(90deg,#ddd9cb 0 8px,transparent 8px 16px)}
+.track i[data-fill="busy"]{
+  width:100%;background:linear-gradient(90deg,rgba(31,158,134,0) 0%,var(--teal) 42%,var(--emerald) 58%,rgba(31,158,134,0) 100%);
+  background-repeat:no-repeat;background-size:46% 100%;animation:pr-sheen 1.5s ease-in-out infinite;
+}
+.track i[data-fill="done"]{width:100%;background:var(--teal)}
+.track i[data-fill="error"]{width:100%;background:var(--cinnabar)}
+/* unknown:既不是成功也不是失败,所以既不能给绿条也不能给红条。
+   斜纹表达"这一格填不出来" —— 静态图案,capture 下逐字节稳定。 */
+.track i[data-fill="unknown"]{
+  width:100%;background:repeating-linear-gradient(45deg,#e0c78f 0 9px,#f1e4c3 9px 18px);
+}
+.pg-note{display:flex;align-items:flex-start;gap:8px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.pg-note .ic{flex:0 0 auto;margin-top:2px}
+.pg-note[data-tone="error"]{color:var(--cinnabar-d)}
+.pg-note[data-tone="warn"]{color:#7a4d13}
+.pg-note[data-tone="ok"]{color:var(--teal-d)}
+.donecard{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
+  padding:22px 20px;border:1px solid #9ed2c4;border-radius:20px;
+  background:var(--teal-soft);color:#0b4c40;text-align:center;
+}
+.donecard .glyph{display:grid;width:56px;height:56px;place-items:center;border-radius:18px;background:#fffdf8;color:var(--teal-d)}
+.donecard b{font-family:var(--serif);font-size:18.5px;font-weight:800}
+.donecard span{max-width:262px;font-size:13px;line-height:1.6}
+
+/* ── 事实表：时限、留存、恢复路径这类"必须写清楚"的话统一走这里 ────────
+   为什么单独做一块而不是散在正文里：这两条 route 上最容易被写含糊的就是
+   "多久失效""文件去哪了"。给它固定的键值版式，写的人就不能省掉键那一列。 */
+.facts{
+  display:flex;flex:0 0 auto;flex-direction:column;overflow:hidden;
+  border:1px solid var(--line);border-radius:16px;background:var(--surface);
+}
+.fact{display:flex;gap:11px;padding:10px 13px;border-top:1px solid var(--line)}
+.fact:first-child{border-top:0}
+.fact .fk{flex:0 0 74px;color:var(--muted);font-size:12.5px;font-weight:800;line-height:1.6}
+.fact .fv{min-width:0;flex:1;color:var(--ink2);font-size:12.5px;line-height:1.6}
+.fact .fv b{color:var(--ink);font-weight:800}
+
+/* ── 小节标题与格式标签 ────────────────────────────────────────────── */
+.sect{
+  display:flex;flex:0 0 auto;align-items:center;gap:9px;padding-top:2px;
+  color:var(--ink2);font-size:12.5px;font-weight:800;letter-spacing:.6px;
+}
+.sect::after{content:"";flex:1;height:1px;background:var(--line)}
+.chips{display:flex;flex:0 0 auto;flex-wrap:wrap;gap:6px}
+.chip{
+  display:inline-flex;min-height:30px;align-items:center;padding:0 11px;
+  border:1px solid var(--line2);border-radius:15px;background:var(--paper);
+  color:var(--ink2);font-size:12.5px;font-weight:700;
+}
+.chip[data-tone="off"]{border-style:dashed;background:#f0eee6;color:var(--muted)}
+
+/* 状态卡里的出口：手机宽度只有 390px，按钮一律通栏，不并排挤成两个窄条 */
+.statecard .actions{display:flex;width:100%;flex-direction:column;gap:8px;margin-top:16px}
+.statecard .actions .btn{width:100%}
+
+/* ── 页脚隐私条：常驻一条，不重复 ──────────────────────────────────── */
+/* 底部安全区：全面屏的手势条会盖住最后一行字,补 env() 让它抬到手势条上面。 */
+.foot{
+  display:flex;flex:0 0 auto;align-items:flex-start;gap:8px;
+  padding:11px 18px 14px;border-top:1px solid var(--line);background:var(--surface);
+  padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  color:var(--muted);font-size:12px;line-height:1.55;
+}
+.foot .ic{flex:0 0 auto;margin-top:2px;color:var(--teal-d)}
+
+/* ── 进场与切态动效（240ms，只用 transform/opacity）───────────────── */
+.flow>*{animation:pr-rise var(--dur-quick) var(--ease-out) both}
+.flow>*:nth-child(2){animation-delay:40ms}
+.flow>*:nth-child(3){animation-delay:80ms}
+.flow>*:nth-child(4){animation-delay:120ms}
+.flow>*:nth-child(5){animation-delay:160ms}
+@keyframes pr-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pr-spin{to{transform:rotate(360deg)}}
+@keyframes pr-sheen{0%{background-position:-92% 0}100%{background-position:192% 0}}
+
+:is(button,a,label,input):focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+
+/* ── 原型演示控制（不属于产品逻辑，取证时整块排除）──────────────────── */
+.demo-tab{
+  position:absolute;right:8px;bottom:8px;z-index:9;display:none;
+  min-width:48px;min-height:48px;border-radius:24px;background:rgba(11,36,30,.86);
+  color:#fff;font-size:13px;
+}
+.demo-panel{
+  position:absolute;right:8px;bottom:62px;z-index:9;display:none;
+  max-height:520px;width:250px;overflow:auto;padding:10px;border-radius:14px;
+  background:rgba(11,36,30,.95);color:#f2efe4;font-size:12px;
+}
+.demo-panel a{display:block;padding:7px 8px;border-radius:8px;color:#cfeee2;text-decoration:none}
+.demo-panel a:hover{background:rgba(46,230,168,.16)}
+.demo-panel h4{margin:6px 0 4px;color:var(--emerald);font-size:11px;letter-spacing:1px}
+html[data-debug="1"] .demo-tab{display:block}
+html[data-debug="1"][data-panel="1"] .demo-panel{display:block}
+
+/* ── 取证：钉死循环动画相位与安全区，让同一份源码重跑逐字节相同 ───────── */
+html[data-capture="1"] .track i[data-fill="busy"],
+html[data-capture="1"] .statecard .spin{animation-delay:-600ms;animation-play-state:paused}
+/* env() 在无刘海视口里本来就是 0，这里显式钉死，免得取证机器带上系统安全区 */
+html[data-capture="1"] .relaybar{padding-top:16px}
+html[data-capture="1"] .foot{padding-bottom:14px}
+
+/* ── 降级：reduced-motion 与 ?flat=1 一律静态 ───────────────────────── */
+html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after{
+  animation:none!important;transition:none!important;
+}
+html[data-flat="1"] .track i[data-fill="busy"]{background-position:0 0}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .track i[data-fill="busy"]{background-position:0 0}
+}

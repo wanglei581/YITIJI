@@ -1,0 +1,309 @@
+/* ============================================================
+   青序流光 · 能力受控专区（S10）—— 宿主独有版式
+   宿主：50-capability-zone-workspace.html（body[data-host="capability"]）
+        /toolbox 038、/smart-campus 039、/smart-campus/welcome 040、
+        /smart-campus/service/:key 042
+   本文件**只写这一宿主独有的东西**：扩展项磁贴网格、校园服务卡网格、
+        服务说明头、诚实空态块、离场确认层，以及这些新构件在 fit-1/2/3/4
+        四档上的放大规则。
+   令牌、顶栏、紧凑任务头、区块、按钮、状态块、二维码层、真话页脚与底部三 Tab
+        全部继承 policy-campus-workspaces.css（S9 已冻结，本批一个字节都不改），
+        不新开第二套设计语言，也不覆写共享层的任何选择器语义。
+   余高处置沿用共享层的两步法：先由 .fit-1/2/3/4 放大版面本身（只放大既有元素的
+        尺寸与触控面积，不新增一个字），吃不完的作为上下对称留白。因此下面每个
+        新构件都必须补齐四档 —— 漏一档，这一屏就会在门禁的有效内容占用率上掉下去。
+   画布 1080×1920 竖屏触控；任意可点 ≥48px，主行动按钮 ≥72px 且字号 ≥24px。
+   ============================================================ */
+
+/* ── 扩展项磁贴：站内 / 外部 / 扫码三种启动方式同一副骨架 ──────────────
+   静态页只展示字段结构，不冒充真实运营配置。不可用的那一张把原因写在磁贴里，
+   不靠徽标暗示 —— 一体机没有 hover，tooltip 与 title 属性永远不会显示。 */
+.captiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.captile{--ac-d:var(--ink-2);--ac-soft:var(--paper);
+  min-height:250px;padding:20px 22px;border-radius:var(--r-lg);
+  border:1px solid var(--line-2);background:var(--surface);
+  display:flex;flex-direction:column;gap:11px;text-align:left}
+.captile .ct-top{display:flex;align-items:center;gap:14px}
+.captile .ct-ic{flex:none;width:62px;height:62px;border-radius:20px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--ac-soft);color:var(--ac-d)}
+.captile .ct-badge{margin-left:auto;flex:none;min-height:40px;padding:0 14px;border-radius:13px;
+  display:inline-flex;align-items:center;background:var(--ac-soft);color:var(--ac-d);
+  font-size:17px;font-weight:700;white-space:nowrap}
+.captile>b{font-size:24px;font-weight:700;line-height:1.3}
+.captile>b .slot{min-width:220px}
+.captile .ct-desc{font-size:19px;line-height:1.45;color:var(--ink-3)}
+/* 启动方式的后果写在磁贴上：站内留在本机、外部会离开、扫码去手机。
+   用户在按下之前就该知道这一下会把自己带到哪儿，而不是等弹层才看到。 */
+.captile .ct-mode{display:flex;align-items:center;gap:9px;font-size:18px;line-height:1.4;
+  color:var(--ink-2);font-weight:600}
+.captile .ct-mode svg{flex:none;color:var(--ac-d)}
+.captile .ct-go{margin-top:auto;display:inline-flex;align-items:center;gap:9px;
+  font-size:21px;font-weight:700;color:var(--ac-d)}
+.captile .ct-go svg{color:currentColor}
+.captile .reason{margin-top:auto}
+.captile[aria-disabled="true"]{background:var(--paper);border-style:dashed;cursor:default}
+.captile[aria-disabled="true"] .ct-ic{background:var(--line-2);color:var(--ink-3)}
+.captile[aria-disabled="true"] .ct-badge{background:var(--line-2);color:var(--ink-3)}
+.captile[aria-disabled="true"]>b,.captile[aria-disabled="true"] .ct-desc{color:var(--ink-3)}
+
+.status-skeleton{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-top:26px}
+.status-skeleton i{position:relative;overflow:hidden;height:126px;border-radius:var(--r-md);
+  border:1px solid var(--line-2);background:var(--surface)}
+.status-skeleton i::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(110deg,transparent 22%,rgba(255,255,255,.72) 45%,transparent 68%);
+  transform:translateX(-110%);animation:cap-skeleton 1600ms ease-in-out infinite}
+@keyframes cap-skeleton{to{transform:translateX(110%)}}
+html[data-capture="1"] .status-skeleton i::after{animation-play-state:paused;animation-delay:-800ms}
+.scroll.fit-1 .status-skeleton i{height:180px}
+.scroll.fit-2 .status-skeleton i{height:230px}
+.scroll.fit-3 .status-skeleton i{height:300px}
+.scroll.fit-4 .status-skeleton i{height:380px}
+
+.unavailable-strip{min-height:104px;padding:18px 22px;border:1px dashed var(--line-2);
+  border-radius:var(--r-md);background:var(--paper);display:flex;align-items:center;gap:16px}
+.us-ic{flex:none;width:54px;height:54px;border-radius:17px;background:var(--line-2);color:var(--ink-3);
+  display:flex;align-items:center;justify-content:center}
+.us-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.us-copy b{font-size:22px;line-height:1.3;color:var(--ink-2)}
+.us-copy small{font-size:18px;line-height:1.4;color:var(--ink-3)}
+.us-state{flex:none;min-height:42px;padding:0 15px;border-radius:14px;background:var(--surface);
+  display:flex;align-items:center;color:var(--ink-3);font-size:17px;font-weight:700}
+
+/* ── 校园服务卡网格：三张自助服务卡 + 按模块开关出现的三张模块卡 ──────
+   卡片按内容自然高度排列，不用 flex:1 等高硬撑；一行三张在 1080 宽下
+   每张 327px，标题与说明都还读得清。 */
+.capcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.capcard{--ac-d:var(--teal-d);--ac-soft:var(--teal-soft);
+  min-height:196px;padding:18px 19px;border-radius:var(--r-md);
+  border:1px solid var(--line-2);background:var(--surface);
+  display:flex;flex-direction:column;gap:9px;text-align:left}
+.capcard .cc-ic{flex:none;width:56px;height:56px;border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--ac-soft);color:var(--ac-d)}
+.capcard b{font-size:23px;font-weight:700;line-height:1.28}
+.capcard span.cc-desc{font-size:17px;line-height:1.4;color:var(--ink-3)}
+.capcard .cc-go{margin-top:auto;display:inline-flex;align-items:center;gap:8px;
+  font-size:19px;font-weight:700;color:var(--ac-d)}
+
+/* 计数徽标：只允许「可查看指引 N 项」与「⋯ · 已配置入口 M 项」两种句式，
+   N 与 M 必须等于这一屏真实数得出来的数量，因此它只能贴在卡片网格那一段的标签行上。 */
+.capcount{margin-left:auto;flex:none;min-height:46px;padding:0 18px;border-radius:15px;
+  display:inline-flex;align-items:center;gap:10px;
+  background:var(--slate-soft);color:var(--slate-d);font-size:19px;font-weight:700;white-space:nowrap}
+
+/* ── 服务说明头：一眼说清这一屏在讲哪一项服务 ───────────────────── */
+.svchead{--ac-d:var(--teal-d);--ac-soft:var(--teal-soft);
+  display:flex;align-items:center;gap:20px;padding:22px 26px;border-radius:var(--r-lg);
+  border:1px solid var(--line);background:var(--surface)}
+.svchead .sv-ic{flex:none;width:92px;height:92px;border-radius:29px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--ac-soft);color:var(--ac-d)}
+.svchead .sv-tx{flex:1;min-width:0}
+.svchead h2{font-size:33px;font-weight:700;line-height:1.2;letter-spacing:1px}
+.svchead p{margin-top:9px;font-size:20px;line-height:1.5;color:var(--ink-2)}
+
+.task-panel{padding:24px 26px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.tp-head{display:flex;align-items:center;gap:15px}
+.tp-head>span{flex:none;width:62px;height:62px;border-radius:20px;background:var(--teal-soft);
+  color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.tp-head b{display:block;font-size:27px;line-height:1.3}
+.tp-head small{display:block;margin-top:5px;color:var(--ink-3);font-size:18px;line-height:1.4}
+.tp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+.tp-grid>div{min-height:122px;padding:18px;border-radius:var(--r-md);background:var(--paper);
+  border:1px solid var(--line-2);display:flex;align-items:flex-start;gap:12px}
+.tp-grid i{flex:none;width:34px;height:34px;border-radius:11px;background:var(--deep);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-style:normal;font-size:18px;font-weight:700}
+.tp-grid span{font-size:20px;line-height:1.48;font-weight:600;color:var(--ink-2)}
+
+/* ── 死路屏的出口卡：图标 + 去处 + 它能解决什么，三样都常显 ──────────
+   只写一个标题的卡片在竖屏上会被余高拉成一只空盒；补一行「这一项是干什么的」
+   之后，同样的高度装的是内容而不是空气。 */
+.recovery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.recovery-card{min-height:116px;padding:18px 20px;border:1px solid var(--line-2);border-radius:var(--r-md);
+  background:var(--surface);display:flex;align-items:center;gap:13px}
+.recovery-card .rc-ic{flex:none;width:52px;height:52px;border-radius:17px;background:var(--teal-soft);
+  color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.recovery-card .rc-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.recovery-card b{font-size:21px;line-height:1.3}
+.recovery-card small{font-size:17px;line-height:1.4;color:var(--ink-3)}
+.recovery-card>svg{flex:none;color:var(--ink-3)}
+
+/* ── 诚实空态：没有真实内容的地方不放灰色占位图，也不摆假条目 ─────── */
+.emptybox{min-height:170px;border-radius:var(--r-md);border:2px dashed var(--line-2);
+  background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:11px;padding:26px;text-align:center;color:var(--ink-3)}
+.emptybox svg{color:var(--ink-3)}
+.emptybox b{font-size:23px;font-weight:700;color:var(--ink-2);line-height:1.3}
+.emptybox span{font-size:18px;line-height:1.5;max-width:680px}
+
+/* 置灰出口里的原因：共享层的 .exit span 会把它压成灰色小字，这里改回原因该有的样子。 */
+.exit .reason{margin-top:6px;font-size:17px;line-height:1.4;color:var(--wheat-d);font-weight:600}
+/* 置灰出口不留「›」：一个点不了的东西不该带着「可以进去」的箭头。 */
+.exit[aria-disabled="true"]::after{content:none}
+
+/* ── 强调色：按启动方式 / 服务类别区分，避免五张服务屏「除了标题几乎一样」──
+   只换图标底色与行动色，不换卡片骨架 —— 骨架一致才是同一套设计语言。
+   写成两个类选择器，压过上面各组件里的默认色，不靠书写顺序碰运气。
+   **不用朱红**：那一色在本设计语言里承担失败与不可用，拿它给「一卡通开通」这种
+   正常服务上色，会让一张能点的卡片读成一条报错。 */
+.captile.a-teal,.capcard.a-teal,.svchead.a-teal{--ac-d:var(--teal-d);--ac-soft:var(--teal-soft)}
+.captile.a-slate,.capcard.a-slate,.svchead.a-slate{--ac-d:var(--slate-d);--ac-soft:var(--slate-soft)}
+.captile.a-clay,.capcard.a-clay,.svchead.a-clay{--ac-d:var(--clay-d);--ac-soft:var(--clay-soft)}
+.captile.a-wheat,.capcard.a-wheat,.svchead.a-wheat{--ac-d:var(--wheat-d);--ac-soft:var(--wheat-soft)}
+.captile.a-deep,.capcard.a-deep,.svchead.a-deep{--ac-d:#1d4a3f;--ac-soft:#dcebe4}
+
+/* ── 两组通用类别竖着排：左右并排时短的那一列会空掉小半屏，
+   竖排 + 每组内部两列，既没有空洞，也把 1080 的宽度用满。 */
+.dstack{display:flex;flex-direction:column;gap:14px}
+/* 流程环节：标题与说明必须断行，连在一起会读成一句话。 */
+.dsec li i{display:block;margin-top:5px;font-style:normal;font-weight:400;color:var(--ink-3)}
+
+/* ── 离场确认层：与来源二维码层共用 .qrlayer 骨架（因此也共用焦点陷阱与
+   Escape 关闭），只是卡片里换成「去哪里 / 本机不做什么 / 两个出口」。
+   注意它必须保留两个出口：返回首页是真链接，继续打开在真机上会离开本页面。 */
+.qrlayer.extlayer .qrcard{max-width:820px}
+.extlayer .ex-h{display:flex;align-items:center;gap:15px}
+.extlayer .ex-ic{flex:none;width:64px;height:64px;border-radius:20px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--wheat-soft);color:var(--wheat-d)}
+.extlayer h2{font-size:30px;font-weight:700;line-height:1.25}
+
+/* ── 余高处置：四档放大规则（与共享层同一套档位名，档位由壳层逐档试戴）──
+   只放大尺寸、字号与触控面积，不新增文案。漏配某一档，这一屏就会在
+   「有效内容占用率」上掉下去，或者反过来被撑出滚动。 */
+.scroll.fit-1 .captile{min-height:272px;padding:22px 24px}
+.scroll.fit-1 .capcard{min-height:210px}
+.scroll.fit-1 .svchead{padding:24px 28px}
+.scroll.fit-1 .emptybox{min-height:190px}
+.scroll.fit-1 .task-panel{padding:26px 28px}
+.scroll.fit-1 .tp-grid>div{min-height:136px}
+.scroll.fit-1 .recovery-card{min-height:132px}
+
+.scroll.fit-2 .captile{min-height:296px;padding:24px 26px}
+.scroll.fit-2 .captile .ct-ic{width:68px;height:68px}
+.scroll.fit-2 .captile>b{font-size:26px}
+.scroll.fit-2 .captile .ct-desc{font-size:20px}
+.scroll.fit-2 .capcard{min-height:232px;padding:20px 21px}
+.scroll.fit-2 .capcard .cc-ic{width:60px;height:60px}
+.scroll.fit-2 .capcard b{font-size:24px}
+.scroll.fit-2 .svchead{padding:28px 30px}
+.scroll.fit-2 .svchead .sv-ic{width:100px;height:100px}
+.scroll.fit-2 .svchead h2{font-size:35px}
+.scroll.fit-2 .svchead p{font-size:21px}
+.scroll.fit-2 .emptybox{min-height:214px}
+.scroll.fit-2 .emptybox b{font-size:25px}
+.scroll.fit-2 .task-panel{padding:29px 30px}
+.scroll.fit-2 .tp-head b{font-size:29px}
+.scroll.fit-2 .tp-grid>div{min-height:154px;padding:22px}
+.scroll.fit-2 .tp-grid span{font-size:21px}
+/* 竖屏一体机上，三联出口从第二档起改成竖排整行 —— 与共享层对 .strip 的处理同源：
+   余高变成整行的触控面积与可读字号，说明行也终于有地方一行写完。 */
+.scroll.fit-2 .recovery-grid,.scroll.fit-3 .recovery-grid,
+.scroll.fit-4 .recovery-grid{grid-template-columns:minmax(0,1fr)}
+.scroll.fit-2 .recovery-card{min-height:132px;padding:22px 26px;gap:18px}
+.scroll.fit-2 .recovery-card b{font-size:24px}
+.scroll.fit-2 .recovery-card small{font-size:19px}
+
+.scroll.fit-2 .captile .ct-mode{font-size:19px}
+.scroll.fit-3 .captile{min-height:326px;padding:28px 30px}
+.scroll.fit-3 .captile .ct-mode{font-size:20px}
+.scroll.fit-3 .captile .ct-ic{width:76px;height:76px;border-radius:24px}
+.scroll.fit-3 .captile .ct-badge{min-height:46px;font-size:18px}
+.scroll.fit-3 .captile>b{font-size:28px}
+.scroll.fit-3 .captile .ct-desc{font-size:21px}
+.scroll.fit-3 .captile .ct-go{font-size:23px}
+.scroll.fit-3 .capcard{min-height:262px;padding:24px 24px}
+.scroll.fit-3 .capcard .cc-ic{width:66px;height:66px;border-radius:21px}
+.scroll.fit-3 .capcard b{font-size:26px}
+.scroll.fit-3 .capcard span.cc-desc{font-size:19px}
+.scroll.fit-3 .capcard .cc-go{font-size:21px}
+.scroll.fit-3 .svchead{padding:34px 34px;gap:24px}
+.scroll.fit-3 .svchead .sv-ic{width:112px;height:112px;border-radius:34px}
+.scroll.fit-3 .svchead h2{font-size:38px}
+.scroll.fit-3 .svchead p{font-size:23px}
+.scroll.fit-3 .emptybox{min-height:250px;gap:14px}
+.scroll.fit-3 .emptybox b{font-size:27px}
+.scroll.fit-3 .emptybox span{font-size:20px}
+.scroll.fit-3 .capcount{min-height:52px;font-size:21px}
+.scroll.fit-3 .task-panel{padding:34px}
+.scroll.fit-3 .tp-head>span{width:72px;height:72px;border-radius:23px}
+.scroll.fit-3 .tp-head b{font-size:32px}
+.scroll.fit-3 .tp-head small{font-size:20px}
+.scroll.fit-3 .tp-grid{gap:15px;margin-top:24px}
+.scroll.fit-3 .tp-grid>div{min-height:182px;padding:26px}
+.scroll.fit-3 .tp-grid span{font-size:23px}
+.scroll.fit-3 .recovery-card{min-height:152px;padding:26px 30px;gap:20px}
+.scroll.fit-3 .recovery-card .rc-ic{width:62px;height:62px;border-radius:20px}
+.scroll.fit-3 .recovery-card b{font-size:26px}
+.scroll.fit-3 .recovery-card small{font-size:21px}
+
+.scroll.fit-4 .captile{min-height:362px;padding:32px 34px;gap:14px}
+.scroll.fit-4 .captile .ct-mode{font-size:22px}
+.scroll.fit-4 .captile .ct-ic{width:84px;height:84px;border-radius:27px}
+.scroll.fit-4 .captile .ct-badge{min-height:50px;font-size:19px;padding:0 16px}
+.scroll.fit-4 .captile>b{font-size:30px}
+.scroll.fit-4 .captile .ct-desc{font-size:23px}
+.scroll.fit-4 .captile .ct-go{font-size:25px}
+.scroll.fit-4 .capcard{min-height:296px;padding:28px 28px}
+.scroll.fit-4 .capcard .cc-ic{width:72px;height:72px;border-radius:23px}
+.scroll.fit-4 .capcard b{font-size:28px}
+.scroll.fit-4 .capcard span.cc-desc{font-size:21px}
+.scroll.fit-4 .capcard .cc-go{font-size:23px}
+.scroll.fit-4 .svchead{padding:40px 38px;gap:26px}
+.scroll.fit-4 .svchead .sv-ic{width:124px;height:124px;border-radius:38px}
+.scroll.fit-4 .svchead h2{font-size:42px}
+.scroll.fit-4 .svchead p{font-size:25px}
+.scroll.fit-4 .emptybox{min-height:290px;gap:16px}
+.scroll.fit-4 .emptybox b{font-size:30px}
+.scroll.fit-4 .emptybox span{font-size:22px}
+.scroll.fit-4 .capcount{min-height:56px;font-size:22px}
+.scroll.fit-4 .task-panel{padding:40px 38px}
+.scroll.fit-4 .tp-head>span{width:82px;height:82px;border-radius:26px}
+.scroll.fit-4 .tp-head b{font-size:35px}
+.scroll.fit-4 .tp-head small{font-size:22px}
+.scroll.fit-4 .tp-grid{gap:17px;margin-top:28px}
+.scroll.fit-4 .tp-grid>div{min-height:218px;padding:30px}
+.scroll.fit-4 .tp-grid i{width:42px;height:42px;border-radius:14px;font-size:21px}
+.scroll.fit-4 .tp-grid span{font-size:25px}
+.scroll.fit-4 .recovery-card{min-height:180px;padding:32px 34px;gap:24px}
+.scroll.fit-4 .recovery-card .rc-ic{width:72px;height:72px;border-radius:23px}
+.scroll.fit-4 .recovery-card b{font-size:29px}
+.scroll.fit-4 .recovery-card small{font-size:23px}
+.body[data-screen="campus-zone"][data-state="ready-base"] .scroll.fit-4 .capcard{min-height:410px;padding:34px 30px}
+.body[data-screen="campus-zone"][data-state="ready-base"] .scroll.fit-4 .unavailable-strip{min-height:190px;padding:30px}
+.body[data-screen="campus-zone"][data-state="ready-base"] .scroll.fit-4 .noteline{min-height:130px;padding:30px 32px}
+.body[data-screen="campus-zone"][data-state="ready-modules"] .scroll.fit-4 .capcard{min-height:410px;padding:34px 30px}
+.body[data-screen="campus-zone"][data-state="ready-modules"] .scroll.fit-4 .noteline{min-height:148px;padding:34px 32px}
+
+/* 单一状态屏用真实骨架或恢复入口承接竖屏高度，不添加解释段落。
+   曾经在这里按屏把出口卡钉到 270 / 350px，那是拿一只空框去顶密度门禁：卡片里
+   还是一行字，高度全是空地。现在这几屏靠**多给一组真的用得上的出口**与出口卡
+   自己的两行内容把高度填掉，逐屏钉高的那三条规则一并删除。 */
+.body[data-screen="toolbox-zone"][data-state="capability-loading"] .status-skeleton,
+.body[data-screen="campus-zone"][data-state="capability-loading"] .status-skeleton{
+  grid-template-columns:minmax(0,1fr);gap:16px}
+.body[data-screen="toolbox-zone"][data-state="capability-loading"] .status-skeleton i,
+.body[data-screen="campus-zone"][data-state="capability-loading"] .status-skeleton i{
+  height:220px;
+  background:
+    linear-gradient(var(--teal-soft) 0 0) 30px 34px/70px 70px no-repeat,
+    linear-gradient(var(--line-2) 0 0) 126px 38px/34% 24px no-repeat,
+    linear-gradient(var(--line) 0 0) 126px 78px/58% 17px no-repeat,
+    linear-gradient(var(--paper) 0 0) calc(100% - 134px) 35px/104px 38px no-repeat,
+    linear-gradient(var(--line-2) 0 0) 30px 142px/calc(100% - 60px) 16px no-repeat,
+    linear-gradient(var(--line) 0 0) 30px 176px/66% 14px no-repeat,
+    var(--surface)}
+.body[data-screen="campus-zone"][data-state="ready-base"] .capcard{min-height:500px;padding:34px 30px}
+.body[data-screen="campus-zone"][data-state="ready-base"] .unavailable-strip{min-height:190px;padding:30px}
+.scroll.fit-3 .exit .reason,.scroll.fit-4 .exit .reason{font-size:19px}
+
+/* 最薄的几屏（一个状态块 + 两行提示）在共享层四档穿完之后仍会剩下 300px 上下留白。
+   这里把提示条、状态正文与清单行再抬一档：余高变成可读的字号与触控面积，
+   而不是屏幕上下两块空地。放大的都是**真的有字**的元素，所以不会在框里再挖出洞。 */
+.scroll.fit-3 .noteline{min-height:130px}
+.scroll.fit-4 .noteline{min-height:156px;font-size:24px}
+.scroll.fit-4 .dsec li{min-height:112px}
+.scroll.fit-4 .state-p{line-height:2}
+
+@media (prefers-reduced-motion:reduce){.status-skeleton i::after{animation:none!important}}
