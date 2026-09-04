@@ -19,9 +19,9 @@
 >
 > **［2026-08-18 订正］上面这段已不成立，不要照它开工。** 对 `origin/main@85eb7a3b4` 一手复核：
 > `monitorPrintJob()` 的四类不确定结果**全部** fail-closed 成 `failed + PRINT_JOB_UNCONFIRMED`，
-> `unconfirmedOutcome()` 是函数里唯一的不确定出口 —— 非 Windows(`:582-585`)、
-> 连续 5 次 not_found 且从未见过活动作业(`:662-668`)、硬超时含 Pantum `Printing, Retained` 态(`:679-704`)，
-> 另加崩溃后 `spooled`/`dispatching` 恢复(`:289-299`)。**注意是四类不是三条**，原文漏了崩溃恢复那条。
+> `unconfirmedOutcome()` 是函数里唯一的不确定出口 —— 非 Windows（`platform !== 'win32'` 分支）、
+> 连续 5 次 not_found 且从未见过活动作业（`notFoundCount >= NOT_FOUND_LIMIT`）、硬超时含 Pantum `Printing, Retained` 态（`if (seenRetainedOnce)` 起至函数末），
+> 另加崩溃后 `spooled`/`dispatching` 恢复（Step 0 幂等检查内）。**注意是四类不是三条**，原文漏了崩溃恢复那条。
 > 详见文末「需要纠正的几点」第 1 条的订正。
 > **变化时点**：2026-08-09 提交 `fbc762dd0`（fix: fail closed on unverified print outcomes），
 > 随 PR #570 于 2026-08-10 合入 main；**本规格成稿于 08-11，但所据分支早于 #570**，
@@ -951,10 +951,12 @@ PRINT_OUTCOME_V2
 
    | 路径 | 位置 | 说明 |
    |---|---|---|
-   | 非 Windows | `:582-585` | 拿不到 spooler 证据，直接 fail-closed，不再「跳过监控按完成处理」 |
-   | 队列多次未出现 | `:662-668` | 连续 5 次 `not_found` 且从未见过活动作业才判；见过活动作业后再消失才算完成 |
-   | 监控硬超时 | `:679-704` | 含 Pantum `Printing, Retained` 态单独出文案，不再只有它走 unconfirmed |
-   | 崩溃后恢复 | `:289-299` | 本地状态为 `spooled`/`dispatching` 时按 failed 上报，**原文漏了这一条** |
+   | 非 Windows | `platform !== 'win32'` 分支 | 拿不到 spooler 证据，直接 fail-closed，不再「跳过监控按完成处理」 |
+   | 队列多次未出现 | `notFoundCount >= NOT_FOUND_LIMIT` | 连续 5 次 `not_found` 且从未见过活动作业才判；见过活动作业后再消失才算完成 |
+   | 监控硬超时 | `if (seenRetainedOnce)` 起至函数末 | 含 Pantum `Printing, Retained` 态单独出文案，不再只有它走 unconfirmed |
+   | 崩溃后恢复 | Step 0 幂等检查内的 `spooled`/`dispatching` | 本地状态为 `spooled`/`dispatching` 时按 failed 上报，**原文漏了这一条** |
+
+   **［2026-09-03］本表「位置」列原为行号（`:582-585` / `:662-668` / `:679-704` / `:289-299`），现已全部换成符号锚点。** 原因是那四个行号到 2026-09-03 已经全部漂掉 —— 其中 `:582-585` 当时指向的是 `monitorPrintJob()` 的参数默认值（`timeoutMs = 30_000` 那几行），和履约判定毫无关系，照它跳过去的人会看到完全不相干的代码，反而比没有引用更糟。**订正文档里不要再写行号**：这类订正的寿命以月计，而行号在任何一次无关改动后就会失效。符号名（`monitorPrintJob` / `unconfirmedOutcome` / `NOT_FOUND_LIMIT` / `seenRetainedOnce`）不随行漂移，`git grep` 一次即可定位。
 
    回归门禁：`apps/terminal-agent/scripts/verify-print-monitor-truth.ts`（覆盖含非 Windows 路径）。
    **变化时点**：2026-08-09 提交 `fbc762dd0`，随 PR #570 于 2026-08-10 合入 main；本规格成稿于 08-11 但所据分支早于 #570。

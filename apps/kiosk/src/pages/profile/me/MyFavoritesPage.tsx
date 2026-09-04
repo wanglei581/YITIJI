@@ -86,6 +86,7 @@ export function MyFavoritesPage() {
   return (
     <div className="me-inkdetail me-inkdetail-favorites h-full">
       <MeListShell
+      signedOutDescription="这里存的是你收藏的岗位与招聘会。收藏只记录你自己的选择，不会发送给任何单位。"
         title={tab === 'policy' ? '政策收藏' : '我的收藏'}
         subtitle={tab === 'policy' ? '本人收藏的政策（仅本人可见）' : '本人收藏的岗位 / 招聘会 / 政策（仅本人可见）'}
         loginFrom="/me/favorites"

@@ -36,6 +36,11 @@ interface MeListShellProps {
   emptyDescription?: string
   /** 页头右侧操作区；默认「返回我的」。可覆盖为多按钮（如权益页「去权益活动领取」） */
   aside?: ReactNode
+  /**
+   * 未登录态的补充说明。不传时只说"登录后可见"——那对游客是死路：
+   * 他不知道自己现在还能做什么。每页应说明这一页具体存的是什么。
+   */
+  signedOutDescription?: string
   /** ready 且非空时渲染（列表 / Tab 内容） */
   children: ReactNode
 }
@@ -52,6 +57,7 @@ export function MeListShell({
   emptyTitle,
   emptyDescription,
   aside,
+  signedOutDescription,
   children,
 }: MeListShellProps) {
   const navigate = useNavigate()
@@ -72,14 +78,36 @@ export function MeListShell({
     >
       <section data-kiosk-domain="profile" data-kiosk-screen="member-list" className="flex min-h-0 flex-1 flex-col px-6">
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
+      {/* 未登录 / 加载 / 错误 / 空 这四种都是"单块焦点态"——整屏只有一张卡。
+          定高 1080×1920 屏上顶着上边放会在下方留一大片死白（实测 1065px）。
+          单块焦点态居中是对的；有列表内容时必须顶对齐，否则整页悬在屏幕中间。
+          这条规则与 30-my-profile 的块数闸门同源。 */}
+      <div
+        className={`mt-4 flex-1 overflow-y-auto pb-8${
+          !isLoggedIn || state === 'loading' || state === 'error' || isEmpty
+            ? ' flex flex-col justify-center'
+            : ''
+        }`}
+      >
         {!isLoggedIn ? (
           <KioskStatePanel
             tone="permission"
             title="登录后查看本人记录"
-            description="本人记录仅本人可见，登录后绑定；游客模式不留存跨会话明细"
+            description={
+              signedOutDescription ??
+              '本人记录仅本人可见，登录后绑定；游客模式不留存跨会话明细'
+            }
             icon={<LogInIcon aria-hidden="true" />}
-            actions={<Button size="lg" className="min-h-14 px-8" onClick={() => navigate('/login', { state: { from: loginFrom } })}>手机号登录</Button>}
+            actions={
+              <div className="flex flex-wrap items-center gap-3">
+                <Button size="lg" className="min-h-14 px-8" onClick={() => navigate('/login', { state: { from: loginFrom } })}>手机号登录</Button>
+                {/* 免登录出口。不给这两个，游客点进「我的」任何一页就是死路——
+                    而打印扫描与岗位浏览本来就不需要登录（CLAUDE.md §9A）。
+                    原型 39 / 40 都画了这类出口，运行时此前一个都没有。 */}
+                <Button variant="outline" size="lg" className="min-h-14 px-6" onClick={() => navigate('/print-scan')}>去打印扫描</Button>
+                <Button variant="outline" size="lg" className="min-h-14 px-6" onClick={() => navigate('/jobs')}>查看岗位</Button>
+              </div>
+            }
           />
         ) : state === 'loading' ? (
           <KioskStatePanel tone="loading" title="正在加载本人记录" description="请稍候，不会展示其他账号的数据" />

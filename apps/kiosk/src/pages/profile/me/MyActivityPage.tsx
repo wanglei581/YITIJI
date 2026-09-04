@@ -62,6 +62,7 @@ export function MyActivityPage() {
   return (
     <div className="me-inkdetail me-inkdetail-activity h-full">
       <MeListShell
+      signedOutDescription="这里存的是你在本机打开过哪些岗位、招聘会与政策来源入口。只记录你自己的浏览与跳转，不记录投递或预约结果。"
         title="浏览与跳转记录"
         subtitle="本人浏览过的、以及打开过来源平台 / 官方入口的记录（仅本人可见）"
         loginFrom="/me/activity"

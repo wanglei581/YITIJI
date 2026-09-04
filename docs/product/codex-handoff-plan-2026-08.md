@@ -210,9 +210,9 @@ docs/design/console-ai-os-2026-08/                   双后台原型 24 页
 > **订正结论（对 `origin/main@85eb7a3b4` 一手复核）**：下面这三条 conservative completed 路径
 > **在 main 上都已经不存在了**。`monitorPrintJob()` 的四类不确定结果统一 fail-closed 成
 > `failed + PRINT_JOB_UNCONFIRMED`，`unconfirmedOutcome()` 是函数里唯一的不确定出口 ——
-> 非 Windows（`task-runner.ts:582-585`）、队列连续 5 次 not_found 且从未见过活动作业（`:662-668`）、
-> 监控硬超时含 Pantum `Printing, Retained` 态（`:679-704`），另加崩溃后 `spooled`/`dispatching`
-> 恢复（`:289-299`）。只有「显式 Complete/Printed」与「先见到活动作业、随后离开队列」两条才回
+> 非 Windows（`task-runner.ts` 的 `platform !== 'win32'` 分支）、队列连续 5 次 not_found 且从未见过活动作业（`notFoundCount >= NOT_FOUND_LIMIT`）、
+> 监控硬超时含 Pantum `Printing, Retained` 态（`if (seenRetainedOnce)` 起至函数末），另加崩溃后 `spooled`/`dispatching`
+> 恢复（Step 0 幂等检查内）。只有「显式 Complete/Printed」与「先见到活动作业、随后离开队列」两条才回
 > `failed:false`，且注释写明这**只确认 Windows 打印后台生命周期，不证明纸真的到了用户手上**。
 > 回归脚本 `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 覆盖了这些路径（含非 Windows）。
 >

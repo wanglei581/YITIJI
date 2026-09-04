@@ -5,6 +5,24 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>材料检查与打印参数 · 职易达</title>
 <!--
+  ⚠️ 2026-09-03 口径变更 —— 本页关于「遮挡不生成新文件」的全部描述已过期，不要照它施工。
+
+     变更：PR #766 让后端**真的生成遮挡后的新文件**（materials.service.ts 的 resultFileId
+     已回填 redaction.redactedFileId，不再恒 null；39 项断言含核心判据「派生件用
+     unpdf.extractText 提取不出身份证号 / 手机号」）；PR #771 让一体机前端按 claim 的五个
+     取值（redacted_verified / redacted_unverified / partial / not_supported /
+     nothing_to_redact）分别说真话。
+
+     本页画于 2026-08-21 前后，当时后端确实不生成派生件，所以下面这些句子是**照当时的
+     运行时如实描画**，不是产品决定 —— 产品负责人 2026-09-03 已明确「遮挡必须真做出文件」。
+
+     受影响的行：58（「真实合同」块，见该行就地标注）、418、1198、1207、1297、1475。
+     按钮文案「建议遮挡」同样是照旧行为取的名；是否改名属设计决定，本次不动设计、不改按钮。
+
+     ⚠️ 第 58 行尤其注意：它在下面那个自称「真实合同（来源：代码，不是想象）」的块里。
+     该块其余条目仍然准确，唯独遮挡这一条已经和代码对不上 —— 正因为它声称自己抄代码，
+     读的人会格外信任它，所以比普通描述更需要这个提醒。
+
   S21 · 打印台闭环（青序流光，1080x1920 单 HTML 宿主）
   route: /print/material-check（context / check-*）+ /print/preview（preview / file-unsupported /
          capability-* / device-*）。/print/params 是指向 /print/preview 的兼容重定向，不单列状态。
@@ -56,6 +74,7 @@
     设备        useTerminalDeviceStatus kind = ready | offline | error | low_paper | unknown。
                 读不到就是 unknown —— 不说离线，也不说正常。
     遮挡        当前版本只记录裁决并做遮挡评估，**不生成遮挡后的新文件**，打印用的仍是原文件。
+                ⚠️ 2026-09-03 已过期：#766 之后后端真做出派生件，本条与代码不符。
     纸张        本机固定 A4，没有 A3，也不提供其它幅面选项。
     金额        本页不显示、不预估任何金额；报价由下一步服务端返回。
 

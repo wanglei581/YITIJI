@@ -109,6 +109,7 @@ export function MyResumesPage() {
   return (
     <div className="me-inkdetail me-inkdetail-resumes h-full">
       <MeListShell
+      signedOutDescription="这里存的是你上传或生成的简历。公共终端不跨会话保留匿名简历，登录后才能之后回来继续用。"
         title="我的简历"
         subtitle="本人上传诊断与 AI 生成的简历记录（仅元数据）"
         loginFrom="/me/resumes"
