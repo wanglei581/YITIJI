@@ -26,8 +26,20 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 const SSOT = path.join(root, 'packages/shared/src/types/complianceCopy.ts')
-const SCAN_DIRS = ['apps/admin/src', 'apps/kiosk/src', 'apps/partner/src']
-const EXTS = new Set(['.ts', '.tsx'])
+// 每条目录自带扩展名集合。**别改回全局 EXTS** —— 全局那版有个静默失效模式：
+// 往 SCAN_DIRS 里加一个不含 .ts/.tsx 的目录（比如 51 页原型全是 .html），
+// 它贡献 0 个文件，门禁照常 ALL PASS，加了等于没加。下面的 per-dir 非空断言防这个。
+// 同类事故刚发生过：#783「verify-fusion-w4 范围守卫在 CI 中恒为空操作」。
+const SCAN_DIRS = [
+  { dir: 'apps/admin/src', exts: ['.ts', '.tsx'] },
+  { dir: 'apps/kiosk/src', exts: ['.ts', '.tsx'] },
+  { dir: 'apps/partner/src', exts: ['.ts', '.tsx'] },
+  // 待补：docs/design/kiosk-redesign-2026-08（.html）——51 页新稿是上线一体机前端的
+  // 全部来源，文案在那里定稿。实测加进来会报 7 处**误报**：原型是带批注的说明体，
+  // 「本机不代收简历，也不在平台内投递」这类边界声明句，现有否定式豁免（按前 N 字符
+  // 回看）接不住；27-browse-detail 还会被规则 4 误判成目录页。原型本身合规，是豁免
+  // 逻辑不适配。要接这个目录得先扩豁免判定，不能靠放宽禁词表——那会同时削弱 apps/。
+]
 
 let failures = 0
 
@@ -112,17 +124,17 @@ console.log(`   SSOT: ${path.relative(root, SSOT)}`)
 console.log(
   `   禁词 ${terms.length} 项 / 隐私遮挡禁词 ${piiTerms.length} 项 / 扫描正则 ${patterns.length} 项 / 豁免标记 ${markers.length} 项 / 禁用声明标记 ${banMarkers.length} 项`
 )
-console.log(`   扫描: ${SCAN_DIRS.join(' ')}\n`)
+console.log(`   扫描: ${SCAN_DIRS.map((d) => `${d.dir}(${d.exts.join(',')})`).join(' ')}\n`)
 
 // ---------- 2. 递归收集待扫文件 ----------
 
-function collect(dir, acc) {
+function collect(dir, exts, acc) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name === 'dist') continue
-      collect(full, acc)
-    } else if (EXTS.has(path.extname(entry.name))) {
+      collect(full, exts, acc)
+    } else if (exts.has(path.extname(entry.name))) {
       acc.push(full)
     }
   }
@@ -130,12 +142,18 @@ function collect(dir, acc) {
 }
 
 const files = []
-for (const rel of SCAN_DIRS) {
+for (const { dir: rel, exts } of SCAN_DIRS) {
   const abs = path.join(root, rel)
   if (!fs.existsSync(abs)) hardFail(`扫描目录不存在: ${rel}`)
-  collect(abs, files)
+  const before = files.length
+  collect(abs, new Set(exts), files)
+  // **逐目录**断言，不是只看总数。总数非空掩盖不了「某条目录贡献 0 个文件」——
+  // 那正是加了目录却没配对扩展名时的表现，而它的症状是门禁全绿，无人会发现。
+  if (files.length === before) {
+    hardFail(`扫描目录 ${rel} 贡献 0 个文件（期望扩展名 ${exts.join(' / ')}）,范围配置失效`)
+  }
 }
-if (files.length === 0) hardFail('扫描目录下 0 个 .ts/.tsx,范围配置可能失效')
+if (files.length === 0) hardFail('全部扫描目录合计 0 个文件,范围配置可能失效')
 
 // ---------- 3. 逐行判定 ----------
 
