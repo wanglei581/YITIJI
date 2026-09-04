@@ -80,7 +80,7 @@ function Get-MsiProductCode([string]$MsiPath) {
     if ($null -eq $record) {
       throw "MSI ProductCode is missing: $MsiPath"
     }
-    $productCode = [string]$record.StringData(1)
+    $productCode = ([string]$record.StringData(1)).Trim()
     if ($productCode -notmatch '^\{[0-9A-Fa-f-]{36}\}$') {
       throw "Invalid MSI ProductCode: $productCode"
     }
@@ -181,7 +181,8 @@ function Assert-InstalledIdentity(
 ) {
   $productEntry = Assert-SingleRegistration -DisplayName "AI Job Print Agent" -ExpectedVersion $ProductVersion
   $bundleEntry = Assert-SingleRegistration -DisplayName "AI Job Print Terminal Setup" -ExpectedVersion $ProductVersion
-  if ([string]$productEntry.PSChildName -ine $ExpectedProductCode) {
+  $registeredProductCode = ([string]$productEntry.PSChildName).Trim().ToUpperInvariant()
+  if ($registeredProductCode -ine $ExpectedProductCode.Trim().ToUpperInvariant()) {
     throw "$Label MSI ProductCode mismatch: expected=$ExpectedProductCode actual=$($productEntry.PSChildName)"
   }
   Assert-RegistrationCommand -Entry $productEntry -Kind "msi"
