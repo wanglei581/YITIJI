@@ -6,6 +6,7 @@ import { policiesAdminService, type AdminPolicyRecord } from '../../services/api
 import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
+import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ export default function PolicySourcesPage() {
   const [reviewFilter, setReviewFilter] = useState('全部')
   const [rejectingId,  setRejectingId]  = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  // 申领条件只读复核:审核前要能看到这条政策挂了哪些申领门槛(条件在机构侧录入)
+  const [rulesFor,     setRulesFor]     = useState<AdminPolicyRecord | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
@@ -224,7 +227,14 @@ export default function PolicySourcesPage() {
                             <button onClick={() => { setRejectingId(null); setRejectReason('') }} className="rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100">取消</button>
                           </div>
                         ) : (
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              className="whitespace-nowrap rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                              onClick={() => setRulesFor(r)}
+                            >
+                              查看申领条件
+                            </button>
                             {(r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
                               <>
                                 <button className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg" onClick={() => handleApprove(r.id)}>
@@ -260,7 +270,13 @@ export default function PolicySourcesPage() {
 
       <p className="mt-3 text-xs text-neutral-400">
         政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。审核通过并发布后在一体机「政策服务」页展示,所有操作记录审计日志。
+        「查看申领条件」为只读复核:条件由来源机构在合作机构后台录入,本页不改条件。
       </p>
+
+      {/* key 绑 id:换一条政策必须重挂组件,避免上一条的条件在新标题下短暂残留 */}
+      {rulesFor && (
+        <EligibilityRulesDrawer key={rulesFor.id} policy={rulesFor} onClose={() => setRulesFor(null)} />
+      )}
     </Page>
   )
 }
