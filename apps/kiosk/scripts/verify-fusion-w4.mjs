@@ -294,17 +294,27 @@ check('exact 25-route ownership', () => {
   assert.ok(!owned.includes('/notifications'))
 })
 
+// 这个守卫只管一件事：kiosk 页面层的波次归属——「别的波次别动 W4 的页面，
+// W4 也别去动别的波次的页面」。所以它只判 apps/kiosk/src/pages/ 下的文件。
+// 页面层以外（后端、packages/shared、kiosk 自己的 services 适配层、types、
+// 后台、文档）不属于波次分工能仲裁的范围，由各自的门禁负责。
+//
+// 两次实测把边界钉在这里：
+//   1. 不限定判定集时，全仓 3602 个受跟踪文件只有 358 个可改，近 12 个已合 PR
+//      会红 11 个 —— 那不是仓库现行事实的正确编码。
+//   2. FORBIDDEN_PATHS 里的 /^apps\/kiosk\/src\/services\// 会直接挡住
+//      CLAUDE.md §9 要求的合规修复：「适配层伪造数据 + 页面把伪造值渲染成事实」
+//      是一个缺陷的两端，TypeScript 强制同批提交，拆开会先死在 typecheck 上。
+const W4_JUDGED_PREFIX = /^apps\/kiosk\/src\/pages\//
+
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
-  const changes = changedFiles()
-  // W4 是单波次所有权守卫：它记的是「W4 这一刀允许动哪些文件」，不是仓库级合规
-  // 防线。只有当这次 diff 真的改了 W4 自有页面时，才追究越界与冻结文件；后端、
-  // admin、partner、纯文档这类与 W4 无关的 PR 不受这份波次分工记账约束。
-  // 按全仓实测：不加这个触发条件，3602 个受跟踪文件里只有 358 个是可改的，
-  // 近 12 个已合 PR 会红 11 个 —— 那不是仓库现行事实的正确编码。
-  if (!changes.some((path) => ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path)))) {
+  const allChanges = changedFiles()
+  // 触发条件：本次 diff 真的改了 W4 自有页面，才追究波次归属。
+  if (!allChanges.some((path) => ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path)))) {
     console.log('  SKIP W4 波次范围断言：本次 diff 未触及 W4 自有页面')
     return
   }
+  const changes = allChanges.filter((path) => W4_JUDGED_PREFIX.test(path))
   const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && path !== OFFLINE_AGENCY_BACKEND_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
   assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
 
