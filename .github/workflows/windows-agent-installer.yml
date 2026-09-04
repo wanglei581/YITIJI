@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -247,5 +248,103 @@ jobs:
             apps/terminal-agent/installer/artifacts/evidence/upgrade-lifecycle-logs/
             predecessor-0.4.10/apps/terminal-agent/installer/artifacts/staging/manifest.json
             apps/terminal-agent/installer/artifacts/candidate/candidate-identity.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  exact-field-same-version-transition:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Checkout transition verifier
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Download frozen field predecessor candidate
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 33376026528
+          name: terminal-agent-unsigned-installer-candidates
+          path: apps/terminal-agent/installer/artifacts/exact-predecessor
+
+      - name: Download frozen exact-SHA candidate
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 33876577638
+          name: terminal-agent-unsigned-installer-candidates
+          path: apps/terminal-agent/installer/artifacts/exact-candidate
+
+      - name: Verify frozen candidate identity
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Verify `
+            -CandidateRoot apps/terminal-agent/installer/artifacts/exact-candidate/candidate `
+            -SourceCommit "1d7468cda2cd2c8d6495d3e6df7fa23431812139" `
+            -ProductVersion "0.4.11"
+
+      - name: Verify frozen field predecessor identity
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Verify `
+            -CandidateRoot apps/terminal-agent/installer/artifacts/exact-predecessor/candidate `
+            -SourceCommit "7ffc10ed84f67f2bd3b008d54aee9d7cda056f5e" `
+            -ProductVersion "0.4.11"
+
+      - name: Prove pre-launch candidate failure restores predecessor
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-same-version-transition.ps1 `
+            -PredecessorExePath apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/AIJobPrintTerminalSetup.exe `
+            -PredecessorMsiPath apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/AIJobPrintAgent.msi `
+            -PredecessorManifestPath apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/staging-manifest.json `
+            -CandidateExePath apps/terminal-agent/installer/artifacts/exact-candidate/candidate/AIJobPrintTerminalSetup.exe `
+            -CandidateMsiPath apps/terminal-agent/installer/artifacts/exact-candidate/candidate/AIJobPrintAgent.msi `
+            -CandidateManifestPath apps/terminal-agent/installer/artifacts/exact-candidate/candidate/staging-manifest.json `
+            -ExpectedPredecessorCommit "7ffc10ed84f67f2bd3b008d54aee9d7cda056f5e" `
+            -ExpectedCandidateCommit "1d7468cda2cd2c8d6495d3e6df7fa23431812139" `
+            -ProductVersion "0.4.11" `
+            -InjectCandidateInstallFailure
+
+      - name: Exercise explicit same-version uninstall install recovery drill
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-same-version-transition.ps1 `
+            -PredecessorExePath apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/AIJobPrintTerminalSetup.exe `
+            -PredecessorMsiPath apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/AIJobPrintAgent.msi `
+            -PredecessorManifestPath apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/staging-manifest.json `
+            -CandidateExePath apps/terminal-agent/installer/artifacts/exact-candidate/candidate/AIJobPrintTerminalSetup.exe `
+            -CandidateMsiPath apps/terminal-agent/installer/artifacts/exact-candidate/candidate/AIJobPrintAgent.msi `
+            -CandidateManifestPath apps/terminal-agent/installer/artifacts/exact-candidate/candidate/staging-manifest.json `
+            -ExpectedPredecessorCommit "7ffc10ed84f67f2bd3b008d54aee9d7cda056f5e" `
+            -ExpectedCandidateCommit "1d7468cda2cd2c8d6495d3e6df7fa23431812139" `
+            -ProductVersion "0.4.11"
+
+      - name: Verify frozen candidate identity after lifecycle
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Verify `
+            -CandidateRoot apps/terminal-agent/installer/artifacts/exact-candidate/candidate `
+            -SourceCommit "1d7468cda2cd2c8d6495d3e6df7fa23431812139" `
+            -ProductVersion "0.4.11"
+
+      - name: Upload same-version transition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-agent-same-version-transition-evidence
+          path: |
+            apps/terminal-agent/installer/artifacts/exact-candidate/candidate/candidate-identity.json
+            apps/terminal-agent/installer/artifacts/exact-candidate/candidate/staging-manifest.json
+            apps/terminal-agent/installer/artifacts/exact-candidate/candidate/same-version-lifecycle-logs/
+            apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/candidate-identity.json
+            apps/terminal-agent/installer/artifacts/exact-predecessor/candidate/staging-manifest.json
           if-no-files-found: warn
           retention-days: 7

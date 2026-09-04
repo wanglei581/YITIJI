@@ -1,5 +1,18 @@
 # 下一步任务
 
+## 当前硬件主线：Windows Agent 同版本恢复门禁（2026-09-04）
+
+**当前结论：`NO-GO`，不得直接在现场覆盖安装。** exact-SHA 未签名候选 `0.4.11@1d7468c...` 已由 GitHub run `33876577638` 生成并通过原有 Windows 生命周期，但现场是同版本 `0.4.11@7ffc10e...`；现有 WiX 没有证明同版本直接覆盖。
+
+- [ ] 本地门禁与独立 diff 复审通过后，由用户在动作前确认是否推送 `codex/windows-agent-same-version-gate` 并手动触发 `windows-agent-installer`；只看一次性 `exact-field-same-version-transition` job。
+- [ ] 要求 job 先验证历史 run `33376026528` 冻结 artifact 的 identity 为 `0.4.11@7ffc10e`，且现场安装来源可与该制品身份对应；未对应前不得称为现场精确前代。
+- [ ] 要求隔离 runner 证明：先完整卸载前代，再安装冻结的 `1d7468c` 候选；MSI ProductCode、Burn 注册和卸载命令唯一且合法，installed manifest 全量文件哈希精确匹配，服务保持未 provisioning 的 `Stopped/Manual`。
+- [ ] 要求 ProgramData 在卸载/安装/显式恢复间哈希不变，DPAPI LocalMachine token 可解密，真实 SQLite `integrity_check` + 标记行可读，LKG 配置可解析。
+- [ ] 要求候选启动前失败注入后显式尝试恢复前代并同时保留原始错误；正常路径卸载候选后重装前代作恢复演练。该注入不覆盖已注册、部分安装、MSI 事务中断或要求重启；不得称为安装器自动回滚，不得使用历史 `0.4.8` EXE。
+- [ ] Windows runner 的 `Stopped/Manual` 不证明现场 provisioning 恢复；现场变更单必须另行验证 `Automatic` 和 SCM failure recovery，且需动作前单独授权。
+- [ ] Windows job 全绿后，另行准备现场变更单：终端 drain/freeze，云端待领取/已领取任务为 0，本地 nonterminal/pending/dead-letter/扫描审计 backlog 为 0，Windows 打印队列为 0，再由用户在动作前单独授权安装。
+- [ ] 安装门禁通过也不等于硬件通过。后续仍按「空任务启动/心跳 → 单页 A4 三证 → 重启/重复任务 → 断网 → 脱机 → 缺纸 → 卡纸 → 权限 → U 盘 → 面板扫描到 `scanWatchFolder`」逐项授权。任何 `PRINT_JOB_UNCONFIRMED`、未知队列或物理结果不明时立即停止，不得补纸后自动重发。
+
 ## 当前主线：51 页新稿迁移（2026-09-02 建立，取代下方全部历史队列的优先级）
 
 **边界与判定（project-delivery-governance G2/G3 逐页版）。** 已核实的事实基线（`6d74c2f17` 重算图谱后）：

@@ -19,10 +19,13 @@ const workflowStep = (haystack, name) => {
 export function verifyCandidateProvenance({ workflow, candidateIdentity, productVersion }) {
   const freshJobStart = workflow.indexOf('  unsigned-msi-candidate:')
   const upgradeJobStart = workflow.indexOf('  unsigned-exe-upgrade:')
+  const sameVersionJobStart = workflow.indexOf('  exact-field-same-version-transition:')
   assert.ok(freshJobStart >= 0, 'missing unsigned-msi-candidate job')
   assert.ok(upgradeJobStart > freshJobStart, 'missing or misordered unsigned-exe-upgrade job')
+  assert.ok(sameVersionJobStart > upgradeJobStart, 'missing or misordered same-version transition job')
   const freshJob = workflow.slice(freshJobStart, upgradeJobStart)
-  const upgradeJob = workflow.slice(upgradeJobStart)
+  const upgradeJob = workflow.slice(upgradeJobStart, sameVersionJobStart)
+  const candidateWorkflow = freshJob + upgradeJob
 
   assert.doesNotMatch(freshJob, /test-exe-upgrade-lifecycle\.ps1/)
   assert.doesNotMatch(freshJob, /predecessor-0\.4\.10/)
@@ -102,7 +105,7 @@ export function verifyCandidateProvenance({ workflow, candidateIdentity, product
   )
   assert.match(freshJob, /Upload fresh lifecycle evidence on failure\s*\n\s*if: failure\(\)/)
   assert.doesNotMatch(upgradeJob, /terminal-agent-unsigned-installer-candidates/)
-  assert.equal((workflow.match(new RegExp(`-ProductVersion "${productVersion.replaceAll('.', '\\.')}"`, 'g')) ?? []).length, 4)
+  assert.equal((candidateWorkflow.match(new RegExp(`-ProductVersion "${productVersion.replaceAll('.', '\\.')}"`, 'g')) ?? []).length, 4)
 
   assertOrdered(
     freshJob,

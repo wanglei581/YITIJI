@@ -244,6 +244,7 @@ assert.match(staging, /manifest\.json/)
 const lifecycle = read('test-msi-lifecycle.ps1')
 const exeLifecycle = read('test-exe-lifecycle.ps1')
 const upgradeLifecycle = read('test-exe-upgrade-lifecycle.ps1')
+const sameVersionLifecycle = read('test-exe-same-version-transition.ps1')
 assert.match(lifecycle, /Start-Service -Name \$serviceName/)
 assert.match(lifecycle, /Remove-Item -LiteralPath \$diagnosticPath -Force/)
 assert.match(lifecycle, /\$startServiceError = \$null/)
@@ -316,6 +317,50 @@ assert.match(upgradeLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnap
 assert.match(upgradeLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnapshot -Phase "repair"/)
 assert.match(upgradeLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnapshot -Phase "uninstall"/)
 assert.match(upgradeLifecycle, /EXE_UPGRADE_LIFECYCLE_PASS/)
+assert.match(sameVersionLifecycle, /EXE_SAME_VERSION_RECOVERY_DRILL_PASS/)
+assert.match(sameVersionLifecycle, /EXE_SAME_VERSION_FAILURE_RECOVERY_PASS/)
+assert.match(sameVersionLifecycle, /mode=explicit-uninstall-install-recovery/)
+assert.match(sameVersionLifecycle, /automaticRollback=false/)
+assert.match(sameVersionLifecycle, /InjectCandidateInstallFailure/)
+assert.match(sameVersionLifecycle, /ExpectedPredecessorCommit/)
+assert.match(sameVersionLifecycle, /ExpectedCandidateCommit/)
+assert.match(sameVersionLifecycle, /PredecessorMsiPath/)
+assert.match(sameVersionLifecycle, /CandidateMsiPath/)
+assert.match(sameVersionLifecycle, /Get-MsiProductCode/)
+assert.match(sameVersionLifecycle, /Assert-SingleRegistration/)
+assert.match(sameVersionLifecycle, /Assert-RegistrationCommand/)
+assert.match(sameVersionLifecycle, /MSI uninstall command is not bound to its ProductCode/)
+assert.match(sameVersionLifecycle, /Burn cached executable is missing/)
+assert.match(sameVersionLifecycle, /AI Job Print Terminal Setup/)
+assert.match(sameVersionLifecycle, /installed manifest hash does not match the approved staging manifest/)
+assert.match(sameVersionLifecycle, /foreach \(\$record in @\(\$ExpectedManifest\.files\)\)/)
+assert.match(sameVersionLifecycle, /app\/native\/secure-scan-reader\.exe/)
+assert.match(sameVersionLifecycle, /DataProtectionScope\]::LocalMachine/)
+assert.match(sameVersionLifecycle, /integrity_check/)
+assert.match(sameVersionLifecycle, /agent-config\.last-known-good\.json/)
+assert.match(sameVersionLifecycle, /Assert-StateUsable -Phase "candidate install"/)
+assert.match(sameVersionLifecycle, /Assert-StateUsable -Phase "predecessor failure recovery"/)
+assert.match(sameVersionLifecycle, /Assert-StateUsable -Phase "predecessor recovery drill"/)
+assert.match(sameVersionLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnapshot -Phase "candidate install"/)
+assert.match(sameVersionLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnapshot -Phase "predecessor failure recovery"/)
+assert.match(sameVersionLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnapshot -Phase "predecessor recovery drill"/)
+assert.match(sameVersionLifecycle, /Candidate transition failed and predecessor recovery failed\. originalError=\$candidatePhaseError recoveryError=\$recoveryError/)
+assert.match(sameVersionLifecycle, /Candidate transition failed; exact predecessor recovery succeeded\. originalError=\$candidatePhaseError/)
+assert.match(sameVersionLifecycle, /Export-SanitizedStateEvidence -Phase "before-final-cleanup"/)
+assert.match(sameVersionLifecycle, /uninstallCommandPresent/)
+const predecessorUninstall = sameVersionLifecycle.indexOf(
+  'Invoke-Bundle -ExePath $resolvedPredecessor -Action "/uninstall" -LogName (Get-PhaseLogName "predecessor-uninstall")',
+)
+const candidateInstall = sameVersionLifecycle.indexOf(
+  'Invoke-Bundle -ExePath $candidateInstallPath -Action "/install" -LogName (Get-PhaseLogName "candidate-install")',
+)
+const candidateUninstall = sameVersionLifecycle.indexOf(
+  'Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName (Get-PhaseLogName "candidate-uninstall")',
+)
+assert.ok(
+  predecessorUninstall >= 0 && predecessorUninstall < candidateInstall && candidateInstall < candidateUninstall,
+  'same-version transition must uninstall the predecessor before installing the candidate',
+)
 assert.match(workflow, /Verify staged secure scan reader boundary/)
 assert.match(workflow, /verify-secure-scan-reader\.ps1 -InstallRoot apps\/terminal-agent\/installer\/artifacts\/staging/)
 assert.match(secureScanReaderVerify, /SECURE_SCAN_READER_PASS/)
@@ -348,6 +393,7 @@ assert.match(
 )
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
+assert.match(workflow, /test-exe-same-version-transition\.ps1/)
 assert.match(
   workflow,
   /working-directory: apps\/terminal-agent[\s\S]*?node installer\/verify-printservice-completion\.mjs/,
@@ -363,6 +409,22 @@ assert.match(workflow, /predecessor-0\.4\.10\/apps\/terminal-agent\/installer\/a
 assert.match(workflow, /artifacts\/exe\/AIJobPrintTerminalSetup\.exe/)
 assert.match(workflow, /artifacts\/evidence\/fresh-exe-lifecycle-logs\//)
 assert.match(workflow, /artifacts\/evidence\/upgrade-lifecycle-logs\//)
+assert.match(workflow, /exact-field-same-version-transition:/)
+assert.match(workflow, /if: \$\{\{ github\.event_name == 'workflow_dispatch' \}\}/)
+assert.match(workflow, /run-id: 33876577638/)
+assert.match(workflow, /run-id: 33376026528/)
+assert.match(workflow, /name: terminal-agent-unsigned-installer-candidates/)
+assert.doesNotMatch(workflow, /Checkout exact field 0\.4\.11 predecessor source/)
+assert.doesNotMatch(workflow, /predecessor-field-0\.4\.11\/apps\/terminal-agent\/installer\/build-/)
+assert.match(workflow, /CandidateRoot apps\/terminal-agent\/installer\/artifacts\/exact-predecessor\/candidate/)
+assert.match(workflow, /SourceCommit "7ffc10ed84f67f2bd3b008d54aee9d7cda056f5e"/)
+assert.match(workflow, /SourceCommit "1d7468cda2cd2c8d6495d3e6df7fa23431812139"/)
+assert.match(workflow, /ExpectedPredecessorCommit "7ffc10ed84f67f2bd3b008d54aee9d7cda056f5e"/)
+assert.match(workflow, /ExpectedCandidateCommit "1d7468cda2cd2c8d6495d3e6df7fa23431812139"/)
+assert.match(workflow, /Prove pre-launch candidate failure restores predecessor/)
+assert.match(workflow, /-InjectCandidateInstallFailure/)
+assert.match(workflow, /Exercise explicit same-version uninstall install recovery drill/)
+assert.match(workflow, /if: always\(\)[\s\S]*terminal-agent-same-version-transition-evidence/)
 verifyCandidateProvenance({
   workflow,
   candidateIdentity: read('candidate-identity.ps1'),

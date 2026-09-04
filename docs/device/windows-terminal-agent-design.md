@@ -2,8 +2,8 @@
 
 > 版本：v1.6（上线前收口状态校正）
 > 创建时间：2026-05-26
-> 最后更新：2026-06-12（v1.6：对齐当前进度。Phase 8.0–8.2C 已作为代码与真机验证基线封板；生产服务器与新 Windows 主机仍须按上线清单复验后才能宣称生产就绪）
-> 状态：Phase 8 打印链路与安全基线已完成；扫描 / U盘 / 云打印等扩展能力仍按真实硬件验收推进，不得把前端演示写成已上线能力。
+> 最后更新：2026-09-04（v1.6：校正扫描实现边界；未实现的 Session Helper / TWAIN / WIA / Named Pipe 仍为未来设计）
+> 状态：Phase 8 打印链路与安全基线已完成；当前扫描实现仅为「打印机面板扫描到受控目录 → `scanWatchFolder` watcher → 后端 deliver」。U 盘和扫描仍须真实硬件验收，不得把前端演示或未来设计写成已上线能力。
 > 关联文档：[pantum-api-design.md](./pantum-api-design.md) | [api-v1-design.md](../api/api-v1-design.md) | [CLAUDE.md](../../CLAUDE.md)
 
 ---
@@ -26,11 +26,11 @@
 
 ## 1. Agent 定位
 
-### 1.1 总体定位与双进程架构
+### 1.1 总体定位与目标双进程架构
 
 Windows Terminal Agent（以下简称 Agent）是运行在一体机 Windows 主机本地的**后台常驻服务**，承担前端 Kiosk 网页无法直接触达的硬件交互职责。
 
-由于 Windows 服务（LocalSystem 账号）和用户桌面 Session 是隔离的，而 TWAIN/WIA 扫描驱动、扫码器、摄像头等设备**必须在用户 Session 中访问**，Agent 采用**双进程架构**：
+由于 Windows 服务（LocalSystem 账号）和用户桌面 Session 是隔离的，未来如要由终端主动调用 TWAIN/WIA、扫码器或摄像头，目标架构是 Service + Session Helper 双进程。**截至 2026-09-04，下图的 Session Helper、Named Pipe、9528 备用通道和 TWAIN/WIA 主动扫描尚未实现，不属于当前现场验收面。**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -67,14 +67,14 @@ Windows Terminal Agent（以下简称 Agent）是运行在一体机 Windows 主�
         └─────────────────────┘
 ```
 
-**Named Pipe 通信**：Service 进程创建命名管道 `\\.\pipe\AIJobPrintAgent`，ACL 设置如下：
+**未来 Named Pipe 通信设计**：Service 进程计划创建命名管道 `\\.\pipe\AIJobPrintAgent`，ACL 目标如下：
 
 - **允许**：AIJobPrintAgent Service SID（SYSTEM / LocalService）、当前登录用户 SID（Session Helper）、BUILTIN\Administrators 组
 - **禁止**：Everyone / Users / Authenticated Users 泛权限
 
-Helper 启动后向管道连接并接收扫描/扫码/摄像头指令，执行后将结果写回管道。**localhost 127.0.0.1:9528** 作为 Named Pipe 不可用时的备用通道（Service 内部），该端口**仅允许 Service 与 Helper 通信，不接受 Kiosk 请求**，双向鉴权需校验 `service-helper-shared-token`（Service 启动时生成，与 Helper 进程共享）；Kiosk 请求仍走 9527 端口的 local-api-server。
+Helper 未来启动后向管道连接并接收扫描/扫码/摄像头指令，执行后将结果写回管道。`127.0.0.1:9528` 与 `service-helper-shared-token` 同样只是备用设计；当前 Kiosk 与 Agent 的本地接口仅以实际代码中的 `127.0.0.1:9527` 路由为准。
 
-**Session Helper 生命周期**：Service 在用户登录后检测到活跃 Session 时启动 Helper（通过 `CreateProcessAsUser`）；用户注销时 Helper 退出，Service 继续运行；Helper 崩溃时 Service 自动重启 Helper。
+**未来 Session Helper 生命周期设计**：Service 在用户登录后检测活跃 Session 并通过 `CreateProcessAsUser` 启动 Helper；该能力尚未进入当前实现。
 
 ### 1.2 与 Kiosk 前端的关系
 
@@ -85,11 +85,11 @@ CORS 白名单（`http://localhost:5173` 等）是浏览器层辅助控制，**�
 | 场景 | Kiosk 发起 | 鉴权方式 | Agent 响应 |
 |------|-----------|---------|----------|
 | 查询设备状态 | `GET /local/status` | `localAuthToken` | 返回打印机、扫描仪状态 |
-| 轮询扫描结果 | `GET /local/scan/:id` | `localAuthToken` | 返回进度或已完成的文件 URL |
 | 获取 U 盘文件 | `GET /local/usb/files` | `localAuthToken` | 返回 U 盘可打印文件列表 |
 | 加速已建打印任务 | `POST /local/print/wake`（无 body / query） | 精确 Origin + `X-Local-Bridge-Token` | `202` 接受唤醒；实际任务仍由 Agent 向云端 claim |
-| 发起扫描 | `POST /local/scan` | `actionToken`（一次性） | 触发扫描，返回 scanId |
-| 触发 U 盘打印 | `POST /local/usb/print` | `actionToken`（一次性） | 打印 U 盘指定文件 |
+| 上传 U 盘文件 | `POST /local/usb/upload` | 精确 Origin + `X-Local-Bridge-Token` | 一次性消费 `safeId` 并上传后端 |
+
+> `GET /local/scan/:id`、`POST /local/scan` 和 `POST /local/usb/print` 是未来契约，当前 Agent 未注册这些路由，不得纳入本轮现场验收。
 
 **localAuthToken**：终端注册完成后由 Agent 生成并加密保存，同时通过注册响应附带给后端，后端在 Kiosk 初始化时下发。Kiosk 在所有查询类请求头中携带：`Authorization: Bearer <localAuthToken>`。
 
@@ -109,7 +109,7 @@ Agent 是后端 API 的**主动客户端**（非被动服务端）：
 | 设备 | 型号 / 标准 | 接入进程 | 接入方式 |
 |------|------------|---------|---------|
 | 打印机 | 奔图 CM2800ADN/CM2820ADN 系列（有线网络；Windows 识别名：`Pantum CM2800ADN Series`） | Service | Windows GDI Print API |
-| 扫描仪 | CM2800ADN/CM2820ADN 内置扫描（ADF 50 页） | Helper | TWAIN / WIA 驱动（优先）；SMB 目录监听（备用） |
+| 扫描仪 | CM2800ADN/CM2820ADN 内置扫描（ADF 50 页） | Service | 当前：打印机面板扫描到 SMB/受控目录，`scanWatchFolder` watcher 接收；未来：Helper + TWAIN/WIA |
 | U 盘 | USB 存储设备 | Service | Windows 卷挂载事件监听 |
 | 摄像头 | 可选外接 USB 摄像头 | Helper | WIA / DirectShow（Phase 8.3） |
 | 扫码器 | USB HID 键盘模拟扫码枪 | Helper | node-hid 输入拦截（Phase 8.3） |
@@ -166,13 +166,14 @@ Agent 首次启动时向后端注册本终端，获取 `terminalId` 和 `agentTo
 
 ### 2.7 扫描任务执行
 
-1. Kiosk 携带有效 actionToken 调用 `POST /local/scan`
-2. Agent 验证 actionToken，向后端创建 scan-task 记录获取 `scanId`
-3. Service 进程通过 Named Pipe 向 Helper 进程发送扫描指令（含参数）
-4. Helper 通过 TWAIN/WIA 触发扫描仪，将输出文件路径写回 Named Pipe
-5. Service 接收文件路径，执行多页合并（→ 单 PDF）、上传、回传结果
+**当前唯一实现路径：**
 
-**备用路径**：Helper 不可用时（用户未登录/TWAIN 不可用），Service 切换到 SMB 目录监听模式，等待用户从打印机面板发起扫描到共享目录。
+1. 后端存在等待接收的 scan session。
+2. 现场人员在打印机面板执行扫描，将文件落到已配置且 LocalSystem 可访问的 `scanWatchFolder`。
+3. Agent watcher 只读取稳定、直系子文件；Windows 上通过 staged `secure-scan-reader.exe` 验证 reparse/hardlink/TOCTOU 边界。
+4. Agent 调用 `POST /terminals/:id/scan-sessions/deliver` 上传；成功后安全删除源文件，无等待任务或重复内容则移入 `_unclaimed`。
+
+`scanWatchFolder` 未配置或安全体检不通过时，watcher 按设计不启动。Session Helper + TWAIN/WIA + `POST /local/scan` 仍是未来设计，不是当前备用路径。
 
 ### 2.8 扫描文件上传
 
