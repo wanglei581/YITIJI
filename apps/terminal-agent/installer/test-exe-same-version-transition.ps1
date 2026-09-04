@@ -75,7 +75,7 @@ function Get-MsiProductCode([string]$MsiPath) {
   try {
     $database = $installer.OpenDatabase($MsiPath, 0)
     $view = $database.OpenView("SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = 'ProductCode'")
-    $view.Execute()
+    [void]$view.Execute()
     $record = $view.Fetch()
     if ($null -eq $record) {
       throw "MSI ProductCode is missing: $MsiPath"
@@ -86,7 +86,7 @@ function Get-MsiProductCode([string]$MsiPath) {
     }
     return $productCode.ToUpperInvariant()
   } finally {
-    if ($null -ne $view) { $view.Close() }
+    if ($null -ne $view) { [void]$view.Close() }
     foreach ($item in @($record, $view, $database, $installer)) {
       if ($null -ne $item -and [System.Runtime.InteropServices.Marshal]::IsComObject($item)) {
         [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($item)
@@ -565,6 +565,9 @@ try {
     }
     if ((Test-Path -LiteralPath $scanRoot -PathType Container) -and @(Get-ChildItem -LiteralPath $scanRoot -Force).Count -eq 0) {
       Remove-Item -LiteralPath $scanRoot -Force
+    }
+    if ((Test-Path -LiteralPath $stateRoot -PathType Container) -and @(Get-ChildItem -LiteralPath $stateRoot -Force).Count -eq 0) {
+      Remove-Item -LiteralPath $stateRoot -Force
     }
   }
 }

@@ -327,6 +327,8 @@ assert.match(sameVersionLifecycle, /ExpectedCandidateCommit/)
 assert.match(sameVersionLifecycle, /PredecessorMsiPath/)
 assert.match(sameVersionLifecycle, /CandidateMsiPath/)
 assert.match(sameVersionLifecycle, /Get-MsiProductCode/)
+assert.match(sameVersionLifecycle, /\[void\]\$view\.Execute\(\)/)
+assert.match(sameVersionLifecycle, /\[void\]\$view\.Close\(\)/)
 assert.match(sameVersionLifecycle, /Assert-SingleRegistration/)
 assert.match(sameVersionLifecycle, /Assert-RegistrationCommand/)
 assert.match(sameVersionLifecycle, /MSI uninstall command is not bound to its ProductCode/)
@@ -360,6 +362,11 @@ const candidateUninstall = sameVersionLifecycle.indexOf(
 assert.ok(
   predecessorUninstall >= 0 && predecessorUninstall < candidateInstall && candidateInstall < candidateUninstall,
   'same-version transition must uninstall the predecessor before installing the candidate',
+)
+assert.match(
+  sameVersionLifecycle,
+  /if \(\(Test-Path -LiteralPath \$stateRoot -PathType Container\) -and @\(Get-ChildItem -LiteralPath \$stateRoot -Force\)\.Count -eq 0\) \{\s*Remove-Item -LiteralPath \$stateRoot -Force/,
+  'same-version fixture cleanup must remove only the empty ProgramData root it owns',
 )
 assert.match(workflow, /Verify staged secure scan reader boundary/)
 assert.match(workflow, /verify-secure-scan-reader\.ps1 -InstallRoot apps\/terminal-agent\/installer\/artifacts\/staging/)
