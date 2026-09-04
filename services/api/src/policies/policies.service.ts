@@ -10,6 +10,7 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { CreatePolicyPostDto, UpdatePolicyPostDto } from './dto/policy.dto'
 import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
+import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 
 // ============================================================
@@ -350,7 +351,9 @@ export class PoliciesService {
   }
 
   /**
-   * 允许发布政策内容的机构类型。
+   * 仅在**创建**时校验机构类型。
+   * 更新/下架/删除不校验：存量数据若由不该发布的机构创建，仍需允许其下架与删除，
+   * 否则收紧权限反而会把违规内容锁死在已发布状态。
    *
    * ⚠️ 2026-08-11 新增。此前 createPartnerPolicy 只调 assertPartnerOrg——
    * 只检查账号挂靠与机构启用，**不检查机构类型**，导致持证人力资源机构、
@@ -359,17 +362,16 @@ export class PoliciesService {
    * 这是合规风险而非权限洁癖：政策内容是就业政策与补贴指引，属官方性质，
    * 且 Kiosk 侧带扫码办理入口。商业机构以「政策公告」名义发布内容，
    * 求职者会误认为是官方政策——政策涉及补贴与社保，是最敏感的内容类型。
-   * `partner-permission-matrix.md` 本就规定只有人社与高校可管政策，代码未实现。
-   */
-  private static readonly POLICY_CAPABLE_ORG_TYPES = ['public_employment_service', 'school_employment_center']
-
-  /**
-   * 仅在**创建**时校验机构类型。
-   * 更新/下架/删除不校验：存量数据若由不该发布的机构创建，仍需允许其下架与删除，
-   * 否则收紧权限反而会把违规内容锁死在已发布状态。
+   * `partner-permission-matrix.md` 本就规定只有人社与高校可管政策。
+   *
+   * 2026-09-02：原先此处自带一份 POLICY_CAPABLE_ORG_TYPES 常量，
+   * 改为读 `partner-capabilities.ts` 的 `canManagePolicies`——那份矩阵同时也是
+   * `GET /partner/data-sources/capabilities` 的返回内容，Partner 控制台按它决定
+   * 「新增政策内容」是否可点。两处各存一份必然漂移（前端放行、后端拒写）。
+   * 错误码与文案保持不变。
    */
   private assertPolicyCapableOrgType(org: { type: string; name: string }): void {
-    if (!PoliciesService.POLICY_CAPABLE_ORG_TYPES.includes(org.type)) {
+    if (!partnerOrgTypeCan(org.type, 'managePolicies')) {
       throw new BadRequestException({
         error: {
           code: 'ORG_TYPE_NOT_ALLOWED_FOR_POLICY',

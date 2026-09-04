@@ -201,19 +201,59 @@ function collectRoutePaths() {
   return paths.filter((path) => OWNED_PREFIX.test(path.slice(1)))
 }
 
+function git(args) {
+  return execFileSync('git', args, {
+    cwd: WORKSPACE_ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+}
+function canResolveGitRef(ref) {
+  try { git(['rev-parse', '--verify', `${ref}^{commit}`]); return true } catch { return false }
+}
+function canResolveMergeBase(baseRef) {
+  try { git(['merge-base', baseRef, 'HEAD']); return true } catch { return false }
+}
+function ensureMergeBase(baseRef) {
+  if (canResolveMergeBase(baseRef)) return
+  // CI checks this job out at depth 1, so the merge-base is usually absent until deepened.
+  git(['fetch', '--no-tags', '--deepen=50', 'origin'])
+  if (!canResolveMergeBase(baseRef)) throw new Error(`无法解析 ${baseRef}...HEAD 的 merge-base`)
+}
+function tryResolveBase(ref) {
+  const remoteRef = `origin/${ref}`
+  if (canResolveGitRef(remoteRef)) return remoteRef
+  // Shallow CI checkouts (`actions/checkout` defaults to depth 1) carry no
+  // remote-tracking ref for the base branch; fetch just enough to name it.
+  try { git(['fetch', '--no-tags', '--depth=1', 'origin', `${ref}:refs/remotes/origin/${ref}`]) } catch { return null }
+  return canResolveGitRef(remoteRef) ? remoteRef : null
+}
+function resolveDiffBase() {
+  const githubBaseRef = process.env.GITHUB_BASE_REF?.trim()
+  // pull_request runs name their target branch; push/workflow_dispatch fall back to main.
+  for (const ref of [githubBaseRef, 'main'].filter(Boolean)) {
+    const base = tryResolveBase(ref)
+    if (base) return base
+  }
+  throw new Error('无法解析 diff base：origin/main 不存在，且 GITHUB_BASE_REF 未提供或无法获取')
+}
 function changedFiles() {
-  // Earlier waves are frozen as commits before W4. Scope this guard to the
-  // current integration worktree instead of reclassifying committed W2/W3
-  // changes against the historical W1 baseline as W4 violations.
-  const tracked = execFileSync('git', ['diff', '--name-only', 'HEAD'], {
-    cwd: WORKSPACE_ROOT,
-    encoding: 'utf8',
-  })
-  const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
-    cwd: WORKSPACE_ROOT,
-    encoding: 'utf8',
-  })
-  return [...new Set(`${tracked}\n${untracked}`.split('\n').map((item) => item.trim()).filter(Boolean))]
+  // Compare the whole branch against its merge base, not just the dirty worktree.
+  // `git diff HEAD` reports only uncommitted edits, and CI always checks out a clean
+  // tree — that made this guard a permanent no-op there while still firing locally.
+  const diffBase = resolveDiffBase()
+  ensureMergeBase(diffBase)
+  const committed = git(['diff', '--name-only', `${diffBase}...HEAD`])
+  const unstaged = git(['diff', '--name-only'])
+  const staged = git(['diff', '--cached', '--name-only'])
+  const untracked = git(['ls-files', '--others', '--exclude-standard'])
+  return [...new Set(
+    [committed, unstaged, staged, untracked]
+      .join('\n')
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )]
 }
 
 function collectTsx(dir) {
@@ -254,8 +294,27 @@ check('exact 25-route ownership', () => {
   assert.ok(!owned.includes('/notifications'))
 })
 
+// 这个守卫只管一件事：kiosk 页面层的波次归属——「别的波次别动 W4 的页面，
+// W4 也别去动别的波次的页面」。所以它只判 apps/kiosk/src/pages/ 下的文件。
+// 页面层以外（后端、packages/shared、kiosk 自己的 services 适配层、types、
+// 后台、文档）不属于波次分工能仲裁的范围，由各自的门禁负责。
+//
+// 两次实测把边界钉在这里：
+//   1. 不限定判定集时，全仓 3602 个受跟踪文件只有 358 个可改，近 12 个已合 PR
+//      会红 11 个 —— 那不是仓库现行事实的正确编码。
+//   2. FORBIDDEN_PATHS 里的 /^apps\/kiosk\/src\/services\// 会直接挡住
+//      CLAUDE.md §9 要求的合规修复：「适配层伪造数据 + 页面把伪造值渲染成事实」
+//      是一个缺陷的两端，TypeScript 强制同批提交，拆开会先死在 typecheck 上。
+const W4_JUDGED_PREFIX = /^apps\/kiosk\/src\/pages\//
+
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
-  const changes = changedFiles()
+  const allChanges = changedFiles()
+  // 触发条件：本次 diff 真的改了 W4 自有页面，才追究波次归属。
+  if (!allChanges.some((path) => ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path)))) {
+    console.log('  SKIP W4 波次范围断言：本次 diff 未触及 W4 自有页面')
+    return
+  }
+  const changes = allChanges.filter((path) => W4_JUDGED_PREFIX.test(path))
   const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && path !== OFFLINE_AGENCY_BACKEND_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
   assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
 

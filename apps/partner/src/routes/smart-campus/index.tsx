@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { getSmartCampusTerminals, saveSmartCampusConfig, type PartnerSmartCampusTerminal } from '../../services/api'
+import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
 import {
   ActivityIcon,
   CheckCircleIcon,
@@ -287,9 +288,52 @@ function UsagePanel() {
   )
 }
 
+/**
+ * 无权机构的拒绝态。
+ *
+ * 侧栏已按能力隐藏本入口，但**书签、历史记录、别人发来的链接、手输 URL** 仍会走到这里；
+ * 此前这些路径会先转圈加载、再把服务端 403 的原文丢进一个红色错误框，
+ * 读起来像「系统坏了」而不是「你这类机构用不了」。这里改成明确说明 + 可继续的下一步。
+ *
+ * 只在服务端能力**明确为 false** 时展示：能力未知一律照常渲染
+ * （见 services/capabilities.ts 的 fail-open 说明），真正的拦截仍在服务端。
+ */
+function NotEntitledState() {
+  return (
+    <Page title="智慧校园" subtitle="本机构类型不可用">
+      <Card className="flex flex-col items-center justify-center gap-3 p-10 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100">
+          <LockIcon className="h-7 w-7 text-neutral-400" aria-hidden="true" />
+        </div>
+        <div>
+          <p className="text-base font-semibold text-neutral-900">智慧校园仅对高校就业中心开放</p>
+          <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-neutral-500">
+            智慧校园用于配置归属本校终端的迎新、行李、全景等校内服务，因此只向高校就业中心类型的机构开放。
+            本机构账号无法查看或配置这些终端；如机构类型有误，请联系平台运营核对。
+          </p>
+        </div>
+      </Card>
+    </Page>
+  )
+}
+
 export default function SmartCampusPage() {
+  const { status: capabilityStatus } = usePartnerCapabilities()
+  const canManage = useCapability('canManageSmartCampus')
   const [activeTab, setActiveTab] = useState<SmartCampusTab>('terminals')
   const activeLabel = TABS.find((tab) => tab.key === activeTab)?.label ?? '终端开关'
+
+  // 能力未回来之前不要抢先渲染整页：否则无权机构会先看到一屏可用界面
+  // （还会打一个注定 403 的终端请求），再被换成拒绝态，闪一下像出错。
+  if (capabilityStatus === 'loading') {
+    return (
+      <Page title="智慧校园" subtitle="加载中…">
+        <div className="flex h-48 items-center justify-center text-sm text-neutral-400">正在加载…</div>
+      </Page>
+    )
+  }
+
+  if (!canManage) return <NotEntitledState />
 
   return (
     <Page

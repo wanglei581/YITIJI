@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalToolboxService } from '../terminals/terminal-toolbox.service'
+import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import {
   DEFAULT_SMART_CAMPUS_MODULES,
   type KioskSmartCampusConfig,
@@ -223,7 +224,15 @@ export class SmartCampusService {
     return this.saveTerminalConfig(terminal.terminalCode, input, user.userId)
   }
 
-  /** Partner 学校机构校验：orgId 非空 + 机构存在/启用 + 类型为 school_employment_center。 */
+  /**
+   * Partner 学校机构校验：orgId 非空 + 机构存在/启用 + 类型可管智慧校园。
+   *
+   * 2026-09-02：类型判定由字面量 `org.type !== 'school_employment_center'` 改为读
+   * `partner-capabilities.ts` 的 `canManageSmartCampus`（当前仍只有
+   * school_employment_center 为 true，行为不变）。这条与列表读取共用，
+   * 所以非学校机构在 Partner 控制台是**整页不可用**，侧栏据同一份能力隐藏该入口；
+   * 规则只留一处定义，避免侧栏与服务端漂移。错误码与文案保持不变。
+   */
   private async assertSchoolOrg(orgId: string | null): Promise<{ id: string; name: string }> {
     if (!orgId) {
       throw new ForbiddenException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
@@ -235,7 +244,7 @@ export class SmartCampusService {
     if (!org || !org.enabled) {
       throw new ForbiddenException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
     }
-    if (org.type !== 'school_employment_center') {
+    if (!partnerOrgTypeCan(org.type, 'manageSmartCampus')) {
       throw new ForbiddenException({ error: { code: 'PARTNER_NOT_SCHOOL', message: '仅学校就业中心机构可管理智慧校园' } })
     }
     return { id: org.id, name: org.name }
