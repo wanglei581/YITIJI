@@ -2,16 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
-import { COMPANY_SCALE_SHORT } from '../../types/fair'
 import { BriefcaseIcon, BuildingIcon, ChevronRightIcon, SearchIcon } from 'lucide-react'
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
 import { FusionBadge, FusionNotice, FusionSourceMeta, KioskPageFrame } from '../jobs/components/W4Presentation'
-
-const CHECKIN_LABELS = {
-  checked_in: '已签到',
-  pending:    '未签到',
-  absent:     '缺席',
-}
 
 export function FairCompaniesPage() {
   const navigate = useNavigate()
@@ -133,10 +126,9 @@ export function FairCompaniesPage() {
               <span className="jf-row-main">
                 <span className="jf-row-title">
                   <b>{company.companyName}</b>
-                  <span className="jf-scale-tag">{COMPANY_SCALE_SHORT[company.scale]}</span>
-                  <span className={`jf-chip ${company.checkinStatus === 'checked_in' ? 'ok' : company.checkinStatus === 'pending' ? 'warn' : ''}`}>
-                    {CHECKIN_LABELS[company.checkinStatus]}
-                  </span>
+                  {/* 规模原样显示来源文本。来源没给就不出这个标签——不写「中型」之类的猜测。 */}
+                  {company.scale ? <span className="jf-scale-tag">{company.scale}</span> : null}
+                  {/* 签到状态 chip 已撤：系统不追踪签到，接口也不返回该字段。 */}
                 </span>
                 <span className="jf-row-info">
                   {company.boothNumber && (
