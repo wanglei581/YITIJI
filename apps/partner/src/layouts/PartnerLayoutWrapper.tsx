@@ -16,6 +16,9 @@ import {
   UserCogIcon,
 } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
+import { PartnerCapabilitiesProvider } from '../services/CapabilitiesProvider'
+import { usePartnerCapabilities } from '../services/capabilities'
+import type { PartnerDataSourceCapabilities } from '../services/api'
 
 const PATH_TO_KEY: Record<string, string> = {
   '/':           'dashboard',
@@ -51,6 +54,41 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'account',    label: '账号权限',       icon: UserCogIcon, href: KEY_TO_PATH.account },
 ]
 
+/**
+ * 侧栏能力投影：只隐藏「这类机构连打开都会被服务端拒绝」的入口。
+ *
+ * 判定来源是服务端 `partner-capabilities.ts` 的同一份矩阵（经
+ * `GET /partner/data-sources/capabilities` 下发），前端不另写机构类型规则。
+ *
+ * 只有智慧校园符合「整页不可用」：smart-campus.service.ts 的 assertSchoolOrg
+ * 对**读取**也拒（PARTNER_NOT_SCHOOL），非学校机构点进去只会拿到 403。
+ *
+ * 岗位 / 招聘会 / 政策**不隐藏**，尽管服务端按类型拒绝新增：
+ * 这三处的列表、编辑、下架都不校验机构类型（jobs-partner.service.ts 的
+ * getPartnerJobs/getPartnerFairs、policies.service.ts 「更新/下架/删除不校验」），
+ * 存量数据必须还能被机构自己下架——把整页藏掉反而会把违规内容锁死在已发布状态。
+ * 这些页面改为**在真正会 403 的那颗「新增」按钮上禁用并说明原因**，
+ * 比藏掉整个入口更准确，也正好消掉「填完整张表才 403」的死路。
+ */
+function isNavItemVisible(key: string, caps: PartnerDataSourceCapabilities | null): boolean {
+  if (!caps) return true // 能力未知一律放行，见 services/capabilities.ts 的 fail-open 说明
+  if (key === 'smart-campus') return caps.canManageSmartCampus
+  return true
+}
+
+/** 过滤后把被丢弃项的分组标题顺延给该组第一个幸存项，避免分组表头凭空消失。 */
+function projectNavItems(caps: PartnerDataSourceCapabilities | null): NavItem[] {
+  const out: NavItem[] = []
+  let pendingGroup: string | undefined
+  for (const item of NAV_ITEMS) {
+    if (item.group) pendingGroup = item.group
+    if (!isNavItemVisible(item.key, caps)) continue
+    out.push(pendingGroup ? { ...item, group: pendingGroup } : item)
+    pendingGroup = undefined
+  }
+  return out
+}
+
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin:   '管理员',
   partner: '机构管理员',
@@ -59,11 +97,8 @@ const ROLE_LABEL: Record<AuthedUser['role'], string> = {
 
 export function PartnerLayoutWrapper() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [authChecked, setAuthChecked] = useState(false)
-  const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
 
   useEffect(() => {
     let cancelled = false
@@ -92,12 +127,28 @@ export function PartnerLayoutWrapper() {
     )
   }
 
+  // 能力接口需要已登录的 JWT，所以放在鉴权通过之后才挂载
+  return (
+    <PartnerCapabilitiesProvider>
+      <PartnerConsoleShell user={user} />
+    </PartnerCapabilitiesProvider>
+  )
+}
+
+function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [collapsed, setCollapsed] = useState(false)
+  const { capabilities } = usePartnerCapabilities()
+  const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
+  const navItems = projectNavItems(capabilities)
+
   const orgName = user?.name ?? '合作机构后台'
 
   return (
     <PartnerLayout
       orgName={orgName}
-      navItems={NAV_ITEMS}
+      navItems={navItems}
       activeKey={activeKey}
       visualTheme="legacy"
       density="comfortable"

@@ -11,6 +11,8 @@ import type {
   UpdatePartnerFairInput,
 } from '../../services/api'
 import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartnerFair } from '../../services/api'
+import { RejectReason } from '../../components/RejectReason'
+import { useCapability } from '../../services/capabilities'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -97,7 +99,16 @@ function errMsg(e: unknown): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * 服务端按机构类型拒绝新增招聘会（partner-capabilities.ts 的 canImportFairs → 403
+ * PARTNER_CAPABILITY_DENIED，例如企业数据来源方）。与岗位页同口径：
+ * 只禁用真正会 403 的「新增」按钮，不藏整页——列表/编辑/下架不校验类型，
+ * 存量招聘会仍必须能被机构自己下架。
+ */
+const CANNOT_CREATE_HINT = '本机构类型不支持录入招聘会数据，如需开通请联系平台运营。已有招聘会仍可下架。编辑同样需要该机构类型的录入能力，服务端会拒绝。'
+
 export default function FairsPage() {
+  const canCreate = useCapability('canImportFairs')
   const [statusFilter, setStatusFilter] = useState('全部')
   const [editing, setEditing] = useState<PartnerFairRecord | 'new' | null>(null)
   const [form, setForm] = useState<FairFormState>(EMPTY_FORM)
@@ -248,10 +259,22 @@ export default function FairsPage() {
       title="招聘会信息管理"
       subtitle={`共 ${fairs.length} 场招聘会`}
       actions={
-        <Button size="sm" variant="primary" className="flex items-center gap-1.5" onClick={openNew}>
-          <PlusIcon className="h-4 w-4" />
-          新增招聘会
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button
+            size="sm"
+            variant="primary"
+            className="flex items-center gap-1.5"
+            onClick={openNew}
+            disabled={!canCreate}
+            title={canCreate ? undefined : CANNOT_CREATE_HINT}
+          >
+            <PlusIcon className="h-4 w-4" />
+            新增招聘会
+          </Button>
+          {!canCreate && (
+            <p className="max-w-[280px] text-right text-xs leading-relaxed text-neutral-500">{CANNOT_CREATE_HINT}</p>
+          )}
+        </div>
       }
     >
       {notice && (
@@ -328,7 +351,10 @@ export default function FairsPage() {
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{f.syncTime}</td>
-                      <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
+                      <td className="px-4 py-3">
+                        <StatusBadge dot status={review.badge}  label={review.label}  />
+                        <RejectReason reviewStatus={f.reviewStatus} reason={f.rejectReason} />
+                      </td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-2">

@@ -12,6 +12,7 @@ import {
   type PolicyKind,
   type SavePolicyInput,
 } from '../../services/api/policies'
+import { useCapability } from '../../services/capabilities'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -75,7 +76,19 @@ function errMsg(e: unknown): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * 政策内容只有公共就业服务机构与高校就业中心可**创建**
+ * （policies.service.ts 的 assertPolicyCapableOrgType → 400
+ * ORG_TYPE_NOT_ALLOWED_FOR_POLICY，判定读 partner-capabilities.ts 的
+ * canManagePolicies）。这是合规约束：政策属官方性质，商业机构不得冒名发布。
+ *
+ * 更新/下架/删除不校验类型，存量内容必须还能被机构自己下架，
+ * 所以此页不隐藏、只禁用「新增」。
+ */
+const CANNOT_CREATE_HINT = '政策内容属官方性质，仅公共就业服务机构与高校就业中心可发布。本机构可查看与下架已有内容。'
+
 export default function PolicyPage() {
+  const canCreate = useCapability('canManagePolicies')
   const [editing, setEditing] = useState<PartnerPolicyRecord | 'new' | null>(null)
   const [form, setForm] = useState<PolicyFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -226,10 +239,20 @@ export default function PolicyPage() {
       title="政策公告"
       subtitle={`共 ${rows.length} 条政策内容 — 政策扶持条目与政策公告`}
       actions={
-        <button onClick={openNew} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700">
-          <PlusIcon className="h-4 w-4" />
-          新增政策内容
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={openNew}
+            disabled={!canCreate}
+            title={canCreate ? undefined : CANNOT_CREATE_HINT}
+            className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:pointer-events-none disabled:opacity-50"
+          >
+            <PlusIcon className="h-4 w-4" />
+            新增政策内容
+          </button>
+          {!canCreate && (
+            <p className="max-w-[300px] text-right text-xs leading-relaxed text-neutral-500">{CANNOT_CREATE_HINT}</p>
+          )}
+        </div>
       }
     >
       {notice && (
@@ -242,7 +265,9 @@ export default function PolicyPage() {
         <EmptyState
           icon={FileTextIcon}
           title="暂无政策内容"
-          description='点击右上角"新增政策内容",发布就业政策说明与公告(经管理员审核后在一体机展示)'
+          description={canCreate
+            ? '点击右上角"新增政策内容",发布就业政策说明与公告(经管理员审核后在一体机展示)'
+            : CANNOT_CREATE_HINT}
           className="py-16"
         />
       ) : (

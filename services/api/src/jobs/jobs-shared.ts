@@ -236,6 +236,18 @@ export interface PartnerJobDto {
   sourceOrgId: string; sourceName: string
   category?: string; salary?: string; tags?: string[]
   description?: string; requirements?: string
+  /**
+   * 管理员驳回时填写的原因（`Job.rejectReason`，reject 必填、approve 置 null）。
+   *
+   * **null = 本条没有被驳回**，不是「驳回了但没写原因」——
+   * approve 会把它清成 null，机构 import/update 重新提审同样清成 null
+   * （jobs-partner.service.ts）。只有 `reviewStatus === 'rejected'` 时才应展示；
+   * 消费方不得把 null 渲染成空串或「无原因」。
+   *
+   * 与 Admin 侧同字段同口径（prismaJobToAdminDto），与 PolicyPostDto / 企业
+   * partner DTO 的 rejectReason 写法一致。
+   */
+  rejectReason: string | null
 }
 
 export interface PartnerFairDto {
@@ -244,6 +256,8 @@ export interface PartnerFairDto {
   sourceUrl: string; checkinUrl?: string; syncTime: string; reviewStatus: ReviewStatus; publishStatus: PublishStatus
   sourceOrgId: string; sourceName: string
   theme?: string; city?: string; address?: string; description?: string
+  /** 同 {@link PartnerJobDto.rejectReason}：null = 未被驳回，不是「驳回但无原因」。 */
+  rejectReason: string | null
 }
 
 export interface PaginatedResult<T> {
@@ -615,6 +629,7 @@ export function prismaJobToPartnerDto(j: PrismaJobRow): PartnerJobDto {
     tags: safeJsonArr(j.tagsJson),
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
+    rejectReason: j.rejectReason,
   }
 }
 
@@ -696,6 +711,7 @@ export function prismaFairToPartnerDto(f: PrismaJobFairRow): PartnerFairDto {
     city: f.city,
     address: f.address ?? undefined,
     description: f.description ?? undefined,
+    rejectReason: f.rejectReason,
   }
 }
 
