@@ -73,8 +73,9 @@ export function useResumeAiConsent() {
     let cancelled = false
     const run = async () => {
       if (API_MODE !== 'http' || !token) {
-        const ack = typeof sessionStorage !== 'undefined' && sessionStorage.getItem(GUEST_ACK_KEY) === '1'
-        if (!cancelled) setPhase(ack ? 'granted' : 'needed')
+        // 拍板结论第 7 条：游客只做会话级提示，不入库、也不阻断解析（阻断会把游客诊断流
+        // 变成登录门槛，W3 回归「上传 → 解析 → 报告」即因此卡死）。提示由页面内联展示。
+        if (!cancelled) setPhase('granted')
         return
       }
       try {
@@ -112,6 +113,8 @@ export function useResumeAiConsent() {
     checking: phase === 'checking',
     needsPrompt: phase === 'needed',
     ready: phase === 'granted',
+    /** 游客：不入库、不阻断，页面内联一句会话级提示。 */
+    guestNotice: API_MODE === 'http' && !token,
     busy,
     error,
     confirm,

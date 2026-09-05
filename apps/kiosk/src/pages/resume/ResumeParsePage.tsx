@@ -241,6 +241,11 @@ export function ResumeParsePage() {
             <SparklesIcon style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
             当前服务仅返回最终解析结果。以下为本次处理内容说明，不代表服务端实时阶段。
           </div>
+          {consent.guestNotice && (
+            <div className="rp-notice" role="note" data-testid="resume-ai-guest-notice">
+              未登录使用简历 AI：本次结果只在本机会话内可见，离场即清，不进入任何账号；AI 建议仅供参考，不替你投递。
+            </div>
+          )}
 
           {/* 处理内容说明：API 不提供分阶段状态，不渲染完成/进行中 */}
           <div className="rp-steps">
