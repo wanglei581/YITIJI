@@ -25,6 +25,7 @@ import { ExcelImportModal } from './ExcelImportModal'
 import { omitWebhookSecretOnce } from './omitWebhookSecretOnce'
 import { RotateCredentialDrawer } from './RotateCredentialDrawer'
 import { usePartnerCapabilities } from '../../services/capabilities'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 
 /** 使用凭证、因而可以轮换的接入方式。excel/csv/json/manual 没有凭证概念。 */
 const CREDENTIAL_ACCESS_MODES: readonly string[] = ['api', 'webhook']
@@ -358,6 +359,7 @@ export default function SourcesPage() {
   const [archivingId,  setArchivingId]  = useState<string | null>(null)
   const [archiveError, setArchiveError] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<PartnerDataSource | null>(null)
+  const [confirmToggle, setConfirmToggle] = useState<PartnerDataSource | null>(null)
 
   const fetchSources = () =>
     getDataSources()
@@ -383,6 +385,7 @@ export default function SourcesPage() {
   const handleToggle = (id: string) => {
     if (togglingId) return
     setTogglingId(id)
+    setConfirmToggle(null)
     setToggleError(null)
     toggleDataSource(id)
       .then((updated) => {
@@ -578,7 +581,7 @@ export default function SourcesPage() {
                                 }`}
                                 type="button"
                                 disabled={togglingId === s.id}
-                                onClick={() => handleToggle(s.id)}
+                                onClick={() => setConfirmToggle(s)}
                               >
                                 {togglingId === s.id ? '处理中…' : s.connStatus === 'disabled' ? '启用' : '停用'}
                               </button>}
@@ -708,6 +711,20 @@ export default function SourcesPage() {
           </div>
         )}
       </Drawer>
+
+      <ConfirmActionDialog
+        open={confirmToggle !== null}
+        title={confirmToggle?.connStatus === 'disabled' ? '确认启用数据源' : '确认停用数据源'}
+        description={confirmToggle
+          ? confirmToggle.connStatus === 'disabled'
+            ? `启用「${confirmToggle.name}」后将恢复该来源的采集（仍受管理员启停策略约束）。`
+            : `停用「${confirmToggle.name}」后将停止采集。已发布内容不会自动下架。`
+          : ''}
+        confirmLabel={confirmToggle?.connStatus === 'disabled' ? '确认启用' : '确认停用'}
+        busy={togglingId !== null}
+        onCancel={() => setConfirmToggle(null)}
+        onConfirm={() => confirmToggle && handleToggle(confirmToggle.id)}
+      />
     </Page>
   )
 }

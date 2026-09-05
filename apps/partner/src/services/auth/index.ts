@@ -154,7 +154,13 @@ export async function login(loginId: string, password: string): Promise<LoginRes
   return ensurePartnerSession(r.data)
 }
 
+const MOCK_SMS_HINT = '当前为演示模式，不会发送真实短信。请改用密码登录，或配置 VITE_API_MODE=http 连接真实后端。'
+const MOCK_RESET_HINT = '当前为演示模式，无法发送找回密码短信。请改用密码登录，或连接真实后端后再重置。'
+
 export async function sendLoginSmsCode(phone: string): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {
+  if (API_MODE === 'mock') {
+    return { ok: false, code: 'MOCK_MODE', message: MOCK_SMS_HINT }
+  }
   const r = await postJson<{ sent: true; cooldownSeconds: number }>('/auth/sms-code', {
     phone,
     purpose: 'login',
@@ -165,36 +171,54 @@ export async function sendLoginSmsCode(phone: string): Promise<{ ok: true; coold
 }
 
 export async function loginWithSms(phone: string, code: string): Promise<LoginResult> {
+  if (API_MODE === 'mock') {
+    return { ok: false, code: 'MOCK_MODE', message: MOCK_SMS_HINT }
+  }
   const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login/sms', { phone, code, portal: 'partner' })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return ensurePartnerSession(r.data)
 }
 
 export async function startPasswordReset(loginIdOrPhone: string): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {
+  if (API_MODE === 'mock') {
+    return { ok: false, code: 'MOCK_MODE', message: MOCK_RESET_HINT }
+  }
   const r = await postJson<{ sent: true; cooldownSeconds: number }>('/auth/password/reset/start', { loginIdOrPhone })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return { ok: true, cooldownSeconds: r.data.cooldownSeconds }
 }
 
 export async function verifyPasswordReset(loginIdOrPhone: string, code: string): Promise<{ ok: true; resetTicket: string } | { ok: false; code: string; message: string }> {
+  if (API_MODE === 'mock') {
+    return { ok: false, code: 'MOCK_MODE', message: MOCK_RESET_HINT }
+  }
   const r = await postJson<{ resetTicket: string }>('/auth/password/reset/verify', { loginIdOrPhone, code })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return { ok: true, resetTicket: r.data.resetTicket }
 }
 
 export async function completePasswordReset(resetTicket: string, newPassword: string): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  if (API_MODE === 'mock') {
+    return { ok: false, code: 'MOCK_MODE', message: MOCK_RESET_HINT }
+  }
   const r = await postJson<{ success: true }>('/auth/password/reset/complete', { resetTicket, newPassword })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return { ok: true }
 }
 
 export async function sendOwnPhoneCode(): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {
+  if (API_MODE === 'mock') {
+    return { ok: false, code: 'MOCK_MODE', message: MOCK_SMS_HINT }
+  }
   const r = await postJson<{ sent: true; cooldownSeconds: number }>('/auth/phone/code', {})
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return { ok: true, cooldownSeconds: r.data.cooldownSeconds }
 }
 
 export async function verifyOwnPhone(code: string): Promise<{ ok: true; phoneVerifiedAt: string } | { ok: false; code: string; message: string }> {
+  if (API_MODE === 'mock') {
+    return { ok: false, code: 'MOCK_MODE', message: MOCK_SMS_HINT }
+  }
   const r = await postJson<{ phoneMasked: string; phoneVerifiedAt: string }>('/auth/phone/verify', { code })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   mergeStoredUser({ phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt })
