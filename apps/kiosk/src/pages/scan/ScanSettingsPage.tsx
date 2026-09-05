@@ -115,7 +115,12 @@ export function ScanSettingsPage() {
           if (cancellationCredentials) {
             cancelSessionOnce(cancellationCredentials.scanTaskId, cancellationCredentials.controlToken)
           }
-          throw new ApiHttpError('INVALID_SCAN_SESSION', '扫描任务未创建成功，请返回重试', 0)
+          // status 必须**非 0**：本仓约定 status===0 表示「压根没拿到 HTTP 响应」
+          // （networkError 就是这么造的），下面的 catch 据此判 outcomeUnknown 并显示
+          // 「网络连接中断，无法确认服务端是否收到请求」。而这里的情况恰恰相反——
+          // 服务端**回了** 2xx，只是响应体缺字段。用 0 会让页面对用户说反话，
+          // 还会走进「为避免重复创建不自动重发」那条本不适用的分支。
+          throw new ApiHttpError('INVALID_SCAN_SESSION', '扫描任务未创建成功，请返回重试', 200)
         }
 
         if (cancelled) {
