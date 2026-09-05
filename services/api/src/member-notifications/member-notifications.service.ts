@@ -39,45 +39,56 @@ export class MemberNotificationsService {
     opts: { cursor: string | null; pageSize: number; unreadOnly?: boolean },
   ): Promise<MemberNotificationPage> {
     const take = Math.min(Math.max(opts.pageSize, 1), 50)
-    const cursorDate = opts.cursor ? new Date(opts.cursor) : null
+    const cursor = decodeNotificationCursor(opts.cursor)
     const personalWhere: Record<string, unknown> = { endUserId, deletedAt: null }
     if (opts.unreadOnly) personalWhere['isRead'] = false
-    if (cursorDate && !Number.isNaN(cursorDate.getTime())) personalWhere['createdAt'] = { lt: cursorDate }
+    if (cursor) Object.assign(personalWhere, cursorWhere(cursor))
 
-    const broadcasts = await this.prisma.systemBroadcast.findMany({
-      where: {
+    const broadcastWhere = {
+      deletedAt: null,
+      ...(cursor ? cursorWhere(cursor) : {}),
+      readStates: opts.unreadOnly
+        ? { none: { endUserId, OR: [{ readAt: { not: null } }, { dismissedAt: { not: null } }] } }
+        : { none: { endUserId, dismissedAt: { not: null } } },
+    }
+
+    const [broadcasts, personal, personalTotal, broadcastTotal] = await Promise.all([
+      this.prisma.systemBroadcast.findMany({
+        where: broadcastWhere,
+        include: { readStates: { where: { endUserId } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.memberNotification.findMany({
+        where: personalWhere,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.memberNotification.count({ where: { endUserId, deletedAt: null, ...(opts.unreadOnly ? { isRead: false } : {}) } }),
+      this.prisma.systemBroadcast.count({ where: {
         deletedAt: null,
-        ...(cursorDate && !Number.isNaN(cursorDate.getTime()) ? { createdAt: { lt: cursorDate } } : {}),
         readStates: opts.unreadOnly
           ? { none: { endUserId, OR: [{ readAt: { not: null } }, { dismissedAt: { not: null } }] } }
           : { none: { endUserId, dismissedAt: { not: null } } },
-      },
-      include: { readStates: { where: { endUserId } } },
-      orderBy: { createdAt: 'desc' },
-      take,
-    })
-    const personal = await this.prisma.memberNotification.findMany({
-      where: personalWhere,
-      orderBy: { createdAt: 'desc' },
-      take,
-    })
+      } }),
+    ])
 
     const items = [
       ...personal.map((row) => this.toPersonalItem(row)),
       ...broadcasts.map((row) => this.toBroadcastItem(row, endUserId)),
     ]
       .filter((item) => !opts.unreadOnly || !item.isRead)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, take)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+
+    const hasMore = items.length > take
+    const pageItems = items.slice(0, take)
 
     const unreadCount = await this.countUnread(endUserId)
     return {
-      items,
-      total: items.length,
+      items: pageItems,
+      total: personalTotal + broadcastTotal,
       unreadCount,
-      // P1 exposes a single merged snapshot of personal notifications + broadcasts.
-      // Do not advertise cursor paging until the merged stream has a compound keyset cursor.
-      nextCursor: null,
+      nextCursor: hasMore && pageItems.length > 0 ? encodeNotificationCursor(pageItems[pageItems.length - 1]) : null,
     }
   }
 
@@ -142,9 +153,12 @@ export class MemberNotificationsService {
     })
   }
 
-  async listBroadcasts(): Promise<{ items: AdminBroadcastItem[] }> {
-    const rows = await this.prisma.systemBroadcast.findMany({ orderBy: { createdAt: 'desc' }, take: 100 })
-    return { items: rows.map(this.toAdminBroadcast) }
+  async listBroadcasts(): Promise<{ items: AdminBroadcastItem[]; total: number }> {
+    const [rows, total] = await Promise.all([
+      this.prisma.systemBroadcast.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }),
+      this.prisma.systemBroadcast.count(),
+    ])
+    return { items: rows.map(this.toAdminBroadcast), total }
   }
 
   async createBroadcast(admin: AuthedUser, dto: CreateBroadcastDto): Promise<AdminBroadcastItem> {
@@ -261,4 +275,30 @@ export class MemberNotificationsService {
       createdAt: row.createdAt.toISOString(),
     }
   }
+}
+
+function cursorWhere(cursor: { createdAt: Date; id: string }): { OR: Array<Record<string, unknown>> } {
+  return {
+    OR: [
+      { createdAt: { lt: cursor.createdAt } },
+      { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+    ],
+  }
+}
+
+function decodeNotificationCursor(value: string | null): { createdAt: Date; id: string } | null {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as { createdAt?: string; id?: string }
+    const createdAt = parsed.createdAt ? new Date(parsed.createdAt) : null
+    if (createdAt && !Number.isNaN(createdAt.getTime()) && parsed.id) return { createdAt, id: parsed.id }
+  } catch {
+    const createdAt = new Date(value)
+    if (!Number.isNaN(createdAt.getTime())) return { createdAt, id: '' }
+  }
+  return null
+}
+
+function encodeNotificationCursor(item: Pick<MemberNotificationItem, 'createdAt' | 'id'>): string {
+  return Buffer.from(JSON.stringify({ createdAt: item.createdAt, id: item.id })).toString('base64url')
 }

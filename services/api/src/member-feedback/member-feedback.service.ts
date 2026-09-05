@@ -53,19 +53,20 @@ export class MemberFeedbackService {
   async listForEndUser(endUserId: string, opts: { cursor: string | null; pageSize: number }): Promise<MemberFeedbackPage> {
     const take = Math.min(Math.max(opts.pageSize, 1), 50)
     const cursorDate = opts.cursor ? new Date(opts.cursor) : null
-    const rows = await this.prisma.feedbackTicket.findMany({
-      where: {
-        endUserId,
-        ...(cursorDate && !Number.isNaN(cursorDate.getTime()) ? { createdAt: { lt: cursorDate } } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take,
-    })
-    const items = rows.map((row) => this.toMemberItem(row))
+    const where = {
+      endUserId,
+      ...(cursorDate && !Number.isNaN(cursorDate.getTime()) ? { createdAt: { lt: cursorDate } } : {}),
+    }
+    const [rows, total] = await Promise.all([
+      this.prisma.feedbackTicket.findMany({ where, orderBy: { createdAt: 'desc' }, take: take + 1 }),
+      this.prisma.feedbackTicket.count({ where: { endUserId } }),
+    ])
+    const hasMore = rows.length > take
+    const items = rows.slice(0, take).map((row) => this.toMemberItem(row))
     return {
       items,
-      total: items.length,
-      nextCursor: items.length === take ? items[items.length - 1].createdAt : null,
+      total,
+      nextCursor: hasMore && items.length > 0 ? items[items.length - 1].createdAt : null,
     }
   }
 
@@ -107,7 +108,7 @@ export class MemberFeedbackService {
 
   async listForAdmin(
     query: { status?: string; category?: string; submitterType?: string },
-  ): Promise<{ items: AdminFeedbackTicketItem[] }> {
+  ): Promise<{ items: AdminFeedbackTicketItem[]; total: number }> {
     const status = query.status ? this.validateStatus(query.status) : undefined
     const category = query.category ? this.validateCategory(query.category) : undefined
     // 匿名一体机工单与会员工单混在同一张表里，处置方式完全不同：
@@ -115,17 +116,21 @@ export class MemberFeedbackService {
     // 「需要现场跑一趟的队列」单独拉出来 —— 这正是 @@index([submitterType, terminalId, createdAt])
     // 建了却一直没有查询使用的原因。
     const submitterType = query.submitterType ? this.validateSubmitterType(query.submitterType) : undefined
-    const rows = await this.prisma.feedbackTicket.findMany({
-      where: {
-        ...(status ? { status } : {}),
-        ...(category ? { category } : {}),
-        ...(submitterType ? { submitterType } : {}),
-      },
-      include: { endUser: { select: { phoneEnc: true, nickname: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
-    return { items: rows.map((row) => this.toAdminItem(row)) }
+    const where = {
+      ...(status ? { status } : {}),
+      ...(category ? { category } : {}),
+      ...(submitterType ? { submitterType } : {}),
+    }
+    const [rows, total] = await Promise.all([
+      this.prisma.feedbackTicket.findMany({
+        where,
+        include: { endUser: { select: { phoneEnc: true, nickname: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      this.prisma.feedbackTicket.count({ where }),
+    ])
+    return { items: rows.map((row) => this.toAdminItem(row)), total }
   }
 
   async getForAdmin(admin: AuthedUser, id: string): Promise<AdminFeedbackTicketDetail> {

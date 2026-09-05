@@ -70,7 +70,9 @@ const EMPTY_FORM = {
 
 export default function BenefitActivitiesPage() {
   const [items, setItems] = useState<AdminBenefitActivityItem[]>([])
+  const [total, setTotal] = useState(0)
   const [claims, setClaims] = useState<AdminBenefitActivityClaimItem[]>([])
+  const [claimsTotal, setClaimsTotal] = useState(0)
   const [selected, setSelected] = useState<AdminBenefitActivityItem | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [claimsState, setClaimsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -84,6 +86,7 @@ export default function BenefitActivitiesPage() {
     benefitActivitiesAdminApi.list()
       .then((res) => {
         setItems(res.items)
+        setTotal(res.total)
         setState('ready')
       })
       .catch(() => setState('error'))
@@ -115,6 +118,7 @@ export default function BenefitActivitiesPage() {
   const reset = () => {
     setSelected(null)
     setClaims([])
+    setClaimsTotal(0)
     setClaimsState('idle')
     setForm(EMPTY_FORM)
   }
@@ -124,6 +128,7 @@ export default function BenefitActivitiesPage() {
     try {
       const res = await benefitActivitiesAdminApi.claims(id)
       setClaims(res.items)
+      setClaimsTotal(res.total)
       setClaimsState('ready')
     } catch {
       setClaimsState('error')
@@ -206,7 +211,10 @@ export default function BenefitActivitiesPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-semibold text-neutral-900">活动列表</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-semibold text-neutral-900">活动列表</p>
+              <p className="text-xs text-neutral-400">{total} 条{total > items.length ? ` · 仅显示最近 ${items.length} 条` : ''}</p>
+            </div>
             <button type="button" onClick={reset} className="rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white">
               新建活动
             </button>
@@ -370,7 +378,10 @@ export default function BenefitActivitiesPage() {
           </Card>
 
           <Card className="p-4">
-            <p className="mb-3 text-sm font-semibold text-neutral-900">领取记录</p>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-neutral-900">领取记录</p>
+              {selected && <p className="text-xs text-neutral-400">{claimsTotal} 条{claimsTotal > claims.length ? ` · 仅显示最近 ${claims.length} 条` : ''}</p>}
+            </div>
             {!selected && <EmptyState icon={GiftIcon} title="未选择活动" description="选择活动后查看领取记录" className="py-12" />}
             {selected && claimsState === 'loading' && <LoadingState className="py-12" />}
             {selected && claimsState === 'error' && <ErrorState className="py-12" onRetry={() => void loadClaims(selected.id)} />}

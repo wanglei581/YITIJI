@@ -70,7 +70,7 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   return json.data
 }
 
-const EMPTY = { items: [] }
+const EMPTY = { items: [], total: 0 }
 
 export const memberBenefitsAdminApi = {
   searchUsers(phone: string): Promise<{ items: AdminEndUserSearchItem[] }> {
@@ -83,7 +83,7 @@ export const memberBenefitsAdminApi = {
     }
     return request(`/admin/member-benefits/users?phone=${encodeURIComponent(phone)}`)
   },
-  list(endUserId: string): Promise<{ items: AdminBenefitGrantItem[] }> {
+  list(endUserId: string): Promise<{ items: AdminBenefitGrantItem[]; total: number }> {
     if (API_MODE !== 'http' || !endUserId) return Promise.resolve(EMPTY)
     return request(`/admin/member-benefits?endUserId=${encodeURIComponent(endUserId)}`)
   },

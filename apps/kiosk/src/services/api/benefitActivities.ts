@@ -58,8 +58,8 @@ async function request<T>(
 export function listBenefitActivities(
   token?: string | null,
   source?: BenefitActivitySourceType,
-): Promise<{ items: BenefitActivityListItem[] }> {
-  if (API_MODE !== 'http') return Promise.resolve({ items: [] })
+): Promise<{ items: BenefitActivityListItem[]; total: number }> {
+  if (API_MODE !== 'http') return Promise.resolve({ items: [], total: 0 })
   const params = new URLSearchParams()
   if (source) params.set('source', source)
   const q = params.toString()

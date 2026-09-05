@@ -500,7 +500,6 @@ export class TerminalToolboxService {
           heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
         },
         orderBy: { registeredAt: 'desc' },
-        take: 500,
       }),
       this.prisma.terminalToolboxConfig.findMany(),
     ])

@@ -61,6 +61,7 @@ export interface AdminCompanyDetail extends AdminCompanyListItem {
   showEmployeeScale: boolean
   showBoothNo: boolean
   linkedJobs: CompanyLinkedJob[]
+  linkedJobsTotal: number
 }
 
 /** 可关联岗位（同来源机构 + 已审核发布 + 未关联本企业）。 */
@@ -70,6 +71,11 @@ export interface CompanyLinkableJob {
   city: string
   category: string | null
   companyProfileId: string | null
+}
+
+export interface CompanyLinkableJobsResult {
+  items: CompanyLinkableJob[]
+  total: number
 }
 
 export interface CompanyListFilters {
@@ -127,7 +133,7 @@ export interface CompaniesAdminServiceInterface {
   updateCompany(id: string, input: CompanyFieldsInput): Promise<AdminCompanyDetail>
   reviewCompany(id: string, action: 'approve' | 'reject', rejectReason?: string): Promise<void>
   publishCompany(id: string, publish: boolean): Promise<void>
-  listLinkableJobs(id: string, keyword?: string): Promise<CompanyLinkableJob[]>
+  listLinkableJobs(id: string, keyword?: string): Promise<CompanyLinkableJobsResult>
   linkJobs(id: string, jobIds: string[]): Promise<LinkJobsResult>
   unlinkJob(id: string, jobId: string): Promise<void>
 }
@@ -195,7 +201,7 @@ const httpAdapter: CompaniesAdminServiceInterface = {
     await req<unknown>('PATCH', `/admin/companies/${id}/publish`, { publish })
   },
   listLinkableJobs: (id, keyword) =>
-    req<CompanyLinkableJob[]>('GET', `/admin/companies/${id}/linkable-jobs${keyword?.trim() ? `?keyword=${encodeURIComponent(keyword.trim())}` : ''}`),
+    req<CompanyLinkableJobsResult>('GET', `/admin/companies/${id}/linkable-jobs${keyword?.trim() ? `?keyword=${encodeURIComponent(keyword.trim())}` : ''}`),
   linkJobs: (id, jobIds) => req<LinkJobsResult>('POST', `/admin/companies/${id}/jobs`, { jobIds }),
   unlinkJob: async (id, jobId) => {
     await req<unknown>('DELETE', `/admin/companies/${id}/jobs/${jobId}`)
@@ -275,6 +281,7 @@ const mockAdapter: CompaniesAdminServiceInterface = {
       showEmployeeScale: input.showEmployeeScale ?? true,
       showBoothNo: input.showBoothNo ?? true,
       linkedJobs: [],
+      linkedJobsTotal: 0,
     }
     mockCompanies.unshift(created)
     return created
@@ -311,7 +318,7 @@ const mockAdapter: CompaniesAdminServiceInterface = {
   async listLinkableJobs(id) {
     mustFind(id)
     // mock 模式无岗位数据源，返回空列表（真实可关联岗位接 http 后端后出现）
-    return []
+    return { items: [], total: 0 }
   },
   async linkJobs(id, jobIds) {
     mustFind(id)
@@ -322,6 +329,7 @@ const mockAdapter: CompaniesAdminServiceInterface = {
     const idx = c.linkedJobs.findIndex((j) => j.id === jobId)
     if (idx < 0) throw new ApiHttpError('COMPANY_JOB_NOT_LINKED', '该岗位未关联本企业', 404)
     c.linkedJobs.splice(idx, 1)
+    c.linkedJobsTotal -= 1
   },
 }
 

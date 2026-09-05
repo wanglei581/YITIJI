@@ -231,7 +231,6 @@ export class JobsAdminService {
     const batches = await this.prisma.importBatch.findMany({
       include: { source: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
-      take: 500,
     })
     const orgIds = [...new Set(batches.map((b) => b.orgId))]
     const orgs = await this.prisma.organization.findMany({
