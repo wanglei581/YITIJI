@@ -13,6 +13,7 @@ import type {
 } from '../../services/api'
 import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartnerFair } from '../../services/api'
 import { RejectReason } from '../../components/RejectReason'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import { useCapability } from '../../services/capabilities'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
@@ -119,6 +120,8 @@ export default function FairsPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [configuring, setConfiguring] = useState<PartnerFairRecord | null>(null)
+  const [noticeIsError, setNoticeIsError] = useState(false)
+  const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerFairRecord | null>(null)
 
   const { data, status, refresh } = useRefreshable(
     PARTNER_FAIRS_REFRESH_KEY,
@@ -130,7 +133,13 @@ export default function FairsPage() {
     },
   )
 
-  useInteractionLock(editing !== null || configuring !== null || saving || busyId !== null, [PARTNER_FAIRS_REFRESH_KEY], 'hard')
+  // 四个都要进锁：编辑中、配置子资源中（#806）、保存中、下架确认框开着（本 PR）。
+  // 确认框开着时后台刷新换掉那一行，用户确认的就是别人。
+  useInteractionLock(
+    editing !== null || configuring !== null || saving || busyId !== null || confirmUnpublish !== null,
+    [PARTNER_FAIRS_REFRESH_KEY],
+    'hard',
+  )
 
   useEffect(() => {
     if (!notice) return
@@ -153,12 +162,16 @@ export default function FairsPage() {
     已结束: fairs.filter((f) => f.status === 'ended').length,
   }
 
-  const handleUnpublish = async (id: string) => {
-    setBusyId(id)
+  const handleUnpublish = async (fair: PartnerFairRecord) => {
+    setBusyId(fair.id)
+    setConfirmUnpublish(null)
     try {
-      await unpublishPartnerFair(id)
+      await unpublishPartnerFair(fair.id)
+      setNoticeIsError(false)
+      setNotice('招聘会已下架，终端将不再展示。')
       void refresh()
     } catch (e) {
+      setNoticeIsError(true)
       setNotice(errMsg(e))
     } finally {
       setBusyId(null)
@@ -210,6 +223,7 @@ export default function FairsPage() {
     try {
       if (editing === 'new') {
         const externalId = `MANUAL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        setNoticeIsError(false)
         await importPartnerFairs([{
           externalId,
           title: payload.title!,
@@ -226,6 +240,7 @@ export default function FairsPage() {
         setNotice('招聘会已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')
       } else if (editing) {
         await updatePartnerFair(editing.id, payload)
+        setNoticeIsError(false)
         setNotice('修改已保存。该招聘会已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')
       }
       setEditing(null)
@@ -282,7 +297,11 @@ export default function FairsPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          noticeIsError
+            ? 'border-error/30 bg-error-bg text-error-fg'
+            : 'border-success/30 bg-success-bg text-success-fg'
+        }`}>
           {notice}
         </div>
       )}
@@ -373,7 +392,7 @@ export default function FairsPage() {
                             <button
                               disabled={busyId === f.id}
                               className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => void handleUnpublish(f.id)}
+                              onClick={() => setConfirmUnpublish(f)}
                             >
                               {busyId === f.id ? '处理中…' : '下架'}
                             </button>
@@ -473,6 +492,18 @@ export default function FairsPage() {
         </div>
       </Drawer>
       {configuring && <FairSubresourcesDrawer fairId={configuring.id} fairName={configuring.name} venueDefault={configuring.venue} open onClose={() => setConfiguring(null)} />}
+
+      <ConfirmActionDialog
+        open={confirmUnpublish !== null}
+        title="确认下架招聘会"
+        description={confirmUnpublish
+          ? `下架后终端将不再展示「${confirmUnpublish.name}」。已发布内容立即对求职者不可见。`
+          : ''}
+        confirmLabel="确认下架"
+        busy={busyId !== null}
+        onCancel={() => setConfirmUnpublish(null)}
+        onConfirm={() => confirmUnpublish && void handleUnpublish(confirmUnpublish)}
+      />
     </Page>
   )
 }

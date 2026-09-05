@@ -88,7 +88,7 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
     },
   ]
   return (
-    <section aria-label="数据概览">
+    <section role="region" aria-label="数据概览">
       <div className="mb-3 flex items-center gap-2">
         <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
         <h2 className="text-[13px] font-bold text-neutral-700">数据概览</h2>

@@ -4,6 +4,7 @@ import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-pri
 import { Page } from '../Page'
 import { ClipboardListIcon, FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
   partnerPoliciesService,
   type PartnerPolicyRecord,
@@ -97,8 +98,10 @@ export default function PolicyPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [noticeIsError, setNoticeIsError] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerPolicyRecord | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<PartnerPolicyRecord | null>(null)
   /** P21 申领条件录入面(只对政策扶持条目开放;公告没有申领条件) */
   const [rulesFor, setRulesFor] = useState<PartnerPolicyRecord | null>(null)
 
@@ -113,7 +116,7 @@ export default function PolicyPage() {
   )
 
   useInteractionLock(
-    editing !== null || saving || busyId !== null || deletingId !== null || rulesFor !== null,
+    editing !== null || saving || busyId !== null || confirmDelete !== null || confirmUnpublish !== null || rulesFor !== null,
     [PARTNER_POLICIES_REFRESH_KEY],
     'hard',
   )
@@ -123,12 +126,6 @@ export default function PolicyPage() {
     const t = setTimeout(() => setNotice(null), 8000)
     return () => clearTimeout(t)
   }, [notice])
-
-  useEffect(() => {
-    if (!deletingId) return
-    const t = setTimeout(() => setDeletingId(null), 5000)
-    return () => clearTimeout(t)
-  }, [deletingId])
 
   const rows = data ?? []
   const loading = status === 'idle' || (status === 'loading' && rows.length === 0)
@@ -174,9 +171,11 @@ export default function PolicyPage() {
     try {
       if (editing === 'new') {
         await partnerPoliciesService.createPolicy(payload)
+        setNoticeIsError(false)
         setNotice('政策内容已提交,进入待审核;管理员审核通过并发布后,终端才会展示。')
       } else if (editing) {
         await partnerPoliciesService.updatePolicy(editing.id, payload)
+        setNoticeIsError(false)
         setNotice('修改已保存。该内容已重新进入待审核,审核通过并重新发布前,终端不展示。')
       }
       setEditing(null)
@@ -188,29 +187,32 @@ export default function PolicyPage() {
     }
   }
 
-  const handleUnpublish = async (id: string) => {
-    setBusyId(id)
+  const handleUnpublish = async (row: PartnerPolicyRecord) => {
+    setBusyId(row.id)
+    setConfirmUnpublish(null)
     try {
-      await partnerPoliciesService.unpublishPolicy(id)
+      await partnerPoliciesService.unpublishPolicy(row.id)
+      setNoticeIsError(false)
+      setNotice('政策内容已下架，终端将不再展示。')
       void refresh()
     } catch (e) {
+      setNoticeIsError(true)
       setNotice(errMsg(e))
     } finally {
       setBusyId(null)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (deletingId !== id) {
-      setDeletingId(id)
-      return
-    }
-    setDeletingId(null)
-    setBusyId(id)
+  const handleDelete = async (row: PartnerPolicyRecord) => {
+    setBusyId(row.id)
+    setConfirmDelete(null)
     try {
-      await partnerPoliciesService.deletePolicy(id)
+      await partnerPoliciesService.deletePolicy(row.id)
+      setNoticeIsError(false)
+      setNotice('政策内容已删除')
       void refresh()
     } catch (e) {
+      setNoticeIsError(true)
       setNotice(errMsg(e))
     } finally {
       setBusyId(null)
@@ -260,7 +262,11 @@ export default function PolicyPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          noticeIsError
+            ? 'border-error/30 bg-error-bg text-error-fg'
+            : 'border-success/30 bg-success-bg text-success-fg'
+        }`}>
           {notice}
         </div>
       )}
@@ -311,7 +317,12 @@ export default function PolicyPage() {
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => openEdit(r)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
+                          <button
+                            type="button"
+                            aria-label="编辑"
+                            onClick={() => openEdit(r)}
+                            className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                          >
                             <PencilIcon className="h-3.5 w-3.5" />
                           </button>
                           {r.kind === 'policy_guide' && (
@@ -327,20 +338,20 @@ export default function PolicyPage() {
                           {r.publishStatus === 'published' && (
                             <button
                               disabled={busyId === r.id}
-                              onClick={() => void handleUnpublish(r.id)}
+                              onClick={() => setConfirmUnpublish(r)}
                               className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg disabled:opacity-50"
                             >
                               下架
                             </button>
                           )}
                           <button
+                            type="button"
+                            aria-label="删除"
                             disabled={busyId === r.id}
-                            onClick={() => void handleDelete(r.id)}
-                            className={`rounded px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                              deletingId === r.id ? 'bg-error text-white hover:bg-error/90' : 'text-error-fg hover:bg-error-bg'
-                            }`}
+                            onClick={() => setConfirmDelete(r)}
+                            className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
                           >
-                            {deletingId === r.id ? '确认删除?' : <Trash2Icon className="h-3.5 w-3.5" />}
+                            <Trash2Icon className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </td>
@@ -363,6 +374,7 @@ export default function PolicyPage() {
           policy={rulesFor}
           onClose={() => setRulesFor(null)}
           onSaved={() => {
+            setNoticeIsError(false)
             setNotice('申领条件已保存。该政策已重新进入待审核,审核通过并重新发布前,一体机不会使用这组条件。')
             void refresh()
           }}
@@ -435,6 +447,30 @@ export default function PolicyPage() {
           </p>
         </div>
       </Drawer>
+
+      <ConfirmActionDialog
+        open={confirmUnpublish !== null}
+        title="确认下架政策"
+        description={confirmUnpublish
+          ? `下架后终端将不再展示「${confirmUnpublish.title}」。`
+          : ''}
+        confirmLabel="确认下架"
+        busy={busyId !== null}
+        onCancel={() => setConfirmUnpublish(null)}
+        onConfirm={() => confirmUnpublish && void handleUnpublish(confirmUnpublish)}
+      />
+      <ConfirmActionDialog
+        open={confirmDelete !== null}
+        title="确认删除政策"
+        description={confirmDelete
+          ? `删除「${confirmDelete.title}」后不可恢复。终端若仍在展示，将立即失去该条内容。`
+          : ''}
+        confirmLabel="确认删除"
+        tone="danger"
+        busy={busyId !== null}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete && void handleDelete(confirmDelete)}
+      />
     </Page>
   )
 }

@@ -14,6 +14,7 @@ import type {
 import { getPartnerJobQualitySummary, getPartnerJobs, importPartnerJobs, unpublishPartnerJob, updatePartnerJob } from '../../services/api'
 import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
 import { RejectReason } from '../../components/RejectReason'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import { useCapability } from '../../services/capabilities'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
@@ -133,6 +134,7 @@ export default function JobsPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [noticeIsError, setNoticeIsError] = useState(false)
+  const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerJobRecord | null>(null)
 
   function showNotice(msg: string, isError = false) {
     setNotice(msg)
@@ -158,7 +160,7 @@ export default function JobsPage() {
     },
   )
 
-  useInteractionLock(editing !== null || saving || busyId !== null, [PARTNER_JOBS_REFRESH_KEY, PARTNER_JOB_QUALITY_REFRESH_KEY], 'hard')
+  useInteractionLock(editing !== null || saving || busyId !== null || confirmUnpublish !== null, [PARTNER_JOBS_REFRESH_KEY, PARTNER_JOB_QUALITY_REFRESH_KEY], 'hard')
 
   useEffect(() => {
     if (!notice) return
@@ -184,10 +186,12 @@ export default function JobsPage() {
     已拒绝: jobs.filter((j) => j.reviewStatus === 'rejected').length,
   }
 
-  const handleUnpublish = async (id: string) => {
-    setBusyId(id)
+  const handleUnpublish = async (job: PartnerJobRecord) => {
+    setBusyId(job.id)
+    setConfirmUnpublish(null)
     try {
-      await unpublishPartnerJob(id)
+      await unpublishPartnerJob(job.id)
+      showNotice('岗位已下架，终端将不再展示。')
       void refresh()
     } catch (e) {
       showNotice(errMsg(e), true)
@@ -427,7 +431,7 @@ export default function JobsPage() {
                             <button
                               disabled={busyId === j.id}
                               className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => void handleUnpublish(j.id)}
+                              onClick={() => setConfirmUnpublish(j)}
                             >
                               {busyId === j.id ? '处理中…' : '下架'}
                             </button>
@@ -544,6 +548,18 @@ export default function JobsPage() {
           </p>
         </div>
       </Drawer>
+
+      <ConfirmActionDialog
+        open={confirmUnpublish !== null}
+        title="确认下架岗位"
+        description={confirmUnpublish
+          ? `下架后终端将不再展示「${confirmUnpublish.title}」。已发布内容立即对求职者不可见。`
+          : ''}
+        confirmLabel="确认下架"
+        busy={busyId !== null}
+        onCancel={() => setConfirmUnpublish(null)}
+        onConfirm={() => confirmUnpublish && void handleUnpublish(confirmUnpublish)}
+      />
     </Page>
   )
 }

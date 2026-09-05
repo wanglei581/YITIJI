@@ -128,8 +128,47 @@ const httpAdapter: PartnerCompaniesServiceInterface = {
 // ─── Mock adapter（初始空列表；导入/编辑镜像后端 pending+draft 语义）────────────
 
 const now = () => new Date().toISOString()
-let mockSeq = 0
-const mockRows: PartnerCompanyRecord[] = []
+let mockSeq = 2
+const mockRows: PartnerCompanyRecord[] = [
+  {
+    id: 'pc-mock-pub',
+    name: '演示科技有限公司',
+    sourceOrgId: 'mock-org',
+    sourceName: '测试机构',
+    externalId: 'CO-DEMO-001',
+    province: '山东省',
+    city: '青岛市',
+    district: null,
+    industry: null,
+    companyType: null,
+    fairParticipant: false,
+    reviewStatus: 'approved',
+    publishStatus: 'published',
+    rejectReason: null,
+    linkedJobCount: 2,
+    syncTime: '2026-05-25T08:00:00.000Z',
+    updatedAt: '2026-05-25T08:00:00.000Z',
+  },
+  {
+    id: 'pc-mock-rej',
+    name: '被驳回企业',
+    sourceOrgId: 'mock-org',
+    sourceName: '测试机构',
+    externalId: 'CO-DEMO-002',
+    province: null,
+    city: null,
+    district: null,
+    industry: null,
+    companyType: null,
+    fairParticipant: false,
+    reviewStatus: 'rejected',
+    publishStatus: 'draft',
+    rejectReason: '企业简介缺少主营业务说明',
+    linkedJobCount: 0,
+    syncTime: '2026-05-24T18:00:00.000Z',
+    updatedAt: '2026-05-24T18:00:00.000Z',
+  },
+]
 
 function applyFields(row: PartnerCompanyRecord, input: CompanyFieldsInput) {
   if (input.name !== undefined) row.name = input.name

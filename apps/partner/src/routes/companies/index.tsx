@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { Building2Icon, PlusIcon, RefreshCwIcon } from 'lucide-react'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
   COMPANY_TYPES,
   COMPANY_INDUSTRIES,
@@ -215,6 +216,9 @@ export default function CompaniesPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [noticeIsError, setNoticeIsError] = useState(false)
+  const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerCompanyRecord | null>(null)
+  const [unpublishing, setUnpublishing] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -321,6 +325,7 @@ export default function CompaniesPage() {
         const jobIds = splitList(form.jobExternalIds)
         if (jobIds.length > 0) item.jobExternalIds = jobIds
         const result = await partnerCompaniesService.importPartnerCompanies([item])
+        setNoticeIsError(false)
         setNotice(
           result.updated > 0
             ? '该外部编号已存在,本次提交已更新原企业资料并回到待审核+草稿状态,须管理员重新审核发布。'
@@ -331,27 +336,35 @@ export default function CompaniesPage() {
         const jobIds = splitList(form.jobExternalIds)
         if (jobIds.length > 0) payload.jobExternalIds = jobIds
         await partnerCompaniesService.updatePartnerCompany(editing.id, payload)
+        setNoticeIsError(false)
         setNotice('修改已保存。该企业资料已回到待审核+草稿状态,管理员重新审核发布前,终端不展示该企业。')
       }
       setEditing(null)
       load()
     } catch (e) {
       setFormError(errMsg(e))
+      setNoticeIsError(true)
     } finally {
       setSaving(false)
     }
   }
 
   // P1-A④ 下架本机构已发布企业(镜像岗位/招聘会/政策):只改 publishStatus,不触发重审。
-  const handleUnpublish = async (id: string) => {
+  const handleUnpublish = async (company: PartnerCompanyRecord) => {
+    setUnpublishing(true)
+    setConfirmUnpublish(null)
     try {
-      const updated = await partnerCompaniesService.unpublishPartnerCompany(id)
-      if (updated) setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)))
+      const updated = await partnerCompaniesService.unpublishPartnerCompany(company.id)
+      if (updated) setCompanies((prev) => prev.map((c) => (c.id === company.id ? updated : c)))
       else load()
+      setNoticeIsError(false)
       setNotice('企业资料已下架，终端将不再展示。如需重新上架，请用「编辑」重新提交并由管理员审核发布。')
-    } catch {
-      // 下架失败 → 重新拉取列表，保证 UI 与后端一致
+    } catch (e) {
+      setNoticeIsError(true)
+      setNotice(errMsg(e))
       load()
+    } finally {
+      setUnpublishing(false)
     }
   }
 
@@ -399,7 +412,11 @@ export default function CompaniesPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          noticeIsError
+            ? 'border-error/30 bg-error-bg text-error-fg'
+            : 'border-success/30 bg-success-bg text-success-fg'
+        }`}>
           {notice}
         </div>
       )}
@@ -483,7 +500,7 @@ export default function CompaniesPage() {
                           {c.publishStatus === 'published' && (
                             <button
                               className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => void handleUnpublish(c.id)}
+                              onClick={() => setConfirmUnpublish(c)}
                             >
                               下架
                             </button>
@@ -664,6 +681,18 @@ export default function CompaniesPage() {
           </p>
         </div>
       </Drawer>
+
+      <ConfirmActionDialog
+        open={confirmUnpublish !== null}
+        title="确认下架企业"
+        description={confirmUnpublish
+          ? `下架后终端将不再展示「${confirmUnpublish.name}」。已发布内容立即对求职者不可见。`
+          : ''}
+        confirmLabel="确认下架"
+        busy={unpublishing}
+        onCancel={() => setConfirmUnpublish(null)}
+        onConfirm={() => confirmUnpublish && void handleUnpublish(confirmUnpublish)}
+      />
     </Page>
   )
 }
