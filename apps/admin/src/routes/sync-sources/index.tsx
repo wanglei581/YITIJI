@@ -34,6 +34,7 @@ interface ApiSyncSourceItem {
   accessMode: string
   syncFreq: string
   enabled: boolean
+  archived: boolean
   lastSyncAt: string | null
   lastSyncStatus: string | null
   hasEndpoint: boolean
@@ -86,6 +87,7 @@ const MOCK_SOURCES: ApiSyncSourceItem[] = [
     accessMode: 'api',
     syncFreq: 'hourly',
     enabled: true,
+    archived: false,
     lastSyncAt: null,
     lastSyncStatus: null,
     hasEndpoint: true,
@@ -242,6 +244,7 @@ export default function SyncSourcesPage() {
   }
 
   const handleEnabled = async (source: ApiSyncSourceItem) => {
+    if (source.archived) return
     setSourceActionId(source.id)
     setSourceActionError(null)
     try {
@@ -358,7 +361,9 @@ export default function SyncSourcesPage() {
                         {s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString('zh-CN') : '从未'}
                       </td>
                       <td className="px-4 py-3">
-                        {!s.enabled ? (
+                        {s.archived ? (
+                          <StatusBadge dot status="default" label="已归档" />
+                        ) : !s.enabled ? (
                           <StatusBadge dot status="warning" label="待启用 / 已停用" />
                         ) : s.lastSyncStatus ? (
                           <StatusBadge
@@ -393,14 +398,14 @@ export default function SyncSourcesPage() {
                             mappings
                           </button>}
                           {s.accessMode === 'api' && <button
-                            disabled={trigState === 'loading' || !s.enabled || !s.hasEndpoint}
+                            disabled={trigState === 'loading' || s.archived || !s.enabled || !s.hasEndpoint}
                             onClick={() => handleTrigger(s.id)}
                             className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
                               trigState === 'ok'    ? 'bg-success-bg text-success-fg' :
                               trigState === 'error' ? 'bg-error-bg text-error-fg' :
                               'bg-primary-50 text-primary-600 hover:bg-primary-100'
                             }`}
-                            title={!s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
+                            title={s.archived ? '数据源已归档' : !s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
                           >
                             <PlayIcon className="h-3 w-3" />
                             {trigState === 'loading' ? '触发中…' :
@@ -409,11 +414,11 @@ export default function SyncSourcesPage() {
                              '立即同步'}
                           </button>}
                           <button
-                            disabled={sourceActionId === s.id}
+                            disabled={s.archived || sourceActionId === s.id}
                             onClick={() => void handleEnabled(s)}
                             className="rounded border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
                           >
-                            {s.enabled ? '停用通道' : '审批并启用'}
+                            {s.archived ? '已归档' : s.enabled ? '停用通道' : '审批并启用'}
                           </button>
                           <button
                             disabled={sourceActionId === s.id}

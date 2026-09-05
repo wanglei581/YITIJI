@@ -110,12 +110,43 @@ export default function AccountSettingsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [successVisible, setSuccessVisible] = useState(false)
   const [loginLogs, setLoginLogs] = useState<AuditLogRecord[]>([])
+  const [loginLogsLoading, setLoginLogsLoading] = useState(true)
+  const [loginLogsError, setLoginLogsError] = useState<string | null>(null)
 
   useEffect(() => {
-    getAuditLogs({ limit: 5, action: 'system.login' })
-      .then((res) => setLoginLogs(res.items))
-      .catch(() => undefined) // 非关键功能，失败不打断页面
-  }, [])
+    if (!user?.id) {
+      setLoginLogs([])
+      setLoginLogsLoading(false)
+      setLoginLogsError('无法识别当前账号，登录记录暂不可用')
+      return
+    }
+
+    let cancelled = false
+    setLoginLogsLoading(true)
+    setLoginLogsError(null)
+    Promise.all([
+      getAuditLogs({ limit: 5, action: 'auth.password_login', actorId: user.id }),
+      getAuditLogs({ limit: 5, action: 'auth.sms_login', actorId: user.id }),
+    ])
+      .then((responses) => {
+        if (cancelled) return
+        const newest = responses
+          .flatMap((response) => response.items)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 5)
+        setLoginLogs(newest)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setLoginLogs([])
+        setLoginLogsError(error instanceof Error && error.message ? error.message : '登录记录加载失败')
+      })
+      .finally(() => {
+        if (!cancelled) setLoginLogsLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [user?.id])
 
   function handlePhoneBound(phone: Pick<AuthedUser, 'phoneMasked' | 'phoneVerifiedAt'>): void {
     setUser((current) => current ? { ...current, ...phone } : current)
@@ -308,28 +339,27 @@ export default function AccountSettingsPage() {
         </div>
 
         {/* ── 最近登录记录 ─────────────────────────────────── */}
-        {loginLogs.length > 0 && (
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-              <h2 className="text-[13px] font-bold text-neutral-700">最近登录记录</h2>
-            </div>
-            <Card className="overflow-hidden p-0">
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+            <h2 className="text-[13px] font-bold text-neutral-700">最近登录记录</h2>
+          </div>
+          <Card className="overflow-hidden p-0">
+            {loginLogsLoading ? (
+              <p className="px-5 py-4 text-sm text-neutral-400">正在加载当前账号的登录记录…</p>
+            ) : loginLogsError ? (
+              <p role="alert" className="px-5 py-4 text-sm text-error-fg">{loginLogsError}</p>
+            ) : loginLogs.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-neutral-500">当前账号暂无密码或短信登录记录。</p>
+            ) : (
               <div className="divide-y divide-neutral-900/[0.06]">
-                {loginLogs.map((log, i) => (
+                {loginLogs.map((log) => (
                   <div key={log.id} className="flex items-center gap-3 px-5 py-3.5">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-primary-50 text-primary-600">
                       <MonitorIcon className="h-4 w-4" aria-hidden="true" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-2 text-[13px] font-semibold text-neutral-900">
-                        {formatLoginTime(log.createdAt)}
-                        {i === 0 && (
-                          <span className="rounded-full bg-success-bg px-2 py-0.5 text-[10.5px] font-bold text-success-fg">
-                            当前会话
-                          </span>
-                        )}
-                      </p>
+                      <p className="text-[13px] font-semibold text-neutral-900">{formatLoginTime(log.createdAt)}</p>
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {log.ipAddress ?? '未记录 IP'} · {parseDevice(log.userAgent)}
                       </p>
@@ -340,9 +370,9 @@ export default function AccountSettingsPage() {
                   </div>
                 ))}
               </div>
-            </Card>
-          </div>
-        )}
+            )}
+          </Card>
+        </div>
       </div>
     </Page>
   )

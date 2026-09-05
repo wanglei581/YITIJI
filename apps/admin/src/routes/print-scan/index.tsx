@@ -53,6 +53,7 @@ const TASK_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' |
   failed: { badge: 'error', label: '失败' },
   expired: { badge: 'default', label: '已过期' },
   cancelled: { badge: 'default', label: '已取消' },
+  abandoned: { badge: 'default', label: '已废弃' },
 }
 
 const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: string; value: string }[]> = {
@@ -64,6 +65,7 @@ const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: str
     { label: '已完成', value: 'completed' },
     { label: '失败', value: 'failed' },
     { label: '已取消', value: 'cancelled' },
+    { label: '已废弃', value: 'abandoned' },
   ],
   scan: [
     { label: '全部', value: '' },
