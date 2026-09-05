@@ -186,7 +186,50 @@ const allowedChanged = new Set([
   'services/api/package.json',
   'services/api/scripts/verify-benefit-redemption.ts',
   'services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts',
+  // 序 13「订单详情展示真实打印参数与优惠退款额」（2026-09-06）。
+  // 该功能横跨 API → shared 类型 → Admin → Kiosk，以下文件都在本页的业务链路上。
+  'apps/admin/scripts/verify-admin-billing-ui.mjs',
+  'apps/admin/scripts/verify-admin-orders-readonly-ui.mjs',
+  'apps/admin/src/routes/billing/index.tsx',
+  'apps/admin/src/routes/orders/index.tsx',
+  'apps/admin/src/routes/orders/orderHonestyCopy.ts',
+  'apps/admin/src/services/api/adminOrdersReadonly.ts',
+  'apps/kiosk/scripts/verify-member-print-orders-ui.mjs',
+  'apps/kiosk/scripts/verify-price-single-source.mjs',
+  'apps/kiosk/src/pages/print/PrintCashierPage.tsx',
+  'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
+  'packages/shared/src/types/memberPrintOrders.ts',
+  'packages/shared/src/types/payment.ts',
+  'services/api/scripts/verify-admin-orders-readonly.ts',
+  'services/api/scripts/verify-member-print-orders.ts',
+  'services/api/scripts/verify-print-color-duplex-capability.ts',
+  'services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts',
+  'services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts',
+  'services/api/src/member-print-orders/member-print-orders.service.ts',
+  'services/api/src/member-print-orders/member-print-orders.types.ts',
 ])
+
+// ⚠️ 设计问题，待产品负责人裁决（2026-09-06，序 13 撞上后记录，本次未擅自改动）
+//
+// 上面这张 allowlist 断言的是：只要 PR 碰了 /me/print-orders，**整个变更集**
+// 就必须落在清单内。它是「墨青纸感视觉收口」那个批次落地时的装置，用来证明
+// 那批改动没夹带业务逻辑。那个批次早已合入，这个目的已经达成 ——
+// 已落地的批次不可能被后来的 PR 追溯弄脏。
+//
+// 但它留下来之后对**任何**正当改这一页的工作都是敌对的。序 13 是第一个撞上的：
+// 该功能横跨四层，19 个文件全在清单外，而它们没有一个是「夹带」。
+// 本次按最小侵入处理 —— 加行放行，不动检查逻辑。
+//
+// 问题在于这条路走不长：下一个改这一页的 PR 还要再加一批，清单会退化成
+// 「历史上谁改过什么」的流水账，不再是契约。一个每次都要靠加行才能变绿的门禁
+// 挡不住任何东西。（原作者已察觉过一半：touchesOwnedPage 条件挡住了「无关 PR
+// 被误伤」，但挡不住「相关 PR 必然被误伤」。）
+//
+// 建议裁决：退役这段变更集范围检查，保留本文件其余全部断言（页面结构、真实
+// API、支付字段、取件码、分页筛选、自动刷新、反馈跳转，以及三个兄弟守卫不得
+// 回头拦截本页）。支付诚实性另有 verify:member-print-orders-ui 覆盖，序 13
+// 已对它做过变异测试（把实付改成「应付减优惠」推算 → 该门禁转红）。
+// 未获裁决前保持现状，不要自行删除。
 
 // 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/print-orders 明细页（或其 printOrders 子组件）时，
 // 才强制 allowlist 范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次改动。
