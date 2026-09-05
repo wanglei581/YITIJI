@@ -3,8 +3,8 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { RefreshCwIcon } from 'lucide-react'
-import type { PartnerSyncLog, SyncDataType, SyncResult } from '../../services/api'
-import { getSyncLogs } from '../../services/api'
+import type { PartnerDataSource, PartnerSyncLog, SyncDataType, SyncResult } from '../../services/api'
+import { getDataSources, getSyncLogs } from '../../services/api'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -25,37 +25,48 @@ const RESULT_FILTER_MAP: Record<string, SyncResult | null> = {
   全部: null, 成功: 'success', 部分失败: 'partial', 失败: 'failed',
 }
 
+const PAGE_SIZE = 20
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SyncLogsPage() {
   const [logs,         setLogs]         = useState<PartnerSyncLog[]>([])
+  const [sources,      setSources]      = useState<PartnerDataSource[]>([])
   const [loading,      setLoading]      = useState(true)
-  // 日志详情抽屉(审计修复:原「查看详情」死按钮)
-  const [detail, setDetail] = useState<(typeof logs)[number] | null>(null)
+  const [detail, setDetail] = useState<PartnerSyncLog | null>(null)
   const [error,        setError]        = useState(false)
   const [resultFilter, setResultFilter] = useState('全部')
+  const [sourceId,     setSourceId]     = useState('')
+  const [page,         setPage]         = useState(1)
+  const [total,        setTotal]        = useState(0)
+  const [totalPages,   setTotalPages]   = useState(1)
+
+  useEffect(() => {
+    getDataSources().then(setSources).catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-    getSyncLogs()
-      .then((data) => { if (!cancelled) setLogs(data) })
+    setLoading(true)
+    getSyncLogs({
+      page,
+      pageSize: PAGE_SIZE,
+      sourceId: sourceId || undefined,
+      result: RESULT_FILTER_MAP[resultFilter] ?? undefined,
+    })
+      .then((res) => {
+        if (cancelled) return
+        setLogs(res.data)
+        setTotal(res.pagination.total)
+        setTotalPages(res.pagination.totalPages)
+        setError(false)
+      })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [page, resultFilter, sourceId])
 
-  const filtered = resultFilter === '全部'
-    ? logs
-    : logs.filter((l) => l.status === RESULT_FILTER_MAP[resultFilter])
-
-  const counts = {
-    全部:   logs.length,
-    成功:   logs.filter((l) => l.status === 'success').length,
-    部分失败: logs.filter((l) => l.status === 'partial').length,
-    失败:   logs.filter((l) => l.status === 'failed').length,
-  }
-
-  if (loading) {
+  if (loading && logs.length === 0) {
     return (
       <Page title="同步日志" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
@@ -65,7 +76,7 @@ export default function SyncLogsPage() {
     )
   }
 
-  if (error) {
+  if (error && logs.length === 0) {
     return (
       <Page title="同步日志" subtitle="加载失败">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
@@ -78,23 +89,32 @@ export default function SyncLogsPage() {
 
   return (
     <Page title="同步日志" subtitle="数据源同步任务记录">
-      {/* 筛选标签 */}
-      <div className="mb-4 flex gap-2">
-        {RESULT_FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setResultFilter(f)}
-            className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
-              resultFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
-            }`}
-          >
-            {f}
-            <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
-          </button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <select
+          className="h-9 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-700"
+          value={sourceId}
+          onChange={(e) => { setSourceId(e.target.value); setPage(1) }}
+        >
+          <option value="">全部数据源</option>
+          {sources.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <div className="flex gap-2">
+          {RESULT_FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => { setResultFilter(f); setPage(1) }}
+              className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
+                resultFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* 表格 */}
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -106,7 +126,7 @@ export default function SyncLogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-900/[0.06]">
-              {filtered.length === 0 ? (
+              {logs.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="py-12 text-center text-sm text-neutral-400">
                     <RefreshCwIcon className="mx-auto mb-2 h-8 w-8 text-neutral-200" />
@@ -114,8 +134,8 @@ export default function SyncLogsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((l) => {
-                  const dt  = DATA_TYPE_MAP[l.dataType]
+                logs.map((l) => {
+                  const dt  = DATA_TYPE_MAP[l.dataType] ?? DATA_TYPE_MAP.job
                   const res = RESULT_MAP[l.status]
                   return (
                     <tr key={l.id} className="hover:bg-neutral-50">
@@ -140,7 +160,6 @@ export default function SyncLogsPage() {
                       <td className="px-4 py-3"><StatusBadge dot status={res.badge} label={res.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(l.syncTime)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        {/* 「重试」已移除:后端暂无按日志重放端点,失败数据请修正后重新导入(审计修复) */}
                         <button
                           className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
                           onClick={() => setDetail(l)}
@@ -157,11 +176,32 @@ export default function SyncLogsPage() {
         </div>
       </Card>
 
+      <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
+        <p>共 {total} 条 · 第 {page} / {totalPages} 页</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="rounded border border-neutral-200 px-3 py-1.5 disabled:opacity-40"
+          >
+            上一页
+          </button>
+          <button
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="rounded border border-neutral-200 px-3 py-1.5 disabled:opacity-40"
+          >
+            下一页
+          </button>
+        </div>
+      </div>
+
       <p className="mt-3 text-xs text-neutral-400">
-        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。
+        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。日志编号为稳定记录 ID，不随列表位置变化。
       </p>
 
-      {/* 同步日志详情(展示该行全部字段,含完整失败原因) */}
       {detail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
           <Card className="w-full max-w-lg p-6">

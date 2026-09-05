@@ -21,7 +21,7 @@
 
 import { formatDate } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
-import { authHeader } from '../auth'
+import { authHeader, redirectToLogin } from '../auth'
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -192,7 +192,9 @@ async function fetchPartnerStats(period: StatsPeriod): Promise<PartnerStatsRespo
   // 拒成 400 VALIDATION_FAILED。时区改由响应的 timezone 字段声明。
   const res = await fetch(`${API_BASE_URL}/partner/stats?period=${period}`, {
     headers: { Accept: 'application/json', ...authHeader() },
+    credentials: 'include',
   })
+  if (res.status === 401) redirectToLogin()
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
     throw new Error(err.error?.message ?? `HTTP ${res.status}`)

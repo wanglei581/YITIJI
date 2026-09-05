@@ -12,6 +12,7 @@ import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
 import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
+import { normalizeOptionalHttpUrl } from '../jobs/jobs-shared'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -152,7 +153,7 @@ export class PoliciesService {
         content: dto.content ?? null,
         audience: dto.audience ?? null,
         category: dto.category ?? null,
-        externalUrl: dto.externalUrl ?? null,
+        externalUrl: normalizeOptionalHttpUrl(dto.externalUrl, 'externalUrl') ?? null,
         externalId: dto.externalId ?? null,
         publishedDate: dto.publishedDate ? new Date(dto.publishedDate) : null,
       },
@@ -188,7 +189,7 @@ export class PoliciesService {
         ...(dto.content !== undefined ? { content: dto.content } : {}),
         ...(dto.audience !== undefined ? { audience: dto.audience } : {}),
         ...(dto.category !== undefined ? { category: dto.category } : {}),
-        ...(dto.externalUrl !== undefined ? { externalUrl: dto.externalUrl } : {}),
+        ...(dto.externalUrl !== undefined ? { externalUrl: normalizeOptionalHttpUrl(dto.externalUrl, 'externalUrl') ?? null } : {}),
         ...(dto.externalId !== undefined ? { externalId: dto.externalId } : {}),
         ...(dto.publishedDate !== undefined ? { publishedDate: new Date(dto.publishedDate) } : {}),
         // 状态机:内容修订 → 强制重审(与岗位/招聘会一致)

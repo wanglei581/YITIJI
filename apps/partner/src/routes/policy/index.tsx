@@ -12,7 +12,10 @@ import {
   type PolicyKind,
   type SavePolicyInput,
 } from '../../services/api/policies'
+import type { ReviewStatus } from '../../services/api'
 import { useCapability } from '../../services/capabilities'
+import { RejectReason } from '../../components/RejectReason'
+import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -152,7 +155,8 @@ export default function PolicyPage() {
     setEditing(r)
   }
 
-  const canSave = form.title.trim().length > 0
+  const urlOk = !form.externalUrl.trim() || isAbsoluteHttpUrl(form.externalUrl)
+  const canSave = form.title.trim().length > 0 && urlOk
 
   const save = async () => {
     setSaving(true)
@@ -295,9 +299,7 @@ export default function PolicyPage() {
                       <td className="max-w-96 px-4 py-3">
                         <p className="font-medium text-neutral-800">{r.title}</p>
                         {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
-                        {r.reviewStatus === 'rejected' && r.rejectReason && (
-                          <p className="mt-0.5 text-xs text-error-fg">拒绝原因:{r.rejectReason}(修改后将重新提审)</p>
-                        )}
+                        <RejectReason reviewStatus={r.reviewStatus as ReviewStatus} reason={r.rejectReason} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         {r.kind === 'policy_guide'
@@ -420,6 +422,9 @@ export default function PolicyPage() {
           <div className="grid grid-cols-2 gap-3">
             <Field label="政策来源 / 办理链接">
               <input className={inputCls} placeholder="https://…(请填写发布主体或办理渠道链接)" value={form.externalUrl} onChange={(e) => setForm((f) => ({ ...f, externalUrl: e.target.value }))} />
+              {form.externalUrl.trim() && !isAbsoluteHttpUrl(form.externalUrl) && (
+                <p className="mt-1 text-xs text-error-fg">请填写以 http:// 或 https:// 开头的有效链接</p>
+              )}
             </Field>
             <Field label="展示日期">
               <input type="date" className={inputCls} value={form.publishedDate} onChange={(e) => setForm((f) => ({ ...f, publishedDate: e.target.value }))} />

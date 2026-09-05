@@ -15,6 +15,7 @@ import { getPartnerJobQualitySummary, getPartnerJobs, importPartnerJobs, unpubli
 import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
 import { RejectReason } from '../../components/RejectReason'
 import { useCapability } from '../../services/capabilities'
+import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -49,17 +50,18 @@ const PARTNER_JOBS_REFRESH_KEY = 'partner:jobs'
 const PARTNER_JOB_QUALITY_REFRESH_KEY = 'partner:jobs:quality'
 
 /** DB category('fulltime' 等)→ 编辑表单 workType('full_time' 等)。 */
-const CATEGORY_TO_WORKTYPE: Record<JobCategory, 'full_time' | 'part_time' | 'internship'> = {
+const CATEGORY_TO_WORKTYPE: Record<JobCategory, 'full_time' | 'part_time' | 'internship' | 'campus'> = {
   fulltime: 'full_time',
   parttime: 'part_time',
   intern:   'internship',
-  campus:   'full_time',
+  campus:   'campus',
 }
 
 const WORKTYPE_OPTIONS = [
   { value: 'full_time',  label: '全职' },
   { value: 'part_time',  label: '兼职' },
   { value: 'internship', label: '实习' },
+  { value: 'campus',     label: '校招' },
 ] as const
 
 const inputCls =
@@ -82,15 +84,26 @@ interface JobFormState {
   company: string
   city: string
   sourceUrl: string
-  workType: 'full_time' | 'part_time' | 'internship' | ''
+  workType: 'full_time' | 'part_time' | 'internship' | 'campus' | ''
   salary: string
   tags: string
   description: string
   requirements: string
+  educationRequirement: string
+  experienceRequirement: string
+  skills: string
+  benefits: string
+  salaryMin: string
+  salaryMax: string
+  salaryUnit: string
+  validThrough: string
+  headcount: string
 }
 
 const EMPTY_FORM: JobFormState = {
   title: '', company: '', city: '', sourceUrl: '', workType: '', salary: '', tags: '', description: '', requirements: '',
+  educationRequirement: '', experienceRequirement: '', skills: '', benefits: '',
+  salaryMin: '', salaryMax: '', salaryUnit: '', validThrough: '', headcount: '',
 }
 
 function errMsg(e: unknown): string {
@@ -200,12 +213,21 @@ export default function JobsPage() {
       tags: (j.tags ?? []).join(','),
       description: j.description ?? '',
       requirements: j.requirements ?? '',
+      educationRequirement: j.educationRequirement ?? '',
+      experienceRequirement: j.experienceRequirement ?? '',
+      skills: (j.skills ?? []).join(','),
+      benefits: (j.benefits ?? []).join(','),
+      salaryMin: j.salaryMin != null ? String(j.salaryMin) : '',
+      salaryMax: j.salaryMax != null ? String(j.salaryMax) : '',
+      salaryUnit: j.salaryUnit ?? '',
+      validThrough: j.validThrough ? j.validThrough.slice(0, 10) : '',
+      headcount: j.headcount != null ? String(j.headcount) : '',
     })
     setFormError(null)
     setEditing(j)
   }
 
-  const canSave = form.title.trim() && form.company.trim() && form.city.trim() && form.sourceUrl.trim()
+  const canSave = form.title.trim() && form.company.trim() && form.city.trim() && isAbsoluteHttpUrl(form.sourceUrl)
 
   const save = async () => {
     setSaving(true)
@@ -220,6 +242,15 @@ export default function JobsPage() {
       description: form.description.trim() || undefined,
       requirements: form.requirements.trim() || undefined,
       workType: form.workType || undefined,
+      educationRequirement: form.educationRequirement.trim() || undefined,
+      experienceRequirement: form.experienceRequirement.trim() || undefined,
+      skills: form.skills.split(',').map((t) => t.trim()).filter(Boolean),
+      benefits: form.benefits.split(',').map((t) => t.trim()).filter(Boolean),
+      salaryMin: form.salaryMin.trim() === '' || !Number.isFinite(Number(form.salaryMin)) ? undefined : Number(form.salaryMin),
+      salaryMax: form.salaryMax.trim() === '' || !Number.isFinite(Number(form.salaryMax)) ? undefined : Number(form.salaryMax),
+      salaryUnit: form.salaryUnit.trim() || undefined,
+      validThrough: form.validThrough.trim() || undefined,
+      headcount: form.headcount.trim() === '' || !Number.isFinite(Number(form.headcount)) ? undefined : Number(form.headcount),
     }
     try {
       if (editing === 'new') {
@@ -462,10 +493,46 @@ export default function JobsPage() {
           </div>
           <Field label="外部投递链接(来源平台)" required>
             <input className={inputCls} placeholder="https://…(求职者跳转外部平台投递)" value={form.sourceUrl} onChange={(e) => setForm((f) => ({ ...f, sourceUrl: e.target.value }))} />
+            {form.sourceUrl.trim() && !isAbsoluteHttpUrl(form.sourceUrl) && (
+              <p className="mt-1 text-xs text-error-fg">请填写以 http:// 或 https:// 开头的有效链接</p>
+            )}
           </Field>
           <Field label="标签(逗号分隔)">
             <input className={inputCls} placeholder="如 五险一金,双休" value={form.tags} onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))} />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="学历要求">
+              <input className={inputCls} value={form.educationRequirement} onChange={(e) => setForm((f) => ({ ...f, educationRequirement: e.target.value }))} />
+            </Field>
+            <Field label="经验要求">
+              <input className={inputCls} value={form.experienceRequirement} onChange={(e) => setForm((f) => ({ ...f, experienceRequirement: e.target.value }))} />
+            </Field>
+          </div>
+          <Field label="技能(逗号分隔)">
+            <input className={inputCls} placeholder="如 React,TypeScript" value={form.skills} onChange={(e) => setForm((f) => ({ ...f, skills: e.target.value }))} />
+          </Field>
+          <Field label="福利(逗号分隔)">
+            <input className={inputCls} placeholder="如 五险一金,年终奖" value={form.benefits} onChange={(e) => setForm((f) => ({ ...f, benefits: e.target.value }))} />
+          </Field>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="最低薪资">
+              <input className={inputCls} inputMode="numeric" value={form.salaryMin} onChange={(e) => setForm((f) => ({ ...f, salaryMin: e.target.value }))} />
+            </Field>
+            <Field label="最高薪资">
+              <input className={inputCls} inputMode="numeric" value={form.salaryMax} onChange={(e) => setForm((f) => ({ ...f, salaryMax: e.target.value }))} />
+            </Field>
+            <Field label="薪资单位">
+              <input className={inputCls} placeholder="如 元/月" value={form.salaryUnit} onChange={(e) => setForm((f) => ({ ...f, salaryUnit: e.target.value }))} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="有效期">
+              <input type="date" className={inputCls} value={form.validThrough} onChange={(e) => setForm((f) => ({ ...f, validThrough: e.target.value }))} />
+            </Field>
+            <Field label="招聘人数">
+              <input className={inputCls} inputMode="numeric" value={form.headcount} onChange={(e) => setForm((f) => ({ ...f, headcount: e.target.value }))} />
+            </Field>
+          </div>
           <Field label="职位描述">
             <textarea className={`${inputCls} h-24 resize-none`} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
           </Field>
