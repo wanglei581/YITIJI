@@ -104,6 +104,7 @@
     "verify:job-validity-expiry": "node -r @swc-node/register scripts/verify-job-validity-expiry.ts",
     "verify:db-load-indexes": "node -r @swc-node/register scripts/verify-db-load-indexes.ts",
     "verify:screensaver-content": "node -r @swc-node/register scripts/verify-screensaver-content.ts",
+    "verify:ad-asset-range": "node -r @swc-node/register scripts/verify-ad-asset-range.ts",
     "verify:audit-logs": "node -r @swc-node/register scripts/verify-audit-logs.ts",
     "verify:ai-config": "node -r @swc-node/register scripts/verify-ai-config.ts",
     "verify:ai-contract-mirror": "node scripts/verify-ai-contract-mirror.mjs",
