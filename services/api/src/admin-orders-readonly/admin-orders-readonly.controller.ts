@@ -80,9 +80,13 @@ export class AdminOrdersReadonlyController {
     @Query('channel') channel?: string,
     @Query('pickupStatus') pickupStatus?: string,
     @Query('search') search?: string,
-    @Query('refundRequired') refundRequiredRaw?: string,
     @Query('page') pageStr?: string,
     @Query('pageSize') sizeStr?: string,
+    // 新增的可选筛选一律**追加在末尾**。@Query 在 HTTP 上按名字绑定，顺序无所谓；
+    // 但 verify-admin-order-filters 这类门禁是直接按位置调 controller.list(...) 的，
+    // 往中间插参数会把它们的 page/pageSize 挤到别的形参上（实测：'1' 落到
+    // refundRequired 被解析成 true，整条用例莫名 400）。
+    @Query('refundRequired') refundRequiredRaw?: string,
   ) {
     const refundRequired = pickRefundRequired(refundRequiredRaw)
     const resolvedPayStatus = pickFilter('payStatus', payStatus, VALID_PAY_STATUS)
