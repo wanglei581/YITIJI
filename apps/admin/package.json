@@ -29,7 +29,8 @@
     "verify:partner-account-action-state": "pnpm --filter @ai-job-print/api exec node --import tsx --experimental-test-coverage --test-coverage-lines=97 --test-coverage-functions=100 --test-coverage-branches=80 --test ../../apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
     "verify:admin-device-fleet-overview-ui": "node scripts/verify-admin-device-fleet-overview-ui.mjs",
     "verify:admin-terminal-network-diagnostics-ui": "node scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
-    "preview": "vite preview --port 5174"
+    "preview": "vite preview --port 5174",
+    "test:e2e": "node scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

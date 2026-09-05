@@ -962,7 +962,7 @@ jobs:
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -1034,6 +1034,10 @@ jobs:
           # 长期处于「写了但从不运行」的状态。挂进来，否则它守不住任何东西。
           pnpm --filter @ai-job-print/kiosk test:browser:truth
 
+      - name: Run Admin browser E2E
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs
+
       - name: Upload Kiosk browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -1059,5 +1063,7 @@ jobs:
             test-results/kiosk-scan-safety/**
             test-results/kiosk-mic-capability/**
             test-results/kiosk-mic-capability-report/**
+            test-results/admin-e2e/**
+            test-results/admin-e2e-report/**
           if-no-files-found: ignore
           retention-days: 7
