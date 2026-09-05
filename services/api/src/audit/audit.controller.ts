@@ -5,6 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { AuditService } from './audit.service'
 import type { AuditLogListResponse } from './audit.types'
+import { AuditLogQueryDto } from './dto/audit-log-query.dto'
 
 /**
  * 路由:
@@ -19,27 +20,7 @@ export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
   @Get()
-  async list(
-    @Query('action') action?: string,
-    @Query('actorId') actorId?: string,
-    @Query('targetType') targetType?: string,
-    @Query('targetId') targetId?: string,
-    @Query('startAt') startAt?: string,
-    @Query('endAt') endAt?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ): Promise<ApiResponse<AuditLogListResponse>> {
-    return ApiResponse.ok(
-      await this.audit.list({
-        action,
-        actorId,
-        targetType,
-        targetId,
-        startAt,
-        endAt,
-        limit: limit ? Number(limit) : undefined,
-        offset: offset ? Number(offset) : undefined,
-      }),
-    )
+  async list(@Query() query: AuditLogQueryDto): Promise<ApiResponse<AuditLogListResponse>> {
+    return ApiResponse.ok(await this.audit.list(query))
   }
 }

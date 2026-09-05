@@ -257,10 +257,10 @@ export class FilesController {
     if (!requester) {
       throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后访问文件' } })
     }
-    const { response, record, needsAdminAudit } = await this.files.getAccessUrl(id, requester, disposition)
+    const { response, record } = await this.files.getAccessUrl(id, requester, disposition)
     // 合规(CLAUDE.md §11):管理员访问用户文件必须记录审计日志。
-    if (needsAdminAudit && requester.kind === 'user') {
-      await this.audit.write({
+    if (requester.kind === 'user' && requester.role === 'admin') {
+      await this.audit.writeRequired(this.prisma, {
         actorId: requester.userId,
         actorRole: 'admin',
         action: 'file.admin_access',
@@ -292,7 +292,7 @@ export class FilesController {
     @Req() req: ReqLike,
   ): Promise<ApiResponse<SignedUrlResponse>> {
     const result = await this.files.getSignedUrl(id, user)
-    await this.audit.write({
+    const auditArgs = {
       actorId: user.userId,
       actorRole: user.role,
       action: 'file.get_signed_url',
@@ -302,7 +302,12 @@ export class FilesController {
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
-    })
+    }
+    if (user.role === 'admin') {
+      await this.audit.writeRequired(this.prisma, auditArgs)
+    } else {
+      await this.audit.write(auditArgs)
+    }
     return ApiResponse.ok(result)
   }
 

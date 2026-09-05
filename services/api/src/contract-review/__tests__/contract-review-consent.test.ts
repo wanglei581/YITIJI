@@ -788,8 +788,12 @@ test('contract review disclaimer is recognized but newly created documents remai
       },
       findFirst: async () => null,
     },
+    $transaction: async (operation: (tx: unknown) => Promise<unknown>) => operation(prisma),
   }
-  const service = new LegalService(prisma as never)
+  const audit = {
+    writeRequired: async () => 'audit-1',
+  }
+  const service = new LegalService(prisma as never, audit as never)
 
   assert.match(sharedLegalTypes, /'contract_review_disclaimer'/)
   assert.ok(LEGAL_DOC_TYPES.includes('contract_review_disclaimer'))

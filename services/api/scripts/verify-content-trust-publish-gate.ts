@@ -186,6 +186,16 @@ const fakeAudit = {
     auditWrites.push({ action: a.action, targetType: a.targetType, targetId: a.targetId })
     return 'audit-id'
   },
+  // 对齐真实 AuditService.writeRequired：必须拿到事务客户端，拿不到就抛。
+  // 审计与业务改动同事务是「审计不静默丢失」的核心性质，双测不能把它放水。
+  writeRequired: async (
+    tx: unknown,
+    a: { action: string; targetType: string; targetId?: string | null },
+  ) => {
+    if (!tx) throw new Error('fakeAudit.writeRequired: 缺少事务客户端')
+    auditWrites.push({ action: a.action, targetType: a.targetType, targetId: a.targetId })
+    return 'audit-id'
+  },
 } as unknown as AuditService
 
 const user: AuthedUser = { userId: 'admin-1', role: 'admin' } as AuthedUser
@@ -296,7 +306,13 @@ function buildFixture() {
     { id: 'mat-null', jobFairId: 'fair-null', name: '资料B', type: 'pdf', storageKey: 'k/b', publishStatus: 'draft', deletedAt: null, allowPrint: true, pageCount: 1, description: null, mimeType: 'application/pdf', sizeBytes: 1, createdAt: NOW, updatedAt: NOW },
   ])
 
-  const prisma = { organization, job, jobFair, policyPost, companyProfile, offlineAgency, fairMaterial } as unknown as PrismaService
+  // $transaction 把同一批模型双测原样交给回调：本套断言的是闸门与审计行为，
+  // 不模拟回滚；缺了它服务层进不去事务分支。
+  const prismaModels = { organization, job, jobFair, policyPost, companyProfile, offlineAgency, fairMaterial }
+  const prisma = {
+    ...prismaModels,
+    $transaction: async <T>(fn: (tx: typeof prismaModels) => Promise<T>): Promise<T> => fn(prismaModels),
+  } as unknown as PrismaService
 
   const jobsAdmin = new JobsAdminService(prisma, fakeAudit)
   const policies = new PoliciesService(prisma, fakeAudit)

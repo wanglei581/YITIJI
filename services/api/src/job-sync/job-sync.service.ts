@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
+import { request as httpRequest, type IncomingHttpHeaders } from 'node:http'
+import { request as httpsRequest } from 'node:https'
 import { PrismaService } from '../prisma/prisma.service'
 import { decryptSecret } from '../common/crypto/secret-cipher'
 import { isSensitiveColumn } from '../jobs/dto/excel-import.dto'
@@ -17,10 +19,12 @@ import {
   type JobSourceResponseConfig,
   type SyncStats,
 } from './job-sync.types'
-import { validatePublicUrl } from './ssrf-guard'
+import { resolvePublicUrl, validatePublicUrl, type ResolvedPublicUrl } from './ssrf-guard'
+import type { UpdateResponseConfigDto } from './dto/response-config.dto'
 
 const FETCH_TIMEOUT_MS = 30_000
 const MAX_REDIRECTS = 5
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 
 // ── Internal mapped types ─────────────────────────────────────────────────────
 
@@ -254,6 +258,45 @@ export class JobSyncService {
     }
   }
 
+  async getSource(sourceId: string) {
+    const source = await this.prisma.jobSource.findUnique({
+      where: { id: sourceId },
+      select: { id: true, name: true, orgId: true, responseConfig: true },
+    })
+    if (!source) throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    return {
+      id: source.id,
+      name: source.name,
+      orgId: source.orgId,
+      responseConfig: source.responseConfig ? JSON.parse(source.responseConfig) as Record<string, unknown> : null,
+    }
+  }
+
+  async updateResponseConfig(sourceId: string, dto: UpdateResponseConfigDto, user: AuthedUser) {
+    const serialized = JSON.stringify(dto)
+    if (Buffer.byteLength(serialized, 'utf8') > 64 * 1024) {
+      throw new BadRequestException({ error: { code: 'RESPONSE_CONFIG_TOO_LARGE', message: '字段映射配置不能超过 64KB' } })
+    }
+    const source = await this.prisma.jobSource.findUnique({
+      where: { id: sourceId },
+      select: { id: true, responseConfig: true, org: { select: { type: true } } },
+    })
+    if (!source) throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    assertPartnerDataTypeCapability(source.org.type, dto.dataType)
+    await this.prisma.$transaction(async (tx) => {
+      await tx.jobSource.update({ where: { id: sourceId }, data: { responseConfig: serialized } })
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId,
+        actorRole: user.role,
+        action: 'data_source.response_config_update',
+        targetType: 'job_source',
+        targetId: sourceId,
+        payload: { fromConfigured: Boolean(source.responseConfig), dataType: dto.dataType },
+      })
+    })
+    return { updated: true, sourceId }
+  }
+
   async setSourceEnabled(sourceId: string, enabled: boolean, user: AuthedUser) {
     const source = await this.prisma.jobSource.findUnique({
       where: { id: sourceId },
@@ -437,9 +480,6 @@ export class JobSyncService {
     authType: string | null,
     credential: string,
   ): Promise<unknown> {
-    // 1. SSRF 校验初始 URL
-    await validatePublicUrl(endpoint)
-
     const headers: Record<string, string> = { Accept: 'application/json' }
     switch (authType) {
       case 'bearer':   headers['Authorization'] = `Bearer ${credential}`;                              break
@@ -450,23 +490,20 @@ export class JobSyncService {
     let currentUrl = endpoint
 
     for (let attempt = 0; attempt <= MAX_REDIRECTS; attempt++) {
-      const ac = new AbortController()
-      const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS)
-      let res: Response
+      const resolved = await resolvePublicUrl(currentUrl)
+      let res: { status: number; statusText: string; headers: IncomingHttpHeaders; body: Buffer }
       try {
-        res = await fetch(currentUrl, { headers, signal: ac.signal, redirect: 'manual' })
+        res = await this.requestPinned(resolved, headers)
       } catch (e) {
-        clearTimeout(timer)
         throw new Error((e as Error).name === 'AbortError' ? 'REQUEST_TIMEOUT' : `NETWORK_ERROR: ${(e as Error).message}`)
       }
-      clearTimeout(timer)
 
       // 2. 手动跟随重定向并对 Location 重新做 SSRF 校验
       if (res.status >= 300 && res.status < 400) {
         if (attempt === MAX_REDIRECTS) {
           throw new Error('TOO_MANY_REDIRECTS')
         }
-        const location = res.headers.get('location')
+        const location = Array.isArray(res.headers.location) ? res.headers.location[0] : res.headers.location
         if (!location) throw new Error('REDIRECT_WITHOUT_LOCATION')
         // 解析相对 URL(Location 可能是相对路径)
         let nextUrl: string
@@ -475,18 +512,60 @@ export class JobSyncService {
         } catch {
           throw new Error(`SSRF_INVALID_REDIRECT_URL: ${location.slice(0, 200)}`)
         }
-        await validatePublicUrl(nextUrl) // 重定向目标也必须是公网地址
+        // 下一轮只解析一次并把连接钉在该地址；这里若提前解析会重新留下 DNS rebinding 窗口。
         currentUrl = nextUrl
         continue
       }
 
-      if (!res.ok) {
+      if (res.status < 200 || res.status >= 300) {
         throw new Error(`HTTP_${res.status}: ${res.statusText.slice(0, 80)}`)
       }
-      return res.json() as Promise<unknown>
+      try {
+        return JSON.parse(res.body.toString('utf8')) as unknown
+      } catch {
+        throw new Error('INVALID_JSON_RESPONSE')
+      }
     }
 
     throw new Error('TOO_MANY_REDIRECTS')
+  }
+
+  private requestPinned(
+    resolved: ResolvedPublicUrl,
+    headers: Record<string, string>,
+  ): Promise<{ status: number; statusText: string; headers: IncomingHttpHeaders; body: Buffer }> {
+    return new Promise((resolve, reject) => {
+      const request = resolved.url.protocol === 'https:' ? httpsRequest : httpRequest
+      const req = request(resolved.url, {
+        method: 'GET',
+        headers,
+        lookup: (_hostname, _options, callback) => callback(null, resolved.address, resolved.family),
+      }, (res) => {
+        const chunks: Buffer[] = []
+        let size = 0
+        res.on('data', (chunk: Buffer) => {
+          size += chunk.length
+          if (size > MAX_RESPONSE_BYTES) {
+            req.destroy(new Error('RESPONSE_TOO_LARGE'))
+            return
+          }
+          chunks.push(chunk)
+        })
+        res.on('end', () => resolve({
+          status: res.statusCode ?? 0,
+          statusText: res.statusMessage ?? '',
+          headers: res.headers,
+          body: Buffer.concat(chunks),
+        }))
+      })
+      const timeout = setTimeout(
+        () => req.destroy(Object.assign(new Error('REQUEST_TIMEOUT'), { name: 'AbortError' })),
+        FETCH_TIMEOUT_MS,
+      )
+      req.on('close', () => clearTimeout(timeout))
+      req.on('error', reject)
+      req.end()
+    })
   }
 
   // ── Private: parsing ───────────────────────────────────────────────────────

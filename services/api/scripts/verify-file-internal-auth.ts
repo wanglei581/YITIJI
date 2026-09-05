@@ -154,7 +154,14 @@ function createWorld(options: WorldOptions = {}) {
     },
   }
 
-  const audit = { write: async () => undefined }
+  // writeRequired 与真实实现一致：必须在事务客户端上调用，拿不到就抛（审计不静默丢失）。
+  const audit = {
+    write: async () => undefined,
+    writeRequired: async (tx: unknown) => {
+      if (!tx) throw new Error('audit.writeRequired: 缺少事务客户端')
+      return 'verify-file-internal-auth-audit'
+    },
+  }
 
   const controller = new FilesController(
     files as never,

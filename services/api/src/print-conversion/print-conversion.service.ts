@@ -269,12 +269,12 @@ export class PrintConversionService {
     const printSigned = signFileUrl(uploaded.fileId, OUTPUT_URL_TTL_MS)
 
     await this.audit.write({
-      actorId: endUserId,
+      actorId: null,
       actorRole: endUserId ? 'member' : 'system',
       action: 'print_conversion.images_to_pdf',
       targetType: 'file',
       targetId: uploaded.fileId,
-      payload: { sourceCount: sources.length, sourceFileIds: sources.map((s) => s.fileId) },
+      payload: { endUserId: endUserId ?? null, sourceCount: sources.length, sourceFileIds: sources.map((s) => s.fileId) },
     })
 
     return {
