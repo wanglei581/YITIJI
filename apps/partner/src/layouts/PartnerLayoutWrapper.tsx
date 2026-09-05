@@ -11,7 +11,6 @@ import {
   GraduationCapIcon,
   LayoutDashboardIcon,
   LogOutIcon,
-  MonitorIcon,
   RefreshCwIcon,
   UserCogIcon,
 } from 'lucide-react'
@@ -28,7 +27,6 @@ const PATH_TO_KEY: Record<string, string> = {
   '/fairs':      'fairs',
   '/smart-campus': 'smart-campus',
   '/policy':     'policy',
-  '/terminals':  'terminals',
   '/stats':      'stats',
   '/sources':    'sources',
   '/sync-logs':  'sync-logs',
@@ -49,9 +47,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon, href: KEY_TO_PATH.policy },
   { key: 'sources',    label: '数据源管理',     icon: DatabaseIcon, href: KEY_TO_PATH.sources },
   { key: 'sync-logs',  label: '同步日志',       icon: RefreshCwIcon, href: KEY_TO_PATH['sync-logs'] },
-  { key: 'terminals',  label: '终端数据',       icon: MonitorIcon,     group: '数据与账号', href: KEY_TO_PATH.terminals },
-  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, href: KEY_TO_PATH.stats },
-  { key: 'account',    label: '账号权限',       icon: UserCogIcon, href: KEY_TO_PATH.account },
+  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, group: '数据与账号', href: KEY_TO_PATH.stats },
+  { key: 'account',    label: '账号',           icon: UserCogIcon, href: KEY_TO_PATH.account },
 ]
 
 /**

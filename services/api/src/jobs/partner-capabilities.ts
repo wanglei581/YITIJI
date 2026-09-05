@@ -3,6 +3,8 @@ import type { AccessMode, SourceKind } from './jobs-shared'
 
 export const ADMIN_MANAGED_ACCESS_MODES = ['api', 'webhook'] as const satisfies readonly AccessMode[]
 
+export type CompanyManageScope = 'unrestricted' | 'fair_associated' | 'own_enterprise'
+
 interface PartnerCapabilityRule {
   allowedAccessModes: readonly AccessMode[]
   allowedSourceKinds: readonly SourceKind[]
@@ -18,6 +20,12 @@ interface PartnerCapabilityRule {
   canManagePolicies: boolean
   /** 能否配置智慧校园（读写都拒，见 smart-campus.service.ts 的 assertSchoolOrg）。 */
   canManageSmartCampus: boolean
+  /**
+   * 能否维护企业展示资料（CompanyProfile）。所有已知机构类型均可进入该页；
+   * 写入范围由 companyManageScope 收窄（fair_organizer / enterprise_source）。
+   */
+  canManageCompanies: boolean
+  companyManageScope: CompanyManageScope
 }
 
 const FULL_ACCESS_MODES = ['api', 'excel', 'csv', 'json', 'webhook', 'manual'] as const
@@ -31,6 +39,8 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canImportFairs: true,
     canManagePolicies: true,
     canManageSmartCampus: true,
+    canManageCompanies: true,
+    companyManageScope: 'unrestricted',
   },
   public_employment_service: {
     allowedAccessModes: FULL_ACCESS_MODES,
@@ -40,6 +50,8 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canImportFairs: true,
     canManagePolicies: true,
     canManageSmartCampus: false,
+    canManageCompanies: true,
+    companyManageScope: 'unrestricted',
   },
   licensed_hr_agency: {
     allowedAccessModes: FULL_ACCESS_MODES,
@@ -49,6 +61,8 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canImportFairs: false,
     canManagePolicies: false,
     canManageSmartCampus: false,
+    canManageCompanies: true,
+    companyManageScope: 'unrestricted',
   },
   fair_organizer: {
     // 当前 Webhook 端点只接受岗位，尚无招聘会 Webhook，先 fail-closed。
@@ -59,6 +73,8 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canImportFairs: true,
     canManagePolicies: false,
     canManageSmartCampus: false,
+    canManageCompanies: true,
+    companyManageScope: 'fair_associated',
   },
   enterprise_source: {
     allowedAccessModes: ['excel', 'csv', 'manual'],
@@ -68,6 +84,8 @@ const PARTNER_CAPABILITY_MATRIX: Record<string, PartnerCapabilityRule> = {
     canImportFairs: false,
     canManagePolicies: false,
     canManageSmartCampus: false,
+    canManageCompanies: true,
+    companyManageScope: 'own_enterprise',
   },
 }
 
@@ -90,6 +108,8 @@ export function getPartnerCapabilities(orgType: string) {
     canImportFairs: rule.canImportFairs,
     canManagePolicies: rule.canManagePolicies,
     canManageSmartCampus: rule.canManageSmartCampus,
+    canManageCompanies: rule.canManageCompanies,
+    companyManageScope: rule.companyManageScope,
   }
 }
 
@@ -106,7 +126,7 @@ export function getPartnerCapabilities(orgType: string) {
  */
 export function partnerOrgTypeCan(
   orgType: string,
-  capability: 'importJobs' | 'importFairs' | 'managePolicies' | 'manageSmartCampus',
+  capability: 'importJobs' | 'importFairs' | 'managePolicies' | 'manageSmartCampus' | 'manageCompanies',
 ): boolean {
   const rule = PARTNER_CAPABILITY_MATRIX[orgType]
   if (!rule) return false
@@ -115,6 +135,7 @@ export function partnerOrgTypeCan(
     case 'importFairs':       return rule.canImportFairs
     case 'managePolicies':    return rule.canManagePolicies
     case 'manageSmartCampus': return rule.canManageSmartCampus
+    case 'manageCompanies':   return rule.canManageCompanies
   }
 }
 

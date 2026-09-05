@@ -236,6 +236,10 @@ export interface PartnerJobDto {
   sourceOrgId: string; sourceName: string
   category?: string; salary?: string; tags?: string[]
   description?: string; requirements?: string
+  educationRequirement?: string; experienceRequirement?: string
+  skills?: string[]; benefits?: string[]
+  salaryMin?: number; salaryMax?: number; salaryUnit?: string
+  headcount?: number
   /**
    * 管理员驳回时填写的原因（`Job.rejectReason`，reject 必填、approve 置 null）。
    *
@@ -445,18 +449,23 @@ function shanghaiDate(d: Date): string {
   return new Date(d.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+export function isAbsoluteHttpUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  try {
+    const url = new URL(trimmed)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export function normalizeOptionalHttpUrl(value: string | undefined, fieldName: string): string | null | undefined {
   if (value === undefined) return undefined
   const trimmed = value.trim()
   if (!trimmed) return null
-  let url: URL
-  try {
-    url = new URL(trimmed)
-  } catch {
+  if (!isAbsoluteHttpUrl(trimmed)) {
     throw new BadRequestException({ error: { code: 'INVALID_URL', message: `${fieldName} 必须是有效 http(s) 链接` } })
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new BadRequestException({ error: { code: 'INVALID_URL', message: `${fieldName} 必须以 http:// 或 https:// 开头` } })
   }
   return trimmed
 }
@@ -634,6 +643,14 @@ export function prismaJobToPartnerDto(j: PrismaJobRow): PartnerJobDto {
     tags: safeJsonArr(j.tagsJson),
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
+    educationRequirement: j.educationRequirement ?? undefined,
+    experienceRequirement: j.experienceRequirement ?? undefined,
+    skills: safeJsonArr(j.skillsJson),
+    benefits: safeJsonArr(j.benefitsJson),
+    salaryMin: j.salaryMin ?? undefined,
+    salaryMax: j.salaryMax ?? undefined,
+    salaryUnit: j.salaryUnit ?? undefined,
+    headcount: j.headcount ?? undefined,
     rejectReason: j.rejectReason,
   }
 }
@@ -658,7 +675,7 @@ export function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     syncTime: fmtSyncTime(f.syncTime),
     hasManagedData: companyCount > 0,
     managedCompanyCount: companyCount,
-    managedMaterialCount: 0,
+    managedMaterialCount: f._count?.materials ?? 0,
     dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${shanghaiDate(f.syncTime)} · 仅供参考`,
     jobCount: f.jobCount,
     theme: f.theme,
@@ -833,5 +850,5 @@ export interface PrismaJobFairRow {
   trafficInfo: string | null
   expectedAttendance: number | null
   seekerIntentJson: string | null
-  _count?: { companies: number }
+  _count?: { companies: number; materials?: number }
 }

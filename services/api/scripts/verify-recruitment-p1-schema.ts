@@ -134,8 +134,12 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *   另加 episodeToken 区分「恢复后又发生」——刻意不把时间 / 心跳 id / 离线分钟数
  *   编进主键，那些值在同一条故障持续期间会变。
  *   处置只压制提醒，**不代表问题已修复**：界面对仍在 firing 的条目显示「已确认（仍在发生）」。
+ * - 100（本包，求职材料模板后台化，+1）：
+ *     JobMaterialTemplate —— 后台可编辑 / 发布 / 下架的求职材料模板（2026-09-06 产品裁决），
+ *     空库按代码常量幂等种子化一次后以库为准，status 沿用 published | disabled 口径。
+ *     详见 prisma/schema.prisma 该模型上方注释与 docs/progress/current-progress.md 2026-09-06 记录。
  */
-const EXPECTED_MODEL_COUNT = 99
+const EXPECTED_MODEL_COUNT = 100
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
