@@ -24,6 +24,7 @@ import { FairCalendarPopover } from './components/FairCalendarPopover'
 import { RegionPicker } from './components/RegionPicker'
 import { matchesRegion, type RegionSelection } from '../../lib/regions'
 import { FusionBadge, FusionListSteps, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { evaluateJobSourceTrust } from '../jobs/utils/sourceTrust'
 
 // ─── 状态标签配置 ───────────────────────────────────────────────────────────────
 const STATUS_DOT = {
@@ -196,7 +197,9 @@ export function JobFairsPage() {
   const favoriteSet = idsOf('job_fair')
 
   const openBookingQr = (fair: ExternalJobFairDTO) => {
-    recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    if (evaluateJobSourceTrust(fair).ok) {
+      recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    }
     setQrFair(fair)
   }
 
