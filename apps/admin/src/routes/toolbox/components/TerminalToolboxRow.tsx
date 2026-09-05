@@ -4,6 +4,7 @@ import { PackageIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import type { KioskAppLaunchMode, KioskAppPlacement, KioskToolboxItem, ToolboxTerminalView } from '@ai-job-print/shared'
 import { toolboxService } from '../../../services/api/toolbox'
 import { ICON_OPTIONS, LAUNCH_MODE_OPTIONS, PLACEMENT_OPTIONS } from '../constants'
+import { normalizeToolboxDraftItem, saveToolboxTerminalConfig, toolboxActionErrorMessage } from '../toolboxActionState'
 
 function emptyItem(index: number): KioskToolboxItem {
   return {
@@ -22,21 +23,10 @@ function emptyItem(index: number): KioskToolboxItem {
   }
 }
 
-function normalizeDraftItem(item: KioskToolboxItem): KioskToolboxItem {
-  return {
-    ...item,
-    placements: item.placements?.length ? item.placements : ['toolbox'],
-    launchMode: item.launchMode ?? 'internal_route',
-    externalUrl: item.externalUrl ?? null,
-    qrImageUrl: item.qrImageUrl ?? null,
-    qrTargetUrl: item.qrTargetUrl ?? null,
-  }
-}
-
 export function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTerminalView; onSaved: () => void }) {
   const cfg = terminal.config
   const [enabled, setEnabled] = useState(cfg?.enabled ?? true)
-  const [items, setItems] = useState<KioskToolboxItem[]>((cfg?.items ?? []).map(normalizeDraftItem))
+  const [items, setItems] = useState<KioskToolboxItem[]>((cfg?.items ?? []).map(normalizeToolboxDraftItem))
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -58,14 +48,18 @@ export function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTer
     setSaving(true)
     setMsg('')
     try {
-      await toolboxService.saveConfig(terminal.terminalId, {
+      const saved = await saveToolboxTerminalConfig(
+        toolboxService.saveConfig,
+        terminal.terminalId,
         enabled,
-        items: items.map((item, index) => ({ ...normalizeDraftItem(item), sortOrder: index })),
-      })
+        items,
+      )
+      setEnabled(saved.enabled)
+      setItems(saved.items)
       setMsg('已保存')
       onSaved()
     } catch (error) {
-      setMsg(error instanceof Error && error.message ? error.message : '保存失败，请检查路径和内容')
+      setMsg(toolboxActionErrorMessage(error, '保存失败，请检查网络或配置内容后重试'))
     } finally {
       setSaving(false)
     }

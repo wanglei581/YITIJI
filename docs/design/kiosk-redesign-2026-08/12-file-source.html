@@ -263,7 +263,9 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .mini h4{font-size:23px;font-weight:700;display:flex;align-items:center;gap:10px}
 .mini p{margin-top:10px;font-size:20px;line-height:1.55;color:var(--ink-2)}
 .spread{justify-content:space-evenly}
-.sec.grow>.card{justify-content:space-evenly}
+/* 2026-09-05 体检修复：source-chooser / phone-cancel-requesting 等态「当前文件」卡内容超高时画到下方警示行上，
+   卡片改为自身滚动；正常态内容不超高时行为不变。 */
+.sec.grow>.card{justify-content:space-evenly;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin}
 .pvopen{width:100%;margin-top:16px;justify-content:center}
 
 /* ---------- 完整预览：同一宿主内的 near-full-stage 模态 ---------- */
