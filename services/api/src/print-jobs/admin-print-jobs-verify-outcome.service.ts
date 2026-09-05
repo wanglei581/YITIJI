@@ -7,6 +7,11 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import {
+  markPaidUnfulfilledRefundRequired,
+  shouldSignalPaidUnfulfilledRefund,
+  PAID_UNFULFILLED_PENDING_REFUND_REASON,
+} from '../payment/pending-refund-signal'
 
 export const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
 export const PRINT_OUTCOME_PRINTED = 'printed'
@@ -23,6 +28,8 @@ export interface VerifyPrintOutcomeResult {
   printOutcome: PrintOutcomeValue
   idempotent: boolean
   verifiedAt: string
+  /** 核查为未出纸且订单已付款有实收时为 true。只是待退款信号，不会自动出款。 */
+  refundRequired: boolean
 }
 
 @Injectable()
@@ -61,7 +68,16 @@ export class AdminPrintJobsVerifyOutcomeService {
     const task = await this.prisma.printTask.findUnique({
       where: { id: taskId },
       include: {
-        order: { select: { id: true, payStatus: true, taskStatus: true } },
+        order: {
+          select: {
+            id: true,
+            payStatus: true,
+            taskStatus: true,
+            amountCents: true,
+            discountCents: true,
+            refundReason: true,
+          },
+        },
       },
     })
     if (!task) {
@@ -71,12 +87,17 @@ export class AdminPrintJobsVerifyOutcomeService {
     }
 
     if (task.printOutcome === outcome) {
+      let refundRequired = false
+      if (outcome === PRINT_OUTCOME_NOT_PRINTED && task.order && shouldSignalPaidUnfulfilledRefund(task.order)) {
+        refundRequired = await markPaidUnfulfilledRefundRequired(this.prisma, task.order)
+      }
       return {
         taskId: task.id,
         orderId: task.order?.id ?? null,
         printOutcome: outcome,
         idempotent: true,
         verifiedAt: task.updatedAt.toISOString(),
+        refundRequired,
       }
     }
     if (task.printOutcome === PRINT_OUTCOME_PRINTED || task.printOutcome === PRINT_OUTCOME_NOT_PRINTED) {
@@ -106,6 +127,9 @@ export class AdminPrintJobsVerifyOutcomeService {
 
     const verifiedAt = new Date()
     const logCode = outcome === PRINT_OUTCOME_PRINTED ? 'PRINT_OUTCOME_PRINTED' : 'PRINT_OUTCOME_NOT_PRINTED'
+    const refundRequired =
+      outcome === PRINT_OUTCOME_NOT_PRINTED &&
+      Boolean(task.order && shouldSignalPaidUnfulfilledRefund(task.order))
 
     await this.prisma.$transaction(async (tx) => {
       const cas = await tx.printTask.updateMany({
@@ -135,6 +159,10 @@ export class AdminPrintJobsVerifyOutcomeService {
         },
       })
 
+      if (refundRequired && task.order) {
+        await markPaidUnfulfilledRefundRequired(tx, task.order)
+      }
+
       await this.audit.writeRequired(tx, {
         actorId: operatorId,
         actorRole: 'admin',
@@ -146,6 +174,9 @@ export class AdminPrintJobsVerifyOutcomeService {
           orderId: task.order?.id ?? null,
           orderPayStatus: task.order?.payStatus ?? null,
           errorCode: task.errorCode,
+          refundRequired,
+          refundReason: refundRequired ? PAID_UNFULFILLED_PENDING_REFUND_REASON : null,
+          autoRefund: false,
         },
       })
     })
@@ -156,6 +187,7 @@ export class AdminPrintJobsVerifyOutcomeService {
       printOutcome: outcome,
       idempotent: false,
       verifiedAt: verifiedAt.toISOString(),
+      refundRequired,
     }
   }
 }

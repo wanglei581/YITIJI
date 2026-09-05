@@ -20,7 +20,6 @@ export interface WireOfflineAgency {
   lng: number | null
   openHours: string | null
   phone: string | null
-  contactEmail: string | null
   website: string | null
   services: string
   description: string | null

@@ -16,6 +16,8 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { AdminPrintJobsAbandonService, ADMIN_ABANDON_ERROR_CODE } from '../src/print-jobs/admin-print-jobs-abandon.service'
+import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -60,6 +62,13 @@ async function main() {
   const taskPendingClaim = `pt_vap_pndclm_${suffix}` // pending 但 claimedAt 非 null
   const taskCompleted    = `pt_vap_done_${suffix}`
   const taskAbandoned    = `pt_vap_abn_${suffix}`
+  const taskPaid         = `pt_vap_paid_${suffix}`
+  const taskUnpaid       = `pt_vap_unpaid_${suffix}`
+  const taskFree         = `pt_vap_free_${suffix}`
+  const ordPaid          = `ord_vap_paid_${suffix}`
+  const ordUnpaid        = `ord_vap_unpaid_${suffix}`
+  const ordFree          = `ord_vap_free_${suffix}`
+  const allTaskIds = [taskPending, taskPendingClaim, taskCompleted, taskAbandoned, taskPaid, taskUnpaid, taskFree]
 
   // 建立测试数据
   await prisma.printTask.createMany({
@@ -100,13 +109,78 @@ async function main() {
         errorCode: ADMIN_ABANDON_ERROR_CODE,
         errorMessage: '该历史打印任务已由管理员受控废弃',
       },
+      {
+        id: taskPaid,
+        terminalId: termId,
+        fileUrl: 'https://internal/test-file-paid',
+        fileMd5: 'aabbccdd',
+        status: 'pending',
+        claimedAt: null,
+      },
+      {
+        id: taskUnpaid,
+        terminalId: termId,
+        fileUrl: 'https://internal/test-file-unpaid',
+        fileMd5: 'aabbccdd',
+        status: 'pending',
+        claimedAt: null,
+      },
+      {
+        id: taskFree,
+        terminalId: termId,
+        fileUrl: 'https://internal/test-file-free',
+        fileMd5: 'aabbccdd',
+        status: 'pending',
+        claimedAt: null,
+      },
+    ],
+  })
+  await prisma.order.createMany({
+    data: [
+      {
+        id: ordPaid,
+        orderNo: `ORD-VAP-P-${suffix.toUpperCase()}`,
+        type: 'print',
+        printTaskId: taskPaid,
+        amountCents: 500,
+        discountCents: 0,
+        currency: 'CNY',
+        payStatus: 'paid',
+        taskStatus: 'pending',
+        paymentSource: 'offline',
+      },
+      {
+        id: ordUnpaid,
+        orderNo: `ORD-VAP-U-${suffix.toUpperCase()}`,
+        type: 'print',
+        printTaskId: taskUnpaid,
+        amountCents: 500,
+        discountCents: 0,
+        currency: 'CNY',
+        payStatus: 'unpaid',
+        taskStatus: 'pending',
+      },
+      {
+        id: ordFree,
+        orderNo: `ORD-VAP-F-${suffix.toUpperCase()}`,
+        type: 'print',
+        printTaskId: taskFree,
+        amountCents: 0,
+        discountCents: 0,
+        currency: 'CNY',
+        payStatus: 'paid',
+        taskStatus: 'pending',
+        paymentSource: 'free',
+      },
     ],
   })
 
   const cleanup = async () => {
-    await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: [taskPending, taskPendingClaim, taskCompleted, taskAbandoned] } } })
-    await prisma.auditLog.deleteMany({ where: { targetId: { in: [taskPending, taskPendingClaim, taskCompleted, taskAbandoned] } } })
-    await prisma.printTask.deleteMany({ where: { id: { in: [taskPending, taskPendingClaim, taskCompleted, taskAbandoned] } } })
+    await prisma.refund.deleteMany({ where: { orderId: { in: [ordPaid, ordUnpaid, ordFree] } } })
+    await prisma.order.deleteMany({ where: { id: { in: [ordPaid, ordUnpaid, ordFree] } } })
+    await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: allTaskIds } } })
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: allTaskIds } } })
+    await prisma.printTask.deleteMany({ where: { id: { in: allTaskIds } } })
     await prisma.terminal.delete({ where: { id: termId } })
     await prisma.user.delete({ where: { id: adminId } })
   }
@@ -117,6 +191,7 @@ async function main() {
       const result = await svc.abandonPending(taskPending, adminId)
       if (result.newStatus !== 'abandoned') fail('1. newStatus 应为 abandoned')
       if (result.previousStatus !== 'pending') fail('1. previousStatus 应为 pending')
+      if (result.refundRequired !== false) fail('1. 无订单的废弃不得标待退款')
       const task = await prisma.printTask.findUniqueOrThrow({ where: { id: taskPending } })
       if (task.status !== 'abandoned') fail('1. PrintTask.status 未更新为 abandoned')
       if (task.errorCode !== ADMIN_ABANDON_ERROR_CODE) fail('1. errorCode 未正确设置')
@@ -196,6 +271,44 @@ async function main() {
         if (code !== 'PRINT_TASK_NOT_FOUND') fail(`7. 期望 PRINT_TASK_NOT_FOUND，得到 ${code}`)
         pass('7. 不存在任务 404（PRINT_TASK_NOT_FOUND）')
       }
+    }
+
+    // ── 8. 已付款有实收 → 落待退款信号，不创建 Refund ────────────────────────
+    {
+      const result = await svc.abandonPending(taskPaid, adminId)
+      if (result.refundRequired !== true) fail('8. 已付款废弃必须 refundRequired=true')
+      const order = await prisma.order.findUniqueOrThrow({ where: { id: ordPaid } })
+      if (order.payStatus !== 'paid') fail('8. 不得改 payStatus（禁止自动出款）')
+      if (order.taskStatus !== 'abandoned') fail('8. taskStatus 应为 abandoned')
+      if (order.refundReason !== PAID_UNFULFILLED_PENDING_REFUND_REASON) {
+        fail(`8. refundReason 应为 ${PAID_UNFULFILLED_PENDING_REFUND_REASON}，得到 ${order.refundReason}`)
+      }
+      const refundCount = await prisma.refund.count({ where: { orderId: ordPaid } })
+      if (refundCount !== 0) fail('8. 不得创建 Refund 行')
+      const list = new AdminOrdersReadonlyService(prisma)
+      const page = await list.list({ refundRequired: true, page: 1, pageSize: 20 })
+      if (!page.items.some((item) => item.id === ordPaid && item.refundRequired === true)) {
+        fail(`8. 管理端待退款筛选看不到该单：${JSON.stringify(page.items.map((i) => i.orderNo))}`)
+      }
+      pass('8. 已付款废弃落待退款信号，管理端筛得到，不自动出款')
+    }
+
+    // ── 9. 未付款废弃不标待退款 ──────────────────────────────────────────────
+    {
+      const result = await svc.abandonPending(taskUnpaid, adminId)
+      if (result.refundRequired !== false) fail('9. 未付款不得标待退款')
+      const order = await prisma.order.findUniqueOrThrow({ where: { id: ordUnpaid } })
+      if (order.refundReason !== null) fail('9. 未付款不得写 refundReason')
+      pass('9. 未付款废弃不标待退款')
+    }
+
+    // ── 10. 0 元已付款不标待退款 ─────────────────────────────────────────────
+    {
+      const result = await svc.abandonPending(taskFree, adminId)
+      if (result.refundRequired !== false) fail('10. 0 元单不得标待退款')
+      const order = await prisma.order.findUniqueOrThrow({ where: { id: ordFree } })
+      if (order.refundReason !== null) fail('10. 0 元单不得写 refundReason')
+      pass('10. 0 元已付款废弃不标待退款')
     }
 
     console.log('\nAll checks PASS\n')

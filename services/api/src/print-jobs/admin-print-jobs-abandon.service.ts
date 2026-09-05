@@ -19,8 +19,22 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import {
+  markPaidUnfulfilledRefundRequired,
+  shouldSignalPaidUnfulfilledRefund,
+  PAID_UNFULFILLED_PENDING_REFUND_REASON,
+} from '../payment/pending-refund-signal'
 
 export const ADMIN_ABANDON_ERROR_CODE = 'ADMIN_ABANDONED'
+
+const ORDER_REFUND_SELECT = {
+  id: true,
+  payStatus: true,
+  taskStatus: true,
+  amountCents: true,
+  discountCents: true,
+  refundReason: true,
+} as const
 
 export interface AbandonPrintJobResult {
   taskId: string
@@ -28,6 +42,8 @@ export interface AbandonPrintJobResult {
   newStatus: 'abandoned'
   orderId: string | null
   abandonedAt: string
+  /** 已付款且有实收时为 true。只是待退款信号，不会自动出款。 */
+  refundRequired: boolean
 }
 
 @Injectable()
@@ -58,7 +74,7 @@ export class AdminPrintJobsAbandonService {
     const task = await this.prisma.printTask.findUnique({
       where: { id: taskId },
       include: {
-        order: { select: { id: true, payStatus: true, taskStatus: true } },
+        order: { select: ORDER_REFUND_SELECT },
       },
     })
     if (!task) {
@@ -67,14 +83,19 @@ export class AdminPrintJobsAbandonService {
       })
     }
 
-    // 已是终态 abandoned → 幂等返回
+    // 已是终态 abandoned → 幂等返回；已付款未标待退的存量单在此补标，不二次写废弃审计。
     if (task.status === 'abandoned' && task.errorCode === ADMIN_ABANDON_ERROR_CODE) {
+      let refundRequired = false
+      if (task.order && shouldSignalPaidUnfulfilledRefund(task.order)) {
+        refundRequired = await markPaidUnfulfilledRefundRequired(this.prisma, task.order)
+      }
       return {
         taskId: task.id,
         previousStatus: 'abandoned',
         newStatus: 'abandoned',
         orderId: task.order?.id ?? null,
         abandonedAt: (task.completedAt ?? task.updatedAt).toISOString(),
+        refundRequired,
       }
     }
 
@@ -134,6 +155,11 @@ export class AdminPrintJobsAbandonService {
         })
       }
 
+      // 已付款且有实收：只落待退款标记 + 审计，不创建 Refund、不调渠道。
+      if (task.order && shouldSignalPaidUnfulfilledRefund(task.order)) {
+        await markPaidUnfulfilledRefundRequired(tx, task.order)
+      }
+
       await tx.printTaskStatusLog.create({
         data: {
           taskId: task.id,
@@ -150,6 +176,10 @@ export class AdminPrintJobsAbandonService {
       return { updatedTask }
     })
 
+    const refundRequired = Boolean(
+      task.order && shouldSignalPaidUnfulfilledRefund(task.order),
+    )
+
     // 审计日志（事务外，写失败不回滚业务）
     await this.audit.write({
       actorId: operatorId,
@@ -162,6 +192,9 @@ export class AdminPrintJobsAbandonService {
         toStatus: 'abandoned',
         orderId: task.order?.id ?? null,
         orderPayStatus: task.order?.payStatus ?? null,
+        refundRequired,
+        refundReason: refundRequired ? PAID_UNFULFILLED_PENDING_REFUND_REASON : null,
+        autoRefund: false,
       },
     })
 
@@ -171,6 +204,7 @@ export class AdminPrintJobsAbandonService {
       newStatus: 'abandoned',
       orderId: updatedTask.order?.id ?? null,
       abandonedAt: abandonedAt.toISOString(),
+      refundRequired,
     }
   }
 }

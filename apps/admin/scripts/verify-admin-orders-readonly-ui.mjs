@@ -159,6 +159,21 @@ if (!page.includes('print_duplex_surcharge') && !page.includes('双面附加')) 
   pass('订单页不把双面渲染成计价项')
 } else {
   fail('订单页不得出现 print_duplex_surcharge / 双面附加')
+
+// API-20：已付款未出纸的待退款信号必须在管理端可见、可筛，且不得宣称自动出款。
+if (
+  service.includes('refundRequired: boolean') &&
+  service.includes("refundRequired: params.refundRequired ? 'true' : undefined") &&
+  page.includes('待退款（已付款未出纸）') &&
+  page.includes('setRefundRequiredFilter(true)') &&
+  page.includes('不会自动出款') &&
+  page.includes("value: 'abandoned'") &&
+  jobsClient.includes('refundRequired: boolean')
+) {
+  pass('paid-unfulfilled refundRequired signal is listed, filterable, and does not claim auto-refund')
+} else {
+  fail('API-20 admin visibility for paid-not-printed pending refund is incomplete')
+}
 }
 
 console.log('\nALL PASS')
