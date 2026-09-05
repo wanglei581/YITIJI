@@ -6,7 +6,8 @@ import type {
   PartnerJobRecord,
   PartnerJobQualitySummary,
   PartnerFairRecord,
-  PartnerSyncLog,
+  PartnerSyncLogPage,
+  PartnerSyncLogsQuery,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -190,8 +191,14 @@ export const partnerHttpAdapter = {
     post<ImportResult<PartnerFairRecord>>('/partner/fairs/import', { items }),
 
   // Sync Logs (read-only)
-  getSyncLogs: () =>
-    get<PartnerSyncLog[]>('/partner/sync-logs'),
+  getSyncLogs: (query?: PartnerSyncLogsQuery) => {
+    const params: Record<string, string> = {}
+    if (query?.page) params.page = String(query.page)
+    if (query?.pageSize) params.pageSize = String(query.pageSize)
+    if (query?.sourceId) params.sourceId = query.sourceId
+    if (query?.result) params.result = query.result
+    return get<PartnerSyncLogPage>('/partner/sync-logs', params)
+  },
 
   // Excel Import
   downloadExcelTemplate: async (dataType: 'job' | 'fair') => {

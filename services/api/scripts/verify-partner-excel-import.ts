@@ -9,6 +9,9 @@ import {
   PARTNER_IMPORT_MAX_FILE_BYTES,
 } from '../src/jobs/partner-import-file'
 import { prismaJobSourceToPartnerDto } from '../src/jobs/jobs-shared'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`FAIL ${message}`)
@@ -70,7 +73,11 @@ async function verifyConcurrentConfirm(): Promise<void> {
         return batch
       },
     },
-    job: { upsert: async () => ({ id: 'job-1' }) },
+    job: {
+      findMany: async () => [],
+      upsert: async () => ({ id: 'job-1' }),
+    },
+    jobFair: { findMany: async () => [] },
     jobSource: { update: async () => ({}) },
     syncLog: {
       create: async () => {
@@ -208,8 +215,75 @@ async function main(): Promise<void> {
   assert(sourceView.lastSyncTime !== '从未同步', '数据源最近同步时间来自事务维护的来源状态')
   await verifyEmptyBatchRejected()
   await verifyConcurrentConfirm()
+  await verifyExcelPreviewRules()
+  verifyExcelModalCopy()
 
   console.log('ALL PASS')
+}
+
+async function verifyExcelPreviewRules(): Promise<void> {
+  const prisma = {
+    jobSource: {
+      findUnique: async () => ({
+        id: 'source-1', orgId: 'org-1', enabled: true, accessMode: 'excel', sourceKind: 'manual',
+        org: { type: 'school_employment_center', enabled: true },
+      }),
+    },
+    importBatch: {
+      create: async (args: { data: Record<string, unknown> }) => ({ id: 'batch-preview', ...args.data }),
+    },
+    importRecord: { createMany: async () => ({ count: 0 }) },
+  }
+  const service = new JobsExcelService(
+    prisma as never,
+    { write: async () => undefined } as never,
+    { refreshJobQualitySnapshots: async () => undefined } as never,
+  )
+  const user = { userId: 'partner-1', role: 'partner', orgId: 'org-1' } as AuthedUser
+  const jobCsv = Buffer.from(
+    'externalId,title,company,city,sourceUrl\n' +
+    'EXISTING,岗位A,公司,青岛,https://example.com/a\n' +
+    'NEW,岗位B,公司,青岛,https://example.com/b\n' +
+    'NEW,岗位C,公司,青岛,https://example.com/c\n' +
+    'BAD,岗位D,公司,青岛,httpfoo\n',
+  )
+  const jobPreview = await service.previewExcelImport({
+    buffer: jobCsv,
+    fileName: 'jobs.csv',
+    sourceId: 'source-1',
+    dataType: 'job',
+    fieldMapping: {
+      externalId: 'externalId', title: 'title', company: 'company', city: 'city', sourceUrl: 'sourceUrl',
+    },
+    user,
+  })
+  assert(jobPreview.validRows === 2, `存量 externalId 应算有效更新，实际 validRows=${jobPreview.validRows}`)
+  assert(jobPreview.dupRows === 1, `文件内重复才记 dup，实际 dupRows=${jobPreview.dupRows}`)
+  assert(jobPreview.invalidRows === 1, `httpfoo 应记 invalid，实际 invalidRows=${jobPreview.invalidRows}`)
+
+  const fairCsv = Buffer.from(
+    'externalId,title,startAt,endAt,venue,city,sourceUrl\n' +
+    'F1,招聘会,2026-09-02T00:00:00.000Z,2026-09-01T00:00:00.000Z,馆,青岛,https://example.com/f\n',
+  )
+  const fairPreview = await service.previewExcelImport({
+    buffer: fairCsv,
+    fileName: 'fairs.csv',
+    sourceId: 'source-1',
+    dataType: 'fair',
+    fieldMapping: {
+      externalId: 'externalId', title: 'title', startAt: 'startAt', endAt: 'endAt',
+      venue: 'venue', city: 'city', sourceUrl: 'sourceUrl',
+    },
+    user,
+  })
+  assert(fairPreview.invalidRows === 1 && fairPreview.validRows === 0, 'endAt 早于 startAt 应判无效')
+}
+
+function verifyExcelModalCopy(): void {
+  const modal = readFileSync(join(__dirname, '../../../apps/partner/src/routes/sources/ExcelImportModal.tsx'), 'utf8')
+  assert(modal.includes('discardPreviewBatch'), '上一步/关闭会取消已生成的预览批次')
+  assert(!modal.includes('onImported(result.imported)'), '确认导入不得先卸载弹窗')
+  assert(modal.includes('useCapability'), 'Excel 数据类型按钮按 canImportJobs/canImportFairs 投影')
 }
 
 main().catch((error) => {

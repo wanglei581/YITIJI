@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   ValidateNested,
   ArrayMinSize,
@@ -27,7 +28,7 @@ export class ImportJobItemDto {
   @IsString() @IsNotEmpty() @MaxLength(100)
   city!: string
 
-  @IsString() @IsNotEmpty() @MaxLength(500)
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(500)
   sourceUrl!: string
 
   @IsOptional() @IsString() @MaxLength(100)

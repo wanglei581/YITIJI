@@ -103,6 +103,23 @@
 
 ---
 
+### 四 A、企业展示资料（`canManageCompanies`）
+
+> 2026-09-06 按产品负责人拍板写入。能力位由 `partner-capabilities.ts` 投影，
+> Partner 控制台与服务端同源；页面菜单隐藏不能替代服务端授权。
+
+| 功能 | school | public_service | hr_agency | fair_organizer | enterprise |
+|------|:------:|:--------------:|:---------:|:--------------:|:----------:|
+| 维护企业展示资料 | ✅ | ✅ | ✅ | ⚠️ 仅本机构招聘会关联企业 | ⚠️ 仅本企业 |
+| 范围（`companyManageScope`） | unrestricted | unrestricted | unrestricted | fair_associated | own_enterprise |
+
+- **fair_organizer**：写入时必须标记为招聘会参展企业，且企业名称须已出现在本机构招聘会的参展企业名单（`FairCompany`）中。不能录入与本机构招聘会无关的任意企业。
+- **enterprise_source**：企业名称必须与机构名称一致，只能维护本企业展示资料。
+- 其余类型不额外限制；所有类型仍禁止候选人/简历/面试/Offer。
+- 列表、下架不受此范围限制（存量数据仍须能自己下架）。
+
+---
+
 ### 五、数据统计
 
 | 功能 | school | public_service | hr_agency | fair_organizer | enterprise |
@@ -179,7 +196,7 @@
 - `Organization.type` 是服务端权限真源；Partner 只能从该类型的 `allowedAccessModes` 与 `allowedSourceKinds` 中选择，越权请求返回 `PARTNER_CAPABILITY_DENIED`。
 - API/Webhook 通道创建时固定 `enabled=false`，Partner 不得自行启用；Admin 检查机构状态、来源类型、endpoint/密钥和数据类型后才能启用。
 - 停用数据源只停止后续同步/推送/文件确认，不级联下架既有岗位或招聘会。需要下架时，Admin 必须先读取影响数量，再调用独立批量下架动作并二次确认；两种动作分别写审计。
-- `fair_organizer` 当前只能录入招聘会，不能走通用岗位导入；`licensed_hr_agency` 不能录入招聘会；`enterprise_source` 只能录入本企业岗位，当前接入方式限 Excel/CSV/manual。
+- `fair_organizer` 当前只能录入招聘会，不能走通用岗位导入；企业资料仅限本机构招聘会关联企业。`licensed_hr_agency` 不能录入招聘会；`enterprise_source` 只能录入本企业岗位与本企业展示资料，当前接入方式限 Excel/CSV/manual。
 - 页面菜单隐藏属于体验优化，不能替代上述服务端授权。
 
 ---
