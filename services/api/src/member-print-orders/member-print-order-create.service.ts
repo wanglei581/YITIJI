@@ -200,7 +200,9 @@ export class MemberPrintOrderCreateService {
   async cancel(endUserId: string, orderId: string, dto: CancelMemberPrintOrderDto) {
     const order = await this.requireOwned(endUserId, orderId)
     const freeOrder = order.amountCents === 0 && order.payStatus === 'paid' && order.paymentSource === 'free'
-    if (order.printTaskId || order.pickupStatus !== 'pending' || (order.payStatus !== 'unpaid' && !freeOrder)) {
+    // 支付超时关单后 pickup 回 pending：允许取消从未收款的 closed 单，解开「码还在、付不了、取消不了」死局。
+    const closedUnpaid = order.payStatus === 'closed' && !order.paidAt
+    if (order.printTaskId || order.pickupStatus !== 'pending' || (order.payStatus !== 'unpaid' && !freeOrder && !closedUnpaid)) {
       throw new BadRequestException({ error: { code: 'PRINT_ORDER_NOT_CANCELLABLE', message: '订单当前状态不能取消' } })
     }
     const updated = await this.prisma.order.updateMany({
@@ -209,7 +211,11 @@ export class MemberPrintOrderCreateService {
         endUserId,
         pickupStatus: 'pending',
         printTaskId: null,
-        ...(freeOrder ? { payStatus: 'paid', paymentSource: 'free', amountCents: 0 } : { payStatus: 'unpaid' }),
+        ...(freeOrder
+          ? { payStatus: 'paid', paymentSource: 'free', amountCents: 0 }
+          : closedUnpaid
+            ? { payStatus: 'closed', paidAt: null }
+            : { payStatus: 'unpaid' }),
       },
       data: {
         pickupStatus: 'cancelled',
@@ -251,10 +257,14 @@ export class MemberPrintOrderCreateService {
   }
 
   private async expireIfNeeded(order: Awaited<ReturnType<MemberPrintOrderCreateService['requireOwned']>>) {
-    if (order.pickupStatus !== 'pending' || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
+    if (!['pending', 'claimed'].includes(order.pickupStatus) || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
     await this.prisma.order.updateMany({
-      where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
-      data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: order.payStatus === 'unpaid' ? 'closed' : order.payStatus },
+      where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
+      data: {
+        pickupStatus: 'expired',
+        taskStatus: 'expired',
+        payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
+      },
     })
   }
 
@@ -264,10 +274,10 @@ export class MemberPrintOrderCreateService {
       where: {
         endUserId,
         sourceFileId: { not: null },
-        pickupStatus: 'pending',
+        pickupStatus: { in: ['pending', 'claimed'] },
         printTaskId: null,
         pickupCodeExpiresAt: { lte: now },
-        payStatus: 'unpaid',
+        payStatus: { in: ['unpaid', 'paying'] },
       },
       data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
     })
@@ -275,17 +285,23 @@ export class MemberPrintOrderCreateService {
       where: {
         endUserId,
         sourceFileId: { not: null },
-        pickupStatus: 'pending',
+        pickupStatus: { in: ['pending', 'claimed'] },
         printTaskId: null,
         pickupCodeExpiresAt: { lte: now },
-        payStatus: { not: 'unpaid' },
+        payStatus: { notIn: ['unpaid', 'paying'] },
       },
       data: { pickupStatus: 'expired', taskStatus: 'expired' },
     })
   }
 
-  private visibleCode(order: { pickupStatus: string; pickupCodeExpiresAt: Date | null; pickupCodeEnc: string | null }): string | null {
+  private visibleCode(order: {
+    pickupStatus: string
+    payStatus: string
+    pickupCodeExpiresAt: Date | null
+    pickupCodeEnc: string | null
+  }): string | null {
     if (!['pending', 'claimed'].includes(order.pickupStatus)) return null
+    if (!['unpaid', 'paying', 'paid'].includes(order.payStatus)) return null
     if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date() || !order.pickupCodeEnc) return null
     try { return decryptSecret(order.pickupCodeEnc) } catch { return null }
   }

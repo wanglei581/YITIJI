@@ -68,8 +68,12 @@ export class PickupOrderService {
     }
     if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date()) {
       await this.prisma.order.updateMany({
-        where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
-        data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: order.payStatus === 'unpaid' ? 'closed' : order.payStatus },
+        where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
+        data: {
+          pickupStatus: 'expired',
+          taskStatus: 'expired',
+          payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
+        },
       })
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
     }
