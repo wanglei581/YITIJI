@@ -54,8 +54,46 @@ export interface PrintJobCreated {
   paymentSessionToken: string
 }
 
-/** Backend status values — subset of shared PrintTaskStatus */
-export type BackendJobStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed'
+/** Backend status values — subset of shared PrintTaskStatus plus admin abandoned. */
+export type BackendJobStatus =
+  | 'pending'
+  | 'claimed'
+  | 'printing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'abandoned'
+
+export class PrintApiError extends Error {
+  readonly code: string
+  readonly status: number
+  constructor(code: string, message: string, status: number) {
+    super(message)
+    this.name = 'PrintApiError'
+    this.code = code
+    this.status = status
+  }
+}
+
+const PRINTER_UNAVAILABLE_ZH = '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员'
+
+function throwPrintApiError(action: string, status: number, text: string): never {
+  let code = 'PRINT_REQUEST_FAILED'
+  let message = `${action} failed: ${status}`
+  try {
+    const body = JSON.parse(text) as { error?: { code?: string; message?: string } }
+    if (typeof body?.error?.code === 'string' && body.error.code.trim()) code = body.error.code.trim()
+    if (typeof body?.error?.message === 'string' && body.error.message.trim()) {
+      message = body.error.message.trim()
+    }
+  } catch {
+    if (text.trim()) message = `${action} failed: ${status} ${text.trim()}`
+  }
+  if (code === 'PRINTER_UNAVAILABLE') {
+    message = /[\u4e00-\u9fff]/.test(message) ? message : PRINTER_UNAVAILABLE_ZH
+  }
+  throw new PrintApiError(code, message, status)
+}
 
 export interface PrintJobStatusResult {
   taskId:        string
@@ -109,7 +147,7 @@ export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<Prin
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`quotePrintOrder failed: ${res.status} ${text}`)
+    throwPrintApiError('quotePrintOrder', res.status, text)
   }
   const body = (await res.json()) as PrintOrderQuote & { lines?: PrintPriceLine[]; data?: PrintOrderQuote & { lines?: PrintPriceLine[] } }
   // 兼容裸对象与偶发 ApiResponse 包装；契约字段为 lines（后端）→ 前端统一成 priceLines。
@@ -140,7 +178,7 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`createPrintJob failed: ${res.status} ${text}`)
+    throwPrintApiError('createPrintJob', res.status, text)
   }
   return res.json() as Promise<PrintJobCreated>
 }
@@ -158,7 +196,7 @@ export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusR
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`getPrintJobStatus failed: ${res.status} ${text}`)
+    throwPrintApiError('getPrintJobStatus', res.status, text)
   }
   return res.json() as Promise<PrintJobStatusResult>
 }

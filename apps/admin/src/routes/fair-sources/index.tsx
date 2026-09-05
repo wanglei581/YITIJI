@@ -137,7 +137,8 @@ export default function FairSourcesPage() {
     })
   }
 
-  const handleUnpublish = (id: string) => {
+  const handleUnpublish = (id: string, name: string) => {
+    if (!window.confirm(`确认下架「${name}」？下架后一体机不再展示该招聘会。`)) return
     void unpublishFairSource(id).then((updated) => {
       setSources((prev) => prev.map((s) => s.id === id ? updated : s))
     })
@@ -313,7 +314,7 @@ export default function FairSourcesPage() {
                               <button
                                 type="button"
                                 className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                                onClick={() => handleUnpublish(s.id)}
+                                onClick={() => handleUnpublish(s.id, s.name)}
                               >
                                 下架
                               </button>

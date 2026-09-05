@@ -41,34 +41,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 11 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 10 |
 | **medium** | 只被文档或其它文件提及 | 8 |
-| **low** | 全仓零提及 | 72 |
+| **low** | 全仓零提及 | 69 |
 
 
 ──────────────────────────────────────────────────────────────────────
 
-## ⚠ 自相矛盾的门禁（1）
-
-同一个路径，一条门禁断言它**必须存在**，另一条断言它**必须不存在**。
-
-**这不只是「该删一条」。** 它说明这两条门禁的作者互相不知道对方存在——
-是流程信号，不是代码信号。而且因为其中一条通常没接线，矛盾不会以 CI 红的
-形式暴露，只会在某天有人把它接上时才炸。
-
-### `src/routes/partners/PartnerAccountDeletionDialog.tsx`
-
-该路径在仓库中**不存在**。
-
-| 断言方向 | 门禁 | 是否会执行 |
-| --- | --- | --- |
-| 必须存在 | `apps/admin/scripts/verify-partner-account-delete-ui.mjs` | **无脚本名，不会执行** |
-| 必须不存在 | `apps/admin/scripts/verify-partner-account-action-ui.mjs` | CI 会跑 |
-
-
-──────────────────────────────────────────────────────────────────────
-
-## low — 全仓零提及（72）
+## low — 全仓零提及（69）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -82,14 +62,11 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusMockAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 文档（66）
+### 文档（63）
 
 | 路径 | 判定依据 |
 | --- | --- |
-| `docs/business/AI求职打印服务终端-B2G-B2B2C方案-专家评审报告.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/business/百宝箱商业价值与实用性说明.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/business/职易达AI求职服务终端-参赛项目简介.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/business/职易达AI求职服务终端-青岛OPC创业大赛商业计划书.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/delivery/kiosk-redesign-r1/handover.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/delivery/kiosk-redesign-r1/initiative.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/delivery/kiosk-redesign-r1/release-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -186,7 +163,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（11）
+## high — 仍被 CI / 门禁 / 包脚本引用（10）
 
 ### 页面/组件（6）
 
@@ -198,12 +175,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-member-login-dialog.mjs |
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-prod-build-config.mjs、apps/kiosk/scripts/verify-runtime-terminal-identity.mjs |
 | `apps/kiosk/src/pages/home/serviceGroups.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-jobfair-checkin.mjs、apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs |
-
-### 门禁脚本（1）
-
-| 路径 | 判定依据 |
-| --- | --- |
-| `apps/admin/scripts/verify-partner-account-delete-ui.mjs` | 文件存在，但没有任何 package.json 脚本名指向它 —— 从未被执行过<br/>→ 仍被 CI / 门禁 / 包脚本引用：scripts/ci-gate-exemptions.json、scripts/verify-ci-gate-coverage.mjs |
 
 ### 样式（3）
 

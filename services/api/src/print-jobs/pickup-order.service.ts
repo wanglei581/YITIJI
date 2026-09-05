@@ -68,8 +68,12 @@ export class PickupOrderService {
     }
     if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date()) {
       await this.prisma.order.updateMany({
-        where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
-        data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: order.payStatus === 'unpaid' ? 'closed' : order.payStatus },
+        where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
+        data: {
+          pickupStatus: 'expired',
+          taskStatus: 'expired',
+          payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
+        },
       })
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
     }
@@ -82,7 +86,10 @@ export class PickupOrderService {
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })
     }
-    await this.assertOrderFileReady(order)
+    const firstItem = !order.sourceFileId
+      ? await this.prisma.orderItem.findFirst({ where: { orderId: order.id, seq: 0 }, orderBy: { seq: 'asc' } })
+      : null
+    await this.assertOrderFileReady(order, firstItem?.fileId)
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
 
     if (order.pickupStatus === 'pending') {
@@ -114,7 +121,7 @@ export class PickupOrderService {
       terminalId: terminal.id,
       amountCents: fresh.amountCents,
       priceLines: this.priceLines(fresh.itemsJson),
-      fileName: fresh.sourceFileName,
+      fileName: fresh.sourceFileName ?? (firstItem ? `材料包第${firstItem.seq + 1}份` : null),
       paymentSessionToken: this.paymentToken(fresh),
     }
   }
@@ -128,10 +135,15 @@ export class PickupOrderService {
     if (order.printTaskId) return this.releasedView(order)
     if (order.pickupStatus !== 'claimed') throw new BadRequestException('PICKUP_NOT_CLAIMED')
     if (order.payStatus !== 'paid') throw new BadRequestException('ORDER_NOT_PAID')
-    await this.assertOrderFileReady(order)
+    const firstItem = !order.sourceFileId
+      ? await this.prisma.orderItem.findFirst({ where: { orderId: order.id, seq: 0 }, orderBy: { seq: 'asc' } })
+      : null
+    if (!order.sourceFileId && !firstItem) throw new BadRequestException('PRINT_FILE_NOT_FOUND')
+    await this.assertOrderFileReady(order, firstItem?.fileId)
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'document_print')
 
-    const signed = signFileUrl(order.sourceFileId!, SIGNED_URL_TTL_MS)
+    const sourceFileId = firstItem?.fileId ?? order.sourceFileId!
+    const signed = signFileUrl(sourceFileId, SIGNED_URL_TTL_MS)
     const taskId = `ptask_pickup_${crypto.randomBytes(8).toString('hex')}`
     const result = await this.prisma.$transaction(async (tx) => {
       const current = await tx.order.findUnique({ where: { id: order.id } })
@@ -140,18 +152,45 @@ export class PickupOrderService {
       if (current.pickupStatus !== 'claimed' || current.payStatus !== 'paid') {
         throw new BadRequestException('ORDER_RELEASE_INVALID_STATE')
       }
+      const item = !current.sourceFileId
+        ? await tx.orderItem.findFirst({ where: { orderId: current.id, seq: 0 }, orderBy: { seq: 'asc' } })
+        : null
+      if (!current.sourceFileId && (!item || item.status !== 'pending' || item.printTaskId)) {
+        throw new BadRequestException('ORDER_RELEASE_INVALID_STATE')
+      }
+      const taskParams = item
+        ? JSON.stringify({
+            copies: item.copies,
+            colorMode: item.colorMode,
+            duplex: item.duplex,
+            paperSize: 'A4',
+            orientation: 'auto',
+            quality: 'standard',
+            scale: 'fit',
+            pagesPerSheet: 1,
+            ...(item.pageRange ? { pageRange: item.pageRange } : {}),
+          })
+        : current.printParamsJson
       await tx.printTask.create({
         data: {
           id: taskId,
           terminalId: terminal.id,
           endUserId: current.endUserId,
           fileUrl: signed.url,
-          fileId: current.sourceFileId,
-          fileMd5: current.sourceFileSha256 ?? '',
-          paramsJson: current.printParamsJson,
+          fileId: item?.fileId ?? current.sourceFileId,
+          fileMd5: item ? (await tx.fileObject.findUnique({ where: { id: item.fileId }, select: { sha256: true } }))?.sha256 ?? '' : current.sourceFileSha256 ?? '',
+          paramsJson: taskParams,
           status: 'pending',
+          ...(item ? { orderId: current.id } : {}),
         },
       })
+      if (item) {
+        const itemUpdate = await tx.orderItem.updateMany({
+          where: { id: item.id, status: 'pending', printTaskId: null },
+          data: { printTaskId: taskId },
+        })
+        if (itemUpdate.count !== 1) throw new BadRequestException('ORDER_RELEASE_CONFLICT')
+      }
       const updated = await tx.order.updateMany({
         where: { id: current.id, printTaskId: null, pickupStatus: 'claimed', payStatus: 'paid' },
         data: { printTaskId: taskId, pickupStatus: 'used', taskStatus: 'pending' },
@@ -218,10 +257,11 @@ export class PickupOrderService {
     return terminal
   }
 
-  private async assertOrderFileReady(order: { sourceFileId: string | null; endUserId: string | null }) {
-    if (!order.sourceFileId) throw new BadRequestException('PRINT_FILE_NOT_FOUND')
+  private async assertOrderFileReady(order: { sourceFileId: string | null; endUserId: string | null }, itemFileId?: string) {
+    const fileId = itemFileId ?? order.sourceFileId
+    if (!fileId) throw new BadRequestException('PRINT_FILE_NOT_FOUND')
     const file = await this.prisma.fileObject.findFirst({
-      where: { id: order.sourceFileId, endUserId: order.endUserId, deletedAt: null },
+      where: { id: fileId, endUserId: order.endUserId, deletedAt: null },
       select: { status: true, expiresAt: true, purpose: true },
     })
     if (!file || file.status !== 'active' || (file.expiresAt && file.expiresAt <= new Date())) {
@@ -229,7 +269,7 @@ export class PickupOrderService {
     }
     if (['print_doc', 'resume_upload', 'resume_scan'].includes(file.purpose)) {
       const scan = await this.prisma.documentProcessTask.findFirst({
-        where: { sourceFileId: order.sourceFileId, kind: 'pii_scan', status: 'completed' },
+        where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
         orderBy: { createdAt: 'desc' }, select: { id: true },
       })
       if (!scan || await this.prisma.piiFinding.count({ where: { taskId: scan.id, action: 'pending' } }) > 0) {

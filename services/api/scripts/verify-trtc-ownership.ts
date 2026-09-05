@@ -1,22 +1,29 @@
 /**
  * TRTC 会话归属（Redis）— 后端 E2E 验证脚本
  *
- * 背景：专家审查阶段 A 把 TRTC 会话归属从进程内 Map 改为 Redis（trtc:owner:{taskId}），
- * 修复"API 重启后归属清空 → 任意请求方可跨会话终止他人会话 → 触发腾讯云异常计费"。
- * 本脚本在真实 Redis 下端到端验证归属逻辑，**stub 掉 TrtcService 不调用腾讯云**（不计费）。
+ * 背景：原设计把 `taskId → clientKey(IP|UA)` 落 Redis，靠比对 IP+UA 判断"谁有权终止"。
+ * 该模型有两个洞：**同一个展厅的多台一体机走同一出口 IP、同一 UA，clientKey 完全相同**，
+ * 彼此可以互相终止会话；而 IP 与 UA 本来就是请求方可控的，攻击者可以直接伪造。
+ *
+ * 现设计（任务包 5）：对外返回的 `taskId` 是每会话一次性随机的**停止能力令牌**
+ * （32 字节随机数），Redis 存 `trtc:owner:{stopToken} → 真实腾讯 TaskId`。
+ * 真实 TaskId 永不出服务端；不持有令牌就无法终止，与 IP/UA 是否相同无关。
+ *
+ * 本脚本在真实 Redis 下端到端验证该模型，**stub 掉 TrtcService 不调用腾讯云**（不计费）。
  *
  * 前置：services/api/.env 含 REDIS_URL；Redis 已启动（redis-cli ping → PONG）。
  * 运行（services/api/ 目录）：pnpm verify:trtc-ownership
  *
  * 验证项：
- *   1. startSession → Redis 写入 trtc:owner:{taskId} = clientKey(发起方 IP|UA)
- *   2. 该 key 存在 TTL（≈1800s，与 TRTC MaxIdleTime 对齐），不是永久 key
- *   3. stopSession 同 clientKey → 放行 + 删除 key
- *   4. stopSession 不同 clientKey → 401/403 拒绝（TASK_NOT_OWNED），key 仍在
- *   5. （持久化语义）owner key 在"模拟重启"后仍可读到，归属校验依然生效
+ *   1. 对外 taskId 是随机令牌，不等于真实腾讯 TaskId（真实 TaskId 不外泄）
+ *   2. Redis trtc:owner:{stopToken} = 真实 TaskId，且 TTL 在 1..1800（与 MaxIdleTime 对齐）
+ *   3. 两次会话拿到不同令牌，各自只映射到自己的 TaskId（无串号）
+ *   4. 同 IP/UA 的另一台终端用**自己的**令牌只能停自己的会话（旧模型在此处会误杀）
+ *   5. 猜/伪造的令牌是空操作：不停任何人的会话（幂等返回，绝不误杀）
+ *   6. 模拟 API 重启（新 controller 实例）后令牌仍可用 —— 归属在 Redis 不在进程内
+ *   7. 成功终止后令牌失效，重放不会二次调用腾讯云（防重复计费）
  */
 import 'dotenv/config'
-import { ForbiddenException } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import type { Request } from 'express'
 import { AppModule } from '../src/app.module'
@@ -29,15 +36,16 @@ function pass(msg: string) { console.log(`  ✅ ${msg}`) }
 function fail(msg: string) { console.error(`  ❌ ${msg}`); process.exitCode = 1 }
 function info(msg: string) { console.log(`  ℹ  ${msg}`) }
 
-const OWNER_KEY = (taskId: string) => `trtc:owner:${taskId}`
+const OWNER_KEY = (token: string) => `trtc:owner:${token}`
 
-// 构造携带 IP + UA 的最小 Request，供 makeClientKey 派生 clientKey。
-function mockReq(ip: string, ua: string): Request {
-  return { headers: { 'user-agent': ua }, ip } as unknown as Request
+// 同一展厅的两台一体机：出口 IP 与 UA **完全相同**。
+// 旧的 clientKey(IP|UA) 模型在这种最常见的现场部署下形同虚设，本脚本刻意用它做对照。
+function mockReq(): Request {
+  return { headers: { 'user-agent': 'kiosk-agent' }, ip: '10.0.0.1' } as unknown as Request
 }
 
 async function main() {
-  console.log('\n=== TRTC 会话归属（Redis）— 后端 E2E 验证 ===')
+  console.log('\n=== TRTC 会话归属（Redis 停止令牌）— 后端 E2E 验证 ===')
   console.log(`Redis: ${process.env['REDIS_URL'] ?? '(未设置)'}\n`)
   if (!process.env['REDIS_URL']) { fail('REDIS_URL 未设置'); process.exit(1) }
 
@@ -48,90 +56,106 @@ async function main() {
   const redis = app.get(RedisService)
   const rawRedis = app.get<Redis>(REDIS_CLIENT)
 
-  // 唯一 taskId，避免与历史 Redis 冲突
   const tail = Date.now().toString().slice(-9)
-  const TASK_ID = `e2e_trtc_${tail}`
+  const REAL_TASK_A = `e2e_trtc_A_${tail}`
+  const REAL_TASK_B = `e2e_trtc_B_${tail}`
   const TERMINAL = 'e2e-terminal-01'
+  const reqA = mockReq()
+  const reqB = mockReq() // 与 A 同 IP、同 UA
 
-  // 两个不同的客户端（IP|UA 不同 → clientKey 不同）
-  const reqA = mockReq('10.0.0.1', 'kiosk-agent-A')   // clientKey = "10.0.0.1|kiosk-agent-A"
-  const reqB = mockReq('10.0.0.2', 'kiosk-agent-B')   // clientKey = "10.0.0.2|kiosk-agent-B"
-  const clientKeyA = '10.0.0.1|kiosk-agent-A'
-
-  // stub TrtcService：固定返回我们的 TASK_ID，绝不调用腾讯云
-  let startCalls = 0
-  let stopCalls = 0
+  // stub TrtcService：绝不调用腾讯云；按调用顺序发不同的真实 TaskId。
+  const started: string[] = []
+  const stopped: string[] = []
   const stubTrtc = {
     startSession: async (userId: string) => {
-      startCalls++
-      return { taskId: TASK_ID, sdkAppId: 0, userId, userSig: 'stub', roomId: 'stub-room', expireTime: 0 }
+      const taskId = started.length === 0 ? REAL_TASK_A : REAL_TASK_B
+      started.push(taskId)
+      return { taskId, sdkAppId: 0, userId, userSig: 'stub', roomId: 'stub-room', expireTime: 0 }
     },
-    stopSession: async (_taskId: string) => { stopCalls++ },
+    stopSession: async (taskId: string) => { stopped.push(taskId) },
   }
 
-  // 直接实例化 controller，注入真实 RedisService + stub TrtcService
   const controller = new TrtcController(stubTrtc as never, redis)
+  const issuedTokens: string[] = []
 
   try {
-    // 预清理
-    await redis.del(OWNER_KEY(TASK_ID))
+    // ── 1. 对外 taskId 是随机令牌，不是真实 TaskId ────────────────────────────
+    console.log('── 1. startSession → 对外只给随机停止令牌 ────────────────────')
+    const startA = await controller.startSession({ userId: 'e2euserA' }, reqA, TERMINAL)
+    const tokenA = startA.taskId
+    issuedTokens.push(tokenA)
+    if (started.length === 1 && started[0] === REAL_TASK_A) pass('TrtcService.startSession 被调用 1 次（stub，未触腾讯云）')
+    else fail(`startSession 调用异常: ${JSON.stringify(started)}`)
+    if (typeof tokenA === 'string' && tokenA.length >= 32 && tokenA !== REAL_TASK_A) {
+      pass(`对外 taskId 是随机令牌（${tokenA.length} 字符），真实腾讯 TaskId 未外泄`)
+    } else {
+      fail(`对外 taskId 不该等于真实 TaskId，也不该短于 32 字符: "${String(tokenA)}"`)
+    }
 
-    // ── 1. startSession 写入归属 ────────────────────────────────────────────────
-    console.log('── 1. startSession → Redis 写入归属 ──────────────────────────')
-    const startRes = await controller.startSession({ userId: 'e2euserA' }, reqA, TERMINAL)
-    if (startRes?.taskId === TASK_ID && startCalls === 1) pass(`startSession 返回 taskId=${TASK_ID}（TrtcService 被调用，未触腾讯云为 stub）`)
-    else fail(`startSession 返回异常: ${JSON.stringify(startRes)}`)
-    const ownerVal = await redis.get(OWNER_KEY(TASK_ID))
-    if (ownerVal === clientKeyA) pass(`Redis trtc:owner:${TASK_ID} = "${ownerVal}"（= 发起方 clientKey）`)
-    else fail(`归属值异常: 期望 "${clientKeyA}"，实得 "${ownerVal}"`)
-
-    // ── 2. TTL 存在且 ≈1800s ────────────────────────────────────────────────────
-    console.log('\n── 2. owner key 存在 TTL（非永久）─────────────────────────────')
-    const ttl = await rawRedis.ttl(OWNER_KEY(TASK_ID))
+    // ── 2. Redis 映射与 TTL ───────────────────────────────────────────────────
+    console.log('\n── 2. Redis 令牌 → 真实 TaskId，且有 TTL ─────────────────────')
+    const mapped = await redis.get(OWNER_KEY(tokenA))
+    if (mapped === REAL_TASK_A) pass(`Redis trtc:owner:{token} = "${REAL_TASK_A}"（真实 TaskId 只存服务端）`)
+    else fail(`映射值异常: 期望 "${REAL_TASK_A}"，实得 "${String(mapped)}"`)
+    const ttl = await rawRedis.ttl(OWNER_KEY(tokenA))
     if (ttl > 0 && ttl <= 1800) pass(`TTL=${ttl}s（>0 且 ≤1800，与 MaxIdleTime 对齐，会自动过期）`)
     else fail(`TTL 异常: ${ttl}（应在 1..1800；-1=永久未设过期，-2=key 不存在）`)
 
-    // ── 3. 不同 clientKey 终止被拒（key 仍在）──────────────────────────────────
-    console.log('\n── 3. 不同 clientKey stopSession → 拒绝 ───────────────────────')
-    let rejected = false
-    let rejectCode = ''
-    try {
-      await controller.stopSession({ taskId: TASK_ID }, reqB, TERMINAL)
-    } catch (e) {
-      rejected = e instanceof ForbiddenException
-      const resp = e instanceof ForbiddenException ? (e.getResponse() as { error?: { code?: string } }) : {}
-      rejectCode = resp.error?.code ?? ''
-    }
-    if (rejected && rejectCode === 'TASK_NOT_OWNED') pass('不同 clientKey 终止 → 403 TASK_NOT_OWNED（跨会话终止被拦截）')
-    else fail(`不同 clientKey 终止未被正确拒绝: rejected=${rejected} code=${rejectCode}`)
-    const stillThere = await redis.get(OWNER_KEY(TASK_ID))
-    if (stillThere === clientKeyA && stopCalls === 0) pass('被拒后 owner key 仍在、TrtcService.stopSession 未被调用（不误杀）')
-    else fail(`被拒后状态异常: owner=${stillThere} stopCalls=${stopCalls}`)
+    // ── 3. 两次会话令牌不同、各归其主 ─────────────────────────────────────────
+    console.log('\n── 3. 第二台终端（同 IP/同 UA）另起会话 ──────────────────────')
+    const startB = await controller.startSession({ userId: 'e2euserB' }, reqB, TERMINAL)
+    const tokenB = startB.taskId
+    issuedTokens.push(tokenB)
+    if (tokenB !== tokenA) pass('两次会话拿到不同令牌（令牌是每会话随机，不可复用）')
+    else fail('两次会话令牌相同 —— 令牌不是每会话随机')
+    const mappedB = await redis.get(OWNER_KEY(tokenB))
+    if (mappedB === REAL_TASK_B) pass('第二个令牌映射到它自己的 TaskId（无串号）')
+    else fail(`第二个令牌映射异常: 期望 "${REAL_TASK_B}"，实得 "${String(mappedB)}"`)
 
-    // ── 4. 模拟"API 重启"后仍能正确校验归属 ───────────────────────────────────
-    console.log('\n── 4. 模拟重启：新 controller 实例仍能读到 Redis 归属 ─────────')
-    // 旧设计中进程内 Map 会清空 → 任意请求放行；Redis 持久化下新实例仍读到归属。
+    // ── 4. 同 IP/UA 的终端只能停自己那一路 ────────────────────────────────────
+    console.log('\n── 4. 同 IP/UA 终端用自己的令牌 → 只停自己 ───────────────────')
+    await controller.stopSession({ taskId: tokenB }, reqB, TERMINAL)
+    if (stopped.length === 1 && stopped[0] === REAL_TASK_B) {
+      pass('只终止了 B 自己的会话；A 的会话未被误杀（旧 IP|UA 模型在此处必然误杀）')
+    } else {
+      fail(`终止范围异常: stopped=${JSON.stringify(stopped)}`)
+    }
+    const aStillAlive = await redis.get(OWNER_KEY(tokenA))
+    if (aStillAlive === REAL_TASK_A) pass('A 的令牌仍然有效（互不影响）')
+    else fail(`A 的令牌被连带清掉了: ${String(aStillAlive)}`)
+
+    // ── 5. 伪造/猜测的令牌是空操作 ────────────────────────────────────────────
+    console.log('\n── 5. 伪造令牌 → 空操作，绝不误杀 ────────────────────────────')
+    const before = stopped.length
+    const forged = await controller.stopSession({ taskId: 'forged-token-not-in-redis' }, reqB, TERMINAL)
+    if ((forged as { ok?: boolean })?.ok === true && stopped.length === before) {
+      pass('伪造令牌 → 幂等返回 ok，且未调用 TrtcService.stopSession（不误杀他人会话）')
+    } else {
+      fail(`伪造令牌处理异常: ${JSON.stringify(forged)} stopped=${JSON.stringify(stopped)}`)
+    }
+
+    // ── 6. 模拟 API 重启后令牌仍可用 ──────────────────────────────────────────
+    console.log('\n── 6. 模拟重启：新 controller 实例仍认这枚令牌 ───────────────')
     const controllerAfterRestart = new TrtcController(stubTrtc as never, redis)
-    let rejectedAfterRestart = false
-    try {
-      await controllerAfterRestart.stopSession({ taskId: TASK_ID }, reqB, TERMINAL)
-    } catch (e) {
-      rejectedAfterRestart = e instanceof ForbiddenException
+    await controllerAfterRestart.stopSession({ taskId: tokenA }, reqA, TERMINAL)
+    if (stopped.length === 2 && stopped[1] === REAL_TASK_A) {
+      pass('重启后（新实例）令牌仍解析到真实 TaskId —— 归属在 Redis，不在进程内')
+    } else {
+      fail(`重启后终止异常: stopped=${JSON.stringify(stopped)}`)
     }
-    if (rejectedAfterRestart) pass('重启后（新实例）不同 clientKey 终止仍被拒 → 修复了"重启窗口放行"风险')
-    else fail('重启后归属校验失效（不同 clientKey 被放行）')
+    const afterStop = await redis.get(OWNER_KEY(tokenA))
+    if (afterStop === null) pass('终止后令牌已从 Redis 删除')
+    else fail(`终止后令牌未删除: ${afterStop}`)
 
-    // ── 5. 同 clientKey 终止放行 + 删除 key ────────────────────────────────────
-    console.log('\n── 5. 同 clientKey stopSession → 放行 + 清除归属 ──────────────')
-    const stopRes = await controller.stopSession({ taskId: TASK_ID }, reqA, TERMINAL)
-    if ((stopRes as { ok?: boolean })?.ok === true && stopCalls === 1) pass('同 clientKey 终止 → ok，TrtcService.stopSession 被调用 1 次')
-    else fail(`同 clientKey 终止异常: ${JSON.stringify(stopRes)} stopCalls=${stopCalls}`)
-    const afterStop = await redis.get(OWNER_KEY(TASK_ID))
-    if (afterStop === null) pass('终止后 owner key 已从 Redis 删除（幂等清理）')
-    else fail(`终止后 key 未删除: ${afterStop}`)
+    // ── 7. 令牌重放不会二次计费 ───────────────────────────────────────────────
+    console.log('\n── 7. 令牌重放 → 不再调用腾讯云（防重复计费）─────────────────')
+    const replayBefore = stopped.length
+    await controller.stopSession({ taskId: tokenA }, reqA, TERMINAL)
+    if (stopped.length === replayBefore) pass('重放已用过的令牌 → 未再调用 TrtcService.stopSession')
+    else fail(`重放导致二次调用: stopped=${JSON.stringify(stopped)}`)
 
   } finally {
-    await redis.del(OWNER_KEY(TASK_ID))
+    for (const t of issuedTokens) await redis.del(OWNER_KEY(t))
     info('测试数据已清理。')
     await app.close()
   }

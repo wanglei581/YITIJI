@@ -129,7 +129,8 @@ export default function JobSourcesPage() {
     })
   }
 
-  const handleUnpublish = (id: string) => {
+  const handleUnpublish = (id: string, title: string) => {
+    if (!window.confirm(`确认下架「${title}」？下架后一体机不再展示该岗位。`)) return
     void unpublishJobSource(id).then((updated) => {
       setSources((prev) => prev.map((s) => s.id === id ? updated : s))
     })
@@ -313,7 +314,7 @@ export default function JobSourcesPage() {
                               <button
                                 type="button"
                                 className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                                onClick={() => handleUnpublish(s.id)}
+                                onClick={() => handleUnpublish(s.id, s.title)}
                               >
                                 下架
                               </button>

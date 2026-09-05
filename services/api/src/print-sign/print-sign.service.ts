@@ -348,12 +348,13 @@ export class PrintSignService {
     const printSigned = signFileUrl(uploaded.fileId, OUTPUT_URL_TTL_MS)
 
     await this.audit.write({
-      actorId: endUserId,
+      actorId: null,
       actorRole: endUserId ? 'member' : 'system',
       action: 'print_sign.compose',
       targetType: 'file',
       targetId: uploaded.fileId,
       payload: {
+        endUserId: endUserId ?? null,
         terminalId: args.terminalId,
         requestId: args.requestId ?? null,
         documentFileId: args.document.fileId,

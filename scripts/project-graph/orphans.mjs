@@ -82,7 +82,11 @@ export function protectionFor(file) {
 const TEXT_EXT =
   /\.(tsx?|mts|cts|mjs|cjs|jsx?|json|md|ya?ml|css|scss|html|prisma|sql|sh|ps1|txt|wxml|wxss|toml|env|example|gitignore|gitattributes)$/
 
-const PATH_TOKEN_PATTERN = /[\w@][\w@.-]*(?:\/[\w@.-]+)+/g
+// 2026-09-06 修：原来是 /[\w@][\w@.-]*(?:\/[\w@.-]+)+/g —— \w 只认 ASCII，
+// 遇到中文文件名会在中文处截断：`docs/patent/对接清单.md` 只 tokenize 出 `docs/patent`。
+// 后果：仓库里 5 个中文名跟踪文档全部被误判成「全仓零提及」进 orphans.md。
+// 改用 Unicode 属性类 + u 标志，中日韩文件名同样能整段取出。
+const PATH_TOKEN_PATTERN = /[\p{L}\p{N}@_][\p{L}\p{N}@._-]*(?:\/[\p{L}\p{N}@._-]+)+/gu
 
 /**
  * 返回 { paths, basenames, ambiguousBasenames }
