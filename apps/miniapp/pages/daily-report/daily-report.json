@@ -1,4 +1,5 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#f4f1e8"
+  "navigationBarTitleText": "今日提醒",
+  "backgroundColor": "#f5f7fa"
 }

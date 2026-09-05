@@ -2,8 +2,6 @@
   "_README": "小程序依赖的后端端点契约快照。任何 lane 改动 services/api 路由导致这里的端点消失，CI 会红。新增小程序调用后跑 --write 更新；knownMissing 里的每一条都必须写清原因。",
   "generatedFrom": "apps/miniapp/utils/api.js + services/api/src/**/*.controller.ts",
   "endpoints": [
-    "DELETE /community/comments/:p/like",
-    "DELETE /community/feeds/:p/like",
     "DELETE /contract-reviews/:p",
     "DELETE /files/:p",
     "DELETE /me/ai-records/:p",
@@ -13,8 +11,6 @@
     "DELETE /resume/job-fit/consent/:p",
     "DELETE /resume/self-assessment/:p",
     "GET /community/feeds",
-    "GET /community/feeds/:p",
-    "GET /community/feeds/:p/comments",
     "GET /companies",
     "GET /companies/:p",
     "GET /companies/:p/jobs",
@@ -76,9 +72,6 @@
     "POST /activity/external-jump",
     "POST /assistant/chat",
     "POST /assistant/daily-report",
-    "POST /community/comments/:p/like",
-    "POST /community/feeds/:p/comments",
-    "POST /community/feeds/:p/like",
     "POST /contract-reviews",
     "POST /contract-reviews/:p/confirm",
     "POST /files/kiosk-upload",
@@ -127,16 +120,9 @@
     "POST /resume/voice/transcribe"
   ],
   "knownMissing": {
-    "DELETE /community/comments/:p/like": "同上，取消评论点赞。",
-    "DELETE /community/feeds/:p/like": "同上，取消点赞。",
-    "GET /community/feeds": "职业生活圈社区流：后端无 community 模块。CLAUDE.md §15 已声明「职业圈动态」未开放，小程序 pages/ai 在入口处标注未开放并写明原因。",
-    "GET /community/feeds/:p": "同上，社区详情。",
-    "GET /community/feeds/:p/comments": "同上，社区评论列表。",
+    "GET /community/feeds": "最新动态官方流。契约已接线：items[{id,kind,title,summary,sourceName,publishedAt,action{label,route}}]、nextCursor、commentsEnabled:false。后端在 feat/community-feed-daily-brief@9532c2da4，本工作区 services/api 尚未合入；合入后本豁免应变 STALE。",
     "GET /orders/package/:p": "同上，材料包详情。",
-    "POST /assistant/daily-report": "今日早报：后端无该端点。CLAUDE.md §15 已声明未开放。",
-    "POST /community/comments/:p/like": "同上，评论点赞。",
-    "POST /community/feeds/:p/comments": "同上，发评论。社区功能上线前须先过 UGC 内容审核与合规评估。",
-    "POST /community/feeds/:p/like": "同上，点赞。",
+    "POST /assistant/daily-report": "今日提醒办事清单。契约已接线：POST {city?} → {date,empty,modules[pickup_expiring|fair_countdown|city_new|broadcast]}，需登录。后端在 feat/community-feed-daily-brief@9532c2da4，本工作区 services/api 尚未合入；合入后本豁免应变 STALE。",
     "POST /orders/package": "材料包创建：Gate 0 决策 D5 明确 M2 延后，后端无 orders/package 路由。pages/home/home.js 已把入口从材料包改指职业规划以避免死路由。",
     "POST /orders/package/:p/cancel": "同上，材料包取消。"
   }

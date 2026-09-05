@@ -1303,107 +1303,30 @@ const api = {
     });
   },
 
-  // ---------- 职业圈动态 ----------
-
-
+  // ---------- 最新动态 / 今日提醒 ----------
   /**
-   * 获取动态详情
-   * @param {string} id
+   * 官方动态流。契约：GET /community/feeds?cursor&limit
+   * → { items[{ id, kind, title, summary, sourceName, publishedAt, action{label,route} }], nextCursor, commentsEnabled:false }
+   * 公开可读，无点赞/评论。
    */
-  getFeedDetail(id) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('动态详情'));
-    return request(`/community/feeds/${encodeURIComponent(id)}`, { method: 'GET', needAuth: false });
+  getCommunityFeeds({ cursor, limit } = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('最新动态'));
+    const data = {};
+    if (cursor) data.cursor = cursor;
+    if (limit) data.limit = limit;
+    return request('/community/feeds', { method: 'GET', data, needAuth: false });
   },
 
   /**
-   * 点赞动态
-   * @param {string} id
+   * 今日提醒办事清单。契约：POST /assistant/daily-report { city? }
+   * → { date, empty, modules[ pickup_expiring | fair_countdown | city_new | broadcast ] }
+   * 需登录。city 由页面从岗位页 storage 读取，没有就不传。
    */
-  likeFeed(id) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('点赞'));
-    return request(`/community/feeds/${encodeURIComponent(id)}/like`, { method: 'POST', needAuth: true });
-  },
-
-  /**
-   * 取消点赞
-   * @param {string} id
-   */
-  unlikeFeed(id) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消点赞'));
-    return request(`/community/feeds/${encodeURIComponent(id)}/like`, { method: 'DELETE', needAuth: true });
-  },
-
-  /**
-   * 获取动态评论列表
-   * @param {string} feedId
-   * @param {object} params { cursor, pageSize }
-   */
-  getFeedComments(feedId, params = {}) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('评论列表'));
-    return unwrapList(request(`/community/feeds/${encodeURIComponent(feedId)}/comments`, {
-      method: 'GET',
-      data: params,
-      needAuth: false
-    }));
-  },
-
-  /**
-   * 发表评论
-   * @param {string} feedId
-   * @param {object} data { content, replyToCommentId? }
-   */
-  commentFeed(feedId, data) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('发表评论'));
-    return request(`/community/feeds/${encodeURIComponent(feedId)}/comments`, {
-      method: 'POST',
-      data,
-      needAuth: true
-    });
-  },
-
-  /**
-   * 点赞评论
-   * @param {string} commentId
-   */
-  likeComment(commentId) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('点赞评论'));
-    return request(`/community/comments/${encodeURIComponent(commentId)}/like`, {
-      method: 'POST',
-      needAuth: true
-    });
-  },
-
-  /**
-   * 取消点赞评论
-   * @param {string} commentId
-   */
-  unlikeComment(commentId) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消点赞评论'));
-    return request(`/community/comments/${encodeURIComponent(commentId)}/like`, {
-      method: 'DELETE',
-      needAuth: true
-    });
-  },
-
-  // ---------- 今日早报 ----------
-
-  /**
-   * 职业圈动态 / 今日早报。
-   *
-   * ⚠️ 服务端 /community/feeds 与 /assistant/daily-report 目前均不存在。
-   * 保留这两个方法不是因为它们能用，而是 pages/community/ 与
-   * pages/daily-report/ 这两个在制页面仍在调用，删掉会直接打断
-   * 主仓正在进行的工作。等那两页连同后端一起落地或一起废弃时再处理。
-   * AI 百宝箱首页已不再引用（见 e2d8dcfb1）。
-   */
-  getCommunityFeeds(params = {}) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('职业圈动态'));
-    return unwrapList(request('/community/feeds', { method: 'GET', data: params, needAuth: false }));
-  },
-
-  getDailyReport() {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('今日早报'));
-    return request('/assistant/daily-report', { method: 'POST', needAuth: false, timeout: config.aiTimeout });
+  getDailyBrief({ city } = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('今日提醒'));
+    const data = {};
+    if (city) data.city = city;
+    return request('/assistant/daily-report', { method: 'POST', data, needAuth: true });
   },
 
   // ---------- 合同审查（后端 contract-review.controller.ts 已实现） ----------
