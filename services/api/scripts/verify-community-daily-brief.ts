@@ -134,6 +134,25 @@ async function main(): Promise<void> {
         && !secondPage.items.some((item) => item.id === firstPage.items[0]?.id),
       '4b. publishedAt|id 游标分页返回后续项且无重复',
     )
+
+    // 4c：三源夹具的 createdAt 全是同一个 today，正好覆盖「同毫秒跨 kind」这一最难的
+    // 游标边界（Antigravity 第 17 轮建议 1 质疑此处会重复或漏项）。逐页 limit=1 走完，
+    // 断言与一次性取回的集合逐个相等且无重复，用例红了就说明 tie-break 真有问题。
+    const walked: string[] = []
+    let walkCursor: string | undefined
+    for (let guard = 0; guard < 50; guard += 1) {
+      const page: FeedPage = await community.listFeeds({ limit: 1, ...(walkCursor ? { cursor: walkCursor } : {}) })
+      if (page.items.length === 0) break
+      walked.push(...page.items.map((item) => item.id))
+      if (!page.nextCursor) break
+      walkCursor = page.nextCursor
+    }
+    assert(
+      walked.length === new Set(walked).size
+        && walked.length === ids.length
+        && walked.every((id, index) => id === ids[index]),
+      '4c. 同毫秒跨 kind 时逐页 limit=1 走完与整页取回顺序一致、无重复无漏项',
+    )
     console.log(`  FEED_SAMPLE ${JSON.stringify(policy)}`)
 
     const report: DailyReport = await daily.create({ endUserId: userA, sessionId: 'verify' }, { city })
