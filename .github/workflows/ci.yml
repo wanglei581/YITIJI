@@ -551,6 +551,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:screensaver-content
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ad-asset-range
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
           pnpm --filter @ai-job-print/api verify:job-review
