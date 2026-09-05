@@ -147,7 +147,7 @@
 小程序 → 一体机的**唯一**履约交接。E2 走查丙档、第 14 轮问二第 1 条、问三全部、问四第 1 条都卡在它。
 
 ### 现状（已核，2026-09-05）
-- 后端：**无** package 模型、**无** 端点。`Order.sourceFileId` 单数（一单一文件）、`itemsJson` 是计费快照不是文件清单、
+- 后端：**无**端点。schema 第 2860 行有一张 `PrintMaterialPack` **空壳模板目录表**（name / description / items JSON / priceCents / sortOrder），7 处引用全在 `generated/`，**零业务代码使用** —— 它对应 PRD §5.1.2「模板后续 Admin 可配置」，可作模板源复用，但**订单侧仍无子项模型**。`Order.sourceFileId` 单数（一单一文件）、`itemsJson` 是计费快照不是文件清单、
   无 `OrderItem`、`PrintTask ↔ Order` 一对一、`CreateMemberPrintOrderDto` 只收一个 `fileId`。
   **N 份材料各自参数，现有模型装不下。**
 - 小程序：四页在，被 `utils/package-feature.js` 的 `guardPackageChain()` 在 `onLoad` 首行无条件拦截回首页；
@@ -185,6 +185,7 @@
 
 ### 不做
 不做 AI 自动选材（PRD P2）、不做 Partner 模板、不做跨终端 follow-me、不做付费套餐绑定。
+**模板须分两套**：PRD 现有「招聘会标配包」（简历 ×5 + 岗位列表 + 参展手册）服务 `phone_digital`；`hall_paper` 另开「大厅材料包」（身份证复印件 + 纸质简历 + 资格证 + 政策材料清单），不硬套。见 audience-growth-space.md §2.1。
 **排期：在 #756 合入 + E2 真机走查之后另开分支，不进 #756。**
 
 ## 生活圈判定（2026-09-05 评审 + 代码核，待产品负责人确认）
