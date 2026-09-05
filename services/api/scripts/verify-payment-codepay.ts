@@ -601,28 +601,43 @@ async function main(): Promise<void> {
     }
     const failedQrCreateFixture = createFixture(new FailedQrCreateSandboxProvider(SESSION_SECRET))
     const failedQrCreateOrder = failedQrCreateFixture.makeOrder(100)
+    // 契约变更（API-09）：渠道出码抛错**不再原样外泄**，也不再把尝试留在 created 等惰性过期。
+    // 现在当场捕获 → 尝试置 failed、订单从 paying 回退 unpaid、对外统一 PAY_CHANNEL_UNAVAILABLE(503)。
+    // 这比旧契约更强：不必等本地过期，订单立刻可再次发起支付，且不泄露渠道原始错误文本。
+    let precreateError: unknown
     try {
       await failedQrCreateFixture.payment.createPayAttempt(failedQrCreateOrder.order.id, failedQrCreateOrder.token, 'sandbox')
       fail('simulated QR precreate failure should reject')
     } catch (error) {
-      if (!(error instanceof Error) || !error.message.includes('SIMULATED_QR_PRECREATE_FAILURE')) throw error
+      precreateError = error
     }
+    const precreateBody = (precreateError as { getResponse?: () => unknown })?.getResponse?.() as
+      | { error?: { code?: string; message?: string } }
+      | undefined
+    const precreateText = JSON.stringify(precreateBody ?? String(precreateError))
+    if (precreateBody?.error?.code !== 'PAY_CHANNEL_UNAVAILABLE') {
+      fail(`QR precreate failure must surface PAY_CHANNEL_UNAVAILABLE, got: ${precreateText}`)
+    }
+    if (precreateText.includes('SIMULATED_QR_PRECREATE_FAILURE')) {
+      fail(`QR precreate failure must not leak the raw channel error: ${precreateText}`)
+    }
+    pass('QR precreate failure surfaces PAY_CHANNEL_UNAVAILABLE and never leaks the raw channel error')
+
     const failedQrAttempt = [...failedQrCreateFixture.attempts.values()][0]
     if (!failedQrAttempt) fail('missing failed QR precreate attempt fixture')
-    failedQrAttempt.expiresAt = new Date(Date.now() - 1_000)
     const recoveredFromFailedQrCreate = await failedQrCreateFixture.payment.getPayStatus(
       failedQrCreateOrder.order.id,
       failedQrCreateOrder.token,
     )
     if (
-      failedQrAttempt.status === 'expired' &&
+      failedQrAttempt.status === 'failed' &&
       failedQrCreateOrder.order.payStatus === 'unpaid' &&
       recoveredFromFailedQrCreate.payStatus === 'unpaid'
     ) {
-      pass('expired QR precreate failure is safely released without treating it as a scannable channel order')
+      pass('failed QR precreate marks the attempt failed and releases the order immediately (no lazy-expiry wait)')
     } else {
       fail(
-        `failed QR precreate must release after local expiry: ${JSON.stringify({
+        `failed QR precreate must fail the attempt and release the order at once: ${JSON.stringify({
           attempt: failedQrAttempt,
           order: failedQrCreateOrder.order,
           status: recoveredFromFailedQrCreate,
