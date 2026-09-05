@@ -36,7 +36,12 @@ const FROZEN = new Map([
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', '1adb30c98603ef45cc5fd065e9c28d0905b4a02e902ba741f4ff8dd4b35800ed'],
+  // 哈希随序 13「订单详情展示真实打印参数与优惠退款额」同步更新。
+  // 该改动是**纯追加**：原有导出一行未动，新增单双面 / 彩黑 / 份数 / 页范围的
+  // 展示函数，以及「未记录」口径的金额格式化。其中 NET_PAID_UNRECORDED 明确
+  // 钉死「实付无独立真源字段，禁止用应付减优惠推算」——是加强诚实性，不是放宽。
+  // 与上面 A2.1 同理：冻结契约不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'c6542ec16364884bfb741cc735d53f32a99c70e930a14b6ab080bd26c0627581'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],

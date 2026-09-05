@@ -207,6 +207,10 @@ const allowedChanged = new Set([
   'services/api/src/admin-orders-readonly/admin-orders-readonly.types.ts',
   'services/api/src/member-print-orders/member-print-orders.service.ts',
   'services/api/src/member-print-orders/member-print-orders.types.ts',
+  // 第二次被迫加行：paymentCopy.ts 同时被 verify:fusion-w5 的哈希冻结契约覆盖，
+  // 纯追加改动要求把基线哈希前移，于是 verify-fusion-w5.mjs 也进了变更集，
+  // 又撞上本 allowlist。一个 PR 内触发两次，见下方设计问题。
+  'apps/kiosk/scripts/verify-fusion-w5.mjs',
 ])
 
 // ⚠️ 设计问题，待产品负责人裁决（2026-09-06，序 13 撞上后记录，本次未擅自改动）
