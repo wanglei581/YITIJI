@@ -22,6 +22,7 @@ import {
   type ScreensaverTerminalView,
 } from '../../services/api/screensaver'
 import { API_BASE_URL } from '../../services/api/client'
+import { saveScreensaverTerminalForm, screensaverTerminalFormState } from './terminalConfigState'
 
 type Tab = 'assets' | 'playlists' | 'terminals'
 
@@ -698,9 +699,10 @@ function TerminalConfigRow({
   onSaved: () => void
 }) {
   const cfg = terminal.config
-  const [enabled, setEnabled] = useState(cfg?.enabled ?? false)
-  const [timeout, setTimeoutSec] = useState(String(cfg?.idleTimeoutSec ?? 180))
-  const [playlistId, setPlaylistId] = useState(cfg?.playlistId ?? '')
+  const initialState = screensaverTerminalFormState(cfg)
+  const [enabled, setEnabled] = useState(initialState.enabled)
+  const [timeout, setTimeoutSec] = useState(initialState.timeout)
+  const [playlistId, setPlaylistId] = useState(initialState.playlistId)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -708,12 +710,16 @@ function TerminalConfigRow({
     setSaving(true)
     setMsg(null)
     try {
-      const sec = Math.max(30, Math.min(1800, Number(timeout) || 180))
-      await screensaverService.saveConfig(terminal.terminalId, {
+      const nextState = await saveScreensaverTerminalForm(
+        screensaverService.saveConfig,
+        terminal.terminalId,
         enabled,
-        idleTimeoutSec: sec,
-        playlistId: playlistId || null,
-      })
+        timeout,
+        playlistId,
+      )
+      setEnabled(nextState.enabled)
+      setTimeoutSec(nextState.timeout)
+      setPlaylistId(nextState.playlistId)
       setMsg('已保存')
       onSaved()
     } catch (e) {
@@ -734,7 +740,13 @@ function TerminalConfigRow({
       </div>
 
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          disabled={!playlistId}
+          title={!playlistId ? '请先选择播放方案' : undefined}
+        />
         启用待机宣传屏
       </label>
 
@@ -754,7 +766,11 @@ function TerminalConfigRow({
         <label className="mb-1 block text-xs text-neutral-500">播放方案</label>
         <select
           value={playlistId}
-          onChange={(e) => setPlaylistId(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value
+            setPlaylistId(value)
+            if (!value) setEnabled(false)
+          }}
           className="h-10 w-52 rounded-md border border-neutral-300 px-3 text-sm"
         >
           <option value="">未绑定</option>

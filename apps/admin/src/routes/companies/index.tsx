@@ -115,6 +115,12 @@ export default function CompaniesPage() {
         />
       )}
 
+      {listState === 'ready' && rows.length === 200 && (
+        <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">
+          当前仅显示最近更新的前 200 家企业，可能还有更多记录；请使用筛选或关键词缩小范围。
+        </div>
+      )}
+
       {listState === 'ready' && rows.length > 0 && (
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
