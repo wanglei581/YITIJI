@@ -135,7 +135,9 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *   编进主键，那些值在同一条故障持续期间会变。
  *   处置只压制提醒，**不代表问题已修复**：界面对仍在 firing 的条目显示「已确认（仍在发生）」。
  */
-const EXPECTED_MODEL_COUNT = 99
+// 新增 OrderItem（材料包逐份履约）。注意：#800 同期也加了一张表（JobMaterialTemplate）
+// 且同样写 100，两者谁后合入 main 谁必须改成 101，否则 main 直接转红。
+const EXPECTED_MODEL_COUNT = 100
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
