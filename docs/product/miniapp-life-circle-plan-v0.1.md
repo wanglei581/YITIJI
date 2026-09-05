@@ -1,277 +1,169 @@
-# 微信小程序 · 「职业生活圈」规划草案
+# 微信小程序 · 「职业生活圈」规划 v1.0
 
-> **状态**：草案 v0.1，等本地 `claude` CLI 反馈后定版。
-> **范围**：仅讨论 `apps/miniapp` 内 AI 百宝箱 Tab 的内容扩展。
-> **基准**：`apps/miniapp` 当前 `main@a3d4b953`，不含本规划任何功能。
-> **合规边界**：严格遵守 `CLAUDE.md §15 / §16 / §9`，所有功能必须可点击即真实，禁止伪造 Token / 会员 / 积分 / 领取结果。
-
----
-
-## 1. 目标与范围
-
-### 1.1 目标
-把当前"AI 百宝箱"升级为"职业生活圈"，形成：
-- **上半屏**：真实 AI 求职工具 + 材料与打印（已有，不动）
-- **下半屏**：新增 4 个真实能力入口（视频 / 福利 / 邀请 / 签到）
-- **顶部 Tab 名**：保持"AI百宝箱"作为业务标识，页面内副标题改为"职业生活圈"
-
-### 1.2 不在范围
-- ❌ 不新增底部 Tab
-- ❌ 不改首页、求职、我的 Tab
-- ❌ 不动 Kiosk / Admin / Partner 任何代码
-- ❌ 不改 API 数据库 schema（除非要新增 1 个视频内容表，可选）
+> **状态**：v1.0，产品负责人 2026-09-05 拍板「同意生活圈换形状」。取代 v0.1 草案（v0.1 从未定版，
+> 其提出的 5 个页面 / 3 个 API / 1 张表**均未实施**，本次改写不删除任何代码）。文件名保留以维持既有引用。
+> **范围**：仅 `apps/miniapp` 的「职业生活圈」Tab（`pages/ai`）内容方向。不新增底部 Tab，不改首页 / 求职 / 我的。
+> **从属**：[feature-scope.md](./feature-scope.md)、[compliance-boundary.md](../compliance/compliance-boundary.md)、
+> [audience-growth-space.md](./audience-growth-space.md)。冲突时它们赢。
+> **性质**：这是方向与范围，不是实施。每个模块动工前按 `CLAUDE.md §8.1` 另写任务声明。排期在 #756 合入 + E2 真机走查之后。
 
 ---
 
-## 2. 4 个新模块的合规与可行性
+## 0. 决策记录
 
-### 2.1 📹 学习视频（合规 ✅ / 可立即做）
+| 日期 | 决定 | 依据 |
+|---|---|---|
+| 2026-09-04 | 第 14 轮评审判定 v0.1（学习视频 / 福利中心 / 邀请有礼 / 每日签到）是贴皮：四样里没有一样从「求职 + 打印 + 人社场景」长出来，换成任何 App 都能贴 | 合成页「求职材料服务网」问三 |
+| 2026-09-05 | 替代方案逐个对代码核对象与出口（见 `next-tasks.md` 生活圈判定表） | 代码核 |
+| 2026-09-05 | 产品负责人：**同意换形状** —— 从「内容 + 裂变」换成「出门前 + 去窗口前」 | 本文 |
 
-**做法**：
-- 内容源：接入**官方公开视频**（人社部就业指导公开课、地方人社局政策解读）
-- **不抓第三方版权视频**（避免侵权）
-- 数据形态：`VideoItem { id, title, cover, durationSec, sourceOrg, sourceUrl, category }`
-- 存储位置：
-  - 方案 A：API 静态 JSON（`GET /api/v1/discovery/videos`），Admin 后台可编辑
-  - 方案 B：前端硬编码在 `data/videos.js`（更轻量，5-10 个视频起步）
-- 用户交互：点击 → `wx.navigateTo` 跳 `pages/video-player/video-player` → 嵌入 `<video>` 组件播放 URL
-- 跳转记录：复用既有 `BrowseLog`（仅记录本人浏览行为，不记录观看时长）
-
-**API 路径**：新增 `GET /api/v1/discovery/videos`（仅读、needAuth:false）
-**风险**：低（纯展示 + 嵌入播放，无奖励机制）
-
-### 2.2 🎁 福利中心（合规 ✅ / 复用 Kiosk）
-
-**做法**：
-- Kiosk 端已有 `BenefitActivity` MVP（详见 `docs/superpowers/plans/2026-06-18-benefit-activities-mvp-implementation.md`）
-- 后端 API 已存在：
-  - `GET /api/v1/benefit-activities`（活动列表）
-  - `GET /api/v1/benefit-activities/:id`（详情）
-  - `POST /api/v1/benefit-activities/:id/claim`（会员领取）
-  - `GET /api/v1/me/benefits`（我的权益）
-- **小程序直接调用以上 API**，不写新后端
-- 页面：复用 Kiosk `BenefitActivitiesPage.tsx` 的设计风格，新建 `apps/miniapp/pages/benefit-list/benefit-list` 与 `pages/benefit-detail/benefit-detail`
-
-**API 路径**：复用既有 `benefit-activities`
-**风险**：低（仅前端移植）
-
-### 2.3 🔗 邀请有礼（合规 ✅ / 简化版）
-
-**做法**：
-- **不发任何奖励**（按你的决策 C1）
-- 仅生成"我的专属邀请码"（基于用户 memberId hash）
-- 用户可分享该码给朋友，**朋友注册时输入邀请码作为推荐来源记录**（不发放优惠券/积分）
-- API：
-  - `GET /api/v1/member/invite-code` → 返回本人邀请码（首次访问生成，缓存到 `member.inviteCode`）
-  - `POST /api/v1/member/auth/register` → 新增可选 `inviteCode` 字段，仅记录 `InviterRelation`（不影响会员等级/权益）
-- 小程序展示：我的邀请码 + 二维码（`wxqrcode` 接口生成）+ "分享给朋友"按钮（`onShareAppMessage`）
-- 数据库新增 1 个表：`MemberInviteRelation { id, inviterId, inviteeId, inviteCode, createdAt }`
-
-**风险**：低（仅记录关联，不发奖励；不影响权益合同到位前的业务）
-
-### 2.4 📅 每日签到（合规 ⚠️ / 仅作预告）
-
-**做法**（按你最终决策 S1）：
-- 入口可点击，跳转 `pages/signin-preview/signin-preview`
-- 页面**仅展示**：
-  - 签到日历 UI（带签到格子占位）
-  - 连续签到天数说明
-  - "签到权益即将上线"提示
-  - **没有任何"已签到"状态、没有积分数字、没有领取按钮**
-- API：`GET /api/v1/member/signin-info` 返回 `{ available: false, message: '签到权益即将上线' }`
-- 后端**不维护签到记录表**（不浪费数据库）
-
-**风险**：低（纯展示，无业务逻辑）
+**一句话**：生活 = 求职 / 办事这件事在下班后和出门前的那几小时，不是用户生活的全部。
 
 ---
 
-## 3. UI 与页面结构
+## 1. 判定标准（四条全过才进本 Tab）
 
-### 3.1 改造后 `pages/ai/ai.wxml` 结构
-
-```text
-[顶部导航]
-  └─ AI百宝箱（主标题）
-  └─ 职业生活圈（副标题，新增）
-
-[上半屏·真实能力]
-  ├─ 小青 AI 助手入口卡（保留）
-  ├─ AI 免责声明（保留）
-  ├─ AI 求职工具网格（保留 5 个）
-  ├─ 材料与打印列表（保留 5 个）
-  └─ AI 服务记录入口（保留）
-
-[下半屏·职业生活圈新模块]（新增 section-t: "生活圈"）
-  ├─ 📹 学习视频（横向滚动卡片）
-  ├─ 🎁 福利中心（卡片入口）
-  ├─ 🔗 邀请有礼（卡片入口，含我的邀请码）
-  └─ 📅 每日签到（卡片入口，仅预告）
-
-[底部]
-  └─ 合规备注（保留）
-```
-
-### 3.2 新增页面（4 个）
-
-| 页面 | 路径 | 复用 Kiosk | 备注 |
-|------|------|-----------|------|
-| 视频列表/播放器 | `pages/video-list/video-list` + `pages/video-player/video-player` | ❌ 新建 | 嵌入 `<video>` |
-| 福利列表 | `pages/benefit-list/benefit-list` | ✅ 复用 API | UI 参考 Kiosk |
-| 福利详情 | `pages/benefit-detail/benefit-detail` | ✅ 复用 API | UI 参考 Kiosk |
-| 邀请有礼 | `pages/invite/invite` | ❌ 新建 | 二维码 + 分享 |
-| 签到预告 | `pages/signin-preview/signin-preview` | ❌ 新建 | 纯展示 |
-
-### 3.3 app.json 注册变更
-
-新增 5 个页面注册，无修改。
+1. **同一周、同一场求职或办事。** 招聘会前夜、去窗口前、合同不敢签、家里人要打印证明。不是「用户也要娱乐」。
+2. **消耗我们已有的对象。** 简历版本、到机码、订单、已审核政策、场馆、合同任务、设备在线。不新开内容品类。
+3. **出口是我们能履约的。** 出纸、扫描、来源平台跳转、到机核销。不是播放完成、签到成功、积分到账。
+4. **不做第二品类 App。** 不做社交、课表、商城、出行、通用福利。人社场地也讲不清为什么要它。
 
 ---
 
-## 4. 数据流与接口
+## 2. 处置清单
 
-### 4.1 复用既有 API
+| v0.1 模块 | 处置 | 理由 |
+|---|---|---|
+| 📹 学习视频 | **撤** | 官方公开课也是内容产品，播放完成不是我们的履约（违反标准 2、3） |
+| 🔗 邀请有礼 | **撤** | 增长黑客挂在求职终端上，场地甲方无法解释；不发奖励的邀请码没有对象也没有出口（违反 2、3、4） |
+| 📅 每日签到 | **撤** | 草案自己写成纯预告、不发奖励 —— 承认没有对象没有出口。留入口等于教用户我们会做游戏（违反 2、3） |
+| 🎁 福利中心 | **留，收窄** | 券只在核销到打印页 / AI 次数 / 材料包时才是我们的履约（见 §3.3） |
+| 职业圈动态 / 今日早报（现网 pending） | **保持未开放** | 无接口；且社交 feed 与资讯早报不消耗打印 / 政策 / 到机码。早报只有改成「你收藏的那场会明天开始、你的到机码 4 小时过期」才过标准 —— 那已是「出门清单」 |
 
-| 路径 | 方法 | 用途 |
-|------|------|------|
-| `/api/v1/benefit-activities` | GET | 福利列表 |
-| `/api/v1/benefit-activities/:id` | GET | 福利详情 |
-| `/api/v1/benefit-activities/:id/claim` | POST | 领取（需登录） |
-| `/api/v1/me/benefits` | GET | 我的权益 |
+**新增（按能不能真做排序）**
 
-### 4.2 新增 API（仅 3 个）
-
-| 路径 | 方法 | 返回 | 实现位置 |
-|------|------|------|---------|
-| `/api/v1/discovery/videos` | GET | `VideoItem[]` | `services/api/src/discovery/discovery.controller.ts`（新建） |
-| `/api/v1/member/invite-code` | GET/POST | `{ inviteCode, qrCodeUrl }` | `services/api/src/member/member-invite.controller.ts`（新建） |
-| `/api/v1/member/signin-info` | GET | `{ available: false, message }` | `services/api/src/member/signin-info.controller.ts`（新建） |
-
-### 4.3 数据库变更
-
-新增 1 张表（用于邀请关系）：
-- `MemberInviteRelation { id, inviterId, inviteeId, inviteCode, createdAt }`
-- 同时给 `EndUser` 表新增 `inviteCode String?` 字段
-
-Prisma 迁移文件：
-- `services/api/prisma/migrations/20260815000000_add_member_invite_relation/`
-- `services/api/prisma/postgres/migrations/20260815000000_add_member_invite_relation/`
+| 模块 | 对象（已有？） | 出口（已有？） | 判定 |
+|---|---|---|---|
+| A · 招聘会出门清单 | 逛展计划 ✓ | 「生成准备单去打印」✓ 已在 `fair-visit-plan.js` | **先做** |
+| B · 窗口材料单 | 政策核对 ✓（kiosk `EligibilityPanel` + miniapp `policy-check`） | 出纸 ✓ | **先做** |
+| C · 福利中心（收窄） | `BenefitActivity` / `RedemptionRecord` ✓ | 券核销到 Order / AI 配额 ✓（C5-4 设计） | **先做（大部分是限制，不是新建）** |
+| D · 家人代出示到机码 | 到机码 ✓ | 出纸 ✓ | **后置**：委托模型全仓 0 处，且是隐私面，须过合规评审 |
+| ~~E · 证件到期雷达~~ | 无用户证件模型 | 无（订阅消息 0） | **撤或后置**：两头都没有 |
 
 ---
 
-## 5. 文件清单
+## 3. 先做的三个模块
 
-### 5.1 新建文件（14 个）
+### 3.1 A · 招聘会出门清单
 
-**小程序端**（10 个）：
-- `apps/miniapp/pages/video-list/{video-list.wxml,wxss,js,json}`
-- `apps/miniapp/pages/video-player/{video-player.wxml,wxss,js,json}`
-- `apps/miniapp/pages/benefit-list/{benefit-list.wxml,wxss,js,json}`
-- `apps/miniapp/pages/benefit-detail/{benefit-detail.wxml,wxss,js,json}`
-- `apps/miniapp/pages/invite/{invite.wxml,wxss,js,json}`
-- `apps/miniapp/pages/signin-preview/{signin-preview.wxml,wxss,js,json}`
+**用户在什么时候用**：明天 9 点要出门去招聘会。
 
-**后端**（3 个）：
-- `services/api/src/discovery/discovery.controller.ts` + `discovery.service.ts` + `discovery.module.ts`
-- `services/api/src/member/member-invite.controller.ts` + `member-invite.service.ts`
-- `services/api/src/member/signin-info.controller.ts`
+**内容**（全部是已有对象的聚合，不生成新内容）：
+- 我的逛展计划（`fair-visit-plan` 已有）—— 目标展位、顺序、要问的问题
+- 简历带几份（从「我的简历」取最近版本 + 用户填份数）
+- 到机码（**依赖材料包立项**；材料包上线前此行显示「到场后在一体机打印」而不是空格子）
+- 哪台一体机在会场 / 在线（`GET /terminals/public` 已有；生产终端 0 台时显示诚实空态）
+- 出口：**「生成准备单去打印」**（已有）→ 打印链
 
-**数据库**（2 个）：
-- `services/api/prisma/migrations/20260815000000_add_member_invite_relation/migration.sql`
-- `services/api/prisma/postgres/migrations/20260815000000_add_member_invite_relation/migration.sql`
+**不做**：出门前提醒。它依赖微信订阅消息（全仓当前 0 处），那是独立立项（要微信后台模板 + 服务端发送），
+不在小程序 lane。v1 出门清单**没有提醒**，用户自己打开看。写清楚，别让入口暗示会响。
 
-**脚本**（1 个）：
-- `apps/miniapp/scripts/verify-life-circle.mjs`
+**页面**：不新建页。在 `pages/fair-visit-plan` 顶部加「出门清单」聚合区，或在 `pages/ai` 的生活圈区加一张
+「最近的招聘会」卡直达它。**二选一，动工时按 §8.1 定，禁止两处都加**（同义入口，违反 `user-data-flow-matrix.md`）。
 
-### 5.2 修改文件（4 个）
+**API**：无新增。复用 `fair-visit-plan`、`resumes`、`terminals/public`；到机码那行等材料包端点。
 
-- `apps/miniapp/app.json`：注册 5 个新页面
-- `apps/miniapp/pages/ai/ai.wxml`：增加下半屏
-- `apps/miniapp/pages/ai/ai.wxss`：新增卡片样式
-- `apps/miniapp/pages/ai/ai.js`：绑定新入口跳转
+**合规**：招聘会仍只做第三方 / 官方来源入口；清单里的「去预约」仍是「去来源平台预约 / 扫码预约」。
 
-### 5.3 不动文件
+### 3.2 B · 窗口材料单
 
-- `CLAUDE.md` / `AGENTS.md`（不需改）
-- Kiosk / Admin / Partner（不需改）
-- `packages/shared/`（不需改，复用既有 `BenefitActivity` 类型）
+**用户在什么时候用**：明天去人社窗口办事，该带什么。
 
----
+**内容**：
+- 政策核对的结果（`policy-check` 已有，**资格判定继续走确定性引擎，不换 LLM**）
+- 把「符合」的政策正文收成材料清单 + 官方办理码（AI 只做「把已发布政策正文收成清单」这一步）
+- 出口：小程序行前看；**一体机当场打**（打印链已有）
 
-## 6. 合规审查
+**空库纪律**：库里没有政策时先探空、不收身份证、不展示假清单。生产政策当前 0 条 —— 此模块上线前提是内容库存，
+不是代码。
 
-| 模块 | 合规检查 | 结论 |
-|------|---------|------|
-| 视频 | 仅展示官方公开视频，不发奖励 | ✅ |
-| 福利 | 复用 Kiosk 既有 MVP，已通过双 CI | ✅ |
-| 邀请 | 仅生成码 + 记录关联，不发奖励 | ✅ |
-| 签到 | 仅展示预告，无业务逻辑 | ✅ |
-| 整体 | 未触碰岗位/招聘会/简历/合同/硬件 | ✅ |
+**页面**：`pages/policy-check` 结果页加「生成材料单」动作；不新建页。
 
-**符合 CLAUDE.md §9（不伪造能力）/ §15（权益合同未到位）/ §16（入口稳定规则）**
+**API**：可能需要一个小端点把政策正文 → 材料清单（服务端做，避免前端自行解析政策文本漂移）。动工时按 §8.1 声明，
+跨 `services/api`。
 
----
+**合规**：补贴只做指引，不承诺到账、不代申请；材料单上的码必须是官方源。`compliance-boundary.md` §8.2。
 
-## 7. 风险与缓解
+### 3.3 C · 福利中心（收窄）
 
-| 风险 | 等级 | 缓解 |
-|------|------|------|
-| 视频源失效 | 中 | Admin 后台可配置 URL，前端有 fallback 文案 |
-| 福利活动后端 schema 不兼容 | 低 | Kiosk 已验证 API 稳定 |
-| 邀请码生成冲突 | 极低 | 6 位 base32 + 唯一索引 |
-| 静态门禁回归 | 低 | 新增 `verify:life-circle` |
-| 视觉风格不统一 | 中 | 复用 Kiosk `inkpaper` 主题 |
+**现状**：`membership` 页已调 `getMyBenefits`；`RedemptionRecord.kind` 只有 `coupon | free_quota | package_entitlement`；
+`orderId` 回填抵扣是 C5-4 设计。
+
+**收窄规则（写进 Admin 与合规文案）**：福利活动只允许三类 —— **本机打印券**（`coupon`，核销到 Order）、
+**AI 次卡**（`free_quota`）、**材料包权益 / 折扣**（`package_entitlement`）。**不得**出现电影票、外卖、打车、
+异业券、现金红包。这三类正好是既有 `kind` 枚举 —— 收窄是**限制到既有类型**，不是新建。
+
+**要做的**：
+- Admin 创建福利活动时，`kind` 只能选这三个；文案门禁加禁词（外卖 / 打车 / 电影 / 红包 / 异业）
+- 小程序 `membership` 页展示时按 `kind` 分三组，每张券写清「在哪核销」（打印页 / AI 服务 / 材料包）
+- 不做：签到送券、邀请送券、任何以行为换券的机制
+
+**API**：无新增。
 
 ---
 
-## 8. 验证门禁
+## 4. 后置与撤销的说明
 
-新增 `apps/miniapp/scripts/verify-life-circle.mjs`：
-- 4 个新模块入口真实可点击
-- 视频 / 福利调用真实 API
-- 邀请码真实生成
-- 签到页面**仅展示预告**，无任何"已签到"状态
-- 合规文案 / 触控尺寸 48px+ / 数据真实
+**D · 家人代出示到机码**（后置）。蓝领真实使用单元经常是家庭：子女帮父母打参保证明清单、家长帮毕业生备材料。
+但到机码的分享 / 委托 / 代取模型全仓 0 处，且必须满足「本人资产不对代办者展开简历原文」——这是隐私面，
+不是纯前端。前置：账号模型加「代为准备」授权（不是亲情账号）+ 合规评审。见 `audience-growth-space.md §2.1`。
 
-集成进 `verify-miniapp-static`，期望 **100+ PASS / 0 FAIL**（从 87 增加到 ~100）
+**E · 证件到期雷达**（撤或后置）。没有用户证件模型（`validUntil` 只在机构资质 `QualificationRecord` 上），
+没有订阅消息出口。两头都没有，做出来就是又一条断头路。若将来做，两个前置都不在小程序 lane。
 
----
-
-## 9. 后续步骤
-
-1. **本地 `claude` CLI 反馈**：用户拿这份草案让本地 Claude 评审
-2. **汇总双方意见**：用户贴回本地 Claude 的反馈
-3. **本会话 Claude 出最终版**：含修订点
-4. **用户审核最终版**
-5. **动手实施**：按修订后的最终版，分 2 个 PR 提交：
-   - PR1：API + DB（邀请码 + 视频 + 签到预告）
-   - PR2：小程序 UI（5 个新页面 + AI 百宝箱改造）
+**视频 / 邀请 / 签到**（撤）。见 §2。v0.1 §2.1 / §2.3 / §2.4 及其 API、表、页面规划**全部作废**，未实施故无需回滚。
 
 ---
 
-## 附录 A：参考文档
+## 5. 文件影响（方向层面，动工时按 §8.1 精确声明）
 
-- `CLAUDE.md §15/§16/§9` — 合规边界
-- `docs/superpowers/plans/2026-06-18-benefit-activities-mvp-implementation.md` — 福利活动 MVP（Kiosk）
-- `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` — 福利列表参考实现
-- `apps/admin/src/routes/benefit-activities/index.tsx` — 福利管理后台
-- `apps/miniapp/utils/api.js` — 既有 API 封装
-- `apps/miniapp/pages/ai/ai.wxml` — 当前 AI 百宝箱
+| 模块 | 小程序 | 后端 | 数据库 |
+|---|---|---|---|
+| A 出门清单 | `pages/fair-visit-plan` 或 `pages/ai` 加聚合区（二选一） | 无 | 无 |
+| B 窗口材料单 | `pages/policy-check` 加动作 | 可能 1 个「政策正文 → 材料清单」端点 | 无 |
+| C 福利收窄 | `pages/membership` 分组展示 | Admin 侧 `kind` 白名单 + 文案禁词 | 无（枚举已存在） |
 
----
-
-## 附录 B：等本地 Claude 评审的问题清单
-
-请让本地 Claude 重点评审：
-
-1. **视频源**：你建议选哪个公开源？（人社部 / 地方人社局 / 其他？）
-2. **视频存储**：A 方案（API + Admin 可配）vs B 方案（前端硬编码 5-10 个），哪个更合适？
-3. **邀请码格式**：6 位 base32 够用吗？还是建议 8 位？
-4. **签到预告页面**：除了"即将上线"，还要不要展示"上线后能获得什么"的预告文案？
-5. **UI 风格**：要不要复用 Kiosk 的"inkpaper"主题？还是沿用 miniapp 当前的"纸本+紫调"？
-6. **新页面是否需要分页/P0/P1 排序**：视频列表要不要加分类筛选？
-7. **数据库表 `MemberInviteRelation` 字段**：还需要哪些字段（如设备指纹、注册时间、注册来源渠道）？
-8. **小程序端 `wx.login` 登录是否需要与邀请码结合**：当前是手机号 + 短信，是否需要改成"手机号 + 短信 + 邀请码"？
+**不动**：`app.json` 不新增页面（v0.1 要加 5 页，本版 0 页）；Kiosk / Partner 不动；`packages/shared` 不动。
 
 ---
 
-> **草案完成，等用户贴本地 Claude 反馈。**
+## 6. 验证
+
+- 静态：`verify-miniapp-static` 现 112 条须保持；福利文案禁词进 `verify:compliance-copy`
+- 运行时：开发者工具走 A / B 的生成 → 打印链；C 的三组分类展示
+- **真机**：与 E2 同批，不单独开
+
+---
+
+## 7. 合规审查
+
+| 模块 | 检查 | 结论 |
+|---|---|---|
+| A 出门清单 | 只聚合本人已有对象；招聘会仍是来源入口；不预约、不签到 | ✅ |
+| B 窗口材料单 | 资格判定确定性引擎；只指引不代办不承诺到账；空库不收身份证 | ✅（内容库存是前提） |
+| C 福利收窄 | 三类 `kind` 白名单；无行为换券；无异业 | ✅ |
+| D 家人代出示 | 隐私面，须评审后才动 | ⏸ |
+| 整体 | 未触碰岗位投递 / 简历给企业 / 硬件链路 | ✅ |
+
+---
+
+## 附录：v0.1 → v1.0 变更摘要
+
+| 项 | v0.1 | v1.0 |
+|---|---|---|
+| 形状 | 内容 + 裂变（视频 / 福利 / 邀请 / 签到） | 出门前 + 去窗口前（出门清单 / 材料单 / 福利收窄） |
+| 新页面 | 5 | 0 |
+| 新 API | 3 | 0～1 |
+| 新表 | 1（邀请关系） | 0 |
+| 判定标准 | 无 | 四条（§1） |
+| 顶部 Tab 名 | 「保持 AI百宝箱」（已过期，Tab 现为「职业生活圈」） | 不改 |
