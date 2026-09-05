@@ -15,6 +15,8 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
+import { ApiHttpError } from '../api/httpAdapter'
+import { networkError, throwHttpError } from '../api/throwHttpError'
 import type { CodePayAttemptView, PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
 import { getTerminalId } from '../api/screensaver'
 
@@ -25,25 +27,15 @@ export interface PaymentSessionInput {
 
 /** 查询服务端已启用的支付通道（无密钥信息；收银页据此渲染通道选择）。 */
 export async function fetchPaymentChannels(): Promise<string[]> {
-  const res = await fetch(`${API_BASE_URL}/payment/channels`)
-  if (!res.ok) throw new Error(`fetchPaymentChannels failed: ${res.status} ${await readError(res)}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/payment/channels`)
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
   const body = (await res.json()) as PaymentChannelsView
   return Array.isArray(body.channels) ? body.channels.map(String) : []
-}
-
-async function readError(res: Response): Promise<string> {
-  const text = await res.text().catch(() => '')
-  // 尝试解出后端错误码（{ error: { code } } 或 { message }），失败则回退原文。
-  try {
-    const body = JSON.parse(text) as { error?: { code?: string }; message?: string | string[] }
-    const code = body.error?.code
-    if (code) return code
-    if (typeof body.message === 'string') return body.message
-    if (Array.isArray(body.message)) return body.message.join('; ')
-  } catch {
-    /* 非 JSON，回退 */
-  }
-  return text || `请求失败（${res.status}）`
 }
 
 function paymentSessionHeaders(input: PaymentSessionInput): Record<string, string> {
@@ -55,12 +47,17 @@ function paymentSessionHeaders(input: PaymentSessionInput): Record<string, strin
  * `channel` 只能取服务端已启用通道（fetchPaymentChannels）；多通道时必须显式指定。
  */
 export async function createPayAttempt(input: PaymentSessionInput & { channel?: string }): Promise<PayAttemptView> {
-  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
-    body: JSON.stringify(input.channel ? { channel: input.channel } : {}),
-  })
-  if (!res.ok) throw new Error(`createPayAttempt failed: ${res.status} ${await readError(res)}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
+      body: JSON.stringify(input.channel ? { channel: input.channel } : {}),
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
   return res.json() as Promise<PayAttemptView>
 }
 
@@ -68,12 +65,17 @@ export async function createPayAttempt(input: PaymentSessionInput & { channel?: 
 export async function createCodePayAttempt(
   input: PaymentSessionInput & { channel?: string; authCode: string },
 ): Promise<CodePayAttemptView> {
-  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/code-pay`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
-    body: JSON.stringify({ ...(input.channel ? { channel: input.channel } : {}), authCode: input.authCode }),
-  })
-  if (!res.ok) throw new Error(`createCodePayAttempt failed: ${res.status} ${await readError(res)}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/code-pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
+      body: JSON.stringify({ ...(input.channel ? { channel: input.channel } : {}), authCode: input.authCode }),
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
   return res.json() as Promise<CodePayAttemptView>
 }
 
@@ -82,20 +84,30 @@ export async function createCodePayAttempt(
  * 只有真实渠道支持；sandbox 返回 RECONCILE_UNSUPPORTED。绝不据此在前端伪造已支付。
  */
 export async function reconcilePayment(input: PaymentSessionInput): Promise<PayStatusView> {
-  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay/reconcile`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
-  })
-  if (!res.ok) throw new Error(`reconcilePayment failed: ${res.status} ${await readError(res)}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay/reconcile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
   return res.json() as Promise<PayStatusView>
 }
 
 /** 查询支付状态（收银页轮询用）；paid 且可见时返回 pickupCode。 */
 export async function getPayStatus(input: PaymentSessionInput): Promise<PayStatusView> {
-  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay-status`, {
-    headers: paymentSessionHeaders(input),
-  })
-  if (!res.ok) throw new Error(`getPayStatus failed: ${res.status} ${await readError(res)}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay-status`, {
+      headers: paymentSessionHeaders(input),
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
   return res.json() as Promise<PayStatusView>
 }
 
@@ -113,16 +125,23 @@ export interface PickupReleaseView {
 /** Order-only 订单付款成功后，绑定本机并原子创建唯一 PrintTask。 */
 export async function releasePickupOrder(input: PaymentSessionInput): Promise<PickupReleaseView> {
   const terminalId = getTerminalId()
-  if (!terminalId) throw new Error('TERMINAL_ID_REQUIRED')
-  const res = await fetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-terminal-id': terminalId,
-      ...paymentSessionHeaders(input),
-    },
-  })
-  if (!res.ok) throw new Error(`releasePickupOrder failed: ${res.status} ${await readError(res)}`)
+  if (!terminalId) {
+    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
+  }
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-terminal-id': terminalId,
+        ...paymentSessionHeaders(input),
+      },
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
   return res.json() as Promise<PickupReleaseView>
 }
 
@@ -135,10 +154,15 @@ export async function simulateSandboxPayment(
   attemptId: string,
   result: 'success' | 'failed',
 ): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/payment/sandbox/simulate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ attemptId, result }),
-  })
-  if (!res.ok) throw new Error(`simulateSandboxPayment failed: ${res.status} ${await readError(res)}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/payment/sandbox/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attemptId, result }),
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res)
 }

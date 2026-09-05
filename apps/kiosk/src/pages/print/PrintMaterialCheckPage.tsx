@@ -32,6 +32,7 @@ import {
   toMaterialRedactionSummary,
 } from './piiRedaction'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   MaterialCheckPresentation,
   type MaterialCheckStage,
@@ -364,7 +365,7 @@ export function PrintMaterialCheckPage() {
       if (err instanceof ApiHttpError && [403, 404, 410].includes(err.status)) {
         clearStaleSession()
       }
-      setError(err instanceof Error ? err.message : '材料检查失败，请重试')
+      setError(userMessageOf(err, '材料检查失败，请重试'))
       setStage('error')
     }
   }
@@ -450,7 +451,7 @@ export function PrintMaterialCheckPage() {
       setStage('done')
       navigate('/print/preview', { state: { file: printFile, materialCheck, source } })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存隐私选择失败，请重试')
+      setError(userMessageOf(err, '保存隐私选择失败，请重试'))
       setStage('review')
     }
   }

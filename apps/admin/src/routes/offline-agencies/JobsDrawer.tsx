@@ -7,6 +7,7 @@ import {
   type OfflineAgencyJob,
   type OfflineAgencyJobInput,
 } from '../../services/api/offlineAgenciesAdmin'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── 样式 ─────────────────────────────────────────────────────────────────────
 
@@ -212,7 +213,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
       await load()
       setFormMode('none')
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '创建失败，请重试')
+      setFormError(userMessageOf(e, '创建失败，请重试'))
     } finally {
       setBusy(false)
     }
@@ -230,7 +231,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
       setFormMode('none')
       setEditingJob(null)
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '更新失败，请重试')
+      setFormError(userMessageOf(e, '更新失败，请重试'))
     } finally {
       setBusy(false)
     }
@@ -245,7 +246,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
       await onJobsChanged?.()
       await load()
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : '删除失败，请重试')
+      setActionError(userMessageOf(error, '删除失败，请稍后重试'))
       void load()
     } finally {
       setDeletingId(null)
@@ -287,7 +288,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
           </div>
         )}
         {actionError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg" role="alert">
             {actionError}
           </div>
         )}

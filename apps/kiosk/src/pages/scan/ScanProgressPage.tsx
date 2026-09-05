@@ -15,6 +15,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
 import { ApiHttpError } from '../../services/api/httpAdapter'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
@@ -131,7 +132,7 @@ export function ScanProgressPage() {
         scheduleNext()
       } catch (err) {
         if (!stopped) {
-          setError(err instanceof Error ? err.message : '查询扫描状态失败')
+          setError(userMessageOf(err, '查询扫描状态失败，请稍后重试'))
           scheduleNext()
         }
       }

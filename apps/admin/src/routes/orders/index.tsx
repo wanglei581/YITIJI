@@ -14,6 +14,7 @@ import {
 } from '../../services/api/adminOrdersReadonly'
 import { adminPrintJobsService } from '../../services/api/adminPrintJobs'
 import { ApiHttpError } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -254,15 +255,16 @@ export default function OrdersPage() {
     setRefundError(null)
     try {
       await adminOrdersReadonlyService.refundOrder(detail.id, refundReason.trim())
-      // 退款成功：刷新列表，重新加载详情（payStatus 已变为 refunding/refunded）
-      void refresh()
-      const updated = await adminOrdersReadonlyService.getById(detail.id)
-      setDetail(updated)
       setRefundOpen(false)
       setRefundReason('')
+      void refresh()
+      try {
+        setDetail(await adminOrdersReadonlyService.getById(detail.id))
+      } catch {
+        /* 退款已受理；详情刷新失败不得显示成退款失败 */
+      }
     } catch (err) {
-      const code = err instanceof ApiHttpError ? err.code : '操作失败，请重试'
-      setRefundError(code)
+      setRefundError(userMessageOf(err, '退款失败，请稍后重试'))
     } finally {
       setRefundSubmitting(false)
     }

@@ -26,6 +26,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { convertImagesToPdf } from '../../services/api/printConversion'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import './styles/print-scan-fusion.css'
 
@@ -93,7 +94,7 @@ export function ConvertImagesPage() {
       const res = await kioskUploadFile(selected, getToken())
       addImage({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes) })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败，请重试')
+      setError(userMessageOf(err, '上传失败，请重试'))
     } finally {
       setUploading(false)
     }
@@ -155,7 +156,7 @@ export function ConvertImagesPage() {
         },
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成失败，请稍后重试')
+      setError(userMessageOf(err, '生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
     }

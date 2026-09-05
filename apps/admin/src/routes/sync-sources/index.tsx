@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { RefreshCwIcon, PlayIcon, SettingsIcon } from 'lucide-react'
-import { API_BASE_URL, API_MODE } from '../../services/api/client'
+import { API_BASE_URL, API_MODE, ApiHttpError } from '../../services/api/client'
 import { authHeader, redirectToLogin } from '../../services/auth'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 /**
  * 统一鉴权 fetch:带 Bearer(authHeader)+ credentials,401 走全局 redirectToLogin。
@@ -18,9 +19,23 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   })
   if (res.status === 401) {
     redirectToLogin()
-    throw new Error('登录已过期')
+    throw new ApiHttpError('AUTH_REQUIRED', '登录已过期', 401)
   }
   return res
+}
+
+async function throwIfNotOk(res: Response): Promise<void> {
+  if (res.ok) return
+  let code = `HTTP_${res.status}`
+  let message = `请求失败（${res.status}）`
+  try {
+    const body = (await res.json()) as { error?: { code?: string; message?: string } }
+    if (body.error?.code) code = body.error.code
+    if (body.error?.message) message = body.error.message
+  } catch {
+    /* 非 JSON */
+  }
+  throw new ApiHttpError(code, message, res.status)
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -99,7 +114,7 @@ const MOCK_SOURCES: ApiSyncSourceItem[] = [
 async function fetchApiSources(): Promise<ApiSyncSourceItem[]> {
   if (API_MODE !== 'http') return MOCK_SOURCES
   const res = await authFetch('/admin/job-sync/sources')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await throwIfNotOk(res)
   const body = (await res.json()) as { data: ApiSyncSourceItem[] }
   return body.data ?? []
 }
@@ -112,10 +127,7 @@ async function triggerApiSync(sourceId: string): Promise<void> {
   const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/trigger`, {
     method: 'POST',
   })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } }
-    throw new Error(body.error?.message ?? `HTTP ${res.status}`)
-  }
+  await throwIfNotOk(res)
 }
 
 async function setSourceEnabled(sourceId: string, enabled: boolean): Promise<void> {
@@ -125,7 +137,7 @@ async function setSourceEnabled(sourceId: string, enabled: boolean): Promise<voi
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled }),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await throwIfNotOk(res)
 }
 
 async function fetchSourceImpact(sourceId: string): Promise<SourceImpact> {
@@ -133,7 +145,7 @@ async function fetchSourceImpact(sourceId: string): Promise<SourceImpact> {
     return { content: { jobs: { total: 3, published: 2 }, fairs: { total: 1, published: 1 } } }
   }
   const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/impact`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await throwIfNotOk(res)
   const body = await res.json() as { data: SourceImpact }
   return body.data
 }
@@ -145,7 +157,7 @@ async function unpublishSourceContent(sourceId: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ confirmation: 'UNPUBLISH_SOURCE_CONTENT' }),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  await throwIfNotOk(res)
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -160,7 +172,7 @@ export default function SyncSourcesPage() {
   const [configSaving, setConfigSaving] = useState(false)
   const [configErr,    setConfigErr]    = useState<string | null>(null)
   const [sourceActionId, setSourceActionId] = useState<string | null>(null)
-  const [sourceActionError, setSourceActionError] = useState<string | null>(null)
+  const [sourceActionError, setSourceActionError] = useState<{ id: string; message: string } | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -185,7 +197,7 @@ export default function SyncSourcesPage() {
     }
     try {
       const res = await authFetch('/admin/job-sync/sources/' + src.id)
-      if (!res.ok) throw new Error('HTTP ' + res.status)
+      await throwIfNotOk(res)
       const body = (await res.json()) as { data?: { responseConfig?: { dataType?: string; rootPath?: string; fields?: Record<string, string> } } }
       const rc = body.data?.responseConfig
       setConfigDraft({
@@ -220,12 +232,12 @@ export default function SyncSourcesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dto),
         })
-        if (!res.ok) throw new Error('HTTP ' + res.status)
+        await throwIfNotOk(res)
       }
       setConfigSrc(null)
       load()
     } catch (e) {
-      setConfigErr((e as Error).message || 'Save failed')
+      setConfigErr(userMessageOf(e, '保存失败，请稍后重试'))
     } finally {
       setConfigSaving(false)
     }
@@ -233,12 +245,14 @@ export default function SyncSourcesPage() {
 
   const handleTrigger = async (sourceId: string) => {
     setTriggers((prev) => ({ ...prev, [sourceId]: 'loading' }))
+    setSourceActionError(null)
     try {
       await triggerApiSync(sourceId)
       setTriggers((prev) => ({ ...prev, [sourceId]: 'ok' }))
       setTimeout(() => setTriggers((prev) => ({ ...prev, [sourceId]: 'idle' })), 3000)
-    } catch {
+    } catch (e) {
       setTriggers((prev) => ({ ...prev, [sourceId]: 'error' }))
+      setSourceActionError({ id: sourceId, message: userMessageOf(e, '触发同步失败，请查看原因后重试') })
       setTimeout(() => setTriggers((prev) => ({ ...prev, [sourceId]: 'idle' })), 4000)
     }
   }
@@ -250,8 +264,8 @@ export default function SyncSourcesPage() {
     try {
       await setSourceEnabled(source.id, !source.enabled)
       load()
-    } catch {
-      setSourceActionError(source.id)
+    } catch (e) {
+      setSourceActionError({ id: source.id, message: userMessageOf(e, '启停失败，请查看原因后重试') })
     } finally {
       setSourceActionId(null)
     }
@@ -274,8 +288,8 @@ export default function SyncSourcesPage() {
       if (!confirmed) return
       await unpublishSourceContent(source.id)
       load()
-    } catch {
-      setSourceActionError(source.id)
+    } catch (e) {
+      setSourceActionError({ id: source.id, message: userMessageOf(e, '批量下架失败，请稍后重试') })
     } finally {
       setSourceActionId(null)
     }
@@ -427,7 +441,9 @@ export default function SyncSourcesPage() {
                           >
                             批量下架内容
                           </button>
-                          {sourceActionError === s.id && <span className="text-xs text-error-fg">操作失败</span>}
+                          {sourceActionError?.id === s.id && (
+                            <span className="max-w-[16rem] text-xs text-error-fg">{sourceActionError.message}。请修正后重试。</span>
+                          )}
                         </div>
                       </td>
                     </tr>

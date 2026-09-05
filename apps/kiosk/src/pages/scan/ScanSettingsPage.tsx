@@ -8,6 +8,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
@@ -114,7 +115,7 @@ export function ScanSettingsPage() {
           if (cancellationCredentials) {
             cancelSessionOnce(cancellationCredentials.scanTaskId, cancellationCredentials.controlToken)
           }
-          throw new Error('INVALID_SCAN_SESSION')
+          throw new ApiHttpError('INVALID_SCAN_SESSION', '扫描任务未创建成功，请返回重试', 0)
         }
 
         if (cancelled) {
@@ -136,16 +137,34 @@ export function ScanSettingsPage() {
       })
       .catch((error: unknown) => {
         if (cancelled) return
-        const outcomeUnknown = error instanceof ApiHttpError && error.code === 'NETWORK_ERROR'
-        setFailure(outcomeUnknown
-          ? {
-              title: '无法确认扫描任务状态',
-              description: '网络响应中断，无法确认服务端是否收到请求。为避免重复创建，本页不会自动重发。',
-            }
-          : {
-              title: '扫描任务未创建',
-              description: '服务端未返回可用的扫描会话，因此本页不显示任务编号或设备操作指引。',
-            })
+        const code = errorCodeOf(error)
+        const outcomeUnknown = error instanceof ApiHttpError && (error.code === 'NETWORK_ERROR' || error.status === 0)
+        if (outcomeUnknown) {
+          setFailure({
+            title: '无法确认扫描任务状态',
+            description: '网络连接中断，无法确认服务端是否收到请求。为避免重复创建，本页不会自动重发。请检查网络后返回重试。',
+          })
+        } else if (code === 'SCAN_TERMINAL_BUSY') {
+          setFailure({
+            title: '本机正在扫描中',
+            description: userMessageOf(error, '请等待当前扫描任务完成后再试。'),
+          })
+        } else if (code === 'SCAN_TERMINAL_DISABLED') {
+          setFailure({
+            title: '扫描功能已停用',
+            description: userMessageOf(error, '请联系现场工作人员。'),
+          })
+        } else if (code === 'RATE_LIMITED' || (error instanceof ApiHttpError && error.status === 429)) {
+          setFailure({
+            title: '请求过于频繁',
+            description: userMessageOf(error, '请稍后再试。'),
+          })
+        } else {
+          setFailure({
+            title: '扫描任务未创建',
+            description: userMessageOf(error, '服务端未能创建扫描会话。请返回重试，或联系现场工作人员。'),
+          })
+        }
         setPhase('error')
       })
 

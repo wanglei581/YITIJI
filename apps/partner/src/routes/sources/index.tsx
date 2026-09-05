@@ -11,7 +11,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { AccessMode, PartnerDataSource, PartnerDataSourceCapabilities, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
-import { API_BASE_URL } from '../../services/api/client'
+import { API_BASE_URL, ApiHttpError } from '../../services/api/client'
 import {
   API_ORIGIN,
   getDataSources,
@@ -28,6 +28,22 @@ import { usePartnerCapabilities } from '../../services/capabilities'
 
 /** 使用凭证、因而可以轮换的接入方式。excel/csv/json/manual 没有凭证概念。 */
 const CREDENTIAL_ACCESS_MODES: readonly string[] = ['api', 'webhook']
+
+function createSourceErrorMessage(err: unknown): string {
+  const code = err instanceof ApiHttpError ? err.code : (err as { code?: string } | undefined)?.code
+  const serverMsg = err instanceof ApiHttpError ? err.message.trim() : ''
+  if (code === 'WEBHOOK_SECRET_LOW_ENTROPY' || code === 'WEBHOOK_SECRET_TOO_SHORT') {
+    return serverMsg || '自定义密钥强度不足，请改用更长的随机密钥或留空由系统生成'
+  }
+  if (code === 'VALIDATION_FAILED') {
+    return serverMsg || '填写内容未通过校验，请检查后重试'
+  }
+  if (code === 'AUTH_REQUIRED' || code === 'HTTP_401') {
+    return '登录已过期，请重新登录后再试'
+  }
+  if (serverMsg) return serverMsg
+  return '创建失败，请检查填写内容或稍后重试'
+}
 
 function resolveWebhookUrl(webhookUrl?: string): string {
   if (!webhookUrl) return ''
@@ -141,8 +157,8 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
             : 'Excel / CSV 文件导入，支持字段映射和导入预览',
       })
       setCreated(result)
-    } catch {
-      setError('创建失败，请检查登录状态或稍后重试')
+    } catch (err) {
+      setError(createSourceErrorMessage(err))
     } finally {
       setSubmitting(false)
     }

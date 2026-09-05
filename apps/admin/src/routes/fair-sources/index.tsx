@@ -16,6 +16,7 @@ import {
 import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ export default function FairSourcesPage() {
   const [viewing,      setViewing]      = useState<AdminFairSourceRecord | null>(null)
   const [rejectingId,  setRejectingId]  = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [actionError,  setActionError]  = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
@@ -117,31 +119,44 @@ export default function FairSourcesPage() {
   }
 
   const handleApprove = (id: string) => {
-    void approveFairSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    setActionError(null)
+    void approveFairSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
   }
 
   const handleReject = (id: string) => {
     if (!rejectReason.trim()) return
-    void rejectFairSource(id, rejectReason.trim()).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-      setRejectingId(null)
-      setRejectReason('')
-    })
+    setActionError(null)
+    void rejectFairSource(id, rejectReason.trim())
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+        setRejectingId(null)
+        setRejectReason('')
+      })
+      .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
   }
 
   const handlePublish = (id: string) => {
-    void publishFairSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    setActionError(null)
+    void publishFairSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
   }
 
   const handleUnpublish = (id: string, name: string) => {
     if (!window.confirm(`确认下架「${name}」？下架后一体机不再展示该招聘会。`)) return
-    void unpublishFairSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
+    setActionError(null)
+    void unpublishFairSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
   }
 
   if (loading) {
@@ -166,6 +181,11 @@ export default function FairSourcesPage() {
       subtitle="第三方平台同步招聘会数据管理"
       actions={<BulkPublishButton kind="fair" orgOptions={orgOptions} onDone={reload} />}
     >
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
+          {actionError}。请修正后重试，或刷新页面。
+        </div>
+      )}
       {/* 来自 Excel 导入批次的上下文 banner */}
       {sourceOrgIdFilter && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-bg px-4 py-2.5">

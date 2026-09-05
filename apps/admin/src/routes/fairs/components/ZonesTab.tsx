@@ -51,9 +51,12 @@ export function ZonesTab({
 
   const remove = async (zoneId: string) => {
     setBusyId(zoneId)
+    setError(null)
     try {
       await fairsAdminService.deleteZone(fairId, zoneId)
       onChanged()
+    } catch (e) {
+      setError(errMsg(e))
     } finally {
       setBusyId(null)
     }
@@ -61,6 +64,7 @@ export function ZonesTab({
 
   return (
     <div className="space-y-4">
+      {error && !editing && <InlineError message={error} />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-neutral-600">{zones.length} 个展区(按排序值升序展示)</p>
         <button onClick={openNew} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
