@@ -658,7 +658,7 @@ export function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     syncTime: fmtSyncTime(f.syncTime),
     hasManagedData: companyCount > 0,
     managedCompanyCount: companyCount,
-    managedMaterialCount: 0,
+    managedMaterialCount: f._count?.materials ?? 0,
     dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${shanghaiDate(f.syncTime)} · 仅供参考`,
     jobCount: f.jobCount,
     theme: f.theme,
@@ -833,5 +833,5 @@ export interface PrismaJobFairRow {
   trafficInfo: string | null
   expectedAttendance: number | null
   seekerIntentJson: string | null
-  _count?: { companies: number }
+  _count?: { companies: number; materials?: number }
 }

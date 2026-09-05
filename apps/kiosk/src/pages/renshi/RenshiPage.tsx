@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
-import { getPublishedPolicies, type PolicyPostView } from '../../services/api/policies'
+import { getPublishedPolicies, type PolicyPostView, type PublishedPoliciesResult } from '../../services/api/policies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { MessageCircleQuestionIcon, ShieldCheckIcon } from 'lucide-react'
@@ -42,30 +42,48 @@ export function RenshiPage() {
     setQrEntry({ title: policy.title, url: policy.externalUrl })
   }
 
-  const [policies, setPolicies] = useState<PolicyPostView[]>([])
-  /** 服务端已发布政策总数;大于已取回条数时页面必须如实说明,不能静默截断。 */
-  const [policyTotal, setPolicyTotal] = useState(0)
+  const [guides, setGuides] = useState<PolicyPostView[]>([])
+  /** 服务端已发布政策（policy_guide）总数;大于已取回条数时页面必须如实说明。 */
+  const [guideTotal, setGuideTotal] = useState(0)
+  const [notices, setNotices] = useState<PolicyPostView[]>([])
+  const [noticeTotal, setNoticeTotal] = useState(0)
   const [policyState, setPolicyState] = useState<'loading' | 'error' | 'ready'>('loading')
 
-  const loadPolicies = () => {
+  const loadPolicies = useCallback(() => {
+    const mergePolicyResults = (chunks: PublishedPoliciesResult[]): PublishedPoliciesResult => {
+      const byId = new Map<string, PolicyPostView>()
+      let total = 0
+      for (const chunk of chunks) {
+        total += chunk.total
+        for (const item of chunk.items) byId.set(item.id, item)
+      }
+      return { items: [...byId.values()], total }
+    }
     setPolicyState('loading')
-    getPublishedPolicies()
-      .then((res) => {
-        setPolicies(res.items)
-        setPolicyTotal(res.total)
+    const guideReq = audience === 'all'
+      ? getPublishedPolicies({ kind: 'policy_guide' })
+      : Promise.all([
+          getPublishedPolicies({ kind: 'policy_guide', audience }),
+          getPublishedPolicies({ kind: 'policy_guide', audience: 'general' }),
+        ]).then((chunks) => mergePolicyResults(chunks))
+    Promise.all([guideReq, getPublishedPolicies({ kind: 'notice' })])
+      .then(([guideRes, noticeRes]) => {
+        setGuides(guideRes.items)
+        setGuideTotal(guideRes.total)
+        setNotices(noticeRes.items)
+        setNoticeTotal(noticeRes.total)
         setPolicyState('ready')
       })
       .catch(() => setPolicyState('error'))
-  }
+  }, [audience])
 
-  useEffect(() => { loadPolicies() }, [])
+  useEffect(() => { loadPolicies() }, [loadPolicies])
 
   useEffect(() => {
     setActiveTab(getInitialTab(searchParams))
   }, [searchParams])
 
-  const notices = policies.filter((p) => p.kind === 'notice')
-  const policyGuides = policies.filter((p) => p.kind === 'policy_guide')
+  const policyGuides = guides
 
   // 政策库条目与内置办事指引分开传给 PolicyPanel，绝不合并成一个数组。
   // 合并后政策库为空时页面照样满屏（内置指引常驻 5 条，其中一条对任何身份都命中），
@@ -73,14 +91,20 @@ export function RenshiPage() {
   // useMemo 的引用稳定性要保住：fromPublished 每次都造新对象，
   // 掉了 memo 会让详情面板的选中项每帧换新身份，白跑 onOpened 副作用。
   const libraryItems = useMemo<PolicyItem[]>(
-    () => policies.filter((p) => p.kind === 'policy_guide').map(fromPublished),
-    [policies],
+    () => guides.map(fromPublished),
+    [guides],
   )
   const guideItems = BUILTIN_GUIDES
 
   // 单页有上限，取回条数少于服务端总数时如实说明，不让多出来的条目无声消失。
-  const truncated = policyTotal > policies.length
-    ? `；服务端共 ${policyTotal} 条已发布内容，本页取回 ${policies.length} 条，可用上方身份筛选缩小范围`
+  // 身份筛选会重新请求 audience，因此这条提示现在是真的。
+  const truncated = guideTotal > guides.length
+    ? audience === 'all'
+      ? `；服务端共 ${guideTotal} 条已发布政策，本页取回 ${guides.length} 条，可用上方身份筛选缩小范围`
+      : `；服务端该身份下共 ${guideTotal} 条已发布政策，本页取回 ${guides.length} 条`
+    : ''
+  const noticeTruncated = noticeTotal > notices.length
+    ? `；服务端共 ${noticeTotal} 条已发布公告，本页取回 ${notices.length} 条`
     : ''
   /** 来源行必须按 kind 各算各的：政策 Tab 引用公告的来源机构会把「库里其实没有政策」说成有。 */
   const describeSources = (rows: PolicyPostView[]) => {
@@ -93,7 +117,7 @@ export function RenshiPage() {
     : `政策库${describeSources(policyGuides)}；「通用办事指引」为本机整理参考${truncated}`
   const noticeSourceLine = notices.length === 0
     ? null
-    : `政策公告${describeSources(notices)}${truncated}`
+    : `政策公告${describeSources(notices)}${noticeTruncated}`
 
   const renderPolicyTab = () => {
     if (policyState === 'loading') return <LoadingState className="py-16" />

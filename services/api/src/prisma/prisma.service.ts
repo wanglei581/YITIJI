@@ -28,7 +28,10 @@ import { createPrismaClient, type AppPrismaClient, type DbKind } from './create-
  */
 const DEFAULT_DB_CONNECT_TIMEOUT_MS = 15_000
 
-export type PrismaTransactionClient = Omit<AppPrismaClient, '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>
+export type PrismaTransactionClient = Omit<
+  AppPrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$use' | '$extends'
+>
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
@@ -49,10 +52,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     // Do not log credentials embedded in DATABASE_URL.
-    const safeUrl = (process.env['DATABASE_URL'] ?? '').replace(
-      /\/\/[^:]+:[^@]+@/,
-      '//<redacted>@',
-    )
+    const safeUrl = (process.env['DATABASE_URL'] ?? '').replace(/\/\/[^:]+:[^@]+@/, '//<redacted>@')
     const timeoutMs = readTimeoutMs('DB_CONNECT_TIMEOUT_MS', DEFAULT_DB_CONNECT_TIMEOUT_MS)
     try {
       // 数据库是**硬依赖**：连不上就明确失败退出（非 0 退出码），
@@ -65,9 +65,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(
         `BOOT_DEPENDENCY_FATAL subsystem=${DATABASE_SUBSYSTEM} code=DB_CONNECT_FAILED ` +
-          `target=${safeUrl} timeoutMs=${timeoutMs} errorType=${error instanceof Error ? error.name : 'UnknownError'}`,
+          `target=${safeUrl} timeoutMs=${timeoutMs} errorType=${error instanceof Error ? error.name : 'UnknownError'}`
       )
-      this.logger.error('数据库是硬依赖，无法连接时不启动服务。请检查 DATABASE_URL、数据库进程与网络放行。')
+      this.logger.error(
+        '数据库是硬依赖，无法连接时不启动服务。请检查 DATABASE_URL、数据库进程与网络放行。'
+      )
       throw error
     }
     bootReadiness.markOk(DATABASE_SUBSYSTEM, 'DB_CONNECTED', `数据库已连接（${this.dbKind}）。`)
@@ -503,9 +505,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.contractReviewTask
   }
 
+  // ── 求职材料模板（后台可编辑，JobMaterialsModule）─────────────────────────
+
+  get jobMaterialTemplate() {
+    return this.client.jobMaterialTemplate
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
-  $transaction<R>(fn: (prisma: PrismaTransactionClient) => Promise<R>, options?: { maxWait?: number; timeout?: number; isolationLevel?: unknown }): Promise<R>
+  $transaction<R>(
+    fn: (prisma: PrismaTransactionClient) => Promise<R>,
+    options?: { maxWait?: number; timeout?: number; isolationLevel?: unknown }
+  ): Promise<R>
   $transaction<R>(ops: readonly unknown[], options?: { isolationLevel?: unknown }): Promise<R[]>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   $transaction(...args: any[]): any {

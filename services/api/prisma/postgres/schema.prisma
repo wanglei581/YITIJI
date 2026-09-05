@@ -3052,3 +3052,28 @@ model AdvisorArtifact {
   @@index([sessionId, createdAt])
   @@index([expiresAt])
 }
+
+// ── 求职材料模板（后台可编辑）──────────────────────────────────────────────────
+// 2026-09-06 产品裁决：管理员后台需能新建 / 编辑 / 发布 / 下架求职材料模板，
+// 模板不再只由代码常量承载。services/api/src/job-materials/job-material-templates.ts
+// 保留为种子源：库为空时按 id 幂等 upsert 一次，此后以库为准，重启不覆盖运营改动。
+// status 取值沿用既有 JobMaterialTemplateStatus 口径：published（已发布）| disabled（未发布/已下架）。
+// 本表为低频运营配置表，admin 全部写操作走 AuditService 留痕（updatedByUserId 记操作人）。
+model JobMaterialTemplate {
+  id                 String   @id
+  type               String
+  title              String
+  description        String
+  tags               Json
+  status             String   @default("disabled")
+  recommendedFor     String
+  outputFilename     String
+  fields             Json
+  resumeLayoutPreset Json?
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  updatedByUserId    String?
+
+  @@index([status, sortOrder])
+}

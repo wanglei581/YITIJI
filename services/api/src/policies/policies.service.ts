@@ -127,6 +127,16 @@ export class PoliciesService {
     }
   }
 
+  async getPublishedPolicyById(id: string): Promise<{ data: PolicyPostDto; success: true }> {
+    const row = await this.prisma.policyPost.findFirst({
+      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+    })
+    if (!row) {
+      throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
+    }
+    return { data: mapPolicy(row), success: true }
+  }
+
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
 
   async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]> {
