@@ -35,6 +35,8 @@ import {
 import { exportResumeDraft, submitResumeGenerate } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
+import { useResumeAiConsent } from './resumeAiConsent'
+import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import './resume-authoring-lightflow.css'
 import './resume-fusion-youth.css'
@@ -168,6 +170,8 @@ function appendVoiceText(current: string | undefined, transcript: string): strin
 export function ResumeGeneratePage() {
   const navigate = useNavigate()
   const { getToken } = useAuth()
+  const consent = useResumeAiConsent()
+  const [showConsent, setShowConsent] = useState(false)
   const [step, setStep] = useState(0)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -237,7 +241,7 @@ export function ResumeGeneratePage() {
     selfIntro: selfIntro.trim() || undefined,
   })
 
-  const handleGenerate = async () => {
+  const runGenerate = async () => {
     setGenerating(true)
     setError(null)
     setAiOutage(null)
@@ -262,6 +266,15 @@ export function ResumeGeneratePage() {
     } finally {
       setGenerating(false)
     }
+  }
+
+  const handleGenerate = async () => {
+    if (consent.checking) return
+    if (!consent.ready) {
+      setShowConsent(true)
+      return
+    }
+    await runGenerate()
   }
 
   /**
@@ -601,6 +614,21 @@ export function ResumeGeneratePage() {
         </div>
       </KioskActionBar>
     </section>
+    {showConsent && (
+      <ResumeAiConsentDialog
+        busy={consent.busy}
+        error={consent.error}
+        guest={!getToken()}
+        onCancel={() => setShowConsent(false)}
+        onConfirm={() => {
+          void consent.confirm().then((ok) => {
+            if (!ok) return
+            setShowConsent(false)
+            void runGenerate()
+          })
+        }}
+      />
+    )}
     </KioskPageFrame>
   )
 }

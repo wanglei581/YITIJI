@@ -165,6 +165,10 @@ expectMatches(
   /const ALLOWED_ROUTE_PREFIXES\s*=\s*\[[^\]]*['"]\/interview['"]/,
   'AI 返回的模拟面试 action 通过助手安全路由白名单',
 )
+expect(!assistantPage.includes("'/print/'"), '打印路由前缀不得带尾斜杠（否则 /print/upload 被丢弃）')
+expect(!assistantPage.includes("'/scan/'"), '扫描路由前缀不得带尾斜杠（否则 /scan/start 被丢弃）')
+expectIncludes(assistantPage, "'/print'", '打印路由前缀是 /print')
+expectIncludes(assistantPage, "'/scan'", '扫描路由前缀是 /scan')
 
 for (const [route, label] of [
   ["/resume/source", '简历服务'],

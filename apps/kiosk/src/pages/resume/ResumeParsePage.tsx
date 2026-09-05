@@ -12,6 +12,8 @@ import type { StepperStep } from '@ai-job-print/ui'
 import { submitResumeParse } from '../../services/api'
 import { aiErrorMessageOf } from '../../ai'
 import { saveAiResumeSession } from './aiResumeSession'
+import { useResumeAiConsent } from './resumeAiConsent'
+import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import {
   RESUME_SCORING_DIMENSIONS,
   type ResumeScoringDimensionKey,
@@ -48,6 +50,7 @@ export function ResumeParsePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
+  const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
 
   const file = state?.file as { name?: string; format?: string; size?: number | string } | undefined
@@ -121,10 +124,11 @@ export function ResumeParsePage() {
       if (failTimerRef.current) clearTimeout(failTimerRef.current)
     }
     if (!fileId || startedRef.current) return cleanup
+    if (consent.checking || consent.needsPrompt || !consent.ready) return cleanup
     startedRef.current = true
     void submitAndWait()
     return cleanup
-  }, [fileId, submitAndWait])
+  }, [fileId, submitAndWait, consent.checking, consent.needsPrompt, consent.ready])
 
   // File meta from navigation state
   const fileName = file?.name ?? '简历文件'
@@ -135,6 +139,32 @@ export function ResumeParsePage() {
   const sourceLabel = source === 'scan' ? '扫描件' : source === 'manual' ? '手动填写' : '云端上传'
 
   /* ── 顶部流程步骤条：与上传/报告/优化页共用 Stepper ── */
+
+  if (consent.checking || consent.needsPrompt) {
+    return (
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+        <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6">
+          <div className="resume-lightflow__stepper">
+            <Stepper steps={RESUME_FLOW_STEPS} currentIndex={1} />
+          </div>
+          <div className="rp-center">
+            <p className="text-base text-neutral-500">
+              {consent.checking ? '正在确认授权状态…' : '使用简历 AI 前需要先确认授权'}
+            </p>
+          </div>
+        </section>
+        {consent.needsPrompt && (
+          <ResumeAiConsentDialog
+            busy={consent.busy}
+            error={consent.error}
+            guest={!getToken()}
+            onCancel={() => navigate('/resume/source')}
+            onConfirm={() => { void consent.confirm() }}
+          />
+        )}
+      </KioskPageFrame>
+    )
+  }
 
   if (!fileId) {
     return (
@@ -240,7 +270,7 @@ export function ResumeParsePage() {
 
           <div className="rp-notice">
             <SparklesIcon style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
-            解析通常在 1 分钟内完成；若格式不支持、识别失败或服务不可用，将如实提示失败原因，可重试或重新上传。诊断结果由 AI 生成，仅供参考。
+            解析通常在 90 秒内完成；若格式不支持、识别失败或服务不可用，将如实提示失败原因，可重试或重新上传。诊断结果由 AI 生成，仅供参考。
           </div>
         </section>
       </div>

@@ -59,9 +59,9 @@ const LazyCallPanel = USE_VOICE_CALL
   : null
 
 const ALLOWED_ROUTE_PREFIXES = [
-  '/resume', '/resume/', '/resume-service',
-  '/print/', '/print-scan',
-  '/scan/',
+  '/resume', '/resume-service',
+  '/print', '/print-scan',
+  '/scan',
   '/jobs', '/job-fairs', '/fairs-service', '/jobs-service',
   '/interview', '/interview-service',
   '/renshi', '/policy-service',

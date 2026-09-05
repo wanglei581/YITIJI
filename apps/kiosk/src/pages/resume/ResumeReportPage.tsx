@@ -131,6 +131,7 @@ export function ResumeReportPage() {
   >(state.extractionNotice)
   const [loading, setLoading] = useState(!state.report && !!taskId && success)
   const [loadError, setLoadError] = useState(false)
+  const [recoveredFail, setRecoveredFail] = useState<string | null>(null)
 
   // http 模式：页面刷新后 state.report 为空，但 taskId 可用，从服务端恢复
   useEffect(() => {
@@ -143,6 +144,10 @@ export function ResumeReportPage() {
         if (cancelled) return
         if (res.providerName) setProviderName(res.providerName)
         if (res.extractionNotice) setExtractionNotice(res.extractionNotice)
+        if (res.status === 'failed' || (!res.report && res.failReason)) {
+          setRecoveredFail(res.failReason ?? '简历解析未能完成，请重试')
+          return
+        }
         if (res.report) setReport(res.report)
         else setLoadError(true)
       })
@@ -158,23 +163,28 @@ export function ResumeReportPage() {
     navigate('/resume/parse', { state: retryState })
   }
 
+  const failView = (failReason: string) => (
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center overflow-y-auto p-8">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-error-bg">
+        <AlertCircleIcon className="h-12 w-12 text-error-fg" />
+      </div>
+      <h1 className="text-2xl font-bold text-neutral-900">诊断失败</h1>
+      <p className="mt-2 max-w-xl text-center text-base text-neutral-500">
+        {failReason}
+      </p>
+      <ResumeDiagnosisFailExits
+        file={state.file}
+        onRetry={handleRetry}
+        onHome={() => navigate('/')}
+      />
+    </section></KioskPageFrame>
+  )
+
   if (!success) {
-    return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center overflow-y-auto p-8">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-error-bg">
-          <AlertCircleIcon className="h-12 w-12 text-error-fg" />
-        </div>
-        <h1 className="text-2xl font-bold text-neutral-900">诊断失败</h1>
-        <p className="mt-2 max-w-xl text-center text-base text-neutral-500">
-          {reason ?? '简历解析未能完成，请重试'}
-        </p>
-        <ResumeDiagnosisFailExits
-          file={state.file}
-          onRetry={handleRetry}
-          onHome={() => navigate('/')}
-        />
-      </section></KioskPageFrame>
-    )
+    return failView(reason ?? '简历解析未能完成，请重试')
+  }
+  if (recoveredFail) {
+    return failView(recoveredFail)
   }
 
   if (loading) {
