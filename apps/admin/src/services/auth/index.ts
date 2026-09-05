@@ -98,6 +98,14 @@ interface ErrorBody {
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<{ ok: true; data: T; status: number } | { ok: false; code: string; message: string; status: number }> {
+  if (API_MODE === 'mock') {
+    return {
+      ok: false,
+      code: 'DEMO_MODE_READONLY',
+      message: '当前为 mock 模式，该操作需要连接真实后端',
+      status: 501,
+    }
+  }
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -560,7 +568,7 @@ export async function verifyToken(): Promise<AuthedUser | null> {
  */
 export function logout(): void {
   const token = getToken()
-  if (token) {
+  if (token && API_MODE === 'http') {
     void fetch(`${API_BASE_URL}/auth/logout`, {
       method: 'POST',
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },

@@ -150,7 +150,8 @@ export default function OfflineAgenciesPage() {
     }
   }
 
-  const handleUnpublish = async (id: string) => {
+  const handleUnpublish = async (id: string, name: string) => {
+    if (!window.confirm(`确认下架「${name}」？下架后一体机不再展示该机构。`)) return
     try {
       await offlineAgenciesAdminService.publishAgency(id, false)
       void loadList()
@@ -343,7 +344,7 @@ export default function OfflineAgenciesPage() {
                         )}
                         {canUnpublish && (
                           <button
-                            onClick={() => void handleUnpublish(row.id)}
+                            onClick={() => void handleUnpublish(row.id, row.name)}
                             className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
                           >
                             下架
