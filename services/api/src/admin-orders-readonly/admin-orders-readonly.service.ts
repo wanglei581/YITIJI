@@ -24,6 +24,8 @@ interface OrderRow {
   pickupCodeExpiresAt: Date | null
   refundReason: string | null
   refundedAt: Date | null
+  discountCents: number
+  refundedAmountCents: number
   createdAt: Date
   updatedAt: Date
   printTask: {
@@ -84,6 +86,8 @@ export interface ListAdminOrdersReadonlyParams {
   pageSize: number
 }
 
+const DUPLEX_MODES = ['simplex', 'duplex_long_edge', 'duplex_short_edge'] as const
+
 const EMPTY_PRINT_SUMMARY: AdminOrderReadonlyPrintSummary = {
   fileName: null,
   copies: null,
@@ -113,7 +117,9 @@ function parseSafePrintSummary(paramsJson: string | null | undefined): AdminOrde
     fileName: stringValue('fileName'),
     copies,
     colorMode: p['colorMode'] === 'black_white' || p['colorMode'] === 'color' ? p['colorMode'] : null,
-    duplex: stringValue('duplex'),
+    duplex: DUPLEX_MODES.includes(p['duplex'] as (typeof DUPLEX_MODES)[number])
+      ? (p['duplex'] as (typeof DUPLEX_MODES)[number])
+      : null,
     paperSize: stringValue('paperSize'),
     pageRange: stringValue('pageRange'),
   }
@@ -182,6 +188,8 @@ export class AdminOrdersReadonlyService {
       ...item,
       refundedAt: row.refundedAt ? row.refundedAt.toISOString() : null,
       refundReason: row.refundReason,
+      discountCents: row.discountCents,
+      refundedAmountCents: row.refundedAmountCents,
       printTaskId: row.printTaskId ?? null,
       print: row.printTask && summary
         ? {
@@ -275,6 +283,8 @@ function orderSelect() {
     pickupCodeExpiresAt: true,
     refundReason: true,
     refundedAt: true,
+    discountCents: true,
+    refundedAmountCents: true,
     createdAt: true,
     updatedAt: true,
     printTask: {

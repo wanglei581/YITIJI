@@ -110,7 +110,7 @@ export type BillingPageSource = 'pdf_lightweight_scan' | 'image_single_page'
 
 /** 单条计费明细（单位：分）。 */
 export interface PrintPriceLine {
-  /** 价目项键，如 print_bw_page / print_color_page / print_duplex_surcharge。 */
+  /** 价目项键，仅 print_bw_page / print_color_page。双面不计价，不存在 duplex 价目键。 */
   serviceKey: string
   /** 单价（分），>= 0。 */
   unitCents: number

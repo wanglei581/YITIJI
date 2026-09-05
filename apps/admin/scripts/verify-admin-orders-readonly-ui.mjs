@@ -120,4 +120,45 @@ if (
   fail('UNCONFIRMED verification buttons, confirm phrases and print-jobs client must stay aligned')
 }
 
+if (
+  page.includes('label="单双面"') &&
+  page.includes('label="彩色/黑白"') &&
+  page.includes('label="份数"') &&
+  page.includes('label="页范围"') &&
+  page.includes('duplexText(detail.print?.duplex)') &&
+  page.includes('pageRangeText(detail.print?.pageRange)') &&
+  !page.includes('label="打印参数"')
+) {
+  pass('订单详情逐项展示打印参数，缺值走 helper（未记录），不再合成一行把缺项吃掉')
+} else {
+  fail('订单详情必须逐项展示单双面/彩黑/份数/页范围，且不得再使用合成「打印参数」行')
+}
+
+if (
+  page.includes('label="下单金额"') &&
+  page.includes('label="优惠/权益抵扣"') &&
+  page.includes('label="已退款"') &&
+  page.includes('label="实付"') &&
+  page.includes('recordedCentsText(detail.discountCents') &&
+  page.includes('recordedCentsText(detail.refundedAmountCents') &&
+  page.includes('NET_PAID_UNRECORDED') &&
+  !/detail\.amountCents\s*-/.test(page)
+) {
+  pass('订单详情展示下单金额/优惠/已退款真源字段，实付标未记录且不推算')
+} else {
+  fail('订单详情金额必须用服务端 discountCents/refundedAmountCents，实付不得用应付减优惠')
+}
+
+if (service.includes('discountCents: number') && service.includes('refundedAmountCents: number')) {
+  pass('Admin 订单详情类型包含 discountCents / refundedAmountCents')
+} else {
+  fail('Admin 订单详情类型必须包含优惠与已退款真源字段')
+}
+
+if (!page.includes('print_duplex_surcharge') && !page.includes('双面附加')) {
+  pass('订单页不把双面渲染成计价项')
+} else {
+  fail('订单页不得出现 print_duplex_surcharge / 双面附加')
+}
+
 console.log('\nALL PASS')

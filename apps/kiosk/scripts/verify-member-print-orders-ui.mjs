@@ -167,6 +167,42 @@ expectAbsent(pageSrc, /min-h-\[44px\]/, '本页无 44px 触控目标（筛选 ch
 // 12) 金额非法输入返回「—」，不编造金额。
 expectMatches(copySrc, /!Number\.isInteger\(amountCents\)\s*\|\|\s*amountCents\s*<\s*0\)\s*return\s*'—'/, '金额非整数 / 负数返回「—」，不输出异常格式')
 
+// 14) 打印参数来自已保存字段；缺值「未记录」，不把双面显示成金额项。
+expectMatches(summarySrc, /label="单双面"/, '详单展示单双面')
+expectMatches(summarySrc, /label="彩色\/黑白"/, '详单展示彩色/黑白')
+expectMatches(summarySrc, /label="份数"/, '详单展示份数')
+expectMatches(summarySrc, /label="页范围"/, '详单展示页范围')
+expectMatches(summarySrc, /duplexDisplay\(item\.duplex\)/, '单双面走 helper，不默认成单面')
+expectMatches(copySrc, /return duplexShortLabel\(duplex\) \?\? UNRECORDED/, 'duplex 缺失显示未记录')
+expectMatches(copySrc, /return UNRECORDED/, '打印参数 helper 以未记录为缺省')
+expectAbsent(summarySrc, /print_duplex_surcharge|双面附加/, '详单不把双面渲染成计价项')
+expectMatches(pageSrc, /duplexShortLabel\(item\.duplex\)/, '列表摘要在有记录时展示单双面')
+
+// 15) 优惠 / 已退款展示服务端字段；实付无独立字段标未记录；前端不推算。
+expectMatches(summarySrc, /label="下单金额"/, '详单展示下单金额（amountCents）')
+expectMatches(summarySrc, /label="优惠\/权益抵扣"/, '详单展示优惠/权益抵扣（discountCents）')
+expectMatches(summarySrc, /label="已退款"/, '详单展示已退款（refundedAmountCents）')
+expectMatches(summarySrc, /label="实付"/, '详单有实付行')
+expectMatches(summarySrc, /recordedAmountDisplay\(item\.discountCents\)/, '优惠额只格式化服务端 discountCents')
+expectMatches(summarySrc, /recordedAmountDisplay\(item\.refundedAmountCents\)/, '已退款只格式化服务端 refundedAmountCents')
+expectMatches(summarySrc, /value=\{NET_PAID_UNRECORDED\}/, '实付固定未记录，不计算')
+expectMatches(copySrc, /NET_PAID_UNRECORDED = '未记录'/, '实付未记录文案在 copy helper')
+expectAbsent(summarySrc, /amountCents[\s\S]{0,40}-[\s\S]{0,40}discountCents/, '详单不按应付减优惠推算实付')
+expectAbsent(copySrc, /amountCents\s*-/, 'paymentCopy 不计算实付')
+expectMatches(
+  copySrc,
+  /export function formatRecordedCents[\s\S]{0,500}return `¥\$\{yuan\}\.\$\{fen\}`/,
+  'formatRecordedCents 对 0 分也输出 ¥x.xx，不说免费',
+)
+{
+  const recordedFn = copySrc.slice(
+    copySrc.indexOf('export function formatRecordedCents'),
+    copySrc.indexOf('export function recordedAmountDisplay'),
+  )
+  if (recordedFn.includes('免费')) fail('formatRecordedCents 不得把 0 分抵扣/退款说成免费')
+  else pass('formatRecordedCents 不把 0 分说成免费')
+}
+
 // 13) 打印任务状态自动刷新：只追踪进行中打印状态，按 id 合并，不覆盖已加载分页。
 expectMatches(refreshSrc, /MEMBER_ORDERS_POLL_MS\s*=\s*5000/, '自动刷新基础间隔为 5 秒（列表页低于进度页实时性）')
 expectMatches(refreshSrc, /MEMBER_ORDERS_POLL_MAX_MS\s*=\s*60000/, '自动刷新失败退避封顶 60 秒')

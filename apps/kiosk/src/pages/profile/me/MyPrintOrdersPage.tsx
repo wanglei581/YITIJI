@@ -21,7 +21,7 @@ import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
-import { formatAmountCents, paymentSourceLabel, payStatusMeta } from './printOrders/paymentCopy'
+import { duplexShortLabel, formatAmountCents, paymentSourceLabel, payStatusMeta } from './printOrders/paymentCopy'
 import {
   MEMBER_ORDERS_POLL_MS,
   hasActivePrintOrders,
@@ -58,6 +58,8 @@ function metaLine(item: MemberPrintOrderItem): string {
   const parts: string[] = []
   if (item.copies) parts.push(`${item.copies} 份`)
   if (item.colorMode) parts.push(item.colorMode === 'color' ? '彩色' : '黑白')
+  const duplex = duplexShortLabel(item.duplex)
+  if (duplex) parts.push(duplex)
   if (item.paperSize) parts.push(item.paperSize)
   parts.push(formatTime(item.completedAt ?? item.createdAt))
   return parts.join(' · ')

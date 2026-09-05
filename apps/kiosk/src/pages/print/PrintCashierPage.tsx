@@ -61,7 +61,6 @@ const AUTO_RECONCILE_INTERVAL_MS = 3500
 const SERVICE_KEY_LABEL: Record<string, string> = {
   print_bw_page: '黑白打印',
   print_color_page: '彩色打印',
-  print_duplex_surcharge: '双面附加',
 }
 
 function lineLabel(line: PrintPriceLine): string {

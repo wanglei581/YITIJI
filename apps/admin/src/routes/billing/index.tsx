@@ -19,7 +19,6 @@ import {
 const SERVICE_LABELS: Record<string, string> = {
   print_bw_page: '黑白打印（每页）',
   print_color_page: '彩色打印（每页）',
-  print_duplex_surcharge: '双面附加',
 }
 
 const DISCREPANCY_LABELS: Record<string, string> = {
