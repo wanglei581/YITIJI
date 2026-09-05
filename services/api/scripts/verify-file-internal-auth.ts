@@ -17,8 +17,20 @@ import assert from 'node:assert/strict'
 import { JwtService } from '@nestjs/jwt'
 import { ForbiddenException, NotFoundException } from '@nestjs/common'
 
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { FilesController } from '../src/files/files.controller'
 import { canAccessFile, type FileRequester } from '../src/files/files.service'
+import {
+  canActorUseUploadPurpose,
+  rawUploadByteLimitForPurpose,
+  RAW_UPLOAD_PROXY_MAX_BYTES,
+} from '../src/files/file-validation'
+import {
+  collectBodyUntilByteLimit,
+  RawUploadLimitExceededError,
+} from '../src/files/collect-raw-upload-body'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../src/common/constants/internal-session.constants'
 import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
@@ -480,6 +492,61 @@ async function main(): Promise<void> {
       'Redis 不可达 + 已停用管理员',
     )
     assert.equal(world.calls.getAccessUrl, 0, 'Redis 挂掉时也不得放行已停用账号')
+  })
+
+  const apiRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const controllerSrc = readFileSync(join(apiRoot, 'src/files/files.controller.ts'), 'utf8')
+
+  await scenario('raw PUT 必须先按 purpose 取上限再流式读取，不得先缓冲 200MB', async () => {
+    assert.match(controllerSrc, /resolveRawUploadByteLimit/, 'rawUpload 必须按文件用途取上限')
+    assert.match(controllerSrc, /collectBodyUntilByteLimit/, 'rawUpload 必须流式累计字节')
+    const filesServiceSrc = readFileSync(join(apiRoot, 'src/files/files.service.ts'), 'utf8')
+    assert.match(
+      filesServiceSrc,
+      /canActorUseUploadPurpose\(args\.purpose, args\.actorRole/,
+      'proxy 上传必须按角色收敛用途',
+    )
+    assert.match(
+      filesServiceSrc,
+      /canActorUseUploadPurpose\(body\.purpose, args\.actorRole/,
+      '直传意图必须按角色收敛用途',
+    )
+    assert.doesNotMatch(
+      controllerSrc,
+      /if \(total > RAW_UPLOAD_MAX_BYTES\)/,
+      '不得再按固定 200MB 收完再判',
+    )
+    const printDocLimit = rawUploadByteLimitForPurpose('print_doc')
+    const adminLimit = rawUploadByteLimitForPurpose('admin_upload')
+    assert.equal(printDocLimit, 20 * 1024 * 1024, 'print_doc 直传上限必须是 20MB，不是 200MB')
+    assert.ok(printDocLimit < RAW_UPLOAD_PROXY_MAX_BYTES, '普通用途必须严于 200MB 内存天花板')
+    assert.equal(adminLimit, RAW_UPLOAD_PROXY_MAX_BYTES, 'admin_upload 仍受 200MB 代理天花板约束')
+  })
+
+  await scenario('超限必须在后续 chunk 到达前停读（流式判定）', async () => {
+    let yielded = 0
+    async function* body() {
+      yielded += 1
+      yield Buffer.alloc(8)
+      yielded += 1
+      yield Buffer.alloc(8)
+      yielded += 1
+      yield Buffer.alloc(8)
+    }
+    await assert.rejects(
+      () => collectBodyUntilByteLimit(body(), 10),
+      (err: unknown) => err instanceof RawUploadLimitExceededError,
+    )
+    assert.equal(yielded, 2, '超限后不得继续消费后续 chunk（若先收完再判，yielded 会是 3）')
+  })
+
+  await scenario('kiosk/partner/会员不得使用 admin_upload 用途', async () => {
+    assert.equal(canActorUseUploadPurpose('admin_upload', 'admin'), true)
+    assert.equal(canActorUseUploadPurpose('admin_upload', 'partner'), false)
+    assert.equal(canActorUseUploadPurpose('admin_upload', 'kiosk'), false)
+    assert.equal(canActorUseUploadPurpose('admin_upload', null), false)
+    assert.equal(canActorUseUploadPurpose('print_doc', 'kiosk'), true)
+    assert.equal(canActorUseUploadPurpose('partner_image', 'partner'), true)
   })
 
   resetRedisCooldownForTests()

@@ -122,6 +122,33 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
 /** 服务端代理上传(multipart,整 buffer 进内存)的硬上限。超此须走 upload-intent 直传。 */
 export const PROXY_MAX_BYTES = 15 * MB
 
+/**
+ * 本地代理直传（PUT /files/:id/raw）的进程内存天花板。
+ * COS 直传不经此路径。purpose 上限更严时取更严者（见 rawUploadByteLimitForPurpose）。
+ */
+export const RAW_UPLOAD_PROXY_MAX_BYTES = 200 * MB
+
+/**
+ * 仅管理员可声明的上传用途。kiosk / partner / 会员 token 不得占用 admin_upload 命名空间。
+ */
+export const ADMIN_ONLY_UPLOAD_PURPOSES: ReadonlySet<FilePurpose> = new Set(['admin_upload'])
+
+/** 本地代理直传按 purpose 的流式上限：purpose 政策与 200MB 内存天花板取更严。 */
+export function rawUploadByteLimitForPurpose(purpose: string): number {
+  if (!isPurpose(purpose)) return 0
+  return Math.min(PURPOSE_POLICY[purpose].maxBytes, RAW_UPLOAD_PROXY_MAX_BYTES)
+}
+
+/** 上传用途是否允许当前内部角色（会员 / 匿名 actorRole=null）。 */
+export function canActorUseUploadPurpose(
+  purpose: string,
+  actorRole: string | null | undefined,
+): boolean {
+  if (!isPurpose(purpose)) return false
+  if (ADMIN_ONLY_UPLOAD_PURPOSES.has(purpose)) return actorRole === 'admin'
+  return true
+}
+
 /** 默认敏感等级(显式传入可覆盖)。 */
 export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   resume_upload: 'highly_sensitive',

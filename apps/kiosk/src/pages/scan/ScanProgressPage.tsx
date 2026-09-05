@@ -16,6 +16,7 @@ import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { ScanFlowSteps } from './ScanFlowSteps'
+import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -51,7 +52,7 @@ function buildResultFileState(file: ScanSessionFileView) {
     size: formatSize(file.sizeBytes),
     mimeType: file.mimeType,
     pages: null,
-    format: 'PDF' as const,
+    format: formatLabelFromMime(file.mimeType),
   }
 }
 
@@ -207,7 +208,7 @@ export function ScanProgressPage() {
               ['扫描类型', SCAN_TYPE_LABELS[scanType]],
               ['任务编号', scanTaskId ?? '未创建'],
               ['开始等待', `已等待 ${elapsed}`],
-              ['输出格式', 'PDF（自动生成）'],
+              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
             ].map(([key, value]) => (
               <div key={key}><span>{key}</span><b>{value}</b></div>
             ))}
@@ -218,7 +219,7 @@ export function ScanProgressPage() {
             {[
               ['任务已创建', '本机已就绪，等待打印机端发起', 'done'],
               ['等待扫描回传', '打印机扫描并回传文件中', 'active'],
-              ['生成扫描文件', '回传完成后自动生成 PDF', 'pending'],
+              ['保存扫描文件', '按设备回传的原格式保存，服务端不做转换', 'pending'],
               ['进入结果页', '选择打印、保存或 AI 识别', 'pending'],
             ].map(([title, copy, state]) => (
               <div key={title} data-state={state}>

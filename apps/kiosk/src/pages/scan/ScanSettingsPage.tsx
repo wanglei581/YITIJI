@@ -9,6 +9,7 @@ import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
 import { ScanFlowSteps } from './ScanFlowSteps'
+import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -264,7 +265,7 @@ export function ScanSettingsPage() {
                 ['扫描类型', SCAN_TYPE_LABELS[scanType]],
                 ['任务编号', scanTaskId],
                 ['剩余时间', countdown],
-                ['输出格式', 'PDF（服务端生成）'],
+                ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
               ].map(([key, value]) => (
                 <div key={key}><span>{key}</span><b>{value}</b></div>
               ))}

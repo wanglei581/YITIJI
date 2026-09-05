@@ -51,4 +51,79 @@ assert.doesNotMatch(
   'scan settings must never persist its control token in browser storage',
 )
 
+const scanProgress = read('src/pages/scan/ScanProgressPage.tsx')
+const scanResult = read('src/pages/scan/ScanResultPage.tsx')
+const scanFormat = read('src/pages/scan/scanOutputFormat.ts')
+
+assert.match(
+  scanFormat,
+  /export function formatLabelFromMime/,
+  'scan format label must be derived from mimeType, not hardcoded',
+)
+assert.match(
+  scanSettings,
+  /SCAN_OUTPUT_FORMAT_PENDING/,
+  'settings must not promise a format before the file exists',
+)
+assert.doesNotMatch(
+  scanSettings,
+  /PDF（服务端生成）|PDF（自动生成）/,
+  'settings must not claim server-generated PDF',
+)
+assert.match(
+  scanProgress,
+  /formatLabelFromMime\(file\.mimeType\)/,
+  'progress result state must derive format from the delivered mimeType',
+)
+assert.doesNotMatch(
+  scanProgress,
+  /format:\s*'PDF'|自动生成 PDF|PDF（自动生成）/,
+  'progress must not hardcode PDF as the scan output',
+)
+assert.match(
+  scanProgress,
+  /服务端不做转换/,
+  'progress must say the server stores the original bytes',
+)
+assert.doesNotMatch(
+  scanResult,
+  /format:\s*'PDF'|application\/pdf/,
+  'result must not default the scanned file to PDF',
+)
+assert.match(
+  scanResult,
+  /formatLabelFromMime\(file\?\.mimeType\)/,
+  'result chip must follow the real mimeType',
+)
+assert.doesNotMatch(
+  scanResult,
+  /登录后可在「我的文档」管理|登录后管理文件/,
+  'guest scan result must not promise My Documents after login',
+)
+assert.match(
+  scanResult,
+  /未登录扫描件不会进入「我的文档」/,
+  'guest scan result must say the file will not enter My Documents',
+)
+assert.match(
+  scanResult,
+  /disabled=\{!file \|\| !isLoggedIn\}/,
+  'guest must not be sent to login as if the scan file will be claimed',
+)
+assert.match(
+  scanStart,
+  /未登录不会进入「我的文档」|未登录扫描件不会进入「我的文档」/,
+  'scan start must not tell guests that login will recover the file',
+)
+assert.doesNotMatch(
+  scanStart,
+  /生成 PDF/,
+  'scan start must not advertise PDF conversion that the server does not do',
+)
+
+assert.match(scanFormat, /mime === 'image\/jpeg'[\s\S]{0,40}return 'JPEG'/, 'jpeg mime maps to JPEG')
+assert.match(scanFormat, /mime === 'image\/png'[\s\S]{0,40}return 'PNG'/, 'png mime maps to PNG')
+assert.match(scanFormat, /mime === 'application\/pdf'[\s\S]{0,40}return 'PDF'/, 'pdf mime maps to PDF')
+assert.match(scanFormat, /if \(!mime\) return '未知格式'/, 'missing mime maps to 未知格式')
+
 console.log('ALL PASS scan session truth contract')

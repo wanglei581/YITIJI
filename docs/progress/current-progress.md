@@ -1,5 +1,9 @@
 # 当前开发进度
 
+2026-09-06 **一体机诚实文案 + 上传限额（分支 `fix/kiosk-honesty-and-upload`，本地候选，未部署）**。对照 [`launch-audit-2026-09-05.md`](../reviews/launch-audit-2026-09-05.md) MSC-03/04/05/06、API-28（复核后按 P1 修）。① 扫描全链不再写死「输出 PDF（服务端生成）」：格式由真实 `mimeType` 派生；文件未回传时只说明「设备回传原格式（服务端不转换）」。**未做**服务端转 PDF。② 游客扫描结果不再承诺「登录后在我的文档管理」——无认领机制，文案改为本次文件不会进入「我的文档」。**未做**认领。③ 格式转换规则卡按 token 与横幅一致，游客不说「已保存到我的文档」。④ 格式转换补 `terminalId` + `assertUserTaskAllowed(..., 'format_convert')`，照抄扫描/签章。⑤ raw PUT 按 purpose 流式限额（`print_doc` 20MB 即断，不再先缓冲 200MB）；`admin_upload` 仅 admin 可用。未加 Prisma 字段，未改 `apps/miniapp/**`、`.github/workflows/**`。验证：prisma generate 后 api/kiosk `tsc --noEmit` 退出 0；`verify:scan-input-safety` / `verify:print-confirm-honest` / `verify:scan-session-truth` / `verify:fusion-w2` 全绿；`VERIFICATION_DATABASE_TARGET=isolated` 下 `verify:scan-tasks` PASS；`verify:file-internal-auth` 18 PASS；`verify:print-conversion` 含 16/17 能力门禁 PASS；`verify:repository-integrity` / `verify:ci-gate-coverage` 通过。变异：写回「PDF（服务端生成）」→ `verify:scan-session-truth` 红；写回「登录后可在我的文档管理」→ 同门禁红；无条件「PDF 已保存到我的文档」→ `verify:print-confirm-honest` 红；去掉 `assertUserTaskAllowed(format_convert)` → `verify:print-conversion` 红；raw PUT 改回固定 200MB 缓冲 → `verify:file-internal-auth` 红；恢复后全绿。未 push。
+
+
+
 > **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。
 
 2026-09-06 **商用补充清单第 5 / 第 8 项（分支 `team/commercial-5-8`，本地候选，未部署）**。对照 [`launch-audit-2026-09-05.md`](../reviews/launch-audit-2026-09-05.md) 功能优化机会清单。

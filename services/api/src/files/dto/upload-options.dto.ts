@@ -23,6 +23,7 @@ export class UploadOptionsDto {
     'partner_video',
     'job_fair_material',
     'screensaver_material',
+    // admin_upload 仅管理员可用；kiosk / partner 在 FilesService 按角色拒绝。
     'admin_upload',
     'temp',
   ])
