@@ -31,6 +31,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { ContentService } from '../src/content/content.service'
 import { verifyAdAssetSignature } from '../src/content/content-signing'
+import { AuditService } from '../src/audit/audit.service'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -62,11 +63,20 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const storage = new StorageService()
-  const content = new ContentService(prisma, storage)
+  const audit = new AuditService(prisma)
+  const content = new ContentService(prisma, storage, audit)
 
   const suffix = randomBytes(6).toString('hex')
   const terminalId = `term_vsc_${suffix}`
   const terminalCode = `VSC-${suffix}`
+  const auditActorId = `admin_vsc_${suffix}`
+  const auditContext = {
+    actorId: auditActorId,
+    actorRole: 'admin',
+    ipAddress: '127.0.0.1',
+    userAgent: 'verify-screensaver-content',
+    requestId: `req_vsc_${suffix}`,
+  }
   const assetIds: string[] = []
   const playlistIds: string[] = []
 
@@ -77,18 +87,36 @@ async function main() {
       await prisma.adPlaylist.deleteMany({ where: { id: { in: playlistIds } } })
     }
     if (assetIds.length) await prisma.adAsset.deleteMany({ where: { id: { in: assetIds } } })
+    await prisma.auditLog.deleteMany({ where: { actorId: auditActorId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
+    await prisma.user.deleteMany({ where: { id: auditActorId } })
   }
 
   const track = <T extends { id: string }>(a: T, bucket: string[]): T => { bucket.push(a.id); return a }
 
   try {
     await cleanup()
+    await prisma.user.create({
+      data: {
+        id: auditActorId,
+        username: `vsc-admin-${suffix}`,
+        passwordHash: 'verify',
+        name: '待机屏强审计验证管理员',
+        role: 'admin',
+      },
+    })
     await prisma.terminal.create({ data: { id: terminalId, terminalCode, agentToken: `vsc-${suffix}`, deviceFingerprint: `fp-${suffix}` } })
     pass('终端夹具已创建')
 
     // ── 1. 上传素材 ───────────────────────────────────────────────────
-    const img = track(await content.createAsset({ buffer: PNG, mimeType: 'image/png', title: '宣传图', durationSec: 8, createdBy: 'admin' }), assetIds)
+    const img = track(await content.createAsset({
+      buffer: PNG,
+      mimeType: 'image/png',
+      title: '宣传图',
+      durationSec: 8,
+      createdBy: auditActorId,
+      auditContext,
+    }), assetIds)
     if (img.status === 'active' && img.source === 'uploaded' && img.type === 'image') pass('1a. 上传素材 → AdAsset(active/uploaded/image)')
     else fail(`1a. 上传异常: ${JSON.stringify(img)}`)
     const readBack = await content.readAssetContent(img.id)
@@ -106,7 +134,13 @@ async function main() {
     const imgItemOff = track(await content.createAsset({ buffer: PNG, mimeType: 'image/png', title: 'item禁用', createdBy: null }), assetIds)
 
     // ── 2. 外链素材 + 白名单 ──────────────────────────────────────────
-    const ext = track(await content.createExternalAsset({ url: 'https://cdn.example.com/promo.mp4', title: '外链视频', durationSec: 30, createdBy: 'admin' }), assetIds)
+    const ext = track(await content.createExternalAsset({
+      url: 'https://cdn.example.com/promo.mp4',
+      title: '外链视频',
+      durationSec: 30,
+      createdBy: auditActorId,
+      auditContext,
+    }), assetIds)
     if (ext.source === 'external_url' && ext.type === 'video') pass('2a. 外链素材（白名单内 https mp4 直链）→ external_url')
     else fail(`2a. 外链异常: ${JSON.stringify(ext)}`)
     await expectCode(() => content.createExternalAsset({ url: 'https://not-allowed.example.org/x.mp4', title: 'x', createdBy: null }), 'EXTERNAL_VIDEO_URL_HOST_NOT_ALLOWED', '2b. 非白名单 host → 拒')
@@ -120,7 +154,7 @@ async function main() {
 
     // ── 3. 播放方案 + 排序 ────────────────────────────────────────────
     const p1 = await content.createPlaylist({
-      name: '方案A', status: 'active', createdBy: 'admin',
+      name: '方案A', status: 'active', createdBy: auditActorId, auditContext,
       items: [
         { assetId: ext.id, order: 1, enabled: true },
         { assetId: img.id, order: 0, enabled: true },
@@ -138,21 +172,32 @@ async function main() {
     playlistIds.push(p2.id)
 
     // ── 4. 启用/禁用 + 软删 + 脏数据制造 ─────────────────────────────
-    const upd = await content.updateAsset(imgDisabled.id, { status: 'disabled' })
+    const upd = await content.updateAsset(imgDisabled.id, { status: 'disabled' }, auditContext)
     if (upd.status === 'disabled') pass('4a. updateAsset → 禁用（status=disabled）')
     else fail(`4a. 禁用异常: ${upd.status}`)
-    const del = await content.deleteAsset(imgDeleted.id)
+    const del = await content.deleteAsset(imgDeleted.id, auditContext)
     if (del.status === 'disabled') pass('4b. deleteAsset → 软删（status=disabled，deletedAt 置位）')
     else fail(`4b. 软删异常: ${JSON.stringify(del)}`)
     const listDefault = await content.listAssets()
     const listAll = await content.listAssets({ includeDeleted: true })
-    if (!listDefault.some((a) => a.id === imgDeleted.id) && listAll.some((a) => a.id === imgDeleted.id)) pass('4c. 软删素材：默认列表不含、includeDeleted 才含')
+    if (
+      !listDefault.items.some((a) => a.id === imgDeleted.id) &&
+      listAll.items.some((a) => a.id === imgDeleted.id) &&
+      listDefault.total === listDefault.items.length &&
+      listAll.total === listAll.items.length &&
+      !listDefault.truncated && !listAll.truncated
+    ) pass('4c. 软删素材：默认列表不含、includeDeleted 才含，total/truncated 真实')
     else fail('4c. 软删列表过滤异常')
     // 制造脏外链（externalUrl=null），模拟脏数据
     await prisma.adAsset.update({ where: { id: extDirty.id }, data: { externalUrl: null } })
 
     // ── 5. 终端绑定 ───────────────────────────────────────────────────
-    const cfgNoPlaylist = await content.saveTerminalConfig(terminalId, { enabled: true, idleTimeoutSec: 200, playlistId: null }, 'admin')
+    const cfgNoPlaylist = await content.saveTerminalConfig(
+      terminalId,
+      { enabled: true, idleTimeoutSec: 200, playlistId: null },
+      auditActorId,
+      auditContext,
+    )
     if (cfgNoPlaylist.enabled === false) pass('5a. 无绑定方案时 enabled 强制为 false（不让终端拉空）')
     else fail(`5a. 无方案应 enabled=false，实际 ${cfgNoPlaylist.enabled}`)
     const cfg = await content.saveTerminalConfig(terminalId, { enabled: true, idleTimeoutSec: 200, playlistId: p1.id }, 'admin')
@@ -183,7 +228,11 @@ async function main() {
 
     // playlist 非 active → enabled:false
     await content.saveTerminalConfig(terminalId, { enabled: true, idleTimeoutSec: 200, playlistId: p1.id }, 'admin')
-    await content.updatePlaylist(p1.id, { name: '方案A', status: 'disabled', items: [{ assetId: img.id, order: 0, enabled: true }] })
+    await content.updatePlaylist(
+      p1.id,
+      { name: '方案A', status: 'disabled', items: [{ assetId: img.id, order: 0, enabled: true }] },
+      auditContext,
+    )
     const kpInactive = await content.getKioskPlaylist(terminalId)
     if (kpInactive.enabled === false) pass('6e. playlist 非 active → enabled:false')
     else fail(`6e. playlist 非 active 异常: ${JSON.stringify(kpInactive)}`)
@@ -193,6 +242,53 @@ async function main() {
     const kpDirty = await content.getKioskPlaylist(terminalId)
     if (kpDirty.enabled === false && kpDirty.items.length === 0) pass('6f. 外链缺 URL 被剔 + 无可播素材 → enabled:false（防黑屏）')
     else fail(`6f. 脏外链/无可播异常: ${JSON.stringify(kpDirty)}`)
+
+    // ── 7. 高权限写操作强审计 + 事务回滚 ─────────────────────────────
+    const deletePlaylistFixture = await content.createPlaylist({
+      name: '待删除强审计方案',
+      status: 'active',
+      createdBy: auditActorId,
+      items: [{ assetId: img.id, order: 0, enabled: true }],
+      auditContext,
+    })
+    playlistIds.push(deletePlaylistFixture.id)
+    await content.deletePlaylist(deletePlaylistFixture.id, auditContext)
+
+    const auditRows = await prisma.auditLog.findMany({
+      where: { actorId: auditActorId },
+      select: { action: true, requestId: true },
+    })
+    const actionSet = new Set(auditRows.map((row) => row.action))
+    const requiredActions = [
+      'ad_asset.upload',
+      'ad_asset.create_external',
+      'ad_asset.update',
+      'ad_asset.delete',
+      'ad_playlist.create',
+      'ad_playlist.update',
+      'ad_playlist.delete',
+      'screensaver_config.update',
+    ]
+    const missingActions = requiredActions.filter((action) => !actionSet.has(action))
+    if (missingActions.length || auditRows.some((row) => row.requestId !== auditContext.requestId)) {
+      fail(`7a. 内容管理强审计缺失或上下文不完整: ${missingActions.join(',') || 'requestId'}`)
+    }
+    pass('7a. 素材/方案/终端配置八类高权限写操作均落 writeRequired 强审计')
+
+    const beforeRollback = await prisma.adAsset.findUniqueOrThrow({ where: { id: img.id } })
+    const failingAudit = {
+      writeRequired: async () => { throw new Error('VERIFY_AUDIT_WRITE_FAILED') },
+    } as unknown as AuditService
+    const contentWithFailingAudit = new ContentService(prisma, storage, failingAudit)
+    try {
+      await contentWithFailingAudit.updateAsset(img.id, { title: '不应提交的标题' }, auditContext)
+      fail('7b. 强审计失败时内容更新必须抛错')
+    } catch (error) {
+      if ((error as Error).message !== 'VERIFY_AUDIT_WRITE_FAILED') throw error
+    }
+    const afterRollback = await prisma.adAsset.findUniqueOrThrow({ where: { id: img.id } })
+    if (afterRollback.title !== beforeRollback.title) fail('7b. 强审计失败后素材更新必须回滚')
+    pass('7b. writeRequired 失败会回滚内容管理业务写入')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

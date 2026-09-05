@@ -99,7 +99,8 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const capabilities = new TerminalCapabilitiesService(prisma)
-  const printScan = new AdminPrintScanService(prisma)
+  const audit = new AuditService(prisma)
+  const printScan = new AdminPrintScanService(prisma, audit)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `term_vps_${suffix}`
@@ -108,8 +109,25 @@ async function main() {
   const createdScanTaskIds: string[] = []
   const createdOrderIds: string[] = []
   const createdPaymentAttemptIds: string[] = []
+  const auditActorId = `admin_vps_${suffix}`
+  const actionActor = {
+    actorId: auditActorId,
+    actorRole: 'admin',
+    ipAddress: '127.0.0.1',
+    userAgent: 'verify-admin-print-scan',
+    requestId: `req_vps_${suffix}`,
+  }
 
   try {
+    await prisma.user.create({
+      data: {
+        id: auditActorId,
+        username: `vps-admin-${suffix}`,
+        passwordHash: 'verify',
+        name: '打印扫描强审计验证管理员',
+        role: 'admin',
+      },
+    })
     await prisma.terminal.create({
       data: { id: terminalId, terminalCode: `VPS-${suffix}`, agentToken: `tok_vps_${suffix}`, deviceFingerprint: 'fp' },
     })
@@ -439,7 +457,7 @@ async function main() {
     }
     pass('退役终端 retry fail-closed，且与退役共用 Terminal 行串行点')
 
-    const retried = await printScan.applyAction('print', failedTaskId, 'retry')
+    const retried = await printScan.applyAction('print', failedTaskId, 'retry', actionActor)
     if (retried.fromStatus !== 'failed' || retried.toStatus !== 'pending') fail('retry 应 failed → pending')
     const afterRetry = await prisma.printTask.findUnique({ where: { id: failedTaskId } })
     if (afterRetry?.status !== 'pending' || afterRetry.errorCode !== null || afterRetry.claimExpiry !== null) {
@@ -457,7 +475,69 @@ async function main() {
       where: { taskId: failedTaskId, fromStatus: 'failed', toStatus: 'pending' },
     })
     if (!log || log.errorCode !== 'admin_retry') fail('retry 应写 PrintTaskStatusLog（errorCode=admin_retry）')
-    pass('print.retry：failed→pending + Order 联动 + 状态日志')
+    const retryAudit = await prisma.auditLog.findFirst({
+      where: { action: 'print_scan.task.retry', targetId: failedTaskId },
+    })
+    if (
+      retryAudit?.actorId !== auditActorId ||
+      retryAudit.requestId !== actionActor.requestId ||
+      !retryAudit.payloadJson.includes('"fromStatus":"failed"')
+    ) {
+      fail('print.retry 应在同一事务内写入带 actor/requestId/状态摘要的强审计')
+    }
+    pass('print.retry：failed→pending + Order 联动 + 状态日志 + writeRequired 强审计')
+
+    const rollbackTaskId = `pt_vps_audit_rollback_${suffix}`
+    const rollbackOrderId = `order_vps_audit_rollback_${suffix}`
+    createdPrintTaskIds.push(rollbackTaskId)
+    createdOrderIds.push(rollbackOrderId)
+    await prisma.printTask.create({
+      data: {
+        id: rollbackTaskId,
+        terminalId,
+        fileUrl: signFileUrl(fileId, 60_000).url,
+        fileMd5: 'x',
+        status: 'failed',
+        errorCode: 'printer_offline',
+        completedAt: new Date(),
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: rollbackOrderId,
+        orderNo: `NO-VPSA-${suffix}`,
+        type: 'print',
+        printTaskId: rollbackTaskId,
+        payStatus: 'paid',
+        taskStatus: 'failed',
+        amountCents: 100,
+      },
+    })
+    const failingAudit = {
+      writeRequired: async () => { throw new Error('VERIFY_AUDIT_WRITE_FAILED') },
+    } as unknown as AuditService
+    const printScanWithFailingAudit = new AdminPrintScanService(prisma, failingAudit)
+    try {
+      await printScanWithFailingAudit.applyAction('print', rollbackTaskId, 'retry', actionActor)
+      fail('强审计失败时 print.retry 必须抛错')
+    } catch (error) {
+      if ((error as Error).message !== 'VERIFY_AUDIT_WRITE_FAILED') throw error
+    }
+    const [auditRollbackTask, auditRollbackOrder, auditRollbackLogCount] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: rollbackTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: rollbackOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: rollbackTaskId } }),
+    ])
+    if (
+      auditRollbackTask.status !== 'failed' ||
+      auditRollbackTask.errorCode !== 'printer_offline' ||
+      auditRollbackTask.completedAt === null ||
+      auditRollbackOrder.taskStatus !== 'failed' ||
+      auditRollbackLogCount !== 0
+    ) {
+      fail('print.retry 强审计失败后任务、订单和状态日志必须全部回滚')
+    }
+    pass('print.retry：writeRequired 失败会回滚任务、订单与状态日志')
 
     await expectHttpError(() => printScan.applyAction('print', failedTaskId, 'retry'), 409, '重复 retry（已 pending）→ 409')
 
@@ -837,11 +917,36 @@ async function main() {
       },
     })
     createdScanTaskIds.push(scanTask.id)
-    const cancelled = await printScan.applyAction('scan', scanTask.id, 'cancel')
+    const cancelled = await printScan.applyAction('scan', scanTask.id, 'cancel', actionActor)
     if (cancelled.fromStatus !== 'waiting' || cancelled.toStatus !== 'cancelled') fail('scan.cancel 应 waiting → cancelled')
     const afterCancel = await prisma.scanTask.findUnique({ where: { id: scanTask.id } })
     if (afterCancel?.status !== 'cancelled') fail('scan.cancel 后 DB 状态应为 cancelled')
-    pass('scan.cancel：waiting→cancelled（CAS）')
+    const cancelAudit = await prisma.auditLog.findFirst({
+      where: { action: 'print_scan.task.cancel', targetId: scanTask.id },
+    })
+    if (cancelAudit?.actorId !== auditActorId || !cancelAudit.payloadJson.includes('"toStatus":"cancelled"')) {
+      fail('scan.cancel 应在同一事务内写入带 actor/状态摘要的强审计')
+    }
+    pass('scan.cancel：waiting→cancelled（CAS）+ writeRequired 强审计')
+
+    const rollbackScan = await prisma.scanTask.create({
+      data: {
+        terminalId,
+        scanType: 'document',
+        status: 'waiting',
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      },
+    })
+    createdScanTaskIds.push(rollbackScan.id)
+    try {
+      await printScanWithFailingAudit.applyAction('scan', rollbackScan.id, 'cancel', actionActor)
+      fail('强审计失败时 scan.cancel 必须抛错')
+    } catch (error) {
+      if ((error as Error).message !== 'VERIFY_AUDIT_WRITE_FAILED') throw error
+    }
+    const rollbackScanAfter = await prisma.scanTask.findUniqueOrThrow({ where: { id: rollbackScan.id } })
+    if (rollbackScanAfter.status !== 'waiting') fail('scan.cancel 强审计失败后状态必须回滚为 waiting')
+    pass('scan.cancel：writeRequired 失败会回滚扫描任务状态')
 
     await expectHttpError(() => printScan.applyAction('scan', scanTask.id, 'cancel'), 409, '重复 cancel（已 cancelled）→ 409')
 
@@ -849,7 +954,14 @@ async function main() {
   } finally {
     setPrintScanCapabilityModeForTest(null)
     // 清理本脚本创建的数据（依赖 Terminal onDelete: Cascade 清 capability/scan/print）
-    await prisma.auditLog.deleteMany({ where: { targetId: { in: [...createdPrintTaskIds, ...createdPaymentAttemptIds] } } }).catch(() => undefined)
+    await prisma.auditLog.deleteMany({
+      where: {
+        OR: [
+          { actorId: auditActorId },
+          { targetId: { in: [...createdPrintTaskIds, ...createdScanTaskIds, ...createdPaymentAttemptIds] } },
+        ],
+      },
+    }).catch(() => undefined)
     await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: createdOrderIds } } }).catch(() => undefined)
     await prisma.order.deleteMany({ where: { id: { in: createdOrderIds } } }).catch(() => undefined)
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: createdPrintTaskIds } } }).catch(() => undefined)
@@ -858,7 +970,9 @@ async function main() {
     await prisma.fileObject.deleteMany({ where: { id: { in: [`file_vps_${suffix}`, `file_vps_gone_${suffix}`] } } }).catch(() => undefined)
     await prisma.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
     // retired 行是数据库永久 tombstone，按设计不可删除；验证库使用随机编号避免冲突。
-    await prisma.user.deleteMany({ where: { id: { startsWith: `admin_close_${suffix}` } } }).catch(() => undefined)
+    await prisma.user.deleteMany({
+      where: { id: { in: [auditActorId, `admin_close_${suffix}`] } },
+    }).catch(() => undefined)
     await prisma.onModuleDestroy()
   }
 }

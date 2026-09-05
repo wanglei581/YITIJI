@@ -493,13 +493,13 @@ export default function DashboardPage() {
       adminOpsService.listPrintTasks({ page: 1, pageSize: 5 }),
       adminOpsService.listAlerts(),
     ])
-      .then(([terminalRes, printerRes, jobSources, fairSources, files, aiUsage, auditRes, printTaskPage, alertsRes]) => {
+      .then(([terminalRes, printerRes, jobSources, fairSources, filePage, aiUsage, auditRes, printTaskPage, alertsRes]) => {
         setData({
           terminals: terminalRes.terminals,
           printers: printerRes.printers,
           jobSources,
           fairSources,
-          files,
+          files: filePage.items,
           aiUsage,
           auditLogs: auditRes.items,
           printTasks: printTaskPage.data,

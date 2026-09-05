@@ -481,7 +481,7 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
     name: '通用 list 对导出文件不返回 bucket/region/key/hash',
     async run() {
       const harness = createHarness({ initialRecord: makeFileRow() })
-      const [item] = await harness.files.list({ purpose: EXPORT_PURPOSE })
+      const { items: [item] } = await harness.files.list({ purpose: EXPORT_PURPOSE })
       assert.ok(item)
       assert.equal(Boolean(item.bucket), false)
       assert.equal(Boolean(item.region), false)

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
-import type { AdminFeedbackTicketDetail, AdminFeedbackTicketItem } from './member-feedback.types'
+import type { AdminFeedbackTicketDetail, AdminFeedbackTicketPage } from './member-feedback.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -19,7 +19,7 @@ export class AdminMemberFeedbackController {
     @Query('status') status?: string,
     @Query('category') category?: string,
     @Query('submitterType') submitterType?: string,
-  ): Promise<ApiResponse<{ items: AdminFeedbackTicketItem[] }>> {
+  ): Promise<ApiResponse<AdminFeedbackTicketPage>> {
     return ApiResponse.ok(await this.feedback.listForAdmin({ status, category, submitterType }))
   }
 

@@ -45,6 +45,12 @@ export type {
 export type PartnerSmartCampusTerminal = SmartCampusTerminalView
 export type PartnerJobQualitySummary = JobSourceQualitySummaryDTO
 
+export interface PartnerListSnapshot<T> {
+  items: T[]
+  total: number
+  truncated: boolean
+}
+
 export interface SaveSmartCampusConfigPayload {
   enabled: boolean
   modules: SmartCampusModules

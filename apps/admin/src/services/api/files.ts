@@ -78,11 +78,24 @@ export interface ListFilesOptions {
   includeDeleted?: boolean
   purpose?: string
   limit?: number
+  sensitiveLevel?: AdminFileSensitive
+  cleanStatus?: 'active' | 'scheduled' | 'cleaned'
+  retentionPolicy?: FileRetentionPolicy
+  search?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface AdminFilePage {
+  items: AdminFileRecord[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export interface AdminFilesServiceInterface {
   /** GET /files — admin 列出文件元数据(默认不含已删除) */
-  listFiles(opts?: ListFilesOptions): Promise<AdminFileRecord[]>
+  listFiles(opts?: ListFilesOptions): Promise<AdminFilePage>
   /** GET /files/lifecycle-summary — admin 只读全局生命周期统计 */
   getFileLifecycleSummary(): Promise<AdminFileLifecycleSummary>
   /** DELETE /files/:id — admin 强制删除(物理删存储 + 软删记录 + 后端写审计) */
@@ -138,8 +151,14 @@ export const adminFilesHttpAdapter: AdminFilesServiceInterface = {
     if (opts?.includeDeleted) q.set('includeDeleted', 'true')
     if (opts?.purpose) q.set('purpose', opts.purpose)
     if (opts?.limit) q.set('limit', String(opts.limit))
+    if (opts?.sensitiveLevel) q.set('sensitiveLevel', opts.sensitiveLevel)
+    if (opts?.cleanStatus) q.set('cleanStatus', opts.cleanStatus)
+    if (opts?.retentionPolicy) q.set('retentionPolicy', opts.retentionPolicy)
+    if (opts?.search) q.set('search', opts.search)
+    if (opts?.page) q.set('page', String(opts.page))
+    if (opts?.pageSize) q.set('pageSize', String(opts.pageSize))
     const qs = q.toString()
-    return data(request<{ data: AdminFileRecord[] }>('GET', `/files${qs ? `?${qs}` : ''}`))
+    return data(request<{ data: AdminFilePage }>('GET', `/files${qs ? `?${qs}` : ''}`))
   },
   getFileLifecycleSummary() {
     return data(request<{ data: AdminFileLifecycleSummary }>('GET', '/files/lifecycle-summary'))
@@ -184,7 +203,16 @@ export const adminFilesMockAdapter: AdminFilesServiceInterface = {
     let rows = getStore()
     if (!opts?.includeDeleted) rows = rows.filter((f) => f.deletedAt === null)
     if (opts?.purpose) rows = rows.filter((f) => f.purpose === opts.purpose)
-    return rows.slice(0, opts?.limit ?? 100).map((f) => ({ ...f }))
+    if (opts?.sensitiveLevel) rows = rows.filter((f) => f.sensitiveLevel === opts.sensitiveLevel)
+    if (opts?.retentionPolicy) rows = rows.filter((f) => f.retentionPolicy === opts.retentionPolicy)
+    if (opts?.search) rows = rows.filter((f) => f.filename.includes(opts.search!) || f.endUserId?.includes(opts.search!) || f.uploaderId?.includes(opts.search!))
+    if (opts?.cleanStatus === 'cleaned') rows = rows.filter((f) => f.deletedAt !== null)
+    if (opts?.cleanStatus === 'scheduled') rows = rows.filter((f) => f.deletedAt === null && f.expiresAt !== null && Date.parse(f.expiresAt) <= Date.now())
+    if (opts?.cleanStatus === 'active') rows = rows.filter((f) => f.deletedAt === null && (f.expiresAt === null || Date.parse(f.expiresAt) > Date.now()))
+    const total = rows.length
+    const page = opts?.page ?? 1
+    const pageSize = opts?.pageSize ?? opts?.limit ?? 100
+    return { items: rows.slice((page - 1) * pageSize, page * pageSize).map((f) => ({ ...f })), total, page, pageSize }
   },
   async getFileLifecycleSummary() {
     await delay(120)

@@ -13,7 +13,6 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
-import { AuditService } from '../audit/audit.service'
 import { AdminPrintScanService } from './admin-print-scan.service'
 import { ApplyPrintScanActionDto } from './dto/apply-print-scan-action.dto'
 import { CancelUnpaidPrintTaskDto } from './dto/cancel-unpaid-print-task.dto'
@@ -43,7 +42,6 @@ function safeInt(value: string | undefined, defaultValue: number, min: number, m
 export class AdminPrintScanController {
   constructor(
     private readonly printScan: AdminPrintScanService,
-    private readonly audit: AuditService,
   ) {}
 
   @Get('tasks')
@@ -103,19 +101,9 @@ export class AdminPrintScanController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ): Promise<ApiResponse<AdminPrintScanActionResult>> {
-    const result = await this.printScan.applyAction(type, taskId, dto.action)
-    await this.audit.write({
+    const result = await this.printScan.applyAction(type, taskId, dto.action, {
       actorId: user.userId,
       actorRole: user.role,
-      action: `print_scan.task.${result.action}`,
-      targetType: 'print_scan_task',
-      targetId: result.taskId,
-      payload: {
-        taskType: result.type,
-        action: result.action,
-        fromStatus: result.fromStatus,
-        toStatus: result.toStatus,
-      },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,

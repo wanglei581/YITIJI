@@ -17,6 +17,7 @@ import {
   type DownloadUrlArgs,
   type HeadResult,
   type ObjectStorageBackend,
+  type ObjectStreamResult,
   type PutResult,
   type SignedUrlResult,
   type StorageDriver,
@@ -100,6 +101,9 @@ export class StorageService {
   }
   getObject(objectKey: string, bucket?: string | null): Promise<Buffer> {
     return this.backendFor(bucket).getObject(objectKey)
+  }
+  getObjectStream(objectKey: string, range?: { start: number; end: number }, bucket?: string | null): Promise<ObjectStreamResult> {
+    return this.backendFor(bucket).getObjectStream(objectKey, range)
   }
   deleteObject(objectKey: string, bucket?: string | null): Promise<void> {
     return this.backendFor(bucket).deleteObject(objectKey)

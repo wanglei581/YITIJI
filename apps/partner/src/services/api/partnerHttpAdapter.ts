@@ -4,6 +4,7 @@ import type {
   PartnerDataSource,
   PartnerDataSourceCapabilities,
   PartnerJobRecord,
+  PartnerListSnapshot,
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
@@ -165,7 +166,7 @@ export const partnerHttpAdapter = {
 
   // Jobs
   getPartnerJobs: () =>
-    get<PartnerJobRecord[]>('/partner/jobs'),
+    get<PartnerListSnapshot<PartnerJobRecord>>('/partner/jobs'),
   getPartnerJobQualitySummary: () =>
     get<PartnerJobQualitySummary[]>('/partner/jobs/quality-summary'),
   unpublishPartnerJob: (id: string) =>
@@ -179,7 +180,7 @@ export const partnerHttpAdapter = {
 
   // Fairs
   getPartnerFairs: () =>
-    get<PartnerFairRecord[]>('/partner/fairs'),
+    get<PartnerListSnapshot<PartnerFairRecord>>('/partner/fairs'),
   unpublishPartnerFair: (id: string) =>
     patch<PartnerFairRecord>(`/partner/fairs/${id}/publish`, { action: 'unpublish' }),
   // 阶段1C:编辑本机构招聘会(后端强制回 pending+draft 重审)
@@ -191,7 +192,7 @@ export const partnerHttpAdapter = {
 
   // Sync Logs (read-only)
   getSyncLogs: () =>
-    get<PartnerSyncLog[]>('/partner/sync-logs'),
+    get<PartnerListSnapshot<PartnerSyncLog>>('/partner/sync-logs'),
 
   // Excel Import
   downloadExcelTemplate: async (dataType: 'job' | 'fair') => {

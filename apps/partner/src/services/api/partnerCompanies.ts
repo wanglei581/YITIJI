@@ -12,7 +12,7 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 import type { CompanyType, CompanyIndustry } from '@ai-job-print/shared'
-import type { ReviewStatus, PublishStatus } from './types'
+import type { PartnerListSnapshot, ReviewStatus, PublishStatus } from './types'
 
 /** GET /partner/companies 行（后端 adminRow 投影）。 */
 export interface PartnerCompanyRecord {
@@ -78,7 +78,7 @@ export interface CompanyImportResult {
 }
 
 export interface PartnerCompaniesServiceInterface {
-  getPartnerCompanies(): Promise<PartnerCompanyRecord[]>
+  getPartnerCompanies(): Promise<PartnerListSnapshot<PartnerCompanyRecord>>
   importPartnerCompanies(items: ImportCompanyItem[]): Promise<CompanyImportResult>
   updatePartnerCompany(id: string, input: UpdatePartnerCompanyInput): Promise<PartnerCompanyRecord | undefined>
   /** P1-A④ 下架本机构企业(只改 publishStatus=unpublished;镜像岗位/招聘会/政策)。 */
@@ -116,7 +116,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 const httpAdapter: PartnerCompaniesServiceInterface = {
-  getPartnerCompanies: () => req<PartnerCompanyRecord[]>('GET', '/partner/companies'),
+  getPartnerCompanies: () => req<PartnerListSnapshot<PartnerCompanyRecord>>('GET', '/partner/companies'),
   importPartnerCompanies: (items) =>
     req<CompanyImportResult>('POST', '/partner/companies/import', { items }),
   updatePartnerCompany: (id, input) =>
@@ -143,7 +143,8 @@ function applyFields(row: PartnerCompanyRecord, input: CompanyFieldsInput) {
 
 const mockAdapter: PartnerCompaniesServiceInterface = {
   async getPartnerCompanies() {
-    return [...mockRows]
+    const items = mockRows.slice(0, 200)
+    return { items, total: mockRows.length, truncated: mockRows.length > items.length }
   },
   async importPartnerCompanies(items) {
     let created = 0

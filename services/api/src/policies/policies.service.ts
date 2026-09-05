@@ -129,13 +129,14 @@ export class PoliciesService {
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
 
-  async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.policyPost.findMany({
-      where: { sourceOrgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-    })
-    return rows.map(mapPolicy)
+  async getPartnerPolicies(user: AuthedUser) {
+    if (!user.orgId) return { items: [], total: 0, truncated: false }
+    const where = { sourceOrgId: user.orgId }
+    const [rows, total] = await Promise.all([
+      this.prisma.policyPost.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 }),
+      this.prisma.policyPost.count({ where }),
+    ])
+    return { items: rows.map(mapPolicy), total, truncated: total > rows.length }
   }
 
   async createPartnerPolicy(dto: CreatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto> {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, PlusIcon } from 'lucide-react'
@@ -120,7 +120,7 @@ export default function FairsPage() {
     getPartnerFairs,
     {
       intervalMs: 60_000,
-      merge: mergeById<PartnerFairRecord>((item) => item.id),
+      merge: replaceIfChanged,
       failPolicy: 'keep-last',
     },
   )
@@ -133,7 +133,8 @@ export default function FairsPage() {
     return () => clearTimeout(t)
   }, [notice])
 
-  const fairs = data ?? []
+  const fairs = data?.items ?? []
+  const total = data?.total ?? fairs.length
   const loading = status === 'idle' || (status === 'loading' && fairs.length === 0)
   const error = status === 'error' && fairs.length === 0
 
@@ -255,7 +256,7 @@ export default function FairsPage() {
   return (
     <Page
       title="招聘会信息管理"
-      subtitle={`共 ${fairs.length} 场招聘会`}
+      subtitle={data?.truncated ? `共 ${total} 场招聘会 · 仅显示最近 ${fairs.length} 场` : `共 ${total} 场招聘会`}
       actions={
         <div className="flex flex-col items-end gap-1">
           <Button

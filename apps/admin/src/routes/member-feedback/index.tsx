@@ -94,6 +94,7 @@ export default function MemberFeedbackPage() {
   const [category, setCategory] = useState<FeedbackCategory | 'all'>('all')
   const [submitterType, setSubmitterType] = useState<FeedbackSubmitterType | 'all'>('all')
   const [items, setItems] = useState<AdminFeedbackTicketItem[]>([])
+  const [total, setTotal] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<AdminFeedbackTicketDetail | null>(null)
   const [listState, setListState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -108,6 +109,7 @@ export default function MemberFeedbackPage() {
     try {
       const res = await memberFeedbackAdminApi.list({ status, category, submitterType })
       setItems(res.items)
+      setTotal(res.total)
       setListState('ready')
     } catch (error) {
       setListState('error')
@@ -232,7 +234,9 @@ export default function MemberFeedbackPage() {
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-neutral-900">反馈列表</p>
-            <p className="text-xs text-neutral-400">{items.length} 条</p>
+            <p className="text-xs text-neutral-400">
+              {total > items.length ? `仅显示最近 ${items.length} / ${total} 条` : `${total} 条`}
+            </p>
           </div>
 
           {listState === 'loading' && <LoadingState className="py-20" />}

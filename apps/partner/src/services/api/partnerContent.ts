@@ -3,6 +3,7 @@ import { partnerMockAdapter } from './partnerMockAdapter'
 import { partnerHttpAdapter } from './partnerHttpAdapter'
 import type {
   PartnerJobRecord,
+  PartnerListSnapshot,
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
@@ -24,6 +25,7 @@ import type {
 
 export type {
   PartnerJobRecord,
+  PartnerListSnapshot,
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
@@ -44,7 +46,7 @@ export type {
 }
 
 export interface PartnerContentServiceInterface {
-  getPartnerJobs(): Promise<PartnerJobRecord[]>
+  getPartnerJobs(): Promise<PartnerListSnapshot<PartnerJobRecord>>
   getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]>
   unpublishPartnerJob(id: string): Promise<PartnerJobRecord>
   // 阶段1C:编辑本机构数据(后端强制回 pending+draft 重审)
@@ -52,12 +54,12 @@ export interface PartnerContentServiceInterface {
   // sourceOrgId / sourceName 由后端从 JWT 推断，不再由前端传入
   importPartnerJobs(items: ImportJobItem[]): Promise<ImportResult<PartnerJobRecord>>
 
-  getPartnerFairs(): Promise<PartnerFairRecord[]>
+  getPartnerFairs(): Promise<PartnerListSnapshot<PartnerFairRecord>>
   unpublishPartnerFair(id: string): Promise<PartnerFairRecord>
   updatePartnerFair(id: string, input: UpdatePartnerFairInput): Promise<PartnerFairRecord>
   importPartnerFairs(items: ImportFairItem[]): Promise<ImportResult<PartnerFairRecord>>
 
-  getSyncLogs(): Promise<PartnerSyncLog[]>
+  getSyncLogs(): Promise<PartnerListSnapshot<PartnerSyncLog>>
 
   parseExcel(file: File): Promise<{ columns: string[]; sampleRows: Record<string, string>[] }>
   previewExcel(

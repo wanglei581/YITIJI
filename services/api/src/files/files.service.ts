@@ -621,19 +621,55 @@ export class FilesService {
   // ── 列表(admin)─────────────────────────────────────────────────────────
 
   async list(
-    args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {}
-  ): Promise<FileMetadata[]> {
-    const records = await this.prisma.fileObject.findMany({
-      where: {
-        ...(args.includeDeleted ? {} : { deletedAt: null }),
-        ...(args.purpose
-          ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
-          : { purpose: { not: 'contract_review_report' } }),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(args.limit ?? 100, 500),
-    })
-    return records.map(toMetadata)
+    args: {
+      includeDeleted?: boolean
+      purpose?: string
+      sensitiveLevel?: string
+      cleanStatus?: 'active' | 'scheduled' | 'cleaned'
+      retentionPolicy?: string
+      search?: string
+      page?: number
+      pageSize?: number
+      limit?: number
+    } = {},
+  ): Promise<{ items: FileMetadata[]; total: number; page: number; pageSize: number }> {
+    const rawPage = Number(args.page ?? 1)
+    const rawPageSize = Number(args.pageSize ?? args.limit ?? 100)
+    const page = Number.isFinite(rawPage) ? Math.max(1, Math.round(rawPage)) : 1
+    const pageSize = Number.isFinite(rawPageSize) ? Math.min(Math.max(Math.round(rawPageSize), 1), 500) : 100
+    const now = new Date()
+    const search = args.search?.trim()
+    const and: Record<string, unknown>[] = []
+    if (args.cleanStatus === 'active') {
+      and.push({ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] })
+    }
+    if (search) {
+      and.push({ OR: [{ filename: { contains: search } }, { endUserId: { contains: search } }, { uploaderId: { contains: search } }] })
+    }
+    const where: Record<string, unknown> = {
+      ...(args.includeDeleted ? {} : { deletedAt: null }),
+      ...(args.purpose
+        ? { purpose: args.purpose === 'contract_review_report'
+            ? '__hidden__'
+            : { in: args.purpose.split(',').map((value) => value.trim()).filter(Boolean) } }
+        : { purpose: { not: 'contract_review_report' } }),
+      ...(args.sensitiveLevel ? { sensitiveLevel: args.sensitiveLevel } : {}),
+      ...(args.retentionPolicy ? { retentionPolicy: args.retentionPolicy } : {}),
+      ...(args.cleanStatus === 'cleaned' ? { deletedAt: { not: null } } : {}),
+      ...(args.cleanStatus === 'scheduled' ? { deletedAt: null, expiresAt: { lte: now } } : {}),
+      ...(args.cleanStatus === 'active' ? { deletedAt: null } : {}),
+      ...(and.length > 0 ? { AND: and } : {}),
+    }
+    const [records, total] = await Promise.all([
+      this.prisma.fileObject.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.fileObject.count({ where }),
+    ])
+    return { items: records.map(toMetadata), total, page, pageSize }
   }
 
   /** Admin 文件生命周期全局只读统计。 */

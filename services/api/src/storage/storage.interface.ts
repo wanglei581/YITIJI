@@ -32,6 +32,13 @@ export interface SignedUrlResult {
   expiresAt: Date
 }
 
+export interface ObjectStreamResult {
+  stream: NodeJS.ReadableStream
+  sizeBytes: number
+  contentLength: number
+  contentType: string | null
+}
+
 export interface DownloadUrlArgs {
   objectKey: string
   /** 本地后端用 fileId 走 /files/:id/content 代理签名;COS 后端忽略。 */
@@ -71,6 +78,8 @@ export interface ObjectStorageBackend {
   putObject(objectKey: string, buffer: Buffer, contentType: string): Promise<PutResult>
   /** 服务端读取对象内容(供 /content 代理、打印兜底)。 */
   getObject(objectKey: string): Promise<Buffer>
+  /** 流式读取对象；range 为含首尾的单段字节范围。 */
+  getObjectStream(objectKey: string, range?: { start: number; end: number }): Promise<ObjectStreamResult>
   /** 物理删除对象(幂等)。 */
   deleteObject(objectKey: string): Promise<void>
   /** 获取对象元信息;不存在返回 null。 */

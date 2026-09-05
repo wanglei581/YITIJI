@@ -29,6 +29,8 @@ const RESULT_FILTER_MAP: Record<string, SyncResult | null> = {
 
 export default function SyncLogsPage() {
   const [logs,         setLogs]         = useState<PartnerSyncLog[]>([])
+  const [total, setTotal] = useState(0)
+  const [truncated, setTruncated] = useState(false)
   const [loading,      setLoading]      = useState(true)
   // 日志详情抽屉(审计修复:原「查看详情」死按钮)
   const [detail, setDetail] = useState<(typeof logs)[number] | null>(null)
@@ -38,7 +40,12 @@ export default function SyncLogsPage() {
   useEffect(() => {
     let cancelled = false
     getSyncLogs()
-      .then((data) => { if (!cancelled) setLogs(data) })
+      .then((data) => {
+        if (cancelled) return
+        setLogs(data.items)
+        setTotal(data.total)
+        setTruncated(data.truncated)
+      })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -77,7 +84,7 @@ export default function SyncLogsPage() {
   }
 
   return (
-    <Page title="同步日志" subtitle="数据源同步任务记录">
+    <Page title="同步日志" subtitle={truncated ? `数据源同步任务记录 · 仅显示最近 ${logs.length} / ${total} 条` : `数据源同步任务记录 · 共 ${total} 条`}>
       {/* 筛选标签 */}
       <div className="mb-4 flex gap-2">
         {RESULT_FILTERS.map((f) => (

@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsNumber, IsOptional, IsString } from 'class-validator'
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator'
 import { Type } from 'class-transformer'
 
 const WIRED_NETWORK_STATUSES = ['connected', 'disconnected', 'unknown'] as const
@@ -11,10 +11,12 @@ const PRINTER_NETWORK_STATUSES = ['reachable', 'unreachable', 'not_network_print
  */
 export class HeartbeatDto {
   @IsString()
+  @MaxLength(64)
   @IsOptional()
   status?: string
 
   @IsString()
+  @MaxLength(128)
   @IsOptional()
   printerStatus?: string
 
@@ -34,26 +36,32 @@ export class HeartbeatDto {
   memUsedPercent?: number
 
   @IsString()
+  @MaxLength(64)
   @IsOptional()
   agentVersion?: string
 
   @IsString()
+  @MaxLength(64)
   @IsOptional()
   ipAddress?: string
 
   @IsString()
+  @MaxLength(64)
   @IsOptional()
   macAddress?: string
 
   @IsString()
+  @MaxLength(120)
   @IsOptional()
   displayName?: string
 
   @IsString()
+  @MaxLength(200)
   @IsOptional()
   locationLabel?: string
 
   @IsString()
+  @MaxLength(64)
   @IsOptional()
   reportedAt?: string
 

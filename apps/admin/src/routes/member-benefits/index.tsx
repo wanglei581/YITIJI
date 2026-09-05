@@ -55,6 +55,8 @@ export default function MemberBenefitsPage() {
   const [phone, setPhone] = useState('')
   const [selectedUser, setSelectedUser] = useState<AdminEndUserSearchItem | null>(null)
   const [items, setItems] = useState<AdminBenefitGrantItem[]>([])
+  const [itemTotal, setItemTotal] = useState(0)
+  const [itemsTruncated, setItemsTruncated] = useState(false)
   const [state, setState] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [benefitType, setBenefitType] = useState<AdminBenefitType>('free_quota')
@@ -73,6 +75,8 @@ export default function MemberBenefitsPage() {
     try {
       const res = await memberBenefitsAdminApi.list(userId)
       setItems(res.items)
+      setItemTotal(res.total)
+      setItemsTruncated(res.truncated)
       setState('ready')
     } catch {
       setState('error')
@@ -83,6 +87,8 @@ export default function MemberBenefitsPage() {
     setMessage(null)
     setSelectedUser(null)
     setItems([])
+    setItemTotal(0)
+    setItemsTruncated(false)
     setState('loading')
     try {
       const res = await memberBenefitsAdminApi.searchUsers(normalized)
@@ -284,7 +290,10 @@ export default function MemberBenefitsPage() {
           </Card>
 
           <Card className="p-4">
-            <p className="mb-3 text-sm font-semibold text-neutral-900">权益记录</p>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-neutral-900">权益记录</p>
+              {itemsTruncated && <p className="text-xs text-warning-fg">仅显示最近 {items.length} / {itemTotal} 条</p>}
+            </div>
             {state === 'loading' && <LoadingState className="py-16" />}
             {state === 'error' && <ErrorState className="py-16" onRetry={() => selectedUser && void loadItems(selectedUser.endUserId)} />}
             {state === 'ready' && items.length === 0 && (

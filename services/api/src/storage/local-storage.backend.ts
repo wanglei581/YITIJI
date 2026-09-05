@@ -14,6 +14,7 @@ import {
   type DownloadUrlArgs,
   type HeadResult,
   type ObjectStorageBackend,
+  type ObjectStreamResult,
   type PutResult,
   type SignedUrlResult,
   type StorageDriver,
@@ -34,6 +35,18 @@ export class LocalStorageBackend implements ObjectStorageBackend {
 
   async getObject(objectKey: string): Promise<Buffer> {
     return this.fsStorage.read(objectKey)
+  }
+
+  async getObjectStream(objectKey: string, range?: { start: number; end: number }): Promise<ObjectStreamResult> {
+    const head = await this.fsStorage.head(objectKey)
+    if (!head) throw new Error('LOCAL_OBJECT_NOT_FOUND')
+    const contentLength = range ? range.end - range.start + 1 : head.sizeBytes
+    return {
+      stream: this.fsStorage.createReadStream(objectKey, range),
+      sizeBytes: head.sizeBytes,
+      contentLength,
+      contentType: null,
+    }
   }
 
   async deleteObject(objectKey: string): Promise<void> {

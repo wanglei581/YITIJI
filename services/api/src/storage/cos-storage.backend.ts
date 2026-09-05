@@ -9,11 +9,13 @@
  *   - 所有对外 URL 均为短期预签名 URL,无永久公开链接。
  */
 import { createHash } from 'crypto'
+import { Readable } from 'stream'
 import { buildCosPresignedUrl, cosHost } from './cos-signing'
 import type {
   DownloadUrlArgs,
   HeadResult,
   ObjectStorageBackend,
+  ObjectStreamResult,
   PutResult,
   SignedUrlResult,
   StorageDriver,
@@ -86,6 +88,28 @@ export class CosStorageBackend implements ObjectStorageBackend {
       throw new Error(`COS_GET_FAILED: ${res.status} ${detail}`)
     }
     return Buffer.from(await res.arrayBuffer())
+  }
+
+  async getObjectStream(objectKey: string, range?: { start: number; end: number }): Promise<ObjectStreamResult> {
+    const url = this.presign('GET', objectKey, 300)
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: range ? { Range: `bytes=${range.start}-${range.end}` } : undefined,
+    })
+    if (!res.ok || !res.body) {
+      const detail = await safeBody(res)
+      throw new Error(`COS_GET_STREAM_FAILED: ${res.status} ${detail}`)
+    }
+    const contentRange = res.headers.get('content-range')
+    const totalFromRange = contentRange?.match(/\/(\d+)$/)?.[1]
+    const contentLength = Number(res.headers.get('content-length') ?? 0)
+    const sizeBytes = totalFromRange ? Number(totalFromRange) : contentLength
+    return {
+      stream: Readable.fromWeb(res.body as import('stream/web').ReadableStream),
+      sizeBytes,
+      contentLength,
+      contentType: res.headers.get('content-type'),
+    }
   }
 
   async deleteObject(objectKey: string): Promise<void> {

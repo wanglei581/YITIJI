@@ -198,6 +198,8 @@ function errMsg(e: unknown): string {
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<PartnerCompanyRecord[]>([])
+  const [total, setTotal] = useState(0)
+  const [truncated, setTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
@@ -213,7 +215,11 @@ export default function CompaniesPage() {
     setLoading(true)
     setError(false)
     partnerCompaniesService.getPartnerCompanies()
-      .then(setCompanies)
+      .then((page) => {
+        setCompanies(page.items)
+        setTotal(page.total)
+        setTruncated(page.truncated)
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [])
@@ -362,7 +368,9 @@ export default function CompaniesPage() {
   return (
     <Page
       title="企业资料管理"
-      subtitle={`共 ${companies.length} 家企业 · 仅维护本机构来源的企业展示资料`}
+      subtitle={truncated
+        ? `共 ${total} 家企业 · 仅显示最近 ${companies.length} 家`
+        : `共 ${total} 家企业 · 仅维护本机构来源的企业展示资料`}
       actions={
         <Button size="sm" variant="primary" className="flex items-center gap-1.5" onClick={openNew}>
           <PlusIcon className="h-4 w-4" />

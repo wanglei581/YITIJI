@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { mergeById, replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -131,7 +131,7 @@ export default function JobsPage() {
     getPartnerJobs,
     {
       intervalMs: 60_000,
-      merge: mergeById<PartnerJobRecord>((item) => item.id),
+      merge: replaceIfChanged,
       failPolicy: 'keep-last',
     },
   )
@@ -153,7 +153,8 @@ export default function JobsPage() {
     return () => clearTimeout(t)
   }, [notice])
 
-  const jobs = data ?? []
+  const jobs = data?.items ?? []
+  const total = data?.total ?? jobs.length
   const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
   const error = status === 'error' && jobs.length === 0
 
@@ -264,7 +265,7 @@ export default function JobsPage() {
   return (
     <Page
       title="岗位信息管理"
-      subtitle={`共 ${jobs.length} 条岗位`}
+      subtitle={data?.truncated ? `共 ${total} 条岗位 · 仅显示最近 ${jobs.length} 条` : `共 ${total} 条岗位`}
       actions={
         <div className="flex flex-col items-end gap-1">
           <Button

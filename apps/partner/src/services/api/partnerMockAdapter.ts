@@ -8,6 +8,7 @@ import type {
   RotateDataSourceCredentialPayload,
   PartnerDataSourceCredentialRotationResult,
   PartnerJobRecord,
+  PartnerListSnapshot,
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
@@ -289,9 +290,10 @@ export const partnerMockAdapter = {
   },
 
   // Jobs
-  async getPartnerJobs(): Promise<PartnerJobRecord[]> {
+  async getPartnerJobs(): Promise<PartnerListSnapshot<PartnerJobRecord>> {
     await delay()
-    return [...PARTNER_JOBS]
+    const items = PARTNER_JOBS.slice(0, 200)
+    return { items, total: PARTNER_JOBS.length, truncated: PARTNER_JOBS.length > items.length }
   },
   async getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]> {
     await delay()
@@ -356,9 +358,10 @@ export const partnerMockAdapter = {
   },
 
   // Fairs
-  async getPartnerFairs(): Promise<PartnerFairRecord[]> {
+  async getPartnerFairs(): Promise<PartnerListSnapshot<PartnerFairRecord>> {
     await delay()
-    return [...PARTNER_FAIRS]
+    const items = PARTNER_FAIRS.slice(0, 200)
+    return { items, total: PARTNER_FAIRS.length, truncated: PARTNER_FAIRS.length > items.length }
   },
   async unpublishPartnerFair(id: string): Promise<PartnerFairRecord> {
     await delay()
@@ -416,9 +419,10 @@ export const partnerMockAdapter = {
   },
 
   // Sync Logs (read-only)
-  async getSyncLogs(): Promise<PartnerSyncLog[]> {
+  async getSyncLogs(): Promise<PartnerListSnapshot<PartnerSyncLog>> {
     await delay()
-    return [...SYNC_LOGS]
+    const items = SYNC_LOGS.slice(0, 100)
+    return { items, total: SYNC_LOGS.length, truncated: SYNC_LOGS.length > items.length }
   },
 
   // Excel Import (mock)

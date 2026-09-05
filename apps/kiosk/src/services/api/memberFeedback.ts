@@ -41,6 +41,7 @@ export interface MemberFeedbackPage {
   items: MemberFeedbackTicketItem[]
   nextCursor: string | null
   total: number
+  truncated: boolean
 }
 
 export class MemberFeedbackApiError extends Error {
@@ -115,7 +116,7 @@ function pageQuery(opts?: { cursor?: string | null; pageSize?: number }): string
   return q ? `?${q}` : ''
 }
 
-const EMPTY_PAGE: MemberFeedbackPage = { items: [], nextCursor: null, total: 0 }
+const EMPTY_PAGE: MemberFeedbackPage = { items: [], nextCursor: null, total: 0, truncated: false }
 
 export function getMyFeedback(
   token: string | null | undefined,

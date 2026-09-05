@@ -99,10 +99,10 @@ function feedbackQuery(params: ListFeedbackParams): string {
   return text ? `?${text}` : ''
 }
 
-const EMPTY = { items: [] as AdminFeedbackTicketItem[] }
+const EMPTY = { items: [] as AdminFeedbackTicketItem[], total: 0, truncated: false }
 
 export const memberFeedbackAdminApi = {
-  list(params: ListFeedbackParams = {}): Promise<{ items: AdminFeedbackTicketItem[] }> {
+  list(params: ListFeedbackParams = {}): Promise<{ items: AdminFeedbackTicketItem[]; total: number; truncated: boolean }> {
     if (API_MODE !== 'http') return Promise.resolve(EMPTY)
     return request(`/admin/feedback${feedbackQuery(params)}`)
   },

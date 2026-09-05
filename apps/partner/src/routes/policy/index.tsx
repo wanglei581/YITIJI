@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { ClipboardListIcon, FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
@@ -104,7 +104,7 @@ export default function PolicyPage() {
     () => partnerPoliciesService.getPolicies(),
     {
       intervalMs: 60_000,
-      merge: mergeById<PartnerPolicyRecord>((item) => item.id),
+      merge: replaceIfChanged,
       failPolicy: 'keep-last',
     },
   )
@@ -127,7 +127,8 @@ export default function PolicyPage() {
     return () => clearTimeout(t)
   }, [deletingId])
 
-  const rows = data ?? []
+  const rows = data?.items ?? []
+  const total = data?.total ?? rows.length
   const loading = status === 'idle' || (status === 'loading' && rows.length === 0)
   const error = status === 'error' && rows.length === 0
 
@@ -237,7 +238,9 @@ export default function PolicyPage() {
   return (
     <Page
       title="政策公告"
-      subtitle={`共 ${rows.length} 条政策内容 — 政策扶持条目与政策公告`}
+      subtitle={data?.truncated
+        ? `共 ${total} 条政策内容 · 仅显示最近 ${rows.length} 条`
+        : `共 ${total} 条政策内容 · 政策扶持条目与政策公告`}
       actions={
         <div className="flex flex-col items-end gap-1">
           <button

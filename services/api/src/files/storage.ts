@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { promises as fs } from 'fs'
+import { createReadStream } from 'fs'
 import * as path from 'path'
 
 /**
@@ -75,6 +76,10 @@ export class LocalFileStorage {
   /** 读取文件 buffer。 */
   async read(storageKey: string): Promise<Buffer> {
     return fs.readFile(this.resolve(storageKey))
+  }
+
+  createReadStream(storageKey: string, range?: { start: number; end: number }): NodeJS.ReadableStream {
+    return createReadStream(this.resolve(storageKey), range)
   }
 
   /** 物理删除文件(不可逆,只在 cron / admin 强制清理时调用)。 */

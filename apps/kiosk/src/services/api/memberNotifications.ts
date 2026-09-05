@@ -31,6 +31,7 @@ export interface MemberNotificationPage {
   nextCursor: string | null
   total: number
   unreadCount: number
+  truncated: boolean
 }
 
 export class MemberNotificationsApiError extends Error {
@@ -97,6 +98,7 @@ const EMPTY_PAGE: MemberNotificationPage = {
   nextCursor: null,
   total: 0,
   unreadCount: 0,
+  truncated: false,
 }
 
 export function getMyNotifications(

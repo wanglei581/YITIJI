@@ -10,6 +10,7 @@
 
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import type { PartnerListSnapshot } from './types'
 
 export type PolicyKind = 'policy_guide' | 'notice'
 export type PolicyAudience = 'graduate' | 'flexible' | 'migrant' | 'hardship' | 'startup' | 'general'
@@ -171,7 +172,7 @@ export interface PolicyEligibilityCheckResult {
 }
 
 export interface PartnerPoliciesServiceInterface {
-  getPolicies(): Promise<PartnerPolicyRecord[]>
+  getPolicies(): Promise<PartnerListSnapshot<PartnerPolicyRecord>>
   createPolicy(input: SavePolicyInput): Promise<PartnerPolicyRecord>
   updatePolicy(id: string, input: Partial<SavePolicyInput>): Promise<PartnerPolicyRecord>
   unpublishPolicy(id: string): Promise<PartnerPolicyRecord>
@@ -217,7 +218,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 const httpAdapter: PartnerPoliciesServiceInterface = {
-  getPolicies: () => req<PartnerPolicyRecord[]>('GET', '/partner/policies'),
+  getPolicies: () => req<PartnerListSnapshot<PartnerPolicyRecord>>('GET', '/partner/policies'),
   createPolicy: (input) => req<PartnerPolicyRecord>('POST', '/partner/policies', input),
   updatePolicy: (id, input) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}`, input),
   unpublishPolicy: (id) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/publish`, { action: 'unpublish' }),
@@ -247,7 +248,10 @@ const mockRows: PartnerPolicyRecord[] = [
 ]
 
 const mockAdapter: PartnerPoliciesServiceInterface = {
-  async getPolicies() { return [...mockRows] },
+  async getPolicies() {
+    const items = mockRows.slice(0, 200)
+    return { items, total: mockRows.length, truncated: mockRows.length > items.length }
+  },
   async createPolicy(input) {
     const created: PartnerPolicyRecord = {
       id: `pp-mock-${++seq}`,

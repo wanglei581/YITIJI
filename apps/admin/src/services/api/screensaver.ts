@@ -27,14 +27,20 @@ export type {
   TerminalScreensaverConfigView,
 }
 
+export interface ScreensaverListSnapshot<T> {
+  items: T[]
+  total: number
+  truncated: boolean
+}
+
 export interface ScreensaverServiceInterface {
-  listAssets(): Promise<AdAssetView[]>
+  listAssets(): Promise<ScreensaverListSnapshot<AdAssetView>>
   uploadAsset(file: File, title: string, durationSec?: number): Promise<AdAssetView>
   createExternalVideo(url: string, title: string, durationSec?: number): Promise<AdAssetView>
   updateAsset(id: string, patch: { title?: string; durationSec?: number; status?: 'active' | 'disabled' }): Promise<AdAssetView>
   deleteAsset(id: string): Promise<AdAssetView>
 
-  listPlaylists(): Promise<AdPlaylistView[]>
+  listPlaylists(): Promise<ScreensaverListSnapshot<AdPlaylistView>>
   createPlaylist(input: SaveAdPlaylistInput): Promise<AdPlaylistView>
   updatePlaylist(id: string, input: SaveAdPlaylistInput): Promise<AdPlaylistView>
   deletePlaylist(id: string): Promise<void>
@@ -80,7 +86,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 const httpAdapter: ScreensaverServiceInterface = {
-  listAssets: () => req<AdAssetView[]>('GET', '/admin/ad-assets'),
+  listAssets: () => req<ScreensaverListSnapshot<AdAssetView>>('GET', '/admin/ad-assets'),
   async uploadAsset(file, title, durationSec) {
     const form = new FormData()
     form.append('file', file)
@@ -101,7 +107,7 @@ const httpAdapter: ScreensaverServiceInterface = {
   updateAsset: (id, patch) => req<AdAssetView>('PATCH', `/admin/ad-assets/${id}`, patch),
   deleteAsset: (id) => req<AdAssetView>('DELETE', `/admin/ad-assets/${id}`),
 
-  listPlaylists: () => req<AdPlaylistView[]>('GET', '/admin/ad-playlists'),
+  listPlaylists: () => req<ScreensaverListSnapshot<AdPlaylistView>>('GET', '/admin/ad-playlists'),
   createPlaylist: (input) => req<AdPlaylistView>('POST', '/admin/ad-playlists', input),
   updatePlaylist: (id, input) => req<AdPlaylistView>('PUT', `/admin/ad-playlists/${id}`, input),
   async deletePlaylist(id) {
@@ -150,7 +156,8 @@ let mockCounter = 0
 
 const mockAdapter: ScreensaverServiceInterface = {
   async listAssets() {
-    return mockAssets.filter((a) => a.status !== undefined)
+    const items = mockAssets.filter((a) => a.status !== undefined).slice(0, 500)
+    return { items, total: mockAssets.length, truncated: mockAssets.length > items.length }
   },
   async uploadAsset(file, title, durationSec) {
     const isVideo = file.type.startsWith('video/')
@@ -192,7 +199,8 @@ const mockAdapter: ScreensaverServiceInterface = {
   },
 
   async listPlaylists() {
-    return mockPlaylists
+    const items = mockPlaylists.slice(0, 200)
+    return { items, total: mockPlaylists.length, truncated: mockPlaylists.length > items.length }
   },
   async createPlaylist(input) {
     const pl = buildMockPlaylist(genId('playlist'), input)

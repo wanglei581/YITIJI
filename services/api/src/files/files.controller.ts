@@ -336,12 +336,24 @@ export class FilesController {
   async list(
     @Query('includeDeleted') includeDeleted?: string,
     @Query('purpose') purpose?: string,
+    @Query('sensitiveLevel') sensitiveLevel?: string,
+    @Query('cleanStatus') cleanStatus?: 'active' | 'scheduled' | 'cleaned',
+    @Query('retentionPolicy') retentionPolicy?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
     @Query('limit') limit?: string,
-  ): Promise<ApiResponse<FileMetadata[]>> {
+  ): Promise<ApiResponse<{ items: FileMetadata[]; total: number; page: number; pageSize: number }>> {
     return ApiResponse.ok(
       await this.files.list({
         includeDeleted: includeDeleted === 'true' || includeDeleted === '1',
         purpose,
+        sensitiveLevel,
+        cleanStatus,
+        retentionPolicy,
+        search,
+        page: page ? Number(page) : undefined,
+        pageSize: pageSize ? Number(pageSize) : undefined,
         limit: limit ? Number(limit) : undefined,
       }),
     )

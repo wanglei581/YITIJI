@@ -41,26 +41,30 @@ export class MemberNotificationsService {
     const take = Math.min(Math.max(opts.pageSize, 1), 50)
     const cursorDate = opts.cursor ? new Date(opts.cursor) : null
     const personalWhere: Record<string, unknown> = { endUserId, deletedAt: null }
+    const personalCountWhere: Record<string, unknown> = { endUserId, deletedAt: null }
     if (opts.unreadOnly) personalWhere['isRead'] = false
+    if (opts.unreadOnly) personalCountWhere['isRead'] = false
     if (cursorDate && !Number.isNaN(cursorDate.getTime())) personalWhere['createdAt'] = { lt: cursorDate }
 
-    const broadcasts = await this.prisma.systemBroadcast.findMany({
-      where: {
-        deletedAt: null,
+    const broadcastReadWhere = opts.unreadOnly
+      ? { none: { endUserId, OR: [{ readAt: { not: null } }, { dismissedAt: { not: null } }] } }
+      : { none: { endUserId, dismissedAt: { not: null } } }
+    const broadcastWhere = {
+        deletedAt: null as Date | null,
         ...(cursorDate && !Number.isNaN(cursorDate.getTime()) ? { createdAt: { lt: cursorDate } } : {}),
-        readStates: opts.unreadOnly
-          ? { none: { endUserId, OR: [{ readAt: { not: null } }, { dismissedAt: { not: null } }] } }
-          : { none: { endUserId, dismissedAt: { not: null } } },
-      },
-      include: { readStates: { where: { endUserId } } },
-      orderBy: { createdAt: 'desc' },
-      take,
-    })
-    const personal = await this.prisma.memberNotification.findMany({
-      where: personalWhere,
-      orderBy: { createdAt: 'desc' },
-      take,
-    })
+        readStates: broadcastReadWhere,
+    }
+    const [broadcasts, personal, broadcastTotal, personalTotal] = await Promise.all([
+      this.prisma.systemBroadcast.findMany({
+        where: broadcastWhere,
+        include: { readStates: { where: { endUserId } } },
+        orderBy: { createdAt: 'desc' },
+        take,
+      }),
+      this.prisma.memberNotification.findMany({ where: personalWhere, orderBy: { createdAt: 'desc' }, take }),
+      this.prisma.systemBroadcast.count({ where: { deletedAt: null, readStates: broadcastReadWhere } }),
+      this.prisma.memberNotification.count({ where: personalCountWhere }),
+    ])
 
     const items = [
       ...personal.map((row) => this.toPersonalItem(row)),
@@ -71,9 +75,11 @@ export class MemberNotificationsService {
       .slice(0, take)
 
     const unreadCount = await this.countUnread(endUserId)
+    const total = personalTotal + broadcastTotal
     return {
       items,
-      total: items.length,
+      total,
+      truncated: total > items.length,
       unreadCount,
       // P1 exposes a single merged snapshot of personal notifications + broadcasts.
       // Do not advertise cursor paging until the merged stream has a compound keyset cursor.
@@ -142,9 +148,12 @@ export class MemberNotificationsService {
     })
   }
 
-  async listBroadcasts(): Promise<{ items: AdminBroadcastItem[] }> {
-    const rows = await this.prisma.systemBroadcast.findMany({ orderBy: { createdAt: 'desc' }, take: 100 })
-    return { items: rows.map(this.toAdminBroadcast) }
+  async listBroadcasts(): Promise<{ items: AdminBroadcastItem[]; total: number; truncated: boolean }> {
+    const [rows, total] = await Promise.all([
+      this.prisma.systemBroadcast.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }),
+      this.prisma.systemBroadcast.count(),
+    ])
+    return { items: rows.map(this.toAdminBroadcast), total, truncated: total > rows.length }
   }
 
   async createBroadcast(admin: AuthedUser, dto: CreateBroadcastDto): Promise<AdminBroadcastItem> {

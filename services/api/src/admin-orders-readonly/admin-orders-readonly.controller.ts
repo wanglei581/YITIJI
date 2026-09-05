@@ -8,7 +8,7 @@ import { AdminOrdersReadonlyService } from './admin-orders-readonly.service'
 const VALID_TYPES = ['print', 'scan', 'photo', 'ai'] as const
 /** 支付状态白名单唯一来源，禁止在此就地再写一份（历史事故见 payment.types.ts 注释）。 */
 const VALID_PAY_STATUS = ORDER_PAY_STATUSES
-const VALID_TASK_STATUS = ['pending', 'claimed', 'printing', 'completed', 'failed', 'cancelled'] as const
+const VALID_TASK_STATUS = ['pending', 'claimed', 'printing', 'completed', 'failed', 'cancelled', 'abandoned'] as const
 // M1/M2：渠道与取件状态筛选。
 // channel 不含「未标注」——那是 null，语义是「无法判定」而非一个渠道，不作为可选筛选值。
 const VALID_CHANNELS = ['kiosk', 'miniapp_cloud'] as const

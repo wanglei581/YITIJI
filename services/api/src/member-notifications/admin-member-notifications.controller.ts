@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common'
-import type { AdminBroadcastItem } from './member-notifications.types'
+import type { AdminBroadcastItem, AdminBroadcastPage } from './member-notifications.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -15,7 +15,7 @@ export class AdminMemberNotificationsController {
   constructor(private readonly notifications: MemberNotificationsService) {}
 
   @Get('broadcasts')
-  async listBroadcasts(): Promise<ApiResponse<{ items: AdminBroadcastItem[] }>> {
+  async listBroadcasts(): Promise<ApiResponse<AdminBroadcastPage>> {
     return ApiResponse.ok(await this.notifications.listBroadcasts())
   }
 

@@ -102,6 +102,8 @@ export default function ScreensaverPage() {
 
 function AssetsTab() {
   const [assets, setAssets] = useState<AdAssetView[]>([])
+  const [assetTotal, setAssetTotal] = useState(0)
+  const [assetsTruncated, setAssetsTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
@@ -122,7 +124,11 @@ function AssetsTab() {
     setLoading(true)
     screensaverService
       .listAssets()
-      .then(setAssets)
+      .then((page) => {
+        setAssets(page.items)
+        setAssetTotal(page.total)
+        setAssetsTruncated(page.truncated)
+      })
       .catch((e) => setListError(e?.message ?? '加载失败'))
       .finally(() => setLoading(false))
   }, [])
@@ -288,6 +294,7 @@ function AssetsTab() {
       </Card>
 
       {/* 素材网格 */}
+      {assetsTruncated && <p className="mb-3 text-xs text-warning-fg">仅显示最近 {assets.length} / {assetTotal} 条素材</p>}
       {loading ? (
         <p className="text-sm text-neutral-400">加载中…</p>
       ) : listError ? (
@@ -422,6 +429,10 @@ interface EditorState {
 function PlaylistsTab() {
   const [playlists, setPlaylists] = useState<AdPlaylistView[]>([])
   const [assets, setAssets] = useState<AdAssetView[]>([])
+  const [playlistTotal, setPlaylistTotal] = useState(0)
+  const [playlistsTruncated, setPlaylistsTruncated] = useState(false)
+  const [assetTotal, setAssetTotal] = useState(0)
+  const [assetsTruncated, setAssetsTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -430,8 +441,12 @@ function PlaylistsTab() {
     setLoading(true)
     Promise.all([screensaverService.listPlaylists(), screensaverService.listAssets()])
       .then(([pl, as]) => {
-        setPlaylists(pl)
-        setAssets(as.filter((a) => a.status === 'active'))
+        setPlaylists(pl.items)
+        setPlaylistTotal(pl.total)
+        setPlaylistsTruncated(pl.truncated)
+        setAssets(as.items.filter((a) => a.status === 'active'))
+        setAssetTotal(as.total)
+        setAssetsTruncated(as.truncated)
       })
       .catch((e) => setError((e as Error)?.message ?? '加载失败'))
       .finally(() => setLoading(false))
@@ -531,6 +546,13 @@ function PlaylistsTab() {
             </Card>
           ))}
         </div>
+      )}
+      {(playlistsTruncated || assetsTruncated) && (
+        <p className="mt-3 text-xs text-warning-fg">
+          {playlistsTruncated ? `播放方案仅显示最近 ${playlists.length} / ${playlistTotal} 条` : ''}
+          {playlistsTruncated && assetsTruncated ? '；' : ''}
+          {assetsTruncated ? `可选素材仅显示最近 ${assets.length} / ${assetTotal} 条` : ''}
+        </p>
       )}
     </div>
   )
@@ -666,7 +688,7 @@ function TerminalsTab() {
     Promise.all([screensaverService.listTerminals(), screensaverService.listPlaylists()])
       .then(([ts, pl]) => {
         setTerminals(ts)
-        setPlaylists(pl)
+        setPlaylists(pl.items)
       })
       .catch((e) => setError((e as Error)?.message ?? '加载失败'))
       .finally(() => setLoading(false))

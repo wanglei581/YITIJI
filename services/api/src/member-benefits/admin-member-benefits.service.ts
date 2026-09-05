@@ -61,16 +61,18 @@ export class AdminMemberBenefitsService {
     }
   }
 
-  async listForEndUser(endUserId: string): Promise<{ items: AdminBenefitGrantItem[] }> {
+  async listForEndUser(endUserId: string): Promise<{ items: AdminBenefitGrantItem[]; total: number; truncated: boolean }> {
     const user = await this.findEndUser(endUserId)
     const phoneMasked = maskPhoneFromEnc(user.phoneEnc)
-    const rows = await this.prisma.benefitGrant.findMany({
-      where: { endUserId },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
+    const where = { endUserId }
+    const [rows, total] = await Promise.all([
+      this.prisma.benefitGrant.findMany({ where, orderBy: { createdAt: 'desc' }, take: 100 }),
+      this.prisma.benefitGrant.count({ where }),
+    ])
     return {
       items: rows.map((row) => this.toAdminItem(row, phoneMasked, user.nickname)),
+      total,
+      truncated: total > rows.length,
     }
   }
 

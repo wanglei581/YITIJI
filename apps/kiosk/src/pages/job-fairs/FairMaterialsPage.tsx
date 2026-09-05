@@ -45,6 +45,7 @@ export function FairMaterialsPage() {
 
   const [fair,      setFair]      = useState<ExternalJobFairDTO | null>(null)
   const [materials, setMaterials] = useState<FairMaterialDTO[]>([])
+  const [materialTotal, setMaterialTotal] = useState(0)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(false)
   const [printingId, setPrintingId] = useState<string | null>(null)
@@ -58,6 +59,7 @@ export function FairMaterialsPage() {
         if (cancelled) return
         setFair(fairRes.data)
         setMaterials(matsRes.data)
+        setMaterialTotal(matsRes.pagination.total)
       })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -104,7 +106,9 @@ export function FairMaterialsPage() {
     <KioskPageFrame
       tone="wheat"
       title="活动资料"
-      subtitle={fair ? `${fair.name} · ${materials.length} 份资料` : `${materials.length} 份资料`}
+      subtitle={fair
+        ? `${fair.name} · ${materialTotal} 份资料${materialTotal > materials.length ? ` · 仅显示最近 ${materials.length} 份` : ''}`
+        : `${materialTotal} 份资料${materialTotal > materials.length ? ` · 仅显示最近 ${materials.length} 份` : ''}`}
       backLabel="返回详情"
       onBack={() => navigate(`/job-fairs/${fairId}`)}
       badge={<FusionBadge icon={FileTextIcon}>活动资料</FusionBadge>}

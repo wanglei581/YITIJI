@@ -34,6 +34,13 @@ export interface MemberFeedbackPage {
   items: MemberFeedbackTicketItem[]
   nextCursor: string | null
   total: number
+  truncated: boolean
+}
+
+export interface AdminFeedbackTicketPage {
+  items: AdminFeedbackTicketItem[]
+  total: number
+  truncated: boolean
 }
 
 export interface AdminFeedbackTicketItem extends MemberFeedbackTicketItem {

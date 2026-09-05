@@ -3,9 +3,11 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common'
 import { randomUUID, createHash } from 'crypto'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
 import { generateObjectKey } from '../storage/object-key'
 import { signAdAssetUrl, signAdAssetPreviewUrl } from './content-signing'
@@ -32,6 +34,14 @@ const MIN_DURATION_SEC = 3
 const MAX_EXTERNAL_VIDEO_DURATION_SEC = 1800
 const DEFAULT_EXTERNAL_VIDEO_DURATION_SEC = 15
 
+export interface ContentAuditContext {
+  actorId: string
+  actorRole: string
+  ipAddress?: string | null
+  userAgent?: string | null
+  requestId?: string | null
+}
+
 /**
  * 待机宣传屏内容服务。
  *
@@ -48,21 +58,22 @@ export class ContentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   // ── 素材 ────────────────────────────────────────────────────────────────────
 
-  async listAssets(args: { includeDeleted?: boolean; status?: string; type?: string } = {}): Promise<AdAssetView[]> {
-    const records = await this.prisma.adAsset.findMany({
-      where: {
+  async listAssets(args: { includeDeleted?: boolean; status?: string; type?: string } = {}) {
+    const where = {
         ...(args.includeDeleted ? {} : { deletedAt: null }),
         ...(args.status ? { status: args.status } : {}),
         ...(args.type ? { type: args.type } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    })
-    return records.map(toAssetView)
+      }
+    const [records, total] = await Promise.all([
+      this.prisma.adAsset.findMany({ where, orderBy: { createdAt: 'desc' }, take: 500 }),
+      this.prisma.adAsset.count({ where }),
+    ])
+    return { items: records.map(toAssetView), total, truncated: total > records.length }
   }
 
   async createAsset(args: {
@@ -71,6 +82,7 @@ export class ContentService {
     title: string
     durationSec?: number
     createdBy: string | null
+    auditContext?: ContentAuditContext
   }): Promise<AdAssetView> {
     const v = validateMedia(args.mimeType, args.buffer)
     if (!v.ok) {
@@ -94,21 +106,35 @@ export class ContentService {
     })
     const { sha256 } = await this.storage.putObject(storageKey, args.buffer, args.mimeType)
 
-    const record = await this.prisma.adAsset.create({
-      data: {
-        id,
-        type: v.kind,
-        title,
-        storageKey,
-        mimeType: args.mimeType,
-        sizeBytes: args.buffer.length,
-        sha256,
-        durationSec,
-        source: 'uploaded',
-        status: 'active',
-        createdBy: args.createdBy,
-      },
-    })
+    let record
+    try {
+      record = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.adAsset.create({
+          data: {
+            id,
+            type: v.kind,
+            title,
+            storageKey,
+            mimeType: args.mimeType,
+            sizeBytes: args.buffer.length,
+            sha256,
+            durationSec,
+            source: 'uploaded',
+            status: 'active',
+            createdBy: args.createdBy,
+          },
+        })
+        await this.writeRequiredAudit(tx, args.auditContext, 'ad_asset.upload', 'ad_asset', id, {
+          type: created.type,
+          title: created.title,
+          sizeBytes: created.sizeBytes,
+        })
+        return created
+      })
+    } catch (error) {
+      await this.storage.deleteObject(storageKey).catch(() => undefined)
+      throw error
+    }
     this.logger.log(`Ad asset uploaded: ${record.id} (${record.type}, ${record.sizeBytes}B)`)
     return toAssetView(record)
   }
@@ -126,6 +152,7 @@ export class ContentService {
     title: string
     durationSec?: number
     createdBy: string | null
+    auditContext?: ContentAuditContext
   }): Promise<AdAssetView> {
     const v = validateExternalVideoUrl(args.url)
     if (!v.ok) {
@@ -142,8 +169,8 @@ export class ContentService {
     const id = randomUUID().replace(/-/g, '')
     const sha256 = createHash('sha256').update(v.normalizedUrl).digest('hex')
 
-    const record = await this.prisma.adAsset.create({
-      data: {
+    const record = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.adAsset.create({ data: {
         id,
         type: 'video',
         title,
@@ -156,7 +183,13 @@ export class ContentService {
         source: 'external_url',
         status: 'active',
         createdBy: args.createdBy,
-      },
+      } })
+      await this.writeRequiredAudit(tx, args.auditContext, 'ad_asset.create_external', 'ad_asset', id, {
+        type: created.type,
+        title: created.title,
+        externalUrl: created.externalUrl,
+      })
+      return created
     })
     this.logger.log(`Ad asset (external) created: ${record.id} (${v.mimeType})`)
     return toAssetView(record)
@@ -165,6 +198,7 @@ export class ContentService {
   async updateAsset(
     id: string,
     patch: { title?: string; durationSec?: number; status?: AdAssetStatus },
+    auditContext?: ContentAuditContext,
   ): Promise<AdAssetView> {
     const record = await this.requireAliveAsset(id)
     const data: Record<string, unknown> = {}
@@ -178,21 +212,23 @@ export class ContentService {
     }
     if (patch.status !== undefined) data['status'] = patch.status
 
-    const updated = await this.prisma.adAsset.update({ where: { id }, data })
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.adAsset.update({ where: { id }, data })
+      await this.writeRequiredAudit(tx, auditContext, 'ad_asset.update', 'ad_asset', id, { ...patch })
+      return saved
+    })
     return toAssetView(updated)
   }
 
-  async deleteAsset(id: string): Promise<AdAssetView> {
+  async deleteAsset(id: string, auditContext?: ContentAuditContext): Promise<AdAssetView> {
     const record = await this.requireAliveAsset(id)
-    // 物理删除文件 + 软删元数据(保留删除痕迹,审计可追溯)。
-    // 外链素材无物理文件,跳过对象存储删除(storageKey 为合成键 external:<id>)。
-    if (record.source !== 'external_url') {
-      await this.storage.deleteObject(record.storageKey)
-    }
-    const updated = await this.prisma.adAsset.update({
-      where: { id },
-      data: { deletedAt: new Date(), status: 'disabled' },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.adAsset.update({ where: { id }, data: { deletedAt: new Date(), status: 'disabled' } })
+      await this.writeRequiredAudit(tx, auditContext, 'ad_asset.delete', 'ad_asset', id, { title: saved.title })
+      return saved
     })
+    // 对象存储不能加入数据库事务；逻辑删除与审计先原子提交，再幂等删除物理对象。
+    if (record.source !== 'external_url') await this.storage.deleteObject(record.storageKey)
     this.logger.log(`Ad asset deleted: ${id}`)
     return toAssetView(updated)
   }
@@ -208,15 +244,41 @@ export class ContentService {
     return { buffer, mimeType: record.mimeType }
   }
 
+  async streamAssetContent(id: string, range?: { start: number; end: number }) {
+    const record = await this.requireAliveAsset(id)
+    if (record.source === 'external_url') {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_NO_LOCAL_CONTENT', message: '外链素材无本地内容' } })
+    }
+    const result = await this.storage.getObjectStream(record.storageKey, range)
+    return { ...result, mimeType: record.mimeType }
+  }
+
+  async getAssetContentInfo(id: string): Promise<{ sizeBytes: number; mimeType: string }> {
+    const record = await this.requireAliveAsset(id)
+    if (record.source === 'external_url') {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_NO_LOCAL_CONTENT', message: '外链素材无本地内容' } })
+    }
+    const head = await this.storage.headObject(record.storageKey)
+    if (!head) {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_CONTENT_NOT_FOUND', message: '素材内容不存在' } })
+    }
+    return { sizeBytes: head.sizeBytes, mimeType: record.mimeType }
+  }
+
   // ── 播放方案 ────────────────────────────────────────────────────────────────
 
-  async listPlaylists(): Promise<AdPlaylistView[]> {
-    const records = await this.prisma.adPlaylist.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: 'desc' },
-      include: { items: { include: { asset: true }, orderBy: { order: 'asc' } } },
-    })
-    return records.map(toPlaylistView)
+  async listPlaylists() {
+    const where = { deletedAt: null }
+    const [records, total] = await Promise.all([
+      this.prisma.adPlaylist.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+        include: { items: { include: { asset: true }, orderBy: { order: 'asc' } } },
+      }),
+      this.prisma.adPlaylist.count({ where }),
+    ])
+    return { items: records.map(toPlaylistView), total, truncated: total > records.length }
   }
 
   async createPlaylist(input: {
@@ -224,11 +286,12 @@ export class ContentService {
     status?: 'active' | 'disabled'
     items: { assetId: string; order: number; enabled?: boolean }[]
     createdBy: string | null
+    auditContext?: ContentAuditContext
   }): Promise<AdPlaylistView> {
     await this.assertAssetsExist(input.items.map((i) => i.assetId))
     const id = randomUUID().replace(/-/g, '')
-    await this.prisma.adPlaylist.create({
-      data: {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.adPlaylist.create({ data: {
         id,
         name: input.name.trim(),
         status: input.status ?? 'active',
@@ -240,7 +303,11 @@ export class ContentService {
             enabled: i.enabled ?? true,
           })),
         },
-      },
+      } })
+      await this.writeRequiredAudit(tx, input.auditContext, 'ad_playlist.create', 'ad_playlist', id, {
+        name: input.name.trim(),
+        itemCount: dedupeItems(input.items).length,
+      })
     })
     return this.getPlaylistOrThrow(id)
   }
@@ -248,6 +315,7 @@ export class ContentService {
   async updatePlaylist(
     id: string,
     input: { name: string; status?: 'active' | 'disabled'; items: { assetId: string; order: number; enabled?: boolean }[] },
+    auditContext?: ContentAuditContext,
   ): Promise<AdPlaylistView> {
     const existing = await this.prisma.adPlaylist.findFirst({ where: { id, deletedAt: null } })
     if (!existing) {
@@ -273,11 +341,14 @@ export class ContentService {
           },
         },
       })
+      await this.writeRequiredAudit(tx, auditContext, 'ad_playlist.update', 'ad_playlist', id, {
+        name: input.name.trim(), itemCount: items.length,
+      })
     })
     return this.getPlaylistOrThrow(id)
   }
 
-  async deletePlaylist(id: string): Promise<void> {
+  async deletePlaylist(id: string, auditContext?: ContentAuditContext): Promise<void> {
     const existing = await this.prisma.adPlaylist.findFirst({ where: { id, deletedAt: null } })
     if (!existing) {
       throw new NotFoundException({ error: { code: 'AD_PLAYLIST_NOT_FOUND', message: '播放方案不存在' } })
@@ -289,6 +360,7 @@ export class ContentService {
         data: { playlistId: null, enabled: false },
       })
       await tx.adPlaylist.update({ where: { id }, data: { deletedAt: new Date(), status: 'disabled' } })
+      await this.writeRequiredAudit(tx, auditContext, 'ad_playlist.delete', 'ad_playlist', id, {})
     })
     this.logger.log(`Ad playlist deleted: ${id}`)
   }
@@ -315,6 +387,7 @@ export class ContentService {
     terminalId: string,
     input: { enabled: boolean; idleTimeoutSec: number; playlistId: string | null },
     updatedBy: string | null,
+    auditContext?: ContentAuditContext,
   ): Promise<TerminalScreensaverConfigView> {
     const publicTerminalId = await this.resolvePublicTerminalId(terminalId)
     const idleTimeoutSec = clamp(Math.floor(input.idleTimeoutSec), MIN_IDLE_TIMEOUT_SEC, MAX_IDLE_TIMEOUT_SEC)
@@ -331,11 +404,17 @@ export class ContentService {
     // 没有绑定方案时不允许 enabled=true(否则终端拉到空,屏保无内容可放)
     const enabled = input.enabled && !!playlistId
 
-    const saved = await this.prisma.terminalScreensaverConfig.upsert({
-      where: { terminalId: publicTerminalId },
-      create: { terminalId: publicTerminalId, enabled, idleTimeoutSec, playlistId, updatedBy },
-      update: { enabled, idleTimeoutSec, playlistId, updatedBy },
-      include: { playlist: true },
+    const saved = await this.prisma.$transaction(async (tx) => {
+      const config = await tx.terminalScreensaverConfig.upsert({
+        where: { terminalId: publicTerminalId },
+        create: { terminalId: publicTerminalId, enabled, idleTimeoutSec, playlistId, updatedBy },
+        update: { enabled, idleTimeoutSec, playlistId, updatedBy },
+        include: { playlist: true },
+      })
+      await this.writeRequiredAudit(tx, auditContext, 'screensaver_config.update', 'screensaver_config', terminalId, {
+        enabled, idleTimeoutSec, playlistId,
+      })
+      return config
     })
     return toConfigView(saved, saved.playlist?.name ?? null)
   }
@@ -346,7 +425,6 @@ export class ContentService {
         // 取最新真实心跳用于在线判定
         include: { heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
         orderBy: { registeredAt: 'desc' },
-        take: 500,
       }),
       this.prisma.terminalScreensaverConfig.findMany({ include: { playlist: true } }),
     ])
@@ -440,6 +518,29 @@ export class ContentService {
       })
     }
     return n
+  }
+
+  private async writeRequiredAudit(
+    tx: PrismaTransactionClient,
+    context: ContentAuditContext | undefined,
+    action: string,
+    targetType: string,
+    targetId: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    if (!context) return
+    if (!this.audit) throw new Error('AUDIT_SERVICE_REQUIRED')
+    await this.audit.writeRequired(tx, {
+      actorId: context.actorId,
+      actorRole: context.actorRole,
+      action,
+      targetType,
+      targetId,
+      payload,
+      ipAddress: context.ipAddress ?? null,
+      userAgent: context.userAgent ?? null,
+      requestId: context.requestId ?? null,
+    })
   }
 
   /**

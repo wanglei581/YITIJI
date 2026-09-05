@@ -10,18 +10,49 @@ import {
   getFileSignedUrl,
   listFiles,
   type AdminFileLifecycleSummary,
+  type AdminFilePurpose,
   type AdminFileRecord,
+  type AdminFileSensitive,
 } from '../../services/api'
+import type { FileRetentionPolicy } from '@ai-job-print/shared'
 import {
   CLEAN_FILTERS,
-  CLEAN_MAP,
   SENSITIVE_FILTERS,
   TYPE_FILTERS,
   toViewFile,
 } from './fileMeta'
-import { RETENTION_FILTERS, retentionPolicyLabel } from './retentionMeta'
+import { RETENTION_FILTERS } from './retentionMeta'
 import { RetentionSummary } from './RetentionSummary'
 import { FileTable } from './FileTable'
+
+const TYPE_FILTERS_TO_PURPOSE: Record<string, AdminFilePurpose | string | undefined> = {
+  全部: undefined,
+  简历上传: 'resume_upload',
+  简历扫描: 'resume_scan',
+  身份证: 'id_scan',
+  打印文档: 'print_doc',
+  招聘会资料: 'fair_material,job_fair_material',
+  求职信: 'cover_letter',
+}
+const SENSITIVE_FILTERS_TO_LEVEL: Record<string, AdminFileSensitive | undefined> = {
+  全部: undefined,
+  高敏感: 'highly_sensitive',
+  中敏感: 'sensitive',
+  低敏感: 'normal',
+}
+const CLEAN_FILTERS_TO_STATUS: Record<string, 'active' | 'scheduled' | 'cleaned' | undefined> = {
+  全部: undefined,
+  有效期内: 'active',
+  待清理: 'scheduled',
+  已清理: 'cleaned',
+}
+const RETENTION_FILTERS_TO_POLICY: Record<string, FileRetentionPolicy | undefined> = {
+  全部: undefined,
+  保存3个月: 'months_3',
+  保存6个月: 'months_6',
+  长期保存: 'long_term',
+  系统短期: 'system_short',
+}
 
 function resolveSignedUrl(signedUrl: string): string {
   if (signedUrl.startsWith('http://') || signedUrl.startsWith('https://')) return signedUrl
@@ -43,6 +74,7 @@ function openDeferredPreviewWindow(): Window | null {
 
 export default function FilesPage() {
   const [files, setFiles] = useState<AdminFileRecord[]>([])
+  const [total, setTotal] = useState(0)
   const [summary, setSummary] = useState<AdminFileLifecycleSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -61,36 +93,32 @@ export default function FilesPage() {
     setLoading(true)
     setError(false)
     Promise.all([
-      listFiles({ includeDeleted: true, limit: 200 }),
+      listFiles({
+        includeDeleted: true,
+        purpose: typeFilter === '全部' ? undefined : TYPE_FILTERS_TO_PURPOSE[typeFilter],
+        sensitiveLevel: sensitiveFilter === '全部' ? undefined : SENSITIVE_FILTERS_TO_LEVEL[sensitiveFilter],
+        cleanStatus: cleanFilter === '全部' ? undefined : CLEAN_FILTERS_TO_STATUS[cleanFilter],
+        retentionPolicy: retentionFilter === '全部' ? undefined : RETENTION_FILTERS_TO_POLICY[retentionFilter],
+        search: search.trim() || undefined,
+        page,
+        pageSize,
+      }),
       getFileLifecycleSummary(),
     ])
-      .then(([rows, lifecycle]) => {
-        setFiles(rows)
+      .then(([filePage, lifecycle]) => {
+        setFiles(filePage.items)
+        setTotal(filePage.total)
         setSummary(lifecycle)
         setNow(Date.now())
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
-  }, [])
+  }, [cleanFilter, page, pageSize, retentionFilter, search, sensitiveFilter, typeFilter])
 
   useEffect(() => { load() }, [load])
 
   const views = useMemo(() => files.map((f) => toViewFile(f, now)), [files, now])
 
-  const filtered = views.filter((v) => {
-    const matchType = typeFilter === '全部' || v.typeLabel === typeFilter
-    const matchSensitive = sensitiveFilter === '全部' || v.sensitiveLabel === sensitiveFilter
-    const matchClean = cleanFilter === '全部' || CLEAN_MAP[v.clean].label === cleanFilter
-    const matchRetention = retentionFilter === '全部' || retentionPolicyLabel(v.raw.retentionPolicy) === retentionFilter
-    return matchType && matchSensitive && matchClean && matchRetention
-  })
-
-  const searched = search.trim()
-    ? filtered.filter((v) => v.name.includes(search) || v.user.includes(search))
-    : filtered
-
-  const total = searched.length
-  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
   const highSensitiveCount = views.filter((v) => v.sensitive === 'high' && v.clean !== 'cleaned').length
   const expiredPending = summary?.expiredPendingCleanup ?? views.filter((v) => v.clean === 'scheduled').length
 
@@ -207,7 +235,7 @@ export default function FilesPage() {
         loading={loading}
         error={error}
         search={search}
-        files={paginated}
+        files={views}
         total={total}
         page={page}
         pageSize={pageSize}

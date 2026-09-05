@@ -56,6 +56,11 @@ function parseConstArray(source: string, constName: string): string[] {
   return [...source.slice(open, close).matchAll(/'([a-z_]+)'/g)].map((m) => m[1] as string)
 }
 
+function parseLocalConstArray(source: string, constName: string): string[] {
+  const match = source.match(new RegExp(`const ${constName} = \\[([^\\]]+)\\] as const`))
+  return match ? [...match[1].matchAll(/'([a-z_]+)'/g)].map((item) => item[1] as string) : []
+}
+
 async function verifyNoDrift(): Promise<string[]> {
   console.log('\n[A] 支付状态取值表与联合类型一致（两份声明都从源码解析，门禁不另抄一份）')
 
@@ -88,6 +93,8 @@ async function verifyNoDrift(): Promise<string[]> {
     controller.includes('INVALID_FILTER_VALUE') && !/\?\s*\w+\s*:\s*undefined/.test(
       controller.slice(controller.indexOf('this.orders.list('), controller.indexOf('search:'))),
   )
+  const taskStatuses = parseLocalConstArray(controller, 'VALID_TASK_STATUS')
+  check('订单筛选允许管理员处置产生的 abandoned 状态', taskStatuses.includes('abandoned'), taskStatuses.join(','))
 
   return apiConst
 }

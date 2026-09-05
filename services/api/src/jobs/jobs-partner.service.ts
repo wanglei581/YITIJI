@@ -40,7 +40,6 @@ import {
   type PartnerJobDto,
   type PartnerFairDto,
   type ImportResult,
-  type SyncLogDto,
   prismaJobSourceToPartnerDto,
   prismaJobToPartnerDto,
   prismaFairToPartnerDto,
@@ -471,13 +470,14 @@ export class JobsPartnerService {
     return withLifecycle(prismaJobSourceToPartnerDto(updated, summaries.get(id)), updated)
   }
 
-  async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.job.findMany({
-      where: { sourceOrgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-    })
-    return rows.map(prismaJobToPartnerDto)
+  async getPartnerJobs(user: AuthedUser) {
+    if (!user.orgId) return { items: [], total: 0, truncated: false }
+    const where = { sourceOrgId: user.orgId }
+    const [rows, total] = await Promise.all([
+      this.prisma.job.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 }),
+      this.prisma.job.count({ where }),
+    ])
+    return { items: rows.map(prismaJobToPartnerDto), total, truncated: total > rows.length }
   }
 
   async importJobs(items: ImportJobItemDto[], user: AuthedUser): Promise<ImportResult<PartnerJobDto>> {
@@ -711,13 +711,14 @@ export class JobsPartnerService {
     return prismaJobToPartnerDto(updated)
   }
 
-  async getPartnerFairs(user: AuthedUser): Promise<PartnerFairDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.jobFair.findMany({
-      where: { sourceOrgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-    })
-    return rows.map(prismaFairToPartnerDto)
+  async getPartnerFairs(user: AuthedUser) {
+    if (!user.orgId) return { items: [], total: 0, truncated: false }
+    const where = { sourceOrgId: user.orgId }
+    const [rows, total] = await Promise.all([
+      this.prisma.jobFair.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 }),
+      this.prisma.jobFair.count({ where }),
+    ])
+    return { items: rows.map(prismaFairToPartnerDto), total, truncated: total > rows.length }
   }
 
   async importFairs(dto: ImportFairsDto, user: AuthedUser): Promise<ImportResult<PartnerFairDto>> {
@@ -929,15 +930,19 @@ export class JobsPartnerService {
     }
   }
 
-  async getPartnerSyncLogs(user: AuthedUser): Promise<SyncLogDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.syncLog.findMany({
-      where: { orgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: { source: { select: { name: true } } },
-    })
-    return rows.map((r, i) => ({
+  async getPartnerSyncLogs(user: AuthedUser) {
+    if (!user.orgId) return { items: [], total: 0, truncated: false }
+    const where = { orgId: user.orgId }
+    const [rows, total] = await Promise.all([
+      this.prisma.syncLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: { source: { select: { name: true } } },
+      }),
+      this.prisma.syncLog.count({ where }),
+    ])
+    const items = rows.map((r, i) => ({
       id: r.id,
       no: `SYNC-${r.createdAt.toISOString().slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
       source: r.source?.name ?? r.sourceId,
@@ -951,5 +956,6 @@ export class JobsPartnerService {
       syncTime: fmtSyncTime(r.createdAt),
       status: r.result as 'success' | 'partial' | 'failed',
     }))
+    return { items, total, truncated: total > items.length }
   }
 }

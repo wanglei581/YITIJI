@@ -307,7 +307,6 @@ export class CompaniesService {
       where,
       include: { _count: { select: { jobs: true } } },
       orderBy: [{ updatedAt: 'desc' }],
-      take: 200,
     })
     return rows.map((c) => this.adminRow(c))
   }
@@ -317,7 +316,7 @@ export class CompaniesService {
       where: { id },
       include: {
         _count: { select: { jobs: true } },
-        jobs: { select: { id: true, title: true, city: true, category: true, reviewStatus: true, publishStatus: true }, take: 100 },
+        jobs: { select: { id: true, title: true, city: true, category: true, reviewStatus: true, publishStatus: true } },
       },
     })
     if (!c) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
@@ -452,7 +451,6 @@ export class CompaniesService {
         ...(keyword?.trim() ? { title: { contains: keyword.trim() } } : {}),
       },
       select: { id: true, title: true, city: true, category: true, companyProfileId: true },
-      take: 50,
       orderBy: [{ syncTime: 'desc' }],
     })
   }
@@ -495,13 +493,17 @@ export class CompaniesService {
   // ── Partner（来源机构维护本机构数据；不是企业 HR 后台）─────────────────────
 
   async partnerList(orgId: string) {
-    const rows = await this.prisma.companyProfile.findMany({
-      where: { sourceOrgId: orgId },
-      include: { _count: { select: { jobs: true } } },
-      orderBy: [{ updatedAt: 'desc' }],
-      take: 200,
-    })
-    return rows.map((c) => this.adminRow(c))
+    const where = { sourceOrgId: orgId }
+    const [rows, total] = await Promise.all([
+      this.prisma.companyProfile.findMany({
+        where,
+        include: { _count: { select: { jobs: true } } },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: 200,
+      }),
+      this.prisma.companyProfile.count({ where }),
+    ])
+    return { items: rows.map((c) => this.adminRow(c)), total, truncated: total > rows.length }
   }
 
   /** 按本机构岗位 externalId 关联岗位（跨机构 externalId 自然查不到，天然隔离）。 */
@@ -573,7 +575,7 @@ export class CompaniesService {
       targetType: 'company_profile', targetId: id,
       payload: { orgId, fields: Object.keys(this.fieldsToData(dto)) },
     })
-    return this.partnerList(orgId).then((list) => list.find((x) => x.id === id))
+    return this.partnerList(orgId).then((page) => page.items.find((x) => x.id === id))
   }
 
   /**
@@ -595,6 +597,6 @@ export class CompaniesService {
       targetType: 'company_profile', targetId: id,
       payload: { orgId, fromPublishStatus: existing.publishStatus },
     })
-    return this.partnerList(orgId).then((list) => list.find((x) => x.id === id))
+    return this.partnerList(orgId).then((page) => page.items.find((x) => x.id === id))
   }
 }

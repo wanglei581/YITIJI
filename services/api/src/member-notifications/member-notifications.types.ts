@@ -20,6 +20,7 @@ export interface MemberNotificationPage {
   nextCursor: string | null
   total: number
   unreadCount: number
+  truncated: boolean
 }
 
 export interface AdminBroadcastItem {
@@ -30,4 +31,10 @@ export interface AdminBroadcastItem {
   deletedAt: string | null
   createdBy: string | null
   createdAt: string
+}
+
+export interface AdminBroadcastPage {
+  items: AdminBroadcastItem[]
+  total: number
+  truncated: boolean
 }

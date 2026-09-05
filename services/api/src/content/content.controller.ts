@@ -20,11 +20,11 @@ import {
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import type { Response } from 'express'
+import type { Request } from 'express'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
-import { AuditService } from '../audit/audit.service'
 import { ContentService } from './content.service'
 import { getMediaLimits } from './media-validation'
 import { verifyAdAssetSignature } from './content-signing'
@@ -65,7 +65,6 @@ const UPLOAD_HARD_LIMIT = getMediaLimits().maxVideoBytes + 4 * 1024 * 1024
 export class ContentController {
   constructor(
     private readonly content: ContentService,
-    private readonly audit: AuditService,
   ) {}
 
   // ── 素材(admin)──────────────────────────────────────────────────────────
@@ -89,11 +88,7 @@ export class ContentController {
       title: dto.title,
       durationSec: dto.durationSec,
       createdBy: user.userId,
-    })
-    await this.writeAudit(req, user, 'ad_asset.upload', 'ad_asset', asset.id, {
-      type: asset.type,
-      title: asset.title,
-      sizeBytes: asset.sizeBytes,
+      auditContext: toAuditContext(req, user),
     })
     return asset
   }
@@ -111,11 +106,7 @@ export class ContentController {
       title: dto.title,
       durationSec: dto.durationSec,
       createdBy: user.userId,
-    })
-    await this.writeAudit(req, user, 'ad_asset.create_external', 'ad_asset', asset.id, {
-      type: asset.type,
-      title: asset.title,
-      externalUrl: asset.externalUrl,
+      auditContext: toAuditContext(req, user),
     })
     return asset
   }
@@ -144,8 +135,7 @@ export class ContentController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ) {
-    const asset = await this.content.updateAsset(id, dto)
-    await this.writeAudit(req, user, 'ad_asset.update', 'ad_asset', id, { ...dto })
+    const asset = await this.content.updateAsset(id, dto, toAuditContext(req, user))
     return asset
   }
 
@@ -153,8 +143,7 @@ export class ContentController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async deleteAsset(@Param('id') id: string, @CurrentUser() user: AuthedUser, @Req() req: AuditReq) {
-    const asset = await this.content.deleteAsset(id)
-    await this.writeAudit(req, user, 'ad_asset.delete', 'ad_asset', id, { title: asset.title })
+    const asset = await this.content.deleteAsset(id, toAuditContext(req, user))
     return asset
   }
 
@@ -176,10 +165,7 @@ export class ContentController {
       status: dto.status,
       items: dto.items,
       createdBy: user.userId,
-    })
-    await this.writeAudit(req, user, 'ad_playlist.create', 'ad_playlist', playlist.id, {
-      name: playlist.name,
-      itemCount: playlist.itemCount,
+      auditContext: toAuditContext(req, user),
     })
     return playlist
   }
@@ -193,11 +179,11 @@ export class ContentController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ) {
-    const playlist = await this.content.updatePlaylist(id, { name: dto.name, status: dto.status, items: dto.items })
-    await this.writeAudit(req, user, 'ad_playlist.update', 'ad_playlist', id, {
-      name: playlist.name,
-      itemCount: playlist.itemCount,
-    })
+    const playlist = await this.content.updatePlaylist(
+      id,
+      { name: dto.name, status: dto.status, items: dto.items },
+      toAuditContext(req, user),
+    )
     return playlist
   }
 
@@ -206,8 +192,7 @@ export class ContentController {
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
   async deletePlaylist(@Param('id') id: string, @CurrentUser() user: AuthedUser, @Req() req: AuditReq) {
-    await this.content.deletePlaylist(id)
-    await this.writeAudit(req, user, 'ad_playlist.delete', 'ad_playlist', id, {})
+    await this.content.deletePlaylist(id, toAuditContext(req, user))
     return { success: true }
   }
 
@@ -240,12 +225,8 @@ export class ContentController {
       terminalId,
       { enabled: dto.enabled, idleTimeoutSec: dto.idleTimeoutSec, playlistId: dto.playlistId ?? null },
       user.userId,
+      toAuditContext(req, user),
     )
-    await this.writeAudit(req, user, 'screensaver_config.update', 'screensaver_config', terminalId, {
-      enabled: config.enabled,
-      idleTimeoutSec: config.idleTimeoutSec,
-      playlistId: config.playlistId,
-    })
     return config
   }
 
@@ -266,44 +247,55 @@ export class ContentController {
     @Param('id') id: string,
     @Query('expires') expires: string,
     @Query('sig') sig: string,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
     if (!expires || !sig || !verifyAdAssetSignature(id, expires, sig)) {
       throw new UnauthorizedException({ error: { code: 'AD_ASSET_SIGNATURE_INVALID', message: '签名无效或已过期' } })
     }
-    const { buffer, mimeType } = await this.content.readAssetContent(id)
-    res.setHeader('Content-Type', mimeType)
-    res.setHeader('Content-Length', buffer.length)
+    const rangeHeader = req.headers.range
+    const info = await this.content.getAssetContentInfo(id)
+    const range = parseByteRange(rangeHeader, info.sizeBytes)
+    if (rangeHeader && !range) {
+      res.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+      res.setHeader('Content-Range', `bytes */${info.sizeBytes}`)
+      res.end()
+      return
+    }
+    const content = await this.content.streamAssetContent(id, range ?? undefined)
+    res.setHeader('Content-Type', content.mimeType)
+    res.setHeader('Content-Length', content.contentLength)
     // Admin/Kiosk dev server 与 API 分端口运行,签名素材需要允许跨 origin 作为 <img>/<video> 嵌入。
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
     // 屏保素材可被 Kiosk 长缓存(内容不可变,内容变了会换新 id)
     res.setHeader('Cache-Control', 'public, max-age=3600')
     res.setHeader('Accept-Ranges', 'bytes')
-    res.send(buffer)
+    if (range) {
+      res.status(HttpStatus.PARTIAL_CONTENT)
+      res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${content.sizeBytes}`)
+    }
+    content.stream.on('error', () => res.destroy())
+    content.stream.pipe(res)
   }
 
-  // ── 审计 helper ──────────────────────────────────────────────────────────
+}
 
-  private async writeAudit(
-    req: AuditReq,
-    user: AuthedUser,
-    action: string,
-    targetType: string,
-    targetId: string,
-    payload: Record<string, unknown>,
-  ): Promise<void> {
-    await this.audit.write({
-      actorId: user.userId,
-      actorRole: user.role,
-      action,
-      targetType,
-      targetId,
-      payload,
-      ipAddress: extractIp(req),
-      userAgent: extractUa(req),
-      requestId: req.requestId ?? null,
-    })
+export function parseByteRange(raw: string | undefined, size: number): { start: number; end: number } | null {
+  if (!raw) return null
+  const match = raw.match(/^bytes=(\d*)-(\d*)$/)
+  if (!match || size <= 0) return null
+  const startRaw = match[1]
+  const endRaw = match[2]
+  if (!startRaw && !endRaw) return null
+  if (!startRaw) {
+    const suffix = Number(endRaw)
+    if (!Number.isInteger(suffix) || suffix <= 0) return null
+    return { start: Math.max(0, size - suffix), end: size - 1 }
   }
+  const start = Number(startRaw)
+  const requestedEnd = endRaw ? Number(endRaw) : size - 1
+  if (!Number.isInteger(start) || !Number.isInteger(requestedEnd) || start < 0 || start >= size || requestedEnd < start) return null
+  return { start, end: Math.min(requestedEnd, size - 1) }
 }
 
 interface AuditReq {
@@ -322,4 +314,14 @@ function extractUa(req: AuditReq): string | null {
   if (typeof ua === 'string') return ua.slice(0, 256)
   if (Array.isArray(ua) && ua[0]) return ua[0].slice(0, 256)
   return null
+}
+
+function toAuditContext(req: AuditReq, user: AuthedUser) {
+  return {
+    actorId: user.userId,
+    actorRole: user.role,
+    ipAddress: extractIp(req),
+    userAgent: extractUa(req),
+    requestId: req.requestId ?? null,
+  }
 }
