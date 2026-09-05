@@ -56,6 +56,7 @@
     "verify:kiosk-anonymous-feedback": "node -r @swc-node/register scripts/verify-kiosk-anonymous-feedback.ts",
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:miniapp-cloud-print-m2": "node -r @swc-node/register scripts/verify-miniapp-cloud-print-m2.ts",
+    "verify:package-order-fulfillment": "node -r @swc-node/register scripts/verify-package-order-fulfillment.ts",
     "verify:isolated-verification-database": "node -r @swc-node/register scripts/verify-isolated-verification-database.ts",
     "verify:wave2-account-rebind": "node -r @swc-node/register scripts/verify-wave2-account-rebind.ts",
     "verify:wave3-print-aftercare": "node -r @swc-node/register scripts/verify-wave3-print-aftercare.ts",

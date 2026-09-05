@@ -688,6 +688,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-validity-expiry
           pnpm --filter @ai-job-print/api verify:member-sms-provider-errors
           pnpm --filter @ai-job-print/api verify:miniapp-cloud-print-m2
+          pnpm --filter @ai-job-print/api verify:package-order-fulfillment
           pnpm --filter @ai-job-print/api verify:sms-provider
           pnpm --filter @ai-job-print/api verify:sms-send
           pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance

@@ -151,12 +151,16 @@ model PrintTask {
 
   statusLogs PrintTaskStatusLog[]
   order      Order?
+  // 材料包的逐份任务血缘。Order.printTaskId 仍只指向当前待处理任务，
+  // 不把现有单文件 1:1 关系改成 1:N。
+  orderId    String?
 
   @@index([endUserId])
   @@index([fileId])
   @@index([status, terminalId, createdAt])
   @@index([status, claimExpiry])
   @@index([status, claimedAt])
+  @@index([orderId])
 }
 
 // ── ScanTask ──────────────────────────────────────────────────────────────────
@@ -398,6 +402,7 @@ model Order {
 
   printTaskId String?    @unique
   printTask   PrintTask? @relation(fields: [printTaskId], references: [id])
+  orderItems  OrderItem[]
 
   endUserId  String?
   terminalId String?
@@ -483,6 +488,30 @@ model Order {
   @@index([pickupStatus, pickupCodeExpiresAt])
   @@index([createdAt])
   @@index([channel, createdAt])
+}
+
+// 材料包逐行履约快照。金额/页数/参数全部在建单时由服务端计算并固化，
+// 不复用 Order.itemsJson，避免把计费明细与实际履约队列混在无 schema JSON 中。
+model OrderItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seq           Int
+  fileId        String
+  colorMode     String
+  duplex        String
+  copies        Int
+  pageRange     String?
+  billablePages Int
+  amountCents   Int
+  status        String   @default("pending") // pending | claimed | printing | completed | failed
+  printTaskId   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([orderId, seq])
+  @@index([orderId, status])
+  @@index([printTaskId])
 }
 
 /// 服务端价目 SSOT（P0a 支付域）。首批仅开发默认价 seed，不对外宣称最终定价；
