@@ -601,28 +601,48 @@ async function main(): Promise<void> {
     }
     const failedQrCreateFixture = createFixture(new FailedQrCreateSandboxProvider(SESSION_SECRET))
     const failedQrCreateOrder = failedQrCreateFixture.makeOrder(100)
+    // 渠道出码抛错不得把渠道原始错误透给收银台，也不得把订单卡在 paying 等本地过期。
+    // 契约：立刻把尝试置 failed（不可扫）、订单回 unpaid（可立即重试）、对外只给 PAY_CHANNEL_UNAVAILABLE。
+    let qrCreateRejection: unknown
     try {
       await failedQrCreateFixture.payment.createPayAttempt(failedQrCreateOrder.order.id, failedQrCreateOrder.token, 'sandbox')
       fail('simulated QR precreate failure should reject')
     } catch (error) {
-      if (!(error instanceof Error) || !error.message.includes('SIMULATED_QR_PRECREATE_FAILURE')) throw error
+      qrCreateRejection = error
+    }
+    const rejectionText = JSON.stringify(
+      qrCreateRejection instanceof Error
+        ? { message: qrCreateRejection.message, response: (qrCreateRejection as { response?: unknown }).response }
+        : qrCreateRejection,
+    )
+    const rejectionStatus = (qrCreateRejection as { status?: number } | undefined)?.status
+    if (rejectionText.includes('PAY_CHANNEL_UNAVAILABLE') && rejectionStatus === 503) {
+      pass('QR precreate failure surfaces as PAY_CHANNEL_UNAVAILABLE (503), not the raw channel error')
+    } else {
+      fail(`QR precreate failure must surface as PAY_CHANNEL_UNAVAILABLE 503, got: ${rejectionText} status=${String(rejectionStatus)}`)
+    }
+    if (!rejectionText.includes('SIMULATED_QR_PRECREATE_FAILURE')) {
+      pass('raw channel error text never reaches the cashier response')
+    } else {
+      fail(`raw channel error leaked to the cashier: ${rejectionText}`)
     }
     const failedQrAttempt = [...failedQrCreateFixture.attempts.values()][0]
     if (!failedQrAttempt) fail('missing failed QR precreate attempt fixture')
-    failedQrAttempt.expiresAt = new Date(Date.now() - 1_000)
     const recoveredFromFailedQrCreate = await failedQrCreateFixture.payment.getPayStatus(
       failedQrCreateOrder.order.id,
       failedQrCreateOrder.token,
     )
     if (
-      failedQrAttempt.status === 'expired' &&
+      failedQrAttempt.status === 'failed' &&
+      failedQrAttempt.qrCodeContent === null &&
+      failedQrAttempt.prepayId === null &&
       failedQrCreateOrder.order.payStatus === 'unpaid' &&
       recoveredFromFailedQrCreate.payStatus === 'unpaid'
     ) {
-      pass('expired QR precreate failure is safely released without treating it as a scannable channel order')
+      pass('failed QR precreate is released immediately: attempt not scannable, order back to unpaid without waiting for expiry')
     } else {
       fail(
-        `failed QR precreate must release after local expiry: ${JSON.stringify({
+        `failed QR precreate must release immediately: ${JSON.stringify({
           attempt: failedQrAttempt,
           order: failedQrCreateOrder.order,
           status: recoveredFromFailedQrCreate,

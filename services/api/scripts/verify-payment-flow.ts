@@ -27,7 +27,7 @@ import { signFileUrl } from '../src/files/signing'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
-import { OrderStatusService } from '../src/payment/order-status.service'
+import { ONLINE_PAID_PENDING_REFUND_REASON, OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
@@ -828,6 +828,136 @@ async function main(): Promise<void> {
       pass('production runtime gates pass with payment provider unset/disabled')
     } catch (e) {
       fail(`production gates unexpectedly rejected unset/disabled payment provider: ${(e as Error).message}`)
+    }
+
+    // ── (13) API-07：取件窗口已关拒绝入账并记待退；云打印单不铸幽灵码 ─────
+    const expiredCloudId = await makeOrder(220, 'closed')
+    await prisma.order.update({
+      where: { id: expiredCloudId },
+      data: {
+        pickupStatus: 'expired',
+        pickupCodeHash: `hash_expired_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+      },
+    })
+    await expectCode(
+      'markPaidOnline refuses expired pickup window (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(expiredCloudId, {
+          channel: CHANNEL,
+          attemptId: 'pa_expired_window',
+          channelTxnNo: `txn_expired_${suffix}`,
+          late: true,
+        }),
+    )
+    const expiredCloud = await prisma.order.findUnique({ where: { id: expiredCloudId } })
+    const pendingRefundAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: expiredCloudId },
+    })
+    if (
+      expiredCloud?.payStatus === 'closed' &&
+      expiredCloud.pickupCode == null &&
+      expiredCloud.refundReason === ONLINE_PAID_PENDING_REFUND_REASON &&
+      pendingRefundAudit
+    ) {
+      pass('expired pickup window stays closed, records ONLINE_PAID_PENDING_REFUND, no ghost pickupCode')
+    } else {
+      fail(
+        `pending-refund mismatch: pay=${expiredCloud?.payStatus} reason=${expiredCloud?.refundReason} code=${expiredCloud?.pickupCode} audit=${pendingRefundAudit?.payloadJson}`,
+      )
+    }
+
+    const cancelledCloudId = await makeOrder(180, 'unpaid')
+    await prisma.order.update({
+      where: { id: cancelledCloudId },
+      data: { pickupStatus: 'cancelled', pickupCodeHash: `hash_cancelled_${suffix}` },
+    })
+    await expectCode(
+      'markPaidOnline refuses cancelled pickup (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(cancelledCloudId, {
+          channel: CHANNEL,
+          attemptId: 'pa_cancelled_window',
+          channelTxnNo: `txn_cancelled_${suffix}`,
+          late: false,
+        }),
+    )
+
+    const hashedCloudId = await makeOrder(160, 'unpaid')
+    await prisma.order.update({
+      where: { id: hashedCloudId },
+      data: { pickupStatus: 'pending', pickupCodeHash: `hash_live_${suffix}` },
+    })
+    const hashedPaid = await orderStatus.markPaidOnline(hashedCloudId, {
+      channel: CHANNEL,
+      attemptId: 'pa_hashed',
+      channelTxnNo: `txn_hashed_${suffix}`,
+      late: false,
+    })
+    if (hashedPaid.payStatus === 'paid' && hashedPaid.pickupCode == null) {
+      pass('cloud print markPaidOnline does not mint a ghost plaintext pickupCode')
+    } else {
+      fail(`ghost pickupCode minted: pay=${hashedPaid.payStatus} code=${hashedPaid.pickupCode}`)
+    }
+
+    // ── (14) API-08：关单后 claimed 回滚 pending，不再卡死 ──────────────────
+    const claimedCloseId = await makeOrder(300, 'paying')
+    await prisma.order.update({
+      where: { id: claimedCloseId },
+      data: {
+        pickupStatus: 'claimed',
+        expiresAt: new Date(Date.now() - 1_000),
+      },
+    })
+    const claimedCloseSession = await paymentSessionFor(claimedCloseId)
+    const claimedCloseStatus = await payment.getPayStatus(claimedCloseId, claimedCloseSession)
+    const claimedCloseOrder = await prisma.order.findUnique({ where: { id: claimedCloseId } })
+    if (
+      claimedCloseStatus.payStatus === 'closed' &&
+      claimedCloseOrder?.pickupStatus === 'pending' &&
+      claimedCloseOrder.pickupStatus !== 'claimed'
+    ) {
+      pass('closing unpaid claimed order rolls pickupStatus back to pending')
+    } else {
+      fail(
+        `claimed close mismatch: pay=${claimedCloseStatus.payStatus} pickup=${claimedCloseOrder?.pickupStatus}`,
+      )
+    }
+
+    // ── (15) API-09：渠道出码抛错 → 尝试 failed、订单回 unpaid、503 ────────
+    const qrFailId = await makeOrder(140, 'unpaid')
+    const qrFailSession = await paymentSessionFor(qrFailId)
+    const originalCreateQr = provider.createQrPayment.bind(provider)
+    provider.createQrPayment = async () => {
+      throw new Error('channel 5xx')
+    }
+    try {
+      let qrFailCode = 'RESOLVED'
+      try {
+        await payment.createPayAttempt(qrFailId, qrFailSession)
+      } catch (error) {
+        qrFailCode = errorCode(error)
+      }
+      const qrFailOrder = await prisma.order.findUnique({ where: { id: qrFailId } })
+      const qrFailAttempt = await prisma.paymentAttempt.findFirst({
+        where: { orderId: qrFailId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (
+        qrFailCode.includes('PAY_CHANNEL_UNAVAILABLE') &&
+        qrFailOrder?.payStatus === 'unpaid' &&
+        qrFailAttempt?.status === 'failed'
+      ) {
+        pass('channel QR throw marks attempt failed, order unpaid, and returns PAY_CHANNEL_UNAVAILABLE')
+      } else {
+        fail(
+          `QR throw mismatch: code=${qrFailCode} pay=${qrFailOrder?.payStatus} attempt=${qrFailAttempt?.status}`,
+        )
+      }
+    } finally {
+      provider.createQrPayment = originalCreateQr
     }
 
     console.log('\nAll payment-flow assertions passed.\n')

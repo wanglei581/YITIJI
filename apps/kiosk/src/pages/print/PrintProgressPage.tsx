@@ -12,7 +12,7 @@
 //   pending  / claimed  → step 1 "排队等待"  (step 0 "提交任务" already done)
 //   printing            → step 2 "打印中"
 //   completed           → navigate to /print/done (success)
-//   failed              → navigate to /print/done (failure)
+//   failed / cancelled / abandoned → navigate to /print/done (failure / 终态)
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -127,7 +127,9 @@ function errorCodeToMessage(code?: string): string | undefined {
 }
 
 const POLL_INTERVAL_MS = 3000
+const POLL_FAIL_LIMIT = 5
 const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes — guard against Agent never claiming without false timeout
+const STATUS_READ_ERROR_TEXT = '暂时无法读取状态'
 
 const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
 
@@ -221,7 +223,9 @@ export function PrintProgressPage() {
   const [failed, setFailed]     = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [simDone, setSimDone]   = useState(false)
+  const [statusReadError, setStatusReadError] = useState(false)
   const cancelRef               = useRef(false)
+  const pollFailsRef            = useRef(0)
   const simTimerRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
   const failTimerRef            = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wakeRequestedTaskIdRef  = useRef<string | null>(null)
@@ -333,12 +337,27 @@ export function PrintProgressPage() {
           )
           return
         }
+        if (result.status === 'cancelled' || result.status === 'abandoned') {
+          navigateFail(
+            result.failureReasonForUser
+              ?? (result.status === 'cancelled'
+                ? '任务已取消，请联系现场工作人员确认订单'
+                : '任务已结束，请联系现场工作人员确认订单'),
+          )
+          return
+        }
+        pollFailsRef.current = 0
+        setStatusReadError(false)
         // pending | claimed | printing — update step
         setBackendStatus(result.status)
         setCurrent(backendStatusToStep(result.status))
       } catch {
         if (cancelRef.current) return
-        navigateFail('无法连接打印服务，请联系工作人员')
+        pollFailsRef.current += 1
+        setStatusReadError(true)
+        if (pollFailsRef.current >= POLL_FAIL_LIMIT) {
+          navigateFail(`${STATUS_READ_ERROR_TEXT}，请联系工作人员`)
+        }
       }
     }
 
@@ -524,6 +543,15 @@ export function PrintProgressPage() {
           role="note"
         >
           演示模式·非真实打印
+        </div>
+      )}
+
+      {useRealApi && statusReadError && !failed && (
+        <div
+          className="mx-6 mt-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-center text-base font-semibold text-warning"
+          role="status"
+        >
+          {STATUS_READ_ERROR_TEXT}
         </div>
       )}
 

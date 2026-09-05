@@ -1025,7 +1025,7 @@ test('standby countdown still fires for a signed-in member on the homepage @warn
  * 打印页通过 useBusyLock 持锁，普通 idle 全程暂停；这里用真实轮询把这条锁钉死，
  * 避免以后有人改动打印页的锁条件时无声退化。
  *
- * 注意边界：不受 busy 抑制的**硬隐私截止**仍会在最长安全时限后清场，这是刻意设计
+ * 注意边界：忙碌锁会暂停硬隐私截止（顺延上限 15 分钟），到期仍清场。
  * （见 kiosk-privacy-timeout.spec.ts「hard clear stops active print polling without
  * cancelling the backend task」）：终端页面重置，但后台打印任务继续，纸照出。
  * 本用例只守「普通 30 秒倒计时不得打断打印」，不碰硬截止。
