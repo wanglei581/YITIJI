@@ -235,10 +235,12 @@ check(
   'quality useRefreshable binds the real quality key/service, 60s interval, replace merge, and keep-last',
 )
 check(
-  /useInteractionLock\(\s*editing\s*!==\s*null\s*\|\|\s*saving\s*\|\|\s*busyId\s*!==\s*null\s*,\s*\[\s*PARTNER_JOBS_REFRESH_KEY\s*,\s*PARTNER_JOB_QUALITY_REFRESH_KEY\s*\]\s*,\s*['"]hard['"]\s*\)/.test(
+  /useInteractionLock\(\s*editing\s*!==\s*null\s*\|\|\s*saving\s*\|\|\s*busyId\s*!==\s*null\s*\|\|\s*confirmUnpublish\s*!==\s*null\s*,\s*\[\s*PARTNER_JOBS_REFRESH_KEY\s*,\s*PARTNER_JOB_QUALITY_REFRESH_KEY\s*\]\s*,\s*['"]hard['"]\s*\)/.test(
     refreshContract,
   ),
-  'interaction lock binds editing/saving/busyId, both refresh keys, and hard mode',
+  // confirmUnpublish 也要进锁：二次确认弹窗开着的时候后台刷新不能把那一行换掉，
+  // 否则用户确认的是 A、下架的是刷新后落在同一位置的 B。
+  'interaction lock binds editing/saving/busyId/confirmUnpublish, both refresh keys, and hard mode',
 )
 
 const filterDataContract = extractBetween(
@@ -337,25 +339,18 @@ check(
 
 const unpublishBlock = extractBetween(
   jobsPage,
-  'const handleUnpublish = async (id: string) => {',
+  'const handleUnpublish = async (job: PartnerJobRecord) => {',
   'const openNew',
   'handleUnpublish',
 )
-const expectedUnpublishBlock = `const handleUnpublish = async (id: string) => {
-  setBusyId(id)
+// 下架现在只能从二次确认弹窗触发，因此入参从 id 变成整条记录（弹窗要显示岗位标题）。
+// 锁的仍是同一套纪律：真调服务、失败报错、成功刷新、无论如何清 busyId。
+const expectedUnpublishBlock = `const handleUnpublish = async (job: PartnerJobRecord) => {
+  setBusyId(job.id)
+  setConfirmUnpublish(null)
   try {
-    await unpublishPartnerJob(id)
-    void refresh()
-  } catch (e) {
-    setNotice(errMsg(e))
-  } finally {
-    setBusyId(null)
-  }
-}`
-const expectedUnpublishBlockWithShowNotice = `const handleUnpublish = async (id: string) => {
-  setBusyId(id)
-  try {
-    await unpublishPartnerJob(id)
+    await unpublishPartnerJob(job.id)
+    showNotice('岗位已下架，终端将不再展示。')
     void refresh()
   } catch (e) {
     showNotice(errMsg(e), true)
@@ -364,13 +359,25 @@ const expectedUnpublishBlockWithShowNotice = `const handleUnpublish = async (id:
   }
 }`
 check(
-  compact(unpublishBlock) === compact(expectedUnpublishBlock) ||
-    compact(unpublishBlock) === compact(expectedUnpublishBlockWithShowNotice),
-  'handleUnpublish awaits the real service, reports failure, refreshes success, and always clears busyId',
+  compact(unpublishBlock) === compact(expectedUnpublishBlock),
+  'handleUnpublish awaits the real service, reports both outcomes, refreshes success, and always clears busyId',
+)
+
+// 下架是不可撤销的对外动作（求职者立刻看不到），必须经二次确认。
+// 钉死「唯一触发点是弹窗的 onConfirm」：定义写作 `const handleUnpublish = async (job…`，
+// 不含 `handleUnpublish(`，所以全页该模式应当恰好出现一次 —— 就是 onConfirm 那处。
+// 多出一处就意味着有人绕开了确认框。
+check(
+  /onConfirm=\{\(\)\s*=>\s*confirmUnpublish\s*&&\s*void\s+handleUnpublish\(confirmUnpublish\)\}/.test(jobsPage),
+  'unpublish is triggered only through the confirm dialog onConfirm handler',
+)
+check(
+  (jobsPage.match(/handleUnpublish\(/g) ?? []).length === 1,
+  'handleUnpublish has exactly one call site (the confirm dialog), so no path skips confirmation',
 )
 
 check(
-  /<button\s+disabled=\{busyId\s*===\s*j\.id\}\s+className=['"][^'"]+['"]\s+onClick=\{\(\)\s*=>\s*void\s+handleUnpublish\(j\.id\)\}\s*>\s*\{busyId\s*===\s*j\.id\s*\?\s*['"]处理中…['"]\s*:\s*['"]下架['"]\}\s*<\/button>/.test(
+  /<button\s+disabled=\{busyId\s*===\s*j\.id\}\s+className=['"][^'"]+['"]\s+onClick=\{\(\)\s*=>\s*setConfirmUnpublish\(j\)\}\s*>\s*\{busyId\s*===\s*j\.id\s*\?\s*['"]处理中…['"]\s*:\s*['"]下架['"]\}\s*<\/button>/.test(
     jobsPage,
   ),
   'published-row unpublish button is disabled while busy and calls handleUnpublish for its job',
