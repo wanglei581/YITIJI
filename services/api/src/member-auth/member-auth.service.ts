@@ -410,13 +410,40 @@ export class MemberAuthService {
     const phone = await this.fetchWxPhone(phoneCode)
 
     const phoneHash = hashPhone(phone)
-    const existing = await this.prisma.endUser.findUnique({ where: { phoneHash } })
-    if (existing && (!existing.enabled || existing.status !== 'active')) {
+    const [openidUser, phoneUser] = await Promise.all([
+      this.prisma.endUser.findUnique({ where: { wxOpenId: openid } }),
+      this.prisma.endUser.findUnique({ where: { phoneHash } }),
+    ])
+    if (openidUser && (!openidUser.enabled || openidUser.status !== 'active')) {
+      throw this.accountUnavailable()
+    }
+    if (phoneUser && (!phoneUser.enabled || phoneUser.status !== 'active')) {
       throw this.accountUnavailable()
     }
 
     let endUser: { id: string; nickname: string | null }
-    if (!existing) {
+    if (openidUser) {
+      endUser = await this.prisma.$transaction(async (tx) => {
+        if (phoneUser && phoneUser.id !== openidUser.id) {
+          await tx.endUser.update({
+            where: { id: openidUser.id },
+            data: { wxOpenId: null },
+          })
+          return tx.endUser.update({
+            where: { id: phoneUser.id },
+            data: { wxOpenId: openid, lastLoginAt: new Date() },
+          })
+        }
+        return tx.endUser.update({
+          where: { id: openidUser.id },
+          data: {
+            phoneHash,
+            phoneEnc: encryptPhone(phone),
+            lastLoginAt: new Date(),
+          },
+        })
+      })
+    } else if (!phoneUser) {
       endUser = await this.prisma.endUser.create({
         data: {
           phoneHash,
@@ -429,7 +456,7 @@ export class MemberAuthService {
       })
     } else {
       endUser = await this.prisma.endUser.update({
-        where: { id: existing.id },
+        where: { id: phoneUser.id },
         data: { wxOpenId: openid, lastLoginAt: new Date() },
       })
     }

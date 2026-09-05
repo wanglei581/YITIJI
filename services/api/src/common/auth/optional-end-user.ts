@@ -2,6 +2,7 @@ import { JwtService } from '@nestjs/jwt'
 import type { RedisService } from '../redis/redis.service'
 import { memberSessionKey } from '../guards/end-user-auth.guard'
 import type { PrismaService } from '../../prisma/prisma.service'
+import { tryRedis } from '../redis/redis-degradation'
 
 interface EndUserJwtPayload {
   sub: string
@@ -42,8 +43,8 @@ export async function resolveOptionalEndUser(
   const sessionId = payload.jti
   if (!payload.sub || !sessionId) return null
 
-  const ownerId = await redis.get(memberSessionKey(sessionId))
-  if (ownerId !== payload.sub) return null
+  const owner = await tryRedis('optional-member-session:get', () => redis.get(memberSessionKey(sessionId)))
+  if (!owner.ok || owner.value !== payload.sub) return null
 
   let user: { enabled: boolean; status: string } | null
   try {
@@ -57,7 +58,10 @@ export async function resolveOptionalEndUser(
     return null
   }
   if (!user || !user.enabled || user.status !== 'active') {
-    await redis.unregisterMemberSession(payload.sub, sessionId)
+    await tryRedis(
+      'optional-member-session:unregister',
+      () => redis.unregisterMemberSession(payload.sub, sessionId),
+    )
     return null
   }
 

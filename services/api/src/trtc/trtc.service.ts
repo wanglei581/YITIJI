@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
+import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { genUserSig } from './usersig.util'
 import { callTencentApi } from './tencent-api.util'
 import {
@@ -182,7 +182,10 @@ export class TrtcService {
       this.logger.log(`AI 会话已结束 task=${taskId}`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      this.logger.warn(`StopAIConversation 失败（忽略）: ${msg}`)
+      this.logger.warn(`StopAIConversation 失败: ${msg}`)
+      throw new ServiceUnavailableException({
+        error: { code: 'TRTC_STOP_FAILED', message: '结束 AI 对话失败，请重试', retryable: true },
+      })
     }
   }
 }
