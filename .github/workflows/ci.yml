@@ -1006,6 +1006,9 @@ jobs:
 
       - name: Verify Kiosk fusion baseline
         run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
+      - name: Verify 青序流光 prototype geometry (1080×1920, all fixture states)
+        # Real Chromium render of docs/design/kiosk-redesign-2026-08: stage clipping, card overflow, touch ≥48, font ≥14, <16px ratchet.
+        run: pnpm --filter @ai-job-print/kiosk verify:qingxu-proto-geometry
 
       - name: Verify Kiosk feedback entry gate
         run: pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry
