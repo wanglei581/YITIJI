@@ -13,6 +13,7 @@ import { Building2Icon, PlusIcon, RefreshCwIcon } from 'lucide-react'
 import {
   COMPANY_TYPES,
   COMPANY_INDUSTRIES,
+  formatDateTime,
   PROVINCES,
   citiesOf,
   districtsOf,
@@ -68,10 +69,7 @@ function regionText(c: PartnerCompanyRecord): string {
 }
 
 function fmtTime(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(iso, { fallback: iso })
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────

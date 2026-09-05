@@ -165,8 +165,9 @@ export class CompaniesService {
     const fairCompanyCount = await this.prisma.companyProfile.count({ where: { ...where, fairParticipant: true } })
     const jobWhere = { ...publishedJob(), companyProfile: { is: where } }
     const openJobCount = await this.prisma.job.count({ where: jobWhere })
-    const startOfToday = new Date()
-    startOfToday.setHours(0, 0, 0, 0)
+    const shanghaiNow = new Date(Date.now() + 8 * 60 * 60 * 1000)
+    shanghaiNow.setUTCHours(0, 0, 0, 0)
+    const startOfToday = new Date(shanghaiNow.getTime() - 8 * 60 * 60 * 1000)
     const todayNewJobCount = await this.prisma.job.count({ where: { ...jobWhere, syncTime: { gte: startOfToday } } })
     return { companyCount, openJobCount, todayNewJobCount, fairCompanyCount }
   }

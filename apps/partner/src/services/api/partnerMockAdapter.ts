@@ -320,7 +320,7 @@ export const partnerMockAdapter = {
   },
   async importPartnerJobs(items: ImportJobItem[]): Promise<ImportResult<PartnerJobRecord>> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     const added: PartnerJobRecord[] = items.map((item) => ({
       id: genId(), externalId: item.externalId, title: item.title,
       company: item.company, city: item.city,
@@ -337,7 +337,7 @@ export const partnerMockAdapter = {
   // 阶段1C:编辑本机构岗位(mock 同步后端状态机:编辑后回 pending+draft 重审)
   async updatePartnerJob(id: string, input: UpdatePartnerJobInput): Promise<PartnerJobRecord> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     PARTNER_JOBS = PARTNER_JOBS.map((j) =>
       j.id === id
         ? {
@@ -369,7 +369,7 @@ export const partnerMockAdapter = {
   },
   async importPartnerFairs(items: ImportFairItem[]): Promise<ImportResult<PartnerFairRecord>> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     const added: PartnerFairRecord[] = items.map((item) => {
       const start = new Date(item.startAt)
       const end   = new Date(item.endAt)
@@ -391,7 +391,7 @@ export const partnerMockAdapter = {
   // 阶段1C:编辑本机构招聘会(mock 同步后端状态机)
   async updatePartnerFair(id: string, input: UpdatePartnerFairInput): Promise<PartnerFairRecord> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     PARTNER_FAIRS = PARTNER_FAIRS.map((f) => {
       if (f.id !== id) return f
       const next = { ...f }

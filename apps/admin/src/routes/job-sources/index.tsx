@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, Drawer, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, FilterIcon, XIcon } from 'lucide-react'
@@ -249,7 +250,7 @@ export default function JobSourcesPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.company}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{s.city}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.salary}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(s.syncTime)}</td>
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -358,7 +359,7 @@ export default function JobSourcesPage() {
             <DetailRow label="标签" value={viewing.tags.length ? viewing.tags.join('、') : undefined} />
             <DetailRow label="岗位描述" value={viewing.description} />
             <DetailRow label="任职要求" value={viewing.requirements} />
-            <DetailRow label="同步时间" value={viewing.syncTime} />
+            <DetailRow label="同步时间" value={formatDateTime(viewing.syncTime)} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
             <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
             <DetailRow

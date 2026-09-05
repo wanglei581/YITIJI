@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { MessageSquareIcon, RefreshCwIcon, SendIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -68,7 +69,7 @@ const REPLY_SENDER_LABEL: Record<AdminFeedbackTicketDetail['replies'][number]['s
 }
 
 function fmt(iso: string): string {
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 /**

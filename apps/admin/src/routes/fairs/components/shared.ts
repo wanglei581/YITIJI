@@ -1,3 +1,4 @@
+import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import { API_BASE_URL } from '../../../services/api/client'
 
 // fairs 路由内多个子组件与主页共享的展示常量与工具函数。
@@ -57,9 +58,7 @@ export function deriveTimeStatus(startAt: string, endAt: string): FairTimeStatus
 }
 
 export function fmtDateTime(iso: string): string {
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(iso)
 }
 
 export function formatSize(kb: number): string {
@@ -73,14 +72,12 @@ export function resolvePreviewUrl(previewUrl: string): string {
   return previewUrl.startsWith('/') ? `${origin}${previewUrl}` : previewUrl
 }
 
-/** ISO ↔ <input type="datetime-local">(本地时区)。 */
+/** ISO ↔ <input type="datetime-local">（Asia/Shanghai 墙钟）。 */
 export function isoToLocalInput(iso: string): string {
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  return toDatetimeLocalValue(iso)
 }
 export function localInputToIso(value: string): string {
-  return new Date(value).toISOString()
+  return fromDatetimeLocalValue(value)
 }
 
 export const inputCls =

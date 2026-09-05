@@ -13,6 +13,7 @@ import {
   MEMBER_DATA_REQUEST_STATUS_LABEL,
   MEMBER_DATA_REQUEST_TYPE_HINT,
   MEMBER_DATA_REQUEST_TYPE_LABEL,
+  formatDateTime,
   type MemberDataRequestItem,
 } from '@ai-job-print/shared'
 import { FileDownIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react'
@@ -22,7 +23,7 @@ import { createMyDataRequest, listMyDataRequests } from '../../../services/api/m
 import './me-detail-inkpaper.css'
 
 function fmt(iso: string): string {
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 export function MyPrivacyRequestsPage() {

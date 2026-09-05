@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FileSpreadsheetIcon, SearchIcon } from 'lucide-react'
@@ -36,8 +37,7 @@ const DATA_TYPE_FILTER_MAP: Record<string, 'job' | 'fair' | null> = {
 const PAGE_SIZE = 15
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
-  return iso.replace('T', ' ').slice(0, 16)
+  return formatDateTime(iso)
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

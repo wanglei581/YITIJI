@@ -3,6 +3,7 @@ import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-prin
 import {
   ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT,
   ADMIN_DATA_REQUEST_REJECT_HINT,
+  formatDateTime,
   MEMBER_DATA_REQUEST_SCOPE,
   MEMBER_DATA_REQUEST_STATUS_LABEL,
   MEMBER_DATA_REQUEST_TYPE_LABEL,
@@ -37,7 +38,7 @@ const STATUS_CLASS: Record<MemberDataRequestStatus, string> = {
 }
 
 function fmt(iso: string): string {
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 function shortId(id: string): string {

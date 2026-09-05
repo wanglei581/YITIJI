@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { ScrollTextIcon } from 'lucide-react'
@@ -204,7 +205,7 @@ export default function PolicySourcesPage() {
                           : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—')}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{r.syncTime.slice(0, 16).replace('T', ' ')}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(r.syncTime)}</td>
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="px-4 py-3">

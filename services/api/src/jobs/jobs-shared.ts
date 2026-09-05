@@ -436,8 +436,13 @@ export function categoryToWorkType(category: string | null): WorkType | undefine
   }
 }
 
+/** 对外时间一律 ISO-8601（含 Z）。展示由三端 formatDateTime 按 Asia/Shanghai 格式化。 */
 export function fmtSyncTime(d: Date): string {
-  return d.toISOString().replace('T', ' ').slice(0, 16)
+  return d.toISOString()
+}
+
+function shanghaiDate(d: Date): string {
+  return new Date(d.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
 export function normalizeOptionalHttpUrl(value: string | undefined, fieldName: string): string | null | undefined {
@@ -583,7 +588,7 @@ export function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
     salaryDisplay,
-    dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${j.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+    dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${shanghaiDate(j.syncTime)} · 仅供参考`,
     companyProfileId: j.companyProfileId ?? null,
   }
 }
@@ -654,7 +659,7 @@ export function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     hasManagedData: companyCount > 0,
     managedCompanyCount: companyCount,
     managedMaterialCount: 0,
-    dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${f.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+    dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${shanghaiDate(f.syncTime)} · 仅供参考`,
     jobCount: f.jobCount,
     theme: f.theme,
     city: f.city,

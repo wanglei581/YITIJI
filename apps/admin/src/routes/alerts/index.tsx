@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
@@ -42,7 +43,7 @@ const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [
 ]
 
 function fmt(iso: string): string {
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 function handlingLabel(alert: AdminAlertItem): { badge: 'info' | 'warning' | 'default'; label: string } {

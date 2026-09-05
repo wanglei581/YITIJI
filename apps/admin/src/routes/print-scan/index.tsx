@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
@@ -128,7 +129,7 @@ const CAPABILITY_STATUS_BADGE: Record<PrintScanCapabilityStatus, { badge: 'succe
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
 
 function fmt(iso: string | null): string {
-  return iso ? iso.slice(0, 16).replace('T', ' ') : '—'
+  return formatDateTime(iso)
 }
 
 function taskSummary(item: AdminPrintScanTaskItem): string {

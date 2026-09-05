@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState } from '@ai-job-print/ui'
-import type { ExternalJobFairDTO, FairCompanyDTO, FairZoneDTO } from '@ai-job-print/shared'
+import { formatDateTime, parseInstant, shanghaiParts, type ExternalJobFairDTO, type FairCompanyDTO, type FairZoneDTO } from '@ai-job-print/shared'
 import {
   AwardIcon,
   BriefcaseIcon,
@@ -64,27 +64,21 @@ function categoryOf(title: string) {
   return '职能类'
 }
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
 function fmtDate(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+  return formatDateTime(iso, { style: 'zh-date', fallback: iso })
 }
 function fmtTime(iso: string) {
-  const d = new Date(iso)
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return formatDateTime(iso, { style: 'time', fallback: iso })
 }
 function fmtSync(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+  return formatDateTime(iso, { style: 'zh-date', fallback: iso })
 }
 /** 活动信息「举办时间」：同日显示「日期 起–止」，跨日显示「起日期 – 止日期」。 */
 function fmtHeldTime(start: string, end: string) {
-  const a = new Date(start)
-  const b = new Date(end)
-  const sameDay = a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const a = parseInstant(start)
+  const b = parseInstant(end)
+  if (!a || !b) return `${start} – ${end}`
+  const sameDay = shanghaiParts(a).dateKey === shanghaiParts(b).dateKey
   return sameDay
     ? `${fmtDate(start)} ${fmtTime(start)}–${fmtTime(end)}`
     : `${fmtDate(start)} – ${fmtDate(end)}`
