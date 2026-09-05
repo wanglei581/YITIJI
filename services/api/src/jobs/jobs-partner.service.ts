@@ -939,29 +939,6 @@ export class JobsPartnerService {
     }
   }
 
-<<<<<<< HEAD
-  async getPartnerSyncLogs(user: AuthedUser): Promise<SyncLogDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.syncLog.findMany({
-      where: { orgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-      include: { source: { select: { name: true } } },
-    })
-    return rows.map((r, i) => ({
-      id: r.id,
-      no: `SYNC-${r.createdAt.toISOString().slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
-      source: r.source?.name ?? r.sourceId,
-      dataType: r.dataType as 'job' | 'fair',
-      addedCount: r.addedCount,
-      updatedCount: r.updatedCount,
-      errorCount: r.errorCount,
-      dupCount: r.dupCount,
-      errorFields: r.errorFields === '[]' ? null : r.errorFields,
-      errorDetail: r.errorDetail,
-      syncTime: fmtSyncTime(r.createdAt),
-      status: r.result as 'success' | 'partial' | 'failed',
-    }))
-=======
   async getPartnerSyncLogs(
     user: AuthedUser,
     query: {
@@ -1014,6 +991,5 @@ export class JobsPartnerService {
         totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
       },
     }
->>>>>>> origin/main
   }
 }
