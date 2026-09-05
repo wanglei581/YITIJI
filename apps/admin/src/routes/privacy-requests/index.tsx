@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { ShieldIcon, RefreshCwIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -49,7 +50,7 @@ const TH_CLS = 'whitespace-nowrap border-b border-neutral-900/10 px-2.5 py-2 tex
 const TD_CLS = 'whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-[11px]'
 
 function fmt(iso: string | null): string {
-  return iso ? iso.slice(0, 16).replace('T', ' ') : '—'
+  return formatDateTime(iso)
 }
 
 function Info({ label, value }: { label: string; value: string }) {

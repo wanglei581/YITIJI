@@ -1,4 +1,4 @@
-import type { ExternalJobDTO } from '@ai-job-print/shared'
+import { formatDateTime, parseInstant, shanghaiParts, type ExternalJobDTO } from '@ai-job-print/shared'
 
 export const TYPE_OPTIONS: { label: string; category: string; hint: string }[] = [
   { label: '全部', category: '', hint: '查看所有已发布岗位' },
@@ -52,15 +52,14 @@ export interface TagCount {
 }
 
 export function formatSync(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${d.getMonth() + 1}月${d.getDate()}日更新`
+  const instant = parseInstant(iso)
+  if (!instant) return ''
+  const parts = shanghaiParts(instant)
+  return `${parts.month}月${parts.day}日更新`
 }
 
 export function formatFullDate(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+  return formatDateTime(iso, { style: 'zh-date', fallback: iso })
 }
 
 export function uniqueSorted(values: (string | undefined)[]): string[] {

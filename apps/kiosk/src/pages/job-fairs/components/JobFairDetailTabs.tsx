@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
-import type {
-  ExternalJobFairDTO,
-  FairCompanyDTO,
-  FairZoneDTO,
-  FairVenueGuideDTO,
-  FairVenueHallDTO,
+import {
+  formatDateTime,
+  type ExternalJobFairDTO,
+  type FairCompanyDTO,
+  type FairZoneDTO,
+  type FairVenueGuideDTO,
+  type FairVenueHallDTO,
 } from '@ai-job-print/shared'
 import {
   BriefcaseIcon,
@@ -58,16 +59,11 @@ function categoryOf(title: string) {
   return '职能类'
 }
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-function formatDateTime(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`
+function formatFairDateTime(iso: string) {
+  return formatDateTime(iso, { style: 'zh-datetime', fallback: iso })
 }
 function formatSync(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+  return formatDateTime(iso, { style: 'zh-date', fallback: iso })
 }
 
 // ─── Tab① 详情与特色 ─────────────────────────────────────────────────────────────
@@ -125,7 +121,7 @@ export function DetailsTab({
             </div>
             <div className="jf-kv" style={{ marginTop: 16 }}>
               <div className="k">活动时间</div>
-              <div className="v">{formatDateTime(fair.startTime)} — {formatDateTime(fair.endTime)}</div>
+              <div className="v">{formatFairDateTime(fair.startTime)} — {formatFairDateTime(fair.endTime)}</div>
             </div>
             {/* pill 行 */}
             <div className="jf-pill-row">

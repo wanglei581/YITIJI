@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { RefreshCwIcon } from 'lucide-react'
@@ -137,7 +138,7 @@ export default function SyncLogsPage() {
                           : <span className="text-neutral-300">—</span>}
                       </td>
                       <td className="px-4 py-3"><StatusBadge dot status={res.badge} label={res.label} /></td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{l.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(l.syncTime)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         {/* 「重试」已移除:后端暂无按日志重放端点,失败数据请修正后重新导入(审计修复) */}
                         <button
@@ -174,7 +175,7 @@ export default function SyncLogsPage() {
               <DetailRow label="结果" value={RESULT_MAP[detail.status]?.label ?? detail.status} />
               <DetailRow label="新增 / 更新" value={`${detail.addedCount} / ${detail.updatedCount}`} />
               <DetailRow label="失败 / 重复" value={`${detail.errorCount} / ${detail.dupCount}`} />
-              <DetailRow label="同步时间" value={detail.syncTime} />
+              <DetailRow label="同步时间" value={formatDateTime(detail.syncTime)} />
               {detail.errorFields && (
                 <div>
                   <p className="mb-1 text-xs text-neutral-400">异常字段</p>

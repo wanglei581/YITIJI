@@ -333,7 +333,7 @@ export class MemberAuthService {
   }
 
   private dayBucket(): string {
-    return new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
   }
 
   private hourBucket(): string {

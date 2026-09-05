@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { GiftIcon, RefreshCwIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -40,13 +41,11 @@ const STATUS_CLASS: Record<AdminBenefitActivityStatus, string> = {
 }
 
 function fmt(iso: string | null): string {
-  if (!iso) return '—'
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 function toLocalInput(iso: string | null): string {
-  if (!iso) return ''
-  return iso.slice(0, 16)
+  return toDatetimeLocalValue(iso)
 }
 
 function defaultTitle(type: AdminBenefitActivityType): string {
@@ -142,8 +141,8 @@ export default function BenefitActivitiesPage() {
       sourceType: form.sourceType,
       quantityTotal: quantityEnabled && form.quantityTotal ? Number(form.quantityTotal) : null,
       stockTotal: form.stockTotal ? Number(form.stockTotal) : null,
-      validFrom: form.validFrom ? new Date(form.validFrom).toISOString() : null,
-      validUntil: form.validUntil ? new Date(form.validUntil).toISOString() : null,
+      validFrom: form.validFrom ? fromDatetimeLocalValue(form.validFrom) : null,
+      validUntil: form.validUntil ? fromDatetimeLocalValue(form.validUntil) : null,
       grantValidDays: form.grantValidDays ? Number(form.grantValidDays) : null,
     }
     try {

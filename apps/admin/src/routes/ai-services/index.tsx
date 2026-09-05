@@ -8,6 +8,7 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge, LoadingState, ErrorState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
@@ -722,7 +723,7 @@ export default function AiServicesPage() {
                           : `${log.latencyMs}ms`}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">
-                        {log.createdAt}
+                        {formatDateTime(log.createdAt)}
                       </td>
                     </tr>
                   ))

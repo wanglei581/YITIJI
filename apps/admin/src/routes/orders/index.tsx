@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
@@ -98,7 +99,7 @@ function pickupText(order: { pickupStatus: string; channel: string | null }): st
 }
 
 function fmt(iso: string | null): string {
-  return iso ? iso.slice(0, 16).replace('T', ' ') : '—'
+  return formatDateTime(iso)
 }
 
 function amountText(amountCents: number, currency: string): string {

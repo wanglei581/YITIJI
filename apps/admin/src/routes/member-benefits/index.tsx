@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useMemo, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { GiftIcon, RefreshCwIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -40,8 +41,7 @@ const STATUS_CLASS: Record<AdminBenefitGrantItem['status'], string> = {
 }
 
 function fmt(iso: string | null): string {
-  if (!iso) return '—'
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 function defaultTitle(type: AdminBenefitType): string {

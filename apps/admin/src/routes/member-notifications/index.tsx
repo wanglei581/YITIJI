@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { MegaphoneIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
 import { Page } from '../Page'
@@ -27,7 +28,7 @@ const CATEGORY_CLASS: Record<SystemBroadcastCategory, string> = {
 }
 
 function fmt(iso: string): string {
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 export default function MemberNotificationsPage() {

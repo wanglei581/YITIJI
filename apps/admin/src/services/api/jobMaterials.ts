@@ -1,5 +1,4 @@
-import type { JobMaterialAdminSummary, JobMaterialTemplate } from '@ai-job-print/shared'
-import { JOB_MATERIAL_TEMPLATES } from '@ai-job-print/shared'
+import { formatDate, JOB_MATERIAL_TEMPLATES, type JobMaterialAdminSummary, type JobMaterialTemplate } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
@@ -54,7 +53,7 @@ function mockSummary(): JobMaterialAdminSummary {
     last7DaysGenerated: Array.from({ length: 7 }, (_, index) => {
       const date = new Date()
       date.setDate(date.getDate() - (6 - index))
-      return { date: date.toISOString().slice(0, 10), count: index % 3 }
+      return { date: formatDate(date), count: index % 3 }
     }),
     templates,
   }

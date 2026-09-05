@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { mergeById, replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
@@ -372,7 +373,7 @@ export default function JobsPage() {
                           查看来源
                         </a>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{j.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(j.syncTime)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge dot status={review.badge}  label={review.label}  />
                         <RejectReason reviewStatus={j.reviewStatus} reason={j.rejectReason} />

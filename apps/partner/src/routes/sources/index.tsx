@@ -21,7 +21,7 @@ import {
   archiveDataSource,
   unarchiveDataSource,
 } from '../../services/api'
-import { WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
+import { formatDateTime, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import { ExcelImportModal } from './ExcelImportModal'
 import { omitWebhookSecretOnce } from './omitWebhookSecretOnce'
 import { RotateCredentialDrawer } from './RotateCredentialDrawer'
@@ -513,7 +513,7 @@ export default function SourcesPage() {
                       <span className={s.connStatus === 'error' ? 'text-error-fg' : ''}>{s.description}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{FREQ_LABELS[s.syncFreq]}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.lastSyncTime}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(s.lastSyncTime)}</td>
                     <td className="px-4 py-3"><StatusBadge dot status={conn.badge} label={s.activationManagedBy === 'admin' && s.connStatus === 'disabled' ? '待管理员启用' : conn.label} /></td>
                     <td className="px-4 py-3 text-center font-medium text-success-fg">{s.successCount}</td>
                     <td className="px-4 py-3 text-center font-medium text-error-fg">{s.failCount}</td>

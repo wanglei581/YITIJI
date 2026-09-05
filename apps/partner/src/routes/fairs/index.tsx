@@ -3,6 +3,7 @@ import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/ref
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, PlusIcon } from 'lucide-react'
+import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import type {
   PartnerFairRecord,
   JobFairStatus,
@@ -64,15 +65,12 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
-/** ISO ↔ <input type="datetime-local">(本地时区)。 */
+/** ISO ↔ <input type="datetime-local">（Asia/Shanghai 墙钟）。 */
 function isoToLocalInput(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  return toDatetimeLocalValue(iso)
 }
 function localInputToIso(value: string): string {
-  return new Date(value).toISOString()
+  return fromDatetimeLocalValue(value)
 }
 
 interface FairFormState {
@@ -329,8 +327,8 @@ export default function FairsPage() {
                       <td className="px-4 py-3 font-medium text-neutral-800">{f.name}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{f.organizer}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        <div>{f.startTime.slice(0, 16).replace('T', ' ')}</div>
-                        <div className="text-neutral-300">至 {f.endTime.slice(5, 16).replace('T', ' ')}</div>
+                        <div>{formatDateTime(f.startTime)}</div>
+                        <div className="text-neutral-300">至 {formatDateTime(f.endTime)}</div>
                       </td>
                       <td className="px-4 py-3 text-xs text-neutral-500">{f.venue}</td>
                       <td className="px-4 py-3">
@@ -350,7 +348,7 @@ export default function FairsPage() {
                           <span className="text-neutral-300">未配置</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{f.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(f.syncTime)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge dot status={review.badge}  label={review.label}  />
                         <RejectReason reviewStatus={f.reviewStatus} reason={f.rejectReason} />

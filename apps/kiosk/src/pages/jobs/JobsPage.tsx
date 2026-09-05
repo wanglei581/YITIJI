@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
-import type { ExternalJobDTO, JobAiRecommendationDTO, MemberResumeItem } from '@ai-job-print/shared'
+import { formatDateTime, parseInstant, type ExternalJobDTO, type JobAiRecommendationDTO, type MemberResumeItem } from '@ai-job-print/shared'
 import { Building2Icon, FilterIcon, RefreshCwIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
@@ -24,13 +24,8 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
-function formatW4Date(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '暂无同步时间'
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+function formatW4Date(iso: string | Date) {
+  return formatDateTime(iso, { fallback: '暂无同步时间' })
 }
 
 export function JobsPage() {
@@ -156,10 +151,7 @@ export function JobsPage() {
   const displayedJobs = useMemo(() => {
     const base = favoritesOnly ? listJobs.filter((job) => favoriteSet.has(job.id)) : listJobs
     // 展示端排序：只对已载入的真实数据重排，不改变筛选查询本身
-    const time = (iso: string) => {
-      const value = Date.parse(iso)
-      return Number.isNaN(value) ? 0 : value
-    }
+    const time = (iso: string) => parseInstant(iso)?.getTime() ?? 0
     return [...base].sort((a, b) => {
       if (sortMode === 'salary_first') {
         // 薪资标注完整的岗位优先（不伪造薪资，仅按"来源是否提供"排序）
@@ -175,10 +167,10 @@ export function JobsPage() {
   const aiRecommendationMode = aiRecommendations !== null
   const latestSync = useMemo(() => {
     const times = displayedJobs
-      .map((job) => Date.parse(job.syncTime))
-      .filter((value) => !Number.isNaN(value))
+      .map((job) => parseInstant(job.syncTime)?.getTime())
+      .filter((value): value is number => value != null)
     if (times.length === 0) return '暂无'
-    return formatW4Date(new Date(Math.max(...times)).toISOString())
+    return formatW4Date(new Date(Math.max(...times)))
   }, [displayedJobs])
 
   function requireToken(): string | null {

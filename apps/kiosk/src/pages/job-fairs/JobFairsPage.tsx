@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
-import type { ExternalJobFairDTO } from '@ai-job-print/shared'
+import { formatDateTime, parseInstant, shanghaiParts, shanghaiTodayKey, type ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
   Building2Icon,
   CalendarIcon,
@@ -41,18 +41,19 @@ const THEME_LABEL: Record<string, string> = {
 
 // ─── 时间格式化 ──────────────────────────────────────────────────────────────────
 function pad(n: number) { return String(n).padStart(2, '0') }
-function fmtDate(iso: string) { const d = new Date(iso); return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
-function fmtTime(iso: string) { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}` }
+function fmtDate(iso: string) { return formatDateTime(iso, { style: 'month-day', fallback: iso }) }
+function fmtTime(iso: string) { return formatDateTime(iso, { style: 'time', fallback: iso }) }
 function fmtSync(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const today = new Date()
-  if (d.toDateString() === today.toDateString()) return `今天 ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const instant = parseInstant(iso)
+  if (!instant) return iso
+  const parts = shanghaiParts(instant)
+  if (parts.dateKey === shanghaiTodayKey()) return `今天 ${pad(parts.hour)}:${pad(parts.minute)}`
+  return `${pad(parts.month)}-${pad(parts.day)}`
 }
 function dateKey(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const instant = parseInstant(iso)
+  if (!instant) return iso
+  return shanghaiParts(instant).dateKey
 }
 
 // ─── 扫码预约弹层 ─────────────────────────────────────────────────────────────────

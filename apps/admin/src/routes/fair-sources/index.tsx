@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, Drawer, ErrorState, LoadingState, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, FilterIcon, SearchIcon, XIcon } from 'lucide-react'
@@ -240,8 +241,8 @@ export default function FairSourcesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.organizer}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        <div>{s.startTime}</div>
-                        <div className="text-neutral-300">至 {s.endTime.slice(5)}</div>
+                        <div>{formatDateTime(s.startTime)}</div>
+                        <div className="text-neutral-300">至 {formatDateTime(s.endTime)}</div>
                       </td>
                       <td className="px-4 py-3 text-xs text-neutral-500">{s.venue}</td>
                       <td className="px-4 py-3">
@@ -249,7 +250,7 @@ export default function FairSourcesPage() {
                           {FAIR_STATUS_LABELS[s.status]}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(s.syncTime)}</td>
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -353,13 +354,13 @@ export default function FairSourcesPage() {
             <DetailRow label="来源签到链接" value={viewing.checkinUrl ? <a href={viewing.checkinUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">查看来源签到入口</a> : '未配置'} />
             <DetailRow label="招聘会名称" value={viewing.name} />
             <DetailRow label="主办方" value={viewing.organizer} />
-            <DetailRow label="开始时间" value={viewing.startTime} />
-            <DetailRow label="结束时间" value={viewing.endTime} />
+            <DetailRow label="开始时间" value={formatDateTime(viewing.startTime)} />
+            <DetailRow label="结束时间" value={formatDateTime(viewing.endTime)} />
             <DetailRow label="举办场馆" value={viewing.venue} />
             <DetailRow label="活动状态" value={FAIR_STATUS_LABELS[viewing.status]} />
             <DetailRow label="展位数" value={viewing.boothCount !== undefined ? String(viewing.boothCount) : undefined} />
             <DetailRow label="描述" value={viewing.description} />
-            <DetailRow label="同步时间" value={viewing.syncTime} />
+            <DetailRow label="同步时间" value={formatDateTime(viewing.syncTime)} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
             <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
             {viewing.reviewStatus === 'rejected' && viewing.rejectReason ? (
