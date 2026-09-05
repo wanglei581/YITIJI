@@ -20,6 +20,18 @@ type OrderClient = Pick<PrismaTransactionClient, 'order'>
  */
 const PICKUP_MAX_ATTEMPTS = 6
 
+/** 线上入账时取件窗口已关：渠道钱已到、本单无法出纸，记待退而不转 paid。 */
+export const ONLINE_PAID_PENDING_REFUND_REASON = 'ONLINE_PAID_PENDING_REFUND'
+
+/** 取件窗口已关：过期截止已到，或到机码已被标 expired/cancelled。 */
+export function isPickupWindowClosed(order: {
+  pickupCodeExpiresAt: Date | null
+  pickupStatus: string
+}): boolean {
+  if (order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= new Date()) return true
+  return order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled'
+}
+
 /** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。markPaid 的 update data 中唯一带唯一索引的列即 pickupCode。 */
 function isPickupCodeUniqueConflict(e: unknown): boolean {
   const err = e as { code?: string; meta?: { target?: unknown } }
@@ -95,10 +107,7 @@ export class OrderStatusService {
     //
     // 只拒「有截止时间且已过」：一体机现场单不写 pickupCodeExpiresAt（为 null），
     // 按 null 也拒会误伤现场收款这条主链路。
-    if (order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= new Date()) {
-      throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
-    }
-    if (order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled') {
+    if (isPickupWindowClosed(order)) {
       throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
     }
     // free 只能用于零额免费单，杜绝把付费单伪装成免费。
@@ -174,7 +183,8 @@ export class OrderStatusService {
    *
    * - 合法起点：unpaid / paying；`closed` 仅当 late=true（已存在支付尝试的有效迟到回调）。
    * - 落库：payStatus=paid + paymentSource=channel + payChannel=channel + paidAt +
-   *   paidBy='online_callback' + 唯一 pickupCode；CAS + 取件码撞码有界重试（同 markPaid）。
+   *   paidBy='online_callback'；无 pickupCodeHash 时才铸明文 pickupCode（同 markPaid）。
+   * - 取件窗口已关（过期/已取消）：拒绝转 paid，refundReason=ONLINE_PAID_PENDING_REFUND，审计待退。
    * - 幂等：已 paid 且 paymentSource=channel → 原样返回，不重复副作用/审计；
    *   已 paid 但来源不同（如 Admin 已线下确认）→ ORDER_ALREADY_PAID 冲突，绝不覆盖。
    * - 审计 action=order.mark_paid_online，payload 带 late 标记 —— 迟到回调入账必须可审计
@@ -199,6 +209,12 @@ export class OrderStatusService {
       if (order.paymentSource === channel) return order
       throw new BadRequestException('ORDER_ALREADY_PAID')
     }
+    // 取件窗口已关：渠道钱可能已入账，但本单无法出纸。拒绝转 paid，记「已收款待退」。
+    // 迟到回调仍走这条：closed 且窗口仍开才能入账履约；过期/已取消的云打印单不能再铸幽灵码。
+    if (isPickupWindowClosed(order)) {
+      await this.recordOnlinePaidPendingRefund(order, opts)
+      throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
+    }
     // closed 只对迟到回调开放（caller 已确认回调绑定到已存在的 PaymentAttempt 且全字段匹配）。
     const late = opts.late || order.payStatus === 'closed'
     const fromStatuses = late ? ['unpaid', 'paying', 'closed'] : ['unpaid', 'paying']
@@ -206,9 +222,11 @@ export class OrderStatusService {
       throw new BadRequestException('ORDER_INVALID_TRANSITION') // refunded / failed 不可转 paid
     }
 
+    // 已有 pickupCodeHash 的云打印单不再另铸明文码（与 markPaid 同一口径）。
+    const mintPickupCode = order.pickupCodeHash == null
     let settled = false
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = await this.generateUniquePickupCode(this.prisma)
+      const pickupCode = mintPickupCode ? await this.generateUniquePickupCode(this.prisma) : null
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
@@ -219,7 +237,7 @@ export class OrderStatusService {
             payChannel: channel,
             paidAt: new Date(),
             paidBy: 'online_callback',
-            pickupCode,
+            ...(mintPickupCode ? { pickupCode } : {}),
           },
         })
       } catch (e) {
@@ -396,6 +414,37 @@ export class OrderStatusService {
     const order = await client.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
     return order
+  }
+
+  /**
+   * 渠道已收款但取件窗口已关：不转 paid（无法出纸），落 refundReason + 审计供对账退款。
+   * 幂等：已标记待退则不再重复写库，仍补一条审计以外的调用由 caller 按同错误码处理。
+   */
+  private async recordOnlinePaidPendingRefund(
+    order: OrderRecord,
+    opts: { channel: PaymentChannel; attemptId: string; channelTxnNo: string; late: boolean },
+  ): Promise<void> {
+    if (order.refundReason !== ONLINE_PAID_PENDING_REFUND_REASON) {
+      await this.prisma.order.updateMany({
+        where: { id: order.id, refundReason: null, payStatus: { not: 'paid' } },
+        data: { refundReason: ONLINE_PAID_PENDING_REFUND_REASON },
+      })
+    }
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'order.online_payment_pending_refund',
+      targetType: 'order',
+      targetId: order.id,
+      payload: {
+        channel: opts.channel,
+        attemptId: opts.attemptId,
+        channelTxnNo: opts.channelTxnNo,
+        late: opts.late,
+        pickupStatus: order.pickupStatus,
+        reason: 'pickup_window_closed',
+      },
+    })
   }
 
   /** 生成库内唯一取件码；有界重试（不无限循环），穷尽后 fail-closed。唯一索引为最终防撞。 */
