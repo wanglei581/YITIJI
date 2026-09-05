@@ -67,6 +67,46 @@ function parseServices(raw: unknown): string[] {
   }
 }
 
+const PUBLIC_AGENCY_LIST_SELECT = {
+  id: true, name: true, orgType: true, address: true, district: true,
+  lat: true, lng: true, openHours: true, phone: true,
+  website: true, services: true, description: true, logoUrl: true,
+  status: true, sourceOrgId: true, externalId: true, syncTime: true,
+  createdAt: true, updatedAt: true,
+} as const
+
+/** 公开列表不得返回 contactEmail。phone/website 是门店公示联系方式，保留。 */
+function toPublicAgencyListItem(row: Record<string, unknown>): Record<string, unknown> {
+  const copy = { ...row }
+  delete copy['contactEmail']
+  return copy
+}
+
+/**
+ * 把 service 筛选下推到 Prisma where。
+ * services 存的是 JSON 数组字符串（默认 `"[]"`），也兼容逗号分隔存量。
+ * 含 LIKE 通配符或引号的 token 视为无匹配，避免过滤被绕过。
+ */
+export function publicServiceWhere(service: string | undefined): Record<string, unknown> | null {
+  const token = (service ?? '').trim()
+  if (!token) return null
+  if (token.length > 80 || /["\\%_]/.test(token)) {
+    return { id: { in: [] } }
+  }
+  return {
+    OR: [
+      { services: { contains: `"${token}"` } },
+      { services: { equals: token } },
+      { services: { startsWith: `${token},` } },
+      { services: { startsWith: `${token}，` } },
+      { services: { endsWith: `,${token}` } },
+      { services: { endsWith: `，${token}` } },
+      { services: { contains: `,${token},` } },
+      { services: { contains: `，${token}，` } },
+    ],
+  }
+}
+
 @Injectable()
 export class OfflineAgenciesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -91,6 +131,10 @@ export class OfflineAgenciesService {
         { description: { contains: keyword } },
       ]
     }
+    const serviceWhere = publicServiceWhere(service)
+    if (serviceWhere) {
+      where['AND'] = [serviceWhere]
+    }
 
     const [rows, total] = await Promise.all([
       this.prisma.offlineAgency.findMany({
@@ -98,26 +142,15 @@ export class OfflineAgenciesService {
         skip,
         take: pageSize,
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        select: {
-          id: true, name: true, orgType: true, address: true, district: true,
-          lat: true, lng: true, openHours: true, phone: true, contactEmail: true,
-          website: true, services: true, description: true, logoUrl: true,
-          status: true, sourceOrgId: true, externalId: true, syncTime: true,
-          createdAt: true, updatedAt: true,
-        },
+        select: PUBLIC_AGENCY_LIST_SELECT,
       }),
       this.prisma.offlineAgency.count({ where: where as never }),
     ])
 
-    let items = rows
-
-    if (service) {
-      items = items.filter((item: (typeof items)[number]) => parseServices(item.services).includes(service))
-    }
-
+    const items = rows.map((row) => toPublicAgencyListItem({ ...row } as Record<string, unknown>))
     return {
       data: items,
-      total: service ? items.length : total,
+      total: total,
       page,
       pageSize,
     }

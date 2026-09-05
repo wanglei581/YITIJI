@@ -387,6 +387,59 @@ check(
   '跨端契约与 kiosk 页面都不带有效期时长常量（带了就会有人拿它算倒计时）',
 )
 
+// ── API-15：公开线下机构列表不得泄露 contactEmail，筛选必须下推 ──────────
+console.log('\n--- 公开线下机构列表 ---')
+const publicFindAll = offlineService.slice(
+  offlineService.indexOf('async findAll('),
+  offlineService.indexOf('async findOne('),
+)
+check(
+  publicFindAll.includes('PUBLIC_AGENCY_LIST_SELECT') &&
+    /const PUBLIC_AGENCY_LIST_SELECT = \{[^}]*phone:\s*true,[^}]*website:\s*true/.test(offlineService.replace(/\n/g, ' ')) &&
+    !/const PUBLIC_AGENCY_LIST_SELECT = \{[^}]*contactEmail:\s*true/.test(offlineService.replace(/\n/g, ' ')) &&
+    !/contactEmail:\s*true/.test(publicFindAll) &&
+    publicFindAll.includes('toPublicAgencyListItem'),
+  '公开 findAll 的 select 不含 contactEmail，且映射层会剥掉该字段',
+)
+check(
+  !publicFindAll.includes('items.filter') &&
+    publicFindAll.includes('publicServiceWhere') &&
+    publicFindAll.includes("where['AND']"),
+  'service 筛选下推到 Prisma where，不再在分页之后内存过滤',
+)
+check(
+  offlineService.includes('contactEmail: dto.contactEmail') &&
+    offlineController.includes("@UseGuards(JwtAuthGuard, RolesGuard)") &&
+    offlineController.includes("@Roles('admin')"),
+  '管理端仍可读写 contactEmail，且整控制器有 admin 鉴权',
+)
+
+// ── API-22：未鉴权 stub 不得假成功 ──────────────────────────────────────
+console.log('\n--- 未实现 stub 必须 501 ---')
+const kioskSessionCtl = read('services/api/src/kiosk-session/kiosk-session.controller.ts')
+const kioskNotificationsCtl = read('services/api/src/notifications/notifications.controller.ts')
+const kioskActivitiesCtl = read('services/api/src/activities/activities.controller.ts')
+check(
+  kioskSessionCtl.includes('NotImplementedException') &&
+    kioskSessionCtl.includes('KIOSK_SESSION_NOT_IMPLEMENTED') &&
+    !kioskSessionCtl.includes('{ ok: true }'),
+  'kiosk/session heartbeat/extend 返回 501，不假成功',
+)
+check(
+  kioskNotificationsCtl.includes('NotImplementedException') &&
+    kioskNotificationsCtl.includes('KIOSK_NOTIFICATIONS_NOT_IMPLEMENTED') &&
+    !kioskNotificationsCtl.includes('unreadCount: 0') &&
+    !kioskNotificationsCtl.includes('{ ok: true }'),
+  'kiosk/notifications 返回 501，不返回空未读/假已读',
+)
+check(
+  kioskActivitiesCtl.includes('NotImplementedException') &&
+    kioskActivitiesCtl.includes('KIOSK_ACTIVITIES_NOT_IMPLEMENTED') &&
+    !kioskActivitiesCtl.includes('return { data: [] }') &&
+    !kioskActivitiesCtl.includes('return { id }'),
+  'kiosk/activities 返回 501，不回显假活动',
+)
+
 if (failed > 0) {
   console.error(`\n${failed} backend P0 contract check(s) failed.\n`)
   process.exit(1)

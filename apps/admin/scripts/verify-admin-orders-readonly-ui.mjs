@@ -120,4 +120,18 @@ if (
   fail('UNCONFIRMED verification buttons, confirm phrases and print-jobs client must stay aligned')
 }
 
+if (
+  service.includes('refundRequired: boolean') &&
+  service.includes("refundRequired: params.refundRequired ? 'true' : undefined") &&
+  page.includes('待退款（已付款未出纸）') &&
+  page.includes('setRefundRequiredFilter(true)') &&
+  page.includes('不会自动出款') &&
+  page.includes("value: 'abandoned'") &&
+  jobsClient.includes('refundRequired: boolean')
+) {
+  pass('paid-unfulfilled refundRequired signal is listed, filterable, and does not claim auto-refund')
+} else {
+  fail('API-20 admin visibility for paid-not-printed pending refund is incomplete')
+}
+
 console.log('\nALL PASS')

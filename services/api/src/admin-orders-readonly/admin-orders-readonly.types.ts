@@ -36,6 +36,8 @@ export interface AdminOrderReadonlyItem {
   aftercareStatus: AdminOrderAftercareStatus
   refundEligible: boolean
   retryForbidden: boolean
+  /** 已付款未出纸、已落待退款信号。不会自动出款。 */
+  refundRequired: boolean
   createdAt: string
   updatedAt: string
 }

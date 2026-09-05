@@ -46,6 +46,7 @@ const STATUS_FILTERS = [
   { label: '已完成', value: 'completed' },
   { label: '失败', value: 'failed' },
   { label: '已取消', value: 'cancelled' },
+  { label: '已废弃', value: 'abandoned' },
 ] as const
 
 const PAY_FILTERS = [
@@ -140,6 +141,7 @@ export default function OrdersPage() {
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle')
   const [statusFilter, setStatusFilter] = useState('')
   const [payStatus, setPayStatus] = useState('')
+  const [refundRequiredFilter, setRefundRequiredFilter] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -166,7 +168,7 @@ export default function OrdersPage() {
   const [verifyConfirm, setVerifyConfirm] = useState('')
   const [verifySubmitting, setVerifySubmitting] = useState(false)
   const [verifyError, setVerifyError] = useState<string | null>(null)
-  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${search}:${page}:${pageSize}`
+  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${refundRequiredFilter}:${search}:${page}:${pageSize}`
 
   const {
     data: orderPage,
@@ -178,6 +180,7 @@ export default function OrdersPage() {
       taskStatus: statusFilter || undefined,
       payStatus: payStatus || undefined,
       search: search || undefined,
+      refundRequired: refundRequiredFilter || undefined,
       page,
       pageSize,
     }),
@@ -375,7 +378,7 @@ export default function OrdersPage() {
                 key={f.label}
                 active={statusFilter === f.value}
                 label={f.label}
-                onClick={() => { setStatusFilter(f.value); setPage(1) }}
+                onClick={() => { setStatusFilter(f.value); setRefundRequiredFilter(false); setPage(1) }}
               />
             ))}
           </div>
@@ -386,13 +389,18 @@ export default function OrdersPage() {
                 key={f.label}
                 active={payStatus === f.value}
                 label={f.label}
-                onClick={() => { setPayStatus(f.value); setPage(1) }}
+                onClick={() => { setPayStatus(f.value); setRefundRequiredFilter(false); setPage(1) }}
               />
             ))}
             <FilterChip
-              active={statusFilter === 'failed' && payStatus === 'paid'}
+              active={statusFilter === 'failed' && payStatus === 'paid' && !refundRequiredFilter}
               label="已支付失败待核查"
-              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setPage(1) }}
+              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setRefundRequiredFilter(false); setPage(1) }}
+            />
+            <FilterChip
+              active={refundRequiredFilter}
+              label="待退款（已付款未出纸）"
+              onClick={() => { setRefundRequiredFilter(true); setPayStatus('paid'); setStatusFilter(''); setPage(1) }}
             />
           </div>
         </div>
@@ -437,7 +445,12 @@ export default function OrdersPage() {
                           <td className={`${TD_CLS} text-xs`}>{channelText(order.channel)}</td>
                           <td className={`${TD_CLS} font-mono text-xs text-neutral-500`}>{order.terminalCode ?? '—'}</td>
                           <td className={`${TD_CLS} tabular-nums text-neutral-700`}>{amountText(order.amountCents, order.currency)}</td>
-                          <td className={TD_CLS}><StatusBadge dot status={pay.badge} label={pay.label} /></td>
+                          <td className={TD_CLS}>
+                            <StatusBadge dot status={pay.badge} label={pay.label} />
+                            {order.refundRequired ? (
+                              <span className="ml-1 text-[11px] font-bold text-warning-fg">待退款</span>
+                            ) : null}
+                          </td>
                           <td className={TD_CLS}><StatusBadge dot status={taskStatus.badge} label={taskStatus.label} /></td>
                           <td className={`${TD_CLS} text-xs`}>{pickupText(order)}</td>
                           <td className={`${TD_CLS} font-mono text-xs text-error-fg`}>{order.errorCode ?? '—'}</td>
@@ -515,9 +528,9 @@ export default function OrdersPage() {
               {detail.refundedAt && (
                 <Info label="退款时间" value={fmt(detail.refundedAt)} />
               )}
-              {detail.refundReason && (
+              {detail.refundReason && detail.payStatus !== 'paid' ? (
                 <Info label="退款原因" value={detail.refundReason} />
-              )}
+              ) : null}
             </div>
 
             {detail.aftercareStatus === 'manual_check_required' && (
@@ -587,7 +600,19 @@ export default function OrdersPage() {
             )}
             {detail.printOutcome === 'not_printed' && (
               <div className="mt-4 rounded-[9px] border border-neutral-900/10 bg-neutral-50 px-4 py-3 text-[12.5px] text-neutral-700">
-                已核查：现场确认未出纸。可走下方全额退款。不可重新排队。
+                已核查：现场确认未出纸。
+                {detail.refundRequired
+                  ? '系统已标记待退款，不会自动出款；请走下方全额退款。'
+                  : '可走下方全额退款。'}
+                不可重新排队。
+              </div>
+            )}
+            {detail.refundRequired && detail.printOutcome !== 'not_printed' && (
+              <div className="mt-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3 text-[12.5px] leading-relaxed text-warning-fg">
+                <p className="font-extrabold">待退款：已付款但未出纸</p>
+                <p className="mt-1">
+                  金额以本页服务端金额为准。系统不会自动出款，请走下方全额退款。
+                </p>
               </div>
             )}
 
@@ -637,6 +662,7 @@ export default function OrdersPage() {
                     <p className="text-[13px] font-bold text-neutral-800">确认废弃此打印孤单？</p>
                     <p className="text-xs text-neutral-500">
                       打印任务将标记为 <span className="font-mono font-semibold text-neutral-700">abandoned</span>，写入审计日志，操作不可撤销。
+                      若订单已付款且有实收，系统会标记待退款（不会自动出款），请到本页发起退款。
                     </p>
                     {abandonError && (
                       <p className="text-xs font-semibold text-error-fg">{abandonError}</p>

@@ -17,6 +17,7 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const service = new OfflineAgenciesService(prisma)
   let agencyId: string | null = null
+  const extraIds: string[] = []
 
   try {
     const agency = await service.adminCreate({
@@ -88,10 +89,64 @@ async function main(): Promise<void> {
       pass('Reject requires an audit reason')
     }
 
+    const stamp = Date.now()
+    const secretEmail = `pii-secret-${stamp}@example.com`
+    const fooSvc = `foo-${stamp}`
+    const barSvc = `bar-${stamp}`
+    const makePublished = async (name: string, services: string[]) => {
+      const created = await service.adminCreate({
+        name,
+        orgType: 'recruitment',
+        address: 'P0 Pagination Address',
+        phone: '010-11111111',
+        contactEmail: secretEmail,
+        services: JSON.stringify(services),
+      })
+      extraIds.push(created.id)
+      await service.adminReview(created.id, 'approve')
+      await service.adminPublish(created.id, 'published')
+      return created
+    }
+    await makePublished(`P0 Foo Old ${stamp}`, [fooSvc])
+    const barAgency = await makePublished(`P0 Bar ${stamp}`, [barSvc])
+    await makePublished(`P0 Foo New ${stamp}`, [fooSvc])
+
+    const barPage = await service.findAll({ service: barSvc, page: 1, pageSize: 1 })
+    if (barPage.total !== 1) fail(`service=bar total should be 1 after push-down, got ${barPage.total}`)
+    if (barPage.data.length !== 1 || barPage.data[0]?.id !== barAgency.id) {
+      fail(`page 1 of service=bar should be the bar agency, got ${JSON.stringify(barPage.data)}`)
+    }
+    const serialized = JSON.stringify(barPage)
+    if (serialized.includes(secretEmail) || serialized.includes('contactEmail')) {
+      fail('public list leaked contactEmail')
+    }
+    pass('Public list pushes service filter into query and omits contactEmail')
+
+    const fooPage1 = await service.findAll({ service: fooSvc, page: 1, pageSize: 1 })
+    const fooPage2 = await service.findAll({ service: fooSvc, page: 2, pageSize: 1 })
+    if (fooPage1.total !== 2 || fooPage2.total !== 2) {
+      fail(`service=foo total should be 2, got p1=${fooPage1.total} p2=${fooPage2.total}`)
+    }
+    if (fooPage1.data.length !== 1 || fooPage2.data.length !== 1) {
+      fail('service=foo pagination should return one row per page')
+    }
+    if (fooPage1.data[0]?.id === fooPage2.data[0]?.id) {
+      fail('service=foo page 1 and page 2 returned the same row')
+    }
+    pass('Public list total is the filtered count and later pages are reachable')
+
+    const adminList = await service.adminFindAll({ keyword: `P0 Bar ${stamp}` })
+    const adminRow = adminList.data.find((item) => item.id === barAgency.id) as { contactEmail?: string | null } | undefined
+    if (!adminRow || adminRow.contactEmail !== secretEmail) {
+      fail('admin list must still return contactEmail for authorized operators')
+    }
+    pass('Admin list still returns contactEmail under admin auth')
+
   } finally {
-    if (agencyId) {
-      await prisma.offlineJob.deleteMany({ where: { agencyId } })
-      await prisma.offlineAgency.deleteMany({ where: { id: agencyId } })
+    const cleanupIds = [...extraIds, ...(agencyId ? [agencyId] : [])]
+    for (const id of cleanupIds) {
+      await prisma.offlineJob.deleteMany({ where: { agencyId: id } })
+      await prisma.offlineAgency.deleteMany({ where: { id } })
     }
     await prisma.onModuleDestroy()
   }

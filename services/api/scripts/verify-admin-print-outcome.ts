@@ -18,6 +18,8 @@ import { AuditService } from '../src/audit/audit.service'
 import { RefundService } from '../src/payment/refund.service'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
 import { AdminPrintJobsVerifyOutcomeService } from '../src/print-jobs/admin-print-jobs-verify-outcome.service'
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
+import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
 import type { PaymentProvider } from '../src/payment/payment-provider.types'
 
 function pass(msg: string): void { console.log(`  PASS ${msg}`) }
@@ -175,6 +177,9 @@ async function main(): Promise<void> {
     const first = await verifySvc.verifyOutcome(taskPrinted, { outcome: 'printed', confirm: 'VERIFY_PRINTED' }, adminId)
     const printedTask = await prisma.printTask.findUniqueOrThrow({ where: { id: taskPrinted } })
     if (first.printOutcome !== 'printed' || first.idempotent !== false) fail(`首次核查返回异常：${JSON.stringify(first)}`)
+    if (first.refundRequired !== false) fail('已出纸不得标待退款')
+    const printedOrder = await prisma.order.findUniqueOrThrow({ where: { id: ordPrinted } })
+    if (printedOrder.refundReason !== null) fail('已出纸不得写 refundReason')
     if (printedTask.printOutcome !== 'printed') fail('printOutcome 未落库 printed')
     if (printedTask.errorCode !== 'PRINT_JOB_UNCONFIRMED') fail('核查不得覆盖 errorCode')
     if (printedTask.status !== 'failed') fail('核查不得改 status')
@@ -215,7 +220,22 @@ async function main(): Promise<void> {
       pass('已确认出纸退款被 PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN 拒绝')
     }
 
-    await verifySvc.verifyOutcome(taskNotPrinted, { outcome: 'not_printed', confirm: 'VERIFY_NOT_PRINTED' }, adminId)
+    const notPrintedResult = await verifySvc.verifyOutcome(taskNotPrinted, { outcome: 'not_printed', confirm: 'VERIFY_NOT_PRINTED' }, adminId)
+    if (notPrintedResult.refundRequired !== true) fail('未出纸已付款必须 refundRequired=true')
+    const pendingOrder = await prisma.order.findUniqueOrThrow({ where: { id: ordNotPrinted } })
+    if (pendingOrder.payStatus !== 'paid') fail('核查未出纸不得改 payStatus')
+    if (pendingOrder.refundReason !== PAID_UNFULFILLED_PENDING_REFUND_REASON) {
+      fail(`未出纸应落 ${PAID_UNFULFILLED_PENDING_REFUND_REASON}，得到 ${pendingOrder.refundReason}`)
+    }
+    const refundRowsBefore = await prisma.refund.count({ where: { orderId: ordNotPrinted } })
+    if (refundRowsBefore !== 0) fail('核查未出纸不得自动创建 Refund')
+    const readonly = new AdminOrdersReadonlyService(prisma)
+    const pendingPage = await readonly.list({ refundRequired: true, search: orderNoNotPrinted, page: 1, pageSize: 10 })
+    if (!pendingPage.items.some((item) => item.id === ordNotPrinted && item.refundRequired === true)) {
+      fail('管理端待退款筛选必须能看到未出纸已付款单')
+    }
+    pass('未出纸已付款落待退款信号，管理端可见，不自动出款')
+
     const refunded = await refundService.refund(ordNotPrinted, { reason: '现场确认未出纸', operatorId: adminId })
     if (refunded.refund.amountCents !== 150) fail(`未出纸退款额异常：${JSON.stringify(refunded)}`)
     const notPrintedTask = await prisma.printTask.findUniqueOrThrow({ where: { id: taskNotPrinted } })
