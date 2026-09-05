@@ -13,6 +13,7 @@ import { StorageService } from '../storage/storage.service'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
 import { RedisService } from '../common/redis/redis.service'
+import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { countPdfPages } from '../files/file-page-count.util'
 import { readImageDimensions } from './image-dimensions.util'
@@ -53,14 +54,17 @@ export class PrintConversionService {
     private readonly audit: AuditService,
     private readonly files: FilesService,
     private readonly redis: RedisService,
+    private readonly capabilities: TerminalCapabilitiesService,
   ) {}
 
   async convertImagesToPdf(args: {
     sources: ConvertImageSource[]
     endUserId: string | null
+    terminalId: string
     idempotencyKey?: string | null
   }): Promise<ConvertImagesResponse> {
-    const { sources, endUserId, idempotencyKey } = args
+    const { sources, endUserId, terminalId, idempotencyKey } = args
+    await this.capabilities.assertUserTaskAllowed(terminalId, 'format_convert')
 
     if (sources.length < 1) {
       throw new BadRequestException({ error: { code: 'CONVERT_INPUT_INVALID', message: '请至少选择一张图片' } })

@@ -148,7 +148,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'scan',
     icon: ScanLineIcon,
     title: '材料扫描',
-    description: '纸质材料扫成 PDF，可打印、可做简历识别',
+    description: '纸质材料扫描后按设备回传格式保存，可打印、可做简历识别',
     to: '/scan/start',
     aiRole: 'ai',
     needsMfp: true,
@@ -156,7 +156,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     // 扫描这一步本身不做文字识别（services/api/src/scan-tasks/ 全目录零 OCR）。
     // OCR 在结果页选「AI 简历识别」之后的简历链路里才发生，置信度也在那边的报告页
     // 如实标注（ResumeReportPage.tsx:62）。「需人工复核」这个标记全链路不存在。
-    stateNote: '可用 · 扫成 PDF；文字识别在结果页的「AI 简历识别」里做，不在这一步',
+    stateNote: '可用 · 按设备回传格式保存；文字识别在结果页的「AI 简历识别」里做，不在这一步',
     mfpOffBadge: '暂停 · 扫描仪就在这台一体机上',
     mfpOffNote: '打印和扫描是同一台机器，它出不了纸，扫描一起停。',
   },

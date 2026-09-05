@@ -45,6 +45,19 @@ function expectMatches(source, pattern, message) {
 
 console.log('\n=== Kiosk 打印确认页诚实性守卫 ===')
 
+const CONVERT = 'src/pages/print-scan/ConvertImagesPage.tsx'
+const convertSrc = read(CONVERT)
+expectMatches(
+  convertSrc,
+  /未登录时 PDF 不会进入「我的文档」/,
+  '格式转换规则卡按登录态说实话，游客不得看到「已保存到我的文档」',
+)
+if (/<li>生成后自动进入确认打印；PDF 已保存到「我的文档」。<\/li>/.test(convertSrc)) {
+  fail('格式转换不得无条件写「PDF 已保存到我的文档」')
+} else {
+  pass('格式转换不再无条件承诺已保存到我的文档')
+}
+
 const confirmSrc = read(CONFIRM)
 const progressSrc = read(PROGRESS)
 const localPrintWakeSrc = read(LOCAL_PRINT_WAKE)

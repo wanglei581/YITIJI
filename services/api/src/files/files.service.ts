@@ -36,6 +36,8 @@ import {
   PURPOSE_POLICY,
   validateUpload,
   isPurpose,
+  canActorUseUploadPurpose,
+  rawUploadByteLimitForPurpose,
   type UploadValidationMode,
 } from './file-validation'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
@@ -106,6 +108,11 @@ export class FilesService {
           code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY',
           message: '该文件用途仅允许服务端生成',
         },
+      })
+    }
+    if (!canActorUseUploadPurpose(args.purpose, args.actorRole ?? null)) {
+      throw new ForbiddenException({
+        error: { code: 'FILE_PURPOSE_FORBIDDEN', message: '当前身份不能使用该文件用途' },
       })
     }
     const validation = validateUpload({
@@ -267,6 +274,11 @@ export class FilesService {
         },
       })
     }
+    if (!canActorUseUploadPurpose(body.purpose, args.actorRole ?? null)) {
+      throw new ForbiddenException({
+        error: { code: 'FILE_PURPOSE_FORBIDDEN', message: '当前身份不能使用该文件用途' },
+      })
+    }
     if (!isPurpose(body.purpose)) {
       throw new BadRequestException({
         error: { code: 'FILE_PURPOSE_INVALID', message: '不支持的文件用途' },
@@ -424,6 +436,15 @@ export class FilesService {
       sha256: updated.sha256,
       fileExpiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
     }
+  }
+
+  /**
+   * 本地代理直传在开始读 body 之前查出该意图的流式字节上限。
+   * 未知 purpose fail-closed 为 0，调用方应立即拒绝。
+   */
+  async resolveRawUploadByteLimit(fileId: string): Promise<number> {
+    const record = await this.requireAlive(fileId)
+    return rawUploadByteLimitForPurpose(record.purpose)
   }
 
   /** 本地后端直传:接收原始 buffer 写入,并复核大小/落地 active。 */

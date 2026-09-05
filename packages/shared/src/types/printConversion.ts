@@ -5,6 +5,8 @@ export interface ConvertImageSource {
 }
 
 export interface ConvertImagesRequest {
+  /** 一体机终端 id；服务端按此做 format_convert 能力门禁（与扫描/签章同口径）。 */
+  terminalId: string
   sources: ConvertImageSource[]
 }
 
@@ -29,3 +31,5 @@ export type ConvertImagesErrorCode =
   | 'CONVERSION_IN_PROGRESS'
   | 'IDEMPOTENCY_KEY_REUSED'
   | 'CONVERT_FAILED'
+  | 'CAPABILITY_UNAVAILABLE'
+  | 'CAPABILITY_NOT_CONFIGURED'

@@ -10,6 +10,9 @@ export class ConvertImageSourceDto {
 }
 
 export class ConvertImagesDto {
+  @IsString()
+  terminalId!: string
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(20)

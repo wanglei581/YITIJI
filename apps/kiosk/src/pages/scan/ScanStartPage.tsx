@@ -36,22 +36,22 @@ const SCAN_TYPES: ScanTypeOption[] = [
   {
     type: 'resume',
     label: '简历扫描',
-    description: '扫描纸质简历生成 PDF，可进入 AI 识别与优化，也可打印',
-    chips: [{ label: '支持 AI 简历识别', tone: 'ok' }, { label: '生成 PDF' }],
+    description: '扫描纸质简历，按设备回传格式保存，可进入 AI 识别与优化，也可打印',
+    chips: [{ label: '支持 AI 简历识别', tone: 'ok' }, { label: '按回传格式保存' }],
     icon: FileTextIcon,
   },
   {
     type: 'id',
     label: '证件扫描',
-    description: '扫描证件原件生成存档 PDF；证件类文件设有效期并自动清理',
-    chips: [{ label: '敏感文件 · 自动清理', tone: 'warn' }, { label: '生成 PDF' }],
+    description: '扫描证件原件存档；证件类文件设有效期并自动清理',
+    chips: [{ label: '敏感文件 · 自动清理', tone: 'warn' }, { label: '按回传格式保存' }],
     icon: CreditCardIcon,
   },
   {
     type: 'document',
     label: '普通文档',
-    description: '扫描通用文件生成 PDF；登录后可在「我的文档」查看与管理',
-    chips: [{ label: '生成 PDF' }, { label: '可打印 / 管理' }],
+    description: '扫描通用材料，按设备回传格式保存；未登录不会进入「我的文档」',
+    chips: [{ label: '按回传格式保存' }, { label: '可打印' }],
     icon: ScanIcon,
   },
 ]
@@ -60,7 +60,7 @@ const FLOW_STEPS = [
   ['选择扫描类型', '下一步会创建真实扫描会话'],
   ['获取服务端指引', '只在会话创建成功后显示；含面板扫描到本机接收目录'],
   ['在设备上扫描', '按当前会话的服务端指引在打印机面板操作'],
-  ['选择文件去向', '打印、前往我的文档或 AI 简历识别'],
+  ['选择文件去向', '打印或 AI 简历识别；未登录文件不会进入「我的文档」'],
 ] as const
 
 const CAPABILITY_STATUS_NOTES: Record<string, string> = {
@@ -234,7 +234,7 @@ export function ScanStartPage() {
                       <span>{index + 1}</span><p><b>{title}</b>，{copy}</p>
                     </div>
                   ))}
-                  <div className="w2-scan-privacy"><ShieldCheckIcon />扫描文件设有效期；未登录时离开后可能无法在「我的文档」找回。</div>
+                  <div className="w2-scan-privacy"><ShieldCheckIcon />扫描文件设有效期；未登录扫描件不会进入「我的文档」，请在本次操作内完成。</div>
                 </aside>
               </div>
             </>
