@@ -31,7 +31,7 @@ const assertExactStringLiteralUnion =
   ) => void
 
 const CONTRACT_VERSION = 'contract-review-consent-v1'
-const EXPECTED_CONSENT_SCOPES = ['job_ai', 'contract_review'] as const
+const EXPECTED_CONSENT_SCOPES = ['job_ai', 'contract_review', 'resume_ai'] as const
 const repoRoot = resolve(__dirname, '../../../../..')
 const PROCESSING_STATUSES = [
   'uploaded',
@@ -314,17 +314,18 @@ test('contract review has an isolated consent version in API and shared contract
   assert.deepEqual(CONSENT_VERSION_BY_SCOPE, {
     job_ai: CURRENT_JOB_AI_CONSENT_VERSION,
     contract_review: CONTRACT_VERSION,
+    resume_ai: 'resume-ai-consent-v1',
   })
   assert.match(
     sharedPrivacyTypes,
-    /export type MemberAiConsentScope = 'job_ai' \| 'contract_review'/
+    /export type MemberAiConsentScope = 'job_ai' \| 'contract_review' \| 'resume_ai'/
   )
   assert.match(sharedPrivacyTypes, /export interface MemberAiConsentStatus/)
   assert.equal(consentVersionForScope('contract_review'), CONTRACT_VERSION)
   assert.notEqual(consentVersionForScope('contract_review'), consentVersionForScope('job_ai'))
 })
 
-test('GrantAiConsentDto accepts only job_ai and contract_review at runtime', async () => {
+test('GrantAiConsentDto accepts job_ai, contract_review and resume_ai at runtime', async () => {
   const parameterTypes = Reflect.getMetadata(
     'design:paramtypes',
     MemberPrivacyController.prototype,
@@ -333,7 +334,7 @@ test('GrantAiConsentDto accepts only job_ai and contract_review at runtime', asy
   const GrantAiConsentDto = parameterTypes[1]
   assert.ok(GrantAiConsentDto, 'grantConsent body DTO metadata must exist')
 
-  for (const scope of ['job_ai', 'contract_review']) {
+  for (const scope of ['job_ai', 'contract_review', 'resume_ai']) {
     const errors = await validate(plainToInstance(GrantAiConsentDto, { scope }))
     assert.equal(errors.length, 0, `${scope} must remain accepted by the HTTP DTO`)
   }
@@ -345,7 +346,7 @@ test('GrantAiConsentDto accepts only job_ai and contract_review at runtime', asy
   }
 })
 
-test('revoke Param DTO accepts only job_ai and contract_review at runtime', async () => {
+test('revoke Param DTO accepts job_ai, contract_review and resume_ai at runtime', async () => {
   const parameterTypes = Reflect.getMetadata(
     'design:paramtypes',
     MemberPrivacyController.prototype,
@@ -355,7 +356,7 @@ test('revoke Param DTO accepts only job_ai and contract_review at runtime', asyn
   assert.ok(RevokeAiConsentParamsDto, 'revokeConsent params DTO metadata must exist')
   assert.notEqual(RevokeAiConsentParamsDto, String, 'revoke route must use a validated DTO')
 
-  for (const scope of ['job_ai', 'contract_review']) {
+  for (const scope of ['job_ai', 'contract_review', 'resume_ai']) {
     const errors = await validate(plainToInstance(RevokeAiConsentParamsDto, { scope }))
     assert.equal(errors.length, 0, `${scope} must remain accepted by the revoke Param DTO`)
   }
@@ -389,9 +390,10 @@ test('contract consent verifier is registered and enforced in the main CI contra
 
 test('consent scope verifier requires an exact string-literal-only union AST', () => {
   const validFixtures = [
-    `export type MemberAiConsentScope = 'job_ai' | 'contract_review'`,
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'resume_ai'`,
     `export type MemberAiConsentScope =
       "contract_review"
+      | "resume_ai"
       | "job_ai"`,
   ]
   for (const source of validFixtures) {
@@ -400,13 +402,13 @@ test('consent scope verifier requires an exact string-literal-only union AST', (
     )
   }
   const invalidFixtures = [
-    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'other'`,
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'resume_ai' | 'other'`,
     `export type MemberAiConsentScope = 'job_ai'`,
-    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | string`,
-    `type OtherScope = 'other'; export type MemberAiConsentScope = ('job_ai' | 'contract_review') & OtherScope`,
-    `const scopes = ['job_ai', 'contract_review'] as const; export type MemberAiConsentScope = typeof scopes[number]`,
-    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'job_ai'`,
-    `export type AnotherScope = 'job_ai' | 'contract_review'`,
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'resume_ai' | string`,
+    `type OtherScope = 'other'; export type MemberAiConsentScope = ('job_ai' | 'contract_review' | 'resume_ai') & OtherScope`,
+    `const scopes = ['job_ai', 'contract_review', 'resume_ai'] as const; export type MemberAiConsentScope = typeof scopes[number]`,
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'resume_ai' | 'job_ai'`,
+    `export type AnotherScope = 'job_ai' | 'contract_review' | 'resume_ai'`,
   ]
   for (const source of invalidFixtures) {
     assert.throws(
@@ -444,6 +446,12 @@ test('getConsentStatus returns independent job and contract review status entrie
         consentVersion: CONTRACT_VERSION,
         granted: false,
         revokedAt: revokedAt.toISOString(),
+      },
+      {
+        scope: 'resume_ai',
+        consentVersion: 'resume-ai-consent-v1',
+        granted: false,
+        revokedAt: null,
       },
     ]
   )

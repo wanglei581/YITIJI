@@ -8,6 +8,7 @@
 // - apiKey 由 LlmConfigService 解密提供，绝不下发前端
 // ============================================================
 
+import { createHash, randomBytes } from 'crypto'
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import type {
   AssistantAction,
@@ -38,10 +39,19 @@ interface ChatMessage {
 const MAX_HISTORY = 12
 // 会话空闲过期时间
 const SESSION_TTL_MS = 30 * 60 * 1000
+/** 进程内助手会话上限，超出淘汰最久未更新的。 */
+export const MAX_ASSISTANT_SESSIONS = 256
 
 interface SessionEntry {
   messages: ChatMessage[]
   updatedAt: number
+  ownerKey: string
+}
+
+export function assistantOwnerKey(endUserId: string | null, ip: string | null): string {
+  if (endUserId) return `u:${endUserId}`
+  const seed = ip && ip.trim() ? ip.trim() : 'unknown'
+  return `ip:${createHash('sha256').update(seed, 'utf8').digest('hex').slice(0, 16)}`
 }
 
 // ── 意图 → 站内白名单跳转（确定性注入）────────────────────────
@@ -211,6 +221,18 @@ export class LlmChatService {
     }
   }
 
+  private evictOldest(): void {
+    let oldestId: string | null = null
+    let oldestAt = Number.POSITIVE_INFINITY
+    for (const [id, s] of this.sessions) {
+      if (s.updatedAt < oldestAt) {
+        oldestAt = s.updatedAt
+        oldestId = id
+      }
+    }
+    if (oldestId) this.sessions.delete(oldestId)
+  }
+
   async chat(
     input: ChatInput,
     /**
@@ -218,8 +240,8 @@ export class LlmChatService {
      * 只传 provider/token 元数据，不含任何对话正文。
      */
     onLlmCall?: AiLlmCallSink,
+    ownerKey = 'anon',
   ): Promise<ChatOutput> {
-    const sessionId = input.sessionId ?? `session-${Date.now()}`
     const apiKey = this.config.getApiKey('assistant_chat')
     const cfg = this.config.getConfig('assistant_chat')
 
@@ -230,8 +252,19 @@ export class LlmChatService {
     const now = Date.now()
     this.pruneSessions(now)
 
-    // 取/建会话历史
-    const session = this.sessions.get(sessionId) ?? { messages: [], updatedAt: now }
+    const requestedId = typeof input.sessionId === 'string' ? input.sessionId.trim() : ''
+    const existing = requestedId ? this.sessions.get(requestedId) : undefined
+    let sessionId: string
+    let session: SessionEntry
+    if (existing && existing.ownerKey === ownerKey) {
+      sessionId = requestedId
+      session = existing
+    } else {
+      if (this.sessions.size >= MAX_ASSISTANT_SESSIONS) this.evictOldest()
+      sessionId = randomBytes(16).toString('hex')
+      session = { messages: [], updatedAt: now, ownerKey }
+      this.sessions.set(sessionId, session)
+    }
     session.messages.push({ role: 'user', content: input.message })
     const skill = input.skill
 

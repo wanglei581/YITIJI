@@ -20,9 +20,11 @@
  * 不触网、不碰 DB（logService 用 stub）。
  * 运行：pnpm --filter @ai-job-print/api verify:assistant-provider-label
  */
+import { createServer } from 'http'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { AiService } from '../src/ai/ai.service'
+import { LlmChatService, assistantOwnerKey, MAX_ASSISTANT_SESSIONS } from '../src/ai/llm/llm-chat.service'
 import { isLlmProviderLabel } from '../src/ai/interfaces/ai-provider.interface'
 import type { ChatInput, ChatOutput } from '../src/ai/interfaces/ai-provider.interface'
 
@@ -163,11 +165,72 @@ const shared = readFileSync(join(ROOT, '..', '..', 'packages', 'shared', 'src', 
 assertContains(shared, 'providerLabel?: string', 'shared: AssistantChatResponse 透出 providerLabel（可选）')
 assertContains(shared, 'aiGenerated?: boolean', 'shared: AssistantChatResponse 透出 aiGenerated（可选）')
 
+const chatSrc = read('src/ai/llm/llm-chat.service.ts')
+assertContains(chatSrc, 'randomBytes', '会话 id 由服务端 randomBytes 铸造')
+assertContains(chatSrc, 'ownerKey', '会话绑定归属')
+assertContains(chatSrc, 'MAX_ASSISTANT_SESSIONS', '会话 Map 有上限')
+if (MAX_ASSISTANT_SESSIONS >= 32 && MAX_ASSISTANT_SESSIONS <= 1024) {
+  pass(`MAX_ASSISTANT_SESSIONS=${MAX_ASSISTANT_SESSIONS} 在合理区间`)
+} else {
+  fail(`MAX_ASSISTANT_SESSIONS 异常: ${MAX_ASSISTANT_SESSIONS}`)
+}
+if (assistantOwnerKey('u1', '1.1.1.1') !== assistantOwnerKey('u2', '1.1.1.1')) {
+  pass('会员归属键按 endUserId 隔离')
+} else fail('会员归属键未按 endUserId 隔离')
+if (assistantOwnerKey(null, '10.0.0.1') !== assistantOwnerKey(null, '10.0.0.2')) {
+  pass('匿名归属键按 IP 摘要隔离')
+} else fail('匿名归属键未按 IP 隔离')
+
+async function sessionIsolationChecks(): Promise<void> {
+  const bodies: string[] = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', (c) => { body += String(c) })
+    req.on('end', () => {
+      bodies.push(body)
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }))
+    })
+  })
+  await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', () => resolve()) })
+  const addr = server.address()
+  const port = typeof addr === 'object' && addr ? addr.port : 0
+  const chat = new LlmChatService({
+    getApiKey: () => 'stub-key',
+    getConfig: () => ({
+      vendor: 'deepseek',
+      model: 'stub',
+      baseURL: `http://127.0.0.1:${port}`,
+      systemPrompt: 'sys',
+      roleScope: '',
+      forbiddenWords: [],
+      temperature: 0,
+      enabled: true,
+    }),
+  } as never)
+  try {
+    const a = await chat.chat({ message: 'SECRET_SESSION_A' }, undefined, 'ip:aaa')
+    const b = await chat.chat({ message: 'probe', sessionId: a.sessionId }, undefined, 'ip:bbb')
+    if (b.sessionId === a.sessionId) fail('两个匿名归属不得共用 sessionId')
+    else pass('两个匿名 sessionId 互不可见：归属不同则另铸 id')
+    if ((bodies[1] ?? '').includes('SECRET_SESSION_A')) fail('B 的请求不得带上 A 的对话')
+    else pass('两个匿名 sessionId 互不可见：B 的 prompt 不含 A 的原文')
+    const a2 = await chat.chat({ message: 'followup', sessionId: a.sessionId }, undefined, 'ip:aaa')
+    if (a2.sessionId !== a.sessionId) fail('同一归属应延续原 sessionId')
+    else pass('同一归属可续聊')
+    if (!(bodies[2] ?? '').includes('SECRET_SESSION_A')) fail('续聊应带上本人历史')
+    else pass('续聊带上本人历史')
+  } finally {
+    server.close()
+  }
+}
+
 // ─── 结果 ────────────────────────────────────────────────────────────────────
 
 void (async () => {
   try {
     await runtimeChecks()
+    await sessionIsolationChecks()
   } catch (error) {
     fail(`运行时检查异常: ${error instanceof Error ? error.message : String(error)}`)
   }

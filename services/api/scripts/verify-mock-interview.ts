@@ -584,6 +584,38 @@ async function main() {
       pass(`15. ai-down 仍能出纸：${sheetPdf.filename} · ${sheet.questionCount} 题 / ${sheet.pageCount} 页 / ${sheetPdf.buffer.length} bytes（variant=degraded, AIGenerated=false）`)
     }
 
+    // ── 16. 并发两次 /end 只生成一份报告 ──────────────────────────────────
+    {
+      const created = await svc.createSession({ ...baseCfg, durationMin: 3 }, { endUserId: endUserA, accessToken: null })
+      cleanupSessionIds.push(created.sessionId)
+      const reqA = { endUserId: endUserA, accessToken: null }
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      await svc.start(created.sessionId, reqA)
+      responseQueue.push(q('下一题'))
+      await svc.answer(created.sessionId, { answer: '有量化项目经历' }, reqA)
+      let reportCalls = 0
+      const orig = llm.buildReport.bind(llm)
+      llm.buildReport = (async (input: Parameters<typeof orig>[0], sink?: Parameters<typeof orig>[1]) => {
+        reportCalls += 1
+        await new Promise((resolve) => setTimeout(resolve, 250))
+        return orig(input, sink)
+      }) as typeof llm.buildReport
+      try {
+        responseQueue.push(reportJson(), reportJson())
+        const [first, second] = await Promise.all([
+          svc.end(created.sessionId, reqA),
+          svc.end(created.sessionId, reqA),
+        ])
+        if (reportCalls !== 1) fail(`16. 并发 end 应只调一次 LLM，实际 ${reportCalls}`)
+        const count = await prisma.mockInterviewReport.count({ where: { sessionId: created.sessionId } })
+        if (count !== 1) fail(`16. 报告行应只有 1 条，实际 ${count}`)
+        if (first.sessionId !== second.sessionId) fail('16. 两次 end 应返回同一会话')
+        pass('16. 并发两次 /end 只生成一份报告')
+      } finally {
+        llm.buildReport = orig
+      }
+    }
+
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {
     process.exitCode = 1

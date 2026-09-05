@@ -8,8 +8,8 @@ import { resolveClientIp } from '../common/client-ip'
 import type { AuditContext } from './resume/self-assessment.service'
 import { SelfAssessmentService } from './resume/self-assessment.service'
 import { AppendedSelfAssessmentService } from './resume/appended-self-assessment.service'
-import type { SelfAssessmentAnswerV1 } from './resume/self-assessment.types'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { AppendSelfAssessmentDto, SubmitSelfAssessmentDto } from './dto/self-assessment.dto'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -74,11 +74,7 @@ export class SelfAssessmentController {
    * 判定逻辑集中在 service，controller 不做第二份版本比较（避免两处口径漂移）。
    */
   async submit(
-    @Body()
-    body: {
-      answers: SelfAssessmentAnswerV1[]
-      consent: { nonSensitive: boolean; sensitive: boolean; consentVersion?: string }
-    },
+    @Body() body: SubmitSelfAssessmentDto,
     @Req() req: ReqLike,
   ) {
     return this.service.submit(await this.requesterOf(req), body, auditContextOf(req))
@@ -103,7 +99,7 @@ export class SelfAssessmentController {
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async appendToResume(
     @Param('taskId') taskId: string,
-    @Body() body: { resumeFileId: string },
+    @Body() body: AppendSelfAssessmentDto,
     @Req() req: ReqLike,
   ) {
     return this.append.appendToResume({

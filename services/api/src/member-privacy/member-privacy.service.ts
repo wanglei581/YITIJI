@@ -9,14 +9,17 @@ import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.se
 import type { MemberAiConsentScope, MemberAiConsentStatus } from './member-privacy.types'
 
 export const CURRENT_JOB_AI_CONSENT_VERSION = '20260701'
+export const CURRENT_RESUME_AI_CONSENT_VERSION = 'resume-ai-consent-v1'
 export const CONSENT_VERSION_BY_SCOPE: Readonly<Record<MemberAiConsentScope, string>> = {
   job_ai: CURRENT_JOB_AI_CONSENT_VERSION,
   contract_review: 'contract-review-consent-v1',
+  resume_ai: CURRENT_RESUME_AI_CONSENT_VERSION,
 }
 
 const CONSENT_SCOPES = [
   'job_ai',
   'contract_review',
+  'resume_ai',
 ] as const satisfies readonly MemberAiConsentScope[]
 const CONSENT_SCOPE_SET: ReadonlySet<string> = new Set(CONSENT_SCOPES)
 const CONTRACT_REVIEW_PROCESSING_STATUSES = [
@@ -176,7 +179,9 @@ export class MemberPrivacyService {
 
   async requireActiveConsent(endUserId: string | null, scope: MemberAiConsentScope): Promise<void> {
     this.assertScope(scope)
+    // 简历类 AI：游客只做会话级提示，不入库、不在此拦截。
     if (!endUserId) {
+      if (scope === 'resume_ai') return
       throw new ForbiddenException({
         error: {
           code: 'USER_AI_CONSENT_REQUIRED',
@@ -238,7 +243,12 @@ export class MemberPrivacyService {
     throw new ForbiddenException({
       error: {
         code: 'USER_AI_CONSENT_REQUIRED',
-        message: scope === 'job_ai' ? '请先确认 AI 简历分析授权' : '请先确认合同审查 AI 授权',
+        message:
+          scope === 'job_ai'
+            ? '请先确认 AI 简历分析授权'
+            : scope === 'contract_review'
+              ? '请先确认合同审查 AI 授权'
+              : '请先确认简历 AI 服务授权',
       },
     })
   }

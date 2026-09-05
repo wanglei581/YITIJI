@@ -1,4 +1,4 @@
-export type MemberAiConsentScope = 'job_ai' | 'contract_review'
+export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'resume_ai'
 export type MemberDataRequestType = 'export' | 'delete' | 'revoke_consent'
 export type MemberDataRequestStatus =
   | 'pending'

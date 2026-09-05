@@ -25,12 +25,12 @@ function terminalIdOf(req: ReqLike): string | null {
 }
 
 class GrantAiConsentDto {
-  @IsIn(['job_ai', 'contract_review'])
+  @IsIn(['job_ai', 'contract_review', 'resume_ai'])
   scope!: MemberAiConsentScope
 }
 
 class RevokeAiConsentParamsDto {
-  @IsIn(['job_ai', 'contract_review'])
+  @IsIn(['job_ai', 'contract_review', 'resume_ai'])
   scope!: MemberAiConsentScope
 }
 
