@@ -38,7 +38,6 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberNotificationItem[]>([])
-  const [total, setTotal] = useState(0)
   const [unreadCount, setUnreadCount] = useState(0)
   const [state, setState] = useState<MeListState>('loading')
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -52,7 +51,6 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
   const load = useCallback(() => {
     if (!isLoggedIn) {
       setItems([])
-      setTotal(0)
       setUnreadCount(0)
       setState('ready')
       return
@@ -61,7 +59,6 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
     getMyNotifications(getToken(), { pageSize: 50, unreadOnly })
       .then((page) => {
         setItems(page.items)
-        setTotal(page.total)
         setUnreadCount(page.unreadCount)
         setState('ready')
       })
@@ -150,7 +147,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
             <span>未读消息来自本人设备、打印、文件与服务状态</span>
           </div>
           <div className="me-summary-mini" aria-label="消息状态">
-            <span>共 {total}{total > items.length ? ` · 仅显示最近 ${items.length} 条` : ''}</span>
+            <span>当前 {items.length}</span>
             <span>{canUseRemote ? '已连接' : '待登录'}</span>
           </div>
         </section>
