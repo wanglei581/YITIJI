@@ -180,7 +180,7 @@ async function main() {
     )
 
     const extraFeedbacks = await Promise.all(Array.from({ length: 101 }, (_, index) => feedback.create(userA, {
-      category: 'other',
+      category: 'general',  // FEEDBACK_CATEGORIES 只有 device/print/file_process/general，'other' 会被 DTO 400
       title: `分页反馈 ${index}`,
       content: '用于验证后台反馈列表总数不因展示上限失真。',
     })))

@@ -128,6 +128,12 @@ async function main() {
       pass('2. Admin 发放权益成功，剩余额度初始化正确')
     } else fail(`2. 发放结果异常：${JSON.stringify(granted)}`)
 
+    // 3. Kiosk 本人只读可读回。
+    const mine = await memberBenefits.list(endUserId, { cursor: null, pageSize: 20 })
+    if (mine.items.some((i) => i.id === granted.id && i.quantityRemaining === 3)) pass('3. Kiosk /me/benefits 本人只读可读回 Admin 发放的权益')
+    else fail(`3. Kiosk 读回异常：${JSON.stringify(mine)}`)
+
+    // 分页夹具放在用例 3 之后：它一次插 100 条，会把用例 3 要读回的那条挤出 pageSize=20 的首页。
     await Promise.all(Array.from({ length: 100 }, (_, index) => adminBenefits.grant(admin, {
       endUserId,
       benefitType: 'free_quota',
@@ -142,10 +148,6 @@ async function main() {
     if (adminBenefitList.items.length === 100 && adminBenefitList.total === 101) pass('2b. Admin 权益列表超过 100 条时返回真实 total')
     else fail(`2b. Admin 权益 total 异常：${JSON.stringify({ items: adminBenefitList.items.length, total: adminBenefitList.total })}`)
 
-    // 3. Kiosk 本人只读可读回。
-    const mine = await memberBenefits.list(endUserId, { cursor: null, pageSize: 20 })
-    if (mine.items.some((i) => i.id === granted.id && i.quantityRemaining === 3)) pass('3. Kiosk /me/benefits 本人只读可读回 Admin 发放的权益')
-    else fail(`3. Kiosk 读回异常：${JSON.stringify(mine)}`)
 
     // 4. 合规拦截。
     await expectReject('BENEFIT_COPY_FORBIDDEN', '4. subsidy_eligibility_hint 拒绝承诺性文案', () =>
