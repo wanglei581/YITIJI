@@ -14,6 +14,7 @@ import type {
 import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartnerFair } from '../../services/api'
 import { RejectReason } from '../../components/RejectReason'
 import { useCapability } from '../../services/capabilities'
+import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -184,7 +185,8 @@ export default function FairsPage() {
   }
 
   const canSave =
-    form.title.trim() && form.venue.trim() && form.city.trim() && form.sourceUrl.trim() && form.startAt && form.endAt
+    form.title.trim() && form.venue.trim() && form.city.trim() && isAbsoluteHttpUrl(form.sourceUrl) && form.startAt && form.endAt
+    && (!form.checkinUrl.trim() || isAbsoluteHttpUrl(form.checkinUrl))
 
   const save = async () => {
     setSaving(true)
@@ -447,9 +449,15 @@ export default function FairsPage() {
           </Field>
           <Field label="来源平台预约链接" required>
             <input className={inputCls} placeholder="https://…(求职者跳转外部平台预约)" value={form.sourceUrl} onChange={(e) => setForm((f) => ({ ...f, sourceUrl: e.target.value }))} />
+            {form.sourceUrl.trim() && !isAbsoluteHttpUrl(form.sourceUrl) && (
+              <p className="mt-1 text-xs text-error-fg">请填写以 http:// 或 https:// 开头的有效链接</p>
+            )}
           </Field>
           <Field label="来源平台签到链接">
             <input className={inputCls} placeholder="https://…(现场扫码前往来源平台签到，可选)" value={form.checkinUrl} onChange={(e) => setForm((f) => ({ ...f, checkinUrl: e.target.value }))} />
+            {form.checkinUrl.trim() && !isAbsoluteHttpUrl(form.checkinUrl) && (
+              <p className="mt-1 text-xs text-error-fg">请填写以 http:// 或 https:// 开头的有效链接</p>
+            )}
           </Field>
           <Field label="简介">
             <textarea className={`${inputCls} h-24 resize-none`} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />

@@ -237,3 +237,10 @@ export function logout(): void {
     window.location.href = '/login'
   }
 }
+
+/** 登录态自助改密:成功后旧 token 立即失效,调用方需自行清 session 并跳登录页 */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ success: true }>('/auth/password/change', { currentPassword, newPassword })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true }
+}
