@@ -653,6 +653,42 @@ if (simEndActionsIncludeFailure) {
   fail('SIM 结束操作区不得排除 failed；失败演示也必须有返回首页 / 重新上传出口')
 }
 
+expectMatches(
+  confirmSrc,
+  /useTerminalDeviceStatus/,
+  'PrintConfirmPage 接 useTerminalDeviceStatus 复核打印机状态',
+)
+expectMatches(
+  confirmSrc,
+  /printerBlocked|!printerReady/,
+  'PrintConfirmPage 打印机未就绪时禁用主按钮',
+)
+expectMatches(
+  confirmSrc,
+  /PRINTER_UNAVAILABLE/,
+  'PrintConfirmPage 将 PRINTER_UNAVAILABLE 映射为中文',
+)
+expectMatches(
+  progressCode,
+  /result\.status\s*===\s*'cancelled'[\s\S]{0,200}abandoned/,
+  '进度页 cancelled/abandoned 走终态分支',
+)
+expectMatches(
+  progressCode,
+  /POLL_FAIL_LIMIT\s*=\s*5/,
+  '进度页轮询连续失败 ≥5 次才判失败',
+)
+expectMatches(
+  progressCode,
+  /暂时无法读取状态/,
+  '进度页轮询失败文案为「暂时无法读取状态」',
+)
+expectMatches(
+  printJobsApiSrc,
+  /'cancelled'[\s\S]{0,40}'abandoned'/,
+  'BackendJobStatus 含 cancelled/abandoned',
+)
+
 // ============================================================
 // 16) 参数摘要：展示的值必须与真实参数同源（AST 断言）
 //
