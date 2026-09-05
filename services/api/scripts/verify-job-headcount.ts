@@ -85,6 +85,14 @@ async function main(): Promise<void> {
     }
     pass('3. headcount=0（来源明确值）与「未提供」可区分')
 
+    if (withCount.sourceContentTrustStatus !== null) {
+      fail(`3b. 未标记机构的 sourceContentTrustStatus 应为 null，实际 ${JSON.stringify(withCount.sourceContentTrustStatus)} —— 不得编成 active`)
+    }
+    if (withCount.sourceOrgArchived !== false) {
+      fail(`3b. 未归档机构 sourceOrgArchived 应为 false，实际 ${JSON.stringify(withCount.sourceOrgArchived)}`)
+    }
+    pass('3b. 来源核验状态来自 Organization.contentTrustStatus，未标记即为 null')
+
     // ── 4. 两份 schema + 两份迁移 ───────────────────────────────────────
     for (const [label, rel] of [
       ['SQLite', 'prisma/schema.prisma'],

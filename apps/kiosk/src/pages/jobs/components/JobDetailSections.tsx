@@ -22,6 +22,10 @@ import { SourceUrlQr } from '../../../components/SourceUrlQr'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../../lib/url'
 import { CATEGORY_LABEL, formatFullDate, jobCompleteness, splitTextLines } from '../utils/jobDisplay'
+import {
+  describeSourceOrgTrust,
+  SOURCE_ORG_TRUST_DISCLAIMER,
+} from '../utils/sourceContentTrust'
 import { SOURCE_ELEMENT_MISSING_TEXT, sourceTrustReason, type JobSourceTrust } from '../utils/sourceTrust'
 
 export function QrOverlay({
@@ -220,6 +224,7 @@ function TextList({ title, items, fallback }: { title: string; items: string[]; 
 
 export function JobTrustSection({ job, trust }: { job: ExternalJobDTO; trust: JobSourceTrust }) {
   const sourceCanApply = trust.ok
+  const sourceOrgTrust = describeSourceOrgTrust(job.sourceContentTrustStatus)
   return (
     // shrink-0 的理由见 JobSummarySection
     <section className="jf-card accented compact shrink-0" style={{ '--accent': 'var(--wheat)', '--accent-deep': 'var(--wheat-deep)', '--accent-soft': 'var(--wheat-soft)' } as React.CSSProperties}>
@@ -243,6 +248,16 @@ export function JobTrustSection({ job, trust }: { job: ExternalJobDTO; trust: Jo
         <div className="jf-kv"><div className="k">来源类型</div><div className="v">线上招聘平台</div></div>
         <SourceElementCell label="同步时间" value={formatFullDate(job.syncTime)} present={trust.present.syncTime} />
         <SourceElementCell label="外部ID" value={job.externalId} present={trust.present.externalId} />
+        <div className="jf-kv" data-source-org-trust="true">
+          <div className="k">来源核验状态</div>
+          <div className={`v${sourceOrgTrust.known ? '' : ' text-[var(--muted)]'}`}>{sourceOrgTrust.label}</div>
+        </div>
+        {job.sourceOrgArchived ? (
+          <div className="jf-kv">
+            <div className="k">机构归档</div>
+            <div className="v">来源机构已归档</div>
+          </div>
+        ) : null}
         {/*
           有效期限：27-browse-detail.html 的「信息来源」块把它列为来源四要素之一
           （来源平台 / 同步时间 / 外部编号 / 有效期限），所以放在同一个 kv 栅格里。
@@ -290,6 +305,7 @@ export function JobTrustSection({ job, trust }: { job: ExternalJobDTO; trust: Jo
         <InfoIcon aria-hidden="true" />
         <p>
           本岗位来自第三方/官方来源，本系统不接收简历、不参与招聘流程。
+          <span className="mt-1 block">{SOURCE_ORG_TRUST_DISCLAIMER}</span>
           <span className="mt-1 block text-neutral-400">{job.dataSourceNote}</span>
         </p>
       </div>

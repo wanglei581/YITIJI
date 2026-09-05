@@ -318,6 +318,26 @@ async function main() {
     }
     pass('7. 文档删除：对象物理删除 + 行软删（deletedBy=member）+ 审计 + 列表不再返回')
 
+    const deletedListA = await http('GET', '/me/documents/deleted', { token: tokenA })
+    const deletedItemsA = (deletedListA.body?.data?.items ?? []) as Array<{
+      id: string
+      deletedAt?: string
+      deletedByKind?: string
+      storageObjectState?: string
+      downloadUrlPath?: string
+    }>
+    const deletedRow = deletedItemsA.find((item) => item.id === uploaded.fileId)
+    if (deletedListA.status !== 200 || !deletedRow) {
+      fail(`7b. A 的删除记录应能从 /me/documents/deleted 读回，实际 ${deletedListA.status} ${JSON.stringify(deletedListA.body)}`)
+    }
+    if (!deletedRow.deletedAt) fail('7b. 删除记录缺 deletedAt')
+    if (deletedRow.deletedByKind !== 'self') fail(`7b. deletedByKind 应为 self，实际 ${deletedRow.deletedByKind}`)
+    if (deletedRow.downloadUrlPath) fail('7b. 删除记录不得签发 downloadUrlPath')
+    const deletedListB = await http('GET', '/me/documents/deleted', { token: tokenB })
+    const deletedItemsB = (deletedListB.body?.data?.items ?? []) as Array<{ id: string }>
+    if (deletedItemsB.some((item) => item.id === uploaded.fileId)) fail('7b. B 读到了 A 的删除记录')
+    pass('7b. 删除记录可读回：本人可见 tombstone、跨会员隔离、无下载 URL')
+
     // ── 8. 收藏幂等 ──────────────────────────────────────────────────────────
     await prisma.organization.create({
       data: { id: orgId, name: `C2D 收藏验证机构 ${suffix}`, type: 'school' },

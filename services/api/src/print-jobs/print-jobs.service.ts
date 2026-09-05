@@ -54,6 +54,17 @@ export interface PrintJobStatusResult {
   /** 面向本人的安全中文失败原因；仅在任务失败时给出。 */
   failureReasonForUser?: string
   completedAt?:  string
+  /**
+   * 关联 FileObject 是否读取到。false/缺省 = 前台必须说「保留期以后台策略为准」，
+   * 不得编造 24 小时。true 时才解释 fileExpiresAt / retentionPolicy。
+   */
+  fileRetentionAvailable?: boolean
+  /** FileObject.expiresAt ISO；null = 未设到期（长期或未填，前台再按 retentionPolicy 区分）。 */
+  fileExpiresAt?: string | null
+  fileRetentionPolicy?: string | null
+  fileDeletedAt?: string | null
+  fileDeleteReason?: string | null
+  fileStorageDeletedAt?: string | null
 }
 
 /**
@@ -536,7 +547,20 @@ export class PrintJobsService {
   }
 
   async getStatus(taskId: string): Promise<PrintJobStatusResult> {
-    const task = await this.prisma.printTask.findUnique({ where: { id: taskId } })
+    const task = await this.prisma.printTask.findUnique({
+      where: { id: taskId },
+      include: {
+        file: {
+          select: {
+            expiresAt: true,
+            retentionPolicy: true,
+            deletedAt: true,
+            deleteReason: true,
+            storageDeletedAt: true,
+          },
+        },
+      },
+    })
     if (!task) {
       throw new NotFoundException({
         error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
@@ -550,6 +574,7 @@ export class PrintJobsService {
       task.status === 'failed' || Boolean(task.errorCode) || Boolean(task.errorMessage)
     )
     const safeReason = hasFailure ? failureReasonForUser(task.errorCode) : undefined
+    const file = task.file
     return {
       taskId:       task.id,
       status:       task.status,
@@ -559,6 +584,14 @@ export class PrintJobsService {
       errorMessage: safeReason,
       failureReasonForUser: safeReason,
       completedAt:  task.completedAt?.toISOString(),
+      fileRetentionAvailable: Boolean(file),
+      fileExpiresAt: file?.expiresAt ? file.expiresAt.toISOString() : file ? null : undefined,
+      fileRetentionPolicy: file?.retentionPolicy ?? (file ? null : undefined),
+      fileDeletedAt: file?.deletedAt ? file.deletedAt.toISOString() : file ? null : undefined,
+      fileDeleteReason: file ? file.deleteReason : undefined,
+      fileStorageDeletedAt: file?.storageDeletedAt
+        ? file.storageDeletedAt.toISOString()
+        : file ? null : undefined,
     }
   }
 }

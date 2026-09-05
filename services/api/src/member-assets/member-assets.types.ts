@@ -42,6 +42,21 @@ export interface MemberDocumentItem {
   previewUrlPath: string
 }
 
+export type MemberDeletedDocumentStorageState = 'removed' | 'pending' | 'unknown'
+export type MemberDeletedDocumentActorKind = 'system' | 'self' | 'admin' | 'unknown'
+
+export interface MemberDeletedDocumentItem {
+  id: string
+  filename: string
+  purpose: string
+  createdAt: string
+  expiresAt: string | null
+  deletedAt: string
+  deleteReason: string | null
+  deletedByKind: MemberDeletedDocumentActorKind
+  storageObjectState: MemberDeletedDocumentStorageState
+}
+
 export interface MemberAiRecordItem {
   id: string
   taskId: string

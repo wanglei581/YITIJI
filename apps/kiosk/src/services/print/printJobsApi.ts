@@ -107,6 +107,13 @@ export interface PrintJobStatusResult {
   /** 后端下发的安全中文失败原因（仅失败时有值）。前台展示失败原因的首选来源。 */
   failureReasonForUser?: string
   completedAt?:  string
+  /** 关联文件保留字段是否读取到。取不到时前台不得编造保留时长。 */
+  fileRetentionAvailable?: boolean
+  fileExpiresAt?: string | null
+  fileRetentionPolicy?: string | null
+  fileDeletedAt?: string | null
+  fileDeleteReason?: string | null
+  fileStorageDeletedAt?: string | null
 }
 
 /** POST /orders/quote 响应（与后端 PrintPriceQuote 对齐；金额为分）。 */

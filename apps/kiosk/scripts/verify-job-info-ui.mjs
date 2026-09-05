@@ -19,6 +19,7 @@ const files = {
   jobsPage: read('src/pages/jobs/JobsPage.tsx'),
   detailPage: read('src/pages/jobs/JobDetailPage.tsx'),
   components: readDirectory('src/pages/jobs/components'),
+  sourceContentTrust: read('src/pages/jobs/utils/sourceContentTrust.ts'),
   jobHttpAdapter: read('src/services/api/jobHttpAdapter.ts'),
 }
 
@@ -49,6 +50,18 @@ const required = [
   ['detailPage', 'getTerminalId'],
   ['components', 'SourceUrlQr value={job.sourceUrl}'],
   ['components', '放大二维码'],
+  ['detailPage', /<JobAntiFraudNotice\s*\/>/],
+  ['components', '防骗提示'],
+  ['components', '12333'],
+  ['components', '正规招聘不会以任何名义向求职者收取费用'],
+  ['components', '本系统不审核岗位是否真实招人'],
+  ['components', '来源核验状态'],
+  ['components', 'sourceContentTrustStatus'],
+  ['sourceContentTrust', '已通过发布核验'],
+  ['sourceContentTrust', '不构成本平台对该岗位真实性的背书'],
+  ['components', '来源机构'],
+  ['components', '同步时间'],
+  ['components', '外部ID'],
 ]
 
 const forbidden = [
@@ -58,6 +71,8 @@ const forbidden = [
   { label: '投递简历', pattern: /投递简历/ },
   { label: '企业收简历', pattern: /企业收简历/ },
   { label: '候选人管理', pattern: /候选人管理/ },
+  { label: '内容可信背书', pattern: /内容可信/ },
+  { label: '岗位已核验/真实招聘背书', pattern: /岗位已核验|真实招聘|平台担保/ },
 ]
 
 const failures = []

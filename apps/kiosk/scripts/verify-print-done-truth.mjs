@@ -26,7 +26,7 @@ const checks = [
   }],
   ['只有 completed 状态进入成功视图', () => {
     assert.match(doneSource, /result\.status\s*===\s*'completed'/)
-    assert.match(doneSource, /setVerification\(\{\s*taskId,\s*result:\s*'completed'\s*\}\)/)
+    assert.match(doneSource, /setVerification\(\{\s*taskId,\s*result:\s*'completed'/)
   }],
   ['pending、claimed、printing 返回真实进度页', () => {
     assert.match(doneSource, /\['pending',\s*'claimed',\s*'printing'\]/)
