@@ -7,6 +7,7 @@ import { JobsExcelService } from './jobs-excel.service'
 import { JobsController } from './jobs.controller'
 import { AdminFairsService } from './admin-fairs.service'
 import { AdminFairsController } from './admin-fairs.controller'
+import { PartnerFairsController } from './partner-fairs.controller'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
 import { JobQualityService } from '../job-ai/job-quality.service'
@@ -46,7 +47,7 @@ import { JobRequirementStatsService } from './job-requirement-stats.service'
     // 岗位要求计数（AI 降级来源）：只读 Prisma + 纯函数聚合，不进 JobsService 门面
     JobRequirementStatsService,
   ],
-  controllers: [JobsController, AdminFairsController, RecruitmentIntegrationController],
+  controllers: [JobsController, AdminFairsController, PartnerFairsController, RecruitmentIntegrationController],
   exports: [JobsService, AdminFairsService],
 })
 export class JobsModule {}

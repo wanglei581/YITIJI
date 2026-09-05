@@ -260,7 +260,7 @@ export class FairVenueGuideService {
   private async writeFairAudit(user: AuthedUser, action: string, fairId: string, payload: Record<string, unknown>): Promise<void> {
     await this.audit.write({
       actorId: user.userId,
-      actorRole: 'admin',
+      actorRole: user.role,
       action,
       targetType: 'fair',
       targetId: fairId,

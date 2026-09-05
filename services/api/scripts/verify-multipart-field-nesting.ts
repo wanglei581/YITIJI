@@ -42,6 +42,7 @@ const EXPECTED_FILE_INTERCEPTORS = [
   { file: 'src/files/files.controller.ts', count: 2 },
   { file: 'src/upload-sessions/upload-sessions.controller.ts', count: 1 },
   { file: 'src/jobs/admin-fairs.controller.ts', count: 1 },
+  { file: 'src/jobs/partner-fairs.controller.ts', count: 1 },
   { file: 'src/jobs/jobs.controller.ts', count: 2 },
 ] as const
 
@@ -192,8 +193,8 @@ async function verifyStaticGuards(): Promise<void> {
     }
   }
 
-  if (calls.length !== 10) {
-    failures.push(`全局 FileInterceptor: 预期 10 处，实际 ${calls.length} 处`)
+  if (calls.length !== 11) {
+    failures.push(`全局 FileInterceptor: 预期 11 处，实际 ${calls.length} 处`)
   }
 
   // 代理上传（整 buffer 进内存）的两处入口必须对齐既有的 PROXY_MAX_BYTES，
@@ -212,8 +213,8 @@ async function verifyStaticGuards(): Promise<void> {
   }
 
   assert.deepEqual(failures, [], `静态 multipart 防护契约失败:\n${failures.join('\n')}`)
-  console.log('  PASS 静态核验：10 处 FileInterceptor 均设置 limits.fieldNestingDepth: 0')
-  console.log('  PASS 静态核验：10 处 FileInterceptor 均真正赋值 limits.fileSize（非类型断言）')
+  console.log('  PASS 静态核验：11 处 FileInterceptor 均设置 limits.fieldNestingDepth: 0')
+  console.log('  PASS 静态核验：11 处 FileInterceptor 均真正赋值 limits.fileSize（非类型断言）')
   console.log('  PASS 静态核验：files.controller.ts 两处代理上传入口对齐 PROXY_MAX_BYTES')
 }
 
