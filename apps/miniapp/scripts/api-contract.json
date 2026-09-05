@@ -1,0 +1,14 @@
+{
+  "_README": "小程序依赖的后端端点契约快照。材料包端点已由 services/api 实现；取消端点仍未实现，页面守卫删除与接线属于下一刀。",
+  "generatedFrom": "apps/miniapp/utils/api.js + services/api/src/**/*.controller.ts",
+  "endpoints": [
+    "GET /orders/package/:p",
+    "POST /orders/package",
+    "POST /orders/package/:p/cancel",
+    "POST /orders/quote"
+  ],
+  "knownMissing": {
+    "POST /orders/package/:p/cancel": "材料包取消属于下一刀；v1 只实现建单、详情、支付与逐份到机履约。"
+  },
+  "literalParamBindings": {}
+}
