@@ -91,7 +91,11 @@ assert.notEqual(exitIndex, -1, 'failStartup must exit after reporting the closed
 assert.ok(safeDiagnosticIndex < failureLogIndex, 'failStartup must attempt diagnostics before logging the closed code')
 assert.ok(failureLogIndex < exitIndex, 'failStartup must log the closed code before exiting')
 const readyDiagnosticIndex = indexSource.indexOf("writeStartupDiagnosticSafely('AGENT_READY'")
-const heartbeatIndex = indexSource.indexOf('const heartbeatTimer = startHeartbeat')
+// AGT-06 之后心跳定时器是可重建的 `let heartbeatTimer`（服务端调整间隔时重启），
+// 这里只断言入口确实启动了心跳循环，不绑定 const/let 写法。
+// 取最后一次出现：onConfigUpdate 里的重启调用在源码里更靠前，真正的启动调用在
+// AGENT_READY 诊断之后，用 lastIndexOf 才是「启动心跳循环」那一处。
+const heartbeatIndex = indexSource.lastIndexOf('heartbeatTimer = startHeartbeat')
 assert.notEqual(readyDiagnosticIndex, -1, 'registration success must use the non-blocking ready diagnostic')
 assert.notEqual(heartbeatIndex, -1, 'agent entrypoint must start the heartbeat loop')
 assert.ok(readyDiagnosticIndex < heartbeatIndex, 'ready diagnostic must be attempted before heartbeat startup')

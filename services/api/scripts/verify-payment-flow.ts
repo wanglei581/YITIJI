@@ -812,6 +812,7 @@ async function main(): Promise<void> {
       TERMINAL_LEGACY_REGISTER_ENABLED: 'false',
       TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true',
       PRINT_REQUIRE_PII_SCAN: 'true', // 商用生产必须阻断未完成 PII 检查的原始材料
+      PRINT_REQUIRE_PRINTER_ONLINE: 'true', // PRT-03：打印机离线不得建单收款
       PRINT_SCAN_CAPABILITY_MODE: 'managed', // Task 11：生产必须显式声明能力开关模式
       TRUST_PROXY_HOPS: '1',
     }

@@ -28,6 +28,7 @@ const PROD_OK: Env = {
   PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
   // 商用隐私底线：用户原始材料必须完成 PII 检查后才能建打印任务。
   PRINT_REQUIRE_PII_SCAN: 'true',
+  PRINT_REQUIRE_PRINTER_ONLINE: 'true',
   // Task 11：生产必须显式声明 print-scan 能力开关未配置行语义
   PRINT_SCAN_CAPABILITY_MODE: 'managed',
   // 反代可信跳数：生产必须显式声明 1..9（禁止 true）
@@ -292,6 +293,23 @@ function main(): void {
     { ...PROD_OK, PRINT_REQUIRE_PII_SCAN: ' true ' },
     'PRODUCTION_PRINT_PII_SCAN_REQUIRED',
     '生产环境拒绝空格变体，避免启动门禁与建单门禁漂移',
+  )
+
+  // 生产环境：打印机离线 / 缺纸 / 故障时不得建单收款（PRT-03），必须显式开启。
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PRINTER_ONLINE: undefined },
+    'PRODUCTION_PRINT_PRINTER_ONLINE_REQUIRED',
+    '生产环境拒绝未设置 PRINT_REQUIRE_PRINTER_ONLINE',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PRINTER_ONLINE: 'false' },
+    'PRODUCTION_PRINT_PRINTER_ONLINE_REQUIRED',
+    '生产环境拒绝关闭 PRINT_REQUIRE_PRINTER_ONLINE',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PRINTER_ONLINE: 'TRUE' },
+    'PRODUCTION_PRINT_PRINTER_ONLINE_REQUIRED',
+    '生产环境拒绝 PRINT_REQUIRE_PRINTER_ONLINE 大小写变体，与建单门禁精确判定一致',
   )
 
   // Task 11：print-scan feature gate 显式声明
