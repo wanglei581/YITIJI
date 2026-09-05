@@ -29,6 +29,7 @@ import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth
 import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
+import { networkError } from './throwHttpError'
 
 /** 普通读写（查记录、导出 PDF） */
 const DEFAULT_TIMEOUT_MS = 15_000
@@ -73,7 +74,7 @@ async function get<T>(path: string, access?: ResumeReadAccess, timeoutMs = DEFAU
     if (err instanceof Error && err.name === 'AbortError') {
       throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {
@@ -121,7 +122,7 @@ async function post<T>(path: string, body: unknown, token?: string | null, timeo
     if (err instanceof Error && err.name === 'AbortError') {
       throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {
@@ -159,7 +160,7 @@ async function postWithAccess<T>(path: string, body: unknown, access?: ResumeRea
     if (err instanceof Error && err.name === 'AbortError') {
       throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {
@@ -193,7 +194,7 @@ async function postForm<T>(path: string, body: FormData, timeoutMs = LLM_TIMEOUT
     if (err instanceof Error && err.name === 'AbortError') {
       throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {

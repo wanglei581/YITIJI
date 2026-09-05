@@ -92,9 +92,12 @@ export function MaterialsTab({
 
   const togglePublish = async (m: FairMaterialView) => {
     setBusyId(m.id)
+    setError(null)
     try {
       await fairsAdminService.publishMaterial(fairId, m.id, m.publishStatus === 'published' ? 'unpublish' : 'publish')
       onChanged()
+    } catch (e) {
+      setError(errMsg(e))
     } finally {
       setBusyId(null)
     }
@@ -102,9 +105,12 @@ export function MaterialsTab({
 
   const remove = async (materialId: string) => {
     setBusyId(materialId)
+    setError(null)
     try {
       await fairsAdminService.deleteMaterial(fairId, materialId)
       onChanged()
+    } catch (e) {
+      setError(errMsg(e))
     } finally {
       setBusyId(null)
     }
@@ -112,6 +118,7 @@ export function MaterialsTab({
 
   return (
     <div className="space-y-4">
+      {error && !busyId && <InlineError message={error} />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-neutral-600">{materials.length} 份资料(发布后在一体机"活动资料"页可见)</p>
         <button onClick={openUpload} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">

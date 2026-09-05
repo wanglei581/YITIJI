@@ -8,6 +8,8 @@
 // 的 localApiBridgeToken 配置一致，安装时一起下发）。
 // ============================================================
 
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
+
 const configuredLocalAgentBaseUrl = (import.meta.env['VITE_TERMINAL_AGENT_LOCAL_URL'] ?? '').trim()
 const LOCAL_AGENT_BASE_URL = configuredLocalAgentBaseUrl || 'http://127.0.0.1:9527'
 const BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
@@ -94,6 +96,9 @@ async function callLocalAgent<T>(
       message = payload.error?.message ?? message
     } catch {
       /* keep default */
+    }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(endUserToken))) {
+      notifyMemberSessionExpired(endUserToken ?? undefined)
     }
     throw new LocalAgentApiError(code, message, res.status)
   }

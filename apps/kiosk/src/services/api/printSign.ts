@@ -20,6 +20,7 @@ import type {
 } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
+import { notifySessionIfInvalid } from './throwHttpError'
 
 interface ResponseEnvelope<T> {
   success?: boolean
@@ -31,6 +32,7 @@ async function post<T>(
   path: string,
   body: unknown,
   headers: Record<string, string>,
+  token?: string | null,
 ): Promise<T> {
   let res: Response
   try {
@@ -53,6 +55,7 @@ async function post<T>(
   if (!res.ok) {
     const code = payload?.error?.code ?? 'UNKNOWN_ERROR'
     const message = payload?.error?.message ?? `请求失败（${res.status}）`
+    notifySessionIfInvalid(res.status, code, token)
     throw new ApiHttpError(code, message, res.status)
   }
 
@@ -68,7 +71,7 @@ export async function signInspect(
 ): Promise<SignInspectResponse> {
   const headers: Record<string, string> = {}
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`
-  return post<SignInspectResponse>('/print/sign/inspect', request, headers)
+  return post<SignInspectResponse>('/print/sign/inspect', request, headers, options.token)
 }
 
 export async function signCompose(
@@ -77,5 +80,5 @@ export async function signCompose(
 ): Promise<SignComposeResponse> {
   const headers: Record<string, string> = { 'Idempotency-Key': options.idempotencyKey }
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`
-  return post<SignComposeResponse>('/print/sign/compose', request, headers)
+  return post<SignComposeResponse>('/print/sign/compose', request, headers, options.token)
 }

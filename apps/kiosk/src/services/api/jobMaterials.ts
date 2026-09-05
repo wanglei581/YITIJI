@@ -13,6 +13,7 @@ import {
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 import { ApiHttpError } from './httpAdapter'
+import { networkError } from './throwHttpError'
 
 interface Envelope<T> {
   success?: boolean
@@ -52,11 +53,16 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string |
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (init.body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
   return parseEnvelope<T>(res, token)
 }
 

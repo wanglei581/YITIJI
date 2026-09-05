@@ -11,7 +11,9 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
+import { ApiHttpError } from '../api/httpAdapter'
 import { getTerminalId } from '../api/screensaver'
+import { networkError, throwHttpError } from '../api/throwHttpError'
 import type {
   BillingPageSource,
   OrderPayStatus,
@@ -54,6 +56,7 @@ export interface PrintJobCreated {
   paymentSessionToken: string
 }
 
+/** Backend status values — subset of shared PrintTaskStatus */
 /** Backend status values — subset of shared PrintTaskStatus plus admin abandoned. */
 export type BackendJobStatus =
   | 'pending'
@@ -63,37 +66,6 @@ export type BackendJobStatus =
   | 'failed'
   | 'cancelled'
   | 'abandoned'
-
-export class PrintApiError extends Error {
-  readonly code: string
-  readonly status: number
-  constructor(code: string, message: string, status: number) {
-    super(message)
-    this.name = 'PrintApiError'
-    this.code = code
-    this.status = status
-  }
-}
-
-const PRINTER_UNAVAILABLE_ZH = '本机打印机当前不可用（离线、缺纸或故障），暂不能下单，请联系工作人员'
-
-function throwPrintApiError(action: string, status: number, text: string): never {
-  let code = 'PRINT_REQUEST_FAILED'
-  let message = `${action} failed: ${status}`
-  try {
-    const body = JSON.parse(text) as { error?: { code?: string; message?: string } }
-    if (typeof body?.error?.code === 'string' && body.error.code.trim()) code = body.error.code.trim()
-    if (typeof body?.error?.message === 'string' && body.error.message.trim()) {
-      message = body.error.message.trim()
-    }
-  } catch {
-    if (text.trim()) message = `${action} failed: ${status} ${text.trim()}`
-  }
-  if (code === 'PRINTER_UNAVAILABLE') {
-    message = /[\u4e00-\u9fff]/.test(message) ? message : PRINTER_UNAVAILABLE_ZH
-  }
-  throw new PrintApiError(code, message, status)
-}
 
 export interface PrintJobStatusResult {
   taskId:        string
@@ -143,19 +115,21 @@ function normalizePrintParams(params: PrintJobParams): PrintJobParams {
  * 仅 API_MODE=http 且有真实签名 fileUrl 时调用。
  */
 export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<PrintOrderQuote> {
-  const res = await fetch(`${API_BASE_URL}/orders/quote`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fileUrl: input.fileUrl,
-      params: normalizePrintParams(input.params),
-      ...(input.terminalId ? { terminalId: input.terminalId } : {}),
-    }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throwPrintApiError('quotePrintOrder', res.status, text)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/orders/quote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileUrl: input.fileUrl,
+        params: normalizePrintParams(input.params),
+        ...(input.terminalId ? { terminalId: input.terminalId } : {}),
+      }),
+    })
+  } catch (err) {
+    throw networkError(err)
   }
+  if (!res.ok) await throwHttpError(res)
   const body = (await res.json()) as PrintOrderQuote & { lines?: PrintPriceLine[]; data?: PrintOrderQuote & { lines?: PrintPriceLine[] } }
   // 兼容裸对象与偶发 ApiResponse 包装；契约字段为 lines（后端）→ 前端统一成 priceLines。
   const raw = body.data ?? body
@@ -172,21 +146,23 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
   const { token, ...body } = input
   const terminalId = getTerminalId()
   if (!terminalId) {
-    throw new Error('createPrintJob failed: missing terminal id')
+    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
   }
-  const res = await fetch(`${API_BASE_URL}/print/jobs`, {
-    method:  'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Terminal-Id': terminalId,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body:    JSON.stringify({ ...body, params: normalizePrintParams(body.params) }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throwPrintApiError('createPrintJob', res.status, text)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/print/jobs`, {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Terminal-Id': terminalId,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body:    JSON.stringify({ ...body, params: normalizePrintParams(body.params) }),
+    })
+  } catch (err) {
+    throw networkError(err)
   }
+  if (!res.ok) await throwHttpError(res, token)
   return res.json() as Promise<PrintJobCreated>
 }
 
@@ -198,12 +174,14 @@ export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusR
   // 与 createPrintJob 不同，这里**不**因缺少终端身份而抛错：查状态不需要设备身份，
   // 硬要求会把「Agent 未就绪」变成看不到打印进度。取不到就不发，后端退化回按 IP 计数。
   const terminalId = getTerminalId()
-  const res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`, {
-    headers: terminalId ? { 'X-Terminal-Id': terminalId } : {},
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throwPrintApiError('getPrintJobStatus', res.status, text)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`, {
+      headers: terminalId ? { 'X-Terminal-Id': terminalId } : {},
+    })
+  } catch (err) {
+    throw networkError(err)
   }
+  if (!res.ok) await throwHttpError(res)
   return res.json() as Promise<PrintJobStatusResult>
 }

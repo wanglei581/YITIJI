@@ -33,7 +33,8 @@ import {
   PRINT_BENEFIT_REDEEM_DISABLED_REASON,
 } from '../../services/api/benefits'
 import { fetchPrintPriceConfig, unitCentsFor } from '../../services/print/priceConfigApi'
-import { createPrintJob, quotePrintOrder, PrintApiError } from '../../services/print/printJobsApi'
+import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
@@ -236,9 +237,11 @@ export function PrintConfirmPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
+        // 打印机不可用要如实说出来（用户看到这句才知道不是页数没算好，是机器不能用）；
+        // 其余报价失败只说页数待确认，不把技术串甩给站在机器前的求职者。
         const reason =
-          err instanceof PrintApiError && err.code === 'PRINTER_UNAVAILABLE'
-            ? err.message
+          errorCodeOf(err) === 'PRINTER_UNAVAILABLE'
+            ? userMessageOf(err, '本机打印机当前不可用，请联系现场工作人员')
             : '页数待服务端确认，以最终计费为准'
         setQuote({ status: 'unavailable', reason })
       })
@@ -424,13 +427,10 @@ export function PrintConfirmPage() {
           navigate('/print/progress', { state: nextState })
         }
       } catch (err) {
-        const msg =
-          err instanceof PrintApiError
-            ? err.message
-            : err instanceof Error
-              ? err.message
-              : '提交失败，请重试'
-        setSubmitError(msg)
+        // 原写法把兜底句挂在「不是 Error」那一支，而技术串恰恰是**有 message 的
+        // Error**，那句中文一次都执行不到。统一走 userMessageOf：白名单码给专属
+        // 文案，未知码落到这里的兜底句。
+        setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
         setSubmitting(false)
       }
       return

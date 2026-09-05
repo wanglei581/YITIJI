@@ -48,7 +48,7 @@ async function get<T>(path: string): Promise<T> {
   })
   if (!res.ok) {
     let code = `HTTP_${res.status}`
-    let message = res.statusText
+    let message = `请求失败（${res.status}）`
     try {
       const body = await res.json() as { error?: { code?: string; message?: string } }
       if (body.error?.code) code = body.error.code
@@ -79,7 +79,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   })
   if (!res.ok) {
     let code = `HTTP_${res.status}`
-    let message = res.statusText
+    let message = `请求失败（${res.status}）`
     try {
       const errBody = await res.json() as { error?: { code?: string; message?: string } }
       if (errBody.error?.code) code = errBody.error.code
@@ -106,7 +106,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   })
   if (!res.ok) {
     let code = `HTTP_${res.status}`
-    let message = res.statusText
+    let message = `请求失败（${res.status}）`
     try {
       const errBody = await res.json() as { error?: { code?: string; message?: string } }
       if (errBody.error?.code) code = errBody.error.code

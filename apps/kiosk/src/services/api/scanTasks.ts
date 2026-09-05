@@ -7,6 +7,7 @@ import type {
 import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
+import { notifySessionIfInvalid } from './throwHttpError'
 
 interface ResponseEnvelope<T> {
   success?: boolean
@@ -53,6 +54,7 @@ async function requestJson<T>(
     const envelope = payload as ResponseEnvelope<T> | null
     const code = envelope?.error?.code ?? 'UNKNOWN_ERROR'
     const message = envelope?.error?.message ?? `请求失败（${res.status}）`
+    notifySessionIfInvalid(res.status, code, token)
     throw new ApiHttpError(code, message, res.status)
   }
 

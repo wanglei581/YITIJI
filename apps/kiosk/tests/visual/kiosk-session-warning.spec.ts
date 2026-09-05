@@ -443,18 +443,34 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
   await page.goto('/session-timeout')
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 5_000 })
 
-  const snapshot = await page.evaluate(() => {
-    const raw = window.sessionStorage.getItem('kiosk-orphan-snapshot:v1')
-    if (!raw) return null
-    return JSON.parse(raw) as {
-      sessionCount: number
-      headingCount: number
-      exitButtonCount: number
-      continueButtonCount: number
-      accountLabelCount: number
-      clearingCount: number
+  // hardClear 走的是 window.location.reload：URL 可能已经读到 '/'，而那次 reload
+  // 仍在途中。此时直接 page.evaluate 会撞上「Execution context was destroyed」——
+  // CI 上偶发红过一次，本地跑不出来。先等 load 落定，再用 expect.poll 读快照：
+  // 上下文若在读取途中被销毁就重试，而不是把整条用例判失败。
+  // 注意这只是消除竞态，断言本身一条没放松。
+  await page.waitForLoadState('load')
+
+  type OrphanSnapshot = {
+    sessionCount: number
+    headingCount: number
+    exitButtonCount: number
+    continueButtonCount: number
+    accountLabelCount: number
+    clearingCount: number
+  }
+  const readSnapshot = async (): Promise<OrphanSnapshot | null> => {
+    try {
+      return await page.evaluate(() => {
+        const raw = window.sessionStorage.getItem('kiosk-orphan-snapshot:v1')
+        if (!raw) return null
+        return JSON.parse(raw) as OrphanSnapshot
+      })
+    } catch {
+      return null // 上下文被导航销毁，交给 poll 重试
     }
-  })
+  }
+  await expect.poll(readSnapshot, { timeout: 10_000 }).not.toBeNull()
+  const snapshot = await readSnapshot()
 
   expect(snapshot).not.toBeNull()
   expect(snapshot!.sessionCount).toBe(0)

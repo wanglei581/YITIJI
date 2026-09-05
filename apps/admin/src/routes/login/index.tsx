@@ -141,6 +141,7 @@ export default function LoginPage() {
   const [resetTicket, setResetTicket] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [resetError, setResetError] = useState<string | null>(null)
+  const [resendBusy, setResendBusy] = useState(false)
   const [phoneVerifyUser, setPhoneVerifyUser] = useState<AuthedUser | null>(null)
   const [phoneVerifyCode, setPhoneVerifyCode] = useState('')
   const [phoneVerifyError, setPhoneVerifyError] = useState<string | null>(null)
@@ -575,14 +576,25 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="c-resend"
-                  disabled={resetCountdown.seconds > 0}
-                  onClick={() =>
-                    void startPasswordReset(resetIdentity).then((r) => {
-                      if (r.ok) resetCountdown.start(r.cooldownSeconds || 60)
-                    })
-                  }
+                  disabled={resetCountdown.seconds > 0 || resendBusy}
+                  onClick={() => {
+                    if (resendBusy || resetCountdown.seconds > 0) return
+                    setResendBusy(true)
+                    setResetError(null)
+                    void startPasswordReset(resetIdentity.trim())
+                      .then((r) => {
+                        if (r.ok) resetCountdown.start(r.cooldownSeconds || 60)
+                        else setResetError(r.message || '验证码发送失败，请稍后重试')
+                      })
+                      .catch(() => setResetError('验证码发送失败，请检查网络后重试'))
+                      .finally(() => setResendBusy(false))
+                  }}
                 >
-                  {resetCountdown.seconds > 0 ? `${resetCountdown.seconds}s 后可重新发送` : '重新发送验证码'}
+                  {resendBusy
+                    ? '发送中…'
+                    : resetCountdown.seconds > 0
+                      ? `${resetCountdown.seconds}s 后可重新发送`
+                      : '重新发送验证码'}
                 </button>
               </form>
             )}

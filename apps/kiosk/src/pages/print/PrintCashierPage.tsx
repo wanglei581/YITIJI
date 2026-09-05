@@ -30,6 +30,7 @@ import {
   releasePickupOrder,
   simulateSandboxPayment,
 } from '../../services/print/paymentApi'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   deriveCashierView,
   formatCents,
@@ -114,7 +115,7 @@ export function PrintCashierPage() {
       navigate('/print/progress', { state: nextState })
     } catch (error) {
       navigatedRef.current = false
-      setIssueError(error instanceof Error ? error.message : '订单已付款，但创建打印任务失败，请重试')
+      setIssueError(userMessageOf(error, '订单已付款，但创建打印任务失败，请重试或联系现场工作人员'))
     }
   }, [navigate, state, orderId, paymentSessionToken])
 
@@ -140,7 +141,7 @@ export function PrintCashierPage() {
       } catch (err) {
         if (cancelRef.current) return
         // 出码失败不阻断轮询（订单可能已 paid/closed，轮询会反映真实状态）；仅提示。
-        setIssueError(err instanceof Error ? err.message : '出码失败，请重试')
+        setIssueError(userMessageOf(err, '出码失败，请稍后重试或联系现场工作人员'))
       } finally {
         if (!cancelRef.current) setIssuing(false)
       }
@@ -165,7 +166,7 @@ export function PrintCashierPage() {
       } catch (err) {
         if (cancelRef.current) return
         setChannels([])
-        setIssueError(err instanceof Error ? err.message : '获取支付通道失败')
+        setIssueError(userMessageOf(err, '获取支付通道失败，请检查网络后重试'))
       }
     })()
     return () => {
@@ -251,14 +252,7 @@ export function PrintCashierPage() {
       if (result.status === 'failed') setIssueError(result.failReason ?? '支付未完成，请重新扫码')
     } catch (error) {
       authCodeBufferRef.current = ''
-      const message = error instanceof Error ? error.message : ''
-      setIssueError(
-        message.includes('PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED')
-          ? '检测到上一笔支付待核实，请先等待自动确认或点击核实'
-          : message.includes('PAYMENT_ATTEMPT_PENDING')
-            ? '已有支付正在处理中，请勿重复扫码'
-            : '付款码支付未完成，请重新扫码',
-      )
+      setIssueError(userMessageOf(error, '付款码支付未完成，请重新扫码'))
     } finally {
       codeSubmitLockRef.current = false
       if (!cancelRef.current) setCodeSubmitting(false)
@@ -345,8 +339,7 @@ export function PrintCashierPage() {
       else setIssueError(null)
     } catch (err) {
       if (cancelRef.current) return
-      const msg = err instanceof Error ? err.message : ''
-      setIssueError(msg.includes('RECONCILE_TOO_FREQUENT') ? '核实过于频繁，请稍候几秒再试' : '暂未查到支付结果，请稍候或继续等待自动确认')
+      setIssueError(userMessageOf(err, '暂未查到支付结果，请稍候或继续等待自动确认'))
     } finally {
       if (!cancelRef.current) setReconciling(false)
     }
@@ -364,7 +357,7 @@ export function PrintCashierPage() {
           if (s.payStatus === 'paid') proceedToPrint()
         }
       } catch (err) {
-        setIssueError(err instanceof Error ? err.message : '模拟支付失败')
+        setIssueError(userMessageOf(err, '模拟支付失败，请稍后重试'))
       }
     },
     [snapshot, orderId, paymentSessionToken, proceedToPrint],

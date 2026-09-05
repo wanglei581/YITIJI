@@ -20,6 +20,7 @@ import { FileDownIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
 import { useInkRipple } from '../../../hooks/useInkRipple'
 import { createMyDataRequest, listMyDataRequests } from '../../../services/api/memberPrivacy'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 import './me-detail-inkpaper.css'
 
 function fmt(iso: string): string {
@@ -50,7 +51,7 @@ export function MyPrivacyRequestsPage() {
       setState('ready')
     } catch (error) {
       setState('error')
-      setMessage(error instanceof Error ? error.message : '加载失败')
+      setMessage(userMessageOf(error, '加载失败，请稍后重试'))
     }
   }
 
@@ -74,7 +75,7 @@ export function MyPrivacyRequestsPage() {
       setConfirmRevoke(false)
       setMessage('已撤回岗位 AI 授权，请求已记录')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '提交失败，请稍后重试')
+      setMessage(userMessageOf(error, '提交失败，请稍后重试'))
     } finally {
       setBusy(false)
     }

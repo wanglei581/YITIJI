@@ -98,6 +98,19 @@ const USER_FACING_ERROR_PAGES = [
   'src/pages/resume/ResumeGeneratePreviewPage.tsx',
   'src/pages/resume/ResumeParsePage.tsx',
   'src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx',
+  'src/pages/print/PrintConfirmPage.tsx',
+  'src/pages/print/PrintCashierPage.tsx',
+  'src/pages/print/PrintUploadPage.tsx',
+  'src/pages/print/PrintMaterialCheckPage.tsx',
+  'src/pages/print-scan/SignStampPage.tsx',
+  'src/pages/print-scan/ConvertImagesPage.tsx',
+  'src/pages/scan/ScanProgressPage.tsx',
+  'src/pages/scan/ScanSettingsPage.tsx',
+  'src/pages/profile/me/MySettingsPage.tsx',
+  'src/pages/profile/me/MyPrivacyRequestsPage.tsx',
+  'src/pages/resume/ResumeGeneratePage.tsx',
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  'src/pages/resume/ResumeTemplateLibraryPage.tsx',
 ]
 
 for (const rel of USER_FACING_ERROR_PAGES) {
@@ -185,6 +198,21 @@ assert.deepEqual(
   assert.match(rateLimited, /[\u4e00-\u9fff]/, 'RATE_LIMITED 文案必须是中文')
   // verify-ai-down-fallbacks 要求解析页透出真实原因，MOCK_MODE 不能被抹成通用文案。
   assert.notEqual(userMessageOf({ code: 'MOCK_MODE' }, FALLBACK), FALLBACK, 'MOCK_MODE 必须有自己的文案')
+  for (const [code, hint] of [
+    ['NETWORK_ERROR', /网络|重试/],
+    ['TERMINAL_NOT_READY', /设备未就绪|现场/],
+    ['ONLINE_PAYMENT_DISABLED', /支付|现场/],
+    ['SCAN_TERMINAL_BUSY', /扫描|等待/],
+    ['PRINTER_UNAVAILABLE', /打印机|重试|现场/],
+  ]) {
+    const text = userMessageOf({ code }, FALLBACK)
+    assert.notEqual(text, FALLBACK, `${code} 必须有自己的文案`)
+    assert.match(text, hint, `${code} 文案须含下一步`)
+  }
+  class ProbeTypeError extends TypeError {}
+  const networkText = userMessageOf(new ProbeTypeError('Failed to fetch'), FALLBACK)
+  assert.notEqual(networkText, FALLBACK, 'TypeError 断网必须映射中文，不得透传 Failed to fetch')
+  assert.match(networkText, /网络|重试/)
 }
 
 console.log('PASS kiosk route errors use a safe Chinese recovery page')

@@ -1,5 +1,8 @@
 # 当前开发进度
 
+2026-09-06 **包 3 错误统一（分支 `team/audit-p3-errors`，本地候选，未部署）**。按体检清单 SES-02 / PRT-01 / SES-12 / AI-03 / MSC-02 / PTR-07 / ADM-C3 / ADM-C5 / ADM-C10 / ADM-M1 / ADM-M13 / ADM-A9 / ADM-A24 / OPS-03 / SES-09：① 一体机打印/支付适配器改抛 `ApiHttpError(code, 中文, status)`，缺终端身份映射「本机设备未就绪」；② 页面统一 `userMessageOf`，断网 TypeError 与 5xx/401/429 有中文下一步；③ 6 个带 Bearer 模块 401 触发会话重置（`kioskFeedback` 匿名不带 token，不重置）；④ Admin `main.tsx` 加 unhandledrejection 横幅；来源审核/发布/下架、sync-sources、招聘会 Tab 删除、机构启停、JobsDrawer 删除、屏保删除/启停、退款、登录重发均有中文失败提示。**未做**：清单外页面仍有 `instanceof Error ? message`（如我的文档、取件码页），不顺手改；未改 `apps/miniapp/**`、`.github/workflows/**`，未覆盖包 6/7 的适配器字段映射。验证：kiosk/admin/partner `tsc --noEmit` 退出 0；eslint 改动文件 0 error；`verify:no-raw-error-render` ALL PASS（挂在 `verify:compliance-copy` 下进 CI，`verify:ci-gate-coverage` 386/392）；`verify:kiosk-runtime-error-boundary` PASS（含 TypeError 断网与 SCAN_TERMINAL_BUSY 等码表）；member-session-closure / source-publish-actions / admin-orders-readonly-ui / print-confirm-honest / fusion-w2 / scan-session-truth / scan-input-safety 全绿。未 push。
+
+
 > **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。
 
 2026-09-06 **商用补充清单第 5 / 第 8 项（分支 `team/commercial-5-8`，本地候选，未部署）**。对照 [`launch-audit-2026-09-05.md`](../reviews/launch-audit-2026-09-05.md) 功能优化机会清单。

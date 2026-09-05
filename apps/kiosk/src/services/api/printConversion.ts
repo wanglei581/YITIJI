@@ -13,6 +13,7 @@
 import type { ConvertImagesRequest, ConvertImagesResponse } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
+import { notifySessionIfInvalid } from './throwHttpError'
 
 interface ResponseEnvelope<T> {
   success?: boolean
@@ -51,6 +52,7 @@ export async function convertImagesToPdf(
   if (!res.ok) {
     const code = payload?.error?.code ?? 'UNKNOWN_ERROR'
     const message = payload?.error?.message ?? `请求失败（${res.status}）`
+    notifySessionIfInvalid(res.status, code, options.token)
     throw new ApiHttpError(code, message, res.status)
   }
 
