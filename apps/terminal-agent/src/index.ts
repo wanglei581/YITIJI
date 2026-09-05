@@ -95,12 +95,31 @@ program
     let panelCloudConnected = false
     let panelLastHeartbeatAt: string | null = null
     let panelPrinterStatus: LocalAgentPanelStatus['printerStatus'] = 'unknown'
+    // 可重建的定时器句柄（AGT-06：服务端调整轮询间隔时需要重启它们）。
+    let heartbeatTimer: NodeJS.Timeout | null = null
+    let taskRunner: ReturnType<typeof startTaskRunner> | null = null
     const heartbeatOptions: Parameters<typeof sendHeartbeat>[0] = {
       config,
       localTaskDatabaseAvailable,
       onConfigUpdate: (patch) => {
-        if (patch.heartbeatIntervalMs) config.heartbeatIntervalMs = patch.heartbeatIntervalMs
-        if (patch.claimIntervalMs) config.claimIntervalMs = patch.claimIntervalMs
+        // AGT-06：服务端下发的轮询间隔此前只写进 config 对象，两个 setInterval 仍按旧值跑。
+        // 变化时重建定时器，让后台调整真正生效。
+        if (patch.heartbeatIntervalMs && patch.heartbeatIntervalMs !== config.heartbeatIntervalMs) {
+          config.heartbeatIntervalMs = patch.heartbeatIntervalMs
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = startHeartbeat(heartbeatOptions, false)
+            log(`heartbeat: interval updated by server — ${patch.heartbeatIntervalMs}ms`)
+          }
+        }
+        if (patch.claimIntervalMs && patch.claimIntervalMs !== config.claimIntervalMs) {
+          config.claimIntervalMs = patch.claimIntervalMs
+          if (taskRunner) {
+            taskRunner.stop()
+            taskRunner = startTaskRunner({ config, db })
+            log(`task-runner: claim interval updated by server — ${patch.claimIntervalMs}ms`)
+          }
+        }
       },
       onObservation: (observation) => {
         panelCloudConnected = observation.connected
@@ -121,12 +140,12 @@ program
     } else {
       warn(`agent started but cloud authentication is not ready — terminalId=${config.terminalId!}`)
     }
-    const heartbeatTimer = startHeartbeat(heartbeatOptions, false)
+    heartbeatTimer = startHeartbeat(heartbeatOptions, false)
     const panelScanHealth = inspectScanInputFolder(config.scanWatchFolder)
     const scanWatcherHandle = startScanWatcher(config)
 
     // ── Step 6: Start claim / print loop ──────────────────────────────────
-    const taskRunner = startTaskRunner({ config, db })
+    taskRunner = startTaskRunner({ config, db })
 
     // ── Step 7: Start offline PATCH retry loop ────────────────────────────
     const offlineRetryTimer = startOfflineRetry(config, db)
@@ -138,7 +157,7 @@ program
     let qrLocalServer: LocalQrServerHandle | null = null
     try {
       qrLocalServer = startQrLoginLocalServer(config, {
-        wakePrintQueue: taskRunner.wake,
+        wakePrintQueue: () => taskRunner!.wake(),
         getPanelStatus: () => {
           return {
             runtimeVersion: AGENT_RUNTIME_VERSION,
@@ -163,8 +182,8 @@ program
     // ── Graceful shutdown ─────────────────────────────────────────────────
     const shutdown = (signal: string) => {
       log(`Agent: received ${signal}, shutting down...`)
-      clearInterval(heartbeatTimer)
-      taskRunner.stop()
+      if (heartbeatTimer) clearInterval(heartbeatTimer)
+      taskRunner?.stop()
       clearInterval(offlineRetryTimer)
       clearInterval(scanDeletionAuditReporterTimer)
       void qrLocalServer?.close()

@@ -90,6 +90,52 @@ async function downloadFile(fileUrl: string, destPath: string): Promise<void> {
   fs.writeFileSync(destPath, Buffer.from(resp.data))
 }
 
+const DOWNLOAD_RETRY_DELAYS_MS = [2_000, 5_000, 10_000]
+
+/**
+ * AGT-03：下载失败按 2s / 5s / 10s 退避重试（共 4 次尝试）。只对网络层与 5xx 重试；
+ * 4xx（签名过期 / 文件已清理）立即失败，重试也不会变好。
+ */
+export async function downloadWithRetry(
+  fileUrl: string,
+  destPath: string,
+  taskId: string,
+  dependencies: { download?: typeof downloadFile; wait?: (ms: number) => Promise<void> } = {},
+): Promise<void> {
+  const download = dependencies.download ?? downloadFile
+  const sleep = dependencies.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+  let lastError: unknown
+  for (let attempt = 0; attempt <= DOWNLOAD_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      await download(fileUrl, destPath)
+      return
+    } catch (e) {
+      lastError = e
+      const status = axios.isAxiosError(e) ? e.response?.status : undefined
+      const retryable = status === undefined || status >= 500
+      if (!retryable || attempt === DOWNLOAD_RETRY_DELAYS_MS.length) break
+      const delay = DOWNLOAD_RETRY_DELAYS_MS[attempt] ?? DOWNLOAD_RETRY_DELAYS_MS[DOWNLOAD_RETRY_DELAYS_MS.length - 1]!
+      warn(
+        `task ${taskId}: download attempt ${attempt + 1} failed — ${axiosErrorMessage(e)}; retry in ${delay / 1000}s`,
+      )
+      await sleep(delay)
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError))
+}
+
+/**
+ * AGT-02：出纸监控窗口按 页数 × 份数 放大。SumatraPDF 在 spool 完成即退出，多页多份
+ * 任务的 despool 时间全部落在监控窗口里；固定 30s 会把正常长任务判成 PRINT_JOB_UNCONFIRMED，
+ * 用户重下单就重复出纸。基线 30s + 每面 3s，封顶 5 分钟（服务端 printing 超时 10 分钟，须大于此上限）。
+ */
+export function computeMonitorTimeoutMs(billablePages: number | undefined, copies: number | undefined): number {
+  const pages = Number.isFinite(billablePages) && (billablePages as number) > 0 ? Math.floor(billablePages as number) : 1
+  const copyCount = Number.isFinite(copies) && (copies as number) > 0 ? Math.floor(copies as number) : 1
+  const sheets = pages * copyCount
+  return Math.min(5 * 60_000, 30_000 + sheets * 3_000)
+}
+
 /**
  * 计算下载文件的 SHA-256 摘要（hex）。
  *
@@ -319,16 +365,21 @@ export async function executeTask(
   const ext = inferTaskExt(task)
   const tempFilePath = path.join(getTempDir(), `task_${task.taskId}${ext}`)
 
+  // AGT-07：日志不落用户原始文件名（简历常以「姓名+简历.pdf」命名，属 CLAUDE.md §11
+  // 敏感文件）。只记扩展名与长度，足够排障。
   log(
     `task ${task.taskId}: start — type=${task.type}  ext=${ext} ` +
-      `(mime=${task.mimeType ?? '-'}, name=${task.fileName ?? '-'})`,
+      `(mime=${task.mimeType ?? '-'}, nameLen=${task.fileName ? task.fileName.length : 0})`,
   )
 
   try {
     // ── Step 1: Download ──────────────────────────────────────────────────
+    // AGT-03：签名 URL 瞬时超时 / 5xx 不能直接判 failed —— 这时纸还没出，重试没有
+    // 重复出纸风险；而一次失败就终态会让已付款订单直接失败。三次退避重试后仍失败
+    // 才上报（总耗时上限约 3 分钟，在 5 分钟租约内）。
     log(`task ${task.taskId}: downloading...`)
     try {
-      await downloadFile(resolveFileUrl(task.fileUrl, apiBaseUrl), tempFilePath)
+      await downloadWithRetry(resolveFileUrl(task.fileUrl, apiBaseUrl), tempFilePath, task.taskId)
     } catch (e) {
       err(`task ${task.taskId}: download failed — ${e instanceof Error ? e.message : String(e)}`)
       markTaskDone(db, task.taskId, 'failed')
@@ -382,7 +433,12 @@ export async function executeTask(
       warn(`task ${task.taskId}: credential became unauthorized before printing status; print skipped`)
       return
     }
-    await patch('printing')
+    // AGT-01：printing 只是信息性中间态。上报失败重试一次后继续打印；服务端已接受
+    // claimed → completed（补写 printing 日志），所以这里不会再把真出纸记成假失败。
+    const printingAcked = (await patch('printing')) || (!shouldAbortBeforePrint() && (await patch('printing')))
+    if (!printingAcked) {
+      warn(`task ${task.taskId}: printing status not acknowledged; continuing — terminal status will be reported directly`)
+    }
     if (shouldAbortBeforePrint()) {
       warn(`task ${task.taskId}: printing status rejected as unauthorized; print skipped`)
       return
@@ -423,8 +479,17 @@ export async function executeTask(
     )
 
     // ── Step 5+6: Record outcome + PATCH terminal status ──────────────────
-    if (result.success) {
-      log(`task ${task.taskId}: print success in ${result.durationMs}ms ✓`)
+    // AGT-04：PRINT_TIMEOUT 只说明 SumatraPDF 没在 60s 内退出，spool 往往仍在进行、
+    // 纸随后照样出来。此时不能直接判 failed（会与真实出纸相反），而是和成功路径一样
+    // 进入队列监控：观测到作业完成 → completed；什么都没看到 → 按监控口径 fail-closed
+    // 报 PRINT_JOB_UNCONFIRMED，交由核查流处理，绝不自动重印。
+    const dispatchTimedOut = !result.success && result.errorCode === 'PRINT_TIMEOUT'
+    if (result.success || dispatchTimedOut) {
+      if (dispatchTimedOut) {
+        warn(`task ${task.taskId}: print command timed out after ${result.durationMs}ms; job may still be spooling — falling through to queue monitoring`)
+      } else {
+        log(`task ${task.taskId}: print success in ${result.durationMs}ms ✓`)
+      }
 
       // ── Step 4.5: Immediately write 'spooled' to local DB ─────────────
       // N5 guarantee: if Agent crashes during post-spooling monitoring, restart
@@ -448,10 +513,12 @@ export async function executeTask(
       // Ambiguous outcomes (timeout / never observed / monitor unavailable) fail
       // closed. Only an explicit spooler completion or an observed job followed
       // by queue removal may reach the server as completed.
+      const monitorTimeoutMs = computeMonitorTimeoutMs(task.billablePages, task.params?.copies)
+      log(`task ${task.taskId}: monitoring print queue for up to ${monitorTimeoutMs / 1000}s (pages=${task.billablePages ?? '?'} copies=${task.params?.copies ?? 1})`)
       const monitorOutcome = await monitorPrintJob(
         resolvedPrinter,
         task.taskId,
-        30_000,
+        monitorTimeoutMs,
         1_500,
         { dispatchedAtMs: Date.parse(result.startedAt) },
       )

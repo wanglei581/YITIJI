@@ -15,6 +15,7 @@
     "verify:local-print-wake": "ts-node scripts/verify-local-print-wake.ts",
     "verify:task-runner-wake": "ts-node scripts/verify-task-runner-wake.ts",
     "verify:task-reliability": "ts-node scripts/verify-task-reliability.ts",
+    "verify:print-truth-hardening": "ts-node scripts/verify-print-truth-hardening.ts",
     "verify:print-monitor-truth": "ts-node scripts/verify-print-monitor-truth.ts",
     "verify:image-scale-truth": "ts-node scripts/verify-image-scale-truth.ts",
     "verify:usb-import-agent": "ts-node scripts/verify-usb-import-agent.ts",
