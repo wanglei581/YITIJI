@@ -95,5 +95,15 @@ try {
 }
 
 Write-Host ""
+Write-Host "==> 注册 Kiosk 浏览器看门狗（登录后自动全屏打开 $origin）" -ForegroundColor Cyan
+$kioskRegister = Join-Path $installRoot "kiosk\register-kiosk-watchdog.ps1"
+if (-not (Test-Path -LiteralPath $kioskRegister -PathType Leaf)) {
+  Fail "Kiosk 看门狗组件缺失，请修复 MSI 安装后重试"
+}
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $kioskRegister -Url ($origin + "/") -Browser auto
+if ($LASTEXITCODE -ne 0) { Fail "Kiosk 看门狗注册未完成，错误码 $LASTEXITCODE" }
+Write-Host "[OK] 计划任务 AIJobPrintKioskWatchdog 已注册：下次登录自动进入全屏，浏览器退出会被自动拉起" -ForegroundColor Green
+
+Write-Host ""
 Write-Host "CONFIG SUCCESS - 设备已绑定，可以打开 zyidai.cn" -ForegroundColor Green
 Start-Process "http://127.0.0.1:9527/local/panel"
