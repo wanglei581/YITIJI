@@ -309,7 +309,6 @@ export class ReleaseObservationService {
     const now = new Date()
     const plans = await this.prisma.agentReleasePlan.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 50,
       include: {
         artifact: true,
         targets: {

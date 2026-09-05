@@ -55,6 +55,7 @@ export default function MemberBenefitsPage() {
   const [phone, setPhone] = useState('')
   const [selectedUser, setSelectedUser] = useState<AdminEndUserSearchItem | null>(null)
   const [items, setItems] = useState<AdminBenefitGrantItem[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [benefitType, setBenefitType] = useState<AdminBenefitType>('free_quota')
@@ -73,6 +74,7 @@ export default function MemberBenefitsPage() {
     try {
       const res = await memberBenefitsAdminApi.list(userId)
       setItems(res.items)
+      setTotal(res.total)
       setState('ready')
     } catch {
       setState('error')
@@ -83,6 +85,7 @@ export default function MemberBenefitsPage() {
     setMessage(null)
     setSelectedUser(null)
     setItems([])
+    setTotal(0)
     setState('loading')
     try {
       const res = await memberBenefitsAdminApi.searchUsers(normalized)
@@ -106,6 +109,7 @@ export default function MemberBenefitsPage() {
     if (!/^1[3-9]\d{9}$/.test(normalized)) {
       setSelectedUser(null)
       setItems([])
+      setTotal(0)
       setState('idle')
       setMessage('请输入 11 位中国大陆手机号')
       return
@@ -284,7 +288,10 @@ export default function MemberBenefitsPage() {
           </Card>
 
           <Card className="p-4">
-            <p className="mb-3 text-sm font-semibold text-neutral-900">权益记录</p>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-neutral-900">权益记录</p>
+              <p className="text-xs text-neutral-400">{total} 条{total > items.length ? ` · 仅显示最近 ${items.length} 条` : ''}</p>
+            </div>
             {state === 'loading' && <LoadingState className="py-16" />}
             {state === 'error' && <ErrorState className="py-16" onRetry={() => selectedUser && void loadItems(selectedUser.endUserId)} />}
             {state === 'ready' && items.length === 0 && (

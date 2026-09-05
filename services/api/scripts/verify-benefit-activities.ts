@@ -180,6 +180,23 @@ async function main() {
     if (claims.items.some((item) => item.endUserId === userA && item.phoneMasked.endsWith(phoneA.slice(-4)) && !item.phoneMasked.includes(phoneA))) pass('11. Admin 领取记录只返回脱敏手机号')
     else fail(`11. 领取记录脱敏异常：${JSON.stringify(claims)}`)
 
+    const extraActivities = await Promise.all(Array.from({ length: 200 }, (_, index) => activities.create(admin, {
+      title: `分页活动 ${index} ${suffix}`,
+      description: '用于验证活动列表总数不因展示上限失真。',
+      rulesText: null,
+      benefitType: 'free_quota',
+      sourceType: 'platform',
+      quantityTotal: 1,
+      stockTotal: 1,
+      validFrom,
+      validUntil,
+      grantValidDays: null,
+    })))
+    activityIds.push(...extraActivities.map((activity) => activity.id))
+    const adminActivities = await activities.adminList({})
+    if (adminActivities.items.length === 200 && adminActivities.total >= 202) pass('11b. Admin 活动列表超过 200 条时返回真实 total')
+    else fail(`11b. Admin 活动 total 异常：${JSON.stringify({ items: adminActivities.items.length, total: adminActivities.total })}`)
+
     const logs = await prisma.auditLog.findMany({
       where: {
         action: { in: ['benefit_activity.create', 'benefit_activity.publish', 'benefit_activity.end', 'benefit_activity.claim'] },

@@ -8,6 +8,7 @@ import { companiesAdminService, type AdminCompanyDetail, type CompanyLinkableJob
 export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyDetail; onMutated: () => void }) {
   const [keyword, setKeyword] = useState('')
   const [linkable, setLinkable] = useState<CompanyLinkableJob[]>([])
+  const [linkableTotal, setLinkableTotal] = useState(0)
   const [searchState, setSearchState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -18,8 +19,9 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
   const search = useCallback(async (kw: string) => {
     setSearchState('loading')
     try {
-      const rows = await companiesAdminService.listLinkableJobs(detail.id, kw)
-      setLinkable(rows)
+      const result = await companiesAdminService.listLinkableJobs(detail.id, kw)
+      setLinkable(result.items)
+      setLinkableTotal(result.total)
       setSelected(new Set())
       setSearchState('ready')
     } catch {
@@ -77,7 +79,7 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
 
   return (
     <Card className="space-y-4 p-4">
-      <p className="text-sm font-medium text-neutral-700">关联岗位（{detail.linkedJobs.length}）</p>
+      <p className="text-sm font-medium text-neutral-700">关联岗位（{detail.linkedJobsTotal}）</p>
       <InlineError message={error} />
       <InlineSuccess message={success} />
 
@@ -85,7 +87,11 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
       {detail.linkedJobs.length === 0 ? (
         <p className="rounded-lg bg-neutral-50 px-3 py-3 text-center text-xs text-neutral-400">暂无关联岗位，可在下方搜索同来源机构的已发布岗位进行关联</p>
       ) : (
-        <ul className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
+        <>
+          {detail.linkedJobsTotal > detail.linkedJobs.length && (
+            <p className="mb-2 text-xs text-warning-fg">仅显示最近 {detail.linkedJobs.length} 条</p>
+          )}
+          <ul className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
           {detail.linkedJobs.map((j) => (
             <li key={j.id} className="flex items-center gap-2 px-3 py-2">
               <div className="min-w-0 flex-1">
@@ -98,7 +104,8 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
               <DangerDeleteButton onConfirm={() => void unlink(j.id)} busy={busyJobId === j.id} confirmText="确认移除?" />
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       )}
 
       {/* 可关联岗位搜索 */}
@@ -127,6 +134,9 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
         )}
         {searchState === 'ready' && linkable.length > 0 && (
           <>
+            {linkableTotal > linkable.length && (
+              <p className="text-xs text-warning-fg">仅显示最近 {linkable.length} 条</p>
+            )}
             <ul className="max-h-56 divide-y divide-neutral-900/[0.06] overflow-y-auto rounded-lg border border-neutral-100 bg-surface">
               {linkable.map((j) => (
                 <li key={j.id}>

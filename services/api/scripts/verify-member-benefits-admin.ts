@@ -128,6 +128,20 @@ async function main() {
       pass('2. Admin 发放权益成功，剩余额度初始化正确')
     } else fail(`2. 发放结果异常：${JSON.stringify(granted)}`)
 
+    await Promise.all(Array.from({ length: 100 }, (_, index) => adminBenefits.grant(admin, {
+      endUserId,
+      benefitType: 'free_quota',
+      sourceType: 'platform',
+      title: `分页权益 ${index}`,
+      description: '用于验证后台权益列表总数不因展示上限失真。',
+      quantityTotal: 1,
+      validFrom: null,
+      validUntil: null,
+    })))
+    const adminBenefitList = await adminBenefits.listForEndUser(endUserId)
+    if (adminBenefitList.items.length === 100 && adminBenefitList.total === 101) pass('2b. Admin 权益列表超过 100 条时返回真实 total')
+    else fail(`2b. Admin 权益 total 异常：${JSON.stringify({ items: adminBenefitList.items.length, total: adminBenefitList.total })}`)
+
     // 3. Kiosk 本人只读可读回。
     const mine = await memberBenefits.list(endUserId, { cursor: null, pageSize: 20 })
     if (mine.items.some((i) => i.id === granted.id && i.quantityRemaining === 3)) pass('3. Kiosk /me/benefits 本人只读可读回 Admin 发放的权益')

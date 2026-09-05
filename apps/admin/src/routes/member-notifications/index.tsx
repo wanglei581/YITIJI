@@ -33,6 +33,7 @@ function fmt(iso: string): string {
 
 export default function MemberNotificationsPage() {
   const [items, setItems] = useState<AdminBroadcastItem[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [message, setMessage] = useState<string | null>(null)
   const [title, setTitle] = useState('系统维护提醒')
@@ -46,6 +47,7 @@ export default function MemberNotificationsPage() {
     try {
       const res = await memberNotificationsAdminApi.listBroadcasts()
       setItems(res.items)
+      setTotal(res.total)
       setState('ready')
     } catch (error) {
       setState('error')
@@ -175,7 +177,7 @@ export default function MemberNotificationsPage() {
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-neutral-900">广播列表</p>
-            <p className="text-xs text-neutral-400">{items.length} 条</p>
+            <p className="text-xs text-neutral-400">{total} 条{total > items.length ? ` · 仅显示最近 ${items.length} 条` : ''}</p>
           </div>
 
           {state === 'loading' && <LoadingState className="py-24" />}

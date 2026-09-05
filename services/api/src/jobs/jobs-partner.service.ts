@@ -934,7 +934,6 @@ export class JobsPartnerService {
     const rows = await this.prisma.syncLog.findMany({
       where: { orgId: user.orgId },
       orderBy: { createdAt: 'desc' },
-      take: 100,
       include: { source: { select: { name: true } } },
     })
     return rows.map((r, i) => ({

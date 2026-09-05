@@ -69,6 +69,11 @@ export interface OfflineAgencyJob {
   updatedAt: string
 }
 
+export interface OfflineAgencyJobsResult {
+  items: OfflineAgencyJob[]
+  total: number
+}
+
 export interface OfflineAgencyListFilters {
   orgType?: string
   reviewStatus?: string
@@ -129,7 +134,7 @@ export interface OfflineAgenciesAdminServiceInterface {
   deleteAgency(id: string): Promise<void>
   reviewAgency(id: string, action: 'approve' | 'reject', rejectReason?: string): Promise<void>
   publishAgency(id: string, publish: boolean): Promise<void>
-  listJobs(agencyId: string): Promise<OfflineAgencyJob[]>
+  listJobs(agencyId: string): Promise<OfflineAgencyJobsResult>
   createJob(agencyId: string, input: OfflineAgencyJobInput): Promise<OfflineAgencyJob>
   updateJob(agencyId: string, jobId: string, input: Partial<OfflineAgencyJobInput>): Promise<OfflineAgencyJob>
   deleteJob(agencyId: string, jobId: string): Promise<void>
@@ -234,7 +239,7 @@ const httpAdapter: OfflineAgenciesAdminServiceInterface = {
   },
   async listJobs(agencyId) {
     const page = await req<RawPage<RawOfflineJob>>('GET', `${BASE}/${agencyId}/jobs?pageSize=100`)
-    return page.data.map(mapJob)
+    return { items: page.data.map(mapJob), total: page.total }
   },
   async createJob(agencyId, input) { return mapJob(await req<RawOfflineJob>('POST', `${BASE}/${agencyId}/jobs`, input)) },
   async updateJob(agencyId, jobId, input) { return mapJob(await req<RawOfflineJob>('PUT', `${BASE}/${agencyId}/jobs/${jobId}`, input)) },
@@ -350,7 +355,8 @@ const mockAdapter: OfflineAgenciesAdminServiceInterface = {
   },
   async listJobs(agencyId) {
     mustFindAgency(agencyId)
-    return mockJobs.get(agencyId) ?? []
+    const items = mockJobs.get(agencyId) ?? []
+    return { items, total: items.length }
   },
   async createJob(agencyId, input) {
     const agency = mustFindAgency(agencyId)

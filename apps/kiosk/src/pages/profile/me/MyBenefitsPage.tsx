@@ -47,6 +47,7 @@ export function MyBenefitsPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberBenefitItem[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   useInkRipple('.me-inkdetail .me-ripple')
@@ -60,6 +61,7 @@ export function MyBenefitsPage() {
     getMyBenefits(getToken(), { pageSize: 50 })
       .then((r) => {
         setItems(r.items)
+        setTotal(r.total)
         setState('ready')
       })
       .catch(() => setState('error'))
@@ -96,12 +98,12 @@ export function MyBenefitsPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p>权益口袋</p>
-            <strong>{items.length}</strong>
+            <strong>{total}</strong>
             <span>仅展示本人已领取或已发放权益，不接支付、不做核销</span>
           </div>
           <div className="me-summary-mini" aria-label="权益状态数量">
-            <span>可用 {items.filter((item) => item.status === 'active').length}</span>
-            <span>已结束 {items.filter((item) => item.status !== 'active').length}</span>
+            <span>当前页可用 {items.filter((item) => item.status === 'active').length}</span>
+            <span>{total > items.length ? `仅显示最近 ${items.length} 条` : `当前页已结束 ${items.filter((item) => item.status !== 'active').length}`}</span>
           </div>
         </section>
 

@@ -152,6 +152,14 @@ async function main() {
     if (unreadOnlyA.items.some((item) => item.id === unreadBoundary.id && item.kind === 'broadcast' && !item.isRead)) pass('7b. 未读广播列表不会被较新的已读广播截断')
     else fail(`7b. 未读广播分页异常：${JSON.stringify(unreadOnlyA.items.map((item) => ({ id: item.id, isRead: item.isRead, kind: item.kind })))}`)
 
+    const firstNotificationsPage = await notifications.listForEndUser(userA, { cursor: null, pageSize: 50 })
+    if (firstNotificationsPage.total > firstNotificationsPage.items.length && firstNotificationsPage.nextCursor) {
+      const secondNotificationsPage = await notifications.listForEndUser(userA, { cursor: firstNotificationsPage.nextCursor, pageSize: 50 })
+      if (secondNotificationsPage.items.length > 0 && secondNotificationsPage.total === firstNotificationsPage.total) {
+        pass('7bb. 通知超过 50 条时返回真实 total 和复合游标，第二页可达')
+      } else fail(`7bb. 通知第二页/total 异常：${JSON.stringify({ first: firstNotificationsPage, second: secondNotificationsPage })}`)
+    } else fail(`7bb. 通知首屏未报告真实 total 或 nextCursor：${JSON.stringify(firstNotificationsPage)}`)
+
     const bulkUnreadBroadcasts = Array.from({ length: 105 }, (_, i) => ({
       id: `unread_all_${suffix}_${i}`,
       title: `批量未读广播 ${i}`,
@@ -170,6 +178,16 @@ async function main() {
     await expectReject('FEEDBACK_COPY_FORBIDDEN', '8. 反馈回复拒绝招聘流程文案', () =>
       feedback.addAdminReply(admin, ticket.id, { content: '已收到企业面试邀约，请查看投递结果。' }),
     )
+
+    const extraFeedbacks = await Promise.all(Array.from({ length: 101 }, (_, index) => feedback.create(userA, {
+      category: 'other',
+      title: `分页反馈 ${index}`,
+      content: '用于验证后台反馈列表总数不因展示上限失真。',
+    })))
+    const adminFeedbackList = await feedback.listForAdmin({})
+    if (adminFeedbackList.items.length === 100 && adminFeedbackList.total >= extraFeedbacks.length + 1) {
+      pass('8b. Admin 反馈列表超过 100 条时返回真实 total')
+    } else fail(`8b. Admin 反馈 total 异常：${JSON.stringify({ items: adminFeedbackList.items.length, total: adminFeedbackList.total })}`)
 
     const logs = await prisma.auditLog.findMany({ where: { actorId: adminId } })
     const payloads = logs.map((log) => log.payloadJson).join('\n')

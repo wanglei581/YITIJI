@@ -29,16 +29,15 @@ export class BenefitActivitiesService {
     private readonly audit: AuditService,
   ) {}
 
-  async adminList(query: AdminListBenefitActivitiesQueryDto): Promise<{ items: BenefitActivityListItem[] }> {
+  async adminList(query: AdminListBenefitActivitiesQueryDto): Promise<{ items: BenefitActivityListItem[]; total: number }> {
     const where: Record<string, unknown> = {}
     if (query.status) where['status'] = query.status
     if (query.source) where['sourceType'] = query.source
-    const rows = await this.prisma.benefitActivity.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    })
-    return { items: rows.map((row) => this.toActivityItem(row, false)) }
+    const [rows, total] = await Promise.all([
+      this.prisma.benefitActivity.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200 }),
+      this.prisma.benefitActivity.count({ where }),
+    ])
+    return { items: rows.map((row) => this.toActivityItem(row, false)), total }
   }
 
   async create(admin: AuthedUser, dto: UpsertBenefitActivityDto): Promise<BenefitActivityListItem> {
@@ -121,17 +120,21 @@ export class BenefitActivitiesService {
     return this.toActivityItem(updated, false)
   }
 
-  async listClaims(id: string): Promise<{ items: BenefitActivityClaimItem[] }> {
+  async listClaims(id: string): Promise<{ items: BenefitActivityClaimItem[]; total: number }> {
     await this.findActivity(id)
-    const rows = await this.prisma.benefitClaim.findMany({
-      where: { activityId: id },
-      include: {
-        endUser: { select: { phoneEnc: true } },
-        benefitGrant: { select: { status: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    })
+    const where = { activityId: id }
+    const [rows, total] = await Promise.all([
+      this.prisma.benefitClaim.findMany({
+        where,
+        include: {
+          endUser: { select: { phoneEnc: true } },
+          benefitGrant: { select: { status: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+      this.prisma.benefitClaim.count({ where }),
+    ])
     return {
       items: rows.map((row) => ({
         id: row.id,
@@ -142,17 +145,18 @@ export class BenefitActivitiesService {
         grantStatus: row.benefitGrant.status,
         createdAt: row.createdAt.toISOString(),
       })),
+      total,
     }
   }
 
-  async listVisible(query: ListBenefitActivitiesQueryDto, endUserId?: string | null): Promise<{ items: BenefitActivityListItem[] }> {
-    const rows = await this.prisma.benefitActivity.findMany({
-      where: this.visibleWhere(query.source),
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
+  async listVisible(query: ListBenefitActivitiesQueryDto, endUserId?: string | null): Promise<{ items: BenefitActivityListItem[]; total: number }> {
+    const where = this.visibleWhere(query.source)
+    const [rows, total] = await Promise.all([
+      this.prisma.benefitActivity.findMany({ where, orderBy: { createdAt: 'desc' }, take: 100 }),
+      this.prisma.benefitActivity.count({ where }),
+    ])
     const claimedIds = await this.claimedActivityIds(endUserId, rows.map((row) => row.id))
-    return { items: rows.map((row) => this.toActivityItem(row, claimedIds.has(row.id))) }
+    return { items: rows.map((row) => this.toActivityItem(row, claimedIds.has(row.id))), total }
   }
 
   async detail(id: string, endUserId?: string | null): Promise<BenefitActivityListItem> {

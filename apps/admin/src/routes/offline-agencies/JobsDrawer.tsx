@@ -169,6 +169,7 @@ export interface JobsDrawerProps {
 
 export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChange, onJobsChanged }: JobsDrawerProps) {
   const [jobs,        setJobs]        = useState<OfflineAgencyJob[]>([])
+  const [jobsTotal,   setJobsTotal]   = useState(0)
   const [loadState,   setLoadState]   = useState<'loading' | 'error' | 'ready'>('loading')
   const [formMode,    setFormMode]    = useState<'none' | 'create' | 'edit'>('none')
   const [editingJob,  setEditingJob]  = useState<OfflineAgencyJob | null>(null)
@@ -181,9 +182,10 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
     if (!agencyId) return
     setLoadState('loading')
     try {
-      const data = await offlineAgenciesAdminService.listJobs(agencyId)
-      setJobs(data)
-      onJobCountChange?.(data.length)
+      const result = await offlineAgenciesAdminService.listJobs(agencyId)
+      setJobs(result.items)
+      setJobsTotal(result.total)
+      onJobCountChange?.(result.total)
       setLoadState('ready')
     } catch {
       setLoadState('error')
@@ -205,10 +207,9 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
     if (err) { setFormError(err); return }
     setBusy(true); setFormError(null); setActionError(null)
     try {
-      const created = await offlineAgenciesAdminService.createJob(agencyId, formToJobInput(f))
-      setJobs((prev) => [created, ...prev])
-      onJobCountChange?.(jobs.length + 1)
+      await offlineAgenciesAdminService.createJob(agencyId, formToJobInput(f))
       await onJobsChanged?.()
+      await load()
       setFormMode('none')
     } catch (e) {
       setFormError(e instanceof Error ? e.message : '创建失败，请重试')
@@ -241,9 +242,8 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
     setActionError(null)
     try {
       await offlineAgenciesAdminService.deleteJob(agencyId, jobId)
-      setJobs((prev) => prev.filter((j) => j.id !== jobId))
-      onJobCountChange?.(jobs.length - 1)
       await onJobsChanged?.()
+      await load()
     } catch (error) {
       setActionError(error instanceof Error ? error.message : '删除失败，请重试')
       void load()
@@ -281,6 +281,11 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
         <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
           新增或修改岗位会使所属机构回到“待审核 + 草稿”，管理员重新审核发布后才会公开展示。
         </div>
+        {jobsTotal > jobs.length && (
+          <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
+            仅显示最近 {jobs.length} 条（共 {jobsTotal} 条）。
+          </div>
+        )}
         {actionError && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {actionError}

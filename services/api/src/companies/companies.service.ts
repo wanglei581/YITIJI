@@ -307,7 +307,6 @@ export class CompaniesService {
       where,
       include: { _count: { select: { jobs: true } } },
       orderBy: [{ updatedAt: 'desc' }],
-      take: 200,
     })
     return rows.map((c) => this.adminRow(c))
   }
@@ -330,6 +329,7 @@ export class CompaniesService {
       showOpenJobCount: c.showOpenJobCount, showCity: c.showCity,
       showEmployeeScale: c.showEmployeeScale, showBoothNo: c.showBoothNo,
       linkedJobs: c.jobs,
+      linkedJobsTotal: c._count.jobs,
     }
   }
 
@@ -444,17 +444,22 @@ export class CompaniesService {
   async adminLinkableJobs(id: string, keyword?: string) {
     const company = await this.prisma.companyProfile.findUnique({ where: { id }, select: { sourceOrgId: true } })
     if (!company) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
-    return this.prisma.job.findMany({
-      where: {
-        sourceOrgId: company.sourceOrgId,
-        ...PUBLISHED,
-        OR: [{ companyProfileId: null }, { companyProfileId: { not: id } }],
-        ...(keyword?.trim() ? { title: { contains: keyword.trim() } } : {}),
-      },
-      select: { id: true, title: true, city: true, category: true, companyProfileId: true },
-      take: 50,
-      orderBy: [{ syncTime: 'desc' }],
-    })
+    const where = {
+      sourceOrgId: company.sourceOrgId,
+      ...PUBLISHED,
+      OR: [{ companyProfileId: null }, { companyProfileId: { not: id } }],
+      ...(keyword?.trim() ? { title: { contains: keyword.trim() } } : {}),
+    }
+    const [items, total] = await Promise.all([
+      this.prisma.job.findMany({
+        where,
+        select: { id: true, title: true, city: true, category: true, companyProfileId: true },
+        take: 50,
+        orderBy: [{ syncTime: 'desc' }],
+      }),
+      this.prisma.job.count({ where }),
+    ])
+    return { items, total }
   }
 
   async adminLinkJobs(id: string, dto: AdminLinkJobsDto, actor: { userId: string }) {
@@ -499,7 +504,6 @@ export class CompaniesService {
       where: { sourceOrgId: orgId },
       include: { _count: { select: { jobs: true } } },
       orderBy: [{ updatedAt: 'desc' }],
-      take: 200,
     })
     return rows.map((c) => this.adminRow(c))
   }

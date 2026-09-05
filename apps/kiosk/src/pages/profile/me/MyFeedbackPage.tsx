@@ -32,6 +32,7 @@ export function MyFeedbackPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberFeedbackTicketItem[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [form, setForm] = useState<FeedbackFormState>(emptyFeedbackForm)
@@ -57,6 +58,7 @@ export function MyFeedbackPage() {
     getMyFeedback(getToken(), { pageSize: 50 })
       .then((page) => {
         setItems(page.items)
+        setTotal(page.total)
         setState('ready')
       })
       .catch(() => setState('error'))
@@ -173,7 +175,7 @@ export function MyFeedbackPage() {
     }
   }
 
-  const totalLabel = useMemo(() => (items.length > 0 ? `${items.length} 条反馈` : '暂无反馈记录'), [items.length])
+  const totalLabel = useMemo(() => (total > 0 ? `${total} 条反馈${total > items.length ? ` · 仅显示最近 ${items.length} 条` : ''}` : '暂无反馈记录'), [items.length, total])
 
   return (
     <div className="me-inkdetail me-inkdetail-feedback h-full">
@@ -197,7 +199,7 @@ export function MyFeedbackPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p>服务反馈</p>
-            <strong>{items.length}</strong>
+            <strong>{total}</strong>
             <span>本人设备、打印、文件处理与一般建议，不涉及招聘平台闭环承诺</span>
           </div>
           <div className="me-summary-mini" aria-label="反馈状态">
