@@ -678,6 +678,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:fair-stats-truth
           pnpm --filter @ai-job-print/api verify:fair-visit-plan
           pnpm --filter @ai-job-print/api verify:feedback-notifications
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:community-daily-brief
           pnpm --filter @ai-job-print/api verify:field-mapping
           pnpm --filter @ai-job-print/api verify:file-lifecycle-summary
           pnpm --filter @ai-job-print/api verify:member-assets
