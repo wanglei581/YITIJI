@@ -38,6 +38,7 @@ console.log('\n=== Kiosk 设备状态去伪守卫 ===')
 
 const hookSrc = read('src/hooks/useTerminalDeviceStatus.ts')
 const previewSrc = read('src/pages/print/PrintPreviewPage.tsx')
+const confirmSrc = read('src/pages/print/PrintConfirmPage.tsx')
 const homeSrc = read('src/pages/home/HomePage.tsx')
 const warmOverrideSrc = read('src/styles/warm-professional-override.css')
 const pillsSrc = read('src/components/KioskDeviceStatusPills.tsx')
@@ -118,6 +119,13 @@ expectNotMatches(
   'PrintPreview 在仅黑白能力下不读取或推导未知耗材告警',
 )
 expectMatches(previewSrc, /printerReady/, 'PrintPreview 以 printerReady 门控放行')
+expectMatches(
+  confirmSrc,
+  /useTerminalDeviceStatus/,
+  'PrintConfirmPage 消费 useTerminalDeviceStatus',
+)
+expectMatches(confirmSrc, /printerReady/, 'PrintConfirmPage 以 printerReady 门控放行')
+expectMatches(confirmSrc, /打印机不可用/, 'PrintConfirmPage 打印机未就绪时主按钮中文禁用态')
 
 expectNotMatches(
   homeSrc,
