@@ -61,7 +61,8 @@
     "pages/fair-reminders/fair-reminders",
     "pages/kiosk-login/kiosk-login",
     "pages/daily-report/daily-report",
-    "pages/community/community"
+    "pages/community/community",
+    "pages/feedback/feedback"
   ],
   "window": {
     "navigationBarTextStyle": "black",

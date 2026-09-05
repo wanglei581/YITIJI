@@ -1634,6 +1634,36 @@ const api = {
       method: 'POST', data: {}, header: { 'x-member-step-up-token': stepUpToken }, needAuth: true,
     });
   },
+
+  // ---------- 会员意见反馈（/me/feedback，需登录；小程序不传 terminalId）----------
+  getMyFeedback(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('意见反馈'));
+    return unwrapList(request('/me/feedback', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  createFeedback(data) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('意见反馈'));
+    return request('/me/feedback', { method: 'POST', data, needAuth: true });
+  },
+
+  getFeedbackDetail(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('意见反馈'));
+    return request(`/me/feedback/${encodeURIComponent(id)}`, { method: 'GET', needAuth: true });
+  },
+
+  replyFeedback(id, content) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('意见反馈'));
+    return request(`/me/feedback/${encodeURIComponent(id)}/replies`, {
+      method: 'POST', data: { content }, needAuth: true,
+    });
+  },
+
+  closeFeedback(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('意见反馈'));
+    return request(`/me/feedback/${encodeURIComponent(id)}/close`, {
+      method: 'PATCH', needAuth: true,
+    });
+  },
 };
 
 

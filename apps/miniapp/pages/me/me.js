@@ -35,6 +35,7 @@ Page({
       { id: 'favorites', icon: 'inbox',     title: '我的收藏',      sub: '岗位、招聘会与政策',   accent: 'teal'  },
       { id: 'reminders', icon: 'bell',      title: '招聘会提醒',    sub: '仅保存在本机，换设备不同步', accent: 'clay'  },
       { id: 'activity',  icon: 'history',   title: '浏览与跳转记录', sub: '仅记录本人浏览与跳转', accent: 'wheat' },
+      { id: 'feedback',  icon: 'comment',   title: '意见反馈',      sub: '提交后可看处理进度',   accent: 'cyan'  },
       { id: 'membership',icon: 'crown',     title: '我的权益',      sub: '查看本人实际权益记录', accent: 'wheat' },
       { id: 'settings',  icon: 'setting',   title: '账号设置',      sub: '手机号、隐私与登录',   accent: 'slate' },
     ],
@@ -88,6 +89,7 @@ Page({
       favorites:  '/pages/favorites/favorites',
       reminders:  '/pages/fair-reminders/fair-reminders',
       activity:   '/pages/browse-history/browse-history',
+      feedback:   '/pages/feedback/feedback',
       membership: '/pages/membership/membership',
       settings:   '/pages/settings/settings',
     }
