@@ -1,0 +1,72 @@
+/* 参会企业列表 · 本页私有类。全局类（page-wrap / navbar / content / chips / chip /
+   notice / compliance-note / list-state）直接复用 app.wxss，这里不重复定义。 */
+
+.fc-head { padding: 12rpx 32rpx 4rpx; }
+.fc-count { font-size: 30rpx; font-weight: 720; color: var(--ink); }
+.fc-count-sub { margin-top: 5rpx; font-size: 22rpx; color: var(--muted); }
+
+/* 搜索框与展区筛选高度都钉在 96rpx = 48px：手机端最小可点尺寸，
+   低于它在触屏上会频繁点空（app.wxss 的 .f-chip 只有 32px，不能直接用）。 */
+.search-bar { height: 96rpx; margin: 16rpx 32rpx 0; padding: 0 22rpx; border-radius: var(--r);
+  border: 1rpx solid var(--line-soft); background: var(--surface); display: flex;
+  align-items: center; gap: 14rpx; box-shadow: var(--sh-xs); }
+.sb-ic { width: 29rpx; height: 29rpx; color: var(--faint); flex-shrink: 0; }
+.sb-input { flex: 1; min-width: 0; font-size: 26rpx; color: var(--ink); }
+.sb-ph { color: var(--faint); }
+/* 图标只占 26rpx，但热区必须撑满 96rpx（48px）：清空键是最容易点空的元素之一，
+   视觉上仍是一个小叉，负 margin 把多出来的热区吃回搜索框的内边距里。 */
+.sb-clear { width: 96rpx; height: 96rpx; margin-right: -22rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: var(--faint); flex-shrink: 0; }
+.sb-clear .ficon { width: 26rpx; height: 26rpx; }
+
+.zone-scroll { width: 100%; margin-top: 16rpx; }
+.zone-row { padding: 0 32rpx; display: flex; gap: 12rpx; white-space: nowrap; }
+.zone-chip { height: 96rpx; padding: 0 30rpx; border-radius: 24rpx; border: 1rpx solid var(--line-soft);
+  background: var(--surface); color: var(--muted); font-size: var(--fs-base); display: inline-flex;
+  align-items: center; justify-content: center; flex-shrink: 0; }
+.zone-chip.on { color: #fff; background: var(--teal); border-color: var(--teal); font-weight: 650; }
+
+.fc-list { margin-top: 20rpx; display: flex; flex-direction: column; gap: 16rpx; }
+.fc-card { min-height: 176rpx; margin: 0 32rpx; padding: 24rpx; border-radius: var(--r);
+  background: var(--surface); border: 1rpx solid var(--line-soft); box-shadow: var(--sh-xs);
+  display: flex; align-items: flex-start; gap: 20rpx; }
+
+/* 用企业名首字做标识，不用 logoUrl/coverImageUrl：那是任意远程地址，
+   加载失败时 image 只留一块空白，比一个稳定的首字更难认。 */
+.fc-logo { width: 84rpx; height: 84rpx; border-radius: var(--r); background: var(--teal-soft);
+  color: var(--teal-deep); font-size: 34rpx; font-weight: 700; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; }
+
+.fc-main { flex: 1; min-width: 0; }
+.fc-name { font-size: var(--fs-md); font-weight: 720; color: var(--ink); line-height: 1.45; }
+.fc-meta { margin-top: 7rpx; font-size: 22rpx; color: var(--muted); }
+.fc-place { margin-top: 9rpx; display: flex; align-items: center; gap: 8rpx;
+  font-size: 22rpx; color: var(--teal-deep); }
+.fc-place-ic { width: 24rpx; height: 24rpx; flex-shrink: 0; }
+.fc-tags { margin-top: 12rpx; }
+
+.fc-right { align-self: stretch; display: flex; flex-direction: column; align-items: flex-end;
+  justify-content: space-between; gap: 12rpx; flex-shrink: 0; }
+.fc-jobs { font-size: 20rpx; font-weight: 650; color: var(--wheat-deep); background: var(--wheat-soft);
+  padding: 6rpx 14rpx; border-radius: var(--r-full); white-space: nowrap; }
+.fc-arrow { width: 22rpx; height: 22rpx; color: var(--ghost); }
+
+/* 加载 / 错误 / 空态卡片 */
+.list-state { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: var(--r);
+  border: 1rpx solid var(--line-soft); background: var(--surface); text-align: center;
+  font-size: 26rpx; color: var(--muted); }
+.empty-wrap { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: var(--r);
+  border: 1rpx solid var(--line-soft); background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; text-align: center; }
+.state-icon { width: 92rpx; height: 92rpx; border-radius: var(--r); background: var(--surface-2);
+  color: var(--faint); display: flex; align-items: center; justify-content: center; }
+.state-icon.error { background: var(--error-soft); color: var(--error); }
+.state-icon .ficon { width: 44rpx; height: 44rpx; }
+.state-title { margin-top: 22rpx; font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.state-desc { margin-top: 9rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; }
+/* 112rpx = 56px：错误态的重试是这一屏的主操作，按主按钮下限给。 */
+.retry-btn { margin-top: 25rpx; height: 112rpx; padding: 0 40rpx; border-radius: 24rpx;
+  background: var(--teal); color: #fff; display: flex; align-items: center;
+  font-size: 26rpx; font-weight: 650; }
+
+.notice { margin-top: 20rpx; }

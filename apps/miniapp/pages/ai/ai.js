@@ -48,8 +48,26 @@ Page({
         title: '准备材料',
         sub: '改简历、管文档、发起打印',
         items: [
+          // 排在诊断/优化**之前**：那两条都以「你已经有一份简历」为前提，
+          // 一份都没有的应届生在这一组里原本无路可走。
+          //
+          // 删掉这条会怎样：pages/resume-build 立刻变成不可达页面。全仓对它的
+          // 唯一其它引用是 ai-records 的记录回看路由，而那个列表在用户成功生成过
+          // 一次之前是空的——「要先有记录才能进页面，要进页面才能产生记录」。
+          // 页面本身是完整的（6 段表单 + 服务端 POST /resume/generate，已在
+          // scripts/api-contract.json 的 endpoints 里，不是 knownMissing），
+          // 所以这不是「功能没做完」，是入口漏接。没有门禁能发现这种漏接。
+          //
+          // desc 写「AI 只润色不编造」而不是「AI 帮你写简历」：后端 DTO 的契约
+          // 原文就是「AI 只润色，不编造」，在 service 层强制。入口处先把预期封住，
+          // 用户才不会带着「AI 会替我写经历」的期待进去。
+          { id: 'build',     icon: 'plus',        title: '生成简历', desc: '从零填写，AI 只润色不编造', accent: 'cyan'  },
+          { id: 'voice',     icon: 'comment',     title: '语音说简历', desc: '一题一问，看字确认再生成', accent: 'plum'  },
           { id: 'diagnose',  icon: 'file-search', title: '简历诊断', desc: '逐条给出问题与依据', accent: 'plum'  },
           { id: 'optimize',  icon: 'edit',        title: '简历优化', desc: '改写前后对照可选用', accent: 'teal'  },
+          // 放「准备材料」而不是 AI 组：这条链全程无模型，服务端按模板 + 你填的字段
+          // 直接渲染 PDF。desc 也不写「智能/AI」——写了就是伪造。
+          { id: 'materials', icon: 'form',        title: '材料模板', desc: '自荐信、感谢信、材料清单', accent: 'wheat' },
           { id: 'documents', icon: 'folder',      title: '我的文档', desc: '管理材料并再次打印', accent: 'clay'  },
           { id: 'print',     icon: 'printer',     title: '发起打印', desc: '选文档、终端与参数', accent: 'cyan'  },
         ],
@@ -63,6 +81,10 @@ Page({
           { id: 'match',     icon: 'link',    title: '岗位匹配', desc: '三档参考，不代表录用结果', accent: 'teal'  },
           { id: 'interview', icon: 'comment', title: '模拟面试', desc: '按岗位出题并复盘',       accent: 'plum'  },
           { id: 'plan',      icon: 'compass', title: '职业规划', desc: '方向建议仅供参考',       accent: 'wheat' },
+          // 放「想清楚再决定」而不是另起一组：它和岗位匹配/职业规划一样，
+          // 产出的是帮你做判断的参考，不是可交付的材料。
+          // 标题按后端口径写「自我探索」——不叫「测评」：测评是资格判定口吻。
+          { id: 'explore',   icon: 'aim',     title: '自我探索', desc: '五维倾向参考，非资格评定', accent: 'slate' },
         ],
       },
       {
@@ -155,13 +177,20 @@ Page({
   tapEntry(e) {
     const { id } = e.currentTarget.dataset
     const routes = {
+      // 删掉这条会怎样：上面 groups.prepare 的「生成简历」磁贴点下去 url 取到
+      // undefined，wx.navigateTo 不会被调用，卡片变成静默死按钮（用户会以为是
+      // 自己没点准，反复去戳）。id 与 groups 里的 id 必须逐字对应。
+      build:     '/pages/resume-build/resume-build',
+      voice:     '/pages/resume-voice/resume-voice',
       diagnose:  '/pages/resume-diagnose/resume-diagnose',
       optimize:  '/pages/resume-optimize/resume-optimize',
       documents: '/pages/documents/documents',
+      materials: '/pages/job-materials/job-materials',
       print:     '/pages/print/print',
       contract:  '/pages/contract-review/contract-review',
       match:     '/pages/job-fit/job-fit',
       interview: '/pages/interview-entry/interview-entry',
+      explore:   '/pages/self-explore/self-explore',
       plan:      '/pages/career-plan/career-plan',
       orders:    '/pages/orders/orders',
       kiosk:     '/pages/kiosk-login/kiosk-login',

@@ -58,9 +58,13 @@ function formatPrice(cents) {
 
 // 到机码格式化：每 2 位一组方便阅读，如 "AB-C3-9M"
 function fmtCode(raw) {
+  // 与 print-pickup 的 formatCode 同形：String() 包装 + groups 判空。
+  // 原版对纯空白串（replace 后为空，match 返回 null）和数字入参直接 THROW，
+  // 一行数据异常会中断整个列表渲染。同一函数全仓三份实现，以 print-pickup 版为准。
   if (!raw) return ''
-  const s = raw.replace(/\s/g, '').toUpperCase()
-  return s.match(/.{1,2}/g).join('-')
+  const s = String(raw).replace(/\s/g, '').toUpperCase()
+  const groups = s.match(/.{1,2}/g)
+  return groups ? groups.join('-') : ''
 }
 
 // 后端 item → UI 展示对象
@@ -75,6 +79,11 @@ function toUiItem(item) {
                : null
   return {
     id:          item.id,
+    // 列表把两套 id 空间拼在一起：cloud 段来自 Order（toView 只发 taskStatus），
+    // legacy 段来自 PrintTask（select 里带 status）。详情端点 requireOwned() 只查
+    // prisma.order，拿 PrintTask.id 去打必回 PRINT_ORDER_NOT_FOUND。
+    // 所以「订单详情」只能对 Order 行开放；这个判别位和下面到机码那行用的是同一个。
+    cloudOrder:  !item.status,
     orderNo:     item.orderNo || item.id,
     store:       item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端',
     title:       item.fileName || '打印文件',
@@ -213,6 +222,8 @@ Page({
   detail(e) {
     const item = this.data.filtered.find(o => o.id === e.currentTarget.dataset.id)
     if (!item) return
+    // 兜一道：一体机任务没有线上详情，点了只会 404。按钮本身已按 cloudOrder 隐藏。
+    if (!item.cloudOrder) return
     wx.navigateTo({ url: `/pages/order-detail/order-detail?orderId=${encodeURIComponent(item.id)}` })
   },
 

@@ -14,6 +14,11 @@ function countFromResult(res) {
 Page({
   data: {
     statusBarHeight: 20,
+    // 胶囊右让。2026-09-03 实测：本页顶栏右侧按钮**整个落在微信胶囊矩形内**
+    // （390pt 上胶囊 [296,383]，按钮 [329,374]），用户点不到，而模拟器截图看不出来
+    // ——胶囊是系统绘制的另一层。值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，
+    // 不能在 wxss 里写死：胶囊位置随机型与系统版本变。
+    capsuleInsetRight: 94,
     isLoggedIn: false,
     user: null,
     // 概览计数（真实数据接入前为占位 0，不伪造已完成状态）
@@ -28,6 +33,7 @@ Page({
       { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '到机码与出纸状态',     accent: 'clay'  },
       { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
       { id: 'favorites', icon: 'inbox',     title: '我的收藏',      sub: '岗位、招聘会与政策',   accent: 'teal'  },
+      { id: 'reminders', icon: 'bell',      title: '招聘会提醒',    sub: '仅保存在本机，换设备不同步', accent: 'clay'  },
       { id: 'activity',  icon: 'history',   title: '浏览与跳转记录', sub: '仅记录本人浏览与跳转', accent: 'wheat' },
       { id: 'membership',icon: 'crown',     title: '我的权益',      sub: '查看本人实际权益记录', accent: 'wheat' },
       { id: 'settings',  icon: 'setting',   title: '账号设置',      sub: '手机号、隐私与登录',   accent: 'slate' },
@@ -35,7 +41,10 @@ Page({
   },
 
   onLoad() {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this.setData({
+      statusBarHeight: app.globalData.statusBarHeight || 20,
+      capsuleInsetRight: app.globalData.capsuleInsetRight || 94,
+    })
   },
 
   onShow() {
@@ -77,6 +86,7 @@ Page({
       orders:     '/pages/orders/orders',
       ai:         '/pages/ai-records/ai-records',
       favorites:  '/pages/favorites/favorites',
+      reminders:  '/pages/fair-reminders/fair-reminders',
       activity:   '/pages/browse-history/browse-history',
       membership: '/pages/membership/membership',
       settings:   '/pages/settings/settings',

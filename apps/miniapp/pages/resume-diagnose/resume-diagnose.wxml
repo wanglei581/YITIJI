@@ -45,9 +45,9 @@
     </view>
 
     <!-- 文本抽取质量:低置信度时必须提醒人工复核 -->
-    <view wx:if="{{report.noticeConfidence !== null && report.noticeConfidence < 0.8}}" class="notice warn">
+    <view wx:if="{{report.noticeNeedsReview}}" class="notice warn">
       <text class="ficon i-info n-ic"></text>
-      <text>简历文字识别置信度较低({{report.noticeConfidence}}),部分内容可能未被正确读取,建议核对后再参考评分。</text>
+      <text>简历文字识别置信度{{report.noticeConfidenceLabel}}，部分内容可能未被正确读取，建议先核对原文再参考下面的评分。</text>
     </view>
     <view wx:for="{{report.noticeWarnings}}" wx:for-item="w" wx:key="*this" class="notice warn">
       <text class="ficon i-info n-ic"></text>

@@ -1,0 +1,174 @@
+/* 自我探索 · 倾向参考。优先复用 app.wxss 全局类；尺寸走 --fs-* / --r-* 令牌。
+   触控下限：可点区 96rpx（=48px），主按钮走全局 .btn.lg（60px）。 */
+
+/* card + card-inner 合并在同一个元素上，所以分区标题不能再用 .card-head
+   （它自带 14/16px 内边距，会和 card-inner 的 16px 叠成双层留白）。 */
+.sec-t {
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 20rpx;
+}
+
+/* 全局 .state-retry 只有 8px 上下内边距（约 33px 高），在触控屏上够不着 48px 下限。
+   这里只在本页把它抬到 96rpx，不动 app.wxss。 */
+.state-retry { min-height: 96rpx; padding: 0 40rpx; display: flex; align-items: center; }
+
+/* 错误态的第二出口（.state-retry 是主出口，这条是次要动作） */
+.err-alt {
+  margin-top: 20rpx; min-height: 96rpx; padding: 0 40rpx;
+  display: flex; align-items: center;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--fs-base);
+}
+
+/* ── 同意书 ───────────────────────────────────────────────── */
+.cs-head { display: flex; align-items: center; gap: 12rpx; margin-bottom: 18rpx; }
+.cs-ic { font-size: var(--fs-md); color: var(--teal); }
+.cs-title { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+
+.cs-list { display: flex; flex-direction: column; gap: 18rpx; }
+.cs-item { display: flex; align-items: flex-start; gap: 12rpx; }
+.cs-dot { font-size: var(--fs-sm); color: var(--teal); margin-top: 6rpx; flex-shrink: 0; }
+.cs-text { flex: 1; font-size: var(--fs-base); line-height: 1.65; color: var(--ink-soft); }
+
+.cs-ver {
+  margin-top: 20rpx; padding-top: 18rpx;
+  border-top: 1px solid var(--line-faint);
+  font-size: var(--fs-xs); color: var(--faint); line-height: 1.6;
+  word-break: break-all;
+}
+
+/* 勾选行整行可点：只让 24px 的方框可点，在触控屏上几乎点不中 */
+.cbox { display: flex; align-items: flex-start; gap: 20rpx; min-height: 96rpx; padding: 12rpx 0; }
+.cb {
+  width: 44rpx; height: 44rpx; margin-top: 6rpx; flex-shrink: 0;
+  border: 2rpx solid var(--line);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-sm); color: transparent;
+}
+.cb.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+.cb-body { flex: 1; min-width: 0; }
+.cb-title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); line-height: 1.5; }
+.cb-desc { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; }
+.cb-sep { margin: 16rpx 0; }
+
+/* ── 答题 ─────────────────────────────────────────────────── */
+.ask-top { padding: 20rpx 32rpx 4rpx; }
+.ask-count { margin-top: 12rpx; font-size: var(--fs-sm); color: var(--muted); }
+
+.gdots { display: flex; gap: 16rpx; margin-top: 20rpx; }
+.gdot {
+  width: 96rpx; height: 96rpx;
+  border-radius: var(--r-full);
+  border: 2rpx solid var(--line);
+  background: var(--surface);
+  color: var(--faint);
+  font-size: var(--fs-base); font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.gdot.done { background: var(--teal-soft); border-color: var(--teal-soft); color: var(--teal-deep); }
+.gdot.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+.q-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin-bottom: 20rpx; }
+.q-prompt { flex: 1; font-size: var(--fs-base); font-weight: 600; color: var(--ink); line-height: 1.6; }
+/* 「可以不选」是知情提示，不是操作，所以弱化且不做成可点 */
+.q-optional { font-size: var(--fs-xs); color: var(--faint); flex-shrink: 0; }
+
+.q-opts { display: flex; flex-direction: column; gap: 14rpx; }
+.q-opt {
+  display: flex; align-items: center; gap: 16rpx;
+  min-height: 96rpx; padding: 16rpx 22rpx;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.q-opt.on { background: var(--teal-wash); border-color: var(--teal); }
+.qo-mark {
+  width: 36rpx; height: 36rpx; flex-shrink: 0;
+  border: 2rpx solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xs); color: transparent;
+}
+.qo-mark.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+.qo-text { flex: 1; font-size: var(--fs-base); line-height: 1.55; color: var(--ink-soft); }
+.q-opt.on .qo-text { color: var(--teal-deep); font-weight: 600; }
+
+/* ── 结果：雷达图 + 等价文字列表 ───────────────────────────── */
+.radar-wrap { display: flex; flex-direction: column; align-items: center; }
+/* canvas 尺寸由 js 按屏宽算好后走内联 px；这里只管背景与圆角 */
+.radar-cv { display: block; background: var(--surface); border-radius: var(--r-md); }
+.radar-cap { margin-top: 8rpx; font-size: var(--fs-xs); color: var(--faint); line-height: 1.6; text-align: center; }
+.radar-note {
+  padding: 24rpx; border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: var(--fs-sm); color: var(--muted); line-height: 1.6;
+}
+
+.dim-bars { margin-top: 24rpx; display: flex; flex-direction: column; gap: 20rpx; }
+.db-top { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin-bottom: 10rpx; }
+.db-label { font-size: var(--fs-base); color: var(--ink-soft); }
+.db-val { font-size: var(--fs-base); font-weight: 700; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
+/* 「暂无数据」不是一个分值，不能沿用分值的强调色 */
+.db-val.na { color: var(--faint); font-weight: 500; }
+
+.radar-foot {
+  margin-top: 24rpx; padding-top: 18rpx;
+  border-top: 1px solid var(--line-faint);
+  font-size: var(--fs-sm); color: var(--muted); line-height: 1.6;
+}
+
+/* ── 结果：单维度卡片 ─────────────────────────────────────── */
+.dh { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 16rpx; }
+.dh-label { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.dn { font-size: var(--fs-base); line-height: 1.7; color: var(--ink-soft); }
+/* 解读缺失是常态之一（AI 不可用或命中合规词），要显式可读，不是错误红 */
+.dn.na { color: var(--faint); }
+.dm { margin-top: 16rpx; font-size: var(--fs-xs); color: var(--faint); line-height: 1.6; }
+
+/* ── 结果：本次记录 ───────────────────────────────────────── */
+.mrow { display: flex; align-items: flex-start; gap: 16rpx; padding: 12rpx 0; }
+.mk { width: 190rpx; flex-shrink: 0; font-size: var(--fs-sm); color: var(--muted); }
+.mv { flex: 1; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.6; word-break: break-all; }
+.mnotice { margin: 16rpx 0 0; }
+
+.wd {
+  margin-top: 24rpx;
+  min-height: 96rpx;
+  display: flex; align-items: center; justify-content: center; gap: 10rpx;
+  border: 1px solid var(--error-soft);
+  border-radius: var(--r-md);
+  background: var(--error-soft);
+  color: var(--error);
+  font-size: var(--fs-base); font-weight: 600;
+}
+.wd-ic { font-size: var(--fs-base); }
+.wd-desc { margin-top: 12rpx; font-size: var(--fs-xs); color: var(--faint); line-height: 1.6; }
+
+/* ── 底部操作条：次要动作定宽，主动作吃掉余量 ───────────────── */
+.ab-side { flex: 0 0 auto; }
+.ab-main { flex: 1; }
+.ab-ic { font-size: var(--fs-md); }
+
+/* 倾向形态图。标签在 canvas 外面：画布文字不吃字阶令牌、跨 DPR 会糊、会被边界裁。
+   删掉 .radar-stage 的 position:relative，五个标签会全部塌到卡片左上角。 */
+.radar-stage { position: relative; margin: 0 auto; }
+.radar-lb {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* 画布在舞台里居中；标签占舞台四周的余量 */
+.radar-stage .radar-cv { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }

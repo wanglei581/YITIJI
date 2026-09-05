@@ -7,7 +7,10 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs"
+    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale",
+    "verify:api-contract": "node scripts/verify-miniapp-api-contract.mjs",
+    "contract:update": "node scripts/verify-miniapp-api-contract.mjs --write",
+    "verify:visual-scale": "node scripts/verify-miniapp-visual-scale.mjs"
   },
   "main": "app.js",
   "keywords": [],

@@ -1,0 +1,48 @@
+# 修订 0c04cec15 · 2026-09-02T22:25+0800 · local
+# ⚠️ 被执行的脚本本身带未提交改动，**这条结果不属于 HEAD**，详见文末。
+
+$ node scripts/verify-ci-gate-coverage.mjs
+OK: 16 deterministic CI gates are directly executed; 375/381 verify/ui 门禁在 CI 执行闭包内，6 条已登记豁免（其中 0 条待接线，上限 1）；168 个门禁脚本文件中 1 个无脚本名（全部已登记，上限 1）
+exit=0
+
+$ git status --porcelain
+ M docs/progress/current-progress.md
+ M scripts/verify-ci-gate-coverage.mjs
+?? docs/delivery/miniapp-fair-onsite-2026-09/evidence/EV-026-static-gate.txt
+?? docs/delivery/miniapp-fair-onsite-2026-09/evidence/EV-027-api-contract.txt
+?? docs/delivery/miniapp-fair-onsite-2026-09/evidence/EV-028-visual-scale.txt
+?? docs/delivery/miniapp-fair-onsite-2026-09/evidence/EV-029-pickup-qrcode.txt
+?? docs/delivery/miniapp-fair-onsite-2026-09/evidence/EV-030-ci-gate-coverage.txt
+
+$ git diff --stat scripts/verify-ci-gate-coverage.mjs
+ scripts/verify-ci-gate-coverage.mjs | 26 ++++++++++++++++++++------
+ 1 file changed, 20 insertions(+), 6 deletions(-)
+
+$ git show HEAD:scripts/verify-ci-gate-coverage.mjs | grep -n 'ENFORCED_PREFIXES ='
+148:const ENFORCED_PREFIXES = ['verify', 'ui']
+
+$ grep -n 'ENFORCED_PREFIXES =' scripts/verify-ci-gate-coverage.mjs   # 工作区版本
+162:const ENFORCED_PREFIXES = ['verify', 'ui', 'typecheck']
+
+────────────────────────────────────────────────────────────────────
+这条结果为什么不能当成 HEAD 的结果
+
+被执行的 scripts/verify-ci-gate-coverage.mjs 有未提交改动（lane 外，另一位
+作者在做 B-1「放开 ENFORCED_PREFIXES 的 typecheck 半」）。HEAD 提交里是
+['verify','ui']，工作区里是 ['verify','ui','typecheck']。前缀多一个，纳管的
+门禁总数就多 3 条（isGate 要求「前缀:」带冒号）：
+  ai-job-print-terminal::typecheck:refresh
+  @ai-job-print/api::typecheck:recruitment-wave2-proposed-governance
+  @ai-job-print/api::typecheck:recruitment-wave2-full-inventory
+
+因此上面的 375/381 是**工作区版本**的数字。HEAD 提交版本会是另一个数字，
+本轮**没有实测**——要实测必须在干净检出上跑，本工作区不具备这个条件
+（不允许做任何 git 写操作）。不把「按差异推出来的数」写成「跑出来的数」。
+
+这条能证明的：改动后的覆盖率检查 exit=0，没有出现「未接线门禁」超限。
+这条不能证明的：
+  1. HEAD 提交版本的确切覆盖率数字；
+  2. CI 真的跑过本分支的任何一个提交 —— 分支从未推送
+     （git branch -r --contains HEAD 为空），ci.yml 的触发是
+     push: [main] + pull_request + workflow_dispatch，本分支既没进 main
+     也没开 PR，所以 GitHub Actions 上一次都没执行过。

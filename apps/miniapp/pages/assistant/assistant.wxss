@@ -62,3 +62,15 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .dot:nth-child(2) { animation-delay: .2s; }
 .dot:nth-child(3) { animation-delay: .4s; }
 @keyframes dot-pulse { 0%,80%,100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+
+/* 降级提示。视觉上明确弱于正文但必须可读——它是事实声明，不是装饰。
+   只在 aiGenerated=false 时出现，真实回答不挂任何徽章。 */
+.msg-fallback {
+  margin-top: 14rpx; padding: 12rpx 16rpx;
+  display: flex; align-items: flex-start; gap: 10rpx;
+  background: var(--wheat-wash);
+  border: 1px solid var(--wheat-soft);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs); color: var(--warn); line-height: 1.55;
+}
+.mf-ic { flex-shrink: 0; margin-top: 2rpx; }

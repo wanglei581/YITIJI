@@ -70,7 +70,9 @@
 
 /* content 包裹层 */
 .content { padding: 24rpx 24rpx 0; }
-.content.has-bar { padding-bottom: 160rpx; }
+/* 必须带 var(--sab)：全仓 6 个页面覆盖 .content.has-bar，另外 5 个都写了，
+   只有这里漏了——全面屏上 home indicator 会压住最后一行。 */
+.content.has-bar { padding-bottom: calc(160rpx + var(--sab)); }
 
 /* 对比模块空状态 */
 .empty-modules { text-align: center; color: var(--muted); font-size: 26rpx;

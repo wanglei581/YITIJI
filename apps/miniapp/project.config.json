@@ -32,6 +32,10 @@
         "type": "folder"
       },
       {
+        "value": "tools",
+        "type": "folder"
+      },
+      {
         "value": ".claude",
         "type": "folder"
       },

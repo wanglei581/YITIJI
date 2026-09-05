@@ -1,0 +1,136 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回参会企业列表">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">企业详情</view>
+  </view>
+
+  <view class="content has-bar">
+
+    <view wx:if="{{loading}}" class="list-state">正在加载企业信息…</view>
+
+    <view wx:elif="{{loadError}}" class="empty-wrap">
+      <view class="state-icon error"><text class="ficon i-warning"></text></view>
+      <view class="state-title">加载失败</view>
+      <view class="state-desc">{{loadError}}</view>
+      <view class="retry-btn tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载企业信息">重新加载</view>
+    </view>
+
+    <view wx:elif="{{!company.id}}" class="empty-wrap">
+      <view class="state-icon"><text class="ficon i-bank"></text></view>
+      <view class="state-title">未找到该企业</view>
+      <view class="state-desc">这家企业可能已从名单中移除，或所属招聘会尚未发布。</view>
+    </view>
+
+    <block wx:else>
+
+      <view class="cd-hero rise-d1">
+        <view class="cd-logo">{{company.initial}}</view>
+        <view class="cd-hero-copy">
+          <view class="cd-name">{{company.name}}</view>
+          <view wx:if="{{company.subText}}" class="cd-sub">{{company.subText}}</view>
+        </view>
+      </view>
+
+      <view wx:if="{{company.honorTags.length}}" class="chips cd-honors rise-d1">
+        <view class="chip wheat" wx:for="{{company.honorTags}}" wx:for-item="tag" wx:key="*this">{{tag}}</view>
+      </view>
+
+      <view wx:if="{{company.boothNumber || company.zoneName}}" class="cd-booth rise-d2">
+        <view class="cd-booth-ic"><text class="ficon i-map-pin"></text></view>
+        <view class="cd-booth-copy">
+          <view class="cd-booth-label">现场展位</view>
+          <view class="cd-booth-val">{{company.boothNumber ? '展位 ' + company.boothNumber : '展位号未标注'}}</view>
+          <view wx:if="{{company.zoneName}}" class="cd-booth-zone">{{company.zoneName}}</view>
+        </view>
+      </view>
+
+      <view wx:if="{{company.infoRows.length}}" class="cd-card rise-d2">
+        <view class="cd-card-title">企业信息</view>
+        <view class="cd-row" wx:for="{{company.infoRows}}" wx:key="k">
+          <text class="cd-row-k">{{item.k}}</text>
+          <text class="cd-row-v">{{item.v}}</text>
+        </view>
+        <!-- aiMatchScore 是机构自己录进来的展示数字，不是系统算出来的任何结论，
+             所以只标「机构标注参考值」并明说口径，不做任何推断性描述。 -->
+        <view wx:if="{{company.matchScore !== null}}" class="cd-score">
+          <view class="cd-score-head">
+            <text class="cd-score-label">机构标注参考值</text>
+            <text class="cd-score-num">{{company.matchScore}}</text>
+          </view>
+          <view class="cd-score-note">该数值由录入机构自行标注，仅作展示，不代表本平台的任何评估或建议。</view>
+        </view>
+      </view>
+
+      <view wx:if="{{company.description}}" class="cd-card rise-d3">
+        <view class="cd-card-title">企业简介</view>
+        <view class="cd-text">{{company.description}}</view>
+      </view>
+
+      <view class="cd-sec-head rise-d3">
+        <view class="cd-sec-title">招聘岗位</view>
+        <view wx:if="{{company.posCount}}" class="cd-sec-count">{{company.posCount}} 个</view>
+      </view>
+
+      <view wx:if="{{!company.posCount}}" class="cd-card rise-d4">
+        <view class="cd-empty-pos">暂无岗位信息</view>
+        <view wx:if="{{company.posNote}}" class="cd-empty-note">{{company.posNote}}</view>
+      </view>
+
+      <view wx:else class="cd-pos-list rise-d4">
+        <view class="cd-pos" wx:for="{{company.positions}}" wx:key="id">
+          <view class="cd-pos-top">
+            <view class="cd-pos-title">{{item.title}}</view>
+            <view wx:if="{{item.salary}}" class="cd-pos-salary">{{item.salary}}</view>
+          </view>
+          <view class="cd-pos-head">{{item.headText}}</view>
+          <view wx:if="{{item.metaText}}" class="cd-pos-meta">{{item.metaText}}</view>
+          <view wx:if="{{item.requirements}}" class="cd-pos-req">{{item.requirements}}</view>
+        </view>
+      </view>
+
+      <!-- applyNote 是后端下发的合规提示原文，必须原样展示，不省略也不改写。
+           当前后端 FairCompany 并不返回该字段，所以这里只在真有值时渲染，
+           不本地编一句顶上去冒充「来源方的提示」。 -->
+      <view wx:if="{{company.applyNote}}" class="notice plum rise-d5">
+        <text class="ficon i-info n-ic"></text>
+        <text>{{company.applyNote}}</text>
+      </view>
+
+      <view class="notice info rise-d5">
+        <text class="ficon i-info n-ic"></text>
+        <text>本终端仅展示招聘会信息，预约/报名请前往来源平台或现场办理，本平台不代收报名信息。</text>
+      </view>
+
+      <view class="cd-print-hint rise-d6">
+        <text class="ficon i-printer cd-print-ic"></text>
+        <text>下方两个打印按钮只生成可打印文件，生成后仍需在打印页确认参数并下单，本页不代表已打印。</text>
+      </view>
+
+      <view class="compliance-note">企业与岗位信息由主办方或来源机构录入，本平台不接收简历、不参与招聘环节。</view>
+      <view class="spacer-lg"></view>
+
+    </block>
+  </view>
+
+  <view wx:if="{{!loading && !loadError && company.id}}" class="actionbar">
+    <view class="ab-btn tap {{printing === 'profile' ? 'busy' : ''}}" hover-class="tap-press"
+      bindtap="tapPrintProfile" role="button" aria-label="生成企业资料文件并前往打印">
+      <text class="ficon i-printer ab-btn-ic"></text>
+      <text class="ab-btn-t">企业资料</text>
+    </view>
+    <view class="ab-btn tap {{company.posCount ? '' : 'off'}} {{printing === 'positions' ? 'busy' : ''}}"
+      hover-class="tap-press" bindtap="tapPrintPositions" role="button" aria-label="生成岗位清单文件并前往打印">
+      <text class="ficon i-printer ab-btn-ic"></text>
+      <text class="ab-btn-t">岗位清单</text>
+    </view>
+    <view class="btn primary ab-main tap {{company.sourceUrl ? '' : 'disabled'}}" hover-class="tap-press"
+      bindtap="tapCopySource" role="button" aria-label="复制该企业的来源平台链接">
+      {{company.sourceUrl ? '复制来源链接' : '暂无来源链接'}}
+    </view>
+  </view>
+
+</view>

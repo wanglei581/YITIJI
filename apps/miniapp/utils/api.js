@@ -129,6 +129,135 @@ const api = {
     return request(`/job-fairs/${id}`, { method: 'GET', needAuth: false }).then(N.fairDetail);
   },
 
+  // ---------- 招聘会现场助手 ----------
+  // 这一组端点后端早就为一体机建好了（apps/kiosk 已在消费），小程序此前一条都没接。
+  // 响应结构以 packages/shared 的 FairCompanyDTO / FairZoneDTO / FairVenueGuideDTO /
+  // FairMaterialDTO / FairVisitPlanResponse 为准，前端不得自行猜测字段。
+
+  /**
+   * 参会企业列表。分页响应，走 unwrapList。
+   * 合规：DTO 不含企业联系人和 HR 邮箱——后端就没返回，前端也不要显示任何"联系方式"占位。
+   */
+  getFairCompanies(fairId, params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('参会企业'));
+    return adaptList(unwrapList(request(`/job-fairs/${fairId}/companies`, {
+      method: 'GET', data: params, needAuth: false,
+    })), N.fairCompanyLike);
+  },
+
+  /**
+   * 参会企业详情。
+   * 合规：响应里的 applyNote 是**必须展示**的合规提示文字，页面不得省略或改写。
+   */
+  getFairCompanyDetail(fairId, companyId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('参会企业'));
+    return request(`/job-fairs/${fairId}/companies/${companyId}`, { method: 'GET', needAuth: false })
+      .then(N.fairCompanyLike);
+  },
+
+  /** 展区列表（FairZoneDTO[]）。未发布或无数据时后端可能给 null，调用方要兜空数组。 */
+  getFairZones(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('展区导览'));
+    return request(`/job-fairs/${fairId}/zones`, { method: 'GET', needAuth: false })
+      .then((list) => (Array.isArray(list) ? list.map(N.fairZoneLike) : []));
+  },
+
+  /**
+   * 展位平面数据 { zones, booths }。
+   * 后端在未发布/无数据时会返回 data:null，这里统一兜成空集合，
+   * 让页面落到空态而不是在 .map 上崩掉。
+   */
+  getFairMap(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('展位导览'));
+    return request(`/job-fairs/${fairId}/map`, { method: 'GET', needAuth: false })
+      .then((d) => ({
+        // mapImageUrl 是主办方上传的真实平面图,早先这里把它丢了,页面就算有图也看不到。
+        mapImageUrl: (d && d.mapImageUrl) || null,
+        zones: ((d && d.zones) || []).map(N.fairZoneLike),
+        // 服务端当前恒返回空数组(jobs-kiosk.service.ts 的返回类型写死 booths: [])。
+        // 保留这条链路,等真有展位数据时页面不用改。
+        booths: (d && d.booths) || [],
+      }));
+  },
+
+  /** 会场导览（展厅 + 设施点位）。无配置时后端返回 null，属正常空态不是错误。 */
+  getFairVenueGuide(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('会场导览'));
+    return request(`/job-fairs/${fairId}/venue-guide`, { method: 'GET', needAuth: false });
+  },
+
+  /** 活动资料列表。previewUrl 是 2 小时签名 URL，不要缓存也不要拼接原始存储路径。 */
+  getFairMaterials(fairId, params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('活动资料'));
+    return unwrapList(request(`/job-fairs/${fairId}/materials`, {
+      method: 'GET', data: params, needAuth: false,
+    }));
+  },
+
+  /**
+   * 活动资料按需打印：生成短期派生文件，返回 { fileId, filename, pageCount, printFileUrl, ... }。
+   * **生成文件不等于已打印**——拿到响应只能进入打印下单流程，页面不得声称已打印。
+   */
+  prepareFairMaterialPrint(fairId, materialId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('活动资料打印'));
+    return request(`/job-fairs/${fairId}/materials/${materialId}/print-url`, {
+      method: 'POST', needAuth: true, timeout: 60000,
+    });
+  },
+
+  /**
+   * 参会企业资料按需打印。variant: 'profile' 企业资料 / 'positions' 岗位清单。
+   * 与活动资料不同，这里没有预置文件，服务端按库内展示字段实时渲染 PDF，
+   * 所以 pageCount / sizeBytes 来自真实渲染结果，前端不要估算。
+   */
+  prepareFairCompanyPrint(fairId, companyId, variant) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('企业资料打印'));
+    // variant 必须拼进 query string:后端是 @Query('variant')(jobs.controller.ts),
+    // 放进 POST body 会拿到 undefined 并抛 400「variant 只能是 profile 或 positions」。
+    const q = encodeURIComponent(variant || '');
+    return request(`/job-fairs/${fairId}/companies/${companyId}/print-url?variant=${q}`, {
+      method: 'POST', needAuth: true, timeout: 60000,
+    });
+  },
+
+  /**
+   * 招聘会统计。
+   * 合规：DTO 里 checkedInCompanies / browseCount / scanCount / printCount / checkinCount
+   * 为 null 时表示**无可证明的统计源**，页面必须渲染「暂无数据」，**不得显示 0**。
+   */
+  getFairStats(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('招聘会数据'));
+    return request(`/job-fairs/${fairId}/stats`, { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 生成 AI 参会准备单（付费 AI 服务，限流 6 次/分钟，与职业规划同一条权益扣次通道）。
+   * 依赖本人已有简历任务 taskId——没有简历就没有这个能力，页面要先引导去上传简历。
+   * 服务端按招聘会 endAt 判定 mode：未结束 preparation / 已结束 review，前端只读不猜。
+   */
+  generateFairVisitPlan(fairId, taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 参会准备单'));
+    return request(`/job-fairs/${fairId}/visit-plan/${taskId}`, {
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /** 读取已生成的参会准备单（不触发新生成）。无记录时后端 404，属正常空态。 */
+  getFairVisitPlan(fairId, taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 参会准备单'));
+    return request(`/job-fairs/${fairId}/visit-plan/${taskId}`, {
+      method: 'GET', header: tokenHeader(accessToken), needAuth: true,
+    });
+  },
+
+  /** 把准备单渲染成 PDF 入库。同 printCareerPlan：进了「我的文档」，但不等于已打印。 */
+  printFairVisitPlan(fairId, taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 参会准备单'));
+    return request(`/job-fairs/${fairId}/visit-plan/${taskId}/print`, {
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000,
+    });
+  },
+
   // ---------- 企业 ----------
   getCompanies(params = {}) {
     if (config.USE_MOCK) return mockResolve(mock.companyList());
@@ -154,6 +283,36 @@ const api = {
     if (config.USE_MOCK) return mockResolve(mock.policyList());
     return adaptList(unwrapList(request('/policies', { method: 'GET', data: params, needAuth: false })), N.policy);
   },
+  /**
+   * 政策条件自测问项。免登录（与 GET /policies 同口径）。
+   * 返回 { questionSetVersion, questions, privacyNotice, disclaimer }。
+   * questions[].sensitive 为真表示敏感个人信息——页面必须就地提示「这项可以不填」，
+   * 而不是默默收集。
+   */
+  getPolicyEligibilityQuestions() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('政策条件自测'));
+    return request('/policies/eligibility-questions', { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 政策条件核对。免登录、纯计算、**服务端零落库**——作答不进库、不进审计、不进日志
+   * （policy-eligibility.service.ts 的隐私口径）。
+   *
+   * 用 POST 而不是 GET 是刻意的：作答含户籍/参保/失业登记等个人信息，
+   * 放进 URL query 会进网关与访问日志。同理前端也不得把作答写进
+   * Storage 或页面路由参数。
+   *
+   * 结果里的 overallLabel 是服务端给定的合规措辞（「已录入条件的比对结果」），
+   * **必须原样展示**：写成「你符合申领资格」就把机械比对说成了资格认定。
+   * evidenceLevel 恒为 E2（来源方事实），不得出现「AI 判断」字样。
+   */
+  checkPolicyEligibility(answers, policyIds) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('政策条件自测'));
+    const data = { answers: answers || {} };
+    if (Array.isArray(policyIds) && policyIds.length) data.policyIds = policyIds;
+    return request('/policies/eligibility-check', { method: 'POST', data, needAuth: false });
+  },
+
   getPolicyDetail(id) {
     if (config.USE_MOCK) return mockResolve(mock.policyById(id));
     return request(`/policies/${id}`, { method: 'GET', needAuth: false }).then(N.policyDetail);
@@ -661,8 +820,32 @@ const api = {
    *
    * 页面不得传 pages / billablePages / amountCents，也不得把公开单价乘法当成最终报价。
    */
-  quoteMyPrintOrder(fileId, params) {
+  /**
+   * 打印报价。
+   *
+   * 常规路径：拿 fileId 去换 printFileUrl 再报价。这条路要求文件属于本人
+   * （canAccessFile 对会员只认 `record.endUserId === requester.endUserId`）。
+   *
+   * presetFileUrl 是给「服务端已经把 printFileUrl 交到手上」的场景用的：
+   * 招聘会活动资料和参会企业资料是共享派生文件，创建时 uploaderId / endUserId
+   * 都是 null（ownerType 落成 'system'），会员拿 fileId 去 preview-url 必吃
+   * 403 FILE_ACCESS_DENIED。而 prepareFair*Print 的响应里本来就带 printFileUrl，
+   * 后端注释也写明「前端据此进入正常打印流程」——透传即可，不必再换一次。
+   *
+   * 注意这里不放宽任何访问策略：presetFileUrl 只能来自服务端刚刚下发的响应，
+   * 前端不构造、不缓存、不复用。
+   */
+  quoteMyPrintOrder(fileId, params, presetFileUrl) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
+    const quoteWith = (fileUrl) => request('/orders/quote', {
+      method: 'POST',
+      data: { fileUrl, params },
+      needAuth: false,
+    });
+
+    const preset = String(presetFileUrl || '').trim();
+    if (preset) return quoteWith(preset);
+
     const id = String(fileId || '').trim();
     if (!id) return Promise.reject(new Error('缺少打印文件'));
     return request(`/files/${encodeURIComponent(id)}/preview-url`, {
@@ -671,11 +854,29 @@ const api = {
     }).then((access) => {
       const fileUrl = access && access.printFileUrl;
       if (!fileUrl) throw new Error('服务端未返回可打印文件凭证');
-      return request('/orders/quote', {
-        method: 'POST',
-        data: { fileUrl, params },
-        needAuth: false,
-      });
+      return quoteWith(fileUrl);
+    });
+  },
+
+  /**
+   * 修改本人文件的保存期限。
+   *
+   * 可选项**只能用服务端在 /me/documents 里给出的 allowedRetentionPolicies**，
+   * 前端不自行推算：证件照 / 签名 / 合同上传与审查报告被锁死在 system_short，
+   * 原始文件不允许 long_term——这些规则在 retention-policy.ts 里，
+   * 前端复制一份必然漂移，漂移的结果是用户点了却被后端打回。
+   *
+   * months_6 与 long_term 属于延长保存，服务端要求 consentVersion；
+   * 缺了回 RETENTION_CONSENT_REQUIRED，版本不对回 RETENTION_CONSENT_INVALID。
+   * 所以调用方必须**先向用户出示保存条款并取得确认**，再带上版本号——
+   * 在这里默认补一个版本号等于替用户签字。
+   */
+  updateFileRetention(fileId, retentionPolicy, consentVersion) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('修改保存期限'));
+    const data = { retentionPolicy };
+    if (consentVersion) data.consentVersion = consentVersion;
+    return request(`/files/${encodeURIComponent(fileId)}/retention`, {
+      method: 'PATCH', data, needAuth: true,
     });
   },
 
@@ -794,7 +995,7 @@ const api = {
 
   /**
    * 本人 AI 服务记录（需登录）。返回 MemberAiRecordItem[] 数组，附 .total。
-   * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan
+   * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan | self_assessment
    * 后端: GET /api/v1/me/ai-records?cursor=&pageSize=
    */
   getMyAiRecords(params = {}) {
@@ -826,6 +1027,173 @@ const api = {
     const body = { message };
     if (sessionId) body.sessionId = sessionId;
     return request('/assistant/chat', { method: 'POST', data: body, needAuth: false, timeout: config.aiTimeout });
+  },
+
+  // ---------- AI 简历从零生成 ----------
+  // 定位：给**没有简历**的人用。现有链路是「上传 → 诊断 → 优化」，
+  // 没有简历的应届生根本进不来。
+  //
+  // 合规（后端 DTO 注释原文）：「输入只是求职者本人提供的简历资料；
+  // AI 只润色，不编造（契约在 service 层强制）」。前端配套的红线是：
+  //   1. 这是**表单**不是聊天。不做「帮你写一段实习经历」这类入口。
+  //   2. 用户没填的段落，结果与导出的 PDF 上必须**可见地留空/留占位**，
+  //      不许出现「已为你补全」。
+  //   3. 后端全局 ValidationPipe 是 whitelist + forbidNonWhitelisted，
+  //      多传任何字段（身份证号、候选人评级、企业侧字段）直接 400。
+  //      前端也不要自作主张加字段。
+
+  /**
+   * 提交生成（付费 AI，PaidAiThrottle 6 次/分钟）。
+   * 必填：basic.name、intention.position、experience[].company/role/description、
+   *       education[].school。其余可选，留空就是留空。
+   * 上限：education≤6 experience≤8 projects≤6 skills≤20 certificates≤15。
+   */
+  submitResumeGenerate(payload, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
+    return request('/resume/generate', {
+      method: 'POST', data: payload, header: tokenHeader(accessToken),
+      needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /** 读取生成结果（轮询用）。无记录时 404 属正常空态，不是错误。 */
+  getResumeGenerate(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
+    return request(`/resume/generate/${encodeURIComponent(taskId)}`, {
+      method: 'GET', header: tokenHeader(accessToken), needAuth: true,
+    });
+  },
+
+  /**
+   * 导出为文件。format ∈ pdf | docx | txt | md。
+   * draft=true 表示**导出未经润色的原始填写内容**——AI 不可用时给用户的退路：
+   * 功能退化成「按你填的排版」，而不是转圈假装成功。
+   */
+  exportGeneratedResume(payload, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
+    return request('/resume/generate/export', {
+      method: 'POST', data: payload, header: tokenHeader(accessToken),
+      needAuth: true, timeout: 60000,
+    });
+  },
+
+  /**
+   * 简历语音转写。multipart 字段名必须是 audio——wx.uploadFile 默认 name 是 file，
+   * 不覆盖的话后端 FileInterceptor('audio') 收不到，回 AUDIO_MISSING。
+   *
+   * 成功裸响应 { text, providerName }。失败不要吞成通用错误，按业务码分流：
+   *   ASR_NOT_CONFIGURED  服务端没配 ASR，整场改手打
+   *   ASR_FAILED          没听清 / 音频过长，可重录或手打这一题
+   *   AUDIO_MISSING       没带上音频
+   *   INVALID_AUDIO_FORMAT 不是 RIFF/WAVE
+   * 音频不落库；转写文本也从未自动视为事实，必须用户确认后再写入表单。
+   *
+   * @param {string} filePath RecorderManager.onStop 给出的临时 wav 路径
+   * @returns {Promise<{text:string, providerName:string}>}
+   */
+  transcribeResumeVoice(filePath) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('语音转写'));
+    return uploadFile('/resume/voice/transcribe', filePath, {
+      name: 'audio',
+      needAuth: true,
+      timeout: config.aiTimeout,
+    }).then((res) => ({
+      text: res && typeof res.text === 'string' ? res.text : '',
+      providerName: (res && res.providerName) || '',
+    }));
+  },
+
+  // ---------- 求职材料模板 ----------
+  // **这条链全程无 LLM**：服务端按模板 + 用户填写的字段直接渲染 PDF
+  // （job-materials.service.ts 里没有任何模型调用）。所以页面不得挂 AI 标识、
+  // 不得写「AI 生成」——那是伪造。
+
+  /** 模板清单。免登录。返回 [{ id, type, title, description, tags, recommendedFor, fields[] }]。 */
+  getJobMaterialTemplates() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('求职材料模板'));
+    return request('/job-materials/templates', { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 按模板生成 PDF。需登录（EndUserAuthGuard），限流 10 次/分钟。
+   *
+   * type 为 'resume_template' 的模板服务端会拒（JOB_MATERIAL_TEMPLATE_UNSUPPORTED，
+   * 提示走简历诊断/优化链路），页面应当直接不给它「去填写」入口，
+   * 而不是让用户填完才被打回。
+   *
+   * 产出文件带 endUserId（归属本人）且 sensitiveLevel='sensitive'，
+   * 所以打印走普通 fileId 路径即可，**不需要 printFileUrl 旁路**
+   * ——那条旁路是给招聘会共享派生文件用的。
+   */
+  generateJobMaterial(templateId, values) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('求职材料模板'));
+    return request('/job-materials/generate', {
+      method: 'POST', data: Object.assign({ templateId }, values || {}), needAuth: true, timeout: 60000,
+    });
+  },
+
+  // ---------- 自我探索 · 倾向参考 ----------
+  // 注意命名：后端本身就叫「自我探索 · 倾向参考」。**不要叫「职业测评」**——
+  // 「测评 / 性格 / 适合岗位」是资格判定口吻，这里只是本人倾向的参考描述。
+
+  /**
+   * 题目下发（5 维 × 5 题）。免登录。
+   * 小程序原生 JS 无构建，导不进 packages/shared 的题库模块，所以由服务端下发；
+   * 下发的正是服务端用来计分的那一份，不存在「题目与计分口径不一致」。
+   */
+  getSelfAssessmentQuestions() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request('/resume/self-assessment/questions', { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 提交作答。付费 AI 服务（PaidAiThrottle 6 次/分钟）。
+   *
+   * consent.nonSensitive 为必填：为 false 服务端直接拒绝
+   * （SELF_ASSESSMENT_CONSENT_REQUIRED）。consentVersion 必须用服务端
+   * questions 接口下发的那个值，不在前端写死——写死会在版本换代时静默失配。
+   *
+   * 隐私：答案原文**不入库也不送 LLM**，服务端只持久化
+   * answersHash + dimensions + summary + note，送模型的只有维度
+   * key/label/strength 与证据题号。
+   *
+   * 结果里的 strength 是**纯函数评分**（5 题 weight 累加归一化），
+   * LLM 只写 note；LLM 不可用或命中合规词时 note 为 null 而 strength 不变。
+   * 所以图表只能画 strength，绝不能拿 note 反推分数。
+   */
+  submitSelfAssessment(answers, consent, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request('/resume/self-assessment', {
+      method: 'POST',
+      data: { answers, consent },
+      header: tokenHeader(accessToken),
+      needAuth: true,
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /** 读取已生成的结果（不触发新生成）。无记录时 404 属正常空态。 */
+  getSelfAssessment(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request(`/resume/self-assessment/${encodeURIComponent(taskId)}`, {
+      method: 'GET', header: tokenHeader(accessToken), needAuth: true,
+    });
+  },
+
+  /** 渲染报告 PDF 入库。同 printCareerPlan：进了「我的文档」，但不等于已打印。 */
+  printSelfAssessment(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request(`/resume/self-assessment/${encodeURIComponent(taskId)}/print`, {
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000,
+    });
+  },
+
+  /** 本人撤回该次结果（服务端删除并留审计）。 */
+  withdrawSelfAssessment(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request(`/resume/self-assessment/${encodeURIComponent(taskId)}`, {
+      method: 'DELETE', header: tokenHeader(accessToken), needAuth: true,
+    });
   },
 
   // ---------- 打印订单 ----------

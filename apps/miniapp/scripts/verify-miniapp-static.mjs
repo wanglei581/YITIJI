@@ -9,6 +9,7 @@
  * - 登录/合规/诚实能力与密钥残留扫描
  */
 import fs from 'node:fs'
+import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -104,6 +105,11 @@ const allowedTopLevel = new Set([
   'pages',
   'project.config.json',
   'scripts',
+  // tools/ 放需要本机开发者工具才能跑的东西（devtools-probe.mjs）。
+  // 为什么不放 scripts/：verify-ci-gate-coverage.mjs 按**路径**枚举门禁脚本
+  // （apps/*/scripts/*.mjs），不看文件名——放进去会被算成「未接线门禁」把 CI 打红。
+  // 已同步加进 project.config.json 的 packOptions.ignore，不进小程序包。
+  'tools',
   'sitemap.json',
   'utils',
 ])
@@ -276,6 +282,25 @@ for (const f of jsFiles) {
   if (deadJs.length) bad('JS 跳转目标已注册', `${f}: ${[...new Set(deadJs)].join(',')}`)
 }
 if (!fails.some((x) => x.startsWith('JS 跳转目标已注册'))) ok('JS 跳转目标全部已注册')
+
+// 上面那条查不到「路由存在表里、跳转时拼出来」的写法——它把含 ${} 的动态目标
+// 整个过滤掉了。ai-records 正是这种：`${record.route}?taskId=...`，
+// 于是 KIND_META 里的 route 字面量从来没被校验过，2026-09-02 就因此漏过一次
+// 「页面已存在但表里是空字符串」。这里把这类路由表单独捞出来查。
+{
+  const aiRecordsJs = read('pages/ai-records/ai-records.js')
+  const routes = [...aiRecordsJs.matchAll(/route:\s*'([^']*)'/g)].map((m) => m[1]).filter(Boolean)
+  const dead = routes
+    .map((t) => t.replace(/^\//, '').replace(/\/$/, ''))
+    .filter((t) => !pagePathSet.has(t))
+  if (routes.length === 0) {
+    bad('AI 记录路由表已注册', 'ai-records.js 里取不到任何 route 字面量——抽取失效，不要当作通过')
+  } else if (dead.length) {
+    bad('AI 记录路由表已注册', `指向未注册页面: ${[...new Set(dead)].join(',')}`)
+  } else {
+    ok(`AI 记录路由表全部已注册（${routes.length} 条）`)
+  }
+}
 
 for (const f of wxmlFiles.filter((x) => x.startsWith('./pages/'))) {
   const pageJs = f.replace(/\.wxml$/, '.js')
@@ -548,7 +573,7 @@ if (
 else bad('文档上传与服务端计价闭环', '缺少真实上传、PII 确认、Order-only 建单，或仍由小程序提交金额/页数')
 
 if (
-  apiJs.includes('quoteMyPrintOrder(fileId, params)') &&
+  apiJs.includes('quoteMyPrintOrder(fileId, params, presetFileUrl)') &&
   apiJs.includes("/preview-url`") &&
   apiJs.includes("request('/orders/quote'") &&
   printUploadJs.includes('api.quoteMyPrintOrder') &&
@@ -558,6 +583,95 @@ if (
   !/quoteMyPrintOrder\([\s\S]{0,500}\b(?:pages|billablePages|amountCents)\s*:/.test(printUploadJs)
 ) ok('打印参数页使用服务端真实页数与精确报价')
 else bad('打印参数页服务端精确报价', '必须先取本人 printFileUrl 再调 /orders/quote，且不得提交或本地计算页数/金额')
+
+// 注册的页面必须**在 git 里**有四件套，不只是在磁盘上有。
+//
+// 上面所有目录/四件套检查都按磁盘判定。这在本地永远是对的，但挡不住一类事故：
+// 用限定范围的 `git add` 提交了 app.json 的页面注册，而实现文件还是未跟踪状态。
+// 本地跑门禁全绿（文件就在磁盘上），干净检出却直接红——2026-09-02 的
+// ec552bb8 就是这样：app.json 注册了 pages/resume-build、ai-records 也指向它，
+// 而 git ls-files 该目录 0 个文件。
+//
+// 用 git ls-files 复核一遍。拿不到 git（打包产物、非仓库环境）就跳过并说明，
+// 不把「查不了」当成「查过了」。
+{
+  let tracked = null
+  try {
+    tracked = new Set(
+      execSync('git ls-files apps/miniapp/pages', { cwd: path.join(ROOT, '..', '..'), encoding: 'utf8' })
+        .split('\n').filter(Boolean)
+        .map((f) => f.replace(/^apps\/miniapp\//, '')),
+    )
+  } catch (_) {
+    tracked = null
+  }
+  if (tracked === null) {
+    ok('注册页面四件套已入库（跳过：当前环境取不到 git）')
+  } else {
+    const missing = []
+    for (const page of PAGE_PATHS) {
+      for (const ext of ['js', 'wxml', 'wxss', 'json']) {
+        if (!tracked.has(`${page}.${ext}`)) missing.push(`${page}.${ext}`)
+      }
+    }
+    if (missing.length) {
+      bad('注册页面四件套已入库', `已在 app.json 注册但 git 里没有：${[...new Set(missing)].slice(0, 8).join(', ')}` +
+        `${missing.length > 8 ? ` 等 ${missing.length} 项` : ''}——干净检出会红`)
+    } else {
+      ok(`注册页面四件套已入库（${PAGE_PATHS.length} 页 × 4 文件）`)
+    }
+  }
+}
+
+// 报价参数与下单参数必须锁在一起。
+//
+// print-upload 的 verifiedPrintParams()（报价用）和 print-pay 的
+// createCloudPrintOrder()（下单用）各自硬编码了 colorMode / duplex。
+// 今天两边都是 black_white / simplex，与 print-upload 页上「彩色与双面本期不可选」
+// 的锁定一致，所以没有问题。
+//
+// 但这是个潜伏陷阱：哪天驱动侧彩色通过真机验收、有人在 print-upload 解锁了选项，
+// 却忘了改 print-pay 的硬编码，用户就会看到「彩色·双面」而实际下单黑白单面——
+// 展示与实付不一致。那是钱和纸的事，不是文案问题。
+//
+// 所以这里把两处钉在一起：值必须逐字相等，改一边不改另一边即转红。
+{
+  const grab = (src, label) => {
+    const color = /colorMode:\s*'([a-z_]+)'/.exec(src)
+    const duplex = /duplex:\s*'([a-z]+)'/.exec(src)
+    return { label, color: color && color[1], duplex: duplex && duplex[1] }
+  }
+  const quote = grab(printUploadJs, 'print-upload/verifiedPrintParams')
+  const order = grab(printPayJs, 'print-pay/createCloudPrintOrder')
+  if (!quote.color || !quote.duplex || !order.color || !order.duplex) {
+    bad('报价与下单打印参数一致', '取不到 colorMode / duplex 字面量——抽取失效，不要当作通过')
+  } else if (quote.color !== order.color || quote.duplex !== order.duplex) {
+    bad('报价与下单打印参数一致',
+      `报价用 ${quote.color}/${quote.duplex}，下单用 ${order.color}/${order.duplex}——` +
+      '用户看到的和实际下单的不是一回事，必须两处同改')
+  } else {
+    ok(`报价与下单打印参数一致（${quote.color} / ${quote.duplex}）`)
+  }
+}
+
+// presetFileUrl 旁路：招聘会活动资料 / 参会企业资料是共享派生文件(endUserId 为 null)，
+// 会员拿 fileId 去 preview-url 必吃 403，只能透传服务端已下发的 printFileUrl。
+// 这条旁路把「本人」的证明点从 preview-url 的归属校验挪到了上游端点自己的资格校验 +
+// HMAC 签名上，所以必须钉死两件事：URL 只能来自服务端响应，且只有这两页可以用。
+{
+  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail']
+  const offenders = []
+  for (const full of physicalPageDirs) {
+    const dir = full.replace(/^pages\//, '')   // physicalPageDirs 已带 pages/ 前缀
+    const js = read(`${full}/${dir}.js`)
+    if (!js.includes('printFileUrl=')) continue
+    if (!PRESET_ALLOWED.includes(dir)) { offenders.push(`${dir}：不在旁路白名单内`); continue }
+    // 必须是从服务端响应里取的，不许自己拼
+    if (!/res\s*&&\s*res\.printFileUrl/.test(js)) offenders.push(`${dir}：printFileUrl 不是取自服务端响应`)
+  }
+  if (offenders.length === 0) ok('打印 printFileUrl 旁路仅限共享派生文件且只取自服务端响应')
+  else bad('打印 printFileUrl 旁路受控', offenders.join('；'))
+}
 
 const quoteRefreshMatch = printUploadJs.match(/_refreshQuote\(delay = 0\) \{([\s\S]*?)\n  \},\n\n  pickColor/)
 const quoteRefreshBody = quoteRefreshMatch ? quoteRefreshMatch[1] : ''
@@ -716,6 +830,36 @@ for (const page of PACKAGE_CHAIN_PAGES) {
 }
 if (!packageFakeHits.length) ok('材料包四页无假电话 / 假坐标 / 本地硬编码计价')
 else bad('材料包侧链假数据', packageFakeHits.join('；'))
+
+// WXSS 编译器比标准 CSS 严：注释后面跟一个多余的分号（`*/;`）、或连续分号
+// （`;;`），在浏览器和 postcss 里都是无害的空声明，会被静默忽略；WXSS 直接判编译
+// 失败，**整个视图层不渲染**——App 照常启动、getApp() 有值、页面栈恒为 0、模拟器
+// 纯白，日志里只有一句「编译 .wxss 文件错误」不指文件。
+//
+// 2026-09-02 就是这么炸的：app.wxss 的字阶块末尾写成 `52rpx;  /* 26px ... */;`。
+// 当时 110 条静态门禁全绿、API 契约一致、视觉刻度零偏离、postcss 解析 63 个 wxss
+// 全过、花括号与注释配平也全过——没有任何一道拦得住，最后是靠在开发者工具里看到
+// 白屏、二分 app.wxss 才找出来。
+//
+// 删掉这条检查会怎样：同一类改动可以再次把整个小程序变成白屏而全部门禁保持绿色。
+const wxssFiles = [
+  path.join(ROOT, 'app.wxss'),
+  ...PAGE_PATHS.map((pg) => path.join(ROOT, `${pg}.wxss`)),
+  path.join(ROOT, 'custom-tab-bar/index.wxss'),
+].filter((f) => fs.existsSync(f))
+const wxssStrayHits = []
+for (const f of wxssFiles) {
+  const src = fs.readFileSync(f, 'utf8')
+  const rel = path.relative(ROOT, f)
+  for (const [re, what] of [[/\*\/\s*;/g, '注释后多余分号 `*/;`'], [/;\s*;/g, '连续分号 `;;`']]) {
+    let m
+    while ((m = re.exec(src))) {
+      wxssStrayHits.push(`${rel}:${src.slice(0, m.index).split('\n').length} ${what}`)
+    }
+  }
+}
+if (!wxssStrayHits.length) ok(`wxss 无 WXSS 编译器拒绝的空声明（${wxssFiles.length} 个文件）`)
+else bad('wxss 含 WXSS 会拒绝的空声明', `${wxssStrayHits.slice(0, 5).join('；')}——会导致整个小程序白屏`)
 
 const pageCount = (appJson?.pages || []).length
 console.log(`\n${pass} PASS / ${fails.length} FAIL（注册页面 ${pageCount}）`)

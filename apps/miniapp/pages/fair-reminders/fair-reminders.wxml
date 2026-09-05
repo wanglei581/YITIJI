@@ -68,7 +68,7 @@
       </view>
     </view>
 
-    <view class="remind-note">提醒存储在本机，仅在打开 App 时触发提示，不发送系统推送。</view>
+    <view class="remind-note">提醒存储在本机，仅在打开 App 时触发提示，不发送系统推送；换设备或清除小程序数据后不会同步。</view>
 
   </view>
 </view>

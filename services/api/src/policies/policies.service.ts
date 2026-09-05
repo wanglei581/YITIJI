@@ -127,6 +127,21 @@ export class PoliciesService {
     }
   }
 
+  /**
+   * 单条政策详情。过滤口径与 getPublishedPolicies 完全一致
+   * (approved + published),不另开一套——否则列表里点不进去的、
+   * 或详情能看到列表里没有的,都是同一份数据讲两种话。
+   *
+   * 查不到返回 null,由 controller 转 404。不区分「不存在」与「未发布」:
+   * 区分了就等于把未发布政策的存在性泄露出去。
+   */
+  async getPublishedPolicyById(id: string): Promise<{ data: PolicyPostDto | null; success: true }> {
+    const row = await this.prisma.policyPost.findFirst({
+      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+    })
+    return { data: row ? mapPolicy(row) : null, success: true }
+  }
+
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
 
   async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]> {

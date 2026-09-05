@@ -1,0 +1,95 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">求职材料模板</view>
+  </view>
+
+  <view class="content has-bar">
+
+    <view wx:if="{{loading}}" class="list-state">加载中…</view>
+
+    <view wx:elif="{{loadError}}" class="empty-wrap">
+      <view class="state-icon error"><text class="ficon i-warning"></text></view>
+      <view class="state-title">加载失败</view>
+      <view class="state-desc">{{loadError}}</view>
+      <view class="retry-btn tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载">重新加载</view>
+    </view>
+
+    <!-- ── 选模板 ── -->
+    <block wx:elif="{{phase === 'list'}}">
+      <view class="pagehead rise-d1">
+        <view class="ph-title">按模板生成一份可打印的材料</view>
+        <!-- 这条链全程没有模型参与，说清楚它按什么生成，不含糊成「智能生成」 -->
+        <view class="ph-sub">填几项信息，按选定模板排版成 PDF。内容来自你填写的字段，不经过 AI 改写。</view>
+      </view>
+
+      <view wx:if="{{!templates.length}}" class="empty">
+        <view class="e-ic"><text class="ficon i-file-text"></text></view>
+        <view class="e-title">暂无可用模板</view>
+      </view>
+
+      <view wx:for="{{templates}}" wx:key="id"
+            class="card tap {{item.unsupported ? 'jm-off' : ''}}" hover-class="tap-press"
+            bindtap="tapTemplate" data-id="{{item.id}}"
+            role="button" aria-label="{{item.title}}，{{item.description}}">
+        <view class="jm-head">
+          <view class="jm-title">{{item.title}}</view>
+          <text class="chip">{{item.typeLabel}}</text>
+        </view>
+        <view class="jm-desc">{{item.description}}</view>
+        <view wx:if="{{item.recommendedFor}}" class="jm-for">适合：{{item.recommendedFor}}</view>
+        <view wx:if="{{item.tags.length}}" class="chips jm-tags">
+          <text wx:for="{{item.tags}}" wx:for-item="tg" wx:key="*this" class="chip">{{tg}}</text>
+        </view>
+        <view wx:if="{{item.unsupported}}" class="jm-off-why">{{item.unsupportedWhy}}</view>
+      </view>
+      <view class="spacer-lg"></view>
+    </block>
+
+    <!-- ── 填写 ── -->
+    <block wx:else>
+      <view class="pagehead rise-d1">
+        <view class="ph-title">{{picked.title}}</view>
+        <view class="ph-sub">{{picked.description}}</view>
+      </view>
+
+      <view class="card rise-d2" wx:for="{{picked.fields}}" wx:key="key">
+        <view class="jm-flabel">
+          {{item.label}}<text wx:if="{{item.required}}" class="jm-req">必填</text>
+        </view>
+        <textarea wx:if="{{item.multiline}}" class="jm-input jm-area" value="{{values[item.key]}}"
+          placeholder="{{item.placeholder}}" placeholder-class="jm-ph" maxlength="{{item.maxLength}}"
+          data-key="{{item.key}}" bindinput="onInput" auto-height />
+        <input wx:else class="jm-input" value="{{values[item.key]}}"
+          placeholder="{{item.placeholder}}" placeholder-class="jm-ph" maxlength="{{item.maxLength}}"
+          data-key="{{item.key}}" bindinput="onInput" />
+      </view>
+
+      <view class="notice info rise-d3">
+        <text class="ficon i-info n-ic"></text>
+        <text>生成的文件会存进你本人的「我的文档」，可再次打印或自行删除。生成只代表文件已做好，出纸要到终端核销后才发生。</text>
+      </view>
+      <view class="spacer-lg"></view>
+    </block>
+
+  </view>
+
+  <view class="actionbar" wx:if="{{!loading && !loadError}}">
+    <block wx:if="{{phase === 'list'}}">
+      <view class="compliance-note">材料按模板排版，内容以你填写的为准。</view>
+    </block>
+    <block wx:else>
+      <!-- 两个按钮直接做 .actionbar 的 flex 子项——全仓 20+ 个底栏都是这个写法，
+           本页原先是唯一的例外（外面套了一层 .jm-bar）。
+           删掉这层包裹是修 bug 不是洁癖：.actionbar 是 display:flex，而 .jm-bar
+           自己没有 flex:1，于是它按 max-content 收缩（1×93 + 2×93 + 8 = 287px），
+           在 343px 的可用宽里靠左贴着，右边空 56px。子元素的 flex:1 / flex:2 只能
+           在这个已经缩过的父容器里分配，救不回来。 -->
+      <view class="btn lg ghost tap jm-side" hover-class="tap-press" bindtap="backToList" role="button" aria-label="换一个模板">换模板</view>
+      <view class="btn lg primary tap jm-main {{!canSubmit || generating ? 'disabled' : ''}}" hover-class="tap-press"
+            bindtap="submit" role="button" aria-label="生成并去打印">{{generating ? '正在生成…' : '生成并去打印'}}</view>
+    </block>
+  </view>
+</view>

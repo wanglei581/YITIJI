@@ -9,6 +9,8 @@ import type { AuditContext } from './resume/self-assessment.service'
 import { SelfAssessmentService } from './resume/self-assessment.service'
 import { AppendedSelfAssessmentService } from './resume/appended-self-assessment.service'
 import type { SelfAssessmentAnswerV1 } from './resume/self-assessment.types'
+import { SELF_ASSESSMENT_CONSENT_VERSION } from './resume/self-assessment.types'
+import { SELF_ASSESSMENT_QUESTIONS_V1 } from './resume/self-assessment-questions'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 
 interface ReqLike {
@@ -82,6 +84,29 @@ export class SelfAssessmentController {
     @Req() req: ReqLike,
   ) {
     return this.service.submit(await this.requesterOf(req), body, auditContextOf(req))
+  }
+
+  /**
+   * 题目下发。**这个装饰器必须排在 @Get(':taskId') 之前** ——
+   * Nest 按声明顺序匹配，放后面 'questions' 会被当成 taskId 吃掉。
+   * （同一个坑在 policies.controller.ts 的 eligibility-* 上踩过一次。）
+   *
+   * 为什么需要它：微信小程序是原生 JS、无构建、零依赖，**导不进
+   * packages/shared 的题库模块**。Kiosk 能 import（Vite/TS），小程序不能。
+   * 与其把 JSON 抄进小程序（文件名就叫 v1，v2 切换时必然静默漂移），
+   * 不如由服务端下发——而且下发的正是本服务用来计分的那一份，
+   * 从根上排除「题目和计分口径不一致」。
+   *
+   * 免登录：与 POST 同口径（submit 也允许匿名 x-resume-access-token）。
+   * 只返回题目与同意版本，不含任何本人数据。
+   */
+  @Get('questions')
+  questions() {
+    return {
+      version: SELF_ASSESSMENT_QUESTIONS_V1.version,
+      dimensions: SELF_ASSESSMENT_QUESTIONS_V1.dimensions,
+      consentVersion: SELF_ASSESSMENT_CONSENT_VERSION,
+    }
   }
 
   @Get(':taskId')

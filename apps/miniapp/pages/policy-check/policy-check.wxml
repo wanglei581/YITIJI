@@ -1,0 +1,123 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">政策条件自测</view>
+  </view>
+
+  <view class="content has-bar">
+
+    <view wx:if="{{loading}}" class="list-state">加载中…</view>
+
+    <view wx:elif="{{loadError}}" class="empty-wrap">
+      <view class="state-icon error"><text class="ficon i-warning"></text></view>
+      <view class="state-title">加载失败</view>
+      <view class="state-desc">{{loadError}}</view>
+      <view class="retry-btn tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载">重新加载</view>
+    </view>
+
+    <!-- ── 填写 ── -->
+    <block wx:elif="{{phase === 'ask' || phase === 'checking'}}">
+      <view class="pagehead rise-d1">
+        <view class="ph-title">看看哪些政策可能和你有关</view>
+        <view class="ph-sub">把你填的信息和已录入的政策条件做机械比对。可以只填几项。</view>
+      </view>
+
+      <!-- 隐私口径由服务端下发，原样展示——这是用户交出户籍/参保信息前唯一的知情依据 -->
+      <view wx:if="{{privacyNotice}}" class="notice info rise-d1">
+        <text class="ficon i-info n-ic"></text>
+        <text>{{privacyNotice}}</text>
+      </view>
+
+      <view class="card rise-d2" wx:for="{{questions}}" wx:key="key">
+        <view class="q-head">
+          <view class="q-label">{{item.label}}</view>
+          <!-- sensitive 由服务端标注。标了就必须真的能不填：选项可再点取消 -->
+          <text wx:if="{{item.sensitive}}" class="q-optional">这项可以不填</text>
+        </view>
+        <view class="q-opts">
+          <view
+            wx:for="{{item.options}}"
+            wx:for-item="opt"
+            wx:key="value"
+            class="q-opt tap {{answers[item.key] === opt.value ? 'on' : ''}}"
+            hover-class="tap-press"
+            bindtap="tapOption"
+            data-key="{{item.key}}"
+            data-value="{{opt.value}}"
+            role="button"
+            aria-label="{{item.label}}，{{opt.label}}{{answers[item.key] === opt.value ? '，已选中，再次点击取消' : ''}}"
+          >{{opt.label}}</view>
+        </view>
+      </view>
+
+      <view class="notice warn rise-d3">
+        <text class="ficon i-info n-ic"></text>
+        <text>{{disclaimer}}</text>
+      </view>
+      <view class="spacer-lg"></view>
+    </block>
+
+    <!-- ── 结果 ── -->
+    <block wx:elif="{{phase === 'result'}}">
+      <view class="pagehead rise-d1">
+        <view class="ph-title">比对结果</view>
+        <view class="ph-sub">按你填的 {{result.answeredCount}} 项信息比对。这不是资格认定。</view>
+      </view>
+
+      <!-- 空结果只说「没有可比对的政策」。库里没录入条件和「你不符合」是两回事，
+           后者是系统根本不知道的结论。 -->
+      <view wx:if="{{result.isEmpty}}" class="empty">
+        <view class="e-ic"><text class="ficon i-file-text"></text></view>
+        <view class="e-title">没有可比对的政策</view>
+        <view class="e-desc">当前已发布的政策里没有录入可机械比对的条件，不代表你不符合任何政策。可以直接浏览政策原文或咨询经办窗口。</view>
+      </view>
+
+      <view wx:else>
+        <view class="card tap rise-d2" wx:for="{{result.items}}" wx:key="policyId"
+              hover-class="tap-press" bindtap="tapPolicy" data-id="{{item.policyId}}"
+              role="button" aria-label="{{item.title}}，{{item.overallLabel}}">
+          <view class="r-title">{{item.title}}</view>
+          <!-- overallLabel 原样用服务端的措辞，不自己造 -->
+          <view class="r-overall">{{item.overallLabel}}</view>
+          <view class="r-sum" wx:if="{{item.conditionsRecorded}}">
+            <text class="chip ok">符合 {{item.summary.matched}}</text>
+            <text class="chip err" wx:if="{{item.summary.conflict}}">不符 {{item.summary.conflict}}</text>
+            <text class="chip" wx:if="{{item.summary.unknown}}">未填 {{item.summary.unknown}}</text>
+          </view>
+          <view class="r-sum" wx:else>
+            <text class="chip">该政策未录入可比对条件</text>
+          </view>
+          <!-- 这层必须带条件:里面两个 text 都是条件渲染,而 sourceName 默认 ''、
+               manualReviewRequired 默认 false,可以同时为假。无条件渲染时 .r-foot 的
+               border-top + padding-top 仍然占位,卡片底部会出现一条断头分隔线,
+               线下面 17px 全空。 -->
+          <view wx:if="{{item.sourceName || item.manualReviewRequired}}" class="r-foot">
+            <text wx:if="{{item.sourceName}}">来源：{{item.sourceName}}</text>
+            <text wx:if="{{item.manualReviewRequired}}" class="r-manual">需窗口人工核定</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="notice warn rise-d4">
+        <text class="ficon i-info n-ic"></text>
+        <text>{{result.disclaimer}}</text>
+      </view>
+      <view class="compliance-note" wx:if="{{result.ignoredCount}}">有 {{result.ignoredCount}} 项填写未被识别，已忽略，不影响其余比对。</view>
+      <view class="spacer-lg"></view>
+    </block>
+
+  </view>
+
+  <view class="actionbar" wx:if="{{!loading && !loadError}}">
+    <!-- ghost 不能省：.btn 基类只给尺寸与字重,background/color 全在配色变体里
+           (.primary/.ghost/.dark/...)。不带变体就是透明底 + 无描边,压在 .actionbar
+           的白底上,「重新填写」会退化成一行居中深色文字,看不出是按钮。
+           用 ghost 而不是 primary:这是结果页的「重来」,不是要引导用户去点的主动作。 -->
+      <view wx:if="{{phase === 'result'}}" class="btn lg block ghost tap" hover-class="tap-press"
+          bindtap="restart" role="button" aria-label="重新填写">重新填写</view>
+    <view wx:else class="btn lg block primary tap {{submitting ? 'disabled' : ''}}" hover-class="tap-press"
+          bindtap="submit" role="button" aria-label="开始比对">{{submitting ? '正在比对…' : '开始比对（已选 ' + answeredCount + ' 项）'}}</view>
+  </view>
+</view>

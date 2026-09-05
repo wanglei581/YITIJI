@@ -1,0 +1,100 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回上一页">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">参会企业</view>
+  </view>
+
+  <view class="content">
+
+    <!-- 搜索与展区筛选只在真的有企业时出现：一个筛不出任何东西的筛选条
+         比没有筛选条更让人以为「是我筛错了」。 -->
+    <block wx:if="{{!loading && !loadError && all.length}}">
+      <view class="fc-head rise-d1">
+        <view class="fc-count">共 {{all.length}} 家参会企业</view>
+        <view wx:if="{{list.length !== all.length}}" class="fc-count-sub">当前筛选出 {{list.length}} 家</view>
+      </view>
+
+      <view class="search-bar rise-d1">
+        <text class="ficon i-search sb-ic"></text>
+        <input class="sb-input" type="text" value="{{query}}" placeholder="搜索企业名称、行业或展区"
+          placeholder-class="sb-ph" confirm-type="search" bindinput="onSearchInput" />
+        <view wx:if="{{query}}" class="sb-clear tap" hover-class="tap-press" bindtap="clearSearch"
+          role="button" aria-label="清空搜索关键词">
+          <text class="ficon i-close"></text>
+        </view>
+      </view>
+
+      <scroll-view wx:if="{{zones.length > 1}}" class="zone-scroll rise-d2" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="zone-row">
+          <view class="zone-chip tap {{zoneIndex === index ? 'on' : ''}}" wx:for="{{zones}}" wx:key="*this"
+            hover-class="tap-press" data-index="{{index}}" bindtap="tapZone"
+            role="button" aria-label="按{{item}}筛选参会企业">{{item}}</view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{truncated}}" class="notice warn rise-d2">
+        <text class="ficon i-warning n-ic"></text>
+        <text>企业数量较多，当前只载入前 {{all.length}} 家，搜索与展区筛选的范围以已载入部分为准。</text>
+      </view>
+    </block>
+
+    <view wx:if="{{loading}}" class="list-state">正在加载参会企业…</view>
+
+    <view wx:elif="{{loadError}}" class="empty-wrap">
+      <view class="state-icon error"><text class="ficon i-warning"></text></view>
+      <view class="state-title">加载失败</view>
+      <view class="state-desc">{{loadError}}</view>
+      <view class="retry-btn tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载参会企业">重新加载</view>
+    </view>
+
+    <view wx:elif="{{!all.length}}" class="empty-wrap">
+      <view class="state-icon"><text class="ficon i-bank"></text></view>
+      <view class="state-title">暂无参会企业</view>
+      <!-- 后端对「招聘会不存在 / 未发布」也返回 200 空集(jobs.controller.ts:175)，
+           空集有两种成因、前端分不出来，就不能只挑一种说成事实。 -->
+      <view class="state-desc">可能是主办方尚未录入名单，也可能这场招聘会已下线。</view>
+    </view>
+
+    <block wx:else>
+      <view wx:if="{{!list.length}}" class="empty-wrap rise-d3">
+        <view class="state-icon"><text class="ficon i-search"></text></view>
+        <view class="state-title">没有匹配的企业</view>
+        <view class="state-desc">换个关键词，或把展区切回「全部」。</view>
+      </view>
+
+      <view wx:else class="fc-list rise-d3">
+        <view class="fc-card tap" wx:for="{{list}}" wx:key="id" hover-class="tap-press"
+          bindtap="tapItem" data-id="{{item.id}}" role="button" aria-label="查看{{item.name}}的企业详情">
+          <view class="fc-logo">{{item.initial}}</view>
+          <view class="fc-main">
+            <view class="fc-name">{{item.name}}</view>
+            <view wx:if="{{item.metaText}}" class="fc-meta">{{item.metaText}}</view>
+            <view wx:if="{{item.placeText}}" class="fc-place">
+              <text class="ficon i-map-pin fc-place-ic"></text>
+              <text>{{item.placeText}}</text>
+            </view>
+            <view wx:if="{{item.honorTags.length}}" class="chips fc-tags">
+              <view class="chip wheat" wx:for="{{item.honorTags}}" wx:for-item="tag" wx:key="*this">{{tag}}</view>
+            </view>
+          </view>
+          <view class="fc-right">
+            <view class="fc-jobs">{{item.jobText}}</view>
+            <text class="ficon i-right fc-arrow"></text>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <view class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <text>本终端仅展示招聘会信息，预约/报名请前往来源平台或现场办理，本平台不代收报名信息。</text>
+    </view>
+
+    <view class="compliance-note">参会企业与岗位信息由主办方或来源机构录入，本平台不接收简历、不参与招聘环节。</view>
+    <view class="spacer-lg"></view>
+  </view>
+</view>
