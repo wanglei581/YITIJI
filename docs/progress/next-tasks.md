@@ -127,6 +127,86 @@
 
 - [x] **F0.5 管理端计划与 Agent 运行版本观察（PR #744 已合并至 `main`，未部署）**：仅对明确 `active` 的 Windows 终端创建、启用、暂停或取消观察计划；激活事务会再次确认全部静态目标仍为 `enabled + active`。Agent 通过独立端点读取本终端计划，并只读安装目录 `manifest.json` 的 `productVersion` 回报运行版本。该阶段不下载、不验包、不安装、不控制 Windows 服务、不创建计划任务、不执行远程 PowerShell，也不自动更新。`版本匹配` 仅表示 manifest 版本字符串与计划目标相同，**不代表** MSI/EXE 字节、哈希、Authenticode 签名或证书链已经由 Agent 验证。+5 additive schema 模型已登记，两条新增 `verify:*` 已接入 CI，合并前四项 CI 全绿。后续生产迁移、F0.5 部署、KSK-001 操作和任何 updater 功能均需新的具名授权。
 
+## 材料包立项（2026-09-05 产品负责人拍板；按 CLAUDE.md §8.1 先声明范围，审查通过才写代码）
+
+> 第 14 轮三家评审一致判定：材料包是两端的核心交接物（七月差异化方案 §4.3 原话），没有它小程序与一体机
+> 只是共用品牌的两个 App。产品负责人 2026-09-05 拍板立项。本节是 §8.1 要求的任务声明，**不是实现**。
+
+### 立的是哪个材料包 —— 先裁这一条
+
+`docs/product/print-material-pack-prd.md` 写的是**一体机现场即打版**：入口在 `/print-scan`、模板前端硬编码、
+提交后子任务顺序执行；「预约打印」被它排到 P2 / v2.0（非目标表第 5 行、第 230 行、第 342 行）。
+而 `feature-scope.md §1.1` 定的小程序首要闭环是「材料包 → 服务端报价与支付 → 到机码 → 一体机核验释放」——
+**这正是 PRD 的 P2**。小程序四页（package-create / store-select / package-confirm / package-code）也是按这条链建的。
+
+**裁定：本次立项的是 §1.1 的小程序链（PRD 的「预约打印」提前到 v1）**，不是 PRD 的一体机现场即打。
+理由：跨端交接物的价值全在「手机准备、到机消耗」，现场即打版没有交接、焊不住两端。PRD 非目标第 5 行
+「不做预约打印」按此作废，其余非目标（不替投递 / 不一键 / 不自动选材 / 不跨终端编排 / 不绑付费套餐）**全部保留**。
+
+### 对应哪个真实闭环 / 上线阻塞
+小程序 → 一体机的**唯一**履约交接。E2 走查丙档、第 14 轮问二第 1 条、问三全部、问四第 1 条都卡在它。
+
+### 现状（已核，2026-09-05）
+- 后端：**无** package 模型、**无** 端点。`Order.sourceFileId` 单数（一单一文件）、`itemsJson` 是计费快照不是文件清单、
+  无 `OrderItem`、`PrintTask ↔ Order` 一对一、`CreateMemberPrintOrderDto` 只收一个 `fileId`。
+  **N 份材料各自参数，现有模型装不下。**
+- 小程序：四页在，被 `utils/package-feature.js` 的 `guardPackageChain()` 在 `onLoad` 首行无条件拦截回首页；
+  守卫注释写明「开放条件是服务端下单接口上线，届时删掉本文件与四处调用即可」。
+- 命名不一致：小程序等的是 `POST /orders/package`，PRD 提的是 `POST /api/v1/print/packs`。
+  **取 `/orders/package`**——它是 Order（有 pickupCode / amountCents / paymentSource / 退款账本），不是 print pack；
+  且小程序契约快照与守卫已按此键。
+
+### 允许 / 禁止修改
+- 允许：`services/api/prisma/schema.prisma` + `prisma/postgres/schema.prisma`（**双库 additive 迁移**）、
+  `services/api/src/member-print-orders/**`（新增 package 子路径，不改既有单文件建单路径）、
+  `packages/shared/src/types/`（只加不改）、`apps/miniapp/utils/package-feature.js`（**删除**）与四页的四处调用、
+  `apps/miniapp/utils/api.js`（接线）、`apps/miniapp/scripts/api-contract.json`（更新快照）。
+- 禁止：改动既有 `POST /me/print-orders` 单文件语义；改动 `PrintTask` 的 Agent claim 语义
+  （`claimed` 仍只由 Agent 写，见交付阻塞清单 A3）；任何投递 / 企业侧字段；`apps/kiosk/**`（本刀不动一体机）。
+
+### 是否新增数据模型 —— 是，且必须说清为什么不能复用
+两条路：(a) 新 `OrderItem`（一单多行，各行独立 fileId + 参数 + 面数）；(b) 「包 = N 个 Order 用 `packId` 绑定」。
+**倾向 (a)**：到机码、支付、退款都是包级别的一个动作，(b) 会让一个包有 N 个到机码 / N 笔支付，与 §1.1「生成到机码」单数语义冲突。
+(a) 的代价：`PrintTask` 需从「一对一 Order」变为「一对一 OrderItem」或「一 Order 多 PrintTask」——**触碰 Agent claim 链**，
+须与 A3（打印交易履约）同批评审，不得单独拍。**这一条是本立项最大的技术风险，审查时先过它。**
+
+### 触碰面
+岗位 ✗ 招聘会 ✗ 简历 ✓（作为材料来源，只读）文件 ✓（只引用 fileId，不动留存策略）打印 ✓ 生产配置 ✗
+数据库 ✓（双库 additive）密钥 ✗ 硬件链路 ✓（PrintTask 派生，见上）
+
+### 验证
+`typecheck` / `lint` / `verify:repository-integrity` / `verify:ci-gate-coverage` / 双库 `migrate deploy` 空库 + `migrate diff` 无差异 /
+`verify:member-print-orders`（若有）/ 小程序 `verify:api-contract`（快照更新后）+ `verify-miniapp-static`（守卫删除后 112 条须保持）/
+开发者工具走 package-create → package-code 真链。**真机与真终端出纸仍是 E2 / A3 的门禁，本立项不替代。**
+
+### 同步文档
+`current-progress.md`（立项记录）、`feature-scope.md §1.2`（材料包行从 fail-closed 改状态时）、
+`print-material-pack-prd.md`（非目标第 5 行作废注 + 端点名改 `/orders/package`）、本节。
+
+### 不做
+不做 AI 自动选材（PRD P2）、不做 Partner 模板、不做跨终端 follow-me、不做付费套餐绑定。
+**排期：在 #756 合入 + E2 真机走查之后另开分支，不进 #756。**
+
+## 生活圈判定（2026-09-05 评审 + 代码核，待产品负责人确认）
+
+产品负责人指示：「看一下怎么打造完善，如果不行就撤掉不要」。第 14 轮判定 v0.1（学习视频 / 福利中心 / 邀请有礼 / 每日签到）
+是贴皮，四条判定标准见第 14 轮合成页。下面是**替代方案逐个对代码核**的结果 —— 对象在不在、出口在不在，不靠推测。
+
+| 方案 | 对象（已有？） | 出口（已有？） | 判定 |
+|---|---|---|---|
+| **招聘会出门清单** | 逛展计划 ✓ `fair-visit-plan` | 「生成准备单去打印」✓ 已在 `fair-visit-plan.js:34` | **能做**。缺的两样都是依赖不是新功能：到机码（材料包立项）、出门前提醒（订阅消息，全仓 0 处）。 |
+| **窗口材料单** | 政策核对 ✓ `policy-check` + kiosk `EligibilityPanel` | 出纸 ✓ | **能做**。要做的是把资格判定结果收成材料清单并接到打印，资格判定继续走确定性引擎不换 LLM。 |
+| **家人代出示到机码** | 到机码 ✓ | 出纸 ✓ | **要先建委托模型**：到机码的分享 / 委托 / 代取，全仓 0 处（那 1 处命中是 prisma 生成代码的假阳性）。这是隐私敏感面（本人资产不对代办者展开简历原文），设计要过合规评审，**不是纯前端**。 |
+| **证件到期雷达** | **无**用户证件模型（`validUntil` 只在机构资质 `QualificationRecord` 上） | **无**（订阅消息 0） | **撤或后置**。两头都没有，做出来就是又一条断头路。若将来做，前置是订阅消息 + 用户证件模型，都不在小程序 lane。 |
+| ~~学习视频 / 邀请有礼 / 每日签到~~ | — | 播放完成 / 邀请记录 / 签到成功都不是我们的履约 | **撤**。v0.1 §2.1 / §2.3 / §2.4 从计划里拿掉。 |
+| 福利中心 | `benefit-activities` ✓ | 券核销到打印页 / AI 次数 ✓（`RedemptionRecord`） | **留，但收窄**：只卖本机打印券 / 本场材料包折扣 / AI 次卡；一旦出现外卖打车电影票，即不合格。 |
+| 职业圈动态 / 今日早报 | 无接口（`GET /community/feeds`、`POST /assistant/daily-report` 均不存在） | 无 | **保持未开放**。早报只有改成「你收藏的那场会明天开始、你的到机码 4 小时过期」才过标准 —— 那已经是「出门清单」，不是早报。 |
+
+**建议给产品负责人的结论**：生活圈**能真做**，但形状要换 —— 从「内容 + 裂变」换成「出门前 + 去窗口前」。
+保留 Tab，改内容：出门清单、窗口材料单、收窄后的福利中心三项先做；家人代出示待委托模型；证件雷达撤。
+**订阅消息**是这三项里两项的出口，不在小程序 lane（要微信后台模板 + 服务端发送），须与材料包同批排期。
+确认后由我改写 `miniapp-life-circle-plan-v0.1.md`，不另建文件。
+
 ## 小程序 PR #756 合入退出标准与真机走查（2026-09-03 终版，本节已冻结）
 
 > **本节是一次性重写的终版，不再按评审意见打补丁。** 前三版是在原文上追加更正段，
