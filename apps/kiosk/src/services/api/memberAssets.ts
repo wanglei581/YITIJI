@@ -81,6 +81,24 @@ export interface MemberPageOpts {
 
 const EMPTY_PAGE = { items: [], nextCursor: null, total: 0 }
 
+/**
+ * 把服务端返回收敛成真实的分页形状。
+ *
+ * `call<MemberAssetPage<T>>` 只是**断言**类型，不校验：服务端漏 `total`（或返回裸数组）时，
+ * 页面会把它直接渲染出去——「当前显示最近 3 / undefined 条」。2026-09-06 全路由扫描
+ * 在 /activities 上抓到过同型缺陷（「共 undefined 个活动」），这里是同一类，一并收。
+ *
+ * total 缺失时退回条目数，而不是显示 0 —— 0 会被读成「一条都没有」，
+ * 而此刻列表里明明有内容。
+ */
+function normalizePage<T>(raw: unknown): MemberAssetPage<T> {
+  const body = (raw ?? {}) as { items?: unknown; total?: unknown; nextCursor?: unknown }
+  const items = Array.isArray(body.items) ? (body.items as T[]) : []
+  const total = typeof body.total === 'number' && Number.isFinite(body.total) ? body.total : items.length
+  const nextCursor = typeof body.nextCursor === 'string' && body.nextCursor.length > 0 ? body.nextCursor : null
+  return { items, total, nextCursor }
+}
+
 function pageQuery(opts?: MemberPageOpts): string {
   const params = new URLSearchParams()
   if (opts?.cursor) params.set('cursor', opts.cursor)
@@ -95,7 +113,7 @@ export function getMyResumes(
   opts?: MemberPageOpts,
 ): Promise<MemberAssetPage<MemberResumeItem>> {
   if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
-  return call<MemberAssetPage<MemberResumeItem>>(`/me/resumes${pageQuery(opts)}`, token)
+  return call<unknown>(`/me/resumes${pageQuery(opts)}`, token).then(normalizePage<MemberResumeItem>)
 }
 
 /** 我的文档（本人，仅元数据 + 临时访问端点路径）。未登录 / mock 模式返回空页。 */
@@ -104,7 +122,7 @@ export function getMyDocuments(
   opts?: MemberPageOpts,
 ): Promise<MemberAssetPage<MemberDocumentItem>> {
   if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
-  return call<MemberAssetPage<MemberDocumentItem>>(`/me/documents${pageQuery(opts)}`, token)
+  return call<unknown>(`/me/documents${pageQuery(opts)}`, token).then(normalizePage<MemberDocumentItem>)
 }
 
 /**
@@ -125,7 +143,7 @@ export function getMyAiRecords(
   opts?: MemberPageOpts,
 ): Promise<MemberAssetPage<MemberAiRecordItem>> {
   if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
-  return call<MemberAssetPage<MemberAiRecordItem>>(`/me/ai-records${pageQuery(opts)}`, token)
+  return call<unknown>(`/me/ai-records${pageQuery(opts)}`, token).then(normalizePage<MemberAiRecordItem>)
 }
 
 /**
