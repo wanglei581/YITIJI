@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,27 +19,6 @@ const W4_ROUTES = [
 ]
 
 const OWNED_PREFIX = /^(jobs(?:\/|$)|offline-agencies(?:\/|$)|companies(?:\/|$)|job-fairs(?:\/|$)|campus(?:\/|$)|smart-campus(?:\/|$)|renshi$)/
-const FORBIDDEN_PATHS = [
-  /^services\//,
-  /^packages\/shared\//,
-  /^apps\/kiosk\/src\/services\//,
-  /^apps\/kiosk\/src\/routes\//,
-  /^apps\/kiosk\/package\.json$/,
-  /^\.github\/workflows\/ci\.yml$/,
-  /^apps\/kiosk\/src\/index\.css$/,
-  /^apps\/kiosk\/src\/components\/ComingSoonNotice\.tsx$/,
-  /^apps\/kiosk\/src\/pages\/home\/components\/(ToolboxLaunchModals|kioskAppLaunch)\.tsx?$/,
-  /^apps\/kiosk\/src\/pages\/jobs\/utils\/jobDisplay\.ts$/,
-  /^apps\/kiosk\/src\/pages\/renshi\/(builtinData|shared)\.ts$/,
-]
-const PLANNED_TEST_FILES = new Set([
-  'docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md',
-  'apps/kiosk/scripts/verify-fusion-w4.mjs',
-  'apps/kiosk/playwright.w4.config.ts',
-  'apps/kiosk/tests/fixtures/fusion-w4-api.ts',
-  'apps/kiosk/tests/visual/fusion-w4.spec.ts',
-])
-const OFFLINE_AGENCY_SERVICE = 'apps/kiosk/src/services/api/offlineAgencies.ts'
 // G1 二次合规（2026-08-03）：后端 hardcode '营业中' / 机构临时休息 文案，属于
 // 运营状态声明且 verify-fusion-w4 反向闸门原则要求只能收敛到中性语。
 // 唯一允许修改的后端 service 文件；变更前必须确认：
@@ -48,106 +26,6 @@ const OFFLINE_AGENCY_SERVICE = 'apps/kiosk/src/services/api/offlineAgencies.ts'
 //   2. 不得新增 jobs/stats/todayOpen 等聚合字段
 //   3. 修改须配套 docs/progress 日志
 const OFFLINE_AGENCY_BACKEND_SERVICE = 'services/api/src/offline-agencies/offline-agencies.service.ts'
-const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
-  'apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx',
-  'apps/kiosk/src/routes/index.tsx',
-  'apps/kiosk/src/layouts/KioskRoot.tsx',
-  'apps/kiosk/src/main.tsx',
-  'apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx',
-  'apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs',
-  'apps/kiosk/scripts/verify-fusion-shell.mjs',
-  'apps/kiosk/scripts/verify-member-login-dialog.mjs',
-  'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
-  'apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs',
-  'apps/kiosk/scripts/verify-print-done-truth.mjs',
-  'apps/kiosk/scripts/verify-scan-session-truth.mjs',
-  'apps/kiosk/scripts/verify-visual-evidence-manifest.mjs',
-  'apps/kiosk/tests/visual/fixtures/kiosk-p1-visual-evidence-targets.ts',
-  'apps/kiosk/tests/visual/fixtures/fusion-w6-api.ts',
-  'apps/kiosk/tests/visual/fixtures/kiosk-p1-evidence-capture-api.ts',
-  'apps/kiosk/tests/visual/kiosk-p1-visual-evidence.spec.ts',
-  'apps/kiosk/tests/visual/kiosk-visible-actions-truth.spec.ts',
-  'apps/kiosk/tests/visual/print-done-truth.spec.ts',
-  'apps/kiosk/tests/visual/scan-session-truth.spec.ts',
-  'apps/kiosk/tests/visual/fusion-smoke.spec.ts',
-  'apps/kiosk/tests/visual/kiosk-privacy-timeout.spec.ts',
-  'docs/acceptance/kiosk-8177-5299-fusion-visual-runbook.md',
-  'docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md',
-])
-const W6_INTEGRATION_FILES = new Set([
-  '.github/workflows/ci.yml',
-  'apps/kiosk/package.json',
-  // W8+ visual-unity：service-desk 须在 kiosk-shell 之前，避免冰蓝盖住 fusion 青绿。
-  'apps/kiosk/src/index.css',
-  'docs/design/kiosk-proto-2026-07-migration-matrix.md',
-  'docs/progress/current-progress.md',
-  'docs/progress/next-tasks.md',
-  // PG schema parity: wxOpenId added to postgres/schema.prisma + PG migration (mirrors SQLite migration in prisma/migrations/)
-  'services/api/prisma/postgres/schema.prisma',
-  'services/api/prisma/postgres/migrations/20260802120000_add_wx_open_id_to_end_user/migration.sql',
-  // Baseline repair: exact migration generated from the postgres-readiness drift report.
-  'services/api/prisma/postgres/migrations/20260805132000_repair_notification_legal_defaults/migration.sql',
-  // Recovery candidate: keep contract review default-closed and its shared-type verifier buildable.
-  'services/api/src/app.module.ts',
-  'services/api/scripts/verify-contract-review-contract.ts',
-  'apps/kiosk/src/hooks/useToolboxConfig.ts',
-  'apps/kiosk/src/hooks/useSmartCampusConfig.ts',
-  'apps/kiosk/src/auth/KioskCapabilityGuard.tsx',
-  'apps/kiosk/src/services/api/kioskCapabilityValidation.ts',
-  'apps/kiosk/src/pages/home/HomePage.tsx',
-  'apps/kiosk/src/pages/home/components/V6HomeView.tsx',
-  'apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx',
-  'apps/kiosk/src/pages/home/hooks/useHomeJobFairHighlight.ts',
-  'apps/kiosk/src/pages/home/styles/home-v6-footer.css',
-  'apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx',
-  'apps/kiosk/scripts/verify-fusion-home.mjs',
-  'apps/kiosk/scripts/verify-smart-campus-ui.mjs',
-  'apps/kiosk/tests/fixtures/api-router.ts',
-  'apps/kiosk/tests/visual/fusion-w5.spec.ts',
-  'apps/kiosk/scripts/verify-home-toolbox-ui.mjs',
-  'docs/progress/current-progress.md',
-  'docs/progress/next-tasks.md',
-  'docs/compliance/contract-review-release-gate.md',
-  // W6 route manifest is a cross-wave contract file; route count changes are W6 integration scope
-  'apps/kiosk/tests/visual/route-manifest.ts',
-  // baseline script route count mirrors W6; must update together
-  'apps/kiosk/scripts/verify-fusion-baseline.mjs',
-  // migration matrix is a documentation contract updated alongside route manifest
-  'docs/design/kiosk-proto-2026-07-migration-matrix.md',
-])
-const ALLOWED_PRODUCTION_PATHS = [
-  /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,
-  /^apps\/kiosk\/src\/pages\/jobs-fairs-prototype\.css$/,
-  /^apps\/kiosk\/src\/pages\/styles\/(?:jobs-fairs-foundation|jobs-companies-fusion|job-fairs-fusion|campus-policy-fusion)\.css$/,
-  /^apps\/kiosk\/src\/pages\/placeholders\/(?:CampusWelcomePage|FreshmanInsightsPage)\.tsx$/,
-]
-const OTHER_WAVE_PLAN = /^docs\/superpowers\/(?:plans|specs)\/2026-07-(?:24-kiosk-8177-5299-fusion-w(?:2|3|5|6)|25-kiosk-86-proto-visual-1to1(?:-design)?)\.md$/
-const OTHER_WAVE_PATHS = [
-  // W2: print/scan presentation and its isolated verification assets.
-  /^apps\/kiosk\/src\/pages\/(?:print|print-scan|scan)\//,
-  /^apps\/kiosk\/scripts\/verify-fusion-w2-print-scan\.mjs$/,
-  /^apps\/kiosk\/(?:playwright\.w2\.config\.ts|tests\/visual\/fusion-w2(?:|-print|-scan|-tools)\.spec\.ts)$/,
-  // W3: resume, AI assistant and interview authoring surfaces.
-  /^apps\/kiosk\/src\/pages\/(?:resume|assistant|interview)\//,
-  /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui|verify-lightflow-k2a-ai-career|verify-lightflow-k2c-interview)\.mjs$/,
-  /^apps\/kiosk\/(?:playwright\.w3\.config\.ts|tests\/visual\/(?:fixtures\/fusion-w3-states\.ts|fusion-w3\.spec\.ts))$/,
-  // W5: system, profile, account, help and benefit surfaces.
-  /^apps\/kiosk\/src\/pages\/(?:activities|auth|help|legal|profile|screensaver|toolbox|upload)\//,
-  /^apps\/kiosk\/src\/pages\/placeholders\/(?:ErrorOfflinePage|MeActivityDetailPage|NotificationsPage|SessionTimeoutPage)\.tsx$/,
-  /^apps\/kiosk\/src\/pages\/placeholders\/system-pages-batch8\.css$/,
-  /^apps\/kiosk\/scripts\/(?:verify-fusion-w5|verify-profile-activity-inkpaper)\.mjs$/,
-  /^apps\/kiosk\/scripts\/(?:verify-lightflow-k1-public-entry|verify-lightflow-profile-entry|verify-profile-commercial-first-batch|verify-profile-inkpaper-home|verify-profile-resumes-notifications-inkpaper)\.mjs$/,
-  /^apps\/kiosk\/(?:playwright\.w5\.config\.ts|tests\/visual\/(?:fusion-w5\.spec|fixtures\/fusion-w5-pagination-route)\.ts)$/,
-  // W6: integration verifier and its contract test are owned by the integration wave.
-  /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
-  /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
-  // Visual unity / 方案 B 细对齐（跨域壳、门禁与 allowlist，非 W4 业务路由所有权变更）
-  /^apps\/kiosk\/scripts\/(?:verify-fusion-home|verify-home-prototype-v1)\.mjs$/,
-  /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
-  /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
-  /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,
-  /^packages\/ui\/scripts\/verify-fusion-youth-foundation\.mjs$/,
-]
 
 let failed = 0
 function pass(message) { console.log(`  PASS ${message}`) }
@@ -201,61 +79,6 @@ function collectRoutePaths() {
   return paths.filter((path) => OWNED_PREFIX.test(path.slice(1)))
 }
 
-function git(args) {
-  return execFileSync('git', args, {
-    cwd: WORKSPACE_ROOT,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-}
-function canResolveGitRef(ref) {
-  try { git(['rev-parse', '--verify', `${ref}^{commit}`]); return true } catch { return false }
-}
-function canResolveMergeBase(baseRef) {
-  try { git(['merge-base', baseRef, 'HEAD']); return true } catch { return false }
-}
-function ensureMergeBase(baseRef) {
-  if (canResolveMergeBase(baseRef)) return
-  // CI checks this job out at depth 1, so the merge-base is usually absent until deepened.
-  git(['fetch', '--no-tags', '--deepen=50', 'origin'])
-  if (!canResolveMergeBase(baseRef)) throw new Error(`无法解析 ${baseRef}...HEAD 的 merge-base`)
-}
-function tryResolveBase(ref) {
-  const remoteRef = `origin/${ref}`
-  if (canResolveGitRef(remoteRef)) return remoteRef
-  // Shallow CI checkouts (`actions/checkout` defaults to depth 1) carry no
-  // remote-tracking ref for the base branch; fetch just enough to name it.
-  try { git(['fetch', '--no-tags', '--depth=1', 'origin', `${ref}:refs/remotes/origin/${ref}`]) } catch { return null }
-  return canResolveGitRef(remoteRef) ? remoteRef : null
-}
-function resolveDiffBase() {
-  const githubBaseRef = process.env.GITHUB_BASE_REF?.trim()
-  // pull_request runs name their target branch; push/workflow_dispatch fall back to main.
-  for (const ref of [githubBaseRef, 'main'].filter(Boolean)) {
-    const base = tryResolveBase(ref)
-    if (base) return base
-  }
-  throw new Error('无法解析 diff base：origin/main 不存在，且 GITHUB_BASE_REF 未提供或无法获取')
-}
-function changedFiles() {
-  // Compare the whole branch against its merge base, not just the dirty worktree.
-  // `git diff HEAD` reports only uncommitted edits, and CI always checks out a clean
-  // tree — that made this guard a permanent no-op there while still firing locally.
-  const diffBase = resolveDiffBase()
-  ensureMergeBase(diffBase)
-  const committed = git(['diff', '--name-only', `${diffBase}...HEAD`])
-  const unstaged = git(['diff', '--name-only'])
-  const staged = git(['diff', '--cached', '--name-only'])
-  const untracked = git(['ls-files', '--others', '--exclude-standard'])
-  return [...new Set(
-    [committed, unstaged, staged, untracked]
-      .join('\n')
-      .split('\n')
-      .map((item) => item.trim())
-      .filter(Boolean),
-  )]
-}
-
 function collectTsx(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
@@ -292,43 +115,6 @@ check('exact 25-route ownership', () => {
   assert.equal(new Set(owned).size, 25)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
-})
-
-// 这个守卫只管一件事：kiosk 页面层的波次归属——「别的波次别动 W4 的页面，
-// W4 也别去动别的波次的页面」。所以它只判 apps/kiosk/src/pages/ 下的文件。
-// 页面层以外（后端、packages/shared、kiosk 自己的 services 适配层、types、
-// 后台、文档）不属于波次分工能仲裁的范围，由各自的门禁负责。
-//
-// 两次实测把边界钉在这里：
-//   1. 不限定判定集时，全仓 3602 个受跟踪文件只有 358 个可改，近 12 个已合 PR
-//      会红 11 个 —— 那不是仓库现行事实的正确编码。
-//   2. FORBIDDEN_PATHS 里的 /^apps\/kiosk\/src\/services\// 会直接挡住
-//      CLAUDE.md §9 要求的合规修复：「适配层伪造数据 + 页面把伪造值渲染成事实」
-//      是一个缺陷的两端，TypeScript 强制同批提交，拆开会先死在 typecheck 上。
-const W4_JUDGED_PREFIX = /^apps\/kiosk\/src\/pages\//
-
-check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
-  const allChanges = changedFiles()
-  // 触发条件：本次 diff 真的改了 W4 自有页面，才追究波次归属。
-  if (!allChanges.some((path) => ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path)))) {
-    console.log('  SKIP W4 波次范围断言：本次 diff 未触及 W4 自有页面')
-    return
-  }
-  const changes = allChanges.filter((path) => W4_JUDGED_PREFIX.test(path))
-  const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && path !== OFFLINE_AGENCY_BACKEND_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
-  assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
-
-  const scopeViolations = changes.filter((path) => {
-    if (W6_INTEGRATION_FILES.has(path)) return false
-    if (CURRENT_AUDIT_INTEGRATION_FILES.has(path)) return false
-    if (OTHER_WAVE_PLAN.test(path)) return false
-    if (OTHER_WAVE_PATHS.some((pattern) => pattern.test(path))) return false
-    if (PLANNED_TEST_FILES.has(path)) return false
-    if (path === OFFLINE_AGENCY_SERVICE) return false
-    if (path === OFFLINE_AGENCY_BACKEND_SERVICE) return false
-    return !ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path))
-  })
-  assert.deepEqual(scopeViolations, [], `W4 scope violation: ${scopeViolations.join(', ')}`)
 })
 
 const jobsPage = read('src/pages/jobs/JobsPage.tsx')

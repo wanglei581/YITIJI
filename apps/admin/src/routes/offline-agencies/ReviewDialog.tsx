@@ -118,9 +118,20 @@ export function ReviewDialog({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-neutral-600">
-              选择审核操作。通过后机构可发布至一体机展示；驳回后机构回到草稿状态。
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm text-neutral-600">
+                选择审核操作。通过后机构可发布至一体机展示；驳回后机构回到草稿状态。
+              </p>
+              {/*
+                本弹窗只负责 legacy OfflineAgency 的审核状态流转，本身不含资质信息。
+                资质与网点在同一行的「资质」按钮里（GovernanceDrawer），
+                查看资质材料会走 evidence-access 并写审计（CLAUDE.md §11）。
+              */}
+              <p className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
+                机构资质与网点信息不在本弹窗内。通过审核前请先在列表同一行的「资质」中核对：
+                资质是否齐全有效、材料是否可查看。
+              </p>
+            </div>
           )}
         </div>
 

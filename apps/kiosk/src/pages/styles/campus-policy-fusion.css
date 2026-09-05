@@ -3,7 +3,16 @@
   min-height: 100%;
 }
 
-.kproto {
+/* --kp-* 令牌块由 .kproto 与 .campus-proto 共用。
+   拆开的原因：CampusPage 根元素挂的是 .campus-proto（从不挂 .kproto），
+   而令牌此前只定义在 .kproto 上，于是该页所有 var(--kp-*) 全部未定义。
+   后果不是颜色不对，是整条声明作废 —— Hero 的 background: var(--kp-dark)
+   被丢弃变透明，而文字色 var(--k-paper, ...) 带兜底照常生效，浅字落到浅底上，
+   实测对比度 1.06:1，招聘会名称/日期/场馆/企业数全成幽灵字。
+   令牌定义与布局必须分开写，否则给第二个选择器加令牌会连带把 .kproto 的
+   背景渐变和 min-height:100% 一起带过去。 */
+.kproto,
+.campus-proto {
   --kp-paper: var(--k-paper, var(--color-canvas));
   --kp-surface: var(--k-surface, var(--color-surface));
   --kp-ink: var(--k-ink);
@@ -25,6 +34,9 @@
   --kp-accent: var(--kp-teal);
   --kp-accent-deep: var(--kp-teal-deep);
   --kp-accent-soft: var(--kp-teal-soft);
+}
+
+.kproto {
   min-height: 100%;
   color: var(--kp-ink);
   background:

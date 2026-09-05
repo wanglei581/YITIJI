@@ -40,14 +40,23 @@ export interface FairCompany {
   fairId: string
   companyName: string
   industry: string
-  scale: CompanyScale
+  /** 来源方原始展示文本（如 "1200+"），不分桶；来源未提供为 null。 */
+  scale: string | null
   description: string
   boothNumber?: string
   zoneId?: string
   zoneName?: string
   positions: FairCompanyPosition[]
   sourceUrl?: string
-  checkinStatus: CompanyCheckinStatus
+  /**
+   * 招聘会现场签到状态 —— **系统当前不追踪签到，接口不返回此字段，实际恒为
+   * undefined**。保留字段是因为将来若真接了签到设备，这里是它的落点。
+   *
+   * 必须是可选的：此前它是必填，适配层被迫硬造 'pending'，页面把这个占位
+   * 当事实渲染成「未签到」chip——对每家企业断言了系统不掌握的状态。
+   * 类型必填 = 断言"每家企业都有签到状态"，而这句话是假的。
+   */
+  checkinStatus?: CompanyCheckinStatus
   checkinTime?: string
   honorTags?: string[]
   coverImageUrl?: string

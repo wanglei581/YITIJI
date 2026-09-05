@@ -35,6 +35,14 @@ export interface AdminOfflineAgencyListItem {
   reviewStatus: string   // pending | reviewing | approved | rejected
   publishStatus: string  // draft | published | unpublished | expired
   jobCount: number
+  /**
+   * 来源机构 Organization.id。可空、**无外键**（schema.prisma model OfflineAgency）。
+   * 后端 adminFindAll / adminFindOne 用 include 返回全部标量，本字段一直在返回体里，
+   * 只是前端此前没有声明。offline-agencies.service.ts 的发布闸门把它当 Organization.id
+   * 交给 assertOrgContentTrustActive，因此它是 legacy 机构通向治理档案 / 资质的唯一桥。
+   * 为空 = 后台自录的线下机构目录，本就不存在「来源机构资质」这个对象。
+   */
+  sourceOrgId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -86,6 +94,20 @@ export interface OfflineAgencyInput {
   description?: string | null
   website?: string | null
   logoUrl?: string | null
+  /**
+   * 来源机构 Organization.id；**可空**，且 schema 里没有外键。
+   *
+   * 后端一直支持（create-offline-agency.dto.ts 的 `@IsOptional() @IsString() sourceOrgId`，
+   * adminCreate / adminUpdate 都往 data 里写这一列），只是前端此前没有声明也没有表单字段，
+   * 于是本页新建的每一条机构 sourceOrgId 恒为 null，资质抽屉永远停在「没有来源机构」那一态。
+   *
+   * 语义按 offline-agencies.service.ts adminPublish 的发布闸门读：
+   *   - 有值 → 发布时必须 assertOrgContentTrustActive（contentTrustStatus='active' 且未归档）；
+   *   - null → Admin 自录的线下机构目录，不存在「来源机构信任」这个决策对象，不套闸门。
+   * 传 null 是**明确清空**（DTO 的 @IsOptional 放行 null，Prisma 写 null）；
+   * 传 undefined 才是「不修改」。
+   */
+  sourceOrgId?: string | null
 }
 
 export interface OfflineAgencyJobInput {
@@ -167,7 +189,9 @@ function listQuery(filters: OfflineAgencyListFilters): string {
 
 const BASE = '/admin/offline-agencies'
 
-interface RawOfflineAgency extends Omit<AdminOfflineAgencyDetail, 'jobCount'> {
+interface RawOfflineAgency extends Omit<AdminOfflineAgencyDetail, 'jobCount' | 'sourceOrgId'> {
+  /** 后端一直返回；声明为可选是为了老部署缺字段时不把 undefined 当成合法 orgId 用。 */
+  sourceOrgId?: string | null
   _count?: { jobs: number }
   jobs?: RawOfflineJob[]
 }
@@ -182,7 +206,11 @@ interface RawPage<T> {
 }
 
 function mapAgency(raw: RawOfflineAgency): AdminOfflineAgencyDetail {
-  return { ...raw, jobCount: raw._count?.jobs ?? raw.jobs?.length ?? 0 }
+  return {
+    ...raw,
+    sourceOrgId: raw.sourceOrgId ?? null,
+    jobCount: raw._count?.jobs ?? raw.jobs?.length ?? 0,
+  }
 }
 
 function mapJob(raw: RawOfflineJob): OfflineAgencyJob {
@@ -234,6 +262,7 @@ function toListItem(a: AdminOfflineAgencyDetail): AdminOfflineAgencyListItem {
     phone: a.phone,
     reviewStatus: a.reviewStatus, publishStatus: a.publishStatus,
     jobCount: mockJobs.get(a.id)?.length ?? 0,
+    sourceOrgId: a.sourceOrgId,
     createdAt: a.createdAt, updatedAt: a.updatedAt,
   }
 }
@@ -273,6 +302,11 @@ const mockAdapter: OfflineAgenciesAdminServiceInterface = {
       reviewStatus: 'pending',
       publishStatus: 'draft',
       jobCount: 0,
+      // 按表单实际选择写入。此处**不得**再按固定顺序轮流分配来源机构：
+      // 那是表单还没有该字段时为了让治理档案抽屉的几种表现能被人工点到而做的
+      // mock-only 兜底，如今它会把「管理员明确留空」篡改成「系统替你绑了一个」。
+      // 抽屉五态的人工可达性改由 AgencyForm 的 mock 剧本选项承担（见该文件 MOCK_SCRIPT_ORGS）。
+      sourceOrgId: input.sourceOrgId ?? null,
       createdAt: now(),
       updatedAt: now(),
     }
