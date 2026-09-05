@@ -879,6 +879,81 @@ if (infoRows.length === 0) {
   if (previewSourced) pass('预览页用量预估的每一行都取自真实状态（白名单外无写死值）')
 }
 
+// ============================================================
+// 17) 打印完成页文件保留时点必须来自后端真实字段（商用清单第 5 项）
+// ============================================================
+const retentionHelper = read('src/pages/print/components/printFileRetention.ts')
+const retentionNotice = read('src/pages/print/components/PrintFileRetentionNotice.tsx')
+const deletionRecords = read('src/pages/print/components/PrintFileDeletionRecords.tsx')
+const retentionHelperCode = stripComments(retentionHelper)
+const doneCode = stripComments(doneSrc)
+
+expectMatches(
+  printJobsApiSrc,
+  /fileRetentionAvailable\?:\s*boolean/,
+  'PrintJobStatusResult 含 fileRetentionAvailable（后端是否读到 FileObject）',
+)
+expectMatches(
+  printJobsApiSrc,
+  /fileExpiresAt\?:\s*string\s*\|\s*null/,
+  'PrintJobStatusResult 含 fileExpiresAt（FileObject.expiresAt）',
+)
+expectMatches(
+  doneSrc,
+  /fileRetentionFromStatus\(result\)/,
+  'PrintDonePage 把 getPrintJobStatus 的文件保留字段写入核验结果',
+)
+expectMatches(
+  doneSrc,
+  /<PrintFileRetentionNotice/,
+  '打印完成页渲染文件保留说明',
+)
+expectMatches(
+  doneSrc,
+  /<PrintFileDeletionRecords/,
+  '打印完成页提供本人删除记录查阅',
+)
+expectMatches(
+  retentionHelperCode,
+  /fileRetentionAvailable\s*!==\s*true/,
+  '取不到保留字段时走「以后台策略为准」，不编造时长',
+)
+expectMatches(
+  retentionHelper,
+  /未能读取本次文件的保留期，保留期以后台策略为准/,
+  '取不到到期时间时如实标注「保留期以后台策略为准」',
+)
+expectMatches(
+  retentionHelper,
+  /这不是对存储介质的物理销毁/,
+  '文案不承诺物理销毁',
+)
+expectMatches(
+  retentionNotice,
+  /data-print-file-retention/,
+  '文件保留说明有可核验标记',
+)
+expectMatches(
+  deletionRecords,
+  /getMyDeletedDocuments/,
+  '删除记录走 GET /me/documents/deleted，不造假列表',
+)
+expectMatches(
+  deletionRecords,
+  /游客打印的文件不绑定账号，无法事后查阅删除记录/,
+  '游客态如实说明无法查阅删除记录',
+)
+if (!/24\s*小时|24h|FILE_DEFAULT_TTL/.test(doneCode + retentionHelperCode)) {
+  pass('打印完成页与保留文案不写死 24 小时')
+} else {
+  fail('打印完成页不得写死 24 小时或复用 FILE_DEFAULT_TTL')
+}
+if (!/彻底销毁|彻底删除|已销毁/.test(doneCode + retentionHelperCode + stripComments(deletionRecords))) {
+  pass('打印完成页不承诺彻底销毁')
+} else {
+  fail('打印完成页不得承诺彻底销毁 / 彻底删除')
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Kiosk 打印确认页诚实性守卫未通过\n`)
   process.exit(1)

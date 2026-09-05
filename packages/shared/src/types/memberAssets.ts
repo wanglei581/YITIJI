@@ -74,6 +74,28 @@ export interface MemberDocumentItem {
   previewUrlPath: string
 }
 
+/** 删除记录里云端对象的可核验状态。unknown = 历史行未记账，不得说成已销毁。 */
+export type MemberDeletedDocumentStorageState = 'removed' | 'pending' | 'unknown'
+
+/** 删除动作主体。只给安全分类，不回显内部 userId。 */
+export type MemberDeletedDocumentActorKind = 'system' | 'self' | 'admin' | 'unknown'
+
+/**
+ * 本人已删除文件的可读回记录（CLAUDE.md §11）。
+ * 只含 tombstone 元数据，不含文件内容 / 签名 URL / storageKey / sha256。
+ */
+export interface MemberDeletedDocumentItem {
+  id: string
+  filename: string
+  purpose: string
+  createdAt: string
+  expiresAt: string | null
+  deletedAt: string
+  deleteReason: string | null
+  deletedByKind: MemberDeletedDocumentActorKind
+  storageObjectState: MemberDeletedDocumentStorageState
+}
+
 /** AI 服务记录：会员名下 AI 解析 / 优化 / 生成调用历史（仅元数据，不含 payload）。 */
 export interface MemberAiRecordItem {
   /** AiResumeResult 行 id */

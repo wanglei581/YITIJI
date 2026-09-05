@@ -146,6 +146,14 @@ export interface JobListItemDto {
   dataSourceNote: string
   /** 企业展示关联(可选) */
   companyProfileId?: string | null
+  /**
+   * 来源机构 Organization.contentTrustStatus。
+   * pending/active/suspended/revoked；null=未标记；缺字段=本次未读取。
+   * 只表示该机构是否被允许在本系统发布信息，不构成岗位真实性背书。
+   */
+  sourceContentTrustStatus?: string | null
+  /** 来源机构是否已归档。未读取时省略。 */
+  sourceOrgArchived?: boolean
 }
 
 export interface FairIntentSlice { label: string; percent: number }

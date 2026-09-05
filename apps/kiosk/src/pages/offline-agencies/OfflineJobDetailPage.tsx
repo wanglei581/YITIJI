@@ -6,6 +6,7 @@ import {
   getOfflineJobDetail,
   type OfflineJobDetailDTO,
 } from '../../services/api/offlineAgencies'
+import { JobAntiFraudNotice } from '../jobs/components/JobAntiFraudNotice'
 import { FusionNotice, FusionSourceMeta, KioskPageFrame } from '../jobs/components/W4Presentation'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { isValidSourceUrl } from '../../lib/url'
@@ -71,6 +72,7 @@ export default function OfflineJobDetailPage() {
         </>
       )}
     >
+      <JobAntiFraudNotice />
       <section className="oa-job-sum" aria-label="岗位概要">
         <div className="oa-job-sum-head">
           <div className="min-w-0 flex-1">

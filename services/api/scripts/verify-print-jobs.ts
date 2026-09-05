@@ -205,6 +205,35 @@ async function main() {
       pass('1. 合法签名 fileUrl + 目标终端 → 创建任务 pending')
     } else fail(`1. 创建异常: ${JSON.stringify(created)}`)
 
+    const fileExpiry = new Date(Date.now() + 90 * 60 * 1000)
+    await prisma.fileObject.update({
+      where: { id: fileId },
+      data: { expiresAt: fileExpiry, retentionPolicy: 'system_short' },
+    })
+    const statusWithFile = await printJobs.getStatus(created.taskId)
+    if (
+      statusWithFile.fileRetentionAvailable === true
+      && statusWithFile.fileExpiresAt === fileExpiry.toISOString()
+      && statusWithFile.fileRetentionPolicy === 'system_short'
+    ) {
+      pass('1-retention. getStatus 回传 FileObject.expiresAt / retentionPolicy，不编造时长')
+    } else {
+      fail(`1-retention. 文件保留字段异常: ${JSON.stringify({
+        fileRetentionAvailable: statusWithFile.fileRetentionAvailable,
+        fileExpiresAt: statusWithFile.fileExpiresAt,
+        fileRetentionPolicy: statusWithFile.fileRetentionPolicy,
+        expected: fileExpiry.toISOString(),
+      })}`)
+    }
+    await prisma.printTask.update({ where: { id: created.taskId }, data: { fileId: null } })
+    const statusWithoutFile = await printJobs.getStatus(created.taskId)
+    if (statusWithoutFile.fileRetentionAvailable === false) {
+      pass('1-retention-missing. 无 fileId 时 fileRetentionAvailable=false，前台必须走「以后台策略为准」')
+    } else {
+      fail(`1-retention-missing. 期望 fileRetentionAvailable=false，实际 ${JSON.stringify(statusWithoutFile.fileRetentionAvailable)}`)
+    }
+    await prisma.printTask.update({ where: { id: created.taskId }, data: { fileId } })
+
     // M1 渠道标注：一体机建单必须落 channel='kiosk'。
     // 不显式标注则会员单无法与小程序云单区分（两端写的 terminalId/endUserId 相同），
     // 渠道对比与转化统计全部失真。见 docs/product/miniapp-console-sharing-2026-08.md §六 T-M1。

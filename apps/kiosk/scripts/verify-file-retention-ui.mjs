@@ -73,6 +73,8 @@ mustMatch(documentsPage, /setItems\(\(prev\)\s*=>\s*prev\.map/, '18. 成功后�
 mustNotMatch(filesMockAdapter, /简历\s*1h\s*自动清理|resume_upload:\s*1\b/, '19. Mock 上传不得保留会员简历 1h 旧口径')
 mustContain(filesMockAdapter, '90 * 24 * 60 * 60 * 1000', '20. Mock 会员简历类上传默认 90 天')
 mustContain(filesMockAdapter, 'FILE_DEFAULT_TTL_HOURS', '21. Mock 匿名/系统短期文件复用 24h/6h/1h 常量')
+mustContain(memberAssets, 'export function getMyDeletedDocuments', '22. adapter 导出 getMyDeletedDocuments')
+mustContain(memberAssets, '/me/documents/deleted', '23. 删除记录走 GET /me/documents/deleted，不造假页')
 
 if (failed > 0) {
   console.error(`\n=== FAILED (${failed} 项) ===`)

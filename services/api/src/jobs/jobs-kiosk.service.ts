@@ -32,6 +32,21 @@ const publicFairCountSelect = {
   materials: { where: { deletedAt: null, publishStatus: 'published' } },
 } as const
 
+const JOB_SOURCE_ORG_TRUST_INCLUDE = {
+  org: { select: { contentTrustStatus: true, archivedAt: true } },
+} as const
+
+function withSourceOrgTrust(
+  dto: JobListItemDto,
+  org: { contentTrustStatus: string | null; archivedAt: Date | null } | null,
+): JobListItemDto {
+  return {
+    ...dto,
+    sourceContentTrustStatus: org ? org.contentTrustStatus : undefined,
+    sourceOrgArchived: org ? org.archivedAt != null : undefined,
+  }
+}
+
 @Injectable()
 export class JobsKioskService {
   constructor(private readonly prisma: PrismaService) {}
@@ -56,11 +71,12 @@ export class JobsKioskService {
         orderBy: [{ syncTime: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: JOB_SOURCE_ORG_TRUST_INCLUDE,
       }),
       this.prisma.job.count({ where }),
     ])
     return {
-      data: rows.map(prismaJobToListItem),
+      data: rows.map((row) => withSourceOrgTrust(prismaJobToListItem(row), row.org)),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     }
   }
@@ -80,8 +96,9 @@ export class JobsKioskService {
         publishStatus: 'published',
         ...jobValidityWhere(),
       },
+      include: JOB_SOURCE_ORG_TRUST_INCLUDE,
     })
-    return { data: j ? prismaJobToListItem(j) : null, success: true }
+    return { data: j ? withSourceOrgTrust(prismaJobToListItem(j), j.org) : null, success: true }
   }
 
   private async resolveCampusPreferredOrgId(terminalId?: string): Promise<string | null> {

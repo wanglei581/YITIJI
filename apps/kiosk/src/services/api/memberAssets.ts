@@ -13,6 +13,7 @@ import type {
   MemberAssetPage,
   MemberResumeItem,
   MemberDocumentItem,
+  MemberDeletedDocumentItem,
   MemberAiRecordItem,
   FileAccessUrlResponse,
   FileRetentionUpdateResponse,
@@ -104,6 +105,18 @@ export function getMyDocuments(
 ): Promise<MemberAssetPage<MemberDocumentItem>> {
   if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
   return call<MemberAssetPage<MemberDocumentItem>>(`/me/documents${pageQuery(opts)}`, token)
+}
+
+/**
+ * 本人已删除文件记录。只读 tombstone 元数据，无下载 URL。
+ * 未登录 / mock 模式返回空页，不编造删除记录。
+ */
+export function getMyDeletedDocuments(
+  token: string | null | undefined,
+  opts?: MemberPageOpts,
+): Promise<MemberAssetPage<MemberDeletedDocumentItem>> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
+  return call<MemberAssetPage<MemberDeletedDocumentItem>>(`/me/documents/deleted${pageQuery(opts)}`, token)
 }
 
 /** AI 服务记录（本人，仅元数据；kind=parse/optimize/generate 如实区分）。未登录 / mock 模式返回空页。 */
