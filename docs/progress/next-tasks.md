@@ -326,6 +326,31 @@ v1 是**用户自选文件 + 行参数**，不做模板。PRD 的「招聘会标
   `resume-upload.wxml` / `documents.wxml` 对用户的「敏感文件已设有效期、到期自动清理」承诺一致。
   这是 E1 的显式子项，不是顺带提醒。**已拍板：选「无法确定固定期限」，不填天数** —— 依据与被否方案见下方第 2 条。
 
+### 第 17 轮 · 自动化全页面 / 全按钮测试（2026-09-06，开发者工具 automator，游客 AppID 副本 × 生产 API）
+
+产品负责人要求「所有功能所有按钮全部测一遍，异常全部修掉」。三层证据 + 五家评审（Claude / grok / Hermes / antigravity / codex）：
+
+| 层 | 覆盖 | 结果 |
+|---|---|---|
+| 静态按钮 | 448 处 bind/catch → 372 个处理函数；250 个跳转目标 | 0 绑到不存在的方法，0 跳到未注册页（审计脚本注入假方法 / 假跳转反验通过） |
+| 页面 | 62 页 | 全部能开，0 console.error / 未捕获异常（探针证明监听器有效）；4 页未登录 `redirectTo launch?returnTo=` 为预期 |
+| 动态按钮 | 372 个处理函数逐个真调（空合成事件），72 条复测 | 同步 / 异步 / 未捕获异常 **0**；`ERR Uncaught [object Object]` 与 MISSING 全是 IDE 自动化桥在 `navigateTo` 压栈过程中丢回调（单按钮诊断：目标页已在栈顶、无事件；47 条 ERR 目标只有 7 条是守卫页，否定「守卫页二次跳转」假说） |
+| 交叉审计 | dataset 依赖 99 处、驼峰 dataset 陷阱、忙状态位 37 处、合规禁词 | 全部 0 命中（忙状态位 2 条疑似经核对为误报） |
+
+**修了 3 处（本节 commit，门禁 112 PASS，开发者工具复验通过）：**
+1. `job-detail` / `fair-detail` / `company-detail`：后端对不存在的 id 返回 `data:null`，页面读 `job.title` 抛 TypeError，把原始 JS 错误文案显示给用户。真机可达（收藏 / 浏览记录 / 分享里的旧 id）。已对齐 `policy-detail` 的空值判断 →「未找到该内容，可能已下线」。
+2. 四个详情页深链缺 id：原先发空参请求再报通用错误；现直接提示「缺少内容参数，请从列表页进入」（codex 审出）。
+3. `documents` / `membership` / `notifications` 的 `redirectTo launch` 补 `fail → switchTab home` 兜底，与 `contract-review._toLogin` 同款（Hermes 审出）。
+
+**判为非缺陷、不进 #756 的：** 列表项处理函数不判空 id（`data-id` 全来自接口数据，详情页已兜底）；14 个 `class="disabled"` 的 `<view>` 按钮忙态仍可点但守卫静默返回（不会重复提交；a11y 层面 P3，见下）；`store-select` 死代码里的 `console.error`（整链被 `guardPackageChain` 拦截）。
+
+**本轮测不到、留给真机 E2 或后续：**
+- 登录态分支：游客 AppID 无法登录，需登录页面的按钮只覆盖了「被送走」路径；4 个守卫页与材料包链页面的按钮从未在 UI 上下文里执行。
+- 命中测试：胶囊避让（`capsuleInsetRight`）是否真点得到，截图在此 automator 组合上挂死，无视觉证据。
+- 原生能力回调：`getPhoneNumber` / `chooseImage` / `scanCode` / `downloadFile` 的 success/fail（E2 第 2 步卡的正是 downloadFile 域名）。
+- 连点压栈 / 防抖、`showModal` / `showActionSheet` 里的二层按钮、`custom-tab-bar` 组件方法。
+- P3 加固候选：14 个伪 disabled `<view>` 改原生 `button disabled` 或 busy 态换无绑定节点 + `aria-disabled`；`verify-miniapp-static` 对 `LOGIN_RETURN_ROUTES` 的存在性检查升级为成员语义检查；automator 脚本入库 `apps/miniapp/scripts/automator/` 输出 JSONL（Hermes 建议，当前脚本只在会话 scratchpad）。
+
 ### E2 · 真机走查（按「能不能真跑」分三档）
 
 **前提已核（2026-09-03）**：生产 `https://zyidai.cn/api/v1/health` 返回 200，后端是通的；

@@ -26,6 +26,11 @@ Page({
     // 企业收藏后端没有对应模型（FavoriteTargetType 只有 job/job_fair/policy），
     // 因此始终只有本机一份；同步读取即为权威值。
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20, pageId: id, faved: favorites.isFaved('company', id) })
+    if (!id) {
+      // 深链 / 分享进来没带 id：不发空参请求，直接给可读提示（codex 第 17 轮审出）。
+      this.setData({ loading: false, loadError: '缺少内容参数，请从列表页进入' })
+      return
+    }
     this.loadDetail(id)
   },
 
@@ -39,6 +44,12 @@ Page({
   loadDetail(id) {
     this.setData({ loading: true, loadError: '', jobsLoading: true, jobsError: '', jobs: [] })
     api.getCompanyDetail(id).then((company) => {
+      // 后端对「不存在 / 未发布」返回 data:null（与 policy-detail 同口径）：不判空会 TypeError 掉进 catch，
+      // 把原始 JS 错误文案显示给用户（第 17 轮真调复现）。
+      if (!company) {
+        this.setData({ loading: false, loadError: '未找到该内容，可能已下线', jobsLoading: false })
+        return
+      }
       this.setData({ company, loading: false, faved: favorites.isFaved('company', id) })
       history.recordView('company', { id, title: company.name, source: company.sourceOrg })
       this.loadJobs(id)

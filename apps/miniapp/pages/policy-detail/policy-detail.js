@@ -19,6 +19,11 @@ Page({
     const { statusBarHeight } = app.globalData;
     const id = (opts && opts.id) || '';
     this.setData({ statusBarHeight: statusBarHeight || 20, pageId: id });
+    if (!id) {
+      // 深链 / 分享进来没带 id：不发空参请求，直接给可读提示（codex 第 17 轮审出）。
+      this.setData({ loading: false, loadError: '缺少内容参数，请从列表页进入' });
+      return;
+    }
     this.loadDetail(id);
   },
 

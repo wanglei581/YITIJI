@@ -42,6 +42,8 @@ Page({
     if (!auth.isLoggedIn()) {
       wx.redirectTo({
         url: `/pages/launch/launch?returnTo=${encodeURIComponent('/pages/membership/membership')}`,
+        // redirectTo 失败（如 launch 已在栈顶）时不能静默留在本页，与 contract-review._toLogin 同款兜底。
+        fail: () => wx.switchTab({ url: '/pages/home/home' }),
       })
       return
     }
