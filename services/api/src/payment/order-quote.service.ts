@@ -3,7 +3,7 @@ import { countPagesInRange } from '../print-jobs/page-range.util'
 import { PrintPageCountService } from '../print-jobs/print-page-count.service'
 import { assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
-import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
+import { assertTerminalPrinterAvailable, printerOnlineRequired } from '../terminals/printer-availability'
 import { requiredPrintCapabilityKeys } from '../terminals/terminal-capabilities.types'
 import { PrismaService } from '../prisma/prisma.service'
 import type { QuotePrintOrderDto } from './dto/quote-print-order.dto'
@@ -96,6 +96,9 @@ export class OrderQuoteService {
    * 只在请求带 terminalId 时判定（黑白单面的历史调用方可不带终端，此时由建单再拦）。
    */
   private async assertTerminalPrinterReady(terminalRef: string | undefined): Promise<void> {
+    // 开关关闭时不触碰数据库：报价夹具（verify:miniapp-cloud-print-m2 等）以不带 prisma 的
+    // 桩构造本服务，黑白单面路径此前也从不查库。
+    if (!printerOnlineRequired()) return
     const ref = terminalRef?.trim()
     if (!ref) return
     const terminal = await this.prisma.terminal.findFirst({
