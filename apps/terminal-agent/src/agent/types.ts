@@ -183,6 +183,11 @@ export interface ClaimTask {
    * 扩展名推断优先级：mimeType → fileName 后缀 → URL 后缀 → 最后 .pdf。
    */
   mimeType?: string
+  /**
+   * 计费页数（服务端从 Order.billablePages 带出，可能缺省）。
+   * 只用于把出纸监控窗口按 页数 × 份数 放大，不参与任何计费或校验。
+   */
+  billablePages?: number
 }
 
 // ── Status PATCH ──────────────────────────────────────────────────────────────

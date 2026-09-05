@@ -86,7 +86,8 @@ $nodeRoot = Join-Path $stagingRoot "node"
 $appRoot = Join-Path $stagingRoot "app"
 $bootstrapRoot = Join-Path $stagingRoot "bootstrap"
 $provisionRoot = Join-Path $stagingRoot "provision"
-New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot, $provisionRoot -Force | Out-Null
+$kioskRoot = Join-Path $stagingRoot "kiosk"
+New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot, $provisionRoot, $kioskRoot -Force | Out-Null
 Copy-Item -LiteralPath $nodeExecutable -Destination (Join-Path $nodeRoot "node.exe")
 Copy-Item -LiteralPath (Join-Path $extractedNodeRoot "LICENSE") -Destination (Join-Path $nodeRoot "LICENSE")
 
@@ -187,6 +188,13 @@ Copy-WindowsPowerShellScript `
 Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\provisioning-runtime-security.ps1") `
   -Destination (Join-Path $provisionRoot "provisioning-runtime-security.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "kiosk\kiosk-watchdog.ps1") `
+  -Destination (Join-Path $kioskRoot "kiosk-watchdog.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "kiosk\register-kiosk-watchdog.ps1") `
+  -Destination (Join-Path $kioskRoot "register-kiosk-watchdog.ps1")
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "kiosk\launch-kiosk.cmd") -Destination $kioskRoot
 
 Remove-Item -LiteralPath $deployRoot -Recurse -Force
 Remove-Item -LiteralPath $extractRoot -Recurse -Force

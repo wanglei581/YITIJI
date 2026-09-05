@@ -3,6 +3,7 @@ import { countPagesInRange } from '../print-jobs/page-range.util'
 import { PrintPageCountService } from '../print-jobs/print-page-count.service'
 import { assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
+import { assertTerminalPrinterAvailable, printerOnlineRequired } from '../terminals/printer-availability'
 import { requiredPrintCapabilityKeys } from '../terminals/terminal-capabilities.types'
 import { PrismaService } from '../prisma/prisma.service'
 import type { QuotePrintOrderDto } from './dto/quote-print-order.dto'
@@ -38,6 +39,7 @@ export class OrderQuoteService {
     // 门禁第 2 层：彩色/双面必须在**计价之前**证明这台机器验过。
     // 报价就是用户看到的价；先按彩色报价、建单再拒，等于用错价把人骗到付款页。
     await this.assertTerminalAllowsParams(dto)
+    await this.assertTerminalPrinterReady(dto.terminalId)
     const { billablePages: documentPages, billingPageSource } =
       await this.pageCount.resolveBillablePages(dto.fileUrl)
 
@@ -87,5 +89,23 @@ export class OrderQuoteService {
     }
 
     await this.capabilities.assertPrintParamsAllowed(terminal.id, dto.params)
+  }
+
+  /**
+   * PRT-03：报价与建单同口径——打印机离线 / 缺纸 / 故障时不给报价，避免用户走到收银台才失败。
+   * 只在请求带 terminalId 时判定（黑白单面的历史调用方可不带终端，此时由建单再拦）。
+   */
+  private async assertTerminalPrinterReady(terminalRef: string | undefined): Promise<void> {
+    // 开关关闭时不触碰数据库：报价夹具（verify:miniapp-cloud-print-m2 等）以不带 prisma 的
+    // 桩构造本服务，黑白单面路径此前也从不查库。
+    if (!printerOnlineRequired()) return
+    const ref = terminalRef?.trim()
+    if (!ref) return
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: ref }, { terminalCode: ref }] },
+      select: { id: true },
+    })
+    if (!terminal) return
+    await assertTerminalPrinterAvailable(this.prisma, terminal.id)
   }
 }

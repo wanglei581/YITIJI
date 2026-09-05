@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
+import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { OrderStatusService } from '../payment/order-status.service'
 import { assertPaymentSessionSecretConfigured, createPaymentSessionToken } from '../payment/payment-session-token'
 import { PricingService } from '../payment/pricing.service'
@@ -330,6 +331,8 @@ export class PrintJobsService {
     // Task 10 服务端能力门禁：管理员把该终端 document_print 配为非 available 时
     // 拒绝创建（未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(targetTerminalId, 'document_print')
+    // PRT-03：打印机离线 / 缺纸 / 故障时不建单、不收款（PRINT_REQUIRE_PRINTER_ONLINE=true 生效，生产必开）。
+    await assertTerminalPrinterAvailable(this.prisma, targetTerminalId)
 
     // 打印参数门禁第 1 层（全局产品边界）：N-up 恒拒；彩色/双面在此层放行。
     assertVerifiedPrintParameters(dto.params)

@@ -62,11 +62,26 @@ import {
   type AgentDatabase,
 } from './db'
 
-const STABILITY_CHECK_INTERVAL_MS = 500
-const STABILITY_MAX_CHECKS = 10
+// AGT-08：扫描仪经 SMB 分段写入时，两次采样间隔 500ms 内可能恰好停顿，导致读到半个文件。
+// 采样间隔放大到 1s，并要求连续 3 次快照一致（约 2s 稳定窗）才视为写完。
+const STABILITY_CHECK_INTERVAL_MS = 1_000
+const STABILITY_MAX_CHECKS = 15
+const STABILITY_REQUIRED_CONSECUTIVE = 3
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000
 const UNCLAIMED_DIRNAME = '_unclaimed'
 const UNCLAIMED_EXPIRY_REASON = 'UNCLAIMED_TTL_EXPIRED'
+
+/**
+ * AGT-07：日志里不落扫描件原始文件名（CLAUDE.md §11 敏感文件）。保留扩展名与前 2 个
+ * 字符便于现场对照，其余用长度代替。
+ */
+export function maskScanName(filename: string): string {
+  const dot = filename.lastIndexOf('.')
+  const base = dot > 0 ? filename.slice(0, dot) : filename
+  const ext = dot > 0 ? filename.slice(dot) : ''
+  if (base.length <= 2) return `${base}***${ext}`
+  return `${base.slice(0, 2)}***(${base.length})${ext}`
+}
 
 /** Returns true when a 401 requires preserving the source file for re-bind. */
 export function preserveScanFileForUnauthorized(error: unknown): boolean {
@@ -148,11 +163,17 @@ async function waitForStableFile(
   filename: string,
 ): Promise<ReturnType<typeof snapshotCandidate> | undefined> {
   let previous: ReturnType<typeof snapshotCandidate> | undefined
+  let stableStreak = 1
   for (let i = 0; i < STABILITY_MAX_CHECKS; i++) {
     if (!existsSync(filePath)) return undefined
     const current = snapshotCandidate(filePath, filename)
     if (classifyScanInputCandidate(current) !== 'accepted' || current.nlink !== 1) return undefined
-    if (current.size > 0 && previous && isStableScanInputCandidate(previous, current)) return current
+    if (current.size > 0 && previous && isStableScanInputCandidate(previous, current)) {
+      stableStreak += 1
+      if (stableStreak >= STABILITY_REQUIRED_CONSECUTIVE) return current
+    } else {
+      stableStreak = 1
+    }
     previous = current
     await new Promise((resolve) => setTimeout(resolve, STABILITY_CHECK_INTERVAL_MS))
   }
@@ -248,7 +269,7 @@ export async function processCandidate(
       return
     }
     if (!isDirectChild(filePath, filename, scanWatchFolder)) {
-      warn(`scan-watcher: unsafe scan input path rejected before read — ${filename}`)
+      warn(`scan-watcher: unsafe scan input path rejected before read — ${maskScanName(filename)}`)
       return
     }
 
@@ -256,13 +277,13 @@ export async function processCandidate(
     const classification = classifyScanInputCandidate(initial)
     if (classification !== 'accepted' || initial.nlink !== 1) {
       const reason = initial.nlink !== 1 ? 'rejected_multiple_links' : classification
-      warn(`scan-watcher: unsafe scan input candidate rejected before read (${reason}) — ${filename}`)
+      warn(`scan-watcher: unsafe scan input candidate rejected before read (${reason}) — ${maskScanName(filename)}`)
       return
     }
 
     const stable = await waitForStableFile(filePath, filename)
     if (!stable) {
-      warn(`scan-watcher: file did not stabilize in time, skipping this round — ${filename}`)
+      warn(`scan-watcher: file did not stabilize in time, skipping this round — ${maskScanName(filename)}`)
       return
     }
 
@@ -271,7 +292,7 @@ export async function processCandidate(
     // 但双重确认更安全,尤其是应对本模块之外的原因导致文件消失,例如
     // 杀毒软件锁定后又释放并删除、SMB 短暂断连等)。
     if (!existsSync(filePath)) {
-      warn(`scan-watcher: file disappeared before processing, skipping — ${filename}`)
+      warn(`scan-watcher: file disappeared before processing, skipping — ${maskScanName(filename)}`)
       return
     }
 
@@ -281,7 +302,7 @@ export async function processCandidate(
       || finalSnapshot.nlink !== 1
       || !isStableScanInputCandidate(stable, finalSnapshot)
     ) {
-      warn(`scan-watcher: unsafe or changed scan input rejected before read — ${filename}`)
+      warn(`scan-watcher: unsafe or changed scan input rejected before read — ${maskScanName(filename)}`)
       return
     }
 
@@ -306,16 +327,16 @@ export async function processCandidate(
         })
       }
       finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'delete')
-      log(`scan-watcher: delivered and removed source file — ${filename}`)
+      log(`scan-watcher: delivered and removed source file — ${maskScanName(filename)}`)
     } catch (e) {
       if (preserveScanFileForUnauthorized(e)) {
-        warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${filename}`)
+        warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${maskScanName(filename)}`)
         return
       }
       const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       if (code === 'NO_WAITING_SCAN_TASK') {
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${filename}`)
+        warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`)
         return
       }
 
@@ -330,7 +351,7 @@ export async function processCandidate(
       // 归宿（无等待任务 / 重试超时）分别不同，避免运维排查时混淆三种不同的原因。
       if (code === 'SCAN_TASK_STATE_CHANGED') {
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${filename}`)
+        warn(`scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${maskScanName(filename)}`)
         return
       }
 
@@ -342,7 +363,7 @@ export async function processCandidate(
       // 同样必须立即隔离，不重试。
       if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${filename}`)
+        warn(`scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${maskScanName(filename)}`)
         return
       }
 
@@ -362,21 +383,21 @@ export async function processCandidate(
           finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
           warn(
             `scan-watcher: delivery retry timeout exceeded (idle ${formatDuration(Date.now() - mtimeMs)}), ` +
-              `abandoning retries and moved to _unclaimed — ${filename}`,
+              `abandoning retries and moved to _unclaimed — ${maskScanName(filename)}`,
           )
         } catch (moveErr) {
-          err(`scan-watcher: failed to quarantine file after retry timeout — ${filename}: ${axiosErrorMessage(moveErr)}`)
+          err(`scan-watcher: failed to quarantine file after retry timeout — ${maskScanName(filename)}: ${axiosErrorMessage(moveErr)}`)
         }
         return
       }
 
-      err(`scan-watcher: delivery failed, leaving file for next sweep — ${filename}: ${axiosErrorMessage(e)}`)
+      err(`scan-watcher: delivery failed, leaving file for next sweep — ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
     }
   } catch (e) {
     // 兜底:任何其它未预料到的文件系统错误(锁定、权限、竞态残留等)都不能
     // 逃逸成 unhandled rejection——本 Agent 进程有全局 process.exit(1) 兜底,
     // 这里崩了会把心跳/领任务等其它功能一起打挂。
-    err(`scan-watcher: unexpected error processing candidate, leaving file in place for retry — ${filename}: ${axiosErrorMessage(e)}`)
+    err(`scan-watcher: unexpected error processing candidate, leaving file in place for retry — ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
   } finally {
     inFlightPaths.delete(filePath)
   }
@@ -638,7 +659,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   watcher.on('add', (filePath: string) => {
     const filename = filePath.split(/[\\/]/).pop() ?? filePath
     processCandidate(filePath, filename, config).catch((e) => {
-      err(`scan-watcher: processCandidate threw unexpectedly for ${filename}: ${axiosErrorMessage(e)}`)
+      err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
     })
   })
 

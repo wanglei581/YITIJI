@@ -304,6 +304,8 @@ jobs:
           pnpm run verify:scan-deletion-audit
           # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
           pnpm run verify:task-reliability
+          # Injected download/wait seams only: download retry backoff, monitor window scaling, log masking contract.
+          pnpm run verify:print-truth-hardening
           # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.

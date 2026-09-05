@@ -297,7 +297,10 @@ foreach ($relativeProvisionPath in @(
   "provision\install-production-agent.ps1",
   "provision\service-identity.ps1",
   "provision\terminal-control-center.ps1",
-  "provision\launch-control-center.vbs"
+  "provision\launch-control-center.vbs",
+  "kiosk\kiosk-watchdog.ps1",
+  "kiosk\register-kiosk-watchdog.ps1",
+  "kiosk\launch-kiosk.cmd"
 )) {
   if (-not (Test-Path -LiteralPath (Join-Path $installRoot $relativeProvisionPath) -PathType Leaf)) {
     throw "Provisioning payload is missing after install: $relativeProvisionPath"

@@ -54,6 +54,7 @@ export interface ProductionRuntimeEnv {
   PAYMENT_SESSION_SECRET?: string
   PAYMENT_PROVIDER?: string
   PRINT_REQUIRE_PII_SCAN?: string
+  PRINT_REQUIRE_PRINTER_ONLINE?: string
   PRINT_SCAN_CAPABILITY_MODE?: string
   TRUST_PROXY_HOPS?: string
   TERMINAL_LEGACY_REGISTER_ENABLED?: string
@@ -217,6 +218,15 @@ export function assertProductionRuntimeGates(
   if (env.PRINT_REQUIRE_PII_SCAN !== 'true') {
     throw new Error(
       'PRODUCTION_PRINT_PII_SCAN_REQUIRED: NODE_ENV=production 时 PRINT_REQUIRE_PII_SCAN 必须显式为 true（用户原始材料未完成隐私检查不得建打印任务）',
+    )
+  }
+
+  // 商用资损底线：打印机离线 / 缺纸 / 故障时不得建单收款（PRT-03）。判定在
+  // terminals/printer-availability.ts，同样用精确 `=== 'true'`。默认关闭只为本地与 CI
+  // 的无心跳夹具，生产必须显式打开。
+  if (env.PRINT_REQUIRE_PRINTER_ONLINE !== 'true') {
+    throw new Error(
+      'PRODUCTION_PRINT_PRINTER_ONLINE_REQUIRED: NODE_ENV=production 时 PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或故障时不得建单收款）',
     )
   }
 

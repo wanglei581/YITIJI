@@ -172,25 +172,47 @@ export function enumerateDriveFiles(rootPath: string): RawUsbFileEntry[] {
   }
 
   const entries: RawUsbFileEntry[] = []
-  for (const name of names) {
+  // AGT-09：用户常把简历放在「E:\简历\」这类一级子目录里，只枚举根目录会显示为空且无提示。
+  // 这里额外枚举一级子目录（不递归更深，不跟随符号链接 / reparse point），子目录里的文件
+  // 以「子目录/文件名」作为展示名，绝对路径仍在 U 盘内，realpath containment 校验不变。
+  const subdirectories: string[] = []
+  const collect = (dirPath: string, displayPrefix: string, dirNames: string[]): void => {
+    for (const name of dirNames) {
+      if (entries.length >= MAX_USB_FILES_LISTED) break
+      if (name.startsWith('.') || name.startsWith('$')) continue
+      if (IGNORED_NAMES.has(name.toLowerCase())) continue
+
+      const fullPath = join(dirPath, name)
+      let stat
+      try {
+        stat = lstatSync(fullPath)
+      } catch {
+        continue
+      }
+      if (stat.isDirectory() && displayPrefix === '') {
+        subdirectories.push(name)
+        continue
+      }
+      if (!stat.isFile()) continue
+
+      const ext = extname(name).toLowerCase()
+      if (!ALLOWED_USB_EXTENSIONS.has(ext)) continue
+      if (stat.size <= 0 || stat.size > MAX_USB_FILE_BYTES) continue
+
+      entries.push({ filename: displayPrefix + name, extension: ext, sizeBytes: stat.size, absolutePath: fullPath })
+    }
+  }
+
+  collect(rootPath, '', names)
+  for (const subdirectory of subdirectories) {
     if (entries.length >= MAX_USB_FILES_LISTED) break
-    if (name.startsWith('.') || name.startsWith('$')) continue
-    if (IGNORED_NAMES.has(name.toLowerCase())) continue
-
-    const ext = extname(name).toLowerCase()
-    if (!ALLOWED_USB_EXTENSIONS.has(ext)) continue
-
-    const fullPath = join(rootPath, name)
-    let stat
+    let childNames: string[]
     try {
-      stat = lstatSync(fullPath)
+      childNames = readdirSync(join(rootPath, subdirectory))
     } catch {
       continue
     }
-    if (!stat.isFile()) continue
-    if (stat.size <= 0 || stat.size > MAX_USB_FILE_BYTES) continue
-
-    entries.push({ filename: name, extension: ext, sizeBytes: stat.size, absolutePath: fullPath })
+    collect(join(rootPath, subdirectory), `${subdirectory}/`, childNames)
   }
   return entries
 }

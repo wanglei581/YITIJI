@@ -56,6 +56,15 @@
             <RemoveFolder Id="RemoveProvisioningProgramMenuFolder" Directory="AgentProgramMenuFolder" On="uninstall" />
           </Component>
         </Directory>
+        <Directory Id="KIOSKDIR" Name="kiosk">
+          <!-- Kiosk browser launcher + watchdog. Files only: the logon task is
+               registered by the elevated provisioning flow, never by the MSI. -->
+          <Component Id="KioskWatchdogComponent" Guid="3C2E5F84-7B1D-4C0A-9E52-6A1F0D9B7E21" Bitness="always64">
+            <File Id="KioskWatchdogScript" Source="$(var.StagingRoot)\kiosk\kiosk-watchdog.ps1" KeyPath="yes" Checksum="yes" />
+            <File Id="KioskWatchdogRegister" Source="$(var.StagingRoot)\kiosk\register-kiosk-watchdog.ps1" Checksum="yes" />
+            <File Id="KioskLauncher" Source="$(var.StagingRoot)\kiosk\launch-kiosk.cmd" Checksum="yes" />
+          </Component>
+        </Directory>
       </Directory>
     </StandardDirectory>
 
@@ -87,6 +96,7 @@
       <ComponentRef Id="AgentStateDirectoryComponent" />
       <ComponentRef Id="AgentPanelShortcutComponent" />
       <ComponentRef Id="ProvisioningWizardComponent" />
+      <ComponentRef Id="KioskWatchdogComponent" />
       <ComponentGroupRef Id="AgentPayload" />
     </Feature>
   </Package>

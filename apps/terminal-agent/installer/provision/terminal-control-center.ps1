@@ -17,6 +17,8 @@ $panelUrl = "http://127.0.0.1:9527/local/panel"
 $siteUrl = "https://zyidai.cn"
 $apiBase = "https://zyidai.cn/api/v1"
 $agentVersion = "0.4.11-production"
+$kioskRegisterScript = Join-Path $installRoot "kiosk\register-kiosk-watchdog.ps1"
+$kioskTaskName = "AIJobPrintKioskWatchdog"
 
 function Test-IsAdministrator {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -58,6 +60,8 @@ function Get-ControlCenterSnapshot {
     bridgeConfigured = $null -ne $config -and -not [string]::IsNullOrWhiteSpace([string]$config.localApiBridgeToken)
     serviceInstalled = $null -ne $service
     serviceStatus = if ($null -ne $service) { [string]$service.Status } else { "NotInstalled" }
+    kioskWatchdogRegistered = $null -ne (Get-ScheduledTask -TaskName $kioskTaskName -ErrorAction SilentlyContinue)
+    kioskWatchdogAvailable = Test-Path -LiteralPath $kioskRegisterScript -PathType Leaf
     printers = @($printers)
   }
 }
@@ -215,8 +219,8 @@ function Test-QrBridge {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "AI 求职打印服务终端 - 控制中心"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(940, 720)
-$form.MinimumSize = New-Object System.Drawing.Size(940, 720)
+$form.Size = New-Object System.Drawing.Size(940, 762)
+$form.MinimumSize = New-Object System.Drawing.Size(940, 762)
 $form.MaximizeBox = $false
 $form.BackColor = [System.Drawing.ColorTranslator]::FromHtml("#F1F5F9")
 $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
@@ -282,7 +286,7 @@ $form.Controls.Add($settings)
 $actions = New-Object System.Windows.Forms.GroupBox
 $actions.Text = "运行与维护"
 $actions.Location = New-Object System.Drawing.Point(24, 426)
-$actions.Size = New-Object System.Drawing.Size(884, 98)
+$actions.Size = New-Object System.Drawing.Size(884, 140)
 $actions.BackColor = [System.Drawing.Color]::White
 $startButton = New-Button "启动服务" 20 34 120
 $restartButton = New-Button "重启服务" 150 34 120
@@ -290,11 +294,14 @@ $refreshButton = New-Button "刷新检测" 280 34 120
 $panelButton = New-Button "打开运行状态" 410 34 130
 $qrButton = New-Button "二维码链路自检" 550 34 140
 $logsButton = New-Button "打开日志目录" 700 34 140
-$actions.Controls.AddRange(@($startButton, $restartButton, $refreshButton, $panelButton, $qrButton, $logsButton))
+$kioskText = New-Label "Kiosk 看门狗：正在检查" 22 86 300 26
+$kioskRegisterButton = New-Button "注册 / 更新 Kiosk 看门狗" 410 82 200 38
+$kioskUnregisterButton = New-Button "停用看门狗" 620 82 120 38
+$actions.Controls.AddRange(@($startButton, $restartButton, $refreshButton, $panelButton, $qrButton, $logsButton, $kioskText, $kioskRegisterButton, $kioskUnregisterButton))
 $form.Controls.Add($actions)
 
 $logBox = New-Object System.Windows.Forms.TextBox
-$logBox.Location = New-Object System.Drawing.Point(24, 542)
+$logBox.Location = New-Object System.Drawing.Point(24, 584)
 $logBox.Size = New-Object System.Drawing.Size(884, 112)
 $logBox.Multiline = $true
 $logBox.ReadOnly = $true
@@ -328,6 +335,16 @@ function Refresh-View {
   } else {
     "设备已配置并运行；桥接凭据：$(if ($snapshot.bridgeConfigured) { '已配置' } else { '动态本机会话' })"
   }
+  $kioskText.Text = if (-not $snapshot.kioskWatchdogAvailable) {
+    "Kiosk 看门狗：组件缺失，请修复安装"
+  } elseif ($snapshot.kioskWatchdogRegistered) {
+    "Kiosk 看门狗：已注册（登录后自动全屏，退出自动拉起）"
+  } else {
+    "Kiosk 看门狗：未注册，登录后不会自动打开全屏"
+  }
+  $kioskText.ForeColor = if ($snapshot.kioskWatchdogRegistered) { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }
+  $kioskRegisterButton.Enabled = $snapshot.kioskWatchdogAvailable
+  $kioskUnregisterButton.Enabled = $snapshot.kioskWatchdogAvailable -and $snapshot.kioskWatchdogRegistered
   $panelButton.Enabled = $snapshot.serviceStatus -eq "Running"
   $qrButton.Enabled = $snapshot.serviceStatus -eq "Running"
   $saveButton.Enabled = $snapshot.configured
@@ -341,6 +358,61 @@ $browseButton.Add_Click({
   $dialog.Description = "选择扫描文件输入目录"
   if (-not [string]::IsNullOrWhiteSpace($scanFolderBox.Text)) { $dialog.SelectedPath = $scanFolderBox.Text }
   if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $scanFolderBox.Text = $dialog.SelectedPath }
+})
+
+function Invoke-KioskWatchdogScript([string[]]$ScriptArguments) {
+  if (-not (Test-Path -LiteralPath $kioskRegisterScript -PathType Leaf)) { throw "Kiosk 看门狗组件缺失，请先修复安装" }
+  $arguments = New-Object "System.Collections.Generic.List[string]"
+  foreach ($value in @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $kioskRegisterScript) + $ScriptArguments) {
+    $arguments.Add((Quote-ProcessArgument ([string]$value)))
+  }
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName = "powershell.exe"
+  $startInfo.Arguments = ($arguments -join " ")
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $startInfo
+  [void]$process.Start()
+  $output = $process.StandardOutput.ReadToEnd()
+  $errorOutput = $process.StandardError.ReadToEnd()
+  $process.WaitForExit()
+  if ($process.ExitCode -ne 0) {
+    $detail = (($output + "`n" + $errorOutput) -split "`r?`n" | Where-Object { $_ -match "Exception|error|throw" } | Select-Object -Last 2) -join " "
+    if ([string]::IsNullOrWhiteSpace($detail)) { $detail = "错误码 $($process.ExitCode)" }
+    throw $detail
+  }
+  return $output
+}
+
+$kioskRegisterButton.Add_Click({
+  try {
+    Set-Busy $true "正在注册 Kiosk 看门狗…"
+    [void](Invoke-KioskWatchdogScript @("-Url", ($siteUrl + "/"), "-Browser", "auto", "-StartNow"))
+    Add-Log "Kiosk 看门狗已注册：登录后自动全屏打开 $siteUrl，浏览器退出会自动拉起"
+    [void](Refresh-View)
+  } catch {
+    Add-Log "看门狗注册失败：$($_.Exception.Message)"
+  } finally {
+    Set-Busy $false
+  }
+})
+
+$kioskUnregisterButton.Add_Click({
+  $answer = [System.Windows.Forms.MessageBox]::Show("停用后，登录不再自动进入全屏，浏览器退出也不会被拉起。仅在维护本机时使用，确定停用？", "停用 Kiosk 看门狗", [System.Windows.Forms.MessageBoxButtons]::OKCancel, [System.Windows.Forms.MessageBoxIcon]::Warning)
+  if ($answer -ne [System.Windows.Forms.DialogResult]::OK) { return }
+  try {
+    Set-Busy $true "正在停用 Kiosk 看门狗…"
+    [void](Invoke-KioskWatchdogScript @("-Unregister"))
+    Add-Log "Kiosk 看门狗已停用；维护完成后请重新注册"
+    [void](Refresh-View)
+  } catch {
+    Add-Log "停用失败：$($_.Exception.Message)"
+  } finally {
+    Set-Busy $false
+  }
 })
 
 $refreshButton.Add_Click({

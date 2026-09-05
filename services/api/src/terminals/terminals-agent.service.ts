@@ -20,6 +20,7 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { signFileUrl } from '../files/signing'
 import { ContractReportPrintLifecycleService } from '../files/contract-report-print-lifecycle.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
@@ -59,8 +60,16 @@ const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed', 'cancelled']
 
 class PrintTaskClaimRaceError extends Error {}
 
+// API-03：claim 时重签文件 URL 的有效期。Agent 单任务最长路径（下载重试 + 预检 + 打印 +
+// 监控）不到 15 分钟，30 分钟与建单时的 PRINT_JOB_FILE_URL_TTL_MS 同口径。
+const CLAIM_FILE_URL_TTL_MS = 30 * 60 * 1000
+
+// AGT-01（2026-09-05 拍板）：Agent 的 printing 上报只是信息性中间态，网络抖动时
+// 可能丢失而纸已经出来。claimed → completed 必须被接受，否则真出纸会被记成
+// PRINT_JOB_UNCONFIRMED 假失败，用户重下单重复出纸。接受时补写一条 claimed→printing
+// 状态日志（见 patchTaskStatus），保证状态日志链完整可追溯。
 const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
-  claimed: ['printing', 'failed'],
+  claimed: ['printing', 'completed', 'failed'],
   printing: ['completed', 'failed'],
 }
 
@@ -79,6 +88,8 @@ export interface ClaimTaskResponse {
   // 契约 C2：原始文件名与推断的 MIME。Agent 据此推断打印扩展名。
   fileName?: string
   mimeType?: string
+  /** Order.billablePages；Agent 只用它放大出纸监控窗口（页数 × 份数），不参与计费。 */
+  billablePages?: number
 }
 
 // ── Bind code response types ───────────────────────────────────────────────────
@@ -457,11 +468,26 @@ export class TerminalAgentService implements OnModuleInit {
       const params = this.parseParams(claimed.paramsJson)
       const fileName = this.extractFileName(claimed.paramsJson)
       const mimeType = inferMimeFromFileName(fileName)
+      // API-03：建单时落库的签名 URL 只有 30 分钟；付款、终端离线或缺纸都可能让 claim
+      // 晚于这个窗口。领取时按 fileId 重新签发，保证 Agent 拿到的是可下载的链接。
+      // 无 fileId 的历史任务保持原 URL（无法重签，行为不变）。
+      const fileUrl = claimed.fileId
+        ? signFileUrl(claimed.fileId, CLAIM_FILE_URL_TTL_MS).url
+        : claimed.fileUrl
+      const orderMeta = await this.prisma.order.findFirst({
+        where: { printTaskId: claimed.id },
+        select: { billablePages: true },
+      })
+      const billablePages =
+        typeof orderMeta?.billablePages === 'number' && orderMeta.billablePages > 0
+          ? orderMeta.billablePages
+          : undefined
       results.push({
         taskId: claimed.id,
         type: 'print',
-        fileUrl: claimed.fileUrl,
+        fileUrl,
         fileMd5: claimed.fileMd5,
+        ...(billablePages !== undefined ? { billablePages } : {}),
         actionToken: createActionToken(claimed.id, terminalId, claimExpiry),
         claimedBy: terminalId,
         claimExpiresAt: claimExpiry.toISOString(),
@@ -572,10 +598,17 @@ export class TerminalAgentService implements OnModuleInit {
         })
       }
 
+      if (preCheck.status === 'claimed' && dto.status === 'completed') {
+        // printing 上报丢失（AGT-01）：补写中间态日志，errorCode 标明是服务端推断，
+        // 便于事后区分「Agent 真上报过 printing」与「跳态确认」。
+        await tx.printTaskStatusLog.create({
+          data: { taskId, fromStatus: 'claimed', toStatus: 'printing', errorCode: 'PRINTING_REPORT_LOST' },
+        })
+      }
       await tx.printTaskStatusLog.create({
         data: {
           taskId,
-          fromStatus: preCheck.status,
+          fromStatus: preCheck.status === 'claimed' && dto.status === 'completed' ? 'printing' : preCheck.status,
           toStatus: dto.status,
           errorCode: dto.errorCode ?? null,
         },

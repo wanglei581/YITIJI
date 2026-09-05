@@ -14,7 +14,10 @@ $excluded = @(
   "provision/install-production-agent.ps1",
   "provision/service-identity.ps1",
   "provision/terminal-control-center.ps1",
-  "provision/launch-control-center.vbs"
+  "provision/launch-control-center.vbs",
+  "kiosk/kiosk-watchdog.ps1",
+  "kiosk/register-kiosk-watchdog.ps1",
+  "kiosk/launch-kiosk.cmd"
 )
 
 function Get-StableId([string]$Prefix, [string]$Value) {
