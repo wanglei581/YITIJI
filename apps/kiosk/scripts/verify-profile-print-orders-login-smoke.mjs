@@ -71,13 +71,17 @@ const allowedKeys = new Set([
   'completedAt',
   'copies',
   'colorMode',
+  'duplex',
   'paperSize',
+  'pageRange',
   'amountCents',
   'payStatus',
   'paymentSource',
   'billablePages',
   'billingPageSource',
   'pickupCode',
+  'refundedAmountCents',
+  'discountCents',
 ])
 const allowedStatuses = new Set(['pending', 'claimed', 'printing', 'completed', 'failed', 'cancelled'])
 const allowedPayStatuses = new Set(['unpaid', 'paid', 'refunded', 'failed', 'paying', 'closed', null])
@@ -129,7 +133,9 @@ for (const item of Array.isArray(items) ? items : []) {
     item.paymentSource === null &&
     item.billablePages === null &&
     item.billingPageSource === null &&
-    item.pickupCode === null
+    item.pickupCode === null &&
+    item.discountCents === null &&
+    item.refundedAmountCents === null
   ) {
     hasNoOrder = true
   }

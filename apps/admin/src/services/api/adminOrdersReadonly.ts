@@ -35,6 +35,8 @@ export interface AdminOrderReadonlyItem {
 export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundedAt: string | null
   refundReason: string | null
+  discountCents: number
+  refundedAmountCents: number
   /** PrintTask.id（废弃孤单入口使用；非文件链接，不含敏感信息）。 */
   printTaskId: string | null
   print: {
@@ -215,6 +217,8 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   updatedAt: now(),
   refundedAt: null,
   refundReason: null,
+  discountCents: 0,
+  refundedAmountCents: 0,
   printTaskId: null,
   print: {
     fileName: '演示简历.pdf',
@@ -280,6 +284,7 @@ const mockAdapter: AdminOrdersReadonlyService = {
       refundEligible: false,
       refundedAt,
       refundReason,
+      refundedAmountCents: mockDetailState.amountCents,
       updatedAt: refundedAt,
     }
     return {

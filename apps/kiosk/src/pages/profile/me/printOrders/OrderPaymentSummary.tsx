@@ -2,10 +2,12 @@
 // 打印订单详单（支付信息区，C5 P0b）。
 //
 // 诚实口径：
-// - 关联 Order 缺失（payStatus 为 null，历史订单）→ 只显示「暂无支付信息」，
+// - 打印参数（单双面 / 彩黑 / 份数 / 页范围）来自 PrintTask.paramsJson 已外露字段；
+//   缺值显示「未记录」，不默认成单面/黑白/全部。双面不计价，不渲染金额项。
+// - 关联 Order 缺失（payStatus 为 null，历史订单）→ 支付区只显示「暂无支付信息」，
 //   不显示金额 0、不推断支付状态。
-// - 有 Order → 展示后端真实字段：金额（整数分）、支付状态、支付来源
-//   （只可能是 线下收款 / 免费 / 人工确认）、后端识别的计费页数。
+// - 有 Order → 展示后端真实字段：下单金额、优惠/权益抵扣、已退款、支付状态、来源、计费页数。
+//   实付无独立字段，标「未记录」，前端不按应付减优惠推算。
 // - 取件码仅在后端返回时渲染（门控在服务端）。
 // - 「再打一份」本批不做订单侧直连（PrintTask 无可重签文件源），
 //   只提供「去我的文档再打印」诚实引导：走我的文档重签 URL → 打印确认，
@@ -15,7 +17,19 @@
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 import { KIcon } from '../../../../components/kiosk-icon'
-import { BILLING_PAGE_SOURCE_LABEL, formatAmountCents, paymentSourceLabel, payStatusMeta } from './paymentCopy'
+import {
+  BILLING_PAGE_SOURCE_LABEL,
+  colorModeDisplay,
+  copiesDisplay,
+  duplexDisplay,
+  formatAmountCents,
+  NET_PAID_UNRECORDED,
+  NET_PAID_UNRECORDED_HINT,
+  pageRangeDisplay,
+  paymentSourceLabel,
+  payStatusMeta,
+  recordedAmountDisplay,
+} from './paymentCopy'
 import { PickupCodePanel } from './PickupCodePanel'
 
 function DetailRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -36,6 +50,13 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
 
   return (
     <div className="me-payment-summary">
+      <div className="me-payment-grid">
+        <DetailRow label="单双面" value={duplexDisplay(item.duplex)} />
+        <DetailRow label="彩色/黑白" value={colorModeDisplay(item.colorMode)} />
+        <DetailRow label="份数" value={copiesDisplay(item.copies)} />
+        <DetailRow label="页范围" value={pageRangeDisplay(item.pageRange)} />
+      </div>
+
       {payStatus === null ? (
         <p className="me-payment-empty">
           暂无支付信息
@@ -43,7 +64,13 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         </p>
       ) : (
         <div className="me-payment-grid">
-          {typeof item.amountCents === 'number' && <DetailRow label="金额" value={formatAmountCents(item.amountCents)} />}
+          <DetailRow
+            label="下单金额"
+            value={typeof item.amountCents === 'number' ? formatAmountCents(item.amountCents) : '未记录'}
+          />
+          <DetailRow label="优惠/权益抵扣" value={recordedAmountDisplay(item.discountCents)} />
+          <DetailRow label="已退款" value={recordedAmountDisplay(item.refundedAmountCents)} />
+          <DetailRow label="实付" value={NET_PAID_UNRECORDED} hint={NET_PAID_UNRECORDED_HINT} />
           <DetailRow
             label="支付状态"
             value={payStatusMeta(payStatus).label}
