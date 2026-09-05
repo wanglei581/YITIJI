@@ -85,7 +85,8 @@ export default function PolicySourcesPage() {
   const handlePublish = (id: string) => {
     void policiesAdminService.publishPolicy(id, 'publish').then(applyUpdate)
   }
-  const handleUnpublish = (id: string) => {
+  const handleUnpublish = (id: string, title: string) => {
+    if (!window.confirm(`确认下架「${title}」？下架后一体机不再展示该政策。`)) return
     void policiesAdminService.publishPolicy(id, 'unpublish').then(applyUpdate)
   }
 
@@ -252,7 +253,7 @@ export default function PolicySourcesPage() {
                               </button>
                             )}
                             {r.publishStatus === 'published' && (
-                              <button className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg" onClick={() => handleUnpublish(r.id)}>
+                              <button className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg" onClick={() => handleUnpublish(r.id, r.title)}>
                                 下架
                               </button>
                             )}

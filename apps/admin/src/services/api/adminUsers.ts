@@ -6,7 +6,7 @@ import type {
 } from '@ai-job-print/shared'
 export type { AdminUserActivityItem, AdminUserListItem } from '@ai-job-print/shared'
 import { authHeader, redirectToLogin } from '../auth'
-import { API_BASE_URL, ApiHttpError } from './client'
+import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 
 interface ErrorBody {
   code?: string
@@ -62,7 +62,14 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return parse<T>(response)
 }
 
+function demoModeUnavailable(action: string): Promise<never> {
+  return Promise.reject(new ApiHttpError('DEMO_MODE_READONLY', `当前为演示模式，${action}需要连接真实后端`, 501))
+}
+
 export function list(query: AdminUserListQuery): Promise<AdminUserListResult> {
+  if (API_MODE !== 'http') {
+    return Promise.resolve({ items: [], total: 0, page: query.page, pageSize: query.pageSize })
+  }
   const params = new URLSearchParams({
     page: String(query.page),
     pageSize: String(query.pageSize),
@@ -76,15 +83,18 @@ export function list(query: AdminUserListQuery): Promise<AdminUserListResult> {
 }
 
 export function getDetail(endUserId: string): Promise<AdminUserDetailResult> {
+  if (API_MODE !== 'http') return demoModeUnavailable('查看用户详情')
   return get<AdminUserDetailResult>(`/admin/users/${encodeURIComponent(endUserId)}`)
 }
 
 /** 停用终端用户。reason 必填，服务端会连同操作人一起写入审计。 */
 export function disable(endUserId: string, reason: string): Promise<AdminUserStatusChangeResult> {
+  if (API_MODE !== 'http') return demoModeUnavailable('停用用户')
   return post<AdminUserStatusChangeResult>(`/admin/users/${encodeURIComponent(endUserId)}/disable`, { reason })
 }
 
 /** 恢复被停用的终端用户。已注销 / 注销中的账号会被服务端以 409 拒绝。 */
 export function restore(endUserId: string, reason: string): Promise<AdminUserStatusChangeResult> {
+  if (API_MODE !== 'http') return demoModeUnavailable('恢复用户')
   return post<AdminUserStatusChangeResult>(`/admin/users/${encodeURIComponent(endUserId)}/restore`, { reason })
 }
