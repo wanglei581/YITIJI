@@ -8,6 +8,13 @@ import {
 } from '../../services/api/offlineAgencies'
 import { FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
+function offlineJobTypeLabel(jobType?: string): string {
+  if (jobType === 'parttime') return '兼职'
+  if (jobType === 'internship' || jobType === 'intern') return '实习'
+  if (jobType === 'fulltime') return '全职'
+  return '以机构公示为准'
+}
+
 function salaryText(job: OfflineAgencyDetailDTO['jobs'][number]): string {
   if (job.salaryMin != null && job.salaryMax != null) return `${job.salaryMin}-${job.salaryMax} 元/月`
   if (job.salaryMin != null) return `${job.salaryMin} 元起/月`
@@ -104,7 +111,7 @@ export default function OfflineAgencyDetailPage() {
             <div className="jf-row-main">
               <div className="jf-row-title">
                 <b>{job.title}</b>
-                <span className="jf-kind">{job.jobType === 'parttime' ? '兼职' : job.jobType === 'intern' ? '实习' : '全职'}</span>
+                <span className="jf-kind">{offlineJobTypeLabel(job.jobType)}</span>
               </div>
               <div className="jf-row-info">
                 <span>{job.location || agency.address}</span>
