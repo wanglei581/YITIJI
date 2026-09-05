@@ -340,6 +340,11 @@ const PUBLISH_PATH_INVENTORY: { file: string; method: string; gated: boolean; no
     note: '门面,原样转发 FairMaterialService.publishMaterial,闸门在被转发方',
   },
   {
+    file: 'job-materials/job-materials.service.ts', method: 'adminSetTemplatePublish', gated: false,
+    note: '求职材料模板是平台自营内容:JobMaterialTemplate 无 sourceOrgId / organization 关联,'
+      + '不存在「来源机构信任」这个决策对象;写入受 @Roles(\'admin\') 与审计约束。与 BenefitActivity 同类。',
+  },
+  {
     file: 'benefit-activities/benefit-activities.service.ts', method: 'publish', gated: false,
     note: 'BenefitActivity 是平台自营权益活动,模型无 organization 关联,不存在「来源机构信任」这个决策对象',
   },
