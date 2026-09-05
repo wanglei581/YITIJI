@@ -42,7 +42,7 @@ function mapReplies(replies) {
 }
 
 function toView(item) {
-  const st = STATUS_LABEL[item.status] ? item.status : item.status
+  const st = item.status
   return Object.assign({
     id: String(item.id || ''),
     categoryLabel: CAT_LABEL[item.category] || item.category || '',
@@ -132,9 +132,22 @@ Page({
         this.loadList()
       })
       .catch((err) => {
+        if (this._handleAuthError(err)) return
         this.setData({ submitting: false })
         wx.showToast({ title: (err && err.message) || '提交失败，反馈未送出', icon: 'none', duration: 2000 })
       })
+  },
+
+  /**
+   * 令牌过期（401）时统一回到「请先登录」态：只弹 toast 会把用户留在一个再点也没用的
+   * 表单前面。返回 true 表示已按登录态处理，调用方不要再弹自己的失败 toast。
+   * （Hermes 第 17 轮建议 2）
+   */
+  _handleAuthError(err) {
+    if (!err || err.statusCode !== 401) return false
+    this.setData({ loggedIn: false, list: [], listState: 'idle', loadError: '', submitting: false, closingId: '' })
+    wx.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+    return true
   },
 
   loadList() {
@@ -176,6 +189,7 @@ Page({
       .then((detail) => this._patch(id, Object.assign({ closing: false }, statusFields(detail && detail.status))))
       .catch((err) => {
         this._patch(id, { closing: false })
+        if (this._handleAuthError(err)) return
         wx.showToast({ title: (err && err.message) || '关闭失败', icon: 'none' })
       })
   },
@@ -195,6 +209,7 @@ Page({
       })
       .catch((err) => {
         this._patch(id, { loadingDetail: false })
+        if (this._handleAuthError(err)) return
         wx.showToast({ title: (err && err.message) || '详情加载失败', icon: 'none' })
       })
   },

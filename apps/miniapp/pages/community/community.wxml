@@ -12,7 +12,8 @@
   <scroll-view class="content" scroll-y enable-back-to-top
     bindscrolltolower="loadMore" refresher-enabled refresher-triggered="{{refreshing}}" bindrefresherrefresh="onPullDownRefresh">
 
-    <view wx:if="{{error}}" class="state-card">
+    <!-- 只有首屏无数据时才整卡报错；已有列表时翻页失败走底部提示，不把已读内容换掉。（Hermes 第 17 轮建议 5）-->
+    <view wx:if="{{error && feeds.length === 0}}" class="state-card">
       <view class="es-t">加载失败</view>
       <view class="es-d">{{error}}</view>
     </view>
@@ -46,6 +47,7 @@
     </view>
 
     <view wx:if="{{loading}}" class="load-more-tip">加载中…</view>
+    <view wx:elif="{{error && feeds.length > 0}}" class="load-more-tip tap" hover-class="tap-press" bindtap="loadMore" role="button">{{error}}，点此重试</view>
     <view wx:elif="{{noMore && feeds.length > 0}}" class="load-more-tip">已经到底了</view>
     <view class="page-pad"></view>
   </scroll-view>
