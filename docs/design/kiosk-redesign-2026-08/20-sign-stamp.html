@@ -182,6 +182,8 @@ button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
 .pv-empty{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;background:var(--paper);border:1px dashed var(--line-2);border-radius:var(--r-md);padding:24px;font-size:20px;line-height:1.5;color:var(--ink-2)}
 .pv-ghost{flex:none;width:100%;max-width:330px;aspect-ratio:840/1188;background:var(--surface);border:2px dashed var(--line-2);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px}
 .pv-empty b{font-size:23px}
+/* 2026-09-05 体检修复：选文档前的空态提示（12 个 document-* 态）文字比预览列高出约 39px，画到列边框外；改为列内滚动。 */
+.pv-empty{overflow-y:auto;overscroll-behavior:contain}
 .pv-cap{flex:none;min-height:34px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ink-3);text-align:center;padding:0 6px}
 /* 纸面内容 */
 .pp{position:absolute;background:#b6ae98;border-radius:2px}

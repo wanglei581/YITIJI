@@ -162,17 +162,19 @@ export interface JobsDrawerProps {
   agencyName: string
   onClose: () => void
   onJobCountChange?: (count: number) => void
+  onJobsChanged?: () => void | Promise<void>
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChange }: JobsDrawerProps) {
+export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChange, onJobsChanged }: JobsDrawerProps) {
   const [jobs,        setJobs]        = useState<OfflineAgencyJob[]>([])
   const [loadState,   setLoadState]   = useState<'loading' | 'error' | 'ready'>('loading')
   const [formMode,    setFormMode]    = useState<'none' | 'create' | 'edit'>('none')
   const [editingJob,  setEditingJob]  = useState<OfflineAgencyJob | null>(null)
   const [busy,        setBusy]        = useState(false)
   const [formError,   setFormError]   = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -192,6 +194,7 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
     if (open && agencyId) {
       setFormMode('none')
       setFormError(null)
+      setActionError(null)
       void load()
     }
   }, [open, agencyId, load])
@@ -200,11 +203,12 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
     if (!agencyId) return
     const err = validateJob(f)
     if (err) { setFormError(err); return }
-    setBusy(true); setFormError(null)
+    setBusy(true); setFormError(null); setActionError(null)
     try {
       const created = await offlineAgenciesAdminService.createJob(agencyId, formToJobInput(f))
       setJobs((prev) => [created, ...prev])
       onJobCountChange?.(jobs.length + 1)
+      await onJobsChanged?.()
       setFormMode('none')
     } catch (e) {
       setFormError(e instanceof Error ? e.message : '创建失败，请重试')
@@ -217,10 +221,11 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
     if (!agencyId || !editingJob) return
     const err = validateJob(f)
     if (err) { setFormError(err); return }
-    setBusy(true); setFormError(null)
+    setBusy(true); setFormError(null); setActionError(null)
     try {
       const updated = await offlineAgenciesAdminService.updateJob(agencyId, editingJob.id, formToJobInput(f))
       setJobs((prev) => prev.map((j) => j.id === editingJob.id ? updated : j))
+      await onJobsChanged?.()
       setFormMode('none')
       setEditingJob(null)
     } catch (e) {
@@ -233,12 +238,14 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
   const handleDelete = async (jobId: string) => {
     if (!agencyId) return
     setDeletingId(jobId)
+    setActionError(null)
     try {
       await offlineAgenciesAdminService.deleteJob(agencyId, jobId)
       setJobs((prev) => prev.filter((j) => j.id !== jobId))
       onJobCountChange?.(jobs.length - 1)
-    } catch {
-      // 静默失败，刷新列表
+      await onJobsChanged?.()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : '删除失败，请重试')
       void load()
     } finally {
       setDeletingId(null)
@@ -274,10 +281,15 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
         <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
           新增或修改岗位会使所属机构回到“待审核 + 草稿”，管理员重新审核发布后才会公开展示。
         </div>
+        {actionError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {actionError}
+          </div>
+        )}
         {/* 新增按钮 */}
         {formMode === 'none' && (
           <button
-            onClick={() => { setFormMode('create'); setFormError(null) }}
+            onClick={() => { setFormMode('create'); setFormError(null); setActionError(null) }}
             className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-neutral-200 py-3 text-sm font-medium text-neutral-500 hover:border-primary-300 hover:text-primary-600"
           >
             <PlusIcon className="h-4 w-4" />

@@ -77,7 +77,7 @@ export function MaterialsTab({
       await fairsAdminService.updateMaterial(fairId, editing.id, {
         name: editMeta.name.trim(),
         type: editMeta.type,
-        description: editMeta.description.trim() || undefined,
+        description: editMeta.description.trim(),
         pageCount: editMeta.pageCount ? Math.max(0, Math.floor(Number(editMeta.pageCount) || 0)) : 0,
         allowPrint: editMeta.allowPrint,
       })

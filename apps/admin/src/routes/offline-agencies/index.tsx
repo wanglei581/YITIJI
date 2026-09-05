@@ -397,6 +397,7 @@ export default function OfflineAgenciesPage() {
             setRows((prev) => prev.map((r) => r.id === jobsAgency.id ? { ...r, jobCount: count } : r))
           }
         }}
+        onJobsChanged={loadList}
       />
 
       {/* 治理档案 / 资质抽屉（只读） */}

@@ -40,7 +40,9 @@ const MAX_HISTORY = 12
 // 会话空闲过期时间
 const SESSION_TTL_MS = 30 * 60 * 1000
 /** 进程内助手会话上限，超出淘汰最久未更新的。 */
-export const MAX_ASSISTANT_SESSIONS = 256
+export const MAX_ASSISTANT_SESSIONS = 1024
+/** 同一归属（会员或 IP 摘要）最多保留的会话数，防止匿名洪水挤掉他人。 */
+export const MAX_ASSISTANT_SESSIONS_PER_OWNER = 16
 
 interface SessionEntry {
   messages: ChatMessage[]
@@ -221,16 +223,25 @@ export class LlmChatService {
     }
   }
 
-  private evictOldest(): void {
+  private evictOldest(ownerKey?: string): void {
     let oldestId: string | null = null
     let oldestAt = Number.POSITIVE_INFINITY
     for (const [id, s] of this.sessions) {
+      if (ownerKey && s.ownerKey !== ownerKey) continue
       if (s.updatedAt < oldestAt) {
         oldestAt = s.updatedAt
         oldestId = id
       }
     }
     if (oldestId) this.sessions.delete(oldestId)
+  }
+
+  private ownerSessionCount(ownerKey: string): number {
+    let n = 0
+    for (const s of this.sessions.values()) {
+      if (s.ownerKey === ownerKey) n += 1
+    }
+    return n
   }
 
   async chat(
@@ -259,7 +270,13 @@ export class LlmChatService {
     if (existing && existing.ownerKey === ownerKey) {
       sessionId = requestedId
       session = existing
+      session.updatedAt = now
     } else {
+      while (this.ownerSessionCount(ownerKey) >= MAX_ASSISTANT_SESSIONS_PER_OWNER) {
+        const size = this.sessions.size
+        this.evictOldest(ownerKey)
+        if (this.sessions.size >= size) break
+      }
       if (this.sessions.size >= MAX_ASSISTANT_SESSIONS) this.evictOldest()
       sessionId = randomBytes(16).toString('hex')
       session = { messages: [], updatedAt: now, ownerKey }
@@ -280,7 +297,7 @@ export class LlmChatService {
     }
 
     session.messages.push({ role: 'assistant', content: reply })
-    session.updatedAt = now
+    session.updatedAt = Date.now()
     // 截断历史
     if (session.messages.length > MAX_HISTORY) {
       session.messages = session.messages.slice(-MAX_HISTORY)

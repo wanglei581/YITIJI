@@ -5,6 +5,8 @@ import * as net from 'net'
  * 管理员配置的模型 baseURL 不得指向本机 / 内网 / 链路本地。
  * 只做字面主机名与 IP 判断，不在写入路径做 DNS（避免把配置页变成慢探测）。
  * 连通性测试端点会再拦一次，防止环境变量里已有的内网地址被「测试」打到。
+ *
+ * 已知边界：不做 DNS，因此 `http://127.0.0.1.nip.io` 这类解析到内网的公网名会放行。
  */
 export function assertPublicLlmBaseUrl(raw: string): void {
   const value = raw.trim()
@@ -33,8 +35,19 @@ export function assertPublicLlmBaseUrl(raw: string): void {
   }
 }
 
+/** URL.hostname 对 IPv6 带方括号（`[::1]`），且可能带 FQDN 末尾点（`localhost.`）。 */
+function normalizeLlmHost(hostname: string): string {
+  let host = hostname.trim().toLowerCase()
+  if (host.startsWith('[') && host.endsWith(']')) {
+    host = host.slice(1, -1)
+  }
+  while (host.endsWith('.')) host = host.slice(0, -1)
+  return host
+}
+
 export function isBlockedLlmHost(hostname: string): boolean {
-  const host = hostname.trim().toLowerCase()
+  const host = normalizeLlmHost(hostname)
+  if (!host) return true
   if (
     host === 'localhost' ||
     host === '::1' ||

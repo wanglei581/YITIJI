@@ -146,7 +146,9 @@ export class MockInterviewService {
   }
 
   async start(sessionId: string, requester: InterviewRequester) {
-    return this.startInflight.run(sessionId, () => this.startOnce(sessionId, requester))
+    // 鉴权必须在合并之前：否则无权请求会复用已授权 worker 的 Promise。
+    await this.loadAuthorized(sessionId, requester)
+    return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester))
   }
 
   private async startOnce(sessionId: string, requester: InterviewRequester) {
@@ -227,19 +229,23 @@ export class MockInterviewService {
 
     if (asked >= session.questionTarget) {
       if (!lastIsCandidate) {
-        await this.prisma.mockInterviewTurn.create({
-          data: {
-            sessionId: session.id,
-            idx: turns.length,
-            role: 'candidate',
-            content: input.skip ? '（跳过）' : answerText,
-            skipped: !!input.skip,
-            inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
-            transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
-            transcriptEdited: input.transcriptEdited === true,
-            answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
-          },
-        })
+        try {
+          await this.prisma.mockInterviewTurn.create({
+            data: {
+              sessionId: session.id,
+              idx: turns.length,
+              role: 'candidate',
+              content: input.skip ? '（跳过）' : answerText,
+              skipped: !!input.skip,
+              inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
+              transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
+              transcriptEdited: input.transcriptEdited === true,
+              answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
+            },
+          })
+        } catch (error) {
+          if (!isUniqueConflict(error)) throw error
+        }
       }
       return { done: true, questionIndex: asked, questionTarget: session.questionTarget }
     }
@@ -293,7 +299,8 @@ export class MockInterviewService {
 
   /** 结束并生成练习报告（幂等：已有报告直接返回）。 */
   async end(sessionId: string, requester: InterviewRequester) {
-    return this.endInflight.run(sessionId, () => this.endOnce(sessionId, requester))
+    await this.loadAuthorized(sessionId, requester)
+    return this.endInflight.run(this.coalesceKey(sessionId, requester), () => this.endOnce(sessionId, requester))
   }
 
   private async endOnce(sessionId: string, requester: InterviewRequester) {
@@ -313,7 +320,12 @@ export class MockInterviewService {
         const latest = await this.loadAuthorized(sessionId, requester)
         return this.reportDto(latest, raced.payloadJson)
       }
-      throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_ACTIVE', message: '本场练习未在进行中' } })
+      // CAS 已把状态写成 completed，但进程在写报告前崩溃 → 无报告。
+      // 不引入 completing（shared InterviewSessionStatus 无此值）；允许 completed 且无报告时重试生成。
+      const latest = await this.prisma.mockInterviewSession.findUnique({ where: { id: session.id } })
+      if (!latest || latest.status !== 'completed') {
+        throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_ACTIVE', message: '本场练习未在进行中' } })
+      }
     }
     const turns = await this.prisma.mockInterviewTurn.findMany({ where: { sessionId: session.id }, orderBy: { idx: 'asc' } })
     const answered = turns.filter((t) => t.role === 'candidate' && !t.skipped).length
@@ -597,6 +609,13 @@ export class MockInterviewService {
       endUserId,
       terminalId: null,
     })
+  }
+
+  private coalesceKey(sessionId: string, requester: InterviewRequester): string {
+    const owner = requester.endUserId
+      ? `u:${requester.endUserId}`
+      : `t:${hashToken(requester.accessToken ?? '')}`
+    return `${sessionId}:${owner}`
   }
 
   private llmCtx(session: SessionRow) {

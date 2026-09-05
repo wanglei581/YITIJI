@@ -334,7 +334,9 @@ export class AiController {
    * 调用方必须让用户确认转写文本后再写入简历生成表单。
    */
   @Post('resume/voice/transcribe')
-  @PaidAiThrottle(6)
+  // 2026-09-05 真机 E2：引导式一问一录有 12 道语音题 + 试音，6 次/分在第 10 题必撞 429。
+  // 人说话物理上到不了 20 次/分；每 IP 每小时 AI_IP_HOURLY_CEILING（默认 300）的天花板仍在。
+  @PaidAiThrottle(20)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async transcribeResumeVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
