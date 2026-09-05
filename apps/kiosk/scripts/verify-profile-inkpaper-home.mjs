@@ -420,6 +420,12 @@ const allowedPrintOrdersInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
+  // 序 13「订单详情展示真实打印参数与优惠退款额」（2026-09-06）。纯追加：新增单双面 /
+  // 彩黑 / 份数 / 页范围的展示函数与「未记录」口径金额格式化，其中 NET_PAID_UNRECORDED
+  // 钉死「实付无独立真源，禁止用应付减优惠推算」——是加强诚实性，不是放宽。
+  // 这是同一个 PR 内第三处被迫加行的范围 allowlist（前两处见
+  // verify-profile-print-orders-inkpaper.mjs 里的说明）。
+  'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
 ])
 /** 2026-07-25：冻结项诚实文案 / 合规入口收口（允许主入口标签与 toast，不做视觉换装）。 */
 const allowedHonestCopyChanged = new Set([
