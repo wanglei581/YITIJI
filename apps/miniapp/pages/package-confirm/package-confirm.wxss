@@ -135,10 +135,12 @@
   gap: 16rpx;
 }
 
+/* 支付方式行是可点选项，实测 47px → min-height 96rpx(48px) */
 .payment-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 96rpx;
   padding: 24rpx;
   background: var(--bg, #f5f7fa);
   border-radius: var(--r-sm, 8rpx);

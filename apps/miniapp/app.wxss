@@ -174,6 +174,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   white-space: nowrap;
 }
 .navbar .nav-title.left { position: static; transform: none; font-size: 20px; font-weight: 750; }
+/* 顶栏胶囊实测 62x25：它是纯展示标签，不是按钮，此处只标注不放大 */
 .navbar .nav-caps {
   font-size: 11px; color: var(--muted);
   background: var(--surface-2);
@@ -311,7 +312,8 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .btn.ghost    { background: transparent; color: var(--teal); border: 1.5px solid var(--teal); }
 .btn.ghost-ink { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
 .btn.wx       { background: #07c160; color: #fff; }
-.btn.sm  { height: 40px; padding: 0 16px; font-size: 13px; }
+/* 小号按钮实测 40px，低于 48px 可点标准；视觉高度靠内边距保持紧凑 */
+.btn.sm  { min-height: 48px; padding: 0 16px; font-size: 13px; }
 .btn.lg  { height: 60px; padding: 0 32px; font-size: 16px; }
 .btn.block { width: 100%; }
 .btn.icon-only { width: 52px; padding: 0; }
@@ -586,8 +588,9 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   padding: 40px 24px; text-align: center;
   font-size: 13px; color: var(--muted);
 }
+/* 错误态重试键，实测 96x36 → 补到 48px 可点（§9） */
 .state-retry {
-  margin-top: 6px; padding: 8px 22px; border-radius: 999px;
+  margin-top: 6px; min-height: 48px; padding: 8px 22px; border-radius: 999px;
   background: var(--teal); color: #fff; font-size: 13px; font-weight: 600;
 }
 
