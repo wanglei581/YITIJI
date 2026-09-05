@@ -78,9 +78,10 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   align-items: center;
   gap: 24rpx;
 }
+/* 份数加减键，实测 45x45 低于 48px 可点标准 → 96rpx=48px */
 .counter-btn {
-  width: 56rpx;
-  height: 56rpx;
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 14rpx;
   background: var(--surface-2);
   color: var(--ink);

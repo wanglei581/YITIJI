@@ -304,8 +304,10 @@
   color: var(--text-tertiary, #8d98a9);
 }
 
+/* 主操作按钮，实测 43px；§9 主要按钮建议 ≥56px → min-height 112rpx */
 .confirm-btn {
   flex-shrink: 0;
+  min-height: 112rpx;
   padding: 24rpx 48rpx;
   background: var(--teal, #1677ff);
   color: #ffffff;

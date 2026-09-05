@@ -146,7 +146,9 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 
 /* ── 自定义导航栏 ───────────────────────────────────────────── */
 .navbar {
-  height: 48px;
+  /* 52 而不是 48：返回键要放得下 48x48 的可点区域（CLAUDE.md §9）。
+     实测原来的返回键只有 32x32，几乎每页都有。 */
+  height: 52px;
   padding: 0 16px;
   display: flex;
   align-items: center;
@@ -156,7 +158,9 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   background: var(--paper);
 }
 .navbar .nav-back {
-  width: 32px; height: 32px;
+  /* 32x32 → 48x48：纯图标、无背景无边框，放大只扩可点区域，视觉不变。
+     第 18 轮真实渲染实测（createSelectorQuery 量真实矩形）逐页确认过。 */
+  width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; color: var(--ink);
 }
@@ -183,7 +187,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 /* 列式 navbar：statusBar 占位条嵌在 navbar 内部时，需纵向堆叠 */
 .navbar.col { flex-direction: column; height: auto; padding: 0; }
 .nav-inner {
-  height: 46px; width: 100%;
+  height: 52px; width: 100%;
   padding: 0 16px;
   display: flex; align-items: center; justify-content: space-between;
   flex-shrink: 0; position: relative;

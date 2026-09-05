@@ -292,8 +292,11 @@
   transform: scale(0.9);
 }
 
+/* 协议链接实测 104x20：文字链补纵向内边距把可点区撑到 48px，视觉不变 */
 .agreement-label .link {
   color: var(--teal, #1677ff);
+  display: inline-block;
+  padding: 30rpx 6rpx;
 }
 
 /* 底部提交栏 */
@@ -337,8 +340,10 @@
   color: var(--clay, #f06a3c);
 }
 
+/* 主操作按钮，实测 43px → min-height 112rpx（§9 ≥56px） */
 .submit-btn {
   flex-shrink: 0;
+  min-height: 112rpx;
   padding: 24rpx 56rpx;
   background: var(--teal, #1677ff);
   color: #ffffff;
