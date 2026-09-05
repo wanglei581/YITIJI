@@ -962,6 +962,7 @@ jobs:
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest
+    # 本 job 现在同时跑 kiosk 多套 + admin + partner 三家浏览器用例，取较大的上限。
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -1038,6 +1039,11 @@ jobs:
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs
 
+      - name: Run Partner browser E2E (mock)
+        # 合作机构后台此前 0 条浏览器用例。mock 模式预览包（vite --mode development），
+        # 不连真实后端。命令走 package.json test:e2e，内部用 kiosk 已装的 Playwright。
+        run: pnpm --filter @ai-job-print/partner test:e2e
+
       - name: Upload Kiosk browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -1065,5 +1071,7 @@ jobs:
             test-results/kiosk-mic-capability-report/**
             test-results/admin-e2e/**
             test-results/admin-e2e-report/**
+            test-results/partner-e2e/**
+            test-results/partner-e2e-report/**
           if-no-files-found: ignore
           retention-days: 7
