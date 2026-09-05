@@ -35,7 +35,7 @@ AI 在小程序中作为全局交互层，通过“今天页 + 全局小青 + �
 
 | 端 | 代码事实 | 对用户 | 线上 |
 |---|---|---|---|
-| 微信小程序 `apps/miniapp/` | 唯一发布源；`verify:miniapp-static` 53 个注册页、98 PASS。四 Tab：首页 / 职业生活圈 / 求职 / 我的 | 材料包四页 `guardPackageChain()` fail-closed（后端 `POST /orders/package` 不存在）。职业圈、今日早报入口标明「未开放」。求职进度看板仅为本人本地记录，不是平台投递 | 未授权上传正式版；须与后端同一 SHA 再发 |
+| 微信小程序 `apps/miniapp/` | 唯一发布源；`verify:miniapp-static` 53 个注册页、98 PASS。四 Tab：首页 / 职业生活圈 / 求职 / 我的 | 材料包四页 `guardPackageChain()` fail-closed（后端 `POST /orders/package` 不存在）。职业圈（最新动态）/ 今日早报（今日提醒）后端就绪，小程序改名接线待 ⑤b。求职进度看板仅为本人本地记录，不是平台投递 | 未授权上传正式版；须与后端同一 SHA 再发 |
 | 一体机 `apps/kiosk/` | 首页与打印扫描域已接 V6 运行时；7 月 75 屏仍是 CI 回归基线，不是视觉目标。首页真值原型：`docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。`kiosk-redesign-2026-08/` 为负责人指定保留的新原型整目录 | 未付不能出纸；断电卡单用户页说「结果未确认」 | 2026-09-01 实时只读核验：生产仍运行 `771d53e2`（部署于 2026-08-18），落后于当前 `origin/main`；PM2 与持久化 dump 已显式为 `NODE_ENV=production`，完整启动门禁隔离复验通过，local/public health 与 ready 均为 200。该证据只关闭 B1，不代表当前 main 已部署；发布仍需精确 SHA 的独立授权。 |
 | 管理员后台 `apps/admin/` | 运行时路由在 `apps/admin/src/routes/index.tsx`：工作台、设备（终端/打印机/外设合并）、订单、打印扫描运维、计费、文件、求职材料、AI 服务/配置、岗位/招聘会/政策来源审核、招聘会、企业、合作机构、用户、会员权益/活动/反馈/通知、数据权利工单（唯一入口 `/privacy-requests`）、告警、权限、审计、导入批次、同步源、宣传屏、百宝箱、智慧校园、线下机构、法务文档、账号设置。**没有**候选人筛选 / 面试邀约 / Offer。断电卡单核查 `POST /admin/print-jobs/:id/verify-outcome` 已合入 `main`（#740），未部署。原型：`docs/design/console-ai-os-2026-08/admin/` | 运营可审内容、管设备与订单；C0 仍待冻结（原型有 `/online-platforms`，运行时路由尚未建）。Redis 故障时部分后台动作会 500，见 next-tasks 平台可靠性遗留 | 与四端同闸门，未解冻则后台也是旧构建 |
 | 合作机构后台 `apps/partner/` | 运行时路由在 `apps/partner/src/routes/index.tsx`：工作台、机构资料、岗位、企业、招聘会、智慧校园、政策、终端、统计、数据源、同步日志、账号。**禁止**候选人管理 / 收简历 / 面试邀约。原型：`docs/design/console-ai-os-2026-08/partner/` | 只做外部岗位/招聘会/政策数据管理。C1 统计时区与响应解包仍待收口，不得伪造曝光漏斗 | 同上，未解冻不发新包 |
