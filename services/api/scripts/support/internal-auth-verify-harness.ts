@@ -213,6 +213,33 @@ export class RecordingAudit {
     this.entries.push({ ...entry, payload: { ...(entry.payload ?? {}) } })
     return `verify-transfer-audit-${this.entries.length}`
   }
+
+  /**
+   * 对齐真实 AuditService.writeRequired：审计写在调用方事务里，拿不到事务客户端
+   * 或写失败都必须抛——这正是「审计不再静默丢失」要守的性质，双测不能把它吞掉。
+   */
+  async writeRequired(
+    tx: { auditLog?: { create?: (args: { data: Record<string, unknown> }) => Promise<{ id: string }> } } | null | undefined,
+    entry: RecordedAudit,
+  ): Promise<string> {
+    if (!tx) throw new Error('RecordingAudit.writeRequired: 缺少事务客户端')
+    this.entries.push({ ...entry, payload: { ...(entry.payload ?? {}) } })
+    const create = tx.auditLog?.create
+    if (typeof create === 'function') {
+      const row = await create.call(tx.auditLog, {
+        data: {
+          actorId: entry.actorId ?? null,
+          actorRole: entry.actorRole,
+          action: entry.action,
+          targetType: entry.targetType,
+          targetId: entry.targetId ?? null,
+          payloadJson: JSON.stringify(entry.payload ?? {}),
+        },
+      })
+      if (row?.id) return row.id
+    }
+    return `verify-transfer-audit-${this.entries.length}`
+  }
 }
 
 export type BoundedBarrier = {
