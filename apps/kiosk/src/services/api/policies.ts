@@ -34,8 +34,19 @@ export interface PublishedPoliciesResult {
   total: number
 }
 
-async function fetchPolicies(): Promise<PublishedPoliciesResult> {
-  const res = await fetch(`${API_BASE_URL}/policies`, {
+export interface PolicyQueryParams {
+  kind?: string
+  audience?: string
+  category?: string
+}
+
+async function fetchPolicies(params?: PolicyQueryParams): Promise<PublishedPoliciesResult> {
+  const query = new URLSearchParams()
+  if (params?.kind) query.set('kind', params.kind)
+  if (params?.audience) query.set('audience', params.audience)
+  if (params?.category) query.set('category', params.category)
+  const qs = query.toString()
+  const res = await fetch(`${API_BASE_URL}/policies${qs ? `?${qs}` : ''}`, {
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) throw new Error(`请求失败（${res.status}）`)
@@ -69,9 +80,19 @@ const MOCK_POLICIES: PolicyPostView[] = [
   },
 ]
 
-export async function getPublishedPolicies(): Promise<PublishedPoliciesResult> {
+function filterMock(params?: PolicyQueryParams): PolicyPostView[] {
+  return MOCK_POLICIES.filter((item) => {
+    if (params?.kind && item.kind !== params.kind) return false
+    if (params?.audience && item.audience !== params.audience) return false
+    if (params?.category && item.category !== params.category) return false
+    return true
+  })
+}
+
+export async function getPublishedPolicies(params?: PolicyQueryParams): Promise<PublishedPoliciesResult> {
   if (API_MODE !== 'http') {
-    return { items: [...MOCK_POLICIES], total: MOCK_POLICIES.length }
+    const items = filterMock(params)
+    return { items, total: items.length }
   }
-  return fetchPolicies()
+  return fetchPolicies(params)
 }

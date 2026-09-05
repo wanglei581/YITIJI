@@ -31,8 +31,16 @@
 // 「有效期限」一格只如实回显来源标注的日期（见 JobDetailSections.tsx）。
 // ============================================================
 
-import { isParseableInstant, type ExternalJobDTO } from '@ai-job-print/shared'
+import { isParseableInstant } from '@ai-job-print/shared'
 import { isValidSourceUrl } from '../../../lib/url'
+
+/** 岗位 / 招聘会共用的来源四要素。缺一即不放行外跳与扫码，也不写 ExternalJumpLog。 */
+export type SourceTrustInput = {
+  sourceName?: string | null
+  syncTime?: string | null
+  externalId?: string | null
+  sourceUrl?: string | null
+}
 
 export type SourceElementKey = 'sourceName' | 'syncTime' | 'externalId' | 'sourceUrl'
 
@@ -69,7 +77,7 @@ function hasDate(value: string | undefined | null): boolean {
   return isParseableInstant(value)
 }
 
-export function evaluateJobSourceTrust(job: ExternalJobDTO): JobSourceTrust {
+export function evaluateJobSourceTrust(job: SourceTrustInput): JobSourceTrust {
   const present: Record<SourceElementKey, boolean> = {
     sourceName: hasText(job.sourceName),
     syncTime: hasDate(job.syncTime),

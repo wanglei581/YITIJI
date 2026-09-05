@@ -127,10 +127,22 @@ export function JobFairCheckinPage() {
     setLoading(true)
     setError(false)
 
-    getJobFairs({ terminalId: getTerminalId() })
-      .then((res) => {
+    const terminalId = getTerminalId()
+    const base = { pageSize: 100, ...(terminalId ? { terminalId } : {}) }
+    Promise.all([
+      getJobFairs({ ...base, status: 'ongoing' }),
+      getJobFairs({ ...base, status: 'upcoming' }),
+    ])
+      .then(([ongoing, upcoming]) => {
         if (!alive) return
-        setFairs(res.data)
+        const seen = new Set<string>()
+        const merged: ExternalJobFairDTO[] = []
+        for (const fair of [...ongoing.data, ...upcoming.data]) {
+          if (seen.has(fair.id)) continue
+          seen.add(fair.id)
+          merged.push(fair)
+        }
+        setFairs(merged)
       })
       .catch(() => {
         if (alive) setError(true)

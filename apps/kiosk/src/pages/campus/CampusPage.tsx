@@ -34,6 +34,7 @@ import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { AiJobTab, CompaniesTab, MapTab, OverviewTab, PrintTab } from './components/CampusTabs'
 import { KioskPageFrame } from '../jobs/components/W4Presentation'
+import { evaluateJobSourceTrust } from '../jobs/utils/sourceTrust'
 
 // verify marker: MapBlock lives in CampusTabs after the zero-behavior split.
 
@@ -164,7 +165,9 @@ export function CampusPage() {
 
   // 外部跳转记录(P1):只记录「打开来源平台预约入口」;预约结果以来源平台为准,本系统不记录。
   const openBookingQr = () => {
-    if (fair) recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    if (fair && evaluateJobSourceTrust(fair).ok) {
+      recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    }
     setQr({ kind: 'book' })
   }
 
