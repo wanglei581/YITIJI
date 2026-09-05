@@ -11,6 +11,8 @@ import type {
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
+  PartnerSyncLogPage,
+  PartnerSyncLogsQuery,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -193,6 +195,8 @@ export const partnerMockAdapter = {
       canImportFairs: false,
       canManagePolicies: false,
       canManageSmartCampus: false,
+      canManageCompanies: true,
+      companyManageScope: 'unrestricted',
     }
   },
   async toggleDataSource(id: string): Promise<PartnerDataSource> {
@@ -416,9 +420,24 @@ export const partnerMockAdapter = {
   },
 
   // Sync Logs (read-only)
-  async getSyncLogs(): Promise<PartnerSyncLog[]> {
+  async getSyncLogs(query?: PartnerSyncLogsQuery): Promise<PartnerSyncLogPage> {
     await delay()
-    return [...SYNC_LOGS]
+    const page = query?.page && query.page > 0 ? query.page : 1
+    const pageSize = query?.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, 100) : 20
+    let rows = [...SYNC_LOGS]
+    if (query?.result) rows = rows.filter((row) => row.status === query.result)
+    if (query?.sourceId) rows = rows.filter((row) => row.id === query.sourceId || row.source === query.sourceId)
+    const total = rows.length
+    const start = (page - 1) * pageSize
+    return {
+      data: rows.slice(start, start + pageSize),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+    }
   },
 
   // Excel Import (mock)

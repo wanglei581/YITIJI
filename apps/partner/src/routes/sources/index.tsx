@@ -15,7 +15,6 @@ import { API_BASE_URL } from '../../services/api/client'
 import {
   API_ORIGIN,
   getDataSources,
-  getDataSourceCapabilities,
   toggleDataSource,
   createDataSource,
   archiveDataSource,
@@ -25,6 +24,7 @@ import { formatDateTime, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import { ExcelImportModal } from './ExcelImportModal'
 import { omitWebhookSecretOnce } from './omitWebhookSecretOnce'
 import { RotateCredentialDrawer } from './RotateCredentialDrawer'
+import { usePartnerCapabilities } from '../../services/capabilities'
 
 /** 使用凭证、因而可以轮换的接入方式。excel/csv/json/manual 没有凭证概念。 */
 const CREDENTIAL_ACCESS_MODES: readonly string[] = ['api', 'webhook']
@@ -342,8 +342,8 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SourcesPage() {
+  const { capabilities } = usePartnerCapabilities()
   const [sources,    setSources]    = useState<PartnerDataSource[]>([])
-  const [capabilities, setCapabilities] = useState<PartnerDataSourceCapabilities | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(false)
   const [showWizard, setShowWizard] = useState(false)
@@ -369,11 +369,11 @@ export default function SourcesPage() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getDataSources(), getDataSourceCapabilities()])
-      .then(([data, caps]) => {
+    getDataSources()
+      .then((data) => {
         if (cancelled) return
         setSources(data)
-        setCapabilities(caps)
+        setError(false)
       })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -463,7 +463,9 @@ export default function SourcesPage() {
             size="sm"
             variant="primary"
             className="flex items-center gap-1.5"
-            onClick={() => setShowWizard(true)}
+            disabled={!capabilities}
+            title={capabilities ? undefined : '正在确认本机构接入能力，确认后再新增'}
+            onClick={() => { if (capabilities) setShowWizard(true) }}
           >
             <PlusIcon className="h-4 w-4" />
             新增数据来源
@@ -619,7 +621,6 @@ export default function SourcesPage() {
           sourceName={excelSource.name}
           onClose={() => setExcelSource(null)}
           onImported={(count) => {
-            setExcelSource(null)
             setImportNotice(`文件导入完成，共 ${count} 条（默认待审核，管理员发布后才会在终端展示）`)
             void fetchSources()
           }}

@@ -192,8 +192,16 @@ export class JobsService {
     return this.partner.getPartnerDashboard(user)
   }
 
-  getPartnerSyncLogs(user: AuthedUser) {
-    return this.partner.getPartnerSyncLogs(user)
+  getPartnerSyncLogs(
+    user: AuthedUser,
+    query: {
+      page: number
+      pageSize: number
+      sourceId?: string
+      result?: 'success' | 'partial' | 'failed'
+    },
+  ) {
+    return this.partner.getPartnerSyncLogs(user, query)
   }
 
   // ── Excel ──────────────────────────────────────────────────────────────────
