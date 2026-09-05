@@ -27,12 +27,13 @@ docs/progress/next-tasks.md、docs/product/feature-scope.md、docs/compliance/co
 
 ## 包 1 · 钱与纸（最高优先，Agent + API + Kiosk）
 
-- **ID**：AGT-01、AGT-02、AGT-03、API-03、API-07、API-08、API-09、PRT-03、PRT-02、PRT-04、SES-03
+- **已由 Claude 完成并合入 main（#789 / #790，2026-09-05）——Codex 不要再做**：AGT-01、AGT-02、AGT-03、AGT-04、AGT-06、AGT-07、AGT-08、AGT-09、API-03、PRT-03（后端 create/quote 心跳 fail-closed + `PRINT_REQUIRE_PRINTER_ONLINE`），以及 Kiosk 看门狗进安装包。AGT-05、AGT-10 刻意不改（见 current-progress.md 2026-09-05 记录）。
+- **本包剩余 ID**：API-07、API-08、API-09、PRT-02、PRT-04、SES-03（SES-03 按拍板结论第 2 条做）；PRT-03 只剩前端：确认页接 `useTerminalDeviceStatus` 禁用主按钮并把 `PRINTER_UNAVAILABLE` 映射成中文。
 - **目标**：付了钱一定出纸，出了纸绝不报失败；离线不收款。
 - **已定做法（见文末「拍板结论」第 1、2 条）**：AGT-01 走后端放开 `claimed→completed/failed`（服务端幂等补写一条 printing 状态日志）+ Agent 侧 printing 上报失败重试后继续打印 + 离线队列对终态 PATCH 收到 `INVALID_STATUS_TRANSITION` 时先补发 printing 再重发终态，不再 dead-letter；SES-03 走忙碌期间顺延：持有忙碌锁（语音 live/connecting、支付 pending、AI 生成中）时硬截止暂停，顺延上限 15 分钟，支付轮询成功与语音音频活动计为活动。
-- **允许改**：`apps/terminal-agent/src/agent/task-runner.ts`、`offline-queue.ts`；`services/api/src/terminals/terminals-agent.service.ts`、`print-jobs/print-jobs.service.ts`、`print-jobs/order-quote.service.ts`、`payment/order-status.service.ts`、`payment/online-payment.service.ts`、`print-jobs/pickup-order.service.ts`、`member-print-orders/member-print-order-create.service.ts`；`apps/kiosk/src/pages/print/PrintProgressPage.tsx`、`PrintConfirmPage.tsx`、`services/print/printJobsApi.ts`、`auth/KioskPrivacyGuard.tsx`
+- **允许改**：`services/api/src/payment/order-status.service.ts`、`payment/online-payment.service.ts`、`print-jobs/pickup-order.service.ts`、`member-print-orders/member-print-order-create.service.ts`；`apps/kiosk/src/pages/print/PrintProgressPage.tsx`、`PrintConfirmPage.tsx`、`services/print/printJobsApi.ts`、`auth/KioskPrivacyGuard.tsx`。**不要再动** `apps/terminal-agent/**` 与 `terminals-agent.service.ts`（已收口，真机验证中）。
 - **禁改**：`apps/kiosk/src/pages/profile/me/printOrders/**`、`MyPrintOrdersPage.tsx`（触发批次范围守卫 `verify:profile-print-orders-inkpaper`，另立 PR）
-- **验收**：`verify:payment-flow`、`verify:refund-idempotent`、`verify:reconciliation`、`verify:task-reliability`（terminal-agent）、`verify:print-monitor-truth`、`verify:kiosk-print-*` 相关；新增回归用例：printing 上报失败后 completed 不被拒；下载失败任务回到可重领；关单后 pickupStatus 不停在 claimed；`markPaidOnline` 对已取消单拒绝并记「待退」；打印机离线时 `POST /print/jobs` 与 `/orders/quote` 返回 `PRINTER_UNAVAILABLE`。
+- **验收**：`verify:payment-flow`、`verify:refund-idempotent`、`verify:reconciliation`、`verify:kiosk-cashier-ui`（以 `VERIFICATION_DATABASE_TARGET=isolated` 跑）；新增回归用例：关单后 pickupStatus 不停在 claimed；`markPaidOnline` 对已取消/过期单拒绝并记「待退」；渠道出码抛错时尝试置 failed、订单回 unpaid；进度页对 `cancelled/abandoned` 走终态分支；轮询连续失败 ≥5 次才判失败。
 - **真机项**（Codex 做不了，留给现场）：AGT-02 的 30 页×2 份实测。
 
 ## 包 2 · 时间根因（API + 三端）
