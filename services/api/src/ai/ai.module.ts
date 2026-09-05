@@ -46,11 +46,12 @@ import { ResumeDocxService } from './resume/resume-docx.service'
 import { ResumeTextService } from './resume/resume-text.service'
 import { LlmResumeProvider } from './providers/llm.provider'
 import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemption.module'
+import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
-  imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule],
+  imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule],
   controllers: [AiController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
   providers: [
     AiService,

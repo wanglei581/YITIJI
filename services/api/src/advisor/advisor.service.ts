@@ -24,6 +24,8 @@ import {
 } from './advisor-skills'
 import type { AdvisorArtifactPayload } from './advisor-artifact.types'
 
+export const MAX_ADVISOR_PINS = 40
+
 // ============================================================
 // S3-3 · P26 顾问作业面会话服务。
 //
@@ -340,6 +342,12 @@ export class AdvisorService {
     if (!isEvidenceLevel(input.evidenceLevel)) {
       throw new BadRequestException({
         error: { code: 'ADVISOR_EVIDENCE_INVALID', message: '证据分级取值非法（只允许 E1 / E2 / E3）' },
+      })
+    }
+    const pinCount = await this.prisma.advisorPin.count({ where: { sessionId: row.id } })
+    if (pinCount >= MAX_ADVISOR_PINS) {
+      throw new BadRequestException({
+        error: { code: 'ADVISOR_PIN_LIMIT', message: `最多钉住 ${MAX_ADVISOR_PINS} 条，请先取消部分条目` },
       })
     }
     const last = await this.prisma.advisorPin.findFirst({

@@ -31,6 +31,9 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
+import { runWithPublicQuota } from './ai-request-guard'
+import { assistantOwnerKey } from './llm/llm-chat.service'
 
 import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
@@ -38,6 +41,8 @@ interface ReqLike {
   headers: Record<string, string | string[] | undefined>
   ip?: string
   socket?: { remoteAddress?: string }
+  on?: (event: string, listener: () => void) => void
+  aborted?: boolean
 }
 
 function ipOf(req: unknown): string | null {
@@ -108,6 +113,7 @@ export class AiController {
     private readonly asr: AsrService,
     private readonly benefitRedemption: BenefitRedemptionService,
     private readonly publicQuota: AiPublicQuotaService,
+    private readonly privacy: MemberPrivacyService,
   ) {}
 
   /**
@@ -136,19 +142,17 @@ export class AiController {
     @Req() req: ReqLike,
   ): Promise<ResumeParseResponseDto> {
     const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    if (endUser) {
+      await this.privacy.requireActiveConsent(endUser.endUserId, 'resume_ai')
+    }
     const quotaTicket = await this.publicQuota.consume('resume_parse', {
       member: endUser?.endUserId ?? null,
       terminal: throttleTerminalIdOf(req),
       ip: ipOf(req),
     })
-    let result: ResumeParseResponseDto
-    try {
-      result = await this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null)
-    } catch (error) {
-      // 没真正提交成功就不该吃掉今日额度。
-      await this.publicQuota.rollback(quotaTicket)
-      throw error
-    }
+    const result = await runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
+      this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null),
+    )
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -203,6 +207,9 @@ export class AiController {
     @Query('benefitGrantId') benefitGrantId?: string,
   ): Promise<ResumeOptimizeResponseDto> {
     const requester = await this.resolveAiResultRequester(req)
+    if (requester.endUserId) {
+      await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
+    }
     const result = await this.aiService.getResumeOptimize(taskId, requester)
 
     // 权益核销：仅当优化结果真实生成（completed）且显式传入 benefitGrantId 时才核销；
@@ -284,6 +291,9 @@ export class AiController {
     @Req() req: ReqLike,
   ) {
     const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    if (endUser) {
+      await this.privacy.requireActiveConsent(endUser.endUserId, 'resume_ai')
+    }
     const result = await this.aiService.submitResumeGenerate(dto, endUser?.endUserId ?? null)
     await this.audit.write({
       actorId: null,
@@ -413,13 +423,12 @@ export class AiController {
       terminal: throttleTerminalIdOf(req),
       ip: ipOf(req),
     })
-    let result: AssistantChatResponseDto
-    try {
-      result = await this.aiService.chatWithAssistant(dto)
-    } catch (error) {
-      await this.publicQuota.rollback(quotaTicket)
-      throw error
-    }
+    const result = await runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
+      this.aiService.chatWithAssistant(
+        dto,
+        assistantOwnerKey(chatMember?.endUserId ?? null, ipOf(req)),
+      ),
+    )
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',

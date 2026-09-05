@@ -396,6 +396,18 @@ async function runtimeChecks(): Promise<void> {
   console.log('\n[7] 超时档位')
   check('7.a 默认档对齐 job-ai 的 45 秒量级', LLM_TIMEOUT_MS >= 5_000 && LLM_TIMEOUT_MS <= 60_000, `${LLM_TIMEOUT_MS}ms`)
   check('7.b 长文档档更长但仍有硬上限', LLM_LONG_TIMEOUT_MS > LLM_TIMEOUT_MS && LLM_LONG_TIMEOUT_MS <= 180_000, `${LLM_LONG_TIMEOUT_MS}ms`)
+
+  console.log('\n[8] 一体机客户端超时不得短于后端长档')
+  const adapterSrc = readFileSync(join(__dirname, '../../../apps/kiosk/src/services/api/aiHttpAdapter.ts'), 'utf8')
+  const clientRaw = (adapterSrc.match(/const LLM_TIMEOUT_MS\s*=\s*([0-9_]+)/) ?? [])[1] ?? ''
+  const clientLong = Number(clientRaw.replace(/_/g, ''))
+  check('8.a kiosk LLM_TIMEOUT_MS 存在且为数字', Number.isFinite(clientLong) && clientLong > 0, String(clientLong))
+  check(
+    '8.b 客户端超时 ≥ 后端 LLM_LONG_TIMEOUT_MS 默认值',
+    clientLong >= LLM_LONG_TIMEOUT_MS,
+    `client=${clientLong} backend=${LLM_LONG_TIMEOUT_MS}`,
+  )
+  check('8.c parse/optimize/generate 走长超时', adapterSrc.includes('LLM_TIMEOUT_MS') && adapterSrc.includes('/resume/parse'), adapterSrc.slice(0, 80))
 }
 
 /**

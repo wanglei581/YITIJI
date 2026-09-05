@@ -15,6 +15,7 @@ import {
   pickPracticeQuestions,
 } from './interview-practice-sheet'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
+import { InflightCoalescer } from '../ai/ai-inflight'
 
 // ============================================================
 // 2C 模拟面试会话服务。
@@ -56,9 +57,21 @@ function verifyToken(token: string | null, expectedHash: string | null): boolean
 
 type SessionRow = NonNullable<Awaited<ReturnType<PrismaService['mockInterviewSession']['findUnique']>>>
 
+function isUniqueConflict(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'P2002')
+}
+
 @Injectable()
 export class MockInterviewService {
   private readonly logger = new Logger(MockInterviewService.name)
+  private readonly startInflight = new InflightCoalescer<{
+    question: string
+    qType: string
+    questionIndex: number
+    questionTarget: number
+    done: false
+  }>()
+  private readonly endInflight = new InflightCoalescer<ReturnType<MockInterviewService['reportDto']>>()
 
   constructor(
     private readonly prisma: PrismaService,
@@ -133,27 +146,40 @@ export class MockInterviewService {
   }
 
   async start(sessionId: string, requester: InterviewRequester) {
+    return this.startInflight.run(sessionId, () => this.startOnce(sessionId, requester))
+  }
+
+  private async startOnce(sessionId: string, requester: InterviewRequester) {
     const session = await this.loadAuthorized(sessionId, requester)
-    if (session.status !== 'configured') {
+    const claimed = await this.prisma.mockInterviewSession.updateMany({
+      where: { id: session.id, status: 'configured' },
+      data: { status: 'in_progress', startedAt: new Date() },
+    })
+    if (claimed.count === 0) {
       throw new BadRequestException({ error: { code: 'INTERVIEW_ALREADY_STARTED', message: '本场练习已开始或已结束' } })
     }
-    // A-6 成本可见性：本轮 nextQuestion 调用（含重试）通过 onLlmCall 累计 token。
     const usage = new AiUsageAccumulator()
     const startedAt = Date.now()
     let q: NextQuestionOutput
     try {
       q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: 0, transcript: [] }, usage.add)
+      this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'success', session.endUserId)
+      const content = q.greeting ? `${q.greeting}\n${q.question}` : q.question
+      await this.prisma.mockInterviewTurn.create({
+        data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content },
+      })
+      return { question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false as const }
     } catch (error) {
       this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
+      await this.prisma.$transaction([
+        this.prisma.mockInterviewTurn.deleteMany({ where: { sessionId: session.id } }),
+        this.prisma.mockInterviewSession.updateMany({
+          where: { id: session.id, status: 'in_progress' },
+          data: { status: 'configured', startedAt: null },
+        }),
+      ])
       throw error
     }
-    this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'success', session.endUserId)
-    const content = q.greeting ? `${q.greeting}\n${q.question}` : q.question
-    await this.prisma.$transaction(async (tx) => {
-      await tx.mockInterviewSession.update({ where: { id: session.id }, data: { status: 'in_progress', startedAt: new Date() } })
-      await tx.mockInterviewTurn.create({ data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content } })
-    })
-    return { question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false }
   }
 
   /** 提交回答（或跳过）→ 返回下一题或结束建议。语音回合附转写元数据（2C+）。 */
@@ -178,32 +204,46 @@ export class MockInterviewService {
     if (asked === 0) {
       throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_STARTED', message: '请先开始面试' } })
     }
+    const last = turns[turns.length - 1]
+    const lastIsCandidate = last?.role === 'candidate'
+    if (asked >= session.questionTarget && lastIsCandidate) {
+      throw new BadRequestException({ error: { code: 'INTERVIEW_ALREADY_COMPLETE', message: '本题已全部答完，请生成练习报告' } })
+    }
     const answerText = input.skip ? '' : (input.answer ?? '').trim().slice(0, MAX_ANSWER_CHARS)
-    if (!input.skip && answerText.length === 0) {
+    if (!input.skip && !lastIsCandidate && answerText.length === 0) {
       throw new BadRequestException({ error: { code: 'INTERVIEW_ANSWER_EMPTY', message: '请输入回答内容，或选择跳过此题' } })
     }
-    const nextIdx = turns.length
-    await this.prisma.mockInterviewTurn.create({
-      data: {
-        sessionId: session.id,
-        idx: nextIdx,
-        role: 'candidate',
-        content: input.skip ? '（跳过）' : answerText,
-        skipped: !!input.skip,
-        inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
-        transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
-        transcriptEdited: input.transcriptEdited === true,
-        answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
-      },
-    })
+
+    const candidateContent = lastIsCandidate ? last.content : (input.skip ? '（跳过）' : answerText)
+    const candidateSkipped = lastIsCandidate ? last.skipped : !!input.skip
+    const transcript = [
+      ...turns.filter((t) => !(lastIsCandidate && t.idx === last.idx)),
+      { role: 'candidate' as const, content: candidateSkipped ? '' : candidateContent.replace(/^（跳过）$/, ''), skipped: candidateSkipped },
+    ].map((t) => ({
+      role: t.role as 'interviewer' | 'candidate',
+      content: t.content,
+      skipped: 'skipped' in t ? !!t.skipped : false,
+    }))
 
     if (asked >= session.questionTarget) {
-      // 已答完最后一题 → 建议结束（前端调 /end 生成报告）
+      if (!lastIsCandidate) {
+        await this.prisma.mockInterviewTurn.create({
+          data: {
+            sessionId: session.id,
+            idx: turns.length,
+            role: 'candidate',
+            content: input.skip ? '（跳过）' : answerText,
+            skipped: !!input.skip,
+            inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
+            transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
+            transcriptEdited: input.transcriptEdited === true,
+            answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
+          },
+        })
+      }
       return { done: true, questionIndex: asked, questionTarget: session.questionTarget }
     }
-    const transcript = [...turns, { role: 'candidate' as const, content: input.skip ? '' : answerText, skipped: !!input.skip }]
-      .map((t) => ({ role: t.role as 'interviewer' | 'candidate', content: t.content, skipped: 'skipped' in t ? !!t.skipped : false }))
-    // A-6 成本可见性：记录本轮问题生成
+
     const qUsage = new AiUsageAccumulator()
     const qStartedAt = Date.now()
     let q: NextQuestionOutput
@@ -214,26 +254,76 @@ export class MockInterviewService {
       throw error
     }
     this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'success', session.endUserId)
-    await this.prisma.mockInterviewTurn.create({
-      data: { sessionId: session.id, idx: nextIdx + 1, role: 'interviewer', qType: q.qType, content: q.question },
-    })
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (!lastIsCandidate) {
+          await tx.mockInterviewTurn.create({
+            data: {
+              sessionId: session.id,
+              idx: turns.length,
+              role: 'candidate',
+              content: input.skip ? '（跳过）' : answerText,
+              skipped: !!input.skip,
+              inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
+              transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
+              transcriptEdited: input.transcriptEdited === true,
+              answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
+            },
+          })
+        }
+        await tx.mockInterviewTurn.create({
+          data: {
+            sessionId: session.id,
+            idx: lastIsCandidate ? turns.length : turns.length + 1,
+            role: 'interviewer',
+            qType: q.qType,
+            content: q.question,
+          },
+        })
+      })
+    } catch (error) {
+      if (isUniqueConflict(error)) {
+        throw new BadRequestException({ error: { code: 'INTERVIEW_TURN_CONFLICT', message: '本题已提交，请刷新后继续' } })
+      }
+      throw error
+    }
     return { done: false, question: q.question, qType: q.qType, questionIndex: asked + 1, questionTarget: session.questionTarget }
   }
 
   /** 结束并生成练习报告（幂等：已有报告直接返回）。 */
   async end(sessionId: string, requester: InterviewRequester) {
+    return this.endInflight.run(sessionId, () => this.endOnce(sessionId, requester))
+  }
+
+  private async endOnce(sessionId: string, requester: InterviewRequester) {
     const session = await this.loadAuthorized(sessionId, requester)
     const existing = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
     if (existing) return this.reportDto(session, existing.payloadJson)
     if (session.status === 'configured') {
       throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_STARTED', message: '尚未开始面试，无法生成报告' } })
     }
+    const claimed = await this.prisma.mockInterviewSession.updateMany({
+      where: { id: session.id, status: 'in_progress' },
+      data: { status: 'completed', endedAt: new Date() },
+    })
+    if (claimed.count === 0) {
+      const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
+      if (raced) {
+        const latest = await this.loadAuthorized(sessionId, requester)
+        return this.reportDto(latest, raced.payloadJson)
+      }
+      throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_ACTIVE', message: '本场练习未在进行中' } })
+    }
     const turns = await this.prisma.mockInterviewTurn.findMany({ where: { sessionId: session.id }, orderBy: { idx: 'asc' } })
     const answered = turns.filter((t) => t.role === 'candidate' && !t.skipped).length
     if (answered === 0) {
+      await this.prisma.mockInterviewSession.updateMany({
+        where: { id: session.id, status: 'completed' },
+        data: { status: 'in_progress', endedAt: null },
+      })
       throw new BadRequestException({ error: { code: 'INTERVIEW_NO_ANSWERS', message: '本场练习还没有任何回答，请至少回答一个问题后再生成报告' } })
     }
-    // A-6 成本可见性：记录报告生成（含重试累计）
     const rUsage = new AiUsageAccumulator()
     const rStartedAt = Date.now()
     let payload: InterviewReportPayload
@@ -250,16 +340,29 @@ export class MockInterviewService {
       }, rUsage.add)
     } catch (error) {
       this.recordAiLog(session.id, 'interviewReport', rUsage, rStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_REPORT_FAILED'))
+      await this.prisma.mockInterviewSession.updateMany({
+        where: { id: session.id, status: 'completed' },
+        data: { status: 'in_progress', endedAt: null },
+      })
       throw error
     }
     this.recordAiLog(session.id, 'interviewReport', rUsage, rStartedAt, 'success', session.endUserId)
     const ttl = session.endUserId ? MEMBER_TTL_MS : ANON_TTL_MS
-    await this.prisma.$transaction(async (tx) => {
-      await tx.mockInterviewSession.update({ where: { id: session.id }, data: { status: 'completed', endedAt: new Date() } })
-      await tx.mockInterviewReport.create({
+    try {
+      await this.prisma.mockInterviewReport.create({
         data: { sessionId: session.id, payloadJson: JSON.stringify(payload), expiresAt: new Date(Date.now() + ttl) },
       })
-    })
+    } catch (error) {
+      if (isUniqueConflict(error)) {
+        const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
+        if (raced) return this.reportDto(session, raced.payloadJson)
+      }
+      await this.prisma.mockInterviewSession.updateMany({
+        where: { id: session.id, status: 'completed' },
+        data: { status: 'in_progress', endedAt: null },
+      })
+      throw error
+    }
     await this.audit.write({
       actorId: null,
       actorRole: session.endUserId ? 'enduser' : 'kiosk',
@@ -269,7 +372,7 @@ export class MockInterviewService {
       payload: { answered, level: payload.overall.level },
       ipAddress: null, userAgent: null, requestId: null,
     })
-    return this.reportDto(session, JSON.stringify(payload))
+    return this.reportDto({ ...session, status: 'completed', endedAt: new Date() }, JSON.stringify(payload))
   }
 
   // ── 读取 ──────────────────────────────────────────────────────────────────

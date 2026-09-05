@@ -19,6 +19,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { LlmConfigService } from '../src/ai/llm/llm-config.service'
+import { assertPublicLlmBaseUrl, isBlockedLlmHost } from '../src/ai/llm/llm-base-url'
 
 // 隔离：临时 SECRET_ENCRYPTION_KEY（≥32）+ 临时 FILE_STORAGE_DIR（配置 JSON 写临时目录，不碰真实 data）。
 // 清掉可能从 .env 带入的默认 LLM key，保证「初始无 key」状态确定。
@@ -110,6 +111,23 @@ function main() {
     else fail('7. 非法 featureKey 未抛错')
     if (svc.assertValidFeatureKey('assistant_chat') === 'assistant_chat') pass('7b. 合法 featureKey 正常返回')
     else fail('7b. 合法 featureKey 异常')
+
+    if (isBlockedLlmHost('127.0.0.1') && isBlockedLlmHost('localhost') && isBlockedLlmHost('169.254.169.254')) {
+      pass('7c. 本机/链路本地 host 被识别为禁止')
+    } else fail('7c. 内网 host 未拦住')
+    if (!isBlockedLlmHost('api.deepseek.com')) pass('7d. 公网 host 放行')
+    else fail('7d. 公网 host 被误拦')
+    let blocked = false
+    try { assertPublicLlmBaseUrl('http://127.0.0.1/v1') }
+    catch { blocked = true }
+    if (blocked) pass('7e. admin baseURL 拒绝回环地址')
+    else fail('7e. 回环 baseURL 未拒绝')
+    try {
+      assertPublicLlmBaseUrl('https://api.deepseek.com')
+      pass('7f. 公网 https baseURL 放行')
+    } catch {
+      fail('7f. 公网 https baseURL 被拒绝')
+    }
 
     // ── 8. 重启（new service）持久化 ────────────────────────────────────
     const svc2 = new LlmConfigService() // 从文件重新加载
