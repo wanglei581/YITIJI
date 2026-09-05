@@ -129,6 +129,28 @@ function main() {
       fail('7f. 公网 https baseURL 被拒绝')
     }
 
+    const blockedHosts = ['[::1]', '[fe80::1]', '[fc00::1]', 'localhost.', '[::ffff:7f00:1]']
+    if (blockedHosts.every((h) => isBlockedLlmHost(h))) {
+      pass('7g. IPv6 方括号 / localhost. / v4-mapped 字面 host 禁止')
+    } else {
+      fail(`7g. 未拦住: ${blockedHosts.filter((h) => !isBlockedLlmHost(h)).join(', ')}`)
+    }
+    const blockedUrls = ['http://[::1]:8000', 'http://[fe80::1]', 'http://[fc00::1]', 'http://localhost.']
+    for (const raw of blockedUrls) {
+      let blocked = false
+      try { assertPublicLlmBaseUrl(raw) } catch (e) {
+        blocked = errCode(e) === 'AI_BASE_URL_PRIVATE'
+      }
+      if (!blocked) fail(`7h. 应拒绝内网 URL: ${raw}`)
+    }
+    pass('7h. http://[::1]:8000 / [fe80::1] / [fc00::1] / localhost. 拒绝')
+    try {
+      assertPublicLlmBaseUrl('http://127.0.0.1.nip.io')
+      pass('7i. 127.0.0.1.nip.io 按 DNS 不做（已知边界，字面公网名放行）')
+    } catch {
+      fail('7i. nip.io 不应在字面检查被拦（已知边界：不做 DNS）')
+    }
+
     // ── 8. 重启（new service）持久化 ────────────────────────────────────
     const svc2 = new LlmConfigService() // 从文件重新加载
     if (

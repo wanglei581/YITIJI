@@ -23,16 +23,19 @@ const STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'inf
   printing:  { badge: 'info',    label: '打印中' },
   completed: { badge: 'success', label: '已完成' },
   failed:    { badge: 'error',   label: '失败' },
+  cancelled: { badge: 'default', label: '已取消' },
   abandoned: { badge: 'default', label: '已废弃' },
 }
 
 const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'default'; label: string }> = {
   unpaid:           { badge: 'warning', label: '未支付' },
+  paying:           { badge: 'warning', label: '支付中' },
   paid:             { badge: 'success', label: '已支付' },
   refunding:        { badge: 'warning', label: '退款中' },
   refunded:         { badge: 'default', label: '已退款' },
   partial_refunded: { badge: 'default', label: '部分退款' },
   failed:           { badge: 'error',   label: '支付失败' },
+  closed:           { badge: 'default', label: '已关闭' },
 }
 
 const STATUS_FILTERS = [
@@ -42,15 +45,19 @@ const STATUS_FILTERS = [
   { label: '打印中', value: 'printing' },
   { label: '已完成', value: 'completed' },
   { label: '失败', value: 'failed' },
+  { label: '已取消', value: 'cancelled' },
 ] as const
 
 const PAY_FILTERS = [
   { label: '全部支付状态', value: '' },
   { label: '未支付', value: 'unpaid' },
+  { label: '支付中', value: 'paying' },
   { label: '已支付', value: 'paid' },
   { label: '退款中', value: 'refunding' },
+  { label: '部分退款', value: 'partial_refunded' },
   { label: '已退款', value: 'refunded' },
   { label: '支付失败', value: 'failed' },
+  { label: '已关闭', value: 'closed' },
 ] as const
 
 const COLOR_LABELS: Record<string, string> = { black_white: '黑白', color: '彩色' }

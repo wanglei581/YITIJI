@@ -64,6 +64,7 @@ export function CompaniesTab({
       // 空标题岗位行前端过滤(后端 DTO 对 title 有非空校验);positionType/文本空值转 undefined → 后端落 null。
       const payload: SaveFairCompanyInput = {
         ...form,
+        scale: form.scale || undefined,
         positions: (form.positions ?? [])
           .filter((p) => p.title.trim().length > 0)
           .map((p) => ({

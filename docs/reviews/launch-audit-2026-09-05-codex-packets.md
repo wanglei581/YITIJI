@@ -114,3 +114,59 @@ docs/progress/next-tasks.md、docs/product/feature-scope.md、docs/compliance/co
 | 7 | API-32 简历 AI 同意 | 新增 `resume_ai` 同意项，会员首次使用简历类 AI 时确认一次、可撤回，复用 `UserAiConsent`；游客保持会话级提示不入库 | 包 4 |
 | 8 | 运营大屏一期 | 政务 + 运营两套 profile、只读令牌、配置放工作台区块；模块 M2/M3/M6(24h)/M7/M8 队列数/M9/M12 结构数；「服务人次」显示为「登录会员数（不含匿名）」并标口径；排在包 1–6 之后 | 单独任务包（待建） |
 
+---
+
+## 五家执行看板（2026-09-06 定，产品负责人授权「定好任务一直执行到商用收口」）
+
+### 角色分工（固定）
+
+| 角色 | 谁 | 做什么 | 不做什么 |
+|---|---|---|---|
+| 总指挥 / 收货 | Claude | 切任务包、写验收标准、原型与页面 UI、门禁设计、逐 ID 复核、CI 绿即合并、进度记录、争议裁决 | 不亲自写实现类代码（原型/门禁/一行以内的收货修补除外） |
+| 后端与跨层实现 | Codex（gpt-5.6-sol / high / fast） | 包 5、包 9、OPS-02 后端、大屏聚合端点 | 不碰 `apps/miniapp/**`、`.github/workflows/**` |
+| 全栈实现 | Grok（grok-4.6 / xhigh） | 包 7、包 8、包 3，以及复审回流的修复包（4b 类） | 同上 |
+| 安全 / 并发复审 | Antigravity（gemini-3.8，纯推理） | 每个含 `services/api` 的 PR 合并前复审 diff：竞态、鉴权、SSRF、信息泄露 | 不碰仓库、不跑命令 |
+| 前端 / 文案 / 合规复审 | Hermes（纯推理） | 每个含 `apps/**` 的 PR 合并前复审 diff：状态机、误导文案、合规禁词、会 400 的请求体 | 同上 |
+
+### 争议处理规则
+
+1. 复审意见先由 Claude 对照 `origin/main` 代码核实：能复现 → 开修复包回给原实现者（如 4b）；核实为误报 → 记进 PR 描述，不改代码。
+2. 两家实现者或复审者结论相反时，以「能否用一条门禁用例复现」为唯一裁决标准，Claude 写用例，红的一方改。
+3. 涉及产品口径（合规、留存、收费）的争议，列进「待产品负责人拍板」并附推荐默认值，不阻塞其它包。
+
+### 收口判定（全部打勾才算商用可交付）
+
+- [ ] **代码缺陷**：体检清单 P0/P1 全部 fixed 或有产品负责人签字的 skipped；P2 中「不伪造能力」「合规」「资损」三类清零，其余按包收口。
+- [ ] **门禁**：每个包至少新增一条门禁并接进 CI；`verify-ci-gate-coverage` 保持 0 待接线；新门禁做过变异测试。
+- [ ] **复审**：每个 API PR 有 Antigravity 复审、每个前端 PR 有 Hermes 复审，结论写进 PR。
+- [ ] **文档**：`current-progress.md` 每包一段；`feature-scope.md §1.2` 上线状态更新；`launch-audit` 清单逐 ID 标状态。
+- [ ] **部署与真机（产品负责人）**：BL-02 生产复验、BL-03 Windows 真机六项、BL-05 密钥轮换、商户开通、B2 内容录入、`PRINT_REQUIRE_PRINTER_ONLINE=true`。
+- [ ] **试运营**：一台机器真实用户两周，告警与退款记录归档后，`feature-scope.md` 整体结论由 NO-GO 改 GO。
+
+### 任务序列（按依赖排，✅ 已合入 · 🔄 进行中 · ⏳ 排队）
+
+| 序 | 包 | 执行者 | 复审 | 状态 |
+|---|---|---|---|---|
+| 1 | 硬件链路十项 + Kiosk 看门狗 | Claude | — | ✅ #789 #790 |
+| 2 | 包 2 时间根因 | Grok | Hermes | ✅ #793 |
+| 3 | 包 4 AI 链路 | Grok | Antigravity | ✅ #794，复审回流 → 包 4b |
+| 4 | 包 10 原型版式 + 几何门禁 | Claude | — | ✅ #795 |
+| 5 | 包 6 管理员静默失败 | Codex | Hermes | 🔄 #796 CI |
+| 6 | 包 1 剩余（支付死局 / 进度页 / 硬截止） | Grok | Antigravity | 🔄 #797 CI |
+| 7 | 包 4b AI 安全复审修复 | Grok | Antigravity 二审 | 🔄 #798 CI |
+| 8 | 包 5 审计与安全 | Codex | Antigravity | 🔄 实现中 |
+| 9 | 包 7 一体机契约 + 登录不清场 | Grok | Hermes | ⏳ 包 1 合入后开 |
+| 10 | 包 8 Partner | Grok | Hermes | ⏳ |
+| 11 | 包 3 错误统一 + 门禁 | Grok | Hermes | ⏳ 包 6/7 合入后开（依赖它们的适配器改动） |
+| 12 | 包 9 截断口径 + 心跳清理 + OPS-02 后端 | Codex | Antigravity | ⏳ |
+| 13 | 打印订单展示（duplex / 优惠退款额，批次守卫独立 PR） | Grok | Hermes | ⏳ |
+| 14 | 三端错误/时间/截断三条根因门禁复扫 + 清单逐 ID 收口表 | Claude | — | ⏳ 包 3/9 合入后 |
+| 15 | 运营数据大屏一期（M2/M3/M6/M7/M8 队列/M9/M12） | Codex 后端 + Claude UI | Antigravity + Hermes | ⏳ 序 1–12 合入后 |
+| 16 | 商用补充（市场清单 #1 服务人次报表、#3 大屏真实数据、#5 文件删除明示、#8 岗位防骗提示、#7 简历套餐） | Grok / Codex | Hermes | ⏳ 大屏之后，按产品负责人勾选 |
+
+### 已识别但清单外的补充项（五家在执行中发现，待产品负责人确认是否纳入）
+
+- Antigravity：`InflightCoalescer` 进程内 Map 在多实例部署下失效——上线前确认 API 单实例，或改 Redis 锁（包 9 可带）。
+- Codex：`PriceConfig.effectiveFrom` 无调度语义，Admin UI 应标「尚未启用」（低优先）。
+- Claude：`TerminalHeartbeat` 无清理（已在包 9）；`KioskSession` / `ReviewDecision` 零写入（大屏「服务人次」「审核时效」前置）。
+- Grok：Playwright 隐私套件与 `verify:prod-build-config` 在无 `dist/` 的 worktree 不可跑，只能靠 CI；建议给 worktree 一键 `dist` 构建脚本。
