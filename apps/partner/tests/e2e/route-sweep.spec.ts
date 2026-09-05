@@ -23,7 +23,8 @@ const AUTHED_ROUTES: Array<{ path: string; title: string | RegExp }> = [
   { path: '/stats', title: '数据统计' },
   { path: '/sources', title: '数据源管理' },
   { path: '/sync-logs', title: '同步日志' },
-  { path: '/account', title: '账号权限' },
+  // #804（包 8）把这页从「账号权限」改名为「账号」——改密是自助的，权限不是。
+  { path: '/account', title: '账号' },
 ]
 
 test.describe('partner route sweep (mock)', () => {
