@@ -55,7 +55,7 @@ async function request<T>(
   return json.data
 }
 
-export function listBenefitActivities(
+export async function listBenefitActivities(
   token?: string | null,
   source?: BenefitActivitySourceType,
 ): Promise<{ items: BenefitActivityListItem[]; total: number }> {
@@ -63,7 +63,15 @@ export function listBenefitActivities(
   const params = new URLSearchParams()
   if (source) params.set('source', source)
   const q = params.toString()
-  return request(`/activities${q ? `?${q}` : ''}`, token)
+  // 这里的返回类型此前是在说谎：`request` 拿到什么就返回什么，而调用方直接把
+  // `res.total` 渲染进「共 N 个活动」。服务端漏 total（或返回裸数组）时，
+  // 求职者会在一体机上看到「共 undefined 个活动」——全路由扫描抓到的就是这条。
+  // 在这一层收敛成真实形状：total 缺失时退回条目数，条目非数组时按空列表处理。
+  const raw = (await request(`/activities${q ? `?${q}` : ''}`, token)) as unknown
+  const body = (raw ?? {}) as { items?: unknown; total?: unknown }
+  const items = Array.isArray(body.items) ? (body.items as BenefitActivityListItem[]) : []
+  const total = typeof body.total === 'number' && Number.isFinite(body.total) ? body.total : items.length
+  return { items, total }
 }
 
 export function getBenefitActivity(id: string, token?: string | null): Promise<BenefitActivityListItem> {

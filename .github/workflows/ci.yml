@@ -1019,7 +1019,7 @@ jobs:
 
       - name: Run Kiosk browser smoke
         run: |
-          pnpm --filter @ai-job-print/kiosk test:browser:smoke
+          pnpm --filter @ai-job-print/kiosk test:browser:fusion-smoke
           pnpm --filter @ai-job-print/kiosk test:browser:w1
           pnpm --filter @ai-job-print/kiosk test:browser:w2
           pnpm --filter @ai-job-print/kiosk test:browser:w3
@@ -1044,6 +1044,13 @@ jobs:
         # 合作机构后台此前 0 条浏览器用例。mock 模式预览包（vite --mode development），
         # 不连真实后端。命令走 package.json test:e2e，内部用 kiosk 已装的 Playwright。
         run: pnpm --filter @ai-job-print/partner test:e2e
+
+      - name: Run Kiosk route sweep
+        # 一体机全路由扫描：productionRoutePatterns 每条打开、不白屏、无 pageerror。
+        # mock 口径（ApiRouter fail-closed），不连真实后端。视口 1080×1920。
+        # 与 Admin / Partner 浏览器 E2E 并列，三端至此都有全路由覆盖。
+        # 独立 step 只跑扫描，不重复 fusion-smoke；本地 `test:browser:smoke` 两者都跑。
+        run: pnpm --filter @ai-job-print/kiosk test:browser:route-sweep
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
