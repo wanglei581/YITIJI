@@ -139,7 +139,9 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *     空库按代码常量幂等种子化一次后以库为准，status 沿用 published | disabled 口径。
  *     详见 prisma/schema.prisma 该模型上方注释与 docs/progress/current-progress.md 2026-09-06 记录。
  */
-const EXPECTED_MODEL_COUNT = 100
+// main 已含 JobMaterialTemplate（#800，99→100），本刀再加 OrderItem（材料包逐份履约）→ 101。
+// 加表就要同步这个数，忘了改 build-and-verify 与 postgres-readiness 会一起红。
+const EXPECTED_MODEL_COUNT = 101
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)

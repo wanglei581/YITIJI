@@ -39,6 +39,8 @@ process.env['FILE_STORAGE_DRIVER'] = 'local'
 process.env['FILE_SIGNING_SECRET'] = 'verify-file-signing-secret-0123456789abcdef'
 process.env['PAYMENT_SESSION_SECRET'] = 'verify-payment-session-secret-0123456789abcdef'
 process.env['SECRET_ENCRYPTION_KEY'] = 'verify-secret-encryption-key-0123456789abcdef'
+process.env['TERMINAL_ADMIN_SECRET'] = 'verify-terminal-admin-secret-0123456789abcdef'
+process.env['TERMINAL_ACTION_TOKEN_SECRET'] = 'verify-terminal-action-token-secret-0123456789abcdef'
 
 function pass(message: string): void { console.log(`  PASS ${message}`) }
 function fail(message: string): never { throw new Error(message) }
@@ -265,7 +267,6 @@ async function main(): Promise<void> {
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
   const redis = new FakeRedis()
   const pickup = new PickupOrderService(prisma, capabilities, audit, redis as unknown as RedisService)
-
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const userId = `eu_m2_${suffix}`
   const terminalId = `terminal_m2_${suffix}`
@@ -531,10 +532,15 @@ async function main(): Promise<void> {
   } finally {
     setPrintScanCapabilityModeForTest(null)
     await prisma.auditLog.deleteMany({ where: { targetId: { in: (await prisma.order.findMany({ where: { endUserId: userId }, select: { id: true } })).map((row) => row.id) } } })
+    // Order.printTaskId 指向当前任务，PrintTask.orderId 又回指包单；先解除当前指针，
+    // 再删任务/行，避免 SQLite 外键在清理夹具时把真实业务链误判成实现故障。
+    await prisma.order.updateMany({ where: { endUserId: userId }, data: { printTaskId: null } })
+    await prisma.orderItem.deleteMany({ where: { order: { endUserId: userId } } })
+    await prisma.printTaskStatusLog.deleteMany({ where: { task: { endUserId: userId } } })
+    await prisma.printTask.deleteMany({ where: { endUserId: userId } })
     await prisma.order.deleteMany({ where: { endUserId: userId } })
     await prisma.piiFinding.deleteMany({ where: { task: { endUserId: userId } } })
     await prisma.documentProcessTask.deleteMany({ where: { endUserId: userId } })
-    await prisma.printTask.deleteMany({ where: { endUserId: userId } })
     await prisma.fileObject.deleteMany({ where: { endUserId: userId } })
     await prisma.endUser.deleteMany({ where: { id: userId } })
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, otherTerminalId] } } })

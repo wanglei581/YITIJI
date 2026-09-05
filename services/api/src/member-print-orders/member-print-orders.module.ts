@@ -4,6 +4,8 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberPendingTasksController, MemberPrintOrdersController } from './member-print-orders.controller'
 import { MemberPrintOrdersService } from './member-print-orders.service'
 import { MemberPrintOrderCreateService } from './member-print-order-create.service'
+import { PackageOrdersController } from './package-orders.controller'
+import { PackageOrderService } from './package-order.service'
 import { PrintJobsModule } from '../print-jobs/print-jobs.module'
 import { PaymentModule } from '../payment/payment.module'
 import { TerminalsModule } from '../terminals/terminals.module'
@@ -33,7 +35,7 @@ import { TerminalsModule } from '../terminals/terminals.module'
       },
     }),
   ],
-  controllers: [MemberPrintOrdersController, MemberPendingTasksController],
-  providers: [MemberPrintOrdersService, MemberPrintOrderCreateService, EndUserAuthGuard],
+  controllers: [MemberPrintOrdersController, MemberPendingTasksController, PackageOrdersController],
+  providers: [MemberPrintOrdersService, MemberPrintOrderCreateService, PackageOrderService, EndUserAuthGuard],
 })
 export class MemberPrintOrdersModule {}
