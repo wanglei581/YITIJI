@@ -63,7 +63,8 @@ page { height: 100%; background: #eef4ff; }
 .launch-btn-sms-confirm { background: var(--teal) !important; box-shadow: 0 12rpx 26rpx rgba(22,119,255,.15); }
 .launch-wx-icon { width: 34rpx; height: 34rpx; margin-right: 12rpx; }
 .launch-btn-guest {
-  height: 88rpx !important;
+  /* 88rpx=44px 低于 48px 可点标准（实测 45px） → 96rpx */
+  height: 96rpx !important;
   border-radius: 23rpx !important;
   border: 1rpx solid var(--line) !important;
   background: var(--surface-2) !important;
