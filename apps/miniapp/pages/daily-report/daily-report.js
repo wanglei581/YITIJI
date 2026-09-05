@@ -61,11 +61,18 @@ function mapModule(mod) {
     const jobs = Number(mod.newJobs) || 0
     const policies = Number(mod.newPolicies) || 0
     const city = mod.city ? `${mod.city}` : ''
+    // 政策数是**平台全局**当日新增，不是这座城市的（PolicyPost 无城市字段，
+    // 服务端 daily-brief.service.ts:103 已注明如实统计全局）。因此两句必须分开写，
+    // 合成「深圳今日新增 12 个岗位、1 条政策」会把全局政策伪装成本地。
+    // （Antigravity 第 17 轮建议 3，Claude 裁决转前端文案）
     return {
       type: 'city_new',
-      title: city ? `${city}今日新增` : '今日新增',
-      summary: `岗位 ${jobs} 条，政策 ${policies} 条`,
-      rows: [],
+      title: '今日新增',
+      summary: '',
+      rows: [
+        { key: 'jobs', title: city ? `${city}新增岗位 ${jobs} 条` : `新增岗位 ${jobs} 条` },
+        { key: 'policies', title: `平台新增政策 ${policies} 条` },
+      ],
       actionLabel: '看岗位',
       route: mod.route,
     }
