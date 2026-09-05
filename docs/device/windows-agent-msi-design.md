@@ -73,6 +73,21 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 
 升级前由管理员将终端切为 `maintenance` 并确认 `pending`、`claimed`、`printing` 均为 0；升级后经只读诊断和 Admin 心跳确认才恢复 `active`。MSI 不自行调用生命周期、打印、订单或数据库接口。
 
+### 4.3 Kiosk 浏览器启动器与看门狗（2026-09-05 加入安装包）
+
+MSI 在 `%ProgramFiles%\AIJobPrintAgent\kiosk\` 交付三个文件：`kiosk-watchdog.ps1`（启动全屏浏览器并循环守护）、`register-kiosk-watchdog.ps1`（注册/注销登录计划任务）、`launch-kiosk.cmd`（维护时手动拉起一次）。**MSI 仍不含任何 CustomAction**：计划任务 `AIJobPrintKioskWatchdog` 由设备绑定向导在绑定成功后以管理员身份注册，控制中心提供「注册 / 更新」与「停用」两个按钮（停用需确认），卸载 MSI 不会自动删除该任务，维护时先在控制中心停用。
+
+| 项 | 结论 | 原因 |
+| --- | --- | --- |
+| 触发与身份 | 登录触发，主体 `BUILTIN\Users`，Limited 权限，无存储凭据 | 在自动登录的标准账号会话里运行；服务会话（Session 0）拉不起图形界面 |
+| 浏览器 | Edge 优先、Chrome 兜底，`--kiosk` + `--edge-kiosk-type=fullscreen`，独立 `--user-data-dir` 在 `%LOCALAPPDATA%\AIJobPrintKiosk\profile` | 与运维人员的普通浏览器窗口互不影响；ProgramData 根目录 ACL 只给 SYSTEM/Administrators，Kiosk 用户不能写，所以状态与日志都放用户目录 |
+| 识别自己的进程 | 启动参数带 `--aijobprint-kiosk=1` 标记，只守护带标记的主进程 | 不会误杀或误判运维打开的浏览器 |
+| 守护策略 | 每 5 秒检查；退出即拉起；60 秒内反复崩溃按 3→6→12…封顶 60 秒退避；任务本身无执行时限、失败后 1 分钟重启 3 次 | 避免崩溃风暴，也避免任务被系统按超时杀掉 |
+| 参数与秘密 | 任务参数只有公开站点 URL（必须 https）与浏览器偏好；脚本不读 `agent.token`、`agent-config.json` | 与「MSI/任务不携带凭据」一致 |
+| 已知不做 | 不检测页面白屏或 JS 卡死（需要 CDP 才能判断）；不接管系统自动登录与电源策略（由母盘镜像负责） | 保持安装包只做浏览器进程级守护 |
+
+验证：`verify:installer-inputs` 断言文件、WiX 组件、暂存复制、片段排除、任务主体/触发/时限、URL 仅 https、无凭据字样；`verify-staged-powershell.ps1` 对 `kiosk/*.ps1` 做 BOM 与 5.1 语法解析；`test-msi-lifecycle.ps1` 断言三个文件装后存在。Windows 真机上还需验证：登录后自动全屏、手动关闭 Edge 后 5 秒内拉起、控制中心停用后不再拉起、重启后任务仍在。
+
 ## 5. 未来代码归属与文件预算
 
 实施分支最多新增或修改以下区域，超过范围须重新审查：

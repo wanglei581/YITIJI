@@ -11,9 +11,20 @@ if (-not (Test-Path -LiteralPath $provisionRoot -PathType Container)) {
   throw "Staged provision directory is missing: $provisionRoot"
 }
 
-$scripts = @(Get-ChildItem -LiteralPath $provisionRoot -Filter "*.ps1" -File | Sort-Object Name)
+$kioskRoot = Join-Path $StagingRoot "kiosk"
+if (-not (Test-Path -LiteralPath $kioskRoot -PathType Container)) {
+  throw "Staged kiosk directory is missing: $kioskRoot"
+}
+
+$scripts = @(Get-ChildItem -LiteralPath $provisionRoot -Filter "*.ps1" -File | Sort-Object Name) +
+  @(Get-ChildItem -LiteralPath $kioskRoot -Filter "*.ps1" -File | Sort-Object Name)
 if ($scripts.Count -eq 0) {
   throw "No staged Windows PowerShell scripts were found"
+}
+foreach ($required in @("kiosk-watchdog.ps1", "register-kiosk-watchdog.ps1")) {
+  if (-not (Test-Path -LiteralPath (Join-Path $kioskRoot $required) -PathType Leaf)) {
+    throw "Staged kiosk script is missing: $required"
+  }
 }
 
 foreach ($script in $scripts) {
