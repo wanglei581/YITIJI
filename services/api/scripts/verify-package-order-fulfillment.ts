@@ -205,6 +205,24 @@ async function main(): Promise<void> {
     }
     pass('seq=0 completed 后只派生 seq=1 pending，Order.printTaskId 已前移')
 
+    // 弱网重传：同一条 seq=0 的 completed 再报一次，整条链必须是空操作 ——
+    // 不得把整单误判成完成、不得再派生任务、不得抛错打断一体机。
+    // 实际挡住它的是上游 terminals-agent 的终态幂等（:540），不是履约内部；
+    // 本用例钉的是**对外行为**，删掉履约里的幂等短路不会让它转红（已变异验证）。
+    await agent.patchTaskStatus(released.taskId, { status: 'completed' }, authorization, terminalId)
+    const afterReplay = await prisma.order.findUnique({
+      where: { id: created.orderId }, include: { orderItems: { orderBy: { seq: 'asc' } } },
+    })
+    if (
+      !afterReplay || afterReplay.printTaskId !== secondTaskId || afterReplay.taskStatus !== 'pending' ||
+      afterReplay.orderItems[1]?.printTaskId !== secondTaskId ||
+      afterReplay.orderItems[2]?.printTaskId ||
+      await prisma.printTask.count({ where: { orderId: created.orderId } }) !== 2
+    ) {
+      fail('重传同一条 completed 必须是空操作：整单不得判完成、不得多派任务')
+    }
+    pass('重传同一条 completed 对外是空操作：订单指针、行状态、任务数都不变')
+
     const secondClaim = await agent.claimTasks(terminalId, { maxTasks: 1 }, authorization)
     if (secondClaim.length !== 1 || secondClaim[0]?.taskId !== secondTaskId || secondClaim[0]?.taskId === released.taskId) {
       fail('已有 completed 行时 Agent 只能领取当前 seq=1，不得领回旧任务')

@@ -176,6 +176,14 @@ export class PackageOrderService {
     }
   }
 
+  /**
+   * 到机码在**未支付时也必须可见**：材料包是「手机组包拿码 → 到机器 → 现场付款 → 出纸」，
+   * 码就是去机器的凭证。`pickup-order.service.ts:100-101` 明确接受 unpaid / paying 并回一个
+   * 支付令牌，`:133` 才在出纸前硬卡 `payStatus !== 'paid'`。因此这里**不**套用单文件路径的
+   * `pickupCodeVisibleFor`（那条线是先线上付款后出码，口径本就不同）。
+   * （Antigravity 第 17 轮复审阻塞项 1 建议加 payStatus 判断 —— 核实后判定为误报：
+   *  照它改会让整条现场付款链走不通。）
+   */
   private visibleCode(order: { pickupStatus: string; pickupCodeExpiresAt: Date | null; pickupCodeEnc: string | null }): string | null {
     if (order.pickupStatus !== 'pending' || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date()) return null
     if (!order.pickupCodeEnc) return null
