@@ -62,3 +62,6 @@
 /* ── actionbar 打印按钮禁用 ── */
 .ri-btn-loading { opacity: .6; }
 .flex-1-4 { flex: 1.4; }
+
+/* A′ 出门前看一眼：行首标签 */
+.rs-k { font-weight: 600; margin-right: 8rpx; }
