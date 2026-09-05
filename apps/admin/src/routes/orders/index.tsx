@@ -14,6 +14,14 @@ import {
 } from '../../services/api/adminOrdersReadonly'
 import { adminPrintJobsService } from '../../services/api/adminPrintJobs'
 import { ApiHttpError } from '../../services/api/client'
+import {
+  colorModeText,
+  copiesText,
+  duplexText,
+  NET_PAID_UNRECORDED,
+  pageRangeText,
+  recordedCentsText,
+} from './orderHonestyCopy'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -60,7 +68,6 @@ const PAY_FILTERS = [
   { label: '已关闭', value: 'closed' },
 ] as const
 
-const COLOR_LABELS: Record<string, string> = { black_white: '黑白', color: '彩色' }
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
 
 // 收款入账来源：后端 AdminMarkPaidDto 只放行这两个（free 由 0 元建单自动产生，
@@ -494,24 +501,20 @@ export default function OrdersPage() {
           <>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
               <Info label="订单类型" value={detail.type} />
-              <Info label="金额" value={amountText(detail.amountCents, detail.currency)} />
+              <Info label="下单金额" value={amountText(detail.amountCents, detail.currency)} />
+              <Info label="优惠/权益抵扣" value={recordedCentsText(detail.discountCents, detail.currency)} />
+              <Info label="已退款" value={recordedCentsText(detail.refundedAmountCents, detail.currency)} />
+              <Info label="实付" value={NET_PAID_UNRECORDED} />
               <Info label="支付状态" value={PAY_STATUS_MAP[detail.payStatus]?.label ?? detail.payStatus} />
               <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
               <Info label="用户" value={`${OWNER_LABELS[detail.ownerType]} · ${detail.userLabel}`} />
               <Info label="终端" value={detail.terminalCode ?? '—'} />
               <Info label="文件名" value={detail.print?.fileName ?? '未记录'} />
-              <Info
-                label="打印参数"
-                value={
-                  [
-                    detail.print?.copies ? `${detail.print.copies} 份` : null,
-                    detail.print?.colorMode ? COLOR_LABELS[detail.print.colorMode] : null,
-                    detail.print?.paperSize,
-                    detail.print?.duplex,
-                    detail.print?.pageRange ? `页码 ${detail.print.pageRange}` : null,
-                  ].filter(Boolean).join(' · ') || '—'
-                }
-              />
+              <Info label="单双面" value={duplexText(detail.print?.duplex)} />
+              <Info label="彩色/黑白" value={colorModeText(detail.print?.colorMode)} />
+              <Info label="份数" value={copiesText(detail.print?.copies)} />
+              <Info label="页范围" value={pageRangeText(detail.print?.pageRange)} />
+              <Info label="幅面" value={detail.print?.paperSize?.trim() ? detail.print.paperSize : '未记录'} />
               {detail.refundedAt && (
                 <Info label="退款时间" value={fmt(detail.refundedAt)} />
               )}

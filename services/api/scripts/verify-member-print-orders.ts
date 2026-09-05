@@ -126,7 +126,7 @@ async function main() {
       data: {
         id: t('a2'), endUserId: userA, fileUrl: 'sig://secret-a2', fileMd5: 'sha256-a2',
         status: 'completed', createdAt: at(20), completedAt: at(25),
-        paramsJson: JSON.stringify({ fileName: '求职信.pdf', copies: 2, colorMode: 'color', paperSize: 'A4' }),
+        paramsJson: JSON.stringify({ fileName: '求职信.pdf', copies: 2, colorMode: 'color', paperSize: 'A4', pageRange: '1-2' }),
       },
     })
     // A 的"脏 paramsJson"任务：损坏 JSON → 所有 params 派生字段必须安全降级为 null。
@@ -182,18 +182,22 @@ async function main() {
     else fail(`1b. 游标分页异常：first=${JSON.stringify(firstSlice)} second=${JSON.stringify(secondSlice)}`)
 
     // ── 2. 安全字段映射 ─────────────────────────────────────────
+    const a1 = listA.find((o) => o.id === t('a1'))!
     const a2 = listA.find((o) => o.id === t('a2'))!
+    const a1Ok = a1.duplex === 'simplex' && a1.pageRange === null
     const a2Ok =
       a2.fileName === '求职信.pdf' && a2.copies === 2 && a2.colorMode === 'color' &&
       a2.paperSize === 'A4' && a2.status === 'completed' &&
+      a2.duplex === null && a2.pageRange === '1-2' &&
       typeof a2.completedAt === 'string' && a2.completedAt.startsWith('2026-06-08')
     const aBad = listA.find((o) => o.id === t('a_bad'))!
     const badOk =
       aBad.fileName === null && aBad.copies === null && aBad.colorMode === null &&
-      aBad.paperSize === null && aBad.status === 'failed' && aBad.completedAt === null
-    if (a2Ok && badOk) {
-      pass('2. 安全字段映射：正常 params 正确解析；损坏 paramsJson 全部安全降级为 null；completedAt 正确')
-    } else fail(`2. 字段映射异常：a2=${JSON.stringify(a2)} aBad=${JSON.stringify(aBad)}`)
+      aBad.paperSize === null && aBad.duplex === null && aBad.pageRange === null &&
+      aBad.status === 'failed' && aBad.completedAt === null
+    if (a1Ok && a2Ok && badOk) {
+      pass('2. 安全字段映射：正常 params 正确解析；缺 duplex/pageRange 为 null 不回落默认；损坏 paramsJson 全部安全降级为 null')
+    } else fail(`2. 字段映射异常：a1=${JSON.stringify(a1)} a2=${JSON.stringify(a2)} aBad=${JSON.stringify(aBad)}`)
 
     // ── 3. 跨用户隔离 ───────────────────────────────────────────
     const listB = (await orders.list(userB, defaultPage)).items
@@ -218,7 +222,8 @@ async function main() {
     //   colorMode / paperSize 同类。之前它被采集、计价、落进 printParamsJson，
     //   却没有外露——用户付了双面的钱却在「我的 → 打印订单」看不到，
     //   补打与申诉也无法复现参数。
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
+    //   pageRange（2026-09-06）：与 copies/duplex 同类，来自 paramsJson 已保存参数。
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
@@ -268,9 +273,9 @@ async function main() {
     }
     const ord8 = suffix.slice(0, 8).toUpperCase()
     // unpaid 订单故意带 pickupCode（DB 里有值），门控必须隐藏它；paid 可见；refunded 隐藏。
-    await prisma.order.create({ data: { orderNo: `ORD-DU-${ord8}`, type: 'print', printTaskId: dPay.unpaid, endUserId: userD, amountCents: 100, billablePages: 1, billingPageSource: 'pdf_lightweight_scan', payStatus: 'unpaid', paymentSource: null, taskStatus: 'pending', pickupCode: `UNPD${ord8}` } })
-    await prisma.order.create({ data: { orderNo: `ORD-DP-${ord8}`, type: 'print', printTaskId: dPay.paid, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'paid', paymentSource: 'offline', paidAt: at(41), taskStatus: 'pending', pickupCode: `PAID${ord8}` } })
-    await prisma.order.create({ data: { orderNo: `ORD-DR-${ord8}`, type: 'print', printTaskId: dPay.refunded, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'refunded', paymentSource: 'offline', paidAt: at(41), refundReason: '测试退款', refundedAt: at(42), taskStatus: 'pending', pickupCode: `RFND${ord8}` } })
+    await prisma.order.create({ data: { orderNo: `ORD-DU-${ord8}`, type: 'print', printTaskId: dPay.unpaid, endUserId: userD, amountCents: 100, billablePages: 1, billingPageSource: 'pdf_lightweight_scan', payStatus: 'unpaid', paymentSource: null, taskStatus: 'pending', pickupCode: `UNPD${ord8}`, discountCents: 0, refundedAmountCents: 0 } })
+    await prisma.order.create({ data: { orderNo: `ORD-DP-${ord8}`, type: 'print', printTaskId: dPay.paid, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'paid', paymentSource: 'offline', paidAt: at(41), taskStatus: 'pending', pickupCode: `PAID${ord8}`, discountCents: 50, refundedAmountCents: 0 } })
+    await prisma.order.create({ data: { orderNo: `ORD-DR-${ord8}`, type: 'print', printTaskId: dPay.refunded, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'refunded', paymentSource: 'offline', paidAt: at(41), refundReason: '测试退款', refundedAt: at(42), taskStatus: 'pending', pickupCode: `RFND${ord8}`, discountCents: 0, refundedAmountCents: 200 } })
     // dPay.noorder 无 Order
 
     const listD = (await orders.list(userD, defaultPage)).items
@@ -280,14 +285,14 @@ async function main() {
     const rItem = findD(dPay.refunded)
     const nItem = findD(dPay.noorder)
 
-    const okUnpaid = !!uItem && uItem.amountCents === 100 && uItem.payStatus === 'unpaid' && uItem.paymentSource === null && uItem.billablePages === 1 && uItem.billingPageSource === 'pdf_lightweight_scan' && uItem.pickupCode === null
-    const okPaid = !!pItem && pItem.payStatus === 'paid' && pItem.paymentSource === 'offline' && pItem.amountCents === 200 && typeof pItem.pickupCode === 'string' && (pItem.pickupCode ?? '').length > 0
-    const okRefunded = !!rItem && rItem.payStatus === 'refunded' && rItem.pickupCode === null
-    const okNoOrder = !!nItem && nItem.amountCents === null && nItem.payStatus === null && nItem.paymentSource === null && nItem.billablePages === null && nItem.billingPageSource === null && nItem.pickupCode === null
+    const okUnpaid = !!uItem && uItem.amountCents === 100 && uItem.payStatus === 'unpaid' && uItem.paymentSource === null && uItem.billablePages === 1 && uItem.billingPageSource === 'pdf_lightweight_scan' && uItem.pickupCode === null && uItem.discountCents === 0 && uItem.refundedAmountCents === 0
+    const okPaid = !!pItem && pItem.payStatus === 'paid' && pItem.paymentSource === 'offline' && pItem.amountCents === 200 && typeof pItem.pickupCode === 'string' && (pItem.pickupCode ?? '').length > 0 && pItem.discountCents === 50 && pItem.refundedAmountCents === 0
+    const okRefunded = !!rItem && rItem.payStatus === 'refunded' && rItem.pickupCode === null && rItem.refundedAmountCents === 200 && rItem.discountCents === 0
+    const okNoOrder = !!nItem && nItem.amountCents === null && nItem.payStatus === null && nItem.paymentSource === null && nItem.billablePages === null && nItem.billingPageSource === null && nItem.pickupCode === null && nItem.discountCents === null && nItem.refundedAmountCents === null
     const noLiveGateway = listD.every((x) => x.paymentSource !== 'wechat' && x.paymentSource !== 'alipay')
 
     if (okUnpaid && okPaid && okRefunded && okNoOrder && noLiveGateway) {
-      pass('7. 支付字段真实化：有 Order 返回诚实字段；无 Order 全 null；unpaid/refunded 隐藏 pickupCode、paid 可见；无微信/支付宝来源')
+      pass('7. 支付字段真实化：有 Order 返回诚实字段（含 discountCents/refundedAmountCents）；无 Order 全 null；unpaid/refunded 隐藏 pickupCode、paid 可见；无微信/支付宝来源')
     } else {
       fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} noLiveGateway=${noLiveGateway}`)
     }
