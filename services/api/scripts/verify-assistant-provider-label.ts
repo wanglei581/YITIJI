@@ -24,7 +24,12 @@ import { createServer } from 'http'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { AiService } from '../src/ai/ai.service'
-import { LlmChatService, assistantOwnerKey, MAX_ASSISTANT_SESSIONS } from '../src/ai/llm/llm-chat.service'
+import {
+  LlmChatService,
+  assistantOwnerKey,
+  MAX_ASSISTANT_SESSIONS,
+  MAX_ASSISTANT_SESSIONS_PER_OWNER,
+} from '../src/ai/llm/llm-chat.service'
 import { isLlmProviderLabel } from '../src/ai/interfaces/ai-provider.interface'
 import type { ChatInput, ChatOutput } from '../src/ai/interfaces/ai-provider.interface'
 
@@ -174,6 +179,11 @@ if (MAX_ASSISTANT_SESSIONS >= 32 && MAX_ASSISTANT_SESSIONS <= 1024) {
 } else {
   fail(`MAX_ASSISTANT_SESSIONS 异常: ${MAX_ASSISTANT_SESSIONS}`)
 }
+if (MAX_ASSISTANT_SESSIONS_PER_OWNER >= 4 && MAX_ASSISTANT_SESSIONS_PER_OWNER <= 64) {
+  pass(`MAX_ASSISTANT_SESSIONS_PER_OWNER=${MAX_ASSISTANT_SESSIONS_PER_OWNER} 在合理区间`)
+} else {
+  fail(`MAX_ASSISTANT_SESSIONS_PER_OWNER 异常: ${MAX_ASSISTANT_SESSIONS_PER_OWNER}`)
+}
 if (assistantOwnerKey('u1', '1.1.1.1') !== assistantOwnerKey('u2', '1.1.1.1')) {
   pass('会员归属键按 endUserId 隔离')
 } else fail('会员归属键未按 endUserId 隔离')
@@ -220,6 +230,55 @@ async function sessionIsolationChecks(): Promise<void> {
     else pass('同一归属可续聊')
     if (!(bodies[2] ?? '').includes('SECRET_SESSION_A')) fail('续聊应带上本人历史')
     else pass('续聊带上本人历史')
+
+    type SessionStore = Map<string, { updatedAt: number; ownerKey: string }>
+    const store = (chat as unknown as { sessions: SessionStore }).sessions
+
+    let stallNext = false
+    let stallRelease = () => { /* set below */ }
+    const stall = new Promise<void>((resolve) => { stallRelease = resolve })
+    server.removeAllListeners('request')
+    server.on('request', (req, res) => {
+      let body = ''
+      req.on('data', (c) => { body += String(c) })
+      req.on('end', () => {
+        bodies.push(body)
+        const finish = () => {
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }))
+        }
+        if (stallNext) {
+          void stall.then(finish)
+          return
+        }
+        finish()
+      })
+    })
+    const t0 = store.get(a.sessionId)?.updatedAt ?? 0
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    stallNext = true
+    const continued = chat.chat({ message: 'keep-alive', sessionId: a.sessionId }, undefined, 'ip:aaa')
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    const during = store.get(a.sessionId)?.updatedAt ?? 0
+    if (during <= t0) fail('命中已有会话应在 LLM 返回前刷新 updatedAt')
+    else pass('命中已有会话在 LLM 期间已刷新 updatedAt')
+    stallNext = false
+    stallRelease()
+    await continued
+
+    const other = await chat.chat({ message: 'keep-other' }, undefined, 'ip:other')
+    const floodOwner = 'ip:flood'
+    for (let i = 0; i < MAX_ASSISTANT_SESSIONS_PER_OWNER + 2; i += 1) {
+      await chat.chat({ message: `flood-${i}` }, undefined, floodOwner)
+    }
+    const floodCount = [...store.values()].filter((s) => s.ownerKey === floodOwner).length
+    if (floodCount > MAX_ASSISTANT_SESSIONS_PER_OWNER) {
+      fail(`同一归属会话不得超过 ${MAX_ASSISTANT_SESSIONS_PER_OWNER}，实际 ${floodCount}`)
+    } else {
+      pass(`同一归属会话上限生效（${floodCount}/${MAX_ASSISTANT_SESSIONS_PER_OWNER}）`)
+    }
+    if (!store.has(other.sessionId)) fail('其他归属的会话不应被匿名洪水挤掉')
+    else pass('其他归属的会话未被同归属 LRU 挤掉')
   } finally {
     server.close()
   }
