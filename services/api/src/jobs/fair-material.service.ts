@@ -106,6 +106,12 @@ export class FairMaterialService {
 
   // ── 活动资料 ────────────────────────────────────────────────────────────────
 
+  async listMaterials(fairId: string): Promise<FairMaterialDto[]> {
+    await this.assertFairExists(fairId)
+    const rows = await this.prisma.fairMaterial.findMany({ where: { jobFairId: fairId, deletedAt: null }, orderBy: { createdAt: 'desc' } })
+    return rows.map((row) => mapMaterial(row, signFairMaterialPreviewUrl(row.id)))
+  }
+
   async uploadMaterial(args: {
     fairId: string
     buffer: Buffer
@@ -114,6 +120,7 @@ export class FairMaterialService {
     type?: string
     description?: string
     pageCount?: number
+    initialPublishStatus?: 'unpublished'
     user: AuthedUser
   }): Promise<FairMaterialDto> {
     const fair = await this.assertFairExists(args.fairId)
@@ -147,6 +154,7 @@ export class FairMaterialService {
         sizeBytes: args.buffer.length,
         sha256: '',
         pageCount: args.pageCount ?? 0,
+        ...(args.initialPublishStatus ? { publishStatus: args.initialPublishStatus } : {}),
         createdBy: args.user.userId,
       },
     })
@@ -313,7 +321,7 @@ export class FairMaterialService {
   private async writeFairAudit(user: AuthedUser, action: string, fairId: string, payload: Record<string, unknown>): Promise<void> {
     await this.audit.write({
       actorId: user.userId,
-      actorRole: 'admin',
+      actorRole: user.role,
       action,
       targetType: 'fair',
       targetId: fairId,

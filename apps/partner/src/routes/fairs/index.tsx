@@ -14,6 +14,7 @@ import type {
 import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartnerFair } from '../../services/api'
 import { RejectReason } from '../../components/RejectReason'
 import { useCapability } from '../../services/capabilities'
+import { FairSubresourcesDrawer } from './components/FairSubresourcesDrawer'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ export default function FairsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [configuring, setConfiguring] = useState<PartnerFairRecord | null>(null)
 
   const { data, status, refresh } = useRefreshable(
     PARTNER_FAIRS_REFRESH_KEY,
@@ -125,7 +127,7 @@ export default function FairsPage() {
     },
   )
 
-  useInteractionLock(editing !== null || saving || busyId !== null, [PARTNER_FAIRS_REFRESH_KEY], 'hard')
+  useInteractionLock(editing !== null || configuring !== null || saving || busyId !== null, [PARTNER_FAIRS_REFRESH_KEY], 'hard')
 
   useEffect(() => {
     if (!notice) return
@@ -362,6 +364,7 @@ export default function FairsPage() {
                           >
                             编辑
                           </button>
+                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50" onClick={() => setConfiguring(f)}>配置</button>
                           {f.publishStatus === 'published' && (
                             <button
                               disabled={busyId === f.id}
@@ -383,7 +386,7 @@ export default function FairsPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会需经管理员重新审核后才会在终端展示;现场活动资料由管理员在运营后台维护。
+        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会需经管理员重新审核后才会在终端展示；活动资料由合作机构上传，发布仍由管理员控制。
       </p>
 
       {/* 编辑/新增抽屉 */}
@@ -459,6 +462,7 @@ export default function FairsPage() {
           </p>
         </div>
       </Drawer>
+      {configuring && <FairSubresourcesDrawer fairId={configuring.id} fairName={configuring.name} venueDefault={configuring.venue} open onClose={() => setConfiguring(null)} />}
     </Page>
   )
 }
