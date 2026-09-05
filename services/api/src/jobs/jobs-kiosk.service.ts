@@ -26,6 +26,12 @@ import { jobValidityWhere } from './job-validity'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 
+/** 公开列表/详情的资料份数与资料页口径一致：已发布且未软删。 */
+const publicFairCountSelect = {
+  companies: true,
+  materials: { where: { deletedAt: null, publishStatus: 'published' } },
+} as const
+
 @Injectable()
 export class JobsKioskService {
   constructor(private readonly prisma: PrismaService) {}
@@ -114,7 +120,7 @@ export class JobsKioskService {
         orderBy: groups[i].orderBy,
         skip: remainingSkip,
         take,
-        include: { _count: { select: { companies: true } } },
+        include: { _count: { select: publicFairCountSelect } },
       })
       rows.push(...pageRows)
       remainingTake -= take
@@ -160,7 +166,7 @@ export class JobsKioskService {
   async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
     const f = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id, reviewStatus: 'approved', publishStatus: 'published' }),
-      include: { _count: { select: { companies: true } } },
+      include: { _count: { select: publicFairCountSelect } },
     })
     return { data: f ? prismaFairToListItem(f) : null, success: true }
   }

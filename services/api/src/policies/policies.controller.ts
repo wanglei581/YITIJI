@@ -25,6 +25,7 @@ import { PublishActionDto } from '../jobs/dto/publish.dto'
  *     GET    /policies?kind=&audience=&category=
  *     GET    /policies/eligibility-questions      条件核对问项字典(P21)
  *     POST   /policies/eligibility-check          条件核对(P21,纯计算不落库)
+ *     GET    /policies/:id                        公开详情(未审/未发 404)
  *   Partner(Bearer + partner,本机构):
  *     GET    /partner/policies
  *     POST   /partner/policies                    新增(默认 pending+draft)
@@ -68,8 +69,7 @@ export class PoliciesController {
    * P21 问项字典。前端不得自己硬编码问项与取值 —— 取值一旦漂移,
    * 已录入的政策条件会静默失配,判定结果全变「无法判定」而没人发现。
    *
-   * 路由注册在 `policies/:id` 之类的通配路由之前不存在冲突问题:
-   * 本控制器没有 `GET /policies/:id`。
+   * 静态段必须写在 `GET /policies/:id` 之前，否则 eligibility-questions 会被当成 id。
    */
   @Get('policies/eligibility-questions')
   getEligibilityQuestions() {
@@ -87,6 +87,14 @@ export class PoliciesController {
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   checkEligibility(@Body() dto: PolicyEligibilityCheckDto) {
     return this.eligibility.checkEligibility({ answers: dto.answers, policyIds: dto.policyIds })
+  }
+
+  /**
+   * 公开政策详情。只返回 approved+published；其余一律 404，不泄露草稿/驳回。
+   */
+  @Get('policies/:id')
+  getPublishedPolicy(@Param('id') id: string) {
+    return this.policies.getPublishedPolicyById(id)
   }
 
   // ── Partner ─────────────────────────────────────────────────────────────────
