@@ -13,6 +13,7 @@ import 'dotenv/config'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 
 function pass(message: string): void {
   console.log(`  PASS ${message}`)
@@ -271,9 +272,10 @@ async function main(): Promise<void> {
       notPrintedItem?.printOutcome !== 'not_printed' ||
       notPrintedItem.aftercareStatus !== null ||
       notPrintedItem.refundEligible !== true ||
-      notPrintedItem.retryForbidden !== true
+      notPrintedItem.retryForbidden !== true ||
+      notPrintedItem.refundRequired !== false
     ) {
-      fail(`已核查未出纸必须清红条、可退款、仍禁重试：${JSON.stringify(notPrintedItem)}`)
+      fail(`已核查未出纸必须清红条、可退款、仍禁重试、未标待退款信号：${JSON.stringify(notPrintedItem)}`)
     }
     const unconfirmedDetail = await service.getById(unconfirmedOrderId)
     if (
@@ -283,10 +285,24 @@ async function main(): Promise<void> {
     ) {
       fail(`订单详情派生售后字段不一致：${JSON.stringify(unconfirmedDetail)}`)
     }
-    if (item?.aftercareStatus !== null || item?.refundEligible || item?.retryForbidden) {
+    if (item?.aftercareStatus !== null || item?.refundEligible || item?.retryForbidden || item?.refundRequired) {
       fail('普通未支付订单不得误派生 Gate 0.3B 售后资格')
     }
     pass('list/detail 服务端派生 paid+failed+unconfirmed 售后字段，其他订单 fail-closed')
+
+    await prisma.order.update({
+      where: { id: notPrintedOrderId },
+      data: { refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON },
+    })
+    const markedPage = await service.list({ refundRequired: true, search: notPrintedOrderNo, page: 1, pageSize: 10 })
+    if (
+      markedPage.pagination.total !== 1 ||
+      markedPage.items[0]?.id !== notPrintedOrderId ||
+      markedPage.items[0]?.refundRequired !== true
+    ) {
+      fail(`refundRequired 筛选必须只返回已标记待退款的已付款单：${JSON.stringify(markedPage)}`)
+    }
+    pass('refundRequired 筛选返回已标记待退款的已付款未出纸单')
 
     const detail = await service.getById(orderId)
     if (

@@ -8,6 +8,7 @@ export interface AdminPrintJobAbandonResult {
   newStatus: 'abandoned'
   orderId: string | null
   abandonedAt: string
+  refundRequired: boolean
 }
 
 export interface AdminPrintJobVerifyOutcomeResult {
@@ -16,6 +17,7 @@ export interface AdminPrintJobVerifyOutcomeResult {
   printOutcome: 'printed' | 'not_printed'
   idempotent: boolean
   verifiedAt: string
+  refundRequired: boolean
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
@@ -84,6 +86,7 @@ const mockAdapter: AdminPrintJobsService = {
       newStatus: 'abandoned',
       orderId: null,
       abandonedAt: new Date().toISOString(),
+      refundRequired: false,
     }
   },
   async verifyOutcome(printTaskId, input) {
@@ -93,6 +96,7 @@ const mockAdapter: AdminPrintJobsService = {
       printOutcome: input.outcome,
       idempotent: false,
       verifiedAt: new Date().toISOString(),
+      refundRequired: false,
     }
   },
 }

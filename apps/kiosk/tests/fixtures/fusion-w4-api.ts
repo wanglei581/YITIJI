@@ -55,7 +55,6 @@ interface WireOfflineAgency {
   lng: number | null
   openHours: string | null
   phone: string | null
-  contactEmail: string | null
   website: string | null
   services: string
   description: string | null
@@ -159,7 +158,7 @@ export function registerW4Api(api: ApiRouter, options: W4ApiOptions = {}): void 
   const agency = {
     id: 'agency-001', name: '青岛合规人力服务机构', orgType: 'recruitment',
     address: '市南区示例路1号', district: '市南区', lat: 36.0671, lng: 120.3826,
-    openHours: null, phone: '0532-00000000', contactEmail: null,
+    openHours: null, phone: '0532-00000000',
     website: 'https://agency.example.gov.cn', services: '["岗位咨询","用工咨询"]',
     description: '线下公开服务机构。', logoUrl: null, status: 'inactive',
     sourceOrgId: 'source-001', externalId: 'QD-HR-001', syncTime: '2026-07-24T08:00:00.000Z',

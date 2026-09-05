@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import {
+  isPaidUnfulfilledRefundRequired,
+  PAID_UNFULFILLED_PENDING_REFUND_REASON,
+} from '../payment/pending-refund-signal'
 import type {
   AdminOrderReadonlyDetail,
   AdminOrderReadonlyItem,
@@ -52,7 +56,7 @@ function parsePrintOutcome(value: string | null | undefined): AdminOrderReadonly
 
 function deriveAftercare(row: OrderRow): Pick<
   AdminOrderReadonlyItem,
-  'aftercareStatus' | 'refundEligible' | 'retryForbidden' | 'printOutcome'
+  'aftercareStatus' | 'refundEligible' | 'retryForbidden' | 'printOutcome' | 'refundRequired'
 > {
   const printOutcome = parsePrintOutcome(row.printTask?.printOutcome)
   const unconfirmedFailure =
@@ -70,6 +74,7 @@ function deriveAftercare(row: OrderRow): Pick<
     refundEligible: row.payStatus === 'paid' && printOutcome !== 'printed',
     // 未确认历史原因仍在时禁止重打，核查后同样禁止。
     retryForbidden: unconfirmedFailure,
+    refundRequired: isPaidUnfulfilledRefundRequired(row),
   }
 }
 
@@ -80,6 +85,8 @@ export interface ListAdminOrdersReadonlyParams {
   channel?: string
   pickupStatus?: string
   search?: string
+  /** true = 只看已付款且已落待退款信号的单（不会自动出款）。 */
+  refundRequired?: boolean
   page: number
   pageSize: number
 }
@@ -133,6 +140,10 @@ export class AdminOrdersReadonlyService {
     if (params.channel) where['channel'] = params.channel
     if (params.pickupStatus) where['pickupStatus'] = params.pickupStatus
     if (params.search && params.search.trim()) where['orderNo'] = { contains: params.search.trim() }
+    if (params.refundRequired === true) {
+      where['payStatus'] = 'paid'
+      where['refundReason'] = PAID_UNFULFILLED_PENDING_REFUND_REASON
+    }
 
     const [rows, total] = await Promise.all([
       this.prisma.order.findMany({
