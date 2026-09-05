@@ -25,6 +25,7 @@ import { DetailsTab, CompaniesTab, VenueGuideTab } from './components/JobFairDet
 import { useFavorites } from '../../favorites/useFavorites'
 import { useAuth } from '../../auth/useAuth'
 import { KioskPageFrame } from '../jobs/components/W4Presentation'
+import { evaluateJobSourceTrust } from '../jobs/utils/sourceTrust'
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-primary-50',  text: 'text-primary-600' },
@@ -155,12 +156,24 @@ export function JobFairDetailPage() {
 
   // 外部跳转记录(P1):只记录「打开来源平台预约入口」动作;预约结果以来源平台为准,本系统不记录。
   const openBookingQr = () => {
-    if (fair) recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    if (fair && evaluateJobSourceTrust(fair).ok) {
+      recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    }
     setQr({ kind: 'book' })
   }
 
   const openCheckinQr = () => {
-    if (fair) recordExternalJump(getToken(), 'job_fair', fair.id, 'external_checkin_open')
+    if (
+      fair &&
+      evaluateJobSourceTrust({
+        sourceName: fair.sourceName,
+        syncTime: fair.syncTime,
+        externalId: fair.externalId,
+        sourceUrl: fair.checkinUrl,
+      }).ok
+    ) {
+      recordExternalJump(getToken(), 'job_fair', fair.id, 'external_checkin_open')
+    }
     setQr({ kind: 'checkin' })
   }
 
