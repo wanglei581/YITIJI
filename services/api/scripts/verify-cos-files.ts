@@ -168,6 +168,43 @@ async function main() {
     ok(canAccessFile(pfRec!, memberEu1) === false, '会员不可访问机构文件')
     ok(canAccessFile(pfRec!, adminReq) === true, '管理员可访问机构文件')
 
+    await expectThrowCode(
+      () =>
+        files.upload({
+          buffer: img,
+          filename: 'admin.jpg',
+          mimeType: 'image/jpeg',
+          purpose: 'admin_upload',
+          uploaderId: p1,
+          actorRole: 'partner',
+          actorOrgId: org1,
+        }),
+      'FILE_PURPOSE_FORBIDDEN',
+      'partner token 不得上传 admin_upload',
+    )
+    await expectThrowCode(
+      () =>
+        files.createUploadIntent({
+          body: { purpose: 'admin_upload', filename: 'doc.pdf', mimeType: 'application/pdf', sizeBytes: 1000 },
+          uploaderId: p1,
+          actorRole: 'partner',
+          actorOrgId: org1,
+        }),
+      'FILE_PURPOSE_FORBIDDEN',
+      'partner token 不得创建 admin_upload 直传意图',
+    )
+    await expectThrowCode(
+      () =>
+        files.createUploadIntent({
+          body: { purpose: 'admin_upload', filename: 'doc.pdf', mimeType: 'application/pdf', sizeBytes: 1000 },
+          uploaderId: null,
+          actorRole: 'kiosk',
+          actorOrgId: null,
+        }),
+      'FILE_PURPOSE_FORBIDDEN',
+      'kiosk token 不得创建 admin_upload 直传意图',
+    )
+
     // ── D. 直传意图 → raw 写入 → complete ──────────────────────────────
     console.log('\n[D] upload-intent → raw 写入 → complete')
     const intent = await files.createUploadIntent({
