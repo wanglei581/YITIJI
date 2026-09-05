@@ -51,7 +51,7 @@ docs/progress/next-tasks.md、docs/product/feature-scope.md、docs/compliance/co
 
 ## 包 4 · AI 链路（API + Kiosk）
 
-- **ID**：AI-01（P0）、AI-02、AI-04、AI-05、AI-06、API-02、API-12、API-31、MSC-01
+- **ID**：AI-01（P0）、AI-02、AI-04、AI-05、AI-06、API-02、API-12、API-31、MSC-01、API-32（按拍板结论第 7 条：新增 `resume_ai` 同意项，复用 `UserAiConsent`，会员首次使用简历类 AI 确认一次、可撤回；游客会话级提示不入库）
 - **目标**：前端超时 ≥ 后端 LLM 超时（或改异步+轮询）；客户端 abort 回滚配额；助手会话按归属隔离；模拟面试 CAS；优化懒执行加锁；助手路由白名单去尾斜杠。
 - **允许改**：`apps/kiosk/src/services/api/aiHttpAdapter.ts`、`pages/resume/*`、`pages/assistant/AssistantPage.tsx`；`services/api/src/ai/**`、`mock-interview/**`、`advisor/**`
 - **验收**：`verify:ai-*` 全绿；新增用例：LLM 延迟 20s 时解析成功；重复提交 optimize 只扣一次；两个匿名 sessionId 互不可见；并发两次 `/end` 只生成一份报告。
@@ -65,7 +65,7 @@ docs/progress/next-tasks.md、docs/product/feature-scope.md、docs/compliance/co
 
 ## 包 6 · Admin 静默失败与假保存
 
-- **ID**：ADM-A1（P0）、OPS-01、OPS-02、ADM-C1、ADM-C4、ADM-C6、ADM-C7、ADM-M2、ADM-M4、ADM-M5、ADM-A2、ADM-A3、ADM-A4、ADM-A5、ADM-A6、ADM-A7、ADM-A8、ADM-A10
+- **ID**：ADM-A1（P0）、OPS-01、OPS-02、ADM-C1、ADM-C4、ADM-C6、ADM-C7、ADM-M2、ADM-M4、ADM-M5（按拍板结论第 4 条：删除 `/member-privacy` 路由与页面，保留 `/privacy-requests`，删除证据与记录按 CLAUDE.md §8）、ADM-A2、ADM-A3、ADM-A4、ADM-A5、ADM-A6、ADM-A7、ADM-A8、ADM-A10
 - **目标**：每个动作失败必有提示；保存后本地态用服务端返回值；枚举映射补全；筛选值与后端动作名一致。
 - **允许改**：`apps/admin/src/routes/**` 清单列出的页面、`apps/admin/src/services/api/**`；后端仅 `terminals/dto/save-toolbox-config.dto.ts`（若选 DTO 加字段方案）
 - **禁改**：jobs-admin/jobs-partner/companies service 的状态迁移逻辑（另一会话在改）。
@@ -80,7 +80,8 @@ docs/progress/next-tasks.md、docs/product/feature-scope.md、docs/compliance/co
 ## 包 8 · Partner
 
 - **ID**：PTR-02（P1）、PTR-03、PTR-05、PTR-06、PTR-09、PTR-10、PTR-11、PTR-14、PTR-16、PTR-17、PTR-18（只做摘导航 + 接改密端点）、PTR-19
-- **禁改**：`jobs-partner.service.ts` 的 reviewStatus/publishStatus 迁移逻辑（另一会话在改）；PTR-12/PTR-20 等待产品拍板不做。
+- **禁改**：`jobs-partner.service.ts` 的 reviewStatus/publishStatus 迁移逻辑（另一会话在改）。
+- **已定做法**：PTR-12 按拍板结论第 3 条（存量 externalId 走更新并回 pending）；PTR-20 按第 6 条（`canManageCompanies` 按机构类型投影，写进 `docs/product/partner-permission-matrix.md`）。
 - **验收**：`verify:partner-edit`、`verify:partner-*`；用例：编辑校招岗位后 category 仍为 campus；Excel「上一步」再预览不留孤儿批次；政策/企业被驳回显示原因。
 
 ## 包 9 · 截断口径 + 心跳清理（API + 三端）
