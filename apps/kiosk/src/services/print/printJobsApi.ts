@@ -57,7 +57,15 @@ export interface PrintJobCreated {
 }
 
 /** Backend status values — subset of shared PrintTaskStatus */
-export type BackendJobStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed'
+/** Backend status values — subset of shared PrintTaskStatus plus admin abandoned. */
+export type BackendJobStatus =
+  | 'pending'
+  | 'claimed'
+  | 'printing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'abandoned'
 
 export interface PrintJobStatusResult {
   taskId:        string

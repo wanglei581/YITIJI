@@ -25,6 +25,7 @@ import { loginPathForCurrentLocation } from '../../auth/returnPath'
 import { API_MODE } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
+import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import {
   fetchPrintBenefits,
   resolvePrintBenefitState,
@@ -33,7 +34,7 @@ import {
 } from '../../services/api/benefits'
 import { fetchPrintPriceConfig, unitCentsFor } from '../../services/print/priceConfigApi'
 import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
@@ -160,6 +161,12 @@ export function PrintConfirmPage() {
   // 按**本机**能力收口：已验收的彩色/双面原样保留，未验收的才砍回基线。
   // 无条件砍成黑白会把管理员已验收的能力静默降级，用户选了彩色却按黑白出纸。
   const capability = usePrintParamCapability()
+  const {
+    printerReady,
+    printerLabel,
+    loading: printerLoading,
+  } = useTerminalDeviceStatus()
+  const printerBlocked = printerLoading || !printerReady
   const capabilityAllows = useMemo(
     () => ({ color: capability.color.allowed, duplex: capability.duplex.allowed }),
     [capability.color.allowed, capability.duplex.allowed],
@@ -228,9 +235,15 @@ export function PrintConfirmPage() {
           quantity: line?.quantity ?? q.billablePages * params.copies,
         })
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (cancelled) return
-        setQuote({ status: 'unavailable', reason: '页数待服务端确认，以最终计费为准' })
+        // 打印机不可用要如实说出来（用户看到这句才知道不是页数没算好，是机器不能用）；
+        // 其余报价失败只说页数待确认，不把技术串甩给站在机器前的求职者。
+        const reason =
+          errorCodeOf(err) === 'PRINTER_UNAVAILABLE'
+            ? userMessageOf(err, '本机打印机当前不可用，请联系现场工作人员')
+            : '页数待服务端确认，以最终计费为准'
+        setQuote({ status: 'unavailable', reason })
       })
     return () => {
       cancelled = true
@@ -328,7 +341,10 @@ export function PrintConfirmPage() {
   ]
 
   const confirmBlocked =
-    submitting || abandoning || (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
+    submitting ||
+    abandoning ||
+    printerBlocked ||
+    (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
 
   const handleBack = async () => {
     if (!contractReport) {
@@ -347,6 +363,14 @@ export function PrintConfirmPage() {
   }
 
   const handleConfirm = async () => {
+    if (printerBlocked) {
+      setSubmitError(
+        printerLoading
+          ? '正在确认打印机状态，请稍候'
+          : `${printerLabel}。当前不能下单，请联系工作人员。`,
+      )
+      return
+    }
     if (API_MODE === 'http') {
       if (!file.fileUrl) {
         setSubmitError('打印文件尚未就绪，无法提交打印。请返回重新上传或重新生成文件后再试。')
@@ -403,6 +427,9 @@ export function PrintConfirmPage() {
           navigate('/print/progress', { state: nextState })
         }
       } catch (err) {
+        // 原写法把兜底句挂在「不是 Error」那一支，而技术串恰恰是**有 message 的
+        // Error**，那句中文一次都执行不到。统一走 userMessageOf：白名单码给专属
+        // 文案，未知码落到这里的兜底句。
         setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
         setSubmitting(false)
       }
@@ -472,6 +499,13 @@ export function PrintConfirmPage() {
         <div className="print-confirm-left" style={{ overflowY: 'auto' }}>
 
           {/* 文件条 */}
+          {printerBlocked && (
+            <div className="mb-4 rounded-lg border border-warning bg-warning-bg px-4 py-3 text-sm text-warning-fg" role="status">
+              {printerLoading
+                ? '正在确认打印机状态…'
+                : `${printerLabel}。当前不能下单，请联系工作人员。`}
+            </div>
+          )}
           {paramsWereRestricted && (
             <div className="mb-4 rounded-lg border border-warning bg-warning-bg px-4 py-3 text-sm text-warning-fg">
               参数已按本机已验证能力收口
@@ -734,6 +768,10 @@ export function PrintConfirmPage() {
               <LoaderIcon style={{ width: 24, height: 24, animation: 'spin 1s linear infinite' }} aria-hidden="true" />
               提交中…
             </>
+          ) : printerLoading ? (
+            '设备检测中…'
+          ) : !printerReady ? (
+            '打印机不可用'
           ) : (
             <>
               <PrinterIcon aria-hidden="true" />
