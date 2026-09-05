@@ -404,6 +404,23 @@ export class AlipayProvider implements PaymentProvider {
     return { ok: true, event }
   }
 
+  /**
+   * 这笔交易在支付宝侧是否**从未被创建**（顾客没扫码）。
+   *
+   * 只判 ACQ.TRADE_NOT_EXIST 这一个错误码；其它异常一律向上抛，由调用方按不可判处理。
+   * 刻意不并进 queryPayment：那里返回 unknown 是正确的保守行为，只有「本地已过期」
+   * 这个前提成立时（closeExpiredQrPayment）才能把 NOT_EXIST 解释成「不会再有扣款」。
+   */
+  private async qrTradeNeverCreated(input: { attemptId: string; orderId: string }): Promise<boolean> {
+    try {
+      await this.call('alipay.trade.query', { out_trade_no: input.attemptId })
+      return false
+    } catch (e) {
+      if ((e as Error).message?.includes('ACQ.TRADE_NOT_EXIST')) return true
+      throw e
+    }
+  }
+
   /** 主动查单兜底（回调丢失时）：alipay.trade.query。 */
   async queryPayment(input: { attemptId: string; orderId: string }): Promise<PaymentQueryResult> {
     let node: Record<string, unknown>
@@ -433,6 +450,18 @@ export class AlipayProvider implements PaymentProvider {
    * 关闭与支付成功竞态时重新查单，绝不根据本地倒计时臆测渠道终态。
    */
   async closeExpiredQrPayment(input: { attemptId: string; orderId: string }): Promise<PaymentQueryResult> {
+    // API-10：顾客压根没扫码时，支付宝侧根本没有这笔交易，查单抛 ACQ.TRADE_NOT_EXIST。
+    // queryPayment 对它返回 unknown 是对的——预下单刚完成的那一小段时间里也可能瞬时
+    // 返回 NOT_EXIST，那时候当成 closed 会有双扣风险。
+    //
+    // 但**本方法只在屏上码本地过期之后才被调用**，且出码时已经带了 timeout_express
+    // （见 createQrPayment），渠道侧的码同样已经到期。此时 NOT_EXIST 只有一种解释：
+    // 这笔交易从未被买家发起，也就不可能产生扣款。继续返回 unknown 会把订单锁死——
+    // 顾客等 5 分钟重新出码，拿到的还是 PENDING，一直到订单被自动关闭为止，
+    // 全程无法付款。所以这里必须把它收敛成 closed，让业务层释放互斥。
+    if (await this.qrTradeNeverCreated(input)) {
+      return { status: 'closed', channelTxnNo: null, amountCents: null }
+    }
     const queried = await this.queryPayment(input)
     if (queried.status !== 'pending') return queried
     try {
