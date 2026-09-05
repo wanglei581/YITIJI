@@ -77,6 +77,42 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   VALIDATION_FAILED: '提交内容未通过校验，请检查后重试',
 }
 
+/**
+ * 「服务端文案可直接展示」的码白名单。
+ *
+ * 与上面 SHARED_USER_MESSAGES 的分工：那张表是**用固定中文覆盖**服务端说法，
+ * 适合失败原因唯一的码；这张表针对的是**原因随具体输入变化、且服务端那句就是
+ * 写给求职者看的**的码，固定文案在这里反而更糟。
+ *
+ * 实例：`CONVERT_FAILED` 若统一成「生成失败，请稍后重试」，用户会照着提示一直重试，
+ * 而真实原因可能是「合成图片尺寸不受支持」—— 重试永远不会成功，正确动作是换一张图。
+ * 这不只是 helpfulness 损失，是把用户导向一个无效操作。
+ *
+ * 加码进这张表的判据（三条都要满足）：
+ * 1. 该码的服务端 message 由业务代码显式写成面向求职者的中文，不是异常串或运维提示
+ *    （反例见本文件顶部那条「请配置 JOB_MATERIAL_PDF_FONT_PATH」）；
+ * 2. message 不含内部状态：路径、SQL、堆栈、配置项名、内部 ID；
+ * 3. 有门禁或浏览器用例钉住前两条。CONVERT_FAILED 由
+ *    fusion-w2-tools.spec.ts「conversion page renders a server conversion error
+ *    without fabricating output」钉住。
+ *
+ * 未登记的码一律仍走调用方兜底句 —— 对披露 fail-closed 的默认没有变。
+ */
+const PASSTHROUGH_MESSAGE_CODES: ReadonlySet<string> = new Set(['CONVERT_FAILED'])
+
+/**
+ * 透传前的最后一道形状检查。不是判据（判据是上面那三条 + 逐码登记），
+ * 只是防止某天服务端在同一个码下换成异常串时把它原样怼到一体机屏幕上。
+ */
+function displayableServerMessage(error: unknown): string | undefined {
+  if (!(error instanceof ApiHttpError)) return undefined
+  const message = error.message?.trim()
+  if (!message || message.length > 60) return undefined
+  if (!/[\u4e00-\u9fa5]/.test(message)) return undefined
+  if (/^(HTTP\s|请求失败（)/.test(message)) return undefined
+  return message
+}
+
 /** 从任意 error 上取错误码；取不到返回 undefined。 */
 export function errorCodeOf(error: unknown): string | undefined {
   if (error instanceof ApiHttpError) return error.code
@@ -96,6 +132,10 @@ export function errorCodeOf(error: unknown): string | undefined {
 export function userMessageOf(error: unknown, fallback: string): string {
   const code = errorCodeOf(error)
   if (code && code in SHARED_USER_MESSAGES) return SHARED_USER_MESSAGES[code] as string
+  if (code && PASSTHROUGH_MESSAGE_CODES.has(code)) {
+    const serverMessage = displayableServerMessage(error)
+    if (serverMessage) return serverMessage
+  }
   // 浏览器 fetch 失败是 TypeError。普通 Error('Failed to fetch') 仍走兜底——
   // verify-kiosk-runtime-error-boundary 钉死不得按 message 文本猜测。
   if (error instanceof TypeError) return SHARED_USER_MESSAGES.NETWORK_ERROR as string
@@ -110,3 +150,6 @@ export function userMessageOf(error: unknown, fallback: string): string {
 
 /** 门禁与测试用：暴露白名单本体，避免各处重新抄一份码表造成漂移。 */
 export const SHARED_USER_MESSAGE_CODES = Object.freeze(Object.keys(SHARED_USER_MESSAGES))
+
+/** 门禁与测试用：暴露透传码白名单，同样避免各处重抄造成漂移。 */
+export const PASSTHROUGH_USER_MESSAGE_CODES = Object.freeze([...PASSTHROUGH_MESSAGE_CODES])
