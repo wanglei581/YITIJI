@@ -16,6 +16,10 @@
  * 11. 报告 PDF：真实 pdfkit 渲染（中文字体 + pageCount ≥1），含合规声明文本
  * 15. ai-down：模型断连 → start 失败，但通用题目单照常渲染出真实 PDF
  *     （variant=degraded / AIGenerated=false / 文件名写明通用题库）
+ * 16. 并发两次 /end 只生成一份报告
+ * 17. 最后一题并发重发：唯一约束冲突返回 done:true，不 500
+ * 18. 并发无权 /end → 403/404，且不二次打 LLM
+ * 19. completed 且无报告时 /end 可恢复生成（崩溃恢复）
  *
  * 运行：pnpm --filter @ai-job-print/api verify:mock-interview
  */
@@ -614,6 +618,112 @@ async function main() {
       } finally {
         llm.buildReport = orig
       }
+    }
+
+    const httpStatusOf = (e: unknown): number =>
+      e instanceof Error && 'getStatus' in e ? (e as { getStatus(): number }).getStatus() : 0
+
+    // ── 17. 最后一题并发重发：P2002 不得 500 ──────────────────────────────
+    {
+      const created = await svc.createSession({ ...baseCfg, durationMin: 3 }, { endUserId: endUserA, accessToken: null })
+      cleanupSessionIds.push(created.sessionId)
+      const reqA = { endUserId: endUserA, accessToken: null }
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      await svc.start(created.sessionId, reqA)
+      responseQueue.push(q('第二题'))
+      await svc.answer(created.sessionId, { answer: '经历一' }, reqA)
+      responseQueue.push(q('第三题'))
+      await svc.answer(created.sessionId, { answer: '经历二' }, reqA)
+      responseQueue.push(q('最后一题'))
+      await svc.answer(created.sessionId, { answer: '经历三' }, reqA)
+
+      let release!: () => void
+      const hold = new Promise<void>((resolve) => { release = resolve })
+      let entered = 0
+      const origCreate = prisma.mockInterviewTurn.create.bind(prisma.mockInterviewTurn)
+      ;(prisma.mockInterviewTurn as { create: typeof origCreate }).create = (async (args: Parameters<typeof origCreate>[0]) => {
+        entered += 1
+        if (entered === 1) await hold
+        return origCreate(args)
+      }) as typeof origCreate
+      try {
+        const first = svc.answer(created.sessionId, { answer: '最后一题回答 A' }, reqA)
+        const waitFrom = Date.now()
+        while (entered < 1 && Date.now() - waitFrom < 2000) {
+          await new Promise((resolve) => setTimeout(resolve, 10))
+        }
+        if (entered < 1) fail('17. 最后一题第一笔 create 未进入')
+        const second = await svc.answer(created.sessionId, { answer: '最后一题回答 B' }, reqA)
+        if (!second.done) fail('17. 第二笔并发答题应 done:true')
+        release()
+        const firstResult = await first
+        if (!firstResult.done) fail('17. 第一笔命中唯一约束后应 done:true，不得 500')
+        const candidates = await prisma.mockInterviewTurn.count({
+          where: { sessionId: created.sessionId, role: 'candidate' },
+        })
+        if (candidates !== 4) fail(`17. 候选人回合应为 4，实际 ${candidates}`)
+        pass('17. 最后一题并发重发：P2002 返回 done:true，不 500')
+      } finally {
+        ;(prisma.mockInterviewTurn as { create: typeof origCreate }).create = origCreate
+      }
+    }
+
+    // ── 18. 并发无权 /end 不得复用已授权 Promise ──────────────────────────
+    {
+      const created = await svc.createSession({ ...baseCfg, durationMin: 3 }, { endUserId: endUserA, accessToken: null })
+      cleanupSessionIds.push(created.sessionId)
+      const reqA = { endUserId: endUserA, accessToken: null }
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      await svc.start(created.sessionId, reqA)
+      responseQueue.push(q('下一题'))
+      await svc.answer(created.sessionId, { answer: '有量化项目经历' }, reqA)
+      let reportCalls = 0
+      const orig = llm.buildReport.bind(llm)
+      llm.buildReport = (async (input: Parameters<typeof orig>[0], sink?: Parameters<typeof orig>[1]) => {
+        reportCalls += 1
+        await new Promise((resolve) => setTimeout(resolve, 250))
+        return orig(input, sink)
+      }) as typeof llm.buildReport
+      try {
+        responseQueue.push(reportJson(), reportJson())
+        const authorized = svc.end(created.sessionId, reqA)
+        await new Promise((resolve) => setTimeout(resolve, 40))
+        let badStatus = 0
+        try {
+          await svc.end(created.sessionId, { endUserId: endUserB, accessToken: null })
+        } catch (e) {
+          badStatus = httpStatusOf(e)
+        }
+        await authorized
+        if (badStatus !== 404 && badStatus !== 403) {
+          fail(`18. 无权并发 end 应为 403/404，实际 ${badStatus}`)
+        }
+        if (reportCalls !== 1) fail(`18. 无权请求不得触发第二次 LLM，实际 ${reportCalls}`)
+        pass('18. 并发无权 /end → 404 且不二次打 LLM')
+      } finally {
+        llm.buildReport = orig
+      }
+    }
+
+    // ── 19. completed 且无报告：崩溃恢复可再生成 ──────────────────────────
+    {
+      const created = await svc.createSession({ ...baseCfg, durationMin: 3 }, { endUserId: endUserA, accessToken: null })
+      cleanupSessionIds.push(created.sessionId)
+      const reqA = { endUserId: endUserA, accessToken: null }
+      responseQueue.push(q('请自我介绍', { qType: 'intro' }))
+      await svc.start(created.sessionId, reqA)
+      responseQueue.push(q('下一题'))
+      await svc.answer(created.sessionId, { answer: '有量化项目经历' }, reqA)
+      await prisma.mockInterviewSession.update({
+        where: { id: created.sessionId },
+        data: { status: 'completed', endedAt: new Date() },
+      })
+      const preexisting = await prisma.mockInterviewReport.findUnique({ where: { sessionId: created.sessionId } })
+      if (preexisting) fail('19. 前置：此时不应已有报告')
+      responseQueue.push(reportJson())
+      const recovered = await svc.end(created.sessionId, reqA)
+      if (recovered.report.overall.level !== 'good') fail('19. 崩溃恢复应生成完整报告')
+      pass('19. completed 且无报告时 /end 可恢复生成，不永久卡死')
     }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)

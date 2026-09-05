@@ -192,7 +192,33 @@ textarea{font:inherit}
 .tag.slate{background:var(--slate-soft);color:var(--slate-d)}
 
 /* 合成示例（持续标记） */
-.ans{flex:1;min-height:0;margin-top:14px;display:flex;flex-direction:column;border-radius:var(--r-lg);padding:22px 26px 20px}
+/* 2026-09-05 体检修复：回答正文超高时此前会画到下方「可以直接去的地方」「不经过 AI 也能办」两个区块上
+   （reply-* / voice-* 共 7 态）。回答区改为自身滚动，下方两个区块保持固定高度不被覆盖。 */
+.ans{flex:1;min-height:0;margin-top:14px;display:flex;flex-direction:column;border-radius:var(--r-lg);padding:22px 26px 20px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin}
+/* 2026-09-05 体检修复（续）：回答态下 body 只有 648px，而驾驶舱的能力清单占 416px，回答区被压到 44px 只剩一条横纹。
+   有回答时把能力清单的五行分组收起（表头「本机 AI 能力 · 在线/受控/未开放」计数保留可见），回答区拿回约 350px；
+   回到提问态清单自动展开。只用 :has()（Chromium/Edge Kiosk 支持），不改结构与状态名。 */
+#stage:has(#body-root[data-state^="reply-"]) .rail .rgrp,
+#stage:has(#body-root[data-state^="voice-"]) .rail .rgrp,
+#stage:has(#body-root[data-state="ai-unavailable"]) .rail .rgrp,
+#stage:has(#body-root[data-state="mic-denied"]) .rail .rgrp{display:none}
+#stage:has(#body-root[data-state^="reply-"]) .rail .sweep,
+#stage:has(#body-root[data-state^="voice-"]) .rail .sweep,
+#stage:has(#body-root[data-state="ai-unavailable"]) .rail .sweep,
+#stage:has(#body-root[data-state="mic-denied"]) .rail .sweep{display:none}
+#stage:has(#body-root[data-state^="reply-"]) .ans,
+#stage:has(#body-root[data-state^="voice-"]) .ans,
+#stage:has(#body-root[data-state="ai-unavailable"]) .ans,
+#stage:has(#body-root[data-state="mic-denied"]) .ans{min-height:200px}
+/* 「不经过 AI 也能办」四张卡在这些态带副标题，2×2 等高网格会把卡压到内容画出边框；改为按内容定高，回答区吸收剩余。 */
+#stage:has(#body-root[data-state^="reply-"]) .mrail.big,
+#stage:has(#body-root[data-state^="voice-"]) .mrail.big,
+#stage:has(#body-root[data-state="ai-unavailable"]) .mrail.big,
+#stage:has(#body-root[data-state="mic-denied"]) .mrail.big{flex:none;grid-template-rows:auto auto}
+#stage:has(#body-root[data-state^="reply-"]) .mrail.big .ment,
+#stage:has(#body-root[data-state^="voice-"]) .mrail.big .ment,
+#stage:has(#body-root[data-state="ai-unavailable"]) .mrail.big .ment,
+#stage:has(#body-root[data-state="mic-denied"]) .mrail.big .ment{min-height:0;padding:16px 22px;gap:8px}
 .ans.synthetic{border:1.5px dashed var(--wheat);background-color:var(--surface);background-image:repeating-linear-gradient(135deg,rgba(169,120,31,.055) 0 10px,rgba(169,120,31,0) 10px 22px)}
 .ans.waiting{border:1.5px dashed var(--line-2);background:var(--surface)}
 .syn-bar{flex:none;display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px dashed var(--line-2);font-size:18px;line-height:1.45;color:var(--wheat-d);font-weight:600}
@@ -381,6 +407,9 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 .rail-route .rr-x{margin-left:auto;font-size:15px;color:rgba(223,243,234,.5);}
 @media (prefers-reduced-motion:reduce){.sweep.run{animation:none;opacity:0;}}
 #stage.flat .sweep.run{animation:none;opacity:0;}
+
+/* 2026-09-05 体检修复：27 寸竖屏 1px≈0.31mm，13–15px 辅助文字站立读不清；统一提到 16px（正文字阶仍按规范 17–23）。 */
+.ment-go small,.tag,.ans-list li i,.act small,.rail-n,.rail-route .rr-x{font-size:16px}.rc .rt{font-size:15px}
 </style>
 </head>
 <body>

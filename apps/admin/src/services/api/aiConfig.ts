@@ -5,9 +5,18 @@ import { authHeader, redirectToLogin } from '../auth'
 export type LlmVendor = 'deepseek' | 'qwen' | 'minimax' | 'yuren'
 export type AiModelFeatureKey =
   | 'assistant_chat'
+  | 'mock_interview'
   | 'resume_diagnosis'
   | 'resume_generate'
   | 'resume_optimize'
+  | 'job_fit'
+  | 'career_plan'
+  | 'fair_visit_plan'
+  | 'self_assessment'
+  | 'job_recommend'
+  | 'job_explain'
+  | 'advisor_work'
+  | 'print_param_prefill'
   | 'digital_human'
   | 'poster_generation'
 
@@ -18,6 +27,7 @@ export interface AiModelFeatureMeta {
   description: string
   runtimeNote: string
   allowCustomSystemPrompt: boolean
+  inheritsFrom?: AiModelFeatureKey
 }
 
 export interface LlmPreset {
@@ -40,6 +50,7 @@ export interface AiConfigView {
   temperature:      number
   enabled:          boolean
   apiKeyConfigured: boolean
+  inheritedFrom:   AiModelFeatureKey | null
 }
 
 export interface AiConfigResponse {

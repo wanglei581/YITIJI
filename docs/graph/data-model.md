@@ -105,7 +105,7 @@ flowchart TD
 | **JobApplication** | 17 | EndUser、Job | 2 个文件<br/>`job-applications/job-applications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **JobDataQualitySnapshot** | 10 | Job、Organization | 1 个文件<br/>`job-ai/job-quality.service.ts` |
 | **JobFair** | 39 | FairCompany、FairMaterial、FairVenueGuide、FairZone、JobSource、Organization | 15 个文件<br/>`activity/activity.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
-| **JobSource** | 30 | FieldMappingRule、ImportBatch、Job、JobFair、Organization、SyncLog | 5 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>`jobs/jobs-partner.service.ts`<br/>… |
+| **JobSource** | 30 | FieldMappingRule、ImportBatch、Job、JobFair、Organization、SyncLog | 6 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/data-source-credential-policy.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **KioskActivity** | 12 | — | **无代码读写** |
 | **KioskSession** | 9 | — | **无代码读写** |
 | **LegalDocVersion** | 10 | — | 2 个文件<br/>`legal/legal.service.ts`<br/>`member-auth/member-auth.service.ts` |
@@ -142,7 +142,7 @@ flowchart TD
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 1 个文件<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalHeartbeat** | 12 | Terminal | 2 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`terminals/terminals-agent.service.ts` |
+| **TerminalHeartbeat** | 12 | Terminal | 3 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`terminals/printer-availability.ts`<br/>`terminals/terminals-agent.service.ts` |
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |

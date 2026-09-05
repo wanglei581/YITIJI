@@ -109,7 +109,8 @@
     "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs",
     "verify:scan-input-safety": "node scripts/verify-scan-input-safety.mjs",
     "test:browser:scan-safety": "playwright test --config=playwright.scan-safety.config.ts",
-    "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs"
+    "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs",
+    "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

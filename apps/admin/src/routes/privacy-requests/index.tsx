@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import {
+  ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT,
+  ADMIN_DATA_REQUEST_REJECT_HINT,
+  MEMBER_DATA_REQUEST_SCOPE,
+} from '@ai-job-print/shared'
 import { ShieldIcon, RefreshCwIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
@@ -81,6 +86,7 @@ function RejectDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
       <div className="w-full max-w-sm rounded-xl bg-white px-6 py-5 shadow-xl">
         <h2 className="mb-1 text-[15px] font-extrabold text-neutral-900">拒绝数据请求</h2>
+        <p className="mb-2 text-[12.5px] text-neutral-500">{ADMIN_DATA_REQUEST_REJECT_HINT}</p>
         <p className="mb-4 text-[12.5px] text-neutral-500">请填写拒绝原因（最多 200 字，不可包含手机号）</p>
         <textarea
           value={reason}
@@ -233,10 +239,10 @@ export default function PrivacyRequestsPage() {
         </button>
       }
     >
-      {/* 说明横幅 */}
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        此页仅供管理员处理数据导出请求（标记重试或拒绝）。账号注销（delete）请求因法务矩阵未签字，暂不开放操作按钮。撤回授权（revoke_consent）由系统同步完成，无需人工干预。
+        {MEMBER_DATA_REQUEST_SCOPE}
       </div>
+      <p className="mb-4 text-[12.5px] text-neutral-500">{ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT}</p>
 
       {actionError && (
         <div className="mb-4 rounded-[9px] border border-error/30 bg-error-bg px-4 py-2.5 text-[13px] text-error-fg">
