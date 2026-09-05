@@ -29,7 +29,7 @@ docs/progress/next-tasks.md、docs/product/feature-scope.md、docs/compliance/co
 
 - **ID**：AGT-01、AGT-02、AGT-03、API-03、API-07、API-08、API-09、PRT-03、PRT-02、PRT-04、SES-03
 - **目标**：付了钱一定出纸，出了纸绝不报失败；离线不收款。
-- **先拍板再做**（问产品负责人，答案写进 PR）：AGT-01 是后端放开 `claimed→completed` 还是 Agent 未确认 printing 不出纸；SES-03 是忙碌期间顺延硬截止还是把 300s 调大并写进文档。
+- **已定做法（见文末「拍板结论」第 1、2 条）**：AGT-01 走后端放开 `claimed→completed/failed`（服务端幂等补写一条 printing 状态日志）+ Agent 侧 printing 上报失败重试后继续打印 + 离线队列对终态 PATCH 收到 `INVALID_STATUS_TRANSITION` 时先补发 printing 再重发终态，不再 dead-letter；SES-03 走忙碌期间顺延：持有忙碌锁（语音 live/connecting、支付 pending、AI 生成中）时硬截止暂停，顺延上限 15 分钟，支付轮询成功与语音音频活动计为活动。
 - **允许改**：`apps/terminal-agent/src/agent/task-runner.ts`、`offline-queue.ts`；`services/api/src/terminals/terminals-agent.service.ts`、`print-jobs/print-jobs.service.ts`、`print-jobs/order-quote.service.ts`、`payment/order-status.service.ts`、`payment/online-payment.service.ts`、`print-jobs/pickup-order.service.ts`、`member-print-orders/member-print-order-create.service.ts`；`apps/kiosk/src/pages/print/PrintProgressPage.tsx`、`PrintConfirmPage.tsx`、`services/print/printJobsApi.ts`、`auth/KioskPrivacyGuard.tsx`
 - **禁改**：`apps/kiosk/src/pages/profile/me/printOrders/**`、`MyPrintOrdersPage.tsx`（触发批次范围守卫 `verify:profile-print-orders-inkpaper`，另立 PR）
 - **验收**：`verify:payment-flow`、`verify:refund-idempotent`、`verify:reconciliation`、`verify:task-reliability`（terminal-agent）、`verify:print-monitor-truth`、`verify:kiosk-print-*` 相关；新增回归用例：printing 上报失败后 completed 不被拒；下载失败任务回到可重领；关单后 pickupStatus 不停在 claimed；`markPaidOnline` 对已取消单拒绝并记「待退」；打印机离线时 `POST /print/jobs` 与 `/orders/quote` 返回 `PRINTER_UNAVAILABLE`。
@@ -99,6 +99,16 @@ docs/progress/next-tasks.md、docs/product/feature-scope.md、docs/compliance/co
 
 ---
 
-## 需要产品负责人先拍板的（Codex 不能替你决定）
+## 拍板结论（2026-09-05 推荐默认值；产品负责人未另行说明即按此执行）
 
-AGT-01 修法、SES-03 硬截止策略、PTR-12 Excel 重复导入语义、ADM-M5 两个隐私页去留、MP-05 小程序取消入口、PTR-20 企业资料是否按机构类型限制、API-32 简历 AI 是否要 UserAiConsent、大屏一期范围。
+| # | 事项 | 结论 | 落到哪个包 |
+|---|---|---|---|
+| 1 | AGT-01 真出纸假失败 | 后端放开 `claimed→completed/failed`（幂等补 printing 日志）；Agent printing 上报失败重试后继续打印；离线队列对终态 400 先补发 printing 再重发，不 dead-letter | 包 1 |
+| 2 | SES-03 300s 硬隐私截止 | 忙碌期间顺延（语音/支付/AI 生成持锁时暂停），上限 15 分钟；支付轮询成功、语音音频活动计为活动 | 包 1 |
+| 3 | PTR-12 Excel 重复导入 | 存量 externalId 走更新并回到 pending 待审，与 JSON/API 通道一致；提示文案同步改 | 包 8 |
+| 4 | ADM-M5 两个隐私工单页 | 删除 `/member-privacy` 路由与页面（保留 `/privacy-requests`），删除按 CLAUDE.md §8 留证据并记进度 | 包 6 |
+| 5 | MP-05 小程序取消订单 | 开放，仅限 `payStatus=unpaid` 且 `pickupStatus=pending` 的单；后端已有端点，小程序入口由用户本人在小程序线加 | 不在 Codex 范围 |
+| 6 | PTR-20 企业资料按机构类型 | 限制：fair_organizer 只能录本机构招聘会关联企业；enterprise_source 只管本企业；其余类型不额外限制；加 `canManageCompanies` 能力并写进 partner-permission-matrix | 包 8 |
+| 7 | API-32 简历 AI 同意 | 新增 `resume_ai` 同意项，会员首次使用简历类 AI 时确认一次、可撤回，复用 `UserAiConsent`；游客保持会话级提示不入库 | 包 4 |
+| 8 | 运营大屏一期 | 政务 + 运营两套 profile、只读令牌、配置放工作台区块；模块 M2/M3/M6(24h)/M7/M8 队列数/M9/M12 结构数；「服务人次」显示为「登录会员数（不含匿名）」并标口径；排在包 1–6 之后 | 单独任务包（待建） |
+
