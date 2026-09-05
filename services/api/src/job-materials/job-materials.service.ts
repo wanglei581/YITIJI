@@ -73,8 +73,10 @@ export class JobMaterialsService {
   }
 
   private async seedTemplatesIfEmpty(): Promise<void> {
-    const existing = await this.prisma.jobMaterialTemplate.count()
-    if (existing > 0) return
+    // 不用 count()>0 提前返回：多实例并发启动时，实例 A 刚插入第 1 条、实例 B 就会读到
+    // count=1 判定「已种子化」，剩下 5 条永远补不上；单实例种子中途崩溃同样会卡死在半套。
+    // 逐条 upsert 本身按 id 幂等且 update 为空（运营改过的行不会被覆盖），无条件跑即自愈。
+    // 代价是每个进程首次读时多 6 次 upsert，可忽略。（Antigravity 第 17 轮复审阻塞项 2）
     for (const [index, template] of JOB_MATERIAL_TEMPLATES.entries()) {
       await this.prisma.jobMaterialTemplate.upsert({
         where: { id: template.id },
