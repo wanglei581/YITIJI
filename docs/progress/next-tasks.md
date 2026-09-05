@@ -463,6 +463,19 @@ v1 是**用户自选文件 + 行参数**，不做模板。PRD 的「招聘会标
 **分歧记录：** antigravity 认为等待期一行代码都不该进新分支（「基础框架真机可能报错，侧翼是空中楼阁；心理上是逃避阻塞」）。
 未采纳，因该论证对任何小程序工作永远成立、证明过头；但其心理警告有效，故上面加了「一个人、小预算、不是许可证」三个限制。
 
+### A′ 面试出门清单 · 任务声明（2026-09-05，§8.1；等待期三条测试放行 + 产品负责人「你们继续」）
+
+- **对应闭环**：生活圈 v1.0 模块 A′。用户面试前一晚在 `interview-result` 看一眼「穿什么 / 带什么 / 安排」+ 已有的报告清单与高频问题；打印走**既有**报告 PDF。
+- **分支 / 位置**：`claude/miniapp-a-prime-interview-checklist`，独立 worktree，基于 integrate head。**不进 #756**，#756 合入后 rebase 再单独 PR。
+- **允许修改**：`apps/miniapp/pages/interview-result/{interview-result.wxml,.js,.wxss}` 三个文件。
+- **禁止修改**：`app.json`（不加页、不加 Tab）、`pages/ai`（二选一已选 interview-result）、`services/api/**`（零 API）、`packages/shared`、提示词（不做凭证型变体）、任何其它页面。
+- **新增入口 / 模型 / 服务 / 依赖**：全无。新增的是结果页内一个分区。
+- **事实修正**：面试会话**无公司、无岗位 id、无城市**（`industry` 硬编码「通用」）。故计划 §3.1′ 第 4 项「几点到怎么走」**整行取消**；着装只用一体机 `InterviewTipsPage` 的通用句（按公司性质分需公司信息，没有）。六条静态文案**复制为页内常量**（小程序零依赖、无构建，不能 import shared）。
+- **不做**：到机码行（等材料包）、提醒（等订阅消息）、PDF 改动（三条静态句不进 PDF，卡片标题写「出门前看一眼」不写「可打印」）。
+- **触碰面**：岗位 ✗ 招聘会 ✗ 简历 ✗ 文件 ✗ 打印 ✗（复用既有按钮）生产配置 ✗ 数据库 ✗ 密钥 ✗ 硬件 ✗。
+- **验证**：`verify-miniapp-static`（112 保持）/ `verify:api-contract`（不应变）/ `verify:visual-scale`（新字号只用 `--fs-*`）/ 开发者工具探针实看（`tools/devtools-probe.mjs --route /pages/interview-result/...`）/ 底栏 `--measure` + `--capsule`。
+- **同步文档**：本节；合入时 `current-progress.md`。
+
 ### 落后 main 的处理规则（2026-09-04 评审组定，可复用）
 
 **非合入日容忍「受控 DIRTY」，不为刷绿而预防性合 `main`。** 理由：E4 要求合入当天再合一次，
