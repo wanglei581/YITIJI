@@ -144,7 +144,7 @@ export function PrintPickupClaimPage() {
     } catch (err) {
       claimLockRef.current = false
       setCode('')
-      setErrorMsg(err instanceof Error ? err.message : '请求失败，请重试')
+      setErrorMsg(userMessageOf(err, '请求失败，请重试'))
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
     }

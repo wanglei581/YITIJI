@@ -7,6 +7,7 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, ErrorState, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { InterviewReportResponse } from '@ai-job-print/shared'
@@ -111,7 +112,7 @@ export function InterviewReportPage() {
         },
       })
     } catch (err) {
-      setPrintError(err instanceof Error ? err.message : '打印版生成失败，请稍后重试')
+      setPrintError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }

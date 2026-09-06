@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { useAuth } from '../../../auth/useAuth'
@@ -85,7 +86,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         if (cancelled) return
         setStatus(null)
         setFiles(null)
-        setError(err instanceof Error ? err.message : 'U盘读取失败，请确认 Terminal Agent 正在运行')
+        setError(userMessageOf(err, 'U盘读取失败，请确认 Terminal Agent 正在运行'))
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -119,7 +120,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       })
     } catch (err) {
       if (!mountedRef.current) return
-      setError(err instanceof Error ? err.message : 'U盘文件导入失败，请重试')
+      setError(userMessageOf(err, 'U盘文件导入失败，请重试'))
       setFiles(null)
       setStatus(null)
     } finally {

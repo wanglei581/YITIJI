@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 import { useNavigate, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
@@ -92,7 +93,7 @@ export function FairMaterialsPage() {
         },
       })
     } catch (error) {
-      setPrintError(error instanceof Error ? error.message : '打印文件准备失败，请稍后重试')
+      setPrintError(userMessageOf(error, '打印文件准备失败，请稍后重试'))
     } finally {
       setPrintingId(null)
     }

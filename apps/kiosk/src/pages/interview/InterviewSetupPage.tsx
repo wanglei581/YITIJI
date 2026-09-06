@@ -7,6 +7,7 @@
 
 import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
 import { isTerminalKiosk } from '../../services/api/screensaver'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
@@ -176,7 +177,7 @@ export function InterviewSetupPage() {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
       setResumeFile({ fileId: uploaded.fileId, name: uploaded.filename })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '简历上传失败，请重试')
+      setError(userMessageOf(err, '简历上传失败，请重试'))
     } finally {
       setUploading(false)
     }
