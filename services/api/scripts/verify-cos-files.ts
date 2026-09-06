@@ -15,7 +15,7 @@
  * Run: pnpm --filter @ai-job-print/api verify:cos:files
  */
 import 'dotenv/config'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import * as os from 'os'
 import * as path from 'path'
 import { promises as fs } from 'fs'
@@ -224,11 +224,16 @@ async function main() {
     const docBytes = Buffer.from('%PDF-1.4 admin doc ' + sfx)
     await files.writeRawUpload(intent.fileId, docBytes)
     const afterRaw = await prisma.fileObject.findUnique({ where: { id: intent.fileId } })
-    ok(afterRaw?.status === 'active' && afterRaw?.sizeBytes === docBytes.length, 'raw 写入后 status=active / size 正确')
+    ok(afterRaw?.status === 'uploading' && afterRaw?.sizeBytes === docBytes.length, 'raw 写入后仍 uploading，complete 才 finalize')
     ok((afterRaw?.sha256?.length ?? 0) === 64, 'raw 写入后 sha256 已计算')
 
     const completed = await files.completeUpload(intent.fileId, adminReq)
     ok(completed.status === 'active' && completed.sizeBytes === docBytes.length, 'complete 复核 headObject 通过')
+    await expectThrowCode(
+      () => files.writeRawUpload(intent.fileId, Buffer.from('%PDF-1.4 rewrite after complete ' + sfx)),
+      'FILE_ALREADY_FINALIZED',
+      'API-27a complete 后再 PUT raw → 409 FILE_ALREADY_FINALIZED',
+    )
 
     // ── E. 软删除 ───────────────────────────────────────────────────────
     console.log('\n[E] 软删除 + 物理回收')
@@ -344,6 +349,7 @@ async function main() {
     try {
       const bigDone = await files.completeUpload(bigIntent.fileId, adminReq)
       ok(bigDone.status === 'active', '超嗅探门限直传对象 completeUpload 正常 active(嗅探按已披露残留跳过)')
+      ok(bigDone.sha256 === '', '超嗅探门限不伪造 sha256，清空客户端声明')
     } finally {
       ;(storage as { getObject: StorageService['getObject'] }).getObject = realGetObject
     }
@@ -352,9 +358,11 @@ async function main() {
     // G3. 直传对象字节与声明一致 → active
     const goodIntent = await mkIntent('good-direct.pdf', 1000)
     const goodRec = (await prisma.fileObject.findUnique({ where: { id: goodIntent.fileId } }))!
-    await storage.putObject(goodRec.storageKey, Buffer.from('%PDF-1.4 good direct ' + sfx, 'latin1'), 'application/pdf', goodRec.bucket)
+    const goodBytes = Buffer.from('%PDF-1.4 good direct ' + sfx, 'latin1')
+    await storage.putObject(goodRec.storageKey, goodBytes, 'application/pdf', goodRec.bucket)
     const goodDone = await files.completeUpload(goodIntent.fileId, adminReq)
     ok(goodDone.status === 'active', '直传字节与声明一致 completeUpload → active')
+    ok(goodDone.sha256 === createHash('sha256').update(goodBytes).digest('hex'), 'complete 落库 sha256 为服务端就字节计算')
 
     // G4. writeRawUpload 字节与意图声明不符 → FILE_CONTENT_MISMATCH
     const rawIntent = await mkIntent('bad-raw.pdf', 1000)

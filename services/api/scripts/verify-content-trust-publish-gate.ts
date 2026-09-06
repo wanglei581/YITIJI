@@ -177,6 +177,16 @@ function makeTable(seed: Row[]) {
       Object.assign(hit, args.data)
       return { ...hit }
     },
+    updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      let count = 0
+      for (const row of rows) {
+        if (matches(row, args.where)) {
+          Object.assign(row, args.data)
+          count += 1
+        }
+      }
+      return { count }
+    },
   }
 }
 
@@ -643,6 +653,36 @@ async function main(): Promise<void> {
     // 撤销信任后立刻恢复拦截
     await trustSvc.setContentTrust(ORG_NULL, { status: 'revoked', reason: '授权到期' }, user)
     await assertDeniedByGate('撤销信任后:该机构的其它内容重新被拒', () => f.jobsAdmin.publishFairSource('fair-null', 'publish', user))
+  }
+
+  // ── 并发 reject + publish 不得 published（API-33a）────────────────────────
+  console.log('\n[6] 并发 reject+publish：CAS 不得写出 rejected+published')
+  {
+    const f = buildFixture()
+    const origFind = f.job.findUnique.bind(f.job)
+    let flipped = false
+    f.job.findUnique = async (args: { where: { id: string } }) => {
+      const row = await origFind(args)
+      if (!flipped && args.where.id === 'job-trusted' && row) {
+        flipped = true
+        const live = f.job.rows.find((r) => r.id === 'job-trusted')
+        if (live) live.reviewStatus = 'rejected'
+      }
+      return row
+    }
+    let code = ''
+    try {
+      await f.jobsAdmin.publishJobSource('job-trusted', 'publish', user)
+    } catch (e) {
+      code = errorOf(e).code
+    }
+    const final = f.job.rows.find((r) => r.id === 'job-trusted')
+    assert('并发 reject+publish 返回 409 PUBLISH_STATE_CONFLICT', code === 'PUBLISH_STATE_CONFLICT', `实际 ${code}`)
+    assert(
+      '并发 reject+publish 不得 published',
+      final?.publishStatus !== 'published',
+      `最终 publishStatus=${String(final?.publishStatus)} reviewStatus=${String(final?.reviewStatus)}`,
+    )
   }
 
   // ── ⑥ 源码层清单 ─────────────────────────────────────────────────────────

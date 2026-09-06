@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
@@ -429,10 +429,24 @@ export class CompaniesService {
         contentId: id,
       })
     }
-    const updated = await this.prisma.companyProfile.update({
-      where: { id },
-      data: { publishStatus: dto.publish ? 'published' : 'unpublished' },
-    })
+    if (dto.publish) {
+      const cas = await this.prisma.companyProfile.updateMany({
+        where: { id, reviewStatus: 'approved' },
+        data: { publishStatus: 'published' },
+      })
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
+        })
+      }
+    } else {
+      await this.prisma.companyProfile.update({
+        where: { id },
+        data: { publishStatus: 'unpublished' },
+      })
+    }
+    const updated = await this.prisma.companyProfile.findUnique({ where: { id } })
+    if (!updated) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
     await this.audit.write({
       actorId: actor.userId, actorRole: 'admin', action: 'company.publish',
       targetType: 'company_profile', targetId: id,

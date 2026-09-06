@@ -1,3 +1,5 @@
+import type { Readable } from 'stream'
+
 /**
  * 对象存储后端抽象。
  *
@@ -71,6 +73,10 @@ export interface ObjectStorageBackend {
   putObject(objectKey: string, buffer: Buffer, contentType: string): Promise<PutResult>
   /** 服务端读取对象内容(供 /content 代理、打印兜底)。 */
   getObject(objectKey: string): Promise<Buffer>
+  /** 读取闭区间 [start, end]（含端点）。只取这一段，不得把整个对象读进内存。 */
+  getObjectRange(objectKey: string, start: number, end: number): Promise<Buffer>
+  /** 流式读取；start/end 为闭区间，缺省为整对象。 */
+  openObjectStream(objectKey: string, start?: number, end?: number): Promise<Readable>
   /** 物理删除对象(幂等)。 */
   deleteObject(objectKey: string): Promise<void>
   /** 获取对象元信息;不存在返回 null。 */

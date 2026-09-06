@@ -71,6 +71,7 @@ import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { firstQueryString } from './jobs-shared'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -115,7 +116,7 @@ export class JobsController {
 
   @Get('jobs')
   getJobs(
-    @Query('keyword')     keyword?:     string,
+    @Query('keyword')     keyword?:     string | string[],
     @Query('city')        city?:        string,
     @Query('industry')    industry?:    string,
     @Query('category')    category?:    string,
@@ -130,7 +131,7 @@ export class JobsController {
     // workType('full_time' 等)与 category('fulltime' 等)二选一,category 优先
     const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
     return this.jobsService.getPublishedJobs({
-      keyword, city, industry, category: effectiveCategory, sourceOrgId, tag, page, pageSize,
+      keyword: firstQueryString(keyword), city, industry, category: effectiveCategory, sourceOrgId, tag, page, pageSize,
     })
   }
 
@@ -142,7 +143,7 @@ export class JobsController {
    */
   @Get('jobs/requirement-stats')
   getJobRequirementStats(
-    @Query('keyword')     keyword?:     string,
+    @Query('keyword')     keyword?:     string | string[],
     @Query('city')        city?:        string,
     @Query('industry')    industry?:    string,
     @Query('category')    category?:    string,
@@ -151,7 +152,7 @@ export class JobsController {
   ) {
     const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
     return this.jobRequirementStats.getStats({
-      keyword, city, industry, category: effectiveCategory, sourceOrgId,
+      keyword: firstQueryString(keyword), city, industry, category: effectiveCategory, sourceOrgId,
     })
   }
 
@@ -163,14 +164,14 @@ export class JobsController {
   @Get('job-fairs')
   getJobFairs(
     @Query('status')   status?:   string,
-    @Query('keyword')  keyword?:  string,
+    @Query('keyword')  keyword?:  string | string[],
     @Query('page')     pageStr?:  string,
     @Query('pageSize') sizeStr?:  string,
     @Query('terminalId') terminalId?: string,
   ) {
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
-    return this.jobsService.getPublishedFairs({ status, keyword, page, pageSize, terminalId })
+    return this.jobsService.getPublishedFairs({ status, keyword: firstQueryString(keyword), page, pageSize, terminalId })
   }
 
   @Get('job-fairs/:id')
@@ -465,7 +466,6 @@ export class JobsController {
     if (!user.orgId) throw new BadRequestException({ error: { code: 'ORG_REQUIRED', message: '合作机构账号未绑定机构' } })
     return this.jobQuality.getSourceQualitySummary({ sourceOrgId: user.orgId })
   }
-  @PaidAiThrottle(10)
 
   /**
    * Phase #5 — Partner 导入岗位(只能写入自己机构,默认 pending+draft)。
@@ -482,6 +482,7 @@ export class JobsController {
   @Post('partner/jobs/import')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(10)
   async importJobs(@Body() dto: ImportJobsDto, @CurrentUser() user: AuthedUser) {
     return this.jobsService.importJobs(dto.items, user)
   }
@@ -496,7 +497,6 @@ export class JobsController {
   ) {
     return this.jobsService.unpublishPartnerJob(id, user)
   }
-  @PaidAiThrottle(30)
 
   /**
    * 阶段1C — Partner 编辑本机构岗位(展示字段白名单)。
@@ -505,6 +505,7 @@ export class JobsController {
   @Patch('partner/jobs/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(30)
   updatePartnerJob(
     @Param('id') id: string,
     @Body() dto: UpdatePartnerJobDto,
@@ -689,11 +690,11 @@ export class JobsController {
       user,
     })
   }
-  @PaidAiThrottle(10)
 
   @Post('partner/excel/:batchId/confirm')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(10)
   confirmExcelImport(
     @Param('batchId') batchId: string,
     @CurrentUser() user: AuthedUser,

@@ -159,19 +159,29 @@ export class MaterialsService {
       // 跳过路径。'skipped_non_document' 这个 mode 值仍保留在类型/前端展示逻辑里，只是为了兼容
       // TASK_TTL_HOURS 内、修复上线前用旧代码路径创建、此刻仍可能被读取到的存量任务。
       const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket).catch(() => null)
+      const sourceSha256 = buffer ? createHash('sha256').update(buffer).digest('hex') : ''
+      const persistScan = async (resultJson: unknown) => {
+        let current: Record<string, unknown> = {}
+        try {
+          current = JSON.parse(paramsJson || '{}') as Record<string, unknown>
+        } catch {
+          current = {}
+        }
+        await this.prisma.documentProcessTask.update({
+          where: { id: task.id },
+          data: {
+            paramsJson: JSON.stringify({ ...current, sourceSha256 }),
+            resultJson: JSON.stringify(resultJson),
+          },
+        })
+      }
       const extraction = buffer
         ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
         : { pages: [], outcome: 'degraded' as const, truncated: false as const }
       if (extraction.outcome === 'unsupported_format') {
-        await this.prisma.documentProcessTask.update({
-          where: { id: task.id },
-          data: { resultJson: JSON.stringify({ mode: 'unsupported_format', findingCount: 0 }) },
-        })
+        await persistScan({ mode: 'unsupported_format', findingCount: 0 })
       } else if (extraction.outcome === 'degraded') {
-        await this.prisma.documentProcessTask.update({
-          where: { id: task.id },
-          data: { resultJson: JSON.stringify({ mode: 'degraded', findingCount: 0 }) },
-        })
+        await persistScan({ mode: 'degraded', findingCount: 0 })
       } else {
         const findings = buildPiiFindingsFromPages(extraction.pages)
         if (findings.length > 0) {
@@ -194,10 +204,7 @@ export class MaterialsService {
               totalPages: extraction.totalPages,
             }
           : { mode: 'real' as const, findingCount: findings.length }
-        await this.prisma.documentProcessTask.update({
-          where: { id: task.id },
-          data: { resultJson: JSON.stringify(resultJson) },
-        })
+        await persistScan(resultJson)
       }
     }
 

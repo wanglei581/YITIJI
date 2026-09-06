@@ -178,7 +178,10 @@ async function main() {
         fail('2. 招聘会详情未带出地图/大屏字段')
       }
       if (json(f.seekerIntent) !== json(slices)) fail('2. 招聘会详情 seekerIntent 不符')
-      pass('2a. getPublishedFairDetail 带出 lat/lng/trafficInfo/expectedAttendance/mapImageUrl/seekerIntent')
+      if ('reviewedBy' in f || 'reviewedAt' in f || 'rejectReason' in f) {
+        fail('2. 公开招聘会详情暴露了 reviewedBy/reviewedAt/rejectReason')
+      }
+      pass('2a. getPublishedFairDetail 带出 lat/lng/trafficInfo/expectedAttendance/mapImageUrl/seekerIntent，且剥离审核元数据')
 
       const map = await jobs.getFairMap(fair.id)
       if (!map.data || map.data.mapImageUrl !== MAP) fail('2. getFairMap 未带出 mapImageUrl')

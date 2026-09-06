@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
-import { promises as fs } from 'fs'
+import { createReadStream, promises as fs } from 'fs'
+import type { Readable } from 'stream'
 import * as path from 'path'
 
 /**
@@ -75,6 +76,28 @@ export class LocalFileStorage {
   /** 读取文件 buffer。 */
   async read(storageKey: string): Promise<Buffer> {
     return fs.readFile(this.resolve(storageKey))
+  }
+
+  /** 读取闭区间 [start, end]（含端点），只把这一段读进内存。 */
+  async readRange(storageKey: string, start: number, end: number): Promise<Buffer> {
+    const length = end - start + 1
+    if (length <= 0) return Buffer.alloc(0)
+    const handle = await fs.open(this.resolve(storageKey), 'r')
+    try {
+      const buf = Buffer.alloc(length)
+      const { bytesRead } = await handle.read(buf, 0, length, start)
+      return bytesRead === length ? buf : buf.subarray(0, bytesRead)
+    } finally {
+      await handle.close()
+    }
+  }
+
+  /** 流式读取；fs.createReadStream 的 end 也是闭区间。 */
+  openReadStream(storageKey: string, start?: number, end?: number): Readable {
+    return createReadStream(this.resolve(storageKey), {
+      ...(start !== undefined ? { start } : {}),
+      ...(end !== undefined ? { end } : {}),
+    })
   }
 
   /** 物理删除文件(不可逆,只在 cron / admin 强制清理时调用)。 */

@@ -8,6 +8,8 @@ import { JobSyncScheduler } from './job-sync.scheduler'
 import { JobSyncController } from './job-sync.controller'
 import { JobSyncProcessor } from './job-sync.processor'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { FilesModule } from '../files/files.module'
+import { FairMaterialPrintBridgeService } from '../jobs/fair-material-print-bridge.service'
 
 const redisUrl = process.env['REDIS_URL']
 
@@ -24,6 +26,7 @@ const redisUrl = process.env['REDIS_URL']
   imports: [
     PrismaModule,
     AuthModule,
+    FilesModule,
     ...(redisUrl
       ? [BullModule.registerQueue({ name: JOB_SYNC_QUEUE })]
       : []),
@@ -31,6 +34,7 @@ const redisUrl = process.env['REDIS_URL']
   providers: [
     JobSyncService,
     JobQualityService,
+    FairMaterialPrintBridgeService,
     JobSyncScheduler,
     ...(redisUrl ? [JobSyncProcessor] : []),
   ],

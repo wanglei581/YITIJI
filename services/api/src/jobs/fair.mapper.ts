@@ -1,4 +1,4 @@
-import type { Fair, FairCompany, FairCompanyPosition, FairIntentSlice, FairZone } from './fair.types'
+import type { Fair, FairCompany, FairCompanyPosition, FairIntentSlice, FairZone, PublicFair } from './fair.types'
 
 /**
  * Prisma JobFair / FairCompany / FairZone 行 → API DTO 转换。
@@ -167,6 +167,42 @@ export function mapFair(row: PrismaJobFairRow): Fair {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
+}
+
+export function mapPublicFair(row: PrismaJobFairRow): PublicFair {
+  const mapped = mapFair(row)
+  const rest: PublicFair = {
+    id: mapped.id,
+    sourceOrgId: mapped.sourceOrgId,
+    externalId: mapped.externalId,
+    sourceName: mapped.sourceName,
+    sourceUrl: mapped.sourceUrl,
+    checkinUrl: mapped.checkinUrl,
+    title: mapped.title,
+    theme: mapped.theme,
+    startAt: mapped.startAt,
+    endAt: mapped.endAt,
+    venue: mapped.venue,
+    city: mapped.city,
+    address: mapped.address,
+    mapImageUrl: mapped.mapImageUrl,
+    description: mapped.description,
+    coverImageUrl: mapped.coverImageUrl,
+    latitude: mapped.latitude,
+    longitude: mapped.longitude,
+    trafficInfo: mapped.trafficInfo,
+    expectedAttendance: mapped.expectedAttendance,
+    seekerIntent: mapped.seekerIntent,
+    companyCount: mapped.companyCount,
+    jobCount: mapped.jobCount,
+    viewCount: mapped.viewCount,
+    reviewStatus: mapped.reviewStatus,
+    publishStatus: mapped.publishStatus,
+    syncTime: mapped.syncTime,
+    createdAt: mapped.createdAt,
+    updatedAt: mapped.updatedAt,
+  }
+  return rest
 }
 
 export function mapFairCompany(row: PrismaFairCompanyRow): FairCompany {

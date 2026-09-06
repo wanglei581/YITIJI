@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { Injectable, NotFoundException, BadRequestException, Optional, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, Optional, ServiceUnavailableException, ConflictException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
@@ -519,7 +519,7 @@ export class PrintJobsService {
   private async assertPiiScanned(fileId: string): Promise<void> {
     const file = await this.prisma.fileObject.findUnique({
       where: { id: fileId },
-      select: { purpose: true, assetCategory: true },
+      select: { purpose: true, assetCategory: true, sha256: true },
     })
     // 文件不存在交由后续既有校验处理，此处不越权报错
     if (!file) return
@@ -530,7 +530,7 @@ export class PrintJobsService {
     const scan = await this.prisma.documentProcessTask.findFirst({
       where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, paramsJson: true },
     })
 
     let pendingFindings = 0
@@ -541,7 +541,18 @@ export class PrintJobsService {
     }
 
     const ok = Boolean(scan) && pendingFindings === 0
-    if (ok) return
+    if (ok) {
+      const scanSha = readPiiScanSourceSha256(scan!.paramsJson)
+      if (!SHA256_HEX_PATTERN.test(file.sha256) || file.sha256 !== scanSha) {
+        throw new ConflictException({
+          error: {
+            code: 'PII_SCAN_STALE',
+            message: '文件在隐私检查后又被改过，请重新检查后再打印',
+          },
+        })
+      }
+      return
+    }
 
     const reason = !scan ? 'PII_SCAN_MISSING' : 'PII_DECISIONS_PENDING'
 
@@ -615,5 +626,14 @@ export class PrintJobsService {
         ? file.storageDeletedAt.toISOString()
         : file ? null : undefined,
     }
+  }
+}
+
+function readPiiScanSourceSha256(paramsJson: string | null): string {
+  try {
+    const parsed = JSON.parse(paramsJson || '{}') as { sourceSha256?: unknown }
+    return typeof parsed.sourceSha256 === 'string' ? parsed.sourceSha256 : ''
+  } catch {
+    return ''
   }
 }

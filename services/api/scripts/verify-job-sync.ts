@@ -25,6 +25,8 @@ import { JobSyncService } from '../src/job-sync/job-sync.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import type { AuditService } from '../src/audit/audit.service'
 import type { JobQualityService } from '../src/job-ai/job-quality.service'
+import type { FairMaterialPrintBridgeService } from '../src/jobs/fair-material-print-bridge.service'
+import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
@@ -86,7 +88,14 @@ async function main() {
   await prisma.onModuleInit()
   const quality = { refreshJobQualitySnapshots: async () => undefined } as unknown as JobQualityService
   const audit = { write: async () => 'verify-job-sync-audit' } as unknown as AuditService
-  const syncService = new JobSyncService(prisma, quality, audit)
+  const revoked: string[] = []
+  const printBridges = {
+    revokeForFair: async (id: string, reason: string) => {
+      revoked.push(`${id}:${reason}`)
+      return 1
+    },
+  } as unknown as FairMaterialPrintBridgeService
+  const syncService = new JobSyncService(prisma, quality, audit, printBridges)
   ;(syncService as unknown as { fetchJson: (endpoint: string) => Promise<unknown> }).fetchJson = async (endpoint) => {
     if (endpoint.includes('bad-source')) throw new Error('HTTP_503')
     return { jobs: MOCK_JOBS.map((job) => ({ ...job })) }
@@ -201,6 +210,30 @@ async function main() {
       }
     }
 
+    const fair = await prisma.jobFair.create({
+      data: {
+        sourceId: goodSourceId,
+        sourceOrgId: TEST_ORG_ID,
+        externalId: `e2e-fair-${Date.now()}`,
+        sourceName: 'E2E Fair Source',
+        sourceUrl: 'https://example.com/fairs/e2e',
+        title: 'E2E 招聘会',
+        theme: 'campus',
+        startAt: new Date(Date.now() + 86400_000),
+        endAt: new Date(Date.now() + 172800_000),
+        venue: 'E2E 会场',
+        city: '广州',
+        reviewStatus: 'approved',
+        publishStatus: 'published',
+      },
+    })
+    await syncService.unpublishSourceContent(goodSourceId, { userId: 'admin-verify', role: 'admin' } as AuthedUser)
+    if (revoked.includes(`${fair.id}:source_bulk_unpublished`)) {
+      pass('API-33b 批量下架对受影响 fairId 调用 printBridges.revokeForFair')
+    } else {
+      fail(`API-33b 未撤打印桥: ${JSON.stringify(revoked)}`)
+    }
+
     // ── 6. Test B: failure path ───────────────────────────────────────────────
     console.log('\n── Test B: failure path (HTTP 503 source) ───────────────────────────────')
     const badJobId = await syncService.enqueue(badSourceId, true)
@@ -226,6 +259,7 @@ async function main() {
     console.log('\n── Cleanup ──────────────────────────────────────────────────────────────')
     if (goodSourceId) {
       await prisma.syncLog.deleteMany({ where: { sourceId: goodSourceId } })
+      await prisma.jobFair.deleteMany({ where: { sourceId: goodSourceId } })
       await prisma.job.deleteMany({ where: { sourceId: goodSourceId } })
       await prisma.jobSource.deleteMany({ where: { id: goodSourceId } })
     }

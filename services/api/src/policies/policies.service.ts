@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -409,7 +410,23 @@ export class PoliciesService {
       })
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
-    const updated = await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: toStatus } })
+    if (action === 'publish') {
+      const cas = await this.prisma.policyPost.updateMany({
+        where: { id, reviewStatus: 'approved' },
+        data: { publishStatus: 'published' },
+      })
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
+        })
+      }
+    } else {
+      await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: 'unpublished' } })
+    }
+    const updated = await this.prisma.policyPost.findUnique({ where: { id } })
+    if (!updated) {
+      throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
+    }
     await this.audit.write({
       actorId: user.userId,
       actorRole: 'admin',

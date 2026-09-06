@@ -37,6 +37,7 @@
  * 不连数据库、不连 Redis、不调用任何外部服务。
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import 'reflect-metadata'
 import ts from 'typescript'
@@ -188,6 +189,28 @@ interface Handler {
 
 function main(): void {
   console.log('=== 会花钱的 AI 路由：限流维度显式声明验证 ===')
+  const jobsControllerSrc = readFileSync(path.join(SRC_ROOT, 'jobs/jobs.controller.ts'), 'utf8')
+  assert.match(
+    jobsControllerSrc,
+    /@Roles\('partner'\)\s*\n\s*@PaidAiThrottle\(10\)\s*\n\s*async importJobs/,
+    'PTR-21 importJobs 的 @PaidAiThrottle 必须在 @Roles 之后的方法装饰器栈内',
+  )
+  assert.match(
+    jobsControllerSrc,
+    /@Roles\('partner'\)\s*\n\s*@PaidAiThrottle\(30\)\s*\n\s*updatePartnerJob/,
+    'PTR-21 updatePartnerJob 的 @PaidAiThrottle 必须在方法装饰器栈内',
+  )
+  assert.match(
+    jobsControllerSrc,
+    /@Roles\('partner'\)\s*\n\s*@PaidAiThrottle\(10\)\s*\n\s*confirmExcelImport/,
+    'PTR-21 confirmExcelImport 的 @PaidAiThrottle 必须在方法装饰器栈内',
+  )
+  assert.doesNotMatch(
+    jobsControllerSrc,
+    /}\s*\n\s*@PaidAiThrottle/,
+    'PTR-21 不得把 @PaidAiThrottle 写在上一方法结尾与下一方法 JSDoc 之间',
+  )
+  console.log('  PASS PTR-21 @PaidAiThrottle 已移进各自方法装饰器栈')
 
   const configPath = path.join(API_ROOT, 'tsconfig.json')
   const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, {
