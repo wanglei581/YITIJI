@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { AlertCircleIcon } from 'lucide-react'
-import type { PrintJobParams } from '@ai-job-print/shared'
+import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
+import { useAuth } from '../../auth/useAuth'
+import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { getPayStatus } from '../../services/print/paymentApi'
-import { getPrintJobStatus, type PrintJobStatusResult } from '../../services/print/printJobsApi'
+import {
+  getPrintJobStatus,
+  issuePrintJobTakeawayUrl,
+  retryPrintJob,
+  type PrintJobStatusResult,
+} from '../../services/print/printJobsApi'
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
@@ -69,6 +78,11 @@ function fileRetentionFromStatus(result: PrintJobStatusResult) {
  */
 const PRINT_JOB_UNCONFIRMED = 'PRINT_JOB_UNCONFIRMED'
 
+function toPublicQrUrl(signedUrl: string): string {
+  if (/^https?:\/\//i.test(signedUrl)) return signedUrl
+  return `${window.location.origin}${signedUrl.startsWith('/') ? signedUrl : `/${signedUrl}`}`
+}
+
 interface PickupLookup {
   orderId: string
   code: string | null
@@ -86,6 +100,7 @@ const DUPLEX_LABEL: Record<string, string> = {
 export function PrintDonePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = (location.state ?? {}) as PrintJobState
 
   const { file, params } = state
@@ -115,6 +130,13 @@ export function PrintDonePage() {
   const [pickupLookup, setPickupLookup] = useState<PickupLookup | null>(null)
   const pickupCode = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.code : null
   const pickupCodeError = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.error : null
+  const [takeaway, setTakeaway] = useState<PrintJobTakeawayUrl | null>(null)
+  const [takeawayError, setTakeawayError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [retryError, setRetryError] = useState<string | null>(null)
+  const takeawayRemaining = useRemainingSeconds(takeaway?.expiresAt)
+  const takeawayExpired = takeawayRemaining === 0
+  const takeawayQrUrl = takeaway && !takeawayExpired ? toPublicQrUrl(takeaway.signedUrl) : null
 
   useEffect(() => {
     if (!taskId) {
@@ -162,6 +184,31 @@ export function PrintDonePage() {
   }, [location.state, navigate, taskId])
 
   useEffect(() => {
+    if (resultState !== 'failed' || API_MODE !== 'http' || !taskId) {
+      setTakeaway(null)
+      setTakeawayError(null)
+      return
+    }
+    let cancelled = false
+    setTakeaway(null)
+    setTakeawayError(null)
+    void issuePrintJobTakeawayUrl({
+      taskId,
+      paymentSessionToken: state.paymentSessionToken,
+      token: getToken(),
+    })
+      .then((result) => {
+        if (!cancelled) setTakeaway(result)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setTakeawayError(userMessageOf(err, '暂时无法签发带走链接，请联系工作人员'))
+        }
+      })
+    return () => { cancelled = true }
+  }, [getToken, resultState, state.paymentSessionToken, taskId])
+
+  useEffect(() => {
     if (resultState !== 'completed' || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) {
       setPickupLookup(null)
       return
@@ -200,6 +247,26 @@ export function PrintDonePage() {
       showSatisfaction={resultState === 'completed'}
     />
   ) : null
+
+  const handleResubmitPrint = async () => {
+    if (!taskId || retrying || isUnconfirmed) return
+    setRetrying(true)
+    setRetryError(null)
+    try {
+      await retryPrintJob({
+        taskId,
+        paymentSessionToken: state.paymentSessionToken,
+        token: getToken(),
+      })
+      navigate('/print/progress', {
+        replace: true,
+        state: { ...((location.state ?? {}) as object), taskId },
+      })
+    } catch (err: unknown) {
+      setRetryError(userMessageOf(err, '重新提交失败，请联系工作人员补打'))
+      setRetrying(false)
+    }
+  }
 
   /* ── 核验中 / 无法确认 ── */
   if (resultState === 'loading' || resultState === 'unknown') {
@@ -272,6 +339,11 @@ export function PrintDonePage() {
           <div className="print-done-fail-reason">
             {failureReason}
           </div>
+          {(state.orderId || takeaway?.orderNo) && (
+            <div className="print-done-fail-reason">
+              订单号 {takeaway?.orderNo ?? state.orderId}
+            </div>
+          )}
           {/* 「无法确认」不等于「没出纸」，也不等于「已出纸」。这里只给两件确定的事：
               纸要现场看，订单还在、由工作人员核查后处理 —— 不承诺结果，也不否认出纸。
               刻意不提「自助退款」四个字：verify:kiosk-feedback-entry 按 2026-08-16 定案
@@ -284,6 +356,29 @@ export function PrintDonePage() {
               {taskId ? `（任务号 ${taskId}）` : null}
             </div>
           )}
+          <p className="print-done-fail-reason">联系工作人员补打</p>
+          {takeawayQrUrl && (
+            <div className="print-done-takeaway" role="region" aria-label="文件带走">
+              <p className="print-done-takeaway-title">文件带走</p>
+              <div className="print-done-takeaway-qr">
+                <QRCodeSVG value={takeawayQrUrl} size={168} level="M" marginSize={0} />
+              </div>
+              {takeawayRemaining >= 0 && (
+                <p className="print-done-takeaway-note">
+                  剩余 {formatRemainingSeconds(takeawayRemaining)}，请用本人手机扫码保存
+                </p>
+              )}
+            </div>
+          )}
+          {takeaway && takeawayExpired && (
+            <p className="print-done-fail-reason" role="status">带走链接已过期，请联系工作人员补打</p>
+          )}
+          {takeawayError && (
+            <p className="print-done-fail-reason" role="status">{takeawayError}</p>
+          )}
+          {retryError && (
+            <p className="print-done-fail-reason" role="status">{retryError}</p>
+          )}
           <div className="print-done-fail-actions">
             <button type="button" className="print-done-action-btn ghost" onClick={() => navigate('/')}>
               返回首页
@@ -291,6 +386,16 @@ export function PrintDonePage() {
             {canReportIssue && (
               <button type="button" className="print-done-action-btn ghost" onClick={() => setFeedbackOpen(true)}>
                 反馈问题
+              </button>
+            )}
+            {takeaway?.canRetry && !isUnconfirmed && (
+              <button
+                type="button"
+                className="print-done-action-btn primary"
+                disabled={retrying}
+                onClick={() => { void handleResubmitPrint() }}
+              >
+                {retrying ? '正在重新提交…' : '重新提交打印'}
               </button>
             )}
             <button type="button" className="print-done-action-btn primary" onClick={() => navigate('/help')}>
@@ -327,6 +432,7 @@ export function PrintDonePage() {
             </div>
 
             <div className="print-done-title">请取走文件</div>
+            <div className="print-done-paper-reminder" role="status">请取走纸张</div>
 
             <div className="print-done-sub">
               {totalFaces != null

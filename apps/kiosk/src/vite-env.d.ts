@@ -11,6 +11,10 @@ interface ImportMetaEnv {
   readonly VITE_TERMINAL_DISPLAY_NAME: string
   readonly VITE_TERMINAL_AGENT_LOCAL_URL: string
   readonly VITE_QR_LOGIN_PUBLIC_BASE_URL: string
+  readonly VITE_KIOSK_LOGOUT_IDLE_SEC?: string
+  readonly VITE_KIOSK_RESULT_IDLE_SEC?: string
+  readonly VITE_KIOSK_SESSION_WARNING_SEC?: string
+  readonly VITE_KIOSK_PRIVACY_IDLE_SEC?: string
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv

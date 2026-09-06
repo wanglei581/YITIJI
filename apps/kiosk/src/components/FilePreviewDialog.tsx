@@ -1,7 +1,7 @@
 import { XIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { FileContentPreview } from './FileContentPreview'
-import { useCountdown } from '../hooks/useCountdown'
+import { formatRemainingSeconds, useRemainingSeconds } from '../hooks/useCountdown'
 
 interface FilePreviewDialogProps {
   fileUrl: string
@@ -9,8 +9,9 @@ interface FilePreviewDialogProps {
   mimeType?: string | null
   format?: string | null
   phoneDownloadUrl?: string | null
-  /** 短时签名链接过期时刻；过期后隐藏二维码并提示重新导出。 */
   expiresAt?: string | null
+  onRegenerate?: () => void
+  regenerating?: boolean
   onClose: () => void
 }
 
@@ -21,11 +22,15 @@ export function FilePreviewDialog({
   format,
   phoneDownloadUrl,
   expiresAt,
+  onRegenerate,
+  regenerating = false,
   onClose,
 }: FilePreviewDialogProps) {
-  const countdown = useCountdown(expiresAt)
-  const qrExpired = Boolean(expiresAt) && countdown.expired
-  const showQr = Boolean(phoneDownloadUrl) && !qrExpired
+  const remaining = useRemainingSeconds(expiresAt)
+  const hasExpiry = Boolean(expiresAt) && remaining >= 0
+  const expired = hasExpiry && remaining === 0
+  const canRegenerate = Boolean(onRegenerate) && hasExpiry && remaining <= 30
+  const showQr = Boolean(phoneDownloadUrl) && !expired
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-5">
@@ -48,7 +53,7 @@ export function FilePreviewDialog({
             <XIcon className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
-        <div className={`min-h-0 flex-1 ${phoneDownloadUrl || expiresAt ? 'grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_210px]' : 'flex'}`}>
+        <div className={`min-h-0 flex-1 ${phoneDownloadUrl ? 'grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_210px]' : 'flex'}`}>
           <FileContentPreview
             className="min-h-0 flex-1 rounded-none border-0"
             fileUrl={fileUrl}
@@ -56,25 +61,39 @@ export function FilePreviewDialog({
             mimeType={mimeType}
             format={format}
           />
-          {(phoneDownloadUrl || expiresAt) && (
+          {phoneDownloadUrl && (
             <aside className="flex items-center justify-center border-t border-neutral-200 bg-neutral-50 p-5 sm:border-l sm:border-t-0">
               <div className="text-center">
+                <p className="mb-3 text-sm font-semibold text-neutral-800">手机扫码保存</p>
                 {showQr ? (
-                  <>
-                    <p className="mb-3 text-sm font-semibold text-neutral-800">手机扫码保存</p>
-                    <div className="inline-flex bg-white p-2">
-                      <QRCodeSVG value={phoneDownloadUrl!} size={160} level="M" marginSize={0} />
-                    </div>
-                    <p className="mt-3 text-xs leading-5 text-neutral-500">
-                      链接短时有效，请仅在本人手机上打开
-                      {expiresAt ? ` · 剩余 ${countdown.label}` : ''}
-                    </p>
-                  </>
+                  <div className="inline-flex bg-white p-2">
+                    <QRCodeSVG value={phoneDownloadUrl} size={160} level="M" marginSize={0} />
+                  </div>
                 ) : (
-                  <>
-                    <p className="mb-3 text-sm font-semibold text-neutral-800">二维码已失效</p>
-                    <p className="text-xs leading-5 text-neutral-500">链接已过期，请重新导出后再扫码带走。</p>
-                  </>
+                  <p className="rounded-md bg-white px-3 py-4 text-sm leading-6 text-neutral-600" role="status">
+                    二维码已过期，请重新生成后再扫码带走
+                  </p>
+                )}
+                {hasExpiry && !expired && (
+                  <p className="mt-3 text-xs leading-5 text-neutral-500">
+                    剩余 {formatRemainingSeconds(remaining)}，链接短时有效，请仅在本人手机上打开
+                  </p>
+                )}
+                {expired && (
+                  <p className="mt-3 text-xs leading-5 text-neutral-500">链接已过期，重新生成后可再扫码</p>
+                )}
+                {!hasExpiry && showQr && (
+                  <p className="mt-3 text-xs leading-5 text-neutral-500">链接短时有效，请仅在本人手机上打开</p>
+                )}
+                {canRegenerate && (
+                  <button
+                    type="button"
+                    className="mt-3 min-h-14 w-full rounded-md bg-primary-600 px-3 text-sm font-semibold text-white disabled:opacity-60"
+                    disabled={regenerating}
+                    onClick={onRegenerate}
+                  >
+                    {regenerating ? '正在重新生成…' : expired ? '重新生成' : '重新生成'}
+                  </button>
                 )}
               </div>
             </aside>

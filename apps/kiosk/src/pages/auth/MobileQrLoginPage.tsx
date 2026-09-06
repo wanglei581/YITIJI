@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CheckCircle2Icon, CircleAlertIcon, LoaderCircleIcon, MonitorIcon, QrCodeIcon, ShieldCheckIcon } from 'lucide-react'
+import { useCountdown } from '../../hooks/useCountdown'
 import { resolveMemberApiErrorMessage, sendSmsCode } from '../../services/auth/memberAuthApi'
 import { confirmQrLogin, fetchQrLoginStatus } from '../../services/auth/memberQrLoginApi'
 import './mobile-qr-service-desk.css'
@@ -16,16 +17,6 @@ function formatPhone(raw: string): string {
   if (raw.length <= 3) return raw
   if (raw.length <= 7) return `${raw.slice(0, 3)} ${raw.slice(3)}`
   return `${raw.slice(0, 3)} ${raw.slice(3, 7)} ${raw.slice(7)}`
-}
-
-function useCountdown() {
-  const [seconds, setSeconds] = useState(0)
-  useEffect(() => {
-    if (seconds <= 0) return undefined
-    const timer = window.setTimeout(() => setSeconds((value) => Math.max(0, value - 1)), 1000)
-    return () => window.clearTimeout(timer)
-  }, [seconds])
-  return { seconds, start: setSeconds }
 }
 
 export function MobileQrLoginPage() {

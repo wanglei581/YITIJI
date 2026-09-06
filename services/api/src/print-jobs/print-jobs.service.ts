@@ -6,7 +6,11 @@ import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { OrderStatusService } from '../payment/order-status.service'
-import { assertPaymentSessionSecretConfigured, createPaymentSessionToken } from '../payment/payment-session-token'
+import {
+  assertPaymentSessionSecretConfigured,
+  createPaymentSessionToken,
+  verifyPaymentSessionToken,
+} from '../payment/payment-session-token'
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
@@ -44,6 +48,35 @@ export interface PrintJobCreated {
   billingPageSource: BillingPageSource
   /** 短期支付会话 token（只授权本次订单出码 / 轮询；不含文件 URL 或密钥）。 */
   paymentSessionToken: string
+}
+
+export interface PrintJobTakeawayUrlResult {
+  signedUrl: string
+  expiresAt: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  orderId: string
+  orderNo: string
+  payStatus: OrderPayStatus
+  amountCents: number
+  canRetry: boolean
+}
+
+export interface PrintJobRetryResult {
+  taskId: string
+  orderId: string
+  orderNo: string
+  amountCents: number
+  payStatus: OrderPayStatus
+  status: string
+}
+
+export interface PrintJobAccessContext {
+  endUserId?: string | null
+  paymentSessionToken?: string
+  ipAddress?: string | null
+  userAgent?: string | null
 }
 
 export interface PrintJobStatusResult {
@@ -94,6 +127,23 @@ const USER_FAILURE_REASONS: Record<string, string> = {
 
 /** 未知错误码 / 仅有原始 errorMessage 时的统一安全兜底文案。 */
 const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员处理或稍后重试'
+const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
+const KIOSK_RETRY_LOG_CODE = 'kiosk_retry'
+
+function parseStoredPrintFileId(fileUrl: string): string | null {
+  try {
+    const u = new URL(fileUrl, 'http://internal.local')
+    return u.pathname.match(/\/files\/([^/]+)\/content$/)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+function printTaskNotFound(): never {
+  throw new NotFoundException({
+    error: { code: 'PRINT_TASK_NOT_FOUND', message: '打印任务不存在' },
+  })
+}
 
 /**
  * 纯函数：把内部 errorCode 映射为面向用户的安全中文失败原因。
@@ -623,6 +673,229 @@ export class PrintJobsService {
         ? file.storageDeletedAt.toISOString()
         : file ? null : undefined,
     }
+  }
+
+  async issueTakeawayUrl(
+    taskId: string,
+    ctx: PrintJobAccessContext,
+  ): Promise<PrintJobTakeawayUrlResult> {
+    const { task, order, file } = await this.loadAccessiblePrintJob(taskId, ctx)
+    const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
+    if (!fileId || !file || file.deletedAt) {
+      throw new ConflictException({
+        error: {
+          code: 'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+          message: '打印文件已按保存策略清理，无法再签发带走链接',
+        },
+      })
+    }
+    const signed = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+    await this.audit.write({
+      actorId: ctx.endUserId ?? null,
+      actorRole: 'kiosk',
+      action: 'print_job.takeaway_url',
+      targetType: 'print_task',
+      targetId: task.id,
+      payload: { orderId: order.id, orderNo: order.orderNo, fileId },
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
+    }).catch(() => undefined)
+
+    return {
+      signedUrl: signed.url,
+      expiresAt: signed.expiresAt.toISOString(),
+      filename: file.filename,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+      orderId: order.id,
+      orderNo: order.orderNo,
+      payStatus: order.payStatus as OrderPayStatus,
+      amountCents: order.amountCents,
+      canRetry: this.canRetryPaidFailedJob(task, order, file),
+    }
+  }
+
+  async retryPaidFailedJob(
+    taskId: string,
+    ctx: PrintJobAccessContext,
+  ): Promise<PrintJobRetryResult> {
+    const { task, order, file } = await this.loadAccessiblePrintJob(taskId, ctx)
+    if (task.status === 'pending') {
+      const lastLog = await this.prisma.printTaskStatusLog.findFirst({
+        where: { taskId: task.id },
+        orderBy: { createdAt: 'desc' },
+        select: { errorCode: true, toStatus: true },
+      })
+      if (lastLog?.errorCode === KIOSK_RETRY_LOG_CODE && lastLog.toStatus === 'pending') {
+        return {
+          taskId: task.id,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          amountCents: order.amountCents,
+          payStatus: order.payStatus as OrderPayStatus,
+          status: task.status,
+        }
+      }
+    }
+    if (task.status !== 'failed') {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_INVALID_STATE', message: '仅失败的打印任务可以重新提交' },
+      })
+    }
+    if (task.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) {
+      throw new ConflictException({
+        error: {
+          code: 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
+          message: '打印结果未确认，不能重新提交，请联系工作人员核查',
+        },
+      })
+    }
+    if (order.payStatus !== 'paid') {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_NOT_PAID', message: '未完成支付的打印任务不能重新提交' },
+      })
+    }
+    const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
+    if (!fileId || !file || file.deletedAt) {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+      })
+    }
+    const { url: freshFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+    const amountBefore = order.amountCents
+
+    await this.prisma.$transaction(async (tx) => {
+      const activeTerminalLock = task.terminalId
+        ? await tx.terminal.updateMany({
+            where: { id: task.terminalId, enabled: true, lifecycleStatus: 'active' },
+            data: { lifecycleStatus: 'active' },
+          })
+        : null
+      if (activeTerminalLock && activeTerminalLock.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_TERMINAL_NOT_ACTIVE', message: '目标终端当前不能重新排队' },
+        })
+      }
+
+      const liveFile = await tx.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
+      if (!liveFile || liveFile.deletedAt) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+        })
+      }
+
+      const updatedOrder = await tx.order.updateMany({
+        where: {
+          id: order.id,
+          taskStatus: 'failed',
+          payStatus: 'paid',
+          amountCents: amountBefore,
+        },
+        data: { taskStatus: 'pending' },
+      })
+      if (updatedOrder.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+        })
+      }
+
+      const updated = await tx.printTask.updateMany({
+        where: { id: task.id, status: 'failed' },
+        data: {
+          status: 'pending',
+          claimedAt: null,
+          claimExpiry: null,
+          completedAt: null,
+          errorCode: null,
+          errorMessage: null,
+          fileUrl: freshFileUrl,
+        },
+      })
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+        })
+      }
+      await tx.printTaskStatusLog.create({
+        data: { taskId: task.id, fromStatus: 'failed', toStatus: 'pending', errorCode: KIOSK_RETRY_LOG_CODE },
+      })
+    })
+
+    await this.audit.write({
+      actorId: ctx.endUserId ?? null,
+      actorRole: 'kiosk',
+      action: 'print_job.retry',
+      targetType: 'print_task',
+      targetId: task.id,
+      payload: {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        amountCents: amountBefore,
+        fromStatus: 'failed',
+        toStatus: 'pending',
+      },
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
+    })
+
+    const fresh = await this.prisma.printTask.findUnique({
+      where: { id: task.id },
+      include: { order: { select: { id: true, orderNo: true, amountCents: true, payStatus: true } } },
+    })
+    if (!fresh?.order) printTaskNotFound()
+    return {
+      taskId: fresh.id,
+      orderId: fresh.order.id,
+      orderNo: fresh.order.orderNo,
+      amountCents: fresh.order.amountCents,
+      payStatus: fresh.order.payStatus as OrderPayStatus,
+      status: fresh.status,
+    }
+  }
+
+  private canRetryPaidFailedJob(
+    task: { status: string; errorCode: string | null },
+    order: { payStatus: string },
+    file: { deletedAt: Date | null } | null,
+  ): boolean {
+    return (
+      task.status === 'failed' &&
+      order.payStatus === 'paid' &&
+      task.errorCode !== PRINT_JOB_UNCONFIRMED_ERROR_CODE &&
+      Boolean(file) &&
+      !file?.deletedAt
+    )
+  }
+
+  private async loadAccessiblePrintJob(taskId: string, ctx: PrintJobAccessContext) {
+    const task = await this.prisma.printTask.findUnique({
+      where: { id: taskId },
+      include: {
+        order: true,
+        file: {
+          select: {
+            id: true,
+            filename: true,
+            mimeType: true,
+            sizeBytes: true,
+            deletedAt: true,
+          },
+        },
+      },
+    })
+    if (!task?.order) printTaskNotFound()
+
+    const session = verifyPaymentSessionToken(ctx.paymentSessionToken, {
+      orderId: task.order.id,
+      orderNo: task.order.orderNo,
+      terminalId: task.terminalId,
+      amountCents: task.order.amountCents,
+      printTaskId: task.id,
+    })
+    const memberOk = Boolean(ctx.endUserId && task.endUserId && ctx.endUserId === task.endUserId)
+    if (!session.ok && !memberOk) printTaskNotFound()
+
+    return { task, order: task.order, file: task.file }
   }
 }
 

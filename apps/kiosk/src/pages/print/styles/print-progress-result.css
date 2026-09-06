@@ -56,6 +56,39 @@
 }
 .print-done-icon svg { width: 96px; height: 96px; }
 
+.print-done-paper-reminder {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--print-teal-deep);
+  letter-spacing: 1px;
+}
+.print-done-takeaway {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border: 1px solid var(--print-line);
+  border-radius: 16px;
+  background: var(--print-paper);
+}
+.print-done-takeaway-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--print-ink);
+}
+.print-done-takeaway-qr {
+  display: inline-flex;
+  padding: 8px;
+  background: #fff;
+}
+.print-done-takeaway-note {
+  font-size: 15px;
+  color: var(--print-muted);
+  text-align: center;
+}
+
 /* 主标题 */
 .print-done-title {
   font-family: var(--print-serif);

@@ -166,8 +166,17 @@ export function PrintConfirmPage() {
     printerReady,
     printerLabel,
     loading: printerLoading,
+    kind: printerKind,
+    printer,
   } = useTerminalDeviceStatus()
   const printerBlocked = printerLoading || !printerReady
+  const printerBlockedReason = printerLoading
+    ? '正在确认打印机状态，请稍候'
+    : printer.errorCode === 'paperEmpty'
+      ? '打印机缺纸，当前不能下单，不会扣费。请联系工作人员补纸后再试。'
+      : printerKind === 'offline'
+        ? `${printerLabel}。当前不能下单，不会扣费。请联系工作人员检查设备后再试。`
+        : `${printerLabel}。当前不能下单，不会扣费。请联系工作人员。`
   const capabilityAllows = useMemo(
     () => ({ color: capability.color.allowed, duplex: capability.duplex.allowed }),
     [capability.color.allowed, capability.duplex.allowed],
@@ -377,11 +386,7 @@ export function PrintConfirmPage() {
       return
     }
     if (printerBlocked) {
-      setSubmitError(
-        printerLoading
-          ? '正在确认打印机状态，请稍候'
-          : `${printerLabel}。当前不能下单，请联系工作人员。`,
-      )
+      setSubmitError(printerBlockedReason)
       return
     }
     if (API_MODE === 'http') {
@@ -514,9 +519,7 @@ export function PrintConfirmPage() {
           {/* 文件条 */}
           {printerBlocked && (
             <div className="mb-4 rounded-lg border border-warning bg-warning-bg px-4 py-3 text-sm text-warning-fg" role="status">
-              {printerLoading
-                ? '正在确认打印机状态…'
-                : `${printerLabel}。当前不能下单，请联系工作人员。`}
+              {printerBlockedReason}
             </div>
           )}
           {terminalSession === 'failed' && (

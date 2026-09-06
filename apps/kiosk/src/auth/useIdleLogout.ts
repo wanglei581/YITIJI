@@ -34,8 +34,11 @@ export interface KioskIdleWarningRequest {
  * 不包含 token、手机号、材料或其他用户数据。
  *
  * 阈值默认 180s，可经 VITE_KIOSK_LOGOUT_IDLE_SEC 覆盖。
+ * 结果页（报告 / 优化 / 我的文档）默认 90s + 15s 可见预警，可经 VITE_KIOSK_RESULT_IDLE_SEC 覆盖。
  */
 const DEFAULT_LOGOUT_IDLE_SEC = 180
+const DEFAULT_RESULT_IDLE_SEC = 90
+const RESULT_WARNING_SEC = 15
 const MAX_BROWSER_TIMER_MS = 2_147_483_647
 // Keep at least 1s before the warning when the total idle window permits it.
 // The outer clamp below still prevents extending the configured privacy deadline.
@@ -47,10 +50,29 @@ function resolveLogoutIdleMs(): number {
   return sec * 1000
 }
 
-export function resolveWarningWindow(totalMs: number): { triggerMs: number; warningMs: number } {
+function resolveResultIdleMs(): number {
+  const raw = Number(import.meta.env.VITE_KIOSK_RESULT_IDLE_SEC)
+  const sec = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RESULT_IDLE_SEC
+  return sec * 1000
+}
+
+export function isKioskResultIdlePath(pathname: string): boolean {
+  return (
+    pathname === '/resume/report' ||
+    pathname === '/resume/optimize' ||
+    pathname.startsWith('/resume/optimize/') ||
+    pathname === '/me/documents' ||
+    pathname.startsWith('/me/documents/')
+  )
+}
+
+export function resolveWarningWindow(
+  totalMs: number,
+  warningSec?: number,
+): { triggerMs: number; warningMs: number } {
   const safeTotalMs =
     Number.isFinite(totalMs) && totalMs > 0 && totalMs <= MAX_BROWSER_TIMER_MS ? totalMs : 1
-  const raw = Number(import.meta.env.VITE_KIOSK_SESSION_WARNING_SEC)
+  const raw = warningSec !== undefined ? warningSec : Number(import.meta.env.VITE_KIOSK_SESSION_WARNING_SEC)
   const configuredMs = (Number.isFinite(raw) && raw > 0 ? raw : 30) * 1000
   // 触发延时 = min(safeTotalMs, max(MIN_TRIGGER_MS, safeTotalMs - configuredMs)):
   // 外层 min 防止触发延时超过配置的总阈值,守住"triggerMs + warningMs === safeTotalMs"不变量。
@@ -69,7 +91,11 @@ export function useIdleLogout(
   const busy = kioskBusy || authBusy
   const onScreensaverRoute = pathname === '/screensaver'
   const onSessionTimeoutRoute = pathname === '/session-timeout'
-  const { triggerMs, warningMs } = resolveWarningWindow(resolveLogoutIdleMs())
+  const resultPage = isKioskResultIdlePath(pathname)
+  const { triggerMs, warningMs } = resolveWarningWindow(
+    resultPage ? resolveResultIdleMs() : resolveLogoutIdleMs(),
+    resultPage ? RESULT_WARNING_SEC : undefined,
+  )
   const handleIdle = useCallback(
     (scheduledAt: number) => {
       onWarning({ deadlineAt: scheduledAt + warningMs, warningMs })
@@ -80,13 +106,18 @@ export function useIdleLogout(
   useIdleTimer({
     timeoutMs: triggerMs,
     // 覆盖登录 + 匿名；屏保接管（screensaverActive）时关闭，避免与 useScreensaverController 双触发。
+    // 结果页除外：结果页必须走更短的 90s 清场，不能被 180s 屏保计时顶掉。
     //
     // 刻意不在这里用「清场是否空操作」关计时器：enabled 只在渲染时求值，而
     // sessionStorage 的写入不会触发重渲染。曾经这样写过，结果是用户在首页留下
     // 敏感会话后计时器不再武装，该清的一次也没清（回归用例
     // 「standby countdown still fires when sensitive session data is present」抓到）。
     // 空操作判定统一放在 KioskPrivacyGuard.startWarning，在计时器到点那一刻读实时状态。
-    enabled: !busy && !onScreensaverRoute && !onSessionTimeoutRoute && !screensaverActive,
+    enabled:
+      !busy &&
+      !onScreensaverRoute &&
+      !onSessionTimeoutRoute &&
+      (!screensaverActive || resultPage),
     onIdle: handleIdle,
   })
 }

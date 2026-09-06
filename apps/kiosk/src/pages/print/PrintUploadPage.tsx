@@ -61,6 +61,7 @@ import {
 } from './printMaterialSession'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
+import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
@@ -389,6 +390,10 @@ export function PrintUploadPage() {
           backLabel={isTransferMode ? '返回打印扫描' : '返回首页'}
           onBack={() => navigate(isTransferMode ? '/print-scan' : '/')}
         />
+
+        <p className="mt-3 text-sm leading-relaxed text-neutral-600" role="note">
+          {KIOSK_DEVICE_ORIGINAL_NOTICE}
+        </p>
 
         {source === 'resume' && (
           <Card className="mt-6 border-primary-100 bg-primary-50/60 p-5">

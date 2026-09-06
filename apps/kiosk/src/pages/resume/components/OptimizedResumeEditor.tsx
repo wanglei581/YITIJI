@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { PencilLineIcon, ShieldCheckIcon } from 'lucide-react'
 import { Card } from '@ai-job-print/ui'
 import type { GeneratedResume, ResumeLayoutSettings } from '@ai-job-print/shared'
+import { MaskedContactLine } from '../../../components/MaskedContactLine'
 
 type OptimizedResumeEditorProps = {
   resume: GeneratedResume
@@ -44,13 +45,12 @@ export function OptimizedResumeEditor({
         </div>
         <div className="border-b-2 border-[var(--resume-accent,#2563eb)] pb-3">
           <p className="text-2xl font-bold text-gray-900">{resume.basic.name || '(原文未识别到姓名)'}</p>
-          <p className="mt-1 text-sm text-gray-500">
-            {[
-              resume.intention.position ? `求职意向:${resume.intention.position}` : '',
-              resume.basic.phone ? `电话:${resume.basic.phone}` : '',
-              resume.basic.email ? `邮箱:${resume.basic.email}` : '',
-            ].filter(Boolean).join(' · ')}
-          </p>
+          <MaskedContactLine
+            className="mt-1 text-sm text-gray-500"
+            phone={resume.basic.phone}
+            email={resume.basic.email}
+            extra={[resume.intention.position ? `求职意向:${resume.intention.position}` : '']}
+          />
         </div>
 
         <div
