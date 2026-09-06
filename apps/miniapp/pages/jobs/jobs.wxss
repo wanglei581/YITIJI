@@ -31,7 +31,7 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .job-source { margin-top: 20rpx; padding-top: 18rpx; border-top: 1rpx solid var(--line-faint); display: flex; align-items: center; justify-content: space-between; gap: 14rpx; }
 .source-meta { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8rpx; color: var(--muted); font-size: 22rpx; }
 .source-meta .ficon { width: 22rpx; height: 22rpx; flex-shrink: 0; }
-.source-action { min-height: 76rpx; padding: 0 20rpx; border-radius: 19rpx; background: var(--teal-soft); color: var(--teal-deep); display: flex; align-items: center; font-size: 23rpx; font-weight: 650; flex-shrink: 0; }
+.source-action { min-height: 96rpx; padding: 0 20rpx; border-radius: 19rpx; background: var(--teal-soft); color: var(--teal-deep); display: flex; align-items: center; font-size: 23rpx; font-weight: 650; flex-shrink: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .list-state, .empty-wrap { padding: 68rpx 30rpx; border-radius: 27rpx; border: 1rpx solid var(--line-soft); background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .loading-line { width: 72%; height: 24rpx; border-radius: 999rpx; background: var(--surface-3); }

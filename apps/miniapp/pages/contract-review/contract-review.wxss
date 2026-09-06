@@ -56,7 +56,8 @@ page { background: var(--paper); }
 .sum-n { margin-top: 14rpx; font-size: 23rpx; color: var(--muted); line-height: 1.6; }
 .cr-nav { min-height: 88rpx; padding: 0 28rpx; display: flex; align-items: center; justify-content: space-between; }
 .cr-nav-title { font-size: 34rpx; font-weight: 750; color: var(--ink); }
-.cr-back, .cr-back-ph { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; }
+/* 返回键可点区域 ≥ 48px（96rpx）；登录态真点扫描量到 33×33，与全站 .nav-back 口径对齐 */
+.cr-back, .cr-back-ph { width: 96rpx; height: 96rpx; display: flex; align-items: center; justify-content: center; }
 .cr-back .ficon { width: 30rpx; height: 30rpx; transform: rotate(180deg); color: var(--ink-soft); }
 
 /* 分析进度：按服务端真实状态推进，不做匀速假动画 */

@@ -82,3 +82,6 @@
   padding: 3rpx 12rpx; border-radius: var(--r-full);
   background: var(--teal-soft);
 }
+
+/* 「连接终端」是导航栏里的真实动作按钮，登录态真点扫描量到 62×25，撑到 ≥48px */
+.navbar .nav-caps { min-height: 96rpx; display: flex; align-items: center; box-sizing: border-box; }
