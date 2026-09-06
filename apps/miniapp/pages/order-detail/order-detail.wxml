@@ -62,6 +62,13 @@
       </view>
 
       <view class="od-actions">
+        <button
+          wx:if="{{detail.canCancel}}"
+          class="btn ghost-ink block tap {{cancelling ? 'disabled' : ''}}"
+          hover-class="tap-press"
+          bindtap="cancelOrder"
+          disabled="{{cancelling}}"
+        >{{cancelling ? '正在取消…' : '取消订单'}}</button>
         <button class="btn primary block tap" hover-class="tap-press" bindtap="toPrint">再打印一份</button>
       </view>
     </block>

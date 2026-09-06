@@ -30,7 +30,7 @@
   <view class="card flat rise-d3">
     <view wx:for="{{files}}" wx:key="name" class="order-file">
       <view class="of-ic a-teal"><text class="ficon i-file-text"></text></view>
-      <view class="of-main"><view class="of-name">{{item.name}}</view><view class="of-desc">{{item.desc}}</view></view>
+      <view class="of-main"><view class="of-name">{{item.name}}</view><view class="of-desc">{{colorLabel}} · {{duplexLabel}} · {{pageCountLabel}} · ×{{copiesLabel}}</view></view>
       <view class="of-price">{{item.price === '—' || item.price === '免费' ? item.price : '¥' + item.price}}</view>
     </view>
   </view>
