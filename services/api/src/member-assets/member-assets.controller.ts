@@ -6,7 +6,7 @@ import { AuditService } from '../audit/audit.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MemberAssetsService } from './member-assets.service'
 import type {
-  MemberAiRecordItem,
+  MemberAiRecordPage,
   MemberAssetPage,
   MemberDeletedDocumentItem,
   MemberDocumentItem,
@@ -85,7 +85,7 @@ export class MemberAssetsController {
     @CurrentEndUser() user: AuthedEndUser,
     @Query('cursor') cursor?: string,
     @Query('pageSize') pageSize?: string,
-  ): Promise<ApiResponse<MemberAssetPage<MemberAiRecordItem>>> {
+  ): Promise<ApiResponse<MemberAiRecordPage>> {
     return ApiResponse.ok(await this.assets.listAiRecords(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
   }
 

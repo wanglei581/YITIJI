@@ -178,7 +178,7 @@ export class AdvisorArtifactService {
   }
 
   private filenameOf(payload: AdvisorArtifactPayload): string {
-    if (payload.kind === 'qa_pins') return 'AI顾问-钉住条目单'
+    if (payload.kind === 'qa_pins') return payload.title?.trim() || 'AI顾问-钉住条目单'
     if (payload.kind === 'slot_draft') return 'AI顾问-成稿'
     return 'AI顾问-逐条比对表'
   }

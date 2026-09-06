@@ -28,6 +28,7 @@ const AI_CONTROLLER = 'src/ai/ai.controller.ts'
 
 const GUARDED_HANDLERS = [
   { handler: 'chatWithAssistant', operation: 'assistant_chat' },
+  { handler: 'transcribeAssistantVoice', operation: 'assistant_chat' },
   { handler: 'submitResumeParse', operation: 'resume_parse' },
 ] as const
 

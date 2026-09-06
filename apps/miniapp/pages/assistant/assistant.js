@@ -1,5 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
+const auth = require('../../utils/auth')
+const voice = require('../../utils/voice-recorder')
 
 // 后端 route 字符串 → 小程序页面路径映射（后端返回 actions[].route 时使用）
 const ROUTE_MAP = {
@@ -48,6 +50,15 @@ Page({
     quickChips: ['简历怎么写更好', '求职补贴怎么领', '附近招聘会', '练习模拟面试'],
     inputText: '',
     sending: false,
+    holding: false,
+    transcribing: false,
+    sendVoiceDirect: false,
+    asrEnabled: false,
+    voiceBlockedReason: '',
+    savingSummary: false,
+    summaryHint: '',
+    summaryHighlights: [],
+    summaryTodos: [],
     // 滚动到底部：两值交替使 scroll-top 绑定每次触发
     _stFlip: false,
     scrollTop: 0,
@@ -61,6 +72,22 @@ Page({
       // 见 data.capsuleInsetRight 的说明：本页右上角的「更多」按钮实测整个落在胶囊里
       capsuleInsetRight: (app.globalData && app.globalData.capsuleInsetRight) || 94,
     })
+    api.getAssistantVoiceCapability().then((cap) => {
+      const ok = !!(cap && cap.asrEnabled)
+      this.setData({
+        asrEnabled: ok,
+        voiceBlockedReason: ok ? '' : '语音转写未启用，请使用文字输入。恢复条件：管理员配置 ASR 后重新进入本页。',
+      })
+    }).catch(() => {
+      this.setData({
+        asrEnabled: false,
+        voiceBlockedReason: '语音转写未启用，请使用文字输入。恢复条件：管理员配置 ASR 后重新进入本页。',
+      })
+    })
+  },
+
+  onUnload() {
+    voice.cancel()
   },
 
   back() {
@@ -143,6 +170,102 @@ Page({
 
   tapChip(e) {
     this._send(e.currentTarget.dataset.text)
+  },
+
+  toggleSendDirect() {
+    this.setData({ sendVoiceDirect: !this.data.sendVoiceDirect })
+  },
+
+  onHoldStart() {
+    if (this.data.sending || this.data.holding || this.data.transcribing) return
+    if (!this.data.asrEnabled) return
+    this._wantRecord = true
+    voice.ensureRecordAuth().then((ok) => {
+      if (!this._wantRecord) return null
+      if (!ok) {
+        this.setData({
+          asrEnabled: false,
+          voiceBlockedReason: '录音授权失败，已退回文字输入。可在微信设置里允许麦克风后重进本页。',
+        })
+        return null
+      }
+      this.setData({ holding: true })
+      return voice.start(58000)
+    }).then((res) => {
+      if (!res) {
+        this.setData({ holding: false })
+        return null
+      }
+      this.setData({ holding: false, transcribing: true })
+      return api.transcribeAssistantVoice(res.tempFilePath)
+    }).then((out) => {
+      if (!out) return
+      const text = String((out && out.text) || '').trim()
+      this.setData({ transcribing: false })
+      if (!text) {
+        wx.showToast({ title: '没听清，请重说或手打', icon: 'none' })
+        return
+      }
+      if (this.data.sendVoiceDirect) this._send(text)
+      else this.setData({ inputText: text })
+    }).catch((err) => {
+      this._wantRecord = false
+      voice.cancel()
+      const code = (err && err.code) || ''
+      if (code === 'ASR_NOT_CONFIGURED' || code === 'permission-denied' || code === 'unsupported') {
+        this.setData({
+          holding: false,
+          transcribing: false,
+          asrEnabled: false,
+          voiceBlockedReason: (err && err.message) || '语音不可用，请使用文字输入',
+        })
+        return
+      }
+      this.setData({ holding: false, transcribing: false })
+      wx.showToast({ title: (err && err.message) || '转写失败，请手打', icon: 'none' })
+    })
+  },
+
+  onHoldEnd() {
+    this._wantRecord = false
+    voice.stop()
+  },
+
+  onHoldCancel() {
+    this._wantRecord = false
+    voice.cancel()
+    this.setData({ holding: false, transcribing: false })
+  },
+
+  saveSummary() {
+    if (this.data.savingSummary) return
+    if (!auth.isLoggedIn()) {
+      this.setData({ summaryHint: '登录后可将本次要点保存到我的文档并打印。' })
+      return
+    }
+    if (!this.data.sessionId) {
+      this.setData({ summaryHint: '先问小青至少一轮，才能保存本次要点。' })
+      return
+    }
+    this.setData({ savingSummary: true, summaryHint: '' })
+    api.summarizeAssistantSession(this.data.sessionId).then((res) => {
+      const highlights = (res && res.highlights) || []
+      const todos = (res && res.todos) || []
+      const saved = res && res.document
+        ? '本次要点已保存到我的文档，可打印。'
+        : ((res && res.printUnavailableReason) || '本次要点已保存，打印稿尚未生成。')
+      this.setData({
+        savingSummary: false,
+        summaryHint: saved,
+        summaryHighlights: highlights,
+        summaryTodos: todos,
+      })
+    }).catch((err) => {
+      this.setData({
+        savingSummary: false,
+        summaryHint: (err && err.message) || '本次要点暂时保存不了，请稍后重试',
+      })
+    })
   },
 
   tapMore() {

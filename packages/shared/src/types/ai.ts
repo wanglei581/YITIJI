@@ -426,6 +426,35 @@ export interface ResumeVoiceTranscribeResponse {
   providerName: string
 }
 
+/** 小青按住说话转写。形状与简历语音转写相同。 */
+export interface AssistantVoiceTranscribeResponse {
+  text: string
+  providerName: string
+}
+
+/** 登录用户保存的「本次要点」产物（可进我的文档 / 打印）。 */
+export interface AssistantSessionSummaryDocument {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+  printFileUrl: string
+}
+
+export interface AssistantSessionSummaryResponse {
+  advisorSessionId: string
+  artifactId: string
+  highlights: string[]
+  todos: string[]
+  disclaimer: string
+  savedToDocuments: boolean
+  document: AssistantSessionSummaryDocument | null
+  printUnavailableReason?: string
+}
+
 /** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0，
  *  但均可打印——Wave 6 会为 docx/txt/md 额外渲染一份同内容 PDF 副本供打印使用。 */
 export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'

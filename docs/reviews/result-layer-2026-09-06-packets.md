@@ -180,6 +180,9 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 - **禁改**：`asr.service.ts`、`AssistantCallPanel.tsx`、`profileEntries.ts`、`apps/kiosk/src/pages/profile/**`。
 - **验收**：新门禁（WAV 校验 / 配额 / ASR 未配置诚实 / summary 匿名 404 / 产物落库）；`verify:audit-logs`、`verify:pii-redaction`（语音转写文本不进日志）、`pnpm --dir apps/miniapp verify:static`、kiosk typecheck / lint；触控 ≥56px 实测截图。
 
+- **执行记录（原写在 current-progress.md，为避免多会话顶部冲突改记于此）**：
+  > 2026-09-06 **包 I 小青语音（分支 `claude/rl-i-assistant-voice`，本地候选，未部署、未 push）**。拍板第 5 条：保留 TRTC 通话；文字对话新增长按语音转写与「本次要点」。① `POST /assistant/voice` multipart `audio` WAV，`@TerminalScopedThrottle(12)`，与 chat 共用 `assistant_chat` 日配额，WAV 魔数校验，返回 `{ text, providerName }`；`ASR_NOT_CONFIGURED` 诚实 400，转写正文不进日志/审计。② 一体机 `AssistantPage` 增加「按住说话」（aria-pressed / aria-disabled，Playwright 1080×1920 测高 60px ≥56）与「语音直接发送」；麦克风/ASR 不可用写明原因与恢复条件；TRTC `AssistantCallPanel` 未改。③ 小程序 assistant 长按说话走 `voice-recorder.js` + `uploadFile('/assistant/voice')`，授权失败退回文字。④ 登录用户 `POST /assistant/sessions/:sessionId/summary` 浓缩 ≤8 要点 + ≤5 待办，落 `AdvisorSession`（slotsJson.source=assistant，不改 Prisma 模型）+ `AdvisorArtifact(kind=qa_pins)`，复用 advisor print 进我的文档；匿名 404，前端置灰并提示登录。⑤ `GET /me/ai-records` 只加 `qaRecords`（不改 `profileEntries.ts`）。**未做**：未接 live ASR/LLM、未真机麦克风、未部署、未改 `/me` 记录页 UI（禁改 profile）。**验证**：`verify:assistant-voice` ALL PASS；变异 WAV 校验 / 匿名 summary / qaRecords 各红一次后恢复全绿；`verify:resume-voice-generate`、`verify:ai-public-quota`、`verify:multipart-field-nesting`、`verify:ai-throttle-dimension`、`verify:ai-cost-coverage`、`verify:audit-logs`、`verify:pii-redaction`、`verify:member-assets`、kiosk `verify:assistant-trtc-guard` / `verify:advisor-provider-gate` / `verify:lightflow-k2a-ai-career` / `verify:fusion-w3`、miniapp `verify:static`、`verify:repository-integrity`、`verify:ci-gate-coverage`（新门禁挂在 `verify:resume-voice-generate` 后进 CI 闭包）全绿；api/kiosk/shared tsc 0，改动文件 eslint 0。
+
 #### 包 J · 半实现补全 —— hermes（或 codex）
 
 - **条目**：拍板第 7、8 条；评审 §3.5 的模拟面试 / 签约风险 / 招聘会规划 / AI 记录文案

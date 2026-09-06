@@ -3,11 +3,13 @@ import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import type {
   MemberAiRecordItem,
+  MemberAiRecordPage,
   MemberAssetPage,
   MemberDeletedDocumentActorKind,
   MemberDeletedDocumentItem,
   MemberDeletedDocumentStorageState,
   MemberDocumentItem,
+  MemberQaRecordItem,
   MemberResumeItem,
 } from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
@@ -194,23 +196,44 @@ export class MemberAssetsService {
   async listAiRecords(
     endUserId: string,
     page: MemberPageQuery
-  ): Promise<MemberAssetPage<MemberAiRecordItem>> {
+  ): Promise<MemberAiRecordPage> {
     const where = { endUserId, expiresAt: { gt: new Date() } }
-    const total = await this.prisma.aiResumeResult.count({ where })
-    const rows = await this.prisma.aiResumeResult.findMany({
-      where,
-      select: {
-        id: true,
-        taskId: true,
-        kind: true,
-        status: true,
-        provider: true,
-        createdAt: true,
-        expiresAt: true,
-      },
-      ...memberPageArgs(page),
-    })
-    return buildMemberPage(rows, page, total, (r) => ({
+    const now = new Date()
+    const [total, rows, qaRows] = await Promise.all([
+      this.prisma.aiResumeResult.count({ where }),
+      this.prisma.aiResumeResult.findMany({
+        where,
+        select: {
+          id: true,
+          taskId: true,
+          kind: true,
+          status: true,
+          provider: true,
+          createdAt: true,
+          expiresAt: true,
+        },
+        ...memberPageArgs(page),
+      }),
+      this.prisma.advisorArtifact.findMany({
+        where: {
+          kind: 'qa_pins',
+          expiresAt: { gt: now },
+          session: { endUserId, expiresAt: { gt: now } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          sessionId: true,
+          payloadJson: true,
+          fileId: true,
+          createdAt: true,
+          expiresAt: true,
+          session: { select: { topic: true } },
+        },
+      }),
+    ])
+    const list = buildMemberPage(rows, page, total, (r): MemberAiRecordItem => ({
       id: r.id,
       taskId: r.taskId,
       // generate 必须如实展示为「生成」，绝不冒充「解析」（C-2D 验收点）。
@@ -222,12 +245,23 @@ export class MemberAssetsService {
         r.kind === 'fair_visit_plan' ||
         r.kind === 'self_assessment'
           ? r.kind
-          : ('parse' as const),
+          : 'parse',
       status: r.status,
       provider: r.provider,
       createdAt: r.createdAt.toISOString(),
       expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
     }))
+    const qaRecords: MemberQaRecordItem[] = qaRows.map((row) => ({
+      id: row.id,
+      sessionId: row.sessionId,
+      artifactId: row.id,
+      kind: 'qa_pins',
+      title: qaTitleOf(row.payloadJson, row.session.topic),
+      createdAt: row.createdAt.toISOString(),
+      expiresAt: row.expiresAt.toISOString(),
+      fileId: row.fileId,
+    }))
+    return { ...list, qaRecords }
   }
 
   /**
@@ -337,4 +371,17 @@ function classifyStorageObjectState(
   if (storageDeletedAt) return 'removed'
   if (storageDeletePendingAt) return 'pending'
   return 'unknown'
+}
+
+function qaTitleOf(payloadJson: string, topic: string): string {
+  try {
+    const payload = JSON.parse(payloadJson) as { kind?: unknown; title?: unknown }
+    if (payload.kind === 'qa_pins' && typeof payload.title === 'string' && payload.title.trim()) {
+      return payload.title.trim().slice(0, 80)
+    }
+  } catch {
+    // 损坏 payload 不进列表正文，只用会话主题兜底
+  }
+  const fallback = topic.trim()
+  return fallback ? fallback.slice(0, 80) : '问答要点'
 }
