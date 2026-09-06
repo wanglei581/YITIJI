@@ -107,6 +107,11 @@
       "name": "VITE_AMAP_KEY",
       "status": "pending-decision",
       "reason": "招聘会详情页地图（JobFairDetailTabs.tsx / MapBlock.tsx）。未配置时地图块降级不渲染。是否采购并注入高德 key 属产品/成本决策，且 key 进前端包即公开，需先确认高德侧域名白名单与配额限制再裁决。当前不设 = 招聘会地图不显示。"
+    },
+    {
+      "name": "VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN",
+      "status": "safe-default",
+      "reason": "不设即空字符串 → 不短路，终端会话闸门正常生效（安全默认）。只允许 Playwright 浏览器套件（API 全部路由 mock、无真实 Agent 换票）在 webServer 命令里设置。deploy.yml 必须不含该变量，verify-runtime-terminal-identity 有断言。"
     }
   ]
 }

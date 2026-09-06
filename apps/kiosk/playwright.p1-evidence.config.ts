@@ -37,7 +37,7 @@ export default defineConfig({
   webServer: [
     {
       // Prefer the already-running local Kiosk; fall back to production preview only when absent.
-      command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm exec vite preview --host 127.0.0.1 --port 58245 --strictPort',
+      command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm exec vite preview --host 127.0.0.1 --port 58245 --strictPort',
       url: 'http://127.0.0.1:58245',
       reuseExistingServer: true,
       timeout: 60_000,

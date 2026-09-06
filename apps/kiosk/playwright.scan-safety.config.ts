@@ -40,7 +40,7 @@ export default defineConfig({
     command:
       // VITE_USE_TRTC_CALL=true 是 kiosk 生产构建的硬门禁（verify:prod-build-config），
       // 与 playwright.privacy.config.ts 保持一致，否则 vite build 直接拒绝。
-      'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4191 --strictPort',
+      'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4191 --strictPort',
     url: 'http://127.0.0.1:4191',
     reuseExistingServer: false,
     timeout: 180_000,
