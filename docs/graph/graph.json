@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 511,
+    "endpointCount": 507,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -9700,89 +9700,6 @@
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.getResumeDraft",
-        "method": "GET",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId/draft",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.putResumeDraft",
-        "method": "PUT",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/draft",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.factCheckResume",
-        "method": "POST",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "ContractReviewTask",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/resume/records/:taskId/fact-check",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts"
-        ],
-        "services": [
-          "AiService",
-          "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
         "handler": "AiController.adjustResumeLayout",
         "method": "POST",
         "models": [
@@ -9834,31 +9751,6 @@
           "AuditService",
           "BenefitRedemptionService",
           "MemberPrivacyService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/ai.controller.ts",
-        "handler": "AiController.listResumeVersions",
-        "method": "GET",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "AuditLog",
-          "BenefitGrant",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PriceConfig",
-          "PrintTask",
-          "RedemptionRecord"
-        ],
-        "path": "/api/v1/resume/records/:taskId/versions",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/ai/ai.service.ts"
-        ],
-        "services": [
-          "AiService"
         ]
       },
       {
@@ -20641,7 +20533,6 @@
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-member-assets.ts",
-      "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-assets/member-assets.types.ts": [
@@ -29915,14 +29806,11 @@
           "services/api/src/ai/ai.service.ts",
           "services/api/src/files/file.types.ts",
           "services/api/src/files/retention-policy.ts",
-          "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/storage/storage.service.ts"
         ],
-        "missing": [
-          "services/api/src/ai/resume/resume-draft.store.ts"
-        ]
+        "missing": []
       },
       "file": "services/api/scripts/verify-member-data-retention.ts",
       "helper": false,
