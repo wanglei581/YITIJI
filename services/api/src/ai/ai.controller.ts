@@ -302,7 +302,7 @@ export class AiController {
   }
 
   @Post('resume/records/:taskId/fact-check')
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @PaidAiThrottle(6)
   async factCheckResume(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,

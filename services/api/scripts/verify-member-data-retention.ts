@@ -72,7 +72,6 @@ assert(resumeAssetsReview.includes('默认保存 90 天') && resumeAssetsReview.
 assert(ai.includes('AI_RESUME_RESULT_TTL_HOURS') && ai.includes('raw : 24'), 'AI 简历结果默认 TTL 代码为 24 小时')
 assert(doc.includes('AI 简历结果') && doc.includes('24 小时'), '文档声明 AI 简历结果默认 24 小时')
 
-const memberAssets = read('services/api/src/member-assets/member-assets.service.ts')
 const draftStore = read('services/api/src/ai/resume/resume-draft.store.ts')
 assert(draftStore.includes("KIND_OPTIMIZE_DRAFT = 'optimize_draft'"), '草稿 kind=optimize_draft 已约定')
 assert(draftStore.includes("KIND_OPTIMIZE_CONFIRMED = 'optimize_confirmed'"), '确认快照 kind=optimize_confirmed 已约定')
