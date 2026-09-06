@@ -190,11 +190,13 @@ for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
   includes(
     path,
-    path === 'src/pages/interview/InterviewReportsPage.tsx'
-      ? 'KioskFullscreenShell'
-      : isInterview
-        ? 'InterviewShell'
-        : 'KioskPageFrame',
+    path === 'src/pages/resume/ResumeReportPage.tsx'
+      ? 'QxPageFrame'
+      : path === 'src/pages/interview/InterviewReportsPage.tsx'
+        ? 'KioskFullscreenShell'
+        : isInterview
+          ? 'InterviewShell'
+          : 'KioskPageFrame',
     `${screen} consumes the frozen W1 frame`,
   )
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)

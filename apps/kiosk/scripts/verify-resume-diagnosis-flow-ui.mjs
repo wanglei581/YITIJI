@@ -32,6 +32,8 @@ const source = read('src/pages/resume/ResumeSourcePage.tsx')
 const diagnosisForm = read('src/pages/resume/components/DiagnosisDirectionForm.tsx')
 const parse = read('src/pages/resume/ResumeParsePage.tsx')
 const report = read('src/pages/resume/ResumeReportPage.tsx')
+const reportScores = readOptional('src/pages/resume/components/resume-report/ResumeReportScores.tsx')
+const reportAll = `${report}\n${reportScores}`
 const optimize = read('src/pages/resume/ResumeOptimizePage.tsx')
 // S2-1 拆页：逐条 diff 搬到对照页，因此 diff 的触控安全断言随之搬过去（覆盖面不缩水）。
 const optimizeCompare = read('src/pages/resume/ResumeOptimizeComparePage.tsx')
@@ -89,8 +91,8 @@ assertNotIncludes(parse, 'duration:', 'parse page does not use fake timed step d
 assertIncludes(report, 'targetContext', 'report keeps target context summary')
 assertIncludes(report, '目标方向', 'report displays target direction summary')
 assertIncludes(report, 'ReportNoticePanel', 'report page consolidates top notices')
-assertIncludes(report, 'role="progressbar"', 'report section bars expose progressbar semantics')
-assertIncludes(report, 'aria-valuenow', 'report section bars expose current score')
+assertIncludes(reportAll, 'role="progressbar"', 'report section bars expose progressbar semantics')
+assertIncludes(reportAll, 'aria-valuenow', 'report section bars expose current score')
 
 assertNotIncludes(optimize, 'estimateUplift', 'optimize page removes fake uplift estimator')
 assertNotIncludes(optimize, '综合评分提升', 'optimize page removes fake numeric score uplift card')
