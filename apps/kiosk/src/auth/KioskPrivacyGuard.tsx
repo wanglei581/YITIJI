@@ -57,7 +57,7 @@ interface KioskHistoryState {
   [PRIVACY_BOUNDARY_CREATED_AT_STATE_KEY]?: number
 }
 
-function resolvePrivacyIdleMs(): number {
+export function resolvePrivacyIdleMs(): number {
   const raw = Number(import.meta.env.VITE_KIOSK_PRIVACY_IDLE_SEC)
   const sec = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PRIVACY_IDLE_SEC
   return sec * 1000
