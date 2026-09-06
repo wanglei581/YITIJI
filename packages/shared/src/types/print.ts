@@ -1,3 +1,5 @@
+import type { OrderPayStatus } from './payment'
+
 export type PrintTaskStatus =
   | 'pending'    // 等待 Terminal Agent 认领
   | 'claimed'    // Terminal Agent 已认领，准备打印
@@ -353,4 +355,28 @@ export interface PrintTask {
   createdAt: string
   completedAt?: string
   errorMessage?: string
+}
+
+/** POST /print/jobs/:taskId/takeaway-url */
+export interface PrintJobTakeawayUrl {
+  signedUrl: string
+  expiresAt: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  orderId: string
+  orderNo: string
+  payStatus: OrderPayStatus
+  amountCents: number
+  canRetry: boolean
+}
+
+/** POST /print/jobs/:taskId/retry —— 同一订单、同一金额、不再计费。 */
+export interface PrintJobRetryResult {
+  taskId: string
+  orderId: string
+  orderNo: string
+  amountCents: number
+  payStatus: OrderPayStatus
+  status: PrintTaskStatus | string
 }

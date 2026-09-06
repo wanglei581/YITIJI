@@ -25,6 +25,7 @@ import {
   type PrintFileState,
   type PrintMaterialSession,
 } from './printMaterialSession'
+import { maskSnippet } from '../../utils/maskPii'
 import {
   hasUsableRedactedFile,
   parsePiiRedactionResult,
@@ -152,21 +153,6 @@ function inspectionWarningText(code: string): string {
   if (code === 'SOURCE_FILE_BYTES_UNAVAILABLE') return '暂未读取到文件内容，以实际打印为准'
   if (code === 'PRINT_MIME_UNSUPPORTED') return '当前文件格式暂不支持打印前体检'
   return '材料体检存在提示，请继续核对打印参数'
-}
-
-function maskSnippet(type: string, snippet: string | null): string {
-  if (!snippet) return '未提供片段'
-  const value = snippet.trim()
-  if (!value) return '未提供片段'
-  if (type === 'phone') return value.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
-  if (type === 'email') {
-    const [name, domain] = value.split('@')
-    if (!name || !domain) return value
-    const first = name.slice(0, 1)
-    return `${first}***@${domain}`
-  }
-  if (value.length <= 4) return `${value.slice(0, 1)}**`
-  return `${value.slice(0, 2)}***${value.slice(-2)}`
 }
 
 function suggestionForFinding(finding: PiiFindingView): string {

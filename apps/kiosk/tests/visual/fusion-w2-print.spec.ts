@@ -704,6 +704,11 @@ test('failed print status displays only the safe user reason and no pickup code 
       failureReasonForUser: '打印机暂时离线，请联系现场工作人员',
     },
   })
+  // 包 G：失败态会向服务端要「文件带走」链接；本用例无支付会话凭证 → 404，页面只能显示失败原因，不得伪造二维码。
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 404,
+    json: { error: { code: 'PRINT_TASK_NOT_FOUND', message: '打印任务不存在或无权访问' } },
+  })
 
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)

@@ -1,5 +1,6 @@
 import type { GeneratedResume } from '@ai-job-print/shared'
 import type { CSSProperties } from 'react'
+import { MaskedContactLine } from '../../../../components/MaskedContactLine'
 
 const taCls = 'qx-rd-ta'
 
@@ -25,14 +26,16 @@ export function GenerateResumeEditor(props: {
     <article className="qx-card qx-rd-paper" style={props.previewStyle}>
       <header>
         <p className="qx-rd-paper-name">{resume.basic.name}</p>
-        <p className="qx-rd-paper-meta">
-          {[
+        {/* 包 G：公共终端纸面上电话 / 邮箱一律掩码展示，导出文件里仍是全量原文 */}
+        <MaskedContactLine
+          className="qx-rd-paper-meta"
+          phone={resume.basic.phone}
+          email={resume.basic.email}
+          extra={[
             resume.intention.position ? `求职意向:${resume.intention.position}` : '',
             resume.intention.city ? `意向城市:${resume.intention.city}` : '',
-            resume.basic.phone ? `电话:${resume.basic.phone}` : '',
-            resume.basic.email ? `邮箱:${resume.basic.email}` : '',
-          ].filter(Boolean).join(' · ')}
-        </p>
+          ]}
+        />
       </header>
       <div className={`qx-rd-paper-body ${props.previewClassName ?? ''}`}>
         <div>

@@ -678,6 +678,16 @@ expectMatches(
 )
 expectMatches(
   confirmSrc,
+  /不会扣费/,
+  'PrintConfirmPage 缺纸/脱机时写明不会扣费',
+)
+expectMatches(
+  confirmSrc,
+  /打印机缺纸，当前不能下单，不会扣费/,
+  'PrintConfirmPage 缺纸状态有 PAPER_EMPTY 对应文案',
+)
+expectMatches(
+  confirmSrc,
   /PRINTER_UNAVAILABLE/,
   'PrintConfirmPage 将 PRINTER_UNAVAILABLE 映射为中文',
 )

@@ -26,6 +26,7 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
+import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
 import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
@@ -331,6 +332,10 @@ export function ResumeSourcePage() {
         onBack={() => navigate('/')}
         backLabel="返回首页"
       />
+
+      <p className="mt-3 text-sm leading-relaxed text-neutral-600" role="note">
+        {KIOSK_DEVICE_ORIGINAL_NOTICE}
+      </p>
 
       <AiDriverBanner feature="AI简历诊断" description="上传后自动解析结构、识别问题" />
 

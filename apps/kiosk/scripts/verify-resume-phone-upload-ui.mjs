@@ -229,6 +229,8 @@ assertNotIncludes(preview, "target=\"_blank\"", 'shared Kiosk preview does not l
 assertNotIncludes(preview, "normalized.includes('pdf')", 'shared file preview does not use substring PDF detection')
 assertIncludes(previewDialog, 'FileContentPreview', 'sensitive file dialog uses the shared inline preview')
 assertIncludes(previewDialog, 'QRCodeSVG', 'sensitive file dialog can hand a short-lived download URL to the user phone')
+assertIncludes(previewDialog, 'expiresAt', 'sensitive file dialog shows remaining time for the phone QR')
+assertIncludes(previewDialog, '重新生成', 'sensitive file dialog can regenerate an expired phone QR')
 assertIncludes(previewDialog, 'h-12 w-12', 'sensitive file dialog close button keeps the 48px Kiosk touch target')
 assertIncludes(optimize, 'FilePreviewDialog', 'optimized resumes open inside the Kiosk privacy root')
 assertIncludes(selfAssessment, 'FilePreviewDialog', 'self-assessment PDFs open inside the Kiosk privacy root')

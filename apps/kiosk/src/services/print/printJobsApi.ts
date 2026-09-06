@@ -19,6 +19,8 @@ import type {
   BillingPageSource,
   OrderPayStatus,
   PrintJobParams,
+  PrintJobRetryResult,
+  PrintJobTakeawayUrl,
   PrintPriceLine,
 } from '@ai-job-print/shared'
 
@@ -164,6 +166,56 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
   }
   if (!res.ok) await throwHttpError(res, token)
   return res.json() as Promise<PrintJobCreated>
+}
+
+function paymentSessionHeaders(
+  paymentSessionToken?: string | null,
+  token?: string | null,
+): Record<string, string> {
+  return {
+    ...(paymentSessionToken ? { 'x-payment-session-token': paymentSessionToken } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+export async function issuePrintJobTakeawayUrl(input: {
+  taskId: string
+  paymentSessionToken?: string | null
+  token?: string | null
+}): Promise<PrintJobTakeawayUrl> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.taskId)}/takeaway-url`, {
+      method: 'POST',
+      headers: paymentSessionHeaders(input.paymentSessionToken, input.token),
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res, input.token)
+  return res.json() as Promise<PrintJobTakeawayUrl>
+}
+
+export async function retryPrintJob(input: {
+  taskId: string
+  paymentSessionToken?: string | null
+  token?: string | null
+}): Promise<PrintJobRetryResult> {
+  const terminalId = getTerminalId()
+  if (!terminalId) {
+    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
+  }
+  let res: Response
+  try {
+    res = await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.taskId)}/retry`, {
+      method: 'POST',
+      headers: paymentSessionHeaders(input.paymentSessionToken, input.token),
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
+  if (!res.ok) await throwHttpError(res, input.token)
+  return res.json() as Promise<PrintJobRetryResult>
 }
 
 export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusResult> {

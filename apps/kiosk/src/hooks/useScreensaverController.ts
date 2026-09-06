@@ -3,7 +3,11 @@ import { resolvePrivacyIdleMs } from '../auth/KioskPrivacyGuard'
 import { useLocation } from 'react-router-dom'
 import type { KioskScreensaverPlaylist } from '@ai-job-print/shared'
 import { useKioskBusy } from '../contexts/KioskBusyContext'
-import { resolveWarningWindow, type KioskIdleWarningRequest } from '../auth/useIdleLogout'
+import {
+  isKioskResultIdlePath,
+  resolveWarningWindow,
+  type KioskIdleWarningRequest,
+} from '../auth/useIdleLogout'
 import { useIdleTimer } from './useIdleTimer'
 import { getScreensaverPlaylist, getTerminalId } from '../services/api/screensaver'
 import { prefetchAsset, pruneCache } from '../services/screensaverCache'
@@ -66,6 +70,7 @@ export function useScreensaverController(onWarning: (request: ScreensaverWarning
   const active = !!playlist?.enabled && (playlist?.items.length ?? 0) > 0
   const onScreensaverRoute = pathname === '/screensaver'
   const onSessionTimeoutRoute = pathname === '/session-timeout'
+  const onResultIdlePath = isKioskResultIdlePath(pathname)
   // 屏保 idle 不得晚于隐私硬截止（否则登录态用户先被清场回首页、再等屏保）（SES-11）
   const timeoutMs = Math.min((playlist?.idleTimeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000, resolvePrivacyIdleMs())
   const { triggerMs, warningMs } = resolveWarningWindow(timeoutMs)
@@ -85,7 +90,7 @@ export function useScreensaverController(onWarning: (request: ScreensaverWarning
 
   useIdleTimer({
     timeoutMs: triggerMs,
-    enabled: active && !busy && !onScreensaverRoute && !onSessionTimeoutRoute,
+    enabled: active && !busy && !onScreensaverRoute && !onSessionTimeoutRoute && !onResultIdlePath,
     onIdle: handleIdle,
   })
 

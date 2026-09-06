@@ -376,7 +376,7 @@ export function SelfAssessmentResultPage() {
   const [withdrawing, setWithdrawing] = useState(false)
   // 撤回二次确认用页内 KioskModal，不用浏览器原生 confirm（Kiosk 全屏下样式 / 触控不受控）（SES-06）
   const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false)
-  const [printed, setPrinted] = useState<{ fileId: string; signedUrl: string; printFileUrl?: string; filename: string; pageCount: number; sizeBytes: number } | null>(null)
+  const [printed, setPrinted] = useState<{ fileId: string; signedUrl: string; printFileUrl?: string; filename: string; pageCount: number; sizeBytes: number; expiresAt?: string } | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useSelfAssessmentIdleExit(inflight === null && !printing && !withdrawing && !previewOpen)
@@ -525,6 +525,7 @@ export function SelfAssessmentResultPage() {
         filename: file.filename,
         pageCount: file.pageCount,
         sizeBytes: file.sizeBytes,
+        expiresAt: file.expiresAt,
       })
       setPreviewOpen(true)
     } catch (err) {
@@ -691,6 +692,9 @@ export function SelfAssessmentResultPage() {
             fileName={printed.filename}
             mimeType="application/pdf"
             phoneDownloadUrl={printed.signedUrl}
+            expiresAt={printed.expiresAt}
+            regenerating={printing}
+            onRegenerate={() => { void handlePrint() }}
             onClose={() => setPreviewOpen(false)}
           />
         )}
