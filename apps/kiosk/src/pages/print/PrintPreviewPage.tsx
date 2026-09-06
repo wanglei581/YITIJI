@@ -24,6 +24,14 @@ import {
 } from '@ai-job-print/shared'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
+import { useAuth } from '../../auth/useAuth'
+import { FileContentPreview } from '../../components/FileContentPreview'
+import {
+  isWordDocument,
+  useDocumentConversionCapabilities,
+  WORD_CONVERSION_DISCLOSURE,
+  WORD_CONVERSION_UNAVAILABLE_COPY,
+} from '../../services/api/documentConversion'
 import {
   patchPrintMaterialSession,
   printUploadPathForSource,
@@ -49,22 +57,13 @@ function formatPageCount(pages: number | null): string {
   return pages === null ? '页数待识别' : `共 ${pages} 页`
 }
 
-function inferMimeType(file: PrintFile): string {
-  if (file.mimeType) return file.mimeType
-  const lowerName = file.name.toLowerCase()
-  if (lowerName.endsWith('.pdf')) return 'application/pdf'
-  if (lowerName.endsWith('.png')) return 'image/png'
-  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg'
-  if (lowerName.endsWith('.webp')) return 'image/webp'
-  if (lowerName.endsWith('.doc') || lowerName.endsWith('.docx')) return 'application/msword'
-  return 'application/octet-stream'
-}
-
-function previewKindForFile(file: PrintFile): 'pdf' | 'image' | 'unsupported' | 'unavailable' {
+function previewKindForFile(file: PrintFile): 'pdf' | 'image' | 'word' | 'unsupported' | 'unavailable' {
+  if (isWordDocument({ fileName: file.name, mimeType: file.mimeType })) return 'word'
   if (!file.fileUrl || file.fileUrl.startsWith('/mock/')) return 'unavailable'
-  const mimeType = inferMimeType(file)
-  if (mimeType === 'application/pdf') return 'pdf'
-  if (mimeType.startsWith('image/')) return 'image'
+  const mimeType = file.mimeType?.split(';', 1)[0]?.trim().toLowerCase() ?? ''
+  const extension = file.name.toLowerCase().match(/\.([^.]+)$/)?.[1] ?? ''
+  if (mimeType === 'application/pdf' || extension === 'pdf') return 'pdf'
+  if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp'].includes(extension)) return 'image'
   return 'unsupported'
 }
 
@@ -168,7 +167,8 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-function FilePreviewPanel({ file }: { file: PrintFile }) {
+function FilePreviewPanel({ file, token }: { file: PrintFile; token: string | null }) {
+  const { capabilities } = useDocumentConversionCapabilities()
   const previewKind = previewKindForFile(file)
 
   return (
@@ -199,10 +199,20 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
             className="h-full max-h-full w-full object-contain"
           />
         )}
+        {previewKind === 'word' && (
+          <FileContentPreview
+            className="min-h-0 flex-1 rounded-none border-0"
+            fileUrl={file.fileUrl}
+            fileName={file.name}
+            mimeType={file.mimeType}
+            fileId={file.fileId}
+            token={token}
+          />
+        )}
         {(previewKind === 'unsupported' || previewKind === 'unavailable') && (
           <div className="flex w-full flex-col items-center justify-center gap-4 px-5 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
-              <FileTextIcon className="h-8 w-8 text-neutral-300" />
+              <FileTextIcon className="h-8 w-8 text-neutral-300" aria-hidden="true" />
             </div>
             <div>
               <p className="break-all text-sm font-semibold text-neutral-800">{file.name}</p>
@@ -214,16 +224,16 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
             </div>
           </div>
         )}
-        {previewKind !== 'unavailable' && (
-          <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-neutral-600 shadow-sm">
-            <EyeIcon className="h-3.5 w-3.5" />
-            预览
-          </div>
-        )}
+        <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-neutral-600 shadow-sm">
+          <EyeIcon className="h-3.5 w-3.5" />
+          预览
+        </div>
       </div>
 
       <div className="rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs leading-5 text-primary-700">
-        PDF 和图片可在左侧预览；Word 文档需后续接入转换服务后才能页内预览。若只看到文件图标，请确认文件链接未过期，或返回重新上传。
+        {capabilities.wordToPdf
+          ? `PDF、图片和 Word 可在左侧预览；Word ${WORD_CONVERSION_DISCLOSURE}。若只看到文件图标，请确认文件链接未过期。`
+          : `PDF 和图片可在左侧预览；${WORD_CONVERSION_UNAVAILABLE_COPY}。${capabilities.reason || '转换引擎未就绪'}。`}
       </div>
     </div>
   )
@@ -254,6 +264,7 @@ function InfoSection({
 export function PrintPreviewPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const locationState = location.state as LocationState | null
   const restoredSession = useMemo(() => readPrintMaterialSession(), [])
 
@@ -398,7 +409,7 @@ export function PrintPreviewPage() {
       <div className="mt-6 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] gap-6">
         {/* ── Left: A4 预览主区 ─────────────────────────────────────────── */}
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <FilePreviewPanel file={file} />
+          <FilePreviewPanel file={file} token={getToken()} />
           <p className="text-center text-sm text-neutral-500">
             {formatPageCount(file.pages)} · {file.size}
           </p>

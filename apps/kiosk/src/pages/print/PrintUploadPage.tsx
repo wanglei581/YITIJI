@@ -47,6 +47,11 @@ import {
   type UsbStatus,
 } from '../../services/files/usbImportApi'
 import { useAuth } from '../../auth/useAuth'
+import {
+  useDocumentConversionCapabilities,
+  WORD_CONVERSION_DISCLOSURE,
+  WORD_CONVERSION_UNAVAILABLE_COPY,
+} from '../../services/api/documentConversion'
 import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import {
   UploadSessionQrPanel,
@@ -77,6 +82,8 @@ type UploadTab = 'file' | 'qr' | 'usb'
  * 并由 services/api 的 verify:file-display-truth 门禁对着服务端策略核对,不再手抄。
  */
 export const PRINT_UPLOAD_MAX_MB = 15
+const PRINT_BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
+const PRINT_WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 type UploadedFile = PrintFileState & { fileId: string; fileUrl: string; fileMd5: string }
 
@@ -119,6 +126,9 @@ export function PrintUploadPage() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
+  const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
+  const wordConversionAvailable = conversionCapabilities.wordToPdf
+  const printAccept = wordConversionAvailable ? `${PRINT_BASE_ACCEPT},${PRINT_WORD_ACCEPT}` : PRINT_BASE_ACCEPT
   const inputRef = useRef<HTMLInputElement>(null)
   const source: PrintMaterialSource =
     searchParams.get('source') === 'resume' ? 'resume' : 'document'
@@ -549,7 +559,7 @@ export function PrintUploadPage() {
               <input
                 ref={inputRef}
                 type="file"
-                accept={contentCategory === 'photo' ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'}
+                accept={contentCategory === 'photo' ? '.jpg,.jpeg,.png' : printAccept}
                 className="sr-only"
                 onChange={handleFileChange}
               />
@@ -605,10 +615,22 @@ export function PrintUploadPage() {
                           {source === 'resume' ? '点击选择简历文件' : '点击选择文件'}
                         </p>
                         <p className="mt-1.5 text-sm text-neutral-400">
-                          {source === 'resume'
-                            ? `支持 PDF、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB，适合已有电子简历直接打印`
-                            : `支持 PDF、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB，上传后将先做材料检查`}
+                          {wordConversionAvailable
+                            ? `支持 PDF、DOC、DOCX、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB；${WORD_CONVERSION_DISCLOSURE}`
+                            : `${WORD_CONVERSION_UNAVAILABLE_COPY}；支持 PDF、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB${source === 'resume' ? '，适合已有电子简历直接打印' : '，上传后将先做材料检查'}`}
                         </p>
+                        <span
+                          className="sr-only"
+                          aria-disabled={!wordConversionAvailable || undefined}
+                          aria-describedby={!wordConversionAvailable ? 'print-word-conversion-reason' : undefined}
+                        >
+                          Word 文件上传能力
+                        </span>
+                        {!wordConversionAvailable && (
+                          <p id="print-word-conversion-reason" className="mt-1 text-xs text-neutral-400">
+                            {conversionCapabilities.reason || '转换引擎未就绪；服务恢复并通过能力探测后会自动开放。'}
+                          </p>
+                        )}
                       </div>
                     </>
                   )}
@@ -707,7 +729,9 @@ export function PrintUploadPage() {
                     <UsbIcon className="h-10 w-10 text-neutral-400" />
                     <p className="text-base font-medium text-neutral-700">未检测到可导入的文件</p>
                     <p className="text-sm text-neutral-500">
-                      仅支持 PDF、JPG、PNG 格式，且不超过 {PRINT_UPLOAD_MAX_MB}MB
+                      {wordConversionAvailable
+                        ? `支持 PDF、DOC、DOCX、JPG、PNG，且不超过 ${PRINT_UPLOAD_MAX_MB}MB；${WORD_CONVERSION_DISCLOSURE}`
+                        : `${WORD_CONVERSION_UNAVAILABLE_COPY}；仅支持 PDF、JPG、PNG，且不超过 ${PRINT_UPLOAD_MAX_MB}MB`}
                     </p>
                   </Card>
                 ) : (

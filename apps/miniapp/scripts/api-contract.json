@@ -17,6 +17,7 @@
     "GET /companies/:p/jobs",
     "GET /contract-reviews/:p",
     "GET /contract-reviews/consent-scope",
+    "GET /document-conversion/capabilities",
     "GET /files/:p/preview-url",
     "GET /job-fairs",
     "GET /job-fairs/:p",

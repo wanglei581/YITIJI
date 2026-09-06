@@ -1,9 +1,10 @@
 const app = getApp()
 const api = require('../../utils/api')
 
-// 后端 kiosk-upload 接受的简历类型。doc/docx 能上传,但能否抽出文本取决于后端解析器,
-// 抽不出时后端会走 extractionNotice 告知,不在前端假设成功。
-const RESUME_EXT = ['pdf', 'doc', 'docx']
+const BASE_RESUME_EXT = ['pdf']
+const WORD_RESUME_EXT = ['doc', 'docx']
+const WORD_CONVERSION_UNAVAILABLE_COPY = 'Word 转换暂未开放，请另存为 PDF 上传'
+const WORD_CONVERSION_DISCLOSURE = '由转换引擎生成，复杂版式可能有偏差，请预览核对'
 
 Page({
   data: {
@@ -12,9 +13,27 @@ Page({
     // 保持为空并走已有空态,不填示例简历(旧数据还用了真实姓名,属 PII)。
     myResumes: [],
     uploading: false,
+    wordConversionAvailable: false,
+    wordConversionCopy: '正在确认 Word 转换能力；当前可先上传 PDF',
   },
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    api.getDocumentConversionCapabilities()
+      .then((capabilities) => {
+        const available = capabilities && capabilities.wordToPdf === true
+        this.setData({
+          wordConversionAvailable: available,
+          wordConversionCopy: available
+            ? `支持 DOC / DOCX；${WORD_CONVERSION_DISCLOSURE}`
+            : `${WORD_CONVERSION_UNAVAILABLE_COPY}；${(capabilities && capabilities.reason) || '转换引擎未就绪'}`,
+        })
+      })
+      .catch((err) => {
+        this.setData({
+          wordConversionAvailable: false,
+          wordConversionCopy: `${WORD_CONVERSION_UNAVAILABLE_COPY}；${(err && err.message) || '无法确认转换能力'}`,
+        })
+      })
   },
   onShow() {},
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
@@ -67,16 +86,22 @@ Page({
 
   // 上传来源
   tapUploadFile() {
+    const resumeExt = this.data.wordConversionAvailable
+      ? BASE_RESUME_EXT.concat(WORD_RESUME_EXT)
+      : BASE_RESUME_EXT
     wx.chooseMessageFile({
       count: 1,
       type: 'file',
-      extension: RESUME_EXT,
+      extension: resumeExt,
       success: (res) => {
         const f = (res.tempFiles || [])[0]
         if (!f || !f.path) return
         const ext = this._extOf(f.name)
-        if (RESUME_EXT.indexOf(ext) === -1) {
-          wx.showToast({ title: '请选择 PDF 或 Word 文件', icon: 'none' })
+        if (resumeExt.indexOf(ext) === -1) {
+          wx.showToast({
+            title: this.data.wordConversionAvailable ? '请选择 PDF 或 Word 文件' : '请选择 PDF 文件',
+            icon: 'none',
+          })
           return
         }
         this._upload(f.path, f.name, 'resume_upload')

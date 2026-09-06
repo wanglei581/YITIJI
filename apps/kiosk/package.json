@@ -42,6 +42,7 @@
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
     "verify:pii-redaction-contract": "node --experimental-strip-types scripts/verify-pii-redaction-contract.mjs",
     "verify:file-display-truth": "node scripts/verify-file-display-truth.mjs",
+    "verify:word-conversion-ui": "node scripts/verify-word-conversion-ui.mjs",
     "verify:kiosk-feedback-entry": "node scripts/verify-kiosk-feedback-entry.mjs",
     "verify:print-parameter-capability": "node scripts/verify-print-parameter-capability.mjs",
     "verify:device-status-honest": "node scripts/verify-device-status-honest.mjs",

@@ -27,6 +27,11 @@ import {
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
 import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
+import {
+  useDocumentConversionCapabilities,
+  WORD_CONVERSION_DISCLOSURE,
+  WORD_CONVERSION_UNAVAILABLE_COPY,
+} from '../../services/api/documentConversion'
 import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
@@ -111,12 +116,9 @@ const INTENT_COPY: Record<ResumeIntent, {
 /** 优化路径闭环展示(上传页直接告诉用户整条链路)。 */
 const OPTIMIZE_FLOW_STEPS = ['上传', '诊断', '优化', '新旧对比', '编辑', '导出 PDF', '打印']
 
-// 2026-08-11（CLAUDE.md §9）：移除 DOC。
-// 后端 resume-extraction.service.ts:116 对旧版 .doc 固定返回 UNSUPPORTED_FILE_TYPE
-// （「暂不支持旧版 .doc 格式，请另存为 PDF 或 DOCX 后重试」），.docx 才走 docx 分支。
-// 前端此前既在格式清单里写 DOC、又让 accept 放行 .doc/application/msword，
-// 用户能选中却在上传后才被拒——白跑一趟。现让文件选择器直接不可选。
-const SUPPORTED_FORMATS = ['PDF', 'DOCX', 'JPG', 'PNG', 'WEBP']
+const BASE_SUPPORTED_FORMATS = ['PDF', 'JPG', 'PNG', 'WEBP']
+const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
+const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 const RESUME_FLOW_STEPS: StepperStep[] = [
   { title: '上传与方向' },
@@ -125,7 +127,6 @@ const RESUME_FLOW_STEPS: StepperStep[] = [
   { title: '优化打印' },
 ]
 
-const ACCEPT = '.pdf,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
 const MAX_BYTES = 10 * 1024 * 1024
 
 interface UploadedResumeFile {
@@ -181,6 +182,12 @@ export function ResumeSourcePage() {
   const intent: ResumeIntent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
   const copy = INTENT_COPY[intent]
   const { getToken } = useAuth()
+  const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
+  const wordConversionAvailable = conversionCapabilities.wordToPdf
+  const supportedFormats = wordConversionAvailable
+    ? ['PDF', 'DOC', 'DOCX', ...BASE_SUPPORTED_FORMATS.slice(1)]
+    : BASE_SUPPORTED_FORMATS
+  const accept = wordConversionAvailable ? `${BASE_ACCEPT},${WORD_ACCEPT}` : BASE_ACCEPT
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<UploadChannel>('cloud')
   const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(null)
@@ -353,7 +360,7 @@ export function ResumeSourcePage() {
         ref={fileInputRef}
         type="file"
         aria-label="选择本机简历文件"
-        accept={ACCEPT}
+        accept={accept}
         className="hidden"
         onChange={handleFileChosen}
       />
@@ -464,12 +471,12 @@ export function ResumeSourcePage() {
                     ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
                       uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
                     } · 已就绪`
-                    /* 与 SUPPORTED_FORMATS / ACCEPT 保持同一份口径：旧版 .doc 后端固定
-                       返回 UNSUPPORTED_FILE_TYPE，文件选择器也选不中，不能在这里承诺。 */
-                    : '支持 PDF / DOCX / 图片格式，单个文件最大 10MB'}
+                    : wordConversionAvailable
+                      ? '支持 PDF、DOC、DOCX 和图片格式，单个文件最大 10MB'
+                      : `${WORD_CONVERSION_UNAVAILABLE_COPY}；支持 PDF / 图片格式，单个文件最大 10MB`}
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
-                  {SUPPORTED_FORMATS.map((format) => (
+                  {supportedFormats.map((format) => (
                     <span key={format} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
                       {format}
                     </span>
@@ -479,7 +486,20 @@ export function ResumeSourcePage() {
             )}
             <p className="resume-source-upload-hint mt-2 text-sm leading-relaxed text-neutral-500">
               再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
+              <span
+                aria-disabled={!wordConversionAvailable || undefined}
+                aria-describedby={!wordConversionAvailable ? 'resume-word-conversion-reason' : undefined}
+              >
+                {wordConversionAvailable
+                  ? ` Word ${WORD_CONVERSION_DISCLOSURE}。`
+                  : ` ${WORD_CONVERSION_UNAVAILABLE_COPY}。`}
+              </span>
             </p>
+            {!wordConversionAvailable && (
+              <p id="resume-word-conversion-reason" className="mt-1 text-xs leading-5 text-neutral-400">
+                {conversionCapabilities.reason || '转换引擎未就绪；服务恢复并通过能力探测后会自动开放。'}
+              </p>
+            )}
             {uploadedFile && (
               <FileContentPreview
                 compact
@@ -488,6 +508,8 @@ export function ResumeSourcePage() {
                 fileName={uploadedFile.name}
                 mimeType={uploadedFile.mimeType}
                 format={uploadedFile.format}
+                fileId={uploadedFile.fileId}
+                token={getToken()}
               />
             )}
           </div>
