@@ -14,6 +14,7 @@
 
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import {
   IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
@@ -40,6 +41,7 @@ type CloseUnpaidActor = {
   userAgent?: string | null
   requestId?: string | null
 }
+type PrintScanActionActor = CloseUnpaidActor
 
 // 与 print-jobs.service 的 PRINT_JOB_FILE_URL_TTL_MS 同口径：重试后 Agent claim
 // 前需要一个未过期的下载链接。
@@ -130,7 +132,10 @@ function parseSafePrintParams(paramsJson: string | null | undefined): SafePrintP
 
 @Injectable()
 export class AdminPrintScanService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit?: AuditService,
+  ) {}
 
   async listTasks(params: ListAdminPrintScanTasksParams): Promise<AdminPrintScanTaskPage> {
     const type = this.asTaskType(params.type)
@@ -157,11 +162,11 @@ export class AdminPrintScanService {
   }
 
   /** 类型感知动作。返回值供 controller 写审计。不支持的组合一律 400。 */
-  async applyAction(type: string, taskId: string, action: string): Promise<AdminPrintScanActionResult> {
+  async applyAction(type: string, taskId: string, action: string, actor?: PrintScanActionActor): Promise<AdminPrintScanActionResult> {
     const taskType = this.asTaskType(type)
 
-    if (taskType === 'print' && action === 'retry') return this.retryPrintTask(taskId)
-    if (taskType === 'scan' && action === 'cancel') return this.cancelScanTask(taskId)
+    if (taskType === 'print' && action === 'retry') return this.retryPrintTask(taskId, actor)
+    if (taskType === 'scan' && action === 'cancel') return this.cancelScanTask(taskId, actor)
 
     throw new BadRequestException({
       error: {
@@ -436,7 +441,7 @@ export class AdminPrintScanService {
     return { eligible: true, reason: null }
   }
 
-  private async retryPrintTask(taskId: string): Promise<AdminPrintScanActionResult> {
+  private async retryPrintTask(taskId: string, actor?: PrintScanActionActor): Promise<AdminPrintScanActionResult> {
     const task = await this.prisma.printTask.findUnique({
       where: { id: taskId },
       select: { id: true, terminalId: true, status: true, fileUrl: true, errorCode: true },
@@ -545,6 +550,17 @@ export class AdminPrintScanService {
       await tx.printTaskStatusLog.create({
         data: { taskId, fromStatus: 'failed', toStatus: 'pending', errorCode: 'admin_retry' },
       })
+      if (actor && this.audit) await this.audit.writeRequired(tx, {
+        actorId: actor.actorId,
+        actorRole: actor.actorRole,
+        action: 'print_scan.task.retry',
+        targetType: 'print_scan_task',
+        targetId: taskId,
+        payload: { taskType: 'print', action: 'retry', fromStatus: 'failed', toStatus: 'pending' },
+        ipAddress: actor.ipAddress ?? null,
+        userAgent: actor.userAgent ?? null,
+        requestId: actor.requestId ?? null,
+      })
     })
 
     return { taskId, type: 'print', action: 'retry', fromStatus: 'failed', toStatus: 'pending' }
@@ -635,7 +651,7 @@ export class AdminPrintScanService {
     }
   }
 
-  private async cancelScanTask(taskId: string): Promise<AdminPrintScanActionResult> {
+  private async cancelScanTask(taskId: string, actor?: PrintScanActionActor): Promise<AdminPrintScanActionResult> {
     const task = await this.prisma.scanTask.findUnique({
       where: { id: taskId },
       select: { id: true, status: true },
@@ -650,15 +666,28 @@ export class AdminPrintScanService {
     }
 
     // CAS：对齐 scan-tasks 服务的取消语义（waiting → cancelled，并发下不覆盖终态）。
-    const updated = await this.prisma.scanTask.updateMany({
-      where: { id: taskId, status: 'waiting' },
-      data: { status: 'cancelled' },
-    })
-    if (updated.count !== 1) {
-      throw new ConflictException({
-        error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.scanTask.updateMany({
+        where: { id: taskId, status: 'waiting' },
+        data: { status: 'cancelled' },
       })
-    }
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+        })
+      }
+      if (actor && this.audit) await this.audit.writeRequired(tx, {
+        actorId: actor.actorId,
+        actorRole: actor.actorRole,
+        action: 'print_scan.task.cancel',
+        targetType: 'print_scan_task',
+        targetId: taskId,
+        payload: { taskType: 'scan', action: 'cancel', fromStatus: 'waiting', toStatus: 'cancelled' },
+        ipAddress: actor.ipAddress ?? null,
+        userAgent: actor.userAgent ?? null,
+        requestId: actor.requestId ?? null,
+      })
+    })
 
     return { taskId, type: 'scan', action: 'cancel', fromStatus: 'waiting', toStatus: 'cancelled' }
   }

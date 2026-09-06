@@ -21,6 +21,8 @@
 import 'reflect-metadata'
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { Module } from '@nestjs/common'
 import { NestFactory, Reflector } from '@nestjs/core'
 import { JwtModule, JwtService } from '@nestjs/jwt'
@@ -30,7 +32,8 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.service'
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
-import { PRINT_FAILED_LIST_CAP } from '../src/admin-ops/derived-alerts'
+import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP } from '../src/admin-ops/derived-alerts'
+import { TERMINAL_ONLINE_WINDOW_MS } from '../src/terminals/printer-availability'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
@@ -101,6 +104,22 @@ async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
 
 async function main() {
   console.log('\n=== 阶段1E Admin 运营视图验证 ===')
+
+  if (ONLINE_WINDOW_MS !== TERMINAL_ONLINE_WINDOW_MS || ONLINE_WINDOW_MS !== 5 * 60 * 1000) {
+    fail('终端在线窗口必须统一引用五分钟心跳常量')
+  }
+  for (const relativePath of [
+    'terminals/terminals-admin.service.ts',
+    'terminals/terminal-toolbox.service.ts',
+    'content/content.service.ts',
+    'smart-campus/smart-campus.service.ts',
+  ]) {
+    const source = readFileSync(join(__dirname, '../src', relativePath), 'utf8')
+    if (!source.includes('TERMINAL_ONLINE_WINDOW_MS') || /ONLINE_THRESHOLD_MS|ONLINE_WINDOW_MS = [235] \* 60 \* 1000/.test(source)) {
+      fail(`终端读取点必须复用 TERMINAL_ONLINE_WINDOW_MS: ${relativePath}`)
+    }
+  }
+  pass('SES-07 终端在线窗口统一为五分钟心跳常量')
 
   await verifyHealthyPrinterStatusesDoNotAlert()
   if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return

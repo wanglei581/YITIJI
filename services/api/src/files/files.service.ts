@@ -1107,8 +1107,12 @@ export class FilesService {
     purpose: FilePurpose,
     explicit?: FileSensitiveLevel
   ): FileSensitiveLevel {
-    if (purpose === 'contract_upload') return 'highly_sensitive'
-    return explicit ?? DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
+    const defaultLevel = purpose === 'contract_upload'
+      ? 'highly_sensitive'
+      : DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
+    if (!explicit) return defaultLevel
+    const severity: Record<FileSensitiveLevel, number> = { normal: 0, sensitive: 1, highly_sensitive: 2 }
+    return severity[explicit] >= severity[defaultLevel] ? explicit : defaultLevel
   }
 
   private async hasActivePrintTaskForFile(fileId: string): Promise<boolean> {

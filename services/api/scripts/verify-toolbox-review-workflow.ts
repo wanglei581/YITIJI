@@ -123,6 +123,10 @@ function runStaticChecks(): void {
     'updatedBy: userId',
     'status: \'published\'',
     'status: \'suspended\'',
+    'interface ToolboxAllowedHostMutationResult',
+    'expiresAt: string | null',
+    'Promise<ToolboxAllowedHostMutationResult>',
+    'return { id: saved.id, host: saved.host, purpose: saved.purpose, status: saved.status, expiresAt:',
   ], '治理 service 复用规则、发布前 dry-run 严格校验、串行化写入 itemsJson 并使用事务')
   mustNotContain(service, [
     'take: 500',

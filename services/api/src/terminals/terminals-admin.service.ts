@@ -20,6 +20,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { isHealthyPrinterStatus } from './printer-status'
+import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
   cleanNullable,
@@ -249,7 +250,6 @@ export class TerminalAdminService {
   }
 
   async listTerminalsForAdmin(): Promise<{ terminals: AdminTerminalView[] }> {
-    const ONLINE_WINDOW_MS = 3 * 60 * 1000
     const now = Date.now()
 
     const rows = await this.prisma.terminal.findMany({
@@ -310,7 +310,7 @@ export class TerminalAdminService {
         orgName: t.org?.name ?? null,
         registeredAt: t.registeredAt.toISOString(),
         lastSeenAt: lastSeen.toISOString(),
-        online: !!lastHeartbeatAt && now - lastSeen.getTime() < ONLINE_WINDOW_MS,
+        online: !!lastHeartbeatAt && now - lastSeen.getTime() < TERMINAL_ONLINE_WINDOW_MS,
         lastHeartbeatAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
         agentStatus: hb?.status ?? null,
         localTaskDatabaseAvailable: hb?.localTaskDatabaseAvailable ?? null,
@@ -669,7 +669,6 @@ export class TerminalAdminService {
   }
 
   async listPrintersForAdmin(): Promise<{ printers: AdminPrinterView[] }> {
-    const ONLINE_WINDOW_MS = 3 * 60 * 1000
     const now = Date.now()
 
     const rows = await this.prisma.terminal.findMany({
@@ -693,7 +692,7 @@ export class TerminalAdminService {
       const hb = t.heartbeats[0]
       const activeTask = t.printTasks[0]
       const lastHeartbeatAt = hb?.createdAt ?? null
-      const online = lastHeartbeatAt ? now - lastHeartbeatAt.getTime() < ONLINE_WINDOW_MS : false
+      const online = lastHeartbeatAt ? now - lastHeartbeatAt.getTime() < TERMINAL_ONLINE_WINDOW_MS : false
       const printerStatus = hb?.printerStatus ?? null
       const status = toAdminPrinterStatus(online, printerStatus)
 
@@ -744,7 +743,7 @@ export class TerminalAdminService {
     }
     const latest = terminal.heartbeats[0]
     const lastSeenAt = latest?.createdAt?.toISOString() ?? null
-    const isOnline = latest ? Date.now() - latest.createdAt.getTime() < 5 * 60 * 1000 : false
+    const isOnline = latest ? Date.now() - latest.createdAt.getTime() < TERMINAL_ONLINE_WINDOW_MS : false
     return {
       found: true,
       printerStatus: latest?.printerStatus ?? null,
@@ -769,7 +768,7 @@ export class TerminalAdminService {
     const now = Date.now()
     return rows.flatMap((row) => {
       const latest = row.heartbeats[0]
-      const isOnline = Boolean(latest && now - latest.createdAt.getTime() < 5 * 60 * 1000 && latest.localTaskDatabaseAvailable !== false)
+      const isOnline = Boolean(latest && now - latest.createdAt.getTime() < TERMINAL_ONLINE_WINDOW_MS && latest.localTaskDatabaseAvailable !== false)
       if (!isOnline) return []
       return [{
         id: row.id,

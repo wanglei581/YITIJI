@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { findToolboxComplianceViolation } from './toolbox-policy'
+import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import type {
   KioskAppLaunchModeView,
   KioskAppPlacementView,
@@ -15,7 +16,6 @@ import type {
   ToolboxTerminalView,
 } from './terminal-toolbox.types'
 
-const ONLINE_THRESHOLD_MS = 2 * 60 * 1000
 const MAX_TOOLBOX_ITEMS = 24
 const TOOLBOX_EVENT_RETENTION_DAYS = 90
 const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }
@@ -519,7 +519,7 @@ export class TerminalToolboxService {
         // 无心跳必离线，最近心跳距今 < 3 分钟才在线。
         isOnline: (() => {
           const lastHeartbeatAt = t.heartbeats[0]?.createdAt
-          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < ONLINE_THRESHOLD_MS
+          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < TERMINAL_ONLINE_WINDOW_MS
         })(),
         config: config ? toAdminConfigView(config) : null,
       }

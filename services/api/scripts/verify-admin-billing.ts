@@ -38,9 +38,13 @@ async function expectCode(label: string, code: string, fn: () => Promise<unknown
   try {
     await fn()
   } catch (e) {
+    const response = (e as { getResponse?: () => unknown }).getResponse?.()
+    const responseCode = response && typeof response === 'object'
+      ? (response as { error?: { code?: string } }).error?.code
+      : undefined
     const msg = (e as Error)?.message ?? String(e)
-    if (msg.includes(code)) return pass(label)
-    fail(`${label} — expected ${code}, got: ${msg}`)
+    if (responseCode === code || msg.includes(code)) return pass(label)
+    fail(`${label} — expected ${code}, got: ${responseCode ?? msg}`)
   }
   fail(`${label} — expected error ${code}, but resolved`)
 }
@@ -128,7 +132,7 @@ async function main(): Promise<void> {
     }
 
     // (4) fail-closed：空 patch / 无变化 / 未知 serviceKey，且零新增审计
-    const auditsBefore = await auditCount()
+    const auditsBeforeRejectedPaths = await auditCount()
     await expectCode('空 patch 拒绝', 'PRICE_PATCH_EMPTY', () =>
       billing.updatePriceConfig('print_bw_page', {}, operatorId),
     )
@@ -138,8 +142,30 @@ async function main(): Promise<void> {
     await expectCode('未知 serviceKey 拒绝（本波不开放新建）', 'PRICE_CONFIG_NOT_FOUND', () =>
       billing.updatePriceConfig('print_nonexistent_item', { unitCents: 100 }, operatorId),
     )
-    if ((await auditCount()) === auditsBefore) pass('全部拒绝路径零新增审计')
+    await expectCode('设置 0 元必须显式确认', 'ZERO_PRICE_CONFIRMATION_REQUIRED', () =>
+      billing.updatePriceConfig('print_bw_page', { unitCents: 0 }, operatorId),
+    )
+    if ((await auditCount()) === auditsBeforeRejectedPaths) pass('全部拒绝路径零新增审计')
     else fail('rejected paths wrote audits')
+
+    const zero = await billing.updatePriceConfig('print_bw_page', { unitCents: 0, confirmZeroPrice: true }, operatorId)
+    if (zero.unitCents !== 0) fail('显式确认后应允许设置 0 元')
+    await billing.updatePriceConfig('print_bw_page', { unitCents: oldBw }, operatorId)
+    pass('0 元改价缺确认被拒；显式确认后允许且可恢复')
+
+    const beforeAuditFailure = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+    const failingBilling = new AdminBillingService(prisma, {
+      writeRequired: async () => { throw new Error('audit unavailable') },
+    } as never)
+    try {
+      await failingBilling.updatePriceConfig('print_bw_page', { unitCents: beforeAuditFailure.unitCents + 1 }, operatorId)
+      fail('审计失败时改价必须回滚')
+    } catch (error) {
+      if (!(error as Error).message.includes('audit unavailable')) throw error
+    }
+    const afterAuditFailure = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+    if (afterAuditFailure.unitCents !== beforeAuditFailure.unitCents) fail('审计失败后 PriceConfig 被部分提交')
+    pass('改价审计失败与 PriceConfig 更新同事务回滚')
 
     // (5) DTO 校验（ValidationPipe 语义）：非整数 / 负数 / 超上限 / 超长描述拒绝
     for (const [label, input] of [

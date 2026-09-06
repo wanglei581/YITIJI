@@ -435,6 +435,7 @@ export class JobsController {
   @Get('partner/jobs/quality-summary')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(30)
   getPartnerJobQualitySummary(@CurrentUser() user: AuthedUser) {
     if (!user.orgId) throw new BadRequestException({ error: { code: 'ORG_REQUIRED', message: '合作机构账号未绑定机构' } })
     return this.jobQuality.getSourceQualitySummary({ sourceOrgId: user.orgId })

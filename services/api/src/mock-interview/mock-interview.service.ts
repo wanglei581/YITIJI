@@ -16,6 +16,8 @@ import {
 } from './interview-practice-sheet'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
 import { InflightCoalescer } from '../ai/ai-inflight'
+import { RedisInflightLock } from '../ai/redis-inflight-lock'
+import { RedisService } from '../common/redis/redis.service'
 
 // ============================================================
 // 2C 模拟面试会话服务。
@@ -71,7 +73,7 @@ export class MockInterviewService {
     questionTarget: number
     done: false
   }>()
-  private readonly endInflight = new InflightCoalescer<ReturnType<MockInterviewService['reportDto']>>()
+  private readonly endLock: RedisInflightLock
 
   constructor(
     private readonly prisma: PrismaService,
@@ -82,7 +84,8 @@ export class MockInterviewService {
     private readonly extraction: ResumeExtractionService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
-  ) {}
+    redis?: RedisService,
+  ) { this.endLock = new RedisInflightLock(redis) }
 
   // ── 创建 / 开始 ────────────────────────────────────────────────────────────
 
@@ -300,7 +303,7 @@ export class MockInterviewService {
   /** 结束并生成练习报告（幂等：已有报告直接返回）。 */
   async end(sessionId: string, requester: InterviewRequester) {
     await this.loadAuthorized(sessionId, requester)
-    return this.endInflight.run(this.coalesceKey(sessionId, requester), () => this.endOnce(sessionId, requester))
+    return this.endLock.run(`ai:mock-interview:end:${this.coalesceKey(sessionId, requester)}`, 120_000, () => this.endOnce(sessionId, requester))
   }
 
   private async endOnce(sessionId: string, requester: InterviewRequester) {

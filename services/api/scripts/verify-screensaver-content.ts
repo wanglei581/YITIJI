@@ -19,6 +19,7 @@ import { randomBytes } from 'crypto'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { readFileSync } from 'fs'
 
 // 隔离环境——必须在构造 StorageService / 调用签名之前设好。
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-screensaver-file-signing-secret-0123456789ab'
@@ -30,6 +31,7 @@ process.env['FILE_STORAGE_DIR'] = STORAGE_DIR
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { ContentService } from '../src/content/content.service'
+import { AuditService } from '../src/audit/audit.service'
 import { verifyAdAssetSignature } from '../src/content/content-signing'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
@@ -59,10 +61,33 @@ const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a
 async function main() {
   console.log('\n=== 待机宣传屏内容 service 级 E2E 验证（P1-B② 守门）===')
 
+  const serviceSource = readFileSync(join(__dirname, '../src/content/content.service.ts'), 'utf8')
+  const auditedMethods = [
+    'createAsset',
+    'createExternalAsset',
+    'updateAsset',
+    'deleteAsset',
+    'createPlaylist',
+    'updatePlaylist',
+    'deletePlaylist',
+    'saveTerminalConfig',
+  ]
+  const missingRequiredAudit = auditedMethods.filter((method, index) => {
+    const next = auditedMethods[index + 1]
+    const start = serviceSource.indexOf(`async ${method}(`)
+    const end = next ? serviceSource.indexOf(`async ${next}(`) : serviceSource.indexOf('async listTerminalConfigs(')
+    const section = start >= 0 ? serviceSource.slice(start, end >= 0 ? end : undefined) : ''
+    return !section.includes('this.prisma.$transaction') || !section.includes('this.audit.writeRequired') || section.includes('this.audit.write(')
+  })
+  if (missingRequiredAudit.length > 0) {
+    fail(`API-26：content 写动作必须在事务内 writeRequired，审计失败不得返回 success: ${missingRequiredAudit.join(', ')}`)
+  }
+  pass('API-26：content 写动作与 required audit 同事务')
+
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const storage = new StorageService()
-  const content = new ContentService(prisma, storage)
+  const content = new ContentService(prisma, storage, new AuditService(prisma))
 
   const suffix = randomBytes(6).toString('hex')
   const terminalId = `term_vsc_${suffix}`

@@ -110,7 +110,19 @@ async function main() {
   const pdf = new InterviewReportPdfService()
   // ai-down 题目单渲染器：与 AI 版式并列注入（位置参数，顺序必须与构造函数一致）。
   const practiceSheetPdf = new InterviewPracticeSheetPdfService()
-  const svc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, {} as never, {} as never, audit, aiLog)
+  const inflightKeys = new Set<string>()
+  const redis = {
+    setNxPx: async (key: string) => {
+      if (inflightKeys.has(key)) return false
+      inflightKeys.add(key)
+      return true
+    },
+    getAndDelIfEquals: async (key: string) => {
+      inflightKeys.delete(key)
+      return 'matched'
+    },
+  } as never
+  const svc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, {} as never, {} as never, audit, aiLog, redis)
   const suffix = Date.now().toString(36)
   const endUserA = `vmi_a_${suffix}`
   const endUserB = `vmi_b_${suffix}`
@@ -147,7 +159,7 @@ async function main() {
           }
         },
       }
-      const guardedSvc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, {} as never, guardedExtraction as never, audit, aiLog)
+      const guardedSvc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, {} as never, guardedExtraction as never, audit, aiLog, redis)
       const created = await guardedSvc.createSession(
         { ...baseCfg, resumeFileId: ownedResumeFileId },
         { endUserId: endUserA, accessToken: null },
@@ -539,7 +551,7 @@ async function main() {
           }
         },
       }
-      const downSvc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, filesStub as never, {} as never, audit, aiLog)
+      const downSvc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, filesStub as never, {} as never, audit, aiLog, redis)
       const created = await downSvc.createSession(
         { interviewerType: 'tech', industry: '互联网 / AI', position: '前端开发工程师', experience: 'y1_3', difficulty: 'standard', durationMin: 8 },
         { endUserId: endUserA, accessToken: null },
@@ -558,7 +570,7 @@ async function main() {
           forbiddenWords: [], temperature: 0, enabled: true, apiKeyEncrypted: 'x',
         }),
       } as never)
-      const brokenSvc = new MockInterviewService(prisma, downLlm, pdf, practiceSheetPdf, filesStub as never, {} as never, audit, aiLog)
+      const brokenSvc = new MockInterviewService(prisma, downLlm, pdf, practiceSheetPdf, filesStub as never, {} as never, audit, aiLog, redis)
       let startFailed = false
       try {
         await brokenSvc.start(created.sessionId, { endUserId: endUserA, accessToken: null })
