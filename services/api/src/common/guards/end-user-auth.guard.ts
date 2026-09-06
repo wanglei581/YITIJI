@@ -1,8 +1,16 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { AuthedEndUser } from '../decorators/current-end-user.decorator'
 import { RedisService } from '../redis/redis.service'
+import { tryRedis } from '../redis/redis-degradation'
 import { PrismaService } from '../../prisma/prisma.service'
 
 interface EndUserJwtPayload {
@@ -27,6 +35,8 @@ export function memberSessionKey(sessionId: string): string {
  */
 @Injectable()
 export class EndUserAuthGuard implements CanActivate {
+  private readonly logger = new Logger(EndUserAuthGuard.name)
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly redis: RedisService,
@@ -53,7 +63,24 @@ export class EndUserAuthGuard implements CanActivate {
       throw this.unauthorized('MEMBER_TOKEN_INVALID', '登录已失效,请重新登录')
     }
 
-    const ownerId = await this.redis.get(memberSessionKey(sessionId))
+    // 会员会话的 Redis 是唯一真源，不能像内部账号缓存那样回源放行；但外部
+    // 依赖失联也不能把请求拖到 ioredis 重试耗尽后才以 500 结束。
+    const session = await tryRedis(
+      'member-session:get',
+      () => this.redis.get(memberSessionKey(sessionId)),
+      this.logger,
+    )
+    if (!session.ok && session.reason !== 'rejected') {
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'MEMBER_SESSION_STORE_UNAVAILABLE',
+          message: '登录状态暂时无法核验，请稍后重试',
+        },
+      })
+    }
+    // ReplyError 表示 Redis 已经回复、只是该命令被拒；按既有 tryRedis 语义不把它
+    // 扩散为连接故障，和会话不存在一样 fail-closed 为 401。
+    const ownerId = session.ok ? session.value : null
     if (!ownerId || ownerId !== payload.sub) {
       throw this.unauthorized('MEMBER_SESSION_EXPIRED', '会话已失效,请重新登录')
     }

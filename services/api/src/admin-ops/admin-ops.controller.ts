@@ -5,7 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { AdminAlertActionsService } from './admin-alert-actions.service'
 import { parseAlertListView } from './derived-alert-identity'
-import { AdminOpsService } from './admin-ops.service'
+import { AdminOpsService, DEFAULT_ALERT_LIST_LIMIT, MAX_ALERT_LIST_LIMIT } from './admin-ops.service'
 
 /** Number() 对非数字返回 NaN;安全解析并夹紧范围。 */
 function safeInt(value: string | undefined, defaultValue: number, min: number, max: number): number {
@@ -20,7 +20,7 @@ const VALID_TASK_STATUS = new Set(['pending', 'claimed', 'printing', 'completed'
  *
  * 路由表(全部含 /api/v1 前缀,Bearer + admin):
  *   GET  /admin/print-tasks?status=&page=&pageSize=   打印任务流水
- *   GET  /admin/alerts?view=open|acknowledged|suppressed|all
+ *   GET  /admin/alerts?view=open|acknowledged|suppressed|all&limit=50
  *   POST /admin/alerts/disposition                    确认 / 静默 / 关闭
  */
 @Controller()
@@ -46,14 +46,14 @@ export class AdminOpsController {
   }
 
   @Get('admin/alerts')
-  listAlerts(@Query('view') viewStr?: string) {
+  listAlerts(@Query('view') viewStr?: string, @Query('limit') limitStr?: string) {
     const view = parseAlertListView(viewStr)
     if (!view) {
       throw new BadRequestException({
         error: { code: 'ALERT_VIEW_INVALID', message: 'view 必须是 open / acknowledged / suppressed / all' },
       })
     }
-    return this.ops.listDerivedAlerts(view)
+    return this.ops.listDerivedAlerts(view, safeInt(limitStr, DEFAULT_ALERT_LIST_LIMIT, 1, MAX_ALERT_LIST_LIMIT))
   }
 
   @Post('admin/alerts/disposition')

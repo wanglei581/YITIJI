@@ -25,6 +25,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { MemberPendingTasksController } from '../src/member-print-orders/member-print-orders.controller'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
+import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
 import { verifyPaymentSessionToken } from '../src/payment/payment-session-token'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
@@ -56,6 +57,24 @@ async function expectGuardCode(fn: () => Promise<unknown>, code: string, label: 
     const c = errCode(e)
     if (c === code) pass(label)
     else fail(`${label} — 期望 ${code}，实际: ${c ?? (e as Error).message}`)
+  }
+}
+
+async function expectGuardUnavailable(fn: () => Promise<unknown>, label: string): Promise<void> {
+  const startedAt = Date.now()
+  try {
+    await fn()
+    fail(`${label} — 期望 503，但 canActivate 通过`)
+  } catch (e) {
+    const response = (e as { getStatus?: () => number; getResponse?: () => unknown })
+    const status = response.getStatus?.()
+    const body = response.getResponse?.() as { error?: { code?: string } } | undefined
+    const elapsedMs = Date.now() - startedAt
+    if (status === 503 && body?.error?.code === 'MEMBER_SESSION_STORE_UNAVAILABLE' && elapsedMs <= 3_000) {
+      pass(`${label} → 3 秒内 503 MEMBER_SESSION_STORE_UNAVAILABLE（${elapsedMs}ms）`)
+    } else {
+      fail(`${label} — status=${status} code=${body?.error?.code} elapsedMs=${elapsedMs}`)
+    }
   }
 }
 
@@ -253,16 +272,25 @@ async function main() {
     await expectGuardCode(() => guardBad.canActivate(mockCtx({ authorization: 'Bearer bad.token' })), 'MEMBER_TOKEN_INVALID', '6b. 错 token → 401 MEMBER_TOKEN_INVALID')
 
     const jwtOk = { verify: () => ({ sub: userA, jti: 'sess-x' }) } as never
+    resetRedisCooldownForTests()
+    const guardHung = new EndUserAuthGuard(jwtOk, {
+      get: async () => new Promise<string>(() => { setTimeout(() => undefined, 10_000) }),
+    } as never, {} as never)
+    await expectGuardUnavailable(
+      () => guardHung.canActivate(mockCtx({ authorization: 'Bearer ok.token' })),
+      '6c. Redis get 挂起',
+    )
+    resetRedisCooldownForTests()
     const guardNoSession = new EndUserAuthGuard(jwtOk, { get: async () => null } as never, {} as never)
-    await expectGuardCode(() => guardNoSession.canActivate(mockCtx({ authorization: 'Bearer ok.token' })), 'MEMBER_SESSION_EXPIRED', '6c. 有效 token 但无 Redis 会话（含过期会话）→ 401 MEMBER_SESSION_EXPIRED')
+    await expectGuardCode(() => guardNoSession.canActivate(mockCtx({ authorization: 'Bearer ok.token' })), 'MEMBER_SESSION_EXPIRED', '6d. 有效 token 但无 Redis 会话（含过期会话）→ 401 MEMBER_SESSION_EXPIRED')
 
     const prismaActive = { endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) } } as never
     const guardOk = new EndUserAuthGuard(jwtOk, { get: async () => userA } as never, prismaActive)
     const ctx = mockCtx({ authorization: 'Bearer ok.token' })
     const allowed = await guardOk.canActivate(ctx)
     const injected = (ctx.switchToHttp().getRequest() as { endUser?: { endUserId: string } }).endUser
-    if (allowed === true && injected?.endUserId === userA) pass('6d. 有效会员 token + 会话 → 通过并注入本人 endUserId')
-    else fail('6d. 有效会员鉴权未通过或未注入 endUser')
+    if (allowed === true && injected?.endUserId === userA) pass('6e. 有效会员 token + 会话 → 通过并注入本人 endUserId')
+    else fail('6e. 有效会员鉴权未通过或未注入 endUser')
 
     // ── 7. P0a 支付字段真实化：join Order，诚实字段 + pickupCode 门控 + 无 live 网关来源 ──
     const dPay = {

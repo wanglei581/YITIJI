@@ -12,7 +12,7 @@
  *   5. 已退款失败单（Order.payStatus=refunded，printOutcome 仍为空）不再报警。
  *   6. episode 不一致拒绝；处理动作写审计。
  *   7. GET 只读：列表端点不写 AlertDisposition（缺席不等于恢复）。
- *   8. 列表上限：firingCount 是精确总数、截断如实告知、被截断的告警仍可处置，
+ *   8. 列表上限：total/firingCount 是精确总数、truncated 如实告知、被截断的告警仍可处置，
  *      且不会因为「这次没列出来」把操作员的处置抹掉。
  *   9. reopen：已关闭/已静默的告警可以被重新打开，回到待处理。
  *
@@ -48,13 +48,13 @@ function errorCode(err: unknown): string | undefined {
   return e.response?.error?.code ?? e.getResponse?.()?.error?.code ?? e.message
 }
 
-function mockOpsPrisma(terminalRows: unknown[], printRows: unknown[] = []): PrismaService {
+function mockOpsPrisma(terminalRows: unknown[], printRows: unknown[] = [], dispositionRows: unknown[] = []): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
     printTask: { findMany: async () => printRows, count: async () => printRows.length },
     terminalHeartbeat: { groupBy: async () => [], findFirst: async () => null },
     alertDisposition: {
-      findMany: async () => [],
+      findMany: async () => dispositionRows,
       updateMany: async () => {
         throw new Error('listDerivedAlerts 是只读端点，不得写 AlertDisposition')
       },
@@ -126,6 +126,7 @@ async function main() {
   const fillerPrefix = `pt_vop_fill_${suffix}_`
   /** 第 8 节:从未被处置过的告警,用来验证 reopen 不凭空造记录。 */
   const taskFresh = `pt_vop_fresh_${suffix}`
+  const limitProbePrefix = `pt_vop_limit_${suffix}_`
   const subjectKeys = [
     `terminal_offline:${tOffline}`,
     `printer_issue:${tPrinterIssue}`,
@@ -381,7 +382,7 @@ async function main() {
     }
 
     // ── 6. HTTP：造告警 → 确认 → 再查列表 ────────────────────────────────
-    {
+    if (process.env.ADMIN_OPS_SKIP_HTTP !== '1') {
       process.env['JWT_SECRET'] ||= 'dev-only-secret-please-replace-in-prod-min-16-chars'
       const jwtSecret = process.env['JWT_SECRET']
       const redisStub = {
@@ -456,6 +457,8 @@ async function main() {
         await app.close()
         await httpPrisma.onModuleDestroy?.()
       }
+    } else {
+      console.log('  SKIP 6. HTTP 子段（ADMIN_OPS_SKIP_HTTP=1，仅用于禁止监听端口的沙箱）')
     }
 
     // ── 7. 列表上限：精确计数 + 如实截断 + 被截断的告警仍可处置 ──────────
@@ -494,13 +497,25 @@ async function main() {
       if (listed.truncation.cap !== PRINT_FAILED_LIST_CAP) fail('7. truncation.cap 应回真实上限')
       if (listed.truncation.type !== 'print_failed') fail('7. truncation 必须说明被截断的是哪一类')
       if (listed.listedCount !== listed.data.length) fail('7. listedCount 应等于本次实际列出的条数')
+      if (listed.total !== listed.firingCount) fail('7. total 必须等于当前仍在发生的精确总数')
+      if (!listed.truncated) fail('7. 截断时 truncated 必须为 true')
       if (listed.firingCount <= listed.listedCount) {
         fail(`7. 截断时 firingCount 必须大于已列出条数，不得把上限当成全部(${listed.firingCount}/${listed.listedCount})`)
       }
-      if (listed.firingCount - listed.listedCount !== listed.truncation.omitted) {
-        fail('7. omitted 必须等于 firingCount - listedCount')
+      // total 还含终端类告警；truncation.omitted 只统计 print_failed 的派生层上限。
+      if (listed.truncation.omitted < 3) {
+        fail(`7. 派生层 omitted 必须反映超过 PRINT_FAILED_LIST_CAP 的打印失败告警，实际=${listed.truncation.omitted}`)
       }
       if (listed.firingCount < PRINT_FAILED_LIST_CAP + 3) fail('7. firingCount 应是精确总数，不受列表上限影响')
+
+      const defaultLimit = await svc.listDerivedAlerts('all')
+      if (defaultLimit.data.length !== 50 || defaultLimit.total !== listed.total || !defaultLimit.truncated) {
+        fail(`7. 默认 limit=50 必须保留总数并如实截断：${JSON.stringify({ length: defaultLimit.data.length, total: defaultLimit.total, truncated: defaultLimit.truncated })}`)
+      }
+      const raisedLimit = await svc.listDerivedAlerts('all', 100)
+      if (raisedLimit.data.length !== 100 || raisedLimit.total !== listed.total || !raisedLimit.truncated) {
+        fail(`7. limit=100 必须仍按上限截断：${JSON.stringify({ length: raisedLimit.data.length, total: raisedLimit.total, truncated: raisedLimit.truncated })}`)
+      }
 
       // 真值：这条任务此刻确实仍然满足告警条件
       const truth = await prisma.printTask.findUnique({
@@ -533,10 +548,11 @@ async function main() {
       if (backList.listedCount < PRINT_FAILED_LIST_CAP && backList.truncation !== null) {
         fail('7. 未触及上限时 truncation 应为 null')
       }
-      if (backList.listedCount < PRINT_FAILED_LIST_CAP && backList.firingCount !== backList.listedCount) {
-        fail('7. 未截断时 firingCount 应等于 listedCount')
+      if (backList.total !== backList.firingCount) fail('7. API total 必须等于 firingCount')
+      if (backList.total <= 50 && (backList.truncated || backList.firingCount !== backList.listedCount)) {
+        fail('7. 未触及 API 默认 50 条上限时，truncated 必须为 false 且 total 等于 listedCount')
       }
-      pass('7. 列表上限如实告知(firingCount 精确/omitted 一致)，被截断的告警不被判恢复、仍可处置、回列表后处置不丢')
+      pass('7. 列表上限如实告知(total/firingCount 精确、默认 50/可提至 100、truncated 一致)，被截断的告警不被判恢复、仍可处置、回列表后处置不丢')
     }
 
     // ── 8. reopen：关闭可撤销，不再是同一 episode 内的单向门 ──────────────
@@ -604,6 +620,75 @@ async function main() {
         if (errorCode(err) !== 'ALERT_ACTION_INVALID') fail(`8. 期望 ALERT_ACTION_INVALID，得到 ${errorCode(err)}`)
       }
       pass('8. reopen 可撤销关闭并回到待处理、持久化 + 审计 1 条、重复与无操作均幂等、未知动作仍拒绝')
+    }
+
+    // ── 9. API 响应上限：73 条 → 默认 50，limit=100 全量 ─────────────────
+    {
+      const now = new Date()
+      const limitProbe = new AdminOpsService(mockOpsPrisma([], Array.from({ length: 73 }, (_, index) => ({
+        id: `${limitProbePrefix}${index}`,
+        errorCode: 'PRINTER_OFFLINE',
+        updatedAt: new Date(now.getTime() - index * 1000),
+        terminal: null,
+        order: null,
+      }))))
+      const limitController = new AdminOpsController(limitProbe, {} as AdminAlertActionsService)
+      const defaultPage = await limitController.listAlerts('all')
+      const raisedPage = await limitController.listAlerts('all', '100')
+      if (
+        defaultPage.data.length !== 50
+        || defaultPage.total !== 73
+        || !defaultPage.truncated
+        || raisedPage.data.length !== 73
+        || raisedPage.total !== 73
+        || raisedPage.truncated
+      ) {
+        fail(`9. 73 条告警 API 上限契约不成立：${JSON.stringify({ default: { count: defaultPage.data.length, total: defaultPage.total, truncated: defaultPage.truncated }, raised: { count: raisedPage.data.length, total: raisedPage.total, truncated: raisedPage.truncated } })}`)
+      }
+      pass('9. 73 条告警：默认返回 50 + total + truncated；limit=100 返回全部 73')
+    }
+    // ── 9b. truncated 必须按当前 view 判断：open 视图里存在已确认告警 ≠ 被截断 ──
+    // 反例（2026-09-06 复核时发现的实现缺陷）：拿全视图的 total 去比 open 视图的 data，
+    // 只要有 20 条已确认，open 视图就会永远显示「仅展示前 53 条，共 73 条」。
+    {
+      const now = new Date()
+      const rows = Array.from({ length: 73 }, (_, index) => ({
+        id: `${limitProbePrefix}view_${index}`,
+        errorCode: 'PRINTER_OFFLINE',
+        updatedAt: new Date(now.getTime() - index * 1000),
+        terminal: null,
+        order: null,
+      }))
+      const probeAll = new AdminOpsController(new AdminOpsService(mockOpsPrisma([], rows)), {} as AdminAlertActionsService)
+      const everything = await probeAll.listAlerts('all', '100')
+      const acknowledged = everything.data.slice(0, 20).map((item) => ({
+        subjectKey: item.subjectKey,
+        action: 'acknowledged',
+        episodeToken: item.episodeToken,
+        recoveredAt: null,
+        silencedUntil: null,
+        note: null,
+        updatedAt: now,
+      }))
+      const mixed = new AdminOpsController(new AdminOpsService(mockOpsPrisma([], rows, acknowledged)), {} as AdminAlertActionsService)
+      const openAll = await mixed.listAlerts('open', '100')
+      const openDefault = await mixed.listAlerts('open')
+      const ackAll = await mixed.listAlerts('acknowledged', '100')
+      const snapshot = {
+        openAll: { count: openAll.data.length, viewTotal: openAll.viewTotal, truncated: openAll.truncated, total: openAll.total },
+        openDefault: { count: openDefault.data.length, viewTotal: openDefault.viewTotal, truncated: openDefault.truncated },
+        ackAll: { count: ackAll.data.length, viewTotal: ackAll.viewTotal, truncated: ackAll.truncated },
+      }
+      if (openAll.data.length !== 53 || openAll.viewTotal !== 53 || openAll.truncated || openAll.total !== 73) {
+        fail(`9b. open 视图未被截断时不得报 truncated：${JSON.stringify(snapshot)}`)
+      }
+      if (openDefault.data.length !== 50 || openDefault.viewTotal !== 53 || !openDefault.truncated) {
+        fail(`9b. open 视图被 limit 截断时 truncated 必须为 true 且 viewTotal 精确：${JSON.stringify(snapshot)}`)
+      }
+      if (ackAll.data.length !== 20 || ackAll.viewTotal !== 20 || ackAll.truncated) {
+        fail(`9b. acknowledged 视图 20 条全部列出时不得报 truncated：${JSON.stringify(snapshot)}`)
+      }
+      pass('9b. truncated / viewTotal 按当前 view 判断；total 仍是全部在发告警数（73）')
     }
 
     console.log('\n=== ALL PASS ===')

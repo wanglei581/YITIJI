@@ -38,6 +38,10 @@ import {
 import { resolveClientIp } from '../common/client-ip'
 export type { AdminOrgAccount } from './admin-org-account-view'
 
+type SessionInvalidationResult =
+  | { sessionInvalidation: 'ok' }
+  | { sessionInvalidation: 'failed'; staleWindowSeconds: number }
+
 // ============================================================
 // AdminOrgsService — 阶段1B:Admin 合作机构管理
 //
@@ -509,9 +513,11 @@ export class AdminOrgsService {
         })
       })
       updated = { ...account, enabled: toEnabled, tokenVersion: account.tokenVersion + 1 }
-      await this.invalidateAccountSession(accountId)
     }
-    return mapAdminOrgAccount(updated)
+    // 即使状态已是目标值也重新尝试删除缓存：上一次 DB 已提交但 Redis 故障时，
+    // 管理员可以通过重试补齐失效，而不会被 no-op 分支吞掉。
+    const sessionInvalidation = await this.invalidateAccountSession(accountId, admin)
+    return { ...mapAdminOrgAccount(updated), ...sessionInvalidation }
   }
 
   async resetAccountPassword(
@@ -519,7 +525,7 @@ export class AdminOrgsService {
     accountId: string,
     password: string,
     admin: AuthedUser,
-  ): Promise<{ success: true }> {
+  ): Promise<{ success: true } & SessionInvalidationResult> {
     const account = await this.assertAccountInOrg(orgId, accountId)
     const passwordHash = await bcrypt.hash(password, 10)
     await this.prisma.$transaction(async (tx) => {
@@ -541,8 +547,8 @@ export class AdminOrgsService {
         payload: { accountId, username: account.username },
       })
     })
-    await this.invalidateAccountSession(accountId)
-    return { success: true }
+    const sessionInvalidation = await this.invalidateAccountSession(accountId, admin)
+    return { success: true, ...sessionInvalidation }
   }
 
   /**
@@ -554,7 +560,7 @@ export class AdminOrgsService {
     accountId: string,
     input: { email: string; confirmVerified: true },
     admin: AuthedUser,
-  ): Promise<AdminOrgAccount> {
+  ): Promise<AdminOrgAccount & SessionInvalidationResult> {
     if (input.confirmVerified !== true) {
       throw new BadRequestException({
         error: { code: 'EMAIL_CONFIRM_REQUIRED', message: '必须确认已人工核验该邮箱归属' },
@@ -600,9 +606,9 @@ export class AdminOrgsService {
       })
       return result
     })
-    await this.invalidateAccountSession(accountId)
+    const sessionInvalidation = await this.invalidateAccountSession(accountId, admin)
     const mapped = mapAdminOrgAccount(refreshed)
-    return mapped
+    return { ...mapped, ...sessionInvalidation }
   }
 
   /**
@@ -808,8 +814,31 @@ export class AdminOrgsService {
     return `internal:session-state:${userId}`
   }
 
-  private async invalidateAccountSession(userId: string): Promise<void> {
-    await this.redis.del(this.sessionStateKey(userId))
+  private async invalidateAccountSession(
+    userId: string,
+    actor?: Pick<AuthedUser, 'userId' | 'role'>,
+  ): Promise<SessionInvalidationResult> {
+    try {
+      await this.redis.del(this.sessionStateKey(userId))
+      return { sessionInvalidation: 'ok' }
+    } catch {
+      // internal:session-state 是数据库真源的最多 60 秒缓存。DB 已提交但 DEL
+      // 失败、旧缓存仍可读时，旧 token 最长会被接受到该 TTL 结束；重试操作会再尝试 DEL。
+      const staleWindowSeconds = INTERNAL_SESSION_CACHE_TTL_SECONDS
+      const code = 'REDIS_SESSION_INVALIDATION_FAILED'
+      this.logger.warn(`account session invalidation failed: accountId=${userId} code=${code}`)
+      if (actor) {
+        await this.audit.write({
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: 'org.account.session_invalidation_failed',
+          targetType: 'user',
+          targetId: userId,
+          payload: { accountId: userId, code, level: 'warn', staleWindowSeconds },
+        })
+      }
+      return { sessionInvalidation: 'failed', staleWindowSeconds }
+    }
   }
 
   /**

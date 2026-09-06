@@ -57,6 +57,9 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AdminAlertItem[]>([])
   const [derivedAt, setDerivedAt] = useState<string | null>(null)
   const [firingCount, setFiringCount] = useState(0)
+  const [total, setTotal] = useState(0)
+  const [truncated, setTruncated] = useState(false)
+  const [viewTotal, setViewTotal] = useState<number | null>(null)
   const [listedCount, setListedCount] = useState(0)
   const [truncation, setTruncation] = useState<AdminAlertsResult['truncation']>(null)
   const [openCount, setOpenCount] = useState(0)
@@ -78,6 +81,9 @@ export default function AlertsPage() {
       setAlerts(res.data)
       setDerivedAt(res.derivedAt)
       setFiringCount(res.firingCount)
+      setTotal(res.total)
+      setTruncated(res.truncated)
+      setViewTotal(res.viewTotal ?? null)
       setListedCount(res.listedCount)
       setTruncation(res.truncation)
       setOpenCount(res.openCount)
@@ -131,7 +137,7 @@ export default function AlertsPage() {
   return (
     <Page
       title="告警中心"
-      subtitle={`实时派生 · 待处理 ${openCount} / 仍在发生 ${firingCount}${truncation ? `（本页只列出 ${listedCount} 条）` : ''}${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}${errorCount ? ` · 本栏严重 ${errorCount}` : ''}`}
+      subtitle={`实时派生 · 待处理 ${openCount} / 仍在发生 ${firingCount}${truncated ? (viewTotal !== null ? ` · 仅展示前 ${listedCount} 条，本视图共 ${viewTotal} 条` : ` · 仅展示前 ${listedCount} 条，全部在发 ${total} 条（派生层上限已触及，本视图精确条数未知）`) : ''}${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}${errorCount ? ` · 本栏严重 ${errorCount}` : ''}`}
       actions={
         <button
           type="button"
