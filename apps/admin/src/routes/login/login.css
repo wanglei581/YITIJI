@@ -929,6 +929,11 @@
   font-size: 12.5px;
   line-height: 1.75;
   color: var(--muted);
+  white-space: pre-wrap;
+}
+.clogin .c-doc-error {
+  color: var(--red);
+  font-weight: 700;
 }
 .clogin .c-doc-tabs {
   display: flex;

@@ -7,6 +7,8 @@ test.describe('宣传屏（mock 口径）', () => {
     const guards = await openAuthed(page, '/screensaver')
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: '宣传屏' })).toBeVisible()
+    await expect(page.getByText('状态获取失败')).toHaveCount(0)
+    await expect(page.getByText(/AI 文生图海报：二期能力，暂未启用/)).toBeVisible()
 
     for (const tab of ['素材库', '播放方案', '终端配置']) {
       await page.getByRole('button', { name: tab }).click()

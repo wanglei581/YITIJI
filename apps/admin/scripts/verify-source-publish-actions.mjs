@@ -146,4 +146,36 @@ for (const target of targets) {
   pass(`${rel(target)} approved + unpublished 可渲染「发布」按钮`)
 }
 
+const jobSources = readFileSync(join(adminRoot, 'src/routes/job-sources/index.tsx'), 'utf8')
+const fairSources = readFileSync(join(adminRoot, 'src/routes/fair-sources/index.tsx'), 'utf8')
+const policySources = readFileSync(join(adminRoot, 'src/routes/policy-sources/index.tsx'), 'utf8')
+const importBatches = readFileSync(join(adminRoot, 'src/routes/import-batches/index.tsx'), 'utf8')
+
+if (!importBatches.includes('filterScope=org') || !fairSources.includes('按来源机构筛选招聘会')) {
+  fail('ADM-C9: 查看招聘会必须按机构筛选，横幅不得声称按批次')
+}
+pass('ADM-C9 招聘会从导入批次进入时横幅按机构诚实说明')
+
+if (fairSources.includes('展位数')) {
+  fail('ADM-C14: 不得把 companyCount 标成「展位数」')
+}
+if (!fairSources.includes('参展企业数')) {
+  fail('ADM-C14: 招聘会详情应把 boothCount 标成「参展企业数」')
+}
+if (jobSources.includes('label="行业"')) {
+  fail('ADM-C14: http 模式 industry 恒空，不得渲染行业列/行')
+}
+pass('ADM-C14 参展企业数 / 行业列口径诚实')
+
+for (const [name, source] of [
+  ['job-sources', jobSources],
+  ['fair-sources', fairSources],
+  ['policy-sources', policySources],
+]) {
+  if (!source.includes('服务端当前全量返回，本页本地分页')) {
+    fail(`ADM-C15: ${name} 必须声明本次加载条数是服务端全量返回的本地分页`)
+  }
+}
+pass('ADM-C15 三个来源页不再把本地分页假装成服务端全集而不加说明')
+
 console.log('\nALL PASS')

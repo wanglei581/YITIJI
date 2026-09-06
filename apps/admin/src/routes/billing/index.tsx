@@ -64,11 +64,17 @@ function PriceConfigSection() {
         return
       }
       const unitCents = Math.round(parsed * 100)
-      if (!window.confirm(`确认将「${SERVICE_LABELS[serviceKey] ?? serviceKey}」单价改为 ¥${(unitCents / 100).toFixed(2)}？改价即时对全端生效并记入审计。`)) return
+      const zeroPriceNote = unitCents === 0
+        ? '\n0 元 = 免费打印，将跳过收银。'
+        : ''
+      if (!window.confirm(`确认将「${SERVICE_LABELS[serviceKey] ?? serviceKey}」单价改为 ¥${(unitCents / 100).toFixed(2)}？${zeroPriceNote}\n改价即时对全端生效并记入审计。`)) return
       setSaving(serviceKey)
       setError(null)
       try {
-        await adminBillingService.updatePriceConfig(serviceKey, { unitCents })
+        await adminBillingService.updatePriceConfig(serviceKey, {
+          unitCents,
+          ...(unitCents === 0 ? { confirmZeroPrice: true } : {}),
+        })
         setEditing((prev) => {
           const next = { ...prev }
           delete next[serviceKey]

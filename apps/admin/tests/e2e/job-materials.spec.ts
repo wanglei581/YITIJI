@@ -11,6 +11,9 @@ test.describe('求职材料库（mock 口径）', () => {
     await expect(page.getByRole('heading', { name: '求职材料库' })).toBeVisible()
     await expect(page.getByText('模板可编辑，生成统计与文件只读')).toBeVisible()
     await expect(page.getByRole('heading', { name: '模板目录' })).toBeVisible()
+    await expect(page.getByText('已停用').first()).toBeVisible()
+    const disabledBadge = page.locator('span', { hasText: '已停用' }).first()
+    await expect(disabledBadge).not.toHaveClass(/success/)
 
     // 有模板就渲染列表，没有就渲染空态；两者必居其一，不允许两者都不出现（那是白屏）。
     const emptyState = page.getByText('暂无模板')

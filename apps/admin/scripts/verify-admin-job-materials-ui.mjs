@@ -49,4 +49,11 @@ assertNotContains(
   'Admin page is readonly and avoids forbidden recruiting flow wording',
 )
 
+assertContains('src/routes/job-materials/index.tsx', '已停用', 'disabled templates are labelled 已停用')
+const jobMaterialsPage = read('src/routes/job-materials/index.tsx')
+if (/bg-success-bg[\s\S]{0,120}已停用|已停用[\s\S]{0,120}bg-success-bg/.test(jobMaterialsPage)) {
+  fail('ADM-A17: 「已停用」不得使用绿色徽章')
+}
+pass('ADM-A17 已停用模板不使用绿色徽章')
+
 console.log('\nALL PASS')

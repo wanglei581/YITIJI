@@ -43,6 +43,20 @@ function relativeTime(iso: string | null): string {
   return `${Math.floor(hours / 24)} 天前`
 }
 
+/**
+ * paperTrayLevel 后端当前恒 null（心跳未上报该字段）。
+ * 字段名是 Level，工作台按百分比展示；单位未经 Agent 确认前，有值按 % 与工作台对齐，
+ * 无值不猜测「张」。
+ */
+function formatPaperTrayLevel(level: number | null) {
+  if (level === null || !Number.isFinite(level)) {
+    return null
+  }
+  return (
+    <span className="ml-1 text-xs tabular-nums text-neutral-500">({Math.round(level)}%)</span>
+  )
+}
+
 function matchesSearch(p: AdminPrinterRecord, search: string): boolean {
   const s = search.trim().toLowerCase()
   if (!s) return true
@@ -216,14 +230,14 @@ export default function PrintersPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold ${paper.color}`}>{paper.text}</span>
-                        {p.paperTrayLevel !== null && (
-                          <span className="ml-1 text-xs tabular-nums text-neutral-500">({p.paperTrayLevel}张)</span>
-                        )}
+                        {formatPaperTrayLevel(p.paperTrayLevel)}
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {p.fault
                           ? <span className="font-semibold text-error-fg">{p.fault}</span>
-                          : <span className="text-neutral-400">—</span>
+                          : p.printerStatus && p.printerStatus !== 'unknown'
+                            ? <span className="font-semibold text-error-fg">{p.printerStatus}</span>
+                            : <span className="text-neutral-400">未上报</span>
                         }
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-neutral-500">{relativeTime(p.lastSyncAt)}</td>

@@ -189,7 +189,7 @@ export default function JobMaterialsPage() {
                             : 'bg-neutral-100 text-neutral-600'
                         }`}
                       >
-                        {template.status === 'published' ? '已发布' : '未发布'}
+                        {template.status === 'published' ? '已发布' : '已停用'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-neutral-900">

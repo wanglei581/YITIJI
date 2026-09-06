@@ -27,5 +27,9 @@ test.describe('设备 / 终端 / 打印机（mock 口径）', () => {
 
     await page.getByRole('button', { name: '外设' }).click()
     await expect(page.getByText('本阶段不开放外设独立管理')).toBeVisible()
+
+    await page.getByRole('button', { name: '打印机' }).click()
+    await expect(page.getByText('张)')).toHaveCount(0)
+    await expect(page.getByText('未上报').first()).toBeVisible()
   })
 })

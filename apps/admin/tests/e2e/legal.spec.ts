@@ -7,6 +7,8 @@ test.describe('法务文档版本（mock 口径）', () => {
     const guards = await openAuthed(page, '/legal-docs')
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: '法务文档版本' })).toBeVisible()
+    await expect(page.getByText('已归档 / 已被 v1.0 取代')).toBeVisible()
+    await expect(page.getByText('草稿').first()).toBeVisible()
 
     await page.getByRole('button', { name: '新增版本' }).click()
     await expect(page.getByRole('dialog', { name: '新增法务文档版本' })).toBeVisible()

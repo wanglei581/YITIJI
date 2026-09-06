@@ -37,6 +37,8 @@ test.describe('登录页（mock 口径：密码登录旁路任意账号可进）
     await openAnonymous(page, '/login')
     await page.getByRole('link', { name: /用户服务协议/ }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByText('v1 草拟版')).toHaveCount(0)
+    await expect(page.getByText(/当前有效版本|法务文档加载失败/)).toBeVisible()
     await page.getByRole('button', { name: '关闭' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })

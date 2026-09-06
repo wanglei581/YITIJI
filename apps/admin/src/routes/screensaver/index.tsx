@@ -18,7 +18,9 @@ import {
   screensaverService,
   type AdAssetView,
   type AdPlaylistView,
+  type AdPlaylistStatus,
   type AiPosterStatusView,
+  type SaveAdPlaylistInput,
   type ScreensaverTerminalView,
 } from '../../services/api/screensaver'
 import { API_BASE_URL } from '../../services/api/client'
@@ -49,9 +51,19 @@ function resolvePreviewUrl(previewUrl: string): string {
 export default function ScreensaverPage() {
   const [tab, setTab] = useState<Tab>('assets')
   const [aiStatus, setAiStatus] = useState<AiPosterStatusView | null>(null)
+  const [aiStatusState, setAiStatusState] = useState<'loading' | 'ok' | 'error'>('loading')
 
   useEffect(() => {
-    screensaverService.aiPosterStatus().then(setAiStatus).catch(() => setAiStatus(null))
+    screensaverService
+      .aiPosterStatus()
+      .then((status) => {
+        setAiStatus(status)
+        setAiStatusState('ok')
+      })
+      .catch(() => {
+        setAiStatus(null)
+        setAiStatusState('error')
+      })
   }, [])
 
   return (
@@ -67,8 +79,15 @@ export default function ScreensaverPage() {
       <div className="mt-4 flex items-center gap-2 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
         <SparklesIcon className="h-4 w-4 text-neutral-400" aria-hidden="true" />
         <span>
-          AI 文生图海报：{aiStatus?.enabled ? `已启用（${aiStatus.provider}）` : '二期能力，暂未启用'}
-          {!aiStatus?.enabled && '（一期请上传自制海报 / 视频）'}
+          AI 文生图海报：
+          {aiStatusState === 'error'
+            ? '状态获取失败'
+            : aiStatusState === 'loading'
+              ? '正在获取状态…'
+              : aiStatus?.enabled
+                ? `已启用（${aiStatus.provider}）`
+                : '二期能力，暂未启用'}
+          {aiStatusState === 'ok' && !aiStatus?.enabled ? '（一期请上传自制海报 / 视频）' : ''}
         </span>
       </div>
 
@@ -426,6 +445,9 @@ interface EditorState {
   id: string | null
   name: string
   itemAssetIds: string[]
+  /** 编辑时带上原方案状态；更新请求不下发 status，避免把已停用方案静默重新激活。 */
+  originalStatus?: AdPlaylistStatus
+  originalItemEnabled?: Record<string, boolean>
 }
 
 function PlaylistsTab() {
@@ -450,7 +472,13 @@ function PlaylistsTab() {
 
   const startNew = () => setEditor({ id: null, name: '', itemAssetIds: [] })
   const startEdit = (p: AdPlaylistView) =>
-    setEditor({ id: p.id, name: p.name, itemAssetIds: p.items.map((it) => it.assetId) })
+    setEditor({
+      id: p.id,
+      name: p.name,
+      itemAssetIds: p.items.map((it) => it.assetId),
+      originalStatus: p.status,
+      originalItemEnabled: Object.fromEntries(p.items.map((it) => [it.assetId, it.enabled])),
+    })
 
   const save = useCallback(async () => {
     if (!editor) return
@@ -463,11 +491,15 @@ function PlaylistsTab() {
       return
     }
     setError(null)
-    const input = {
+    const input: SaveAdPlaylistInput = {
       name: editor.name.trim(),
-      status: 'active' as const,
-      items: editor.itemAssetIds.map((assetId, i) => ({ assetId, order: i, enabled: true })),
+      items: editor.itemAssetIds.map((assetId, i) => ({
+        assetId,
+        order: i,
+        enabled: editor.originalItemEnabled?.[assetId] ?? true,
+      })),
     }
+    if (!editor.id) input.status = 'active'
     try {
       if (editor.id) await screensaverService.updatePlaylist(editor.id, input)
       else await screensaverService.createPlaylist(input)

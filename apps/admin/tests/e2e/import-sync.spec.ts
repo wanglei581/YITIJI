@@ -6,6 +6,10 @@ test.describe('导入批次 / 数据接入通道（mock 口径）', () => {
     const guards = await openAuthed(page, '/import-batches')
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: 'Excel 导入记录' })).toBeVisible()
+    await page.getByRole('button', { name: '查看招聘会' }).click()
+    await expect(page).toHaveURL(/filterScope=org/)
+    await expect(page.getByText('按来源机构筛选招聘会')).toBeVisible()
+    await expect(page.getByText('无法按 Excel 批次精确过滤')).toBeVisible()
   })
 
   test('数据接入通道：批量下架有二次确认', async ({ page }) => {

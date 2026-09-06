@@ -191,7 +191,9 @@ export default function FairSourcesPage() {
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-bg px-4 py-2.5">
           <FilterIcon className="h-4 w-4 flex-shrink-0 text-warning" />
           <span className="text-sm text-warning-fg">
-            正在显示来自 Excel 导入批次 <strong>{batchLabel || sourceOrgIdFilter}</strong> 的招聘会（机构 ID：{sourceOrgIdFilter}）
+            正在按来源机构筛选招聘会（机构 ID：{sourceOrgIdFilter}
+            {batchLabel ? ` · 来自导入文件 ${batchLabel}` : ''}
+            ）。招聘会记录没有批次 ID，无法按 Excel 批次精确过滤。
           </span>
           <button
             onClick={() => setSearchParams({})}
@@ -353,7 +355,7 @@ export default function FairSourcesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        仅展示第三方平台同步的招聘会信息，不参与招聘闭环。
+        仅展示第三方平台同步的招聘会信息，不参与招聘闭环。本次加载 {sources.length} 条（服务端当前全量返回，本页本地分页）。
       </p>
 
       <Drawer
@@ -379,7 +381,7 @@ export default function FairSourcesPage() {
             <DetailRow label="结束时间" value={formatDateTime(viewing.endTime)} />
             <DetailRow label="举办场馆" value={viewing.venue} />
             <DetailRow label="活动状态" value={FAIR_STATUS_LABELS[viewing.status]} />
-            <DetailRow label="展位数" value={viewing.boothCount !== undefined ? String(viewing.boothCount) : undefined} />
+            <DetailRow label="参展企业数" value={viewing.boothCount !== undefined ? String(viewing.boothCount) : undefined} />
             <DetailRow label="描述" value={viewing.description} />
             <DetailRow label="同步时间" value={formatDateTime(viewing.syncTime)} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
