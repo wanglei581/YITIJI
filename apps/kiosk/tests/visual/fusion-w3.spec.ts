@@ -224,8 +224,11 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   await page.getByRole('button', { name: '确认导出' }).click()
   await expect(page.getByRole('button', { name: '查看或手机保存PDF' })).toBeVisible()
   const pageCount = page.context().pages().length
-  await page.getByRole('button', { name: '查看或手机保存PDF' }).click()
+  // 包 F：导出成功后页面会自动打开真实 PDF 预览（预览 = 导出 = 打印同一份）；未自动打开时再点按钮。
   const dialog = page.getByRole('dialog', { name: '优化版简历.pdf' })
+  if (!(await dialog.isVisible().catch(() => false))) {
+    await page.getByRole('button', { name: '查看或手机保存PDF' }).click()
+  }
   await expect(dialog).toBeVisible()
   await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', '/w3-fixtures/optimized-resume.pdf')
   await expect(dialog.getByText('手机扫码保存')).toBeVisible()
