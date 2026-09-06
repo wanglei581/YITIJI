@@ -23,9 +23,8 @@ import { canAccessFile, FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
-import { JOB_MATERIAL_TEMPLATES } from '../job-materials/job-material-templates'
+import { JobMaterialsService } from '../job-materials/job-materials.service'
 import type { ResumeTemplateLayoutPreset } from '../job-materials/job-materials.types'
-import { Prisma } from '../generated/prisma/client'
 import {
   ResumeExportGateService,
   hashResumeExportContent,
@@ -133,6 +132,7 @@ export class AiService {
     private readonly resumeText: ResumeTextService,
     redis?: RedisService,
     @Optional() private readonly exportGate?: ResumeExportGateService,
+    @Optional() private readonly jobMaterials?: JobMaterialsService,
   ) {
     this.optimizeLock = new RedisInflightLock(redis)
     const rawName = process.env['AI_PROVIDER'] ?? 'mock'
@@ -642,34 +642,9 @@ export class AiService {
   private async loadPublishedResumeTemplate(
     templateId: string,
   ): Promise<{ resumeLayoutPreset: ResumeTemplateLayoutPreset } | null> {
-    const existing = await this.prisma.jobMaterialTemplate.findUnique({
-      where: { id: templateId },
-      select: { id: true },
-    })
-    if (!existing) {
-      for (const [index, template] of JOB_MATERIAL_TEMPLATES.entries()) {
-        await this.prisma.jobMaterialTemplate.upsert({
-          where: { id: template.id },
-          update: {},
-          create: {
-            id: template.id,
-            type: template.type,
-            title: template.title,
-            description: template.description,
-            tags: template.tags as unknown as Prisma.InputJsonValue,
-            status: template.status,
-            recommendedFor: template.recommendedFor,
-            outputFilename: template.outputFilename,
-            fields: template.fields as unknown as Prisma.InputJsonValue,
-            ...(template.resumeLayoutPreset
-              ? { resumeLayoutPreset: template.resumeLayoutPreset as unknown as Prisma.InputJsonValue }
-              : {}),
-            sortOrder: index,
-            updatedByUserId: null,
-          },
-        })
-      }
-    }
+    // 模板写入（含空库补种）只属于 job-materials 模块；AI 模块对 JobMaterialTemplate 只读
+    //（verify:ai-user-text-retention 禁止 AI 模块写无 TTL 模型）。listTemplates() 内部会在空库时补种。
+    if (this.jobMaterials) await this.jobMaterials.listTemplates()
     const row = await this.prisma.jobMaterialTemplate.findFirst({
       where: { id: templateId, status: 'published', type: 'resume_template' },
       select: { resumeLayoutPreset: true },
