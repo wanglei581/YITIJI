@@ -74,7 +74,14 @@ async function main(): Promise<void> {
   const broadcastId = `broadcast_cdb_${suffix}`
   const city = `验证城市${suffix}`
   const now = new Date()
-  const today = new Date(now.getTime() - 60 * 60 * 1000)
+  // 「当日」必须按服务端口径（Asia/Shanghai 自然日）：北京时间 00:00–01:00 之间 now-1h 会落到前一天，
+  // 让第 6 项在每天 UTC 16–17 点必红。取 max(now-1h, 上海当日 00:01)。
+  const shanghaiDayStart = (() => {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
+    const v = (t: string) => parts.find((x) => x.type === t)?.value
+    return new Date(`${v('year')}-${v('month')}-${v('day')}T00:00:00.000+08:00`)
+  })()
+  const today = new Date(Math.max(now.getTime() - 60 * 60 * 1000, shanghaiDayStart.getTime() + 60 * 1000))
 
   async function cleanup(): Promise<void> {
     await prisma.broadcastReadState.deleteMany({ where: { endUserId: { in: [userA, userB, userEmpty] } } })
