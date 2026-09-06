@@ -25,7 +25,8 @@ import {
   type AgentDatabase,
   type PendingPatch,
 } from '../src/agent/db'
-import { executeTask } from '../src/agent/task-runner'
+import { computeClaimPause } from '../src/agent/claim-rate-limit'
+import { __resetClaimRateLimitForTests, executeTask, startTaskRunner } from '../src/agent/task-runner'
 import { __setUnauthorizedMarkerPathForTests } from '../src/agent/auth-state'
 import type { AgentConfig, ClaimTask } from '../src/agent/types'
 
@@ -60,6 +61,124 @@ function config(): AgentConfig {
     agentToken: 'agent-token',
     printerName: 'Test Printer',
     agentVersion: 'verify',
+  }
+}
+
+function waitFor(predicate: () => boolean, description: string): Promise<void> {
+  const deadline = Date.now() + 2_000
+  return new Promise((resolve, reject) => {
+    const poll = () => {
+      if (predicate()) {
+        resolve()
+        return
+      }
+      if (Date.now() >= deadline) {
+        reject(new Error(`timed out waiting for ${description}`))
+        return
+      }
+      setTimeout(poll, 5)
+    }
+    poll()
+  })
+}
+
+function verifyClaimPauseComputation(): void {
+  const now = Date.parse('2026-09-06T12:00:00.000Z')
+  const retryAfter = computeClaimPause(429, '7', 0, now, 321)
+  assert.equal(retryAfter.pauseMs, 7_321)
+  assert.ok(retryAfter.pauseMs >= 7_000 && retryAfter.pauseMs <= 8_000)
+  assert.equal(retryAfter.pausedUntil, now + retryAfter.pauseMs)
+  assert.equal(computeClaimPause(429, '7', 0, now, 10_000).pauseMs, 8_000)
+
+  const retryDate = new Date(now + 12_000).toUTCString()
+  assert.equal(computeClaimPause(429, retryDate, 0, now, 0).pauseMs, 12_000)
+  assert.equal(computeClaimPause(429, '86400', 0, now, 0).pauseMs, 300_000, 'a server Retry-After is capped at 5 minutes')
+  const pastDate = new Date(now - 30_000).toUTCString()
+  assert.equal(computeClaimPause(429, pastDate, 0, now, 0).pauseMs, 5_000, 'an already-elapsed Retry-After date falls back to exponential backoff')
+  assert.equal(computeClaimPause(429, '0', 1, now, 0).pauseMs, 10_000, 'Retry-After: 0 falls back to exponential backoff, not a zero pause')
+
+  assert.equal(computeClaimPause(429, undefined, 0, now, 0).pauseMs, 5_000)
+  assert.equal(computeClaimPause(429, undefined, 1, now, 0).pauseMs, 10_000)
+  assert.equal(computeClaimPause(429, undefined, 2, now, 0).pauseMs, 20_000)
+  assert.equal(computeClaimPause(429, undefined, 5, now, 0).pauseMs, 60_000)
+  assert.deepEqual(
+    computeClaimPause(200, undefined, 5, now, 0),
+    { consecutive429: 0, pauseMs: 0, pausedUntil: 0 },
+    'a successful claim response must reset the consecutive 429 state',
+  )
+}
+
+function verifyClaimPauseGuardPrecedesClaimSetup(): void {
+  const source = readFileSync(join(__dirname, '../src/agent/task-runner.ts'), 'utf8')
+  const claimCycleStart = source.indexOf('async function runClaimCycle(')
+  const claimCycleEnd = source.indexOf('// ── Public API', claimCycleStart)
+  assert.ok(claimCycleStart >= 0 && claimCycleEnd > claimCycleStart)
+  const claimCycle = source.slice(claimCycleStart, claimCycleEnd)
+  const pauseGuard = claimCycle.indexOf('if (Date.now() < claimPausedUntil) return')
+  const clientCreation = claimCycle.indexOf('const client = createApiClient')
+  assert.ok(pauseGuard >= 0, 'claim cycles must return silently while rate-limit pause is active')
+  assert.ok(
+    clientCreation > pauseGuard,
+    'the rate-limit pause guard must run before claim HTTP client setup, including local wake cycles',
+  )
+}
+
+async function verifyClaimPauseSuppressesSecondHttpRequest(): Promise<void> {
+  let requestCount = 0
+  const server = http.createServer((_req, res) => {
+    requestCount += 1
+    res.writeHead(429, {
+      'Content-Type': 'application/json',
+      'Retry-After': '7',
+    })
+    res.end('{"error":{"code":"RATE_LIMITED"}}')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(address && typeof address === 'object')
+  const root = mkdtempSync(join(tmpdir(), 'claim-rate-limit-verify-'))
+  const previousProgramData = process.env['PROGRAMDATA']
+  process.env['PROGRAMDATA'] = root
+  const db = openDatabase()
+  assert.ok(db)
+  const originalStdout = process.stdout.write.bind(process.stdout)
+  let stdout = ''
+  process.stdout.write = ((chunk: unknown) => {
+    stdout += String(chunk)
+    return true
+  }) as typeof process.stdout.write
+  const runner = startTaskRunner({
+    config: {
+      ...config(),
+      apiBaseUrl: `http://127.0.0.1:${address.port}/api/v1`,
+      claimIntervalMs: 60_000,
+    },
+    db,
+  })
+  try {
+    runner.wake()
+    await waitFor(
+      () => stdout.includes('task-runner: claim rate limited (HTTP 429)'),
+      'first rate-limit pause decision',
+    )
+    assert.equal(requestCount, 1)
+    runner.wake()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    assert.equal(requestCount, 1, 'a second cycle during the pause must not issue an HTTP request')
+    assert.equal(
+      stdout.match(/task-runner: claim rate limited \(HTTP 429\)/g)?.length,
+      1,
+      'the paused cycle must not emit another rate-limit warning',
+    )
+  } finally {
+    runner.stop()
+    __resetClaimRateLimitForTests()
+    process.stdout.write = originalStdout
+    db.close()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    if (previousProgramData === undefined) delete process.env['PROGRAMDATA']
+    else process.env['PROGRAMDATA'] = previousProgramData
+    rmSync(root, { recursive: true, force: true })
   }
 }
 
@@ -587,6 +706,9 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
 
 async function main(): Promise<void> {
   const cases: Array<[string, () => void | Promise<void>]> = [
+    ['claim rate-limit pause computation', verifyClaimPauseComputation],
+    ['claim rate-limit pause guard wiring', verifyClaimPauseGuardPrecedesClaimSetup],
+    ['claim rate-limit pause suppresses requests', verifyClaimPauseSuppressesSecondHttpRequest],
     ['4xx dead-letter durability', verifyFourHundredPatchBecomesDurableDeadLetter],
     ['retry-limit dead-letter durability', verifyRetryLimitBecomesDurableDeadLetter],
     ['known terminal task replay', verifyKnownTerminalTasksAreReplayed],

@@ -49,6 +49,7 @@ import {
   type PrinterPreflight,
   type PrintJobMonitorStatus,
 } from './wmi'
+import { computeClaimPause } from './claim-rate-limit'
 import { log, warn, err } from '../logger'
 import {
   isTaskDone,
@@ -817,11 +818,21 @@ function sleep(ms: number): Promise<void> {
 
 // ── Claim loop ────────────────────────────────────────────────────────────────
 
+let claimPausedUntil = 0
+let consecutiveClaimRateLimits = 0
+
+/** Test-only: clear module-level rate-limit state between verification cases. */
+export function __resetClaimRateLimitForTests(): void {
+  claimPausedUntil = 0
+  consecutiveClaimRateLimits = 0
+}
+
 async function runClaimCycle(
   config: AgentConfig,
   db: AgentDatabase,
   activeTasks: Set<string>,
 ): Promise<void> {
+  if (Date.now() < claimPausedUntil) return
   if (!config.terminalId || !config.agentToken) {
     return // Not registered yet; skip silently
   }
@@ -842,15 +853,35 @@ async function runClaimCycle(
       `/terminals/${config.terminalId}/tasks/claim`,
       { maxTasks: 1 },
     )
+    // Any accepted claim response (including an empty list) ends the rate-limit episode.
+    consecutiveClaimRateLimits = 0
+    claimPausedUntil = 0
     tasks = Array.isArray(resp.data) ? resp.data : []
   } catch (e) {
+    const response = axios.isAxiosError(e) ? e.response : undefined
+    const status = response?.status
+    if (status === 429) {
+      const decision = computeClaimPause(
+        status,
+        response?.headers?.['retry-after'],
+        consecutiveClaimRateLimits,
+        Date.now(),
+        Math.floor(Math.random() * 1_001),
+      )
+      consecutiveClaimRateLimits = decision.consecutive429
+      claimPausedUntil = decision.pausedUntil
+      warn(
+        `task-runner: claim rate limited (HTTP 429) — pausing claims for ` +
+          `${(decision.pauseMs / 1_000).toFixed(1)}s`,
+      )
+      return
+    }
     if (isUnauthorizedHttpError(e)) {
       markUnauthorized()
       writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
       err('task-runner: claim unauthorized — credential revoked/invalid; printing stopped')
       return
     }
-    const status = axios.isAxiosError(e) ? e.response?.status : undefined
     if (status !== 404 && status !== 204) {
       warn(`task-runner: claim cycle error — ${axiosErrorMessage(e)}`)
     }
@@ -903,6 +934,13 @@ export function startTaskRunner(options: TaskRunnerOptions): TaskRunnerControl {
   const interval = config.claimIntervalMs ?? 5_000
   const activeTasks = new Set<string>()
 
+  if (interval < 5_000) {
+    warn(
+      `task-runner: configured claim interval ${interval}ms is below the server rate-limit budget; ` +
+        'update the installed Agent configuration through the production installer',
+    )
+  }
+
   if (!isDatabaseAvailable(db)) {
     warn('task-runner: local task database unavailable; printing disabled; claim loop not started')
     return createTaskRunnerControl({
@@ -917,6 +955,8 @@ export function startTaskRunner(options: TaskRunnerOptions): TaskRunnerControl {
 
   return createTaskRunnerControl({
     intervalMs: interval,
+    // Local print wake shares the same cycle, so it must honor claimPausedUntil.
+    // The server explicitly asked us to slow down; bypassing it only re-enters the 60s block.
     runCycle: () => runClaimCycle(config, db, activeTasks),
     onCycleError: (e) =>
       err(`task-runner: unexpected cycle error — ${e instanceof Error ? e.message : String(e)}`),

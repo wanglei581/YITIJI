@@ -9,6 +9,10 @@ import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.servic
 import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
+import {
+  TERMINAL_CLAIM_INTERVAL_MS,
+  TERMINAL_CLAIM_LIMIT_PER_MINUTE,
+} from '../src/common/throttler/terminal-throttle'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -245,10 +249,24 @@ async function main(): Promise<void> {
     assert(listed?.lifecycleStatus === 'commissioning', 'Admin list exposes lifecycle status')
     assert(listed.online === false, 'terminal without heartbeat is never reported online')
 
-    await service.heartbeat(
+    const heartbeatAck = await service.heartbeat(
       planned.id,
       { status: 'online', agentVersion: 'verify-terminal-provisioning' },
       `Bearer ${exchanged.terminalToken}`,
+    )
+    assert(
+      heartbeatAck.config?.claimIntervalMs === TERMINAL_CLAIM_INTERVAL_MS,
+      'heartbeat returns config.claimIntervalMs matching TERMINAL_CLAIM_INTERVAL_MS',
+    )
+    assert(
+      TERMINAL_CLAIM_INTERVAL_MS * TERMINAL_CLAIM_LIMIT_PER_MINUTE >= 120_000,
+      'claim interval leaves 2x headroom under the per-minute throttle',
+    )
+    const claimControllerSource = readFileSync(join(process.cwd(), 'src/terminals/terminals.controller.ts'), 'utf8')
+    assert(
+      /@TerminalScopedThrottle\(\s*TERMINAL_CLAIM_LIMIT_PER_MINUTE\s*\)/.test(claimControllerSource) &&
+        !/@TerminalScopedThrottle\(\s*\d+\s*\)/.test(claimControllerSource),
+      'claim endpoint throttles with TERMINAL_CLAIM_LIMIT_PER_MINUTE constant, not a bare number',
     )
     const activated = await prisma.terminal.findUniqueOrThrow({ where: { id: planned.id } })
     assert(activated.lifecycleStatus === 'active', 'first authenticated heartbeat closes commissioning to active')

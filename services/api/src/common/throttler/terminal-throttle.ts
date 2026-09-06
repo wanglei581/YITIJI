@@ -69,6 +69,15 @@ export const THROTTLE_WINDOW_MS = 60_000
 export const THROTTLE_DEFAULT_LIMIT = 60
 
 /**
+ * Claim 端点每台每分钟限额，与下发的 claim 间隔绑定。
+ *
+ * `TERMINAL_CLAIM_INTERVAL_MS * TERMINAL_CLAIM_LIMIT_PER_MINUTE` 必须 ≥ `2 * 60_000`
+ * （留一倍余量给本机 wake 触发的额外 claim）。改任一个都要同时看另一个。
+ */
+export const TERMINAL_CLAIM_LIMIT_PER_MINUTE = 30
+export const TERMINAL_CLAIM_INTERVAL_MS = 5_000
+
+/**
  * 全局纯 IP 兜底桶限额（次/分钟/路由）。
  *
  * 它的职责不是精细限流，而是给「终端维度可被伪造」兜底：无论请求头怎么换，

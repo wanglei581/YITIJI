@@ -26,7 +26,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
-import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
+import { TerminalScopedThrottle, TERMINAL_CLAIM_LIMIT_PER_MINUTE } from '../common/throttler/terminal-throttle'
 import type { Response } from 'express'
 import { TerminalsService, SAMPLE_PNG, SAMPLE_VISIBLE_PDF } from './terminals.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
@@ -168,9 +168,10 @@ export class TerminalsController {
   //     → 打印任务领不走 → **整个大厅停印**（不只是进度条不动）
   //
   // Agent 本来就发 X-Terminal-Id（api-client.ts:52），所以按台计数无需改 Agent。
+  // 服务端心跳响应会下发 `config.claimIntervalMs`，现场配置更快也会被拉回。
   @Post('terminals/:terminalId/tasks/claim')
   @HttpCode(HttpStatus.OK)
-  @TerminalScopedThrottle(30)
+  @TerminalScopedThrottle(TERMINAL_CLAIM_LIMIT_PER_MINUTE)
   claimTasks(
     @Param('terminalId') terminalId: string,
     @Body() dto: ClaimTasksDto,
