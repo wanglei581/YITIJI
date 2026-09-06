@@ -243,7 +243,6 @@ export class PrintJobsService {
         },
       })
     }
-    const trustedFileHash = dto.fileMd5 ?? ''
 
     // 招聘会资料 bridge 被下架/禁打/删除后，已确认任务可保留文件继续履约；
     // 旧 HMAC URL 不得借该保留窗口创建新任务。此检查只收紧已验签的标准 FileObject 路径。
