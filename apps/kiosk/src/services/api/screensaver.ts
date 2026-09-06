@@ -143,6 +143,10 @@ export const getTerminalId = (): string => resolvedIdentity?.terminalId ?? ''
  * 是否运行在一体机（本机 Agent 已给出终端身份）。一体机上不得出现浏览器文件选择框等系统级弹窗
  * （CLAUDE.md §17），本机文件入口只在桌面浏览器 / E2E 链路渲染（SES-05）。
  */
-export const isTerminalKiosk = (): boolean => getTerminalId() !== ''
+// Playwright 套件用 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN 短路终端会话（API 全部路由 mock，无真实 Agent），
+// 同一变量也标记「这是 E2E 构建」：桌面验证链路（<input type=file>）只在 E2E 构建里保留；
+// 生产 / deploy 构建永不设置该变量（verify-runtime-terminal-identity 断言），一体机上入口不渲染。
+const IS_E2E_BUILD = Boolean(import.meta.env['VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN']?.trim())
+export const isTerminalKiosk = (): boolean => getTerminalId() !== '' && !IS_E2E_BUILD
 
 export const getTerminalCode = (): string => resolvedIdentity?.terminalCode ?? ''
