@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useCountdown } from '../../../hooks/useCountdown'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoginResult,
   memberLogin,
@@ -55,6 +54,29 @@ export function formatMemberPhone(raw: string): string {
   if (raw.length <= 3) return raw
   if (raw.length <= 7) return `${raw.slice(0, 3)} ${raw.slice(3)}`
   return `${raw.slice(0, 3)} ${raw.slice(3, 7)} ${raw.slice(7)}`
+}
+
+function useCountdown() {
+  const [seconds, setSeconds] = useState(0)
+  const [total, setTotal] = useState(60)
+
+  useEffect(() => {
+    if (seconds <= 0) return undefined
+    const timer = window.setTimeout(() => setSeconds((value) => Math.max(0, value - 1)), 1000)
+    return () => window.clearTimeout(timer)
+  }, [seconds])
+
+  const start = useCallback((value: number) => {
+    setTotal(value > 0 ? value : 60)
+    setSeconds(value)
+  }, [])
+
+  const reset = useCallback(() => {
+    setSeconds(0)
+    setTotal(60)
+  }, [])
+
+  return useMemo(() => ({ seconds, total, start, reset }), [reset, seconds, start, total])
 }
 
 export function useMemberPhoneLogin(
