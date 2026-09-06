@@ -234,4 +234,24 @@ PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或�
 - **探测教训**：事故中我从本机打公网 `https://120.48.13.190.sslip.io` 全部 `000`，一度误判主机不可达；实为本机 DNS 把 `sslip.io` 解析到 `198.18.1.0`（RFC 2544 基准段）。改走 `http://120.48.13.190/api/v1/health`（:80 按 IP）才拿到真相。公网复验时不要信 sslip 域名，按 IP 打。
 - **SSH 断连**：崩溃循环期间 SSH 会话多次被服务端关闭；加 `ServerAliveInterval=5 ServerAliveCountMax=2` 且把命令拆短后稳定。
 
+### 收口：完整重发 `6ee09fcc0`（2026-09-06 15:15–15:37，UTC+8）
+
+按 runbook 重跑目标提交的 CI（run `34010011985` attempt 2）触发 deploy run `34018634556`，**全步骤成功**，无回滚、无手工干预：
+
+| 检查项 | 结果 |
+|---|---|
+| `DEPLOY_SOURCE.txt` | `origin/main@6ee09fcc0`，`ci_run=34010011985`，`deployed_at=15:36:41` |
+| `/api/v1/health`（按 IP :80 与 `https://zyidai.cn` 各打一次） | 200 `status:ok`，`db:postgres`，`degraded:[]` |
+| `/api/v1/health/ready` | 200 |
+| pm2 `ai-job-print-api` | online；restarts 计数 17→18（仅本次重启一次），复查 79 s 后未再增长 |
+| 运行目录 `.env` | `PRINT_REQUIRE_PII_SCAN=true`、`PRINT_REQUIRE_PRINTER_ONLINE=true` 两行齐 |
+| 三前台 dist | kiosk/admin/partner 的 `index.html` 均为 15:36:48 重写 |
+| 公网 bundle | `zyidai.cn`→`index-CwmmxZK1.js`、`admin.zyidai.cn`→`index-C4MR-GbL.js`、`partner.zyidai.cn`→`index-C2zKlKOe.js`，与各自 dist 一致（**前端不再是旧版**） |
+| 磁盘 | 16G 已用 / 22G 可用（42%），本次又落一份 `pre-6ee09fcc0…` 备份 |
+| 开关 | deploy 的 SSH 步骤进入 in_progress 后立即置 `DEPLOY_API_ENABLED=false`（步骤 env 已在起步时求值，此后再翻不影响本次发布） |
+
+04:18Z 那次 deploy run `34011164995` 显示 skipped 曾被误读为流水线异常：查 attempt 1 实为 success，跳过只因当时开关仍为 false。**复验探针注意**：按 IP 打 `/admin/`、`/partner/` 路径拿到的永远是 kiosk（nginx 里三前台分别是 :80 默认、:8081、:8082 与 `*.zyidai.cn` 三个 443 vhost，8081/8082 未对公网开放），要用 `curl --resolve admin.zyidai.cn:443:120.48.13.190` 这种方式按域名打。
+
+防复发两件已合入 main：#829（3b 按 `REQUIRED_PRODUCTION_GATES` 循环持久化 + PM2 重启前 export 全部闸门键 + `verify:deploy-gates-in-sync` 钉进 `REQUIRED_COMMANDS`，deterministic 16→17 + 授权门禁改按数组断言）。
+
 第二、三档与凭据文件仍未动。
