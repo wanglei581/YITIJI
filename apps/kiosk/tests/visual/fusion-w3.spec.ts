@@ -196,6 +196,10 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   )
   terminalBaseline(api)
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/resume/export/pricing', {
+    status: 200,
+    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' },
+  })
   api.respond('GET', '/api/v1/resume/records/resume-w3-inline-preview/optimize', {
     status: 200,
     json: { taskId: 'resume-w3-inline-preview', status: 'completed', providerName: 'llm', modules: [], optimizedResume },
@@ -215,7 +219,9 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
 
   await page.goto('/resume/optimize?taskId=resume-w3-inline-preview')
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
-  await page.getByRole('button', { name: '导出 PDF', exact: true }).click()
+  await page.getByRole('button', { name: '导出 PDF', exact: true }).first().click()
+  await page.getByRole('checkbox', { name: /测试大学/ }).click()
+  await page.getByRole('button', { name: '确认导出' }).click()
   await expect(page.getByRole('button', { name: '查看或手机保存PDF' })).toBeVisible()
   const pageCount = page.context().pages().length
   await page.getByRole('button', { name: '查看或手机保存PDF' }).click()

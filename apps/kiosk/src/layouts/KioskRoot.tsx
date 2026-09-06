@@ -158,6 +158,8 @@ function KioskShell() {
   const QX_MIGRATED_ROUTES = new Set<string>([
     '/print/pickup-claim',
     '/resume/report',
+    '/resume/optimize',
+    '/resume/generate/preview',
   ])
   const isQxRoute = QX_MIGRATED_ROUTES.has(pathname)
 

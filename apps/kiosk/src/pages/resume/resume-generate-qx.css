@@ -1,0 +1,27 @@
+/* 简历生成预览 · 青序流光。共用优化页交付样式，只补本页差异。 */
+@import './resume-optimize-qx.css';
+
+.qx-resume-generate .qx-rd-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qx-resume-generate .qx-rd-hint {
+  min-height: var(--qx-tap-min);
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qx-resume-generate *,
+  .qx-resume-generate *::before,
+  .qx-resume-generate *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
