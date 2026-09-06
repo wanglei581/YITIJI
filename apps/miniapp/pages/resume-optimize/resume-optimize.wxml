@@ -76,6 +76,38 @@
       <text class="ficon i-info n-ic"></text>
       <text>优化结果仅供参考，请核实内容真实性后再使用。不得添加虚假经历或虚构数据。</text>
     </view>
+
+    <view class="section-title">导出优化稿</view>
+    <view class="format-grid">
+      <view
+        class="format-option {{format === item.key ? 'on' : ''}} tap"
+        wx:for="{{formats}}"
+        wx:key="key"
+        bindtap="pickFormat"
+        data-format="{{item.key}}"
+        role="button"
+        aria-label="导出为 {{item.label}}"
+      >{{item.label}}</view>
+    </view>
+    <view class="export-note">四种格式都来自同一份优化稿；打印和打开预览使用同内容 PDF 副本。导出前请核对姓名、学校、公司、时间和数字。</view>
+    <view wx:if="{{exportDisabledReason}}" class="export-disabled-reason">{{exportDisabledReason}}</view>
+
+    <view wx:if="{{exportResult}}" class="export-result">
+      <view class="export-result-title">{{exportResult.filename}}</view>
+      <view class="export-meta">{{exportResult.formatLabel}} · {{exportResult.mimeType}}</view>
+      <view class="export-meta">{{exportResult.pageLabel}} · {{exportResult.sizeLabel}} · 链接有效至 {{exportResult.expiresLabel}}</view>
+      <view class="export-saved">文件已真实生成并存入你的「我的文档」。非 PDF 格式的打印使用同内容 PDF 副本。</view>
+      <view class="export-actions">
+        <view class="btn ghost tap" bindtap="openPdf">打开真实 PDF</view>
+        <view class="btn ghost tap" bindtap="viewDocuments">我的文档</view>
+        <view class="btn primary tap" bindtap="printExport">去打印</view>
+      </view>
+    </view>
   </view>
 
+  <view wx:if="{{phase === 'done'}}" class="actionbar">
+    <button class="btn primary block" bindtap="exportResume" loading="{{exporting}}" disabled="{{exporting || !opt.hasOptimizedResume}}" aria-disabled="{{exporting || !opt.hasOptimizedResume}}">
+      {{exporting ? '正在生成…' : '生成并打开文件'}}
+    </button>
+  </view>
 </view>

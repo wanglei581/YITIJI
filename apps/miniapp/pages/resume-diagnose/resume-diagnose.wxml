@@ -44,7 +44,11 @@
       <text>当前服务端使用占位分析模型,以下内容仅用于流程演示,不能作为简历评估结论。</text>
     </view>
 
-    <!-- 文本抽取质量:低置信度时必须提醒人工复核 -->
+    <!-- 文本抽取质量:截断 / OCR 必须在报告最上方出现 -->
+    <view wx:if="{{report.truncatedInput}}" class="notice err">
+      <text class="ficon i-info n-ic"></text>
+      <text>本次输入超过分析上限，AI 没有看完整份简历。后半部分可能未进入诊断，请不要把缺失内容理解成简历里没有。</text>
+    </view>
     <view wx:if="{{report.noticeNeedsReview}}" class="notice warn">
       <text class="ficon i-info n-ic"></text>
       <text>简历文字识别置信度{{report.noticeConfidenceLabel}}，部分内容可能未被正确读取，建议先核对原文再参考下面的评分。</text>
@@ -54,8 +58,25 @@
       <text>{{w}}</text>
     </view>
 
-    <!-- 概览:综合分是 6 个维度得分的折算,口径写在卡里,不伪装成后端下发的独立评分 -->
-    <view class="diag-summary">
+    <view wx:if="{{report.targetContext && !report.targetContext.skipped}}" class="direction-strip">
+      <text class="direction-label">本次方向</text>
+      <text>{{report.targetContext.targetJob || report.targetContext.industry || report.targetContext.major || '已指定方向'}}</text>
+    </view>
+
+    <!-- 首屏先给可执行结论，不让分数压过真实问题 -->
+    <view wx:if="{{report.firstFixes.length}}" class="section-t first-title">先改这些</view>
+    <view wx:if="{{report.firstFixes.length}}" class="first-fixes">
+      <view class="first-fix" wx:for="{{report.firstFixes}}" wx:key="focus">
+        <view class="first-index">{{index + 1}}</view>
+        <view class="first-body">
+          <view class="first-focus">{{item.focus}}</view>
+          <view wx:if="{{item.reason}}" class="first-reason">{{item.reason}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 无带原文证据的问题时不展示总分，避免把覆盖不足包装成完整判断 -->
+    <view wx:if="{{report.showScore}}" class="diag-summary">
       <view class="ds-score">
         <view class="ds-num">{{report.scorePct}}</view>
         <view class="ds-label">综合评分</view>
@@ -66,10 +87,13 @@
         <view class="ds-c"><view class="ds-n low">{{report.riskNotes.length}}</view><view class="ds-k">风险提示</view></view>
       </view>
     </view>
-    <view class="score-note">综合评分 = 各维度得分合计 {{report.scoreSum}} / {{report.scoreMax}} 折算百分制</view>
+    <view wx:if="{{report.showScore}}" class="score-note">综合评分 = 各维度得分合计 {{report.scoreSum}} / {{report.scoreMax}} 折算百分制。这不是录取分，也不是排名或通过率。</view>
+    <view wx:else class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <text>本次报告没有返回可核对的原文证据，因此不展示总分。你仍可查看各维建议，并以原件为准。</text>
+    </view>
 
-    <!-- 维度得分:后端真实返回的 label 与 score,不做任何加工 -->
-    <view class="section-t">维度得分</view>
+    <view class="section-t">六维怎么看</view>
     <view class="card dim-card">
       <view class="dim-row" wx:for="{{report.sections}}" wx:key="key">
         <view class="dim-head">
@@ -77,26 +101,31 @@
           <view class="dim-score">{{item.score}}<text class="dim-max">/{{item.maxScore}}</text></view>
         </view>
         <view class="meter"><i class="{{item.tone}}" style="width:{{item.pct}}%"></i></view>
+        <view class="dim-insight">{{item.insight}}</view>
       </view>
     </view>
 
-    <!-- 优先改进:后端 priorities,是真实的优先级来源 -->
-    <view wx:if="{{report.priorities.length}}" class="section-t">优先改进</view>
-    <view wx:if="{{report.priorities.length}}" class="issue-list">
-      <view
-        class="issue-item tap"
-        wx:for="{{report.priorities}}"
-        wx:key="focus"
-        bindtap="tapText"
-        data-title="{{item.focus}}"
-        data-text="{{item.reason}}"
-      >
-        <view class="ii-left"><view class="sev-dot high"></view></view>
-        <view class="ii-body">
-          <view class="ii-title">{{item.focus}}</view>
-          <view class="ii-tip">{{item.reason}}</view>
+    <!-- 主体问题清单：维度 / 机械严重度 / 原文引用 / 影响 / 改法 -->
+    <view wx:if="{{report.issues.length}}" class="section-t">问题与原文证据</view>
+    <view wx:if="{{report.issues.length}}" class="evidence-list">
+      <view class="evidence-card" wx:for="{{report.issues}}" wx:key="id">
+        <view class="evidence-head">
+          <view class="evidence-title">{{item.title}}</view>
+          <view class="severity {{item.severityKey}}">{{item.severityLabel}}</view>
         </view>
-        <text class="ficon i-right ii-arr"></text>
+        <view class="evidence-dim">诊断维度：{{item.dimLabel}}</view>
+        <view class="quote" wx:for="{{item.evidence}}" wx:for-item="ev" wx:key="quote">“{{ev.quote}}”</view>
+        <view wx:if="{{item.impact}}" class="evidence-row"><text class="evidence-key">影响</text><text>{{item.impact}}</text></view>
+        <view wx:if="{{item.fixIt}}" class="evidence-row fix"><text class="evidence-key">改法</text><text>{{item.fixIt}}</text></view>
+      </view>
+    </view>
+    <view wx:if="{{report.issues.length}}" class="tier-rule">严重度按对应维度得分机械分档：不足一半为高，一半到八成为中，八成及以上为低。它不是录取判断。</view>
+
+    <view wx:if="{{report.contentBlocks.length}}" class="section-t">AI 实际看到的内容片段</view>
+    <view wx:if="{{report.contentBlocks.length}}" class="content-blocks">
+      <view class="content-block" wx:for="{{report.contentBlocks}}" wx:key="key">
+        <view class="content-block-title">{{item.label}}</view>
+        <view class="content-line" wx:for="{{item.lines}}" wx:for-item="line" wx:key="*this">{{line}}</view>
       </view>
     </view>
 
@@ -138,7 +167,7 @@
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>诊断结果由 AI 生成,仅供参考。评分不代表用人单位意见,最终以招聘方要求为准。</text>
+      <text>诊断结果由 AI 生成，仅供本人修改简历参考。请逐项核对原文，不代表用人单位意见。</text>
     </view>
 
   </view>
@@ -151,7 +180,11 @@
     <view class="btn primary block tap" bindtap="toUpload">上传简历开始诊断</view>
   </view>
   <view wx:elif="{{status === 'failed'}}" class="actionbar">
-    <view class="btn ghost tap" bindtap="toUpload">重新上传</view>
-    <view class="btn primary tap flex-1-5" bindtap="retry">重试</view>
+    <view class="fail-actions">
+      <view class="btn ghost tap" bindtap="printOriginal">打印原件</view>
+      <view class="btn ghost tap" bindtap="goPrint">去打印</view>
+      <view class="btn ghost tap" bindtap="viewJobs">查看岗位</view>
+      <view class="btn primary tap" bindtap="retryDiagnosis">重试诊断</view>
+    </view>
   </view>
 </view>

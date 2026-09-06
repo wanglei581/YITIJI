@@ -19,6 +19,16 @@ const STAGE_DEFS = [
 const POLL_INTERVAL = 3000
 const POLL_MAX = 40
 
+function parseJsonOption(value, fallback) {
+  if (!value) return fallback
+  try {
+    const parsed = JSON.parse(decodeURIComponent(value))
+    return parsed
+  } catch (_) {
+    return fallback
+  }
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -33,6 +43,8 @@ Page({
     fileName: '',
     fileFormat: '',
     source: 'upload',
+    selectedDimensions: [],
+    targetContext: { skipped: true },
   },
 
   onLoad(options) {
@@ -42,6 +54,12 @@ Page({
     const fileName = options.fileName ? decodeURIComponent(options.fileName) : ''
     const fileFormat = options.fileFormat ? decodeURIComponent(options.fileFormat) : ''
     const source = options.source || 'upload'
+    const dimensions = parseJsonOption(options.selectedDimensions, [])
+    const target = parseJsonOption(options.targetContext, null)
+    const selectedDimensions = Array.isArray(dimensions) ? dimensions : []
+    const targetContext = target && typeof target === 'object'
+      ? target
+      : { skipped: true }
 
     // 没有 fileId 说明不是从上传流程进来的。后端解析必须有真实文件,
     // 不允许在这里凭空开始一段"解析"动画。
@@ -53,7 +71,7 @@ Page({
       return
     }
 
-    this.setData({ fileId, fileName, fileFormat, source })
+    this.setData({ fileId, fileName, fileFormat, source, selectedDimensions, targetContext })
     this._startElapsed()
     this._submit()
   },
@@ -74,12 +92,15 @@ Page({
 
   _submit() {
     this.setData({ atext: '正在解析简历,请勿离开…' })
-    api.parseResume({
+    const payload = {
       fileId: this.data.fileId,
       fileName: this.data.fileName || `resume.${this.data.fileFormat || 'pdf'}`,
       fileFormat: this.data.fileFormat || 'pdf',
       source: this.data.source === 'scan' ? 'scan' : 'upload',
-    })
+      targetContext: this.data.targetContext,
+    }
+    if (this.data.selectedDimensions.length) payload.selectedDimensions = this.data.selectedDimensions
+    api.parseResume(payload)
       .then((res) => this._handle(res, 0))
       .catch((err) => this._fail(err))
   },
@@ -92,10 +113,11 @@ Page({
   _handle(res, round) {
     if (this._stopped || !res) return
 
-    if (res.accessToken && res.taskId) {
+    if (res.taskId) {
       storage.set(storage.KEYS.RESUME_TASK, {
         taskId: res.taskId,
-        accessToken: res.accessToken,
+        accessToken: res.accessToken || '',
+        fileId: res.fileId || this.data.fileId,
         fileName: this.data.fileName,
         ts: Date.now(),
       })

@@ -55,7 +55,7 @@
               <text class="resume-name">{{item.name}}</text>
               <text class="chip teal" wx:if="{{item.isDefault}}">主版本</text>
             </view>
-            <view class="resume-meta">PDF · {{item.updated}}</view>
+            <view class="resume-meta">{{item.fileLabel}} · {{item.updated}}</view>
             <view class="resume-status" wx:if="{{item.tag}}">
               <text class="chip ok" wx:if="{{item.tag === '已优化'}}">{{item.tag}}</text>
               <text class="chip plum" wx:elif="{{item.tag === '已诊断'}}">{{item.tag}}</text>
