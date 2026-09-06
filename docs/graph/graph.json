@@ -11164,7 +11164,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 427,
+      "reachableFileCount": 446,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -11258,6 +11258,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11314,6 +11315,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11589,6 +11591,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11631,6 +11634,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11673,6 +11677,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11715,6 +11720,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11757,6 +11763,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11799,6 +11806,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11841,6 +11849,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11908,6 +11917,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11950,6 +11960,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -11992,6 +12003,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -12034,6 +12046,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -12892,6 +12905,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -12942,6 +12956,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -12953,6 +12968,7 @@
             "POST /jobs/ai/recommendations",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
+            "POST /me/favorites",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -12966,12 +12982,12 @@
           ],
           "path": "/resume/generate/preview",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/resume-generate-qx.css",
+            "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -12992,6 +13008,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -13115,6 +13132,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -13126,6 +13144,7 @@
             "POST /jobs/ai/recommendations",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
+            "POST /me/favorites",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -13139,12 +13158,11 @@
           ],
           "path": "/resume/optimize",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13164,6 +13182,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -13215,6 +13234,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -13266,6 +13286,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -13432,6 +13453,7 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
@@ -13758,7 +13780,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 448
+      "sourceFileCount": 467
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -16073,6 +16095,7 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-shell-active-nav.mjs",
@@ -17111,7 +17134,8 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -17194,6 +17218,45 @@
     "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeExportResult.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/generatePreviewQuery.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeQuery.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -17241,7 +17304,13 @@
     "apps/kiosk/src/pages/resume/resume-fusion-youth.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/resume/resume-generate-qx.css": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
     "apps/kiosk/src/pages/resume/resume-library-lightflow.css": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-optimize-qx.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
@@ -22557,6 +22626,7 @@
         "files": [
           "apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx",
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css",
@@ -23432,7 +23502,9 @@
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
           "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css",
+          "apps/kiosk/src/pages/resume/resume-generate-qx.css",
           "apps/kiosk/src/pages/resume/resume-library-lightflow.css",
+          "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
           "apps/kiosk/src/routes/index.tsx"
         ],
         "missing": []
@@ -24616,6 +24688,7 @@
         "files": [
           "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeParsePage.tsx",
@@ -24626,6 +24699,19 @@
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeExportResult.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/generatePreviewQuery.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeQuery.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
