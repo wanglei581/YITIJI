@@ -271,4 +271,20 @@ PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或�
 
 **取证注意**：`gh run list --workflow=deploy.yml` 显示的 `headSha` 是 main 当时的 tip（workflow_run 事件特性），不是发布目标；本次列表显示 `891492396` 而实际目标是 `7f826bcb9`，以服务器 `ps` 里的 `TARGET_SHA=`、`/root/YITIJI` HEAD 或 `DEPLOY_SOURCE.txt` 为准。
 
+### 第三次发布 `fd2a126b9`（2026-09-06 18:59–19:01，UTC+8）——main 顶端，含 #833 可信终端身份
+
+产品负责人授权「发 main 顶端」后执行。顶端在等待期间被并行会话的 #831 推前一次（并发组取消了 `5bff1bc42` 的 CI），改以 `fd2a126b9` 为目标；已请并行会话在发布起步前暂停合并。deploy `34028530951` 全步骤成功，无迁移。
+
+| 检查项 | 结果 |
+|---|---|
+| `DEPLOY_SOURCE.txt` | `origin/main@fd2a126b9`，`ci_run=34027057398`，19:01:05 |
+| health / ready（`--resolve zyidai.cn`） | 200 `ok/postgres`，`degraded:[]` / 200 |
+| #833 新端点 `POST /terminals/session-token` | 空体 400（存在，非 404） |
+| pm2 | online，restarts 19→20；`.env` 两闸门键为 2 |
+| 三前台 | dist 19:01:26 重写；kiosk `index-CC6VWakW.js`、partner `index-Ks5VjnQ6.js` 已变；admin 未变（#831 未触及） |
+| 备份 / 磁盘 | `pre-fd2a126b9…-20260906T105933Z.{dump,runtime}`；17G 用 / 21G 可用 |
+| 开关 | SSH 步骤 in_progress 后置 false |
+
+**#833 的可见行为**：无 Agent 的普通浏览器打开一体机前台，打印确认页会显示「终端会话未就绪」——这是 fail-closed 设计，不是故障。Windows 一体机的 Agent / MSI 必须从 `fd2a126b9` 构建，与线上 API 同一提交。
+
 第二、三档与凭据文件仍未动。
