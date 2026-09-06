@@ -20,7 +20,8 @@
         "billingPageSource": "pdf_lightweight_scan",
         "pickupCode": "PICK20260704",
         "discountCents": 0,
-        "refundedAmountCents": 0
+        "refundedAmountCents": 0,
+        "refundRequired": false
       },
       {
         "id": "print-task-unpaid",
@@ -40,7 +41,8 @@
         "billingPageSource": "pdf_lightweight_scan",
         "pickupCode": null,
         "discountCents": 0,
-        "refundedAmountCents": 0
+        "refundedAmountCents": 0,
+        "refundRequired": false
       },
       {
         "id": "print-task-refunded",
@@ -60,7 +62,8 @@
         "billingPageSource": "image_single_page",
         "pickupCode": null,
         "discountCents": 0,
-        "refundedAmountCents": 20
+        "refundedAmountCents": 20,
+        "refundRequired": false
       },
       {
         "id": "print-task-without-order",
@@ -80,7 +83,8 @@
         "billingPageSource": null,
         "pickupCode": null,
         "discountCents": null,
-        "refundedAmountCents": null
+        "refundedAmountCents": null,
+        "refundRequired": null
       }
     ],
     "nextCursor": "cursor-after-smoke-page",

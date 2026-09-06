@@ -1,7 +1,8 @@
 // ============================================================
 // 我的打印订单 — /me/print-orders（本人，只读）。
 // 展示安全元数据（文件名 / 状态 / 份数 / 彩黑 / 幅面 / 时间）
-// + C5-1 订单支付安全字段（金额 / 支付状态 / 支付来源 / 计费页数 / 取件码）。
+// + C5-1 订单支付安全字段（金额 / 支付状态 / 支付来源 / 计费页数 / 取件码）
+// + API-20 待退款信号（refundRequired，由服务端派生）。
 // 诚实口径（C5 P0b）：
 // - 支付字段全部来自后端关联 Order；历史订单无 Order（payStatus 为 null）
 //   显示「暂无支付信息」，不显示金额 0、不推断。
@@ -21,7 +22,13 @@ import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
-import { duplexShortLabel, formatAmountCents, paymentSourceLabel, payStatusMeta } from './printOrders/paymentCopy'
+import {
+  duplexShortLabel,
+  formatAmountCents,
+  memberPayStatusLabel,
+  paymentSourceLabel,
+  PENDING_REFUND_LABEL,
+} from './printOrders/paymentCopy'
 import {
   MEMBER_ORDERS_POLL_MS,
   hasActivePrintOrders,
@@ -72,7 +79,7 @@ function paymentLine(item: MemberPrintOrderItem): string {
   if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
   const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
   const source = sourceLabel ? `（${sourceLabel}）` : ''
-  parts.push(`${payStatusMeta(item.payStatus).label}${source}`)
+  parts.push(`${memberPayStatusLabel(item).label}${source}`)
   return parts.join(' · ')
 }
 
@@ -322,6 +329,9 @@ export function MyPrintOrdersPage() {
                   <p className="me-row-meta">{metaLine(item)}</p>
                   <p className="me-print-payment-line">
                     <span>{paymentLine(item)}</span>
+                    {item.refundRequired === true && (
+                      <span className="me-chip">{PENDING_REFUND_LABEL}</span>
+                    )}
                     {item.pickupCode && (
                       <span className="me-chip me-print-pickup-chip">
                         <TicketIcon aria-hidden="true" />

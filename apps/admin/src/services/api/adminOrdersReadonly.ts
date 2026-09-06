@@ -286,6 +286,7 @@ const mockAdapter: AdminOrdersReadonlyService = {
       ...mockDetailState,
       payStatus: 'refunded',
       refundEligible: false,
+      refundRequired: false,
       refundedAt,
       refundReason,
       refundedAmountCents: mockDetailState.amountCents,

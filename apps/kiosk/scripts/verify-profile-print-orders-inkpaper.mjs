@@ -217,6 +217,26 @@ const allowedChanged = new Set([
   // 级联触发五处加行。这不是巧合，是下面那段设计问题的直接后果。
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
   'apps/kiosk/scripts/verify-lightflow-profile-entry.mjs',
+  // API-20（2026-09-06）：管理端人工发起退款 + 顾客侧待退款展示。只加行、不动检查逻辑。
+  // 本分支基于 fix/misclassified-p2（#824 待退款信号），变更集含信号打标与公开列表收口文件。
+  'apps/admin/src/services/api/adminPrintJobs.ts',
+  'apps/admin/src/services/api/userErrorMessage.ts',
+  'apps/kiosk/src/services/api/offlineAgencies.ts',
+  'apps/kiosk/tests/fixtures/fusion-w4-api.ts',
+  'services/api/scripts/verify-admin-pending-dispose.ts',
+  'services/api/scripts/verify-admin-print-outcome.ts',
+  'services/api/scripts/verify-api20-manual-refund.ts',
+  'services/api/scripts/verify-backend-p0-contracts.mjs',
+  'services/api/scripts/verify-offline-agencies-contract.ts',
+  'services/api/src/activities/activities.controller.ts',
+  'services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts',
+  'services/api/src/kiosk-session/kiosk-session.controller.ts',
+  'services/api/src/notifications/notifications.controller.ts',
+  'services/api/src/offline-agencies/offline-agencies.service.ts',
+  'services/api/src/payment/admin-order-actions.controller.ts',
+  'services/api/src/payment/pending-refund-signal.ts',
+  'services/api/src/print-jobs/admin-print-jobs-abandon.service.ts',
+  'services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts',
 ])
 
 // ⚠️ 设计问题，待产品负责人裁决（2026-09-06，序 13 撞上后记录，本次未擅自改动）

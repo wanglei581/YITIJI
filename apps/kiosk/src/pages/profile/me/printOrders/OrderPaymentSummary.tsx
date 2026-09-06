@@ -23,11 +23,13 @@ import {
   copiesDisplay,
   duplexDisplay,
   formatAmountCents,
+  memberPayStatusLabel,
   NET_PAID_UNRECORDED,
   NET_PAID_UNRECORDED_HINT,
   pageRangeDisplay,
   paymentSourceLabel,
-  payStatusMeta,
+  PENDING_REFUND_EXPLANATION,
+  PENDING_REFUND_LABEL,
   recordedAmountDisplay,
 } from './paymentCopy'
 import { PickupCodePanel } from './PickupCodePanel'
@@ -73,7 +75,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
           <DetailRow label="实付" value={NET_PAID_UNRECORDED} hint={NET_PAID_UNRECORDED_HINT} />
           <DetailRow
             label="支付状态"
-            value={payStatusMeta(payStatus).label}
+            value={memberPayStatusLabel(item).label}
             hint={item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined}
           />
           {typeof item.billablePages === 'number' && (
@@ -84,6 +86,14 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
             />
           )}
         </div>
+      )}
+
+      {item.refundRequired === true && (
+        <p className="me-note" role="status">
+          <strong>{PENDING_REFUND_LABEL}</strong>
+          {' '}
+          {PENDING_REFUND_EXPLANATION}
+        </p>
       )}
 
       {item.pickupCode && <PickupCodePanel code={item.pickupCode} />}

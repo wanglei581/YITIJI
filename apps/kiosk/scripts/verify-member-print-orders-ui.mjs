@@ -83,8 +83,9 @@ expectMatches(copySrc, /PAYMENT_SOURCE_LABEL:\s*Partial</, 'PAYMENT_SOURCE_LABEL
 expectMatches(copySrc, /PAY_STATUS_META:\s*Partial</, 'PAY_STATUS_META 用 Partial（不穷举 C5-2 线上态）')
 expectMatches(copySrc, /PAY_STATUS_FALLBACK\s*=\s*\{\s*label:\s*'处理中'/, '未识别支付状态回退中性文案「处理中」')
 expectMatches(copySrc, /PAY_STATUS_META\[status\]\s*\?\?\s*PAY_STATUS_FALLBACK/, 'payStatusMeta 对未识别状态回退，不返回 undefined（不 crash）')
+expectMatches(copySrc, /payStatusMeta\(/, 'paymentCopy 经 payStatusMeta helper 取状态（容错回退）')
 for (const [name, src] of [[PAGE, pageSrc], [SUMMARY, summarySrc]]) {
-  expectMatches(src, /payStatusMeta\(/, `${name} 经 payStatusMeta helper 取状态（容错回退）`)
+  expectMatches(src, /memberPayStatusLabel\(/, `${name} 经 memberPayStatusLabel 取状态（待退款信号优先，内部仍走 payStatusMeta）`)
   expectAbsent(src, /PAY_STATUS_META\[/, `${name} 不直接索引 PAY_STATUS_META（Partial 下会 crash）`)
   expectAbsent(src, /PAYMENT_SOURCE_LABEL\[/, `${name} 不直接索引 PAYMENT_SOURCE_LABEL（经 helper 取，sandbox 安全回退）`)
 }
@@ -220,6 +221,24 @@ expectMatches(pageSrc, /setAutoRefreshFailed\(true\)/, '轮询失败只进入自
 expectMatches(pageSrc, /<span role="status" aria-live="polite">[\s\S]{0,80}自动刷新失败/, '自动刷新失败提示对读屏播报')
 expectAbsent(pageSrc, /<div[\s\S]{0,180}aria-live="polite"[\s\S]{0,180}autoRefreshChecking/, '常规 5 秒刷新文案不使用 aria-live，避免读屏反复播报')
 expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/, '本轮不在我的打印订单页回显失败原因或内部错误字段')
+
+// API-20：顾客侧待退款状态。不承诺到账天数，已退款只展示服务端 refundedAmountCents。
+expectMatches(copySrc, /PENDING_REFUND_LABEL = '待退款'/, '待退款标签在 paymentCopy')
+expectMatches(
+  copySrc,
+  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'/,
+  '待退款说明不写到账天数',
+)
+expectMatches(copySrc, /item\.refundRequired === true/, 'memberPayStatusLabel 以服务端 refundRequired 为准')
+expectMatches(copySrc, /refunding:\s*\{\s*label:\s*'退款中'/, '退款中单独展示，不伪装已退款')
+expectMatches(pageSrc, /item\.refundRequired === true/, '列表待退款 chip 由服务端 refundRequired 门控')
+expectMatches(pageSrc, /PENDING_REFUND_LABEL/, '列表使用待退款标签常量')
+expectMatches(summarySrc, /PENDING_REFUND_EXPLANATION/, '详单展示待退款诚实说明')
+expectMatches(summarySrc, /item\.refundRequired === true/, '详单待退款说明由服务端 refundRequired 门控')
+expectMatches(summarySrc, /recordedAmountDisplay\(item\.refundedAmountCents\)/, '已退款只格式化服务端 refundedAmountCents')
+expectAbsent(copySrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '待退款文案不承诺到账天数')
+expectAbsent(pageSrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '列表不承诺到账天数')
+expectAbsent(summarySrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '详单不承诺到账天数')
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 「我的打印订单」支付展示诚实性守卫未通过\n`)
