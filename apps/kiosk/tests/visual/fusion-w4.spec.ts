@@ -342,7 +342,9 @@ test('smart-campus 子模块关闭不能从深链绕过 @w4', async ({ page, api
   await expect(page.getByText('校园大数据暂未开放')).toBeVisible()
 })
 
-test('smart-campus 刷新开始即卸载旧页面，失败后保持关闭 @w4', async ({ page, api }) => {
+// MSC-07（2026-09-07）：5 分钟定时刷新不再先置 loading 卸载子页（用户填到一半会丢状态）；
+// 刷新期间保留旧快照，拿到新结果再替换。刷新失败仍 fail-closed 关闭。
+test('smart-campus 刷新期间保留旧页面，失败后关闭 @w4', async ({ page, api }) => {
   registerW4Api(api)
   await captureCapabilityRefresh(page)
   let releaseRefresh!: (value: { abort: 'internetdisconnected' }) => void
@@ -356,8 +358,8 @@ test('smart-campus 刷新开始即卸载旧页面，失败后保持关闭 @w4', 
     await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
     await runCapabilityRefresh(page)
     await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(2)
-    await expect(page.locator('[data-capability-state="loading"]')).toBeVisible()
-    await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)
+    await expect(page.locator('[data-capability-state="loading"]')).toHaveCount(0)
+    await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
     releaseRefresh({ abort: 'internetdisconnected' })
     await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
     await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)

@@ -43,6 +43,7 @@ const AS_ERROR_MESSAGE = /\(\s*\w+\s+as\s+Error\s*\)\s*\?\.?\s*message/
 
 const PACKET_PAGES = [
   // SES-12 第二批（2026-09-07）：残留原样渲染 err.message 的页面
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx',
   'apps/kiosk/src/pages/interview/InterviewReportPage.tsx',
   'apps/kiosk/src/pages/interview/InterviewSetupPage.tsx',
