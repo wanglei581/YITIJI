@@ -17,6 +17,9 @@ import { assertVerifiedPrintParameters } from './verified-print-parameters'
 import { DocumentConversionService } from '../document-conversion/document-conversion.service'
 import { WORD_MIME_TYPES } from '../document-conversion/document-conversion.types'
 
+/** 服务端 sha256 必须是 64 位小写十六进制（PII 扫描比对 / 报告完整性校验共用）。 */
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
+
 export interface PrintJobCreated {
   taskId:    string
   status:    string
