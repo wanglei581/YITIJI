@@ -90,6 +90,9 @@ const USER_FAILURE_REASONS: Record<string, string> = {
 }
 
 /** 未知错误码 / 仅有原始 errorMessage 时的统一安全兜底文案。 */
+/** PII 预检绑定用：文件 sha256 必须是 64 位小写十六进制（API-27c）。#868 把合同报告的同名常量迁走，这里独立保留。 */
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
+
 const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员处理或稍后重试'
 
 /**
