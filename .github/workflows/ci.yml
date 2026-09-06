@@ -281,6 +281,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-ai-career
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2b-ai-resume
           pnpm --filter @ai-job-print/kiosk verify:resume-diagnosis-flow-ui
+          # 包 K2：Word 转换能力为假时三处 accept 不含 doc/docx、提示文案存在、convert 只在能力为真时调用
+          pnpm --filter @ai-job-print/kiosk verify:word-conversion-ui
           pnpm --filter @ai-job-print/kiosk verify:job-material-library-ui
           pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui
