@@ -66,3 +66,21 @@ export interface MemberAiRecordItem {
   createdAt: string
   expiresAt: string | null
 }
+
+export interface MemberQaRecordItem {
+  id: string
+  sessionId: string
+  artifactId: string
+  kind: 'qa_pins'
+  title: string
+  createdAt: string
+  expiresAt: string
+  fileId: string | null
+}
+
+export interface MemberAiRecordPage {
+  items: MemberAiRecordItem[]
+  total: number
+  nextCursor: string | null
+  qaRecords: MemberQaRecordItem[]
+}

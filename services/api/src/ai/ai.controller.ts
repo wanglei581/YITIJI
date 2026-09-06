@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { BadRequestException, Controller, Post, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -34,6 +34,7 @@ import { BenefitRedemptionService } from '../benefit-redemption/benefit-redempti
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { runWithPublicQuota } from './ai-request-guard'
 import { assistantOwnerKey } from './llm/llm-chat.service'
+import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 
 import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
@@ -97,6 +98,8 @@ function isWavBuffer(buffer: Buffer): boolean {
 // GET  /resume/records/:taskId/optimize  — 查询优化建议
 // POST /resume/parse                     — 提交简历解析
 // POST /assistant/chat                   — AI 助手对话
+// POST /assistant/voice                  — 小青按住说话转写
+// POST /assistant/sessions/:id/summary   — 登录用户保存本次要点
 // GET  /admin/ai/usage                   — AI 服务用量统计（仅元数据）
 // GET  /admin/ai/logs                    — AI 调用日志列表（仅元数据）
 // ============================================================
@@ -114,6 +117,7 @@ export class AiController {
     private readonly benefitRedemption: BenefitRedemptionService,
     private readonly publicQuota: AiPublicQuotaService,
     private readonly privacy: MemberPrivacyService,
+    private readonly assistantSummary: AssistantSummaryService,
   ) {}
 
   /**
@@ -452,6 +456,94 @@ export class AiController {
       requestId: req.requestId ?? null,
     })
     return result
+  }
+
+  /**
+   * 小青文字对话的「按住说话」转写。multipart 字段名 audio，仅内存 WAV。
+   * 与 /assistant/chat 共用 assistant_chat 日配额；ASR 未配置返回 ASR_NOT_CONFIGURED。
+   * 转写正文不进日志 / 审计。
+   */
+  @Post('assistant/voice')
+  @TerminalScopedThrottle(12)
+  @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  async transcribeAssistantVoice(
+    @UploadedFile() audio: Express.Multer.File | undefined,
+    @Req() req: ReqLike,
+  ): Promise<{ text: string; providerName: string }> {
+    const voiceMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    const quotaTicket = await this.publicQuota.consume('assistant_chat', {
+      member: voiceMember?.endUserId ?? null,
+      terminal: throttleTerminalIdOf(req),
+      ip: ipOf(req),
+    })
+    return runWithPublicQuota(this.publicQuota, quotaTicket, req, async () => {
+      if (!audio?.buffer?.length) {
+        throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
+      }
+      if (!isWavBuffer(audio.buffer)) {
+        throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
+      }
+      const asrStartedAt = Date.now()
+      const result = await this.asr.recognizeWav(audio.buffer)
+      this.logService.record({
+        taskId: null,
+        operation: 'voiceTranscribe',
+        provider: this.asr.activeProviderName,
+        status: result.ok ? 'success' : 'failed',
+        latencyMs: Math.max(0, Date.now() - asrStartedAt),
+        tokenUsage: undefined,
+        errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
+        endUserId: voiceMember?.endUserId ?? null,
+        terminalId: throttleTerminalIdOf(req),
+      })
+      if (!result.ok) {
+        throw new BadRequestException({
+          error: {
+            code: result.errorCode ?? 'ASR_FAILED',
+            message: result.errorMessage ?? '语音转写失败，请改用文字输入',
+          },
+        })
+      }
+      const text = result.text?.trim()
+      if (!text) {
+        throw new BadRequestException({ error: { code: 'ASR_FAILED', message: '没有识别到有效文字，请改用文字输入' } })
+      }
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'kiosk',
+        action: 'assistant.voice_transcribe',
+        targetType: 'system',
+        targetId: null,
+        payload: {
+          providerName: this.asr.activeProviderName,
+          chars: text.length,
+          bytes: audio.buffer.length,
+        },
+        ipAddress: ipOf(req),
+        userAgent: uaOf(req),
+        requestId: req.requestId ?? null,
+      })
+      return { text, providerName: this.asr.activeProviderName }
+    })
+  }
+
+  /**
+   * 登录用户把本次小青对话浓缩为要点 + 待办，落 AdvisorSession(source=assistant)
+   * 与 qa_pins 产物，并生成可进「我的文档」的 PDF。匿名统一 404。
+   */
+  @Post('assistant/sessions/:sessionId/summary')
+  @PaidAiThrottle(6)
+  async summarizeAssistantSession(
+    @Param('sessionId') sessionId: string,
+    @Req() req: ReqLike,
+  ) {
+    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    if (!member) {
+      throw new NotFoundException({
+        error: { code: 'ASSISTANT_SESSION_NOT_FOUND', message: '会话不存在或已过期' },
+      })
+    }
+    return this.assistantSummary.summarize(sessionId, member.endUserId, ipOf(req))
   }
 
   // ─── Admin 统计 / 日志接口 ──────────────────────────────────

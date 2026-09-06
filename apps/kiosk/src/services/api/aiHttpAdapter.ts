@@ -23,6 +23,8 @@ import type {
   ResumeOptimizeResponse,
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSessionSummaryResponse,
+  AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
 import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
@@ -184,7 +186,7 @@ async function postForm<T>(path: string, body: FormData, timeoutMs = LLM_TIMEOUT
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...terminalHeader() },
       credentials: 'include',
       body,
       signal: ac.signal,
@@ -242,8 +244,8 @@ export const aiHttpAdapter = {
     )
   },
 
-  async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
-    return post<AssistantChatResponse>('/assistant/chat', req, undefined, LLM_TIMEOUT_MS)
+  async chatWithAssistant(req: AssistantChatRequest, token?: string | null): Promise<AssistantChatResponse> {
+    return post<AssistantChatResponse>('/assistant/chat', req, token, LLM_TIMEOUT_MS)
   },
 
   // ── 阶段2A AI 简历生成 ──────────────────────────────────────
@@ -260,6 +262,21 @@ export const aiHttpAdapter = {
     const form = new FormData()
     form.append('audio', audio, 'resume-voice.wav')
     return postForm<ResumeVoiceTranscribeResponse>('/resume/voice/transcribe', form)
+  },
+
+  async transcribeAssistantVoice(audio: Blob): Promise<AssistantVoiceTranscribeResponse> {
+    const form = new FormData()
+    form.append('audio', audio, 'assistant-voice.wav')
+    return postForm<AssistantVoiceTranscribeResponse>('/assistant/voice', form)
+  },
+
+  async summarizeAssistantSession(sessionId: string, token: string): Promise<AssistantSessionSummaryResponse> {
+    return post<AssistantSessionSummaryResponse>(
+      `/assistant/sessions/${encodeURIComponent(sessionId)}/summary`,
+      {},
+      token,
+      LLM_TIMEOUT_MS,
+    )
   },
 
   async exportGeneratedResume(

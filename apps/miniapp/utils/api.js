@@ -8,6 +8,7 @@ const { request, uploadFile } = require('./request');
 const mock = require('./mock-data');
 const N = require('./normalize');
 const uploadNames = require('./upload-name');
+const auth = require('./auth');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -1026,7 +1027,60 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 助手'));
     const body = { message };
     if (sessionId) body.sessionId = sessionId;
-    return request('/assistant/chat', { method: 'POST', data: body, needAuth: false, timeout: config.aiTimeout });
+    const token = auth.getToken();
+    return request('/assistant/chat', {
+      method: 'POST',
+      data: body,
+      needAuth: false,
+      header: token ? { Authorization: 'Bearer ' + token } : {},
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /**
+   * 小青按住说话转写。multipart 字段名必须是 audio。
+   * 成功 { text, providerName }。ASR_NOT_CONFIGURED 时整场改手打。
+   */
+  transcribeAssistantVoice(filePath) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('语音转写'));
+    return uploadFile('/assistant/voice', filePath, {
+      name: 'audio',
+      needAuth: false,
+      header: auth.getToken() ? { Authorization: 'Bearer ' + auth.getToken() } : {},
+      timeout: config.aiTimeout,
+    }).then((res) => ({
+      text: res && typeof res.text === 'string' ? res.text : '',
+      providerName: (res && res.providerName) || '',
+    }));
+  },
+
+  /**
+   * 登录用户保存本次要点。匿名 404。
+   * 成功 { advisorSessionId, artifactId, highlights, todos, savedToDocuments, document }
+   */
+  summarizeAssistantSession(sessionId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('本次要点'));
+    return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/summary`, {
+      method: 'POST',
+      data: {},
+      needAuth: true,
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /** ASR 是否已配置。复用面试能力探测，同一套服务端 ASR。 */
+  getAssistantVoiceCapability() {
+    if (config.USE_MOCK) return Promise.resolve({ asrEnabled: false });
+    return request('/mock-interviews/capabilities/voice', { method: 'GET', needAuth: false })
+      .then((res) => ({ asrEnabled: !!(res && res.asrEnabled) }))
+      .catch(() => ({ asrEnabled: false }));
+  },
+
+  /** /me/ai-records 附加的问答分区（只读 qaRecords，不含对话正文）。 */
+  getMyAssistantQaRecords() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('问答记录'));
+    return request('/me/ai-records', { method: 'GET', data: { pageSize: 1 }, needAuth: true })
+      .then((res) => (res && Array.isArray(res.qaRecords) ? res.qaRecords : []));
   },
 
   // ---------- AI 简历从零生成 ----------

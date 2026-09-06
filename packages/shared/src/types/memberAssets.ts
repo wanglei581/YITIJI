@@ -108,6 +108,26 @@ export interface MemberAiRecordItem {
   expiresAt: string | null
 }
 
+/**
+ * AI 服务记录里的「问答」分区（只加字段，不改 kind 联合）。
+ * 数据来自 AdvisorArtifact(kind=qa_pins)，仅元数据，不含对话正文。
+ */
+export interface MemberQaRecordItem {
+  id: string
+  sessionId: string
+  artifactId: string
+  kind: 'qa_pins'
+  title: string
+  createdAt: string
+  expiresAt: string
+  fileId: string | null
+}
+
+/** /me/ai-records 在既有分页之上附加问答产物。 */
+export interface MemberAiRecordPage extends MemberAssetPage<MemberAiRecordItem> {
+  qaRecords: MemberQaRecordItem[]
+}
+
 // ── 浏览 / 外部跳转记录（P1 闭环）─────────────────────────────────────────────
 // 合规：只记录「浏览」和「打开来源平台入口」两类本人行为；
 // 投递/预约结果以来源平台为准，本系统不记录、类型上也不存在这类字段。

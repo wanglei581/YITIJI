@@ -26,6 +26,8 @@ import type {
   ResumeOptimizeResponse,
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSessionSummaryResponse,
+  AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
 import { API_MODE } from './client'
 import { aiMockAdapter } from './aiMockAdapter'
@@ -65,11 +67,13 @@ export interface AiServiceInterface {
     layout: ResumeLayoutSettings,
     access?: ResumeReadAccess,
   ): Promise<ResumeLayoutAdjustResponse>
-  chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse>
+  chatWithAssistant(req: AssistantChatRequest, token?: string | null): Promise<AssistantChatResponse>
   // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
   submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse>
   getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse>
   transcribeResumeVoice(audio: Blob): Promise<ResumeVoiceTranscribeResponse>
+  transcribeAssistantVoice(audio: Blob): Promise<AssistantVoiceTranscribeResponse>
+  summarizeAssistantSession(sessionId: string, token: string): Promise<AssistantSessionSummaryResponse>
   exportGeneratedResume(
     resume: GeneratedResume,
     taskId?: string,
@@ -118,9 +122,9 @@ export const adjustResumeLayoutDraft = (
   access?: ResumeReadAccess,
 ) => adapter.adjustResumeLayoutDraft(taskId, resume, action, layout, access)
 
-/** 向 AI 助手发送消息（意图分类 + 引导跳转） */
-export const chatWithAssistant = (req: AssistantChatRequest) =>
-  adapter.chatWithAssistant(req)
+/** 向 AI 助手发送消息（意图分类 + 引导跳转）。登录时带 token，便于保存本次要点。 */
+export const chatWithAssistant = (req: AssistantChatRequest, token?: string | null) =>
+  adapter.chatWithAssistant(req, token)
 
 /** 阶段2A:提交 AI 简历生成(引导式表单;AI 只润色,不编造) */
 export const submitResumeGenerate = (input: ResumeGenerateInput, token?: string | null) =>
@@ -133,6 +137,14 @@ export const getResumeGenerate = (taskId: string, access?: ResumeReadAccess) =>
 /** Wave 4:简历语音短音频转写。转写结果必须由页面让用户确认后才写入表单。 */
 export const transcribeResumeVoice = (audio: Blob) =>
   adapter.transcribeResumeVoice(audio)
+
+/** 小青文字对话按住说话。松手后得到可编辑转写；ASR 未配置返回 ASR_NOT_CONFIGURED。 */
+export const transcribeAssistantVoice = (audio: Blob) =>
+  adapter.transcribeAssistantVoice(audio)
+
+/** 登录用户保存本次要点（≤8 条要点 + ≤5 条待办 PDF）。匿名不要调。 */
+export const summarizeAssistantSession = (sessionId: string, token: string) =>
+  adapter.summarizeAssistantSession(sessionId, token)
 
 /**
  * 阶段2A:导出确认后的简历为真实文件(FileObject + 签名 URL,可进打印链路)。

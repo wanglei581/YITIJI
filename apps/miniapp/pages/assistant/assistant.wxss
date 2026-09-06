@@ -54,6 +54,44 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   white-space: nowrap; min-height: 96rpx; box-sizing: border-box; }
 
 .input-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 16rpx 24rpx calc(18rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid var(--line-soft); background: #fff; display: flex; align-items: center; gap: 14rpx; }
+.as-input-col { flex-direction: column; align-items: stretch; gap: 12rpx; }
+.as-voice-row { display: flex; align-items: center; gap: 16rpx; }
+.as-hold {
+  flex: 1;
+  min-height: 112rpx;
+  border-radius: 23rpx;
+  border: 1rpx solid var(--line);
+  background: var(--teal-soft, #e8f3ff);
+  color: var(--teal);
+  font-size: 28rpx;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.as-hold.is-on { background: var(--teal); color: #fff; }
+.as-hold.is-off { opacity: .45; }
+.as-direct { min-height: 96rpx; display: flex; align-items: center; gap: 10rpx; color: var(--ink-soft); font-size: 24rpx; }
+.as-check { width: 36rpx; height: 36rpx; border-radius: 8rpx; border: 2rpx solid var(--line); }
+.as-check.on { background: var(--teal); border-color: var(--teal); }
+.as-voice-reason { color: var(--warn, #a15c12); font-size: 22rpx; line-height: 1.5; }
+.as-type-row { display: flex; align-items: center; gap: 14rpx; }
+.as-summary { margin: 8rpx 0 24rpx; }
+.as-sum-btn {
+  min-height: 112rpx;
+  border-radius: 23rpx;
+  border: 1rpx solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-size: 28rpx;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.as-sum-hint { margin-top: 12rpx; color: var(--muted); font-size: 22rpx; line-height: 1.5; }
+.as-sum-list { margin-top: 10rpx; }
+.as-sum-item { padding: 8rpx 0; color: var(--ink); font-size: 24rpx; line-height: 1.5; }
 .ib-input { flex: 1; height: 78rpx; padding: 0 25rpx; border-radius: 23rpx; border: 1rpx solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 25rpx; }
 /* 实测 40x40 → 96rpx=48px（发送键，输入区主操作） */
 .ib-send { width: 96rpx; height: 96rpx; border-radius: 23rpx; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 22rpx rgba(22,119,255,.16); }

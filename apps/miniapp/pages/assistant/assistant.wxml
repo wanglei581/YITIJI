@@ -78,19 +78,52 @@
         </view>
       </view>
 
-      <view style="height:240rpx"></view>
+      <view class="as-summary">
+        <view class="as-sum-btn tap {{savingSummary ? 'ib-disabled' : ''}}" hover-class="tap-press" bindtap="saveSummary">
+          {{savingSummary ? '正在保存…' : '保存本次要点'}}
+        </view>
+        <view wx:if="{{summaryHint}}" class="as-sum-hint">{{summaryHint}}</view>
+        <view wx:if="{{summaryHighlights.length}}" class="as-sum-list">
+          <view wx:for="{{summaryHighlights}}" wx:key="*this" class="as-sum-item">{{item}}</view>
+        </view>
+        <view wx:if="{{summaryTodos.length}}" class="as-sum-list">
+          <view wx:for="{{summaryTodos}}" wx:key="*this" class="as-sum-item">待办：{{item}}</view>
+        </view>
+      </view>
+
+      <view style="height:320rpx"></view>
     </view>
   </scroll-view>
 
   <!-- 底部输入栏（fixed） -->
-  <view class="input-bar">
-    <input class="ib-input" placeholder="和小青说点什么…"
-      placeholder-style="color:var(--muted)"
-      value="{{inputText}}" bindinput="onInputChange"
-      confirm-type="send" bindconfirm="sendMsg"
-      disabled="{{sending}}" />
-    <view class="ib-send tap {{sending ? 'ib-disabled' : ''}}" hover-class="tap-press" bindtap="sendMsg">
-      <text class="ficon i-right" style="transform:rotate(-90deg)"></text>
+  <view class="input-bar as-input-col">
+    <view class="as-voice-row">
+      <view
+        class="as-hold {{holding ? 'is-on' : ''}} {{(!asrEnabled || sending || transcribing) ? 'is-off' : ''}}"
+        hover-class="tap-press"
+        bindtouchstart="onHoldStart"
+        bindtouchend="onHoldEnd"
+        bindtouchcancel="onHoldCancel"
+        aria-role="button"
+        aria-pressed="{{holding}}"
+      >
+        {{holding ? '松手结束' : (transcribing ? '正在转写…' : '按住说话')}}
+      </view>
+      <view class="as-direct tap" hover-class="tap-press" bindtap="toggleSendDirect">
+        <view class="as-check {{sendVoiceDirect ? 'on' : ''}}"></view>
+        语音直接发送
+      </view>
+    </view>
+    <view wx:if="{{voiceBlockedReason}}" class="as-voice-reason">{{voiceBlockedReason}}</view>
+    <view class="as-type-row">
+      <input class="ib-input" placeholder="和小青说点什么…"
+        placeholder-style="color:var(--muted)"
+        value="{{inputText}}" bindinput="onInputChange"
+        confirm-type="send" bindconfirm="sendMsg"
+        disabled="{{sending}}" />
+      <view class="ib-send tap {{sending ? 'ib-disabled' : ''}}" hover-class="tap-press" bindtap="sendMsg">
+        <text class="ficon i-right" style="transform:rotate(-90deg)"></text>
+      </view>
     </view>
   </view>
 </view>

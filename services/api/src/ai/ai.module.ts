@@ -41,6 +41,9 @@ import { BaiduOcrProvider } from './resume/ocr/baidu-ocr.provider'
 import { LlmResumeService } from './resume/llm-resume.service'
 import { LlmResumeGenerateService } from './resume/llm-resume-generate.service'
 import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
+import { AdvisorArtifactService } from '../advisor/advisor-artifact.service'
+import { AdvisorPdfService } from '../advisor/advisor-pdf.service'
+import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { ResumeDocxService } from './resume/resume-docx.service'
 import { ResumeTextService } from './resume/resume-text.service'
@@ -102,6 +105,10 @@ import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
     ResumeTextService,
     // ── 阶段2B AI 简历优化真实化(基于原文,防编造) ──
     LlmResumeOptimizeService,
+    // 小青「本次要点」复用顾问产物 PDF / 我的文档链路（不改 AdvisorModule 既有实例）。
+    AdvisorPdfService,
+    AdvisorArtifactService,
+    AssistantSummaryService,
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
   // 导出 OcrService 供 MaterialsModule 复用做打印材料真实内容扫描（文件体检真实化）。

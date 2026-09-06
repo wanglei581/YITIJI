@@ -22,7 +22,9 @@ import type {
   ResumeOptimizeResponse,
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSessionSummaryResponse,
   AssistantSkill,
+  AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
 import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
 
@@ -141,7 +143,8 @@ export const aiMockAdapter = {
     }
   },
 
-  async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
+  async chatWithAssistant(req: AssistantChatRequest, _token?: string | null): Promise<AssistantChatResponse> {
+    void _token
     await delay(500)
     const sceneReplies: Record<AssistantSkill, Pick<AssistantChatResponse, 'reply' | 'actions'>> = {
       offer_compare: {
@@ -260,6 +263,19 @@ export const aiMockAdapter = {
     void _audio
     await delay(80)
     throw new Error('演示模式不支持语音识别，请使用文字输入')
+  },
+
+  async transcribeAssistantVoice(_audio: Blob): Promise<AssistantVoiceTranscribeResponse> {
+    void _audio
+    await delay(80)
+    throw new AiMockModeError('ASR_NOT_CONFIGURED', '演示模式未启用语音转写，请使用文字输入', 400)
+  },
+
+  async summarizeAssistantSession(_sessionId: string, _token: string): Promise<AssistantSessionSummaryResponse> {
+    void _sessionId
+    void _token
+    await delay(80)
+    throw new AiMockModeError('AI_NOT_CONFIGURED', '演示模式不能保存本次要点', 503)
   },
 
   async exportGeneratedResume(
