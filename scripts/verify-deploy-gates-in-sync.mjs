@@ -65,6 +65,16 @@ if (!arrayMatch) {
   const writesTrue = /print key "=true"/.test(deploySource) || /print key"=true"/.test(deploySource)
   if (writesTrue) pass('3b 把每个键写成 KEY=true，与闸门的精确 === \'true\' 判定一致')
   else fail('3b 写入的值不是 "=true" —— 闸门用精确 === \'true\' 判定，带空格或大小写变体会通不过')
+
+  // 五、PM2 重启前每个键都要 export（--update-env 把 shell 环境带进进程；与 .env 持久化互为兜底）
+  const restartAt = deploySource.indexOf('pm2 restart "$PM2_NAME" --update-env')
+  if (restartAt < 0) fail(`${DEPLOY_SH} 里没找到 pm2 restart "$PM2_NAME" --update-env`)
+  else {
+    const beforeRestart = deploySource.slice(0, restartAt)
+    const notExported = [...requiredByGates].filter((k) => !new RegExp(`^export ${k}=true$`, 'm').test(beforeRestart))
+    if (notExported.length === 0) pass('PM2 重启前每个闸门键都已 export KEY=true')
+    else fail(`PM2 重启前未 export：${notExported.join(', ')} —— 进程环境与 .env 持久化不一致`)
+  }
 }
 
 if (failures > 0) {

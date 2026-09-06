@@ -244,6 +244,7 @@ EOF
 
 echo "=== 8. 重启 PM2 并健康检查 ==="
 export COMMIT="$TARGET_SHA"
+export PRINT_REQUIRE_PRINTER_ONLINE=true
 export PRINT_REQUIRE_PII_SCAN=true
 pm2 restart "$PM2_NAME" --update-env
 for _ in $(seq 1 30); do
