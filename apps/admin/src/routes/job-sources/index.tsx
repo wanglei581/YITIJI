@@ -188,7 +188,9 @@ export default function JobSourcesPage() {
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-bg px-4 py-2.5">
           <FilterIcon className="h-4 w-4 flex-shrink-0 text-warning" />
           <span className="text-sm text-warning-fg">
-            正在显示来自 Excel 导入批次 <strong>{batchLabel || sourceIdFilter}</strong> 的岗位（数据源 ID：{sourceIdFilter}）
+            正在按数据源筛选岗位（数据源 ID：{sourceIdFilter}
+            {batchLabel ? ` · 来自导入文件 ${batchLabel}` : ''}
+            ）。同一数据源下其它批次的岗位也会出现，不是按单次 Excel 批次过滤。
           </span>
           <button
             onClick={() => setSearchParams({})}
@@ -353,7 +355,7 @@ export default function JobSourcesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        仅展示第三方平台同步的岗位信息，不参与招聘闭环。
+        仅展示第三方平台同步的岗位信息，不参与招聘闭环。本次加载 {sources.length} 条（服务端当前全量返回，本页本地分页）。
       </p>
 
       <Drawer
@@ -376,7 +378,7 @@ export default function JobSourcesPage() {
             <DetailRow label="公司" value={viewing.company} />
             <DetailRow label="城市" value={viewing.city} />
             <DetailRow label="薪资" value={viewing.salary} />
-            <DetailRow label="行业" value={viewing.industry} />
+            {/* http 模式 industry 恒为 undefined（prismaJobToAdminDto），不渲染该行，避免 mock 有值、http 没值。 */}
             <DetailRow label="标签" value={viewing.tags.length ? viewing.tags.join('、') : undefined} />
             <DetailRow label="岗位描述" value={viewing.description} />
             <DetailRow label="任职要求" value={viewing.requirements} />

@@ -56,6 +56,15 @@ export interface ReviewToolboxAllowedHostInput {
   expiresAt?: string
 }
 
+/** 与后端 upsert/review 真实响应对齐：{ host, purpose, status }；⑨a 会补 id/expiresAt。 */
+export interface ToolboxAllowedHostMutationResult {
+  host: string
+  purpose: string
+  status: string
+  id?: string
+  expiresAt?: string | null
+}
+
 export interface ToolboxAdminServiceInterface {
   listTerminals(): Promise<ToolboxTerminalView[]>
   getLaunchSummary(params?: { days?: number; terminalId?: string | null }): Promise<ToolboxLaunchSummary>
@@ -70,8 +79,8 @@ export interface ToolboxAdminServiceInterface {
   rejectVersion(appKey: string, version: number, reason: string): Promise<ToolboxGovernanceResult>
   publishVersion(appKey: string, version: number, terminalIds?: string[]): Promise<ToolboxGovernanceResult>
   suspendApp(appKey: string): Promise<ToolboxGovernanceResult>
-  upsertAllowedHost(input: UpsertToolboxAllowedHostInput): Promise<ToolboxAllowedHostRecord>
-  reviewAllowedHost(hostId: string, input: ReviewToolboxAllowedHostInput): Promise<ToolboxAllowedHostRecord>
+  upsertAllowedHost(input: UpsertToolboxAllowedHostInput): Promise<ToolboxAllowedHostMutationResult>
+  reviewAllowedHost(hostId: string, input: ReviewToolboxAllowedHostInput): Promise<ToolboxAllowedHostMutationResult>
 }
 
 async function parseError(res: Response): Promise<never> {
@@ -131,9 +140,9 @@ const httpAdapter: ToolboxAdminServiceInterface = {
     req<ToolboxGovernanceResult>('POST', `/admin/toolbox/apps/${encodeURIComponent(appKey)}/versions/${version}/publish`, { terminalIds }),
   suspendApp: (appKey) =>
     req<ToolboxGovernanceResult>('POST', `/admin/toolbox/apps/${encodeURIComponent(appKey)}/suspend`),
-  upsertAllowedHost: (input) => req<ToolboxAllowedHostRecord>('POST', '/admin/toolbox/allowed-hosts', input),
+  upsertAllowedHost: (input) => req<ToolboxAllowedHostMutationResult>('POST', '/admin/toolbox/allowed-hosts', input),
   reviewAllowedHost: (hostId, input) =>
-    req<ToolboxAllowedHostRecord>('POST', `/admin/toolbox/allowed-hosts/${encodeURIComponent(hostId)}/review`, input),
+    req<ToolboxAllowedHostMutationResult>('POST', `/admin/toolbox/allowed-hosts/${encodeURIComponent(hostId)}/review`, input),
 }
 
 const mockTerminals: ToolboxTerminalView[] = [
@@ -334,25 +343,22 @@ const mockAdapter: ToolboxAdminServiceInterface = {
       updatedAt: new Date().toISOString(),
     }
     mockHosts = [next, ...mockHosts.filter((host) => host.id !== next.id)]
-    return next
+    return { id: next.id, host: next.host, purpose: next.purpose, status: next.status, expiresAt: next.expiresAt }
   },
   async reviewAllowedHost(hostId, input) {
-    let saved: ToolboxAllowedHostRecord | null = null
-    mockHosts = mockHosts.map((host) => {
-      if (host.id !== hostId) return host
-      saved = {
-        ...host,
-        status: input.status,
-        reason: input.reason ?? host.reason,
-        reviewedBy: 'mock-reviewer',
-        reviewedAt: new Date().toISOString(),
-        expiresAt: input.expiresAt ?? host.expiresAt,
-        updatedAt: new Date().toISOString(),
-      }
-      return saved
-    })
-    if (!saved) throw new ApiHttpError('TOOLBOX_HOST_NOT_FOUND', '允许域名不存在', 404)
-    return saved
+    const existing = mockHosts.find((host) => host.id === hostId)
+    if (!existing) throw new ApiHttpError('TOOLBOX_HOST_NOT_FOUND', '允许域名不存在', 404)
+    const saved: ToolboxAllowedHostRecord = {
+      ...existing,
+      status: input.status,
+      reason: input.reason ?? existing.reason,
+      reviewedBy: 'mock-reviewer',
+      reviewedAt: new Date().toISOString(),
+      expiresAt: input.expiresAt ?? existing.expiresAt,
+      updatedAt: new Date().toISOString(),
+    }
+    mockHosts = mockHosts.map((host) => (host.id === hostId ? saved : host))
+    return { id: saved.id, host: saved.host, purpose: saved.purpose, status: saved.status, expiresAt: saved.expiresAt }
   },
 }
 

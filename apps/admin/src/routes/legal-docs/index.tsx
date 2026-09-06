@@ -31,6 +31,22 @@ function formatDate(iso: string | null): string {
   })
 }
 
+/** 被新版取代的已发布版本仍带 publishedAt，不得标成「草稿」。 */
+function legalDocBadge(
+  row: LegalDocVersionView,
+  all: LegalDocVersionView[] = [],
+): { status: 'success' | 'warning' | 'default'; label: string } {
+  if (row.isActive) return { status: 'success', label: '当前有效' }
+  if (row.publishedAt) {
+    const successor = all.find((item) => item.docType === row.docType && item.isActive)
+    return {
+      status: 'default',
+      label: successor ? `已归档 / 已被 ${successor.version} 取代` : '已归档',
+    }
+  }
+  return { status: 'warning', label: '草稿' }
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function LegalDocsPage() {
@@ -147,7 +163,9 @@ export default function LegalDocsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50 bg-white">
-                  {rows.map((row) => (
+                  {rows.map((row) => {
+                    const badge = legalDocBadge(row, rows)
+                    return (
                     <tr key={row.id} className="hover:bg-neutral-50">
                       <td className="px-4 py-3 text-neutral-700">
                         {DOC_TYPE_LABELS[row.docType] ?? row.docType}
@@ -155,11 +173,7 @@ export default function LegalDocsPage() {
                       <td className="px-4 py-3 font-mono text-neutral-600">{row.version}</td>
                       <td className="max-w-xs truncate px-4 py-3 text-neutral-800">{row.title}</td>
                       <td className="px-4 py-3">
-                        {row.isActive ? (
-                          <StatusBadge status="success" label="当前有效" />
-                        ) : (
-                          <StatusBadge status="default" label="草稿" />
-                        )}
+                        <StatusBadge status={badge.status} label={badge.label} />
                       </td>
                       <td className="px-4 py-3 text-neutral-500">{formatDate(row.publishedAt)}</td>
                       <td className="px-4 py-3">
@@ -176,7 +190,8 @@ export default function LegalDocsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

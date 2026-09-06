@@ -21,6 +21,8 @@ export interface AdminPriceConfigItem {
 
 export interface UpdatePriceConfigInput {
   unitCents?: number
+  /** 单价改为 0 时必须为 true：0 元会跳过收银。 */
+  confirmZeroPrice?: boolean
   active?: boolean
   description?: string
 }
@@ -102,7 +104,12 @@ const mockAdapter: AdminBillingService = {
   updatePriceConfig: async (serviceKey, patch) => {
     const row = MOCK_PRICES.find((p) => p.serviceKey === serviceKey)
     if (!row) throw new ApiHttpError('PRICE_CONFIG_NOT_FOUND', '价目不存在', 404)
-    if (patch.unitCents !== undefined) row.unitCents = patch.unitCents
+    if (patch.unitCents !== undefined) {
+      if (patch.unitCents === 0 && patch.confirmZeroPrice !== true) {
+        throw new ApiHttpError('ZERO_PRICE_CONFIRMATION_REQUIRED', '设置 0 元会跳过收银，需明确确认', 400)
+      }
+      row.unitCents = patch.unitCents
+    }
     if (patch.active !== undefined) row.active = patch.active
     if (patch.description !== undefined) row.description = patch.description
     row.updatedAt = new Date().toISOString()

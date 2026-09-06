@@ -113,7 +113,13 @@ mustContain(adminRoot, 'src/services/api/toolbox.ts', [
   '/admin/toolbox/apps',
   '/admin/toolbox/allowed-hosts',
   'API_MODE === \'http\' ? httpAdapter : mockAdapter',
+  'ToolboxAllowedHostMutationResult',
+  'req<ToolboxAllowedHostMutationResult>',
 ], 'Admin toolbox service 覆盖审核发布 API、reason 透出和 mock/http 切换')
+mustNotContain(adminRoot, 'src/services/api/toolbox.ts', [
+  "req<ToolboxAllowedHostRecord>('POST', '/admin/toolbox/allowed-hosts'",
+  "req<ToolboxAllowedHostRecord>('POST', `/admin/toolbox/allowed-hosts/${encodeURIComponent(hostId)}/review`",
+], 'ADM-A28 upsert/review 不得把后端 {host,purpose,status} 伪造成完整 ToolboxAllowedHostRecord')
 
 mustContain(adminRoot, 'src/routes/toolbox/index.tsx', [
   'ToolboxGovernancePanel',

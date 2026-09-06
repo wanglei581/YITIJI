@@ -293,6 +293,7 @@ export default function PolicySourcesPage() {
       <p className="mt-3 text-xs text-neutral-400">
         政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。审核通过并发布后在一体机「政策服务」页展示,所有操作记录审计日志。
         「查看申领条件」为只读复核:条件由来源机构在合作机构后台录入,本页不改条件。
+        本次加载 {records.length} 条（服务端当前全量返回，本页本地分页）。
       </p>
 
       {/* key 绑 id:换一条政策必须重挂组件,避免上一条的条件在新标题下短暂残留 */}

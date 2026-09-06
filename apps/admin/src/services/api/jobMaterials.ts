@@ -90,6 +90,7 @@ function ensureMockStore(): JobMaterialTemplateAdminRow[] {
     const now = new Date().toISOString()
     mockStore = JOB_MATERIAL_TEMPLATES.map((template, index) => ({
       ...deepClone(template),
+      status: index === JOB_MATERIAL_TEMPLATES.length - 1 ? 'disabled' : template.status,
       sortOrder: index,
       createdAt: now,
       updatedAt: now,

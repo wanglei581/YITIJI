@@ -50,6 +50,15 @@ if (page.includes('window.confirm') && page.includes('记入审计')) {
 } else {
   fail('改价缺二次确认/审计提示')
 }
+if (
+  page.includes('0 元 = 免费打印，将跳过收银') &&
+  page.includes('confirmZeroPrice: true') &&
+  service.includes('confirmZeroPrice?: boolean')
+) {
+  pass('OPS-06: 改 0 元确认框写明跳过收银，并提交 confirmZeroPrice: true')
+} else {
+  fail('单价改 0 必须显式确认「0 元 = 免费打印，将跳过收银」并传 confirmZeroPrice')
+}
 if (page.includes('并非「免费」') || page.includes('不可下单')) {
   pass('停用价目语义诚实（报价失败，非免费）')
 } else {

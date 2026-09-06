@@ -9,6 +9,8 @@ test.describe('百宝箱（mock 口径）', () => {
     await expect(page.getByRole('heading', { name: '百宝箱 / 微应用治理' })).toBeVisible()
 
     await page.getByRole('button', { name: '域名白名单' }).click()
+    await expect(page.getByText('域名已提交 DB 审核表')).toHaveCount(0)
+    await expect(page.getByPlaceholder('trusted.example.com')).toBeVisible()
     await page.getByRole('button', { name: '终端投放配置' }).click()
     await page.getByRole('button', { name: '微应用审核发布' }).click()
 

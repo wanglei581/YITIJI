@@ -8,6 +8,7 @@
 import type {
   AdAssetView,
   AdPlaylistView,
+  AdPlaylistStatus,
   AiPosterStatusView,
   SaveAdPlaylistInput,
   SaveScreensaverConfigInput,
@@ -20,6 +21,7 @@ import { authHeader, redirectToLogin } from '../auth'
 export type {
   AdAssetView,
   AdPlaylistView,
+  AdPlaylistStatus,
   AiPosterStatusView,
   SaveAdPlaylistInput,
   SaveScreensaverConfigInput,

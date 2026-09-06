@@ -6,6 +6,12 @@ test.describe('工作台（mock 口径）', () => {
     const guards = await openAuthed(page, '/')
     await settleAdminPage(page, guards)
     await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+    await expect(page.getByText('工作台数据加载失败')).toHaveCount(0)
+    await expect(page.getByText('数据源加载失败')).toHaveCount(0)
+    const alertCta = page.getByRole('link', { name: /处理告警/ })
+    if (await alertCta.isVisible()) {
+      await expect(alertCta).toHaveText(/处理告警 \(\d+\)/)
+    }
     await page.getByRole('button', { name: '刷新' }).click()
     await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
     const todo = page.getByRole('link', { name: /岗位|招聘会|告警|设备/ }).first()
