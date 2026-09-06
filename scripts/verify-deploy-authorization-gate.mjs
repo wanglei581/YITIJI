@@ -83,16 +83,26 @@ assert.match(
   /if \[ "\$\{PRINT_REQUIRE_PII_SCAN:-\}" != "true" \]; then/,
   'release script must retain a defense-in-depth PII scan gate'
 )
+// 3b 自 #829 起按 REQUIRED_PRODUCTION_GATES 数组循环持久化（PII + 打印机在线两道闸门），
+// awk 以 -v key= 传键名；下面三条断言守住的仍是同一件事：PII 闸门必在清单里、
+// 精确/带空格/export/重复写法全部归一、写入值恰为 KEY=true 且不回显受保护的 .env。
+const requiredGatesArray = releaseScript.match(/REQUIRED_PRODUCTION_GATES=\(([\s\S]*?)\)/)
+assert.ok(requiredGatesArray, 'release script must declare REQUIRED_PRODUCTION_GATES=( ... )')
+assert.match(
+  requiredGatesArray[1],
+  /^\s*PRINT_REQUIRE_PII_SCAN\s*$/m,
+  'REQUIRED_PRODUCTION_GATES must still contain the PII scan gate'
+)
 assert.ok(
   releaseScript.includes(
-    '/^[[:space:]]*(export[[:space:]]+)?PRINT_REQUIRE_PII_SCAN[[:space:]]*=/ {'
+    '$0 ~ ("^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=") {'
   ),
-  'release script must canonicalize exact, spaced, exported, and duplicate PII gate entries'
+  'release script must canonicalize exact, spaced, exported, and duplicate gate entries for every required key'
 )
 assert.match(
   releaseScript,
-  /print "PRINT_REQUIRE_PII_SCAN=true"/,
-  'release script must persist the required PII scan gate without printing the protected env file'
+  /print key "=true"/,
+  'release script must persist each required gate as KEY=true without printing the protected env file'
 )
 const releasePiiGateOffset = releaseScript.indexOf(
   'if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then'

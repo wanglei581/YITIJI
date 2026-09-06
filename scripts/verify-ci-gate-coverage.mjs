@@ -52,6 +52,9 @@ const exemptionsPath = join(repoRoot, 'scripts/ci-gate-exemptions.json')
 // 只增不减：删除任何一条都等于降低标准。
 const REQUIRED_COMMANDS = [
   'node scripts/verify-deploy-authorization-gate.mjs',
+  // 生产闸门 ↔ 部署脚本持久化清单同步（2026-09-06 事故）：#790 加闸门、部署脚本没跟，
+  // 发布走完备份/构建/迁移后 API 启动即拒、pm2 崩溃循环。钉在这里，不许被悄悄摘掉。
+  'pnpm verify:deploy-gates-in-sync',
   'pnpm --filter @ai-job-print/miniapp verify:static',
   'pnpm run verify:task-runner-wake',
   'pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness',

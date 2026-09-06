@@ -191,4 +191,47 @@ pm2 set pm2-logrotate:compress true
 
 执行时一处插曲：删发布树时 SSH 被服务端断开一次，但删除已在断开前完成（重连核验：发布树剩 0、API 200）。后续步骤加 `ServerAliveInterval` 后无异常。
 
-**仍未动**：第二档（pnpm store prune、`/root/YITIJI` 源码检出）、第三档（数据库备份、密钥）、两个 `/root` 下的明文凭据文件（去留待产品负责人本人操作）。重新部署到最新 main 仍需发布窗口。
+**仍未动**：第二档（pnpm store prune、`/root/YITIJI` 源码检出）、第三档（数据库备份、密钥）、两个 `/root` 下的明文凭据文件（去留待产品负责人本人操作）。
+
+## 八、重新部署事故记录（2026-09-06，产品负责人批准「现在就做」后执行）
+
+清盘后按 `deploy-unfreeze-runbook-2026-08-17.md` 走 CI 流水线发布 `35af2263b`（线上原 `771d53e2`，落后 243 个提交）。**发布走完了全部步骤后在最后一步失败，线上 API 中断约 3 小时，最终一行 env 修复，未回滚。**
+
+### 时间线（UTC+8）
+
+| 时刻 | 事件 |
+|---|---|
+| 11:27 | 预检全过（Redis PONG、备份空间 25 GB、pg_dump 16.14、`ls-remote` 通、API `status:ok`）；设 `DEPLOY_API_ENABLED=true` |
+| 11:42 | deploy run `34009244783` 启动：`pg_dump` + `pg_restore -l` 校验、运行目录备份、构建、迁移「All migrations have been successfully applied」 |
+| 11:44 | 第 8 步 PM2 重启后健康检查失败，run 报 failure。**此时环境已换成新版**（runbook §2.1 描述的最坏时点） |
+| 11:44–14:40 | pm2 崩溃循环 17 次；`/api/v1/health` 无响应；三个前台仍由 nginx 提供**旧版**静态文件（脚本在拷 dist 之前已退出） |
+| ~14:40 | 读 `ai-job-print-api-error.log` 定位根因（见下）；往运行目录 `.env` 追加 `PRINT_REQUIRE_PRINTER_ONLINE=true`；`pm2 restart --update-env` |
+| 14:45 | `/api/v1/health` 200 `status:ok`；`/health/ready` 200（该端点旧版没有，证明新代码在跑）；pm2 `online`，负载 0；`DEPLOY_SOURCE=35af2263b` |
+
+### 根因
+
+```
+[FATAL] API_BOOTSTRAP_FAILED —— 服务未启动，端口未监听。
+Error: PRODUCTION_PRINT_PRINTER_ONLINE_REQUIRED: NODE_ENV=production 时
+PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或故障时不得建单收款）
+    at assertProductionRuntimeGates (production-runtime-gates.ts:228)
+```
+
+#790（硬件链路十项，2026-09-05）给 `production-runtime-gates.ts` 加了这条 fail-closed 闸门——闸门本身正确，是「打印机离线时不得收款」的资损底线。**错在 `deploy-api-release.sh` 的 3b 步骤只持久化 `PRINT_REQUIRE_PII_SCAN` 一个键**，加闸门的 PR 没有同步教会部署脚本；线上 `.env` 缺这一行，新 API 一启动就按设计拒绝。两处清单各自维护、没人比对。
+
+这条是**我（Claude）在 #790 引入的**：加了启动期闸门，没改部署流水线。
+
+### 为什么修前进而不是回滚
+
+- 根因是一行缺失的 env，不是代码缺陷；补上即可，5 秒。
+- 迁移全部 additive（发布前逐条扫过，零 DROP/DELETE/TRUNCATE），回滚运行目录后旧代码本可跑，但会丢掉 35 个提交的修复，且修完同一个缺口后还得再发一次。
+- 备份锚点（`pre-35af2263b…dump` 3.5 MB + `.runtime`）完好，若修前进失败仍可回退。
+
+### 遗留与后续
+
+- **前端未更新**：脚本在健康检查处退出，未执行「拷 dist + reload nginx」。当前状态 = 新 API + 旧前端。处置：按 runbook 重跑目标提交的 CI 让流水线完整跑一遍（服务器已在目标 SHA 时会跳过拉取；迁移无变化；再备份一次约 1.1 GB）。
+- **防复发**：3b 改为按 `REQUIRED_PRODUCTION_GATES` 数组循环持久化；新增 `verify:deploy-gates-in-sync` 门禁在 CI 里比对闸门源码与脚本清单（变异测试：数组删一键 → 红）；runbook §2 补 2.0 前置项。
+- **探测教训**：事故中我从本机打公网 `https://120.48.13.190.sslip.io` 全部 `000`，一度误判主机不可达；实为本机 DNS 把 `sslip.io` 解析到 `198.18.1.0`（RFC 2544 基准段）。改走 `http://120.48.13.190/api/v1/health`（:80 按 IP）才拿到真相。公网复验时不要信 sslip 域名，按 IP 打。
+- **SSH 断连**：崩溃循环期间 SSH 会话多次被服务端关闭；加 `ServerAliveInterval=5 ServerAliveCountMax=2` 且把命令拆短后稳定。
+
+第二、三档与凭据文件仍未动。

@@ -56,6 +56,30 @@ deploy.yml   job 级 if：  vars.DEPLOY_API_ENABLED == 'true'
 
 ## 2. 第 0 步：前置检查（不能省）
 
+### 2.0 确认运行目录 `.env` 含全部生产闸门键（2026-09-06 补，实测栽过）
+
+**为什么**：`production-runtime-gates.ts` 在 `NODE_ENV=production` 下对若干 env 做 fail-closed
+校验——不是 `'true'` 就**拒绝启动**。部署脚本 3b 会把这些键写进运行目录 `.env`，
+但**只写它清单里有的那几个**；闸门新增而清单没跟上时，新 API 会在 PM2 重启后立刻退出。
+
+**后果**：与 §2.1 同一类最坏时点——pg_dump、运行目录备份、rsync、迁移全部做完，
+健康检查失败，pm2 崩溃循环，线上 API 中断。2026-09-06 发布 `35af2263b` 就是这样：
+#790 加了 `PRINT_REQUIRE_PRINTER_ONLINE` 闸门，3b 仍只持久化 `PRINT_REQUIRE_PII_SCAN`，
+崩溃循环 17 次，直到手工往 `.env` 补一行。
+
+**现在的机械保障**：CI 里 `verify:deploy-gates-in-sync` 会把闸门源码要求显式为 true 的键
+与脚本 3b 的 `REQUIRED_PRODUCTION_GATES` 数组做集合比对，不一致直接红。但它保护的是
+**脚本**；线上 `.env` 现状仍要在发布前看一眼：
+
+```bash
+# 期望两行都在且都为 true；缺哪个就先补哪个，再发
+grep -E '^PRINT_REQUIRE_(PII_SCAN|PRINTER_ONLINE)=true' /srv/ai-job-print/services/api/.env
+```
+
+> 新增一个「必须为 true」的生产闸门时，**同一个 PR** 必须改三处：
+> `production-runtime-gates.ts`、`deploy-api-release.sh` 的 `REQUIRED_PRODUCTION_GATES`、本节的 grep。
+> 少改脚本那一处，`verify:deploy-gates-in-sync` 会拦；少改本节只是文档过期，不致命。
+
 ### 2.1 确认服务器 Redis 在跑
 
 **为什么**：`deploy-api-release.sh` 第 8 步健康检查是 `grep -q '"status":"ok"'`。
