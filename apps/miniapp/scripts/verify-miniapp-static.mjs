@@ -835,10 +835,14 @@ if (
   aiRecordsJs.includes("route: '/pages/job-fit/job-fit'") &&
   aiRecordsJs.includes("route: '/pages/career-plan/career-plan'") &&
   aiRecordsJs.includes('api.deleteMyAiRecord(record.id)') &&
-  !aiRecordsJs.includes("key: 'interview'") &&
+  aiRecordsJs.includes("key: 'interview'") &&
+  aiRecordsJs.includes('getMyMockInterviews') &&
+  aiRecordsJs.includes('deleteMyMockInterview') &&
+  apiJs.includes('getMyMockInterviews') &&
+  apiJs.includes('/me/mock-interviews') &&
   jobFitJs.includes('historyTaskId') && jobFitJs.includes('api.getJobFit(this.data.taskId') &&
   careerPlanJs.includes('historyTaskId') && careerPlanJs.includes('api.getCareerPlan(this.data.taskId')
-) ok('AI 服务记录支持真实结果回看与删除')
+) ok('AI 服务记录支持真实结果回看与删除，模拟面试分区来自 /me/mock-interviews')
 else bad('AI 服务记录闭环', '缺少真实类型筛选、已有结果页跳转、会员历史读取或删除入口')
 
 if (

@@ -60,12 +60,11 @@ test('default contract module never registers BullMQ processor, controller, or r
     (provider as { provide?: unknown }).provide === CONTRACT_REVIEW_REPORT_ENABLED
   )) as { useFactory: () => boolean } | undefined
   assert.ok(reportFlag)
+  assert.equal(reportFlag.useFactory(), true)
   const previous = process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
   delete process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
-  assert.equal(reportFlag.useFactory(), false)
-  process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = 'TRUE'
-  assert.equal(reportFlag.useFactory(), false)
-  process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = 'true'
+  assert.equal(reportFlag.useFactory(), true)
+  process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = 'false'
   assert.equal(reportFlag.useFactory(), true)
   if (previous === undefined) delete process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
   else process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = previous

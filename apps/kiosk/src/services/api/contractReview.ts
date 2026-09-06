@@ -258,6 +258,39 @@ export async function createContractReviewReport(
   })
 }
 
+export interface ContractReviewKeepView {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  expiresAt: string
+  retentionPolicy: 'months_3'
+  savedToDocuments: true
+  allowedRetentionPolicies: Array<'system_short' | 'months_3'>
+}
+
+/** 本人确认后把风险提示报告保存到「我的文档」（90 天，不可打印）。 */
+export async function keepContractReviewReport(
+  id: string,
+  access: ContractReviewAccess,
+): Promise<ContractReviewKeepView> {
+  if (API_MODE !== 'http') {
+    return {
+      fileId: 'mock-contract-report-001',
+      filename: 'AI签约风险提示报告.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 42_800,
+      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      retentionPolicy: 'months_3',
+      savedToDocuments: true,
+      allowedRetentionPolicies: ['system_short', 'months_3'],
+    }
+  }
+  return call<ContractReviewKeepView>(`/contract-reviews/${id}/report/keep`, access, {
+    method: 'POST',
+  })
+}
+
 /** 放弃尚未创建 PrintTask 的报告；凭证不具备合同或报告读取权限。 */
 export async function abandonContractReviewReport(
   fileId: string,

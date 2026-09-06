@@ -20,6 +20,9 @@
     <view wx:if="{{phase === 'failed'}}" class="qa-state">
       <text class="ficon i-info qa-fail-ic"></text>
       <text class="state-tip">{{failMsg}}</text>
+      <view class="btn teal tap qa-back-btn {{practiceBusy ? 'qa-btn-loading' : ''}}" bindtap="tapPracticeSheet">
+        {{practiceBusy ? '正在生成题目单…' : '打印通用题目单'}}
+      </view>
       <view class="btn ghost tap qa-back-btn" bindtap="tapQuit">返回</view>
     </view>
 
@@ -38,9 +41,17 @@
           value="{{myAnswer}}"
           bindinput="inputAnswer"
           maxlength="600"
-          disabled="{{phase === 'submitting'}}"
+          disabled="{{phase === 'submitting' || recStatus === 'recording' || recStatus === 'transcribing'}}"
         />
         <view class="word-count">{{myAnswer.length}}/600</view>
+        <view wx:if="{{voiceAvailable}}" class="qa-voice">
+          <view wx:if="{{recStatus !== 'recording'}}" class="btn ghost tap qa-voice-btn" bindtap="tapVoice">
+            {{recStatus === 'transcribing' ? '正在转写…' : '语音作答'}}
+          </view>
+          <view wx:else class="btn teal tap qa-voice-btn" bindtap="tapStopVoice">结束录音</view>
+        </view>
+        <view wx:else class="qa-voice-off">没有麦克风权限，请用文字作答</view>
+        <view wx:if="{{recError}}" class="qa-voice-err">{{recError}}</view>
       </view>
     </block>
 
@@ -49,7 +60,11 @@
     <text class="ficon i-info n-ic"></text>
     <view>题目由 AI 根据岗位需求生成，综合评价将在面试结束后统一呈现。</view>
   </view>
-  <view class="actionbar">
+  <view class="actionbar col">
+    <label class="qa-omit" wx:if="{{phase === 'running' || phase === 'submitting'}}">
+      <checkbox checked="{{omitPrintAnswers}}" bindchange="toggleOmit" color="#0f766e" />
+      <text>不打印我的回答</text>
+    </label>
     <view wx:if="{{phase === 'running'}}" class="btn primary tap w-full" bindtap="tapSubmit">提交回答</view>
     <view wx:if="{{phase === 'submitting'}}" class="btn primary w-full qa-btn-loading">提交中…</view>
   </view>

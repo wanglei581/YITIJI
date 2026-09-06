@@ -139,8 +139,7 @@ export class ContractReviewReportFileService {
       record.mimeType === REPORT_MIME &&
       record.sensitiveLevel === CONTRACT_REVIEW_REPORT_FILE_POLICY.sensitiveLevel &&
       record.visibility === CONTRACT_REVIEW_REPORT_FILE_POLICY.visibility &&
-      record.retentionPolicy === CONTRACT_REVIEW_REPORT_FILE_POLICY.retentionPolicy &&
-      record.retentionLockedReason === 'contract_review_session_only' &&
+      isKeepableReportRetention(record.retentionPolicy, record.retentionLockedReason) &&
       record.endUserId === args.endUserId &&
       record.ownerType === (args.endUserId ? 'user' : 'system') &&
       record.ownerId === args.endUserId &&
@@ -171,6 +170,75 @@ export class ContractReviewReportFileService {
       return null
     }
     return this.toView(record, pages)
+  }
+
+  /**
+   * 本人确认保存：months_3、解锁、延长到期。合同原件策略不变。
+   * 幂等：已 keep 的报告直接返回当前元数据。
+   */
+  async keep(args: {
+    fileId: string
+    endUserId: string
+  }): Promise<{
+    fileId: string
+    filename: string
+    mimeType: string
+    sizeBytes: number
+    expiresAt: Date
+  }> {
+    const record = await this.prisma.fileObject.findUnique({ where: { id: args.fileId } })
+    if (
+      !record ||
+      record.deletedAt ||
+      record.status !== 'active' ||
+      record.purpose !== 'contract_review_report' ||
+      record.endUserId !== args.endUserId
+    ) {
+      throw invalidReport('CONTRACT_REVIEW_REPORT_NOT_FOUND', '合同风险提示报告不存在或已过期')
+    }
+    const now = new Date()
+    const alreadyKept =
+      record.retentionPolicy === 'months_3' &&
+      record.retentionLockedReason == null &&
+      record.expiresAt != null &&
+      record.expiresAt.getTime() > now.getTime()
+    if (alreadyKept && record.expiresAt) {
+      return {
+        fileId: record.id,
+        filename: record.filename,
+        mimeType: record.mimeType,
+        sizeBytes: record.sizeBytes,
+        expiresAt: record.expiresAt,
+      }
+    }
+    const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
+    const updated = await this.prisma.fileObject.update({
+      where: { id: record.id },
+      data: {
+        retentionPolicy: 'months_3',
+        retentionLockedReason: null,
+        retentionSetBy: 'user',
+        retentionConsentAt: now,
+        expiresAt,
+      },
+      select: {
+        id: true,
+        filename: true,
+        mimeType: true,
+        sizeBytes: true,
+        expiresAt: true,
+      },
+    })
+    if (!updated.expiresAt) {
+      throw invalidReport('CONTRACT_REVIEW_REPORT_RETENTION_INVALID', '合同风险提示报告到期时间无效')
+    }
+    return {
+      fileId: updated.id,
+      filename: updated.filename,
+      mimeType: updated.mimeType,
+      sizeBytes: updated.sizeBytes,
+      expiresAt: updated.expiresAt,
+    }
   }
 
   private toView(
@@ -276,4 +344,15 @@ function sha256(buffer: Buffer): string {
 
 function invalidReport(code: string, message: string): BadRequestException {
   return new BadRequestException({ error: { code, message } })
+}
+
+function isKeepableReportRetention(
+  retentionPolicy: string | null,
+  retentionLockedReason: string | null,
+): boolean {
+  const sessionOnly =
+    retentionPolicy === CONTRACT_REVIEW_REPORT_FILE_POLICY.retentionPolicy &&
+    retentionLockedReason === 'contract_review_session_only'
+  const kept = retentionPolicy === 'months_3' && retentionLockedReason == null
+  return sessionOnly || kept
 }

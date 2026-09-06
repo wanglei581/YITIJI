@@ -41,7 +41,8 @@ assert.doesNotMatch(processing, /useLocation|location\.state|state:\s*\{[^}]*acc
 assert.match(result, /readContractReviewSession\(user\?\.id \?\? null\)/)
 assert.match(result, /clearContractReviewSession\(\)/)
 assert.doesNotMatch(result, /useLocation|location\.state/)
-assert.match(result, /报告打印暂未开放/)
+assert.match(result, /保存到我的文档/)
+assert.doesNotMatch(result, /打印风险提示报告|报告打印暂未开放/)
 
 assert.match(notice, /刷新、关闭页面或切换用户会结束本次查看/)
 assert.match(notice, /当前合同和结果无法从此终端恢复/)

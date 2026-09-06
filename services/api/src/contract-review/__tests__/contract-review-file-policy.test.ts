@@ -186,6 +186,13 @@ test('contract upload is locked to an exact two-hour system session', () => {
     allowedPoliciesForFile({ purpose: 'contract_upload', assetCategory: 'original' }),
     ['system_short']
   )
+  assert.deepEqual(
+    allowedPoliciesForFile({ purpose: 'contract_review_report', assetCategory: 'derived' }),
+    ['system_short', 'months_3']
+  )
+  assert.ok(
+    !allowedPoliciesForFile({ purpose: 'contract_review_report', assetCategory: 'derived' }).includes('long_term'),
+  )
 })
 
 test('FilesService ignores weaker or longer client policy attempts for contract uploads', async () => {
@@ -637,7 +644,7 @@ test('contract scans map to contract_upload', () => {
   assert.equal(SCAN_TYPE_TO_PURPOSE.document, 'print_doc')
 })
 
-test('member document queries exclude contract originals, reports, and locked session derivatives', async () => {
+test('member document queries exclude contract originals and locked session derivatives; kept reports are listed', async () => {
   const whereClauses: Array<Record<string, unknown>> = []
   const prisma = {
     fileObject: {
@@ -658,7 +665,7 @@ test('member document queries exclude contract originals, reports, and locked se
   assert.equal(whereClauses.length, 2)
   for (const where of whereClauses) {
     assert.deepEqual(where.purpose, {
-      notIn: ['signature_image', 'contract_upload', 'contract_review_report'],
+      notIn: ['signature_image', 'contract_upload'],
     })
     assert.match(JSON.stringify(where), /contract_review_session_only/)
   }

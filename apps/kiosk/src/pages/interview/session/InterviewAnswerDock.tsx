@@ -42,6 +42,8 @@ interface InterviewAnswerDockProps {
   onSkip: () => void
   onSubmitText: () => void
   onFinish: () => void
+  omitPrintAnswers: boolean
+  onOmitPrintAnswersChange: (value: boolean) => void
 }
 
 export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
@@ -49,7 +51,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
     micError, error, voiceLocked, busyTurn, phase, mode, voice, recordSec, maxRecordSec,
     draft, voiceAvailable, micBlockedReason, onRecheckMic, onDraftChange, onReviewChange,
     onReviewSubmit, onRetryVoice, onStopRecording, onUseText, onUseVoice, onSkip,
-    onSubmitText, onFinish,
+    onSubmitText, onFinish, omitPrintAnswers, onOmitPrintAnswersChange,
   } = props
   const answerStatus =
     phase === 'done_suggest' ? '本场已完成'
@@ -82,6 +84,14 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
       )}
       {error && !micError && <p className="interview-session__error" role="alert">{error}</p>}
 
+      <label className="interview-session__omit-print">
+        <input
+          type="checkbox"
+          checked={omitPrintAnswers}
+          onChange={(event) => onOmitPrintAnswersChange(event.target.checked)}
+        />
+        <span>不打印我的回答（报告仍可在屏幕上回看问答摘录）</span>
+      </label>
       {phase === 'done_suggest' ? (
         <Button size="lg" className="interview-session__primary-action" disabled={voiceLocked} onClick={onFinish}>
           <FileTextIcon aria-hidden="true" />结束并生成练习报告

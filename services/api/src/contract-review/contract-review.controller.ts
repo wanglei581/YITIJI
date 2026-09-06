@@ -97,6 +97,12 @@ export class ContractReviewController {
     return ApiResponse.ok(await this.lifecycle.createReport(id, await this.requesterOf(req)))
   }
 
+  @Post(':id/report/keep')
+  @Throttle({ default: { ttl: 60_000, limit: 4 } })
+  async keepReport(@Param('id') id: string, @Req() req: RequestLike) {
+    return ApiResponse.ok(await this.lifecycle.keepReport(id, await this.requesterOf(req)))
+  }
+
   @Delete('reports/:fileId')
   @Throttle({ default: { ttl: 60_000, limit: 8 } })
   async abandonReport(@Param('fileId') fileId: string, @Req() req: RequestLike) {

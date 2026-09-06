@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
+import type { InterviewQaExcerpt } from './interview-qa-excerpt'
 import type { InterviewReportPayload } from './mock-interview-llm.service'
 
 // ============================================================
@@ -30,7 +31,11 @@ export function registerInterviewCjkFont(doc: PDFKit.PDFDocument): boolean {
 export class InterviewReportPdfService {
   private readonly logger = new Logger(InterviewReportPdfService.name)
 
-  async render(meta: { position: string; industry: string; interviewerLabel: string; date: string }, report: InterviewReportPayload): Promise<{ buffer: Buffer; pageCount: number }> {
+  async render(
+    meta: { position: string; industry: string; interviewerLabel: string; date: string },
+    report: InterviewReportPayload,
+    qa?: { excerpts: InterviewQaExcerpt[]; includeAnswers: boolean },
+  ): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
     // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
     applyAigcPdfMetadata(doc, {
@@ -90,6 +95,23 @@ export class InterviewReportPdfService {
 
     title('十、面试前准备清单')
     report.checklist.forEach((c) => doc.fontSize(10.5).fillColor('#374151').text(`□ ${c}`, { lineGap: 4 }))
+
+    if (qa && qa.excerpts.length > 0) {
+      title('十一、问答摘录')
+      if (!qa.includeAnswers) {
+        doc.fontSize(10).fillColor('#b45309').text('按你的选择，本打印件不含回答转写，只列出题目。', { lineGap: 4 })
+      }
+      qa.excerpts.forEach((item, i) => {
+        doc.fontSize(10.5).fillColor('#111827').text(`${i + 1}. ${item.question}`, { lineGap: 2 })
+        if (!qa.includeAnswers) return
+        if (item.skipped) {
+          doc.fontSize(10).fillColor('#6b7280').text('   回答：（跳过）', { lineGap: 4 })
+          return
+        }
+        const answer = item.answerExcerpt?.trim() ? item.answerExcerpt : '（未作答）'
+        doc.fontSize(10).fillColor('#374151').text(`   回答：${answer}`, { lineGap: 4 })
+      })
+    }
 
     // pageCount 必须在 end() 之前读取（pdfkit 行为）
     const pageCount = doc.bufferedPageRange().count

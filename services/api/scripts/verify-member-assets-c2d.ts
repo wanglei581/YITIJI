@@ -184,6 +184,21 @@ async function main() {
     await mkResult(t1, 'optimize', userA.id)
     const rowGenA = await mkResult(t2, 'generate', userA.id)
     await mkResult(t3, 'parse', userB.id)
+    const fairTask = `c2dfair_${suffix}`
+    await prisma.aiResumeResult.create({
+      data: {
+        taskId: fairTask,
+        kind: 'fair_visit_plan',
+        status: 'completed',
+        provider: 'mock',
+        payloadJson: JSON.stringify({
+          basedOn: { resume: true, fairId: `fair_${suffix}`, fairName: '春季招聘会', companyCount: 3, positionCount: 10 },
+          secretShouldNotLeak: 'payload-secret',
+        }),
+        endUserId: userA.id,
+        expiresAt: future,
+      },
+    })
 
     const uploaded = await files.upload({
       buffer: Buffer.from(`%PDF-1.4 c2d verify ${suffix}\n%%EOF`),
@@ -222,7 +237,15 @@ async function main() {
       fail(`AI 记录 kind 不全: ${[...kinds].join(',')}`)
     }
     if (aItems.some((a) => a['kind'] === 'generate' && a['taskId'] === t2) === false) fail('generate 记录缺失')
-    pass('3. /me/ai-records：parse / optimize / generate 三种 kind 如实区分')
+    const fairRow = aItems.find((a) => a['kind'] === 'fair_visit_plan' && a['taskId'] === fairTask)
+    const fairRef = fairRow?.['ref'] as { type?: string; id?: string; name?: string } | undefined
+    if (!fairRow || fairRef?.type !== 'job_fair' || fairRef.id !== `fair_${suffix}` || fairRef.name !== '春季招聘会') {
+      fail(`fair_visit_plan 未输出窄 ref: ${JSON.stringify(fairRow)}`)
+    }
+    if (JSON.stringify(fairRow).includes('payload-secret') || 'payloadJson' in fairRow) {
+      fail('listAiRecords 不得回传 payload')
+    }
+    pass('3. /me/ai-records：parse / optimize / generate 三种 kind 如实区分，fair_visit_plan 只带 fairId/fairName')
 
     // ── 4. 游标分页：封顶 / 非法 400 / 遍历不重不漏 / total 真实 ────────────
     const favSeed = Array.from({ length: 55 }, (_, i) => ({

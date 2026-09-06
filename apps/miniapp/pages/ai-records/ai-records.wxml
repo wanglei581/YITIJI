@@ -68,7 +68,7 @@
       <view class="empty-slot">
         <text class="ficon i-robot es-ic"></text>
         <view class="es-t">暂无 AI 服务记录</view>
-        <view class="es-d">使用简历诊断、优化、岗位匹配或职业规划后可在此回看</view>
+        <view class="es-d">使用简历诊断、优化、模拟面试、岗位匹配或职业规划后可在此回看</view>
       </view>
     </view>
 

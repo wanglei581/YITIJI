@@ -382,6 +382,8 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
   'apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx',
+  // 包 J 第 1 次（2026-09-06）：模拟面试记录分区拆分组件。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx',
   'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
   'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
   'apps/kiosk/src/pages/profile/me/activityPresentation.ts',

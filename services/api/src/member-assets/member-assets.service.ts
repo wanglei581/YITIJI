@@ -4,6 +4,7 @@ import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common
 import type {
   MemberAiRecordItem,
   MemberAiRecordPage,
+  MemberAiRecordRef,
   MemberAssetPage,
   MemberDeletedDocumentActorKind,
   MemberDeletedDocumentItem,
@@ -99,7 +100,7 @@ export class MemberAssetsService {
   ): Promise<MemberAssetPage<MemberDocumentItem>> {
     const where = {
       ...isVisibleMemberFileWhere(endUserId, new Date()),
-      purpose: { notIn: ['signature_image', 'contract_upload', 'contract_review_report'] },
+      purpose: { notIn: ['signature_image', 'contract_upload'] },
       AND: [
         {
           OR: [
@@ -144,6 +145,7 @@ export class MemberAssetsService {
       // 必要的临时访问能力：会员带本人 token 调既有端点换取 TTL 受控签名 URL。
       downloadUrlPath: `/files/${f.id}/download-url`,
       previewUrlPath: `/files/${f.id}/preview-url`,
+      reprintable: f.purpose !== 'contract_review_report',
     }))
   }
 
@@ -211,6 +213,7 @@ export class MemberAssetsService {
           provider: true,
           createdAt: true,
           expiresAt: true,
+          payloadJson: true,
         },
         ...memberPageArgs(page),
       }),
@@ -250,6 +253,7 @@ export class MemberAssetsService {
       provider: r.provider,
       createdAt: r.createdAt.toISOString(),
       expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
+      ref: r.kind === 'fair_visit_plan' ? parseFairVisitPlanRef(r.payloadJson) : null,
     }))
     const qaRecords: MemberQaRecordItem[] = qaRows.map((row) => ({
       id: row.id,
@@ -384,4 +388,18 @@ function qaTitleOf(payloadJson: string, topic: string): string {
   }
   const fallback = topic.trim()
   return fallback ? fallback.slice(0, 80) : '问答要点'
+}
+
+/** 只抽出 basedOn.fairId / fairName，任何其它 payload 字段都不外露。 */
+function parseFairVisitPlanRef(payloadJson: string | null | undefined): MemberAiRecordRef | null {
+  if (!payloadJson) return null
+  try {
+    const parsed = JSON.parse(payloadJson) as { basedOn?: { fairId?: unknown; fairName?: unknown } }
+    const id = typeof parsed?.basedOn?.fairId === 'string' ? parsed.basedOn.fairId.trim() : ''
+    if (!id) return null
+    const name = typeof parsed?.basedOn?.fairName === 'string' ? parsed.basedOn.fairName.trim() : ''
+    return { type: 'job_fair', id, name: name || '招聘会' }
+  } catch {
+    return null
+  }
 }

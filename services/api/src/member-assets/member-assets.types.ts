@@ -40,6 +40,8 @@ export interface MemberDocumentItem {
   expiresAt: string | null
   downloadUrlPath: string
   previewUrlPath: string
+  /** false = 高敏报告等禁止进入打印链路，前端不得展示重新打印。 */
+  reprintable: boolean
 }
 
 export type MemberDeletedDocumentStorageState = 'removed' | 'pending' | 'unknown'
@@ -57,6 +59,12 @@ export interface MemberDeletedDocumentItem {
   storageObjectState: MemberDeletedDocumentStorageState
 }
 
+export interface MemberAiRecordRef {
+  type: 'job_fair'
+  id: string
+  name: string
+}
+
 export interface MemberAiRecordItem {
   id: string
   taskId: string
@@ -65,6 +73,8 @@ export interface MemberAiRecordItem {
   provider: string
   createdAt: string
   expiresAt: string | null
+  /** 仅 fair_visit_plan：从 payload.basedOn 抽出的窄字段，不回传 payload。 */
+  ref?: MemberAiRecordRef | null
 }
 
 export interface MemberQaRecordItem {

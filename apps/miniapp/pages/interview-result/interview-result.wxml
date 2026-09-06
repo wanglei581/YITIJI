@@ -87,6 +87,15 @@
         </view>
       </view>
 
+      <view wx:if="{{qaExcerpts.length}}" class="ri-section">
+        <view class="rs-title">问答摘录</view>
+        <view wx:if="{{omitPrintNote}}" class="rs-text" style="margin-bottom:16rpx">你选择了不把回答印进打印件。下面仍可在屏幕上回看。</view>
+        <view wx:for="{{qaExcerpts}}" wx:key="question" class="ri-pred-item">
+          <view class="rp-q">{{index + 1}}. {{item.question}}</view>
+          <view class="rp-app">{{item.skipped ? '回答：（跳过）' : ('回答：' + (item.answerExcerpt || '（未作答）'))}}</view>
+        </view>
+      </view>
+
       <!-- 面试前行动清单 -->
       <view wx:if="{{checklist.length > 0}}" class="ri-section">
         <view class="rs-title">面试前行动清单</view>

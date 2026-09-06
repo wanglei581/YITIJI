@@ -172,7 +172,6 @@ function makeOrderNo(): string {
  * 不在此列——它们由本机生成，不是用户手里可能夹带证件号的原件。
  */
 const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
-const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
 
 /**
  * 打印前隐私预检门控。默认关闭，由 PRINT_REQUIRE_PII_SCAN=true 显式开启；
@@ -220,9 +219,7 @@ export class PrintJobsService {
       })
     }
 
-    // 合同审查只允许打印系统生成的风险提示报告，原合同属于短期高敏原件，
-    // 即使调用方拿到了仍有效的内部签名 URL，也不得绕过合同审查页面直接建打印单。
-    // 报告哈希必须采用服务端落库值，不能信任 Kiosk 可篡改/遗漏的 fileMd5。
+    // 合同原件与签约风险报告均不得进入打印链路（2026-09-06 拍板：可保存、不打印）。
     const sourceFile = await this.prisma.fileObject.findUnique({
       where: { id: requestedFileId },
       select: { purpose: true, sha256: true, mimeType: true, filename: true },
@@ -239,16 +236,14 @@ export class PrintJobsService {
     let effectiveFileName = dto.fileName ?? sourceFile?.filename ?? null
     let trustedFileHash = dto.fileMd5 ?? ''
     if (sourceFile?.purpose === 'contract_review_report') {
-      if (!SHA256_HEX_PATTERN.test(sourceFile.sha256)) {
-        throw new BadRequestException({
-          error: {
-            code: 'PRINT_CONTRACT_REPORT_INVALID',
-            message: '合同风险提示报告校验信息无效，请重新生成后再打印',
-          },
-        })
-      }
-      trustedFileHash = sourceFile.sha256
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_CONTRACT_REPORT_FORBIDDEN',
+          message: '签约风险提示报告不可打印。本人确认后可保存到「我的文档」查看或删除，不进入打印链路。',
+        },
+      })
     }
+    const trustedFileHash = dto.fileMd5 ?? ''
 
     // 招聘会资料 bridge 被下架/禁打/删除后，已确认任务可保留文件继续履约；
     // 旧 HMAC URL 不得借该保留窗口创建新任务。此检查只收紧已验签的标准 FileObject 路径。

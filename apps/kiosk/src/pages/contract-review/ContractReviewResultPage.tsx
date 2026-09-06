@@ -2,7 +2,7 @@
 // AI 签约风险提示结果页（步骤 3/3）
 //
 // 展示统计概览（优先核查 / 关注 / 信息不足）+ 各风险项详情。
-// 免责声明置顶，结果仅作参考；打印报告 / 完成操作。
+// 免责声明置顶，结果仅作参考；本人确认后可保存到我的文档，不可打印。
 // ============================================================
 
 import { useState } from 'react'
@@ -25,18 +25,14 @@ import {
   HomeIcon,
   InfoIcon,
   Loader2Icon,
-  PrinterIcon,
+  SaveIcon,
   Trash2Icon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
-import { deleteContractReview } from '../../services/api/contractReview'
+import { deleteContractReview, keepContractReviewReport } from '../../services/api/contractReview'
 import { ContractReviewSessionNotice } from './ContractReviewSessionNotice'
-import {
-  isContractReviewReportPrintEnabled,
-  prepareContractReviewReportPrint,
-} from './contractReviewReportPrintFlow'
 import {
   clearContractReviewSession,
   readContractReviewSession,
@@ -66,7 +62,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   offer_conditions: '录用条件',
 }
 
-const REPORT_PRINT_ENABLED = isContractReviewReportPrintEnabled()
+const KEEP_RETENTION_COPY =
+  '保存后仅本人可在「我的文档」查看，保存期限 90 天，可随时删除。报告不会进入打印链路，也不会发给企业或合作机构。合同原件仍按短期策略删除。'
 
 function PriorityBadge({ priority }: { priority: string }) {
   return (
@@ -151,30 +148,36 @@ export function ContractReviewResultPage() {
   const result = session?.result ?? null
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [showPrintConfirm, setShowPrintConfirm] = useState(false)
-  const [generatingReport, setGeneratingReport] = useState(false)
-  const [reportError, setReportError] = useState<string | null>(null)
+  const [showKeepConfirm, setShowKeepConfirm] = useState(false)
+  const [keeping, setKeeping] = useState(false)
+  const [keepError, setKeepError] = useState<string | null>(null)
+  const [keepDone, setKeepDone] = useState(false)
 
-  useBusyLock(deleting || generatingReport)
+  useBusyLock(deleting || keeping)
 
-  async function continueToReportPrint() {
-    if (!REPORT_PRINT_ENABLED || !session?.taskId || generatingReport) return
-    setGeneratingReport(true)
-    setReportError(null)
+  const canKeep = Boolean(user?.id && session?.taskId)
+  const keepDisabledReason = user?.id
+    ? null
+    : '保存到「我的文档」需要先登录本人会员账号'
+
+  async function continueKeep() {
+    if (!canKeep || keeping || !session?.taskId) return
+    setKeeping(true)
+    setKeepError(null)
     try {
-      const handoff = await prepareContractReviewReportPrint(session.taskId, {
+      const kept = await keepContractReviewReport(session.taskId, {
         token: getToken(),
         accessToken: session.accessToken,
       })
-      navigate('/print/confirm', {
-        replace: true,
-        state: handoff,
-      })
+      if (!kept.savedToDocuments) {
+        throw new Error('SAVE_NOT_CONFIRMED')
+      }
+      setKeepDone(true)
+      setShowKeepConfirm(false)
     } catch {
-      setShowPrintConfirm(false)
-      setReportError('风险提示报告生成或原合同清理未完成，请稍后重试。当前不会进入收费或打印流程。')
+      setKeepError('保存失败。请确认已登录后重试。当前不会进入打印或收费流程。')
     } finally {
-      setGeneratingReport(false)
+      setKeeping(false)
     }
   }
 
@@ -267,14 +270,18 @@ export function ContractReviewResultPage() {
             <Button
               size="lg"
               style={{ flex: 2 }}
-              disabled={!REPORT_PRINT_ENABLED || deleting || generatingReport}
-              title={REPORT_PRINT_ENABLED ? '生成并打印 AI 风险提示报告' : '合同审查报告文件尚未开放'}
-              onClick={() => setShowPrintConfirm(true)}
+              disabled={!canKeep || deleting || keeping || keepDone}
+              aria-disabled={!canKeep || undefined}
+              title={keepDisabledReason ?? (keepDone ? '已保存到我的文档' : '保存到我的文档')}
+              onClick={() => {
+                if (!canKeep) return
+                setShowKeepConfirm(true)
+              }}
             >
-              {generatingReport
+              {keeping
                 ? <Loader2Icon size={20} className="mr-2 animate-spin" />
-                : <PrinterIcon size={20} className="mr-2" />}
-              {REPORT_PRINT_ENABLED ? '打印风险提示报告' : '报告打印暂未开放'}
+                : <SaveIcon size={20} className="mr-2" />}
+              {keepDone ? '已保存到我的文档' : '保存到我的文档'}
             </Button>
             <Button
               size="lg"
@@ -296,10 +303,16 @@ export function ContractReviewResultPage() {
             <span>{deleteError}</span>
           </div>
         )}
-        {reportError && (
+        {keepError && (
           <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
             <AlertCircleIcon />
-            <span>{reportError}</span>
+            <span>{keepError}</span>
+          </div>
+        )}
+        {!canKeep && keepDisabledReason && (
+          <div className="cr-disclaimer-banner" role="status">
+            <InfoIcon />
+            <span>{keepDisabledReason}</span>
           </div>
         )}
         {session && <ContractReviewSessionNotice expiresAt={session.expiresAt} />}
@@ -448,44 +461,41 @@ export function ContractReviewResultPage() {
         </KioskPageFrame>
       </main>
       <KioskModal
-        title="确认打印风险提示报告"
-        open={showPrintConfirm}
-        onClose={() => !generatingReport && setShowPrintConfirm(false)}
+        title="保存到我的文档"
+        open={showKeepConfirm}
+        onClose={() => !keeping && setShowKeepConfirm(false)}
         actions={
           <div style={{ display: 'flex', gap: 16 }}>
             <Button
               variant="ghost"
-              disabled={generatingReport}
-              onClick={() => setShowPrintConfirm(false)}
+              disabled={keeping}
+              onClick={() => setShowKeepConfirm(false)}
               style={{ flex: 1 }}
             >
-              暂不打印
+              暂不保存
             </Button>
             <Button
-              disabled={generatingReport}
-              onClick={() => void continueToReportPrint()}
+              disabled={keeping}
+              onClick={() => void continueKeep()}
               style={{ flex: 2 }}
             >
-              {generatingReport
+              {keeping
                 ? <Loader2Icon size={18} className="animate-spin mr-1" />
-                : <PrinterIcon size={18} className="mr-1" />}
-              生成报告并查看报价
+                : <SaveIcon size={18} className="mr-1" />}
+              确认保存 90 天
             </Button>
           </div>
         }
       >
         <div className="cr-confirm-modal">
           <div className="cr-confirm-modal__info">
-            只生成并打印 AI 风险提示报告，不打印合同原件。报告生成成功后，系统会优先清理原合同。
+            {KEEP_RETENTION_COPY}
           </div>
           <div>
-            <div className="cr-confirm-modal__row"><span>打印内容</span><span>风险提示报告</span></div>
-            <div className="cr-confirm-modal__row"><span>默认参数</span><span>黑白 · A4 · 单面 · 1 份</span></div>
-            <div className="cr-confirm-modal__row"><span>费用</span><span>下一步由服务端报价</span></div>
+            <div className="cr-confirm-modal__row"><span>保存位置</span><span>我的文档（仅本人）</span></div>
+            <div className="cr-confirm-modal__row"><span>保存期限</span><span>90 天，可随时删除</span></div>
+            <div className="cr-confirm-modal__row"><span>打印</span><span>不可打印</span></div>
           </div>
-          <p style={{ fontSize: 17, color: 'var(--muted)', lineHeight: 1.55 }}>
-            报告可能包含敏感条款摘要，请在机器旁等待并及时取走纸张。进入打印确认后放弃，系统会请求立即删除尚未建单的报告。
-          </p>
         </div>
       </KioskModal>
     </KioskFullscreenShell>

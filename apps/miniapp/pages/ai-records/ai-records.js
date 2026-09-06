@@ -13,8 +13,8 @@ const KIND_META = {
   // fairId 在路径里），而 /me/ai-records 只 select 了 id/taskId/kind，**不带招聘会标识**。
   // 硬接上会让「查看结果」点进去撞「缺少招聘会参数」——比诚实的说明更糟。
   // 等后端记录带上 fairId 再接。
-  fair_visit_plan: { type: 'career',  title: '招聘会规划',  icon: 'i-calendar',    tone: 'wheat', route: '',
-                     noRouteReason: '招聘会规划要从对应的那场招聘会进入才能打开；服务端的记录列表不带招聘会标识，所以这里无法直接跳转。你可以在「求职 → 招聘会」里找到那场招聘会再进。' },
+  fair_visit_plan: { type: 'career',  title: '招聘会规划',  icon: 'i-calendar',    tone: 'wheat',
+                     route: '/pages/fair-visit-plan/fair-visit-plan' },
   self_assessment: { type: 'career',  title: '自我探索',   icon: 'i-form',        tone: 'wheat', route: '/pages/self-explore/self-explore' },
 }
 
@@ -47,13 +47,16 @@ function timeLabel(iso) {
 function mapRecord(item) {
   const meta = KIND_META[item.kind] || { type: 'other', title: item.kind || 'AI 服务', icon: 'i-robot', tone: 'wheat', route: '' }
   const status = item.status || ''
-  const canOpen = status === 'completed' && Boolean(meta.route)
+  const ref = item.ref && item.ref.type === 'job_fair' ? item.ref : null
+  const fairId = ref && typeof ref.id === 'string' ? ref.id : ''
+  const canOpen = status === 'completed' && Boolean(meta.route) && (item.kind !== 'fair_visit_plan' || Boolean(fairId))
+  const title = item.kind === 'fair_visit_plan' && ref && ref.name ? `${meta.title} · ${ref.name}` : meta.title
   return {
     id: String(item.id || ''),
     taskId: String(item.taskId || ''),
     kind: item.kind || '',
     type: meta.type,
-    title: meta.title,
+    title,
     day: dayLabel(item.createdAt),
     time: timeLabel(item.createdAt),
     status,
@@ -61,9 +64,34 @@ function mapRecord(item) {
     icon: meta.icon,
     tone: meta.tone,
     route: meta.route,
+    fairId,
     canOpen,
-    noRouteReason: meta.noRouteReason || '',
+    noRouteReason: item.kind === 'fair_visit_plan' && !fairId
+      ? '这场招聘会规划没有对应的招聘会标识，无法直接打开。'
+      : (meta.noRouteReason || ''),
     actionLabel: canOpen ? '查看结果' : '查看状态',
+    source: 'ai',
+  }
+}
+
+function mapInterview(item) {
+  return {
+    id: `interview:${item.sessionId}`,
+    sessionId: String(item.sessionId || ''),
+    kind: 'mock_interview',
+    type: 'interview',
+    title: item.position ? `模拟面试 · ${item.position}` : '模拟面试',
+    day: dayLabel(item.createdAt),
+    time: timeLabel(item.createdAt),
+    status: item.hasReport ? 'completed' : 'failed',
+    statusLabel: item.hasReport ? '已完成' : '无报告',
+    icon: 'i-form',
+    tone: 'plum',
+    route: '/pages/interview-result/interview-result',
+    canOpen: Boolean(item.hasReport && item.sessionId),
+    noRouteReason: '',
+    actionLabel: item.hasReport ? '查看报告' : '查看状态',
+    source: 'interview',
   }
 }
 
@@ -90,6 +118,7 @@ Page({
       { key: 'job', label: '岗位匹配' },
       // 这一组现在装的是职业规划 / 招聘会规划 / 自我探索，没有一项是「评估」。
       { key: 'career', label: '规划探索' },
+      { key: 'interview', label: '模拟面试' },
     ],
     groups: [],
     loginRequired: false,
@@ -127,7 +156,18 @@ Page({
       const cursor = append ? this._nextCursor : null
       const list = await api.getMyAiRecords({ pageSize: 50, ...(cursor ? { cursor } : {}) })
       const page = (list || []).map(mapRecord)
-      this._all = append ? [...this._all, ...page] : page
+      let interviews = this._interviews || []
+      if (!append) {
+        try {
+          const iv = await api.getMyMockInterviews({ pageSize: 50 })
+          interviews = (iv || []).map(mapInterview)
+        } catch (_) {
+          interviews = []
+        }
+        this._interviews = interviews
+      }
+      const merged = append ? [...this._all.filter((r) => r.source !== 'interview'), ...page] : page
+      this._all = [...merged, ...interviews]
       this._nextCursor = (list && list.nextCursor) || null
       this._applyFilter(this.data.activeFilter)
       this.setData({ loading: false })
@@ -163,6 +203,16 @@ Page({
     const record = this._all.find((item) => item.id === String(e.currentTarget.dataset.id || ''))
     if (!record) return
     if (record.canOpen) {
+      if (record.source === 'interview') {
+        wx.navigateTo({ url: `${record.route}?sessionId=${encodeURIComponent(record.sessionId)}` })
+        return
+      }
+      if (record.kind === 'fair_visit_plan') {
+        wx.navigateTo({
+          url: `${record.route}?fairId=${encodeURIComponent(record.fairId)}&taskId=${encodeURIComponent(record.taskId)}`,
+        })
+        return
+      }
       wx.navigateTo({ url: `${record.route}?taskId=${encodeURIComponent(record.taskId)}` })
       return
     }
@@ -195,7 +245,10 @@ Page({
           success: (modal) => {
             if (!modal.confirm) return
             wx.showLoading({ title: '正在删除…', mask: true })
-            api.deleteMyAiRecord(record.id)
+            const del = record.source === 'interview'
+              ? api.deleteMyMockInterview(record.sessionId)
+              : api.deleteMyAiRecord(record.id)
+            del
               .then(() => {
                 wx.hideLoading()
                 wx.showToast({ title: '已删除', icon: 'success' })

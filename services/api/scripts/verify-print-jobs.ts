@@ -255,18 +255,15 @@ async function main() {
       '1a. 合同审查原件签名 URL → 拒绝直接创建打印任务',
     )
 
-    const reportCreated = await printJobs.create({
-      fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
-      fileMd5: 'client-supplied-hash-must-not-win',
-      fileName: 'AI签约风险提示报告.pdf',
-    }, { terminalId })
-    createdTaskIds.push(reportCreated.taskId)
-    const reportTask = await prisma.printTask.findUnique({ where: { id: reportCreated.taskId } })
-    if (reportTask?.fileMd5 === reportSha256) {
-      pass('1b. 合同风险提示报告 → PrintTask 强制使用服务端 SHA-256')
-    } else {
-      fail(`1b. 合同报告哈希未采用服务端值: ${reportTask?.fileMd5 ?? 'missing'}`)
-    }
+    await expectCode(
+      () => printJobs.create({
+        fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
+        fileMd5: 'client-supplied-hash-must-not-win',
+        fileName: 'AI签约风险提示报告.pdf',
+      }, { terminalId }),
+      'PRINT_CONTRACT_REPORT_FORBIDDEN',
+      '1b. 合同风险提示报告建打印单 → 400 PRINT_CONTRACT_REPORT_FORBIDDEN',
+    )
 
     await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: 'invalid-server-hash' } })
     await expectCode(
@@ -274,8 +271,8 @@ async function main() {
         fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
         fileMd5: reportSha256,
       }, { terminalId }),
-      'PRINT_CONTRACT_REPORT_INVALID',
-      '1c. 合同风险提示报告缺少有效服务端 SHA-256 → fail-closed',
+      'PRINT_CONTRACT_REPORT_FORBIDDEN',
+      '1c. 合同风险提示报告即使哈希无效也一律禁止打印',
     )
     await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: reportSha256 } })
 
