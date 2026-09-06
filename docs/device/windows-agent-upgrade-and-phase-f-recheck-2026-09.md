@@ -1,0 +1,198 @@
+# Windows 一体机 Agent 升级 + Phase F 复验执行单（2026-09）
+
+> 版本：安装包 `main@5bff1bc42`（CI run `34026906605`）· 线上 API `891492396`（含 #833 可信终端身份总闸门）
+> 执行人：____ · 核对人：____ · 日期：____
+> 本单是「到了机器旁按序做什么」；通过标准与勾选项仍以
+> [production-deployment-and-windows-host-checklist.md §五](./production-deployment-and-windows-host-checklist.md)、
+> [windows-field-recheck-phase-f-runbook.md](./windows-field-recheck-phase-f-runbook.md)、
+> [production-agent-onboarding.md](./production-agent-onboarding.md) 为准。两边不一致时以被引用文档为准。
+> 每项必须记证据（脱敏截图、任务 ID、日志行、时间）；未做的项不画勾。
+
+## 为什么要做这一单
+
+- 线上 API 已于 2026-09-06 17:37 受控发布到 `891492396`，其中 #833 要求 Kiosk 先从本机 Agent 取 60 秒启动票、再向云端换 30 分钟会话令牌；`POST /print/jobs`、`GET /terminals/:id/config`、`POST /terminals/:id/toolbox-events` 三条接口无令牌即 401。
+- 终端 `t_ksk_001` 最后心跳 2026-08-31 23:42（北京时间），线上 `isOnline=false`。机器上跑的 8 月版 Agent 没有 `/local/terminal-boot-ticket`，即使开机，Kiosk 建单也会在退避 60 秒后显示「终端安全校验失败，请联系现场工作人员」。
+- 2026-07-25 的 Phase F 通过是旧契约下的结论，不能继承。
+
+## 0. 前置与授权
+
+- [ ] 已取得现场执行授权（本机 Windows 主机 + 奔图打印机），知道发布窗口与回滚联系人。
+- [ ] 有管理员后台账号，能打开「终端管理」页对 `KSK-001` 做「进入维护 / 生成绑定码 / 恢复运行 / 停用 / 启用」。
+- [ ] 安装包已取到（在有 `gh` 的机器上执行，**9 月 13 日产物过期**）：
+
+  ```bash
+  gh run download 34026906605 -n terminal-agent-unsigned-installer-candidates -D ./agent-5bff1bc42
+  ```
+
+  包内用到：`AIJobPrintTerminalSetup.exe`（首选）、`AIJobPrintAgent.msi`（备用）、`candidate-identity.json`（记录来源提交）。产物**未签名**，SmartScreen 会拦一次，属预期。
+- [ ] 测试 PDF：1 页、无个人信息。
+- [ ] 不用本单练 close-unpaid、退款或「紧急吊销凭证」；不把绑定码、Agent token、桥接令牌贴进聊天、工单或仓库。
+
+## 1. 动手前盘点（只读，全部记回执）
+
+在一体机用**管理员 PowerShell**：
+
+```powershell
+Get-Service | Where-Object { $_.Name -match 'AIJob|PrintAgent|Terminal' } | Format-List Name, DisplayName, Status, StartType
+sc.exe qc aijobprintagent.exe
+```
+
+- [ ] **A1 安装方式**：看 `BINARY_PATH_NAME`。指向 `C:\Program Files\AIJobPrintAgent\...` 记「EXE/MSI 安装」；指向仓库目录 `...\apps\terminal-agent\...` 记「仓库目录运行」（2026-07-27 回执是后者）。这决定第 2 节走 2A 还是 2B。
+- [ ] **A2 配置位置**：`%ProgramData%\AIJobPrintAgent\agent-config.json` 是否存在；仓库目录 `apps\terminal-agent\config\agent-config.json` 是否存在。只看 `terminalId` / `terminalCode` / `printerName` / `apiBaseUrl` 四个字段，**不要打开或复制 `agent.token`**。
+- [ ] **A3 打印机真实名**：
+
+  ```powershell
+  Get-Printer | Select-Object Name, DriverName, PortName, PrinterStatus | Format-Table -AutoSize
+  ```
+
+  记下名字，后面绑定向导里按序号选它。红线：代码和配置只能走 `printerName`，不得硬编码型号。
+- [ ] **A4 本机打印队列为空**：`Get-PrintJob -PrinterName "<A3 记下的名字>"` 无结果。
+- [ ] **A5 云端无在途任务**：管理员后台订单页确认 `KSK-001` 没有 `pending / claimed / printing`。有的话先处理完，否则第 2 节的「进入维护 → 生成绑定码」会被 `TERMINAL_IN_FLIGHT_TASKS` 拒绝。
+- [ ] **A6 为什么 8 月 31 日之后没心跳**：看服务当前状态和 `%ProgramData%\AIJobPrintAgent\logs\` 或仓库目录日志最后几行，把原因写进回执（关机、服务停了、断网、其他）。这是独立问题，升级不会自动解释它。
+
+## 2. 升级 Agent
+
+### 2A 仓库目录运行 → 换成 EXE 安装（当前预期路径）
+
+1. 停并卸载旧服务（在仓库 `apps\terminal-agent` 目录）：
+
+   ```powershell
+   node dist\index.js uninstall-service
+   Get-Service | Where-Object { $_.Name -match 'AIJob|PrintAgent|Terminal' }
+   ```
+
+   期望第二条为空。若 `uninstall-service` 报错，用 `sc.exe stop aijobprintagent.exe` + `sc.exe delete aijobprintagent.exe`，并把报错原文写进回执。新旧服务 SCM 名相同，**不清掉旧的不能装新的**。
+2. 管理员后台「终端管理」→ `KSK-001` → **进入维护**（填操作原因）。已激活终端只有在 `maintenance` 下才允许生成换机绑定码。
+3. 同页 → **生成绑定码**。明文只显示一次，记在纸上，不截图外发。
+4. 双击 `AIJobPrintTerminalSetup.exe` 安装。装完服务应为 Stopped / Manual，这是设计如此（未绑定前 fail-closed）。
+5. 开始菜单「AI Job Print Terminal」→ 运行 `provision\provision-terminal.cmd`（或安装目录 `C:\Program Files\AIJobPrintAgent\provision\provision-terminal.cmd`）。向导会：列出打印机让你按序号选（选 A3 那个）、提示输入绑定码、把 API 固定为 `https://zyidai.cn/api/v1`、把 Kiosk 来源固定为 `https://zyidai.cn`、DPAPI 保存 token、收紧 ProgramData ACL、启动服务并校验心跳。
+   - 绑定成功会使云端 `credentialGeneration +1`，旧 token 立即作废。这正是想要的：机器上只剩一份凭证。
+   - 报 `TERMINAL_MAINTENANCE_REQUIRED`：第 2 步没做。报 `TERMINAL_IN_FLIGHT_TASKS`：回到 A5。
+6. 管理员后台 → `KSK-001` → **恢复运行**。在途任务不为 0 会被拒，先排空。
+7. 若之前启用过 U 盘 / 扫码桥接令牌，按 [production-agent-onboarding.md](./production-agent-onboarding.md) 用 `configure-local-bridge-token.ps1` 重配；本单不验 U 盘。
+
+### 2B 已是 EXE/MSI 安装 → 同机升级
+
+1. 管理员后台 → **进入维护**，确认在途任务 0（升级不得覆盖运行中的 Agent，这是 MSI 设计 §4.2 的硬要求）。
+2. 双击新的 `AIJobPrintTerminalSetup.exe`。Major Upgrade 保留 `%ProgramData%` 下的配置、DPAPI token、SQLite，**不需要重新绑定**。
+3. `Get-Service aijobprintagent.exe` 为 Running；不是就 `Start-Service aijobprintagent.exe` 并看日志。
+4. 管理员后台 → **恢复运行**。
+
+### 2C 升级后即时核对（两条路径都做）
+
+- [ ] 服务 Running + Automatic（或符合现场策略）。
+- [ ] 本机回环只听 127.0.0.1：
+
+  ```powershell
+  netstat -ano | findstr LISTENING | findstr ":9527"
+  ```
+
+- [ ] 新版特征接口存在（**不带 Origin、不带查询串、空 body**，这是给看门狗用的）：
+
+  ```powershell
+  Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:9527/local/terminal-boot-ticket" -TimeoutSec 4 | ConvertTo-Json
+  ```
+
+  期望：`success=true`，`data.bootTicket` 为 32 到 128 位字符串，`data.expiresInSeconds=60`。旧版 Agent 这里是 404，这就是新旧的分水岭。票 60 秒过期且一次性，这张测试票不会被复用，不用管。
+- [ ] 从 Mac 只读旁证（本机 `*.sslip.io` 被劫持，公网一律 `--resolve`）：
+
+  ```bash
+  curl -s --resolve zyidai.cn:443:120.48.13.190 https://zyidai.cn/api/v1/terminals/t_ksk_001/printer-status
+  ```
+
+  期望 `isOnline=true`，`lastSeenAt` 为当前时间，`printerStatus=ready`。
+- [ ] 管理员后台终端行显示在线；「版本观察」若有计划则显示 `0.4.11`，没有计划显示「版本未验证」也算正常（那只是版本字符串对照，不是制品验真）。
+
+## 3. Kiosk 看门狗
+
+- [ ] 查现有计划任务：`Get-ScheduledTask -TaskName AIJobPrintKioskWatchdog`。没有则注册（管理员 PowerShell）：
+
+  ```powershell
+  & "C:\Program Files\AIJobPrintAgent\kiosk\register-kiosk-watchdog.ps1" -Url https://zyidai.cn/ -StartNow
+  ```
+
+  或在「终端控制中心」窗口点「注册 Kiosk 看门狗」。计划任务只带公网 URL，不带任何凭据。
+- [ ] 已有旧任务的：旧任务指向的是旧 `kiosk-watchdog.ps1` 路径吗？`(Get-ScheduledTask AIJobPrintKioskWatchdog).Actions` 看 `-File` 参数。指向仓库目录或旧安装目录就先 `-Unregister` 再重新注册，否则拉起的浏览器永远没有票。
+- [ ] 看门狗日志 `%LOCALAPPDATA%\AIJobPrintKiosk\watchdog.log` 最新一行应为：
+
+  ```text
+  started kiosk browser pid=... exe=... bootTicket=True
+  ```
+
+  `bootTicket=False` 表示取票失败，往上翻 `boot ticket attempt N failed` 看原因，回到 2C。
+
+## 4. Phase F 复验（新契约）
+
+### F1 服务与驱动名
+
+- [ ] `Get-Service aijobprintagent.exe`：Running / Automatic。
+- [ ] `%ProgramData%\AIJobPrintAgent\agent-config.json` 的 `printerName` 与 A3 完全一致。
+
+### F2 Kiosk 会话建立
+
+- [ ] Kiosk 全屏页正常进入首页，地址栏（若能看到）**不含** `boot_ticket=`（页面兑换后会用 `history.replaceState` 抹掉）。
+- [ ] 进到打印确认页：按钮不是「安全校验中…」也不是「终端安全校验失败」，页面无黄色告警条。
+- [ ] 首页设备状态显示在线 / 就绪（允许首帧「检查中」）。
+
+### F3 真机出纸（受控 1 页）
+
+- [ ] 走 Kiosk 既有上传或扫码上传路径，打 1 页无个人信息 PDF（FREE_MODE 下 0 元）。
+- [ ] 任务 `pending → claimed → printing → completed`，纸真出来，`Get-PrintJob` 队列空。记 `taskId`、订单号、耗时。
+- [ ] 不为验收造未支付 pending 单。
+- 今日不便出纸：回执写「F3 跳过：原因」，本单不得标通过。
+
+### F4 停用即拒（吊销验证，不动凭证）
+
+- [ ] 管理员后台 → `KSK-001` → 关闭「启用」开关（确认弹窗）。
+- [ ] Kiosk 上再点一次建单：应立即显示「终端安全校验失败，请联系现场工作人员」，**不**转圈 60 秒（#833 评审已把业务 401 从可重试里拆出来）。
+- [ ] 后台重新打开「启用」。会话令牌未被轮换，无需重新绑定。
+- [ ] 关掉 Kiosk 浏览器窗口（或 `taskkill /IM msedge.exe /F`），看门狗 3 秒内带新票重新拉起，重复 F2。
+- 说明：不要用「紧急吊销凭证」做这一项。它会把终端转为「已暂停」并作废 token，之后必须重走 2A 第 2 到 6 步。
+
+### F5 Agent 掉线自愈（无人值守场景）
+
+- [ ] `Stop-Service aijobprintagent.exe`，然后关掉 Kiosk 浏览器。
+- [ ] 看门狗日志出现 `boot ticket unavailable after automatic retry window; launching without ticket`，浏览器仍被拉起，打印确认页显示「终端安全校验失败」。这是 fail-closed，不是故障。
+- [ ] `Start-Service aijobprintagent.exe`。**不碰浏览器**，30 秒内日志出现 `local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket`，浏览器自动重启，重复 F2 通过。记从启动服务到页面可用的秒数。
+
+### F6 断网恢复（约 3 分钟）
+
+- [ ] 拔网线或断 Wi-Fi 60 到 90 秒。Mac 侧 `printer-status` 的 `lastSeenAt` 停更或 `isOnline=false`。
+- [ ] 恢复网络，不重启服务：心跳恢复，`isOnline=true`。
+- [ ] Kiosk 页在断网期间点建单应得到中文提示，不是原始英文错误。
+- [ ] 网络恢复后再点建单。两种结果都要如实记：① 直接能建单；② 显示「终端安全校验失败」。② 是代码里已知的口子：断网期间若恰好撞上 10 分钟主动续签或某次 401 刷新，60 秒退避耗尽后会话进入 `failed`，页面不会再自动恢复，看门狗也不会重启它（它只盯无票启动的浏览器）。现场处理：关掉浏览器让看门狗带新票重拉。出现 ② 就在回执里写明断网时长与是否点过建单，回来定是否要补自动恢复。
+
+### F7 Kiosk 全屏抽查
+
+- [ ] Edge/Chrome Kiosk 全屏无系统弹窗阻断主路径；无 SmartScreen 或更新提示残留。
+
+## 5. 可选：小程序到出纸闭环（B3）
+
+时间允许再做，按 [next-tasks.md](../progress/next-tasks.md)「B3 Windows + 奔图真机验收」的口径：小程序建单 → 到机码或扫码 → 支付 → Agent claim → 出纸 → 进度回流；覆盖错码、错终端、未支付、过期、连点不重复出纸。这条走 Agent 的 claim 接口，#833 没改它，但也没在新版 API 上验过。留 orderId / taskId / 出纸照片。
+
+## 6. 回执模板
+
+```text
+WINDOWS AGENT 升级 + Phase F 复验回执（2026-09）
+安装包：5bff1bc42 / run 34026906605 / candidate-identity.json 已核对 = 是|否
+A1 安装方式：仓库目录|EXE/MSI    A6 8/31 后断心跳原因：____
+2 升级路径：2A|2B   绑定：成功|失败（错误码）   恢复运行：是|否
+2C boot-ticket 接口：200 + 60s = 是|否   printer-status isOnline=true：是|否
+3 看门狗：任务已注册 = 是|否   watchdog.log bootTicket=True = 是|否
+F1 服务 Running/Automatic：是|否   printerName 一致：是|否
+F2 Kiosk 会话就绪：通过|失败
+F3 真机出纸：通过（taskId ____）|跳过（原因）
+F4 停用即拒 + 启用后恢复：通过|失败
+F5 Agent 掉线自愈（秒数 ____）：通过|失败
+F6 断网恢复：通过|失败|未做
+F7 全屏抽查：通过|问题
+5 B3 闭环：通过（orderId ____）|未做
+说明：未造未支付单；未用紧急吊销；未贴任何 token / 绑定码
+```
+
+## 7. 边界声明
+
+- 本单只证明「新契约下 Kiosk 与 Agent 能建立会话并出纸」。以下仍是**未验收**，通过本单也不得改口：双面长边/短边实际翻页方向、本地驱动控制彩色、卡纸 / 缺纸 / 缺粉恢复、扫描仪进件、身份证复印、U 盘导入、Windows Assigned Access 专用会话。
+- 打印参数继续只开放 `black_white + simplex + pagesPerSheet=1`。
+- 安装包未经企业 Authenticode 签名，本单不构成正式发布或批量部署授权。
+- 回执收到后，只勾 checklist §五中**已举证**的子项；F3 没出纸则 §5.6 保持打开。
