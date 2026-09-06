@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { RefreshCwIcon } from 'lucide-react'
 import type { PartnerDataSource, PartnerSyncLog, SyncDataType, SyncResult } from '../../services/api'
 import { getDataSources, getSyncLogs } from '../../services/api'
@@ -68,7 +68,7 @@ export default function SyncLogsPage() {
 
   if (loading && logs.length === 0) {
     return (
-      <Page title="同步日志" subtitle="加载中...">
+      <Page title="同步日志" subtitle={withFrontendHint('加载中...', FRONTEND_HINT.none)}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -78,7 +78,7 @@ export default function SyncLogsPage() {
 
   if (error && logs.length === 0) {
     return (
-      <Page title="同步日志" subtitle="加载失败">
+      <Page title="同步日志" subtitle={withFrontendHint('加载失败', FRONTEND_HINT.none)}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <RefreshCwIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -88,7 +88,7 @@ export default function SyncLogsPage() {
   }
 
   return (
-    <Page title="同步日志" subtitle="数据源同步任务记录">
+    <Page title="同步日志" subtitle={withFrontendHint('数据源同步任务记录', FRONTEND_HINT.none)}>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <select
           className="h-9 rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-700"

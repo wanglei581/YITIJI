@@ -277,6 +277,49 @@ export interface PaginatedResult<T> {
   pagination: { page: number; pageSize: number; total: number; totalPages: number }
 }
 
+export interface PartnerListPaging {
+  page: number
+  pageSize: number
+}
+
+/**
+ * 数据源 endpoint 的 query 不得携带凭证。只看**参数名**（不是整段 query 子串）：
+ * `?foo=monkey` 不能因为值里含 "key" 被误拒；参数名等于或以 token / key / secret / sign /
+ * signature / password 结尾（api_key、access-token 等）才算把凭证放进了地址。
+ */
+const CREDENTIAL_QUERY_KEY_RE = /(^|[_-])(token|key|secret|sign|signature|password|passwd|pwd)$/i
+
+export function endpointQueryContainsCredential(endpoint: string): boolean {
+  const query = extractUrlQuery(endpoint)
+  if (query.length === 0) return false
+  for (const key of new URLSearchParams(query).keys()) {
+    if (CREDENTIAL_QUERY_KEY_RE.test(key)) return true
+  }
+  return false
+}
+
+export function redactEndpointQueryCredentials(endpoint: string | null | undefined): string | undefined {
+  if (!endpoint) return undefined
+  if (!endpointQueryContainsCredential(endpoint)) return endpoint
+  try {
+    const url = new URL(endpoint)
+    url.search = ''
+    return url.toString()
+  } catch {
+    const q = endpoint.indexOf('?')
+    return q >= 0 ? endpoint.slice(0, q) : endpoint
+  }
+}
+
+function extractUrlQuery(endpoint: string): string {
+  try {
+    return new URL(endpoint).search
+  } catch {
+    const q = endpoint.indexOf('?')
+    return q >= 0 ? endpoint.slice(q) : ''
+  }
+}
+
 export interface SyncLogDto {
   id: string
   no: string
@@ -575,7 +618,7 @@ export function prismaJobSourceToPartnerDto(
     failCount: syncSummary?.failCount ?? 0,
     description: source.description ?? '',
     credentialConfigured: Boolean(source.encryptedCredential || source.webhookSecret),
-    endpoint: source.endpoint ?? undefined,
+    endpoint: redactEndpointQueryCredentials(source.endpoint),
     activationManagedBy: source.accessMode === 'api' || source.accessMode === 'webhook' ? 'admin' : 'partner',
   }
 }

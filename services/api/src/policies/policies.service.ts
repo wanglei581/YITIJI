@@ -140,13 +140,51 @@ export class PoliciesService {
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
 
-  async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.policyPost.findMany({
-      where: { sourceOrgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-    })
-    return rows.map(mapPolicy)
+  async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]>
+  async getPartnerPolicies(
+    user: AuthedUser,
+    query: { page: number; pageSize: number },
+  ): Promise<{ data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>
+  async getPartnerPolicies(
+    user: AuthedUser,
+    query?: { page: number; pageSize: number },
+  ): Promise<
+    | PolicyPostDto[]
+    | { data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }
+  > {
+    if (!user.orgId) {
+      if (!query) return []
+      return {
+        data: [],
+        pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
+      }
+    }
+    const where = { sourceOrgId: user.orgId }
+    if (!query) {
+      const rows = await this.prisma.policyPost.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      })
+      return rows.map(mapPolicy)
+    }
+    const [total, rows] = await Promise.all([
+      this.prisma.policyPost.count({ where }),
+      this.prisma.policyPost.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ])
+    return {
+      data: rows.map(mapPolicy),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    }
   }
 
   async createPartnerPolicy(dto: CreatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto> {

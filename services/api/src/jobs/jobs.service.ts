@@ -152,8 +152,8 @@ export class JobsService {
     return this.partner.togglePartnerDataSource(id, user)
   }
 
-  getPartnerJobs(user: AuthedUser) {
-    return this.partner.getPartnerJobs(user)
+  getPartnerJobs(user: AuthedUser, query?: { page: number; pageSize: number }) {
+    return query ? this.partner.getPartnerJobs(user, query) : this.partner.getPartnerJobs(user)
   }
 
   importJobs(items: ImportJobItemDto[], user: AuthedUser) {
@@ -172,8 +172,8 @@ export class JobsService {
     return this.partner.updatePartnerJob(id, dto, user)
   }
 
-  getPartnerFairs(user: AuthedUser) {
-    return this.partner.getPartnerFairs(user)
+  getPartnerFairs(user: AuthedUser, query?: { page: number; pageSize: number }) {
+    return query ? this.partner.getPartnerFairs(user, query) : this.partner.getPartnerFairs(user)
   }
 
   importFairs(dto: ImportFairsDto, user: AuthedUser) {

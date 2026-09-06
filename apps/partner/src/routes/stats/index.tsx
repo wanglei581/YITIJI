@@ -42,7 +42,7 @@ import {
   InfoIcon,
   RefreshCwIcon,
 } from 'lucide-react'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import {
   getPartnerStats,
   type PartnerStatsResponse,
@@ -331,7 +331,7 @@ export default function StatsPage() {
   return (
     <Page
       title="数据统计"
-      subtitle="同步概况"
+      subtitle={withFrontendHint('同步概况', FRONTEND_HINT.none)}
       actions={<PeriodSelector value={period} onChange={setPeriod} />}
     >
       {state === 'loading' ? (

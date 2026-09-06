@@ -502,7 +502,7 @@ const LOADERS: Record<BlockKey, () => Promise<unknown>> = {
   printers: () => getPrinters().then((res) => res.printers),
   jobSources: () => getJobSources(),
   fairSources: () => getFairSources(),
-  files: () => listFiles({ limit: 100 }),
+  files: () => listFiles({ limit: 100 }).then((res) => res.items),
   aiUsage: () => getAiUsage(),
   auditLogs: () => getAuditLogs({ limit: 6, offset: 0 }).then((res) => res.items),
   printTasks: () => adminOpsService.listPrintTasks({ page: 1, pageSize: 5 }),

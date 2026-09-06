@@ -8,6 +8,9 @@ import type {
   PartnerFairRecord,
   PartnerSyncLogPage,
   PartnerSyncLogsQuery,
+  PartnerListQuery,
+  PartnerJobPage,
+  PartnerFairPage,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -165,8 +168,12 @@ export const partnerHttpAdapter = {
     patch<PartnerDataSource>(`/partner/data-sources/${encodeURIComponent(id)}/unarchive`, {}),
 
   // Jobs
-  getPartnerJobs: () =>
-    get<PartnerJobRecord[]>('/partner/jobs'),
+  getPartnerJobs: (query?: PartnerListQuery) => {
+    const params: Record<string, string> = {}
+    if (query?.page) params.page = String(query.page)
+    if (query?.pageSize) params.pageSize = String(query.pageSize)
+    return get<PartnerJobPage>('/partner/jobs', params)
+  },
   getPartnerJobQualitySummary: () =>
     get<PartnerJobQualitySummary[]>('/partner/jobs/quality-summary'),
   unpublishPartnerJob: (id: string) =>
@@ -179,8 +186,12 @@ export const partnerHttpAdapter = {
     post<ImportResult<PartnerJobRecord>>('/partner/jobs/import', { items }),
 
   // Fairs
-  getPartnerFairs: () =>
-    get<PartnerFairRecord[]>('/partner/fairs'),
+  getPartnerFairs: (query?: PartnerListQuery) => {
+    const params: Record<string, string> = {}
+    if (query?.page) params.page = String(query.page)
+    if (query?.pageSize) params.pageSize = String(query.pageSize)
+    return get<PartnerFairPage>('/partner/fairs', params)
+  },
   unpublishPartnerFair: (id: string) =>
     patch<PartnerFairRecord>(`/partner/fairs/${id}/publish`, { action: 'unpublish' }),
   // 阶段1C:编辑本机构招聘会(后端强制回 pending+draft 重审)

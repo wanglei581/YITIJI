@@ -8,6 +8,9 @@ import type {
   PartnerSyncLog,
   PartnerSyncLogPage,
   PartnerSyncLogsQuery,
+  PartnerListQuery,
+  PartnerJobPage,
+  PartnerFairPage,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -31,6 +34,9 @@ export type {
   PartnerSyncLog,
   PartnerSyncLogPage,
   PartnerSyncLogsQuery,
+  PartnerListQuery,
+  PartnerJobPage,
+  PartnerFairPage,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -48,7 +54,7 @@ export type {
 }
 
 export interface PartnerContentServiceInterface {
-  getPartnerJobs(): Promise<PartnerJobRecord[]>
+  getPartnerJobs(query?: PartnerListQuery): Promise<PartnerJobPage>
   getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]>
   unpublishPartnerJob(id: string): Promise<PartnerJobRecord>
   // 阶段1C:编辑本机构数据(后端强制回 pending+draft 重审)
@@ -56,7 +62,7 @@ export interface PartnerContentServiceInterface {
   // sourceOrgId / sourceName 由后端从 JWT 推断，不再由前端传入
   importPartnerJobs(items: ImportJobItem[]): Promise<ImportResult<PartnerJobRecord>>
 
-  getPartnerFairs(): Promise<PartnerFairRecord[]>
+  getPartnerFairs(query?: PartnerListQuery): Promise<PartnerFairPage>
   unpublishPartnerFair(id: string): Promise<PartnerFairRecord>
   updatePartnerFair(id: string, input: UpdatePartnerFairInput): Promise<PartnerFairRecord>
   importPartnerFairs(items: ImportFairItem[]): Promise<ImportResult<PartnerFairRecord>>
@@ -79,7 +85,7 @@ export interface PartnerContentServiceInterface {
 const adapter: PartnerContentServiceInterface =
   API_MODE === 'http' ? partnerHttpAdapter : partnerMockAdapter
 
-export const getPartnerJobs      = ()              => adapter.getPartnerJobs()
+export const getPartnerJobs      = (query?: PartnerListQuery) => adapter.getPartnerJobs(query)
 export const getPartnerJobQualitySummary = () => adapter.getPartnerJobQualitySummary()
 export const unpublishPartnerJob = (id: string)    => adapter.unpublishPartnerJob(id)
 export const updatePartnerJob    = (id: string, input: UpdatePartnerJobInput) =>
@@ -87,7 +93,7 @@ export const updatePartnerJob    = (id: string, input: UpdatePartnerJobInput) =>
 export const importPartnerJobs   = (items: ImportJobItem[]) =>
   adapter.importPartnerJobs(items)
 
-export const getPartnerFairs      = ()              => adapter.getPartnerFairs()
+export const getPartnerFairs      = (query?: PartnerListQuery) => adapter.getPartnerFairs(query)
 export const unpublishPartnerFair = (id: string)    => adapter.unpublishPartnerFair(id)
 export const updatePartnerFair    = (id: string, input: UpdatePartnerFairInput) =>
   adapter.updatePartnerFair(id, input)

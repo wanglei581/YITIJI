@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { mergeById, replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
 import type {
   PartnerJobRecord,
@@ -49,6 +49,7 @@ const FILTER_SELECTED_CLASS = 'border-primary-600 bg-primary-600 text-white'
 const FILTER_IDLE_CLASS = 'border-neutral-200 bg-surface text-neutral-700 hover:border-primary-600/40'
 const PARTNER_JOBS_REFRESH_KEY = 'partner:jobs'
 const PARTNER_JOB_QUALITY_REFRESH_KEY = 'partner:jobs:quality'
+const PAGE_SIZE = 20
 
 /** DB category('fulltime' 等)→ 编辑表单 workType('full_time' 等)。 */
 const CATEGORY_TO_WORKTYPE: Record<JobCategory, 'full_time' | 'part_time' | 'internship' | 'campus'> = {
@@ -135,18 +136,20 @@ export default function JobsPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [noticeIsError, setNoticeIsError] = useState(false)
   const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerJobRecord | null>(null)
+  const [page, setPage] = useState(1)
 
   function showNotice(msg: string, isError = false) {
     setNotice(msg)
     setNoticeIsError(isError)
   }
 
+  const jobsRefreshKey = `${PARTNER_JOBS_REFRESH_KEY}:${page}`
   const { data, status, refresh } = useRefreshable(
-    PARTNER_JOBS_REFRESH_KEY,
-    getPartnerJobs,
+    jobsRefreshKey,
+    () => getPartnerJobs({ page, pageSize: PAGE_SIZE }),
     {
       intervalMs: 60_000,
-      merge: mergeById<PartnerJobRecord>((item) => item.id),
+      merge: replaceIfChanged,
       failPolicy: 'keep-last',
     },
   )
@@ -160,7 +163,7 @@ export default function JobsPage() {
     },
   )
 
-  useInteractionLock(editing !== null || saving || busyId !== null || confirmUnpublish !== null, [PARTNER_JOBS_REFRESH_KEY, PARTNER_JOB_QUALITY_REFRESH_KEY], 'hard')
+  useInteractionLock(editing !== null || saving || busyId !== null || confirmUnpublish !== null, [jobsRefreshKey, PARTNER_JOB_QUALITY_REFRESH_KEY], 'hard')
 
   useEffect(() => {
     if (!notice) return
@@ -168,7 +171,9 @@ export default function JobsPage() {
     return () => clearTimeout(t)
   }, [notice])
 
-  const jobs = data ?? []
+  const jobs = data?.data ?? []
+  const total = data?.pagination.total ?? 0
+  const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
   const error = status === 'error' && jobs.length === 0
 
@@ -277,7 +282,7 @@ export default function JobsPage() {
 
   if (loading) {
     return (
-      <Page title="岗位信息管理" subtitle="加载中...">
+      <Page title="岗位信息管理" subtitle={withFrontendHint('加载中...', FRONTEND_HINT.jobs)}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -287,7 +292,7 @@ export default function JobsPage() {
 
   if (error) {
     return (
-      <Page title="岗位信息管理" subtitle="加载失败">
+      <Page title="岗位信息管理" subtitle={withFrontendHint('加载失败', FRONTEND_HINT.jobs)}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <BriefcaseIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -299,7 +304,7 @@ export default function JobsPage() {
   return (
     <Page
       title="岗位信息管理"
-      subtitle={`共 ${jobs.length} 条岗位`}
+      subtitle={withFrontendHint(`共 ${total} 条岗位`, FRONTEND_HINT.jobs)}
       actions={
         <div className="flex flex-col items-end gap-1">
           <Button
@@ -329,7 +334,7 @@ export default function JobsPage() {
         </div>
       )}
 
-      <JobQualitySummaryPanel qualitySummary={qualitySummary} jobCount={jobs.length} />
+      <JobQualitySummaryPanel qualitySummary={qualitySummary} jobCount={total} />
 
       {/* 双行筛选 */}
       <div className="mb-4 space-y-2">
@@ -446,6 +451,8 @@ export default function JobsPage() {
           </table>
         </div>
       </Card>
+
+      <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
       <p className="mt-3 text-xs text-neutral-400">
         本后台仅管理外部来源岗位链接，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的岗位需经管理员重新审核后才会在终端展示。
