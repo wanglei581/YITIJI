@@ -10,6 +10,14 @@ import type {
 } from '@ai-job-print/shared'
 import { RESUME_CONTENT_BLOCKS, RESUME_SCORING_DIMENSIONS } from '@ai-job-print/shared'
 
+export const EXPORT_CAPTURE_STATES = [
+  'export-ready',
+  'export-failed',
+  'pricing-charged',
+  'pricing-unavailable',
+] as const
+export type ExportCaptureState = (typeof EXPORT_CAPTURE_STATES)[number]
+
 export const REPORT_STATES = [
   'no-context',
   'loading',
@@ -20,17 +28,26 @@ export const REPORT_STATES = [
   'diagnose-failed',
   'unavailable',
   'illegal',
+  ...EXPORT_CAPTURE_STATES,
 ] as const
 export type ReportViewState = (typeof REPORT_STATES)[number]
 
-export const FIXTURE_STATES = ['report', 'report-minimal', 'report-empty'] as const
+export const FIXTURE_STATES = ['report', 'report-minimal', 'report-empty', ...EXPORT_CAPTURE_STATES] as const
 export type FixtureState = (typeof FIXTURE_STATES)[number]
 
 export const REPORT_SEGS = ['structure', 'issues', 'scores', 'conclusions'] as const
 export type ReportSeg = (typeof REPORT_SEGS)[number]
 
 export const TASK_ID_RE = /^[A-Za-z0-9_-]{1,24}$/
-export const EXPORT_UNAVAILABLE_REASON = '报告导出端点上线后开放'
+export const GUEST_TAKEAWAY_COPY = '登录后可存我的文档，本次可扫码带走'
+export const SAVED_TO_DOCUMENTS_COPY = '已存入我的文档'
+export const EXPORT_BEFORE_PRINT_COPY = '请先导出 PDF，成功后才能打印或扫码带走。'
+export const EXPORT_ERROR_COPY: Record<string, string> = {
+  AI_RESULT_NOT_READY: '诊断结果还没准备好，请稍后再导出。刷新本页或重新诊断后再试。',
+  RESUME_PDF_FONT_NOT_FOUND: '服务器缺少中文字体，已通知运维；你可以先打印原件或扫码保存。',
+  RESUME_EXPORT_UNAVAILABLE: '简历导出当前不可用（价目已停用，不是免费）。',
+  AI_TASK_NOT_FOUND: '找不到这份报告，可能已过期或无权查看。请从简历来源重新进入。',
+}
 export const TIER_RULE =
   '档位与严重度都由同一个分数机械分档：八成及以上（较强／低），一半到八成（中等／中），不足一半（偏弱／高）。它们不是新结论，也不是排名或通过率。'
 
@@ -64,6 +81,10 @@ export const REPORT_HEAD: Record<ReportViewState, { title: string; sub: string; 
   'diagnose-failed': { title: '简历诊断报告', sub: '解析中断，你上传的文件没有丢。', tag: '解析失败', rail: 1 },
   unavailable: { title: '简历诊断报告', sub: '这台机器还没有接通报告读取能力，不是你的简历有问题。', tag: '未接通', rail: 0 },
   illegal: { title: '简历诊断报告', sub: '地址里的参数不在登记范围内，已按不可用处理。', tag: '参数不合法', rail: 0 },
+  'export-ready': { title: '简历诊断报告', sub: '诊断报告 PDF 已生成，可打印或扫码带走。', tag: '导出已生成', rail: 2 },
+  'export-failed': { title: '简历诊断报告', sub: '这次没有生成文件，按钮不会假装成功。', tag: '导出失败', rail: 2 },
+  'pricing-charged': { title: '简历诊断报告', sub: '导出按次收费，没有可用权益时按钮不可用。', tag: '收费导出', rail: 2 },
+  'pricing-unavailable': { title: '简历诊断报告', sub: '导出当前不可用，不是免费。', tag: '导出不可用', rail: 2 },
 }
 
 export const REPORT_STATUS: Record<ReportViewState, { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }> = {
@@ -76,6 +97,10 @@ export const REPORT_STATUS: Record<ReportViewState, { tone: 'ok' | 'warn' | 'bad
   'diagnose-failed': { tone: 'bad', label: '解析失败' },
   unavailable: { tone: 'warn', label: '能力未接通' },
   illegal: { tone: 'warn', label: '参数不合法' },
+  'export-ready': { tone: 'ok', label: '导出已生成' },
+  'export-failed': { tone: 'bad', label: '导出失败' },
+  'pricing-charged': { tone: 'warn', label: '收费导出' },
+  'pricing-unavailable': { tone: 'warn', label: '导出不可用' },
 }
 
 export type ScoreTier = { word: '较强' | '中等' | '偏弱'; tone: 'ok' | 'mid' | 'low' }
@@ -122,6 +147,18 @@ function isBlk(value: string): value is ResumeContentBlockKey {
 }
 function isFixtureState(value: string): value is FixtureState {
   return (FIXTURE_STATES as readonly string[]).includes(value)
+}
+
+export function isExportCaptureState(value: string | null | undefined): value is ExportCaptureState {
+  return Boolean(value && (EXPORT_CAPTURE_STATES as readonly string[]).includes(value))
+}
+
+export function shouldSkipReportFetch(tech: boolean, urlState: ReportViewState | null): boolean {
+  return Boolean(tech && urlState)
+}
+
+export function showsReportBody(viewState: ReportViewState): boolean {
+  return viewState === 'report' || viewState === 'report-minimal' || isExportCaptureState(viewState)
 }
 
 export function parseReportSearch(search: string): ReportSearch {

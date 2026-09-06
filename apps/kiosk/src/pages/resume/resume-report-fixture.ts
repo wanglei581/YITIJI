@@ -1,4 +1,5 @@
-import type { ResumeContentBlock, ResumeIssue, ResumeReport } from '@ai-job-print/shared'
+import type { ResumeContentBlock, ResumeExportPricing, ResumeIssue, ResumeReport, ResumeReportExportResponse } from '@ai-job-print/shared'
+import { EXPORT_ERROR_COPY } from './resume-report-model'
 
 /** capture/debug 夹具。只在 ?capture=1 / ?debug=1 下可达，页面必须标「合成演示」。 */
 export const FIXTURE_REPORT: ResumeReport = {
@@ -127,3 +128,38 @@ export function fixtureReport(kind: 'full' | 'minimal' | 'empty'): ResumeReport 
     issues: FIXTURE_ISSUES,
   }
 }
+
+/** 最小合法 PDF，仅供 capture 夹具预览 / 二维码，标明合成演示。 */
+export const FIXTURE_PDF_DATA_URL =
+  'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0NvdW50IDEvS2lkc1szIDAgUl0+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA2MTIgNzkyXT4+CmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA2MyAwMDAwMCBuIAowMDAwMDAwMTI0IDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA0L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMjAzCiUlRU9GCg=='
+
+export const FIXTURE_EXPORT: ResumeReportExportResponse = {
+  fileId: 'capture-report-export',
+  filename: 'AI诊断报告_合成样本.pdf',
+  mimeType: 'application/pdf',
+  sizeBytes: 24576,
+  pageCount: 2,
+  signedUrl: FIXTURE_PDF_DATA_URL,
+  expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  printFileUrl: '/api/v1/files/capture-report-export/content',
+  savedToDocuments: false,
+  aiGenerated: true,
+}
+
+export const FIXTURE_PRICING_CHARGED: ResumeExportPricing = {
+  mode: 'charged',
+  unitCents: 500,
+  unit: 'item',
+  benefit: { available: 0, serviceType: 'resume_export' },
+  label: '每次导出 5.00 元',
+}
+
+export const FIXTURE_PRICING_UNAVAILABLE: ResumeExportPricing = {
+  mode: 'unavailable',
+  unitCents: 0,
+  unit: 'item',
+  benefit: null,
+  label: '简历导出当前不可用（价目已停用，不是免费）',
+}
+
+export const FIXTURE_EXPORT_ERROR = EXPORT_ERROR_COPY.AI_RESULT_NOT_READY
