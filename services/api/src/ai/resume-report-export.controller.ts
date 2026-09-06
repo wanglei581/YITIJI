@@ -10,7 +10,9 @@ import {
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
+import { createHash } from 'crypto'
 import { AuditService } from '../audit/audit.service'
+import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { FilesService } from '../files/files.service'
@@ -43,13 +45,14 @@ export class ResumeReportExportController {
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly privacy: MemberPrivacyService,
   ) {}
 
   @Post(':taskId/export')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async export(
     @Param('taskId') taskId: string,
-    @Body() body: { kind?: string } | undefined,
+    @Body() body: { kind?: string; benefitGrantId?: string | null } | undefined,
     @Req() req: ReqLike,
   ) {
     if (body?.kind !== 'diagnosis_report' && body?.kind !== 'change_list') {
@@ -57,10 +60,15 @@ export class ResumeReportExportController {
         error: { code: 'AI_EXPORT_KIND_INVALID', message: '导出类型仅支持诊断报告或修改清单' },
       })
     }
-    return this.exportAuthorized(taskId, body.kind as ResumeReportExportKind, await this.requesterOf(req))
+    return this.exportAuthorized(taskId, body.kind as ResumeReportExportKind, await this.requesterOf(req), body.benefitGrantId ?? null)
   }
 
-  private async exportAuthorized(taskId: string, kind: ResumeReportExportKind, requester: AiResultRequester) {
+  private async exportAuthorized(
+    taskId: string,
+    kind: ResumeReportExportKind,
+    requester: AiResultRequester,
+    benefitGrantId: string | null,
+  ) {
     const parse = await this.ai.getResumeRecord(taskId, requester)
     if (parse.status !== 'completed' || !parse.report) {
       throw new ConflictException({
@@ -74,7 +82,14 @@ export class ResumeReportExportController {
     })
     if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) throw this.notFound()
 
+    // 契约 2：导出前必须有 resume_ai 授权（会员），并过收费开关门禁（free 放行 / charged 核销 / unavailable 拒绝）。
+    // 门禁本身不扣次；只有文件真实生成后才 commit，生成失败不扣次。
+    if (row.endUserId) await this.privacy.requireActiveConsent(row.endUserId, 'resume_ai')
     const optimize = await this.loadExistingOptimize(taskId, row)
+    const contentHash = createHash('sha256')
+      .update(JSON.stringify({ kind, report: parse.report, modules: optimize?.modules ?? null }))
+      .digest('hex')
+    const decision = await this.ai.assertExportAllowed({ endUserId: row.endUserId, taskId, benefitGrantId, contentHash })
     const generatedAt = new Date()
     const rendered = await this.pdf.render({
       taskId,
@@ -97,6 +112,8 @@ export class ResumeReportExportController {
       sourceFileId,
       createdBy: 'ai_resume_diagnosis_export',
     })
+
+    await this.ai.commitExportRedemption(decision)
 
     await this.audit.write({
       actorId: null,

@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 507,
+    "endpointCount": 508,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
