@@ -59,8 +59,14 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
+  let failSessionInvalidation = false
+  let sessionInvalidationCalls = 0
   const redis = {
-    del: async () => 1,
+    del: async () => {
+      sessionInvalidationCalls += 1
+      if (failSessionInvalidation) throw new Error('simulated Redis unavailable')
+      return 1
+    },
     setJsonIfVersionNotOlder: async () => 'stored' as const,
   } as never
   const auth = new AuthService(
@@ -182,6 +188,34 @@ async function main() {
       await svc.setAccountStatus(orgId, accountId, 'enable', admin)
       await auth.login(username, passwordV1, 'partner')
       pass('5b. 账号恢复后登录恢复')
+
+      // DB 已提交后 Redis DEL 失败必须如实回报补偿状态，而不能把业务成功伪报成 500。
+      failSessionInvalidation = true
+      const invalidationsBefore = sessionInvalidationCalls
+      const disabledWithRedisFailure = await svc.setAccountStatus(orgId, accountId, 'disable', admin)
+      if (
+        disabledWithRedisFailure.sessionInvalidation !== 'failed'
+        || disabledWithRedisFailure.staleWindowSeconds !== 60
+      ) {
+        fail(`5c. Redis 失效失败必须回 sessionInvalidation=failed + staleWindowSeconds=60：${JSON.stringify(disabledWithRedisFailure)}`)
+      }
+      const persistedDisabled = await prisma.user.findUnique({ where: { id: accountId }, select: { enabled: true } })
+      if (persistedDisabled?.enabled !== false) fail('5c. Redis 失效失败时 DB 账号停用仍必须已经提交')
+      const warningAudit = await prisma.auditLog.findFirst({
+        where: { actorId: admin.userId, action: 'org.account.session_invalidation_failed', targetId: accountId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (!warningAudit || !warningAudit.payloadJson.includes('"level":"warn"') || !warningAudit.payloadJson.includes('REDIS_SESSION_INVALIDATION_FAILED')) {
+        fail('5c. Redis 失效失败必须落 warn 审计且不暴露原始错误')
+      }
+      await svc.setAccountStatus(orgId, accountId, 'disable', admin)
+      if (sessionInvalidationCalls !== invalidationsBefore + 2) {
+        fail(`5c. 目标状态重试仍必须重新失效缓存：调用次数=${sessionInvalidationCalls - invalidationsBefore}`)
+      }
+      failSessionInvalidation = false
+      const reenabledAfterRetry = await svc.setAccountStatus(orgId, accountId, 'enable', admin)
+      if (reenabledAfterRetry.sessionInvalidation !== 'ok') fail('5c. Redis 恢复后失效应返回 ok')
+      pass('5c. Redis 失效失败不伪报业务失败，写 warn 审计；同目标状态重试仍会再次失效缓存')
 
       // ── 6. 重置密码 ──────────────────────────────────────────────────────
       await svc.resetAccountPassword(orgId, accountId, passwordV2, admin)
