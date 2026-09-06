@@ -202,6 +202,10 @@ export class ResumeGenerateExportDto {
   /** PDF 排版参数(Wave 2):仅 PDF 消费;docx/txt/md 忽略该字段且不伪造排版效果。 */
   @IsOptional() @IsObject() @ValidateNested() @Type(() => ResumeLayoutDto)
   layout?: ResumeLayoutDto
+
+  /** 收费导出时核销的本人权益 id；免费模式忽略。 */
+  @IsOptional() @IsString() @MaxLength(80)
+  benefitGrantId?: string
 }
 
 export class ResumeLayoutAdjustResumeDto {

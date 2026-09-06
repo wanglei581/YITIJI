@@ -6,6 +6,7 @@
 //   GET  /admin/billing/reconciliation            本地对账报表
 //
 // 无任何支付凭证字段；改价即时生效（服务端每次报价实时读库）。
+// 价目含 resume_export（简历导出，对应一体机 / 小程序简历优化页的导出按钮）。
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, AssistantChatResult, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { isLlmProviderLabel } from './interfaces/ai-provider.interface'
@@ -23,7 +23,16 @@ import { canAccessFile, FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { JobMaterialsService } from '../job-materials/job-materials.service'
 import { findJobMaterialTemplate } from '../job-materials/job-material-templates'
+import type { ResumeTemplateLayoutPreset } from '../job-materials/job-materials.types'
+import {
+  ResumeExportGateService,
+  hashResumeExportContent,
+  type ResumeExportGateContext,
+  type ResumeExportGateDecision,
+  type ResumeExportPricingView,
+} from '../benefit-redemption/resume-export-gate.service'
 import { RedisInflightLock } from './redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
 
@@ -123,6 +132,8 @@ export class AiService {
     private readonly resumeDocx: ResumeDocxService,
     private readonly resumeText: ResumeTextService,
     redis?: RedisService,
+    @Optional() private readonly exportGate?: ResumeExportGateService,
+    @Optional() private readonly jobMaterials?: JobMaterialsService,
   ) {
     this.optimizeLock = new RedisInflightLock(redis)
     const rawName = process.env['AI_PROVIDER'] ?? 'mock'
@@ -605,15 +616,52 @@ export class AiService {
     return file.id
   }
 
+  /** GET /resume/export/pricing：三态价目 + 登录会员可用权益次数。 */
+  async getResumeExportPricing(endUserId: string | null): Promise<ResumeExportPricingView> {
+    if (this.exportGate) return this.exportGate.getPricing(endUserId)
+    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' }
+  }
+
   /**
-   * 导出格式计费门禁(Wave 1 Task 6)。
-   *
-   * Wave 1 阶段恒放行(所有格式对所有请求者一律允许),不做任何拦截。
-   * Wave 5 引入计费能力后,在此按 format / 请求者会员状态 / 额度挂真实门禁
-   * (额度不足 → 抛业务异常,由 controller 转 4xx),调用位置(export 入口)已就位。
+   * 导出门禁（契约 2）。free 放行；charged 必须有可核销权益或同内容已核销；
+   * unavailable → 400 RESUME_EXPORT_UNAVAILABLE。本方法不扣次。
    */
-  private assertExportFormatAllowed(_format: ResumeExportFormat): void {
-    // Wave 1：恒放行，无计费/额度校验。
+  async assertExportAllowed(ctx: ResumeExportGateContext): Promise<ResumeExportGateDecision> {
+    if (this.exportGate) return this.exportGate.assertExportAllowed(ctx)
+    return { mode: 'free', alreadyPaid: true, serviceRefId: '', benefitGrantId: null, endUserId: ctx.endUserId }
+  }
+
+  /** 文件成功生成后落账。生成失败不得调用。 */
+  async commitExportRedemption(decision: ResumeExportGateDecision): Promise<void> {
+    if (this.exportGate) await this.exportGate.commitExportRedemption(decision)
+  }
+
+  /**
+   * 模板校验读公开列表（数据库 published 行），不再读代码常量。
+   * 空库时按 job-materials.service 同口径幂等补种常量，不覆盖运营改动。
+   */
+  private async loadPublishedResumeTemplate(
+    templateId: string,
+  ): Promise<{ resumeLayoutPreset: ResumeTemplateLayoutPreset } | null> {
+    // 模板写入（含空库补种）只属于 job-materials 模块；AI 模块对 JobMaterialTemplate 只读
+    //（verify:ai-user-text-retention 禁止 AI 模块写无 TTL 模型）。listTemplates() 内部会在空库时补种。
+    if (this.jobMaterials) await this.jobMaterials.listTemplates()
+    const row = await this.prisma.jobMaterialTemplate.findFirst({
+      where: { id: templateId, status: 'published', type: 'resume_template' },
+      select: { resumeLayoutPreset: true },
+    })
+    const preset = row?.resumeLayoutPreset
+    if (preset && typeof preset === 'object' && !Array.isArray(preset)) {
+      return { resumeLayoutPreset: preset as unknown as ResumeTemplateLayoutPreset }
+    }
+    // 没有 JobMaterialsService（verify 脚本裸构造）时库里可能从未补种：退回只读的内置常量，不在 AI 模块写库。
+    if (!this.jobMaterials) {
+      const builtIn = findJobMaterialTemplate(templateId)
+      if (builtIn && builtIn.status === 'published' && builtIn.type === 'resume_template' && builtIn.resumeLayoutPreset) {
+        return { resumeLayoutPreset: builtIn.resumeLayoutPreset }
+      }
+    }
+    return null
   }
 
   /**
@@ -643,6 +691,7 @@ export class AiService {
      * 只影响 PDF 元数据诚实性（AIGenerated='false'），排版与既有导出逐字一致。
      */
     draft = false,
+    charge?: { taskId?: string | null; benefitGrantId?: string | null },
   ): Promise<{
     fileId: string
     filename: string
@@ -654,9 +703,14 @@ export class AiService {
      *  docx/txt/md 签发另外渲染的同内容 PDF 副本(Wave 6),不是原文件本身。 */
     printFileUrl?: string
   }> {
-    this.assertExportFormatAllowed(format)
-    const template = format === 'pdf' && templateId ? findJobMaterialTemplate(templateId) : null
-    if (format === 'pdf' && templateId && (!template || template.status !== 'published' || template.type !== 'resume_template' || !template.resumeLayoutPreset)) {
+    const decision = await this.assertExportAllowed({
+      endUserId,
+      taskId: charge?.taskId,
+      benefitGrantId: charge?.benefitGrantId,
+      contentHash: hashResumeExportContent(resume),
+    })
+    const template = format === 'pdf' && templateId ? await this.loadPublishedResumeTemplate(templateId) : null
+    if (format === 'pdf' && templateId && (!template || !template.resumeLayoutPreset)) {
       throw new BadRequestException({
         error: {
           code: 'AI_RESUME_TEMPLATE_UNSUPPORTED',
@@ -741,6 +795,7 @@ export class AiService {
       printFileUrl = signFileUrl(pdfUploaded.fileId).url
     }
 
+    await this.commitExportRedemption(decision)
     return {
       fileId: uploaded.fileId,
       filename: uploaded.filename,

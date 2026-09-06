@@ -9,7 +9,8 @@
  *   3. 渲染字节非空;docx 前两字节 'PK'(zip 容器魔数);md 文本含 '#';txt 文本非空。
  *   4. 防编造回归:夹具外的诱饵事实串(诱饵公司名/诱饵学校名)不得出现在任何格式输出中。
  *   5. 合规:四格式渲染输出不得出现承诺/越界词(保录用/内推/一键投递等)。
- *   6. assertExportFormatAllowed 对四种合法 format 均放行(Wave 1 恒放行,不误加计费拦截)。
+ *   6. 导出收费三态:free 放行不扣次;charged 必须核销且同内容不重复扣、生成失败不扣次;
+ *      unavailable → RESUME_EXPORT_UNAVAILABLE。assertExportFormatAllowed 已改名为 assertExportAllowed。
  *   7. printFileUrl(打印链路专用系统签名 URL,与 signedUrl/COS 下载 URL 隔离):
  *      四种格式均返回且匹配 /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>;
  *      pdf 直接签发本文件;docx/txt/md 签发另外渲染的同内容 PDF 副本(Wave 6),fileId 不同于主文件。
@@ -35,6 +36,7 @@ if (!process.env['DATABASE_URL']) {
   process.env['DATABASE_URL'] = `file:${join(__dirname, '../prisma/dev.db')}`
 }
 
+import { BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
@@ -46,9 +48,36 @@ import { ResumeDocxService } from '../src/ai/resume/resume-docx.service'
 import { ResumeTextService } from '../src/ai/resume/resume-text.service'
 import type { GeneratedResume } from '../src/ai/interfaces/ai-provider.interface'
 import type { ResumeExportFormat } from '../src/ai/dto/resume-generate.dto'
+import { BenefitRedemptionService } from '../src/benefit-redemption/benefit-redemption.service'
+import { ResumeExportGateService } from '../src/benefit-redemption/resume-export-gate.service'
+import { RESUME_EXPORT_SERVICE_KEY } from '../src/payment/price-config.seed'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exitCode = 1; throw new Error(m) }
+
+function errorCodeOf(err: unknown): string | undefined {
+  if (err instanceof BadRequestException) {
+    const response = err.getResponse()
+    if (response && typeof response === 'object') {
+      return (response as { error?: { code?: string } }).error?.code
+    }
+  }
+  return undefined
+}
+
+async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
+  try {
+    await fn()
+  } catch (err) {
+    const actual = errorCodeOf(err)
+    if (actual === code) {
+      pass(label)
+      return
+    }
+    fail(`${label} — expected ${code}, got ${actual ?? (err as Error).message}`)
+  }
+  fail(`${label} — expected ${code}, but succeeded`)
+}
 
 // 合规拦截词(与 src/ai/llm/llm-guard.ts DEFAULT_FORBIDDEN_WORDS + CLAUDE.md §2 越界文案对齐)。
 // 本文件独立维护(不 import 生产代码常量),避免"断言复制生产实现"式假阳性。
@@ -145,6 +174,15 @@ async function main(): Promise<void> {
     if (!dtoSrc.includes("accent?: ResumeLayoutAccent")) fail('1d. ResumeLayoutDto 未包含 accent')
     if (!dtoSrc.includes('layout?: ResumeLayoutDto')) fail('1d. ResumeGenerateExportDto 未接入 layout 可选字段')
     pass('1d. API DTO layout 白名单字段已接入导出请求')
+    if (!dtoSrc.includes('benefitGrantId?: string')) fail('1e. ResumeGenerateExportDto 未接入 benefitGrantId')
+    pass('1e. ResumeGenerateExportDto 接入收费核销 benefitGrantId')
+
+    const controllerSrc = readFileSync(join(__dirname, '../src/ai/ai.controller.ts'), 'utf-8')
+    if (!controllerSrc.includes("Get('resume/export/pricing')")) fail('1f. 缺少 GET /resume/export/pricing')
+    if (!controllerSrc.includes("requireActiveConsent(requester.endUserId, 'resume_ai')")) {
+      fail('1f. /resume/generate/export 未补 requireActiveConsent(endUserId, resume_ai)')
+    }
+    pass('1f. GET /resume/export/pricing 已注册；generate/export 已补 resume_ai consent')
   }
 
   const prisma = new PrismaService()
@@ -158,6 +196,8 @@ async function main(): Promise<void> {
   const mockProvider = new MockAiProvider()
   const emptyStub = {} as never
   const logStub = { record: () => {} } as never
+  const redemption = new BenefitRedemptionService(prisma, audit as never, undefined as never)
+  const exportGate = new ResumeExportGateService(prisma, redemption)
   const ai = new AiService(
     mockProvider as never,
     emptyStub, emptyStub, emptyStub, emptyStub, emptyStub,
@@ -172,22 +212,46 @@ async function main(): Promise<void> {
     audit as never,
     resumeDocx,
     resumeText,
+    undefined,
+    exportGate,
   )
 
   const createdFileIds: string[] = []
   const createdEndUserIds: string[] = []
+  const createdGrantIds: string[] = []
+  const originalExportPrice = await prisma.priceConfig.findUnique({ where: { serviceKey: RESUME_EXPORT_SERVICE_KEY } })
+
+  async function setExportPrice(unitCents: number, active: boolean): Promise<void> {
+    await prisma.priceConfig.upsert({
+      where: { serviceKey: RESUME_EXPORT_SERVICE_KEY },
+      create: {
+        serviceKey: RESUME_EXPORT_SERVICE_KEY,
+        unitCents,
+        unit: 'item',
+        active,
+        description: 'verify-resume-export-formats',
+      },
+      update: { unitCents, active },
+    })
+  }
 
   try {
-    // ── 6. assertExportFormatAllowed 静态断言:Wave 1 恒放行 ────────────────
+    // ── 6. 导出门禁静态断言:三态,不再恒放行 ────────────────────────────────
     {
       const svcSrc = readFileSync(join(__dirname, '../src/ai/ai.service.ts'), 'utf-8')
-      const methodMatch = svcSrc.match(/private assertExportFormatAllowed\(_format: ResumeExportFormat\): void \{([^}]*)\}/)
-      if (!methodMatch) fail('6a. 未找到 assertExportFormatAllowed 方法')
-      const body = methodMatch![1]
-      // 方法体内不得含任何 throw(Wave 1 恒放行,不误加计费拦截)。
-      if (/throw/.test(body)) fail('6a. assertExportFormatAllowed 方法体含 throw,Wave 1 应恒放行')
-      pass('6a. assertExportFormatAllowed 静态断言:方法体不含 throw(Wave 1 恒放行)')
+      if (svcSrc.includes('assertExportFormatAllowed')) fail('6a. assertExportFormatAllowed 必须改名为 assertExportAllowed')
+      if (!svcSrc.includes('assertExportAllowed')) fail('6a. 未找到 assertExportAllowed')
+      if (!svcSrc.includes('RESUME_EXPORT_UNAVAILABLE')) fail('6a. 未断言 unavailable → RESUME_EXPORT_UNAVAILABLE')
+      if (!svcSrc.includes('commitExportRedemption')) fail('6a. 缺少 commitExportRedemption（成功后才落账）')
+      const commitIdx = svcSrc.indexOf('await this.commitExportRedemption(decision)')
+      const renderIdx = svcSrc.indexOf('this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })')
+      if (commitIdx < 0 || renderIdx < 0 || commitIdx < renderIdx) {
+        fail('6a. 核销必须在文件成功生成之后，不得提前扣次')
+      }
+      pass('6a. assertExportAllowed 三态门禁已接线，核销在生成成功之后')
     }
+
+    await setExportPrice(0, true)
 
     const endUser = await prisma.endUser.create({
       data: {
@@ -302,6 +366,117 @@ async function main(): Promise<void> {
       pass('4/5. docx 同源代理(txt/md 复用同一 FIXTURE):无诱饵串、无合规拦截词、真实事实字段完整保留')
     }
 
+    // ── 6. 运行时三态 + 失败不扣次 + 同内容不重复扣 ────────────────────────
+    {
+      await setExportPrice(0, false)
+      const unavailablePricing = await ai.getResumeExportPricing(endUser.id)
+      if (unavailablePricing.mode !== 'unavailable' || !unavailablePricing.label.includes('不是免费')) {
+        fail(`6b. unavailable pricing 不符: ${JSON.stringify(unavailablePricing)}`)
+      }
+      await expectCode('6b. active=false → RESUME_EXPORT_UNAVAILABLE', 'RESUME_EXPORT_UNAVAILABLE', () =>
+        ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'pdf'))
+      pass('6b. unavailable：GET pricing mode=unavailable，导出 400 RESUME_EXPORT_UNAVAILABLE')
+
+      await setExportPrice(0, true)
+      const freePricing = await ai.getResumeExportPricing(endUser.id)
+      if (freePricing.mode !== 'free' || freePricing.label !== '当前免费，不扣权益' || freePricing.benefit !== null) {
+        fail(`6c. free pricing 不符: ${JSON.stringify(freePricing)}`)
+      }
+      const freeExported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'txt')
+      createdFileIds.push(freeExported.fileId)
+      pass('6c. free：GET pricing 写「当前免费，不扣权益」，导出放行且不扣权益')
+
+      await setExportPrice(199, true)
+      const chargedAnon = await ai.getResumeExportPricing(null)
+      if (chargedAnon.mode !== 'charged' || chargedAnon.benefit !== null || chargedAnon.unitCents !== 199) {
+        fail(`6d. charged 匿名 pricing 不符: ${JSON.stringify(chargedAnon)}`)
+      }
+      await expectCode('6d. charged 匿名 → REDEEM_REQUIRES_LOGIN', 'REDEEM_REQUIRES_LOGIN', () =>
+        ai.exportGeneratedResume(FIXTURE, null, null, 'pdf'))
+      await expectCode('6d. charged 无权益 → RESUME_EXPORT_BENEFIT_REQUIRED', 'RESUME_EXPORT_BENEFIT_REQUIRED', () =>
+        ai.exportGeneratedResume(FIXTURE, endUser.id, null, 'pdf', undefined, undefined, false, { taskId: 'export-task-1' }))
+
+      const grant = await prisma.benefitGrant.create({
+        data: {
+          endUserId: endUser.id,
+          benefitType: 'free_quota',
+          title: '导出验证权益',
+          quantityTotal: 2,
+          quantityRemaining: 2,
+          status: 'active',
+          sourceType: 'platform',
+        },
+      })
+      createdGrantIds.push(grant.id)
+
+      const chargedPricing = await ai.getResumeExportPricing(endUser.id)
+      if (chargedPricing.mode !== 'charged' || chargedPricing.benefit?.available !== 2 || chargedPricing.benefit?.serviceType !== 'resume_export') {
+        fail(`6d. charged 会员 pricing 不符: ${JSON.stringify(chargedPricing)}`)
+      }
+      pass('6d. charged：匿名须登录，无权益拒绝，pricing 回可用次数')
+
+      const originalRender = pdf.render.bind(pdf)
+      pdf.render = (async () => {
+        throw new Error('VERIFY_FORCE_GENERATE_FAIL')
+      }) as typeof pdf.render
+      try {
+        await ai.exportGeneratedResume(
+          FIXTURE,
+          endUser.id,
+          null,
+          'pdf',
+          undefined,
+          undefined,
+          false,
+          { taskId: 'export-task-fail', benefitGrantId: grant.id },
+        )
+        pdf.render = originalRender
+        fail('6e. 强制生成失败应抛错')
+      } catch (err) {
+        pdf.render = originalRender
+        if ((err as Error).message !== 'VERIFY_FORCE_GENERATE_FAIL') {
+          fail(`6e. 期望 VERIFY_FORCE_GENERATE_FAIL，实际 ${(err as Error).message}`)
+        }
+      }
+      const afterFail = await prisma.benefitGrant.findUnique({ where: { id: grant.id } })
+      if (afterFail?.quantityRemaining !== 2) {
+        fail(`6e. 生成失败不应扣次，剩余 ${afterFail?.quantityRemaining}`)
+      }
+      pass('6e. 生成失败不扣次（quantityRemaining 仍为 2）')
+
+      const firstCharged = await ai.exportGeneratedResume(
+        FIXTURE,
+        endUser.id,
+        null,
+        'pdf',
+        undefined,
+        undefined,
+        false,
+        { taskId: 'export-task-same', benefitGrantId: grant.id },
+      )
+      createdFileIds.push(firstCharged.fileId)
+      const afterFirst = await prisma.benefitGrant.findUnique({ where: { id: grant.id } })
+      if (afterFirst?.quantityRemaining !== 1) {
+        fail(`6f. 首次收费导出应扣 1 次，剩余 ${afterFirst?.quantityRemaining}`)
+      }
+      const secondCharged = await ai.exportGeneratedResume(
+        FIXTURE,
+        endUser.id,
+        null,
+        'docx',
+        undefined,
+        undefined,
+        false,
+        { taskId: 'export-task-same', benefitGrantId: grant.id },
+      )
+      createdFileIds.push(secondCharged.fileId)
+      const afterSecond = await prisma.benefitGrant.findUnique({ where: { id: grant.id } })
+      if (afterSecond?.quantityRemaining !== 1) {
+        fail(`6f. 同内容再次导出不应重复扣，剩余 ${afterSecond?.quantityRemaining}`)
+      }
+      pass('6f. 同内容不重复扣（首次 2→1，再次仍为 1）')
+    }
+
     console.log('\n=== ALL PASS ===')
   } finally {
     for (const fid of createdFileIds) {
@@ -312,6 +487,16 @@ async function main(): Promise<void> {
       }
     }
     await prisma.auditLog.deleteMany({ where: { targetId: { in: createdFileIds } } }).catch(() => undefined)
+    await prisma.redemptionRecord.deleteMany({ where: { benefitRef: { in: createdGrantIds } } }).catch(() => undefined)
+    await prisma.benefitGrant.deleteMany({ where: { id: { in: createdGrantIds } } }).catch(() => undefined)
+    if (originalExportPrice) {
+      await prisma.priceConfig.update({
+        where: { serviceKey: RESUME_EXPORT_SERVICE_KEY },
+        data: { unitCents: originalExportPrice.unitCents, active: originalExportPrice.active, description: originalExportPrice.description },
+      }).catch(() => undefined)
+    } else {
+      await prisma.priceConfig.deleteMany({ where: { serviceKey: RESUME_EXPORT_SERVICE_KEY } }).catch(() => undefined)
+    }
     await prisma.endUser.deleteMany({ where: { id: { in: createdEndUserIds } } }).catch(() => undefined)
     await prisma.onModuleDestroy?.()
   }
