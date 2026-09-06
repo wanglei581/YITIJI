@@ -28,6 +28,7 @@ export interface AdminOrderReadonlyItem {
   aftercareStatus: AdminOrderAftercareStatus
   refundEligible: boolean
   retryForbidden: boolean
+  refundRequired: boolean
   createdAt: string
   updatedAt: string
 }
@@ -69,6 +70,7 @@ export interface ListAdminOrdersReadonlyParams {
   payStatus?: string
   taskStatus?: string
   search?: string
+  refundRequired?: boolean
   page: number
   pageSize: number
 }
@@ -176,6 +178,7 @@ const httpAdapter: AdminOrdersReadonlyService = {
       payStatus: params.payStatus,
       taskStatus: params.taskStatus,
       search: params.search,
+      refundRequired: params.refundRequired ? 'true' : undefined,
       page: String(params.page),
       pageSize: String(params.pageSize),
     }),
@@ -213,6 +216,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   aftercareStatus: null,
   refundEligible: false,
   retryForbidden: false,
+  refundRequired: false,
   createdAt: now(),
   updatedAt: now(),
   refundedAt: null,
