@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { FilesController } from './files.controller'
@@ -6,6 +6,7 @@ import { FilesService } from './files.service'
 import { FilesCleanupTask } from './files.cleanup.task'
 import { MemberDataExportFileService } from './member-data-export-file.service'
 import { ContractReportPrintLifecycleService } from './contract-report-print-lifecycle.service'
+import { UploadSessionsModule } from '../upload-sessions/upload-sessions.module'
 
 /**
  * BE-1 文件模块。
@@ -28,6 +29,7 @@ import { ContractReportPrintLifecycleService } from './contract-report-print-lif
   imports: [
     PrismaModule,
     JwtVerifierModule,
+    forwardRef(() => UploadSessionsModule),
   ],
   controllers: [FilesController],
   providers: [

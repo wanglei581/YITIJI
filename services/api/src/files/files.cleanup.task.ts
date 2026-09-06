@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { UploadSessionsService } from '../upload-sessions/upload-sessions.service'
 import { FilesService } from './files.service'
 
 /**
@@ -17,7 +18,27 @@ import { FilesService } from './files.service'
 export class FilesCleanupTask {
   private readonly logger = new Logger(FilesCleanupTask.name)
 
-  constructor(private readonly files: FilesService) {}
+  constructor(
+    private readonly files: FilesService,
+    @Optional()
+    @Inject(forwardRef(() => UploadSessionsService))
+    private readonly uploadSessions?: UploadSessionsService,
+  ) {}
+
+  /** 同一文件生命周期调度器中的分钟级扫码会话回收，不新增第二套 scheduler。 */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleEveryMinute(): Promise<void> {
+    if (!this.uploadSessions) return
+    try {
+      const result = await this.uploadSessions.cleanupExpiredSessions()
+      if (result.cleaned > 0 || result.skipped > 0) {
+        this.logger.log(`Upload session cleanup: cleaned=${result.cleaned} skipped=${result.skipped}`)
+      }
+    } catch {
+      // Redis 是软依赖；本轮不做半清理，下一分钟重试，不能拖垮 API 进程。
+      this.logger.warn('code=UPLOAD_SESSION_CLEANUP_SKIPPED reason=redis_unavailable')
+    }
+  }
 
   @Cron(CronExpression.EVERY_HOUR)
   async handleHourly(): Promise<void> {

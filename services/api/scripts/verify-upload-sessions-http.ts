@@ -126,6 +126,19 @@ function expectError(
   console.log(`  PASS ${label} -> ${status} ${expectedCode}`)
 }
 
+function assertPhoneErrorEnvelopeSafe(
+  envelope: ApiEnvelope<unknown>,
+  forbidden: string[],
+  label: string,
+): void {
+  const serialized = JSON.stringify(envelope)
+  for (const value of forbidden) {
+    assert.equal(serialized.includes(value), false, `${label}: phone error must not expose ${value}`)
+  }
+  assert.equal(/\bat\s+.+\(/.test(serialized), false, `${label}: phone error must not expose a stack frame`)
+  console.log(`  PASS ${label} contains only the public error envelope`)
+}
+
 function assertNoSignedUrl(file: FileView | null | undefined, label: string): void {
   assert.ok(file, `${label}: file is required`)
   const allowed = new Set(['fileId', 'filename', 'sizeBytes', 'mimeType', 'sha256', 'fileExpiresAt'])
@@ -350,6 +363,11 @@ async function runVerifier(): Promise<void> {
     headers: { 'x-upload-session-control': 'bad-control-token' },
   })
   expectError(badControl.status, badControl.body, 403, 'UPLOAD_SESSION_CONTROL_INVALID', 'status with bad control token is denied')
+  assertPhoneErrorEnvelopeSafe(
+    badControl.body,
+    [created.uploadToken, created.controlToken, 'http-e2e-main'],
+    'phone upload error envelope',
+  )
 
   const initialStatus = await requestJson<ApiEnvelope<SessionStatusResponse>>(`/upload-sessions/${created.sessionId}`, {
     headers: { 'x-upload-session-control': created.controlToken },
