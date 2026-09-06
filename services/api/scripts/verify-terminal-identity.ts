@@ -59,11 +59,12 @@ async function main(): Promise<void> {
   await expectCode('missing token is 401', 'TERMINAL_SESSION_INVALID', () => sessions.validate('term_identity_a', undefined))
   await expectCode('wrong terminal id is 401', 'TERMINAL_SESSION_INVALID', () => sessions.validate('term_identity_b', session.sessionToken))
 
-  const context = (terminalId: string | undefined, sessionToken: string | undefined, routeTerminalId?: string) => ({
+  const context = (terminalId: string | undefined, sessionToken: string | undefined, routeTerminalId?: string, bodyTerminalId?: string) => ({
     switchToHttp: () => ({
       getRequest: () => ({
         header: (name: string) => name === 'x-terminal-id' ? terminalId : sessionToken,
         params: routeTerminalId ? { terminalId: routeTerminalId } : {},
+        body: bodyTerminalId ? { terminalId: bodyTerminalId } : {},
       }),
     }),
   })
@@ -75,6 +76,11 @@ async function main(): Promise<void> {
     await expectCode(`${endpoint} rejects a missing terminal session with 401`, 'TERMINAL_SESSION_INVALID', () => guard.canActivate(context('term_identity_a', undefined) as never))
   }
   await expectCode('protected endpoint guard rejects route/header terminal mismatch with 401', 'TERMINAL_SESSION_INVALID', () => guard.canActivate(context('term_identity_a', session.sessionToken, 'term_identity_b') as never))
+  await expectCode('POST /print/jobs guard rejects body.terminalId that differs from the verified header (cross-terminal job injection)', 'TERMINAL_SESSION_INVALID', () => guard.canActivate(context('term_identity_a', session.sessionToken, undefined, 'term_identity_b') as never))
+  if (await guard.canActivate(context('term_identity_a', session.sessionToken, undefined, 'term_identity_a') as never) !== true) {
+    fail('guard must allow a body.terminalId equal to the verified header')
+  }
+  pass('guard allows body.terminalId equal to the verified header')
 
   data.delete(sessions.sessionKey(session.sessionToken))
   await expectCode('expired or deleted session is 401', 'TERMINAL_SESSION_INVALID', () => sessions.validate('term_identity_a', session.sessionToken))
@@ -103,6 +109,11 @@ async function main(): Promise<void> {
     fail('all three protected endpoints must carry TerminalIdentityGuard')
   }
   pass('three protected endpoints carry TerminalIdentityGuard')
+  const guardSource = readFileSync(path.join(root, 'src/terminals/terminal-identity.guard.ts'), 'utf8')
+  if (!/typeof bodyTerminalId === 'string' && bodyTerminalId !== terminalId/.test(guardSource)) {
+    fail('TerminalIdentityGuard must reject a request body terminalId that differs from the verified x-terminal-id (cross-terminal print job injection)')
+  }
+  pass('guard binds body.terminalId to the verified terminal (no cross-terminal job injection)')
   if (!terminalSessionService.includes('term:boot:${ticket}') || !terminalSessionService.includes('term:session:${sessionToken}')) {
     fail('terminal session Redis keys must use term:boot and term:session namespaces')
   }

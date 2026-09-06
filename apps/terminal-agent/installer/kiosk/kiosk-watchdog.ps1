@@ -107,6 +107,17 @@ function Get-BootTicketUrl {
   return $Url
 }
 
+function Test-AgentIdentityReady {
+  # Cheap read-only probe: once the local Agent answers with a terminal identity it
+  # can also mint boot tickets, so a ticketless browser can be replaced.
+  try {
+    $response = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:9527/local/terminal-identity" -TimeoutSec 4
+    return [bool]($response.success -and $response.data.terminalId)
+  } catch {
+    return $false
+  }
+}
+
 function Start-KioskBrowser([string]$Executable, [string]$LaunchUrl) {
   $arguments = @(
     "--kiosk", $LaunchUrl,
@@ -140,8 +151,20 @@ Write-Log "watchdog start browser=$executable once=$($Once.IsPresent)"
 
 $backoffSeconds = 3
 $lastStart = [DateTime]::MinValue
+$launchedWithoutTicket = $false
+$lastTicketProbe = [DateTime]::MinValue
 while ($true) {
   $existing = Get-KioskProcess
+  if ($null -ne $existing -and $launchedWithoutTicket -and ((Get-Date) - $lastTicketProbe).TotalSeconds -ge 30) {
+    # Self-heal without on-site staff: a browser launched without a boot ticket is stuck
+    # on the fail-closed screen. Once the Agent is reachable again, restart it with a ticket.
+    $lastTicketProbe = Get-Date
+    if (Test-AgentIdentityReady) {
+      Write-Log "local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket"
+      try { Stop-Process -Id $existing.ProcessId -Force -ErrorAction Stop } catch { Write-Log "failed to stop ticketless browser: $($_.Exception.Message)" }
+      $existing = $null
+    }
+  }
   if ($null -eq $existing) {
     $sinceLast = (Get-Date) - $lastStart
     if ($sinceLast.TotalSeconds -lt $backoffSeconds) {
@@ -150,6 +173,8 @@ while ($true) {
     try {
       $launchUrl = Get-BootTicketUrl
       [void](Start-KioskBrowser -Executable $executable -LaunchUrl $launchUrl)
+      $launchedWithoutTicket = ($launchUrl -eq $Url)
+      $lastTicketProbe = Get-Date
       if ($lastStart -ne [DateTime]::MinValue -and ((Get-Date) - $lastStart).TotalSeconds -lt 60) {
         # Crash loop: double the wait, cap at one minute.
         $backoffSeconds = [Math]::Min(60, $backoffSeconds * 2)

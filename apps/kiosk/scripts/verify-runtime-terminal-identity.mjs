@@ -12,6 +12,16 @@ const terminalAuth = read('src/services/terminalAuth.ts')
 const advisorCall = read('src/hooks/useAiAdvisorCallSession.ts')
 const shell = read('src/layouts/KioskRoot.tsx')
 const topbar = read('src/components/kiosk-shell/KioskAppTopbar.tsx')
+
+// 拍板②：只有网络抖动 / 503 TERMINAL_SESSION_RETRYABLE 自动重试；401 TERMINAL_SESSION_INVALID 立即 fail-closed。
+const transientBody = terminalAuth.match(/function transient\(error: unknown\): boolean \{([\s\S]*?)\n\}/)?.[1] ?? ''
+assert.ok(transientBody, 'terminalAuth must classify retryable errors in transient()')
+assert.match(transientBody, /503/, 'transient() must treat 503 TERMINAL_SESSION_RETRYABLE as retryable')
+assert.doesNotMatch(transientBody, /401/, 'transient() must not retry 401 TERMINAL_SESSION_INVALID (revoked / used ticket cannot recover by retrying)')
+assert.match(terminalAuth, /if \(!sessionInvalid\(error\)\) return response/, 'a business 401 must trigger exactly one session refresh, other errors go back to the caller')
+assert.match(terminalAuth, /refreshInflight/, 'concurrent 401s must share one refresh (no thundering herd on /session-token/refresh)')
+assert.match(terminalAuth, /initInflight/, 'identity recovery must not re-enter initializeTerminalSession while a boot ticket exchange is in flight')
+
 const terminalScopedConsumers = [
   'src/services/print/printJobsApi.ts',
   'src/services/api/printScanCapabilities.ts',

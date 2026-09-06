@@ -85,15 +85,27 @@ async function asHttpError(response: Response): Promise<ApiHttpError> {
   return new ApiHttpError(error.code, error.message, response.status)
 }
 
-function retryable(error: unknown): boolean {
+// 只有网络抖动 / 超时 / 服务端明确的 503 TERMINAL_SESSION_RETRYABLE（Redis 抖动）才自动重试；
+// 401 TERMINAL_SESSION_INVALID 表示票已用过、令牌过期或终端被吊销，重试不会变好，立即 fail-closed。
+function transient(error: unknown): boolean {
   if (error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')) return true
-  return error instanceof ApiHttpError && (
-    (error.status === 401 && error.code === 'TERMINAL_SESSION_INVALID') ||
-    (error.status === 503 && error.code === 'TERMINAL_SESSION_RETRYABLE')
-  )
+  return error instanceof ApiHttpError && error.status === 503 && error.code === 'TERMINAL_SESSION_RETRYABLE'
 }
 
-async function retryRefresh(): Promise<void> {
+function sessionInvalid(error: unknown): boolean {
+  return error instanceof ApiHttpError && error.status === 401 && error.code === 'TERMINAL_SESSION_INVALID'
+}
+
+let refreshInflight: Promise<void> | null = null
+
+// 并发业务请求同时遇到 401 时共享同一次刷新，避免向 /session-token/refresh 涌入多次请求。
+function retryRefresh(): Promise<void> {
+  if (refreshInflight) return refreshInflight
+  refreshInflight = retryRefreshOnce().finally(() => { refreshInflight = null })
+  return refreshInflight
+}
+
+async function retryRefreshOnce(): Promise<void> {
   setState('checking')
   const startedAt = Date.now()
   let lastError: unknown = new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
@@ -111,7 +123,7 @@ async function retryRefresh(): Promise<void> {
       return
     } catch (error) {
       lastError = error
-      if (!retryable(error)) break
+      if (!transient(error)) break
     }
   }
   setState('failed')
@@ -124,7 +136,17 @@ function scheduleRefresh(): void {
   refreshTimer = window.setTimeout(() => { void retryRefresh().catch(() => undefined) }, 10 * 60_000)
 }
 
-export async function initializeTerminalSession(): Promise<void> {
+let initInflight: Promise<void> | null = null
+
+// 身份恢复回调可能在换票尚未完成时再次调用；此时 URL 里的票已被抹掉，
+// 若不合并会把状态误置为 failed。进行中的初始化直接复用同一个 Promise。
+export function initializeTerminalSession(): Promise<void> {
+  if (initInflight) return initInflight
+  initInflight = initializeTerminalSessionOnce().finally(() => { initInflight = null })
+  return initInflight
+}
+
+async function initializeTerminalSessionOnce(): Promise<void> {
   if (API_MODE !== 'http' || HAS_E2E_MOCK_TOKEN) { setState('ready'); return }
   const bootTicket = cleanBootTicketFromUrl()
   if (bootTicket) {
@@ -151,7 +173,7 @@ async function retryBootTicketExchange(bootTicket: string): Promise<void> {
       scheduleRefresh()
       return
     } catch (error) {
-      if (!retryable(error)) break
+      if (!transient(error)) break
     }
   }
   setState('failed')
@@ -169,7 +191,8 @@ export async function terminalProtectedFetch(input: RequestInfo | URL, init: Req
   let response = await fetch(input, { ...init, headers: headers(init.headers) })
   if (response.ok) return response
   const error = await asHttpError(response.clone())
-  if (!retryable(error)) return response
+  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动 / 503 重试）；其它错误原样交给调用方。
+  if (!sessionInvalid(error)) return response
   await retryRefresh()
   response = await fetch(input, { ...init, headers: headers(init.headers) })
   return response
