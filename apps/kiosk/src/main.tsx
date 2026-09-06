@@ -10,6 +10,7 @@ import {
   startTerminalIdentityRecovery,
   subscribeTerminalIdentity,
 } from './services/api/screensaver'
+import { initializeTerminalSession } from './services/terminalAuth'
 
 type RouterErrorHandler = NonNullable<ComponentProps<typeof RouterProvider>['onError']>
 
@@ -28,7 +29,10 @@ export function KioskApp() {
   const [identityRevision, setIdentityRevision] = useState(0)
 
   useEffect(() => {
-    const unsubscribe = subscribeTerminalIdentity(() => setIdentityRevision((revision) => revision + 1))
+    const unsubscribe = subscribeTerminalIdentity(() => {
+      setIdentityRevision((revision) => revision + 1)
+      void initializeTerminalSession()
+    })
     startTerminalIdentityRecovery()
     return unsubscribe
   }, [])
@@ -50,4 +54,4 @@ function renderKiosk(): void {
   )
 }
 
-void initializeTerminalIdentity().finally(renderKiosk)
+void initializeTerminalIdentity().then(initializeTerminalSession).finally(renderKiosk)

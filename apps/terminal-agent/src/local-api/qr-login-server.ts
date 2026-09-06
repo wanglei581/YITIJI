@@ -14,6 +14,7 @@ import type {
   LocalQrClaimRequest,
   LocalQrCreateRequest,
   LocalTerminalIdentityResponse,
+  LocalTerminalBootTicketResponse,
   LocalUsbFileItem,
   LocalUsbListResponse,
   LocalUsbStatusResponse,
@@ -142,6 +143,29 @@ async function handleRequest(input: {
       return
     }
     sendLocalAgentStatusPanel(res, status)
+    return
+  }
+
+  // The watchdog has no browser Origin. The server is loopback-only and returns
+  // a one-minute, one-time ticket instead of ever exposing an Agent credential.
+  if (req.method === 'POST' && url.pathname === '/local/terminal-boot-ticket') {
+    if (origin) {
+      sendJson(res, 403, { code: 'LOCAL_TERMINAL_BOOT_ORIGIN_FORBIDDEN', message: '终端启动票仅供本机启动器使用' })
+      return
+    }
+    if (url.search.length > 0) {
+      sendJson(res, 400, { code: 'LOCAL_TERMINAL_BOOT_QUERY_NOT_ALLOWED', message: '终端启动票不接受查询参数' })
+      return
+    }
+    await assertEmptyBody(req)
+    const response = await client.post<ApiEnvelope<LocalTerminalBootTicketResponse> | LocalTerminalBootTicketResponse>('/terminals/boot-ticket', undefined, {
+      ...NO_RETRY_CONFIG,
+      timeout: 3_000,
+    })
+      .catch((error) => { throw backendError(error, 'qr') })
+    const payload = response.data
+    const ticket = 'data' in payload ? payload.data : payload
+    sendEnvelope(res, 200, ticket, origin ?? '')
     return
   }
 

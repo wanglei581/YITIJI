@@ -3,6 +3,7 @@ import { DEFAULT_SMART_CAMPUS_MODULES } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 import { ApiHttpError } from './httpAdapter'
 import { getTerminalCode, getTerminalId } from './screensaver'
+import { terminalProtectedFetch } from '../terminalAuth'
 
 const OFF_CONFIG: KioskTerminalConfig = {
   smartCampus: { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] },
@@ -29,7 +30,7 @@ export async function getKioskTerminalConfig(terminalId: string): Promise<KioskT
     `${API_BASE_URL}/terminals/${encodeURIComponent(terminalId)}/config`,
     window.location.origin,
   )
-  const res = await fetch(url.toString(), {
+  const res = await terminalProtectedFetch(url.toString(), {
     method: 'GET',
     headers: { Accept: 'application/json' },
     credentials: 'include',

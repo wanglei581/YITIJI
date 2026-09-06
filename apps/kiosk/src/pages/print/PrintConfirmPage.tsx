@@ -48,6 +48,7 @@ import {
 } from './printMaterialSession'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import { materialRedactionBadge } from './piiRedaction'
+import { subscribeTerminalSession, terminalSessionState, type TerminalSessionState } from '../../services/terminalAuth'
 
 type PrintFile = PrintFileState
 
@@ -183,6 +184,7 @@ export function PrintConfirmPage() {
   const isContractReport = Boolean(contractReport)
   const effectivePages = file.pages ?? 1
   const [submitting, setSubmitting] = useState(false)
+  const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
   const [abandoning, setAbandoning] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
@@ -193,6 +195,8 @@ export function PrintConfirmPage() {
     Boolean(selfAssessmentSnapshot?.taskId) &&
     Boolean(file.fileId) &&
     (file.mimeType === undefined || file.mimeType === 'application/pdf')
+
+  useEffect(() => subscribeTerminalSession(setTerminalSession), [])
   const [quote, setQuote] = useState<QuoteView>(
     API_MODE === 'http' ? { status: 'loading' } : { status: 'demo' },
   )
@@ -344,6 +348,7 @@ export function PrintConfirmPage() {
     submitting ||
     abandoning ||
     printerBlocked ||
+    terminalSession !== 'ready' ||
     (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
 
   const handleBack = async () => {
@@ -363,6 +368,14 @@ export function PrintConfirmPage() {
   }
 
   const handleConfirm = async () => {
+    if (terminalSession === 'checking') return
+    if (terminalSession === 'failed') {
+      setSubmitError(userMessageOf(
+        { code: 'TERMINAL_SESSION_INVALID' },
+        '终端安全校验失败，请联系现场工作人员',
+      ))
+      return
+    }
     if (printerBlocked) {
       setSubmitError(
         printerLoading
@@ -504,6 +517,14 @@ export function PrintConfirmPage() {
               {printerLoading
                 ? '正在确认打印机状态…'
                 : `${printerLabel}。当前不能下单，请联系工作人员。`}
+            </div>
+          )}
+          {terminalSession === 'failed' && (
+            <div className="mb-4 rounded-lg border border-warning bg-warning-bg px-4 py-3 text-sm text-warning-fg" role="alert">
+              {userMessageOf(
+                { code: 'TERMINAL_SESSION_INVALID' },
+                '终端安全校验失败，请联系现场工作人员',
+              )}
             </div>
           )}
           {paramsWereRestricted && (
@@ -763,7 +784,11 @@ export function PrintConfirmPage() {
           disabled={confirmBlocked}
           onClick={() => void handleConfirm()}
         >
-          {submitting ? (
+          {terminalSession === 'checking' ? (
+            '安全校验中…'
+          ) : terminalSession === 'failed' ? (
+            '终端安全校验失败'
+          ) : submitting ? (
             <>
               <LoaderIcon style={{ width: 24, height: 24, animation: 'spin 1s linear infinite' }} aria-hidden="true" />
               提交中…

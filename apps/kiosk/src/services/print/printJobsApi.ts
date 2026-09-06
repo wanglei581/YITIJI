@@ -14,6 +14,7 @@ import { API_BASE_URL } from '../api/client'
 import { ApiHttpError } from '../api/httpAdapter'
 import { getTerminalId } from '../api/screensaver'
 import { networkError, throwHttpError } from '../api/throwHttpError'
+import { terminalProtectedFetch } from '../terminalAuth'
 import type {
   BillingPageSource,
   OrderPayStatus,
@@ -150,11 +151,10 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
   }
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/print/jobs`, {
+    res = await terminalProtectedFetch(`${API_BASE_URL}/print/jobs`, {
       method:  'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Terminal-Id': terminalId,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body:    JSON.stringify({ ...body, params: normalizePrintParams(body.params) }),

@@ -512,6 +512,7 @@ jobs:
           # 简历与同意槽位恒空且无写入路径、无第三方回流与对外读取入口、无按企业聚合。
           pnpm --filter @ai-job-print/api verify:job-application-track
           pnpm --filter @ai-job-print/api verify:terminal-credentials
+          pnpm --filter @ai-job-print/api verify:terminal-identity
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
           pnpm --filter @ai-job-print/api verify:terminal-network-diagnostics

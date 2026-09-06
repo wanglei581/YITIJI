@@ -25,6 +25,13 @@
 - 所有临时文件（简历/扫描件）任务结束立即删除
 - API 失败绝不伪造成功
 
+## Kiosk 启动票（2026-09-06）
+
+1. Windows watchdog 在每次拉起 Edge/Chrome 前，仅向 loopback Agent `POST /local/terminal-boot-ticket` 请求启动票；watchdog 不读取 ProgramData、DPAPI 文件或长期 Agent 凭证。
+2. Agent 用既有 `Authorization: Bearer <agentToken>` 和 `X-Terminal-Id` 调 API `POST /terminals/boot-ticket`，取得 Redis 中 60 秒、一次性的 `bootTicket`。
+3. watchdog 将短票作为 URL `boot_ticket` 参数传给浏览器。Kiosk 用它兑换 30 分钟终端会话令牌，立即用 `history.replaceState` 清除 URL，令牌只保存到浏览器 `sessionStorage`。
+4. 取票与浏览器端刷新均按 2 / 5 / 10 / 20 秒退避、总窗口不超过 60 秒。失败仍启动页面；页面在会话恢复前拒绝受保护下单，并在耗尽窗口后提示联系现场工作人员。
+
 ## MVP 范围（Phase 8.1）
 
 心跳上报 + 打印任务执行 + 扫描任务执行 + 文件上传 + Windows 服务注册

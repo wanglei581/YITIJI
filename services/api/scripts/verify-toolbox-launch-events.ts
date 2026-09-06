@@ -6,7 +6,8 @@
  *   2. 公开 Kiosk 写入端点限流,只接 itemKey/action/placement。
  *   3. 后端从终端配置派生 launchMode/title/targetHost,不信任客户端 URL/host。
  *   4. Admin 汇总接口走既有 admin guard,并返回最近 7 天基础统计。
- *   5. Kiosk 使用 sendBeacon 保障外部 H5 确认事件,Admin 文案使用“二维码展示数”。
+ *   5. Kiosk 用 keepalive fetch（经 terminalProtectedFetch 带终端会话令牌）保障外部 H5 确认事件在页面卸载时仍能送达；
+ *      不再用 sendBeacon —— 它无法携带 x-terminal-session-token，会被终端身份闸门 401。Admin 文案使用“二维码展示数”。
  *
  * 运行: pnpm --filter @ai-job-print/api verify:toolbox-launch-events
  */
@@ -106,12 +107,20 @@ notContains('src/terminals/terminal-toolbox.service.ts', ['input.targetHost', 'i
 contains('../../apps/kiosk/src/services/api/toolboxLaunchEvents.ts', [
   'recordToolboxLaunchEvent',
   'recordToolboxLaunchEventBeforeUnload',
-  'navigator.sendBeacon',
+  // 2026-09-06 终端身份闸门：事件上报必须走 terminalProtectedFetch（带 x-terminal-session-token）。
+  // sendBeacon 不能设请求头，用了就会被 TerminalIdentityGuard 401，等于事件全部丢失。
+  'terminalProtectedFetch',
   'keepalive: true',
   "credentials: 'omit'",
   "API_MODE !== 'http'",
   'getTerminalId()',
 ], 'Kiosk 百宝箱事件 fire-and-forget 上报服务存在')
+
+notContains(
+  '../../apps/kiosk/src/services/api/toolboxLaunchEvents.ts',
+  ['navigator.sendBeacon'],
+  'Kiosk 事件上报不得用 sendBeacon（无法带终端会话令牌，会被闸门 401）',
+)
 
 contains('../../apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx', [
   "action: 'show_qr'",

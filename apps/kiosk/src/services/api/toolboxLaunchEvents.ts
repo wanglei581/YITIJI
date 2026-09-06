@@ -1,6 +1,7 @@
 import type { RecordToolboxLaunchEventInput } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 import { getTerminalId } from './screensaver'
+import { terminalProtectedFetch } from '../terminalAuth'
 
 function endpoint(): string | null {
   if (API_MODE !== 'http') return null
@@ -15,7 +16,7 @@ function endpoint(): string | null {
 export function recordToolboxLaunchEvent(input: RecordToolboxLaunchEventInput): void {
   const url = endpoint()
   if (!url) return
-  void fetch(url, {
+  void terminalProtectedFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     credentials: 'omit',
@@ -29,11 +30,9 @@ export function recordToolboxLaunchEventBeforeUnload(input: RecordToolboxLaunchE
   const url = endpoint()
   if (!url) return
   const payload = JSON.stringify(input)
-  if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-    const sent = navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }))
-    if (sent) return
-  }
-  void fetch(url, {
+  // sendBeacon cannot carry the terminal session token. Keepalive fetch preserves
+  // the same protected transport even during navigation.
+  void terminalProtectedFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     credentials: 'omit',

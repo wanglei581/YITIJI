@@ -41,7 +41,7 @@
 - BL-03 Windows 一体机真机打印/扫描/Agent 未验收：建单→到机码→支付→claim→出纸→回流（现场）。
 - BL-05 百度 OCR 密钥曾在聊天暴露，须轮换（产品负责人）。
 - B2 生产库岗位/招聘会/政策 `total:0`，需授权来源录入。
-- 招聘信息专区缺可信终端身份的服务端总闸门（P0 架构缺口，另一会话处理中）。
+- ~~招聘信息专区缺可信终端身份的服务端总闸门（P0 架构缺口，另一会话处理中）。~~ **代码候选已修（2026-09-06，PR #待收货人创建，未提交、未部署）**：Agent 凭既有终端凭证换 60 秒一次性启动票，Kiosk 换 30 分钟 Redis 会话令牌；`POST /print/jobs`、`GET /terminals/:id/config`、`POST /terminals/:id/toolbox-events` 均核对 `x-terminal-id`、会话令牌、终端启用状态及 `credentialGeneration`。Redis 读故障返回 `503 TERMINAL_SESSION_RETRYABLE` 供前端静默重试；`printer-status` / `capabilities` 保持公开只读。PR 未创建，依赖型门禁受本机 DNS 阻塞，收货前不得升级为已验收。
 - 平台可靠性遗留：EndUserAuthGuard Redis 无界等待 23s；admin-orgs 缓存失效假失败；admin-ops 告警 take:50。
 - 扫码上传 Redis 过期后 FileObject 生命周期；`GET /me/summary` 不存在；mock-only 字段 `onsiteServices/admissionMethod/tagline`。
 - 奔图开放 API 彩色 mode 三处措辞不一致（`packages/shared/src/types/print.ts:100-107`、`apps/terminal-agent/src/printer/types.ts:47-48 vs 76-77`、`docs/device/pantum-api-design.md:87`）。

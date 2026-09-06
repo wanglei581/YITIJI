@@ -8,7 +8,7 @@
 //   GET   /print/jobs/:taskId  — Kiosk polls task status
 // ============================================================
 
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Param, Post, UseGuards } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
@@ -19,6 +19,7 @@ import { PrintJobsService } from './print-jobs.service'
 import { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { ClaimPickupDto } from './dto/claim-pickup.dto'
 import { PickupOrderService } from './pickup-order.service'
+import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 
 @Controller('print/jobs')
 export class PrintJobsController {
@@ -48,12 +49,11 @@ export class PrintJobsController {
     return this.pickupOrders.release(orderId, terminalId, paymentSessionToken)
   }
 
-  // 鉴权取舍（HIGH-3）：本端点服务匿名 Kiosk 上传打印流程，加 JWT/设备鉴权会破坏
-  // 一体机匿名打印，故采用「强校验签名 fileUrl（验签+有效期，SSRF 防护）+ IP 限流
-  // （10/min）+ 全量审计」组合。fileUrl 必须由本系统 files 服务签发，外部 URL 一律 400。
+  // HIGH-3：已改用终端会话令牌，签名 fileUrl + 限流 + 审计仍保留为第二层。
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @UseGuards(TerminalIdentityGuard)
   async create(
     @Body() dto: CreatePrintJobDto,
     @Ip() ip: string,

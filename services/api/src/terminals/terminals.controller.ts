@@ -23,6 +23,7 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
@@ -39,6 +40,9 @@ import { RecordToolboxLaunchEventDto } from './dto/record-toolbox-launch-event.d
 import { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 import { ReportReleaseObservationDto } from './dto/report-release-observation.dto'
 import { ReleaseObservationService } from './release-observation.service'
+import { TerminalSessionService } from './terminal-session.service'
+import { TerminalIdentityGuard } from './terminal-identity.guard'
+import { ExchangeTerminalSessionDto } from './dto/exchange-terminal-session.dto'
 
 @Controller()
 export class TerminalsController {
@@ -47,6 +51,7 @@ export class TerminalsController {
     private readonly toolbox: TerminalToolboxService,
     private readonly capabilities: TerminalCapabilitiesService,
     private readonly releases: ReleaseObservationService,
+    private readonly terminalSessions: TerminalSessionService,
   ) {}
 
   // ── 1. Register ──────────────────────────────────────────────────────────
@@ -88,6 +93,31 @@ export class TerminalsController {
     return this.releases.getPlanForTerminal(terminalId, auth)
   }
 
+  // Agent credentials may mint a browser bootstrap ticket, but never enter the browser.
+  @Post('terminals/boot-ticket')
+  @HttpCode(HttpStatus.CREATED)
+  createBootTicket(
+    @Headers('x-terminal-id') terminalId: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    return this.terminalSessions.createBootTicket(terminalId, authorization)
+  }
+
+  @Post('terminals/session-token')
+  @HttpCode(HttpStatus.CREATED)
+  exchangeSessionToken(@Body() dto: ExchangeTerminalSessionDto) {
+    return this.terminalSessions.exchangeBootTicket(dto.bootTicket)
+  }
+
+  @Post('terminals/session-token/refresh')
+  @HttpCode(HttpStatus.CREATED)
+  refreshSessionToken(
+    @Headers('x-terminal-id') terminalId: string | undefined,
+    @Headers('x-terminal-session-token') sessionToken: string | undefined,
+  ) {
+    return this.terminalSessions.refresh(terminalId, sessionToken)
+  }
+
   @Put('terminals/:terminalId/release-observation')
   @HttpCode(HttpStatus.OK)
   reportReleaseObservation(
@@ -109,6 +139,7 @@ export class TerminalsController {
   // GET /api/v1/terminals/:terminalId/config
   @Get('terminals/:terminalId/config')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(TerminalIdentityGuard)
   getTerminalConfig(@Param('terminalId') terminalId: string) {
     return this.terminalsService.getKioskTerminalConfig(terminalId)
   }
@@ -118,6 +149,7 @@ export class TerminalsController {
   @Post('terminals/:terminalId/toolbox-events')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  @UseGuards(TerminalIdentityGuard)
   recordToolboxLaunchEvent(
     @Param('terminalId') terminalId: string,
     @Body() dto: RecordToolboxLaunchEventDto,

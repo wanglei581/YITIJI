@@ -16,6 +16,8 @@ import { TerminalScanDeletionAuditService } from './terminal-scan-deletion-audit
 import { ReleaseObservationService } from './release-observation.service'
 import { AdminReleaseObservationController } from './admin-release-observation.controller'
 import { TerminalHeartbeatRetentionTask } from './terminal-heartbeat-retention.task'
+import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from './terminal-session.service'
+import { TerminalIdentityGuard } from './terminal-identity.guard'
 
 @Module({
   imports: [JwtVerifierModule, FilesModule],
@@ -28,6 +30,7 @@ import { TerminalHeartbeatRetentionTask } from './terminal-heartbeat-retention.t
   ],
   providers: [
     TerminalAgentService,
+    { provide: TERMINAL_TOKEN_VALIDATOR, useExisting: TerminalsService },
     TerminalCredentialSecurityService,
     TerminalScanDeletionAuditService,
     ReleaseObservationService,
@@ -37,6 +40,8 @@ import { TerminalHeartbeatRetentionTask } from './terminal-heartbeat-retention.t
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
     TerminalHeartbeatRetentionTask,
+    TerminalSessionService,
+    TerminalIdentityGuard,
   ],
   exports: [
     TerminalAgentService,
@@ -45,6 +50,8 @@ import { TerminalHeartbeatRetentionTask } from './terminal-heartbeat-retention.t
     TerminalToolboxService,
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
+    TerminalSessionService,
+    TerminalIdentityGuard,
   ],
 })
 export class TerminalsModule {}
