@@ -5,7 +5,7 @@
 // lifecycle，不看心跳。结果是打印机离线也能建单收款，钱收了纸不出，只能人工退款。
 //
 // 口径：
-//   - 最近一条心跳超过 PRINTER_ONLINE_WINDOW_MS（3 分钟，与 Admin 终端列表 /
+//   - 最近一条心跳超过 PRINTER_ONLINE_WINDOW_MS（5 分钟，与 Admin 终端列表 /
 //     派生告警同窗口）或从未上报 → 视为离线。
 //   - 心跳的 printerStatus 落在 UNAVAILABLE_PRINTER_STATUSES → 视为不可用。
 //   - 判定 fail-closed；只在 PRINT_REQUIRE_PRINTER_ONLINE=true 时生效，
@@ -15,7 +15,9 @@
 import { BadRequestException } from '@nestjs/common'
 import type { PrismaService } from '../prisma/prisma.service'
 
-export const PRINTER_ONLINE_WINDOW_MS = 3 * 60 * 1000
+/** 心跳上报窗口为五分钟；所有终端读取点共用，避免前后台状态分裂。 */
+export const TERMINAL_ONLINE_WINDOW_MS = 5 * 60 * 1000
+export const PRINTER_ONLINE_WINDOW_MS = TERMINAL_ONLINE_WINDOW_MS
 
 /** Agent 心跳 printerStatus 枚举里，明确不能出纸的取值。unknown 不在其中：
  *  驱动查询失败或未配置时是 unknown，由 Kiosk 端 fail-closed 展示，这里不重复拦。 */

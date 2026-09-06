@@ -156,6 +156,20 @@ async function main(): Promise<void> {
     '模板下载路由受 Partner 鉴权并返回 xlsx 附件',
   )
   mustContain(
+    controller,
+    [
+      "@Get('partner/jobs/quality-summary')",
+      '@PaidAiThrottle(30)',
+      'getPartnerJobQualitySummary',
+    ],
+    'quality-summary 是付费 AI 读取端点，明确受 PaidAiThrottle 限流',
+  )
+  if (!/@Get\('partner\/jobs\/quality-summary'\)\s+@UseGuards\(JwtAuthGuard, RolesGuard\)\s+@Roles\('partner'\)\s+@PaidAiThrottle\(30\)\s+getPartnerJobQualitySummary/s.test(controller)) {
+    fail('PaidAiThrottle 必须在 quality-summary 的同一装饰器栈，不能漂移到写路径')
+  } else {
+    pass('PaidAiThrottle 精确绑定 quality-summary，不误限流导入/编辑/确认写路径')
+  }
+  mustContain(
     template,
     [
       'JOB_TEMPLATE_FIELDS',

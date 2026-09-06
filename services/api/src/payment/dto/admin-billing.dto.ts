@@ -24,6 +24,11 @@ export class AdminUpdatePriceConfigDto {
   @Max(1_000_000)
   unitCents?: number
 
+  /** 0 元会绕过收银，必须由管理员的二次确认显式提交。 */
+  @IsOptional()
+  @IsBoolean()
+  confirmZeroPrice?: boolean
+
   @IsOptional()
   @IsBoolean()
   active?: boolean

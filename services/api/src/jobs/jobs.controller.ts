@@ -435,12 +435,11 @@ export class JobsController {
   @Get('partner/jobs/quality-summary')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(30)
   getPartnerJobQualitySummary(@CurrentUser() user: AuthedUser) {
     if (!user.orgId) throw new BadRequestException({ error: { code: 'ORG_REQUIRED', message: '合作机构账号未绑定机构' } })
     return this.jobQuality.getSourceQualitySummary({ sourceOrgId: user.orgId })
   }
-  @PaidAiThrottle(10)
-
   /**
    * Phase #5 — Partner 导入岗位(只能写入自己机构,默认 pending+draft)。
    *
@@ -470,8 +469,6 @@ export class JobsController {
   ) {
     return this.jobsService.unpublishPartnerJob(id, user)
   }
-  @PaidAiThrottle(30)
-
   /**
    * 阶段1C — Partner 编辑本机构岗位(展示字段白名单)。
    * 编辑成功后强制回 pending+draft 重审;externalId / 来源字段不可改。
@@ -659,8 +656,6 @@ export class JobsController {
       user,
     })
   }
-  @PaidAiThrottle(10)
-
   @Post('partner/excel/:batchId/confirm')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')

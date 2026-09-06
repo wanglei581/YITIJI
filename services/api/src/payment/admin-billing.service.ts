@@ -71,24 +71,31 @@ export class AdminBillingService {
       next.active !== existing.active ||
       (next.description ?? null) !== (existing.description ?? null)
     if (!changed) throw new BadRequestException('PRICE_PATCH_NO_CHANGE')
+    if (next.unitCents === 0 && patch.confirmZeroPrice !== true) {
+      throw new BadRequestException({ error: { code: 'ZERO_PRICE_CONFIRMATION_REQUIRED', message: '设置 0 元会跳过收银，需明确确认' } })
+    }
 
-    const updated = await this.prisma.priceConfig.update({
-      where: { serviceKey },
-      data: { unitCents: next.unitCents, active: next.active, description: next.description },
-    })
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.priceConfig.update({
+        where: { serviceKey },
+        data: { unitCents: next.unitCents, active: next.active, description: next.description },
+      })
 
-    await this.audit.write({
-      // actorId 是 User 外键；管理端操作员放 payload（与 order 域 Admin 动作同口径）。
-      actorId: null,
-      actorRole: 'system',
-      action: 'price.updated',
-      targetType: 'price_config',
-      targetId: serviceKey,
-      payload: {
-        operatorId,
-        old: { unitCents: existing.unitCents, active: existing.active, description: existing.description ?? null },
-        new: { unitCents: updated.unitCents, active: updated.active, description: updated.description ?? null },
-      },
+      await this.audit.writeRequired(tx, {
+        // actorId 是 User 外键；管理端操作员放 payload（与 order 域 Admin 动作同口径）。
+        actorId: null,
+        actorRole: 'system',
+        action: 'price.updated',
+        targetType: 'price_config',
+        targetId: serviceKey,
+        payload: {
+          operatorId,
+          old: { unitCents: existing.unitCents, active: existing.active, description: existing.description ?? null },
+          new: { unitCents: saved.unitCents, active: saved.active, description: saved.description ?? null },
+          ...(saved.unitCents === 0 ? { zeroPriceConfirmed: true, zeroPriceCashierBypass: 'paid/free' } : {}),
+        },
+      })
+      return saved
     })
 
     return {

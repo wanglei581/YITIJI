@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { ContentService } from '../src/content/content.service'
+import { AuditService } from '../src/audit/audit.service'
 
 /**
  * 外部视频直链 service 层集成验证(打 dev.db,自清理)。
@@ -25,7 +26,7 @@ const EXT_URL = 'https://cdn.example.com/verify/promo.mp4'
 async function main(): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
-  const content = new ContentService(prisma, new StorageService())
+  const content = new ContentService(prisma, new StorageService(), new AuditService(prisma))
 
   let assetId: string | null = null
   let playlistId: string | null = null

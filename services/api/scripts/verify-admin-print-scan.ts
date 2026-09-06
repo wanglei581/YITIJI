@@ -76,6 +76,12 @@ async function expectHttpErrorCode(
 async function main() {
   console.log('\n=== Task 10 Admin print-scan 任务中心 + 能力开关验证 ===')
 
+  const serviceSource = readFileSync(join(__dirname, '../src/admin-print-scan/admin-print-scan.service.ts'), 'utf8')
+  if (!/this\.prisma\.\$transaction[\s\S]*this\.audit\.writeRequired/s.test(serviceSource)) {
+    fail('API-26：admin print-scan 写动作必须在事务内 writeRequired，审计失败不得返回 success')
+  }
+  pass('API-26：admin print-scan 写动作与 required audit 同事务')
+
   // ── 0. 契约镜像防漂移（W-6）：shared SSOT 与 API 本地镜像必须结构一致 ──────
   assertDeepEqual(apiContract.PRINT_SCAN_CAPABILITY_KEYS, sharedContract.PRINT_SCAN_CAPABILITY_KEYS, '能力键列表')
   assertDeepEqual(apiContract.PRINT_SCAN_CAPABILITY_STATUSES, sharedContract.PRINT_SCAN_CAPABILITY_STATUSES, '能力状态列表')

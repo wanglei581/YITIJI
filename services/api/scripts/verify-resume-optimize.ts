@@ -51,6 +51,7 @@ import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
 import { LlmResumeGenerateService } from '../src/ai/resume/llm-resume-generate.service'
 import { LlmResumeOptimizeService } from '../src/ai/resume/llm-resume-optimize.service'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
+import { RedisInflightLock } from '../src/ai/redis-inflight-lock'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exitCode = 1; throw new Error(m) }
@@ -98,6 +99,58 @@ let llmCallCount = 0
 let stubDelayMs = 0
 /** 桩自身出问题(队列耗尽 / prompt 里找不到该有的东西)时记在这里,必须显性红。 */
 let stubFault = ''
+
+async function verifyRedisInflightLock(): Promise<void> {
+  let held = false
+  let workCalls = 0
+  const redis = {
+    setNxPx: async () => {
+      if (held) return false
+      held = true
+      return true
+    },
+    getAndDelIfEquals: async () => {
+      held = false
+      return 'matched'
+    },
+  }
+  const firstLock = new RedisInflightLock(redis as never)
+  const secondLock = new RedisInflightLock(redis as never)
+  const first = firstLock.run('verify:resume-optimize', 1_000, async () => {
+    workCalls += 1
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    return 'done'
+  })
+  let duplicateCode: string | undefined
+  try {
+    await secondLock.run('verify:resume-optimize', 1_000, async () => {
+      workCalls += 1
+      return 'duplicate'
+    })
+  } catch (error) {
+    duplicateCode = errCode(error)
+  }
+  if (await first !== 'done' || duplicateCode !== 'AI_REQUEST_IN_PROGRESS' || workCalls !== 1) {
+    fail(`0. Redis NX 跨实例并发必须只执行一次，code=${duplicateCode}, calls=${workCalls}`)
+  }
+
+  const broken = new RedisInflightLock({
+    setNxPx: async () => { throw new Error('redis down') },
+  } as never)
+  let failureCode: string | undefined
+  try {
+    await broken.run('verify:resume-optimize:down', 1_000, async () => {
+      workCalls += 1
+      return 'must-not-run'
+    })
+  } catch (error) {
+    failureCode = errCode(error)
+  }
+  if (failureCode !== 'AI_IDEMPOTENCY_UNAVAILABLE' || workCalls !== 1) {
+    fail(`0. Redis 故障必须 fail-closed 且不执行付费工作，code=${failureCode}, calls=${workCalls}`)
+  }
+  pass('0. Redis NX 锁：两并发只执行一次；Redis 故障 fail-closed 不双跑')
+}
 let lastUserPrompt = ''
 const setResponses = (arr: StubEntry[]) => { responseQueue = arr.slice(); llmCallCount = 0; stubFault = '' }
 const assertStubHealthy = () => { if (stubFault) fail(stubFault) }
@@ -173,6 +226,7 @@ function buildOptimize(prompt: string, mut?: StubMutate): string | null {
 
 async function main(): Promise<void> {
   console.log('\n=== 阶段2B AI 简历优化真实化验证 ===')
+  await verifyRedisInflightLock()
 
   Logger.overrideLogger({ log: () => {}, error: () => {}, warn: () => {}, debug: () => {}, verbose: () => {}, fatal: () => {} })
 
@@ -261,6 +315,10 @@ async function main(): Promise<void> {
   const pdf = new ResumePdfService()
   const emptyStub = {} as never
   const logStub = { record: () => {} } as never
+  const redis = {
+    setNxPx: async () => true,
+    getAndDelIfEquals: async () => 'matched',
+  } as never
 
   const build = (cfg: unknown) =>
     new AiService(
@@ -274,6 +332,9 @@ async function main(): Promise<void> {
       files,
       prisma,
       audit as never,
+      undefined,
+      undefined,
+      redis,
     )
   const ai = build(bothCfg)
   const aiOptimizeOff = build(diagOnlyCfg)

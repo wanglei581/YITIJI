@@ -90,6 +90,14 @@ export interface ToolboxAdminAllowedHostView extends ToolboxAllowedHostInput {
   updatedAt: string
 }
 
+export interface ToolboxAllowedHostMutationResult extends Record<string, unknown> {
+  id: string
+  host: string
+  purpose: string
+  status: string
+  expiresAt: string | null
+}
+
 interface ToolboxAppRow {
   id: string
   appKey: string
@@ -394,7 +402,7 @@ export class ToolboxGovernanceService {
     }
   }
 
-  async upsertAllowedHost(dto: UpsertToolboxAllowedHostDto, userId: string): Promise<{ host: string; purpose: string; status: string }> {
+  async upsertAllowedHost(dto: UpsertToolboxAllowedHostDto, userId: string): Promise<ToolboxAllowedHostMutationResult> {
     const host = normalizeHostInput(dto.host)
     const purpose = assertHostPurpose(dto.purpose)
     const expiresAt = parseOptionalDate(dto.expiresAt)
@@ -422,14 +430,14 @@ export class ToolboxGovernanceService {
         expiresAt,
       },
     })
-    return { host: saved.host, purpose: saved.purpose, status: saved.status }
+    return { id: saved.id, host: saved.host, purpose: saved.purpose, status: saved.status, expiresAt: saved.expiresAt?.toISOString() ?? null }
   }
 
   async reviewAllowedHost(
     id: string,
     dto: ReviewToolboxAllowedHostDto,
     reviewerId: string,
-  ): Promise<{ host: string; purpose: string; status: string }> {
+  ): Promise<ToolboxAllowedHostMutationResult> {
     const host = await this.prisma.toolboxAllowedHost.findUnique({ where: { id } })
     if (!host) throw new NotFoundException({ error: { code: 'TOOLBOX_HOST_NOT_FOUND', message: '允许域名不存在' } })
     assertReviewer(host.updatedBy ?? host.createdBy, reviewerId)
@@ -444,7 +452,7 @@ export class ToolboxGovernanceService {
         expiresAt: parseOptionalDate(dto.expiresAt) ?? host.expiresAt,
       },
     })
-    return { host: saved.host, purpose: saved.purpose, status: saved.status }
+    return { id: saved.id, host: saved.host, purpose: saved.purpose, status: saved.status, expiresAt: saved.expiresAt?.toISOString() ?? null }
   }
 
   private async findApp(appKey: string): Promise<ToolboxAppRow> {

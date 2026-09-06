@@ -431,6 +431,12 @@ export class RedisService implements OnModuleDestroy {
     return res === 'OK'
   }
 
+  /** SET key value NX PX ttl — 跨实例短任务锁使用毫秒 TTL，Redis 错误必须向上抛出。 */
+  async setNxPx(key: string, value: string, ttlMs: number): Promise<boolean> {
+    const res = await this.client.set(key, value, 'PX', ttlMs, 'NX')
+    return res === 'OK'
+  }
+
   /** INCR 并在首次出现时设置过期,返回自增后的值(用于滑动窗口计数)。 */
   async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
     const result = await this.client.eval(

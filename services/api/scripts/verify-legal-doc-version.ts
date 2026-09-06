@@ -97,6 +97,22 @@ async function main() {
     pass('legal.controller.ts 注册了 GET /kiosk/legal/:type')
   }
 
+  // ── 4a. 未知类型不得静默回落服务条款 ─────────────────────────────────
+  {
+    const controller = new LegalController({ getActive: async () => { throw new Error('unknown type must not reach service') } } as never)
+    try {
+      await controller.getActive('not-a-legal-document')
+      fail('未知 legal type 不得返回服务条款')
+    } catch (error) {
+      const status = (error as { getStatus?: () => number }).getStatus?.()
+      const body = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+      if (status !== 404 || body?.error?.code !== 'LEGAL_DOC_TYPE_UNKNOWN') {
+        fail('未知 legal type 必须返回 404 LEGAL_DOC_TYPE_UNKNOWN')
+      }
+    }
+    pass('未知 legal type → 404 LEGAL_DOC_TYPE_UNKNOWN，不回落服务条款')
+  }
+
   // ── 5. activate 方法写入 auditLog ────────────────────────────────────────
   {
     const service = readFile('services/api/src/legal/legal.service.ts')

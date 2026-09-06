@@ -24,7 +24,6 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
-import { AuditService } from '../audit/audit.service'
 import { ContentService } from './content.service'
 import { getMediaLimits } from './media-validation'
 import { verifyAdAssetSignature } from './content-signing'
@@ -65,7 +64,6 @@ const UPLOAD_HARD_LIMIT = getMediaLimits().maxVideoBytes + 4 * 1024 * 1024
 export class ContentController {
   constructor(
     private readonly content: ContentService,
-    private readonly audit: AuditService,
   ) {}
 
   // ── 素材(admin)──────────────────────────────────────────────────────────
@@ -89,11 +87,7 @@ export class ContentController {
       title: dto.title,
       durationSec: dto.durationSec,
       createdBy: user.userId,
-    })
-    await this.writeAudit(req, user, 'ad_asset.upload', 'ad_asset', asset.id, {
-      type: asset.type,
-      title: asset.title,
-      sizeBytes: asset.sizeBytes,
+      audit: auditInput(req, user),
     })
     return asset
   }
@@ -111,11 +105,7 @@ export class ContentController {
       title: dto.title,
       durationSec: dto.durationSec,
       createdBy: user.userId,
-    })
-    await this.writeAudit(req, user, 'ad_asset.create_external', 'ad_asset', asset.id, {
-      type: asset.type,
-      title: asset.title,
-      externalUrl: asset.externalUrl,
+      audit: auditInput(req, user),
     })
     return asset
   }
@@ -144,8 +134,7 @@ export class ContentController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ) {
-    const asset = await this.content.updateAsset(id, dto)
-    await this.writeAudit(req, user, 'ad_asset.update', 'ad_asset', id, { ...dto })
+    const asset = await this.content.updateAsset(id, dto, auditInput(req, user))
     return asset
   }
 
@@ -153,8 +142,7 @@ export class ContentController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async deleteAsset(@Param('id') id: string, @CurrentUser() user: AuthedUser, @Req() req: AuditReq) {
-    const asset = await this.content.deleteAsset(id)
-    await this.writeAudit(req, user, 'ad_asset.delete', 'ad_asset', id, { title: asset.title })
+    const asset = await this.content.deleteAsset(id, auditInput(req, user))
     return asset
   }
 
@@ -176,10 +164,7 @@ export class ContentController {
       status: dto.status,
       items: dto.items,
       createdBy: user.userId,
-    })
-    await this.writeAudit(req, user, 'ad_playlist.create', 'ad_playlist', playlist.id, {
-      name: playlist.name,
-      itemCount: playlist.itemCount,
+      audit: auditInput(req, user),
     })
     return playlist
   }
@@ -193,11 +178,7 @@ export class ContentController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ) {
-    const playlist = await this.content.updatePlaylist(id, { name: dto.name, status: dto.status, items: dto.items })
-    await this.writeAudit(req, user, 'ad_playlist.update', 'ad_playlist', id, {
-      name: playlist.name,
-      itemCount: playlist.itemCount,
-    })
+    const playlist = await this.content.updatePlaylist(id, { name: dto.name, status: dto.status, items: dto.items }, auditInput(req, user))
     return playlist
   }
 
@@ -206,8 +187,7 @@ export class ContentController {
   @Roles('admin')
   @HttpCode(HttpStatus.OK)
   async deletePlaylist(@Param('id') id: string, @CurrentUser() user: AuthedUser, @Req() req: AuditReq) {
-    await this.content.deletePlaylist(id)
-    await this.writeAudit(req, user, 'ad_playlist.delete', 'ad_playlist', id, {})
+    await this.content.deletePlaylist(id, auditInput(req, user))
     return { success: true }
   }
 
@@ -240,12 +220,8 @@ export class ContentController {
       terminalId,
       { enabled: dto.enabled, idleTimeoutSec: dto.idleTimeoutSec, playlistId: dto.playlistId ?? null },
       user.userId,
+      auditInput(req, user),
     )
-    await this.writeAudit(req, user, 'screensaver_config.update', 'screensaver_config', terminalId, {
-      enabled: config.enabled,
-      idleTimeoutSec: config.idleTimeoutSec,
-      playlistId: config.playlistId,
-    })
     return config
   }
 
@@ -304,28 +280,6 @@ export class ContentController {
     res.send(buffer)
   }
 
-  // ── 审计 helper ──────────────────────────────────────────────────────────
-
-  private async writeAudit(
-    req: AuditReq,
-    user: AuthedUser,
-    action: string,
-    targetType: string,
-    targetId: string,
-    payload: Record<string, unknown>,
-  ): Promise<void> {
-    await this.audit.write({
-      actorId: user.userId,
-      actorRole: user.role,
-      action,
-      targetType,
-      targetId,
-      payload,
-      ipAddress: extractIp(req),
-      userAgent: extractUa(req),
-      requestId: req.requestId ?? null,
-    })
-  }
 }
 
 interface AuditReq {
@@ -344,6 +298,16 @@ function extractUa(req: AuditReq): string | null {
   if (typeof ua === 'string') return ua.slice(0, 256)
   if (Array.isArray(ua) && ua[0]) return ua[0].slice(0, 256)
   return null
+}
+
+function auditInput(req: AuditReq, user: AuthedUser) {
+  return {
+    actorId: user.userId,
+    actorRole: user.role,
+    ipAddress: extractIp(req),
+    userAgent: extractUa(req),
+    requestId: req.requestId ?? null,
+  }
 }
 
 /**

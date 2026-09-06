@@ -178,6 +178,14 @@ async function verifyMalformedContractCleanup(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const sensitiveService = new FilesService({} as never, {} as never, {} as never)
+  const resolveSensitiveLevel = (sensitiveService as unknown as {
+    resolveSensitiveLevel(purpose: string, explicit?: string): string
+  }).resolveSensitiveLevel.bind(sensitiveService)
+  assert.equal(resolveSensitiveLevel('id_scan', 'normal'), 'highly_sensitive')
+  assert.equal(resolveSensitiveLevel('print_doc', 'highly_sensitive'), 'highly_sensitive')
+  console.log('  PASS API-29 客户端 sensitiveLevel 只能升级，id_scan 不可降级')
+
   assert.equal(
     defaultRetentionForUpload({
       purpose: 'resume_upload',

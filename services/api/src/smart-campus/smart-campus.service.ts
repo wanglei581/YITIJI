@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import { TerminalToolboxService } from '../terminals/terminal-toolbox.service'
 import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import {
@@ -11,7 +12,6 @@ import {
   type TerminalSmartCampusConfigView,
 } from './smart-campus.types'
 
-const ONLINE_THRESHOLD_MS = 2 * 60 * 1000
 
 /** 解析 modulesJson 为强类型开关位，缺失/损坏一律按 false（默认全关）。 */
 function parseModules(json: string): SmartCampusModules {
@@ -142,7 +142,7 @@ export class SmartCampusService {
         // 任意行更新都会刷新，断电终端也会显示「在线」。改用最新真实心跳判定。
         isOnline: (() => {
           const lastHeartbeatAt = t.heartbeats[0]?.createdAt
-          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < ONLINE_THRESHOLD_MS
+          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < TERMINAL_ONLINE_WINDOW_MS
         })(),
         config: config ? toConfigView(config) : null,
       }
@@ -192,7 +192,7 @@ export class SmartCampusService {
         // 任意行更新都会刷新，断电终端也会显示「在线」。改用最新真实心跳判定。
         isOnline: (() => {
           const lastHeartbeatAt = t.heartbeats[0]?.createdAt
-          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < ONLINE_THRESHOLD_MS
+          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < TERMINAL_ONLINE_WINDOW_MS
         })(),
         config: config ? toConfigView(config) : null,
       }

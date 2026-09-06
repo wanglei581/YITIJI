@@ -1,5 +1,6 @@
 import type { PrismaService } from '../prisma/prisma.service'
 import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus } from '../terminals/printer-status'
+import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import {
   buildSubjectKey,
   offlineEpisodeToken,
@@ -8,8 +9,8 @@ import {
   type DerivedAlertType,
 } from './derived-alert-identity'
 
-/** 与 terminals.service 同口径:lastSeen 距今 < 3 分钟 = 在线。 */
-export const ONLINE_WINDOW_MS = 3 * 60 * 1000
+/** 与终端心跳五分钟窗口同口径。 */
+export const ONLINE_WINDOW_MS = TERMINAL_ONLINE_WINDOW_MS
 /** 打印失败告警回看窗口。 */
 export const FAILED_LOOKBACK_MS = 24 * 60 * 60 * 1000
 

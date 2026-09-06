@@ -24,7 +24,8 @@ import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { findJobMaterialTemplate } from '../job-materials/job-material-templates'
-import { InflightCoalescer } from './ai-inflight'
+import { RedisInflightLock } from './redis-inflight-lock'
+import { RedisService } from '../common/redis/redis.service'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -99,7 +100,7 @@ function verifyAccessToken(token: string | null, expectedHash: string): boolean 
 export class AiService {
   private readonly logger = new Logger(AiService.name)
   private readonly provider: AiProvider
-  private readonly optimizeInflight = new InflightCoalescer<OptimizeResumeOutput>()
+  private readonly optimizeLock: RedisInflightLock
 
   constructor(
     private readonly mockProvider: MockAiProvider,
@@ -121,7 +122,9 @@ export class AiService {
     // (services/api/scripts/verify-*.ts 里 new AiService(...) 按位置传参)。
     private readonly resumeDocx: ResumeDocxService,
     private readonly resumeText: ResumeTextService,
+    redis?: RedisService,
   ) {
+    this.optimizeLock = new RedisInflightLock(redis)
     const rawName = process.env['AI_PROVIDER'] ?? 'mock'
     if (!(KNOWN_PROVIDERS as readonly string[]).includes(rawName)) {
       throw new InternalServerErrorException({
@@ -353,7 +356,7 @@ export class AiService {
   ): Promise<OptimizeResumeOutput> {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
-    return this.optimizeInflight.run(taskId, () => this.computeResumeOptimize(taskId, requester))
+    return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester))
   }
 
   private async computeResumeOptimize(
