@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   HttpException,
   Inject,
@@ -12,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { ContractReviewReportFileService } from './contract-review-report-file.service'
 import { ContractReviewReportPdfService } from './contract-review-report-pdf.service'
 import type {
+  ContractReviewKeepView,
   ContractReviewReportView,
   ContractReviewResult,
   ContractReviewTaskRow,
@@ -111,6 +113,46 @@ export class ContractReviewReportService {
       // 只有尚未挂到任务上的候选文件才允许补偿清理。
       if (!won) await this.deleteCandidate(candidate.fileId)
       throw error
+    }
+  }
+
+  async keep(args: {
+    task: ContractReviewTaskRow
+    result: ContractReviewResult
+    endUserId: string
+  }): Promise<ContractReviewKeepView> {
+    if (!this.enabled) throw reportUnavailable(false)
+    if (!args.endUserId || args.task.endUserId !== args.endUserId) {
+      throw new BadRequestException({
+        error: {
+          code: 'CONTRACT_REVIEW_KEEP_LOGIN_REQUIRED',
+          message: '保存到「我的文档」需要登录本人会员账号',
+        },
+      })
+    }
+    const report = await this.create({ task: args.task, result: args.result })
+    const kept = await this.reportFiles.keep({ fileId: report.fileId, endUserId: args.endUserId })
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'enduser',
+      action: 'contract_review.report_kept',
+      targetType: 'file_object',
+      targetId: kept.fileId,
+      payload: {
+        taskId: args.task.id,
+        endUserId: args.endUserId,
+        retentionPolicy: 'months_3',
+      },
+    })
+    return {
+      fileId: kept.fileId,
+      filename: kept.filename,
+      mimeType: 'application/pdf',
+      sizeBytes: kept.sizeBytes,
+      expiresAt: kept.expiresAt.toISOString(),
+      retentionPolicy: 'months_3',
+      savedToDocuments: true,
+      allowedRetentionPolicies: ['system_short', 'months_3'],
     }
   }
 

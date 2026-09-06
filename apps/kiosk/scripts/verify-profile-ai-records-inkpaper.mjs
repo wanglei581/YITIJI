@@ -63,6 +63,8 @@ expectIncludes(aiRecords, 'KIcon', 'MyAiRecordsPage 复用 KIcon 图标系统')
 
 expectIncludes(aiRecords, 'getMyAiRecords(token, { pageSize: 50 })', 'MyAiRecordsPage 保留本人 AI 记录真实 API 拉取')
 expectIncludes(aiRecords, 'listMyJobAiSessions(token, { pageSize: 50 })', 'MyAiRecordsPage 保留岗位 AI 会话真实 API 拉取')
+expectIncludes(aiRecords, 'getMyInterviews(token)', 'MyAiRecordsPage 模拟面试分区来自 /me/mock-interviews')
+expectIncludes(aiRecords, 'MockInterviewRecords', 'MyAiRecordsPage 渲染模拟面试分区组件')
 expectIncludes(aiRecords, 'deleteMyAiRecord(token, record.id)', 'MyAiRecordsPage 保留本人 AI 记录删除接口')
 expectIncludes(aiRecords, 'deleteMyJobAiSession(token, sessionId)', 'MyAiRecordsPage 保留岗位 AI 会话删除接口')
 expectIncludes(aiRecords, 'confirmId !== record.id', 'MyAiRecordsPage 保留本人 AI 记录二次确认删除')

@@ -204,6 +204,10 @@ async function main() {
       const report = await svc.end(created.sessionId, requester)
       if (report.report.overall.level !== 'good') fail('1. 报告 overall 解析错误')
       if (report.report.checklist.length < 3) fail('1. 报告 checklist 缺失')
+      if (!Array.isArray(report.qaExcerpts) || report.qaExcerpts.length < 1) fail('1. 报告缺少问答摘录')
+      if (!report.qaExcerpts[0]?.question) fail('1. 问答摘录缺题目')
+      if (!String(report.qaExcerpts[0]?.answerExcerpt ?? '').includes('机密标记XYZQ')) fail('1. 问答摘录未截取用户回答')
+      if (report.includeAnswersInPrint !== true) fail('1. 默认应打印回答')
       pass('1. 匿名完整闭环：创建→6 题→done→报告结构完整')
       pass('2. 题量硬控制：第 6 题后 done:true，无超发问题')
 
@@ -529,7 +533,21 @@ async function main() {
       )
       if (pageCount < 1) fail('11. pageCount 应 ≥1')
       if (buffer.slice(0, 4).toString() !== '%PDF') fail('11. 输出不是 PDF')
-      pass(`11. 报告 PDF 真实渲染（${buffer.length} bytes / ${pageCount} 页）`)
+      const withAnswers = await pdf.render(
+        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11' },
+        VALID_REPORT,
+        { excerpts: [{ question: SECRET_QUESTION, answerExcerpt: SECRET_ANSWER.slice(0, 200), skipped: false }], includeAnswers: true },
+      )
+      const withoutAnswers = await pdf.render(
+        { position: '前端开发工程师', industry: '互联网 / AI', interviewerLabel: '技术面试官', date: '2026-06-11' },
+        VALID_REPORT,
+        { excerpts: [{ question: SECRET_QUESTION, answerExcerpt: SECRET_ANSWER.slice(0, 200), skipped: false }], includeAnswers: false },
+      )
+      if (withAnswers.buffer.slice(0, 4).toString() !== '%PDF' || withoutAnswers.buffer.slice(0, 4).toString() !== '%PDF') {
+        fail('11b. 问答摘录开关两份输出都必须是 PDF')
+      }
+      if (withAnswers.buffer.equals(withoutAnswers.buffer)) fail('11b. 不打印回答必须改变 PDF 内容')
+      pass(`11. 报告 PDF 真实渲染（${buffer.length} bytes / ${pageCount} 页）含问答摘录开关`)
     }
 
     // ── 15. ai-down：模型挂掉时仍然拿得到一张纸 ──────────────────────────────

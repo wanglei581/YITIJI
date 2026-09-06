@@ -759,14 +759,6 @@ const api = {
     });
   },
 
-  /** 结束面试。实测 27s,直接返回完整报告(与 getInterviewReport 同形) */
-  endInterview(sessionId, accessToken) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
-    return request(`/mock-interviews/${sessionId}/end`, {
-      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
-    });
-  },
-
   /** 读取面试报告(已结束的会话,秒回) */
   getInterviewReport(sessionId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
@@ -791,6 +783,71 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
     return request(`/mock-interviews/${sessionId}/report/print`, {
       method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /**
+   * 结束面试。opts.includeAnswersInPrint=false 时打印件不含回答转写。
+   * 不传则默认打印回答摘录。
+   */
+  endInterview(sessionId, accessToken, opts) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    const includeAnswersInPrint = !(opts && opts.includeAnswersInPrint === false);
+    return request(`/mock-interviews/${sessionId}/end`, {
+      method: 'POST',
+      data: { includeAnswersInPrint },
+      header: interviewHeader(accessToken),
+      needAuth: true,
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /** 本人模拟面试历史。需登录。{ items, nextCursor } */
+  getMyMockInterviews(params) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return unwrapList(request('/me/mock-interviews', {
+      method: 'GET', data: params || {}, needAuth: true,
+    }));
+  },
+
+  deleteMyMockInterview(sessionId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return request(`/me/mock-interviews/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE', needAuth: true,
+    });
+  },
+
+  /**
+   * AI 不可用时的降级题目单。不调模型，返回真实 PDF 元数据（variant=degraded）。
+   */
+  printInterviewPracticeSheet(sessionId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return request(`/mock-interviews/${sessionId}/practice-sheet`, {
+      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /**
+   * 模拟面试语音转写。multipart 字段名必须是 audio。
+   * 无麦克风权限时页面应退回文字，不要假装转写成功。
+   */
+  transcribeInterviewAnswer(sessionId, filePath, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return uploadFile(`/mock-interviews/${encodeURIComponent(sessionId)}/transcribe`, filePath, {
+      name: 'audio',
+      header: interviewHeader(accessToken),
+      needAuth: true,
+      timeout: config.aiTimeout,
+    }).then((res) => ({
+      text: res && typeof res.text === 'string' ? res.text : '',
+    }));
+  },
+
+  /** 本人确认后把签约风险报告保存到「我的文档」（90 天，不可打印）。 */
+  keepContractReviewReport(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('签约风险提示'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}/report/keep`, {
+      method: 'POST', needAuth: true, timeout: 60000,
     });
   },
 

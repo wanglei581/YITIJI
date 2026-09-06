@@ -129,6 +129,10 @@
         </view>
         <view class="cr-empty" wx:if="{{!report.findings.length}}">本次未识别到需要特别提示的条款。这不代表合同没有问题，仅代表规则与模型未命中。</view>
         <view class="cr-note">结果由 AI 生成，可能存在错误或遗漏，不构成法律意见。涉及争议请咨询劳动监察或法律援助。免责声明版本 {{report.disclaimerVersion}}。</view>
+        <view class="cr-cta tap {{keepBusy || keepDone ? '' : ''}}" hover-class="tap-press" bindtap="keepReport" role="button" aria-label="保存到我的文档">
+          {{keepDone ? '已保存到我的文档' : (keepBusy ? '正在保存…' : '保存到我的文档')}}
+        </view>
+        <view class="cr-note">保存后仅本人可在「我的文档」查看，期限 90 天，可随时删除；报告不可打印。合同原件仍按短期策略删除。</view>
         <view class="cr-sub tap" hover-class="tap-press" bindtap="discard" role="button" aria-label="删除本次记录">删除本次记录</view>
       </block>
 

@@ -159,6 +159,18 @@ export interface ContractReviewReportView {
   abandonTokenExpiresAt: string
 }
 
+/** 本人确认后保存到「我的文档」的窄结果。不含打印 URL。 */
+export interface ContractReviewKeepView {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  expiresAt: string
+  retentionPolicy: 'months_3'
+  savedToDocuments: true
+  allowedRetentionPolicies: Array<'system_short' | 'months_3'>
+}
+
 export interface ContractReviewTaskView {
   id: string
   status: ContractReviewStatus

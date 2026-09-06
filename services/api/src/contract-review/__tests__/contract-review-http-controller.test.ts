@@ -67,6 +67,12 @@ class LifecycleHarness {
     throw new ServiceUnavailableException('REPORT_NOT_AVAILABLE')
   }
 
+  async keepReport(id: string, requester: ContractReviewRequester): Promise<never> {
+    this.calls.push({ method: 'keep', id, requester })
+    rejectSourceProofReplay(requester)
+    throw new ServiceUnavailableException('REPORT_NOT_AVAILABLE')
+  }
+
   async remove(id: string, requester: ContractReviewRequester) {
     this.calls.push({ method: 'remove', id, requester })
     rejectSourceProofReplay(requester)

@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
+const voice = require('../../utils/voice-recorder')
 
 Page({
   data: {
@@ -19,6 +20,11 @@ Page({
     qType:          '',
     myAnswer:       '',
     failMsg:        '',
+    voiceAvailable: false,
+    recStatus:      'idle',
+    recError:       '',
+    omitPrintAnswers: false,
+    practiceBusy:   false,
   },
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
@@ -32,6 +38,9 @@ Page({
       return
     }
     this.setData({ sessionId, accessToken, position, questionTarget })
+    voice.ensureRecordAuth().then((ok) => {
+      this.setData({ voiceAvailable: !!ok })
+    })
     this._start()
   },
   async _start() {
@@ -46,11 +55,11 @@ Page({
         myAnswer:       '',
       })
     } catch (err) {
-      const code = err.error?.code || ''
+      const code = err.error?.code || err.code || ''
       if (code === 'INTERVIEW_SESSION_NOT_FOUND') {
         this._fail('面试会话不存在或无权访问')
       } else {
-        this._fail(err.error?.message || '面试初始化失败，请返回重试')
+        this._fail(err.error?.message || err.message || '面试初始化失败。AI 不可用时可打印通用题目单。')
       }
     }
   },
@@ -76,10 +85,7 @@ Page({
         this.data.accessToken,
       )
       if (res.done) {
-        // 全部题目完成，跳到报告页（replace，不允许返回答题页）
-        wx.redirectTo({
-          url: `/pages/interview-result/interview-result?sessionId=${this.data.sessionId}`,
-        })
+        this._goResult()
       } else {
         this.setData({
           phase:   'running',
@@ -96,4 +102,82 @@ Page({
     }
   },
   _fail(failMsg) { this.setData({ phase: 'failed', failMsg }) },
+  toggleOmit(e) {
+    const v = e.detail && e.detail.value
+    this.setData({ omitPrintAnswers: Array.isArray(v) ? v.length > 0 : !!v })
+  },
+  _goResult() {
+    const saved = storage.get(storage.KEYS.INTERVIEW_SESSION) || {}
+    storage.set(storage.KEYS.INTERVIEW_SESSION, {
+      ...saved,
+      sessionId: this.data.sessionId,
+      accessToken: this.data.accessToken,
+      omitPrintAnswers: this.data.omitPrintAnswers,
+    })
+    wx.redirectTo({
+      url: `/pages/interview-result/interview-result?sessionId=${this.data.sessionId}`,
+    })
+  },
+  tapVoice() {
+    if (!this.data.voiceAvailable) {
+      wx.showToast({ title: '没有麦克风权限，请用文字作答', icon: 'none' })
+      return
+    }
+    if (this.data.recStatus === 'recording' || this.data.recStatus === 'transcribing') return
+    if (this.data.phase !== 'running') return
+    this.setData({ recStatus: 'recording', recError: '' })
+    voice.start(voice.QUESTION_MAX_MS)
+      .then((res) => {
+        const path = res && res.tempFilePath
+        if (!path) {
+          this.setData({ recStatus: 'idle' })
+          return
+        }
+        this._transcribe(path)
+      })
+      .catch((err) => {
+        const denied = err && (err.code === 'permission-denied' || err.code === 'unsupported')
+        this.setData({
+          recStatus: 'idle',
+          voiceAvailable: denied ? false : this.data.voiceAvailable,
+          recError: denied ? '没有麦克风权限，已改用文字输入' : ((err && err.message) || '录音失败，请改用文字'),
+        })
+      })
+  },
+  tapStopVoice() {
+    if (this.data.recStatus !== 'recording') return
+    voice.stop()
+  },
+  _transcribe(filePath) {
+    this.setData({ recStatus: 'transcribing' })
+    api.transcribeInterviewAnswer(this.data.sessionId, filePath, this.data.accessToken)
+      .then((res) => {
+        const text = String((res && res.text) || '').trim()
+        if (!text) {
+          this.setData({ recStatus: 'idle', recError: '没有识别到有效文字，请重说或改用文字输入' })
+          return
+        }
+        this.setData({ recStatus: 'idle', myAnswer: text, recError: '' })
+      })
+      .catch((err) => {
+        this.setData({
+          recStatus: 'idle',
+          recError: (err && err.message) || '转写失败，请改用文字输入',
+        })
+      })
+  },
+  tapPracticeSheet() {
+    if (this.data.practiceBusy) return
+    this.setData({ practiceBusy: true })
+    api.printInterviewPracticeSheet(this.data.sessionId, this.data.accessToken)
+      .then((file) => {
+        const name = encodeURIComponent((file && file.filename) || '模拟面试通用题目单.pdf')
+        const pages = Number(file && file.pageCount) > 0 ? Number(file.pageCount) : ''
+        wx.navigateTo({ url: `/pages/print-upload/print-upload?fileId=${file.fileId}&name=${name}&pages=${pages}` })
+      })
+      .catch((err) => {
+        wx.showToast({ title: (err && err.message) || '题目单生成失败', icon: 'none' })
+      })
+      .finally(() => this.setData({ practiceBusy: false }))
+  },
 })

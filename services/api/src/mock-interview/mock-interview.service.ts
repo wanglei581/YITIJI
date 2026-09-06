@@ -7,6 +7,11 @@ import { FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
 import { MockInterviewLlmService, type InterviewReportPayload, type NextQuestionOutput } from './mock-interview-llm.service'
+import {
+  buildQaExcerpts,
+  parseStoredInterviewReport,
+  serializeInterviewReport,
+} from './interview-qa-excerpt'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
 import { InterviewPracticeSheetPdfService } from './interview-practice-sheet-pdf.service'
 import {
@@ -301,15 +306,28 @@ export class MockInterviewService {
   }
 
   /** 结束并生成练习报告（幂等：已有报告直接返回）。 */
-  async end(sessionId: string, requester: InterviewRequester) {
+  async end(
+    sessionId: string,
+    requester: InterviewRequester,
+    opts?: { includeAnswersInPrint?: boolean },
+  ) {
     await this.loadAuthorized(sessionId, requester)
-    return this.endLock.run(`ai:mock-interview:end:${this.coalesceKey(sessionId, requester)}`, 120_000, () => this.endOnce(sessionId, requester))
+    const includeAnswersInPrint = opts?.includeAnswersInPrint !== false
+    return this.endLock.run(
+      `ai:mock-interview:end:${this.coalesceKey(sessionId, requester)}`,
+      120_000,
+      () => this.endOnce(sessionId, requester, includeAnswersInPrint),
+    )
   }
 
-  private async endOnce(sessionId: string, requester: InterviewRequester) {
+  private async endOnce(
+    sessionId: string,
+    requester: InterviewRequester,
+    includeAnswersInPrint: boolean,
+  ) {
     const session = await this.loadAuthorized(sessionId, requester)
     const existing = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
-    if (existing) return this.reportDto(session, existing.payloadJson)
+    if (existing) return await this.reportDto(session, existing.payloadJson)
     if (session.status === 'configured') {
       throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_STARTED', message: '尚未开始面试，无法生成报告' } })
     }
@@ -321,7 +339,7 @@ export class MockInterviewService {
       const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
       if (raced) {
         const latest = await this.loadAuthorized(sessionId, requester)
-        return this.reportDto(latest, raced.payloadJson)
+        return await this.reportDto(latest, raced.payloadJson)
       }
       // CAS 已把状态写成 completed，但进程在写报告前崩溃 → 无报告。
       // 不引入 completing（shared InterviewSessionStatus 无此值）；允许 completed 且无报告时重试生成。
@@ -365,12 +383,16 @@ export class MockInterviewService {
     const ttl = session.endUserId ? MEMBER_TTL_MS : ANON_TTL_MS
     try {
       await this.prisma.mockInterviewReport.create({
-        data: { sessionId: session.id, payloadJson: JSON.stringify(payload), expiresAt: new Date(Date.now() + ttl) },
+        data: {
+          sessionId: session.id,
+          payloadJson: serializeInterviewReport(payload, includeAnswersInPrint),
+          expiresAt: new Date(Date.now() + ttl),
+        },
       })
     } catch (error) {
       if (isUniqueConflict(error)) {
         const raced = await this.prisma.mockInterviewReport.findUnique({ where: { sessionId: session.id } })
-        if (raced) return this.reportDto(session, raced.payloadJson)
+        if (raced) return await this.reportDto(session, raced.payloadJson)
       }
       await this.prisma.mockInterviewSession.updateMany({
         where: { id: session.id, status: 'completed' },
@@ -387,7 +409,10 @@ export class MockInterviewService {
       payload: { answered, level: payload.overall.level },
       ipAddress: null, userAgent: null, requestId: null,
     })
-    return this.reportDto({ ...session, status: 'completed', endedAt: new Date() }, JSON.stringify(payload))
+    return await this.reportDto(
+      { ...session, status: 'completed', endedAt: new Date() },
+      serializeInterviewReport(payload, includeAnswersInPrint),
+    )
   }
 
   // ── 读取 ──────────────────────────────────────────────────────────────────
@@ -425,7 +450,11 @@ export class MockInterviewService {
     if (!report || report.expiresAt.getTime() < Date.now()) {
       throw new NotFoundException({ error: { code: 'INTERVIEW_REPORT_NOT_FOUND', message: '报告不存在或已过期，请重新练习' } })
     }
-    const payload = JSON.parse(report.payloadJson) as InterviewReportPayload
+    const stored = parseStoredInterviewReport(report.payloadJson)
+    const turns = await this.prisma.mockInterviewTurn.findMany({
+      where: { sessionId: session.id },
+      orderBy: { idx: 'asc' },
+    })
     const { buffer, pageCount } = await this.pdf.render(
       {
         position: session.position,
@@ -433,7 +462,8 @@ export class MockInterviewService {
         interviewerLabel: INTERVIEWER_LABEL[session.interviewerType] ?? session.interviewerType,
         date: (session.endedAt ?? session.createdAt).toISOString().slice(0, 10),
       },
-      payload,
+      stored.report,
+      { excerpts: buildQaExcerpts(turns), includeAnswers: stored.includeAnswersInPrint },
     )
     const uploaded = await this.files.upload({
       buffer,
@@ -633,7 +663,13 @@ export class MockInterviewService {
     }
   }
 
-  private reportDto(session: SessionRow, payloadJson: string) {
+  private async reportDto(session: SessionRow, payloadJson: string) {
+    const stored = parseStoredInterviewReport(payloadJson)
+    const turns = await this.prisma.mockInterviewTurn.findMany({
+      where: { sessionId: session.id },
+      orderBy: { idx: 'asc' },
+      select: { role: true, content: true, skipped: true },
+    })
     return {
       sessionId: session.id,
       position: session.position,
@@ -642,7 +678,9 @@ export class MockInterviewService {
       interviewerLabel: INTERVIEWER_LABEL[session.interviewerType] ?? session.interviewerType,
       durationMin: session.durationMin,
       endedAt: session.endedAt ? session.endedAt.toISOString() : null,
-      report: JSON.parse(payloadJson) as InterviewReportPayload,
+      report: stored.report,
+      qaExcerpts: buildQaExcerpts(turns),
+      includeAnswersInPrint: stored.includeAnswersInPrint,
     }
   }
 

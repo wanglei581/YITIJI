@@ -101,7 +101,9 @@ function makeProviderRuntime(): ContractReviewProviderRuntime {
     ContractReviewReportService,
     {
       provide: CONTRACT_REVIEW_REPORT_ENABLED,
-      useFactory: () => process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] === 'true',
+      // 2026-09-06：报告文件用于「可保存、不打印」。生成与打印解耦；
+      // 打印由 print-jobs 对 purpose=contract_review_report 一律 400。
+      useFactory: () => true,
     },
     ContractReviewExtractionService,
     ContractReviewFactMerger,

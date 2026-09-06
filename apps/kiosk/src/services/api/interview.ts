@@ -133,9 +133,16 @@ export function answerInterview(
   return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/answer`, access, { method: 'POST', body: input })
 }
 
-export function endInterview(sessionId: string, access: InterviewAccess): Promise<InterviewReportResponse> {
+export function endInterview(
+  sessionId: string,
+  access: InterviewAccess,
+  opts?: { includeAnswersInPrint?: boolean },
+): Promise<InterviewReportResponse> {
   if (API_MODE !== 'http') return Promise.resolve(MOCK_REPORT)
-  return call<InterviewReportResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/end`, access, { method: 'POST', body: {} })
+  return call<InterviewReportResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/end`, access, {
+    method: 'POST',
+    body: { includeAnswersInPrint: opts?.includeAnswersInPrint !== false },
+  })
 }
 
 export function getInterviewReport(sessionId: string, access: InterviewAccess): Promise<InterviewReportResponse> {
