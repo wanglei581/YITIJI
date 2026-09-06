@@ -32,6 +32,22 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
+  /* ── Terminal Agent: Node.js on Windows, not a React app ── */
+  {
+    files: ['apps/terminal-agent/**/*.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+      'react-refresh/only-export-components': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
   /* ── Services: Node.js TypeScript (NestJS backend, no browser APIs) ── */
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],

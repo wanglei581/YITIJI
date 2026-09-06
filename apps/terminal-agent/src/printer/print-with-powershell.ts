@@ -1,4 +1,3 @@
-import path from 'path'
 import { spawnSync } from 'child_process'
 import { PrintResult, PrintErrorCode } from './types'
 import { PRINT_TIMEOUT_MS } from '../config'
@@ -23,8 +22,6 @@ export function printWithPowerShell(filePath: string, printerName: string): Prin
   const startedAt = new Date().toISOString()
   const t0 = Date.now()
   const method = 'powershell' as const
-
-  const ext = path.extname(filePath).toLowerCase()
 
   // Escape both paths for PowerShell single-quoted strings
   const escapedFile = filePath.replace(/'/g, "''")

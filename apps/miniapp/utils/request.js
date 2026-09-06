@@ -178,8 +178,29 @@ function unwrapEnvelope(body) {
  * @param {string} filePath 本地临时文件路径(wx.chooseMessageFile 等给出)
  * @param {object} options { name, formData, header, needAuth }
  * @returns {Promise<any>} resolve 解包后的业务 data;reject Error(带 statusCode/code)
+ *
+ * 401 与 request() 同一层 silentResignin:合同审查等流程的第一步就是上传,
+ * JWT 30 分钟过期后若不补签,用户会直接看到「登录已失效」且丢失 error.code。
  */
 function uploadFile(path, filePath, options = {}) {
+  return rawUploadFile(path, filePath, options).catch((err) => {
+    const retriable = err && err.statusCode === 401
+      && options.needAuth !== false
+      && !options._retried
+      && auth.canSilentResignin();
+    if (!retriable) throw err;
+
+    return silentResignin().then(
+      () => rawUploadFile(path, filePath, Object.assign({}, options, { _retried: true })),
+      (resignErr) => {
+        auth.logout();
+        throw (resignErr && resignErr.code) ? resignErr : err;
+      },
+    );
+  });
+}
+
+function rawUploadFile(path, filePath, options = {}) {
   const { name = 'file', formData = {}, header = {}, needAuth = true, timeout } = options;
 
   const finalHeader = { ...header };
@@ -219,9 +240,12 @@ function uploadFile(path, filePath, options = {}) {
           }
           resolve(unwrapEnvelope(body));
         } else if (statusCode === 401) {
-          // 与 rawRequest 一致：不在此清会话。上传是合同审查等流程的
-          // 第一个鉴权调用，过期即清会话会让用户「上传失败还被登出」。
-          reject(makeError('登录已失效,请重新登录', 401));
+          // 与 rawRequest 一致：不在此清会话。外层 uploadFile() 先静默补签,
+          // 补签失败才清。401 用 extractError 保留服务端 error.code
+          // （如 MEMBER_LEGAL_VERSION_STALE），不再丢掉响应体。
+          const e401 = extractError(body, 401);
+          if (!e401.code) e401.message = '登录已失效,请重新登录';
+          reject(e401);
         } else {
           reject(extractError(body, statusCode));
         }

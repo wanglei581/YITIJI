@@ -18,6 +18,7 @@ import {
   sweepUnclaimedDir,
   processCandidate,
   startScanWatcher,
+  maskScanName,
   UNCLAIMED_MAX_AGE_MS,
   DELIVERY_RETRY_MAX_MS,
 } from '../src/agent/scan-watcher'
@@ -73,9 +74,26 @@ function verifySourceStructure(): void {
   // 真机 / 长驻进程验收覆盖，不在这里伪装通过。
   assert.match(
     source,
-    /sweep failed to process .*, continuing with remaining files/,
+    /sweep failed to process \$\{maskScanName\(name\)\}, continuing with remaining files/,
     'sweepFolder must catch per-file errors so one bad file does not abort the rest of the sweep',
   )
+  assert.match(
+    source,
+    /unsafe scan input candidate skipped during sweep — \$\{maskScanName\(name\)\}/,
+    'sweepFolder skip logs must mask the scan file name',
+  )
+  assert.doesNotMatch(
+    source,
+    /base\.slice\(0,\s*2\)/,
+    'maskScanName must not keep a filename prefix',
+  )
+  assert.equal(maskScanName('张三简历.pdf'), '***(4).pdf')
+  assert.equal(maskScanName('ab.pdf'), '***(2).pdf')
+  assert.equal(maskScanName('身份证扫描件.PNG'), '***(6).PNG')
+  assert.equal(maskScanName('noext'), '***(5)')
+  assert.equal(maskScanName('.hidden'), '***(7)')
+  assert.doesNotMatch(maskScanName('张三简历.pdf'), /张/)
+  assert.doesNotMatch(maskScanName('李四材料.pdf'), /^[^(*]/)
   // 无法动态触发：processCandidate 自身已经用一个吞掉一切异常的外层 catch 兜底
   // （见下面 verifyUnexpectedErrorOuterCatch），意味着通过 sweepFolder 的公开
   // 路径调用它时它实际上不会再向外抛出——这段 catch 目前是纯防御性代码，只能

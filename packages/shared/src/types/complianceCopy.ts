@@ -250,6 +250,7 @@ export const COMPLIANCE_PREFERRED_TERMS = [
   '查看招聘会',
   '去来源平台预约',
   '扫码预约',
+  '复制来源链接',
 ] as const
 
 /**

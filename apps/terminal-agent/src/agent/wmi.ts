@@ -25,13 +25,19 @@
  *   NOTE: Pantum CM2800ADN Series driver does NOT set DetectedErrorState=4 for paper-empty
  *   via WMI. PAPER_EMPTY cannot be detected by preflight on this driver (N3 known limit).
  *
- * Mapping to PrinterStatus:
+ * Mapping to PrinterStatus (heartbeat; see mapWin32PrinterQuery):
  *   WorkOffline=True                              → 'offline'  (N2 fix)
  *   PrinterStatus=7 or DetectedErrorState=9       → 'offline'
  *   DetectedErrorState=4,6,7,8 (fatal errors)     → 'error'
  *   DetectedErrorState=3,5 (recoverable warnings)  → 'low_paper'
- *   DetectedErrorState=2 or 0 (normal)             → 'ready'
- *   anything else / query failure                  → 'unknown'
+ *   DetectedErrorState=2 (No Error)               → 'ready'
+ *   DetectedErrorState=0 (CIM Unknown)            → 'unknown'  (not ready)
+ *   Win32_Printer not found                       → 'error'    (distinct from query failure)
+ *   query failure / unparseable                   → 'unknown'
+ *
+ * Preflight (getPrinterPreflight) keeps a finer enum: missing printer is
+ * 'not_found', and DetectedErrorState=0 still returns 'ok' so a Pantum
+ * driver that reports CIM Unknown while Idle does not block printing.
  */
 
 import { spawn } from 'child_process'
@@ -95,20 +101,15 @@ function runPowerShell(script: string, stdin?: string, timeoutMs = 8_000): Promi
 // ── Printer status ────────────────────────────────────────────────────────────
 
 /**
- * Query Win32_Printer via WMI and map to PrinterStatus.
- * printerName is passed via stdin — safe against all PS special characters.
- * Returns 'unknown' on non-Windows or if the query fails / printer not found.
+ * Map one Win32_Printer WMI line to heartbeat PrinterStatus.
+ *
+ * Aligns with getPrinterPreflight's split at not_found vs empty output:
+ * missing printer is a definitive fault; a failed query is unknown.
+ * DetectedErrorState=0 is CIM Unknown, not No Error — only 2 is ready.
  */
-export async function getPrinterStatus(printerName: string): Promise<PrinterStatus> {
-  if (process.platform !== 'win32') return 'unknown'
-
-  const script =
-    `$name = [Console]::In.ReadLine(); ` +
-    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace(\"'\", \"''\"))'" -ErrorAction SilentlyContinue; ` +
-    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)" } else { "not_found" }`
-
-  const output = await runPowerShell(script, printerName)
-  if (!output || output === 'not_found') return 'unknown'
+export function mapWin32PrinterQuery(output: string | null): PrinterStatus {
+  if (!output) return 'unknown'
+  if (output === 'not_found') return 'error'
 
   const [statusStr, errorStr, workOfflineStr] = output.split(',')
   const printerStatusCode = parseInt(statusStr ?? '', 10)
@@ -122,9 +123,30 @@ export async function getPrinterStatus(printerName: string): Promise<PrinterStat
     return 'error'
   }
   if (detectedError === 3 || detectedError === 5) return 'low_paper'
-  if (detectedError === 0 || detectedError === 2) return 'ready'
+  if (detectedError === 2) return 'ready'
 
   return 'unknown'
+}
+
+/**
+ * Query Win32_Printer via WMI and map to PrinterStatus.
+ * printerName is passed via stdin — safe against all PS special characters.
+ * Returns 'unknown' on non-Windows or if the query itself fails.
+ * Returns 'error' when the configured printerName is not installed.
+ */
+export async function getPrinterStatus(printerName: string): Promise<PrinterStatus> {
+  if (process.platform !== 'win32') return 'unknown'
+
+  const script =
+    `$name = [Console]::In.ReadLine(); ` +
+    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace("'", "''"))'" -ErrorAction SilentlyContinue; ` +
+    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)" } else { "not_found" }`
+
+  const output = await runPowerShell(script, printerName)
+  if (output === 'not_found') {
+    warn('wmi: configured printerName not found via Win32_Printer — reporting error')
+  }
+  return mapWin32PrinterQuery(output)
 }
 
 // ── Printer pre-flight (打印前预检) ─────────────────────────────────────────────
@@ -153,7 +175,7 @@ export async function getPrinterPreflight(printerName: string): Promise<PrinterP
 
   const script =
     `$name = [Console]::In.ReadLine(); ` +
-    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace(\"'\", \"''\"))'" -ErrorAction SilentlyContinue; ` +
+    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace("'", "''"))'" -ErrorAction SilentlyContinue; ` +
     `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)" } else { "not_found" }`
 
   const output = await runPowerShell(script, printerName)

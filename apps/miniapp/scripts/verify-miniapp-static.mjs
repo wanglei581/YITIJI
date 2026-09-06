@@ -406,6 +406,17 @@ if (
 ) ok('401 补签准入与 token 存在性解耦')
 else bad('401 补签准入与 token 存在性解耦', '补签不得以 auth.getToken() 是否有值作为准入，登出须撤销补签资格')
 
+const uploadFileIdx = requestJs.indexOf('function uploadFile(')
+const uploadFileSource = uploadFileIdx >= 0 ? requestJs.slice(uploadFileIdx) : ''
+if (
+  requestJs.includes('function silentResignin()') &&
+  /function uploadFile\s*\(/.test(requestJs) &&
+  uploadFileSource.includes('silentResignin()') &&
+  /statusCode === 401[\s\S]*extractError\(body,\s*401\)/.test(uploadFileSource) &&
+  !requestJs.includes("reject(makeError('登录已失效,请重新登录', 401))")
+) ok('uploadFile 401 走 silentResignin 且保留 error.code')
+else bad('uploadFile 401 静默补签', '必须复用 silentResignin、401 走 extractError(body, 401)，不得用丢掉 code 的 makeError')
+
 const membershipJs = read('pages/membership/membership.js')
 const notificationsJs = read('pages/notifications/notifications.js')
 const loginReturnPages = [documentsJs, membershipJs, notificationsJs]
@@ -847,6 +858,18 @@ else bad('AI 历史模式登录失效保护', '岗位匹配和职业规划不得
 const configJs = read('utils/config.js')
 if (/USE_MOCK:\s*false/.test(configJs)) ok('正式源码默认关闭 mock')
 else bad('正式源码默认关闭 mock', 'utils/config.js 必须 USE_MOCK=false')
+
+if (
+  /const PRODUCTION_BASE_URL = 'https:\/\/zyidai\.cn'/.test(configJs) &&
+  /const TEST_BASE_URL =/.test(configJs) &&
+  configJs.includes('wx.getAccountInfoSync') &&
+  /envVersion === 'develop'/.test(configJs) &&
+  /envVersion === 'trial'/.test(configJs) &&
+  /baseUrl:\s*resolveBaseUrl\(\)/.test(configJs) &&
+  /return PRODUCTION_BASE_URL/.test(configJs) &&
+  !/envVersion === 'release'[\s\S]{0,120}TEST_BASE_URL/.test(configJs)
+) ok('baseUrl 按 miniProgram.envVersion 选择，正式版固定生产域名')
+else bad('baseUrl 环境分流', 'develop/trial 可配测试域名，release 必须固定 https://zyidai.cn')
 
 const secretPatterns = [/sk-[A-Za-z0-9]{12,}/, /AKID[A-Za-z0-9]{10,}/, /AI_LLM_API_KEY\s*[:=]/, /DATABASE_URL\s*[:=]/]
 let secretHit = false
