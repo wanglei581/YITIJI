@@ -583,6 +583,29 @@ const api = {
     return request(`/resume/records/${taskId}`, { method: 'GET', header, needAuth: true });
   },
 
+  /**
+   * 导出诊断报告或修改清单 PDF。匿名读取沿用诊断记录的
+   * x-resume-access-token；收费模式下 benefitGrantId 由本人权益列表选出。
+   */
+  exportResumeReport(taskId, kind, accessToken, benefitGrantId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 诊断报告导出'));
+    const data = { kind };
+    if (benefitGrantId) data.benefitGrantId = benefitGrantId;
+    return request(`/resume/records/${encodeURIComponent(taskId)}/export`, {
+      method: 'POST',
+      data,
+      header: tokenHeader(accessToken),
+      needAuth: true,
+      timeout: 60000,
+    });
+  },
+
+  /** 简历导出收费三态；匿名可读价格，登录会员会同时收到可用权益次数。 */
+  getResumeExportPricing() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历导出价格'));
+    return request('/resume/export/pricing', { method: 'GET', needAuth: true });
+  },
+
   // ── 以下 AI 能力都挂在解析任务 taskId 上,凭 RESUME_TASK 里的 accessToken 读取 ──
 
   /**
