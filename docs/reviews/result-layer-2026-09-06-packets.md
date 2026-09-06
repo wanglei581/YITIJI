@@ -88,6 +88,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 ### 包 A · 诊断报告与修改清单导出 —— codex
 
+- **已合入 main**：#866（squash `d09478b14`，2026-09-07）。
 - **条目**：P0-2（后端）、P0-13、P0-6 的文件名与页眉部分
 - **目标**：按契约 1 实现导出端点与两种 PDF；报告 PDF 的内容以服务端 `ResumeReport`（含 `issues` / `contentBlocks` / `priorities` / `riskNotes` / `truncatedInput`）为准；严重度按 `ai-provider.interface.ts:166-174` 注释的分档规则在服务端算好并进 PDF。
 - **允许改 / 新增**：`services/api/src/ai/resume/diagnosis-report-pdf.service.ts`（新）、`services/api/src/ai/resume-report-export.controller.ts`（新，不要塞进 ai.controller.ts）、`services/api/src/ai/ai.module.ts`（注册）、`packages/shared/src/types/ai.ts`（只加类型）、`services/api/src/ai/resume/*.spec.ts` 或 `scripts/verify-*.ts`（新门禁 `verify:resume-report-export`）。
@@ -101,6 +102,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 ### 包 B · 导出收费开关、模板双源、consent —— grok
 
+- **已合入 main**：#851（squash `e98a20cf4`，2026-09-07）。
 - **条目**：P0-7、P0-8、契约 2
 - **目标**：`resume_export` 价目行三态 + `/resume/export/pricing` + `assertExportAllowed` + 权益核销幂等 + 失败不扣次；`ai.service.ts:658-666` 模板校验改读数据库（`job-materials.service.ts` 的公开列表）；`/resume/generate/export` 补 `requireActiveConsent`；Admin `/billing` 价目表出现该行且 `SERVICE_LABELS` 有中文名，页头副标题写清「对应一体机 / 小程序简历优化页的导出按钮」。
 - **允许改**：`services/api/src/ai/ai.service.ts`（仅导出与模板校验段）、`services/api/src/ai/ai.controller.ts`（仅 export 段）、`services/api/src/ai/dto/resume-generate.dto.ts`、`services/api/src/benefit-redemption/**`（只加）、`services/api/src/payment/**` 中价目读取处（只加 serviceKey）、`apps/admin/src/routes/billing/index.tsx`、`apps/admin/src/services/api/adminBilling.ts`、`packages/shared/src/types/*`（只加）、价目种子脚本、`verify-resume-export-formats` 门禁（它现在钉死「恒放行」，改为断言三态）。
@@ -112,6 +114,8 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 ### 包 C · 小程序结果层第一批 —— hermes
 
+- **已合入 main**：#861（squash `174a6561e`，2026-09-07）。
+- **C2（小程序接契约 1 / 2）已合入 main**：#875（squash `588fbaf6b`，2026-09-07）；执行记录见下方。
 - **条目**：P0-1（小程序）、P0-4、P0-5（小程序部分）、诊断方向透传
 - **目标**：诊断页渲染 `issues`（维度 / 严重度 / 原文引用 / 影响 / 改法）与 `contentBlocks`，首屏 3 条「先改这些」+ 每维一句人话 +「这不是录取分」，截断 / OCR 顶栏；`resume-parse` 传 `selectedDimensions` / `targetContext`（若小程序无方向表单，至少透传 URL 参数并允许跳过）；优化页接**现有** `POST /resume/generate/export`（四格式 + 打印用 PDF 副本 + 存我的文档提示），复用 `resume-build.js:383-457` 的流程；`resumes.js:47` 的 `format:'PDF'` 改为真实 mime，没有文件写「仅记录，未导出文件」；诊断失败补「打印原件 / 去打印 / 查看岗位」出口；导出后用 `wx.openDocument` 打开真实 PDF 并显示页数 / 大小 / 有效期；修正 `resume-optimize.js:26` 失真注释。
 - **允许改**：`apps/miniapp/pages/resume-diagnose/**`、`resume-optimize/**`、`resume-parse/**`、`resumes/**`、`apps/miniapp/utils/normalize.js`、`utils/api.js`（只加）、小程序门禁脚本（只加）。
@@ -124,6 +128,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 ### 包 D · 文档转换引擎（Word → PDF，.doc 接收）—— codex
 
+- **已合入 main**：#853（squash `ae33b4fa7`，2026-09-07）。
 - **条目**：P0（转换进上线承诺）、P0-9（.doc 三端接收后服务端转换）、契约 3
 - **目标**：新模块 `services/api/src/document-conversion/`（允许新增模块，不新增 Prisma 模型）：soffice 适配器 + gotenberg 适配器骨架 + 能力探测 + 转换端点；`resume-extraction.service.ts` 对 `.doc` 走「转换为 PDF → unpdf 抽文字」，引擎不可用时保持现有诚实失败文案并附「服务端未配置转换引擎」；打印链路：`print_doc` purpose 增加 doc/docx 但只在 capabilities 为真时接受，建单前服务端转成派生 PDF 并以派生文件建单（`print-page-count.service.ts` 保持只认 PDF / 图片）；`PhoneUploadPage` / `ResumeSourcePage` / `resume-upload.js` 的 `.doc` 口径统一为「接收」，但这三处前端不在本包改（记进 PR 描述，交包 E3 / C3）。部署：`docs/device/production-deployment-and-windows-host-checklist.md` 增加 LibreOffice / Gotenberg 安装、思源字体、env、探测命令；`.env.example` 增加 `CONVERSION_ENGINE` / `SOFFICE_PATH` / `CONVERSION_MAX_CONCURRENCY`。
 - **允许改 / 新增**：`services/api/src/document-conversion/**`（新）、`services/api/src/app.module.ts`（注册）、`services/api/src/files/file-validation.ts`（仅 print_doc 的条件放行）、`services/api/src/print-jobs/print-jobs.service.ts`（建单前转换分支）、`services/api/src/ai/resume/resume-extraction.service.ts`（.doc 分支）、`services/api/.env.example`、`packages/shared/src/types/documentConversion.ts`（新）、`docs/device/production-deployment-and-windows-host-checklist.md`、新门禁 `verify:document-conversion`。
@@ -135,6 +140,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 ### 包 E · 一体机诊断报告页（青序流光 22 页迁移）—— grok
 
+- **已合入 main**：#855（squash `d63289219`，2026-09-07）。
 - **条目**：P0-1（一体机）、P0-5 的诊断部分
 - **目标**：按 `docs/design/kiosk-redesign-2026-08/22-resume-report.html` 把 `/resume/report` 迁进青序流光（`apps/kiosk/src/layouts/KioskRoot.tsx` 的 `QX_MIGRATED_ROUTES` 登记，复用 `styles/qingxu/` 令牌与 `components/qingxu/QxPageFrame.tsx`，样板见取件码页 `pickup-claim-qx.css`）；原型声明的 9 个 `?state=`（loading / report / report-empty / report-minimal / diagnose-failed / read-error / no-context / unavailable / illegal）全部有真实对应；渲染 `issues`（维度 / 严重度 / 原文引用 / 影响 / 改法）、`contentBlocks` 七块、「先改这几处」、每维一句人话、「这不是录取分」、截断 / OCR 顶栏，`report.sections` 为空不出总分；刷新后从服务端回填 `targetContext`；打印 / 导出 / 二维码三个动作本包只做**诚实置灰 + 原因「报告导出端点上线后开放」**（包 E2 接契约 1）。
 - **允许改**：`apps/kiosk/src/pages/resume/ResumeReportPage.tsx` 及其拆分出的子组件（>300 行必须拆）、新建 `apps/kiosk/src/pages/resume/resume-report-qx.css`、`apps/kiosk/src/layouts/KioskRoot.tsx`（仅 `QX_MIGRATED_ROUTES` 加一项）、`packages/ui/src/charts/ResumeRadarChart.tsx`（若需）、kiosk 门禁脚本（只加）。
@@ -162,6 +168,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 G · 公共终端与打印救济 —— codex（A / D 合入后起）
 
+- **已合入 main**：#870（squash `64fd6c78e`，2026-09-07）。
 - **条目**：P0-10
 - **事实**：清场链路已存在（`apps/kiosk/src/auth/KioskPrivacyGuard.tsx`、`useIdleLogout.ts:38` 默认 180s + 30s 预警、`kioskSensitiveSession.ts:31-37` 清敏感键）；前端无共享掩码工具，唯一实现是 `PrintMaterialCheckPage.tsx:157-169` 的私有 `maskSnippet`；`FilePreviewDialog.tsx:5-12` 无 `expiresAt`、无倒计时，登录域有三份私有 `useCountdown`；打印失败全部跳 `/print/done`，「补打」只有文案没有代码路径（`PrintDonePage.tsx:342`）；打印机就绪门禁 `PrintConfirmPage.tsx:169-170, 347-352`。
 - **要做**：① 抽 `apps/kiosk/src/hooks/useCountdown.ts` 与 `apps/kiosk/src/utils/maskPii.ts`（从上面两处迁出，原处改为引用）；② `FilePreviewDialog` 增加 `expiresAt` 与 `onRegenerate`，二维码下方显示剩余时间，到期前 30 秒可「重新生成」，过期后二维码隐藏并提示；三个调用点（`ResumeOptimizePage`、`SelfAssessmentFlow`、后续报告页）传入；③ 简历上传页与打印上传页顶部一行「本机不保存你的原文，离开后自动清除」（复用现有清场事实，不新增承诺）；④ 结果页（报告 / 优化 / 我的文档）的空闲清场缩短为 `VITE_KIOSK_RESULT_IDLE_SEC`（默认 90s）+ 15s 可见倒计时预警，全局 180s 不动；⑤ 屏幕上的手机号 / 邮箱默认掩码，提供「显示完整联系方式」开关（不影响导出文件）；⑥ 打印失败救济：`PrintProgressPage` 终态 failed 时在 `/print/done` 显示「文件带走」二维码（凭本单归属重新签发 30 分钟 URL，新增只读端点 `POST /print-jobs/:id/takeaway-url`，归属校验同现有单据）、失败原因中文、订单号与「联系工作人员补打」；已付费失败单允许「重新提交打印」（新增 `POST /print-jobs/:id/retry`：仅 `status=failed` 且订单已付、同一文件、不再计费、幂等，写审计）；⑦ 缺纸 / 脱机：`PrintConfirmPage` 已置灰，补 `PAPER_EMPTY` 状态文案与「不会扣费」说明；⑧ `PrintDonePage` 出纸后「请取走纸张」提醒。
@@ -174,6 +181,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 H · 草稿 / 版本 / 事实核对（服务端部分）—— codex（B 合入后起）
 
+- **已合入 main**：#873（squash `fb734fca7`，2026-09-07）。
 - **条目**：P0-12、P0-6 的服务端部分。**Kiosk 侧 UI 归包 F（23 页迁移时一并做），本包不改 kiosk。**
 - **事实**：`AiResumeResult` 无版本列，`kind` 是自由字符串且 `@@unique([taskId, kind])`（`schema.prisma:1752-1782`）；`persistResult` 是整块覆盖的 upsert（`ai.service.ts:158-204`）；`listAiRecords` 白名单外的 kind 会被降级显示为 `parse`（`member-assets.service.ts:216-226`）。
 - **要做（不改 Prisma 模型）**：① 新增 kind 约定：`optimize`（最新 AI 结果）、`optimize_draft`（用户编辑草稿，payload 含 `resume`、`layout`、`decisions`、`updatedAt`）、`optimize_confirmed`（导出时的快照，payload 含 `version` 递增、`confirmedAt`、`fileId`）；② 端点 `PUT /resume/records/:taskId/draft`（登录用户；匿名 404）、`GET /resume/records/:taskId/draft`、`GET /resume/records/:taskId/versions`；重新生成 optimize 不得覆盖 `optimize_confirmed`；③ `listAiRecords` 与 `listResumes` 对 `optimize_draft` / `optimize_confirmed` 的处理：不单独成行，合并进对应 `parse` 行的 `optimized` / `hasDraft` / `latestVersion` 字段（只加字段）；④ 事实核对：`POST /resume/records/:taskId/fact-check` 返回优化稿中的事实项（学校 / 公司 / 时间段 / 证书 / 电话 / 邮箱）及其是否能在原文中找到（复用 `llm-resume-optimize.service.ts:384-510` 的校验函数，抽成可复用的纯函数），导出端点增加 `factsConfirmedAt` 必填（登录用户）——未确认 400 `RESUME_FACTS_NOT_CONFIRMED`；匿名用户由前端弹窗确认后传时间戳；⑤ DOCX 导出补 AIGC 自定义属性（`resume-docx.service.ts` 的 `Document` 增加 `AIGenerated` 等 core properties）。
@@ -185,6 +193,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 I · 小青语音（保留通话 + 长按语音接大模型 + 本次要点）—— grok
 
+- **已合入 main**：#857（squash `17d95271a`，2026-09-07）。
 - **条目**：拍板第 5 条
 - **事实**：ASR 只有 `recognizeWav(buffer)`（`services/api/src/asr/asr.service.ts:78`，16k 单声道 WAV ≤4MB，`ASR_PROVIDER` disabled 时返回 `ASR_NOT_CONFIGURED`）；kiosk 已有 `utils/wavRecorder.ts` + `utils/micCapability.ts`（面试与语音简历在用）；小程序已有 `utils/voice-recorder.js`（语音简历在用）；`POST /assistant/chat`（`ai.controller.ts:415-455`，匿名可用、公共配额）；TRTC 通话面板 `AssistantCallPanel.tsx` 保留；advisor 后端 10 端点无前端（`advisor.controller.ts:92-167`），`advisor-artifact.service.ts:99-138` 已能把 `qa_pins` 渲染成 PDF 落我的文档。
 - **要做**：① 新端点 `POST /assistant/voice`（multipart `audio` WAV，`@TerminalScopedThrottle(12)`，公共配额键 `assistant_chat` 共用，WAV 魔数校验同 `ai.controller.ts:85`，返回 `{ text, providerName }`；ASR 未配置返回 `ASR_NOT_CONFIGURED`，前端退回文字输入并说明）；② kiosk `AssistantPage` 文字对话增加「按住说话」按钮（≥56px，`aria-pressed`，松手后显示转写文本，用户可编辑后发送，或开启「语音直接发送」开关）；麦克风不可用 / ASR 未配置时按钮 aria-disabled + 原因，TRTC 通话入口不变；③ 小程序 `assistant` 页同样的长按说话（`voice-recorder.js` + `uploadFile('/assistant/voice')`），录音授权失败退回文字；④ 「本次要点」：`POST /assistant/sessions/:sessionId/summary`（登录用户）让模型把本次对话浓缩为 ≤8 条要点 + ≤5 条待办，落一条 `AdvisorSession`（`source='assistant'`）+ `AdvisorArtifact(kind='qa_pins')`，复用 `advisor-artifact.service.ts` 的 print 生成 PDF（`purpose='print_doc'`，进我的文档，可打印）；kiosk 与小程序在对话区底部提供「保存本次要点」，匿名用户置灰并提示登录；⑤ `/me/ai-records` 增加「问答」分区读取 `AdvisorArtifact`（只加字段），使 `profileEntries.ts:9` 的「问答」成立（**不改 `profileEntries.ts`**，它被 `verify-fusion-w5` 逐字节冻结）。
@@ -197,6 +206,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 J · 半实现补全 —— hermes（或 codex）
 
+- **已合入 main**：#868（squash `db2117a72`，2026-09-07）。
 - **条目**：拍板第 7、8 条；评审 §3.5 的模拟面试 / 签约风险 / 招聘会规划 / AI 记录文案
 - **事实**：模拟面试报告与 PDF 不含转写（`mock-interview.service.ts:636-647`、`interview-report-pdf.service.ts:94-129`），会员列表 `GET /me/mock-interviews` 已有（`:534-559`），小程序未封装（`utils/api.js:737-791`），降级题目单 `POST :id/practice-sheet` 小程序未接；`listAiRecords` 只读 `AiResumeResult`（`member-assets.service.ts:194-231`）；合同报告 2 小时 TTL（`contract-review-report-file.service.ts:18-20`）、`listDocuments` 排除 `contract_review_report`（`member-assets.service.ts:100`）、留存锁 `system_short`（`retention-policy.ts:97-100`）、服务端只拦 `contract_upload` 原件打印（`print-jobs.service.ts:227-234`）、报告打印开关只在前端（`contractReviewReportPrintFlow.ts:67-69`）；`fair_visit_plan` 的 `fairId` 只在 `payloadJson.basedOn`（`fair-visit-plan.service.ts:22-27`），`listAiRecords` 刻意不 select payload。
 - **要做**：① 模拟面试：报告 DTO 与 PDF 增加「问答摘录」章节（每题问题 + 用户回答转写前 200 字，用户可在结束前勾选「不打印我的回答」）；`MyAiRecordsPage`（kiosk）与小程序 `ai-records` 增加「模拟面试」分区，数据来自 `GET /me/mock-interviews`（**不改 `profileEntries.ts`**）；小程序封装 `/me/mock-interviews`、`DELETE`、`/practice-sheet`（AI 挂时降级题目单）；② 签约风险「可保存、不打印」：结果页「保存到我的文档」（本人确认弹窗，写明保存期限与可删除）→ 服务端 `POST /contract-reviews/:id/report/keep`：把报告 `retentionPolicy` 设为 `months_3`、清除 `retentionLockedReason`、`expiresAt` 延长，`allowedPoliciesForFile` 对 `contract_review_report` 放开 `months_3`（仍不允许 `long_term`），`listDocuments` 对已 keep 的报告不再排除；**服务端打印硬拦**：`print-jobs.service.ts` 对 `purpose='contract_review_report'` 一律 400 `PRINT_CONTRACT_REPORT_FORBIDDEN`，删除前端 `VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT` 开关与打印按钮，我的文档对该类文件不显示「重新打印」；合同原件仍 `system_short`、仍在生成报告时删除；`docs/compliance/compliance-boundary.md` 增补一段引用 feature-scope §2.2 的 2026-09-06 裁定；③ 招聘会规划回看：`listAiRecords` 对 `kind='fair_visit_plan'` 只解析 payload 中的 `basedOn.fairId` / `fairName` 输出为 `ref: { type:'job_fair', id, name }`（窄字段，不放开 payload），kiosk / 小程序记录项可跳转到对应招聘会规划页；④ 小程序模拟面试语音：接 `POST :id/transcribe`（复用 `voice-recorder.js`），无麦克风权限退回文字。
@@ -209,6 +219,8 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 K1 · 中文字体包与启动自检 —— codex
 
+- **已合入 main**：#860（squash `9364bb6c2`，2026-09-07）。
+- **执行记录**：#860 按上述范围收口 —— `common/pdf/cjk-font.ts` 单一解析源、生产启动自检缺字体即拒绝启动、部署清单加字体项；未碰 `apps/**`。
 - **条目**：P0-11（三端 `.doc` UI 归 K2，待包 D 合入）
 - **事实**：9 份各自漂移的字体解析实现（`resume-pdf.service.ts:28-55,120-147`、`advisor-pdf.service.ts:20-79`、`contract-review-report-pdf.service.ts:14-153`、`fair-visit-plan-pdf.service.ts:17-81`、`self-assessment-pdf.service.ts:17-72`、`job-fit-pdf.service.ts:12-78`、`interview-report-pdf.service.ts:15-58`、`career-plan-pdf.service.ts:15-83`、`job-material-pdf.service.ts:15-105`、`jobs/fair-company-print.service.ts:97-277`），env 名不一致（`RESUME_PDF_FONT_PATH` vs `JOB_MATERIAL_PDF_FONT_PATH`）；启动门禁 `config/production-runtime-gates.ts:97-101` 只在 production 生效且无字体项；部署清单 `docs/device/production-deployment-and-windows-host-checklist.md` 零字体内容；预生产曾因缺字体事故（`docs/acceptance/user-file-assets-preprod-execution-record.md:161`）。
 - **要做**：① 新建 `services/api/src/common/pdf/cjk-font.ts`：统一候选路径（以 `resume-pdf.service.ts:33-52` 为最全版本）、`RESUME_PDF_FONT_PATH` / `_FAMILY` 优先、`JOB_MATERIAL_PDF_FONT_PATH` 兼容回退、`resolveCjkFont()` 带进程内缓存、`registerCjkFont(doc)`、`probeCjkFont(): { ok, path, family, tried[] }`；② 10 处改为调用公共模块，**保留各自现有错误码**；③ 启动自检：`production-runtime-gates.ts` 在 production 缺字体即 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；非 production 只打 warn（含 tried 路径）；新增管理员可读的探测端点（若已有 health 控制器则只加一个路由）返回探测结果；④ 部署清单 §3.2 增加字体环境变量、§3.1 增加 `fonts-noto-cjk` / 思源字体安装与 `fc-list :lang=zh` 核对命令、§3.6 增加 `verify:resume-generate` 与新门禁；`.env.example` 注释说明；⑤ 缺字体时导出接口返回的错误文案统一为「服务器缺少中文字体，已通知运维；你可以先打印原件或扫码保存」（各端已有错误码映射处只改文案表，不改错误码）。
@@ -218,6 +230,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 F · 一体机优化页 / 生成页迁入青序流光（23 / 24 页）并接契约 1 / 2 —— grok
 
+- **已合入 main**：#871（squash `f098e0e61`，2026-09-07）。
 - **条目**：P0-3、P0-5（优化 / 生成部分）、P0-13 入口、P0-6 屏显部分、P0-10 的二维码倒计时（本页范围内）
 - **事实**：`/resume/optimize`（`apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx`，633 行）与 `/resume/generate/preview`（`ResumeGeneratePreviewPage.tsx`）仍是旧壳；原型 `docs/design/kiosk-redesign-2026-08/23-resume-optimize.html`（状态 loading / ready / example / empty / no-context / read-error / optimize-failed / unavailable / illegal）与 `24-resume-generate.html`；青序样板：`apps/kiosk/src/layouts/KioskRoot.tsx` 的 `QX_MIGRATED_ROUTES`、`components/qingxu/QxPageFrame.tsx`、`styles/qingxu/`、已迁的 `/resume/report`（`resume-report-qx.css`、`components/resume-report/*`）与 `/print/pickup-claim`。本分支已含契约 1（`POST /resume/records/:taskId/export`，kind=diagnosis_report|change_list）与契约 2（`GET /resume/export/pricing`，导出 body 可带 `benefitGrantId`）。
 - **要做**：① 两页登记进 `QX_MIGRATED_ROUTES`，按原型实现并拆到 ≤300 行/文件；原型声明的每个 `?state=` 有真实对应，`?capture=1` 才开合成夹具并明标「合成演示」；② 优化页与生成预览页共用同一套「结果交付」组件：模板选择（读 `/job-materials/templates`）、排版控件、四格式导出、导出前显示 `GET /resume/export/pricing` 的价格 / 「当前免费，不扣权益」/ 不可用原因，charged 且无权益时按钮 aria-disabled 并说明；③ 导出后自动打开真实 PDF 预览（`FileContentPreview` 的 iframe，同一 signedUrl），页面写「打印的就是这一份」，显示页数 / 大小 / 有效期 / 版本号（版本号暂用导出次数）；HTML 示意预览标「示意，非打印稿」；导出前显示「共 N 页」并提供「压到一页」（fontScale/lineSpacing 一档收紧）微调；④ 二维码带剩余有效时间倒计时（本页内实现 `useCountdown`，`FilePreviewDialog` 增加可选 `expiresAt`），过期后隐藏二维码并提示重新导出；⑤ 「修改清单」入口：调 `POST /resume/records/:taskId/export` kind=change_list，结果同样进真实 PDF 预览 / 二维码 / 打印；⑥ 事实核对墙：导出前弹窗列出优化稿里的学校 / 公司 / 时间段 / 证书 / 电话，逐项勾「已核对」，未全勾不出文件；导出请求附 `factsConfirmedAt`（ISO 时间，后端暂未校验，包 H 会加）；AI 新增的数字 / 职责段落（不在 `modules[].before` 中出现的 after 文本）标「待本人确认」；⑦ 屏幕上「AI 优化稿，请自行核对」常驻标识；⑧ 生成流预览页与优化页同构（模板 / 排版 / 四格式 / 预览 / 二维码 / 打印），语音生成录完的结果同样能带走。
@@ -230,6 +243,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 E2 · 一体机诊断报告页接契约 1 / 2 —— grok
 
+- **已合入 main**：#876（squash `b593aabf3`，2026-09-07）。
 - **条目**：P0-2（一体机侧）、P0-13 入口、P0-7 价格显示、P0-5 报告部分、二维码倒计时
 - **事实**：包 E 已把 `/resume/report` 迁进青序流光，三个动作「打印这份报告 / 导出 PDF / 生成二维码带走」在 `components/resume-report/ResumeReportActions.tsx` 的 `ResumeReportTakeaway` 里是 aria-disabled 占位（原因「报告导出端点上线后开放」）。服务端已有 `POST /resume/records/:taskId/export`（body `{kind:'diagnosis_report'|'change_list', benefitGrantId?}` → `{fileId, filename, mimeType, sizeBytes, pageCount, signedUrl, expiresAt, printFileUrl, savedToDocuments, aiGenerated}`；鉴权与 `getResumeRecord` 相同：会员 token 或匿名 accessToken）与 `GET /resume/export/pricing`。包 F 已在 `apps/kiosk/src/services/api/ai.ts`（+ http/mock adapter）加了 `exportResumeRecord` / `getResumeExportPricing` 一类封装，并有 `components/resume-deliver/*`、`hooks/useCountdown.ts`、`FilePreviewDialog` 的 `expiresAt`。
 - **要做**：① `ResumeReportTakeaway` 三键接真：「导出 PDF」调 kind=diagnosis_report，「打印这份报告」在导出成功且 `printFileUrl` 存在后跳 `/print/confirm`（沿用优化页的 state 形状），「生成二维码带走」打开 `FilePreviewDialog`（真实 PDF iframe + 二维码 + `expiresAt` 倒计时）；再加「导出修改清单」（kind=change_list）；② 三键上方显示 pricing 三态（免费 / 收费 + 权益 / 不可用置灰 + 原因），charged 且无权益时按钮 aria-disabled 并说明；③ 导出结果卡：文件名 / 页数 / 大小 / 有效期；会员 `savedToDocuments=true` 写「已存入我的文档」，匿名不得写「已存」，改写「登录后可存我的文档，本次可扫码带走」；④ 导出失败 / AI_RESULT_NOT_READY / RESUME_PDF_FONT_NOT_FOUND / RESUME_EXPORT_UNAVAILABLE 各有中文原因，按钮不假装成功；⑤ `?capture=1` 夹具里增加 `export-ready` / `export-failed` / `pricing-charged` / `pricing-unavailable` 四个 state 供截图；⑥ 更新 `apps/kiosk/scripts/verify-resume-report-qx.mjs` 断言（占位置灰断言改为「未导出前置灰、导出后可点」；savedToDocuments=false 不出现「已存」）。
@@ -239,6 +253,20 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 - **执行记录**：
   > 2026-09-07 **包 E2 · 一体机诊断报告页接契约 1 / 2**（分支 `claude/rl-e2-report-contracts`，叠在包 F 上并 cherry-pick 包 E 两个提交，本地候选，未 push、未开 PR、未部署）。条目 P0-2（一体机侧）、P0-13 入口、P0-7 价格显示、P0-5 报告部分、二维码倒计时。① `ResumeReportTakeaway` 拆到独立文件并接真：`导出 PDF` → `exportResumeRecord` kind=`diagnosis_report`；打印在 `printFileUrl` 就绪后跳 `/print/confirm`（与优化页同一 state 形状）；`生成二维码带走` 打开 `FilePreviewDialog`（PDF iframe + 二维码 + `expiresAt` 倒计时）；新增 `导出修改清单` kind=`change_list`。未导出前打印/二维码 `aria-disabled` 并写「请先导出」；导出后有链接才可点。② 复用 `useResumeExportPricing` + `ResumePricingBar`：免费写「当前免费，不扣权益」；charged 无权益置灰并说明；unavailable fail-closed 写「价目已停用，不是免费」。③ 结果卡展示文件名 / 页数 / 大小 / 有效期；`savedToDocuments && 登录` 才写「已存入我的文档」，匿名写「登录后可存我的文档，本次可扫码带走」。④ `AI_RESULT_NOT_READY` / `RESUME_PDF_FONT_NOT_FOUND` / `RESUME_EXPORT_UNAVAILABLE` / `AI_TASK_NOT_FOUND` 映射中文，失败不清成成功。⑤ `?capture=1` 增加 `export-ready` / `export-failed` / `pricing-charged` / `pricing-unavailable`。⑥ `verify-resume-report-qx` 占位「报告导出端点上线后开放」改为未导出前置灰、导出后可点、匿名不得写「已存」。**未改**：`services/api/**`、`apps/miniapp/**`、`resume-deliver/*`（只复用）、`docs/progress/current-progress.md`。**验证（实跑）**：kiosk `tsc --noEmit` 0；改动文件 eslint 0；`verify:resume-report-qx` 全绿，新增 24 条断言变异各红后恢复绿；`verify:resume-diagnosis-flow-ui` / `fusion-w3`（静态）/ `lightflow-k2b-ai-resume` / `ai-down-fallbacks` / `kiosk-visual-unity` / `kiosk-frontend-debt` / `compliance-copy` 全绿。Playwright 1080×1920 mock（dev `127.0.0.1:5197`）对 4 个 capture state 截图在 `/private/tmp/e2-shots/`，`data-state` 对齐，可点区 ≥48px（导出键 495×76）。未部署。
+
+#### 包 K2 · 三端 .doc/.docx 口径与 Word 预览 / 转 PDF 入口（消费契约 3）—— codex
+
+- **已合入 main**：#874（squash `__K2__`，2026-09-07）。
+
+- **条目**：P0-9（三端统一「接收」）、Word 页内预览、我的文档「转 PDF」、打印上传接 Word；全部以 `GET /api/v1/document-conversion/capabilities` 为真时才开放，为假时 aria-disabled + reason（「由转换引擎生成，复杂版式可能有偏差，请预览核对」固定出现在开放态文案中）。
+- **事实**：kiosk 简历上传 accept 刻意剔除 .doc（`apps/kiosk/src/pages/resume/ResumeSourcePage.tsx:115-126`）；手机中转页 `PhoneUploadPage.tsx:16-18` 与小程序 `resume-upload.js:6` 放行 .doc；打印上传 `PrintUploadPage.tsx:545` 只收 pdf/jpg/png；`FileContentPreview.tsx:15-31` 只认 pdf/图片，DOCX 归 unsupported；`PrintPreviewPage.tsx:226` 写「Word 文档需后续接入转换服务后才能页内预览」；我的文档 `MyDocumentsPage.tsx:204-229`「重新打印」不按格式过滤（该文件受批次守卫禁改，本包不碰）。服务端（包 D）：`POST /files/:id/convert {target:'pdf'}` 返回派生 PDF 的 signedUrl / printFileUrl；`print_doc` 上传在能力为真时接受 doc/docx，建单前服务端自动转派生 PDF。
+- **要做**：① kiosk 新增 `services/api/documentConversion.ts`（capabilities 缓存 + convert）；② 简历上传 / 手机中转 / 打印上传三处 accept：能力为真时含 .doc/.docx，为假时不含且文案说明「Word 转换暂未开放，请另存为 PDF 上传」；③ `FileContentPreview` 对 Word：能力为真 → 先调 convert 再 iframe 派生 PDF（显示「由转换引擎生成…」提示），为假 → 保留诚实不支持态；④ 打印预览页 Word：同 ③，`PrintPreviewPage.tsx:226` 文案按能力真假二选一；⑤ 小程序 `resume-upload` 的 .doc/.docx 选择与文案同口径（读 capabilities，新增 `utils/api.js` 封装，只加）；⑥ 新增 kiosk 静态门禁 `verify:word-conversion-ui`（能力为假时三处 accept 不含 doc/docx、提示文案存在、convert 只在能力为真时调用）；⑦ miniapp `verify:api-contract` 快照补新端点。
+- **允许改**：上述 kiosk 文件（`MyDocumentsPage.tsx` 除外）、`apps/kiosk/src/services/api/documentConversion.ts`（新）、`apps/kiosk/scripts/verify-word-conversion-ui.mjs`（新）+ `apps/kiosk/package.json`、`apps/miniapp/pages/resume-upload/**`、`apps/miniapp/utils/api.js`（只加）、`apps/miniapp/scripts/api-contract.json`。
+- **禁改**：`services/api/**`、`apps/kiosk/src/pages/profile/**`、`.github/workflows/**`。
+- **验收**：kiosk tsc / lint；`verify:word-conversion-ui`（变异测试）、`verify:file-display-truth`、`verify:kiosk-visual-unity`、`verify:ai-down-fallbacks`、`verify:compliance-copy`、图谱列出的门禁；`pnpm --dir apps/miniapp verify:static`。
+
+- **执行记录（原写在 current-progress.md，为避免多会话顶部冲突改记于此）**：
+  > 2026-09-07 **包 K2（分支 `claude/rl-k2-doc-ui`，基于包 D `32ee331f0`）完成三端 Word 接收口径与页内转换预览接线，未部署**：新增 kiosk `documentConversion.ts`，以 `GET /document-conversion/capabilities` 的 `wordToPdf=true` 为唯一开放条件并缓存能力；简历上传、手机中转、打印上传仅在能力为真时把 DOC/DOCX 加入选择器，能力关闭或探测失败时保留 PDF/图片并用 `aria-disabled` + 常驻原因说明「Word 转换暂未开放，请另存为 PDF 上传」。`FileContentPreview` 与打印预览对 Word 调 `POST /files/:id/convert`，成功后只用派生 PDF 的短时 `signedUrl` 页内预览，开放态固定提示「由转换引擎生成，复杂版式可能有偏差，请预览核对」；鉴权、转换或链接失败均保留诚实错误态，打印建单仍沿用包 D 的服务端自动转换分支。小程序 `resume-upload` 同样 fail-closed 读取 capabilities，并把新端点写入 API 契约快照。新增 `verify:word-conversion-ui`，正常门禁通过，8 项变异测试逐项转红且恢复源文件。实跑通过：kiosk `tsc --noEmit`、eslint（0 error，9 条既有 Fast Refresh warning）、任务包指定的 `verify:file-display-truth` / `verify:kiosk-visual-unity` / `verify:ai-down-fallbacks` / `verify:compliance-copy`、全部目标文件图谱门禁、服务端交叉 `verify-file-display-truth` / `verify-print-color-duplex-capability`、小程序 API contract 与 `verify:static` 的四段等价 Node 脚本、`verify:repository-integrity`。**未做**：`MyDocumentsPage.tsx` 的「转 PDF」按钮，因包 K2 明确禁改该批次守卫文件，且现有预览调用未传转换所需 `fileId`；匿名 Word 页内转换仍受包 D 当前 `AUTH_REQUIRED` 契约限制，前端不伪装成功；未运行浏览器真点、微信开发者工具、生产部署或 Windows/打印机真机验证。
 
 ## 第三波（P1 补全，商用完整）
 
