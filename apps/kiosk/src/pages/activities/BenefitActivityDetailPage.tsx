@@ -2,6 +2,7 @@
 // 布局：Hero 大卡 + 权益格 + 活动规则 + 使用步骤 + 合规提示 + 双 CTA。
 
 import { useCallback, useEffect, useState } from 'react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
@@ -111,7 +112,7 @@ export function BenefitActivityDetailPage() {
         setMessage({ text: '已领取，可在我的权益查看', kind: 'success' })
         await getBenefitActivity(id, getToken()).then(setItem).catch(() => undefined)
       } else {
-        setMessage({ text: error instanceof Error ? error.message : '领取失败，请稍后重试', kind: 'error' })
+        setMessage({ text: userMessageOf(error, '领取失败，请稍后重试'), kind: 'error' })
       }
     } finally {
       setClaiming(false)

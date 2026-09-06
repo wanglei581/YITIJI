@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import type { FairCompanyDTO } from '@ai-job-print/shared'
 import { BuildingIcon, ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
@@ -112,7 +113,7 @@ export function FairCompanyDetailPage() {
         },
       })
     } catch (err) {
-      setPrintError(err instanceof Error ? err.message : '打印文件准备失败，请稍后重试')
+      setPrintError(userMessageOf(err, '打印文件准备失败，请稍后重试'))
     } finally {
       setPrinting(null)
     }

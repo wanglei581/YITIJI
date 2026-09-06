@@ -14,6 +14,8 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRightIcon, RotateCcwIcon, PrinterIcon } from 'lucide-react'
 import {
@@ -96,7 +98,8 @@ async function claimPickup(code: string): Promise<ClaimPickupResult> {
       body.error?.message ??
       (Array.isArray(body.message) ? body.message.join('; ') : (body.message as string | undefined)) ??
       `到机码无效或已过期（${errCode}）`
-    throw new Error(errMsg)
+    // 带错误码抛出，userMessageOf 才能按 PICKUP_CODE_* 映射用户文案，而不是落到通用兜底
+    throw new ApiHttpError(errCode, errMsg, res.status)
   }
   return body as ClaimPickupResult
 }
@@ -144,7 +147,7 @@ export function PrintPickupClaimPage() {
     } catch (err) {
       claimLockRef.current = false
       setCode('')
-      setErrorMsg(err instanceof Error ? err.message : '请求失败，请重试')
+      setErrorMsg(userMessageOf(err, '请求失败，请重试'))
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
     }

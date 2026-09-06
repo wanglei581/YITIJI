@@ -38,6 +38,12 @@ import { ApiHttpError } from './httpAdapter'
  */
 const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
+  // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
+  PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
+  PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
+  PICKUP_CODE_UNAVAILABLE: '这个到机码对应的文件暂时不可用，请联系现场工作人员',
+  PICKUP_CODE_LENGTH: '到机码位数不对，请重新输入',
+  PICKUP_CODE_PATTERN: '到机码格式不对，请重新输入',
   REQUEST_TIMEOUT: '本次请求响应超时，请重试',
   RATE_LIMITED: '当前使用的人较多，请稍后再试',
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
