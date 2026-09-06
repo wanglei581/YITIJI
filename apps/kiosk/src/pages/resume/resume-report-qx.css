@@ -59,7 +59,7 @@
 .rrp-fx { height: 40px; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; background: var(--qx-wheat); color: var(--qx-on-solid); font-size: 17px; font-weight: 800; }
 .rrp-fxtx { flex: 1; font-size: 17px; color: var(--qx-wheat-d); font-weight: 700; }
 
-.rrp-pri ol, .rrp-dimtalk { margin: 0; padding: 0; list-style: none; }
+.rrp-pri ol, .rrp-dimtalk ul { margin: 0; padding: 0; list-style: none; }
 .rrp-pri li, .rrp-dimtalk li { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; font-size: 18px; line-height: 1.4; color: var(--qx-ink-2); }
 .rrp-pri .no, .rrp-iss .no, .rrp-it .no, .rrp-blk .bno {
   flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
