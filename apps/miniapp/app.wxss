@@ -387,7 +387,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   border-radius: var(--r-full);
   font-size: 13px; color: var(--muted);
   background: var(--surface); border: 1px solid var(--line);
-  white-space: nowrap; flex-shrink: 0; min-height: 96rpx; box-sizing: border-box; }
+  white-space: nowrap; flex-shrink: 0; min-height: 96rpx; min-width: 96rpx; justify-content: center; box-sizing: border-box; }
 .f-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .f-chip.teal { background: var(--teal-soft); color: var(--teal-deep); border-color: transparent; }
 
@@ -429,7 +429,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   border: 1px solid var(--line-soft);
 }
 .seg .s {
-  flex: 1; min-height: 48px;
+  flex: 1; min-height: 48px; min-width: 96rpx;
   display: flex; align-items: center; justify-content: center;
   border-radius: 9px;
   font-size: 13px; font-weight: 500; color: var(--muted);

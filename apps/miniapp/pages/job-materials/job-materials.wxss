@@ -37,3 +37,6 @@
    「生成并去打印」这几个字，底栏右侧空出一大块，主次比例也没了。 */
 .jm-side { flex: 1; }
 .jm-main { flex: 2; }
+
+/* 重试按钮可点区域 ≥48px（真实量到 24px 高） */
+.retry-btn { min-height: 96rpx; display: inline-flex; align-items: center; justify-content: center; }
