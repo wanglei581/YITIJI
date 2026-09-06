@@ -38,6 +38,8 @@ const MAX_IMAGES = 20
 const MAX_SINGLE_IMAGE_BYTES = 10 * 1024 * 1024
 
 interface SelectedImage {
+  /** 来源按入列路径记录，不靠文件名猜 */
+  source: 'qr' | 'local'
   fileId: string
   fileAccessUrl: string
   name: string
@@ -93,7 +95,7 @@ export function ConvertImagesPage() {
     setError(null)
     try {
       const res = await kioskUploadFile(selected, getToken())
-      addImage({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes) })
+      addImage({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes), source: 'local' })
     } catch (err) {
       setError(userMessageOf(err, '上传失败，请重试'))
     } finally {
@@ -106,7 +108,7 @@ export function ConvertImagesPage() {
       setError('手机上传未返回可用的文件地址，请重试')
       return
     }
-    addImage({ fileId: file.fileId, fileAccessUrl: file.fileUrl, name: file.name, size: file.size })
+    addImage({ fileId: file.fileId, fileAccessUrl: file.fileUrl, name: file.name, size: file.size, source: 'qr' })
     setShowQr(false)
   }
 
@@ -220,7 +222,7 @@ export function ConvertImagesPage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <b className="block break-all text-[22px] font-bold">{img.name}</b>
-                    <span className="mt-1 block text-[16.5px] text-neutral-500">{img.size} · {img.name.includes('手机') ? '手机扫码上传' : '本机上传'}</span>
+                    <span className="mt-1 block text-[16.5px] text-neutral-500">{img.size} · {img.source === 'qr' ? '手机扫码上传' : '本机上传'}</span>
                   </span>
                   <span className="flex shrink-0 flex-col gap-1.5">
                     <button type="button" disabled={index === 0} onClick={() => moveImage(index, -1)} className="grid h-12 w-12 place-items-center rounded-md border border-neutral-200 bg-surface text-neutral-500 disabled:opacity-30" aria-label="上移">

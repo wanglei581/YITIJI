@@ -9,6 +9,7 @@ import type {
 import { makePrintParams } from '@ai-job-print/shared'
 import { ArrowRightIcon, FileTextIcon, ImageIcon, MailIcon, PrinterIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
@@ -68,6 +69,8 @@ export function JobMaterialLibraryPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // 生成求职材料是长调用（可达 150s+），期间不能被隐私硬截止清场（SES-10）
+  useBusyLock(submitting)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [generated, setGenerated] = useState<JobMaterialGenerateResponse | null>(null)
 
