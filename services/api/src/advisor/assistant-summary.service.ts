@@ -273,7 +273,7 @@ export class AssistantSummaryService {
       }
       if (error instanceof LlmTimeoutError) {
         throw new ServiceUnavailableException({
-          error: { code: 'AI_CHAT_TIMEOUT', message: llmTimeoutMessage('本次要点', error.timeoutMs) },
+          error: { code: 'AI_ASSISTANT_SUMMARY_TIMEOUT', message: llmTimeoutMessage('本次要点', error.timeoutMs) },
         })
       }
       throw new ServiceUnavailableException({
