@@ -1,5 +1,19 @@
 const api = require('../../utils/api')
 
+// MP-07 改法 (a)：标签只显示即将建单的真实参数，不从 query 猜彩色/双面。
+// 与 print-upload.verifiedPrintParams 锁死同一组（verify-miniapp-static 抽取字面量）。
+// 彩色/双面尚未通过真机验收，不能做 (b) 把 query 透传到报价/建单——那会按彩色收费或 400。
+const ORDER_COLOR_MODE = 'black_white'
+const ORDER_DUPLEX = 'simplex'
+
+function colorLabelOf(colorMode) {
+  return colorMode === 'color' ? '彩色' : '黑白'
+}
+
+function duplexLabelOf(duplex) {
+  return duplex === 'simplex' ? '单面' : '双面'
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -8,6 +22,12 @@ Page({
     fee: { total: '—' },
     isFreeOrder: false,
     submitting: false,
+    colorMode: ORDER_COLOR_MODE,
+    duplex: ORDER_DUPLEX,
+    colorLabel: '黑白',
+    duplexLabel: '单面',
+    pageCountLabel: '未知 页',
+    copiesLabel: 1,
   },
 
   onLoad(opts) {
@@ -15,8 +35,11 @@ Page({
     const total = q.total || '—'
     const copies = Number(q.copies) > 0 ? Number(q.copies) : 1
     const pages = Number(q.pages) > 0 ? Number(q.pages) : 0
-    const color = q.color === 'color' ? '彩色' : '黑白'
-    const duplex = q.duplex === 'double' ? '双面' : '单面'
+    const colorMode = ORDER_COLOR_MODE
+    const duplex = ORDER_DUPLEX
+    const color = colorLabelOf(colorMode)
+    const duplexText = duplexLabelOf(duplex)
+    const pageCountLabel = `${pages || '未知'} 页`
     const amountCents = Number(q.amountCents)
     const hasAmount = q.amountCents !== undefined && q.amountCents !== '' && Number.isSafeInteger(amountCents) && amountCents >= 0
     const isFreeOrder = hasAmount && amountCents === 0
@@ -24,10 +47,16 @@ Page({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
       isFreeOrder,
+      colorMode,
+      duplex,
+      colorLabel: color,
+      duplexLabel: duplexText,
+      pageCountLabel,
+      copiesLabel: copies,
       'fee.total': total,
       'files[0].price': isFreeOrder ? '免费' : total,
       'files[0].name': q.name ? decodeURIComponent(q.name) : '未选择文件',
-      'files[0].desc': `${color} · ${duplex} · ${pages || '未知'} 页 · ×${copies}`,
+      'files[0].desc': `${color} · ${duplexText} · ${pageCountLabel} · ×${copies}`,
     })
   },
 

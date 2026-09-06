@@ -53,4 +53,14 @@
 
 .od-actions {
   padding: 24rpx 0 8rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+.od-actions .btn {
+  min-height: 48px;
+}
+.od-actions .btn.primary {
+  min-height: 56px;
+  height: 56px;
 }

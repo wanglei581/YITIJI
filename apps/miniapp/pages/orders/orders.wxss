@@ -118,7 +118,7 @@
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.oc-btns { display: flex; gap: 14rpx; }
+.oc-btns { display: flex; flex-wrap: wrap; gap: 14rpx; justify-content: flex-end; }
 /* 一体机历史任务的说明文字。不是按钮：它没有可点的去处，
    做成按钮样子等于又给一次点击预期。 */
 .oc-note {
@@ -129,14 +129,15 @@
   color: var(--ink-faint, var(--ink-soft));
 }
 .oc-btn {
-  height: 64rpx;
+  min-height: 48px;
+  min-width: 48px;
   padding: 0 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--r);
   border: 1rpx solid var(--line-soft);
-  font-size: 25rpx;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink-soft);
   background: var(--surface);
@@ -145,6 +146,13 @@
   background: var(--teal);
   color: #fff;
   border-color: var(--teal);
+}
+.oc-btn.cancel {
+  color: var(--ink);
+}
+.oc-btn.disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .empty-slot {

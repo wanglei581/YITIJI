@@ -47,17 +47,43 @@ function buildSpec(item) {
   return parts.join(' · ') || '—'
 }
 
+function canCancelCloudOrder(raw) {
+  return !raw.status
+    && raw.payStatus === 'unpaid'
+    && raw.pickupStatus === 'pending'
+}
+
+function toDetail(raw) {
+  const status = raw.status || raw.taskStatus || ''
+  const pickupRaw = (!raw.status && raw.pickupStatus === 'pending') ? (raw.pickupCode || '') : ''
+  return {
+    fileName:     raw.fileName || '打印文件',
+    store:        raw.terminalDisplayName || raw.terminalName || raw.storeName || '打印服务终端',
+    spec:         buildSpec(raw),
+    price:        fmtPrice(raw.amountCents),
+    statusLabel:  STATUS_MAP[status] || status || '未知',
+    statusTone:   STATUS_TONE[status] || 'neutral',
+    pickup:       fmtCode(pickupRaw),
+    createdAt:    fmtTime(raw.createdAt),
+    payStatus:    raw.payStatus || '',
+    pickupStatus: raw.pickupStatus || '',
+    canCancel:    canCancelCloudOrder(raw),
+  }
+}
+
 Page({
   data: {
     statusBarHeight: 20,
     loading: true,
     error: '',
     detail: null,
+    cancelling: false,
   },
 
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     this._orderId = options.orderId || ''
+    this._toDetail = toDetail
     this._load()
   },
 
@@ -69,20 +95,10 @@ Page({
     this.setData({ loading: true, error: '' })
     api.getCloudPrintOrder(this._orderId)
       .then((raw) => {
-        const status = raw.status || raw.taskStatus || ''
-        const pickupRaw = (!raw.status && raw.pickupStatus === 'pending') ? (raw.pickupCode || '') : ''
         this.setData({
           loading: false,
-          detail: {
-            fileName:    raw.fileName || '打印文件',
-            store:       raw.terminalDisplayName || raw.terminalName || raw.storeName || '打印服务终端',
-            spec:        buildSpec(raw),
-            price:       fmtPrice(raw.amountCents),
-            statusLabel: STATUS_MAP[status] || status || '未知',
-            statusTone:  STATUS_TONE[status] || 'neutral',
-            pickup:      fmtCode(pickupRaw),
-            createdAt:   fmtTime(raw.createdAt),
-          },
+          cancelling: false,
+          detail: toDetail(raw),
         })
       })
       .catch((err) => {
@@ -101,5 +117,45 @@ Page({
 
   toPrint() {
     wx.navigateTo({ url: '/pages/documents/documents' })
+  },
+
+  cancelOrder() {
+    const detail = this.data.detail
+    if (!this._orderId || !detail || !detail.canCancel || this.data.cancelling) return
+    wx.showModal({
+      title: '取消订单',
+      content: '取消后到机码立即失效，且不能恢复。确定取消这张未付款订单？',
+      confirmText: '确认取消',
+      cancelText: '再想想',
+      confirmColor: '#b5643c',
+      success: (res) => {
+        if (!res.confirm) return
+        this._submitCancel()
+      },
+    })
+  },
+
+  _submitCancel() {
+    if (this._cancelLock) return
+    const detail = this.data.detail
+    if (!this._orderId || !detail || !detail.canCancel) return
+    this._cancelLock = true
+    this.setData({ cancelling: true })
+    api.cancelCloudPrintOrder(this._orderId)
+      .then((raw) => {
+        this.setData({
+          cancelling: false,
+          detail: toDetail(raw),
+        })
+      })
+      .catch((err) => {
+        this.setData({ cancelling: false })
+        wx.showModal({
+          title: '取消失败',
+          content: (err && err.message) || '请稍后重试',
+          showCancel: false,
+        })
+      })
+      .then(() => { this._cancelLock = false })
   },
 })

@@ -561,6 +561,8 @@ const printPayJs = read('pages/print-pay/print-pay.js')
 const printPayWxml = read('pages/print-pay/print-pay.wxml')
 const ordersJs = read('pages/orders/orders.js')
 const ordersWxml = read('pages/orders/orders.wxml')
+const orderDetailJs = read('pages/order-detail/order-detail.js')
+const orderDetailWxml = read('pages/order-detail/order-detail.wxml')
 if (
   documentsJs.includes('api.uploadPrintFile') &&
   printUploadJs.includes('api.createPrintPiiScan') &&
@@ -651,6 +653,49 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
       '用户看到的和实际下单的不是一回事，必须两处同改')
   } else {
     ok(`报价与下单打印参数一致（${quote.color} / ${quote.duplex}）`)
+  }
+}
+
+// MP-07：支付页不得按 query 渲染彩色/双面。标签必须跟建单字面量走。
+{
+  const guessesQuery = /q\.color\s*===\s*'color'/.test(printPayJs)
+    || /q\.duplex\s*===\s*'double'/.test(printPayJs)
+  const labelsFromCreate = printPayJs.includes("colorMode: 'black_white'")
+    && printPayJs.includes("duplex: 'simplex'")
+    && printPayJs.includes('colorLabel')
+    && printPayJs.includes('duplexLabel')
+    && printPayWxml.includes('{{colorLabel}}')
+    && printPayWxml.includes('{{duplexLabel}}')
+  if (guessesQuery) {
+    bad('支付页打印标签不从 query 猜测', 'print-pay 仍按 query 渲染彩色/双面，会与建单 black_white/simplex 分叉')
+  } else if (!labelsFromCreate) {
+    bad('支付页打印标签与建单参数同源', '标签必须来自建单真实参数（colorLabel/duplexLabel），且建单仍是 black_white/simplex')
+  } else {
+    ok('支付页彩色/双面标签与建单参数同源')
+  }
+}
+
+// MP-05：云打印 unpaid+pending 可取消；材料包取消端点仍 knownMissing，页面不得调用。
+{
+  const listWired = ordersJs.includes('api.cancelCloudPrintOrder')
+    && ordersJs.includes("payStatus === 'unpaid'")
+    && ordersJs.includes("pickupStatus === 'pending'")
+    && ordersJs.includes('toUiItem(raw)')
+    && ordersWxml.includes('取消订单')
+    && ordersWxml.includes('item.canCancel')
+  const detailWired = orderDetailJs.includes('api.cancelCloudPrintOrder')
+    && orderDetailJs.includes("payStatus === 'unpaid'")
+    && orderDetailJs.includes("pickupStatus === 'pending'")
+    && orderDetailJs.includes('toDetail(raw)')
+    && orderDetailWxml.includes('取消订单')
+    && orderDetailWxml.includes('detail.canCancel')
+  const packageLeftClosed = !ordersJs.includes('cancelPackageOrder')
+    && !orderDetailJs.includes('cancelPackageOrder')
+  if (listWired && detailWired && packageLeftClosed) {
+    ok('云打印未付款待到机订单可取消，材料包取消未接线')
+  } else {
+    bad('云打印未付款订单取消入口',
+      `list=${listWired} detail=${detailWired} packageClosed=${packageLeftClosed}`)
   }
 }
 

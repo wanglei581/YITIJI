@@ -67,6 +67,13 @@ function fmtCode(raw) {
   return groups ? groups.join('-') : ''
 }
 
+// MP-05：仅云打印 Order-only，且拍板第 5 条 unpaid + pending。材料包取消端点仍 knownMissing。
+function canCancelCloudOrder(item) {
+  return !item.status
+    && item.payStatus === 'unpaid'
+    && item.pickupStatus === 'pending'
+}
+
 // 后端 item → UI 展示对象
 function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
@@ -96,6 +103,10 @@ function toUiItem(item) {
     pickupRaw,
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
     taskStatus:  effectiveStatus,
+    payStatus:   item.payStatus || '',
+    pickupStatus: item.pickupStatus || '',
+    canCancel:   canCancelCloudOrder(item),
+    cancelling:  false,
     // 已完成可再打一份；到机码可见时显示"查看到机码"
     action,
     actionLabel: action === 'pickup' ? '查看到机码'
@@ -127,6 +138,8 @@ Page({
 
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._toUiItem = toUiItem
+    this._cancelLocks = {}
   },
 
   onShow() {
@@ -225,6 +238,56 @@ Page({
     // 兜一道：一体机任务没有线上详情，点了只会 404。按钮本身已按 cloudOrder 隐藏。
     if (!item.cloudOrder) return
     wx.navigateTo({ url: `/pages/order-detail/order-detail?orderId=${encodeURIComponent(item.id)}` })
+  },
+
+  cancelOrder(e) {
+    const id = e.currentTarget.dataset.id
+    const item = this.data.filtered.find(o => o.id === id) || this.data.orders.find(o => o.id === id)
+    if (!item || !item.canCancel || item.cancelling) return
+    wx.showModal({
+      title: '取消订单',
+      content: '取消后到机码立即失效，且不能恢复。确定取消这张未付款订单？',
+      confirmText: '确认取消',
+      cancelText: '再想想',
+      confirmColor: '#b5643c',
+      success: (res) => {
+        if (!res.confirm) return
+        this._submitCancel(id)
+      },
+    })
+  },
+
+  _patchOrder(id, patch) {
+    const apply = (list) => list.map(o => o.id === id ? Object.assign({}, o, patch) : o)
+    const orders = apply(this.data.orders)
+    this.setData({ orders, filtered: apply(this.data.filtered) })
+    return orders
+  },
+
+  _submitCancel(id) {
+    this._cancelLocks = this._cancelLocks || {}
+    if (this._cancelLocks[id]) return
+    const current = this.data.orders.find(o => o.id === id)
+    if (!current || !current.canCancel) return
+    this._cancelLocks[id] = true
+    this._patchOrder(id, { cancelling: true })
+    api.cancelCloudPrintOrder(id)
+      .then((raw) => {
+        // 用服务端回读整行替换，不在本地写「已取消」。
+        const next = toUiItem(raw)
+        const orders = this.data.orders.map(o => o.id === id ? next : o)
+        this.setData({ orders })
+        this._filterTab(this.data.activeTab, orders)
+      })
+      .catch((err) => {
+        this._patchOrder(id, { cancelling: false })
+        wx.showModal({
+          title: '取消失败',
+          content: (err && err.message) || '请稍后重试',
+          showCancel: false,
+        })
+      })
+      .then(() => { delete this._cancelLocks[id] })
   },
 
   // 去登录
