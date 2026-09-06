@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common'
+import { BadRequestException, Controller, Get, Param } from '@nestjs/common'
 import { LegalService, LEGAL_DOC_TYPES, type LegalDocType } from './legal.service'
 
 @Controller('kiosk/legal')
@@ -8,10 +8,12 @@ export class LegalController {
   /** GET /api/v1/kiosk/legal/:type — 返回当前有效版本内容（无鉴权） */
   @Get(':type')
   async getActive(@Param('type') type: string) {
-    const safeType: LegalDocType = LEGAL_DOC_TYPES.includes(type as LegalDocType)
-      ? (type as LegalDocType)
-      : 'terms_of_service'
-    const doc = await this.service.getActive(safeType)
+    if (!LEGAL_DOC_TYPES.includes(type as LegalDocType)) {
+      throw new BadRequestException({
+        error: { code: 'LEGAL_DOC_TYPE_INVALID', message: '法务文档类型不支持' },
+      })
+    }
+    const doc = await this.service.getActive(type as LegalDocType)
     return { success: true, data: doc }
   }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req } from '@nestjs/common'
+import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { ApiResponse } from '../common/dto/api-response.dto'
@@ -32,6 +32,8 @@ function cleanStr(v: unknown, max = 128): string | null {
   return typeof v === 'string' && v.trim() && v.trim().length <= max ? v.trim() : null
 }
 
+const TERMINAL_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
+
 /**
  * 浏览 / 外部跳转行为上报（/api/v1/activity/*，P1 闭环）。
  *
@@ -56,31 +58,46 @@ export class ActivityController {
     return member?.endUserId ?? null
   }
 
+  private async resolveTerminalId(value: unknown): Promise<string | null> {
+    const terminalRef = cleanStr(value, 64)
+    if (!terminalRef || !TERMINAL_ID_RE.test(terminalRef)) return null
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
+      select: { id: true },
+    })
+    // 浏览/跳转上报是 P1 best-effort，未知终端不能阻断用户主流程。
+    return terminal?.id ?? null
+  }
+
   @Post('browse')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
   async browse(@Body() body: RecordBrowseDto, @Req() req: ReqLike) {
     const endUserId = await this.endUserIdOf(req)
     if (!endUserId) return ApiResponse.ok({ recorded: false as const, reason: 'LOGIN_REQUIRED' })
+    const terminalId = await this.resolveTerminalId(body.terminalId)
     const result = await this.activity.recordBrowse(
       endUserId,
       cleanStr(body.targetType) ?? '',
       cleanStr(body.targetId) ?? '',
-      cleanStr(body.terminalId),
+      terminalId,
     )
     return ApiResponse.ok(result)
   }
 
   @Post('external-jump')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
   async externalJump(@Body() body: RecordJumpDto, @Req() req: ReqLike) {
     const endUserId = await this.endUserIdOf(req)
     if (!endUserId) return ApiResponse.ok({ recorded: false as const, reason: 'LOGIN_REQUIRED' })
+    const terminalId = await this.resolveTerminalId(body.terminalId)
     const result = await this.activity.recordJump(
       endUserId,
       cleanStr(body.targetType) ?? '',
       cleanStr(body.targetId) ?? '',
       cleanStr(body.action) ?? '',
-      cleanStr(body.terminalId),
+      terminalId,
     )
     return ApiResponse.ok(result)
   }
