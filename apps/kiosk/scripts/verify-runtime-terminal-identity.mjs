@@ -22,6 +22,11 @@ assert.match(terminalAuth, /if \(!sessionInvalid\(error\)\) return response/, 'a
 assert.match(terminalAuth, /refreshInflight/, 'concurrent 401s must share one refresh (no thundering herd on /session-token/refresh)')
 assert.match(terminalAuth, /initInflight/, 'identity recovery must not re-enter initializeTerminalSession while a boot ticket exchange is in flight')
 
+assert.match(terminalAuth, /import\.meta\.env\['VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN'\]/, 'the E2E mock token must be read from a VITE_-prefixed variable (Vite exposes nothing else to the bundle)')
+assert.doesNotMatch(terminalAuth, /import\.meta\.env\['E2E_MOCK_TERMINAL_SESSION_TOKEN'\]/, 'an unprefixed E2E_MOCK_TERMINAL_SESSION_TOKEN is never exposed by Vite, so the mock short-circuit silently never applies')
+const deployWorkflow = readFileSync(join(ROOT, '..', '..', '.github', 'workflows', 'deploy.yml'), 'utf8')
+assert.doesNotMatch(deployWorkflow, /E2E_MOCK_TERMINAL_SESSION_TOKEN/, 'production deploy builds must never set the E2E mock terminal session token')
+
 const terminalScopedConsumers = [
   'src/services/print/printJobsApi.ts',
   'src/services/api/printScanCapabilities.ts',

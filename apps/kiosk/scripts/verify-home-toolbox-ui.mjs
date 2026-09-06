@@ -11,7 +11,7 @@
  *      外部离场确认 + 匿名事件上报（launch modals 文件未变，断言保留）。
  *   C2. 百宝箱外部 H5 不在点击时直接整页跳出。
  *   D. 智慧校园保留终端开关隐藏逻辑并渲染后台投放应用项。
- *   E/E2. 终端默认配置 + 事件上报 sendBeacon/keepalive 且不发送 URL/host。
+ *   E/E2. 终端默认配置 + 事件上报走终端会话 keepalive fetch（不能用 sendBeacon，带不了会话令牌）且不发送 URL/host。
  *
  * 运行：pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
  */
@@ -149,9 +149,10 @@ if (
   fail('E. 百宝箱只有已确认且至少一个有效启动项时才可进入')
 }
 
-// E2. 事件上报 sendBeacon/keepalive 且不发送 URL/host
+// E2. 事件上报走 terminalProtectedFetch + keepalive 且不发送 URL/host
 if (
-  toolboxLaunchEvents.includes('navigator.sendBeacon') &&
+  toolboxLaunchEvents.includes('terminalProtectedFetch') &&
+  !toolboxLaunchEvents.includes('navigator.sendBeacon') &&
   toolboxLaunchEvents.includes('keepalive: true') &&
   toolboxLaunchEvents.includes("credentials: 'omit'") &&
   toolboxLaunchEvents.includes("API_MODE !== 'http'") &&
@@ -159,7 +160,7 @@ if (
   !toolboxLaunchEvents.includes('targetHost') &&
   !toolboxLaunchEvents.includes('externalUrl')
 ) {
-  pass('E2. Kiosk 百宝箱事件上报使用 sendBeacon/keepalive 且不发送 URL/host')
+  pass('E2. Kiosk 百宝箱事件上报走终端会话 keepalive fetch 且不发送 URL/host')
 } else {
   fail('E2. Kiosk 百宝箱事件上报必须可靠且不得发送 URL/host')
 }

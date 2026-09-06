@@ -7,8 +7,9 @@ const STORAGE_KEY = 'terminal_session_token_v1'
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000]
 const RETRY_WINDOW_MS = 60_000
 const REQUEST_TIMEOUT_MS = 4_000
-const MOCK_TOKEN = (import.meta.env['E2E_MOCK_TERMINAL_SESSION_TOKEN'] ?? 'mock-terminal-session-fixture').trim()
-const HAS_E2E_MOCK_TOKEN = Boolean(import.meta.env['E2E_MOCK_TERMINAL_SESSION_TOKEN']?.trim())
+// 仅 Playwright 浏览器套件（API 被路由 mock）设置；生产 / deploy 构建禁止出现该变量（verify-runtime-terminal-identity 断言）。
+const MOCK_TOKEN = (import.meta.env['VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN'] ?? 'mock-terminal-session-fixture').trim()
+const HAS_E2E_MOCK_TOKEN = Boolean(import.meta.env['VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN']?.trim())
 
 export type TerminalSessionState = 'checking' | 'ready' | 'failed'
 

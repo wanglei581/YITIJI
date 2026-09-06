@@ -36,7 +36,7 @@ export default defineConfig({
     { name: 'mobile-390x844', grep: /@w5-mobile/, use: { viewport: { width: 390, height: 844 } } },
   ],
   webServer: {
-    command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4185 --strictPort',
+    command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4185 --strictPort',
     url: 'http://127.0.0.1:4185',
     reuseExistingServer: false,
     timeout: 180_000,
