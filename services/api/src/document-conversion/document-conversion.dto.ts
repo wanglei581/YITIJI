@@ -4,4 +4,3 @@ export class ConvertDocumentDto {
   @IsIn(['pdf'])
   target!: 'pdf'
 }
-

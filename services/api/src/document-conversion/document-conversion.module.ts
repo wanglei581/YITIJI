@@ -28,4 +28,3 @@ import { DOCUMENT_CONVERSION_ADAPTER, DOCUMENT_CONVERSION_FONT_PROBE } from './d
   exports: [DocumentConversionService],
 })
 export class DocumentConversionModule {}
-

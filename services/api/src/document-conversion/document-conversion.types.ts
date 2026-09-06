@@ -48,4 +48,3 @@ export class ConversionTimeoutError extends Error {
     this.name = 'ConversionTimeoutError'
   }
 }
-

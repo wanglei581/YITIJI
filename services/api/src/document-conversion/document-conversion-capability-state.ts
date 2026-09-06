@@ -7,4 +7,3 @@ export function setWordToPdfUploadAvailable(available: boolean): void {
 export function isWordToPdfUploadAvailable(): boolean {
   return wordToPdfAvailable
 }
-
