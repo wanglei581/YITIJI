@@ -186,7 +186,7 @@ export function DetailsTab({
             <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/stats`)}>
               <span className="t-text">
                 <b>现场数据</b>
-                <span className="cnt">签到进度 · 行业分布</span>
+                <span className="cnt">行业分布 · 岗位规模</span>
               </span>
             </button>
             <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/visit-plan`)}>

@@ -1,3 +1,4 @@
+import { PARTNER_TYPE_LABELS, type PartnerType } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import {
   MODULE_LABELS,
@@ -30,16 +31,6 @@ import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../s
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
 // 内容信任状态（contentTrustStatus）为发布闸门依据，由平台管理员人工核验与标记。
 
-const ORG_TYPE_LABELS: Record<string, string> = {
-  school: '高校 / 院校',
-  hr_company: '人力资源公司',
-  job_platform: '招聘平台',
-  fair_organizer: '招聘会主办方',
-  government: '政府 / 公共就业服务机构',
-  public_employment_service: '公共就业服务机构',
-  aggregator: '数据聚合方',
-  other: '其他机构',
-}
 
 function trustStatusLabel(status: OrgContentTrustStatus | null | undefined): string {
   if (!status) return ORG_CONTENT_TRUST_UNSET_LABEL
@@ -146,7 +137,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <h2 className="text-base font-semibold text-neutral-900">{profile.name}</h2>
-              <p className="text-sm text-neutral-500">{ORG_TYPE_LABELS[profile.type] ?? profile.type}</p>
+              <p className="text-sm text-neutral-500">{PARTNER_TYPE_LABELS[profile.type as PartnerType] ?? profile.type}</p>
             </div>
           </div>
           <div className="space-y-3 text-sm">

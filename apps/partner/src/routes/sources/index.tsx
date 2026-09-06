@@ -659,7 +659,7 @@ export default function SourcesPage() {
             <div>
               <p className="mb-1 text-xs text-neutral-400">推送地址(POST)</p>
               <code className="block break-all rounded bg-neutral-50 px-3 py-2 font-mono text-xs">
-                {`${API_BASE_URL}/sync/webhook?source=${webhookGuide.id}`}
+                {resolveWebhookUrl(webhookGuide.webhookUrl ?? `${API_BASE_URL}/sync/webhook?source=${webhookGuide.id}`)}
               </code>
             </div>
             <div className="rounded-lg bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-600">
