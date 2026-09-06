@@ -24,6 +24,7 @@ import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { JobMaterialsService } from '../job-materials/job-materials.service'
+import { findJobMaterialTemplate } from '../job-materials/job-material-templates'
 import type { ResumeTemplateLayoutPreset } from '../job-materials/job-materials.types'
 import {
   ResumeExportGateService,
@@ -650,8 +651,17 @@ export class AiService {
       select: { resumeLayoutPreset: true },
     })
     const preset = row?.resumeLayoutPreset
-    if (!preset || typeof preset !== 'object' || Array.isArray(preset)) return null
-    return { resumeLayoutPreset: preset as unknown as ResumeTemplateLayoutPreset }
+    if (preset && typeof preset === 'object' && !Array.isArray(preset)) {
+      return { resumeLayoutPreset: preset as unknown as ResumeTemplateLayoutPreset }
+    }
+    // 没有 JobMaterialsService（verify 脚本裸构造）时库里可能从未补种：退回只读的内置常量，不在 AI 模块写库。
+    if (!this.jobMaterials) {
+      const builtIn = findJobMaterialTemplate(templateId)
+      if (builtIn && builtIn.status === 'published' && builtIn.type === 'resume_template' && builtIn.resumeLayoutPreset) {
+        return { resumeLayoutPreset: builtIn.resumeLayoutPreset }
+      }
+    }
+    return null
   }
 
   /**
