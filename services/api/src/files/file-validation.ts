@@ -10,6 +10,7 @@
  * 鉴权(登录用户 / 机构 / 管理员)在 service / controller 层完成,不在此处。
  */
 import type { FilePurpose, FileSensitiveLevel } from './file.types'
+import { isWordToPdfUploadAvailable } from '../document-conversion/document-conversion-capability-state'
 
 export interface ValidationOk {
   ok: true
@@ -78,11 +79,15 @@ const PDF_DOC_IMG = [
 const IMG = ['image/jpeg', 'image/png', 'image/webp']
 const VIDEO = ['video/mp4', 'video/webm']
 const PRINTABLE = ['application/pdf', 'image/jpeg', 'image/png']
+const WORD = [
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 
 /** 各 purpose 的 MIME 白名单 + 大小上限(字节)。 */
 export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: number }> = {
   // 直接进打印流程 → 仅 Agent 能真正出纸的格式
-  print_doc: { mimes: PRINTABLE, maxBytes: 20 * MB },
+  print_doc: { mimes: [...PRINTABLE, ...WORD], maxBytes: 20 * MB },
   // 求职者敏感文档(给 AI 解析 / 展示)
   // text/plain 与 text/markdown 为服务端生成的简历导出格式(inert 文本),故仅在 resume_upload 放宽。
   // 安全前提:其 inline 提供不产生 XSS 依赖全局 helmet nosniff(main.ts,X-Content-Type-Options: nosniff)——
@@ -208,7 +213,10 @@ export function validateUpload(args: {
   }
   const policy = PURPOSE_POLICY[args.purpose]
 
-  if (!policy.mimes.includes(args.mimeType)) {
+  if (
+    !policy.mimes.includes(args.mimeType) ||
+    (args.purpose === 'print_doc' && WORD.includes(args.mimeType) && !isWordToPdfUploadAvailable())
+  ) {
     return { ok: false, code: 'FILE_MIME_NOT_ALLOWED', message: '该文件用途不支持此文件类型' }
   }
 

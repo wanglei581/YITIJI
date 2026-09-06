@@ -121,6 +121,9 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 - **本机现实**：开发 Mac 没有 LibreOffice。门禁用 fake 引擎覆盖契约、超时、并发、归属、能力为假时的 fail-closed；真实引擎的集成测试在 `SOFFICE_PATH` 存在时才跑、缺席时打印醒目 SKIPPED，并把「服务器安装后执行的验收命令」写进部署清单。PR 描述必须写明「真实转换未在本机验证」。
 - **验收**：`verify:document-conversion`（含变异测试）、`verify:print-page-count` 或图谱列出的打印门禁、`verify:real-resume-diagnosis`、`verify:file-assets-trial-acceptance`、`verify:file-internal-auth`；API typecheck / lint；`pnpm --dir apps/miniapp verify:api-contract`。
 
+- **执行记录（原写在 current-progress.md，为避免多会话顶部冲突改记于此）**：
+  > 2026-09-06 **包 D · 文档转换引擎（分支 `claude/rl-d-doc-conversion`，本地候选，未部署）**。新增 API 内 `document-conversion` 模块：`GET /api/v1/document-conversion/capabilities` 诚实返回 Word 转 PDF 引擎与 CJK 字体探测结果，`POST /api/v1/files/:id/convert` 复用文件归属校验并生成带来源链的派生 PDF；soffice 适配器使用独立临时目录、独立 LibreOffice profile、60 秒超时、并发上限与 15MB 输出上限，Gotenberg 本包只落 fail-closed 骨架。`.doc` 简历提取改为先转 PDF 再走既有 unpdf；`print_doc` 仅在能力探测为真时接收 doc/docx，建单前转换并始终让页数识别和终端任务消费派生 PDF。部署清单补 LibreOffice / Gotenberg、思源字体、环境变量、探测与服务器真转换验收命令。**实跑**：API / shared typecheck、API / shared eslint、`verify:document-conversion`（含 7 条静态断言逐条变异、fake 引擎契约/超时/失败/15MB/并发/归属/.doc 提取/打印派生 PDF）、`verify:resume-extraction`、隔离库 `verify:print-jobs`、`verify:file-internal-auth`、小程序 `verify:api-contract` 及图谱可在本沙箱运行的相关文件/会员/岗位门禁均通过；本机未安装 LibreOffice、未设置 `SOFFICE_PATH`，真实转换集成明确 SKIPPED，必须在服务器安装后按部署清单复验。`verify:real-resume-diagnosis` / `verify:ocr-baidu` 及需本机监听端口、Redis 的 HTTP 门禁受沙箱 `EPERM` / 网络限制未能运行；`verify:file-assets-trial-acceptance` 命中既有冻结候选批次守卫（包 D 新运行时文件属于首轮范围碰撞），未改阈值或白名单。未改 `apps/**`、worker、终端 Agent、Prisma 模型或工作流；未验证真实 Gotenberg/LibreOffice，未 push、未开 PR、未部署。
+
 ### 包 E · 一体机诊断报告页（青序流光 22 页迁移）—— grok
 
 - **条目**：P0-1（一体机）、P0-5 的诊断部分

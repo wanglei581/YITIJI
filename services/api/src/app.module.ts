@@ -62,6 +62,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 import { RecruitmentContentModule } from './recruitment-content/recruitment-content.module'
 import { CommunityModule } from './community/community.module'
 import { AssistantModule } from './assistant/assistant.module'
+import { DocumentConversionModule } from './document-conversion/document-conversion.module'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
   const u = new URL(url)
@@ -100,6 +101,7 @@ const redisUrl = process.env['REDIS_URL']
     // AuditModule 必须在 FilesModule / JobsModule 之前,
     // @Global() 让 AuditService 被任意业务模块自动注入。
     AuditModule,
+    DocumentConversionModule,
     AuthModule,
     MemberAuthModule,
     ActivityModule,

@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, Optional, ServiceUnavailableException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
@@ -14,6 +14,8 @@ import { countPagesInRange } from './page-range.util'
 import { PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
 import { assertVerifiedPrintParameters } from './verified-print-parameters'
+import { DocumentConversionService } from '../document-conversion/document-conversion.service'
+import { WORD_MIME_TYPES } from '../document-conversion/document-conversion.types'
 
 export interface PrintJobCreated {
   taskId:    string
@@ -192,6 +194,7 @@ export class PrintJobsService {
     private readonly pricing: PricingService,
     private readonly orderStatus: OrderStatusService,
     private readonly capabilities: TerminalCapabilitiesService,
+    @Optional() private readonly documentConversion?: DocumentConversionService,
   ) {}
 
   async create(
@@ -207,8 +210,8 @@ export class PrintJobsService {
 
     // HIGH-3 (SSRF)：fileUrl 必须是本系统签名 URL，且签名/有效期校验通过。
     // 非法 URL（外部地址、无签名、签名错误、已过期）直接 400，绝不落库给 Agent 下载。
-    const fileId = parseAndVerifySignedFileUrl(dto.fileUrl)
-    if (!fileId) {
+    const requestedFileId = parseAndVerifySignedFileUrl(dto.fileUrl)
+    if (!requestedFileId) {
       throw new BadRequestException({
         error: {
           code: 'PRINT_INVALID_FILE_URL',
@@ -221,8 +224,8 @@ export class PrintJobsService {
     // 即使调用方拿到了仍有效的内部签名 URL，也不得绕过合同审查页面直接建打印单。
     // 报告哈希必须采用服务端落库值，不能信任 Kiosk 可篡改/遗漏的 fileMd5。
     const sourceFile = await this.prisma.fileObject.findUnique({
-      where: { id: fileId },
-      select: { purpose: true, sha256: true },
+      where: { id: requestedFileId },
+      select: { purpose: true, sha256: true, mimeType: true, filename: true },
     })
     if (sourceFile?.purpose === 'contract_upload') {
       throw new BadRequestException({
@@ -232,6 +235,8 @@ export class PrintJobsService {
         },
       })
     }
+    let fileId = requestedFileId
+    let effectiveFileName = dto.fileName ?? sourceFile?.filename ?? null
     let trustedFileHash = dto.fileMd5 ?? ''
     if (sourceFile?.purpose === 'contract_review_report') {
       if (!SHA256_HEX_PATTERN.test(sourceFile.sha256)) {
@@ -297,9 +302,6 @@ export class PrintJobsService {
     // 但记录，避免一刀切把既有打印链路堵死。
     await this.assertPiiScanned(fileId)
 
-    // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
-    // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
-    const { url: storedFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
     const terminalRef = ctx.terminalId?.trim()
     if (!terminalRef) {
       throw new BadRequestException({
@@ -351,9 +353,28 @@ export class PrintJobsService {
     // 必须在报价与落库**之前** —— 否则会出现「按彩色计价成单、实际出黑白纸」的资损。
     await this.capabilities.assertPrintParamsAllowed(targetTerminalId, dto.params)
 
+    // Word 原件只在全部终端与打印参数门禁通过后转换，避免无效请求留下派生文件。
+    // 隐私预检必须针对用户上传的原件执行；转换后的 derived PDF 会继承 sourceFileId，
+    // Agent 仍只收到 PDF，不新增 Word 打印能力。
+    if (sourceFile && WORD_MIME_TYPES.includes(sourceFile.mimeType as (typeof WORD_MIME_TYPES)[number])) {
+      if (!this.documentConversion) {
+        throw new ServiceUnavailableException({
+          error: { code: 'CONVERSION_UNAVAILABLE', message: '服务端未配置转换引擎' },
+        })
+      }
+      const converted = await this.documentConversion.convertForPrint(requestedFileId)
+      fileId = converted.fileId
+      effectiveFileName = converted.filename
+      trustedFileHash = converted.sha256
+    }
+
+    // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
+    // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
+    const { url: storedFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+
     // 计费页数：后端从签名 fileUrl 识别真实内容页数（**绝不信任前端 pages**）；
     // 未知 MIME / 识别失败 / 0 页 / 签名无效 / 文件缺失 → fail-closed 抛错，拒绝建（付费）订单。
-    const { billablePages: documentPages, billingPageSource } = await this.pageCount.resolveBillablePages(dto.fileUrl)
+    const { billablePages: documentPages, billingPageSource } = await this.pageCount.resolveBillablePages(storedFileUrl)
     // 页码范围：Agent 只打印 pageRange 选中页，计费必须与实际出纸一致，否则按整份文件收费即超收。
     // 选中页数为 0 / 范围非法 → fail-closed，绝不回退成整份文件页数。
     const billablePages = countPagesInRange(dto.params?.pageRange, documentPages)
@@ -376,7 +397,7 @@ export class PrintJobsService {
     // Agent 端 parseParams 会原样带上该字段，print() 忽略未知键，无副作用。
     const storedParams: Record<string, unknown> = {
       ...(dto.params ?? DEFAULT_PARAMS),
-      ...(dto.fileName ? { fileName: dto.fileName } : {}),
+      ...(effectiveFileName ? { fileName: effectiveFileName } : {}),
     }
 
     const orderNo = makeOrderNo()
@@ -451,7 +472,8 @@ export class PrintJobsService {
       targetId:   task.id,
       payload: {
         fileId,
-        fileName:    dto.fileName ?? null,
+        fileName:    effectiveFileName,
+        sourceFileId: requestedFileId === fileId ? null : requestedFileId,
         hasFileHash: Boolean(trustedFileHash),
         params:      dto.params ?? DEFAULT_PARAMS,
         hasEndUser:  Boolean(ctx.endUserId),
