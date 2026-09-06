@@ -123,6 +123,53 @@ sc.exe qc aijobprintagent.exe
 
 ## 4. Phase F 复验（新契约）
 
+### 4A. 交给 Mac/Claude 的上线前问题单（先修复，再做 Windows 真机）
+
+#### Mac 侧核对结论（2026-09-06，逐条对代码与线上）
+
+| 问题单结论 | 核对结果 | 证据 |
+|---|---|---|
+| 线上仍是旧 UI，需先部署 106 路由新版 | **不成立**。线上就是 main `891492396`（deploy run 34024303135，kiosk bundle `assets/index-CC6VWakW.js`），无更新的前端可发；「新版」指 51 页迁移，当前 1/51 | `docs/progress/next-tasks.md` 主线表 |
+| claim 出现 429 | **根因已定位，修复中**：安装脚本默认 `ClaimIntervalMs=1000` × claim 端点每台 30 次/分钟；Agent 不识别 429 | `install-production-agent.ps1:69`、`terminals.controller.ts:173`、`task-runner.ts` catch 分支；分支 `fix/claim-rate-limit-429` |
+| 单飞机制无并发但缺真机证据 | 代码层已有自动化证据（`verify:task-runner-wake` 在 CI）；真机矩阵按下文执行 | `task-runner-control.ts` |
+| `Printing, Retained` 不能当已出纸 | **已实现**：retained 视为不确定态，查 PrintService 完成事件，超时 `PRINT_JOB_UNCONFIRMED`、不自动重印 | `wmi.ts:369-377`、`task-runner.ts:718`、门禁 `verify:print-monitor-truth` |
+| 彩色/扫描/复印按证据分层 | **已实现**：`PrintConfirmPage` 按本机 `TerminalCapability` 收口并明示未验证；开放 API 彩色仍无 wire value | `PrintConfirmPage.tsx:162,533`、`packages/shared/src/types/print.ts:100` |
+| 连续 5 单/突发/耐久未验证 | 同意，等 429 修复部署后执行下文矩阵 | 本节 |
+
+#### UI 发布基线
+
+- 当前线上 `zyidai.cn` / `admin.zyidai.cn` 仍可能展示旧版前端；Windows 侧不能用线上旧页面判断 Mac 侧 106 路由的完成情况。
+- Mac/Claude 需要把已完成的 106 路由前端构建部署到目标线上环境，并提供：部署提交 SHA、三端实际访问 URL、构建时间、浏览器验证结果。Windows 侧只在确认浏览器加载的是该 SHA 后做真机打印验收。
+- 发布前逐项核对现有入口、按钮和空态，避免因为旧线上 bundle 缺少按钮而把“前端未发布”误判为“打印机能力缺失”。不新增重复入口；沿用既有打印/扫描服务中心和打印参数页。
+
+#### 打印能力按钮与真实能力边界
+
+- 奔图 CM2820ADN 硬件已知具备彩色打印、扫描、复印；但《开放打印能力.pdf》V1.0 只定义云 API 的设备注册、打印任务、状态和回调，没有彩色 `mode` 的 wire value，也没有扫描/复印 API。
+- Mac/Claude 需要把按钮和状态按证据分层：
+  - 已有本地 Windows 链路且本轮可以验证：黑白打印、单面打印、PDF/图片打印。
+  - 硬件具备但系统链路尚未接通：彩色打印、扫描、证件复印。可以展示“设备支持/待现场开通”或禁用态，但不能伪造任务成功、价格、记录或云端扫描能力。
+  - 双面、纸盒、份数、纸张类型等只有在本地驱动实际验证后才可开放给用户；云 API 规格中的字段不能替代 Windows 真机证据。
+- 彩色按钮不得默认发送 `mode: "color"`。在厂家书面确认 wire value 前，开放 API 路径保持不可用；本地驱动彩色是否可用单独通过 Windows 真机验证。
+- 所有按钮点击都必须有真实状态反馈：设备离线、缺纸、卡纸/设备故障、任务排队、打印中、完成、结果未确认。不能仅因 `pdf-to-printer` 返回成功就显示“已出纸”。
+
+#### 连续多订单打印的修复要求与验收结论
+
+- 当前候选 Agent 已有 `task-runner-control` 的单飞控制：claim 周期和 wake 请求共用锁，`maxTasks=1`，并等待一单的 `executeTask()` 完整结束后才进入下一轮。因此“必然并发串单”目前不是已证实缺陷，但仍未有连续不同订单的 Windows 真机证据。
+- Mac/Claude 需要在合入前补齐并保留自动化证据：单台终端同一时间最多一个打印生命周期；异常、重启、状态回传失败和 wake/定时器同时触发都不能重复派发；后端 claim 继续以终端和任务状态做幂等兜底；终端日志、云端状态和 Windows 队列可用同一 `taskId` 对账。
+- 已观察到 claim 端点 HTTP 429，单次现场约延迟 4 分钟才领取成功。Mac/Claude 需要查清限流窗口和触发维度，处理 `Retry-After`（无该值时指数退避 + 随机抖动），并证明 429 不会把任务误判为失败、不会重复 claim，也不会让队列长期积压。
+- `Printing, Retained` 不能单独作为完成证据。若 Windows 队列监控在超时前未观察到明确完成事件，必须进入 `PRINT_JOB_UNCONFIRMED`，提示现场核查并禁止自动重印；需要补充连续任务下的队列观察和 PrintService 事件对账。
+
+#### Windows 侧连续打印验收矩阵
+
+Mac/Claude 修复并部署候选版本后，现场至少执行以下四组；任一组失败即暂停，不把“第一单能出纸”扩展为连续打印通过：
+
+1. **顺序组**：5 个不同的一页 PDF，内容分别标识 A/B/C/D/E，逐单提交。验证每单只出 1 页、顺序一致、无串单，状态均为 `pending → claimed → printing → completed`，队列最终为空，临时文件清理。
+2. **突发组**：5 个任务在 10 秒内提交。验证 Agent 串行出纸、无重复/漏打、没有任务永久停在 `claimed` 或 `printing`，后台与页面状态一致，并记录每个 `taskId` 的领取和完成时间。
+3. **格式与参数组**：混合 PDF/JPG/PNG；黑白任务先验收。彩色、双面、份数、纸张类型必须逐项记录为“通过/未验证”，不能用黑白单面结果代替。
+4. **耐久与恢复组**：连续 10 至 20 个小任务，观察卡纸、缺纸、队列卡死、CPU/内存持续升高、429 重试、临时文件残留；再分别做断网恢复、Agent 重启、打印机重启、补纸和 Print Spooler 恢复。出现“后台完成但无纸”“有纸但后台失败”“数量不符”“顺序错乱”时立即停止，保留 `taskId`、时间、队列状态和脱敏日志。
+
+完成标准：只有上述证据齐全且每项通过，才能对外说“连续打印已验证”。单次 F3 通过只能证明一张黑白单面测试页曾经真实出纸。
+
 ### F1 服务与驱动名
 
 - [ ] `Get-Service aijobprintagent.exe`：Running / Automatic。
