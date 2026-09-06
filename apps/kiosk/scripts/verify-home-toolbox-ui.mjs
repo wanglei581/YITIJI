@@ -149,9 +149,11 @@ if (
   fail('E. 百宝箱只有已确认且至少一个有效启动项时才可进入')
 }
 
-// E2. 事件上报 sendBeacon/keepalive 且不发送 URL/host
+// E2. 事件上报走终端安全会话（#833：sendBeacon 带不了会话令牌，改为 keepalive 的受保护 fetch）
+//     且不发送 URL/host。守的仍是「可靠上报 + 不外泄」，只是可靠传输的载体换成了带令牌的 keepalive fetch。
 if (
-  toolboxLaunchEvents.includes('navigator.sendBeacon') &&
+  toolboxLaunchEvents.includes('terminalProtectedFetch') &&
+  !toolboxLaunchEvents.includes('navigator.sendBeacon') &&
   toolboxLaunchEvents.includes('keepalive: true') &&
   toolboxLaunchEvents.includes("credentials: 'omit'") &&
   toolboxLaunchEvents.includes("API_MODE !== 'http'") &&
@@ -159,7 +161,7 @@ if (
   !toolboxLaunchEvents.includes('targetHost') &&
   !toolboxLaunchEvents.includes('externalUrl')
 ) {
-  pass('E2. Kiosk 百宝箱事件上报使用 sendBeacon/keepalive 且不发送 URL/host')
+  pass('E2. Kiosk 百宝箱事件上报走终端安全会话 keepalive fetch 且不发送 URL/host')
 } else {
   fail('E2. Kiosk 百宝箱事件上报必须可靠且不得发送 URL/host')
 }

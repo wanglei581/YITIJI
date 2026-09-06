@@ -7,12 +7,12 @@ const STORAGE_KEY = 'terminal_session_token_v1'
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000]
 const RETRY_WINDOW_MS = 60_000
 const REQUEST_TIMEOUT_MS = 4_000
-const MOCK_TOKEN = (import.meta.env['E2E_MOCK_TERMINAL_SESSION_TOKEN'] ?? 'mock-terminal-session-fixture').trim()
-const HAS_E2E_MOCK_TOKEN = Boolean(import.meta.env['E2E_MOCK_TERMINAL_SESSION_TOKEN']?.trim())
+// mock 模式（非 http）不走终端票据，用固定占位令牌。E2E 用例在 http 模式下由夹具往 sessionStorage 注入令牌并应答刷新端点。
+const MOCK_TOKEN = 'mock-terminal-session-fixture'
 
 export type TerminalSessionState = 'checking' | 'ready' | 'failed'
 
-let state: TerminalSessionState = API_MODE === 'http' && !HAS_E2E_MOCK_TOKEN ? 'checking' : 'ready'
+let state: TerminalSessionState = API_MODE === 'http' ? 'checking' : 'ready'
 let refreshTimer: number | null = null
 const listeners = new Set<(next: TerminalSessionState) => void>()
 
@@ -22,7 +22,7 @@ function setState(next: TerminalSessionState): void {
 }
 
 function token(): string | null {
-  if (API_MODE !== 'http' || HAS_E2E_MOCK_TOKEN) return MOCK_TOKEN || 'mock-terminal-session-fixture'
+  if (API_MODE !== 'http') return MOCK_TOKEN
   try { return window.sessionStorage.getItem(STORAGE_KEY) } catch { return null }
 }
 
@@ -147,7 +147,7 @@ export function initializeTerminalSession(): Promise<void> {
 }
 
 async function initializeTerminalSessionOnce(): Promise<void> {
-  if (API_MODE !== 'http' || HAS_E2E_MOCK_TOKEN) { setState('ready'); return }
+  if (API_MODE !== 'http') { setState('ready'); return }
   const bootTicket = cleanBootTicketFromUrl()
   if (bootTicket) {
     setState('checking')
