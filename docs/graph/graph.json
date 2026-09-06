@@ -17911,6 +17911,9 @@
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
+    "apps/terminal-agent/src/agent/claim-rate-limit.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
     "apps/terminal-agent/src/agent/config-manager.ts": [
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs",
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
@@ -19096,7 +19099,8 @@
       "services/api/scripts/verify-advisor-work.ts"
     ],
     "services/api/src/advisor/advisor-pdf.service.ts": [
-      "services/api/scripts/verify-advisor-work.ts"
+      "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/advisor/advisor-retention.task.ts": [
       "services/api/scripts/verify-advisor-work.ts",
@@ -19285,7 +19289,8 @@
     "services/api/src/ai/resume/career-plan-pdf.service.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
-      "services/api/scripts/verify-career-plan.ts"
+      "services/api/scripts/verify-career-plan.ts",
+      "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/ai/resume/career-plan.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
@@ -19300,6 +19305,7 @@
     ],
     "services/api/src/ai/resume/fair-visit-plan-pdf.service.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
+      "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts"
     ],
@@ -19314,6 +19320,7 @@
     "services/api/src/ai/resume/job-fit-pdf.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
+      "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-job-fit-print.ts"
     ],
     "services/api/src/ai/resume/job-fit.service.ts": [
@@ -19415,6 +19422,7 @@
     "services/api/src/ai/resume/resume-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
+      "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
@@ -19429,6 +19437,7 @@
     "services/api/src/ai/resume/self-assessment-pdf.service.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-compliance.ts"
     ],
     "services/api/src/ai/resume/self-assessment-questions.ts": [
@@ -19792,6 +19801,9 @@
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-recruitment-content-http.ts"
     ],
+    "services/api/src/common/health.controller.ts": [
+      "services/api/scripts/verify-cjk-font.ts"
+    ],
     "services/api/src/common/jwt-verifier.module.ts": [
       "services/api/scripts/verify-production-runtime-gates.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
@@ -19801,6 +19813,9 @@
     ],
     "services/api/src/common/pdf/aigc-pdf-metadata.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts"
+    ],
+    "services/api/src/common/pdf/cjk-font.ts": [
+      "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/common/pickup-code.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -19854,6 +19869,7 @@
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-partner-source-capabilities.ts",
+      "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/community/community.controller.ts": [
@@ -19881,6 +19897,7 @@
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "scripts/verify-deploy-gates-in-sync.mjs",
+      "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-production-real-services.ts",
@@ -19930,7 +19947,8 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/contract-review/contract-review-report-pdf.service.ts": [
-      "services/api/scripts/verify-aigc-pdf-metadata.ts"
+      "services/api/scripts/verify-aigc-pdf-metadata.ts",
+      "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/contract-review/contract-review-task-view.mapper.ts": [
       "services/api/scripts/verify-contract-review-timeout.ts"
@@ -20151,6 +20169,7 @@
       "services/api/scripts/verify-job-application-track.ts"
     ],
     "services/api/src/job-materials/job-material-pdf.service.ts": [
+      "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-job-materials.ts"
     ],
     "services/api/src/job-materials/job-material-templates.ts": [
@@ -20242,7 +20261,8 @@
       "services/api/scripts/verify-partner-excel-template.ts"
     ],
     "services/api/src/jobs/fair-company-print.service.ts": [
-      "services/api/scripts/verify-backend-p0-http.ts"
+      "services/api/scripts/verify-backend-p0-http.ts",
+      "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/jobs/fair-company-zone.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
@@ -20708,6 +20728,7 @@
     ],
     "services/api/src/mock-interview/interview-report-pdf.service.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
+      "services/api/scripts/verify-cjk-font.ts",
       "services/api/scripts/verify-mock-interview.ts"
     ],
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
@@ -21551,6 +21572,7 @@
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-identity.ts",
+      "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts",
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
@@ -25448,6 +25470,7 @@
         "dirs": [],
         "files": [
           "apps/terminal-agent/src/agent/auth-state.ts",
+          "apps/terminal-agent/src/agent/claim-rate-limit.ts",
           "apps/terminal-agent/src/agent/db.ts",
           "apps/terminal-agent/src/agent/dead-letter-operator.ts",
           "apps/terminal-agent/src/agent/offline-queue.ts",
@@ -27529,6 +27552,36 @@
       "package": "services/api",
       "scriptNames": [],
       "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/advisor/advisor-pdf.service.ts",
+          "services/api/src/ai/resume/career-plan-pdf.service.ts",
+          "services/api/src/ai/resume/fair-visit-plan-pdf.service.ts",
+          "services/api/src/ai/resume/job-fit-pdf.service.ts",
+          "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/ai/resume/self-assessment-pdf.service.ts",
+          "services/api/src/common/health.controller.ts",
+          "services/api/src/common/pdf/cjk-font.ts",
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/contract-review/contract-review-report-pdf.service.ts",
+          "services/api/src/job-materials/job-material-pdf.service.ts",
+          "services/api/src/jobs/fair-company-print.service.ts",
+          "services/api/src/mock-interview/interview-report-pdf.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-cjk-font.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:cjk-font"
+      ],
+      "wired": true
     },
     {
       "asserts": {
@@ -32078,11 +32131,13 @@
         "dirs": [],
         "files": [
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/throttler/terminal-throttle.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/admin-terminals.controller.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.controller.ts",
           "services/api/src/terminals/terminals.service.ts"
         ],
         "missing": []
