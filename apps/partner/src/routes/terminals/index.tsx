@@ -1,10 +1,10 @@
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { EmptyState } from '@ai-job-print/ui'
 import { MonitorIcon } from 'lucide-react'
 
 export default function TerminalsPage() {
   return (
-    <Page title="终端数据" subtitle="机构关联终端的使用数据">
+    <Page title="终端数据" subtitle={withFrontendHint('机构关联终端的使用数据', FRONTEND_HINT.none)}>
       <EmptyState
         icon={MonitorIcon}
         title="终端明细暂由平台统一运营"

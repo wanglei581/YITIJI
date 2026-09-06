@@ -180,7 +180,7 @@ mustContain(
 // B8. PTR-15：无归因数据时不承诺「效果」
 mustContain(
   PAGE,
-  ['subtitle="同步概况"', '暂无归因数据'],
+  ["withFrontendHint('同步概况'", '暂无归因数据'],
   'B8. /stats 副标题为「同步概况」，归因区块仍如实标注暂无数据',
 )
 mustNotContain(

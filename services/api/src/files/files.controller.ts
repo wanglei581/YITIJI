@@ -48,6 +48,7 @@ import type {
   FileUploadResponse,
   SignedUrlResponse,
   FileMetadata,
+  FileListResult,
   FileCleanupResponse,
   FileAccessUrlResponse,
   UploadIntentResponse,
@@ -59,6 +60,13 @@ import type {
 import { resolveClientIp } from '../common/client-ip'
 /** Kiosk 上传响应需覆盖“上传→预览→确认打印”触控窗口，本次取 30 分钟签名 TTL。 */
 const KIOSK_UPLOAD_SIGNED_URL_TTL_MS = 30 * 60 * 1000
+
+function parseDeletedQuery(deleted?: string): boolean | 'all' | undefined {
+  if (deleted === 'all') return 'all'
+  if (deleted === 'true' || deleted === '1') return true
+  if (deleted === 'false' || deleted === '0') return false
+  return undefined
+}
 
 /**
  * Multer/Busboy 可能把浏览器 multipart 中的 UTF-8 文件名按 Latin-1 解码。
@@ -348,15 +356,23 @@ export class FilesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async list(
+    @Query('skip') skip?: string,
+    @Query('search') search?: string,
+    @Query('deleted') deleted?: string,
     @Query('includeDeleted') includeDeleted?: string,
     @Query('purpose') purpose?: string,
     @Query('limit') limit?: string,
-  ): Promise<ApiResponse<FileMetadata[]>> {
+  ): Promise<ApiResponse<FileListResult>> {
+    const skipN = skip !== undefined ? Number(skip) : 0
+    const limitN = limit !== undefined ? Number(limit) : undefined
     return ApiResponse.ok(
       await this.files.list({
+        skip: Number.isFinite(skipN) ? Math.max(0, Math.round(skipN)) : 0,
+        search: search?.trim() || undefined,
+        deleted: parseDeletedQuery(deleted),
         includeDeleted: includeDeleted === 'true' || includeDeleted === '1',
         purpose,
-        limit: limit ? Number(limit) : undefined,
+        limit: limitN !== undefined && Number.isFinite(limitN) ? limitN : undefined,
       }),
     )
   }

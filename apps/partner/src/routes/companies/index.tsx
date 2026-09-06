@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { Building2Icon, PlusIcon, RefreshCwIcon } from 'lucide-react'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
@@ -370,7 +370,7 @@ export default function CompaniesPage() {
 
   if (loading) {
     return (
-      <Page title="企业资料管理" subtitle="加载中...">
+      <Page title="企业资料管理" subtitle={withFrontendHint('加载中...', FRONTEND_HINT.companies)}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -380,7 +380,7 @@ export default function CompaniesPage() {
 
   if (error) {
     return (
-      <Page title="企业资料管理" subtitle="加载失败">
+      <Page title="企业资料管理" subtitle={withFrontendHint('加载失败', FRONTEND_HINT.companies)}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <Building2Icon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -396,7 +396,7 @@ export default function CompaniesPage() {
   return (
     <Page
       title="企业资料管理"
-      subtitle={`共 ${companies.length} 家企业 · 仅维护本机构来源的企业展示资料`}
+      subtitle={withFrontendHint(`共 ${companies.length} 家企业 · 仅维护本机构来源的企业展示资料`, FRONTEND_HINT.companies)}
       actions={
         <Button
           size="sm"

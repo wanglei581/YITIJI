@@ -79,6 +79,15 @@ function safeInt(value: string | undefined, defaultValue: number, min: number, m
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : defaultValue
 }
 
+/** 缺省（不带 page/pageSize）保持原数组形状；任一分页参数出现即走 skip/take + count。 */
+function optionalPaging(page?: string, pageSize?: string): { page: number; pageSize: number } | undefined {
+  if (page === undefined && pageSize === undefined) return undefined
+  return {
+    page: safeInt(page, 1, 1, 10_000),
+    pageSize: safeInt(pageSize, 20, 1, 100),
+  }
+}
+
 /**
  * Kiosk 岗位类型筛选既接受 workType('full_time' 等,前端枚举),
  * 也接受 category('fulltime' 等,DB 列值)。这里把 workType 归一到 category。
@@ -428,8 +437,12 @@ export class JobsController {
   @Get('partner/jobs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  getPartnerJobs(@CurrentUser() user: AuthedUser) {
-    return this.jobsService.getPartnerJobs(user)
+  getPartnerJobs(
+    @CurrentUser() user: AuthedUser,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.jobsService.getPartnerJobs(user, optionalPaging(page, pageSize))
   }
 
   @Get('partner/jobs/quality-summary')
@@ -491,8 +504,12 @@ export class JobsController {
   @Get('partner/fairs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  getPartnerFairs(@CurrentUser() user: AuthedUser) {
-    return this.jobsService.getPartnerFairs(user)
+  getPartnerFairs(
+    @CurrentUser() user: AuthedUser,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.jobsService.getPartnerFairs(user, optionalPaging(page, pageSize))
   }
 
   @Post('partner/fairs/import')

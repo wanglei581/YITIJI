@@ -42,6 +42,8 @@ import {
   type ImportResult,
   type SyncLogDto,
   type PaginatedResult,
+  type PartnerListPaging,
+  endpointQueryContainsCredential,
   prismaJobSourceToPartnerDto,
   prismaJobToPartnerDto,
   prismaFairToPartnerDto,
@@ -100,6 +102,19 @@ function withLifecycle(
     archivedAt: row.archivedAt?.toISOString() ?? null,
     credentialRotatedAt: row.webhookSecretRotatedAt?.toISOString() ?? null,
   }
+}
+
+function partnerPagination(query: PartnerListPaging, total: number) {
+  return {
+    page: query.page,
+    pageSize: query.pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+  }
+}
+
+function emptyPartnerPage<T>(query: PartnerListPaging): PaginatedResult<T> {
+  return { data: [], pagination: partnerPagination(query, 0) }
 }
 
 @Injectable()
@@ -179,6 +194,14 @@ export class JobsPartnerService {
     assertDataSourceCapability(org.type, accessMode, sourceKind)
     if (accessMode === 'api' && !dto.endpoint) {
       throw new BadRequestException({ error: { code: 'API_ENDPOINT_REQUIRED', message: 'API 数据源必须填写 endpoint' } })
+    }
+    if (accessMode === 'api' && dto.endpoint && endpointQueryContainsCredential(dto.endpoint)) {
+      throw new BadRequestException({
+        error: {
+          code: 'API_ENDPOINT_CONTAINS_CREDENTIAL',
+          message: '接口地址的查询参数不能包含凭证，请把 token/key/secret 放到鉴权配置里',
+        },
+      })
     }
     const suppliedCredential = normalizeOptionalSecret(dto.credential)
     if (accessMode === 'webhook' && suppliedCredential) {
@@ -472,13 +495,37 @@ export class JobsPartnerService {
     return withLifecycle(prismaJobSourceToPartnerDto(updated, summaries.get(id)), updated)
   }
 
-  async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.job.findMany({
-      where: { sourceOrgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-    })
-    return rows.map(prismaJobToPartnerDto)
+  async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]>
+  async getPartnerJobs(user: AuthedUser, query: PartnerListPaging): Promise<PaginatedResult<PartnerJobDto>>
+  async getPartnerJobs(
+    user: AuthedUser,
+    query?: PartnerListPaging,
+  ): Promise<PartnerJobDto[] | PaginatedResult<PartnerJobDto>> {
+    if (!user.orgId) {
+      if (!query) return []
+      return emptyPartnerPage(query)
+    }
+    const where = { sourceOrgId: user.orgId }
+    if (!query) {
+      const rows = await this.prisma.job.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      })
+      return rows.map(prismaJobToPartnerDto)
+    }
+    const [total, rows] = await Promise.all([
+      this.prisma.job.count({ where }),
+      this.prisma.job.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ])
+    return {
+      data: rows.map(prismaJobToPartnerDto),
+      pagination: partnerPagination(query, total),
+    }
   }
 
   async importJobs(items: ImportJobItemDto[], user: AuthedUser): Promise<ImportResult<PartnerJobDto>> {
@@ -721,13 +768,37 @@ export class JobsPartnerService {
     return prismaJobToPartnerDto(updated)
   }
 
-  async getPartnerFairs(user: AuthedUser): Promise<PartnerFairDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.jobFair.findMany({
-      where: { sourceOrgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-    })
-    return rows.map(prismaFairToPartnerDto)
+  async getPartnerFairs(user: AuthedUser): Promise<PartnerFairDto[]>
+  async getPartnerFairs(user: AuthedUser, query: PartnerListPaging): Promise<PaginatedResult<PartnerFairDto>>
+  async getPartnerFairs(
+    user: AuthedUser,
+    query?: PartnerListPaging,
+  ): Promise<PartnerFairDto[] | PaginatedResult<PartnerFairDto>> {
+    if (!user.orgId) {
+      if (!query) return []
+      return emptyPartnerPage(query)
+    }
+    const where = { sourceOrgId: user.orgId }
+    if (!query) {
+      const rows = await this.prisma.jobFair.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      })
+      return rows.map(prismaFairToPartnerDto)
+    }
+    const [total, rows] = await Promise.all([
+      this.prisma.jobFair.count({ where }),
+      this.prisma.jobFair.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ])
+    return {
+      data: rows.map(prismaFairToPartnerDto),
+      pagination: partnerPagination(query, total),
+    }
   }
 
   async importFairs(dto: ImportFairsDto, user: AuthedUser): Promise<ImportResult<PartnerFairDto>> {

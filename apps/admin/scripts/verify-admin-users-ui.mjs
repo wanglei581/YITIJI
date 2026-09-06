@@ -145,9 +145,15 @@ const statusDialogTokens = [
 for (const token of statusDialogTokens) {
   if (!statusDialog.includes(token)) fail(`停用/恢复确认弹窗缺少能力或文案: ${token}`)
 }
-// 二次确认不能被绕过：原因为空时提交按钮必须禁用。
-if (!/disabled=\{busy \|\| !trimmedReason\}/.test(statusDialog)) {
-  fail('确认弹窗未在原因为空时禁用提交按钮')
+// 二次确认不能被绕过：原因不足 2 字时提交按钮必须禁用，submit 同判。
+if (!/disabled=\{busy \|\| trimmedReason\.length < 2\}/.test(statusDialog)) {
+  fail('确认弹窗未在原因不足 2 字时禁用提交按钮')
+}
+if (!/if \(trimmedReason\.length < 2 \|\| busy\) return/.test(statusDialog)) {
+  fail('确认弹窗 submit 未在原因不足 2 字时拦截')
+}
+if (!statusDialog.includes('userMessageOf(caught')) {
+  fail('确认弹窗错误分支未走 userMessageOf')
 }
 pass('停用/恢复走独立确认弹窗，必填原因且具备模态可访问性')
 

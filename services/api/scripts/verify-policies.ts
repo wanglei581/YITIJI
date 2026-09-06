@@ -188,6 +188,15 @@ async function main() {
       pass('8. 6 类审计动作齐全')
     }
 
+    {
+      const unpaged = await svc.getPartnerPolicies(partnerA)
+      if (!Array.isArray(unpaged)) fail('PTR-22. 缺省 getPartnerPolicies 应保持数组形状')
+      const paged = await svc.getPartnerPolicies(partnerA, { page: 1, pageSize: 1 })
+      if (!('data' in paged) || paged.data.length !== 1) fail('PTR-22. 带 page 的政策列表应返回单页 {data,pagination}')
+      if (paged.pagination.total < 1) fail('PTR-22. 政策 total 未计入本机构行')
+      pass('PTR-22. 政策列表缺省保持数组，带 page/pageSize 走 skip/take + count')
+    }
+
     console.log('\n=== ALL PASS ===')
   } finally {
     await cleanup()

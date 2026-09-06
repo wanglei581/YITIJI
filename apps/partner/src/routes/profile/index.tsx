@@ -10,7 +10,7 @@ import {
   type OrgContentTrustStatus,
 } from '@ai-job-print/shared'
 import { Button, Card, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -110,14 +110,14 @@ export default function ProfilePage() {
 
   if (state === 'loading') {
     return (
-      <Page title="机构资料" subtitle="机构基本信息与合作配置">
+      <Page title="机构资料" subtitle={withFrontendHint('机构基本信息与合作配置', FRONTEND_HINT.profile)}>
         <LoadingState className="py-20" />
       </Page>
     )
   }
   if (state === 'error' || !profile) {
     return (
-      <Page title="机构资料" subtitle="机构基本信息与合作配置">
+      <Page title="机构资料" subtitle={withFrontendHint('机构基本信息与合作配置', FRONTEND_HINT.profile)}>
         <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
       </Page>
     )
@@ -129,7 +129,7 @@ export default function ProfilePage() {
   return (
     <Page
       title="机构资料"
-      subtitle="机构基本信息与合作配置"
+      subtitle={withFrontendHint('机构基本信息与合作配置', FRONTEND_HINT.profile)}
       actions={
         <Button size="sm" variant="outline" className="flex items-center gap-1.5" onClick={openEdit}>
           <PencilIcon className="h-4 w-4" />

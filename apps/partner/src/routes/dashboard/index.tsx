@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import {
   AlertCircleIcon,
   ArrowRightIcon,
@@ -231,7 +231,7 @@ export default function DashboardPage() {
   }, [reloadKey])
 
   return (
-    <Page title="工作台" subtitle="本机构数据概览（实时统计）">
+    <Page title="工作台" subtitle={withFrontendHint('本机构数据概览（实时统计）', FRONTEND_HINT.none)}>
       {state === 'loading' ? (
         <LoadingState className="py-20" />
       ) : state === 'error' || !data ? (

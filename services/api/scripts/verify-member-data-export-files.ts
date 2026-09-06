@@ -104,12 +104,15 @@ function createHarness(options: HarnessOptions = {}) {
       async findUnique() {
         return record
       },
+      async count() {
+        return record ? 1 : 0
+      },
       async findMany(input?: { where?: Record<string, unknown> }) {
-        if (
-          input?.where
-          && (Object.hasOwn(input.where, 'expiresAt') || Object.hasOwn(input.where, 'OR'))
-        ) {
-          cleanupWhere = input.where
+        const where = input?.where ?? {}
+        const or = Array.isArray(where['OR']) ? where['OR'] as Array<Record<string, unknown>> : []
+        const isCleanup = or.some((clause) => clause && Object.hasOwn(clause, 'expiresAt'))
+        if (isCleanup) {
+          cleanupWhere = where
           return []
         }
         return record ? [record] : []
@@ -481,12 +484,30 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
     name: '通用 list 对导出文件不返回 bucket/region/key/hash',
     async run() {
       const harness = createHarness({ initialRecord: makeFileRow() })
-      const [item] = await harness.files.list({ purpose: EXPORT_PURPOSE })
+      const listed = await harness.files.list({ purpose: EXPORT_PURPOSE })
+      const item = listed.items[0]
+      assert.equal(listed.total, 1)
       assert.ok(item)
       assert.equal(Boolean(item.bucket), false)
       assert.equal(Boolean(item.region), false)
       assert.equal(Boolean(item.objectKey), false)
       assert.equal(Boolean(item.sha256), false)
+    },
+  },
+  {
+    name: 'admin list 返回 {items,total} 并接受 skip/search/deleted',
+    async run() {
+      const harness = createHarness({ initialRecord: makeFileRow() })
+      const page = await harness.files.list({
+        skip: 0,
+        search: 'member-data',
+        deleted: false,
+        purpose: EXPORT_PURPOSE,
+        limit: 20,
+      })
+      assert.equal(Array.isArray(page.items), true)
+      assert.equal(page.total, 1)
+      assert.equal(page.items.length, 1)
     },
   },
   {

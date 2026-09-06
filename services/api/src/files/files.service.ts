@@ -642,19 +642,49 @@ export class FilesService {
   // ── 列表(admin)─────────────────────────────────────────────────────────
 
   async list(
-    args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {}
-  ): Promise<FileMetadata[]> {
-    const records = await this.prisma.fileObject.findMany({
-      where: {
-        ...(args.includeDeleted ? {} : { deletedAt: null }),
-        ...(args.purpose
-          ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
-          : { purpose: { not: 'contract_review_report' } }),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(args.limit ?? 100, 500),
-    })
-    return records.map(toMetadata)
+    args: {
+      skip?: number
+      search?: string
+      deleted?: boolean | 'all'
+      purpose?: string
+      limit?: number
+      includeDeleted?: boolean
+    } = {},
+  ): Promise<{ items: FileMetadata[]; total: number }> {
+    const search = args.search?.trim()
+    const deleted = args.deleted ?? (args.includeDeleted ? 'all' : false)
+    const skip = Math.max(0, Math.floor(args.skip ?? 0))
+    const take = Math.min(Math.max(1, Math.floor(args.limit ?? 100)), 100)
+    const where = {
+      ...(deleted === 'all'
+        ? {}
+        : deleted === true
+          ? { deletedAt: { not: null } }
+          : { deletedAt: null }),
+      ...(args.purpose
+        ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
+        : { purpose: { not: 'contract_review_report' } }),
+      ...(search
+        ? {
+            OR: [
+              { filename: { contains: search } },
+              { ownerId: { contains: search } },
+              { endUserId: { contains: search } },
+              { uploaderId: { contains: search } },
+            ],
+          }
+        : {}),
+    }
+    const [total, records] = await Promise.all([
+      this.prisma.fileObject.count({ where }),
+      this.prisma.fileObject.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+    ])
+    return { items: records.map(toMetadata), total }
   }
 
   /** Admin 文件生命周期全局只读统计。 */

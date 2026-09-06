@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
 import { ClipboardListIcon, FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
@@ -42,6 +42,7 @@ const PUBLISH_MAP: Record<string, { badge: 'success' | 'warning' | 'default'; la
   expired:     { badge: 'default', label: '已过期' },
 }
 const PARTNER_POLICIES_REFRESH_KEY = 'partner:policies'
+const PAGE_SIZE = 20
 
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
@@ -104,20 +105,22 @@ export default function PolicyPage() {
   const [confirmDelete, setConfirmDelete] = useState<PartnerPolicyRecord | null>(null)
   /** P21 申领条件录入面(只对政策扶持条目开放;公告没有申领条件) */
   const [rulesFor, setRulesFor] = useState<PartnerPolicyRecord | null>(null)
+  const [page, setPage] = useState(1)
 
+  const policiesRefreshKey = `${PARTNER_POLICIES_REFRESH_KEY}:${page}`
   const { data, status, refresh } = useRefreshable(
-    PARTNER_POLICIES_REFRESH_KEY,
-    () => partnerPoliciesService.getPolicies(),
+    policiesRefreshKey,
+    () => partnerPoliciesService.getPolicies({ page, pageSize: PAGE_SIZE }),
     {
       intervalMs: 60_000,
-      merge: mergeById<PartnerPolicyRecord>((item) => item.id),
+      merge: replaceIfChanged,
       failPolicy: 'keep-last',
     },
   )
 
   useInteractionLock(
     editing !== null || saving || busyId !== null || confirmDelete !== null || confirmUnpublish !== null || rulesFor !== null,
-    [PARTNER_POLICIES_REFRESH_KEY],
+    [policiesRefreshKey],
     'hard',
   )
 
@@ -127,7 +130,9 @@ export default function PolicyPage() {
     return () => clearTimeout(t)
   }, [notice])
 
-  const rows = data ?? []
+  const rows = data?.data ?? []
+  const total = data?.pagination.total ?? 0
+  const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && rows.length === 0)
   const error = status === 'error' && rows.length === 0
 
@@ -221,7 +226,7 @@ export default function PolicyPage() {
 
   if (loading) {
     return (
-      <Page title="政策公告" subtitle="加载中...">
+      <Page title="政策公告" subtitle={withFrontendHint('加载中...', FRONTEND_HINT.policy)}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -231,7 +236,7 @@ export default function PolicyPage() {
 
   if (error) {
     return (
-      <Page title="政策公告" subtitle="加载失败">
+      <Page title="政策公告" subtitle={withFrontendHint('加载失败', FRONTEND_HINT.policy)}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <FileTextIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -243,7 +248,7 @@ export default function PolicyPage() {
   return (
     <Page
       title="政策公告"
-      subtitle={`共 ${rows.length} 条政策内容 — 政策扶持条目与政策公告`}
+      subtitle={withFrontendHint(`共 ${total} 条政策内容 — 政策扶持条目与政策公告`, FRONTEND_HINT.policy)}
       actions={
         <div className="flex flex-col items-end gap-1">
           <button
@@ -362,6 +367,10 @@ export default function PolicyPage() {
             </table>
           </div>
         </Card>
+      )}
+
+      {total > 0 && (
+        <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
       )}
 
       <p className="mt-3 text-xs text-neutral-400">

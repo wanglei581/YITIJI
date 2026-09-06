@@ -223,10 +223,16 @@ const refreshContract = extractBetween(
   'refresh and interaction-lock contract',
 )
 check(
-  /const\s*\{\s*data\s*,\s*status\s*,\s*refresh\s*\}\s*=\s*useRefreshable\(\s*PARTNER_JOBS_REFRESH_KEY\s*,\s*getPartnerJobs\s*,\s*\{\s*intervalMs:\s*60_000\s*,\s*merge:\s*mergeById<PartnerJobRecord>\(\(item\)\s*=>\s*item\.id\)\s*,\s*failPolicy:\s*['"]keep-last['"]\s*,?\s*\}\s*,?\s*\)/.test(
+  /const\s*\{\s*data\s*,\s*status\s*,\s*refresh\s*\}\s*=\s*useRefreshable\(\s*jobsRefreshKey\s*,\s*\(\)\s*=>\s*getPartnerJobs\(\{\s*page\s*,\s*pageSize:\s*PAGE_SIZE\s*\}\)\s*,\s*\{\s*intervalMs:\s*60_000\s*,\s*merge:\s*replaceIfChanged\s*,\s*failPolicy:\s*['"]keep-last['"]\s*,?\s*\}\s*,?\s*\)/.test(
     refreshContract,
   ),
-  'jobs useRefreshable binds the real jobs key/service, 60s interval, mergeById, and keep-last',
+  'jobs useRefreshable binds the paged jobs key/service, 60s interval, replaceIfChanged, and keep-last',
+)
+check(
+  jobsPage.includes('const jobsRefreshKey = `${PARTNER_JOBS_REFRESH_KEY}:${page}`')
+    && jobsPage.includes('<ListPagination')
+    && jobsPage.includes('pageSize: PAGE_SIZE'),
+  'jobs pagination uses current-page refresh key, PAGE_SIZE, and ListPagination',
 )
 check(
   /const\s*\{\s*data:\s*qualitySummary\s*=\s*\[\]\s*\}\s*=\s*useRefreshable\(\s*PARTNER_JOB_QUALITY_REFRESH_KEY\s*,\s*getPartnerJobQualitySummary\s*,\s*\{\s*intervalMs:\s*60_000\s*,\s*merge:\s*replaceIfChanged\s*,\s*failPolicy:\s*['"]keep-last['"]\s*,?\s*\}\s*,?\s*\)/.test(
@@ -235,7 +241,7 @@ check(
   'quality useRefreshable binds the real quality key/service, 60s interval, replace merge, and keep-last',
 )
 check(
-  /useInteractionLock\(\s*editing\s*!==\s*null\s*\|\|\s*saving\s*\|\|\s*busyId\s*!==\s*null\s*\|\|\s*confirmUnpublish\s*!==\s*null\s*,\s*\[\s*PARTNER_JOBS_REFRESH_KEY\s*,\s*PARTNER_JOB_QUALITY_REFRESH_KEY\s*\]\s*,\s*['"]hard['"]\s*\)/.test(
+  /useInteractionLock\(\s*editing\s*!==\s*null\s*\|\|\s*saving\s*\|\|\s*busyId\s*!==\s*null\s*\|\|\s*confirmUnpublish\s*!==\s*null\s*,\s*\[\s*jobsRefreshKey\s*,\s*PARTNER_JOB_QUALITY_REFRESH_KEY\s*\]\s*,\s*['"]hard['"]\s*\)/.test(
     refreshContract,
   ),
   // confirmUnpublish 也要进锁：二次确认弹窗开着的时候后台刷新不能把那一行换掉，
@@ -266,11 +272,13 @@ for (const required of [
 
 const filteringBlock = extractBetween(
   jobsPage,
-  'const jobs = data ?? []',
+  'const jobs = data?.data ?? []',
   'const handleUnpublish',
   'loading, filtering, and review count contract',
 )
-const expectedFilteringBlock = `const jobs = data ?? []
+const expectedFilteringBlock = `const jobs = data?.data ?? []
+const total = data?.pagination.total ?? 0
+const totalPages = data?.pagination.totalPages ?? 1
 const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
 const error = status === 'error' && jobs.length === 0
 
@@ -296,7 +304,7 @@ const loadingBranch = compact(
   stripComments(extractBetween(jobsPage, 'if (loading) {', 'if (error) {', 'loading branch')),
 )
 check(
-  /^if \(loading\) \{ return \( <Page title="岗位信息管理" subtitle="加载中\.\.\."> .*(?:<p[^>]*>加载中[.…]{3,}<\/p>|<LoadingState[^/]*\/>).*<\/Page> \) \}$/.test(
+  /^if \(loading\) \{ return \( <Page title="岗位信息管理" subtitle=\{withFrontendHint\('加载中\.\.\.', FRONTEND_HINT\.jobs\)\}> .*(?:<p[^>]*>加载中[.…]{3,}<\/p>|<LoadingState[^/]*\/>).*<\/Page> \) \}$/.test(
     loadingBranch,
   ),
   'loading condition returns the jobs Page with loading subtitle and visible loading copy',
@@ -308,7 +316,7 @@ const errorBranch = compact(
   ),
 )
 check(
-  /^if \(error\) \{ return \( <Page title="岗位信息管理" subtitle="加载失败"> .*<p[^>]*>加载失败，请稍后重试<\/p>.*<\/Page> \) \}$/.test(
+  /^if \(error\) \{ return \( <Page title="岗位信息管理" subtitle=\{withFrontendHint\('加载失败', FRONTEND_HINT\.jobs\)\}> .*<p[^>]*>加载失败，请稍后重试<\/p>.*<\/Page> \) \}$/.test(
     errorBranch,
   ),
   'error condition returns the jobs Page with failure subtitle and visible failure copy',

@@ -291,6 +291,19 @@ export interface PartnerSyncLog {
   status: SyncResult      // R3: was result
 }
 
+export interface PartnerListQuery {
+  page?: number
+  pageSize?: number
+}
+
+export interface PartnerListPage<T> {
+  data: T[]
+  pagination: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
+export type PartnerJobPage = PartnerListPage<PartnerJobRecord>
+export type PartnerFairPage = PartnerListPage<PartnerFairRecord>
+
 export interface PartnerSyncLogPage {
   data: PartnerSyncLog[]
   pagination: { page: number; pageSize: number; total: number; totalPages: number }
