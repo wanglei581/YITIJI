@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { isTerminalKiosk } from '../../services/api/screensaver'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
@@ -394,7 +395,7 @@ export function ResumeSourcePage() {
         <div className="resume-source-split grid min-w-0 grid-cols-1 gap-5">
           <div className="resume-source-main flex min-w-0 flex-1 flex-col">
             <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
-              {UPLOAD_OPTIONS.map((option) => {
+              {UPLOAD_OPTIONS.filter((option) => option.type !== 'cloud' || !isTerminalKiosk()).map((option) => {
               const isSelected = selected === option.type
               const Icon = option.icon
               const disabled = sourceBusy

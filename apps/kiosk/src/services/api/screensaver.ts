@@ -139,4 +139,10 @@ export function subscribeTerminalIdentity(listener: () => void): () => void {
 /** Empty means this browser has no verified local terminal identity. */
 export const getTerminalId = (): string => resolvedIdentity?.terminalId ?? ''
 
+/**
+ * 是否运行在一体机（本机 Agent 已给出终端身份）。一体机上不得出现浏览器文件选择框等系统级弹窗
+ * （CLAUDE.md §17），本机文件入口只在桌面浏览器 / E2E 链路渲染（SES-05）。
+ */
+export const isTerminalKiosk = (): boolean => getTerminalId() !== ''
+
 export const getTerminalCode = (): string => resolvedIdentity?.terminalCode ?? ''

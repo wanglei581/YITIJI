@@ -25,7 +25,7 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
-import { getTerminalId } from '../../services/api/screensaver'
+import { getTerminalId, isTerminalKiosk } from '../../services/api/screensaver'
 import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
@@ -236,7 +236,7 @@ export function ConvertImagesPage() {
                 </div>
               ))}
 
-              <button type="button" disabled={atLimit} onClick={() => inputRef.current?.click()} className="flex flex-1 items-center justify-center gap-3 rounded-md border-2 border-dashed border-neutral-200 bg-surface text-xl font-semibold text-neutral-500 disabled:opacity-45">
+              <button type="button" disabled={atLimit} onClick={() => (isTerminalKiosk() ? setShowQr(true) : inputRef.current?.click())} className="flex flex-1 items-center justify-center gap-3 rounded-md border-2 border-dashed border-neutral-200 bg-surface text-xl font-semibold text-neutral-500 disabled:opacity-45">
                 <PlusIcon className="h-7 w-7" />
                 {images.length === 0 ? '添加第一张图片' : `继续添加图片（还可添加 ${MAX_IMAGES - images.length} 张）`}
               </button>
@@ -252,7 +252,7 @@ export function ConvertImagesPage() {
             <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <b className="mb-3 block text-xl font-bold">继续添加图片</b>
               <input ref={inputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={handleLocalFile} />
-              <button type="button" disabled={uploading || atLimit} onClick={() => inputRef.current?.click()} className="flex min-h-[88px] w-full items-center gap-4 rounded-lg border border-info/30 bg-info-bg px-4 text-left text-info-fg disabled:opacity-45">
+              <button type="button" disabled={uploading || atLimit} onClick={() => (isTerminalKiosk() ? setShowQr(true) : inputRef.current?.click())} className="flex min-h-[88px] w-full items-center gap-4 rounded-lg border border-info/30 bg-info-bg px-4 text-left text-info-fg disabled:opacity-45">
                 <span className="grid h-12 w-12 place-items-center rounded-md bg-surface">
                   {uploading ? <LoaderIcon className="h-6 w-6 animate-spin" /> : <UploadIcon className="h-6 w-6" />}
                 </span>

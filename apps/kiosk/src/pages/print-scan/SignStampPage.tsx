@@ -32,7 +32,7 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/api/files'
-import { getTerminalId } from '../../services/api/screensaver'
+import { getTerminalId, isTerminalKiosk } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
@@ -311,10 +311,12 @@ export function SignStampPage() {
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <input ref={docInputRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => void handleLocalDoc(e)} />
-                  <Button size="lg" variant="secondary" className="h-14" disabled={busy} onClick={() => docInputRef.current?.click()}>
-                    {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <UploadIcon className="mr-2 h-5 w-5" />}
-                    本机上传 PDF
-                  </Button>
+                  {!isTerminalKiosk() && (
+                    <Button size="lg" variant="secondary" className="h-14" disabled={busy} onClick={() => docInputRef.current?.click()}>
+                      {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <UploadIcon className="mr-2 h-5 w-5" />}
+                      本机上传 PDF
+                    </Button>
+                  )}
                   <Button size="lg" variant="secondary" className="h-14" disabled={busy} onClick={() => setShowQr('document')}>
                     <QrCodeIcon className="mr-2 h-5 w-5" />
                     手机扫码上传
@@ -352,10 +354,12 @@ export function SignStampPage() {
                     <span className="mt-1 text-sm leading-relaxed text-neutral-500">本批次请上传签名 / 印章图片；触屏手写将在校准后开放</span>
                   </div>
                   <input ref={stampInputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => void handleLocalStamp(e)} />
-                  <Button size="lg" variant="secondary" className="h-full" disabled={busy || !document} onClick={() => stampInputRef.current?.click()}>
-                    {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <ImageIcon className="mr-2 h-5 w-5" />}
-                    本机上传
-                  </Button>
+                  {!isTerminalKiosk() && (
+                    <Button size="lg" variant="secondary" className="h-full" disabled={busy || !document} onClick={() => stampInputRef.current?.click()}>
+                      {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <ImageIcon className="mr-2 h-5 w-5" />}
+                      本机上传
+                    </Button>
+                  )}
                   <Button size="lg" variant="secondary" className="h-full" disabled={busy || !document} onClick={() => setShowQr('stamp')}>
                     <QrCodeIcon className="mr-2 h-5 w-5" />
                     手机扫码

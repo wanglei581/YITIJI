@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-09-07 **P2 D 桶第四批（一体机，分支 `fix/p2-d-bucket-kiosk-4`）**：SES-04 本机 Agent 晚于浏览器启动、首次拿到终端身份（'' → 有值）时只补终端会话，不再换 key 重挂整棵树（登录态 / 上传中 state 不再被静默清空）；只有 terminalId 从 A 换成 B 才重挂。SES-05 一体机（本机 Agent 已给出身份，`isTerminalKiosk()`）不再渲染任何浏览器文件选择框入口：打印上传隐藏「选择文件」tab 且默认进扫码；面试简历、合同审查隐藏「本机文件（桌面验证）」渠道；图片转 PDF 的「添加图片」直接开手机扫码；签名盖章隐藏两处「本机上传」；简历来源隐藏「云盘 / 本机文件」选项。桌面浏览器与 E2E 链路（无终端身份）保持原样。验证：kiosk typecheck / lint；图谱命中的 18 条门禁全绿（`verify:runtime-terminal-identity` 断言要求回调先重试终端会话，已按其顺序）。
+
 2026-09-06 **main 顶端 `1b2195adf` 发布（已上线、已复验）：首次失败于跨境拉取，bundle 预置后成功**。负责人授权；等待期间顶端被并行会话推前三次（#844、#845），每次取消发布前 CI。首次 deploy 因服务器到 github.com 通道断绝（HTTPS 000、SSH-443 不能传数据）在备份前中止、线上未动；改为本机打 git bundle 经运维 SSH 预置到服务器并检出目标，利用 deploy.yml「已在目标提交则跳过拉取」分支重跑 CI 发布成功。复验：`DEPLOY_SOURCE=1b2195adf`、health/ready 200、pm2 只重启一次、两闸门键在、三前台 dist 重写（admin bundle 变，kiosk/partner 无改动）、构建产物含 #842 到期索引、备份在、21G 可用、开关已关。详见 [`production-server-cleanup-2026-09-06.md`](../device/production-server-cleanup-2026-09-06.md) §八「第四次发布」。**结构性问题待立项**：生产机直连 GitHub 是发布链路瓶颈（deploy.yml 自带 TODO：CI 产物经国内端点下发）。线上现含 #833 终端身份、#841 Redis 三项、#842 上传生命周期、P2 三桶清零全部批次。
 2026-09-06 **小程序标签类触控统一 ≥48px（产品负责人拍板：剩余标签 / 段选 / 步骤条全部改到 §9 下限）**：全局 `.seg .s` 34px→48px 且最小宽 96rpx、`.f-chip` 32px→96rpx 且最小宽 96rpx、`.steps .st` 最小宽高 96rpx；页面级 `.filter-chip`（岗位）58→96rpx、`.opt-chip`（面试入口）70→96rpx、`.q-chip`（助手）58→96rpx、ai 页 `.section-more`、岗位 / 材料页 `.retry-btn`、打印上传文件卡。开发者工具游客态 `createSelectorQuery` 复量 63 页 289 个真实渲染元素（结果以 PR 评论为准）。视觉密度随之变化，属拍板后的取舍。四条小程序门禁 + 合规文案门禁全绿。
 

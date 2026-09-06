@@ -6,6 +6,7 @@
 // ============================================================
 
 import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
+import { isTerminalKiosk } from '../../services/api/screensaver'
 import { useNavigate } from 'react-router-dom'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
@@ -462,7 +463,7 @@ export function InterviewSetupPage() {
                       { key: 'phone' as const, label: '手机扫码上传', icon: QrCodeIcon },
                       { key: 'usb' as const, label: 'U盘导入', icon: UsbIcon },
                       { key: 'desktop' as const, label: '本机文件（桌面验证）', icon: MonitorSmartphoneIcon },
-                    ]).map((channel) => (
+                    ]).filter((channel) => channel.key !== 'desktop' || !isTerminalKiosk()).map((channel) => (
                       <button
                         key={channel.key}
                         type="button"
