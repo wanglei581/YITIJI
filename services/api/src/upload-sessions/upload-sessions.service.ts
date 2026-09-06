@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -12,6 +14,7 @@ import { defaultRetentionForUpload } from '../files/retention-policy'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
+import type { Redis } from 'ioredis'
 import type {
   UploadSessionChannel,
   UploadSessionMode,
@@ -84,14 +87,26 @@ interface StoredUploadSession {
   createdAt: string
 }
 
+interface StoredUploadSessionCleanup {
+  sessionId: string
+  expiresAt: string
+  file: UploadSessionFileView | null
+  status: 'expired'
+}
+
 const SESSION_TTL_SECONDS = 10 * 60
 const SESSION_RETAIN_AFTER_EXPIRE_SECONDS = 60
+// 主会话自然过期后，用无令牌的最小 cleanup record 保留回收重试窗口。
+const CLEANUP_RECORD_TTL_SECONDS = 24 * 60 * 60
 const UPLOAD_LOCK_TTL_SECONDS = 30
+const CLEANUP_BATCH_LIMIT = 100
 const MAX_SESSION_UPLOAD_BYTES = 10 * 1024 * 1024
 /** confirm 签发的内容 URL 有效期，与 kiosk-upload 的 30 分钟 TTL 保持一致。 */
 const CONFIRMED_FILE_URL_TTL_MS = 30 * 60 * 1000
 const SESSION_PREFIX = 'upload_session:'
 const UPLOAD_LOCK_PREFIX = 'upload_session_upload_lock:'
+const UPLOAD_EXPIRY_INDEX_KEY = 'upload_session_expiry_index'
+const UPLOAD_CLEANUP_PREFIX = 'upload_session_cleanup:'
 const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set([
   'resume_upload',
   'print_doc',
@@ -109,11 +124,16 @@ const SIGNED_URL_PURPOSES: ReadonlySet<FilePurpose> = new Set([
 
 @Injectable()
 export class UploadSessionsService {
+  private readonly redisClient: Pick<Redis, 'zadd' | 'zrangebyscore' | 'zrem'>
+
   constructor(
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
-    private readonly files: FilesService
-  ) {}
+    @Inject(forwardRef(() => FilesService))
+    private readonly files: FilesService,
+  ) {
+    this.redisClient = (redis as unknown as { client: Pick<Redis, 'zadd' | 'zrangebyscore' | 'zrem'> }).client
+  }
 
   async create(input: CreateUploadSessionInput): Promise<UploadSessionCreateResponse> {
     if (!SUPPORTED_UPLOAD_SESSION_PURPOSES.has(input.purpose)) {
@@ -153,6 +173,8 @@ export class UploadSessionsService {
     }
 
     await this.redis.setEx(sessionKey(sessionId), sessionRedisTtlSeconds(), JSON.stringify(record))
+    await this.redisClient.zadd(UPLOAD_EXPIRY_INDEX_KEY, expiresAt.getTime(), sessionId)
+    await this.persistCleanupRecord(record)
     return {
       sessionId,
       uploadToken,
@@ -168,13 +190,7 @@ export class UploadSessionsService {
   ): Promise<UploadSessionStatusResponse> {
     const record = await this.load(sessionId)
     this.assertControlToken(record, controlToken)
-    const next = this.markExpired(record)
-    if (next.status === 'expired' && record.status !== 'expired') {
-      await this.cleanupAbandonedFile(next, 'upload session expired')
-      await this.persist({ ...next, file: null }).catch(() => undefined)
-      return this.toStatusResponse({ ...next, file: null })
-    }
-    return this.toStatusResponse(next)
+    return this.toStatusResponse(this.markExpired(record))
   }
 
   async uploadFile(args: {
@@ -264,8 +280,14 @@ export class UploadSessionsService {
         file: toSessionFile(file),
         uploadedAt: new Date().toISOString(),
       }
-      await this.persist(uploaded)
-      return this.toStatusResponse(uploaded)
+      const finalRecord = this.markExpired(uploaded)
+      if (finalRecord.status === 'expired') {
+        await this.expireLocked(finalRecord, 'upload session expired during upload')
+        throw expiredSessionException()
+      }
+      await this.persist(finalRecord)
+      await this.persistCleanupRecord(finalRecord)
+      return this.toStatusResponse(finalRecord)
     } finally {
       await this.redis.del(lockKey)
     }
@@ -276,78 +298,122 @@ export class UploadSessionsService {
     controlToken: string | undefined,
     endUserId?: string | null
   ): Promise<UploadSessionConfirmResponse> {
-    const record = this.markExpired(await this.load(sessionId))
-    this.assertControlToken(record, controlToken)
-    if (record.status === 'expired') {
-      await this.cleanupAbandonedFile(record, 'upload session expired before confirm')
-      throw new BadRequestException({
-        error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
-      })
-    }
-    if (record.status !== 'uploaded' || !record.file) {
-      throw new BadRequestException({
-        error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端尚未上传文件' },
-      })
-    }
-    let confirmedFile = record.file
-    if (record.mode === 'member') {
-      if (!endUserId || endUserId !== record.pendingEndUserId) {
-        throw new ForbiddenException({
-          error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '会员身份与上传会话不一致' },
+    return this.withSessionLock(sessionId, async () => {
+      const record = this.markExpired(await this.load(sessionId))
+      this.assertControlToken(record, controlToken)
+      if (record.status === 'expired') {
+        await this.expireLocked(record, 'upload session expired before confirm')
+        throw expiredSessionException()
+      }
+      if (record.status !== 'uploaded' || !record.file) {
+        throw new BadRequestException({
+          error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端尚未上传文件' },
         })
       }
-      const boundFile = await this.bindMemberFile(record.file.fileId, endUserId)
-      confirmedFile = {
-        ...record.file,
-        fileExpiresAt: boundFile.expiresAt ? boundFile.expiresAt.toISOString() : null,
+      let confirmedFile = record.file
+      if (record.mode === 'member') {
+        if (!endUserId || endUserId !== record.pendingEndUserId) {
+          throw new ForbiddenException({
+            error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '会员身份与上传会话不一致' },
+          })
+        }
+        const boundFile = await this.bindMemberFile(record.file.fileId, endUserId)
+        confirmedFile = {
+          ...record.file,
+          fileExpiresAt: boundFile.expiresAt ? boundFile.expiresAt.toISOString() : null,
+        }
       }
-    }
-    if (SIGNED_URL_PURPOSES.has(record.purpose)) {
-      const signed = signFileUrl(confirmedFile.fileId, CONFIRMED_FILE_URL_TTL_MS)
-      confirmedFile = { ...confirmedFile, fileUrl: signed.url }
-    }
+      if (SIGNED_URL_PURPOSES.has(record.purpose)) {
+        const signed = signFileUrl(confirmedFile.fileId, CONFIRMED_FILE_URL_TTL_MS)
+        confirmedFile = { ...confirmedFile, fileUrl: signed.url }
+      }
 
-    const confirmed: StoredUploadSession = {
-      ...record,
-      status: 'confirmed',
-      file: confirmedFile,
-      confirmedAt: new Date().toISOString(),
-    }
-    await this.persist(confirmed)
-    return {
-      sessionId,
-      status: 'confirmed',
-      file: confirmedFile,
-    }
+      const confirmed: StoredUploadSession = {
+        ...record,
+        status: 'confirmed',
+        file: confirmedFile,
+        confirmedAt: new Date().toISOString(),
+      }
+      await this.persist(confirmed)
+      await this.removeFromExpiryIndex(sessionId)
+      return { sessionId, status: 'confirmed', file: confirmedFile }
+    })
   }
 
   async cancel(
     sessionId: string,
     controlToken: string | undefined
   ): Promise<UploadSessionCancelResponse> {
-    const record = await this.load(sessionId)
-    this.assertControlToken(record, controlToken)
-    if (record.status === 'confirmed') {
-      throw new BadRequestException({
-        error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
-      })
-    }
-    await this.cleanupAbandonedFile(record, 'upload session cancelled')
-    const cancelled: StoredUploadSession = { ...record, status: 'cancelled', file: null }
-    await this.persist(cancelled)
-    return { sessionId, status: 'cancelled' }
+    return this.withSessionLock(sessionId, async () => {
+      const record = this.markExpired(await this.load(sessionId))
+      this.assertControlToken(record, controlToken)
+      if (record.status === 'expired') {
+        await this.expireLocked(record, 'upload session expired before cancel')
+        throw expiredSessionException()
+      }
+      if (record.status === 'confirmed') {
+        throw new BadRequestException({
+          error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
+        })
+      }
+      await this.cleanupAbandonedFile(record, 'upload session cancelled')
+      const cancelled: StoredUploadSession = { ...record, status: 'cancelled', file: null }
+      await this.persist(cancelled)
+      await this.removeFromExpiryIndex(sessionId)
+      return { sessionId, status: 'cancelled' }
+    })
   }
 
-  private async cleanupAbandonedFile(record: StoredUploadSession, reason: string): Promise<void> {
+  /** 由既有 FilesCleanupTask 每分钟调用；Redis 不可用时由调用方降级为 warn。 */
+  async cleanupExpiredSessions(now = Date.now()): Promise<{ scanned: number; cleaned: number; skipped: number }> {
+    const sessionIds = await this.redisClient.zrangebyscore(
+      UPLOAD_EXPIRY_INDEX_KEY,
+      '-inf',
+      now,
+      'LIMIT',
+      0,
+      CLEANUP_BATCH_LIMIT,
+    )
+    let cleaned = 0
+    let skipped = 0
+    for (const sessionId of sessionIds) {
+      const lockKey = uploadLockKey(sessionId)
+      const acquired = await this.redis.setNxEx(lockKey, randomUUID(), UPLOAD_LOCK_TTL_SECONDS)
+      if (!acquired) {
+        skipped += 1
+        continue
+      }
+      try {
+        const record = await this.loadOptional(sessionId)
+        if (record?.status === 'confirmed') {
+          await this.removeFromExpiryIndex(sessionId)
+          continue
+        }
+        const cleanup = record ?? await this.loadCleanupRecord(sessionId)
+        if (!cleanup || new Date(cleanup.expiresAt).getTime() > now) continue
+        if (record && this.markExpired(record, now).status !== 'expired') continue
+        await this.cleanupAbandonedFile(cleanup, 'upload session expired')
+        if (record) await this.persist({ ...record, status: 'expired', file: null })
+        await this.removeFromExpiryIndex(sessionId)
+        cleaned += 1
+      } finally {
+        await this.redis.del(lockKey)
+      }
+    }
+    return { scanned: sessionIds.length, cleaned, skipped }
+  }
+
+  private async cleanupAbandonedFile(
+    record: Pick<StoredUploadSession, 'file' | 'status'>,
+    reason: string
+  ): Promise<void> {
     if (!record.file || record.status === 'confirmed') return
     const file = await this.prisma.fileObject.findUnique({
       where: { id: record.file.fileId },
       select: { endUserId: true, ownerType: true },
     })
     if (file?.endUserId || file?.ownerType === 'user') return
-    await this.files
-      .forceDelete(record.file.fileId, 'upload-session', reason)
-      .catch(() => undefined)
+    await this.files.systemDelete(record.file.fileId, reason)
   }
 
   private async bindMemberFile(
@@ -363,10 +429,7 @@ export class UploadSessionsService {
     const isContractUpload = file.purpose === 'contract_upload'
     if (isContractUpload && !file.expiresAt) {
       throw new BadRequestException({
-        error: {
-          code: 'CONTRACT_FILE_EXPIRY_MISSING',
-          message: '上传文件状态异常，请重新上传',
-        },
+        error: { code: 'CONTRACT_FILE_EXPIRY_MISSING', message: '上传文件状态异常，请重新上传' },
       })
     }
     const retention = defaultRetentionForUpload({
@@ -375,7 +438,6 @@ export class UploadSessionsService {
       ownerType: 'user',
       endUserId,
     })
-    // 合同上传的两小时寿命从原始上传时刻起算；会员绑定不得重置或延长。
     const boundExpiry = isContractUpload ? file.expiresAt : retention.expiresAt
     return this.prisma.fileObject.update({
       where: { id: fileId },
@@ -410,6 +472,11 @@ export class UploadSessionsService {
     return JSON.parse(raw) as StoredUploadSession
   }
 
+  private async loadOptional(sessionId: string): Promise<StoredUploadSession | null> {
+    const raw = await this.redis.get(sessionKey(sessionId))
+    return raw ? JSON.parse(raw) as StoredUploadSession : null
+  }
+
   private async persist(record: StoredUploadSession): Promise<void> {
     const ttl = await this.redis.ttl(sessionKey(record.sessionId))
     if (ttl <= 0) {
@@ -420,8 +487,53 @@ export class UploadSessionsService {
     await this.redis.setExistingWithCurrentTtl(sessionKey(record.sessionId), JSON.stringify(record))
   }
 
-  private markExpired(record: StoredUploadSession): StoredUploadSession {
-    if (new Date(record.expiresAt).getTime() <= Date.now() && record.status !== 'confirmed') {
+  private async persistCleanupRecord(record: StoredUploadSession): Promise<void> {
+    const cleanup: StoredUploadSessionCleanup = {
+      sessionId: record.sessionId,
+      expiresAt: record.expiresAt,
+      file: record.file,
+      status: 'expired',
+    }
+    await this.redis.setEx(cleanupKey(record.sessionId), CLEANUP_RECORD_TTL_SECONDS, JSON.stringify(cleanup))
+  }
+
+  private async loadCleanupRecord(sessionId: string): Promise<StoredUploadSessionCleanup | null> {
+    const raw = await this.redis.get(cleanupKey(sessionId))
+    return raw ? JSON.parse(raw) as StoredUploadSessionCleanup : null
+  }
+
+  private async removeFromExpiryIndex(sessionId: string): Promise<void> {
+    await Promise.all([
+      this.redisClient.zrem(UPLOAD_EXPIRY_INDEX_KEY, sessionId),
+      this.redis.del(cleanupKey(sessionId)),
+    ])
+  }
+
+  private async expireLocked(record: StoredUploadSession, reason: string): Promise<void> {
+    await this.cleanupAbandonedFile(record, reason)
+    await this.persist({ ...record, status: 'expired', file: null })
+    await this.removeFromExpiryIndex(record.sessionId)
+  }
+
+  private async withSessionLock<T>(sessionId: string, action: () => Promise<T>): Promise<T> {
+    const lockKey = uploadLockKey(sessionId)
+    const acquired = await this.redis.setNxEx(lockKey, randomUUID(), UPLOAD_LOCK_TTL_SECONDS)
+    if (!acquired) {
+      const current = await this.loadOptional(sessionId)
+      if (!current || this.markExpired(current).status === 'expired') throw expiredSessionException()
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_ACTION_IN_PROGRESS', message: '上传会话正在处理中，请稍候' },
+      })
+    }
+    try {
+      return await action()
+    } finally {
+      await this.redis.del(lockKey)
+    }
+  }
+
+  private markExpired(record: StoredUploadSession, now = Date.now()): StoredUploadSession {
+    if (new Date(record.expiresAt).getTime() <= now && record.status !== 'confirmed') {
       return { ...record, status: 'expired' }
     }
     return record
@@ -454,6 +566,16 @@ function sessionKey(sessionId: string): string {
 
 function uploadLockKey(sessionId: string): string {
   return `${UPLOAD_LOCK_PREFIX}${sessionId}`
+}
+
+function cleanupKey(sessionId: string): string {
+  return `${UPLOAD_CLEANUP_PREFIX}${sessionId}`
+}
+
+function expiredSessionException(): BadRequestException {
+  return new BadRequestException({
+    error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
+  })
 }
 
 function defaultUploadFilename(purpose: FilePurpose): string {

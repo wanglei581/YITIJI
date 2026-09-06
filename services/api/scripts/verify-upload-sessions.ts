@@ -2,13 +2,24 @@ import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-upload-sessions-secret-0123456789-abcdef'
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { validateUpload, DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-validation'
 import { CONTRACT_REVIEW_TTL_MS, defaultRetentionForUpload } from '../src/files/retention-policy'
 import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
 import type { FilePurpose, FileUploadResponse } from '../src/files/file.types'
 import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
+import { FilesCleanupTask } from '../src/files/files.cleanup.task'
+import { FilesService } from '../src/files/files.service'
+import { PrismaService } from '../src/prisma/prisma.service'
+import { StorageService } from '../src/storage/storage.service'
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+
+const ISOLATED_DATABASE = process.env['VERIFICATION_DATABASE_TARGET'] === 'isolated'
+const REAL_STORAGE_DIR = path.join('/tmp', `verify-upload-sessions-${process.pid}`)
+if (ISOLATED_DATABASE) process.env['FILE_STORAGE_DIR'] = REAL_STORAGE_DIR
 
 interface StoredFile {
   id: string
@@ -32,6 +43,11 @@ interface StoredFile {
 
 class FakeRedis {
   private readonly values = new Map<string, { value: string; expiresAt: number }>()
+  private readonly sortedSets = new Map<string, Map<string, number>>()
+
+  get client(): this {
+    return this
+  }
 
   async get(key: string): Promise<string | null> {
     const entry = this.values.get(key)
@@ -73,6 +89,47 @@ class FakeRedis {
     return existed ? 1 : 0
   }
 
+  async zAdd(key: string, score: number, member: string): Promise<void> {
+    const index = this.sortedSets.get(key) ?? new Map<string, number>()
+    index.set(member, score)
+    this.sortedSets.set(key, index)
+  }
+
+  zadd(key: string, score: number, member: string): Promise<void> {
+    return this.zAdd(key, score, member)
+  }
+
+  async zRangeByScore(key: string, maxScore: number, limit: number): Promise<string[]> {
+    return [...(this.sortedSets.get(key) ?? new Map()).entries()]
+      .filter(([, score]) => score <= maxScore)
+      .sort(([, left], [, right]) => left - right)
+      .slice(0, limit)
+      .map(([member]) => member)
+  }
+
+  zrangebyscore(
+    key: string,
+    _min: string,
+    maxScore: number,
+    _limit: string,
+    _offset: number,
+    limit: number,
+  ): Promise<string[]> {
+    return this.zRangeByScore(key, maxScore, limit)
+  }
+
+  async zRem(key: string, member: string): Promise<void> {
+    this.sortedSets.get(key)?.delete(member)
+  }
+
+  zrem(key: string, member: string): Promise<void> {
+    return this.zRem(key, member)
+  }
+
+  hasSortedSetMember(key: string, member: string): boolean {
+    return this.sortedSets.get(key)?.has(member) ?? false
+  }
+
   hasLiveKey(key: string): boolean {
     const entry = this.values.get(key)
     return Boolean(entry && entry.expiresAt > Date.now())
@@ -108,6 +165,8 @@ class FakePrisma {
 class FakeFilesService {
   private next = 1
   readonly uploadCalls: Array<{ purpose: FilePurpose; filename: string }> = []
+  readonly storedObjects = new Set<string>()
+  readonly deletionLog: Array<{ fileId: string; deletedBy: string; reason: string }> = []
 
   constructor(
     private readonly prisma: FakePrisma,
@@ -175,6 +234,7 @@ class FakeFilesService {
         args.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
     }
     this.prisma.files.set(id, file)
+    this.storedObjects.add(id)
     return {
       fileId: id,
       filename: file.filename,
@@ -198,8 +258,15 @@ class FakeFilesService {
       status: 'deleted',
     } as StoredFile
     this.prisma.files.set(fileId, next)
+    this.storedObjects.delete(fileId)
+    this.deletionLog.push({ fileId, deletedBy, reason })
     return next
   }
+
+  async systemDelete(fileId: string, reason: string): Promise<unknown> {
+    return this.forceDelete(fileId, 'system', reason)
+  }
+
 }
 
 function makeService(options?: { beforeUpload?: (callNumber: number) => Promise<void> }): {
@@ -378,7 +445,8 @@ async function main(): Promise<void> {
       service.confirm(session.sessionId, session.controlToken, 'member_concurrent'),
       service.confirm(session.sessionId, session.controlToken, 'member_concurrent'),
     ])
-    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 2)
+    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1)
+    assert.equal(results.filter((result) => result.status === 'rejected').length, 1)
     const bound = prisma.files.get(uploaded.file!.fileId)!
     assert.equal(bound.expiresAt?.toISOString(), originalExpiry)
     assert.equal(bound.retentionLockedReason, 'contract_review_session_only')
@@ -388,7 +456,7 @@ async function main(): Promise<void> {
           call.data.expiresAt?.toISOString() === originalExpiry &&
           call.data.retentionLockedReason === 'contract_review_session_only'
       ),
-      `concurrent binding must preserve expiry and never clear the retention lock: ${JSON.stringify(
+      `winning binding must preserve expiry and never clear the retention lock: ${JSON.stringify(
         prisma.fileUpdateCalls
       )}`
     )
@@ -474,6 +542,144 @@ async function main(): Promise<void> {
     assert.equal(bound?.endUserId, 'member_1')
     assert.equal(bound?.ownerType, 'user')
     assert.equal(bound?.retentionPolicy, 'months_3')
+  }
+
+  {
+    const { service, prisma, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const result = await service.cleanupExpiredSessions(new Date(session.expiresAt).getTime() + 1)
+    assert.equal(result.cleaned, 1, 'expired unread session must be collected by one scheduler run')
+    assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt, null)
+    assert.equal(files.storedObjects.has(uploaded.file!.fileId), false, 'expired unread storage object must be deleted')
+    assert.deepEqual(files.deletionLog[0], {
+      fileId: uploaded.file!.fileId,
+      deletedBy: 'system',
+      reason: 'upload session expired',
+    })
+  }
+
+  {
+    const { service, prisma, files } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
+    const recordKey = `upload_session:${session.sessionId}`
+    const raw = await (service as unknown as { redis: FakeRedis }).redis.get(recordKey)
+    assert.ok(raw)
+    await (service as unknown as { redis: FakeRedis }).redis.setExistingWithCurrentTtl(
+      recordKey,
+      JSON.stringify({ ...JSON.parse(raw!), expiresAt: new Date(Date.now() - 1).toISOString() })
+    )
+    const race = await Promise.allSettled([
+      service.confirm(session.sessionId, session.controlToken),
+      service.cleanupExpiredSessions(Date.now()),
+    ])
+    assert.equal(race.filter((entry) => entry.status === 'fulfilled').length, 1, 'only confirm or expiry cleanup may win')
+    assert.equal(race.filter((entry) => entry.status === 'rejected').length, 1)
+    assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt, null)
+    assert.equal(files.deletionLog.length, 1)
+  }
+
+  {
+    const { service } = makeService()
+    const warnings: string[] = []
+    const task = new FilesCleanupTask({} as never, service)
+    ;(task as unknown as { logger: { warn(message: string): void; log(message: string): void } }).logger = {
+      warn: (message) => warnings.push(message),
+      log: () => undefined,
+    }
+    ;(service as unknown as { cleanupExpiredSessions: () => Promise<never> }).cleanupExpiredSessions = async () => {
+      throw new Error('redis unavailable')
+    }
+    await task.handleEveryMinute()
+    assert.deepEqual(warnings, ['code=UPLOAD_SESSION_CLEANUP_SKIPPED reason=redis_unavailable'])
+  }
+
+  {
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      terminalId: 'Terminal Display Name',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    let exception: unknown
+    try {
+      await service.getStatus(session.sessionId, 'bad-control-token')
+    } catch (error) {
+      exception = error
+    }
+    assert.ok(exception instanceof ForbiddenException)
+    let body: unknown
+    const response = {
+      status: () => ({ json: (value: unknown) => { body = value } }),
+    }
+    new HttpExceptionFilter().catch(exception, {
+      switchToHttp: () => ({
+        getResponse: () => response,
+        getRequest: () => ({
+          method: 'GET',
+          route: { path: '/upload-sessions/:sessionId' },
+          originalUrl: `/upload-sessions/${session.sessionId}`,
+          headers: { authorization: `Bearer ${session.controlToken}` },
+          requestId: 'verify-request',
+          requestStartedAt: Date.now(),
+        }),
+      }),
+    } as never)
+    const serialized = JSON.stringify(body)
+    for (const forbidden of [session.uploadToken, session.controlToken, 'Terminal Display Name', 'bad-control-token']) {
+      assert.equal(serialized.includes(forbidden), false, `phone error envelope leaked ${forbidden}`)
+    }
+    assert.doesNotMatch(serialized, /\bat\s+.+\(/, 'phone error envelope must not expose a stack frame')
+    assert.match(serialized, /UPLOAD_SESSION_CONTROL_INVALID/)
+  }
+
+  {
+    const { service, prisma, files } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'print.pdf' }),
+    })
+    await service.confirm(session.sessionId, session.controlToken)
+    assert.equal(
+      (service as unknown as { redis: FakeRedis }).redis.hasSortedSetMember(
+        'upload_session_expiry_index',
+        session.sessionId,
+      ),
+      false,
+      'confirmation must immediately remove its expiry cleanup index entry',
+    )
+    const result = await service.cleanupExpiredSessions(new Date(session.expiresAt).getTime() + 1)
+    assert.equal(result.cleaned, 0, 'confirmed session must be removed from expiry cleanup')
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.deletedAt, null)
+    assert.equal(files.storedObjects.has(uploaded.file!.fileId), true)
   }
 
   {
@@ -673,7 +879,7 @@ async function main(): Promise<void> {
   }
 
   {
-    const { service, prisma } = makeService()
+    const { service } = makeService()
     const session = await service.create({
       purpose: 'resume_upload',
       mode: 'temporary',
@@ -859,6 +1065,44 @@ async function main(): Promise<void> {
       /@Get\(':sessionId'\)\n\s+@Throttle\(\{ default: \{ ttl: 60_000, limit: 60 \} \}\)/,
       'status polling endpoint should have a wide throttle'
     )
+  }
+
+  if (ISOLATED_DATABASE) {
+    assertIsolatedVerificationDatabase()
+    const prisma = new PrismaService()
+    const storage = new StorageService()
+    const files = new FilesService(prisma, { write: async () => null } as never, storage)
+    const redis = new FakeRedis()
+    const service = new UploadSessionsService(redis as never, prisma, files)
+    try {
+      const session = await service.create({
+        purpose: 'resume_upload',
+        mode: 'temporary',
+        channel: 'phone_h5',
+        uploadUrl: 'http://localhost:5173/upload/phone',
+      })
+      const uploaded = await service.uploadFile({
+        sessionId: session.sessionId,
+        uploadToken: session.uploadToken,
+        file: file({ originalname: 'isolated-expiry.pdf' }),
+      })
+      const before = await prisma.fileObject.findUnique({ where: { id: uploaded.file!.fileId } })
+      assert.ok(before)
+      assert.ok(await storage.headObject(before.storageKey, before.bucket))
+
+      const cleanup = await service.cleanupExpiredSessions(new Date(session.expiresAt).getTime() + 1)
+      assert.equal(cleanup.cleaned, 1)
+      const after = await prisma.fileObject.findUnique({ where: { id: uploaded.file!.fileId } })
+      assert.ok(after?.deletedAt, 'expired unread FileObject must have a deletion tombstone')
+      assert.equal(after?.deletedBy, 'system')
+      assert.equal(after?.deleteReason, 'upload session expired')
+      assert.ok(after?.storageDeletedAt, 'physical object deletion must be recorded')
+      assert.equal(await storage.headObject(before.storageKey, before.bucket), null)
+      console.log('  PASS isolated expiry cleanup removes FileObject storage and records deletion ledger')
+    } finally {
+      await prisma.onModuleDestroy()
+      rmSync(REAL_STORAGE_DIR, { recursive: true, force: true })
+    }
   }
 
   console.log('PASS upload session verification')
