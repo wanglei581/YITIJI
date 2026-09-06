@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 508,
+    "endpointCount": 507,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -9699,16 +9699,6 @@
         ]
       },
       {
-        "controller": "services/api/src/ai/resume-report-export.controller.ts",
-        "handler": "ResumeReportExportController.export",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/resume/records/:taskId/export",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
         "controller": "services/api/src/ai/ai.controller.ts",
         "handler": "AiController.adjustResumeLayout",
         "method": "POST",
@@ -14220,7 +14210,6 @@
         "usedBy": [
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
@@ -14611,7 +14600,6 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/contract-review/contract-review-report-file.service.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
@@ -19187,7 +19175,6 @@
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
-      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
@@ -19218,7 +19205,6 @@
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
-      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -19289,9 +19275,6 @@
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
     ],
-    "services/api/src/ai/resume-report-export.controller.ts": [
-      "services/api/scripts/verify-resume-report-export.ts"
-    ],
     "services/api/src/ai/resume/appended-self-assessment.service.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts"
@@ -19319,9 +19302,6 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-compliance.ts"
-    ],
-    "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
-      "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/ai/resume/fair-visit-plan-pdf.service.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
@@ -19585,7 +19565,6 @@
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
-      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-tasks.ts",
@@ -20077,7 +20056,6 @@
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
-      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -20555,7 +20533,6 @@
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-member-assets.ts",
-      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-assets/member-assets.types.ts": [
@@ -20730,8 +20707,7 @@
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
-      "services/api/scripts/verify-member-data-request-truth.ts",
-      "services/api/scripts/verify-resume-report-export.ts"
+      "services/api/scripts/verify-member-data-request-truth.ts"
     ],
     "services/api/src/member-privacy/member-privacy.types.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts"
@@ -21295,7 +21271,6 @@
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
-      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-screensaver-content.ts",
@@ -21448,7 +21423,6 @@
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
-      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
@@ -31828,33 +31802,6 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:resume-optimize"
-      ],
-      "wired": true
-    },
-    {
-      "asserts": {
-        "absent": [],
-        "dirs": [],
-        "files": [
-          "services/api/src/ai/ai.service.ts",
-          "services/api/src/ai/interfaces/ai-provider.interface.ts",
-          "services/api/src/ai/resume-report-export.controller.ts",
-          "services/api/src/ai/resume/diagnosis-report-pdf.service.ts",
-          "services/api/src/audit/audit.service.ts",
-          "services/api/src/files/files.service.ts",
-          "services/api/src/member-assets/member-assets.service.ts",
-          "services/api/src/member-privacy/member-privacy.service.ts",
-          "services/api/src/prisma/prisma.service.ts",
-          "services/api/src/storage/storage.service.ts"
-        ],
-        "missing": []
-      },
-      "file": "services/api/scripts/verify-resume-report-export.ts",
-      "helper": false,
-      "inCi": true,
-      "package": "@ai-job-print/api",
-      "scriptNames": [
-        "@ai-job-print/api::verify:resume-report-export"
       ],
       "wired": true
     },
