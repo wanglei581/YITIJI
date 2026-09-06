@@ -84,4 +84,4 @@
 }
 
 /* 「连接终端」是导航栏里的真实动作按钮，登录态真点扫描量到 62×25，撑到 ≥48px */
-.nav-caps { min-height: 96rpx; display: flex; align-items: center; padding: 0 20rpx; }
+.navbar .nav-caps { min-height: 96rpx; display: flex; align-items: center; box-sizing: border-box; }
