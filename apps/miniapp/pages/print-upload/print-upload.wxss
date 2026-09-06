@@ -102,3 +102,6 @@
 .ab-label { font-size: 22rpx; color: var(--muted); display: block; }
 .ab-amt { font-size: 40rpx; font-weight: 700; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
 .ab-amt.pending { font-size: 32rpx; color: var(--ghost); }
+
+/* 页内所有可点卡片高度 ≥48px：复量到第 4 张 .card 为 47px（rpx 取整），用 98rpx 避免取整落到 47 */
+.card.tap { min-height: 98rpx; box-sizing: border-box; }
