@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 507,
+    "endpointCount": 520,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -546,9 +546,13 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/admin/ai/usage",
         "roles": [
@@ -1870,10 +1874,14 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
+          "FairMaterial",
+          "FairMaterialPrintBridge",
+          "FileObject",
           "Job",
           "JobDataQualitySnapshot",
           "JobFair",
           "JobSource",
+          "PrintTask",
           "SyncLog"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/enabled",
@@ -1893,10 +1901,14 @@
         "method": "GET",
         "models": [
           "AuditLog",
+          "FairMaterial",
+          "FairMaterialPrintBridge",
+          "FileObject",
           "Job",
           "JobDataQualitySnapshot",
           "JobFair",
           "JobSource",
+          "PrintTask",
           "SyncLog"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/impact",
@@ -1940,10 +1952,14 @@
         "method": "POST",
         "models": [
           "AuditLog",
+          "FairMaterial",
+          "FairMaterialPrintBridge",
+          "FileObject",
           "Job",
           "JobDataQualitySnapshot",
           "JobFair",
           "JobSource",
+          "PrintTask",
           "SyncLog"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/unpublish-content",
@@ -4504,9 +4520,13 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/assistant/chat",
         "roles": [],
@@ -4539,6 +4559,35 @@
         "services": [
           "DailyBriefService"
         ]
+      },
+      {
+        "controller": "services/api/src/ai/ai.controller.ts",
+        "handler": "AiController.summarizeAssistantSession",
+        "method": "POST",
+        "models": [
+          "AdvisorArtifact",
+          "AdvisorSession",
+          "AiServiceLog",
+          "AuditLog"
+        ],
+        "path": "/api/v1/assistant/sessions/:sessionId/summary",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/advisor/assistant-summary.service.ts"
+        ],
+        "services": [
+          "AssistantSummaryService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/ai.controller.ts",
+        "handler": "AiController.transcribeAssistantVoice",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/assistant/voice",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/auth/auth.controller.ts",
@@ -5048,6 +5097,24 @@
       },
       {
         "controller": "services/api/src/contract-review/contract-review.controller.ts",
+        "handler": "ContractReviewController.keepReport",
+        "method": "POST",
+        "models": [
+          "ContractReviewTask",
+          "FileObject",
+          "PrintTask"
+        ],
+        "path": "/api/v1/contract-reviews/:id/report/keep",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/contract-review/contract-review-lifecycle.service.ts"
+        ],
+        "services": [
+          "ContractReviewLifecycleService"
+        ]
+      },
+      {
+        "controller": "services/api/src/contract-review/contract-review.controller.ts",
         "handler": "ContractReviewController.consentScope",
         "method": "GET",
         "models": [
@@ -5079,6 +5146,24 @@
         ],
         "services": [
           "ContractReviewLifecycleService"
+        ]
+      },
+      {
+        "controller": "services/api/src/document-conversion/document-conversion.controller.ts",
+        "handler": "DocumentConversionController.capabilities",
+        "method": "GET",
+        "models": [
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "PrintTask"
+        ],
+        "path": "/api/v1/document-conversion/capabilities",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/document-conversion/document-conversion.service.ts"
+        ],
+        "services": [
+          "DocumentConversionService"
         ]
       },
       {
@@ -5178,6 +5263,27 @@
         ],
         "services": [
           "FilesService"
+        ]
+      },
+      {
+        "controller": "services/api/src/document-conversion/document-conversion.controller.ts",
+        "handler": "DocumentConversionController.convert",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "PrintTask"
+        ],
+        "path": "/api/v1/files/:id/convert",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/document-conversion/document-conversion.service.ts"
+        ],
+        "services": [
+          "AuditService",
+          "DocumentConversionService"
         ]
       },
       {
@@ -6430,6 +6536,7 @@
         "handler": "MemberAssetsController.aiRecords",
         "method": "GET",
         "models": [
+          "AdvisorArtifact",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -6525,6 +6632,7 @@
         "handler": "MemberAssetsController.documents",
         "method": "GET",
         "models": [
+          "AdvisorArtifact",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -6543,6 +6651,7 @@
         "handler": "MemberAssetsController.deletedDocuments",
         "method": "GET",
         "models": [
+          "AdvisorArtifact",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -6984,6 +7093,7 @@
         "handler": "MemberAssetsController.resumes",
         "method": "GET",
         "models": [
+          "AdvisorArtifact",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -9243,6 +9353,7 @@
           "PiiFinding",
           "PriceConfig",
           "PrintTask",
+          "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability"
         ],
@@ -9292,10 +9403,63 @@
           "PiiFinding",
           "PriceConfig",
           "PrintTask",
+          "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability"
         ],
         "path": "/api/v1/print/jobs/:taskId",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/print-jobs.service.ts"
+        ],
+        "services": [
+          "PrintJobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/print-jobs.controller.ts",
+        "handler": "PrintJobsController.retryPaidFailedJob",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "DocumentProcessTask",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "Order",
+          "PiiFinding",
+          "PriceConfig",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/print/jobs/:taskId/retry",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/print-jobs.service.ts"
+        ],
+        "services": [
+          "PrintJobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/print-jobs.controller.ts",
+        "handler": "PrintJobsController.issueTakeawayUrl",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "DocumentProcessTask",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "Order",
+          "PiiFinding",
+          "PriceConfig",
+          "PrintTask",
+          "PrintTaskStatusLog",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/print/jobs/:taskId/takeaway-url",
         "roles": [],
         "serviceFiles": [
           "services/api/src/print-jobs/print-jobs.service.ts"
@@ -9454,16 +9618,45 @@
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
+        "handler": "AiController.getResumeExportPricing",
+        "method": "GET",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
+        ],
+        "path": "/api/v1/resume/export/pricing",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/ai/ai.service.ts"
+        ],
+        "services": [
+          "AiService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/ai.controller.ts",
         "handler": "AiController.submitResumeGenerate",
         "method": "POST",
         "models": [
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobMaterialTemplate",
+          "PriceConfig",
           "PrintTask",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate",
@@ -9487,9 +9680,13 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/generate/:taskId",
         "roles": [],
@@ -9508,19 +9705,27 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
+          "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord",
+          "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate/export",
         "roles": [],
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
-          "services/api/src/audit/audit.service.ts"
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
           "AiService",
-          "AuditService"
+          "AuditService",
+          "MemberPrivacyService"
         ]
       },
       {
@@ -9658,10 +9863,14 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobMaterialTemplate",
+          "PriceConfig",
           "PrintTask",
+          "RedemptionRecord",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/parse",
@@ -9685,9 +9894,13 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/records/:taskId",
         "roles": [],
@@ -9700,15 +9913,112 @@
       },
       {
         "controller": "services/api/src/ai/ai.controller.ts",
+        "handler": "AiController.getResumeDraft",
+        "method": "GET",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
+        ],
+        "path": "/api/v1/resume/records/:taskId/draft",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/ai/ai.service.ts"
+        ],
+        "services": [
+          "AiService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/ai.controller.ts",
+        "handler": "AiController.putResumeDraft",
+        "method": "PUT",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
+          "ContractReviewTask",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/resume/records/:taskId/draft",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
+        ],
+        "services": [
+          "AiService",
+          "MemberPrivacyService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/resume-report-export.controller.ts",
+        "handler": "ResumeReportExportController.export",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/resume/records/:taskId/export",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/ai/ai.controller.ts",
+        "handler": "AiController.factCheckResume",
+        "method": "POST",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
+          "ContractReviewTask",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/resume/records/:taskId/fact-check",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts"
+        ],
+        "services": [
+          "AiService",
+          "MemberPrivacyService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/ai.controller.ts",
         "handler": "AiController.adjustResumeLayout",
         "method": "POST",
         "models": [
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "BenefitGrant",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
         ],
         "path": "/api/v1/resume/records/:taskId/layout-adjust",
         "roles": [],
@@ -9733,7 +10043,9 @@
           "ContractReviewTask",
           "FairMaterialPrintBridge",
           "FileObject",
+          "JobMaterialTemplate",
           "Order",
+          "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
           "UserAiConsent"
@@ -9751,6 +10063,31 @@
           "AuditService",
           "BenefitRedemptionService",
           "MemberPrivacyService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/ai.controller.ts",
+        "handler": "AiController.listResumeVersions",
+        "method": "GET",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "AuditLog",
+          "BenefitGrant",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PriceConfig",
+          "PrintTask",
+          "RedemptionRecord"
+        ],
+        "path": "/api/v1/resume/records/:taskId/versions",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/ai/ai.service.ts"
+        ],
+        "services": [
+          "AiService"
         ]
       },
       {
@@ -10468,7 +10805,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 144,
+      "reachableFileCount": 145,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -10479,9 +10816,7 @@
             "GET /admin/ai/logs",
             "GET /admin/ai/usage",
             "GET /admin/alerts",
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
             "GET /admin/print-tasks",
             "GET /files",
@@ -10504,9 +10839,7 @@
         {
           "component": "AccountSettingsPage",
           "endpoints": [
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
@@ -10537,9 +10870,7 @@
             "DELETE /files/:param",
             "GET /admin/ai/logs",
             "GET /admin/ai/usage",
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
             "GET /files",
             "GET /files/:param/url",
@@ -10575,9 +10906,7 @@
         {
           "component": "AuditPage",
           "endpoints": [
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
@@ -10664,9 +10993,7 @@
         {
           "component": "DevicesPage",
           "endpoints": [
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
@@ -10686,9 +11013,7 @@
             "DELETE /files/:param",
             "GET /admin/ai/logs",
             "GET /admin/ai/usage",
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
             "GET /files",
             "GET /files/:param/url",
@@ -10743,9 +11068,7 @@
             "DELETE /files/:param",
             "GET /admin/ai/logs",
             "GET /admin/ai/usage",
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
             "GET /files",
             "GET /files/:param/url",
@@ -10770,9 +11093,7 @@
             "DELETE /files/:param",
             "GET /admin/ai/logs",
             "GET /admin/ai/usage",
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
             "GET /files",
             "GET /files/:param/url",
@@ -10808,9 +11129,7 @@
             "DELETE /files/:param",
             "GET /admin/ai/logs",
             "GET /admin/ai/usage",
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
             "GET /files",
             "GET /files/:param/url",
@@ -11000,13 +11319,25 @@
         {
           "component": "PolicySourcesPage",
           "endpoints": [
-            "GET /admin/policy-sources",
+            "DELETE /files/:param",
+            "GET /admin/ai/logs",
+            "GET /admin/ai/usage",
+            "GET /admin/import-batches",
+            "GET /admin/jobs/quality-summary",
             "GET /admin/policy-sources/:param/eligibility-rules",
+            "GET /files",
+            "GET /files/:param/url",
+            "GET /files/lifecycle-summary",
             "GET /policies/eligibility-questions",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "PATCH /admin/policy-sources/:param/publish",
             "PATCH /admin/policy-sources/:param/review",
             "POST /admin/bulk-publish/execute",
-            "POST /admin/bulk-publish/preview"
+            "POST /admin/bulk-publish/preview",
+            "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/policy-sources/index.tsx",
           "layout": [
@@ -11019,9 +11350,7 @@
         {
           "component": "PrintScanOpsPage",
           "endpoints": [
-            "GET /admin/fair-sources",
             "GET /admin/import-batches",
-            "GET /admin/job-sources",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
@@ -11160,11 +11489,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 149
+      "sourceFileCount": 150
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 427,
+      "reachableFileCount": 462,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -11228,7 +11557,17 @@
         {
           "component": "BenefitActivityDetailPage",
           "endpoints": [
-            "POST /activities/:param/claim"
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /activities/:param/claim",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
           ],
           "file": "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx",
           "layout": [
@@ -11246,6 +11585,7 @@
           "component": "AssistantPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /me/mock-interviews/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -11258,10 +11598,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11269,6 +11611,10 @@
             "POST /jobs/ai/recommendations",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
+            "POST /mock-interviews",
+            "POST /mock-interviews/:param/answer",
+            "POST /mock-interviews/:param/report/print",
+            "POST /mock-interviews/:param/start",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -11314,10 +11660,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11409,7 +11757,6 @@
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
-            "POST /mock-interviews/:param/end",
             "POST /mock-interviews/:param/report/print",
             "POST /mock-interviews/:param/start"
           ],
@@ -11446,7 +11793,6 @@
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
-            "POST /mock-interviews/:param/end",
             "POST /mock-interviews/:param/report/print",
             "POST /mock-interviews/:param/start"
           ],
@@ -11483,7 +11829,6 @@
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
-            "POST /mock-interviews/:param/end",
             "POST /mock-interviews/:param/report/print",
             "POST /mock-interviews/:param/start"
           ],
@@ -11520,7 +11865,6 @@
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
-            "POST /mock-interviews/:param/end",
             "POST /mock-interviews/:param/report/print",
             "POST /mock-interviews/:param/start"
           ],
@@ -11589,10 +11933,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11631,10 +11977,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11673,10 +12021,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11715,10 +12065,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11757,10 +12109,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11799,10 +12153,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11841,10 +12197,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11908,10 +12266,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11950,10 +12310,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11992,10 +12354,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -12034,10 +12398,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -12116,6 +12482,7 @@
           "component": "MyAiRecordsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /me/mock-interviews/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12132,7 +12499,11 @@
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
             "POST /me/ai-consents",
-            "POST /me/ai-consents/:param/revoke"
+            "POST /me/ai-consents/:param/revoke",
+            "POST /mock-interviews",
+            "POST /mock-interviews/:param/answer",
+            "POST /mock-interviews/:param/report/print",
+            "POST /mock-interviews/:param/start"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "layout": [
@@ -12175,7 +12546,18 @@
         },
         {
           "component": "MyDocumentsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
           "file": "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "layout": [
             "KioskRoot",
@@ -12892,10 +13274,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -12942,10 +13326,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -12953,6 +13339,7 @@
             "POST /jobs/ai/recommendations",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
+            "POST /me/favorites",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -12966,12 +13353,12 @@
           ],
           "path": "/resume/generate/preview",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/resume-generate-qx.css",
+            "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -12992,10 +13379,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -13115,10 +13504,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -13126,6 +13517,7 @@
             "POST /jobs/ai/recommendations",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
+            "POST /me/favorites",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -13139,12 +13531,11 @@
           ],
           "path": "/resume/optimize",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13164,10 +13555,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -13215,10 +13608,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -13266,10 +13661,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -13277,6 +13674,7 @@
             "POST /jobs/ai/recommendations",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
+            "POST /me/favorites",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
@@ -13290,13 +13688,12 @@
           ],
           "path": "/resume/report",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-diagnosis-ext.css",
-            "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/resume-report-qx.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13432,10 +13829,12 @@
             "GET /jobs/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
             "POST /assistant/chat",
+            "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -13539,7 +13938,18 @@
         },
         {
           "component": "ScanResultPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
           "file": "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "layout": [
             "KioskRoot",
@@ -13758,7 +14168,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 448
+      "sourceFileCount": 484
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -13915,7 +14325,6 @@
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
-            "GET /partner/policies",
             "GET /partner/policies/:param/eligibility-rules",
             "GET /partner/smart-campus/terminals",
             "GET /partner/sync-logs",
@@ -14141,7 +14550,8 @@
         "usedBy": [
           "services/api/src/advisor/advisor-artifact.service.ts",
           "services/api/src/advisor/advisor-retention.task.ts",
-          "services/api/src/advisor/advisor.service.ts"
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts"
         ]
       },
       {
@@ -14163,7 +14573,8 @@
         ],
         "usedBy": [
           "services/api/src/advisor/advisor-retention.task.ts",
-          "services/api/src/advisor/advisor.service.ts"
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts"
         ]
       },
       {
@@ -14210,10 +14621,12 @@
         "usedBy": [
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/ai/resume/resume-draft.store.ts",
           "services/api/src/ai/resume/self-assessment.service.ts",
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
@@ -14297,6 +14710,7 @@
         "usedBy": [
           "services/api/src/benefit-activities/benefit-activities.service.ts",
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
           "services/api/src/member-benefits/member-benefits.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
@@ -14600,11 +15014,13 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
           "services/api/src/ai/resume/appended-self-assessment.service.ts",
           "services/api/src/contract-review/contract-review-report-file.service.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
           "services/api/src/contract-review/contract-review.service.ts",
+          "services/api/src/document-conversion/document-conversion.service.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/member-data-export-file.service.ts",
@@ -14773,6 +15189,7 @@
         "name": "JobMaterialTemplate",
         "relations": [],
         "usedBy": [
+          "services/api/src/ai/ai.service.ts",
           "services/api/src/job-materials/job-materials.service.ts"
         ]
       },
@@ -15074,6 +15491,7 @@
         "name": "PriceConfig",
         "relations": [],
         "usedBy": [
+          "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/payment/admin-billing.service.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts"
@@ -15134,6 +15552,7 @@
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -15155,6 +15574,7 @@
         "relations": [],
         "usedBy": [
           "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/member-benefits/member-benefits.service.ts"
         ]
       },
@@ -15771,11 +16191,13 @@
     ],
     "apps/admin/src/services/api/adminHttpAdapter.ts": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
-      "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
+      "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
+      "apps/admin/scripts/verify-source-publish-actions.mjs"
     ],
     "apps/admin/src/services/api/adminMockAdapter.ts": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
-      "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
+      "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs",
+      "apps/admin/scripts/verify-source-publish-actions.mjs"
     ],
     "apps/admin/src/services/api/adminOrdersReadonly.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
@@ -15820,9 +16242,15 @@
     "apps/admin/src/services/api/orgsAdmin.ts": [
       "apps/admin/scripts/verify-partner-account-action-ui.mjs"
     ],
+    "apps/admin/src/services/api/policiesAdmin.ts": [
+      "apps/admin/scripts/verify-source-publish-actions.mjs"
+    ],
     "apps/admin/src/services/api/printScan.ts": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
+    ],
+    "apps/admin/src/services/api/sourcePaging.ts": [
+      "apps/admin/scripts/verify-source-publish-actions.mjs"
     ],
     "apps/admin/src/services/api/toolbox.ts": [
       "apps/admin/scripts/verify-toolbox-review-ui.mjs",
@@ -16008,7 +16436,8 @@
     "apps/kiosk/src/components/FileContentPreview.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
-      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/components/FilePreviewDialog.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
@@ -16073,6 +16502,7 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-shell-active-nav.mjs",
@@ -16083,6 +16513,7 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx": [
@@ -16109,7 +16540,8 @@
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
@@ -16126,11 +16558,15 @@
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx": [
+      "services/api/scripts/verify-assistant-voice.ts"
+    ],
     "apps/kiosk/src/pages/assistant/AssistantPage.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
     "apps/kiosk/src/pages/assistant/advisorProvider.ts": [
@@ -16165,7 +16601,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css": [
-      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
+      "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
+      "services/api/scripts/verify-assistant-voice.ts"
     ],
     "apps/kiosk/src/pages/assistant/assistant-lightflow-content.css": [
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
@@ -16357,7 +16794,8 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -16377,7 +16815,8 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
-      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewShell.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -16425,6 +16864,7 @@
       "apps/kiosk/scripts/verify-jobfair-page-size.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-activity-logs.ts"
     ],
     "apps/kiosk/src/pages/job-fairs/FairMapPage.tsx": [
@@ -16439,7 +16879,8 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -16658,7 +17099,6 @@
       "services/api/scripts/verify-print-rollout-config.ts"
     ],
     "apps/kiosk/src/pages/print/PrintConfirmPage.tsx": [
-      "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
@@ -16694,6 +17134,7 @@
     "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs",
+      "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
@@ -16707,6 +17148,7 @@
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
     "apps/kiosk/src/pages/print/PrintProgressPage.tsx": [
@@ -16727,6 +17169,7 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-file-display-truth.ts"
     ],
@@ -16812,6 +17255,10 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -16844,7 +17291,8 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -17111,7 +17559,8 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -17137,7 +17586,8 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeServiceHubPage.tsx": [
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
@@ -17149,7 +17599,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
-      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -17189,10 +17640,72 @@
     ],
     "apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeExportResult.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/generatePreviewQuery.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeQuery.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportActions.tsx": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportChrome.tsx": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportIssues.tsx": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -17241,8 +17754,23 @@
     "apps/kiosk/src/pages/resume/resume-fusion-youth.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
+    "apps/kiosk/src/pages/resume/resume-generate-qx.css": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
     "apps/kiosk/src/pages/resume/resume-library-lightflow.css": [
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-optimize-qx.css": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-report-fixture.ts": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-report-model.ts": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resume-report-qx.css": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
@@ -17344,7 +17872,8 @@
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
-      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -17428,6 +17957,9 @@
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
+    ],
+    "apps/kiosk/src/services/api/documentConversion.ts": [
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/services/api/fairVisitPlan.ts": [
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs"
@@ -17712,6 +18244,12 @@
     "apps/miniapp/pages/ai/ai.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/pages/assistant/assistant.js": [
+      "services/api/scripts/verify-assistant-voice.ts"
+    ],
+    "apps/miniapp/pages/assistant/assistant.wxml": [
+      "services/api/scripts/verify-assistant-voice.ts"
+    ],
     "apps/miniapp/pages/career-plan/career-plan.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
@@ -17761,6 +18299,21 @@
     "apps/miniapp/pages/print/print.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/pages/resume-diagnose/resume-diagnose.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/pages/resume-optimize/resume-optimize.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/pages/resume-parse/resume-parse.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/pages/resume-upload/resume-upload.js": [
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
+    ],
+    "apps/miniapp/pages/resumes/resumes.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
     "apps/miniapp/pages/settings/settings.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
@@ -17773,12 +18326,16 @@
     "apps/miniapp/utils/api.js": [
       "apps/miniapp/scripts/verify-miniapp-api-contract.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/miniapp/utils/auth.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/utils/config.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/utils/normalize.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/utils/pickup-qrcode.js": [
@@ -17798,14 +18355,20 @@
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
     ],
+    "apps/partner/src/routes/Page.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
     "apps/partner/src/routes/account/index.tsx": [
       "apps/admin/scripts/verify-honest-placeholders.mjs",
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/routes/companies/index.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "services/api/scripts/verify-companies.ts"
     ],
     "apps/partner/src/routes/dashboard/index.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/routes/fairs/index.tsx": [
@@ -17829,6 +18392,12 @@
     "apps/partner/src/routes/policy/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
+    "apps/partner/src/routes/profile/index.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
+    "apps/partner/src/routes/smart-campus/index.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
     "apps/partner/src/routes/sources/ExcelImportModal.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/partner/scripts/verify-excel-template-download-ui.mjs",
@@ -17841,6 +18410,7 @@
     ],
     "apps/partner/src/routes/sources/index.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
@@ -17848,10 +18418,15 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "apps/partner/src/routes/stats/index.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
+    ],
+    "apps/partner/src/routes/sync-logs/index.tsx": [
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/terminals/index.tsx": [
       "apps/admin/scripts/verify-honest-placeholders.mjs",
+      "apps/partner/scripts/verify-partner-refresh-safe.mjs",
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/services/api/client.ts": [
@@ -18111,6 +18686,10 @@
     ],
     "docs/api/cos-object-storage.md": [
       "services/api/scripts/verify-cos-lifecycle-policy.ts"
+    ],
+    "docs/compliance/compliance-boundary.md": [
+      "scripts/verify-compliance-copy.mjs",
+      "services/api/scripts/verify-member-data-retention.ts"
     ],
     "docs/compliance/contract-review-release-gate.md": [
       "services/api/scripts/verify-contract-review-gate0.ts",
@@ -19116,6 +19695,9 @@
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts"
     ],
+    "services/api/src/advisor/assistant-summary.service.ts": [
+      "services/api/scripts/verify-assistant-voice.ts"
+    ],
     "services/api/src/advisor/llm-advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts"
     ],
@@ -19146,10 +19728,13 @@
       "services/api/scripts/verify-ai-public-quota.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-resume-voice-generate.ts",
@@ -19170,11 +19755,13 @@
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/dto/assistant-chat.dto.ts": [
@@ -19182,6 +19769,7 @@
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
     "services/api/src/ai/dto/resume-generate.dto.ts": [
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
@@ -19201,10 +19789,12 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -19224,6 +19814,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
@@ -19257,6 +19848,7 @@
     ],
     "services/api/src/ai/providers/mock.provider.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
@@ -19274,6 +19866,9 @@
     ],
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
+    ],
+    "services/api/src/ai/resume-report-export.controller.ts": [
+      "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/ai/resume/appended-self-assessment.service.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
@@ -19302,6 +19897,9 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-compliance.ts"
+    ],
+    "services/api/src/ai/resume/diagnosis-report-pdf.service.ts": [
+      "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/ai/resume/fair-visit-plan-pdf.service.ts": [
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
@@ -19409,20 +20007,30 @@
       "services/api/scripts/verify-resume-extraction.ts"
     ],
     "services/api/src/ai/resume/resume-docx.service.ts": [
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
+    "services/api/src/ai/resume/resume-draft.store.ts": [
+      "services/api/scripts/verify-member-data-retention.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts"
+    ],
     "services/api/src/ai/resume/resume-extraction.service.ts": [
+      "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
       "services/api/scripts/verify-resume-extraction.ts"
     ],
+    "services/api/src/ai/resume/resume-fact-match.ts": [
+      "services/api/scripts/verify-resume-draft-versions.ts"
+    ],
     "services/api/src/ai/resume/resume-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "services/api/scripts/verify-aigc-pdf-metadata.ts",
       "services/api/scripts/verify-cjk-font.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
@@ -19430,6 +20038,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/resume/resume-text.service.ts": [
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
@@ -19561,10 +20170,12 @@
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-tasks.ts",
@@ -19656,7 +20267,13 @@
     "services/api/src/benefit-redemption/benefit-redemption.service.ts": [
       "services/api/scripts/verify-benefit-redemption.ts",
       "services/api/scripts/verify-payment-flow.ts",
-      "services/api/scripts/verify-redemption-audit.ts"
+      "services/api/scripts/verify-redemption-audit.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-formats.ts"
+    ],
+    "services/api/src/benefit-redemption/resume-export-gate.service.ts": [
+      "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-formats.ts"
     ],
     "services/api/src/bulk-publish/bulk-publish.service.ts": [
       "services/api/scripts/verify-bulk-publish.ts",
@@ -19716,6 +20333,7 @@
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
       "services/api/scripts/verify-job-review.ts",
+      "services/api/scripts/verify-job-sync.ts",
       "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
@@ -19915,6 +20533,7 @@
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
     "services/api/src/content/content.service.ts": [
+      "services/api/scripts/verify-ad-asset-range.ts",
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-screensaver-content.ts"
     ],
@@ -19978,6 +20597,18 @@
     "services/api/src/device-fleet/device-fleet.types.ts": [
       "services/api/scripts/verify-device-fleet-overview.ts"
     ],
+    "services/api/src/document-conversion/document-conversion-capability-state.ts": [
+      "services/api/scripts/verify-document-conversion.ts"
+    ],
+    "services/api/src/document-conversion/document-conversion.controller.ts": [
+      "services/api/scripts/verify-document-conversion.ts"
+    ],
+    "services/api/src/document-conversion/document-conversion.service.ts": [
+      "services/api/scripts/verify-document-conversion.ts"
+    ],
+    "services/api/src/document-conversion/document-conversion.types.ts": [
+      "services/api/scripts/verify-document-conversion.ts"
+    ],
     "services/api/src/files/collect-raw-upload-body.ts": [
       "services/api/scripts/verify-file-internal-auth.ts"
     ],
@@ -19998,6 +20629,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-cos-storage.ts",
+      "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-file-display-truth.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
@@ -20051,11 +20683,14 @@
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pii-redaction.ts",
+      "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -20080,6 +20715,7 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-order.ts",
@@ -20283,8 +20919,10 @@
       "services/api/scripts/verify-content-trust-publish-gate.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
+      "services/api/scripts/verify-job-sync.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
-      "services/api/scripts/verify-partner-fair-subresources.ts"
+      "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-public-fair-demo-guard.ts"
     ],
     "services/api/src/jobs/fair-material-signing.ts": [
       "services/api/scripts/verify-admin-fairs.ts"
@@ -20296,14 +20934,16 @@
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
-      "services/api/scripts/verify-partner-fair-subresources.ts"
+      "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-public-fair-demo-guard.ts"
     ],
     "services/api/src/jobs/fair-venue-guide.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
-      "services/api/scripts/verify-partner-fair-subresources.ts"
+      "services/api/scripts/verify-partner-fair-subresources.ts",
+      "services/api/scripts/verify-public-fair-demo-guard.ts"
     ],
     "services/api/src/jobs/job-content-screening.ts": [
       "services/api/scripts/verify-job-content-screening.ts"
@@ -20421,6 +21061,8 @@
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-requirement-stats.ts",
+      "services/api/scripts/verify-job-review.ts",
+      "services/api/scripts/verify-jobfair-review.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-partner-excel-template.ts"
     ],
@@ -20529,10 +21171,14 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-member-assets.ts",
+      "services/api/scripts/verify-member-data-retention.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-assets/member-assets.types.ts": [
@@ -20707,7 +21353,8 @@
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
-      "services/api/scripts/verify-member-data-request-truth.ts"
+      "services/api/scripts/verify-member-data-request-truth.ts",
+      "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/member-privacy/member-privacy.types.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts"
@@ -20899,6 +21546,7 @@
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-payment-codepay.ts",
       "services/api/scripts/verify-payment-flow.ts",
+      "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
     ],
     "services/api/src/payment/payment.controller.ts": [
@@ -20937,6 +21585,8 @@
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -21004,6 +21654,9 @@
     "services/api/src/policies/dto/policy.dto.ts": [
       "services/api/scripts/verify-policies.ts",
       "services/api/scripts/verify-policy-eligibility.ts"
+    ],
+    "services/api/src/policies/policies.controller.ts": [
+      "services/api/scripts/verify-policies.ts"
     ],
     "services/api/src/policies/policies.service.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
@@ -21079,6 +21732,7 @@
       "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/print-jobs/print-jobs.service.ts": [
+      "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -21087,8 +21741,10 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-closed-pending-print-task-disposition.ts",
+      "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
+      "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
@@ -21179,6 +21835,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -21267,10 +21924,12 @@
       "services/api/scripts/verify-refund-convergence.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-screensaver-content.ts",
@@ -21417,12 +22076,15 @@
       "services/api/scripts/verify-payment-real-channels.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-jobs.ts",
+      "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
+      "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
@@ -22067,7 +22729,11 @@
           "apps/admin/src/routes/fair-sources/index.tsx",
           "apps/admin/src/routes/import-batches/index.tsx",
           "apps/admin/src/routes/job-sources/index.tsx",
-          "apps/admin/src/routes/policy-sources/index.tsx"
+          "apps/admin/src/routes/policy-sources/index.tsx",
+          "apps/admin/src/services/api/adminHttpAdapter.ts",
+          "apps/admin/src/services/api/adminMockAdapter.ts",
+          "apps/admin/src/services/api/policiesAdmin.ts",
+          "apps/admin/src/services/api/sourcePaging.ts"
         ],
         "missing": []
       },
@@ -22252,8 +22918,8 @@
         "files": [
           "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx",
           "apps/kiosk/src/pages/contract-review/contractReviewReportPrintFlow.ts",
-          "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
-          "apps/kiosk/src/services/api/contractReview.ts"
+          "apps/kiosk/src/services/api/contractReview.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts"
         ],
         "missing": []
       },
@@ -22557,6 +23223,7 @@
         "files": [
           "apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx",
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css",
@@ -23432,7 +24099,9 @@
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
           "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css",
+          "apps/kiosk/src/pages/resume/resume-generate-qx.css",
           "apps/kiosk/src/pages/resume/resume-library-lightflow.css",
+          "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
           "apps/kiosk/src/routes/index.tsx"
         ],
         "missing": []
@@ -23490,6 +24159,7 @@
           "apps/kiosk/src/pages/profile/components/ProfileHeader.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
+          "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx",
@@ -24356,6 +25026,7 @@
           "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
+          "apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx",
@@ -24616,6 +25287,7 @@
         "files": [
           "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeParsePage.tsx",
@@ -24626,6 +25298,20 @@
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeExportResult.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/generatePreviewQuery.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeQuery.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
           "apps/kiosk/src/services/api/ai.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
@@ -24670,6 +25356,35 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:resume-phone-upload-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportActions.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportChrome.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportIssues.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx",
+          "apps/kiosk/src/pages/resume/resume-report-fixture.ts",
+          "apps/kiosk/src/pages/resume/resume-report-model.ts",
+          "apps/kiosk/src/pages/resume/resume-report-qx.css"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-resume-report-qx.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:resume-report-qx"
       ],
       "wired": true
     },
@@ -24864,6 +25579,32 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          "apps/kiosk/src/components/FileContentPreview.tsx",
+          "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
+          "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
+          "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
+          "apps/kiosk/src/services/api/documentConversion.ts",
+          "apps/miniapp/pages/resume-upload/resume-upload.js"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:word-conversion-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/miniapp/utils/api.js"
@@ -24906,12 +25647,17 @@
           "apps/miniapp/pages/print-store/print-store.js",
           "apps/miniapp/pages/print-upload/print-upload.js",
           "apps/miniapp/pages/print/print.js",
+          "apps/miniapp/pages/resume-diagnose/resume-diagnose.js",
+          "apps/miniapp/pages/resume-optimize/resume-optimize.js",
+          "apps/miniapp/pages/resume-parse/resume-parse.js",
+          "apps/miniapp/pages/resumes/resumes.js",
           "apps/miniapp/pages/settings/settings.js",
           "apps/miniapp/project.config.json",
           "apps/miniapp/scripts/verify-miniapp-static.mjs",
           "apps/miniapp/utils/api.js",
           "apps/miniapp/utils/auth.js",
           "apps/miniapp/utils/config.js",
+          "apps/miniapp/utils/normalize.js",
           "apps/miniapp/utils/pickup-qrcode.js",
           "apps/miniapp/utils/request.js",
           "apps/miniapp/utils/storage.js",
@@ -25027,9 +25773,19 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/partner/src/routes/Page.tsx",
+          "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/companies/index.tsx",
+          "apps/partner/src/routes/dashboard/index.tsx",
           "apps/partner/src/routes/fairs/index.tsx",
           "apps/partner/src/routes/jobs/index.tsx",
-          "apps/partner/src/routes/policy/index.tsx"
+          "apps/partner/src/routes/policy/index.tsx",
+          "apps/partner/src/routes/profile/index.tsx",
+          "apps/partner/src/routes/smart-campus/index.tsx",
+          "apps/partner/src/routes/sources/index.tsx",
+          "apps/partner/src/routes/stats/index.tsx",
+          "apps/partner/src/routes/sync-logs/index.tsx",
+          "apps/partner/src/routes/terminals/index.tsx"
         ],
         "missing": []
       },
@@ -25795,6 +26551,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "docs/compliance/compliance-boundary.md",
           "packages/shared/src/types/complianceCopy.ts"
         ],
         "missing": []
@@ -25954,17 +26711,25 @@
           "apps/admin/src/routes/policy-sources/index.tsx",
           "apps/admin/src/routes/screensaver/index.tsx",
           "apps/admin/src/routes/sync-sources/index.tsx",
+          "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
           "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx",
+          "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
           "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
@@ -26514,7 +27279,8 @@
         "dirs": [],
         "files": [
           "services/api/src/content/content-signing.ts",
-          "services/api/src/content/content.controller.ts"
+          "services/api/src/content/content.controller.ts",
+          "services/api/src/content/content.service.ts"
         ],
         "missing": []
       },
@@ -27248,6 +28014,34 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:assistant-provider-label"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/assistant/assistant-lightflow-chat.css",
+          "apps/miniapp/pages/assistant/assistant.js",
+          "apps/miniapp/pages/assistant/assistant.wxml",
+          "apps/miniapp/utils/api.js",
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-assistant-voice.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:assistant-voice"
       ],
       "wired": true
     },
@@ -28009,6 +28803,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:device-fleet-overview"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/resume/resume-extraction.service.ts",
+          "services/api/src/document-conversion/document-conversion-capability-state.ts",
+          "services/api/src/document-conversion/document-conversion.controller.ts",
+          "services/api/src/document-conversion/document-conversion.service.ts",
+          "services/api/src/document-conversion/document-conversion.types.ts",
+          "services/api/src/files/file-validation.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-document-conversion.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:document-conversion"
       ],
       "wired": true
     },
@@ -29077,6 +29896,7 @@
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
+          "services/api/src/jobs/jobs.controller.ts",
           "services/api/src/jobs/jobs.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -29097,8 +29917,10 @@
         "dirs": [],
         "files": [
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/job-ai/job-quality.service.ts",
           "services/api/src/job-sync/job-sync.service.ts",
+          "services/api/src/jobs/fair-material-print-bridge.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []
@@ -29207,6 +30029,7 @@
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
+          "services/api/src/jobs/jobs.controller.ts",
           "services/api/src/jobs/jobs.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -29798,16 +30621,20 @@
           "services"
         ],
         "files": [
+          "docs/compliance/compliance-boundary.md",
           "docs/compliance/member-personal-data-retention.md",
           "docs/product/role-boundary.md",
           "docs/product/user-data-flow-matrix.md",
           "docs/reviews/ai-resume-assets-closure-planning.md",
           "services/api/src/activity/activity.service.ts",
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/resume/resume-draft.store.ts",
           "services/api/src/files/file.types.ts",
           "services/api/src/files/retention-policy.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/storage/storage.service.ts"
         ],
         "missing": []
@@ -30741,6 +31568,7 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/policies/dto/policy.dto.ts",
+          "services/api/src/policies/policies.controller.ts",
           "services/api/src/policies/policies.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -30907,6 +31735,7 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/payment-session-token.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/print-jobs/dto/create-print-job.dto.ts",
@@ -31152,13 +31981,18 @@
         "files": [
           "services/api/scripts/lib/verify-fair-residue.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/jobs/fair-material-print-bridge.service.ts",
+          "services/api/src/jobs/fair-material.service.ts",
+          "services/api/src/jobs/fair-venue-guide.service.ts",
           "services/api/src/jobs/jobs-admin.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/jobs/jobs.service.ts",
-          "services/api/src/prisma/prisma.service.ts"
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
         ],
         "missing": []
       },
@@ -31654,7 +32488,43 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/dto/resume-generate.dto.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/providers/mock.provider.ts",
+          "services/api/src/ai/resume/resume-docx.service.ts",
+          "services/api/src/ai/resume/resume-draft.store.ts",
+          "services/api/src/ai/resume/resume-fact-match.ts",
+          "services/api/src/ai/resume/resume-pdf.service.ts",
+          "services/api/src/ai/resume/resume-text.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/benefit-redemption/resume-export-gate.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-draft-versions.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-draft-versions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "packages/shared/src/types/ai.ts",
+          "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/ai.service.ts",
           "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
@@ -31663,7 +32533,10 @@
           "services/api/src/ai/resume/resume-pdf.service.ts",
           "services/api/src/ai/resume/resume-text.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/benefit-redemption/resume-export-gate.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/payment/price-config.seed.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.service.ts"
         ],
@@ -31802,6 +32675,33 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:resume-optimize"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume-report-export.controller.ts",
+          "services/api/src/ai/resume/diagnosis-report-pdf.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-report-export.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-report-export"
       ],
       "wired": true
     },
@@ -32706,6 +33606,18 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-member-login-dialog.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/contract-review/contractReviewReportPrintFlow.ts",
+        "kind": "component",
+        "mentions": [
+          "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
+          "docs/reviews/result-layer-2026-09-06-packets.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-contract-review-report-print.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
