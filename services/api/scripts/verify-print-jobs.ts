@@ -563,8 +563,9 @@ async function main() {
       'PRINT_TASK_NOT_FOUND',
       '8a. takeaway-url 无归属凭证 → 404',
     )
+    const otherOrderSession = await sessionFor(piiCreated.taskId)
     await expectCode(
-      () => printJobs.issueTakeawayUrl(created.taskId, { paymentSessionToken: reportCreated.paymentSessionToken }),
+      () => printJobs.issueTakeawayUrl(created.taskId, { paymentSessionToken: otherOrderSession }),
       'PRINT_TASK_NOT_FOUND',
       '8b. takeaway-url 越权（其他订单支付会话）→ 404',
     )
@@ -615,7 +616,7 @@ async function main() {
     }
 
     await expectCode(
-      () => printJobs.retryPaidFailedJob(knownFailId, { paymentSessionToken: reportCreated.paymentSessionToken }),
+      () => printJobs.retryPaidFailedJob(knownFailId, { paymentSessionToken: otherOrderSession }),
       'PRINT_TASK_NOT_FOUND',
       '8f. retry 越权 → 404',
     )

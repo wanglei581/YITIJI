@@ -81,7 +81,7 @@
 .print-done-takeaway-qr {
   display: inline-flex;
   padding: 8px;
-  background: #fff;
+  background: var(--print-surface);
 }
 .print-done-takeaway-note {
   font-size: 15px;
