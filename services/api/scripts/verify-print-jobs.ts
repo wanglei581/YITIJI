@@ -543,6 +543,8 @@ async function main() {
       }),
       'PII_SCAN_STALE',
       'API-27c 建单比对 sha256 不一致 → 409 PII_SCAN_STALE',
+    )
+
     async function sessionFor(taskId: string): Promise<string> {
       const order = await prisma.order.findFirst({ where: { printTaskId: taskId } })
       if (!order) fail(`sessionFor 找不到订单: ${taskId}`)
