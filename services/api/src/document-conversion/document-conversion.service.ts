@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os'
 import { extname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { PDFDocument } from 'pdf-lib'
+import { withBootTimeout } from '../common/boot/boot-readiness'
 import { FilesService } from '../files/files.service'
 import type { FilePurpose, FileSensitiveLevel } from '../files/file.types'
 import { signFileUrl } from '../files/signing'
@@ -44,6 +45,9 @@ export interface DocumentConversionRuntimeOptions {
   maxOutputBytes?: number
 }
 
+/** 启动期探测上限：引擎 / 字体探测超过此时限按不可用处理，不阻塞 API 启动。 */
+const PROBE_TIMEOUT_MS = 8_000
+
 @Injectable()
 export class DocumentConversionService implements OnModuleInit {
   private readonly logger = new Logger(DocumentConversionService.name)
@@ -70,7 +74,12 @@ export class DocumentConversionService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    const cjkFonts = await (this.fontProbe ?? probeCjkFonts)().catch(() => false)
+    // 启动期探测必须有界（verify:boot-resilience）：字体 / 引擎探测挂住不能拖住整个 API 启动，超时按「不可用」处理。
+    const cjkFonts = await withBootTimeout(() => (this.fontProbe ?? probeCjkFonts)(), {
+      subsystem: 'document-conversion',
+      operation: 'probe-cjk-fonts',
+      timeoutMs: PROBE_TIMEOUT_MS,
+    }).catch(() => false)
     if (!this.adapter) {
       this.capabilities = {
         wordToPdf: false,
@@ -83,7 +92,11 @@ export class DocumentConversionService implements OnModuleInit {
       return
     }
 
-    const probe = await this.adapter.probe().catch(() => ({
+    const probe = await withBootTimeout(() => this.adapter!.probe(), {
+      subsystem: 'document-conversion',
+      operation: 'probe-engine',
+      timeoutMs: PROBE_TIMEOUT_MS,
+    }).catch(() => ({
       available: false,
       reason: '服务端转换引擎探测失败',
     }))
