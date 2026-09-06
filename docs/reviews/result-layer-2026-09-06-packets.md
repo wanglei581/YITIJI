@@ -256,7 +256,7 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 K2 · 三端 .doc/.docx 口径与 Word 预览 / 转 PDF 入口（消费契约 3）—— codex
 
-- **已合入 main**：#874（squash `__K2__`，2026-09-07）。
+- **已合入 main**：#874（squash `e2219ceb8`，2026-09-07）。
 
 - **条目**：P0-9（三端统一「接收」）、Word 页内预览、我的文档「转 PDF」、打印上传接 Word；全部以 `GET /api/v1/document-conversion/capabilities` 为真时才开放，为假时 aria-disabled + reason（「由转换引擎生成，复杂版式可能有偏差，请预览核对」固定出现在开放态文案中）。
 - **事实**：kiosk 简历上传 accept 刻意剔除 .doc（`apps/kiosk/src/pages/resume/ResumeSourcePage.tsx:115-126`）；手机中转页 `PhoneUploadPage.tsx:16-18` 与小程序 `resume-upload.js:6` 放行 .doc；打印上传 `PrintUploadPage.tsx:545` 只收 pdf/jpg/png；`FileContentPreview.tsx:15-31` 只认 pdf/图片，DOCX 归 unsupported；`PrintPreviewPage.tsx:226` 写「Word 文档需后续接入转换服务后才能页内预览」；我的文档 `MyDocumentsPage.tsx:204-229`「重新打印」不按格式过滤（该文件受批次守卫禁改，本包不碰）。服务端（包 D）：`POST /files/:id/convert {target:'pdf'}` 返回派生 PDF 的 signedUrl / printFileUrl；`print_doc` 上传在能力为真时接受 doc/docx，建单前服务端自动转派生 PDF。
