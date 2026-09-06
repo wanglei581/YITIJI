@@ -196,3 +196,26 @@ F7 全屏抽查：通过|问题
 - 打印参数继续只开放 `black_white + simplex + pagesPerSheet=1`。
 - 安装包未经企业 Authenticode 签名，本单不构成正式发布或批量部署授权。
 - 回执收到后，只勾 checklist §五中**已举证**的子项；F3 没出纸则 §5.6 保持打开。
+
+## 8. 实际执行回执（2026-09-06）
+
+```text
+WINDOWS AGENT 升级 + Phase F 复验回执（2026-09）
+安装包：5bff1bc42 / run 34026906605 / candidate-identity.json 已核对 = 是
+A1 安装方式：EXE/MSI；安装目录 C:\\Program Files\\AIJobPrintAgent
+A6 8/31 后断心跳原因：旧 Agent 服务于 2026-08-31 23:42:54 停止，之后未运行
+2 升级路径：2B（EXE/MSI）+ 重新绑定；绑定：成功；恢复运行：是
+2C boot-ticket 接口：200 + 60s = 是；printer-status isOnline=true：是；printerStatus=ready
+3 看门狗：任务已注册 = 是；watchdog.log bootTicket=True = 是
+F1 服务 Running/Automatic：是；printerName 一致：是（Pantum CM2800ADN Series）
+F2 Kiosk 会话就绪：通过（启动票兑换后地址栏不含 boot_ticket）
+F3 真机出纸：通过（taskId ptask_kiosk_73db2dfb9b9546e0；现场确认 1 页已出纸；队列回空）
+F4 停用即拒 + 启用后恢复：未做
+F5 Agent 掉线自愈：未做
+F6 断网恢复：未做
+F7 全屏抽查：未做
+5 B3 闭环：未做
+说明：未造未支付单；未用紧急吊销；未贴任何 token / 绑定码
+```
+
+补充证据：生产 Kiosk 首次不带启动票的测试提交被安全门禁拒绝；随后通过本机 Agent 新取启动票进入 Kiosk，完成上传、材料检查、黑白单面 1 页免费打印。Agent 日志记录领取、文件哈希校验、打印成功、`completed` 回传和临时文件删除；现场确认纸张已从奔图出纸口出来。首次提交页显示订单号 `ORD-20260906-9D3B5DA26F`，完成页显示另一内部订单标识，需后续核对订单号展示口径。

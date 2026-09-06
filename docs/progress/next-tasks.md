@@ -86,7 +86,7 @@
 
 ### 待真机验证（产品负责人在 Windows 侧执行）
 
-- **先做这一单（2026-09-06）**：[windows-agent-upgrade-and-phase-f-recheck-2026-09.md](../device/windows-agent-upgrade-and-phase-f-recheck-2026-09.md) —— 线上 API 已含 #833 终端身份闸门，`t_ksk_001` 自 08-31 离线且机上仍是旧 Agent；按单升级到 `main@5bff1bc42` 安装包（CI run 34026906605，产物 09-13 过期）并重跑 Phase F。下面各硬件项在此单通过后再排。
+- [x] **Windows Agent 升级 + Phase F F1/F2/F3（2026-09-06，现场分支 `field/windows-phase-f-2026-09`）**：[执行单](../device/windows-agent-upgrade-and-phase-f-recheck-2026-09.md) 已完成安装包 `main@5bff1bc42`（CI run `34026906605`）、重新绑定、启动票、看门狗、生产 Kiosk 1 页黑白单面真实出纸和队列回空复验。F4/F5/F6/F7、B3 和扫描/U 盘/断网等仍待后续现场窗口，不得据此宣称整体验收完成。
 
 - **双面长边/短边的实际翻页方向** —— 名字只是名字，搞反了用户拿到的装订方向就是错的
 - 本地驱动能否真正控制彩色打印（CLAUDE.md §3 标着待验证）
