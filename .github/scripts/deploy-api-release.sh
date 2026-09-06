@@ -158,31 +158,46 @@ pg_restore -l "$BACKUP_PREFIX.dump" >/dev/null
 echo "=== 3. 备份当前运行目录（回滚锚点）==="
 cp -a "$RUNTIME_ROOT" "$BACKUP_PREFIX.runtime"
 
-echo "=== 3b. 持久化强制 PII 扫描门禁（不打印 .env）==="
+echo "=== 3b. 持久化全部生产运行闸门（不打印 .env）==="
+# 这里的键必须与 services/api/src/config/production-runtime-gates.ts 里
+# NODE_ENV=production 时 fail-closed 要求显式为 true 的 env 一一对应。
+# 少一个，新 API 在 PM2 重启后就拒绝启动 —— 而那时备份、迁移、rsync 都已经做完了。
+#
+# 2026-09-06 实测：#790 加了 PRINT_REQUIRE_PRINTER_ONLINE 闸门，这里没跟着加，
+# 结果 35af2263b 发布走完全部步骤后健康检查失败，pm2 崩溃循环 17 次，线上 API
+# 中断到手工补 .env 为止。verify:deploy-gates-in-sync 门禁现在会在 CI 里对这张
+# 清单和 production-runtime-gates.ts 做集合比对，两边不一致直接红。
+REQUIRED_PRODUCTION_GATES=(
+  PRINT_REQUIRE_PII_SCAN
+  PRINT_REQUIRE_PRINTER_ONLINE
+)
 ENV_FILE="$API_DIR/.env"
-ENV_TMP="$(mktemp "$API_DIR/.env.runtime.XXXXXX")"
-cleanup_env_tmp() {
-  rm -f -- "$ENV_TMP"
-}
-trap cleanup_env_tmp EXIT
-awk '
-  BEGIN { written = 0 }
-  /^[[:space:]]*(export[[:space:]]+)?PRINT_REQUIRE_PII_SCAN[[:space:]]*=/ {
-    if (!written) {
-      print "PRINT_REQUIRE_PII_SCAN=true"
-      written = 1
+for GATE_KEY in "${REQUIRED_PRODUCTION_GATES[@]}"; do
+  ENV_TMP="$(mktemp "$API_DIR/.env.runtime.XXXXXX")"
+  cleanup_env_tmp() {
+    rm -f -- "$ENV_TMP"
+  }
+  trap cleanup_env_tmp EXIT
+  awk -v key="$GATE_KEY" '
+    BEGIN { written = 0 }
+    $0 ~ ("^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=") {
+      if (!written) {
+        print key "=true"
+        written = 1
+      }
+      next
     }
-    next
-  }
-  { print }
-  END {
-    if (!written) print "PRINT_REQUIRE_PII_SCAN=true"
-  }
-' "$ENV_FILE" > "$ENV_TMP"
-chmod --reference="$ENV_FILE" "$ENV_TMP"
-chown --reference="$ENV_FILE" "$ENV_TMP" 2>/dev/null || true
-mv -f -- "$ENV_TMP" "$ENV_FILE"
-trap - EXIT
+    { print }
+    END {
+      if (!written) print key "=true"
+    }
+  ' "$ENV_FILE" > "$ENV_TMP"
+  chmod --reference="$ENV_FILE" "$ENV_TMP"
+  chown --reference="$ENV_FILE" "$ENV_TMP" 2>/dev/null || true
+  mv -f -- "$ENV_TMP" "$ENV_FILE"
+  trap - EXIT
+  echo "  已持久化 $GATE_KEY=true"
+done
 
 echo "=== 4. 在目标提交内构建 API ==="
 cd "$DEPLOY_PATH"

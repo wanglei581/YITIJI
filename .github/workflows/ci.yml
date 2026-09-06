@@ -79,6 +79,8 @@ jobs:
         # 全量 tracked 文件拒绝残留冲突标记；所有 GitHub Actions workflow 必须能通过 YAML 语法解析。
         run: |
           pnpm verify:repository-integrity
+          # 生产闸门 ↔ 部署脚本持久化清单必须同步（2026-09-06 缺一个键让发布在 PM2 重启后失败）
+          pnpm verify:deploy-gates-in-sync
           pnpm verify:ci-gate-coverage
           pnpm verify:fixture-time-bombs
 
