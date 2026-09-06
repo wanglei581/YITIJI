@@ -137,6 +137,12 @@
 | POST | `/api/v1/admin/ai-config/:featureKey/test` | AiConfigController.testOne | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
 | POST | `/api/v1/admin/ai-config/test` | AiConfigController.test | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
 
+## `services/api/src/ai/resume-report-export.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/resume/records/:taskId/export` | ResumeReportExportController.export | — | — | — |
+
 ## `services/api/src/ai/self-assessment.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |

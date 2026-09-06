@@ -178,6 +178,26 @@ export interface ResumeReport {
   truncatedInput?: boolean
 }
 
+export type ResumeReportExportKind = 'diagnosis_report' | 'change_list'
+export type ResumeIssueSeverity = 'high' | 'medium' | 'low'
+
+export interface ResumeReportExportRequest {
+  kind: ResumeReportExportKind
+}
+
+export interface ResumeReportExportResponse {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+  printFileUrl: string
+  savedToDocuments: boolean
+  aiGenerated: true
+}
+
 /**
  * 求职目标方向上下文（用户在 /resume/source 同页设置）
  *
