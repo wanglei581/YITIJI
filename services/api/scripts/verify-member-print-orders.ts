@@ -27,6 +27,7 @@ import { MemberPrintOrdersService } from '../src/member-print-orders/member-prin
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 import { verifyPaymentSessionToken } from '../src/payment/payment-session-token'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { PAID_UNFULFILLED_PENDING_REFUND_REASON } from '../src/payment/pending-refund-signal'
 
 const apiRoot = path.resolve(__dirname, '..')
 const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-member-print-orders-${randomUUID().slice(0, 8)}.db`
@@ -68,6 +69,8 @@ const FORBIDDEN_KEYS = [
   'fileUrl', 'fileMd5', 'paramsJson', 'storageKey', 'sha256',
   'payloadJson', 'accessTokenHash', 'errorCode', 'errorMessage',
   'endUserId', 'terminalId', 'pages', 'amount', 'paidStatus',
+  // API-20：内部待退款原因码不得出现在会员只读契约。
+  'refundReason',
 ]
 
 async function main() {
@@ -91,7 +94,7 @@ async function main() {
   const t = (k: string) => `ptask_po_${k}_${suffix}`
   const taskIds = [
     t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'),
-    t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder'),
+    t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder'), t('d_pending_refund'),
     t('e_unpaid'), t('e_paying'), t('e_paid'), t('e_claimed'), t('e_printing'),
     t('e_completed'), t('e_failed'), t('e_cancelled'), t('e_closed'), t('e_refunded_claimed'),
   ]
@@ -223,7 +226,8 @@ async function main() {
     //   却没有外露——用户付了双面的钱却在「我的 → 打印订单」看不到，
     //   补打与申诉也无法复现参数。
     //   pageRange（2026-09-06）：与 copies/duplex 同类，来自 paramsJson 已保存参数。
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
+    //   refundRequired（API-20）：服务端派生布尔，不回传内部 refundReason。
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'duplex', 'paperSize', 'pageRange', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents', 'refundRequired'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
@@ -261,7 +265,13 @@ async function main() {
     else fail('6d. 有效会员鉴权未通过或未注入 endUser')
 
     // ── 7. P0a 支付字段真实化：join Order，诚实字段 + pickupCode 门控 + 无 live 网关来源 ──
-    const dPay = { unpaid: t('d_unpaid'), paid: t('d_paid'), refunded: t('d_refunded'), noorder: t('d_noorder') }
+    const dPay = {
+      unpaid: t('d_unpaid'),
+      paid: t('d_paid'),
+      refunded: t('d_refunded'),
+      noorder: t('d_noorder'),
+      pendingRefund: t('d_pending_refund'),
+    }
     for (const [key, id] of Object.entries(dPay)) {
       await prisma.printTask.create({
         data: {
@@ -276,6 +286,25 @@ async function main() {
     await prisma.order.create({ data: { orderNo: `ORD-DU-${ord8}`, type: 'print', printTaskId: dPay.unpaid, endUserId: userD, amountCents: 100, billablePages: 1, billingPageSource: 'pdf_lightweight_scan', payStatus: 'unpaid', paymentSource: null, taskStatus: 'pending', pickupCode: `UNPD${ord8}`, discountCents: 0, refundedAmountCents: 0 } })
     await prisma.order.create({ data: { orderNo: `ORD-DP-${ord8}`, type: 'print', printTaskId: dPay.paid, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'paid', paymentSource: 'offline', paidAt: at(41), taskStatus: 'pending', pickupCode: `PAID${ord8}`, discountCents: 50, refundedAmountCents: 0 } })
     await prisma.order.create({ data: { orderNo: `ORD-DR-${ord8}`, type: 'print', printTaskId: dPay.refunded, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'refunded', paymentSource: 'offline', paidAt: at(41), refundReason: '测试退款', refundedAt: at(42), taskStatus: 'pending', pickupCode: `RFND${ord8}`, discountCents: 0, refundedAmountCents: 200 } })
+    await prisma.order.create({
+      data: {
+        orderNo: `ORD-DX-${ord8}`,
+        type: 'print',
+        printTaskId: dPay.pendingRefund,
+        endUserId: userD,
+        amountCents: 180,
+        billablePages: 2,
+        billingPageSource: 'pdf_lightweight_scan',
+        payStatus: 'paid',
+        paymentSource: 'offline',
+        paidAt: at(41),
+        refundReason: PAID_UNFULFILLED_PENDING_REFUND_REASON,
+        taskStatus: 'abandoned',
+        pickupCode: `PEND${ord8}`,
+        discountCents: 0,
+        refundedAmountCents: 0,
+      },
+    })
     // dPay.noorder 无 Order
 
     const listD = (await orders.list(userD, defaultPage)).items
@@ -284,17 +313,21 @@ async function main() {
     const pItem = findD(dPay.paid)
     const rItem = findD(dPay.refunded)
     const nItem = findD(dPay.noorder)
+    const xItem = findD(dPay.pendingRefund)
 
-    const okUnpaid = !!uItem && uItem.amountCents === 100 && uItem.payStatus === 'unpaid' && uItem.paymentSource === null && uItem.billablePages === 1 && uItem.billingPageSource === 'pdf_lightweight_scan' && uItem.pickupCode === null && uItem.discountCents === 0 && uItem.refundedAmountCents === 0
-    const okPaid = !!pItem && pItem.payStatus === 'paid' && pItem.paymentSource === 'offline' && pItem.amountCents === 200 && typeof pItem.pickupCode === 'string' && (pItem.pickupCode ?? '').length > 0 && pItem.discountCents === 50 && pItem.refundedAmountCents === 0
-    const okRefunded = !!rItem && rItem.payStatus === 'refunded' && rItem.pickupCode === null && rItem.refundedAmountCents === 200 && rItem.discountCents === 0
-    const okNoOrder = !!nItem && nItem.amountCents === null && nItem.payStatus === null && nItem.paymentSource === null && nItem.billablePages === null && nItem.billingPageSource === null && nItem.pickupCode === null && nItem.discountCents === null && nItem.refundedAmountCents === null
+    const okUnpaid = !!uItem && uItem.amountCents === 100 && uItem.payStatus === 'unpaid' && uItem.paymentSource === null && uItem.billablePages === 1 && uItem.billingPageSource === 'pdf_lightweight_scan' && uItem.pickupCode === null && uItem.discountCents === 0 && uItem.refundedAmountCents === 0 && uItem.refundRequired === false
+    const okPaid = !!pItem && pItem.payStatus === 'paid' && pItem.paymentSource === 'offline' && pItem.amountCents === 200 && typeof pItem.pickupCode === 'string' && (pItem.pickupCode ?? '').length > 0 && pItem.discountCents === 50 && pItem.refundedAmountCents === 0 && pItem.refundRequired === false
+    const okRefunded = !!rItem && rItem.payStatus === 'refunded' && rItem.pickupCode === null && rItem.refundedAmountCents === 200 && rItem.discountCents === 0 && rItem.refundRequired === false
+    const okNoOrder = !!nItem && nItem.amountCents === null && nItem.payStatus === null && nItem.paymentSource === null && nItem.billablePages === null && nItem.billingPageSource === null && nItem.pickupCode === null && nItem.discountCents === null && nItem.refundedAmountCents === null && nItem.refundRequired === null
+    const okPendingRefund = !!xItem && xItem.payStatus === 'paid' && xItem.refundRequired === true && xItem.refundedAmountCents === 0
     const noLiveGateway = listD.every((x) => x.paymentSource !== 'wechat' && x.paymentSource !== 'alipay')
+    const noInternalReason = listD.every((x) => !Object.prototype.hasOwnProperty.call(x, 'refundReason'))
+      && !JSON.stringify(listD).includes(PAID_UNFULFILLED_PENDING_REFUND_REASON)
 
-    if (okUnpaid && okPaid && okRefunded && okNoOrder && noLiveGateway) {
-      pass('7. 支付字段真实化：有 Order 返回诚实字段（含 discountCents/refundedAmountCents）；无 Order 全 null；unpaid/refunded 隐藏 pickupCode、paid 可见；无微信/支付宝来源')
+    if (okUnpaid && okPaid && okRefunded && okNoOrder && okPendingRefund && noLiveGateway && noInternalReason) {
+      pass('7. 支付字段真实化：有 Order 返回诚实字段（含 discountCents/refundedAmountCents/refundRequired）；无 Order 全 null；unpaid/refunded 隐藏 pickupCode、paid 可见；待退款信号派生且不回传内部原因码；无微信/支付宝来源')
     } else {
-      fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} noLiveGateway=${noLiveGateway}`)
+      fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} pendingRefund=${JSON.stringify(xItem)} noLiveGateway=${noLiveGateway} noInternalReason=${noInternalReason}`)
     }
 
     // ── 8. /me/pending-tasks：本人 active 任务 + 支付/打印恢复语义 ──

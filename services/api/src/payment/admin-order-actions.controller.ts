@@ -59,7 +59,8 @@ export class AdminOrderActionsController {
     }
   }
 
-  // C5-4：Admin 退款走 canonical RefundService（Refund 账本 + sandbox provider 退款 + 幂等 + 审计）。
+  // C5-4 / API-20：Admin 退款走 canonical RefundService（Refund 账本 + 渠道三分法 + 幂等 refundNo + 审计）。
+  // 已付款未出纸的待退款信号单也走本端点，不另造退款；只有管理员点「发起退款」才会打到这里。
   // refundNo 缺省按订单派生（一单一退幂等）；仅 admin auth/role 放行，绝不新增匿名/会员自助退款入口。
   @Post('admin/orders/:id/refund')
   async refund(

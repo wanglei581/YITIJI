@@ -22,12 +22,13 @@ export const PAYMENT_SOURCE_LABEL: Partial<Record<NonNullable<MemberPrintOrderIt
   manual_confirmed: '人工确认',
 }
 
-/** 支付状态 → 文案与徽章样式（token 类，禁用默认灰蓝色阶；P0b 只显式处理这四态）。 */
+/** 支付状态 → 文案与徽章样式（token 类，禁用默认灰蓝色阶；未列出的态走 FALLBACK）。 */
 export const PAY_STATUS_META: Partial<
   Record<NonNullable<MemberPrintOrderItem['payStatus']>, { label: string; cls: string }>
 > = {
   unpaid: { label: '待现场确认', cls: 'bg-warning-bg text-warning-fg' },
   paid: { label: '已支付', cls: 'bg-success-bg text-success-fg' },
+  refunding: { label: '退款中', cls: 'bg-warning-bg text-warning-fg' },
   refunded: { label: '已退款', cls: 'bg-neutral-100 text-neutral-500' },
   failed: { label: '支付异常', cls: 'bg-error-bg text-error-fg' },
 }
@@ -123,3 +124,21 @@ export function recordedAmountDisplay(amountCents: number | null | undefined): s
 /** 实付无独立真源字段，禁止用应付减优惠推算。 */
 export const NET_PAID_UNRECORDED = '未记录'
 export const NET_PAID_UNRECORDED_HINT = '无独立字段，不按应付减优惠推算'
+
+/** API-20：已付款未出纸的待退款展示。到账时间不以天数承诺，渠道不在我们控制范围内。 */
+export const PENDING_REFUND_LABEL = '待退款'
+export const PENDING_REFUND_EXPLANATION =
+  '本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'
+
+/** 列表/详单支付状态：待退款信号优先于「已支付」，金额仍只格式化服务端字段。 */
+export function memberPayStatusLabel(
+  item: Pick<MemberPrintOrderItem, 'payStatus' | 'refundRequired'>,
+): { label: string; cls: string } {
+  if (item.refundRequired === true) {
+    return { label: PENDING_REFUND_LABEL, cls: 'bg-warning-bg text-warning-fg' }
+  }
+  if (item.payStatus == null) {
+    return { label: '暂无支付信息', cls: 'bg-neutral-100 text-neutral-500' }
+  }
+  return payStatusMeta(item.payStatus)
+}

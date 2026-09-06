@@ -67,4 +67,10 @@ export interface MemberPrintOrderItem {
   refundedAmountCents?: number | null
   /** 券/权益核销抵扣额（分）；无抵扣为 0，无 Order 为 null。券=平台 credit，非资金。 */
   discountCents?: number | null
+  /**
+   * 已付款未出纸的待退款信号（API-20）。服务端由 `Order.refundReason` 派生，不新建列。
+   * true = 本单已确认未出纸、退款由工作人员处理；false = 有 Order 但无该信号；无 Order 为 null。
+   * 前端不得把内部原因码展示给顾客，也不得据此自行计算金额。
+   */
+  refundRequired?: boolean | null
 }

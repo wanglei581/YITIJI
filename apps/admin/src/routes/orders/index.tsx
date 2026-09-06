@@ -264,7 +264,11 @@ export default function OrdersPage() {
     setRefundSubmitting(true)
     setRefundError(null)
     try {
-      await adminOrdersReadonlyService.refundOrder(detail.id, refundReason.trim())
+      const result = await adminOrdersReadonlyService.refundOrder(detail.id, refundReason.trim())
+      if (result.refund.status === 'failed') {
+        setRefundError('渠道退款失败，订单未改状态，请稍后重试')
+        return
+      }
       setRefundOpen(false)
       setRefundReason('')
       void refresh()
@@ -809,15 +813,23 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {/* Gate 0.3B 售后退款入口：资格由服务端只读派生，执行仍复用 canonical RefundService。 */}
+            {/*
+              Gate 0.3B / API-20 售后退款入口：资格由服务端只读派生，执行仍复用
+              canonical RefundService（POST /admin/orders/:id/refund）。
+              待退款信号单走同一入口，文案改成「发起退款」并二次确认；不点确认不会发。
+            */}
             {detail.refundEligible && (
               <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
                 {!refundOpen ? (
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[13px] font-bold text-neutral-800">发起全额退款</p>
+                      <p className="text-[13px] font-bold text-neutral-800">
+                        {detail.refundRequired ? '发起退款' : '发起全额退款'}
+                      </p>
                       <p className="mt-0.5 text-xs text-neutral-500">
-                        退款 {amountText(detail.amountCents, detail.currency)}，操作不可撤销，仅 admin 可执行
+                        {detail.refundRequired
+                          ? '已付款未出纸。系统不会自动出款；只有管理员点确认后才会向支付渠道发起。金额以本页服务端金额为准。'
+                          : `退款 ${amountText(detail.amountCents, detail.currency)}，操作不可撤销，仅 admin 可执行`}
                       </p>
                     </div>
                     <button
@@ -825,12 +837,16 @@ export default function OrdersPage() {
                       onClick={() => { setRefundOpen(true); setRefundError(null) }}
                       className="ml-4 inline-flex h-9 shrink-0 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90"
                     >
-                      退款
+                      {detail.refundRequired ? '发起退款' : '退款'}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    <p className="text-[13px] font-bold text-neutral-800">确认全额退款</p>
+                    <p className="text-[13px] font-bold text-neutral-800">
+                      {detail.refundRequired
+                        ? '确认向支付渠道发起退款？这是对外资金动作，点确认后才会出款。'
+                        : '确认全额退款'}
+                    </p>
                     <textarea
                       value={refundReason}
                       onChange={(e) => setRefundReason(e.target.value)}
@@ -849,7 +865,9 @@ export default function OrdersPage() {
                         onClick={() => void handleRefund()}
                         className="inline-flex h-9 items-center rounded-[9px] bg-error px-4 text-[13px] font-bold text-white transition-colors hover:bg-error/90 disabled:opacity-40"
                       >
-                        {refundSubmitting ? '处理中…' : '确认退款'}
+                        {refundSubmitting
+                          ? '处理中…'
+                          : detail.refundRequired ? '确认发起退款' : '确认退款'}
                       </button>
                       <button
                         type="button"

@@ -159,6 +159,7 @@ if (!page.includes('print_duplex_surcharge') && !page.includes('双面附加')) 
   pass('订单页不把双面渲染成计价项')
 } else {
   fail('订单页不得出现 print_duplex_surcharge / 双面附加')
+}
 
 // API-20：已付款未出纸的待退款信号必须在管理端可见、可筛，且不得宣称自动出款。
 if (
@@ -174,6 +175,21 @@ if (
 } else {
   fail('API-20 admin visibility for paid-not-printed pending refund is incomplete')
 }
+
+// API-20 人工发起退款：待退款信号单必须二次确认后才走 canonical refundOrder。
+if (
+  page.includes('发起退款') &&
+  page.includes('确认发起退款') &&
+  page.includes('点确认后才会出款') &&
+  page.includes('金额以本页服务端金额为准') &&
+  page.includes('adminOrdersReadonlyService.refundOrder') &&
+  page.includes("onClick={() => void handleRefund()}") &&
+  !/useEffect\s*\([\s\S]{0,1200}(?:handleRefund|refundOrder)/.test(page) &&
+  (page.match(/adminOrdersReadonlyService\.refundOrder\(/g) || []).length === 1
+) {
+  pass('pending-refund orders expose 发起退款 with click-only RefundService entry')
+} else {
+  fail('API-20 admin manual refund button/confirm/no-auto-trigger contract is incomplete')
 }
 
 console.log('\nALL PASS')

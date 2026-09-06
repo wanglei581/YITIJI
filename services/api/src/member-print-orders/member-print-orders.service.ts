@@ -7,6 +7,7 @@ import type {
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import { pickupCodeVisibleFor } from '../payment/order-status.service'
+import { isPaidUnfulfilledRefundRequired } from '../payment/pending-refund-signal'
 import type { OrderPayStatus, PaymentSource, PrintPriceLine } from '../payment/payment.types'
 import { createPaymentSessionToken } from '../payment/payment-session-token'
 import type { BillingPageSource } from '../print-jobs/print-page-count.types'
@@ -143,6 +144,8 @@ export class MemberPrintOrdersService {
             // C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）。
             refundedAmountCents: true,
             discountCents: true,
+            // API-20：只用来派生 refundRequired，不回传内部原因码。
+            refundReason: true,
           },
         },
       },
@@ -177,6 +180,12 @@ export class MemberPrintOrdersService {
         // C5-4 只读：已退金额 / 券抵扣额（历史无 Order 为 null）。券=平台 credit 非资金。
         refundedAmountCents: order ? order.refundedAmountCents : null,
         discountCents: order ? order.discountCents : null,
+        refundRequired: order
+          ? isPaidUnfulfilledRefundRequired({
+              payStatus: order.payStatus,
+              refundReason: order.refundReason,
+            })
+          : null,
       }
     })
   }
