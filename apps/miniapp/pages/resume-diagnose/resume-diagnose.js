@@ -19,6 +19,7 @@ Page({
     // 本机是否存有上一次解析任务,用于 empty 态给一个真实可用的入口
     hasSavedTask: false,
     savedFileName: '',
+    sourceFileId: '',
   },
 
   onLoad(options) {
@@ -30,7 +31,11 @@ Page({
     const taskId = options.taskId || ''
 
     if (taskId) {
-      this.setData({ taskId })
+      this.setData({
+        taskId,
+        savedFileName: saved.taskId === taskId ? (saved.fileName || '') : '',
+        sourceFileId: saved.taskId === taskId ? (saved.fileId || '') : '',
+      })
       this._load(taskId, 0)
       return
     }
@@ -60,6 +65,7 @@ Page({
           this.setData({
             status: 'failed',
             failMsg: (res && res.failReason) || 'AI 未能完成本次诊断',
+            sourceFileId: (res && res.fileId) || this.data.sourceFileId,
           })
           return
         }
@@ -74,7 +80,7 @@ Page({
             })
             return
           }
-          this.setData({ status: 'done', report })
+          this.setData({ status: 'done', report, sourceFileId: report.fileId || this.data.sourceFileId })
           return
         }
 
@@ -111,7 +117,13 @@ Page({
   viewSaved() {
     const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
     if (!saved.taskId) return
-    this.setData({ status: 'loading', taskId: saved.taskId, failMsg: '' })
+    this.setData({
+      status: 'loading',
+      taskId: saved.taskId,
+      failMsg: '',
+      savedFileName: saved.fileName || '',
+      sourceFileId: saved.fileId || '',
+    })
     this._stopped = false
     this._load(saved.taskId, 0)
   },
@@ -130,6 +142,21 @@ Page({
     this._load(this.data.taskId, 0)
   },
 
+  retryDiagnosis() {
+    if (!this.data.sourceFileId) {
+      this.toUpload()
+      return
+    }
+    const extension = (this.data.savedFileName.split('.').pop() || 'pdf').toLowerCase()
+    const query = [
+      `fileId=${encodeURIComponent(this.data.sourceFileId)}`,
+      `fileName=${encodeURIComponent(this.data.savedFileName || '简历原件.pdf')}`,
+      `fileFormat=${encodeURIComponent(extension)}`,
+      'source=upload',
+    ].join('&')
+    wx.redirectTo({ url: `/pages/resume-parse/resume-parse?${query}` })
+  },
+
   /** 展开某条建议/风险的完整内容(长文本在列表里会被截断) */
   tapText(e) {
     const { text, title } = e.currentTarget.dataset
@@ -146,4 +173,18 @@ Page({
     // 优化端点由用户点击后触发真实模型调用，taskId 用于归属校验和结果持久化。
     wx.navigateTo({ url: `/pages/resume-optimize/resume-optimize?taskId=${this.data.taskId}` })
   },
+
+  printOriginal() {
+    const fileId = this.data.sourceFileId
+    if (!fileId) {
+      wx.showModal({ title: '原件暂不可打印', content: '本次记录没有可用的原件文件，请重新上传后再打印。', showCancel: false })
+      return
+    }
+    wx.navigateTo({
+      url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(fileId)}&name=${encodeURIComponent(this.data.savedFileName || '简历原件')}`,
+    })
+  },
+
+  goPrint() { wx.navigateTo({ url: '/pages/print/print' }) },
+  viewJobs() { wx.switchTab({ url: '/pages/jobs/jobs' }) },
 })

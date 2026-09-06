@@ -63,7 +63,7 @@
 
     <view wx:if="{{phase === 'parsing'}}" class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <view>AI 解析通常需要 20–40 秒,期间请勿退出。解析结果仅供参考,不代表用人单位意见。</view>
+      <view>本次解析会同时生成诊断，不会再单独重复解析。没有指定方向时按通用方向诊断；结果仅供参考，不代表用人单位意见。</view>
     </view>
     <view wx:if="{{phase === 'failed'}}" class="notice warn">
       <text class="ficon i-info n-ic"></text>

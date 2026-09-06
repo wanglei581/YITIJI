@@ -366,6 +366,12 @@ const meWxml = read('pages/me/me.wxml')
 const settingsWxml = read('pages/settings/settings.wxml')
 const settingsJs = read('pages/settings/settings.js')
 const documentsJs = read('pages/documents/documents.js')
+const resumeDiagnoseWxml = read('pages/resume-diagnose/resume-diagnose.wxml')
+const resumeDiagnoseJs = read('pages/resume-diagnose/resume-diagnose.js')
+const resumeOptimizeWxml = read('pages/resume-optimize/resume-optimize.wxml')
+const resumeOptimizeJs = read('pages/resume-optimize/resume-optimize.js')
+const resumeParseJs = read('pages/resume-parse/resume-parse.js')
+const resumesJs = read('pages/resumes/resumes.js')
 const loginPageOk = PAGE_PATHS.includes('pages/launch/launch') &&
   PAGE_PATHS.includes('pages/legal/legal') &&
   PAGE_PATHS.includes('pages/privacy/privacy')
@@ -478,6 +484,47 @@ for (const f of textFiles) {
 }
 if (honestyHits.length) bad('无伪造个人数据或商业能力', honestyHits.join(','))
 else ok('无伪造个人数据或商业能力')
+
+if (
+  resumeDiagnoseWxml.includes('report.issues') &&
+  resumeDiagnoseWxml.includes('report.contentBlocks') &&
+  resumeDiagnoseWxml.includes('这不是录取分') &&
+  resumeDiagnoseWxml.includes('report.truncatedInput') &&
+  resumeDiagnoseWxml.includes('打印原件') &&
+  resumeDiagnoseJs.includes('viewJobs()')
+) ok('简历诊断页展示问题证据、内容块、截断提示与非 AI 失败出口')
+else bad('简历诊断结果层', '必须引用 issues/contentBlocks，说明非录取分，展示截断提示，并保留打印原件/去打印/查看岗位出口')
+
+if (
+  resumeParseJs.includes('selectedDimensions') &&
+  resumeParseJs.includes('targetContext') &&
+  resumeParseJs.includes("{ skipped: true }") &&
+  resumeParseJs.includes('api.parseResume(payload)')
+) ok('简历解析透传诊断维度与目标方向，并允许通用诊断')
+else bad('简历解析方向透传', '必须从 URL 读取 selectedDimensions/targetContext 并传给 parseResume，未指定时显式 skipped')
+
+if (
+  resumeOptimizeJs.includes('api.exportGeneratedResume') &&
+  resumeOptimizeJs.includes('wx.openDocument') &&
+  resumeOptimizeJs.includes('printFileUrl') &&
+  resumeOptimizeJs.includes("key: 'pdf'") &&
+  resumeOptimizeJs.includes("key: 'docx'") &&
+  resumeOptimizeJs.includes("key: 'txt'") &&
+  resumeOptimizeJs.includes("key: 'md'") &&
+  resumeOptimizeWxml.includes('exportResult.pageLabel') &&
+  resumeOptimizeWxml.includes('exportResult.sizeLabel') &&
+  resumeOptimizeWxml.includes('exportResult.expiresLabel') &&
+  resumeOptimizeWxml.includes('aria-disabled') &&
+  resumeOptimizeWxml.includes('exportDisabledReason') &&
+  resumeOptimizeJs.includes('服务端没有返回结构化优化稿')
+) ok('简历优化页接真实四格式导出、PDF 打开、打印副本与文件元数据')
+else bad('简历优化导出结果层', '必须接 exportGeneratedResume，打开真实 PDF，展示四格式/页数/大小/有效期，并在不可导出时 aria-disabled')
+
+if (!/format\s*:\s*['"]PDF['"]/.test(resumesJs) && resumesJs.includes('仅记录，未导出文件')) {
+  ok('我的简历不再把 AI 记录硬编码成 PDF 文件')
+} else {
+  bad('我的简历文件真实性', '禁止 format: PDF 硬编码；没有真实 MIME 时必须写「仅记录，未导出文件」')
+}
 
 const pickupWxml = read('pages/print-pickup/print-pickup.wxml')
 const pickupJs = read('pages/print-pickup/print-pickup.js')
@@ -699,20 +746,28 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
   }
 }
 
-// presetFileUrl 旁路：招聘会活动资料 / 参会企业资料是共享派生文件(endUserId 为 null)，
-// 会员拿 fileId 去 preview-url 必吃 403，只能透传服务端已下发的 printFileUrl。
+// presetFileUrl 旁路：共享派生文件(endUserId 为 null)拿 fileId 去 preview-url 必吃 403；
+// 简历非 PDF 导出则需要把服务端同步生成的同内容 PDF 副本交给打印链路。
 // 这条旁路把「本人」的证明点从 preview-url 的归属校验挪到了上游端点自己的资格校验 +
-// HMAC 签名上，所以必须钉死两件事：URL 只能来自服务端响应，且只有这两页可以用。
+// HMAC 签名上，所以必须钉死两件事：URL 只能来自服务端响应，且只有明确审计过的页面可以用。
 {
-  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail']
+  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail', 'resume-optimize']
   const offenders = []
   for (const full of physicalPageDirs) {
     const dir = full.replace(/^pages\//, '')   // physicalPageDirs 已带 pages/ 前缀
     const js = read(`${full}/${dir}.js`)
     if (!js.includes('printFileUrl=')) continue
     if (!PRESET_ALLOWED.includes(dir)) { offenders.push(`${dir}：不在旁路白名单内`); continue }
-    // 必须是从服务端响应里取的，不许自己拼
-    if (!/res\s*&&\s*res\.printFileUrl/.test(js)) offenders.push(`${dir}：printFileUrl 不是取自服务端响应`)
+    // 必须是从服务端响应里取的，不许自己拼。resume-optimize 还必须来自
+    // exportGeneratedResume 响应，并解析出签名 URL 自带的 PDF fileId。
+    if (!/res\s*&&\s*res\.printFileUrl|res\.printFileUrl/.test(js)) {
+      offenders.push(`${dir}：printFileUrl 不是取自服务端响应`)
+    }
+    if (dir === 'resume-optimize' && (
+      !js.includes('api.exportGeneratedResume') ||
+      !js.includes('fileIdFromPrintUrl(res.printFileUrl)') ||
+      !js.includes('fileUrls.absoluteUrl(res.printFileUrl)')
+    )) offenders.push(`${dir}：未锁定为导出响应里的同内容 PDF 副本`)
   }
   if (offenders.length === 0) ok('打印 printFileUrl 旁路仅限共享派生文件且只取自服务端响应')
   else bad('打印 printFileUrl 旁路受控', offenders.join('；'))

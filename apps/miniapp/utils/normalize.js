@@ -415,6 +415,53 @@ function policyDetail(raw) {
 /** 维度得分条的配色:按维度顺序轮转,只是视觉区分,不表达"严重程度"。 */
 const DIM_TONES = ['teal', 'wheat', 'clay', 'plum', 'slate', 'teal'];
 
+const DIMENSION_COPY = {
+  basic: {
+    strong: '联系方式与基本信息较完整，仍请逐项核对。',
+    medium: '基本信息能看懂，但还有关键项需要补齐。',
+    weak: '基本信息缺口较明显，先补齐联系方式与必要字段。',
+  },
+  objective: {
+    strong: '求职方向表达较清楚，继续保持岗位称谓一致。',
+    medium: '求职方向大致可见，建议再写得具体一些。',
+    weak: '求职方向不够明确，先写清目标岗位与方向。',
+  },
+  experience: {
+    strong: '经历脉络较清楚，重点核对事实与时间。',
+    medium: '经历能读懂，但职责与结果的关系还可更清楚。',
+    weak: '经历表达较散，先按动作、过程、结果重新组织。',
+  },
+  quantification: {
+    strong: '成果证据相对充分，数字仍需本人确认。',
+    medium: '已有部分成果信息，可补充真实可核对的结果。',
+    weak: '成果证据不足，优先补充本人确认过的数字或事实。',
+  },
+  keyword: {
+    strong: '岗位相关表达覆盖较好，仍需按目标方向核对。',
+    medium: '已有部分岗位表达，可补充真实技能与工具名称。',
+    weak: '岗位关键词较少，先补充本人真实具备的技能与工具。',
+  },
+  readability: {
+    strong: '结构与阅读顺序较清楚，导出前仍需预览核对。',
+    medium: '整体可读，但层级、长度或顺序还可收紧。',
+    weak: '阅读负担较重，先精简长段并统一层级。',
+  },
+};
+
+function scoreTier(score, maxScore) {
+  const ratio = maxScore > 0 ? score / maxScore : 0;
+  if (ratio >= 0.8) return 'strong';
+  if (ratio >= 0.5) return 'medium';
+  return 'weak';
+}
+
+function issueSeverity(score, maxScore) {
+  const tier = scoreTier(score, maxScore);
+  if (tier === 'strong') return { key: 'low', label: '严重度 低' };
+  if (tier === 'medium') return { key: 'mid', label: '严重度 中' };
+  return { key: 'high', label: '严重度 高' };
+}
+
 /**
  * 归一化后端 ParseResumeOutput。
  *
@@ -442,15 +489,65 @@ function resumeReport(raw) {
     const maxScore = Number(s.maxScore) || 0;
     sum += score;
     max += maxScore;
+    const key = s.key || `dim${i}`;
+    const tier = scoreTier(score, maxScore);
     return {
-      key: s.key || `dim${i}`,
+      key,
       label: s.label || s.key || `维度 ${i + 1}`,
       score,
       maxScore,
       // 条形宽度百分比;满分为 0 时不画条,避免除零得出 Infinity
       pct: maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
       tone: DIM_TONES[i % DIM_TONES.length],
+      tier,
+      insight: (DIMENSION_COPY[key] && DIMENSION_COPY[key][tier]) ||
+        (tier === 'strong' ? '这一项相对完整，仍请核对原文。' :
+          tier === 'medium' ? '这一项基本可读，但还有明确改进空间。' : '这一项缺口较明显，建议优先处理。'),
     };
+  });
+
+  const sectionByKey = {};
+  sections.forEach((section) => { sectionByKey[section.key] = section; });
+
+  const contentBlocks = objList(r.contentBlocks).map((block, i) => ({
+    key: block.key || `block${i}`,
+    label: block.label || `内容块 ${i + 1}`,
+    lines: strList(block.lines),
+  })).filter((block) => block.lines.length > 0);
+
+  const issues = objList(r.issues).map((issue, i) => {
+    const dim = issue.dim || '';
+    const section = sectionByKey[dim] || null;
+    const severity = issueSeverity(section ? section.score : 0, section ? section.maxScore : 0);
+    const evidence = objList(issue.evidence).map((item) => ({
+      blockKey: item.blockKey || '',
+      lineIndex: Number.isInteger(item.lineIndex) ? item.lineIndex : -1,
+      quote: typeof item.quote === 'string' ? item.quote.trim() : '',
+    })).filter((item) => item.quote);
+    return {
+      id: issue.id || `I${i + 1}`,
+      dim,
+      dimLabel: section ? section.label : dim || '未标明维度',
+      title: issue.title || `问题 ${i + 1}`,
+      evidence,
+      impact: issue.impact || '',
+      fixIt: issue.fixIt || '',
+      severityKey: severity.key,
+      severityLabel: severity.label,
+    };
+  }).filter((issue) => issue.evidence.length > 0);
+
+  const priorities = objList(r.priorities).map((item) => ({
+    focus: item.focus || '',
+    reason: item.reason || '',
+  })).filter((item) => item.focus || item.reason);
+  const firstFixes = [];
+  priorities.forEach((item) => {
+    if (firstFixes.length < 3 && item.focus) firstFixes.push(item);
+  });
+  issues.forEach((item) => {
+    if (firstFixes.length >= 3 || firstFixes.some((entry) => entry.focus === item.title)) return;
+    firstFixes.push({ focus: item.title, reason: item.fixIt || item.impact });
   });
 
   const notice = raw.extractionNotice || null;
@@ -475,15 +572,22 @@ function resumeReport(raw) {
     failReason: raw.failReason || '',
 
     hasReport: sections.length > 0,
+    hasEvidence: issues.length > 0,
+    showScore: sections.length > 0 && issues.length > 0,
     sections,
     scoreSum: sum,
     scoreMax: max,
     // 折算到百分制;口径由页面文案说明,不伪装成后端下发的"综合评分"
     scorePct: max > 0 ? Math.round((sum / max) * 100) : null,
 
-    priorities: Array.isArray(r.priorities) ? r.priorities : [],
+    priorities,
+    firstFixes,
     riskNotes: Array.isArray(r.riskNotes) ? r.riskNotes : [],
     suggestions: Array.isArray(r.suggestions) ? r.suggestions : [],
+    contentBlocks,
+    issues,
+    truncatedInput: r.truncatedInput === true,
+    targetContext: raw.targetContext && typeof raw.targetContext === 'object' ? raw.targetContext : null,
 
     // OCR / 文本抽取质量提示:低置信度时页面必须提醒人工复核
     noticeSource: notice ? notice.textSource || '' : '',
@@ -568,7 +672,8 @@ function resumeOptimize(raw) {
     isMockProvider: raw.providerName === 'mock',
     modules,
     hasModules: modules.length > 0,
-    // 优化版简历结构较深,页面当前只做"是否可导出"的判断,不逐字段渲染
+    optimizedResume: raw.optimizedResume && typeof raw.optimizedResume === 'object'
+      ? raw.optimizedResume : null,
     hasOptimizedResume: !!(raw.optimizedResume && typeof raw.optimizedResume === 'object'),
   };
 }

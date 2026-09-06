@@ -26,7 +26,8 @@ function relDate(iso) {
 /**
  * 将后端 MemberResumeItem 映射到 WXML 所需字段。
  * 后端字段: { id, taskId, kind, status, provider, optimized, createdAt, updatedAt, expiresAt }
- * WXML 期待: { id, name, format, updated, isDefault, score, tag, tagTone }
+ * 当前列表端点只返回 AI 记录元数据，不返回关联文件或 MIME。
+ * 若未来 additive 返回 mimeType 才显示真实格式；没有就明确写成记录，不能默认 PDF。
  */
 function mapResume(item, index) {
   const name = item.kind === 'generate' ? 'AI 生成简历' : '上传简历'
@@ -42,7 +43,10 @@ function mapResume(item, index) {
     id: item.id,
     taskId: item.taskId,
     name,
-    format: 'PDF',
+    mimeType: typeof item.mimeType === 'string' ? item.mimeType : '',
+    fileLabel: typeof item.mimeType === 'string' && item.mimeType
+      ? item.mimeType
+      : '仅记录，未导出文件',
     updated: relDate(item.updatedAt || item.createdAt),
     isDefault: index === 0,
     score: 0, // 列表端点不含诊断分，详情页展示
