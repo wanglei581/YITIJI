@@ -82,6 +82,9 @@ const allowedKeys = new Set([
   'pickupCode',
   'refundedAmountCents',
   'discountCents',
+  // API-20（2026-09-06）：已付款未出纸的待退款信号。服务端由 Order.refundReason 派生成
+  // 布尔，不回传内部原因码；本白名单登记的是这个派生字段，不是原因码。
+  'refundRequired',
 ])
 const allowedStatuses = new Set(['pending', 'claimed', 'printing', 'completed', 'failed', 'cancelled'])
 const allowedPayStatuses = new Set(['unpaid', 'paid', 'refunded', 'failed', 'paying', 'closed', null])
