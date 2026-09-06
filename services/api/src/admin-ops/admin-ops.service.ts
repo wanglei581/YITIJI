@@ -6,7 +6,7 @@ import {
   type AlertHandlingState,
   type AlertListView,
 } from './derived-alert-identity'
-import { collectDerivedAlerts } from './derived-alerts'
+import { collectDerivedAlerts, type DerivedAlertCollection } from './derived-alerts'
 
 // ============================================================
 // AdminOpsService — 阶段1E:Admin 运营视图(打印任务流水 + 派生告警)
@@ -59,6 +59,19 @@ export interface AdminAlertsResult {
   derivedAt: string
   /** 当前仍在发生的告警总数(精确计数,不受列表上限影响)。 */
   firingCount: number
+  /** 当前仍在发生的精确总数，包含所有派生告警。 */
+  total: number
+  /**
+   * 当前 view 下的精确条数；派生层上限（PRINT_FAILED_LIST_CAP）被触及时无法精确得知，返回 null，
+   * 界面此时只能说「至少 N 条」。total 与 view 无关，永远是全部在发告警数。
+   */
+  viewTotal: number | null
+  /**
+   * 本次 data 少于「当前 view 实际应有的条数」时为 true：要么派生层上限截掉了未知处置态的告警，
+   * 要么 limit 截掉了本 view 的尾部。不能拿全 view 的 total 去比本 view 的 data（那会在 open 视图下
+   * 只要存在已确认告警就误报截断）。
+   */
+  truncated: boolean
   /** 本次实际派生出的条数;小于 firingCount 即说明被截断。 */
   listedCount: number
   /**
@@ -74,6 +87,8 @@ export interface AdminAlertsResult {
 
 /** SQLite 的绑定变量上限保守取值;subjectKey in (...) 按此分批,避免长列表炸参数。 */
 const DISPOSITION_LOOKUP_CHUNK = 300
+export const DEFAULT_ALERT_LIST_LIMIT = 50
+export const MAX_ALERT_LIST_LIMIT = 200
 
 type ParsedParams = {
   fileName: string | null
@@ -181,9 +196,20 @@ export class AdminOpsService {
    *   任何一次真实恢复都会让下一轮故障拿到新 token,旧处置自然失效。
    *   也就是说恢复判定是从正面数据算出来的,不是从「没看见」推断出来的。
    */
-  async listDerivedAlerts(view: AlertListView = 'open'): Promise<AdminAlertsResult> {
+  async listDerivedAlerts(
+    view: AlertListView = 'open',
+    limit = DEFAULT_ALERT_LIST_LIMIT,
+  ): Promise<AdminAlertsResult> {
     const now = new Date()
-    const collected = await collectDerivedAlerts(this.prisma, now)
+    // count() 和明细派生放在同一 Prisma transaction，避免高频失败写入时 total
+    // 与列表来自两个不同快照。collectDerivedAlerts 内的派生 print_failed 也计入 total。
+    const transaction = (this.prisma as unknown as {
+      $transaction?: (operation: (tx: unknown) => Promise<DerivedAlertCollection>) => Promise<DerivedAlertCollection>
+    }).$transaction
+    const collected = transaction
+      ? await transaction.call(this.prisma, (tx: unknown) => collectDerivedAlerts(tx as PrismaService, now))
+      // 仅供无数据库 mock 的既有单元门禁；运行时 PrismaClient 一律走上面的快照事务。
+      : await collectDerivedAlerts(this.prisma, now)
     const derived = collected.alerts
 
     // 只按本次确实派生出来的 subjectKey 取处置行,读取范围随列表有界。
@@ -222,12 +248,19 @@ export class AdminOpsService {
       else suppressedCount += 1
     }
 
+    const visibleItems = items.filter((item) => matchesView(item.handlingState, view))
+    const data = visibleItems.slice(0, limit)
+    // 派生层上限截掉的告警处置态未知，无法归入任何 view：此时只能如实说「被截断」。
+    const cappedUpstream = collected.firingTotal > items.length
     return {
-      data: items.filter((item) => matchesView(item.handlingState, view)),
+      data,
       derivedAt: now.toISOString(),
       // 精确总数,不是「本次列出了几条」。截断时二者不等,由 truncation 如实说明。
       firingCount: collected.firingTotal,
-      listedCount: items.length,
+      total: collected.firingTotal,
+      viewTotal: cappedUpstream ? null : visibleItems.length,
+      truncated: cappedUpstream || visibleItems.length > data.length,
+      listedCount: data.length,
       truncation: collected.omitted > 0
         ? { type: 'print_failed' as const, omitted: collected.omitted, cap: collected.cap }
         : null,

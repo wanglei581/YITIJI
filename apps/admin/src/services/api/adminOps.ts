@@ -57,6 +57,10 @@ export interface AdminAlertsResult {
   derivedAt: string
   /** 当前仍在发生的告警总数(精确计数,不受列表上限影响)。 */
   firingCount: number
+  total: number
+  /** 当前 view 的精确条数；派生层上限被触及时为 null。 */
+  viewTotal: number | null
+  truncated: boolean
   /** 本次实际列出的条数;小于 firingCount 即说明被截断。 */
   listedCount: number
   /** 非 null 表示列表不是全部,界面必须如实提示(CLAUDE.md §9)。 */
@@ -81,7 +85,7 @@ export interface AlertDispositionResult {
 
 export interface AdminOpsServiceInterface {
   listPrintTasks(params: { status?: string; page: number; pageSize: number }): Promise<AdminPrintTaskPage>
-  listAlerts(view?: AlertListView): Promise<AdminAlertsResult>
+  listAlerts(view?: AlertListView, limit?: number): Promise<AdminAlertsResult>
   disposeAlert(input: {
     subjectKey: string
     episodeToken: string
@@ -149,7 +153,7 @@ const httpAdapter: AdminOpsServiceInterface = {
       page: String(page),
       pageSize: String(pageSize),
     }),
-  listAlerts: (view = 'open') => get<AdminAlertsResult>('/admin/alerts', { view }),
+  listAlerts: (view = 'open', limit = 50) => get<AdminAlertsResult>('/admin/alerts', { view, limit: String(limit) }),
   disposeAlert: (input) => postJson<AlertDispositionResult>('/admin/alerts/disposition', input),
 }
 
@@ -208,6 +212,9 @@ const mockAdapter: AdminOpsServiceInterface = {
       data,
       derivedAt: now(),
       firingCount: MOCK_ALERTS.length,
+      total: MOCK_ALERTS.length,
+      viewTotal: MOCK_ALERTS.length,
+      truncated: false,
       listedCount: MOCK_ALERTS.length,
       truncation: null,
       openCount: MOCK_ALERTS.filter((a) => a.handlingState === 'open').length,
