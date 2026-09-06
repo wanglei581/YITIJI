@@ -254,4 +254,21 @@ PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或�
 
 防复发两件已合入 main：#829（3b 按 `REQUIRED_PRODUCTION_GATES` 循环持久化 + PM2 重启前 export 全部闸门键 + `verify:deploy-gates-in-sync` 钉进 `REQUIRED_COMMANDS`，deterministic 16→17 + 授权门禁改按数组断言）。
 
+### 第二次发布 `7f826bcb9` 与第二档结果（2026-09-06 17:19–17:37，UTC+8）
+
+产品负责人采纳建议后执行：**不发 main 顶端**（含 #833 可信终端身份 fail-closed 闸门，需与一体机 MSI 同一提交，待 Windows 真机验证），只发到 `7f826bcb9`（含 #828 人工退款、#829 部署防复发、#830 小程序、#832 文档，无数据库迁移）。重跑被并发规则取消的 CI `34021273456` → deploy `34024303135` 全步骤成功——**这是 3b 新循环持久化逻辑的首次真实发布**。
+
+| 检查项 | 结果 |
+|---|---|
+| `DEPLOY_SOURCE.txt` | `origin/main@7f826bcb9`，`ci_run=34021273456`，17:37:04 |
+| health / ready（`--resolve zyidai.cn`） | 200 `ok/postgres`，`degraded:[]` / 200 |
+| pm2 | online，restarts 18→19（仅本次），`.env` 两闸门键仍为 2 |
+| 三前台 | dist 17:37:10 重写；`zyidai.cn`→`index-BFs79WmT.js`、`admin.zyidai.cn`→`index-DLwlvl1k.js` 均已更新，`partner.zyidai.cn` 无改动故 hash 不变（`C2zKlKOe`） |
+| 备份 | `pre-7f826bcb9…-20260906T093532Z.{dump,runtime}` |
+| 开关 | SSH 步骤 in_progress 后立即置 false |
+
+**第二档结果**：`pnpm store prune`（store `/root/.local/share/pnpm/store/v11`）前后均 2.7G，**没有可回收的无引用包**；磁盘 17G 已用 / 21G 可用。`/root/YITIJI` 按建议保留。第三档不动。
+
+**取证注意**：`gh run list --workflow=deploy.yml` 显示的 `headSha` 是 main 当时的 tip（workflow_run 事件特性），不是发布目标；本次列表显示 `891492396` 而实际目标是 `7f826bcb9`，以服务器 `ps` 里的 `TARGET_SHA=`、`/root/YITIJI` HEAD 或 `DEPLOY_SOURCE.txt` 为准。
+
 第二、三档与凭据文件仍未动。
