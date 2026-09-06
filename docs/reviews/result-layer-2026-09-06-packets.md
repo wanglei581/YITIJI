@@ -129,6 +129,9 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 - **禁改**：`apps/kiosk/src/pages/profile/**`（批次守卫）、`services/api/**`、`apps/miniapp/**`。
 - **验收**：单页验收六条（`docs/progress/next-tasks.md`「单页验收标准」）：1080×1920 截图与原型并排（`scripts/dev/shot-route.sh`）、每个 state 实测、`data-route` 目标可达、图谱门禁 + kiosk typecheck / lint、触控 ≥48px（用 `?capture=1` 夹具）、合规文案。`verify:kiosk-*` 中图谱列出的全部；`verify:compliance-copy`。
 
+- **执行记录（原写在 current-progress.md，为避免多会话顶部冲突改记于此）**：
+  > 2026-09-06 **包 E 一体机诊断报告页青序流光 22 页迁移（分支 `claude/rl-e-kiosk-report-qx`，本地候选，未 push、未部署）**。条目 P0-1（一体机）与 P0-5 诊断部分。`/resume/report` 退出旧 LightFlow 外壳，登记进 `QX_MIGRATED_ROUTES`，复用 `QxPageFrame` + `resume-report-qx.css`。原型 9 个 `?state=`（loading / report / report-empty / report-minimal / diagnose-failed / read-error / no-context / unavailable / illegal）均有真实对应：运行时由读取结果派生，`?capture=1` / `?debug=1` 才开放合成夹具。渲染 `issues`（维度 / 严重度机械分档 / 原文引用 / 影响 / 改法）、`contentBlocks` 七块、「先改这几处」、每维一句人话、「这不是录取分」、截断 / OCR 顶栏；`sections` 为空不出总分；刷新后 `GET /resume/records/:taskId` 回填 `targetContext`。打印 / 导出 / 二维码三键 `aria-disabled` + 常驻原因「报告导出端点上线后开放」（包 E2 接契约 1）。**未做**：导出端点接线、二维码倒计时、原件 `?src=` 预览层、雷达图、生产部署。**验证**：kiosk `tsc --noEmit` 0、eslint 0 error；`verify:resume-report-qx`（36 条变异各红后恢复绿）、`verify:resume-diagnosis-flow-ui`、`verify:fusion-w3`、`verify:lightflow-k2b-ai-resume`、`verify:ai-down-fallbacks`、`verify:kiosk-frontend-debt`、`verify:kiosk-visual-unity`、`verify:compliance-copy`、`verify:repository-integrity` 绿。1080×1920 Playwright 实拍 9 态，`data-state` 对齐、可点区 ≥48px；`scripts/dev/shot-route.sh` 本 worktree 不存在，改用 Playwright。
+
 ## 第二波（第一波合入后）
 
 | 包 | 执行方 | 条目 | 依赖 |
