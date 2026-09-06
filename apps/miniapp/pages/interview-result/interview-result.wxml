@@ -34,6 +34,20 @@
       </view>
 
       <!-- 能力维度点评 -->
+      <!-- A′ 出门前看一眼：三条通用句 + 指向下方针对本场生成的清单。不写「可打印」——
+           这三句不在报告 PDF 里；打印走底部既有「打印报告」，PDF 第十节已含行动清单。 -->
+      <view class="ri-section">
+        <view class="rs-title">出门前看一眼</view>
+        <view wx:for="{{goChecklist}}" wx:key="k" wx:for-item="g" class="rs-point">
+          <text class="rs-dot"></text>
+          <text class="rs-text"><text class="rs-k">{{g.k}}</text>{{g.t}}</text>
+        </view>
+        <view class="rs-point">
+          <text class="rs-dot"></text>
+          <text class="rs-text">下面的行动清单和高频问题，是针对你这场「{{position}}」练习生成的。</text>
+        </view>
+      </view>
+
       <view wx:for="{{sections}}" wx:key="key" class="ri-section">
         <view class="rs-title">{{item.title}}</view>
         <view

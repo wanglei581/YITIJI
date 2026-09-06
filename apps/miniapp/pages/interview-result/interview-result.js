@@ -17,6 +17,16 @@ const SECTION_TITLES = {
   risks:        '待提升点',
 }
 
+// 出门前看一眼：三条通用准备句，文案取自一体机 InterviewTipsPage（apps/kiosk/.../InterviewTipsPage.tsx）
+// 的「形象着装 / 面试材料 / 面试安排」。复制为常量而非 import：小程序零依赖、无构建，不能引 packages/shared。
+// 刻意不按公司性质个性化——面试会话没有公司、没有岗位 id（interview-entry 的 industry 硬编码「通用」），
+// 写「按你的公司…」就是伪造。到机码行等材料包，提醒等订阅消息，本卡片不承诺。
+const GO_CHECKLIST = [
+  { k: '着装', t: '根据公司性质选择合适着装（互联网偏休闲，金融 / 国企偏正装），保持整洁精神。' },
+  { k: '材料', t: '简历、作品集、证件、纸质材料按需备齐；简历可在一体机打印。' },
+  { k: '安排', t: '确认时间、地点、交通路线；线上面试提前测试设备与网络。' },
+]
+
 Page({
   data: {
     statusBarHeight:  20,
@@ -34,6 +44,7 @@ Page({
     predictedQuestions: [],
     starAdvice:       null,
     checklist:        [],
+    goChecklist:      GO_CHECKLIST,
     printing:         false,
   },
   onLoad(options) {
