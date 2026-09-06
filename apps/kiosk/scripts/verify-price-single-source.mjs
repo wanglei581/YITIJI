@@ -80,6 +80,16 @@ expectMatches(pricingService, /listActivePriceConfig\(\)/, 'PricingService.listA
 expectMatches(pricingService, /where:\s*\{\s*active:\s*true\s*\}/, '公开视图只读 active 价目')
 expectMatches(paymentController, /@Get\('print\/price-config'\)/, 'GET /print/price-config 路由存在')
 
+// ── 5. 双面不计价：界面不得把 duplex 标成金额项 ──
+const cashier = read(join(root, 'src/pages/print/PrintCashierPage.tsx'))
+const billing = read(join(repoRoot, 'apps/admin/src/routes/billing/index.tsx'))
+const paymentTypes = read(join(repoRoot, 'packages/shared/src/types/payment.ts'))
+expectAbsent(cashier, /print_duplex_surcharge/, '收银页无 print_duplex_surcharge 计价标签')
+expectAbsent(cashier, /双面附加/, '收银页无「双面附加」金额文案')
+expectAbsent(billing, /print_duplex_surcharge/, 'Admin 计费页无 print_duplex_surcharge 死标签')
+expectAbsent(billing, /双面附加/, 'Admin 计费页无「双面附加」文案')
+expectAbsent(paymentTypes, /print_duplex_surcharge/, 'shared PrintPriceLine 注释不再把 duplex 举例成价目键')
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 价格真相源单一化守卫未通过\n`)
   process.exit(1)

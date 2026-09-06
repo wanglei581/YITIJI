@@ -50,6 +50,10 @@ export interface AdminOrderStatusLogItem {
 export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundedAt: string | null
   refundReason: string | null
+  /** 券/权益抵扣（分）。Order.discountCents，无抵扣为 0。 */
+  discountCents: number
+  /** 已退金额累计（分）。Order.refundedAmountCents，未退为 0。 */
+  refundedAmountCents: number
   /** PrintTask.id（废弃孤单入口使用；非文件链接，不含敏感内容）。 */
   printTaskId: string | null
   print: (AdminOrderReadonlyPrintSummary & {

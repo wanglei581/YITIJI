@@ -68,3 +68,58 @@ export function formatAmountCents(amountCents: number): string {
   const fen = String(amountCents % 100).padStart(2, '0')
   return `¥${yuan}.${fen}`
 }
+
+const UNRECORDED = '未记录'
+
+const DUPLEX_LABEL: Record<NonNullable<MemberPrintOrderItem['duplex']>, string> = {
+  simplex: '单面',
+  duplex_long_edge: '双面（长边）',
+  duplex_short_edge: '双面（短边）',
+}
+
+/** 列表摘要用：缺失不占位，避免把「未记录」铺进每一行。 */
+export function duplexShortLabel(duplex: MemberPrintOrderItem['duplex'] | undefined): string | undefined {
+  if (duplex == null) return undefined
+  return DUPLEX_LABEL[duplex]
+}
+
+export function duplexDisplay(duplex: MemberPrintOrderItem['duplex'] | undefined): string {
+  return duplexShortLabel(duplex) ?? UNRECORDED
+}
+
+export function colorModeDisplay(colorMode: MemberPrintOrderItem['colorMode'] | undefined): string {
+  if (colorMode === 'color') return '彩色'
+  if (colorMode === 'black_white') return '黑白'
+  return UNRECORDED
+}
+
+export function copiesDisplay(copies: MemberPrintOrderItem['copies'] | undefined): string {
+  if (typeof copies === 'number' && Number.isInteger(copies) && copies >= 1) return `${copies} 份`
+  return UNRECORDED
+}
+
+export function pageRangeDisplay(pageRange: MemberPrintOrderItem['pageRange'] | undefined): string {
+  if (typeof pageRange !== 'string' || pageRange.trim().length === 0) return UNRECORDED
+  const trimmed = pageRange.trim()
+  return trimmed.toLowerCase() === 'all' ? '全部' : trimmed
+}
+
+/**
+ * 抵扣 / 已退款等「记录值」：0 分也按整数分格式化，不说「免费」。
+ * 非法输入返回「未记录」，不编造金额。
+ */
+export function formatRecordedCents(amountCents: number): string {
+  if (!Number.isInteger(amountCents) || amountCents < 0) return UNRECORDED
+  const yuan = Math.floor(amountCents / 100)
+  const fen = String(amountCents % 100).padStart(2, '0')
+  return `¥${yuan}.${fen}`
+}
+
+export function recordedAmountDisplay(amountCents: number | null | undefined): string {
+  if (typeof amountCents !== 'number') return UNRECORDED
+  return formatRecordedCents(amountCents)
+}
+
+/** 实付无独立真源字段，禁止用应付减优惠推算。 */
+export const NET_PAID_UNRECORDED = '未记录'
+export const NET_PAID_UNRECORDED_HINT = '无独立字段，不按应付减优惠推算'

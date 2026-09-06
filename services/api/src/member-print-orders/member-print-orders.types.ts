@@ -19,6 +19,8 @@ export interface MemberPrintOrderItem {
    */
   duplex: 'simplex' | 'duplex_long_edge' | 'duplex_short_edge' | null
   paperSize: string | null
+  /** 页范围（来自 paramsJson）；缺失 / 空串为 null，前端显示「未记录」。 */
+  pageRange: string | null
   // ── 支付字段（P0a，无 live 网关；可选以保持向后兼容）──
   amountCents?: number | null
   payStatus?: OrderPayStatus | null

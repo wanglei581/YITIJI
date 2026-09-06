@@ -125,6 +125,12 @@ else fail('路由未注册 /billing')
 if (nav.includes("'/billing'") && nav.includes('计费与对账')) pass('侧栏导航接入计费与对账')
 else fail('侧栏未接入计费与对账')
 
+if (!page.includes('print_duplex_surcharge') && !page.includes('双面附加')) {
+  pass('计费页不展示未播种的双面附加价目标签')
+} else {
+  fail('计费页不得把 print_duplex_surcharge / 双面附加标成价目（双面不计价）')
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Admin 计费/对账 UI 守卫未通过\n`)
   process.exit(1)
