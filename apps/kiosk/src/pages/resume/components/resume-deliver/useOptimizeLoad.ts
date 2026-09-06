@@ -56,7 +56,7 @@ export function useOptimizeLoad(opts: {
       setOptimizedResume(requested === 'ready' ? SYNTHETIC_RESUME : null)
       return
     }
-    if (!taskId) { setLoading(false); setFailKind('reparse'); setFailMsg('请先上传简历完成诊断'); return }
+    if (!taskId) { setLoading(false); setFailKind('reparse'); setFailMsg('优化建议基于诊断结果生成。回到 AI 简历服务上传简历并完成诊断后，再进入本页。'); return }
     if (consentChecking || consentNeedsPrompt || !consentReady) { setLoading(true); return }
     let cancelled = false
     setLoading(true)

@@ -14,5 +14,5 @@ export function optimizeStateDescription(view: OptimizeViewState, failMsg: strin
   if (view === 'loading') return '正在读取优化结果，读回来之前不展示任何简历内容。'
   if (view === 'illegal') return '查询参数无法识别，已按失败关闭处理，不回显原始地址。'
   if (view === 'unavailable') return failMsg ?? '能力未接通。可打印原件或返回上传。'
-  return failMsg ?? '请先上传简历完成诊断'
+  return failMsg ?? '优化建议基于诊断结果生成。回到 AI 简历服务上传简历并完成诊断后，再进入本页。'
 }
