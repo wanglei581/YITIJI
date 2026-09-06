@@ -321,7 +321,7 @@ export const httpJobFairAdapter = {
   },
 
   async getFairMaterials(fairId: string): Promise<PaginatedResponse<FairMaterialDTO>> {
-    return get<PaginatedResponse<FairMaterialDTO>>(`/job-fairs/${fairId}/materials`)
+    return get<PaginatedResponse<FairMaterialDTO>>(`/job-fairs/${fairId}/materials?pageSize=100`)
   },
 
   async prepareFairMaterialPrint(fairId: string, materialId: string): Promise<FairMaterialPrintResponse> {

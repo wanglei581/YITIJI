@@ -56,6 +56,8 @@ interface CashierLocationState {
   [k: string]: unknown
 }
 
+// 到这些状态后订单不会再变成 paid，轮询应停止（重开收银由用户动作触发，不靠轮询）。
+const PAY_POLL_TERMINAL: ReadonlySet<string> = new Set(['closed', 'failed', 'refunded', 'refunding', 'partial_refunded'])
 const POLL_INTERVAL_MS = 2500
 const AUTO_RECONCILE_INTERVAL_MS = 3500
 
@@ -261,12 +263,15 @@ export function PrintCashierPage() {
   // ── 轮询支付状态 ──
   useEffect(() => {
     if (API_MODE !== 'http' || !orderId || !paymentSessionToken) return
+    let timer: ReturnType<typeof setInterval> | null = null
     const tick = async () => {
       if (cancelRef.current) return
       try {
         const s = await getPayStatus({ orderId, paymentSessionToken })
         if (cancelRef.current) return
         setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
+        // 支付终态（关闭 / 失败 / 已退款）后再轮询没有意义：停掉，不再每 2.5s 打 pay-status。
+        if (PAY_POLL_TERMINAL.has(s.payStatus) && timer) { clearInterval(timer); timer = null; return }
         if (s.payStatus === 'paid') void proceedToPrint()
         // 回调是首选路径；回调延迟/丢失时，所有真实 pending 尝试（屏上收款码和付款码）
         // 都按服务端最小间隔主动查账。sandbox 没有真实渠道账本，绝不伪造查单能力。
@@ -291,8 +296,8 @@ export function PrintCashierPage() {
       }
     }
     void tick()
-    const timer = setInterval(() => void tick(), POLL_INTERVAL_MS)
-    return () => clearInterval(timer)
+    timer = setInterval(() => void tick(), POLL_INTERVAL_MS)
+    return () => { if (timer) clearInterval(timer) }
   }, [orderId, paymentSessionToken, proceedToPrint])
 
   // 1s 心跳：驱动倒计时 + 动态码过期本地即时翻面（不必等下次轮询）。
