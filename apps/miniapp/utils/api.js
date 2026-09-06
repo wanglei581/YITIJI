@@ -1721,6 +1721,22 @@ const api = {
       method: 'PATCH', needAuth: true,
     });
   },
+
+  /**
+   * Word 转 PDF 能力是三端是否接收 .doc/.docx 的唯一真源。
+   * mock 模式 fail-closed，不能把未运行的转换引擎显示成可用。
+   */
+  getDocumentConversionCapabilities() {
+    if (config.USE_MOCK) {
+      return mockResolve({
+        wordToPdf: false,
+        engine: 'none',
+        reason: '本地演示模式未连接文档转换引擎',
+        cjkFonts: false,
+      });
+    }
+    return request('/document-conversion/capabilities', { method: 'GET', needAuth: false });
+  },
 };
 
 

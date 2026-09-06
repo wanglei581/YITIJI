@@ -13,7 +13,8 @@
         <view class="src-ic a-teal"><text class="ficon i-upload"></text></view>
         <view class="src-body">
           <view class="src-title">从手机选择文件</view>
-          <view class="src-desc">支持 PDF、Word、图片格式</view>
+          <view class="src-desc">支持 PDF<text wx:if="{{wordConversionAvailable}}">、DOC、DOCX</text></view>
+          <view class="src-note" aria-disabled="{{!wordConversionAvailable}}">{{wordConversionCopy}}</view>
         </view>
         <text class="ficon i-right src-arr"></text>
       </view>
