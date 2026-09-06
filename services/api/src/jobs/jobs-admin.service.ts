@@ -12,6 +12,7 @@ import {
   Optional,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import type { Prisma } from '../generated/prisma/client'
 import { AuditService } from '../audit/audit.service'
 import { FairMaterialPrintBridgeService } from './fair-material-print-bridge.service'
 import type { ReviewAction } from './dto/review.dto'
@@ -31,6 +32,34 @@ import {
   prismaFairToAdminDto,
 } from './jobs-shared'
 
+export interface AdminSourceListParams {
+  page?: string
+  pageSize?: string
+  reviewStatus?: string
+  sourceId?: string
+  sourceOrgId?: string
+  keyword?: string
+}
+
+export interface AdminSourcePage<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function hasPagination(params?: AdminSourceListParams): params is AdminSourceListParams & { page?: string; pageSize?: string } {
+  return params?.page !== undefined || params?.pageSize !== undefined
+}
+
+function normalizePage(params: AdminSourceListParams): { page: number; pageSize: number; skip: number } {
+  const parsedPage = Number.parseInt(params.page ?? '1', 10)
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+  const parsedPageSize = Number.parseInt(params.pageSize ?? '20', 10)
+  const pageSize = Math.min(100, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 20)
+  return { page, pageSize, skip: (page - 1) * pageSize }
+}
+
 @Injectable()
 export class JobsAdminService {
   private readonly logger = new Logger(JobsAdminService.name)
@@ -41,9 +70,32 @@ export class JobsAdminService {
     @Optional() private readonly printBridges?: FairMaterialPrintBridgeService,
   ) {}
 
-  async getAllJobSources(): Promise<AdminJobDto[]> {
-    const rows = await this.prisma.job.findMany({ orderBy: { createdAt: 'desc' } })
-    return rows.map(prismaJobToAdminDto)
+  async getAllJobSources(): Promise<AdminJobDto[]>
+  async getAllJobSources(params: AdminSourceListParams): Promise<AdminJobDto[] | AdminSourcePage<AdminJobDto>>
+  async getAllJobSources(params?: AdminSourceListParams): Promise<AdminJobDto[] | AdminSourcePage<AdminJobDto>> {
+    const where: Prisma.JobWhereInput = {
+      ...(params?.reviewStatus ? { reviewStatus: params.reviewStatus } : {}),
+      ...(params?.sourceId ? { sourceId: params.sourceId } : {}),
+      ...(params?.keyword?.trim()
+        ? {
+            OR: [
+              { title: { contains: params.keyword.trim() } },
+              { company: { contains: params.keyword.trim() } },
+              { sourceName: { contains: params.keyword.trim() } },
+            ],
+          }
+        : {}),
+    }
+    if (!hasPagination(params)) {
+      const rows = await this.prisma.job.findMany({ where, orderBy: { createdAt: 'desc' } })
+      return rows.map(prismaJobToAdminDto)
+    }
+    const { page, pageSize, skip } = normalizePage(params)
+    const [rows, total] = await Promise.all([
+      this.prisma.job.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: pageSize }),
+      this.prisma.job.count({ where }),
+    ])
+    return { items: rows.map(prismaJobToAdminDto), total, page, pageSize }
   }
 
   async reviewJobSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<AdminJobDto> {
@@ -139,9 +191,32 @@ export class JobsAdminService {
     return prismaJobToAdminDto(updated)
   }
 
-  async getAllFairSources(): Promise<AdminFairDto[]> {
-    const rows = await this.prisma.jobFair.findMany({ orderBy: { createdAt: 'desc' } })
-    return rows.map(prismaFairToAdminDto)
+  async getAllFairSources(): Promise<AdminFairDto[]>
+  async getAllFairSources(params: AdminSourceListParams): Promise<AdminFairDto[] | AdminSourcePage<AdminFairDto>>
+  async getAllFairSources(params?: AdminSourceListParams): Promise<AdminFairDto[] | AdminSourcePage<AdminFairDto>> {
+    const where: Prisma.JobFairWhereInput = {
+      ...(params?.reviewStatus ? { reviewStatus: params.reviewStatus } : {}),
+      ...(params?.sourceOrgId ? { sourceOrgId: params.sourceOrgId } : {}),
+      ...(params?.keyword?.trim()
+        ? {
+            OR: [
+              { title: { contains: params.keyword.trim() } },
+              { sourceName: { contains: params.keyword.trim() } },
+              { venue: { contains: params.keyword.trim() } },
+            ],
+          }
+        : {}),
+    }
+    if (!hasPagination(params)) {
+      const rows = await this.prisma.jobFair.findMany({ where, orderBy: { createdAt: 'desc' } })
+      return rows.map(prismaFairToAdminDto)
+    }
+    const { page, pageSize, skip } = normalizePage(params)
+    const [rows, total] = await Promise.all([
+      this.prisma.jobFair.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: pageSize }),
+      this.prisma.jobFair.count({ where }),
+    ])
+    return { items: rows.map(prismaFairToAdminDto), total, page, pageSize }
   }
 
   async reviewFairSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<AdminFairDto> {

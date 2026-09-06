@@ -4,6 +4,8 @@ import type {
   AdminJobSourceRecord,
   AdminFairSourceRecord,
   AdminImportBatch,
+  AdminSourceListQuery,
+  AdminSourcePage,
   AdminPrintersResponse,
   AdminTerminalsResponse,
   AdminOrgOptionsResponse,
@@ -26,6 +28,7 @@ import type {
   UpdateReleaseObservationPlanInput,
 } from './types'
 import type { ReviewAction, PublishAction } from './review-types'
+import { isPagedSourceQuery, toAdminSourceQueryString } from './sourcePaging'
 
 /**
  * Phase C:401 统一处理。后端 token 失效或权限不足时,
@@ -125,8 +128,12 @@ async function postData<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const adminHttpAdapter = {
-  getJobSources: () =>
-    get<AdminJobSourceRecord[]>('/admin/job-sources'),
+  getJobSources: (query?: AdminSourceListQuery) => {
+    const path = `/admin/job-sources${query ? toAdminSourceQueryString(query) : ''}`
+    return isPagedSourceQuery(query)
+      ? get<AdminSourcePage<AdminJobSourceRecord>>(path)
+      : get<AdminJobSourceRecord[]>(path)
+  },
 
   reviewJobSource: (id: string, action: ReviewAction, reason?: string) =>
     patch<AdminJobSourceRecord>(`/admin/job-sources/${id}/review`, { action, reason }),
@@ -134,8 +141,12 @@ export const adminHttpAdapter = {
   publishJobSourceRecord: (id: string, action: PublishAction) =>
     patch<AdminJobSourceRecord>(`/admin/job-sources/${id}/publish`, { action }),
 
-  getFairSources: () =>
-    get<AdminFairSourceRecord[]>('/admin/fair-sources'),
+  getFairSources: (query?: AdminSourceListQuery) => {
+    const path = `/admin/fair-sources${query ? toAdminSourceQueryString(query) : ''}`
+    return isPagedSourceQuery(query)
+      ? get<AdminSourcePage<AdminFairSourceRecord>>(path)
+      : get<AdminFairSourceRecord[]>(path)
+  },
 
   reviewFairSource: (id: string, action: ReviewAction, reason?: string) =>
     patch<AdminFairSourceRecord>(`/admin/fair-sources/${id}/review`, { action, reason }),

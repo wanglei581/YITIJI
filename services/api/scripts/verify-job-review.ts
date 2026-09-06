@@ -17,6 +17,8 @@
  */
 import 'dotenv/config'
 import { randomBytes } from 'crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JobsService } from '../src/jobs/jobs.service'
@@ -144,6 +146,51 @@ async function main() {
     const rejForce = await jobs.reviewJobSource(j4, 'reject', '撤下并拒绝', user)
     if (rejForce.reviewStatus === 'rejected' && rejForce.publishStatus === 'draft') pass('9. reject 强制 publishStatus=draft（防"已发布的还挂在 Kiosk"）')
     else fail(`9. reject force-draft 异常: ${rejForce.reviewStatus}/${rejForce.publishStatus}`)
+
+    // ── 10. ADM-C15 GET /admin/job-sources 可选分页 ─────────────────────
+    {
+      const controller = readFileSync(join(process.cwd(), 'src/jobs/jobs.controller.ts'), 'utf8')
+      const fn = controller.slice(controller.indexOf('getJobSources('), controller.indexOf('getJobSources(') + 900)
+      if (!fn.includes("@Query('page')") || !fn.includes("@Query('pageSize')")) {
+        fail('10a. GET /admin/job-sources 未声明 page/pageSize')
+      }
+      pass('10a. GET /admin/job-sources 声明 page/pageSize')
+
+      const tag = `ADM_C15_${sfx}`
+      await mkJob('p1', { title: `${tag} one` })
+      await mkJob('p2', { title: `${tag} two` })
+      await mkJob('p3', { title: `${tag} three` })
+      const unpaged = await jobs.getAllJobSources()
+      if (!Array.isArray(unpaged)) fail('10b. 缺省参数必须保持裸数组')
+      if (!unpaged.some((j) => j.title.includes(tag))) fail('10b. 缺省数组未包含分页夹具')
+      pass('10b. 缺省参数返回裸数组')
+
+      const paged = await jobs.getAllJobSources({ page: '1', pageSize: '2', keyword: tag })
+      if (Array.isArray(paged)) fail('10c. 带 page/pageSize 不得返回裸数组')
+      if (paged.total !== 3 || paged.page !== 1 || paged.pageSize !== 2 || paged.items.length !== 2) {
+        fail(`10c. 分页形状异常: total=${paged.total} page=${paged.page} pageSize=${paged.pageSize} items=${paged.items.length}`)
+      }
+      if (paged.items.length > paged.pageSize) fail('10c. items.length > pageSize')
+      pass('10c. 带分页参数返回 total 且 items.length ≤ pageSize')
+
+      const page2 = await jobs.getAllJobSources({ page: '2', pageSize: '2', keyword: tag })
+      if (Array.isArray(page2) || page2.items.length !== 1 || page2.total !== 3) {
+        fail('10d. 第二页未按 skip/take 切片')
+      }
+      pass('10d. 第二页 skip/take 生效')
+
+      const capped = await jobs.getAllJobSources({ page: '1', pageSize: '999', keyword: tag })
+      if (Array.isArray(capped) || capped.pageSize !== 100) {
+        fail(`10e. pageSize 上限应为 100，实际 ${Array.isArray(capped) ? 'array' : capped.pageSize}`)
+      }
+      pass('10e. pageSize 上限 100')
+
+      const pending = await jobs.getAllJobSources({ page: '1', pageSize: '20', keyword: tag, reviewStatus: 'pending' })
+      if (Array.isArray(pending) || pending.items.some((j) => j.reviewStatus !== 'pending')) {
+        fail('10f. reviewStatus 筛选在分页下未生效')
+      }
+      pass('10f. 分页下 reviewStatus 筛选生效')
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

@@ -11,10 +11,10 @@
 //   GET  /job-fairs/:id                 — 已发布招聘会详情
 //
 // Admin（管理员）:
-//   GET   /admin/job-sources            — 全量岗位列表（含审核/发布状态）
+//   GET   /admin/job-sources            — 岗位列表（无 page/pageSize 时仍返回裸数组；带分页参数返回 { items, total, page, pageSize }）
 //   PATCH /admin/job-sources/:id/review — 审核操作（approve/reject/reviewing）
 //   PATCH /admin/job-sources/:id/publish — 发布操作（publish/unpublish）
-//   GET   /admin/fair-sources           — 全量招聘会列表
+//   GET   /admin/fair-sources           — 招聘会列表（缺省裸数组；?page=&pageSize= 返回分页对象）
 //   PATCH /admin/fair-sources/:id/review
 //   PATCH /admin/fair-sources/:id/publish
 //
@@ -287,8 +287,14 @@ export class JobsController {
   @Get('admin/job-sources')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getJobSources() {
-    return this.jobsService.getAllJobSources()
+  getJobSources(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('sourceId') sourceId?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    return this.jobsService.getAllJobSources({ page, pageSize, reviewStatus, sourceId, keyword })
   }
 
   @Get('admin/jobs/quality-summary')
@@ -323,8 +329,14 @@ export class JobsController {
   @Get('admin/fair-sources')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getFairSources() {
-    return this.jobsService.getAllFairSources()
+  getFairSources(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('sourceOrgId') sourceOrgId?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    return this.jobsService.getAllFairSources({ page, pageSize, reviewStatus, sourceOrgId, keyword })
   }
 
   @Patch('admin/fair-sources/:id/review')

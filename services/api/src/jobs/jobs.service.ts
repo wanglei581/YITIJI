@@ -15,6 +15,7 @@
 import { Injectable } from '@nestjs/common'
 import { JobsKioskService } from './jobs-kiosk.service'
 import { JobsAdminService } from './jobs-admin.service'
+import type { AdminSourceListParams } from './jobs-admin.service'
 import { JobsPartnerService } from './jobs-partner.service'
 import { JobsExcelService } from './jobs-excel.service'
 import type { ReviewAction } from './dto/review.dto'
@@ -102,8 +103,8 @@ export class JobsService {
 
   // ── Admin ──────────────────────────────────────────────────────────────────
 
-  getAllJobSources() {
-    return this.admin.getAllJobSources()
+  getAllJobSources(params?: AdminSourceListParams) {
+    return params === undefined ? this.admin.getAllJobSources() : this.admin.getAllJobSources(params)
   }
 
   reviewJobSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser) {
@@ -114,8 +115,8 @@ export class JobsService {
     return this.admin.publishJobSource(id, action, user)
   }
 
-  getAllFairSources() {
-    return this.admin.getAllFairSources()
+  getAllFairSources(params?: AdminSourceListParams) {
+    return params === undefined ? this.admin.getAllFairSources() : this.admin.getAllFairSources(params)
   }
 
   reviewFairSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser) {

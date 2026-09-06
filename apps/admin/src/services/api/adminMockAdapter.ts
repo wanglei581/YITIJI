@@ -2,6 +2,8 @@ import type {
   AdminJobSourceRecord,
   AdminFairSourceRecord,
   AdminImportBatch,
+  AdminSourceListQuery,
+  AdminSourcePage,
   AdminPrinterRecord,
   AdminPrintersResponse,
   AdminTerminalRecord,
@@ -31,6 +33,7 @@ import type {
 import { ApiHttpError } from './client'
 import type { ReviewAction } from './review-types'
 import type { PublishAction } from './review-types'
+import { isPagedSourceQuery, paginateAdminSourceRows } from './sourcePaging'
 
 export type { ReviewAction, PublishAction }
 
@@ -237,10 +240,34 @@ function delay(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 120))
 }
 
+function filterMockJobs(query?: AdminSourceListQuery): AdminJobSourceRecord[] {
+  let rows = [...JOB_SOURCES]
+  if (query?.reviewStatus) rows = rows.filter((s) => s.reviewStatus === query.reviewStatus)
+  if (query?.sourceId) rows = rows.filter((s) => s.sourceId === query.sourceId)
+  const keyword = query?.keyword?.trim()
+  if (keyword) {
+    rows = rows.filter((s) => s.title.includes(keyword) || s.company.includes(keyword) || s.sourceName.includes(keyword))
+  }
+  return rows
+}
+
+function filterMockFairs(query?: AdminSourceListQuery): AdminFairSourceRecord[] {
+  let rows = [...FAIR_SOURCES]
+  if (query?.reviewStatus) rows = rows.filter((s) => s.reviewStatus === query.reviewStatus)
+  if (query?.sourceOrgId) rows = rows.filter((s) => s.sourceOrgId === query.sourceOrgId)
+  const keyword = query?.keyword?.trim()
+  if (keyword) {
+    rows = rows.filter((s) => s.name.includes(keyword) || s.organizer.includes(keyword) || s.sourceName.includes(keyword))
+  }
+  return rows
+}
+
 export const adminMockAdapter = {
-  async getJobSources(): Promise<AdminJobSourceRecord[]> {
+  async getJobSources(query?: AdminSourceListQuery): Promise<AdminJobSourceRecord[] | AdminSourcePage<AdminJobSourceRecord>> {
     await delay()
-    return [...JOB_SOURCES]
+    const rows = filterMockJobs(query)
+    if (!isPagedSourceQuery(query)) return rows
+    return paginateAdminSourceRows(rows, query ?? {})
   },
 
   async reviewJobSource(id: string, action: ReviewAction, reason?: string): Promise<AdminJobSourceRecord> {
@@ -268,9 +295,11 @@ export const adminMockAdapter = {
     return JOB_SOURCES.find((s) => s.id === id)!
   },
 
-  async getFairSources(): Promise<AdminFairSourceRecord[]> {
+  async getFairSources(query?: AdminSourceListQuery): Promise<AdminFairSourceRecord[] | AdminSourcePage<AdminFairSourceRecord>> {
     await delay()
-    return [...FAIR_SOURCES]
+    const rows = filterMockFairs(query)
+    if (!isPagedSourceQuery(query)) return rows
+    return paginateAdminSourceRows(rows, query ?? {})
   },
 
   async reviewFairSource(id: string, action: ReviewAction, reason?: string): Promise<AdminFairSourceRecord> {

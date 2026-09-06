@@ -4,6 +4,8 @@ import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { ScrollTextIcon } from 'lucide-react'
 import { policiesAdminService, type AdminPolicyRecord } from '../../services/api/policiesAdmin'
+import type { AdminSourcePage, ReviewStatus } from '../../services/api'
+import { requireAdminSourcePage } from '../../services/api/sourcePaging'
 import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
@@ -35,7 +37,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const REVIEW_FILTERS = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
-const REVIEW_FILTER_MAP: Record<string, string | null> = {
+const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
   全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected',
 }
 
@@ -43,6 +45,7 @@ const REVIEW_FILTER_MAP: Record<string, string | null> = {
 
 export default function PolicySourcesPage() {
   const [records,      setRecords]      = useState<AdminPolicyRecord[]>([])
+  const [total,        setTotal]        = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
@@ -53,47 +56,56 @@ export default function PolicySourcesPage() {
   const [actionError,  setActionError]  = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
+  const listQuery = useMemo(() => ({
+    page,
+    pageSize,
+    keyword: search.trim() || undefined,
+    reviewStatus: REVIEW_FILTER_MAP[reviewFilter] ?? undefined,
+  }), [page, pageSize, search, reviewFilter])
+
+  const applyPage = useCallback((data: AdminPolicyRecord[] | AdminSourcePage<AdminPolicyRecord>) => {
+    const pageData = requireAdminSourcePage(data)
+    setRecords(pageData.items)
+    setTotal(pageData.total)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
-    policiesAdminService.getPolicySources()
-      .then((data) => { if (!cancelled) setRecords(data) })
+    setError(false)
+    policiesAdminService.getPolicySources(listQuery)
+      .then((data) => { if (!cancelled) applyPage(data) })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [listQuery, applyPage])
 
-  // 批量发布后重新拉取,让页面状态与库一致(不做本地猜测式更新)
   const reload = useCallback(() => {
-    policiesAdminService.getPolicySources().then(setRecords).catch(() => setError(true))
-  }, [])
+    policiesAdminService.getPolicySources(listQuery).then(applyPage).catch(() => setError(true))
+  }, [listQuery, applyPage])
 
   const orgOptions = useMemo(() => toOrgOptions(records), [records])
-
-  const applyUpdate = (updated: AdminPolicyRecord) => {
-    setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r))
-  }
 
   const handleApprove = (id: string) => {
     setActionError(null)
     void policiesAdminService.reviewPolicy(id, 'approve')
-      .then(applyUpdate)
+      .then(() => reload())
       .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
   }
   const handleReject = (id: string) => {
     if (!rejectReason.trim()) return
     setActionError(null)
     void policiesAdminService.reviewPolicy(id, 'reject', rejectReason.trim())
-      .then((updated) => {
-        applyUpdate(updated)
+      .then(() => {
         setRejectingId(null)
         setRejectReason('')
+        reload()
       })
       .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
   }
   const handlePublish = (id: string) => {
     setActionError(null)
     void policiesAdminService.publishPolicy(id, 'publish')
-      .then(applyUpdate)
+      .then(() => reload())
       .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
   }
   const handleUnpublish = (id: string, title: string) => {
@@ -101,27 +113,8 @@ export default function PolicySourcesPage() {
     // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
     setActionError(null)
     void policiesAdminService.publishPolicy(id, 'unpublish')
-      .then(applyUpdate)
+      .then(() => reload())
       .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
-  }
-
-  const filtered = reviewFilter === '全部'
-    ? records
-    : records.filter((r) => r.reviewStatus === REVIEW_FILTER_MAP[reviewFilter])
-
-  const searched = search.trim()
-    ? filtered.filter((r) => r.title.includes(search) || r.sourceName.includes(search))
-    : filtered
-
-  const total = searched.length
-  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
-
-  const counts = {
-    全部:   records.length,
-    待审核: records.filter((r) => r.reviewStatus === 'pending').length,
-    审核中: records.filter((r) => r.reviewStatus === 'reviewing').length,
-    已通过: records.filter((r) => r.reviewStatus === 'approved').length,
-    已拒绝: records.filter((r) => r.reviewStatus === 'rejected').length,
   }
 
   if (loading) {
@@ -168,7 +161,6 @@ export default function PolicySourcesPage() {
               }`}
             >
               {f}
-              <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
             </button>
           ))}
         </div>
@@ -190,7 +182,7 @@ export default function PolicySourcesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-900/[0.06]">
-              {paginated.length === 0 ? (
+              {records.length === 0 ? (
                 <tr>
                   <td colSpan={9}>
                     <EmptyState
@@ -202,7 +194,7 @@ export default function PolicySourcesPage() {
                   </td>
                 </tr>
               ) : (
-                paginated.map((r) => {
+                records.map((r) => {
                   const review  = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
                   const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
                   return (
@@ -293,7 +285,6 @@ export default function PolicySourcesPage() {
       <p className="mt-3 text-xs text-neutral-400">
         政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。审核通过并发布后在一体机「政策服务」页展示,所有操作记录审计日志。
         「查看申领条件」为只读复核:条件由来源机构在合作机构后台录入,本页不改条件。
-        本次加载 {records.length} 条（服务端当前全量返回，本页本地分页）。
       </p>
 
       {/* key 绑 id:换一条政策必须重挂组件,避免上一条的条件在新标题下短暂残留 */}
