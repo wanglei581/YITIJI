@@ -82,11 +82,15 @@ export function FileContentPreview({
     return () => { active = false }
   }, [capabilities.wordToPdf, fileId, sourceKind, token])
 
+  // 引擎未开放时 Word 按诚实的「不支持」态渲染（data-file-preview-kind=unsupported，与既有走查用例一致），
+  // 只有能力为真才进入 word（转换中 / 转换失败）态，转换成功后按 pdf 渲染。
   const kind = renderFailed
     ? 'unavailable'
     : sourceKind === 'word' && convertedUrl
       ? 'pdf'
-      : sourceKind
+      : sourceKind === 'word' && !capabilities.wordToPdf
+        ? 'unsupported'
+        : sourceKind
   const previewUrl = convertedUrl ?? fileUrl
   const wordUnavailableReason = capabilities.reason?.trim() || WORD_CONVERSION_UNAVAILABLE_COPY
 
@@ -155,7 +159,9 @@ export function FileContentPreview({
             */}
             <p className="max-w-lg text-xs leading-5 text-neutral-500">
               {kind === 'unsupported'
-                ? '该格式不能在当前浏览器内直接显示，请更换为 PDF、JPG、PNG 或 WebP 文件后预览。'
+                ? sourceKind === 'word'
+                  ? `Word 文档暂不能页内预览（${wordUnavailableReason}）；可扫码到手机打开原件，或另存为 PDF 后上传。`
+                  : '该格式不能在当前浏览器内直接显示，请更换为 PDF、JPG、PNG 或 WebP 文件后预览。'
                 : '这份文件无法在本页内嵌预览；预览失败不代表文件本身有问题，文件状态以页面上的文件卡为准。'}
             </p>
           </div>
