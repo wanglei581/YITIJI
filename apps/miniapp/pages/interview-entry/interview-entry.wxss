@@ -16,7 +16,7 @@
 .option-group { margin-top: 16rpx; }
 .og-label { font-size: 26rpx; color: var(--muted); margin-bottom: 12rpx; }
 .og-chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.opt-chip { min-height: 70rpx; padding: 0 28rpx; border-radius: 22rpx; border: 2rpx solid var(--line);
+.opt-chip { min-height: 96rpx; padding: 0 28rpx; border-radius: 22rpx; border: 2rpx solid var(--line);
   font-size: 26rpx; color: var(--ink); background: var(--surface); }
 .opt-chip.active { border-color: var(--teal); color: var(--teal);
   background: var(--teal-soft); }
