@@ -19,8 +19,8 @@
 // ============================================================
 
 import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
-import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import { FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { signFileUrl } from '../files/signing'
@@ -94,47 +94,9 @@ const SCALE_LABELS: Record<string, string> = {
   '>2000': '2000 人以上',
 }
 
-interface FontCandidate {
-  path: string
-  family?: string
-}
-
-/**
- * 中文字体候选。与 job-material-pdf / resume-pdf 等既有 PDF 服务同构：
- * 本仓库现有 7 个 PDF 服务各自持有一份，此处沿用同一约定，不在本次修复里
- * 顺带重构那 7 个文件（改动面控制）。
- */
-function fontCandidates(): FontCandidate[] {
-  const custom = process.env['JOB_MATERIAL_PDF_FONT_PATH']?.trim() || process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const list: FontCandidate[] = []
-  if (custom) list.push({ path: custom })
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] || 'C:\\Windows'
-    list.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\msyh.ttf` },
-      { path: `${winDir}\\Fonts\\simhei.ttf` },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    list.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-    )
-  } else {
-    list.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return list
-}
-
 @Injectable()
 export class FairCompanyPrintService {
   private readonly logger = new Logger(FairCompanyPrintService.name)
-  private resolvedFont: FontCandidate | null = null
 
   constructor(
     private readonly prisma: PrismaService,
@@ -250,30 +212,12 @@ export class FairCompanyPrintService {
   }
 
   private resolveFont(doc: InstanceType<typeof PDFDocument>): void {
-    const tryRegister = (candidate: FontCandidate): boolean => {
-      if (!existsSync(candidate.path)) return false
-      try {
-        if (candidate.family) doc.registerFont('cjk', candidate.path, candidate.family)
-        else doc.registerFont('cjk', candidate.path)
-        doc.font('cjk')
-        return true
-      } catch {
-        return false
-      }
-    }
-
-    if (this.resolvedFont && tryRegister(this.resolvedFont)) return
-    for (const candidate of fontCandidates()) {
-      if (tryRegister(candidate)) {
-        this.resolvedFont = candidate
-        return
-      }
-    }
+    if (registerCjkFont(doc)) return
     doc.end()
     throw new ServiceUnavailableException({
       error: {
         code: 'FAIR_COMPANY_PDF_FONT_NOT_FOUND',
-        message: '服务器缺少可用中文字体，暂时无法生成企业资料 PDF；请配置 JOB_MATERIAL_PDF_FONT_PATH',
+        message: CJK_FONT_MISSING_USER_MESSAGE,
       },
     })
   }

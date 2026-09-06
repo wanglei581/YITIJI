@@ -4,6 +4,20 @@ import { assertProductionRuntimeGates } from '../src/config/production-runtime-g
 import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 
 type Env = Parameters<typeof assertProductionRuntimeGates>[0]
+type FontProbe = Parameters<typeof assertProductionRuntimeGates>[1]
+
+const FONT_OK: FontProbe = {
+  ok: true,
+  path: '/verify/NotoSansCJK-Regular.ttc',
+  family: 'NotoSansCJKsc-Regular',
+  tried: ['/verify/NotoSansCJK-Regular.ttc'],
+}
+const FONT_MISSING: FontProbe = {
+  ok: false,
+  path: null,
+  family: null,
+  tried: ['/missing/NotoSansCJK-Regular.ttc'],
+}
 
 const PROD_OK: Env = {
   NODE_ENV: 'production',
@@ -46,13 +60,13 @@ const REQUIRED_SMS_KEYS = [
 ] as const
 
 function expectAllowed(env: Env, label: string): void {
-  assertProductionRuntimeGates(env)
+  assertProductionRuntimeGates(env, FONT_OK)
   console.log(`  PASS ${label}`)
 }
 
 function expectRejected(env: Env, expectedCode: string, label: string): void {
   try {
-    assertProductionRuntimeGates(env)
+    assertProductionRuntimeGates(env, FONT_OK)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (!message.includes(expectedCode)) {
@@ -114,6 +128,14 @@ function main(): void {
 
   // 生产环境：全部满足时放行
   expectAllowed(PROD_OK, '生产环境合规配置放行')
+  try {
+    assertProductionRuntimeGates(PROD_OK, FONT_MISSING)
+    throw new Error('生产环境缺少中文字体时本应拒绝启动')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!message.includes('PRODUCTION_CJK_FONT_MISSING')) throw error
+    console.log('  PASS 生产环境缺少中文字体时拒绝启动')
+  }
 
   // 生产环境：JWT_SECRET 门禁
   expectRejected(

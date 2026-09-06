@@ -25,10 +25,12 @@
  *     + 一次性绑定码激活；共享 adminSecret 旧注册面不得在生产开放）
  *   - TERMINAL_PLANNED_PROVISIONING_ENABLED 必须显式声明 true|false；滚动部署第一阶段保持
  *     false，所有 API 实例升级且旧 binary 退出后再切 true
+ *   - 中文 PDF 字体必须可由 PDFKit 实际注册；生产缺失即拒绝启动
  *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
 import { assertRuntimeDatabaseAllowed } from '../prisma/create-client'
+import { probeCjkFont, type CjkFontProbeResult } from '../common/pdf/cjk-font'
 import { assertProductionTrustProxyHops } from './trust-proxy'
 
 export interface ProductionRuntimeEnv {
@@ -96,9 +98,21 @@ function hasValue(value: string | undefined): boolean {
 
 export function assertProductionRuntimeGates(
   env: ProductionRuntimeEnv = process.env,
+  cjkFontProbe: CjkFontProbeResult = probeCjkFont(),
 ): void {
   const nodeEnv = env.NODE_ENV
+  if (nodeEnv !== 'production' && !cjkFontProbe.ok) {
+    console.warn(
+      `[WARN] CJK_FONT_MISSING: 非生产环境未找到可用中文字体；PDF 导出将失败。tried=${cjkFontProbe.tried.join(',')}`,
+    )
+  }
   if (nodeEnv !== 'production') return
+
+  if (!cjkFontProbe.ok) {
+    throw new Error(
+      `PRODUCTION_CJK_FONT_MISSING: NODE_ENV=production 时必须安装可用中文字体；tried=${cjkFontProbe.tried.join(',')}`,
+    )
+  }
 
   const jwtSecret = env.JWT_SECRET
   if (!jwtSecret || jwtSecret.length < MIN_JWT_SECRET_LENGTH) {

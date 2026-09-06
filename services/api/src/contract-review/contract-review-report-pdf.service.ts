@@ -1,38 +1,12 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common'
-import { existsSync } from 'node:fs'
 import PDFDocument from 'pdfkit'
+import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import type { ContractReviewFinding, ContractReviewResult } from './contract-review.types'
-
-interface FontCandidate { path: string; family?: string }
 
 const PRIORITY_LABEL: Record<ContractReviewFinding['priority'], string> = {
   priority_check: '优先核对',
   attention: '需要留意',
   insufficient_info: '信息不足',
-}
-
-function fontCandidates(): FontCandidate[] {
-  const envPath = process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const candidates: FontCandidate[] = envPath ? [{ path: envPath }] : []
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] ?? 'C:\\Windows'
-    candidates.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    candidates.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-    )
-  } else {
-    candidates.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return candidates
 }
 
 @Injectable()
@@ -133,23 +107,13 @@ export class ContractReviewReportPdfService {
   }
 
   private requireChineseFont(doc: InstanceType<typeof PDFDocument>): void {
-    const available = fontCandidates().some((candidate) => {
-      if (!existsSync(candidate.path)) return false
-      try {
-        if (candidate.family) doc.registerFont('cjk', candidate.path, candidate.family)
-        else doc.registerFont('cjk', candidate.path)
-        doc.font('cjk')
-        return true
-      } catch {
-        return false
-      }
-    })
+    const available = registerCjkFont(doc)
     if (!available) {
       doc.end()
       throw new InternalServerErrorException({
         error: {
           code: 'CONTRACT_REVIEW_REPORT_FONT_NOT_FOUND',
-          message: '服务器缺少中文字体，无法生成合同风险提示报告',
+          message: CJK_FONT_MISSING_USER_MESSAGE,
         },
       })
     }

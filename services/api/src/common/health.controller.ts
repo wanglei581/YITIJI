@@ -1,6 +1,10 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common'
+import { Controller, Get, ServiceUnavailableException, UseGuards } from '@nestjs/common'
+import { Roles } from './decorators/roles.decorator'
+import { JwtAuthGuard } from './guards/jwt-auth.guard'
+import { RolesGuard } from './guards/roles.guard'
 import { PrismaService } from '../prisma/prisma.service'
 import { bootReadiness, type BootSubsystemState } from './boot/boot-readiness'
+import { probeCjkFont } from './pdf/cjk-font'
 
 /**
  * 健康检查。上线清单 §3.8 探活用，遵守 CLAUDE.md §9「不伪造能力」：
@@ -61,6 +65,16 @@ export class HealthController {
         subsystems: bootReadiness.snapshot().map(toPublicState),
         time: new Date().toISOString(),
       },
+    }
+  }
+
+  @Get('cjk-font')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  cjkFont() {
+    return {
+      success: true,
+      data: probeCjkFont(),
     }
   }
 
