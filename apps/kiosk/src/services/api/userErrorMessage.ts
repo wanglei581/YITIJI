@@ -55,6 +55,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_PROVIDER_UNREACHABLE: 'AI 服务暂时连不上，请稍后重试',
   TERMINAL_NOT_READY: '本机设备未就绪，请联系现场工作人员后再试',
   TERMINAL_ID_REQUIRED: '本机设备未就绪，请联系现场工作人员后再试',
+  TERMINAL_SESSION_INVALID: '终端安全校验失败，请联系现场工作人员',
+  TERMINAL_SESSION_RETRYABLE: '终端安全校验中，请稍候',
   ONLINE_PAYMENT_DISABLED: '本机暂未开通线上支付，请改用其他支付方式或联系现场工作人员',
   PRINTER_UNAVAILABLE: '打印机当前不可用（离线、缺纸或故障），请稍后再试或联系现场工作人员',
   SCAN_TERMINAL_BUSY: '本机正在扫描中，请等待当前任务完成后再试',

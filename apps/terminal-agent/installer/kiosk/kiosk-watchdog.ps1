@@ -5,7 +5,7 @@
 # full-screen kiosk browser pointed at the terminal site:
 #   - starts Edge (preferred) or Chrome in --kiosk mode with a dedicated profile
 #   - restarts it when the process exits or crashes, with backoff
-#   - never touches Agent credentials, config or ProgramData ACL-protected files
+#   - gets only a one-minute boot ticket from the loopback Agent; it never reads Agent credentials
 #
 # Usage:
 #   kiosk-watchdog.ps1 -Url https://zyidai.cn/            # loop forever (task)
@@ -80,9 +80,36 @@ function Get-KioskProcess {
   return $null
 }
 
-function Start-KioskBrowser([string]$Executable) {
+function Get-BootTicketUrl {
+  $deadline = (Get-Date).AddSeconds(60)
+  $delays = @(2, 5, 10, 20)
+  $attempt = 0
+  while ((Get-Date) -lt $deadline) {
+    try {
+      # Five 4-second attempts plus 2/5/10/20-second backoff stay within 57 seconds.
+      $response = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:9527/local/terminal-boot-ticket" -TimeoutSec 4
+      $ticket = [string]$response.data.bootTicket
+      if ($ticket -match '^[A-Za-z0-9_-]{32,128}$') {
+        $separator = if ($Url.Contains('?')) { '&' } else { '?' }
+        return "$Url$separator" + "boot_ticket=$([uri]::EscapeDataString($ticket))"
+      }
+      Write-Log "boot ticket response was invalid"
+    } catch {
+      Write-Log "boot ticket attempt $($attempt + 1) failed: $($_.Exception.Message)"
+    }
+    if ($attempt -ge ($delays.Count - 1)) { break }
+    $delay = $delays[$attempt]
+    if ((Get-Date).AddSeconds($delay) -gt $deadline) { break }
+    Start-Sleep -Seconds $delay
+    $attempt += 1
+  }
+  Write-Log "boot ticket unavailable after automatic retry window; launching without ticket"
+  return $Url
+}
+
+function Start-KioskBrowser([string]$Executable, [string]$LaunchUrl) {
   $arguments = @(
-    "--kiosk", $Url,
+    "--kiosk", $LaunchUrl,
     "--edge-kiosk-type=fullscreen",
     "--kiosk-idle-timeout-minutes=0",
     "--no-first-run",
@@ -99,7 +126,7 @@ function Start-KioskBrowser([string]$Executable) {
     $kioskMarker
   )
   $process = Start-Process -FilePath $Executable -ArgumentList $arguments -PassThru
-  Write-Log "started kiosk browser pid=$($process.Id) exe=$Executable"
+  Write-Log "started kiosk browser pid=$($process.Id) exe=$Executable bootTicket=$($LaunchUrl -ne $Url)"
   return $process
 }
 
@@ -109,7 +136,7 @@ if ($null -eq $executable) {
   throw "No supported kiosk browser installed"
 }
 
-Write-Log "watchdog start url=$Url browser=$executable once=$($Once.IsPresent)"
+Write-Log "watchdog start browser=$executable once=$($Once.IsPresent)"
 
 $backoffSeconds = 3
 $lastStart = [DateTime]::MinValue
@@ -121,7 +148,8 @@ while ($true) {
       Start-Sleep -Seconds ([Math]::Ceiling($backoffSeconds - $sinceLast.TotalSeconds))
     }
     try {
-      [void](Start-KioskBrowser -Executable $executable)
+      $launchUrl = Get-BootTicketUrl
+      [void](Start-KioskBrowser -Executable $executable -LaunchUrl $launchUrl)
       if ($lastStart -ne [DateTime]::MinValue -and ((Get-Date) - $lastStart).TotalSeconds -lt 60) {
         # Crash loop: double the wait, cap at one minute.
         $backoffSeconds = [Math]::Min(60, $backoffSeconds * 2)

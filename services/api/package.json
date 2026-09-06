@@ -89,6 +89,7 @@
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
     "verify:terminal-bind-code": "node -r @swc-node/register scripts/verify-terminal-bind-code.ts",
     "verify:terminal-credentials": "node -r @swc-node/register scripts/verify-terminal-credentials.ts",
+    "verify:terminal-identity": "node -r @swc-node/register scripts/verify-terminal-identity.ts",
     "verify:terminal-provisioning": "node -r @swc-node/register scripts/verify-terminal-provisioning.ts",
     "verify:terminal-status-idempotency": "node -r @swc-node/register scripts/verify-terminal-status-idempotency.ts",
     "verify:terminal-network-diagnostics": "node -r @swc-node/register scripts/verify-terminal-network-diagnostics.ts",

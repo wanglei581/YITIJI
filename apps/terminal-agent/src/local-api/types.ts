@@ -34,6 +34,12 @@ export interface LocalTerminalIdentityResponse {
   terminalCode: string
 }
 
+/** One-minute bootstrap ticket; Agent credentials never leave the loopback server. */
+export interface LocalTerminalBootTicketResponse {
+  bootTicket: string
+  expiresInSeconds: number
+}
+
 export interface LocalPrintWakeResponse {
   accepted: true
   coalesced: boolean

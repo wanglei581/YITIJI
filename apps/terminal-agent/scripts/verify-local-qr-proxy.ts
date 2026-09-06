@@ -85,6 +85,12 @@ async function startBackendStub(): Promise<{ baseUrl: string; records: RecordedR
         return
       }
 
+      if (req.method === 'POST' && req.url === '/api/v1/terminals/boot-ticket') {
+        res.writeHead(201, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ bootTicket: 'boot_ticket_abcdefghijklmnopqrstuvwxyz012345', expiresInSeconds: 60 }))
+        return
+      }
+
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: false, error: { code: 'NOT_FOUND', message: 'not found' } }))
     })().catch((error) => {
@@ -243,6 +249,26 @@ async function main(): Promise<void> {
       terminalId: 'terminal-qr-1',
       terminalCode: 'T-LOCAL-QR',
     })
+
+    const bootTicket = await fetch(`${localBase}/local/terminal-boot-ticket`, { method: 'POST' })
+    assert.equal(bootTicket.status, 200, 'watchdog may obtain a loopback boot ticket without Origin')
+    const bootTicketEnvelope = await bootTicket.json() as {
+      success: true
+      data: { bootTicket: string; expiresInSeconds: number }
+    }
+    assert.equal(bootTicketEnvelope.data.expiresInSeconds, 60)
+    assert.match(bootTicketEnvelope.data.bootTicket, /^[A-Za-z0-9_-]{32,128}$/)
+    const bootRecord = backend.records.find((record) => record.url === '/api/v1/terminals/boot-ticket')
+    assert.ok(bootRecord, 'boot ticket request must be proxied through the Agent')
+    assert.equal(bootRecord.authorization, 'Bearer agent-token-secret')
+    assert.equal(bootRecord.terminalId, 'terminal-qr-1')
+
+    const browserBootTicket = await fetch(`${localBase}/local/terminal-boot-ticket`, {
+      method: 'POST', headers: { Origin: ALLOWED_ORIGIN },
+    })
+    assert.equal(browserBootTicket.status, 403, 'browser Origin must not obtain a boot ticket')
+    const browserBootTicketError = await browserBootTicket.json() as { error: { code: string } }
+    assert.equal(browserBootTicketError.error.code, 'LOCAL_TERMINAL_BOOT_ORIGIN_FORBIDDEN')
 
     const denied = await postJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/qr-login/create`,
