@@ -16,6 +16,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { LegalController } from '../src/legal/legal.controller'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
