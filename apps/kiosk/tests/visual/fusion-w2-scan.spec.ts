@@ -306,7 +306,11 @@ test('successful resume scan can continue to AI parsing @w2', async ({ page, api
   await expectHealthy(page, errors)
 })
 
-test('successful scan exposes the real documents destination @w2', async ({ page, api }) => {
+test('successful scan tells a guest the file will not reach 我的文档 @w2', async ({ page, api }) => {
+  // 本用例全程未登录。原版断言按钮是「登录后管理文件」并点进 /login——
+  // 那句承诺是假的：游客扫描件 ownerType='system'，没有认领机制，登录后
+  // 「我的文档」里根本不会出现（体检 MSC-04）。所以这里断言的是修正后的真话：
+  // 明说本次不进我的文档，并且按钮禁用——不能把用户送去一个去了也没用的登录页。
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
@@ -315,8 +319,14 @@ test('successful scan exposes the real documents destination @w2', async ({ page
   await page.goto('/scan/result')
   await setReactRouterState(page, '/scan/result', resultState)
   await expectPdfCompleted(binary)
-  await page.getByRole('button', { name: /登录后管理文件|前往我的文档/ }).click()
-  await page.waitForURL(/\/(login|me\/documents)/)
+
+  const destination = page.getByRole('button', { name: /本次不进入我的文档/ })
+  await expect(destination).toBeVisible()
+  await expect(destination).toBeDisabled()
+  await expect(page.getByText('未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别')).toBeVisible()
+
+  // 旧的不实承诺不得再出现在页面上。
+  await expect(page.getByText(/登录后管理文件|登录后可在「我的文档」管理/)).toHaveCount(0)
   await expectHealthy(page, errors)
 })
 

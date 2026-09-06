@@ -33,6 +33,10 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { FilesService, type FileRequester } from './files.service'
 import { PROXY_MAX_BYTES } from './file-validation'
+import {
+  collectBodyUntilByteLimit,
+  RawUploadLimitExceededError,
+} from './collect-raw-upload-body'
 import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
@@ -53,8 +57,6 @@ import type {
 } from './file.types'
 
 import { resolveClientIp } from '../common/client-ip'
-/** 本地代理直传单文件上限(防内存打爆;COS 直传不经此路径)。 */
-const RAW_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
 /** Kiosk 上传响应需覆盖“上传→预览→确认打印”触控窗口，本次取 30 分钟签名 TTL。 */
 const KIOSK_UPLOAD_SIGNED_URL_TTL_MS = 30 * 60 * 1000
 
@@ -213,16 +215,23 @@ export class FilesController {
     if (!expires || !sig || !verifyRawUploadSignature(id, expires, sig)) {
       throw new UnauthorizedException({ error: { code: 'FILE_SIGNATURE_INVALID', message: '签名无效或已过期' } })
     }
-    const chunks: Buffer[] = []
-    let total = 0
-    for await (const chunk of req) {
-      total += chunk.length
-      if (total > RAW_UPLOAD_MAX_BYTES) {
-        throw new PayloadTooLargeException({ error: { code: 'FILE_TOO_LARGE', message: '上传体积超出代理上限' } })
+    const limit = await this.files.resolveRawUploadByteLimit(id)
+    try {
+      const buffer = await collectBodyUntilByteLimit(req, limit)
+      await this.files.writeRawUpload(id, buffer)
+    } catch (err) {
+      if (err instanceof RawUploadLimitExceededError) {
+        try {
+          ;(req as { destroy?: () => void }).destroy?.()
+        } catch {
+          // 超限后尽力断开，避免客户端继续推送打满内存。
+        }
+        throw new PayloadTooLargeException({
+          error: { code: 'FILE_TOO_LARGE', message: '上传体积超出该用途上限' },
+        })
       }
-      chunks.push(chunk)
+      throw err
     }
-    await this.files.writeRawUpload(id, Buffer.concat(chunks))
     return ApiResponse.ok({ ok: true })
   }
 

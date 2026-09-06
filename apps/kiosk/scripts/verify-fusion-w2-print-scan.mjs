@@ -768,15 +768,20 @@ for (const target of ['/print/confirm', '/me/documents', '/resume/parse']) {
     `scan result retains ${target} action`
   )
 }
-assert.match(
+assert.doesNotMatch(
   scanResult,
   /loginPathForCurrentLocation/,
-  'scan result guides guests to login before documents'
+  'guest scan files have no claim path; result must not send guests to login as if documents will appear',
 )
 assert.match(
   scanResult,
-  /登录后管理文件|前往我的文档/,
-  'scan result uses honest documents destination copy'
+  /本次不进入我的文档|前往我的文档/,
+  'scan result uses honest documents destination copy',
+)
+assert.match(
+  scanResult,
+  /未登录扫描件不会进入「我的文档」/,
+  'guest scan result must say the file will not enter My Documents',
 )
 assert.match(scanResult, /state\.file/, 'scan result derives its file only from route state')
 assert.ok(!/scan-result\.pdf/.test(scanResult), 'scan result never fabricates a local result file')
@@ -812,6 +817,37 @@ assert.doesNotMatch(
   convertImages,
   /justify-around/,
   'convert rules must not space-around empty vertical room'
+)
+
+assert.doesNotMatch(
+  convertImages,
+  /<li>生成后自动进入确认打印；PDF 已保存到「我的文档」。<\/li>/,
+  'convert rules must not unconditionally claim the PDF is in My Documents',
+)
+assert.match(
+  convertImages,
+  /未登录时 PDF 不会进入「我的文档」/,
+  'convert rules must tell guests the PDF will not enter My Documents',
+)
+assert.match(
+  convertImages,
+  /getTerminalId\(\)/,
+  'convert must read the kiosk terminal id before calling the API',
+)
+assert.match(
+  convertImages,
+  /终端编号未配置，无法使用格式转换/,
+  'convert must fail closed when terminal id is missing (same as sign-stamp)',
+)
+assert.match(
+  convertImages,
+  /terminalId,/,
+  'convert request body must include terminalId',
+)
+assert.match(
+  signStamp,
+  /getTerminalId\(\)/,
+  'sign-stamp remains the reference deep-link gate that convert must copy',
 )
 
 console.log('ALL PASS fusion W2 print/scan contract')
