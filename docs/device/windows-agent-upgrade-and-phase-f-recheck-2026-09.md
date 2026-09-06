@@ -125,6 +125,17 @@ sc.exe qc aijobprintagent.exe
 
 ### 4A. 交给 Mac/Claude 的上线前问题单（先修复，再做 Windows 真机）
 
+#### Mac 侧核对结论（2026-09-06，逐条对代码与线上）
+
+| 问题单结论 | 核对结果 | 证据 |
+|---|---|---|
+| 线上仍是旧 UI，需先部署 106 路由新版 | **不成立**。线上就是 main `891492396`（deploy run 34024303135，kiosk bundle `assets/index-CC6VWakW.js`），无更新的前端可发；「新版」指 51 页迁移，当前 1/51 | `docs/progress/next-tasks.md` 主线表 |
+| claim 出现 429 | **根因已定位，修复中**：安装脚本默认 `ClaimIntervalMs=1000` × claim 端点每台 30 次/分钟；Agent 不识别 429 | `install-production-agent.ps1:69`、`terminals.controller.ts:173`、`task-runner.ts` catch 分支；分支 `fix/claim-rate-limit-429` |
+| 单飞机制无并发但缺真机证据 | 代码层已有自动化证据（`verify:task-runner-wake` 在 CI）；真机矩阵按下文执行 | `task-runner-control.ts` |
+| `Printing, Retained` 不能当已出纸 | **已实现**：retained 视为不确定态，查 PrintService 完成事件，超时 `PRINT_JOB_UNCONFIRMED`、不自动重印 | `wmi.ts:369-377`、`task-runner.ts:718`、门禁 `verify:print-monitor-truth` |
+| 彩色/扫描/复印按证据分层 | **已实现**：`PrintConfirmPage` 按本机 `TerminalCapability` 收口并明示未验证；开放 API 彩色仍无 wire value | `PrintConfirmPage.tsx:162,533`、`packages/shared/src/types/print.ts:100` |
+| 连续 5 单/突发/耐久未验证 | 同意，等 429 修复部署后执行下文矩阵 | 本节 |
+
 #### UI 发布基线
 
 - 当前线上 `zyidai.cn` / `admin.zyidai.cn` 仍可能展示旧版前端；Windows 侧不能用线上旧页面判断 Mac 侧 106 路由的完成情况。
