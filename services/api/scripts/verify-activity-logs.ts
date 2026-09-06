@@ -14,15 +14,16 @@
  * 11. 匿名上报（controller 路径，无 Authorization）→ recorded:false 且零落库
  * 12. 禁词扫描（本轮触达的前后端文件无违规状态文案）
  *     + 前端封装 fire-and-forget（记录失败不阻断主流程）
- * 13. TTL 清理 cron：过期行被物理删除
+ * 13. 伪造 terminalId 不拒绝上报，但 BrowseLog 只落 null
+ * 14. TTL 清理 cron：过期行被物理删除
  *
  * 运行：pnpm --filter @ai-job-print/api verify:activity-logs
  */
-require('dotenv').config()
-
+import * as dotenv from 'dotenv'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { JwtService } from '@nestjs/jwt'
+import { HTTP_CODE_METADATA } from '@nestjs/common/constants'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { ActivityService } from '../src/activity/activity.service'
@@ -30,6 +31,8 @@ import { ActivityController } from '../src/activity/activity.controller'
 import { MeActivityController } from '../src/activity/me-activity.controller'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+
+dotenv.config()
 
 // 稳定且唯一的残留标记(跨运行不变):嵌进机构 id 与测试会员 phoneHash,开始前预清。
 // 本脚本的 finally 已按本次 id 清 endUser/浏览日志,这里的预清负责收掉历史残留。
@@ -54,12 +57,18 @@ async function expectStatus(p: Promise<unknown>, status: number, label: string) 
 
 async function main() {
   const prisma = new PrismaService()
+  await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const activity = new ActivityService(prisma)
   const meController = new MeActivityController(activity, audit)
   // 匿名路径不触达 redis（无 Authorization 直接返回 null），stub 仅占位
   const stubRedis = { get: async () => null } as unknown as RedisService
-  const postController = new ActivityController(activity, new JwtService({ secret: 'verify-only-secret-0123456789' }), stubRedis)
+  const postController = new ActivityController(
+    activity,
+    new JwtService({ secret: 'verify-only-secret-0123456789' }),
+    stubRedis,
+    prisma,
+  )
 
   // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag 命中 org / endUser)。
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
@@ -74,6 +83,7 @@ async function main() {
   let draftFairCompanyId = ''
   let policyId = ''
   let draftJobId = ''
+  let terminalId = ''
 
   try {
     // ── 测试数据 ──────────────────────────────────────────────
@@ -81,6 +91,15 @@ async function main() {
     const a = await prisma.endUser.create({ data: { phoneHash: `ha-${tag}`, phoneEnc: 'enc-a' } })
     const b = await prisma.endUser.create({ data: { phoneHash: `hb-${tag}`, phoneEnc: 'enc-b' } })
     userA = a.id; userB = b.id
+    terminalId = `terminal-${tag}`
+    await prisma.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `code-${tag}`,
+        agentToken: `token-${tag}`,
+        deviceFingerprint: `fingerprint-${tag}`,
+      },
+    })
     const job = await prisma.job.create({
       data: {
         sourceOrgId: orgId, externalId: `ext-job-${tag}`, sourceName: '来源平台甲',
@@ -265,7 +284,36 @@ async function main() {
     }
     pass('11. 匿名上报 → recorded:false 且零落库（共享一体机不留影子记录）')
 
-    // ── 12. 禁词扫描 + 前端 fire-and-forget ──────────────────
+    // ── 12. 伪造 terminalId 降级为 null，不阻断上报 ──────────
+    ;(postController as unknown as { endUserIdOf: () => Promise<string> }).endUserIdOf = async () => userA
+    const terminalLog = await postController.browse(
+      { targetType: 'job', targetId: jobId, terminalId: 'forged-terminal-id' },
+      { headers: {} },
+    )
+    if (!(terminalLog as { data: { recorded: boolean } }).data.recorded) fail('12. 伪造终端不应拒绝浏览上报')
+    const terminalRow = await prisma.browseLog.findFirst({
+      where: { endUserId: userA, targetId: jobId },
+      orderBy: { createdAt: 'desc' },
+      select: { terminalId: true },
+    })
+    if (!terminalRow || terminalRow.terminalId !== null) fail('12. 伪造 terminalId 应按 null 落库')
+    if (Reflect.getMetadata(HTTP_CODE_METADATA, postController.browse) !== 200) {
+      fail('12. 浏览/跳转 best-effort 上报必须显式返回 200')
+    }
+    // 正向：真实 terminalCode 必须解析成 Terminal.id 落库（换 userB 绕开同人同目标的去重窗口）
+    ;(postController as unknown as { endUserIdOf: () => Promise<string> }).endUserIdOf = async () => userB
+    const realTerminalLog = await postController.browse({ targetType: 'job', targetId: jobId, terminalId: `code-${tag}` }, { headers: {} })
+    if (!(realTerminalLog as { data: { recorded: boolean } }).data.recorded) fail('12. 真实 terminalCode 上报不应被拒绝')
+    const realTerminalRow = await prisma.browseLog.findFirst({
+      where: { endUserId: userB, targetId: jobId },
+      orderBy: { createdAt: 'desc' },
+      select: { terminalId: true },
+    })
+    if (!realTerminalRow || realTerminalRow.terminalId !== terminalId) fail('12. 真实 terminalCode 应解析为 Terminal.id 落库')
+    ;(postController as unknown as { endUserIdOf: () => Promise<string> }).endUserIdOf = async () => userA
+    pass('12. 伪造 terminalId 不拒绝上报，BrowseLog 以 null 落库；真实 terminalCode 解析为 Terminal.id')
+
+    // ── 13. 禁词扫描 + 前端 fire-and-forget ──────────────────
     const repoRoot = join(__dirname, '..', '..', '..')
     const scanFiles = [
       'services/api/src/activity/activity.service.ts',
@@ -317,23 +365,23 @@ async function main() {
         .replaceAll('登录用户', '')
         .replaceAll('记录用于', '')
       for (const w of bannedCopy) {
-        if (content.includes(w)) fail(`12. ${f} 含违规状态文案「${w}」`)
+        if (content.includes(w)) fail(`13. ${f} 含违规状态文案「${w}」`)
       }
     }
     const kioskApi = readFileSync(join(repoRoot, 'apps/kiosk/src/services/api/activity.ts'), 'utf8')
-    if (!kioskApi.includes('.catch(() => {')) fail('12. 前端上报封装必须吞掉失败（fire-and-forget）')
-    if (!/recordBrowse[\s\S]{0,200}?\): void/.test(kioskApi)) fail('12. recordBrowse 应为 void（调用方不可 await 阻塞）')
-    pass('12. 禁词扫描通过；前端上报 fire-and-forget（记录失败不阻断主流程）')
+    if (!kioskApi.includes('.catch(() => {')) fail('13. 前端上报封装必须吞掉失败（fire-and-forget）')
+    if (!/recordBrowse[\s\S]{0,200}?\): void/.test(kioskApi)) fail('13. recordBrowse 应为 void（调用方不可 await 阻塞）')
+    pass('13. 禁词扫描通过；前端上报 fire-and-forget（记录失败不阻断主流程）')
 
-    // ── 13. TTL 清理 ─────────────────────────────────────────
+    // ── 14. TTL 清理 ─────────────────────────────────────────
     const expired = await prisma.browseLog.create({
       data: { endUserId: userA, targetType: 'job', targetId: jobId, expiresAt: new Date(Date.now() - 1000) },
     })
     const listBeforeCleanup = await activity.listBrowse(userA, PAGE)
-    if (listBeforeCleanup.items.some((x) => x.id === expired.id)) fail('13. 过期行不应出现在列表')
+    if (listBeforeCleanup.items.some((x) => x.id === expired.id)) fail('14. 过期行不应出现在列表')
     await activity.cleanupExpired()
-    if (await prisma.browseLog.findFirst({ where: { id: expired.id } })) fail('13. cron 应物理清理过期行')
-    pass('13. 过期行列表不可见且 cron 物理清理')
+    if (await prisma.browseLog.findFirst({ where: { id: expired.id } })) fail('14. cron 应物理清理过期行')
+    pass('14. 过期行列表不可见且 cron 物理清理')
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {
@@ -347,6 +395,7 @@ async function main() {
     await prisma.job.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.jobFair.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.policyPost.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
+    await prisma.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: { in: [userA, userB].filter(Boolean) } } }).catch(() => undefined)
     await prisma.organization.deleteMany({ where: { id: orgId } }).catch(() => undefined)
     await prisma.onModuleDestroy?.()

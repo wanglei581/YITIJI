@@ -53,31 +53,45 @@ export function FairCompaniesPage() {
     })
   }, [companies, search, zoneFilter])
 
+  const pageFrameProps = {
+    tone: 'wheat' as const,
+    title: '参会企业',
+    subtitle: fair ? `${fair.name} · ${companies.length} 家企业` : `${companies.length} 家企业`,
+    backLabel: '返回详情',
+    onBack: () => navigate(`/job-fairs/${fairId}`),
+  }
+
   if (loading) {
-    return <LoadingState className="h-full" />
+    return (
+      <KioskPageFrame {...pageFrameProps}>
+        <LoadingState className="h-full" />
+      </KioskPageFrame>
+    )
   }
 
   if (error) {
     return (
-      <ErrorState
-        message="加载失败，请稍后重试"
-        onRetry={() => navigate(`/job-fairs/${fairId}`)}
-        className="h-full"
-      />
+      <KioskPageFrame {...pageFrameProps}>
+        <ErrorState
+          message="加载失败，请稍后重试"
+          onRetry={() => navigate(`/job-fairs/${fairId}`)}
+          className="h-full"
+        />
+      </KioskPageFrame>
     )
   }
 
   if (companies.length === 0) {
-    return <EmptyState icon={BuildingIcon} title="暂无企业数据" className="h-full" />
+    return (
+      <KioskPageFrame {...pageFrameProps}>
+        <EmptyState icon={BuildingIcon} title="暂无企业数据" className="h-full" />
+      </KioskPageFrame>
+    )
   }
 
   return (
     <KioskPageFrame
-      tone="wheat"
-      title="参会企业"
-      subtitle={fair ? `${fair.name} · ${companies.length} 家企业` : `${companies.length} 家企业`}
-      backLabel="返回详情"
-      onBack={() => navigate(`/job-fairs/${fairId}`)}
+      {...pageFrameProps}
       badge={<FusionBadge icon={BuildingIcon}>{filtered.length} 家匹配</FusionBadge>}
       actionBar={
         <>

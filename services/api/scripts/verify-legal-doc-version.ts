@@ -16,6 +16,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { LegalController } from '../src/legal/legal.controller'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
@@ -106,6 +107,22 @@ async function main() {
       fail('legal.service.ts 审计日志缺少 action: legal_doc.activate')
     }
     pass('activate 方法写入 auditLog（action: legal_doc.activate）')
+  }
+
+  // ── 5a. 公开读取拒绝未知文档类型 ─────────────────────────────────────────
+  {
+    const controller = new LegalController({ getActive: async () => null } as never)
+    try {
+      await controller.getActive('unknown_legal_document')
+      fail('未知法务文档类型必须返回 400')
+    } catch (error) {
+      const status = (error as { getStatus?: () => number }).getStatus?.()
+      const response = (error as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } } | undefined
+      if (status !== 400 || response?.error?.code !== 'LEGAL_DOC_TYPE_INVALID') {
+        fail('未知法务文档类型应返回 LEGAL_DOC_TYPE_INVALID / 400')
+      }
+    }
+    pass('未知 kiosk legal type 返回 LEGAL_DOC_TYPE_INVALID / 400')
   }
 
   // ── 6. Kiosk LegalDocPage 有 API fetch 调用 ──────────────────────────────
