@@ -58,7 +58,7 @@ export interface MemberRedemptionItem {
   kind: string
   /** 关联 BenefitGrant id */
   benefitRef: string
-  /** 核销场景：order_redeem / resume_optimize / print_task 等 */
+  /** 核销场景：order_redeem / resume_optimize / resume_export / print_task 等 */
   serviceType: string
   /** 场景产物 id（orderId / taskId 等） */
   serviceRefId: string

@@ -377,6 +377,16 @@ export class AiController {
   }
 
   /**
+   * 简历导出收费三态（契约 2）。匿名只回 mode/价格；登录会员在 charged 时附带可用权益次数。
+   */
+  @Get('resume/export/pricing')
+  @Header('Cache-Control', 'no-store')
+  async getResumeExportPricing(@Req() req: ReqLike) {
+    const requester = await this.resolveAiResultRequester(req)
+    return this.aiService.getResumeExportPricing(requester.endUserId)
+  }
+
+  /**
    * 阶段2A — 导出确认后的简历为真实 PDF(FileObject + 签名 URL + 既有清理策略)。
    * 审计只放元数据(fileId/页数/大小),绝不包含简历内容。
    */
@@ -387,9 +397,11 @@ export class AiController {
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
+    await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     const { taskId, format, layout, templateId, draft, ...resume } = dto
+    delete (resume as { benefitGrantId?: string }).benefitGrantId
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true)
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId })
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',

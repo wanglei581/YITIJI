@@ -445,6 +445,23 @@ export interface ResumeLayoutSettings {
   accent?: ResumeLayoutAccent
 }
 
+/**
+ * 简历导出收费三态（契约 2 / Admin 价目 `resume_export`）。
+ * - free：unitCents=0 且 active，界面写「当前免费，不扣权益」
+ * - charged：unitCents>0 且 active，导出前展示价格 + 可用权益
+ * - unavailable：active=false 或价目缺失，fail-closed，不是免费
+ */
+export type ResumeExportPricingMode = 'free' | 'charged' | 'unavailable'
+
+/** GET /api/v1/resume/export/pricing */
+export interface ResumeExportPricing {
+  mode: ResumeExportPricingMode
+  unitCents: number
+  unit: string
+  benefit: { available: number; serviceType: 'resume_export' } | null
+  label: string
+}
+
 /** 导出响应:真实 FileObject + 短时签名 URL,可直接进打印链路(pdf)或下载(docx/txt/md) */
 export interface ResumeGenerateExportResponse {
   fileId: string

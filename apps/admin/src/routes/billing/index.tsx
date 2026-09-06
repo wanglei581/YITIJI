@@ -19,6 +19,7 @@ import {
 const SERVICE_LABELS: Record<string, string> = {
   print_bw_page: '黑白打印（每页）',
   print_color_page: '彩色打印（每页）',
+  resume_export: '简历导出（每次）',
 }
 
 const DISCREPANCY_LABELS: Record<string, string> = {
@@ -65,7 +66,9 @@ function PriceConfigSection() {
       }
       const unitCents = Math.round(parsed * 100)
       const zeroPriceNote = unitCents === 0
-        ? '\n0 元 = 免费打印，将跳过收银。'
+        ? (serviceKey === 'resume_export'
+          ? '\n0 元 = 当前免费，不扣权益。'
+          : '\n0 元 = 免费打印，将跳过收银。')
         : ''
       if (!window.confirm(`确认将「${SERVICE_LABELS[serviceKey] ?? serviceKey}」单价改为 ¥${(unitCents / 100).toFixed(2)}？${zeroPriceNote}\n改价即时对全端生效并记入审计。`)) return
       setSaving(serviceKey)
@@ -128,7 +131,9 @@ function PriceConfigSection() {
       const nextActive = !item.active
       const warn = nextActive
         ? '启用后该项恢复计价。'
-        : '停用后该项对应的打印报价会失败（不可下单），并非「免费」。确认停用？'
+        : item.serviceKey === 'resume_export'
+          ? '停用后简历导出不可用，并非「免费」。确认停用？'
+          : '停用后该项对应的打印报价会失败（不可下单），并非「免费」。确认停用？'
       if (!window.confirm(warn)) return
       setSaving(item.serviceKey)
       setError(null)
@@ -337,7 +342,7 @@ function ReconciliationSection() {
 export default function BillingPage() {
   const [tab, setTab] = useState<'price' | 'reconciliation'>('price')
   return (
-    <Page title="计费与对账" subtitle="打印价目管理（唯一合法改价路径，改价即时生效并记审计）与本地账本对账">
+    <Page title="计费与对账" subtitle="打印价目与简历导出管理（唯一合法改价路径，改价即时生效并记审计）。resume_export 对应一体机 / 小程序简历优化页的导出按钮；停用后导出不可用，并非免费。">
       <div className="mb-4 flex gap-2">
         {(
           [

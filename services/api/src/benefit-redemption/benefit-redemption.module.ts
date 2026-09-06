@@ -4,6 +4,7 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { PaymentModule } from '../payment/payment.module'
 import { BenefitRedemptionService } from './benefit-redemption.service'
 import { OrderRedeemController } from './order-redeem.controller'
+import { ResumeExportGateService } from './resume-export-gate.service'
 
 /**
  * 权益核销模块（P1 核销 SSOT + C5-4 订单核销扩展）。PrismaModule / AuditModule 均为 @Global。
@@ -27,7 +28,7 @@ import { OrderRedeemController } from './order-redeem.controller'
     }),
   ],
   controllers: [OrderRedeemController],
-  providers: [BenefitRedemptionService, EndUserAuthGuard],
-  exports: [BenefitRedemptionService],
+  providers: [BenefitRedemptionService, ResumeExportGateService, EndUserAuthGuard],
+  exports: [BenefitRedemptionService, ResumeExportGateService],
 })
 export class BenefitRedemptionModule {}

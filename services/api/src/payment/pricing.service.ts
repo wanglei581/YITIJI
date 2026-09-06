@@ -42,14 +42,19 @@ export class PricingService {
       select: { serviceKey: true, unitCents: true, unit: true, description: true },
     })
     if (rows.length === 0) throw new BadRequestException('PRICE_CONFIG_UNAVAILABLE')
-    return {
-      billingEnabled: true,
-      items: rows.map((r) => ({
+    const printKeys = new Set(['print_bw_page', 'print_color_page'])
+    const items = rows
+      .filter((r) => printKeys.has(r.serviceKey))
+      .map((r) => ({
         serviceKey: r.serviceKey,
         unitCents: r.unitCents,
         unit: r.unit,
         description: r.description ?? null,
-      })),
+      }))
+    if (items.length === 0) throw new BadRequestException('PRICE_CONFIG_UNAVAILABLE')
+    return {
+      billingEnabled: true,
+      items,
     }
   }
 

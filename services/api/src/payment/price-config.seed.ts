@@ -26,6 +26,8 @@ import { PRINT_UNIT_PRICE_CENTS } from '../print-jobs/print-pricing'
 export const DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION =
   'DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION'
 
+export const RESUME_EXPORT_SERVICE_KEY = 'resume_export'
+
 export const DEV_DEFAULT_PRICE_CONFIG = [
   {
     serviceKey: 'print_bw_page',
@@ -39,6 +41,12 @@ export const DEV_DEFAULT_PRICE_CONFIG = [
     unit: 'page',
     description: '彩色打印每页（开发默认价，非正式价）',
   },
+  {
+    serviceKey: RESUME_EXPORT_SERVICE_KEY,
+    unitCents: 0,
+    unit: 'item',
+    description: '简历导出（开发默认免费，非正式价；停用后导出不可用，不是免费）',
+  },
 ] as const
 
 /** 纯函数：生产环境禁止开发价 seed（供 seed 与 verify 共用）。 */
@@ -48,6 +56,25 @@ export function assertDevPriceSeedAllowed(
   if (env['NODE_ENV'] === 'production') {
     throw new Error(DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION)
   }
+}
+
+/**
+ * 保证 `resume_export` 目录行存在，绝不覆盖运营已改的单价 / 启停。
+ * 生产缺行时插入为停用（fail-closed，不是免费）；开发 / verify 缺行时插入为免费启用。
+ */
+export async function ensureResumeExportPriceConfig(prisma: PrismaService): Promise<void> {
+  const active = process.env['NODE_ENV'] !== 'production'
+  await prisma.priceConfig.upsert({
+    where: { serviceKey: RESUME_EXPORT_SERVICE_KEY },
+    create: {
+      serviceKey: RESUME_EXPORT_SERVICE_KEY,
+      unitCents: 0,
+      unit: 'item',
+      active,
+      description: '简历导出（停用后导出不可用，不是免费）',
+    },
+    update: {},
+  })
 }
 
 /** 幂等写入开发默认价目（upsert by serviceKey）。仅供 seed / verify 使用。 */

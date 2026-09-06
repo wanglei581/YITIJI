@@ -16,8 +16,9 @@ export type RedeemableBenefitType = (typeof REDEEMABLE_BENEFIT_TYPES)[number]
  * 核销服务点位：
  * - `resume_optimize`：P1 AI 简历优化（服务产物 = resume taskId，orderId 恒 null）。
  * - `order_redeem`：C5-4 订单抵扣（服务产物 = orderId，回填 orderId + amountCents 抵扣额）。
+ * - `resume_export`：简历导出（服务产物 = endUserId:taskId:内容哈希，同一内容不重复扣）。
  */
-export const REDEMPTION_SERVICE_TYPES = ['resume_optimize', 'order_redeem'] as const
+export const REDEMPTION_SERVICE_TYPES = ['resume_optimize', 'order_redeem', 'resume_export'] as const
 export type RedemptionServiceType = (typeof REDEMPTION_SERVICE_TYPES)[number]
 
 /** 核销入参（服务点位内部调用，endUserId 来自已认证会员，绝不接受任意 id）。 */

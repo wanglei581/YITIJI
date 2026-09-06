@@ -15,6 +15,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AdminUpdatePriceConfigDto } from './dto/admin-billing.dto'
+import { ensureResumeExportPriceConfig } from './price-config.seed'
 
 export interface AdminPriceConfigItem {
   serviceKey: string
@@ -35,6 +36,7 @@ export class AdminBillingService {
 
   /** 管理端全量价目（含 inactive；含时间戳，供审计对照）。 */
   async listPriceConfig(): Promise<{ items: AdminPriceConfigItem[] }> {
+    await ensureResumeExportPriceConfig(this.prisma)
     const rows = await this.prisma.priceConfig.findMany({ orderBy: { serviceKey: 'asc' } })
     return {
       items: rows.map((r) => ({
