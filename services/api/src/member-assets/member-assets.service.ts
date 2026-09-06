@@ -42,6 +42,14 @@ import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/reten
 
 /** 简历资产包含的 AiResumeResult 种类：parse=上传诊断，generate=AI 生成。 */
 const RESUME_KINDS = ['parse', 'generate'] as const
+/** 草稿 / 确认快照不单独成行，合并进对应 parse 行字段。 */
+const HIDDEN_RESUME_RESULT_KINDS = ['optimize_draft', 'optimize_confirmed'] as const
+
+interface ResumeDraftMeta {
+  optimized: boolean
+  hasDraft: boolean
+  latestVersion: number | null
+}
 
 @Injectable()
 export class MemberAssetsService {
@@ -68,29 +76,24 @@ export class MemberAssetsService {
       },
       ...memberPageArgs(page),
     })
-    // 仅查当前页 parse 行对应的 optimize 行（同样限定本人），标注「已生成优化版」。
     const parseTaskIds = rows.filter((r) => r.kind === 'parse').map((r) => r.taskId)
-    const optimizedTaskIds = new Set(
-      parseTaskIds.length === 0
-        ? []
-        : (
-            await this.prisma.aiResumeResult.findMany({
-              where: { endUserId, kind: 'optimize', taskId: { in: parseTaskIds } },
-              select: { taskId: true },
-            })
-          ).map((r) => r.taskId)
-    )
-    return buildMemberPage(rows, page, total, (r) => ({
-      id: r.id,
-      taskId: r.taskId,
-      kind: r.kind === 'generate' ? ('generate' as const) : ('parse' as const),
-      status: r.status,
-      provider: r.provider,
-      optimized: r.kind === 'parse' && optimizedTaskIds.has(r.taskId),
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-      expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
-    }))
+    const draftMeta = await loadResumeDraftMeta(this.prisma, endUserId, parseTaskIds)
+    return buildMemberPage(rows, page, total, (r) => {
+      const extra = r.kind === 'parse' ? draftMeta.get(r.taskId) : undefined
+      return {
+        id: r.id,
+        taskId: r.taskId,
+        kind: r.kind === 'generate' ? ('generate' as const) : ('parse' as const),
+        status: r.status,
+        provider: r.provider,
+        optimized: extra?.optimized ?? false,
+        hasDraft: extra?.hasDraft ?? false,
+        latestVersion: extra?.latestVersion ?? null,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
+      }
+    })
   }
 
   /** 我的文档：本人 FileObject（仅元数据 + 临时访问端点路径，无文件内容）。 */
@@ -199,7 +202,11 @@ export class MemberAssetsService {
     endUserId: string,
     page: MemberPageQuery
   ): Promise<MemberAiRecordPage> {
-    const where = { endUserId, expiresAt: { gt: new Date() } }
+    const where = {
+      endUserId,
+      expiresAt: { gt: new Date() },
+      kind: { notIn: [...HIDDEN_RESUME_RESULT_KINDS] },
+    }
     const now = new Date()
     const [total, rows, qaRows] = await Promise.all([
       this.prisma.aiResumeResult.count({ where }),
@@ -236,7 +243,11 @@ export class MemberAssetsService {
         },
       }),
     ])
-    const list = buildMemberPage(rows, page, total, (r): MemberAiRecordItem => ({
+    const parseTaskIds = rows.filter((r) => r.kind === 'parse').map((r) => r.taskId)
+    const draftMeta = await loadResumeDraftMeta(this.prisma, endUserId, parseTaskIds)
+    const list = buildMemberPage(rows, page, total, (r): MemberAiRecordItem => {
+      const extra = r.kind === 'parse' ? draftMeta.get(r.taskId) : undefined
+      return {
       id: r.id,
       taskId: r.taskId,
       // generate 必须如实展示为「生成」，绝不冒充「解析」（C-2D 验收点）。
@@ -251,10 +262,14 @@ export class MemberAssetsService {
           : 'parse',
       status: r.status,
       provider: r.provider,
+      optimized: extra?.optimized ?? r.kind === 'optimize',
+      hasDraft: extra?.hasDraft ?? false,
+      latestVersion: extra?.latestVersion ?? null,
       createdAt: r.createdAt.toISOString(),
       expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
       ref: r.kind === 'fair_visit_plan' ? parseFairVisitPlanRef(r.payloadJson) : null,
-    }))
+      }
+    })
     const qaRecords: MemberQaRecordItem[] = qaRows.map((row) => ({
       id: row.id,
       sessionId: row.sessionId,
@@ -355,6 +370,52 @@ export class MemberAssetsService {
       deletedCount: deletion.deletedCount,
     }
   }
+}
+
+async function loadResumeDraftMeta(
+  prisma: PrismaService,
+  endUserId: string,
+  parseTaskIds: string[],
+): Promise<Map<string, ResumeDraftMeta>> {
+  const meta = new Map<string, ResumeDraftMeta>()
+  for (const taskId of parseTaskIds) {
+    meta.set(taskId, { optimized: false, hasDraft: false, latestVersion: null })
+  }
+  if (parseTaskIds.length === 0) return meta
+  const flags = await prisma.aiResumeResult.findMany({
+    where: {
+      endUserId,
+      taskId: { in: parseTaskIds },
+      kind: { in: ['optimize', 'optimize_draft'] },
+    },
+    select: { taskId: true, kind: true },
+  })
+  for (const row of flags) {
+    const current = meta.get(row.taskId) ?? { optimized: false, hasDraft: false, latestVersion: null }
+    if (row.kind === 'optimize') current.optimized = true
+    else current.hasDraft = true
+    meta.set(row.taskId, current)
+  }
+  const confirmed = await prisma.aiResumeResult.findMany({
+    where: {
+      endUserId,
+      taskId: { in: parseTaskIds },
+      kind: 'optimize_confirmed',
+    },
+    select: { taskId: true, payloadJson: true },
+  })
+  for (const row of confirmed) {
+    const current = meta.get(row.taskId) ?? { optimized: false, hasDraft: false, latestVersion: null }
+    try {
+      const parsed = JSON.parse(row.payloadJson) as { version?: unknown }
+      const version = Number(parsed.version)
+      if (Number.isInteger(version) && version >= 1) current.latestVersion = version
+    } catch {
+      // 确认快照损坏时不把列表打挂，latestVersion 保持 null。
+    }
+    meta.set(row.taskId, current)
+  }
+  return meta
 }
 
 function classifyDeletedBy(

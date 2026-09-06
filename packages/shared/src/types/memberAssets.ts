@@ -48,6 +48,10 @@ export interface MemberResumeItem {
   provider: string
   /** 是否已生成优化版（同 taskId 是否存在 optimize 行） */
   optimized: boolean
+  /** 是否有登录用户编辑草稿（optimize_draft，不单独成行） */
+  hasDraft: boolean
+  /** 最近一次导出确认版本号；无确认快照为 null */
+  latestVersion: number | null
   createdAt: string
   updatedAt: string
   /** 留存到期时间；到期后被清理治理移除，列表不再返回 */
@@ -104,6 +108,12 @@ export interface MemberAiRecordItem {
   kind: MemberAiRecordKind
   status: AiTaskStatus
   provider: string
+  /** parse 行：同 taskId 是否已有 optimize。其它 kind 为 false。 */
+  optimized: boolean
+  /** parse 行：同 taskId 是否有 optimize_draft。其它 kind 为 false。 */
+  hasDraft: boolean
+  /** parse 行：optimize_confirmed.version；无快照或非 parse 为 null。 */
+  latestVersion: number | null
   createdAt: string
   expiresAt: string | null
 }

@@ -72,6 +72,14 @@ assert(resumeAssetsReview.includes('默认保存 90 天') && resumeAssetsReview.
 assert(ai.includes('AI_RESUME_RESULT_TTL_HOURS') && ai.includes('raw : 24'), 'AI 简历结果默认 TTL 代码为 24 小时')
 assert(doc.includes('AI 简历结果') && doc.includes('24 小时'), '文档声明 AI 简历结果默认 24 小时')
 
+const memberAssets = read('services/api/src/member-assets/member-assets.service.ts')
+const draftStore = read('services/api/src/ai/resume/resume-draft.store.ts')
+assert(draftStore.includes("KIND_OPTIMIZE_DRAFT = 'optimize_draft'"), '草稿 kind=optimize_draft 已约定')
+assert(draftStore.includes("KIND_OPTIMIZE_CONFIRMED = 'optimize_confirmed'"), '确认快照 kind=optimize_confirmed 已约定')
+assert(memberAssets.includes("HIDDEN_RESUME_RESULT_KINDS"), '列表不把草稿/确认快照单独成行')
+assert(memberAssets.includes("row.kind === 'parse' ? { endUserId, taskId: row.taskId }"), '删除 parse 按 taskId 级联草稿与确认快照')
+assert(ai.includes('persistPayload') && ai.includes('optimize_confirmed'), '确认快照与草稿写入同一 AiResumeResult TTL 窗口')
+
 assert(interview.includes('const MEMBER_TTL_MS = 7 * 24 * 60 * 60 * 1000'), '会员模拟面试记录 TTL 代码为 7 天')
 assert(doc.includes('模拟面试') && doc.includes('7 天'), '文档声明会员模拟面试记录 7 天')
 

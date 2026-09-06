@@ -21,6 +21,8 @@ export interface MemberResumeItem {
   status: string
   provider: string
   optimized: boolean
+  hasDraft: boolean
+  latestVersion: number | null
   createdAt: string
   updatedAt: string
   expiresAt: string | null
@@ -71,6 +73,12 @@ export interface MemberAiRecordItem {
   kind: MemberAiRecordKind
   status: string
   provider: string
+  /** parse 行：同 taskId 是否已有 optimize。其它 kind 为 false。 */
+  optimized: boolean
+  /** parse 行：同 taskId 是否有 optimize_draft。其它 kind 为 false。 */
+  hasDraft: boolean
+  /** parse 行：optimize_confirmed.version；无快照或非 parse 为 null。 */
+  latestVersion: number | null
   createdAt: string
   expiresAt: string | null
   /** 仅 fair_visit_plan：从 payload.basedOn 抽出的窄字段，不回传 payload。 */

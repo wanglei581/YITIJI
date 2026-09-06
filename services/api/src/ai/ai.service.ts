@@ -35,6 +35,7 @@ import {
 } from '../benefit-redemption/resume-export-gate.service'
 import { RedisInflightLock } from './redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
+import { ResumeDraftStore } from './resume/resume-draft.store'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -110,6 +111,7 @@ export class AiService {
   private readonly logger = new Logger(AiService.name)
   private readonly provider: AiProvider
   private readonly optimizeLock: RedisInflightLock
+  private readonly drafts: ResumeDraftStore
 
   constructor(
     private readonly mockProvider: MockAiProvider,
@@ -156,6 +158,12 @@ export class AiService {
       llm:    this.llmResumeProvider,
     }
     this.provider = providerMap[name]
+    this.drafts = new ResumeDraftStore({
+      prisma: this.prisma,
+      extraction: this.resumeExtraction,
+      loadAuthorized: this.loadAuthorizedResult.bind(this),
+      persist: this.persistPayload.bind(this),
+    })
   }
 
   /**
@@ -165,6 +173,9 @@ export class AiService {
    * accessTokenHash（Phase C-2A）：仅匿名 parse 铸造的令牌 hash，或 optimize 继承自 parse 行的 hash。
    * 显式传 string → 写入；传 null → 写 null（会员行）；传 undefined → update 时保持原值不动。
    * 注意：payload 里绝不含明文 token（response 才返回明文一次），DB 只存 hash。
+   *
+   * kind 仅允许 parse / optimize / generate。草稿与导出快照走 persistPayload 的
+   * optimize_draft / optimize_confirmed，避免重新生成 optimize 覆盖已确认版本。
    */
   private async persistResult(
     taskId: string,
@@ -174,13 +185,25 @@ export class AiService {
     endUserId?: string | null,
     accessTokenHash?: string | null,
   ): Promise<void> {
-    // 明文 token 只在 response 返回；落库前从 payload 防御性摘掉 accessToken，
-    // 确保即便未来调整调用顺序，payloadJson 也绝不含明文 token。
     const persistablePayload: Record<string, unknown> = { ...payload }
     delete persistablePayload['accessToken']
-    const payloadJson = JSON.stringify(persistablePayload)
+    await this.persistPayload(taskId, kind, status, persistablePayload, endUserId, accessTokenHash)
+  }
+
+  /**
+   * 通用 kind 写入。optimize_draft / optimize_confirmed 只能经此入口，
+   * persistResult 的联合类型把它们排除在重新生成路径之外。
+   */
+  private async persistPayload(
+    taskId: string,
+    kind: string,
+    status: string,
+    payload: unknown,
+    endUserId?: string | null,
+    accessTokenHash?: string | null,
+  ): Promise<void> {
+    const payloadJson = JSON.stringify(payload)
     const provider = this.provider.name
-    // 每次写入(含 update)都刷新留存窗口,避免活跃任务被提前清理。
     const expiresAt = new Date(Date.now() + AI_RESUME_RESULT_TTL_HOURS * 60 * 60 * 1000)
     try {
       await this.prisma.aiResumeResult.upsert({
@@ -200,7 +223,6 @@ export class AiService {
         },
       })
     } catch (err) {
-      // 不打印 payload（可能含简历正文），只记可定位的非内容元数据。
       this.logger.error(
         `AI 结果持久化失败 taskId=${taskId} kind=${kind} status=${status} provider=${provider}: ` +
           (err instanceof Error ? err.message : String(err)),
@@ -319,7 +341,7 @@ export class AiService {
    */
   private async loadAuthorizedResult<T>(
     taskId: string,
-    kind: 'parse' | 'optimize' | 'generate',
+    kind: string,
     requester: AiResultRequester,
   ): Promise<T | null> {
     const row = await this.prisma.aiResumeResult.findUnique({
@@ -368,6 +390,30 @@ export class AiService {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
     return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester))
+  }
+
+  /** PUT /resume/records/:taskId/draft — 仅登录用户；匿名 404。 */
+  saveResumeDraft(
+    taskId: string,
+    input: { resume: GeneratedResume; layout?: ResumeLayoutSettings; decisions?: Record<string, unknown> },
+    requester: AiResultRequester,
+  ) {
+    return this.drafts.saveDraft(taskId, input, requester)
+  }
+
+  /** GET /resume/records/:taskId/draft — 仅登录用户；匿名 404。无草稿返回 draft:null。 */
+  getResumeDraft(taskId: string, requester: AiResultRequester) {
+    return this.drafts.getDraft(taskId, requester)
+  }
+
+  /** GET /resume/records/:taskId/versions — 仅登录用户；匿名 404。 */
+  listResumeVersions(taskId: string, requester: AiResultRequester) {
+    return this.drafts.listVersions(taskId, requester)
+  }
+
+  /** POST /resume/records/:taskId/fact-check — 鉴权同 GET record。 */
+  factCheckResume(taskId: string, requester: AiResultRequester) {
+    return this.drafts.factCheck(taskId, requester)
   }
 
   private async computeResumeOptimize(
@@ -691,7 +737,7 @@ export class AiService {
      * 只影响 PDF 元数据诚实性（AIGenerated='false'），排版与既有导出逐字一致。
      */
     draft = false,
-    charge?: { taskId?: string | null; benefitGrantId?: string | null },
+    charge?: { taskId?: string | null; benefitGrantId?: string | null; factsConfirmedAt?: string },
   ): Promise<{
     fileId: string
     filename: string
@@ -703,6 +749,12 @@ export class AiService {
      *  docx/txt/md 签发另外渲染的同内容 PDF 副本(Wave 6),不是原文件本身。 */
     printFileUrl?: string
   }> {
+    await this.drafts.assertFactsConfirmed({
+      endUserId,
+      taskId: charge?.taskId,
+      factsConfirmedAt: charge?.factsConfirmedAt,
+      draft,
+    })
     const decision = await this.assertExportAllowed({
       endUserId,
       taskId: charge?.taskId,
@@ -796,6 +848,14 @@ export class AiService {
     }
 
     await this.commitExportRedemption(decision)
+    if (charge?.taskId) {
+      await this.drafts.persistConfirmed({
+        taskId: charge.taskId,
+        endUserId,
+        fileId: uploaded.fileId,
+        factsConfirmedAt: charge.factsConfirmedAt,
+      })
+    }
     return {
       fileId: uploaded.fileId,
       filename: uploaded.filename,

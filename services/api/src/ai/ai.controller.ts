@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Controller, Post, Put, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -23,6 +23,7 @@ import type { AdminAiUsage, AdminAiLogsResult, AiLogStatus, AiOperation } from '
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
 import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
+import { ResumeDraftPutDto } from './dto/resume-draft.dto'
 import { RESUME_VOICE_AUDIO_FIELD, RESUME_VOICE_MAX_AUDIO_BYTES, type ResumeVoiceTranscribeResponseDto } from './dto/resume-voice.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
@@ -96,6 +97,10 @@ function isWavBuffer(buffer: Buffer): boolean {
 //
 // GET  /resume/records/:taskId           — 查询解析结果
 // GET  /resume/records/:taskId/optimize  — 查询优化建议
+// PUT  /resume/records/:taskId/draft     — 登录用户保存编辑草稿
+// GET  /resume/records/:taskId/draft     — 登录用户读取编辑草稿
+// GET  /resume/records/:taskId/versions  — 登录用户读取导出确认版本
+// POST /resume/records/:taskId/fact-check — 事实核对（学校/公司/时间/证书/电话/邮箱）
 // POST /resume/parse                     — 提交简历解析
 // POST /assistant/chat                   — AI 助手对话
 // POST /assistant/voice                  — 小青按住说话转写
@@ -254,6 +259,61 @@ export class AiController {
     return result
   }
 
+  @Put('resume/records/:taskId/draft')
+  @Header('Cache-Control', 'no-store')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async putResumeDraft(
+    @Param('taskId') taskId: string,
+    @Body() dto: ResumeDraftPutDto,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (!requester.endUserId) {
+      throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' } })
+    }
+    await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
+    return this.aiService.saveResumeDraft(taskId, dto, requester)
+  }
+
+  @Get('resume/records/:taskId/draft')
+  @Header('Cache-Control', 'no-store')
+  async getResumeDraft(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (!requester.endUserId) {
+      throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' } })
+    }
+    return this.aiService.getResumeDraft(taskId, requester)
+  }
+
+  @Get('resume/records/:taskId/versions')
+  @Header('Cache-Control', 'no-store')
+  async listResumeVersions(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (!requester.endUserId) {
+      throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' } })
+    }
+    return this.aiService.listResumeVersions(taskId, requester)
+  }
+
+  @Post('resume/records/:taskId/fact-check')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async factCheckResume(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (requester.endUserId) {
+      await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
+    }
+    return this.aiService.factCheckResume(taskId, requester)
+  }
+
   @Post('resume/records/:taskId/layout-adjust')
   @PaidAiThrottle(6)
   async adjustResumeLayout(
@@ -404,8 +464,9 @@ export class AiController {
     await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     const { taskId, format, layout, templateId, draft, ...resume } = dto
     delete (resume as { benefitGrantId?: string }).benefitGrantId
+    delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId })
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt })
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
