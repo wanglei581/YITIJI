@@ -107,7 +107,7 @@ class FakeFiles {
       mimeType: 'application/pdf',
       sha256: 'a'.repeat(64),
       signedUrl: 'https://files.invalid/derived-pdf',
-      signedUrlExpiresAt: '2026-09-06T12:00:00.000Z',
+      signedUrlExpiresAt: '2099-01-01T12:00:00.000Z',
       fileExpiresAt: null,
     }
   }
@@ -255,7 +255,7 @@ async function verifyRuntime(): Promise<void> {
       printTask: {
         create: async ({ data }: { data: Record<string, unknown> }) => {
           printTaskData = data
-          return { id: String(data.id), status: 'pending', createdAt: new Date('2026-09-06T12:00:00.000Z') }
+          return { id: String(data.id), status: 'pending', createdAt: new Date('2000-01-01T12:00:00.000Z') }
         },
       },
       order: {
@@ -292,7 +292,7 @@ async function verifyRuntime(): Promise<void> {
         sizeBytes: pdf.length,
         pageCount: 1,
         signedUrl: 'https://files.invalid/derived',
-        expiresAt: '2026-09-06T12:30:00.000Z',
+        expiresAt: '2099-01-01T12:30:00.000Z',
         printFileUrl: signFileUrl(derivedFileId).url,
         engine: 'soffice',
         warnings: [],
