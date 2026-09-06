@@ -73,20 +73,15 @@ test('场馆导览加载失败后可原页重试并进入诚实空态 @kiosk', a
   await expect(page.getByText('暂无场馆导览数据')).toBeVisible()
 })
 
-test('导出直达保持无真实产物守门 @kiosk', async ({ page, api }) => {
+test('导出直达已下线为优化页兼容重定向 @kiosk', async ({ page, api }) => {
   registerW4Api(api)
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
   await page.goto('/resume/export')
-  await expect(page.getByRole('button', { name: '保存到我的简历' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '打印', exact: true })).toBeDisabled()
-
-  const shellBox = await page.locator('.resume-lightflow__shell').boundingBox()
-  expect(shellBox?.width ?? 0).toBeGreaterThanOrEqual(900)
+  await expect(page).toHaveURL(/\/resume\/optimize$/)
+  await expect(page.getByText('请先上传简历完成诊断')).toBeVisible()
   const buttonHeights = await page.locator('button:visible').evaluateAll((buttons) => (
     buttons.map((button) => button.getBoundingClientRect().height)
   ))
   expect(Math.min(...buttonHeights)).toBeGreaterThanOrEqual(48)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-
-  await page.getByRole('button', { name: /返回真实简历流程/ }).click()
-  await expect(page).toHaveURL(/\/resume\/source$/)
 })

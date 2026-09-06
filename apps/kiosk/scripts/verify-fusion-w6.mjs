@@ -242,8 +242,9 @@ check('106/106 routes', () => {
   assert.equal(manifest.paths.length, 106, `manifest exposes ${manifest.paths.length} route patterns`)
   assert.equal(new Set(manifest.paths).size, 106, 'manifest route patterns must be unique')
   assert.deepEqual([...actual].sort(), [...manifest.paths].sort(), 'router and frozen manifest differ')
-  // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6（106 路由总数不变）。
-  assert.equal(manifest.redirects.size, 6, 'manifest must contain six compatibility redirects')
+  // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
+  // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7（106 路由总数不变）。
+  assert.equal(manifest.redirects.size, 7, 'manifest must contain seven compatibility redirects')
   for (const [path, target] of manifest.redirects) {
     const route = routeInventory.find((candidate) => candidate.path === path)
     assert.ok(route?.redirect, `${path} must render Navigate`)

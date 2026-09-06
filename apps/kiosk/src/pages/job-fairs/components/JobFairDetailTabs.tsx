@@ -19,7 +19,6 @@ import {
   FilterIcon,
   InfoIcon,
   MapIcon,
-  MapPinIcon,
   MessageCircleQuestionIcon,
   MonitorIcon,
   NavigationIcon,
@@ -27,6 +26,7 @@ import {
   SparklesIcon,
 } from 'lucide-react'
 import { getFairVenueGuide } from '../../../services/api'
+import { MapBlock } from './MapBlock'
 
 // 参展企业头像配色（按企业名 hash）
 const AVATAR_COLORS = ['bg-primary-500', 'bg-plum', 'bg-warning', 'bg-error', 'bg-success', 'bg-info', 'bg-plum', 'bg-neutral-700']
@@ -67,32 +67,6 @@ function formatSync(iso: string) {
 }
 
 // ─── Tab① 详情与特色 ─────────────────────────────────────────────────────────────
-
-// 高德静态地图 key（生产/合规优先）。未配置则回退 OSM 嵌入（演示用，无 key）。
-const AMAP_KEY = (import.meta.env as Record<string, string | undefined>).VITE_AMAP_KEY
-
-function MapBlock({ lat, lng, mapImageUrl, venue }: { lat?: number; lng?: number; mapImageUrl?: string; venue: string }) {
-  const cls = 'h-full min-h-[15rem] w-full'
-  if (mapImageUrl) {
-    return <img src={mapImageUrl} alt={`${venue}位置导览图`} className={`${cls} object-cover`} />
-  }
-  if (lat != null && lng != null) {
-    if (AMAP_KEY) {
-      const src = `https://restapi.amap.com/v3/staticmap?location=${lng},${lat}&zoom=15&size=750*400&scale=2&markers=mid,,A:${lng},${lat}&key=${AMAP_KEY}`
-      return <img src={src} alt={`${venue}地图`} className={`${cls} object-cover`} />
-    }
-    const d = 0.012
-    const bbox = `${(lng - d).toFixed(5)},${(lat - d * 0.62).toFixed(5)},${(lng + d).toFixed(5)},${(lat + d * 0.62).toFixed(5)}`
-    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
-    return <iframe src={src} title={`${venue}位置地图`} className={`${cls} border-0`} loading="lazy" />
-  }
-  return (
-    <div className={`${cls} flex flex-col items-center justify-center gap-1.5 bg-neutral-50 text-neutral-400`}>
-      <MapPinIcon className="h-7 w-7" />
-      <span className="text-xs">暂无地图，可扫码在手机查看</span>
-    </div>
-  )
-}
 
 export function DetailsTab({
   fair,

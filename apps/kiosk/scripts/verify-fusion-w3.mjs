@@ -175,7 +175,6 @@ const screens = new Map([
   ['src/pages/resume/ResumeGeneratePage.tsx', 'resume-generate'],
   ['src/pages/resume/ResumeGeneratePreviewPage.tsx', 'resume-generate-preview'],
   ['src/pages/resume/ResumeOptimizePage.tsx', 'resume-optimize'],
-  ['src/pages/resume/ResumeExportPage.tsx', 'resume-export'],
   ['src/pages/resume/ResumeTemplateLibraryPage.tsx', 'resume-templates'],
   ['src/pages/resume/JobMaterialLibraryPage.tsx', 'resume-materials'],
   ['src/pages/resume/JobFitPage.tsx', 'resume-job-fit'],
@@ -258,7 +257,9 @@ includes('src/pages/resume/ResumeGeneratePreviewPage.tsx', 'exported?.printFileU
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'confirmLeave', 'optimization keeps dirty-leave protection')
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimization keeps busy lock')
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'setExported(null)', 'content/layout changes invalidate stale export')
-includes('src/pages/resume/ResumeExportPage.tsx', '当前流程尚未生成可导出的真实文件', 'export keeps honest no-context state')
+check(!existsSync(join(ROOT, 'src/pages/resume/ResumeExportPage.tsx')), 'AI-07 ResumeExportPage is deleted')
+includes('src/routes/index.tsx', 'path: \'resume/export\'', 'AI-07 keeps /resume/export as a compatibility route')
+includes('src/routes/index.tsx', '<Navigate to="/resume/optimize" replace />', 'AI-07 /resume/export redirects to real optimize export')
 includes('src/pages/resume/ResumeTemplateLibraryPage.tsx', 'getResumeTemplates()', 'templates keep real loading')
 includes('src/pages/resume/JobMaterialLibraryPage.tsx', 'readJobMaterialDraft()', 'materials keep draft recovery')
 includes('src/pages/resume/JobMaterialLibraryPage.tsx', 'generated.printFileUrl', 'materials print only real output')

@@ -72,6 +72,7 @@ function codeMustNotContain(path, tokens, message, base = root) {
 
 const ADAPTER = 'src/services/api/stats.ts'
 const PAGE = 'src/routes/stats/index.tsx'
+const DASHBOARD = 'src/routes/dashboard/index.tsx'
 
 console.log('\n=== Partner /stats 契约与诚实性门禁 ===')
 
@@ -174,6 +175,30 @@ mustContain(
   PAGE,
   ['无可比基期', 'deltaPercent === null'],
   'B7. 无可比基期时如实说明，不伪造环比',
+)
+
+// B8. PTR-15：无归因数据时不承诺「效果」
+mustContain(
+  PAGE,
+  ['subtitle="同步概况"', '暂无归因数据'],
+  'B8. /stats 副标题为「同步概况」，归因区块仍如实标注暂无数据',
+)
+mustNotContain(
+  PAGE,
+  ['产生了什么效果', '同步效果', '曝光与跳转效果'],
+  'B8b. /stats 页不承诺效果或曝光漏斗',
+)
+
+// B9. PTR-13：工作台「待审核」与统计页同一服务端口径 snapshot.pendingReview
+mustContain(
+  DASHBOARD,
+  ['getPartnerStats', 'stats.snapshot.pendingReview', 'pendingReview'],
+  'B9. 工作台待审核数取自 GET /partner/stats snapshot.pendingReview',
+)
+mustNotContain(
+  DASHBOARD,
+  ['data.pendingTotal', 'pendingTotal }'],
+  'B9b. 工作台待审核标题不再使用 dashboard.pendingTotal',
 )
 
 // ── C. 与 honest-placeholders 门禁的交接 ───────────────────────────────────

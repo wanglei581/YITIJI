@@ -173,6 +173,18 @@ check('offline agency presentation does not invent unavailable metrics or live s
   assert.doesNotMatch(offlineAgencies, /'营业中'|"营业中"/)
   assert.match(offlineAgencies, /服务时间以机构公示为准/)
   assert.doesNotMatch(offlineJobDetail, /agencyServices as string|Array\.isArray\(job\.agencyServices\)/)
+  // JOB-12：徽章读服务端 status；假「全部区域」chip 不得写死。
+  assert.match(offlineAgencies, /agencyStatusBadge\(agency\.status\)/)
+  assert.doesNotMatch(offlineAgencies, /全部区域/)
+  assert.match(offlineAgencies, /district: district \|\| undefined/)
+})
+check('fair subpages do not fake syncTime with activity startTime', () => {
+  const fairCompaniesPage = read('src/pages/job-fairs/FairCompaniesPage.tsx')
+  const fairMapPage = read('src/pages/job-fairs/FairMapPage.tsx')
+  assert.doesNotMatch(fairCompaniesPage, /syncTime \?\? fair\.startTime/)
+  assert.doesNotMatch(fairMapPage, /syncTime \?\? fair\.startTime/)
+  assert.doesNotMatch(fairMaterials, /syncTime \?\? fair\.startTime/)
+  assert.match(w4Presentation, /同步时间未知/)
 })
 check('company detail retains browse and external jump records', () => {
   assert.match(companiesPage, /className="min-h-12 min-w-0 flex-1 bg-transparent/, 'company search input keeps the kiosk 48px touch target')

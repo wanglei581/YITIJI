@@ -116,7 +116,9 @@ export const visualEvidenceTargets: readonly VisualEvidenceTarget[] = [
   primary({ targetId: '25', prototypePath: 'docs/design/kiosk-proto-2026-07/25-resume-generate.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/generate'], captureUrls: ['/resume/generate'], precondition: 'Open the blank generator form; do not submit personal information.', readyMarker: '[data-kiosk-screen="resume-generate"]' }),
   primary({ targetId: '26', prototypePath: 'docs/design/kiosk-proto-2026-07/26-resume-generate-preview.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/generate/preview'], captureUrls: ['/resume/generate/preview'], precondition: 'Provide a synthetic generated-resume preview through the current envelope.', readyMarker: '[data-kiosk-screen="resume-generate-preview"]' }),
   primary({ targetId: '27', prototypePath: 'docs/design/kiosk-proto-2026-07/27-resume-parse.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/parse'], captureUrls: ['/resume/parse'], precondition: 'Enter with a synthetic file identifier and a deferred parse response.', readyMarker: '[data-kiosk-screen="resume-parse"]' }),
-  primary({ targetId: '28', prototypePath: 'docs/design/kiosk-proto-2026-07/28-resume-export.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/export'], captureUrls: ['/resume/export'], precondition: 'Capture the honest no-artifact state unless a contract artifact is supplied.', readyMarker: '[data-kiosk-screen="resume-export"]' }),
+  // 28（简历导出原型）由 /resume/optimize 承载：真实导出在优化页完成，
+  // /resume/export 已下线为兼容重定向，不再产出独立视觉对。
+  primary({ targetId: '28', prototypePath: 'docs/design/kiosk-proto-2026-07/28-resume-export.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/optimize'], captureUrls: ['/resume/optimize'], precondition: 'Capture the real export surface on optimize; the orphan /resume/export route is a compatibility redirect.', readyMarker: '[data-kiosk-screen="resume-optimize"]' }),
   primary({ targetId: '29', prototypePath: 'docs/design/kiosk-proto-2026-07/29-resume-templates.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/templates'], captureUrls: ['/resume/templates'], precondition: 'Return synthetic template metadata without downloadable user files.', readyMarker: '[data-kiosk-screen="resume-templates"]' }),
   primary({ targetId: '30', prototypePath: 'docs/design/kiosk-proto-2026-07/30-resume-materials.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/materials'], captureUrls: ['/resume/materials'], precondition: 'Return synthetic job-material template metadata.', readyMarker: '[data-kiosk-screen="resume-materials"]' }),
   primary({ targetId: '31', prototypePath: 'docs/design/kiosk-proto-2026-07/31-print-material-check.html', referenceKind: 'PRIMARY', routeOrState: ['/print/material-check'], captureUrls: ['/print/material-check'], precondition: 'Enter with a synthetic uploaded-file context and inspection envelope.', readyMarker: '[data-w2-page="print-material-check"]' }),
@@ -265,7 +267,7 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   route('/resume/generate/preview', ['26']),
   route('/resume/parse', ['27']),
   route('/resume/report', ['06']),
-  route('/resume/optimize', ['07']),
+  route('/resume/optimize', ['07', '28']),
   // S2-1 拆页，2026-07 原型冻结之后新增：同上，只登记生产侧证据与原型缺口。
   routeDisposition({
     routePattern: '/resume/optimize/compare',
@@ -276,7 +278,7 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
     claimScope: 'Production-only route evidence and explicit prototype-gap record.',
     knownLimits: 'Added after the 2026-07 prototype freeze; its design baseline sits in the separate kiosk-ai-os-v3-2026-08 set, which this contract does not own. Target 07 stays bound to /resume/optimize, so no prototype/production screenshot pair may be claimed for this route.',
   }),
-  route('/resume/export', ['28']),
+  redirect('/resume/export', '/resume/optimize'),
   route('/resume/templates', ['29']),
   route('/resume/materials', ['30']),
   productionOnly('/resume-service'),

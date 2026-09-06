@@ -215,7 +215,7 @@ function AttributionNotice({
       <div className="flex gap-3">
         <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
         <div className="min-w-0 space-y-2 text-sm text-neutral-600">
-          <p className="font-bold text-neutral-800">曝光与跳转效果：暂无归因数据</p>
+          <p className="font-bold text-neutral-800">暂无归因数据</p>
           <p>
             列表曝光、详情浏览、打开来源平台、资料打印这四项，以及由它们组成的转化漏斗、
             内容排行、时段与点位分布，<strong>当前都算不出来</strong>——
@@ -331,7 +331,7 @@ export default function StatsPage() {
   return (
     <Page
       title="数据统计"
-      subtitle="我发布的内容产生了什么效果"
+      subtitle="同步概况"
       actions={<PeriodSelector value={period} onChange={setPeriod} />}
     >
       {state === 'loading' ? (
@@ -361,11 +361,11 @@ export default function StatsPage() {
             )}
           </section>
 
-          {/* 同步效果 —— 周期内，含环比 */}
-          <section aria-label="同步效果">
+          {/* 同步概况 —— 周期内，含环比；不承诺曝光/跳转效果 */}
+          <section aria-label="同步概况">
             <div className="mb-2.5 flex items-center gap-2">
               <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-              <h2 className="text-[13px] font-bold text-neutral-700">同步效果</h2>
+              <h2 className="text-[13px] font-bold text-neutral-700">同步概况</h2>
               <span className="text-[11.5px] text-neutral-400">
                 {data.period.label}（{data.period.from} ~ {data.period.to}）· 时区 {data.timezone}
               </span>
@@ -396,11 +396,11 @@ export default function StatsPage() {
             )}
           </section>
 
-          {/* 归因 —— 恒不可用，如实说明 */}
-          <section aria-label="曝光与跳转效果">
+          {/* 归因 —— 恒不可用，如实说明，不承诺效果 */}
+          <section aria-label="浏览与跳转归因">
             <div className="mb-2.5 flex items-center gap-2">
               <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-neutral-300" aria-hidden="true" />
-              <h2 className="text-[13px] font-bold text-neutral-700">曝光与跳转效果</h2>
+              <h2 className="text-[13px] font-bold text-neutral-700">浏览与跳转归因</h2>
             </div>
             <AttributionNotice attribution={data.attribution} />
           </section>

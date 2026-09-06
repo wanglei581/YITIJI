@@ -15,10 +15,19 @@ import {
   ScrollTextIcon,
 } from 'lucide-react'
 import { getPartnerDashboard, type PartnerDashboardData } from '../../services/api/orgSelf'
+import { getPartnerStats } from '../../services/api/stats'
 
-// ─── 工作台（审计修复：全部指标来自 GET /partner/dashboard 真实计数）──────────
-// 原硬编码 METRICS/RECENT_SYNCS/pendingCount 已删除；无埋点支撑的「展示/跳转/打印次数」
-// 指标卡一并移除（没有的数据不展示假数字）。
+function firstPendingPath(data: PartnerDashboardData): string {
+  if (data.jobs.pending > 0) return '/jobs'
+  if (data.fairs.pending > 0) return '/fairs'
+  if (data.policies.pending > 0) return '/policy'
+  return '/companies'
+}
+
+// ─── 工作台 ────────────────────────────────────────────────────────────────
+// 内容计数来自 GET /partner/dashboard；待审核标题数与统计页统一为
+// GET /partner/stats snapshot.pendingReview（pending+reviewing，含企业）。
+// 无埋点支撑的「展示/跳转/打印次数」不展示假数字。
 
 const RESULT_CONFIG: Record<string, { label: string; badge: 'success' | 'error' | 'warning' }> = {
   success: { label: '成功', badge: 'success' },
@@ -54,21 +63,29 @@ function PendingReviewCallout({ count, onView }: { count: number; onView: () => 
   )
 }
 
-function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: string) => void }) {
+function MetricsGrid({
+  data,
+  pendingReview,
+  onGo,
+}: {
+  data: PartnerDashboardData
+  pendingReview: number
+  onGo: (path: string) => void
+}) {
   const metrics = [
     {
       label: '已上传岗位', value: data.jobs.total,
-      note: `已发布 ${data.jobs.published} · 待审核 ${data.jobs.pending}`,
+      note: `已发布 ${data.jobs.published} · 待初审 ${data.jobs.pending}`,
       icon: BriefcaseIcon, iconClass: 'bg-info-bg text-info-fg', path: '/jobs',
     },
     {
       label: '已上传招聘会', value: data.fairs.total,
-      note: `已发布 ${data.fairs.published} · 待审核 ${data.fairs.pending}`,
+      note: `已发布 ${data.fairs.published} · 待初审 ${data.fairs.pending}`,
       icon: CalendarIcon, iconClass: 'bg-purple-50 text-purple-600', path: '/fairs',
     },
     {
       label: '政策公告', value: data.policies.total,
-      note: `已发布 ${data.policies.published} · 待审核 ${data.policies.pending}`,
+      note: `已发布 ${data.policies.published} · 待初审 ${data.policies.pending}`,
       icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
     },
     {
@@ -77,9 +94,9 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
       icon: CheckCircleIcon, iconClass: 'bg-success-bg text-success-fg', path: '/jobs',
     },
     {
-      label: '待审核数据', value: data.pendingTotal,
-      note: data.pendingTotal > 0 ? '等待管理员审核' : '当前无待审核',
-      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: '/jobs',
+      label: '待审核数据', value: pendingReview,
+      note: pendingReview > 0 ? '含审核中与企业资料，与统计页相同' : '当前无待审核',
+      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: firstPendingPath(data),
     },
     {
       label: '数据源', value: data.sources.total,
@@ -191,16 +208,18 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<PartnerDashboardData | null>(null)
+  const [pendingReview, setPendingReview] = useState(0)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     setState('loading')
-    getPartnerDashboard()
-      .then((d) => {
+    Promise.all([getPartnerDashboard(), getPartnerStats('week')])
+      .then(([d, stats]) => {
         if (cancelled) return
         setData(d)
+        setPendingReview(stats.snapshot.pendingReview)
         setState('ready')
       })
       .catch(() => {
@@ -219,8 +238,8 @@ export default function DashboardPage() {
         <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
       ) : (
         <div className="flex flex-col gap-6">
-          <PendingReviewCallout count={data.pendingTotal} onView={() => navigate('/jobs')} />
-          <MetricsGrid data={data} onGo={(p) => navigate(p)} />
+          <PendingReviewCallout count={pendingReview} onView={() => navigate(firstPendingPath(data))} />
+          <MetricsGrid data={data} pendingReview={pendingReview} onGo={(p) => navigate(p)} />
           <SyncLogSection data={data} onGoLogs={() => navigate('/sync-logs')} />
         </div>
       )}

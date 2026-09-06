@@ -74,6 +74,7 @@ test('resume aliases stay redirects and prototype 73 stays a sub-state', () => {
   const redirects = extractDirectNavigateRedirects(read('src/routes/index.tsx'))
   assert.equal(redirects.get('/resume'), '/resume/source')
   assert.equal(redirects.get('/resume/upload'), '/resume/source')
+  assert.equal(redirects.get('/resume/export'), '/resume/optimize')
   assert.equal(redirects.has('/assistant/call'), false)
   assert.equal(redirects.has('/interview/call'), false)
 })

@@ -12,6 +12,8 @@ test.describe('工作台（mock 口径）', () => {
     await waitForMockList(page)
 
     await expect(page.getByText('已上传岗位')).toBeVisible()
+    await expect(page.getByText('待审核数据')).toBeVisible()
+    await expect(page.getByText('含审核中与企业资料，与统计页相同')).toBeVisible()
     await expect(page.getByText('市人才网 API（演示）')).toBeVisible()
 
     await page.getByRole('button', { name: '去查看' }).click()

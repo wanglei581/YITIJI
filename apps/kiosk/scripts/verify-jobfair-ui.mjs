@@ -102,6 +102,21 @@ console.log('\n=== 阶段1F 招聘会/校园招聘新版 UI 防回退验证 ==='
   if (missing.length > 0) fail(`A. 新版组件文件缺失: ${missing.join(', ')}`)
   else pass('A. 新版组件文件齐全(RegionPicker/Calendar/DataScreen/MapBlock/regions/url)')
 }
+mustNotContain(
+  'src/pages/job-fairs/components/MapBlock.tsx',
+  ['openstreetmap'],
+  'JOB-13 MapBlock 无 AMAP key 时不得嵌 openstreetmap',
+)
+mustNotContain(
+  'src/pages/job-fairs/components/JobFairDetailTabs.tsx',
+  ['openstreetmap'],
+  'JOB-13 招聘会详情 Tab 无 openstreetmap iframe',
+)
+mustContain(
+  'src/pages/job-fairs/components/MapBlock.tsx',
+  ['暂无地图，请以场馆地址为准', 'VITE_AMAP_KEY'],
+  'JOB-13 无 key 时落「暂无地图，请以场馆地址为准」且有 key 才渲染地图',
+)
 
 // ── B. /job-fairs 列表页 ──────────────────────────────────────────────────
 mustContain(

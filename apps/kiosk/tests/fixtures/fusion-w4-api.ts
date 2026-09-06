@@ -139,6 +139,7 @@ export function registerW4Api(api: ApiRouter, options: W4ApiOptions = {}): void 
   const fair = {
     id: 'fair-001', name: '2026 青岛高校毕业生招聘会', organizer: '青岛市公共就业服务中心',
     startTime: '2026-08-01T01:00:00.000Z', endTime: '2026-08-01T08:00:00.000Z', venue: '青岛国际会展中心',
+    latitude: 36.0671, longitude: 120.3826,
     status: 'upcoming', theme: 'campus', city: '青岛市', address: '崂山区苗岭路9号', boothCount: 1, jobCount: 2,
     sourceOrgId: 'source-001', externalId: 'ext-fair-001', sourceName: '青岛公共就业服务网',
     sourceUrl: 'https://jobs.example.gov.cn/fairs/fair-001', checkinUrl: 'https://jobs.example.gov.cn/fairs/fair-001/checkin',
