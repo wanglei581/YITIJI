@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import { EXPORT_UNAVAILABLE_REASON } from '../../resume-report-model'
 
 interface Props {
   viewState: string
@@ -66,39 +65,6 @@ export function ResumeReportCta({ viewState, canOptimize, intent, why, onRetry, 
           继续优化这份简历
         </button>
       )}
-    </>
-  )
-}
-
-export function ResumeReportTakeaway({ show, onJobFit }: { show: boolean; onJobFit: () => void }) {
-  const navigate = useNavigate()
-  if (!show) return null
-  return (
-    <>
-      <div className="rrp-export" data-testid="resume-report-export-actions">
-        {['打印这份报告', '导出 PDF', '生成二维码带走'].map((label) => (
-          <button
-            key={label}
-            type="button"
-            className="rrp-dead"
-            aria-disabled="true"
-            aria-describedby="resume-report-export-reason"
-          >
-            {label}
-            <small>暂未开放</small>
-          </button>
-        ))}
-      </div>
-      <p className="rrp-export-reason" id="resume-report-export-reason">{EXPORT_UNAVAILABLE_REASON}</p>
-      <button type="button" className="rrp-jobfit" onClick={onJobFit} data-route="/resume/job-fit">
-        目标岗位匹配参考（仅供参考）
-      </button>
-      <p className="rrp-self">
-        想了解自己的倾向？
-        <button type="button" className="rrp-self" onClick={() => navigate('/resume/self-assessment/intro')}>
-          做一次自我探索
-        </button>
-      </p>
     </>
   )
 }

@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { RESUME_SCORING_DIMENSIONS } from '@ai-job-print/shared'
-import { MANUAL_CHECKS, type ReportViewState } from '../../resume-report-model'
+import { MANUAL_CHECKS, type ExportCaptureState, type ReportViewState } from '../../resume-report-model'
+
+type StateView = Exclude<ReportViewState, 'report' | 'report-minimal' | 'report-empty' | 'diagnose-failed' | ExportCaptureState>
 
 interface Exit {
   title: string
@@ -9,7 +11,7 @@ interface Exit {
   testid: string
 }
 
-const COPY: Record<Exclude<ReportViewState, 'report' | 'report-minimal' | 'report-empty' | 'diagnose-failed'>, { h: string; p: string; exits: Exit[] }> = {
+const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
   'no-context': {
     h: '还没有诊断报告',
     p: '诊断结果按简历任务编号读取，并且要凭本人凭证才读得到 —— 地址栏里带一个编号不等于有权限。没有编号就读不到，本页也不会拿通用结论顶替。',
@@ -57,7 +59,7 @@ const COPY: Record<Exclude<ReportViewState, 'report' | 'report-minimal' | 'repor
   },
 }
 
-export function ResumeReportStates({ viewState }: { viewState: Exclude<ReportViewState, 'report' | 'report-minimal' | 'report-empty' | 'diagnose-failed'> }) {
+export function ResumeReportStates({ viewState }: { viewState: StateView }) {
   const navigate = useNavigate()
   const copy = COPY[viewState]
   return (

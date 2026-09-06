@@ -11,9 +11,12 @@ import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
 import { readAiResumeSession } from './aiResumeSession'
 import {
   deriveViewState,
+  isExportCaptureState,
   parseReportSearch,
   REPORT_HEAD,
   REPORT_STATUS,
+  shouldSkipReportFetch,
+  showsReportBody,
   targetSummary,
   type ReportSeg,
 } from './resume-report-model'
@@ -21,7 +24,8 @@ import { fixtureReport } from './resume-report-fixture'
 import { ResumeReportHead } from './components/resume-report/ResumeReportChrome'
 import { ResumeReportStates } from './components/resume-report/ResumeReportStates'
 import { EmptyReportBody, ResumeReportBody } from './components/resume-report/ResumeReportBody'
-import { ResumeReportCta, ResumeReportTakeaway } from './components/resume-report/ResumeReportActions'
+import { ResumeReportCta } from './components/resume-report/ResumeReportActions'
+import { ResumeReportTakeaway } from './components/resume-report/ResumeReportTakeaway'
 import './resume-report-qx.css'
 
 interface ReportState {
@@ -100,7 +104,7 @@ export function ResumeReportPage() {
   const usingSessionTask = !stateTaskId && !parsed.queryTaskId && Boolean(session?.taskId)
   const accessToken = state.accessToken ?? (usingSessionTask ? session?.accessToken : undefined)
 
-  const skipFetch = parsed.tech && (parsed.urlState === 'report' || parsed.urlState === 'report-minimal' || parsed.urlState === 'report-empty' || parsed.urlState === 'loading' || parsed.urlState === 'unavailable' || parsed.urlState === 'illegal' || parsed.urlState === 'no-context' || parsed.urlState === 'read-error' || parsed.urlState === 'diagnose-failed')
+  const skipFetch = shouldSkipReportFetch(parsed.tech, parsed.urlState)
   const [report, setReport] = useState<ResumeReport | undefined>(state.report)
   const [providerName, setProviderName] = useState<string | undefined>(state.providerName)
   const [extractionNotice, setExtractionNotice] = useState(state.extractionNotice)
@@ -153,7 +157,13 @@ export function ResumeReportPage() {
     report,
   })
 
-  const fixtureKind = parsed.tech && viewState === 'report' ? 'full' : parsed.tech && viewState === 'report-minimal' ? 'minimal' : parsed.tech && viewState === 'report-empty' ? 'empty' : null
+  const fixtureKind = parsed.tech && (viewState === 'report' || isExportCaptureState(viewState))
+    ? 'full'
+    : parsed.tech && viewState === 'report-minimal'
+      ? 'minimal'
+      : parsed.tech && viewState === 'report-empty'
+        ? 'empty'
+        : null
   const displayReport = fixtureKind ? fixtureReport(fixtureKind) : report
   const displayIssues = displayReport?.issues ?? []
   const isFixture = Boolean(fixtureKind)
@@ -195,7 +205,7 @@ export function ResumeReportPage() {
   if (viewState === 'diagnose-failed') return failView(reason ?? recoveredFail ?? '简历解析未能完成，请重试')
 
   const isDemoReport = isFixture || providerName === 'mock'
-  const canOptimize = Boolean(taskId) && (viewState === 'report' || viewState === 'report-minimal')
+  const canOptimize = Boolean(taskId) && (viewState === 'report' || viewState === 'report-minimal' || isExportCaptureState(viewState))
   const why =
     viewState === 'loading' ? '读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。'
     : viewState === 'unavailable' ? '能力没接通时不提供优化入口：优化和诊断走同一条 AI 链路，这时候点进去只会再失败一次。'
@@ -247,7 +257,7 @@ export function ResumeReportPage() {
             <span className="rrp-fxtx">合成数据，不是任何人的真实简历，也不是真实 AI 结果。</span>
           </div>
         ) : null}
-        {viewState === 'report' || viewState === 'report-minimal' ? (
+        {showsReportBody(viewState) ? (
           <>
             <ReportNoticePanel isDemoReport={isDemoReport} extractionNotice={extractionNotice} truncated={displayReport?.truncatedInput} />
             {summary ? <p className="rrp-dir" data-testid="resume-report-target">目标方向 {summary}</p> : null}
@@ -264,7 +274,11 @@ export function ResumeReportPage() {
               />
             ) : null}
             <ResumeReportTakeaway
+              key={viewState}
               show
+              taskId={taskId}
+              accessToken={accessToken}
+              capture={isExportCaptureState(viewState) ? viewState : null}
               onJobFit={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
             />
           </>
