@@ -27,6 +27,8 @@ assert.doesNotMatch(terminalAuth, /import\.meta\.env\['E2E_MOCK_TERMINAL_SESSION
 const deployWorkflow = readFileSync(join(ROOT, '..', '..', '.github', 'workflows', 'deploy.yml'), 'utf8')
 assert.doesNotMatch(deployWorkflow, /E2E_MOCK_TERMINAL_SESSION_TOKEN/, 'production deploy builds must never set the E2E mock terminal session token')
 
+assert.match(identity, /export const isTerminalKiosk = \(\): boolean => getTerminalId\(\) !== '' && !IS_E2E_BUILD/, 'kiosk-only UI gating must be off in E2E builds and on whenever a real terminal identity exists')
+
 const terminalScopedConsumers = [
   'src/services/print/printJobsApi.ts',
   'src/services/api/printScanCapabilities.ts',

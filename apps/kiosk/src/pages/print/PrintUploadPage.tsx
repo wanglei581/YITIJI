@@ -16,6 +16,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
+import { isTerminalKiosk } from '../../services/api/screensaver'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { Button, Card } from '@ai-job-print/ui'
@@ -151,7 +152,7 @@ export function PrintUploadPage() {
   // 简历打印与文档打印共用三种上传通道；?tab= 决定初始通道。
   const requestedTab = searchParams.get('tab')
   const entryTab: UploadTab =
-    requestedTab === 'qr' || requestedTab === 'usb' ? requestedTab : 'file'
+    requestedTab === 'qr' || requestedTab === 'usb' ? requestedTab : (isTerminalKiosk() ? 'qr' : 'file')
 
   const TRANSFER_COPY: Record<UploadTab, { title: string; subtitle: string }> = {
     file: { title: '本机上传', subtitle: '在这台机器上选择文件，传完可以直接接着打印' },
@@ -196,12 +197,13 @@ export function PrintUploadPage() {
     disabled?: boolean
     note?: string
   }[] = [
-    {
-      key: 'file',
+    // 一体机不渲染浏览器文件选择框入口（CLAUDE.md §17 / SES-05）；桌面浏览器与 E2E 链路保留
+    ...(isTerminalKiosk() ? [] : [{
+      key: 'file' as const,
       label: isResumePrint ? '上传简历' : '选择文件',
       icon: MonitorSmartphoneIcon,
       note: isResumePrint ? 'PDF/图片' : '桌面验证',
-    },
+    }]),
     { key: 'qr', label: '扫码上传', icon: QrCodeIcon, note: '手机/浏览器' },
     {
       key: 'usb',
