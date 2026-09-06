@@ -92,7 +92,6 @@ expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-
 for (const [page, sourceCode, rootClass, cssPath] of [
   ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],
   ['parse', parse, 'resume-parse-lightflow', './resume-diagnosis-lightflow.css'],
-  ['report', report, 'resume-report-lightflow', './resume-diagnosis-lightflow.css'],
   ['generate', generate, 'resume-generate-lightflow', './resume-authoring-lightflow.css'],
   ['generate preview', preview, 'resume-generate-preview-lightflow', './resume-authoring-lightflow.css'],
   ['optimize', optimize, 'resume-optimize-lightflow', './resume-authoring-lightflow.css'],
@@ -103,6 +102,10 @@ for (const [page, sourceCode, rootClass, cssPath] of [
   expectIncludes(sourceCode, 'resume-lightflow', `${page} uses shared local LightFlow namespace`)
   expectIncludes(sourceCode, rootClass, `${page} uses its route-specific LightFlow root`)
 }
+
+expectIncludes(report, "import './resume-report-qx.css'", 'report imports Qingxu page CSS')
+expectIncludes(report, 'QxPageFrame', 'report uses Qingxu page frame (22-resume-report migration)')
+expectIncludes(kioskShell, "'/resume/report'", 'report is registered in QX_MIGRATED_ROUTES')
 
 expectCssContract('src/pages/resume/resume-diagnosis-lightflow.css', [
   'resume-source-lightflow',

@@ -157,6 +157,7 @@ function KioskShell() {
   // 一并删除，这个集合也随之消失。
   const QX_MIGRATED_ROUTES = new Set<string>([
     '/print/pickup-claim',
+    '/resume/report',
   ])
   const isQxRoute = QX_MIGRATED_ROUTES.has(pathname)
 
