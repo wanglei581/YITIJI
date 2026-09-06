@@ -5,6 +5,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@ai-job-print/ui'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
@@ -222,7 +223,7 @@ export function MyDocumentsPage() {
         },
       })
     } catch (error) {
-      setHint(error instanceof Error ? error.message : '打印链接生成失败，可能已到期或被清理')
+      setHint(userMessageOf(error, '打印链接生成失败，可能已到期或被清理'))
     } finally {
       setPrintingId(null)
     }
@@ -247,7 +248,7 @@ export function MyDocumentsPage() {
         },
       })
     } catch (error) {
-      setHint(error instanceof Error ? error.message : '打开签名盖章失败，文件可能已到期或被清理')
+      setHint(userMessageOf(error, '打开签名盖章失败，文件可能已到期或被清理'))
     } finally {
       setSigningId(null)
     }
