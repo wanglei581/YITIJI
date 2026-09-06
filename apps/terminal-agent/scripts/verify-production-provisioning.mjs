@@ -8,6 +8,12 @@ const installer = fs.readFileSync(path.join(scriptDir, 'install-production-agent
 
 console.log('\n=== verify production Agent provisioning contract ===')
 
+assert.match(
+  installer,
+  /\[int\]\$ClaimIntervalMs\s*=\s*5000/,
+  'production installer must default claim polling to the server rate-limit budget',
+)
+
 for (const parameter of [
   'PromptForBindCode',
   'BindCodeFromStandardInput',

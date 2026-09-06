@@ -65,8 +65,9 @@ param(
   [ValidateNotNullOrEmpty()]
   [string]$PrinterName,
 
+  # POST /terminals/:id/tasks/claim budget: 30 requests per terminal per minute.
   [Parameter(Mandatory = $false)]
-  [int]$ClaimIntervalMs = 1000,
+  [int]$ClaimIntervalMs = 5000,
 
   [Parameter(Mandatory = $false)]
   [int]$HeartbeatIntervalMs = 30000,

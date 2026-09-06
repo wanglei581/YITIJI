@@ -18,6 +18,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common'
+import { TERMINAL_CLAIM_INTERVAL_MS } from '../common/throttler/terminal-throttle'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
@@ -340,7 +341,7 @@ export class TerminalAgentService implements OnModuleInit {
     terminalId: string,
     dto: HeartbeatDto,
     authHeader: string | undefined,
-  ): Promise<{ acknowledged: true }> {
+  ): Promise<{ acknowledged: true; config: { claimIntervalMs: number } }> {
     await this.credentialSecurity.validateTerminalToken(terminalId, authHeader, { allowDisabled: true })
     const profilePatch = await this.buildDeviceProfilePatch(dto, terminalId)
     const lastSeenAt = new Date()
@@ -387,7 +388,7 @@ export class TerminalAgentService implements OnModuleInit {
       data: { lifecycleStatus: 'active' },
     })
 
-    return { acknowledged: true }
+    return { acknowledged: true, config: { claimIntervalMs: TERMINAL_CLAIM_INTERVAL_MS } }
   }
 
   // ── 3. Claim tasks ────────────────────────────────────────────────────────────
