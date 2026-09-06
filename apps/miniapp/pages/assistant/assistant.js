@@ -30,6 +30,9 @@ function iconForRoute(route) {
 Page({
   data: {
     statusBarHeight: 20,
+    // 胶囊右让（px）。实测本页 .as-more 落在胶囊 [296,383] 内的 [346,376]，点不到。
+    // 由 app.js 运行时算，不写死 rpx——胶囊位置随机型变。
+    capsuleInsetRight: 94,
     sessionId: '',
     messages: [
       {
@@ -53,7 +56,11 @@ Page({
 
   onLoad() {
     const fallback = () => (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()).statusBarHeight
-    this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20 })
+    this.setData({
+      statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20,
+      // 见 data.capsuleInsetRight 的说明：本页右上角的「更多」按钮实测整个落在胶囊里
+      capsuleInsetRight: (app.globalData && app.globalData.capsuleInsetRight) || 94,
+    })
   },
 
   back() {
@@ -96,7 +103,22 @@ Page({
         url:  ROUTE_MAP[a.route] || '',
       })).filter(c => c.url)
 
-      const aiMsg = { id: loadingMsg.id, role: 'ai', text: res.reply || '', cards }
+      // 服务端专门透出 aiGenerated / providerLabel，就是为了让前端分辨
+      // 「真实模型」与「mock/stub 预置话术」(ai.service.ts S0-1 / 风险 R1：
+      // 「绝不因为 reply 看起来像 AI 回答就当成 AI 回答」)。
+      // 此前这里只取 res.reply，把降级话术原样当成小青的回答展示——
+      // 那是在用户看不见的地方伪造能力。
+      const aiGenerated = res.aiGenerated === true
+      const aiMsg = {
+        id: loadingMsg.id,
+        role: 'ai',
+        text: res.reply || '',
+        cards,
+        aiGenerated,
+        // 只在**没走真实模型**时出标记。走了就什么都不显示——
+        // 给每条真实回答都挂个「AI 生成」徽章是噪音，不是诚实。
+        fallbackNote: aiGenerated ? '' : '本条不是模型生成的回答，是系统预置话术（AI 服务当前不可用）。',
+      }
       const msgs  = this.data.messages.slice(0, -1).concat(aiMsg)
       this.setData({
         messages:  msgs,

@@ -1,0 +1,7 @@
+# 修订 8176c1ee2004 · 2026-09-02 · local
+
+$ node apps/miniapp/scripts/verify-miniapp-api-contract.mjs
+  ○ 未开放  POST /orders/package  —— 材料包创建：Gate 0 决策 D5 明确 M2 延后，后端无 orders/package 路由。pages/home/home.js 已把入口从材料包改指职业规划以避免死路由。
+  ○ 未开放  POST /orders/package/:p/cancel  —— 同上，材料包取消。
+
+✓ 小程序 ↔ 后端 API 契约一致

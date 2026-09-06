@@ -32,10 +32,11 @@
 .step-num { width: 44rpx; height: 44rpx; border-radius: 15rpx; background: var(--teal-soft); color: var(--teal); font-size: 22rpx; font-weight: 750; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .step-text { flex: 1; padding-top: 4rpx; color: var(--ink-soft); font-size: 24rpx; line-height: 1.55; }
 .btn-scan,
+/* 实测 47px，主操作按钮 → 112rpx=56px（§9） */
 .btn-primary,
 .btn-secondary {
   width: 100%;
-  min-height: 92rpx;
+  min-height: 112rpx;
   border-radius: 26rpx;
   display: flex;
   align-items: center;

@@ -79,3 +79,16 @@
   font-size: 28rpx; display: flex; flex-direction: column; align-items: center; gap: 28rpx; }
 .detail-state .ds-msg { color: var(--muted); line-height: 1.6; }
 .detail-state .ds-back { min-width: 220rpx; }
+
+/* 无 externalUrl 时第三颗按钮文案变长（「来源链接暂不可用」8 字），
+   而前两颗是 flex-shrink:0 的自定义按钮，压不动。
+   320pt 实算：fav 56.3(min-width 132rpx) + remind 64(min-width 150rpx)
+   + 第三颗 8×15+48=168 + 两段 gap 13.7 = 302 > 可用 288，溢 14px。
+   app.wxss 的窄屏规则只收 .btn.lg，这三颗都不是 lg，收不到。
+   **也不能让它收**：remind-btn 是 class="btn remind-btn"，页面给的 padding 是
+   18rpx（320pt 下 7.7px），被 .actionbar .btn(0,2,0) 盖成 16px 反而撑宽 16.6px。
+   所以只收第三颗（.btn.primary）的内边距：168 → 144，总计 278，余 10px。
+   删掉这段：320pt 上「来源链接暂不可用」末字被屏幕切掉。 */
+@media (max-width: 374px) {
+  .actionbar .btn.primary { padding: 0 12px; }
+}

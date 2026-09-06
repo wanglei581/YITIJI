@@ -63,7 +63,8 @@ page { height: 100%; background: #eef4ff; }
 .launch-btn-sms-confirm { background: var(--teal) !important; box-shadow: 0 12rpx 26rpx rgba(22,119,255,.15); }
 .launch-wx-icon { width: 34rpx; height: 34rpx; margin-right: 12rpx; }
 .launch-btn-guest {
-  height: 88rpx !important;
+  /* 88rpx=44px 低于 48px 可点标准（实测 45px） → 96rpx */
+  height: 96rpx !important;
   border-radius: 23rpx !important;
   border: 1rpx solid var(--line) !important;
   background: var(--surface-2) !important;
@@ -74,15 +75,18 @@ page { height: 100%; background: #eef4ff; }
 .launch-btn-guest::after,
 .launch-btn-sms-confirm::after { border: none !important; }
 .launch-btn-wx[disabled] { opacity: .45; }
-.launch-alt { min-height: 54rpx; display: flex; align-items: center; justify-content: center; color: var(--teal); font-size: 23rpx; font-weight: 600; }
+/* 实测 348x28 → 96rpx=48px */
+.launch-alt { min-height: 96rpx; display: flex; align-items: center; justify-content: center; color: var(--teal); font-size: 23rpx; font-weight: 600; }
 .launch-back-icon { width: 20rpx; height: 20rpx; margin-right: 9rpx; transform: rotate(180deg); }
 
 .launch-legal { padding-top: 4rpx; color: var(--faint); font-size: 20rpx; line-height: 1.7; text-align: center; }
-.launch-agree { min-height: 46rpx; display: flex; align-items: center; justify-content: center; gap: 10rpx; color: var(--muted); }
+/* 实测 348x23 → 96rpx=48px */
+.launch-agree { min-height: 96rpx; display: flex; align-items: center; justify-content: center; gap: 10rpx; color: var(--muted); }
 .launch-check { width: 30rpx; height: 30rpx; border-radius: 9rpx; border: 2rpx solid var(--ghost); display: flex; align-items: center; justify-content: center; }
 .launch-check.checked { border-color: var(--teal); background: var(--teal); }
 .check-dot { width: 11rpx; height: 11rpx; border-radius: 50%; background: #fff; }
-.launch-link { color: var(--teal); }
+/* 实测 60x12：文字链，补纵向内边距把可点区撑到 48px，视觉不变 */
+.launch-link { color: var(--teal); display: inline-block; padding: 36rpx 8rpx; }
 
 .sms-field { display: flex; flex-direction: column; gap: 10rpx; }
 .sms-phone-wrap { height: 96rpx; padding: 0 22rpx; border: 2rpx solid var(--line); border-radius: 24rpx; background: var(--surface-2); display: flex; align-items: center; gap: 16rpx; }

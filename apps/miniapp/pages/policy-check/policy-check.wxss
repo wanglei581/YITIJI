@@ -1,0 +1,60 @@
+/* 政策条件自测。只放本页私有类，其余复用 app.wxss 全局类。
+   尺寸一律走 --fs-* / --r-* 令牌，不再挑新数。 */
+/* 本页所有卡片都是「简单内容卡」，不是 fair-venue 那种整幅行卡，
+   因此统一补内距。全局 .card 有意不带 padding（内距在 .card-inner），
+   本页每张卡都需要，就不再逐张套一层 .card-inner 节点。
+   取 16px 而不是 32rpx：要和别的页面用 .card-inner 的卡片内距逐像素一致。
+   删掉这条会让题目文字和选项直接贴住卡片 1px 边框。 */
+.card { padding: 16px; }
+
+
+.q-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin-bottom: 16rpx; }
+.q-label { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+/* 「可以不填」要看得见但不抢戏——它是知情提示，不是操作 */
+.q-optional { font-size: var(--fs-xs); color: var(--faint); flex-shrink: 0; }
+
+.q-opts { display: flex; flex-wrap: wrap; gap: 14rpx; }
+/* 96rpx = 48px 触控下限 */
+.q-opt {
+  min-height: 96rpx; padding: 0 26rpx;
+  display: flex; align-items: center;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.q-opt.on { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); font-weight: 600; }
+
+.r-title { font-size: var(--fs-md); font-weight: 600; color: var(--ink); line-height: 1.45; }
+.r-overall { margin-top: 10rpx; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.6; }
+.r-sum { margin-top: 16rpx; display: flex; flex-wrap: wrap; gap: 12rpx; }
+.r-foot {
+  margin-top: 16rpx; padding-top: 16rpx; border-top: 1px solid var(--line-faint);
+  display: flex; flex-wrap: wrap; gap: 16rpx;
+  font-size: var(--fs-xs); color: var(--faint);
+}
+.r-manual { color: var(--warn); }
+
+/* 加载失败态的这 5 个类此前**哪儿都没有定义**——app.wxss 没有，本页也没有。
+   别的页面（fair-companies / fair-company-detail / fair-visit-plan / jobs / fairs /
+   policies）各自在自己的 wxss 里定义了同名的一套，而页面 wxss 不跨页生效，
+   于是本页的失败态拿不到任何样式。
+   删掉这一段会怎样：接口一失败就是满屏贴边的四行黑字（.content 无横向内距），
+   「重新加载」和正文长得完全一样、可点高度只有 24.8px（低于 §9 的 48px 下限），
+   而它是这一屏**唯一的出口**。取问项失败在首屏就可能命中。
+   数值照抄 fair-companies.wxss 的同名类，保证跨页观感一致。 */
+.empty-wrap { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: var(--r);
+  border: 1rpx solid var(--line-soft); background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; text-align: center; }
+.state-icon { width: 92rpx; height: 92rpx; border-radius: var(--r); background: var(--surface-2);
+  color: var(--faint); display: flex; align-items: center; justify-content: center; }
+.state-icon.error { background: var(--error-soft); color: var(--error); }
+.state-icon .ficon { width: 44rpx; height: 44rpx; }
+.state-title { margin-top: 22rpx; font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.state-desc { margin-top: 9rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; }
+/* 112rpx = 56px：错误态的重试是这一屏的主操作，按主按钮下限给。 */
+.retry-btn { margin-top: 25rpx; height: 112rpx; padding: 0 40rpx; border-radius: 24rpx;
+  background: var(--teal); color: #fff; display: flex; align-items: center;
+  font-size: 26rpx; font-weight: 650; }

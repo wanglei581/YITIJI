@@ -46,6 +46,10 @@ Page({
     wx.switchTab({ url: '/pages/ai/ai' })
   },
 
+  goFeedback() {
+    wx.navigateTo({ url: '/pages/feedback/feedback' })
+  },
+
   onShareAppMessage() {
     return {
       title: '使用帮助',

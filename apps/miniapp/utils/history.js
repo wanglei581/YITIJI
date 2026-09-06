@@ -23,7 +23,7 @@ const store = require('./storage');
 const auth = require('./auth');
 const api = require('./api');
 
-const TYPES = ['job', 'fair', 'company', 'policy'];
+const TYPES = ['job', 'fair', 'company', 'policy', 'fair_company'];
 
 // 本机类型 → 后端 ActivityTargetType(ACTIVITY_TARGET_TYPES 全集:
 // job | job_fair | policy | company_profile | fair_company)。
@@ -32,9 +32,15 @@ const SERVER_TYPE = {
   fair: 'job_fair',
   company: 'company_profile',
   policy: 'policy',
+  fair_company: 'fair_company',
 };
-// 后端 → 本机(反向)。fair_company 是一体机产生的「参展企业」记录,小程序没有独立页面,
-// 归到招聘会筛选下;后端把父级 JobFair.id 存在 externalId 里,回跳时用它。
+// 后端 → 本机(反向)。fair_company 归到招聘会筛选下;后端把父级 JobFair.id 存在
+// externalId 里,回跳时用它。
+//
+// 注:这里原本写的是「一体机产生的记录,小程序没有独立页面」——2026-09-02 起不成立了,
+// 小程序有了 fair-company-detail。不上报的直接后果是 AI 参会准备单的回顾态里
+// 「你在本机留下的记录」永远为空(服务端按 fair_company + external_apply + externalId=fairId 查),
+// 等于摆一个暗示系统在记录、实际什么也没记的区块。
 const LOCAL_TYPE = {
   job: 'job',
   job_fair: 'fair',
@@ -48,6 +54,9 @@ const JUMP_ACTION = {
   fair: 'external_appointment',
   company: 'external_open',
   policy: 'external_open',
+  // 与一体机一致,也是 fair-visit-plan 回顾态查询用的那一条
+  // (targetType:'fair_company' + action:'external_apply')。
+  fair_company: 'external_apply',
 };
 // 动作 → 展示文案。只描述「打开了哪类入口」,不描述办理结果。
 const ACTION_LABEL = {
@@ -63,6 +72,7 @@ const META = {
   fair:    { icon: 'i-calendar',  tone: 'wheat' },
   company: { icon: 'i-bank',      tone: 'clay' },
   policy:  { icon: 'i-file-text', tone: 'teal' },
+  fair_company: { icon: 'i-bank', tone: 'clay' },
 };
 const MAX = 100; // 本机只留最近 100 条,避免 storage 无限增长
 

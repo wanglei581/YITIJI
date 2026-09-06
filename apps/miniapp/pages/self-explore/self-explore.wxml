@@ -1,0 +1,280 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack" role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">自我探索 · 倾向参考</view>
+  </view>
+
+  <view class="content {{phase === 'consent' || phase === 'ask' || phase === 'result' ? 'has-bar' : ''}}">
+
+    <view wx:if="{{phase === 'loading'}}" class="list-state">加载中…</view>
+
+    <!-- ── 出错 ── -->
+    <view wx:elif="{{phase === 'error'}}" class="empty">
+      <view class="e-ic"><text class="ficon i-warning"></text></view>
+      <view class="e-title">没能打开</view>
+      <view class="e-desc">{{errMsg}}</view>
+      <!-- 两个出口都留着：401 / 网络失败要的是「再试一次」，
+           已撤回 / 已过期要的是「重新作答」，二选一必然堵住其中一种人。 -->
+      <view class="state-retry tap" hover-class="tap-press" bindtap="reload"
+            role="button" aria-label="重新加载">重新加载</view>
+      <view wx:if="{{errCanRestart}}" class="err-alt tap" hover-class="tap-press" bindtap="restart"
+            role="button" aria-label="重新作答一次">重新作答一次</view>
+    </view>
+
+    <!-- ══ 同意书。合规闸门，不是表单校验：nonSensitive 为 false 时服务端直接拒
+         （SELF_ASSESSMENT_CONSENT_REQUIRED），所以这一屏过不去就进不了答题。 ══ -->
+    <block wx:elif="{{phase === 'consent'}}">
+      <view class="pagehead rise-d1">
+        <view class="ph-title">先说清楚这是什么</view>
+        <view class="ph-sub">{{totalCount}} 道单选题，答完给出你在五个维度上的倾向参考。这是对你本次作答的描述，不是对你的评定。</view>
+      </view>
+
+      <view wx:if="{{consentTip}}" class="notice warn rise-d1">
+        <text class="ficon i-warning n-ic"></text>
+        <text>{{consentTip}}</text>
+      </view>
+
+      <view class="card card-inner rise-d2">
+        <view class="cs-head">
+          <text class="ficon i-info cs-ic"></text>
+          <text class="cs-title">知情同意说明</text>
+        </view>
+        <view class="cs-list">
+          <view wx:for="{{consentItems}}" wx:key="*this" class="cs-item">
+            <text class="ficon i-check cs-dot"></text>
+            <text class="cs-text">{{item}}</text>
+          </view>
+        </view>
+        <!-- 版本号是服务端下发的原值。页面不写死：写死会在同意书改版后把「对旧说明的
+             同意」当成「对新说明的同意」，而这正是版本号存在的唯一理由。 -->
+        <view class="cs-ver" wx:if="{{consentVersion}}">同意说明版本：{{consentVersion}}</view>
+        <view class="cs-ver" wx:else>服务端未下发同意说明版本号，本次将记为「未版本化同意」。</view>
+      </view>
+
+      <view class="card card-inner rise-d3">
+        <view class="cbox tap" hover-class="tap-press" bindtap="toggleNonSensitive"
+              role="button" aria-label="{{agreeNonSensitive ? '已同意上述说明并开始作答，点击取消' : '同意上述说明并开始作答，必选'}}">
+          <view class="cb {{agreeNonSensitive ? 'on' : ''}}"><text wx:if="{{agreeNonSensitive}}" class="ficon i-check"></text></view>
+          <view class="cb-body">
+            <view class="cb-title">我已阅读并同意上述说明（必选）</view>
+            <view class="cb-desc">不勾选无法提交：服务端同样会拒绝没有这项同意的请求。</view>
+          </view>
+        </view>
+
+        <view class="card-sep cb-sep"></view>
+
+        <!-- 敏感题同意单独一条，且不勾也能提交。题数按服务端下发的题目真值算，
+             不写死数字——v1 题库实测 0 题，写死「N 题」在题库改版时就成了假话。 -->
+        <view class="cbox tap" hover-class="tap-press" bindtap="toggleSensitive"
+              role="button" aria-label="{{agreeSensitive ? '已同意作答敏感话题题目，可选，点击取消' : '同意作答敏感话题题目，可选'}}">
+          <view class="cb {{agreeSensitive ? 'on' : ''}}"><text wx:if="{{agreeSensitive}}" class="ficon i-check"></text></view>
+          <view class="cb-body">
+            <view class="cb-title">我同意作答涉及敏感话题的题目（可选）</view>
+            <view class="cb-desc" wx:if="{{sensitiveCount > 0}}">本次题目中有 {{sensitiveCount}} 题被标为敏感；不勾选也能提交，这些题可以留空。</view>
+            <view class="cb-desc" wx:else>本次题目中没有被标为敏感的题，勾不勾都不会改变题目，此项只记录你的意愿。</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="compliance-note">本终端只提供本人自助参考，不向企业、合作机构或任何第三方推送你的作答与结果。</view>
+      <view class="spacer-lg"></view>
+    </block>
+
+    <!-- ══ 答题：按维度分成 5 组翻页。25 题一屏滚到底在手机上找不到自己答到哪，
+         分组后每屏 5 题，进度和「还差几题」都能一眼看到。 ══ -->
+    <block wx:elif="{{phase === 'ask'}}">
+      <view class="ask-top">
+        <view class="progress"><i style="width:{{totalCount ? (answeredCount * 100 / totalCount) : 0}}%"></i></view>
+        <view class="ask-count">已答 {{answeredCount}} / {{totalCount}} 题</view>
+        <view class="gdots">
+          <view wx:for="{{dims}}" wx:key="key" wx:for-index="gi"
+                class="gdot tap {{gi === groupIdx ? 'on' : (groupDone[gi] ? 'done' : '')}}"
+                hover-class="tap-press" bindtap="tapStep" data-g="{{gi}}"
+                role="button" aria-label="第{{gi + 1}}组 {{item.label}}{{groupDone[gi] ? '，已答完' : '，未答完'}}">{{gi + 1}}</view>
+        </view>
+      </view>
+
+      <block wx:for="{{dims}}" wx:key="key" wx:for-item="dim" wx:for-index="gi">
+        <view wx:if="{{gi === groupIdx}}">
+          <view class="pagehead rise-d1">
+            <view class="ph-title">{{dim.label}}</view>
+            <view class="ph-sub">第 {{gi + 1}} 组 / 共 {{dims.length}} 组 · 选最接近你日常做法的一项，没有对错。</view>
+          </view>
+
+          <view class="card card-inner rise-d2" wx:for="{{dim.questions}}" wx:key="idx" wx:for-item="q" wx:for-index="qi">
+            <view class="q-head">
+              <view class="q-prompt">{{qi + 1}}. {{q.prompt}}</view>
+              <!-- 标了敏感就必须真的能不选：同一项再点一次即取消 -->
+              <text wx:if="{{q.sensitive}}" class="q-optional">这题可以不选</text>
+            </view>
+            <view class="q-opts">
+              <view wx:for="{{q.choices}}" wx:key="key" wx:for-item="c"
+                    class="q-opt tap {{q.picked === c.key ? 'on' : ''}}"
+                    hover-class="tap-press" bindtap="tapChoice"
+                    data-g="{{gi}}" data-q="{{qi}}" data-c="{{c.key}}"
+                    role="button" aria-label="{{c.label}}{{q.picked === c.key ? '，已选中' : ''}}">
+                <view class="qo-mark {{q.picked === c.key ? 'on' : ''}}"><text wx:if="{{q.picked === c.key}}" class="ficon i-check"></text></view>
+                <view class="qo-text">{{c.label}}</view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <view class="compliance-note">作答内容不会上传原文，服务端只保存作答摘要与由固定权重算出的五维强度。</view>
+      <view class="spacer-lg"></view>
+    </block>
+
+    <!-- ── 提交中：只报真实已用时长，服务端不给进度，所以不画百分比 ── -->
+    <view wx:elif="{{phase === 'submitting'}}" class="empty">
+      <view class="e-ic"><text class="ficon i-compass"></text></view>
+      <view class="e-title">正在生成倾向参考</view>
+      <view class="e-desc">已用时 {{elapsed}} 秒。五维强度由服务端固定权重算出，五段解读由 AI 生成，这一步会稍慢一些。</view>
+    </view>
+
+    <!-- ══ 结果 ══ -->
+    <block wx:elif="{{phase === 'result'}}">
+      <view class="notice plum rise-d1">
+        <text class="ficon i-info n-ic"></text>
+        <text>以下是对你本次作答的倾向参考描述，仅供你本人参考，不构成职业指导意见，也不代表用人单位意见。</text>
+      </view>
+
+      <view wx:if="{{historyMode}}" class="notice info rise-d1">
+        <text class="ficon i-history n-ic"></text>
+        <text>这是账户中的历史结果，只读展示；打开它不会重新调用 AI，也不会产生新的记录。</text>
+      </view>
+
+      <!-- 解读缺失要说清缺的是哪一半：缺的只是文字，强度是纯函数算的，不受影响 -->
+      <view wx:if="{{result.status === 'rejected' || result.providerUnavailable}}" class="notice warn rise-d1">
+        <text class="ficon i-warning n-ic"></text>
+        <text wx:if="{{result.providerUnavailable}}">AI 解读服务本次不可用，五段文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
+        <text wx:else>本次 AI 解读未通过服务端校验{{result.failReason ? '（' + result.failReason + '）' : ''}}，文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
+      </view>
+
+      <view wx:if="{{result.consentStale}}" class="notice warn rise-d1">
+        <text class="ficon i-info n-ic"></text>
+        <text>这条记录保存的同意版本与当前说明不一致（或属未版本化的旧记录）。如需再做一次，请重新阅读并确认同意说明。</text>
+      </view>
+
+      <!-- ── 五维强度：图 + 等价文字列表 ──
+           canvas 是冗余表达。读屏用户、取不到画布节点、低端机渲染失败，
+           全都要能从下面的列表拿到同样的五个数字，所以列表常驻，不是降级方案。 -->
+      <view class="card card-inner rise-d2">
+        <view class="sec-t">五维强度</view>
+
+        <!-- 标签排在 canvas 外面（绝对定位，坐标由 radar.labelAnchors() 与绘制共用同一套角度）。
+             canvas 里一个字都不写：画布文字不吃页面字阶令牌、在不同 DPR 上糊、还会被边界裁掉。
+             数值不在这里重复——下面的条形列表已经逐项写了 N/5，图只负责「形状」。 -->
+        <view class="radar-stage" wx:if="{{radarDrawable && radarStatus !== 'error'}}"
+              style="width:{{radarPx}}px;height:{{radarHeightPx}}px">
+          <canvas
+            type="2d"
+            id="radar"
+            class="radar-cv"
+            style="width:{{radarCanvasPx}}px;height:{{radarCanvasHeightPx}}px"
+            aria-label="五维倾向形态图，具体数值见下方列表"
+          ></canvas>
+          <view wx:for="{{radarLabels}}" wx:key="key" class="radar-lb"
+                style="left:{{item.leftPct}}%;top:{{item.topPct}}%">{{item.label}}</view>
+        </view>
+        <view class="radar-cap" wx:if="{{radarDrawable && radarStatus !== 'error'}}">外圈淡线是五维的均衡位置，形状偏向哪边就是这次作答更投入的方向。</view>
+        <view wx:elif="{{!radarDrawable}}" class="radar-note">服务端返回的五维强度不完整，本次不绘制图形；下面的列表按服务端实际返回逐项显示。</view>
+        <view wx:else class="radar-note">图形未能渲染，五个数值见下面的列表。</view>
+
+        <view class="dim-bars">
+          <view wx:for="{{result.dims}}" wx:key="key" class="dbar">
+            <view class="db-top">
+              <text class="db-label">{{item.label}}</text>
+              <text class="db-val {{item.hasScore ? '' : 'na'}}">{{item.strengthText}}</text>
+            </view>
+            <view class="meter"><i style="width:{{item.pct}}%"></i></view>
+          </view>
+        </view>
+
+        <view class="radar-foot">这五个数值由你所选选项的固定权重累加算出，不经过 AI；AI 只负责下面的文字解读。</view>
+      </view>
+
+      <!-- ── 每个维度：强度 + 解读 ── -->
+      <view class="card card-inner rise-d3" wx:for="{{result.dims}}" wx:key="key">
+        <view class="dh">
+          <view class="dh-label">{{item.label}}</view>
+          <!-- 「暂无数据」不能挂分值的强调色：那会让缺数据看起来像一个分数 -->
+          <text class="chip {{item.hasScore ? 'teal' : ''}}">{{item.strengthText}}</text>
+        </view>
+        <!-- note 为 null 时写「解读暂缺」，不拿 strength 编一段话，也不隐藏该维度：
+             分数还在，缺的只是文字。 -->
+        <view wx:if="{{item.note}}" class="dn tap" hover-class="tap-press" bindtap="tapNote"
+              data-title="{{item.label}}" data-text="{{item.note}}"
+              role="button" aria-label="{{item.label}}解读全文">{{item.note}}</view>
+        <view wx:else class="dn na">解读暂缺</view>
+        <view class="dm" wx:if="{{item.evidence}}">依据：本组第 {{item.evidence}} 题的选择（只记题号，不含你选了什么）。</view>
+        <view class="dm" wx:else>依据：本组没有被采纳的题号。</view>
+      </view>
+
+      <view class="card card-inner rise-d4">
+        <view class="sec-t">整体解读</view>
+        <view wx:if="{{result.summary}}" class="dn tap" hover-class="tap-press" bindtap="tapNote"
+              data-title="整体解读" data-text="{{result.summary}}"
+              role="button" aria-label="整体解读全文">{{result.summary}}</view>
+        <view wx:else class="dn na">解读暂缺</view>
+      </view>
+
+      <!-- ── 本次记录：只回显服务端存下来的事实，缺什么就说缺什么 ── -->
+      <view class="card card-inner rise-d5">
+        <view class="sec-t">本次记录</view>
+        <view class="mrow"><text class="mk">同意说明版本</text><text class="mv">{{result.consentVersion || '未版本化（服务端未存版本号）'}}</text></view>
+        <view class="mrow"><text class="mk">勾选时间</text><text class="mv">{{result.consentedAt || '未记录'}}</text></view>
+        <view class="mrow"><text class="mk">保留至</text><text class="mv">{{result.expiresAt || '未返回到期时间'}}</text></view>
+        <view class="mrow"><text class="mk">已生成解读</text><text class="mv">{{result.noteCount}} / {{result.dims.length}} 段</text></view>
+
+        <view wx:if="{{manageBlockedReason}}" class="notice warn mnotice">
+          <text class="ficon i-warning n-ic"></text>
+          <text>{{manageBlockedReason}}</text>
+        </view>
+
+        <view wx:if="{{canManage}}" class="wd tap" hover-class="tap-press" bindtap="tapWithdraw"
+              role="button" aria-label="撤回本次结果">
+          <text class="ficon i-close wd-ic"></text>
+          <text>{{withdrawing ? '正在撤回…' : '撤回本次结果'}}</text>
+        </view>
+        <view wx:if="{{canManage}}" class="wd-desc">撤回后服务端会删除这次的五维强度与解读，并留下一条删除审计记录。</view>
+      </view>
+
+      <view class="compliance-note">本页只做本人自助参考，不参与任何岗位或招聘会的排序与筛选，也不会向企业、合作机构展示。</view>
+      <view class="spacer-lg"></view>
+    </block>
+
+  </view>
+
+  <!-- ── 底部操作条 ── -->
+  <view class="actionbar" wx:if="{{phase === 'consent'}}">
+    <view class="btn lg block primary tap {{agreeNonSensitive ? '' : 'disabled'}}" hover-class="tap-press"
+          bindtap="startAsk" role="button" aria-label="同意并开始作答">同意并开始作答</view>
+  </view>
+
+  <view class="actionbar" wx:elif="{{phase === 'ask'}}">
+    <view class="btn lg ghost-ink tap ab-side" hover-class="tap-press" bindtap="prevGroup"
+          role="button" aria-label="{{groupIdx === 0 ? '返回同意说明' : '上一组'}}">{{groupIdx === 0 ? '返回说明' : '上一组'}}</view>
+    <!-- 「还差 N 题」的比较放在 js 里算：属性值里写 `<` 是 XML 的标签起始符，
+         不同版本的编译器对它的容忍度不一样，不值得赌。 -->
+    <view wx:if="{{isLastGroup}}" class="btn lg primary tap ab-main {{submitReady ? '' : 'disabled'}}"
+          hover-class="tap-press" bindtap="submit" role="button" aria-label="提交作答并生成倾向参考">
+      {{submitReady ? '提交并生成参考' : '还差 ' + missingRequired + ' 题'}}
+    </view>
+    <view wx:else class="btn lg primary tap ab-main" hover-class="tap-press" bindtap="nextGroup"
+          role="button" aria-label="下一组">下一组</view>
+  </view>
+
+  <view class="actionbar" wx:elif="{{phase === 'result'}}">
+    <view class="btn lg ghost-ink tap ab-side" hover-class="tap-press" bindtap="restart"
+          role="button" aria-label="重新作答">重新作答</view>
+    <!-- 拿到打印响应只代表报告文件已生成并进了「我的文档」，不等于已打印，
+         所以按钮只说「生成并去打印」。 -->
+    <view wx:if="{{canManage}}" class="btn lg primary tap ab-main {{printing ? 'disabled' : ''}}"
+          hover-class="tap-press" bindtap="tapPrint" role="button" aria-label="生成报告并去打印">
+      <text class="ficon i-printer ab-ic"></text>{{printing ? '正在生成…' : '生成并去打印'}}
+    </view>
+  </view>
+</view>

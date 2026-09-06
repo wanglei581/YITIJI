@@ -1,7 +1,9 @@
 <view class="me-page">
   <view style="height:{{statusBarHeight}}px"></view>
 
-  <view class="me-head">
+  <!-- padding-right 让开微信胶囊：本行右侧的按钮实测整个落在胶囊矩形内，点不到。
+       值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，不能写死 rpx。 -->
+  <view class="me-head" style="padding-right:{{capsuleInsetRight}}px">
     <view>
       <view class="me-page-title">我的</view>
       <view class="me-page-sub">管理本人资料、记录与服务</view>

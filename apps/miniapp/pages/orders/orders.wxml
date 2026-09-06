@@ -67,7 +67,9 @@
         <view class="oc-foot">
           <view class="oc-price">{{item.price}}</view>
           <view class="oc-btns">
-            <view class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
+            <view wx:if="{{item.cloudOrder}}" class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
+            <!-- 一体机上产生的历史任务没有线上详情端点，不放会 404 的按钮。 -->
+            <text wx:else class="oc-note">一体机任务，详情请在一体机「我的打印订单」查看</text>
             <view wx:if="{{item.action}}" class="oc-btn pri tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="primary">{{item.actionLabel}}</view>
           </view>
         </view>

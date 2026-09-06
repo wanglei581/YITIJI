@@ -19,7 +19,9 @@ const STATUS_TONE = {
 function fmtCode(raw) {
   if (!raw) return ''
   const s = String(raw).replace(/\s/g, '').toUpperCase()
-  return s.match(/.{1,2}/g).join('-')
+  // groups 判空：纯空白入参 replace 后为空串，match 返回 null，直接 .join 会 THROW
+  const groups = s.match(/.{1,2}/g)
+  return groups ? groups.join('-') : ''
 }
 
 function fmtPrice(cents) {

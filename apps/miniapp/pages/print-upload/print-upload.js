@@ -64,6 +64,11 @@ Page({
     if (upstreamPages > 0) this.setData({ 'file.pages': upstreamPages })
 
     if (o.fileId) {
+      // printFileUrl：上游（招聘会活动资料 / 参会企业资料）拿到的服务端签名 URL。
+      // 那两类是共享派生文件，endUserId 为 null，用 fileId 去换 preview-url 必吃 403；
+      // 服务端在生成响应里已经把 URL 给过一次，这里直接用，不再换第二次。
+      // 普通本人文件不带这个参数，走原路径，行为完全不变。
+      this._printFileUrl = o.printFileUrl ? decodeURIComponent(o.printFileUrl) : ''
       this.setData({ fileId: o.fileId, hasFile: true })
       this._runPrivacyScan(o.fileId)
       this._refreshQuote()
@@ -112,7 +117,7 @@ Page({
 
     const run = () => {
       this._quoteTimer = null
-      api.quoteMyPrintOrder(fileId, verifiedPrintParams(copies))
+      api.quoteMyPrintOrder(fileId, verifiedPrintParams(copies), this._printFileUrl)
         .then((quote) => {
           if (seq !== this._quoteSeq) return
           const amountCents = Number(quote && quote.amountCents)

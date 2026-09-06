@@ -58,3 +58,25 @@
 .state-icon .ficon { width: 43rpx; height: 43rpx; }
 .state-title { margin-top: 20rpx; font-size: 30rpx; font-weight: 720; color: var(--ink); }
 .state-desc { margin-top: 8rpx; font-size: 23rpx; color: var(--muted); line-height: 1.6; }
+
+/* 政策条件自测入口。放在分类条之前，比政策卡片更醒目一档但不做成 banner——
+   它是一条路，不是广告。 */
+.pc-entry {
+  margin: 0 32rpx 24rpx;
+  padding: 28rpx;
+  display: flex; align-items: center; gap: 20rpx;
+  background: var(--teal-wash);
+  border: 1px solid var(--teal-soft);
+  border-radius: var(--r-md);
+}
+.pc-ic {
+  width: 76rpx; height: 76rpx; flex-shrink: 0;
+  border-radius: var(--r-sm);
+  background: var(--teal-soft); color: var(--teal-deep);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-md);
+}
+.pc-body { flex: 1; min-width: 0; }
+.pc-t { font-size: var(--fs-base); font-weight: 600; color: var(--ink); line-height: 1.45; }
+.pc-s { margin-top: 8rpx; font-size: var(--fs-xs); color: var(--muted); line-height: 1.55; }
+.pc-arrow { color: var(--ghost); flex-shrink: 0; font-size: var(--fs-sm); }

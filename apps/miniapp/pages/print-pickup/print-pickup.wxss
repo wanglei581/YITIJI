@@ -107,7 +107,8 @@
 .state-icon { width: 92rpx; height: 92rpx; margin: 0 auto 20rpx; border-radius: 29rpx; background: var(--error-soft); color: var(--error); display: flex; align-items: center; justify-content: center; }
 .state-icon .ficon { width: 44rpx; height: 44rpx; }
 .state-label { display: block; margin-bottom: 30rpx; font-size: 27rpx; color: var(--muted); line-height: 1.6; }
-.btn-retry { display: inline-flex; min-height: 76rpx; padding: 0 40rpx; border-radius: 22rpx; background: var(--teal); color: #fff; font-size: 27rpx; font-weight: 650; align-items: center; justify-content: center; }
+/* 实测 39px → 96rpx=48px */
+.btn-retry { display: inline-flex; min-height: 96rpx; padding: 0 40rpx; border-radius: 22rpx; background: var(--teal); color: #fff; font-size: 27rpx; font-weight: 650; align-items: center; justify-content: center; }
 
 .action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1rpx solid var(--line-soft); }
 .ab-btn { min-height: 88rpx; border-radius: 25rpx; background: var(--teal); color: #fff; font-size: 30rpx; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 24rpx rgba(22,119,255,.16); }

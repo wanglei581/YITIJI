@@ -71,3 +71,19 @@
   line-height: 1.75;
   color: var(--ink-soft);
 }
+
+.help-fb {
+  margin: 24rpx 32rpx 8rpx;
+  min-height: 96rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+}
+.help-fb-copy { flex: 1; min-width: 0; }
+.help-fb-t { font-size: var(--fs-md); font-weight: 650; color: var(--ink); }
+.help-fb-d { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--muted); }
+.help-fb .ficon { width: 22rpx; height: 22rpx; color: var(--ghost); flex-shrink: 0; }

@@ -1,0 +1,84 @@
+<view class="page-wrap">
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">意见反馈</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content">
+    <view class="card" wx:if="{{!loggedIn}}">
+      <view class="empty-slot">
+        <text class="ficon i-comment es-ic"></text>
+        <view class="es-t">请先登录</view>
+        <view class="es-d">登录后可提交意见反馈，并查看处理进度</view>
+        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goLogin" role="button" aria-label="去登录">去登录</view>
+      </view>
+    </view>
+
+    <block wx:else>
+      <view class="section-t">提交反馈</view>
+      <view class="card form-card">
+        <view class="field-label">分类</view>
+        <view class="cat-row">
+          <view class="cat tap {{category === item.value ? 'on' : ''}}" wx:for="{{categories}}" wx:key="value"
+            hover-class="tap-press" data-value="{{item.value}}" bindtap="setCategory" role="button" aria-label="{{item.label}}">{{item.label}}</view>
+        </view>
+        <view class="field-label">标题（选填）</view>
+        <input class="fb-input" value="{{title}}" maxlength="80" placeholder="如：打印预览显示不完整" bindinput="onTitle" />
+        <view class="field-label">反馈内容</view>
+        <textarea class="fb-area" value="{{content}}" maxlength="500" placeholder="请说明遇到的情况、发生页面或希望改进的地方（10–500 字）" bindinput="onContent" />
+        <view class="fb-count {{contentLen < 10 ? 'short' : ''}}">{{contentLen}} / 500</view>
+        <view class="field-label">联系电话（选填）</view>
+        <input class="fb-input" type="number" value="{{contactPhone}}" maxlength="11" placeholder="便于必要时联系确认" bindinput="onPhone" />
+        <view class="btn lg primary block tap {{canSubmit && !submitting ? '' : 'disabled'}}" hover-class="tap-press"
+          bindtap="submit" role="button" aria-label="提交反馈">{{submitting ? '正在提交…' : '提交反馈'}}</view>
+      </view>
+
+      <view class="section-t">我的反馈</view>
+      <view class="card" wx:if="{{listState === 'loading'}}">
+        <view class="empty-slot compact"><view class="es-t">正在加载本人反馈…</view></view>
+      </view>
+      <view class="card" wx:elif="{{listState === 'error'}}">
+        <view class="empty-slot compact">
+          <view class="es-t">加载失败</view>
+          <view class="es-d">{{loadError}}</view>
+          <view class="btn ghost tap" hover-class="tap-press" bindtap="retryLoad" role="button" aria-label="重新加载">重新加载</view>
+        </view>
+      </view>
+      <view class="card" wx:elif="{{list.length}}">
+        <view class="fb-item tap" wx:for="{{list}}" wx:key="id" hover-class="tap-press" data-id="{{item.id}}" bindtap="toggleItem">
+          <view class="fb-top">
+            <view class="fb-title">{{item.title || item.content}}</view>
+            <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="fb-meta">{{item.categoryLabel}} · {{item.time}}</view>
+          <view class="fb-sub">{{item.replyPreview || item.preview}}</view>
+          <view class="fb-detail" wx:if="{{item.expanded}}">
+            <view class="fb-body">{{item.content}}</view>
+            <view class="fb-replies" wx:if="{{item.loadingDetail}}">正在读取回复…</view>
+            <view class="fb-replies" wx:elif="{{item.replies && item.replies.length}}">
+              <view class="fb-reply" wx:for="{{item.replies}}" wx:for-item="rep" wx:key="id">
+                <view class="fb-reply-h"><text>{{rep.who}}</text><text class="fb-reply-t">{{rep.time}}</text></view>
+                <view class="fb-reply-c">{{rep.content}}</view>
+              </view>
+            </view>
+            <view class="fb-replies" wx:elif="{{item.replies}}">暂无回复</view>
+            <view wx:if="{{item.canClose}}" class="btn ghost tap close-btn {{item.closing ? 'disabled' : ''}}"
+              hover-class="tap-press" catchtap="closeItem" data-id="{{item.id}}" role="button" aria-label="关闭这条反馈">{{item.closing ? '正在关闭…' : '关闭'}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="card" wx:else>
+        <view class="empty-slot compact">
+          <view class="es-t">还没有反馈记录</view>
+          <view class="es-d">提交后，这里会显示处理状态与回复</view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

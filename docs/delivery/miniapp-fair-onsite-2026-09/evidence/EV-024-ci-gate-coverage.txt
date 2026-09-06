@@ -1,0 +1,16 @@
+# 修订 eff92ac9c063 · 2026-09-02T20:54+0800 · local
+
+$ node scripts/verify-ci-gate-coverage.mjs
+OK: 16 deterministic CI gates are directly executed; 371/377 verify/ui 门禁在 CI 执行闭包内，6 条已登记豁免（其中 0 条待接线，上限 1）；169 个门禁脚本文件中 3 个无脚本名（全部已登记，上限 3）
+exit=0
+
+本条回答的问题：本批新增的两个门禁脚本名（verify:api-contract / verify:visual-scale）
+到底有没有真的接进 CI 执行闭包。
+
+建包时它们是用 `node ... && node ...` 串在 verify:static 里的，覆盖率展开器只跟踪
+pnpm/npm 调用，跟不进 node 直串——**断言在跑，但覆盖率检查判定为未接线**，
+本分支进 CI 会在 Repository integrity gate 直接转红（DEF-004）。
+eff92ac9c063 改成 `pnpm run ...` 后覆盖率 369/377 → 371/377。
+
+本条不能证明什么：它只证明门禁被 CI 闭包覆盖，**不证明 CI 真的跑过本分支**。
+本分支从未推送、从未在 GitHub Actions 上执行过。

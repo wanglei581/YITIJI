@@ -454,6 +454,16 @@ function resumeReport(raw) {
   });
 
   const notice = raw.extractionNotice || null;
+  // 低/中置信度时下面会渲染一条完整的「识别置信度…」横幅，而提取层
+  // （services/api resume-extraction.service.ts 的 finalizeText）对**同一条件**还会再推一条
+  // 「文字识别置信度有限…」warning。两条讲的是同一件事，一起渲染就是同一句话叠两个警告框。
+  // 这里只在横幅已经出现时摘掉那一条 warning；截断、只识别前 N 页等其它 warning 全部保留。
+  // 后端不动：那条 warning 由 verify-ocr-baidu 断言，Kiosk 也在消费同一个 extractionNotice。
+  const needsReview = Boolean(notice && (notice.confidence === 'low' || notice.confidence === 'medium'));
+  const rawWarnings = notice && Array.isArray(notice.warnings) ? notice.warnings : [];
+  const dedupedWarnings = needsReview
+    ? rawWarnings.filter((w) => !(typeof w === 'string' && w.indexOf(CONFIDENCE_WARNING_PREFIX) === 0))
+    : rawWarnings;
 
   return {
     taskId: raw.taskId || '',
@@ -477,10 +487,29 @@ function resumeReport(raw) {
 
     // OCR / 文本抽取质量提示:低置信度时页面必须提醒人工复核
     noticeSource: notice ? notice.textSource || '' : '',
-    noticeConfidence: notice && typeof notice.confidence === 'number' ? notice.confidence : null,
-    noticeWarnings: notice && Array.isArray(notice.warnings) ? notice.warnings : [],
+    // 后端声明的是字符串枚举 'high' | 'medium' | 'low'（packages/shared ai.ts
+    // extractionNotice），不是数字。原来写 typeof === 'number'，于是这个字段
+    // **永远是 null**，页面上「低置信度请人工复核」那条提示从来没出现过——
+    // 扫描件/OCR 简历拿到一份看起来很确定的评分，却没有任何可靠性提示。
+    // 上一行的注释写着「低置信度时页面必须提醒人工复核」，意图是对的，实现失效了。
+    noticeConfidence: notice && typeof notice.confidence === 'string' ? notice.confidence : null,
+    // 只要不是 high 就提醒。宁可多提醒一次，也不要让 medium 悄悄过去——
+    // 这条提示的代价是一行字，漏掉的代价是用户按错误识别的文本改简历。
+    noticeConfidenceLabel: notice && CONFIDENCE_LABEL[notice.confidence] ? CONFIDENCE_LABEL[notice.confidence] : '',
+    noticeNeedsReview: needsReview,
+    noticeWarnings: dedupedWarnings,
   };
 }
+
+/** 文本抽取置信度 → 中文标签。取值来自后端 extractionNotice.confidence 枚举。 */
+const CONFIDENCE_LABEL = { high: '较高', medium: '中等', low: '较低' };
+
+/**
+ * 提取层「置信度有限」warning 的开头（services/api resume-extraction.service.ts）。
+ * 只有在页面已经显示置信度横幅时才拿它去重。故意用开头匹配而不是包含匹配：
+ * 截断 / 只识别前 N 页等其它 warning 不以此开头，不会被误删。
+ */
+const CONFIDENCE_WARNING_PREFIX = '文字识别置信度';
 
 /** 数组映射helper:对 null/非数组安全 */
 function mapList(fn) {
@@ -681,7 +710,69 @@ function interviewReport(raw) {
   };
 }
 
+/**
+ * 参会企业:后端实际返回的是 services/api/src/jobs/fair.types.ts 的 FairCompany
+ * (name / jobFairId / jobsCount),不是 packages/shared 的 FairCompanyDTO
+ * (companyName / fairId / applyNote / checkinStatus / aiMatchScore)。
+ *
+ * 这里只做键名对齐,**不造后端没有的值**。
+ * 一体机端 httpAdapter.ts 是硬编了 checkinStatus:'pending' 和一句
+ * applyNote:'如需了解更多,请扫码前往来源平台' —— 那是前端自己编的字符串,
+ * 冒充成了来源方给的提示。小程序不跟这个做法:拿不到就保持缺失,
+ * 页面按「暂无」渲染,而不是显示一句谁都没说过的话。
+ */
+function fairCompanyLike(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  return Object.assign({}, raw, {
+    companyName: pick(raw.companyName, raw.name),
+    fairId:      pick(raw.fairId, raw.jobFairId),
+    jobCount:    typeof raw.jobsCount === 'number' ? raw.jobsCount
+               : (typeof raw.jobCount === 'number' ? raw.jobCount : undefined),
+    coverImageUrl: pick(raw.coverImageUrl, raw.logoUrl),
+  });
+}
+
+/**
+ * 展区:后端 mapFairZone 返回 name,且**没有** industry / boothCount /
+ * checkedInCount / color 这四个字段。同样只对齐键名,不补 0。
+ * 一体机端在适配层填了 boothCount:0 / checkedInCount:0 —— 那会让页面
+ * 显示「0 个展位」,而真相是「不知道有几个展位」。这两件事不一样。
+ */
+function fairZoneLike(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  return Object.assign({}, raw, {
+    zoneName: pick(raw.zoneName, raw.name),
+    fairId:   pick(raw.fairId, raw.jobFairId),
+  });
+}
+
+/**
+ * 参会企业规模标签。后端 FairCompany.scale 是自由文本列
+ * (fair.types.ts 的 `scale: string | null`),库里既可能是枚举值也可能是中文原文。
+ * 只翻译认得出的枚举,认不出原样显示 —— 不学一体机 httpAdapter 兜底成 'medium',
+ * 那等于给每家没填规模的企业凭空盖章。
+ *
+ * 收在这里是因为列表页和详情页各写过一份,值还不一样(「中型」vs「中型企业」),
+ * 同一家企业在相邻两页显示两种说法。用不带「企业」的短形:
+ * 详情页里它紧挨着行业名,带上「企业」是冗余。
+ */
+const SCALE_LABEL = {
+  startup: '初创',
+  small: '小型',
+  medium: '中型',
+  large: '大型',
+  enterprise: '超大型',
+};
+
+function scaleLabel(scale) {
+  const s = scale == null ? '' : String(scale).trim();
+  return s ? (SCALE_LABEL[s] || s) : '';
+}
+
 module.exports = {
+  scaleLabel,
+  fairCompanyLike,
+  fairZoneLike,
   resumeReport,
   resumeOptimize,
   jobFit,

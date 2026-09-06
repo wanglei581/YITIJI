@@ -1,0 +1,32 @@
+/* 活动资料：布局与状态全部复用 app.wxss 全局类（page-wrap / navbar / content /
+   card / card-inner / chip / empty / list-state / notice / compliance-note /
+   btn / a-* 色调），本文件只放本页私有类。颜色一律用令牌。 */
+
+.mat-sum { padding: 20rpx 32rpx 8rpx; font-size: var(--fs-base); color: var(--muted); }
+
+.mat-top { display: flex; align-items: flex-start; gap: 22rpx; }
+/* .ficon 是 mask 图标，尺寸取 1em，所以图标块的 font-size 就是图标大小。 */
+.mat-ic {
+  width: 88rpx; height: 88rpx; border-radius: 24rpx;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40rpx; flex-shrink: 0;
+}
+.mat-head { flex: 1; min-width: 0; }
+.mat-name { font-size: 30rpx; font-weight: 680; color: var(--ink); line-height: 1.4; }
+
+.mat-desc { margin-top: 18rpx; font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.7; }
+
+.mat-meta { margin-top: 14rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+.mat-dot { padding: 0 10rpx; color: var(--line); }
+
+.mat-acts { display: flex; align-items: center; gap: 18rpx; margin-top: 24rpx; }
+/* 高度沿用全局 .btn.lg（60px），保证主操作在手机上仍≥56px；这里只调宽度与字号，
+   两枚按钮并排时 .btn.lg 自带的 32px 内边距会把长文案挤到换行。 */
+.mat-btn { flex: 1; min-width: 0; padding: 0 16rpx; font-size: var(--fs-base); }
+
+/* 「不提供打印 / 未提供预览」是能力说明而不是可点区，做成静态文字，
+   不套 .btn —— 灰按钮会被反复点，用户以为是加载中。 */
+.mat-off {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-sm); color: var(--faint); line-height: 1.5; text-align: center;
+}

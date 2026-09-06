@@ -12,7 +12,10 @@
  *   - 微信公众平台已配置 request / uploadFile 合法域名 = https://zyidai.cn
  *   - /api/v1/health 返回 db=postgres
  *
- * 注意切真的影响面:全仓仅 9 个页面调用 api 层
+ * 影响面(2026-09-02 复核):全仓 58 个注册页面中 47 个调用数据层
+ *   (utils/api 或经 utils/history、favorites、reminders 中转),107 个端点。
+ *   原注释写的"仅 9 个页面"是 2026-08-01 切真当天的数字,早已不成立——
+ *   照它判断改动影响面会严重低估。
  *   免登录只读:jobs / job-detail / fairs / fair-detail / companies /
  *              company-detail / policies / policy-detail
  *   需短信登录:login

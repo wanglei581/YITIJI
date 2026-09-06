@@ -1,0 +1,475 @@
+<!--pages/resume-build/resume-build.wxml-->
+<!--
+  从零建一份简历。合规红线（评审专门为这一页划的）在版面上的落点：
+
+  1. 这里**没有**任何「帮我写一段」「帮我想几个亮点」的按钮。整页只有输入框。
+     AI 拿到的就是用户敲进去的字，服务端契约保证它只润色描述文本、不新增经历条目。
+  2. 结果区每个段落都有 wx:else 分支渲染「（未填写：xxx）」——空着必须看得见。
+     不允许出现「已为你补全 / 已为你生成」，也不允许把空段落悄悄藏掉。
+  3. 失败态里那个「按填写内容导出」不是可选装饰：AI 挂了的时候，用户站在打印终端
+     前必须还能拿到一张按自己填的内容排版的纸（draft:true，服务端把 PDF 元数据
+     标成 AIGenerated='false'）。
+  4. 全页不出现录用或面试结果类表述。这是求职材料工具，不是招聘平台。
+-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">从零建一份简历</view>
+  </view>
+
+  <!-- ── 读取历史结果 ── -->
+  <view wx:if="{{phase === 'loading'}}" class="list-state">正在读取历史结果…</view>
+
+  <!-- ── 失败：三种出口分开给，且始终保留「按填写内容导出」这条退路 ── -->
+  <view wx:elif="{{phase === 'failed'}}" class="content">
+    <view class="rb-state">
+      <view class="rb-ic warn"><text class="ficon i-warning"></text></view>
+      <view class="rb-title">这次没有生成成功</view>
+      <view class="rb-sub">{{failMsg}}</view>
+    </view>
+
+    <view wx:if="{{failKind === 'login'}}" class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <text>登录状态过期了。登录后回到这一页点「重试一次」继续，已填内容不会丢。</text>
+    </view>
+
+    <view class="rb-acts">
+      <view wx:if="{{failKind === 'login'}}" class="btn lg primary block tap" hover-class="tap-press"
+            bindtap="goLogin" role="button" aria-label="去登录">去登录</view>
+      <view wx:if="{{failKind !== 'refill'}}" class="btn lg {{failKind === 'login' ? 'ghost' : 'primary'}} block tap" hover-class="tap-press"
+            bindtap="retry" role="button" aria-label="重试一次">重试一次</view>
+      <view class="btn lg ghost block tap" hover-class="tap-press"
+            bindtap="backToForm" role="button" aria-label="回去检查填写内容">回去检查填写内容</view>
+      <view wx:if="{{!historyMode}}" class="btn lg ghost-ink block tap {{exporting ? 'disabled' : ''}}" hover-class="tap-press"
+            bindtap="tapExportDraft" role="button" aria-label="{{fromVoice ? '按你说的原话出稿' : '按填写内容导出未润色版本'}}">
+        {{exporting ? '正在排版…' : (fromVoice ? '按你说的原话出稿' : '按填写内容导出（未润色）')}}
+      </view>
+    </view>
+
+    <view wx:if="{{!historyMode}}" class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <text wx:if="{{fromVoice}}">这次按你说的原话排版，一个字都不改。文件上会标明不是 AI 写的。</text>
+      <text wx:else>「按填写内容导出」不经过 AI：把你刚才填的内容原样排版成文件，一个字都不改，也不会替你补写空着的段落。</text>
+    </view>
+  </view>
+
+  <!-- ── 生成中：只报真实已用秒数。服务端不给进度，这里就没有百分比，也不写「预计还剩」 ── -->
+  <view wx:elif="{{phase === 'running'}}" class="rb-state rb-state-run">
+    <view class="rb-anim">
+      <view class="rb-ring"></view>
+      <text class="ficon i-file-text rb-anim-ic"></text>
+    </view>
+    <view class="rb-title">AI 正在润色你填的内容…</view>
+    <view class="rb-sub">已用 {{elapsed}} 秒，请勿离开页面</view>
+    <view class="rb-fine">只调整表达方式；学校、单位、职务、时间这些事实字段逐字保留你填写的原文。</view>
+  </view>
+
+  <!-- ── 结果 ── -->
+  <block wx:elif="{{phase === 'done'}}">
+    <view class="content has-bar">
+      <view class="notice plum rise-d1">
+        <text class="ficon i-info n-ic"></text>
+        <text>以下建议由 AI 基于你的简历文本生成，仅供你本人参考，不构成职业指导意见，也不代表用人单位意见。</text>
+      </view>
+
+      <view wx:if="{{result.isMockProvider}}" class="notice warn">
+        <text class="ficon i-warning n-ic"></text>
+        <text>当前服务端使用占位模型，以下内容仅用于流程演示，不能作为求职材料使用。</text>
+      </view>
+
+      <view wx:if="{{historyMode}}" class="notice info">
+        <text class="ficon i-history n-ic"></text>
+        <text>这是账户里的历史结果，只读展示，不会重新调用 AI。</text>
+      </view>
+
+      <!-- 抬头 -->
+      <view class="card rise-d2">
+        <view class="card-inner">
+          <view class="rb-res-name">{{result.name}}</view>
+          <view class="rb-res-pos">目标岗位：{{result.position}}</view>
+          <view wx:if="{{result.wanted}}" class="rb-res-meta">{{result.wanted}}</view>
+          <view wx:if="{{result.contact}}" class="rb-res-meta">{{result.contact}}</view>
+          <view wx:else class="rb-slot">（未填写：联系方式）</view>
+        </view>
+      </view>
+
+      <!-- 服务端确定性算出的缺口，不是模型写的 -->
+      <view wx:if="{{result.missingHints.length}}" class="card wheat-wash rise-d3">
+        <view class="card-head"><view class="ch-title">还缺这些（系统按你填写的内容逐条核对）</view></view>
+        <view class="card-inner">
+          <view wx:for="{{result.missingHints}}" wx:key="*this" class="rb-hint-item">
+            <text class="ficon i-info rb-hint-ic"></text>
+            <text class="rb-hint-text">{{item}}</text>
+          </view>
+          <view class="rb-fine">这些空缺不会被自动填上。要补，请回到表单自己写。</view>
+        </view>
+      </view>
+
+      <view class="section-t">个人简介</view>
+      <view class="card"><view class="card-inner">
+        <view wx:if="{{result.summary}}" class="rb-para">{{result.summary}}</view>
+        <view wx:else class="rb-slot">（未填写：自我介绍。AI 不会替你写一段。）</view>
+      </view></view>
+
+      <view class="section-t">教育经历</view>
+      <view class="card"><view class="card-inner">
+        <block wx:if="{{result.education.length}}">
+          <view wx:for="{{result.education}}" wx:key="id" class="rb-entry">
+            <view class="rb-entry-head">
+              <view class="rb-entry-title">{{item.title}}</view>
+              <view wx:if="{{item.period}}" class="rb-entry-period">{{item.period}}</view>
+            </view>
+            <view wx:if="{{item.desc}}" class="rb-entry-desc">{{item.desc}}</view>
+          </view>
+        </block>
+        <view wx:else class="rb-slot">（未填写：教育经历）</view>
+      </view></view>
+
+      <view class="section-t">实习 / 工作经历</view>
+      <view class="card"><view class="card-inner">
+        <block wx:if="{{result.experience.length}}">
+          <view wx:for="{{result.experience}}" wx:key="id" class="rb-entry">
+            <view class="rb-entry-head">
+              <view class="rb-entry-title">{{item.title}}</view>
+              <view wx:if="{{item.period}}" class="rb-entry-period">{{item.period}}</view>
+            </view>
+            <view wx:if="{{item.desc}}" class="rb-entry-desc">{{item.desc}}</view>
+          </view>
+        </block>
+        <view wx:else class="rb-slot">（未填写：实习 / 工作经历）</view>
+      </view></view>
+
+      <view class="section-t">项目经历</view>
+      <view class="card"><view class="card-inner">
+        <block wx:if="{{result.projects.length}}">
+          <view wx:for="{{result.projects}}" wx:key="id" class="rb-entry">
+            <view class="rb-entry-head">
+              <view class="rb-entry-title">{{item.title}}</view>
+            </view>
+            <view wx:if="{{item.desc}}" class="rb-entry-desc">{{item.desc}}</view>
+          </view>
+        </block>
+        <view wx:else class="rb-slot">（未填写：项目经历）</view>
+      </view></view>
+
+      <view class="section-t">技能与证书</view>
+      <view class="card"><view class="card-inner">
+        <view class="rb-sub-cap">技能</view>
+        <view wx:if="{{result.skills.length}}" class="chips">
+          <text wx:for="{{result.skills}}" wx:key="*this" class="chip teal">{{item}}</text>
+        </view>
+        <view wx:else class="rb-slot">（未填写：技能）</view>
+
+        <view class="card-sep rb-sep"></view>
+
+        <view class="rb-sub-cap">证书 / 资质</view>
+        <view wx:if="{{result.certificates.length}}" class="chips">
+          <text wx:for="{{result.certificates}}" wx:key="*this" class="chip">{{item}}</text>
+        </view>
+        <view wx:else class="rb-slot">（未填写：证书 / 资质）</view>
+      </view></view>
+
+      <!-- 导出设置 -->
+      <view class="section-t">导出设置</view>
+      <view class="card"><view class="card-inner">
+        <view wx:for="{{optionGroups}}" wx:key="key" class="rb-opt">
+          <view class="rb-opt-l">{{item.label}}</view>
+          <view class="seg rb-seg">
+            <view wx:for="{{item.items}}" wx:for-item="opt" wx:key="label"
+                  class="s {{opt.on ? 'on' : ''}} tap" hover-class="tap-press"
+                  bindtap="pickOption" data-opt="{{item.key}}" data-val="{{opt.val}}"
+                  role="button" aria-label="{{item.label}}选择{{opt.label}}">{{opt.label}}</view>
+          </view>
+        </view>
+        <view class="rb-fine">排版设置只对 PDF 生效。Word / 纯文本 / Markdown 由服务端按各自格式渲染，不套用这里的选择，页面也不假装它生效了。</view>
+      </view></view>
+
+      <view class="notice info">
+        <text class="ficon i-info n-ic"></text>
+        <text>导出只代表文件已经做好并存进你的「我的文档」，不等于已经打印。出纸要到终端核销后才发生。</text>
+      </view>
+
+      <view class="rb-textline tap" hover-class="tap-press" bindtap="tapRegenerate" role="button" aria-label="重新生成一次">
+        对润色结果不满意？重新生成一次
+      </view>
+
+      <view class="compliance-note">简历内容由你本人填写并负责。本平台不代收简历，也不代为投递。</view>
+      <view class="spacer-lg"></view>
+    </view>
+
+    <view class="actionbar">
+      <view class="btn lg ghost tap" hover-class="tap-press" bindtap="backToForm" role="button" aria-label="返回修改填写内容">返回修改</view>
+      <view class="btn lg primary rb-grow tap {{exporting ? 'disabled' : ''}}" hover-class="tap-press"
+            bindtap="tapExport" role="button" aria-label="导出文件">
+        {{exporting ? '正在生成…' : (format === 'pdf' ? '导出并去打印' : '导出文件')}}
+      </view>
+    </view>
+  </block>
+
+  <!-- ── 分段填写 ── -->
+  <block wx:else>
+    <view class="content has-bar">
+      <view class="steps rb-steps">
+        <block wx:for="{{steps}}" wx:key="label">
+          <view wx:if="{{index > 0}}" class="line {{index <= step ? 'done' : ''}}"></view>
+          <view class="st {{index === step ? 'on' : (item.filled ? 'done' : '')}} tap" hover-class="tap-press"
+                bindtap="goStep" data-step="{{index}}" role="button" aria-label="第{{index + 1}}段 {{item.label}}">
+            <view class="n">{{index + 1}}</view>
+            <view class="nl">{{item.label}}</view>
+          </view>
+        </block>
+      </view>
+
+      <view class="pagehead rise-d1">
+        <view class="ph-title">{{steps[step].title}}</view>
+        <view class="ph-sub">第 {{step + 1}} / {{steps.length}} 段 · {{steps[step].sub}}</view>
+      </view>
+
+      <view wx:if="{{step === 0}}" class="card rise-d1"><view class="card-inner">
+        <view class="rb-row-title">也可以一题一题说</view>
+        <view class="rb-fine">每句转成文字后你自己确认，确认前不会写进简历。电话请手打。文字填写入口一直留在这一页。</view>
+        <view class="btn lg ghost block tap rb-voice-go" hover-class="tap-press" bindtap="goVoice" role="button" aria-label="用语音说一份">用语音说一份</view>
+      </view></view>
+
+      <view wx:if="{{step === 0}}" class="notice info">
+        <text class="ficon i-info n-ic"></text>
+        <text>这是一份表单，不是对话。简历内容全部以你填写的为准；AI 只对你写下的句子做表达润色，不会替你编造经历，也不会替你补写空着的段落。</text>
+      </view>
+
+      <!-- 第 1 段：基本信息 -->
+      <view wx:if="{{step === 0}}" class="card rise-d2"><view class="card-inner">
+        <view class="rb-field">
+          <view class="rb-label">姓名<text class="rb-req">必填</text></view>
+          <input class="rb-input" value="{{basic.name}}" placeholder="你的真实姓名" placeholder-class="rb-ph"
+                 maxlength="{{LEN.name}}" data-group="basic" data-key="name" bindinput="onFlat" />
+        </view>
+        <view class="rb-field">
+          <view class="rb-label">手机号</view>
+          <input class="rb-input" type="number" value="{{basic.phone}}" placeholder="留空的话，简历上就没有电话" placeholder-class="rb-ph"
+                 maxlength="{{LEN.phone}}" data-group="basic" data-key="phone" bindinput="onFlat" />
+        </view>
+        <view class="rb-field">
+          <view class="rb-label">邮箱</view>
+          <input class="rb-input" value="{{basic.email}}" placeholder="选填" placeholder-class="rb-ph"
+                 maxlength="{{LEN.email}}" data-group="basic" data-key="email" bindinput="onFlat" />
+        </view>
+        <view class="rb-field">
+          <view class="rb-label">所在城市</view>
+          <input class="rb-input" value="{{basic.city}}" placeholder="选填" placeholder-class="rb-ph"
+                 maxlength="{{LEN.city}}" data-group="basic" data-key="city" bindinput="onFlat" />
+        </view>
+        <view class="rb-fine">手机号和邮箱只出现在你自己导出的简历文件上；本平台不会把它交给任何用人单位。</view>
+      </view></view>
+
+      <!-- 第 2 段：求职意向 -->
+      <view wx:elif="{{step === 1}}" class="card rise-d2"><view class="card-inner">
+        <view class="rb-field">
+          <view class="rb-label">目标岗位<text class="rb-req">必填</text></view>
+          <input class="rb-input" value="{{intention.position}}" placeholder="例如：前端开发工程师" placeholder-class="rb-ph"
+                 maxlength="{{LEN.position}}" data-group="intention" data-key="position" bindinput="onFlat" />
+        </view>
+        <view class="rb-field">
+          <view class="rb-label">期望城市</view>
+          <input class="rb-input" value="{{intention.city}}" placeholder="选填" placeholder-class="rb-ph"
+                 maxlength="{{LEN.city}}" data-group="intention" data-key="city" bindinput="onFlat" />
+        </view>
+        <view class="rb-field">
+          <view class="rb-label">工作类型</view>
+          <input class="rb-input" value="{{intention.jobType}}" placeholder="例如：全职 / 实习 / 校招" placeholder-class="rb-ph"
+                 maxlength="{{LEN.jobType}}" data-group="intention" data-key="jobType" bindinput="onFlat" />
+        </view>
+        <view class="rb-field">
+          <view class="rb-label">期望薪资</view>
+          <input class="rb-input" value="{{intention.salary}}" placeholder="选填，按你自己的预期写" placeholder-class="rb-ph"
+                 maxlength="{{LEN.salary}}" data-group="intention" data-key="salary" bindinput="onFlat" />
+        </view>
+      </view></view>
+
+      <!-- 第 3 段：教育经历 -->
+      <block wx:elif="{{step === 2}}">
+        <view wx:for="{{eduRows}}" wx:key="id" class="card rise-d2"><view class="card-inner">
+          <view class="rb-row-head">
+            <view class="rb-row-title">教育经历 {{index + 1}}</view>
+            <view class="rb-row-del tap" hover-class="tap-press" catchtap="removeRow" data-group="eduRows" data-index="{{index}}"
+                  role="button" aria-label="删除第{{index + 1}}条教育经历">
+              <text class="ficon i-close"></text>
+            </view>
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">学校<text class="rb-req">必填</text></view>
+            <input class="rb-input" value="{{item.school}}" placeholder="学校名称" placeholder-class="rb-ph"
+                   maxlength="{{LEN.school}}" data-group="eduRows" data-index="{{index}}" data-key="school" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">专业</view>
+            <input class="rb-input" value="{{item.major}}" placeholder="选填" placeholder-class="rb-ph"
+                   maxlength="{{LEN.major}}" data-group="eduRows" data-index="{{index}}" data-key="major" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">学历</view>
+            <input class="rb-input" value="{{item.degree}}" placeholder="例如：本科" placeholder-class="rb-ph"
+                   maxlength="{{LEN.degree}}" data-group="eduRows" data-index="{{index}}" data-key="degree" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">起止时间</view>
+            <input class="rb-input" value="{{item.period}}" placeholder="例如：2022.09 - 2026.06" placeholder-class="rb-ph"
+                   maxlength="{{LEN.period}}" data-group="eduRows" data-index="{{index}}" data-key="period" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">补充说明</view>
+            <textarea class="rb-input rb-area" value="{{item.description}}" placeholder="选填。主修课程、成绩、奖学金等，按你自己的情况写"
+                      placeholder-class="rb-ph" maxlength="{{LEN.description}}" auto-height
+                      data-group="eduRows" data-index="{{index}}" data-key="description" bindinput="onRow"></textarea>
+          </view>
+        </view></view>
+        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="eduRows" role="button" aria-label="添加一条教育经历">
+          <text class="ficon i-plus rb-add-ic"></text>
+          <text>添加一条（最多 {{maxEdu}} 条）</text>
+        </view>
+      </block>
+
+      <!-- 第 4 段：实习 / 工作经历 -->
+      <block wx:elif="{{step === 3}}">
+        <view class="notice info">
+          <text class="ficon i-info n-ic"></text>
+          <text>没有实习或工作经历就整段留空，直接往下一段走。空着的段落会如实空着，不会被补写。</text>
+        </view>
+        <view wx:for="{{expRows}}" wx:key="id" class="card rise-d2"><view class="card-inner">
+          <view class="rb-row-head">
+            <view class="rb-row-title">经历 {{index + 1}}</view>
+            <view class="rb-row-del tap" hover-class="tap-press" catchtap="removeRow" data-group="expRows" data-index="{{index}}"
+                  role="button" aria-label="删除第{{index + 1}}条经历">
+              <text class="ficon i-close"></text>
+            </view>
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">单位名称<text class="rb-req">必填</text></view>
+            <input class="rb-input" value="{{item.company}}" placeholder="公司 / 机构名称" placeholder-class="rb-ph"
+                   maxlength="{{LEN.company}}" data-group="expRows" data-index="{{index}}" data-key="company" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">岗位 / 职务<text class="rb-req">必填</text></view>
+            <input class="rb-input" value="{{item.role}}" placeholder="例如：前端开发实习生" placeholder-class="rb-ph"
+                   maxlength="{{LEN.role}}" data-group="expRows" data-index="{{index}}" data-key="role" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">起止时间</view>
+            <input class="rb-input" value="{{item.period}}" placeholder="例如：2025.07 - 2025.09" placeholder-class="rb-ph"
+                   maxlength="{{LEN.period}}" data-group="expRows" data-index="{{index}}" data-key="period" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">你做了什么<text class="rb-req">必填</text></view>
+            <textarea class="rb-input rb-area" value="{{item.description}}"
+                      placeholder="用你自己的话写清楚职责和结果。AI 只润色这段话的表达，不会替你添内容。"
+                      placeholder-class="rb-ph" maxlength="{{LEN.description}}" auto-height
+                      data-group="expRows" data-index="{{index}}" data-key="description" bindinput="onRow"></textarea>
+          </view>
+        </view></view>
+        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="expRows" role="button" aria-label="添加一条经历">
+          <text class="ficon i-plus rb-add-ic"></text>
+          <text>添加一条（最多 {{maxExp}} 条）</text>
+        </view>
+      </block>
+
+      <!-- 第 5 段：项目与技能 -->
+      <block wx:elif="{{step === 4}}">
+        <view wx:for="{{projRows}}" wx:key="id" class="card rise-d2"><view class="card-inner">
+          <view class="rb-row-head">
+            <view class="rb-row-title">项目 {{index + 1}}</view>
+            <view class="rb-row-del tap" hover-class="tap-press" catchtap="removeRow" data-group="projRows" data-index="{{index}}"
+                  role="button" aria-label="删除第{{index + 1}}个项目">
+              <text class="ficon i-close"></text>
+            </view>
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">项目名称<text class="rb-req">必填</text></view>
+            <input class="rb-input" value="{{item.name}}" placeholder="课程设计、竞赛、个人作品都算" placeholder-class="rb-ph"
+                   maxlength="{{LEN.projectName}}" data-group="projRows" data-index="{{index}}" data-key="name" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">你的角色</view>
+            <input class="rb-input" value="{{item.role}}" placeholder="选填，例如：负责前端页面" placeholder-class="rb-ph"
+                   maxlength="{{LEN.role}}" data-group="projRows" data-index="{{index}}" data-key="role" bindinput="onRow" />
+          </view>
+          <view class="rb-field">
+            <view class="rb-label">项目内容<text class="rb-req">必填</text></view>
+            <textarea class="rb-input rb-area" value="{{item.description}}"
+                      placeholder="做了什么、用了什么、结果如何。写多少算多少，不会被替你补齐。"
+                      placeholder-class="rb-ph" maxlength="{{LEN.description}}" auto-height
+                      data-group="projRows" data-index="{{index}}" data-key="description" bindinput="onRow"></textarea>
+          </view>
+        </view></view>
+        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="projRows" role="button" aria-label="添加一个项目">
+          <text class="ficon i-plus rb-add-ic"></text>
+          <text>添加一个项目（最多 {{maxProj}} 个）</text>
+        </view>
+
+        <view class="card rise-d3"><view class="card-inner">
+          <view class="rb-field">
+            <view class="rb-label">技能</view>
+            <textarea class="rb-input rb-area" value="{{skillsText}}"
+                      placeholder="一行一个，或用逗号、顿号分隔" placeholder-class="rb-ph"
+                      maxlength="1000" auto-height bindinput="onSkills"></textarea>
+          </view>
+          <view class="rb-parsed">
+            <view class="rb-parsed-cap">识别为 {{skillChips.length}} 项 / 上限 {{maxSkills}} 项</view>
+            <view wx:if="{{skillChips.length}}" class="chips">
+              <text wx:for="{{skillChips}}" wx:key="*this" class="chip teal">{{item}}</text>
+            </view>
+            <view wx:else class="rb-slot">（未填写：技能）</view>
+          </view>
+
+          <view class="card-sep rb-sep"></view>
+
+          <view class="rb-field">
+            <view class="rb-label">证书 / 资质</view>
+            <textarea class="rb-input rb-area" value="{{certsText}}"
+                      placeholder="一行一个，或用逗号、顿号分隔" placeholder-class="rb-ph"
+                      maxlength="1000" auto-height bindinput="onCerts"></textarea>
+          </view>
+          <view class="rb-parsed">
+            <view class="rb-parsed-cap">识别为 {{certChips.length}} 项 / 上限 {{maxCerts}} 项</view>
+            <view wx:if="{{certChips.length}}" class="chips">
+              <text wx:for="{{certChips}}" wx:key="*this" class="chip">{{item}}</text>
+            </view>
+            <view wx:else class="rb-slot">（未填写：证书 / 资质）</view>
+          </view>
+          <view class="rb-fine">上面这些标签就是将要提交的内容，分隔结果当场可见，系统不会替你改写或合并。</view>
+        </view></view>
+      </block>
+
+      <!-- 第 6 段：自我介绍 -->
+      <view wx:else class="card rise-d2"><view class="card-inner">
+        <view class="rb-field">
+          <view class="rb-label">自我介绍</view>
+          <textarea class="rb-input rb-area rb-area-lg" value="{{selfIntro}}"
+                    placeholder="用你自己的话写。留空也能提交——留空时简历上的个人简介一栏就是空的，不会被生成一段。"
+                    placeholder-class="rb-ph" maxlength="{{LEN.selfIntro}}" auto-height
+                    bindinput="onSelfIntro"></textarea>
+        </view>
+        <view class="rb-fine">{{selfIntro.length}} / {{LEN.selfIntro}} 字</view>
+      </view></view>
+
+      <view wx:if="{{step === 5}}" class="notice plum">
+        <text class="ficon i-robot n-ic"></text>
+        <text>提交后 AI 会对你填的描述文字做表达润色，通常需要几十秒。学校、单位、职务、时间、证书等事实字段由服务端逐字保留，不会被改动。</text>
+      </view>
+
+      <view class="compliance-note">简历内容由你本人填写并负责。本平台不代收简历，也不代为投递。</view>
+      <view class="spacer-lg"></view>
+    </view>
+
+    <view class="actionbar">
+      <view wx:if="{{step > 0}}" class="btn lg ghost tap" hover-class="tap-press"
+            bindtap="prevStep" role="button" aria-label="上一段">上一段</view>
+      <view wx:if="{{step < 5}}" class="btn lg primary rb-grow tap" hover-class="tap-press"
+            bindtap="nextStep" role="button" aria-label="下一段">下一段</view>
+      <view wx:else class="btn lg primary rb-grow tap" hover-class="tap-press"
+            bindtap="submit" role="button" aria-label="提交并生成简历">提交生成</view>
+    </view>
+  </block>
+</view>

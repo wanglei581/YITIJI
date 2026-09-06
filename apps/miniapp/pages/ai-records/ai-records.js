@@ -6,11 +6,16 @@ const auth = require('../../utils/auth')
 const KIND_META = {
   parse:           { type: 'resume',  title: '简历诊断',   icon: 'i-file-search', tone: 'plum', route: '/pages/resume-diagnose/resume-diagnose' },
   optimize:        { type: 'resume',  title: '简历优化',   icon: 'i-edit',        tone: 'teal', route: '/pages/resume-optimize/resume-optimize' },
-  generate:        { type: 'resume',  title: 'AI 生成简历', icon: 'i-file-text',  tone: 'plum', route: '' },
+  generate:        { type: 'resume',  title: 'AI 生成简历', icon: 'i-file-text',  tone: 'plum', route: '/pages/resume-build/resume-build' },
   job_fit:         { type: 'job',     title: '岗位匹配',   icon: 'i-link',        tone: 'teal', route: '/pages/job-fit/job-fit' },
   career_plan:     { type: 'career',  title: '职业规划',   icon: 'i-compass',     tone: 'plum', route: '/pages/career-plan/career-plan' },
-  fair_visit_plan: { type: 'career',  title: '招聘会规划',  icon: 'i-calendar',    tone: 'wheat', route: '' },
-  self_assessment: { type: 'career',  title: '自我评估',   icon: 'i-form',        tone: 'wheat', route: '' },
+  // route 有意留空：fair-visit-plan 页要求 ?fairId= 才能取数（getFairVisitPlan 的
+  // fairId 在路径里），而 /me/ai-records 只 select 了 id/taskId/kind，**不带招聘会标识**。
+  // 硬接上会让「查看结果」点进去撞「缺少招聘会参数」——比诚实的说明更糟。
+  // 等后端记录带上 fairId 再接。
+  fair_visit_plan: { type: 'career',  title: '招聘会规划',  icon: 'i-calendar',    tone: 'wheat', route: '',
+                     noRouteReason: '招聘会规划要从对应的那场招聘会进入才能打开；服务端的记录列表不带招聘会标识，所以这里无法直接跳转。你可以在「求职 → 招聘会」里找到那场招聘会再进。' },
+  self_assessment: { type: 'career',  title: '自我探索',   icon: 'i-form',        tone: 'wheat', route: '/pages/self-explore/self-explore' },
 }
 
 const STATUS_LABEL = {
@@ -57,6 +62,7 @@ function mapRecord(item) {
     tone: meta.tone,
     route: meta.route,
     canOpen,
+    noRouteReason: meta.noRouteReason || '',
     actionLabel: canOpen ? '查看结果' : '查看状态',
   }
 }
@@ -82,7 +88,8 @@ Page({
       { key: 'all', label: '全部' },
       { key: 'resume', label: '简历服务' },
       { key: 'job', label: '岗位匹配' },
-      { key: 'career', label: '规划评估' },
+      // 这一组现在装的是职业规划 / 招聘会规划 / 自我探索，没有一项是「评估」。
+      { key: 'career', label: '规划探索' },
     ],
     groups: [],
     loginRequired: false,
@@ -100,16 +107,28 @@ Page({
     this._load()
   },
 
-  async _load() {
-    if (!auth.isLoggedIn()) {
-      this._all = []
-      this.setData({ loginRequired: true, groups: [], loading: false, loadError: '' })
-      return
-    }
-    this.setData({ loginRequired: false, loading: true, loadError: '' })
+  onReachBottom() {
+    this._load(true)
+  },
+
+  async _load(append = false) {
+    if (append && (!this._nextCursor || this._loadingMore)) return
+    this._loadingMore = append
     try {
-      const list = await api.getMyAiRecords({ pageSize: 50 })
-      this._all = (list || []).map(mapRecord)
+      if (!auth.isLoggedIn()) {
+        this._all = []
+        this.setData({ loginRequired: true, groups: [], loading: false, loadError: '' })
+        return
+      }
+      // append 时不进整页 loading：那会把已渲染的列表打回加载态闪一下
+      this.setData(append ? { loginRequired: false } : { loginRequired: false, loading: true, loadError: '' })
+      // 2026-09-03：同 documents 的「50 条静默截断」——nextCursor 一直被丢弃，
+      // 第 51 条起永远不显示。分页写法对照 orders.js / documents.js。
+      const cursor = append ? this._nextCursor : null
+      const list = await api.getMyAiRecords({ pageSize: 50, ...(cursor ? { cursor } : {}) })
+      const page = (list || []).map(mapRecord)
+      this._all = append ? [...this._all, ...page] : page
+      this._nextCursor = (list && list.nextCursor) || null
       this._applyFilter(this.data.activeFilter)
       this.setData({ loading: false })
     } catch (err) {
@@ -119,6 +138,13 @@ Page({
       } else {
         this.setData({ loading: false, loadError: (err && err.message) || '加载记录失败，请稍后重试' })
       }
+    } finally {
+      // 必须在 finally 复位：未登录的提前 return 和两个 catch 分支原先都不复位，
+      // 于是「加载更多」失败一次之后，上面那道 _loadingMore guard 会把后续每一次
+      // 加载更多静默吞掉——列表永久停在 50 条，且不再报任何错。
+      // 本页是全仓唯一用实例字段（而非 data）做加载闸的列表页，
+      // documents / notifications / orders 都在 catch 里复位了 data.loadingMore。
+      this._loadingMore = false
     }
   },
 
@@ -142,7 +168,9 @@ Page({
     }
     const reason = record.status !== 'completed'
       ? `任务状态：${record.statusLabel}`
-      : '当前版本没有注册这类结果的独立回看页面，记录仍保留在你的账户中。'
+      // 有专属原因就说专属的。笼统说「没有注册页面」对招聘会规划是不准确的——
+      // 那一页注册了，只是没有招聘会标识进不去。
+      : (record.noRouteReason || '当前版本没有注册这类结果的独立回看页面，记录仍保留在你的账户中。')
     wx.showModal({
       title: record.title,
       content: `${reason}\n创建时间：${record.day} ${record.time}`,

@@ -1,0 +1,39 @@
+/* 求职材料模板。本页私有类，其余复用 app.wxss 全局类；尺寸走令牌。 */
+/* 同 policy-check：本页模板卡与字段卡都是简单内容卡，全局 .card 不带
+   padding（内距在 .card-inner），此处统一补齐。取 16px 与 .card-inner 一致。
+   删掉这条会让模板标题、描述和输入框直接贴住卡片边框。 */
+.card { padding: 16px; }
+
+
+.jm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
+.jm-title { font-size: var(--fs-md); font-weight: 600; color: var(--ink); line-height: 1.45; }
+.jm-desc { margin-top: 10rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.6; }
+.jm-for { margin-top: 10rpx; font-size: var(--fs-xs); color: var(--faint); line-height: 1.55; }
+.jm-tags { margin-top: 16rpx; }
+
+/* 服务端会拒的模板：视觉上明确弱一档，但仍可点——点开是解释，不是死按钮 */
+.jm-off { opacity: 0.72; }
+.jm-off-why {
+  margin-top: 16rpx; padding-top: 16rpx; border-top: 1px solid var(--line-faint);
+  font-size: var(--fs-xs); color: var(--warn); line-height: 1.55;
+}
+
+.jm-flabel { font-size: var(--fs-base); font-weight: 600; color: var(--ink); margin-bottom: 16rpx; }
+.jm-req { margin-left: 12rpx; font-size: var(--fs-xs); font-weight: 400; color: var(--clay); }
+.jm-input {
+  width: 100%; box-sizing: border-box;
+  min-height: 96rpx; padding: 20rpx 24rpx;
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-base); color: var(--ink); line-height: 1.6;
+}
+.jm-area { min-height: 180rpx; }
+.jm-ph { color: var(--ghost); }
+
+/* 底栏两个按钮的分配比例。对应 self-explore 的 .ab-side / .ab-main 写法：
+   flex 直接挂在按钮上，因为它们本身就是 .actionbar 的 flex 子项，中间不再隔
+   一层 .jm-bar（那一层没有 flex:1，会先把自己缩到 max-content，见 wxml 注释）。
+   删掉这两条会怎样：两个按钮各自退回 flex:0 1 auto，宽度只够包住「换模板」和
+   「生成并去打印」这几个字，底栏右侧空出一大块，主次比例也没了。 */
+.jm-side { flex: 1; }
+.jm-main { flex: 2; }

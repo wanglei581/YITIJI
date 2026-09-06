@@ -4,7 +4,8 @@
 .content.has-bar { padding-bottom: calc(112px + var(--sab)); }
 
 /* ── 文件卡 ─────────────────────────────────────────────────── */
-.file-card { display: flex; align-items: center; gap: 24rpx; border: 1rpx solid var(--line-soft); box-shadow: none; }
+/* 文件卡整卡可点（bindtap=tapFile），实测 47px → 补最小高度到 96rpx(48px) */
+.file-card { display: flex; align-items: center; min-height: 96rpx; gap: 24rpx; border: 1rpx solid var(--line-soft); box-shadow: none; }
 .fc-ic { width: 88rpx; height: 88rpx; border-radius: var(--r-md); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; }
 .fc-ic .ficon { width: 44rpx; height: 44rpx; }

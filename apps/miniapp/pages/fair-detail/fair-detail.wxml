@@ -94,6 +94,40 @@
       <view wx:if="{{fair.dataSourceNote}}" class="source-note">{{fair.dataSourceNote}}</view>
     </view>
 
+    <!-- 现场助手：这四条对应的后端能力早就为一体机建好了，小程序此前一条都没接，
+         导致「行前计划 → 展位导览 → 参展企业 → 现场打材料」整条链在手机上是断的。
+         入口放在详情页而不是列表页：只有确定要去哪一场，这四件事才有意义。 -->
+    <view class="section-head rise-d4">
+      <view class="section-title">现场助手</view>
+      <view class="section-sub">到场前后用得上的四件事</view>
+    </view>
+    <view class="tiles rise-d4">
+      <view class="tile sheen tap" hover-class="tap-press" bindtap="tapVenue"
+            role="button" aria-label="会场导览，展厅分区与打印点位置">
+        <view class="t-ic a-teal"><text class="ficon i-map"></text></view>
+        <view class="t-title">会场导览</view>
+        <view class="t-desc">展厅分区与打印点位置</view>
+      </view>
+      <view class="tile sheen tap" hover-class="tap-press" bindtap="tapCompanies"
+            role="button" aria-label="参会企业，展位号与岗位清单">
+        <view class="t-ic a-slate"><text class="ficon i-bank"></text></view>
+        <view class="t-title">参会企业</view>
+        <view class="t-desc">展位号与岗位清单</view>
+      </view>
+      <view class="tile sheen tap" hover-class="tap-press" bindtap="tapMaterials"
+            role="button" aria-label="活动资料，主办方发布的可打印资料">
+        <view class="t-ic a-wheat"><text class="ficon i-file-text"></text></view>
+        <view class="t-title">活动资料</view>
+        <view class="t-desc">主办方发布，可打印</view>
+      </view>
+      <view class="tile sheen tap" hover-class="tap-press" bindtap="tapVisitPlan"
+            role="button" aria-label="AI 参会准备单，基于你的简历生成参会准备建议">
+        <view class="t-ic a-plum"><text class="ficon i-robot"></text></view>
+        <view class="t-title">AI 参会准备单</view>
+        <view class="t-desc">按你的简历给准备建议</view>
+      </view>
+    </view>
+
     <!-- 合规提示 -->
     <view class="notice info rise-d5">
       <text class="ficon i-info n-ic"></text>

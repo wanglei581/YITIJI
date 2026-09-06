@@ -19,12 +19,24 @@ Page({
     const { statusBarHeight } = app.globalData;
     const id = (opts && opts.id) || '';
     this.setData({ statusBarHeight: statusBarHeight || 20, pageId: id });
+    if (!id) {
+      // 深链 / 分享进来没带 id：不发空参请求，直接给可读提示（codex 第 17 轮审出）。
+      this.setData({ loading: false, loadError: '缺少内容参数，请从列表页进入' });
+      return;
+    }
     this.loadDetail(id);
   },
 
   loadDetail(id) {
     this.setData({ loading: true, loadError: '' });
     api.getPolicyDetail(id).then((policy) => {
+      // 后端对「不存在 / 未发布」返回 data:null（与 job-fairs/:id 同口径，
+      // 不区分两者以免泄露未发布政策的存在性）。这里必须先判空：
+      // 直接读 policy.title 会抛 TypeError 掉进 catch，把「已下线」显示成「加载失败」。
+      if (!policy) {
+        this.setData({ loading: false, loadError: '未找到该政策，可能已下线' });
+        return;
+      }
       this.setData({ policy, loading: false });
       history.recordView('policy', { id, title: policy.title, source: policy.sourceOrg });
     }).catch((err) => {

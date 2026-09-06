@@ -165,7 +165,8 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   display: flex;
   gap: 16rpx;
 }
+/* 底部主操作，实测 45px；§9 主要按钮建议 ≥56px → 112rpx */
 .actionbar .btn {
   flex: 1;
-  height: 88rpx;
+  height: 112rpx;
 }

@@ -16,6 +16,7 @@
 | 下一步做什么 | [progress/next-tasks.md](progress/next-tasks.md) |
 | 当日开发摘要与协作收尾 | [progress/today-claude.md](progress/today-claude.md) |
 | 功能边界（能做 / 不能做） | [product/feature-scope.md](product/feature-scope.md) |
+| 按谁排序、12 个月长什么 / 不长什么（从属于功能边界与合规） | [product/audience-growth-space.md](product/audience-growth-space.md) |
 | 合规红线 | [compliance/](compliance/) 全部 |
 | 目录职责 | [project-structure.md](project-structure.md) |
 

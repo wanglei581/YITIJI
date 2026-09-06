@@ -37,6 +37,14 @@
       <view>没找到答案？可以进入 AI 百宝箱使用小青助手。</view>
     </view>
 
+    <view class="help-fb tap" hover-class="tap-press" bindtap="goFeedback" role="button" aria-label="没解决？去反馈">
+      <view class="help-fb-copy">
+        <view class="help-fb-t">没解决？去反馈</view>
+        <view class="help-fb-d">登录后可提交，并查看处理进度</view>
+      </view>
+      <text class="ficon i-right"></text>
+    </view>
+
   </view>
 
   <view class="actionbar">

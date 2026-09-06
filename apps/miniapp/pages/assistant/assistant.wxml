@@ -1,5 +1,7 @@
 <view class="as-wrap">
-  <view class="as-top">
+  <!-- padding-right 让开微信胶囊：本行右侧的按钮实测整个落在胶囊矩形内，点不到。
+       值由 app.js 运行时按 getMenuButtonBoundingClientRect 算，不能写死 rpx。 -->
+  <view class="as-top" style="padding-right:{{capsuleInsetRight}}px">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="as-row">
       <view class="as-back tap" hover-class="tap-press" bindtap="back">
@@ -35,6 +37,12 @@
               <view class="dot"></view><view class="dot"></view><view class="dot"></view>
             </view>
             <view wx:else class="bt">{{item.text}}</view>
+            <!-- 降级如实标注。服务端 aiGenerated=false 表示这条是 mock/stub 预置话术，
+                 不标出来就是把预置话术冒充成小青的回答。 -->
+            <view wx:if="{{item.fallbackNote}}" class="msg-fallback">
+              <text class="ficon i-info mf-ic"></text>
+              <text>{{item.fallbackNote}}</text>
+            </view>
             <!-- 引导卡 -->
             <view wx:if="{{item.cards && item.cards.length}}" class="guide-cards">
               <view wx:for="{{item.cards}}" wx:for-item="card" wx:key="id"

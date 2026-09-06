@@ -18,6 +18,18 @@
       <view class="ph-icon"><text class="ficon i-bank"></text></view>
     </view>
 
+    <!-- 自测入口放在分类条之前：用户来这一页多半是「我能不能办」，
+         而不是「我想读哪一类文件」。先给答问题的路，再给读原文的路。 -->
+    <view class="pc-entry tap" hover-class="tap-press" bindtap="tapSelfCheck"
+          role="button" aria-label="政策条件自测，回答几个问题，看看哪些政策可能和你有关">
+      <view class="pc-ic"><text class="ficon i-aim"></text></view>
+      <view class="pc-body">
+        <view class="pc-t">看看哪些政策可能和我有关</view>
+        <view class="pc-s">回答几个问题，与已录入的政策条件做机械比对。免登录，作答不保存。</view>
+      </view>
+      <text class="ficon i-right pc-arrow"></text>
+    </view>
+
     <scroll-view class="cat-scroll" scroll-x="true" enhanced="true" show-scrollbar="false">
       <view class="cat {{activeCat === item.key ? 'on' : ''}} tap" wx:for="{{cats}}" wx:key="key"
         data-key="{{item.key}}" bindtap="tapCat" hover-class="tap-press">

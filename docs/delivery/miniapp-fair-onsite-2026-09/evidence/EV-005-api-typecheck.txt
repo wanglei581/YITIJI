@@ -1,0 +1,4 @@
+# 修订 8176c1ee2004 · 2026-09-02 · local
+
+$ tsc --noEmit -p services/api/tsconfig.json  （先 prisma generate）
+exit=0 · error TS 计数 0

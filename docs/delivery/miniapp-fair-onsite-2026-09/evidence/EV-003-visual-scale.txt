@@ -1,0 +1,7 @@
+# 修订 8176c1ee2004 · 2026-09-02 · local
+
+$ node apps/miniapp/scripts/verify-miniapp-visual-scale.mjs
+偏离字阶 439 处（基线 439）· 偏离圆角阶 181 处（基线 181）
+偏离最多的 5 页：contract-review(22+15) print-pickup(17+12) job-fit(21+6) company-detail(16+8) print-upload(22+0)
+
+✓ 视觉刻度未新增偏离

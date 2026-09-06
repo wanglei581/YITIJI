@@ -95,3 +95,11 @@
 .es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
 .es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
 .es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
+
+/* 保存期限行。放在 meta 行之下而不是挤进去：到期日期是"什么时候没"，
+   保留档位是"按哪条规则保存"，两件事混在一行读不出区别。 */
+.doc-retention { display: flex; align-items: center; gap: 12rpx; margin-top: 10rpx; flex-wrap: wrap; }
+.doc-retention-hint { font-size: var(--fs-xs); color: var(--faint); line-height: 1.5; }
+
+/* 分页提示。没有它，上拉加载对用户是不可见的静默行为 */
+.load-hint { padding: 24rpx 0 8rpx; text-align: center; font-size: var(--fs-xs); color: var(--faint); }

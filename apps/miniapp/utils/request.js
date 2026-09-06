@@ -180,7 +180,7 @@ function unwrapEnvelope(body) {
  * @returns {Promise<any>} resolve 解包后的业务 data;reject Error(带 statusCode/code)
  */
 function uploadFile(path, filePath, options = {}) {
-  const { name = 'file', formData = {}, header = {}, needAuth = true } = options;
+  const { name = 'file', formData = {}, header = {}, needAuth = true, timeout } = options;
 
   const finalHeader = { ...header };
   if (needAuth) {
@@ -197,7 +197,7 @@ function uploadFile(path, filePath, options = {}) {
       name,
       formData,
       header: finalHeader,
-      timeout: config.uploadTimeout || config.timeout,
+      timeout: timeout || config.uploadTimeout || config.timeout,
       success(res) {
         const { statusCode } = res;
 

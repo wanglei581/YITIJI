@@ -27,7 +27,9 @@
          自定义导航栏右侧永远不可用。本页只在 onLoad 拉一次列表，刷新入口必须保留，
          但属低频次级操作，并入列表标题行。 -->
     <view class="list-toolbar" wx:if="{{!loading && !loadError}}">
-      <text class="section-t lt-title">最近 · {{filtered.length}} 个文件</text>
+      <!-- 不写「N 个文件」当总数：filtered.length 只是已载入数，还有下一页时说成总数
+           就是把「不显示文件」包装成「只有这么多」。 -->
+      <text class="section-t lt-title">最近{{nextCursor ? '' : ' · ' + filtered.length + ' 个文件'}}</text>
       <view class="lt-action tap" hover-class="tap-press" bindtap="loadDocuments"
             role="button" aria-label="重新加载文档列表">刷新</view>
     </view>
@@ -62,9 +64,19 @@
             <text>{{item.time}}</text>
             <text class="doc-exp" wx:if="{{item.expire}}">{{item.expire}}</text>
           </view>
+          <!-- 保存期限：此前只显示到期日期，用户看不出自己处在哪一档、也不知道能不能改。
+               档位与是否可改都由服务端给（allowedRetentionPolicies），前端不推算。 -->
+          <view class="doc-retention" wx:if="{{item.retentionPolicy}}">
+            <text class="chip">{{item.retentionLabel}}</text>
+            <text class="doc-retention-hint" wx:if="{{item.retentionLocked}}">此类文件按系统策略保存，不可延长</text>
+          </view>
         </view>
         <view class="doc-more tap" hover-class="tap-press" catchtap="more" data-id="{{item.id}}">⋯</view>
       </view>
+    </view>
+
+    <view class="load-hint" wx:if="{{filtered.length && (loadingMore || nextCursor)}}">
+      {{loadingMore ? '正在加载更多…' : '上拉加载更多'}}
     </view>
 
     <view class="card" wx:else>

@@ -1,16 +1,24 @@
 // pages/community/community.js
+// 官方动态流：政策 / 权益 / 通知。未登录可读；无点赞、无评论。
 const app = getApp()
 const api = require('../../utils/api')
 
-const AV_COLORS = ['#7a5a86', '#1f9e86', '#c8622a', '#2563eb', '#be7c30']
-function avColor(name) {
-  return AV_COLORS[(name || '?').charCodeAt(0) % AV_COLORS.length]
+const PAGE_LIMIT = 20
+const KIND_LABEL = { policy: '政策', benefit: '权益', broadcast: '通知' }
+const KIND_TONE = { policy: 'teal', benefit: 'wheat', broadcast: 'plum' }
+const TAB_PATHS = {
+  '/pages/home/home': true,
+  '/pages/ai/ai': true,
+  '/pages/jobs/jobs': true,
+  '/pages/me/me': true,
 }
+
 function timeAgo(dateStr) {
   if (!dateStr) return ''
   const diff = Date.now() - new Date(dateStr).getTime()
+  if (Number.isNaN(diff)) return ''
   const m = Math.floor(diff / 60000)
-  if (m < 1)  return '刚刚'
+  if (m < 1) return '刚刚'
   if (m < 60) return `${m}分钟前`
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}小时前`
@@ -18,15 +26,42 @@ function timeAgo(dateStr) {
   if (d < 30) return `${d}天前`
   return new Date(dateStr).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }
-function process(item) {
-  const name = item.authorName || (item.author && item.author.name) || '匿名'
-  return { ...item, _authorName: name, _initials: name.slice(0, 1), _color: avColor(name), _timeAgo: timeAgo(item.createdAt || item.publishedAt) }
+
+function toView(item) {
+  const action = item && item.action ? item.action : {}
+  const kind = item && item.kind
+  return {
+    id: item && item.id,
+    kindLabel: KIND_LABEL[kind] || '',
+    kindTone: KIND_TONE[kind] || '',
+    title: (item && item.title) || '',
+    summary: (item && item.summary) || '',
+    sourceName: (item && item.sourceName) || '',
+    timeAgo: timeAgo(item && item.publishedAt),
+    actionLabel: action.label || '',
+    actionRoute: action.route || '',
+  }
+}
+
+function openMiniappRoute(route) {
+  if (!route) return
+  const path = String(route).split('?')[0]
+  if (TAB_PATHS[path]) {
+    wx.switchTab({ url: path })
+    return
+  }
+  wx.navigateTo({ url: route })
 }
 
 Page({
   data: {
     statusBarHeight: 20,
-    feeds: [], loading: true, error: '', noMore: false, cursor: null, refreshing: false,
+    feeds: [],
+    loading: true,
+    error: '',
+    noMore: false,
+    nextCursor: '',
+    refreshing: false,
   },
 
   onLoad() {
@@ -39,44 +74,39 @@ Page({
   },
 
   _load(reset) {
-    if (!reset && this.data.noMore) return Promise.resolve()
-    const cursor = reset ? null : this.data.cursor
+    if (!reset && (this.data.noMore || this.data.loading)) return Promise.resolve()
+    const cursor = reset ? '' : this.data.nextCursor
     this.setData({ loading: true, error: '', ...(reset ? { refreshing: true } : {}) })
-    return api.getCommunityFeeds({ pageSize: 15, ...(cursor ? { cursor } : {}) })
-      .then(list => {
-        const items = (Array.isArray(list) ? list : []).map(process)
-        const feeds = reset ? items : [...this.data.feeds, ...items]
+    return api.getCommunityFeeds({ limit: PAGE_LIMIT, ...(cursor ? { cursor } : {}) })
+      .then((res) => {
+        const list = (res && Array.isArray(res.items) ? res.items : []).map(toView)
+        const nextCursor = (res && res.nextCursor) || ''
         this.setData({
-          feeds,
-          loading:    false,
+          feeds: reset ? list : this.data.feeds.concat(list),
+          loading: false,
           refreshing: false,
-          noMore:     items.length < 15,
-          cursor:     list.nextCursor || null,
+          nextCursor,
+          noMore: !nextCursor,
         })
       })
-      .catch(err => {
-        const msg = err && err.statusCode === 501 ? '职业圈需连接真实后端' : '加载失败，下拉可重试'
-        this.setData({ loading: false, refreshing: false, error: msg })
+      .catch((err) => {
+        this.setData({
+          loading: false,
+          refreshing: false,
+          error: (err && err.message) || '加载失败，下拉可重试',
+        })
       })
   },
 
   loadMore() { this._load(false) },
 
-  tapLike(e) {
-    const { id, liked } = e.currentTarget.dataset
-    const fn = liked ? api.unlikeFeed.bind(api) : api.likeFeed.bind(api)
-    fn(id).then(() => {
-      const feeds = this.data.feeds.map(f => {
-        if (f.id !== id) return f
-        return { ...f, likedByMe: !liked, likeCount: (f.likeCount || 0) + (liked ? -1 : 1) }
-      })
-      this.setData({ feeds })
-    }).catch(() => wx.showToast({ title: '请先登录', icon: 'none' }))
+  openRoute(e) {
+    openMiniappRoute(e.currentTarget.dataset.route)
   },
 
-  goBack() { wx.navigateBack() },
+  goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/ai/ai' }) } }) },
 
   onShareAppMessage() {
-    return { title: '职易达职业圈', path: '/pages/community/community' }
+    return { title: '最新动态', path: '/pages/community/community' }
   },
 })

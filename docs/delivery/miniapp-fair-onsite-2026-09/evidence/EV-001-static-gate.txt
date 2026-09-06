@@ -1,0 +1,6 @@
+# 修订 8176c1ee2004 · 2026-09-02 · local
+
+$ node apps/miniapp/scripts/verify-miniapp-static.mjs
+  ✓ 材料包四页无假电话 / 假坐标 / 本地硬编码计价
+
+103 PASS / 0 FAIL（注册页面 57）

@@ -22,6 +22,11 @@ Page({
     // 先用同步的保守值渲染（本机收藏或已热的服务端缓存），再由 _syncFaved 用账号
     // 数据纠正。同步值只会「少显示已收藏」，不会凭空显示成已收藏。
     this.setData({ statusBarHeight: statusBarHeight || 20, pageId: id, faved: favorites.isFaved('job', id) });
+    if (!id) {
+      // 深链 / 分享进来没带 id：不发空参请求，直接给可读提示（codex 第 17 轮审出）。
+      this.setData({ loading: false, loadError: '缺少内容参数，请从列表页进入' });
+      return;
+    }
     this._syncFaved();
     this.loadDetail(id);
   },
@@ -43,6 +48,12 @@ Page({
   loadDetail(id) {
     this.setData({ loading: true, loadError: '' });
     api.getJobDetail(id).then((job) => {
+      // 后端对「不存在 / 未发布」返回 data:null（与 policy-detail 同口径）：不判空会 TypeError 掉进 catch，
+      // 把原始 JS 错误文案显示给用户（第 17 轮真调复现）。
+      if (!job) {
+        this.setData({ loading: false, loadError: '未找到该内容，可能已下线' });
+        return;
+      }
       this.setData({ job, loading: false });
       // 真实拿到内容后才记录浏览，不记录 loading/错误态的空对象。
       history.recordView('job', { id, title: job.title, source: job.sourceOrg });

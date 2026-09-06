@@ -26,6 +26,11 @@ Page({
     // 先用同步的保守值渲染（本机收藏或已热的服务端缓存），再由 _syncFaved 用账号
     // 数据纠正。同步值只会「少显示已收藏」，不会凭空显示成已收藏。
     this.setData({ statusBarHeight: statusBarHeight || 20, pageId: id, faved: favorites.isFaved('fair', id), reminded: reminders.isSet(id) });
+    if (!id) {
+      // 深链 / 分享进来没带 id：不发空参请求，直接给可读提示（codex 第 17 轮审出）。
+      this.setData({ loading: false, loadError: '缺少内容参数，请从列表页进入' });
+      return;
+    }
     this._syncFaved();
     this.loadDetail(id);
   },
@@ -48,6 +53,12 @@ Page({
   loadDetail(id) {
     this.setData({ loading: true, loadError: '' });
     api.getFairDetail(id).then((fair) => {
+      // 后端对「不存在 / 未发布」返回 data:null（与 policy-detail 同口径）：不判空会 TypeError 掉进 catch，
+      // 把原始 JS 错误文案显示给用户（第 17 轮真调复现）。
+      if (!fair) {
+        this.setData({ loading: false, loadError: '未找到该内容，可能已下线' });
+        return;
+      }
       this.setData({ fair, loading: false, reminded: reminders.isSet(id) });
       history.recordView('fair', { id, title: fair.title || fair.name, source: fair.sourceOrg });
     }).catch((err) => {
@@ -59,6 +70,26 @@ Page({
   reload() {
     this.loadDetail(this.data.pageId);
   },
+
+  // 现场助手四个入口。fairId 是这四页的必需参数,取不到就不跳——
+  // 与其跳进去让下游页面报「缺少招聘会参数」,不如在这里就不给点。
+  _openFairPage(page) {
+    const id = this.data.pageId
+    if (!id) return
+    // 真机上快速双击会压两次栈,用户要按两次返回才出得来。
+    // 500ms 内只放行一次;navigateTo 失败也要解锁,否则这个入口会永久卡住。
+    if (this._navBusy) return
+    this._navBusy = true
+    setTimeout(() => { this._navBusy = false }, 500)
+    wx.navigateTo({
+      url: `/pages/${page}/${page}?fairId=${encodeURIComponent(id)}`,
+      fail: () => { this._navBusy = false },
+    })
+  },
+  tapVenue()     { this._openFairPage('fair-venue') },
+  tapCompanies() { this._openFairPage('fair-companies') },
+  tapMaterials() { this._openFairPage('fair-materials') },
+  tapVisitPlan() { this._openFairPage('fair-visit-plan') },
 
   goBack() {
     wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } });

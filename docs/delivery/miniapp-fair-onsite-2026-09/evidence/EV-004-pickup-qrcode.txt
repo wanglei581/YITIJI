@@ -1,0 +1,4 @@
+# 修订 8176c1ee2004 · 2026-09-02 · local
+
+$ node apps/miniapp/scripts/verify-pickup-qrcode.mjs
+PICKUP_QR_MATRIX_PASS samples=6 version=1 ecc=H

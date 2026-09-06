@@ -1,0 +1,5 @@
+# 修订 eff92ac9c063 · 2026-09-02T20:52+0800 · local（apps/miniapp 与 services/api 工作区干净；唯一未提交内容是本交付包自身）
+
+$ cd apps/miniapp && node scripts/verify-pickup-qrcode.mjs
+PICKUP_QR_MATRIX_PASS samples=6 version=1 ecc=H
+exit=0

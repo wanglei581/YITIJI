@@ -3,13 +3,15 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .as-wrap { height: 100vh; display: flex; flex-direction: column; background: var(--paper); }
 .as-top { flex-shrink: 0; padding: 0 28rpx 18rpx; background: #fff; border-bottom: 1rpx solid var(--line-soft); }
 .as-row { min-height: 92rpx; display: flex; align-items: center; gap: 16rpx; }
-.as-back { width: 56rpx; height: 56rpx; margin-left: -8rpx; display: flex; align-items: center; justify-content: center; color: var(--ink); flex-shrink: 0; }
+/* 实测 29x29，低于 48px 可点标准 → 96rpx=48px（图标居中，视觉不变） */
+.as-back { width: 96rpx; height: 96rpx; margin-left: -8rpx; display: flex; align-items: center; justify-content: center; color: var(--ink); flex-shrink: 0; }
 .as-back-ic { width: 28rpx; height: 28rpx; transform: rotate(180deg); }
 .as-av { width: 72rpx; height: 72rpx; overflow: hidden; border-radius: 23rpx; border: 2rpx solid #dce9ff; background: #eaf2ff; flex-shrink: 0; }
 .as-av image, .msg-av-wrap image { width: 100%; height: 100%; }
 .as-name { font-size: 29rpx; line-height: 1.2; font-weight: 750; color: var(--ink); }
 .as-role { margin-top: 5rpx; font-size: 20rpx; color: var(--muted); }
-.as-more { width: 58rpx; height: 58rpx; border-radius: 19rpx; background: var(--surface-2); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; }
+/* 实测 30x30 → 96rpx=48px */
+.as-more { width: 96rpx; height: 96rpx; border-radius: 19rpx; background: var(--surface-2); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; }
 .as-more .ficon { width: 27rpx; height: 27rpx; }
 
 .chat-scroll { flex: 1; min-height: 0; overflow: hidden; }
@@ -54,7 +56,8 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 
 .input-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 16rpx 24rpx calc(18rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid var(--line-soft); background: #fff; display: flex; align-items: center; gap: 14rpx; }
 .ib-input { flex: 1; height: 78rpx; padding: 0 25rpx; border-radius: 23rpx; border: 1rpx solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 25rpx; }
-.ib-send { width: 78rpx; height: 78rpx; border-radius: 23rpx; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 22rpx rgba(22,119,255,.16); }
+/* 实测 40x40 → 96rpx=48px（发送键，输入区主操作） */
+.ib-send { width: 96rpx; height: 96rpx; border-radius: 23rpx; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 22rpx rgba(22,119,255,.16); }
 .ib-send .ficon { width: 29rpx; height: 29rpx; transform: rotate(-90deg); }
 .ib-disabled { opacity: .4; }
 .msg-loading { min-width: 72rpx; min-height: 35rpx; display: flex; align-items: center; gap: 8rpx; }
@@ -62,3 +65,15 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .dot:nth-child(2) { animation-delay: .2s; }
 .dot:nth-child(3) { animation-delay: .4s; }
 @keyframes dot-pulse { 0%,80%,100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+
+/* 降级提示。视觉上明确弱于正文但必须可读——它是事实声明，不是装饰。
+   只在 aiGenerated=false 时出现，真实回答不挂任何徽章。 */
+.msg-fallback {
+  margin-top: 14rpx; padding: 12rpx 16rpx;
+  display: flex; align-items: flex-start; gap: 10rpx;
+  background: var(--wheat-wash);
+  border: 1px solid var(--wheat-soft);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs); color: var(--warn); line-height: 1.55;
+}
+.mf-ic { flex-shrink: 0; margin-top: 2rpx; }

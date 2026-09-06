@@ -8,6 +8,36 @@
 
 ---
 
+## 阅读须知：本文是方案候选，其中的技术选型已被后续决策否决（2026-09-02 补注）
+
+**本文是立项前的方案候选，不是有效决策记录。**读之前先记住下面这条：
+
+> **§11.1「前端选型」与 §2.3「工程归位」表中 `apps/miniapp/` 那一行写的「Taro 4 + React + TypeScript」，已被
+> [微信小程序 Gate 0 决策确认单](./miniprogram-gate0-decision-confirmation-2026-08-07.md) 的 **D3** 否决，不得据以开发。**
+> D3 的结论是「原生微信小程序渐进演进，不迁移 Taro 4」。
+>
+> 实际实现口径以代码为准：`apps/miniapp/` 是**原生微信小程序**，纯 JavaScript / WXML / WXSS，无构建步骤，
+> 运行时零 npm 依赖。依据：
+> - `apps/miniapp/package.json` —— `dependencies` 字段不存在（空），`main` 为 `app.js`，无任何构建 script；
+> - `apps/miniapp/scripts/verify-miniapp-static.mjs`（约 169–174 行）—— 静态门禁断言
+>   `Object.keys(packageJson.dependencies || {}).length === 0`，同时要求发布包排除 `scripts` 目录；
+>   引入任何运行时依赖会直接把门禁打红。
+>
+> 原文两处**保留不删**，因为它们记录了当时选择 Taro 的理由（团队栈一致、可复用 `packages/shared`、
+> 旧 Wave 0 分支有工程基线），是决策链条的一部分。只在原处加失效注。
+
+另外两处在核对中发现的、同样已被后续事实取代的段落，本次**只登记不改**，供读者自行折算：
+
+| 位置 | 文中写法 | 现状（依据） |
+|---|---|---|
+| §6.1 四个底部 Tab | 「今天 / 材料 / 发现 / 我的」 | 实际为「首页 / 职业生活圈 / 求职 / 我的」。依据 `apps/miniapp/app.json` 的 `tabBar.list` 与 `CLAUDE.md §15` |
+| §13 Gate 0 事项 | 「盘点旧 Taro 分支」「对 Taro CLI、构建链和新增依赖重新执行依赖树审查与 `pnpm audit`」 | 随 D3 一并失效：当前没有 Taro 构建链和依赖树可审计。对应约束改由 `apps/miniapp/scripts/verify-miniapp-static.mjs` 的空依赖门禁承担 |
+| §17 立项前需要用户确认的决策 | 五项待确认（含 Tab、终端履约） | 已于 2026-08-07 由 Gate 0 决策确认单逐项作答，该清单不再是待办 |
+
+§2.1「当前事实」中的逐条时效性，见该节内的行内补注。
+
+---
+
 ## 一、决策摘要
 
 小程序不做“一体机缩小版”，也不做独立招聘平台。正式定位是：
@@ -38,13 +68,36 @@
 
 ### 2.1 当前事实
 
+> **⚠️ 本节写的是 2026-08-06 的事实快照，多条已过期（2026-09-02 逐条核对补注）。**
+> 原文全部保留，失效项在条目后以「**〔2026-09-02 已过期〕**」标出。整节应读作历史记录，不是当前状态。
+
 - 已找回原生微信小程序候选源码 `/Users/wanglei/zhiyida-miniapp`：独立 Git 仓库，审查基线为 `feature/test-mode-pricing-2026-08-04@4d17e5b`，`app.json` 注册 57 个页面，采用原生 JavaScript/WXML/WXSS。它可作为选择性迁移资产，但尚未进入主仓唯一 `apps/miniapp/`，不是正式发布 SSOT。
+  - **〔2026-09-02 已过期〕** 后半句不再成立。`apps/miniapp/` **早已是唯一发布源**：`package.json` 的
+    `description` 即「职易达 · AI 求职与职业生活服务微信小程序（唯一发布源码）」，`app.json` 现注册 **61 个页面**
+    （无分包），并有 `scripts/verify-miniapp-static.mjs` 的静态门禁守着「`pages/*` 物理目录与注册路由一一对应」。
+    「57 个页面 / 尚未进主仓」只描述找回候选仓 `/Users/wanglei/zhiyida-miniapp` 在 2026-08-06 的状态，
+    不描述主仓。判断小程序有没有某个页面，一律看主仓 `apps/miniapp/app.json`，不要看找回候选仓。
 - `apps/miniprogram/` 当前只有 ignored 的 `node_modules`，不是可运行源码。
+  - **〔2026-09-02 已过期〕** 主仓已无 `apps/miniprogram/` 目录；`apps/` 下现为
+    `admin` / `kiosk` / `miniapp` / `partner` / `terminal-agent`。本条不再有指向对象。
 - 分支 `codex/miniapp-wechat-wave0` 仍保存一套旧 Taro Wave 0 源码，但未合入 `main`，范围也只覆盖公开内容浏览。
+  - **〔2026-09-02 未核对〕** 分支状态本次未验证（本轮为纯文档核对，未执行 git 查询）。无论该分支是否还在，
+    Taro 路线已被 Gate 0 **D3** 否决，它不构成任何可继承的技术选型依据。
 - `docs/design/mini-proto-v2-2026-07/` 已于 2026-08-22 按产品负责人确认删除；小程序页面以 `apps/miniapp/` 为准，不再另留独立原型目录。
+  - **〔2026-09-02 仍成立〕** `docs/design/` 下已无 `mini-proto-v2-2026-07/` 与 `miniapp-os-prototype-2026-08/`。
 - 主仓库已经具备大量可复用后端底座，包括微信登录、会员资产、文件安全、AI 服务、支付退款、订单、取件码、Terminal Agent 和内容来源治理。
 - `PrintMaterialPack` 当前只有基础表，未发现真实业务服务；材料包仍需正式建模和接线。
+  - **〔2026-09-02 仍成立〕** 服务端 `POST /orders/package` 至今不存在（`services/api/src/` 排除
+    `generated/` 后无对应 controller）。小程序侧 `utils/api.js` 虽已写好调用，但材料包四页
+    （`package-create` / `store-select` / `package-confirm` / `package-code`）已由
+    `utils/package-feature.js` 的 `guardPackageChain()` 在 `onLoad` 首行 fail-closed 拦死，
+    并有静态门禁强制该守卫位置。
 - 进度文档曾记录 `claim-pickup` 已完成，但当前工作区的 `services/api/src/` 在排除生成目录后没有对应 controller、service 或路由。Gate 0 必须以干净 `main`、CI 和真实端点再次核验；若仍缺失，`POST /print/jobs/claim-pickup` 及其 CAS、限流、审计和负向测试就是 M2 明确新增项，不得继续标成“待复核”或假定可用。
+  - **〔2026-09-02 已过期〕** 该端点现已存在：`services/api/src/print-jobs/print-jobs.controller.ts`
+    有 `@Post('claim-pickup')` 与 `claimPickup()`，配套 `dto/claim-pickup.dto.ts`、
+    `common/pickup-code.ts` 与 `common/throttler/terminal-throttle.ts` 中的终端限流。
+    本条「缺失、须列为 M2 新增项」的结论不再适用。
+    （存在 ≠ 已验收：真机核销与出纸证据不在本节范围，见 `docs/progress/current-progress.md`。）
 
 ### 2.2 本次方案不代表
 
@@ -58,9 +111,14 @@
 
 正式开发目标：
 
+> **⚠️ 下表第一行的技术选型已失效（2026-09-02 补注）。**「Taro 4 + React + TypeScript」是被
+> [Gate 0 决策确认单](./miniprogram-gate0-decision-confirmation-2026-08-07.md) **D3** 否决的方案候选；
+> `apps/miniapp/` 实际为**原生微信小程序（JavaScript / WXML / WXSS，无构建，运行时零依赖）**。
+> 目标目录 `apps/miniapp/` 本身仍然有效，且已成为唯一发布源。原文保留不删。
+
 | 层 | 目标目录 | 职责 |
 |---|---|---|
-| 小程序前端 | `apps/miniapp/` | Taro 4 + React + TypeScript，微信首发 |
+| 小程序前端 | `apps/miniapp/` | ~~Taro 4 + React + TypeScript~~，微信首发（技术选型已被 D3 否决，实为原生 JS/WXML/WXSS） |
 | API | `services/api/` | 身份、资产、AI、订单、支付、履约、通知、内容 |
 | 异步任务 | `services/worker/` 或现有 BullMQ 模块 | AI、文件处理、消息与超时收敛 |
 | 一体机 | `apps/kiosk/` | 到机码核验、现场确认、队列与进度 |
@@ -83,6 +141,9 @@
 小程序的商业价值不是多一个入口，而是解决一体机无法解决的持续关系：用户离开点位后仍能准备材料、管理订单、接收提醒并再次到机履约。
 
 ### 3.2 目标用户
+
+> **履约形态 overlay（2026-09-05）**：下表五类是**处境**，不是阶层。功能取舍另加且只加两个值：`hall_paper`（现场纸质履约，口头「蓝领」）与 `phone_digital`（数字迭代准备，口头「白领」）。完整需求、空转清单、12 个月可长 / 不长见 [audience-growth-space.md](./audience-growth-space.md)。本文不维护阶层画像，避免与处境表并列成两套用户。
+
 
 | 用户 | 核心问题 | 小程序价值 | 一体机价值 |
 |---|---|---|---|
@@ -502,6 +563,14 @@ M2 首发时间规则固定为：
 ## 十一、技术方案
 
 ### 11.1 前端选型
+
+> **⚠️ 本小节已失效（2026-09-02 补注）。**下面这段技术选型是当时的**方案候选**，已被
+> [Gate 0 决策确认单](./miniprogram-gate0-decision-confirmation-2026-08-07.md) **D3**「原生微信小程序渐进演进，
+> 不迁移 Taro 4」否决。现行口径：`apps/miniapp/` 为原生微信小程序，纯 JavaScript / WXML / WXSS，无构建，
+> 运行时零 npm 依赖（依据 `apps/miniapp/package.json` 无 `dependencies`，以及
+> `apps/miniapp/scripts/verify-miniapp-static.mjs` 中锁死空依赖的静态门禁）。
+> 原文保留，是为了留下当时选 Taro 的理由；**不得据此开发或做依赖审计计划**。
+> 末段「Taro 依赖必须重新审计」一并失效——当前没有 Taro 依赖树可审计，对应的约束已由静态门禁承担。
 
 采用 Taro 4 + React + TypeScript，微信小程序首发，暂不承诺支付宝同步发布。理由：
 
