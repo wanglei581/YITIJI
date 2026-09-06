@@ -126,6 +126,10 @@
 - [ ] 服务器时区为 `Asia/Shanghai`。
 - [ ] 磁盘空间、内存、CPU 满足预估访问量。
 - [ ] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
+- [ ] Word → PDF 采用服务端 LibreOffice 或内网 Gotenberg；不在 Windows 一体机安装转换引擎，Terminal Agent 仍只接收 PDF / 图片。
+- [ ] LibreOffice 路线安装固定版本的 `libreoffice-core` / `libreoffice-writer`；Gotenberg 路线固定容器镜像 digest，服务端口只允许 API 内网访问，禁止公网暴露。当前 Gotenberg 为适配器骨架，容器内 CJK 字体验证门禁补齐前必须保持 `wordToPdf=false`，不得把 `/health` 通过当作字体可用。
+- [ ] 安装思源黑体/宋体或 Noto CJK 字体包，执行 `fc-cache -f -v` 后 `fc-list ':lang=zh' family | head` 有输出；没有中文字体时能力必须保持关闭。
+- [ ] soffice 运行账户使用独立低权限 UID、只写系统临时目录，并由容器/network namespace/防火墙阻断出网；进程内不可达代理只是纵深防护，不得替代主机级禁网。独立 profile 的宏安全级别为最高，真实含宏样例验证不会执行宏。
 - [x] 域名解析、HTTPS 证书正常。（**2026-08-08 外部实测**：`https://zyidai.cn` 返回 `HTTP/2 200`，`server: nginx/1.24.0 (Ubuntu)`；证书 `subject=CN=zyidai.cn`，`issuer=Let's Encrypt`，`notAfter=2026-10-04`。）**证书自动续期仍未验证** —— 须在服务器确认 certbot/acme 定时任务存在且上次续期成功。
 
 ### 3.2 环境变量核对
@@ -156,6 +160,9 @@
 - [ ] `TERMINAL_PLANNED_PROVISIONING_ENABLED` 显式设为 `true|false`：滚动升级第一阶段保持 `false`；确认所有 API 实例均为 reader-aware 新版本且旧 binary 已摘流量/退出后，第二阶段才切 `true`。
 - [ ] 开启 planned writer 前已保存所有 API 实例的构建版本/commit、进程清单和健康检查证据；开启后禁止回滚到不认识 `lifecycleStatus` 的旧 binary。确需回滚时先把 planned writer 切回 `false` 并停止新设备预创建。
 - [ ] 文件大小、签名 URL TTL、匿名/会员数据 TTL 与产品要求一致。
+- [ ] `CONVERSION_ENGINE=soffice|gotenberg|disabled` 已显式声明；生产启用 soffice 时 `SOFFICE_PATH` 为绝对路径，启用 Gotenberg 时 `GOTENBERG_URL` 仅指向内网地址。
+- [ ] `CONVERSION_MAX_CONCURRENCY` 已按机器容量设置（默认 2）；确认单次 60 秒超时、输出 15MB 上限不被外围代理放宽。
+- [ ] API 启动日志中记录的转换探测结果与 `GET /api/v1/document-conversion/capabilities` 一致；探测失败、缺字体或 disabled 时 `wordToPdf=false` 且返回明确 `reason`。
 
 ### 3.3 构建与静态资源
 
@@ -242,6 +249,7 @@ pnpm --filter ./services/api verify:production-runtime-gates
 pnpm --filter ./services/api verify:ocr-baidu
 pnpm --filter ./services/api verify:career-plan
 pnpm --filter ./services/api verify:activity-logs
+pnpm --filter ./services/api verify:document-conversion
 ```
 
 验收：
@@ -249,6 +257,16 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] verify 全部 PASS。
 - [ ] 运行日志无简历原文、面试回答、转写文本、规划正文、API Key、access token。
 - [ ] 验证脚本在 PostgreSQL 环境下执行，而不是误连 SQLite。
+- [ ] `SOFFICE_PATH` 存在的部署机使用真实 `.doc` / `.docx` 样例执行转换，逐份打开 PDF 核对中文字体、表格、图片、分页、页数，并记录 LibreOffice 版本；本地 fake 引擎通过不等于真实转换通过。
+
+转换引擎部署探测命令（服务器执行，不含密钥）：
+
+```bash
+test -x "$SOFFICE_PATH" && "$SOFFICE_PATH" --version
+fc-list ':lang=zh' family | head -20
+curl -fsS http://127.0.0.1:${API_PORT:-3000}/api/v1/document-conversion/capabilities
+SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conversion
+```
 
 ### 3.7 nginx / 反代 / 上传限制
 
@@ -302,6 +320,9 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] 文档预览使用短期签名 URL。
 - [ ] 文档下载成功。
 - [ ] 再打印进入打印链路。
+- [ ] `.doc` / `.docx` 上传后仅在 capabilities `wordToPdf=true` 时允许「转 PDF / Word 预览 / Word 打印」；否则入口置灰并展示服务端返回的 reason。
+- [ ] Word 转换后的界面固定展示「由转换引擎生成，复杂版式可能有偏差，请预览核对」，用户确认预览后才进入打印建单。
+- [ ] Word 打印任务关联的是 `createdBy=document_conversion`、`assetCategory=derived`、`sourceFileId=原件` 的派生 PDF；Agent 下载 MIME 为 `application/pdf`，不直接下发 Word。
 - [ ] 删除文档后对象存储与数据库状态一致，删除审计存在。
 - [ ] 打印任务进入打印订单，状态展示正确。
 

@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Optional } from '@nestjs/common'
 import mammoth from 'mammoth'
 import { FilesService } from '../../files/files.service'
 import type { FilePurpose } from '../../files/file.types'
+import { DocumentConversionService } from '../../document-conversion/document-conversion.service'
 import { OcrService } from './ocr/ocr.service'
 import { openPdfForRender } from './ocr/pdf-page-renderer'
 import type {
@@ -60,7 +61,8 @@ type FileKind = 'docx' | 'doc' | 'pdf' | 'image' | 'unknown'
  * 简历文件文字提取 service（Phase 1A）。
  *
  * 支持：DOCX 正文（mammoth）、文本型 PDF 文字层（unpdf）、图片 OCR（Provider 架构，
- * 默认 disabled 时诚实失败）。旧版 .doc / 扫描件 PDF / 空文件 / 文字过少均返回明确失败码，
+ * 默认 disabled 时诚实失败）。旧版 .doc 先经服务端转换为 PDF；扫描件 PDF / 空文件 /
+ * 文字过少均返回明确失败码，
  * 绝不伪造文本。原文与 buffer 不写日志、不落库。
  */
 @Injectable()
@@ -70,6 +72,7 @@ export class ResumeExtractionService {
   constructor(
     private readonly files: FilesService,
     private readonly ocr: OcrService,
+    @Optional() private readonly documentConversion?: DocumentConversionService,
   ) {}
 
   async extractResumeText(input: ResumeExtractionInput): Promise<ResumeExtractionResult> {
@@ -114,12 +117,7 @@ export class ResumeExtractionService {
       case 'image':
         return this.extractImageOcr(fileId, buffer, mimeType, startedAt)
       case 'doc':
-        return this.fail(
-          fileId,
-          'UNSUPPORTED_FILE_TYPE',
-          '暂不支持旧版 .doc 格式，请另存为 PDF 或 DOCX 后重试',
-          startedAt,
-        )
+        return this.extractLegacyDoc(fileId, buffer, filename, startedAt)
       default:
         return this.fail(
           fileId,
@@ -150,6 +148,33 @@ export class ResumeExtractionService {
       )
     }
     return this.finalizeText(fileId, raw, 'docx', 'high', undefined, startedAt)
+  }
+
+  private async extractLegacyDoc(
+    fileId: string,
+    buffer: Buffer,
+    filename: string,
+    startedAt: number,
+  ): Promise<ResumeExtractionResult> {
+    if (!this.documentConversion?.getCapabilities().wordToPdf) {
+      return this.fail(
+        fileId,
+        'UNSUPPORTED_FILE_TYPE',
+        '暂不支持旧版 .doc 格式，请另存为 PDF 或 DOCX 后重试；服务端未配置转换引擎',
+        startedAt,
+      )
+    }
+    try {
+      const converted = await this.documentConversion.convertBufferToPdf(buffer, filename)
+      return this.extractPdf(fileId, converted.buffer, startedAt)
+    } catch {
+      return this.fail(
+        fileId,
+        'UNSUPPORTED_FILE_TYPE',
+        '旧版 .doc 转换失败，请确认文件未损坏，或另存为 PDF / DOCX 后重试',
+        startedAt,
+      )
+    }
   }
 
   private async extractPdf(
