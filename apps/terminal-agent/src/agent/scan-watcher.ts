@@ -72,15 +72,14 @@ const UNCLAIMED_DIRNAME = '_unclaimed'
 const UNCLAIMED_EXPIRY_REASON = 'UNCLAIMED_TTL_EXPIRED'
 
 /**
- * AGT-07：日志里不落扫描件原始文件名（CLAUDE.md §11 敏感文件）。保留扩展名与前 2 个
- * 字符便于现场对照，其余用长度代替。
+ * AGT-07：日志里不落扫描件原始文件名（CLAUDE.md §11 敏感文件）。
+ * 只保留扩展名与基名长度，不保留任何前缀字符。
  */
 export function maskScanName(filename: string): string {
   const dot = filename.lastIndexOf('.')
   const base = dot > 0 ? filename.slice(0, dot) : filename
   const ext = dot > 0 ? filename.slice(dot) : ''
-  if (base.length <= 2) return `${base}***${ext}`
-  return `${base.slice(0, 2)}***(${base.length})${ext}`
+  return `***(${base.length})${ext}`
 }
 
 /** Returns true when a 401 requires preserving the source file for re-bind. */
@@ -617,7 +616,7 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     try {
       const snapshot = snapshotCandidate(fullPath, name)
       if (classifyScanInputCandidate(snapshot) !== 'accepted' || snapshot.nlink !== 1) {
-        warn(`scan-watcher: unsafe scan input candidate skipped during sweep — ${name}`)
+        warn(`scan-watcher: unsafe scan input candidate skipped during sweep — ${maskScanName(name)}`)
         continue
       }
     } catch {
@@ -626,7 +625,7 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     try {
       await processCandidate(fullPath, name, config)
     } catch (e) {
-      err(`scan-watcher: sweep failed to process ${name}, continuing with remaining files: ${axiosErrorMessage(e)}`)
+      err(`scan-watcher: sweep failed to process ${maskScanName(name)}, continuing with remaining files: ${axiosErrorMessage(e)}`)
     }
   }
 }

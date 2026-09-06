@@ -81,7 +81,9 @@ async function main(): Promise<void> {
   assert.match(source, /await downloadWithRetry\(/, 'download must go through the retry helper')
   assert.doesNotMatch(source, /name=\$\{task\.fileName/, 'logs must not contain the raw file name')
   const scanSource = fs.readFileSync(path.join(__dirname, '../src/agent/scan-watcher.ts'), 'utf8')
-  assert.doesNotMatch(scanSource, /(log|warn|err)\([^\n]*\$\{filename\}/, 'scan-watcher logs must mask file names')
+  assert.doesNotMatch(scanSource, /(log|warn|err)\([^\n]*\$\{(filename|name)\}/, 'scan-watcher logs must mask file names')
+  assert.doesNotMatch(scanSource, /base\.slice\(0,\s*2\)/, 'maskScanName must not keep a filename prefix')
+  assert.match(scanSource, /return `\*\*\*\(\$\{base\.length\}\)\$\{ext\}`/, 'maskScanName must emit ***(len)+ext only')
   assert.match(scanSource, /STABILITY_REQUIRED_CONSECUTIVE = 3/, 'scan stability must require three consecutive identical snapshots')
 
   console.log('ALL PASS: print truth hardening (download retry, monitor window, log masking)')

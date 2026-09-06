@@ -219,6 +219,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk lint
           pnpm --filter @ai-job-print/admin lint
           pnpm --filter @ai-job-print/partner lint
+          pnpm --filter terminal-agent lint
 
       - name: Typecheck
         run: |

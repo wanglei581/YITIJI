@@ -24,9 +24,38 @@
  * 已知空数据:/policies 线上返回 [],页面显示空态属正常,
  * 该归一化逻辑尚未见过真实样本。
  */
+const PRODUCTION_BASE_URL = 'https://zyidai.cn';
+// 开发版 / 体验版可填已在微信公众平台「request 合法域名」里的测试 API。
+// 空字符串回落生产。正式版忽略此值,固定生产域名。本文件不维护合法域名列表。
+const TEST_BASE_URL = '';
+
+function readMiniProgramEnvVersion() {
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getAccountInfoSync !== 'function') {
+      return 'release';
+    }
+    const info = wx.getAccountInfoSync();
+    const envVersion = info && info.miniProgram && info.miniProgram.envVersion;
+    if (envVersion === 'develop' || envVersion === 'trial' || envVersion === 'release') {
+      return envVersion;
+    }
+  } catch (_) {
+    // 部分基础库 / 非微信运行时会抛,按正式版处理,避免指向未备案域名。
+  }
+  return 'release';
+}
+
+function resolveBaseUrl() {
+  const envVersion = readMiniProgramEnvVersion();
+  if (envVersion === 'develop' || envVersion === 'trial') {
+    return TEST_BASE_URL || PRODUCTION_BASE_URL;
+  }
+  return PRODUCTION_BASE_URL;
+}
+
 const config = {
   // 已备案域名,已在微信公众平台配置 request 合法域名。裸 IP 不可用,必须域名。
-  baseUrl: 'https://zyidai.cn',
+  baseUrl: resolveBaseUrl(),
   apiPrefix: '/api/v1',
   USE_MOCK: false,
   timeout: 15000,

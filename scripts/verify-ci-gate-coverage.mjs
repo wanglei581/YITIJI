@@ -56,6 +56,8 @@ const REQUIRED_COMMANDS = [
   // 发布走完备份/构建/迁移后 API 启动即拒、pm2 崩溃循环。钉在这里，不许被悄悄摘掉。
   'pnpm verify:deploy-gates-in-sync',
   'pnpm --filter @ai-job-print/miniapp verify:static',
+  // X-01：terminal-agent 必须进 CI lint。摘掉这一行等于让 Agent 再回到「11 条 eslint error 无人拦」。
+  'pnpm --filter terminal-agent lint',
   'pnpm run verify:task-runner-wake',
   'pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness',
   // 扫码输入安全（FIX-SCAN-SAFETY）：付款码不落屏 + 非授权页吞掉 HID 突发。
