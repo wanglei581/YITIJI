@@ -60,10 +60,11 @@ export function assertDevPriceSeedAllowed(
 
 /**
  * 保证 `resume_export` 目录行存在，绝不覆盖运营已改的单价 / 启停。
- * 生产缺行时插入为停用（fail-closed，不是免费）；开发 / verify 缺行时插入为免费启用。
+ * 缺行时插入为「0 元、启用」= 免费：与开关上线前的既有行为一致（导出一直免费），
+ * 避免首次部署把一个正在工作的功能变成不可用；收费或停用由 Admin 计费管理改该行（2026-09-06 产品负责人拍板：收费与否由开关决定）。
  */
 export async function ensureResumeExportPriceConfig(prisma: PrismaService): Promise<void> {
-  const active = process.env['NODE_ENV'] !== 'production'
+  const active = true
   await prisma.priceConfig.upsert({
     where: { serviceKey: RESUME_EXPORT_SERVICE_KEY },
     create: {
