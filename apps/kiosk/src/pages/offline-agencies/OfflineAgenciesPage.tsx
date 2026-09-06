@@ -10,9 +10,17 @@ import {
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const PAGE_SIZE = 10
+const DISTRICT_SAMPLE_SIZE = 100
+
+function agencyStatusBadge(status: string): { label: string; className: 'open' | 'rest' } {
+  if (status === 'open') return { label: '正常收录', className: 'open' }
+  if (status === 'rest') return { label: '暂停收录', className: 'rest' }
+  return { label: '收录状态未知', className: 'rest' }
+}
 
 function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () => void }) {
   const services = Array.isArray(agency.services) ? agency.services : []
+  const badge = agencyStatusBadge(agency.status)
   return (
     <article className="jf-row oa-agency-row" aria-label={agency.name} onClick={onClick} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
       <span className="oa-ag-logo" aria-hidden="true">
@@ -21,9 +29,9 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
       <div className="jf-row-main">
         <div className="jf-row-title">
           <b>{agency.name}</b>
-          <span className="oa-st open">
+          <span className={`oa-st ${badge.className}`}>
             <i className="oa-dot" aria-hidden="true" />
-            正常收录
+            {badge.label}
           </span>
         </div>
         <div className="jf-row-info">
@@ -40,6 +48,7 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           {services.map((svc) => (
             <span key={svc} className="jf-chip">{svc}</span>
           ))}
+          {agency.district ? <span className="jf-chip">{agency.district}</span> : null}
           <span className="jf-chip src">来源编号 {agency.orgCode}</span>
           <span className="jf-chip ok">机构信息已审核</span>
         </div>
@@ -65,8 +74,32 @@ export function OfflineAgenciesPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
+  const [district, setDistrict] = useState<string | undefined>(undefined)
+  const [districts, setDistricts] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [retryKey, setRetryKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    getOfflineAgencies({
+      keyword: keyword || undefined,
+      page: 1,
+      pageSize: DISTRICT_SAMPLE_SIZE,
+    })
+      .then((res) => {
+        if (cancelled) return
+        const unique = [...new Set(
+          res.items
+            .map((item) => item.district?.trim())
+            .filter((value): value is string => Boolean(value)),
+        )].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+        setDistricts(unique)
+      })
+      .catch(() => {
+        if (!cancelled) setDistricts([])
+      })
+    return () => { cancelled = true }
+  }, [keyword, retryKey])
 
   useEffect(() => {
     let cancelled = false
@@ -74,6 +107,7 @@ export function OfflineAgenciesPage() {
     setError(null)
     getOfflineAgencies({
       keyword: keyword || undefined,
+      district: district || undefined,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -89,12 +123,13 @@ export function OfflineAgenciesPage() {
       })
 
     return () => { cancelled = true }
-  }, [keyword, page, retryKey])
+  }, [keyword, district, page, retryKey])
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextKeyword = searchInput.trim()
     setPage(1)
+    setDistrict(undefined)
     if (nextKeyword === keyword) {
       setRetryKey((value) => value + 1)
       return
@@ -105,7 +140,13 @@ export function OfflineAgenciesPage() {
   const clearSearch = () => {
     setSearchInput('')
     setKeyword('')
+    setDistrict(undefined)
     setPage(1)
+  }
+
+  const selectDistrict = (next: string | undefined) => {
+    setPage(1)
+    setDistrict(next)
   }
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 0
@@ -120,8 +161,30 @@ export function OfflineAgenciesPage() {
       badge={<FusionBadge icon={ShieldCheckIcon}>机构信息审核后收录</FusionBadge>}
     >
       <div className="jf-filter-bar">
-        <span className="jf-filter-label">区域</span>
-        <span className="jf-f-chip on">全部区域</span>
+        {districts.length > 0 && (
+          <>
+            <span className="jf-filter-label">区域</span>
+            <button
+              type="button"
+              className={`jf-f-chip min-h-12 ${district ? '' : 'on'}`}
+              aria-pressed={!district}
+              onClick={() => selectDistrict(undefined)}
+            >
+              全部
+            </button>
+            {districts.map((name) => (
+              <button
+                type="button"
+                key={name}
+                className={`jf-f-chip min-h-12 ${district === name ? 'on' : ''}`}
+                aria-pressed={district === name}
+                onClick={() => selectDistrict(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </>
+        )}
         <form className="oa-search-btn flex-wrap" role="search" onSubmit={handleSearch}>
           <SearchIcon aria-hidden="true" />
           <input

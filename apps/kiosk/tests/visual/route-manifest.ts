@@ -52,4 +52,6 @@ export const compatibilityRedirects = {
   '/print/params': '/print/preview',
   '/resume': '/resume/source',
   '/resume/upload': '/resume/source',
+  // AI-07：/resume/export 孤儿占位页下线，真实导出在优化页。
+  '/resume/export': '/resume/optimize',
 } as const

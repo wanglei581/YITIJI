@@ -122,12 +122,12 @@ export function FusionSourceMeta({
   externalId,
 }: {
   sourceName?: string
-  syncTime?: string
+  syncTime?: string | null
   externalId?: string
 }) {
   const items = [
     sourceName ? ['来源机构', sourceName] : null,
-    syncTime ? ['同步时间', formatW4Date(syncTime)] : null,
+    ['同步时间', syncTime?.trim() ? formatW4Date(syncTime) : '同步时间未知'],
     externalId ? ['外部ID', externalId] : null,
   ].filter((item): item is string[] => item !== null)
 

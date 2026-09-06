@@ -12,7 +12,9 @@ test.describe('数据统计（mock 口径：dataMode=demo）', () => {
     await waitForMockList(page)
 
     await expect(page.getByText('在架岗位')).toBeVisible()
-    await expect(page.getByRole('heading', { name: '曝光与跳转效果' })).toBeVisible()
+    await expect(page.getByText('产生了什么效果')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: '同步概况' })).toBeVisible()
+    await expect(page.getByText('暂无归因数据')).toBeVisible()
     await expect(page.getByRole('group', { name: '统计周期' }).getByRole('button', { name: '本周' })).toHaveAttribute('aria-pressed', 'true')
 
     await page.getByRole('button', { name: '本月' }).click()

@@ -76,11 +76,22 @@ test('/jobs/:id 只提供来源 CTA @w4', async ({ page, api }) => {
 // G1 #482: /offline-agencies/:id 已注册为真实路由，列表须提供导航入口
 test('/offline-agencies 列表可进入真实详情页 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
+  const districtRequests: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/v1/kiosk/offline-agencies') {
+      districtRequests.push(request.url())
+    }
+  })
   await page.goto('/offline-agencies')
   const agencyRow = page.getByRole('article', { name: '青岛合规人力服务机构' })
   await expect(agencyRow).toBeVisible()
   await expect(page.getByText('岗位咨询', { exact: true })).toBeVisible()
   await expect(page.getByText(/服务时间以机构公示为准/)).toBeVisible()
+  await expect(agencyRow.getByText('暂停收录')).toBeVisible()
+  await expect(page.getByText('全部区域')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '市南区' })).toBeVisible()
+  await page.getByRole('button', { name: '市南区' }).click()
+  await expect.poll(() => districtRequests.at(-1)).toContain('district=')
   // 不得伪造实时指标
   await expect(page.getByText(/营业中|今日服务|在招岗位|距本机|按直线距离/)).toHaveCount(0)
   // 详情路由真实存在，列表页须能通过真实机构行进入详情。
@@ -131,9 +142,35 @@ test('/job-fairs 预约离开平台且 mock 统计为空 @w4', async ({ page, ap
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/job-fairs/fair-001')
   await expect(page.getByRole('button', { name: /扫码预约|去来源平台预约/ }).first()).toBeVisible()
+  await expect(page.locator('iframe[src*="openstreetmap"]')).toHaveCount(0)
+  await expect(page.getByText('暂无地图，请以场馆地址为准')).toBeVisible()
   await page.getByRole('button', { name: '数据大屏' }).click()
   await expect(page.getByText(/暂无真实统计/)).toBeVisible()
   await expect(page.getByText(/签到成功|确认签到/)).toHaveCount(0)
+  await verifyPage(page, errors)
+})
+
+test('/job-fairs/:id/companies 无 syncTime 显示同步时间未知 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  api.respond('GET', '/api/v1/job-fairs/fair-001', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        id: 'fair-001', name: '2026 青岛高校毕业生招聘会', organizer: '青岛市公共就业服务中心',
+        startTime: '2026-08-01T01:00:00.000Z', endTime: '2026-08-01T08:00:00.000Z', venue: '青岛国际会展中心',
+        status: 'upcoming', theme: 'campus', city: '青岛市', address: '崂山区苗岭路9号', boothCount: 1, jobCount: 2,
+        sourceOrgId: 'source-001', externalId: 'ext-fair-001', sourceName: '青岛公共就业服务网',
+        sourceUrl: 'https://jobs.example.gov.cn/fairs/fair-001',
+        reviewStatus: 'approved', publishStatus: 'published',
+        hasManagedData: true, managedCompanyCount: 1, managedMaterialCount: 0,
+        dataSourceNote: '活动信息来自主办方，以来源平台和现场公告为准。',
+      },
+    },
+  })
+  await page.goto('/job-fairs/fair-001/companies')
+  await expect(page.getByText('同步时间未知')).toBeVisible()
+  await expect(page.getByText('2026-08-01')).toHaveCount(0)
   await verifyPage(page, errors)
 })
 

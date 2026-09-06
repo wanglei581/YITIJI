@@ -62,7 +62,6 @@ const preview = read('src/pages/resume/ResumeGeneratePreviewPage.tsx')
 const optimize = read('src/pages/resume/ResumeOptimizePage.tsx')
 const templates = read('src/pages/resume/ResumeTemplateLibraryPage.tsx')
 const materials = read('src/pages/resume/JobMaterialLibraryPage.tsx')
-const exportPage = read('src/pages/resume/ResumeExportPage.tsx')
 
 expectIncludes(
   packageJson,
@@ -99,7 +98,6 @@ for (const [page, sourceCode, rootClass, cssPath] of [
   ['optimize', optimize, 'resume-optimize-lightflow', './resume-authoring-lightflow.css'],
   ['templates', templates, 'resume-templates-lightflow', './resume-library-lightflow.css'],
   ['materials', materials, 'resume-materials-lightflow', './resume-library-lightflow.css'],
-  ['export', exportPage, 'resume-export-lightflow', './resume-library-lightflow.css'],
 ]) {
   expectIncludes(sourceCode, `import '${cssPath}'`, `${page} imports its local LightFlow CSS`)
   expectIncludes(sourceCode, 'resume-lightflow', `${page} uses shared local LightFlow namespace`)
@@ -141,16 +139,19 @@ for (const [sourceCode, marker, label] of [
   [templates, 'aria-pressed={selected?.id === template.id}', 'templates expose actual selection state'],
   [materials, 'readJobMaterialDraft()', 'materials keep draft recovery'],
   [materials, 'file.printFileUrl', 'materials print only real file URL'],
-  [exportPage, 'disabled', 'export does not enable a fake print action'],
 ]) {
   expectIncludes(sourceCode, marker, label)
 }
 
-for (const marker of ['我的简历.pdf', '248 KB', 'savedResume:', 'savedKind:', 'new Date().toISOString()']) {
-  expectNotIncludes(exportPage, marker, `export does not fabricate ${marker}`)
-}
-expectIncludes(exportPage, '当前流程尚未生成可导出的真实文件', 'export explains the honest no-context state')
-expectIncludes(exportPage, "navigate('/resume/source'", 'export returns users to the real resume flow')
+expect(
+  !existsSync(join(kioskRoot, 'src/pages/resume/ResumeExportPage.tsx')),
+  'AI-07 ResumeExportPage is deleted',
+)
+expectIncludes(
+  read('src/routes/index.tsx'),
+  '<Navigate to="/resume/optimize" replace />',
+  'AI-07 /resume/export redirects to the real optimize export',
+)
 
 if (failures > 0) {
   console.error(`\n${failures} K2b LightFlow contract checks failed`)

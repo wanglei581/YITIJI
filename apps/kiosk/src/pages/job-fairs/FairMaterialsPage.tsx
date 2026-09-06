@@ -218,7 +218,7 @@ export function FairMaterialsPage() {
       {fair && (
         <FusionSourceMeta
           sourceName={fair.sourceName}
-          syncTime={fair.syncTime ?? fair.startTime}
+          syncTime={fair.syncTime}
           externalId={fair.externalId}
         />
       )}

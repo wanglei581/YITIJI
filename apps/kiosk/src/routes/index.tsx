@@ -66,7 +66,6 @@ import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
 import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
 import { ResumeOptimizeComparePage } from '../pages/resume/ResumeOptimizeComparePage'
-import { ResumeExportPage } from '../pages/resume/ResumeExportPage'
 import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibraryPage'
 import { JobMaterialLibraryPage } from '../pages/resume/JobMaterialLibraryPage'
 import { HomePage } from '../pages/home/HomePage'
@@ -245,7 +244,8 @@ export const kioskRouter = createBrowserRouter([
       { path: 'resume/optimize',   element: <ResumeOptimizePage /> },
       // S2-1 拆页：逐条原文 vs 候选改写独立成屏（设计基线 09b-resume-optimize.html）。
       { path: 'resume/optimize/compare', element: <ResumeOptimizeComparePage /> },
-      { path: 'resume/export',     element: <ResumeExportPage /> },
+      // AI-07：孤儿占位页下线。真实导出在 /resume/optimize；保留兼容重定向，106 路由基线不变。
+      { path: 'resume/export',     element: <Navigate to="/resume/optimize" replace /> },
       { path: 'resume/templates',  element: <ResumeTemplateLibraryPage /> },
       { path: 'resume/materials',   element: <JobMaterialLibraryPage /> },
       // 扫描流程（Phase 3）
