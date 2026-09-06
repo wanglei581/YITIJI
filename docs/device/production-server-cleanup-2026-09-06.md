@@ -287,4 +287,24 @@ PRINT_REQUIRE_PRINTER_ONLINE 必须显式为 true（打印机离线、缺纸或�
 
 **#833 的可见行为**：无 Agent 的普通浏览器打开一体机前台，打印确认页会显示「终端会话未就绪」——这是 fail-closed 设计，不是故障。Windows 一体机的 Agent / MSI 必须从 `fd2a126b9` 构建，与线上 API 同一提交。
 
+### 第四次发布 `1b2195adf`（2026-09-06 21:41–22:52，UTC+8）——首次失败于跨境拉取，bundle 预置后成功
+
+负责人再次授权发 main 顶端。等待期间顶端被并行会话推前三次（#844、#845；#846 后被关闭未合），每次都取消发布前 CI，最终目标 `1b2195adf`（线上 `fd2a126b9` 之后：#841 Redis 三项、#842 上传生命周期、#834/#836 P2 清零、#844 小程序、四份文档；**无迁移**）。
+
+**第一次 deploy `34036854394` 失败（21:41–22:00）**：服务器到 github.com 的通道当时几乎断掉——HTTPS 20s 内 000，SSH-443 只能 `ls-remote` 不能传数据。脚本的 `git fetch --depth=1 origin <sha>` 两次失败（600s 超时、497s "unexpected disconnect while reading sideband packet"），按设计在**备份之前**中止：线上未动、PM2 未重启、无新备份。deploy.yml 里 2026-08-17 的注释已预言这一点：600s 仍失败说明问题在通道，应转向 CI 产物经国内端点下发的根治方案（TODO 仍未做，需负责人立项）。
+
+**绕行**：本机 `git bundle create fd2a126b9..origin/main`（97 KB）经运维 SSH 传到服务器，`git fetch <bundle>` + `git checkout --detach <sha>`；deploy.yml 有「`git rev-parse HEAD` 已等于目标即跳过拉取」的分支，之后脚本仍核对 HEAD 等于 `workflow_run.head_sha`。对象来自 CI 已验证的 `origin/main`，不绕过任何门禁。顶端每被推前一次就再打一个增量 bundle（5 KB）。重跑目标 CI → deploy `34040295571` 直接进入构建，全步骤成功。
+
+| 检查项 | 结果 |
+|---|---|
+| `DEPLOY_SOURCE.txt` | `origin/main@1b2195adf`，`ci_run=34038608989`，22:51:35 |
+| health / ready（`--resolve zyidai.cn`） | 200 `ok/postgres` / 200 |
+| pm2 | online，restarts 20→21；`.env` 两闸门键为 2 |
+| 三前台 | dist 22:51:57 重写；admin bundle 已变（#834），kiosk/partner 无改动 hash 不变 |
+| 新代码 | 构建产物含 #842 的到期索引；`/admin/alerts?limit=` 无鉴权 401（端点存在） |
+| 备份 / 磁盘 | `pre-1b2195adf…-20260906T144951Z.{dump,runtime}`；17G 用 / 21G 可用 |
+| 开关 | SSH 步骤 in_progress 后置 false |
+
+**两条流程教训**：① 发布前 CI 运行在 `ci-refs/heads/main` 并发组，任何合并都会取消它；并行会话必须在「发布已起步」之前停止合并，今天为此重置了三次。② 服务器直连 GitHub 不可靠时，bundle 预置是可重复的应急路径；写在 runbook 之前先记在这里。
+
 第二、三档与凭据文件仍未动。
