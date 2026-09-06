@@ -5,6 +5,24 @@ import type { AuditLogRecord, AuditLogListResponse, AuditLogListQuery } from '@a
 export type { ReviewStatus, PublishStatus, JobFairStatus }
 export type { AuditLogRecord, AuditLogListResponse, AuditLogListQuery }
 
+/** GET /admin/{job,fair,policy}-sources 带 page/pageSize 时的查询。缺省（无 page/pageSize）仍返回裸数组。 */
+export interface AdminSourceListQuery {
+  page?: number
+  pageSize?: number
+  reviewStatus?: ReviewStatus
+  sourceId?: string
+  sourceOrgId?: string
+  keyword?: string
+}
+
+/** 三个来源列表在带分页参数时的响应形状，与后端 { items, total, page, pageSize } 对齐。 */
+export interface AdminSourcePage<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 // ─── Device fleet overview (F0 只读白名单投影) ───────────────────────────────
 
 export type DeviceFleetHealth = 'healthy' | 'degraded' | 'offline' | 'unknown'

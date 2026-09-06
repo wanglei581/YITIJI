@@ -1,19 +1,37 @@
 import { API_MODE } from './client'
 import { adminMockAdapter } from './adminMockAdapter'
 import { adminHttpAdapter } from './adminHttpAdapter'
-import type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch, JobFairStatus } from './types'
+import type {
+  AdminJobSourceRecord,
+  AdminFairSourceRecord,
+  AdminImportBatch,
+  AdminSourceListQuery,
+  AdminSourcePage,
+  JobFairStatus,
+} from './types'
 import type { ReviewAction, PublishAction } from './review-types'
 
-export type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch, JobFairStatus, ReviewAction, PublishAction }
+export type {
+  AdminJobSourceRecord,
+  AdminFairSourceRecord,
+  AdminImportBatch,
+  AdminSourceListQuery,
+  AdminSourcePage,
+  JobFairStatus,
+  ReviewAction,
+  PublishAction,
+}
+
+export { paginateAdminSourceRows, toAdminSourceQueryString } from './sourcePaging'
 
 // ─── Adapter interface (core methods aligned with backend endpoints) ───────────
 
 export interface AdminSourceServiceInterface {
-  getJobSources(): Promise<AdminJobSourceRecord[]>
+  getJobSources(query?: AdminSourceListQuery): Promise<AdminJobSourceRecord[] | AdminSourcePage<AdminJobSourceRecord>>
   reviewJobSource(id: string, action: ReviewAction, reason?: string): Promise<AdminJobSourceRecord>
   publishJobSourceRecord(id: string, action: PublishAction): Promise<AdminJobSourceRecord>
 
-  getFairSources(): Promise<AdminFairSourceRecord[]>
+  getFairSources(query?: AdminSourceListQuery): Promise<AdminFairSourceRecord[] | AdminSourcePage<AdminFairSourceRecord>>
   reviewFairSource(id: string, action: ReviewAction, reason?: string): Promise<AdminFairSourceRecord>
   publishFairSourceRecord(id: string, action: PublishAction): Promise<AdminFairSourceRecord>
 
@@ -25,11 +43,19 @@ const adapter: AdminSourceServiceInterface =
 
 // ─── Core service functions (new, aligned with backend) ──────────────────────
 
-export const getJobSources          = ()                                          => adapter.getJobSources()
+export function getJobSources(): Promise<AdminJobSourceRecord[]>
+export function getJobSources(query: AdminSourceListQuery): Promise<AdminJobSourceRecord[] | AdminSourcePage<AdminJobSourceRecord>>
+export function getJobSources(query?: AdminSourceListQuery) {
+  return query ? adapter.getJobSources(query) : adapter.getJobSources()
+}
 export const reviewJobSource        = (id: string, action: ReviewAction, reason?: string) => adapter.reviewJobSource(id, action, reason)
 export const publishJobSourceRecord = (id: string, action: PublishAction)         => adapter.publishJobSourceRecord(id, action)
 
-export const getFairSources          = ()                                          => adapter.getFairSources()
+export function getFairSources(): Promise<AdminFairSourceRecord[]>
+export function getFairSources(query: AdminSourceListQuery): Promise<AdminFairSourceRecord[] | AdminSourcePage<AdminFairSourceRecord>>
+export function getFairSources(query?: AdminSourceListQuery) {
+  return query ? adapter.getFairSources(query) : adapter.getFairSources()
+}
 export const reviewFairSource        = (id: string, action: ReviewAction, reason?: string) => adapter.reviewFairSource(id, action, reason)
 export const publishFairSourceRecord = (id: string, action: PublishAction)         => adapter.publishFairSourceRecord(id, action)
 

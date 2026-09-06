@@ -36,7 +36,7 @@ import { PublishActionDto } from '../jobs/dto/publish.dto'
  *     PATCH  /partner/policies/:id/publish        下架(unpublish)
  *     DELETE /partner/policies/:id                删除(留审计)
  *   Admin(Bearer + admin):
- *     GET    /admin/policy-sources                全量(含审核/发布状态)
+ *     GET    /admin/policy-sources                列表(缺省裸数组；?page=&pageSize= 返回分页对象)
  *     GET    /admin/policy-sources/:id/eligibility-rules  只读复核
  *     PATCH  /admin/policy-sources/:id/review     审核(approve/reject/reviewing)
  *     PATCH  /admin/policy-sources/:id/publish    发布/下架
@@ -217,8 +217,14 @@ export class PoliciesController {
   @Get('admin/policy-sources')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getPolicySources() {
-    return this.policies.getAllPolicySources()
+  getPolicySources(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('sourceOrgId') sourceOrgId?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    return this.policies.getAllPolicySources({ page, pageSize, reviewStatus, sourceOrgId, keyword })
   }
 
   /** Admin 只读复核已录入的申领条件(审核前要能看到条件与原文摘录)。 */

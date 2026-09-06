@@ -19,6 +19,8 @@
  */
 import 'dotenv/config'
 import { randomBytes } from 'crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JobsService } from '../src/jobs/jobs.service'
@@ -228,6 +230,39 @@ async function main() {
       fail('12. 审计 payload 不应包含 password 字段')
     }
     pass('12. 审计落 fair.review / fair.publish，payload 含 from/to 状态且无密码字段')
+
+    // ── 13. ADM-C15 GET /admin/fair-sources 可选分页 ────────────────────
+    {
+      const controller = readFileSync(join(process.cwd(), 'src/jobs/jobs.controller.ts'), 'utf8')
+      const fn = controller.slice(controller.indexOf('getFairSources('), controller.indexOf('getFairSources(') + 900)
+      if (!fn.includes("@Query('page')") || !fn.includes("@Query('pageSize')")) {
+        fail('13a. GET /admin/fair-sources 未声明 page/pageSize')
+      }
+      pass('13a. GET /admin/fair-sources 声明 page/pageSize')
+
+      const tag = `ADM_C15_FAIR_${suffix}`
+      await mkFair('p1', { title: `${tag} one` })
+      await mkFair('p2', { title: `${tag} two` })
+      await mkFair('p3', { title: `${tag} three` })
+      const unpaged = await jobs.getAllFairSources()
+      if (!Array.isArray(unpaged)) fail('13b. 缺省参数必须保持裸数组')
+      if (!unpaged.some((f) => f.name.includes(tag))) fail('13b. 缺省数组未包含分页夹具')
+      pass('13b. 缺省参数返回裸数组')
+
+      const paged = await jobs.getAllFairSources({ page: '1', pageSize: '2', keyword: tag })
+      if (Array.isArray(paged)) fail('13c. 带 page/pageSize 不得返回裸数组')
+      if (paged.total !== 3 || paged.page !== 1 || paged.pageSize !== 2 || paged.items.length !== 2) {
+        fail(`13c. 分页形状异常: total=${paged.total} page=${paged.page} pageSize=${paged.pageSize} items=${paged.items.length}`)
+      }
+      if (paged.items.length > paged.pageSize) fail('13c. items.length > pageSize')
+      pass('13c. 带分页参数返回 total 且 items.length ≤ pageSize')
+
+      const page2 = await jobs.getAllFairSources({ page: '2', pageSize: '2', keyword: tag })
+      if (Array.isArray(page2) || page2.items.length !== 1 || page2.total !== 3) {
+        fail('13d. 第二页未按 skip/take 切片')
+      }
+      pass('13d. 第二页 skip/take 生效')
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

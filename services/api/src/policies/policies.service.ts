@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import type { Prisma } from '../generated/prisma/client'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { CreatePolicyPostDto, UpdatePolicyPostDto } from './dto/policy.dto'
@@ -44,6 +45,33 @@ export interface PolicyPostDto {
   rejectReason: string | null
   syncTime: string
   updatedAt: string
+}
+
+export interface AdminPolicySourceListParams {
+  page?: string
+  pageSize?: string
+  reviewStatus?: string
+  sourceOrgId?: string
+  keyword?: string
+}
+
+export interface AdminPolicySourcePage {
+  items: PolicyPostDto[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function hasPolicyPagination(params?: AdminPolicySourceListParams): params is AdminPolicySourceListParams {
+  return params?.page !== undefined || params?.pageSize !== undefined
+}
+
+function normalizePolicyPage(params: AdminPolicySourceListParams): { page: number; pageSize: number; skip: number } {
+  const parsedPage = Number.parseInt(params.page ?? '1', 10)
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+  const parsedPageSize = Number.parseInt(params.pageSize ?? '20', 10)
+  const pageSize = Math.min(100, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 20)
+  return { page, pageSize, skip: (page - 1) * pageSize }
 }
 
 interface PrismaPolicyRow {
@@ -298,9 +326,31 @@ export class PoliciesService {
 
   // ── Admin:全量 + 审核/发布(状态机与 fair-sources 一致)──────────────────
 
-  async getAllPolicySources(): Promise<PolicyPostDto[]> {
-    const rows = await this.prisma.policyPost.findMany({ orderBy: { createdAt: 'desc' } })
-    return rows.map(mapPolicy)
+  async getAllPolicySources(): Promise<PolicyPostDto[]>
+  async getAllPolicySources(params: AdminPolicySourceListParams): Promise<PolicyPostDto[] | AdminPolicySourcePage>
+  async getAllPolicySources(params?: AdminPolicySourceListParams): Promise<PolicyPostDto[] | AdminPolicySourcePage> {
+    const where: Prisma.PolicyPostWhereInput = {
+      ...(params?.reviewStatus ? { reviewStatus: params.reviewStatus } : {}),
+      ...(params?.sourceOrgId ? { sourceOrgId: params.sourceOrgId } : {}),
+      ...(params?.keyword?.trim()
+        ? {
+            OR: [
+              { title: { contains: params.keyword.trim() } },
+              { sourceName: { contains: params.keyword.trim() } },
+            ],
+          }
+        : {}),
+    }
+    if (!hasPolicyPagination(params)) {
+      const rows = await this.prisma.policyPost.findMany({ where, orderBy: { createdAt: 'desc' } })
+      return rows.map(mapPolicy)
+    }
+    const { page, pageSize, skip } = normalizePolicyPage(params)
+    const [rows, total] = await Promise.all([
+      this.prisma.policyPost.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: pageSize }),
+      this.prisma.policyPost.count({ where }),
+    ])
+    return { items: rows.map(mapPolicy), total, page, pageSize }
   }
 
   async reviewPolicy(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<PolicyPostDto> {

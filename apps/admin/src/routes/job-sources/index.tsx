@@ -4,7 +4,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { Card, Drawer, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, FilterIcon, XIcon } from 'lucide-react'
-import type { AdminJobSourceRecord, ReviewStatus, PublishStatus } from '../../services/api'
+import type { AdminJobSourceRecord, AdminSourcePage, ReviewStatus, PublishStatus } from '../../services/api'
 import {
   getJobSources,
   approveJobSource,
@@ -12,6 +12,7 @@ import {
   publishJobSource,
   unpublishJobSource,
 } from '../../services/api'
+import { requireAdminSourcePage } from '../../services/api/sourcePaging'
 import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
@@ -57,6 +58,7 @@ export default function JobSourcesPage() {
   const batchLabel     = searchParams.get('batchLabel') ?? ''
 
   const [sources,      setSources]      = useState<AdminJobSourceRecord[]>([])
+  const [total,        setTotal]        = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
@@ -66,56 +68,40 @@ export default function JobSourcesPage() {
   const [actionError,  setActionError]  = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
+  const listQuery = useMemo(() => ({
+    page,
+    pageSize,
+    keyword: search.trim() || undefined,
+    reviewStatus: REVIEW_FILTER_MAP[reviewFilter] ?? undefined,
+    sourceId: sourceIdFilter || undefined,
+  }), [page, pageSize, search, reviewFilter, sourceIdFilter])
+
+  const applyPage = useCallback((data: AdminJobSourceRecord[] | AdminSourcePage<AdminJobSourceRecord>) => {
+    const pageData = requireAdminSourcePage(data)
+    setSources(pageData.items)
+    setTotal(pageData.total)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
-    getJobSources()
-      .then((data) => { if (!cancelled) setSources(data) })
+    setError(false)
+    getJobSources(listQuery)
+      .then((data) => { if (!cancelled) applyPage(data) })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [listQuery, applyPage])
 
-  // 批量发布后重新拉取,让页面状态与库一致(不做本地猜测式更新)
   const reload = useCallback(() => {
-    getJobSources().then(setSources).catch(() => setError(true))
-  }, [])
+    getJobSources(listQuery).then(applyPage).catch(() => setError(true))
+  }, [listQuery, applyPage])
 
   const orgOptions = useMemo(() => toOrgOptions(sources), [sources])
-
-  // sourceId filter: when arriving from import-batches page
-  const bySource = sourceIdFilter
-    ? sources.filter((s) => s.sourceId === sourceIdFilter)
-    : sources
-
-  const filtered = reviewFilter === '全部'
-    ? bySource
-    : bySource.filter((s) => s.reviewStatus === REVIEW_FILTER_MAP[reviewFilter])
-
-  const searched = search.trim()
-    ? filtered.filter((s) =>
-        s.title.includes(search) ||
-        s.company.includes(search) ||
-        s.sourceName.includes(search)
-      )
-    : filtered
-
-  const total = searched.length
-  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
-
-  const counts = {
-    全部:   bySource.length,
-    待审核: bySource.filter((s) => s.reviewStatus === 'pending').length,
-    审核中: bySource.filter((s) => s.reviewStatus === 'reviewing').length,
-    已通过: bySource.filter((s) => s.reviewStatus === 'approved').length,
-    已拒绝: bySource.filter((s) => s.reviewStatus === 'rejected').length,
-  }
 
   const handleApprove = (id: string) => {
     setActionError(null)
     void approveJobSource(id)
-      .then((updated) => {
-        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-      })
+      .then(() => reload())
       .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
   }
 
@@ -123,10 +109,10 @@ export default function JobSourcesPage() {
     if (!rejectReason.trim()) return
     setActionError(null)
     void rejectJobSource(id, rejectReason.trim())
-      .then((updated) => {
-        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      .then(() => {
         setRejectingId(null)
         setRejectReason('')
+        reload()
       })
       .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
   }
@@ -134,9 +120,7 @@ export default function JobSourcesPage() {
   const handlePublish = (id: string) => {
     setActionError(null)
     void publishJobSource(id)
-      .then((updated) => {
-        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-      })
+      .then(() => reload())
       .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
   }
 
@@ -145,9 +129,7 @@ export default function JobSourcesPage() {
     // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
     setActionError(null)
     void unpublishJobSource(id)
-      .then((updated) => {
-        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-      })
+      .then(() => reload())
       .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
   }
 
@@ -214,7 +196,6 @@ export default function JobSourcesPage() {
             }`}
           >
 {f}
-              <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
             </button>
           ))}
         </div>
@@ -236,14 +217,14 @@ export default function JobSourcesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-900/[0.06]">
-              {paginated.length === 0 ? (
+              {sources.length === 0 ? (
                 <tr>
                   <td colSpan={10}>
                     <EmptyState title={search ? '未找到匹配的岗位' : '该分类暂无岗位数据'} description={search ? '请尝试其他关键词' : undefined} icon={BriefcaseIcon} className="py-12" />
                   </td>
                 </tr>
               ) : (
-                paginated.map((s) => {
+                sources.map((s) => {
                   const review  = REVIEW_MAP[s.reviewStatus]
                   // 过期是后端按 validThrough 实时派生的，与 publishStatus 并列展示：
                   // 库里仍是「已发布」（所以「下架」按钮还在），但对求职者已不再放出。
@@ -355,7 +336,7 @@ export default function JobSourcesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        仅展示第三方平台同步的岗位信息，不参与招聘闭环。本次加载 {sources.length} 条（服务端当前全量返回，本页本地分页）。
+        仅展示第三方平台同步的岗位信息，不参与招聘闭环。
       </p>
 
       <Drawer

@@ -167,15 +167,46 @@ if (jobSources.includes('label="行业"')) {
 }
 pass('ADM-C14 参展企业数 / 行业列口径诚实')
 
-for (const [name, source] of [
-  ['job-sources', jobSources],
-  ['fair-sources', fairSources],
-  ['policy-sources', policySources],
+const sourcePaging = readFileSync(join(adminRoot, 'src/services/api/sourcePaging.ts'), 'utf8')
+const mockAdapter = readFileSync(join(adminRoot, 'src/services/api/adminMockAdapter.ts'), 'utf8')
+const policiesAdmin = readFileSync(join(adminRoot, 'src/services/api/policiesAdmin.ts'), 'utf8')
+const httpAdapter = readFileSync(join(adminRoot, 'src/services/api/adminHttpAdapter.ts'), 'utf8')
+
+if (!sourcePaging.includes('items: rows.slice(start, start + pageSize)') || !sourcePaging.includes('total: rows.length')) {
+  fail('ADM-C15: sourcePaging 必须按 page/pageSize 切片并返回 total')
+}
+pass('ADM-C15 mock 分页助手按 page/pageSize 切片并带 total')
+
+for (const [name, source, fetchName] of [
+  ['job-sources', jobSources, 'getJobSources'],
+  ['fair-sources', fairSources, 'getFairSources'],
+  ['policy-sources', policySources, 'getPolicySources'],
 ]) {
-  if (!source.includes('服务端当前全量返回，本页本地分页')) {
-    fail(`ADM-C15: ${name} 必须声明本次加载条数是服务端全量返回的本地分页`)
+  if (source.includes('服务端当前全量返回，本页本地分页') || source.includes('仅显示前')) {
+    fail(`ADM-C15: ${name} 已接服务端分页，不得再声明本地截断`)
+  }
+  if (source.includes('.slice((page - 1) * pageSize') || source.includes('const total = searched.length')) {
+    fail(`ADM-C15: ${name} 不得再对全集做本地 slice / 用筛选长度当 total`)
+  }
+  if (!source.includes('<Pagination total={total}')) {
+    fail(`ADM-C15: ${name} 分页控件必须把服务端 total 传给 Pagination`)
+  }
+  if (!source.includes('setTotal(pageData.total)') && !source.includes('setTotal(data.total)')) {
+    fail(`ADM-C15: ${name} 必须把服务端 total 写入分页控件`)
+  }
+  if (!source.includes('requireAdminSourcePage')) {
+    fail(`ADM-C15: ${name} 必须按分页对象解包，不能把裸数组当成一页`)
+  }
+  if (!new RegExp(`${fetchName}\\(listQuery\\)`).test(source)) {
+    fail(`ADM-C15: ${name} 必须把 page/pageSize 随 listQuery 传给 ${fetchName}`)
   }
 }
-pass('ADM-C15 三个来源页不再把本地分页假装成服务端全集而不加说明')
+if (!httpAdapter.includes('toAdminSourceQueryString(query)') || !httpAdapter.includes('isPagedSourceQuery(query)')) {
+  fail('ADM-C15: http 适配器必须把 page/pageSize 打进查询串，并按分页形状解包')
+}
+if (!mockAdapter.includes('paginateAdminSourceRows') || !policiesAdmin.includes('paginateAdminSourceRows')) {
+  fail('ADM-C15: mock 必须按 page/pageSize 切片，不能 mock 有分页、http 没分页')
+}
+pass('ADM-C15 三个来源页分页控件读服务端 total，mock/http 都按 page/pageSize 分页')
 
 console.log('\nALL PASS')
