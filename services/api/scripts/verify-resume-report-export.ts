@@ -11,6 +11,8 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { AuditService } from '../src/audit/audit.service'
 import { AiService } from '../src/ai/ai.service'
+import { ForbiddenException } from '@nestjs/common'
+import type { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { ResumeReportExportController } from '../src/ai/resume-report-export.controller'
 import { DiagnosisReportPdfService } from '../src/ai/resume/diagnosis-report-pdf.service'
 import type { ResumeReport } from '../src/ai/interfaces/ai-provider.interface'
@@ -141,7 +143,16 @@ async function main(): Promise<void> {
     get: async (key: string) => key.includes(`session-a-${suffix}`) ? userA : key.includes(`session-b-${suffix}`) ? userB : null,
     unregisterMemberSession: async () => undefined,
   }
-  const controller = new ResumeReportExportController(ai, pdf, files, jwt as never, redis as never, prisma, audit)
+  // 契约 2：会员导出前必须有 resume_ai 授权。用假 privacy 记录调用次数，并在一条用例里让它拒绝。
+  const consentCalls: string[] = []
+  let consentReject = false
+  const privacy = {
+    requireActiveConsent: async (endUserId: string, scope: string) => {
+      consentCalls.push(`${endUserId}:${scope}`)
+      if (consentReject) throw new ForbiddenException({ error: { code: 'AI_CONSENT_REQUIRED', message: '需先授权' } })
+    },
+  } as unknown as MemberPrivacyService
+  const controller = new ResumeReportExportController(ai, pdf, files, jwt as never, redis as never, prisma, audit, privacy)
 
   try {
     await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: taskIds } } })
@@ -253,13 +264,25 @@ async function main(): Promise<void> {
     )
     assert(unauthorizedOk, '越权路径：跨会员统一 AI_TASK_NOT_FOUND，不泄露任务存在性')
 
+    // 契约 2：会员路径必须过 requireActiveConsent；被拒时 403 且不落文件
+    assert(consentCalls.some((c) => c.endsWith(':resume_ai')), '会员导出调用了 requireActiveConsent(resume_ai)')
+    const uploadsBeforeConsentReject = await prisma.fileObject.count({ where: { createdBy: 'ai_resume_diagnosis_export' } })
+    consentReject = true
+    const consentBlocked = await expectCode(
+      () => controller.export(memberTask, { kind: 'diagnosis_report' }, { headers: { authorization: 'Bearer member-a' } }),
+      'AI_CONSENT_REQUIRED',
+    )
+    consentReject = false
+    const uploadsAfterConsentReject = await prisma.fileObject.count({ where: { createdBy: 'ai_resume_diagnosis_export' } })
+    assert(consentBlocked && uploadsAfterConsentReject === uploadsBeforeConsentReject, '无授权：403 AI_CONSENT_REQUIRED 且不落文件')
+
     const uploadsBeforeFontFailure = await prisma.fileObject.count({ where: { createdBy: 'ai_resume_diagnosis_export' } })
     const missingFontPdf = {
       render: (input: Parameters<DiagnosisReportPdfService['render']>[0]) =>
         pdf.render(input, { fontCandidates: [{ path: join(storageDir, 'missing-font.ttf') }] }),
     }
     const missingFontController = new ResumeReportExportController(
-      ai, missingFontPdf as DiagnosisReportPdfService, files, jwt as never, redis as never, prisma, audit,
+      ai, missingFontPdf as DiagnosisReportPdfService, files, jwt as never, redis as never, prisma, audit, privacy,
     )
     const fontOk = await expectCode(
       () => missingFontController.export(memberTask, { kind: 'diagnosis_report' }, { headers: { authorization: 'Bearer member-a' } }),
