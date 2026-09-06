@@ -1,4 +1,4 @@
-import { COMPANY_INDUSTRIES, COMPANY_TYPES, isMunicipality, resolveRegionSelection } from '@ai-job-print/shared'
+import { COMPANY_INDUSTRIES, COMPANY_TYPES, formatDateTime, isMunicipality, resolveRegionSelection } from '@ai-job-print/shared'
 import { type AdminCompanyDetail, type CompanyFieldsInput } from '../../../services/api/companiesAdmin'
 
 // companies 路由内多个子组件与主页共享的展示常量、标签工具与表单逻辑。
@@ -58,9 +58,7 @@ export function regionLabel(c: { province: string | null; city: string | null; d
 }
 
 export function fmtDateTime(iso: string): string {
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(iso)
 }
 
 export function errMsg(e: unknown): string {

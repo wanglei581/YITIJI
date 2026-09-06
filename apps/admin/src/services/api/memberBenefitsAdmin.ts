@@ -70,14 +70,20 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   return json.data
 }
 
-const EMPTY = { items: [] }
+const EMPTY = { items: [], total: 0 }
 
 export const memberBenefitsAdminApi = {
   searchUsers(phone: string): Promise<{ items: AdminEndUserSearchItem[] }> {
-    if (API_MODE !== 'http') return Promise.resolve(EMPTY)
+    if (API_MODE !== 'http') {
+      return Promise.reject(new ApiHttpError(
+        'DEMO_MODE_READONLY',
+        '当前为 mock 模式，无法检索真实会员。请连接后端后再发放权益。',
+        501,
+      ))
+    }
     return request(`/admin/member-benefits/users?phone=${encodeURIComponent(phone)}`)
   },
-  list(endUserId: string): Promise<{ items: AdminBenefitGrantItem[] }> {
+  list(endUserId: string): Promise<{ items: AdminBenefitGrantItem[]; total: number }> {
     if (API_MODE !== 'http' || !endUserId) return Promise.resolve(EMPTY)
     return request(`/admin/member-benefits?endUserId=${encodeURIComponent(endUserId)}`)
   },

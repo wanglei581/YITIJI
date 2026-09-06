@@ -34,7 +34,9 @@ import { ResumeLayoutControls } from './components/ResumeLayoutControls'
 import { useResumeLayout } from './hooks/useResumeLayout'
 import './resume-authoring-lightflow.css'
 import './resume-fusion-youth.css'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { useResumeAiConsent } from './resumeAiConsent'
+import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 
 /** 导出格式可选项 */
 const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
@@ -76,6 +78,7 @@ export function ResumeOptimizePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
+  const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
 
   const session = useMemo(() => readAiResumeSession(), [])
@@ -92,6 +95,9 @@ export function ResumeOptimizePage() {
   const [providerName, setProviderName] = useState<string | undefined>(undefined)
   const [loading,  setLoading]  = useState(true)
   const [failMsg,  setFailMsg]  = useState<string | null>(null)
+  const [failKind, setFailKind] = useState<'retry' | 'reparse' | 'expired' | 'consent'>('reparse')
+  const [retryNonce, setRetryNonce] = useState(0)
+  const [guestRecordNote, setGuestRecordNote] = useState<string | null>(null)
 
   const [exporting, setExporting] = useState(false)
   const [printNavigating, setPrintNavigating] = useState(false)
@@ -146,10 +152,17 @@ export function ResumeOptimizePage() {
   useEffect(() => {
     if (!taskId) {
       setLoading(false)
+      setFailKind('reparse')
       setFailMsg('请先上传简历完成诊断')
       return
     }
+    if (consent.checking || consent.needsPrompt || !consent.ready) {
+      setLoading(true)
+      return
+    }
     let cancelled = false
+    setLoading(true)
+    setFailMsg(null)
     getResumeOptimize(taskId, { token: getToken(), accessToken })
       .then((res) => {
         if (cancelled) return
@@ -158,21 +171,45 @@ export function ResumeOptimizePage() {
           setModules(res.modules ?? [])
           setOptimizedResume(res.optimizedResume ?? null)
           if (!res.optimizedResume && (res.modules ?? []).length === 0) {
-            setFailMsg('暂无优化建议，请返回重新解析')
+            setFailKind('retry')
+            setFailMsg('暂无优化建议，可重试一次；若仍没有内容请返回重新解析')
           }
         } else {
           const reason = res.failReason ?? ''
           if (reason.includes('重新上传')) {
+            setFailKind('expired')
             setFailMsg('文件已过期，请重新上传简历')
           } else {
-            setFailMsg(reason || '暂无优化建议，请返回重新解析')
+            setFailKind('retry')
+            setFailMsg(reason || '本次没有生成优化建议，可重试或返回重新解析')
           }
         }
       })
-      .catch(() => { if (!cancelled) setFailMsg('优化结果读取失败，请返回重新解析') })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        const code = errorCodeOf(err)
+        if (code === 'USER_AI_CONSENT_REQUIRED') {
+          setFailKind('consent')
+          setFailMsg('请先确认简历 AI 服务授权后再生成优化建议')
+          return
+        }
+        if (
+          code === 'REQUEST_TIMEOUT' ||
+          code === 'AI_BUSY' ||
+          code === 'RATE_LIMITED' ||
+          code === 'AI_RATE_LIMITED' ||
+          code === 'AI_PUBLIC_QUOTA_UNAVAILABLE'
+        ) {
+          setFailKind('retry')
+          setFailMsg(userMessageOf(err, '优化请求超时或繁忙，请重试。已生成的结果不会重复扣次。'))
+          return
+        }
+        setFailKind('reparse')
+        setFailMsg(userMessageOf(err, '优化结果读取失败，请返回重新解析'))
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [taskId, accessToken, getToken])
+  }, [taskId, accessToken, getToken, consent.checking, consent.needsPrompt, consent.ready, retryNonce])
 
   // 不做「保存」动作：优化结果在生成时已由服务端落库
   // （AiResumeResult kind='optimize'，见 services/api/src/ai/ai.service.ts），
@@ -183,6 +220,10 @@ export function ResumeOptimizePage() {
   // 却提示「优化建议已加入本次记录」—— 用户以为存下了，实际没有。
   // 属 CLAUDE.md §9「不伪造能力」违规，已移除。
   const handleViewRecord = () => {
+    if (!getToken()) {
+      setGuestRecordNote('本次优化结果只保留在本机这次使用期间。登录后不会自动带入游客记录；如需写入「我的 AI 服务记录」，请先登录再生成。')
+      return
+    }
     navigate('/me/ai-records')
   }
 
@@ -254,6 +295,23 @@ export function ResumeOptimizePage() {
     })
   }
 
+  if (consent.needsPrompt) {
+    return (
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+        <section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
+          <KioskPageHeader title="优化建议" description="基于已有内容优化表达" onBack={() => navigate(-1)} backLabel="返回报告" />
+        </section>
+        <ResumeAiConsentDialog
+          busy={consent.busy}
+          error={consent.error}
+          guest={!getToken()}
+          onCancel={() => navigate(-1)}
+          onConfirm={() => { void consent.confirm() }}
+        />
+      </KioskPageFrame>
+    )
+  }
+
   if (loading) {
     return (
       <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
@@ -275,7 +333,20 @@ export function ResumeOptimizePage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <AlertCircleIcon className="h-14 w-14 text-neutral-300" />
           <p className="text-base text-neutral-500">{failMsg}</p>
-          <Button size="lg" onClick={() => navigate('/resume/source?intent=optimize')}>重新上传简历</Button>
+          <div className="flex flex-wrap justify-center gap-3">
+            {(failKind === 'retry' || failKind === 'consent') && (
+              <Button size="lg" onClick={() => { setFailMsg(null); setRetryNonce((n) => n + 1) }}>
+                重试
+              </Button>
+            )}
+            <Button
+              size="lg"
+              variant={failKind === 'retry' ? 'secondary' : 'primary'}
+              onClick={() => navigate('/resume/source?intent=optimize')}
+            >
+              重新上传简历
+            </Button>
+          </div>
         </div>
       </section></KioskPageFrame>
     )
@@ -514,6 +585,11 @@ export function ResumeOptimizePage() {
 
       </div>
 
+      {guestRecordNote && (
+        <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-sm text-neutral-600" role="status">
+          {guestRecordNote}
+        </p>
+      )}
       <KioskActionBar className="resume-lightflow__action-bar mt-6 flex gap-3">
         <Button size="lg" variant="secondary" className="flex-1" onClick={() => requestLeave(handleViewRecord)}>
           在 AI 服务记录里查看

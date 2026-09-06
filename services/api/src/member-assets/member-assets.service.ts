@@ -4,6 +4,9 @@ import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common
 import type {
   MemberAiRecordItem,
   MemberAssetPage,
+  MemberDeletedDocumentActorKind,
+  MemberDeletedDocumentItem,
+  MemberDeletedDocumentStorageState,
   MemberDocumentItem,
   MemberResumeItem,
 } from './member-assets.types'
@@ -142,6 +145,51 @@ export class MemberAssetsService {
     }))
   }
 
+  /**
+   * 本人已删除文件的可读回记录（CLAUDE.md §11）。
+   * 只读 FileObject tombstone：deletedAt / deleteReason / storageDeletedAt。
+   * 不签发下载 URL，不回 storageKey / sha256。
+   */
+  async listDeletedDocuments(
+    endUserId: string,
+    page: MemberPageQuery
+  ): Promise<MemberAssetPage<MemberDeletedDocumentItem>> {
+    const where = {
+      endUserId,
+      status: 'deleted',
+      deletedAt: { not: null },
+      purpose: { notIn: ['signature_image', 'contract_upload', 'contract_review_report'] },
+    }
+    const total = await this.prisma.fileObject.count({ where })
+    const rows = await this.prisma.fileObject.findMany({
+      where,
+      select: {
+        id: true,
+        filename: true,
+        purpose: true,
+        createdAt: true,
+        expiresAt: true,
+        deletedAt: true,
+        deletedBy: true,
+        deleteReason: true,
+        storageDeletedAt: true,
+        storageDeletePendingAt: true,
+      },
+      ...memberPageArgs(page),
+    })
+    return buildMemberPage(rows, page, total, (f) => ({
+      id: f.id,
+      filename: f.filename,
+      purpose: f.purpose,
+      createdAt: f.createdAt.toISOString(),
+      expiresAt: f.expiresAt ? f.expiresAt.toISOString() : null,
+      deletedAt: (f.deletedAt ?? f.createdAt).toISOString(),
+      deleteReason: f.deleteReason,
+      deletedByKind: classifyDeletedBy(f.deletedBy, endUserId),
+      storageObjectState: classifyStorageObjectState(f.storageDeletedAt, f.storageDeletePendingAt),
+    }))
+  }
+
   /** AI 服务记录：本人 AiResumeResult(parse / optimize / generate) 调用历史元数据（不含 payload）。 */
   async listAiRecords(
     endUserId: string,
@@ -269,4 +317,24 @@ export class MemberAssetsService {
       deletedCount: deletion.deletedCount,
     }
   }
+}
+
+function classifyDeletedBy(
+  deletedBy: string | null,
+  endUserId: string,
+): MemberDeletedDocumentActorKind {
+  if (!deletedBy) return 'unknown'
+  if (deletedBy === 'auto' || deletedBy === 'system') return 'system'
+  if (deletedBy === `member:${endUserId}` || deletedBy.includes(endUserId)) return 'self'
+  if (deletedBy.startsWith('admin:')) return 'admin'
+  return 'unknown'
+}
+
+function classifyStorageObjectState(
+  storageDeletedAt: Date | null,
+  storageDeletePendingAt: Date | null,
+): MemberDeletedDocumentStorageState {
+  if (storageDeletedAt) return 'removed'
+  if (storageDeletePendingAt) return 'pending'
+  return 'unknown'
 }

@@ -49,6 +49,17 @@ export function ToolboxAllowedHostPanel({
     setForm({ host: '', purpose: 'web_app', owner: '', reason: '', expiresAt: '' })
   }, '域名已提交 DB 审核表')
 
+  const reviewHost = (host: ToolboxAllowedHostRecord, option: typeof HOST_REVIEW_OPTIONS[number]) => {
+    if (option.value !== 'active') {
+      const confirmed = window.confirm(`确认将域名「${host.host}」标记为「${option.label}」？相关外部入口可能停止发布或访问。`)
+      if (!confirmed) return
+    }
+    void runAction(
+      () => toolboxService.reviewAllowedHost(host.id, { status: option.value, reason: reviewReason }),
+      `已${option.label}`,
+    )
+  }
+
   return (
     <Card className="p-5">
       <div className="grid gap-4 xl:grid-cols-[0.95fr_1.2fr]">
@@ -91,7 +102,7 @@ export function ToolboxAllowedHostPanel({
                 {host.expiresAt && <p className="mt-1 text-xs text-neutral-400">过期：{host.expiresAt}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {HOST_REVIEW_OPTIONS.map((option) => (
-                    <Button key={option.value} size="sm" variant={option.value === 'active' ? 'secondary' : 'outline'} onClick={() => void runAction(() => toolboxService.reviewAllowedHost(host.id, { status: option.value, reason: reviewReason }), `已${option.label}`)}>
+                    <Button key={option.value} size="sm" variant={option.value === 'active' ? 'secondary' : 'outline'} onClick={() => reviewHost(host, option)}>
                       {option.label}
                     </Button>
                   ))}

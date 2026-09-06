@@ -5,6 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import { CreateLegalDocDto } from './dto/admin-legal-doc.dto'
 
 @Controller('admin/legal-doc-versions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -21,7 +22,7 @@ export class AdminLegalDocsController {
   /** POST /api/v1/admin/legal-doc-versions — 新建草稿 */
   @Post()
   async create(
-    @Body() body: { docType: string; version: string; title: string; content: string },
+    @Body() body: CreateLegalDocDto,
     @CurrentUser() user: AuthedUser,
   ) {
     return {

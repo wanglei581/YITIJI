@@ -405,6 +405,26 @@ async function verifyHealthyCachePath(): Promise<void> {
     const { bootReadiness, REDIS_SUBSYSTEM } = await import('../src/common/boot/boot-readiness')
     check('可用路径全程未产生假降级结论（/health 不会因为一次正常请求变红）',
       !bootReadiness.isDegraded(REDIS_SUBSYSTEM))
+
+    // 「命令被拒」不等于「Redis 不可用」。ioredis 的 ReplyError 意味着 Redis 活着并回了错
+    // （WRONGTYPE / 未知命令 / 参数不对 / Lua 报错）。若把它当连通性故障，会触发全局静默期，
+    // 期间所有 tryRedis 一律跳过 —— 内部账号回写缓存失败（本身无害，数据库是真源）
+    // 会连带把没有数据库后备的 C 端会员会话打掉，表现为用户被登出。
+    // 这条实测过：曾让 verify:content-pipeline-e2e 的 6 项会员记录断言全红。
+    const { tryRedis, resetRedisCooldownForTests } = await import('../src/common/redis/redis-degradation')
+    resetRedisCooldownForTests()
+    class ReplyError extends Error { override name = 'ReplyError' }
+    const rejected = await tryRedis('gate:command-rejected', async () => {
+      throw new ReplyError('WRONGTYPE Operation against a key holding the wrong kind of value')
+    })
+    check('命令被拒时 tryRedis 返回 ok:false/reason=rejected（调用方按取不到值处理）',
+      !rejected.ok && rejected.reason === 'rejected')
+    check('命令被拒不标 Redis 降级（Redis 明明还活着）',
+      !bootReadiness.isDegraded(REDIS_SUBSYSTEM))
+    const afterReject = await tryRedis('gate:still-usable', async () => 'ok')
+    check('命令被拒后不进静默期：后续正常调用仍真的执行（不误伤其他子系统）',
+      afterReject.ok && afterReject.value === 'ok')
+    resetRedisCooldownForTests()
   } finally {
     await prisma.user.deleteMany({ where: { id: adminId } })
     await prisma.onModuleDestroy()

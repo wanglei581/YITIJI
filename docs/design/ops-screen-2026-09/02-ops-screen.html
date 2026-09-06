@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>运营数据大屏 · 运营版（1920×1080）</title>
+<link rel="stylesheet" href="screen.css">
+</head>
+<body>
+<div class="screen">
+
+  <div class="hd">
+    <div>
+      <h1>终端运营看板</h1>
+      <p class="sub">面向运维与内容审核。含告警与队列，仅限内网 / 管理员登录后访问，不投放到公开场所。</p>
+    </div>
+    <div class="stamp">
+      更新于 <b>2026-09-06 09:42:15</b><br>
+      <span class="win">告警与任务 15 秒 · 计数 60 秒 · 累计 5 分钟</span>
+    </div>
+  </div>
+
+  <div class="grid g-ops">
+
+    <!-- 行 1：六个运维 KPI -->
+    <div class="card">
+      <h2>在网终端</h2>
+      <div class="body kpi"><div class="n">37<span class="u">/ 42</span></div><div class="lb">180 秒内有心跳</div></div>
+      <div class="foot">device-fleet 投影，响应带 onlineWindowSeconds。</div>
+    </div>
+    <div class="card">
+      <h2>进行中打印</h2>
+      <div class="body kpi"><div class="n">6<span class="u">个</span></div><div class="lb">排队 2 · 打印中 4</div></div>
+      <div class="foot">PrintTask 六态按 status 分组。</div>
+    </div>
+    <div class="card">
+      <h2>今日打印失败</h2>
+      <div class="body kpi"><div class="n" style="color:var(--err)">3<span class="u">个</span></div><div class="lb">2 个未核查退款</div></div>
+      <div class="foot">失败且 24 小时内未核查未退款的会进告警。</div>
+    </div>
+    <div class="card">
+      <h2>待审内容</h2>
+      <div class="body kpi"><div class="n" style="color:var(--warn)">70<span class="u">条</span></div><div class="lb">岗位 46 · 招聘会 5 · 政策 8 · 企业 11</div></div>
+      <div class="foot">四类 pending + reviewing 服务端计数，非前端截断后统计。</div>
+    </div>
+    <div class="card">
+      <h2>AI 成功率</h2>
+      <div class="body kpi"><div class="n">97.5<span class="u">%</span></div><div class="lb">近 24h · 673 次调用</div></div>
+      <div class="foot">status 只有成功 / 失败两态，无「降级」态：本平台的模型调用不做静默兜底。</div>
+    </div>
+    <div class="card">
+      <h2>同步成功率</h2>
+      <div class="body kpi"><div class="n">94.1<span class="u">%</span></div><div class="lb">近 24h · 17 个数据源</div></div>
+      <div class="foot">SyncLog 全局聚合，逐源明细见数据源页。</div>
+    </div>
+
+    <!-- 行 2 左：告警 -->
+    <div class="card c2 r-tall">
+      <h2>实时告警 <span class="tag">派生 · 无历史</span></h2>
+      <div class="body">
+        <div class="list">
+          <div class="li"><span class="sev e"></span><span class="tx">GZ-HZ-007 海珠区人才市场 · 离线 34 分钟</span><span class="tm">09:08</span></div>
+          <div class="li"><span class="sev e"></span><span class="tx">GZ-TH-002 天河南街道 · 离线 12 分钟</span><span class="tm">09:30</span></div>
+          <div class="li"><span class="sev w"></span><span class="tx">GZ-BY-011 白云人和镇 · 打印机缺纸</span><span class="tm">09:36</span></div>
+          <div class="li"><span class="sev w"></span><span class="tx">GZ-YX-004 越秀北京街 · 打印机故障</span><span class="tm">09:21</span></div>
+          <div class="li"><span class="sev i"></span><span class="tx">打印任务 #PT-20260906-0412 失败未核查</span><span class="tm">08:54</span></div>
+          <div class="li"><span class="sev i"></span><span class="tx">打印任务 #PT-20260906-0389 失败未核查</span><span class="tm">08:12</span></div>
+        </div>
+      </div>
+      <div class="foot">告警由当前状态实时派生、不落表，因此<b style="color:var(--ink-2)">没有历史与平均修复时长</b>。需要 MTTR 要先建告警事件表。</div>
+    </div>
+
+    <!-- 行 2 中：任务流 -->
+    <div class="card c2 r-tall">
+      <h2>任务流 <span class="tag">近 24 小时</span></h2>
+      <div class="body">
+        <div class="bars">
+          <div class="bar-r"><span class="bl">已完成</span><span class="bar-t"><span class="bar-f" style="width:100%"></span></span><span class="bv">418</span></div>
+          <div class="bar-r"><span class="bl">打印中</span><span class="bar-t"><span class="bar-f i" style="width:5%"></span></span><span class="bv">4</span></div>
+          <div class="bar-r"><span class="bl">排队中</span><span class="bar-t"><span class="bar-f i" style="width:3%"></span></span><span class="bv">2</span></div>
+          <div class="bar-r"><span class="bl">已取消</span><span class="bar-t"><span class="bar-f w" style="width:6%"></span></span><span class="bv">11</span></div>
+          <div class="bar-r"><span class="bl">失败</span><span class="bar-t"><span class="bar-f e" style="width:4%"></span></span><span class="bv">3</span></div>
+          <div class="bar-r"><span class="bl">扫描完成</span><span class="bar-t"><span class="bar-f" style="width:22%"></span></span><span class="bv">92</span></div>
+        </div>
+      </div>
+      <div class="foot">PrintTask / ScanTask 按 status 分组。已完成含免费单。</div>
+    </div>
+
+    <!-- 行 2 右：外部跳转 Top -->
+    <div class="card c2 r-tall">
+      <h2>打开来源平台入口 <span class="tag">近 30 日 · Top 5</span></h2>
+      <div class="body">
+        <div class="bars">
+          <div class="bar-r"><span class="bl">广东公共就业</span><span class="bar-t"><span class="bar-f" style="width:100%"></span></span><span class="bv">412</span></div>
+          <div class="bar-r"><span class="bl">海珠海纳职通</span><span class="bar-t"><span class="bar-f" style="width:71%"></span></span><span class="bv">293</span></div>
+          <div class="bar-r"><span class="bl">南方人才网</span><span class="bar-t"><span class="bar-f" style="width:48%"></span></span><span class="bv">198</span></div>
+          <div class="bar-r"><span class="bl">广州人社局</span><span class="bar-t"><span class="bar-f" style="width:31%"></span></span><span class="bv">127</span></div>
+          <div class="bar-r"><span class="bl">校园招聘专区</span><span class="bar-t"><span class="bar-f" style="width:22%"></span></span><span class="bv">89</span></div>
+        </div>
+      </div>
+      <div class="foot">按来源机构计数，不含个人身份。<b style="color:var(--ink-2)">这是「打开了外部入口」，不是投递结果</b> —— 用户是否投递发生在来源平台，本平台无从得知也不记录。行为日志保留 30 天，故无累计值。</div>
+    </div>
+
+    <!-- 行 3 -->
+    <div class="card c2">
+      <h2>招聘会结构 <span class="tag">进行中 3 场</span></h2>
+      <div class="body">
+        <div class="mini sm">
+          <div class="m"><div class="mv">168</div><div class="mk">参展企业</div><div class="ms">3 场合计</div></div>
+          <div class="m"><div class="mv">12</div><div class="mk">展区</div><div class="ms">已配置导览</div></div>
+          <div class="m"><div class="mv">54</div><div class="mk">活动资料</div><div class="ms">已发布可打印</div></div>
+          <div class="m" style="opacity:.62"><div class="mv" style="font-size:19px;color:var(--ink-3)">未接入</div><div class="mk">资料打印量</div><div class="ms">计数器无自增路径</div></div>
+        </div>
+      </div>
+      <div class="foot">结构数直接来自招聘会子表。资料打印量的字段存在但从未被写过，显示为「未接入」而不是 0 —— 0 会被读成「没人打印」。</div>
+    </div>
+
+    <div class="card c2">
+      <h2>AI 成本与用量 <span class="tag">近 24 小时</span></h2>
+      <div class="body">
+        <div class="bars">
+          <div class="bar-r"><span class="bl">输入 token</span><span class="bar-t"><span class="bar-f i" style="width:100%"></span></span><span class="bv">1.84M</span></div>
+          <div class="bar-r"><span class="bl">输出 token</span><span class="bar-t"><span class="bar-f i" style="width:34%"></span></span><span class="bv">0.63M</span></div>
+          <div class="bar-r"><span class="bl">估算成本</span><span class="bar-t"><span class="bar-f" style="width:41%"></span></span><span class="bv">¥38.7</span></div>
+          <div class="bar-r"><span class="bl">未计量调用</span><span class="bar-t"><span class="bar-f w" style="width:9%"></span></span><span class="bv">61</span></div>
+          <div class="bar-r"><span class="bl">P95 延迟</span><span class="bar-t"><span class="bar-f" style="width:52%"></span></span><span class="bv">4.2s</span></div>
+        </div>
+      </div>
+      <div class="foot">成本为按单价估算，<b style="color:var(--ink-2)">不是账单</b>。61 次调用在计量开始前或缺 token 字段，单独列出而不摊进成本。</div>
+    </div>
+
+    <div class="card is-na c2">
+      <h2>审核时效 / 按机构维度</h2>
+      <div class="body">
+        <div class="na">
+          <div class="t">未接入</div>
+          <div class="d">审核决策表全仓没有写入，`reviewedAt` 会被三个不同动作覆盖，用它算时长会得到偏小的假值。AI 日志与订单也没有机构字段，做不出按机构的对比。这两块宁可空着，也不用代理值凑数。</div>
+        </div>
+      </div>
+      <div class="foot">接入方式：审核动作落 ReviewDecision 并补 pendingSince；AI 日志与订单补 orgId。</div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

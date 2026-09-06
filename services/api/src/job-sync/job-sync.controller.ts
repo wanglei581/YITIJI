@@ -18,8 +18,8 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JobSyncService } from './job-sync.service'
 import { UnpublishSourceContentDto, UpdateSourceEnabledDto } from './dto/source-operations.dto'
-import { assertPartnerDataTypeCapability } from '../jobs/partner-capabilities'
 import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { UpdateResponseConfigDto } from './dto/response-config.dto'
 
 /**
  * 路由前缀：/api/v1（由 main.ts 全局设置）
@@ -77,17 +77,7 @@ export class JobSyncController {
     orgId: string
     responseConfig: Record<string, unknown> | null
   }>> {
-    const s = await this.service['prisma'].jobSource.findUnique({
-      where: { id: sourceId },
-      select: { id: true, name: true, orgId: true, responseConfig: true },
-    })
-    if (!s) throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
-    return ApiResponse.ok({
-      id: s.id,
-      name: s.name,
-      orgId: s.orgId,
-      responseConfig: s.responseConfig ? (JSON.parse(s.responseConfig) as Record<string, unknown>) : null,
-    })
+    return ApiResponse.ok(await this.service.getSource(sourceId))
   }
 
   /**
@@ -97,22 +87,10 @@ export class JobSyncController {
   @HttpCode(200)
   async updateResponseConfig(
     @Param('sourceId') sourceId: string,
-    @Body() dto: Record<string, unknown>,
+    @Body() dto: UpdateResponseConfigDto,
+    @CurrentUser() user: AuthedUser,
   ): Promise<ApiResponse<{ updated: boolean; sourceId: string }>> {
-    if (dto.dataType !== 'job' && dto.dataType !== 'fair') {
-      throw new BadRequestException({ error: { code: 'INVALID_DATA_TYPE', message: 'dataType must be "job" or "fair"' } })
-    }
-    const exists = await this.service['prisma'].jobSource.findUnique({
-      where: { id: sourceId },
-      select: { id: true, org: { select: { type: true } } },
-    })
-    if (!exists) throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
-    assertPartnerDataTypeCapability(exists.org.type, dto.dataType)
-    await this.service['prisma'].jobSource.update({
-      where: { id: sourceId },
-      data: { responseConfig: JSON.stringify(dto) },
-    })
-    return ApiResponse.ok({ updated: true, sourceId })
+    return ApiResponse.ok(await this.service.updateResponseConfig(sourceId, dto, user))
   }
 
   @Get('sources/:sourceId/impact')

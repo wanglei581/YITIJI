@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
@@ -15,6 +15,7 @@ import type {
   AdminCreateCompanyDto, AdminLinkJobsDto, AdminPublishCompanyDto, AdminReviewCompanyDto,
   AdminUpdateCompanyDto, CompanyFieldsDto, PartnerImportCompaniesDto, PartnerUpdateCompanyDto,
 } from './dto/company.dto'
+import { getPartnerCapabilities } from '../jobs/partner-capabilities'
 
 // ============================================================
 // 企业展示服务（CompanyProfile，来源企业与岗位导览）。
@@ -165,8 +166,9 @@ export class CompaniesService {
     const fairCompanyCount = await this.prisma.companyProfile.count({ where: { ...where, fairParticipant: true } })
     const jobWhere = { ...publishedJob(), companyProfile: { is: where } }
     const openJobCount = await this.prisma.job.count({ where: jobWhere })
-    const startOfToday = new Date()
-    startOfToday.setHours(0, 0, 0, 0)
+    const shanghaiNow = new Date(Date.now() + 8 * 60 * 60 * 1000)
+    shanghaiNow.setUTCHours(0, 0, 0, 0)
+    const startOfToday = new Date(shanghaiNow.getTime() - 8 * 60 * 60 * 1000)
     const todayNewJobCount = await this.prisma.job.count({ where: { ...jobWhere, syncTime: { gte: startOfToday } } })
     return { companyCount, openJobCount, todayNewJobCount, fairCompanyCount }
   }
@@ -306,7 +308,6 @@ export class CompaniesService {
       where,
       include: { _count: { select: { jobs: true } } },
       orderBy: [{ updatedAt: 'desc' }],
-      take: 200,
     })
     return rows.map((c) => this.adminRow(c))
   }
@@ -329,6 +330,7 @@ export class CompaniesService {
       showOpenJobCount: c.showOpenJobCount, showCity: c.showCity,
       showEmployeeScale: c.showEmployeeScale, showBoothNo: c.showBoothNo,
       linkedJobs: c.jobs,
+      linkedJobsTotal: c._count.jobs,
     }
   }
 
@@ -443,17 +445,22 @@ export class CompaniesService {
   async adminLinkableJobs(id: string, keyword?: string) {
     const company = await this.prisma.companyProfile.findUnique({ where: { id }, select: { sourceOrgId: true } })
     if (!company) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
-    return this.prisma.job.findMany({
-      where: {
-        sourceOrgId: company.sourceOrgId,
-        ...PUBLISHED,
-        OR: [{ companyProfileId: null }, { companyProfileId: { not: id } }],
-        ...(keyword?.trim() ? { title: { contains: keyword.trim() } } : {}),
-      },
-      select: { id: true, title: true, city: true, category: true, companyProfileId: true },
-      take: 50,
-      orderBy: [{ syncTime: 'desc' }],
-    })
+    const where = {
+      sourceOrgId: company.sourceOrgId,
+      ...PUBLISHED,
+      OR: [{ companyProfileId: null }, { companyProfileId: { not: id } }],
+      ...(keyword?.trim() ? { title: { contains: keyword.trim() } } : {}),
+    }
+    const [items, total] = await Promise.all([
+      this.prisma.job.findMany({
+        where,
+        select: { id: true, title: true, city: true, category: true, companyProfileId: true },
+        take: 50,
+        orderBy: [{ syncTime: 'desc' }],
+      }),
+      this.prisma.job.count({ where }),
+    ])
+    return { items, total }
   }
 
   async adminLinkJobs(id: string, dto: AdminLinkJobsDto, actor: { userId: string }) {
@@ -498,9 +505,54 @@ export class CompaniesService {
       where: { sourceOrgId: orgId },
       include: { _count: { select: { jobs: true } } },
       orderBy: [{ updatedAt: 'desc' }],
-      take: 200,
     })
     return rows.map((c) => this.adminRow(c))
+  }
+
+  /**
+   * 企业资料写入范围：fair_organizer 只能维护本机构招聘会已有的参展企业；
+   * enterprise_source 只能维护本企业（名称与机构名称一致）；其余类型不额外限制。
+   */
+  private async assertPartnerCompanyWrite(
+    org: { id: string; type: string; name: string },
+    input: { name: string; fairParticipant?: boolean },
+  ): Promise<void> {
+    const capabilities = getPartnerCapabilities(org.type)
+    if (!capabilities.canManageCompanies) {
+      throw new ForbiddenException({
+        error: { code: 'PARTNER_CAPABILITY_DENIED', message: `机构类型 ${org.type} 不允许维护企业展示资料` },
+      })
+    }
+    if (capabilities.companyManageScope === 'fair_associated') {
+      if (input.fairParticipant !== true) {
+        throw new BadRequestException({
+          error: {
+            code: 'COMPANY_FAIR_ASSOCIATION_REQUIRED',
+            message: '招聘会主办方只能维护本机构招聘会关联企业，请标记为招聘会参展企业',
+          },
+        })
+      }
+      const linked = await this.prisma.fairCompany.findFirst({
+        where: { name: input.name.trim(), jobFair: { sourceOrgId: org.id } },
+        select: { id: true },
+      })
+      if (!linked) {
+        throw new BadRequestException({
+          error: {
+            code: 'COMPANY_NOT_IN_OWN_FAIR',
+            message: '该企业未出现在本机构招聘会的参展企业名单中，请先在招聘会中录入参展企业',
+          },
+        })
+      }
+    }
+    if (capabilities.companyManageScope === 'own_enterprise' && input.name.trim() !== org.name.trim()) {
+      throw new BadRequestException({
+        error: {
+          code: 'COMPANY_OWN_ENTERPRISE_ONLY',
+          message: '企业来源方只能维护本企业资料，企业名称须与机构名称一致',
+        },
+      })
+    }
   }
 
   /** 按本机构岗位 externalId 关联岗位（跨机构 externalId 自然查不到，天然隔离）。 */
@@ -525,6 +577,10 @@ export class CompaniesService {
     let created = 0
     let updated = 0
     for (const item of dto.items) {
+      await this.assertPartnerCompanyWrite(org, {
+        name: item.name,
+        fairParticipant: item.fairParticipant,
+      })
       const data = {
         ...this.fieldsToData(item),
         name: item.name,
@@ -553,9 +609,20 @@ export class CompaniesService {
   }
 
   async partnerUpdate(orgId: string, id: string, dto: PartnerUpdateCompanyDto, actor: { userId: string }) {
-    const existing = await this.prisma.companyProfile.findFirst({ where: { id, sourceOrgId: orgId }, select: { id: true } })
+    const org = await this.prisma.organization.findFirst({ where: { id: orgId, enabled: true } })
+    if (!org) {
+      throw new BadRequestException({ error: { code: 'COMPANY_ORG_DISABLED', message: '机构不存在或已被停用' } })
+    }
+    const existing = await this.prisma.companyProfile.findFirst({
+      where: { id, sourceOrgId: orgId },
+      select: { id: true, name: true, fairParticipant: true },
+    })
     // 跨机构 / 不存在统一 404，不泄露存在性
     if (!existing) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
+    await this.assertPartnerCompanyWrite(org, {
+      name: dto.name ?? existing.name,
+      fairParticipant: dto.fairParticipant ?? existing.fairParticipant,
+    })
     await this.prisma.companyProfile.update({
       where: { id },
       data: {

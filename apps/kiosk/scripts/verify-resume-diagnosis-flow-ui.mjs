@@ -241,6 +241,15 @@ assertNotIncludes(optimize, '¥', 'optimize page shows no pricing copy')
 assertNotIncludes(optimize, '付费', 'optimize page shows no paywall copy')
 assertNotIncludes(optimize, '元/', 'optimize page shows no per-unit pricing copy')
 
+{
+  const match = httpAdapter.match(/const LLM_TIMEOUT_MS\s*=\s*([0-9_]+)/)
+  const clientMs = match ? Number(match[1].replace(/_/g, '')) : 0
+  if (!(clientMs >= 90_000)) {
+    throw new Error(`AI-01: kiosk LLM_TIMEOUT_MS must be >= 90000, got ${clientMs}`)
+  }
+  console.log(`PASS kiosk LLM timeout ${clientMs}ms >= 90s backend long timeout`)
+}
+
 assertIncludes(httpAdapter, 'format?: ResumeExportFormat', 'http adapter accepts optional export format')
 assertIncludes(httpAdapter, 'layout?: ResumeLayoutSettings', 'http adapter accepts optional layout')
 assertIncludes(httpAdapter, 'format ?? ', 'http adapter defaults export format to pdf when omitted')

@@ -36,6 +36,7 @@ import {
   truncateFileNameMiddle,
 } from '../../lib/fileName'
 import { kioskUploadFile } from '../../services/files/filesApi'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getUsbStatus,
   isUsbImportConfigured,
@@ -237,7 +238,7 @@ export function PrintUploadPage() {
         setUsbStatus(null)
         setUsbFiles(null)
         setUsbError(
-          err instanceof Error ? err.message : 'U 盘状态查询失败，请确认 Terminal Agent 正在运行'
+          userMessageOf(err, 'U 盘状态查询失败，请确认终端服务正在运行后重试')
         )
       }
     }
@@ -302,7 +303,7 @@ export function PrintUploadPage() {
         contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType),
       })
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : '上传失败，请重试')
+      setUploadError(userMessageOf(err, '上传失败，请重试'))
     } finally {
       setUploading(false)
     }
@@ -357,7 +358,7 @@ export function PrintUploadPage() {
         contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType),
       })
     } catch (err) {
-      setUsbError(err instanceof Error ? err.message : 'U 盘文件导入失败，请重试')
+      setUsbError(userMessageOf(err, 'U 盘文件导入失败，请重试'))
       // 该 safeId 在 Agent 侧多半已因一次性消费失效,刷新列表让用户重选。
       setUsbFiles(null)
       setUsbStatus(null)

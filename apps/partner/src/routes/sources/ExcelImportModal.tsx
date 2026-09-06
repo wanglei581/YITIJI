@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { parseExcel, previewExcel, confirmExcelImport, cancelExcelImport, getMappingRule, downloadExcelTemplate } from '../../services/api'
 import type { ExcelPreviewResult } from '../../services/api'
+import { useCapability } from '../../services/capabilities'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,8 +104,10 @@ function StepBar({ current }: { current: Step }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: Props) {
+  const canImportJobs = useCapability('canImportJobs')
+  const canImportFairs = useCapability('canImportFairs')
   const [step, setStep]         = useState<Step>('upload')
-  const [dataType, setDataType] = useState<'job' | 'fair'>('job')
+  const [dataType, setDataType] = useState<'job' | 'fair'>(canImportJobs || !canImportFairs ? 'job' : 'fair')
   const [file, setFile]         = useState<File | null>(null)
   const [columns, setColumns]   = useState<string[]>([])
   const [mapping, setMapping]   = useState<Record<string, string>>({})
@@ -185,6 +188,12 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
     }
   }
 
+  const discardPreviewBatch = async () => {
+    if (!preview?.batchId) return
+    await cancelExcelImport(preview.batchId).catch(() => null)
+    setPreview(null)
+  }
+
   // Step 2 → 3: send mapping, get preview
   const handlePreview = async () => {
     const missingRequired = fields.filter((f) => f.required && !mapping[f.key])
@@ -194,6 +203,10 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
     }
     setLoading(true); setError('')
     try {
+      if (preview?.batchId) {
+        await cancelExcelImport(preview.batchId).catch(() => null)
+        setPreview(null)
+      }
       const result = await previewExcel(file!, sourceId, dataType, mapping)
       setPreview(result)
       setStep('preview')
@@ -211,7 +224,6 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
     try {
       const result = await confirmExcelImport(preview.batchId)
       setImportedCount(result.imported)
-      onImported(result.imported)
       setStep('done')
     } catch (e) {
       setError((e as Error).message || '确认导入失败，请稍后重试')
@@ -220,10 +232,13 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
     }
   }
 
-  const handleCancel = async () => {
-    if (preview?.batchId && step === 'preview') {
-      await cancelExcelImport(preview.batchId).catch(() => null)
+  const handleClose = async () => {
+    if (step === 'done') {
+      onImported(importedCount)
+      onClose()
+      return
     }
+    await discardPreviewBatch()
     onClose()
   }
 
@@ -236,7 +251,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
             <h2 className="text-base font-semibold text-neutral-900">Excel / CSV 导入</h2>
             <p className="mt-0.5 text-xs text-neutral-500">数据源：{sourceName}</p>
           </div>
-          <button onClick={handleCancel} className="text-neutral-400 hover:text-neutral-600">
+          <button onClick={() => { void handleClose() }} className="text-neutral-400 hover:text-neutral-600">
             <XIcon className="h-5 w-5" />
           </button>
         </div>
@@ -268,19 +283,31 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {(['job', 'fair'] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setDataType(t)}
-                      className={`rounded-lg border px-5 py-2 text-sm font-medium transition ${
-                        dataType === t ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                      }`}
-                    >
-                      {t === 'job' ? '岗位数据' : '招聘会数据'}
-                    </button>
-                  ))}
+                  {(['job', 'fair'] as const).map((t) => {
+                    const allowed = t === 'job' ? canImportJobs : canImportFairs
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        disabled={!allowed}
+                        title={allowed ? undefined : '本机构类型不支持导入此类数据'}
+                        onClick={() => { if (allowed) setDataType(t) }}
+                        className={`rounded-lg border px-5 py-2 text-sm font-medium transition ${
+                          dataType === t ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                        } ${allowed ? '' : 'cursor-not-allowed opacity-50'}`}
+                      >
+                        {t === 'job' ? '岗位数据' : '招聘会数据'}
+                      </button>
+                    )
+                  })}
                 </div>
+                {(!canImportJobs || !canImportFairs) && (
+                  <p className="mt-2 text-xs text-neutral-500">
+                    {!canImportJobs ? '本机构类型不能导入岗位数据。' : ''}
+                    {!canImportFairs ? '本机构类型不能导入招聘会数据。' : ''}
+                    如需开通请联系平台运营。
+                  </p>
+                )}
               </div>
 
               <div>
@@ -436,11 +463,10 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                 </div>
               )}
 
-              {preview.dupRows > 0 && (
-                <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
-                  {preview.dupRows} 行与已有数据重复，本次导入将跳过；如需更新，请先处理原记录后重新导入。
-                </div>
-              )}
+              <div className="rounded-lg border border-info/20 bg-info-bg px-3 py-2 text-xs text-info-fg">
+                与本机构已有记录外部ID相同的行将更新原记录，并重新进入待审核；不会因为「已存在」被跳过。
+                {preview.dupRows > 0 ? ` 文件内重复的 ${preview.dupRows} 行将跳过（同一文件中相同外部ID只导入首次出现的一行）。` : ''}
+              </div>
 
               {preview.validRows === 0 && (
                 <div className="rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-xs text-error-fg">
@@ -474,10 +500,10 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
           </p>
           <div className="flex gap-3">
             {step === 'done' ? (
-              <Button variant="primary" size="md" onClick={onClose}>关闭</Button>
+              <Button variant="primary" size="md" onClick={() => { void handleClose() }}>关闭</Button>
             ) : (
               <>
-                <Button variant="outline" size="md" onClick={handleCancel} disabled={loading}>
+                <Button variant="outline" size="md" onClick={() => { void handleClose() }} disabled={loading}>
                   取消
                 </Button>
                 {step === 'upload'  && <Button variant="primary" size="md" onClick={handleUpload}  disabled={!file || loading}>{loading ? '解析中...' : '下一步'}</Button>}
@@ -489,7 +515,13 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                 )}
                 {step === 'preview' && (
                   <>
-                    <Button variant="outline" size="md" onClick={() => setStep('mapping')}>上一步</Button>
+                    <Button
+                      variant="outline"
+                      size="md"
+                      onClick={() => { void discardPreviewBatch().then(() => setStep('mapping')) }}
+                    >
+                      上一步
+                    </Button>
                     <Button variant="primary" size="md" onClick={handleConfirm} disabled={loading || (preview?.validRows ?? 0) === 0}>
                       {loading ? '导入中...' : `确认导入 ${preview?.validRows ?? 0} 行`}
                     </Button>

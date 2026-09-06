@@ -6,6 +6,8 @@ import type {
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
+  PartnerSyncLogPage,
+  PartnerSyncLogsQuery,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -27,6 +29,8 @@ export type {
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
+  PartnerSyncLogPage,
+  PartnerSyncLogsQuery,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -57,7 +61,7 @@ export interface PartnerContentServiceInterface {
   updatePartnerFair(id: string, input: UpdatePartnerFairInput): Promise<PartnerFairRecord>
   importPartnerFairs(items: ImportFairItem[]): Promise<ImportResult<PartnerFairRecord>>
 
-  getSyncLogs(): Promise<PartnerSyncLog[]>
+  getSyncLogs(query?: PartnerSyncLogsQuery): Promise<PartnerSyncLogPage>
 
   parseExcel(file: File): Promise<{ columns: string[]; sampleRows: Record<string, string>[] }>
   previewExcel(
@@ -90,7 +94,7 @@ export const updatePartnerFair    = (id: string, input: UpdatePartnerFairInput) 
 export const importPartnerFairs   = (items: ImportFairItem[]) =>
   adapter.importPartnerFairs(items)
 
-export const getSyncLogs = () => adapter.getSyncLogs()
+export const getSyncLogs = (query?: PartnerSyncLogsQuery) => adapter.getSyncLogs(query)
 
 export const parseExcel = (file: File) => adapter.parseExcel(file)
 export const previewExcel = (

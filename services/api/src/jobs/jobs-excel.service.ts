@@ -38,6 +38,7 @@ import {
   mapWorkTypeToCategory,
   normalizeMappedWorkType,
   normalizeOptionalHttpUrl,
+  isAbsoluteHttpUrl,
   splitMappedList,
   parseMappedNumber,
   parseMappedDate,
@@ -222,21 +223,6 @@ export class JobsExcelService {
     }
 
     const orgId = args.user.orgId
-    const existingExtIds = new Set<string>()
-    if (args.dataType === 'job') {
-      const existing = await this.prisma.job.findMany({
-        where: { sourceOrgId: orgId },
-        select: { externalId: true },
-      })
-      existing.forEach((j) => existingExtIds.add(j.externalId))
-    } else {
-      const existing = await this.prisma.jobFair.findMany({
-        where: { sourceOrgId: orgId },
-        select: { externalId: true },
-      })
-      existing.forEach((f) => existingExtIds.add(f.externalId))
-    }
-
     const seenInBatch = new Set<string>()
     const parsed: ParsedRow[] = dataRows.map((rawRow, idx) => {
       const rawData: Record<string, string> = {}
@@ -251,11 +237,11 @@ export class JobsExcelService {
           errors.push(`${req} 不能为空`)
         }
       }
-      if (mapped.sourceUrl && !mapped.sourceUrl.startsWith('http')) {
-        errors.push('sourceUrl 必须以 http 开头')
+      if (mapped.sourceUrl && !isAbsoluteHttpUrl(mapped.sourceUrl)) {
+        errors.push('sourceUrl 必须是有效的 http(s) 链接')
       }
-      if (mapped.checkinUrl && !mapped.checkinUrl.startsWith('http')) {
-        errors.push('checkinUrl 必须以 http 开头')
+      if (mapped.checkinUrl && !isAbsoluteHttpUrl(mapped.checkinUrl)) {
+        errors.push('checkinUrl 必须是有效的 http(s) 链接')
       }
       if (args.dataType === 'job' && mapped.workType?.trim()) {
         const normalizedWorkType = normalizeMappedWorkType(mapped.workType)
@@ -266,18 +252,23 @@ export class JobsExcelService {
         }
       }
       if (args.dataType === 'fair') {
-        if (mapped.startAt && Number.isNaN(Date.parse(mapped.startAt))) {
+        const startMs = mapped.startAt ? Date.parse(mapped.startAt) : Number.NaN
+        const endMs = mapped.endAt ? Date.parse(mapped.endAt) : Number.NaN
+        if (mapped.startAt && Number.isNaN(startMs)) {
           errors.push('startAt 日期格式无效')
         }
-        if (mapped.endAt && Number.isNaN(Date.parse(mapped.endAt))) {
+        if (mapped.endAt && Number.isNaN(endMs)) {
           errors.push('endAt 日期格式无效')
+        }
+        if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs <= startMs) {
+          errors.push('endAt 必须晚于 startAt')
         }
       }
       let status: 'ok' | 'invalid' | 'dup' = 'ok'
       if (errors.length > 0) {
         status = 'invalid'
       } else if (mapped.externalId) {
-        if (seenInBatch.has(mapped.externalId) || existingExtIds.has(mapped.externalId)) {
+        if (seenInBatch.has(mapped.externalId)) {
           status = 'dup'
         } else {
           seenInBatch.add(mapped.externalId)
@@ -380,6 +371,8 @@ export class JobsExcelService {
     const totalValid  = batch.records.length
     const touchedJobIds: string[] = []
     let syncLogId: string | null = null
+    let addedCount = 0
+    let updatedCount = 0
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -388,6 +381,20 @@ export class JobsExcelService {
           data: { status: 'processing' },
         })
         if (claim.count !== 1) throw new Error('IMPORT_BATCH_ALREADY_CLAIMED')
+        const mappedRows = batch.records.map((record) => JSON.parse(record.mappedJson) as Record<string, string>)
+        const externalIds = mappedRows.map((mapped) => mapped.externalId).filter((id): id is string => Boolean(id))
+        const existing = batch.dataType === 'job'
+          ? await tx.job.findMany({
+            where: { sourceOrgId, externalId: { in: externalIds } },
+            select: { externalId: true },
+          })
+          : await tx.jobFair.findMany({
+            where: { sourceOrgId, externalId: { in: externalIds } },
+            select: { externalId: true },
+          })
+        const existingExtIds = new Set(existing.map((row) => row.externalId))
+        addedCount = externalIds.filter((id) => !existingExtIds.has(id)).length
+        updatedCount = externalIds.filter((id) => existingExtIds.has(id)).length
         for (const record of batch.records) {
           const mapped = JSON.parse(record.mappedJson) as Record<string, string>
           if (batch.dataType === 'job') {
@@ -500,8 +507,8 @@ export class JobsExcelService {
             // 在日志里伪装成 Excel 导入,运营排查「这批数据是怎么进来的」时会被误导。
             syncMode: importSyncModeOf(batch.fileName),
             totalCount: totalValid + batch.dupRows + batch.invalidRows,
-            addedCount: totalValid,
-            updatedCount: 0,
+            addedCount,
+            updatedCount,
             dupCount: batch.dupRows,
             errorCount: batch.invalidRows,
             errorFields: '[]',

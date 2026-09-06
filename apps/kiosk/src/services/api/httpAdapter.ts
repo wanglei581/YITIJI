@@ -79,6 +79,39 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
   return res.json() as Promise<T>
 }
 
+/** 公开招聘会子资源默认 20 条；参展企业超过一页时继续拉完，避免详情写「20 家」却丢后面的企业。 */
+const FAIR_SUBRESOURCE_PAGE_SIZE = 100
+
+async function collectPaged<T>(path: string): Promise<PaginatedResponse<T>> {
+  const first = await get<PaginatedResponse<T>>(path, {
+    page: '1',
+    pageSize: String(FAIR_SUBRESOURCE_PAGE_SIZE),
+  })
+  const items = [...(first.data ?? [])]
+  const total = first.pagination?.total ?? items.length
+  const totalPages = Math.max(
+    1,
+    first.pagination?.totalPages ?? (Math.ceil(total / FAIR_SUBRESOURCE_PAGE_SIZE) || 1),
+  )
+  for (let page = 2; page <= totalPages && items.length < total; page += 1) {
+    const next = await get<PaginatedResponse<T>>(path, {
+      page: String(page),
+      pageSize: String(FAIR_SUBRESOURCE_PAGE_SIZE),
+    })
+    items.push(...(next.data ?? []))
+  }
+  return {
+    ...first,
+    data: items,
+    pagination: {
+      page: 1,
+      pageSize: items.length,
+      total,
+      totalPages: 1,
+    },
+  }
+}
+
 async function post<T>(path: string): Promise<T> {
   const url = new URL(`${API_BASE_URL}${path}`, window.location.origin)
   const res = await fetch(url.toString(), {
@@ -252,7 +285,7 @@ export const httpJobFairAdapter = {
   },
 
   async getFairCompanies(fairId: string): Promise<PaginatedResponse<FairCompanyDTO>> {
-    const res = await get<PaginatedResponse<WireFairCompany>>(`/job-fairs/${fairId}/companies`)
+    const res = await collectPaged<WireFairCompany>(`/job-fairs/${fairId}/companies`)
     return { ...res, data: (res.data ?? []).map(mapWireCompany) }
   },
 

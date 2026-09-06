@@ -1,3 +1,4 @@
+import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import { useState } from 'react'
 import { useRefreshable } from '@ai-job-print/refresh'
 import {
@@ -12,8 +13,7 @@ import {
 const HASH_EMPTY = ''
 
 function defaultObservationEndsAt(): string {
-  const next = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  return next.toISOString().slice(0, 16)
+  return toDatetimeLocalValue(new Date(Date.now() + 24 * 60 * 60 * 1000))
 }
 
 export function ReleaseObservationPanel({
@@ -64,7 +64,7 @@ export function ReleaseObservationPanel({
         signerCertificateThumbprint: form.signerTrustLevel === 'unsigned_internal'
           ? undefined
           : form.signerCertificateThumbprint || undefined,
-        observationEndsAt: new Date(form.observationEndsAt).toISOString(),
+        observationEndsAt: fromDatetimeLocalValue(form.observationEndsAt),
         targets,
       })
       setOpen(false)
@@ -148,7 +148,7 @@ export function ReleaseObservationPanel({
                 <td className="px-3 py-2 font-mono">{plan.targetVersion}<div className="text-neutral-400">{plan.status} v{plan.version}</div></td>
                 <td className="px-3 py-2">{plan.signerTrustLevel}</td>
                 <td className="px-3 py-2">{plan.targets.map((target) => `${target.terminalCode}: ${target.state}`).join('；')}</td>
-                <td className="px-3 py-2">{new Date(plan.observationEndsAt).toLocaleString('zh-CN')}</td>
+                <td className="px-3 py-2">{formatDateTime(plan.observationEndsAt)}</td>
                 <td className="px-3 py-2">
                   <div className="flex gap-2">
                     {plan.status !== 'active' && plan.status !== 'cancelled' && <button type="button" onClick={() => void transition(plan, 'activate')} className="text-primary-700 hover:underline">启用观察</button>}

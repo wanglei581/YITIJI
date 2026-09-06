@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -44,8 +44,12 @@ const kioskPage = read(join(kioskRoot, 'src/pages/profile/me/MyPrivacyRequestsPa
 const kioskApi = read(join(kioskRoot, 'src/services/api/memberPrivacy.ts'))
 const kioskRoutes = read(join(kioskRoot, 'src/routes/index.tsx'))
 const kioskSettings = read(join(kioskRoot, 'src/pages/profile/me/MySettingsPage.tsx'))
-const adminPage = read(join(repoRoot, 'apps/admin/src/routes/member-privacy/index.tsx'))
-const adminApi = read(join(repoRoot, 'apps/admin/src/services/api/memberPrivacyAdmin.ts'))
+const adminPagePath = join(repoRoot, 'apps/admin/src/routes/privacy-requests/index.tsx')
+const adminApiPath = join(repoRoot, 'apps/admin/src/services/api/adminPrivacyRequests.ts')
+const retiredAdminPagePath = join(repoRoot, 'apps/admin/src/routes/member-privacy/index.tsx')
+const retiredAdminApiPath = join(repoRoot, 'apps/admin/src/services/api/memberPrivacyAdmin.ts')
+const adminPage = read(adminPagePath)
+const adminApi = read(adminApiPath)
 const adminRoutes = read(join(repoRoot, 'apps/admin/src/routes/index.tsx'))
 const adminNav = read(join(repoRoot, 'apps/admin/src/layouts/AdminLayoutWrapper.tsx'))
 const backendCreate = read(join(repoRoot, 'services/api/src/member-privacy/member-data-request.service.ts'))
@@ -122,8 +126,14 @@ expectIncludes(adminPage, 'ADMIN_DATA_REQUEST_EXPORT_COMPLETE_HINT', 'Admin 导�
 expectIncludes(adminApi, '/admin/member-privacy/data-requests', 'Admin API 走 member-privacy 端点')
 expectIncludes(adminApi, '/retry', 'Admin API 提供重试')
 expectIncludes(adminApi, '/reject', 'Admin API 提供驳回')
-expectMatches(adminRoutes, /path:\s*'member-privacy'/, 'Admin 路由注册 /member-privacy')
-expectIncludes(adminNav, '会员隐私请求', 'Admin 侧栏含会员隐私请求')
+expectMatches(adminRoutes, /path:\s*'privacy-requests'/, 'Admin 路由注册 /privacy-requests')
+expectIncludes(adminNav, '数据权利工单', 'Admin 侧栏保留数据权利工单')
+expectAbsent(adminRoutes, /path:\s*'member-privacy'/, 'Admin 已移除重复 /member-privacy 路由')
+expectAbsent(adminNav, /会员隐私请求/, 'Admin 已移除重复会员隐私请求导航')
+if (!existsSync(retiredAdminPagePath)) pass('Admin 重复 member-privacy 页面已删除')
+else fail('Admin 重复 member-privacy 页面仍存在')
+if (!existsSync(retiredAdminApiPath)) pass('Admin 重复 memberPrivacyAdmin 适配器已删除')
+else fail('Admin 重复 memberPrivacyAdmin 适配器仍存在')
 expectAbsent(
   adminPage,
   /全部个人数据已删除|清空账号|账号注销成功|已删除全部|仅处理岗位 AI 咨询会话与授权相关请求/,

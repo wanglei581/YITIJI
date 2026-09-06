@@ -10,9 +10,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { Building2Icon, PlusIcon, RefreshCwIcon } from 'lucide-react'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
   COMPANY_TYPES,
   COMPANY_INDUSTRIES,
+  formatDateTime,
   PROVINCES,
   citiesOf,
   districtsOf,
@@ -28,6 +30,9 @@ import {
   type UpdatePartnerCompanyInput,
   type CompanyFieldsInput,
 } from '../../services/api/partnerCompanies'
+import { RejectReason } from '../../components/RejectReason'
+import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
+import { getOrgProfile } from '../../services/api/orgSelf'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -68,10 +73,7 @@ function regionText(c: PartnerCompanyRecord): string {
 }
 
 function fmtTime(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(iso, { fallback: iso })
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────
@@ -199,6 +201,10 @@ function errMsg(e: unknown): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CompaniesPage() {
+  const canManage = useCapability('canManageCompanies')
+  const { capabilities } = usePartnerCapabilities()
+  const companyScope = capabilities?.companyManageScope ?? 'unrestricted'
+  const [orgName, setOrgName] = useState<string>('')
   const [companies, setCompanies] = useState<PartnerCompanyRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -210,6 +216,9 @@ export default function CompaniesPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [noticeIsError, setNoticeIsError] = useState(false)
+  const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerCompanyRecord | null>(null)
+  const [unpublishing, setUnpublishing] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -221,6 +230,16 @@ export default function CompaniesPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    getOrgProfile().then((profile) => setOrgName(profile.name)).catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    if (editing === 'new' && companyScope === 'own_enterprise' && orgName) {
+      setForm((f) => (f.name === orgName ? f : { ...f, name: orgName }))
+    }
+  }, [editing, companyScope, orgName])
 
   useEffect(() => {
     if (!notice) return
@@ -241,7 +260,11 @@ export default function CompaniesPage() {
   }
 
   const openNew = () => {
-    setForm(EMPTY_FORM)
+    setForm({
+      ...EMPTY_FORM,
+      fairParticipant: companyScope === 'fair_associated',
+      name: companyScope === 'own_enterprise' ? orgName : '',
+    })
     setInitialForm(null)
     setFormError(null)
     setEditing('new')
@@ -302,6 +325,7 @@ export default function CompaniesPage() {
         const jobIds = splitList(form.jobExternalIds)
         if (jobIds.length > 0) item.jobExternalIds = jobIds
         const result = await partnerCompaniesService.importPartnerCompanies([item])
+        setNoticeIsError(false)
         setNotice(
           result.updated > 0
             ? '该外部编号已存在,本次提交已更新原企业资料并回到待审核+草稿状态,须管理员重新审核发布。'
@@ -312,27 +336,35 @@ export default function CompaniesPage() {
         const jobIds = splitList(form.jobExternalIds)
         if (jobIds.length > 0) payload.jobExternalIds = jobIds
         await partnerCompaniesService.updatePartnerCompany(editing.id, payload)
+        setNoticeIsError(false)
         setNotice('修改已保存。该企业资料已回到待审核+草稿状态,管理员重新审核发布前,终端不展示该企业。')
       }
       setEditing(null)
       load()
     } catch (e) {
       setFormError(errMsg(e))
+      setNoticeIsError(true)
     } finally {
       setSaving(false)
     }
   }
 
   // P1-A④ 下架本机构已发布企业(镜像岗位/招聘会/政策):只改 publishStatus,不触发重审。
-  const handleUnpublish = async (id: string) => {
+  const handleUnpublish = async (company: PartnerCompanyRecord) => {
+    setUnpublishing(true)
+    setConfirmUnpublish(null)
     try {
-      const updated = await partnerCompaniesService.unpublishPartnerCompany(id)
-      if (updated) setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)))
+      const updated = await partnerCompaniesService.unpublishPartnerCompany(company.id)
+      if (updated) setCompanies((prev) => prev.map((c) => (c.id === company.id ? updated : c)))
       else load()
+      setNoticeIsError(false)
       setNotice('企业资料已下架，终端将不再展示。如需重新上架，请用「编辑」重新提交并由管理员审核发布。')
-    } catch {
-      // 下架失败 → 重新拉取列表，保证 UI 与后端一致
+    } catch (e) {
+      setNoticeIsError(true)
+      setNotice(errMsg(e))
       load()
+    } finally {
+      setUnpublishing(false)
     }
   }
 
@@ -366,14 +398,25 @@ export default function CompaniesPage() {
       title="企业资料管理"
       subtitle={`共 ${companies.length} 家企业 · 仅维护本机构来源的企业展示资料`}
       actions={
-        <Button size="sm" variant="primary" className="flex items-center gap-1.5" onClick={openNew}>
+        <Button
+          size="sm"
+          variant="primary"
+          className="flex items-center gap-1.5"
+          onClick={openNew}
+          disabled={!canManage}
+          title={canManage ? undefined : '本机构类型不支持维护企业展示资料'}
+        >
           <PlusIcon className="h-4 w-4" />
           新增企业
         </Button>
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          noticeIsError
+            ? 'border-error/30 bg-error-bg text-error-fg'
+            : 'border-success/30 bg-success-bg text-success-fg'
+        }`}>
           {notice}
         </div>
       )}
@@ -438,11 +481,7 @@ export default function CompaniesPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{fmtTime(c.syncTime)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge dot status={review.badge} label={review.label} />
-                        {c.reviewStatus === 'rejected' && c.rejectReason && (
-                          <p className="mt-1 max-w-[200px] text-xs text-error-fg" title={c.rejectReason}>
-                            原因:{c.rejectReason}
-                          </p>
-                        )}
+                        <RejectReason reviewStatus={c.reviewStatus} reason={c.rejectReason} />
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600">
@@ -461,7 +500,7 @@ export default function CompaniesPage() {
                           {c.publishStatus === 'published' && (
                             <button
                               className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => void handleUnpublish(c.id)}
+                              onClick={() => setConfirmUnpublish(c)}
                             >
                               下架
                             </button>
@@ -503,6 +542,16 @@ export default function CompaniesPage() {
               ? '提交后该企业资料进入待审核+草稿状态;管理员审核通过并发布后,终端才会展示。'
               : '保存后该企业资料将回到待审核+草稿状态;管理员重新审核发布前,终端不展示该企业。外部编号与来源机构不可修改。'}
           </p>
+          {companyScope === 'fair_associated' && (
+            <p className="rounded-lg border border-info/20 bg-info-bg px-3 py-2 text-xs text-info-fg">
+              招聘会主办方只能维护本机构招聘会已录入的参展企业，企业名称须与参展名单一致。
+            </p>
+          )}
+          {companyScope === 'own_enterprise' && (
+            <p className="rounded-lg border border-info/20 bg-info-bg px-3 py-2 text-xs text-info-fg">
+              企业来源方只能维护本企业资料，名称须与机构名称一致。
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="外部编号(externalId)" required={editing === 'new'}>
               <input
@@ -514,7 +563,12 @@ export default function CompaniesPage() {
               />
             </Field>
             <Field label="企业名称(2-80字)" required>
-              <input className={inputCls} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <input
+                className={`${inputCls} ${companyScope === 'own_enterprise' ? 'bg-neutral-50 text-neutral-400' : ''}`}
+                value={form.name}
+                disabled={companyScope === 'own_enterprise'}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -616,6 +670,7 @@ export default function CompaniesPage() {
                 type="checkbox"
                 className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                 checked={form.fairParticipant}
+                disabled={companyScope === 'fair_associated'}
                 onChange={(e) => setForm((f) => ({ ...f, fairParticipant: e.target.checked }))}
               />
               招聘会参展企业
@@ -626,6 +681,18 @@ export default function CompaniesPage() {
           </p>
         </div>
       </Drawer>
+
+      <ConfirmActionDialog
+        open={confirmUnpublish !== null}
+        title="确认下架企业"
+        description={confirmUnpublish
+          ? `下架后终端将不再展示「${confirmUnpublish.name}」。已发布内容立即对求职者不可见。`
+          : ''}
+        confirmLabel="确认下架"
+        busy={unpublishing}
+        onCancel={() => setConfirmUnpublish(null)}
+        onConfirm={() => confirmUnpublish && void handleUnpublish(confirmUnpublish)}
+      />
     </Page>
   )
 }

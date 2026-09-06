@@ -34,6 +34,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/api/files'
 import { getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import './styles/print-scan-fusion.css'
 
@@ -80,13 +81,12 @@ function formatBytes(bytes: number): string {
 }
 
 function friendlyError(err: unknown, fallback: string, loggedIn: boolean): string {
-  const code = (err as { code?: string })?.code
-  if (code === 'SIGN_SOURCE_NOT_FOUND') {
+  if (errorCodeOf(err) === 'SIGN_SOURCE_NOT_FOUND') {
     return loggedIn
       ? '文件访问凭证已过期或文件已清理，请重新选择文件'
       : '文件访问凭证已过期（有效期约 30 分钟），请重新上传'
   }
-  return err instanceof Error ? err.message : fallback
+  return userMessageOf(err, fallback)
 }
 
 export function SignStampPage() {
@@ -168,7 +168,7 @@ export function SignStampPage() {
       const res = await kioskUploadFile(selected, 'print_doc', getToken())
       await acceptDocument({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes) })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败，请重试')
+      setError(userMessageOf(err, '上传失败，请重试'))
     } finally {
       setBusy(false)
     }
@@ -193,7 +193,7 @@ export function SignStampPage() {
       setStamp({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes) })
       setResult(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败，请重试')
+      setError(userMessageOf(err, '上传失败，请重试'))
     } finally {
       setBusy(false)
     }

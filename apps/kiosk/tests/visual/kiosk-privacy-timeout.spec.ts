@@ -11,7 +11,8 @@ const PAYMENT_ORDER_ID = 'privacy-payment-order'
 const PRINT_TASK_ID = 'privacy-print-task'
 const SCAN_TASK_ID = 'privacy-scan-task'
 const SCAN_CONTROL_TOKEN = 'privacy-scan-control-token'
-const HARD_PRIVACY_SETTLE_MS = 3_800
+/** idle 3s；忙碌锁顺延 2s（VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC），再加缓冲。 */
+const HARD_PRIVACY_SETTLE_MS = 6_500
 const POLL_CLEANUP_OBSERVATION_MS = 3_400
 
 const SENSITIVE_SESSION_KEYS = [

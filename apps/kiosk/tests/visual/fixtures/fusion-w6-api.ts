@@ -76,7 +76,9 @@ export function registerW6Api(api: ApiRouter): void {
   get('/api/v1/mock-interviews/capabilities/voice', {
     data: { asrEnabled: false, ttsEnabled: false },
   })
-  get('/api/v1/activities', success({ items: [] }))
+  // 与服务端真实形状一致：listVisible 返回 { items, total }。夹具漏 total 会让页面
+  // 渲染「共 undefined 个活动」，而那正是真实缺陷，不该被夹具掩盖或制造。
+  get('/api/v1/activities', success({ items: [], total: 0 }))
   get(
     '/api/v1/activities/activity-001',
     success({

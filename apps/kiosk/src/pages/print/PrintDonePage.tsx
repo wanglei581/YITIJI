@@ -4,11 +4,13 @@ import { AlertCircleIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { getPayStatus } from '../../services/print/paymentApi'
-import { getPrintJobStatus } from '../../services/print/printJobsApi'
+import { getPrintJobStatus, type PrintJobStatusResult } from '../../services/print/printJobsApi'
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintFileDeletionRecords } from './components/PrintFileDeletionRecords'
+import { PrintFileRetentionNotice } from './components/PrintFileRetentionNotice'
 
 interface PrintFile {
   name:     string
@@ -35,6 +37,23 @@ interface PrintVerification {
   result: Exclude<PrintResultState, 'loading'>
   failureReason?: string
   errorCode?: string
+  fileRetentionAvailable?: boolean
+  fileExpiresAt?: string | null
+  fileRetentionPolicy?: string | null
+  fileDeletedAt?: string | null
+  fileDeleteReason?: string | null
+  fileStorageDeletedAt?: string | null
+}
+
+function fileRetentionFromStatus(result: PrintJobStatusResult) {
+  return {
+    fileRetentionAvailable: result.fileRetentionAvailable,
+    fileExpiresAt: result.fileExpiresAt,
+    fileRetentionPolicy: result.fileRetentionPolicy,
+    fileDeletedAt: result.fileDeletedAt,
+    fileDeleteReason: result.fileDeleteReason,
+    fileStorageDeletedAt: result.fileStorageDeletedAt,
+  }
 }
 
 /**
@@ -113,7 +132,7 @@ export function PrintDonePage() {
           return
         }
         if (result.status === 'completed') {
-          setVerification({ taskId, result: 'completed' })
+          setVerification({ taskId, result: 'completed', ...fileRetentionFromStatus(result) })
           return
         }
         if (result.status === 'failed') {
@@ -122,6 +141,7 @@ export function PrintDonePage() {
             result: 'failed',
             failureReason: result.failureReasonForUser ?? '打印任务未能完成，请联系现场工作人员',
             errorCode: result.errorCode,
+            ...fileRetentionFromStatus(result),
           })
           return
         }
@@ -345,6 +365,19 @@ export function PrintDonePage() {
           <div className="print-done-right">
 
             {/* 任务摘要 */}
+            <PrintFileRetentionNotice
+              retention={{
+                fileRetentionAvailable: verification?.fileRetentionAvailable,
+                fileExpiresAt: verification?.fileExpiresAt,
+                fileRetentionPolicy: verification?.fileRetentionPolicy,
+                fileDeletedAt: verification?.fileDeletedAt,
+                fileDeleteReason: verification?.fileDeleteReason,
+                fileStorageDeletedAt: verification?.fileStorageDeletedAt,
+              }}
+            />
+
+            <PrintFileDeletionRecords />
+
             {file && params && (
               <div className="print-done-card a-slate">
                 <b className="print-done-card-hd">本次任务摘要</b>

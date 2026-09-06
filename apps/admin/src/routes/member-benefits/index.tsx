@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useMemo, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { GiftIcon, RefreshCwIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -40,8 +41,7 @@ const STATUS_CLASS: Record<AdminBenefitGrantItem['status'], string> = {
 }
 
 function fmt(iso: string | null): string {
-  if (!iso) return '—'
-  return iso.slice(0, 16).replace('T', ' ')
+  return formatDateTime(iso)
 }
 
 function defaultTitle(type: AdminBenefitType): string {
@@ -55,6 +55,7 @@ export default function MemberBenefitsPage() {
   const [phone, setPhone] = useState('')
   const [selectedUser, setSelectedUser] = useState<AdminEndUserSearchItem | null>(null)
   const [items, setItems] = useState<AdminBenefitGrantItem[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [benefitType, setBenefitType] = useState<AdminBenefitType>('free_quota')
@@ -73,22 +74,18 @@ export default function MemberBenefitsPage() {
     try {
       const res = await memberBenefitsAdminApi.list(userId)
       setItems(res.items)
+      setTotal(res.total)
       setState('ready')
     } catch {
       setState('error')
     }
   }, [])
 
-  const search = async (event: FormEvent) => {
-    event.preventDefault()
+  const searchByPhone = async (normalized: string) => {
     setMessage(null)
     setSelectedUser(null)
     setItems([])
-    const normalized = phone.trim()
-    if (!/^1[3-9]\d{9}$/.test(normalized)) {
-      setMessage('请输入 11 位中国大陆手机号')
-      return
-    }
+    setTotal(0)
     setState('loading')
     try {
       const res = await memberBenefitsAdminApi.searchUsers(normalized)
@@ -100,9 +97,24 @@ export default function MemberBenefitsPage() {
         return
       }
       await loadItems(user.endUserId)
-    } catch {
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '搜索会员失败，请重试')
       setState('error')
     }
+  }
+
+  const search = async (event: FormEvent) => {
+    event.preventDefault()
+    const normalized = phone.trim()
+    if (!/^1[3-9]\d{9}$/.test(normalized)) {
+      setSelectedUser(null)
+      setItems([])
+      setTotal(0)
+      setState('idle')
+      setMessage('请输入 11 位中国大陆手机号')
+      return
+    }
+    await searchByPhone(normalized)
   }
 
   const submitGrant = async (event: FormEvent) => {
@@ -185,8 +197,18 @@ export default function MemberBenefitsPage() {
         </button>
       </form>
 
-      {message && (
+      {message && !(state === 'error' && !selectedUser) && (
         <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">{message}</div>
+      )}
+
+      {!selectedUser && state === 'loading' && <LoadingState className="py-20" />}
+      {!selectedUser && state === 'error' && (
+        <ErrorState
+          title="搜索会员失败"
+          message={message ?? '请检查网络后重试'}
+          onRetry={() => void searchByPhone(phone.trim())}
+          className="py-20"
+        />
       )}
 
       {selectedUser && (
@@ -266,7 +288,10 @@ export default function MemberBenefitsPage() {
           </Card>
 
           <Card className="p-4">
-            <p className="mb-3 text-sm font-semibold text-neutral-900">权益记录</p>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-neutral-900">权益记录</p>
+              <p className="text-xs text-neutral-400">{total} 条{total > items.length ? ` · 仅显示最近 ${items.length} 条` : ''}</p>
+            </div>
             {state === 'loading' && <LoadingState className="py-16" />}
             {state === 'error' && <ErrorState className="py-16" onRetry={() => selectedUser && void loadItems(selectedUser.endUserId)} />}
             {state === 'ready' && items.length === 0 && (

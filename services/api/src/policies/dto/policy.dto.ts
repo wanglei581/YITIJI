@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
@@ -9,6 +9,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   ValidateNested,
 } from 'class-validator'
@@ -48,7 +49,9 @@ export class CreatePolicyPostDto {
   @IsOptional() @IsIn([...POLICY_CATEGORIES])
   category?: string
 
-  @IsOptional() @IsString() @MaxLength(500)
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(500)
   externalUrl?: string
 
   /** 来源方原始编号(如发文字号)。CLAUDE.md §10 的「外部ID」要素。 */
@@ -78,7 +81,9 @@ export class UpdatePolicyPostDto {
   @IsOptional() @IsIn([...POLICY_CATEGORIES])
   category?: string
 
-  @IsOptional() @IsString() @MaxLength(500)
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(500)
   externalUrl?: string
 
   @IsOptional() @IsString() @MaxLength(120)

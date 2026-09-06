@@ -1,4 +1,6 @@
+import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import { API_BASE_URL } from '../../../services/api/client'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 
 // fairs 路由内多个子组件与主页共享的展示常量与工具函数。
 // 由 routes/fairs/index.tsx 抽出,行为与取值零变化。
@@ -57,9 +59,7 @@ export function deriveTimeStatus(startAt: string, endAt: string): FairTimeStatus
 }
 
 export function fmtDateTime(iso: string): string {
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return formatDateTime(iso)
 }
 
 export function formatSize(kb: number): string {
@@ -73,22 +73,17 @@ export function resolvePreviewUrl(previewUrl: string): string {
   return previewUrl.startsWith('/') ? `${origin}${previewUrl}` : previewUrl
 }
 
-/** ISO ↔ <input type="datetime-local">(本地时区)。 */
+/** ISO ↔ <input type="datetime-local">（Asia/Shanghai 墙钟）。 */
 export function isoToLocalInput(iso: string): string {
-  const d = new Date(iso)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  return toDatetimeLocalValue(iso)
 }
 export function localInputToIso(value: string): string {
-  return new Date(value).toISOString()
+  return fromDatetimeLocalValue(value)
 }
 
 export const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
 export function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') {
-    return (e as Error).message
-  }
-  return '操作失败,请重试'
+  return userMessageOf(e, '操作失败，请重试')
 }

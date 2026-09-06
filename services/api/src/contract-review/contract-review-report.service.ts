@@ -227,12 +227,12 @@ export class ContractReviewReportService {
     reused: boolean,
   ): Promise<void> {
     await this.audit.write({
-      actorId: task.endUserId,
+      actorId: null,
       actorRole: task.endUserId ? 'member' : 'anonymous',
       action: 'contract_review.report_generated',
       targetType: 'contract_review_task',
       targetId: task.id,
-      payload: { reused, pages: report.pages, sourceDeleted: true },
+      payload: { endUserId: task.endUserId, reused, pages: report.pages, sourceDeleted: true },
     })
   }
 }

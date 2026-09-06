@@ -44,8 +44,10 @@ import {
   MAX_CONCURRENT_LLM,
   llmConcurrencyGate,
   llmFetchJson,
+  llmRequestAbort,
   llmTimeoutMessage,
 } from '../src/ai/llm/llm-http'
+import { httpAbortSignal, runWithPublicQuota } from '../src/ai/ai-request-guard'
 
 const SRC_ROOT = join(__dirname, '..', 'src')
 
@@ -396,6 +398,91 @@ async function runtimeChecks(): Promise<void> {
   console.log('\n[7] 超时档位')
   check('7.a 默认档对齐 job-ai 的 45 秒量级', LLM_TIMEOUT_MS >= 5_000 && LLM_TIMEOUT_MS <= 60_000, `${LLM_TIMEOUT_MS}ms`)
   check('7.b 长文档档更长但仍有硬上限', LLM_LONG_TIMEOUT_MS > LLM_TIMEOUT_MS && LLM_LONG_TIMEOUT_MS <= 180_000, `${LLM_LONG_TIMEOUT_MS}ms`)
+
+  console.log('\n[8] 一体机客户端超时不得短于后端长档')
+  const adapterSrc = readFileSync(join(__dirname, '../../../apps/kiosk/src/services/api/aiHttpAdapter.ts'), 'utf8')
+  const clientRaw = (adapterSrc.match(/const LLM_TIMEOUT_MS\s*=\s*([0-9_]+)/) ?? [])[1] ?? ''
+  const clientLong = Number(clientRaw.replace(/_/g, ''))
+  check('8.a kiosk LLM_TIMEOUT_MS 存在且为数字', Number.isFinite(clientLong) && clientLong > 0, String(clientLong))
+  check(
+    '8.b 客户端超时 ≥ 后端 LLM_LONG_TIMEOUT_MS 默认值',
+    clientLong >= LLM_LONG_TIMEOUT_MS,
+    `client=${clientLong} backend=${LLM_LONG_TIMEOUT_MS}`,
+  )
+  check('8.c parse/optimize/generate 走长超时', adapterSrc.includes('LLM_TIMEOUT_MS') && adapterSrc.includes('/resume/parse'), adapterSrc.slice(0, 80))
+
+  console.log('\n[9] 客户端断开：请求体收完后靠 res.close 取消 LLM 并回滚配额')
+  const guardSrc = blankComments(readFileSync(join(SRC_ROOT, 'ai', 'ai-request-guard.ts'), 'utf8'))
+  check('9.a 仍监听 req aborted（body 未收完）', guardSrc.includes("'aborted'"))
+  check('9.b 同时监听 res close', guardSrc.includes("'close'"))
+  check('9.c 仅在 !writableFinished 时 abort', guardSrc.includes('writableFinished'))
+
+  type Listener = () => void
+  function mockReqRes(writableFinished: boolean) {
+    const reqListeners = new Map<string, Listener[]>()
+    const resListeners = new Map<string, Listener[]>()
+    const res = {
+      writableFinished,
+      on: (event: string, listener: Listener) => {
+        resListeners.set(event, [...(resListeners.get(event) ?? []), listener])
+      },
+      emit: (event: string) => {
+        for (const listener of resListeners.get(event) ?? []) listener()
+      },
+    }
+    const req = {
+      aborted: false,
+      on: (event: string, listener: Listener) => {
+        reqListeners.set(event, [...(reqListeners.get(event) ?? []), listener])
+      },
+      emit: (event: string) => {
+        for (const listener of reqListeners.get(event) ?? []) listener()
+      },
+      res,
+    }
+    return { req, res }
+  }
+
+  {
+    const { req } = mockReqRes(false)
+    const signal = httpAbortSignal(req)
+    req.emit('aborted')
+    check('9.d req aborted 仍会 abort signal', signal.aborted)
+  }
+  {
+    const { req, res } = mockReqRes(false)
+    const signal = httpAbortSignal(req)
+    res.emit('close')
+    check('9.e 请求体已收完后 res.close 且未写完 → abort', signal.aborted)
+  }
+  {
+    const { req, res } = mockReqRes(true)
+    const signal = httpAbortSignal(req)
+    res.emit('close')
+    check('9.f 响应已写完的 close 不得 abort（避免成功后回滚）', !signal.aborted)
+  }
+  {
+    const { req, res } = mockReqRes(false)
+    let rolled = false
+    const quota = { rollback: async () => { rolled = true } }
+    const work = () =>
+      new Promise((_resolve, reject) => {
+        const stored = llmRequestAbort.getStore()
+        stored?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('REQUEST_ABORTED'), { name: 'AbortError' }))
+        })
+      })
+    const pending = runWithPublicQuota(quota as never, { keys: ['quota:test'] }, req, work)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    res.emit('close')
+    const outcome = await withWatchdog(pending, 3_000, 'res.close 配额回滚')
+    check(
+      '9.g res.close 取消 in-flight 工作',
+      outcome instanceof Error,
+      `实际：${outcome instanceof Error ? outcome.message : String(outcome)}`,
+    )
+    check('9.h 客户端断开后回滚配额', rolled)
+  }
 }
 
 /**

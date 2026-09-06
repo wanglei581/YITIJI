@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
@@ -87,7 +88,7 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
     },
   ]
   return (
-    <section aria-label="数据概览">
+    <section role="region" aria-label="数据概览">
       <div className="mb-3 flex items-center gap-2">
         <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
         <h2 className="text-[13px] font-bold text-neutral-700">数据概览</h2>
@@ -173,7 +174,7 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
                     <td className="px-5 py-3.5">
                       <StatusBadge dot status={cfg.badge} label={cfg.label} />
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-neutral-400">{s.syncTime}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-neutral-400">{formatDateTime(s.syncTime)}</td>
                   </tr>
                 )
               })}

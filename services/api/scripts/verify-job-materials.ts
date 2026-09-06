@@ -1,8 +1,8 @@
 import 'dotenv/config'
-import { existsSync, readFileSync, rmSync } from 'fs'
+import { execFileSync } from 'child_process'
+import { closeSync, existsSync, openSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import { createClient } from '@libsql/client'
 import { AuditService } from '../src/audit/audit.service'
 import { FilesService } from '../src/files/files.service'
 import { JobMaterialPdfService } from '../src/job-materials/job-material-pdf.service'
@@ -79,6 +79,18 @@ assertNotContains(
   ],
   'Job materials service avoids forbidden wording, storage key leaks, unbounded file scans, and UTC/local date drift',
 )
+
+{
+  const fallbackFn = read('scripts/verify-job-materials.ts').match(/async function initFallbackDb\([\s\S]*?\n\}/)
+  if (!fallbackFn) fail('initFallbackDb() is missing')
+  if (/CREATE TABLE/i.test(fallbackFn[0])) {
+    fail('initFallbackDb still hand-writes CREATE TABLE DDL')
+  }
+  if (!/\[prismaCli,\s*'migrate',\s*'deploy'\]/.test(fallbackFn[0])) {
+    fail('initFallbackDb does not call prisma migrate deploy')
+  }
+  pass('Fallback isolated DB is created by prisma migrate deploy without handwritten DDL')
+}
 
 async function verifyRuntimeClosure(): Promise<void> {
   if (fallbackDbName) await initFallbackDb()
@@ -221,80 +233,23 @@ function cleanupFallbackDb(): void {
 }
 
 async function initFallbackDb(): Promise<void> {
-  const client = createClient({ url: process.env['DATABASE_URL']! })
+  const dbUrl = process.env['DATABASE_URL']
+  if (!fallbackDbName || !dbUrl) fail('Fallback DATABASE_URL was not assigned before migrate deploy')
+  closeSync(openSync(join(root, 'prisma', fallbackDbName), 'a'))
+  const prismaCli = join(root, 'node_modules', 'prisma', 'build', 'index.js')
+  if (!existsSync(prismaCli)) fail(`Missing Prisma CLI: ${prismaCli}`)
   try {
-    await client.batch([
-      `CREATE TABLE "EndUser" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "phoneHash" TEXT NOT NULL,
-        "phoneEnc" TEXT NOT NULL,
-        "nickname" TEXT,
-        "wxOpenId" TEXT,
-        "enabled" BOOLEAN NOT NULL DEFAULT true,
-        "lastLoginAt" DATETIME,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`,
-      `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
-      `CREATE UNIQUE INDEX "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
-      `CREATE TABLE "FileObject" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "storageKey" TEXT NOT NULL,
-        "bucket" TEXT NOT NULL DEFAULT 'local-fs',
-        "region" TEXT NOT NULL DEFAULT 'local',
-        "filename" TEXT NOT NULL,
-        "mimeType" TEXT NOT NULL,
-        "sizeBytes" INTEGER NOT NULL,
-        "sha256" TEXT NOT NULL,
-        "uploaderId" TEXT,
-        "endUserId" TEXT,
-        "ownerType" TEXT,
-        "ownerId" TEXT,
-        "purpose" TEXT NOT NULL,
-        "sensitiveLevel" TEXT NOT NULL DEFAULT 'normal',
-        "visibility" TEXT NOT NULL DEFAULT 'private',
-        "status" TEXT NOT NULL DEFAULT 'active',
-        "createdBy" TEXT,
-        "expiresAt" DATETIME,
-        "deletedAt" DATETIME,
-        "deletedBy" TEXT,
-        "deleteReason" TEXT,
-        "assetCategory" TEXT NOT NULL DEFAULT 'original',
-        "sourceFileId" TEXT,
-        "retentionPolicy" TEXT,
-        "retentionSetBy" TEXT,
-        "retentionConsentAt" DATETIME,
-        "retentionConsentVersion" TEXT,
-        "retentionLockedReason" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`,
-      `CREATE UNIQUE INDEX "FileObject_storageKey_key" ON "FileObject"("storageKey")`,
-      `CREATE INDEX "FileObject_endUserId_idx" ON "FileObject"("endUserId")`,
-      `CREATE INDEX "FileObject_purpose_idx" ON "FileObject"("purpose")`,
-      `CREATE INDEX "FileObject_status_idx" ON "FileObject"("status")`,
-      `CREATE INDEX "FileObject_expiresAt_idx" ON "FileObject"("expiresAt")`,
-      `CREATE INDEX "FileObject_deletedAt_idx" ON "FileObject"("deletedAt")`,
-      `CREATE TABLE "AuditLog" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "actorId" TEXT,
-        "actorRole" TEXT NOT NULL,
-        "action" TEXT NOT NULL,
-        "targetType" TEXT NOT NULL,
-        "targetId" TEXT,
-        "payloadJson" TEXT NOT NULL DEFAULT '{}',
-        "ipAddress" TEXT,
-        "userAgent" TEXT,
-        "requestId" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`,
-      `CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action")`,
-      `CREATE INDEX "AuditLog_targetType_targetId_idx" ON "AuditLog"("targetType","targetId")`,
-      `CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt")`,
-    ])
-  } finally {
-    client.close()
+    execFileSync(process.execPath, [prismaCli, 'migrate', 'deploy'], {
+      cwd: root,
+      env: { ...process.env, DATABASE_URL: dbUrl },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch (error) {
+    const err = error as { stderr?: string; stdout?: string; message?: string }
+    fail(`prisma migrate deploy failed: ${(err.stderr || err.stdout || err.message || 'unknown error').trim()}`)
   }
+  pass('Fallback isolated SQLite DB applied prisma migrate deploy')
 }
 
 function toLocalDateKey(date: Date): string {

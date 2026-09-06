@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
@@ -52,6 +53,7 @@ const TASK_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' |
   failed: { badge: 'error', label: '失败' },
   expired: { badge: 'default', label: '已过期' },
   cancelled: { badge: 'default', label: '已取消' },
+  abandoned: { badge: 'default', label: '已废弃' },
 }
 
 const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: string; value: string }[]> = {
@@ -63,6 +65,7 @@ const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: str
     { label: '已完成', value: 'completed' },
     { label: '失败', value: 'failed' },
     { label: '已取消', value: 'cancelled' },
+    { label: '已废弃', value: 'abandoned' },
   ],
   scan: [
     { label: '全部', value: '' },
@@ -128,7 +131,7 @@ const CAPABILITY_STATUS_BADGE: Record<PrintScanCapabilityStatus, { badge: 'succe
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
 
 function fmt(iso: string | null): string {
-  return iso ? iso.slice(0, 16).replace('T', ' ') : '—'
+  return formatDateTime(iso)
 }
 
 function taskSummary(item: AdminPrintScanTaskItem): string {

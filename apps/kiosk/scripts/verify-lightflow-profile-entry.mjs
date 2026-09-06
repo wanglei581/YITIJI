@@ -394,6 +394,12 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/styles/me-orders.css',
   'apps/kiosk/src/pages/profile/me/styles/me-records.css',
   'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
+  // 序 13（2026-09-06）：订单详情展示真实打印参数与优惠退款额。
+  // 同一个 PR 内第四处被迫加行的范围 allowlist —— 一个正当的跨层功能要靠改四张
+  // 白名单才能变绿，这个模式本身需要产品负责人裁决，说明见
+  // verify-profile-print-orders-inkpaper.mjs 顶部注释。
+  'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
+  'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
 ])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),

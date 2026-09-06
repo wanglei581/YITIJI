@@ -34,12 +34,13 @@ type ParsedParams = {
   colorMode: 'black_white' | 'color' | null
   duplex: DuplexMode | null
   paperSize: string | null
+  pageRange: string | null
 }
 
 /** 与 shared 的 `DuplexMode` 逐字一致；改这里必须同改 packages/shared/src/types/print.ts。 */
 const DUPLEX_MODES: readonly DuplexMode[] = ['simplex', 'duplex_long_edge', 'duplex_short_edge']
 
-const EMPTY_PARAMS: ParsedParams = { fileName: null, copies: null, colorMode: null, duplex: null, paperSize: null }
+const EMPTY_PARAMS: ParsedParams = { fileName: null, copies: null, colorMode: null, duplex: null, paperSize: null, pageRange: null }
 const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
 const RESUMABLE_PAYMENT_STATUSES = new Set<OrderPayStatus>(['unpaid', 'paying'])
 const NON_RESUMABLE_PAYMENT_STATUSES: OrderPayStatus[] = [
@@ -72,8 +73,10 @@ function parseSafeParams(paramsJson: string): ParsedParams {
   // （= 未记录），绝不回落成 'simplex'：那会把「不知道」讲成「就是单面」。
   const duplex = DUPLEX_MODES.includes(p['duplex'] as DuplexMode) ? (p['duplex'] as DuplexMode) : null
   const paperSize = typeof p['paperSize'] === 'string' && p['paperSize'].length > 0 ? p['paperSize'] : null
+  const rawRange = typeof p['pageRange'] === 'string' ? p['pageRange'].trim() : ''
+  const pageRange = rawRange.length > 0 ? rawRange : null
 
-  return { fileName, copies, colorMode, duplex, paperSize }
+  return { fileName, copies, colorMode, duplex, paperSize, pageRange }
 }
 
 function parseSafePriceLines(itemsJson: string): PrintPriceLine[] {
@@ -163,6 +166,7 @@ export class MemberPrintOrdersService {
         colorMode: params.colorMode,
         duplex: params.duplex,
         paperSize: params.paperSize,
+        pageRange: params.pageRange,
         // 支付字段：历史无 Order 一律 null，不编造。paymentSource 只会是 offline/free/manual_confirmed/null。
         amountCents: order ? order.amountCents : null,
         payStatus: order ? (order.payStatus as OrderPayStatus) : null,

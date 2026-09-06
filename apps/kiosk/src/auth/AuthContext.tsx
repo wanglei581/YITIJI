@@ -34,8 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback((next: AuthUser) => {
-    // 登录或切换到另一会员前先清除游客/上一会员的敏感业务内存。
-    clearKioskSensitiveSession()
+    const current = userRef.current
+    // 只清别人的敏感会话：游客中途登录视为同一人继续办理，打印材料仍在。
+    // 已登录会员换成另一个人时才清场。
+    if (current && current.id !== next.id) {
+      clearKioskSensitiveSession()
+    }
     sessionExpiredRedirectingRef.current = false
     userRef.current = next
     setUser(next)

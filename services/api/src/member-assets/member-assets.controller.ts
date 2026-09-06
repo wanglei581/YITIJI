@@ -5,7 +5,13 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { AuditService } from '../audit/audit.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MemberAssetsService } from './member-assets.service'
-import type { MemberAiRecordItem, MemberAssetPage, MemberDocumentItem, MemberResumeItem } from './member-assets.types'
+import type {
+  MemberAiRecordItem,
+  MemberAssetPage,
+  MemberDeletedDocumentItem,
+  MemberDocumentItem,
+  MemberResumeItem,
+} from './member-assets.types'
 
 import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
@@ -52,6 +58,17 @@ export class MemberAssetsController {
     @Query('pageSize') pageSize?: string,
   ): Promise<ApiResponse<MemberAssetPage<MemberResumeItem>>> {
     return ApiResponse.ok(await this.assets.listResumes(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
+  }
+
+  @Get('documents/deleted')
+  async deletedDocuments(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<ApiResponse<MemberAssetPage<MemberDeletedDocumentItem>>> {
+    return ApiResponse.ok(
+      await this.assets.listDeletedDocuments(user.endUserId, parseMemberPageQuery(cursor, pageSize)),
+    )
   }
 
   @Get('documents')

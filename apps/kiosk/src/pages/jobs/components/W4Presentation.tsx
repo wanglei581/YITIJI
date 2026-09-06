@@ -1,3 +1,4 @@
+import { formatDateTime } from '@ai-job-print/shared'
 import type { LucideIcon } from 'lucide-react'
 import { InfoIcon } from 'lucide-react'
 import {
@@ -142,10 +143,5 @@ export function FusionSourceMeta({
 }
 
 function formatW4Date(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(iso, { fallback: iso })
 }

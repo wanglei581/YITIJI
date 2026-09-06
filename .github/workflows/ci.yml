@@ -551,6 +551,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:screensaver-content
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ad-asset-range
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
           pnpm --filter @ai-job-print/api verify:job-review
@@ -678,6 +679,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:fair-stats-truth
           pnpm --filter @ai-job-print/api verify:fair-visit-plan
           pnpm --filter @ai-job-print/api verify:feedback-notifications
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:community-daily-brief
           pnpm --filter @ai-job-print/api verify:field-mapping
           pnpm --filter @ai-job-print/api verify:file-lifecycle-summary
           pnpm --filter @ai-job-print/api verify:member-assets
@@ -688,6 +690,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-validity-expiry
           pnpm --filter @ai-job-print/api verify:member-sms-provider-errors
           pnpm --filter @ai-job-print/api verify:miniapp-cloud-print-m2
+          pnpm --filter @ai-job-print/api verify:package-order-fulfillment
           pnpm --filter @ai-job-print/api verify:sms-provider
           pnpm --filter @ai-job-print/api verify:sms-send
           pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance
@@ -960,7 +963,8 @@ jobs:
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 本 job 现在同时跑 kiosk 多套 + admin + partner 三家浏览器用例，取较大的上限。
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -1006,13 +1010,16 @@ jobs:
 
       - name: Verify Kiosk fusion baseline
         run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
+      - name: Verify 青序流光 prototype geometry (1080×1920, all fixture states)
+        # Real Chromium render of docs/design/kiosk-redesign-2026-08: stage clipping, card overflow, touch ≥48, font ≥14, <16px ratchet.
+        run: pnpm --filter @ai-job-print/kiosk verify:qingxu-proto-geometry
 
       - name: Verify Kiosk feedback entry gate
         run: pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry
 
       - name: Run Kiosk browser smoke
         run: |
-          pnpm --filter @ai-job-print/kiosk test:browser:smoke
+          pnpm --filter @ai-job-print/kiosk test:browser:fusion-smoke
           pnpm --filter @ai-job-print/kiosk test:browser:w1
           pnpm --filter @ai-job-print/kiosk test:browser:w2
           pnpm --filter @ai-job-print/kiosk test:browser:w3
@@ -1028,6 +1035,22 @@ jobs:
           # 引用它 —— 打印完成页「不得伪造已出纸」和匿名反馈入口的断言全在这一套里，
           # 长期处于「写了但从不运行」的状态。挂进来，否则它守不住任何东西。
           pnpm --filter @ai-job-print/kiosk test:browser:truth
+
+      - name: Run Admin browser E2E
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs
+
+      - name: Run Partner browser E2E (mock)
+        # 合作机构后台此前 0 条浏览器用例。mock 模式预览包（vite --mode development），
+        # 不连真实后端。命令走 package.json test:e2e，内部用 kiosk 已装的 Playwright。
+        run: pnpm --filter @ai-job-print/partner test:e2e
+
+      - name: Run Kiosk route sweep
+        # 一体机全路由扫描：productionRoutePatterns 每条打开、不白屏、无 pageerror。
+        # mock 口径（ApiRouter fail-closed），不连真实后端。视口 1080×1920。
+        # 与 Admin / Partner 浏览器 E2E 并列，三端至此都有全路由覆盖。
+        # 独立 step 只跑扫描，不重复 fusion-smoke；本地 `test:browser:smoke` 两者都跑。
+        run: pnpm --filter @ai-job-print/kiosk test:browser:route-sweep
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -1054,5 +1077,9 @@ jobs:
             test-results/kiosk-scan-safety/**
             test-results/kiosk-mic-capability/**
             test-results/kiosk-mic-capability-report/**
+            test-results/admin-e2e/**
+            test-results/admin-e2e-report/**
+            test-results/partner-e2e/**
+            test-results/partner-e2e-report/**
           if-no-files-found: ignore
           retention-days: 7

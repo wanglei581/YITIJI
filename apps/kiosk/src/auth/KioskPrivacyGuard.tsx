@@ -14,10 +14,14 @@ import {
   type KioskWarningDescriptor,
   type KioskWarningExitTo,
 } from './KioskSessionControlContext'
+import { useKioskBusy } from '../contexts/KioskBusyContext'
 import { useAuth } from './useAuth'
 import { useIdleLogout, type KioskIdleWarningRequest } from './useIdleLogout'
 
 const DEFAULT_PRIVACY_IDLE_SEC = 300
+/** 忙碌锁顺延硬截止的上限（秒）。支付轮询成功 / 语音音频活动会重置活动时刻。 */
+const DEFAULT_PRIVACY_BUSY_DEFER_SEC = 15 * 60
+export const KIOSK_SESSION_ACTIVITY_EVENT = 'ai-job-print:kiosk-session-activity'
 const PRIVACY_BOUNDARY_STORAGE_KEY = 'ai-job-print:kiosk-privacy-boundary:v1'
 const PRIVACY_BOUNDARY_LOCAL_KEY = 'ai-job-print:kiosk-privacy-boundary-fallback:v1'
 const PRIVACY_BOUNDARY_COOKIE_KEY = 'ai_job_print_kiosk_privacy_boundary_v1'
@@ -57,6 +61,24 @@ function resolvePrivacyIdleMs(): number {
   const raw = Number(import.meta.env.VITE_KIOSK_PRIVACY_IDLE_SEC)
   const sec = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PRIVACY_IDLE_SEC
   return sec * 1000
+}
+
+function resolvePrivacyBusyDeferMs(): number {
+  const raw = Number(import.meta.env.VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC)
+  if (Number.isFinite(raw) && raw >= 0) return raw * 1000
+  return DEFAULT_PRIVACY_BUSY_DEFER_SEC * 1000
+}
+
+function requestUrlOf(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input
+  if (input instanceof URL) return input.href
+  return input.url
+}
+
+function payStatusLooksPaid(body: unknown): boolean {
+  if (!body || typeof body !== 'object') return false
+  const record = body as { payStatus?: unknown; data?: { payStatus?: unknown } }
+  return record.payStatus === 'paid' || record.data?.payStatus === 'paid'
 }
 
 function readHistoryState(): KioskHistoryState {
@@ -206,7 +228,8 @@ function PrivacyClearingOverlay() {
 }
 
 /**
- * 公共终端会话安全根：统一普通 idle、屏保与不受 busy 抑制的硬隐私截止。
+ * 公共终端会话安全根：统一普通 idle、屏保与硬隐私截止。
+ * 硬截止在忙碌锁（语音 live/connecting、支付 pending、AI 生成中）期间暂停，顺延上限 15 分钟。
  *
  * privacy boundary 只记录随机代次和 React Router history idx，不含任何用户数据。
  * 边界之前的历史项在渲染 Outlet 前即被遮罩、去除 usr 并重载为首页，防止浏览器后退
@@ -216,6 +239,9 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { logout, isLoggedIn, guestMode } = useAuth()
+  const kioskBusy = useKioskBusy()
+  const busyRef = useRef(false)
+  busyRef.current = kioskBusy
   const [clearing, setClearing] = useState(false)
   const [warning, setWarning] = useState<KioskWarningDescriptor | null>(null)
   const pendingWarningRef = useRef<PendingWarning | null>(null)
@@ -497,24 +523,32 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     if (onScreensaverRoute || isStaleHistoryEntry) return
 
     const timeoutMs = resolvePrivacyIdleMs()
+    const busyDeferMs = resolvePrivacyBusyDeferMs()
     let lastActivityAt = Date.now()
     let timer: number | undefined
+    const originalFetch = window.fetch.bind(window)
 
     const checkDeadline = (): void => {
-      const remainingMs = timeoutMs - (Date.now() - lastActivityAt)
-      if (remainingMs <= 0) {
-        // 到点这一刻重新读实时状态，而不是沿用 effect 建立时的快照：
-        // 只要期间出现了登录 / guestMode / 任一敏感残留，这里都会判定「不是空操作」
-        // 并照常硬清场。这是最后一道兜底，不能被上游的省略计时静默绕过。
-        if (clearNoOpProbeRef.current()) {
-          lastActivityAt = Date.now()
-          timer = window.setTimeout(checkDeadline, timeoutMs)
-          return
-        }
-        hardClear()
+      const now = Date.now()
+      const idleDeadline = lastActivityAt + timeoutMs
+      const busyCapDeadline = idleDeadline + busyDeferMs
+      if (now < idleDeadline) {
+        timer = window.setTimeout(checkDeadline, idleDeadline - now)
         return
       }
-      timer = window.setTimeout(checkDeadline, remainingMs)
+      // 到点这一刻重新读实时状态，而不是沿用 effect 建立时的快照：
+      // 只要期间出现了登录 / guestMode / 任一敏感残留，这里都会判定「不是空操作」
+      // 并照常硬清场。这是最后一道兜底，不能被上游的省略计时静默绕过。
+      if (clearNoOpProbeRef.current()) {
+        lastActivityAt = now
+        timer = window.setTimeout(checkDeadline, timeoutMs)
+        return
+      }
+      if (busyRef.current && now < busyCapDeadline) {
+        timer = window.setTimeout(checkDeadline, Math.min(1000, busyCapDeadline - now))
+        return
+      }
+      hardClear()
     }
 
     const scheduleFromNow = (): void => {
@@ -529,28 +563,37 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
 
     const handleVisibilityChange = (): void => {
       if (document.visibilityState !== 'visible') return
-      if (Date.now() - lastActivityAt >= timeoutMs) {
-        if (clearNoOpProbeRef.current()) {
-          lastActivityAt = Date.now()
-          scheduleFromNow()
-          return
-        }
-        hardClear()
-        return
-      }
       if (timer !== undefined) window.clearTimeout(timer)
       checkDeadline()
+    }
+
+    const inspectPaymentActivity = async (res: Response, input: RequestInfo | URL): Promise<void> => {
+      if (!res.ok) return
+      if (!/\/orders\/[^/?#]+\/pay-status(?:\?|$)/.test(requestUrlOf(input))) return
+      const body: unknown = await res.clone().json()
+      if (payStatusLooksPaid(body)) markActivity()
+    }
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const res = await originalFetch(input, init)
+      void inspectPaymentActivity(res, input).catch(() => undefined)
+      return res
     }
 
     ACTIVITY_EVENTS.forEach((event) =>
       window.addEventListener(event, markActivity, { passive: true })
     )
+    window.addEventListener(KIOSK_SESSION_ACTIVITY_EVENT, markActivity)
+    document.addEventListener('playing', markActivity, { capture: true, passive: true })
     document.addEventListener('visibilitychange', handleVisibilityChange)
     scheduleFromNow()
 
     return () => {
       if (timer !== undefined) window.clearTimeout(timer)
+      window.fetch = originalFetch
       ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, markActivity))
+      window.removeEventListener(KIOSK_SESSION_ACTIVITY_EVENT, markActivity)
+      document.removeEventListener('playing', markActivity, { capture: true })
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [hardClear, isStaleHistoryEntry, onScreensaverRoute])

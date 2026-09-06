@@ -29,8 +29,15 @@ import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth
 import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
+import { networkError } from './throwHttpError'
 
-const TIMEOUT_MS = 15_000
+/** 普通读写（查记录、导出 PDF） */
+const DEFAULT_TIMEOUT_MS = 15_000
+/**
+ * 对齐后端 `LLM_LONG_TIMEOUT_MS` 默认 90s，略加余量，避免前端先 abort
+ * 而后端仍在算（AI-01）。助手默认档 45s 也落在此上限内。
+ */
+const LLM_TIMEOUT_MS = 100_000
 
 /**
  * 读取凭证 → 请求头（Phase C-2A）。
@@ -45,12 +52,12 @@ function accessHeaders(access?: ResumeReadAccess): Record<string, string> {
 }
 
 // ──────────────────────────────────────────────────────────────
-// 核心 fetch 封装（带 15s AbortController 超时）
+// 核心 fetch 封装（LLM 路由用长超时，普通读写用短超时）
 // ──────────────────────────────────────────────────────────────
 
-async function get<T>(path: string, access?: ResumeReadAccess): Promise<T> {
+async function get<T>(path: string, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const ac = new AbortController()
-  const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
+  const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -65,9 +72,9 @@ async function get<T>(path: string, access?: ResumeReadAccess): Promise<T> {
   } catch (err) {
     clearTimeout(timerId)
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${TIMEOUT_MS / 1000}s）`, 408)
+      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {
@@ -90,9 +97,9 @@ function terminalHeader(): Record<string, string> {
   return terminalId ? { 'X-Terminal-Id': terminalId } : {}
 }
 
-async function post<T>(path: string, body: unknown, token?: string | null): Promise<T> {
+async function post<T>(path: string, body: unknown, token?: string | null, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const ac = new AbortController()
-  const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
+  const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -113,9 +120,9 @@ async function post<T>(path: string, body: unknown, token?: string | null): Prom
   } catch (err) {
     clearTimeout(timerId)
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${TIMEOUT_MS / 1000}s）`, 408)
+      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {
@@ -132,9 +139,9 @@ async function post<T>(path: string, body: unknown, token?: string | null): Prom
   return res.json() as Promise<T>
 }
 
-async function postWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess): Promise<T> {
+async function postWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const ac = new AbortController()
-  const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
+  const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -151,9 +158,9 @@ async function postWithAccess<T>(path: string, body: unknown, access?: ResumeRea
   } catch (err) {
     clearTimeout(timerId)
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${TIMEOUT_MS / 1000}s）`, 408)
+      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {
@@ -170,9 +177,9 @@ async function postWithAccess<T>(path: string, body: unknown, access?: ResumeRea
   return res.json() as Promise<T>
 }
 
-async function postForm<T>(path: string, body: FormData): Promise<T> {
+async function postForm<T>(path: string, body: FormData, timeoutMs = LLM_TIMEOUT_MS): Promise<T> {
   const ac = new AbortController()
-  const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
+  const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -185,9 +192,9 @@ async function postForm<T>(path: string, body: FormData): Promise<T> {
   } catch (err) {
     clearTimeout(timerId)
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${TIMEOUT_MS / 1000}s）`, 408)
+      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${timeoutMs / 1000}s）`, 408)
     }
-    throw err
+    throw networkError(err)
   }
   clearTimeout(timerId)
   if (!res.ok) {
@@ -209,7 +216,7 @@ async function postForm<T>(path: string, body: FormData): Promise<T> {
 
 export const aiHttpAdapter = {
   async submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse> {
-    return post<ResumeParseResponse>('/resume/parse', req, token)
+    return post<ResumeParseResponse>('/resume/parse', req, token, LLM_TIMEOUT_MS)
   },
 
   async getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse> {
@@ -217,7 +224,7 @@ export const aiHttpAdapter = {
   },
 
   async getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
-    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`, access)
+    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`, access, LLM_TIMEOUT_MS)
   },
 
   async adjustResumeLayoutDraft(
@@ -231,17 +238,18 @@ export const aiHttpAdapter = {
       `/resume/records/${taskId}/layout-adjust`,
       { resume, action, layout },
       access,
+      LLM_TIMEOUT_MS,
     )
   },
 
   async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
-    return post<AssistantChatResponse>('/assistant/chat', req)
+    return post<AssistantChatResponse>('/assistant/chat', req, undefined, LLM_TIMEOUT_MS)
   },
 
   // ── 阶段2A AI 简历生成 ──────────────────────────────────────
 
   async submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse> {
-    return post<ResumeGenerateResponse>('/resume/generate', input, token)
+    return post<ResumeGenerateResponse>('/resume/generate', input, token, LLM_TIMEOUT_MS)
   },
 
   async getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse> {

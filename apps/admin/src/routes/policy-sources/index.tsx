@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { ScrollTextIcon } from 'lucide-react'
@@ -7,6 +8,7 @@ import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ export default function PolicySourcesPage() {
   const [rejectReason, setRejectReason] = useState('')
   // 申领条件只读复核:审核前要能看到这条政策挂了哪些申领门槛(条件在机构侧录入)
   const [rulesFor,     setRulesFor]     = useState<AdminPolicyRecord | null>(null)
+  const [actionError,  setActionError]  = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
@@ -71,21 +74,35 @@ export default function PolicySourcesPage() {
   }
 
   const handleApprove = (id: string) => {
-    void policiesAdminService.reviewPolicy(id, 'approve').then(applyUpdate)
+    setActionError(null)
+    void policiesAdminService.reviewPolicy(id, 'approve')
+      .then(applyUpdate)
+      .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
   }
   const handleReject = (id: string) => {
     if (!rejectReason.trim()) return
-    void policiesAdminService.reviewPolicy(id, 'reject', rejectReason.trim()).then((updated) => {
-      applyUpdate(updated)
-      setRejectingId(null)
-      setRejectReason('')
-    })
+    setActionError(null)
+    void policiesAdminService.reviewPolicy(id, 'reject', rejectReason.trim())
+      .then((updated) => {
+        applyUpdate(updated)
+        setRejectingId(null)
+        setRejectReason('')
+      })
+      .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
   }
   const handlePublish = (id: string) => {
-    void policiesAdminService.publishPolicy(id, 'publish').then(applyUpdate)
+    setActionError(null)
+    void policiesAdminService.publishPolicy(id, 'publish')
+      .then(applyUpdate)
+      .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
   }
-  const handleUnpublish = (id: string) => {
-    void policiesAdminService.publishPolicy(id, 'unpublish').then(applyUpdate)
+  const handleUnpublish = (id: string, title: string) => {
+    if (!window.confirm(`确认下架「${title}」？下架后一体机不再展示该政策。`)) return
+    // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
+    setActionError(null)
+    void policiesAdminService.publishPolicy(id, 'unpublish')
+      .then(applyUpdate)
+      .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
   }
 
   const filtered = reviewFilter === '全部'
@@ -134,6 +151,11 @@ export default function PolicySourcesPage() {
       subtitle="合作机构提交的政策扶持/公告内容审核与发布"
       actions={<BulkPublishButton kind="policy" orgOptions={orgOptions} onDone={reload} />}
     >
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
+          {actionError}。请修正后重试，或刷新页面。
+        </div>
+      )}
       {/* 筛选标签 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex gap-2">
@@ -204,7 +226,7 @@ export default function PolicySourcesPage() {
                           : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—')}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{r.syncTime.slice(0, 16).replace('T', ' ')}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(r.syncTime)}</td>
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="px-4 py-3">
@@ -251,7 +273,7 @@ export default function PolicySourcesPage() {
                               </button>
                             )}
                             {r.publishStatus === 'published' && (
-                              <button className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg" onClick={() => handleUnpublish(r.id)}>
+                              <button className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg" onClick={() => handleUnpublish(r.id, r.title)}>
                                 下架
                               </button>
                             )}

@@ -83,10 +83,10 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   return json.data
 }
 
-const EMPTY = { items: [] }
+const EMPTY = { items: [], total: 0 }
 
 export const benefitActivitiesAdminApi = {
-  list(params?: { status?: AdminBenefitActivityStatus; source?: AdminBenefitActivitySourceType }): Promise<{ items: AdminBenefitActivityItem[] }> {
+  list(params?: { status?: AdminBenefitActivityStatus; source?: AdminBenefitActivitySourceType }): Promise<{ items: AdminBenefitActivityItem[]; total: number }> {
     if (API_MODE !== 'http') return Promise.resolve(EMPTY)
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
@@ -110,7 +110,7 @@ export const benefitActivitiesAdminApi = {
     if (API_MODE !== 'http') return Promise.reject(new ApiHttpError('MOCK_DISABLED', 'mock 模式不支持下架权益活动', 400))
     return request(`/admin/benefit-activities/${encodeURIComponent(id)}/end`, { method: 'PATCH' })
   },
-  claims(id: string): Promise<{ items: AdminBenefitActivityClaimItem[] }> {
+  claims(id: string): Promise<{ items: AdminBenefitActivityClaimItem[]; total: number }> {
     if (API_MODE !== 'http') return Promise.resolve(EMPTY)
     return request(`/admin/benefit-activities/${encodeURIComponent(id)}/claims`)
   },

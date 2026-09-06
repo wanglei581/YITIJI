@@ -9,6 +9,7 @@ import { createHash, createHmac } from 'node:crypto'
 const HOST    = 'trtc.tencentcloudapi.com'
 const SERVICE = 'trtc'
 const VERSION = '2019-07-22'
+const TENCENT_API_TIMEOUT_MS = 10_000
 
 function sha256hex(msg: string): string {
   return createHash('sha256').update(msg, 'utf8').digest('hex')
@@ -70,19 +71,27 @@ export async function callTencentApi<T = unknown>(opts: TencentApiOptions): Prom
     `TC3-HMAC-SHA256 Credential=${secretId}/${credentialScope}, ` +
     `SignedHeaders=${signedHeaders}, Signature=${signature}`
 
-  const res = await fetch(`https://${HOST}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json; charset=utf-8',
-      'Host':          HOST,
-      'X-TC-Action':   action,
-      'X-TC-Version':  VERSION,
-      'X-TC-Timestamp': String(timestamp),
-      'X-TC-Region':   region,
-      'Authorization': authorization,
-    },
-    body,
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), TENCENT_API_TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(`https://${HOST}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json; charset=utf-8',
+        'Host':          HOST,
+        'X-TC-Action':   action,
+        'X-TC-Version':  VERSION,
+        'X-TC-Timestamp': String(timestamp),
+        'X-TC-Region':   region,
+        'Authorization': authorization,
+      },
+      body,
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
 
   const json = await res.json() as { Response?: { Error?: { Code: string; Message: string } } & T }
   if (json.Response?.Error) {

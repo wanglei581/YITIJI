@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, StatusBadge } from '@ai-job-print/ui'
-import { ApiHttpError } from '../../../services/api/client'
 import { toolboxService, type ToolboxAdminAppView, type ToolboxAppVersion, type ToolboxTerminalView } from '../../../services/api/toolbox'
 import { BLOCK_REASON_LABELS, CATEGORY_OPTIONS, PRIORITY_OPTIONS, RISK_OPTIONS, STATUS_LABELS } from '../constants'
+import { runToolboxAction } from '../toolboxActionState'
 
 type EntryType = 'internal_route' | 'web_app' | 'qr_code' | 'mini_program_qr' | 'ai_skill'
 
@@ -74,18 +74,11 @@ export function ToolboxGovernancePanel({
 
   const runAction = async (action: () => Promise<unknown>, success: string) => {
     setMessage('')
-    try {
-      await action()
-      setMessage(success)
-      onRefresh()
-      loadVersions()
-    } catch (error) {
-      if (error instanceof ApiHttpError && error.reason) {
-        setMessage(BLOCK_REASON_LABELS[error.reason] ?? error.message)
-      } else {
-        setMessage(error instanceof Error ? error.message : '操作失败')
-      }
-    }
+    const result = await runToolboxAction(action, success)
+    setMessage(result.message)
+    if (!result.ok) return
+    onRefresh()
+    loadVersions()
   }
 
   const createApp = () => runAction(async () => {
@@ -127,6 +120,12 @@ export function ToolboxGovernancePanel({
 
   const latestTerminalOptions = terminalIds.split(',').map((item) => item.trim()).filter(Boolean)
   const versionEntryIsQr = versionForm.entryType === 'qr_code' || versionForm.entryType === 'mini_program_qr'
+
+  const suspendSelectedApp = () => {
+    if (!selectedApp) return
+    if (!window.confirm(`确认熔断微应用「${selectedApp.title}」？已投放终端将停止展示该应用。`)) return
+    void runAction(() => toolboxService.suspendApp(selectedApp.appKey), '已执行熔断')
+  }
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_1.35fr]">
@@ -231,7 +230,7 @@ export function ToolboxGovernancePanel({
           ))}
           <div className="border-t border-neutral-100 px-4 py-3">
             <input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="驳回原因" className="h-9 w-full rounded-lg border border-neutral-200 px-3 text-xs" />
-            {selectedApp && <Button className="mt-3" size="sm" variant="danger" onClick={() => void runAction(() => toolboxService.suspendApp(selectedApp.appKey), '已执行熔断')}>熔断当前应用</Button>}
+            {selectedApp && <Button className="mt-3" size="sm" variant="danger" onClick={suspendSelectedApp}>熔断当前应用</Button>}
             <p className="mt-2 text-xs text-neutral-400">可发布终端数：{terminals.length}。发布失败时会展示 BLOCK_REASON_LABELS 对应的拦截原因。</p>
           </div>
         </div>

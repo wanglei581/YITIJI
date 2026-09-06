@@ -125,6 +125,7 @@ async function main() {
       const kiosk = await svc.getPublishedPolicies()
       if (kiosk.data.some((p) => p.id === guide.id || p.id === noticePost.id)) fail('2. 未审核内容泄漏到公开列表')
       pass('2. 创建默认 pending+draft,公开列表不可见')
+      await expectCode(() => svc.getPublishedPolicyById(guide.id), 'POLICY_NOT_FOUND', '2b. 未发布详情 404')
     }
 
     // ── 4a. 未过审发布被拒 ─────────────────────────────────────────────────
@@ -146,7 +147,10 @@ async function main() {
       if (onlyGuides.data.some((p) => p.kind !== 'policy_guide')) fail('3. kind 过滤失效')
       const onlyGraduate = await svc.getPublishedPolicies({ audience: 'graduate' })
       if (!onlyGraduate.data.some((p) => p.id === guide.id)) fail('3. audience 过滤失效')
-      pass('3. approve+publish 后 Kiosk 可见,kind/audience 过滤生效')
+      const detail = await svc.getPublishedPolicyById(guide.id)
+      if (detail.data.id !== guide.id || detail.data.reviewStatus !== 'approved') fail('3b. GET /policies/:id 未返回已发布政策')
+      await expectCode(() => svc.getPublishedPolicyById('missing-policy-id'), 'POLICY_NOT_FOUND', '3c. 不存在的政策详情 404')
+      pass('3. approve+publish 后 Kiosk 可见,kind/audience 过滤生效,公开详情可读')
     }
 
     // ── 5. Partner 编辑 → 强制重审 + 立即下架 ─────────────────────────────

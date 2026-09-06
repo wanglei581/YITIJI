@@ -15,6 +15,7 @@ import { TerminalCredentialSecurityService } from './terminal-credential-securit
 import { TerminalScanDeletionAuditService } from './terminal-scan-deletion-audit.service'
 import { ReleaseObservationService } from './release-observation.service'
 import { AdminReleaseObservationController } from './admin-release-observation.controller'
+import { TerminalHeartbeatRetentionTask } from './terminal-heartbeat-retention.task'
 
 @Module({
   imports: [JwtVerifierModule, FilesModule],
@@ -35,6 +36,7 @@ import { AdminReleaseObservationController } from './admin-release-observation.c
     TerminalToolboxService,
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
+    TerminalHeartbeatRetentionTask,
   ],
   exports: [
     TerminalAgentService,

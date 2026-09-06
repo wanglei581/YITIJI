@@ -6,7 +6,11 @@ import {
   getOfflineJobDetail,
   type OfflineJobDetailDTO,
 } from '../../services/api/offlineAgencies'
-import { FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { JobAntiFraudNotice } from '../jobs/components/JobAntiFraudNotice'
+import { FusionNotice, FusionSourceMeta, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { SourceUrlQr } from '../../components/SourceUrlQr'
+import { isValidSourceUrl } from '../../lib/url'
+import { SOURCE_ELEMENT_MISSING_TEXT } from '../jobs/utils/sourceTrust'
 
 export default function OfflineJobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -38,12 +42,13 @@ export default function OfflineJobDetailPage() {
   }
 
   const services = '以机构公示为准'
+  const sourceUrlOk = isValidSourceUrl(job.sourceUrl)
 
   const jobTypeLabel = job.jobType === 'fulltime'
     ? '全职'
     : job.jobType === 'parttime'
       ? '兼职'
-      : job.jobType === 'internship'
+      : job.jobType === 'internship' || job.jobType === 'intern'
         ? '实习'
         : '以机构公示为准'
 
@@ -67,6 +72,7 @@ export default function OfflineJobDetailPage() {
         </>
       )}
     >
+      <JobAntiFraudNotice />
       <section className="oa-job-sum" aria-label="岗位概要">
         <div className="oa-job-sum-head">
           <div className="min-w-0 flex-1">
@@ -95,6 +101,26 @@ export default function OfflineJobDetailPage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="jf-card accented compact" aria-label="数据来源">
+        <h3>数据来源</h3>
+        <FusionSourceMeta
+          sourceName={job.agencyName || SOURCE_ELEMENT_MISSING_TEXT}
+          syncTime={job.syncTime}
+          externalId={job.externalId || SOURCE_ELEMENT_MISSING_TEXT}
+        />
+        <p className="mt-3 text-[18px] leading-relaxed text-[var(--muted)]">
+          外部投递链接 <b className="break-all text-[var(--ink)]">{sourceUrlOk ? job.sourceUrl : SOURCE_ELEMENT_MISSING_TEXT}</b>
+        </p>
+        {sourceUrlOk ? (
+          <div className="mt-4 flex justify-center">
+            <SourceUrlQr value={job.sourceUrl} size={160} />
+          </div>
+        ) : null}
+        <FusionNotice>
+          岗位信息由来源机构提供。本系统仅作展示与到店指引，不代收简历、不代投递；办理请以来源机构或来源平台为准。
+        </FusionNotice>
       </section>
 
       <div className="oa-desc-grid">

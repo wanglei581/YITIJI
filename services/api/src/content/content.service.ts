@@ -60,7 +60,6 @@ export class ContentService {
         ...(args.type ? { type: args.type } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      take: 500,
     })
     return records.map(toAssetView)
   }
@@ -346,7 +345,6 @@ export class ContentService {
         // 取最新真实心跳用于在线判定
         include: { heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
         orderBy: { registeredAt: 'desc' },
-        take: 500,
       }),
       this.prisma.terminalScreensaverConfig.findMany({ include: { playlist: true } }),
     ])

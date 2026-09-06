@@ -224,8 +224,8 @@ assert.match(runtimeRoot, /<KioskBusyProvider>/, 'KioskRuntimeRoot must provide 
 assert.match(runtimeRoot, /<KioskPrivacyGuard>/, 'KioskRuntimeRoot must preserve the privacy guard')
 assert.match(runtimeRoot, /<Outlet\s*\/>/, 'KioskRuntimeRoot must render protected terminal routes')
 
-// P0-1B: warning handler 进入 Guard；最终清场仍走 hardClear + clearKioskSensitiveSession，
-// 安全根 fail-closed 与硬隐私截止不受 busy 抑制保持不变。
+// P0-1B: warning handler 进入 Guard；最终清场仍走 hardClear + clearKioskSensitiveSession。
+// 硬隐私截止在忙碌锁期间顺延（上限 15 分钟），支付轮询成功与语音音频活动计为活动。
 assert.match(
   withoutComments(privacyGuard),
   /useScreensaverController\(\s*handleScreensaverWarning\s*\)/,
@@ -245,6 +245,26 @@ assert.match(
   withoutComments(privacyGuard),
   /\bhardClear\b/,
   'KioskPrivacyGuard must keep a fail-closed hard-clear path',
+)
+assert.match(
+  withoutComments(privacyGuard),
+  /useKioskBusy\(/,
+  'KioskPrivacyGuard pauses the hard privacy cutoff while a busy lock is held',
+)
+assert.match(
+  withoutComments(privacyGuard),
+  /DEFAULT_PRIVACY_BUSY_DEFER_SEC\s*=\s*15\s*\*\s*60/,
+  'Busy deferral of the hard privacy cutoff is capped at 15 minutes',
+)
+assert.match(
+  withoutComments(privacyGuard),
+  /pay-status/,
+  'Payment poll success counts as privacy-guard activity',
+)
+assert.match(
+  withoutComments(privacyGuard),
+  /['"]playing['"]/,
+  'Voice/media audio activity counts as privacy-guard activity',
 )
 
 assertTopLevelHelperRoutes(routes)

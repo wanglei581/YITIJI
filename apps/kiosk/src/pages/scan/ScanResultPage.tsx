@@ -11,8 +11,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { FileContentPreview } from '../../components/FileContentPreview'
-import { loginPathForCurrentLocation } from '../../auth/returnPath'
 import { ScanFlowSteps } from './ScanFlowSteps'
+import { formatLabelFromMime } from './scanOutputFormat'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -23,7 +23,7 @@ interface ScannedFile {
   name: string
   size: string
   pages: number | null
-  format: 'PDF'
+  format: string
   mimeType?: string
 }
 
@@ -74,13 +74,11 @@ export function ScanResultPage() {
   }
 
   const handleDocuments = () => {
-    if (!file) return
-    if (isLoggedIn) {
-      navigate('/me/documents')
-      return
-    }
-    navigate(loginPathForCurrentLocation())
+    if (!file || !isLoggedIn) return
+    navigate('/me/documents')
   }
+
+  const displayFormat = formatLabelFromMime(file?.mimeType)
 
   const handleResumeAI = () => {
     if (!file) return
@@ -126,12 +124,12 @@ export function ScanResultPage() {
             <FileContentPreview
               fileUrl={file.fileUrl}
               fileName={file.name}
-              mimeType={file.mimeType ?? 'application/pdf'}
-              format={file.format}
+              mimeType={file.mimeType}
+              format={displayFormat}
             />
             <section className="w2-scan-file-card">
               <span className="w2-scan-file-icon"><FileTextIcon /></span>
-              <div><p>{SCAN_TYPE_LABELS[scanType]}</p><h2>{file.name}</h2><div className="w2-scan-chips"><small>{file.size}</small><small data-tone="ok">{file.format}</small><small>{file.pages != null ? `${file.pages} 页` : '页数以文件为准'}</small><small data-tone="warn">临时文件 · 设有效期</small></div></div>
+              <div><p>{SCAN_TYPE_LABELS[scanType]}</p><h2>{file.name}</h2><div className="w2-scan-chips"><small>{file.size}</small><small data-tone="ok">{displayFormat}</small><small>{file.pages != null ? `${file.pages} 页` : '页数以文件为准'}</small><small data-tone="warn">临时文件 · 设有效期</small></div></div>
             </section>
           </div>
         ) : (
@@ -152,8 +150,8 @@ export function ScanResultPage() {
             <button type="button" disabled={!file} onClick={handlePrint}>
               <PrinterIcon /><span><b>直接打印</b><small>按默认参数进入确认打印，可再修改</small></span>
             </button>
-            <button type="button" disabled={!file} onClick={handleDocuments}>
-              <FolderIcon /><span><b>{isLoggedIn ? '前往我的文档' : '登录后管理文件'}</b><small>{isLoggedIn ? '在「我的文档」查看与管理本次相关文件' : '临时扫描文件有有效期；登录后可在「我的文档」管理'}</small></span>
+            <button type="button" disabled={!file || !isLoggedIn} onClick={handleDocuments}>
+              <FolderIcon /><span><b>{isLoggedIn ? '前往我的文档' : '本次不进入我的文档'}</b><small>{isLoggedIn ? '在「我的文档」查看与管理本次扫描件' : '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别'}</small></span>
             </button>
             <button type="button" onClick={() => navigate('/')}>
               <HomeIcon /><span><b>返回首页</b><small>结束本次扫描，回到功能大厅</small></span>

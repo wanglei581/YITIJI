@@ -4,6 +4,7 @@ import { Button, Card, EmptyState, ErrorState, KioskPageFrame, LoadingState } fr
 import type { ResumeTemplate } from '@ai-job-print/shared'
 import { ArrowRightIcon, BookOpenIcon, CheckIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import './resume-library-lightflow.css'
 import './resume-library-ext.css'
 import './resume-fusion-youth.css'
@@ -117,7 +118,7 @@ export function ResumeTemplateLibraryPage() {
         setError(null)
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : '简历素材加载失败')
+        if (!cancelled) setError(userMessageOf(err, '简历素材加载失败，请稍后重试'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

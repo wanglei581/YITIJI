@@ -77,8 +77,10 @@ check(
   'Webhook success and failure paths persist SyncLog/source status',
 )
 check(
-  excelModal.includes('本次导入将跳过') && !excelModal.includes('导入时将刷新展示字段'),
-  'Excel duplicate-row copy matches current skip behavior',
+  excelModal.includes('将更新原记录') &&
+    excelModal.includes('重新进入待审核') &&
+    !excelModal.includes('导入时将刷新展示字段'),
+  'Excel duplicate-row copy matches upsert-to-pending behavior',
 )
 check(
   !kioskList.includes('资质核验已通过') && !kioskDetail.includes('资质核验已通过') &&

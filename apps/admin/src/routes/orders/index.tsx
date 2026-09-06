@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
@@ -13,6 +14,15 @@ import {
 } from '../../services/api/adminOrdersReadonly'
 import { adminPrintJobsService } from '../../services/api/adminPrintJobs'
 import { ApiHttpError } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
+import {
+  colorModeText,
+  copiesText,
+  duplexText,
+  NET_PAID_UNRECORDED,
+  pageRangeText,
+  recordedCentsText,
+} from './orderHonestyCopy'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -22,16 +32,19 @@ const STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'inf
   printing:  { badge: 'info',    label: '打印中' },
   completed: { badge: 'success', label: '已完成' },
   failed:    { badge: 'error',   label: '失败' },
+  cancelled: { badge: 'default', label: '已取消' },
   abandoned: { badge: 'default', label: '已废弃' },
 }
 
 const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'default'; label: string }> = {
   unpaid:           { badge: 'warning', label: '未支付' },
+  paying:           { badge: 'warning', label: '支付中' },
   paid:             { badge: 'success', label: '已支付' },
   refunding:        { badge: 'warning', label: '退款中' },
   refunded:         { badge: 'default', label: '已退款' },
   partial_refunded: { badge: 'default', label: '部分退款' },
   failed:           { badge: 'error',   label: '支付失败' },
+  closed:           { badge: 'default', label: '已关闭' },
 }
 
 const STATUS_FILTERS = [
@@ -41,18 +54,21 @@ const STATUS_FILTERS = [
   { label: '打印中', value: 'printing' },
   { label: '已完成', value: 'completed' },
   { label: '失败', value: 'failed' },
+  { label: '已取消', value: 'cancelled' },
 ] as const
 
 const PAY_FILTERS = [
   { label: '全部支付状态', value: '' },
   { label: '未支付', value: 'unpaid' },
+  { label: '支付中', value: 'paying' },
   { label: '已支付', value: 'paid' },
   { label: '退款中', value: 'refunding' },
+  { label: '部分退款', value: 'partial_refunded' },
   { label: '已退款', value: 'refunded' },
   { label: '支付失败', value: 'failed' },
+  { label: '已关闭', value: 'closed' },
 ] as const
 
-const COLOR_LABELS: Record<string, string> = { black_white: '黑白', color: '彩色' }
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
 
 // 收款入账来源：后端 AdminMarkPaidDto 只放行这两个（free 由 0 元建单自动产生，
@@ -98,7 +114,7 @@ function pickupText(order: { pickupStatus: string; channel: string | null }): st
 }
 
 function fmt(iso: string | null): string {
-  return iso ? iso.slice(0, 16).replace('T', ' ') : '—'
+  return formatDateTime(iso)
 }
 
 function amountText(amountCents: number, currency: string): string {
@@ -246,15 +262,16 @@ export default function OrdersPage() {
     setRefundError(null)
     try {
       await adminOrdersReadonlyService.refundOrder(detail.id, refundReason.trim())
-      // 退款成功：刷新列表，重新加载详情（payStatus 已变为 refunding/refunded）
-      void refresh()
-      const updated = await adminOrdersReadonlyService.getById(detail.id)
-      setDetail(updated)
       setRefundOpen(false)
       setRefundReason('')
+      void refresh()
+      try {
+        setDetail(await adminOrdersReadonlyService.getById(detail.id))
+      } catch {
+        /* 退款已受理；详情刷新失败不得显示成退款失败 */
+      }
     } catch (err) {
-      const code = err instanceof ApiHttpError ? err.code : '操作失败，请重试'
-      setRefundError(code)
+      setRefundError(userMessageOf(err, '退款失败，请稍后重试'))
     } finally {
       setRefundSubmitting(false)
     }
@@ -486,24 +503,20 @@ export default function OrdersPage() {
           <>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
               <Info label="订单类型" value={detail.type} />
-              <Info label="金额" value={amountText(detail.amountCents, detail.currency)} />
+              <Info label="下单金额" value={amountText(detail.amountCents, detail.currency)} />
+              <Info label="优惠/权益抵扣" value={recordedCentsText(detail.discountCents, detail.currency)} />
+              <Info label="已退款" value={recordedCentsText(detail.refundedAmountCents, detail.currency)} />
+              <Info label="实付" value={NET_PAID_UNRECORDED} />
               <Info label="支付状态" value={PAY_STATUS_MAP[detail.payStatus]?.label ?? detail.payStatus} />
               <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
               <Info label="用户" value={`${OWNER_LABELS[detail.ownerType]} · ${detail.userLabel}`} />
               <Info label="终端" value={detail.terminalCode ?? '—'} />
               <Info label="文件名" value={detail.print?.fileName ?? '未记录'} />
-              <Info
-                label="打印参数"
-                value={
-                  [
-                    detail.print?.copies ? `${detail.print.copies} 份` : null,
-                    detail.print?.colorMode ? COLOR_LABELS[detail.print.colorMode] : null,
-                    detail.print?.paperSize,
-                    detail.print?.duplex,
-                    detail.print?.pageRange ? `页码 ${detail.print.pageRange}` : null,
-                  ].filter(Boolean).join(' · ') || '—'
-                }
-              />
+              <Info label="单双面" value={duplexText(detail.print?.duplex)} />
+              <Info label="彩色/黑白" value={colorModeText(detail.print?.colorMode)} />
+              <Info label="份数" value={copiesText(detail.print?.copies)} />
+              <Info label="页范围" value={pageRangeText(detail.print?.pageRange)} />
+              <Info label="幅面" value={detail.print?.paperSize?.trim() ? detail.print.paperSize : '未记录'} />
               {detail.refundedAt && (
                 <Info label="退款时间" value={fmt(detail.refundedAt)} />
               )}

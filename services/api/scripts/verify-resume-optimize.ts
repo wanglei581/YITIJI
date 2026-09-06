@@ -95,6 +95,7 @@ const optimizeReply = (mutate?: StubMutate): StubEntry => ({ kind: 'optimize', m
 
 let responseQueue: StubEntry[] = []
 let llmCallCount = 0
+let stubDelayMs = 0
 /** 桩自身出问题(队列耗尽 / prompt 里找不到该有的东西)时记在这里,必须显性红。 */
 let stubFault = ''
 let lastUserPrompt = ''
@@ -179,6 +180,7 @@ async function main(): Promise<void> {
     const chunks: Buffer[] = []
     req.on('data', (c: Buffer) => chunks.push(c))
     req.on('end', () => {
+      const finish = () => {
       llmCallCount++
       const reject = (fault: string) => {
         stubFault ||= fault
@@ -209,6 +211,9 @@ async function main(): Promise<void> {
       res.statusCode = 200
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify({ choices: [{ message: { content } }] }))
+      }
+      if (stubDelayMs > 0) setTimeout(finish, stubDelayMs)
+      else finish()
     })
   })
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()))
@@ -515,6 +520,36 @@ async function main(): Promise<void> {
       if (!buf.subarray(0, 4).equals(Buffer.from('%PDF', 'latin1'))) fail('10. 产物不是 PDF')
       if (exported.filename.includes(REAL_PHONE)) fail('10. 文件名泄露手机号')
       pass(`10. 优化版导出真实 PDF(${exported.pageCount} 页,${Math.round(buf.length / 1024)}KB),FileObject 短 TTL,文件名无手机号`)
+    }
+
+    // ── 13. LLM 延迟 20s 时解析仍成功 ────────────────────────────────────
+    {
+      stubDelayMs = 20_000
+      const t0 = Date.now()
+      const { taskId } = await submitParse(ai, `file_opt_delay_${suffix}`)
+      stubDelayMs = 0
+      const waited = Date.now() - t0
+      if (waited < 19_000) fail(`13. 解析未等到 20s 延迟，实际 ${waited}ms`)
+      if (!taskId) fail('13. 延迟 20s 后应拿到 taskId')
+      pass(`13. LLM 延迟 20s 时解析成功（${waited}ms）`)
+    }
+
+    // ── 14. 重复提交 optimize 只打一次模型 ───────────────────────────────
+    {
+      const { taskId, accessToken } = await submitParse(ai, `file_opt_lock_${suffix}`)
+      setResponses([optimizeReply()])
+      stubDelayMs = 400
+      const started = llmCallCount
+      const [a, b] = await Promise.all([
+        ai.getResumeOptimize(taskId, { endUserId: null, accessToken }),
+        ai.getResumeOptimize(taskId, { endUserId: null, accessToken }),
+      ])
+      stubDelayMs = 0
+      const calls = llmCallCount - started
+      if (calls !== 1) fail(`14. 并发 optimize 应只调一次 LLM，实际 ${calls}`)
+      if (a.status !== 'completed' || b.status !== 'completed') fail('14. 两次都应拿到完成结果')
+      if (a.taskId !== b.taskId) fail('14. 两次应合并为同一份结果')
+      pass('14. 重复提交 optimize 只扣一次（单次 LLM）')
     }
 
     console.log('\n=== ALL PASS ===')

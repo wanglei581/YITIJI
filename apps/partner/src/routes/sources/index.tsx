@@ -11,23 +11,40 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { AccessMode, PartnerDataSource, PartnerDataSourceCapabilities, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
-import { API_BASE_URL } from '../../services/api/client'
+import { API_BASE_URL, ApiHttpError } from '../../services/api/client'
 import {
   API_ORIGIN,
   getDataSources,
-  getDataSourceCapabilities,
   toggleDataSource,
   createDataSource,
   archiveDataSource,
   unarchiveDataSource,
 } from '../../services/api'
-import { WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
+import { formatDateTime, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import { ExcelImportModal } from './ExcelImportModal'
 import { omitWebhookSecretOnce } from './omitWebhookSecretOnce'
 import { RotateCredentialDrawer } from './RotateCredentialDrawer'
+import { usePartnerCapabilities } from '../../services/capabilities'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 
 /** 使用凭证、因而可以轮换的接入方式。excel/csv/json/manual 没有凭证概念。 */
 const CREDENTIAL_ACCESS_MODES: readonly string[] = ['api', 'webhook']
+
+function createSourceErrorMessage(err: unknown): string {
+  const code = err instanceof ApiHttpError ? err.code : (err as { code?: string } | undefined)?.code
+  const serverMsg = err instanceof ApiHttpError ? err.message.trim() : ''
+  if (code === 'WEBHOOK_SECRET_LOW_ENTROPY' || code === 'WEBHOOK_SECRET_TOO_SHORT') {
+    return serverMsg || '自定义密钥强度不足，请改用更长的随机密钥或留空由系统生成'
+  }
+  if (code === 'VALIDATION_FAILED') {
+    return serverMsg || '填写内容未通过校验，请检查后重试'
+  }
+  if (code === 'AUTH_REQUIRED' || code === 'HTTP_401') {
+    return '登录已过期，请重新登录后再试'
+  }
+  if (serverMsg) return serverMsg
+  return '创建失败，请检查填写内容或稍后重试'
+}
 
 function resolveWebhookUrl(webhookUrl?: string): string {
   if (!webhookUrl) return ''
@@ -141,8 +158,8 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
             : 'Excel / CSV 文件导入，支持字段映射和导入预览',
       })
       setCreated(result)
-    } catch {
-      setError('创建失败，请检查登录状态或稍后重试')
+    } catch (err) {
+      setError(createSourceErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -342,8 +359,8 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SourcesPage() {
+  const { capabilities } = usePartnerCapabilities()
   const [sources,    setSources]    = useState<PartnerDataSource[]>([])
-  const [capabilities, setCapabilities] = useState<PartnerDataSourceCapabilities | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(false)
   const [showWizard, setShowWizard] = useState(false)
@@ -358,6 +375,7 @@ export default function SourcesPage() {
   const [archivingId,  setArchivingId]  = useState<string | null>(null)
   const [archiveError, setArchiveError] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<PartnerDataSource | null>(null)
+  const [confirmToggle, setConfirmToggle] = useState<PartnerDataSource | null>(null)
 
   const fetchSources = () =>
     getDataSources()
@@ -369,11 +387,11 @@ export default function SourcesPage() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getDataSources(), getDataSourceCapabilities()])
-      .then(([data, caps]) => {
+    getDataSources()
+      .then((data) => {
         if (cancelled) return
         setSources(data)
-        setCapabilities(caps)
+        setError(false)
       })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -383,6 +401,7 @@ export default function SourcesPage() {
   const handleToggle = (id: string) => {
     if (togglingId) return
     setTogglingId(id)
+    setConfirmToggle(null)
     setToggleError(null)
     toggleDataSource(id)
       .then((updated) => {
@@ -463,7 +482,9 @@ export default function SourcesPage() {
             size="sm"
             variant="primary"
             className="flex items-center gap-1.5"
-            onClick={() => setShowWizard(true)}
+            disabled={!capabilities}
+            title={capabilities ? undefined : '正在确认本机构接入能力，确认后再新增'}
+            onClick={() => { if (capabilities) setShowWizard(true) }}
           >
             <PlusIcon className="h-4 w-4" />
             新增数据来源
@@ -513,7 +534,7 @@ export default function SourcesPage() {
                       <span className={s.connStatus === 'error' ? 'text-error-fg' : ''}>{s.description}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{FREQ_LABELS[s.syncFreq]}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.lastSyncTime}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(s.lastSyncTime)}</td>
                     <td className="px-4 py-3"><StatusBadge dot status={conn.badge} label={s.activationManagedBy === 'admin' && s.connStatus === 'disabled' ? '待管理员启用' : conn.label} /></td>
                     <td className="px-4 py-3 text-center font-medium text-success-fg">{s.successCount}</td>
                     <td className="px-4 py-3 text-center font-medium text-error-fg">{s.failCount}</td>
@@ -576,7 +597,7 @@ export default function SourcesPage() {
                                 }`}
                                 type="button"
                                 disabled={togglingId === s.id}
-                                onClick={() => handleToggle(s.id)}
+                                onClick={() => setConfirmToggle(s)}
                               >
                                 {togglingId === s.id ? '处理中…' : s.connStatus === 'disabled' ? '启用' : '停用'}
                               </button>}
@@ -619,7 +640,6 @@ export default function SourcesPage() {
           sourceName={excelSource.name}
           onClose={() => setExcelSource(null)}
           onImported={(count) => {
-            setExcelSource(null)
             setImportNotice(`文件导入完成，共 ${count} 条（默认待审核，管理员发布后才会在终端展示）`)
             void fetchSources()
           }}
@@ -707,6 +727,20 @@ export default function SourcesPage() {
           </div>
         )}
       </Drawer>
+
+      <ConfirmActionDialog
+        open={confirmToggle !== null}
+        title={confirmToggle?.connStatus === 'disabled' ? '确认启用数据源' : '确认停用数据源'}
+        description={confirmToggle
+          ? confirmToggle.connStatus === 'disabled'
+            ? `启用「${confirmToggle.name}」后将恢复该来源的采集（仍受管理员启停策略约束）。`
+            : `停用「${confirmToggle.name}」后将停止采集。已发布内容不会自动下架。`
+          : ''}
+        confirmLabel={confirmToggle?.connStatus === 'disabled' ? '确认启用' : '确认停用'}
+        busy={togglingId !== null}
+        onCancel={() => setConfirmToggle(null)}
+        onConfirm={() => confirmToggle && handleToggle(confirmToggle.id)}
+      />
     </Page>
   )
 }

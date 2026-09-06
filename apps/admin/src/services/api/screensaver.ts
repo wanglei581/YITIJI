@@ -56,7 +56,7 @@ function handleAuthFailure(status: number, code: string): void {
 
 async function parseError(res: Response): Promise<never> {
   let code = `HTTP_${res.status}`
-  let message = res.statusText
+  let message = `请求失败（${res.status}）`
   try {
     const body = (await res.json()) as { error?: { code?: string; message?: string } }
     if (body.error?.code) code = body.error.code

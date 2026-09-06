@@ -24,6 +24,7 @@ import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { findJobMaterialTemplate } from '../job-materials/job-material-templates'
+import { InflightCoalescer } from './ai-inflight'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -98,6 +99,7 @@ function verifyAccessToken(token: string | null, expectedHash: string): boolean 
 export class AiService {
   private readonly logger = new Logger(AiService.name)
   private readonly provider: AiProvider
+  private readonly optimizeInflight = new InflightCoalescer<OptimizeResumeOutput>()
 
   constructor(
     private readonly mockProvider: MockAiProvider,
@@ -348,6 +350,15 @@ export class AiService {
   async getResumeOptimize(
     taskId: string,
     requester: AiResultRequester = { endUserId: null, accessToken: null },
+  ): Promise<OptimizeResumeOutput> {
+    const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
+    if (cached) return cached
+    return this.optimizeInflight.run(taskId, () => this.computeResumeOptimize(taskId, requester))
+  }
+
+  private async computeResumeOptimize(
+    taskId: string,
+    requester: AiResultRequester,
   ): Promise<OptimizeResumeOutput> {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
@@ -782,9 +793,8 @@ export class AiService {
     return { deletedCount }
   }
 
-  async chatWithAssistant(input: ChatInput): Promise<AssistantChatResult> {
+  async chatWithAssistant(input: ChatInput, ownerKey = 'anon'): Promise<AssistantChatResult> {
     const t0 = Date.now()
-    const sessionId = input.sessionId ?? `session-${Date.now()}`
     // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
     const useLlm = this.llmConfig.isReady('assistant_chat')
     const providerLabel = useLlm ? `llm:${this.llmConfig.getConfig('assistant_chat').vendor}` : this.provider.name
@@ -793,8 +803,12 @@ export class AiService {
     const usage = new AiUsageAccumulator()
     try {
       const result = useLlm
-        ? await this.llmChat.chat({ ...input, sessionId }, usage.add)
-        : await this.provider.chatAssistant({ ...input, sessionId })
+        ? await this.llmChat.chat(input, usage.add, ownerKey)
+        : await this.provider.chatAssistant({
+            ...input,
+            sessionId: input.sessionId ?? randomBytes(16).toString('hex'),
+          })
+      const sessionId = result.sessionId
       this.logService.record({
         taskId:    sessionId,
         ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
@@ -808,7 +822,7 @@ export class AiService {
       return { ...result, providerLabel, aiGenerated: isLlmProviderLabel(providerLabel) }
     } catch (err) {
       this.logService.record({
-        taskId:    sessionId,
+        taskId:    input.sessionId ?? null,
         // 失败前可能已经打过模型（上游 5xx / 空内容）——那次调用照样计费，必须落账。
         ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
         operation: 'chatAssistant',

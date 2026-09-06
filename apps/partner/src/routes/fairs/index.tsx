@@ -3,6 +3,7 @@ import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/ref
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, PlusIcon } from 'lucide-react'
+import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import type {
   PartnerFairRecord,
   JobFairStatus,
@@ -12,7 +13,12 @@ import type {
 } from '../../services/api'
 import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartnerFair } from '../../services/api'
 import { RejectReason } from '../../components/RejectReason'
+import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import { useCapability } from '../../services/capabilities'
+import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
+
+import { FairSubresourcesDrawer } from './components/FairSubresourcesDrawer'
+
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -64,15 +70,12 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
-/** ISO ↔ <input type="datetime-local">(本地时区)。 */
+/** ISO ↔ <input type="datetime-local">（Asia/Shanghai 墙钟）。 */
 function isoToLocalInput(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  return toDatetimeLocalValue(iso)
 }
 function localInputToIso(value: string): string {
-  return new Date(value).toISOString()
+  return fromDatetimeLocalValue(value)
 }
 
 interface FairFormState {
@@ -116,6 +119,9 @@ export default function FairsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [configuring, setConfiguring] = useState<PartnerFairRecord | null>(null)
+  const [noticeIsError, setNoticeIsError] = useState(false)
+  const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerFairRecord | null>(null)
 
   const { data, status, refresh } = useRefreshable(
     PARTNER_FAIRS_REFRESH_KEY,
@@ -127,7 +133,13 @@ export default function FairsPage() {
     },
   )
 
-  useInteractionLock(editing !== null || saving || busyId !== null, [PARTNER_FAIRS_REFRESH_KEY], 'hard')
+  // 四个都要进锁：编辑中、配置子资源中（#806）、保存中、下架确认框开着（本 PR）。
+  // 确认框开着时后台刷新换掉那一行，用户确认的就是别人。
+  useInteractionLock(
+    editing !== null || configuring !== null || saving || busyId !== null || confirmUnpublish !== null,
+    [PARTNER_FAIRS_REFRESH_KEY],
+    'hard',
+  )
 
   useEffect(() => {
     if (!notice) return
@@ -150,12 +162,16 @@ export default function FairsPage() {
     已结束: fairs.filter((f) => f.status === 'ended').length,
   }
 
-  const handleUnpublish = async (id: string) => {
-    setBusyId(id)
+  const handleUnpublish = async (fair: PartnerFairRecord) => {
+    setBusyId(fair.id)
+    setConfirmUnpublish(null)
     try {
-      await unpublishPartnerFair(id)
+      await unpublishPartnerFair(fair.id)
+      setNoticeIsError(false)
+      setNotice('招聘会已下架，终端将不再展示。')
       void refresh()
     } catch (e) {
+      setNoticeIsError(true)
       setNotice(errMsg(e))
     } finally {
       setBusyId(null)
@@ -186,7 +202,8 @@ export default function FairsPage() {
   }
 
   const canSave =
-    form.title.trim() && form.venue.trim() && form.city.trim() && form.sourceUrl.trim() && form.startAt && form.endAt
+    form.title.trim() && form.venue.trim() && form.city.trim() && isAbsoluteHttpUrl(form.sourceUrl) && form.startAt && form.endAt
+    && (!form.checkinUrl.trim() || isAbsoluteHttpUrl(form.checkinUrl))
 
   const save = async () => {
     setSaving(true)
@@ -206,6 +223,7 @@ export default function FairsPage() {
     try {
       if (editing === 'new') {
         const externalId = `MANUAL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        setNoticeIsError(false)
         await importPartnerFairs([{
           externalId,
           title: payload.title!,
@@ -222,6 +240,7 @@ export default function FairsPage() {
         setNotice('招聘会已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')
       } else if (editing) {
         await updatePartnerFair(editing.id, payload)
+        setNoticeIsError(false)
         setNotice('修改已保存。该招聘会已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')
       }
       setEditing(null)
@@ -278,7 +297,11 @@ export default function FairsPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          noticeIsError
+            ? 'border-error/30 bg-error-bg text-error-fg'
+            : 'border-success/30 bg-success-bg text-success-fg'
+        }`}>
           {notice}
         </div>
       )}
@@ -329,8 +352,8 @@ export default function FairsPage() {
                       <td className="px-4 py-3 font-medium text-neutral-800">{f.name}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{f.organizer}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        <div>{f.startTime.slice(0, 16).replace('T', ' ')}</div>
-                        <div className="text-neutral-300">至 {f.endTime.slice(5, 16).replace('T', ' ')}</div>
+                        <div>{formatDateTime(f.startTime)}</div>
+                        <div className="text-neutral-300">至 {formatDateTime(f.endTime)}</div>
                       </td>
                       <td className="px-4 py-3 text-xs text-neutral-500">{f.venue}</td>
                       <td className="px-4 py-3">
@@ -350,7 +373,7 @@ export default function FairsPage() {
                           <span className="text-neutral-300">未配置</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{f.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(f.syncTime)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge dot status={review.badge}  label={review.label}  />
                         <RejectReason reviewStatus={f.reviewStatus} reason={f.rejectReason} />
@@ -364,11 +387,12 @@ export default function FairsPage() {
                           >
                             编辑
                           </button>
+                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50" onClick={() => setConfiguring(f)}>配置</button>
                           {f.publishStatus === 'published' && (
                             <button
                               disabled={busyId === f.id}
                               className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => void handleUnpublish(f.id)}
+                              onClick={() => setConfirmUnpublish(f)}
                             >
                               {busyId === f.id ? '处理中…' : '下架'}
                             </button>
@@ -385,7 +409,7 @@ export default function FairsPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-400">
-        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会需经管理员重新审核后才会在终端展示;现场活动资料由管理员在运营后台维护。
+        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会需经管理员重新审核后才会在终端展示；活动资料由合作机构上传，发布仍由管理员控制。
       </p>
 
       {/* 编辑/新增抽屉 */}
@@ -449,9 +473,15 @@ export default function FairsPage() {
           </Field>
           <Field label="来源平台预约链接" required>
             <input className={inputCls} placeholder="https://…(求职者跳转外部平台预约)" value={form.sourceUrl} onChange={(e) => setForm((f) => ({ ...f, sourceUrl: e.target.value }))} />
+            {form.sourceUrl.trim() && !isAbsoluteHttpUrl(form.sourceUrl) && (
+              <p className="mt-1 text-xs text-error-fg">请填写以 http:// 或 https:// 开头的有效链接</p>
+            )}
           </Field>
           <Field label="来源平台签到链接">
             <input className={inputCls} placeholder="https://…(现场扫码前往来源平台签到，可选)" value={form.checkinUrl} onChange={(e) => setForm((f) => ({ ...f, checkinUrl: e.target.value }))} />
+            {form.checkinUrl.trim() && !isAbsoluteHttpUrl(form.checkinUrl) && (
+              <p className="mt-1 text-xs text-error-fg">请填写以 http:// 或 https:// 开头的有效链接</p>
+            )}
           </Field>
           <Field label="简介">
             <textarea className={`${inputCls} h-24 resize-none`} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
@@ -461,6 +491,19 @@ export default function FairsPage() {
           </p>
         </div>
       </Drawer>
+      {configuring && <FairSubresourcesDrawer fairId={configuring.id} fairName={configuring.name} venueDefault={configuring.venue} open onClose={() => setConfiguring(null)} />}
+
+      <ConfirmActionDialog
+        open={confirmUnpublish !== null}
+        title="确认下架招聘会"
+        description={confirmUnpublish
+          ? `下架后终端将不再展示「${confirmUnpublish.name}」。已发布内容立即对求职者不可见。`
+          : ''}
+        confirmLabel="确认下架"
+        busy={busyId !== null}
+        onCancel={() => setConfirmUnpublish(null)}
+        onConfirm={() => confirmUnpublish && void handleUnpublish(confirmUnpublish)}
+      />
     </Page>
   )
 }

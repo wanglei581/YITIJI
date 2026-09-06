@@ -66,7 +66,10 @@ export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompa
         {canUnpublish && (
           <GhostButton
             disabled={busy}
-            onClick={() => void run(() => companiesAdminService.publishCompany(detail.id, false), '已下架，一体机不再展示')}
+            onClick={() => {
+              if (!window.confirm(`确认下架「${detail.name}」？下架后一体机不再展示该企业。`)) return
+              void run(() => companiesAdminService.publishCompany(detail.id, false), '已下架，一体机不再展示')
+            }}
           >
             下架
           </GhostButton>

@@ -10,13 +10,17 @@
         "completedAt": null,
         "copies": 2,
         "colorMode": "color",
+        "duplex": "duplex_long_edge",
         "paperSize": "A4",
+        "pageRange": "1-2",
         "amountCents": 200,
         "payStatus": "paid",
         "paymentSource": "offline",
         "billablePages": 2,
         "billingPageSource": "pdf_lightweight_scan",
-        "pickupCode": "PICK20260704"
+        "pickupCode": "PICK20260704",
+        "discountCents": 0,
+        "refundedAmountCents": 0
       },
       {
         "id": "print-task-unpaid",
@@ -26,13 +30,17 @@
         "completedAt": null,
         "copies": 1,
         "colorMode": "black_white",
+        "duplex": "simplex",
         "paperSize": "A4",
+        "pageRange": null,
         "amountCents": 20,
         "payStatus": "unpaid",
         "paymentSource": null,
         "billablePages": 1,
         "billingPageSource": "pdf_lightweight_scan",
-        "pickupCode": null
+        "pickupCode": null,
+        "discountCents": 0,
+        "refundedAmountCents": 0
       },
       {
         "id": "print-task-refunded",
@@ -42,13 +50,17 @@
         "completedAt": null,
         "copies": 1,
         "colorMode": "black_white",
+        "duplex": "simplex",
         "paperSize": "A4",
+        "pageRange": "all",
         "amountCents": 20,
         "payStatus": "refunded",
         "paymentSource": "manual_confirmed",
         "billablePages": 1,
         "billingPageSource": "image_single_page",
-        "pickupCode": null
+        "pickupCode": null,
+        "discountCents": 0,
+        "refundedAmountCents": 20
       },
       {
         "id": "print-task-without-order",
@@ -58,13 +70,17 @@
         "completedAt": "2026-07-04T08:35:00.000Z",
         "copies": 1,
         "colorMode": "black_white",
+        "duplex": null,
         "paperSize": "A4",
+        "pageRange": null,
         "amountCents": null,
         "payStatus": null,
         "paymentSource": null,
         "billablePages": null,
         "billingPageSource": null,
-        "pickupCode": null
+        "pickupCode": null,
+        "discountCents": null,
+        "refundedAmountCents": null
       }
     ],
     "nextCursor": "cursor-after-smoke-page",

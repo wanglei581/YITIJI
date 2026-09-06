@@ -134,6 +134,63 @@ async function main() {
       pass('2. externalId / sourceOrgId / sourceName 不可改')
     }
 
+    {
+      const campusJob = await prisma.job.create({
+        data: {
+          sourceOrgId: orgA, externalId: `VPE-CAMPUS-${suffix}`, sourceName: `机构A_${suffix}`,
+          sourceUrl: 'https://example.org/campus', title: '校招岗位', company: '验证公司', city: '验证市',
+          category: 'campus', tagsJson: '[]', reviewStatus: 'approved', publishStatus: 'published',
+        },
+      })
+      const updated = await svc.updatePartnerJob(
+        campusJob.id,
+        { title: '校招岗位(改)', workType: 'campus' },
+        partnerA,
+      )
+      const row = await prisma.job.findUnique({ where: { id: campusJob.id } })
+      if (row!.category !== 'campus') fail(`PTR-02. 校招编辑后 category 被改写为 ${row!.category}`)
+      if (updated.category !== 'campus') fail('PTR-02. 返回 DTO category 不是 campus')
+      pass('PTR-02. 编辑校招岗位后 category 仍为 campus')
+    }
+
+    {
+      await expectCode(
+        () => svc.updatePartnerJob(jobA.id, { sourceUrl: 'not-a-url' }, partnerA),
+        'INVALID_URL',
+        'PTR-05. 无协议 sourceUrl 被拒',
+      )
+      await expectCode(
+        () => svc.updatePartnerJob(jobA.id, { sourceUrl: 'httpfoo' }, partnerA),
+        'INVALID_URL',
+        'PTR-05. 伪协议 sourceUrl 被拒',
+      )
+    }
+
+    {
+      const updated = await svc.updatePartnerJob(
+        jobA.id,
+        {
+          educationRequirement: '本科',
+          experienceRequirement: '1-3年',
+          skills: ['TypeScript'],
+          benefits: ['五险一金'],
+          salaryMin: 8000,
+          salaryMax: 12000,
+          salaryUnit: '元/月',
+          headcount: 2,
+        },
+        partnerA,
+      )
+      if (updated.educationRequirement !== '本科' || updated.headcount !== 2) {
+        fail('PTR-19. 结构化字段未回传到 Partner DTO')
+      }
+      const row = await prisma.job.findUnique({ where: { id: jobA.id } })
+      if (row!.educationRequirement !== '本科' || row!.headcount !== 2 || row!.salaryMin !== 8000) {
+        fail('PTR-19. 结构化字段未落库')
+      }
+      pass('PTR-19. 编辑可补齐学历/技能/薪资/人数等结构化字段')
+    }
+
     // ── 3. 越权 ────────────────────────────────────────────────────────────
     await expectCode(() => svc.updatePartnerJob(jobB.id, { title: 'x' }, partnerA), 'JOB_NOT_FOUND', '3a. 编辑他机构岗位 → JOB_NOT_FOUND')
     await expectCode(() => svc.updatePartnerFair('no_such_fair', { title: 'x' }, partnerA), 'FAIR_NOT_FOUND', '3b. 编辑不存在招聘会 → FAIR_NOT_FOUND')

@@ -308,41 +308,60 @@ export class AdminOrgsService {
     }
 
     const orgId = `org_${randomUUID().replace(/-/g, '').slice(0, 20)}`
-    await this.prisma.organization.create({
-      data: {
-        id: orgId,
-        name: dto.name,
-        type: dto.type,
-        contact: dto.contact ?? null,
-        contactPhone: dto.contactPhone ?? null,
-        sceneTemplate,
-        enabledModulesJson: JSON.stringify(enabledModules),
-      },
-    })
-    await this.writeAudit(admin, 'org.create', orgId, { name: dto.name, type: dto.type })
-
-    if (dto.account) {
-      const passwordHash = await bcrypt.hash(dto.account.password, 10)
-      const normalizedPhone = normalizePhone(dto.account.phone)
-      const account = await this.prisma.user.create({
+    const initialAccount = dto.account
+      ? {
+          ...dto.account,
+          passwordHash: await bcrypt.hash(dto.account.password, 10),
+          normalizedPhone: normalizePhone(dto.account.phone),
+        }
+      : null
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organization.create({
         data: {
-          username: dto.account.username,
-          passwordHash,
-          passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
-          name: dto.account.name,
-          role: 'partner',
-          orgId,
-          phoneHash: hashPhone(normalizedPhone),
-          phoneEnc: encryptPhone(normalizedPhone),
+          id: orgId,
+          name: dto.name,
+          type: dto.type,
+          contact: dto.contact ?? null,
+          contactPhone: dto.contactPhone ?? null,
+          sceneTemplate,
+          enabledModulesJson: JSON.stringify(enabledModules),
         },
       })
-      // 审计只记 username,绝不记密码 / hash
-      await this.writeAudit(admin, 'org.account.create', orgId, {
-        accountId: account.id,
-        username: account.username,
-        phoneMasked: mapAdminOrgAccount(account).phoneMasked,
+      await this.audit.writeRequired(tx, {
+        actorId: admin.userId,
+        actorRole: 'admin',
+        action: 'org.create',
+        targetType: 'organization',
+        targetId: orgId,
+        payload: { name: dto.name, type: dto.type },
       })
-    }
+      if (initialAccount) {
+        const account = await tx.user.create({
+          data: {
+            username: initialAccount.username,
+            passwordHash: initialAccount.passwordHash,
+            passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+            name: initialAccount.name,
+            role: 'partner',
+            orgId,
+            phoneHash: hashPhone(initialAccount.normalizedPhone),
+            phoneEnc: encryptPhone(initialAccount.normalizedPhone),
+          },
+        })
+        await this.audit.writeRequired(tx, {
+          actorId: admin.userId,
+          actorRole: 'admin',
+          action: 'org.account.create',
+          targetType: 'organization',
+          targetId: orgId,
+          payload: {
+            accountId: account.id,
+            username: account.username,
+            phoneMasked: mapAdminOrgAccount(account).phoneMasked,
+          },
+        })
+      }
+    })
 
     this.logger.log(`createOrg: id=${orgId} by=${admin.userId}`)
     return this.getOrgDetail(orgId)
@@ -370,18 +389,27 @@ export class AdminOrgsService {
         enabledModules: nextModules,
       })
     }
-    await this.prisma.organization.update({
-      where: { id: orgId },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.type !== undefined ? { type: dto.type } : {}),
-        ...(dto.contact !== undefined ? { contact: dto.contact } : {}),
-        ...(dto.contactPhone !== undefined ? { contactPhone: dto.contactPhone } : {}),
-        ...(dto.sceneTemplate !== undefined ? { sceneTemplate: dto.sceneTemplate } : {}),
-        ...(modulesChanged ? { enabledModulesJson: JSON.stringify(nextModules) } : {}),
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organization.update({
+        where: { id: orgId },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.type !== undefined ? { type: dto.type } : {}),
+          ...(dto.contact !== undefined ? { contact: dto.contact } : {}),
+          ...(dto.contactPhone !== undefined ? { contactPhone: dto.contactPhone } : {}),
+          ...(dto.sceneTemplate !== undefined ? { sceneTemplate: dto.sceneTemplate } : {}),
+          ...(modulesChanged ? { enabledModulesJson: JSON.stringify(nextModules) } : {}),
+        },
+      })
+      await this.audit.writeRequired(tx, {
+        actorId: admin.userId,
+        actorRole: 'admin',
+        action: 'org.update',
+        targetType: 'organization',
+        targetId: orgId,
+        payload: { changedFields },
+      })
     })
-    await this.writeAudit(admin, 'org.update', orgId, { changedFields })
     return this.getOrgDetail(orgId)
   }
 
@@ -393,10 +421,16 @@ export class AdminOrgsService {
     const org = await this.assertOrgExists(orgId)
     const toEnabled = action === 'enable'
     if (org.enabled !== toEnabled) {
-      await this.prisma.organization.update({ where: { id: orgId }, data: { enabled: toEnabled } })
-      await this.writeAudit(admin, toEnabled ? 'org.enable' : 'org.disable', orgId, {
-        fromEnabled: org.enabled,
-        toEnabled,
+      await this.prisma.$transaction(async (tx) => {
+        await tx.organization.update({ where: { id: orgId }, data: { enabled: toEnabled } })
+        await this.audit.writeRequired(tx, {
+          actorId: admin.userId,
+          actorRole: 'admin',
+          action: toEnabled ? 'org.enable' : 'org.disable',
+          targetType: 'organization',
+          targetId: orgId,
+          payload: { fromEnabled: org.enabled, toEnabled },
+        })
       })
       await this.invalidateOrgSessions(orgId)
     }
@@ -418,24 +452,34 @@ export class AdminOrgsService {
     await this.assertPhoneAvailable(input.phone)
     const passwordHash = await bcrypt.hash(input.password, 10)
     const normalizedPhone = normalizePhone(input.phone)
-    const account = await this.prisma.user.create({
-      data: {
-        username: input.username,
-        passwordHash,
-        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
-        name: input.name,
-        role: 'partner',
-        orgId,
-        phoneHash: hashPhone(normalizedPhone),
-        phoneEnc: encryptPhone(normalizedPhone),
-      },
+    const account = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          username: input.username,
+          passwordHash,
+          passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+          name: input.name,
+          role: 'partner',
+          orgId,
+          phoneHash: hashPhone(normalizedPhone),
+          phoneEnc: encryptPhone(normalizedPhone),
+        },
+      })
+      await this.audit.writeRequired(tx, {
+        actorId: admin.userId,
+        actorRole: 'admin',
+        action: 'org.account.create',
+        targetType: 'organization',
+        targetId: orgId,
+        payload: {
+          accountId: created.id,
+          username: created.username,
+          phoneMasked: mapAdminOrgAccount(created).phoneMasked,
+        },
+      })
+      return created
     })
     const mapped = mapAdminOrgAccount(account)
-    await this.writeAudit(admin, 'org.account.create', orgId, {
-      accountId: account.id,
-      username: account.username,
-      phoneMasked: mapped.phoneMasked,
-    })
     return mapped
   }
 
@@ -449,18 +493,22 @@ export class AdminOrgsService {
     const toEnabled = action === 'enable'
     let updated = account
     if (account.enabled !== toEnabled) {
-      const result = await this.prisma.user.updateMany({
-        where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-        data: { enabled: toEnabled, tokenVersion: { increment: 1 } },
+      await this.prisma.$transaction(async (tx) => {
+        const result = await tx.user.updateMany({
+          where: { id: accountId, orgId, role: 'partner', deletedAt: null },
+          data: { enabled: toEnabled, tokenVersion: { increment: 1 } },
+        })
+        if (result.count !== 1) this.throwAccountNotFound(orgId, accountId)
+        await this.audit.writeRequired(tx, {
+          actorId: admin.userId,
+          actorRole: 'admin',
+          action: toEnabled ? 'org.account.enable' : 'org.account.disable',
+          targetType: 'organization',
+          targetId: orgId,
+          payload: { accountId, username: account.username },
+        })
       })
-      if (result.count !== 1) this.throwAccountNotFound(orgId, accountId)
       updated = { ...account, enabled: toEnabled, tokenVersion: account.tokenVersion + 1 }
-    }
-    if (account.enabled !== toEnabled) {
-      await this.writeAudit(admin, toEnabled ? 'org.account.enable' : 'org.account.disable', orgId, {
-        accountId,
-        username: account.username,
-      })
       await this.invalidateAccountSession(accountId)
     }
     return mapAdminOrgAccount(updated)
@@ -474,18 +522,26 @@ export class AdminOrgsService {
   ): Promise<{ success: true }> {
     const account = await this.assertAccountInOrg(orgId, accountId)
     const passwordHash = await bcrypt.hash(password, 10)
-    const updated = await this.prisma.user.updateMany({
-      where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-      data: {
-        passwordHash,
-        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
-        tokenVersion: { increment: 1 },
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.updateMany({
+        where: { id: accountId, orgId, role: 'partner', deletedAt: null },
+        data: {
+          passwordHash,
+          passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+          tokenVersion: { increment: 1 },
+        },
+      })
+      if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
+      await this.audit.writeRequired(tx, {
+        actorId: admin.userId,
+        actorRole: 'admin',
+        action: 'org.account.reset_password',
+        targetType: 'organization',
+        targetId: orgId,
+        payload: { accountId, username: account.username },
+      })
     })
-    if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
     await this.invalidateAccountSession(accountId)
-    // 审计绝不含密码 / hash
-    await this.writeAudit(admin, 'org.account.reset_password', orgId, { accountId, username: account.username })
     return { success: true }
   }
 
@@ -513,29 +569,39 @@ export class AdminOrgsService {
     }
     await this.assertEmailAvailable(normalized, accountId)
     const emailVerifiedAt = new Date()
-    const updated = await this.prisma.user.updateMany({
-      where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-      data: {
-        emailHash: hashEmail(normalized),
-        emailEnc: encryptEmail(normalized),
-        emailVerifiedAt,
-        emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
-        tokenVersion: { increment: 1 },
-      },
+    const refreshed = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.updateMany({
+        where: { id: accountId, orgId, role: 'partner', deletedAt: null },
+        data: {
+          emailHash: hashEmail(normalized),
+          emailEnc: encryptEmail(normalized),
+          emailVerifiedAt,
+          emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+          tokenVersion: { increment: 1 },
+        },
+      })
+      if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
+      const result = await tx.user.findFirstOrThrow({
+        where: { id: accountId },
+        select: ADMIN_ORG_ACCOUNT_SELECT,
+      })
+      await this.audit.writeRequired(tx, {
+        actorId: admin.userId,
+        actorRole: 'admin',
+        action: 'org.account.bind_email',
+        targetType: 'organization',
+        targetId: orgId,
+        payload: {
+          accountId,
+          username: account.username,
+          emailMasked: maskEmail(normalized),
+          emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+        },
+      })
+      return result
     })
-    if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
     await this.invalidateAccountSession(accountId)
-    const refreshed = await this.prisma.user.findFirstOrThrow({
-      where: { id: accountId },
-      select: ADMIN_ORG_ACCOUNT_SELECT,
-    })
     const mapped = mapAdminOrgAccount(refreshed)
-    await this.writeAudit(admin, 'org.account.bind_email', orgId, {
-      accountId,
-      username: account.username,
-      emailMasked: maskEmail(normalized),
-      emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
-    })
     return mapped
   }
 
@@ -784,17 +850,6 @@ export class AdminOrgsService {
       select: { id: true },
     })
     await Promise.all(users.map((user) => this.invalidateAccountSession(user.id)))
-  }
-
-  private async writeAudit(admin: AuthedUser, action: string, orgId: string, payload: Record<string, unknown>): Promise<void> {
-    await this.audit.write({
-      actorId: admin.userId,
-      actorRole: 'admin',
-      action,
-      targetType: 'organization',
-      targetId: orgId,
-      payload,
-    })
   }
 
   // ── Partner 自助档案（审计修复：替换前端 MOCK_PROFILE）────────────────────

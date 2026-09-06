@@ -81,7 +81,26 @@ export function redisDegradedImpactSentence(): string {
 
 export type RedisAttempt<T> =
   | { ok: true; value: T }
-  | { ok: false; reason: 'timeout' | 'error' | 'skipped_cooldown'; errorName: string }
+  | { ok: false; reason: 'timeout' | 'error' | 'rejected' | 'skipped_cooldown'; errorName: string }
+
+/**
+ * 这次失败能否证明「连接不可用」。
+ *
+ * ioredis 的 `ReplyError` 是 **Redis 活着并回了一条错误**（WRONGTYPE、未知命令、
+ * 参数个数不对、Lua 脚本报错……）。把它当成连通性故障会造成一次误伤扩散：
+ * 任意一条命令被拒 → 全局静默期 → 期间所有 `tryRedis` 一律跳过，
+ * 连本来会成功的调用也被跳过。实测代价是内部账号回写缓存失败（本身无害，
+ * 数据库才是真源）把 **C 端会员会话** 一起打掉 5 秒，而会员会话没有数据库后备，
+ * 直接表现为用户被登出（verify:content-pipeline-e2e 抓到过这条）。
+ *
+ * 所以只有超时与连接层错误才算不可用；命令被拒仍返回 ok:false，
+ * 但不标降级、不进静默期。
+ */
+function isConnectivityFailure(error: unknown): boolean {
+  if (error instanceof RedisRequestTimeoutError) return true
+  const name = error instanceof Error ? error.name : ''
+  return name !== 'ReplyError'
+}
 
 /** 静默期截止时间戳；0 表示当前不在静默期。进程内状态，多实例各自独立。 */
 let cooldownUntil = 0
@@ -119,6 +138,11 @@ export async function tryRedis<T>(
     return { ok: true, value }
   } catch (error) {
     const errorName = error instanceof Error ? error.name : 'UnknownError'
+    if (!isConnectivityFailure(error)) {
+      // Redis 回话了，只是拒了这条命令。调用方按取不到值处理，
+      // 但不能据此判定整个 Redis 不可用，更不能连累其他调用方。
+      return { ok: false, reason: 'rejected', errorName }
+    }
     const reason = error instanceof RedisRequestTimeoutError ? 'timeout' : 'error'
     cooldownUntil = Date.now() + readTimeoutMs(
       REDIS_UNAVAILABLE_COOLDOWN_ENV,

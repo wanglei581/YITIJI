@@ -56,10 +56,10 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   return json.data
 }
 
-const EMPTY = { items: [] as AdminBroadcastItem[] }
+const EMPTY = { items: [] as AdminBroadcastItem[], total: 0 }
 
 export const memberNotificationsAdminApi = {
-  listBroadcasts(): Promise<{ items: AdminBroadcastItem[] }> {
+  listBroadcasts(): Promise<{ items: AdminBroadcastItem[]; total: number }> {
     if (API_MODE !== 'http') return Promise.resolve(EMPTY)
     return request('/admin/notifications/broadcasts')
   },

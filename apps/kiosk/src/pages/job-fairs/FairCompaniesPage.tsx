@@ -18,7 +18,7 @@ export function FairCompaniesPage() {
   const [error,     setError]     = useState(false)
 
   const [search,     setSearch]     = useState('')
-  const [zoneFilter, setZoneFilter] = useState('全部')
+  const [zoneFilter, setZoneFilter] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -39,13 +39,15 @@ export function FairCompaniesPage() {
     return () => { cancelled = true }
   }, [fairId])
 
-  const zoneOptions = useMemo(() => ['全部', ...zones.map((z) => z.zoneName)], [zones])
+  const zoneOptions = useMemo(
+    () => [{ id: '', name: '全部' }, ...zones.map((z) => ({ id: z.id, name: z.zoneName }))],
+    [zones],
+  )
 
   const filtered = useMemo(() => {
-    const q    = search.trim().toLowerCase()
-    const zone = zoneFilter === '全部' ? null : zoneFilter
+    const q = search.trim().toLowerCase()
     return companies.filter((c) => {
-      const matchZone   = zone === null || c.zoneName === zone
+      const matchZone = !zoneFilter || c.zoneId === zoneFilter
       const matchSearch = !q || c.companyName.toLowerCase().includes(q) || c.industry.toLowerCase().includes(q)
       return matchZone && matchSearch
     })
@@ -101,12 +103,12 @@ export function FairCompaniesPage() {
         <div className="jf-filter-bar">
           {zoneOptions.map((z) => (
             <button
-              key={z}
+              key={z.id || 'all'}
               type="button"
-              onClick={() => setZoneFilter(z)}
-              className={`jf-f-chip sm ${zoneFilter === z ? 'on' : ''}`}
+              onClick={() => setZoneFilter(z.id)}
+              className={`jf-f-chip sm ${zoneFilter === z.id ? 'on' : ''}`}
             >
-              {z}
+              {z.name}
             </button>
           ))}
         </div>

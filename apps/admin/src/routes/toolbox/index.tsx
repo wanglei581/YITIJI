@@ -6,6 +6,7 @@ import { ToolboxAllowedHostPanel } from './components/ToolboxAllowedHostPanel'
 import { ToolboxGovernancePanel } from './components/ToolboxGovernancePanel'
 import { ToolboxLaunchSummaryCard } from './components/ToolboxLaunchSummaryCard'
 import { TerminalToolboxPanel } from './components/TerminalToolboxPanel'
+import { Page } from '../Page'
 
 type TabKey = 'governance' | 'hosts' | 'terminals'
 
@@ -23,12 +24,14 @@ export default function ToolboxPage() {
   const [hosts, setHosts] = useState<ToolboxAllowedHostRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [terminalsError, setTerminalsError] = useState('')
+  const [summaryError, setSummaryError] = useState('')
   const [appsError, setAppsError] = useState('')
   const [hostsError, setHostsError] = useState('')
 
   const load = () => {
     setLoading(true)
     setTerminalsError('')
+    setSummaryError('')
     setAppsError('')
     setHostsError('')
     Promise.allSettled([
@@ -45,8 +48,10 @@ export default function ToolboxPage() {
         }
         if (summaryResult.status === 'fulfilled') {
           setSummary(summaryResult.value)
+        } else {
+          setSummary(null)
+          setSummaryError(summaryResult.reason instanceof Error ? summaryResult.reason.message : '使用概览加载失败')
         }
-        // summary 失败时静默保留上次值，不阻断其他面板
         if (appsResult.status === 'fulfilled') {
           setApps(appsResult.value)
         } else {
@@ -64,12 +69,10 @@ export default function ToolboxPage() {
   useEffect(load, [])
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">百宝箱 / 微应用治理</h1>
-          <p className="mt-0.5 text-sm text-neutral-500">审核发布微应用、维护域名双白名单，并保留终端投放配置能力。</p>
-        </div>
+    <Page
+      title="百宝箱 / 微应用治理"
+      subtitle="审核发布微应用、维护域名双白名单，并保留终端投放配置能力。"
+      actions={(
         <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => (
             <Button key={tab.key} size="sm" variant={activeTab === tab.key ? 'primary' : 'outline'} onClick={() => setActiveTab(tab.key)}>
@@ -77,25 +80,27 @@ export default function ToolboxPage() {
             </Button>
           ))}
         </div>
+      )}
+    >
+      <div className="space-y-5">
+        <ToolboxLaunchSummaryCard summary={summary} loading={loading} error={summaryError} onRetry={load} />
+
+        {activeTab === 'governance' && (
+          <>
+            {appsError && <p className="mb-3 rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error-fg">{appsError}</p>}
+            <ToolboxGovernancePanel apps={apps} terminals={terminals} onRefresh={load} />
+          </>
+        )}
+        {activeTab === 'hosts' && (
+          <>
+            {hostsError && <p className="mb-3 rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error-fg">{hostsError}</p>}
+            <ToolboxAllowedHostPanel hosts={hosts} onRefresh={load} />
+          </>
+        )}
+        {activeTab === 'terminals' && (
+          <TerminalToolboxPanel terminals={terminals} loading={loading} error={terminalsError} onReload={load} />
+        )}
       </div>
-
-      <ToolboxLaunchSummaryCard summary={summary} />
-
-      {activeTab === 'governance' && (
-        <>
-          {appsError && <p className="mb-3 rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error-fg">{appsError}</p>}
-          <ToolboxGovernancePanel apps={apps} terminals={terminals} onRefresh={load} />
-        </>
-      )}
-      {activeTab === 'hosts' && (
-        <>
-          {hostsError && <p className="mb-3 rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error-fg">{hostsError}</p>}
-          <ToolboxAllowedHostPanel hosts={hosts} onRefresh={load} />
-        </>
-      )}
-      {activeTab === 'terminals' && (
-        <TerminalToolboxPanel terminals={terminals} loading={loading} error={terminalsError} onReload={load} />
-      )}
-    </div>
+    </Page>
   )
 }

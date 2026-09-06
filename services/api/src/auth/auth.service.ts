@@ -22,6 +22,7 @@ import {
 import type { UserRole } from '../common/decorators/roles.decorator'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
+import { tryRedis } from '../common/redis/redis-degradation'
 import { PrismaService } from '../prisma/prisma.service'
 import type { SendInternalSmsCodeDto } from './dto/internal-auth.dto'
 import { InternalOtpService, type InternalSendCodeResult } from './internal-otp.service'
@@ -38,6 +39,8 @@ type SmsPortal = 'admin' | 'partner'
 const RESET_TICKET_TTL = 600
 const RESET_UNKNOWN_IP_TTL = 60
 const RESET_UNKNOWN_IP_LIMIT = 5
+const PASSWORD_LOGIN_FAILURE_LIMIT = 5
+const PASSWORD_LOGIN_FAILURE_TTL_SECONDS = 15 * 60
 
 interface FullLoginResult {
   token: string
@@ -106,16 +109,23 @@ export class AuthService {
   ) {}
 
   async login(loginId: string, password: string, portal: LoginPortal): Promise<LoginResult> {
+    const identityFailureKey = this.passwordLoginIdentityFailureKey(loginId, portal)
+    await this.assertPasswordLoginNotLocked(identityFailureKey)
     const user = await this.findUserByLoginId(loginId)
+    const accountFailureKey = user ? this.passwordLoginAccountFailureKey(user.id, portal) : null
+    if (accountFailureKey) await this.assertPasswordLoginNotLocked(accountFailureKey)
     if (!user || !(await this.canUseAccount(user, portal))) {
+      await this.recordPasswordLoginFailure(identityFailureKey, accountFailureKey)
       throw this.loginFailed()
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash)
     if (!ok) {
+      await this.recordPasswordLoginFailure(identityFailureKey, accountFailureKey)
       throw this.loginFailed()
     }
 
+    await this.clearPasswordLoginFailures(identityFailureKey, accountFailureKey)
     await this.writeAudit(user.id, user.role, 'auth.password_login', { portal })
     return this.issueLogin(user)
   }
@@ -724,6 +734,45 @@ export class AuthService {
     return new UnauthorizedException({
       error: { code: 'AUTH_LOGIN_FAILED', message: '账号或密码不正确' },
     })
+  }
+
+  private loginLocked(): HttpException {
+    return new HttpException({
+      error: { code: 'AUTH_LOGIN_LOCKED', message: '账号登录失败次数过多，请 15 分钟后重试' },
+    }, HttpStatus.TOO_MANY_REQUESTS)
+  }
+
+  private passwordLoginIdentityFailureKey(loginId: string, portal: LoginPortal): string {
+    const normalized = loginId.trim().toLowerCase()
+    const digest = createHash('sha256').update(`${portal}:${normalized}`).digest('hex')
+    return `internal:password-login:identity-failures:${digest}`
+  }
+
+  private passwordLoginAccountFailureKey(userId: string, portal: LoginPortal): string {
+    return `internal:password-login:account-failures:${portal}:${userId}`
+  }
+
+  private async assertPasswordLoginNotLocked(key: string): Promise<void> {
+    const failures = await tryRedis('password-login-failures:get', () => this.redis.get(key), this.logger)
+    if (failures.ok && Number(failures.value ?? 0) >= PASSWORD_LOGIN_FAILURE_LIMIT) throw this.loginLocked()
+  }
+
+  private async recordPasswordLoginFailure(identityKey: string, accountKey: string | null): Promise<void> {
+    const keys = accountKey ? [identityKey, accountKey] : [identityKey]
+    await Promise.all(keys.map((key) => tryRedis(
+      'password-login-failures:increment',
+      () => this.redis.incrWithTtl(key, PASSWORD_LOGIN_FAILURE_TTL_SECONDS),
+      this.logger,
+    )))
+  }
+
+  private async clearPasswordLoginFailures(identityKey: string, accountKey: string | null): Promise<void> {
+    const keys = accountKey ? [identityKey, accountKey] : [identityKey]
+    await Promise.all(keys.map((key) => tryRedis(
+      'password-login-failures:del',
+      () => this.redis.del(key),
+      this.logger,
+    )))
   }
 
   private resetFailed(): UnauthorizedException {

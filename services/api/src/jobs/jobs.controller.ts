@@ -536,8 +536,22 @@ export class JobsController {
   @Get('partner/sync-logs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  getPartnerSyncLogs(@CurrentUser() user: AuthedUser) {
-    return this.jobsService.getPartnerSyncLogs(user)
+  getPartnerSyncLogs(
+    @CurrentUser() user: AuthedUser,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('sourceId') sourceId?: string,
+    @Query('result') result?: string,
+  ) {
+    const allowedResult = ['success', 'partial', 'failed'] as const
+    return this.jobsService.getPartnerSyncLogs(user, {
+      page: safeInt(page, 1, 1, 10_000),
+      pageSize: safeInt(pageSize, 20, 1, 100),
+      sourceId: sourceId?.trim() || undefined,
+      result: (allowedResult as readonly string[]).includes(result ?? '')
+        ? (result as typeof allowedResult[number])
+        : undefined,
+    })
   }
 
   // ── Admin import batches ─────────────────────────────────────────────────────

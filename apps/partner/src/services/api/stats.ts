@@ -19,8 +19,9 @@
 //   3. attribution 恒为 available:false —— 行为日志无不可变 sourceOrgId 快照，
 //      demo 模式同样不得伪造漏斗。
 
+import { formatDate } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
-import { authHeader } from '../auth'
+import { authHeader, redirectToLogin } from '../auth'
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ function buildDemoTrend(days: number): StatsBucket[] {
     // 用固定偏移标注演示日期（从 2026-05-20 起）
     const d = new Date('2026-05-20T00:00:00Z')
     d.setUTCDate(d.getUTCDate() + i)
-    return { date: d.toISOString().slice(0, 10), added: a, updated: u, failed: f }
+    return { date: formatDate(d), added: a, updated: u, failed: f }
   })
 }
 
@@ -191,7 +192,9 @@ async function fetchPartnerStats(period: StatsPeriod): Promise<PartnerStatsRespo
   // 拒成 400 VALIDATION_FAILED。时区改由响应的 timezone 字段声明。
   const res = await fetch(`${API_BASE_URL}/partner/stats?period=${period}`, {
     headers: { Accept: 'application/json', ...authHeader() },
+    credentials: 'include',
   })
+  if (res.status === 401) redirectToLogin()
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
     throw new Error(err.error?.message ?? `HTTP ${res.status}`)

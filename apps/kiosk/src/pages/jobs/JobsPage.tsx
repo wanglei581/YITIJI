@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
-import type { ExternalJobDTO, JobAiRecommendationDTO, MemberResumeItem } from '@ai-job-print/shared'
+import { formatDateTime, parseInstant, type ExternalJobDTO, type JobAiRecommendationDTO, type MemberResumeItem } from '@ai-job-print/shared'
 import { Building2Icon, FilterIcon, RefreshCwIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
@@ -24,13 +24,8 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
-function formatW4Date(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '暂无同步时间'
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+function formatW4Date(iso: string | Date) {
+  return formatDateTime(iso, { fallback: '暂无同步时间' })
 }
 
 export function JobsPage() {
@@ -60,6 +55,7 @@ export function JobsPage() {
   })
   const [sourceOrgId, setSourceOrgId] = useState(() => sourceOrgIdParam)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [listPage, setListPage] = useState(1)
   const [sortMode, setSortMode] = useState<'latest' | 'salary_first'>('latest')
   const [showFilterPicker, setShowFilterPicker] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
@@ -101,9 +97,9 @@ export function JobsPage() {
         setFacetTotal(res.pagination.total)
         setFacetLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
-        setError('后端服务未连接，请检查 API 服务（VITE_API_MODE=http 需后端在线）')
+        setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
         setFacetLoading(false)
       })
     return () => {
@@ -114,8 +110,12 @@ export function JobsPage() {
   const hasServerFilter = !!(debouncedKeyword || city || industry || category || sourceOrgId)
 
   useEffect(() => {
+    setListPage(1)
+  }, [debouncedKeyword, city, industry, category, sourceOrgId])
+
+  useEffect(() => {
     if (facetLoading) return
-    if (!hasServerFilter) {
+    if (!hasServerFilter && listPage === 1) {
       setListJobs(facetJobs)
       setListTotal(facetTotal)
       setListLoading(false)
@@ -130,6 +130,7 @@ export function JobsPage() {
       industry: industry || undefined,
       category: category || undefined,
       sourceOrgId: sourceOrgId || undefined,
+      page: listPage,
       pageSize: 100,
     })
       .then((res) => {
@@ -138,15 +139,15 @@ export function JobsPage() {
         setListTotal(res.pagination.total)
         setListLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
-        setError('后端服务未连接，请检查 API 服务（VITE_API_MODE=http 需后端在线）')
+        setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
         setListLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [facetLoading, facetJobs, facetTotal, hasServerFilter, debouncedKeyword, city, industry, category, sourceOrgId])
+  }, [facetLoading, facetJobs, facetTotal, hasServerFilter, listPage, debouncedKeyword, city, industry, category, sourceOrgId])
 
   const cityOptions = useMemo(() => uniqueSorted(facetJobs.map((job) => job.city)), [facetJobs])
   const industryOptions = useMemo(() => uniqueSorted(facetJobs.map((job) => job.industry)), [facetJobs])
@@ -156,10 +157,7 @@ export function JobsPage() {
   const displayedJobs = useMemo(() => {
     const base = favoritesOnly ? listJobs.filter((job) => favoriteSet.has(job.id)) : listJobs
     // 展示端排序：只对已载入的真实数据重排，不改变筛选查询本身
-    const time = (iso: string) => {
-      const value = Date.parse(iso)
-      return Number.isNaN(value) ? 0 : value
-    }
+    const time = (iso: string) => parseInstant(iso)?.getTime() ?? 0
     return [...base].sort((a, b) => {
       if (sortMode === 'salary_first') {
         // 薪资标注完整的岗位优先（不伪造薪资，仅按"来源是否提供"排序）
@@ -175,10 +173,10 @@ export function JobsPage() {
   const aiRecommendationMode = aiRecommendations !== null
   const latestSync = useMemo(() => {
     const times = displayedJobs
-      .map((job) => Date.parse(job.syncTime))
-      .filter((value) => !Number.isNaN(value))
+      .map((job) => parseInstant(job.syncTime)?.getTime())
+      .filter((value): value is number => value != null)
     if (times.length === 0) return '暂无'
-    return formatW4Date(new Date(Math.max(...times)).toISOString())
+    return formatW4Date(new Date(Math.max(...times)))
   }, [displayedJobs])
 
   function requireToken(): string | null {
@@ -403,8 +401,24 @@ export function JobsPage() {
           <div className="jf-list-meta">
             <span>
               共 <b>{listTotal}</b> 个岗位 · 当前展示 <b>{displayedJobs.length}</b> 个 · 来源机构 <b>{sourceCards.length}</b> 个 · 最新同步 <b>{latestSync}</b>
+              {listTotal > 100 ? ` · 第 ${listPage}/${Math.max(1, Math.ceil(listTotal / 100))} 批` : ''}
             </span>
             <span className="jf-sort-group">
+              {listTotal > 100 && (
+                <>
+                  <button type="button" className="jf-f-chip sm" disabled={listPage <= 1} onClick={() => setListPage((page) => Math.max(1, page - 1))}>
+                    上一批
+                  </button>
+                  <button
+                    type="button"
+                    className="jf-f-chip sm"
+                    disabled={listPage >= Math.ceil(listTotal / 100)}
+                    onClick={() => setListPage((page) => page + 1)}
+                  >
+                    下一批
+                  </button>
+                </>
+              )}
               <button type="button" className={`jf-f-chip sm${favoritesOnly ? ' on' : ''}`} onClick={() => setFavoritesOnly((value) => !value)}>
                 仅看收藏 {favoriteSet.size}
               </button>

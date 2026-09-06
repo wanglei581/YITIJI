@@ -101,3 +101,24 @@ services/api/src/generated/prisma-pg/
 /deliverables/**/*.pdf
 /deliverables/**/*.pptx
 /deliverables/**/*.docx
+
+# ── 2026-09-06 资产体积治理（审计发现：722 MB 未跟踪证据无任何规则拦截；
+#    docs/design/kiosk-redesign-2026-08 的 549 MB 截图就是这样进的历史）──────
+# 这些目录是「一次性验收/对比证据」，按 .ccg/spec/guides §五「大批量截图、
+# 一次性验收素材不得进入跟踪范围」。目录本身按产品负责人要求保留在磁盘上，
+# 只是不再跟踪，不删除任何文件。
+docs/design/kiosk-redesign-2026-08/kimi-full-coverage-v2/evidence/
+# 例外：s24 的 13 个 fixtures 是被引用的测试夹具（specimen PDF/PNG），必须保留跟踪。
+!docs/design/kiosk-redesign-2026-08/kimi-full-coverage-v2/evidence/*/fixtures/
+!docs/design/kiosk-redesign-2026-08/kimi-full-coverage-v2/evidence/*/fixtures/**
+docs/design/kiosk-redesign-2026-08/review-2026-08-23/
+docs/design/compare-2026-08-23/
+docs/design/_backup-*/
+docs/design/.kiosk-redesign-backup-*.tar.gz
+/.codex-video-build/
+
+# 本地 worktree 与外部项目：原先只写在 .git/info/exclude（不入库，
+# 换机器或新 clone 完全没有保护）。搬进来使其可移植。
+/.claude/worktrees/
+**/.claude/worktrees/
+/_external/

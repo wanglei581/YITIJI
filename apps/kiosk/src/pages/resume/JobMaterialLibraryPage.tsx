@@ -11,6 +11,7 @@ import { ArrowRightIcon, FileTextIcon, ImageIcon, MailIcon, PrinterIcon } from '
 import { useAuth } from '../../auth/useAuth'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { API_MODE } from '../../services/api/client'
 import {
   clearJobMaterialDraft,
@@ -92,7 +93,7 @@ export function JobMaterialLibraryPage() {
         setError(null)
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : '求职材料加载失败')
+        if (!cancelled) setError(userMessageOf(err, '求职材料加载失败，请稍后重试'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -147,7 +148,7 @@ export function JobMaterialLibraryPage() {
       setGenerated(result)
       clearJobMaterialDraft()
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '生成失败，请稍后重试')
+      setSubmitError(userMessageOf(err, '生成失败，请稍后重试'))
     } finally {
       setSubmitting(false)
     }

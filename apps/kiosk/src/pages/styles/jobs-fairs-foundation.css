@@ -699,6 +699,14 @@ button.jf-chip {
   color: var(--accent-deep);
 }
 
+.job-anti-fraud {
+  min-height: 56px;
+}
+
+.job-anti-fraud b {
+  font-size: 20px;
+}
+
 .jf-actionbar {
   border-top: 1px solid var(--line);
   background: rgba(255, 253, 248, .95);

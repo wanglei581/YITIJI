@@ -244,6 +244,12 @@ const mockRows: PartnerPolicyRecord[] = [
     sourceOrgId: 'mock-org', sourceName: '测试机构',
     reviewStatus: 'approved', publishStatus: 'published', rejectReason: null, syncTime: now(), updatedAt: now(),
   },
+  {
+    id: 'pp-mock-2', kind: 'policy_guide', title: '高校毕业生就业补贴说明（演示）',
+    summary: '演示数据', audience: 'graduate', publishedDate: '2026-06-01',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null, syncTime: now(), updatedAt: now(),
+  },
 ]
 
 const mockAdapter: PartnerPoliciesServiceInterface = {

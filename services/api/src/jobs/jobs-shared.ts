@@ -146,6 +146,14 @@ export interface JobListItemDto {
   dataSourceNote: string
   /** 企业展示关联(可选) */
   companyProfileId?: string | null
+  /**
+   * 来源机构 Organization.contentTrustStatus。
+   * pending/active/suspended/revoked；null=未标记；缺字段=本次未读取。
+   * 只表示该机构是否被允许在本系统发布信息，不构成岗位真实性背书。
+   */
+  sourceContentTrustStatus?: string | null
+  /** 来源机构是否已归档。未读取时省略。 */
+  sourceOrgArchived?: boolean
 }
 
 export interface FairIntentSlice { label: string; percent: number }
@@ -236,6 +244,10 @@ export interface PartnerJobDto {
   sourceOrgId: string; sourceName: string
   category?: string; salary?: string; tags?: string[]
   description?: string; requirements?: string
+  educationRequirement?: string; experienceRequirement?: string
+  skills?: string[]; benefits?: string[]
+  salaryMin?: number; salaryMax?: number; salaryUnit?: string
+  headcount?: number
   /**
    * 管理员驳回时填写的原因（`Job.rejectReason`，reject 必填、approve 置 null）。
    *
@@ -436,22 +448,32 @@ export function categoryToWorkType(category: string | null): WorkType | undefine
   }
 }
 
+/** 对外时间一律 ISO-8601（含 Z）。展示由三端 formatDateTime 按 Asia/Shanghai 格式化。 */
 export function fmtSyncTime(d: Date): string {
-  return d.toISOString().replace('T', ' ').slice(0, 16)
+  return d.toISOString()
+}
+
+function shanghaiDate(d: Date): string {
+  return new Date(d.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+export function isAbsoluteHttpUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  try {
+    const url = new URL(trimmed)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 export function normalizeOptionalHttpUrl(value: string | undefined, fieldName: string): string | null | undefined {
   if (value === undefined) return undefined
   const trimmed = value.trim()
   if (!trimmed) return null
-  let url: URL
-  try {
-    url = new URL(trimmed)
-  } catch {
+  if (!isAbsoluteHttpUrl(trimmed)) {
     throw new BadRequestException({ error: { code: 'INVALID_URL', message: `${fieldName} 必须是有效 http(s) 链接` } })
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new BadRequestException({ error: { code: 'INVALID_URL', message: `${fieldName} 必须以 http:// 或 https:// 开头` } })
   }
   return trimmed
 }
@@ -583,7 +605,7 @@ export function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
     salaryDisplay,
-    dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${j.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+    dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${shanghaiDate(j.syncTime)} · 仅供参考`,
     companyProfileId: j.companyProfileId ?? null,
   }
 }
@@ -629,6 +651,14 @@ export function prismaJobToPartnerDto(j: PrismaJobRow): PartnerJobDto {
     tags: safeJsonArr(j.tagsJson),
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
+    educationRequirement: j.educationRequirement ?? undefined,
+    experienceRequirement: j.experienceRequirement ?? undefined,
+    skills: safeJsonArr(j.skillsJson),
+    benefits: safeJsonArr(j.benefitsJson),
+    salaryMin: j.salaryMin ?? undefined,
+    salaryMax: j.salaryMax ?? undefined,
+    salaryUnit: j.salaryUnit ?? undefined,
+    headcount: j.headcount ?? undefined,
     rejectReason: j.rejectReason,
   }
 }
@@ -653,8 +683,8 @@ export function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     syncTime: fmtSyncTime(f.syncTime),
     hasManagedData: companyCount > 0,
     managedCompanyCount: companyCount,
-    managedMaterialCount: 0,
-    dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${f.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+    managedMaterialCount: f._count?.materials ?? 0,
+    dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${shanghaiDate(f.syncTime)} · 仅供参考`,
     jobCount: f.jobCount,
     theme: f.theme,
     city: f.city,
@@ -828,5 +858,5 @@ export interface PrismaJobFairRow {
   trafficInfo: string | null
   expectedAttendance: number | null
   seekerIntentJson: string | null
-  _count?: { companies: number }
+  _count?: { companies: number; materials?: number }
 }

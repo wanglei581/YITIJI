@@ -124,6 +124,9 @@ export interface OfflineJobDTO {
   agencyHours?: string
   agencyPhone?: string
   agencyServices: string[]
+  externalId?: string
+  sourceUrl?: string
+  syncTime?: string
 }
 
 export type OfflineJobDetailDTO = OfflineJobDTO
@@ -247,6 +250,9 @@ export function mapWireOfflineJob(job: WireOfflineJob): OfflineJobDetailDTO {
     agencyHours: job.agency.openHours ?? undefined,
     agencyPhone: job.agency.phone ?? undefined,
     agencyServices: [],
+    externalId: job.externalId ?? undefined,
+    sourceUrl: job.externalUrl ?? undefined,
+    syncTime: job.updatedAt,
   }
 }
 

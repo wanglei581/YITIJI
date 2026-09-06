@@ -19,7 +19,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import type { Response } from 'express'
+import type { Request, Response } from 'express'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -266,19 +266,41 @@ export class ContentController {
     @Param('id') id: string,
     @Query('expires') expires: string,
     @Query('sig') sig: string,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
     if (!expires || !sig || !verifyAdAssetSignature(id, expires, sig)) {
       throw new UnauthorizedException({ error: { code: 'AD_ASSET_SIGNATURE_INVALID', message: '签名无效或已过期' } })
     }
     const { buffer, mimeType } = await this.content.readAssetContent(id)
-    res.setHeader('Content-Type', mimeType)
-    res.setHeader('Content-Length', buffer.length)
     // Admin/Kiosk dev server 与 API 分端口运行,签名素材需要允许跨 origin 作为 <img>/<video> 嵌入。
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
     // 屏保素材可被 Kiosk 长缓存(内容不可变,内容变了会换新 id)
     res.setHeader('Cache-Control', 'public, max-age=3600')
+    res.setHeader('Content-Type', mimeType)
+    // 这个头此前就一直在发，但实现从不理会 Range —— 无论请求什么区间都回 200 + 全量。
+    // 对 <video> 的后果是拖不动进度条（浏览器认为服务端支持 seek，实际拿不到区间），
+    // 属 §9「不伪造能力」：宣称的能力必须真的有。下面把它兑现。
     res.setHeader('Accept-Ranges', 'bytes')
+
+    const rangeHeader = req.headers.range
+    const range = parseByteRange(typeof rangeHeader === 'string' ? rangeHeader : undefined, buffer.length)
+    if (rangeHeader && !range) {
+      // 带了 Range 但不可满足：必须 416 并回带真实总长，不能假装成功回全量。
+      res.setHeader('Content-Range', `bytes */${buffer.length}`)
+      res.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+      res.end()
+      return
+    }
+    if (range) {
+      const slice = buffer.subarray(range.start, range.end + 1)
+      res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${buffer.length}`)
+      res.setHeader('Content-Length', slice.length)
+      res.status(HttpStatus.PARTIAL_CONTENT)
+      res.send(slice)
+      return
+    }
+    res.setHeader('Content-Length', buffer.length)
     res.send(buffer)
   }
 
@@ -322,4 +344,40 @@ function extractUa(req: AuditReq): string | null {
   if (typeof ua === 'string') return ua.slice(0, 256)
   if (Array.isArray(ua) && ua[0]) return ua[0].slice(0, 256)
   return null
+}
+
+/**
+ * 解析 HTTP Range 请求头，返回闭区间 [start, end]（含端点），不可满足时返回 null。
+ *
+ * 只接受单区间的 `bytes=` 形式——多区间（`bytes=0-9,20-29`）需要 multipart/byteranges
+ * 响应，我们不支持，按不可满足处理并回 416，而不是悄悄只给第一段。
+ *
+ * 三种写法：
+ *   bytes=2-5   → [2,5]
+ *   bytes=5-    → [5, size-1]
+ *   bytes=-5    → 最后 5 字节
+ */
+export function parseByteRange(raw: string | undefined, size: number): { start: number; end: number } | null {
+  if (!raw || size <= 0) return null
+  const match = raw.match(/^bytes=(\d*)-(\d*)$/)
+  if (!match) return null
+  const startRaw = match[1]
+  const endRaw = match[2]
+  if (!startRaw && !endRaw) return null
+  let start: number
+  let end: number
+  if (!startRaw) {
+    // 后缀区间：bytes=-N 表示最后 N 字节。N 大于总长时收敛到整个文件，而不是报错。
+    const suffix = Number(endRaw)
+    if (!Number.isSafeInteger(suffix) || suffix <= 0) return null
+    start = Math.max(0, size - suffix)
+    end = size - 1
+  } else {
+    start = Number(startRaw)
+    if (!Number.isSafeInteger(start) || start < 0 || start >= size) return null
+    end = endRaw ? Number(endRaw) : size - 1
+    if (!Number.isSafeInteger(end) || end < start) return null
+    if (end >= size) end = size - 1
+  }
+  return { start, end }
 }

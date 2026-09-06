@@ -17,10 +17,11 @@
  *   G. **双面不改变金额**（按内容页计价，见下方说明）——防止有人「顺手」加双面附加费而超收。
  *   H. 静态断言：两条计价路径都在 quotePrint **之前**执行了第 2 层门禁。
  *
- * 关于 G：仓库里并不存在 print_duplex_surcharge 价目行，它只出现在 payment.ts 的注释举例中。
+ * 关于 G：仓库里并不存在 print_duplex_surcharge 价目行。
  * price-config.seed 明确写了「本批按内容页计价，duplex / pagesPerSheet 不影响单价」。
  * 双面省的是纸不是内容页，维持同价是既有且自洽的定价策略；本门禁把它钉死，
  * 避免未来无意中引入双面加价（那是反向资损）。要改成加价必须是显式的产品决策 + 改本断言。
+ * UI 也不得再挂「双面附加」死标签（界面上有、系统里永远不会发生）。
  *
  * 运行：VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-color-duplex-capability
  */
@@ -313,7 +314,17 @@ async function main(): Promise<void> {
     if (seedSrc.includes('print_duplex_surcharge')) {
       fail('price-config.seed 引入了 print_duplex_surcharge 价目行，与「双面不改价」策略冲突')
     }
-    pass('无 print_duplex_surcharge 价目行（该键仅存在于注释举例，不是真实价目）')
+    pass('无 print_duplex_surcharge 价目行（双面不计价）')
+
+    const billingUi = read(repoRoot, 'apps/admin/src/routes/billing/index.tsx')
+    const cashierUi = read(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx')
+    if (billingUi.includes('print_duplex_surcharge') || billingUi.includes('双面附加')) {
+      fail('Admin 计费页仍有 print_duplex_surcharge / 双面附加死标签')
+    }
+    if (cashierUi.includes('print_duplex_surcharge') || cashierUi.includes('双面附加')) {
+      fail('Kiosk 收银页仍有 print_duplex_surcharge / 双面附加死标签')
+    }
+    pass('计费页与收银页均无双面附加计价标签')
   } finally {
     setPrintScanCapabilityModeForTest(null)
     await prisma.terminalCapability.deleteMany({ where: { terminalId } })

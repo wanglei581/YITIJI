@@ -15,7 +15,7 @@ export class AdminMemberNotificationsController {
   constructor(private readonly notifications: MemberNotificationsService) {}
 
   @Get('broadcasts')
-  async listBroadcasts(): Promise<ApiResponse<{ items: AdminBroadcastItem[] }>> {
+  async listBroadcasts(): Promise<ApiResponse<{ items: AdminBroadcastItem[]; total: number }>> {
     return ApiResponse.ok(await this.notifications.listBroadcasts())
   }
 

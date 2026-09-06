@@ -51,6 +51,9 @@ export default function AiConfigPage() {
 
   const currentPreset = presets.find((p) => p.vendor === vendor)
   const currentFeature = features.find((f) => f.key === selectedFeature)
+  const inheritedFeature = cfg?.inheritedFrom
+    ? features.find((feature) => feature.key === cfg.inheritedFrom)
+    : null
 
   const applyConfig = useCallback((c: AiConfigView) => {
     setCfg(c)
@@ -116,7 +119,16 @@ export default function AiConfigPage() {
     return words
   }
 
+  function confirmIndependentConfig(action: string): boolean {
+    if (!cfg?.inheritedFrom) return true
+    const parentLabel = inheritedFeature?.label ?? cfg.inheritedFrom
+    return window.confirm(
+      `当前功能仍继承「${parentLabel}」的配置。${action}会为当前功能创建独立配置，之后不再自动跟随父配置。确认继续？`,
+    )
+  }
+
   async function onSave() {
+    if (!confirmIndependentConfig('保存')) return
     setSaving(true)
     setSavedTip(false)
     setError(null)
@@ -137,6 +149,7 @@ export default function AiConfigPage() {
   }
 
   async function onTest() {
+    if (!confirmIndependentConfig('保存并测试')) return
     setTesting(true)
     setTestResult(null)
     try {
@@ -146,7 +159,7 @@ export default function AiConfigPage() {
         ...(apiKey ? { apiKey } : {}),
       })
       setConfigs((prev) => prev ? { ...prev, [selectedFeature]: updated } : prev)
-      setApiKey('')
+      applyConfig(updated)
       const r = await aiConfigApi.test(selectedFeature)
       setTestResult(r)
     } catch (e) {
@@ -179,6 +192,9 @@ export default function AiConfigPage() {
             {features.map((feature) => {
               const featureConfig = configs?.[feature.key]
               const configured = Boolean(featureConfig?.enabled && featureConfig.apiKeyConfigured)
+              const inheritedFrom = featureConfig?.inheritedFrom
+                ? features.find((candidate) => candidate.key === featureConfig.inheritedFrom)
+                : null
               return (
                 <button
                   key={feature.key}
@@ -191,6 +207,11 @@ export default function AiConfigPage() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-neutral-900">{feature.label}</span>
                     <div className="flex items-center gap-1.5">
+                      {featureConfig?.inheritedFrom && (
+                        <span className="rounded-full bg-info-bg px-2 py-0.5 text-[11px] font-medium text-info-fg">
+                          继承自 {inheritedFrom?.label ?? featureConfig.inheritedFrom}
+                        </span>
+                      )}
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
                         {configured ? '配置可用' : '未启用'}
                       </span>
@@ -226,6 +247,11 @@ export default function AiConfigPage() {
                   {currentPreset?.label ?? vendor} · {cfg?.model}
                   {cfg?.enabled ? '' : '（未启用，相关功能会明确失败或走既有默认应答）'}
                 </p>
+                {cfg?.inheritedFrom && (
+                  <p className="mt-1 text-xs font-medium text-info-fg">
+                    当前配置继承自「{inheritedFeature?.label ?? cfg.inheritedFrom}」；保存或测试会创建独立配置。
+                  </p>
+                )}
               </div>
             </div>
             <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium

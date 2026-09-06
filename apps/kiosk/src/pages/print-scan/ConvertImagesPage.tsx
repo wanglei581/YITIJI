@@ -25,7 +25,9 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
+import { getTerminalId } from '../../services/api/screensaver'
 import { convertImagesToPdf } from '../../services/api/printConversion'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import './styles/print-scan-fusion.css'
 
@@ -93,7 +95,7 @@ export function ConvertImagesPage() {
       const res = await kioskUploadFile(selected, getToken())
       addImage({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes) })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败，请重试')
+      setError(userMessageOf(err, '上传失败，请重试'))
     } finally {
       setUploading(false)
     }
@@ -131,12 +133,20 @@ export function ConvertImagesPage() {
       setError('请先添加至少一张图片')
       return
     }
+    const terminalId = getTerminalId()
+    if (!terminalId) {
+      setError('终端编号未配置，无法使用格式转换')
+      return
+    }
     setGenerating(true)
     setError(null)
     try {
       const idempotencyKey = `convert-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       const result = await convertImagesToPdf(
-        { sources: images.map((img) => ({ fileId: img.fileId, fileAccessUrl: img.fileAccessUrl })) },
+        {
+          terminalId,
+          sources: images.map((img) => ({ fileId: img.fileId, fileAccessUrl: img.fileAccessUrl })),
+        },
         { token: getToken(), idempotencyKey },
       )
       navigate('/print/confirm', {
@@ -155,7 +165,7 @@ export function ConvertImagesPage() {
         },
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成失败，请稍后重试')
+      setError(userMessageOf(err, '生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
     }
@@ -273,7 +283,11 @@ export function ConvertImagesPage() {
                 <li>仅支持 JPG / PNG 图片，单张不超过 10 MB。</li>
                 <li>一次最多合并 20 张图片，生成一份 PDF。</li>
                 <li>合并顺序即 PDF 页面顺序，生成前请调整好。</li>
-                <li>生成后自动进入确认打印；PDF 已保存到「我的文档」。</li>
+                <li>
+                  {getToken()
+                    ? '生成后自动进入确认打印；PDF 会保存到「我的文档」。'
+                    : '生成后自动进入确认打印；未登录时 PDF 不会进入「我的文档」，请在本次操作内完成。'}
+                </li>
               </ul>
             </section>
           </aside>

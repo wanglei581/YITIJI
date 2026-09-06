@@ -11,7 +11,9 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
+import { ApiHttpError } from '../api/httpAdapter'
 import { getTerminalId } from '../api/screensaver'
+import { networkError, throwHttpError } from '../api/throwHttpError'
 import type {
   BillingPageSource,
   OrderPayStatus,
@@ -55,7 +57,15 @@ export interface PrintJobCreated {
 }
 
 /** Backend status values — subset of shared PrintTaskStatus */
-export type BackendJobStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed'
+/** Backend status values — subset of shared PrintTaskStatus plus admin abandoned. */
+export type BackendJobStatus =
+  | 'pending'
+  | 'claimed'
+  | 'printing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'abandoned'
 
 export interface PrintJobStatusResult {
   taskId:        string
@@ -69,6 +79,13 @@ export interface PrintJobStatusResult {
   /** 后端下发的安全中文失败原因（仅失败时有值）。前台展示失败原因的首选来源。 */
   failureReasonForUser?: string
   completedAt?:  string
+  /** 关联文件保留字段是否读取到。取不到时前台不得编造保留时长。 */
+  fileRetentionAvailable?: boolean
+  fileExpiresAt?: string | null
+  fileRetentionPolicy?: string | null
+  fileDeletedAt?: string | null
+  fileDeleteReason?: string | null
+  fileStorageDeletedAt?: string | null
 }
 
 /** POST /orders/quote 响应（与后端 PrintPriceQuote 对齐；金额为分）。 */
@@ -98,19 +115,21 @@ function normalizePrintParams(params: PrintJobParams): PrintJobParams {
  * 仅 API_MODE=http 且有真实签名 fileUrl 时调用。
  */
 export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<PrintOrderQuote> {
-  const res = await fetch(`${API_BASE_URL}/orders/quote`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fileUrl: input.fileUrl,
-      params: normalizePrintParams(input.params),
-      ...(input.terminalId ? { terminalId: input.terminalId } : {}),
-    }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`quotePrintOrder failed: ${res.status} ${text}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/orders/quote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileUrl: input.fileUrl,
+        params: normalizePrintParams(input.params),
+        ...(input.terminalId ? { terminalId: input.terminalId } : {}),
+      }),
+    })
+  } catch (err) {
+    throw networkError(err)
   }
+  if (!res.ok) await throwHttpError(res)
   const body = (await res.json()) as PrintOrderQuote & { lines?: PrintPriceLine[]; data?: PrintOrderQuote & { lines?: PrintPriceLine[] } }
   // 兼容裸对象与偶发 ApiResponse 包装；契约字段为 lines（后端）→ 前端统一成 priceLines。
   const raw = body.data ?? body
@@ -127,21 +146,23 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
   const { token, ...body } = input
   const terminalId = getTerminalId()
   if (!terminalId) {
-    throw new Error('createPrintJob failed: missing terminal id')
+    throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
   }
-  const res = await fetch(`${API_BASE_URL}/print/jobs`, {
-    method:  'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Terminal-Id': terminalId,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body:    JSON.stringify({ ...body, params: normalizePrintParams(body.params) }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`createPrintJob failed: ${res.status} ${text}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/print/jobs`, {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Terminal-Id': terminalId,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body:    JSON.stringify({ ...body, params: normalizePrintParams(body.params) }),
+    })
+  } catch (err) {
+    throw networkError(err)
   }
+  if (!res.ok) await throwHttpError(res, token)
   return res.json() as Promise<PrintJobCreated>
 }
 
@@ -153,12 +174,14 @@ export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusR
   // 与 createPrintJob 不同，这里**不**因缺少终端身份而抛错：查状态不需要设备身份，
   // 硬要求会把「Agent 未就绪」变成看不到打印进度。取不到就不发，后端退化回按 IP 计数。
   const terminalId = getTerminalId()
-  const res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`, {
-    headers: terminalId ? { 'X-Terminal-Id': terminalId } : {},
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`getPrintJobStatus failed: ${res.status} ${text}`)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`, {
+      headers: terminalId ? { 'X-Terminal-Id': terminalId } : {},
+    })
+  } catch (err) {
+    throw networkError(err)
   }
+  if (!res.ok) await throwHttpError(res)
   return res.json() as Promise<PrintJobStatusResult>
 }

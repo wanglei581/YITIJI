@@ -31,6 +31,11 @@
 //     本文件从头到尾不 log body，也不把上游正文塞进 error message。
 // ============================================================================
 
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+/** 当前 HTTP 请求的 abort signal。客户端断开时取消上游 LLM，从而走配额回滚。 */
+export const llmRequestAbort = new AsyncLocalStorage<AbortSignal>()
+
 /**
  * 模型端卡住、由我们主动 abort。
  *
@@ -208,6 +213,17 @@ export async function llmFetchJson(
     controller.abort(new LlmTimeoutError(timeoutMs))
   }, timeoutMs)
 
+  const requestAbort = llmRequestAbort.getStore()
+  if (requestAbort?.aborted) {
+    clearTimeout(timer)
+    gate.release()
+    throw Object.assign(new Error('REQUEST_ABORTED'), { name: 'AbortError' })
+  }
+  const onRequestAbort = () => {
+    if (!timedOut && !controller.signal.aborted) controller.abort()
+  }
+  requestAbort?.addEventListener('abort', onRequestAbort, { once: true })
+
   try {
     const res = await doFetch(url, { ...init, signal: controller.signal })
     let data: unknown = null
@@ -229,6 +245,7 @@ export async function llmFetchJson(
     throw error
   } finally {
     clearTimeout(timer)
+    requestAbort?.removeEventListener('abort', onRequestAbort)
     gate.release()
   }
 }

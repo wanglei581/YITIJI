@@ -293,6 +293,58 @@
 }
 .print-done-notice svg { width: 20px; height: 20px; flex: none; margin-top: 2px; }
 
+.print-file-retention-headline {
+  margin: 4px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--print-ink);
+}
+
+.print-file-retention-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--print-muted);
+}
+
+.print-file-retention-note svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 2px;
+}
+
+.print-file-deletion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.print-file-deletion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--print-line);
+  border-radius: 12px;
+  background: var(--print-paper);
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--print-muted);
+}
+
+.print-file-deletion-item b {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--print-ink);
+  word-break: break-all;
+}
+
 /* 失败态：居中单列 */
 .print-done-fail {
   flex: 1;

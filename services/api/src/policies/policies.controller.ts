@@ -25,6 +25,7 @@ import { PublishActionDto } from '../jobs/dto/publish.dto'
  *     GET    /policies?kind=&audience=&category=
  *     GET    /policies/eligibility-questions      条件核对问项字典(P21)
  *     POST   /policies/eligibility-check          条件核对(P21,纯计算不落库)
+ *     GET    /policies/:id                        公开详情(未审/未发 404)
  *   Partner(Bearer + partner,本机构):
  *     GET    /partner/policies
  *     POST   /partner/policies                    新增(默认 pending+draft)
@@ -68,8 +69,7 @@ export class PoliciesController {
    * P21 问项字典。前端不得自己硬编码问项与取值 —— 取值一旦漂移,
    * 已录入的政策条件会静默失配,判定结果全变「无法判定」而没人发现。
    *
-   * 路由注册在 `policies/:id` 之类的通配路由之前不存在冲突问题:
-   * 本控制器没有 `GET /policies/:id`。
+   * 静态段必须写在 `GET /policies/:id` 之前，否则 eligibility-questions 会被当成 id。
    */
   @Get('policies/eligibility-questions')
   getEligibilityQuestions() {
@@ -90,17 +90,10 @@ export class PoliciesController {
   }
 
   /**
-   * 政策详情。此前只有列表端点，详情页一直是 404。
-   *
-   * **这个装饰器的位置是有意义的**：必须排在 policies/eligibility-questions 与
-   * policies/eligibility-check 之后。Nest 按声明顺序匹配，放前面会把
-   * `policies/eligibility-questions` 当成 `:id` 吃掉。
-   *
-   * 与 job-fairs/:id 同口径：查不到返回 data:null 而不是抛 404，
-   * 前端据此落空态。不区分「不存在」与「未发布」——区分了就泄露未发布政策的存在性。
+   * 公开政策详情。只返回 approved+published；其余一律 404，不泄露草稿/驳回。
    */
   @Get('policies/:id')
-  getPolicyById(@Param('id') id: string) {
+  getPublishedPolicy(@Param('id') id: string) {
     return this.policies.getPublishedPolicyById(id)
   }
 

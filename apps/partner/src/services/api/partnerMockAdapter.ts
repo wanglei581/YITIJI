@@ -1,4 +1,5 @@
 import { ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
+import { ApiHttpError } from './client'
 import { omitWebhookSecretOnce } from '../../routes/sources/omitWebhookSecretOnce'
 import type {
   ConnStatus,
@@ -11,6 +12,8 @@ import type {
   PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
+  PartnerSyncLogPage,
+  PartnerSyncLogsQuery,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -117,11 +120,11 @@ let PARTNER_JOBS: PartnerJobRecord[] = [
 // ─── Fairs (R2: added sourceName) ─────────────────────────────────────────────
 
 let PARTNER_FAIRS: PartnerFairRecord[] = [
-  { id: 'pf1', externalId: 'UNI-2026-FAIR-023', name: '高校双选会（春）',         organizer: '某大学就业指导中心', startTime: '2026-05-28 10:00', endTime: '2026-05-28 16:00', venue: '某大学体育馆',       status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/23', syncTime: '2026-05-23 09:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
-  { id: 'pf2', externalId: 'UNI-2026-FAIR-024', name: '互联网行业专场招聘',       organizer: '某大学就业指导中心', startTime: '2026-06-10 14:00', endTime: '2026-06-10 17:00', venue: '某大学图书馆报告厅', status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/24', syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
-  { id: 'pf3', externalId: 'UNI-2026-FAIR-020', name: '制造业专场招聘会',         organizer: '市人才交流中心',     startTime: '2026-05-25 09:00', endTime: '2026-05-25 15:00', venue: 'B区大厅',            status: 'ongoing',  sourceUrl: 'https://job.uni.edu.cn/fair/20', syncTime: '2026-05-22 14:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
-  { id: 'pf4', externalId: 'UNI-2026-FAIR-018', name: '护理医疗专场招聘',         organizer: '某大学就业指导中心', startTime: '2026-05-20 09:00', endTime: '2026-05-20 15:00', venue: 'C区多功能厅',        status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/18', syncTime: '2026-05-18 10:00', reviewStatus: 'approved',  publishStatus: 'unpublished', sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
-  { id: 'pf5', externalId: 'UNI-2026-FAIR-015', name: '2026 春季大型综合招聘会', organizer: '某大学就业指导中心', startTime: '2026-04-15 09:00', endTime: '2026-04-15 17:00', venue: '某大学操场',         status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/15', syncTime: '2026-04-10 10:00', reviewStatus: 'approved',  publishStatus: 'expired',     sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf1', externalId: 'UNI-2026-FAIR-023', name: '高校双选会（春）',         organizer: '某大学就业指导中心', startTime: '2026-05-28 10:00', endTime: '2026-05-28 16:00', venue: '某大学体育馆',       city: '青岛', status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/23', syncTime: '2026-05-23 09:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf2', externalId: 'UNI-2026-FAIR-024', name: '互联网行业专场招聘',       organizer: '某大学就业指导中心', startTime: '2026-06-10 14:00', endTime: '2026-06-10 17:00', venue: '某大学图书馆报告厅', city: '青岛', status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/24', syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf3', externalId: 'UNI-2026-FAIR-020', name: '制造业专场招聘会',         organizer: '市人才交流中心',     startTime: '2026-05-25 09:00', endTime: '2026-05-25 15:00', venue: 'B区大厅',            city: '青岛', status: 'ongoing',  sourceUrl: 'https://job.uni.edu.cn/fair/20', syncTime: '2026-05-22 14:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf4', externalId: 'UNI-2026-FAIR-018', name: '护理医疗专场招聘',         organizer: '某大学就业指导中心', startTime: '2026-05-20 09:00', endTime: '2026-05-20 15:00', venue: 'C区多功能厅',        city: '青岛', status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/18', syncTime: '2026-05-18 10:00', reviewStatus: 'approved',  publishStatus: 'unpublished', sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf5', externalId: 'UNI-2026-FAIR-015', name: '2026 春季大型综合招聘会', organizer: '某大学就业指导中心', startTime: '2026-04-15 09:00', endTime: '2026-04-15 17:00', venue: '某大学操场',         city: '青岛', status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/15', syncTime: '2026-04-10 10:00', reviewStatus: 'approved',  publishStatus: 'expired',     sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
 ]
 
 // ─── Sync Logs (R3: field names aligned with backend) ─────────────────────────
@@ -193,6 +196,8 @@ export const partnerMockAdapter = {
       canImportFairs: false,
       canManagePolicies: false,
       canManageSmartCampus: false,
+      canManageCompanies: true,
+      companyManageScope: 'unrestricted',
     }
   },
   async toggleDataSource(id: string): Promise<PartnerDataSource> {
@@ -215,21 +220,21 @@ export const partnerMockAdapter = {
   ): Promise<PartnerDataSourceCredentialRotationResult> {
     await delay()
     const source = DATA_SOURCES.find((s) => s.id === id)
-    if (!source) throw new Error('DATA_SOURCE_NOT_FOUND')
+    if (!source) throw new ApiHttpError('DATA_SOURCE_NOT_FOUND', '数据源不存在', 404)
     if (source.accessMode !== 'webhook' && source.accessMode !== 'api') {
-      throw new Error('DATA_SOURCE_HAS_NO_CREDENTIAL')
+      throw new ApiHttpError('DATA_SOURCE_HAS_NO_CREDENTIAL', '该接入方式不使用凭证，无需轮换', 400)
     }
     if (payload.confirmPhrase !== ROTATE_CREDENTIAL_CONFIRMATION) {
-      throw new Error('CREDENTIAL_ROTATION_CONFIRMATION_REQUIRED')
+      throw new ApiHttpError('CREDENTIAL_ROTATION_CONFIRMATION_REQUIRED', '轮换未确认，已取消', 400)
     }
     if (source.archived) {
-      throw new Error('DATA_SOURCE_ARCHIVED')
+      throw new ApiHttpError('DATA_SOURCE_ARCHIVED', '数据源已归档，无法轮换。请先取消归档', 400)
     }
     if (source.accessMode === 'api' && !payload.credential) {
-      throw new Error('CREDENTIAL_REQUIRED')
+      throw new ApiHttpError('CREDENTIAL_REQUIRED', 'API 数据源必须提供新的凭证', 400)
     }
     if (source.accessMode === 'webhook' && payload.credential && payload.credential.length < WEBHOOK_SECRET_MIN_LENGTH) {
-      throw new Error('WEBHOOK_SECRET_TOO_SHORT')
+      throw new ApiHttpError('WEBHOOK_SECRET_TOO_SHORT', `自定义 Webhook 密钥至少 ${WEBHOOK_SECRET_MIN_LENGTH} 位`, 400)
     }
     const rotatedAt = new Date().toISOString()
     DATA_SOURCES = DATA_SOURCES.map((s) =>
@@ -267,7 +272,7 @@ export const partnerMockAdapter = {
     await delay()
     const accessMode = payload.accessMode ?? 'excel'
     if (accessMode === 'webhook' && payload.credential && payload.credential.length < WEBHOOK_SECRET_MIN_LENGTH) {
-      throw new Error('WEBHOOK_SECRET_TOO_SHORT')
+      throw new ApiHttpError('WEBHOOK_SECRET_TOO_SHORT', `自定义 Webhook 密钥至少 ${WEBHOOK_SECRET_MIN_LENGTH} 位`, 400)
     }
     const id = `ds${Date.now()}`
     const webhookSecretOnce = accessMode === 'webhook' ? 'mock_webhook_secret_only_once' : undefined
@@ -320,7 +325,7 @@ export const partnerMockAdapter = {
   },
   async importPartnerJobs(items: ImportJobItem[]): Promise<ImportResult<PartnerJobRecord>> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     const added: PartnerJobRecord[] = items.map((item) => ({
       id: genId(), externalId: item.externalId, title: item.title,
       company: item.company, city: item.city,
@@ -337,7 +342,7 @@ export const partnerMockAdapter = {
   // 阶段1C:编辑本机构岗位(mock 同步后端状态机:编辑后回 pending+draft 重审)
   async updatePartnerJob(id: string, input: UpdatePartnerJobInput): Promise<PartnerJobRecord> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     PARTNER_JOBS = PARTNER_JOBS.map((j) =>
       j.id === id
         ? {
@@ -351,7 +356,7 @@ export const partnerMockAdapter = {
         : j,
     )
     const hit = PARTNER_JOBS.find((j) => j.id === id)
-    if (!hit) throw new Error('JOB_NOT_FOUND')
+    if (!hit) throw new ApiHttpError('JOB_NOT_FOUND', '岗位不存在', 404)
     return hit
   },
 
@@ -369,7 +374,7 @@ export const partnerMockAdapter = {
   },
   async importPartnerFairs(items: ImportFairItem[]): Promise<ImportResult<PartnerFairRecord>> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     const added: PartnerFairRecord[] = items.map((item) => {
       const start = new Date(item.startAt)
       const end   = new Date(item.endAt)
@@ -391,7 +396,7 @@ export const partnerMockAdapter = {
   // 阶段1C:编辑本机构招聘会(mock 同步后端状态机)
   async updatePartnerFair(id: string, input: UpdatePartnerFairInput): Promise<PartnerFairRecord> {
     await delay()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    const sync = new Date().toISOString()
     PARTNER_FAIRS = PARTNER_FAIRS.map((f) => {
       if (f.id !== id) return f
       const next = { ...f }
@@ -411,14 +416,29 @@ export const partnerMockAdapter = {
       return next
     })
     const hit = PARTNER_FAIRS.find((f) => f.id === id)
-    if (!hit) throw new Error('FAIR_NOT_FOUND')
+    if (!hit) throw new ApiHttpError('FAIR_NOT_FOUND', '招聘会不存在', 404)
     return hit
   },
 
   // Sync Logs (read-only)
-  async getSyncLogs(): Promise<PartnerSyncLog[]> {
+  async getSyncLogs(query?: PartnerSyncLogsQuery): Promise<PartnerSyncLogPage> {
     await delay()
-    return [...SYNC_LOGS]
+    const page = query?.page && query.page > 0 ? query.page : 1
+    const pageSize = query?.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, 100) : 20
+    let rows = [...SYNC_LOGS]
+    if (query?.result) rows = rows.filter((row) => row.status === query.result)
+    if (query?.sourceId) rows = rows.filter((row) => row.id === query.sourceId || row.source === query.sourceId)
+    const total = rows.length
+    const start = (page - 1) * pageSize
+    return {
+      data: rows.slice(start, start + pageSize),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+    }
   },
 
   // Excel Import (mock)

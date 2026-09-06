@@ -42,7 +42,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_TERMINAL_ID=KSK-001 VITE_KIOSK_LOGOUT_IDLE_SEC=180 VITE_KIOSK_PRIVACY_IDLE_SEC=3 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4187 --strictPort',
+    command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_TERMINAL_ID=KSK-001 VITE_KIOSK_LOGOUT_IDLE_SEC=180 VITE_KIOSK_PRIVACY_IDLE_SEC=3 VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC=2 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4187 --strictPort',
     url: 'http://127.0.0.1:4187',
     reuseExistingServer: false,
     timeout: 180_000,

@@ -26,6 +26,27 @@ import { jobValidityWhere } from './job-validity'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 
+/** 公开列表/详情的资料份数与资料页口径一致：已发布且未软删。 */
+const publicFairCountSelect = {
+  companies: true,
+  materials: { where: { deletedAt: null, publishStatus: 'published' } },
+} as const
+
+const JOB_SOURCE_ORG_TRUST_INCLUDE = {
+  org: { select: { contentTrustStatus: true, archivedAt: true } },
+} as const
+
+function withSourceOrgTrust(
+  dto: JobListItemDto,
+  org: { contentTrustStatus: string | null; archivedAt: Date | null } | null,
+): JobListItemDto {
+  return {
+    ...dto,
+    sourceContentTrustStatus: org ? org.contentTrustStatus : undefined,
+    sourceOrgArchived: org ? org.archivedAt != null : undefined,
+  }
+}
+
 @Injectable()
 export class JobsKioskService {
   constructor(private readonly prisma: PrismaService) {}
@@ -50,11 +71,12 @@ export class JobsKioskService {
         orderBy: [{ syncTime: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: JOB_SOURCE_ORG_TRUST_INCLUDE,
       }),
       this.prisma.job.count({ where }),
     ])
     return {
-      data: rows.map(prismaJobToListItem),
+      data: rows.map((row) => withSourceOrgTrust(prismaJobToListItem(row), row.org)),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     }
   }
@@ -74,8 +96,9 @@ export class JobsKioskService {
         publishStatus: 'published',
         ...jobValidityWhere(),
       },
+      include: JOB_SOURCE_ORG_TRUST_INCLUDE,
     })
-    return { data: j ? prismaJobToListItem(j) : null, success: true }
+    return { data: j ? withSourceOrgTrust(prismaJobToListItem(j), j.org) : null, success: true }
   }
 
   private async resolveCampusPreferredOrgId(terminalId?: string): Promise<string | null> {
@@ -114,7 +137,7 @@ export class JobsKioskService {
         orderBy: groups[i].orderBy,
         skip: remainingSkip,
         take,
-        include: { _count: { select: { companies: true } } },
+        include: { _count: { select: publicFairCountSelect } },
       })
       rows.push(...pageRows)
       remainingTake -= take
@@ -160,7 +183,7 @@ export class JobsKioskService {
   async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
     const f = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id, reviewStatus: 'approved', publishStatus: 'published' }),
-      include: { _count: { select: { companies: true } } },
+      include: { _count: { select: publicFairCountSelect } },
     })
     return { data: f ? prismaFairToListItem(f) : null, success: true }
   }

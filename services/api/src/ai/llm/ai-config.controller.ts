@@ -28,6 +28,7 @@ import { LlmChatService } from './llm-chat.service'
 import { LLM_PRESETS, isLlmVendor } from './llm-presets'
 import { buildAiConfigAuditPayload, didToggleEnabled } from './ai-config-audit'
 import { PaidAiThrottle } from '../../common/throttler/terminal-throttle'
+import { assertPublicLlmBaseUrl } from './llm-base-url'
 
 /**
  * 审计动作名。
@@ -88,6 +89,7 @@ function toConfigPatch(body: UpdateAiConfigDto): Parameters<LlmConfigService['up
   if (typeof body.temperature === 'number') patch.temperature = body.temperature
   if (typeof body.enabled === 'boolean')    patch.enabled = body.enabled
   if (body.apiKey !== undefined)       patch.apiKey = body.apiKey
+  if (patch.baseURL !== undefined) assertPublicLlmBaseUrl(patch.baseURL)
   return patch
 }
 
@@ -177,6 +179,7 @@ export class AiConfigController {
   @Post('test')
   async test(@Body() body: TestAiConfigDto) {
     const feature = body.feature === undefined ? 'assistant_chat' : this.config.assertValidFeatureKey(body.feature)
+    assertPublicLlmBaseUrl(this.config.getConfig(feature).baseURL)
     return this.chat.test(feature)
   }
 }
@@ -223,6 +226,8 @@ export class AiConfigsController {
 
   @Post(':featureKey/test')
   async testOne(@Param('featureKey') featureKey: string) {
-    return this.chat.test(this.config.assertValidFeatureKey(featureKey))
+    const feature = this.config.assertValidFeatureKey(featureKey)
+    assertPublicLlmBaseUrl(this.config.getConfig(feature).baseURL)
+    return this.chat.test(feature)
   }
 }

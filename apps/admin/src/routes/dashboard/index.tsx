@@ -109,6 +109,8 @@ const PRINT_STATUS_LABELS: Record<string, { label: string; status: 'success' | '
   printing: { label: '打印中', status: 'info' },
   completed: { label: '已完成', status: 'success' },
   failed: { label: '失败', status: 'error' },
+  cancelled: { label: '已取消', status: 'default' },
+  abandoned: { label: '已废弃', status: 'default' },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

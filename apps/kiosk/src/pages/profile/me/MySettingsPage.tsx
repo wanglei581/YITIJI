@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { useKioskSessionControl } from '../../../auth/KioskSessionControlContext'
 import { KIcon } from '../../../components/kiosk-icon'
 import { useInkRipple } from '../../../hooks/useInkRipple'
@@ -120,7 +121,7 @@ function PhoneRebindOverlay({
   const handle = async (fn: () => Promise<void>) => {
     setErr(null); setBusy(true)
     try { await fn() } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : '操作失败，请重试')
+      setErr(userMessageOf(e, '操作失败，请重试'))
     } finally { setBusy(false) }
   }
 

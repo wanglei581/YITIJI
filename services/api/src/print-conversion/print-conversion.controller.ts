@@ -28,6 +28,7 @@ export class PrintConversionController {
   ): Promise<ApiResponse<ConvertImagesResponse>> {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.conversion.convertImagesToPdf({
+      terminalId: body.terminalId,
       sources: body.sources,
       endUserId: endUser?.endUserId ?? null,
       idempotencyKey: idempotencyKey ?? null,

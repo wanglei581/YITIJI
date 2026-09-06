@@ -31,6 +31,7 @@ import {
   type UpdateOrgInput,
 } from '../../services/api/orgsAdmin'
 import { PartnerAccountManager } from './PartnerAccountManager'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { OrgContentTrustPanel } from './OrgContentTrustPanel'
 import {
   ORG_CONTENT_TRUST_STATUSES,
@@ -491,6 +492,7 @@ export default function PartnersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [detailOrgId, setDetailOrgId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   const load = useCallback(async () => {
@@ -507,9 +509,12 @@ export default function PartnersPage() {
 
   const toggleOrg = async (org: AdminOrgListItem) => {
     setBusyId(org.id)
+    setActionError(null)
     try {
       await orgsAdminService.setOrgStatus(org.id, org.enabled ? 'disable' : 'enable')
       await load()
+    } catch (e) {
+      setActionError(userMessageOf(e, org.enabled ? '停用失败，请稍后重试' : '启用失败，请稍后重试'))
     } finally {
       setBusyId(null)
     }
@@ -556,6 +561,11 @@ export default function PartnersPage() {
     >
       {listState === 'loading' && <LoadingState className="py-24" />}
       {listState === 'error' && <ErrorState className="py-24" onRetry={() => void load()} />}
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
+          {actionError}。请刷新后重试。
+        </div>
+      )}
 
       {listState === 'ready' && (
         <>

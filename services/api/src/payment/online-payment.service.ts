@@ -14,7 +14,7 @@
  * - 支付状态只改支付域（Order.payStatus / PaymentAttempt），绝不改 PrintTask.status。
  * - 出码/轮询/查单必须携带打印建单时服务端签发的短期 payment session token；orderId 不能单独授权。
  */
-import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
 import { randomBytes } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
@@ -40,6 +40,14 @@ const DEFAULT_QR_TTL_SECONDS = 300
 const DEFAULT_ORDER_TTL_SECONDS = 900
 /** 用户可见的失败安全文案 —— 渠道原始错误只进审计，绝不透传。 */
 const SAFE_FAIL_TEXT = '支付未完成，请重新发起支付'
+
+function isPickupWindowClosedError(error: unknown): boolean {
+  const exception = error as { getResponse?: () => unknown; message?: string }
+  const response = typeof exception.getResponse === 'function' ? exception.getResponse() : undefined
+  const nested = (response as { error?: { code?: string } } | undefined)?.error?.code
+  const text = `${nested ?? ''} ${exception.message ?? ''} ${String(error)}`
+  return text.includes('ORDER_PICKUP_WINDOW_CLOSED')
+}
 
 /** 验签/时间窗/解密类失败 → 401；其余业务校验失败 → 400。 */
 const UNAUTHORIZED_CALLBACK_CODES = new Set([
@@ -228,7 +236,7 @@ export class OnlinePaymentService {
       if (reserved.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
 
       // 先建行（status=created，占位）再向渠道出码，最后回填 pending + 码内容；
-      // 本地建行失败时由事务回滚 CAS 预留；渠道出码失败仍保留 created 以便惰性过期收敛。
+      // 本地建行失败时由事务回滚 CAS 预留；渠道出码抛错则尝试 failed、订单回 unpaid。
       return tx.paymentAttempt.create({
         data: {
           orderId: order.id,
@@ -239,13 +247,24 @@ export class OnlinePaymentService {
         },
       })
     })
-    const qr = await provider.createQrPayment({
-      orderId: order.id,
-      orderNo: order.orderNo,
-      attemptId: attempt.id,
-      amountCents: order.amountCents,
-      expiresAt: attemptExpiresAt,
-    })
+    let qr
+    try {
+      qr = await provider.createQrPayment({
+        orderId: order.id,
+        orderNo: order.orderNo,
+        attemptId: attempt.id,
+        amountCents: order.amountCents,
+        expiresAt: attemptExpiresAt,
+      })
+    } catch (error) {
+      await this.failQrCreateAttempt(attempt.id, order.id, provider.channel, error)
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'PAY_CHANNEL_UNAVAILABLE',
+          message: '支付通道暂时不可用，请稍后重试',
+        },
+      })
+    }
     const pendingAttempt = await this.prisma.paymentAttempt.update({
       where: { id: attempt.id },
       data: { status: 'pending', prepayId: qr.prepayId, qrCodeContent: qr.qrCodeContent },
@@ -681,7 +700,14 @@ export class OnlinePaymentService {
 
     // 先订单入账（CAS 幂等，线上通道 paymentSource 的唯一写入路径），再回填尝试；
     // 若回填前崩溃，渠道重试回调会再次幂等走到这里补齐。
-    await this.orderStatus.markPaidOnline(order.id, { channel, attemptId: attempt.id, channelTxnNo, late })
+    // 取件窗口已关：markPaidOnline 拒绝 paid 并记待退；渠道钱已到，尝试仍须 success，避免回调重试死循环。
+    try {
+      await this.orderStatus.markPaidOnline(order.id, { channel, attemptId: attempt.id, channelTxnNo, late })
+    } catch (error) {
+      if (!isPickupWindowClosedError(error)) throw error
+      await this.markAttemptChannelSuccess(attempt.id, channelTxnNo)
+      return { ok: true }
+    }
 
     let res: { count: number }
     try {
@@ -765,9 +791,14 @@ export class OnlinePaymentService {
     })
 
     if ((order.payStatus === 'unpaid' || order.payStatus === 'paying') && order.expiresAt && order.expiresAt < now) {
+      // 云打印认领后未付被关单时，pickupStatus 不得停在 claimed：再输码无法付款、小程序也无法取消。
+      // 回滚 pending，迟到回调若取件窗口仍开仍可入账履约；到机码展示由 visibleCode 按 payStatus 隐藏。
       await this.prisma.order.updateMany({
-        where: { id: order.id, payStatus: { in: ['unpaid', 'paying'] } },
-        data: { payStatus: 'closed' },
+        where: { id: order.id, payStatus: { in: ['unpaid', 'paying'] }, printTaskId: null },
+        data: {
+          payStatus: 'closed',
+          ...(order.pickupStatus === 'claimed' ? { pickupStatus: 'pending' } : {}),
+        },
       })
       return this.requireOrder(order.id)
     }
@@ -869,6 +900,49 @@ export class OnlinePaymentService {
     if (settledOrder.payStatus === 'unpaid') return { order: settledOrder, outcome: 'released' }
     if (settledOrder.payStatus === 'closed') return { order: settledOrder, outcome: 'closed' }
     return { order: settledOrder, outcome: 'skipped' }
+  }
+
+  private async failQrCreateAttempt(
+    attemptId: string,
+    orderId: string,
+    channel: string,
+    error: unknown,
+  ): Promise<void> {
+    await this.prisma.paymentAttempt.updateMany({
+      where: { id: attemptId, status: 'created' },
+      data: { status: 'failed', failReason: SAFE_FAIL_TEXT },
+    })
+    await this.prisma.order.updateMany({
+      where: { id: orderId, payStatus: 'paying' },
+      data: { payStatus: 'unpaid' },
+    })
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'payment.attempt_failed',
+      targetType: 'payment_attempt',
+      targetId: attemptId,
+      payload: {
+        orderId,
+        channel,
+        reasonRaw: error instanceof Error ? error.message : 'qr_create_failed',
+      },
+    })
+  }
+
+  private async markAttemptChannelSuccess(attemptId: string, channelTxnNo: string): Promise<void> {
+    try {
+      const res = await this.prisma.paymentAttempt.updateMany({
+        where: { id: attemptId, status: { in: ['created', 'pending', 'expired'] } },
+        data: { status: 'success', channelTxnNo, failReason: null },
+      })
+      if (res.count !== 0) return
+      const fresh = await this.prisma.paymentAttempt.findUnique({ where: { id: attemptId } })
+      if (fresh?.status === 'success' && fresh.channelTxnNo === channelTxnNo) return
+    } catch (e) {
+      if ((e as { code?: string })?.code === 'P2002') throw new BadRequestException('CALLBACK_TXN_ALREADY_USED')
+      throw e
+    }
   }
 
   private async requireOrder(orderId: string): Promise<OrderRecord> {

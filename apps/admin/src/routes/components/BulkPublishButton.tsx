@@ -10,6 +10,7 @@
 //   - 未点「确认发布」之前,本组件不写任何数据。
 // ============================================================
 
+import { formatDateTime } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
 import {
   bulkPublishService,
@@ -55,9 +56,7 @@ function dayEndIso(d: string): string {
 }
 
 function fmtTime(iso: string): string {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso.slice(0, 16).replace('T', ' ') : d.toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(iso, { fallback: '-' })
 }
 
 export function BulkPublishButton({ kind, orgOptions, onDone }: Props) {

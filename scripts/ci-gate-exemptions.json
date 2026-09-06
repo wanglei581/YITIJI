@@ -69,11 +69,5 @@
     "两个类别都是欠账不是结论。verify-ci-gate-coverage.mjs 里的 MAX_UNWIRED 只允许",
     "调低不允许调高 —— 想加新的，先还掉一条旧的。"
   ],
-  "unwiredScripts": [
-    {
-      "script": "apps/admin/scripts/verify-partner-account-delete-ui.mjs",
-      "category": "broken-pending-deletion",
-      "reason": "本次扫描里唯一一对自相矛盾的断言，也是流程信号而不只是死代码：本门禁断言 src/routes/partners/PartnerAccountDeletionDialog.tsx 必须存在且含 role=\"alertdialog\"，而同目录 verify-partner-account-action-ui.mjs:104 断言的恰恰是该文件必须不存在。该文件确已删除，本门禁实跑 4 条断言全 FAIL（exit 1）。两条门禁的作者互相不知道对方存在，只有被接线的那条在跑。不要接线 —— 接线只会让 CI 红。正确处置是删除本文件，等产品负责人逐条确认孤儿清单后另开 PR 执行。"
-    }
-  ]
+  "unwiredScripts": []
 }

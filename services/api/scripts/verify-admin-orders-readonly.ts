@@ -38,25 +38,28 @@ async function main(): Promise<void> {
   const unconfirmedTaskId = `ptask_aor_unconfirmed_${suffix}`
   const printedTaskId = `ptask_aor_printed_${suffix}`
   const notPrintedTaskId = `ptask_aor_notp_${suffix}`
+  const moneyTaskId = `ptask_aor_money_${suffix}`
   const orderId = `ord_aor_${suffix}`
   const brokenOrderId = `ord_aor_broken_${suffix}`
   const unconfirmedOrderId = `ord_aor_unconfirmed_${suffix}`
   const printedOrderId = `ord_aor_printed_${suffix}`
   const notPrintedOrderId = `ord_aor_notp_${suffix}`
+  const moneyOrderId = `ord_aor_money_${suffix}`
   const orderNo = `ORD-READ-${suffix.toUpperCase()}`
   const brokenOrderNo = `ORD-READ-B-${suffix.toUpperCase()}`
   const unconfirmedOrderNo = `ORD-READ-U-${suffix.toUpperCase()}`
   const printedOrderNo = `ORD-READ-P-${suffix.toUpperCase()}`
   const notPrintedOrderNo = `ORD-READ-N-${suffix.toUpperCase()}`
+  const moneyOrderNo = `ORD-READ-M-${suffix.toUpperCase()}`
 
   async function cleanup(): Promise<void> {
     const leftoverTasks = await prisma.printTask.findMany({
       where: { id: { startsWith: 'ptask_aor_' } },
       select: { id: true },
     })
-    const taskIds = [...new Set([taskId, brokenTaskId, unconfirmedTaskId, printedTaskId, notPrintedTaskId, ...leftoverTasks.map((task) => task.id)])]
+    const taskIds = [...new Set([taskId, brokenTaskId, unconfirmedTaskId, printedTaskId, notPrintedTaskId, moneyTaskId, ...leftoverTasks.map((task) => task.id)])]
     await prisma.order.deleteMany({
-      where: { OR: [{ id: { in: [orderId, brokenOrderId, unconfirmedOrderId, printedOrderId, notPrintedOrderId] } }, { orderNo: { startsWith: 'ORD-READ' } }] },
+      where: { OR: [{ id: { in: [orderId, brokenOrderId, unconfirmedOrderId, printedOrderId, notPrintedOrderId, moneyOrderId] } }, { orderNo: { startsWith: 'ORD-READ' } }] },
     })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
@@ -218,6 +221,40 @@ async function main(): Promise<void> {
         taskStatus: 'failed',
       },
     })
+    await prisma.printTask.create({
+      data: {
+        id: moneyTaskId,
+        terminalId,
+        endUserId,
+        fileUrl: 'https://internal.example/money',
+        fileMd5: 'sha256-money',
+        paramsJson: JSON.stringify({
+          fileName: '优惠退款核对.pdf',
+          copies: 1,
+          colorMode: 'black_white',
+          duplex: 'duplex_long_edge',
+          paperSize: 'A4',
+        }),
+        status: 'completed',
+        completedAt: new Date('2026-06-25T02:00:00.000Z'),
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: moneyOrderId,
+        orderNo: moneyOrderNo,
+        type: 'print',
+        printTaskId: moneyTaskId,
+        endUserId,
+        terminalId,
+        amountCents: 400,
+        currency: 'CNY',
+        payStatus: 'refunded',
+        taskStatus: 'completed',
+        discountCents: 80,
+        refundedAmountCents: 120,
+      },
+    })
     pass('fixtures created')
 
     const page = await service.list({ search: 'ORD-READ', page: 1, pageSize: 10 })
@@ -293,13 +330,29 @@ async function main(): Promise<void> {
       detail.id === orderId &&
       detail.print?.fileName === '只读订单验证.pdf' &&
       detail.print.pageRange === '1-2' &&
+      detail.print.duplex === 'simplex' &&
       detail.print.status === 'completed' &&
+      detail.discountCents === 0 &&
+      detail.refundedAmountCents === 0 &&
       detail.statusLogs.length === 2 &&
       detail.statusLogs[1]?.toStatus === 'completed'
     ) {
-      pass('detail returns whitelisted print detail and status logs')
+      pass('detail returns whitelisted print detail, amount fields and status logs')
     } else {
       fail(`detail mismatch: ${JSON.stringify(detail)}`)
+    }
+
+    const moneyDetail = await service.getById(moneyOrderId)
+    if (
+      moneyDetail.discountCents === 80 &&
+      moneyDetail.refundedAmountCents === 120 &&
+      moneyDetail.amountCents === 400 &&
+      moneyDetail.print?.duplex === 'duplex_long_edge' &&
+      moneyDetail.print?.pageRange === null
+    ) {
+      pass('detail 原样返回 discountCents / refundedAmountCents / duplex，缺 pageRange 为 null 不回落全部')
+    } else {
+      fail(`money detail mismatch: ${JSON.stringify(moneyDetail)}`)
     }
 
     const serialized = JSON.stringify({ page, detail })

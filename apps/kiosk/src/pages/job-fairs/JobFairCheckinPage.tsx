@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
-import type { ExternalJobFairDTO } from '@ai-job-print/shared'
+import { formatDateTime, type ExternalJobFairDTO } from '@ai-job-print/shared'
 import { CalendarIcon, MapPinIcon, QrCodeIcon, SmartphoneIcon, XIcon } from 'lucide-react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { getJobFairs, getTerminalId } from '../../services/api'
@@ -10,11 +10,8 @@ import { useAuth } from '../../auth/useAuth'
 import { isValidSourceUrl } from '../../lib/url'
 import { FusionBadge, FusionNotice, FusionStepStrip, KioskPageFrame } from '../jobs/components/W4Presentation'
 
-function formatDateTime(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+function formatFairDateTime(iso: string): string {
+  return formatDateTime(iso, { fallback: iso })
 }
 
 function CheckinQrOverlay({ fair, onClose }: { fair: ExternalJobFairDTO; onClose: () => void }) {
@@ -72,7 +69,7 @@ function CheckinEntryCard({ fair, onOpenQr }: { fair: ExternalJobFairDTO; onOpen
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[20px] text-[var(--muted)]">
           <span className="inline-flex items-center gap-2">
             <CalendarIcon className="h-5 w-5" />
-            {formatDateTime(fair.startTime)}
+            {formatFairDateTime(fair.startTime)}
           </span>
           <span className="inline-flex items-center gap-2">
             <MapPinIcon className="h-5 w-5" />
@@ -130,10 +127,22 @@ export function JobFairCheckinPage() {
     setLoading(true)
     setError(false)
 
-    getJobFairs({ terminalId: getTerminalId() })
-      .then((res) => {
+    const terminalId = getTerminalId()
+    const base = { pageSize: 100, ...(terminalId ? { terminalId } : {}) }
+    Promise.all([
+      getJobFairs({ ...base, status: 'ongoing' }),
+      getJobFairs({ ...base, status: 'upcoming' }),
+    ])
+      .then(([ongoing, upcoming]) => {
         if (!alive) return
-        setFairs(res.data)
+        const seen = new Set<string>()
+        const merged: ExternalJobFairDTO[] = []
+        for (const fair of [...ongoing.data, ...upcoming.data]) {
+          if (seen.has(fair.id)) continue
+          seen.add(fair.id)
+          merged.push(fair)
+        }
+        setFairs(merged)
       })
       .catch(() => {
         if (alive) setError(true)

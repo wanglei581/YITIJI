@@ -125,7 +125,6 @@ export class SmartCampusService {
       this.prisma.terminal.findMany({
         include: { org: { select: { id: true, name: true } }, heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
         orderBy: { registeredAt: 'desc' },
-        take: 500,
       }),
       this.prisma.terminalSmartCampusConfig.findMany(),
     ])
@@ -176,7 +175,6 @@ export class SmartCampusService {
         // Partner 分支同样需要真实心跳（Admin 与 Partner 两个查询都要改，不能只修一处）
         include: { heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
         orderBy: { registeredAt: 'desc' },
-        take: 500,
       }),
       this.prisma.terminalSmartCampusConfig.findMany(),
     ])

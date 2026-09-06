@@ -40,10 +40,29 @@ export class OrderQuoteService {
     // 报价就是用户看到的价；先按彩色报价、建单再拒，等于用错价把人骗到付款页。
     await this.assertTerminalAllowsParams(dto)
     await this.assertTerminalPrinterReady(dto.terminalId)
-    const { billablePages: documentPages, billingPageSource } =
-      await this.pageCount.resolveBillablePages(dto.fileUrl)
+    if (dto.lines?.length) return this.quoteLines(dto)
+    if (!dto.fileUrl) {
+      throw new BadRequestException({ error: { code: 'PRINT_FILE_REQUIRED', message: '缺少打印文件' } })
+    }
+    return this.quoteOne(dto.fileUrl, dto.params?.pageRange, dto)
+  }
 
-    const billablePages = countPagesInRange(dto.params?.pageRange, documentPages)
+  private async quoteLines(dto: QuotePrintOrderDto): Promise<PrintPriceQuote> {
+    // 逐行报价后聚合；每行继续走真实页数识别与同一套价目，绝不按前端页数/金额合算。
+    const quotes = await Promise.all(dto.lines!.map((line) => this.quoteOne(line.fileUrl, line.pageRange, dto)))
+    return {
+      amountCents: quotes.reduce((sum, quote) => sum + quote.amountCents, 0),
+      billablePages: quotes.reduce((sum, quote) => sum + quote.billablePages, 0),
+      // PrintPriceQuote 保持既有单值契约；混合来源的逐行事实仍由建单时 OrderItem 固化。
+      billingPageSource: quotes[0]!.billingPageSource,
+      lines: quotes.flatMap((quote) => quote.lines),
+    }
+  }
+
+  private async quoteOne(fileUrl: string, pageRange: string | undefined, dto: QuotePrintOrderDto): Promise<PrintPriceQuote> {
+    const { billablePages: documentPages, billingPageSource } = await this.pageCount.resolveBillablePages(fileUrl)
+
+    const billablePages = countPagesInRange(pageRange ?? dto.params?.pageRange, documentPages)
     if (billablePages === null) {
       throw new BadRequestException({
         error: {

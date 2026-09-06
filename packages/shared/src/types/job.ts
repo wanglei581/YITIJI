@@ -287,6 +287,14 @@ export interface PartnerDataSourceCapabilities {
   canManagePolicies: boolean
   /** 能否读写智慧校园配置（smart-campus.service.ts 的 PARTNER_NOT_SCHOOL 同源，读写都拒）。 */
   canManageSmartCampus: boolean
+  /** 能否维护企业展示资料（写入范围见 companyManageScope）。 */
+  canManageCompanies: boolean
+  /**
+   * unrestricted：不额外限制；
+   * fair_associated：招聘会主办方只能维护本机构招聘会已录入的参展企业；
+   * own_enterprise：企业来源方只能维护本企业（名称与机构名称一致）。
+   */
+  companyManageScope: 'unrestricted' | 'fair_associated' | 'own_enterprise'
 }
 
 // ============================================================
@@ -398,4 +406,12 @@ export interface ExternalJobDTO extends ExternalJob, JobNormalizedFields {
   dataSourceNote: string
   /** 企业展示关联（可选）：有值时前端可提供「查看企业」入口（/companies/:id） */
   companyProfileId?: string | null
+  /**
+   * 来源机构 Organization.contentTrustStatus。
+   * pending / active / suspended / revoked；null = 未标记；字段缺失 = 本次未读取到。
+   * 只表示该机构是否被允许在本系统发布信息，不构成岗位真实性背书。
+   */
+  sourceContentTrustStatus?: string | null
+  /** 来源机构是否已归档（archivedAt != null）。未读取到时省略。 */
+  sourceOrgArchived?: boolean
 }

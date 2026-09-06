@@ -50,7 +50,14 @@
 
 > 为什么单列 verify 脚本：一个脚本对应一条完整验收链路，机械按行数拆会割裂验收语义，且拆分本身有让门禁静默失效的风险。verify 脚本改用替代口径：单脚本单验收主题、新增断言优先扩写既有脚本、超 1500 行才按验收阶段拆分。完整口径见 [docs/governance/standards-index.md](../../../docs/governance/standards-index.md) 第五节。
 
-> **实测口径（2026-08-01 复核修正）**：`*/src` 下超 1000 行的文件有 **3 个，全部是 CSS**（`jobs-fairs-foundation.css` 1361、`admin/login.css` 1039、`partner/login.css` 1039）；`.ts/.tsx` 业务源码为 0。另有 7 个超 1000 行的 verify 脚本，但它们在 `*/scripts` 下，本就不在适用范围内。
+> **实测口径（2026-09-06 复核，取代 2026-08-01 版）**：`*/src` 下超 1000 行的文件是 **5 个**——
+> `kiosk/styles/prototype-v1.css` 1705、`kiosk/pages/styles/jobs-fairs-foundation.css` 1392、
+> **`services/api/src/files/files.service.ts` 1338（.ts 业务源码，8-01 版写的「`.ts/.tsx` 为 0」已失效）**、
+> `admin/routes/login/login.css` 1050、`partner/routes/login/login.css` 1050。
+> 分档全景：≤300 行 1133 个 / >300 行 286 个 / >500 行 109 个 / >800 行 18 个 / >1000 行 5 个（共 1419 个在适用范围内）。
+> 两份 `login.css` **逐字节相同**，抽到 `packages/ui` 加色板 token 可一次消掉 2 条清单项与 2100 行重复。
+> `files.service.ts` 在文件上传/存储主链路上（属硬件与合规链路），按 CLAUDE.md §8.1 上线前收口阶段不动，列入上线后重构清单。
+> 另有超 1000 行的 verify 脚本若干，它们在 `*/scripts` 下，本就不在适用范围内。
 > 本行此前写作「7 个超千行文件**全部**是 verify 脚本，业务源码为 0」——该结论来自只统计 `.ts/.tsx` 的命令，漏了同在 `*/src` 下的 CSS。复核命令（不要再只筛 `.ts/.tsx`）：
 >
 > ```bash

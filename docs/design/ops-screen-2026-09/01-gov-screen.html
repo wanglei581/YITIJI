@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>运营数据大屏 · 政务版（1920×1080）</title>
+<link rel="stylesheet" href="screen.css">
+</head>
+<body>
+<div class="screen">
+
+  <div class="hd">
+    <div>
+      <h1>就业服务终端 · 运行概览</h1>
+      <p class="sub">数据来源：本平台终端心跳、打印订单、AI 服务日志、已审核发布的第三方岗位与招聘会信息</p>
+    </div>
+    <div class="stamp">
+      更新于 <b>2026-09-06 09:42:15</b><br>
+      <span class="win">在线判定窗口 180 秒 · 统计时区 Asia/Shanghai · 每 60 秒刷新</span>
+    </div>
+  </div>
+
+  <div class="grid g-gov">
+
+    <!-- 行 1：四个 KPI。只放能追溯到台账的数 -->
+    <div class="card">
+      <h2>在网终端</h2>
+      <div class="body kpi">
+        <div class="n">37<span class="u">/ 42 台</span></div>
+        <div class="lb">最近 180 秒有心跳</div>
+      </div>
+      <div class="foot">Terminal + TerminalHeartbeat。口径与「终端管理」页一致。</div>
+    </div>
+
+    <div class="card">
+      <h2>累计打印</h2>
+      <div class="body kpi">
+        <div class="n">128,431<span class="u">页</span></div>
+        <div class="lb">黑白 111,902 · 彩色 16,529</div>
+      </div>
+      <div class="foot">Order.billablePages 求和，按计价项分色。双面不单独计价，故不拆双面。</div>
+    </div>
+
+    <div class="card">
+      <h2>AI 服务调用</h2>
+      <div class="body kpi">
+        <div class="n">9,706<span class="u">次</span></div>
+        <div class="lb">简历诊断 / 优化 / 模拟面试 / 职业规划</div>
+      </div>
+      <div class="foot">AiServiceLog 累计。该日志为 best-effort 写入，仅作趋势，不作台账。</div>
+    </div>
+
+    <div class="card">
+      <h2>在架岗位信息</h2>
+      <div class="body kpi">
+        <div class="n">2,184<span class="u">条</span></div>
+        <div class="lb">来自 23 家信息来源机构</div>
+      </div>
+      <div class="foot">已审核通过 + 已发布 + 未过期。均为第三方 / 官方来源信息，本平台不收简历。</div>
+    </div>
+
+    <!-- 行 2 左：设备墙 -->
+    <div class="card c2 r-tall">
+      <h2>终端状态墙 <span class="tag">42 台</span></h2>
+      <div class="body">
+        <div class="fleet">
+          <div class="fleet-sum">
+            <div class="frow"><span class="dot" style="background:var(--ok)"></span><span class="v">33</span><span class="k">正常</span></div>
+            <div class="frow"><span class="dot" style="background:var(--warn)"></span><span class="v">4</span><span class="k">打印机告警</span></div>
+            <div class="frow"><span class="dot" style="background:var(--err)"></span><span class="v">3</span><span class="k">离线</span></div>
+            <div class="frow"><span class="dot" style="background:#33564d"></span><span class="v">2</span><span class="k">从未上报</span></div>
+          </div>
+          <div class="dots">
+            <div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d warn"></div>
+            <div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d err"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div>
+            <div class="d ok"></div><div class="d warn"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d unk"></div><div class="d ok"></div>
+            <div class="d ok"></div><div class="d ok"></div><div class="d err"></div><div class="d ok"></div><div class="d ok"></div><div class="d warn"></div><div class="d ok"></div><div class="d ok"></div>
+            <div class="d ok"></div><div class="d ok"></div><div class="d ok"></div><div class="d unk"></div><div class="d ok"></div><div class="d err"></div><div class="d ok"></div><div class="d warn"></div>
+            <div class="d ok"></div><div class="d ok"></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot">每格一台终端，按站点名排序。「从未上报」= 已注册但没有过任何心跳，与「离线」分开计，不并进在线率分母的分子。</div>
+    </div>
+
+    <!-- 行 2 右：内容归集 -->
+    <div class="card c2 r-tall">
+      <h2>信息归集 <span class="tag">在架量</span></h2>
+      <div class="body">
+        <div class="mini">
+          <div class="m"><div class="mv">2,184</div><div class="mk">岗位信息</div><div class="ms">待审 46 · 审核中 12</div></div>
+          <div class="m"><div class="mv">37</div><div class="mk">招聘会信息</div><div class="ms">待审 5 · 审核中 1</div></div>
+          <div class="m"><div class="mv">216</div><div class="mk">政策公告</div><div class="ms">待审 8 · 审核中 0</div></div>
+          <div class="m"><div class="mv">148</div><div class="mk">企业展示</div><div class="ms">待审 11 · 审核中 3</div></div>
+        </div>
+      </div>
+      <div class="foot">「在架」= 审核通过且已发布且未过期。所有条目均标注来源机构、外部 ID 与同步时间，可逐条追溯。</div>
+    </div>
+
+    <!-- 行 3：AI 分项 / 打印趋势 / 两块未接入 -->
+    <div class="card">
+      <h2>AI 服务分项 <span class="tag">近 24 小时</span></h2>
+      <div class="body">
+        <div class="bars">
+          <div class="bar-r"><span class="bl">简历诊断</span><span class="bar-t"><span class="bar-f" style="width:100%"></span></span><span class="bv">312</span></div>
+          <div class="bar-r"><span class="bl">简历优化</span><span class="bar-t"><span class="bar-f" style="width:63%"></span></span><span class="bv">197</span></div>
+          <div class="bar-r"><span class="bl">模拟面试</span><span class="bar-t"><span class="bar-f" style="width:27%"></span></span><span class="bv">84</span></div>
+          <div class="bar-r"><span class="bl">职业规划</span><span class="bar-t"><span class="bar-f" style="width:19%"></span></span><span class="bv">61</span></div>
+          <div class="bar-r"><span class="bl">调用失败</span><span class="bar-t"><span class="bar-f e" style="width:5%"></span></span><span class="bv">17</span></div>
+        </div>
+      </div>
+      <div class="foot">AiServiceLog 近 24 小时滚动窗（非自然日）。失败含超时与上游拒绝。</div>
+    </div>
+
+    <div class="card">
+      <h2>打印量 <span class="tag">近 14 日</span></h2>
+      <div class="body">
+        <svg class="spark" viewBox="0 0 300 120" preserveAspectRatio="none" aria-label="近 14 日每日打印页数折线">
+          <polyline fill="none" stroke="#35ab8e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"
+            points="4,92 26,78 48,84 70,56 92,63 114,41 136,49 158,33 180,44 202,28 224,36 246,22 268,31 292,18"/>
+          <polyline fill="rgba(53,171,142,.13)" stroke="none"
+            points="4,92 26,78 48,84 70,56 92,63 114,41 136,49 158,33 180,44 202,28 224,36 246,22 268,31 292,18 292,120 4,120"/>
+        </svg>
+      </div>
+      <div class="foot">按自然日聚合，Asia/Shanghai。峰值 1,842 页 / 日（09-05）。</div>
+    </div>
+
+    <div class="card is-na">
+      <h2>服务人次</h2>
+      <div class="body">
+        <div class="na">
+          <div class="t">未接入</div>
+          <div class="d">会话表当前无写入，无法统计到人次。可替代口径是「登录会员数（去重）」，但不含匿名使用者，与行业「服务人次」不是同一件事，因此不在此处冒名顶替。</div>
+        </div>
+      </div>
+      <div class="foot">接入方式：补 KioskSession 写入，或改用明确命名的「登录会员数（不含匿名）」。</div>
+    </div>
+
+    <div class="card is-na">
+      <h2>耗材余量 / 终端地图</h2>
+      <div class="body">
+        <div class="na">
+          <div class="t">未接入</div>
+          <div class="d">打印机心跳只上报状态枚举（就绪 / 缺纸 / 故障），没有硒鼓与纸张的数值余量；终端也没有经纬度字段，画不出地图。两者都不用估算值代替。</div>
+        </div>
+      </div>
+      <div class="foot">耗材余量需驱动侧补 SNMP / 厂商接口；地图需给 Terminal 加经纬度。</div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

@@ -44,6 +44,11 @@ export interface MemberPrintOrderItem {
   duplex: DuplexMode | null
   /** 纸张幅面（来自 paramsJson，当前机型固定 A4）；缺省为 null */
   paperSize: string | null
+  /**
+   * 页范围（来自 paramsJson）。省略或空串为 null。
+   * `'all'` 表示下单时写明了全部页面；缺失不得显示成「全部」。
+   */
+  pageRange: string | null
   // ── 支付字段（P0a 支付域，无 live 网关；可选以保持向后兼容）：关联 Order 才有值；历史无 Order 一律 null ──
   /** 金额（分）；无 Order 为 null。 */
   amountCents?: number | null

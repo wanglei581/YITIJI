@@ -169,7 +169,11 @@ function main(): void {
       "import { getTerminalId } from '../api/screensaver'",
       'const terminalId = getTerminalId()',
       "'X-Terminal-Id': terminalId",
-      'missing terminal id',
+      // 断言的是「拿不到终端号就在发请求之前抛」这个行为，不是某句英文提示。
+      // 任务包 3 把它换成了带错误码的用户可读中文（ApiHttpError），
+      // 行为不变；继续断言英文 marker 只会把「统一错误口径」这类正确改动判红。
+      'if (!terminalId)',
+      'TERMINAL_NOT_READY',
     ],
     'Kiosk print API must send the runtime terminal id and fail closed when missing',
   )

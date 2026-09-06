@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   Min,
   ValidateNested,
@@ -57,10 +58,11 @@ export class ImportFairItemDto {
   @IsOptional() @IsString() @MaxLength(5000)
   description?: string
 
-  @IsString() @IsNotEmpty() @MaxLength(500)
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true }) @MaxLength(500)
   sourceUrl!: string
 
   @IsOptional() @IsString() @MaxLength(500)
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   checkinUrl?: string
 
   @IsOptional() @IsInt() @Min(0)

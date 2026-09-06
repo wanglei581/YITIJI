@@ -22,6 +22,8 @@ import {
   type ScreensaverTerminalView,
 } from '../../services/api/screensaver'
 import { API_BASE_URL } from '../../services/api/client'
+import { saveScreensaverTerminalForm, screensaverTerminalFormState } from './terminalConfigState'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 type Tab = 'assets' | 'playlists' | 'terminals'
 
@@ -122,7 +124,7 @@ function AssetsTab() {
     screensaverService
       .listAssets()
       .then(setAssets)
-      .catch((e) => setListError(e?.message ?? '加载失败'))
+      .catch((e) => setListError(userMessageOf(e, '加载失败，请稍后重试')))
       .finally(() => setLoading(false))
   }, [])
 
@@ -143,7 +145,7 @@ function AssetsTab() {
       setDuration('')
       reload()
     } catch (e) {
-      setUploadError((e as Error)?.message ?? '上传失败')
+      setUploadError(userMessageOf(e, '上传失败，请稍后重试'))
     } finally {
       setUploading(false)
     }
@@ -168,7 +170,7 @@ function AssetsTab() {
       setExtDuration('')
       reload()
     } catch (e) {
-      setExtError((e as Error)?.message ?? '添加失败')
+      setExtError(userMessageOf(e, '添加失败，请稍后重试'))
     } finally {
       setExtSubmitting(false)
     }
@@ -176,8 +178,12 @@ function AssetsTab() {
 
   const toggleStatus = useCallback(
     async (a: AdAssetView) => {
-      await screensaverService.updateAsset(a.id, { status: a.status === 'active' ? 'disabled' : 'active' })
-      reload()
+      try {
+        await screensaverService.updateAsset(a.id, { status: a.status === 'active' ? 'disabled' : 'active' })
+        reload()
+      } catch (e) {
+        setListError(userMessageOf(e, '启停失败，请稍后重试'))
+      }
     },
     [reload],
   )
@@ -185,8 +191,12 @@ function AssetsTab() {
   const remove = useCallback(
     async (a: AdAssetView) => {
       if (!window.confirm(`确认删除素材「${a.title}」？删除后绑定它的播放方案将不再播放此素材。`)) return
-      await screensaverService.deleteAsset(a.id)
-      reload()
+      try {
+        await screensaverService.deleteAsset(a.id)
+        reload()
+      } catch (e) {
+        setListError(userMessageOf(e, '删除失败，请稍后重试'))
+      }
     },
     [reload],
   )
@@ -432,7 +442,7 @@ function PlaylistsTab() {
         setPlaylists(pl)
         setAssets(as.filter((a) => a.status === 'active'))
       })
-      .catch((e) => setError((e as Error)?.message ?? '加载失败'))
+      .catch((e) => setError(userMessageOf(e, '加载失败，请稍后重试')))
       .finally(() => setLoading(false))
   }, [])
 
@@ -464,15 +474,19 @@ function PlaylistsTab() {
       setEditor(null)
       reload()
     } catch (e) {
-      setError((e as Error)?.message ?? '保存失败')
+      setError(userMessageOf(e, '保存失败，请稍后重试'))
     }
   }, [editor, reload])
 
   const remove = useCallback(
     async (p: AdPlaylistView) => {
       if (!window.confirm(`确认删除播放方案「${p.name}」？绑定它的终端将自动停用屏保。`)) return
-      await screensaverService.deletePlaylist(p.id)
-      reload()
+      try {
+        await screensaverService.deletePlaylist(p.id)
+        reload()
+      } catch (e) {
+        setError(userMessageOf(e, '删除失败，请稍后重试'))
+      }
     },
     [reload],
   )
@@ -667,7 +681,7 @@ function TerminalsTab() {
         setTerminals(ts)
         setPlaylists(pl)
       })
-      .catch((e) => setError((e as Error)?.message ?? '加载失败'))
+      .catch((e) => setError(userMessageOf(e, '加载失败，请稍后重试')))
       .finally(() => setLoading(false))
   }, [])
 
@@ -698,9 +712,10 @@ function TerminalConfigRow({
   onSaved: () => void
 }) {
   const cfg = terminal.config
-  const [enabled, setEnabled] = useState(cfg?.enabled ?? false)
-  const [timeout, setTimeoutSec] = useState(String(cfg?.idleTimeoutSec ?? 180))
-  const [playlistId, setPlaylistId] = useState(cfg?.playlistId ?? '')
+  const initialState = screensaverTerminalFormState(cfg)
+  const [enabled, setEnabled] = useState(initialState.enabled)
+  const [timeout, setTimeoutSec] = useState(initialState.timeout)
+  const [playlistId, setPlaylistId] = useState(initialState.playlistId)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -708,16 +723,20 @@ function TerminalConfigRow({
     setSaving(true)
     setMsg(null)
     try {
-      const sec = Math.max(30, Math.min(1800, Number(timeout) || 180))
-      await screensaverService.saveConfig(terminal.terminalId, {
+      const nextState = await saveScreensaverTerminalForm(
+        screensaverService.saveConfig,
+        terminal.terminalId,
         enabled,
-        idleTimeoutSec: sec,
-        playlistId: playlistId || null,
-      })
+        timeout,
+        playlistId,
+      )
+      setEnabled(nextState.enabled)
+      setTimeoutSec(nextState.timeout)
+      setPlaylistId(nextState.playlistId)
       setMsg('已保存')
       onSaved()
     } catch (e) {
-      setMsg((e as Error)?.message ?? '保存失败')
+      setMsg(userMessageOf(e, '保存失败，请稍后重试'))
     } finally {
       setSaving(false)
     }
@@ -734,7 +753,13 @@ function TerminalConfigRow({
       </div>
 
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          disabled={!playlistId}
+          title={!playlistId ? '请先选择播放方案' : undefined}
+        />
         启用待机宣传屏
       </label>
 
@@ -754,7 +779,11 @@ function TerminalConfigRow({
         <label className="mb-1 block text-xs text-neutral-500">播放方案</label>
         <select
           value={playlistId}
-          onChange={(e) => setPlaylistId(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value
+            setPlaylistId(value)
+            if (!value) setEnabled(false)
+          }}
           className="h-10 w-52 rounded-md border border-neutral-300 px-3 text-sm"
         >
           <option value="">未绑定</option>

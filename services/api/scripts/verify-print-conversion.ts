@@ -42,8 +42,12 @@ import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-print-conversion-secret-0123456789-abcdef'
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import zlib from 'node:zlib'
+import { ForbiddenException } from '@nestjs/common'
 import { PrintConversionService } from '../src/print-conversion/print-conversion.service'
 import { signFileUrl } from '../src/files/signing'
 
@@ -311,16 +315,50 @@ function file(overrides: Partial<StoredFile> = {}): StoredFile {
   }
 }
 
+class FakeCapabilities {
+  status: 'available' | 'maintenance' = 'available'
+  calls: Array<{ terminalId: string; capabilityKey: string }> = []
+  async assertUserTaskAllowed(terminalId: string, capabilityKey: string): Promise<void> {
+    this.calls.push({ terminalId, capabilityKey })
+    if (this.status !== 'available') {
+      throw new ForbiddenException({
+        error: { code: 'CAPABILITY_UNAVAILABLE', message: '该终端当前不提供此服务，请咨询现场工作人员' },
+      })
+    }
+  }
+}
+
+const TERMINAL_ID = 'term-convert-1'
+
+function runConvert(
+  service: PrintConversionService,
+  args: {
+    sources: Array<{ fileId: string; fileAccessUrl: string }>
+    endUserId: string | null
+    idempotencyKey?: string | null
+    terminalId?: string
+  },
+) {
+  return service.convertImagesToPdf({ ...args, terminalId: args.terminalId ?? TERMINAL_ID })
+}
+
 function makeService() {
   const prisma = new FakePrisma()
   const storage = new FakeStorage()
   const audit = new FakeAudit()
   const files = new FakeFiles(prisma)
   const redis = new FakeRedis()
-  // 真实构造函数参数顺序：(prisma, storage, audit, files, redis) —— 已对照
-  // print-conversion.service.ts 当前源码确认，非凭空假设。
-  const service = new PrintConversionService(prisma as never, storage as never, audit as never, files as never, redis as never)
-  return { service, prisma, storage, audit, redis }
+  const capabilities = new FakeCapabilities()
+  // 真实构造函数参数顺序：(prisma, storage, audit, files, redis, capabilities)
+  const service = new PrintConversionService(
+    prisma as never,
+    storage as never,
+    audit as never,
+    files as never,
+    redis as never,
+    capabilities as never,
+  )
+  return { service, prisma, storage, audit, redis, capabilities }
 }
 
 function seedImage(prisma: FakePrisma, storage: FakeStorage, id: string, overrides: Partial<StoredFile> = {}): StoredFile {
@@ -353,11 +391,20 @@ function idemRedisKey(endUserId: string | null, idempotencyKey: string): string 
 }
 
 async function main() {
+  const apiRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const serviceSrc = readFileSync(join(apiRoot, 'src/print-conversion/print-conversion.service.ts'), 'utf8')
+  const dtoSrc = readFileSync(join(apiRoot, 'src/print-conversion/print-conversion.dto.ts'), 'utf8')
+  const controllerSrc = readFileSync(join(apiRoot, 'src/print-conversion/print-conversion.controller.ts'), 'utf8')
+  assert.match(serviceSrc, /assertUserTaskAllowed\(terminalId, 'format_convert'\)/)
+  assert.match(dtoSrc, /terminalId!: string/)
+  assert.match(controllerSrc, /terminalId: body\.terminalId/)
+  pass('格式转换请求体与服务端必须带 terminalId + format_convert 能力门禁')
+
   // 1) 空列表拒绝
   {
     const { service } = makeService()
     await expectCode(
-      () => service.convertImagesToPdf({ sources: [], endUserId: null }),
+      () => runConvert(service, { sources: [], endUserId: null }),
       'CONVERT_INPUT_INVALID',
       '空列表拒绝',
     )
@@ -368,7 +415,7 @@ async function main() {
     const { service } = makeService()
     const sources = Array.from({ length: 21 }, (_, i) => ({ fileId: `f${i}`, fileAccessUrl: '' }))
     await expectCode(
-      () => service.convertImagesToPdf({ sources, endUserId: null }),
+      () => runConvert(service, { sources, endUserId: null }),
       'CONVERT_TOO_MANY_IMAGES',
       '超过 20 张图片拒绝',
     )
@@ -379,7 +426,7 @@ async function main() {
     const { service } = makeService()
     await expectCode(
       () =>
-        service.convertImagesToPdf({
+        runConvert(service, {
           sources: [
             { fileId: 'dup1', fileAccessUrl: '' },
             { fileId: 'dup1', fileAccessUrl: '' },
@@ -397,7 +444,7 @@ async function main() {
     seedImage(prisma, storage, 'g1')
     seedImage(prisma, storage, 'g2')
     await expectCode(
-      () => service.convertImagesToPdf({ sources: [{ fileId: 'g1', fileAccessUrl: guestAccessUrl('g2') }], endUserId: null }),
+      () => runConvert(service, { sources: [{ fileId: 'g1', fileAccessUrl: guestAccessUrl('g2') }], endUserId: null }),
       'CONVERT_SOURCE_NOT_FOUND',
       '游客访问凭证与 fileId 不匹配拒绝',
     )
@@ -408,7 +455,7 @@ async function main() {
     const { service, prisma, storage } = makeService()
     seedImage(prisma, storage, 'm1', { endUserId: 'other_member', ownerType: 'user', ownerId: 'other_member' })
     await expectCode(
-      () => service.convertImagesToPdf({ sources: [{ fileId: 'm1', fileAccessUrl: '' }], endUserId: 'me' }),
+      () => runConvert(service, { sources: [{ fileId: 'm1', fileAccessUrl: '' }], endUserId: 'me' }),
       'CONVERT_SOURCE_NOT_FOUND',
       '会员访问他人文件拒绝',
     )
@@ -419,7 +466,7 @@ async function main() {
     const { service, prisma, storage } = makeService()
     seedImage(prisma, storage, 'w1', { mimeType: 'image/webp' })
     await expectCode(
-      () => service.convertImagesToPdf({ sources: [{ fileId: 'w1', fileAccessUrl: guestAccessUrl('w1') }], endUserId: null }),
+      () => runConvert(service, { sources: [{ fileId: 'w1', fileAccessUrl: guestAccessUrl('w1') }], endUserId: null }),
       'CONVERT_SOURCE_TYPE_UNSUPPORTED',
       '不支持的图片类型拒绝',
     )
@@ -432,7 +479,7 @@ async function main() {
       seedImage(prisma, storage, id)
       return { fileId: id, fileAccessUrl: guestAccessUrl(id) }
     })
-    const result = await service.convertImagesToPdf({ sources, endUserId: null })
+    const result = await runConvert(service, { sources, endUserId: null })
     assert.equal(result.pages, 3, 'output should have 3 pages')
     assert.match(result.printFileUrl, /^\/api\/v1\/files\//, 'must return internal HMAC url, not COS url')
     assert.equal(audit.entries.length, 1)
@@ -448,8 +495,8 @@ async function main() {
       seedImage(prisma, storage, id)
       return { fileId: id, fileAccessUrl: guestAccessUrl(id) }
     })
-    const first = await service.convertImagesToPdf({ sources, endUserId: null, idempotencyKey: 'k1' })
-    const second = await service.convertImagesToPdf({ sources, endUserId: null, idempotencyKey: 'k1' })
+    const first = await runConvert(service, { sources, endUserId: null, idempotencyKey: 'k1' })
+    const second = await runConvert(service, { sources, endUserId: null, idempotencyKey: 'k1' })
     assert.equal(first.fileId, second.fileId, 'same idempotency key must reuse output')
     assert.equal(audit.entries.length, 1, 'must not audit-log twice for the same idempotency key')
     pass('相同 idempotencyKey 复用同一输出，且不重复审计')
@@ -460,10 +507,10 @@ async function main() {
     const { service, prisma, storage } = makeService()
     seedImage(prisma, storage, 'c1')
     seedImage(prisma, storage, 'c2')
-    await service.convertImagesToPdf({ sources: [{ fileId: 'c1', fileAccessUrl: guestAccessUrl('c1') }], endUserId: null, idempotencyKey: 'k2' })
+    await runConvert(service, { sources: [{ fileId: 'c1', fileAccessUrl: guestAccessUrl('c1') }], endUserId: null, idempotencyKey: 'k2' })
     await expectCode(
       () =>
-        service.convertImagesToPdf({
+        runConvert(service, {
           sources: [{ fileId: 'c2', fileAccessUrl: guestAccessUrl('c2') }],
           endUserId: null,
           idempotencyKey: 'k2',
@@ -478,7 +525,7 @@ async function main() {
     const { service, prisma, storage } = makeService()
     seedImage(prisma, storage, 'big1', { sizeBytes: 10 * 1024 * 1024 + 1 })
     await expectCode(
-      () => service.convertImagesToPdf({ sources: [{ fileId: 'big1', fileAccessUrl: guestAccessUrl('big1') }], endUserId: null }),
+      () => runConvert(service, { sources: [{ fileId: 'big1', fileAccessUrl: guestAccessUrl('big1') }], endUserId: null }),
       'CONVERT_SOURCE_TOO_LARGE',
       '单张图片超过 10MB 拒绝',
     )
@@ -494,7 +541,7 @@ async function main() {
     seedImage(prisma, storage, 'huge1')
     storage.objects.set('key_huge1', withLyingDimensions(makePng(4, 4), 6000, 6000))
     await expectCode(
-      () => service.convertImagesToPdf({ sources: [{ fileId: 'huge1', fileAccessUrl: guestAccessUrl('huge1') }], endUserId: null }),
+      () => runConvert(service, { sources: [{ fileId: 'huge1', fileAccessUrl: guestAccessUrl('huge1') }], endUserId: null }),
       'CONVERT_IMAGE_DIMENSIONS_INVALID',
       '单张图片像素超限拒绝（而非误判为解析失败）',
       '单张图片像素超出限制',
@@ -509,7 +556,7 @@ async function main() {
     await redis.setNxEx(key, JSON.stringify({ status: 'in_progress', fingerprint: fingerprintFileIds(['i1']) }), 120)
     await expectCode(
       () =>
-        service.convertImagesToPdf({
+        runConvert(service, {
           sources: [{ fileId: 'i1', fileAccessUrl: guestAccessUrl('i1') }],
           endUserId: null,
           idempotencyKey: 'k3',
@@ -524,7 +571,7 @@ async function main() {
   {
     const { service, prisma, storage, audit } = makeService()
     seedImage(prisma, storage, 'sec1')
-    const first = await service.convertImagesToPdf({
+    const first = await runConvert(service, {
       sources: [{ fileId: 'sec1', fileAccessUrl: guestAccessUrl('sec1') }],
       endUserId: null,
       idempotencyKey: 'sec-k1',
@@ -533,7 +580,7 @@ async function main() {
 
     await expectCode(
       () =>
-        service.convertImagesToPdf({
+        runConvert(service, {
           sources: [{ fileId: 'sec1', fileAccessUrl: tamperedAccessUrl('sec1') }],
           endUserId: null,
           idempotencyKey: 'sec-k1',
@@ -554,7 +601,7 @@ async function main() {
     const key = idemRedisKey(null, 'k-corrupt')
     await redis.setEx(key, 120, '{not valid json')
 
-    const result = await service.convertImagesToPdf({
+    const result = await runConvert(service, {
       sources: [{ fileId: 'corrupt1', fileAccessUrl: guestAccessUrl('corrupt1') }],
       endUserId: null,
       idempotencyKey: 'k-corrupt',
@@ -575,7 +622,7 @@ async function main() {
     seedImage(prisma, storage, 'fail1', { mimeType: 'image/webp' })
     await expectCode(
       () =>
-        service.convertImagesToPdf({
+        runConvert(service, {
           sources: [{ fileId: 'fail1', fileAccessUrl: guestAccessUrl('fail1') }],
           endUserId: null,
           idempotencyKey: 'k-retry',
@@ -585,13 +632,44 @@ async function main() {
     )
 
     seedImage(prisma, storage, 'fail2')
-    const retry = await service.convertImagesToPdf({
+    const retry = await runConvert(service, {
       sources: [{ fileId: 'fail2', fileAccessUrl: guestAccessUrl('fail2') }],
       endUserId: null,
       idempotencyKey: 'k-retry',
     })
     assert.ok(retry.fileId, 'lock must be released after failure so the same idempotencyKey can retry immediately')
     pass('失败后释放幂等锁，同一 key 立即重试成功')
+  }
+
+  // 16) 维护态终端拒绝 format_convert（与签章 assertUserTaskAllowed 同口径）
+  {
+    const { service, prisma, storage, capabilities } = makeService()
+    seedImage(prisma, storage, 'cap1')
+    capabilities.status = 'maintenance'
+    await expectCode(
+      () =>
+        runConvert(service, {
+          sources: [{ fileId: 'cap1', fileAccessUrl: guestAccessUrl('cap1') }],
+          endUserId: null,
+        }),
+      'CAPABILITY_UNAVAILABLE',
+      '维护态终端拒绝格式转换',
+    )
+    assert.deepEqual(capabilities.calls, [{ terminalId: TERMINAL_ID, capabilityKey: 'format_convert' }])
+  }
+
+  // 17) 成功路径必须先断言 format_convert
+  {
+    const { service, prisma, storage, capabilities } = makeService()
+    seedImage(prisma, storage, 'cap2')
+    await runConvert(service, {
+      sources: [{ fileId: 'cap2', fileAccessUrl: guestAccessUrl('cap2') }],
+      endUserId: null,
+    })
+    assert.equal(capabilities.calls.length, 1)
+    assert.equal(capabilities.calls[0]!.capabilityKey, 'format_convert')
+    assert.equal(capabilities.calls[0]!.terminalId, TERMINAL_ID)
+    pass('成功转换前必须 assertUserTaskAllowed(format_convert)')
   }
 
   console.log('PASS print-conversion verification')

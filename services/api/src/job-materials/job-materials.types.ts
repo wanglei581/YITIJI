@@ -91,3 +91,27 @@ export interface JobMaterialAdminSummaryView {
     generatedCount: number
   }>
 }
+
+/**
+ * 管理员视角的模板行：在公开模板视图基础上追加运营元数据
+ * （公开 GET 不暴露这些字段，见 JobMaterialTemplateView）。
+ */
+export interface JobMaterialTemplateAdminView extends JobMaterialTemplateView {
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  updatedByUserId: string | null
+}
+
+/** 后台新建 / 编辑模板的写入载荷（DTO 校验通过后的领域形状）。 */
+export interface JobMaterialTemplateAdminWriteInput {
+  type: JobMaterialTemplateType
+  title: string
+  description: string
+  tags: string[]
+  recommendedFor: string
+  outputFilename: string
+  sortOrder: number
+  fields: JobMaterialTemplateField[]
+  resumeLayoutPreset?: ResumeTemplateLayoutPreset | null
+}

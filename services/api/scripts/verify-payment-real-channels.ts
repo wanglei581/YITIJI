@@ -1065,6 +1065,59 @@ async function main(): Promise<void> {
     } else {
       fail(`alipay reconcile mishandled: ${reconG.payStatus}`)
     }
+    // ── API-10：顾客没扫码时，屏上码到期必须能释放，不能把订单锁到自动关单 ────────
+    // 顾客不扫码 → 支付宝侧从未创建这笔交易 → 查单抛 ACQ.TRADE_NOT_EXIST。
+    // 旧行为：closeExpiredQrPayment 原样返回 unknown → 业务层保持互斥 →
+    // 顾客等 5 分钟重新出码拿到的还是 PENDING，一直到订单被自动关闭，全程无法付款。
+    const N = await makePrintOrder('orderNotExist')
+    const attemptN = await payment.createPayAttempt(N.orderId, N.token, 'alipay')
+    alipayQueryNode = { code: '40004', msg: 'Business Failed', sub_code: 'ACQ.TRADE_NOT_EXIST', sub_msg: '交易不存在' }
+    const closeCallsBeforeNotExist = alipayCloseCalls
+    const notExistClose = await alipayProvider.closeExpiredQrPayment({
+      attemptId: attemptN.attemptId,
+      orderId: N.orderId,
+    })
+    if (notExistClose.status === 'closed') {
+      pass('API-10：本地过期后查单 TRADE_NOT_EXIST → closed（顾客没扫码，不可能扣款，必须释放互斥）')
+    } else {
+      fail(`API-10 未收敛：期望 closed，实得 ${notExistClose.status}`)
+    }
+    if (alipayCloseCalls === closeCallsBeforeNotExist) {
+      pass('API-10：交易不存在时不再多打一次 alipay.trade.close（没有可关的单）')
+    } else {
+      fail('API-10：交易不存在却仍调用了 trade.close')
+    }
+    // 安全侧不能被顺手放宽：预下单刚完成的那一小段时间里也可能瞬时 NOT_EXIST，
+    // 通用查单在那时把它当 closed 会有双扣风险，所以 queryPayment 必须仍返回 unknown。
+    const notExistQuery = await alipayProvider.queryPayment({
+      attemptId: attemptN.attemptId,
+      orderId: N.orderId,
+    })
+    if (notExistQuery.status === 'unknown') {
+      pass('API-10：通用查单遇 TRADE_NOT_EXIST 仍返回 unknown（只有「已过期」这个前提下才可解释为不会扣款）')
+    } else {
+      fail(`API-10 放宽过头：queryPayment 期望 unknown，实得 ${notExistQuery.status}`)
+    }
+    // 真金白银的那一侧不能误伤：已支付成功的单，到期收敛必须返回 paid 且绝不去关单。
+    const closeCallsBeforePaid = alipayCloseCalls
+    alipayQueryNode = {
+      code: '10000',
+      msg: 'Success',
+      out_trade_no: attemptN.attemptId,
+      trade_no: `alitxn_notexist_${randomBytes(6).toString('hex')}`,
+      trade_status: 'TRADE_SUCCESS',
+      total_amount: centsToYuan(N.amountCents),
+    }
+    const paidClose = await alipayProvider.closeExpiredQrPayment({
+      attemptId: attemptN.attemptId,
+      orderId: N.orderId,
+    })
+    if (paidClose.status === 'paid' && alipayCloseCalls === closeCallsBeforePaid) {
+      pass('API-10：已支付成功的单到期收敛仍返回 paid 且不调 close（不因本次改动误关真实付款）')
+    } else {
+      fail(`API-10 误伤已支付单：status=${paidClose.status} closeCalls差=${alipayCloseCalls - closeCallsBeforePaid}`)
+    }
+
     // D 与 G 均经 reconcile 入账为 paid：两次 claim 应恰好取回这两个任务（unpaid 的 C/E/F 不可见）。
     const reconClaims = new Set([await claimOnce(), await claimOnce()])
     if (reconClaims.has(D.taskId) && reconClaims.has(G.taskId) && (await claimOnce()) === null) {

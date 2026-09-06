@@ -14,7 +14,8 @@
     "verify:excel-template-download-ui": "node scripts/verify-excel-template-download-ui.mjs",
     "verify:partner-relative-api-url": "node scripts/verify-partner-relative-api-url.mjs",
     "verify:partner-stats-contract": "node scripts/verify-partner-stats-contract.mjs",
-    "preview": "vite preview --port 5175"
+    "preview": "vite preview --port 5175",
+    "test:e2e": "node scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

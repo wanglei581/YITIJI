@@ -44,12 +44,73 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   MEMBER_AUTH_REQUIRED: '登录状态已失效，请重新登录后重试',
+  MEMBER_MISSING_TOKEN: '登录状态已失效，请重新登录后重试',
+  MEMBER_SESSION_EXPIRED: '登录状态已失效，请重新登录后重试',
+  MEMBER_TOKEN_INVALID: '登录状态已失效，请重新登录后重试',
   // 演示模式：verify-ai-down-fallbacks.mjs 要求解析页透出**真实原因**，
   // 不许把它抹成通用文案，因此必须在白名单里有自己的说法。
   MOCK_MODE: '当前为演示模式，未连接真实 AI 服务',
   AI_NOT_CONFIGURED: 'AI 能力尚未启用，请联系现场工作人员',
   AI_PROVIDER_NOT_CONFIGURED: 'AI 能力尚未启用，请联系现场工作人员',
   AI_PROVIDER_UNREACHABLE: 'AI 服务暂时连不上，请稍后重试',
+  TERMINAL_NOT_READY: '本机设备未就绪，请联系现场工作人员后再试',
+  TERMINAL_ID_REQUIRED: '本机设备未就绪，请联系现场工作人员后再试',
+  ONLINE_PAYMENT_DISABLED: '本机暂未开通线上支付，请改用其他支付方式或联系现场工作人员',
+  PRINTER_UNAVAILABLE: '打印机当前不可用（离线、缺纸或故障），请稍后再试或联系现场工作人员',
+  SCAN_TERMINAL_BUSY: '本机正在扫描中，请等待当前任务完成后再试',
+  SCAN_TERMINAL_DISABLED: '本机扫描功能已停用，请联系现场工作人员',
+  SCAN_SESSION_EXPIRED: '扫描会话已过期，请返回重新开始',
+  INVALID_SCAN_SESSION: '扫描任务未创建成功，请返回重试',
+  PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED: '检测到上一笔支付待核实，请先等待自动确认或点击核实',
+  PAYMENT_ATTEMPT_PENDING: '已有支付正在处理中，请勿重复扫码',
+  RECONCILE_TOO_FREQUENT: '核实过于频繁，请稍候几秒再试',
+  RECONCILE_UNSUPPORTED: '当前通道不支持主动核实，请继续等待支付结果',
+  LOCAL_AGENT_UNREACHABLE: '无法连接本机终端服务，请确认设备正常后重试',
+  LOCAL_USB_BRIDGE_TOKEN_MISSING: '当前终端未配置 U 盘导入，请联系现场工作人员',
+  CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
+  SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
+  NO_TERMINAL_IDENTITY: '本机终端身份未确认，请联系现场工作人员',
+  KIOSK_FEEDBACK_RATE_LIMITED: '反馈提交过于频繁，请稍后再试',
+  KIOSK_FEEDBACK_PII_REJECTED: '反馈内容含不宜提交的个人信息，请删改后再试',
+  KIOSK_FEEDBACK_EMPTY: '请填写问题说明后再提交',
+  ORDER_NOT_FOUND: '未找到对应订单，请返回重新开始',
+  VALIDATION_FAILED: '提交内容未通过校验，请检查后重试',
+}
+
+/**
+ * 「服务端文案可直接展示」的码白名单。
+ *
+ * 与上面 SHARED_USER_MESSAGES 的分工：那张表是**用固定中文覆盖**服务端说法，
+ * 适合失败原因唯一的码；这张表针对的是**原因随具体输入变化、且服务端那句就是
+ * 写给求职者看的**的码，固定文案在这里反而更糟。
+ *
+ * 实例：`CONVERT_FAILED` 若统一成「生成失败，请稍后重试」，用户会照着提示一直重试，
+ * 而真实原因可能是「合成图片尺寸不受支持」—— 重试永远不会成功，正确动作是换一张图。
+ * 这不只是 helpfulness 损失，是把用户导向一个无效操作。
+ *
+ * 加码进这张表的判据（三条都要满足）：
+ * 1. 该码的服务端 message 由业务代码显式写成面向求职者的中文，不是异常串或运维提示
+ *    （反例见本文件顶部那条「请配置 JOB_MATERIAL_PDF_FONT_PATH」）；
+ * 2. message 不含内部状态：路径、SQL、堆栈、配置项名、内部 ID；
+ * 3. 有门禁或浏览器用例钉住前两条。CONVERT_FAILED 由
+ *    fusion-w2-tools.spec.ts「conversion page renders a server conversion error
+ *    without fabricating output」钉住。
+ *
+ * 未登记的码一律仍走调用方兜底句 —— 对披露 fail-closed 的默认没有变。
+ */
+const PASSTHROUGH_MESSAGE_CODES: ReadonlySet<string> = new Set(['CONVERT_FAILED'])
+
+/**
+ * 透传前的最后一道形状检查。不是判据（判据是上面那三条 + 逐码登记），
+ * 只是防止某天服务端在同一个码下换成异常串时把它原样怼到一体机屏幕上。
+ */
+function displayableServerMessage(error: unknown): string | undefined {
+  if (!(error instanceof ApiHttpError)) return undefined
+  const message = error.message?.trim()
+  if (!message || message.length > 60) return undefined
+  if (!/[\u4e00-\u9fa5]/.test(message)) return undefined
+  if (/^(HTTP\s|请求失败（)/.test(message)) return undefined
+  return message
 }
 
 /** 从任意 error 上取错误码；取不到返回 undefined。 */
@@ -71,8 +132,24 @@ export function errorCodeOf(error: unknown): string | undefined {
 export function userMessageOf(error: unknown, fallback: string): string {
   const code = errorCodeOf(error)
   if (code && code in SHARED_USER_MESSAGES) return SHARED_USER_MESSAGES[code] as string
+  if (code && PASSTHROUGH_MESSAGE_CODES.has(code)) {
+    const serverMessage = displayableServerMessage(error)
+    if (serverMessage) return serverMessage
+  }
+  // 浏览器 fetch 失败是 TypeError。普通 Error('Failed to fetch') 仍走兜底——
+  // verify-kiosk-runtime-error-boundary 钉死不得按 message 文本猜测。
+  if (error instanceof TypeError) return SHARED_USER_MESSAGES.NETWORK_ERROR as string
+  if (error instanceof ApiHttpError) {
+    if (error.status === 0) return SHARED_USER_MESSAGES.NETWORK_ERROR as string
+    if (error.status === 429) return SHARED_USER_MESSAGES.RATE_LIMITED as string
+    if (error.status === 401) return SHARED_USER_MESSAGES.MEMBER_AUTH_REQUIRED as string
+    if (error.status >= 500) return '服务暂时不可用，请稍后重试或联系现场工作人员'
+  }
   return fallback
 }
 
 /** 门禁与测试用：暴露白名单本体，避免各处重新抄一份码表造成漂移。 */
 export const SHARED_USER_MESSAGE_CODES = Object.freeze(Object.keys(SHARED_USER_MESSAGES))
+
+/** 门禁与测试用：暴露透传码白名单，同样避免各处重抄造成漂移。 */
+export const PASSTHROUGH_USER_MESSAGE_CODES = Object.freeze([...PASSTHROUGH_MESSAGE_CODES])

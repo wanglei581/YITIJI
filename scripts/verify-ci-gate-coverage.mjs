@@ -475,9 +475,11 @@ const VALID_UNWIRED_CATEGORIES = new Set([
 //   7 断言）实跑全绿后接线；verify-change-password.ts 是**误判出账** —— 它早经
 //   run-verify-change-password.mjs launcher 在 CI 一直跑着，图谱看不见是 gates.mjs 的
 //   字面量正则不认 .ts（本批已修），修好后回归 helper 分类。至此 newly-visible 六条
-//   全部还清。剩下的 1 = verify-partner-account-delete-ui.mjs（断言互相矛盾的存量，
-//   登记为 broken-pending-deletion）。
-const MAX_UNWIRED = 1
+//   全部还清。2026-09-06：最后一条 verify-partner-account-delete-ui.mjs 已删除
+//   （它断言 PartnerAccountDeletionDialog.tsx 必须存在，而 verify-partner-account-action-ui.mjs:104
+//   断言它必须不存在；该文件确已删除，此门禁实跑必红），上限随之归零。
+//   再有未接线门禁一律先接线或先删，不再留位。
+const MAX_UNWIRED = 0
 
 const unwiredRegistry = exemptionsFile.unwiredScripts || []
 /** @type {Map<string, object>} */

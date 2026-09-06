@@ -61,6 +61,7 @@ export function BenefitActivitiesPage() {
   const [searchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<BenefitActivityListItem[]>([])
+  const [total, setTotal] = useState(0)
   const [state, setState] = useState<PageState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const source = searchParams.get('source') === 'fair' ? 'fair' : undefined
@@ -70,6 +71,7 @@ export function BenefitActivitiesPage() {
     listBenefitActivities(getToken(), source)
       .then((res) => {
         setItems(res.items)
+        setTotal(res.total)
         setState('ready')
       })
       .catch(() => setState('error'))
@@ -83,7 +85,9 @@ export function BenefitActivitiesPage() {
   const subtitle = source === 'fair'
     ? '仅展示招聘会相关服务权益，不代表报名、签到或投递结果'
     : '领取平台服务权益、打印额度和政策信息提示'
-  const countSuffix = state === 'ready' ? ` · 共 ${items.length} 个活动` : ''
+  const countSuffix = state === 'ready'
+    ? ` · 共 ${total} 个活动${total > items.length ? ` · 仅显示最近 ${items.length} 个` : ''}`
+    : ''
 
   return (
     <KioskPageFrame

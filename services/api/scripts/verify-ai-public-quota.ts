@@ -253,15 +253,17 @@ async function verifyControllerContract(): Promise<void> {
           '限流只管每分钟，日配额才管每天烧多少 token',
       )
     }
-    if (!body.includes('publicQuota.rollback')) {
+    if (!body.includes('publicQuota.rollback') && !body.includes('runWithPublicQuota')) {
       failures.push(
-        `${AI_CONTROLLER}#${target.handler}: 下游失败时必须 publicQuota.rollback(...)，` +
+        `${AI_CONTROLLER}#${target.handler}: 下游失败时必须 publicQuota.rollback(...) 或 runWithPublicQuota（内含 rollback），` +
           '否则失败的调用也会吃掉用户当日额度',
       )
     }
   }
 
   assert.deepEqual(failures, [], `AI 公网端点静态契约失败:\n${failures.join('\n')}`)
+  const guardSrc = await readFile(path.join(API_ROOT, 'src/ai/ai-request-guard.ts'), 'utf8')
+  assert.ok(guardSrc.includes('quota.rollback'), 'runWithPublicQuota 必须调用 quota.rollback')
   console.log(`  PASS 静态核验：${GUARDED_HANDLERS.length} 个匿名 AI 端点均有限流 + 配额且未加认证门槛`)
 }
 

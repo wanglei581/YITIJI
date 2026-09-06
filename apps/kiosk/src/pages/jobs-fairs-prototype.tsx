@@ -1,3 +1,4 @@
+import { formatDateTime, parseInstant, shanghaiParts } from '@ai-job-print/shared'
 import type { LucideIcon } from 'lucide-react'
 import { ArrowLeftIcon, InfoIcon } from 'lucide-react'
 
@@ -145,19 +146,18 @@ export function SourceMetaChips({
 }
 
 export function formatDate(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return formatDateTime(iso, { fallback: iso })
 }
 
 export function formatShortDateTime(start: string, end?: string) {
-  const startDate = new Date(start)
-  if (Number.isNaN(startDate.getTime())) return start
+  const startInstant = parseInstant(start)
+  if (!startInstant) return start
+  const startParts = shanghaiParts(startInstant)
   const pad = (value: number) => String(value).padStart(2, '0')
-  const base = `${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())} ${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`
+  const base = `${pad(startParts.month)}-${pad(startParts.day)} ${pad(startParts.hour)}:${pad(startParts.minute)}`
   if (!end) return base
-  const endDate = new Date(end)
-  if (Number.isNaN(endDate.getTime())) return base
-  return `${base}-${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`
+  const endInstant = parseInstant(end)
+  if (!endInstant) return base
+  const endParts = shanghaiParts(endInstant)
+  return `${base}-${pad(endParts.hour)}:${pad(endParts.minute)}`
 }

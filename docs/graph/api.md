@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`479` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`488` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -64,6 +64,8 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/users` | AdminUsersController.list | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
 | GET | `/api/v1/admin/users/:endUserId` | AdminUsersController.getDetail | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask |
 
 ## `services/api/src/advisor/advisor.controller.ts`
 
@@ -87,13 +89,13 @@
 | GET | `/api/v1/admin/ai/logs` | AiController.getAiLogs | admin | AiLogService | AiServiceLog |
 | GET | `/api/v1/admin/ai/usage` | AiController.getAiUsage | admin | AiLogService<br/>AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/assistant/chat` | AiController.chatWithAssistant | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/generate` | AiController.submitResumeGenerate | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/resume/generate` | AiController.submitResumeGenerate | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>UserAiConsent |
 | GET | `/api/v1/resume/generate/:taskId` | AiController.getResumeGenerate | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/resume/generate/export` | AiController.exportGeneratedResume | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/parse` | AiController.submitResumeParse | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/resume/parse` | AiController.submitResumeParse | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>UserAiConsent |
 | GET | `/api/v1/resume/records/:taskId` | AiController.getResumeRecord | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/resume/records/:taskId/layout-adjust` | AiController.adjustResumeLayout | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/resume/records/:taskId/optimize` | AiController.getResumeOptimize | — | AiService<br/>AuditService<br/>BenefitRedemptionService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/resume/records/:taskId/optimize` | AiController.getResumeOptimize | — | AiService<br/>AuditService<br/>BenefitRedemptionService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
 | POST | `/api/v1/resume/voice/transcribe` | AiController.transcribeResumeVoice | — | AiLogService<br/>AsrService | AiServiceLog |
 
 ## `services/api/src/ai/career-plan.controller.ts`
@@ -139,11 +141,17 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/resume/self-assessment` | SelfAssessmentController.submit | — | — | — |
+| POST | `/api/v1/resume/self-assessment` | SelfAssessmentController.submit | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | DELETE | `/api/v1/resume/self-assessment/:taskId` | SelfAssessmentController.withdraw | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | GET | `/api/v1/resume/self-assessment/:taskId` | SelfAssessmentController.latest | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/self-assessment/:taskId/append` | SelfAssessmentController.appendToResume | — | — | — |
+| POST | `/api/v1/resume/self-assessment/:taskId/append` | SelfAssessmentController.appendToResume | — | AppendedSelfAssessmentService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/resume/self-assessment/:taskId/print` | SelfAssessmentController.print | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+
+## `services/api/src/assistant/daily-brief.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/assistant/daily-report` | DailyBriefController.create | — | DailyBriefService | Favorite<br/>Job<br/>JobFair<br/>Order<br/>PolicyPost<br/>SystemBroadcast |
 
 ## `services/api/src/audit/audit.controller.ts`
 
@@ -215,28 +223,34 @@
 | GET | `/api/v1/health` | HealthController.health | — | — | — |
 | GET | `/api/v1/health/ready` | HealthController.ready | — | — | — |
 
+## `services/api/src/community/community.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/community/feeds` | CommunityController.listFeeds | — | CommunityService | BenefitActivity<br/>PolicyPost<br/>SystemBroadcast |
+
 ## `services/api/src/companies/companies.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/companies` | CompaniesController.adminList | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| POST | `/api/v1/admin/companies` | CompaniesController.adminCreate | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/admin/companies/:id` | CompaniesController.adminGet | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| PATCH | `/api/v1/admin/companies/:id` | CompaniesController.adminUpdate | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| POST | `/api/v1/admin/companies/:id/jobs` | CompaniesController.adminLinkJobs | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| DELETE | `/api/v1/admin/companies/:id/jobs/:jobId` | CompaniesController.adminUnlinkJob | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/admin/companies/:id/linkable-jobs` | CompaniesController.adminLinkableJobs | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| PATCH | `/api/v1/admin/companies/:id/publish` | CompaniesController.adminPublish | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| PATCH | `/api/v1/admin/companies/:id/review` | CompaniesController.adminReview | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/companies` | CompaniesController.list | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/companies/:id` | CompaniesController.detail | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/companies/:id/jobs` | CompaniesController.companyJobs | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/companies/filters` | CompaniesController.filters | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/companies/stats` | CompaniesController.stats | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| GET | `/api/v1/partner/companies` | CompaniesController.partnerList | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| PATCH | `/api/v1/partner/companies/:id` | CompaniesController.partnerUpdate | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| PATCH | `/api/v1/partner/companies/:id/publish` | CompaniesController.partnerUnpublish | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
-| POST | `/api/v1/partner/companies/import` | CompaniesController.partnerImport | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>Job<br/>Organization |
+| GET | `/api/v1/admin/companies` | CompaniesController.adminList | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| POST | `/api/v1/admin/companies` | CompaniesController.adminCreate | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/admin/companies/:id` | CompaniesController.adminGet | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| PATCH | `/api/v1/admin/companies/:id` | CompaniesController.adminUpdate | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| POST | `/api/v1/admin/companies/:id/jobs` | CompaniesController.adminLinkJobs | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| DELETE | `/api/v1/admin/companies/:id/jobs/:jobId` | CompaniesController.adminUnlinkJob | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/admin/companies/:id/linkable-jobs` | CompaniesController.adminLinkableJobs | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| PATCH | `/api/v1/admin/companies/:id/publish` | CompaniesController.adminPublish | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| PATCH | `/api/v1/admin/companies/:id/review` | CompaniesController.adminReview | admin | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/companies` | CompaniesController.list | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/companies/:id` | CompaniesController.detail | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/companies/:id/jobs` | CompaniesController.companyJobs | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/companies/filters` | CompaniesController.filters | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/companies/stats` | CompaniesController.stats | — | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| GET | `/api/v1/partner/companies` | CompaniesController.partnerList | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| PATCH | `/api/v1/partner/companies/:id` | CompaniesController.partnerUpdate | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| PATCH | `/api/v1/partner/companies/:id/publish` | CompaniesController.partnerUnpublish | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
+| POST | `/api/v1/partner/companies/import` | CompaniesController.partnerImport | partner | CompaniesService | AuditLog<br/>CompanyProfile<br/>FairCompany<br/>Job<br/>Organization |
 
 ## `services/api/src/content/ai-poster.controller.ts`
 
@@ -332,9 +346,13 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/job-materials/generate` | JobMaterialsController.generate | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/job-materials/summary` | JobMaterialsController.summary | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/job-materials/templates` | JobMaterialsController.templates | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/job-materials/generate` | JobMaterialsController.generate | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PrintTask |
+| GET | `/api/v1/job-materials/summary` | JobMaterialsController.summary | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PrintTask |
+| GET | `/api/v1/job-materials/templates` | JobMaterialsController.templates | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PrintTask |
+| GET | `/api/v1/job-materials/templates` | JobMaterialsController.templates | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PrintTask |
+| POST | `/api/v1/job-materials/templates` | JobMaterialsController.createTemplate | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PrintTask |
+| PATCH | `/api/v1/job-materials/templates/:id` | JobMaterialsController.updateTemplate | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PrintTask |
+| PATCH | `/api/v1/job-materials/templates/:id/publish` | JobMaterialsController.publishTemplate | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PrintTask |
 
 ## `services/api/src/job-sync/job-sync.controller.ts`
 
@@ -741,6 +759,7 @@
 | PUT | `/api/v1/partner/policies/:id/eligibility-rules` | PoliciesController.replacePartnerEligibilityRules | partner | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | PATCH | `/api/v1/partner/policies/:id/publish` | PoliciesController.unpublishPartnerPolicy | partner | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
 | GET | `/api/v1/policies` | PoliciesController.getPolicies | — | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
+| GET | `/api/v1/policies/:id` | PoliciesController.getPublishedPolicy | — | PoliciesService | AuditLog<br/>Organization<br/>PolicyPost |
 | POST | `/api/v1/policies/eligibility-check` | PoliciesController.checkEligibility | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 | GET | `/api/v1/policies/eligibility-questions` | PoliciesController.getEligibilityQuestions | — | PolicyEligibilityService | AuditLog<br/>PolicyEligibilityRule<br/>PolicyPost |
 

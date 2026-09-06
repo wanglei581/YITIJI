@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
 
 export const LEGAL_DOC_TYPES = [
   'privacy_policy',
@@ -29,7 +30,7 @@ export interface LegalDocListItem {
   createdAt: Date
 }
 
-export interface CreateLegalDocDto {
+export interface CreateLegalDocInput {
   docType: string
   version: string
   title: string
@@ -39,7 +40,10 @@ export interface CreateLegalDocDto {
 
 @Injectable()
 export class LegalService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /** Kiosk 公开读取：返回指定类型的当前有效版本（无鉴权） */
   async getActive(docType: LegalDocType): Promise<LegalDocActiveView | null> {
@@ -75,27 +79,39 @@ export class LegalService {
   }
 
   /** Admin：创建草稿（isActive=false） */
-  async create(dto: CreateLegalDocDto) {
+  async create(dto: CreateLegalDocInput) {
     if (!LEGAL_DOC_TYPES.includes(dto.docType as LegalDocType)) {
       throw new BadRequestException(`无效的 docType：${dto.docType}`)
     }
-    return this.prisma.legalDocVersion.create({
-      data: {
-        docType: dto.docType,
-        version: dto.version,
-        title: dto.title,
-        content: dto.content,
-        isActive: false,
-        publishedBy: dto.adminId,
-      },
-      select: {
-        id: true,
-        docType: true,
-        version: true,
-        title: true,
-        isActive: true,
-        createdAt: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.legalDocVersion.create({
+        data: {
+          docType: dto.docType,
+          version: dto.version,
+          title: dto.title,
+          content: dto.content,
+          isActive: false,
+          publishedBy: dto.adminId,
+        },
+        select: {
+          id: true,
+          docType: true,
+          version: true,
+          title: true,
+          isActive: true,
+          createdAt: true,
+        },
+      })
+      // writeRequired writes the auditLog row in this same transaction.
+      await this.audit.writeRequired(tx, {
+        actorId: dto.adminId,
+        actorRole: 'admin',
+        action: 'legal_doc.create',
+        targetType: 'LegalDocVersion',
+        targetId: created.id,
+        payload: { docType: created.docType, version: created.version },
+      })
+      return created
     })
   }
 
@@ -104,41 +120,33 @@ export class LegalService {
     const doc = await this.prisma.legalDocVersion.findUnique({ where: { id } })
     if (!doc) throw new NotFoundException('LegalDocVersion not found')
 
-    await this.prisma.$transaction([
-      this.prisma.legalDocVersion.updateMany({
+    return this.prisma.$transaction(async (tx) => {
+      await tx.legalDocVersion.updateMany({
         where: { docType: doc.docType, isActive: true },
         data: { isActive: false },
-      }),
-      this.prisma.legalDocVersion.update({
+      })
+      const activated = await tx.legalDocVersion.update({
         where: { id },
         data: { isActive: true, publishedAt: new Date(), publishedBy: adminId },
-      }),
-    ])
-
-    // 审计日志写入失败不阻塞激活
-    this.prisma.auditLog
-      .create({
-        data: {
-          actorId: adminId,
-          actorRole: 'admin',
-          action: 'legal_doc.activate',
-          targetType: 'LegalDocVersion',
-          targetId: id,
-          payloadJson: JSON.stringify({ docType: doc.docType, version: doc.version }),
+        select: {
+          id: true,
+          docType: true,
+          version: true,
+          title: true,
+          isActive: true,
+          publishedAt: true,
         },
       })
-      .catch(() => {})
-
-    return this.prisma.legalDocVersion.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        docType: true,
-        version: true,
-        title: true,
-        isActive: true,
-        publishedAt: true,
-      },
+      // writeRequired writes the auditLog row in this same transaction.
+      await this.audit.writeRequired(tx, {
+        actorId: adminId,
+        actorRole: 'admin',
+        action: 'legal_doc.activate',
+        targetType: 'LegalDocVersion',
+        targetId: id,
+        payload: { docType: doc.docType, version: doc.version },
+      })
+      return activated
     })
   }
 }

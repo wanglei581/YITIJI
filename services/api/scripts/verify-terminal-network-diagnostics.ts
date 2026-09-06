@@ -9,6 +9,8 @@ const postgresSchema = read('prisma/postgres/schema.prisma')
 const dto = read('src/terminals/dto/heartbeat.dto.ts')
 const agentService = read('src/terminals/terminals-agent.service.ts')
 const adminService = read('src/terminals/terminals-admin.service.ts')
+const heartbeatRetention = read('src/terminals/terminal-heartbeat-retention.task.ts')
+const terminalsModule = read('src/terminals/terminals.module.ts')
 
 for (const source of [schema, postgresSchema]) {
   const model = source.slice(source.indexOf('model TerminalHeartbeat'), source.indexOf('// ── PrintTaskStatusLog'))
@@ -25,9 +27,14 @@ assert.match(adminService, /wiredNetworkStatus: true/)
 assert.match(adminService, /printerNetworkStatus: true/)
 assert.match(adminService, /wiredNetworkStatus: hb\?\.wiredNetworkStatus \?\? null/)
 assert.match(adminService, /printerNetworkStatus: hb\?\.printerNetworkStatus \?\? null/)
+assert.match(heartbeatRetention, /DEFAULT_TERMINAL_HEARTBEAT_RETENTION_DAYS = 90/)
+assert.match(heartbeatRetention, /TERMINAL_HEARTBEAT_RETENTION_DAYS/)
+assert.match(heartbeatRetention, /terminalHeartbeat\.deleteMany\(\{ where: \{ createdAt: \{ lt: cutoff \} \} \}\)/)
+assert.match(heartbeatRetention, /CronExpression\.EVERY_DAY_AT_3AM/)
+assert.match(terminalsModule, /TerminalHeartbeatRetentionTask/)
 
 for (const forbidden of ['ssid', 'password', 'gateway', 'printerHostAddress', 'agentToken', 'bindCode']) {
   assert.equal(dto.toLowerCase().includes(forbidden.toLowerCase()), false, `DTO must not contain ${forbidden}`)
   assert.equal(agentService.slice(agentService.indexOf('async heartbeat'), agentService.indexOf('// ── 3. Claim tasks')).toLowerCase().includes(forbidden.toLowerCase()), false, `heartbeat persistence must not contain ${forbidden}`)
 }
-console.log('ALL PASS: network diagnostics are dual-schema, enum-only heartbeat fields with no credential or identifier persistence')
+console.log('ALL PASS: network diagnostics are dual-schema, enum-only heartbeat fields with no credential or identifier persistence; heartbeat retention is registered and deletes records older than the configured period')

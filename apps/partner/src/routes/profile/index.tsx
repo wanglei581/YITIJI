@@ -5,6 +5,7 @@ import {
   ORG_CONTENT_TRUST_UNSET_LABEL,
   PROHIBITED_MODULES,
   SCENE_TEMPLATE_LABELS,
+  formatDateTime,
   isOrgContentPublishable,
   type OrgContentTrustStatus,
 } from '@ai-job-print/shared'
@@ -53,9 +54,7 @@ function trustStatusTone(status: OrgContentTrustStatus | null | undefined): 'suc
 }
 
 function fmtTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isFinite(d.getTime()) ? d.toLocaleString('zh-CN', { hour12: false }) : iso
+  return formatDateTime(iso)
 }
 
 export default function ProfilePage() {

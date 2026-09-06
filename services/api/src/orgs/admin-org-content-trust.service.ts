@@ -97,28 +97,30 @@ export class AdminOrgContentTrustService {
       })
     }
 
-    const updated = await this.prisma.organization.update({
-      where: { id },
-      data: {
-        contentTrustStatus: status,
-        contentTrustReviewedBy: user.userId,
-        contentTrustReviewedAt: new Date(),
-        contentTrustReason: reason.length > 0 ? reason : null,
-      },
-    })
-
-    await this.audit.write({
-      actorId: user.userId,
-      actorRole: 'admin',
-      action: 'organization.content_trust',
-      targetType: 'organization',
-      targetId: id,
-      payload: {
-        fromContentTrustStatus: org.contentTrustStatus,
-        toContentTrustStatus: status,
-        reason: reason.length > 0 ? reason : null,
-        archived: org.archivedAt != null,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.organization.update({
+        where: { id },
+        data: {
+          contentTrustStatus: status,
+          contentTrustReviewedBy: user.userId,
+          contentTrustReviewedAt: new Date(),
+          contentTrustReason: reason.length > 0 ? reason : null,
+        },
+      })
+      await this.audit.writeRequired(tx, {
+        actorId: user.userId,
+        actorRole: 'admin',
+        action: 'organization.content_trust',
+        targetType: 'organization',
+        targetId: id,
+        payload: {
+          fromContentTrustStatus: org.contentTrustStatus,
+          toContentTrustStatus: status,
+          reason: reason.length > 0 ? reason : null,
+          archived: org.archivedAt != null,
+        },
+      })
+      return result
     })
 
     this.logger.log(

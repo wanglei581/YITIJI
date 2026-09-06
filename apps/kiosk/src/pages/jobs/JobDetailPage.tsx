@@ -21,6 +21,7 @@ import { useFavorites } from '../../favorites/useFavorites'
 import { JobAiConsentModal } from './components/JobAiConsentModal'
 import { ResumeSelectModal } from './components/ResumeSelectModal'
 import { JobAiResultPanel } from './components/JobAiResultPanel'
+import { JobAntiFraudNotice } from './components/JobAntiFraudNotice'
 import {
   JobDescriptionSection,
   JobNextActionsSection,
@@ -307,6 +308,7 @@ export function JobDetailPage() {
         onSelect={(resume) => void runMatch(resume)}
         onUpload={() => navigate('/resume/source?intent=diagnose')}
       />
+      <JobAntiFraudNotice />
       <JobSummarySection
         job={currentJob}
         favorite={favorite}

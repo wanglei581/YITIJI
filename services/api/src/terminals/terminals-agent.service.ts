@@ -21,6 +21,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
+import { PackageOrderFulfillmentService } from '../member-print-orders/package-order-fulfillment.service'
 import { ContractReportPrintLifecycleService } from '../files/contract-report-print-lifecycle.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
@@ -190,6 +191,7 @@ export class TerminalAgentService implements OnModuleInit {
   private readonly logger = new Logger(TerminalAgentService.name)
   private readonly credentialSecurity: TerminalCredentialSecurityService
   private readonly scanDeletionAudit: TerminalScanDeletionAuditService
+  private readonly packageOrderFulfillment: PackageOrderFulfillmentService
 
   constructor(
     private readonly prisma: PrismaService,
@@ -201,6 +203,7 @@ export class TerminalAgentService implements OnModuleInit {
     // Nest 运行时使用独立 provider；脚本 fixture 保留两参构造兼容。
     this.credentialSecurity = credentialSecurity ?? new TerminalCredentialSecurityService(prisma, audit)
     this.scanDeletionAudit = scanDeletionAudit ?? new TerminalScanDeletionAuditService(prisma)
+    this.packageOrderFulfillment = new PackageOrderFulfillmentService()
   }
 
   async onModuleInit(): Promise<void> {
@@ -456,6 +459,12 @@ export class TerminalAgentService implements OnModuleInit {
             data: { status: 'claimed', claimedAt, claimExpiry },
           })
           if (claimedTask.count !== 1) throw new PrintTaskClaimRaceError()
+          if (task.orderId) {
+            await tx.orderItem.updateMany({
+              where: { orderId: task.orderId, printTaskId: task.id, status: 'pending' },
+              data: { status: 'claimed' },
+            })
+          }
           return tx.printTask.findUnique({ where: { id: task.id } })
         })
       } catch (error) {
@@ -613,10 +622,20 @@ export class TerminalAgentService implements OnModuleInit {
           errorCode: dto.errorCode ?? null,
         },
       })
-      await tx.order.updateMany({
-        where: { printTaskId: taskId },
-        data: { taskStatus: dto.status, terminalId },
-      })
+      if (preCheck.orderId) {
+        await this.packageOrderFulfillment.advance(tx, {
+          orderId: preCheck.orderId,
+          taskId,
+          terminalId,
+          endUserId: preCheck.endUserId,
+          status: dto.status,
+        })
+      } else {
+        await tx.order.updateMany({
+          where: { printTaskId: taskId },
+          data: { taskStatus: dto.status, terminalId },
+        })
+      }
     })
 
     if (isTerminal) await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)

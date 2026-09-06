@@ -64,6 +64,7 @@ export function CompaniesTab({
       // 空标题岗位行前端过滤(后端 DTO 对 title 有非空校验);positionType/文本空值转 undefined → 后端落 null。
       const payload: SaveFairCompanyInput = {
         ...form,
+        scale: form.scale || undefined,
         positions: (form.positions ?? [])
           .filter((p) => p.title.trim().length > 0)
           .map((p) => ({
@@ -91,9 +92,12 @@ export function CompaniesTab({
 
   const remove = async (companyId: string) => {
     setBusyId(companyId)
+    setError(null)
     try {
       await fairsAdminService.deleteCompany(fairId, companyId)
       onChanged()
+    } catch (e) {
+      setError(errMsg(e))
     } finally {
       setBusyId(null)
     }
@@ -107,6 +111,7 @@ export function CompaniesTab({
 
   return (
     <div className="space-y-4">
+      {error && !editing && <InlineError message={error} />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-neutral-600">{companies.length} 家参展企业</p>
         <button onClick={openNew} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">

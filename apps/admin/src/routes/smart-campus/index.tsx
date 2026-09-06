@@ -11,6 +11,7 @@ import { GraduationCapIcon, InfoIcon } from 'lucide-react'
 import type { SmartCampusModules, SmartCampusTerminalView } from '@ai-job-print/shared'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '@ai-job-print/shared'
 import { smartCampusService } from '../../services/api/smartCampus'
+import { Page } from '../Page'
 
 const MODULE_DEFS: { key: keyof SmartCampusModules; label: string; note?: string; frozen?: boolean }[] = [
   { key: 'welcome', label: '迎新指引' },
@@ -32,19 +33,26 @@ function TerminalConfigRow({
   const [modules, setModules] = useState<SmartCampusModules>(cfg?.modules ?? { ...DEFAULT_SMART_CAMPUS_MODULES })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const hasConfigurableModule = modules.welcome || modules.luggage || modules.panorama
 
   const toggleModule = (key: keyof SmartCampusModules) =>
-    setModules((m) => ({ ...m, [key]: !m[key] }))
+    setModules((current) => {
+      const next = { ...current, [key]: !current[key] }
+      if (!next.welcome && !next.luggage && !next.panorama) setEnabled(false)
+      return next
+    })
 
   const save = async () => {
     setSaving(true)
     setMsg('')
     try {
-      await smartCampusService.saveConfig(terminal.terminalId, { enabled, modules })
+      const saved = await smartCampusService.saveConfig(terminal.terminalId, { enabled, modules })
+      setEnabled(saved.enabled)
+      setModules(saved.modules)
       setMsg('已保存')
       onSaved()
-    } catch {
-      setMsg('保存失败，请重试')
+    } catch (error) {
+      setMsg(error instanceof Error && error.message ? error.message : '保存失败，请检查网络后重试')
     } finally {
       setSaving(false)
     }
@@ -65,7 +73,14 @@ function TerminalConfigRow({
 
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <label className="flex cursor-pointer items-center gap-2">
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            disabled={!hasConfigurableModule}
+            title={!hasConfigurableModule ? '请先开启至少一个可用子模块' : undefined}
+            className="h-4 w-4"
+          />
           <span className="text-sm font-medium text-neutral-800">启用智慧校园</span>
         </label>
         <div className="h-5 w-px bg-neutral-200" />
@@ -75,11 +90,11 @@ function TerminalConfigRow({
               type="checkbox"
               checked={m.frozen ? false : modules[m.key]}
               onChange={() => !m.frozen && toggleModule(m.key)}
-              disabled={!enabled || m.frozen}
+              disabled={m.frozen}
               title={m.frozen ? '校园大数据本期冻结，不开放配置' : undefined}
               className="h-4 w-4"
             />
-            <span className={`text-sm ${enabled && !m.frozen ? 'text-neutral-700' : 'text-neutral-400'}`}>
+            <span className={`text-sm ${!m.frozen ? 'text-neutral-700' : 'text-neutral-400'}`}>
               {m.label}
               {m.note && <span className="ml-1 text-[11px] text-warning-fg">（{m.note}）</span>}
             </span>
@@ -115,34 +130,31 @@ export default function SmartCampusPage() {
   useEffect(load, [])
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-neutral-900">智慧校园</h1>
-        <p className="mt-0.5 text-sm text-neutral-500">按终端开启智慧校园及各子模块；开启后该机器前端首页出现智慧校园入口。</p>
-      </div>
-
-      {/* 合规提示 */}
-      <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
-        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-warning-fg">
-          一期由平台运营代配置。<span className="font-semibold">校园大数据</span>需先取得学校书面授权 + 数据处理协议，且只接聚合脱敏统计，
-          本期前端仅为占位、不展示真实数据（详见合规边界 §九）。未开启任何子模块时无法启用。
-        </p>
-      </div>
-
-      {loading ? (
-        <p className="text-sm text-neutral-400">加载中…</p>
-      ) : error ? (
-        <Card className="p-6 text-center text-sm text-neutral-500">{error}</Card>
-      ) : terminals.length === 0 ? (
-        <Card className="p-10 text-center text-sm text-neutral-500">暂无终端</Card>
-      ) : (
-        <div className="space-y-4">
-          {terminals.map((t) => (
-            <TerminalConfigRow key={t.terminalId} terminal={t} onSaved={load} />
-          ))}
+    <Page title="智慧校园" subtitle="按终端开启智慧校园及各子模块；开启后该机器前端首页出现智慧校园入口。">
+      <div className="space-y-5">
+        {/* 合规提示 */}
+        <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
+          <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
+          <p className="text-xs leading-relaxed text-warning-fg">
+            一期由平台运营代配置。<span className="font-semibold">校园大数据</span>需先取得学校书面授权 + 数据处理协议，且只接聚合脱敏统计，
+            本期前端仅为占位、不展示真实数据（详见合规边界 §九）。未开启任何子模块时无法启用。
+          </p>
         </div>
-      )}
-    </div>
+
+        {loading ? (
+          <p className="text-sm text-neutral-400">加载中…</p>
+        ) : error ? (
+          <Card className="p-6 text-center text-sm text-neutral-500">{error}</Card>
+        ) : terminals.length === 0 ? (
+          <Card className="p-10 text-center text-sm text-neutral-500">暂无终端</Card>
+        ) : (
+          <div className="space-y-4">
+            {terminals.map((t) => (
+              <TerminalConfigRow key={t.terminalId} terminal={t} onSaved={load} />
+            ))}
+          </div>
+        )}
+      </div>
+    </Page>
   )
 }

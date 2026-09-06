@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, Drawer, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, FilterIcon, XIcon } from 'lucide-react'
@@ -14,6 +15,7 @@ import {
 import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -61,6 +63,7 @@ export default function JobSourcesPage() {
   const [viewing,      setViewing]      = useState<AdminJobSourceRecord | null>(null)
   const [rejectingId,  setRejectingId]  = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [actionError,  setActionError]  = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
@@ -108,30 +111,44 @@ export default function JobSourcesPage() {
   }
 
   const handleApprove = (id: string) => {
-    void approveJobSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    setActionError(null)
+    void approveJobSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
   }
 
   const handleReject = (id: string) => {
     if (!rejectReason.trim()) return
-    void rejectJobSource(id, rejectReason.trim()).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-      setRejectingId(null)
-      setRejectReason('')
-    })
+    setActionError(null)
+    void rejectJobSource(id, rejectReason.trim())
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+        setRejectingId(null)
+        setRejectReason('')
+      })
+      .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
   }
 
   const handlePublish = (id: string) => {
-    void publishJobSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    setActionError(null)
+    void publishJobSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
   }
 
-  const handleUnpublish = (id: string) => {
-    void unpublishJobSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+  const handleUnpublish = (id: string, title: string) => {
+    if (!window.confirm(`确认下架「${title}」？下架后一体机不再展示该岗位。`)) return
+    // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
+    setActionError(null)
+    void unpublishJobSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
   }
 
   if (loading) {
@@ -161,6 +178,11 @@ export default function JobSourcesPage() {
       subtitle="第三方平台同步岗位数据管理"
       actions={<BulkPublishButton kind="job" orgOptions={orgOptions} onDone={reload} />}
     >
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
+          {actionError}。请修正后重试，或刷新页面。
+        </div>
+      )}
       {/* 来自 Excel 导入批次的上下文 banner */}
       {sourceIdFilter && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-bg px-4 py-2.5">
@@ -249,7 +271,7 @@ export default function JobSourcesPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.company}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{s.city}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.salary}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(s.syncTime)}</td>
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -312,7 +334,7 @@ export default function JobSourcesPage() {
                               <button
                                 type="button"
                                 className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                                onClick={() => handleUnpublish(s.id)}
+                                onClick={() => handleUnpublish(s.id, s.title)}
                               >
                                 下架
                               </button>
@@ -358,7 +380,7 @@ export default function JobSourcesPage() {
             <DetailRow label="标签" value={viewing.tags.length ? viewing.tags.join('、') : undefined} />
             <DetailRow label="岗位描述" value={viewing.description} />
             <DetailRow label="任职要求" value={viewing.requirements} />
-            <DetailRow label="同步时间" value={viewing.syncTime} />
+            <DetailRow label="同步时间" value={formatDateTime(viewing.syncTime)} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
             <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
             <DetailRow

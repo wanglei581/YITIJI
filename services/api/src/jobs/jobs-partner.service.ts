@@ -41,6 +41,7 @@ import {
   type PartnerFairDto,
   type ImportResult,
   type SyncLogDto,
+  type PaginatedResult,
   prismaJobSourceToPartnerDto,
   prismaJobToPartnerDto,
   prismaFairToPartnerDto,
@@ -497,7 +498,7 @@ export class JobsPartnerService {
           where: { sourceOrgId_externalId: { sourceOrgId, externalId: item.externalId } },
           create: {
             sourceOrgId, externalId: item.externalId, sourceName,
-            sourceUrl: item.sourceUrl,
+            sourceUrl: normalizeOptionalHttpUrl(item.sourceUrl, 'sourceUrl') ?? '',
             title: item.title, company: item.company, city: item.city,
             category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
             salary: item.salary,
@@ -516,7 +517,7 @@ export class JobsPartnerService {
             syncTime: sync,
           },
           update: {
-            sourceName, sourceUrl: item.sourceUrl,
+            sourceName, sourceUrl: normalizeOptionalHttpUrl(item.sourceUrl, 'sourceUrl') ?? '',
             title: item.title, company: item.company, city: item.city,
             category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
             salary: item.salary,
@@ -585,7 +586,7 @@ export class JobsPartnerService {
             where: { sourceOrgId_externalId: { sourceOrgId: orgId, externalId: item.externalId } },
             create: {
               sourceOrgId: orgId, sourceId, externalId: item.externalId, sourceName,
-              sourceUrl: item.sourceUrl,
+              sourceUrl: normalizeOptionalHttpUrl(item.sourceUrl, 'sourceUrl') ?? '',
               title: item.title, company: item.company, city: item.city,
               category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
               salary: item.salary,
@@ -605,7 +606,7 @@ export class JobsPartnerService {
             },
             update: {
               sourceId,
-              sourceName, sourceUrl: item.sourceUrl,
+              sourceName, sourceUrl: normalizeOptionalHttpUrl(item.sourceUrl, 'sourceUrl') ?? '',
               title: item.title, company: item.company, city: item.city,
               category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
               salary: item.salary,
@@ -684,12 +685,21 @@ export class JobsPartnerService {
         ...(dto.title !== undefined ? { title: dto.title } : {}),
         ...(dto.company !== undefined ? { company: dto.company } : {}),
         ...(dto.city !== undefined ? { city: dto.city } : {}),
-        ...(dto.sourceUrl !== undefined ? { sourceUrl: dto.sourceUrl } : {}),
+        ...(dto.sourceUrl !== undefined ? { sourceUrl: normalizeOptionalHttpUrl(dto.sourceUrl, 'sourceUrl') ?? '' } : {}),
         ...(dto.salary !== undefined ? { salary: dto.salary } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.requirements !== undefined ? { requirements: dto.requirements } : {}),
         ...(dto.tags !== undefined ? { tagsJson: JSON.stringify(dto.tags) } : {}),
         ...(dto.workType !== undefined ? { category: mapWorkTypeToCategory(dto.workType) } : {}),
+        ...(dto.educationRequirement !== undefined ? { educationRequirement: dto.educationRequirement } : {}),
+        ...(dto.experienceRequirement !== undefined ? { experienceRequirement: dto.experienceRequirement } : {}),
+        ...(dto.skills !== undefined ? { skillsJson: JSON.stringify(dto.skills) } : {}),
+        ...(dto.benefits !== undefined ? { benefitsJson: JSON.stringify(dto.benefits) } : {}),
+        ...(dto.salaryMin !== undefined ? { salaryMin: dto.salaryMin } : {}),
+        ...(dto.salaryMax !== undefined ? { salaryMax: dto.salaryMax } : {}),
+        ...(dto.salaryUnit !== undefined ? { salaryUnit: dto.salaryUnit } : {}),
+        ...(dto.validThrough !== undefined ? { validThrough: new Date(dto.validThrough) } : {}),
+        ...(dto.headcount !== undefined ? { headcount: dto.headcount } : {}),
         reviewStatus: 'pending',
         publishStatus: 'draft',
         rejectReason: null,
@@ -749,7 +759,7 @@ export class JobsPartnerService {
           where: { sourceOrgId_externalId: { sourceOrgId, externalId: item.externalId } },
           create: {
             sourceOrgId, externalId: item.externalId, sourceName,
-            sourceUrl: item.sourceUrl,
+            sourceUrl: normalizeOptionalHttpUrl(item.sourceUrl, 'sourceUrl') ?? '',
             checkinUrl,
             title: item.title,
             theme: item.theme ?? 'general',
@@ -765,7 +775,7 @@ export class JobsPartnerService {
             syncTime: sync,
           },
           update: {
-            sourceName, sourceUrl: item.sourceUrl,
+            sourceName, sourceUrl: normalizeOptionalHttpUrl(item.sourceUrl, 'sourceUrl') ?? '',
             checkinUrl: normalizeOptionalHttpUrl(item.checkinUrl, 'checkinUrl'),
             title: item.title,
             theme: item.theme ?? 'general',
@@ -858,7 +868,7 @@ export class JobsPartnerService {
         ...(dto.city !== undefined ? { city: dto.city } : {}),
         ...(dto.address !== undefined ? { address: dto.address } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.sourceUrl !== undefined ? { sourceUrl: dto.sourceUrl } : {}),
+        ...(dto.sourceUrl !== undefined ? { sourceUrl: normalizeOptionalHttpUrl(dto.sourceUrl, 'sourceUrl') ?? '' } : {}),
         ...checkinUrlUpdate,
         reviewStatus: 'pending',
         publishStatus: 'draft',
@@ -929,27 +939,57 @@ export class JobsPartnerService {
     }
   }
 
-  async getPartnerSyncLogs(user: AuthedUser): Promise<SyncLogDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.syncLog.findMany({
-      where: { orgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: { source: { select: { name: true } } },
-    })
-    return rows.map((r, i) => ({
-      id: r.id,
-      no: `SYNC-${r.createdAt.toISOString().slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
-      source: r.source?.name ?? r.sourceId,
-      dataType: r.dataType as 'job' | 'fair',
-      addedCount: r.addedCount,
-      updatedCount: r.updatedCount,
-      errorCount: r.errorCount,
-      dupCount: r.dupCount,
-      errorFields: r.errorFields === '[]' ? null : r.errorFields,
-      errorDetail: r.errorDetail,
-      syncTime: fmtSyncTime(r.createdAt),
-      status: r.result as 'success' | 'partial' | 'failed',
-    }))
+  async getPartnerSyncLogs(
+    user: AuthedUser,
+    query: {
+      page: number
+      pageSize: number
+      sourceId?: string
+      result?: 'success' | 'partial' | 'failed'
+    },
+  ): Promise<PaginatedResult<SyncLogDto>> {
+    if (!user.orgId) {
+      return {
+        data: [],
+        pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
+      }
+    }
+    const where = {
+      orgId: user.orgId,
+      ...(query.sourceId ? { sourceId: query.sourceId } : {}),
+      ...(query.result ? { result: query.result } : {}),
+    }
+    const [total, rows] = await Promise.all([
+      this.prisma.syncLog.count({ where }),
+      this.prisma.syncLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        include: { source: { select: { name: true } } },
+      }),
+    ])
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        no: r.id,
+        source: r.source?.name ?? r.sourceId,
+        dataType: r.dataType as 'job' | 'fair',
+        addedCount: r.addedCount,
+        updatedCount: r.updatedCount,
+        errorCount: r.errorCount,
+        dupCount: r.dupCount,
+        errorFields: r.errorFields === '[]' ? null : r.errorFields,
+        errorDetail: r.errorDetail,
+        syncTime: fmtSyncTime(r.createdAt),
+        status: r.result as 'success' | 'partial' | 'failed',
+      })),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    }
   }
 }

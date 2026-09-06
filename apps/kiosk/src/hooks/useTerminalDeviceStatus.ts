@@ -12,7 +12,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { DeviceStatus, PrinterStatus } from '@ai-job-print/shared'
-import { API_BASE_URL } from '../services/api/client'
+import { API_BASE_URL, IS_MOCK_MODE } from '../services/api/client'
 import { getTerminalId } from '../services/api/screensaver'
 
 const ZERO_TONER = { black: 0, cyan: 0, magenta: 0, yellow: 0 } as const
@@ -209,6 +209,20 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
   useEffect(() => {
     // 首页自有顶栏轮询时，壳层 header 停用，避免双请求。
     if (!enabled) return
+
+    // mock 模式（VITE_API_MODE=mock）压根没有后端：这里的 fetch 必然失败，
+    // 会把演示 / Playwright 里的打印确认页永久卡在「打印机不可用」。
+    // mock 模式全套数据本来就是夹具，这里同样给夹具值；**只在 mock 模式短路**，
+    // http 模式（生产）一字不动，§9「不伪造能力」约束的是真实链路。
+    if (IS_MOCK_MODE) {
+      setView({
+        loading: false, apiReachable: true, heartbeatOnline: true, printerReady: true, kind: 'ready',
+        printer: { isOnline: true, hasPaper: true, tonerLevels: { ...ZERO_TONER } },
+        tonerKnown: false, printerName: '模拟打印机（mock 模式）',
+        printerLabel: '打印机在线（模拟）', networkLabel: '网络正常（模拟）', deviceStatus: 'online',
+      })
+      return
+    }
 
     if (!terminalId) {
       setView(

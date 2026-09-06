@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator'
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PrintJobParamsDto } from '../../print-jobs/dto/create-print-job.dto'
 
@@ -9,9 +9,10 @@ import { PrintJobParamsDto } from '../../print-jobs/dto/create-print-job.dto'
  * 绝不接受前端传入的 pages / billablePages / amountCents。
  */
 export class QuotePrintOrderDto {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  fileUrl!: string
+  fileUrl?: string
 
   /**
    * 目标终端（id 或 terminalCode）。黑白单面报价可省略（历史调用方兼容）。
@@ -29,4 +30,23 @@ export class QuotePrintOrderDto {
   @ValidateNested()
   @Type(() => PrintJobParamsDto)
   params?: PrintJobParamsDto
+
+  /** 材料包多行报价；单文件 fileUrl 路径保持原契约。 */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => QuotePrintOrderLineDto)
+  lines?: QuotePrintOrderLineDto[]
+}
+
+export class QuotePrintOrderLineDto {
+  @IsString()
+  @IsNotEmpty()
+  fileUrl!: string
+
+  @IsOptional()
+  @IsString()
+  pageRange?: string
 }

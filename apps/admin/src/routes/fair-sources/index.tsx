@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { formatDateTime } from '@ai-job-print/shared'
 import { Card, Drawer, ErrorState, LoadingState, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, FilterIcon, SearchIcon, XIcon } from 'lucide-react'
@@ -15,6 +16,7 @@ import {
 import { Pagination, useTableState } from '../components/DataTable'
 import { BulkPublishButton } from '../components/BulkPublishButton'
 import { toOrgOptions } from '../../services/api/bulkPublish'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -69,6 +71,7 @@ export default function FairSourcesPage() {
   const [viewing,      setViewing]      = useState<AdminFairSourceRecord | null>(null)
   const [rejectingId,  setRejectingId]  = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [actionError,  setActionError]  = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
@@ -116,30 +119,44 @@ export default function FairSourcesPage() {
   }
 
   const handleApprove = (id: string) => {
-    void approveFairSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    setActionError(null)
+    void approveFairSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '审核通过失败，请查看原因后重试')))
   }
 
   const handleReject = (id: string) => {
     if (!rejectReason.trim()) return
-    void rejectFairSource(id, rejectReason.trim()).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-      setRejectingId(null)
-      setRejectReason('')
-    })
+    setActionError(null)
+    void rejectFairSource(id, rejectReason.trim())
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+        setRejectingId(null)
+        setRejectReason('')
+      })
+      .catch((e) => setActionError(userMessageOf(e, '驳回失败，请稍后重试')))
   }
 
   const handlePublish = (id: string) => {
-    void publishFairSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    setActionError(null)
+    void publishFairSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '发布失败，请查看原因后重试')))
   }
 
-  const handleUnpublish = (id: string) => {
-    void unpublishFairSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+  const handleUnpublish = (id: string, name: string) => {
+    if (!window.confirm(`确认下架「${name}」？下架后一体机不再展示该招聘会。`)) return
+    // 二次确认（#813）与失败可见（任务包 3）都要：误触要拦，真失败也不能静默。
+    setActionError(null)
+    void unpublishFairSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch((e) => setActionError(userMessageOf(e, '下架失败，请稍后重试')))
   }
 
   if (loading) {
@@ -164,6 +181,11 @@ export default function FairSourcesPage() {
       subtitle="第三方平台同步招聘会数据管理"
       actions={<BulkPublishButton kind="fair" orgOptions={orgOptions} onDone={reload} />}
     >
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-error/30 bg-error-bg px-4 py-2.5 text-sm text-error-fg" role="alert">
+          {actionError}。请修正后重试，或刷新页面。
+        </div>
+      )}
       {/* 来自 Excel 导入批次的上下文 banner */}
       {sourceOrgIdFilter && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-bg px-4 py-2.5">
@@ -240,8 +262,8 @@ export default function FairSourcesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.organizer}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
-                        <div>{s.startTime}</div>
-                        <div className="text-neutral-300">至 {s.endTime.slice(5)}</div>
+                        <div>{formatDateTime(s.startTime)}</div>
+                        <div className="text-neutral-300">至 {formatDateTime(s.endTime)}</div>
                       </td>
                       <td className="px-4 py-3 text-xs text-neutral-500">{s.venue}</td>
                       <td className="px-4 py-3">
@@ -249,7 +271,7 @@ export default function FairSourcesPage() {
                           {FAIR_STATUS_LABELS[s.status]}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{formatDateTime(s.syncTime)}</td>
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -312,7 +334,7 @@ export default function FairSourcesPage() {
                               <button
                                 type="button"
                                 className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                                onClick={() => handleUnpublish(s.id)}
+                                onClick={() => handleUnpublish(s.id, s.name)}
                               >
                                 下架
                               </button>
@@ -353,13 +375,13 @@ export default function FairSourcesPage() {
             <DetailRow label="来源签到链接" value={viewing.checkinUrl ? <a href={viewing.checkinUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">查看来源签到入口</a> : '未配置'} />
             <DetailRow label="招聘会名称" value={viewing.name} />
             <DetailRow label="主办方" value={viewing.organizer} />
-            <DetailRow label="开始时间" value={viewing.startTime} />
-            <DetailRow label="结束时间" value={viewing.endTime} />
+            <DetailRow label="开始时间" value={formatDateTime(viewing.startTime)} />
+            <DetailRow label="结束时间" value={formatDateTime(viewing.endTime)} />
             <DetailRow label="举办场馆" value={viewing.venue} />
             <DetailRow label="活动状态" value={FAIR_STATUS_LABELS[viewing.status]} />
             <DetailRow label="展位数" value={viewing.boothCount !== undefined ? String(viewing.boothCount) : undefined} />
             <DetailRow label="描述" value={viewing.description} />
-            <DetailRow label="同步时间" value={viewing.syncTime} />
+            <DetailRow label="同步时间" value={formatDateTime(viewing.syncTime)} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
             <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
             {viewing.reviewStatus === 'rejected' && viewing.rejectReason ? (

@@ -114,6 +114,15 @@ export interface PartnerJobRecord {
   tags?: string[]
   description?: string
   requirements?: string
+  educationRequirement?: string
+  experienceRequirement?: string
+  skills?: string[]
+  benefits?: string[]
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit?: string
+  validThrough?: string | null
+  headcount?: number
   /**
    * 管理员驳回原因（契约 = 后端 PartnerJobDto.rejectReason）。
    *
@@ -195,7 +204,16 @@ export interface UpdatePartnerJobInput {
   tags?: string[]
   description?: string
   requirements?: string
-  workType?: 'full_time' | 'part_time' | 'internship' | 'contract'
+  workType?: 'full_time' | 'part_time' | 'internship' | 'contract' | 'campus'
+  educationRequirement?: string
+  experienceRequirement?: string
+  skills?: string[]
+  benefits?: string[]
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit?: string
+  validThrough?: string
+  headcount?: number
 }
 
 export interface UpdatePartnerFairInput {
@@ -271,4 +289,16 @@ export interface PartnerSyncLog {
   errorDetail: string | null  // R3: was failReason
   syncTime: string
   status: SyncResult      // R3: was result
+}
+
+export interface PartnerSyncLogPage {
+  data: PartnerSyncLog[]
+  pagination: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
+export interface PartnerSyncLogsQuery {
+  page?: number
+  pageSize?: number
+  sourceId?: string
+  result?: SyncResult
 }

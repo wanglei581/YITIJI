@@ -257,6 +257,31 @@ async function main() {
     if (unpubPayload.fromPublishStatus !== 'published') fail('9b. 审计应记 fromPublishStatus=published')
     pass('9b. Partner 下架→unpublished（不改 reviewStatus）；跨机构 404；审计 company.unpublish（记 fromPublishStatus）')
 
+    // ── 9c. PTR-20 企业资料按机构类型限制 ─────────────────────
+    const orgFair = `orgFair-${tag}`
+    const orgEnt = `orgEnt-${tag}`
+    await prisma.organization.create({ data: { id: orgFair, name: `招聘会主办方${tag}`, type: 'fair_organizer', contentTrustStatus: 'active' } })
+    await prisma.organization.create({ data: { id: orgEnt, name: `本企业${tag}`, type: 'enterprise_source', contentTrustStatus: 'active' } })
+    await expectStatus(
+      companies.partnerImport(orgFair, {
+        items: [{ externalId: `ff-${tag}`, name: '无关企业', fairParticipant: true }],
+      }, partner),
+      400,
+      '9c. fair_organizer 无本机构参展企业不得录入',
+    )
+    await expectStatus(
+      companies.partnerImport(orgEnt, {
+        items: [{ externalId: `ee-${tag}`, name: '别的公司' }],
+      }, partner),
+      400,
+      '9c. enterprise_source 不得录入非本企业',
+    )
+    const own = await companies.partnerImport(orgEnt, {
+      items: [{ externalId: `own-${tag}`, name: `本企业${tag}` }],
+    }, partner)
+    if (own.created !== 1) fail('9c. enterprise_source 维护本企业应成功')
+    pass('9c. fair_organizer / enterprise_source 企业资料范围限制生效')
+
     // ── 10. 浏览/跳转闭环（company_profile）──────────────────
     const b = await activity.recordBrowse(userA, 'company_profile', companyId, null)
     if (!b.recorded) fail('10. 企业浏览应落库')
@@ -427,11 +452,11 @@ async function main() {
     await prisma.externalJumpLog.deleteMany({ where: { endUserId: userA } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { targetType: 'company_profile', payloadJson: { contains: tag } } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { targetType: 'company_profile', targetId: companyId } }).catch(() => undefined)
-    await prisma.job.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } }).catch(() => undefined)
-    await prisma.companyProfile.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } }).catch(() => undefined)
+    await prisma.job.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB, `orgFair-${tag}`, `orgEnt-${tag}`] } } }).catch(() => undefined)
+    await prisma.companyProfile.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB, `orgFair-${tag}`, `orgEnt-${tag}`] } } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: userA } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { username: { in: [`vadmin-${tag}`, `vpartner-${tag}`] } } }).catch(() => undefined)
-    await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } }).catch(() => undefined)
+    await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB, `orgFair-${tag}`, `orgEnt-${tag}`] } } }).catch(() => undefined)
     await prisma.onModuleDestroy?.()
   }
 }

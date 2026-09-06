@@ -10,7 +10,8 @@ import { API_MODE } from '../../services/api/client'
 
 const ACTION_LABELS: Record<string, string> = {
   'file.upload':              '文件上传',
-  'file.force_delete':        '文件强制删除',
+  'file.delete':              '文件删除',
+  'file.force_delete':        '文件删除',
   'file.cleanup_expired':     '过期文件清理',
   'job.review':               '岗位审核',
   'job.publish':              '岗位发布',
@@ -26,10 +27,15 @@ const ACTION_LABELS: Record<string, string> = {
   'resume.optimize_requested':'简历优化请求',
   'assistant.chat_message':   'AI 助手消息',
   'organization.create':      '机构创建',
-  'organization.update':      '机构更新',
+  'organization.update':      '机构资料更新（历史记录）',
+  'org.update':               '机构资料更新（管理员）',
+  'org.self_profile_update':  '机构自助资料更新',
   'user.create':              '用户创建',
-  'user.disable':             '用户停用',
-  'system.login':             '登录',
+  'user.disable':             '用户停用（历史记录）',
+  'admin.user.disable':       '用户停用',
+  'auth.password_login':      '密码登录',
+  'auth.sms_login':           '短信登录',
+  'system.login':             '登录（历史记录）',
   'system.config_change':     '系统配置变更',
   'alert.acknowledge':        '确认告警',
   'alert.silence':            '静默告警',
@@ -40,18 +46,20 @@ const ACTION_LABELS: Record<string, string> = {
 // 筛选下拉常用动作(全部为查询用,空 = 不筛选)
 const ACTION_FILTERS: Array<{ value: string; label: string }> = [
   { value: '',                   label: '全部动作' },
-  { value: 'system.login',       label: '登录' },
+  { value: 'auth.password_login', label: '密码登录' },
+  { value: 'auth.sms_login',     label: '短信登录' },
   { value: 'job.review',         label: '岗位审核' },
   { value: 'job.publish',        label: '岗位发布' },
   { value: 'job.import',         label: '岗位导入' },
   { value: 'fair.review',        label: '招聘会审核' },
   { value: 'fair.publish',       label: '招聘会发布' },
-  { value: 'file.force_delete',  label: '文件强制删除' },
+  { value: 'file.delete',        label: '文件删除' },
   { value: 'file.cleanup_expired', label: '过期文件清理' },
   { value: 'data_source.create', label: '数据源创建' },
   { value: 'data_source.toggle', label: '数据源启停' },
-  { value: 'organization.update',label: '机构更新' },
-  { value: 'user.disable',       label: '用户停用' },
+  { value: 'org.update',         label: '机构资料更新（管理员）' },
+  { value: 'org.self_profile_update', label: '机构自助资料更新' },
+  { value: 'admin.user.disable', label: '用户停用' },
 ]
 
 const ROLE_BADGE: Record<string, 'info' | 'success' | 'warning' | 'default'> = {

@@ -106,6 +106,12 @@ export class FairCompanyZoneService {
 
   // ── 展区 CRUD ───────────────────────────────────────────────────────────────
 
+  async listZones(fairId: string): Promise<FairZone[]> {
+    await this.assertFairExists(fairId)
+    const zones = await this.prisma.fairZone.findMany({ where: { jobFairId: fairId }, orderBy: { sortOrder: 'asc' } })
+    return zones.map(mapFairZone)
+  }
+
   async createZone(fairId: string, dto: SaveFairZoneDto, user: AuthedUser): Promise<FairZone> {
     await this.assertFairExists(fairId)
     const created = await this.prisma.fairZone.create({
@@ -178,7 +184,7 @@ export class FairCompanyZoneService {
   private async writeFairAudit(user: AuthedUser, action: string, fairId: string, payload: Record<string, unknown>): Promise<void> {
     await this.audit.write({
       actorId: user.userId,
-      actorRole: 'admin',
+      actorRole: user.role,
       action,
       targetType: 'fair',
       targetId: fairId,
