@@ -2,7 +2,11 @@ import { ServiceUnavailableException } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { RedisService } from '../common/redis/redis.service'
 
-/** 跨实例付费 AI 懒执行锁；Redis 异常时 fail-closed，不能退回进程内 Map。 */
+/**
+ * 跨实例付费 AI 懒执行锁。
+ * - 配置了 Redis：SET NX PX 跨实例互斥；Redis 异常时 fail-closed（拒绝，不双跑，不退回进程内 Map）。
+ * - 未配置 Redis（单实例 / 离线 verify）：只做进程内合并，行为与引入锁之前一致。
+ */
 export class RedisInflightLock {
   private readonly inflight = new Map<string, Promise<unknown>>()
 
@@ -21,10 +25,10 @@ export class RedisInflightLock {
   }
 
   private async runOnce<T>(key: string, ttlMs: number, work: () => Promise<T>): Promise<T> {
+    if (!this.redis) return work()
     const token = randomUUID()
     let acquired: boolean
     try {
-      if (!this.redis) throw new Error('RedisService unavailable')
       acquired = await this.redis.setNxPx(key, token, ttlMs)
     } catch {
       throw busy('AI_IDEMPOTENCY_UNAVAILABLE', '服务繁忙，请稍后重试')
@@ -33,7 +37,7 @@ export class RedisInflightLock {
     try {
       return await work()
     } finally {
-      await this.redis?.getAndDelIfEquals(key, token).catch(() => undefined)
+      await this.redis.getAndDelIfEquals(key, token).catch(() => undefined)
     }
   }
 }
