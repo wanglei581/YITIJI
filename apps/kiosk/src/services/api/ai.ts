@@ -16,6 +16,7 @@
 import type {
   GeneratedResume,
   ResumeExportFormat,
+  ResumeExportPricing,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -24,6 +25,8 @@ import type {
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
+  ResumeReportExportKind,
+  ResumeReportExportResponse,
   AssistantChatRequest,
   AssistantChatResponse,
   AssistantSessionSummaryResponse,
@@ -56,6 +59,12 @@ export interface ResumeLayoutAdjustResponse {
   warnings: string[]
 }
 
+/** 契约 2：导出核销与事实核对时间。factsConfirmedAt 只随修改清单 body 发出（generate/export DTO 尚未收该字段）。 */
+export interface ResumeExportChargeOptions {
+  benefitGrantId?: string
+  factsConfirmedAt?: string
+}
+
 export interface AiServiceInterface {
   submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
@@ -83,7 +92,14 @@ export interface AiServiceInterface {
     templateId?: string,
     /** 原样草稿（未经 AI 润色）。只影响产物元数据与文件名的诚实性，排版不变。 */
     draft?: boolean,
+    charge?: ResumeExportChargeOptions,
   ): Promise<ResumeGenerateExportResponse>
+  getResumeExportPricing(access?: ResumeReadAccess): Promise<ResumeExportPricing>
+  exportResumeRecord(
+    taskId: string,
+    body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
+    access?: ResumeReadAccess,
+  ): Promise<ResumeReportExportResponse>
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -158,7 +174,17 @@ export const exportGeneratedResume = (
   layout?: ResumeLayoutSettings,
   templateId?: string,
   draft?: boolean,
-) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft)
+  charge?: ResumeExportChargeOptions,
+) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft, charge)
+
+export const getResumeExportPricing = (access?: ResumeReadAccess) =>
+  adapter.getResumeExportPricing(access)
+
+export const exportResumeRecord = (
+  taskId: string,
+  body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
+  access?: ResumeReadAccess,
+) => adapter.exportResumeRecord(taskId, body, access)
 
 /**
  * AI 生成失败时的出纸路径：把用户**已经填好的内容**原样导出成 PDF。

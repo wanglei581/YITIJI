@@ -13,6 +13,7 @@
 import type {
   GeneratedResume,
   ResumeExportFormat,
+  ResumeExportPricing,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -21,12 +22,19 @@ import type {
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
+  ResumeReportExportKind,
+  ResumeReportExportResponse,
   AssistantChatRequest,
   AssistantChatResponse,
   AssistantSessionSummaryResponse,
   AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
-import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
+import type {
+  ResumeExportChargeOptions,
+  ResumeLayoutAdjustAction,
+  ResumeLayoutAdjustResponse,
+  ResumeReadAccess,
+} from './ai'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
@@ -287,11 +295,41 @@ export const aiHttpAdapter = {
     layout?: ResumeLayoutSettings,
     templateId?: string,
     draft?: boolean,
+    charge?: ResumeExportChargeOptions,
   ): Promise<ResumeGenerateExportResponse> {
     return post<ResumeGenerateExportResponse>(
       '/resume/generate/export',
-      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf', ...(layout ? { layout } : {}), ...(templateId ? { templateId } : {}), ...(draft ? { draft: true } : {}) },
+      {
+        ...resume,
+        ...(taskId ? { taskId } : {}),
+        format: format ?? 'pdf',
+        ...(layout ? { layout } : {}),
+        ...(templateId ? { templateId } : {}),
+        ...(draft ? { draft: true } : {}),
+        ...(charge?.benefitGrantId ? { benefitGrantId: charge.benefitGrantId } : {}),
+        // factsConfirmedAt 不能放进本 body：全局 forbidNonWhitelisted，DTO 尚无该字段（包 H）。
+      },
       token,
+    )
+  },
+
+  async getResumeExportPricing(access?: ResumeReadAccess): Promise<ResumeExportPricing> {
+    return get<ResumeExportPricing>('/resume/export/pricing', access)
+  },
+
+  async exportResumeRecord(
+    taskId: string,
+    body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
+    access?: ResumeReadAccess,
+  ): Promise<ResumeReportExportResponse> {
+    return postWithAccess<ResumeReportExportResponse>(
+      `/resume/records/${encodeURIComponent(taskId)}/export`,
+      {
+        kind: body.kind,
+        ...(body.benefitGrantId ? { benefitGrantId: body.benefitGrantId } : {}),
+        ...(body.factsConfirmedAt ? { factsConfirmedAt: body.factsConfirmedAt } : {}),
+      },
+      access,
     )
   },
 }
