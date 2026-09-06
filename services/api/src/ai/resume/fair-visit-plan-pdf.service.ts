@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
-import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { FairVisitPlanPayload } from './llm-fair-visit-plan.service'
 
 /**
@@ -11,33 +11,6 @@ import type { FairVisitPlanPayload } from './llm-fair-visit-plan.service'
  */
 export const REVIEW_DISCLOSURE =
   '本系统不记录你是否到场，也不记录你在现场取得的材料；以下内容仅基于本机记录的浏览与跳转行为，以及该场招聘会的公开信息。'
-
-interface FontCandidate { path: string; family?: string }
-
-function fontCandidates(): FontCandidate[] {
-  const envPath = process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const list: FontCandidate[] = []
-  if (envPath) list.push({ path: envPath })
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] ?? 'C:\\Windows'
-    list.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    list.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-    )
-  } else {
-    list.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return list
-}
 
 @Injectable()
 export class FairVisitPlanPdfService {
@@ -65,20 +38,10 @@ export class FairVisitPlanPdfService {
         : 'AI 生成的参会准备参考，仅供求职者本人现场准备使用；招聘会仅为第三方或官方来源信息入口',
       kind: 'fairvisit',
     })
-    const ok = fontCandidates().some((candidate) => {
-      if (!existsSync(candidate.path)) return false
-      try {
-        if (candidate.family) doc.registerFont('cjk', candidate.path, candidate.family)
-        else doc.registerFont('cjk', candidate.path)
-        doc.font('cjk')
-        return true
-      } catch {
-        return false
-      }
-    })
+    const ok = registerCjkFont(doc)
     if (!ok) {
       doc.end()
-      throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: '服务器缺少中文字体，无法生成准备单' } })
+      throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: CJK_FONT_MISSING_USER_MESSAGE } })
     }
 
     const chunks: Buffer[] = []

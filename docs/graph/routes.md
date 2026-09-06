@@ -103,7 +103,7 @@ flowchart LR
 | `/renshi` | RenshiPage | `apps/kiosk/src/pages/renshi/RenshiPage.tsx` | 0 | 1 |
 | `/resume` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/career-plan` | CareerPlanPage | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 12 | 7 |
-| `/resume/export` | ResumeExportPage | `apps/kiosk/src/pages/resume/ResumeExportPage.tsx` | 0 | 7 |
+| `/resume/export` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/generate` | ResumeGeneratePage | `apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx` | 28 | 7 |
 | `/resume/generate/preview` | ResumeGeneratePreviewPage | `apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx` | 28 | 6 |
 | `/resume/job-fit` | JobFitPage | `apps/kiosk/src/pages/resume/JobFitPage.tsx` | 32 | 8 |

@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
-import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
+import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import type { InterviewReportPayload } from './mock-interview-llm.service'
 
 // ============================================================
@@ -9,33 +9,6 @@ import type { InterviewReportPayload } from './mock-interview-llm.service'
 // 跨平台中文字体解析与 ResumePdfService 同源（Windows/macOS/Linux 候选 + env 覆盖）；
 // 找不到字体诚实报错，不输出乱码 PDF。报告内容不写日志。
 // ============================================================
-
-interface FontCandidate { path: string; family?: string }
-
-function fontCandidates(): FontCandidate[] {
-  const envPath = process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const list: FontCandidate[] = []
-  if (envPath) list.push({ path: envPath })
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] ?? 'C:\\Windows'
-    list.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    list.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-    )
-  } else {
-    list.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return list
-}
 
 const LEVEL_LABEL: Record<string, string> = {
   needs_work: '需要加强', pass: '基础达标', good: '表现良好', excellent: '表现突出',
@@ -50,15 +23,7 @@ const LEVEL_LABEL: Record<string, string> = {
  * 同源做法见 ai/resume/career-plan-pdf.service.ts 的 registerCjkFont。
  */
 export function registerInterviewCjkFont(doc: PDFKit.PDFDocument): boolean {
-  return fontCandidates().some((c) => {
-    if (!existsSync(c.path)) return false
-    try {
-      if (c.family) doc.registerFont('cjk', c.path, c.family)
-      else doc.registerFont('cjk', c.path)
-      doc.font('cjk')
-      return true
-    } catch { return false }
-  })
+  return registerCjkFont(doc)
 }
 
 @Injectable()
@@ -76,7 +41,7 @@ export class InterviewReportPdfService {
     const ok = registerInterviewCjkFont(doc)
     if (!ok) {
       doc.end()
-      throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: '服务器缺少中文字体，无法生成打印版报告' } })
+      throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: CJK_FONT_MISSING_USER_MESSAGE } })
     }
 
     const chunks: Buffer[] = []

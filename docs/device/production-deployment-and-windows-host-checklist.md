@@ -121,6 +121,8 @@
 - [ ] pnpm 版本与锁文件兼容。
 - [ ] PostgreSQL 版本建议 16.x。
 - [ ] Redis 版本建议 7.x。
+- [ ] Linux 已安装中文字体包：Debian/Ubuntu 执行 `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`；其他发行版安装等价的思源黑体 / Noto Sans CJK。
+- [ ] 执行 `fc-list :lang=zh family file | head -20` 能列出中文字体，且目标字体文件对 API 运行用户可读。
 - [ ] 服务器时区为 `Asia/Shanghai`。
 - [ ] 磁盘空间、内存、CPU 满足预估访问量。
 - [ ] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
@@ -143,6 +145,8 @@
 - [ ] OCR provider 与百度密钥正确。
 - [ ] AI provider / LLM 功能级配置可读取。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
+- [ ] `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY` 已按需配置；默认系统候选可用时可留空。旧变量 `JOB_MATERIAL_PDF_FONT_PATH` / `_FAMILY` 仅作兼容回退，不再作为新部署主配置。
+- [ ] `NODE_ENV=production` 下字体探测失败会以 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；管理员登录后读取 `GET /api/v1/health/cjk-font`，确认 `data.ok=true`、`path` / `family` 与服务器安装一致。
 - [x] SMS provider 在短信审核前不得误设为真实生产发送。（**2026-07-26**：预发已为 `tencent` 且真号 E2E 通过；见 §2.2。正式生产仍须保持密钥仅服务端、禁止 log 假发送冒充生产。）
 - [ ] ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false~~ **该开关已删除，无需配置**。先付后印现在写死在代码里：Agent 只领取「已关联订单 + `payStatus='paid'` + `taskStatus='pending'`」的任务，`claimableWhere` 与事务内 CAS 两层都要求，任何环境都关不掉。验收口径改为看 CI 静态门禁 `verify:print-rollout-config`（钉死该开关不得存在、不得放行无订单任务）与行为门禁 `verify:kiosk-cashier-ui`。若运行目录 `.env` 里还留着这个变量，删掉即可，它已不生效。
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
@@ -232,6 +236,9 @@ pnpm --filter ./services/api verify:member-assets-c2d
 pnpm --filter ./services/api verify:mock-interview
 pnpm --filter ./services/api verify:job-fit
 pnpm --filter ./services/api verify:resume-optimize
+pnpm --filter ./services/api verify:resume-generate
+pnpm --filter ./services/api verify:cjk-font
+pnpm --filter ./services/api verify:production-runtime-gates
 pnpm --filter ./services/api verify:ocr-baidu
 pnpm --filter ./services/api verify:career-plan
 pnpm --filter ./services/api verify:activity-logs

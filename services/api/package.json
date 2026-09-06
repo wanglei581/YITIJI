@@ -139,6 +139,7 @@
     "verify:public-fair-demo-guard": "node -r @swc-node/register scripts/verify-public-fair-demo-guard.ts",
     "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
     "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",
+    "verify:cjk-font": "node -r @swc-node/register scripts/verify-cjk-font.ts",
     "verify:boot-resilience": "node -r @swc-node/register scripts/verify-boot-resilience.ts",
     "verify:redis-degradation-truth": "node -r @swc-node/register scripts/verify-redis-degradation-truth.ts",
     "verify:error-observability": "node -r @swc-node/register scripts/verify-error-observability.ts",

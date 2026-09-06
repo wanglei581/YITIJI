@@ -1,7 +1,7 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
-import { existsSync } from 'fs'
+import { Injectable, ServiceUnavailableException } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
+import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../../common/pdf/cjk-font'
 import type { GeneratedResume, ResumeLayoutSettings } from '../interfaces/ai-provider.interface'
 import type { ResumeTemplateLayoutPreset, ResumeTemplateSectionKey } from '../../job-materials/job-materials.types'
 
@@ -18,41 +18,6 @@ import type { ResumeTemplateLayoutPreset, ResumeTemplateSectionKey } from '../..
 //   - macOS(开发机):PingFang / Hiragino Sans GB / 华文黑体
 //   - Linux:Noto Sans CJK / 文泉驿
 // ============================================================
-
-interface FontCandidate {
-  path: string
-  /** TTC 集合需指定字体族名;单字体文件为 undefined */
-  family?: string
-}
-
-function fontCandidates(): FontCandidate[] {
-  const custom = process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const customFamily = process.env['RESUME_PDF_FONT_FAMILY']?.trim() || undefined
-  const list: FontCandidate[] = []
-  if (custom) list.push({ path: custom, family: customFamily })
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] || 'C:\\Windows'
-    list.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\msyh.ttf` },
-      { path: `${winDir}\\Fonts\\simhei.ttf` },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    list.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-      { path: '/System/Library/Fonts/Supplemental/Songti.ttc', family: 'STSongti-SC-Regular' },
-    )
-  } else {
-    list.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return list
-}
 
 const PAGE = { width: 595.28, height: 841.89 } // A4 pt
 const MARGIN = 48
@@ -113,35 +78,13 @@ function isRenderOptions(value: ResumeLayoutSettings | ResumePdfRenderOptions | 
 
 @Injectable()
 export class ResumePdfService {
-  private readonly logger = new Logger(ResumePdfService.name)
-  private resolvedFont: FontCandidate | null = null
-
   /** 解析可用中文字体(进程内缓存);不可用 → 诚实报错。 */
   private resolveFont(doc: InstanceType<typeof PDFDocument>): void {
-    const tryRegister = (candidate: FontCandidate): boolean => {
-      if (!existsSync(candidate.path)) return false
-      try {
-        if (candidate.family) doc.registerFont('cjk', candidate.path, candidate.family)
-        else doc.registerFont('cjk', candidate.path)
-        doc.font('cjk')
-        return true
-      } catch {
-        return false
-      }
-    }
-
-    if (this.resolvedFont && tryRegister(this.resolvedFont)) return
-    for (const candidate of fontCandidates()) {
-      if (tryRegister(candidate)) {
-        this.resolvedFont = candidate
-        this.logger.log(`resume pdf font: ${candidate.path}${candidate.family ? ` (${candidate.family})` : ''}`)
-        return
-      }
-    }
+    if (registerCjkFont(doc)) return
     throw new ServiceUnavailableException({
       error: {
         code: 'RESUME_PDF_FONT_NOT_FOUND',
-        message: '服务器缺少可用中文字体,无法导出 PDF;请配置 RESUME_PDF_FONT_PATH 指向 .ttf/.ttc 中文字体文件',
+        message: CJK_FONT_MISSING_USER_MESSAGE,
       },
     })
   }
