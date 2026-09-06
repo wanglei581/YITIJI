@@ -1,6 +1,6 @@
 import { JwtService } from '@nestjs/jwt'
 import type { RedisService } from '../redis/redis.service'
-import { memberSessionKey } from '../guards/end-user-auth.guard'
+import { memberSessionKey, touchMemberSessionIfSupported } from '../guards/end-user-auth.guard'
 import type { PrismaService } from '../../prisma/prisma.service'
 import { tryRedis } from '../redis/redis-degradation'
 
@@ -65,5 +65,7 @@ export async function resolveOptionalEndUser(
     return null
   }
 
+  const touch = await touchMemberSessionIfSupported(redis, payload.sub, sessionId)
+  if (touch === -1) return null
   return { endUserId: payload.sub, sessionId }
 }

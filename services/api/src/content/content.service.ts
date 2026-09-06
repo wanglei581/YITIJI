@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import { randomUUID, createHash } from 'crypto'
+import type { Readable } from 'stream'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
@@ -242,12 +243,44 @@ export class ContentService {
     return { buffer, mimeType: record.mimeType }
   }
 
+  async describeAssetContent(id: string): Promise<{ mimeType: string; sizeBytes: number }> {
+    const record = await this.requireAliveAsset(id)
+    if (record.source === 'external_url') {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_NO_LOCAL_CONTENT', message: '外链素材无本地内容' } })
+    }
+    const head = await this.storage.headObject(record.storageKey)
+    if (!head) {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_NOT_FOUND', message: '素材不存在或已删除' } })
+    }
+    return { mimeType: record.mimeType, sizeBytes: head.sizeBytes }
+  }
+
+  async readAssetRange(id: string, start: number, end: number): Promise<Buffer> {
+    const record = await this.requireAliveAsset(id)
+    if (record.source === 'external_url') {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_NO_LOCAL_CONTENT', message: '外链素材无本地内容' } })
+    }
+    return this.storage.getObjectRange(record.storageKey, start, end)
+  }
+
+  async openAssetStream(id: string): Promise<Readable> {
+    const record = await this.requireAliveAsset(id)
+    if (record.source === 'external_url') {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_NO_LOCAL_CONTENT', message: '外链素材无本地内容' } })
+    }
+    return this.storage.openObjectStream(record.storageKey)
+  }
+
   // ── 播放方案 ────────────────────────────────────────────────────────────────
 
-  async listPlaylists(): Promise<AdPlaylistView[]> {
+  async listPlaylists(page = 1, pageSize = 50): Promise<AdPlaylistView[]> {
+    const take = Math.min(100, Math.max(1, pageSize))
+    const skip = (Math.max(1, page) - 1) * take
     const records = await this.prisma.adPlaylist.findMany({
       where: { deletedAt: null },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take,
       include: { items: { include: { asset: true }, orderBy: { order: 'asc' } } },
     })
     return records.map(toPlaylistView)

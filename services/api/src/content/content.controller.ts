@@ -151,8 +151,16 @@ export class ContentController {
   @Get('admin/ad-playlists')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  listPlaylists() {
-    return this.content.listPlaylists()
+  listPlaylists(
+    @Query('page') pageStr?: string,
+    @Query('pageSize') sizeStr?: string,
+  ) {
+    const page = Number(pageStr)
+    const pageSize = Number(sizeStr)
+    return this.content.listPlaylists(
+      Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
+      Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 50,
+    )
   }
 
   @Post('admin/ad-playlists')
@@ -248,7 +256,7 @@ export class ContentController {
     if (!expires || !sig || !verifyAdAssetSignature(id, expires, sig)) {
       throw new UnauthorizedException({ error: { code: 'AD_ASSET_SIGNATURE_INVALID', message: '签名无效或已过期' } })
     }
-    const { buffer, mimeType } = await this.content.readAssetContent(id)
+    const { mimeType, sizeBytes } = await this.content.describeAssetContent(id)
     // Admin/Kiosk dev server 与 API 分端口运行,签名素材需要允许跨 origin 作为 <img>/<video> 嵌入。
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
     // 屏保素材可被 Kiosk 长缓存(内容不可变,内容变了会换新 id)
@@ -260,24 +268,30 @@ export class ContentController {
     res.setHeader('Accept-Ranges', 'bytes')
 
     const rangeHeader = req.headers.range
-    const range = parseByteRange(typeof rangeHeader === 'string' ? rangeHeader : undefined, buffer.length)
+    const range = parseByteRange(typeof rangeHeader === 'string' ? rangeHeader : undefined, sizeBytes)
     if (rangeHeader && !range) {
       // 带了 Range 但不可满足：必须 416 并回带真实总长，不能假装成功回全量。
-      res.setHeader('Content-Range', `bytes */${buffer.length}`)
+      res.setHeader('Content-Range', `bytes */${sizeBytes}`)
       res.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
       res.end()
       return
     }
     if (range) {
-      const slice = buffer.subarray(range.start, range.end + 1)
-      res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${buffer.length}`)
+      const slice = await this.content.readAssetRange(id, range.start, range.end)
+      res.setHeader('Content-Range', `bytes ${range.start}-${range.end}/${sizeBytes}`)
       res.setHeader('Content-Length', slice.length)
       res.status(HttpStatus.PARTIAL_CONTENT)
       res.send(slice)
       return
     }
-    res.setHeader('Content-Length', buffer.length)
-    res.send(buffer)
+    res.setHeader('Content-Length', sizeBytes)
+    const stream = await this.content.openAssetStream(id)
+    await new Promise<void>((resolve, reject) => {
+      stream.on('error', reject)
+      res.once('finish', resolve)
+      res.once('error', reject)
+      stream.pipe(res)
+    })
   }
 
 }

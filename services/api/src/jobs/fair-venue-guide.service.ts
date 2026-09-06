@@ -9,6 +9,7 @@ import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.se
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { SaveVenueGuideDto } from './dto/venue-guide.dto'
+import { withPublicFairDemoExclusion } from './jobs-shared'
 
 // ============================================================
 // FairVenueGuideService — 场馆导览配置(Admin 写 / Kiosk 只读)
@@ -181,7 +182,7 @@ export class FairVenueGuideService {
   /** Kiosk 公开读:招聘会须 approved+published;未配置导览 → data null(空态)。 */
   async getPublishedVenueGuide(fairId: string): Promise<{ data: FairVenueGuideDto | null }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
     })
     if (!fair) return { data: null }

@@ -110,6 +110,7 @@ async function main() {
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     // 计费接线后新增的真实 fixture / 价目清理。
+    await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: fixtureFileIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
     await Promise.all(fixtureStorageKeys.map((key) =>
       storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined),
@@ -494,6 +495,57 @@ async function main() {
     } else {
       fail(`7g. 仅原始 errorMessage 兜底异常: ${JSON.stringify({ failureReasonForUser: userView3.failureReasonForUser, errorMessage: userView3.errorMessage, leaked3 })}`)
     }
+
+    const piiFileId = `file_vpj_pii_${suffix}`
+    const piiKey = `verify/print-jobs/${piiFileId}.pdf`
+    fixtureFileIds.push(piiFileId)
+    fixtureStorageKeys.push(piiKey)
+    const piiSha = createHash('sha256').update(pdfBytes).digest('hex')
+    await storage.putObject(piiKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: piiFileId,
+        storageKey: piiKey,
+        filename: 'pii.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: piiSha,
+        purpose: 'print_doc',
+        status: 'active',
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
+    await prisma.documentProcessTask.create({
+      data: {
+        kind: 'pii_scan',
+        status: 'completed',
+        sourceFileId: piiFileId,
+        paramsJson: JSON.stringify({ sourceSha256: piiSha }),
+        resultJson: JSON.stringify({ mode: 'real', findingCount: 0 }),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    const piiSigned = signFileUrl(piiFileId, 30 * 60 * 1000)
+    const piiDto: CreatePrintJobDto = { fileUrl: piiSigned.url, fileMd5: piiSha, fileName: 'pii.pdf' }
+    const piiCreated = await printJobs.create(piiDto, {
+      ipAddress: '127.0.0.1',
+      userAgent: 'verify',
+      endUserId: null,
+      terminalId,
+    })
+    createdTaskIds.push(piiCreated.taskId)
+    pass('API-27c 扫描 sha256 与文件一致时可建单')
+    await prisma.fileObject.update({ where: { id: piiFileId }, data: { sha256: 'b'.repeat(64) } })
+    await expectCode(
+      () => printJobs.create(piiDto, {
+        ipAddress: '127.0.0.1',
+        userAgent: 'verify',
+        endUserId: null,
+        terminalId,
+      }),
+      'PII_SCAN_STALE',
+      'API-27c 建单比对 sha256 不一致 → 409 PII_SCAN_STALE',
+    )
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

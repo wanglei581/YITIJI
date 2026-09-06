@@ -27,6 +27,8 @@ interface StoredFile {
   mimeType: string
   sizeBytes: number
   sha256: string
+  storageKey: string
+  bucket: string
   purpose: FilePurpose
   sensitiveLevel: string
   endUserId: string | null
@@ -219,6 +221,8 @@ class FakeFilesService {
       mimeType: args.mimeType,
       sizeBytes: args.buffer.length,
       sha256: `sha_${id}`,
+      storageKey: `tmp/uploads/${id}/${id}.pdf`,
+      bucket: 'local-fs',
       purpose: args.purpose,
       sensitiveLevel,
       endUserId: args.endUserId ?? null,
@@ -266,6 +270,9 @@ class FakeFilesService {
   async systemDelete(fileId: string, reason: string): Promise<unknown> {
     return this.forceDelete(fileId, 'system', reason)
   }
+
+  async copyObjectToKey(): Promise<void> {}
+  async deleteObjectAtKey(): Promise<void> {}
 
 }
 
@@ -542,6 +549,11 @@ async function main(): Promise<void> {
     assert.equal(bound?.endUserId, 'member_1')
     assert.equal(bound?.ownerType, 'user')
     assert.equal(bound?.retentionPolicy, 'months_3')
+    assert.match(
+      bound?.storageKey ?? '',
+      /^users\/member_1\//,
+      'API-29c 绑定会员后 storageKey 必须离开 tmp/uploads',
+    )
   }
 
   {

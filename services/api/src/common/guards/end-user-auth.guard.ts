@@ -24,6 +24,25 @@ export function memberSessionKey(sessionId: string): string {
   return `member:session:${sessionId}`
 }
 
+/** 与 member-auth.service SESSION_TTL 对齐；滑动续期刷新到这个窗口。 */
+export const MEMBER_SESSION_TTL_SECONDS = 1800
+
+/** 滑动续期：mock Redis 没有该方法时跳过，不得把 TypeError 当成 Redis 宕机。 */
+export async function touchMemberSessionIfSupported(
+  redis: RedisService,
+  endUserId: string,
+  sessionId: string,
+  logger?: Logger,
+): Promise<number | null> {
+  if (typeof redis.touchMemberSession !== 'function') return null
+  const touch = await tryRedis(
+    'member-session:touch',
+    () => redis.touchMemberSession(endUserId, sessionId, MEMBER_SESSION_TTL_SECONDS),
+    logger,
+  )
+  return touch.ok ? touch.value : null
+}
+
 /**
  * C 端求职者鉴权(阶段 A)。与内部 JwtAuthGuard 完全隔离:
  *
@@ -98,6 +117,15 @@ export class EndUserAuthGuard implements CanActivate {
     }
 
     req.endUser = { endUserId: payload.sub, sessionId }
+    const touch = await touchMemberSessionIfSupported(
+      this.redis,
+      payload.sub,
+      sessionId,
+      this.logger,
+    )
+    if (touch === -1) {
+      throw this.unauthorized('MEMBER_SESSION_EXPIRED', '会话已失效,请重新登录')
+    }
     return true
   }
 

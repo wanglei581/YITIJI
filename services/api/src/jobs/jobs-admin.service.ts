@@ -8,6 +8,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   InternalServerErrorException,
   Optional,
 } from '@nestjs/common'
@@ -175,10 +176,26 @@ export class JobsAdminService {
       assertPublishFieldsComplete('岗位', job as unknown as Record<string, unknown>, JOB_PUBLISH_REQUIRED_FIELDS)
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
-    const updated = await this.prisma.job.update({
-      where: { id },
-      data: { publishStatus: toStatus },
-    })
+    if (action === 'publish') {
+      const cas = await this.prisma.job.updateMany({
+        where: { id, reviewStatus: 'approved' },
+        data: { publishStatus: 'published' },
+      })
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
+        })
+      }
+    } else {
+      await this.prisma.job.update({
+        where: { id },
+        data: { publishStatus: 'unpublished' },
+      })
+    }
+    const updated = await this.prisma.job.findUnique({ where: { id } })
+    if (!updated) {
+      throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
+    }
     await this.audit.write({
       actorId: user.userId,
       actorRole: 'admin',
@@ -283,10 +300,26 @@ export class JobsAdminService {
       assertPublishFieldsComplete('招聘会', fair as unknown as Record<string, unknown>, FAIR_PUBLISH_REQUIRED_FIELDS)
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
-    const updated = await this.prisma.jobFair.update({
-      where: { id },
-      data: { publishStatus: toStatus },
-    })
+    if (action === 'publish') {
+      const cas = await this.prisma.jobFair.updateMany({
+        where: { id, reviewStatus: 'approved' },
+        data: { publishStatus: 'published' },
+      })
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
+        })
+      }
+    } else {
+      await this.prisma.jobFair.update({
+        where: { id },
+        data: { publishStatus: 'unpublished' },
+      })
+    }
+    const updated = await this.prisma.jobFair.findUnique({ where: { id } })
+    if (!updated) {
+      throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })
+    }
     if (action === 'unpublish') {
       await this.printBridges?.revokeForFair(id, 'fair_unpublished')
     }

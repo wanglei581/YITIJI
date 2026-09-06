@@ -29,6 +29,11 @@ export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual
 
 // ─── Query helpers (internal) ─────────────────────────────────────────────────
 
+export function firstQueryString(value: unknown): string | undefined {
+  if (Array.isArray(value)) return firstQueryString(value[0])
+  return typeof value === 'string' ? value : undefined
+}
+
 export interface PublishedFairsParams {
   status?: string
   keyword?: string
@@ -76,8 +81,8 @@ export function buildFairStatusWhere(status: FairStatus, now: Date): Prisma.JobF
 export const FAIR_KEYWORD_FIELDS = ['title', 'sourceName', 'venue', 'city', 'description'] as const
 
 /** 与 /jobs 的 keyword 一致:服务端 OR contains 全表检索。空词返回 null。 */
-export function buildFairKeywordWhere(keyword?: string): Prisma.JobFairWhereInput | null {
-  const kw = keyword?.trim()
+export function buildFairKeywordWhere(keyword?: string | string[]): Prisma.JobFairWhereInput | null {
+  const kw = firstQueryString(keyword)?.trim()
   if (!kw) return null
   return { OR: FAIR_KEYWORD_FIELDS.map((field) => ({ [field]: { contains: kw } })) }
 }
@@ -419,7 +424,7 @@ export function buildJobIndustryTag(industry: string): string {
 
 /** Kiosk 公开岗位的筛选条件（approved + published）。 */
 export interface PublishedJobFilter {
-  keyword?: string
+  keyword?: string | string[]
   city?: string
   industry?: string
   category?: string
@@ -441,7 +446,7 @@ export interface PublishedJobFilter {
  * 那样过期岗位会在带关键词搜索时重新漏出来。
  */
 export function buildPublishedJobWhere(params?: PublishedJobFilter, now: Date = new Date()) {
-  const kw = params?.keyword?.trim()
+  const kw = firstQueryString(params?.keyword)?.trim()
   const and: Prisma.JobWhereInput[] = []
   if (params?.tag)      and.push({ tagsJson: { contains: `"${params.tag}"` } })
   if (params?.industry) and.push({ tagsJson: { contains: `"${buildJobIndustryTag(params.industry)}"` } })

@@ -13,6 +13,9 @@
  */
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { Readable, Writable } from 'node:stream'
 
 // 签名密钥只用于本门禁内部造一条合法链接；真实值绝不写进仓库。
 process.env['FILE_SIGNING_SECRET'] ||= randomBytes(32).toString('hex')
@@ -32,26 +35,34 @@ function makeRes() {
     body: null,
     ended: false,
   }
-  return {
-    headers,
-    state,
-    res: {
-      setHeader(name: string, value: string | number) {
-        headers[name.toLowerCase()] = value
-      },
-      status(code: number) {
-        state.status = code
-        return this
-      },
-      send(body: Buffer) {
-        state.body = body
-        state.ended = true
-      },
-      end() {
-        state.ended = true
-      },
+  const chunks: Buffer[] = []
+  const writable = new Writable({
+    write(chunk, _enc, cb) {
+      chunks.push(Buffer.from(chunk))
+      cb()
     },
+    final(cb) {
+      if (!state.body && chunks.length) state.body = Buffer.concat(chunks)
+      state.ended = true
+      cb()
+    },
+  }) as Writable & {
+    setHeader: (name: string, value: string | number) => void
+    status: (code: number) => typeof writable
+    send: (body: Buffer) => void
   }
+  writable.setHeader = (name, value) => {
+    headers[name.toLowerCase()] = value
+  }
+  writable.status = (code) => {
+    state.status = code
+    return writable
+  }
+  writable.send = (body) => {
+    state.body = body
+    state.ended = true
+  }
+  return { headers, state, res: writable }
 }
 
 async function main(): Promise<void> {
@@ -78,9 +89,11 @@ async function main(): Promise<void> {
   const payload = Buffer.from('0123456789')
   const assetId = 'ad_asset_range_probe'
   const fakeContent = {
-    readAssetContent: async () => ({ buffer: payload, mimeType: 'video/mp4' }),
+    describeAssetContent: async () => ({ mimeType: 'video/mp4', sizeBytes: payload.length }),
+    readAssetRange: async (_id: string, start: number, end: number) => payload.subarray(start, end + 1),
+    openAssetStream: async () => Readable.from(payload),
   }
-  const controller = new ContentController(fakeContent as never, { write: async () => undefined } as never)
+  const controller = new ContentController(fakeContent as never)
   const signed = signAdAssetUrl(assetId)
   const url = new URL(signed.url, 'http://local')
   const expires = url.searchParams.get('expires') ?? ''
@@ -123,6 +136,17 @@ async function main(): Promise<void> {
   assert.equal(unsat.headers['content-range'], 'bytes */10', '416 必须回带真实总长')
   assert.equal(unsat.state.body, null, '416 不得回内容体')
   pass('不可满足区间 → 416 + bytes */size，不假装成功回全量')
+
+  const controllerSrc = readFileSync(path.resolve(__dirname, '../src/content/content.controller.ts'), 'utf8')
+  const serveStart = controllerSrc.indexOf('async serveAssetContent')
+  const serveFn = controllerSrc.slice(serveStart, controllerSrc.indexOf('\n}', serveStart) + 2)
+  assert.doesNotMatch(serveFn, /readAssetContent\(/, 'Range 路径不得再整段 getObject/readAssetContent')
+  assert.match(serveFn, /readAssetRange\(/, 'Range 必须走 readAssetRange/getObjectRange')
+  assert.match(serveFn, /openAssetStream\(/, '无 Range 必须流式 pipe')
+  const serviceSrc = readFileSync(path.resolve(__dirname, '../src/content/content.service.ts'), 'utf8')
+  assert.match(serviceSrc, /getObjectRange\(/, 'storage 必须提供 getObjectRange')
+  assert.match(serviceSrc, /listPlaylists\([\s\S]*take/, 'listPlaylists 必须带 take/分页')
+  pass('源码：Range 不整段入内存，listPlaylists 有 take')
 
   console.log('\n✅ verify:ad-asset-range 全部通过')
 }
