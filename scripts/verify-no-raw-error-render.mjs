@@ -42,7 +42,6 @@ const RAW_MESSAGE = /(\b\w+)\s+instanceof\s+Error\s*\?\s*\1\.message/
 const AS_ERROR_MESSAGE = /\(\s*\w+\s+as\s+Error\s*\)\s*\?\.?\s*message/
 
 const PACKET_PAGES = [
-  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/print/PrintConfirmPage.tsx',
   'apps/kiosk/src/pages/print/PrintCashierPage.tsx',
   'apps/kiosk/src/pages/print/PrintUploadPage.tsx',
