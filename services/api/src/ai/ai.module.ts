@@ -51,12 +51,14 @@ import { LlmResumeProvider } from './providers/llm.provider'
 import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemption.module'
 import { JobMaterialsModule } from '../job-materials/job-materials.module'
 import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
+import { ResumeReportExportController } from './resume-report-export.controller'
+import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule],
-  controllers: [AiController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
+  controllers: [AiController, ResumeReportExportController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
   providers: [
     AiService,
     AiLogService,
@@ -104,6 +106,7 @@ import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
     ResumePdfService,
     ResumeDocxService,
     ResumeTextService,
+    DiagnosisReportPdfService,
     // ── 阶段2B AI 简历优化真实化(基于原文,防编造) ──
     LlmResumeOptimizeService,
     // 小青「本次要点」复用顾问产物 PDF / 我的文档链路（不改 AdvisorModule 既有实例）。
