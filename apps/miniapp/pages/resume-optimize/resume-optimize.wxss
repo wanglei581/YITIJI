@@ -85,6 +85,12 @@
   align-items: center; justify-content: center; text-align: center; font-size: var(--fs-sm); font-weight: 680; }
 .format-option.on { color: var(--teal-deep); background: var(--teal-soft); border-color: var(--teal); }
 .export-note { margin-top: 14rpx; font-size: var(--fs-sm); line-height: 1.6; color: var(--muted); }
+.pricing-line { margin-top: 14rpx; padding: 14rpx 16rpx; border-radius: var(--r-xs);
+  display: flex; align-items: flex-start; gap: 10rpx; font-size: var(--fs-sm); line-height: 1.55; }
+.pricing-line.free { color: var(--teal-deep); background: var(--teal-soft); }
+.pricing-line.charged { color: var(--wheat-deep); background: var(--warn-soft); }
+.pricing-line.unavailable { color: var(--error); background: var(--error-soft); }
+.pricing-icon { margin-top: 3rpx; flex-shrink: 0; }
 .export-disabled-reason { margin-top: 12rpx; padding: 14rpx; border-radius: var(--r-xs);
   background: var(--warn-soft); color: var(--wheat-deep); font-size: var(--fs-sm); line-height: 1.55; }
 .export-result { margin-top: 20rpx; padding: 22rpx; border-radius: var(--r-sm); background: var(--surface);
@@ -96,6 +102,7 @@
 .export-actions { margin-top: 16rpx; display: grid; grid-template-columns: 1fr 1fr; gap: 10rpx; }
 .export-actions .btn { min-width: 0; font-size: var(--fs-sm); }
 .export-actions .btn:last-child { grid-column: 1 / -1; }
+.export-expired { margin-top: 14rpx; color: var(--error); font-size: var(--fs-sm); line-height: 1.55; }
 
 /* 合并视图占位 */
 .mp-placeholder { display: flex; flex-direction: column; align-items: center;

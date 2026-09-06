@@ -35,6 +35,14 @@
     <view class="rs-sub">{{failMsg}}</view>
   </view>
 
+  <view wx:if="{{status !== 'done'}}" class="state-export-disabled">
+    <view class="state-export-reason">诊断失败或尚未完成，暂时不能导出。完成诊断后可生成真实 PDF。</view>
+    <view class="report-export-actions">
+      <button class="btn ghost" disabled="{{true}}" aria-disabled="{{true}}">导出诊断报告 PDF</button>
+      <button class="btn ghost" disabled="{{true}}" aria-disabled="{{true}}">导出修改清单</button>
+    </view>
+  </view>
+
   <!-- 真实诊断结果 -->
   <view wx:else class="content has-bar">
 
@@ -162,6 +170,46 @@
         <view class="ii-left"><view class="sev-dot low"></view></view>
         <view class="ii-body"><view class="ii-tip">{{sg}}</view></view>
         <text class="ficon i-right ii-arr"></text>
+      </view>
+    </view>
+
+    <view class="export-panel">
+      <view class="export-panel-title">带走这份结果</view>
+      <view class="pricing-line {{pricing.mode}}">
+        <text class="ficon i-info pricing-icon"></text>
+        <text>{{pricing.text}}</text>
+      </view>
+      <view wx:if="{{exportDisabledReason}}" class="export-disabled-reason">{{exportDisabledReason}}</view>
+      <view class="report-export-actions">
+        <button
+          class="btn ghost"
+          bindtap="exportReport"
+          data-kind="diagnosis_report"
+          loading="{{exportingKind === 'diagnosis_report'}}"
+          disabled="{{exportDisabled || !!exportingKind}}"
+          aria-disabled="{{exportDisabled || !!exportingKind}}"
+        >导出诊断报告 PDF</button>
+        <button
+          class="btn ghost"
+          bindtap="exportReport"
+          data-kind="change_list"
+          loading="{{exportingKind === 'change_list'}}"
+          disabled="{{exportDisabled || !!exportingKind}}"
+          aria-disabled="{{exportDisabled || !!exportingKind}}"
+        >导出修改清单</button>
+      </view>
+
+      <view wx:if="{{exportResult}}" class="export-result">
+        <view class="export-result-title">{{exportResult.filename}}</view>
+        <view class="export-meta">{{exportResult.kindLabel}} · {{exportResult.pageLabel}} · {{exportResult.sizeLabel}}</view>
+        <view class="export-meta">有效至 {{exportResult.expiresLabel}} · {{exportCountdown}}</view>
+        <view wx:if="{{exportResult.savedToDocuments}}" class="export-save-state saved">已存入我的文档</view>
+        <view wx:else class="export-save-state temporary">本次仅可打开，登录后可存我的文档</view>
+        <view wx:if="{{exportExpired}}" class="export-expired">打开链接已过期，请重新导出。</view>
+        <view wx:else class="export-result-actions">
+          <button class="btn ghost" bindtap="openExportPdf" loading="{{openingPdf}}" disabled="{{openingPdf}}" aria-disabled="{{openingPdf}}">打开真实 PDF</button>
+          <button class="btn primary" bindtap="printExportPdf">去打印</button>
+        </view>
       </view>
     </view>
 
