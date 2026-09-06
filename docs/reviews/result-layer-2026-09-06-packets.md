@@ -119,6 +119,9 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 - **验收**：`pnpm --dir apps/miniapp verify:static`（含 `verify:api-contract`）；新增静态断言：诊断页 wxml 引用 `issues`、`resumes.js` 不再硬编码 `'PDF'`；按 `apps/miniapp/README.md` 的开发者工具自动化截图三页（诊断报告 / 优化导出 / 我的简历）。
 - **告知**：改动只在本 worktree，用户开发者工具里的主 checkout 看不到；PR 描述里写明。
 
+- **执行记录（原写在 current-progress.md，为避免多会话顶部冲突改记于此）**：
+  > 2026-09-07 **包 C2 小程序接诊断报告导出 / 收费三态（分支 `claude/rl-c2-miniapp-contracts`，本地工作区，未部署）**：诊断页接入 `POST /resume/records/:taskId/export` 的诊断报告与修改清单两种 PDF，结果卡展示文件名、页数、大小、有效期及每秒倒计时；打开使用 `signedUrl`，打印透传服务端 `printFileUrl`；会员仅在 `savedToDocuments=true` 时显示「已存入我的文档」，匿名明确为本次临时打开。诊断页与优化页均接 `GET /resume/export/pricing` 三态：免费明示不扣权益，收费展示单价/可用次数并从本人真实权益列表选择 `benefitGrantId`，无权益或匿名收费时禁用，停用/价格加载失败均 fail-closed。新增静态断言覆盖双导出动作、匿名保存文案、三态计费禁用、有效期撤下；两条变异分别证明匿名分支出现「已存」与移除 unavailable 禁用时门禁会红。实跑：API 契约一致（118 个调用端点）、视觉刻度未新增偏离、二维码编码门禁绿、云打印 M2 专项全绿、仓库完整性及 4 条图谱 Profile 守卫全绿。`verify-miniapp-static` 本包新增断言均绿，但整体验证为 119 PASS / 2 FAIL：当前包 C 基线仍缺 `resume-parse` 的方向透传与 `resumes` 的真实格式修正，均不在 C2 允许文件内，本包未越权修改。未生成报告二维码（导出契约没有二维码字段，现有本地编码器只接受到机码）；未做微信开发者工具 / 真机、提交、push、部署或生产验证。
+
 ### 包 D · 文档转换引擎（Word → PDF，.doc 接收）—— codex
 
 - **条目**：P0（转换进上线承诺）、P0-9（.doc 三端接收后服务端转换）、契约 3

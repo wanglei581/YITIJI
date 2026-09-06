@@ -78,10 +78,17 @@ Page({
     opening: false,
     exportResult: null,
     exportDisabledReason: '',
+    pricingStatus: 'loading',
+    pricing: { mode: 'unavailable', text: '正在确认导出价格…', disabledReason: '正在确认导出价格，请稍候。' },
+    benefitGrantId: '',
+    exportDisabled: true,
+    exportCountdown: '',
+    exportExpired: false,
   },
 
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._loadPricing()
     const taskId = options.taskId || ''
     if (!taskId) {
       this.setData({ phase: 'no-task' })
@@ -94,6 +101,11 @@ Page({
       targetPosition: options.position ? decodeURIComponent(options.position) : '',
     })
     this._fetch()
+  },
+
+  onUnload() {
+    this._gone = true
+    this._stopExportCountdown()
   },
 
   async _fetch() {
@@ -121,8 +133,7 @@ Page({
         phase: 'done',
         opt,
         isMock: opt.isMockProvider,
-        exportDisabledReason: opt.hasOptimizedResume ? '' : '服务端没有返回结构化优化稿，暂时不能生成文件。',
-      })
+      }, () => this._syncExportAvailability())
     } catch (err) {
       const code = (err && err.code) || ''
       if (code === 'AI_TASK_NOT_FOUND') {
@@ -138,7 +149,50 @@ Page({
   },
 
   _fail(failMsg, needReupload) {
-    this.setData({ phase: 'failed', failMsg, needReupload })
+    this.setData({ phase: 'failed', failMsg, needReupload }, () => this._syncExportAvailability())
+  },
+
+  _loadPricing() {
+    const seq = (this._pricingSeq || 0) + 1
+    this._pricingSeq = seq
+    this.setData({
+      pricingStatus: 'loading',
+      pricing: { mode: 'unavailable', text: '正在确认导出价格…', disabledReason: '正在确认导出价格，请稍候。' },
+      benefitGrantId: '',
+    }, () => this._syncExportAvailability())
+
+    const loggedIn = auth.isLoggedIn()
+    api.getResumeExportPricing()
+      .then(async (raw) => {
+        const pricing = normalize.resumeExportPricing(raw, loggedIn)
+        let benefitGrantId = ''
+        if (pricing.mode === 'charged' && loggedIn && pricing.available > 0) {
+          const benefits = await api.getMyBenefits({ pageSize: 50 })
+          benefitGrantId = normalize.resumeExportBenefitId(benefits)
+          if (!benefitGrantId) pricing.disabledReason = '服务端显示有可用次数，但未找到可核销权益，请刷新后重试。'
+        }
+        if (this._gone || seq !== this._pricingSeq) return
+        this.setData({ pricingStatus: 'ready', pricing, benefitGrantId }, () => this._syncExportAvailability())
+      })
+      .catch((err) => {
+        if (this._gone || seq !== this._pricingSeq) return
+        const reason = (err && err.message) || '暂时无法确认导出价格'
+        this.setData({
+          pricingStatus: 'failed',
+          pricing: { mode: 'unavailable', text: reason, disabledReason: `${reason}，为避免误扣权益，当前不能导出。` },
+          benefitGrantId: '',
+        }, () => this._syncExportAvailability())
+      })
+  },
+
+  _syncExportAvailability() {
+    let reason = ''
+    if (this.data.phase !== 'done') reason = '优化失败或尚未完成，暂时不能导出。'
+    else if (!this.data.opt || !this.data.opt.hasOptimizedResume) reason = '服务端没有返回结构化优化稿，暂时不能生成文件。'
+    else if (this.data.pricingStatus !== 'ready') reason = this.data.pricing.disabledReason || '正在确认导出价格，请稍候。'
+    else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason
+    else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId) reason = '未取得可核销权益，当前不能导出。'
+    this.setData({ exportDisabled: Boolean(reason), exportDisabledReason: reason })
   },
 
   goBack() {
@@ -169,6 +223,10 @@ Page({
 
   exportResume() {
     if (this.data.exporting) return
+    if (this.data.exportDisabled) {
+      wx.showModal({ title: '暂时不能导出', content: this.data.exportDisabledReason, showCancel: false })
+      return
+    }
     const opt = this.data.opt
     if (!opt || !opt.optimizedResume) {
       wx.showModal({ title: '暂时无法导出', content: '服务端没有返回结构化优化稿。本页只展示现有对照，不会用空内容生成文件。', showCancel: false })
@@ -187,6 +245,8 @@ Page({
 
     const format = this.data.format
     const payload = buildModel.buildExportPayload(opt.optimizedResume, { format, taskId: this.data.taskId })
+    if (this.data.benefitGrantId) payload.benefitGrantId = this.data.benefitGrantId
+    this._stopExportCountdown()
     this.setData({ exporting: true, exportResult: null })
     wx.showLoading({ title: '正在生成文件…', mask: true })
     const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
@@ -207,12 +267,14 @@ Page({
           sizeLabel: formatBytes(res.sizeBytes),
           pageLabel: Number(res.pageCount) > 0 ? `${res.pageCount} 页` : '非分页格式',
           expiresLabel: formatExpiry(res.expiresAt),
+          expiresMs: res.expiresAt ? new Date(res.expiresAt).getTime() : 0,
           pdfUrl: fileUrls.absoluteUrl(res.printFileUrl),
           printFileUrl: res.printFileUrl,
           savedToDocuments: true,
         }
         if (!result.pdfUrl || !result.printFileId) throw new Error('打印用 PDF 副本地址无效')
-        this.setData({ exporting: false, exportResult: result })
+        this.setData({ exporting: false, exportResult: result }, () => this._startExportCountdown())
+        if (this.data.pricing.mode === 'charged') this._loadPricing()
         this._openPdf(result)
       })
       .catch((err) => {
@@ -227,7 +289,7 @@ Page({
   },
 
   _openPdf(result) {
-    if (this.data.opening || !result.pdfUrl) return
+    if (this.data.opening || this.data.exportExpired || !result.pdfUrl) return
     this.setData({ opening: true })
     wx.showLoading({ title: '正在打开 PDF…', mask: true })
     const finish = () => {
@@ -262,11 +324,31 @@ Page({
 
   printExport() {
     const result = this.data.exportResult
-    if (!result || !result.printFileId) return
+    if (!result || this.data.exportExpired || !result.printFileId) return
     const printName = result.filename.replace(/\.[^.]+$/, '') + '_打印副本.pdf'
     wx.navigateTo({
       url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(result.printFileId)}&name=${encodeURIComponent(printName)}&printFileUrl=${encodeURIComponent(result.printFileUrl)}`,
     })
+  },
+
+  _startExportCountdown() {
+    this._stopExportCountdown()
+    const initial = normalize.resumeExportCountdown(this.data.exportResult && this.data.exportResult.expiresMs)
+    this.setData({ exportCountdown: initial.text, exportExpired: initial.expired })
+    if (initial.expired) return
+    const tick = () => {
+      const result = this.data.exportResult
+      if (!result) return
+      const countdown = normalize.resumeExportCountdown(result.expiresMs)
+      this.setData({ exportCountdown: countdown.text, exportExpired: countdown.expired })
+      if (countdown.expired) this._stopExportCountdown()
+    }
+    this._exportCountdownTimer = setInterval(tick, 1000)
+  },
+
+  _stopExportCountdown() {
+    if (this._exportCountdownTimer) clearInterval(this._exportCountdownTimer)
+    this._exportCountdownTimer = null
   },
 
   viewDocuments() { wx.navigateTo({ url: '/pages/documents/documents' }) },

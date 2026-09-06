@@ -59,6 +59,7 @@
     "GET /policies/eligibility-questions",
     "GET /print/price-config",
     "GET /resume/career-plan/:p",
+    "GET /resume/export/pricing",
     "GET /resume/generate/:p",
     "GET /resume/job-fit/:p",
     "GET /resume/job-fit/consent/:p",
@@ -123,6 +124,7 @@
     "POST /resume/job-fit/:p/print",
     "POST /resume/job-fit/consent",
     "POST /resume/parse",
+    "POST /resume/records/:p/export",
     "POST /resume/self-assessment",
     "POST /resume/self-assessment/:p/print",
     "POST /resume/voice/transcribe"

@@ -90,14 +90,19 @@
       >{{item.label}}</view>
     </view>
     <view class="export-note">四种格式都来自同一份优化稿；打印和打开预览使用同内容 PDF 副本。导出前请核对姓名、学校、公司、时间和数字。</view>
+    <view class="pricing-line {{pricing.mode}}">
+      <text class="ficon i-info pricing-icon"></text>
+      <text>{{pricing.text}}</text>
+    </view>
     <view wx:if="{{exportDisabledReason}}" class="export-disabled-reason">{{exportDisabledReason}}</view>
 
     <view wx:if="{{exportResult}}" class="export-result">
       <view class="export-result-title">{{exportResult.filename}}</view>
       <view class="export-meta">{{exportResult.formatLabel}} · {{exportResult.mimeType}}</view>
-      <view class="export-meta">{{exportResult.pageLabel}} · {{exportResult.sizeLabel}} · 链接有效至 {{exportResult.expiresLabel}}</view>
+      <view class="export-meta">{{exportResult.pageLabel}} · {{exportResult.sizeLabel}} · 链接有效至 {{exportResult.expiresLabel}} · {{exportCountdown}}</view>
       <view class="export-saved">文件已真实生成并存入你的「我的文档」。非 PDF 格式的打印使用同内容 PDF 副本。</view>
-      <view class="export-actions">
+      <view wx:if="{{exportExpired}}" class="export-expired">打开链接已过期，请重新导出。</view>
+      <view wx:else class="export-actions">
         <view class="btn ghost tap" bindtap="openPdf">打开真实 PDF</view>
         <view class="btn ghost tap" bindtap="viewDocuments">我的文档</view>
         <view class="btn primary tap" bindtap="printExport">去打印</view>
@@ -106,7 +111,7 @@
   </view>
 
   <view wx:if="{{phase === 'done'}}" class="actionbar">
-    <button class="btn primary block" bindtap="exportResume" loading="{{exporting}}" disabled="{{exporting || !opt.hasOptimizedResume}}" aria-disabled="{{exporting || !opt.hasOptimizedResume}}">
+    <button class="btn primary block" bindtap="exportResume" loading="{{exporting}}" disabled="{{exporting || exportDisabled}}" aria-disabled="{{exporting || exportDisabled}}">
       {{exporting ? '正在生成…' : '生成并打开文件'}}
     </button>
   </view>

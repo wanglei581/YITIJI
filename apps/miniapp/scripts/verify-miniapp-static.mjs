@@ -531,6 +531,54 @@ if (
 ) ok('简历优化页接真实四格式导出、PDF 打开、打印副本与文件元数据')
 else bad('简历优化导出结果层', '必须接 exportGeneratedResume，打开真实 PDF，展示四格式/页数/大小/有效期，并在不可导出时 aria-disabled')
 
+const diagnoseSaveState = resumeDiagnoseWxml.match(
+  /wx:if="\{\{exportResult\.savedToDocuments\}\}"[^>]*>([^<]*)<\/view>\s*<view wx:else[^>]*>([^<]*)<\/view>/,
+)
+const anonymousSaveCopy = diagnoseSaveState ? diagnoseSaveState[2] : ''
+if (
+  apiJs.includes('exportResumeReport(taskId, kind, accessToken, benefitGrantId)') &&
+  apiJs.includes('getResumeExportPricing()') &&
+  resumeDiagnoseWxml.includes('data-kind="diagnosis_report"') &&
+  resumeDiagnoseWxml.includes('data-kind="change_list"') &&
+  resumeDiagnoseWxml.includes("status !== 'done'") &&
+  resumeDiagnoseWxml.includes('诊断失败或尚未完成，暂时不能导出') &&
+  (resumeDiagnoseWxml.match(/aria-disabled="\{\{true\}\}"/g) || []).length >= 2 &&
+  resumeDiagnoseJs.includes('api.exportResumeReport(this.data.taskId, kind, accessToken, this.data.benefitGrantId)') &&
+  resumeDiagnoseJs.includes('wx.downloadFile') &&
+  resumeDiagnoseJs.includes('wx.openDocument') &&
+  resumeDiagnoseJs.includes('result.signedUrl') &&
+  resumeDiagnoseJs.includes('result.printFileUrl') &&
+  resumeDiagnoseWxml.includes('exportResult.pageLabel') &&
+  resumeDiagnoseWxml.includes('exportResult.sizeLabel') &&
+  resumeDiagnoseWxml.includes('exportResult.expiresLabel') &&
+  resumeDiagnoseJs.includes('setInterval(tick, 1000)') &&
+  resumeDiagnoseWxml.includes('wx:if="{{exportExpired}}"') &&
+  diagnoseSaveState &&
+  diagnoseSaveState[1].includes('已存入我的文档') &&
+  anonymousSaveCopy.includes('本次仅可打开，登录后可存我的文档') &&
+  !anonymousSaveCopy.includes('已存')
+) ok('诊断报告与修改清单可真实导出、打开、打印，并按登录态和有效期诚实展示')
+else bad('诊断报告导出结果层', '必须有两种导出动作、真实 PDF 打开/打印、页数/大小/有效期倒计时，且 savedToDocuments=false 分支不得出现「已存」')
+
+const normalizeJs = read('utils/normalize.js')
+const pricingCopyOk =
+  normalizeJs.includes('当前免费，不扣权益') &&
+  normalizeJs.includes('可用权益 ${count} 次') &&
+  normalizeJs.includes('简历导出当前不可用（价目已停用，不是免费）')
+const unavailableFailClosed = [resumeDiagnoseJs, resumeOptimizeJs].every((source) =>
+  source.includes("pricing: { mode: 'unavailable'") &&
+  source.includes('else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason') &&
+  source.includes("else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId)"),
+)
+const pricingButtonsDisabled =
+  resumeDiagnoseWxml.includes('disabled="{{exportDisabled || !!exportingKind}}"') &&
+  resumeOptimizeWxml.includes('disabled="{{exporting || exportDisabled}}"')
+if (pricingCopyOk && unavailableFailClosed && pricingButtonsDisabled) {
+  ok('简历导出价格三态展示，charged 无权益及 unavailable 均 fail-closed')
+} else {
+  bad('简历导出价格三态', '必须展示免费/收费/停用三态；charged 无权益和 unavailable 时按钮必须 aria-disabled')
+}
+
 if (!/format\s*:\s*['"]PDF['"]/.test(resumesJs) && resumesJs.includes('仅记录，未导出文件')) {
   ok('我的简历不再把 AI 记录硬编码成 PDF 文件')
 } else {
@@ -762,7 +810,7 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
 // 这条旁路把「本人」的证明点从 preview-url 的归属校验挪到了上游端点自己的资格校验 +
 // HMAC 签名上，所以必须钉死两件事：URL 只能来自服务端响应，且只有明确审计过的页面可以用。
 {
-  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail', 'resume-optimize']
+  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail', 'resume-optimize', 'resume-diagnose']
   const offenders = []
   for (const full of physicalPageDirs) {
     const dir = full.replace(/^pages\//, '')   // physicalPageDirs 已带 pages/ 前缀
@@ -771,7 +819,7 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
     if (!PRESET_ALLOWED.includes(dir)) { offenders.push(`${dir}：不在旁路白名单内`); continue }
     // 必须是从服务端响应里取的，不许自己拼。resume-optimize 还必须来自
     // exportGeneratedResume 响应，并解析出签名 URL 自带的 PDF fileId。
-    if (!/res\s*&&\s*res\.printFileUrl|res\.printFileUrl/.test(js)) {
+    if (!/res\s*&&\s*res\.printFileUrl|res\.printFileUrl|result\.printFileUrl/.test(js)) {
       offenders.push(`${dir}：printFileUrl 不是取自服务端响应`)
     }
     if (dir === 'resume-optimize' && (
@@ -779,6 +827,11 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
       !js.includes('fileIdFromPrintUrl(res.printFileUrl)') ||
       !js.includes('fileUrls.absoluteUrl(res.printFileUrl)')
     )) offenders.push(`${dir}：未锁定为导出响应里的同内容 PDF 副本`)
+    if (dir === 'resume-diagnose' && (
+      !js.includes('api.exportResumeReport') ||
+      !js.includes('result.printFileUrl') ||
+      !js.includes('result.signedUrl')
+    )) offenders.push(`${dir}：未锁定为报告导出响应，或混淆打开与打印签名`)
   }
   if (offenders.length === 0) ok('打印 printFileUrl 旁路仅限共享派生文件且只取自服务端响应')
   else bad('打印 printFileUrl 旁路受控', offenders.join('；'))

@@ -874,7 +874,105 @@ function scaleLabel(scale) {
   return s ? (SCALE_LABEL[s] || s) : '';
 }
 
+// ---------- 简历导出 ----------
+const REDEEMABLE_EXPORT_BENEFITS = new Set(['coupon', 'free_quota', 'package_entitlement']);
+function formatFileSize(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return '大小未知';
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function formatCents(value) {
+  const cents = Number(value);
+  return Number.isSafeInteger(cents) && cents >= 0 ? `¥${(cents / 100).toFixed(2)}` : '价格未知';
+}
+/** mode 缺失或异常时按 unavailable，不能把未知收费状态回落成免费。 */
+function resumeExportPricing(raw, loggedIn) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const mode = ['free', 'charged', 'unavailable'].includes(source.mode) ? source.mode : 'unavailable';
+  const unitCents = Number(source.unitCents);
+  const benefit = source.benefit && typeof source.benefit === 'object' ? source.benefit : null;
+  const available = benefit && Number.isSafeInteger(Number(benefit.available))
+    ? Math.max(0, Number(benefit.available)) : null;
+  const serverLabel = typeof source.label === 'string' ? source.label.trim() : '';
+
+  if (mode === 'free') return { mode, unitCents: 0, available: null, text: '当前免费，不扣权益', disabledReason: '' };
+  if (mode === 'charged') {
+    const price = formatCents(unitCents);
+    if (!loggedIn) {
+      return {
+        mode,
+        unitCents,
+        available: null,
+        text: `单价 ${price} / 次，登录后查看可用权益`,
+        disabledReason: '收费导出需登录会员账号，并核销 1 次可用权益。',
+      };
+    }
+    const count = available == null ? 0 : available;
+    return {
+      mode, unitCents, available: count,
+      text: `单价 ${price} / 次 · 可用权益 ${count} 次`,
+      disabledReason: count > 0 ? '' : '暂无可用权益，当前不能导出。',
+    };
+  }
+  return {
+    mode: 'unavailable',
+    unitCents: Number.isFinite(unitCents) ? unitCents : 0,
+    available: null,
+    text: serverLabel || '简历导出当前不可用（价目已停用，不是免费）',
+    disabledReason: serverLabel || '简历导出当前不可用，请待管理员启用后再试。',
+  };
+}
+/** 从本人真实权益中选一条服务端允许核销的记录；不按标题猜用途。 */
+function resumeExportBenefitId(items, nowMs = Date.now()) {
+  if (!Array.isArray(items)) return '';
+  const found = items.find((item) => {
+    if (!item || !REDEEMABLE_EXPORT_BENEFITS.has(item.benefitType) || item.status !== 'active') return false;
+    if (!Number.isInteger(item.quantityRemaining) || item.quantityRemaining <= 0) return false;
+    const starts = item.validFrom ? new Date(item.validFrom).getTime() : 0;
+    const ends = item.validUntil ? new Date(item.validUntil).getTime() : Infinity;
+    return (!Number.isFinite(starts) || starts <= nowMs) && (!Number.isFinite(ends) || ends >= nowMs);
+  });
+  return found ? String(found.id || '') : '';
+}
+function resumeExportResult(raw, kindLabel) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const expiresAt = typeof source.expiresAt === 'string' ? source.expiresAt : '';
+  const expiresMs = expiresAt ? new Date(expiresAt).getTime() : NaN;
+  return {
+    fileId: String(source.fileId || ''),
+    filename: String(source.filename || ''),
+    mimeType: String(source.mimeType || ''),
+    pageCount: Number(source.pageCount) > 0 ? Number(source.pageCount) : 0,
+    pageLabel: Number(source.pageCount) > 0 ? `${Number(source.pageCount)} 页` : '页数未知',
+    sizeLabel: formatFileSize(source.sizeBytes),
+    signedUrl: String(source.signedUrl || ''),
+    printFileUrl: String(source.printFileUrl || ''),
+    expiresAt,
+    expiresMs: Number.isFinite(expiresMs) ? expiresMs : 0,
+    expiresLabel: dateTime(expiresAt) || '未返回有效期',
+    savedToDocuments: source.savedToDocuments === true,
+    aiGenerated: source.aiGenerated === true,
+    kindLabel: kindLabel || 'PDF',
+  };
+}
+function resumeExportCountdown(expiresAt, nowMs = Date.now()) {
+  const expiresMs = typeof expiresAt === 'number' ? expiresAt : new Date(expiresAt || '').getTime();
+  if (!Number.isFinite(expiresMs) || expiresMs <= nowMs) return { expired: true, text: '链接已过期' };
+  const totalSeconds = Math.max(0, Math.ceil((expiresMs - nowMs) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value) => String(value).padStart(2, '0');
+  return { expired: false, text: `剩余 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}` };
+}
 module.exports = {
+  resumeExportCountdown,
+  resumeExportResult,
+  resumeExportBenefitId,
+  resumeExportPricing,
+  formatFileSize,
   scaleLabel,
   fairCompanyLike,
   fairZoneLike,
