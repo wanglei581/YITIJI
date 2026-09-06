@@ -173,6 +173,22 @@ pm2 set pm2-logrotate:compress true
 
 前三步都不影响在跑服务；第 4 步需要停机窗口。
 
-## 七、本次没做什么
+## 七、执行记录（2026-09-06，产品负责人当面批准「清」后执行）
 
-没有执行任何删除、重启、配置修改或数据库写入。以上命令全部待批准后执行。
+上面第一档三步 + pm2-logrotate 已执行。**第二、三档没动。**
+
+| 步骤 | 结果 |
+|---|---|
+| `pm2 install pm2-logrotate`（max_size 50M / retain 7 / compress） | 已装、`pm2 save` 已保存 |
+| 删 48 条历史发布树 | 完成，剩 0 |
+| 删 51 个归档包 | 完成，剩 0 |
+| npm / `/root/.cache` / apt 缓存 | 清 |
+| `journalctl --vacuum-size=200M` + `pm2 flush` | 完成（journal 本已在 200M 内，freed 0B） |
+
+**磁盘：28 GB 用 → 13 GB 用，剩余 9.6 GB → 25 GB。** 比第一档预估的「剩 28 GB」少 3 GB，因为估算时用的是「总量减保留集」下限口径，实际硬链接共享比估的少。
+
+删后核验（全部通过）：API `/health` 200；nginx `/`、`/admin/`、`/partner/` 均 200；`/srv/ai-job-print/services/api/dist` 在；`/srv/ai-job-print-db-backups`、`/srv/ai-job-print-secrets` 原样保留。
+
+执行时一处插曲：删发布树时 SSH 被服务端断开一次，但删除已在断开前完成（重连核验：发布树剩 0、API 200）。后续步骤加 `ServerAliveInterval` 后无异常。
+
+**仍未动**：第二档（pnpm store prune、`/root/YITIJI` 源码检出）、第三档（数据库备份、密钥）、两个 `/root` 下的明文凭据文件（去留待产品负责人本人操作）。重新部署到最新 main 仍需发布窗口。
