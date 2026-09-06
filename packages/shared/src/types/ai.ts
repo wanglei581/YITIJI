@@ -494,6 +494,53 @@ export interface ResumeLayoutSettings {
   accent?: ResumeLayoutAccent
 }
 
+// ── 草稿 / 版本 / 事实核对（包 H，不改 Prisma 模型，复用 AiResumeResult.kind）──
+
+/** 登录用户编辑草稿 kind；不单独出现在 /me 列表。 */
+export const RESUME_OPTIMIZE_DRAFT_KIND = 'optimize_draft'
+/** 导出确认快照 kind；重新生成 optimize 不得覆盖。 */
+export const RESUME_OPTIMIZE_CONFIRMED_KIND = 'optimize_confirmed'
+
+export type ResumeFactKind = 'school' | 'company' | 'period' | 'certificate' | 'phone' | 'email'
+
+export interface ResumeFactItem {
+  kind: ResumeFactKind
+  value: string
+  path: string
+  foundInOriginal: boolean
+}
+
+export interface ResumeDraftPayload {
+  resume: GeneratedResume
+  layout?: ResumeLayoutSettings
+  decisions?: Record<string, unknown>
+  updatedAt: string
+}
+
+export interface ResumeDraftResponse {
+  taskId: string
+  draft: ResumeDraftPayload | null
+}
+
+export interface ResumeConfirmedVersion {
+  version: number
+  confirmedAt: string
+  fileId: string
+  factsConfirmedAt?: string
+}
+
+export interface ResumeVersionsResponse {
+  taskId: string
+  latestVersion: number | null
+  items: ResumeConfirmedVersion[]
+}
+
+export interface ResumeFactCheckResponse {
+  taskId: string
+  originalAvailable: true
+  items: ResumeFactItem[]
+}
+
 /**
  * 简历导出收费三态（契约 2 / Admin 价目 `resume_export`）。
  * - free：unitCents=0 且 active，界面写「当前免费，不扣权益」

@@ -134,8 +134,18 @@ export class ResumeDocxService {
       children.push(body(resume.certificates.join('  ·  ')))
     }
 
+    const generatedAt = new Date()
     const doc = new Document({
       title: `${resume.basic.name} 的简历`,
+      creator: '青序 AI 求职服务',
+      subject: 'AI 优化稿，仅供参考，请自行核对',
+      description: 'AI 生成，仅供参考，请自行核对',
+      keywords: 'AIGC,resume',
+      customProperties: [
+        { name: 'AIGenerated', value: 'true' },
+        { name: 'ServiceProviderCode', value: 'zyd-resume-docx-v1' },
+        { name: 'GeneratedAt', value: generatedAt.toISOString() },
+      ],
       sections: [
         {
           properties: {},

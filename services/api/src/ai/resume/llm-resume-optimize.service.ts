@@ -16,6 +16,7 @@ import {
   llmTimeoutMessage,
 } from '../llm/llm-http'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
@@ -171,10 +172,7 @@ function buildTargetContextPrompt(target?: ResumeTargetContext): string {
   return `优化方向(仅用于调整措辞重点,不得据此新增或改写任何事实字段;事实仍须逐字来自简历原文):${parts.join('；')}\n`
 }
 
-/** 空白/标点归一,用于"事实串是否出现在原文"的鲁棒匹配。 */
-function normalizeForMatch(text: string): string {
-  return text.replace(/[\s\u3000,，.。;；:：、·\-—()（）]/g, '').toLowerCase()
-}
+
 
 @Injectable()
 export class LlmResumeOptimizeService {
@@ -395,12 +393,8 @@ export class LlmResumeOptimizeService {
     const rawResume = obj['resume']
     if (!rawResume || typeof rawResume !== 'object') return null
 
-    const normText = normalizeForMatch(originalText)
-    const inText = (value: string | undefined): boolean => {
-      if (!value || !value.trim()) return true // 留空合法(原文没有就不写)
-      const needle = normalizeForMatch(value)
-      return needle.length > 0 && normText.includes(needle)
-    }
+    const normText = normalizeResumeFactText(originalText)
+    const inText = makeFactMatcher(originalText)
     const blocked = [...OPTIMIZE_GUARD_TERMS, ...forbiddenWords]
     const clean = (value: unknown, maxLen: number): string | null => {
       if (typeof value !== 'string') return ''
@@ -499,7 +493,7 @@ export class LlmResumeOptimizeService {
       if (after === null) return null
       if (!title || !before || !after) continue
       if (before.length < MIN_BEFORE_CHARS) continue
-      if (!normText.includes(normalizeForMatch(before))) continue
+      if (!normText.includes(normalizeResumeFactText(before))) continue
       modules.push({ title, before, after })
     }
 
@@ -535,15 +529,11 @@ export class LlmResumeOptimizeService {
     if (arrayLength(r['skills']) > currentResume.skills.length) return null
     if (arrayLength(r['certificates']) > currentResume.certificates.length) return null
 
-    const normFact = normalizeForMatch(factSource)
-    const inFact = (value: string | undefined): boolean => {
-      if (!value || !value.trim()) return true
-      const needle = normalizeForMatch(value)
-      return needle.length > 0 && normFact.includes(needle)
-    }
+    const normFact = normalizeResumeFactText(factSource)
+    const inFact = makeFactMatcher(factSource)
     const hasNoNewNumbers = (value: string): boolean => {
       for (const token of value.match(/\d+(?:\.\d+)?%?/g) ?? []) {
-        if (!normFact.includes(normalizeForMatch(token))) return false
+        if (!normFact.includes(normalizeResumeFactText(token))) return false
       }
       return true
     }

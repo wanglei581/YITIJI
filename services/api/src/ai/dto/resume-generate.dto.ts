@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsISO8601,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -206,6 +207,13 @@ export class ResumeGenerateExportDto {
   /** 收费导出时核销的本人权益 id；免费模式忽略。 */
   @IsOptional() @IsString() @MaxLength(80)
   benefitGrantId?: string
+
+  /**
+   * 事实核对确认时间（ISO 8601）。登录用户导出优化稿必填；
+   * 缺失或无效 → 400 RESUME_FACTS_NOT_CONFIRMED。匿名由前端弹窗后传入。
+   */
+  @IsOptional() @IsISO8601({ strict: true })
+  factsConfirmedAt?: string
 }
 
 export class ResumeLayoutAdjustResumeDto {
