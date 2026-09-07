@@ -112,7 +112,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/toolbox', url: '/toolbox', marker: screen('toolbox'), featureText: '百宝箱' },
   { pattern: '/smart-campus', url: '/smart-campus', marker: w4, featureText: '智慧校园' },
   { pattern: '/smart-campus/welcome', url: '/smart-campus/welcome', marker: w4, featureText: '迎新指引' },
-  { pattern: '/smart-campus/freshman-insights', url: '/smart-campus/freshman-insights', marker: '[data-kiosk-component="page-frame"]:has-text("校园大数据暂未开放")', featureText: '校园大数据' },
+  { pattern: '/smart-campus/freshman-insights', url: '/smart-campus/freshman-insights', marker: '[data-kiosk-component="page-frame"]:has-text("迎新服务导览")', featureText: '迎新服务导览' },
   { pattern: '/smart-campus/service/:key', url: '/smart-campus/service/campus-card', marker: w4, featureText: '校园卡办理' },
   { pattern: '/print-scan', url: '/print-scan', marker: w2('print-scan-home'), featureText: '打印扫描服务' },
   { pattern: '/print-scan/feature/:key', url: '/print-scan/feature/id-photo', marker: w2('print-scan-feature'), featureText: '证件照' },

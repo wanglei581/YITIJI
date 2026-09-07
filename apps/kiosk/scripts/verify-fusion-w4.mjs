@@ -281,10 +281,16 @@ check('campus and smart-campus stay honest and distinct', () => {
   assert.doesNotMatch(campusInsights, /待开发/)
   assert.match(smartHome, /ToolboxLaunchModals/)
   assert.match(smartHome, /placement="smart_campus"/)
-  assert.match(smartInsights, /学校书面授权/)
-  assert.match(smartInsights, /数据处理协议/)
-  assert.match(smartInsights, /聚合脱敏统计/)
+  assert.match(smartInsights, /迎新服务导览/)
+  assert.match(smartInsights, /本平台没有迎新报到数据/)
+  assert.match(smartInsights, /\/print\/upload/)
+  assert.match(smartInsights, /\/resume-service/)
+  assert.match(smartInsights, /to: '\/campus'/)
+  assert.match(smartInsights, /\/policy-service/)
+  assert.match(smartInsights, /\/me\/documents/)
+  assert.doesNotMatch(smartInsights, /校园大数据|聚合统计|报到人数|院系分布/)
   assert.doesNotMatch(smartInsights, /示例数据|MOCK_FRESHMAN|topMajors|ageDistribution/)
+  assert.doesNotMatch(smartInsights, /\/smart-campus\/service\//)
   assert.match(
     cssRuleBody(campusPolicyCss, 'button.kproto-badge'),
     /min-height:\s*48px;/,

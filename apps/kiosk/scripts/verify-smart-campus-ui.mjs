@@ -1,12 +1,12 @@
 /**
  * 智慧校园 · bigdata 严格冻结 / 前台无假数据 守卫。
  *
- * 背景:智慧校园「校园大数据」本期严格冻结——既不在任何入口展示,直达 URL 也只能见
- * 「未开放」真实状态,绝不展示示例 / 演示 / 假统计。本脚本把这些约束钉死为断言,
- * 任何分支误把 bigdata 入口或 mock 聚合数据加回前台,立即 FAIL。
+ * 背景:智慧校园报到统计仍严格冻结——既不在首页/专区列出 bigdata 入口,也不渲染
+ * mock / 示例统计。直达 /smart-campus/freshman-insights 改为「迎新服务导览」,
+ * 只链本机已有真实能力。本脚本把这些约束钉死为断言。
  *
  * 检查维度:
- *   A. /smart-campus/freshman-insights 页面:只展示「未开放」,不含任何 mock 数据来源或示例统计。
+ *   A. /smart-campus/freshman-insights 页面:迎新服务导览,只链已有真实能力,不含任何 mock / 示例统计。
  *   B. mock 聚合数据服务 freshmanInsights.ts 已物理删除。
  *   C. 智慧校园专区(SmartCampusHomePage)不再列出 bigdata 入口(无 freshman-insights 链接)。
  *   D. 首页(HomePage)智慧校园横排不再列出 bigdata 入口(无 freshman-insights 链接)。
@@ -64,13 +64,17 @@ function mustNotExist(rel, label) {
 
 console.log('\n=== 智慧校园 bigdata 冻结 / 前台无假数据验证 ===')
 
-// ── A. freshman-insights 直达页:只见「未开放」,无任何 mock/示例统计 ──────────
+// ── A. freshman-insights 直达页:迎新服务导览,无任何 mock/示例统计 ──────────
 const FRESHMAN_PAGE = 'src/pages/smart-campus/FreshmanInsightsPage.tsx'
-mustContain(FRESHMAN_PAGE, ['暂未开放', '返回智慧校园'], 'A1 freshman-insights 直达只展示「未开放」真实状态')
+mustContain(
+  FRESHMAN_PAGE,
+  ['迎新服务导览', '返回智慧校园', '本平台没有迎新报到数据', '/print/upload', '/resume-service', "to: '/campus'", '/policy-service', '/me/documents'],
+  'A1 freshman-insights 为迎新服务导览并指向已有真实能力',
+)
 mustNotContain(
   FRESHMAN_PAGE,
-  ['getFreshmanInsights', 'MOCK_FRESHMAN', 'isMock', '示例数据', 'topMajors', 'ageDistribution', 'conic-gradient'],
-  'A2 freshman-insights 不含任何 mock 数据来源 / 示例统计渲染',
+  ['getFreshmanInsights', 'MOCK_FRESHMAN', 'isMock', '示例数据', 'topMajors', 'ageDistribution', 'conic-gradient', '校园大数据', '聚合统计', '报到人数', '院系分布', '/smart-campus/service/'],
+  'A2 freshman-insights 不含 mock 统计,也不链智慧校园占位办理页',
 )
 
 // ── B. mock 聚合数据服务已删除 ──────────────────────────────────────────────
