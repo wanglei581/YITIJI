@@ -7,8 +7,6 @@ import {
   type TerminalBindCodeCreated,
 } from '../../services/api/devices'
 
-const DEFAULT_PRODUCTION_API_BASE_URL = 'http://120.48.13.190/api/v1'
-
 type Notice = { type: 'success' | 'error'; text: string }
 
 interface TerminalBindCodeDialogProps {
@@ -28,7 +26,13 @@ function formatCountdown(remainSec: number): string {
 function commandApiBaseUrl(): string {
   if (API_MODE !== 'http') return '<你的生产 API>'
   if (/^https?:\/\//i.test(API_BASE_URL)) return API_BASE_URL
-  return DEFAULT_PRODUCTION_API_BASE_URL
+  // 生产构建的 API_BASE_URL 是相对路径（/api/v1）。Agent 需要绝对地址，就按管理员后台
+  // 当前访问的源解析——nginx 每个 vhost 都把 /api/v1 反代到同一 API；不再硬编码任何主机
+  // 或 IP（CLAUDE.md §17），域名 / IP 变更时安装命令自动跟随。
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return new URL(API_BASE_URL, window.location.origin).toString().replace(/\/$/, '')
+  }
+  return API_BASE_URL
 }
 
 function buildInstallCommand(bindCode: TerminalBindCodeCreated): string {

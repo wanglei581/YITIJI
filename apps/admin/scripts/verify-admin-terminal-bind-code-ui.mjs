@@ -181,4 +181,30 @@ if (
   fail('terminal lifecycle actions and bind-code maintenance gate must stay wired through the existing terminals page')
 }
 
+// 2026-09-07：安装命令里的 API 地址曾硬编码生产机 IP（http://120.48.13.190/api/v1），
+// 违反 CLAUDE.md §17；改为按管理员后台当前访问源解析。这里钉住两件事：
+// ① apps/admin/src 下不得再出现「http(s)://<IPv4>」形态的主机字面量；② 绑定码对话框按 origin 解析相对 API 路径。
+{
+  const { readdirSync, statSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const srcRoot = join(process.cwd(), 'src')
+  const offenders = []
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      if (statSync(full).isDirectory()) { walk(full); continue }
+      if (!/\.(ts|tsx)$/.test(name)) continue
+      const text = readFileSync(full, 'utf8')
+      if (/https?:\/\/\d{1,3}(\.\d{1,3}){3}/.test(text)) offenders.push(full.slice(srcRoot.length + 1))
+    }
+  }
+  walk(srcRoot)
+  const dialog = readFileSync(join(srcRoot, 'routes/terminals/TerminalBindCodeDialog.tsx'), 'utf8')
+  if (offenders.length === 0 && dialog.includes('new URL(API_BASE_URL, window.location.origin)') && !dialog.includes('DEFAULT_PRODUCTION_API_BASE_URL')) {
+    pass('安装命令 API 地址按当前访问源解析，apps/admin/src 无硬编码 IP 主机字面量')
+  } else {
+    fail(`admin must not hardcode a server IP for the agent API base (offenders: ${offenders.join(', ') || 'none'}; dialog resolves via origin: ${dialog.includes('new URL(API_BASE_URL, window.location.origin)')})`)
+  }
+}
+
 console.log('\nALL PASS')
