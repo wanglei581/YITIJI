@@ -94,6 +94,7 @@
     "verify:fusion-shell": "node scripts/verify-fusion-shell.mjs",
     "verify:fusion-home": "node scripts/verify-fusion-home.mjs",
     "verify:fusion-w2": "node scripts/verify-fusion-w2-print-scan.mjs",
+    "verify:file-source-qx": "node scripts/verify-file-source-qx.mjs",
     "verify:fusion-w3": "node scripts/verify-fusion-w3.mjs",
     "verify:fusion-w4": "node scripts/verify-fusion-w4.mjs",
     "verify:fusion-w5": "node scripts/verify-fusion-w5.mjs",

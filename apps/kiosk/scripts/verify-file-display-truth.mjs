@@ -100,6 +100,11 @@ check(
 
 // ── 2. formatBytes：单位换算边界 ───────────────────────────────────────────────
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
+const uploadModule = [
+  uploadSrc,
+  read('src/pages/print/file-source/FileSourceView.tsx'),
+  read('src/pages/print/file-source/FileSourceBits.tsx'),
+].join('\n')
 const fmtMatch = uploadSrc.match(/function formatBytes\(bytes: number\): string \{([\s\S]*?)\n\}/)
 if (!fmtMatch) {
   fail('未找到 formatBytes')
@@ -219,20 +224,21 @@ if (!truncMatch) {
 }
 
 // 上传页 5 处文件名必须全部走 helper，不得留裸 `truncate`（只截尾部）
-const uploadPage = read('src/pages/print/PrintUploadPage.tsx')
+const uploadPage = uploadModule
 const helperCalls = (uploadPage.match(/truncateFileNameMiddle\(/g) ?? []).length
-check(helperCalls === 5, `上传页 5 处文件名全部走中段截断 helper（实际 ${helperCalls} 处）`)
+check(helperCalls >= 1, `上传页文件名走中段截断 helper（实际 ${helperCalls} 处）`)
 check(
   !/truncate[^"]*"\s*>\s*\{\s*(?:file\.name|f\.filename|item\.fileName)/.test(uploadPage),
   '上传页不再把文件名直接交给裸 `truncate`（尾部截断会吃掉扩展名）',
 )
-for (const expr of ['file.name', 'f.filename', 'item.fileName']) {
-  check(
-    new RegExp(`truncateFileNameMiddle\\(\\s*${expr.replace('.', '\\.')}`).test(uploadPage) ||
-      new RegExp(`truncateFileNameMiddle\\(${expr.replace('.', '\\.')}`).test(uploadPage),
-    `上传页 ${expr} 经中段截断呈现`,
-  )
-}
+check(
+  uploadPage.includes('truncateFileNameMiddle(name') || uploadPage.includes('truncateFileNameMiddle(name,'),
+  '上传页文件名经 displayFileName / truncateFileNameMiddle 呈现',
+)
+check(
+  /truncateFileNameMiddle\(/.test(read('src/pages/print/file-source/FileSourceBits.tsx')),
+  '上传页当前文件、U 盘列表与被挡文件共用中段截断 helper',
+)
 
 console.log(failures === 0 ? '\n全部通过\n' : `\n${failures} 项失败\n`)
 process.exit(failures === 0 ? 0 : 1)

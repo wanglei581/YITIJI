@@ -102,7 +102,7 @@ for (const file of [
   'src/pages/print/PrintProgressPage.tsx',
   'src/pages/print/PrintDonePage.tsx',
 ]) {
-  for (const m of read(kioskRoot, file).matchAll(/step=\{(\d)\}/g)) declaredSteps.add(Number(m[1]))
+  for (const m of read(kioskRoot, file).matchAll(/(?:data-print-flow-)?step=\{(\d)\}/g)) declaredSteps.add(Number(m[1]))
 }
 expect(
   [...declaredSteps].sort((a, b) => a - b).join(',') === '1,2,3,4,5,6',

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -41,8 +42,11 @@ const frozenHashes = new Map([
   // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
   // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
   [
+    // 2026-09-07：取消失败不再 catch{} 后无条件清会话（12-file-source 合同：
+    // 没能作废时文件还留着）。刷新仍必须先 await 撤销旧码；该不变量继续由
+    // verify:resume-phone-upload-ui 的 AST 断言钉死。
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0',
+    'df3b640d50558c79aa82006208dd5307e2b25ae76d4af51b54f659d6ac53a683',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',
@@ -374,24 +378,38 @@ assert.doesNotMatch(
   'sign-stamp does not echo the signature/stamp image on the public screen',
 )
 
-const printUpload = read('src/pages/print/PrintUploadPage.tsx')
+const printUploadPage = read('src/pages/print/PrintUploadPage.tsx')
+const printUploadView = read('src/pages/print/file-source/FileSourceView.tsx')
+const printUploadBits = read('src/pages/print/file-source/FileSourceBits.tsx')
+const printUpload = `${printUploadPage}\n${printUploadView}\n${printUploadBits}`
 assert.match(
-  printUpload,
+  printUploadPage,
   /type UploadTab = 'file' \| 'qr' \| 'usb'/,
   'print upload keeps exactly three selectable tabs'
 )
 assert.match(
-  printUpload,
+  printUploadPage,
   /navigate\('\/scan\/start'\)/,
   'print upload keeps scan as an independent CTA'
 )
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
 assert.match(printUpload, /w2-print-upload-source-grid/, 'print upload exposes the 2x2 source grid')
 assert.match(printUpload, /print-upload-footer/, 'print upload exposes a semantic footer selector')
+assert.match(printUploadView, /QxPageFrame/, 'print upload uses Qingxu page frame')
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /['"]\/print\/upload['"]/,
+  'print upload is registered in QX_MIGRATED_ROUTES'
+)
 assert.match(
   read('src/pages/print/styles/print-upload.css'),
   /\.w2-print-upload-source-grid\b/,
   'print upload stylesheet owns the live source grid selector'
+)
+assert.match(
+  read('src/pages/print/styles/file-source-qx.css'),
+  /\.w2-print-upload-source-grid\b/,
+  'qingxu file-source stylesheet owns the live source grid selector'
 )
 assert.equal(
   (printUpload.match(/<UploadSessionQrPanel\b/g) ?? []).length,
@@ -934,5 +952,10 @@ assert.match(
   /getTerminalId\(\)/,
   'sign-stamp remains the reference deep-link gate that convert must copy',
 )
+
+const qx = spawnSync(process.execPath, [join(kioskRoot, 'scripts/verify-file-source-qx.mjs')], {
+  stdio: 'inherit',
+})
+assert.equal(qx.status, 0, 'verify-file-source-qx must pass')
 
 console.log('ALL PASS fusion W2 print/scan contract')

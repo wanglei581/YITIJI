@@ -514,16 +514,34 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
   })
 
   await page.goto('/print/upload?source=document')
-  for (const label of ['选择文件 桌面验证', '扫码上传 手机/浏览器', 'U盘导入 本机未配置']) {
-    await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible()
-  }
-  await expect(page.getByRole('button', { name: /扫描原件/ })).toBeVisible()
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.getByRole('button', { name: /本机选文件/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /手机扫码上传/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /U 盘导入/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /扫描纸质原件|扫描原件/ })).toBeVisible()
+  const primary = page.getByTestId('file-source-primary')
+  await expect(primary).toBeVisible()
+  await expect(primary).toBeDisabled()
+  await expect(primary).toHaveText('下一步：材料检查')
   await expectHealthy(page, errors, 'print-upload')
 
-  await page.getByRole('button', { name: /扫描原件/ }).click()
+  await page.getByRole('button', { name: /扫描纸质原件|扫描原件/ }).click()
   await page.waitForURL('**/scan/start')
   await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
   await expectHealthy(page, errors)
+})
+
+test('print upload does not skip privacy check without a file @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print/upload?source=document')
+  await expect(page.locator('[data-testid="file-source-state-source-chooser"]')).toBeVisible()
+  await page.getByTestId('file-source-primary').click({ force: true })
+  await expect(page).toHaveURL(/\/print\/upload/)
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await expectHealthy(page, errors, 'print-upload')
 })
 
 test('material checks reach review without exposing anonymous access tokens @w2', async ({ page, api }) => {
