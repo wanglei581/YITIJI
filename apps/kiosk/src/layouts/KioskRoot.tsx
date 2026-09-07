@@ -101,6 +101,7 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  * （`isQxMigratedPath(pathname)` 是壳层契约允许的具名谓词形态）。
  */
 const QX_MIGRATED_ROUTES = new Set<string>([
+  '/',
   '/print/pickup-claim',
   '/print/cashier',
   '/print/upload',
@@ -212,11 +213,12 @@ function KioskShell() {
 
   const isCampusZone = pathname === '/campus'
   const v6Shell = V6_SHELL_ROUTES.get(pathname) ?? null
-  const isV6Route = v6Shell !== null
+  const isV6Route = v6Shell !== null && !isQxRoute
   const v6DomainTitle = v6Shell?.domainTitle ?? null
   const usesPageActionbar = routeUsesPageActionbar(pathname)
   const isCompactViewport = viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
-  const isResponsiveHome = pathname === '/' && isCompactViewport
+  // 青序首页自带窄屏布局；旧 kiosk-home-mobile 会再次改壳尺寸，造成两套首页壳叠加。
+  const isResponsiveHome = pathname === '/' && isCompactViewport && !isQxRoute
   const usesFluidViewport = isCompactViewport || (viewportW > 960 && viewportW > viewportH)
 
   const shell = (

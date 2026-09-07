@@ -12,26 +12,25 @@ const check = (condition, message) => {
 }
 
 const home = read('src/pages/home/HomePage.tsx')
-const view = read('src/pages/home/components/V6HomeView.tsx')
-const footer = read('src/pages/home/components/V6HomeFooterPanels.tsx')
+const view = read('src/pages/home/components/QxHomeView.tsx')
+const footer = view
 const fairHook = read('src/pages/home/hooks/useHomeJobFairHighlight.ts')
 const manifest = read('src/pages/home/homeV6Domains.ts')
 const css = [
-  read('src/pages/home/styles/home-v6.css'),
-  read('src/pages/home/styles/home-v6-footer.css'),
-  read('src/pages/home/styles/home-v6-motion-responsive.css'),
+  read('src/pages/home/styles/home-qx.css'),
 ].join('\n')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 
-console.log('\n=== Kiosk V6 首页运行时合同 ===')
+console.log('\n=== Kiosk 青序流光首页运行时合同 ===')
 
-check(home.includes('KioskPageFrame className="v6-home-page"'), '首页继续复用共享 KioskPageFrame')
-check(home.includes('<V6HomeView'), '容器与 V6 presentation 已拆分')
-check(home.includes("import './styles/home-v6.css'"), '首页只导入 V6 页级样式')
+check(home.includes('<QxPageFrame'), '首页使用青序流光 QxPageFrame')
+check(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
+check(home.includes('<QxHomeView'), '容器与青序 presentation 已拆分')
+check(home.includes("import './styles/home-qx.css'"), '首页只导入青序页级样式')
 check(
   !home.includes('prototype-v1.css') &&
     !home.includes('kiosk-uplift.css') &&
-    !view.includes('kpv1'),
+    !view.includes('kpv1') && !view.includes('v6-home'),
   '首页不再混入 75 屏 prototype-v1 视觉'
 )
 check(
@@ -50,8 +49,8 @@ check(
 )
 check(home.includes("navigate('/login', { state: { from: '/' } })"), '登录入口保留安全返回路径')
 check(
-  home.includes('useHomeJobFairHighlight()') && home.includes('<V6HomeFooterPanels'),
-  '首页恢复真实招聘会与本机状态双面板'
+  home.includes('useHomeJobFairHighlight()') && home.includes('jobFair={jobFair}') && home.includes('device={device}'),
+  '首页青序视图接收真实招聘会与本机状态'
 )
 // 审核 / 发布闸门在服务端：getPublishedFairs 的 where 恒带
 // `reviewStatus:'approved', publishStatus:'published'`，而公开列表 DTO
@@ -74,26 +73,26 @@ check(
   '首页不拿列表 DTO 不下发的字段做过滤（审核/发布闸门归服务端）'
 )
 check(
-  footer.includes('暂无进行中或即将开始的招聘会') &&
-    footer.includes('暂时无法获取招聘会信息') &&
+  footer.includes('暂无进行中或即将开始的场次') &&
+    footer.includes('暂时无法获取真实场次') &&
     footer.includes('正在读取已发布场次'),
   '招聘会 loading/empty/error 状态均诚实且稳定'
 )
 check(
   footer.includes('device: TerminalDeviceStatusView') &&
     footer.includes('device.printerLabel') &&
-    footer.includes('device.networkLabel'),
-  '本机面板复用 KioskRoot 已有终端状态快照，不发起第二次轮询'
+    footer.includes('device.printerReady'),
+  '首页复用 KioskRoot 已有终端状态快照，不发起第二次轮询'
 )
 check(
-  footer.includes('未单独上报') &&
+  home.includes("label: '状态未知'") &&
     !/78%|62%|碳粉充足|扫描仪就绪/.test(footer),
   '纸张、碳粉、扫描仪不伪造原型百分比或就绪状态'
 )
 check(
   home.includes("navigate(`/job-fairs/${encodeURIComponent(fairId)}`)") &&
     footer.includes("onAction('fairs-hub')") &&
-    footer.includes("onAction('print-hub')"),
+    footer.includes('actionId="print-hub"'),
   '招聘会详情、招聘会服务与打印扫描均复用现有真实入口'
 )
 
@@ -177,24 +176,24 @@ check(
 )
 
 check(
-  view.includes("HOME_V6_DOMAINS.filter((domain) => domain.size === 'large')"),
-  '大卡从唯一 typed manifest 渲染'
+  ['print-hub', 'resume-hub', 'interview-hub', 'jobs-hub'].every((id) => view.includes(`actionId="${id}"`)),
+  '青序主服务卡完整映射到真实 action'
 )
 check(
-  view.includes("HOME_V6_DOMAINS.filter((domain) => domain.size === 'small')"),
-  '小卡从唯一 typed manifest 渲染'
+  ['policy-hub', 'toolbox', 'smart-campus'].every((id) => view.includes(`actionId="${id}"`)),
+  '青序次级服务卡完整映射到真实 action'
 )
 check(
   !view.includes('.filter((tile)') && !view.includes('visibleTiles'),
   '智慧校园关闭时不从首页消失'
 )
 check(
-  /domain\.id === 'campus'[\s\S]{0,80}\? !campusEnabled/.test(view) &&
-    view.includes('学校接入并完成配置后开放'),
+  view.includes('disabled={!campusReady}') &&
+    view.includes('需终端或机构授权后使用'),
   '智慧校园默认 visible-but-disabled 并显示原因'
 )
 check(
-  /domain\.id === 'toolbox'[\s\S]{0,80}\? !toolboxEnabled/.test(view) &&
+  view.includes('disabled={!toolboxReady}') &&
     view.includes('本机尚未上架扩展服务'),
   '百宝箱无配置时 visible-but-disabled 并显示原因'
 )
@@ -202,9 +201,9 @@ check(
   view.includes('disabled={disabled}') && view.includes('aria-describedby='),
   '禁用卡使用原生 disabled 与可访问原因'
 )
-check(view.includes('/assets/ai-advisor.png'), 'V6 Hero 复用真实小青视觉资产')
+check(css.includes("url('/assets/bg-hero.jpg')"), '青序 Hero 复用原型背景资产')
 check(
-  view.includes('第三方或官方来源') && view.includes('不代收简历') && view.includes('来源平台办理'),
+  view.includes('第三方或官方来源') && view.includes('不代收简历') && view.includes('去来源平台投递'),
   '首页常驻合规边界'
 )
 check(!/一键投递|立即投递/.test(`${home}\n${view}\n${manifest}`), '首页拒绝违规投递文案')
@@ -214,55 +213,56 @@ check(
 )
 
 check(
-  css.includes('.v6-home-services__primary') &&
-    /grid-template-columns:\s*1\.55fr\s+1fr/.test(css),
-  '1080×1920 首行保持 V6 一大一中布局'
+  css.includes('.qx-home-tiles') &&
+    /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(css),
+  '1080×1920 服务区保持青序双列布局'
 )
 check(
-  css.includes('.v6-home-services__secondary') &&
-    /grid-template-columns:\s*repeat\(3,\s*1fr\)/.test(css),
-  '1080×1920 次行保持三列服务域'
+  css.includes(".qx-home-tile[data-size='feature']") &&
+    /grid-column:\s*1\s*\/\s*-1/.test(css),
+  '1080×1920 打印扫描主卡横跨青序双列'
 )
 check(
-  css.includes('.v6-home-footer-panels') &&
-    /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+330px/.test(css) &&
-    /min-height:\s*212px/.test(css),
-  '1080×1920 底部恢复约 212px 的 1fr + 330px 双面板锚点'
+  css.includes('.qx-home-truth') &&
+    css.includes('.qx-home-legal') &&
+    /min-height:\s*64px/.test(css),
+  '1080×1920 底部保留合规真值与备案信息'
 )
 check(
-  /\.v6-home-footer-panel button[\s\S]{0,180}min-height:\s*52px/.test(css),
-  '底部双面板可点目标不小于 48px'
+  /\.qx-home-voice[\s\S]{0,220}min-height:\s*76px/.test(css) &&
+    /\.qx-home-quick button[\s\S]{0,180}min-height:\s*48px/.test(css),
+  '首页主按钮与快捷入口达到 56px / 48px 触控下限'
 )
 check(
   /@media\s*\(max-width:\s*760px\)/.test(css) &&
-    /@media\s*\(max-width:\s*430px\)/.test(css),
+    /grid-template-columns:\s*1fr/.test(css),
   '手机与窄桌面有独立响应式降级'
 )
 check(
-  /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(css) && css.includes('html.lowgpu'),
-  '动效提供 reduced-motion 与 lowgpu 退化'
+  /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(css),
+  '动效提供 reduced-motion 退化'
 )
 check(
-  css.includes('@keyframes v6-home-sheen') && css.includes('@keyframes v6-home-orbit'),
-  'V6 语义动效已实现'
+  css.includes('.qx-home-tile:focus-visible') && css.includes('outline:'),
+  '青序首页提供清晰键盘焦点反馈'
 )
-check(!css.includes('.kpv1'), 'V6 首页样式完全路由作用域化')
+check(!css.includes('.kpv1') && !css.includes('.v6-home'), '青序首页样式完全路由作用域化')
 
 check(
-  kioskRoot.includes('useTerminalDeviceStatus(true)') && kioskRoot.includes('<KioskTopbarStatus'),
-  '共享顶栏继续使用真实设备状态'
+  kioskRoot.includes('useTerminalDeviceStatus(true)') && home.includes('status={deviceStatus}'),
+  '青序顶栏继续使用真实设备状态'
 )
 check(
-  kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>'),
+  kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>') && kioskRoot.includes("'/'"),
   '1080×1920 舞台缩放能力未被替换'
 )
 check(
   home.split('\n').length < 120 &&
-    view.split('\n').length < 260 &&
-    footer.split('\n').length < 220 &&
+    view.split('\n').length < 320 &&
+    css.split('\n').length < 300 &&
     fairHook.split('\n').length < 120 &&
     manifest.split('\n').length < 180,
   '运行时文件保持可维护体积'
 )
 
-console.log('\nALL PASS — V6 首页视觉、动作、门控与响应式合同成立\n')
+console.log('\nALL PASS — 青序流光首页视觉、动作、门控与响应式合同成立\n')
