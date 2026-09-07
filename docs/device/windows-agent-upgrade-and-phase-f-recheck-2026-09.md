@@ -431,3 +431,33 @@ F7 全屏抽查：未做
 
 **运营须知（进现场清单）**：扫码读取依赖手机屏幕亮度。取件页与小程序出码页需提示用户调高亮度，否则现场会出现「扫不上 → 以为码坏了」的误判。
 
+## 12. 第四轮回执（2026-09-07）
+
+执行分支：`field/windows-printer-ready-and-f4-2026-09-07`，基于最新 `origin/main@d385ba81`。本轮未修改 `services/**`、`apps/kiosk/**`、`apps/admin/**`、`apps/miniapp/**`、`.github/**`；未读取、记录或输出 token、绑定码、桥接令牌。
+
+### 第 1 件：恢复运行与看门狗注册
+
+- 时间：2026-09-07 约 19:00（北京时间）。管理员后台将 `KSK-001` 从维护中恢复运行，页面提示“当前在途任务 0 个”。
+- 时间：2026-09-07 约 19:05。重新注册并启动 Kiosk 看门狗：`KIOSK_WATCHDOG_REGISTERED`、`KIOSK_WATCHDOG_STARTED`。
+
+### 第 2 件：新包同机升级
+
+- 时间：2026-09-07 约 19:07–19:10。run `34111973596` 候选 MSI 静默升级返回 `ExitCode=0`；`candidate-identity.json` 核对 `sourceCommit=4cb8c9a8b97fa3f033689254175b958129436247`、`productVersion=0.4.11`。
+- 升级后执行 `Set-Service aijobprintagent.exe -StartupType Automatic` 并启动服务。验收：服务 `Running/Automatic`，`claimIntervalMs=5000`，`POST http://127.0.0.1:9527/local/terminal-boot-ticket` 返回 `200`、`success=true`、`expiresInSeconds=60`。
+- 远端心跳：`printerStatus=ready`、`isOnline=true`。Kiosk 打印页显示“打印机在线”，未出现“打印机未就绪”告警；未上传文件、未创建订单，因此真实文件下最终提交按钮**未验收**。
+
+### 第 3 件：新脚本重配
+
+- 时间：2026-09-07 约 19:10。使用 `-UseExistingToken -ClaimIntervalMs 5000` 重跑成功：`[OK] Using existing DPAPI token`、`[OK] Production config written`、`[OK] Existing DPAPI token retained`、`[OK] Service running with Automatic startup`。
+
+### 第 4 件：F4 补证据与 WMI 查询
+
+- 停用前管理员身份为“系统管理员 / 超级管理员”；页面稳定显示“共 2 台终端”，KSK-001 在线、运行中、在途任务 0，非首载骨架、弹窗或编辑态。
+- 时间：2026-09-07 约 19:15。点击“停用 KSK-001”并确认后，页面稳定变为“全部 0 / 共 0 台终端”，停用结果已生效。浏览器会话未能取得 DevTools 中 `PATCH /api/v1/admin/terminals/KSK-001/profile` 的响应码，故“PATCH 200”证据**未验收**；需要 Mac 侧从服务端/浏览器网络记录复核。
+- 因停用后列表过滤为 0，页面没有“启用”或“恢复运行”控件。Kiosk 未执行建单点击，未创建订单、未提交付费或未支付任务；“终端安全校验失败”即时拒绝、“启用后看门狗带票重启”、“恢复运行”均**未验收**。未点“紧急吊销凭证”。
+- 只读 WMI 查询（`Pantum CM2800ADN Series`）：`PrinterStatus=3`、`DetectedErrorState=0`、`WorkOffline=False`、`PrinterState=0`。这确认奔图驱动的空闲可用态，WMI 查询本身未失败。
+
+### 未做与需要 Mac 侧处理
+
+- 未做连续打印矩阵；未做执行单 4B 三条；未做 API 发布；扫码器按通知不测。
+- 需要 Mac 侧处理：停用后 `GET /api/v1/admin/terminals` 页面过滤为 0，导致无法在现场完成启用、看门狗自愈和恢复运行的闭环；请复核停用请求的 `PATCH 200` 与列表过滤/恢复入口。最终提交按钮因未上传文件保持未验收。
