@@ -122,6 +122,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/scan/settings',
   '/scan/progress',
   '/scan/result',
+  '/jobs',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
@@ -136,6 +137,9 @@ const QX_MIGRATED_PREFIXES = [
  * - /job-fairs/:id/companies/:companyId 不能用 /job-fairs/（会误伤列表、详情、地图、资料）
  */
 const QX_MIGRATED_EXACT_PATTERNS: readonly RegExp[] = [
+  // 26 号稿岗位详情：只放行单段 ID。不能写成 '/jobs/' 前缀——那会连
+  // /jobs/:id/offline 一起放行（它有自己的稿和自己的模式，见下一行）。
+  /^\/jobs\/[^/]+$/,
   /^\/jobs\/[^/]+\/offline$/,
   /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
 ]

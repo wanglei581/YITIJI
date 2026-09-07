@@ -143,6 +143,8 @@ const smartHome = read('src/pages/smart-campus/SmartCampusHomePage.tsx')
 const smartInsights = read('src/pages/smart-campus/FreshmanInsightsPage.tsx')
 const renshi = read('src/pages/renshi/RenshiPage.tsx')
 const jobsCss = read('src/pages/jobs-fairs-prototype.css')
+const jobsListQxCss = read('src/pages/jobs/styles/jobs-list-qx.css')
+const jobDetailQxCss = read('src/pages/jobs/styles/job-detail-qx.css')
 const w4Presentation = read('src/pages/jobs/components/W4Presentation.tsx')
 
 check('W4 shared frame keeps one shell-owned main landmark', () => {
@@ -151,11 +153,24 @@ check('W4 shared frame keeps one shell-owned main landmark', () => {
 })
 
 check('jobs preserve source-only application contract', () => {
+  assert.throws(() => {
   assert.match(jobsPage, /KioskPageFrame/)
+  }, 'jobs page must reject the frozen V6 frame contract')
+  assert.match(jobsPage, /QxPageFrame/)
+  assert.doesNotMatch(jobsPage, /\bKioskPageFrame\b/)
+  assert.match(jobDetail, /QxPageFrame/)
+  assert.doesNotMatch(jobDetail, /\bKioskPageFrame\b/)
   assert.match(jobDetail, /recordBrowse[\s\S]*'job'/)
   assert.match(jobDetail, /recordExternalJump[\s\S]*'external_apply'/)
   assert.match(jobDetail, /扫码投递/)
   assert.match(jobDetail, /去来源平台投递/)
+  assert.match(jobDetail, /if \(!sourceCanApply\) return/)
+  assert.match(jobDetail, /window\.open\(currentJob\.sourceUrl/)
+  assert.doesNotMatch(jobDetail, /resumeId|documentId/)
+  assert.match(read('src/pages/jobs/components/JobDetailSections.tsx'), /投递怎么走[\s\S]*先核对岗位原文与来源四要素[\s\S]*去来源平台自行操作[\s\S]*结果以来源平台为准/)
+  assert.match(read('src/pages/jobs/components/JobDetailSections.tsx'), /数据来源说明：/)
+  assert.match(jobsListQxCss, /--qx-tap-min/)
+  assert.match(jobDetailQxCss, /--qx-tap-min/)
   assert.match(
     jobsFairsFoundationCss,
     /\.jf-searchbox input\s*\{[\s\S]*?min-height:\s*48px;/,

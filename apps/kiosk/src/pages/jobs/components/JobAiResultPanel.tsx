@@ -99,7 +99,7 @@ function RecommendationList({ items, onOpen }: { items: JobAiRecommendationDTO[]
           <SuggestionList title="准备动作" items={item.actionChecklist} />
           {onOpen && (
             <Button size="sm" variant="secondary" className="mt-3 h-12 w-full" onClick={() => onOpen(item.job.jobId)}>
-              查看岗位详情
+              查看岗位
             </Button>
           )}
         </div>
