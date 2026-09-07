@@ -284,7 +284,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
       { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
       { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
-      // 原型 76–78：AI方案确认 / 继续上次 / 线上招聘平台
+      // 原型 52 / 76–78：小青作业面 / 继续上次 / 线上招聘平台
       {
         path: 'ai/plan',
         lazy: async () => ({ Component: (await import('../pages/ai-plan/AiPlanPage')).AiPlanPage }),

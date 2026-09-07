@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { AssistantSessionSummaryResponse } from '@ai-job-print/shared'
 import { summarizeAssistantSession } from '../../services/api'
 import { userMessageOf } from '../../services/api/userErrorMessage'
@@ -16,6 +17,7 @@ export function AssistantSessionSummaryBar({
   loggedIn,
   token,
 }: AssistantSessionSummaryBarProps) {
+  const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<AssistantSessionSummaryResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +35,33 @@ export function AssistantSessionSummaryBar({
     try {
       const saved = await summarizeAssistantSession(sessionId, token)
       setResult(saved)
+      const params = new URLSearchParams({
+        sessionId: saved.advisorSessionId,
+        artifactId: saved.artifactId,
+      })
+      navigate(`/ai/plan?${params.toString()}`, {
+        state: {
+          sessionId: saved.advisorSessionId,
+          artifactId: saved.artifactId,
+          printUnavailableReason: saved.printUnavailableReason,
+          artifact: {
+            kind: 'qa_pins',
+            title: '小青本次要点',
+            pins: [
+              ...saved.highlights.map((content) => ({
+                content,
+                evidenceLevel: 'E3' as const,
+                sourceNote: '由本次对话浓缩，仅供参考',
+              })),
+              ...saved.todos.map((content) => ({
+                content: `待办：${content}`,
+                evidenceLevel: 'E3' as const,
+                sourceNote: '待办（请自行核对后执行）',
+              })),
+            ],
+          },
+        },
+      })
     } catch (err) {
       setError(userMessageOf(err, '本次要点暂时保存不了，请稍后重试'))
     } finally {

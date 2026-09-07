@@ -116,6 +116,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/offline-agencies',
   '/companies',
   '/jobs/online-platforms',
+  '/ai/plan',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',

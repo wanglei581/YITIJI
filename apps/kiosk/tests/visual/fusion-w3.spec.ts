@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
-import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow } from './assert-layout'
+import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
@@ -460,6 +460,159 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await page.waitForURL('/interview/report')
   await expect(page.getByText('表达结构基本完整，仍需用真实数据补充结果。')).toBeVisible()
   await expect(page.getByRole('note', { name: '合规提示' })).toContainText('练习结果仅供本人复盘，不会发送给任何企业。')
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
+
+function advisorCompareSession() {
+  return {
+    sessionId: 'w3-art-sess',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    artifacts: [{
+      artifactId: 'w3-art-1',
+      kind: 'compare_report',
+      status: 'completed',
+      payload: {
+        kind: 'compare_report',
+        summary: '逐条比对',
+        extras: [{ point: '有基础的平面设计能力', note: '岗位没提，面试时可以主动说' }],
+        items: [
+          { requirement: '两年以上社群或用户运营经验', verdict: 'covered', evidence: COVERED_EVIDENCE },
+          { requirement: '本科及以上学历', verdict: 'not_a_capability', evidence: '这是硬性条件，不是能写进材料的能力，本机不做判定。' },
+        ],
+      },
+      provider: 'llm:deepseek',
+      printedFileId: null,
+      createdAt: '2026-09-07T00:00:00.000Z',
+      updatedAt: '2026-09-07T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    }],
+  }
+}
+
+const PROTO_STATES = [
+  'no-artifact',
+  'qa-pins',
+  'slot-draft',
+  'slot-draft-blanks',
+  'compare-report',
+  'compare-all-covered',
+  'print-unavailable',
+  'expired',
+] as const
+
+test('advisor artifact eight proto states fit the kiosk stage @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  for (const state of PROTO_STATES) {
+    await page.goto(`/ai/plan?state=${state}&capture=1`)
+    await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', state)
+    await expect(page.getByText('一键投递')).toHaveCount(0)
+    await assertNoHorizontalOverflow(page)
+    await page.screenshot({ path: test.info().outputPath(`advisor-artifact-${state}.png`) })
+  }
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact renders covered evidence as a quotation @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=compare-report&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'compare-report')
+  await expect(page.getByTestId('advisor-artifact-legend')).toBeVisible()
+  await expect(page.getByText('E1你自己说过的原话', { exact: false })).toBeVisible()
+  await expect(page.getByText('E2本机已有的数据', { exact: false })).toBeVisible()
+  await expect(page.getByText('E3AI 的判断，仅供参考', { exact: false })).toBeVisible()
+  const quote = page.getByTestId('advisor-artifact-quote').first()
+  await expect(quote).toBeVisible()
+  await expect(quote).toHaveJSProperty('tagName', 'BLOCKQUOTE')
+  await expect(quote).toContainText(`「${COVERED_EVIDENCE}」`)
+
+  await page.goto('/ai/plan?state=qa-pins&capture=1')
+  await expect(page.getByTestId('advisor-artifact-qa')).toBeVisible()
+  await expect(page.getByText('对话未保存')).toBeVisible()
+  await expect(page.getByText('第 2 轮问答', { exact: false })).toHaveCount(0)
+
+  await page.goto('/ai/plan?state=slot-draft-blanks&capture=1')
+  await expect(page.getByTestId('advisor-artifact-slot')).toBeVisible()
+  await expect(page.getByText('这段话依据的原话（打印时一并带出）')).toBeVisible()
+  await expect(page.getByText('还有 2 处你没答，我留了空')).toBeVisible()
+
+  await expect(page.getByText('一键投递')).toHaveCount(0)
+  await expect(page.getByText('已打印')).toHaveCount(0)
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact print-unavailable state has no print button @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+
+  await page.goto('/ai/plan?state=print-unavailable&capture=1')
+  await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
+  await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
+  await expect(page.getByText('打印能力读不到，按钮先不放出来', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: '再问一轮' })).toBeVisible()
+  await assertTapTargetPointerHit(page.getByTestId('advisor-artifact-cta-back'))
+  await page.getByTestId('advisor-artifact-cta-back').click()
+  await page.waitForURL('/assistant')
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact print waits for the server receipt @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/advisor/sessions/w3-art-sess', {
+    status: 200,
+    json: advisorCompareSession(),
+  })
+  let printPath = ''
+  api.respondWith('POST', '/api/v1/advisor/sessions/w3-art-sess/artifacts/w3-art-1/print', async () => {
+    await new Promise((resolve) => { setTimeout(resolve, 250) })
+    return {
+      status: 200,
+      json: {
+        artifactId: 'w3-art-1',
+        kind: 'compare_report',
+        fileId: 'file-w3-art',
+        filename: 'AI顾问-逐条比对表.pdf',
+        sizeBytes: 2048,
+        pageCount: 1,
+        signedUrl: '/signed/file-w3-art',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        printFileUrl: '/print/file-w3-art',
+      },
+    }
+  })
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/artifacts/w3-art-1/print')) {
+      printPath = new URL(request.url()).pathname
+    }
+  })
+
+  await page.goto('/ai/plan?sessionId=w3-art-sess&artifactId=w3-art-1')
+  await expect(page.getByTestId('advisor-artifact-compare')).toBeVisible()
+  await expect(page.getByTestId('advisor-artifact-quote')).toContainText(`「${COVERED_EVIDENCE}」`)
+  await expect(page.getByText('已打印')).toHaveCount(0)
+  const printButton = page.getByTestId('advisor-artifact-cta-print')
+  await expect(printButton).toBeEnabled()
+  await assertTapTargetPointerHit(printButton)
+  await printButton.click()
+  await expect(printButton).toHaveText(/正在生成打印稿/)
+  await expect(page.getByText('已打印')).toHaveCount(0)
+  await expect(page.getByText('打印稿已生成，已保存到我的文档。还没有确认出纸。')).toBeVisible()
+  expect(printPath).toBe('/api/v1/advisor/sessions/w3-art-sess/artifacts/w3-art-1/print')
+  await expect(page.getByText('已打印')).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
 })
