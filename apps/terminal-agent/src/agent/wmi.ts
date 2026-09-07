@@ -31,7 +31,9 @@
  *   DetectedErrorState=4,6,7,8 (fatal errors)     → 'error'
  *   DetectedErrorState=3,5 (recoverable warnings)  → 'low_paper'
  *   DetectedErrorState=2 (No Error)               → 'ready'
- *   DetectedErrorState=0 (CIM Unknown)            → 'unknown'  (not ready)
+ *   DetectedErrorState=0 (CIM Unknown) + PrinterStatus 3/4/5 and not offline
+ *                                                 → 'ready'    (Pantum never sets this field)
+ *   DetectedErrorState=0 with any other PrinterStatus → 'unknown'
  *   Win32_Printer not found                       → 'error'    (distinct from query failure)
  *   query failure / unparseable                   → 'unknown'
  *
@@ -124,6 +126,21 @@ export function mapWin32PrinterQuery(output: string | null): PrinterStatus {
   }
   if (detectedError === 3 || detectedError === 5) return 'low_paper'
   if (detectedError === 2) return 'ready'
+  // DetectedErrorState=0 is CIM "Unknown", and the Pantum CM2800ADN driver never
+  // populates this field: the hardening checklist [N2] recorded 0 both while idle
+  // and while powered off. Reading 0 as "not ready" therefore pins this hardware to
+  // 'unknown' forever — 2026-09-07 KSK-001 reported 614 consecutive 'unknown'
+  // heartbeats and the Kiosk blocked every print order (printerReady=false).
+  // Offline is already ruled out above by WorkOffline=True / PrinterStatus=7, which
+  // is exactly what flips on this driver when the printer is switched off, so the
+  // operational PrinterStatus is the honest signal left: 3 Idle / 4 Printing /
+  // 5 Warmup mean the queue can accept work.
+  if (
+    detectedError === 0 &&
+    (printerStatusCode === 3 || printerStatusCode === 4 || printerStatusCode === 5)
+  ) {
+    return 'ready'
+  }
 
   return 'unknown'
 }

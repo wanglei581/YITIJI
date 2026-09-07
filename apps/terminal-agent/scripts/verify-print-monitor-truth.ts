@@ -340,14 +340,23 @@ async function main(): Promise<void> {
     }
   }
 
-  // AGT-05: heartbeat mapping — DetectedErrorState=0 is CIM Unknown, not ready;
-  // missing printer is error (aligned with getPrinterPreflight distinguishing
-  // not_found from an empty/failed query).
+  // AGT-05: heartbeat mapping — missing printer is error (aligned with
+  // getPrinterPreflight distinguishing not_found from an empty/failed query).
+  // DetectedErrorState=0 is CIM Unknown and the Pantum driver never populates it
+  // (checklist [N2]: 0 both idle and powered off), so readiness falls back to
+  // PrinterStatus once WorkOffline / PrinterStatus=7 have ruled out offline.
   const printerQueryCases: Array<[string | null, string]> = [
     [null, 'unknown'],
     ['', 'unknown'],
     ['not_found', 'error'],
-    ['3,0,False', 'unknown'],
+    ['3,0,False', 'ready'],
+    ['4,0,False', 'ready'],
+    ['5,0,False', 'ready'],
+    ['3,0,True', 'offline'],
+    ['7,0,False', 'offline'],
+    ['6,0,False', 'unknown'],
+    ['2,0,False', 'unknown'],
+    ['3,4,True', 'offline'],
     ['3,2,False', 'ready'],
     ['3,3,False', 'low_paper'],
     ['3,5,False', 'low_paper'],
