@@ -22,6 +22,8 @@ const PROD_OK: Env = {
   FILE_SIGNING_SECRET: 'a-strong-file-signing-secret-0123456789',
   SECRET_ENCRYPTION_KEY: 'a-strong-secret-encryption-key-01234567',
   PAYMENT_SESSION_SECRET: 'ci-production-payment-session-secret-0123456789',
+  TERMINAL_ADMIN_SECRET: 'a-strong-terminal-admin-secret-01234567',
+  TERMINAL_ACTION_TOKEN_SECRET: 'a-strong-terminal-action-secret-0123456',
   // C5-6：生产必须显式声明 paid-before-claim（缺省启动即拒）
   PRINT_REQUIRE_PII_SCAN: 'true',
   PRINT_REQUIRE_PRINTER_ONLINE: 'true',

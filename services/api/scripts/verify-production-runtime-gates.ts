@@ -40,6 +40,8 @@ const PROD_OK: Env = {
   AI_PROVIDER: 'llm',
   AI_LLM_API_KEY: 'llm-api-key',
   PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
+  TERMINAL_ADMIN_SECRET: 'a-strong-terminal-admin-secret-01234567',
+  TERMINAL_ACTION_TOKEN_SECRET: 'a-strong-terminal-action-secret-0123456',
   // 商用隐私底线：用户原始材料必须完成 PII 检查后才能建打印任务。
   PRINT_REQUIRE_PII_SCAN: 'true',
   PRINT_REQUIRE_PRINTER_ONLINE: 'true',
@@ -258,6 +260,27 @@ function main(): void {
     '生产环境拒绝过短 PAYMENT_SESSION_SECRET（<32）',
   )
 
+  expectRejected(
+    { ...PROD_OK, TERMINAL_ADMIN_SECRET: undefined },
+    'PRODUCTION_TERMINAL_ADMIN_SECRET_INVALID',
+    '生产环境拒绝缺失 TERMINAL_ADMIN_SECRET',
+  )
+  expectRejected(
+    { ...PROD_OK, TERMINAL_ADMIN_SECRET: 'too-short' },
+    'PRODUCTION_TERMINAL_ADMIN_SECRET_INVALID',
+    '生产环境拒绝过短 TERMINAL_ADMIN_SECRET（<32）',
+  )
+  expectRejected(
+    { ...PROD_OK, TERMINAL_ACTION_TOKEN_SECRET: undefined },
+    'PRODUCTION_TERMINAL_ACTION_TOKEN_SECRET_INVALID',
+    '生产环境拒绝缺失 TERMINAL_ACTION_TOKEN_SECRET',
+  )
+  expectRejected(
+    { ...PROD_OK, TERMINAL_ACTION_TOKEN_SECRET: 'too-short' },
+    'PRODUCTION_TERMINAL_ACTION_TOKEN_SECRET_INVALID',
+    '生产环境拒绝过短 TERMINAL_ACTION_TOKEN_SECRET（<32）',
+  )
+
   // 生产环境：支付通道门禁（C5-2 沙箱禁产 + C5-6 真实通道）
   expectRejected(
     { ...PROD_OK, PAYMENT_PROVIDER: 'sandbox' },
@@ -419,6 +442,8 @@ function main(): void {
     'FILE_SIGNING_SECRET',
     'SECRET_ENCRYPTION_KEY',
     'PAYMENT_SESSION_SECRET',
+    'TERMINAL_ADMIN_SECRET',
+    'TERMINAL_ACTION_TOKEN_SECRET',
   ] as const
   let checked = 0
   for (const key of GUARDED_SECRET_KEYS) {

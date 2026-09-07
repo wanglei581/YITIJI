@@ -10,7 +10,8 @@
  *   - SMS_PROVIDER 必须为 tencent，且腾讯短信生产参数齐全（生产不得日志打印验证码）
  *   - OCR_PROVIDER 必须为 baidu，且百度 OCR 生产参数齐全（生产不得关闭真实简历识别）
  *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
- *   - FILE_SIGNING_SECRET / SECRET_ENCRYPTION_KEY / PAYMENT_SESSION_SECRET 必须存在、
+ *   - FILE_SIGNING_SECRET / SECRET_ENCRYPTION_KEY / PAYMENT_SESSION_SECRET /
+ *     TERMINAL_ADMIN_SECRET / TERMINAL_ACTION_TOKEN_SECRET 必须存在、
  *     长度 >= 32，且不得使用 .env.example 的样值前缀（dev- / test- / replace-with- 等）
  *   - JWT_SECRET 同样拒绝样值前缀（长度门槛仍是 16）
  *   - PAYMENT_PROVIDER 不得含 sandbox（生产禁止沙箱支付通道；wechat/alipay 真实渠道
@@ -54,6 +55,8 @@ export interface ProductionRuntimeEnv {
   AI_LLM_API_KEY?: string
   TRTC_LLM_API_KEY?: string
   PAYMENT_SESSION_SECRET?: string
+  TERMINAL_ADMIN_SECRET?: string
+  TERMINAL_ACTION_TOKEN_SECRET?: string
   PAYMENT_PROVIDER?: string
   PRINT_REQUIRE_PII_SCAN?: string
   PRINT_REQUIRE_PRINTER_ONLINE?: string
@@ -210,6 +213,25 @@ export function assertProductionRuntimeGates(
   // `dev-payment-session-secret-replace-in-prod-min-32-chars` 正好 55 字符，
   // 只查长度会放行。漏掉这一行，照抄示例就能用仓库里的公开串签支付会话。
   assertNotSampleSecret('PAYMENT_SESSION_SECRET', paymentSessionSecret)
+
+  // 终端 Agent 管理凭证与动作令牌签名密钥：terminals-agent.service.ts 在模块加载期
+  // requireEnv，缺了起不来；但 .env.example 的 replace-with- 样值刚好超过 32，
+  // 只查「非空」会放行照抄。与 FILE_SIGNING_SECRET 同一套长度 + 样值前缀门禁。
+  const terminalAdminSecret = env.TERMINAL_ADMIN_SECRET
+  if (!terminalAdminSecret || terminalAdminSecret.length < MIN_LONG_SECRET_LENGTH) {
+    throw new Error(
+      `PRODUCTION_TERMINAL_ADMIN_SECRET_INVALID: NODE_ENV=production 时 TERMINAL_ADMIN_SECRET 必须存在且长度 >= ${MIN_LONG_SECRET_LENGTH} 字符`,
+    )
+  }
+  assertNotSampleSecret('TERMINAL_ADMIN_SECRET', terminalAdminSecret)
+
+  const terminalActionTokenSecret = env.TERMINAL_ACTION_TOKEN_SECRET
+  if (!terminalActionTokenSecret || terminalActionTokenSecret.length < MIN_LONG_SECRET_LENGTH) {
+    throw new Error(
+      `PRODUCTION_TERMINAL_ACTION_TOKEN_SECRET_INVALID: NODE_ENV=production 时 TERMINAL_ACTION_TOKEN_SECRET 必须存在且长度 >= ${MIN_LONG_SECRET_LENGTH} 字符`,
+    )
+  }
+  assertNotSampleSecret('TERMINAL_ACTION_TOKEN_SECRET', terminalActionTokenSecret)
 
   // C5-2/C5-6：生产禁止沙箱支付通道（测试通道绝不能在生产入账）。未设置/disabled = 线上支付关闭，放行；
   // wechat / alipay（可逗号并列）为 C5-6 真实渠道，凭证齐全性由 Provider 工厂启动期校验（fail-closed）。

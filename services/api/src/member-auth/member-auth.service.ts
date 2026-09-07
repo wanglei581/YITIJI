@@ -478,6 +478,31 @@ export class MemberAuthService {
     })
   }
 
+  /**
+   * 已绑定微信的会员静默续签。复用 fetchWxOpenId，按 openid 找存量账号。
+   * 找不到 → 401 MEMBER_NOT_BOUND；禁用 → 403 ACCOUNT_UNAVAILABLE。
+   * 不在这里创建会员、不绑定手机、不重签法务同意。
+   */
+  async wxResignin(code: string): Promise<MemberLoginResult> {
+    const openid = await this.fetchWxOpenId(code)
+    const user = await this.prisma.endUser.findUnique({ where: { wxOpenId: openid } })
+    if (!user) {
+      throw this.loginFailed('MEMBER_NOT_BOUND', '当前微信未绑定会员，请先登录')
+    }
+    if (!user.enabled || user.status !== 'active') {
+      throw this.accountUnavailable()
+    }
+    const updated = await this.prisma.endUser.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    })
+    return this.issueLoginForUser({
+      id: updated.id,
+      phoneMasked: maskPhoneFromEnc(updated.phoneEnc),
+      nickname: updated.nickname,
+    })
+  }
+
   private async fetchWxOpenId(code: string): Promise<string> {
     const appid = process.env['WECHAT_MINIAPP_APPID']
     const secret = process.env['WECHAT_MINIAPP_APPSECRET']
