@@ -170,6 +170,24 @@ Mac/Claude 修复并部署候选版本后，现场至少执行以下四组；任
 
 完成标准：只有上述证据齐全且每项通过，才能对外说“连续打印已验证”。单次 F3 通过只能证明一张黑白单面测试页曾经真实出纸。
 
+### 4B. 结果层新增打印路径的真机项（2026-09-07，简历优化主会话委托；Mac 侧只能跑到 Playwright 与门禁，出纸必须真机）
+
+三条都是「一体机上点导出 → 走既有打印链路 → Agent claim → 出纸」，只用本人测试数据，纸面不含他人个人信息。每条记 taskId、订单号、出纸照片（可打码）。
+
+**先看线上版本再动手**：这三条端点都在 #851/#866 之后才进 main，线上 API `1b2195adf`（2026-09-06 22:51 发布）**没有**这两个控制器。API 发布到含它们的提交之前，一体机上点导出只会 404 或看不到入口，**不要在那之前做本节**，做了也只能记「线上未含该版本」。Mac 侧发布后会在 `current-progress.md` 记发布 SHA 并通知。
+
+| # | 路径 | 真机判据 | 后端事实（origin/main 已核） |
+|---|---|---|---|
+| 1 | AI 诊断报告 PDF 与「修改清单」PDF 出纸 | 两份都能建单并真实出纸；中文不缺字、不方块 | `POST /resume/records/:taskId/export`（`resume-report-export.controller.ts`）；服务端生产启动自检要求中文字体，服务器已装 `NotoSansCJK-Regular.ttc` |
+| 2 | 优化 / 生成预览页导出的简历 PDF 出纸 | 出纸成功；**纸面电话、邮箱是全量原文**（屏幕上掩码、文件里不掩码是设计），如实记录纸面内容是否与设计一致 | 同上导出链路 |
+| 3 | Word → PDF 转换产物出纸；签约风险报告不论转不转都不得出纸 | 转换产物能建单出纸（若线上 `CONVERSION_ENGINE` 为 disabled，则记「转换未开放，页面提示诚实」，不算失败）；对签约风险报告点打印必须被服务端 400/403 拦下（错误码含 `CONTRACT_REPORT_FORBIDDEN`），Agent 日志无该任务的 claim | `POST /files/:id/convert`（`document-conversion.controller.ts`）；引擎未声明时默认 `disabled`；合规边界 §4.8 |
+
+**发布时序约束（下一次 API 发布前，卡在 Mac 侧）**：main 自 #860 起，`NODE_ENV=production` 启动自检无条件要求可用中文字体（`PRODUCTION_CJK_FONT_MISSING` 拒绝启动，与转换引擎无关）。2026-09-07 00:50 只读核过：服务器已有 `/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc` 与 `wqy-microhei.ttc`，探测会过。转换引擎按 checklist 第 124–132、153、163 行，未装则在 `.env` 显式写 `CONVERSION_ENGINE=disabled`（当前未声明，代码默认 disabled）。Agent 侧不装任何转换引擎，仍只收 PDF / 图片。
+
+**发布后必留的线上证据**：管理员登录后请求 `GET /api/v1/health/cjk-font`，把 `data.ok`、`path`、`family` 三个值抄进回执。这是 #860 字体自检唯一的线上证据，`health` 返回 `ok` 不能替代。
+
+**发布窗口协作规则（2026-09-07 与简历优化主会话约定）**：开闸前至少 10 分钟通知该会话并等它回复确认（它会杀掉自动合并脚本）；未确认不开闸；发布完成或闸门关回后再发「闸门已关 / 发布完成」。
+
 ### F1 服务与驱动名
 
 - [ ] `Get-Service aijobprintagent.exe`：Running / Automatic。
