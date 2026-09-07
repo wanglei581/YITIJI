@@ -150,6 +150,39 @@ if [ -z "$DBURL" ]; then
   exit 1
 fi
 
+# 这里的键必须与 services/api/src/config/production-runtime-gates.ts 里
+# NODE_ENV=production 时 fail-closed 要求显式为 true 的 env 一一对应。
+# 3c 预检把它们视为即将写入；3b 再持久化进运行目录 .env。
+# 少一个，新 API 在 PM2 重启后就拒绝启动 —— 而那时备份、迁移、rsync 都已经做完了。
+#
+# 2026-09-06 实测：#790 加了 PRINT_REQUIRE_PRINTER_ONLINE 闸门，这里没跟着加，
+# 结果 35af2263b 发布走完全部步骤后健康检查失败，pm2 崩溃循环 17 次，线上 API
+# 中断到手工补 .env 为止。verify:deploy-gates-in-sync 门禁现在会在 CI 里对这张
+# 清单和 production-runtime-gates.ts 做集合比对，两边不一致直接红。
+#
+# 必须在 3c 之前定义：预检 --force-true 引用本数组。
+REQUIRED_PRODUCTION_GATES=(
+  PRINT_REQUIRE_PII_SCAN
+  PRINT_REQUIRE_PRINTER_ONLINE
+)
+
+echo "=== 1b. 在源码检出内构建 API（不写运行目录，供 3c 预检使用目标提交闸门）==="
+# 只写 DEPLOY_PATH（git 检出），不碰 RUNTIME_ROOT。失败时线上未动。
+cd "$DEPLOY_PATH"
+pnpm install --frozen-lockfile
+pnpm --filter @ai-job-print/api db:pg:generate
+pnpm --filter @ai-job-print/api build
+
+echo "=== 3c. 生产运行闸门预检（目标提交代码 × 服务器真实 .env）==="
+# 用刚构建的 dist/config/production-runtime-gates.js 对运行目录真实 .env
+# 做启动闸门预检，并叠加 3b 将写入的 KEY=true。失败必须在 pg_dump 之前中止。
+if ! node services/api/scripts/preflight-production-gates.mjs \
+  --env-file "$API_DIR/.env" \
+  --force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")"; then
+  echo "::error::生产闸门预检失败，发布在备份前中止（线上未动）"
+  exit 1
+fi
+
 echo "=== 2. PostgreSQL 全库备份 + 可读校验 ==="
 mkdir -p "$BACKUP_ROOT"
 pg_dump "$DBURL" -Fc -f "$BACKUP_PREFIX.dump"
@@ -159,18 +192,8 @@ echo "=== 3. 备份当前运行目录（回滚锚点）==="
 cp -a "$RUNTIME_ROOT" "$BACKUP_PREFIX.runtime"
 
 echo "=== 3b. 持久化全部生产运行闸门（不打印 .env）==="
-# 这里的键必须与 services/api/src/config/production-runtime-gates.ts 里
-# NODE_ENV=production 时 fail-closed 要求显式为 true 的 env 一一对应。
-# 少一个，新 API 在 PM2 重启后就拒绝启动 —— 而那时备份、迁移、rsync 都已经做完了。
-#
-# 2026-09-06 实测：#790 加了 PRINT_REQUIRE_PRINTER_ONLINE 闸门，这里没跟着加，
-# 结果 35af2263b 发布走完全部步骤后健康检查失败，pm2 崩溃循环 17 次，线上 API
-# 中断到手工补 .env 为止。verify:deploy-gates-in-sync 门禁现在会在 CI 里对这张
-# 清单和 production-runtime-gates.ts 做集合比对，两边不一致直接红。
-REQUIRED_PRODUCTION_GATES=(
-  PRINT_REQUIRE_PII_SCAN
-  PRINT_REQUIRE_PRINTER_ONLINE
-)
+# 键清单见上方 REQUIRED_PRODUCTION_GATES（3c 预检已按同一数组 --force-true）。
+# 此处才写运行目录 .env：必须在步骤 3 回滚锚点之后、迁移之前。
 ENV_FILE="$API_DIR/.env"
 for GATE_KEY in "${REQUIRED_PRODUCTION_GATES[@]}"; do
   ENV_TMP="$(mktemp "$API_DIR/.env.runtime.XXXXXX")"
@@ -200,9 +223,14 @@ for GATE_KEY in "${REQUIRED_PRODUCTION_GATES[@]}"; do
 done
 
 echo "=== 4. 在目标提交内构建 API ==="
+# 构建已在备份前（1b）完成，供 3c 加载目标提交 dist。此处确认产物仍在；
+# 若缺失则补构建，不把「API 未构建」漏到 rsync。
 cd "$DEPLOY_PATH"
-pnpm --filter @ai-job-print/api db:pg:generate
-pnpm --filter @ai-job-print/api build
+if [ ! -f "$DEPLOY_PATH/services/api/dist/config/production-runtime-gates.js" ]; then
+  pnpm --filter @ai-job-print/api db:pg:generate
+  pnpm --filter @ai-job-print/api build
+fi
+test -f "$DEPLOY_PATH/services/api/dist/config/production-runtime-gates.js"
 
 echo "=== 4b. 校验三端前端 dist 均已构建（防止 rsync --delete 误删运行目录）==="
 for app in kiosk admin partner; do

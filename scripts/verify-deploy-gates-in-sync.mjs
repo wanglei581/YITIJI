@@ -16,7 +16,7 @@
 // 只比对 `env.KEY !== 'true'` 这一种形态：PAYMENT_PROVIDER / PRINT_SCAN_CAPABILITY_MODE
 // 那类取值集合校验需要运维给出真实取值，部署脚本不能也不该盲设为 true。
 // ============================================================
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -75,6 +75,44 @@ if (!arrayMatch) {
     if (notExported.length === 0) pass('PM2 重启前每个闸门键都已 export KEY=true')
     else fail(`PM2 重启前未 export：${notExported.join(', ')} —— 进程环境与 .env 持久化不一致`)
   }
+}
+
+// 六、备份前预检：用目标提交闸门代码检查服务器真实 .env（2026-09-06 事故根治）
+//
+// 3b 只能持久化 env.KEY !== 'true' 这一种形态。CJK 字体探测、取值集合、
+// 将来别的闸门都不在那张清单里。预检调用目标提交 dist 里的
+// assertProductionRuntimeGates()，失败必须发生在 pg_dump 之前，线上零影响。
+const PREFLIGHT_SCRIPT = 'services/api/scripts/preflight-production-gates.mjs'
+const preflightPath = join(repoRoot, PREFLIGHT_SCRIPT)
+if (!existsSync(preflightPath)) {
+  fail(`预检脚本 ${PREFLIGHT_SCRIPT} 不存在`)
+} else {
+  pass(`预检脚本存在：${PREFLIGHT_SCRIPT}`)
+  const preflightSrc = readFileSync(preflightPath, 'utf8')
+  if (preflightSrc.includes('console.log(process.env')) {
+    fail('预检脚本不得 console.log(process.env…)，避免把 .env 打进公开 Actions 日志')
+  } else {
+    pass('预检脚本不打印 process.env')
+  }
+}
+
+const preflightHeading = '=== 3c. 生产运行闸门预检（目标提交代码 × 服务器真实 .env）==='
+if (deploySource.includes(preflightHeading)) pass('部署脚本含 3c 预检步骤')
+else fail('部署脚本没有 3c 生产运行闸门预检步骤')
+
+const preflightCmdAt = deploySource.indexOf('preflight-production-gates.mjs')
+const pgDumpAt = deploySource.indexOf('pg_dump "$DBURL"')
+if (preflightCmdAt < 0) fail('部署脚本没有调用 preflight-production-gates.mjs')
+else if (pgDumpAt < 0) fail(`${DEPLOY_SH} 里没找到 pg_dump "$DBURL"`)
+else if (preflightCmdAt < pgDumpAt) pass('3c 预检位于 pg_dump 之前（失败时线上未动）')
+else fail('3c 预检必须位于 pg_dump 之前 —— 否则失败时备份可能已开始')
+
+if (
+  deploySource.includes('--force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")"')
+) {
+  pass('预检命令引用 REQUIRED_PRODUCTION_GATES（与 3b 同一份清单）')
+} else {
+  fail('预检命令必须引用 REQUIRED_PRODUCTION_GATES（与 3b 同一份清单）')
 }
 
 if (failures > 0) {
