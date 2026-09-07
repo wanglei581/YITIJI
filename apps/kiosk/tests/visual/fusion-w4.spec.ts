@@ -18,7 +18,7 @@ async function verifyPage(page: Page, errors: string[]): Promise<void> {
 const SMART_CAMPUS_URLS = [
   ['/smart-campus', '迎新指引'],
   ['/smart-campus/welcome', '迎新流程'],
-  ['/smart-campus/freshman-insights', '校园大数据暂未开放'],
+  ['/smart-campus/freshman-insights', '迎新服务导览'],
   ['/smart-campus/service/campus-card', '校园卡办理'],
   ['/smart-campus/service/all-in-one', '一卡通开通'],
   ['/smart-campus/service/campus-network', '校园网开通'],
@@ -191,8 +191,8 @@ test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   await page.goto('/campus')
   await expect(page.getByText(/校园招聘专区/).first()).toBeVisible()
   await page.goto('/smart-campus/freshman-insights')
-  await expect(page.getByText('校园大数据暂未开放')).toBeVisible()
-  await expect(page.getByText(/学校书面授权/)).toBeVisible()
+  await expect(page.getByText('迎新服务导览')).toBeVisible()
+  await expect(page.getByText(/本平台没有迎新报到数据/)).toBeVisible()
   await verifyPage(page, errors)
 })
 
@@ -339,7 +339,7 @@ test('smart-campus 子模块关闭不能从深链绕过 @w4', async ({ page, api
   await page.goto('/smart-campus/service/campus-card')
   await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
   await page.goto('/smart-campus/freshman-insights')
-  await expect(page.getByText('校园大数据暂未开放')).toBeVisible()
+  await expect(page.getByText('迎新服务导览')).toBeVisible()
 })
 
 // MSC-07（2026-09-07）：5 分钟定时刷新不再先置 loading 卸载子页（用户填到一半会丢状态）；
