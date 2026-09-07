@@ -205,6 +205,8 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await expect(page.getByRole('checkbox', { name: /主导/ })).not.toBeChecked()
   await expect(page.getByText('项目成果 · 待定')).toBeVisible()
   await expect(page.getByText('团队协作 · 待定')).toBeVisible()
+})
+
 const GENERATE_TASK_ID = 'gen-preview-1'
 const GENERATE_RESUME = {
   basic: { name: '青岛求职者', phone: '13800001111', city: '青岛' },
