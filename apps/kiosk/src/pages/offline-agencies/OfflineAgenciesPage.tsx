@@ -52,6 +52,10 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           {services.map((svc) => <span key={svc} className="dw-chip">{svc}</span>)}
           {agency.district ? <span className="dw-chip">{agency.district}</span> : null}
           {agency.orgCode ? <span className="dw-chip">来源编号 {agency.orgCode}</span> : null}
+          {/* 平台审核的是「机构信息」，不是「机构资质」——两者不能混说。
+              backend P0 门禁把这条钉死：本页必须出现下面这个标签，
+              且不得出现声称资质已核验的说法（原词见 verify-backend-p0-contracts.mjs:86）。 */}
+          <span className="dw-chip dw-chip-ok">机构信息已审核</span>
         </div>
       </div>
       <span className="dw-row-go" aria-hidden="true">›</span>
