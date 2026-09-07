@@ -393,3 +393,41 @@ F7 全屏抽查：未做
 
 - 未做连续打印矩阵；未做执行单 4B 三条；未做 API 发布。
 - 需要 Mac 侧处理：`-UseExistingToken` 仍在 commit stage=token 失败；停用后管理员终端列表显示 0 台且无法现场完成启用/恢复；需要确认线上页面/API 的停用过滤与恢复入口。
+
+### Mac 侧对第三轮回执的核实（2026-09-07）
+
+| 回执项 | 核实结果 | 证据 |
+|---|---|---|
+| 升级 + F5 自愈通过 | 确认。看门狗改用免 Origin 的取票接口探活后自愈生效 | 回执日志 `local Agent is reachable again…` + `bootTicket=True` |
+| `-UseExistingToken` 仍失败 | **根因已定位并修复（#906）**：`-UseExistingToken` 分支不设 `$tokenToPersist`（保持 `$null`），但 `Commit-ProductionConfigAndToken` 形参是 `[AllowNull()][string]`，PowerShell 绑定时把 `$null` 转成空串，于是恒判「要写 token」，`Protect-AgentToken` 空值抛错。这条路径此前从未成功过 | `install-production-agent.ps1` 第 502 / 535 / 537 行 |
+| F4「停用已执行、随后 0 台」 | **停用请求从未到达服务器**。当日 `/api/v1/admin/*` 只有一次写操作：15:06:14 的 `PATCH /admin/terminals/KSK-001/lifecycle`（进入维护）；`AuditLog` 同期只有一条 `terminal.lifecycle.update`；数据库 KSK-001 `enabled=true`。16:07–16:56 的 21 次列表请求全部 200 / 1336 字节（=2 台）。**F4 仍为未验收** | 生产机 nginx access log、`AuditLog`、Postgres |
+| 「0 台终端」的已知相关现象 | 当日仅两次 429 落在管理端：15:04:43、15:05:25（`admin/release-observation-plans`）与 15:06:47、15:07:18（`admin/terminals`），紧跟那次 lifecycle 修改。当时该公网 IP 全部请求仅约 22 次/分钟，远低于每 IP 60 次/分钟，**触发原因未解释**，已交 API 侧 | 同上 |
+
+**本轮新发现的生产阻塞（第二轮升级引入，非本轮操作所致）**
+
+- 心跳 `printerStatus` 自 2026-09-07 12:21 起连续 614 次为 `unknown`（此前 785 次 `ready`），翻转点正是第二轮升级重启。原因：该版本带入的 AGT-05 把 `DetectedErrorState=0` 由 ready 改判 unknown，而奔图 CM2800ADN 驱动**从不填这个字段**（本机只读实测 `PrinterStatus=3 / DetectedErrorState=0 / WorkOffline=False`；[`print-real-capability-hardening-checklist.md`](./print-real-capability-hardening-checklist.md) [N2] 记录空闲与关机都是 0，区分二者的是 `WorkOffline`）。
+- 后果：服务端 PRT-03 的不可用集合不含 `unknown`，不拦建单；但一体机 `PrintConfirmPage` 的 `printerBlocked = !printerReady`，**用户无法下单打印**。
+- 修复 #911：`DetectedErrorState=0` 且未被离线分支拦下且 `PrinterStatus` 为 3/4/5 时判 ready，故障分支不变。需装新包后生效。
+
+## 11. 第四轮任务（2026-09-07 之后）
+
+**不依赖新包，现在就能做（否则装了包也不接单）：**
+
+1. 管理员后台把 `KSK-001` 从 `maintenance` **恢复运行**（当前仍在维护中，服务端建单会直接拒 `PRINT_TERMINAL_NOT_ACTIVE`）。
+2. 重新注册 Kiosk 看门狗（第三轮为查看后台把计划任务停了，一体机不会自动拉起全屏页面）。
+
+**装新包后：**
+
+3. 按 2B 同机升级（含 #906 安装脚本修复、#911 打印机就绪判定），升级后 `Set-Service aijobprintagent.exe -StartupType Automatic`。
+4. 验收两条：心跳 `printerStatus` 回到 `ready`（Mac 侧可远程只读确认）；一体机打印确认页的提交按钮可用、无「打印机未就绪」。
+5. 用 `-UseExistingToken -ClaimIntervalMs 5000` 重跑一次重配，本次应成功；若仍失败，抄回 `[FAIL] commit stage=… reason=…` 原文。
+6. **F4 停用即拒（补做，硬性要求）**：点「停用」后**立即在 devtools 确认存在一条 `PATCH /api/v1/admin/terminals/KSK-001` 且返回 200**，再看页面与 Kiosk 表现。第三轮的结论无法复核正是因为缺这一步。做完立刻「启用」并「恢复运行」。
+7. 连续打印矩阵（顺序组 / 突发组）待 F4 判定后做。
+8. **执行单 4B 三条已解除阻塞**（2026-09-07 19:52 发布 `origin/main@9183cdb39`，deploy run `34118411969` success，ci_run `34115631887`）。Mac 侧只读复核：PM2 online、`/api/v1/health` = `ok/postgres`；两个控制器已在运行目录 dist 中；公网探针 `POST /resume/records/:taskId/export` 与 `POST /files/:id/convert` 均返回业务级 400（路由生效、DTO 校验先于鉴权，所有权由下游 requester 强制），`GET /health/cjk-font` 返回 401（需管理员 Bearer）。
+   - **前置一**：服务器 `.env` **未声明** `CONVERSION_ENGINE`（只读核过，计数 0），代码默认 `disabled`。因此两端 Word 转 PDF 入口会**诚实置灰**，这是正确行为；第 3 条（Word→PDF 出纸）此时应记「引擎未开放，待配置后重测」，**不得记为失败**。签约风险报告被服务端拦下这一半仍必须验。产品负责人配置后由 Mac 侧通知重测。
+   - **前置二**：用管理员账号取 `GET /api/v1/health/cjk-font` 的 `data.ok` / `path` / `family` 三个值抄进回执（字体自检唯一的线上证据）。
+
+**扫码器：本轮不重测**，结论直接引用 PR #913 写入 [`bench-acceptance-2026-08-16.md`](./bench-acceptance-2026-08-16.md) A 项的真机实测：HID 键盘模式（章程 D-4「扫码零集成」成立，Agent 不需要串口读取）、扫出字符串无前后缀、无后缀不影响取件认领（取件页按「输入静默 250ms」触发而非回车）、模组为接近感应触发而非常亮、能读手机屏幕二维码但需调高手机亮度。仅 **A4 付款码**（微信/支付宝 18 位）待支付商户配置就位后另测。
+
+**运营须知（进现场清单）**：扫码读取依赖手机屏幕亮度。取件页与小程序出码页需提示用户调高亮度，否则现场会出现「扫不上 → 以为码坏了」的误判。
+
