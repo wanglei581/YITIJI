@@ -154,11 +154,13 @@
 >
 > | 堆 | 条数 | 含义 | 本次动作 |
 > |---|---|---|---|
-> | **A** | **28** | 已是事实，有运行/CI 证据 | `- [ ]` → `- [x]`，证据写在条目下 |
-> | **B** | **45** | 必须登录服务器只读才能证 | 保持未勾，条目下附可粘贴命令 |
-> | **C** | **9** | 真的没做 | 保持未勾，条目下写缺什么、谁能做 |
+> | **A** | **33** | 已是事实，有公网/CI/deploy 日志证据 | 未勾改已勾，证据写在条目下 |
+> | **B** | **39** | 必须登录服务器只读才能证 | 保持未勾，条目下附可粘贴命令 |
+> | **C** | **10+1** | 真的没做；另把原已勾的「自动部署」改回未勾 | 保持未勾，条目下写缺什么 |
 >
-> 勾选后本章未勾剩余 **54** 条（45 B + 9 C）。**上线阻塞**仍首先指向 C 堆「岗位/招聘会/政策 `total=0`」。其余 C 堆是 COS 控制台截图、当面付现场、回滚/恢复演练、领域搬数方案、独立 worker（`services/worker` 为空壳，队列在 API 进程，**不等同于内容为空**）。B 堆交给有服务器权限的会话按表执行。
+> 原未勾 82 = A 33 + B 39 + C 10。另：原已勾「main CI 通过后自动部署」今晚 `workflow_run` 为 skipped，改回未勾（计入 C）。本章现况：已勾 39（含原 6 条仍勾：HTTPS / DATABASE_URL / SMS / 构建产物 / base path / 生产库连通）/ 未勾 50。
+>
+> **上线阻塞**首先指向 C「岗位/招聘会/政策 `total=0`」。其余 C：COS 控制台截图、当面付现场、回滚演练、领域搬数、nginx 上传超时未配、body 上限冲突、自动发布未放行。独立 worker 按今晚 PM2 表记 N/A 已勾，**不等同于内容为空**。B 堆交给有服务器权限的会话按表执行。
 >
 > 取证锚点（全程 2026-09-07）：
 > - 公网：`GET https://zyidai.cn/api/v1/health` → `{"status":"ok","db":"postgres","degraded":[]}`；`GET /api/v1/health/ready` → 200 `status:ready`，`database=postgres`，`redis=REDIS_REACHABLE 127.0.0.1:6379`，`since=2026-09-07T15:26:13.487Z`；`GET /api/v1/document-conversion/capabilities` → `{"wordToPdf":true,"engine":"soffice","cjkFonts":true}`；`GET /api/v1/payment/channels` → `["alipay","wechat"]`；岗位/招聘会/政策 `pagination.total=0`。
@@ -290,8 +292,10 @@ pnpm build
 
 - [x] 安装不依赖本机私有路径。
   **证据（2026-09-07，deploy 日志）**：run `34137990264` 在生产机两次 `pnpm install --frozen-lockfile` 成功（`Already up to date` / `Done … pnpm v11.2.2`）。CI job `101768117781` / `101768117757` 同样 `pnpm install --frozen-lockfile` success。
-- [x] 构建产物路径与 nginx/静态服务配置一致。（**2026-09-07 包 P1 公网复测**：`https://zyidai.cn/` `HTTP/2 200`，`last-modified: Mon, 07 Sep 2026 15:26:30 GMT`（与 deploy nginx 重载同一秒），引用 `/assets/index-Do9twi7d.js`、`/assets/index-BVFud9v_.css`；该 hash 与 deploy `34137990264` 构建日志 `dist/assets/index-Do9twi7d.js` 一致。Admin `index-DbJNOmHO.js` / Partner `index-B0pSiPGw.js` 同样与构建日志一致。）
-- [x] 前端资源 base path 正确。（同上，`/assets/*` 绝对路径可正常加载；`GET https://zyidai.cn/assets/index-Do9twi7d.js` 返回 `206` `content-type: application/javascript`。）
+- [x] 构建产物路径与 nginx/静态服务配置一致。
+  **证据（2026-09-07 包 P1 公网复测）**：`https://zyidai.cn/` `HTTP/2 200`，`last-modified: Mon, 07 Sep 2026 15:26:30 GMT`（与 deploy nginx 重载同一秒），引用 `/assets/index-Do9twi7d.js`、`/assets/index-BVFud9v_.css`；该 hash 与 deploy `34137990264` 构建日志 `dist/assets/index-Do9twi7d.js` 一致。Admin `index-DbJNOmHO.js` / Partner `index-B0pSiPGw.js` 同样与构建日志一致。
+- [x] 前端资源 base path 正确。
+  **证据（同上）**：`/assets/*` 绝对路径可正常加载；`GET https://zyidai.cn/assets/index-Do9twi7d.js` 返回 `206` `content-type: application/javascript`。
 - [x] 大文件上传入口不会被前端路由或 nginx 误拦截。
   **证据（2026-09-07，公网）**：`POST https://zyidai.cn/api/v1/files`（无鉴权 JSON）→ `HTTP/2 401` `content-type: application/json` `{"error":{"code":"AUTH_MISSING_TOKEN"}}`，不是 SPA HTML、不是 nginx 405/404。路由打到 API。单请求体上限见 3.7 `client_max_body_size`（B 堆）。
 
@@ -394,7 +398,7 @@ pnpm --filter ./services/api verify:document-conversion
 验收：
 
 - [x] verify 全部 PASS。
-  **证据（2026-09-07，CI，口径=GitHub Actions 全量门禁而非生产机复跑）**：run `34130143436` 四个 job 全部 success。上表所列脚本均在 `.github/workflows/ci.yml` 的 `build-and-verify` 串行套件中（`verify:production-runtime-gates` ~L454、`verify:resume-generate` ~L586、`verify:ocr-baidu` ~L603、`verify:document-conversion` ~L533）；`postgres-readiness` 另在 PostgreSQL 上重跑其中核心子集（含 `verify:cjk-font` / `verify:document-conversion` / `verify:member-assets-c2d` / `verify:mock-interview` / `verify:job-fit` / `verify:resume-optimize` / `verify:career-plan` / `verify:activity-logs`）。
+  **证据（2026-09-07 包 P1，CI job/step 结论，不引用 workflow 行号）**：run `34130143436` 四个 job 全部 success：`build-and-verify` `101768117781`（步骤 `Verify suites` / `Backend P0 contract gates` / `Backend P0 real HTTP contracts` / `PG schema drift check` success）、`postgres-readiness` `101768117757`（步骤 `Core verify suites on PG` / `Migrate deploy on fresh PG` success）、`kiosk-browser-smoke`、`release-bundle`。口径是 GitHub Actions 全量门禁绿，不是生产机复跑上表命令。
 - [ ] 运行日志无简历原文、面试回答、转写文本、规划正文、API Key、access token。
   **待取证（服务器只读）**：`pm2 logs ai-job-print-api --lines 500 --nostream | grep -Ei 'sk-|api[_-]?key|Bearer eyJ|BEGIN PRIVATE|access_token' || echo 'no credential-like lines in last 500'`
   （旁证：CI `verify:pii-redaction` / `verify:error-observability` 在 run `34130143436` PASS，钉的是代码路径，不是生产日志。）
@@ -436,9 +440,9 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 - [ ] 上传超时配置满足大文件与弱网场景。
   ❌ **未配置，判不满足，排上线前**（证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：）：三份 nginx 配置里没有任何 `proxy_read_timeout` / `proxy_send_timeout` / `client_body_timeout`，走默认 **60 秒**。一体机现场是有线网，但**手机扫码上传走用户自己的移动网络**，弱网传几十 MB 扫描件 60 秒很容易不够。需动生产 nginx，需产品负责人授权。
   **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep -E 'proxy_read_timeout|proxy_send_timeout|client_body_timeout'`
-- [x] WebSocket/SSE 如有使用，反代升级头正确。 —— **N/A（判据如下，不留空）**
-  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：全仓搜 `WebSocket` / `EventSource` / `event-stream`，只在 `apps/kiosk/src/ai/useAiTask.ts` 的**注释**里出现（「只能由轮询/SSE/WebSocket 驱动」），无实际使用 → 不需要升级头。若将来真用上，本条需重新打开。
+- [ ] WebSocket/SSE 如有使用，反代升级头正确。
   **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep -n -E 'Upgrade|proxy_set_header Connection|proxy_http_version'`
+  （旁证、不足以下勾：本包对 `https://zyidai.cn/api/v1/health` 发 `Upgrade: websocket` 仍拿到 JSON 200，不是 101；这只说明 health 不是 WS 端点，不能代替 nginx 配置全文。）
 - [x] `/opc` 等其他项目路径不会与本项目路由冲突。
   **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：三份站点配置里无 `/opc`，也无任何非本项目 location。
   **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep -n -E 'location |server_name |root '`
@@ -448,10 +452,9 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 - [x] API 使用 PM2/systemd/等价方式守护，异常自动重启。
   **证据（2026-09-07，deploy 日志）**：`[PM2] Applying action restartProcessId on app [ai-job-print-api](ids: [ 0 ])` / `[PM2] [ai-job-print-api](0) ✓`，表中 `status=online` `↺=25`。随后本机与公网 health 200，`ready.since=2026-09-07T15:26:13.487Z`。未做故意杀进程的混沌演练。
-- [x] Worker/队列进程独立守护。 —— **N/A（架构上无独立 worker，判据与风险如下）**
-  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：`services/worker/package.json` 只有 4 行元数据、description 写「待第 7 阶段开发」、无源码；服务器上无任何独立 worker 进程；队列用 `@nestjs/bullmq` 的 `@Processor` **跑在 API 进程内**（`contract-review.processor.ts` / `job-sync.processor.ts` / `member-privacy.processor.ts`）。
-  ⚠️ **风险注记（现在不是问题，将来必是）**：进程内消费没有独立重启边界 —— 一个队列任务拖垮进程，API 一起挂；PM2 拉起来的是**整个 API**，不是只重启队列。任务量上去后需拆独立 worker 服务。
-  **未完成**：同一份 PM2 表只有 `ai-job-print-api`（id 0）和模块 `pm2-logrotate`（id 1），**没有**独立 worker 进程。`services/worker` 仍是空壳（`package.json` 写「待第 7 阶段开发」）；BullMQ 处理器在 API 进程内，与 [launch-audit-2026-09-05.md](../reviews/launch-audit-2026-09-05.md) 一致。谁能做：若产品仍要求独立 worker，由发布负责人另立进程；**当前架构下不是与「内容为空」同级的上线阻塞**。
+- [x] Worker/队列进程独立守护。 —— **N/A（当前 PM2 没有独立 worker 进程）**
+  **证据（2026-09-07 包 P1，deploy 日志，不是「仓库里 worker 是空壳」）**：run `34137990264` PM2 表只有 `ai-job-print-api`（id 0，`status=online`）和模块 `pm2-logrotate`（id 1）。公网 ready 的 `member-privacy-scheduler` 挂在 API 进程内（`EXPORT_SCHEDULER_REGISTERED`）。
+  ⚠️ 进程内消费没有独立重启边界；任务量上去后若仍要独立 worker，需另立进程。**不是与「内容为空」同级的上线阻塞**。
 - [x] 前端静态服务或 nginx 重启策略明确。
   **证据（2026-09-07，deploy 日志）**：`=== 重载 nginx ===` 后 `2026/09/07 23:26:30 [notice] … signal process started`，job 以 `✅ 部署完成` 收尾。
 - [x] 日志路径固定，日志轮转已配置。
