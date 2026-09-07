@@ -78,6 +78,10 @@ export interface PartnerStatsResponse {
     activeSources: number
     /** 待管理员审核（pending + reviewing）的内容总数 */
     pendingReview: number
+    pendingReviewJobs: number
+    pendingReviewFairs: number
+    pendingReviewPolicies: number
+    pendingReviewCompanies: number
   }
   /** 浏览/跳转/打印归因，恒不可用；见 StatsAttribution */
   attribution: StatsAttribution
@@ -145,6 +149,10 @@ function buildDemoStats(period: StatsPeriod): PartnerStatsResponse {
       publishedPolicies: 9,
       activeSources: 4,
       pendingReview: 4,
+      pendingReviewJobs: 2,
+      pendingReviewFairs: 1,
+      pendingReviewPolicies: 0,
+      pendingReviewCompanies: 1,
     },
     // demo 模式同样不伪造漏斗：归因缺不可变 sourceOrgId 快照，演示态也照实不可用
     attribution: {

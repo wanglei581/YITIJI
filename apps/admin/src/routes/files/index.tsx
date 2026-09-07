@@ -15,12 +15,11 @@ import {
 } from '../../services/api'
 import {
   CLEAN_FILTERS,
-  CLEAN_MAP,
   SENSITIVE_FILTERS,
   TYPE_FILTERS,
   toViewFile,
 } from './fileMeta'
-import { RETENTION_FILTERS, retentionPolicyLabel } from './retentionMeta'
+import { RETENTION_FILTERS } from './retentionMeta'
 import { RetentionSummary } from './RetentionSummary'
 import { FileTable } from './FileTable'
 
@@ -31,6 +30,19 @@ const TYPE_TO_PURPOSE: Partial<Record<string, AdminFilePurpose>> = {
   打印文档: 'print_doc',
   招聘会资料: 'fair_material',
   求职信: 'cover_letter',
+}
+
+const SENSITIVE_TO_LEVEL: Partial<Record<string, AdminFileRecord['sensitiveLevel']>> = {
+  高敏感: 'highly_sensitive',
+  中敏感: 'sensitive',
+  低敏感: 'normal',
+}
+
+const RETENTION_TO_POLICY: Partial<Record<string, NonNullable<AdminFileRecord['retentionPolicy']>>> = {
+  保存3个月: 'months_3',
+  保存6个月: 'months_6',
+  长期保存: 'long_term',
+  系统短期: 'system_short',
 }
 
 function resolveSignedUrl(signedUrl: string): string {
@@ -69,11 +81,18 @@ export default function FilesPage() {
   const [total, setTotal] = useState(0)
 
   const typePurpose = typeFilter === '全部' ? undefined : TYPE_TO_PURPOSE[typeFilter]
+  const sensitiveLevel = sensitiveFilter === '全部' ? undefined : SENSITIVE_TO_LEVEL[sensitiveFilter]
+  const retentionPolicy = retentionFilter === '全部' ? undefined : RETENTION_TO_POLICY[retentionFilter]
   const deletedParam: boolean | 'all' = cleanFilter === '已清理'
     ? true
     : cleanFilter === '全部'
       ? 'all'
       : false
+  const expiry = cleanFilter === '有效期内'
+    ? 'active' as const
+    : cleanFilter === '待清理'
+      ? 'expired' as const
+      : undefined
 
   const load = useCallback(() => {
     setLoading(true)
@@ -85,6 +104,9 @@ export default function FilesPage() {
         search: search.trim() || undefined,
         deleted: deletedParam,
         purpose: typePurpose,
+        sensitiveLevel,
+        retentionPolicy,
+        expiry,
       }),
       getFileLifecycleSummary(),
     ])
@@ -96,18 +118,11 @@ export default function FilesPage() {
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
-  }, [page, pageSize, search, deletedParam, typePurpose])
+  }, [page, pageSize, search, deletedParam, typePurpose, sensitiveLevel, retentionPolicy, expiry])
 
   useEffect(() => { load() }, [load])
 
   const views = useMemo(() => files.map((f) => toViewFile(f, now)), [files, now])
-
-  const filtered = views.filter((v) => {
-    const matchSensitive = sensitiveFilter === '全部' || v.sensitiveLabel === sensitiveFilter
-    const matchClean = cleanFilter === '全部' || cleanFilter === '已清理' || CLEAN_MAP[v.clean].label === cleanFilter
-    const matchRetention = retentionFilter === '全部' || retentionPolicyLabel(v.raw.retentionPolicy) === retentionFilter
-    return matchSensitive && matchRetention && matchClean
-  })
 
   const highSensitiveCount = views.filter((v) => v.sensitive === 'high' && v.clean !== 'cleaned').length
   const expiredPending = summary?.expiredPendingCleanup ?? views.filter((v) => v.clean === 'scheduled').length
@@ -225,7 +240,7 @@ export default function FilesPage() {
         loading={loading}
         error={error}
         search={search}
-        files={filtered}
+        files={views}
         total={total}
         page={page}
         pageSize={pageSize}

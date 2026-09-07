@@ -59,11 +59,30 @@ export interface PublishedFairQueryGroup {
 
 /** FairStatus 的运行时取值(门禁与入参校验共用,避免各处各写一份硬编码清单)。 */
 export const FAIR_STATUS_VALUES = ['upcoming', 'ongoing', 'ended'] as const satisfies readonly FairStatus[]
+export const REVIEW_STATUS_VALUES = ['pending', 'reviewing', 'approved', 'rejected'] as const satisfies readonly ReviewStatus[]
+export const PUBLISH_STATUS_VALUES = ['draft', 'published', 'unpublished', 'expired'] as const satisfies readonly PublishStatus[]
 
 /** 只接受合法 status;非法/缺省一律返回 null(= 不按状态筛选)。 */
 export function parseFairStatusFilter(raw?: string): FairStatus | null {
   const v = raw?.trim()
   return v && (FAIR_STATUS_VALUES as readonly string[]).includes(v) ? (v as FairStatus) : null
+}
+
+export function parseReviewStatusFilter(raw?: string): ReviewStatus | null {
+  const v = raw?.trim()
+  return v && (REVIEW_STATUS_VALUES as readonly string[]).includes(v) ? (v as ReviewStatus) : null
+}
+
+export function parsePublishStatusFilter(raw?: string): PublishStatus | null {
+  const v = raw?.trim()
+  return v && (PUBLISH_STATUS_VALUES as readonly string[]).includes(v) ? (v as PublishStatus) : null
+}
+
+/** Partner 岗位类型：接受 category 或 workType 别名，非法/缺省返回 null。 */
+export function parseJobTypeFilter(raw?: string): string | null {
+  const v = raw?.trim()
+  if (!v) return null
+  return mapJobWorkTypeToCategory(v) ?? null
 }
 
 /**
@@ -282,9 +301,50 @@ export interface PaginatedResult<T> {
   pagination: { page: number; pageSize: number; total: number; totalPages: number }
 }
 
-export interface PartnerListPaging {
+export interface PartnerListQuery {
+  page?: number
+  pageSize?: number
+  reviewStatus?: string
+  publishStatus?: string
+  jobType?: string
+  status?: string
+}
+
+export interface PartnerListPaging extends PartnerListQuery {
   page: number
   pageSize: number
+}
+
+export function hasPartnerPaging(query?: PartnerListQuery): query is PartnerListPaging {
+  return query != null && query.page !== undefined && query.pageSize !== undefined
+}
+
+export function partnerJobListWhere(orgId: string, query?: PartnerListQuery): Prisma.JobWhereInput {
+  const reviewStatus = parseReviewStatusFilter(query?.reviewStatus)
+  const publishStatus = parsePublishStatusFilter(query?.publishStatus)
+  const jobType = parseJobTypeFilter(query?.jobType)
+  return {
+    sourceOrgId: orgId,
+    ...(reviewStatus ? { reviewStatus } : {}),
+    ...(publishStatus ? { publishStatus } : {}),
+    ...(jobType ? { category: jobType } : {}),
+  }
+}
+
+export function partnerFairListWhere(
+  orgId: string,
+  query?: PartnerListQuery,
+  now = new Date(),
+): Prisma.JobFairWhereInput {
+  const reviewStatus = parseReviewStatusFilter(query?.reviewStatus)
+  const publishStatus = parsePublishStatusFilter(query?.publishStatus)
+  const status = parseFairStatusFilter(query?.status)
+  return {
+    sourceOrgId: orgId,
+    ...(reviewStatus ? { reviewStatus } : {}),
+    ...(publishStatus ? { publishStatus } : {}),
+    ...(status ? buildFairStatusWhere(status, now) : {}),
+  }
 }
 
 /**

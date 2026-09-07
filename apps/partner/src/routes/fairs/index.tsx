@@ -125,10 +125,15 @@ export default function FairsPage() {
   const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerFairRecord | null>(null)
   const [page, setPage] = useState(1)
 
-  const fairsRefreshKey = `${PARTNER_FAIRS_REFRESH_KEY}:${page}`
+  const fairStatus = STATUS_FILTER_MAP[statusFilter]
+  const fairsRefreshKey = `${PARTNER_FAIRS_REFRESH_KEY}:${page}:${fairStatus ?? 'all'}`
   const { data, status, refresh } = useRefreshable(
     fairsRefreshKey,
-    () => getPartnerFairs({ page, pageSize: PAGE_SIZE }),
+    () => getPartnerFairs({
+      page,
+      pageSize: PAGE_SIZE,
+      ...(fairStatus ? { status: fairStatus } : {}),
+    }),
     {
       intervalMs: 60_000,
       merge: replaceIfChanged,
@@ -155,17 +160,6 @@ export default function FairsPage() {
   const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && fairs.length === 0)
   const error = status === 'error' && fairs.length === 0
-
-  const filtered = statusFilter === '全部'
-    ? fairs
-    : fairs.filter((f) => f.status === STATUS_FILTER_MAP[statusFilter])
-
-  const counts = {
-    全部:   fairs.length,
-    未开始: fairs.filter((f) => f.status === 'upcoming').length,
-    进行中: fairs.filter((f) => f.status === 'ongoing').length,
-    已结束: fairs.filter((f) => f.status === 'ended').length,
-  }
 
   const handleUnpublish = async (fair: PartnerFairRecord) => {
     setBusyId(fair.id)
@@ -316,13 +310,12 @@ export default function FairsPage() {
         {STATUS_FILTERS.map((f) => (
           <button
             key={f}
-            onClick={() => setStatusFilter(f)}
+            onClick={() => { setStatusFilter(f); setPage(1) }}
             className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
               statusFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
             }`}
           >
             {f}
-            <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
           </button>
         ))}
       </div>
@@ -339,7 +332,7 @@ export default function FairsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-900/[0.06]">
-              {filtered.length === 0 ? (
+              {fairs.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="py-12 text-center text-sm text-neutral-400">
                     <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-neutral-200" />
@@ -347,7 +340,7 @@ export default function FairsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((f) => {
+                fairs.map((f) => {
                   const fs      = FAIR_STATUS_MAP[f.status]
                   const review  = REVIEW_MAP[f.reviewStatus]
                   const publish = PUBLISH_MAP[f.publishStatus]

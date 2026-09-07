@@ -206,6 +206,43 @@ async function main() {
       pass('PTR-22. 岗位/招聘会列表缺省保持数组，带 page/pageSize 走 skip/take + count')
     }
 
+    {
+      const internPending = await prisma.job.create({
+        data: {
+          sourceOrgId: orgA, externalId: `VPE-FLT-I-${suffix}`, sourceName: `机构A_${suffix}`,
+          sourceUrl: 'https://example.org/intern-filter', title: '筛选实习岗', company: '验证公司', city: '验证市',
+          category: 'intern', tagsJson: '[]', reviewStatus: 'pending', publishStatus: 'draft',
+        },
+      })
+      const fulltimeApproved = await prisma.job.create({
+        data: {
+          sourceOrgId: orgA, externalId: `VPE-FLT-F-${suffix}`, sourceName: `机构A_${suffix}`,
+          sourceUrl: 'https://example.org/ft-filter', title: '筛选全职岗', company: '验证公司', city: '验证市',
+          category: 'fulltime', tagsJson: '[]', reviewStatus: 'approved', publishStatus: 'published',
+        },
+      })
+      const internOnly = await svc.getPartnerJobs(partnerA, { page: 1, pageSize: 50, jobType: 'intern' })
+      if (!('data' in internOnly)) fail('RES-5. 带筛选的分页仍应返回 {data,pagination}')
+      if (internOnly.data.some((j) => j.category !== 'intern')) fail('RES-5. jobType=intern 混入了其他类型')
+      if (!internOnly.data.some((j) => j.id === internPending.id)) fail('RES-5. jobType=intern 漏掉目标行')
+      if (internOnly.data.some((j) => j.id === fulltimeApproved.id)) fail('RES-5. jobType=intern 含全职行')
+      const pendingOnly = await svc.getPartnerJobs(partnerA, { page: 1, pageSize: 50, reviewStatus: 'pending' })
+      if (pendingOnly.data.some((j) => j.reviewStatus !== 'pending')) fail('RES-5. reviewStatus=pending 混入其他审核态')
+      const combined = await svc.getPartnerJobs(partnerA, { page: 1, pageSize: 50, jobType: 'fulltime', reviewStatus: 'approved' })
+      if (!combined.data.some((j) => j.id === fulltimeApproved.id)) fail('RES-5. 组合筛选未命中全职已通过')
+      if (combined.data.some((j) => j.id === internPending.id)) fail('RES-5. 组合筛选含实习待审')
+      const unpagedFiltered = await svc.getPartnerJobs(partnerA, { reviewStatus: 'pending' })
+      if (!Array.isArray(unpagedFiltered)) fail('RES-5. 无 page 仅筛选应保持数组形状')
+      if (unpagedFiltered.some((j) => j.reviewStatus !== 'pending')) fail('RES-5. 无 page 筛选未进 where')
+      const ignored = await svc.getPartnerJobs(partnerA, { page: 1, pageSize: 50, reviewStatus: 'not-a-status', jobType: 'nope' })
+      const unfiltered = await svc.getPartnerJobs(partnerA, { page: 1, pageSize: 50 })
+      if (ignored.pagination.total !== unfiltered.pagination.total) fail('RES-5. 非法筛选值应收口为缺省（不筛选）')
+      const upcoming = await svc.getPartnerFairs(partnerA, { page: 1, pageSize: 50, status: 'upcoming' })
+      if (upcoming.data.some((f) => f.status !== 'upcoming')) fail('RES-5. status=upcoming 混入其他会议状态')
+      if (!upcoming.data.some((f) => f.id === fairA.id)) fail('RES-5. 未来招聘会未进 upcoming')
+      pass('RES-5. Partner 岗位/招聘会列表筛选下推 where，非法值缺省不变')
+    }
+
     // ── 3. 越权 ────────────────────────────────────────────────────────────
     await expectCode(() => svc.updatePartnerJob(jobB.id, { title: 'x' }, partnerA), 'JOB_NOT_FOUND', '3a. 编辑他机构岗位 → JOB_NOT_FOUND')
     await expectCode(() => svc.updatePartnerFair('no_such_fair', { title: 'x' }, partnerA), 'FAIR_NOT_FOUND', '3b. 编辑不存在招聘会 → FAIR_NOT_FOUND')

@@ -362,6 +362,9 @@ export class FilesController {
     @Query('includeDeleted') includeDeleted?: string,
     @Query('purpose') purpose?: string,
     @Query('limit') limit?: string,
+    @Query('sensitiveLevel') sensitiveLevel?: string,
+    @Query('retentionPolicy') retentionPolicy?: string,
+    @Query('expiry') expiry?: string,
   ): Promise<ApiResponse<FileListResult>> {
     const skipN = skip !== undefined ? Number(skip) : 0
     const limitN = limit !== undefined ? Number(limit) : undefined
@@ -373,6 +376,9 @@ export class FilesController {
         includeDeleted: includeDeleted === 'true' || includeDeleted === '1',
         purpose,
         limit: limitN !== undefined && Number.isFinite(limitN) ? limitN : undefined,
+        sensitiveLevel: sensitiveLevel?.trim() || undefined,
+        retentionPolicy: retentionPolicy?.trim() || undefined,
+        expiry: expiry?.trim() || undefined,
       }),
     )
   }

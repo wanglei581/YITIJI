@@ -43,6 +43,12 @@ const PUBLISH_MAP: Record<string, { badge: 'success' | 'warning' | 'default'; la
 }
 const PARTNER_POLICIES_REFRESH_KEY = 'partner:policies'
 const PAGE_SIZE = 20
+const REVIEW_FILTERS = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
+const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
+  全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected',
+}
+const FILTER_SELECTED_CLASS = 'border-primary-600 bg-primary-600 text-white'
+const FILTER_IDLE_CLASS = 'border-neutral-200 bg-surface text-neutral-700 hover:border-primary-600/40'
 
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
@@ -106,11 +112,17 @@ export default function PolicyPage() {
   /** P21 申领条件录入面(只对政策扶持条目开放;公告没有申领条件) */
   const [rulesFor, setRulesFor] = useState<PartnerPolicyRecord | null>(null)
   const [page, setPage] = useState(1)
+  const [reviewFilter, setReviewFilter] = useState('全部')
 
-  const policiesRefreshKey = `${PARTNER_POLICIES_REFRESH_KEY}:${page}`
+  const reviewStatus = REVIEW_FILTER_MAP[reviewFilter]
+  const policiesRefreshKey = `${PARTNER_POLICIES_REFRESH_KEY}:${page}:${reviewStatus ?? 'all'}`
   const { data, status, refresh } = useRefreshable(
     policiesRefreshKey,
-    () => partnerPoliciesService.getPolicies({ page, pageSize: PAGE_SIZE }),
+    () => partnerPoliciesService.getPolicies({
+      page,
+      pageSize: PAGE_SIZE,
+      ...(reviewStatus ? { reviewStatus } : {}),
+    }),
     {
       intervalMs: 60_000,
       merge: replaceIfChanged,
@@ -276,13 +288,32 @@ export default function PolicyPage() {
         </div>
       )}
 
+      <div className="mb-4 flex items-center gap-2">
+        <span className="w-14 text-xs text-neutral-400">审核状态</span>
+        <div className="flex gap-2">
+          {REVIEW_FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => { setReviewFilter(f); setPage(1) }}
+              className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                reviewFilter === f ? FILTER_SELECTED_CLASS : FILTER_IDLE_CLASS
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {rows.length === 0 ? (
         <EmptyState
           icon={FileTextIcon}
-          title="暂无政策内容"
-          description={canCreate
-            ? '点击右上角"新增政策内容",发布就业政策说明与公告(经管理员审核后在一体机展示)'
-            : CANNOT_CREATE_HINT}
+          title={reviewFilter === '全部' ? '暂无政策内容' : '当前筛选条件下无政策'}
+          description={reviewFilter === '全部'
+            ? (canCreate
+              ? '点击右上角"新增政策内容",发布就业政策说明与公告(经管理员审核后在一体机展示)'
+              : CANNOT_CREATE_HINT)
+            : '请调整审核状态后重试'}
           className="py-16"
         />
       ) : (

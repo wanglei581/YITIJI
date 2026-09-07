@@ -27,6 +27,7 @@ import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-ed
 import type { FieldMapping } from './dto/excel-import.dto'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
+import type { PartnerListQuery } from './jobs-shared'
 
 // ─── Re-export all types that controllers / other services import from here ───
 export type {
@@ -153,8 +154,8 @@ export class JobsService {
     return this.partner.togglePartnerDataSource(id, user)
   }
 
-  getPartnerJobs(user: AuthedUser, query?: { page: number; pageSize: number }) {
-    return query ? this.partner.getPartnerJobs(user, query) : this.partner.getPartnerJobs(user)
+  getPartnerJobs(user: AuthedUser, query?: PartnerListQuery) {
+    return this.partner.getPartnerJobs(user, query)
   }
 
   importJobs(items: ImportJobItemDto[], user: AuthedUser) {
@@ -173,8 +174,8 @@ export class JobsService {
     return this.partner.updatePartnerJob(id, dto, user)
   }
 
-  getPartnerFairs(user: AuthedUser, query?: { page: number; pageSize: number }) {
-    return query ? this.partner.getPartnerFairs(user, query) : this.partner.getPartnerFairs(user)
+  getPartnerFairs(user: AuthedUser, query?: PartnerListQuery) {
+    return this.partner.getPartnerFairs(user, query)
   }
 
   importFairs(dto: ImportFairsDto, user: AuthedUser) {

@@ -223,16 +223,26 @@ const refreshContract = extractBetween(
   'refresh and interaction-lock contract',
 )
 check(
-  /const\s*\{\s*data\s*,\s*status\s*,\s*refresh\s*\}\s*=\s*useRefreshable\(\s*jobsRefreshKey\s*,\s*\(\)\s*=>\s*getPartnerJobs\(\{\s*page\s*,\s*pageSize:\s*PAGE_SIZE\s*\}\)\s*,\s*\{\s*intervalMs:\s*60_000\s*,\s*merge:\s*replaceIfChanged\s*,\s*failPolicy:\s*['"]keep-last['"]\s*,?\s*\}\s*,?\s*\)/.test(
+  /getPartnerJobs\(\{\s*page\s*,\s*pageSize:\s*PAGE_SIZE\s*,\s*\.\.\.\(jobType \? \{ jobType \} : \{\}\)\s*,\s*\.\.\.\(reviewStatus \? \{ reviewStatus \} : \{\}\)\s*,?\s*\}\)/.test(
     refreshContract,
   ),
+  'jobs useRefreshable pushes jobType/reviewStatus with page/pageSize',
+)
+check(
+  /const\s*\{\s*data\s*,\s*status\s*,\s*refresh\s*\}\s*=\s*useRefreshable\(\s*jobsRefreshKey/.test(
+    refreshContract,
+  )
+    && refreshContract.includes("intervalMs: 60_000")
+    && refreshContract.includes('replaceIfChanged')
+    && refreshContract.includes("failPolicy: 'keep-last'"),
   'jobs useRefreshable binds the paged jobs key/service, 60s interval, replaceIfChanged, and keep-last',
 )
 check(
-  jobsPage.includes('const jobsRefreshKey = `${PARTNER_JOBS_REFRESH_KEY}:${page}`')
+  jobsPage.includes('const jobsRefreshKey = `${PARTNER_JOBS_REFRESH_KEY}:${page}:${jobType ?? \'all\'}:${reviewStatus ?? \'all\'}`')
     && jobsPage.includes('<ListPagination')
-    && jobsPage.includes('pageSize: PAGE_SIZE'),
-  'jobs pagination uses current-page refresh key, PAGE_SIZE, and ListPagination',
+    && jobsPage.includes('pageSize: PAGE_SIZE')
+    && jobsPage.includes('setPage(1)'),
+  'jobs pagination uses filter-aware refresh key, PAGE_SIZE, ListPagination, and filter changes reset to page 1',
 )
 check(
   /const\s*\{\s*data:\s*qualitySummary\s*=\s*\[\]\s*\}\s*=\s*useRefreshable\(\s*PARTNER_JOB_QUALITY_REFRESH_KEY\s*,\s*getPartnerJobQualitySummary\s*,\s*\{\s*intervalMs:\s*60_000\s*,\s*merge:\s*replaceIfChanged\s*,\s*failPolicy:\s*['"]keep-last['"]\s*,?\s*\}\s*,?\s*\)/.test(
@@ -280,24 +290,14 @@ const expectedFilteringBlock = `const jobs = data?.data ?? []
 const total = data?.pagination.total ?? 0
 const totalPages = data?.pagination.totalPages ?? 1
 const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
-const error = status === 'error' && jobs.length === 0
-
-const filtered = jobs.filter((j) => {
-  const matchCat = categoryFilter === '全部' || j.category === CATEGORY_FILTER_MAP[categoryFilter]
-  const matchReview = reviewFilter === '全部' || j.reviewStatus === REVIEW_FILTER_MAP[reviewFilter]
-  return matchCat && matchReview
-})
-
-const reviewCounts = {
-  全部: jobs.length,
-  待审核: jobs.filter((j) => j.reviewStatus === 'pending').length,
-  审核中: jobs.filter((j) => j.reviewStatus === 'reviewing').length,
-  已通过: jobs.filter((j) => j.reviewStatus === 'approved').length,
-  已拒绝: jobs.filter((j) => j.reviewStatus === 'rejected').length,
-}`
+const error = status === 'error' && jobs.length === 0`
 check(
   compact(filteringBlock) === compact(expectedFilteringBlock),
-  'loading/error/filtered conditions and reviewCounts retain their exact real-data computation',
+  'loading/error conditions use server page data without local filter or current-page reviewCounts',
+)
+check(
+  !jobsPage.includes('reviewCounts') && !jobsPage.includes('const filtered = jobs.filter'),
+  'jobs page no longer locally filters the current page or shows per-status counts from it',
 )
 
 const loadingBranch = compact(
@@ -333,10 +333,10 @@ const tableBody = stripComments(
 const filteredEmptyBranch = compact(
   extractBetween(
     tableBody,
-    '{filtered.length === 0 ? (',
+    '{jobs.length === 0 ? (',
     ') : (',
     'filtered-empty table branch',
-  ).replace('{filtered.length === 0 ? (', ''),
+  ).replace('{jobs.length === 0 ? (', ''),
 )
 check(
   /^<tr> <td colSpan=\{10\}[^>]*> .*当前筛选条件下无岗位.*<\/td> <\/tr>$/.test(

@@ -31,6 +31,7 @@ const requiredTokens = [
   "failPolicy: 'keep-last'",
   'pageSize: PAGE_SIZE',
   'ListPagination',
+  'setPage(1)',
 ]
 
 const forbiddenTokens = [
@@ -40,6 +41,18 @@ const forbiddenTokens = [
   'setFairs(',
   'setRows(',
 ]
+
+const routeFilterRequired = {
+  jobs: ['jobType', '...(reviewStatus ? { reviewStatus } : {})'],
+  fairs: ['status: fairStatus'],
+  policy: ['...(reviewStatus ? { reviewStatus } : {})'],
+}
+
+const routeFilterForbidden = {
+  jobs: ['jobs.filter((j)'],
+  fairs: ['fairs.filter((f)'],
+  policy: ['rows.filter((r)'],
+}
 
 let failed = false
 
@@ -54,6 +67,18 @@ for (const route of routes) {
   for (const token of forbiddenTokens) {
     if (text.includes(token)) {
       console.error(`${route.name} refresh integration must not use legacy state token: ${token}`)
+      failed = true
+    }
+  }
+  for (const token of routeFilterRequired[route.name]) {
+    if (!text.includes(token)) {
+      console.error(`${route.name} list filter push-down missing token: ${token}`)
+      failed = true
+    }
+  }
+  for (const token of routeFilterForbidden[route.name]) {
+    if (text.includes(token)) {
+      console.error(`${route.name} still locally filters the current page: ${token}`)
       failed = true
     }
   }

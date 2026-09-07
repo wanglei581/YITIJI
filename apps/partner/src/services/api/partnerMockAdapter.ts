@@ -41,6 +41,22 @@ function paginateRows<T>(rows: T[], query?: PartnerListQuery): { data: T[]; pagi
   }
 }
 
+function filterPartnerJobs(rows: PartnerJobRecord[], query?: PartnerListQuery): PartnerJobRecord[] {
+  let next = rows
+  if (query?.reviewStatus) next = next.filter((row) => row.reviewStatus === query.reviewStatus)
+  if (query?.publishStatus) next = next.filter((row) => row.publishStatus === query.publishStatus)
+  if (query?.jobType) next = next.filter((row) => row.category === query.jobType)
+  return next
+}
+
+function filterPartnerFairs(rows: PartnerFairRecord[], query?: PartnerListQuery): PartnerFairRecord[] {
+  let next = rows
+  if (query?.reviewStatus) next = next.filter((row) => row.reviewStatus === query.reviewStatus)
+  if (query?.publishStatus) next = next.filter((row) => row.publishStatus === query.publishStatus)
+  if (query?.status) next = next.filter((row) => row.status === query.status)
+  return next
+}
+
 function delay(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 120))
 }
@@ -310,7 +326,7 @@ export const partnerMockAdapter = {
   // Jobs
   async getPartnerJobs(query?: PartnerListQuery): Promise<PartnerJobPage> {
     await delay()
-    return paginateRows(PARTNER_JOBS, query)
+    return paginateRows(filterPartnerJobs(PARTNER_JOBS, query), query)
   },
   async getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]> {
     await delay()
@@ -377,7 +393,7 @@ export const partnerMockAdapter = {
   // Fairs
   async getPartnerFairs(query?: PartnerListQuery): Promise<PartnerFairPage> {
     await delay()
-    return paginateRows(PARTNER_FAIRS, query)
+    return paginateRows(filterPartnerFairs(PARTNER_FAIRS, query), query)
   },
   async unpublishPartnerFair(id: string): Promise<PartnerFairRecord> {
     await delay()

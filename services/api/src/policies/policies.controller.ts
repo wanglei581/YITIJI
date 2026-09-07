@@ -58,6 +58,19 @@ function optionalPaging(page?: string, pageSize?: string): { page: number; pageS
   }
 }
 
+function optionalPartnerPolicyQuery(raw: {
+  page?: string
+  pageSize?: string
+  reviewStatus?: string
+  publishStatus?: string
+}): { page?: number; pageSize?: number; reviewStatus?: string; publishStatus?: string } | undefined {
+  const paging = optionalPaging(raw.page, raw.pageSize)
+  const reviewStatus = raw.reviewStatus?.trim() || undefined
+  const publishStatus = raw.publishStatus?.trim() || undefined
+  if (!paging && !reviewStatus && !publishStatus) return undefined
+  return { ...paging, reviewStatus, publishStatus }
+}
+
 @Controller()
 export class PoliciesController {
   constructor(
@@ -119,9 +132,11 @@ export class PoliciesController {
     @CurrentUser() user: AuthedUser,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('publishStatus') publishStatus?: string,
   ) {
-    const paging = optionalPaging(page, pageSize)
-    return paging ? this.policies.getPartnerPolicies(user, paging) : this.policies.getPartnerPolicies(user)
+    const query = optionalPartnerPolicyQuery({ page, pageSize, reviewStatus, publishStatus })
+    return query ? this.policies.getPartnerPolicies(user, query) : this.policies.getPartnerPolicies(user)
   }
 
   @Post('partner/policies')

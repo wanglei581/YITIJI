@@ -143,10 +143,17 @@ export default function JobsPage() {
     setNoticeIsError(isError)
   }
 
-  const jobsRefreshKey = `${PARTNER_JOBS_REFRESH_KEY}:${page}`
+  const jobType = CATEGORY_FILTER_MAP[categoryFilter]
+  const reviewStatus = REVIEW_FILTER_MAP[reviewFilter]
+  const jobsRefreshKey = `${PARTNER_JOBS_REFRESH_KEY}:${page}:${jobType ?? 'all'}:${reviewStatus ?? 'all'}`
   const { data, status, refresh } = useRefreshable(
     jobsRefreshKey,
-    () => getPartnerJobs({ page, pageSize: PAGE_SIZE }),
+    () => getPartnerJobs({
+      page,
+      pageSize: PAGE_SIZE,
+      ...(jobType ? { jobType } : {}),
+      ...(reviewStatus ? { reviewStatus } : {}),
+    }),
     {
       intervalMs: 60_000,
       merge: replaceIfChanged,
@@ -176,20 +183,6 @@ export default function JobsPage() {
   const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
   const error = status === 'error' && jobs.length === 0
-
-  const filtered = jobs.filter((j) => {
-    const matchCat    = categoryFilter === '全部' || j.category     === CATEGORY_FILTER_MAP[categoryFilter]
-    const matchReview = reviewFilter   === '全部' || j.reviewStatus === REVIEW_FILTER_MAP[reviewFilter]
-    return matchCat && matchReview
-  })
-
-  const reviewCounts = {
-    全部:   jobs.length,
-    待审核: jobs.filter((j) => j.reviewStatus === 'pending').length,
-    审核中: jobs.filter((j) => j.reviewStatus === 'reviewing').length,
-    已通过: jobs.filter((j) => j.reviewStatus === 'approved').length,
-    已拒绝: jobs.filter((j) => j.reviewStatus === 'rejected').length,
-  }
 
   const handleUnpublish = async (job: PartnerJobRecord) => {
     setBusyId(job.id)
@@ -344,7 +337,7 @@ export default function JobsPage() {
             {CATEGORY_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setCategoryFilter(f)}
+                onClick={() => { setCategoryFilter(f); setPage(1) }}
                 className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
                   categoryFilter === f ? FILTER_SELECTED_CLASS : FILTER_IDLE_CLASS
                 }`}
@@ -360,13 +353,12 @@ export default function JobsPage() {
             {REVIEW_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setReviewFilter(f)}
+                onClick={() => { setReviewFilter(f); setPage(1) }}
                 className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
                   reviewFilter === f ? FILTER_SELECTED_CLASS : FILTER_IDLE_CLASS
                 }`}
               >
                 {f}
-                <span className="ml-1 text-xs opacity-70">{reviewCounts[f]}</span>
               </button>
             ))}
           </div>
@@ -385,7 +377,7 @@ export default function JobsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-900/[0.06]">
-              {filtered.length === 0 ? (
+              {jobs.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-sm text-neutral-400">
                     <BriefcaseIcon className="mx-auto mb-2 h-8 w-8 text-neutral-200" />
@@ -393,7 +385,7 @@ export default function JobsPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((j) => {
+                jobs.map((j) => {
                   const cat     = j.category ? CATEGORY_MAP[j.category] : undefined
                   const review  = REVIEW_MAP[j.reviewStatus]
                   const publish = PUBLISH_MAP[j.publishStatus]

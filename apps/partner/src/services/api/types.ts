@@ -294,6 +294,10 @@ export interface PartnerSyncLog {
 export interface PartnerListQuery {
   page?: number
   pageSize?: number
+  reviewStatus?: ReviewStatus
+  publishStatus?: PublishStatus
+  jobType?: JobCategory
+  status?: JobFairStatus
 }
 
 export interface PartnerListPage<T> {

@@ -176,7 +176,7 @@ export interface PartnerPolicyPage {
 }
 
 export interface PartnerPoliciesServiceInterface {
-  getPolicies(query?: { page?: number; pageSize?: number }): Promise<PartnerPolicyPage>
+  getPolicies(query?: { page?: number; pageSize?: number; reviewStatus?: string; publishStatus?: string }): Promise<PartnerPolicyPage>
   createPolicy(input: SavePolicyInput): Promise<PartnerPolicyRecord>
   updatePolicy(id: string, input: Partial<SavePolicyInput>): Promise<PartnerPolicyRecord>
   unpublishPolicy(id: string): Promise<PartnerPolicyRecord>
@@ -226,6 +226,8 @@ const httpAdapter: PartnerPoliciesServiceInterface = {
     const params = new URLSearchParams()
     if (query?.page) params.set('page', String(query.page))
     if (query?.pageSize) params.set('pageSize', String(query.pageSize))
+    if (query?.reviewStatus) params.set('reviewStatus', query.reviewStatus)
+    if (query?.publishStatus) params.set('publishStatus', query.publishStatus)
     const qs = params.toString()
     return req<PartnerPolicyPage>('GET', qs ? `/partner/policies?${qs}` : '/partner/policies')
   },
@@ -267,10 +269,13 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
   async getPolicies(query) {
     const page = query?.page && query.page > 0 ? query.page : 1
     const pageSize = query?.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, 100) : 20
-    const total = mockRows.length
+    let rows = mockRows
+    if (query?.reviewStatus) rows = rows.filter((row) => row.reviewStatus === query.reviewStatus)
+    if (query?.publishStatus) rows = rows.filter((row) => row.publishStatus === query.publishStatus)
+    const total = rows.length
     const start = (page - 1) * pageSize
     return {
-      data: mockRows.slice(start, start + pageSize),
+      data: rows.slice(start, start + pageSize),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     }
   },

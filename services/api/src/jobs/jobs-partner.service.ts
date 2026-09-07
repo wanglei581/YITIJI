@@ -43,7 +43,11 @@ import {
   type SyncLogDto,
   type PaginatedResult,
   type PartnerListPaging,
+  type PartnerListQuery,
   endpointQueryContainsCredential,
+  hasPartnerPaging,
+  partnerFairListWhere,
+  partnerJobListWhere,
   prismaJobSourceToPartnerDto,
   prismaJobToPartnerDto,
   prismaFairToPartnerDto,
@@ -495,18 +499,16 @@ export class JobsPartnerService {
     return withLifecycle(prismaJobSourceToPartnerDto(updated, summaries.get(id)), updated)
   }
 
-  async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]>
-  async getPartnerJobs(user: AuthedUser, query: PartnerListPaging): Promise<PaginatedResult<PartnerJobDto>>
   async getPartnerJobs(
     user: AuthedUser,
-    query?: PartnerListPaging,
+    query?: PartnerListQuery,
   ): Promise<PartnerJobDto[] | PaginatedResult<PartnerJobDto>> {
     if (!user.orgId) {
-      if (!query) return []
+      if (!hasPartnerPaging(query)) return []
       return emptyPartnerPage(query)
     }
-    const where = { sourceOrgId: user.orgId }
-    if (!query) {
+    const where = partnerJobListWhere(user.orgId, query)
+    if (!hasPartnerPaging(query)) {
       const rows = await this.prisma.job.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -768,18 +770,16 @@ export class JobsPartnerService {
     return prismaJobToPartnerDto(updated)
   }
 
-  async getPartnerFairs(user: AuthedUser): Promise<PartnerFairDto[]>
-  async getPartnerFairs(user: AuthedUser, query: PartnerListPaging): Promise<PaginatedResult<PartnerFairDto>>
   async getPartnerFairs(
     user: AuthedUser,
-    query?: PartnerListPaging,
+    query?: PartnerListQuery,
   ): Promise<PartnerFairDto[] | PaginatedResult<PartnerFairDto>> {
     if (!user.orgId) {
-      if (!query) return []
+      if (!hasPartnerPaging(query)) return []
       return emptyPartnerPage(query)
     }
-    const where = { sourceOrgId: user.orgId }
-    if (!query) {
+    const where = partnerFairListWhere(user.orgId, query)
+    if (!hasPartnerPaging(query)) {
       const rows = await this.prisma.jobFair.findMany({
         where,
         orderBy: { createdAt: 'desc' },

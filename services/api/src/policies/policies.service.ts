@@ -14,7 +14,11 @@ import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
 import { partnerOrgTypeCan } from '../jobs/partner-capabilities'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
-import { normalizeOptionalHttpUrl } from '../jobs/jobs-shared'
+import {
+  normalizeOptionalHttpUrl,
+  parsePublishStatusFilter,
+  parseReviewStatusFilter,
+} from '../jobs/jobs-shared'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -169,27 +173,31 @@ export class PoliciesService {
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
 
-  async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]>
   async getPartnerPolicies(
     user: AuthedUser,
-    query: { page: number; pageSize: number },
-  ): Promise<{ data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>
-  async getPartnerPolicies(
-    user: AuthedUser,
-    query?: { page: number; pageSize: number },
+    query?: { page?: number; pageSize?: number; reviewStatus?: string; publishStatus?: string },
   ): Promise<
     | PolicyPostDto[]
     | { data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }
   > {
+    const page = query?.page
+    const pageSize = query?.pageSize
+    const hasPaging = page !== undefined && pageSize !== undefined
     if (!user.orgId) {
-      if (!query) return []
+      if (!hasPaging) return []
       return {
         data: [],
-        pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
+        pagination: { page, pageSize, total: 0, totalPages: 1 },
       }
     }
-    const where = { sourceOrgId: user.orgId }
-    if (!query) {
+    const reviewStatus = parseReviewStatusFilter(query?.reviewStatus)
+    const publishStatus = parsePublishStatusFilter(query?.publishStatus)
+    const where = {
+      sourceOrgId: user.orgId,
+      ...(reviewStatus ? { reviewStatus } : {}),
+      ...(publishStatus ? { publishStatus } : {}),
+    }
+    if (!hasPaging) {
       const rows = await this.prisma.policyPost.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -201,17 +209,17 @@ export class PoliciesService {
       this.prisma.policyPost.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       }),
     ])
     return {
       data: rows.map(mapPolicy),
       pagination: {
-        page: query.page,
-        pageSize: query.pageSize,
+        page,
+        pageSize,
         total,
-        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
       },
     }
   }

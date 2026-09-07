@@ -86,6 +86,9 @@ export interface ListFilesOptions {
   includeDeleted?: boolean
   purpose?: string
   limit?: number
+  sensitiveLevel?: AdminFileSensitive
+  retentionPolicy?: FileRetentionPolicy
+  expiry?: 'active' | 'expired'
 }
 
 export interface AdminFilesServiceInterface {
@@ -150,6 +153,9 @@ export const adminFilesHttpAdapter: AdminFilesServiceInterface = {
     else if (opts?.deleted === 'all' || opts?.includeDeleted) q.set('deleted', 'all')
     if (opts?.purpose) q.set('purpose', opts.purpose)
     if (opts?.limit) q.set('limit', String(opts.limit))
+    if (opts?.sensitiveLevel) q.set('sensitiveLevel', opts.sensitiveLevel)
+    if (opts?.retentionPolicy) q.set('retentionPolicy', opts.retentionPolicy)
+    if (opts?.expiry) q.set('expiry', opts.expiry)
     const qs = q.toString()
     return data(request<{ data: AdminFileListResult }>('GET', `/files${qs ? `?${qs}` : ''}`))
   },
@@ -198,6 +204,15 @@ export const adminFilesMockAdapter: AdminFilesServiceInterface = {
     if (deleted === true) rows = rows.filter((f) => f.deletedAt !== null)
     else if (deleted === false) rows = rows.filter((f) => f.deletedAt === null)
     if (opts?.purpose) rows = rows.filter((f) => f.purpose === opts.purpose)
+    if (opts?.sensitiveLevel) rows = rows.filter((f) => f.sensitiveLevel === opts.sensitiveLevel)
+    if (opts?.retentionPolicy) rows = rows.filter((f) => f.retentionPolicy === opts.retentionPolicy)
+    if (opts?.expiry === 'expired') {
+      const now = Date.now()
+      rows = rows.filter((f) => f.expiresAt !== null && Date.parse(f.expiresAt) <= now)
+    } else if (opts?.expiry === 'active') {
+      const now = Date.now()
+      rows = rows.filter((f) => f.expiresAt === null || Date.parse(f.expiresAt) > now)
+    }
     const search = opts?.search?.trim()
     if (search) {
       rows = rows.filter((f) =>
