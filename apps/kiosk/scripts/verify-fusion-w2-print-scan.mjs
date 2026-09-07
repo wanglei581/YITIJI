@@ -191,7 +191,6 @@ for (const path of presentationFiles) {
 
 const printScanPages = new Map([
   ['src/pages/print-scan/ConvertImagesPage.tsx', 'print-scan-convert'],
-  ['src/pages/print-scan/SignStampPage.tsx', 'print-scan-sign'],
 ])
 for (const [path, marker] of printScanPages) {
   const body = read(path)
@@ -372,6 +371,38 @@ assert.doesNotMatch(
   signStamp,
   /<img[\s\S]{0,200}stamp\.(fileAccessUrl|fileUrl)/,
   'sign-stamp does not echo the signature/stamp image on the public screen',
+)
+assert.match(signStamp, /QxPageFrame/, 'SignStampPage uses the qingxu page frame')
+assert.doesNotMatch(signStamp, /KioskPageFrame/, 'SignStampPage has left the V6 frame')
+assert.match(
+  signStamp,
+  /data-w2-page=["']print-scan-sign["']/,
+  'SignStampPage exposes print-scan-sign',
+)
+assert.match(
+  signStamp,
+  /sign-stamp-qx\.css/,
+  'SignStampPage imports its qingxu stylesheet',
+)
+assert.match(
+  read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'),
+  /\/print\/material-check/,
+  'sign-stamp primary exit is material-check, not a fabricated print success',
+)
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /QX_MIGRATED_ROUTES[\s\S]*['"]\/print-scan\/sign['"]/,
+  'sign-stamp is registered in QX_MIGRATED_ROUTES',
+)
+assert.match(
+  read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'),
+  /rate-limited/,
+  'sign-stamp maps 429 to a visible rate-limited state instead of silently retrying',
+)
+assert.match(
+  read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'),
+  /mapComposeError/,
+  'sign-stamp classifies compose failures without fabricating a completed result',
 )
 
 const printUpload = read('src/pages/print/PrintUploadPage.tsx')

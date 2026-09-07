@@ -95,8 +95,8 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  *   1. 精确集合 —— 无参数路由；
  *   2. 前缀列表 —— 只放「整棵子树都已迁完」的带参段。
  *
- * 前缀绝不能写成 `/print-scan`：同前缀下的 `/print-scan/convert`、
- * `/print-scan/sign` 仍是别的 lane，误命中会让它们掉进空壳。
+ * 前缀绝不能写成 `/print-scan`：同前缀下尚未迁移的 `/print-scan/convert`
+ * 仍是别的 lane，误命中会让它掉进空壳。`/print-scan/sign` 已迁入精确集合。
  * hideHeader / hideBottomNav 只接受本文件内对 pathname 的封闭判定
  * （`isQxMigratedPath(pathname)` 是壳层契约允许的具名谓词形态）。
  */
@@ -108,6 +108,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/resume/optimize/compare',
   '/resume/generate/preview',
   '/print-scan',
+  '/print-scan/sign',
 ])
 const QX_MIGRATED_PREFIXES = ['/print-scan/feature/'] as const
 
