@@ -37,7 +37,7 @@ export function ProfileHeader({
         <span className="pf-idname">{isLoggedIn ? displayName : '还没有登录'}</span>
         <span className="pf-idsub">
           {isLoggedIn
-            ? `手机号 ${phoneMasked || '已遮挡'} · 公共终端默认不显示完整个人信息`
+            ? `${phoneMasked || '手机号已绑定'} · 公共终端默认不显示完整个人信息`
             : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
         </span>
       </span>
