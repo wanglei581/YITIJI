@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 
 const FIXTURE_PATH = '/w2-fixtures/sample-visible.pdf'
+const REDACTED_FIXTURE_PATH = '/w2-fixtures/sample-redacted.pdf'
 
 function buildVisiblePdf(): string {
   const stream = '0 0 0 rg\n30 30 140 140 re f\n'
@@ -38,11 +39,11 @@ export class FusionW2BinaryRoute {
   async install(): Promise<void> {
     this.#page.on('response', (response) => {
       const url = new URL(response.url())
-      if (url.pathname === FIXTURE_PATH && response.status() === 200) this.#completed = true
+      if ((url.pathname === FIXTURE_PATH || url.pathname === REDACTED_FIXTURE_PATH) && response.status() === 200) this.#completed = true
     })
     await this.#page.route('**/w2-fixtures/**', async (route) => {
       const path = new URL(route.request().url()).pathname
-      if (path !== FIXTURE_PATH) {
+      if (path !== FIXTURE_PATH && path !== REDACTED_FIXTURE_PATH) {
         this.#unhandled.add(path)
         await route.abort('blockedbyclient')
         return

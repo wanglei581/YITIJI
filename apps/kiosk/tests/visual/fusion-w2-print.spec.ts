@@ -1,5 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
+import type { DocumentProcessTaskView } from '../../src/services/api/materials'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
@@ -58,6 +59,10 @@ function registerShell(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
     status: 200,
     json: { terminalCode: 'KSK-001', capabilities: UNVERIFIED_CAPABILITIES },
+  })
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection-001/print-param-suggestions', {
+    status: 200,
+    json: { success: true, data: printParamSuggestions() },
   })
 }
 
@@ -398,27 +403,31 @@ test('pickup hid invalid code shows the server error without fabricating success
   expect(errors).toEqual([])
 })
 
-/** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
-function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
+function quoteResponseJson(opts?: { amountCents?: number; billablePages?: number; unitCents?: number }) {
   const billablePages = opts?.billablePages ?? 2
   const unitCents = opts?.unitCents ?? 100
   const amountCents = opts?.amountCents ?? billablePages * unitCents
+  return {
+    amountCents,
+    billablePages,
+    billingPageSource: 'detected' as const,
+    priceLines: [
+      {
+        serviceKey: 'print_bw_page',
+        description: '黑白打印',
+        unitCents,
+        quantity: billablePages,
+        amountCents,
+      },
+    ],
+  }
+}
+
+/** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
+function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
   api.respond('POST', '/api/v1/orders/quote', {
     status: 200,
-    json: {
-      amountCents,
-      billablePages,
-      billingPageSource: 'detected',
-      priceLines: [
-        {
-          serviceKey: 'print_bw_page',
-          description: '黑白打印',
-          unitCents,
-          quantity: billablePages,
-          amountCents,
-        },
-      ],
-    },
+    json: quoteResponseJson(opts),
   })
 }
 
@@ -445,11 +454,25 @@ async function routeExactJson(
   })
 }
 
-function materialTask(kind: 'inspection' | 'normalize_a4' | 'pii_scan') {
+function materialTask(kind: 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact'): DocumentProcessTaskView {
   const checks = kind === 'inspection'
     ? { pageCount: 2, canPrint: true, messages: [] }
     : kind === 'normalize_a4'
       ? { targetPaperSize: 'A4', canNormalize: true, messages: [] }
+      : kind === 'pii_redact'
+        ? {
+            canRedact: true,
+            claim: 'nothing_to_redact',
+            redactedFileId: null,
+            resultFileCreated: false,
+            decisionTaskId: 'w2-pii_scan',
+            findingCount: 0,
+            redactedCount: 0,
+            keptCount: 0,
+            pendingCount: 0,
+            items: [],
+            reverify: { ran: false, method: null, remainingCount: null },
+          }
       : undefined
   return {
     id: `w2-${kind}`,
@@ -461,13 +484,43 @@ function materialTask(kind: 'inspection' | 'normalize_a4' | 'pii_scan') {
     resultFileId: null,
     endUserId: null,
     params: {},
-    result: checks ? { mode: 'real', checks } : { mode: 'real' },
+    result: kind === 'pii_redact' ? { mode: 'real', ...checks } : checks ? { mode: 'real', checks } : { mode: 'real' },
     errorCode: null,
     errorMessage: null,
     expiresAt: LATER,
     createdAt: NOW,
     updatedAt: NOW,
     ...(kind === 'pii_scan' ? { piiFindings: [] } : {}),
+  }
+}
+
+function printParamSuggestions(overrides: Partial<Record<'copies' | 'colorMode' | 'duplex' | 'pagesPerSheet', string | number>> = {}) {
+  const values = { copies: 2, colorMode: 'black_white', duplex: 'simplex', pagesPerSheet: 1, ...overrides }
+  return {
+    taskId: 'w2-inspection-001',
+    featureKey: 'print_param_prefill',
+    derivation: 'deterministic_rules',
+    advisory: true,
+    available: true,
+    unavailableReason: null,
+    capabilityProfile: {
+      paperSize: 'A4', verifiedColorModes: ['black_white'], verifiedDuplexModes: ['simplex'],
+      verifiedPagesPerSheet: [1], copiesRange: { min: 1, max: 99 }, note: 'fixture',
+    },
+    items: Object.entries(values).map(([field, suggestedValue]) => ({
+      field,
+      label: field === 'copies' ? '打印份数' : field === 'colorMode' ? '色彩模式' : field === 'duplex' ? '单双面' : '每张页数',
+      status: 'suggested',
+      suggestedValue,
+      basis: { code: `W2_${field}`, evidenceLevel: 'E1', text: '基于文件体检事实', facts: {} },
+      reason: null,
+      blockedPreference: null,
+      editable: true,
+    })),
+    notices: [],
+    evidence: null,
+    disclaimer: '只建议不裁决，确认前不会生效。',
+    generatedAt: NOW,
   }
 }
 
@@ -544,23 +597,77 @@ test('print upload does not skip privacy check without a file @w2', async ({ pag
   await expectHealthy(page, errors, 'print-upload')
 })
 
-test('material checks reach review without exposing anonymous access tokens @w2', async ({ page, api }) => {
-  const errors = collectRuntimeErrors(page)
+test('material checks require a PII decision, create the redacted task, and carry the derived file forward @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, '/w2-fixtures/sample-redacted.pdf')
   registerShell(api)
+  // 青序流光版 /print/preview 进页就取参数建议（原型 13-print-desk 声明的
+  // GET /materials/tasks/:id/print-param-suggestions）。这条测试用的 taskId 是
+  // w2-inspection，此前没有 stub，会撞 ApiRouter 的 Unhandled API requests。
+  // 建议为空表示「本机没有可给的建议」，是诚实空态，不影响本测试断言的 PII 决策链路。
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection/print-param-suggestions', {
+    status: 200,
+    json: { success: true, data: { status: 'not_derivable', suggestions: [] } },
+  })
+  let decisionBody: unknown = null
+  let redactionCreated = false
   await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
     const body = route.request().postDataJSON() as { kind?: string }
-    if (!['inspection', 'normalize_a4', 'pii_scan'].includes(body.kind ?? '')) {
+    if (!['inspection', 'normalize_a4', 'pii_scan', 'pii_redact'].includes(body.kind ?? '')) {
       await route.abort('blockedbyclient')
       return
     }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: materialTask(body.kind as 'inspection' | 'normalize_a4' | 'pii_scan') }) })
+    if (body.kind === 'pii_redact') redactionCreated = true
+    const task = materialTask(body.kind as 'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact')
+    if (body.kind === 'pii_scan') {
+      task.piiFindings = [{
+        id: 'w2-finding-phone', taskId: task.id, type: 'phone', label: '手机号', pageNumber: 1,
+        snippet: '13800138000', confidence: 0.98, action: 'pending', createdAt: NOW,
+      }]
+    }
+    if (body.kind === 'pii_redact') {
+      task.resultFileId = 'w2-redacted-file'
+      task.result = {
+        mode: 'real', ok: true, claim: 'redacted_verified', redactedFileId: 'w2-redacted-file',
+        redactedFileUrl: '/w2-fixtures/sample-redacted.pdf',
+        items: [{ id: 'w2-finding-phone', type: 'phone', pageNumber: 1, requested: 'redact', applied: 'redacted' }],
+        reverify: { ran: true, method: 'text_layer', remainingCount: 0 },
+      }
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: task }) })
   })
+  api.respondWith('POST', '/api/v1/materials/tasks/w2-pii_scan/pii-findings/decisions', async () => ({
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        ...materialTask('pii_scan'),
+        piiFindings: [{
+          id: 'w2-finding-phone', taskId: 'w2-pii_scan', type: 'phone', label: '手机号', pageNumber: 1,
+          snippet: '13800138000', confidence: 0.98, action: 'redact', createdAt: NOW,
+        }],
+      },
+    },
+  }))
+  await page.route('**/api/v1/materials/tasks/w2-pii_scan/pii-findings/decisions', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    decisionBody = route.request().postDataJSON()
+    await route.fallback()
+  })
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
 
   await page.goto('/print/material-check')
   await setReactRouterState(page, '/print/material-check', { file: W2_FILE, source: 'document' })
-  await expect(page.getByText('可以继续设置打印参数', { exact: true })).toBeVisible()
+  await expect(page.getByText('发现 1 个需确认片段', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
+  await page.getByRole('button', { name: '遮挡', exact: true }).click()
+  await page.getByRole('button', { name: '下一步：预览与参数' }).click()
+  await page.waitForURL('**/print/preview')
+  await expect(page.getByTitle('w2-sample.pdf 预览')).toHaveAttribute('data-preview-src', '/w2-fixtures/sample-redacted.pdf')
+  expect(decisionBody).toEqual({ decisions: [{ findingId: 'w2-finding-phone', action: 'redact' }] })
+  expect(redactionCreated).toBe(true)
   await expect(page.getByText('raw-w2-fixture-token')).toHaveCount(0)
-  await expectHealthy(page, errors, 'print-material-check')
+  await expectHealthy(page, errors, 'print-preview')
 })
 
 test('material check failure exposes its real retry action @w2', async ({ page, api }) => {
@@ -588,9 +695,114 @@ test('direct preview restores the material session and completes the PDF respons
 
   await page.goto('/print/preview')
   await expect(page.getByTitle(`${W2_FILE.name} 预览`)).toBeVisible()
-  await expect.poll(() => page.locator(`iframe[src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
+  await expect.poll(() => page.locator(`iframe[data-preview-src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
   binary.assertPdfCompleted()
   await expectHealthy(page, errors, 'print-preview')
+})
+
+test('direct preview without a completed PII summary is fail-closed @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print/preview')
+  await setReactRouterState(page, '/print/preview', { file: W2_FILE, source: 'document' })
+
+  const preview = page.locator('[data-w2-page="print-preview"]')
+  await expect(preview).toHaveAttribute('data-qx-state', 'check-required')
+  await expect(page.getByRole('heading', { name: '不能跳过隐私预检直接打印' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '完成材料检查' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：让服务端报价' })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-preview')
+})
+
+test('preview rejects task ids without a trustworthy redaction result @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print/preview')
+  await setReactRouterState(page, '/print/preview', {
+    file: W2_FILE,
+    source: 'document',
+    materialCheck: {
+      inspectionTaskId: 'w2-inspection-001',
+      piiTaskId: 'w2-pii-001',
+      piiRedactTaskId: 'w2-pii-redact-001',
+      checkedAt: NOW,
+      findingCount: 1,
+      redactedCount: 1,
+      keptCount: 0,
+      redaction: {
+        claim: 'redacted_verified',
+        redactedFileId: null,
+        appliedRedactedCount: 1,
+        failedNoPositionCount: 0,
+        keptCount: 0,
+        reverifyRemainingCount: 0,
+        reverifyRan: true,
+      },
+      mode: 'checked',
+    },
+  })
+
+  await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'check-required')
+  await expect(page.getByText('页面不会只凭任务编号伪造“已检查”。', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：让服务端报价' })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-preview')
+})
+
+test('print parameter suggestions are advisory until applied and then flow to confirmation @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 600, billablePages: 6, unitCents: 100 })
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection-001/print-param-suggestions', {
+    status: 200,
+    json: { success: true, data: printParamSuggestions({ copies: 3 }) },
+  })
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  await seedMaterialSession(page)
+  // 预览→确认是 SPA 导航。Playwright 在这个窗口里对已拦截 POST 的 postDataJSON()
+  // 为空（页面已按 registerQuote 渲染 ¥6.00，请求确实发出了）。
+  // page.route + fallback 会把报价挂死；自己 fulfill 也读不到 body。
+  // 所以在页面 fetch 出口抓 payload，应答仍只由 registerQuote 提供。
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+      if (method === 'POST' && String(url).includes('/orders/quote')) {
+        const marker = window as Window & { __w2QuoteBodies?: unknown[] }
+        marker.__w2QuoteBodies = marker.__w2QuoteBodies ?? []
+        const body = typeof init?.body === 'string' ? init.body : null
+        try {
+          marker.__w2QuoteBodies.push(body ? JSON.parse(body) : null)
+        } catch {
+          marker.__w2QuoteBodies.push(body)
+        }
+      }
+      return originalFetch(input, init)
+    }
+  })
+
+  await page.goto('/print/preview')
+  await expect(page.locator('.qpd-stepper output')).toHaveText('1')
+  await expect(page.getByText('3 份', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '采用这些建议' }).click()
+  await expect(page.locator('.qpd-stepper output')).toHaveText('3')
+  await page.getByRole('button', { name: '下一步：让服务端报价' }).click()
+  await page.waitForURL('**/print/confirm')
+  // 确认页摘要用 data-sum-row + <b class="v">，报价金额来自 POST /orders/quote。
+  // 预览页才有「3 份」的 dd/strong；不能用它们冒充确认页断言。
+  await expect(page.locator('[data-sum-row="打印份数"] .v')).toHaveText('3 份')
+  await expect(page.getByTestId('print-confirm-amount')).toHaveText(/6\.00/)
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const bodies = (window as Window & { __w2QuoteBodies?: Array<{ params?: { copies?: number } }> }).__w2QuoteBodies
+      return bodies?.[bodies.length - 1] ?? null
+    })
+  }).toMatchObject({ params: { copies: 3 } })
+  await expectHealthy(page, errors, 'print-confirm')
 })
 
 // ── 彩色 / 双面按终端能力开放（2026-08-18）────────────────────────────────────
@@ -643,8 +855,8 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   // force:true 绕过 Playwright 的 actionability —— 这里要证的正是「用户硬点也选不上」。
   await colorBtn.click({ force: true })
   await duplexBtn.click({ force: true })
-  await expect(preview.getByRole('button', { name: '黑白', exact: true })).toHaveClass(/bg-primary-600/)
-  await expect(preview.getByRole('button', { name: '单面', exact: true })).toHaveClass(/bg-primary-600/)
+  await expect(preview.getByRole('button', { name: '黑白', exact: true })).toHaveAttribute('data-selected', 'true')
+  await expect(preview.getByRole('button', { name: '单面', exact: true })).toHaveAttribute('data-selected', 'true')
 
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -668,11 +880,11 @@ test('terminal verified for color and duplex can actually select them @w2', asyn
   await expect(preview.getByText(/尚未通过真机验证/)).toHaveCount(0)
 
   await colorBtn.click()
-  await expect(colorBtn).toHaveClass(/bg-primary-600/)
+  await expect(colorBtn).toHaveAttribute('data-selected', 'true')
 
   const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
   await duplexBtn.click()
-  await expect(duplexBtn).toHaveClass(/bg-primary-600/)
+  await expect(duplexBtn).toHaveAttribute('data-selected', 'true')
 
   await expectHealthy(page, errors, 'print-preview')
 })

@@ -1,10 +1,10 @@
-import { Button, Card, KioskActionBar, KioskStatePanel } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
   CheckCircleIcon,
   EyeOffIcon,
+  FileCheckIcon,
   FileTextIcon,
-  LoaderIcon,
+  LoaderCircleIcon,
   ShieldCheckIcon,
 } from 'lucide-react'
 
@@ -31,169 +31,177 @@ export interface MaterialCheckPresentationProps {
   demoMode: boolean
   findings: readonly MaterialFindingPresentation[]
   requiresFormatReview: boolean
-  canContinue: boolean
   isWorking: boolean
-  redactedCount: number
   onRetry: () => void
-  onBack: () => void
   onApplySuggested: () => void
   onKeepAll: () => void
   onDecision: (findingId: string, action: 'keep' | 'redact') => void
-  onContinue: () => void
 }
 
 const RISK_LABEL = { high: '高风险', medium: '中风险', low: '低风险' } as const
 
-function CheckStep({ active, done, label }: { active: boolean; done: boolean; label: string }) {
+function Step({ label, active, done }: { label: string; active: boolean; done: boolean }) {
   return (
-    <div className="w2-material-step" data-state={done ? 'done' : active ? 'active' : 'pending'}>
+    <li data-state={done ? 'done' : active ? 'active' : 'pending'}>
       <span aria-hidden="true">
-        {done ? <CheckCircleIcon /> : active ? <LoaderIcon className="animate-spin" /> : <ShieldCheckIcon />}
+        {done ? <CheckCircleIcon /> : active ? <LoaderCircleIcon /> : <ShieldCheckIcon />}
       </span>
       <b>{label}</b>
-    </div>
+    </li>
   )
 }
 
-function SummaryCard({
+function Summary({
   title,
-  description,
-  badge,
+  detail,
+  state,
   warning,
   messages,
 }: {
   title: string
-  description: string
-  badge: string
+  detail: string
+  state: string
   warning: boolean
   messages: readonly string[]
 }) {
   return (
-    <section className="w2-material-summary">
+    <section className="qpd-summary" data-warning={warning ? 'true' : undefined}>
       <div>
-        <div>
-          <h3>{title}</h3>
-          <p>{description}</p>
-        </div>
-        <span data-warning={warning ? 'true' : undefined}>{badge}</span>
+        <strong>{title}</strong>
+        <span>{state}</span>
       </div>
-      {messages.length > 0 && (
-        <ul>{messages.map((message) => <li key={message}>{message}</li>)}</ul>
-      )}
+      <p>{detail}</p>
+      {messages.length > 0 ? <ul>{messages.map((message) => <li key={message}>{message}</li>)}</ul> : null}
     </section>
   )
 }
 
 export function MaterialCheckPresentation(props: MaterialCheckPresentationProps) {
-  const allDecided = props.findings.every((finding) => finding.selected !== 'pending')
+  const reviewReady = props.stage === 'review' || props.stage === 'submitting' || props.stage === 'done'
   const workingTitle = props.stage === 'inspection'
-    ? '正在检查文件格式'
+    ? '正在检查文件格式、大小与页数'
     : props.stage === 'normalize_a4'
-      ? '正在评估 A4 规范化'
+      ? '正在评估 A4 版式'
       : props.stage === 'submitting'
-        ? '正在保存隐私选择'
+        ? '正在保存选择并生成遮挡文件'
         : '正在检查隐私片段'
 
   return (
-    <div className="w2-material-page" data-w2-page="print-material-check">
-      <div className="w2-material-grid">
-        <aside className="w2-material-aside">
-          <Card className="w2-material-file">
-            <FileTextIcon aria-hidden="true" />
+    <div className="qpd-check-grid" data-w2-page="print-material-check" data-qx-state={props.stage}>
+      <aside className="qpd-check-left">
+        <div className="qpd-file-sheet" aria-label="待检查文件">
+          <FileTextIcon aria-hidden="true" />
+          <strong>{props.file.name}</strong>
+          <span>{props.file.size}</span>
+          <span>{props.file.pages === null ? '页数识别中' : `${props.file.pages} 页`}</span>
+        </div>
+
+        <ol className="qpd-steps" aria-label="材料检查进度">
+          <Step label="文件体检" active={props.stage === 'inspection'} done={Boolean(props.inspection)} />
+          <Step label="A4 规范化评估" active={props.stage === 'normalize_a4'} done={Boolean(props.normalization)} />
+          <Step label="隐私片段检查" active={props.stage === 'pii_scan'} done={reviewReady} />
+        </ol>
+
+        <div className="qpd-privacy-note">
+          <ShieldCheckIcon aria-hidden="true" />
+          <p>文字版文档直接读取文字层；扫描件或图片可能通过第三方 OCR 识别。这里只显示脱敏片段，不展示完整原文。</p>
+        </div>
+      </aside>
+
+      <section className="qpd-check-right" aria-live="polite">
+        {props.isWorking ? (
+          <div className="qx-state qpd-working" data-tone="info">
+            <span className="qx-state-ic"><LoaderCircleIcon aria-hidden="true" /></span>
             <div>
-              <strong>{props.file.name}</strong>
-              <span>{props.file.size} · {props.file.pages === null ? '页数识别中' : `${props.file.pages} 页`}</span>
+              <div className="qx-state-t">{workingTitle}</div>
+              <p className="qx-state-d">结果返回前不说“没问题”，也不会自动放行。</p>
             </div>
-          </Card>
-          <CheckStep label="文件体检" active={props.stage === 'inspection'} done={Boolean(props.inspection)} />
-          <CheckStep label="A4 规范化评估" active={props.stage === 'normalize_a4'} done={Boolean(props.normalization)} />
-          <CheckStep label="隐私片段检查" active={props.stage === 'pii_scan'} done={props.stage === 'review' || props.stage === 'submitting' || props.stage === 'done'} />
-          <p className="w2-material-privacy-note">
-            文档文字层可本地读取；扫描件 / 图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示隐私片段，不展示完整原文。
-          </p>
-        </aside>
+          </div>
+        ) : null}
 
-        <section className="w2-material-main">
-          {props.isWorking && (
-            <KioskStatePanel tone="loading" title={workingTitle} description="请稍候，检查完成后需要您确认" />
-          )}
-          {props.stage === 'error' && (
-            <KioskStatePanel
-              tone="error"
-              title="材料检查未完成"
-              description={props.error ?? '请重新检查'}
-              actions={<Button onClick={props.onRetry}>重试检查</Button>}
-            />
-          )}
-          {props.stage === 'review' && (
-            <div className="w2-material-review">
-              <section className="w2-material-result" data-warning={props.privacyModeWarning ? 'true' : undefined}>
-                {props.privacyModeWarning ? <AlertCircleIcon /> : <CheckCircleIcon />}
-                <div>
-                  <h2>{props.privacyModeWarning ?? '检查完成'}</h2>
-                  <p>
-                    {props.privacyModeWarning
-                      ? '如文件包含隐私信息，请打印前自行确认'
-                      : props.findings.length > 0
-                        ? `发现 ${props.findings.length} 个需确认片段，请逐项选择保留或遮挡`
-                        : '未发现需要确认的隐私片段'}
-                  </p>
-                </div>
-                {props.demoMode && <span>流程演示</span>}
-              </section>
+        {props.stage === 'error' ? (
+          <div className="qx-state qpd-error" data-tone="error">
+            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
+            <div>
+              <h2 className="qx-state-t">材料检查未完成</h2>
+              <p className="qx-state-d">{props.error ?? '检查结果未知，请重新检查。隐私预检不可跳过。'}</p>
+              <button className="qx-btn" data-variant="danger" type="button" onClick={props.onRetry}>重试检查</button>
+            </div>
+          </div>
+        ) : null}
 
-              {props.inspection && (
-                <SummaryCard
-                  title="文件体检摘要"
-                  description={props.inspection.pageLabel}
-                  badge={props.requiresFormatReview ? '需重新上传' : '可继续打印'}
+        {props.stage === 'review' ? (
+          <div className="qpd-review">
+            <section className="qpd-result" data-warning={props.privacyModeWarning ? 'true' : undefined}>
+              {props.privacyModeWarning ? <AlertCircleIcon aria-hidden="true" /> : <FileCheckIcon aria-hidden="true" />}
+              <div>
+                <h2>{props.privacyModeWarning ?? (props.findings.length > 0 ? `发现 ${props.findings.length} 个需确认片段` : '检查完成，请自行再核对')}</h2>
+                <p>
+                  {props.privacyModeWarning
+                    ? '扫描结果不完整，页面不会把它说成“没有隐私信息”。'
+                    : props.findings.length > 0
+                      ? '逐项选择保留或遮挡。全部决定并完成真实遮挡处理后，才能进入打印参数。'
+                      : '规则没有检出片段不等于文件一定没有隐私，请结合预览自行确认。'}
+                </p>
+              </div>
+              {props.demoMode ? <span>流程演示</span> : null}
+            </section>
+
+            {props.privacyModeWarning ? (
+              <button className="qx-btn qpd-retry-scan" data-variant="danger" type="button" onClick={props.onRetry}>
+                重新检查隐私内容
+              </button>
+            ) : null}
+
+            <div className="qpd-summary-grid">
+              {props.inspection ? (
+                <Summary
+                  title="文件体检"
+                  detail={props.inspection.pageLabel}
+                  state={props.requiresFormatReview ? '需重新上传' : '可继续'}
                   warning={props.requiresFormatReview}
                   messages={props.inspection.messages}
                 />
-              )}
-              {props.normalization && (
-                <SummaryCard
-                  title="A4 规范化摘要"
-                  description={`目标纸张：${props.normalization.targetPaperSize} · 当前版本仍使用原文件打印`}
-                  badge={props.normalization.canNormalize ? '已完成评估' : props.normalization.canNormalize === false ? '需核对版式' : '评估信息不完整'}
+              ) : null}
+              {props.normalization ? (
+                <Summary
+                  title="A4 版式评估"
+                  detail={`目标纸张：${props.normalization.targetPaperSize}`}
+                  state={props.normalization.canNormalize === true ? '已完成评估' : '请核对版式'}
                   warning={props.normalization.canNormalize !== true}
                   messages={props.normalization.messages}
                 />
-              )}
+              ) : null}
+            </div>
 
-              {props.findings.length > 0 && (
-                <p className="w2-material-redaction-note">
-                  选择遮挡后，系统会尝试生成遮挡后的文件；能否生成、打印用哪一份，会按实际处理结论告知。
-                </p>
-              )}
-
-              {props.findings.length === 0 ? (
-                <KioskStatePanel
-                  tone={props.requiresFormatReview ? 'error' : props.privacyModeWarning ? 'permission' : 'success'}
-                  title={props.requiresFormatReview ? '请重新上传文件后继续' : props.privacyModeWarning ? '隐私内容未能完整扫描' : '可以继续设置打印参数'}
-                  description={props.requiresFormatReview
-                    ? '材料体检提示当前文件暂不可继续打印，请返回上传页重新选择文件'
-                    : props.privacyModeWarning ?? '后续请继续核对打印参数'}
-                />
-              ) : (
-                <div className="w2-material-findings">
-                  <Card className="w2-material-batch">
-                    <div><strong>批量处理</strong><span>可先按建议处理，再逐项微调</span></div>
-                    <div>
-                      <Button variant="secondary" onClick={props.onApplySuggested}>按建议处理</Button>
-                      <Button variant="secondary" onClick={props.onKeepAll}>全部保留</Button>
-                    </div>
-                  </Card>
+            {props.findings.length === 0 ? (
+              <div className="qx-state qpd-clean" data-tone={props.requiresFormatReview ? 'error' : 'info'}>
+                <span className="qx-state-ic">{props.requiresFormatReview ? <AlertCircleIcon /> : <CheckCircleIcon />}</span>
+                <div>
+                  <div className="qx-state-t">{props.requiresFormatReview ? '当前文件不能直接打印' : '没有待处理的隐私片段'}</div>
+                  <p className="qx-state-d">{props.requiresFormatReview ? '返回上传页重新选择文件。' : '预检已经真实完成；下一步仍需逐页核对预览和打印参数。'}</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="qpd-batch">
+                  <div><strong>逐条裁决</strong><span>遮挡会生成派生文件；生成结果以后端返回为准。</span></div>
+                  <div>
+                    <button className="qx-btn" type="button" onClick={props.onApplySuggested}>按风险建议处理</button>
+                    <button className="qx-btn" data-variant="ghost" type="button" onClick={props.onKeepAll}>全部保留</button>
+                  </div>
+                </div>
+                <div className="qpd-findings">
                   {props.findings.map((finding) => (
-                    <Card className="w2-material-finding" key={finding.id}>
+                    <article className="qpd-finding" key={finding.id} data-risk={finding.risk}>
                       <EyeOffIcon aria-hidden="true" />
-                      <div>
-                        <header><strong>{finding.label}</strong><span data-risk={finding.risk}>{RISK_LABEL[finding.risk]}</span></header>
+                      <div className="qpd-finding-main">
+                        <header><strong>{finding.label}</strong><span>{RISK_LABEL[finding.risk]}</span></header>
                         <dl>
-                          <dt>片段</dt><dd>{finding.maskedSnippet}</dd>
-                          <dt>建议</dt><dd>{finding.suggestion}</dd>
+                          <div><dt>片段</dt><dd>{finding.maskedSnippet}</dd></div>
+                          <div><dt>建议</dt><dd>{finding.suggestion}</dd></div>
                         </dl>
-                        <div className="w2-material-decisions">
+                        <div className="qpd-decisions">
                           {(['redact', 'keep'] as const).map((action) => (
                             <button
                               key={action}
@@ -208,28 +216,14 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                           ))}
                         </div>
                       </div>
-                    </Card>
+                    </article>
                   ))}
                 </div>
-              )}
-            </div>
-          )}
-        </section>
-      </div>
-
-      {props.error && props.stage === 'review' && <p className="w2-material-inline-error">{props.error}</p>}
-      <KioskActionBar className="w2-material-actions">
-        <Button variant="secondary" disabled={props.isWorking} onClick={props.onBack}>返回上传</Button>
-        <Button disabled={!props.canContinue} onClick={props.onContinue}>
-          {props.stage === 'submitting'
-            ? '保存选择中…'
-            : props.requiresFormatReview
-              ? '请重新上传文件'
-              : props.findings.length > 0 && !allDecided
-                ? '请先完成全部选择'
-                : `继续打印设置${props.findings.length > 0 ? ` · 遮挡 ${props.redactedCount} 项` : ''}`}
-        </Button>
-      </KioskActionBar>
+              </>
+            )}
+          </div>
+        ) : null}
+      </section>
     </div>
   )
 }

@@ -138,9 +138,12 @@ expect(
   capPx >= 780 && capPx <= 940,
   `高度上限按 1080×1920 竖屏的 A4 比例取值（608px 宽 → ≈860px 高，实际 ${capPx}px）`,
 )
-for (const tag of ['img', 'iframe']) {
-  const el = preview.match(new RegExp(`<${tag}[^>]*?className="([^"]*)"`, 's'))
-  expect(Boolean(el) && /max-h-full/.test(el[1]), `预览 <${tag}> 有 max-h-full，不撑破容器`)
-}
+const img = preview.match(/<img[^>]*?className="([^"]*)"/s)
+expect(Boolean(img) && /max-h-full/.test(img[1]), '预览 <img> 有 max-h-full，不撑破容器')
+const pdfFrame = read(kioskRoot, 'src/pages/print/PdfPreviewFrame.tsx')
+expect(/<PdfPreviewFrame className="max-h-full"/.test(preview), '预览 PDF 把 max-h-full 传给 PdfPreviewFrame')
+expect(/createElement\('iframe'\)/.test(pdfFrame), 'PDF 预览仍使用 iframe')
+expect(/iframe\.className = className \?\? ''/.test(pdfFrame), 'PdfPreviewFrame 把 max-h-full 落到 iframe，不撑破容器')
+expect(/net::ERR_ABORTED/.test(pdfFrame) && /blob URL/.test(pdfFrame), 'PdfPreviewFrame 说明并处理卸载时的 PDF document abort')
 
 console.log('\nALL PASS')
