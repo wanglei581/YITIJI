@@ -135,7 +135,7 @@ assertIncludes(optimizeCompare, 'loadedTaskId === taskId', 'compare page renders
 assertIncludes(optimizeCompare, 'setDecisions({})', 'compare page clears stale decisions before reading another task')
 assertIncludes(optimizeCompare, 'setConfirmedByModule({})', 'compare page clears stale fact confirmations before reading another task')
 assertIncludes(optimizeCompare, "label: '缺少简历'", 'compare page does not label missing context as ready for a decision')
-assertIncludes(optimizeCompare, 'aria-pressed={decisions[moduleKeyOf(currentIndex)]', 'compare page exposes the current decision non-visually')
+assertIncludes(optimizeCompare, 'aria-pressed={decisions[keyAt(currentIndex)]', 'compare page exposes the current decision non-visually')
 
 // 2026-08-18：这三条原本断言「mock 报告的分项 key 与 SSOT 对齐」（objective /
 // quantification / readability），前提是 mock **会返回一份报告**。走查证明那份报告

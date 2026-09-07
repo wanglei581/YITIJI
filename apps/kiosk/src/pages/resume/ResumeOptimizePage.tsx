@@ -36,6 +36,7 @@ import {
   toggleModuleDecision,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
+import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
 import './resume-optimize-qx.css'
 
 type LeaveAction = () => void
@@ -123,6 +124,21 @@ export function ResumeOptimizePage() {
     setDecisions((prev) => ({ ...prev, [key]: next }))
     markEdited()
   }
+  useCompareDecisionsReturn({
+    state, modules, optimizedResume, decisions, ready: editorOpen,
+    apply: (changes) => {
+      if (!optimizedResume) return
+      let nextResume = optimizedResume
+      const nextDecisions = { ...decisions }
+      for (const [key, next] of changes) {
+        const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
+        if (index < 0) continue
+        nextResume = toggleModuleDecision(nextResume, modules[index], nextDecisions[key] ?? 'optimized', next)
+        nextDecisions[key] = next
+      }
+      setOptimizedResume(nextResume); setDecisions(nextDecisions); markEdited()
+    },
+  })
   const handleContinueDraft = () => {
     const payload = draft.remoteDraft
     if (payload?.resume) {
@@ -279,7 +295,7 @@ export function ResumeOptimizePage() {
             token={token}
             onDecisionChange={handleDecisionChange}
             onResumeChange={(next) => { markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
-            onCompare={() => requestLeave(() => navigate('/resume/optimize/compare', { state: { taskId, accessToken } }))}
+            onCompare={() => requestLeave(() => navigate('/resume/optimize/compare', { state: { taskId, accessToken, decisions } }))}
             onAiAdjust={(action) => { void handleAiAdjust(action) }}
             onUndoAi={() => { setOptimizedResume(lastResumeBeforeAiAdjust!); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setExported(null); setIsDirty(true) }}
             onLayoutChange={handleLayoutChange}

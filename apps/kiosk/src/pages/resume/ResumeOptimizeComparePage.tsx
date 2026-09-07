@@ -12,6 +12,7 @@ import { ResumeCompareState } from './components/resume-compare/ResumeCompareSta
 import {
   buildCompareItems,
   moduleKeyOf,
+  initialDecisionsFrom,
   type ResumeCompareDecisions,
 } from './components/resume-compare/resumeCompareModel'
 import './resume-optimize-compare.css'
@@ -45,7 +46,7 @@ export function ResumeOptimizeComparePage() {
   const [failure, setFailure] = useState<string | null>(null)
   const [retryNonce, setRetryNonce] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [decisions, setDecisions] = useState<ResumeCompareDecisions>({})
+  const [decisions, setDecisions] = useState<ResumeCompareDecisions>(() => initialDecisionsFrom(state))
   const [confirmedByModule, setConfirmedByModule] = useState<Record<string, string[]>>({})
 
   useEffect(() => {
@@ -96,6 +97,7 @@ export function ResumeOptimizeComparePage() {
     [loadedTaskId, modules, taskId],
   )
   const current = items[currentIndex]
+  const keyAt = (index: number) => moduleKeyOf(items[index], index)
   const isDemoResult = providerName === 'mock'
 
   const backToOptimize = () => navigate(OPTIMIZE_ROUTE, {
@@ -108,7 +110,7 @@ export function ResumeOptimizeComparePage() {
 
   const choose = (decision: 'original' | 'optimized') => {
     if (!current) return
-    const key = moduleKeyOf(currentIndex)
+    const key = keyAt(currentIndex)
     if (decision === 'optimized') {
       const confirmed = new Set(confirmedByModule[key] ?? [])
       if (current.additions.some((addition) => !confirmed.has(addition))) return
@@ -117,13 +119,13 @@ export function ResumeOptimizeComparePage() {
   }
 
   const next = () => {
-    if (!current || !decisions[moduleKeyOf(currentIndex)]) return
+    if (!current || !decisions[keyAt(currentIndex)]) return
     if (currentIndex < items.length - 1) setCurrentIndex((index) => index + 1)
     else backToOptimize()
   }
 
   const currentUnconfirmed = current?.additions.some(
-    (item) => !(confirmedByModule[moduleKeyOf(currentIndex)] ?? []).includes(item),
+    (item) => !(confirmedByModule[keyAt(currentIndex)] ?? []).includes(item),
   ) ?? false
   const pageStatus = !taskId
     ? { tone: 'warn' as const, label: '缺少简历' }
@@ -134,9 +136,9 @@ export function ResumeOptimizeComparePage() {
         : { tone: 'ok' as const, label: '待本人裁决' }
   const ctabar = current ? (
     <>
-      <button type="button" className="qx-btn" data-variant="teal" aria-pressed={decisions[moduleKeyOf(currentIndex)] === 'optimized'} onClick={() => choose('optimized')} disabled={currentUnconfirmed} aria-disabled={currentUnconfirmed || undefined}>用改写</button>
-      <button type="button" className="qx-btn" data-variant="ghost" aria-pressed={decisions[moduleKeyOf(currentIndex)] === 'original'} onClick={() => choose('original')}>保留原文</button>
-      <button type="button" className="qx-btn" data-variant="primary" disabled={!decisions[moduleKeyOf(currentIndex)]} onClick={next}>下一条</button>
+      <button type="button" className="qx-btn" data-variant="teal" aria-pressed={decisions[keyAt(currentIndex)] === 'optimized'} onClick={() => choose('optimized')} disabled={currentUnconfirmed} aria-disabled={currentUnconfirmed || undefined}>用改写</button>
+      <button type="button" className="qx-btn" data-variant="ghost" aria-pressed={decisions[keyAt(currentIndex)] === 'original'} onClick={() => choose('original')}>保留原文</button>
+      <button type="button" className="qx-btn" data-variant="primary" disabled={!decisions[keyAt(currentIndex)]} onClick={next}>下一条</button>
     </>
   ) : (
     <button type="button" className="qx-btn" data-variant="ghost" onClick={backToOptimize}>返回优化页</button>
@@ -166,14 +168,14 @@ export function ResumeOptimizeComparePage() {
             item={current}
             index={currentIndex}
             total={items.length}
-            decision={decisions[moduleKeyOf(currentIndex)]}
+            decision={decisions[keyAt(currentIndex)]}
             decisions={decisions}
             allItems={items}
-            confirmed={confirmedByModule[moduleKeyOf(currentIndex)] ?? []}
+            confirmed={confirmedByModule[keyAt(currentIndex)] ?? []}
             isDemoResult={isDemoResult}
             onExit={backToOptimize}
             onConfirm={(addition, checked) => setConfirmedByModule((previous) => {
-              const key = moduleKeyOf(currentIndex)
+              const key = keyAt(currentIndex)
               const nextConfirmed = new Set(previous[key] ?? [])
               if (checked) nextConfirmed.add(addition)
               else {
