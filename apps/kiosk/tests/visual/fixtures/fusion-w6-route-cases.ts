@@ -42,6 +42,7 @@ function createRouteCase(definition: W6RouteDefinition): W6RouteCase {
 const screen = (name: string) => `[data-kiosk-screen="${name}"]`
 const w2 = (name: string) => `[data-w2-page="${name}"]`
 const w4 = '.w4-page-frame'
+const qx = '[data-qx-frame="true"]'
 const member = screen('member-list')
 
 async function seedScreensaver(page: Page): Promise<void> {
@@ -156,18 +157,18 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/jobs', url: '/jobs', marker: w4, featureText: '岗位信息' },
   { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("岗位信息")', featureText: '岗位信息' },
   { pattern: '/jobs/:id', url: '/jobs/job-001', marker: w4, featureText: '前端工程师' },
-  { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: w4, featureText: '线下机构岗位' },
-  { pattern: '/offline-agencies', url: '/offline-agencies', marker: w4, featureText: '线下招聘机构' },
-  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: w4, featureText: '到店咨询办理' },
+  { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: qx, featureText: '线下机构岗位' },
+  { pattern: '/offline-agencies', url: '/offline-agencies', marker: qx, featureText: '线下招聘机构' },
+  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: qx, featureText: '到店咨询办理' },
   { pattern: '/notifications', url: '/notifications', marker: member, featureText: '消息通知' },
-  { pattern: '/companies', url: '/companies', marker: w4, featureText: '找企业' },
-  { pattern: '/companies/:id', url: '/companies/company-001', marker: w4, featureText: '青岛示例制造有限公司' },
+  { pattern: '/companies', url: '/companies', marker: qx, featureText: '找企业' },
+  { pattern: '/companies/:id', url: '/companies/company-001', marker: qx, featureText: '青岛示例制造有限公司' },
   { pattern: '/job-fairs', url: '/job-fairs', marker: w4, featureText: '招聘会' },
   { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("招聘会信息")', featureText: '招聘会信息' },
   { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: w4, featureText: '来源平台入场入口' },
   { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: w4, featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: w4, featureText: '参展企业' },
-  { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: w4, featureText: '青岛示例制造有限公司' },
+  { pattern: '/job-fairs/:id/companies/:companyId', url: '/job-fairs/fair-001/companies/fair-company-001', marker: qx, featureText: '青岛示例制造有限公司' },
   { pattern: '/job-fairs/:id/map', url: '/job-fairs/fair-001/map', marker: w4, featureText: '场馆导览' },
   { pattern: '/job-fairs/:id/materials', url: '/job-fairs/fair-001/materials', marker: w4, featureText: '活动资料' },
   { pattern: '/job-fairs/:id/visit-plan', url: '/job-fairs/fair-001/visit-plan', marker: w4, featureText: 'AI参会准备单' },

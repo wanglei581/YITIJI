@@ -212,6 +212,7 @@ export function registerW4Api(api: ApiRouter, options: W4ApiOptions = {}): void 
   respond('/api/v1/job-fairs', { success: true, data: [fair], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } })
   respond('/api/v1/job-fairs/fair-001', { success: true, data: fair })
   respond('/api/v1/job-fairs/fair-001/companies', { success: true, data: [fairCompany], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } })
+  respond('/api/v1/job-fairs/fair-001/companies/fair-company-001', { success: true, data: fairCompany })
   respond('/api/v1/job-fairs/fair-001/zones', { success: true, data: [fairZone] })
   respond('/api/v1/job-fairs/fair-001/stats', { success: true, data: { fairId: 'fair-001', fairName: fair.name, totalCompanies: 1, checkedInCompanies: 0, totalPositions: 1, totalHeadcount: 2, browseCount: 0, scanCount: 0, printCount: 0, checkinCount: 0, zoneBreakdown: [], lastUpdated: '2026-07-24T08:00:00.000Z', seekerIntent: [], industryDistribution: [], dataSourceLabel: '来源数据 · 非实时', isMockData: true } })
   respond('/api/v1/terminals/KSK-001/config', w4TerminalConfig(options))

@@ -117,10 +117,14 @@ check('exact 25-route ownership', () => {
   assert.ok(!owned.includes('/notifications'))
 })
 
+const kioskRoot = read('src/layouts/KioskRoot.tsx')
 const jobsPage = read('src/pages/jobs/JobsPage.tsx')
 const jobDetail = read('src/pages/jobs/JobDetailPage.tsx')
 const offlineAgencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
+const offlineAgencyDetail = read('src/pages/offline-agencies/OfflineAgencyDetailPage.tsx')
 const offlineJobDetail = read('src/pages/offline-agencies/OfflineJobDetailPage.tsx')
+const onlinePlatforms = read('src/pages/jobs/OnlinePlatformsPage.tsx')
+const fairCompanyDetail = read('src/pages/job-fairs/FairCompanyDetailPage.tsx')
 const offlineAgencyService = read('src/services/api/offlineAgencies.ts')
 const offlineAgencyBackendService = readFileSync(join(WORKSPACE_ROOT, OFFLINE_AGENCY_BACKEND_SERVICE), 'utf8')
 const companyDetail = read('src/pages/companies/CompanyDetailPage.tsx')
@@ -163,13 +167,9 @@ check('offline agency list navigates to real detail route', () => {
   assert.match(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
 })
 check('offline agency presentation does not invent unavailable metrics or live status', () => {
-  // G1 #482 added API-driven status badge (oa-st open/rest → agency.status from server)
-  // and a stats band (openAgencies / totalJobs from server stats field).
-  // These are backend-sourced — they are not fabricated.
-  // Retain guards for: distance proximity (distanceKm / 按直线距离) — backend does NOT
-  // provide coordinates on this endpoint, so any such value would be invented.
+  // 青序 42 号稿：没有可核对的资质字段就不展示「已核验 / 正常收录」。
+  // 仍禁止把服务端没有的距离、营业中、全部区域写进目录。
   assert.doesNotMatch(offlineAgencies, /distanceKm|按直线距离/)
-  // Hardcoded "营业中" copy would be a live operational claim without API backing.
   assert.doesNotMatch(offlineAgencies, /'营业中'|"营业中"/)
   assert.match(offlineAgencies, /服务时间以机构公示为准/)
   assert.doesNotMatch(offlineJobDetail, /agencyServices as string|Array\.isArray\(job\.agencyServices\)/)
@@ -177,6 +177,47 @@ check('offline agency presentation does not invent unavailable metrics or live s
   assert.match(offlineAgencies, /agencyStatusBadge\(agency\.status\)/)
   assert.doesNotMatch(offlineAgencies, /全部区域/)
   assert.match(offlineAgencies, /district: district \|\| undefined/)
+  assert.doesNotMatch(offlineAgencies, /正常收录|已核验/)
+  assert.match(offlineAgencies, /service: service \|\| undefined/)
+  assert.match(offlineAgencies, /orgType: orgType \|\| undefined/)
+})
+check('directory pages have left the V6 frame for QxPageFrame', () => {
+  assert.match(offlineAgencies, /QxPageFrame/)
+  assert.doesNotMatch(offlineAgencies, /KioskPageFrame/, 'offline agencies list has left the V6 frame')
+  assert.match(offlineAgencyDetail, /QxPageFrame/)
+  assert.doesNotMatch(offlineAgencyDetail, /KioskPageFrame/, 'offline agency detail has left the V6 frame')
+  assert.match(offlineJobDetail, /QxPageFrame/)
+  assert.doesNotMatch(offlineJobDetail, /KioskPageFrame/, 'offline job detail has left the V6 frame')
+  assert.match(companiesPage, /QxPageFrame/)
+  assert.doesNotMatch(companiesPage, /KioskPageFrame/, 'companies list has left the V6 frame')
+  assert.match(companyDetail, /QxPageFrame/)
+  assert.doesNotMatch(companyDetail, /KioskPageFrame/, 'company detail has left the V6 frame')
+  assert.match(onlinePlatforms, /QxPageFrame/)
+  assert.doesNotMatch(onlinePlatforms, /KioskPageFrame/, 'online platforms has left the V6 frame')
+  assert.match(fairCompanyDetail, /QxPageFrame/)
+  assert.doesNotMatch(fairCompanyDetail, /KioskPageFrame/, 'fair company detail has left the V6 frame')
+  assert.match(kioskRoot, /['"]\/offline-agencies['"]/)
+  assert.match(kioskRoot, /['"]\/companies['"]/)
+  assert.match(kioskRoot, /['"]\/jobs\/online-platforms['"]/)
+  assert.match(kioskRoot, /\/offline-agencies\//)
+  assert.match(kioskRoot, /\/companies\//)
+  assert.match(kioskRoot, /\/jobs\\\/\[\^\/\]\+\\\/offline/)
+  assert.match(kioskRoot, /\/job-fairs\\\/\[\^\/\]\+\\\/companies\\\/\[\^\/\]\+/)
+  assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/jobs\//)
+  assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/job-fairs\//)
+})
+check('online platforms keep directory-level CTA and never claim apply-on-device', () => {
+  assert.match(onlinePlatforms, /扫码打开来源平台/)
+  assert.doesNotMatch(onlinePlatforms, /一键全网分发|授权代投|同步投递|一键投递|立即投递/)
+  assert.doesNotMatch(onlinePlatforms, /扫码投递|去来源平台投递/)
+})
+check('fair company detail keeps source fail-closed apply CTAs and print backend files', () => {
+  assert.match(fairCompanyDetail, /prepareFairCompanyPrint/)
+  assert.match(fairCompanyDetail, /printable\.printFileUrl/)
+  assert.match(fairCompanyDetail, /SOURCE_APPLY_UNAVAILABLE_REASON/)
+  assert.match(fairCompanyDetail, /扫码投递/)
+  assert.match(fairCompanyDetail, /去来源平台投递/)
+  assert.doesNotMatch(fairCompanyDetail, /投递企业|HR 30|候选人筛选|已收/)
 })
 check('fair subpages do not fake syncTime with activity startTime', () => {
   const fairCompaniesPage = read('src/pages/job-fairs/FairCompaniesPage.tsx')

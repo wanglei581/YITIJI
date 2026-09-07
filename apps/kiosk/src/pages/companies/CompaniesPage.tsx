@@ -1,16 +1,6 @@
-// ============================================================
-// 找企业 / 企业展示页（/companies）。
-//
-// 合规定位（长期红线）：企业展示 = 来源企业与岗位导览，不是招聘平台。
-// - 只展示后端「已审核 + 已发布」企业；列表/统计/筛选项全部来自真实接口，
-//   本页没有任何写死的企业、岗位数、城市统计。
-// - 不收简历、无平台内投递；投递引导一律在岗位详情走「去来源平台投递」。
-// 竖屏 21.5 寸触控（810×1440）：2 列卡片、按钮 ≥48px。
-// ============================================================
-
+// 找企业 / 企业展示页（/companies）。合规定位：来源企业与岗位导览，不是招聘平台。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import {
   COMPANY_INDUSTRIES,
   COMPANY_SOURCE_KINDS,
@@ -18,23 +8,19 @@ import {
   type CompanyCardDTO,
   type CompanyStatsDTO,
 } from '@ai-job-print/shared'
-import {
-  Building2Icon,
-  BuildingIcon,
-  ChevronRightIcon,
-  Loader2Icon,
-  MapPinIcon,
-  SearchIcon,
-  SlidersHorizontalIcon,
-} from 'lucide-react'
+import { Loader2Icon, MapPinIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { DirAiAssist, DirNote, DirSec, DirState } from '../../components/qingxu/directory/DirectoryBits'
+import '../../components/qingxu/directory/directory-qx.css'
 import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
 import { COMPANY_NO_OPEN_JOBS_REASON } from '../../lib/capabilityReasons'
 import { PROVINCES, citiesOf, districtsOf, isMunicipality } from '../../lib/regions'
-import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { getTerminalCode } from '../../services/api/terminalConfig'
 
 const PAGE_SIZE = 10
-
+const BOUNDARY = '本机只做来源企业与岗位导览：不收简历、不做筛选、不安排面试，投递在来源平台完成。'
 const RECRUIT_TYPE_LABEL: Record<string, string> = {
   fulltime: '社招', campus: '校招', intern: '实习', parttime: '兼职', fair: '招聘会参展',
 }
@@ -45,8 +31,6 @@ function labelOfType(v: string | null): string | null {
 function labelOfIndustry(v: string | null): string | null {
   return v ? (COMPANY_INDUSTRIES as Record<string, string>)[v] ?? null : null
 }
-
-// ─── 筛选 chip 行 ───────────────────────────────────────────────────────────
 
 function ChipRow({
   label, options, active, onChange, totalCount, moreLabel, onMore,
@@ -60,54 +44,30 @@ function ChipRow({
   onMore?: () => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className="min-w-[52px] shrink-0 text-[20px] text-[var(--kp-muted)]">{label}</span>
-      <div className="flex flex-1 flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          className={`min-h-[58px] rounded-full px-7 text-[21px] ${active === '' ? 'bg-[var(--kp-dark)] font-bold text-[#f4f1e8]' : 'border border-[var(--kp-line)] bg-[var(--kp-surface)] text-[var(--kp-muted)]'}`}
-        >
-          全部
-        </button>
+    <div className="dw-fgrp">
+      <span className="fl">{label}</span>
+      <span className="fc">
+        <button type="button" onClick={() => onChange('')} className={`dw-chip ${active === '' ? 'on' : ''}`}>全部</button>
         {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(active === o.value ? '' : o.value)}
-            className={`min-h-[58px] rounded-full px-7 text-[21px] ${active === o.value ? 'bg-[var(--kp-dark)] font-bold text-[#f4f1e8]' : 'border border-[var(--kp-line)] bg-[var(--kp-surface)] text-[var(--kp-muted)]'}`}
-          >
-            {o.text}
-          </button>
+          <button key={o.value} type="button" onClick={() => onChange(active === o.value ? '' : o.value)} className={`dw-chip ${active === o.value ? 'on' : ''}`}>{o.text}</button>
         ))}
-        {onMore && totalCount && totalCount > options.length && (
-          <button
-            type="button"
-            className="jf-f-chip"
-            aria-haspopup="dialog"
-            onClick={onMore}
-          >
-            <SlidersHorizontalIcon aria-hidden="true" />
+        {onMore && totalCount && totalCount > options.length ? (
+          <button type="button" className="dw-chip" aria-haspopup="dialog" onClick={onMore}>
+            <SlidersHorizontalIcon aria-hidden size={18} />
             {moreLabel ?? `查看全部 (${totalCount})`}
           </button>
-        )}
-      </div>
+        ) : null}
+      </span>
     </div>
   )
 }
 
-function visibleOptions(
-  options: { value: string; text: string }[],
-  limit: number,
-  active: string,
-) {
+function visibleOptions(options: { value: string; text: string }[], limit: number, active: string) {
   const visible = options.slice(0, limit)
   const activeOption = options.find((option) => option.value === active)
   if (!activeOption || visible.some((option) => option.value === active)) return visible
   return [...visible.slice(0, Math.max(0, limit - 1)), activeOption]
 }
-
-// ─── 企业卡片 ───────────────────────────────────────────────────────────────
 
 function CompanyCard({ company, onDetail, onJobs }: {
   company: CompanyCardDTO
@@ -117,65 +77,43 @@ function CompanyCard({ company, onDetail, onJobs }: {
   const typeLabel = labelOfType(company.companyType)
   const industryLabel = labelOfIndustry(company.industry)
   const region = [company.province, company.city, company.district].filter(Boolean).join(' · ')
+  const noJobs = company.openJobCount === 0
   return (
-    <article className="flex min-h-[124px] items-center gap-5 rounded-[14px] border border-[var(--kp-line)] border-l-[5px] border-l-[var(--kp-accent)] bg-[var(--kp-surface)] px-6 py-3 shadow-sm">
-      <button type="button" className="flex min-w-0 flex-1 items-center gap-5 text-left" onClick={onDetail}>
-        {company.logoUrl ? (
-          <img src={company.logoUrl} alt={`${company.name} logo`} className="h-[60px] w-[60px] shrink-0 rounded-[14px] border border-neutral-100 object-cover" />
-        ) : (
-          <span className="grid h-[60px] w-[60px] shrink-0 place-items-center rounded-[14px] bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
-            <BuildingIcon className="h-8 w-8" aria-hidden="true" />
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <b className="truncate text-[26px] font-bold tracking-[.5px]">{company.name}</b>
-            {industryLabel && <span className="kproto-chip source px-3 py-1 text-base">{industryLabel}</span>}
-            {company.fairParticipant && <span className="kproto-chip warn px-3 py-1 text-base">招聘会参展</span>}
-            {typeLabel && <span className="kproto-chip px-3 py-1 text-base">{typeLabel}</span>}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[18px] text-[var(--kp-muted)]">
-            {region && <span className="inline-flex items-center gap-1"><MapPinIcon className="h-4 w-4" aria-hidden="true" />{region}</span>}
-          </div>
-          {company.repJobTitles.length > 0 && (
-            <p className="mt-1 truncate text-[17px] text-[var(--kp-muted)]">代表岗位：<b className="font-semibold text-[var(--kp-ink)]">{company.repJobTitles.join(' · ')}</b></p>
-          )}
-          <div className="mt-1 flex flex-wrap gap-2">
-            <span className="kproto-chip source px-3 py-1 text-base">来源 · {company.sourceName}</span>
-          </div>
-        </div>
+    <article className="dw-row solid">
+      <button type="button" className="dw-row-main dw-row-as-btn" onClick={onDetail}>
+        <span className="dw-row-t">
+          {company.name}
+          {industryLabel ? <span className="dw-tag slate">{industryLabel}</span> : null}
+          {company.fairParticipant ? <span className="dw-tag wheat">招聘会参展</span> : null}
+          {typeLabel ? <span className="dw-tag">{typeLabel}</span> : null}
+        </span>
+        <span className="dw-row-sub">
+          {region ? <span><MapPinIcon size={18} aria-hidden />{region}</span> : null}
+          <span>来源 {company.sourceName}</span>
+        </span>
+        {company.repJobTitles.length > 0 ? <span className="dw-row-sub">代表岗位：{company.repJobTitles.join(' · ')}</span> : null}
       </button>
-      <div className="flex shrink-0 flex-col items-center gap-1">
-        <div className="text-[30px] font-bold text-[var(--kp-accent-deep)] tabular-nums">{company.openJobCount}</div>
-        <div className="mt-[-4px] text-base text-[var(--kp-muted)]">在招岗位</div>
-        {/* 能力门禁：确实没有在招岗位。旁边虽然有个「0 / 在招岗位」计数，但那不是
-            解释，读屏也不会把它和按钮关联；原生 disabled 还会让按钮掉出 Tab 序列。
-            改 aria-disabled + 常显原因 + aria-describedby，点击在 onClick 里短路。 */}
+      <span className="dw-row-side">
+        <span className="num">{company.openJobCount}</span>
+        <span className="nt">在招岗位</span>
         <button
           type="button"
-          onClick={() => { if (company.openJobCount > 0) onJobs() }}
-          aria-disabled={company.openJobCount === 0 || undefined}
-          aria-describedby={company.openJobCount === 0 ? `company-no-jobs-${company.id}` : undefined}
-          className={`mt-1 min-h-[48px] rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5 text-[17px] font-bold text-[var(--kp-accent-deep)]${company.openJobCount === 0 ? ' cursor-not-allowed opacity-45' : ''}`}
+          onClick={() => { if (!noJobs) onJobs() }}
+          aria-disabled={noJobs || undefined}
+          aria-describedby={noJobs ? `company-no-jobs-${company.id}` : undefined}
+          className="dw-chip"
         >
           查看在招岗位
         </button>
-        {company.openJobCount === 0 ? (
-          <span id={`company-no-jobs-${company.id}`} className="max-w-[9rem] text-center text-xs text-[var(--kp-muted)]">
-            {COMPANY_NO_OPEN_JOBS_REASON}
-          </span>
-        ) : null}
-      </div>
-      <ChevronRightIcon className="h-6 w-6 shrink-0 text-[var(--kp-muted)] opacity-60" aria-hidden="true" />
+        {noJobs ? <span id={`company-no-jobs-${company.id}`} className="dw-why">{COMPANY_NO_OPEN_JOBS_REASON}</span> : null}
+      </span>
+      <span className="dw-row-go" aria-hidden>›</span>
     </article>
   )
 }
 
-// ─── 主组件 ────────────────────────────────────────────────────────────────
-
 export function CompaniesPage() {
   const navigate = useNavigate()
-
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [province, setProvince] = useState('')
@@ -186,53 +124,36 @@ export function CompaniesPage() {
   const [recruitType, setRecruitType] = useState('')
   const [sourceKind, setSourceKind] = useState('')
   const [showTaxonomyPicker, setShowTaxonomyPicker] = useState(false)
-
   const [stats, setStats] = useState<CompanyStatsDTO | null>(null)
   const [items, setItems] = useState<CompanyCardDTO[]>([])
-  const [total, setTotal] = useState<number | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [loadingMore, setLoadingMore] = useState(false)
   const gen = useRef(0)
+  const filtered = Boolean(keyword || province || city || district || companyType || industry || recruitType || sourceKind)
 
-  // 搜索去抖
   useEffect(() => {
     const t = setTimeout(() => setKeyword(keywordInput.trim()), 300)
     return () => clearTimeout(t)
   }, [keywordInput])
 
   const query: Omit<CompanyQuery, 'cursor' | 'pageSize'> = useMemo(
-    () => ({
-      keyword,
-      province,
-      city: province && isMunicipality(province) ? '' : city,
-      district,
-      companyType,
-      industry,
-      recruitType,
-      sourceKind,
-    }),
+    () => ({ keyword, province, city: province && isMunicipality(province) ? '' : city, district, companyType, industry, recruitType, sourceKind }),
     [keyword, province, city, district, companyType, industry, recruitType, sourceKind],
   )
 
   const load = useCallback(() => {
     const g = ++gen.current
     setState('loading')
-    Promise.all([
-      getCompanies({ ...query, pageSize: PAGE_SIZE }),
-      getCompanyStats(query),
-    ])
+    Promise.all([getCompanies({ ...query, pageSize: PAGE_SIZE }), getCompanyStats(query)])
       .then(([page, st]) => {
         if (g !== gen.current) return
         setItems(page.items)
-        setTotal(page.total)
         setNextCursor(page.nextCursor)
         setStats(st)
         setState('ready')
       })
-      .catch(() => {
-        if (g === gen.current) setState('error')
-      })
+      .catch(() => { if (g === gen.current) setState('error') })
   }, [query])
 
   useEffect(() => { load() }, [load])
@@ -243,182 +164,150 @@ export function CompaniesPage() {
     getCompanies({ ...query, cursor: nextCursor, pageSize: PAGE_SIZE })
       .then((page) => {
         setItems((prev) => [...prev, ...page.items])
-        setTotal(page.total)
         setNextCursor(page.nextCursor)
       })
       .catch(() => { /* 翻页失败保留游标可重点 */ })
       .finally(() => setLoadingMore(false))
   }
 
-  // 地区联动选项：完整全国行政区划字典（省/市/区，来自 china-division，非业务数据）。
-  // 用户可选任意地区；后端按真实数据过滤，选到无企业的地区时返回真实空态，不造数据。
   const isMunicipalProvince = province ? isMunicipality(province) : false
-  const provinceOpts = PROVINCES
   const cityOpts = province && !isMunicipalProvince ? citiesOf(province) : []
   const districtOpts = province && (isMunicipalProvince || city)
     ? districtsOf(province, isMunicipalProvince ? '市辖区' : city)
     : []
-
-  // 筛选项来自统一共享字典（完整），不再由当前已有企业反推出不完整选项。
-  // 招聘类型/来源类型受后端语义约束（Job.category / Organization.type），保持既有取值不臆造空项。
   const typeOpts = Object.entries(COMPANY_TYPES).map(([value, text]) => ({ value, text }))
   const industryOpts = Object.entries(COMPANY_INDUSTRIES).map(([value, text]) => ({ value, text }))
   const sourceOpts = Object.entries(COMPANY_SOURCE_KINDS).map(([value, text]) => ({ value, text }))
   const recruitOpts = Object.entries(RECRUIT_TYPE_LABEL).map(([value, text]) => ({ value, text }))
+  const uiState = state === 'loading' ? 'list-loading' : state === 'error' ? 'list-error' : items.length === 0 ? 'list-empty' : filtered ? 'list-filtered' : 'list-ready'
+  const pill = state === 'loading'
+    ? { tone: 'unknown' as const, label: '正在读取企业目录' }
+    : state === 'error'
+      ? { tone: 'bad' as const, label: '企业目录读取失败' }
+      : items.length === 0
+        ? { tone: 'warn' as const, label: '当前筛选没有匹配企业' }
+        : { tone: 'ok' as const, label: filtered ? '已按筛选条件重新请求' : '已审核发布的企业' }
 
-  const regionSelect = (
-    value: string,
-    onChange: (v: string) => void,
-    placeholder: string,
-    options: string[],
-    disabled = false,
-  ) => (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      aria-label={placeholder}
-      className="min-h-[58px] flex-1 rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5 text-[19px] text-[var(--kp-ink)] disabled:bg-[var(--kp-paper)] disabled:text-[var(--kp-muted)]"
-    >
+  const regionSelect = (value: string, onChange: (v: string) => void, placeholder: string, options: string[], disabled = false) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} aria-label={placeholder} className="dw-region-select">
       <option value="">{placeholder}</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
   )
 
   return (
-    <KioskPageFrame
-      tone="clay"
+    <QxPageFrame
       title="找企业"
-      subtitle="来源企业与岗位导览 · 按地区 / 类型 / 行业浏览"
-      backLabel="返回岗位信息"
-      onBack={() => navigate('/jobs')}
-      badge={<FusionBadge>最近更新 · 实时数据</FusionBadge>}
+      subtitle={state === 'loading' ? '企业列表与在招岗位数一起返回，取到之前不显示数字。' : '先定行业和地区，再看企业与在招岗位。'}
+      status={pill}
+      terminalLabel={getTerminalCode() || '设备未绑定'}
+      ctabar={
+        <>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
+          <button type="button" className="qx-btn" data-variant="primary" onClick={load}>按条件筛选</button>
+        </>
+      }
+      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
-        <KioskFilterPickerModal
-          open={showTaxonomyPicker}
-          title="企业类型与行业"
-          description="完整展示当前统一企业字典；选择后立即用于真实数据筛选。"
-          sections={[
-            {
-              id: 'companyType',
-              label: '企业类型',
-              value: companyType,
-              allLabel: '全部类型',
-              options: typeOpts.map((option) => ({ value: option.value, label: option.text })),
-            },
-            {
-              id: 'industry',
-              label: '所属行业',
-              value: industry,
-              allLabel: '全部行业',
-              options: industryOpts.map((option) => ({ value: option.value, label: option.text })),
-            },
-          ]}
-          onChange={(sectionId, value) => {
-            if (sectionId === 'companyType') setCompanyType(value)
-            if (sectionId === 'industry') setIndustry(value)
-          }}
-          onClear={() => {
-            setCompanyType('')
-            setIndustry('')
-          }}
-          onClose={() => setShowTaxonomyPicker(false)}
-        />
-        <div className="kproto kproto-clay kproto-content gap-3">
-          <div className="grid gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <ChipRow
-                label="类型"
-                options={visibleOptions(typeOpts, 3, companyType)}
-                active={companyType}
-                onChange={setCompanyType}
-                totalCount={typeOpts.length}
-                moreLabel={`选择类型 (${typeOpts.length})`}
-                onMore={() => setShowTaxonomyPicker(true)}
-              />
-              <label className="ml-auto flex min-h-[58px] min-w-[280px] items-center gap-3 rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5">
-                <SearchIcon className="h-6 w-6 text-[var(--kp-muted)]" aria-hidden="true" />
-                <input
-                  value={keywordInput}
-                  onChange={(e) => setKeywordInput(e.target.value)}
-                  placeholder="搜索企业 / 岗位"
-                  className="min-h-12 min-w-0 flex-1 bg-transparent text-[19px] outline-none placeholder:text-[var(--kp-muted)]"
-                />
-              </label>
-            </div>
-            <ChipRow
-              label="行业"
-              options={visibleOptions(industryOpts, 5, industry)}
-              active={industry}
-              onChange={setIndustry}
-              totalCount={industryOpts.length}
-              moreLabel={`选择行业 (${industryOpts.length})`}
-              onMore={() => setShowTaxonomyPicker(true)}
+      <KioskFilterPickerModal
+        open={showTaxonomyPicker}
+        title="企业类型与行业"
+        description="完整展示当前统一企业字典；选择后立即用于真实数据筛选。"
+        sections={[
+          { id: 'companyType', label: '企业类型', value: companyType, allLabel: '全部类型', options: typeOpts.map((option) => ({ value: option.value, label: option.text })) },
+          { id: 'industry', label: '所属行业', value: industry, allLabel: '全部行业', options: industryOpts.map((option) => ({ value: option.value, label: option.text })) },
+        ]}
+        onChange={(sectionId, value) => {
+          if (sectionId === 'companyType') setCompanyType(value)
+          if (sectionId === 'industry') setIndustry(value)
+        }}
+        onClear={() => { setCompanyType(''); setIndustry('') }}
+        onClose={() => setShowTaxonomyPicker(false)}
+      />
+      <div className="dw-page qx-grow" data-state={uiState} data-testid={`company-directory-state-${uiState}`}>
+        <DirSec no="01" title="按条件找企业" hint="所有条件均对应真实 CompanyQuery">
+          <div className="dw-qbar" role="search">
+            <span className="qi"><SearchIcon size={26} aria-hidden /></span>
+            <input
+              value={keywordInput}
+              onChange={(e) => setKeywordInput(e.target.value)}
+              placeholder="搜索企业 / 岗位"
+              className="min-h-12 min-w-0 flex-1 bg-transparent"
             />
-            <ChipRow label="招聘" options={recruitOpts} active={recruitType} onChange={setRecruitType} />
-            <ChipRow label="来源" options={sourceOpts.slice(0, 4)} active={sourceKind} onChange={setSourceKind} />
-            <div className="flex gap-3">
-              {regionSelect(province, (v) => { setProvince(v); setCity(''); setDistrict('') }, '全部省份', provinceOpts)}
+          </div>
+          <ChipRow label="类型" options={visibleOptions(typeOpts, 3, companyType)} active={companyType} onChange={setCompanyType} totalCount={typeOpts.length} moreLabel={`选择类型 (${typeOpts.length})`} onMore={() => setShowTaxonomyPicker(true)} />
+          <ChipRow label="行业" options={visibleOptions(industryOpts, 5, industry)} active={industry} onChange={setIndustry} totalCount={industryOpts.length} moreLabel={`选择行业 (${industryOpts.length})`} onMore={() => setShowTaxonomyPicker(true)} />
+          <ChipRow label="招聘" options={recruitOpts} active={recruitType} onChange={setRecruitType} />
+          <ChipRow label="来源" options={sourceOpts.slice(0, 4)} active={sourceKind} onChange={setSourceKind} />
+          <div className="dw-fgrp">
+            <span className="fl">地区</span>
+            <span className="fc">
+              {regionSelect(province, (v) => { setProvince(v); setCity(''); setDistrict('') }, '全部省份', PROVINCES)}
               {regionSelect(city, (v) => { setCity(v); setDistrict('') }, isMunicipalProvince ? '直辖市' : '全部城市', cityOpts, !province || isMunicipalProvince)}
               {regionSelect(district, setDistrict, '全部区县', districtOpts, !province || (!isMunicipalProvince && !city))}
-            </div>
+            </span>
           </div>
+        </DirSec>
 
-          {state === 'ready' && stats && (
-            <div className="oa-stats-band" aria-label="企业概览">
-              <Building2Icon aria-hidden="true" />
-              <div className="oa-stats-cells">
-                <div><div className="oa-n">{stats.companyCount}</div><div className="oa-t">来源企业</div></div>
-                <div><div className="oa-n">{stats.openJobCount}</div><div className="oa-t">在招岗位</div></div>
-                <div><div className="oa-n">{stats.todayNewJobCount}</div><div className="oa-t">今日新增岗位</div></div>
-                <div><div className="oa-n">{stats.fairCompanyCount}</div><div className="oa-t">招聘会参展</div></div>
+        <DirSec no="02" title="企业名单" hint="只列已审核发布企业" grow>
+          <div className="dw-rbox">
+            {state === 'ready' && stats ? (
+              <div className="dw-rhead">
+                <span className="rn">已发布企业</span>
+                <span>共 {stats.companyCount} 条 · 在招岗位 {stats.openJobCount} 个</span>
+                <span className="rsp">{filtered ? '已应用筛选条件' : BOUNDARY}</span>
               </div>
-            </div>
-          )}
-
-          {state === 'loading' ? (
-            <LoadingState className="py-16" />
-          ) : state === 'error' ? (
-            <ErrorState message="企业数据加载失败，请检查后端连接后重试" onRetry={load} className="py-16" />
-          ) : items.length === 0 ? (
-            <EmptyState
-              icon={Building2Icon}
-              title="暂无符合条件的来源企业"
-              description="企业信息由来源机构提供、管理员审核发布后展示；可调整筛选条件再试"
-              className="py-16"
-            />
-          ) : (
-            <>
-              <div className="flex items-center text-[20px] text-[var(--kp-muted)]">
-                <span>共 <b className="text-[var(--kp-ink)]">{total}</b> 家来源企业 · 投递请进入岗位详情在来源平台办理</span>
-                <span className="ml-auto tabular-nums">已显示 {items.length} / {total ?? items.length}</span>
-              </div>
-              <div className="grid gap-2.5">
-                {items.map((c) => (
-                  <CompanyCard
-                    key={c.id}
-                    company={c}
-                    onDetail={() => navigate(`/companies/${c.id}`)}
-                    onJobs={() => navigate(`/companies/${c.id}?tab=jobs`)}
-                  />
-                ))}
-              </div>
-              {nextCursor && (
-                <button
-                  type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="kproto-btn sm w-full border-dashed text-[var(--kp-muted)] disabled:opacity-60"
-                >
-                  {loadingMore && <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" />}
-                  加载更多
-                </button>
-              )}
-            </>
-          )}
-
-          <FusionNotice>企业与岗位信息由来源机构提供、审核发布后展示；投递请进入岗位详情，通过「去来源平台投递 / 扫码投递」在来源平台办理。</FusionNotice>
-        </div>
-    </KioskPageFrame>
+            ) : null}
+            {state === 'loading' ? (
+              <DirState tone="info" testId="company-directory-result-loading" title="正在读取企业目录与统计">
+                企业列表与在招岗位数同一次请求返回；取到之前不显示任何企业名称或数字。
+              </DirState>
+            ) : state === 'error' ? (
+              <>
+                <DirState tone="error" testId="company-directory-result-error" title="企业目录没取到">
+                  列表与在招岗位数一起失败了。数字不会退回到固定值，也不会写 0 顶替。
+                </DirState>
+                <div className="dw-filter-actions">
+                  <button type="button" className="dw-chip" onClick={load}>重试</button>
+                  <button type="button" className="dw-chip" onClick={() => navigate('/jobs')}>去岗位信息</button>
+                </div>
+              </>
+            ) : items.length === 0 ? (
+              <>
+                <DirState tone="empty" testId="company-directory-result-empty" title="当前筛选没有匹配的企业">
+                  少选两个条件再试；企业需审核通过并发布后才会进入目录。
+                </DirState>
+                <div className="dw-filter-actions">
+                  <button type="button" className="dw-chip" onClick={() => { setKeywordInput(''); setKeyword(''); setProvince(''); setCity(''); setDistrict(''); setCompanyType(''); setIndustry(''); setRecruitType(''); setSourceKind('') }}>清除全部筛选</button>
+                  <button type="button" className="dw-chip" onClick={() => navigate('/jobs')}>去岗位信息</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="dw-rlist">
+                  {items.map((c) => (
+                    <CompanyCard
+                      key={c.id}
+                      company={c}
+                      onDetail={() => navigate(`/companies/${c.id}`)}
+                      onJobs={() => navigate(`/companies/${c.id}?tab=jobs`)}
+                    />
+                  ))}
+                </div>
+                {nextCursor ? (
+                  <button type="button" className="dw-pbtn" onClick={loadMore} disabled={loadingMore}>
+                    {loadingMore ? <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden /> : null}
+                    加载更多
+                  </button>
+                ) : null}
+              </>
+            )}
+          </div>
+        </DirSec>
+        {state === 'loading' || state === 'error' || items.length === 0
+          ? <DirNote>{BOUNDARY}</DirNote>
+          : <DirAiAssist screen="company-directory" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />}
+      </div>
+    </QxPageFrame>
   )
 }

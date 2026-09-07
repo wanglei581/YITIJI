@@ -1,9 +1,20 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { KioskPageFrame } from '@ai-job-print/ui'
-import { ExternalLinkIcon, XIcon, InfoIcon } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
-import '../../styles/prototype-v1.css'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import {
+  DirAiAssist,
+  DirExitList,
+  DirKv,
+  DirNote,
+  DirQrHero,
+  DirSec,
+  DirState,
+  DirStripItem,
+} from '../../components/qingxu/directory/DirectoryBits'
+import '../../components/qingxu/directory/directory-qx.css'
+import { getTerminalCode } from '../../services/api/terminalConfig'
 
 interface Platform {
   id: string
@@ -12,268 +23,177 @@ interface Platform {
   url: string
 }
 
-// 卡片副行展示官方域名而非平台标语：标语是本终端替第三方写的推销语,
-// 既未经对方授权也无从核验;域名是可核对的事实,还能让用户在扫码前确认目标站点。
 const PLATFORMS: readonly Platform[] = [
-  {
-    id: 'boss',
-    name: 'Boss直聘',
-    category: '直聘平台',
-    url: 'https://www.zhipin.com',
-  },
-  {
-    id: '51job',
-    name: '前程无忧',
-    category: '综合平台',
-    url: 'https://www.51job.com',
-  },
-  {
-    id: 'zhilian',
-    name: '智联招聘',
-    category: '综合平台',
-    url: 'https://www.zhaopin.com',
-  },
-  {
-    id: 'liepin',
-    name: '猎聘',
-    category: '中高端平台',
-    url: 'https://www.liepin.com',
-  },
+  { id: 'boss', name: 'Boss直聘', category: '直聘平台', url: 'https://www.zhipin.com' },
+  { id: '51job', name: '前程无忧', category: '综合平台', url: 'https://www.51job.com' },
+  { id: 'zhilian', name: '智联招聘', category: '综合平台', url: 'https://www.zhaopin.com' },
+  { id: 'liepin', name: '猎聘', category: '中高端平台', url: 'https://www.liepin.com' },
 ] as const
+
+const BOUNDARY = '浏览、登录和投递都在来源平台完成，本机不接收简历，也不记录你在平台上的操作。'
+const FIELDS = ['互联网与产品', '运营与市场', '销售与客户服务', '制造与工程', '行政与人事', '财务与商务'] as const
 
 export function OnlinePlatformsPage() {
   const navigate = useNavigate()
-  const [activePlatform, setActivePlatform] = useState<Platform | null>(null)
+  const [searchParams] = useSearchParams()
+  const [screen, setScreen] = useState<'ready' | 'qr' | 'navigator' | 'invalid-platform'>('ready')
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [field, setField] = useState('')
+  const [fieldText, setFieldText] = useState('')
+  const [cityText, setCityText] = useState('')
+  const [stageText, setStageText] = useState('')
+  const [note, setNote] = useState('')
 
-  function openPanel(platform: Platform) {
-    setActivePlatform(platform)
+  const active = useMemo(() => PLATFORMS.find((item) => item.id === activeId) ?? null, [activeId])
+  const host = active ? new URL(active.url).host : ''
+
+  useEffect(() => {
+    const requested = searchParams.get('p')
+    if (!requested) return
+    const found = PLATFORMS.find((item) => item.id === requested)
+    if (!found) {
+      setScreen('invalid-platform')
+      setActiveId(null)
+      return
+    }
+    setActiveId(found.id)
+    setScreen('qr')
+  }, [searchParams])
+
+  function openPlatform(platform: Platform) {
+    setActiveId(platform.id)
+    setScreen('qr')
   }
 
-  function closePanel() {
-    setActivePlatform(null)
-  }
+  const pill = screen === 'qr'
+    ? { tone: 'ok' as const, label: '扫码后在来源平台自行浏览' }
+    : screen === 'navigator'
+      ? { tone: 'unknown' as const, label: '本人填写后再确认进入 AI 对话' }
+      : screen === 'invalid-platform'
+        ? { tone: 'warn' as const, label: '平台参数无效 · 不生成二维码' }
+        : { tone: 'ok' as const, label: '4 个固定官网入口' }
 
   return (
-    <KioskPageFrame
-      className="kpv1 kpv1--content-only a-clay"
+    <QxPageFrame
       title="线上招聘平台"
-      subtitle="扫码打开第三方招聘平台官网，岗位与投递均在该平台自行完成"
-      onBack={() => navigate(-1)}
-      backLabel="返回"
-    >
-      {/* 平台卡片列表 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {PLATFORMS.map((platform) => (
-          <div
-            key={platform.id}
-            className="card"
-            style={{
-              padding: '20px 24px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 20,
-            }}
-          >
-            {/* 平台图标（首字缩写） */}
-            <div
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: 16,
-                flexShrink: 0,
-                background: 'var(--pv-clay-soft)',
-                border: '1px solid color-mix(in srgb, var(--pv-clay) 25%, transparent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 22,
-                fontWeight: 700,
-                color: 'var(--pv-clay-deep)',
-                fontFamily: 'var(--pv-serif)',
-              }}
-            >
-              {platform.name.slice(0, 1)}
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                <span style={{ fontSize: 23, fontWeight: 700, color: 'var(--pv-ink)', letterSpacing: 0.5 }}>
-                  {platform.name}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: 'var(--pv-clay-deep)',
-                    background: 'var(--pv-clay-soft)',
-                    border: '1px solid color-mix(in srgb, var(--pv-clay) 25%, transparent)',
-                    borderRadius: 999,
-                    padding: '3px 10px',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {platform.category}
-                </span>
-              </div>
-              <div style={{ fontSize: 16, color: 'var(--pv-muted)', marginTop: 5 }}>
-                {new URL(platform.url).host}
-              </div>
-            </div>
-
+      subtitle={
+        screen === 'qr' ? '扫码打开官网，浏览、登录和投递都在该平台完成。'
+          : screen === 'navigator' ? '快捷选项不是完整字典，可用自由文本补充任意方向。'
+            : screen === 'invalid-platform' ? '平台标识不在固定清单中，返回列表重新选择。'
+              : '选一个固定官网入口，扫码后在手机上打开。'
+      }
+      status={pill}
+      terminalLabel={getTerminalCode() || '设备未绑定'}
+      ctabar={
+        screen === 'qr' || screen === 'invalid-platform' ? (
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => { setScreen('ready'); setActiveId(null) }}>
+            {screen === 'qr' ? '关闭二维码' : '返回平台列表'}
+          </button>
+        ) : screen === 'navigator' ? (
+          <>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setScreen('ready')}>返回平台列表</button>
             <button
               type="button"
-              onClick={() => openPanel(platform)}
-              style={{
-                flexShrink: 0,
-                minHeight: 56,
-                padding: '0 28px',
-                borderRadius: 'var(--pv-r-sm)',
-                border: 'none',
-                background: 'var(--pv-clay)',
-                color: 'var(--pv-paper)',
-                fontSize: 18,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--pv-sans)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
+              className="qx-btn"
+              data-variant="primary"
+              onClick={() => navigate('/assistant?intent=career_explore')}
             >
-              <ExternalLinkIcon aria-hidden="true" style={{ width: 18, height: 18 }} />
-              扫码打开来源平台
+              确认并开始 AI 方向探索
             </button>
-          </div>
-        ))}
+          </>
+        ) : (
+          <>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
+            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/jobs')}>去看岗位信息</button>
+          </>
+        )
+      }
+      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
+    >
+      <div className="dw-page qx-grow" data-screen="online-platform" data-state={screen} data-testid={`online-platform-state-${screen}`}>
+        {screen === 'invalid-platform' ? (
+          <>
+            <DirState tone="empty" testId="online-platform-invalid-platform" title="平台参数无效">
+              平台标识不在当前固定清单中，因此不会生成二维码。返回列表重新选择四个已列出的官网入口。
+            </DirState>
+            <DirExitList>
+              <DirStripItem icon={QrCodeIcon} tone="slate" title="返回平台列表" desc="重新选择固定官网入口" onClick={() => setScreen('ready')} />
+              <DirStripItem icon={QrCodeIcon} title="AI 找岗方向" desc="先整理岗位方向和检索词" onClick={() => setScreen('navigator')} />
+              <DirStripItem icon={ExternalLinkIcon} tone="wheat" title="岗位信息" desc="查看已审核发布岗位" onClick={() => navigate('/jobs')} />
+            </DirExitList>
+          </>
+        ) : screen === 'qr' && active ? (
+          <DirQrHero
+            title={`用手机扫码打开 ${active.name} 官网`}
+            address={<b>{host}</b>}
+            url={active.url}
+            steps={[
+              '手机扫码，在浏览器里打开平台官网。',
+              '浏览岗位、登录、投递都在该平台完成。',
+              '本机不接收简历，也不记录你在平台上的操作。',
+            ]}
+            reason="二维码按内置官网地址生成。本机与这些平台没有数据对接，也不是合作关系；离开前请关掉二维码，不把账号留在公共终端。"
+          />
+        ) : screen === 'navigator' ? (
+          <>
+            <DirSec no="01" title="AI 找岗方向" hint="快捷选项只是起点，自由文本负责补齐" grow>
+              <DirState tone="info" testId="online-platform-navigator-boundary" title="只整理方向和检索词">
+                不展示虚构岗位，不给匹配分数，不读取浏览记录或历史画像。确认后才进入 AI 求职方向探索。
+              </DirState>
+              <div className="dw-fgrp">
+                <span className="fl">关注领域</span>
+                <span className="fc">
+                  {FIELDS.map((item) => (
+                    <button key={item} type="button" className={`dw-chip${field === item ? ' on' : ''}`} onClick={() => setField(item)}>{item}</button>
+                  ))}
+                </span>
+              </div>
+              <div className="dw-filter">
+                <div className="dw-filter-fields">
+                  <label className="dw-filter-input"><span>关注领域</span><input value={fieldText} onChange={(e) => setFieldText(e.target.value)} placeholder="可填写任意岗位或行业方向" /></label>
+                  <label className="dw-filter-input"><span>工作地点</span><input value={cityText} onChange={(e) => setCityText(e.target.value)} placeholder="可填写任意城市、区域或远程倾向" /></label>
+                  <label className="dw-filter-input"><span>当前阶段</span><input value={stageText} onChange={(e) => setStageText(e.target.value)} placeholder="可填写应届、经验年限或转行背景" /></label>
+                  <label className="dw-filter-input"><span>补充说明</span><input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="课程、项目、技能或希望避开的工作方式" /></label>
+                </div>
+              </div>
+            </DirSec>
+            <DirSec no="02" title="当前填写内容" hint="未填写的项目明确保留为空">
+              <div className="dw-blk">
+                <DirKv rows={[
+                  ['关注领域', fieldText || field || '暂未指定'],
+                  ['工作地点', cityText || '暂未指定'],
+                  ['当前阶段', stageText || '暂未指定'],
+                  ['补充说明', note.slice(0, 300) || '暂未填写'],
+                ]} />
+                <div className="dw-reason">确认前不会发起 AI 调用，也不会把这些文本交给来源平台。</div>
+              </div>
+            </DirSec>
+          </>
+        ) : (
+          <DirSec no="01" title="选择来源平台" hint="当前固定展示 4 个官网入口" grow>
+            <div className="dw-platform-grid" data-testid="online-platform-list">
+              {PLATFORMS.map((platform) => (
+                <button key={platform.id} type="button" className="dw-plat" onClick={() => openPlatform(platform)} data-testid={`online-platform-platform-${platform.id}`}>
+                  <span className="dw-plat-ic">{platform.name.slice(0, 1)}</span>
+                  <span className="dw-plat-main">
+                    <span className="dw-plat-kicker">第三方官网入口</span>
+                    <span className="dw-plat-n">{platform.name}<span className="dw-tag slate">{platform.category}</span></span>
+                    <span className="dw-plat-d">{new URL(platform.url).host}</span>
+                  </span>
+                  <span className="dw-plat-flow">
+                    <span><QrCodeIcon size={22} aria-hidden />手机扫码打开</span>
+                    <span><ExternalLinkIcon size={22} aria-hidden />在官网继续浏览</span>
+                  </span>
+                  <span className="dw-plat-go"><QrCodeIcon size={24} aria-hidden />扫码打开来源平台</span>
+                </button>
+              ))}
+            </div>
+            <DirNote><b>{BOUNDARY}</b></DirNote>
+            <DirStripItem icon={QrCodeIcon} title="AI 找岗方向" desc="快捷选项加自由填写，确认后再进入 AI 对话" onClick={() => setScreen('navigator')} />
+            <DirAiAssist screen="online-platform" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
+          </DirSec>
+        )}
       </div>
-
-      {/* 合规提示 */}
-      <div className="notice" style={{ marginTop: 8 }}>
-        <InfoIcon aria-hidden="true" />
-        本终端只提供第三方平台官网入口，不参与投递流程，不收取求职者简历，不参与企业筛选。
-      </div>
-
-      {/* 二维码面板（全屏遮罩） */}
-      {activePlatform != null && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`扫码访问 ${activePlatform.name}`}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            background: 'rgba(16, 48, 43, 0.65)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={closePanel}
-        >
-          <div
-            style={{
-              background: 'var(--pv-surface)',
-              borderRadius: 'var(--pv-r-md)',
-              padding: '36px 40px',
-              width: 'min(480px, 90vw)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 20,
-              boxShadow: '0 20px 60px rgba(16,48,43,0.3)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 关闭按钮 */}
-            <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginBottom: -8 }}>
-              <button
-                type="button"
-                aria-label="关闭"
-                onClick={closePanel}
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  border: '1px solid var(--pv-line)',
-                  background: 'var(--pv-paper)',
-                  color: 'var(--pv-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <XIcon aria-hidden="true" style={{ width: 22, height: 22 }} />
-              </button>
-            </div>
-
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 700,
-                fontFamily: 'var(--pv-serif)',
-                color: 'var(--pv-ink)',
-                letterSpacing: 1,
-                textAlign: 'center',
-              }}
-            >
-              {activePlatform.name}
-            </div>
-
-            <div
-              style={{
-                fontSize: 17,
-                color: 'var(--pv-muted)',
-                textAlign: 'center',
-                lineHeight: 1.5,
-              }}
-            >
-              请用手机扫描下方二维码访问来源平台
-            </div>
-
-            {/* QR码 */}
-            <div
-              style={{
-                background: '#fff',
-                borderRadius: 16,
-                padding: 16,
-                border: '1px solid var(--pv-line)',
-              }}
-            >
-              <QRCodeSVG value={activePlatform.url} size={200} level="M" marginSize={0} />
-            </div>
-
-            <div
-              style={{
-                fontSize: 14,
-                color: 'var(--pv-muted)',
-                textAlign: 'center',
-                background: 'var(--pv-paper)',
-                borderRadius: 8,
-                padding: '10px 16px',
-                border: '1px dashed var(--pv-line)',
-                width: '100%',
-              }}
-            >
-              {activePlatform.url}
-            </div>
-
-            {/* 合规提示 */}
-            <div
-              style={{
-                fontSize: 14,
-                color: 'var(--pv-muted)',
-                textAlign: 'center',
-                lineHeight: 1.6,
-                borderTop: '1px solid var(--pv-line)',
-                paddingTop: 16,
-                width: '100%',
-              }}
-            >
-              本终端不参与投递流程，岗位与投递结果均以来源平台为准
-            </div>
-          </div>
-        </div>
-      )}
-    </KioskPageFrame>
+    </QxPageFrame>
   )
 }
