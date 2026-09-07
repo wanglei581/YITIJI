@@ -23,7 +23,10 @@ import { KIcon } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
+import { useAuth } from '../../auth/useAuth'
 import { AiDisclaimerLine, AigcMark, AiTaskRegion, useAiTask } from '../../ai'
+import { AssistantHoldToTalk } from './AssistantHoldToTalk'
+import { AssistantSessionSummaryBar } from './AssistantSessionSummaryBar'
 import type { AiAvailability, AiTaskFallback } from '../../ai'
 import {
   AdvisorManualEntries,
@@ -90,6 +93,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [callActive, setCallActive] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<ConsultationTask['id'] | null>(null)
+  const [sendVoiceDirect, setSendVoiceDirect] = useState(false)
+  const { isLoggedIn, getToken } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const toolboxSkill = useMemo(() => normalizeToolboxSkill(searchParams.get('intent')), [searchParams])
@@ -125,7 +130,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [providerLabel, setProviderLabel] = useState<string | undefined>(undefined)
 
   useBusyLock(loading)
-  useInkRipple('.kassist .assistant-task, .kassist .assistant-direct-question, .kassist .assistant-context-chip, .kassist .assistant-quick-questions button, .kassist .assistant-tool-button, .kassist .assistant-send, .kassist .action-chip, .kassist .assistant-manual-entry')
+  useInkRipple('.kassist .assistant-task, .kassist .assistant-direct-question, .kassist .assistant-context-chip, .kassist .assistant-quick-questions button, .kassist .assistant-tool-button, .kassist .assistant-send, .kassist .action-chip, .kassist .assistant-manual-entry, .kassist .assistant-hold-talk-btn, .kassist .assistant-summary-save')
 
   const sessionIdRef = useRef(newSessionId())
   const cancelledRef = useRef(false)
@@ -208,7 +213,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 consultationTaskLabel: selectedTask.label,
               }
             : undefined,
-      })
+      }, getToken())
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = response.sessionId
@@ -261,7 +266,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     } finally {
       if (!cancelledRef.current && requestTokenRef.current === requestToken) setLoading(false)
     }
-  }, [aiAvailability, loading, selectedTask, toolboxSkill])
+  }, [aiAvailability, getToken, loading, selectedTask, toolboxSkill])
 
   const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -450,6 +455,13 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
           {advisorTask.isFailed && <AdvisorManualEntries />}
 
+          <AssistantSessionSummaryBar
+            sessionId={sessionIdRef.current}
+            canSave={messages.some((message) => message.kind === 'ai') && !loading && !aiLocked}
+            loggedIn={isLoggedIn}
+            token={getToken()}
+          />
+
           {visibleActions && visibleActions.length > 0 && (
             <div className="action-chips" aria-label="回答后的操作">
               {visibleActions.map((action) => (
@@ -509,6 +521,23 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               </button>
             </div>
           )}
+
+          <AssistantHoldToTalk
+            unavailable={aiLocked || loading}
+            unavailableReason={aiLocked
+              ? `小青答不了话，按住说话也暂停了（服务标识：${describeProviderLabel(providerLabel)}）。`
+              : loading ? '正在回答，请稍候再录音。' : undefined}
+            sendDirect={sendVoiceDirect}
+            onSendDirectChange={setSendVoiceDirect}
+            onTranscript={(text, direct) => {
+              if (direct) {
+                void sendMessage(text)
+                return
+              }
+              setInput(text.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))
+              focusComposer()
+            }}
+          />
 
           <div className="assistant-composer-actions">
             {voiceAvailable && (

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, AssistantChatResult, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { isLlmProviderLabel } from './interfaces/ai-provider.interface'
@@ -23,9 +23,19 @@ import { canAccessFile, FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { JobMaterialsService } from '../job-materials/job-materials.service'
 import { findJobMaterialTemplate } from '../job-materials/job-material-templates'
+import type { ResumeTemplateLayoutPreset } from '../job-materials/job-materials.types'
+import {
+  ResumeExportGateService,
+  hashResumeExportContent,
+  type ResumeExportGateContext,
+  type ResumeExportGateDecision,
+  type ResumeExportPricingView,
+} from '../benefit-redemption/resume-export-gate.service'
 import { RedisInflightLock } from './redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
+import { ResumeDraftStore } from './resume/resume-draft.store'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -101,6 +111,7 @@ export class AiService {
   private readonly logger = new Logger(AiService.name)
   private readonly provider: AiProvider
   private readonly optimizeLock: RedisInflightLock
+  private readonly drafts: ResumeDraftStore
 
   constructor(
     private readonly mockProvider: MockAiProvider,
@@ -123,6 +134,8 @@ export class AiService {
     private readonly resumeDocx: ResumeDocxService,
     private readonly resumeText: ResumeTextService,
     redis?: RedisService,
+    @Optional() private readonly exportGate?: ResumeExportGateService,
+    @Optional() private readonly jobMaterials?: JobMaterialsService,
   ) {
     this.optimizeLock = new RedisInflightLock(redis)
     const rawName = process.env['AI_PROVIDER'] ?? 'mock'
@@ -145,6 +158,12 @@ export class AiService {
       llm:    this.llmResumeProvider,
     }
     this.provider = providerMap[name]
+    this.drafts = new ResumeDraftStore({
+      prisma: this.prisma,
+      extraction: this.resumeExtraction,
+      loadAuthorized: this.loadAuthorizedResult.bind(this),
+      persist: this.persistPayload.bind(this),
+    })
   }
 
   /**
@@ -154,6 +173,9 @@ export class AiService {
    * accessTokenHash（Phase C-2A）：仅匿名 parse 铸造的令牌 hash，或 optimize 继承自 parse 行的 hash。
    * 显式传 string → 写入；传 null → 写 null（会员行）；传 undefined → update 时保持原值不动。
    * 注意：payload 里绝不含明文 token（response 才返回明文一次），DB 只存 hash。
+   *
+   * kind 仅允许 parse / optimize / generate。草稿与导出快照走 persistPayload 的
+   * optimize_draft / optimize_confirmed，避免重新生成 optimize 覆盖已确认版本。
    */
   private async persistResult(
     taskId: string,
@@ -163,13 +185,25 @@ export class AiService {
     endUserId?: string | null,
     accessTokenHash?: string | null,
   ): Promise<void> {
-    // 明文 token 只在 response 返回；落库前从 payload 防御性摘掉 accessToken，
-    // 确保即便未来调整调用顺序，payloadJson 也绝不含明文 token。
     const persistablePayload: Record<string, unknown> = { ...payload }
     delete persistablePayload['accessToken']
-    const payloadJson = JSON.stringify(persistablePayload)
+    await this.persistPayload(taskId, kind, status, persistablePayload, endUserId, accessTokenHash)
+  }
+
+  /**
+   * 通用 kind 写入。optimize_draft / optimize_confirmed 只能经此入口，
+   * persistResult 的联合类型把它们排除在重新生成路径之外。
+   */
+  private async persistPayload(
+    taskId: string,
+    kind: string,
+    status: string,
+    payload: unknown,
+    endUserId?: string | null,
+    accessTokenHash?: string | null,
+  ): Promise<void> {
+    const payloadJson = JSON.stringify(payload)
     const provider = this.provider.name
-    // 每次写入(含 update)都刷新留存窗口,避免活跃任务被提前清理。
     const expiresAt = new Date(Date.now() + AI_RESUME_RESULT_TTL_HOURS * 60 * 60 * 1000)
     try {
       await this.prisma.aiResumeResult.upsert({
@@ -189,7 +223,6 @@ export class AiService {
         },
       })
     } catch (err) {
-      // 不打印 payload（可能含简历正文），只记可定位的非内容元数据。
       this.logger.error(
         `AI 结果持久化失败 taskId=${taskId} kind=${kind} status=${status} provider=${provider}: ` +
           (err instanceof Error ? err.message : String(err)),
@@ -308,7 +341,7 @@ export class AiService {
    */
   private async loadAuthorizedResult<T>(
     taskId: string,
-    kind: 'parse' | 'optimize' | 'generate',
+    kind: string,
     requester: AiResultRequester,
   ): Promise<T | null> {
     const row = await this.prisma.aiResumeResult.findUnique({
@@ -357,6 +390,30 @@ export class AiService {
     const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
     return this.optimizeLock.run(`ai:resume-optimize:${taskId}`, 120_000, () => this.computeResumeOptimize(taskId, requester))
+  }
+
+  /** PUT /resume/records/:taskId/draft — 仅登录用户；匿名 404。 */
+  saveResumeDraft(
+    taskId: string,
+    input: { resume: GeneratedResume; layout?: ResumeLayoutSettings; decisions?: Record<string, unknown> },
+    requester: AiResultRequester,
+  ) {
+    return this.drafts.saveDraft(taskId, input, requester)
+  }
+
+  /** GET /resume/records/:taskId/draft — 仅登录用户；匿名 404。无草稿返回 draft:null。 */
+  getResumeDraft(taskId: string, requester: AiResultRequester) {
+    return this.drafts.getDraft(taskId, requester)
+  }
+
+  /** GET /resume/records/:taskId/versions — 仅登录用户；匿名 404。 */
+  listResumeVersions(taskId: string, requester: AiResultRequester) {
+    return this.drafts.listVersions(taskId, requester)
+  }
+
+  /** POST /resume/records/:taskId/fact-check — 鉴权同 GET record。 */
+  factCheckResume(taskId: string, requester: AiResultRequester) {
+    return this.drafts.factCheck(taskId, requester)
   }
 
   private async computeResumeOptimize(
@@ -605,15 +662,52 @@ export class AiService {
     return file.id
   }
 
+  /** GET /resume/export/pricing：三态价目 + 登录会员可用权益次数。 */
+  async getResumeExportPricing(endUserId: string | null): Promise<ResumeExportPricingView> {
+    if (this.exportGate) return this.exportGate.getPricing(endUserId)
+    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' }
+  }
+
   /**
-   * 导出格式计费门禁(Wave 1 Task 6)。
-   *
-   * Wave 1 阶段恒放行(所有格式对所有请求者一律允许),不做任何拦截。
-   * Wave 5 引入计费能力后,在此按 format / 请求者会员状态 / 额度挂真实门禁
-   * (额度不足 → 抛业务异常,由 controller 转 4xx),调用位置(export 入口)已就位。
+   * 导出门禁（契约 2）。free 放行；charged 必须有可核销权益或同内容已核销；
+   * unavailable → 400 RESUME_EXPORT_UNAVAILABLE。本方法不扣次。
    */
-  private assertExportFormatAllowed(_format: ResumeExportFormat): void {
-    // Wave 1：恒放行，无计费/额度校验。
+  async assertExportAllowed(ctx: ResumeExportGateContext): Promise<ResumeExportGateDecision> {
+    if (this.exportGate) return this.exportGate.assertExportAllowed(ctx)
+    return { mode: 'free', alreadyPaid: true, serviceRefId: '', benefitGrantId: null, endUserId: ctx.endUserId }
+  }
+
+  /** 文件成功生成后落账。生成失败不得调用。 */
+  async commitExportRedemption(decision: ResumeExportGateDecision): Promise<void> {
+    if (this.exportGate) await this.exportGate.commitExportRedemption(decision)
+  }
+
+  /**
+   * 模板校验读公开列表（数据库 published 行），不再读代码常量。
+   * 空库时按 job-materials.service 同口径幂等补种常量，不覆盖运营改动。
+   */
+  private async loadPublishedResumeTemplate(
+    templateId: string,
+  ): Promise<{ resumeLayoutPreset: ResumeTemplateLayoutPreset } | null> {
+    // 模板写入（含空库补种）只属于 job-materials 模块；AI 模块对 JobMaterialTemplate 只读
+    //（verify:ai-user-text-retention 禁止 AI 模块写无 TTL 模型）。listTemplates() 内部会在空库时补种。
+    if (this.jobMaterials) await this.jobMaterials.listTemplates()
+    const row = await this.prisma.jobMaterialTemplate.findFirst({
+      where: { id: templateId, status: 'published', type: 'resume_template' },
+      select: { resumeLayoutPreset: true },
+    })
+    const preset = row?.resumeLayoutPreset
+    if (preset && typeof preset === 'object' && !Array.isArray(preset)) {
+      return { resumeLayoutPreset: preset as unknown as ResumeTemplateLayoutPreset }
+    }
+    // 没有 JobMaterialsService（verify 脚本裸构造）时库里可能从未补种：退回只读的内置常量，不在 AI 模块写库。
+    if (!this.jobMaterials) {
+      const builtIn = findJobMaterialTemplate(templateId)
+      if (builtIn && builtIn.status === 'published' && builtIn.type === 'resume_template' && builtIn.resumeLayoutPreset) {
+        return { resumeLayoutPreset: builtIn.resumeLayoutPreset }
+      }
+    }
+    return null
   }
 
   /**
@@ -643,6 +737,7 @@ export class AiService {
      * 只影响 PDF 元数据诚实性（AIGenerated='false'），排版与既有导出逐字一致。
      */
     draft = false,
+    charge?: { taskId?: string | null; benefitGrantId?: string | null; factsConfirmedAt?: string },
   ): Promise<{
     fileId: string
     filename: string
@@ -654,9 +749,20 @@ export class AiService {
      *  docx/txt/md 签发另外渲染的同内容 PDF 副本(Wave 6),不是原文件本身。 */
     printFileUrl?: string
   }> {
-    this.assertExportFormatAllowed(format)
-    const template = format === 'pdf' && templateId ? findJobMaterialTemplate(templateId) : null
-    if (format === 'pdf' && templateId && (!template || template.status !== 'published' || template.type !== 'resume_template' || !template.resumeLayoutPreset)) {
+    await this.drafts.assertFactsConfirmed({
+      endUserId,
+      taskId: charge?.taskId,
+      factsConfirmedAt: charge?.factsConfirmedAt,
+      draft,
+    })
+    const decision = await this.assertExportAllowed({
+      endUserId,
+      taskId: charge?.taskId,
+      benefitGrantId: charge?.benefitGrantId,
+      contentHash: hashResumeExportContent(resume),
+    })
+    const template = format === 'pdf' && templateId ? await this.loadPublishedResumeTemplate(templateId) : null
+    if (format === 'pdf' && templateId && (!template || !template.resumeLayoutPreset)) {
       throw new BadRequestException({
         error: {
           code: 'AI_RESUME_TEMPLATE_UNSUPPORTED',
@@ -741,6 +847,15 @@ export class AiService {
       printFileUrl = signFileUrl(pdfUploaded.fileId).url
     }
 
+    await this.commitExportRedemption(decision)
+    if (charge?.taskId) {
+      await this.drafts.persistConfirmed({
+        taskId: charge.taskId,
+        endUserId,
+        fileId: uploaded.fileId,
+        factsConfirmedAt: charge.factsConfirmedAt,
+      })
+    }
     return {
       fileId: uploaded.fileId,
       filename: uploaded.filename,

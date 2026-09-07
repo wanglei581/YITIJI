@@ -23,7 +23,7 @@ import {
   withPublicFairDemoExclusion,
 } from './jobs-shared'
 import { jobValidityWhere } from './job-validity'
-import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
+import { mapPublicFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 
 /** 公开列表/详情的资料份数与资料页口径一致：已发布且未软删。 */
@@ -198,7 +198,7 @@ export class JobsKioskService {
     })
     if (!f) return null
     return {
-      fair: mapFair(f),
+      fair: mapPublicFair(f),
       companies: f.companies.map(mapFairCompany),
       zones: f.zones.map(mapFairZone),
     }

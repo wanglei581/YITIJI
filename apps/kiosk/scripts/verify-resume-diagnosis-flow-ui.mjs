@@ -32,7 +32,25 @@ const source = read('src/pages/resume/ResumeSourcePage.tsx')
 const diagnosisForm = read('src/pages/resume/components/DiagnosisDirectionForm.tsx')
 const parse = read('src/pages/resume/ResumeParsePage.tsx')
 const report = read('src/pages/resume/ResumeReportPage.tsx')
-const optimize = read('src/pages/resume/ResumeOptimizePage.tsx')
+const reportScores = readOptional('src/pages/resume/components/resume-report/ResumeReportScores.tsx')
+const reportAll = `${report}\n${reportScores}`
+const deliver = [
+  'src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx',
+  'src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx',
+  'src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx',
+  'src/pages/resume/components/resume-deliver/ResumePricingBar.tsx',
+  'src/pages/resume/components/resume-deliver/ResumeExportResult.tsx',
+  'src/pages/resume/components/resume-deliver/constants.ts',
+  'src/pages/resume/components/resume-deliver/useResumeExportPricing.ts',
+  'src/pages/resume/components/resume-deliver/useOptimizeLoad.ts',
+  'src/pages/resume/components/resume-deliver/optimizeStateCopy.ts',
+  'src/pages/resume/components/resume-deliver/optimizeQuery.ts',
+  'src/pages/resume/components/resume-deliver/generatePreviewQuery.ts',
+  'src/pages/resume/components/resume-deliver/facts.ts',
+  'src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx',
+].map((path) => readOptional(path)).join('\n')
+const optimize = `${read('src/pages/resume/ResumeOptimizePage.tsx')}\n${deliver}`
+const generatePreview = `${read('src/pages/resume/ResumeGeneratePreviewPage.tsx')}\n${deliver}`
 // S2-1 拆页：逐条 diff 搬到对照页，因此 diff 的触控安全断言随之搬过去（覆盖面不缩水）。
 const optimizeCompare = read('src/pages/resume/ResumeOptimizeComparePage.tsx')
 const generate = read('src/pages/resume/ResumeGeneratePage.tsx')
@@ -89,8 +107,8 @@ assertNotIncludes(parse, 'duration:', 'parse page does not use fake timed step d
 assertIncludes(report, 'targetContext', 'report keeps target context summary')
 assertIncludes(report, '目标方向', 'report displays target direction summary')
 assertIncludes(report, 'ReportNoticePanel', 'report page consolidates top notices')
-assertIncludes(report, 'role="progressbar"', 'report section bars expose progressbar semantics')
-assertIncludes(report, 'aria-valuenow', 'report section bars expose current score')
+assertIncludes(reportAll, 'role="progressbar"', 'report section bars expose progressbar semantics')
+assertIncludes(reportAll, 'aria-valuenow', 'report section bars expose current score')
 
 assertNotIncludes(optimize, 'estimateUplift', 'optimize page removes fake uplift estimator')
 assertNotIncludes(optimize, '综合评分提升', 'optimize page removes fake numeric score uplift card')
@@ -236,10 +254,13 @@ assertIncludes(optimize, "'md'", 'optimize page offers md export format')
 assertIncludes(optimize, 'Word', 'optimize page labels docx as Word')
 assertIncludes(optimize, 'Markdown', 'optimize page labels md as Markdown')
 assertIncludes(optimize, 'exportFormat', 'optimize page tracks selected export format state')
-assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected format and layout')
-assertNotIncludes(optimize, '¥', 'optimize page shows no pricing copy')
-assertNotIncludes(optimize, '付费', 'optimize page shows no paywall copy')
-assertNotIncludes(optimize, '元/', 'optimize page shows no per-unit pricing copy')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined', 'optimize page exports with selected format and layout')
+assertIncludes(optimize, 'getResumeExportPricing', 'optimize export reads GET /resume/export/pricing')
+assertIncludes(optimize, '当前免费，不扣权益', 'optimize page shows free-mode copy from the pricing contract')
+assertIncludes(optimize, 'factsConfirmedAt', 'optimize export sends factsConfirmedAt after the confirmation wall')
+assertIncludes(optimize, "kind: 'change_list'", 'optimize page exports the change-list PDF')
+assertIncludes(generatePreview, 'getResumeExportPricing', 'generate preview reads export pricing')
+assertIncludes(generatePreview, 'exportGeneratedResume(resume, result.taskId, getToken()', 'generate preview keeps real export wrapper')
 
 {
   const match = httpAdapter.match(/const LLM_TIMEOUT_MS\s*=\s*([0-9_]+)/)
@@ -264,7 +285,7 @@ assertIncludes(optimize, "from '../../services/api'", 'optimize page imports res
 
 assertIncludes(aiWrapper, 'format?: ResumeExportFormat', 'api wrapper exportGeneratedResume accepts optional export format')
 assertIncludes(aiWrapper, 'layout?: ResumeLayoutSettings', 'api wrapper exportGeneratedResume accepts optional layout')
-assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft)', 'api wrapper delegates format / layout / draft to the selected adapter')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft, charge)', 'api wrapper delegates format / layout / draft / charge to the selected adapter')
 
 // ── Wave2 Task 3:优化页拆分 + 受控排版参数 + PDF layout 导出 ────────────────
 assertIncludes(optimize, 'ResumeLayoutControls', 'optimize page renders layout controls component')
@@ -283,7 +304,7 @@ assertIncludes(layoutControls, '主色', 'layout controls expose accent choices'
 assertIncludes(layoutControls, '单栏', 'layout controls expose single column choice')
 assertIncludes(layoutControls, '双栏', 'layout controls expose double column choice')
 assertIncludes(optimizedEditor, 'GeneratedResume', 'optimized resume editor is typed around GeneratedResume')
-assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected layout')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined', 'optimize page exports with selected layout')
 assertIncludes(optimize, 'setExported(null)', 'optimize page clears stale export when layout/content changes')
 assertIncludes(optimize, 'printFileUrl', 'optimize page still uses printFileUrl for PDF print path')
 assertNotIncludes(optimize, 'signedUrl || exported.printFileUrl', 'optimize page must not fall back from printFileUrl to signedUrl for printing')
@@ -315,13 +336,13 @@ assertIncludes(jobMaterialsApi, 'getResumeTemplates', 'job materials api exposes
 assertIncludes(jobMaterialsApi, 'filter(isResumeTemplate)', 'resume template list only returns resume_template entries')
 assertIncludes(optimize, 'getResumeTemplates', 'optimize page loads resume templates')
 assertIncludes(optimize, 'selectedTemplateId', 'optimize page tracks selected resume template')
-assertIncludes(optimize, 'resumeTemplates.map', 'optimize page renders template choices')
+assertIncludes(optimize, 'templates.map', 'optimize page renders template choices')
 assertIncludes(optimize, 'handleTemplateChange', 'optimize page clears stale export when template changes')
 assertIncludes(optimize, 'PDF 导出按所选模板自动填充版式', 'optimize page explains PDF template fill scope')
 assertIncludes(optimize, 'Word/TXT/Markdown 保持内容格式导出', 'optimize page does not overpromise non-PDF template printing')
-assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected template id')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined', 'optimize page exports with selected template id')
 assertIncludes(aiWrapper, 'templateId?: string', 'api wrapper exportGeneratedResume accepts optional templateId')
-assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft)', 'api wrapper delegates templateId / draft to selected adapter')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft, charge)', 'api wrapper delegates templateId / draft / charge to selected adapter')
 assertIncludes(httpAdapter, 'templateId?: string', 'http adapter accepts optional templateId')
 assertIncludes(httpAdapter, '...(templateId ? { templateId } : {})', 'http adapter sends templateId only when selected')
 assertIncludes(mockAdapter, '_templateId?: string', 'mock adapter accepts templateId without fabricating files')
@@ -357,5 +378,22 @@ assertNotIncludes(resumeVoiceDialog, 'signedUrl', 'voice dialog does not expose 
 assertIncludes(wavRecorder, 'MIC_PERMISSION_TIMEOUT', 'wav recorder times out stalled microphone permission prompts')
 assertIncludes(wavRecorder, 'timedOut', 'wav recorder tracks late microphone permission resolution')
 assertIncludes(wavRecorder, 'lateStream.getTracks().forEach((track) => track.stop())', 'wav recorder releases late microphone streams after timeout')
+
+assertIncludes(optimize, 'QxPageFrame', 'optimize page uses the Qingxu frame')
+assertIncludes(generatePreview, 'QxPageFrame', 'generate preview uses the Qingxu frame')
+assertIncludes(optimize, '合成演示', 'optimize capture fixtures are labeled synthetic')
+assertIncludes(optimize, "q.get('capture') === '1'", 'optimize fixtures require capture=1')
+assertIncludes(optimize, 'AI 优化稿，请自行核对', 'optimize keeps the on-screen AIGC mark')
+assertIncludes(optimize, '示意，非打印稿', 'HTML preview is labeled as non-print')
+assertIncludes(optimize, '打印的就是这一份', 'real PDF copy is identified as the print file')
+assertIncludes(optimize, '压到一页', 'optimize offers compress-to-one-page')
+assertIncludes(optimize, 'expiresAt', 'optimize preview dialog receives expiresAt')
+assertIncludes(optimize, 'useCountdown', 'QR countdown uses useCountdown')
+for (const stateName of ['no-context', 'loading', 'ready', 'empty', 'read-error', 'optimize-failed', 'unavailable', 'illegal']) {
+  assertIncludes(optimize, `'${stateName}'`, `optimize view state ${stateName} is registered`)
+}
+for (const stateName of ['preview-no-result', 'preview-loading', 'preview-failed', 'preview-ready', 'preview-hints', 'preview-editing', 'export-chooser', 'export-exporting', 'export-failed', 'export-ready', 'export-url-expired', 'export-print-unavailable', 'session-lost', 'illegal']) {
+  assertIncludes(generatePreview, `'${stateName}'`, `generate preview view state ${stateName} is registered`)
+}
 
 console.log('PASS resume diagnosis flow UI verification')

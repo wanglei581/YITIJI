@@ -15,6 +15,8 @@
  */
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { validate } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -186,6 +188,47 @@ async function main() {
         if (!actions.has(expected)) fail(`8. 缺少审计动作 ${expected};实际: ${[...actions].join(', ')}`)
       }
       pass('8. 6 类审计动作齐全')
+    }
+
+    {
+      const unpaged = await svc.getPartnerPolicies(partnerA)
+      if (!Array.isArray(unpaged)) fail('PTR-22. 缺省 getPartnerPolicies 应保持数组形状')
+      const paged = await svc.getPartnerPolicies(partnerA, { page: 1, pageSize: 1 })
+      if (!('data' in paged) || paged.data.length !== 1) fail('PTR-22. 带 page 的政策列表应返回单页 {data,pagination}')
+      if (paged.pagination.total < 1) fail('PTR-22. 政策 total 未计入本机构行')
+      pass('PTR-22. 政策列表缺省保持数组，带 page/pageSize 走 skip/take + count')
+    }
+    // ── 9. ADM-C15 GET /admin/policy-sources 可选分页 ───────────────────
+    {
+      const controller = readFileSync(join(process.cwd(), 'src/policies/policies.controller.ts'), 'utf8')
+      const fn = controller.slice(controller.indexOf('getPolicySources('), controller.indexOf('getPolicySources(') + 900)
+      if (!fn.includes("@Query('page')") || !fn.includes("@Query('pageSize')")) {
+        fail('9a. GET /admin/policy-sources 未声明 page/pageSize')
+      }
+      pass('9a. GET /admin/policy-sources 声明 page/pageSize')
+
+      const tag = `ADM_C15_PAGE_${suffix}`
+      await svc.createPartnerPolicy({ kind: 'notice', title: `${tag}_1`, category: 'notice' }, partnerA)
+      await svc.createPartnerPolicy({ kind: 'notice', title: `${tag}_2`, category: 'notice' }, partnerA)
+      await svc.createPartnerPolicy({ kind: 'notice', title: `${tag}_3`, category: 'notice' }, partnerA)
+      const unpaged = await svc.getAllPolicySources()
+      if (!Array.isArray(unpaged)) fail('9b. 缺省参数必须保持裸数组')
+      if (!unpaged.some((p) => p.title.includes(tag))) fail('9b. 缺省数组未包含分页夹具')
+      pass('9b. 缺省参数返回裸数组')
+
+      const paged = await svc.getAllPolicySources({ page: '1', pageSize: '2', keyword: tag })
+      if (Array.isArray(paged)) fail('9c. 带 page/pageSize 不得返回裸数组')
+      if (paged.total !== 3 || paged.page !== 1 || paged.pageSize !== 2 || paged.items.length !== 2) {
+        fail(`9c. 分页形状异常: total=${paged.total} page=${paged.page} pageSize=${paged.pageSize} items=${paged.items.length}`)
+      }
+      if (paged.items.length > paged.pageSize) fail('9c. items.length > pageSize')
+      pass('9c. 带分页参数返回 total 且 items.length ≤ pageSize')
+
+      const page2 = await svc.getAllPolicySources({ page: '2', pageSize: '2', keyword: tag })
+      if (Array.isArray(page2) || page2.items.length !== 1 || page2.total !== 3) {
+        fail('9d. 第二页未按 skip/take 切片')
+      }
+      pass('9d. 第二页 skip/take 生效')
     }
 
     console.log('\n=== ALL PASS ===')

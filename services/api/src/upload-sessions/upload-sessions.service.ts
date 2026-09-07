@@ -11,6 +11,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import type { FilePurpose, FileSensitiveLevel, FileUploadResponse } from '../files/file.types'
 import { FilesService } from '../files/files.service'
 import { defaultRetentionForUpload } from '../files/retention-policy'
+import { generateObjectKey } from '../storage/object-key'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
@@ -439,12 +440,26 @@ export class UploadSessionsService {
       endUserId,
     })
     const boundExpiry = isContractUpload ? file.expiresAt : retention.expiresAt
-    return this.prisma.fileObject.update({
+    const ext = extFromFilenameOrKey(file.filename, file.storageKey)
+    const userKey = generateObjectKey({
+      purpose: file.purpose as FilePurpose,
+      ownerType: 'user',
+      ownerId: endUserId,
+      fileId: file.id,
+      ext,
+    })
+    let storageKey = file.storageKey
+    if (userKey !== file.storageKey) {
+      await this.files.copyObjectToKey(file.storageKey, userKey, file.mimeType, file.bucket)
+      storageKey = userKey
+    }
+    const updated = await this.prisma.fileObject.update({
       where: { id: fileId },
       data: {
         endUserId,
         ownerType: 'user',
         ownerId: endUserId,
+        storageKey,
         expiresAt: boundExpiry,
         retentionPolicy: retention.retentionPolicy,
         retentionSetBy: retention.retentionSetBy,
@@ -460,6 +475,10 @@ export class UploadSessionsService {
       },
       select: { expiresAt: true },
     })
+    if (storageKey !== file.storageKey) {
+      await this.files.deleteObjectAtKey(file.storageKey, file.bucket).catch(() => undefined)
+    }
+    return updated
   }
 
   private async load(sessionId: string): Promise<StoredUploadSession> {
@@ -576,6 +595,13 @@ function expiredSessionException(): BadRequestException {
   return new BadRequestException({
     error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
   })
+}
+
+function extFromFilenameOrKey(filename: string, storageKey: string): string {
+  const fromName = filename.includes('.') ? filename.split('.').pop() ?? '' : ''
+  if (fromName) return fromName
+  const fromKey = storageKey.includes('.') ? storageKey.split('.').pop() ?? '' : ''
+  return fromKey
 }
 
 function defaultUploadFilename(purpose: FilePurpose): string {

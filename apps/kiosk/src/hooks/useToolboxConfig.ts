@@ -40,7 +40,8 @@ export function useToolboxCapabilityState(): ToolboxCapabilityState {
       activeController?.abort()
       const controller = new AbortController()
       activeController = controller
-      setState(OFF_TOOLBOX_CAPABILITY)
+      // 只有首载置 loading；5 分钟定时刷新时保留旧快照，避免子页被替换成「配置检查中」而丢状态（MSC-07）
+      if (requestGeneration === 1) setState(OFF_TOOLBOX_CAPABILITY)
 
       const terminalId = getTerminalId()
       if (!terminalId) {

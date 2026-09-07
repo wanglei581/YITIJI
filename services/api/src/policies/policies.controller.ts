@@ -36,7 +36,7 @@ import { PublishActionDto } from '../jobs/dto/publish.dto'
  *     PATCH  /partner/policies/:id/publish        下架(unpublish)
  *     DELETE /partner/policies/:id                删除(留审计)
  *   Admin(Bearer + admin):
- *     GET    /admin/policy-sources                全量(含审核/发布状态)
+ *     GET    /admin/policy-sources                列表(缺省裸数组；?page=&pageSize= 返回分页对象)
  *     GET    /admin/policy-sources/:id/eligibility-rules  只读复核
  *     PATCH  /admin/policy-sources/:id/review     审核(approve/reject/reviewing)
  *     PATCH  /admin/policy-sources/:id/publish    发布/下架
@@ -45,6 +45,19 @@ import { PublishActionDto } from '../jobs/dto/publish.dto'
  * P21 条件核对是**参考**不是裁定:只给出「已录入条件的比对结果」,
  * 不出现「您符合申领资格」这类结论式表述;判定依据必须追回入库的政策原文摘录。
  */
+function safeInt(value: string | undefined, defaultValue: number, min: number, max: number): number {
+  const n = value !== undefined ? Number(value) : defaultValue
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : defaultValue
+}
+
+function optionalPaging(page?: string, pageSize?: string): { page: number; pageSize: number } | undefined {
+  if (page === undefined && pageSize === undefined) return undefined
+  return {
+    page: safeInt(page, 1, 1, 10_000),
+    pageSize: safeInt(pageSize, 20, 1, 100),
+  }
+}
+
 @Controller()
 export class PoliciesController {
   constructor(
@@ -102,8 +115,13 @@ export class PoliciesController {
   @Get('partner/policies')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  getPartnerPolicies(@CurrentUser() user: AuthedUser) {
-    return this.policies.getPartnerPolicies(user)
+  getPartnerPolicies(
+    @CurrentUser() user: AuthedUser,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const paging = optionalPaging(page, pageSize)
+    return paging ? this.policies.getPartnerPolicies(user, paging) : this.policies.getPartnerPolicies(user)
   }
 
   @Post('partner/policies')
@@ -199,8 +217,14 @@ export class PoliciesController {
   @Get('admin/policy-sources')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getPolicySources() {
-    return this.policies.getAllPolicySources()
+  getPolicySources(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('sourceOrgId') sourceOrgId?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    return this.policies.getAllPolicySources({ page, pageSize, reviewStatus, sourceOrgId, keyword })
   }
 
   /** Admin 只读复核已录入的申领条件(审核前要能看到条件与原文摘录)。 */

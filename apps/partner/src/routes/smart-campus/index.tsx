@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, StatusBadge } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { getSmartCampusTerminals, saveSmartCampusConfig, type PartnerSmartCampusTerminal } from '../../services/api'
 import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
 import {
@@ -300,7 +300,7 @@ function UsagePanel() {
  */
 function NotEntitledState() {
   return (
-    <Page title="智慧校园" subtitle="本机构类型不可用">
+    <Page title="智慧校园" subtitle={withFrontendHint('本机构类型不可用', FRONTEND_HINT.smartCampus)}>
       <Card className="flex flex-col items-center justify-center gap-3 p-10 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100">
           <LockIcon className="h-7 w-7 text-neutral-400" aria-hidden="true" />
@@ -327,7 +327,7 @@ export default function SmartCampusPage() {
   // （还会打一个注定 403 的终端请求），再被换成拒绝态，闪一下像出错。
   if (capabilityStatus === 'loading') {
     return (
-      <Page title="智慧校园" subtitle="加载中…">
+      <Page title="智慧校园" subtitle={withFrontendHint('加载中…', FRONTEND_HINT.smartCampus)}>
         <div className="flex h-48 items-center justify-center text-sm text-neutral-400">正在加载…</div>
       </Page>
     )
@@ -338,7 +338,7 @@ export default function SmartCampusPage() {
   return (
     <Page
       title="智慧校园"
-      subtitle="合作机构（学校）后台管理区 · 终端开关按 orgId 隔离已联动 Kiosk"
+      subtitle={withFrontendHint('合作机构（学校）后台管理区 · 终端开关按 orgId 隔离已联动 Kiosk', FRONTEND_HINT.smartCampus)}
     >
       <div className="space-y-5">
         <Card className="border-info/20 bg-info-bg/50 p-5">

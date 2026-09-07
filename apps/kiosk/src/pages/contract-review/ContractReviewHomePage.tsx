@@ -7,6 +7,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
+import { isTerminalKiosk } from '../../services/api/screensaver'
 import { useNavigate } from 'react-router-dom'
 import {
   Button,
@@ -214,15 +215,17 @@ export function ContractReviewHomePage() {
               <span className="cr-type-btn__name"><QrCodeIcon className="mr-2 inline h-5 w-5" aria-hidden="true" />手机扫码上传</span>
               <span className="cr-type-btn__hint">一体机主通道 · 单个不超过 10MB</span>
             </button>
-            <button
-              type="button"
-              aria-pressed={channel === 'desktop'}
-              className={`cr-type-btn${channel === 'desktop' ? ' cr-type-btn--active' : ''}`}
-              onClick={() => setChannel('desktop')}
-            >
-              <span className="cr-type-btn__name"><MonitorSmartphoneIcon className="mr-2 inline h-5 w-5" aria-hidden="true" />本机文件（桌面验证）</span>
-              <span className="cr-type-btn__hint">E2E / 桌面浏览器 · 不超过 {DESKTOP_MAX_SIZE_MB}MB</span>
-            </button>
+            {!isTerminalKiosk() && (
+              <button
+                type="button"
+                aria-pressed={channel === 'desktop'}
+                className={`cr-type-btn${channel === 'desktop' ? ' cr-type-btn--active' : ''}`}
+                onClick={() => setChannel('desktop')}
+              >
+                <span className="cr-type-btn__name"><MonitorSmartphoneIcon className="mr-2 inline h-5 w-5" aria-hidden="true" />本机文件（桌面验证）</span>
+                <span className="cr-type-btn__hint">E2E / 桌面浏览器 · 不超过 {DESKTOP_MAX_SIZE_MB}MB</span>
+              </button>
+            )}
           </div>
           <input
             ref={fileInputRef}

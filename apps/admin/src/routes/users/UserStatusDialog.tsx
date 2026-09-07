@@ -2,8 +2,8 @@ import type { AdminUserListItem, AdminUserStatusChangeResult } from '@ai-job-pri
 import { AlertTriangleIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Field, GhostButton } from '../../components/form'
-import { ApiHttpError } from '../../services/api/client'
 import { disable as disableUser, restore as restoreUser } from '../../services/api/adminUsers'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { userDisplayName } from './userPresentation'
 
 export type UserStatusIntent = 'disable' | 'restore'
@@ -69,7 +69,7 @@ export function UserStatusDialog({ target, onClose, onSuccess }: UserStatusDialo
   const trimmedReason = reason.trim()
 
   const submit = async () => {
-    if (!trimmedReason || busy) return
+    if (trimmedReason.length < 2 || busy) return
     setBusy(true)
     setError(null)
     try {
@@ -79,11 +79,7 @@ export function UserStatusDialog({ target, onClose, onSuccess }: UserStatusDialo
       onSuccess(result, intent)
       onClose()
     } catch (caught) {
-      setError(
-        caught instanceof ApiHttpError
-          ? caught.message
-          : '操作失败，请检查网络后重试',
-      )
+      setError(userMessageOf(caught, '操作失败，请检查网络后重试'))
     } finally {
       setBusy(false)
     }
@@ -148,7 +144,7 @@ export function UserStatusDialog({ target, onClose, onSuccess }: UserStatusDialo
           <GhostButton disabled={busy} onClick={onClose}>取消</GhostButton>
           <button
             type="button"
-            disabled={busy || !trimmedReason}
+            disabled={busy || trimmedReason.length < 2}
             onClick={() => void submit()}
             className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${
               isDisable ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700'

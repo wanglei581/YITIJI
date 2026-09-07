@@ -15,7 +15,7 @@
 | 登录会员原始简历 / 原始求职材料 | 私有对象存储 + `FileObject(retentionPolicy=months_3/months_6)` | 默认 90 天 | 本人可延长至 180 天或主动删除；到期按 `expiresAt` 物理删除；删除动作留审计 | 原始文件首批不开放长期保存；签名 URL 访问，不暴露对象存储真实地址 |
 | 登录会员优化后简历 / AI 派生成果物 | 私有对象存储 + `FileObject(retentionPolicy=months_3/months_6/long_term)` | 默认 90 天 | 本人确认保存条款后可延长至 180 天或长期保存；长期保存为 `expiresAt = null`；本人可删除 | 只服务本人查看、下载、打印，不向企业或合作机构提供 |
 | 签名 URL | HMAC / COS 预签名 URL | 不超过 30 分钟 | URL 到期失效 | 仅本人 token 换取，不在列表接口直接返回长期链接 |
-| AI 简历结果 | `AiResumeResult` | 默认 24 小时 | 到期 cron 硬删；本人可删除关联记录 | 不长期保存简历派生文本 |
+| AI 简历结果 | `AiResumeResult` | 默认 24 小时 | 到期 cron 硬删；本人可删除关联记录 | 不长期保存简历派生文本。`optimize_draft` / `optimize_confirmed` 复用同一表与 TTL，不单独成行；删除 parse 按 taskId 级联；随账号注销走同一 AiResumeResult 清理 |
 | 模拟面试记录 | `MockInterviewSession` / `MockInterviewReport` | 匿名 2 小时；会员模拟面试 7 天 | 到期 cron 硬删；本人可删除 | 报告原文不写日志，不进入审计 payload |
 | 模拟面试回答与语音转写 | `MockInterviewTurn.content` / `.transcriptText` | 随所属会话（匿名 2 小时；会员 7 天） | 会话被硬删时级联物理删除 | 落库的是**未脱敏原文**（本人回看报告要看到自己的原话）；不写日志、不进审计 payload |
 | AI 助手对话 | 服务进程内存 `LlmChatService.sessions`（**不落库**） | 30 分钟无活动即淘汰；进程重启即失 | `pruneSessions` 按 TTL 主动淘汰 | 对话原文没有任何落库路径；审计只记 `sessionId / intent / provider` |

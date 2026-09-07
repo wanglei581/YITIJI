@@ -20,6 +20,7 @@ import {
   type ContractReviewConfirmInput,
   type ContractReviewCreateInput,
   type ContractReviewCreatedTask,
+  type ContractReviewKeepView,
   type ContractReviewRequester,
   type ContractReviewReportView,
   type ContractReviewTaskRow,
@@ -180,6 +181,36 @@ export class ContractReviewLifecycleService {
       })
     }
     return this.reports.create({ task, result: view.result })
+  }
+
+  async keepReport(
+    id: string,
+    requester: ContractReviewRequester,
+  ): Promise<ContractReviewKeepView> {
+    const task = await this.loadOwnedTask(id, requester)
+    if (!this.reports) throw reportUnavailable()
+    if (!requester.endUserId) {
+      throw new BadRequestException({
+        error: {
+          code: 'CONTRACT_REVIEW_KEEP_LOGIN_REQUIRED',
+          message: '保存到「我的文档」需要登录本人会员账号',
+        },
+      })
+    }
+    const view = this.safeTaskView(task)
+    if (view.status !== 'completed' || !view.result) {
+      throw new ConflictException({
+        error: {
+          code: 'CONTRACT_REVIEW_REPORT_STATE_INVALID',
+          message: '当前合同审查任务不能保存报告',
+        },
+      })
+    }
+    return this.reports.keep({
+      task,
+      result: view.result,
+      endUserId: requester.endUserId,
+    })
   }
 
   async abandonReport(fileId: string, token: string | null) {

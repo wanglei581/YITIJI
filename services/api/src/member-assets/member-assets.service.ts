@@ -3,11 +3,14 @@ import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import type {
   MemberAiRecordItem,
+  MemberAiRecordPage,
+  MemberAiRecordRef,
   MemberAssetPage,
   MemberDeletedDocumentActorKind,
   MemberDeletedDocumentItem,
   MemberDeletedDocumentStorageState,
   MemberDocumentItem,
+  MemberQaRecordItem,
   MemberResumeItem,
 } from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
@@ -39,6 +42,14 @@ import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/reten
 
 /** 简历资产包含的 AiResumeResult 种类：parse=上传诊断，generate=AI 生成。 */
 const RESUME_KINDS = ['parse', 'generate'] as const
+/** 草稿 / 确认快照不单独成行，合并进对应 parse 行字段。 */
+const HIDDEN_RESUME_RESULT_KINDS = ['optimize_draft', 'optimize_confirmed'] as const
+
+interface ResumeDraftMeta {
+  optimized: boolean
+  hasDraft: boolean
+  latestVersion: number | null
+}
 
 @Injectable()
 export class MemberAssetsService {
@@ -65,29 +76,24 @@ export class MemberAssetsService {
       },
       ...memberPageArgs(page),
     })
-    // 仅查当前页 parse 行对应的 optimize 行（同样限定本人），标注「已生成优化版」。
     const parseTaskIds = rows.filter((r) => r.kind === 'parse').map((r) => r.taskId)
-    const optimizedTaskIds = new Set(
-      parseTaskIds.length === 0
-        ? []
-        : (
-            await this.prisma.aiResumeResult.findMany({
-              where: { endUserId, kind: 'optimize', taskId: { in: parseTaskIds } },
-              select: { taskId: true },
-            })
-          ).map((r) => r.taskId)
-    )
-    return buildMemberPage(rows, page, total, (r) => ({
-      id: r.id,
-      taskId: r.taskId,
-      kind: r.kind === 'generate' ? ('generate' as const) : ('parse' as const),
-      status: r.status,
-      provider: r.provider,
-      optimized: r.kind === 'parse' && optimizedTaskIds.has(r.taskId),
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-      expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
-    }))
+    const draftMeta = await loadResumeDraftMeta(this.prisma, endUserId, parseTaskIds)
+    return buildMemberPage(rows, page, total, (r) => {
+      const extra = r.kind === 'parse' ? draftMeta.get(r.taskId) : undefined
+      return {
+        id: r.id,
+        taskId: r.taskId,
+        kind: r.kind === 'generate' ? ('generate' as const) : ('parse' as const),
+        status: r.status,
+        provider: r.provider,
+        optimized: extra?.optimized ?? false,
+        hasDraft: extra?.hasDraft ?? false,
+        latestVersion: extra?.latestVersion ?? null,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
+      }
+    })
   }
 
   /** 我的文档：本人 FileObject（仅元数据 + 临时访问端点路径，无文件内容）。 */
@@ -97,7 +103,7 @@ export class MemberAssetsService {
   ): Promise<MemberAssetPage<MemberDocumentItem>> {
     const where = {
       ...isVisibleMemberFileWhere(endUserId, new Date()),
-      purpose: { notIn: ['signature_image', 'contract_upload', 'contract_review_report'] },
+      purpose: { notIn: ['signature_image', 'contract_upload'] },
       AND: [
         {
           OR: [
@@ -142,6 +148,7 @@ export class MemberAssetsService {
       // 必要的临时访问能力：会员带本人 token 调既有端点换取 TTL 受控签名 URL。
       downloadUrlPath: `/files/${f.id}/download-url`,
       previewUrlPath: `/files/${f.id}/preview-url`,
+      reprintable: f.purpose !== 'contract_review_report',
     }))
   }
 
@@ -194,23 +201,53 @@ export class MemberAssetsService {
   async listAiRecords(
     endUserId: string,
     page: MemberPageQuery
-  ): Promise<MemberAssetPage<MemberAiRecordItem>> {
-    const where = { endUserId, expiresAt: { gt: new Date() } }
-    const total = await this.prisma.aiResumeResult.count({ where })
-    const rows = await this.prisma.aiResumeResult.findMany({
-      where,
-      select: {
-        id: true,
-        taskId: true,
-        kind: true,
-        status: true,
-        provider: true,
-        createdAt: true,
-        expiresAt: true,
-      },
-      ...memberPageArgs(page),
-    })
-    return buildMemberPage(rows, page, total, (r) => ({
+  ): Promise<MemberAiRecordPage> {
+    const where = {
+      endUserId,
+      expiresAt: { gt: new Date() },
+      kind: { notIn: [...HIDDEN_RESUME_RESULT_KINDS] },
+    }
+    const now = new Date()
+    const [total, rows, qaRows] = await Promise.all([
+      this.prisma.aiResumeResult.count({ where }),
+      this.prisma.aiResumeResult.findMany({
+        where,
+        select: {
+          id: true,
+          taskId: true,
+          kind: true,
+          status: true,
+          provider: true,
+          createdAt: true,
+          expiresAt: true,
+          payloadJson: true,
+        },
+        ...memberPageArgs(page),
+      }),
+      this.prisma.advisorArtifact.findMany({
+        where: {
+          kind: 'qa_pins',
+          expiresAt: { gt: now },
+          session: { endUserId, expiresAt: { gt: now } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          sessionId: true,
+          payloadJson: true,
+          fileId: true,
+          createdAt: true,
+          expiresAt: true,
+          session: { select: { topic: true } },
+        },
+      }),
+    ])
+    const parseTaskIds = rows.filter((r) => r.kind === 'parse').map((r) => r.taskId)
+    const draftMeta = await loadResumeDraftMeta(this.prisma, endUserId, parseTaskIds)
+    const list = buildMemberPage(rows, page, total, (r): MemberAiRecordItem => {
+      const extra = r.kind === 'parse' ? draftMeta.get(r.taskId) : undefined
+      return {
       id: r.id,
       taskId: r.taskId,
       // generate 必须如实展示为「生成」，绝不冒充「解析」（C-2D 验收点）。
@@ -222,12 +259,28 @@ export class MemberAssetsService {
         r.kind === 'fair_visit_plan' ||
         r.kind === 'self_assessment'
           ? r.kind
-          : ('parse' as const),
+          : 'parse',
       status: r.status,
       provider: r.provider,
+      optimized: extra?.optimized ?? r.kind === 'optimize',
+      hasDraft: extra?.hasDraft ?? false,
+      latestVersion: extra?.latestVersion ?? null,
       createdAt: r.createdAt.toISOString(),
       expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
+      ref: r.kind === 'fair_visit_plan' ? parseFairVisitPlanRef(r.payloadJson) : null,
+      }
+    })
+    const qaRecords: MemberQaRecordItem[] = qaRows.map((row) => ({
+      id: row.id,
+      sessionId: row.sessionId,
+      artifactId: row.id,
+      kind: 'qa_pins',
+      title: qaTitleOf(row.payloadJson, row.session.topic),
+      createdAt: row.createdAt.toISOString(),
+      expiresAt: row.expiresAt.toISOString(),
+      fileId: row.fileId,
     }))
+    return { ...list, qaRecords }
   }
 
   /**
@@ -319,6 +372,52 @@ export class MemberAssetsService {
   }
 }
 
+async function loadResumeDraftMeta(
+  prisma: PrismaService,
+  endUserId: string,
+  parseTaskIds: string[],
+): Promise<Map<string, ResumeDraftMeta>> {
+  const meta = new Map<string, ResumeDraftMeta>()
+  for (const taskId of parseTaskIds) {
+    meta.set(taskId, { optimized: false, hasDraft: false, latestVersion: null })
+  }
+  if (parseTaskIds.length === 0) return meta
+  const flags = await prisma.aiResumeResult.findMany({
+    where: {
+      endUserId,
+      taskId: { in: parseTaskIds },
+      kind: { in: ['optimize', 'optimize_draft'] },
+    },
+    select: { taskId: true, kind: true },
+  })
+  for (const row of flags) {
+    const current = meta.get(row.taskId) ?? { optimized: false, hasDraft: false, latestVersion: null }
+    if (row.kind === 'optimize') current.optimized = true
+    else current.hasDraft = true
+    meta.set(row.taskId, current)
+  }
+  const confirmed = await prisma.aiResumeResult.findMany({
+    where: {
+      endUserId,
+      taskId: { in: parseTaskIds },
+      kind: 'optimize_confirmed',
+    },
+    select: { taskId: true, payloadJson: true },
+  })
+  for (const row of confirmed) {
+    const current = meta.get(row.taskId) ?? { optimized: false, hasDraft: false, latestVersion: null }
+    try {
+      const parsed = JSON.parse(row.payloadJson) as { version?: unknown }
+      const version = Number(parsed.version)
+      if (Number.isInteger(version) && version >= 1) current.latestVersion = version
+    } catch {
+      // 确认快照损坏时不把列表打挂，latestVersion 保持 null。
+    }
+    meta.set(row.taskId, current)
+  }
+  return meta
+}
+
 function classifyDeletedBy(
   deletedBy: string | null,
   endUserId: string,
@@ -337,4 +436,31 @@ function classifyStorageObjectState(
   if (storageDeletedAt) return 'removed'
   if (storageDeletePendingAt) return 'pending'
   return 'unknown'
+}
+
+function qaTitleOf(payloadJson: string, topic: string): string {
+  try {
+    const payload = JSON.parse(payloadJson) as { kind?: unknown; title?: unknown }
+    if (payload.kind === 'qa_pins' && typeof payload.title === 'string' && payload.title.trim()) {
+      return payload.title.trim().slice(0, 80)
+    }
+  } catch {
+    // 损坏 payload 不进列表正文，只用会话主题兜底
+  }
+  const fallback = topic.trim()
+  return fallback ? fallback.slice(0, 80) : '问答要点'
+}
+
+/** 只抽出 basedOn.fairId / fairName，任何其它 payload 字段都不外露。 */
+function parseFairVisitPlanRef(payloadJson: string | null | undefined): MemberAiRecordRef | null {
+  if (!payloadJson) return null
+  try {
+    const parsed = JSON.parse(payloadJson) as { basedOn?: { fairId?: unknown; fairName?: unknown } }
+    const id = typeof parsed?.basedOn?.fairId === 'string' ? parsed.basedOn.fairId.trim() : ''
+    if (!id) return null
+    const name = typeof parsed?.basedOn?.fairName === 'string' ? parsed.basedOn.fairName.trim() : ''
+    return { type: 'job_fair', id, name: name || '招聘会' }
+  } catch {
+    return null
+  }
 }

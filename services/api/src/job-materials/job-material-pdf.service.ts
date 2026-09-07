@@ -1,47 +1,11 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
-import { existsSync } from 'fs'
+import { Injectable, ServiceUnavailableException } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
+import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import type { GenerateJobMaterialInput, JobMaterialTemplateView } from './job-materials.types'
-
-interface FontCandidate {
-  path: string
-  family?: string
-}
 
 const PAGE = { width: 595.28, height: 841.89 }
 const MARGIN = 48
 const CONTENT_W = PAGE.width - MARGIN * 2
-
-function fontCandidates(): FontCandidate[] {
-  const custom = process.env['JOB_MATERIAL_PDF_FONT_PATH']?.trim() || process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const customFamily = process.env['JOB_MATERIAL_PDF_FONT_FAMILY']?.trim() ||
-    process.env['RESUME_PDF_FONT_FAMILY']?.trim() ||
-    undefined
-  const list: FontCandidate[] = []
-  if (custom) list.push({ path: custom, family: customFamily })
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] || 'C:\\Windows'
-    list.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\msyh.ttf` },
-      { path: `${winDir}\\Fonts\\simhei.ttf` },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    list.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-      { path: '/System/Library/Fonts/Supplemental/Songti.ttc', family: 'STSongti-SC-Regular' },
-    )
-  } else {
-    list.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return list
-}
 
 export interface RenderedJobMaterialPdf {
   buffer: Buffer
@@ -50,9 +14,6 @@ export interface RenderedJobMaterialPdf {
 
 @Injectable()
 export class JobMaterialPdfService {
-  private readonly logger = new Logger(JobMaterialPdfService.name)
-  private resolvedFont: FontCandidate | null = null
-
   async render(template: JobMaterialTemplateView, input: GenerateJobMaterialInput): Promise<RenderedJobMaterialPdf> {
     const doc = new PDFDocument({
       size: 'A4',
@@ -77,30 +38,11 @@ export class JobMaterialPdfService {
   }
 
   private resolveFont(doc: InstanceType<typeof PDFDocument>): void {
-    const tryRegister = (candidate: FontCandidate): boolean => {
-      if (!existsSync(candidate.path)) return false
-      try {
-        if (candidate.family) doc.registerFont('cjk', candidate.path, candidate.family)
-        else doc.registerFont('cjk', candidate.path)
-        doc.font('cjk')
-        return true
-      } catch {
-        return false
-      }
-    }
-
-    if (this.resolvedFont && tryRegister(this.resolvedFont)) return
-    for (const candidate of fontCandidates()) {
-      if (tryRegister(candidate)) {
-        this.resolvedFont = candidate
-        this.logger.log(`job material pdf font: ${candidate.path}${candidate.family ? ` (${candidate.family})` : ''}`)
-        return
-      }
-    }
+    if (registerCjkFont(doc)) return
     throw new ServiceUnavailableException({
       error: {
         code: 'JOB_MATERIAL_PDF_FONT_NOT_FOUND',
-        message: '服务器缺少可用中文字体，无法生成求职材料 PDF；请配置 JOB_MATERIAL_PDF_FONT_PATH 指向 .ttf/.ttc 中文字体文件',
+        message: CJK_FONT_MISSING_USER_MESSAGE,
       },
     })
   }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * 合规文案禁词门禁 —— 扫 apps/{admin,kiosk,partner}/src 全量 .ts/.tsx。
+ * 合规文案禁词门禁 —— 扫 apps/{admin,kiosk,partner}/src 全量 .ts/.tsx，
+ * 以及小程序 pages/utils 的 .js/.wxml（外跳按钮文案，含「复制来源链接」）。
  *
  * 背景(2026-08-01):`COMPLIANCE_FORBIDDEN_TERMS` 自建立起是**死常量**,零消费者;
  * 真正在跑的禁词检查散落在 46 个 verify 脚本里各自硬编码,清单互不一致 ——
@@ -34,6 +35,8 @@ const SCAN_DIRS = [
   { dir: 'apps/admin/src', exts: ['.ts', '.tsx'] },
   { dir: 'apps/kiosk/src', exts: ['.ts', '.tsx'] },
   { dir: 'apps/partner/src', exts: ['.ts', '.tsx'] },
+  { dir: 'apps/miniapp/pages', exts: ['.js', '.wxml'] },
+  { dir: 'apps/miniapp/utils', exts: ['.js'] },
   // 待补：docs/design/kiosk-redesign-2026-08（.html）——51 页新稿是上线一体机前端的
   // 全部来源，文案在那里定稿。实测加进来会报 7 处**误报**：原型是带批注的说明体，
   // 「本机不代收简历，也不在平台内投递」这类边界声明句，现有否定式豁免（按前 N 字符
@@ -119,6 +122,14 @@ const lookbehindMatch = ssotSource.match(/export const COMPLIANCE_EXEMPTION_LOOK
 if (!lookbehindMatch) hardFail('找不到 COMPLIANCE_EXEMPTION_LOOKBEHIND')
 const LOOKBEHIND = Number(lookbehindMatch[1])
 
+const preferred = [
+  ...sliceBlock(ssotSource, 'COMPLIANCE_PREFERRED_TERMS', '[', ']').matchAll(/'([^']+)'/g),
+].map((m) => m[1])
+if (preferred.length === 0) hardFail('COMPLIANCE_PREFERRED_TERMS 解析出 0 项')
+if (!preferred.includes('复制来源链接')) {
+  hardFail('COMPLIANCE_PREFERRED_TERMS 缺少「复制来源链接」（小程序无法打开外链的专用表述）')
+}
+
 console.log(`\n📋 合规文案禁词门禁`)
 console.log(`   SSOT: ${path.relative(root, SSOT)}`)
 console.log(
@@ -198,7 +209,7 @@ for (const file of files) {
 console.log(`  扫描 ${files.length} 个文件,禁词命中 ${hits} 处,豁免 ${exempted} 处\n`)
 
 if (violations.length === 0) {
-  pass(`1. apps/*/src 无违规禁词文案(${terms.length} 项禁词全覆盖)`)
+  pass(`1. apps/*/src 与 miniapp pages/utils 无违规禁词文案(${terms.length} 项禁词全覆盖)`)
 } else {
   fail(`1. 发现 ${violations.length} 处违规禁词文案:`)
   for (const v of violations) {
@@ -206,9 +217,7 @@ if (violations.length === 0) {
     console.error(`         ${v.text}`)
   }
   console.error(`\n     改写参考:使用 COMPLIANCE_PREFERRED_TERMS 白名单文案`)
-  console.error(
-    `     (查看岗位 / 去来源平台投递 / 扫码投递 / 查看招聘会 / 去来源平台预约 / 扫码预约)`
-  )
+  console.error(`     (${preferred.join(' / ')})`)
 }
 
 // ---------- 4. 自检:豁免机制不能形同虚设,也不能过宽 ----------
@@ -237,6 +246,7 @@ const probe = [
   // 禁用声明:连续列举多个禁词,最后一个已超出回看窗口,靠整行标记豁免
   { text: '素材文案禁止出现「一键投递 / 立即投递 / 平台投递」等违规用语。', shouldPass: true },
   { text: '文案不得出现一键报名', shouldPass: true },
+  { text: '复制来源链接', shouldPass: true },
   // 隐私遮挡天花板:裸「已遮挡」禁止;带限定的「已遮挡你确认的 N 处」允许。
   { text: '已遮挡全部隐私信息', shouldPass: false },
   { text: '已遮挡你确认的 2 处', shouldPass: true },
@@ -348,6 +358,44 @@ if (dirViolations.length === 0) {
   }
   console.error(`\n     §4.6:目录只送用户到第三方官网首页,没有具体岗位可投递。`)
   console.error(`     改用:${dirPreferred.join(' / ')}`)
+}
+
+// ---------- 5. 小程序外跳按钮必须用「复制来源链接」----------
+//
+// 微信小程序不能打开任意业务域名外链,岗位/招聘会详情不能承诺「去来源平台投递」。
+// 白名单专用表述是「复制来源链接」。下列页面是用户可见的外跳按钮,漏改或改成
+// 禁词都会被上面的全量扫描拦住;本段再钉住「必须出现白名单文案」,防止改成
+// 既不违规也不诚实的占位（例如「打开链接」）。
+
+const MINIAPP_OUTBOUND_FILES = [
+  'apps/miniapp/pages/job-detail/job-detail.wxml',
+  'apps/miniapp/pages/jobs/jobs.wxml',
+  'apps/miniapp/pages/fair-detail/fair-detail.wxml',
+  'apps/miniapp/pages/fair-company-detail/fair-company-detail.wxml',
+  'apps/miniapp/pages/fair-visit-plan/fair-visit-plan.wxml',
+]
+
+const boundaryDoc = fs.readFileSync(path.join(root, 'docs/compliance/compliance-boundary.md'), 'utf8')
+if (boundaryDoc.includes('复制来源链接')) {
+  pass('5a. compliance-boundary.md 白名单表含「复制来源链接」')
+} else {
+  fail('5a. docs/compliance/compliance-boundary.md 白名单表缺少「复制来源链接」')
+}
+
+let miniappOutboundMissing = 0
+for (const rel of MINIAPP_OUTBOUND_FILES) {
+  const abs = path.join(root, rel)
+  if (!fs.existsSync(abs)) {
+    hardFail(`小程序外跳页面不存在: ${rel} —— 改名或删除后必须同步本门禁`)
+  }
+  const body = fs.readFileSync(abs, 'utf8')
+  if (!body.includes('复制来源链接')) {
+    fail(`5b. ${rel} 未使用白名单外跳文案「复制来源链接」`)
+    miniappOutboundMissing += 1
+  }
+}
+if (miniappOutboundMissing === 0) {
+  pass(`5b. 小程序外跳按钮文案使用「复制来源链接」(${MINIAPP_OUTBOUND_FILES.length} 页)`)
 }
 
 // ---------- 结果 ----------

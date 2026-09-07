@@ -11,10 +11,10 @@
 //   GET  /job-fairs/:id                 — 已发布招聘会详情
 //
 // Admin（管理员）:
-//   GET   /admin/job-sources            — 全量岗位列表（含审核/发布状态）
+//   GET   /admin/job-sources            — 岗位列表（无 page/pageSize 时仍返回裸数组；带分页参数返回 { items, total, page, pageSize }）
 //   PATCH /admin/job-sources/:id/review — 审核操作（approve/reject/reviewing）
 //   PATCH /admin/job-sources/:id/publish — 发布操作（publish/unpublish）
-//   GET   /admin/fair-sources           — 全量招聘会列表
+//   GET   /admin/fair-sources           — 招聘会列表（缺省裸数组；?page=&pageSize= 返回分页对象）
 //   PATCH /admin/fair-sources/:id/review
 //   PATCH /admin/fair-sources/:id/publish
 //
@@ -71,12 +71,22 @@ import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { firstQueryString } from './jobs-shared'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
 function safeInt(value: string | undefined, defaultValue: number, min: number, max: number): number {
   const n = value !== undefined ? Number(value) : defaultValue
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : defaultValue
+}
+
+/** 缺省（不带 page/pageSize）保持原数组形状；任一分页参数出现即走 skip/take + count。 */
+function optionalPaging(page?: string, pageSize?: string): { page: number; pageSize: number } | undefined {
+  if (page === undefined && pageSize === undefined) return undefined
+  return {
+    page: safeInt(page, 1, 1, 10_000),
+    pageSize: safeInt(pageSize, 20, 1, 100),
+  }
 }
 
 /**
@@ -106,7 +116,7 @@ export class JobsController {
 
   @Get('jobs')
   getJobs(
-    @Query('keyword')     keyword?:     string,
+    @Query('keyword')     keyword?:     string | string[],
     @Query('city')        city?:        string,
     @Query('industry')    industry?:    string,
     @Query('category')    category?:    string,
@@ -121,7 +131,7 @@ export class JobsController {
     // workType('full_time' 等)与 category('fulltime' 等)二选一,category 优先
     const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
     return this.jobsService.getPublishedJobs({
-      keyword, city, industry, category: effectiveCategory, sourceOrgId, tag, page, pageSize,
+      keyword: firstQueryString(keyword), city, industry, category: effectiveCategory, sourceOrgId, tag, page, pageSize,
     })
   }
 
@@ -133,7 +143,7 @@ export class JobsController {
    */
   @Get('jobs/requirement-stats')
   getJobRequirementStats(
-    @Query('keyword')     keyword?:     string,
+    @Query('keyword')     keyword?:     string | string[],
     @Query('city')        city?:        string,
     @Query('industry')    industry?:    string,
     @Query('category')    category?:    string,
@@ -142,7 +152,7 @@ export class JobsController {
   ) {
     const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
     return this.jobRequirementStats.getStats({
-      keyword, city, industry, category: effectiveCategory, sourceOrgId,
+      keyword: firstQueryString(keyword), city, industry, category: effectiveCategory, sourceOrgId,
     })
   }
 
@@ -154,14 +164,14 @@ export class JobsController {
   @Get('job-fairs')
   getJobFairs(
     @Query('status')   status?:   string,
-    @Query('keyword')  keyword?:  string,
+    @Query('keyword')  keyword?:  string | string[],
     @Query('page')     pageStr?:  string,
     @Query('pageSize') sizeStr?:  string,
     @Query('terminalId') terminalId?: string,
   ) {
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
-    return this.jobsService.getPublishedFairs({ status, keyword, page, pageSize, terminalId })
+    return this.jobsService.getPublishedFairs({ status, keyword: firstQueryString(keyword), page, pageSize, terminalId })
   }
 
   @Get('job-fairs/:id')
@@ -278,8 +288,14 @@ export class JobsController {
   @Get('admin/job-sources')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getJobSources() {
-    return this.jobsService.getAllJobSources()
+  getJobSources(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('sourceId') sourceId?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    return this.jobsService.getAllJobSources({ page, pageSize, reviewStatus, sourceId, keyword })
   }
 
   @Get('admin/jobs/quality-summary')
@@ -314,8 +330,14 @@ export class JobsController {
   @Get('admin/fair-sources')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getFairSources() {
-    return this.jobsService.getAllFairSources()
+  getFairSources(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('sourceOrgId') sourceOrgId?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    return this.jobsService.getAllFairSources({ page, pageSize, reviewStatus, sourceOrgId, keyword })
   }
 
   @Patch('admin/fair-sources/:id/review')
@@ -428,8 +450,12 @@ export class JobsController {
   @Get('partner/jobs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  getPartnerJobs(@CurrentUser() user: AuthedUser) {
-    return this.jobsService.getPartnerJobs(user)
+  getPartnerJobs(
+    @CurrentUser() user: AuthedUser,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.jobsService.getPartnerJobs(user, optionalPaging(page, pageSize))
   }
 
   @Get('partner/jobs/quality-summary')
@@ -440,7 +466,6 @@ export class JobsController {
     if (!user.orgId) throw new BadRequestException({ error: { code: 'ORG_REQUIRED', message: '合作机构账号未绑定机构' } })
     return this.jobQuality.getSourceQualitySummary({ sourceOrgId: user.orgId })
   }
-  @PaidAiThrottle(10)
 
   /**
    * Phase #5 — Partner 导入岗位(只能写入自己机构,默认 pending+draft)。
@@ -457,6 +482,7 @@ export class JobsController {
   @Post('partner/jobs/import')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(10)
   async importJobs(@Body() dto: ImportJobsDto, @CurrentUser() user: AuthedUser) {
     return this.jobsService.importJobs(dto.items, user)
   }
@@ -471,7 +497,6 @@ export class JobsController {
   ) {
     return this.jobsService.unpublishPartnerJob(id, user)
   }
-  @PaidAiThrottle(30)
 
   /**
    * 阶段1C — Partner 编辑本机构岗位(展示字段白名单)。
@@ -480,6 +505,7 @@ export class JobsController {
   @Patch('partner/jobs/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(30)
   updatePartnerJob(
     @Param('id') id: string,
     @Body() dto: UpdatePartnerJobDto,
@@ -491,8 +517,12 @@ export class JobsController {
   @Get('partner/fairs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  getPartnerFairs(@CurrentUser() user: AuthedUser) {
-    return this.jobsService.getPartnerFairs(user)
+  getPartnerFairs(
+    @CurrentUser() user: AuthedUser,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.jobsService.getPartnerFairs(user, optionalPaging(page, pageSize))
   }
 
   @Post('partner/fairs/import')
@@ -660,11 +690,11 @@ export class JobsController {
       user,
     })
   }
-  @PaidAiThrottle(10)
 
   @Post('partner/excel/:batchId/confirm')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
+  @PaidAiThrottle(10)
   confirmExcelImport(
     @Param('batchId') batchId: string,
     @CurrentUser() user: AuthedUser,

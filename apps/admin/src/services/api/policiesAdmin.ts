@@ -11,6 +11,8 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 import type { ReviewAction, PublishAction } from './review-types'
+import type { AdminSourceListQuery, AdminSourcePage } from './types'
+import { isPagedSourceQuery, paginateAdminSourceRows, toAdminSourceQueryString } from './sourcePaging'
 
 export interface AdminPolicyRecord {
   id: string
@@ -86,7 +88,7 @@ export interface PolicyEligibilityRuleRecord {
 }
 
 export interface PoliciesAdminServiceInterface {
-  getPolicySources(): Promise<AdminPolicyRecord[]>
+  getPolicySources(query?: AdminSourceListQuery): Promise<AdminPolicyRecord[] | AdminSourcePage<AdminPolicyRecord>>
   reviewPolicy(id: string, action: ReviewAction, reason?: string): Promise<AdminPolicyRecord>
   publishPolicy(id: string, action: PublishAction): Promise<AdminPolicyRecord>
   /** 问项字典(公开端点,无角色守卫):把规则里的服务端标识翻成中文名称 */
@@ -126,7 +128,12 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 const httpAdapter: PoliciesAdminServiceInterface = {
-  getPolicySources: () => req<AdminPolicyRecord[]>('GET', '/admin/policy-sources'),
+  getPolicySources: (query?: AdminSourceListQuery) => {
+    const path = `/admin/policy-sources${query ? toAdminSourceQueryString(query) : ''}`
+    return isPagedSourceQuery(query)
+      ? req<AdminSourcePage<AdminPolicyRecord>>('GET', path)
+      : req<AdminPolicyRecord[]>('GET', path)
+  },
   reviewPolicy: (id, action, reason) => req<AdminPolicyRecord>('PATCH', `/admin/policy-sources/${id}/review`, { action, reason }),
   publishPolicy: (id, action) => req<AdminPolicyRecord>('PATCH', `/admin/policy-sources/${id}/publish`, { action }),
   getEligibilityQuestions: () => req<PolicyEligibilityQuestionSet>('GET', '/policies/eligibility-questions'),
@@ -153,7 +160,15 @@ const mockPolicies: AdminPolicyRecord[] = [
 ]
 
 const mockAdapter: PoliciesAdminServiceInterface = {
-  async getPolicySources() { return [...mockPolicies] },
+  async getPolicySources(query?: AdminSourceListQuery) {
+    let rows = [...mockPolicies]
+    if (query?.reviewStatus) rows = rows.filter((r) => r.reviewStatus === query.reviewStatus)
+    if (query?.sourceOrgId) rows = rows.filter((r) => r.sourceOrgId === query.sourceOrgId)
+    const keyword = query?.keyword?.trim()
+    if (keyword) rows = rows.filter((r) => r.title.includes(keyword) || r.sourceName.includes(keyword))
+    if (!isPagedSourceQuery(query)) return rows
+    return paginateAdminSourceRows(rows, query ?? {})
+  },
   async reviewPolicy(id, action, reason) {
     const hit = mockPolicies.find((p) => p.id === id)
     if (!hit) throw new ApiHttpError('POLICY_NOT_FOUND', '不存在', 404)

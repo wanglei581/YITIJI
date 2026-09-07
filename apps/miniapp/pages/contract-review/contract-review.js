@@ -153,6 +153,8 @@ Page({
   data: {
     statusBarHeight: 20,
     step: 'pick',
+    keepBusy: false,
+    keepDone: false,
     stages: STAGES,
     stageIdx: -1,
     waitedSec: 0,
@@ -593,9 +595,46 @@ Page({
     this._pending = null
     this.setData({
       step: 'pick', reviewId: '', report: null, filePath: '', fileName: '', error: message || '',
+      keepBusy: false, keepDone: false,
       pages: null, okCoverage: false, okPersonal: false, sensitiveAgreed: false, busy: false,
     })
   },
 
   discard() { this._reset('') },
+  keepReport() {
+    if (this.data.keepBusy || this.data.keepDone) return
+    if (!auth.isLoggedIn()) {
+      wx.showModal({
+        title: '需要登录',
+        content: '保存到「我的文档」需要本人会员账号。报告不会进入打印链路。',
+        confirmText: '去登录',
+        success: (res) => {
+          if (res.confirm) wx.navigateTo({ url: '/pages/launch/launch' })
+        },
+      })
+      return
+    }
+    wx.showModal({
+      title: '保存到我的文档',
+      content: '保存后仅本人可查看，期限 90 天，可随时删除。报告不可打印，也不会发给企业。合同原件仍按短期策略删除。',
+      confirmText: '确认保存',
+      success: (res) => {
+        if (!res.confirm) return
+        const id = this.data.reviewId
+        if (!id) return
+        this.setData({ keepBusy: true, error: '' })
+        api.keepContractReviewReport(id)
+          .then((kept) => {
+            if (!kept || kept.savedToDocuments !== true) {
+              throw new Error('保存未完成')
+            }
+            this.setData({ keepBusy: false, keepDone: true })
+            wx.showToast({ title: '已保存', icon: 'success' })
+          })
+          .catch((err) => {
+            this.setData({ keepBusy: false, error: (err && err.message) || '保存失败，请稍后重试' })
+          })
+      },
+    })
+  },
 })

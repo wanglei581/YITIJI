@@ -12,9 +12,15 @@ import {
   UploadCloudIcon,
 } from 'lucide-react'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
+import {
+  useDocumentConversionCapabilities,
+  WORD_CONVERSION_DISCLOSURE,
+  WORD_CONVERSION_UNAVAILABLE_COPY,
+} from '../../services/api/documentConversion'
 
-const RESUME_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
-const PRINT_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
+const BASE_RESUME_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
+const BASE_PRINT_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
+const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const MAX_BYTES = 10 * 1024 * 1024
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
@@ -25,27 +31,32 @@ interface PhoneUploadPurposeConfig {
   helper: string
 }
 
-const PHONE_UPLOAD_PURPOSES: Readonly<Record<string, PhoneUploadPurposeConfig>> = {
-  resume_upload: {
-    noun: '简历文件',
-    accept: RESUME_ACCEPT,
-    helper: '简历支持 PDF / Word / JPG / PNG / WEBP；单个最大 10MB，选择后自动上传',
-  },
-  print_doc: {
-    noun: '打印文件',
-    accept: PRINT_DOC_ACCEPT,
-    helper: '打印支持 PDF / JPG / PNG；单个最大 10MB，选择后自动上传',
-  },
-  signature_image: {
-    noun: '签名或印章图片',
-    accept: '.jpg,.jpeg,.png,image/jpeg,image/png',
-    helper: '支持 JPG / PNG；单个最大 10MB，选择后自动上传',
-  },
-  contract_upload: {
-    noun: '合同文件',
-    accept: RESUME_ACCEPT,
-    helper: '合同支持 PDF / Word / JPG / PNG / WEBP；单个最大 10MB，选择后自动上传',
-  },
+const PHONE_UPLOAD_PURPOSES = (wordConversionAvailable: boolean): Readonly<Record<string, PhoneUploadPurposeConfig>> => {
+  const wordHelper = wordConversionAvailable
+    ? `支持 Word；${WORD_CONVERSION_DISCLOSURE}`
+    : WORD_CONVERSION_UNAVAILABLE_COPY
+  return {
+    resume_upload: {
+      noun: '简历文件',
+      accept: wordConversionAvailable ? `${BASE_RESUME_ACCEPT},${WORD_ACCEPT}` : BASE_RESUME_ACCEPT,
+      helper: `简历支持 PDF / JPG / PNG / WEBP；${wordHelper}；单个最大 10MB，选择后自动上传`,
+    },
+    print_doc: {
+      noun: '打印文件',
+      accept: wordConversionAvailable ? `${BASE_PRINT_DOC_ACCEPT},${WORD_ACCEPT}` : BASE_PRINT_DOC_ACCEPT,
+      helper: `打印支持 PDF / JPG / PNG；${wordHelper}；单个最大 10MB，选择后自动上传`,
+    },
+    signature_image: {
+      noun: '签名或印章图片',
+      accept: '.jpg,.jpeg,.png,image/jpeg,image/png',
+      helper: '支持 JPG / PNG；单个最大 10MB，选择后自动上传',
+    },
+    contract_upload: {
+      noun: '合同文件',
+      accept: wordConversionAvailable ? `${BASE_RESUME_ACCEPT},${WORD_ACCEPT}` : BASE_RESUME_ACCEPT,
+      helper: `合同支持 PDF / JPG / PNG / WEBP；${wordHelper}；单个最大 10MB，选择后自动上传`,
+    },
+  }
 }
 
 function formatSize(bytes: number): string {
@@ -66,11 +77,13 @@ function fileFormat(file: File): string {
 
 export function PhoneUploadPage() {
   const location = useLocation()
+  const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
+  const purposes = PHONE_UPLOAD_PURPOSES(conversionCapabilities.wordToPdf)
   const hashParams = useMemo(() => new URLSearchParams(location.hash.replace(/^#/, '')), [location.hash])
   const sessionId = hashParams.get('sessionId')?.trim() ?? ''
   const uploadToken = hashParams.get('token')?.trim() ?? ''
   const purpose = hashParams.get('purpose')?.trim() ?? ''
-  const purposeConfig = PHONE_UPLOAD_PURPOSES[purpose]
+  const purposeConfig = purposes[purpose]
   const [state, setState] = useState<UploadState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [fileLabel, setFileLabel] = useState<string | null>(null)
@@ -181,10 +194,27 @@ export function PhoneUploadPage() {
                 state === 'uploading' ? 'is-busy' : '',
               ].join(' ').trim()}
             >
-              <input type="file" accept={purposeConfig?.accept ?? ''} aria-label={`选择${fileNoun}`} className="sr-only" disabled={state === 'uploading'} onChange={handleFile} />
+              <input
+                type="file"
+                accept={purposeConfig?.accept ?? ''}
+                aria-label={`选择${fileNoun}`}
+                aria-describedby={purpose === 'resume_upload' || purpose === 'print_doc' || purpose === 'contract_upload' ? 'phone-word-conversion-status' : undefined}
+                className="sr-only"
+                disabled={state === 'uploading'}
+                onChange={handleFile}
+              />
               {state === 'uploading' ? <Loader2Icon aria-hidden="true" /> : <UploadCloudIcon aria-hidden="true" />}
               <b>选择手机中的文件</b>
               <span>{purposeConfig?.helper ?? '请回到一体机重新生成二维码。'}</span>
+              {(purpose === 'resume_upload' || purpose === 'print_doc' || purpose === 'contract_upload') && (
+                <span
+                  id="phone-word-conversion-status"
+                  className="sr-only"
+                  aria-disabled={!conversionCapabilities.wordToPdf || undefined}
+                >
+                  {conversionCapabilities.wordToPdf ? WORD_CONVERSION_DISCLOSURE : conversionCapabilities.reason || WORD_CONVERSION_UNAVAILABLE_COPY}
+                </span>
+              )}
             </label>
           )}
 

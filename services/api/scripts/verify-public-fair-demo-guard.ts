@@ -10,6 +10,8 @@
  */
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
+import { readFileSync } from 'fs'
+import path from 'path'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JobsService } from '../src/jobs/jobs.service'
@@ -19,6 +21,11 @@ import { JobsAdminService } from '../src/jobs/jobs-admin.service'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+import { FairMaterialService } from '../src/jobs/fair-material.service'
+import { FairVenueGuideService } from '../src/jobs/fair-venue-guide.service'
+import { FairMaterialPrintBridgeService } from '../src/jobs/fair-material-print-bridge.service'
+import { FilesService } from '../src/files/files.service'
+import { StorageService } from '../src/storage/storage.service'
 
 process.env['EXCLUDE_DEMO_PUBLIC_DATA'] = 'true'
 
@@ -47,6 +54,15 @@ async function main() {
   const _partner = new JobsPartnerService(prisma, audit, _jobQuality)
   const _excel = new JobsExcelService(prisma, audit, _jobQuality)
   const service = new JobsService(_kiosk, _admin, _partner, _excel)
+  const storage = new StorageService()
+  const files = new FilesService(prisma, audit, storage)
+  const materials = new FairMaterialService(
+    prisma,
+    audit,
+    storage,
+    new FairMaterialPrintBridgeService(prisma, storage, files),
+  )
+  const venue = new FairVenueGuideService(prisma, audit)
 
   // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
@@ -123,6 +139,28 @@ async function main() {
       fail('3. 正式学校招聘会详情未正常公开读取')
     }
     pass('3. 严格模式详情:正式学校招聘会仍正常公开展示')
+
+    await prisma.fairMaterial.create({
+      data: {
+        jobFairId: demoFair.id,
+        name: '演示资料',
+        storageKey: `verify/demo-mat-${suffix}.pdf`,
+        mimeType: 'application/pdf',
+        sizeBytes: 12,
+        sha256: 'a'.repeat(64),
+        publishStatus: 'published',
+      },
+    })
+    const demoMats = await materials.getPublishedFairMaterials(demoFair.id, 1, 20)
+    if (demoMats.total !== 0 || demoMats.data.length !== 0) fail('4. 演示招聘会活动资料仍可公开读取')
+    const demoVenue = await venue.getPublishedVenueGuide(demoFair.id)
+    if (demoVenue.data !== null) fail('4. 演示招聘会场馆导览仍可公开读取')
+    pass('4. 严格模式子资源:活动资料/场馆导览套 withPublicFairDemoExclusion')
+    const materialSrc = readFileSync(path.join(__dirname, '../src/jobs/fair-material.service.ts'), 'utf8')
+    const venueSrc = readFileSync(path.join(__dirname, '../src/jobs/fair-venue-guide.service.ts'), 'utf8')
+    if (!materialSrc.includes('withPublicFairDemoExclusion') || !venueSrc.includes('withPublicFairDemoExclusion')) {
+      fail('4. 源码未套 withPublicFairDemoExclusion')
+    }
 
     console.log('\n=== ALL PASS ===')
   } finally {

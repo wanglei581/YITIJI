@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import type { Prisma } from '../generated/prisma/client'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { CreatePolicyPostDto, UpdatePolicyPostDto } from './dto/policy.dto'
@@ -44,6 +46,33 @@ export interface PolicyPostDto {
   rejectReason: string | null
   syncTime: string
   updatedAt: string
+}
+
+export interface AdminPolicySourceListParams {
+  page?: string
+  pageSize?: string
+  reviewStatus?: string
+  sourceOrgId?: string
+  keyword?: string
+}
+
+export interface AdminPolicySourcePage {
+  items: PolicyPostDto[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function hasPolicyPagination(params?: AdminPolicySourceListParams): params is AdminPolicySourceListParams {
+  return params?.page !== undefined || params?.pageSize !== undefined
+}
+
+function normalizePolicyPage(params: AdminPolicySourceListParams): { page: number; pageSize: number; skip: number } {
+  const parsedPage = Number.parseInt(params.page ?? '1', 10)
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+  const parsedPageSize = Number.parseInt(params.pageSize ?? '20', 10)
+  const pageSize = Math.min(100, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 20)
+  return { page, pageSize, skip: (page - 1) * pageSize }
 }
 
 interface PrismaPolicyRow {
@@ -140,13 +169,51 @@ export class PoliciesService {
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
 
-  async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]> {
-    if (!user.orgId) return []
-    const rows = await this.prisma.policyPost.findMany({
-      where: { sourceOrgId: user.orgId },
-      orderBy: { createdAt: 'desc' },
-    })
-    return rows.map(mapPolicy)
+  async getPartnerPolicies(user: AuthedUser): Promise<PolicyPostDto[]>
+  async getPartnerPolicies(
+    user: AuthedUser,
+    query: { page: number; pageSize: number },
+  ): Promise<{ data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>
+  async getPartnerPolicies(
+    user: AuthedUser,
+    query?: { page: number; pageSize: number },
+  ): Promise<
+    | PolicyPostDto[]
+    | { data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }
+  > {
+    if (!user.orgId) {
+      if (!query) return []
+      return {
+        data: [],
+        pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
+      }
+    }
+    const where = { sourceOrgId: user.orgId }
+    if (!query) {
+      const rows = await this.prisma.policyPost.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      })
+      return rows.map(mapPolicy)
+    }
+    const [total, rows] = await Promise.all([
+      this.prisma.policyPost.count({ where }),
+      this.prisma.policyPost.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ])
+    return {
+      data: rows.map(mapPolicy),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+      },
+    }
   }
 
   async createPartnerPolicy(dto: CreatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto> {
@@ -260,9 +327,31 @@ export class PoliciesService {
 
   // ── Admin:全量 + 审核/发布(状态机与 fair-sources 一致)──────────────────
 
-  async getAllPolicySources(): Promise<PolicyPostDto[]> {
-    const rows = await this.prisma.policyPost.findMany({ orderBy: { createdAt: 'desc' } })
-    return rows.map(mapPolicy)
+  async getAllPolicySources(): Promise<PolicyPostDto[]>
+  async getAllPolicySources(params: AdminPolicySourceListParams): Promise<PolicyPostDto[] | AdminPolicySourcePage>
+  async getAllPolicySources(params?: AdminPolicySourceListParams): Promise<PolicyPostDto[] | AdminPolicySourcePage> {
+    const where: Prisma.PolicyPostWhereInput = {
+      ...(params?.reviewStatus ? { reviewStatus: params.reviewStatus } : {}),
+      ...(params?.sourceOrgId ? { sourceOrgId: params.sourceOrgId } : {}),
+      ...(params?.keyword?.trim()
+        ? {
+            OR: [
+              { title: { contains: params.keyword.trim() } },
+              { sourceName: { contains: params.keyword.trim() } },
+            ],
+          }
+        : {}),
+    }
+    if (!hasPolicyPagination(params)) {
+      const rows = await this.prisma.policyPost.findMany({ where, orderBy: { createdAt: 'desc' } })
+      return rows.map(mapPolicy)
+    }
+    const { page, pageSize, skip } = normalizePolicyPage(params)
+    const [rows, total] = await Promise.all([
+      this.prisma.policyPost.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: pageSize }),
+      this.prisma.policyPost.count({ where }),
+    ])
+    return { items: rows.map(mapPolicy), total, page, pageSize }
   }
 
   async reviewPolicy(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<PolicyPostDto> {
@@ -321,7 +410,23 @@ export class PoliciesService {
       })
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
-    const updated = await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: toStatus } })
+    if (action === 'publish') {
+      const cas = await this.prisma.policyPost.updateMany({
+        where: { id, reviewStatus: 'approved' },
+        data: { publishStatus: 'published' },
+      })
+      if (cas.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PUBLISH_STATE_CONFLICT', message: '内容状态已变化，无法发布' },
+        })
+      }
+    } else {
+      await this.prisma.policyPost.update({ where: { id }, data: { publishStatus: 'unpublished' } })
+    }
+    const updated = await this.prisma.policyPost.findUnique({ where: { id } })
+    if (!updated) {
+      throw new NotFoundException({ error: { code: 'POLICY_NOT_FOUND', message: `Policy ${id} not found` } })
+    }
     await this.audit.write({
       actorId: user.userId,
       actorRole: 'admin',

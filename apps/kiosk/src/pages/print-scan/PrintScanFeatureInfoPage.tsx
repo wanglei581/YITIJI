@@ -70,7 +70,7 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
     ],
     notice: 'sensitive',
     fallbackLabel: '先用照片打印',
-    fallbackTo: '/print/upload',
+    fallbackTo: '/print/upload?category=photo',
   },
 }
 

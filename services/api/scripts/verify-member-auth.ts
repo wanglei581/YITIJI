@@ -342,6 +342,36 @@ async function main() {
     if (!JSON.stringify(me.json).includes(PHONE)) pass('/me 响应不含明文手机号')
     else fail('/me 响应泄露明文手机号')
 
+    if (!loginSessionId || typeof user.id !== 'string') {
+      fail('缺少 sessionId，无法测滑动续期')
+    } else {
+      const sessKey = memberSessionKey(loginSessionId)
+      await rawRedis.expire(sessKey, 800)
+      const ttlBefore = await rawRedis.ttl(sessKey)
+      const meRefresh = await get('/me', token)
+      const ttlAfter = await rawRedis.ttl(sessKey)
+      if (meRefresh.status === 200 && ttlBefore > 0 && ttlBefore <= 800 && ttlAfter > 1500) {
+        pass('API-18 剩余 TTL < 50% 时滑动续期刷新到 ~1800s')
+      } else {
+        fail(`API-18 滑动续期异常 ttlBefore=${ttlBefore} ttlAfter=${ttlAfter} me=${meRefresh.status}`)
+      }
+
+      const capSessionId = randomBytes(8).toString('hex')
+      await redis.registerMemberSession(user.id, capSessionId, 1800)
+      await rawRedis.set(
+        `member:session-started:${capSessionId}`,
+        String(Math.floor(Date.now() / 1000) - 24 * 60 * 60 - 5),
+      )
+      const capToken = memberJwt.sign({ sub: user.id }, { jwtid: capSessionId })
+      const capGuard = new EndUserAuthGuard(memberJwt, redis, prisma)
+      await expectGuardCode(
+        () => capGuard.canActivate(mockCtx(`Bearer ${capToken}`)),
+        'MEMBER_SESSION_EXPIRED',
+        'API-18 超过绝对 24h 上限后会话失效',
+      )
+      await redis.unregisterMemberSession(user.id, capSessionId)
+    }
+
     // ── 8. 落库不含明文 ───────────────────────────────────────────────────────
     console.log('\n── 8. EndUser 落库隐私校验 ────────────────────────────────────')
     const row = await prisma.endUser.findUnique({ where: { phoneHash } })

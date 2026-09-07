@@ -4,18 +4,30 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@ai-job-print/ui'
-import type { JobAiSessionListItem, MemberAiRecordItem, MemberAiRecordKind } from '@ai-job-print/shared'
+import type {
+  JobAiSessionListItem,
+  MemberAiRecordItem,
+  MemberAiRecordKind,
+  MemberInterviewItem,
+} from '@ai-job-print/shared'
 import { SparklesIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyAiRecord, getMyAiRecords } from '../../../services/api/memberAssets'
 import { deleteMyJobAiSession, listMyJobAiSessions } from '../../../services/api/jobAi'
+import { deleteMyInterview, getMyInterviews } from '../../../services/api/interview'
 import { useAuth } from '../../../auth/useAuth'
 import { KIcon, type KioskIconName } from '../../../components/kiosk-icon'
 import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { JobAiSessionRecords } from './JobAiSessionRecords'
+import { MockInterviewRecords } from './MockInterviewRecords'
 import './me-detail-inkpaper.css'
+
+type AiRecordView = MemberAiRecordItem & {
+  ref?: { type: 'job_fair'; id: string; name: string } | null
+}
 
 const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon: KioskIconName; tone: string }> = {
   parse: { label: '简历诊断', hint: '上传简历后的诊断记录', icon: 'doc-check', tone: 'teal' },
@@ -65,15 +77,19 @@ function shouldDisplayJobAiSession(
 }
 
 export function MyAiRecordsPage() {
+  const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
-  const [items, setItems] = useState<MemberAiRecordItem[]>([])
+  const [items, setItems] = useState<AiRecordView[]>([])
   const [jobAiSessions, setJobAiSessions] = useState<JobAiSessionListItem[]>([])
+  const [interviews, setInterviews] = useState<MemberInterviewItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [confirmJobAiSessionId, setConfirmJobAiSessionId] = useState<string | null>(null)
+  const [confirmInterviewId, setConfirmInterviewId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [busyJobAiSessionId, setBusyJobAiSessionId] = useState<string | null>(null)
+  const [busyInterviewId, setBusyInterviewId] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
   const mountedRef = useRef(false)
   const loadSeqRef = useRef(0)
@@ -94,6 +110,7 @@ export function MyAiRecordsPage() {
     if (!isLoggedIn) {
       setItems([])
       setJobAiSessions([])
+      setInterviews([])
       setState('ready')
       return
     }
@@ -102,16 +119,18 @@ export function MyAiRecordsPage() {
     Promise.all([
       getMyAiRecords(token, { pageSize: 50 }),
       listMyJobAiSessions(token, { pageSize: 50 }),
+      getMyInterviews(token),
     ])
-      .then(([recordsPage, sessionsPage]) => {
+      .then(([recordsPage, sessionsPage, interviewPage]) => {
         if (!mountedRef.current || loadSeqRef.current !== seq) return
-        setItems(recordsPage.items)
+        setItems(recordsPage.items as AiRecordView[])
         const completedJobFitTaskIds = new Set(
           recordsPage.items
             .filter((item) => item.kind === 'job_fit' && item.status === 'completed')
             .map((item) => item.taskId),
         )
         setJobAiSessions(sessionsPage.items.filter((session) => shouldDisplayJobAiSession(session, completedJobFitTaskIds)))
+        setInterviews(interviewPage.items)
         setState('ready')
       })
       .catch(() => {
@@ -141,6 +160,12 @@ export function MyAiRecordsPage() {
     const t = setTimeout(() => setConfirmJobAiSessionId(null), 3500)
     return () => clearTimeout(t)
   }, [confirmJobAiSessionId])
+
+  useEffect(() => {
+    if (!confirmInterviewId) return
+    const t = setTimeout(() => setConfirmInterviewId(null), 3500)
+    return () => clearTimeout(t)
+  }, [confirmInterviewId])
 
   const remove = async (record: MemberAiRecordItem) => {
     if (confirmId !== record.id) {
@@ -193,10 +218,38 @@ export function MyAiRecordsPage() {
     }
   }
 
-  const totalCount = items.length + jobAiSessions.length
+  const removeInterview = async (sessionId: string) => {
+    if (confirmInterviewId !== sessionId) {
+      setConfirmInterviewId(sessionId)
+      return
+    }
+    const token = getToken()
+    if (!token) return
+    setBusyInterviewId(sessionId)
+    try {
+      await deleteMyInterview(token, sessionId)
+      setInterviews((prev) => prev.filter((item) => item.sessionId !== sessionId))
+      setConfirmInterviewId(null)
+      setHint('模拟面试记录已删除')
+    } catch {
+      setHint('删除失败，记录可能已到期或被清理')
+    } finally {
+      setBusyInterviewId(null)
+    }
+  }
+
+  const openFairPlan = (item: AiRecordView) => {
+    if (item.kind !== 'fair_visit_plan' || item.ref?.type !== 'job_fair' || !item.ref.id) return
+    navigate(`/job-fairs/${encodeURIComponent(item.ref.id)}/visit-plan`, {
+      state: { taskId: item.taskId },
+    })
+  }
+
+  const totalCount = items.length + jobAiSessions.length + interviews.length
   const completedCount =
     items.filter((item) => item.status === 'completed').length +
-    jobAiSessions.filter((item) => item.session.status === 'completed').length
+    jobAiSessions.filter((item) => item.session.status === 'completed').length +
+    interviews.filter((item) => item.hasReport).length
 
   return (
     <div className="me-inkdetail me-inkdetail-ai-records h-full">
@@ -214,10 +267,10 @@ export function MyAiRecordsPage() {
         isLoggedIn={isLoggedIn}
         state={state}
         onRetry={() => setReloadKey((k) => k + 1)}
-        isEmpty={items.length === 0 && jobAiSessions.length === 0}
+        isEmpty={items.length === 0 && jobAiSessions.length === 0 && interviews.length === 0}
         emptyIcon={SparklesIcon}
         emptyTitle="还没有 AI 服务记录"
-        emptyDescription="完成简历诊断、优化、岗位 AI 参考、职业规划或参会准备后，这里会显示记录"
+        emptyDescription="完成简历诊断、优化、模拟面试、岗位 AI 参考、职业规划或参会准备后，这里会显示记录"
       >
         <section className="me-detail-summary" aria-label="AI 服务记录概览">
           <span className="me-summary-icon me-tone-teal" aria-hidden="true">
@@ -233,6 +286,14 @@ export function MyAiRecordsPage() {
             <span>处理中 {totalCount - completedCount}</span>
           </div>
         </section>
+
+        <MockInterviewRecords
+          items={interviews}
+          confirmId={confirmInterviewId}
+          busyId={busyInterviewId}
+          onOpen={(sessionId) => navigate('/interview/report', { state: { sessionId } })}
+          onDelete={(sessionId) => void removeInterview(sessionId)}
+        />
 
         <JobAiSessionRecords
           items={jobAiSessions}
@@ -265,8 +326,19 @@ export function MyAiRecordsPage() {
                     {status.label}
                   </span>
                 </div>
-                <p className="me-row-title mt-2">{kind.hint}</p>
+                <p className="me-row-title mt-2">
+                  {item.kind === 'fair_visit_plan' && item.ref?.name ? item.ref.name : kind.hint}
+                </p>
                 <p className="me-row-meta">{metaLine(item)}</p>
+                {item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && item.ref.id && item.status === 'completed' && (
+                  <button
+                    type="button"
+                    className="me-ripple mt-2 min-h-12 text-sm font-semibold text-primary-700"
+                    onClick={() => openFairPlan(item)}
+                  >
+                    打开这场招聘会规划
+                  </button>
+                )}
               </div>
               <button
                 type="button"

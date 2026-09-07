@@ -112,6 +112,11 @@ class LifecycleHarness {
     throw new ServiceUnavailableException('REPORT_NOT_AVAILABLE')
   }
 
+  async keepReport(id: string, requester: ContractReviewRequester): Promise<never> {
+    this.requireTask(id, requester)
+    throw new ServiceUnavailableException('REPORT_NOT_AVAILABLE')
+  }
+
   async abandonReport(fileId: string, token: string | null) {
     if (fileId !== 'report-file-1' || token !== 'report-abandon-token-1') throw taskNotFound()
     return { fileId, deleted: true, protectedByPrintTask: false }
@@ -292,6 +297,7 @@ async function verifyExplicitHttpModule(): Promise<void> {
       await request(port, 'GET', `/contract-reviews/${task.id}`, undefined, replayHeaders),
       await request(port, 'POST', `/contract-reviews/${task.id}/confirm`, confirmBody, replayHeaders),
       await request(port, 'POST', `/contract-reviews/${task.id}/report`, undefined, replayHeaders),
+      await request(port, 'POST', `/contract-reviews/${task.id}/report/keep`, undefined, replayHeaders),
       await request(port, 'DELETE', `/contract-reviews/${task.id}`, undefined, replayHeaders),
     ]) {
       assertError(replay, 404, 'CONTRACT_REVIEW_TASK_NOT_FOUND')

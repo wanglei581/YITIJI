@@ -78,4 +78,43 @@ export class PrintJobsController {
   getStatus(@Param('taskId') taskId: string) {
     return this.service.getStatus(taskId)
   }
+
+  @Post(':taskId/takeaway-url')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  async issueTakeawayUrl(
+    @Param('taskId') taskId: string,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
+  ) {
+    const endUser = await resolveOptionalEndUser(authorization, this.jwt, this.redis, this.prisma)
+    return this.service.issueTakeawayUrl(taskId, {
+      endUserId: endUser?.endUserId ?? null,
+      paymentSessionToken,
+      ipAddress: ip ?? null,
+      userAgent: userAgent ?? null,
+    })
+  }
+
+  @Post(':taskId/retry')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @UseGuards(TerminalIdentityGuard)
+  async retryPaidFailedJob(
+    @Param('taskId') taskId: string,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
+  ) {
+    const endUser = await resolveOptionalEndUser(authorization, this.jwt, this.redis, this.prisma)
+    return this.service.retryPaidFailedJob(taskId, {
+      endUserId: endUser?.endUserId ?? null,
+      paymentSessionToken,
+      ipAddress: ip ?? null,
+      userAgent: userAgent ?? null,
+    })
+  }
 }

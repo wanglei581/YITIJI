@@ -13,6 +13,7 @@
 import type {
   GeneratedResume,
   ResumeExportFormat,
+  ResumeExportPricing,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -21,10 +22,19 @@ import type {
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
+  ResumeReportExportKind,
+  ResumeReportExportResponse,
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSessionSummaryResponse,
+  AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
-import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
+import type {
+  ResumeExportChargeOptions,
+  ResumeLayoutAdjustAction,
+  ResumeLayoutAdjustResponse,
+  ResumeReadAccess,
+} from './ai'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
@@ -184,7 +194,7 @@ async function postForm<T>(path: string, body: FormData, timeoutMs = LLM_TIMEOUT
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...terminalHeader() },
       credentials: 'include',
       body,
       signal: ac.signal,
@@ -242,8 +252,8 @@ export const aiHttpAdapter = {
     )
   },
 
-  async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
-    return post<AssistantChatResponse>('/assistant/chat', req, undefined, LLM_TIMEOUT_MS)
+  async chatWithAssistant(req: AssistantChatRequest, token?: string | null): Promise<AssistantChatResponse> {
+    return post<AssistantChatResponse>('/assistant/chat', req, token, LLM_TIMEOUT_MS)
   },
 
   // ── 阶段2A AI 简历生成 ──────────────────────────────────────
@@ -262,6 +272,21 @@ export const aiHttpAdapter = {
     return postForm<ResumeVoiceTranscribeResponse>('/resume/voice/transcribe', form)
   },
 
+  async transcribeAssistantVoice(audio: Blob): Promise<AssistantVoiceTranscribeResponse> {
+    const form = new FormData()
+    form.append('audio', audio, 'assistant-voice.wav')
+    return postForm<AssistantVoiceTranscribeResponse>('/assistant/voice', form)
+  },
+
+  async summarizeAssistantSession(sessionId: string, token: string): Promise<AssistantSessionSummaryResponse> {
+    return post<AssistantSessionSummaryResponse>(
+      `/assistant/sessions/${encodeURIComponent(sessionId)}/summary`,
+      {},
+      token,
+      LLM_TIMEOUT_MS,
+    )
+  },
+
   async exportGeneratedResume(
     resume: GeneratedResume,
     taskId?: string,
@@ -270,11 +295,41 @@ export const aiHttpAdapter = {
     layout?: ResumeLayoutSettings,
     templateId?: string,
     draft?: boolean,
+    charge?: ResumeExportChargeOptions,
   ): Promise<ResumeGenerateExportResponse> {
     return post<ResumeGenerateExportResponse>(
       '/resume/generate/export',
-      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf', ...(layout ? { layout } : {}), ...(templateId ? { templateId } : {}), ...(draft ? { draft: true } : {}) },
+      {
+        ...resume,
+        ...(taskId ? { taskId } : {}),
+        format: format ?? 'pdf',
+        ...(layout ? { layout } : {}),
+        ...(templateId ? { templateId } : {}),
+        ...(draft ? { draft: true } : {}),
+        ...(charge?.benefitGrantId ? { benefitGrantId: charge.benefitGrantId } : {}),
+        // factsConfirmedAt 不能放进本 body：全局 forbidNonWhitelisted，DTO 尚无该字段（包 H）。
+      },
       token,
+    )
+  },
+
+  async getResumeExportPricing(access?: ResumeReadAccess): Promise<ResumeExportPricing> {
+    return get<ResumeExportPricing>('/resume/export/pricing', access)
+  },
+
+  async exportResumeRecord(
+    taskId: string,
+    body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
+    access?: ResumeReadAccess,
+  ): Promise<ResumeReportExportResponse> {
+    return postWithAccess<ResumeReportExportResponse>(
+      `/resume/records/${encodeURIComponent(taskId)}/export`,
+      {
+        kind: body.kind,
+        ...(body.benefitGrantId ? { benefitGrantId: body.benefitGrantId } : {}),
+        ...(body.factsConfirmedAt ? { factsConfirmedAt: body.factsConfirmedAt } : {}),
+      },
+      access,
     )
   },
 }

@@ -170,8 +170,13 @@ export interface PolicyEligibilityCheckResult {
   items: PolicyEligibilityCheckItem[]
 }
 
+export interface PartnerPolicyPage {
+  data: PartnerPolicyRecord[]
+  pagination: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
 export interface PartnerPoliciesServiceInterface {
-  getPolicies(): Promise<PartnerPolicyRecord[]>
+  getPolicies(query?: { page?: number; pageSize?: number }): Promise<PartnerPolicyPage>
   createPolicy(input: SavePolicyInput): Promise<PartnerPolicyRecord>
   updatePolicy(id: string, input: Partial<SavePolicyInput>): Promise<PartnerPolicyRecord>
   unpublishPolicy(id: string): Promise<PartnerPolicyRecord>
@@ -217,7 +222,13 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 const httpAdapter: PartnerPoliciesServiceInterface = {
-  getPolicies: () => req<PartnerPolicyRecord[]>('GET', '/partner/policies'),
+  getPolicies: (query) => {
+    const params = new URLSearchParams()
+    if (query?.page) params.set('page', String(query.page))
+    if (query?.pageSize) params.set('pageSize', String(query.pageSize))
+    const qs = params.toString()
+    return req<PartnerPolicyPage>('GET', qs ? `/partner/policies?${qs}` : '/partner/policies')
+  },
   createPolicy: (input) => req<PartnerPolicyRecord>('POST', '/partner/policies', input),
   updatePolicy: (id, input) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}`, input),
   unpublishPolicy: (id) => req<PartnerPolicyRecord>('PATCH', `/partner/policies/${id}/publish`, { action: 'unpublish' }),
@@ -253,7 +264,16 @@ const mockRows: PartnerPolicyRecord[] = [
 ]
 
 const mockAdapter: PartnerPoliciesServiceInterface = {
-  async getPolicies() { return [...mockRows] },
+  async getPolicies(query) {
+    const page = query?.page && query.page > 0 ? query.page : 1
+    const pageSize = query?.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, 100) : 20
+    const total = mockRows.length
+    const start = (page - 1) * pageSize
+    return {
+      data: mockRows.slice(start, start + pageSize),
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    }
+  },
   async createPolicy(input) {
     const created: PartnerPolicyRecord = {
       id: `pp-mock-${++seq}`,

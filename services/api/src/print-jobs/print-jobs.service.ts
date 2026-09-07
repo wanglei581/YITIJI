@@ -1,12 +1,16 @@
 import crypto from 'crypto'
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, Optional, ServiceUnavailableException, ConflictException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { OrderStatusService } from '../payment/order-status.service'
-import { assertPaymentSessionSecretConfigured, createPaymentSessionToken } from '../payment/payment-session-token'
+import {
+  assertPaymentSessionSecretConfigured,
+  createPaymentSessionToken,
+  verifyPaymentSessionToken,
+} from '../payment/payment-session-token'
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
@@ -14,6 +18,11 @@ import { countPagesInRange } from './page-range.util'
 import { PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
 import { assertVerifiedPrintParameters } from './verified-print-parameters'
+import { DocumentConversionService } from '../document-conversion/document-conversion.service'
+import { WORD_MIME_TYPES } from '../document-conversion/document-conversion.types'
+
+/** 服务端 sha256 必须是 64 位小写十六进制（PII 扫描比对 / 报告完整性校验共用）。 */
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
 
 export interface PrintJobCreated {
   taskId:    string
@@ -39,6 +48,35 @@ export interface PrintJobCreated {
   billingPageSource: BillingPageSource
   /** 短期支付会话 token（只授权本次订单出码 / 轮询；不含文件 URL 或密钥）。 */
   paymentSessionToken: string
+}
+
+export interface PrintJobTakeawayUrlResult {
+  signedUrl: string
+  expiresAt: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  orderId: string
+  orderNo: string
+  payStatus: OrderPayStatus
+  amountCents: number
+  canRetry: boolean
+}
+
+export interface PrintJobRetryResult {
+  taskId: string
+  orderId: string
+  orderNo: string
+  amountCents: number
+  payStatus: OrderPayStatus
+  status: string
+}
+
+export interface PrintJobAccessContext {
+  endUserId?: string | null
+  paymentSessionToken?: string
+  ipAddress?: string | null
+  userAgent?: string | null
 }
 
 export interface PrintJobStatusResult {
@@ -89,6 +127,23 @@ const USER_FAILURE_REASONS: Record<string, string> = {
 
 /** 未知错误码 / 仅有原始 errorMessage 时的统一安全兜底文案。 */
 const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员处理或稍后重试'
+const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
+const KIOSK_RETRY_LOG_CODE = 'kiosk_retry'
+
+function parseStoredPrintFileId(fileUrl: string): string | null {
+  try {
+    const u = new URL(fileUrl, 'http://internal.local')
+    return u.pathname.match(/\/files\/([^/]+)\/content$/)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+function printTaskNotFound(): never {
+  throw new NotFoundException({
+    error: { code: 'PRINT_TASK_NOT_FOUND', message: '打印任务不存在' },
+  })
+}
 
 /**
  * 纯函数：把内部 errorCode 映射为面向用户的安全中文失败原因。
@@ -170,7 +225,6 @@ function makeOrderNo(): string {
  * 不在此列——它们由本机生成，不是用户手里可能夹带证件号的原件。
  */
 const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
-const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
 
 /**
  * 打印前隐私预检门控。默认关闭，由 PRINT_REQUIRE_PII_SCAN=true 显式开启；
@@ -192,6 +246,7 @@ export class PrintJobsService {
     private readonly pricing: PricingService,
     private readonly orderStatus: OrderStatusService,
     private readonly capabilities: TerminalCapabilitiesService,
+    @Optional() private readonly documentConversion?: DocumentConversionService,
   ) {}
 
   async create(
@@ -207,8 +262,8 @@ export class PrintJobsService {
 
     // HIGH-3 (SSRF)：fileUrl 必须是本系统签名 URL，且签名/有效期校验通过。
     // 非法 URL（外部地址、无签名、签名错误、已过期）直接 400，绝不落库给 Agent 下载。
-    const fileId = parseAndVerifySignedFileUrl(dto.fileUrl)
-    if (!fileId) {
+    const requestedFileId = parseAndVerifySignedFileUrl(dto.fileUrl)
+    if (!requestedFileId) {
       throw new BadRequestException({
         error: {
           code: 'PRINT_INVALID_FILE_URL',
@@ -217,12 +272,10 @@ export class PrintJobsService {
       })
     }
 
-    // 合同审查只允许打印系统生成的风险提示报告，原合同属于短期高敏原件，
-    // 即使调用方拿到了仍有效的内部签名 URL，也不得绕过合同审查页面直接建打印单。
-    // 报告哈希必须采用服务端落库值，不能信任 Kiosk 可篡改/遗漏的 fileMd5。
+    // 合同原件与签约风险报告均不得进入打印链路（2026-09-06 拍板：可保存、不打印）。
     const sourceFile = await this.prisma.fileObject.findUnique({
-      where: { id: fileId },
-      select: { purpose: true, sha256: true },
+      where: { id: requestedFileId },
+      select: { purpose: true, sha256: true, mimeType: true, filename: true },
     })
     if (sourceFile?.purpose === 'contract_upload') {
       throw new BadRequestException({
@@ -232,17 +285,16 @@ export class PrintJobsService {
         },
       })
     }
+    let fileId = requestedFileId
+    let effectiveFileName = dto.fileName ?? sourceFile?.filename ?? null
     let trustedFileHash = dto.fileMd5 ?? ''
     if (sourceFile?.purpose === 'contract_review_report') {
-      if (!SHA256_HEX_PATTERN.test(sourceFile.sha256)) {
-        throw new BadRequestException({
-          error: {
-            code: 'PRINT_CONTRACT_REPORT_INVALID',
-            message: '合同风险提示报告校验信息无效，请重新生成后再打印',
-          },
-        })
-      }
-      trustedFileHash = sourceFile.sha256
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_CONTRACT_REPORT_FORBIDDEN',
+          message: '签约风险提示报告不可打印。本人确认后可保存到「我的文档」查看或删除，不进入打印链路。',
+        },
+      })
     }
 
     // 招聘会资料 bridge 被下架/禁打/删除后，已确认任务可保留文件继续履约；
@@ -297,9 +349,6 @@ export class PrintJobsService {
     // 但记录，避免一刀切把既有打印链路堵死。
     await this.assertPiiScanned(fileId)
 
-    // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
-    // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
-    const { url: storedFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
     const terminalRef = ctx.terminalId?.trim()
     if (!terminalRef) {
       throw new BadRequestException({
@@ -351,9 +400,28 @@ export class PrintJobsService {
     // 必须在报价与落库**之前** —— 否则会出现「按彩色计价成单、实际出黑白纸」的资损。
     await this.capabilities.assertPrintParamsAllowed(targetTerminalId, dto.params)
 
+    // Word 原件只在全部终端与打印参数门禁通过后转换，避免无效请求留下派生文件。
+    // 隐私预检必须针对用户上传的原件执行；转换后的 derived PDF 会继承 sourceFileId，
+    // Agent 仍只收到 PDF，不新增 Word 打印能力。
+    if (sourceFile && WORD_MIME_TYPES.includes(sourceFile.mimeType as (typeof WORD_MIME_TYPES)[number])) {
+      if (!this.documentConversion) {
+        throw new ServiceUnavailableException({
+          error: { code: 'CONVERSION_UNAVAILABLE', message: '服务端未配置转换引擎' },
+        })
+      }
+      const converted = await this.documentConversion.convertForPrint(requestedFileId)
+      fileId = converted.fileId
+      effectiveFileName = converted.filename
+      trustedFileHash = converted.sha256
+    }
+
+    // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
+    // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
+    const { url: storedFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+
     // 计费页数：后端从签名 fileUrl 识别真实内容页数（**绝不信任前端 pages**）；
     // 未知 MIME / 识别失败 / 0 页 / 签名无效 / 文件缺失 → fail-closed 抛错，拒绝建（付费）订单。
-    const { billablePages: documentPages, billingPageSource } = await this.pageCount.resolveBillablePages(dto.fileUrl)
+    const { billablePages: documentPages, billingPageSource } = await this.pageCount.resolveBillablePages(storedFileUrl)
     // 页码范围：Agent 只打印 pageRange 选中页，计费必须与实际出纸一致，否则按整份文件收费即超收。
     // 选中页数为 0 / 范围非法 → fail-closed，绝不回退成整份文件页数。
     const billablePages = countPagesInRange(dto.params?.pageRange, documentPages)
@@ -376,7 +444,7 @@ export class PrintJobsService {
     // Agent 端 parseParams 会原样带上该字段，print() 忽略未知键，无副作用。
     const storedParams: Record<string, unknown> = {
       ...(dto.params ?? DEFAULT_PARAMS),
-      ...(dto.fileName ? { fileName: dto.fileName } : {}),
+      ...(effectiveFileName ? { fileName: effectiveFileName } : {}),
     }
 
     const orderNo = makeOrderNo()
@@ -451,7 +519,8 @@ export class PrintJobsService {
       targetId:   task.id,
       payload: {
         fileId,
-        fileName:    dto.fileName ?? null,
+        fileName:    effectiveFileName,
+        sourceFileId: requestedFileId === fileId ? null : requestedFileId,
         hasFileHash: Boolean(trustedFileHash),
         params:      dto.params ?? DEFAULT_PARAMS,
         hasEndUser:  Boolean(ctx.endUserId),
@@ -497,7 +566,7 @@ export class PrintJobsService {
   private async assertPiiScanned(fileId: string): Promise<void> {
     const file = await this.prisma.fileObject.findUnique({
       where: { id: fileId },
-      select: { purpose: true, assetCategory: true },
+      select: { purpose: true, assetCategory: true, sha256: true },
     })
     // 文件不存在交由后续既有校验处理，此处不越权报错
     if (!file) return
@@ -508,7 +577,7 @@ export class PrintJobsService {
     const scan = await this.prisma.documentProcessTask.findFirst({
       where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, paramsJson: true },
     })
 
     let pendingFindings = 0
@@ -519,7 +588,18 @@ export class PrintJobsService {
     }
 
     const ok = Boolean(scan) && pendingFindings === 0
-    if (ok) return
+    if (ok) {
+      const scanSha = readPiiScanSourceSha256(scan!.paramsJson)
+      if (!SHA256_HEX_PATTERN.test(file.sha256) || file.sha256 !== scanSha) {
+        throw new ConflictException({
+          error: {
+            code: 'PII_SCAN_STALE',
+            message: '文件在隐私检查后又被改过，请重新检查后再打印',
+          },
+        })
+      }
+      return
+    }
 
     const reason = !scan ? 'PII_SCAN_MISSING' : 'PII_DECISIONS_PENDING'
 
@@ -593,5 +673,237 @@ export class PrintJobsService {
         ? file.storageDeletedAt.toISOString()
         : file ? null : undefined,
     }
+  }
+
+  async issueTakeawayUrl(
+    taskId: string,
+    ctx: PrintJobAccessContext,
+  ): Promise<PrintJobTakeawayUrlResult> {
+    const { task, order, file } = await this.loadAccessiblePrintJob(taskId, ctx)
+    const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
+    if (!fileId || !file || file.deletedAt) {
+      throw new ConflictException({
+        error: {
+          code: 'PRINT_TAKEAWAY_FILE_UNAVAILABLE',
+          message: '打印文件已按保存策略清理，无法再签发带走链接',
+        },
+      })
+    }
+    const signed = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+    await this.audit.write({
+      actorId: ctx.endUserId ?? null,
+      actorRole: 'kiosk',
+      action: 'print_job.takeaway_url',
+      targetType: 'print_task',
+      targetId: task.id,
+      payload: { orderId: order.id, orderNo: order.orderNo, fileId },
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
+    }).catch(() => undefined)
+
+    return {
+      signedUrl: signed.url,
+      expiresAt: signed.expiresAt.toISOString(),
+      filename: file.filename,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+      orderId: order.id,
+      orderNo: order.orderNo,
+      payStatus: order.payStatus as OrderPayStatus,
+      amountCents: order.amountCents,
+      canRetry: this.canRetryPaidFailedJob(task, order, file),
+    }
+  }
+
+  async retryPaidFailedJob(
+    taskId: string,
+    ctx: PrintJobAccessContext,
+  ): Promise<PrintJobRetryResult> {
+    const { task, order, file } = await this.loadAccessiblePrintJob(taskId, ctx)
+    if (task.status === 'pending') {
+      const lastLog = await this.prisma.printTaskStatusLog.findFirst({
+        where: { taskId: task.id },
+        orderBy: { createdAt: 'desc' },
+        select: { errorCode: true, toStatus: true },
+      })
+      if (lastLog?.errorCode === KIOSK_RETRY_LOG_CODE && lastLog.toStatus === 'pending') {
+        return {
+          taskId: task.id,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          amountCents: order.amountCents,
+          payStatus: order.payStatus as OrderPayStatus,
+          status: task.status,
+        }
+      }
+    }
+    if (task.status !== 'failed') {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_INVALID_STATE', message: '仅失败的打印任务可以重新提交' },
+      })
+    }
+    if (task.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) {
+      throw new ConflictException({
+        error: {
+          code: 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
+          message: '打印结果未确认，不能重新提交，请联系工作人员核查',
+        },
+      })
+    }
+    if (order.payStatus !== 'paid') {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_NOT_PAID', message: '未完成支付的打印任务不能重新提交' },
+      })
+    }
+    const fileId = task.fileId ?? parseStoredPrintFileId(task.fileUrl)
+    if (!fileId || !file || file.deletedAt) {
+      throw new ConflictException({
+        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+      })
+    }
+    const { url: freshFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+    const amountBefore = order.amountCents
+
+    await this.prisma.$transaction(async (tx) => {
+      const activeTerminalLock = task.terminalId
+        ? await tx.terminal.updateMany({
+            where: { id: task.terminalId, enabled: true, lifecycleStatus: 'active' },
+            data: { lifecycleStatus: 'active' },
+          })
+        : null
+      if (activeTerminalLock && activeTerminalLock.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_TERMINAL_NOT_ACTIVE', message: '目标终端当前不能重新排队' },
+        })
+      }
+
+      const liveFile = await tx.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
+      if (!liveFile || liveFile.deletedAt) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: '打印文件已按保存策略清理，无法重新提交' },
+        })
+      }
+
+      const updatedOrder = await tx.order.updateMany({
+        where: {
+          id: order.id,
+          taskStatus: 'failed',
+          payStatus: 'paid',
+          amountCents: amountBefore,
+        },
+        data: { taskStatus: 'pending' },
+      })
+      if (updatedOrder.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+        })
+      }
+
+      const updated = await tx.printTask.updateMany({
+        where: { id: task.id, status: 'failed' },
+        data: {
+          status: 'pending',
+          claimedAt: null,
+          claimExpiry: null,
+          completedAt: null,
+          errorCode: null,
+          errorMessage: null,
+          fileUrl: freshFileUrl,
+        },
+      })
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+        })
+      }
+      await tx.printTaskStatusLog.create({
+        data: { taskId: task.id, fromStatus: 'failed', toStatus: 'pending', errorCode: KIOSK_RETRY_LOG_CODE },
+      })
+    })
+
+    await this.audit.write({
+      actorId: ctx.endUserId ?? null,
+      actorRole: 'kiosk',
+      action: 'print_job.retry',
+      targetType: 'print_task',
+      targetId: task.id,
+      payload: {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        amountCents: amountBefore,
+        fromStatus: 'failed',
+        toStatus: 'pending',
+      },
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
+    })
+
+    const fresh = await this.prisma.printTask.findUnique({
+      where: { id: task.id },
+      include: { order: { select: { id: true, orderNo: true, amountCents: true, payStatus: true } } },
+    })
+    if (!fresh?.order) printTaskNotFound()
+    return {
+      taskId: fresh.id,
+      orderId: fresh.order.id,
+      orderNo: fresh.order.orderNo,
+      amountCents: fresh.order.amountCents,
+      payStatus: fresh.order.payStatus as OrderPayStatus,
+      status: fresh.status,
+    }
+  }
+
+  private canRetryPaidFailedJob(
+    task: { status: string; errorCode: string | null },
+    order: { payStatus: string },
+    file: { deletedAt: Date | null } | null,
+  ): boolean {
+    return (
+      task.status === 'failed' &&
+      order.payStatus === 'paid' &&
+      task.errorCode !== PRINT_JOB_UNCONFIRMED_ERROR_CODE &&
+      Boolean(file) &&
+      !file?.deletedAt
+    )
+  }
+
+  private async loadAccessiblePrintJob(taskId: string, ctx: PrintJobAccessContext) {
+    const task = await this.prisma.printTask.findUnique({
+      where: { id: taskId },
+      include: {
+        order: true,
+        file: {
+          select: {
+            id: true,
+            filename: true,
+            mimeType: true,
+            sizeBytes: true,
+            deletedAt: true,
+          },
+        },
+      },
+    })
+    if (!task?.order) printTaskNotFound()
+
+    const session = verifyPaymentSessionToken(ctx.paymentSessionToken, {
+      orderId: task.order.id,
+      orderNo: task.order.orderNo,
+      terminalId: task.terminalId,
+      amountCents: task.order.amountCents,
+      printTaskId: task.id,
+    })
+    const memberOk = Boolean(ctx.endUserId && task.endUserId && ctx.endUserId === task.endUserId)
+    if (!session.ok && !memberOk) printTaskNotFound()
+
+    return { task, order: task.order, file: task.file }
+  }
+}
+
+function readPiiScanSourceSha256(paramsJson: string | null): string {
+  try {
+    const parsed = JSON.parse(paramsJson || '{}') as { sourceSha256?: unknown }
+    return typeof parsed.sourceSha256 === 'string' ? parsed.sourceSha256 : ''
+  } catch {
+    return ''
   }
 }

@@ -7,9 +7,21 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, ErrorState, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { InterviewReportResponse } from '@ai-job-print/shared'
+
+type InterviewQaExcerpt = {
+  question: string
+  answerExcerpt: string | null
+  skipped: boolean
+}
+
+type InterviewReportView = InterviewReportResponse & {
+  qaExcerpts?: InterviewQaExcerpt[]
+  includeAnswersInPrint?: boolean
+}
 import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertTriangleIcon,
@@ -31,7 +43,7 @@ import './interview-service-desk.css'
 interface ReportState {
   sessionId?: string
   accessToken?: string
-  report?: InterviewReportResponse
+  report?: InterviewReportView
 }
 
 const LEVEL_META: Record<string, { label: string; cls: string }> = {
@@ -72,7 +84,7 @@ export function InterviewReportPage() {
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as ReportState
 
-  const [data, setData] = useState<InterviewReportResponse | null>(state.report ?? null)
+  const [data, setData] = useState<InterviewReportView | null>(state.report ?? null)
   const [loading, setLoading] = useState(!state.report && !!state.sessionId)
   const [loadError, setLoadError] = useState(false)
   const [printing, setPrinting] = useState(false)
@@ -111,7 +123,7 @@ export function InterviewReportPage() {
         },
       })
     } catch (err) {
-      setPrintError(err instanceof Error ? err.message : '打印版生成失败，请稍后重试')
+      setPrintError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }
@@ -208,6 +220,26 @@ export function InterviewReportPage() {
             <p className="mt-1 rounded-lg bg-warning-bg px-3 py-2 text-xs text-warning-fg">{data.report.starAdvice.reminder}</p>
           </div>
         </Section>
+
+        {Array.isArray(data.qaExcerpts) && data.qaExcerpts.length > 0 && (
+          <Section icon={MessageSquareTextIcon} title="问答摘录">
+            <p className="mb-3 text-xs text-neutral-500">
+              {data.includeAnswersInPrint === false
+                ? '你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。'
+                : '打印件会收录每题回答的前 200 字。'}
+            </p>
+            <div className="flex flex-col gap-3">
+              {data.qaExcerpts.map((item, i) => (
+                <div key={`${i}-${item.question.slice(0, 24)}`} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                  <p className="text-sm font-semibold text-neutral-900">{i + 1}. {item.question}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-neutral-700">
+                    {item.skipped ? '回答：（跳过）' : `回答：${item.answerExcerpt?.trim() || '（未作答）'}`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
         <Section icon={ClipboardListIcon} title="面试前准备清单">
           <ul className="flex flex-col gap-2">

@@ -186,17 +186,21 @@ const screens = new Map([
   ['src/pages/interview/InterviewTipsPage.tsx', 'interview-tips'],
   ['src/pages/interview/InterviewReportsPage.tsx', 'interview-reports'],
 ])
+const qxScreens = new Set([
+  'src/pages/resume/ResumeReportPage.tsx',
+  'src/pages/resume/ResumeGeneratePreviewPage.tsx',
+  'src/pages/resume/ResumeOptimizePage.tsx',
+])
 for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
-  includes(
-    path,
-    path === 'src/pages/interview/InterviewReportsPage.tsx'
+  const frame = qxScreens.has(path)
+    ? 'QxPageFrame'
+    : path === 'src/pages/interview/InterviewReportsPage.tsx'
       ? 'KioskFullscreenShell'
       : isInterview
         ? 'InterviewShell'
-        : 'KioskPageFrame',
-    `${screen} consumes the frozen W1 frame`,
-  )
+        : 'KioskPageFrame'
+  includes(path, frame, `${screen} consumes the frozen W1 frame`)
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }
 includes('src/pages/interview/InterviewShell.tsx', 'KioskFullscreenShell', 'interview shell uses shared fullscreen chrome')
@@ -257,6 +261,8 @@ includes('src/pages/resume/ResumeGeneratePreviewPage.tsx', 'exported?.printFileU
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'confirmLeave', 'optimization keeps dirty-leave protection')
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimization keeps busy lock')
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'setExported(null)', 'content/layout changes invalidate stale export')
+includes('src/layouts/KioskRoot.tsx', "'/resume/optimize'", 'optimize route is registered as Qingxu-migrated')
+includes('src/layouts/KioskRoot.tsx', "'/resume/generate/preview'", 'generate preview route is registered as Qingxu-migrated')
 check(!existsSync(join(ROOT, 'src/pages/resume/ResumeExportPage.tsx')), 'AI-07 ResumeExportPage is deleted')
 includes('src/routes/index.tsx', 'path: \'resume/export\'', 'AI-07 keeps /resume/export as a compatibility route')
 includes('src/routes/index.tsx', '<Navigate to="/resume/optimize" replace />', 'AI-07 /resume/export redirects to real optimize export')

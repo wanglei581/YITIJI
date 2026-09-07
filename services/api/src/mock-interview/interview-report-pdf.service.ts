@@ -1,7 +1,8 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
-import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
 import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
+import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
+import type { InterviewQaExcerpt } from './interview-qa-excerpt'
 import type { InterviewReportPayload } from './mock-interview-llm.service'
 
 // ============================================================
@@ -9,33 +10,6 @@ import type { InterviewReportPayload } from './mock-interview-llm.service'
 // 跨平台中文字体解析与 ResumePdfService 同源（Windows/macOS/Linux 候选 + env 覆盖）；
 // 找不到字体诚实报错，不输出乱码 PDF。报告内容不写日志。
 // ============================================================
-
-interface FontCandidate { path: string; family?: string }
-
-function fontCandidates(): FontCandidate[] {
-  const envPath = process.env['RESUME_PDF_FONT_PATH']?.trim()
-  const list: FontCandidate[] = []
-  if (envPath) list.push({ path: envPath })
-  if (process.platform === 'win32') {
-    const winDir = process.env['WINDIR'] ?? 'C:\\Windows'
-    list.push(
-      { path: `${winDir}\\Fonts\\msyh.ttc`, family: 'Microsoft YaHei' },
-      { path: `${winDir}\\Fonts\\simsun.ttc`, family: 'SimSun' },
-    )
-  } else if (process.platform === 'darwin') {
-    list.push(
-      { path: '/System/Library/Fonts/PingFang.ttc', family: 'PingFangSC-Regular' },
-      { path: '/System/Library/Fonts/Hiragino Sans GB.ttc', family: 'HiraginoSansGB-W3' },
-      { path: '/System/Library/Fonts/STHeiti Light.ttc', family: 'STHeitiSC-Light' },
-    )
-  } else {
-    list.push(
-      { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', family: 'NotoSansCJKsc-Regular' },
-      { path: '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc', family: 'WenQuanYi Micro Hei' },
-    )
-  }
-  return list
-}
 
 const LEVEL_LABEL: Record<string, string> = {
   needs_work: '需要加强', pass: '基础达标', good: '表现良好', excellent: '表现突出',
@@ -50,22 +24,18 @@ const LEVEL_LABEL: Record<string, string> = {
  * 同源做法见 ai/resume/career-plan-pdf.service.ts 的 registerCjkFont。
  */
 export function registerInterviewCjkFont(doc: PDFKit.PDFDocument): boolean {
-  return fontCandidates().some((c) => {
-    if (!existsSync(c.path)) return false
-    try {
-      if (c.family) doc.registerFont('cjk', c.path, c.family)
-      else doc.registerFont('cjk', c.path)
-      doc.font('cjk')
-      return true
-    } catch { return false }
-  })
+  return registerCjkFont(doc)
 }
 
 @Injectable()
 export class InterviewReportPdfService {
   private readonly logger = new Logger(InterviewReportPdfService.name)
 
-  async render(meta: { position: string; industry: string; interviewerLabel: string; date: string }, report: InterviewReportPayload): Promise<{ buffer: Buffer; pageCount: number }> {
+  async render(
+    meta: { position: string; industry: string; interviewerLabel: string; date: string },
+    report: InterviewReportPayload,
+    qa?: { excerpts: InterviewQaExcerpt[]; includeAnswers: boolean },
+  ): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
     // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
     applyAigcPdfMetadata(doc, {
@@ -76,7 +46,7 @@ export class InterviewReportPdfService {
     const ok = registerInterviewCjkFont(doc)
     if (!ok) {
       doc.end()
-      throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: '服务器缺少中文字体，无法生成打印版报告' } })
+      throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: CJK_FONT_MISSING_USER_MESSAGE } })
     }
 
     const chunks: Buffer[] = []
@@ -125,6 +95,23 @@ export class InterviewReportPdfService {
 
     title('十、面试前准备清单')
     report.checklist.forEach((c) => doc.fontSize(10.5).fillColor('#374151').text(`□ ${c}`, { lineGap: 4 }))
+
+    if (qa && qa.excerpts.length > 0) {
+      title('十一、问答摘录')
+      if (!qa.includeAnswers) {
+        doc.fontSize(10).fillColor('#b45309').text('按你的选择，本打印件不含回答转写，只列出题目。', { lineGap: 4 })
+      }
+      qa.excerpts.forEach((item, i) => {
+        doc.fontSize(10.5).fillColor('#111827').text(`${i + 1}. ${item.question}`, { lineGap: 2 })
+        if (!qa.includeAnswers) return
+        if (item.skipped) {
+          doc.fontSize(10).fillColor('#6b7280').text('   回答：（跳过）', { lineGap: 4 })
+          return
+        }
+        const answer = item.answerExcerpt?.trim() ? item.answerExcerpt : '（未作答）'
+        doc.fontSize(10).fillColor('#374151').text(`   回答：${answer}`, { lineGap: 4 })
+      })
+    }
 
     // pageCount 必须在 end() 之前读取（pdfkit 行为）
     const pageCount = doc.bufferedPageRange().count

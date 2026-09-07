@@ -13,6 +13,8 @@ import type { EvidenceLevel } from './advisor-skills'
 /** 问答型产物：用户主动钉住的条目单。对话本身不落盘，只有钉住的留下。 */
 export interface QaPinsPayload {
   kind: 'qa_pins'
+  /** 小青「本次要点」等具名产物；缺省时打印稿沿用顾问钉住条目单标题。 */
+  title?: string
   pins: Array<{
     content: string
     evidenceLevel: EvidenceLevel

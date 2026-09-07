@@ -125,6 +125,12 @@ function makeTable(seed: Row[]) {
       Object.assign(hit, args.data)
       return { ...hit }
     },
+    // API-33a：发布改为 updateMany({ id, reviewStatus:'approved' }) 的 CAS，假件按 where 过滤并回 count
+    updateMany: async (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      const hits = rows.filter((r) => matches(r, args.where))
+      for (const hit of hits) Object.assign(hit, args.data)
+      return { count: hits.length }
+    },
   }
 }
 

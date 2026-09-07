@@ -9,6 +9,7 @@
     "list-printers": "ts-node src/index.ts list-printers",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
     "dev": "ts-node src/index.ts",
     "verify:direct-http-agents": "ts-node scripts/verify-direct-http-agents.ts",
     "verify:local-qr-proxy": "ts-node scripts/verify-local-qr-proxy.ts",

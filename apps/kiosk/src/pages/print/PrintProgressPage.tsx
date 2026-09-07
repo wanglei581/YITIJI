@@ -220,6 +220,7 @@ export function PrintProgressPage() {
 
   const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
   const [backendStatus, setBackendStatus] = useState<BackendJobStatus | null>(null)
+  const backendStatusRef = useRef<BackendJobStatus | null>(null)
   const [failed, setFailed]     = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [simDone, setSimDone]   = useState(false)
@@ -349,7 +350,9 @@ export function PrintProgressPage() {
         pollFailsRef.current = 0
         setStatusReadError(false)
         // pending | claimed | printing — update step
+        backendStatusRef.current = result.status
         setBackendStatus(result.status)
+        if (result.status === 'printing') setTimedOut(false)
         setCurrent(backendStatusToStep(result.status))
       } catch {
         if (cancelRef.current) return
@@ -365,18 +368,20 @@ export function PrintProgressPage() {
     void tick()
     const timer = setInterval(() => void tick(), POLL_INTERVAL_MS)
 
-    // 5-minute hard timeout — if Agent never claims or backend is unresponsive
-    const timeoutTimer = setTimeout(() => {
+    // 超时只针对「终端迟迟没接单 / 没开始」：正在出纸（printing）不算超时，顺延一个窗口；
+    // 超时后也不停轮询、不置 cancelRef，之后 completed / failed 仍能正常跳转。
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null
+    const onTimeout = () => {
       if (cancelRef.current) return
-      cancelRef.current = true
-      clearInterval(timer)
+      if (backendStatusRef.current === 'printing') { timeoutTimer = setTimeout(onTimeout, REAL_POLL_TIMEOUT_MS); return }
       setTimedOut(true)
-    }, REAL_POLL_TIMEOUT_MS)
+    }
+    timeoutTimer = setTimeout(onTimeout, REAL_POLL_TIMEOUT_MS)
 
     return () => {
       cancelRef.current = true
       clearInterval(timer)
-      clearTimeout(timeoutTimer)
+      if (timeoutTimer) clearTimeout(timeoutTimer)
     }
   }, [useRealApi, taskId, navigateFail, navigateSuccess])
 
@@ -454,9 +459,11 @@ export function PrintProgressPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-neutral-900">处理超时</h1>
           <p className="mt-3 text-base text-neutral-500 max-w-xs">
-            打印终端长时间未响应，任务可能仍在队列中。
+            {backendStatus === 'claimed'
+              ? '打印终端已接单但长时间未开始出纸。'
+              : '打印终端长时间未接单，任务仍在队列中。'}
             <br />
-            请联系工作人员确认打印机状态。
+            请联系工作人员确认打印机状态；页面会继续同步任务状态。
           </p>
           {taskId && (
             <p className="mt-3 text-xs text-neutral-400">任务编号：{taskId}</p>

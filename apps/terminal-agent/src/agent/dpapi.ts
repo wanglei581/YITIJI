@@ -22,7 +22,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import { spawnSync } from 'child_process'
-import { log, warn, err } from '../logger'
+import { log, warn } from '../logger'
 
 // ── Path helpers ──────────────────────────────────────────────────────────────
 

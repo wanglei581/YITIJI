@@ -6,6 +6,7 @@
  *
  * 复用 LocalFileStorage 的 putAtKey/read/delete/head(含路径越界防护)。
  */
+import type { Readable } from 'stream'
 import { LocalFileStorage } from '../files/storage'
 import { signFileUrl, signRawUploadUrl } from '../files/signing'
 import {
@@ -34,6 +35,14 @@ export class LocalStorageBackend implements ObjectStorageBackend {
 
   async getObject(objectKey: string): Promise<Buffer> {
     return this.fsStorage.read(objectKey)
+  }
+
+  async getObjectRange(objectKey: string, start: number, end: number): Promise<Buffer> {
+    return this.fsStorage.readRange(objectKey, start, end)
+  }
+
+  async openObjectStream(objectKey: string, start?: number, end?: number): Promise<Readable> {
+    return this.fsStorage.openReadStream(objectKey, start, end)
   }
 
   async deleteObject(objectKey: string): Promise<void> {

@@ -8,6 +8,7 @@ const { request, uploadFile } = require('./request');
 const mock = require('./mock-data');
 const N = require('./normalize');
 const uploadNames = require('./upload-name');
+const auth = require('./auth');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -582,6 +583,29 @@ const api = {
     return request(`/resume/records/${taskId}`, { method: 'GET', header, needAuth: true });
   },
 
+  /**
+   * 导出诊断报告或修改清单 PDF。匿名读取沿用诊断记录的
+   * x-resume-access-token；收费模式下 benefitGrantId 由本人权益列表选出。
+   */
+  exportResumeReport(taskId, kind, accessToken, benefitGrantId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 诊断报告导出'));
+    const data = { kind };
+    if (benefitGrantId) data.benefitGrantId = benefitGrantId;
+    return request(`/resume/records/${encodeURIComponent(taskId)}/export`, {
+      method: 'POST',
+      data,
+      header: tokenHeader(accessToken),
+      needAuth: true,
+      timeout: 60000,
+    });
+  },
+
+  /** 简历导出收费三态；匿名可读价格，登录会员会同时收到可用权益次数。 */
+  getResumeExportPricing() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历导出价格'));
+    return request('/resume/export/pricing', { method: 'GET', needAuth: true });
+  },
+
   // ── 以下 AI 能力都挂在解析任务 taskId 上,凭 RESUME_TASK 里的 accessToken 读取 ──
 
   /**
@@ -758,14 +782,6 @@ const api = {
     });
   },
 
-  /** 结束面试。实测 27s,直接返回完整报告(与 getInterviewReport 同形) */
-  endInterview(sessionId, accessToken) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
-    return request(`/mock-interviews/${sessionId}/end`, {
-      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
-    });
-  },
-
   /** 读取面试报告(已结束的会话,秒回) */
   getInterviewReport(sessionId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
@@ -790,6 +806,71 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
     return request(`/mock-interviews/${sessionId}/report/print`, {
       method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /**
+   * 结束面试。opts.includeAnswersInPrint=false 时打印件不含回答转写。
+   * 不传则默认打印回答摘录。
+   */
+  endInterview(sessionId, accessToken, opts) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    const includeAnswersInPrint = !(opts && opts.includeAnswersInPrint === false);
+    return request(`/mock-interviews/${sessionId}/end`, {
+      method: 'POST',
+      data: { includeAnswersInPrint },
+      header: interviewHeader(accessToken),
+      needAuth: true,
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /** 本人模拟面试历史。需登录。{ items, nextCursor } */
+  getMyMockInterviews(params) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return unwrapList(request('/me/mock-interviews', {
+      method: 'GET', data: params || {}, needAuth: true,
+    }));
+  },
+
+  deleteMyMockInterview(sessionId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return request(`/me/mock-interviews/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE', needAuth: true,
+    });
+  },
+
+  /**
+   * AI 不可用时的降级题目单。不调模型，返回真实 PDF 元数据（variant=degraded）。
+   */
+  printInterviewPracticeSheet(sessionId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return request(`/mock-interviews/${sessionId}/practice-sheet`, {
+      method: 'POST', header: interviewHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /**
+   * 模拟面试语音转写。multipart 字段名必须是 audio。
+   * 无麦克风权限时页面应退回文字，不要假装转写成功。
+   */
+  transcribeInterviewAnswer(sessionId, filePath, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('模拟面试'));
+    return uploadFile(`/mock-interviews/${encodeURIComponent(sessionId)}/transcribe`, filePath, {
+      name: 'audio',
+      header: interviewHeader(accessToken),
+      needAuth: true,
+      timeout: config.aiTimeout,
+    }).then((res) => ({
+      text: res && typeof res.text === 'string' ? res.text : '',
+    }));
+  },
+
+  /** 本人确认后把签约风险报告保存到「我的文档」（90 天，不可打印）。 */
+  keepContractReviewReport(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('签约风险提示'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}/report/keep`, {
+      method: 'POST', needAuth: true, timeout: 60000,
     });
   },
 
@@ -1026,7 +1107,60 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 助手'));
     const body = { message };
     if (sessionId) body.sessionId = sessionId;
-    return request('/assistant/chat', { method: 'POST', data: body, needAuth: false, timeout: config.aiTimeout });
+    const token = auth.getToken();
+    return request('/assistant/chat', {
+      method: 'POST',
+      data: body,
+      needAuth: false,
+      header: token ? { Authorization: 'Bearer ' + token } : {},
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /**
+   * 小青按住说话转写。multipart 字段名必须是 audio。
+   * 成功 { text, providerName }。ASR_NOT_CONFIGURED 时整场改手打。
+   */
+  transcribeAssistantVoice(filePath) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('语音转写'));
+    return uploadFile('/assistant/voice', filePath, {
+      name: 'audio',
+      needAuth: false,
+      header: auth.getToken() ? { Authorization: 'Bearer ' + auth.getToken() } : {},
+      timeout: config.aiTimeout,
+    }).then((res) => ({
+      text: res && typeof res.text === 'string' ? res.text : '',
+      providerName: (res && res.providerName) || '',
+    }));
+  },
+
+  /**
+   * 登录用户保存本次要点。匿名 404。
+   * 成功 { advisorSessionId, artifactId, highlights, todos, savedToDocuments, document }
+   */
+  summarizeAssistantSession(sessionId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('本次要点'));
+    return request(`/assistant/sessions/${encodeURIComponent(sessionId)}/summary`, {
+      method: 'POST',
+      data: {},
+      needAuth: true,
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /** ASR 是否已配置。复用面试能力探测，同一套服务端 ASR。 */
+  getAssistantVoiceCapability() {
+    if (config.USE_MOCK) return Promise.resolve({ asrEnabled: false });
+    return request('/mock-interviews/capabilities/voice', { method: 'GET', needAuth: false })
+      .then((res) => ({ asrEnabled: !!(res && res.asrEnabled) }))
+      .catch(() => ({ asrEnabled: false }));
+  },
+
+  /** /me/ai-records 附加的问答分区（只读 qaRecords，不含对话正文）。 */
+  getMyAssistantQaRecords() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('问答记录'));
+    return request('/me/ai-records', { method: 'GET', data: { pageSize: 1 }, needAuth: true })
+      .then((res) => (res && Array.isArray(res.qaRecords) ? res.qaRecords : []));
   },
 
   // ---------- AI 简历从零生成 ----------
@@ -1586,6 +1720,22 @@ const api = {
     return request(`/me/feedback/${encodeURIComponent(id)}/close`, {
       method: 'PATCH', needAuth: true,
     });
+  },
+
+  /**
+   * Word 转 PDF 能力是三端是否接收 .doc/.docx 的唯一真源。
+   * mock 模式 fail-closed，不能把未运行的转换引擎显示成可用。
+   */
+  getDocumentConversionCapabilities() {
+    if (config.USE_MOCK) {
+      return mockResolve({
+        wordToPdf: false,
+        engine: 'none',
+        reason: '本地演示模式未连接文档转换引擎',
+        cjkFonts: false,
+      });
+    }
+    return request('/document-conversion/capabilities', { method: 'GET', needAuth: false });
   },
 };
 

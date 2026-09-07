@@ -169,15 +169,18 @@ export class SmartCampusService {
   async listPartnerSmartCampusTerminals(orgId: string | null): Promise<SmartCampusTerminalView[]> {
     const org = await this.assertSchoolOrg(orgId)
 
-    const [terminals, configs] = await Promise.all([
-      this.prisma.terminal.findMany({
-        where: { orgId: org.id },
-        // Partner 分支同样需要真实心跳（Admin 与 Partner 两个查询都要改，不能只修一处）
-        include: { heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
-        orderBy: { registeredAt: 'desc' },
-      }),
-      this.prisma.terminalSmartCampusConfig.findMany(),
-    ])
+    const terminals = await this.prisma.terminal.findMany({
+      where: { orgId: org.id },
+      // Partner 分支同样需要真实心跳（Admin 与 Partner 两个查询都要改，不能只修一处）
+      include: { heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
+      orderBy: { registeredAt: 'desc' },
+    })
+    const terminalIds = [...new Set(terminals.flatMap((t) => [t.id, t.terminalCode].filter(Boolean)))]
+    const configs = terminalIds.length === 0
+      ? []
+      : await this.prisma.terminalSmartCampusConfig.findMany({
+          where: { terminalId: { in: terminalIds } },
+        })
     const byTerminal = new Map(configs.map((c) => [c.terminalId, c]))
     const now = Date.now()
 

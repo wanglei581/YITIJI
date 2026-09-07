@@ -126,8 +126,11 @@ export interface FairListResponse {
   offset: number
 }
 
+/** 公开详情不得携带审核人元数据。 */
+export type PublicFair = Omit<Fair, 'reviewedBy' | 'reviewedAt' | 'rejectReason'>
+
 export interface FairDetailResponse {
-  fair: Fair
+  fair: PublicFair
   companies: FairCompany[]
   zones: FairZone[]
 }

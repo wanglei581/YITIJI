@@ -20,6 +20,11 @@ function registerShell(api: ApiRouter): void {
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
   })
+  // 失败态会主动申请「带走链接」；真值页无归属凭证 → 404，页面须能承受
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, {
+    status: 404,
+    json: { error: { code: 'PRINT_TASK_NOT_FOUND', message: '任务不存在' } },
+  })
 }
 
 async function openDoneWithState(page: Page, state: Record<string, unknown>): Promise<void> {
@@ -172,6 +177,10 @@ test('same-page task switch hides the previous task and pickup code immediately 
   api.respond('GET', `/api/v1/print/jobs/${nextTaskId}`, {
     status: 200,
     json: { taskId: nextTaskId, status: 'failed', failureReasonForUser: '新任务已确认失败' },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${nextTaskId}/takeaway-url`, {
+    status: 404,
+    json: { error: { code: 'PRINT_TASK_NOT_FOUND', message: '任务不存在' } },
   })
 
   await openDoneWithState(page, {

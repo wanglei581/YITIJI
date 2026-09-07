@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import {
   CopyIcon,
   DatabaseIcon,
@@ -154,7 +154,7 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
         description: mode === 'webhook'
           ? '等待外部系统通过 Webhook 推送岗位数据'
           : mode === 'api'
-            ? `API 直连：${endpoint.trim()}`
+            ? 'API 直连'
             : 'Excel / CSV 文件导入，支持字段映射和导入预览',
       })
       setCreated(result)
@@ -245,6 +245,7 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
               <div>
                 <label className="mb-1 block text-sm font-medium text-neutral-700">Endpoint</label>
                 <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-300 px-3 font-mono text-sm focus:border-primary-500 focus:outline-none" placeholder="https://api.example.com/v1/jobs" />
+                <p className="mt-1 text-xs text-neutral-500">不要把凭证放进地址。Token、Key、Secret 请填在下方鉴权字段。</p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -453,7 +454,7 @@ export default function SourcesPage() {
 
   if (loading) {
     return (
-      <Page title="数据源管理" subtitle="加载中...">
+      <Page title="数据源管理" subtitle={withFrontendHint('加载中...', FRONTEND_HINT.none)}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -463,7 +464,7 @@ export default function SourcesPage() {
 
   if (error) {
     return (
-      <Page title="数据源管理" subtitle="加载失败">
+      <Page title="数据源管理" subtitle={withFrontendHint('加载失败', FRONTEND_HINT.none)}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <DatabaseIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -475,7 +476,7 @@ export default function SourcesPage() {
   return (
     <Page
       title="数据源管理"
-      subtitle={`共 ${sources.length} 个数据源`}
+      subtitle={withFrontendHint(`共 ${sources.length} 个数据源`, FRONTEND_HINT.none)}
       actions={
         !showWizard && (
           <Button
@@ -658,7 +659,7 @@ export default function SourcesPage() {
             <div>
               <p className="mb-1 text-xs text-neutral-400">推送地址(POST)</p>
               <code className="block break-all rounded bg-neutral-50 px-3 py-2 font-mono text-xs">
-                {`${API_BASE_URL}/sync/webhook?source=${webhookGuide.id}`}
+                {resolveWebhookUrl(webhookGuide.webhookUrl ?? `${API_BASE_URL}/sync/webhook?source=${webhookGuide.id}`)}
               </code>
             </div>
             <div className="rounded-lg bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-600">

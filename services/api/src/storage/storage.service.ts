@@ -9,6 +9,7 @@
  *
  * 凭证(SecretId/SecretKey)只在 CosStorageBackend 内持有,本服务不暴露。
  */
+import type { Readable } from 'stream'
 import { Injectable, Logger } from '@nestjs/common'
 import { CosStorageBackend } from './cos-storage.backend'
 import { LocalStorageBackend } from './local-storage.backend'
@@ -100,6 +101,22 @@ export class StorageService {
   }
   getObject(objectKey: string, bucket?: string | null): Promise<Buffer> {
     return this.backendFor(bucket).getObject(objectKey)
+  }
+  getObjectRange(
+    objectKey: string,
+    start: number,
+    end: number,
+    bucket?: string | null,
+  ): Promise<Buffer> {
+    return this.backendFor(bucket).getObjectRange(objectKey, start, end)
+  }
+  openObjectStream(
+    objectKey: string,
+    start?: number,
+    end?: number,
+    bucket?: string | null,
+  ): Promise<Readable> {
+    return this.backendFor(bucket).openObjectStream(objectKey, start, end)
   }
   deleteObject(objectKey: string, bucket?: string | null): Promise<void> {
     return this.backendFor(bucket).deleteObject(objectKey)

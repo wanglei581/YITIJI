@@ -18,6 +18,8 @@ function terminalBaseline(api: ApiRouter): void {
     json: { smartCampus: { enabled: false, modules: {}, items: [] }, toolbox: { enabled: false, items: [] }, configVersion: 'w3', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
   })
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
+  // 包 I：助手页「按住说话」挂载时探测语音能力；基线里按未配置处理，按钮应置灰而不是打断页面。
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
 }
 
 test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) => {
@@ -194,6 +196,10 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   )
   terminalBaseline(api)
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/resume/export/pricing', {
+    status: 200,
+    json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' },
+  })
   api.respond('GET', '/api/v1/resume/records/resume-w3-inline-preview/optimize', {
     status: 200,
     json: { taskId: 'resume-w3-inline-preview', status: 'completed', providerName: 'llm', modules: [], optimizedResume },
@@ -213,11 +219,16 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
 
   await page.goto('/resume/optimize?taskId=resume-w3-inline-preview')
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
-  await page.getByRole('button', { name: '导出 PDF', exact: true }).click()
+  await page.getByRole('button', { name: '导出 PDF', exact: true }).first().click()
+  await page.getByRole('checkbox', { name: /测试大学/ }).click()
+  await page.getByRole('button', { name: '确认导出' }).click()
   await expect(page.getByRole('button', { name: '查看或手机保存PDF' })).toBeVisible()
   const pageCount = page.context().pages().length
-  await page.getByRole('button', { name: '查看或手机保存PDF' }).click()
+  // 包 F：导出成功后页面会自动打开真实 PDF 预览（预览 = 导出 = 打印同一份）；未自动打开时再点按钮。
   const dialog = page.getByRole('dialog', { name: '优化版简历.pdf' })
+  if (!(await dialog.isVisible().catch(() => false))) {
+    await page.getByRole('button', { name: '查看或手机保存PDF' }).click()
+  }
   await expect(dialog).toBeVisible()
   await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', '/w3-fixtures/optimized-resume.pdf')
   await expect(dialog.getByText('手机扫码保存')).toBeVisible()

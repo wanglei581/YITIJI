@@ -48,6 +48,10 @@ export interface MemberResumeItem {
   provider: string
   /** 是否已生成优化版（同 taskId 是否存在 optimize 行） */
   optimized: boolean
+  /** 是否有登录用户编辑草稿（optimize_draft，不单独成行） */
+  hasDraft: boolean
+  /** 最近一次导出确认版本号；无确认快照为 null */
+  latestVersion: number | null
   createdAt: string
   updatedAt: string
   /** 留存到期时间；到期后被清理治理移除，列表不再返回 */
@@ -104,8 +108,34 @@ export interface MemberAiRecordItem {
   kind: MemberAiRecordKind
   status: AiTaskStatus
   provider: string
+  /** parse 行：同 taskId 是否已有 optimize。其它 kind 为 false。 */
+  optimized: boolean
+  /** parse 行：同 taskId 是否有 optimize_draft。其它 kind 为 false。 */
+  hasDraft: boolean
+  /** parse 行：optimize_confirmed.version；无快照或非 parse 为 null。 */
+  latestVersion: number | null
   createdAt: string
   expiresAt: string | null
+}
+
+/**
+ * AI 服务记录里的「问答」分区（只加字段，不改 kind 联合）。
+ * 数据来自 AdvisorArtifact(kind=qa_pins)，仅元数据，不含对话正文。
+ */
+export interface MemberQaRecordItem {
+  id: string
+  sessionId: string
+  artifactId: string
+  kind: 'qa_pins'
+  title: string
+  createdAt: string
+  expiresAt: string
+  fileId: string | null
+}
+
+/** /me/ai-records 在既有分页之上附加问答产物。 */
+export interface MemberAiRecordPage extends MemberAssetPage<MemberAiRecordItem> {
+  qaRecords: MemberQaRecordItem[]
 }
 
 // ── 浏览 / 外部跳转记录（P1 闭环）─────────────────────────────────────────────

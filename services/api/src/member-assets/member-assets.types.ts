@@ -21,6 +21,8 @@ export interface MemberResumeItem {
   status: string
   provider: string
   optimized: boolean
+  hasDraft: boolean
+  latestVersion: number | null
   createdAt: string
   updatedAt: string
   expiresAt: string | null
@@ -40,6 +42,8 @@ export interface MemberDocumentItem {
   expiresAt: string | null
   downloadUrlPath: string
   previewUrlPath: string
+  /** false = 高敏报告等禁止进入打印链路，前端不得展示重新打印。 */
+  reprintable: boolean
 }
 
 export type MemberDeletedDocumentStorageState = 'removed' | 'pending' | 'unknown'
@@ -57,12 +61,44 @@ export interface MemberDeletedDocumentItem {
   storageObjectState: MemberDeletedDocumentStorageState
 }
 
+export interface MemberAiRecordRef {
+  type: 'job_fair'
+  id: string
+  name: string
+}
+
 export interface MemberAiRecordItem {
   id: string
   taskId: string
   kind: MemberAiRecordKind
   status: string
   provider: string
+  /** parse 行：同 taskId 是否已有 optimize。其它 kind 为 false。 */
+  optimized: boolean
+  /** parse 行：同 taskId 是否有 optimize_draft。其它 kind 为 false。 */
+  hasDraft: boolean
+  /** parse 行：optimize_confirmed.version；无快照或非 parse 为 null。 */
+  latestVersion: number | null
   createdAt: string
   expiresAt: string | null
+  /** 仅 fair_visit_plan：从 payload.basedOn 抽出的窄字段，不回传 payload。 */
+  ref?: MemberAiRecordRef | null
+}
+
+export interface MemberQaRecordItem {
+  id: string
+  sessionId: string
+  artifactId: string
+  kind: 'qa_pins'
+  title: string
+  createdAt: string
+  expiresAt: string
+  fileId: string | null
+}
+
+export interface MemberAiRecordPage {
+  items: MemberAiRecordItem[]
+  total: number
+  nextCursor: string | null
+  qaRecords: MemberQaRecordItem[]
 }

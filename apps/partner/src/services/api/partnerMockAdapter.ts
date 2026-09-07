@@ -14,6 +14,9 @@ import type {
   PartnerSyncLog,
   PartnerSyncLogPage,
   PartnerSyncLogsQuery,
+  PartnerListQuery,
+  PartnerJobPage,
+  PartnerFairPage,
   ImportJobItem,
   ImportFairItem,
   ImportResult,
@@ -26,6 +29,17 @@ import type {
   SaveSmartCampusConfigPayload,
   TerminalSmartCampusConfigView,
 } from './types'
+
+function paginateRows<T>(rows: T[], query?: PartnerListQuery): { data: T[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } } {
+  const page = query?.page && query.page > 0 ? query.page : 1
+  const pageSize = query?.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, 100) : 20
+  const total = rows.length
+  const start = (page - 1) * pageSize
+  return {
+    data: rows.slice(start, start + pageSize),
+    pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+  }
+}
 
 function delay(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 120))
@@ -294,9 +308,9 @@ export const partnerMockAdapter = {
   },
 
   // Jobs
-  async getPartnerJobs(): Promise<PartnerJobRecord[]> {
+  async getPartnerJobs(query?: PartnerListQuery): Promise<PartnerJobPage> {
     await delay()
-    return [...PARTNER_JOBS]
+    return paginateRows(PARTNER_JOBS, query)
   },
   async getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]> {
     await delay()
@@ -361,9 +375,9 @@ export const partnerMockAdapter = {
   },
 
   // Fairs
-  async getPartnerFairs(): Promise<PartnerFairRecord[]> {
+  async getPartnerFairs(query?: PartnerListQuery): Promise<PartnerFairPage> {
     await delay()
-    return [...PARTNER_FAIRS]
+    return paginateRows(PARTNER_FAIRS, query)
   },
   async unpublishPartnerFair(id: string): Promise<PartnerFairRecord> {
     await delay()

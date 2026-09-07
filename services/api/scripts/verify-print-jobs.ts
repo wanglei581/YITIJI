@@ -30,6 +30,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { signFileUrl } from '../src/files/signing'
+import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
@@ -110,6 +111,7 @@ async function main() {
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     // 计费接线后新增的真实 fixture / 价目清理。
+    await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: fixtureFileIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
     await Promise.all(fixtureStorageKeys.map((key) =>
       storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined),
@@ -255,18 +257,15 @@ async function main() {
       '1a. 合同审查原件签名 URL → 拒绝直接创建打印任务',
     )
 
-    const reportCreated = await printJobs.create({
-      fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
-      fileMd5: 'client-supplied-hash-must-not-win',
-      fileName: 'AI签约风险提示报告.pdf',
-    }, { terminalId })
-    createdTaskIds.push(reportCreated.taskId)
-    const reportTask = await prisma.printTask.findUnique({ where: { id: reportCreated.taskId } })
-    if (reportTask?.fileMd5 === reportSha256) {
-      pass('1b. 合同风险提示报告 → PrintTask 强制使用服务端 SHA-256')
-    } else {
-      fail(`1b. 合同报告哈希未采用服务端值: ${reportTask?.fileMd5 ?? 'missing'}`)
-    }
+    await expectCode(
+      () => printJobs.create({
+        fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
+        fileMd5: 'client-supplied-hash-must-not-win',
+        fileName: 'AI签约风险提示报告.pdf',
+      }, { terminalId }),
+      'PRINT_CONTRACT_REPORT_FORBIDDEN',
+      '1b. 合同风险提示报告建打印单 → 400 PRINT_CONTRACT_REPORT_FORBIDDEN',
+    )
 
     await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: 'invalid-server-hash' } })
     await expectCode(
@@ -274,8 +273,8 @@ async function main() {
         fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
         fileMd5: reportSha256,
       }, { terminalId }),
-      'PRINT_CONTRACT_REPORT_INVALID',
-      '1c. 合同风险提示报告缺少有效服务端 SHA-256 → fail-closed',
+      'PRINT_CONTRACT_REPORT_FORBIDDEN',
+      '1c. 合同风险提示报告即使哈希无效也一律禁止打印',
     )
     await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: reportSha256 } })
 
@@ -494,6 +493,170 @@ async function main() {
     } else {
       fail(`7g. 仅原始 errorMessage 兜底异常: ${JSON.stringify({ failureReasonForUser: userView3.failureReasonForUser, errorMessage: userView3.errorMessage, leaked3 })}`)
     }
+
+    const piiFileId = `file_vpj_pii_${suffix}`
+    const piiKey = `verify/print-jobs/${piiFileId}.pdf`
+    fixtureFileIds.push(piiFileId)
+    fixtureStorageKeys.push(piiKey)
+    const piiSha = createHash('sha256').update(pdfBytes).digest('hex')
+    await storage.putObject(piiKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: piiFileId,
+        storageKey: piiKey,
+        filename: 'pii.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: piiSha,
+        purpose: 'print_doc',
+        status: 'active',
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
+    await prisma.documentProcessTask.create({
+      data: {
+        kind: 'pii_scan',
+        status: 'completed',
+        sourceFileId: piiFileId,
+        paramsJson: JSON.stringify({ sourceSha256: piiSha }),
+        resultJson: JSON.stringify({ mode: 'real', findingCount: 0 }),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    const piiSigned = signFileUrl(piiFileId, 30 * 60 * 1000)
+    const piiDto: CreatePrintJobDto = { fileUrl: piiSigned.url, fileMd5: piiSha, fileName: 'pii.pdf' }
+    const piiCreated = await printJobs.create(piiDto, {
+      ipAddress: '127.0.0.1',
+      userAgent: 'verify',
+      endUserId: null,
+      terminalId,
+    })
+    createdTaskIds.push(piiCreated.taskId)
+    pass('API-27c 扫描 sha256 与文件一致时可建单')
+    await prisma.fileObject.update({ where: { id: piiFileId }, data: { sha256: 'b'.repeat(64) } })
+    await expectCode(
+      () => printJobs.create(piiDto, {
+        ipAddress: '127.0.0.1',
+        userAgent: 'verify',
+        endUserId: null,
+        terminalId,
+      }),
+      'PII_SCAN_STALE',
+      'API-27c 建单比对 sha256 不一致 → 409 PII_SCAN_STALE',
+    )
+
+    async function sessionFor(taskId: string): Promise<string> {
+      const order = await prisma.order.findFirst({ where: { printTaskId: taskId } })
+      if (!order) fail(`sessionFor 找不到订单: ${taskId}`)
+      return createPaymentSessionToken({
+        orderId: order.id,
+        orderNo: order.orderNo,
+        terminalId,
+        amountCents: order.amountCents,
+        printTaskId: taskId,
+      })
+    }
+
+    // ── 8. 失败带走链接 / 已付费失败单重新提交 ────────────────────────
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(created.taskId, {}),
+      'PRINT_TASK_NOT_FOUND',
+      '8a. takeaway-url 无归属凭证 → 404',
+    )
+    const otherOrderSession = await sessionFor(piiCreated.taskId)
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(created.taskId, { paymentSessionToken: otherOrderSession }),
+      'PRINT_TASK_NOT_FOUND',
+      '8b. takeaway-url 越权（其他订单支付会话）→ 404',
+    )
+    const takeaway = await printJobs.issueTakeawayUrl(created.taskId, {
+      paymentSessionToken: await sessionFor(created.taskId),
+    })
+    const takeawayMs = Date.parse(takeaway.expiresAt) - Date.now()
+    if (
+      takeaway.orderId === created.orderId &&
+      takeaway.signedUrl.includes(`/files/`) &&
+      takeawayMs > 20 * 60 * 1000
+    ) {
+      pass('8c. takeaway-url 本单归属可签发约 30 分钟签名 URL')
+    } else {
+      fail(`8c. takeaway 异常: ${JSON.stringify({ orderId: takeaway.orderId, expiresAt: takeaway.expiresAt, signedUrl: takeaway.signedUrl })}`)
+    }
+
+    const retryOrderBefore = await prisma.order.findFirst({ where: { printTaskId: knownFailId } })
+    if (!retryOrderBefore) fail('8d 预备：失败单没有订单')
+    const orderCountBefore = await prisma.order.count({ where: { printTaskId: knownFailId } })
+    const retried = await printJobs.retryPaidFailedJob(knownFailId, {
+      paymentSessionToken: await sessionFor(knownFailId),
+    })
+    const retryOrderAfter = await prisma.order.findFirst({ where: { printTaskId: knownFailId } })
+    const orderCountAfter = await prisma.order.count({ where: { printTaskId: knownFailId } })
+    if (
+      retried.taskId === knownFailId &&
+      retried.orderId === retryOrderBefore.id &&
+      retried.amountCents === retryOrderBefore.amountCents &&
+      retried.status === 'pending' &&
+      retryOrderAfter?.id === retryOrderBefore.id &&
+      retryOrderAfter.amountCents === retryOrderBefore.amountCents &&
+      orderCountBefore === 1 &&
+      orderCountAfter === 1
+    ) {
+      pass('8d. retry 不产生新订单、不改金额，同一任务回到 pending')
+    } else {
+      fail(`8d. retry 金额/订单异常: ${JSON.stringify({ retried, before: retryOrderBefore, after: retryOrderAfter, orderCountBefore, orderCountAfter })}`)
+    }
+
+    const retriedAgain = await printJobs.retryPaidFailedJob(knownFailId, {
+      paymentSessionToken: await sessionFor(knownFailId),
+    })
+    if (retriedAgain.taskId === knownFailId && retriedAgain.orderId === retryOrderBefore.id && retriedAgain.amountCents === retryOrderBefore.amountCents) {
+      pass('8e. retry 幂等：已重新提交的 pending 单再调一次仍是同一订单与金额')
+    } else {
+      fail(`8e. retry 幂等异常: ${JSON.stringify(retriedAgain)}`)
+    }
+
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(knownFailId, { paymentSessionToken: otherOrderSession }),
+      'PRINT_TASK_NOT_FOUND',
+      '8f. retry 越权 → 404',
+    )
+
+    // retry 会把 knownFailId 放回 pending，且它的 createdAt 更早；
+    // 不先移出队列的话，后面 createClaimAndFail 会被它截走 claim。
+    await prisma.printTask.update({
+      where: { id: knownFailId },
+      data: { status: 'cancelled' },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: knownFailId },
+      data: { taskStatus: 'cancelled' },
+    })
+
+    const unconfirmedId = await createClaimAndFail(
+      '失败任务-无法确认',
+      '2019-01-04T00:00:00.000Z',
+      'PRINT_JOB_UNCONFIRMED',
+      RAW_SENSITIVE_MESSAGE,
+    )
+    await expectCode(
+      async () => printJobs.retryPaidFailedJob(unconfirmedId, { paymentSessionToken: await sessionFor(unconfirmedId) }),
+      'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
+      '8g. PRINT_JOB_UNCONFIRMED 禁止重新提交',
+    )
+
+    const unpaid = await printJobs.create({
+      fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+      fileMd5: 'sha256-vpj-unpaid-retry',
+      fileName: '未支付失败单.pdf',
+    }, { terminalId })
+    createdTaskIds.push(unpaid.taskId)
+    await prisma.printTask.update({ where: { id: unpaid.taskId }, data: { status: 'failed', errorCode: 'PRINTER_OFFLINE' } })
+    await prisma.order.updateMany({ where: { printTaskId: unpaid.taskId }, data: { taskStatus: 'failed' } })
+    await expectCode(
+      () => printJobs.retryPaidFailedJob(unpaid.taskId, { paymentSessionToken: unpaid.paymentSessionToken }),
+      'PRINT_RETRY_NOT_PAID',
+      '8h. 未支付失败单不能重新提交',
+    )
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

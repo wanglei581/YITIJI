@@ -97,6 +97,11 @@ export interface FileMetadata {
   createdAt: string
 }
 
+export interface FileListResult {
+  items: FileMetadata[]
+  total: number
+}
+
 export interface FileUploadResponse {
   fileId: string
   filename: string

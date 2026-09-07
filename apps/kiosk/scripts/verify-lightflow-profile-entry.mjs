@@ -370,6 +370,9 @@ const allowedMeChanges = new Set([
   // W22：系统通知页迁共享壳 + 诚实空态（仍复用 /me/notifications 真实路由）
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
+  // 包 J 第 1 次（2026-09-06）：模拟面试记录分区从 MyAiRecordsPage 拆出，数据来自
+  // GET /me/mock-interviews。只加这一行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   // 2026-09-03 补全（只加不减，不动任何断言逻辑）：

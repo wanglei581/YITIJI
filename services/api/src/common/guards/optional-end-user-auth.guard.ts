@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { AuthedEndUser } from '../decorators/current-end-user.decorator'
 import { RedisService } from '../redis/redis.service'
-import { memberSessionKey } from './end-user-auth.guard'
+import { memberSessionKey, touchMemberSessionIfSupported } from './end-user-auth.guard'
 import { PrismaService } from '../../prisma/prisma.service'
 
 interface EndUserJwtPayload {
@@ -48,6 +48,10 @@ export class OptionalEndUserAuthGuard implements CanActivate {
           return true
         }
         req.endUser = { endUserId: payload.sub, sessionId }
+        const touchResult = await touchMemberSessionIfSupported(this.redis, payload.sub, sessionId)
+        if (touchResult === -1) {
+          req.endUser = undefined
+        }
       }
     } catch {
       return true

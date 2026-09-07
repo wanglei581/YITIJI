@@ -178,6 +178,26 @@ export interface ResumeReport {
   truncatedInput?: boolean
 }
 
+export type ResumeReportExportKind = 'diagnosis_report' | 'change_list'
+export type ResumeIssueSeverity = 'high' | 'medium' | 'low'
+
+export interface ResumeReportExportRequest {
+  kind: ResumeReportExportKind
+}
+
+export interface ResumeReportExportResponse {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+  printFileUrl: string
+  savedToDocuments: boolean
+  aiGenerated: true
+}
+
 /**
  * 求职目标方向上下文（用户在 /resume/source 同页设置）
  *
@@ -426,6 +446,35 @@ export interface ResumeVoiceTranscribeResponse {
   providerName: string
 }
 
+/** 小青按住说话转写。形状与简历语音转写相同。 */
+export interface AssistantVoiceTranscribeResponse {
+  text: string
+  providerName: string
+}
+
+/** 登录用户保存的「本次要点」产物（可进我的文档 / 打印）。 */
+export interface AssistantSessionSummaryDocument {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+  printFileUrl: string
+}
+
+export interface AssistantSessionSummaryResponse {
+  advisorSessionId: string
+  artifactId: string
+  highlights: string[]
+  todos: string[]
+  disclaimer: string
+  savedToDocuments: boolean
+  document: AssistantSessionSummaryDocument | null
+  printUnavailableReason?: string
+}
+
 /** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0，
  *  但均可打印——Wave 6 会为 docx/txt/md 额外渲染一份同内容 PDF 副本供打印使用。 */
 export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
@@ -443,6 +492,70 @@ export interface ResumeLayoutSettings {
   margin?: ResumeLayoutMargin
   columns?: ResumeLayoutColumns
   accent?: ResumeLayoutAccent
+}
+
+// ── 草稿 / 版本 / 事实核对（包 H，不改 Prisma 模型，复用 AiResumeResult.kind）──
+
+/** 登录用户编辑草稿 kind；不单独出现在 /me 列表。 */
+export const RESUME_OPTIMIZE_DRAFT_KIND = 'optimize_draft'
+/** 导出确认快照 kind；重新生成 optimize 不得覆盖。 */
+export const RESUME_OPTIMIZE_CONFIRMED_KIND = 'optimize_confirmed'
+
+export type ResumeFactKind = 'school' | 'company' | 'period' | 'certificate' | 'phone' | 'email'
+
+export interface ResumeFactItem {
+  kind: ResumeFactKind
+  value: string
+  path: string
+  foundInOriginal: boolean
+}
+
+export interface ResumeDraftPayload {
+  resume: GeneratedResume
+  layout?: ResumeLayoutSettings
+  decisions?: Record<string, unknown>
+  updatedAt: string
+}
+
+export interface ResumeDraftResponse {
+  taskId: string
+  draft: ResumeDraftPayload | null
+}
+
+export interface ResumeConfirmedVersion {
+  version: number
+  confirmedAt: string
+  fileId: string
+  factsConfirmedAt?: string
+}
+
+export interface ResumeVersionsResponse {
+  taskId: string
+  latestVersion: number | null
+  items: ResumeConfirmedVersion[]
+}
+
+export interface ResumeFactCheckResponse {
+  taskId: string
+  originalAvailable: true
+  items: ResumeFactItem[]
+}
+
+/**
+ * 简历导出收费三态（契约 2 / Admin 价目 `resume_export`）。
+ * - free：unitCents=0 且 active，界面写「当前免费，不扣权益」
+ * - charged：unitCents>0 且 active，导出前展示价格 + 可用权益
+ * - unavailable：active=false 或价目缺失，fail-closed，不是免费
+ */
+export type ResumeExportPricingMode = 'free' | 'charged' | 'unavailable'
+
+/** GET /api/v1/resume/export/pricing */
+export interface ResumeExportPricing {
+  mode: ResumeExportPricingMode
+  unitCents: number
+  unit: string
+  benefit: { available: number; serviceType: 'resume_export' } | null
+  label: string
 }
 
 /** 导出响应:真实 FileObject + 短时签名 URL,可直接进打印链路(pdf)或下载(docx/txt/md) */

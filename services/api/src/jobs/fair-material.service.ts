@@ -14,6 +14,7 @@ import type { UpdateFairMaterialDto } from './dto/admin-fair.dto'
 import type { PublishAction } from './dto/publish.dto'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import { FairMaterialPrintBridgeService, type FairMaterialPrintView } from './fair-material-print-bridge.service'
+import { withPublicFairDemoExclusion } from './jobs-shared'
 
 // ============================================================
 // FairMaterialService — 活动资料管理(上传/更新/发布/删除/读取)
@@ -253,7 +254,7 @@ export class FairMaterialService {
     pageSize: number,
   ): Promise<{ data: FairMaterialDto[]; total: number; page: number; pageSize: number }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
     })
     if (!fair) return { data: [], total: 0, page, pageSize }

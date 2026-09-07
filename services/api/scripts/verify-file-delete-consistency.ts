@@ -62,6 +62,7 @@ function makeHarness(options: { failMetadata?: boolean; failStorageOnce?: boolea
         return { count: 1 }
       },
     },
+    printTask: { findMany: async () => [] as Array<{ fileId: string; fileUrl: string | null }> },
   }
   const storage = {
     deleteObject: async () => {
@@ -84,6 +85,7 @@ function makeHarness(options: { failMetadata?: boolean; failStorageOnce?: boolea
     record,
     order,
     deleteObjectCalls: () => deleteObjectCalls,
+    prisma,
     service: new FilesService(prisma as never, {} as never, storage as never),
   }
 }
@@ -105,6 +107,7 @@ function makeQuarantineHarness(options: { failMetadata?: boolean; failStorage?: 
         return { count: 1 }
       },
     },
+    printTask: { findMany: async () => [] as Array<{ fileId: string; fileUrl: string | null }> },
   }
   const storage = {
     headObject: async () => ({ sizeBytes: 21 * 1024 * 1024, contentType: 'application/pdf' }),
@@ -287,6 +290,27 @@ async function main(): Promise<void> {
     ForbiddenException
   )
   assert.deepEqual(unauthorized.order, [])
+
+  const inUse = makeHarness()
+  inUse.prisma.printTask.findMany = async () => [{ fileId: 'file-1', fileUrl: null }]
+  await assert.rejects(
+    () =>
+      inUse.service.ownerDelete(
+        'file-1',
+        { kind: 'member', endUserId: 'member-1' },
+        'owner delete while printing',
+      ),
+    (err: unknown) => {
+      const body = (err as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+      assert.equal(body?.error?.code, 'FILE_IN_USE')
+      return true
+    },
+  )
+  assert.equal(inUse.record.deletedAt, null, 'in-use file must not be tombstoned')
+  const systemCleanup = makeHarness()
+  systemCleanup.prisma.printTask.findMany = async () => [{ fileId: 'file-1', fileUrl: null }]
+  const systemDeleted = await systemCleanup.service.systemDelete('file-1', 'expired cleanup')
+  assert.equal(systemDeleted.status, 'deleted', 'system cleanup path is exempt from FILE_IN_USE')
 
   const quarantineMetadataFailure = makeQuarantineHarness({ failMetadata: true })
   await assert.rejects(

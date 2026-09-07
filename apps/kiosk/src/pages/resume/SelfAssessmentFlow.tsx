@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskModal, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type {
   SelfAssessmentDimensionKey,
   SelfAssessmentDimensionResult,
@@ -374,7 +374,9 @@ export function SelfAssessmentResultPage() {
   const mountedRef = useRef(true)
   const [printing, setPrinting] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
-  const [printed, setPrinted] = useState<{ fileId: string; signedUrl: string; printFileUrl?: string; filename: string; pageCount: number; sizeBytes: number } | null>(null)
+  // 撤回二次确认用页内 KioskModal，不用浏览器原生 confirm（Kiosk 全屏下样式 / 触控不受控）（SES-06）
+  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false)
+  const [printed, setPrinted] = useState<{ fileId: string; signedUrl: string; printFileUrl?: string; filename: string; pageCount: number; sizeBytes: number; expiresAt?: string } | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useSelfAssessmentIdleExit(inflight === null && !printing && !withdrawing && !previewOpen)
@@ -523,6 +525,7 @@ export function SelfAssessmentResultPage() {
         filename: file.filename,
         pageCount: file.pageCount,
         sizeBytes: file.sizeBytes,
+        expiresAt: file.expiresAt,
       })
       setPreviewOpen(true)
     } catch (err) {
@@ -553,8 +556,10 @@ export function SelfAssessmentResultPage() {
     })
   }
 
-  const handleWithdraw = async () => {
-    if (!confirm('本次自我探索将被物理删除，结果不可恢复。是否继续？')) return
+  const handleWithdraw = () => { setWithdrawConfirmOpen(true) }
+
+  const confirmWithdraw = async () => {
+    setWithdrawConfirmOpen(false)
     setWithdrawing(true)
     setError(null)
     try {
@@ -644,12 +649,25 @@ export function SelfAssessmentResultPage() {
           </GuardedButton>
           <GuardedButton
             blockedReason={withdrawing ? '正在撤回，请稍候' : accessReason}
-            onClick={() => void handleWithdraw()}
+            onClick={handleWithdraw}
             variant="danger"
           >
             {withdrawing ? '撤回中…' : '撤回本次探索'} <Trash2Icon />
           </GuardedButton>
         </div>
+        <KioskModal
+          open={withdrawConfirmOpen}
+          onClose={() => setWithdrawConfirmOpen(false)}
+          title="撤回本次探索"
+          description="本次自我探索将被物理删除，结果不可恢复。是否继续？"
+          closeLabel="取消"
+          actions={(
+            <>
+              <Button variant="ghost" onClick={() => setWithdrawConfirmOpen(false)}>取消</Button>
+              <Button variant="danger" onClick={() => void confirmWithdraw()}>确认撤回</Button>
+            </>
+          )}
+        />
 
         {printed && (
           <Card className="self-assessment-lightflow__print-card">
@@ -674,6 +692,9 @@ export function SelfAssessmentResultPage() {
             fileName={printed.filename}
             mimeType="application/pdf"
             phoneDownloadUrl={printed.signedUrl}
+            expiresAt={printed.expiresAt}
+            regenerating={printing}
+            onRegenerate={() => { void handlePrint() }}
             onClose={() => setPreviewOpen(false)}
           />
         )}

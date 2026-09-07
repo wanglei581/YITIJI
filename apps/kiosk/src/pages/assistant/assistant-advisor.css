@@ -431,6 +431,8 @@
 .kassist.kassist-lightflow .assistant-ai-tool-card[aria-disabled='true'],
 .kassist.kassist-lightflow .assistant-quick-questions button[aria-disabled='true'],
 .kassist.kassist-lightflow .assistant-tool-button[aria-disabled='true'],
+.kassist.kassist-lightflow .assistant-hold-talk-btn[aria-disabled='true'],
+.kassist.kassist-lightflow .assistant-summary-save[aria-disabled='true'],
 .kassist.kassist-lightflow .assistant-send[aria-disabled='true'] {
   opacity: 0.5;
   filter: grayscale(1);

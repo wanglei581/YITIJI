@@ -10,6 +10,7 @@ import {
   getFileSignedUrl,
   listFiles,
   type AdminFileLifecycleSummary,
+  type AdminFilePurpose,
   type AdminFileRecord,
 } from '../../services/api'
 import {
@@ -22,6 +23,15 @@ import {
 import { RETENTION_FILTERS, retentionPolicyLabel } from './retentionMeta'
 import { RetentionSummary } from './RetentionSummary'
 import { FileTable } from './FileTable'
+
+const TYPE_TO_PURPOSE: Partial<Record<string, AdminFilePurpose>> = {
+  简历上传: 'resume_upload',
+  简历扫描: 'resume_scan',
+  身份证: 'id_scan',
+  打印文档: 'print_doc',
+  招聘会资料: 'fair_material',
+  求职信: 'cover_letter',
+}
 
 function resolveSignedUrl(signedUrl: string): string {
   if (signedUrl.startsWith('http://') || signedUrl.startsWith('https://')) return signedUrl
@@ -56,41 +66,49 @@ export default function FilesPage() {
   const [cleanFilter, setCleanFilter] = useState('全部')
   const [retentionFilter, setRetentionFilter] = useState('全部')
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
+  const [total, setTotal] = useState(0)
+
+  const typePurpose = typeFilter === '全部' ? undefined : TYPE_TO_PURPOSE[typeFilter]
+  const deletedParam: boolean | 'all' = cleanFilter === '已清理'
+    ? true
+    : cleanFilter === '全部'
+      ? 'all'
+      : false
 
   const load = useCallback(() => {
     setLoading(true)
     setError(false)
     Promise.all([
-      listFiles({ includeDeleted: true, limit: 200 }),
+      listFiles({
+        skip: (page - 1) * pageSize,
+        limit: pageSize,
+        search: search.trim() || undefined,
+        deleted: deletedParam,
+        purpose: typePurpose,
+      }),
       getFileLifecycleSummary(),
     ])
-      .then(([rows, lifecycle]) => {
-        setFiles(rows)
+      .then(([res, lifecycle]) => {
+        setFiles(res.items)
+        setTotal(res.total)
         setSummary(lifecycle)
         setNow(Date.now())
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
-  }, [])
+  }, [page, pageSize, search, deletedParam, typePurpose])
 
   useEffect(() => { load() }, [load])
 
   const views = useMemo(() => files.map((f) => toViewFile(f, now)), [files, now])
 
   const filtered = views.filter((v) => {
-    const matchType = typeFilter === '全部' || v.typeLabel === typeFilter
     const matchSensitive = sensitiveFilter === '全部' || v.sensitiveLabel === sensitiveFilter
-    const matchClean = cleanFilter === '全部' || CLEAN_MAP[v.clean].label === cleanFilter
+    const matchClean = cleanFilter === '全部' || cleanFilter === '已清理' || CLEAN_MAP[v.clean].label === cleanFilter
     const matchRetention = retentionFilter === '全部' || retentionPolicyLabel(v.raw.retentionPolicy) === retentionFilter
-    return matchType && matchSensitive && matchClean && matchRetention
+    return matchSensitive && matchRetention && matchClean
   })
 
-  const searched = search.trim()
-    ? filtered.filter((v) => v.name.includes(search) || v.user.includes(search))
-    : filtered
-
-  const total = searched.length
-  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
   const highSensitiveCount = views.filter((v) => v.sensitive === 'high' && v.clean !== 'cleaned').length
   const expiredPending = summary?.expiredPendingCleanup ?? views.filter((v) => v.clean === 'scheduled').length
 
@@ -207,7 +225,7 @@ export default function FilesPage() {
         loading={loading}
         error={error}
         search={search}
-        files={paginated}
+        files={filtered}
         total={total}
         page={page}
         pageSize={pageSize}

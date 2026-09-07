@@ -12,6 +12,7 @@
 import type {
   GeneratedResume,
   ResumeExportFormat,
+  ResumeExportPricing,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -20,11 +21,20 @@ import type {
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
+  ResumeReportExportKind,
+  ResumeReportExportResponse,
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSessionSummaryResponse,
   AssistantSkill,
+  AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
-import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
+import type {
+  ResumeExportChargeOptions,
+  ResumeLayoutAdjustAction,
+  ResumeLayoutAdjustResponse,
+  ResumeReadAccess,
+} from './ai'
 
 /**
  * 演示模式拒绝错误。
@@ -141,7 +151,8 @@ export const aiMockAdapter = {
     }
   },
 
-  async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
+  async chatWithAssistant(req: AssistantChatRequest, _token?: string | null): Promise<AssistantChatResponse> {
+    void _token
     await delay(500)
     const sceneReplies: Record<AssistantSkill, Pick<AssistantChatResponse, 'reply' | 'actions'>> = {
       offer_compare: {
@@ -262,6 +273,19 @@ export const aiMockAdapter = {
     throw new Error('演示模式不支持语音识别，请使用文字输入')
   },
 
+  async transcribeAssistantVoice(_audio: Blob): Promise<AssistantVoiceTranscribeResponse> {
+    void _audio
+    await delay(80)
+    throw new AiMockModeError('ASR_NOT_CONFIGURED', '演示模式未启用语音转写，请使用文字输入', 400)
+  },
+
+  async summarizeAssistantSession(_sessionId: string, _token: string): Promise<AssistantSessionSummaryResponse> {
+    void _sessionId
+    void _token
+    await delay(80)
+    throw new AiMockModeError('AI_NOT_CONFIGURED', '演示模式不能保存本次要点', 503)
+  },
+
   async exportGeneratedResume(
     resume: GeneratedResume,
     _taskId?: string,
@@ -270,10 +294,12 @@ export const aiMockAdapter = {
     _layout?: ResumeLayoutSettings,
     _templateId?: string,
     _draft?: boolean,
+    _charge?: ResumeExportChargeOptions,
   ): Promise<ResumeGenerateExportResponse> {
     void _layout
     void _templateId
     void _draft
+    void _charge
     // mock 模式无后端,不构造假文件;返回空 signedUrl,页面会诚实提示
     await delay(400)
     const ext = format ?? 'pdf'
@@ -285,5 +311,22 @@ export const aiMockAdapter = {
       signedUrl: '',
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     }
+  },
+
+  async getResumeExportPricing(_access?: ResumeReadAccess): Promise<ResumeExportPricing> {
+    void _access
+    await delay(40)
+    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' }
+  },
+
+  exportResumeRecord(
+    taskId: string,
+    _body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
+    _access?: ResumeReadAccess,
+  ): Promise<ResumeReportExportResponse> {
+    void taskId
+    void _body
+    void _access
+    return rejectMockMode('修改清单导出')
   },
 }

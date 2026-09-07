@@ -16,6 +16,7 @@
 import type {
   GeneratedResume,
   ResumeExportFormat,
+  ResumeExportPricing,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -24,8 +25,12 @@ import type {
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
+  ResumeReportExportKind,
+  ResumeReportExportResponse,
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSessionSummaryResponse,
+  AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
 import { API_MODE } from './client'
 import { aiMockAdapter } from './aiMockAdapter'
@@ -54,6 +59,12 @@ export interface ResumeLayoutAdjustResponse {
   warnings: string[]
 }
 
+/** 契约 2：导出核销与事实核对时间。factsConfirmedAt 只随修改清单 body 发出（generate/export DTO 尚未收该字段）。 */
+export interface ResumeExportChargeOptions {
+  benefitGrantId?: string
+  factsConfirmedAt?: string
+}
+
 export interface AiServiceInterface {
   submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
@@ -65,11 +76,13 @@ export interface AiServiceInterface {
     layout: ResumeLayoutSettings,
     access?: ResumeReadAccess,
   ): Promise<ResumeLayoutAdjustResponse>
-  chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse>
+  chatWithAssistant(req: AssistantChatRequest, token?: string | null): Promise<AssistantChatResponse>
   // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
   submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse>
   getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse>
   transcribeResumeVoice(audio: Blob): Promise<ResumeVoiceTranscribeResponse>
+  transcribeAssistantVoice(audio: Blob): Promise<AssistantVoiceTranscribeResponse>
+  summarizeAssistantSession(sessionId: string, token: string): Promise<AssistantSessionSummaryResponse>
   exportGeneratedResume(
     resume: GeneratedResume,
     taskId?: string,
@@ -79,7 +92,14 @@ export interface AiServiceInterface {
     templateId?: string,
     /** 原样草稿（未经 AI 润色）。只影响产物元数据与文件名的诚实性，排版不变。 */
     draft?: boolean,
+    charge?: ResumeExportChargeOptions,
   ): Promise<ResumeGenerateExportResponse>
+  getResumeExportPricing(access?: ResumeReadAccess): Promise<ResumeExportPricing>
+  exportResumeRecord(
+    taskId: string,
+    body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
+    access?: ResumeReadAccess,
+  ): Promise<ResumeReportExportResponse>
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -118,9 +138,9 @@ export const adjustResumeLayoutDraft = (
   access?: ResumeReadAccess,
 ) => adapter.adjustResumeLayoutDraft(taskId, resume, action, layout, access)
 
-/** 向 AI 助手发送消息（意图分类 + 引导跳转） */
-export const chatWithAssistant = (req: AssistantChatRequest) =>
-  adapter.chatWithAssistant(req)
+/** 向 AI 助手发送消息（意图分类 + 引导跳转）。登录时带 token，便于保存本次要点。 */
+export const chatWithAssistant = (req: AssistantChatRequest, token?: string | null) =>
+  adapter.chatWithAssistant(req, token)
 
 /** 阶段2A:提交 AI 简历生成(引导式表单;AI 只润色,不编造) */
 export const submitResumeGenerate = (input: ResumeGenerateInput, token?: string | null) =>
@@ -134,6 +154,14 @@ export const getResumeGenerate = (taskId: string, access?: ResumeReadAccess) =>
 export const transcribeResumeVoice = (audio: Blob) =>
   adapter.transcribeResumeVoice(audio)
 
+/** 小青文字对话按住说话。松手后得到可编辑转写；ASR 未配置返回 ASR_NOT_CONFIGURED。 */
+export const transcribeAssistantVoice = (audio: Blob) =>
+  adapter.transcribeAssistantVoice(audio)
+
+/** 登录用户保存本次要点（≤8 条要点 + ≤5 条待办 PDF）。匿名不要调。 */
+export const summarizeAssistantSession = (sessionId: string, token: string) =>
+  adapter.summarizeAssistantSession(sessionId, token)
+
 /**
  * 阶段2A:导出确认后的简历为真实文件(FileObject + 签名 URL,可进打印链路)。
  * Wave1 Task 8:新增可选 format 参数,支持 pdf/docx/txt/md 多格式导出(默认 pdf)。
@@ -146,7 +174,17 @@ export const exportGeneratedResume = (
   layout?: ResumeLayoutSettings,
   templateId?: string,
   draft?: boolean,
-) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft)
+  charge?: ResumeExportChargeOptions,
+) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft, charge)
+
+export const getResumeExportPricing = (access?: ResumeReadAccess) =>
+  adapter.getResumeExportPricing(access)
+
+export const exportResumeRecord = (
+  taskId: string,
+  body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
+  access?: ResumeReadAccess,
+) => adapter.exportResumeRecord(taskId, body, access)
 
 /**
  * AI 生成失败时的出纸路径：把用户**已经填好的内容**原样导出成 PDF。

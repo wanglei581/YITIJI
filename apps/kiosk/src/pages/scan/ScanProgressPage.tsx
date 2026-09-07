@@ -30,6 +30,9 @@ interface LocationState {
 }
 
 const POLL_INTERVAL_MS = 3000
+// 扫描轮询兜底：总时长 10 分钟、连续失败 20 次即判失败，不再无限轮询（MSC-08）
+const MAX_SCAN_POLL_MS = 10 * 60 * 1000
+const MAX_SCAN_POLL_FAILS = 20
 
 const SCAN_TYPE_LABELS: Record<ScanType, string> = {
   resume: '简历扫描',
@@ -69,6 +72,7 @@ export function ScanProgressPage() {
   const controlToken = state.controlToken
 
   const hasTaskIdentity = Boolean(scanTaskId && controlToken)
+  const pollFailsRef = useRef(0)
   const [error, setError] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState('00:00')
   const [busyPhase, setBusyPhase] = useState<ScanBusyPhase>('active')
@@ -115,6 +119,16 @@ export function ScanProgressPage() {
           })
           return
         }
+        if (status.status === 'completed' && !status.file) {
+          setBusyPhase('terminal')
+          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描已完成但未拿到文件，请重新扫描' } })
+          return
+        }
+        if (Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
+          setBusyPhase('terminal')
+          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描超时，请返回重新开始' } })
+          return
+        }
         if (status.status === 'expired') {
           setBusyPhase('terminal')
           navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描超时，请返回重新开始' } })
@@ -134,6 +148,12 @@ export function ScanProgressPage() {
       } catch (err) {
         if (!stopped) {
           setError(userMessageOf(err, '查询扫描状态失败，请稍后重试'))
+          pollFailsRef.current += 1
+          if (pollFailsRef.current >= MAX_SCAN_POLL_FAILS || Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
+            setBusyPhase('terminal')
+            navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '长时间无法查询扫描状态，请联系工作人员或重新开始' } })
+            return
+          }
           scheduleNext()
         }
       }

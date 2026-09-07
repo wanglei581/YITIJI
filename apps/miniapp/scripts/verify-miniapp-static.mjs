@@ -366,6 +366,12 @@ const meWxml = read('pages/me/me.wxml')
 const settingsWxml = read('pages/settings/settings.wxml')
 const settingsJs = read('pages/settings/settings.js')
 const documentsJs = read('pages/documents/documents.js')
+const resumeDiagnoseWxml = read('pages/resume-diagnose/resume-diagnose.wxml')
+const resumeDiagnoseJs = read('pages/resume-diagnose/resume-diagnose.js')
+const resumeOptimizeWxml = read('pages/resume-optimize/resume-optimize.wxml')
+const resumeOptimizeJs = read('pages/resume-optimize/resume-optimize.js')
+const resumeParseJs = read('pages/resume-parse/resume-parse.js')
+const resumesJs = read('pages/resumes/resumes.js')
 const loginPageOk = PAGE_PATHS.includes('pages/launch/launch') &&
   PAGE_PATHS.includes('pages/legal/legal') &&
   PAGE_PATHS.includes('pages/privacy/privacy')
@@ -399,6 +405,17 @@ if (
   settingsJs.includes('auth.logout()')
 ) ok('401 补签准入与 token 存在性解耦')
 else bad('401 补签准入与 token 存在性解耦', '补签不得以 auth.getToken() 是否有值作为准入，登出须撤销补签资格')
+
+const uploadFileIdx = requestJs.indexOf('function uploadFile(')
+const uploadFileSource = uploadFileIdx >= 0 ? requestJs.slice(uploadFileIdx) : ''
+if (
+  requestJs.includes('function silentResignin()') &&
+  /function uploadFile\s*\(/.test(requestJs) &&
+  uploadFileSource.includes('silentResignin()') &&
+  /statusCode === 401[\s\S]*extractError\(body,\s*401\)/.test(uploadFileSource) &&
+  !requestJs.includes("reject(makeError('登录已失效,请重新登录', 401))")
+) ok('uploadFile 401 走 silentResignin 且保留 error.code')
+else bad('uploadFile 401 静默补签', '必须复用 silentResignin、401 走 extractError(body, 401)，不得用丢掉 code 的 makeError')
 
 const membershipJs = read('pages/membership/membership.js')
 const notificationsJs = read('pages/notifications/notifications.js')
@@ -478,6 +495,95 @@ for (const f of textFiles) {
 }
 if (honestyHits.length) bad('无伪造个人数据或商业能力', honestyHits.join(','))
 else ok('无伪造个人数据或商业能力')
+
+if (
+  resumeDiagnoseWxml.includes('report.issues') &&
+  resumeDiagnoseWxml.includes('report.contentBlocks') &&
+  resumeDiagnoseWxml.includes('这不是录取分') &&
+  resumeDiagnoseWxml.includes('report.truncatedInput') &&
+  resumeDiagnoseWxml.includes('打印原件') &&
+  resumeDiagnoseJs.includes('viewJobs()')
+) ok('简历诊断页展示问题证据、内容块、截断提示与非 AI 失败出口')
+else bad('简历诊断结果层', '必须引用 issues/contentBlocks，说明非录取分，展示截断提示，并保留打印原件/去打印/查看岗位出口')
+
+if (
+  resumeParseJs.includes('selectedDimensions') &&
+  resumeParseJs.includes('targetContext') &&
+  resumeParseJs.includes("{ skipped: true }") &&
+  resumeParseJs.includes('api.parseResume(payload)')
+) ok('简历解析透传诊断维度与目标方向，并允许通用诊断')
+else bad('简历解析方向透传', '必须从 URL 读取 selectedDimensions/targetContext 并传给 parseResume，未指定时显式 skipped')
+
+if (
+  resumeOptimizeJs.includes('api.exportGeneratedResume') &&
+  resumeOptimizeJs.includes('wx.openDocument') &&
+  resumeOptimizeJs.includes('printFileUrl') &&
+  resumeOptimizeJs.includes("key: 'pdf'") &&
+  resumeOptimizeJs.includes("key: 'docx'") &&
+  resumeOptimizeJs.includes("key: 'txt'") &&
+  resumeOptimizeJs.includes("key: 'md'") &&
+  resumeOptimizeWxml.includes('exportResult.pageLabel') &&
+  resumeOptimizeWxml.includes('exportResult.sizeLabel') &&
+  resumeOptimizeWxml.includes('exportResult.expiresLabel') &&
+  resumeOptimizeWxml.includes('aria-disabled') &&
+  resumeOptimizeWxml.includes('exportDisabledReason') &&
+  resumeOptimizeJs.includes('服务端没有返回结构化优化稿')
+) ok('简历优化页接真实四格式导出、PDF 打开、打印副本与文件元数据')
+else bad('简历优化导出结果层', '必须接 exportGeneratedResume，打开真实 PDF，展示四格式/页数/大小/有效期，并在不可导出时 aria-disabled')
+
+const diagnoseSaveState = resumeDiagnoseWxml.match(
+  /wx:if="\{\{exportResult\.savedToDocuments\}\}"[^>]*>([^<]*)<\/view>\s*<view wx:else[^>]*>([^<]*)<\/view>/,
+)
+const anonymousSaveCopy = diagnoseSaveState ? diagnoseSaveState[2] : ''
+if (
+  apiJs.includes('exportResumeReport(taskId, kind, accessToken, benefitGrantId)') &&
+  apiJs.includes('getResumeExportPricing()') &&
+  resumeDiagnoseWxml.includes('data-kind="diagnosis_report"') &&
+  resumeDiagnoseWxml.includes('data-kind="change_list"') &&
+  resumeDiagnoseWxml.includes("status !== 'done'") &&
+  resumeDiagnoseWxml.includes('诊断失败或尚未完成，暂时不能导出') &&
+  (resumeDiagnoseWxml.match(/aria-disabled="\{\{true\}\}"/g) || []).length >= 2 &&
+  resumeDiagnoseJs.includes('api.exportResumeReport(this.data.taskId, kind, accessToken, this.data.benefitGrantId)') &&
+  resumeDiagnoseJs.includes('wx.downloadFile') &&
+  resumeDiagnoseJs.includes('wx.openDocument') &&
+  resumeDiagnoseJs.includes('result.signedUrl') &&
+  resumeDiagnoseJs.includes('result.printFileUrl') &&
+  resumeDiagnoseWxml.includes('exportResult.pageLabel') &&
+  resumeDiagnoseWxml.includes('exportResult.sizeLabel') &&
+  resumeDiagnoseWxml.includes('exportResult.expiresLabel') &&
+  resumeDiagnoseJs.includes('setInterval(tick, 1000)') &&
+  resumeDiagnoseWxml.includes('wx:if="{{exportExpired}}"') &&
+  diagnoseSaveState &&
+  diagnoseSaveState[1].includes('已存入我的文档') &&
+  anonymousSaveCopy.includes('本次仅可打开，登录后可存我的文档') &&
+  !anonymousSaveCopy.includes('已存')
+) ok('诊断报告与修改清单可真实导出、打开、打印，并按登录态和有效期诚实展示')
+else bad('诊断报告导出结果层', '必须有两种导出动作、真实 PDF 打开/打印、页数/大小/有效期倒计时，且 savedToDocuments=false 分支不得出现「已存」')
+
+const normalizeJs = read('utils/normalize.js')
+const pricingCopyOk =
+  normalizeJs.includes('当前免费，不扣权益') &&
+  normalizeJs.includes('可用权益 ${count} 次') &&
+  normalizeJs.includes('简历导出当前不可用（价目已停用，不是免费）')
+const unavailableFailClosed = [resumeDiagnoseJs, resumeOptimizeJs].every((source) =>
+  source.includes("pricing: { mode: 'unavailable'") &&
+  source.includes('else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason') &&
+  source.includes("else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId)"),
+)
+const pricingButtonsDisabled =
+  resumeDiagnoseWxml.includes('disabled="{{exportDisabled || !!exportingKind}}"') &&
+  resumeOptimizeWxml.includes('disabled="{{exporting || exportDisabled}}"')
+if (pricingCopyOk && unavailableFailClosed && pricingButtonsDisabled) {
+  ok('简历导出价格三态展示，charged 无权益及 unavailable 均 fail-closed')
+} else {
+  bad('简历导出价格三态', '必须展示免费/收费/停用三态；charged 无权益和 unavailable 时按钮必须 aria-disabled')
+}
+
+if (!/format\s*:\s*['"]PDF['"]/.test(resumesJs) && resumesJs.includes('仅记录，未导出文件')) {
+  ok('我的简历不再把 AI 记录硬编码成 PDF 文件')
+} else {
+  bad('我的简历文件真实性', '禁止 format: PDF 硬编码；没有真实 MIME 时必须写「仅记录，未导出文件」')
+}
 
 const pickupWxml = read('pages/print-pickup/print-pickup.wxml')
 const pickupJs = read('pages/print-pickup/print-pickup.js')
@@ -699,20 +805,33 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
   }
 }
 
-// presetFileUrl 旁路：招聘会活动资料 / 参会企业资料是共享派生文件(endUserId 为 null)，
-// 会员拿 fileId 去 preview-url 必吃 403，只能透传服务端已下发的 printFileUrl。
+// presetFileUrl 旁路：共享派生文件(endUserId 为 null)拿 fileId 去 preview-url 必吃 403；
+// 简历非 PDF 导出则需要把服务端同步生成的同内容 PDF 副本交给打印链路。
 // 这条旁路把「本人」的证明点从 preview-url 的归属校验挪到了上游端点自己的资格校验 +
-// HMAC 签名上，所以必须钉死两件事：URL 只能来自服务端响应，且只有这两页可以用。
+// HMAC 签名上，所以必须钉死两件事：URL 只能来自服务端响应，且只有明确审计过的页面可以用。
 {
-  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail']
+  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail', 'resume-optimize', 'resume-diagnose']
   const offenders = []
   for (const full of physicalPageDirs) {
     const dir = full.replace(/^pages\//, '')   // physicalPageDirs 已带 pages/ 前缀
     const js = read(`${full}/${dir}.js`)
     if (!js.includes('printFileUrl=')) continue
     if (!PRESET_ALLOWED.includes(dir)) { offenders.push(`${dir}：不在旁路白名单内`); continue }
-    // 必须是从服务端响应里取的，不许自己拼
-    if (!/res\s*&&\s*res\.printFileUrl/.test(js)) offenders.push(`${dir}：printFileUrl 不是取自服务端响应`)
+    // 必须是从服务端响应里取的，不许自己拼。resume-optimize 还必须来自
+    // exportGeneratedResume 响应，并解析出签名 URL 自带的 PDF fileId。
+    if (!/res\s*&&\s*res\.printFileUrl|res\.printFileUrl|result\.printFileUrl/.test(js)) {
+      offenders.push(`${dir}：printFileUrl 不是取自服务端响应`)
+    }
+    if (dir === 'resume-optimize' && (
+      !js.includes('api.exportGeneratedResume') ||
+      !js.includes('fileIdFromPrintUrl(res.printFileUrl)') ||
+      !js.includes('fileUrls.absoluteUrl(res.printFileUrl)')
+    )) offenders.push(`${dir}：未锁定为导出响应里的同内容 PDF 副本`)
+    if (dir === 'resume-diagnose' && (
+      !js.includes('api.exportResumeReport') ||
+      !js.includes('result.printFileUrl') ||
+      !js.includes('result.signedUrl')
+    )) offenders.push(`${dir}：未锁定为报告导出响应，或混淆打开与打印签名`)
   }
   if (offenders.length === 0) ok('打印 printFileUrl 旁路仅限共享派生文件且只取自服务端响应')
   else bad('打印 printFileUrl 旁路受控', offenders.join('；'))
@@ -769,10 +888,14 @@ if (
   aiRecordsJs.includes("route: '/pages/job-fit/job-fit'") &&
   aiRecordsJs.includes("route: '/pages/career-plan/career-plan'") &&
   aiRecordsJs.includes('api.deleteMyAiRecord(record.id)') &&
-  !aiRecordsJs.includes("key: 'interview'") &&
+  aiRecordsJs.includes("key: 'interview'") &&
+  aiRecordsJs.includes('getMyMockInterviews') &&
+  aiRecordsJs.includes('deleteMyMockInterview') &&
+  apiJs.includes('getMyMockInterviews') &&
+  apiJs.includes('/me/mock-interviews') &&
   jobFitJs.includes('historyTaskId') && jobFitJs.includes('api.getJobFit(this.data.taskId') &&
   careerPlanJs.includes('historyTaskId') && careerPlanJs.includes('api.getCareerPlan(this.data.taskId')
-) ok('AI 服务记录支持真实结果回看与删除')
+) ok('AI 服务记录支持真实结果回看与删除，模拟面试分区来自 /me/mock-interviews')
 else bad('AI 服务记录闭环', '缺少真实类型筛选、已有结果页跳转、会员历史读取或删除入口')
 
 if (
@@ -792,6 +915,18 @@ else bad('AI 历史模式登录失效保护', '岗位匹配和职业规划不得
 const configJs = read('utils/config.js')
 if (/USE_MOCK:\s*false/.test(configJs)) ok('正式源码默认关闭 mock')
 else bad('正式源码默认关闭 mock', 'utils/config.js 必须 USE_MOCK=false')
+
+if (
+  /const PRODUCTION_BASE_URL = 'https:\/\/zyidai\.cn'/.test(configJs) &&
+  /const TEST_BASE_URL =/.test(configJs) &&
+  configJs.includes('wx.getAccountInfoSync') &&
+  /envVersion === 'develop'/.test(configJs) &&
+  /envVersion === 'trial'/.test(configJs) &&
+  /baseUrl:\s*resolveBaseUrl\(\)/.test(configJs) &&
+  /return PRODUCTION_BASE_URL/.test(configJs) &&
+  !/envVersion === 'release'[\s\S]{0,120}TEST_BASE_URL/.test(configJs)
+) ok('baseUrl 按 miniProgram.envVersion 选择，正式版固定生产域名')
+else bad('baseUrl 环境分流', 'develop/trial 可配测试域名，release 必须固定 https://zyidai.cn')
 
 const secretPatterns = [/sk-[A-Za-z0-9]{12,}/, /AKID[A-Za-z0-9]{10,}/, /AI_LLM_API_KEY\s*[:=]/, /DATABASE_URL\s*[:=]/]
 let secretHit = false

@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`488` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`520` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -55,7 +55,7 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/print-scan/tasks` | AdminPrintScanController.listTasks | admin | AdminPrintScanService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal |
 | GET | `/api/v1/admin/print-scan/tasks/:type/:taskId` | AdminPrintScanController.getTaskDetail | admin | AdminPrintScanService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal |
-| POST | `/api/v1/admin/print-scan/tasks/:type/:taskId/actions` | AdminPrintScanController.applyAction | admin | AdminPrintScanService<br/>AuditService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal |
+| POST | `/api/v1/admin/print-scan/tasks/:type/:taskId/actions` | AdminPrintScanController.applyAction | admin | AdminPrintScanService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal |
 | POST | `/api/v1/admin/print-scan/tasks/print/:taskId/close-unpaid` | AdminPrintScanController.closeUnpaidPrintTask | admin | AdminPrintScanService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal |
 
 ## `services/api/src/admin-users/admin-users.controller.ts`
@@ -87,15 +87,22 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/ai/logs` | AiController.getAiLogs | admin | AiLogService | AiServiceLog |
-| GET | `/api/v1/admin/ai/usage` | AiController.getAiUsage | admin | AiLogService<br/>AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/assistant/chat` | AiController.chatWithAssistant | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/generate` | AiController.submitResumeGenerate | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>UserAiConsent |
-| GET | `/api/v1/resume/generate/:taskId` | AiController.getResumeGenerate | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/generate/export` | AiController.exportGeneratedResume | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/parse` | AiController.submitResumeParse | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>UserAiConsent |
-| GET | `/api/v1/resume/records/:taskId` | AiController.getResumeRecord | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/resume/records/:taskId/layout-adjust` | AiController.adjustResumeLayout | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/resume/records/:taskId/optimize` | AiController.getResumeOptimize | — | AiService<br/>AuditService<br/>BenefitRedemptionService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| GET | `/api/v1/admin/ai/usage` | AiController.getAiUsage | admin | AiLogService<br/>AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/assistant/chat` | AiController.chatWithAssistant | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/assistant/sessions/:sessionId/summary` | AiController.summarizeAssistantSession | — | AssistantSummaryService | AdvisorArtifact<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| POST | `/api/v1/assistant/voice` | AiController.transcribeAssistantVoice | — | — | — |
+| GET | `/api/v1/resume/export/pricing` | AiController.getResumeExportPricing | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/resume/generate` | AiController.submitResumeGenerate | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| GET | `/api/v1/resume/generate/:taskId` | AiController.getResumeGenerate | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| POST | `/api/v1/resume/generate/export` | AiController.exportGeneratedResume | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/resume/parse` | AiController.submitResumeParse | — | AiService<br/>AuditService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| GET | `/api/v1/resume/records/:taskId` | AiController.getResumeRecord | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/resume/records/:taskId/draft` | AiController.getResumeDraft | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| PUT | `/api/v1/resume/records/:taskId/draft` | AiController.putResumeDraft | — | AiService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/resume/records/:taskId/fact-check` | AiController.factCheckResume | — | AiService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| POST | `/api/v1/resume/records/:taskId/layout-adjust` | AiController.adjustResumeLayout | — | AiService<br/>AuditService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
+| GET | `/api/v1/resume/records/:taskId/optimize` | AiController.getResumeOptimize | — | AiService<br/>AuditService<br/>BenefitRedemptionService<br/>MemberPrivacyService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>Order<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>UserAiConsent |
+| GET | `/api/v1/resume/records/:taskId/versions` | AiController.listResumeVersions | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord |
 | POST | `/api/v1/resume/voice/transcribe` | AiController.transcribeResumeVoice | — | AiLogService<br/>AsrService | AiServiceLog |
 
 ## `services/api/src/ai/career-plan.controller.ts`
@@ -137,6 +144,12 @@
 | POST | `/api/v1/admin/ai-config/:featureKey/test` | AiConfigController.testOne | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
 | POST | `/api/v1/admin/ai-config/test` | AiConfigController.test | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
 
+## `services/api/src/ai/resume-report-export.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/resume/records/:taskId/export` | ResumeReportExportController.export | — | — | — |
+
 ## `services/api/src/ai/self-assessment.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -146,6 +159,7 @@
 | GET | `/api/v1/resume/self-assessment/:taskId` | SelfAssessmentController.latest | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/resume/self-assessment/:taskId/append` | SelfAssessmentController.appendToResume | — | AppendedSelfAssessmentService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/resume/self-assessment/:taskId/print` | SelfAssessmentController.print | — | SelfAssessmentService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| GET | `/api/v1/resume/self-assessment/questions` | SelfAssessmentController.questions | — | — | — |
 
 ## `services/api/src/assistant/daily-brief.controller.ts`
 
@@ -221,6 +235,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/health` | HealthController.health | — | — | — |
+| GET | `/api/v1/health/cjk-font` | HealthController.cjkFont | admin | — | — |
 | GET | `/api/v1/health/ready` | HealthController.ready | — | — | — |
 
 ## `services/api/src/community/community.controller.ts`
@@ -265,20 +280,20 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/ad-assets/:id/content` | ContentController.serveAssetContent | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| GET | `/api/v1/admin/ad-assets` | ContentController.listAssets | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| POST | `/api/v1/admin/ad-assets` | ContentController.uploadAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| DELETE | `/api/v1/admin/ad-assets/:id` | ContentController.deleteAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| PATCH | `/api/v1/admin/ad-assets/:id` | ContentController.updateAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| POST | `/api/v1/admin/ad-assets/external-video` | ContentController.createExternalAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| GET | `/api/v1/admin/ad-playlists` | ContentController.listPlaylists | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| POST | `/api/v1/admin/ad-playlists` | ContentController.createPlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| DELETE | `/api/v1/admin/ad-playlists/:id` | ContentController.deletePlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| PUT | `/api/v1/admin/ad-playlists/:id` | ContentController.updatePlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| GET | `/api/v1/admin/screensaver/terminals` | ContentController.listScreensaverTerminals | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| GET | `/api/v1/admin/terminals/:terminalId/screensaver-config` | ContentController.getTerminalConfig | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| PUT | `/api/v1/admin/terminals/:terminalId/screensaver-config` | ContentController.saveTerminalConfig | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
-| GET | `/api/v1/terminals/:terminalId/screensaver` | ContentController.getKioskPlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>Terminal<br/>TerminalScreensaverConfig |
+| GET | `/api/v1/ad-assets/:id/content` | ContentController.serveAssetContent | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| GET | `/api/v1/admin/ad-assets` | ContentController.listAssets | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| POST | `/api/v1/admin/ad-assets` | ContentController.uploadAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| DELETE | `/api/v1/admin/ad-assets/:id` | ContentController.deleteAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| PATCH | `/api/v1/admin/ad-assets/:id` | ContentController.updateAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| POST | `/api/v1/admin/ad-assets/external-video` | ContentController.createExternalAsset | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| GET | `/api/v1/admin/ad-playlists` | ContentController.listPlaylists | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| POST | `/api/v1/admin/ad-playlists` | ContentController.createPlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| DELETE | `/api/v1/admin/ad-playlists/:id` | ContentController.deletePlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| PUT | `/api/v1/admin/ad-playlists/:id` | ContentController.updatePlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| GET | `/api/v1/admin/screensaver/terminals` | ContentController.listScreensaverTerminals | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| GET | `/api/v1/admin/terminals/:terminalId/screensaver-config` | ContentController.getTerminalConfig | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| PUT | `/api/v1/admin/terminals/:terminalId/screensaver-config` | ContentController.saveTerminalConfig | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
+| GET | `/api/v1/terminals/:terminalId/screensaver` | ContentController.getKioskPlaylist | admin | ContentService | AdAsset<br/>AdPlaylist<br/>AdPlaylistItem<br/>AuditLog<br/>Terminal<br/>TerminalScreensaverConfig |
 
 ## `services/api/src/contract-review/contract-review.controller.ts`
 
@@ -289,6 +304,7 @@
 | GET | `/api/v1/contract-reviews/:id` | ContractReviewController.get | — | ContractReviewLifecycleService | ContractReviewTask<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/contract-reviews/:id/confirm` | ContractReviewController.confirm | — | ContractReviewLifecycleService | ContractReviewTask<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/contract-reviews/:id/report` | ContractReviewController.report | — | ContractReviewLifecycleService | ContractReviewTask<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/contract-reviews/:id/report/keep` | ContractReviewController.keepReport | — | ContractReviewLifecycleService | ContractReviewTask<br/>FileObject<br/>PrintTask |
 | GET | `/api/v1/contract-reviews/consent-scope` | ContractReviewController.consentScope | — | ContractReviewConsentService | ContractReviewTask<br/>UserAiConsent |
 | DELETE | `/api/v1/contract-reviews/reports/:fileId` | ContractReviewController.abandonReport | — | ContractReviewLifecycleService | ContractReviewTask<br/>FileObject<br/>PrintTask |
 
@@ -297,6 +313,13 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/device-fleet/overview` | DeviceFleetController.overview | admin | DeviceFleetService | Terminal<br/>TerminalScreensaverConfig<br/>TerminalSmartCampusConfig<br/>TerminalToolboxConfig |
+
+## `services/api/src/document-conversion/document-conversion.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/document-conversion/capabilities` | DocumentConversionController.capabilities | — | DocumentConversionService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/files/:id/convert` | DocumentConversionController.convert | — | AuditService<br/>DocumentConversionService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 
 ## `services/api/src/files/files.controller.ts`
 
@@ -360,11 +383,11 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/job-sync/sources` | JobSyncController.listApiSources | admin | — | — |
 | GET | `/api/v1/admin/job-sync/sources/:sourceId` | JobSyncController.getSource | admin | — | — |
-| PATCH | `/api/v1/admin/job-sync/sources/:sourceId/enabled` | JobSyncController.setSourceEnabled | admin | JobSyncService | AuditLog<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>SyncLog |
-| GET | `/api/v1/admin/job-sync/sources/:sourceId/impact` | JobSyncController.getSourceImpact | admin | JobSyncService | AuditLog<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>SyncLog |
+| PATCH | `/api/v1/admin/job-sync/sources/:sourceId/enabled` | JobSyncController.setSourceEnabled | admin | JobSyncService | AuditLog<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>PrintTask<br/>SyncLog |
+| GET | `/api/v1/admin/job-sync/sources/:sourceId/impact` | JobSyncController.getSourceImpact | admin | JobSyncService | AuditLog<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>PrintTask<br/>SyncLog |
 | PUT | `/api/v1/admin/job-sync/sources/:sourceId/response-config` | JobSyncController.updateResponseConfig | admin | — | — |
 | POST | `/api/v1/admin/job-sync/sources/:sourceId/trigger` | JobSyncController.triggerSync | admin | — | — |
-| POST | `/api/v1/admin/job-sync/sources/:sourceId/unpublish-content` | JobSyncController.unpublishSourceContent | admin | JobSyncService | AuditLog<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>SyncLog |
+| POST | `/api/v1/admin/job-sync/sources/:sourceId/unpublish-content` | JobSyncController.unpublishSourceContent | admin | JobSyncService | AuditLog<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>PrintTask<br/>SyncLog |
 
 ## `services/api/src/jobs/admin-fairs.controller.ts`
 
@@ -441,6 +464,22 @@
 | GET | `/api/v1/partner/jobs/quality-summary` | JobsController.getPartnerJobQualitySummary | partner | JobQualityService | Job<br/>JobDataQualitySnapshot |
 | GET | `/api/v1/partner/sync-logs` | JobsController.getPartnerSyncLogs | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 
+## `services/api/src/jobs/partner-fairs.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/partner/fairs/:id/materials` | PartnerFairsController.getMaterials | partner | FairMaterialService | AuditLog<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| POST | `/api/v1/partner/fairs/:id/materials` | PartnerFairsController.uploadMaterial | partner | FairMaterialService | AuditLog<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| DELETE | `/api/v1/partner/fairs/:id/materials/:materialId` | PartnerFairsController.deleteMaterial | partner | FairMaterialService | AuditLog<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| PATCH | `/api/v1/partner/fairs/:id/materials/:materialId` | PartnerFairsController.updateMaterial | partner | FairMaterialService | AuditLog<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| DELETE | `/api/v1/partner/fairs/:id/venue-guide` | PartnerFairsController.deleteVenueGuide | partner | FairVenueGuideService | AuditLog<br/>FairCompany<br/>FairVenueFacility<br/>FairVenueGuide<br/>FairVenueHall<br/>JobFair |
+| GET | `/api/v1/partner/fairs/:id/venue-guide` | PartnerFairsController.getVenueGuide | partner | FairVenueGuideService | AuditLog<br/>FairCompany<br/>FairVenueFacility<br/>FairVenueGuide<br/>FairVenueHall<br/>JobFair |
+| PUT | `/api/v1/partner/fairs/:id/venue-guide` | PartnerFairsController.saveVenueGuide | partner | FairVenueGuideService | AuditLog<br/>FairCompany<br/>FairVenueFacility<br/>FairVenueGuide<br/>FairVenueHall<br/>JobFair |
+| GET | `/api/v1/partner/fairs/:id/zones` | PartnerFairsController.getZones | partner | FairCompanyZoneService | AuditLog<br/>FairCompany<br/>FairZone<br/>JobFair |
+| POST | `/api/v1/partner/fairs/:id/zones` | PartnerFairsController.createZone | partner | FairCompanyZoneService | AuditLog<br/>FairCompany<br/>FairZone<br/>JobFair |
+| DELETE | `/api/v1/partner/fairs/:id/zones/:zoneId` | PartnerFairsController.deleteZone | partner | FairCompanyZoneService | AuditLog<br/>FairCompany<br/>FairZone<br/>JobFair |
+| PATCH | `/api/v1/partner/fairs/:id/zones/:zoneId` | PartnerFairsController.updateZone | partner | FairCompanyZoneService | AuditLog<br/>FairCompany<br/>FairZone<br/>JobFair |
+
 ## `services/api/src/jobs/recruitment-integration.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -460,15 +499,15 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.list | admin | LegalService | LegalDocVersion |
-| POST | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.create | admin | — | — |
-| PATCH | `/api/v1/admin/legal-doc-versions/:id/activate` | AdminLegalDocsController.activate | admin | LegalService | LegalDocVersion |
+| GET | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.list | admin | LegalService | AuditLog<br/>LegalDocVersion |
+| POST | `/api/v1/admin/legal-doc-versions` | AdminLegalDocsController.create | admin | LegalService | AuditLog<br/>LegalDocVersion |
+| PATCH | `/api/v1/admin/legal-doc-versions/:id/activate` | AdminLegalDocsController.activate | admin | LegalService | AuditLog<br/>LegalDocVersion |
 
 ## `services/api/src/legal/legal.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/kiosk/legal/:type` | LegalController.getActive | — | LegalService | LegalDocVersion |
+| GET | `/api/v1/kiosk/legal/:type` | LegalController.getActive | — | LegalService | AuditLog<br/>LegalDocVersion |
 
 ## `services/api/src/materials/materials.controller.ts`
 
@@ -483,10 +522,11 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/me/ai-records` | MemberAssetsController.aiRecords | — | MemberAssetsService | AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/ai-records` | MemberAssetsController.aiRecords | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/ai-records/:id` | MemberAssetsController.deleteAiRecord | — | — | — |
-| GET | `/api/v1/me/documents` | MemberAssetsController.documents | — | MemberAssetsService | AiResumeResult<br/>FileObject<br/>JobAiSession |
-| GET | `/api/v1/me/resumes` | MemberAssetsController.resumes | — | MemberAssetsService | AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/documents` | MemberAssetsController.documents | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/documents/deleted` | MemberAssetsController.deletedDocuments | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/resumes` | MemberAssetsController.resumes | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/resumes/:id` | MemberAssetsController.deleteResume | — | — | — |
 
 ## `services/api/src/member-auth/member-auth.controller.ts`
@@ -583,6 +623,13 @@
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/cloud` | MemberPrintOrdersController.listCloud | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
+
+## `services/api/src/member-print-orders/package-orders.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/orders/package` | PackageOrdersController.create | — | PackageOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/orders/package/:id` | PackageOrdersController.detail | — | PackageOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/member-privacy/admin-member-privacy.controller.ts`
 
@@ -767,7 +814,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/print/convert/images-to-pdf` | PrintConversionController.imagesToPdf | — | PrintConversionService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/print/convert/images-to-pdf` | PrintConversionController.imagesToPdf | — | PrintConversionService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/print-jobs/admin-print-jobs.controller.ts`
 
@@ -780,10 +827,12 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PiiFinding<br/>PriceConfig<br/>PrintTask<br/>Terminal<br/>TerminalCapability |
-| POST | `/api/v1/print/jobs/:orderId/release` | PrintJobsController.releasePickup | — | PickupOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>PrintTask<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PiiFinding<br/>PriceConfig<br/>PrintTask<br/>Terminal<br/>TerminalCapability |
-| POST | `/api/v1/print/jobs/claim-pickup` | PrintJobsController.claimPickup | — | PickupOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>PrintTask<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/print/jobs` | PrintJobsController.create | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PiiFinding<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/print/jobs/:orderId/release` | PrintJobsController.releasePickup | — | PickupOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>OrderItem<br/>PiiFinding<br/>PrintTask<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/print/jobs/:taskId` | PrintJobsController.getStatus | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PiiFinding<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/print/jobs/:taskId/retry` | PrintJobsController.retryPaidFailedJob | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PiiFinding<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/print/jobs/:taskId/takeaway-url` | PrintJobsController.issueTakeawayUrl | — | PrintJobsService | AuditLog<br/>DocumentProcessTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>PiiFinding<br/>PriceConfig<br/>PrintTask<br/>PrintTaskStatusLog<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/print/jobs/claim-pickup` | PrintJobsController.claimPickup | — | PickupOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>OrderItem<br/>PiiFinding<br/>PrintTask<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/print-sign/print-sign.controller.ts`
 
@@ -812,7 +861,7 @@
 | POST | `/api/v1/scan/sessions` | ScanTasksController.create | — | ScanTasksService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
 | DELETE | `/api/v1/scan/sessions/:id` | ScanTasksController.cancel | — | ScanTasksService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/scan/sessions/:id` | ScanTasksController.status | — | ScanTasksService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
-| POST | `/api/v1/terminals/:terminalId/scan-sessions/deliver` | ScanTasksController.deliver | — | ScanTasksService<br/>TerminalsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/scan-sessions/deliver` | ScanTasksController.deliver | — | ScanTasksService<br/>TerminalsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/screensaver/screensaver.controller.ts`
 
@@ -856,22 +905,22 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/terminals` | AdminTerminalsController.list | admin | — | — |
-| POST | `/api/v1/admin/terminals` | AdminTerminalsController.createPlannedTerminal | admin | AuditService<br/>TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/admin/terminals/:terminalId/bind-code` | AdminTerminalsController.createBindCode | admin | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/admin/terminals` | AdminTerminalsController.createPlannedTerminal | admin | AuditService<br/>TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/admin/terminals/:terminalId/bind-code` | AdminTerminalsController.createBindCode | admin | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/admin/terminals/:terminalId/capabilities` | AdminTerminalsController.listCapabilities | admin | — | — |
 | PUT | `/api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey` | AdminTerminalsController.updateCapability | admin | — | — |
-| POST | `/api/v1/admin/terminals/:terminalId/emergency-revoke` | AdminTerminalsController.emergencyRevoke | admin | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/admin/terminals/:terminalId/lifecycle` | AdminTerminalsController.updateLifecycle | admin | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/admin/terminals/:terminalId/org` | AdminTerminalsController.assignOrg | admin | AuditService<br/>TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/admin/terminals/:terminalId/profile` | AdminTerminalsController.updateProfile | admin | AuditService<br/>TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/admin/terminals/:terminalId/emergency-revoke` | AdminTerminalsController.emergencyRevoke | admin | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PATCH | `/api/v1/admin/terminals/:terminalId/lifecycle` | AdminTerminalsController.updateLifecycle | admin | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PATCH | `/api/v1/admin/terminals/:terminalId/org` | AdminTerminalsController.assignOrg | admin | AuditService<br/>TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PATCH | `/api/v1/admin/terminals/:terminalId/profile` | AdminTerminalsController.updateProfile | admin | AuditService<br/>TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/admin/terminals/org-options` | AdminTerminalsController.orgOptions | admin | — | — |
 
 ## `services/api/src/terminals/admin-toolbox.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/terminals/:terminalId/toolbox-config` | AdminToolboxController.getConfig | admin | TerminalToolboxService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
-| PUT | `/api/v1/admin/terminals/:terminalId/toolbox-config` | AdminToolboxController.saveConfig | admin | AuditService<br/>TerminalToolboxService | AuditLog<br/>Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
+| GET | `/api/v1/admin/terminals/:terminalId/toolbox-config` | AdminToolboxController.getConfig | admin | TerminalToolboxService | Terminal<br/>TerminalHeartbeat<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
+| PUT | `/api/v1/admin/terminals/:terminalId/toolbox-config` | AdminToolboxController.saveConfig | admin | AuditService<br/>TerminalToolboxService | AuditLog<br/>Terminal<br/>TerminalHeartbeat<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
 | GET | `/api/v1/admin/toolbox/allowed-hosts` | AdminToolboxController.listAllowedHosts | admin | ToolboxGovernanceService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxAllowedHost<br/>ToolboxApp<br/>ToolboxAppVersion<br/>ToolboxLaunchEvent |
 | POST | `/api/v1/admin/toolbox/allowed-hosts` | AdminToolboxController.upsertAllowedHost | admin | ToolboxGovernanceService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxAllowedHost<br/>ToolboxApp<br/>ToolboxAppVersion<br/>ToolboxLaunchEvent |
 | POST | `/api/v1/admin/toolbox/allowed-hosts/:hostId/review` | AdminToolboxController.reviewAllowedHost | admin | ToolboxGovernanceService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxAllowedHost<br/>ToolboxApp<br/>ToolboxAppVersion<br/>ToolboxLaunchEvent |
@@ -884,26 +933,29 @@
 | POST | `/api/v1/admin/toolbox/apps/:appKey/versions/:version/publish` | AdminToolboxController.publishVersion | admin | ToolboxGovernanceService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxAllowedHost<br/>ToolboxApp<br/>ToolboxAppVersion<br/>ToolboxLaunchEvent |
 | POST | `/api/v1/admin/toolbox/apps/:appKey/versions/:version/reject` | AdminToolboxController.rejectVersion | admin | ToolboxGovernanceService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxAllowedHost<br/>ToolboxApp<br/>ToolboxAppVersion<br/>ToolboxLaunchEvent |
 | POST | `/api/v1/admin/toolbox/apps/:appKey/versions/:version/submit` | AdminToolboxController.submitVersion | admin | ToolboxGovernanceService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxAllowedHost<br/>ToolboxApp<br/>ToolboxAppVersion<br/>ToolboxLaunchEvent |
-| GET | `/api/v1/admin/toolbox/launch-summary` | AdminToolboxController.getLaunchSummary | admin | TerminalToolboxService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
-| GET | `/api/v1/admin/toolbox/terminals` | AdminToolboxController.listTerminals | admin | TerminalToolboxService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
+| GET | `/api/v1/admin/toolbox/launch-summary` | AdminToolboxController.getLaunchSummary | admin | TerminalToolboxService | Terminal<br/>TerminalHeartbeat<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
+| GET | `/api/v1/admin/toolbox/terminals` | AdminToolboxController.listTerminals | admin | TerminalToolboxService | Terminal<br/>TerminalHeartbeat<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
 
 ## `services/api/src/terminals/terminals.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/auth/terminal/exchange-bind-code` | TerminalsController.exchangeBindCode | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/auth/terminal/register` | TerminalsController.register | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PATCH | `/api/v1/print-tasks/:taskId/status` | TerminalsController.patchTaskStatus | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/auth/terminal/exchange-bind-code` | TerminalsController.exchangeBindCode | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/auth/terminal/register` | TerminalsController.register | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PATCH | `/api/v1/print-tasks/:taskId/status` | TerminalsController.patchTaskStatus | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/terminals/:terminalId/capabilities` | TerminalsController.getTerminalCapabilities | — | TerminalCapabilitiesService | Terminal<br/>TerminalCapability |
-| GET | `/api/v1/terminals/:terminalId/config` | TerminalsController.getTerminalConfig | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| PUT | `/api/v1/terminals/:terminalId/heartbeat` | TerminalsController.heartbeat | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| GET | `/api/v1/terminals/:terminalId/printer-status` | TerminalsController.getTerminalPrinterStatus | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/terminals/:terminalId/config` | TerminalsController.getTerminalConfig | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PUT | `/api/v1/terminals/:terminalId/heartbeat` | TerminalsController.heartbeat | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| GET | `/api/v1/terminals/:terminalId/printer-status` | TerminalsController.getTerminalPrinterStatus | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PUT | `/api/v1/terminals/:terminalId/release-observation` | TerminalsController.reportReleaseObservation | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
 | GET | `/api/v1/terminals/:terminalId/release-observation-plan` | TerminalsController.getReleaseObservationPlan | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
-| POST | `/api/v1/terminals/:terminalId/scan-deletion-audits` | TerminalsController.reportScanDeletionAudit | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/terminals/:terminalId/tasks/claim` | TerminalsController.claimTasks | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
-| POST | `/api/v1/terminals/:terminalId/toolbox-events` | TerminalsController.recordToolboxLaunchEvent | — | TerminalToolboxService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
-| GET | `/api/v1/terminals/public` | TerminalsController.listPublicTerminals | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/scan-deletion-audits` | TerminalsController.reportScanDeletionAudit | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/tasks/claim` | TerminalsController.claimTasks | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/:terminalId/toolbox-events` | TerminalsController.recordToolboxLaunchEvent | — | TerminalToolboxService | Terminal<br/>TerminalHeartbeat<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |
+| POST | `/api/v1/terminals/boot-ticket` | TerminalsController.createBootTicket | — | TerminalSessionService | Terminal |
+| GET | `/api/v1/terminals/public` | TerminalsController.listPublicTerminals | — | TerminalsService | AuditLog<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| POST | `/api/v1/terminals/session-token` | TerminalsController.exchangeSessionToken | — | TerminalSessionService | Terminal |
+| POST | `/api/v1/terminals/session-token/refresh` | TerminalsController.refreshSessionToken | — | TerminalSessionService | Terminal |
 | GET | `/api/v1/test/sample-visible.pdf` | TerminalsController.getSampleVisiblePdf | — | — | — |
 | GET | `/api/v1/test/sample.png` | TerminalsController.getSamplePng | — | — | — |
 

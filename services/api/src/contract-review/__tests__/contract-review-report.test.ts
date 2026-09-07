@@ -140,6 +140,17 @@ test('dedicated report file service persists a private locked PDF and revalidate
     endUserId: 'member-2',
     sourceFileId: 'source-1',
   }), null)
+
+  const kept = await service.keep({ fileId: created.fileId, endUserId: 'member-1' })
+  assert.equal(record?.['retentionPolicy'], 'months_3')
+  assert.equal(record?.['retentionLockedReason'], null)
+  assert.ok(kept.expiresAt.getTime() > Date.now() + 80 * 24 * 60 * 60 * 1000)
+  const keptAvailable = await service.getAvailable({
+    fileId: created.fileId,
+    endUserId: 'member-1',
+    sourceFileId: 'source-1',
+  })
+  assert.ok(keptAvailable)
 })
 
 test('report generation is disabled unless its backend flag is explicitly enabled', async () => {

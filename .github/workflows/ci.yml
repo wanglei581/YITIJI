@@ -220,6 +220,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk lint
           pnpm --filter @ai-job-print/admin lint
           pnpm --filter @ai-job-print/partner lint
+          pnpm --filter terminal-agent lint
 
       - name: Typecheck
         run: |
@@ -281,6 +282,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-ai-career
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2b-ai-resume
           pnpm --filter @ai-job-print/kiosk verify:resume-diagnosis-flow-ui
+          # 包 K2：Word 转换能力为假时三处 accept 不含 doc/docx、提示文案存在、convert 只在能力为真时调用
+          pnpm --filter @ai-job-print/kiosk verify:word-conversion-ui
           pnpm --filter @ai-job-print/kiosk verify:job-material-library-ui
           pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui
@@ -523,6 +526,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:device-fleet-overview
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
+          # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
+          pnpm --filter @ai-job-print/api verify:cjk-font
+          # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
+          pnpm --filter @ai-job-print/api verify:document-conversion
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
@@ -927,6 +934,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
+          # 包 K1：中文字体解析收口 + 探测（缺候选路径即红）
+          pnpm --filter @ai-job-print/api verify:cjk-font
+          # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
+          pnpm --filter @ai-job-print/api verify:document-conversion
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           # 彩色/双面按终端能力开放（fail-closed），PG 下同样必须成立

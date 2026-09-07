@@ -288,6 +288,44 @@ async function main(): Promise<void> {
       'CREDENTIAL_ROTATION_RATE_LIMITED',
       'Org-level rotation cap stops a stolen JWT from burning every webhook in one window',
     )
+
+    await expectCode(
+      () => partner.createPartnerDataSource(
+        {
+          name: 'API with token query',
+          accessMode: 'api',
+          sourceKind: 'school',
+          endpoint: 'https://api.example.com/v1/jobs?token=abc',
+        },
+        school,
+      ),
+      'API_ENDPOINT_CONTAINS_CREDENTIAL',
+      'API endpoint query with token is rejected',
+    )
+    await expectCode(
+      () => partner.createPartnerDataSource(
+        {
+          name: 'API with key query',
+          accessMode: 'api',
+          sourceKind: 'school',
+          endpoint: 'https://api.example.com/v1/jobs?api_key=secret',
+        },
+        school,
+      ),
+      'API_ENDPOINT_CONTAINS_CREDENTIAL',
+      'API endpoint query with key is rejected',
+    )
+    const cleanApi = await partner.createPartnerDataSource(
+      {
+        name: 'API clean endpoint',
+        accessMode: 'api',
+        sourceKind: 'school',
+        endpoint: 'https://api.example.com/v1/jobs',
+      },
+      school,
+    )
+    expect(cleanApi.endpoint === 'https://api.example.com/v1/jobs', 'clean API endpoint is stored without redaction')
+    pass('PTR-25. API endpoint query credentials are rejected; clean URLs remain')
   } finally {
     await prisma.job.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })
     await prisma.jobFair.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })

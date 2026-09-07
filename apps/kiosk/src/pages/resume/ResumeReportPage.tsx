@@ -1,66 +1,50 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, ResumeRadarChart, Stepper } from '@ai-job-print/ui'
-import type { ResumeRadarDimension, StepperStep } from '@ai-job-print/ui'
-import { AlertCircleIcon, ArrowUpRightIcon, FileSearchIcon, SparklesIcon, TargetIcon } from 'lucide-react'
-import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
+import type { ResumeParseResponse, ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
-import { API_MODE } from '../../services/api/client'
+import { isAiOutage } from '../../ai'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
 import { readAiResumeSession } from './aiResumeSession'
-import './resume-diagnosis-lightflow.css'
-import './resume-diagnosis-ext.css'
-import './resume-fusion-youth.css'
+import {
+  deriveViewState,
+  isExportCaptureState,
+  parseReportSearch,
+  REPORT_HEAD,
+  REPORT_STATUS,
+  shouldSkipReportFetch,
+  showsReportBody,
+  targetSummary,
+  type ReportSeg,
+} from './resume-report-model'
+import { fixtureReport } from './resume-report-fixture'
+import { ResumeReportHead } from './components/resume-report/ResumeReportChrome'
+import { ResumeReportStates } from './components/resume-report/ResumeReportStates'
+import { EmptyReportBody, ResumeReportBody } from './components/resume-report/ResumeReportBody'
+import { ResumeReportCta } from './components/resume-report/ResumeReportActions'
+import { ResumeReportTakeaway } from './components/resume-report/ResumeReportTakeaway'
+import './resume-report-qx.css'
 
 interface ReportState {
-  /** intent 分流(diagnose/optimize):由上传页随 state 透传 */
   intent?: string
   source?: string
-  /**
-   * 上传文件元信息。`fileUrl` / `mimeType` 由 ResumeSourcePage 随 state 透传
-   * （kiosk-upload 下发的 HMAC content URL，30 分钟 TTL），诊断失败时凭它把
-   * **原件**送进既有打印链路 —— 打印不依赖 AI。刷新后 state 丢失则两者为空，
-   * 那时按钮如实置灰写明原因，不给一个点了没反应的按钮。
-   */
   file?: { name: string; size: string; format: string; fileUrl?: string; mimeType?: string }
   taskId?: string
-  /** 匿名结果一次性令牌（Phase C-2A）；登录会员无此值 */
   accessToken?: string
   providerName?: string
   success?: boolean
   reason?: string
   report?: ResumeReport
-  /** Stage 3:OCR 来源的置信度与复核提示(解析页随 state 透传) */
   extractionNotice?: { textSource: string; confidence: 'high' | 'medium' | 'low'; warnings: string[] }
   targetContext?: ResumeTargetContext
 }
 
 const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
+const CONFIDENCE_LABEL: Record<'high' | 'medium' | 'low', string> = { high: '较高', medium: '中等', low: '较低' }
 
-const RESUME_FLOW_STEPS: StepperStep[] = [
-  { title: '上传与方向' },
-  { title: 'AI 解析' },
-  { title: '诊断报告' },
-  { title: '优化打印' },
-]
-
-// 目标方向摘要文本（无方向时返回 null）
-function targetSummary(tc?: ResumeTargetContext): string | null {
-  if (!tc) return null
-  if (tc.skipped) return '通用诊断（未指定方向）'
-  const parts = [tc.industry, tc.targetJob, tc.experience, tc.scene].filter(Boolean)
-  return parts.length ? parts.join(' · ') : null
-}
-
-const CONFIDENCE_LABEL: Record<'high' | 'medium' | 'low', string> = {
-  high: '较高',
-  medium: '中等',
-  low: '较低',
-}
-
-/** 按真实提取来源组织提示语：只有 OCR 来源才提识别置信度，其余来源只如实转述 warnings。 */
 function buildExtractionNotice(notice?: ReportState['extractionNotice']): string | null {
   if (!notice) return null
   const isOcr = notice.textSource === 'image_ocr' || notice.textSource === 'pdf_ocr'
@@ -75,35 +59,34 @@ function buildExtractionNotice(notice?: ReportState['extractionNotice']): string
 function ReportNoticePanel({
   isDemoReport,
   extractionNotice,
+  truncated,
 }: {
   isDemoReport: boolean
   extractionNotice?: ReportState['extractionNotice']
+  truncated?: boolean
 }) {
   const notices = [
     isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : null,
-    // R11：这两条曾经相邻且互相打脸 —— 上一条说「由演示用 AI 生成」，
-    // 下一条却说「仅基于上传文件中可解析出的内容生成」。演示态下后半句是假的：
-    // 演示报告和用户上传的文件毫无关系。所以这句话必须随 isDemoReport 换口径。
     isDemoReport
       ? '演示报告不基于你上传的文件内容生成，仅用于展示报告结构；它不会发送给企业，也不代表录用、面试或投递结果。'
       : '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
-    // extractionNotice 现在对所有提取来源都可能下发（超长截断等提示不限于 OCR），
-    // 因此「经 OCR 识别」这句只能在真的走了 OCR 时说，否则就是对用户谎报处理方式。
     buildExtractionNotice(extractionNotice),
+    truncated ? '本次诊断只看了简历前若干字符，后面的内容块可能整块缺失，不是简历里没有那些部分。' : null,
+    COMPLIANCE_COPY.KIOSK_RESUME_REPORT_DISCLAIMER,
+    COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE,
   ].filter((item): item is string => Boolean(item))
-
+  const ocr = extractionNotice && (extractionNotice.textSource === 'image_ocr' || extractionNotice.textSource === 'pdf_ocr')
   return (
-    <Card className="resume-report-notice border-primary-100 bg-primary-50/40 p-4">
-      <p className="text-sm font-semibold text-neutral-900">报告说明</p>
-      <ul className="mt-2 grid gap-2 text-xs leading-relaxed text-neutral-600 md:grid-cols-2">
-        {notices.map((notice) => (
-          <li key={notice} className="flex gap-2">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-            <span>{notice}</span>
-          </li>
-        ))}
-      </ul>
-    </Card>
+    <>
+      {truncated ? <p className="rrp-banner" data-kind="trunc" data-testid="resume-report-trunc">本次诊断没有看完整份简历（输入被截断）。</p> : null}
+      {ocr ? <p className="rrp-banner" data-kind="ocr" data-testid="resume-report-ocr">{buildExtractionNotice(extractionNotice)}</p> : null}
+      <section className="rrp-notice">
+        <p className="text-sm font-semibold">报告说明</p>
+        <ul>
+          {notices.map((notice) => <li key={notice}>{notice}</li>)}
+        </ul>
+      </section>
+    </>
   )
 }
 
@@ -112,38 +95,35 @@ export function ResumeReportPage() {
   const location = useLocation()
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as ReportState
-  // intent 决定底部主引导语义(optimize 入口进来时诊断只是必经步骤)
   const intent = state.intent === 'optimize' ? 'optimize' : 'diagnose'
-
   const { success = true, reason } = state
-  // 刷新后 location.state 丢失：taskId / accessToken 回退到最小会话（Phase C-2A）。
+  const parsed = useMemo(() => parseReportSearch(location.search), [location.search])
   const session = useMemo(() => readAiResumeSession(), [])
-  const queryTaskId = useMemo(() => new URLSearchParams(location.search).get('taskId') ?? undefined, [location.search])
   const stateTaskId = typeof state.taskId === 'string' ? state.taskId : undefined
-  const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
-  const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
+  const taskId = stateTaskId ?? parsed.queryTaskId ?? session?.taskId
+  const usingSessionTask = !stateTaskId && !parsed.queryTaskId && Boolean(session?.taskId)
   const accessToken = state.accessToken ?? (usingSessionTask ? session?.accessToken : undefined)
+
+  const skipFetch = shouldSkipReportFetch(parsed.tech, parsed.urlState)
   const [report, setReport] = useState<ResumeReport | undefined>(state.report)
   const [providerName, setProviderName] = useState<string | undefined>(state.providerName)
-  // Stage 3:OCR 来源(图片/扫描件)的置信度与复核提示,必须如实展示
-  const [extractionNotice, setExtractionNotice] = useState<
-    { textSource: string; confidence: 'high' | 'medium' | 'low'; warnings: string[] } | undefined
-  >(state.extractionNotice)
-  const [loading, setLoading] = useState(!state.report && !!taskId && success)
+  const [extractionNotice, setExtractionNotice] = useState(state.extractionNotice)
+  const [targetContext, setTargetContext] = useState<ResumeTargetContext | undefined>(state.targetContext)
+  const [loading, setLoading] = useState(!state.report && !!taskId && success && !skipFetch)
   const [loadError, setLoadError] = useState(false)
+  const [outage, setOutage] = useState(false)
   const [recoveredFail, setRecoveredFail] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
-  // http 模式：页面刷新后 state.report 为空，但 taskId 可用，从服务端恢复
   useEffect(() => {
-    if (state.report || !taskId || !success) return
+    if (skipFetch || (state.report && state.targetContext) || !taskId || !success) return
     let cancelled = false
-    // 归属 / 令牌门禁（Phase C-1 + C-2A）：登录会员传 token，匿名用户传 accessToken，
-    // 才能读回本人解析结果；无凭证后端返回 AI_TASK_NOT_FOUND。
     getResumeRecord(taskId, { token: getToken(), accessToken })
-      .then((res) => {
+      .then((res: ResumeParseResponse & { targetContext?: ResumeTargetContext }) => {
         if (cancelled) return
         if (res.providerName) setProviderName(res.providerName)
         if (res.extractionNotice) setExtractionNotice(res.extractionNotice)
+        if (res.targetContext) setTargetContext(res.targetContext)
         if (res.status === 'failed' || (!res.report && res.failReason)) {
           setRecoveredFail(res.failReason ?? '简历解析未能完成，请重试')
           return
@@ -151,327 +131,163 @@ export function ResumeReportPage() {
         if (res.report) setReport(res.report)
         else setLoadError(true)
       })
-      .catch(() => { if (!cancelled) setLoadError(true) })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        if (isAiOutage(err)) setOutage(true)
+        else setLoadError(true)
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [taskId, success, state.report, accessToken, getToken])
+  }, [taskId, success, state.report, state.targetContext, accessToken, getToken, skipFetch, reloadKey])
 
   const handleRetry = () => {
-    const retryState = Object.fromEntries(
-      Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)),
-    )
+    const retryState = Object.fromEntries(Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)))
     navigate('/resume/parse', { state: retryState })
   }
 
-  const failView = (failReason: string) => (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center overflow-y-auto p-8">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-error-bg">
-        <AlertCircleIcon className="h-12 w-12 text-error-fg" />
-      </div>
-      <h1 className="text-2xl font-bold text-neutral-900">诊断失败</h1>
-      <p className="mt-2 max-w-xl text-center text-base text-neutral-500">
-        {failReason}
-      </p>
-      <ResumeDiagnosisFailExits
-        file={state.file}
-        onRetry={handleRetry}
-        onHome={() => navigate('/')}
-      />
-    </section></KioskPageFrame>
+  const viewState = deriveViewState({
+    urlState: parsed.urlState,
+    tech: parsed.tech,
+    taskId,
+    success,
+    recoveredFail,
+    loading,
+    loadError,
+    outage,
+    report,
+  })
+
+  const fixtureKind = parsed.tech && (viewState === 'report' || isExportCaptureState(viewState))
+    ? 'full'
+    : parsed.tech && viewState === 'report-minimal'
+      ? 'minimal'
+      : parsed.tech && viewState === 'report-empty'
+        ? 'empty'
+        : null
+  const displayReport = fixtureKind ? fixtureReport(fixtureKind) : report
+  const displayIssues = displayReport?.issues ?? []
+  const isFixture = Boolean(fixtureKind)
+  const direction = targetContext ?? state.targetContext
+  const summary = targetSummary(direction)
+
+  const setSearch = (over: Record<string, string | null>) => {
+    const next = new URLSearchParams(location.search)
+    for (const [key, value] of Object.entries(over)) {
+      if (value === null) next.delete(key)
+      else next.set(key, value)
+    }
+    navigate({ pathname: '/resume/report', search: next.toString() }, { replace: true, state })
+  }
+
+  const nav = (
+    <>
+      <button type="button" className="qx-nav-item" onClick={() => navigate('/')} data-route="/" data-testid="resume-report-nav-home"><HomeIcon size={32} aria-hidden />首页</button>
+      <button type="button" className="qx-nav-item" onClick={() => navigate('/assistant')} data-route="/assistant" data-testid="resume-report-nav-advisor"><SparklesIcon size={32} aria-hidden />AI 顾问</button>
+      <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')} data-route="/profile" data-testid="resume-report-nav-profile"><UserIcon size={32} aria-hidden />我的</button>
+    </>
   )
 
-  if (!success) {
-    return failView(reason ?? '简历解析未能完成，请重试')
-  }
-  if (recoveredFail) {
-    return failView(recoveredFail)
-  }
+  const failView = (failReason: string) => (
+    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={<p className="why">这一屏一条 AI 结论都不给。</p>}>
+      <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
+        <ResumeReportHead viewState="diagnose-failed" />
+        <section className="rrp-state">
+          <h2>解析中断，中断的只是「读懂它」这一步</h2>
+          <p>失败原因：{failReason}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>
+        </section>
+        <ResumeDiagnosisFailExits file={state.file} onRetry={handleRetry} onHome={() => navigate('/')} />
+      </section>
+    </QxPageFrame>
+  )
 
-  if (loading) {
-    return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
-          <SparklesIcon className="h-10 w-10 animate-pulse text-primary-600" />
-        </div>
-        <p className="text-base text-neutral-500">正在恢复诊断报告…</p>
-      </section></KioskPageFrame>
-    )
-  }
+  if (!success) return failView(reason ?? '简历解析未能完成，请重试')
+  if (recoveredFail && viewState === 'diagnose-failed' && !parsed.tech) return failView(recoveredFail)
+  if (viewState === 'diagnose-failed') return failView(reason ?? recoveredFail ?? '简历解析未能完成，请重试')
 
-  if (!report || loadError) {
-    return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
-          <FileSearchIcon className="h-10 w-10 text-primary-600" />
-        </div>
-        <h1 className="mt-6 text-xl font-semibold text-neutral-900">还没有诊断报告</h1>
-        <p className="mt-2 max-w-xs text-center text-sm text-neutral-500">
-          请先上传或选择简历，生成 AI 诊断报告后再查看。
-        </p>
-        <div className="mt-8 flex w-full max-w-sm gap-3">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
-            返回首页
-          </Button>
-          <Button size="lg" className="resume-primary-action flex-1" onClick={() => navigate('/resume/source')}>
-            开始简历诊断
-          </Button>
-        </div>
-      </section></KioskPageFrame>
-    )
-  }
-
-  const totalScore = report.sections.reduce((sum, s) => sum + s.score, 0)
-  const totalMax   = report.sections.reduce((sum, s) => sum + s.maxScore, 0)
-  const radarDimensions: ResumeRadarDimension[] = report.sections.map((s) => ({
-    name: s.label,
-    score: s.maxScore > 0 ? Math.round((s.score / s.maxScore) * 100) : 0,
-  }))
-
-  // 优先修改项：得分率最低的 2-3 个分项（由真实报告派生，不编造）
-  const priorityItems = [...report.sections]
-    .filter((s) => s.maxScore > 0)
-    .map((s) => ({ ...s, pct: Math.round((s.score / s.maxScore) * 100) }))
-    .sort((a, b) => a.pct - b.pct)
-    .slice(0, 3)
-    .filter((s) => s.pct < 100)
-
-  // Phase 1.1：风险表述提醒 / 修改优先级建议为可选；旧报告（5 sections、无此字段）优雅降级。
-  const llmPriorities = report.priorities ?? []
-  const riskNotes = report.riskNotes ?? []
-
-  const summary = targetSummary(state.targetContext)
+  const isDemoReport = isFixture || providerName === 'mock'
+  const canOptimize = Boolean(taskId) && (viewState === 'report' || viewState === 'report-minimal' || isExportCaptureState(viewState))
+  const why =
+    viewState === 'loading' ? '读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。'
+    : viewState === 'unavailable' ? '能力没接通时不提供优化入口：优化和诊断走同一条 AI 链路，这时候点进去只会再失败一次。'
+    : viewState === 'read-error' ? '优化那一步要用同一份报告作输入，报告没取到就先不给入口。'
+    : viewState === 'report-empty' ? '报告里没有内容，优化那一步就没有可对照的原文片段，所以下一步先不给入口。'
+    : viewState === 'no-context' || viewState === 'illegal' ? '没有可展示的报告时，从上传入口重新开始。'
+    : !taskId && (viewState === 'report' || viewState === 'report-minimal') ? '这份报告没有对应的简历编号：优化那一步取不到原文，所以入口先关着。'
+    : '本页只给这一次的诊断；想看改完之后的版本对照，去下一步的简历优化。'
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow flex h-full flex-col p-6">
-      <KioskPageHeader
-        title="诊断报告"
-        description="基于已有内容的 AI 分析结果（仅供参考）"
-        onBack={() => navigate('/')}
-        backLabel="返回首页"
-      />
-
-      <div className="resume-lightflow__stepper mt-4">
-        <Stepper steps={RESUME_FLOW_STEPS} currentIndex={2} />
-      </div>
-
-      <div className="resume-report-content mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
-        <div className="resume-report-score-row flex flex-col gap-4 lg:flex-row">
-          {/* 总分卡片 */}
-          <Card className="resume-report-summary p-4 lg:w-[220px] lg:flex-none">
-            <div className="fy-score-block flex h-full flex-col items-center justify-center gap-2 text-center">
-              <div className="flex items-baseline gap-1">
-                <span className="fy-score-num">{totalScore}</span>
-                <span className="fy-score-denom">/{totalMax}</span>
-              </div>
-              <p className="max-w-[160px] text-xs leading-snug text-neutral-500">
-                参考评分，由 6 个分项汇总<br />不代表真实招聘结果
-              </p>
-              {summary && (
-                <p className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
-                  <TargetIcon className="h-3 w-3" aria-hidden="true" />
-                  {summary}
-                </p>
-              )}
-            </div>
-          </Card>
-
-          {/* 能力雷达图 */}
-          <Card className="resume-report-radar min-w-0 flex-1 p-5">
-            <p className="mb-2 text-sm font-medium text-neutral-700">能力雷达图</p>
-            <ResumeRadarChart dimensions={radarDimensions} height={280} />
-          </Card>
-
-          <div className="resume-report-notice lg:w-[300px] lg:flex-none">
-            <ReportNoticePanel
-              isDemoReport={API_MODE !== 'http' || providerName === 'mock'}
-              extractionNotice={extractionNotice}
-            />
-          </div>
-        </div>
-
-        <div className="resume-report-grid-a grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* 分项得分 */}
-          <Card className="resume-report-evidence p-5">
-            <p className="mb-4 text-sm font-medium text-neutral-700">分项评估</p>
-            <div className="space-y-3">
-              {report.sections.map((section) => {
-                const pct = Math.round((section.score / section.maxScore) * 100)
-                return (
-                  <div key={section.key}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-neutral-700">{section.label}</span>
-                      <span className="font-medium text-neutral-900">
-                        {section.score}/{section.maxScore}
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-                      <div
-                        role="progressbar"
-                        aria-label={`${section.label}得分`}
-                        aria-valuenow={section.score}
-                        aria-valuemin={0}
-                        aria-valuemax={section.maxScore}
-                        className={[
-                          'h-full rounded-full bg-primary-500 transition-all',
-                          pct < 70 ? 'fy-progress-low' : '',
-                        ].join(' ')}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-
-          {/* 修改优先级建议：优先用真实报告 priorities；缺失（含旧 5-section 报告）回退按低分分项派生 */}
-          {llmPriorities.length > 0 ? (
-            <Card className="resume-report-priorities p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
-                <p className="text-sm font-medium text-neutral-700">修改优先级建议</p>
-              </div>
-              <p className="mb-3 text-xs text-neutral-400">按重要性排序，供本人修改简历参考</p>
-              <div className="space-y-2.5">
-                {llmPriorities.map((item, i) => (
-                  <div key={i} className="fy-pri-item flex gap-3">
-                    <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
-                      {i + 1}
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-neutral-800">{item.focus}</p>
-                      {item.reason && <p className="mt-1 text-xs leading-relaxed text-neutral-500">{item.reason}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : priorityItems.length > 0 ? (
-            <Card className="resume-report-priorities p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
-                <p className="text-sm font-medium text-neutral-700">优先修改项</p>
-              </div>
-              <p className="mb-3 text-xs text-neutral-400">得分率偏低的分项，建议优先调整表达与内容结构</p>
-              <div className="space-y-2.5">
-                {priorityItems.map((item, i) => (
-                  <div key={item.key} className="fy-pri-item flex items-center gap-3">
-                    <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
-                      {i + 1}
-                    </span>
-                    <span className="flex-1 text-sm font-medium text-neutral-800">{item.label}</span>
-                    <span className="text-sm font-bold text-neutral-500">{item.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : (
-            <Card className="resume-report-priorities p-5">
-              <p className="text-sm font-medium text-neutral-700">修改优先级建议</p>
-              <p className="mt-2 text-sm text-neutral-500">当前报告未给出独立优先级清单，可参考分项评估中的低分项。</p>
-            </Card>
-          )}
-        </div>
-
-        <div className={`resume-report-grid-b grid grid-cols-1 gap-4 ${riskNotes.length > 0 ? 'lg:grid-cols-2' : ''}`}>
-          {/* 风险表述提醒：仅针对简历文本表达；旧报告无此字段时不渲染占位空卡 */}
-          {riskNotes.length > 0 ? (
-            <Card className="resume-report-risks h-full p-5">
-              <div className="mb-2 flex items-center gap-2">
-                <AlertCircleIcon className="h-4 w-4 text-warning" aria-hidden="true" />
-                <p className="text-sm font-medium text-neutral-700">风险表述提醒</p>
-              </div>
-              <p className="mb-3 text-xs text-neutral-400">仅针对简历文本表达，不涉及身份信息判断；供本人修改参考</p>
-              <ul className="space-y-2">
-                {riskNotes.map((note, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-neutral-600">
-                    <span className="fy-dot-clay mt-2 h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
-                    <span>{note}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-
-          {/* 优化建议 */}
-          <Card className="resume-report-suggestions h-full p-5">
-            <p className="mb-4 text-sm font-medium text-neutral-700">可执行建议</p>
-            <ol className="space-y-3">
-              {report.suggestions.map((tip, i) => (
-                <li key={i} className="flex gap-3 text-sm text-neutral-600">
-                  <span className="fy-sug-no flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">
-                    {i + 1}
-                  </span>
-                  <span className="flex-1 leading-relaxed">{tip}</span>
-                </li>
-              ))}
-            </ol>
-          </Card>
-        </div>
-
-        {/* 合规声明 */}
-        <p className="px-1 pb-1 text-center text-xs leading-relaxed text-neutral-400">
-          {COMPLIANCE_COPY.KIOSK_RESUME_REPORT_DISCLAIMER}
-          {COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE}
-        </p>
-      </div>
-
-      {/* 优化路径引导:用户从「AI简历优化」入口进入时,诊断只是必经步骤,主引导是继续优化 */}
-      {intent === 'optimize' && (
-        <div className="resume-report-next mt-4 flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/70 px-4 py-3">
-          <SparklesIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
-          <p className="text-sm text-primary-800">诊断已完成。点击下方「继续生成优化版简历」，系统将基于原文重组优化（不补充虚构信息）。</p>
-        </div>
-      )}
-
-      {/* 操作按钮 */}
-      <KioskActionBar className="resume-report-actions mt-6 flex gap-3">
-        <Button
-          size="lg"
-          variant="secondary"
-          className="flex flex-1 items-center gap-2"
-          onClick={() => navigate(`/resume/source?intent=${intent}`)}
-        >
-          {intent === 'optimize' ? '重新上传' : '重新诊断'}
-        </Button>
-        {/*
-          R7：这里原本还有一个「目标岗位匹配参考」按钮，onClick 与下方那个整行入口
-          完全相同（同一路由、同一 state）—— 同屏两个一模一样的入口。
-          副作用不只是重复：动作条被挤成三等分后，「重新诊断」「查看优化建议」
-          在按钮内被拆成两行。去掉这一个，剩下两个按钮就够宽了；
-          岗位匹配保留下方那个整行入口，位置更显眼。
-        */}
-        <Button
-          size="lg"
-          className="resume-primary-action flex flex-[1.4] items-center gap-2"
-          onClick={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext } })}
-        >
-          <SparklesIcon className="h-4 w-4" />
-          {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}
-        </Button>
-      </KioskActionBar>
-      {/* 2D:目标岗位定向参考(仅参考,引导去来源平台投递) */}
-      <Button
-        size="lg"
-        variant="secondary"
-        className="resume-secondary-action mt-3 flex w-full items-center justify-center gap-2"
-        onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
+    <QxPageFrame
+      title="简历诊断报告"
+      subtitle={REPORT_HEAD[viewState].sub}
+      status={REPORT_STATUS[viewState]}
+      terminalLabel="就业服务大厅"
+      navbar={nav}
+      ctabar={
+        <ResumeReportCta
+          viewState={viewState}
+          canOptimize={canOptimize}
+          intent={intent}
+          why={why}
+          onRetry={() => {
+            setLoadError(false)
+            setOutage(false)
+            setLoading(true)
+            setReloadKey((n) => n + 1)
+            if (parsed.tech) setSearch({ state: 'loading' })
+          }}
+          onOptimize={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext ?? targetContext } })}
+        />
+      }
+    >
+      <section
+        data-kiosk-domain="resume"
+        data-kiosk-screen="resume-report"
+        data-route="/resume/report"
+        data-state={viewState}
+        data-testid={`resume-report-state-${viewState}`}
+        data-fallback={parsed.fallback ? '1' : undefined}
+        data-seg={displayReport ? (parsed.seg ?? 'structure') : 'none'}
+        className="qx-scroll rrp-page"
+        data-flat={parsed.flat ? '1' : undefined}
       >
-        <TargetIcon className="h-4 w-4" />
-        目标岗位匹配参考（仅供参考）
-      </Button>
-      <p className="resume-report-secondary-line mt-3">
-        想了解自己的倾向？
-        <button
-          type="button"
-          className="resume-report-secondary-link"
-          onClick={() => navigate('/resume/self-assessment/intro')}
-        >
-          做一次自我探索
-        </button>
-      </p>
-    </section>
-    </KioskPageFrame>
+        <ResumeReportHead viewState={viewState} />
+        {isFixture ? (
+          <div className="rrp-idbar" data-testid="resume-report-fixture">
+            <span className="rrp-fx">合成演示</span>
+            <span className="rrp-fxtx">合成数据，不是任何人的真实简历，也不是真实 AI 结果。</span>
+          </div>
+        ) : null}
+        {showsReportBody(viewState) ? (
+          <>
+            <ReportNoticePanel isDemoReport={isDemoReport} extractionNotice={extractionNotice} truncated={displayReport?.truncatedInput} />
+            {summary ? <p className="rrp-dir" data-testid="resume-report-target">目标方向 {summary}</p> : null}
+            {displayReport ? (
+              <ResumeReportBody
+                report={displayReport}
+                issues={displayIssues}
+                fixture={isFixture}
+                seg={parsed.seg}
+                dim={parsed.dim}
+                blk={parsed.blk}
+                onSeg={(seg: ReportSeg) => setSearch({ seg, dim: null, blk: null })}
+                onDim={(dim) => setSearch({ seg: 'scores', dim, blk: null })}
+              />
+            ) : null}
+            <ResumeReportTakeaway
+              key={viewState}
+              show
+              taskId={taskId}
+              accessToken={accessToken}
+              capture={isExportCaptureState(viewState) ? viewState : null}
+              onJobFit={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
+            />
+          </>
+        ) : viewState === 'report-empty' ? (
+          <EmptyReportBody />
+        ) : (
+          <ResumeReportStates viewState={viewState === 'loading' || viewState === 'no-context' || viewState === 'read-error' || viewState === 'unavailable' || viewState === 'illegal' ? viewState : 'no-context'} />
+        )}
+      </section>
+    </QxPageFrame>
   )
 }

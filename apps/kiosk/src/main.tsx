@@ -9,6 +9,7 @@ import {
   initializeTerminalIdentity,
   startTerminalIdentityRecovery,
   subscribeTerminalIdentity,
+  getTerminalId,
 } from './services/api/screensaver'
 import { initializeTerminalSession } from './services/terminalAuth'
 
@@ -29,9 +30,15 @@ export function KioskApp() {
   const [identityRevision, setIdentityRevision] = useState(0)
 
   useEffect(() => {
+    // 首次拿到身份（'' → 有值，Agent 晚于浏览器启动）只补终端会话，不换 key 重挂整棵树——
+    // 否则登录态 / 上传中的 state 会被静默清空（SES-04）。只有 terminalId 从 A 换成 B 才重挂。
+    let lastTerminalId = getTerminalId()
     const unsubscribe = subscribeTerminalIdentity(() => {
-      setIdentityRevision((revision) => revision + 1)
       void initializeTerminalSession()
+      const next = getTerminalId()
+      const switched = lastTerminalId !== '' && next !== '' && next !== lastTerminalId
+      lastTerminalId = next
+      if (switched) setIdentityRevision((revision) => revision + 1)
     })
     startTerminalIdentityRecovery()
     return unsubscribe

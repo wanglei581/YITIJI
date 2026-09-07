@@ -98,7 +98,7 @@ export function allowedPoliciesForFile(input: {
   if (input.purpose === 'id_scan') return ['system_short']
   if (input.purpose === 'signature_image') return ['system_short']
   if (input.purpose === 'contract_upload') return ['system_short']
-  if (input.purpose === 'contract_review_report') return ['system_short']
+  if (input.purpose === 'contract_review_report') return ['system_short', 'months_3']
   if (input.assetCategory === 'optimized' || input.assetCategory === 'derived') {
     return ['months_3', 'months_6', 'long_term']
   }

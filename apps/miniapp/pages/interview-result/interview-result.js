@@ -46,6 +46,8 @@ Page({
     checklist:        [],
     goChecklist:      GO_CHECKLIST,
     printing:         false,
+    qaExcerpts:       [],
+    omitPrintNote:    false,
   },
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
@@ -68,7 +70,10 @@ Page({
     } catch (_) { /* 未结束或 404，继续调用 end 生成 */ }
     // 首次结束：生成报告（约 27 秒）
     try {
-      const dto = await api.endInterview(sessionId, accessToken)
+      const saved = storage.get(storage.KEYS.INTERVIEW_SESSION) || {}
+      const dto = await api.endInterview(sessionId, accessToken, {
+        includeAnswersInPrint: saved.omitPrintAnswers !== true,
+      })
       this._render(dto)
     } catch (err) {
       const code = err.error?.code || ''
@@ -93,6 +98,8 @@ Page({
       predictedQuestions: r.predictedQuestions   || [],
       starAdvice:         r.starAdvice           || null,
       checklist:          r.checklist            || [],
+      qaExcerpts:         Array.isArray(dto.qaExcerpts) ? dto.qaExcerpts : [],
+      omitPrintNote:      dto.includeAnswersInPrint === false,
     })
   },
   _fail(failMsg) { this.setData({ phase: 'failed', failMsg }) },

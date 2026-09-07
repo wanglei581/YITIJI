@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Card, Button, EmptyState } from '@ai-job-print/ui'
 import { LockKeyholeIcon, UserCogIcon } from 'lucide-react'
-import { Page } from '../Page'
+import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { changePassword, logout } from '../../services/auth'
 
 const inputCls =
@@ -57,7 +57,7 @@ export default function AccountPage() {
   }
 
   return (
-    <Page title="账号" subtitle="修改登录密码；机构子账号与操作权限由平台侧管理">
+    <Page title="账号" subtitle={withFrontendHint('修改登录密码；机构子账号与操作权限由平台侧管理', FRONTEND_HINT.none)}>
       <div className="max-w-xl space-y-5">
         <Card className="p-5">
           <div className="mb-5 flex items-start gap-3">

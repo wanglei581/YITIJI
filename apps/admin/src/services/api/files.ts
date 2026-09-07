@@ -74,7 +74,15 @@ export interface AdminFileSignedUrl {
   purpose: AdminFilePurpose
 }
 
+export interface AdminFileListResult {
+  items: AdminFileRecord[]
+  total: number
+}
+
 export interface ListFilesOptions {
+  skip?: number
+  search?: string
+  deleted?: boolean | 'all'
   includeDeleted?: boolean
   purpose?: string
   limit?: number
@@ -82,7 +90,7 @@ export interface ListFilesOptions {
 
 export interface AdminFilesServiceInterface {
   /** GET /files — admin 列出文件元数据(默认不含已删除) */
-  listFiles(opts?: ListFilesOptions): Promise<AdminFileRecord[]>
+  listFiles(opts?: ListFilesOptions): Promise<AdminFileListResult>
   /** GET /files/lifecycle-summary — admin 只读全局生命周期统计 */
   getFileLifecycleSummary(): Promise<AdminFileLifecycleSummary>
   /** DELETE /files/:id — admin 强制删除(物理删存储 + 软删记录 + 后端写审计) */
@@ -135,11 +143,15 @@ async function data<T>(p: Promise<{ data: T }>): Promise<T> {
 export const adminFilesHttpAdapter: AdminFilesServiceInterface = {
   listFiles(opts) {
     const q = new URLSearchParams()
-    if (opts?.includeDeleted) q.set('includeDeleted', 'true')
+    if (opts?.skip != null) q.set('skip', String(opts.skip))
+    if (opts?.search) q.set('search', opts.search)
+    if (opts?.deleted === true) q.set('deleted', 'true')
+    else if (opts?.deleted === false) q.set('deleted', 'false')
+    else if (opts?.deleted === 'all' || opts?.includeDeleted) q.set('deleted', 'all')
     if (opts?.purpose) q.set('purpose', opts.purpose)
     if (opts?.limit) q.set('limit', String(opts.limit))
     const qs = q.toString()
-    return data(request<{ data: AdminFileRecord[] }>('GET', `/files${qs ? `?${qs}` : ''}`))
+    return data(request<{ data: AdminFileListResult }>('GET', `/files${qs ? `?${qs}` : ''}`))
   },
   getFileLifecycleSummary() {
     return data(request<{ data: AdminFileLifecycleSummary }>('GET', '/files/lifecycle-summary'))
@@ -182,9 +194,25 @@ export const adminFilesMockAdapter: AdminFilesServiceInterface = {
   async listFiles(opts) {
     await delay()
     let rows = getStore()
-    if (!opts?.includeDeleted) rows = rows.filter((f) => f.deletedAt === null)
+    const deleted = opts?.deleted ?? (opts?.includeDeleted ? 'all' : false)
+    if (deleted === true) rows = rows.filter((f) => f.deletedAt !== null)
+    else if (deleted === false) rows = rows.filter((f) => f.deletedAt === null)
     if (opts?.purpose) rows = rows.filter((f) => f.purpose === opts.purpose)
-    return rows.slice(0, opts?.limit ?? 100).map((f) => ({ ...f }))
+    const search = opts?.search?.trim()
+    if (search) {
+      rows = rows.filter((f) =>
+        f.filename.includes(search)
+        || (f.endUserId ?? '').includes(search)
+        || (f.uploaderId ?? '').includes(search)
+        || (f.ownerId ?? '').includes(search),
+      )
+    }
+    const skip = Math.max(0, opts?.skip ?? 0)
+    const take = Math.min(Math.max(1, opts?.limit ?? 100), 100)
+    return {
+      items: rows.slice(skip, skip + take).map((f) => ({ ...f })),
+      total: rows.length,
+    }
   },
   async getFileLifecycleSummary() {
     await delay(120)

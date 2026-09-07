@@ -252,6 +252,18 @@ async function main(): Promise<void> {
     // Case 12: 共享契约——学校场景默认含 smart_campus、且有中文标签「智慧校园」。
     if (SCENE_DEFAULT_MODULES.school.includes('smart_campus')) pass('Case12 SCENE_DEFAULT_MODULES.school 含 smart_campus')
     else fail(`Case12 学校默认模板缺 smart_campus: ${JSON.stringify(SCENE_DEFAULT_MODULES.school)}`)
+    const campusSrc = readFileSync(join(__dirname, '../src/smart-campus/smart-campus.service.ts'), 'utf8')
+    const partnerStart = campusSrc.indexOf('async listPartnerSmartCampusTerminals')
+    const partnerEnd = campusSrc.indexOf('async savePartnerTerminalConfig')
+    const partnerList = campusSrc.slice(partnerStart, partnerEnd === -1 ? partnerStart + 1600 : partnerEnd)
+    if (/terminalSmartCampusConfig\.findMany\(\s*\)/.test(partnerList)) {
+      fail('PTR-24 listPartnerSmartCampusTerminals 仍是无 where 的 findMany()')
+    }
+    if (!/terminalId:\s*\{\s*in:/.test(partnerList)) {
+      fail('PTR-24 未按 terminals 的 id/terminalCode in 过滤配置行')
+    }
+    pass('PTR-24 partner 智慧校园配置按本机构终端 id/terminalCode 过滤')
+
     if (MODULE_LABELS.smart_campus === '智慧校园') pass('Case12 MODULE_LABELS.smart_campus = 智慧校园')
     else fail(`Case12 MODULE_LABELS.smart_campus 异常: ${MODULE_LABELS.smart_campus}`)
 

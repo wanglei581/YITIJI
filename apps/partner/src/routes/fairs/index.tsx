@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
-import { Page } from '../Page'
+import { FRONTEND_HINT, ListPagination, Page, withFrontendHint } from '../Page'
 import { CalendarIcon, PlusIcon } from 'lucide-react'
 import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import type {
@@ -47,6 +47,7 @@ const STATUS_FILTER_MAP: Record<string, JobFairStatus | null> = {
   全部: null, 未开始: 'upcoming', 进行中: 'ongoing', 已结束: 'ended',
 }
 const PARTNER_FAIRS_REFRESH_KEY = 'partner:fairs'
+const PAGE_SIZE = 20
 
 const THEME_OPTIONS = [
   { value: 'general',     label: '综合招聘会' },
@@ -122,13 +123,15 @@ export default function FairsPage() {
   const [configuring, setConfiguring] = useState<PartnerFairRecord | null>(null)
   const [noticeIsError, setNoticeIsError] = useState(false)
   const [confirmUnpublish, setConfirmUnpublish] = useState<PartnerFairRecord | null>(null)
+  const [page, setPage] = useState(1)
 
+  const fairsRefreshKey = `${PARTNER_FAIRS_REFRESH_KEY}:${page}`
   const { data, status, refresh } = useRefreshable(
-    PARTNER_FAIRS_REFRESH_KEY,
-    getPartnerFairs,
+    fairsRefreshKey,
+    () => getPartnerFairs({ page, pageSize: PAGE_SIZE }),
     {
       intervalMs: 60_000,
-      merge: mergeById<PartnerFairRecord>((item) => item.id),
+      merge: replaceIfChanged,
       failPolicy: 'keep-last',
     },
   )
@@ -137,7 +140,7 @@ export default function FairsPage() {
   // 确认框开着时后台刷新换掉那一行，用户确认的就是别人。
   useInteractionLock(
     editing !== null || configuring !== null || saving || busyId !== null || confirmUnpublish !== null,
-    [PARTNER_FAIRS_REFRESH_KEY],
+    [fairsRefreshKey],
     'hard',
   )
 
@@ -147,7 +150,9 @@ export default function FairsPage() {
     return () => clearTimeout(t)
   }, [notice])
 
-  const fairs = data ?? []
+  const fairs = data?.data ?? []
+  const total = data?.pagination.total ?? 0
+  const totalPages = data?.pagination.totalPages ?? 1
   const loading = status === 'idle' || (status === 'loading' && fairs.length === 0)
   const error = status === 'error' && fairs.length === 0
 
@@ -254,7 +259,7 @@ export default function FairsPage() {
 
   if (loading) {
     return (
-      <Page title="招聘会信息管理" subtitle="加载中...">
+      <Page title="招聘会信息管理" subtitle={withFrontendHint('加载中...', FRONTEND_HINT.fairs)}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -264,7 +269,7 @@ export default function FairsPage() {
 
   if (error) {
     return (
-      <Page title="招聘会信息管理" subtitle="加载失败">
+      <Page title="招聘会信息管理" subtitle={withFrontendHint('加载失败', FRONTEND_HINT.fairs)}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <CalendarIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -276,7 +281,7 @@ export default function FairsPage() {
   return (
     <Page
       title="招聘会信息管理"
-      subtitle={`共 ${fairs.length} 场招聘会`}
+      subtitle={withFrontendHint(`共 ${total} 场招聘会`, FRONTEND_HINT.fairs)}
       actions={
         <div className="flex flex-col items-end gap-1">
           <Button
@@ -407,6 +412,8 @@ export default function FairsPage() {
           </table>
         </div>
       </Card>
+
+      <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
       <p className="mt-3 text-xs text-neutral-400">
         本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会需经管理员重新审核后才会在终端展示；活动资料由合作机构上传，发布仍由管理员控制。

@@ -29,6 +29,11 @@ export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual
 
 // ─── Query helpers (internal) ─────────────────────────────────────────────────
 
+export function firstQueryString(value: unknown): string | undefined {
+  if (Array.isArray(value)) return firstQueryString(value[0])
+  return typeof value === 'string' ? value : undefined
+}
+
 export interface PublishedFairsParams {
   status?: string
   keyword?: string
@@ -76,8 +81,8 @@ export function buildFairStatusWhere(status: FairStatus, now: Date): Prisma.JobF
 export const FAIR_KEYWORD_FIELDS = ['title', 'sourceName', 'venue', 'city', 'description'] as const
 
 /** 与 /jobs 的 keyword 一致:服务端 OR contains 全表检索。空词返回 null。 */
-export function buildFairKeywordWhere(keyword?: string): Prisma.JobFairWhereInput | null {
-  const kw = keyword?.trim()
+export function buildFairKeywordWhere(keyword?: string | string[]): Prisma.JobFairWhereInput | null {
+  const kw = firstQueryString(keyword)?.trim()
   if (!kw) return null
   return { OR: FAIR_KEYWORD_FIELDS.map((field) => ({ [field]: { contains: kw } })) }
 }
@@ -277,6 +282,49 @@ export interface PaginatedResult<T> {
   pagination: { page: number; pageSize: number; total: number; totalPages: number }
 }
 
+export interface PartnerListPaging {
+  page: number
+  pageSize: number
+}
+
+/**
+ * 数据源 endpoint 的 query 不得携带凭证。只看**参数名**（不是整段 query 子串）：
+ * `?foo=monkey` 不能因为值里含 "key" 被误拒；参数名等于或以 token / key / secret / sign /
+ * signature / password 结尾（api_key、access-token 等）才算把凭证放进了地址。
+ */
+const CREDENTIAL_QUERY_KEY_RE = /(^|[_-])(token|key|secret|sign|signature|password|passwd|pwd)$/i
+
+export function endpointQueryContainsCredential(endpoint: string): boolean {
+  const query = extractUrlQuery(endpoint)
+  if (query.length === 0) return false
+  for (const key of new URLSearchParams(query).keys()) {
+    if (CREDENTIAL_QUERY_KEY_RE.test(key)) return true
+  }
+  return false
+}
+
+export function redactEndpointQueryCredentials(endpoint: string | null | undefined): string | undefined {
+  if (!endpoint) return undefined
+  if (!endpointQueryContainsCredential(endpoint)) return endpoint
+  try {
+    const url = new URL(endpoint)
+    url.search = ''
+    return url.toString()
+  } catch {
+    const q = endpoint.indexOf('?')
+    return q >= 0 ? endpoint.slice(0, q) : endpoint
+  }
+}
+
+function extractUrlQuery(endpoint: string): string {
+  try {
+    return new URL(endpoint).search
+  } catch {
+    const q = endpoint.indexOf('?')
+    return q >= 0 ? endpoint.slice(q) : ''
+  }
+}
+
 export interface SyncLogDto {
   id: string
   no: string
@@ -376,7 +424,7 @@ export function buildJobIndustryTag(industry: string): string {
 
 /** Kiosk 公开岗位的筛选条件（approved + published）。 */
 export interface PublishedJobFilter {
-  keyword?: string
+  keyword?: string | string[]
   city?: string
   industry?: string
   category?: string
@@ -398,7 +446,7 @@ export interface PublishedJobFilter {
  * 那样过期岗位会在带关键词搜索时重新漏出来。
  */
 export function buildPublishedJobWhere(params?: PublishedJobFilter, now: Date = new Date()) {
-  const kw = params?.keyword?.trim()
+  const kw = firstQueryString(params?.keyword)?.trim()
   const and: Prisma.JobWhereInput[] = []
   if (params?.tag)      and.push({ tagsJson: { contains: `"${params.tag}"` } })
   if (params?.industry) and.push({ tagsJson: { contains: `"${buildJobIndustryTag(params.industry)}"` } })
@@ -575,7 +623,7 @@ export function prismaJobSourceToPartnerDto(
     failCount: syncSummary?.failCount ?? 0,
     description: source.description ?? '',
     credentialConfigured: Boolean(source.encryptedCredential || source.webhookSecret),
-    endpoint: source.endpoint ?? undefined,
+    endpoint: redactEndpointQueryCredentials(source.endpoint),
     activationManagedBy: source.accessMode === 'api' || source.accessMode === 'webhook' ? 'admin' : 'partner',
   }
 }

@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common'
@@ -377,7 +378,8 @@ export class FilesService {
 
   /**
    * 客户端直传完成后确认。headObject 复核对象确实落地 + 实测大小,
-   * 通过则 status→active。COS 端 sha256 无法就 buffer 计算,沿用意图阶段客户端值(可空)。
+   * 通过则 CAS status uploading→active。读到字节时服务端计算 sha256 落库；
+   * 超嗅探阈值或 video/* 不读回、清空 sha256（不沿用客户端声明）。
    */
   async completeUpload(fileId: string, requester: FileRequester): Promise<CompleteUploadResponse> {
     const record = await this.requireAlive(fileId)
@@ -404,9 +406,9 @@ export class FilesService {
     }
 
     // 魔数校验(直传路径:客户端字节直达对象存储,服务端此前从未看过内容)。
-    // 边界:StorageService 没有 ranged/partial read,getObject 会把整个对象读进内存,
-    // 故嗅探同时受 DIRECT_UPLOAD_SNIFF_MAX_BYTES 实测大小门限约束——video/* 与超限对象
-    // 本轮明确豁免(属已披露残留;待存储接口支持 Range 读取后收口)。
+    // 嗅探同时受 DIRECT_UPLOAD_SNIFF_MAX_BYTES 实测大小门限约束——video/* 与超限对象
+    // 不读回、不伪造 sha256。
+    let sha256 = ''
     if (!record.mimeType.startsWith('video/') && head.sizeBytes <= DIRECT_UPLOAD_SNIFF_MAX_BYTES) {
       const bytes = await this.storage.getObject(record.storageKey, record.bucket)
       const sniff = sniffDeclaredMimeMismatch(bytes, record.mimeType)
@@ -423,33 +425,38 @@ export class FilesService {
           },
         })
       }
+      sha256 = createHash('sha256').update(bytes).digest('hex')
     }
 
-    const updated = await this.prisma.fileObject.update({
-      where: { id: fileId },
-      data: { sizeBytes: head.sizeBytes, status: 'active' },
+    const cas = await this.prisma.fileObject.updateMany({
+      where: { id: fileId, status: 'uploading' },
+      data: { sizeBytes: head.sizeBytes, sha256, status: 'active' },
     })
+    if (cas.count !== 1) this.throwFileAlreadyFinalized()
     return {
-      fileId: updated.id,
-      status: updated.status as FileStatus,
-      sizeBytes: updated.sizeBytes,
-      sha256: updated.sha256,
-      fileExpiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
+      fileId: record.id,
+      status: 'active',
+      sizeBytes: head.sizeBytes,
+      sha256,
+      fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
     }
   }
 
   /**
    * 本地代理直传在开始读 body 之前查出该意图的流式字节上限。
    * 未知 purpose fail-closed 为 0，调用方应立即拒绝。
+   * 已 complete 的意图在读 body 之前就 409，避免把重写字节读进内存。
    */
   async resolveRawUploadByteLimit(fileId: string): Promise<number> {
     const record = await this.requireAlive(fileId)
+    if (record.status !== 'uploading') this.throwFileAlreadyFinalized()
     return rawUploadByteLimitForPurpose(record.purpose)
   }
 
-  /** 本地后端直传:接收原始 buffer 写入,并复核大小/落地 active。 */
+  /** 本地后端直传:接收原始 buffer 写入。只在 uploading 态落对象；finalize 交给 completeUpload。 */
   async writeRawUpload(fileId: string, buffer: Buffer): Promise<void> {
     const record = await this.requireAlive(fileId)
+    if (record.status !== 'uploading') this.throwFileAlreadyFinalized()
     const validation = validateUpload({
       purpose: record.purpose,
       mimeType: record.mimeType,
@@ -481,10 +488,27 @@ export class FilesService {
       record.mimeType,
       record.bucket
     )
-    await this.prisma.fileObject.update({
-      where: { id: fileId },
-      data: { sizeBytes: put.sizeBytes, sha256: put.sha256, status: 'active' },
+    const cas = await this.prisma.fileObject.updateMany({
+      where: { id: fileId, status: 'uploading' },
+      data: { sizeBytes: put.sizeBytes, sha256: put.sha256 },
     })
+    if (cas.count !== 1) this.throwFileAlreadyFinalized()
+  }
+
+  /** 把已落盘对象拷到新 key（会员绑定搬离 tmp/ 前缀）。 */
+  async copyObjectToKey(
+    fromKey: string,
+    toKey: string,
+    mimeType: string,
+    bucket?: string | null,
+  ): Promise<void> {
+    if (fromKey === toKey) return
+    const bytes = await this.storage.getObject(fromKey, bucket)
+    await this.storage.putObject(toKey, bytes, mimeType, bucket)
+  }
+
+  async deleteObjectAtKey(objectKey: string, bucket?: string | null): Promise<void> {
+    await this.storage.deleteObject(objectKey, bucket)
   }
 
   // ── 下载 / 预览 短期 URL ──────────────────────────────────────────────────
@@ -642,19 +666,49 @@ export class FilesService {
   // ── 列表(admin)─────────────────────────────────────────────────────────
 
   async list(
-    args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {}
-  ): Promise<FileMetadata[]> {
-    const records = await this.prisma.fileObject.findMany({
-      where: {
-        ...(args.includeDeleted ? {} : { deletedAt: null }),
-        ...(args.purpose
-          ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
-          : { purpose: { not: 'contract_review_report' } }),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(args.limit ?? 100, 500),
-    })
-    return records.map(toMetadata)
+    args: {
+      skip?: number
+      search?: string
+      deleted?: boolean | 'all'
+      purpose?: string
+      limit?: number
+      includeDeleted?: boolean
+    } = {},
+  ): Promise<{ items: FileMetadata[]; total: number }> {
+    const search = args.search?.trim()
+    const deleted = args.deleted ?? (args.includeDeleted ? 'all' : false)
+    const skip = Math.max(0, Math.floor(args.skip ?? 0))
+    const take = Math.min(Math.max(1, Math.floor(args.limit ?? 100)), 100)
+    const where = {
+      ...(deleted === 'all'
+        ? {}
+        : deleted === true
+          ? { deletedAt: { not: null } }
+          : { deletedAt: null }),
+      ...(args.purpose
+        ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
+        : { purpose: { not: 'contract_review_report' } }),
+      ...(search
+        ? {
+            OR: [
+              { filename: { contains: search } },
+              { ownerId: { contains: search } },
+              { endUserId: { contains: search } },
+              { uploaderId: { contains: search } },
+            ],
+          }
+        : {}),
+    }
+    const [total, records] = await Promise.all([
+      this.prisma.fileObject.count({ where }),
+      this.prisma.fileObject.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+    ])
+    return { items: records.map(toMetadata), total }
   }
 
   /** Admin 文件生命周期全局只读统计。 */
@@ -794,6 +848,11 @@ export class FilesService {
       allowContractReviewReport: sensitiveLog,
     })
     if (!record.deletedAt) {
+      if (deletedBy !== 'system' && (await this.hasActivePrintTaskForFile(fileId))) {
+        throw new ConflictException({
+          error: { code: 'FILE_IN_USE', message: '文件正在打印中，暂时不能删除' },
+        })
+      }
       const deletedAt = new Date()
       // DB tombstone 必须先于对象删除：写库失败时对象仍在，绝不留下 active metadata
       // 指向已删除对象。updateMany 是 CAS，支持并发删除调用安全收敛到同一 tombstone。
@@ -1244,6 +1303,12 @@ export class FilesService {
   private throwFileNotFound(): never {
     throw new NotFoundException({
       error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
+    })
+  }
+
+  private throwFileAlreadyFinalized(): never {
+    throw new ConflictException({
+      error: { code: 'FILE_ALREADY_FINALIZED', message: '文件已确认，不能再覆盖上传' },
     })
   }
 }

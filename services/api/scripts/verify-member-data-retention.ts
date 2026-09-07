@@ -28,6 +28,8 @@ const memberAuth = read('services/api/src/member-auth/member-auth.service.ts')
 const activity = read('services/api/src/activity/activity.service.ts')
 const files = read('services/api/src/files/file.types.ts')
 const retentionPolicy = read('services/api/src/files/retention-policy.ts')
+const memberAssets = read('services/api/src/member-assets/member-assets.service.ts')
+const printJobs = read('services/api/src/print-jobs/print-jobs.service.ts')
 const storage = read('services/api/src/storage/storage.service.ts')
 const ai = read('services/api/src/ai/ai.service.ts')
 const interview = read('services/api/src/mock-interview/mock-interview.service.ts')
@@ -43,6 +45,14 @@ assert(doc.includes('外部跳转记录') && doc.includes('30 天'), '文档声�
 
 assert(files.includes('normal: 24') && files.includes('sensitive: 6') && files.includes('highly_sensitive: 1'), '文件对象默认 TTL 代码覆盖 24h/6h/1h')
 assert(retentionPolicy.includes("'months_3'") && retentionPolicy.includes('90 * DAY_MS'), '会员文件保存策略代码覆盖 90 天')
+assert(
+  retentionPolicy.includes("if (input.purpose === 'contract_review_report') return ['system_short', 'months_3']"),
+  '签约风险报告允许 months_3、不允许在 allowedPolicies 里放开 long_term',
+)
+assert(
+  !retentionPolicy.includes("if (input.purpose === 'contract_review_report') return ['system_short']"),
+  '签约风险报告不得只允许 system_short',
+)
 assert(retentionPolicy.includes("'months_6'") && retentionPolicy.includes('180 * DAY_MS'), '会员文件保存策略代码覆盖 180 天')
 assert(retentionPolicy.includes("'long_term'") && retentionPolicy.includes('return null'), '会员长期保存代码使用 expiresAt=null')
 assert(retentionPolicy.includes("return ['months_3', 'months_6']"), '原始会员文件代码侧仅允许 90 天 / 180 天')
@@ -62,9 +72,25 @@ assert(resumeAssetsReview.includes('默认保存 90 天') && resumeAssetsReview.
 assert(ai.includes('AI_RESUME_RESULT_TTL_HOURS') && ai.includes('raw : 24'), 'AI 简历结果默认 TTL 代码为 24 小时')
 assert(doc.includes('AI 简历结果') && doc.includes('24 小时'), '文档声明 AI 简历结果默认 24 小时')
 
+const draftStore = read('services/api/src/ai/resume/resume-draft.store.ts')
+assert(draftStore.includes("KIND_OPTIMIZE_DRAFT = 'optimize_draft'"), '草稿 kind=optimize_draft 已约定')
+assert(draftStore.includes("KIND_OPTIMIZE_CONFIRMED = 'optimize_confirmed'"), '确认快照 kind=optimize_confirmed 已约定')
+assert(memberAssets.includes("HIDDEN_RESUME_RESULT_KINDS"), '列表不把草稿/确认快照单独成行')
+assert(memberAssets.includes("row.kind === 'parse' ? { endUserId, taskId: row.taskId }"), '删除 parse 按 taskId 级联草稿与确认快照')
+assert(ai.includes('persistPayload') && ai.includes('optimize_confirmed'), '确认快照与草稿写入同一 AiResumeResult TTL 窗口')
+
 assert(interview.includes('const MEMBER_TTL_MS = 7 * 24 * 60 * 60 * 1000'), '会员模拟面试记录 TTL 代码为 7 天')
 assert(doc.includes('模拟面试') && doc.includes('7 天'), '文档声明会员模拟面试记录 7 天')
 
 assert(doc.includes('本人可删除') && doc.includes('不记录投递结果'), '文档声明本人删除能力和招聘合规边界')
+assert(
+  memberAssets.includes("purpose: { notIn: ['signature_image', 'contract_upload'] }"),
+  'listDocuments 不再一律排除已 keep 的签约风险报告',
+)
+assert(printJobs.includes('PRINT_CONTRACT_REPORT_FORBIDDEN'), '签约风险报告建打印单必须 400')
+assert(
+  read('docs/compliance/compliance-boundary.md').includes('可保存、不打印'),
+  '合规边界记载 2026-09-06 高敏结果可保存不打印裁定',
+)
 
 console.log('\nALL PASS')

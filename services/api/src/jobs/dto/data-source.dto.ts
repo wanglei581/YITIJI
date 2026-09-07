@@ -30,6 +30,7 @@ export class CreateDataSourceDto {
   @IsOptional() @IsString() @MaxLength(500)
   description?: string
 
+  /** API 拉取地址。查询参数不得包含 token/key/secret/sign/password，凭证走 credential 字段。 */
   @IsOptional() @IsString() @MaxLength(500)
   endpoint?: string
 

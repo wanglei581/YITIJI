@@ -42,6 +42,15 @@ const RAW_MESSAGE = /(\b\w+)\s+instanceof\s+Error\s*\?\s*\1\.message/
 const AS_ERROR_MESSAGE = /\(\s*\w+\s+as\s+Error\s*\)\s*\?\.?\s*message/
 
 const PACKET_PAGES = [
+  // SES-12 第二批（2026-09-07）：残留原样渲染 err.message 的页面
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  'apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx',
+  'apps/kiosk/src/pages/interview/InterviewReportPage.tsx',
+  'apps/kiosk/src/pages/interview/InterviewSetupPage.tsx',
+  'apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx',
+  'apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx',
+  'apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx',
+  'apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx',
   'apps/kiosk/src/pages/print/PrintConfirmPage.tsx',
   'apps/kiosk/src/pages/print/PrintCashierPage.tsx',
   'apps/kiosk/src/pages/print/PrintUploadPage.tsx',

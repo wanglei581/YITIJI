@@ -92,17 +92,22 @@ expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-
 for (const [page, sourceCode, rootClass, cssPath] of [
   ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],
   ['parse', parse, 'resume-parse-lightflow', './resume-diagnosis-lightflow.css'],
-  ['report', report, 'resume-report-lightflow', './resume-diagnosis-lightflow.css'],
   ['generate', generate, 'resume-generate-lightflow', './resume-authoring-lightflow.css'],
-  ['generate preview', preview, 'resume-generate-preview-lightflow', './resume-authoring-lightflow.css'],
-  ['optimize', optimize, 'resume-optimize-lightflow', './resume-authoring-lightflow.css'],
+  ['generate preview', preview, 'qx-resume-generate', './resume-generate-qx.css'],
+  ['optimize', optimize, 'qx-resume-optimize', './resume-optimize-qx.css'],
   ['templates', templates, 'resume-templates-lightflow', './resume-library-lightflow.css'],
   ['materials', materials, 'resume-materials-lightflow', './resume-library-lightflow.css'],
 ]) {
   expectIncludes(sourceCode, `import '${cssPath}'`, `${page} imports its local LightFlow CSS`)
-  expectIncludes(sourceCode, 'resume-lightflow', `${page} uses shared local LightFlow namespace`)
   expectIncludes(sourceCode, rootClass, `${page} uses its route-specific LightFlow root`)
+  if (!rootClass.startsWith('qx-')) {
+    expectIncludes(sourceCode, 'resume-lightflow', `${page} uses shared local LightFlow namespace`)
+  }
 }
+
+expectIncludes(report, "import './resume-report-qx.css'", 'report imports Qingxu page CSS')
+expectIncludes(report, 'QxPageFrame', 'report uses Qingxu page frame (22-resume-report migration)')
+expectIncludes(kioskShell, "'/resume/report'", 'report is registered in QX_MIGRATED_ROUTES')
 
 expectCssContract('src/pages/resume/resume-diagnosis-lightflow.css', [
   'resume-source-lightflow',
@@ -114,6 +119,19 @@ expectCssContract('src/pages/resume/resume-authoring-lightflow.css', [
   'resume-generate-preview-lightflow',
   'resume-optimize-lightflow',
 ])
+for (const [path, rootClass] of [
+  ['src/pages/resume/resume-optimize-qx.css', 'qx-resume-optimize'],
+  ['src/pages/resume/resume-generate-qx.css', 'qx-resume-generate'],
+]) {
+  const source = read(path)
+  expect(source.length > 0, `${path} exists`)
+  expect(source.split(/\r?\n/).length < 300, `${path} stays below 300 lines`)
+  expectIncludes(source, `.${rootClass}`, `${path} scopes styles to ${rootClass}`)
+  expectIncludes(source, '@media (prefers-reduced-motion: reduce)', `${path} supports reduced motion`)
+  expectIncludes(source, '--qx-', `${path} consumes Qingxu tokens`)
+  expectNotIncludes(source, 'html {', `${path} does not override html`)
+  expectNotIncludes(source, 'body {', `${path} does not override body`)
+}
 expectCssContract('src/pages/resume/resume-library-lightflow.css', [
   'resume-templates-lightflow',
   'resume-materials-lightflow',
@@ -130,7 +148,7 @@ for (const [sourceCode, marker, label] of [
   [report, "navigate('/resume/optimize'", 'report keeps optimize handoff'],
   [generate, 'useBusyLock(generating || exportingDraft)', 'generate keeps busy lock (含 ai-down 草稿导出)'],
   [generate, 'submitResumeGenerate(input, getToken())', 'generate keeps wrapper submission'],
-  [preview, 'exportGeneratedResume(resume, result.taskId, getToken())', 'preview keeps real export wrapper'],
+  [preview, 'exportGeneratedResume(resume, result.taskId, getToken()', 'preview keeps real export wrapper'],
   [preview, 'exported?.printFileUrl', 'preview only enables real print URL'],
   [optimize, 'confirmLeave', 'optimize keeps dirty-leave guard'],
   [optimize, 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimize keeps busy lock'],

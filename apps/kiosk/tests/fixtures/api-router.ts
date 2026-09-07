@@ -24,6 +24,18 @@ export class ApiRouter {
 
   constructor(page: Page) {
     this.#page = page
+    // 包 F：优化 / 生成预览 / 导出页挂载时都会读导出收费口径（GET /resume/export/pricing）。
+    // 默认按「免费」应答，让所有既有用例不因这条新请求中断；收费 / 未开放态的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/resume/export/pricing', {
+      status: 200,
+      json: { mode: 'free', unitCents: 0, unit: '份', benefit: null, label: '免费导出' },
+    })
+    // 包 K2：上传 / 预览页挂载时都会探测文档转换能力（GET /document-conversion/capabilities）。
+    // 默认按「引擎未配置」应答，让所有既有用例保持 Word 入口置灰、不中断；需要开放态的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/document-conversion/capabilities', {
+      status: 200,
+      json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: '服务端未配置转换引擎' } },
+    })
   }
 
   async install(): Promise<void> {

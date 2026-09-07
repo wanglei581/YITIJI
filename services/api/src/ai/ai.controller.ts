@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { BadRequestException, Controller, Post, Put, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors, NotFoundException } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
@@ -23,6 +23,7 @@ import type { AdminAiUsage, AdminAiLogsResult, AiLogStatus, AiOperation } from '
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
 import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
+import { ResumeDraftPutDto } from './dto/resume-draft.dto'
 import { RESUME_VOICE_AUDIO_FIELD, RESUME_VOICE_MAX_AUDIO_BYTES, type ResumeVoiceTranscribeResponseDto } from './dto/resume-voice.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
@@ -34,6 +35,7 @@ import { BenefitRedemptionService } from '../benefit-redemption/benefit-redempti
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { runWithPublicQuota } from './ai-request-guard'
 import { assistantOwnerKey } from './llm/llm-chat.service'
+import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 
 import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
@@ -95,8 +97,14 @@ function isWavBuffer(buffer: Buffer): boolean {
 //
 // GET  /resume/records/:taskId           — 查询解析结果
 // GET  /resume/records/:taskId/optimize  — 查询优化建议
+// PUT  /resume/records/:taskId/draft     — 登录用户保存编辑草稿
+// GET  /resume/records/:taskId/draft     — 登录用户读取编辑草稿
+// GET  /resume/records/:taskId/versions  — 登录用户读取导出确认版本
+// POST /resume/records/:taskId/fact-check — 事实核对（学校/公司/时间/证书/电话/邮箱）
 // POST /resume/parse                     — 提交简历解析
 // POST /assistant/chat                   — AI 助手对话
+// POST /assistant/voice                  — 小青按住说话转写
+// POST /assistant/sessions/:id/summary   — 登录用户保存本次要点
 // GET  /admin/ai/usage                   — AI 服务用量统计（仅元数据）
 // GET  /admin/ai/logs                    — AI 调用日志列表（仅元数据）
 // ============================================================
@@ -114,6 +122,7 @@ export class AiController {
     private readonly benefitRedemption: BenefitRedemptionService,
     private readonly publicQuota: AiPublicQuotaService,
     private readonly privacy: MemberPrivacyService,
+    private readonly assistantSummary: AssistantSummaryService,
   ) {}
 
   /**
@@ -250,6 +259,61 @@ export class AiController {
     return result
   }
 
+  @Put('resume/records/:taskId/draft')
+  @Header('Cache-Control', 'no-store')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async putResumeDraft(
+    @Param('taskId') taskId: string,
+    @Body() dto: ResumeDraftPutDto,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (!requester.endUserId) {
+      throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' } })
+    }
+    await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
+    return this.aiService.saveResumeDraft(taskId, dto, requester)
+  }
+
+  @Get('resume/records/:taskId/draft')
+  @Header('Cache-Control', 'no-store')
+  async getResumeDraft(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (!requester.endUserId) {
+      throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' } })
+    }
+    return this.aiService.getResumeDraft(taskId, requester)
+  }
+
+  @Get('resume/records/:taskId/versions')
+  @Header('Cache-Control', 'no-store')
+  async listResumeVersions(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (!requester.endUserId) {
+      throw new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' } })
+    }
+    return this.aiService.listResumeVersions(taskId, requester)
+  }
+
+  @Post('resume/records/:taskId/fact-check')
+  @PaidAiThrottle(6)
+  async factCheckResume(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    if (requester.endUserId) {
+      await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
+    }
+    return this.aiService.factCheckResume(taskId, requester)
+  }
+
   @Post('resume/records/:taskId/layout-adjust')
   @PaidAiThrottle(6)
   async adjustResumeLayout(
@@ -377,6 +441,16 @@ export class AiController {
   }
 
   /**
+   * 简历导出收费三态（契约 2）。匿名只回 mode/价格；登录会员在 charged 时附带可用权益次数。
+   */
+  @Get('resume/export/pricing')
+  @Header('Cache-Control', 'no-store')
+  async getResumeExportPricing(@Req() req: ReqLike) {
+    const requester = await this.resolveAiResultRequester(req)
+    return this.aiService.getResumeExportPricing(requester.endUserId)
+  }
+
+  /**
    * 阶段2A — 导出确认后的简历为真实 PDF(FileObject + 签名 URL + 既有清理策略)。
    * 审计只放元数据(fileId/页数/大小),绝不包含简历内容。
    */
@@ -387,9 +461,12 @@ export class AiController {
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
+    await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
     const { taskId, format, layout, templateId, draft, ...resume } = dto
+    delete (resume as { benefitGrantId?: string }).benefitGrantId
+    delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true)
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt })
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -452,6 +529,94 @@ export class AiController {
       requestId: req.requestId ?? null,
     })
     return result
+  }
+
+  /**
+   * 小青文字对话的「按住说话」转写。multipart 字段名 audio，仅内存 WAV。
+   * 与 /assistant/chat 共用 assistant_chat 日配额；ASR 未配置返回 ASR_NOT_CONFIGURED。
+   * 转写正文不进日志 / 审计。
+   */
+  @Post('assistant/voice')
+  @TerminalScopedThrottle(12)
+  @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  async transcribeAssistantVoice(
+    @UploadedFile() audio: Express.Multer.File | undefined,
+    @Req() req: ReqLike,
+  ): Promise<{ text: string; providerName: string }> {
+    const voiceMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    const quotaTicket = await this.publicQuota.consume('assistant_chat', {
+      member: voiceMember?.endUserId ?? null,
+      terminal: throttleTerminalIdOf(req),
+      ip: ipOf(req),
+    })
+    return runWithPublicQuota(this.publicQuota, quotaTicket, req, async () => {
+      if (!audio?.buffer?.length) {
+        throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
+      }
+      if (!isWavBuffer(audio.buffer)) {
+        throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
+      }
+      const asrStartedAt = Date.now()
+      const result = await this.asr.recognizeWav(audio.buffer)
+      this.logService.record({
+        taskId: null,
+        operation: 'voiceTranscribe',
+        provider: this.asr.activeProviderName,
+        status: result.ok ? 'success' : 'failed',
+        latencyMs: Math.max(0, Date.now() - asrStartedAt),
+        tokenUsage: undefined,
+        errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
+        endUserId: voiceMember?.endUserId ?? null,
+        terminalId: throttleTerminalIdOf(req),
+      })
+      if (!result.ok) {
+        throw new BadRequestException({
+          error: {
+            code: result.errorCode ?? 'ASR_FAILED',
+            message: result.errorMessage ?? '语音转写失败，请改用文字输入',
+          },
+        })
+      }
+      const text = result.text?.trim()
+      if (!text) {
+        throw new BadRequestException({ error: { code: 'ASR_FAILED', message: '没有识别到有效文字，请改用文字输入' } })
+      }
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'kiosk',
+        action: 'assistant.voice_transcribe',
+        targetType: 'system',
+        targetId: null,
+        payload: {
+          providerName: this.asr.activeProviderName,
+          chars: text.length,
+          bytes: audio.buffer.length,
+        },
+        ipAddress: ipOf(req),
+        userAgent: uaOf(req),
+        requestId: req.requestId ?? null,
+      })
+      return { text, providerName: this.asr.activeProviderName }
+    })
+  }
+
+  /**
+   * 登录用户把本次小青对话浓缩为要点 + 待办，落 AdvisorSession(source=assistant)
+   * 与 qa_pins 产物，并生成可进「我的文档」的 PDF。匿名统一 404。
+   */
+  @Post('assistant/sessions/:sessionId/summary')
+  @PaidAiThrottle(6)
+  async summarizeAssistantSession(
+    @Param('sessionId') sessionId: string,
+    @Req() req: ReqLike,
+  ) {
+    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    if (!member) {
+      throw new NotFoundException({
+        error: { code: 'ASSISTANT_SESSION_NOT_FOUND', message: '会话不存在或已过期' },
+      })
+    }
+    return this.assistantSummary.summarize(sessionId, member.endUserId, ipOf(req))
   }
 
   // ─── Admin 统计 / 日志接口 ──────────────────────────────────

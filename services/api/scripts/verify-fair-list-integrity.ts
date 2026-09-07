@@ -30,7 +30,7 @@ import { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
 import { JobsAdminService } from '../src/jobs/jobs-admin.service'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import { JobsExcelService } from '../src/jobs/jobs-excel.service'
-import { FAIR_STATUS_VALUES, type FairStatus } from '../src/jobs/jobs-shared'
+import { FAIR_STATUS_VALUES, buildFairKeywordWhere, buildPublishedJobWhere, firstQueryString, type FairStatus } from '../src/jobs/jobs-shared'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
 
 const RESIDUE_TAG = 'vresidfairlistintegrity'
@@ -273,6 +273,16 @@ async function main(): Promise<void> {
       fail('F2. 闸门探针没搜到任何已发布夹具,说明探针本身失效')
     }
     pass(`F2. 闸门探针有效:同一关键词搜到 ${probe.ids.filter((id) => fixtureVisibleIds.has(id)).length} 条已发布夹具`)
+
+    const arrayKeyword = ['a', 'b'] as unknown as string
+    if (firstQueryString(arrayKeyword) !== 'a') fail('API-34c firstQueryString 未取数组首值')
+    try {
+      buildPublishedJobWhere({ keyword: arrayKeyword })
+      buildFairKeywordWhere(arrayKeyword)
+      pass('API-34c 数组 keyword 不 500（取首值）')
+    } catch (e) {
+      fail(`API-34c 数组 keyword 抛错: ${(e as Error).message}`)
+    }
 
     console.log(`\n=== 全部通过(${passed} 项) ===\n`)
   } finally {

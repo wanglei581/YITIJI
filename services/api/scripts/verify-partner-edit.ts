@@ -191,6 +191,21 @@ async function main() {
       pass('PTR-19. 编辑可补齐学历/技能/薪资/人数等结构化字段')
     }
 
+    {
+      const unpagedJobs = await svc.getPartnerJobs(partnerA)
+      if (!Array.isArray(unpagedJobs)) fail('PTR-22. 缺省 getPartnerJobs 应保持数组形状')
+      if (!unpagedJobs.some((j) => j.id === jobA.id)) fail('PTR-22. 缺省岗位列表未包含本机构岗位')
+      const pagedJobs = await svc.getPartnerJobs(partnerA, { page: 1, pageSize: 1 })
+      if (!('data' in pagedJobs) || !('pagination' in pagedJobs)) fail('PTR-22. 带 page 的岗位列表应返回 {data,pagination}')
+      if (pagedJobs.data.length !== 1) fail(`PTR-22. pageSize=1 应只返回 1 条，实际 ${pagedJobs.data.length}`)
+      if (pagedJobs.pagination.total < 2) fail('PTR-22. 岗位 total 应计入本机构全部行')
+      const unpagedFairs = await svc.getPartnerFairs(partnerA)
+      if (!Array.isArray(unpagedFairs)) fail('PTR-22. 缺省 getPartnerFairs 应保持数组形状')
+      const pagedFairs = await svc.getPartnerFairs(partnerA, { page: 1, pageSize: 1 })
+      if (pagedFairs.data.length !== 1 || pagedFairs.pagination.total < 1) fail('PTR-22. 招聘会分页形状错误')
+      pass('PTR-22. 岗位/招聘会列表缺省保持数组，带 page/pageSize 走 skip/take + count')
+    }
+
     // ── 3. 越权 ────────────────────────────────────────────────────────────
     await expectCode(() => svc.updatePartnerJob(jobB.id, { title: 'x' }, partnerA), 'JOB_NOT_FOUND', '3a. 编辑他机构岗位 → JOB_NOT_FOUND')
     await expectCode(() => svc.updatePartnerFair('no_such_fair', { title: 'x' }, partnerA), 'FAIR_NOT_FOUND', '3b. 编辑不存在招聘会 → FAIR_NOT_FOUND')

@@ -112,7 +112,7 @@ for (const token of [
   'clearInterval(recordTimerRef.current)',
   'stopPlayback()',
   'answerInterview(\n        state.sessionId,',
-  'const report = await endInterview(state.sessionId, access)',
+  'const report = await endInterview(state.sessionId, access, {',
   'accessToken: state.accessToken, report',
 ]) {
   check(session.includes(token), `${pages[1]} — Session 状态/清场合同缺失：${token}`)

@@ -35,3 +35,15 @@
 
 /* 提交中按钮禁用态 */
 .qa-btn-loading { opacity: .6; }
+
+.qa-voice { margin-top: 16rpx; }
+.qa-voice-btn { min-height: 96rpx; }
+.qa-voice-off, .qa-voice-err {
+  margin-top: 12rpx; font-size: 24rpx; color: var(--muted); line-height: 1.5;
+}
+.qa-voice-err { color: var(--error); }
+.qa-omit {
+  display: flex; align-items: center; gap: 12rpx;
+  min-height: 96rpx; font-size: 26rpx; color: var(--ink);
+}
+.actionbar.col { flex-direction: column; align-items: stretch; }

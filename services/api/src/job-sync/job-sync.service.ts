@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
+import { FairMaterialPrintBridgeService } from '../jobs/fair-material-print-bridge.service'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http'
@@ -142,6 +143,7 @@ export class JobSyncService {
     private readonly prisma: PrismaService,
     private readonly jobQuality: JobQualityService,
     private readonly audit: AuditService,
+    @Optional() private readonly printBridges?: FairMaterialPrintBridgeService,
     @Optional() @InjectQueue(JOB_SYNC_QUEUE) private readonly queue?: Queue,
   ) {}
 
@@ -365,6 +367,12 @@ export class JobSyncService {
 
   async unpublishSourceContent(sourceId: string, user: AuthedUser) {
     const impact = await this.getSourceImpact(sourceId)
+    const fairIds = (
+      await this.prisma.jobFair.findMany({
+        where: { sourceId, publishStatus: 'published' },
+        select: { id: true },
+      })
+    ).map((row) => row.id)
     const unpublished = await this.prisma.$transaction(async (tx) => {
       const jobs = await tx.job.updateMany({
         where: { sourceId, publishStatus: 'published' },
@@ -376,6 +384,9 @@ export class JobSyncService {
       })
       return { jobs: jobs.count, fairs: fairs.count }
     })
+    for (const fairId of fairIds) {
+      await this.printBridges?.revokeForFair(fairId, 'source_bulk_unpublished')
+    }
     await this.audit.write({
       actorId: user.userId,
       actorRole: user.role,

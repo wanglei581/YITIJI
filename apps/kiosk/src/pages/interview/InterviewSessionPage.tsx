@@ -71,6 +71,7 @@ export function InterviewSessionPage() {
   const [draft, setDraft] = useState('')
   const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
   const [error, setError] = useState<string | null>(null)
+  const [omitPrintAnswers, setOmitPrintAnswers] = useState(false)
   const [remainingSec, setRemainingSec] = useState((state?.durationMin ?? 5) * 60)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -350,7 +351,9 @@ export function InterviewSessionPage() {
     setPhase('finishing')
     setError(null)
     try {
-      const report = await endInterview(state.sessionId, access)
+      const report = await endInterview(state.sessionId, access, {
+        includeAnswersInPrint: !omitPrintAnswers,
+      })
       navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
     } catch (err) {
       setError(userMessageOf(err, '报告生成失败，请重试'))
@@ -459,6 +462,8 @@ export function InterviewSessionPage() {
         onSkip={() => void submit({ text: '', skip: true })}
         onSubmitText={() => void submit({ text: draft, skip: false })}
         onFinish={() => void finish()}
+        omitPrintAnswers={omitPrintAnswers}
+        onOmitPrintAnswersChange={setOmitPrintAnswers}
       />
     </main>
     </InterviewShell>

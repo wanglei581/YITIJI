@@ -73,6 +73,13 @@ export class InterviewAnswerDto {
   answerDurationSec?: number
 }
 
+export class EndInterviewDto {
+  /** 默认 true：打印件含问答摘录中的用户回答。勾选「不打印我的回答」时传 false。 */
+  @IsOptional()
+  @IsBoolean()
+  includeAnswersInPrint?: boolean
+}
+
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
 }
@@ -218,8 +225,10 @@ export class MockInterviewController {
 
   @Post(':id/end')
   @PaidAiThrottle(6)
-  async end(@Param('id') id: string, @Req() req: ReqLike) {
-    return ApiResponse.ok(await this.service.end(id, await this.requesterOf(req)))
+  async end(@Param('id') id: string, @Body() dto: EndInterviewDto, @Req() req: ReqLike) {
+    return ApiResponse.ok(await this.service.end(id, await this.requesterOf(req), {
+      includeAnswersInPrint: dto?.includeAnswersInPrint !== false,
+    }))
   }
 
   @Get(':id')

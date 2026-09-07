@@ -2,6 +2,8 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common'
 import { Redis } from 'ioredis'
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT')
+/** 会员会话绝对寿命上限：滑动续期不得超过首次签发后 24h。 */
+export const MEMBER_SESSION_MAX_AGE_SECONDS = 24 * 60 * 60
 
 export type MemberStepUpChallengeConsumeResult =
   | { status: 'missing' }
@@ -98,13 +100,16 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async registerMemberSession(endUserId: string, sessionId: string, ttlSeconds: number): Promise<void> {
+    const nowSec = Math.floor(Date.now() / 1000)
     const result = await this.client.eval(
       `
       local owner = redis.call('GET', KEYS[1])
       if owner and owner ~= ARGV[1] then return 0 end
 
       local sessionTtl = tonumber(ARGV[3])
+      local maxAge = tonumber(ARGV[5])
       redis.call('SET', KEYS[1], ARGV[1], 'EX', sessionTtl)
+      redis.call('SET', KEYS[3], ARGV[4], 'EX', maxAge)
       redis.call('SADD', KEYS[2], ARGV[2])
       local currentIndexTtl = redis.call('TTL', KEYS[2])
       if currentIndexTtl < 0 or currentIndexTtl < sessionTtl then
@@ -112,14 +117,82 @@ export class RedisService implements OnModuleDestroy {
       end
       return 1
       `,
-      2,
+      3,
       `member:session:${sessionId}`,
       `member:user-sessions:${endUserId}`,
+      `member:session-started:${sessionId}`,
       endUserId,
       sessionId,
       ttlSeconds,
+      String(nowSec),
+      String(MEMBER_SESSION_MAX_AGE_SECONDS),
     )
     if (result !== 1) throw new Error('Member session ownership conflict')
+  }
+
+  /**
+   * 滑动续期：剩余 TTL < 50% 时刷新到 sessionTtl，但不超过首次签发后 24h。
+   * 返回 -1 表示已超过绝对上限，调用方应视为会话失效。
+   */
+  async touchMemberSession(
+    endUserId: string,
+    sessionId: string,
+    sessionTtlSeconds: number,
+  ): Promise<number> {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const result = await this.client.eval(
+      `
+      local owner = redis.call('GET', KEYS[1])
+      if owner ~= ARGV[1] then return 0 end
+
+      local sessionTtl = tonumber(ARGV[3])
+      local maxAge = tonumber(ARGV[4])
+      local now = tonumber(ARGV[5])
+      local threshold = math.floor(sessionTtl / 2)
+      local ttl = redis.call('TTL', KEYS[1])
+      if ttl < 0 then return 0 end
+
+      local started = redis.call('GET', KEYS[3])
+      if not started then
+        started = now - (sessionTtl - ttl)
+        if started < 0 then started = now end
+        redis.call('SET', KEYS[3], started, 'EX', maxAge)
+      end
+      started = tonumber(started)
+      local remainingAbs = maxAge - (now - started)
+      if remainingAbs <= 0 then
+        redis.call('DEL', KEYS[1])
+        redis.call('SREM', KEYS[2], ARGV[2])
+        redis.call('DEL', KEYS[3])
+        return -1
+      end
+      if ttl >= threshold then return 1 end
+      local newTtl = math.min(sessionTtl, remainingAbs)
+      if newTtl < 1 then
+        redis.call('DEL', KEYS[1])
+        redis.call('SREM', KEYS[2], ARGV[2])
+        redis.call('DEL', KEYS[3])
+        return -1
+      end
+      redis.call('EXPIRE', KEYS[1], newTtl)
+      redis.call('EXPIRE', KEYS[3], math.max(newTtl, remainingAbs))
+      local idxTtl = redis.call('TTL', KEYS[2])
+      if idxTtl >= 0 and idxTtl < newTtl then
+        redis.call('EXPIRE', KEYS[2], newTtl)
+      end
+      return 2
+      `,
+      3,
+      `member:session:${sessionId}`,
+      `member:user-sessions:${endUserId}`,
+      `member:session-started:${sessionId}`,
+      endUserId,
+      sessionId,
+      sessionTtlSeconds,
+      String(MEMBER_SESSION_MAX_AGE_SECONDS),
+      String(nowSec),
+    )
+    return Number(result)
   }
 
   async unregisterMemberSession(endUserId: string, sessionId: string): Promise<void> {
@@ -127,15 +200,17 @@ export class RedisService implements OnModuleDestroy {
       `
       local owner = redis.call('GET', KEYS[1])
       if owner == ARGV[1] then redis.call('DEL', KEYS[1]) end
+      redis.call('DEL', KEYS[3])
       redis.call('SREM', KEYS[2], ARGV[2])
       if redis.call('SCARD', KEYS[2]) == 0 then
         redis.call('DEL', KEYS[2])
       end
       return 1
       `,
-      2,
+      3,
       `member:session:${sessionId}`,
       `member:user-sessions:${endUserId}`,
+      `member:session-started:${sessionId}`,
       endUserId,
       sessionId,
     )
@@ -151,6 +226,7 @@ export class RedisService implements OnModuleDestroy {
         if redis.call('GET', sessionKey) == ARGV[1] then
           deleted = deleted + redis.call('DEL', sessionKey)
         end
+        redis.call('DEL', 'member:session-started:' .. sessionId)
       end
       redis.call('DEL', KEYS[1])
       return deleted

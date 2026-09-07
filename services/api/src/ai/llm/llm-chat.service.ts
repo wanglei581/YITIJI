@@ -35,6 +35,12 @@ interface ChatMessage {
   content: string
 }
 
+/** 助手会话可读回的一轮（不含 system）。正文不进日志。 */
+export interface AssistantTranscriptTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 // 每个会话保留的最大历史轮数（user+assistant 各算一条）
 const MAX_HISTORY = 12
 // 会话空闲过期时间
@@ -242,6 +248,22 @@ export class LlmChatService {
       if (s.ownerKey === ownerKey) n += 1
     }
     return n
+  }
+
+  /**
+   * 读取归属匹配的会话转写。找不到 / 过期 / 越权一律 null。
+   * 调用方不得把返回的 content 写入日志或审计 payload。
+   */
+  getOwnedTranscript(sessionId: string, ownerKey: string): AssistantTranscriptTurn[] | null {
+    const id = sessionId.trim()
+    if (!id) return null
+    this.pruneSessions(Date.now())
+    const session = this.sessions.get(id)
+    if (!session || session.ownerKey !== ownerKey) return null
+    return session.messages
+      .filter((message): message is ChatMessage & { role: 'user' | 'assistant' } =>
+        message.role === 'user' || message.role === 'assistant')
+      .map((message) => ({ role: message.role, content: message.content }))
   }
 
   async chat(
