@@ -5,6 +5,19 @@ on:
     workflows: ['CI']
     types: [completed]
     branches: [main]
+  # 手动补发：指定一次**已通过的** main CI 运行号来发布它验证过的那个提交。
+  # 为什么需要它（2026-09-07 实测代价）：ci.yml 的并发组是 ci-${{ github.ref }} 且
+  # cancel-in-progress: true，任何新的 main 推送都会取消正在跑的发布前 CI。多条 lane
+  # 并行开发（其中若干装了「CI 绿即自动合并」的看门狗）时，一次 30 分钟的 CI 几乎
+  # 抢不到窗口 —— 当天连续五次「CI 跑到一半被取消 → 发布不触发」。
+  # 本触发不放宽任何安全前提：仍然只发布 CI 已通过的精确 SHA，由下方 resolve 步骤
+  # 逐项校验所给运行号（必须是本仓库的 CI 工作流、main 分支、conclusion=success）。
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: '要发布的那次 main CI 运行号（必须已 success）'
+        required: true
+        type: string
 
 jobs:
   deploy:
@@ -12,9 +25,41 @@ jobs:
     runs-on: ubuntu-latest
     # 生产发布必须同时满足 CI 全绿与显式授权。变量为 false 时整个 job 跳过，
     # 不得建立 SSH、检出服务器代码、安装依赖、构建或覆盖任何前端/API 产物。
-    if: ${{ github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_API_ENABLED == 'true' }}
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && vars.DEPLOY_API_ENABLED == 'true' }}
 
     steps:
+      # 解析并校验发布目标 SHA。workflow_run 触发时直接取事件里的 head_sha；
+      # workflow_dispatch 触发时必须逐项验证所给运行号，确保「只发 CI 验证过的提交」
+      # 这条不变量不因新增触发方式而松动。
+      - name: Resolve CI-verified target SHA
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_RUN_ID: ${{ inputs.ci_run_id }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            RUN_JSON="$(gh api "repos/${{ github.repository }}/actions/runs/$INPUT_RUN_ID")"
+            NAME="$(printf '%s' "$RUN_JSON" | jq -r '.name')"
+            BRANCH="$(printf '%s' "$RUN_JSON" | jq -r '.head_branch')"
+            CONCL="$(printf '%s' "$RUN_JSON" | jq -r '.conclusion')"
+            SHA="$(printf '%s' "$RUN_JSON" | jq -r '.head_sha')"
+            if [ "$NAME" != "CI" ] || [ "$BRANCH" != "main" ] || [ "$CONCL" != "success" ]; then
+              echo "::error::运行号 $INPUT_RUN_ID 不满足发布前提（name=$NAME branch=$BRANCH conclusion=$CONCL），必须是 main 上 conclusion=success 的 CI" >&2
+              exit 1
+            fi
+            echo "手动补发：CI run $INPUT_RUN_ID（main，success）→ $SHA"
+          else
+            SHA="$RUN_SHA"
+          fi
+          if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::解析出的目标 SHA 非法：$SHA" >&2
+            exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -36,7 +81,7 @@ jobs:
             fi
 
             echo "=== 拉取并检出 CI 已验证提交 ==="
-            EXPECTED_SHA='${{ github.event.workflow_run.head_sha }}'
+            EXPECTED_SHA='${{ steps.target.outputs.sha }}'
             CURRENT_SHA="$(git rev-parse HEAD)"
             if [ "$CURRENT_SHA" = "$EXPECTED_SHA" ]; then
               echo "服务器已在目标提交 $EXPECTED_SHA，跳过拉取"
