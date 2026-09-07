@@ -126,13 +126,29 @@
 - [ ] 服务器时区为 `Asia/Shanghai`。
 - [ ] 磁盘空间、内存、CPU 满足预估访问量。
 - [ ] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
-- [ ] Word → PDF 采用服务端 LibreOffice 或内网 Gotenberg；不在 Windows 一体机安装转换引擎，Terminal Agent 仍只接收 PDF / 图片。
-- [ ] LibreOffice 路线安装固定版本的 `libreoffice-core` / `libreoffice-writer`；Gotenberg 路线固定容器镜像 digest，服务端口只允许 API 内网访问，禁止公网暴露。当前 Gotenberg 为适配器骨架，容器内 CJK 字体验证门禁补齐前必须保持 `wordToPdf=false`，不得把 `/health` 通过当作字体可用。
-- [ ] 安装思源黑体/宋体或 Noto CJK 字体包，执行 `fc-cache -f -v` 后 `fc-list ':lang=zh' family | head` 有输出；没有中文字体时能力必须保持关闭。
-- [ ] soffice 运行账户使用独立低权限 UID、只写系统临时目录，并由容器/network namespace/防火墙阻断出网；进程内不可达代理只是纵深防护，不得替代主机级禁网。独立 profile 的宏安全级别为最高，真实含宏样例验证不会执行宏。
+- [x] Word → PDF 采用服务端 LibreOffice 或内网 Gotenberg；不在 Windows 一体机安装转换引擎，Terminal Agent 仍只接收 PDF / 图片。（**2026-09-07 生产已开通**：engine=soffice）
+- [x] LibreOffice 路线安装固定版本的 `libreoffice-core` / `libreoffice-writer`；Gotenberg 路线固定容器镜像 digest，服务端口只允许 API 内网访问，禁止公网暴露。（2026-09-07 已装 LibreOffice 路线）
+- [x] 安装思源黑体/宋体或 Noto CJK 字体包，执行 `fc-cache -f -v` 后 `fc-list ':lang=zh' family | head` 有输出；没有中文字体时能力必须保持关闭。（2026-09-07 公网实测 `cjkFonts:true`，冒烟 PDF 内嵌 CJK 字体）
+- [x] soffice 运行账户使用独立低权限 UID、只写系统临时目录，并由容器/network namespace/防火墙阻断出网；进程内不可达代理只是纵深防护，不得替代主机侧封锁。
+  **2026-09-07 落地方式（必须照此，勿简化）**：`SOFFICE_PATH` 指向隔离包装脚本 `/usr/local/bin/soffice-sandboxed`，由它用 `systemd-run` 调真正的 soffice；API 代码零改动（适配器本就是 `spawn(SOFFICE_PATH, args)`）。参数：`User=soffice-runner`（system 用户、nologin、无家目录）、`PrivateNetwork=yes`、`ProtectSystem=strict`、`ProtectHome=yes`、`NoNewPrivileges=yes`、`RestrictSUIDSGID=yes`、`RestrictNamespaces=yes`、`MemoryMax=1G`、`TasksMax=64`、`RuntimeMaxSec=120`、`ReadWritePaths=/tmp,/var/tmp`。
+  **本机现状决定了这层隔离不可省**：API 与 pm2 均以 root 运行、`ufw inactive`、`iptables OUTPUT ACCEPT`、无 docker / firejail。直接把 `SOFFICE_PATH` 指向 `/usr/bin/soffice` 属**不达标配置**，等于让 root 权限、可任意出网的解析器处理用户上传的 Word。
+  **三个实测坑，改动前务必读**：① `PrivateTmp=yes` 不能用 —— 沙箱私有 /tmp 会让 API 写在共享 /tmp 的输入文件在沙箱内不存在，soffice 报 `source file could not be loaded`；改用共享 /tmp，靠 `ProtectSystem=strict` + `ReadWritePaths` 限制写范围。② API 以 root 跑时 `mkdtemp` 目录是 700 root，低权限用户读不到输入、写不出输出（`Io Access 0x507`）；包装脚本须在调用前把该次 `--outdir` 与输入文件放开到最小范围、结束后收回。③ 包装脚本内**不得用 `exec`** —— exec 替换进程后 EXIT trap 不触发、权限收不回，首版实测在 /tmp 留下 707 世界可写目录；须前台运行、记录退出码、恢复权限后再原样退出。
 - [x] 域名解析、HTTPS 证书正常。（**2026-08-08 外部实测**：`https://zyidai.cn` 返回 `HTTP/2 200`，`server: nginx/1.24.0 (Ubuntu)`；证书 `subject=CN=zyidai.cn`，`issuer=Let's Encrypt`，`notAfter=2026-10-04`。）**证书自动续期仍未验证** —— 须在服务器确认 certbot/acme 定时任务存在且上次续期成功。
 
 ### 3.2 环境变量核对
+
+> **手改服务器 `.env` 后的强制自检（2026-09-07 新增，来自一次真实风险）**：任何人手工改动生产 `.env` 的键之后，**收工前必须跑一次发布脚本步骤 3c 用的同一个闸门脚本做干跑**，看到 `PREFLIGHT OK` 才算完成：
+>
+> ```bash
+> cd /root/YITIJI && node services/api/scripts/preflight-production-gates.mjs \
+>   --env-file /srv/ai-job-print/services/api/.env \
+>   --force-true PRINT_REQUIRE_PII_SCAN,PRINT_REQUIRE_PRINTER_ONLINE
+> ```
+>
+> **为什么**：手改的键若触发生产启动闸门，故障会推迟到下次发布的 PM2 重启那一步才爆 —— 那是最糟的失败位置（新代码已落盘、旧进程已死）。干跑把它提前一整个发布周期暴露。
+> **干跑结论的有效期**：只在「闸门代码与部署脚本自已部署 SHA 起零变更」时成立，用 `git diff --stat <已部署SHA> origin/main -- services/api/src/config/production-runtime-gates.ts scripts/deploy-api-release.sh` 为空来确认。
+> **手改的键能否在发布中存活**：`rsync` 排除 `services/api/.env`，发布步骤 3b 逐行 awk 只改 `PRINT_REQUIRE_PII_SCAN`，其余键原样透传 —— 2026-09-07 核实。
+
 
 以 `.env.example` 为清单逐项核对生产 `.env`：
 
@@ -150,7 +166,11 @@
 - [ ] AI provider / LLM 功能级配置可读取。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
 - [ ] `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY` 已按需配置；默认系统候选可用时可留空。旧变量 `JOB_MATERIAL_PDF_FONT_PATH` / `_FAMILY` 仅作兼容回退，不再作为新部署主配置。
-- [ ] `NODE_ENV=production` 下字体探测失败会以 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；管理员登录后读取 `GET /api/v1/health/cjk-font`，确认 `data.ok=true`、`path` / `family` 与服务器安装一致。
+- [~] `NODE_ENV=production` 下字体探测失败会以 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；管理员登录后读取 `GET /api/v1/health/cjk-font`，确认 `data.ok=true`、`path` / `family` 与预期一致。
+  **2026-09-07 现状：端点实测未取到**（该端点需 Bearer Token，发布 lane 与 Windows lane 均无管理员账号，且都拒绝索取或代持管理员口令 —— 这个边界要保持）。
+  当前填入的是**按 `cjkFontCandidates()` 解析顺序在服务器只读推定的值，非端点实测**：`path=/usr/share/fonts/truetype/wqy/wqy-microhei.ttc`（来自 `RESUME_PDF_FONT_PATH`，文件存在且 `-rw-r--r--` 可读）、`family=WenQuanYiMicroHei`（来自 `RESUME_PDF_FONT_FAMILY`）、`ok` 预期 `true`（该项为候选列表第一顺位，Noto CJK 为未被选中的次顺位）。
+  **旁证**：服务器转换冒烟产出的 PDF 中文字体确实内嵌成功，`ok=true` 有独立佐证；但 `path` / `family` 的字面值只有推定，**没有独立核对**。
+  **待办**：由持管理员账号者读取端点实际返回并与上述三值逐字比对，不一致以端点为准，届时把本条改为 `[x]` 并写明取证人与时间。
 - [x] SMS provider 在短信审核前不得误设为真实生产发送。（**2026-07-26**：预发已为 `tencent` 且真号 E2E 通过；见 §2.2。正式生产仍须保持密钥仅服务端、禁止 log 假发送冒充生产。）
 - [ ] ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false~~ **该开关已删除，无需配置**。先付后印现在写死在代码里：Agent 只领取「已关联订单 + `payStatus='paid'` + `taskStatus='pending'`」的任务，`claimableWhere` 与事务内 CAS 两层都要求，任何环境都关不掉。验收口径改为看 CI 静态门禁 `verify:print-rollout-config`（钉死该开关不得存在、不得放行无订单任务）与行为门禁 `verify:kiosk-cashier-ui`。若运行目录 `.env` 里还留着这个变量，删掉即可，它已不生效。
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
@@ -160,7 +180,7 @@
 - [ ] `TERMINAL_PLANNED_PROVISIONING_ENABLED` 显式设为 `true|false`：滚动升级第一阶段保持 `false`；确认所有 API 实例均为 reader-aware 新版本且旧 binary 已摘流量/退出后，第二阶段才切 `true`。
 - [ ] 开启 planned writer 前已保存所有 API 实例的构建版本/commit、进程清单和健康检查证据；开启后禁止回滚到不认识 `lifecycleStatus` 的旧 binary。确需回滚时先把 planned writer 切回 `false` 并停止新设备预创建。
 - [ ] 文件大小、签名 URL TTL、匿名/会员数据 TTL 与产品要求一致。
-- [ ] `CONVERSION_ENGINE=soffice|gotenberg|disabled` 已显式声明；生产启用 soffice 时 `SOFFICE_PATH` 为绝对路径，启用 Gotenberg 时 `GOTENBERG_URL` 仅指向内网地址。
+- [x] `CONVERSION_ENGINE=soffice|gotenberg|disabled` 已显式声明；生产启用 soffice 时 `SOFFICE_PATH` 为绝对路径，启用 Gotenberg 时 `GOTENBERG_URL` 仅指向内网地址。（2026-09-07 生产 `CONVERSION_ENGINE=soffice`，`SOFFICE_PATH=/usr/local/bin/soffice-sandboxed`，**不是** `/usr/bin/soffice`）
 - [ ] `CONVERSION_MAX_CONCURRENCY` 已按机器容量设置（默认 2）；确认单次 60 秒超时、输出 15MB 上限不被外围代理放宽。
 - [ ] API 启动日志中记录的转换探测结果与 `GET /api/v1/document-conversion/capabilities` 一致；探测失败、缺字体或 disabled 时 `wordToPdf=false` 且返回明确 `reason`。
 
