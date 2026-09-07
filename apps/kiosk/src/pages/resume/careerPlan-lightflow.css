@@ -169,6 +169,43 @@
 .career-plan-lightflow__guide-list { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; color: var(--sd-color-text); font-size: 18px; line-height: 1.65; }
 .career-plan-lightflow__guide-list li { padding: 12px 14px; background: color-mix(in srgb, var(--sd-color-surface) 72%, transparent); border: 1px solid var(--sd-color-line); border-radius: 15px; }
 .career-plan-lightflow__muted { margin: 16px 0 0; }
+.career-plan-lightflow__materials-note,
+.career-plan-lightflow__materials-counts {
+  margin: 12px 0 0;
+  color: var(--sd-color-copy);
+  font-size: 17px;
+  line-height: 1.65;
+}
+.career-plan-lightflow__materials-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.career-plan-lightflow__materials-counts {
+  color: var(--sd-color-text);
+  font-size: 18px;
+}
+.career-plan-lightflow__materials-files {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.career-plan-lightflow__materials-files li {
+  display: flex;
+  align-items: center;
+  min-height: var(--sd-control-min, 48px);
+  padding: 12px 14px;
+  border: 1px solid var(--sd-color-line);
+  border-radius: 14px;
+  background: var(--sd-color-canvas);
+  color: var(--sd-color-text);
+  font-size: 17px;
+}
+.career-plan-lightflow__materials-exit {
+  min-height: var(--sd-primary-control-min, 56px);
+}
 .career-plan-lightflow__alert { margin: 0; padding: 14px 16px; color: var(--sd-category-orange-fg); background: var(--sd-category-orange-bg); border: 1px solid color-mix(in srgb, var(--sd-category-orange-fg) 26%, var(--sd-color-line)); border-radius: 16px; font-size: 14px; line-height: 1.6; }
 /* ── S1 AI 原语在本页的落位（原语自身样式在 styles/ai-primitives.css） ── */
 /* 证据徽章是 span，会被上面 __evidence span / __direction span 的块级规则误伤，这里复位。 */

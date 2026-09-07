@@ -21,7 +21,10 @@ function readRequired(path) {
 }
 
 const page = readRequired('src/pages/resume/CareerPlanPage.tsx')
+const materials = readRequired('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')
+const section = readRequired('src/pages/resume/components/career-plan/CareerPlanSection.tsx')
 const css = readRequired('src/pages/resume/careerPlan-lightflow.css')
+const careerUi = `${page}\n${materials}\n${section}`
 
 check(page.includes("import './careerPlan-lightflow.css'"), '职业规划页必须导入 LightFlow 局部样式')
 check(!page.includes('careerPlan-inkpaper.css'), '职业规划页不得导入 InkPaper 样式')
@@ -80,9 +83,29 @@ check(page.includes("mode: 'result-unavailable'"), '模型跑了但没出结果�
 check(!page.includes("mode: 'manual'"), '职业规划不得声明等价手动路径（无同等产出的手动替代）')
 check(page.includes('reason: aiOutage ??'), '降级原因必须优先透出后端真实 message，不得只写「AI 暂不可用」')
 check(
-  /blockedActionLabel: plan \? '重新生成职业规划' : '生成职业规划建议'/.test(page),
+  /blockedActionLabel: plan \? '重新生成求职方案' : '生成求职方案'/.test(page),
   'AI 挂掉时入口必须置灰保留并写明是哪个入口，不得整块消失',
 )
+
+check(page.includes('<CareerPlanExistingMaterials'), '求职方案结果必须挂上已有材料栏，不得新开路由')
+check(page.includes('title="求职方案"'), '页头必须把这一页收口为求职方案')
+check(page.includes('title="目标与方向"'), '四栏必须包含目标与方向')
+check(page.includes('title="尚需准备"'), '四栏必须包含尚需准备')
+check(page.includes('title="执行计划"'), '四栏必须包含执行计划')
+check(page.includes('依据：本人简历'), 'basedOn 依据文案必须保留，不得与已有材料混写')
+check(materials.includes('getMyResumes('), '已有材料必须复用 getMyResumes，不得新写 fetch')
+check(materials.includes('getMyDocuments('), '已有材料必须复用 getMyDocuments，不得新写 fetch')
+check(!/\bfetch\s*\(/.test(materials), '已有材料不得新写 fetch')
+check(materials.includes('登录后可看到你已保存的材料'), '匿名必须如实提示登录后可见已保存材料')
+check(materials.includes("navigate('/me/documents')"), '已有材料必须给出「我的文档」既有出口')
+check(materials.includes('if (!isLoggedIn)'), '未登录必须先挡在会员端点之前')
+check(
+  materials.indexOf('if (!isLoggedIn)') < materials.indexOf('getMyResumes('),
+  '未登录分支必须出现在 getMyResumes 之前，避免空列表冒充已查询',
+)
+check(materials.includes('页头「依据」'), '已有材料必须把文件清单与 basedOn 依据区分开')
+check(section.includes('data-career-plan-column={column}'), '四栏必须有稳定 column 地标供失败隔离断言')
+check(!careerUi.includes('一键投递'), '求职方案页不得出现一键投递')
 
 // 5) 置灰一律 aria-disabled。原生 disabled 会退出 Tab 序列、读屏跳过，
 //    触屏又没有 hover，用户永远读不到为什么点不动。

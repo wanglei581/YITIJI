@@ -41,6 +41,16 @@ export class ApiRouter {
       status: 200,
       json: { success: true, data: [] },
     })
+    // 包 N1：求职方案页登录后会读会员简历/文档列表。默认空页，避免冒烟撞 Unhandled API；
+    // 有内容或失败态的用例自行 respond 覆盖。匿名路径不得发这两条请求。
+    this.respond('GET', '/api/v1/me/resumes', {
+      status: 200,
+      json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+    })
+    this.respond('GET', '/api/v1/me/documents', {
+      status: 200,
+      json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+    })
   }
 
   async install(): Promise<void> {

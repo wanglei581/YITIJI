@@ -58,7 +58,15 @@ function collectRuntimeErrors(page: Page): string[] {
   return errors
 }
 
+async function stageScale(page: Page): Promise<number> {
+  const scaler = page.locator('.kiosk-stage')
+  if (await scaler.count() === 0) return 1
+  const transform = await scaler.evaluate((element) => getComputedStyle(element).transform)
+  return transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+}
+
 async function expectTouchTargets(page: Page): Promise<void> {
+  const scale = await stageScale(page)
   const targets = page.locator('button:not(:disabled), a[href], input:not([type="file"]):not(.sr-only):not(:disabled), select:not(:disabled), textarea:not(:disabled), [role="button"]:not([aria-disabled="true"])')
   let visible = 0
   for (let index = 0; index < await targets.count(); index += 1) {
@@ -71,16 +79,14 @@ async function expectTouchTargets(page: Page): Promise<void> {
       return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${element.className ? `.${String(element.className).trim().replaceAll(' ', '.')}` : ''} ${label}`.trim()
     })
     expect(box, `触控目标 ${index}（${identity}）必须有可计算尺寸`).not.toBeNull()
-    expect(box!.width, `触控目标 ${index}（${identity}）宽度不得小于 48px`).toBeGreaterThanOrEqual(48)
-    expect(box!.height, `触控目标 ${index}（${identity}）高度不得小于 48px`).toBeGreaterThanOrEqual(48)
+    expect(box!.width / scale, `触控目标 ${index}（${identity}）换算到舞台 CSS px 后宽度不得小于 48px`).toBeGreaterThanOrEqual(48)
+    expect(box!.height / scale, `触控目标 ${index}（${identity}）换算到舞台 CSS px 后高度不得小于 48px`).toBeGreaterThanOrEqual(48)
   }
   expect(visible, '触控优先页面必须至少有一个可见交互目标').toBeGreaterThan(0)
 }
 
 async function expectResumeCompareControls(page: Page): Promise<void> {
-  const scaler = page.locator('.kiosk-stage')
-  const transform = await scaler.evaluate((element) => getComputedStyle(element).transform)
-  const scale = transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+  const scale = await stageScale(page)
   const controls = page.getByRole('button', { name: /^(?:用改写|保留原文|下一条)$/ })
   await expect(controls).toHaveCount(3)
   for (let index = 0; index < 3; index += 1) {
@@ -235,6 +241,14 @@ for (const route of w6MobileCases) {
 test('/resume/optimize/compare mobile breakpoint @w6-mobile', async ({ page, api }) => {
   const route = w6KioskCases.find(({ pattern }) => pattern === '/resume/optimize/compare')
   if (!route) throw new Error('W6 compare route case is missing')
+  const errors = collectRuntimeErrors(page)
+  registerW6Api(api)
+  await acceptRoute(page, route, errors)
+})
+
+test('/resume/career-plan mobile breakpoint @w6-mobile', async ({ page, api }) => {
+  const route = w6KioskCases.find(({ pattern }) => pattern === '/resume/career-plan')
+  if (!route) throw new Error('W6 career-plan route case is missing')
   const errors = collectRuntimeErrors(page)
   registerW6Api(api)
   await acceptRoute(page, route, errors)

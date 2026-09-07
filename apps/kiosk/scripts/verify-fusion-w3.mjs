@@ -282,7 +282,7 @@ includes('src/pages/assistant/AssistantPage.tsx', 'ASSISTANT_USER_MESSAGE_MAX_LE
 includes('src/pages/assistant/AssistantCallPanel.tsx', 'data-kiosk-screen="assistant-call"', 'assistant call exposes its sub-state landmark')
 for (const marker of ['startCall', 'resumePlay', 'toggleMute', 'endCall', 'needResume', 'micBlocked']) includes('src/pages/assistant/AssistantCallPanel.tsx', marker, `assistant call retains ${marker}`)
 includes('src/pages/interview/InterviewReportPage.tsx', '练习结果仅供本人复盘，不会发送给任何企业。', 'interview report keeps the user-only privacy boundary')
-const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}`
+const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}\n${read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')}`
 for (const forbidden of ['录用概率', '保证录用', '一键投递', '立即投递']) check(!jobGuidancePresentation.includes(forbidden), `job guidance rejects ${forbidden}`)
 for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pages/assistant/AssistantPage.tsx').includes(forbidden), `assistant avoids ${forbidden}`)
 
