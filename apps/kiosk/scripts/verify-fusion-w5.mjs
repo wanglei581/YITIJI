@@ -239,14 +239,9 @@ for (const path of productionFiles) {
 
 const concretePages = [
   'src/pages/profile/ProfilePage.tsx',
-  'src/pages/profile/me/MyResumesPage.tsx',
   'src/pages/profile/me/MyPrintOrdersPage.tsx',
   'src/pages/profile/me/MyDocumentsPage.tsx',
-  'src/pages/profile/me/MyFavoritesPage.tsx',
-  'src/pages/profile/me/MyAiRecordsPage.tsx',
   'src/pages/profile/me/MyBenefitsPage.tsx',
-  'src/pages/profile/me/MyActivityPage.tsx',
-  'src/pages/profile/me/MyNotificationsPage.tsx',
   'src/pages/profile/me/MyFeedbackPage.tsx',
   'src/pages/profile/me/MySettingsPage.tsx',
   'src/pages/profile/me/MyPrivacyRequestsPage.tsx',
@@ -266,5 +261,36 @@ for (const path of concretePages) {
   const source = read(path)
   assert.match(source, /fusion-w5|data-kiosk-presentation=["']fusion-youth["']|MeListShell/, `${path} exposes W5 fusion scope`)
 }
+
+const qxMePages = [
+  'src/pages/profile/me/MyResumesPage.tsx',
+  'src/pages/profile/me/MyFavoritesPage.tsx',
+  'src/pages/profile/me/MyAiRecordsPage.tsx',
+  'src/pages/profile/me/MyActivityPage.tsx',
+  'src/pages/profile/me/MyNotificationsPage.tsx',
+  'src/pages/placeholders/MeActivityDetailPage.tsx',
+]
+for (const path of qxMePages) {
+  const source = read(path)
+  assert.match(source, /QxMePage/, `${path} uses Qingxu member chrome`)
+  assert.doesNotMatch(source, /KioskPageFrame/, `${path} has left the V6 frame`)
+  assert.doesNotMatch(source, /className="qx-nav-item"/, `${path} does not inline navbar items`)
+}
+const qxMeChrome = read('src/pages/profile/me/qx/QxMeChrome.tsx')
+assert.match(qxMeChrome, /QxPageFrame/, 'member chrome uses Qingxu page frame')
+assert.match(qxMeChrome, /QxAppNavbar/, 'member chrome uses shared QxAppNavbar')
+assert.match(qxMeChrome, /current="\/profile"/, 'member chrome marks 我的 as the current nav item')
+assert.doesNotMatch(qxMeChrome, /KioskPageFrame/, 'member chrome has left the V6 frame')
+const qxNavbar = read('src/components/qingxu/QxAppNavbar.tsx')
+assert.match(qxNavbar, /aria-current=\{current === '\/profile' \? 'page' : undefined\}/, 'shared navbar can mark 我的 as current')
+const kioskRootSrc = read('src/layouts/KioskRoot.tsx')
+assert.match(kioskRootSrc, /['"]\/me\/notifications['"]/, '/me/notifications is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/notifications['"]/, '/notifications is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/resumes['"]/, '/me/resumes is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/favorites['"]/, '/me/favorites is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/ai-records['"]/, '/me/ai-records is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/activity['"]/, '/me/activity is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/activity\/['"]/, '/me/activity/:id uses a precise prefix')
+assert.doesNotMatch(kioskRootSrc, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/me\/['"]/, 'does not use a wide /me/ prefix')
 
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')

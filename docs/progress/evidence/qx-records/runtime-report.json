@@ -1,0 +1,98 @@
+[
+  {
+    "route": "/me/notifications",
+    "rootLen": 25783,
+    "qxFrame": true,
+    "scale": 1,
+    "controls": 5,
+    "under48": 0,
+    "blocked": 0,
+    "deadLinks": 0,
+    "overflowPx": 0,
+    "hOverflow": [],
+    "errors": [
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "under48Samples": []
+  },
+  {
+    "route": "/me/resumes",
+    "rootLen": 25378,
+    "qxFrame": true,
+    "scale": 1,
+    "controls": 11,
+    "under48": 0,
+    "blocked": 0,
+    "deadLinks": 0,
+    "overflowPx": 0,
+    "hOverflow": [],
+    "errors": [
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "under48Samples": []
+  },
+  {
+    "route": "/me/favorites",
+    "rootLen": 25370,
+    "qxFrame": true,
+    "scale": 1,
+    "controls": 11,
+    "under48": 0,
+    "blocked": 0,
+    "deadLinks": 0,
+    "overflowPx": 0,
+    "hOverflow": [],
+    "errors": [
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "under48Samples": []
+  },
+  {
+    "route": "/me/ai-records",
+    "rootLen": 25217,
+    "qxFrame": true,
+    "scale": 1,
+    "controls": 11,
+    "under48": 0,
+    "blocked": 0,
+    "deadLinks": 0,
+    "overflowPx": 0,
+    "hOverflow": [],
+    "errors": [
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "under48Samples": []
+  },
+  {
+    "route": "/me/activity",
+    "rootLen": 25181,
+    "qxFrame": true,
+    "scale": 1,
+    "controls": 11,
+    "under48": 0,
+    "blocked": 0,
+    "deadLinks": 0,
+    "overflowPx": 0,
+    "hOverflow": [],
+    "errors": [
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "under48Samples": []
+  },
+  {
+    "route": "/me/activity/w6-record",
+    "rootLen": 25273,
+    "qxFrame": true,
+    "scale": 1,
+    "controls": 11,
+    "under48": 0,
+    "blocked": 0,
+    "deadLinks": 0,
+    "overflowPx": 0,
+    "hOverflow": [],
+    "errors": [
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "under48Samples": []
+  }
+]

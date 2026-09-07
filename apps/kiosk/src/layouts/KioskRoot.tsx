@@ -147,6 +147,15 @@ const QX_MIGRATED_EXACT_PATTERNS: readonly RegExp[] = [
   /^\/jobs\/[^/]+\/offline$/,
   /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
 ]
+  '/me/notifications',
+  '/notifications',
+  '/me/resumes',
+  '/me/favorites',
+  '/me/ai-records',
+  '/me/activity',
+])
+// /me/activity/:id 用精确前缀，避免误伤尚未迁移的 /me/* 兄弟路由。
+const QX_MIGRATED_PREFIXES = ['/print-scan/feature/', '/me/activity/'] as const
 
 function isQxMigratedPath(pathname: string): boolean {
   if (QX_MIGRATED_ROUTES.has(pathname)) return true
