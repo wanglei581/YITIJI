@@ -14,6 +14,24 @@ assert.match(
   'production installer must default claim polling to the server rate-limit budget',
 )
 
+// -UseExistingToken 不换 token：$tokenToPersist 保持 $null，但 PowerShell 绑定到 [string] 形参会转成
+// 空字符串，用 `$null -ne` 判断会误判为「要写 token」并在 Protect-AgentToken 抛错（现场实证）。
+assert.match(
+  installer,
+  /\$shouldWriteToken\s*=\s*-not \[string\]::IsNullOrWhiteSpace\(\$TokenToPersist\)/,
+  'token persistence must be decided by content, not by $null comparison against a [string] parameter',
+)
+assert.doesNotMatch(
+  installer,
+  /\$shouldWriteToken\s*=\s*\$null -ne \$TokenToPersist/,
+  'a [string] parameter is never $null; -UseExistingToken would always fail to commit',
+)
+assert.doesNotMatch(
+  installer,
+  /\$credentialReplaced\s*=\s*\$null -ne \$tokenToPersist/,
+  'credential-replaced reporting must use the same content check',
+)
+
 for (const parameter of [
   'PromptForBindCode',
   'BindCodeFromStandardInput',
