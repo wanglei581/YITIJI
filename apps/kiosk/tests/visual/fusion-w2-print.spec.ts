@@ -403,8 +403,6 @@ test('pickup hid invalid code shows the server error without fabricating success
   expect(errors).toEqual([])
 })
 
-/** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
-function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
 function quoteResponseJson(opts?: { amountCents?: number; billablePages?: number; unitCents?: number }) {
   const billablePages = opts?.billablePages ?? 2
   const unitCents = opts?.unitCents ?? 100
