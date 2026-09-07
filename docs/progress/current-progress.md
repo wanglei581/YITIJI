@@ -1,6 +1,7 @@
 # 当前开发进度
 
 2026-09-07 **报价确认页迁入青序流光（分支 `claude/qx-b1-print-confirm`，原型 14-print-confirm.html）**。`/print/confirm` 登记进 `QX_MIGRATED_ROUTES`，页面改用 `QxPageFrame` + `print-confirm-qx.css`。保留既有 `POST /orders/quote` / `POST /print/jobs` / `GET /print/price-config` 与建单分流（付费进收银、零元仍先建单）。地址栏按稿白名单 fail-closed：表外键、同名键重复、不可回显取值、非空 `#` 一律落到 `invalid-context` 并 `replaceState` 清洗，取值不进 DOM。八态均有真实对应：`missing-context` / `invalid-context` / `quoting` / `quoted` / `quote-failed` / `capability-invalid-params` / `benefit-unverified` / `zero-amount`。优惠券入口保留为「功能尚未接通」禁用态 + 常驻原因（服务端打印核销仍 fail-closed）。未部署、未真机。
+2026-09-07 **到机码页补 hid 扫码指引态（分支 `claude/qx-b1-arrival-hid`，对照稿 11-arrival-code.html `rHid()`）**。`/print/pickup-claim` 已经在 `QX_MIGRATED_ROUTES`，本轮不重迁，只补稿里有、运行时没有的那一屏。未扫码时手输页顶部就能看见「机身侧面的扫码区」和「把手机屏幕亮度调高」（真机 A5 接近感应 / A3 需调亮，PR #913）；点进去是完整 hid 指引（出示手机码、两种扫码消歧、「还是手输吧」「扫不出来？求助」→ `/help`）。HID 仍打进透明 input，250ms 静默窗口与 `hid-guard` 判据未改；只更正了 hid-guard 里「常亮朝外、持续扫描」的过时注释。不显示「扫码器就绪」。未部署、未再做 Windows 真机。
 
 2026-09-07 **打印扫描 Hub 迁入青序流光（分支 `claude/qx-b1-hub`，原型 10-print-hub.html）**。`/print-scan` 与 `/print-scan/feature/:key` 登记进 `QX_MIGRATED_ROUTES`：精确集合收无参路由，前缀只收 `/print-scan/feature/`，避免误伤尚未迁移的 `/print-scan/convert`、`/print-scan/sign`。页面改用 `QxPageFrame` + `print-hub-qx.css`，保留能力探测轴 / MFP 轴状态机。顶栏胶囊默认 `unknown`「能力与设备状态以办理时确认」，拿不到打印机状态不写设备可用（fail-closed）。Hub 八张能力卡按新稿（含 U 盘导入，标注 Windows 真机未验收）；证件照走说明页。未部署、未真机。
 
