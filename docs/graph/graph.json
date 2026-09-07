@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 520,
+    "endpointCount": 522,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5153,6 +5153,7 @@
         "handler": "DocumentConversionController.capabilities",
         "method": "GET",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask"
@@ -5645,6 +5646,7 @@
         "handler": "JobsController.prepareFairCompanyPrint",
         "method": "POST",
         "models": [
+          "AuditLog",
           "FairCompany",
           "FairMaterialPrintBridge",
           "FileObject",
@@ -6210,6 +6212,16 @@
         "method": "GET",
         "models": [],
         "path": "/api/v1/kiosk/activities/:id",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
+        "handler": "KioskAiCapabilitiesController.listCapabilities",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/kiosk/ai/capabilities",
         "roles": [],
         "serviceFiles": [],
         "services": []
@@ -7006,10 +7018,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
-          "PiiFinding",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7028,10 +7038,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
-          "PiiFinding",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7050,10 +7058,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
-          "PiiFinding",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7072,10 +7078,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
-          "PiiFinding",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7297,6 +7301,24 @@
           "MemberLegalConsent"
         ],
         "path": "/api/v1/member/auth/wx-login",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-auth/member-auth.service.ts"
+        ],
+        "services": [
+          "MemberAuthService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-auth/member-auth.controller.ts",
+        "handler": "MemberAuthController.wxResignin",
+        "method": "POST",
+        "models": [
+          "EndUser",
+          "LegalDocVersion",
+          "MemberLegalConsent"
+        ],
+        "path": "/api/v1/member/auth/wx-resignin",
         "roles": [],
         "serviceFiles": [
           "services/api/src/member-auth/member-auth.service.ts"
@@ -7750,10 +7772,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
-          "PiiFinding",
           "Terminal",
           "TerminalCapability"
         ],
@@ -7772,10 +7792,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "DocumentProcessTask",
           "FileObject",
           "Order",
-          "PiiFinding",
           "Terminal",
           "TerminalCapability"
         ],
@@ -10227,6 +10245,7 @@
         "handler": "ScanTasksController.create",
         "method": "POST",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -10248,6 +10267,7 @@
         "handler": "ScanTasksController.cancel",
         "method": "DELETE",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -10269,6 +10289,7 @@
         "handler": "ScanTasksController.status",
         "method": "GET",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
@@ -10713,6 +10734,7 @@
         "handler": "UploadSessionsController.create",
         "method": "POST",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask"
@@ -10731,6 +10753,7 @@
         "handler": "UploadSessionsController.cancel",
         "method": "DELETE",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask"
@@ -10749,6 +10772,7 @@
         "handler": "UploadSessionsController.status",
         "method": "GET",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask"
@@ -10767,6 +10791,7 @@
         "handler": "UploadSessionsController.confirm",
         "method": "POST",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask"
@@ -10785,6 +10810,7 @@
         "handler": "UploadSessionsController.upload",
         "method": "POST",
         "models": [
+          "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask"
@@ -11493,7 +11519,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 462,
+      "reachableFileCount": 478,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -11601,7 +11627,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -11663,7 +11691,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -11936,7 +11966,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -11980,7 +12012,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12024,7 +12058,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12068,7 +12104,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12112,7 +12150,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12156,7 +12196,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12200,7 +12242,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12269,7 +12313,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12313,7 +12359,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12357,7 +12405,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -12401,7 +12451,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13277,7 +13329,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13329,7 +13383,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13382,7 +13438,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13507,7 +13565,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13558,7 +13618,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13581,14 +13643,12 @@
           ],
           "path": "/resume/optimize/compare",
           "styles": [
-            "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
-            "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
             "apps/kiosk/src/pages/resume/resume-optimize-compare.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css",
-            "apps/kiosk/src/styles/ai-primitives.css"
+            "apps/kiosk/src/styles/ai-primitives.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13611,7 +13671,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13664,7 +13726,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -13832,7 +13896,9 @@
             "GET /resume/export/pricing",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
+            "GET /resume/records/:param/draft",
             "GET /resume/records/:param/optimize",
+            "GET /resume/records/:param/versions",
             "POST /assistant/chat",
             "POST /assistant/sessions/:param/summary",
             "POST /job-fairs/:param/companies/:param/print-url",
@@ -14168,7 +14234,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 484
+      "sourceFileCount": 500
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -14667,6 +14733,8 @@
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
           "services/api/src/auth/partner-phone-rebind.service.ts",
+          "services/api/src/files/file-content-integrity.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/job-materials/job-materials.service.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/payment/reconciliation.service.ts",
@@ -14780,10 +14848,7 @@
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/materials/pii-redaction.service.ts",
-          "services/api/src/member-print-orders/member-print-order-create.service.ts",
-          "services/api/src/member-print-orders/package-order.service.ts",
-          "services/api/src/print-jobs/pickup-order.service.ts",
-          "services/api/src/print-jobs/print-jobs.service.ts"
+          "services/api/src/print-jobs/pii-scan-gate.ts"
         ]
       },
       {
@@ -15022,6 +15087,7 @@
           "services/api/src/contract-review/contract-review.service.ts",
           "services/api/src/document-conversion/document-conversion.service.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
+          "services/api/src/files/file-content-integrity.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/member-data-export-file.service.ts",
           "services/api/src/job-materials/job-materials.service.ts",
@@ -15035,6 +15101,7 @@
           "services/api/src/member-privacy/member-data-export.mapper.ts",
           "services/api/src/print-conversion/print-conversion.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/pii-scan-gate.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
           "services/api/src/print-sign/print-sign.service.ts",
@@ -15441,10 +15508,7 @@
         ],
         "usedBy": [
           "services/api/src/materials/materials.service.ts",
-          "services/api/src/member-print-orders/member-print-order-create.service.ts",
-          "services/api/src/member-print-orders/package-order.service.ts",
-          "services/api/src/print-jobs/pickup-order.service.ts",
-          "services/api/src/print-jobs/print-jobs.service.ts"
+          "services/api/src/print-jobs/pii-scan-gate.ts"
         ]
       },
       {
@@ -15928,6 +15992,7 @@
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
+      "scripts/verify-release-bundle.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
@@ -15942,7 +16007,8 @@
     ],
     ".github/workflows/deploy.yml": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
-      "scripts/verify-deploy-authorization-gate.mjs"
+      "scripts/verify-deploy-authorization-gate.mjs",
+      "scripts/verify-release-bundle.mjs"
     ],
     "apps/admin/package.json": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
@@ -16249,6 +16315,9 @@
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
+    "apps/admin/src/services/api/screensaver.ts": [
+      "services/api/scripts/verify-screensaver-content.ts"
+    ],
     "apps/admin/src/services/api/sourcePaging.ts": [
       "apps/admin/scripts/verify-source-publish-actions.mjs"
     ],
@@ -16293,6 +16362,9 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
+    "apps/kiosk/scripts/verify-file-retention-ui.mjs": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+    ],
     "apps/kiosk/scripts/verify-fusion-home.mjs": [
       "apps/kiosk/scripts/verify-home-narrow-visual-balance.mjs",
       "apps/kiosk/scripts/verify-home-prototype-v1.mjs"
@@ -16322,6 +16394,7 @@
     ],
     "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs"
     ],
@@ -16391,6 +16464,9 @@
     ],
     "apps/kiosk/scripts/verify-user-center-wave0.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
+    ],
+    "apps/kiosk/scripts/verify-word-conversion-ui.mjs": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/kiosk/src/ai/AiEvidence.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
@@ -17292,6 +17368,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx": [
@@ -17357,6 +17434,23 @@
     "apps/kiosk/src/pages/profile/me/activityPresentation.ts": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-activity-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx": [
+      "apps/kiosk/scripts/verify-file-retention-ui.mjs",
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/components/documentReprint.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx": [
@@ -17644,6 +17738,15 @@
       "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareState.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-compare/resumeCompareModel.ts": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx": [
@@ -18253,7 +18356,13 @@
     "apps/miniapp/pages/career-plan/career-plan.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/pages/documents/documents-helpers.js": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
+    ],
     "apps/miniapp/pages/documents/documents.js": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/pages/help/help.js": [
@@ -18320,10 +18429,15 @@
     "apps/miniapp/project.config.json": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/scripts/api-contract.json": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+    ],
     "apps/miniapp/scripts/verify-miniapp-static.mjs": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/utils/api.js": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "apps/miniapp/scripts/verify-miniapp-api-contract.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -18808,6 +18922,9 @@
     "docs/reviews/ai-resume-assets-closure-planning.md": [
       "services/api/scripts/verify-member-data-retention.ts"
     ],
+    "docs/reviews/result-layer-2026-09-06-packets.md": [
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+    ],
     "docs/reviews/user-center-commercial-closure-audit-2026-07-16.md": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
@@ -19055,6 +19172,9 @@
     "scripts/mock-server-contract-bindings.json": [
       "scripts/verify-mock-server-contract.mjs"
     ],
+    "scripts/prod-readonly-probe.mjs": [
+      "scripts/verify-prod-readonly-probe.mjs"
+    ],
     "scripts/project-graph-query.mjs": [
       "scripts/project-graph/orphans.mjs"
     ],
@@ -19089,6 +19209,9 @@
       "scripts/project-graph/gates.mjs",
       "scripts/project-graph/orphans.mjs",
       "scripts/verify-ci-gate-coverage.mjs"
+    ],
+    "scripts/release-bundle/bos-object.mjs": [
+      "scripts/verify-release-bundle.mjs"
     ],
     "scripts/verify-ci-gate-coverage.mjs": [
       "services/api/scripts/verify-policy-eligibility-authoring.ts"
@@ -19377,6 +19500,9 @@
     "services/api/scripts/lib/verify-governed-job-fit-runtime.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-governed-job-fit.ts"
+    ],
+    "services/api/scripts/preflight-production-gates.mjs": [
+      "scripts/verify-deploy-gates-in-sync.mjs"
     ],
     "services/api/scripts/recruitment-wave2-restored-dry-run.ts": [
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
@@ -19804,6 +19930,13 @@
       "services/api/scripts/verify-job-fit-governance.ts",
       "services/api/scripts/verify-job-fit-print.ts"
     ],
+    "services/api/src/ai/kiosk-ai-capabilities.controller.ts": [
+      "services/api/scripts/verify-kiosk-ai-capabilities.ts",
+      "services/api/scripts/verify-throttle-dimension.ts"
+    ],
+    "services/api/src/ai/kiosk-ai-capabilities.ts": [
+      "services/api/scripts/verify-kiosk-ai-capabilities.ts"
+    ],
     "services/api/src/ai/llm/ai-config-audit.ts": [
       "services/api/scripts/verify-ai-contract-mirror.mjs"
     ],
@@ -19822,6 +19955,7 @@
       "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
       "services/api/scripts/verify-print-param-suggestion.ts"
     ],
@@ -20083,7 +20217,8 @@
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
-      "services/api/scripts/verify-trtc-ownership.ts"
+      "services/api/scripts/verify-trtc-ownership.ts",
+      "services/api/scripts/verify-upload-sessions-http.ts"
     ],
     "services/api/src/asr/asr.service.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
@@ -20369,6 +20504,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
+      "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
     "services/api/src/common/guards/end-user-auth.guard.ts": [
@@ -20458,6 +20594,7 @@
       "services/api/scripts/verify-partner-account-action.ts"
     ],
     "services/api/src/common/redis/redis-degradation.ts": [
+      "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
@@ -20681,6 +20818,7 @@
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
@@ -23065,6 +23203,7 @@
         ],
         "files": [
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
           "apps/kiosk/src/services/api/filesMockAdapter.ts",
           "apps/kiosk/src/services/api/memberAssets.ts",
           "packages/shared/src/types/file.ts",
@@ -23074,7 +23213,7 @@
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-file-retention-ui.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -24172,6 +24311,9 @@
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
           "apps/kiosk/src/pages/profile/me/activityPresentation.ts",
+          "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
+          "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
+          "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
@@ -24801,12 +24943,14 @@
           "apps/kiosk/package.json",
           "apps/kiosk/playwright.w3.config.ts",
           "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
+          "apps/kiosk/scripts/verify-file-retention-ui.mjs",
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
           "apps/kiosk/scripts/verify-fusion-w3.mjs",
           "apps/kiosk/scripts/verify-fusion-w5.mjs",
           "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
           "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
           "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
+          "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
           "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
           "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
           "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
@@ -24817,6 +24961,7 @@
           "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
           "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
           "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+          "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
           "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/components/FilePreviewDialog.tsx",
           "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx",
@@ -24832,6 +24977,9 @@
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
+          "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
+          "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
@@ -24859,6 +25007,10 @@
           "apps/kiosk/tests/visual/fusion-w2-scan.spec.ts",
           "apps/kiosk/tests/visual/fusion-w2-tools.spec.ts",
           "apps/kiosk/tests/visual/fusion-w3.spec.ts",
+          "apps/miniapp/pages/documents/documents-helpers.js",
+          "apps/miniapp/pages/documents/documents.js",
+          "apps/miniapp/scripts/api-contract.json",
+          "apps/miniapp/utils/api.js",
           "apps/partner/scripts/verify-excel-template-download-ui.mjs",
           "apps/partner/src/routes/sources/ExcelImportModal.tsx",
           "apps/partner/src/routes/sources/index.tsx",
@@ -24874,6 +25026,7 @@
           "docs/progress/current-progress.md",
           "docs/progress/next-tasks.md",
           "docs/progress/today-claude.md",
+          "docs/reviews/result-layer-2026-09-06-packets.md",
           "docs/superpowers/plans/2026-07-04-profile-commercial-first-batch-execution.md",
           "docs/superpowers/plans/2026-07-12-sign-stamp-implementation.md",
           "docs/superpowers/specs/2026-07-12-sign-stamp-design.md",
@@ -25039,6 +25192,9 @@
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
           "apps/kiosk/src/pages/profile/me/activityPresentation.ts",
+          "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
+          "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
+          "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
@@ -25298,6 +25454,9 @@
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareState.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-compare/resumeCompareModel.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx",
@@ -25586,15 +25745,20 @@
           "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx",
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/services/api/documentConversion.ts",
-          "apps/miniapp/pages/resume-upload/resume-upload.js"
+          "apps/miniapp/pages/documents/documents-helpers.js",
+          "apps/miniapp/pages/documents/documents.js",
+          "apps/miniapp/pages/resume-upload/resume-upload.js",
+          "apps/miniapp/utils/api.js"
         ],
         "missing": []
       },
       "file": "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": true,
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
@@ -26388,6 +26552,20 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/prod-readonly-probe.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [
           "scripts/project-graph/orphans.mjs",
           "scripts/project-graph/repo.mjs"
@@ -26529,6 +26707,20 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "scripts/release-bundle/bos-object.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [
           ".github/workflows/ci.yml",
           "scripts/ci-gate-exemptions.json",
@@ -26626,6 +26818,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/preflight-production-gates.mjs",
           "services/api/src/config/production-runtime-gates.ts"
         ],
         "missing": []
@@ -26752,6 +26945,44 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:no-raw-error-render"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "scripts/prod-readonly-probe.mjs"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-prod-readonly-probe.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:prod-readonly-probe"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/deploy.yml",
+          "scripts/release-bundle/bos-object.mjs"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-release-bundle.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:release-bundle"
       ],
       "wired": true
     },
@@ -27226,6 +27457,20 @@
       "asserts": {
         "absent": [],
         "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "services/api/scripts/preflight-production-gates.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "services/api",
+      "scriptNames": [],
+      "wired": false
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
         "files": [
           "services/api/scripts/verify-change-password.ts"
         ],
@@ -27503,6 +27748,7 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
+          "services/api/src/common/redis/redis-degradation.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
@@ -30076,6 +30322,28 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "services/api/src/ai"
+        ],
+        "files": [
+          "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
+          "services/api/src/ai/kiosk-ai-capabilities.ts",
+          "services/api/src/ai/llm/llm-config.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-kiosk-ai-capabilities.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:kiosk-ai-capabilities"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
@@ -30832,6 +31100,7 @@
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
           "services/api/src/payment/order-quote.service.ts",
@@ -32808,6 +33077,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/admin/src/services/api/screensaver.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/content/content-signing.ts",
           "services/api/src/content/content.service.ts",
@@ -33097,6 +33367,7 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
           "services/api/src/common/throttler/terminal-throttle.ts",
           "services/api/src/materials/materials.controller.ts",
           "services/api/src/print-jobs/print-jobs.controller.ts",
@@ -33341,6 +33612,8 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/app.module.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/jwt-verifier.module.ts",
           "services/api/src/prisma/prisma.service.ts"
@@ -33349,7 +33622,7 @@
       },
       "file": "services/api/scripts/verify-upload-sessions-http.ts",
       "helper": false,
-      "inCi": false,
+      "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:upload-sessions:http"

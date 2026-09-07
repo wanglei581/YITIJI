@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`520` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`522` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -131,6 +131,12 @@
 | POST | `/api/v1/resume/job-fit/consent` | JobFitRequestDto.grantConsent | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
 | DELETE | `/api/v1/resume/job-fit/consent/:taskId` | JobFitRequestDto.revokeConsent | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
 | GET | `/api/v1/resume/job-fit/consent/:taskId` | JobFitRequestDto.consentStatus | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
+
+## `services/api/src/ai/kiosk-ai-capabilities.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/kiosk/ai/capabilities` | KioskAiCapabilitiesController.listCapabilities | — | — | — |
 
 ## `services/api/src/ai/llm/ai-config.controller.ts`
 
@@ -318,7 +324,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/document-conversion/capabilities` | DocumentConversionController.capabilities | — | DocumentConversionService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| GET | `/api/v1/document-conversion/capabilities` | DocumentConversionController.capabilities | — | DocumentConversionService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/files/:id/convert` | DocumentConversionController.convert | — | AuditService<br/>DocumentConversionService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 
 ## `services/api/src/files/files.controller.ts`
@@ -428,7 +434,7 @@
 | GET | `/api/v1/job-fairs/:id` | JobsController.getJobFairById | — | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | GET | `/api/v1/job-fairs/:id/companies` | JobsController.getFairCompanies | — | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | GET | `/api/v1/job-fairs/:id/companies/:companyId` | JobsController.getFairCompanyById | — | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
-| POST | `/api/v1/job-fairs/:id/companies/:companyId/print-url` | JobsController.prepareFairCompanyPrint | — | FairCompanyPrintService | FairCompany<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| POST | `/api/v1/job-fairs/:id/companies/:companyId/print-url` | JobsController.prepareFairCompanyPrint | — | FairCompanyPrintService | AuditLog<br/>FairCompany<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
 | GET | `/api/v1/job-fairs/:id/detail` | JobsController.getJobFairDetail | — | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | GET | `/api/v1/job-fairs/:id/map` | JobsController.getFairMap | — | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | GET | `/api/v1/job-fairs/:id/materials` | JobsController.getFairMaterials | — | AdminFairsService | AuditLog<br/>FairCompany<br/>FairMaterial<br/>FairMaterialPrintBridge<br/>FairVenueFacility<br/>FairVenueGuide<br/>FairVenueHall<br/>FairZone<br/>FileObject<br/>JobFair<br/>PrintTask |
@@ -544,6 +550,7 @@
 | POST | `/api/v1/member/auth/step-up/sms-code` | MemberAuthController.sendStepUpCode | — | MemberStepUpService | AuditLog<br/>EndUser |
 | POST | `/api/v1/member/auth/step-up/verify` | MemberAuthController.verifyStepUp | — | MemberStepUpService | AuditLog<br/>EndUser |
 | POST | `/api/v1/member/auth/wx-login` | MemberAuthController.wxLogin | — | MemberAuthService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
+| POST | `/api/v1/member/auth/wx-resignin` | MemberAuthController.wxResignin | — | MemberAuthService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
 | GET | `/api/v1/member/me` | MemberAuthController.me | — | MemberAuthService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
 | POST | `/api/v1/member/phone/rebind` | MemberAuthController.rebindPhone | — | MemberPhoneRebindService | AuditLog<br/>EndUser |
 
@@ -619,17 +626,17 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | — | — |
 | GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | Order<br/>PrintTask |
-| POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
-| POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/me/print-orders/cloud` | MemberPrintOrdersController.listCloud | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/me/print-orders/cloud` | MemberPrintOrdersController.listCloud | — | MemberPrintOrderCreateService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/member-print-orders/package-orders.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/orders/package` | PackageOrdersController.create | — | PackageOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/orders/package/:id` | PackageOrdersController.detail | — | PackageOrderService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/orders/package` | PackageOrdersController.create | — | PackageOrderService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/orders/package/:id` | PackageOrdersController.detail | — | PackageOrderService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 
 ## `services/api/src/member-privacy/admin-member-privacy.controller.ts`
 
@@ -858,9 +865,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/scan/sessions` | ScanTasksController.create | — | ScanTasksService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
-| DELETE | `/api/v1/scan/sessions/:id` | ScanTasksController.cancel | — | ScanTasksService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
-| GET | `/api/v1/scan/sessions/:id` | ScanTasksController.status | — | ScanTasksService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
+| POST | `/api/v1/scan/sessions` | ScanTasksController.create | — | ScanTasksService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
+| DELETE | `/api/v1/scan/sessions/:id` | ScanTasksController.cancel | — | ScanTasksService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
+| GET | `/api/v1/scan/sessions/:id` | ScanTasksController.status | — | ScanTasksService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask<br/>ScanTask<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/terminals/:terminalId/scan-sessions/deliver` | ScanTasksController.deliver | — | ScanTasksService<br/>TerminalsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Order<br/>OrderItem<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCapability<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 
 ## `services/api/src/screensaver/screensaver.controller.ts`
@@ -970,8 +977,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/upload-sessions` | UploadSessionsController.create | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| DELETE | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.cancel | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| GET | `/api/v1/upload-sessions/:sessionId` | UploadSessionsController.status | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/confirm` | UploadSessionsController.confirm | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
+| POST | `/api/v1/upload-sessions/:sessionId/files` | UploadSessionsController.upload | — | UploadSessionsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |

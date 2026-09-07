@@ -70,7 +70,7 @@ flowchart TD
 | **AiResumeResult** | 15 | EndUser | 12 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-report-export.controller.ts`<br/>… |
 | **AiServiceLog** | 12 | EndUser | 2 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts` |
 | **AlertDisposition** | 12 | — | 2 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`admin-ops/admin-ops.service.ts` |
-| **AuditLog** | 12 | User | 14 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`audit/audit.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>… |
+| **AuditLog** | 12 | User | 16 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`audit/audit.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>… |
 | **BenefitActivity** | 19 | BenefitClaim、User | 2 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`community/community.service.ts` |
 | **BenefitClaim** | 8 | BenefitActivity、BenefitGrant、EndUser | 1 个文件<br/>`benefit-activities/benefit-activities.service.ts` |
 | **BenefitGrant** | 16 | BenefitClaim、EndUser | 6 个文件<br/>`benefit-activities/benefit-activities.service.ts`<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>… |
@@ -78,7 +78,7 @@ flowchart TD
 | **BrowseLog** | 12 | EndUser | 3 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **CompanyProfile** | 37 | Job、Organization | 3 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`orgs/partner-stats.service.ts` |
 | **ContractReviewTask** | 30 | EndUser | 7 个文件<br/>`contract-review/__tests__/contract-review-orchestrator.test.ts`<br/>`contract-review/contract-review-lifecycle.service.ts`<br/>`contract-review/contract-review-orchestrator.service.ts`<br/>… |
-| **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 7 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials.service.ts`<br/>`materials/pii-redaction.service.ts`<br/>… |
+| **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 4 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials.service.ts`<br/>`materials/pii-redaction.service.ts`<br/>… |
 | **EndUser** | 33 | AiResumeResult、AiServiceLog、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、JobAiSession、JobApplication、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 12 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
 | **ExternalJumpLog** | 13 | EndUser | 4 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>… |
 | **FairCompany** | 22 | FairCompanyPosition、FairVenueHallCompany、JobFair | 7 个文件<br/>`activity/activity.service.ts`<br/>`companies/companies.service.ts`<br/>`jobs/admin-fairs.service.ts`<br/>… |
@@ -95,7 +95,7 @@ flowchart TD
 | **FeedbackReply** | 8 | FeedbackTicket、User | 1 个文件<br/>`member-feedback/member-feedback.service.ts` |
 | **FeedbackTicket** | 17 | EndUser、FeedbackReply | 3 个文件<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`member-feedback/member-feedback.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
 | **FieldMappingRule** | 9 | JobSource | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
-| **FileObject** | 46 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 29 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
+| **FileObject** | 46 | DocumentProcessTask、EndUser、FairMaterialPrintBridge、OnlinePlatformDirectory、PlatformQualification、PrintTask、QualificationRecord、User | 31 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>… |
 | **HelpItem** | 8 | — | **无代码读写** |
 | **ImportBatch** | 17 | ImportRecord、JobSource | 2 个文件<br/>`jobs/jobs-admin.service.ts`<br/>`jobs/jobs-excel.service.ts` |
 | **ImportRecord** | 10 | ImportBatch | 1 个文件<br/>`jobs/jobs-excel.service.ts` |
@@ -124,7 +124,7 @@ flowchart TD
 | **OrderItem** | 15 | Order | 3 个文件<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`print-jobs/pickup-order.service.ts`<br/>`terminals/terminals-agent.service.ts` |
 | **Organization** | 26 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 16 个文件<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>`auth/partner-phone-rebind.service.ts`<br/>… |
 | **PaymentAttempt** | 13 | Order | 3 个文件<br/>`payment/online-payment.service.ts`<br/>`payment/reconciliation.service.ts`<br/>`payment/refund.service.ts` |
-| **PiiFinding** | 11 | DocumentProcessTask | 5 个文件<br/>`materials/materials.service.ts`<br/>`member-print-orders/member-print-order-create.service.ts`<br/>`member-print-orders/package-order.service.ts`<br/>… |
+| **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`print-jobs/pii-scan-gate.ts` |
 | **PlatformQualification** | 19 | FileObject | 1 个文件<br/>`common/recruitment-capability.ts` |
 | **PolicyEligibilityRule** | 10 | PolicyPost | 1 个文件<br/>`policies/policy-eligibility.service.ts` |
 | **PolicyPost** | 22 | Organization、PolicyEligibilityRule | 9 个文件<br/>`activity/activity.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
