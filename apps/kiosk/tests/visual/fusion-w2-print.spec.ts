@@ -1,7 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { assertNoHorizontalOverflow } from './assert-layout'
+import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { seedMaterialSession, setReactRouterState, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
@@ -109,9 +109,9 @@ test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', as
   await page.goto('/print/pickup-claim')
   const input = page.getByLabel('到机码输入框')
   await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
-  // idle 态必须给出扫码等待提示。文案来自 11-arrival-code.html hid-echo；
-  // 运行时没有独立 hid 页，HID 打进本页 input，所以这句在 idle 可见。
-  await expect(page.getByText('等待扫码输入')).toBeVisible()
+  // 未扫码时指引必须可见：机身扫码区位置 + 亮度（真机 A5/A3），不能等扫到才出现。
+  await expect(page.getByText('机身侧面的扫码区')).toBeVisible()
+  await expect(page.getByText('亮度调高')).toBeVisible()
   await assertNoHorizontalOverflow(page)
   await input.pressSequentially('AB2C7M9P3K', { delay: 5 })
   await input.press('Enter')
@@ -285,6 +285,115 @@ test('pickup invalid code is rejected, cleared, and ready for the next scan @w2'
   await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)
   await expect(input).toHaveValue('')
   await expect(input).toBeFocused()
+  expect(claimCount).toBe(1)
+  expect(errors).toEqual([])
+})
+
+test('pickup hid guidance is visible before any scan and both draft controls work @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print/pickup-claim')
+  const hidEntry = page.getByRole('button', { name: /把手机上的码，对准机身侧面的扫码区/ })
+  await expect(hidEntry).toBeVisible()
+  await expect(page.getByText('亮度调高')).toBeVisible()
+  await expect(page.getByText('扫码器就绪')).toHaveCount(0)
+  await assertTapTargetPointerHit(hidEntry)
+  await assertNoElementCrossesViewport(page)
+
+  await hidEntry.click()
+  await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
+  await expect(page.getByText('请出示手机上的码')).toBeVisible()
+  await expect(page.getByText('等待扫码输入')).toBeVisible()
+  await expect(page.getByText('机身侧面的扫码区')).toBeVisible()
+  await expect(page.getByText('亮度调高')).toBeVisible()
+  await expect(page.getByText('扫码器就绪')).toHaveCount(0)
+
+  const typeInstead = page.getByRole('button', { name: '还是手输吧' })
+  const askHelp = page.getByRole('button', { name: '扫不出来？求助' })
+  await expect(typeInstead).toBeVisible()
+  await expect(askHelp).toBeVisible()
+  const [typeBox, helpBox] = await Promise.all([typeInstead.boundingBox(), askHelp.boundingBox()])
+  expect(typeBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(helpBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  await assertTapTargetPointerHit(typeInstead)
+  await assertTapTargetPointerHit(askHelp)
+  await assertNoElementCrossesViewport(page)
+
+  await typeInstead.click()
+  await expect(page.getByRole('button', { name: '确认校验' })).toBeVisible()
+  await expect(page.getByTestId('arrival-code-state-hid')).toHaveCount(0)
+
+  await page.getByRole('button', { name: '用机身扫码区' }).click()
+  await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
+  await askHelp.click()
+  await expect(page).toHaveURL(/\/help$/)
+  await expect(page.locator('[data-kiosk-screen="help"]')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('pickup hid scan posts the claim payload and renders the server result @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let submittedCode = ''
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    submittedCode = (route.request().postDataJSON() as { code?: string }).code ?? ''
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        released: false,
+        orderId: 'w2-hid-order',
+        orderNo: 'ORD-W2-HID',
+        terminalId: 'KSK-001',
+        amountCents: 100,
+        priceLines: [],
+        paymentSessionToken: 'w2-hid-payment-session-token',
+      }),
+    })
+  })
+
+  await page.goto('/print/pickup-claim')
+  await page.getByRole('button', { name: /把手机上的码，对准机身侧面的扫码区/ }).click()
+  await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
+  await expect(page.getByText('等待扫码输入')).toBeVisible()
+
+  const input = page.getByLabel('到机码输入框')
+  await input.pressSequentially('AB2C7M9P3K', { delay: 5 })
+
+  await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+  await expect(page.getByText('ORD-W2-HID')).toBeVisible()
+  expect(submittedCode).toBe('AB2C7M9P3K')
+  expect(errors).toEqual([])
+})
+
+test('pickup hid invalid code shows the server error without fabricating success @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let claimCount = 0
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    claimCount += 1
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: { code: 'PICKUP_CODE_INVALID', message: '到机码无效或已过期' },
+      }),
+    })
+  })
+
+  await page.goto('/print/pickup-claim')
+  await page.getByRole('button', { name: /把手机上的码，对准机身侧面的扫码区/ }).click()
+  await page.getByLabel('到机码输入框').fill('AB2C7M9P3K')
+
+  await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)
+  await expect(page.getByText('订单核验成功')).toHaveCount(0)
+  await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
   expect(claimCount).toBe(1)
   expect(errors).toEqual([])
 })

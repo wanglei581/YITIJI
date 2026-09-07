@@ -31,6 +31,7 @@ import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import './styles/pickup-claim-qx.css'
 import { KioskNumpad } from '../../components/kiosk-numpad/KioskNumpad'
+import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
 
 // ── 到机码工具 ────────────────────────────────────────────────
 const CODE_LEN = PICKUP_CODE_LENGTH
@@ -72,6 +73,7 @@ interface ClaimPickupResult {
 }
 
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
+type GuideMode = 'keypad' | 'hid'
 
 // ── API 调用（无登录态，Kiosk 匿名层） ────────────────────────
 async function claimPickup(code: string): Promise<ClaimPickupResult> {
@@ -118,6 +120,9 @@ export function PrintPickupClaimPage() {
   // 只影响显示几个码位格与提示文案；受理正则同时接受 8 位新码与 10 位历史码，
   // 这个开关不参与任何格式判定，也不影响提交。
   const [legacyMode, setLegacyMode] = useState(false)
+  // keypad = 手输；hid = 稿 rHid() 扫码指引。默认 keypad 保住数字键盘主路径；
+  // hid 必须在未扫码时就可达（入口在手输页，不依赖扫到才出现）。
+  const [guide, setGuide] = useState<GuideMode>('keypad')
 
   const isValid = PICKUP_CODE_ACCEPTED_PATTERN.test(code)
   // 已输入超过 8 位时按历史码展示，不必等用户去点开关。
@@ -131,6 +136,12 @@ export function PrintPickupClaimPage() {
     }
   }
   useEffect(() => cancelSettle, [])
+
+  useEffect(() => {
+    if (state === 'success') return
+    const id = window.setTimeout(() => inputRef.current?.focus(), 80)
+    return () => window.clearTimeout(id)
+  }, [guide, state])
 
   const handleClaim = async (inputCode = code) => {
     cancelSettle()
@@ -186,6 +197,7 @@ export function PrintPickupClaimPage() {
     setResult(null)
     setErrorMsg('')
     claimLockRef.current = false
+    setGuide('keypad')
     setTimeout(() => inputRef.current?.focus(), 80)
   }
 
@@ -252,6 +264,92 @@ export function PrintPickupClaimPage() {
     )
   }
 
+  const describedBy = state === 'error' ? 'pcp-error-msg' : guide === 'hid' ? 'pcp-hid-hint' : 'pcp-hint'
+  const pickupCodeInput = (
+    <input
+      id="pickup-code-input"
+      ref={inputRef}
+      className={['pcp-input', state === 'error' ? 'pcp-input--error' : ''].filter(Boolean).join(' ')}
+      type="text"
+      // 纯数字码必须唤起数字键盘。用 inputMode 而非 type="number"：
+      // 后者会吞掉前导 0、渲染上下箭头，且过渡期还要能键入 10 位存量码的字母。
+      inputMode="numeric"
+      // 上限取两套长度的较大者（存量 10 位）×3，容纳粘贴进来的分隔符；
+      // 真正的长度判定在 normalizeInput + 受理正则，不靠 maxLength。
+      maxLength={PICKUP_CODE_MAX_INPUT_LENGTH * 3}
+      value={code}
+      onChange={handleInput}
+      onKeyDown={e => { if (e.key === 'Enter') void handleClaim(code) }}
+      autoFocus
+      autoCapitalize="characters"
+      autoCorrect="off"
+      spellCheck={false}
+      aria-label="到机码输入框"
+      aria-invalid={state === 'error'}
+      aria-describedby={describedBy}
+    />
+  )
+
+  const echoText =
+    state === 'loading'
+      ? '认领中…'
+      : code.length === 0
+        ? '等待扫码输入…（扫码器扫到会自动填入并校验）'
+        : `已接收 ${code.length} 位`
+
+  // ── hid 扫码指引（原型 11 rHid；未扫码即可达，不报扫码硬件状态）──
+  if (guide === 'hid') {
+    return (
+      <QxPageFrame
+        title="输入你的到机码"
+        subtitle={<>不用手输：<strong>把手机上的码，对准机身扫码区</strong>。</>}
+        terminalLabel="就业服务大厅"
+        ctabar={
+          <>
+            <button
+              type="button"
+              className="qx-btn pcp-hid-cta"
+              data-variant="ghost"
+              data-testid="arrival-code-primary"
+              onClick={() => setGuide('keypad')}
+            >
+              还是手输吧
+            </button>
+            <button
+              type="button"
+              className="qx-btn pcp-hid-cta"
+              data-variant="ghost"
+              onClick={() => navigate('/help')}
+            >
+              扫不出来？求助
+            </button>
+          </>
+        }
+      >
+        <div
+          className="qx-scroll pickup-claim-page pickup-claim-hid"
+          data-w2-page="pickup-claim"
+          data-claim-guide="hid"
+          data-claim-state={state}
+          data-testid="arrival-code-state-hid"
+        >
+          <PickupHidGuide
+            echo={
+              <div className="pcp-input-wrap">
+                <p className="pcp-scan-echo" id="hid-echo-code" aria-hidden="true">
+                  {echoText}
+                </p>
+                {pickupCodeInput}
+              </div>
+            }
+            errorMsg={state === 'error' ? errorMsg : ''}
+          />
+          <PickupThreeCodeCard />
+        </div>
+      </QxPageFrame>
+    )
+  }
+
   // ── 输入界面 ──────────────────────────────────────────────────
   return (
     <QxPageFrame
@@ -277,7 +375,7 @@ export function PrintPickupClaimPage() {
         </>
       }
     >
-      <div className="qx-scroll pickup-claim-page" data-w2-page="pickup-claim" data-claim-state={state}>
+      <div className="qx-scroll pickup-claim-page" data-w2-page="pickup-claim" data-claim-guide="keypad" data-claim-state={state}>
         {/* 码位格：真实 input 透明覆盖在格子上——HID 扫码器与物理键盘仍然直接打进 input，
             格子只做显示。既保住扫码通路，又让站着的人一眼看出还差几位。 */}
         <div className="qx-card pcp-input-section">
@@ -304,41 +402,24 @@ export function PrintPickupClaimPage() {
                 </span>
               ))}
             </div>
-            <input
-              id="pickup-code-input"
-              ref={inputRef}
-              className={['pcp-input', state === 'error' ? 'pcp-input--error' : ''].filter(Boolean).join(' ')}
-              type="text"
-              // 纯数字码必须唤起数字键盘。用 inputMode 而非 type="number"：
-              // 后者会吞掉前导 0、渲染上下箭头，且过渡期还要能键入 10 位存量码的字母。
-              inputMode="numeric"
-              // 上限取两套长度的较大者（存量 10 位）×3，容纳粘贴进来的分隔符；
-              // 真正的长度判定在 normalizeInput + 受理正则，不靠 maxLength。
-              maxLength={PICKUP_CODE_MAX_INPUT_LENGTH * 3}
-              value={code}
-              onChange={handleInput}
-              onKeyDown={e => { if (e.key === 'Enter') void handleClaim(code) }}
-              autoFocus
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-              aria-label="到机码输入框"
-              aria-invalid={state === 'error'}
-              aria-describedby={state === 'error' ? 'pcp-error-msg' : 'pcp-hint'}
-            />
+            {pickupCodeInput}
             {/* 计数器按当前输入形态显示目标长度：正在输入存量码时不该催用户「只要 8 位」。 */}
             <div id="pcp-hint" className={`pcp-counter ${isValid ? 'pcp-counter--full' : ''}`}>
               {code.length} / {codeCells.length}
             </div>
           </div>
-          {/* 运行时没有独立 hid 页：USB HID 扫码器就打进上面这层透明 input。
-              原型 11-arrival-code.html 把这句放在 ?state=hid 的 hid-echo 里；
-              本页 idle 即扫码落点，所以 idle 必须给出同一句等待提示，否则扫码路径对站着的人是静默的。 */}
-          <p className="pcp-scan-echo" aria-live="polite">
-            {code.length === 0
-              ? '等待扫码输入…（扫码器扫到会自动填入并校验）'
-              : `已接收 ${code.length} 位`}
-          </p>
+          {/* 未扫码就要看得见「怎么扫」：A5 模组不常亮、靠接近感应，站着的人
+              不会自己发现机身侧面有扫码区。点进去才是稿 rHid() 的完整指引屏。 */}
+          <button
+            type="button"
+            className="pcp-hid-entry"
+            onClick={() => setGuide('hid')}
+          >
+            <span className="pcp-hid-entry-t">不用手输：把手机上的码，对准机身侧面的扫码区</span>
+            <span className="pcp-hid-entry-d">
+              扫码模组靠接近感应触发，不会一直亮着。把手机屏幕亮度调高，再把屏幕凑近扫码区。
+            </span>
+          </button>
         </div>
 
         {/* 三条安心提示。说的是本页行为，不是任何服务端数据，所以可以直接写死。
@@ -380,34 +461,28 @@ export function PrintPickupClaimPage() {
 
         </div>
 
-        {/* 三种码对照：现场最高频的求助是「我手上这串码是哪种」——
-            到机码、上传码、取件凭证码长得像，用途完全不同。 */}
-        <section className="qx-card pcp-ab" aria-label="三种码的区别">
-          <h2 className="pcp-ab-t">三种码，别搞混</h2>
-          <div className="pcp-ab-cols">
-            <div className="pcp-ab-col is-current">
-              <b>到机码 · 本页用</b>
-              <span>{CODE_LEN} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。</span>
-            </div>
-            <div className="pcp-ab-col">
-              <b>上传码 · 手机传文件用</b>
-              <span>在手机上传页出示，有效期以服务端返回为准。</span>
-            </div>
-            <div className="pcp-ab-col">
-              <b>取件凭证码 · 取纸/补打用</b>
-              <span>打印完成后才有，给工作人员核验或代取——本页不输它。</span>
-            </div>
-          </div>
-        </section>
+        <PickupThreeCodeCard />
 
-        {/* 兜底出口。原本这里是「怎么找到机码」的三步说明，但真正卡住的人
-            需要的是另一条路，不是把同一条路再讲一遍。 */}
+        {/* 兜底出口。稿 outs()：「用机身扫码区」进 hid，「问工作人员」进帮助中心。 */}
         <div className="qx-card pcp-help">
           <p className="pch-title">码找不到了？</p>
           <ul className="pch-steps pch-outs">
-            <li><b>回手机小程序看</b><span>「我的 → 打印订单」</span></li>
-            <li><b>用机身扫码区</b><span>免输码</span></li>
-            <li><b>问工作人员</b><span>帮你查订单</span></li>
+            <li>
+              <b>回手机小程序看</b>
+              <span>「我的 → 打印订单」</span>
+            </li>
+            <li>
+              <button type="button" className="pch-out-btn" onClick={() => setGuide('hid')}>
+                <b>用机身扫码区</b>
+                <span>免输码</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" className="pch-out-btn" onClick={() => navigate('/help')}>
+                <b>问工作人员</b>
+                <span>帮你查订单</span>
+              </button>
+            </li>
           </ul>
         </div>
       </div>

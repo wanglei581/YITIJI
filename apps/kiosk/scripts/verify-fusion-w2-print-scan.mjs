@@ -634,8 +634,8 @@ for (const marker of [
   // 扫码降为兜底出口，措辞由「扫描小程序二维码」改为「用机身扫码区」。
   // 断言随之改指新措辞，强度不变：删掉扫码入口仍然会红。
   '机身扫码区',
-  // 运行时没有独立 hid 页，HID 打进本页 input。idle 必须露出原型 hid-echo
-  // 的等待提示，否则扫码路径对站着的人是静默的。删掉这句仍然会红。
+  // hid 指引屏的 echo 文案（11-arrival-code.html #hid-echo-code）。
+  // 2026-09-07 补了独立 hid 屏之后这句仍必须在源码里，删掉仍然会红。
   '等待扫码输入',
   // 2026-09-02 迁移到青序流光：本页样式入口随之改名。断言强度不变——
   // 它保的是"这一页必须有自己的样式入口"，删掉仍然会红。
@@ -676,6 +676,51 @@ assert.match(
   pickupClaimQxCss,
   /@media \(max-height: 900px\) and \(orientation: landscape\)/,
   'qingxu pickup claim CSS keeps the compact Windows landscape layout the page actually loads'
+)
+assert.match(
+  pickupClaim,
+  /const SETTLE_MS = 250/,
+  'pickup 8-digit settle window stays 250ms (legacy 10-char numeric prefix trap)'
+)
+assert.match(
+  pickupClaim,
+  /data-claim-guide="hid"/,
+  'pickup claim keeps a dedicated hid guidance state'
+)
+assert.match(
+  pickupClaim,
+  /setGuide\('hid'\)/,
+  '机身扫码区入口 must switch into the hid guidance state without waiting for a scan'
+)
+assert.match(pickupClaim, /还是手输吧/, 'hid guidance keeps the draft "type instead" control')
+assert.match(pickupClaim, /扫不出来？求助/, 'hid guidance keeps the draft help control')
+assert.match(pickupClaim, /机身侧面的扫码区/, 'hid guidance names the scanner location on the kiosk body')
+assert.match(pickupClaim, /亮度调高/, 'hid guidance includes the real-machine brightness condition')
+assert.doesNotMatch(
+  pickupClaim,
+  /扫码器就绪|扫码器在线|扫码器正常/,
+  'pickup claim must not fabricate scanner-ready status'
+)
+assert.match(pickupClaimQxCss, /\.pcp-hid-card\s*\{/, 'qingxu pickup claim CSS includes the hid guidance card')
+assert.match(pickupClaimQxCss, /\.pcp-hid-entry\s*\{/, 'qingxu pickup claim CSS includes the pre-scan hid entry')
+assert.doesNotMatch(
+  pickupClaimQxCss,
+  /margin:\s*-1px/,
+  'pickup claim CSS must not use margin:-1px sr-only (fusion-w6 left=-1 overflow)'
+)
+const pickupHidGuide = read('src/pages/print/components/PickupHidGuide.tsx')
+assert.match(pickupHidGuide, /请出示手机上的码/, 'hid guide screen keeps the draft headline')
+assert.match(pickupHidGuide, /机身侧面的扫码区/, 'hid guide screen names the body-side scanner')
+assert.match(pickupHidGuide, /亮度调高/, 'hid guide screen includes the real-machine brightness condition')
+assert.doesNotMatch(
+  pickupHidGuide,
+  /扫码器就绪|扫码器在线|扫码器正常/,
+  'hid guide screen must not fabricate scanner-ready status'
+)
+assert.match(
+  pickupClaim,
+  /import \{ PickupHidGuide, PickupThreeCodeCard \} from '\.\/components\/PickupHidGuide'/,
+  'pickup claim page must render the extracted hid guide screen'
 )
 
 const scanPages = new Map([

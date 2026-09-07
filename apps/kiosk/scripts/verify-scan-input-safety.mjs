@@ -9,8 +9,8 @@
 //    「HID 输入进入仅内存缓冲区，不绑定可见输入框 / 不显示全码、尾号」。
 //
 // 2. 非授权页面必须吞掉扫码模组的 HID 突发输入。一体机装的是嵌入式影像扫码模组
-//    （常亮、自动触发、朝外），误扫是默认状态：任何人举着任意码经过，内容就会落进
-//    用户当前聚焦的控件，并可能被表单一起提交落库。
+//    （2026-09-07 真机：不常亮，靠接近感应触发；触发后仍是 USB HID 键盘），
+//    用户把手机凑近扫码区时内容会落进当前聚焦控件，并可能被表单一起提交落库。
 //    规范来源：同上，「其他页面必须吞掉扫码器的 HID 突发输入」。
 //
 // 纯静态分析，不联网、不构建。exit 0 = PASS，exit 1 = FAIL。
@@ -129,6 +129,12 @@ assert(
 must('pickup', 'claimLockRef', '取件页的同步提交锁必须保留（挡扫码器尾随回车）')
 must('cashier', 'codeSubmitLockRef', '收银页的同步提交锁必须保留（挡扫码器尾随回车）')
 must('panel', /autoFocus/, '收银页付款码输入框必须保持自动聚焦，否则扫码枪无处落字')
+must('pickup', /autoFocus/, '取件页输入框必须保持自动聚焦，否则 HID 扫码无处落字')
+must('pickup', /const SETTLE_MS = 250/, '8 位静默窗口必须保持 250ms（存量码前 8 位数字陷阱）')
+must('pickup', '机身侧面的扫码区', 'hid 指引必须写出机身扫码区位置')
+must('pickup', /亮度调高/, 'hid 指引必须写出真机实测的亮度条件')
+must('pickup', 'data-claim-guide', '必须有独立 hid 指引态')
+mustNot('pickup', /扫码器就绪|扫码器在线|扫码器正常/, '不得伪造扫码器状态')
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`FAIL ${failure}`)
