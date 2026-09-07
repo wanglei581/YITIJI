@@ -147,11 +147,87 @@ async function verifyLoopbackBos() {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 真跑一次 CI 的 bundle 生成命令。静态断言抓不到这一类：2026-09-07 之前
+// ci.yml 用 `git bundle create "$BUNDLE" "$RELEASE_SHA" ^"$BASE_SHA"` 传裸 SHA，
+// git 以 "Refusing to create empty bundle." 退出 128；该步骤 continue-on-error，
+// 于是 job 一直显示成功，而桶里从来没有过任何 bundle。
+// 这里从 ci.yml 里把命令抽出来，在临时仓库上真执行，再从 bundle 取回目标 SHA。
+// ─────────────────────────────────────────────────────────────────────────────
+function runGit(args, cwd) {
+  return new Promise((resolve) => {
+    const child = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    let out = ''
+    let err = ''
+    child.stdout.on('data', (c) => { out += c })
+    child.stderr.on('data', (c) => { err += c })
+    child.on('close', (code) => resolve({ code, out, err }))
+  })
+}
+
+async function verifyRealBundleRoundTrip() {
+  const ci = await read('.github/workflows/ci.yml')
+  const createLine = ci.split('\n').map((line) => line.trim()).find((line) => line.startsWith('git bundle create'))
+  if (!createLine) fail('ci.yml 里找不到 git bundle create 命令')
+  if (/git bundle create\s+"\$BUNDLE"\s+"\$RELEASE_SHA"/.test(createLine)) {
+    fail('git bundle create 不能直接传裸 SHA：git 会以 "Refusing to create empty bundle." 退出 128。必须先 update-ref 成具名 ref（或用 HEAD）。')
+  }
+  required(ci, /git update-ref refs\/release\/target "\$RELEASE_SHA"/, 'ci.yml 必须先把发布 SHA 写成具名 ref 再打 bundle')
+  required(ci, /git bundle verify "\$BUNDLE"/, 'ci.yml 打完 bundle 必须立即 verify，别把坏包传上去')
+
+  const dir = await mkdtemp(join(tmpdir(), 'qx-bundle-'))
+  try {
+    const src = join(dir, 'src')
+    await runGit(['init', '-q', '--initial-branch=main', src], dir)
+    await runGit(['config', 'user.email', 'verify@example.invalid'], src)
+    await runGit(['config', 'user.name', 'verify'], src)
+    const shas = []
+    for (const n of [1, 2, 3]) {
+      await writeFile(join(src, `f${n}.txt`), `content ${n}\n`)
+      await runGit(['add', '-A'], src)
+      await runGit(['commit', '-q', '-m', `commit ${n}`], src)
+      const rev = await runGit(['rev-parse', 'HEAD'], src)
+      shas.push(rev.out.trim())
+    }
+    const [baseSha, , releaseSha] = shas
+    const bundle = join(dir, 'release.bundle')
+
+    // 逐字替换 ci.yml 里那条命令的变量后真执行。
+    const argv = createLine
+      .replace('git bundle create ', '')
+      .replaceAll('"$BUNDLE"', bundle)
+      .replaceAll('"^$BASE_SHA"', `^${baseSha}`)
+      .replaceAll('"$RELEASE_SHA"', releaseSha)
+      .replaceAll('"$BASE_SHA"', baseSha)
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((token) => token.replaceAll('"', ''))
+    await runGit(['update-ref', 'refs/release/target', releaseSha], src)
+    const created = await runGit(['bundle', 'create', ...argv], src)
+    if (created.code !== 0) fail(`ci.yml 的 bundle 命令实跑失败（exit ${created.code}）：${created.err.trim().split('\n').pop()}`)
+
+    const verified = await runGit(['bundle', 'verify', bundle], src)
+    if (verified.code !== 0) fail(`生成的 bundle 校验失败：${verified.err.trim()}`)
+
+    // 部署脚本按 SHA 从 bundle 取回目标提交，这里复现同一动作。
+    const dst = join(dir, 'dst')
+    await runGit(['clone', '-q', '--no-local', '--depth=1', '--branch', 'main', src, dst], dir)
+    await runGit(['reset', '-q', '--hard', baseSha], dst).catch(() => undefined)
+    const fetched = await runGit(['fetch', '--no-tags', bundle, releaseSha], dst)
+    if (fetched.code !== 0) fail(`部署侧无法从 bundle 取回目标 SHA：${fetched.err.trim().split('\n').pop()}`)
+    const has = await runGit(['cat-file', '-t', releaseSha], dst)
+    if (has.out.trim() !== 'commit') fail('从 bundle 取回后目标 SHA 仍不可达，部署会回退到 GitHub 拉取')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
 try {
   await verifyStaticContracts()
   await verifyMutations()
   await verifyLoopbackBos()
-  console.log('ALL PASS: release bundle contracts, mutations, and loopback BOS round-trip')
+  await verifyRealBundleRoundTrip()
+  console.log('ALL PASS: release bundle contracts, mutations, loopback BOS round-trip, and a real git bundle round-trip')
 } catch (error) {
   console.error(`FAIL: ${error.message}`)
   process.exit(1)
