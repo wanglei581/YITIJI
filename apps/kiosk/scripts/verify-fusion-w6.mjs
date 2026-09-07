@@ -513,10 +513,13 @@ check('W6 route acceptance contract', () => {
 check('W6 browser collection contract', () => {
   const spec = readKiosk('tests/visual/fusion-w6-routes.spec.ts')
   const config = readKiosk('playwright.w6.config.ts')
+  const routes = readKiosk('tests/visual/fixtures/fusion-w6-route-cases.ts')
   assert.match(spec, /for \(const route of w6KioskCases\)/, 'kiosk tests must only collect w6KioskCases')
   assert.match(spec, /for \(const route of w6MobileCases\)/, 'mobile tests must only collect w6MobileCases')
   assert.match(config, /name: 'kiosk-1080x1920', grep: \/@w6-kiosk\$\//, 'kiosk project must own only @w6-kiosk tests')
   assert.match(config, /name: 'mobile-390x844', grep: \/@w6-mobile\$\//, 'mobile project must own only @w6-mobile tests')
+  assert.match(routes, /pattern: '\/resume\/career-plan'[\s\S]*featureText: '求职方案'/, 'career-plan W6 路由面必须断言求职方案')
+  assert.match(spec, /\/resume\/career-plan mobile breakpoint @w6-mobile/, 'career-plan 必须有 390×844 断点')
 })
 
 check('W6 legal and long-text fixture', () => {

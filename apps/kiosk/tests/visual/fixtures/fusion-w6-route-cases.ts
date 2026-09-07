@@ -79,7 +79,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '岗位匹配', requiresFusionRoot: false },
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
   { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次岗位匹配参考', requiresFusionRoot: false },
-  { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '职业规划', requiresFusionRoot: false },
+  { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '求职方案', requiresFusionRoot: false },
   { pattern: '/interview/setup', url: '/interview/setup', marker: screen('interview-setup'), featureText: '模拟面试', requiresFusionRoot: false },
   { pattern: '/interview/session', url: '/interview/session', marker: screen('interview-session'), featureText: '会话已失效', requiresFusionRoot: false },
   { pattern: '/interview/report', url: '/interview/report', marker: screen('interview-report'), featureText: '报告不存在或已过期', requiresFusionRoot: false },

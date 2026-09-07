@@ -9,7 +9,7 @@
 // 真实规划读回、生成与打印逻辑保持在本页；LightFlow 仅重组视觉与状态层级。
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
+import { Button, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type { CareerPlanResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
@@ -43,6 +43,8 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import { readAiResumeSession } from './aiResumeSession'
+import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
+import { CareerPlanSection as Section } from './components/career-plan/CareerPlanSection'
 import './careerPlan-lightflow.css'
 import './resume-fusion-youth.css'
 
@@ -81,22 +83,6 @@ function CareerPlanFullscreenFrame({ children }: { children: ReactNode }) {
     <KioskFullscreenShell>
       <KioskPageFrame className="fusion-w3 fusion-w3--resume">{children}</KioskPageFrame>
     </KioskFullscreenShell>
-  )
-}
-
-function Section({ title, Icon, children }: {
-  title: string
-  Icon: React.ElementType
-  children: React.ReactNode
-}) {
-  return (
-    <Card className="career-plan-lightflow__section">
-      <div className="career-plan-lightflow__section-heading">
-        <span className="career-plan-lightflow__section-icon" aria-hidden="true"><Icon /></span>
-        <h2>{title}</h2>
-      </div>
-      {children}
-    </Card>
   )
 }
 
@@ -197,14 +183,14 @@ export function CareerPlanPage() {
   const fallback: AiTaskFallback = taskFailReason && !aiOutage
     ? {
         mode: 'result-unavailable',
-        reason: `本次没能生成职业规划：${taskFailReason}`,
+        reason: `本次没能生成求职方案：${taskFailReason}`,
         retryHint: '这不是你的操作问题。可以过一会儿再点一次生成；若连续几次都这样，说明这份简历解析结果暂时给不出可用依据，可以回简历工作台补充经历后再来。',
         action: { label: '先做一次自我探索', onClick: goSelfAssessment },
       }
     : {
         mode: 'blocked',
         reason: aiOutage ?? '本机还没有确认 AI 服务状态，这次不发起生成 —— 状态不明时不假装能算。',
-        blockedActionLabel: plan ? '重新生成职业规划' : '生成职业规划建议',
+        blockedActionLabel: plan ? '重新生成求职方案' : '生成求职方案',
         stillAvailable: plan ? STILL_AVAILABLE_WITH_PLAN : STILL_AVAILABLE_WITHOUT_PLAN,
         action: { label: '先做一次自我探索', onClick: goSelfAssessment },
       }
@@ -302,13 +288,13 @@ export function CareerPlanPage() {
       <CareerPlanFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--gate" data-visual-theme="service-desk" data-ux-density="touch">
         <section className="career-plan-lightflow__state-card" aria-labelledby="career-plan-gate-title">
           <span className="career-plan-lightflow__state-icon" aria-hidden="true"><CompassIcon /></span>
-          <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
+          <p className="career-plan-lightflow__eyebrow">求职方案</p>
           <h1 id="career-plan-gate-title">
-            {gate === 'missing' ? '先准备简历，再规划方向' : '这台机器上读不到你那份简历解析结果了'}
+            {gate === 'missing' ? '先准备简历，再看四栏方案' : '这台机器上读不到你那份简历解析结果了'}
           </h1>
           <p>
             {gate === 'missing'
-              ? '职业规划会基于已完成的简历诊断整理发展方向与行动建议，不会替代真实的简历上传与诊断流程。'
+              ? '求职方案会基于已完成的简历诊断整理已有材料、目标与方向、尚需准备和执行计划，不会替代真实的简历上传与诊断流程。'
               : '解析结果有保存期限，也只对本人开放。这次读不到它，所以本页拿不到任何依据 —— 重新上传一次简历、跑完诊断，就能回到这里生成。'}
           </p>
           <Button size="lg" className="career-plan-lightflow__primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>
@@ -322,10 +308,10 @@ export function CareerPlanPage() {
   if (loading) {
     return (
       <CareerPlanFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--loading" data-visual-theme="service-desk" data-ux-density="touch">
-        <section className="career-plan-lightflow__state-card" role="status" aria-live="polite" aria-label="正在恢复职业规划">
+        <section className="career-plan-lightflow__state-card" role="status" aria-live="polite" aria-label="正在恢复求职方案">
           <Loader2Icon className="career-plan-lightflow__spinner" aria-hidden="true" />
-          <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
-          <h1>正在读取你的职业规划</h1>
+          <p className="career-plan-lightflow__eyebrow">求职方案</p>
+          <h1>正在读取你的求职方案</h1>
           <p>正在确认是否存在可继续查看的真实规划结果。</p>
         </section>
       </main></CareerPlanFullscreenFrame>
@@ -337,16 +323,16 @@ export function CareerPlanPage() {
       <CareerPlanFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--result" data-visual-theme="service-desk" data-ux-density="touch">
         <header className="career-plan-lightflow__header">
           <KioskPageHeader
-            title="职业规划建议"
-            description={`依据：本人简历${plan.basedOn?.jobFit ? ` + 岗位匹配参考（${plan.basedOn.jobFit}）` : ''}${plan.basedOn?.interview ? ` + 模拟面试表现（${plan.basedOn.interview}）` : ''}`}
+            title="求职方案"
+            description={`依据：本人简历${plan.basedOn?.jobFit ? ` + 岗位匹配参考（${plan.basedOn.jobFit}）` : ''}${plan.basedOn?.interview ? ` + 模拟面试表现（${plan.basedOn.interview}）` : ''}。依据说明这份规划根据什么生成，不是你手上的文件清单。`}
             onBack={() => navigate('/')}
             backLabel="返回首页"
           />
         </header>
 
-        <div className="career-plan-lightflow__content" aria-label="职业规划结果">
+        <div className="career-plan-lightflow__content" aria-label="求职方案四栏">
           <section className="career-plan-lightflow__summary-card" aria-labelledby="career-plan-summary-title">
-            <p className="career-plan-lightflow__eyebrow">已生成的规划</p>
+            <p className="career-plan-lightflow__eyebrow">已生成的求职方案</p>
             <h2 id="career-plan-summary-title">先看结论，再安排下一步</h2>
             {/* 全页恰好一次的 AIGC 可见标识（interface-handoff.md §3）。 */}
             <div className="career-plan-lightflow__meta-chips">
@@ -370,7 +356,9 @@ export function CareerPlanPage() {
             本机不代收简历、不代为投递；是否转方向、是否考证，由你自己决定。
           </ComplianceBanner>
 
-          <Section title="现状画像" Icon={CompassIcon}>
+          <CareerPlanExistingMaterials />
+
+          <Section title="目标与方向" Icon={TargetIcon} column="directions">
             <AiDisclaimerLine>下面每条结论都是 AI 从你的简历正文读出来的，右侧原文是你自己写的那句话。</AiDisclaimerLine>
             <div className="career-plan-lightflow__stack">
               {(plan.currentSnapshot ?? []).map((item) => (
@@ -380,9 +368,6 @@ export function CareerPlanPage() {
                 </div>
               ))}
             </div>
-          </Section>
-
-          <Section title="发展方向" Icon={TargetIcon}>
             <div className="career-plan-lightflow__stack">
               {(plan.directions ?? []).map((direction, index) => (
                 <div key={direction.title} className="career-plan-lightflow__direction">
@@ -398,7 +383,7 @@ export function CareerPlanPage() {
             <p className="career-plan-lightflow__muted">不是建议你转，是列出来供你自己判断。</p>
           </Section>
 
-          <Section title="技能提升计划" Icon={PencilLineIcon}>
+          <Section title="尚需准备" Icon={PencilLineIcon} column="prepare">
             <div className="career-plan-lightflow__stack">
               {(plan.skillPlan ?? []).map((item) => (
                 <div key={item.skill} className="career-plan-lightflow__skill">
@@ -409,7 +394,7 @@ export function CareerPlanPage() {
             </div>
           </Section>
 
-          <Section title="近期行动清单" Icon={ArrowRightIcon}>
+          <Section title="执行计划" Icon={ArrowRightIcon} column="actions">
             <ol className="career-plan-lightflow__checklist">
               {(plan.actionChecklist ?? []).map((item) => <li key={item}>{item}</li>)}
             </ol>
@@ -420,7 +405,7 @@ export function CareerPlanPage() {
             让它从屏幕上消失（否则打印这条非 AI 能力跟着一起没了）。所以本区域只治理
             「再生成一次」这个 AI 任务面，规划正文渲染在它之外。
           */}
-          <AiTaskRegion task={aiTask} label="重新生成职业规划" running={runningBlock} fallback={fallback}>
+          <AiTaskRegion task={aiTask} label="重新生成求职方案" running={runningBlock} fallback={fallback}>
             <p className="career-plan-lightflow__muted">这份规划已经生成并存好，打印不依赖 AI；简历更新之后可以回来重新生成一次。</p>
           </AiTaskRegion>
 
@@ -484,8 +469,8 @@ export function CareerPlanPage() {
     <main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--guide" data-visual-theme="service-desk" data-ux-density="touch">
       <header className="career-plan-lightflow__header">
         <KioskPageHeader
-          title="职业规划建议"
-          description="基于你的真实简历，生成发展方向与行动计划"
+          title="求职方案"
+          description="四栏：已有材料、目标与方向、尚需准备、执行计划"
           onBack={() => navigate('/')}
           backLabel="返回首页"
         />
@@ -499,7 +484,7 @@ export function CareerPlanPage() {
 
         <AiTaskRegion
           task={aiTask}
-          label="AI 生成职业规划"
+          label="AI 生成求职方案"
           running={runningBlock}
           fallback={fallback}
           idle={(
@@ -508,9 +493,10 @@ export function CareerPlanPage() {
               <p className="career-plan-lightflow__eyebrow">生成前说明</p>
               <h1 id="career-plan-guide-title">把简历经历变成可执行的下一步</h1>
               <ul className="career-plan-lightflow__guide-list">
-                <li>现状画像：每条结论附简历原文依据，不编造经历。</li>
-                <li>发展方向：提供 1–3 个建议及可开始的第一步。</li>
-                <li>提升计划：按阶段整理技能和近期行动清单。</li>
+                <li>已有材料：来自你已保存的简历与文档，不经过模型。</li>
+                <li>目标与方向：提供 1–3 个建议及可开始的第一步。</li>
+                <li>尚需准备：按阶段整理技能缺口。</li>
+                <li>执行计划：近期可动手的清单。</li>
               </ul>
               <AiDisclaimerLine>方向、缺口和行动清单都由 AI 判断，仅供参考；硬门槛（证书等）与「简历漏写」会分开写，不混成一句「你不行」。</AiDisclaimerLine>
               <p className="career-plan-lightflow__muted">岗位匹配或模拟面试已完成时，会在真实数据可用的范围内帮助建议更具体；没有也能直接生成。</p>
@@ -567,9 +553,9 @@ export function CareerPlanPage() {
           {generating ? (
             <><Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" />正在生成（约 15–30 秒）…</>
           ) : aiOutage ? (
-            <>重试生成职业规划建议<ArrowRightIcon aria-hidden="true" /></>
+            <>重试生成求职方案<ArrowRightIcon aria-hidden="true" /></>
           ) : (
-            <>生成职业规划建议<ArrowRightIcon aria-hidden="true" /></>
+            <>生成求职方案<ArrowRightIcon aria-hidden="true" /></>
           )}
         </Button>
       </KioskActionBar>
