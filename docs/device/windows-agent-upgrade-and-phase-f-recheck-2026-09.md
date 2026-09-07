@@ -348,3 +348,48 @@ F7 全屏抽查：未做
 | 升级后服务回到 Manual | 安装器行为（`Agent.wxs` `Start="demand"`）。2B 第 4 步固定设回；#897 控制中心启动/重启前自动设回 | `Agent.wxs:23` |
 
 **下一轮 Windows 侧只做**：装 #897 之后 main 构建的新包（2B）→ 设回 Automatic → 单独复验 F5（停服务→关浏览器→无票拉起→启服务→不碰浏览器，60 秒内看门狗日志出现 `local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket` 并带票重启）→ 顺手用新脚本重跑一次 `-UseExistingToken -ClaimIntervalMs 5000`，把 `reason=`（若仍失败）抄回。F4 按上表补三样现场证据后再判，连续打印矩阵待 F4 判定后做；第 4B 节三条等 API 发布通知。回执里 F4 的三样证据同时抄送「项目bug检查与功能优化」会话。
+## 10. 第三轮回执（2026-09-07）
+
+执行分支：`field/windows-selfheal-recheck-2026-09-07`，基于最新 `origin/main@a753cfa7`。本轮未改 `services/**`、`apps/kiosk/**`、`apps/admin/**`、`apps/miniapp/**`、`.github/**`；未读取、记录或输出 token、绑定码、桥接令牌。
+
+### 第 1 件：同机升级
+
+- 时间：2026-09-07 15:21–15:23（北京时间）。候选 MSI `AIJobPrintAgent.msi` 静默安装返回 `ExitCode=0`；`candidate-identity.json` 核对 `sourceCommit=f6e2c5cb369c6b061ef8b0878464ea1cd298937f`、`productVersion=0.4.11`。
+- 候选安装目录文件已接管：`kiosk-watchdog.ps1` SHA-256=`0EADCC3CFD374A69840066C3F2C44470F13330DDCF6252C8116D90F7BA00CBE7`，重配脚本 SHA-256=`C42057300D9CE2EDED6FC3235F4D896E4E356EAFEA80545A2F37AFBDC2C32D84`。
+- 安装器将服务置为 Manual/Stopped，已执行 `Set-Service aijobprintagent.exe -StartupType Automatic` 并启动。验收：服务 `Running/Automatic`；配置 `claimIntervalMs=5000`；`POST /local/terminal-boot-ticket` 返回 `200`、`success=true`、`expiresInSeconds=60`；Agent 日志出现 `task-runner: starting — interval=5000ms`。
+
+### 第 2 件：F5 单独复验
+
+- 时间：2026-09-07 15:36–15:38。停服务并让新看门狗进入无票态，日志：
+
+```text
+2026-09-07 15:36:31 boot ticket unavailable after automatic retry window; launching without ticket
+2026-09-07 15:36:31 started kiosk browser pid=24996 ... bootTicket=False
+2026-09-07 15:37:35 local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket
+2026-09-07 15:37:35 started kiosk browser pid=8032 ... bootTicket=True
+```
+
+- 结果：通过。自愈从启服务到重启带票浏览器约 `60` 秒；服务最终 `Running/Automatic`。浏览器页面未执行人工点击，未记录黄色告警条。
+
+### 第 3 件：新脚本重配
+
+- 时间：2026-09-07 15:40 左右。使用 `-UseExistingToken -ClaimIntervalMs 5000` 重跑，配置保持 5000ms、服务保持 Running/Automatic。
+- 结果：失败，脚本已输出：
+
+```text
+[FAIL] commit stage=token reason=A terminal token is required for DPAPI persistence. Use -BindCode or -UseExistingToken.
+```
+
+- 该失败已交 Mac 侧处理；现场未再次尝试绑定或接触任何凭据。
+
+### 第 4 件：F4 补证据与停用即拒
+
+- 管理员设备页稳定态截图已取得；登录身份为“系统管理员 / 超级管理员”；页面在停用前稳定显示“共 2 台终端”，KSK-001 在线、维护中、在途任务 0 个。停用前通过页面状态确认不是首载骨架、弹窗或编辑态。
+- 停用 KSK-001 已执行并确认生效；随后管理员页面显示“全部 0 / 共 0 台终端”，无法在同一稳定页面完成启用和“恢复运行”操作。`GET /api/v1/admin/terminals` 的浏览器 DevTools `data.terminals.length` 未能在该次现场窗口取到，记为**未验收**；需 Mac 侧复核停用后的列表/API 行为。
+- 停用态下未创建订单、未提交付费或未支付任务；未点“紧急吊销凭证”。由于 Kiosk 与后台页面被全屏看门狗遮挡且页面连接中断，F4 要求的“建单立即显示终端安全校验失败”“启用后 3 秒内带票重启”“恢复运行”均记为**未验收**，不能写成通过。
+- 现场善后：Agent 服务保持 `Running/Automatic`、配置保持 `claimIntervalMs=5000`；看门狗任务已停止以避免继续遮挡后台。KSK-001 当前后台停用/维护状态需要 Mac 侧管理员页面恢复操作。
+
+### 未做与需要 Mac 侧处理
+
+- 未做连续打印矩阵；未做执行单 4B 三条；未做 API 发布。
+- 需要 Mac 侧处理：`-UseExistingToken` 仍在 commit stage=token 失败；停用后管理员终端列表显示 0 台且无法现场完成启用/恢复；需要确认线上页面/API 的停用过滤与恢复入口。
