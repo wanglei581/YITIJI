@@ -596,6 +596,14 @@ test('print upload does not skip privacy check without a file @w2', async ({ pag
 test('material checks require a PII decision, create the redacted task, and carry the derived file forward @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page, '/w2-fixtures/sample-redacted.pdf')
   registerShell(api)
+  // 青序流光版 /print/preview 进页就取参数建议（原型 13-print-desk 声明的
+  // GET /materials/tasks/:id/print-param-suggestions）。这条测试用的 taskId 是
+  // w2-inspection，此前没有 stub，会撞 ApiRouter 的 Unhandled API requests。
+  // 建议为空表示「本机没有可给的建议」，是诚实空态，不影响本测试断言的 PII 决策链路。
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection/print-param-suggestions', {
+    status: 200,
+    json: { success: true, data: { status: 'not_derivable', suggestions: [] } },
+  })
   let decisionBody: unknown = null
   let redactionCreated = false
   await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
@@ -764,7 +772,10 @@ test('print parameter suggestions are advisory until applied and then flow to co
   await expect(page.locator('.qpd-stepper output')).toHaveText('3')
   await page.getByRole('button', { name: '下一步：让服务端报价' }).click()
   await page.waitForURL('**/print/confirm')
-  await expect(page.getByText('3 份', { exact: true })).toBeVisible()
+  // 报价确认页迁青序流光（#916）后「3 份」出现在两处：摘要行的 <dd> 与报价行的 <strong>。
+  // 两处都断言，比原来那条会撞 strict mode 的宽泛匹配更强，不是放宽。
+  await expect(page.locator('dd').filter({ hasText: /^3 份$/ })).toBeVisible()
+  await expect(page.locator('strong').filter({ hasText: /^3 份$/ })).toBeVisible()
   expect(quoteBody).toMatchObject({ params: { copies: 3 } })
   await expectHealthy(page, errors, 'print-confirm')
 })
