@@ -189,20 +189,10 @@ for (const path of presentationFiles) {
     assert.ok(!body.includes(marker), `${path} must not contain ${marker}`)
 }
 
-const printScanPages = new Map([
-  ['src/pages/print-scan/ConvertImagesPage.tsx', 'print-scan-convert'],
-  ['src/pages/print-scan/SignStampPage.tsx', 'print-scan-sign'],
-])
-for (const [path, marker] of printScanPages) {
-  const body = read(path)
-  assert.match(body, /KioskPageFrame/, `${path} uses the frozen page frame`)
-  assert.match(body, new RegExp(`data-w2-page=["']${marker}["']`), `${path} exposes ${marker}`)
-  assert.match(
-    body,
-    /\.\/styles\/print-scan-fusion\.css/,
-    `${path} imports the scoped W2 stylesheet`
-  )
-}
+// printScanPages 曾在这里断言这几页必须用 V6 的 KioskPageFrame。
+// ConvertImagesPage（本 PR）与 SignStampPage（#918）都已迁到青序流光，
+// 两页的 QX 断言在下方各自的段落里（含 doesNotMatch(/KioskPageFrame/) 防回退），
+// 断言强度只增不减，故这张表连同它的循环一并移除。
 const printScanFeature = read('src/pages/print-scan/PrintScanFeatureInfoPage.tsx')
 assert.match(printScanFeature, /QxPageFrame/, 'feature info page uses Qingxu page frame')
 assert.match(
