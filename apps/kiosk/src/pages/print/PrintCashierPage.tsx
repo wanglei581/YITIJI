@@ -63,6 +63,14 @@ interface CashierLocationState {
 const PAY_POLL_TERMINAL: ReadonlySet<string> = new Set(['closed', 'failed', 'refunded', 'refunding', 'partial_refunded'])
 const POLL_INTERVAL_MS = 2500
 const AUTO_RECONCILE_INTERVAL_MS = 3500
+/** 两种收银方式的用户可见文案。放在页面而不是呈现层：
+ *  文案属于业务口径（付款码是一次性凭证、屏上收款码即时出码），
+ *  且 verify-payment-codepay 断言本文件同时出现这两种方式。 */
+const PAYMENT_METHOD_LABELS = {
+  qr: '屏上收款码',
+  code: '扫付款码 · 出示手机付款码',
+} as const
+
 const REFUND_ASSISTANCE_COPY = '如需退款请联系现场工作人员协助处理，本机不提供自助退款'
 
 export function PrintCashierPage() {
@@ -528,6 +536,7 @@ export function PrintCashierPage() {
         isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
         selectionLocked={hasActivePaymentAttempt}
         onSelectChannel={switchChannel}
+        methodLabels={PAYMENT_METHOD_LABELS}
         onSelectMethod={selectPaymentMethod}
         onSubmitCode={() => void submitCodePayment()}
         onReconcile={() => void handleReconcile()}

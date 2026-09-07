@@ -158,6 +158,7 @@ interface CashierQxViewProps {
   isDevSandbox: boolean
   selectionLocked: boolean
   onSelectChannel: (channel: string) => void
+  methodLabels: { readonly qr: string; readonly code: string }
   onSelectMethod: (method: PaymentMethod) => void
   onSubmitCode: () => void
   onReconcile: () => void
@@ -215,7 +216,7 @@ export function CashierQxView(props: CashierQxViewProps) {
                 disabled={!props.selectedChannel || props.issuing || props.codeSubmitting || props.selectionLocked}
                 onClick={() => props.onSelectMethod('code')}
               >
-                <ScanLineIcon aria-hidden="true" /><span>出示手机付款码</span>
+                <ScanLineIcon aria-hidden="true" /><span>{props.methodLabels.code}</span>
               </button>
             </div>
           </div>
