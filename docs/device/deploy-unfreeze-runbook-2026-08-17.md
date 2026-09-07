@@ -80,6 +80,42 @@ grep -E '^PRINT_REQUIRE_(PII_SCAN|PRINTER_ONLINE)=true' /srv/ai-job-print/servic
 > `production-runtime-gates.ts`、`deploy-api-release.sh` 的 `REQUIRED_PRODUCTION_GATES`、本节的 grep。
 > 少改脚本那一处，`verify:deploy-gates-in-sync` 会拦；少改本节只是文档过期，不致命。
 
+### 2.0a 备份前生产运行闸门预检（2026-09-07，35af2263b 事故根治）
+
+**为什么**：#829 让 3b 持久化所有 `env.KEY !== 'true'` 形态的键，但闸门不止这一种——
+`PRODUCTION_CJK_FONT_MISSING` 要在本机做真实字体探测，取值集合（如
+`PRINT_SCAN_CAPABILITY_MODE`）也不能盲写成 true。只比对清单，仍会在「清单里没有的新闸门」
+上于 PM2 重启后失败，那时 `pg_dump`、运行目录备份、rsync、迁移已经做完。
+
+**现在的机械保障**：`deploy-api-release.sh` 在 `=== 2. PostgreSQL 全库备份` **之前**：
+
+1. 在源码检出内 `pnpm install` + 构建 API（不写运行目录）；
+2. 跑 `=== 3c. 生产运行闸门预检（目标提交代码 × 服务器真实 .env）===`：
+   用目标提交 `dist/config/production-runtime-gates.js` 的
+   `assertProductionRuntimeGates()` 检查运行目录真实 `.env`，并把
+   `REQUIRED_PRODUCTION_GATES` 里的键视为即将由 3b 写成 `true`。
+
+失败则打印闸门 `Error.message`（不含 .env 值），并
+
+```text
+::error::生产闸门预检失败，发布在备份前中止（线上未动）
+```
+
+此时还没碰备份、迁移、rsync、PM2。`verify:deploy-gates-in-sync` 第六项钉住：
+预检步骤存在、位于 `pg_dump` 之前、命令引用 `REQUIRED_PRODUCTION_GATES`、预检脚本存在且
+不含 `console.log(process.env`。
+
+手工复跑（与脚本同一命令；须已在目标 SHA 且已构建 API）：
+
+```bash
+cd "$DEPLOY_PATH"
+node services/api/scripts/preflight-production-gates.mjs \
+  --env-file /srv/ai-job-print/services/api/.env \
+  --force-true PRINT_REQUIRE_PII_SCAN,PRINT_REQUIRE_PRINTER_ONLINE
+```
+
+通过应打印 `PREFLIGHT OK: <n> gates`。不要把 `.env` 内容贴进聊天或 Actions 日志。
+
 ### 2.1 确认服务器 Redis 在跑
 
 **为什么**：`deploy-api-release.sh` 第 8 步健康检查是 `grep -q '"status":"ok"'`。
