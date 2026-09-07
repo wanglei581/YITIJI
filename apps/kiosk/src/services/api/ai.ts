@@ -15,8 +15,11 @@
 
 import type {
   GeneratedResume,
+  ResumeDraftPayload,
+  ResumeDraftResponse,
   ResumeExportFormat,
   ResumeExportPricing,
+  ResumeFactCheckResponse,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -27,6 +30,7 @@ import type {
   ResumeOptimizeResponse,
   ResumeReportExportKind,
   ResumeReportExportResponse,
+  ResumeVersionsResponse,
   AssistantChatRequest,
   AssistantChatResponse,
   AssistantSessionSummaryResponse,
@@ -65,6 +69,18 @@ export interface ResumeExportChargeOptions {
   factsConfirmedAt?: string
 }
 
+export interface ResumeDraftSaveInput {
+  resume: GeneratedResume
+  layout?: ResumeLayoutSettings
+  decisions?: ResumeDraftPayload['decisions']
+}
+
+export interface ResumeDraftSaveResponse {
+  taskId: string
+  updatedAt: string
+  saved: true
+}
+
 export interface AiServiceInterface {
   submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
@@ -100,6 +116,10 @@ export interface AiServiceInterface {
     body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
     access?: ResumeReadAccess,
   ): Promise<ResumeReportExportResponse>
+  getResumeDraft(taskId: string, token: string): Promise<ResumeDraftResponse>
+  saveResumeDraft(taskId: string, input: ResumeDraftSaveInput, token: string): Promise<ResumeDraftSaveResponse>
+  listResumeVersions(taskId: string, token: string): Promise<ResumeVersionsResponse>
+  factCheckResume(taskId: string, access?: ResumeReadAccess): Promise<ResumeFactCheckResponse>
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -185,6 +205,21 @@ export const exportResumeRecord = (
   body: { kind: ResumeReportExportKind; benefitGrantId?: string; factsConfirmedAt?: string },
   access?: ResumeReadAccess,
 ) => adapter.exportResumeRecord(taskId, body, access)
+
+/** 登录会员读取优化编辑草稿。匿名不要调；无草稿时 draft 为 null，不得当成已保存。 */
+export const getResumeDraft = (taskId: string, token: string) =>
+  adapter.getResumeDraft(taskId, token)
+
+/** 登录会员保存优化编辑草稿。匿名不要调。 */
+export const saveResumeDraft = (taskId: string, input: ResumeDraftSaveInput, token: string) =>
+  adapter.saveResumeDraft(taskId, input, token)
+
+/** 登录会员列出已确认导出版本。匿名不要调。 */
+export const listResumeVersions = (taskId: string, token: string) =>
+  adapter.listResumeVersions(taskId, token)
+
+export const factCheckResume = (taskId: string, access?: ResumeReadAccess) =>
+  adapter.factCheckResume(taskId, access)
 
 /**
  * AI 生成失败时的出纸路径：把用户**已经填好的内容**原样导出成 PDF。

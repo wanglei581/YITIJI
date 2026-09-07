@@ -46,12 +46,23 @@ export class ApiRouter {
     this.#installed = true
     await this.#page.route('**/api/v1/**', async (route) => {
       const request = route.request()
-      const key = requestKey(request.method(), new URL(request.url()).pathname)
+      const pathname = new URL(request.url()).pathname
+      const key = requestKey(request.method(), pathname)
       const requestNumber = (this.#requestCounts.get(key) ?? 0) + 1
       this.#requestCounts.set(key, requestNumber)
       const handler = this.#handlers.get(key)
 
       if (!handler) {
+        if (isAnonymousDraftOrVersions(request.method(), pathname)) {
+          await route.fulfill({
+            status: 404,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' },
+            }),
+          })
+          return
+        }
         this.#unhandledRequests.add(key)
         await route.abort('internetdisconnected')
         return
@@ -110,6 +121,12 @@ export class ApiRouter {
     const requests = [...this.#unhandledRequests].sort()
     throw new Error(`Unhandled API requests:\n${requests.map((key) => `- ${key}`).join('\n')}`)
   }
+}
+
+function isAnonymousDraftOrVersions(method: string, path: string): boolean {
+  const normalized = method.trim().toUpperCase()
+  if (!/^\/api\/v1\/resume\/records\/[^/]+\/(draft|versions)$/.test(path)) return false
+  return normalized === 'GET' || normalized === 'PUT'
 }
 
 function requestKey(method: string, path: string): string {

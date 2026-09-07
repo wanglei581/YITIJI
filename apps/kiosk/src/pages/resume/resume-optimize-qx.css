@@ -215,6 +215,68 @@
 }
 .qx-rd-leave-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
 
+.qx-rd-draft { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.qx-rd-draft p { margin: 0; font-size: 18px; font-weight: 700; color: var(--qx-ink-2); }
+.qx-rd-draft-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.qx-rd-draft-actions .qx-btn { width: 100%; }
+.qx-rd-draft-status {
+  margin: 8px 0 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-size: 16px;
+  font-weight: 700;
+}
+.qx-rd-draft-status[data-tone='bad'] { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
+
+.qx-rd-side-stack {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qx-rd-side-stack .qx-rd-side {
+  overflow: visible;
+  flex: none;
+}
+.qx-rd-versions h3 { margin: 0; font-size: 20px; }
+.qx-rd-versions > p { margin: 6px 0 10px; font-size: 15px; line-height: 1.4; color: var(--qx-ink-3); }
+.qx-rd-version {
+  width: 100%;
+  min-height: var(--qx-tap-min);
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--qx-line);
+  border-radius: 14px;
+  background: var(--qx-paper);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.qx-rd-version b { display: block; font-size: 18px; }
+.qx-rd-version span { display: block; margin-top: 4px; font-size: 14px; color: var(--qx-ink-3); }
+
+.qx-rd-mod-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.qx-rd-mod-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--qx-line);
+  border-radius: 14px;
+  background: var(--qx-paper);
+}
+.qx-rd-mod-row > p { margin: 0; font-size: 16px; font-weight: 700; }
+.qx-rd-mod-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.qx-rd-mod-toggle .qx-btn { width: 100%; min-height: var(--qx-tap-min); }
+.qx-rd-mod-toggle .qx-btn[aria-pressed='true'] {
+  background: var(--qx-deep);
+  border-color: var(--qx-deep);
+  color: var(--qx-paper);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .qx-resume-optimize *,
   .qx-resume-generate *,
