@@ -80,23 +80,28 @@ function Get-KioskProcess {
   return $null
 }
 
-function Get-BootTicketUrl {
+function Request-BootTicket([bool]$LogFailure = $true, [int]$Attempt = 1) {
+  try {
+    $response = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:9527/local/terminal-boot-ticket" -TimeoutSec 4
+    $ticket = [string]$response.data.bootTicket
+    if ($ticket -match '^[A-Za-z0-9_-]{32,128}$') {
+      return $ticket
+    }
+    if ($LogFailure) { Write-Log "boot ticket response was invalid" }
+  } catch {
+    if ($LogFailure) { Write-Log "boot ticket attempt $Attempt failed: $($_.Exception.Message)" }
+  }
+  return $null
+}
+
+function Get-BootTicket {
   $deadline = (Get-Date).AddSeconds(60)
   $delays = @(2, 5, 10, 20)
   $attempt = 0
   while ((Get-Date) -lt $deadline) {
-    try {
-      # Five 4-second attempts plus 2/5/10/20-second backoff stay within 57 seconds.
-      $response = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:9527/local/terminal-boot-ticket" -TimeoutSec 4
-      $ticket = [string]$response.data.bootTicket
-      if ($ticket -match '^[A-Za-z0-9_-]{32,128}$') {
-        $separator = if ($Url.Contains('?')) { '&' } else { '?' }
-        return "$Url$separator" + "boot_ticket=$([uri]::EscapeDataString($ticket))"
-      }
-      Write-Log "boot ticket response was invalid"
-    } catch {
-      Write-Log "boot ticket attempt $($attempt + 1) failed: $($_.Exception.Message)"
-    }
+    # Five 4-second attempts plus 2/5/10/20-second backoff stay within 57 seconds.
+    $ticket = Request-BootTicket -Attempt ($attempt + 1)
+    if (-not [string]::IsNullOrWhiteSpace($ticket)) { return $ticket }
     if ($attempt -ge ($delays.Count - 1)) { break }
     $delay = $delays[$attempt]
     if ((Get-Date).AddSeconds($delay) -gt $deadline) { break }
@@ -104,18 +109,19 @@ function Get-BootTicketUrl {
     $attempt += 1
   }
   Write-Log "boot ticket unavailable after automatic retry window; launching without ticket"
-  return $Url
+  return $null
+}
+
+function Get-BootTicketUrl([AllowNull()][string]$BootTicket) {
+  if ([string]::IsNullOrWhiteSpace($BootTicket)) { return $Url }
+  $separator = if ($Url.Contains('?')) { '&' } else { '?' }
+  return "$Url$separator" + "boot_ticket=$([uri]::EscapeDataString($BootTicket))"
 }
 
 function Test-AgentIdentityReady {
-  # Cheap read-only probe: once the local Agent answers with a terminal identity it
-  # can also mint boot tickets, so a ticketless browser can be replaced.
-  try {
-    $response = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:9527/local/terminal-identity" -TimeoutSec 4
-    return [bool]($response.success -and $response.data.terminalId)
-  } catch {
-    return $false
-  }
+  # This Origin-free endpoint is the readiness probe. Return its one-time ticket so
+  # the replacement browser consumes the same ticket without a second round trip.
+  return Request-BootTicket -LogFailure $false
 }
 
 function Start-KioskBrowser([string]$Executable, [string]$LaunchUrl) {
@@ -153,25 +159,32 @@ $backoffSeconds = 3
 $lastStart = [DateTime]::MinValue
 $launchedWithoutTicket = $false
 $lastTicketProbe = [DateTime]::MinValue
+$selfHealBootTicket = $null
 while ($true) {
   $existing = Get-KioskProcess
   if ($null -ne $existing -and $launchedWithoutTicket -and ((Get-Date) - $lastTicketProbe).TotalSeconds -ge 30) {
     # Self-heal without on-site staff: a browser launched without a boot ticket is stuck
     # on the fail-closed screen. Once the Agent is reachable again, restart it with a ticket.
     $lastTicketProbe = Get-Date
-    if (Test-AgentIdentityReady) {
+    $selfHealBootTicket = Test-AgentIdentityReady
+    if (-not [string]::IsNullOrWhiteSpace($selfHealBootTicket)) {
       Write-Log "local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket"
       try { Stop-Process -Id $existing.ProcessId -Force -ErrorAction Stop } catch { Write-Log "failed to stop ticketless browser: $($_.Exception.Message)" }
       $existing = $null
     }
   }
   if ($null -eq $existing) {
-    $sinceLast = (Get-Date) - $lastStart
-    if ($sinceLast.TotalSeconds -lt $backoffSeconds) {
-      Start-Sleep -Seconds ([Math]::Ceiling($backoffSeconds - $sinceLast.TotalSeconds))
+    if ([string]::IsNullOrWhiteSpace($selfHealBootTicket)) {
+      $sinceLast = (Get-Date) - $lastStart
+      if ($sinceLast.TotalSeconds -lt $backoffSeconds) {
+        Start-Sleep -Seconds ([Math]::Ceiling($backoffSeconds - $sinceLast.TotalSeconds))
+      }
     }
     try {
-      $launchUrl = Get-BootTicketUrl
+      $bootTicket = $selfHealBootTicket
+      $selfHealBootTicket = $null
+      if ([string]::IsNullOrWhiteSpace($bootTicket)) { $bootTicket = Get-BootTicket }
+      $launchUrl = Get-BootTicketUrl -BootTicket $bootTicket
       [void](Start-KioskBrowser -Executable $executable -LaunchUrl $launchUrl)
       $launchedWithoutTicket = ($launchUrl -eq $Url)
       $lastTicketProbe = Get-Date

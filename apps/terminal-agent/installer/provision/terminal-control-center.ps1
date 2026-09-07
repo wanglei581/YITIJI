@@ -45,6 +45,19 @@ function Read-AgentConfig {
   }
 }
 
+function Test-AgentBound {
+  $config = Read-AgentConfig
+  return $null -ne $config -and
+    -not [string]::IsNullOrWhiteSpace([string]$config.terminalId) -and
+    (Test-Path -LiteralPath $tokenPath -PathType Leaf)
+}
+
+function Set-AgentAutomaticWhenBound {
+  if (Test-AgentBound) {
+    Set-Service -Name $serviceName -StartupType Automatic -ErrorAction Stop
+  }
+}
+
 function Get-ControlCenterSnapshot {
   $service = Get-AgentService
   $config = Read-AgentConfig
@@ -53,13 +66,14 @@ function Get-ControlCenterSnapshot {
   return [ordered]@{
     version = $agentVersion.Replace("-production", "")
     installed = Test-Path -LiteralPath (Join-Path $agentRoot "dist\index.js") -PathType Leaf
-    configured = $null -ne $config -and (Test-Path -LiteralPath $tokenPath -PathType Leaf)
+    configured = Test-AgentBound
     terminalCode = if ($null -ne $config) { [string]$config.terminalCode } else { "" }
     printerName = if ($null -ne $config) { [string]$config.printerName } else { "" }
     scanWatchFolder = if ($null -ne $config) { [string]$config.scanWatchFolder } else { "" }
     bridgeConfigured = $null -ne $config -and -not [string]::IsNullOrWhiteSpace([string]$config.localApiBridgeToken)
     serviceInstalled = $null -ne $service
     serviceStatus = if ($null -ne $service) { [string]$service.Status } else { "NotInstalled" }
+    serviceStartType = if ($null -ne $service) { [string]$service.StartType } else { "NotInstalled" }
     kioskWatchdogRegistered = $null -ne (Get-ScheduledTask -TaskName $kioskTaskName -ErrorAction SilentlyContinue)
     kioskWatchdogAvailable = Test-Path -LiteralPath $kioskRegisterScript -PathType Leaf
     printers = @($printers)
@@ -244,8 +258,8 @@ $summary.BackColor = [System.Drawing.Color]::White
 $summary.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
 $terminalText = New-Label "终端：尚未绑定" 22 14 280 26
 $terminalText.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 11, [System.Drawing.FontStyle]::Bold)
-$serviceText = New-Label "服务：正在检查" 316 14 250 26
-$versionText = New-Label "版本：0.4.11" 588 14 180 26
+$serviceText = New-Label "服务：正在检查" 316 14 300 26
+$versionText = New-Label "版本：0.4.11" 640 14 180 26
 $statusText = New-Label "正在读取本机状态…" 22 46 820 24
 $statusText.ForeColor = [System.Drawing.ColorTranslator]::FromHtml("#64748B")
 $summary.Controls.AddRange(@($terminalText, $serviceText, $versionText, $statusText))
@@ -324,7 +338,7 @@ function Refresh-View {
   }
   if ([string]::IsNullOrWhiteSpace($scanFolderBox.Text)) { $scanFolderBox.Text = $snapshot.scanWatchFolder }
   $terminalText.Text = if ($snapshot.configured) { "终端：$($snapshot.terminalCode)" } else { "终端：尚未绑定" }
-  $serviceText.Text = "服务：$($snapshot.serviceStatus)"
+  $serviceText.Text = "服务：$($snapshot.serviceStatus) / StartType：$($snapshot.serviceStartType)"
   $serviceText.ForeColor = if ($snapshot.serviceStatus -eq "Running") { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }
   $statusText.Text = if (-not $snapshot.installed) {
     "运行组件缺失，请修复安装"
@@ -446,10 +460,10 @@ $saveButton.Add_Click({
 })
 
 $startButton.Add_Click({
-  try { Start-Service -Name $serviceName; Add-Log "服务已启动" } catch { Add-Log "启动失败：$($_.Exception.Message)" } finally { [void](Refresh-View) }
+  try { Set-AgentAutomaticWhenBound; Start-Service -Name $serviceName; Add-Log "服务已启动，启动类型为 Automatic" } catch { Add-Log "启动失败：$($_.Exception.Message)" } finally { [void](Refresh-View) }
 })
 $restartButton.Add_Click({
-  try { Restart-Service -Name $serviceName -Force; Add-Log "服务已重启" } catch { Add-Log "重启失败：$($_.Exception.Message)" } finally { [void](Refresh-View) }
+  try { Set-AgentAutomaticWhenBound; Restart-Service -Name $serviceName -Force; Add-Log "服务已重启，启动类型为 Automatic" } catch { Add-Log "重启失败：$($_.Exception.Message)" } finally { [void](Refresh-View) }
 })
 $panelButton.Add_Click({ Start-Process $panelUrl })
 $logsButton.Add_Click({

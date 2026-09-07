@@ -539,9 +539,11 @@ function Commit-ProductionConfigAndToken(
   $tokenRollbackPath = $null
   $commitFailed = $false
   $rollbackFailed = $false
+  $commitStage = "config"
 
   try {
     if ($shouldWriteToken) {
+      $commitStage = "token"
       $hadExistingToken = Test-Path -LiteralPath $TokenPath -PathType Leaf
       $tokenDirectory = Split-Path -Parent $TokenPath
       New-Item -ItemType Directory -Path $tokenDirectory -Force | Out-Null
@@ -557,9 +559,11 @@ function Commit-ProductionConfigAndToken(
       Protect-AgentToken -Token $TokenToPersist -TokenPath $TokenPath
     }
 
+    $commitStage = "config"
     Write-TextAtomically -Path $ConfigPath -Text $ConfigText
   } catch {
     $commitFailed = $true
+    Write-Host "[FAIL] commit stage=$commitStage reason=$($_.Exception.Message)"
 
     try {
       if ($shouldWriteToken) {
@@ -655,8 +659,10 @@ $preservedOrigins = if (-not $ReplaceLocalApiAllowedOrigins -and $preservedLocal
 } else {
   @()
 }
+$originCandidates = @($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")
+$originCandidates = @($originCandidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 $effectiveLocalApiAllowedOrigins = @(Merge-LocalApiAllowedOrigins `
-  -Origins (@($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) `
+  -Origins $originCandidates `
   -CanonicalizeOrigin { param($originCandidate) ConvertTo-CanonicalOrigin $originCandidate })
 
 Write-Step "Production Agent hardening"

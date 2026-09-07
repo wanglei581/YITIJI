@@ -55,6 +55,12 @@ assert.match(installer, /Assert-NotReparsePoint \$scanFolderItem/)
 assert.match(installer, /GetLeftPart\(\[System\.UriPartial\]::Authority\)/)
 assert.match(installer, /localApiAllowedOrigins\s+=\s+@\(\$effectiveLocalApiAllowedOrigins\)/)
 assert.match(installer, /Merge-LocalApiAllowedOrigins/)
+assert.match(
+  installer,
+  /\$originCandidates[\s\S]{0,500}Where-Object\s*\{\s*-not \[string\]::IsNullOrWhiteSpace\(\$_\)\s*\}[\s\S]{0,300}Merge-LocalApiAllowedOrigins/,
+  'origin candidates must drop null and blank values before merging',
+)
+assert.match(installer, /\[FAIL\] commit stage=\$commitStage reason=\$\(\$_\.Exception\.Message\)/)
 assert.doesNotMatch(installer, /\$localApiAllowedOrigins\s*=\s*New-Object/, 'parameter names are case-insensitive in PowerShell; do not shadow the fixed string array')
 assert.match(installer, /provisioning-runtime-security\.ps1/)
 assert.doesNotMatch(installer, /FileSystemRights\]::Modify\s+-bor/, 'composite Modify includes read bits and must not be used as a dangerous-rights mask')
