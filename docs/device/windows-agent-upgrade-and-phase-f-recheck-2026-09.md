@@ -76,7 +76,8 @@ sc.exe qc aijobprintagent.exe
 1. 管理员后台 → **进入维护**，确认在途任务 0（升级不得覆盖运行中的 Agent，这是 MSI 设计 §4.2 的硬要求）。
 2. 双击新的 `AIJobPrintTerminalSetup.exe`。Major Upgrade 保留 `%ProgramData%` 下的配置、DPAPI token、SQLite，**不需要重新绑定**。
 3. `Get-Service aijobprintagent.exe` 为 Running；不是就 `Start-Service aijobprintagent.exe` 并看日志。
-4. 管理员后台 → **恢复运行**。
+4. **升级后固定执行** `Set-Service aijobprintagent.exe -StartupType Automatic`（MSI 新装按设计为 Manual，Major Upgrade 也会把它重置；2026-09-07 现场实证）。#897 起在「终端控制中心」点启动/重启会对已绑定终端自动设回。
+5. 管理员后台 → **恢复运行**。
 
 ### 2C 升级后即时核对（两条路径都做）
 
@@ -334,3 +335,16 @@ F7 全屏抽查：未做
 - 2026-09-06 延迟溯源：第一条 429 为 `[2026-09-06T13:02:21.264Z]`，领取成功为 `[2026-09-06T13:06:22.766Z] INFO task-runner: claimed task ptask_kiosk_73db2dfb9b9546e0`，间隔约 241.5 秒。期间心跳仍为 acknowledged；13:02–13:06 UTC 共记录 182 条 `task-runner` 行，且为约 1 秒一次的旧 Agent 重试序列。随后 13:06:25.042Z 打印成功、13:06:29.416Z completed。该证据表明旧 Agent 未按 Retry-After 退避，4 分钟来自持续 429 重试叠加服务端窗口，仍需 Mac 侧结合服务端限流日志确认是否有第二个窗口。
 
 交付说明：本轮没有新增功能入口或外部依赖；未做 B3 闭环、未做连续打印矩阵；上述未验项保持未验收。
+
+### Mac 侧对第二轮回执的核实（2026-09-07）
+
+| 回执项 | 核实结果 | 证据 |
+|---|---|---|
+| 429 退避 | 通过。每次暂停约 60 秒 = 服务端 Retry-After 的 block 时长 | 回执日志六条 `pausing claims for 60.xs` |
+| 「约 241.5 秒延迟」 | **不成立，实际 26 秒**。生产库 `ptask_kiosk_73db2dfb9b9546e0` `createdAt=13:05:56.876Z`、`claimedAt=13:06:22.766Z`；回执从任务创建前的第一条 429（13:02:21）起算。以后延迟一律从任务 `createdAt` 起算 | 生产库只读查询 |
+| F5 自愈失败 | **看门狗缺陷**：探活用 `GET /local/terminal-identity` 且不带 Origin，`origin-guard.ts` 对空 Origin 一律 403，探活恒 false。修复 #897：改用免 Origin 的 `POST /local/terminal-boot-ticket` 探活并复用该票重启 | `qr-login-server.ts:172`、`origin-guard.ts:8` |
+| F4「共 0 台终端」 | **待现场复核，不按缺陷记**。服务器侧：nginx 12:40–13:00 `GET /admin/terminals` 27 次全 200、1330–1333 字节；bug 会话在服务器用生产编译的 `listTerminalsForAdmin()` 只读跑出 1331 字节、count=2，并把该 JSON 喂给 `1b2195adf` 的 admin 前端本地渲染为「共 2 台终端」，无报错；Windows 浏览器加载的也是当前 bundle。代码与数据均无法复现「0 台」。下轮现场补三样：截图 + devtools 里 `data.terminals.length`；看到 0 时是否处于首载骨架态（首载 1–2 秒表头为 0）或开着弹窗/编辑态（该页编辑态硬锁期间新数据不上屏）；登录账号角色（管理员还是机构账号） | 生产机 nginx 日志、bug 会话复现记录 |
+| 安装脚本 `-UseExistingToken` 两次失败 | **脚本缺陷**：缺省 `-LocalApiAllowedOrigins` 时空元素进校验直接 Fail；commit 失败吞异常。修复 #897：过滤空值、输出 `stage=config|token reason=`。第二次失败可确定在写 `agent-config.json` 阶段（`-UseExistingToken` 不写 token），具体原因等新脚本的 `reason=` 回执 | `install-production-agent.ps1:274,562,658` |
+| 升级后服务回到 Manual | 安装器行为（`Agent.wxs` `Start="demand"`）。2B 第 4 步固定设回；#897 控制中心启动/重启前自动设回 | `Agent.wxs:23` |
+
+**下一轮 Windows 侧只做**：装 #897 之后 main 构建的新包（2B）→ 设回 Automatic → 单独复验 F5（停服务→关浏览器→无票拉起→启服务→不碰浏览器，60 秒内看门狗日志出现 `local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket` 并带票重启）→ 顺手用新脚本重跑一次 `-UseExistingToken -ClaimIntervalMs 5000`，把 `reason=`（若仍失败）抄回。F4 按上表补三样现场证据后再判，连续打印矩阵待 F4 判定后做；第 4B 节三条等 API 发布通知。回执里 F4 的三样证据同时抄送「项目bug检查与功能优化」会话。
