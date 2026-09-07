@@ -46,7 +46,7 @@ function expectMatches(source, pattern, message) {
 console.log('\n=== Kiosk 打印确认页诚实性守卫 ===')
 
 const CONVERT = 'src/pages/print-scan/ConvertImagesPage.tsx'
-const convertSrc = read(CONVERT)
+const convertSrc = `${read(CONVERT)}\n${read('src/pages/print-scan/ConvertImagesView.tsx')}\n${read('src/pages/print-scan/ConvertImagesPanels.tsx')}`
 expectMatches(
   convertSrc,
   /未登录时 PDF 不会进入「我的文档」/,

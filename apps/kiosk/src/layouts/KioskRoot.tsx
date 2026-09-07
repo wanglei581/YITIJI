@@ -112,6 +112,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/resume/generate/preview',
   '/print-scan',
   '/print-scan/sign',
+  '/print-scan/convert',
 ])
 const QX_MIGRATED_PREFIXES = ['/print-scan/feature/'] as const
 

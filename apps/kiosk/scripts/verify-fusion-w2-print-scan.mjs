@@ -191,6 +191,7 @@ for (const path of presentationFiles) {
 
 const printScanPages = new Map([
   ['src/pages/print-scan/ConvertImagesPage.tsx', 'print-scan-convert'],
+  ['src/pages/print-scan/SignStampPage.tsx', 'print-scan-sign'],
 ])
 for (const [path, marker] of printScanPages) {
   const body = read(path)
@@ -342,14 +343,58 @@ assert.doesNotMatch(
   /to:\s*['"]\/upload\/phone/,
   'kiosk print hub never navigates directly to the phone-only route'
 )
-const convertImages = read('src/pages/print-scan/ConvertImagesPage.tsx')
-for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel']) {
+const convertImages =
+  read('src/pages/print-scan/ConvertImagesPage.tsx') +
+  read('src/pages/print-scan/ConvertImagesView.tsx') +
+  read('src/pages/print-scan/ConvertImagesPanels.tsx') +
+  read('src/pages/print-scan/convert-images-model.ts')
+for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel', 'QxPageFrame']) {
   assert.match(convertImages, new RegExp(marker), `convert-images retains ${marker}`)
 }
 assert.match(
   convertImages,
+  /data-w2-page=["']print-scan-convert["']/,
+  'convert-images keeps the W2 route ownership marker after qingxu migration'
+)
+assert.match(
+  read('src/pages/print-scan/ConvertImagesPage.tsx'),
+  /import '\.\/styles\/convert-images-qx\.css'/,
+  'convert-images loads its qingxu stylesheet'
+)
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /['"]\/print-scan\/convert['"]/,
+  'convert-images is registered in QX_MIGRATED_ROUTES so it exits the old fusion-youth chrome'
+)
+assert.match(
+  convertImages,
   /<img[\s\S]*?src=\{img\.fileAccessUrl\}[\s\S]*?alt=\{`\$\{img\.name\} 缩略图`\}/,
   'convert-images renders each uploaded image instead of a paper skeleton'
+)
+assert.match(
+  convertImages,
+  /sources:\s*sourceImages\.map\(\(img\) => \(\{\s*fileId:\s*img\.fileId,\s*fileAccessUrl:\s*img\.fileAccessUrl\s*\}\)\)/,
+  'convert payload order is the visible list array order'
+)
+assert.match(
+  read('src/pages/print-scan/styles/convert-images-qx.css'),
+  /\.i2p-lrows\s*\{[^}]*overflow-y:\s*auto/,
+  'many-image list actually scrolls instead of clipping to three cards'
+)
+assert.match(
+  convertImages,
+  /navigate\('\/print\/material-check'/,
+  'successful convert continues to material-check, not cashier or progress'
+)
+assert.match(
+  convertImages,
+  /旋转 90°[\s\S]*当前不可用/,
+  'rotate control stays visible and honestly disabled'
+)
+assert.match(
+  convertImages,
+  /U 盘图片导入尚未接到转换列表/,
+  'USB entry is kept and explained as unwired, not deleted'
 )
 const scanResultPreviewSource = read('src/pages/scan/ScanResultPage.tsx')
 assert.match(
