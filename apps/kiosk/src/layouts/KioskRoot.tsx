@@ -159,6 +159,7 @@ function KioskShell() {
     '/print/pickup-claim',
     '/resume/report',
     '/resume/optimize',
+    '/resume/optimize/compare',
     '/resume/generate/preview',
   ])
   const isQxRoute = QX_MIGRATED_ROUTES.has(pathname)

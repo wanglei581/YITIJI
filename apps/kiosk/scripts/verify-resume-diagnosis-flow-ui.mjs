@@ -52,7 +52,12 @@ const deliver = [
 const optimize = `${read('src/pages/resume/ResumeOptimizePage.tsx')}\n${deliver}`
 const generatePreview = `${read('src/pages/resume/ResumeGeneratePreviewPage.tsx')}\n${deliver}`
 // S2-1 拆页：逐条 diff 搬到对照页，因此 diff 的触控安全断言随之搬过去（覆盖面不缩水）。
-const optimizeCompare = read('src/pages/resume/ResumeOptimizeComparePage.tsx')
+const optimizeCompare = [
+  'src/pages/resume/ResumeOptimizeComparePage.tsx',
+  'src/pages/resume/components/resume-compare/ResumeCompareCard.tsx',
+  'src/pages/resume/components/resume-compare/ResumeCompareState.tsx',
+  'src/pages/resume/components/resume-compare/resumeCompareModel.ts',
+].map((path) => read(path)).join('\n')
 const generate = read('src/pages/resume/ResumeGeneratePage.tsx')
 const resumeVoiceButton = read('src/pages/resume/components/ResumeVoiceInputButton.tsx')
 const resumeVoiceDialog = read('src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx')
@@ -116,15 +121,21 @@ assertIncludes(optimize, '表达调整参考', 'optimize page uses qualitative i
 assertIncludes(optimize, 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimize page prevents standby during export, print navigation or AI adjustment')
 assertIncludes(optimize, 'printNavigating', 'optimize page locks repeated print navigation')
 assertIncludes(optimize, 'confirmLeave', 'optimize page protects edited resume content before leaving')
-assertIncludes(optimizeCompare, 'splitView={false}', 'optimize diff uses touch-safe inline comparison')
+assertIncludes(optimizeCompare, 'wordDiff(props.item.before, props.item.after)', 'optimize diff uses in-house inline word diff (no third-party viewer fold buttons)')
 assertIncludes(optimize, "confirmLeave ? 'overflow-hidden'", 'optimize page locks background scroll behind leave dialog')
-assertIncludes(optimizeCompare, '[&_pre]:whitespace-pre-wrap', 'optimize diff wraps long lines on touch screens')
+assertIncludes(optimizeCompare, 'className="qxc-diff-text"', 'optimize diff wraps long lines on touch screens (.qxc-diff-text is pre-wrap + overflow-wrap anywhere)')
 // 拆页后母页不得再同屏渲染 diff，否则等于没拆。
 assertNotIncludes(optimize, 'ReactDiffViewer', 'optimize page no longer renders per-item diff inline (split to compare page)')
 assertIncludes(optimize, "navigate('/resume/optimize/compare'", 'optimize page links to the split comparison page')
 // 拆出去的那页必须诚实说明「本次选择不保存」——没有采纳落库端点。
 assertIncludes(optimizeCompare, '未保存', 'compare page states the adoption selection is not persisted')
 assertNotIncludes(optimizeCompare, '已采纳', 'compare page avoids copy implying the selection was saved')
+assertIncludes(optimizeCompare, 'setModules([])', 'compare page clears stale modules before reading another task')
+assertIncludes(optimizeCompare, 'loadedTaskId === taskId', 'compare page renders modules only for the current task')
+assertIncludes(optimizeCompare, 'setDecisions({})', 'compare page clears stale decisions before reading another task')
+assertIncludes(optimizeCompare, 'setConfirmedByModule({})', 'compare page clears stale fact confirmations before reading another task')
+assertIncludes(optimizeCompare, "label: '缺少简历'", 'compare page does not label missing context as ready for a decision')
+assertIncludes(optimizeCompare, 'aria-pressed={decisions[keyAt(currentIndex)]', 'compare page exposes the current decision non-visually')
 
 // 2026-08-18：这三条原本断言「mock 报告的分项 key 与 SSOT 对齐」（objective /
 // quantification / readability），前提是 mock **会返回一份报告**。走查证明那份报告

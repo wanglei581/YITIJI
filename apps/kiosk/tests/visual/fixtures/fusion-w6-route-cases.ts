@@ -61,6 +61,15 @@ async function seedScreensaver(page: Page): Promise<void> {
   })
 }
 
+async function seedResumeCompare(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem(
+      'ai-job-print:current-ai-resume',
+      JSON.stringify({ taskId: 'w6-compare', accessToken: 'w6-compare-access' }),
+    )
+  })
+}
+
 const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/', url: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后，简历和记录', landmark: 'none' },
@@ -135,8 +144,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/parse', url: '/resume/parse', marker: screen('resume-parse'), featureText: '未找到简历文件' },
   { pattern: '/resume/report', url: '/resume/report', marker: screen('resume-report'), featureText: '还没有诊断报告' },
   { pattern: '/resume/optimize', url: '/resume/optimize', marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
-  // S2-1 拆页。同上，无 taskId 直达停在前置缺失态。
-  { pattern: '/resume/optimize/compare', url: '/resume/optimize/compare', marker: screen('resume-optimize-compare'), featureText: '请先完成简历上传与解析' },
+  { pattern: '/resume/optimize/compare', url: '/resume/optimize/compare', marker: screen('resume-optimize-compare'), featureText: '第 1 / 2 条', seed: seedResumeCompare },
   { pattern: '/resume/export', url: '/resume/export', expectedPath: compatibilityRedirects['/resume/export'], marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
