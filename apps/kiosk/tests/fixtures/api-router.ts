@@ -51,6 +51,25 @@ export class ApiRouter {
       status: 200,
       json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
     })
+    // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
+    this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          groups: [],
+          reason: 'no_published_campus_records',
+          generatedAt: '2099-01-01T00:00:00.000Z',
+          truncated: false,
+          scanLimit: 2000,
+          notes: [
+            '本页只聚合已审核且已发布的校园招聘会与校招岗位，每个数字都带来源机构与同步时间。',
+            '不含招聘结果类指标；本平台无法证实录用、签约或候选人规模。',
+            '无经核验数据时返回空集合，不使用示例数字。',
+          ],
+        },
+      },
+    })
   }
 
   async install(): Promise<void> {

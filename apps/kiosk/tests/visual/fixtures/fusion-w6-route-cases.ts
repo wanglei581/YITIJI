@@ -108,7 +108,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
   { pattern: '/campus', url: '/campus', marker: '[data-kiosk-component="page-frame"] .campus-proto', featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/campus/welcome', url: '/campus/welcome', marker: '[data-kiosk-component="page-frame"]', featureText: '校园招聘迎新指引' },
-  { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-kiosk-component="page-frame"]', featureText: '校园招聘数据' },
+  { pattern: '/campus/freshman-insights', url: '/campus/freshman-insights', marker: '[data-kiosk-component="page-frame"]:has-text("暂无经核验的校园招聘统计")', featureText: '不会展示示例数据' },
   { pattern: '/toolbox', url: '/toolbox', marker: screen('toolbox'), featureText: '百宝箱' },
   { pattern: '/smart-campus', url: '/smart-campus', marker: w4, featureText: '智慧校园' },
   { pattern: '/smart-campus/welcome', url: '/smart-campus/welcome', marker: w4, featureText: '迎新指引' },

@@ -54,6 +54,7 @@ const TERMINAL_SCOPED_ROUTES = [
   { file: 'src/ai/ai.controller.ts', handler: 'submitResumeParse' },
   { file: 'src/ai/ai.controller.ts', handler: 'chatWithAssistant' },
   { file: 'src/ai/kiosk-ai-capabilities.controller.ts', handler: 'listCapabilities' },
+  { file: 'src/jobs/kiosk-campus-recruitment-stats.controller.ts', handler: 'getRecruitmentStats' },
 ] as const
 
 // ---------------------------------------------------------------------------

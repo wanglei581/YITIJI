@@ -192,7 +192,7 @@ export const kioskRouter = createBrowserRouter([
       },
       {
         path: 'campus/freshman-insights',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/FreshmanInsightsPage')).default }),
+        lazy: async () => ({ Component: (await import('../pages/campus/FreshmanInsightsPage')).default }),
       },
       // 百宝箱与智慧校园的根路由、所有深链先经终端配置能力边界；未知、失败和关闭均不挂载业务页。
       {

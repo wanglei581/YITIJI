@@ -20,6 +20,8 @@ import { FairMaterialService } from './fair-material.service'
 import { FairVenueGuideService } from './fair-venue-guide.service'
 import { RecruitmentIntegrationController } from './recruitment-integration.controller'
 import { JobRequirementStatsService } from './job-requirement-stats.service'
+import { CampusRecruitmentStatsService } from './campus-recruitment-stats.service'
+import { KioskCampusRecruitmentStatsController } from './kiosk-campus-recruitment-stats.controller'
 
 @Module({
   // PrismaModule:供 importJobs 访问 prisma.job / prisma.organization
@@ -46,8 +48,16 @@ import { JobRequirementStatsService } from './job-requirement-stats.service'
     FairCompanyPrintService,
     // 岗位要求计数（AI 降级来源）：只读 Prisma + 纯函数聚合，不进 JobsService 门面
     JobRequirementStatsService,
+    // 校园招聘聚合（一体机 /campus/freshman-insights）：只读 Prisma + 纯函数，不进门面
+    CampusRecruitmentStatsService,
   ],
-  controllers: [JobsController, AdminFairsController, PartnerFairsController, RecruitmentIntegrationController],
+  controllers: [
+    JobsController,
+    AdminFairsController,
+    PartnerFairsController,
+    RecruitmentIntegrationController,
+    KioskCampusRecruitmentStatsController,
+  ],
   exports: [JobsService, AdminFairsService],
 })
 export class JobsModule {}
