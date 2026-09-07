@@ -227,6 +227,17 @@ done
 
 ### 待产品负责人裁决（阻塞对应批次）
 
+> **2026-09-07：交付就绪审计 §五 的 7 项已全部拍板，对应批次解冻。**
+> 裁定全文见 [delivery-readiness-audit-2026-09-05.md §五](../reviews/delivery-readiness-audit-2026-09-05.md)，摘要：
+> ① `partial-output` / `paid-no-output` 两态删，不立项页级回流；② `partial-refunded` 本期不接动作、32 页删该态（类型保留）；
+> ③ 02-services 与 36-index 不成正式路由，`01-home:148,152` 改指五 Hub，**106 条路由基线不变**；
+> ④ 取件码页留 `11-arrival-code`、`33-pickup-code` 冻结（但到机码与线下取件凭证码仍是两条业务线，文案不得合并）；
+> ⑤ `37-pay-states` 冻结并从 36 索引摘链接；⑥ 05、29 两页先复审再迁，不进当前批次；
+> ⑦ 出纸口灯效 / 盖板感知 / 防窥遮罩本期不做，并从 15、18 两页视觉去掉暗示。
+>
+> **仍待裁决（不得按已定执行）**：无稿 4 页（`/ai/plan`、`/resume/export`、两个 `freshman-insights`）去留；`GET /me/summary` 是否正式关闭。
+
+
 1. **10 张原型（42–51）是空壳**：内容交给外部脚本渲染，被引用的 14 个
    sidecar JS/CSS 在仓库里不存在（已核实非 gitignore 所致）。影响 22 条路由。
    这几批开工前必须先补齐这些文件。

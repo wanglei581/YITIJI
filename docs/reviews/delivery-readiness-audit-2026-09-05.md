@@ -54,12 +54,19 @@
 ### B. 需产品负责人 / 现场 / 第三方动手
 
 1. **内容录入**：数据负责人定来源授权 → 管理员标机构 `contentTrustStatus=active` → 运营按 `docs/operations/seed-content-entry-checklist-2026-08.md` 录入 → 复测三端 `total>0`。09-07 仍空。
+   **裁定：删。** Agent 与驱动拿不到页级出纸事件，台账 §四.1 自身也禁止展示逐页递增；保留两个永远拿不到数据的状态等于承诺做不到的能力。不立项页级回流。
 2. **法务审定**用户协议与隐私政策，并在 Admin `/legal-docs` 激活正式版。
+   **裁定：本期不接动作，32 页删该态。** `OrderPayStatus` 的类型取值保留（`payment.ts:21-22` 已注明仅状态机预留），只从界面移除，避免用户看到点不动的入口。
 3. **账号注销**是否本期开放（裁决后转 A10）。
+   **裁定：不成正式路由。** `01-home:148,152` 两个入口改指五个 Hub；**106 条路由基线不变**，不升 107/108。02-services 与 36-index 作为设计参考保留，不进 `QX_MIGRATED_ROUTES`。
 4. **台架四项与现场 54 项**（`docs/device/production-deployment-and-windows-host-checklist.md` §四/§五）：彩色双面、扫码器、麦克风、断网中打印、卡纸缺纸、U 盘、SMB 扫描、绑定码激活。未验前不得在 Admin 把 `color_print` / `duplex_print` 标 `available`。`apps/terminal-agent/src/printer/types.ts:44`「2026-09-02 产品负责人真机验证通过」仓库内无证据，要么补证要么删。
+   **裁定：留 `11-arrival-code`（台账 099 唯一宿主），`33-pickup-code` 冻结。** 注意这不等于「取件码只有一种」——`Order.pickupCode` 的到机码与线下收款现铸的取件凭证码是两条业务线（见 `admin-order-actions.controller.ts:58` 注释），页面文案不得把两者合并表述。
 5. **备份与恢复**：每日 `pg_dump` 定时 + 异机副本 + 生产主机带计时回滚演练（当前只有发布时一次备份且与生产同盘）。
+   **裁定：冻结 `37-pay-states`，并从 36 索引里摘掉指向它的链接。** 它自称「历史六态版式页，不是收银台真值页」，留着被索引会让后来者误当真值。
 6. **百度 OCR 密钥轮换**（BL-05），仓库内不可验证。
+   **裁定：先复审再迁。** 05、29 两页不进当前批次，复审结论出来前不开工。
 7. **小程序体验版上传**（与后端同 SHA）。
+   **裁定：本期不做，并从 15、18 两页视觉里去掉暗示。** 出纸口灯效需 Agent 硬件接口、盖板感知需传感器、防窥遮罩需摄像头，三者都与台账 §四.2 / §四.5 的硬件边界冲突；页面不得画出暗示这些能力已存在的元素。
 8. **给 main 加 branch protection**（required checks：CI 三 job），当前任何人可直推。
 
 ### C. 查实但不阻塞上线（P1）
@@ -91,7 +98,10 @@
 
 **状态层「原型有、后端无」**：`partial-output` / `paid-no-output`（`PrintTaskStatus` 无此值，Agent 无页级回流；台账 §四.1 自禁逐页递增，自相矛盾）；`partial-refunded`（`payment.ts:21-22` 仅预留）；`/me/activity/:id` 详情态。
 
-## 五、待产品负责人裁决（7 项，未裁前对应批次不开工）
+## 五、产品负责人裁决（7 项，2026-09-07 已全部拍板）
+
+> 2026-09-07 产品负责人采纳主持人建议，七条一次性拍板。以下每条「裁定」即最终口径，对应批次解冻；执行方为「青序流光 51 页迁移主线」会话。原始待裁问题保留在每条首行，便于回溯。
+
 
 1. `partial-output` / `paid-no-output` 两态：删，或立项 Agent 页级出纸回流。
 2. `partial-refunded` 本期是否接动作，否则 32 页删该态。
@@ -101,7 +111,7 @@
 6. 05、29 页在 `REUSE-MAP.md:134` 仍「待独立复审」，先复审再迁还是直接迁。
 7. `DESIGN-PLAN.md:123-126` 出纸口灯效 / 盖板感知 / 防窥遮罩与台账硬件边界冲突，需明确本期不做并从 15/18 页视觉去掉暗示。
 
-另两项已在 next-tasks 待裁决区：无稿 4 页（`/ai/plan`、`/resume/export`、两个 `freshman-insights`）去留；`GET /me/summary` 不建（30 页已自我更正，与 `useMemberProfileOverview.ts:52` 一致，可关闭）。
+**以下两项仍待裁决，不在本次七条之内，不得按已定执行**（主持人建议附后）：无稿 4 页（`/ai/plan`、`/resume/export`、两个 `freshman-insights`）去留；`GET /me/summary` 不建（30 页已自我更正，与 `useMemberProfileOverview.ts:52` 一致，可关闭）。主持人建议：无稿 4 页按「先留路由、页面标未开放」处理待裁；`/me/summary` 直接关闭该条。
 
 ## 六、工作量与日历（估算，假设见末）
 
