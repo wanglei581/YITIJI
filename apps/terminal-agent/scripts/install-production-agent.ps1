@@ -534,7 +534,10 @@ function Commit-ProductionConfigAndToken(
   [string]$TokenPath,
   [AllowNull()][string]$TokenToPersist
 ) {
-  $shouldWriteToken = $null -ne $TokenToPersist
+  # PowerShell 把 $null 绑定到 [string] 形参时会转成空字符串，`$null -ne $TokenToPersist`
+  # 因此在 -UseExistingToken（不换 token）路径下恒为 $true，随后 Protect-AgentToken 空值抛错，
+  # 整个重配失败（2026-09-07 KSK-001 现场：commit stage=token）。按内容判断才正确。
+  $shouldWriteToken = -not [string]::IsNullOrWhiteSpace($TokenToPersist)
   $hadExistingToken = $false
   $tokenRollbackPath = $null
   $commitFailed = $false
@@ -842,7 +845,7 @@ $configJson = Test-GeneratedConfig -Config $config
 
 Write-Step "Writing production config and token"
 New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
-$credentialReplaced = $null -ne $tokenToPersist
+$credentialReplaced = -not [string]::IsNullOrWhiteSpace($tokenToPersist)
 Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist
 $tokenToPersist = $null
 try {

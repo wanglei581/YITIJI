@@ -84,12 +84,12 @@ assert.ok(
 assert.match(installer, /\$unauthorizedMarkerPath/, 'installer must know the persistent latch marker')
 assert.match(
   installer,
-  /\$credentialReplaced = \$null -ne \$tokenToPersist/,
+  /\$credentialReplaced = -not \[string\]::IsNullOrWhiteSpace\(\$tokenToPersist\)/,
   'installer must remember successful BindCode credential replacement before clearing plaintext',
 )
 assert.match(
   installer,
-  /\$credentialReplaced = \$null -ne \$tokenToPersist[\s\S]+\$tokenToPersist = \$null/,
+  /\$credentialReplaced = -not \[string\]::IsNullOrWhiteSpace\(\$tokenToPersist\)[\s\S]+\$tokenToPersist = \$null/,
   'installer must clear the plaintext token after persisting the replacement credential',
 )
 assert.match(
