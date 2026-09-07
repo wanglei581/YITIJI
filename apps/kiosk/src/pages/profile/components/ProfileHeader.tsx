@@ -1,28 +1,19 @@
 import { UserIcon } from 'lucide-react'
-import type { ProfileHeaderStats } from '../profileTypes'
 
 export function ProfileHeader({
   isLoggedIn,
   displayName,
   phoneMasked,
-  stats: _stats,
-  statsLoading: _statsLoading,
   reserveBannerSpace,
   onLogin,
-  onLogout: _onLogout,
   onOpenSettings,
-  onOpenNotifications: _onOpenNotifications,
 }: {
   isLoggedIn: boolean
   displayName: string
   phoneMasked: string
-  stats: ProfileHeaderStats
-  statsLoading: boolean
   reserveBannerSpace: boolean
   onLogin: () => void
-  onLogout: () => void
   onOpenSettings: () => void
-  onOpenNotifications: () => void
 }) {
   return (
     <section

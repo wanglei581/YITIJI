@@ -150,17 +150,9 @@ export function ProfilePage() {
             isLoggedIn={isLoggedIn}
             displayName={headerDisplayName}
             phoneMasked={headerPhoneMasked}
-            stats={{
-              aiRecords: assetOverview.counts.ai,
-              favorites: assetOverview.counts.favorites,
-              documents: assetOverview.counts.documents,
-            }}
-            statsLoading={assetOverview.loading}
             reserveBannerSpace={isLoggedIn && Boolean(pendingTask)}
             onLogin={goLogin}
-            onLogout={() => clearSessionTo({ path: '/profile' })}
             onOpenSettings={() => navigate('/me/settings')}
-            onOpenNotifications={() => navigate('/me/notifications')}
           />
 
           {uiState === 'signed-out' ? <SignedOutBody /> : null}
