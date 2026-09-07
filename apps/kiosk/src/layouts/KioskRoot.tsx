@@ -107,6 +107,8 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/confirm',
   '/print/material-check',
   '/print/preview',
+  '/print/progress',
+  '/print/done',
   '/resume/report',
   '/resume/optimize',
   '/resume/optimize/compare',
