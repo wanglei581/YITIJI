@@ -84,6 +84,7 @@
     "POST /contract-reviews",
     "POST /contract-reviews/:p/confirm",
     "POST /contract-reviews/:p/report/keep",
+    "POST /files/:p/convert",
     "POST /files/kiosk-upload",
     "POST /job-fairs/:p/companies/:p/print-url",
     "POST /job-fairs/:p/materials/:p/print-url",

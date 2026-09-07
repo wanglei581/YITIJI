@@ -103,3 +103,54 @@
 
 /* 分页提示。没有它，上拉加载对用户是不可见的静默行为 */
 .load-hint { padding: 24rpx 0 8rpx; text-align: center; font-size: var(--fs-xs); color: var(--faint); }
+
+.doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+.doc-action {
+  flex-shrink: 0;
+  min-width: 96rpx;
+  min-height: 96rpx;
+  padding: 0 24rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  border: 1rpx solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.doc-action.is-disabled {
+  color: var(--ghost);
+  background: var(--surface-2);
+}
+.doc-hint {
+  margin-top: 8rpx;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+  line-height: 1.5;
+}
+.convert-result {
+  margin: 0 32rpx 16rpx;
+  padding: 24rpx;
+  border-radius: var(--r);
+  border: 1rpx solid var(--line);
+  background: var(--surface);
+}
+.convert-result-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-all;
+}
+.convert-result-meta {
+  margin-top: 8rpx;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: 1.5;
+}

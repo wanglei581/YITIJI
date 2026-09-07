@@ -1775,6 +1775,20 @@ const api = {
     }
     return request('/document-conversion/capabilities', { method: 'GET', needAuth: false });
   },
+
+  /**
+   * 把本人 Word 文件转为派生 PDF。服务端超时 60s，客户端须留出同等窗口。
+   * mock 模式拒绝，不能把未运行的转换引擎显示成已生成。
+   */
+  convertDocumentToPdf(fileId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('Word 转 PDF'));
+    return request(`/files/${encodeURIComponent(fileId)}/convert`, {
+      method: 'POST',
+      data: { target: 'pdf' },
+      needAuth: true,
+      timeout: 65000,
+    });
+  },
 };
 
 

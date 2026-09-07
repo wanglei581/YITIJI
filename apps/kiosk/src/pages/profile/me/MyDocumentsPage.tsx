@@ -24,6 +24,9 @@ import { KIcon } from '../../../components/kiosk-icon'
 import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
+import { DocumentConvertAction } from './components/DocumentConvertAction'
+import { DOCUMENT_NOT_REPRINTABLE_COPY, isDocumentReprintable } from './components/documentReprint'
+import { RetentionConfirmOverlay } from './components/RetentionConfirmOverlay'
 import './me-detail-inkpaper.css'
 
 function formatBytes(n: number): string {
@@ -63,12 +66,6 @@ function needsRetentionConsent(policy: SelectableRetentionPolicy): boolean {
   return policy === 'months_6' || policy === 'long_term'
 }
 
-function retentionConfirmText(policy: SelectableRetentionPolicy): string {
-  return policy === 'long_term'
-    ? '长期保存会持续保留该成果物，便于后续查看、下载和打印；你可以随时改回较短期限或删除。'
-    : '保存 6 个月会延长该文件在账号内的保留时间；你可以随时改回 3 个月或删除。'
-}
-
 function applyRetentionUpdate(
   doc: MemberDocumentItem,
   result: Awaited<ReturnType<typeof updateMyDocumentRetention>>,
@@ -82,53 +79,19 @@ function applyRetentionUpdate(
   }
 }
 
-function RetentionConfirmOverlay({
-  policy,
-  onConfirm,
-  onCancel,
-  busy,
-}: {
-  policy: SelectableRetentionPolicy
-  onConfirm: () => void
-  onCancel: () => void
-  busy: boolean
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="retention-confirm-title"
-        aria-describedby="retention-confirm-desc"
-        className="me-dialog me-retention-dialog w-[23rem] max-w-full p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p id="retention-confirm-title" className="text-base font-semibold text-[color:var(--ink)]">
-          确认{RETENTION_LABELS[policy]}
-        </p>
-        <p id="retention-confirm-desc" className="mt-2 text-sm leading-relaxed text-[color:var(--ink-2)]">
-          {retentionConfirmText(policy)}点击“同意并保存”即表示你已知悉文件保存期限说明。
-        </p>
-        <div className="mt-5 flex gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="me-ripple me-dialog-button"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onConfirm}
-            className={['me-ripple me-dialog-button primary', busy ? 'is-disabled' : ''].join(' ')}
-          >
-            {busy ? '保存中' : '同意并保存'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+/** 结果卡预览/打印仍走本页 open/print；列表刷新前用源文件元数据 + 新 fileId 换短期链接。 */
+function documentForConvertedPdf(
+  items: MemberDocumentItem[],
+  fileId: string,
+  source: MemberDocumentItem,
+): MemberDocumentItem {
+  return items.find((item) => item.id === fileId) ?? {
+    ...source,
+    id: fileId,
+    mimeType: 'application/pdf',
+    downloadUrlPath: `/files/${fileId}/download-url`,
+    previewUrlPath: `/files/${fileId}/preview-url`,
+  }
 }
 
 export function MyDocumentsPage() {
@@ -147,6 +110,7 @@ export function MyDocumentsPage() {
   const [retentionPanelId, setRetentionPanelId] = useState<string | null>(null)
   const [retentionBusy, setRetentionBusy] = useState<{ fileId: string; policy: SelectableRetentionPolicy } | null>(null)
   const [retentionConfirm, setRetentionConfirm] = useState<{ fileId: string; policy: SelectableRetentionPolicy } | null>(null)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
   useInkRipple('.me-inkdetail .me-ripple')
 
   const load = useCallback(() => {
@@ -188,7 +152,7 @@ export function MyDocumentsPage() {
   }, [retentionBusy, retentionPanelId])
 
   const open = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || signingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
     const token = getToken()
     if (!token) return
     setOpening(doc.id)
@@ -203,7 +167,11 @@ export function MyDocumentsPage() {
   }
 
   const print = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || signingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
+    if (!isDocumentReprintable(doc)) {
+      setHint(DOCUMENT_NOT_REPRINTABLE_COPY)
+      return
+    }
     const token = getToken()
     if (!token) return
     setPrintingId(doc.id)
@@ -230,7 +198,7 @@ export function MyDocumentsPage() {
   }
 
   const signStamp = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || signingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
     const token = getToken()
     if (!token) return
     setSigningId(doc.id)
@@ -255,7 +223,7 @@ export function MyDocumentsPage() {
   }
 
   const remove = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || signingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
     if (confirmId !== doc.id) {
       setConfirmId(doc.id)
       return
@@ -276,7 +244,7 @@ export function MyDocumentsPage() {
   }
 
   const submitRetention = async (doc: MemberDocumentItem, policy: SelectableRetentionPolicy) => {
-    if (opening || printingId || signingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
     const token = getToken()
     if (!token) return
     setRetentionConfirm(null)
@@ -294,7 +262,7 @@ export function MyDocumentsPage() {
   }
 
   const selectRetention = (doc: MemberDocumentItem, policy: SelectableRetentionPolicy) => {
-    if (opening || signingId || busyId || retentionBusy) return
+    if (opening || signingId || busyId || retentionBusy || convertingId) return
     if (policy === doc.retentionPolicy) {
       setRetentionPanelId(null)
       return
@@ -307,7 +275,7 @@ export function MyDocumentsPage() {
   }
 
   const now = Date.now()
-  const isAnyPending = Boolean(opening || printingId || signingId || busyId || retentionBusy)
+  const isAnyPending = Boolean(opening || printingId || signingId || busyId || retentionBusy || convertingId)
   const confirmDoc = retentionConfirm ? items.find((item) => item.id === retentionConfirm.fileId) : null
 
   return (
@@ -388,8 +356,9 @@ export function MyDocumentsPage() {
           const openingThis = opening === doc.id
           const printingThis = printingId === doc.id
           const printable = doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'
+          const reprintBlocked = !isDocumentReprintable(doc)
           const viewDisabled = expired || isAnyPending
-          const printDisabled = expired || !printable || isAnyPending
+          const printDisabled = expired || !printable || isAnyPending || reprintBlocked
           const deleteDisabled = isAnyPending
           const policies = selectablePolicies(doc)
           const canChangeRetention = !expired && policies.length > 1
@@ -458,13 +427,37 @@ export function MyDocumentsPage() {
                 <button
                   type="button"
                   disabled={printDisabled}
-                  onClick={() => void print(doc)}
-                  title={printable ? '打印文档' : '该文件格式暂不支持打印'}
+                  aria-disabled={reprintBlocked || undefined}
+                  aria-describedby={reprintBlocked ? `doc-print-blocked-${doc.id}` : undefined}
+                  onClick={() => { if (reprintBlocked) return; void print(doc) }}
+                  title={reprintBlocked ? DOCUMENT_NOT_REPRINTABLE_COPY : printable ? '打印文档' : '该文件格式暂不支持打印'}
                   className={['me-ripple me-doc-action', printDisabled ? 'is-disabled' : ''].join(' ')}
                 >
                   <KIcon name="printer" />
-                  {printingThis ? '准备中' : '打印'}
+                  {reprintBlocked ? '重新打印' : printingThis ? '准备中' : '打印'}
                 </button>
+                {reprintBlocked && (
+                  <p id={`doc-print-blocked-${doc.id}`} className="me-row-meta" role="status">
+                    {DOCUMENT_NOT_REPRINTABLE_COPY}
+                  </p>
+                )}
+                <DocumentConvertAction
+                  fileId={doc.id}
+                  fileName={doc.filename}
+                  mimeType={doc.mimeType}
+                  token={getToken()}
+                  busy={isAnyPending}
+                  reprintable={isDocumentReprintable(doc)}
+                  onConverted={() => {
+                    void getMyDocuments(getToken(), { pageSize: 50 })
+                      .then((r) => setItems(r.items))
+                      .catch(() => undefined)
+                  }}
+                  onError={setHint}
+                  onBusyChange={(next) => setConvertingId(next ? doc.id : null)}
+                  onPreview={(convertedId) => void open(documentForConvertedPdf(items, convertedId, doc))}
+                  onPrint={(convertedId) => void print(documentForConvertedPdf(items, convertedId, doc))}
+                />
                 {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) && (
                   <button
                     type="button"

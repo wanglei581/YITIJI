@@ -374,6 +374,10 @@ const allowedMeChanges = new Set([
   // GET /me/mock-interviews。只加这一行，不改守卫逻辑。
   'apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  // 包 L1 第 1 次（2026-09-07）：我的文档 Word 转 PDF 入口拆子组件，避免主文件超 500 行。
+  'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
+  'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
+  'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   // 2026-09-03 补全（只加不减，不动任何断言逻辑）：
   //
