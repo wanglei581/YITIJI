@@ -5,6 +5,8 @@ const normalize = require('../../utils/normalize.js')
 const auth = require('../../utils/auth.js')
 const buildModel = require('../../utils/resume-build-model.js')
 const fileUrls = require('../../utils/file-url.js')
+const draft = require('./draft')
+const factCheck = require('./fact-check')
 
 const FORMATS = [
   { key: 'pdf', label: 'PDF', mimeType: 'application/pdf' },
@@ -13,62 +15,15 @@ const FORMATS = [
   { key: 'md', label: 'Markdown', mimeType: 'text/markdown' },
 ]
 
-function formatBytes(value) {
-  const bytes = Number(value)
-  if (!Number.isFinite(bytes) || bytes < 0) return '未知'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-function formatExpiry(value) {
-  const date = new Date(value)
-  if (!value || Number.isNaN(date.getTime())) return '以服务端签名链接为准'
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  const hh = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  return `${mm}-${dd} ${hh}:${min}`
-}
-
-function fileIdFromPrintUrl(url) {
-  const match = /\/files\/([^/?]+)\/content(?:\?|$)/.exec(String(url || ''))
-  return match ? decodeURIComponent(match[1]) : ''
-}
-
-/**
- * resume-optimize 真实化 — Phase S0C Task#3
- *
- * 删掉的三类伪造(不得恢复):
- *   1. setTimeout 2.5s 后写死 status:'done'
- *   2. 硬编码的 diffs 数组(含虚构工作经历和技能数据)
- *   3. 硬编码的 mergedText 字符串
- *
- * 修复的参数读取错误:
- *   - options.resumeId → options.taskId (导航传参统一为 ?taskId=)
- *
- * 三类后端失败模式:
- *   200 + status:'failed' + failReason    ─ LLM 两次 paraphrase 被防编造校验拒绝;
- *                                           或简历原文已按隐私策略清理
- *   503 AI_OPTIMIZE_INVALID_OUTPUT        ─ 同上(兜底 503)
- *   503 AI_PROVIDER_NOT_CONFIGURED        ─ 模型未配置
- *   404 AI_TASK_NOT_FOUND                 ─ taskId 不存在或无权访问
- *
- * 模型输出未通过真实性校验时进入 failed,页面不自动重试,也不预测重试成功率。
- *
- * 导出复用现有 POST /resume/generate/export。四种下载格式都由同一份
- * optimizedResume 生成；打印/预览统一使用响应里的同内容 PDF 副本。
- */
+/** 优化页接线：导出 / 草稿 / 事实核对。对照只读，编辑区才进草稿与导出。 */
 Page({
   data: {
     statusBarHeight: 20,
-    // phase: no-task | loading | done | failed
     phase: 'no-task',
     taskId: '',
-    // failed 时区分原因:true=简历原文已清理,需重新上传; false=LLM 校验失败,可手动重试
     needReupload: false,
     failMsg: '',
-    opt: null,         // normalize.resumeOptimize 返回值
+    opt: null,
     isMock: false,
     fromJobFit: false,
     targetPosition: '',
@@ -84,10 +39,21 @@ Page({
     exportDisabled: true,
     exportCountdown: '',
     exportExpired: false,
+    loggedIn: false,
+    editor: draft.resumeToEditor(null),
+    draftReady: false,
+    draftKind: 'guest',
+    draftStatus: '未登录不保存',
+    versions: { latestLabel: '', items: [], empty: true },
+    versionsHint: '',
+    openingVersion: false,
+    factPanel: factCheck.closedPanel(),
+    factsBlockedReason: '',
+    LEN: buildModel.LEN,
   },
 
   onLoad(options) {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20, loggedIn: auth.isLoggedIn() })
     this._loadPricing()
     const taskId = options.taskId || ''
     if (!taskId) {
@@ -106,6 +72,7 @@ Page({
   onUnload() {
     this._gone = true
     this._stopExportCountdown()
+    if (this._saver) this._saver.flush()
   },
 
   async _fetch() {
@@ -119,7 +86,6 @@ Page({
         return
       }
       if (opt.isFailed) {
-        // failReason 含「简历原文/清理/重新上传」→ 原文已清理,重试无用
         const msg = opt.failReason || '优化生成失败'
         const needReupload = /简历原文|清理|重新上传/.test(msg)
         this._fail(msg, needReupload)
@@ -129,11 +95,19 @@ Page({
         this._fail('优化任务未完成', false)
         return
       }
+      this._serverResume = draft.clone(opt.optimizedResume || {})
+      this._resume = draft.clone(this._serverResume)
+      this._editor = draft.resumeToEditor(this._resume)
       this.setData({
         phase: 'done',
         opt,
         isMock: opt.isMockProvider,
-      }, () => this._syncExportAvailability())
+        editor: this._editor,
+      }, () => {
+        this._syncExportAvailability()
+        this._bootDraft()
+        this._loadVersions()
+      })
     } catch (err) {
       const code = (err && err.code) || ''
       if (code === 'AI_TASK_NOT_FOUND') {
@@ -150,6 +124,81 @@ Page({
 
   _fail(failMsg, needReupload) {
     this.setData({ phase: 'failed', failMsg, needReupload }, () => this._syncExportAvailability())
+  },
+
+  _bootDraft() {
+    const loggedIn = auth.isLoggedIn()
+    this._draftExtras = {}
+    this._saver = draft.createAutosave({
+      isLoggedIn: () => auth.isLoggedIn() && this._draftWritable,
+      getTaskId: () => this.data.taskId,
+      getPayload: () => draft.buildDraftPutBody(this._resume, this._draftExtras),
+      put: (taskId, payload) => api.putResumeDraft(taskId, payload),
+      onResponse: (res) => { this._draftExtras = draft.mergeDraftExtras(this._draftExtras, res) },
+      onStatus: (kind, iso, err) => {
+        if (this._gone) return
+        const text = kind === 'failed' ? draft.explainSaveError(err) : draft.statusText(kind, iso)
+        this.setData({ draftKind: kind, draftStatus: text })
+      },
+    })
+    if (!loggedIn) {
+      this._draftWritable = false
+      this.setData({ loggedIn: false, draftReady: true, draftKind: 'guest', draftStatus: draft.statusText('guest') })
+      return
+    }
+    this.setData({ loggedIn: true, draftKind: 'saving', draftStatus: '正在读取草稿…' })
+    draft.restoreDraft(api, this.data.taskId).then((result) => {
+      if (this._gone) return
+      this._draftWritable = result.writable
+      this._draftExtras = result.extras || {}
+      if (result.resume) {
+        this._resume = result.resume
+        this._editor = draft.resumeToEditor(this._resume)
+        this.setData({ editor: this._editor })
+      }
+      this.setData({ draftReady: true, draftKind: result.kind, draftStatus: result.text })
+    })
+  },
+
+  _loadVersions() {
+    if (!auth.isLoggedIn()) {
+      this.setData({ versions: { latestLabel: '', items: [], empty: true }, versionsHint: '登录后可查看已确认的导出版本。' })
+      return
+    }
+    api.getResumeVersions(this.data.taskId)
+      .then((res) => {
+        if (this._gone) return
+        const versions = draft.formatVersions(res)
+        this.setData({
+          versions,
+          versionsHint: versions.empty ? '还没有已确认的导出版本。成功导出后会出现在这里。' : '',
+        })
+      })
+      .catch((err) => {
+        if (this._gone) return
+        this.setData({
+          versions: { latestLabel: '', items: [], empty: true },
+          versionsHint: (err && err.message) || '读取已确认版本失败',
+        })
+      })
+  },
+
+  onDraftInput(e) {
+    const ds = e.currentTarget.dataset
+    this._editor = draft.applyInput(this._editor, ds.section, ds.key, ds.index, e.detail.value)
+    this._resume = draft.editorToResume(this._editor)
+    this._factsConfirmedAt = ''
+    this._factsNeedRecheck = true
+    this.setData({ factsBlockedReason: '' }, () => this._syncExportAvailability())
+    if (!auth.isLoggedIn()) {
+      this.setData({ draftKind: 'guest', draftStatus: draft.statusText('guest') })
+      return
+    }
+    if (!this._draftWritable) {
+      this.setData({ draftKind: 'unbound', draftStatus: draft.statusText('unbound') })
+      return
+    }
+    if (this._saver) this._saver.schedule()
   },
 
   _loadPricing() {
@@ -192,6 +241,7 @@ Page({
     else if (this.data.pricingStatus !== 'ready') reason = this.data.pricing.disabledReason || '正在确认导出价格，请稍候。'
     else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason
     else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId) reason = '未取得可核销权益，当前不能导出。'
+    else if (this.data.factsBlockedReason) reason = this.data.factsBlockedReason
     this.setData({ exportDisabled: Boolean(reason), exportDisabledReason: reason })
   },
 
@@ -200,14 +250,12 @@ Page({
   },
 
   tapRetry() {
-    // 仅 failed + !needReupload 时允许用户主动重试。
     if (this.data.phase !== 'failed' || this.data.needReupload) return
     this.setData({ phase: 'loading', failMsg: '' })
     this._fetch()
   },
 
   tapReupload() {
-    // failed + needReupload → 引导重新上传简历
     wx.navigateTo({
       url: '/pages/resume-parse/resume-parse',
       fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }),
@@ -227,8 +275,8 @@ Page({
       wx.showModal({ title: '暂时不能导出', content: this.data.exportDisabledReason, showCancel: false })
       return
     }
-    const opt = this.data.opt
-    if (!opt || !opt.optimizedResume) {
+    const resume = this._resume || (this.data.opt && this.data.opt.optimizedResume)
+    if (!resume) {
       wx.showModal({ title: '暂时无法导出', content: '服务端没有返回结构化优化稿。本页只展示现有对照，不会用空内容生成文件。', showCancel: false })
       return
     }
@@ -242,10 +290,67 @@ Page({
       })
       return
     }
+    if (this._factsConfirmedAt && !this._factsNeedRecheck) {
+      this._doExport(this._factsConfirmedAt)
+      return
+    }
+    this._startFactCheck()
+  },
 
+  _startFactCheck() {
+    this.setData({ factPanel: factCheck.loadingPanel() })
+    const run = () => api.factCheckResume(this.data.taskId)
+      .then((res) => {
+        if (this._gone) return
+        const panel = factCheck.openPanel(res)
+        this._factsNeedRecheck = false
+        this.setData({ factPanel: panel })
+        if (!panel.canConfirm) {
+          this.setData({ factsBlockedReason: panel.error }, () => this._syncExportAvailability())
+        }
+      })
+      .catch((err) => {
+        if (this._gone) return
+        const panel = factCheck.errorPanel(err)
+        this.setData({ factPanel: panel, factsBlockedReason: panel.error }, () => this._syncExportAvailability())
+      })
+    const pending = this._saver ? this._saver.flush() : Promise.resolve()
+    Promise.resolve(pending).then(run, run)
+  },
+
+  toggleFact(e) {
+    const key = e.currentTarget.dataset.factKey
+    const items = factCheck.toggleItem(this.data.factPanel.items, key)
+    this.setData({ 'factPanel.items': items, 'factPanel.pending': factCheck.pendingCount(items) })
+  },
+
+  removeFact(e) {
+    factCheck.runRemove(this, { draft, auth }, e.currentTarget.dataset.factKey)
+  },
+
+  cancelFacts() {
+    this.setData({ factPanel: factCheck.closedPanel() })
+  },
+
+  confirmFacts() {
+    const panel = this.data.factPanel
+    if (!panel.canConfirm || panel.loading) return
+    if (!factCheck.allConfirmed(panel.items)) {
+      wx.showToast({ title: '请先勾选原文未找到的项', icon: 'none' })
+      return
+    }
+    const at = factCheck.nowIso()
+    this._factsConfirmedAt = at
+    this.setData({ factPanel: factCheck.closedPanel() })
+    this._doExport(at)
+  },
+
+  _doExport(factsConfirmedAt) {
     const format = this.data.format
-    const payload = buildModel.buildExportPayload(opt.optimizedResume, { format, taskId: this.data.taskId })
+    const resume = this._resume || this.data.opt.optimizedResume
+    const payload = buildModel.buildExportPayload(resume, { format, taskId: this.data.taskId })
     if (this.data.benefitGrantId) payload.benefitGrantId = this.data.benefitGrantId
+    payload.factsConfirmedAt = factsConfirmedAt
     this._stopExportCountdown()
     this.setData({ exporting: true, exportResult: null })
     wx.showLoading({ title: '正在生成文件…', mask: true })
@@ -257,30 +362,20 @@ Page({
         if (!res || !res.fileId || !res.filename || !res.printFileUrl) {
           throw new Error('服务端未返回完整文件或打印用 PDF 副本')
         }
-        const definition = FORMATS.find((item) => item.key === format) || {}
-        const result = {
-          fileId: res.fileId,
-          printFileId: fileIdFromPrintUrl(res.printFileUrl),
-          filename: res.filename,
-          mimeType: definition.mimeType || '',
-          formatLabel: definition.label || format.toUpperCase(),
-          sizeLabel: formatBytes(res.sizeBytes),
-          pageLabel: Number(res.pageCount) > 0 ? `${res.pageCount} 页` : '非分页格式',
-          expiresLabel: formatExpiry(res.expiresAt),
-          expiresMs: res.expiresAt ? new Date(res.expiresAt).getTime() : 0,
-          pdfUrl: fileUrls.absoluteUrl(res.printFileUrl),
-          printFileUrl: res.printFileUrl,
-          savedToDocuments: true,
-        }
+        const result = draft.toExportResult(res, format, FORMATS, fileUrls.absoluteUrl)
+        result.printFileId = draft.fileIdFromPrintUrl(res.printFileUrl)
+        result.pdfUrl = fileUrls.absoluteUrl(res.printFileUrl)
         if (!result.pdfUrl || !result.printFileId) throw new Error('打印用 PDF 副本地址无效')
         this.setData({ exporting: false, exportResult: result }, () => this._startExportCountdown())
         if (this.data.pricing.mode === 'charged') this._loadPricing()
+        this._loadVersions()
         this._openPdf(result)
       })
       .catch((err) => {
         wx.hideLoading()
         this.setData({ exporting: false })
-        wx.showModal({ title: '未能生成文件', content: (err && err.message) || '请稍后重试', showCancel: false })
+        if ((err && err.code) === 'RESUME_FACTS_NOT_CONFIRMED') this._factsConfirmedAt = ''
+        wx.showModal({ title: '未能生成文件', content: factCheck.explainExportError(err), showCancel: false })
       })
   },
 
@@ -320,6 +415,54 @@ Page({
         wx.showModal({ title: 'PDF 下载失败', content: fileUrls.readableDownloadError(err && err.errMsg), showCancel: false })
       },
     })
+  },
+
+  openVersion(e) {
+    const fileId = String(e.currentTarget.dataset.fileId || '')
+    const hint = String(e.currentTarget.dataset.openHint || '')
+    if (!fileId) {
+      wx.showModal({ title: '无法打开', content: hint || '服务端未返回 fileId，也没有其它 signedUrl 字段可打开。', showCancel: false })
+      return
+    }
+    if (this.data.openingVersion) return
+    this.setData({ openingVersion: true })
+    wx.showLoading({ title: '加载预览…', mask: true })
+    const finish = () => {
+      wx.hideLoading()
+      this.setData({ openingVersion: false })
+    }
+    api.getFilePreviewUrl(fileId)
+      .then((res) => {
+        const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
+        if (!url) throw new Error('服务端未返回预览链接')
+        wx.downloadFile({
+          url,
+          success: (dl) => {
+            if (dl.statusCode !== 200) {
+              finish()
+              wx.showModal({ title: '打开失败', content: `服务端返回 ${dl.statusCode}，文件链接可能已过期。`, showCancel: false })
+              return
+            }
+            wx.openDocument({
+              filePath: dl.tempFilePath,
+              showMenu: true,
+              success: finish,
+              fail: (err) => {
+                finish()
+                wx.showModal({ title: '无法打开此文件', content: fileUrls.readableDownloadError(err && err.errMsg), showCancel: false })
+              },
+            })
+          },
+          fail: (err) => {
+            finish()
+            wx.showModal({ title: '下载失败', content: fileUrls.readableDownloadError(err && err.errMsg), showCancel: false })
+          },
+        })
+      })
+      .catch((err) => {
+        finish()
+        wx.showModal({ title: '预览失败', content: (err && err.message) || '无法取得预览链接', showCancel: false })
+      })
   },
 
   printExport() {

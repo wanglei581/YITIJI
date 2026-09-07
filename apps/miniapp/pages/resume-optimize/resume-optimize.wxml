@@ -7,7 +7,6 @@
     <view class="nav-right"></view>
   </view>
 
-  <!-- 无任务 -->
   <view wx:if="{{phase === 'no-task'}}" class="no-task-state">
     <text class="ficon i-file-text nt-ic"></text>
     <view class="nt-title">未指定优化任务</view>
@@ -15,7 +14,6 @@
     <view class="btn ghost tap nt-btn" bindtap="goBack">返回</view>
   </view>
 
-  <!-- 加载中 -->
   <view wx:if="{{phase === 'loading'}}" class="running-state">
     <view class="rs-anim">
       <view class="rs-ring"></view>
@@ -25,7 +23,6 @@
     <view class="rs-sub">正在读取 AI 优化建议</view>
   </view>
 
-  <!-- 失败 -->
   <view wx:if="{{phase === 'failed'}}" class="failed-state">
     <text class="ficon i-info fail-ic"></text>
     <view class="fail-msg">{{failMsg || '优化生成失败'}}</view>
@@ -40,7 +37,6 @@
     <view class="btn ghost tap fail-btn-sm" bindtap="goBack">返回</view>
   </view>
 
-  <!-- Mock 模型提示(测试环境) -->
   <view wx:if="{{phase === 'done' && isMock}}" class="mock-banner">
     <text class="ficon i-warning mock-icon"></text>
     <text>当前使用测试模型，结果为模拟数据，不代表真实 AI 输出</text>
@@ -51,18 +47,13 @@
     <text>已从“{{targetPosition || '目标岗位'}}”匹配结果进入。本页优化基于原简历诊断生成，请回到匹配结果逐项核对岗位差距，不会替你补写不存在的经历。</text>
   </view>
 
-  <!-- 对比视图 -->
   <view wx:if="{{phase === 'done'}}" class="content">
     <view class="compare-header">
       <view class="ch-col">修改前</view>
       <view class="ch-div"></view>
       <view class="ch-col teal">修改后</view>
     </view>
-    <view
-      class="diff-block"
-      wx:for="{{opt.modules}}"
-      wx:key="key"
-    >
+    <view class="diff-block" wx:for="{{opt.modules}}" wx:key="key">
       <view class="db-section">{{item.title}}</view>
       <view class="db-cols">
         <view class="db-old">{{item.before}}</view>
@@ -74,7 +65,82 @@
     </view>
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <text>优化结果仅供参考，请核实内容真实性后再使用。不得添加虚假经历或虚构数据。</text>
+      <text>优化结果仅供参考，请核实内容真实性后再使用。不得添加虚假经历或虚构数据。对照区只读；要改导出内容请编辑下方优化稿。</text>
+    </view>
+
+    <view class="section-title" id="edit-draft">编辑优化稿</view>
+    <view wx:if="{{!draftReady}}" class="draft-status">正在确认是否有可继续的草稿…</view>
+    <view wx:else class="draft-status {{draftKind}}">{{draftStatus || '登录会员编辑后会自动保存草稿'}}</view>
+    <view class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <text>这里改的才是即将导出的结构化优化稿。匿名不保存。导出前仍须核对原文未找到的事实，系统不会替你确认。</text>
+    </view>
+
+    <block wx:if="{{draftReady}}">
+    <view class="edit-card" id="edit-basic">
+      <view class="edit-label">姓名</view>
+      <input class="edit-input" value="{{editor.basic.name}}" maxlength="{{LEN.name}}" data-section="basic" data-key="name" data-index="-1" bindinput="onDraftInput" />
+      <view class="edit-label">电话</view>
+      <input class="edit-input" value="{{editor.basic.phone}}" maxlength="{{LEN.phone}}" data-section="basic" data-key="phone" data-index="-1" bindinput="onDraftInput" />
+      <view class="edit-label">邮箱</view>
+      <input class="edit-input" value="{{editor.basic.email}}" maxlength="{{LEN.email}}" data-section="basic" data-key="email" data-index="-1" bindinput="onDraftInput" />
+      <view class="edit-label">目标岗位</view>
+      <input class="edit-input" value="{{editor.intention.position}}" maxlength="{{LEN.position}}" data-section="intention" data-key="position" data-index="-1" bindinput="onDraftInput" />
+      <view class="edit-label">简介</view>
+      <textarea class="edit-input edit-area" value="{{editor.summary}}" maxlength="600" auto-height data-section="summary" data-key="summary" data-index="-1" bindinput="onDraftInput"></textarea>
+    </view>
+
+    <block wx:if="{{editor.education.length}}">
+    <view class="edit-card" id="edit-edu-{{index}}" wx:for="{{editor.education}}" wx:for-item="row" wx:key="id">
+      <view class="edit-kicker">教育 {{index + 1}}</view>
+      <view class="edit-label">学校</view>
+      <input class="edit-input" value="{{row.school}}" maxlength="{{LEN.school}}" data-section="education" data-key="school" data-index="{{index}}" bindinput="onDraftInput" />
+      <view class="edit-label">时间段</view>
+      <input class="edit-input" value="{{row.period}}" maxlength="{{LEN.period}}" data-section="education" data-key="period" data-index="{{index}}" bindinput="onDraftInput" />
+      <view class="edit-label">说明</view>
+      <textarea class="edit-input edit-area" value="{{row.description}}" maxlength="{{LEN.description}}" auto-height data-section="education" data-key="description" data-index="{{index}}" bindinput="onDraftInput"></textarea>
+    </view>
+    </block>
+
+    <block wx:if="{{editor.experience.length}}">
+    <view class="edit-card" id="edit-exp-{{index}}" wx:for="{{editor.experience}}" wx:for-item="row" wx:key="id">
+      <view class="edit-kicker">经历 {{index + 1}}</view>
+      <view class="edit-label">公司</view>
+      <input class="edit-input" value="{{row.company}}" maxlength="{{LEN.company}}" data-section="experience" data-key="company" data-index="{{index}}" bindinput="onDraftInput" />
+      <view class="edit-label">职务</view>
+      <input class="edit-input" value="{{row.role}}" maxlength="{{LEN.role}}" data-section="experience" data-key="role" data-index="{{index}}" bindinput="onDraftInput" />
+      <view class="edit-label">时间段</view>
+      <input class="edit-input" value="{{row.period}}" maxlength="{{LEN.period}}" data-section="experience" data-key="period" data-index="{{index}}" bindinput="onDraftInput" />
+      <view class="edit-label">说明</view>
+      <textarea class="edit-input edit-area" value="{{row.description}}" maxlength="{{LEN.description}}" auto-height data-section="experience" data-key="description" data-index="{{index}}" bindinput="onDraftInput"></textarea>
+    </view>
+    </block>
+
+    <view class="edit-card" id="edit-lists">
+      <view class="edit-label">技能（一行一项，或用顿号/逗号分隔）</view>
+      <textarea class="edit-input edit-area" value="{{editor.skillsText}}" maxlength="800" auto-height data-section="skillsText" data-key="skillsText" data-index="-1" bindinput="onDraftInput"></textarea>
+      <view class="edit-label">证书（一行一项）</view>
+      <textarea class="edit-input edit-area" value="{{editor.certsText}}" maxlength="800" auto-height data-section="certsText" data-key="certsText" data-index="-1" bindinput="onDraftInput"></textarea>
+    </view>
+    </block>
+
+    <view class="section-title">已确认版本</view>
+    <view wx:if="{{versions.latestLabel}}" class="ver-latest">{{versions.latestLabel}}</view>
+    <view wx:if="{{versionsHint}}" class="ver-empty">{{versionsHint}}</view>
+    <view wx:for="{{versions.items}}" wx:key="key" class="ver-row">
+      <view class="ver-main">
+        <view class="ver-title">{{item.versionLabel}}</view>
+        <view class="ver-meta">{{item.confirmedAtLabel}}</view>
+        <view class="ver-meta">{{item.factsLabel}}</view>
+      </view>
+      <view
+        class="btn ghost tap ver-open"
+        bindtap="openVersion"
+        data-file-id="{{item.fileId}}"
+        data-open-hint="{{item.openHint}}"
+        role="button"
+        aria-label="打开 {{item.versionLabel}}"
+      >{{item.canOpen ? '打开文件' : '无法打开'}}</view>
     </view>
 
     <view class="section-title">导出优化稿</view>
@@ -110,9 +176,53 @@
     </view>
   </view>
 
-  <view wx:if="{{phase === 'done'}}" class="actionbar">
+  <view wx:if="{{phase === 'done' && !factPanel.open}}" class="actionbar">
     <button class="btn primary block" bindtap="exportResume" loading="{{exporting}}" disabled="{{exporting || exportDisabled}}" aria-disabled="{{exporting || exportDisabled}}">
       {{exporting ? '正在生成…' : '生成并打开文件'}}
     </button>
+  </view>
+
+  <view wx:if="{{factPanel.open}}" class="fact-mask">
+    <view class="fact-sheet">
+      <view class="fact-title">导出前核对事实</view>
+      <view class="fact-desc">原文未找到的项必须逐项勾选确认。系统不会替你确认电话、邮箱、学校、公司、时间或证书。原文不可得时不能写成已核对。发现 AI 编造的内容，可以删掉这条回到编辑区，不要违心确认。</view>
+      <view wx:if="{{factPanel.removedHint}}" class="fact-removed-hint">{{factPanel.removedHint}}</view>
+      <view wx:if="{{factPanel.loading}}" class="fact-loading">正在对照原文核对…</view>
+      <view wx:if="{{factPanel.error}}" class="fact-error">{{factPanel.error}}</view>
+      <block wx:for="{{factPanel.items}}" wx:key="key">
+      <view
+        class="fact-row tap {{item.needsConfirm ? '' : 'found'}} {{item.confirmed ? 'on' : ''}} {{item.removed ? 'removed' : ''}}"
+        bindtap="toggleFact"
+        data-fact-key="{{item.key}}"
+        role="checkbox"
+        aria-label="{{item.label}} {{item.value}}"
+      >
+        <view class="fact-box {{item.confirmed ? 'on' : ''}}"></view>
+        <view class="fact-body">
+          <view class="fact-label">{{item.label}}</view>
+          <view class="fact-value">{{item.value}}</view>
+          <view class="fact-mark">{{item.mark}}</view>
+        </view>
+      </view>
+      <view
+        wx:if="{{item.needsConfirm && !item.removed}}"
+        class="btn ghost tap block fact-remove"
+        bindtap="removeFact"
+        data-fact-key="{{item.key}}"
+        role="button"
+        aria-label="删掉这条，回到原文"
+      >删掉这条，回到原文</view>
+      </block>
+      <view wx:if="{{factPanel.canConfirm && !factPanel.items.length && !factPanel.loading}}" class="fact-empty">这份稿里没有可勾选的学校 / 公司 / 时间 / 证书 / 电话 / 邮箱。仍需你点确认后才会带上核对时间。</view>
+      <view wx:if="{{factPanel.pending > 0}}" class="fact-pending">还有 {{factPanel.pending}} 项原文未找到且未勾选，不能导出。</view>
+      <view class="fact-actions">
+        <view class="btn ghost tap" bindtap="cancelFacts">返回修改</view>
+        <view
+          class="btn primary tap {{factPanel.canConfirm && !factPanel.loading && factPanel.pending === 0 ? '' : 'disabled'}}"
+          bindtap="confirmFacts"
+          aria-disabled="{{!(factPanel.canConfirm && !factPanel.loading && factPanel.pending === 0)}}"
+        >确认导出</view>
+      </view>
+    </view>
   </view>
 </view>

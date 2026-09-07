@@ -622,6 +622,44 @@ const api = {
   },
 
   /**
+   * 登录用户保存优化稿编辑草稿。匿名 / 越权由服务端统一 404。
+   * body 只收 resume / layout / decisions，updatedAt 由服务端写。
+   */
+  putResumeDraft(taskId, payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历草稿'));
+    return request(`/resume/records/${encodeURIComponent(taskId)}/draft`, {
+      method: 'PUT', data: payload, needAuth: true,
+    });
+  },
+
+  /** 登录用户读取优化稿编辑草稿。无草稿时 draft 为 null，不是错误。 */
+  getResumeDraft(taskId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历草稿'));
+    return request(`/resume/records/${encodeURIComponent(taskId)}/draft`, {
+      method: 'GET', needAuth: true,
+    });
+  },
+
+  /** 登录用户读取已确认导出版本（当前服务端返回最新确认快照）。 */
+  getResumeVersions(taskId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历版本'));
+    return request(`/resume/records/${encodeURIComponent(taskId)}/versions`, {
+      method: 'GET', needAuth: true,
+    });
+  },
+
+  /**
+   * 对照原文核对优化稿事实项。成功才有 originalAvailable=true 与 items。
+   * 原文不可得时服务端 404/503，前端不得写成「已核对」。
+   */
+  factCheckResume(taskId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历事实核对'));
+    return request(`/resume/records/${encodeURIComponent(taskId)}/fact-check`, {
+      method: 'POST', needAuth: true,
+    });
+  },
+
+  /**
    * 生成职业规划(POST 触发,同步返回)。服务端内部最多重试 2 次模型调用,
    * 所以慢的时候是两次调用叠加,页面不要写死"约 N 秒"。限流 6 次/分钟。
    *
