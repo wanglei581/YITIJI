@@ -276,6 +276,33 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 - **执行记录**：
   > 2026-09-07 **包 L2 · 一体机优化页草稿自动保存 / 已确认版本 / 回到原文**（分支 `claude/rl-l2-kiosk-draft`，本地工作区，未 commit、未 push、未开 PR、未部署）。消费包 H 的 `PUT/GET /resume/records/:taskId/draft`、`GET .../versions`。① kiosk `ai.ts` + http/mock 适配器新增 4 个方法；mock 对 GET draft / versions 给空结果，PUT draft / fact-check 拒绝，不伪装已保存。② 登录会员先 GET draft；有草稿则青序提示条「继续上次编辑（更新于 hh:mm）/ 从优化结果重新开始」，选择前不渲染编辑区。③ 内容 / 版式 / 逐条裁决变化后防抖 2s PUT draft；状态「草稿已保存 hh:mm:ss」/「保存失败，改动仍在本机」/「未登录，草稿不会保存」。未保存改动仍走 `requestLeave`。④ 每组建议可「回到原文 / 使用优化稿」，`decisions` 随草稿保存，导出前按裁决把已回退模块换回原文。⑤ 「已确认版本」GET versions，点击用既有 `GET /files/:id/preview-url`（`fetchAccessUrl`）打开 `FilePreviewDialog`；找不到链接写明「文件可能已到期或被清理」。导出成功后 `refreshKey` 刷新列表。⑥ 匿名不调 draft / versions，无假按钮。`ResumeOptimizePage.tsx` 316 行。夹具 `api-router` 对未登记的 draft/versions 默认 404。Playwright：会员草稿 `updatedAt=2099-03-15T08:30:00.000Z`。**未做**：小程序接线、服务端 / Prisma / 多版本对比、匿名草稿。**验证（实跑）**：kiosk `tsc --noEmit` 0；改动文件 eslint `--max-warnings=0` 0。`verify:fusion-w3` / `kiosk-runtime-error-boundary` / `lightflow-k2b-ai-resume` / `profile-documents-inkpaper` / `resume-diagnosis-flow-ui` / `resume-phone-upload-ui` / `kiosk-visual-unity` / `ai-down-fallbacks` / `member-session-closure` / `kiosk-frontend-debt` / `no-raw-error-render` / `llm-timeout-concurrency` / `toolbox-ai-skill-intents` 全绿。Playwright：`resume-optimize-draft.spec.ts` 1 passed；`kiosk-visible-actions-truth.spec.ts` 4 passed；`fusion-w3.spec.ts` 11 passed（含优化稿页内预览）；`fusion-w6-routes.spec.ts` `/resume/optimize` 与 `/resume/export` 2 passed。未部署。
 
+#### 包 L6 · 文档与原型标注补漏（交付标准评审仍开着的文档项）
+
+- **条目**：P0 取回被 `9d3bc4789` 整批覆盖的合规授权文本（`compliance-boundary.md` §4.4A + `feature-scope.md` §2.7.1）；青序流光原型接口 / 站内死链标注对齐运行时（改注释与 `href` / `data-route` 路由字面量，不改版式）。
+- **事实**：`CLAUDE.md` 两处引用 `compliance-boundary.md §4.4A`，但 main 上该节与 `feature-scope.md` §2.7.1 都不存在。完整文本在 `4ab3dd5b2`。原型侧：`37-pay-states.html:15` 仍写 `latestAttempt`（运行时字段是 `attempt`）；`07-session-resume.html` 链到 `/me/records`、`/print/arrival-code`；`24-resume-generate.html` 链到 `/profile/records?view=resumes`、`/services`；`37-pay-states.html:462` 链到 `/print/pickup`；`13-print-desk.html` 头部未标 PII 检查端点；`30-my-profile.html`「看出纸」仍 `href` 到 `33-pickup-code.html`（台账 099 唯一宿主是 `11-arrival-code.html`）。
+- **允许改**：上述两份正式文档与 `docs/design/kiosk-redesign-2026-08/` 列出的 html。
+- **禁改**：`apps/**`、`services/**`、`packages/**`、`.github/workflows/**`、Prisma、`docs/progress/current-progress.md`、`docs/graph/**`。
+
+- **执行记录**：
+  > 2026-09-07 **包 L6 · 文档与原型标注补漏**（分支 `rl-l6-docs-gaps`，本地工作区，未 commit、未 push、未开 PR、未部署）。纯文档 / 原型注释，不碰 `apps/**`、`services/**`、`packages/**`。
+  >
+  > **做了什么**
+  > ① 从 `4ab3dd5b2` **逐字**取回：`docs/compliance/compliance-boundary.md` §4.4 对照表「用户本人自填的求职进度」行、`BrowseLog` / `ExternalJumpLog` / `Favorite` 不得扩状态字段那条、整节 **§4.4A**（保留编号，插在 §4.4 与 §4.5 之间）；`docs/product/feature-scope.md` §2.7 表「我的求职进度」行 + **§2.7.1**（插在 §2.7 整改说明之后）。两份文档头部「最后更新」补「2026-09-07 取回被 9d3bc4789 覆盖的 §4.4A / §2.7.1」。其它段落未改。`grep -n "4.4A" CLAUDE.md docs/compliance/compliance-boundary.md` 两边都能对上。
+  > ② 青序流光（先 `git grep` / 运行时核对再改）：`37-pay-states.html` `latestAttempt` → `attempt`；`/print/pickup` → `/print/pickup-claim`。`07-session-resume.html` `/me/records` → `/me/activity`（3 处）、`/print/arrival-code` → `/print/pickup-claim`（3 处）。`24-resume-generate.html` `/profile/records?view=resumes` → `/me/resumes`（6 处）；运行时 `apps/kiosk/src/routes/index.tsx` 无 `/services`、也无「全部服务」Hub，该出口 `data-route` 改指 `/`，页内注释写明。`13-print-desk.html` 头部补 `POST/GET /materials/tasks`、`GET /materials/tasks/:id/print-param-suggestions`、`POST /materials/tasks/:id/pii-findings/decisions`（对齐 `materials.controller.ts`）。`30-my-profile.html`「看出纸进度」`href` `33-pickup-code.html` → `11-arrival-code.html`（2 处），`data-route="/print/pickup-claim"` 与 `data-testid` 未动。未改 `data-*` 夹具钩子、未改 `?capture=1` 真实态渲染、未改版式。
+  >
+  > **门禁（实跑）**
+  > 图谱：`compliance-boundary.md` → `verify:compliance-copy`、`verify:member-data-retention`；`feature-scope.md` → `verify:profile-documents-inkpaper`。五份 html 与本 packets 文件图谱无门禁。仓库无 `verify:feature-scope-*` 脚本。
+  > - `pnpm verify:compliance-copy` ALL PASS（含 datetime-honesty / list-truncation-honesty / no-raw-error-render）
+  > - `pnpm --filter @ai-job-print/api verify:compliance` PASS
+  > - `VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-data-retention` ALL PASS（含「合规边界记载 2026-09-06 高敏结果可保存不打印裁定」，§4.8 仍在）
+  > - `pnpm --filter @ai-job-print/kiosk verify:profile-documents-inkpaper` ALL PASS（未触碰 `/me/documents` 明细页，跳过范围 allowlist）
+  > - `VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:job-application-track` 123 PASS / 0 FAIL（§4.4A 点名的实现门禁；Favorite / BrowseLog / ExternalJumpLog 未扩投递状态字段）
+  > - `pnpm verify:fixture-time-bombs` ALL PASS（无新增夹具日期）
+  > - `node apps/kiosk/scripts/verify-qingxu-proto-geometry.mjs --only='07-session-resume|13-print-desk|24-resume-generate|30-my-profile|37-pay-states'` ALL PASS（5 pages, 88 variants）。无独立「原型空白」门禁盯这五页。
+  >
+  > **没做**
+  > 未改 `apps/**` / `services/**` / `packages/**` / Prisma / workflow / `docs/progress/current-progress.md` / `docs/graph/**`。未 commit / push / 开 PR / 部署。未改写 §2.7.1「后端模型、接口、页面均不存在 / 未开发」去对齐后来的 `JobApplication` 与 `GET/POST /me/job-applications`（按任务要求逐字取回 `4ab3dd5b2`；该句与当前 schema / `verify:job-application-track` 已不一致，留给后续口径修订）。未修交付评审里本包未列的 `15-print-fulfill.html` 取件码来源标注。`37-pay-states.html` 取件码出口仍 `href` 到 `33-pickup-code.html`（任务只改路由字面量）。未跑 51 页全量几何（改的是注释与路由字面量，几何只复验被改的 5 页）。
+
 ## 第三波（P1 补全，商用完整）
 
 ≥3 套真实模板 + 真实缩略图；DOCX 吃 layout / 模板；具名多版本与对比；跨端续办；PDF → 图片；gotenberg 适配器 + 队列化；Puppeteer 替换 pdfkit 评估；缩略图；助手会话要点；政策核对材料清单出纸。

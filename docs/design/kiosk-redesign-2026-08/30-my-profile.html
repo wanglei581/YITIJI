@@ -387,7 +387,7 @@ function todoCard(kind){
       +'<span class="todo-tx"><span class="todo-t">你的文件正在打印</span>'
       +'<span class="todo-meta"><b>求职简历-终稿.pdf</b><i>·</i>第 <b>2</b>/<b>3</b> 页<i>·</i>取件码 <b class="code">4829</b></span>'
       +'<span class="todo-d">出纸进度与取件码由 <b>/me/pending-tasks</b> 的 <b>status</b>（claimed / printing）返回；纸出完前不要离开取件口。</span></span>'
-      +'<a class="todo-btn teal press" href="33-pickup-code.html" data-route="/print/pickup-claim" data-testid="profile-resume">看出纸进度</a></div></div>';
+      +'<a class="todo-btn teal press" href="11-arrival-code.html" data-route="/print/pickup-claim" data-testid="profile-resume">看出纸进度</a></div></div>';
   }
   return '<div class="card"><div class="todo"><span class="todo-ic">'+svg('clock',26)+'</span>'
     +'<span class="todo-tx"><span class="todo-t">你有未办完的事</span>'
@@ -531,7 +531,7 @@ var VIEWS={
     return '<div class="scroll">'+idCard(false)+todoCard('printing')+assetGrid('profile',COUNTS)
       +sessionRecords('has')+accountRows('profile')+'</div>'
       +'<div class="ctabar"><p class="why">出纸完成前不要离开取件口；离开会话不会取消已提交的打印。</p>'
-      +'<a class="btn primary press" href="33-pickup-code.html" data-route="/print/pickup-claim" data-testid="profile-primary">看出纸进度</a></div>';
+      +'<a class="btn primary press" href="11-arrival-code.html" data-route="/print/pickup-claim" data-testid="profile-primary">看出纸进度</a></div>';
   },
   'profile:signed-out':function(){
     return '<div class="scroll">'+idCard(true)

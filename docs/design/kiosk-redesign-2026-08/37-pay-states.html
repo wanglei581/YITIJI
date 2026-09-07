@@ -12,7 +12,7 @@
   state: pending | confirming | paid | expired | reconciling | closed
   api（真值定义，本页一律不调用）:
        POST /api/v1/orders/:id/pay           → { attemptId, channel, status, qrCodeContent, expiresAt }
-       GET  /api/v1/orders/:id/pay-status    → { orderId, payStatus, latestAttempt }
+       GET  /api/v1/orders/:id/pay-status    → { orderId, payStatus, attempt }
        POST /api/v1/orders/:id/pay/reconcile → 主动查单（回调丢失兜底，与回调同一条幂等入账路径）
        GET  /api/v1/print/price-config       → { billingEnabled, items }
   真话边界（本批次修复要点）：
@@ -459,7 +459,7 @@ function bodyFor(state, fallback){
         + '</div>'
         + actsCard('接下来去哪儿','都是可点的实体出口',[
             ['15-print-fulfill.html','/print/progress','progress',['查看打印进度','进度以服务端与设备回流为准'],'print',''],
-            ['33-pickup-code.html','/print/pickup','pickup',['取件码页面','取件码只在服务端返回时展示'],'ticket','slate'],
+            ['33-pickup-code.html','/print/pickup-claim','pickup',['取件码页面','取件码只在服务端返回时展示'],'ticket','slate'],
             ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'order','slate'],
             ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','是否已到账以服务端返回为准'],'refresh','clay']
           ])
