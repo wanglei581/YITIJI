@@ -14,6 +14,12 @@ const paths = {
   printPreview: join(kioskRoot, 'src/pages/print/PrintPreviewPage.tsx'),
   miniapp: join(repoRoot, 'apps/miniapp/pages/resume-upload/resume-upload.js'),
   miniappWxml: join(repoRoot, 'apps/miniapp/pages/resume-upload/resume-upload.wxml'),
+  documentsPage: join(kioskRoot, 'src/pages/profile/me/MyDocumentsPage.tsx'),
+  documentsConvert: join(kioskRoot, 'src/pages/profile/me/components/DocumentConvertAction.tsx'),
+  miniappDocuments: join(repoRoot, 'apps/miniapp/pages/documents/documents.js'),
+  miniappDocumentsWxml: join(repoRoot, 'apps/miniapp/pages/documents/documents.wxml'),
+  miniappDocumentsHelpers: join(repoRoot, 'apps/miniapp/pages/documents/documents-helpers.js'),
+  miniappApi: join(repoRoot, 'apps/miniapp/utils/api.js'),
 }
 
 function sources() {
@@ -90,6 +96,80 @@ function collectFailures(files) {
       'const resumeExt = this.data.wordConversionAvailable\n      ? BASE_RESUME_EXT.concat(WORD_RESUME_EXT)\n      : BASE_RESUME_EXT\n    wx.chooseMessageFile',
     ),
     'miniapp-accept: 小程序能力关闭时 extension 必须只保留基础格式',
+  )
+  check(
+    files.documentsPage.includes('<DocumentConvertAction'),
+    'documents-entry: 我的文档必须接线 DocumentConvertAction，不得把转 PDF 堆进主文件',
+  )
+  check(
+    files.documentsConvert.includes('WORD_CONVERSION_UNAVAILABLE_COPY'),
+    'documents-reason: 我的文档转 PDF 关闭态必须显示 Word 转换未开放原因',
+  )
+  check(
+    files.documentsConvert.includes('WORD_CONVERSION_DISCLOSURE'),
+    'documents-disclosure: 我的文档转 PDF 开放态必须显示复杂版式偏差提示',
+  )
+  check(
+    /if \(!available \|\| converting \|\| busy\) return/.test(files.documentsConvert),
+    'documents-convert-guard: convert 调用前必须校验 wordToPdf 与忙碌态',
+  )
+  const docsConvertCall = files.documentsConvert.indexOf('await convertDocumentToPdf(fileId, token)')
+  const docsGuard = files.documentsConvert.indexOf('if (!available || converting || busy) return')
+  check(docsGuard >= 0 && docsConvertCall > docsGuard, 'documents-convert-order: convert 只能位于能力真值守卫之后')
+  check(
+    files.documentsConvert.includes('useRemainingSeconds') && files.documentsConvert.includes('formatRemainingSeconds'),
+    'documents-expiry: 转换结果必须展示有效期倒计时',
+  )
+  check(
+    files.documentsPage.includes('DOCUMENT_NOT_REPRINTABLE_COPY') && files.documentsPage.includes('aria-disabled={reprintBlocked || undefined}'),
+    'documents-reprintable: reprintable=false 必须 aria-disabled 并写明仅可查看不可打印',
+  )
+  check(
+    files.documentsConvert.includes('onPreview(result.fileId)')
+      && files.documentsConvert.includes('onPrint(result.fileId)')
+      && files.documentsConvert.includes('打印这份 PDF')
+      && files.documentsPage.includes('onPreview=')
+      && files.documentsPage.includes('onPrint=')
+      && files.documentsPage.includes('documentForConvertedPdf'),
+    'documents-convert-result-actions: 转换结果卡必须把既有预览/打印处理器接到派生 PDF',
+  )
+  check(
+    files.documentsConvert.includes('链接已过期，请在列表里重新打开'),
+    'documents-convert-expired: 结果卡链接过期必须提示回列表重新打开',
+  )
+  check(
+    files.documentsPage.includes('reprintable={isDocumentReprintable(doc)}'),
+    'documents-convert-reprintable: 结果卡打印键必须按转换前记录的 reprintable 判定',
+  )
+  check(
+    files.miniappApi.includes("request(`/files/${encodeURIComponent(fileId)}/convert`") && files.miniappApi.includes('needAuth: true'),
+    'miniapp-convert-api: 小程序必须新增 needAuth 的 convertDocumentToPdf',
+  )
+  check(
+    `${files.miniappDocuments}\n${files.miniappDocumentsWxml}\n${files.miniappDocumentsHelpers}`.includes('WORD_CONVERSION_UNAVAILABLE_COPY'),
+    'miniapp-documents-reason: 小程序我的文档关闭态必须显示 Word 转换未开放原因',
+  )
+  check(
+    `${files.miniappDocuments}\n${files.miniappDocumentsWxml}\n${files.miniappDocumentsHelpers}`.includes('WORD_CONVERSION_DISCLOSURE'),
+    'miniapp-documents-disclosure: 小程序我的文档开放态必须显示复杂版式偏差提示',
+  )
+  check(
+    `${files.miniappDocuments}\n${files.miniappDocumentsWxml}\n${files.miniappDocumentsHelpers}`.includes('该报告仅可查看，不可打印'),
+    'miniapp-documents-reprintable: 小程序 reprintable=false 必须写明仅可查看不可打印',
+  )
+  check(
+    files.miniappDocumentsWxml.includes('打开 PDF')
+      && files.miniappDocuments.includes('this.previewDoc(result.fileId)')
+      && files.miniappDocuments.includes("this.reprintDoc({ currentTarget: { dataset: { id: result.fileId } } })"),
+    'miniapp-convert-result-actions: 小程序结果卡必须复用 previewDoc 与 reprintDoc',
+  )
+  check(
+    files.miniappDocumentsWxml.includes('链接已过期，请在列表里重新打开'),
+    'miniapp-convert-expired: 小程序结果卡链接过期必须提示回列表重新打开',
+  )
+  check(
+    files.miniappDocumentsHelpers.includes('reprintable: isDocumentReprintable(sourceFile)'),
+    'miniapp-convert-reprintable: 小程序结果卡打印必须按转换前记录的 reprintable 判定',
   )
   for (const [key, content] of Object.entries({
     resume: files.resume,
@@ -173,6 +253,34 @@ const mutations = [
     from: '? BASE_RESUME_EXT.concat(WORD_RESUME_EXT)\n      : BASE_RESUME_EXT',
     to: '? BASE_RESUME_EXT.concat(WORD_RESUME_EXT)\n      : BASE_RESUME_EXT.concat(WORD_RESUME_EXT)',
     expected: 'miniapp-accept:',
+  },
+  {
+    name: 'documents-convert-guard',
+    path: paths.documentsConvert,
+    from: 'if (!available || converting || busy) return',
+    to: 'if (converting || busy) return',
+    expected: 'documents-convert-guard:',
+  },
+  {
+    name: 'documents-reprintable',
+    path: paths.documentsPage,
+    from: 'aria-disabled={reprintBlocked || undefined}',
+    to: 'aria-disabled={undefined}',
+    expected: 'documents-reprintable:',
+  },
+  {
+    name: 'documents-convert-result-actions',
+    path: paths.documentsConvert,
+    from: 'onClick={() => { if (previewBlocked) return; onPreview(result.fileId) }}',
+    to: 'onClick={() => { if (previewBlocked) return }}',
+    expected: 'documents-convert-result-actions:',
+  },
+  {
+    name: 'miniapp-convert-result-actions',
+    path: paths.miniappDocuments,
+    from: 'this.previewDoc(result.fileId)',
+    to: 'this.previewDoc(item.id)',
+    expected: 'miniapp-convert-result-actions:',
   },
 ]
 

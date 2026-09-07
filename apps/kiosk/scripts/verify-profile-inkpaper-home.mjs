@@ -388,6 +388,10 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
   'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  // 包 L1 第 1 次（2026-09-07）：我的文档 Word 转 PDF 入口拆子组件，避免主文件超 500 行。
+  'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
+  'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
+  'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/styles/me-assets.css',
   'apps/kiosk/src/pages/profile/me/styles/me-detail-base.css',

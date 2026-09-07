@@ -67,6 +67,8 @@ function listChangedFiles() {
 console.log('\n=== Profile 我的文档页墨青纸感守卫 ===')
 
 const page = read('src/pages/profile/me/MyDocumentsPage.tsx')
+const convertAction = read('src/pages/profile/me/components/DocumentConvertAction.tsx')
+const retentionOverlay = read('src/pages/profile/me/components/RetentionConfirmOverlay.tsx')
 const css = readImportedCss(
   'src/pages/profile/me/me-detail-inkpaper.css',
   [
@@ -120,15 +122,30 @@ expectIncludes(page, 'setItems((prev) => prev.filter((item) => item.id !== doc.i
 expectIncludes(page, 'updateMyDocumentRetention(token, doc.id, policy)', '我的文档保留保存期限更新 API')
 expectIncludes(page, 'allowedRetentionPolicies', '我的文档保留后端允许策略驱动选项')
 expectIncludes(page, 'needsRetentionConsent(policy)', '我的文档保留 6 个月/长期保存确认门槛')
-expectIncludes(page, '同意并保存', '我的文档保留保存期限确认按钮')
+expectIncludes(retentionOverlay, '同意并保存', '我的文档保留保存期限确认按钮')
 expectIncludes(page, 'error instanceof MemberAssetsApiError', '我的文档保留后端可读错误透出')
 expectIncludes(page, '保存期限已更新', '我的文档保留保存期限成功提示')
-expectIncludes(page, 'const isAnyPending = Boolean(opening || printingId || signingId || busyId || retentionBusy)', '我的文档保留异步互斥锁')
+expectIncludes(page, 'const isAnyPending = Boolean(opening || printingId || signingId || busyId || retentionBusy || convertingId)', '我的文档保留异步互斥锁')
 expectIncludes(page, 'disabled={viewDisabled}', '查看按钮保留禁用态')
 expectIncludes(page, 'disabled={printDisabled}', '打印按钮保留禁用态')
+expectIncludes(page, 'aria-disabled={reprintBlocked || undefined}', '不可打印报告的重新打印键使用 aria-disabled')
+expectIncludes(page, 'DOCUMENT_NOT_REPRINTABLE_COPY', '不可打印报告展示仅可查看文案')
+expectIncludes(page, '<DocumentConvertAction', 'Word 转 PDF 入口拆到 DocumentConvertAction')
+expectIncludes(convertAction, 'WORD_CONVERSION_UNAVAILABLE_COPY', '转 PDF 关闭态写明 Word 转换未开放')
+expectIncludes(convertAction, 'WORD_CONVERSION_DISCLOSURE', '转 PDF 开放态附带版式偏差提示')
+expectIncludes(convertAction, 'useRemainingSeconds', '转换结果展示有效期倒计时')
+expectIncludes(convertAction, "if (!available || converting || busy) return", 'convert 仅在能力为真且未忙碌时调用')
+expectIncludes(convertAction, '打印这份 PDF', '转换结果卡提供打印这份 PDF')
+expectIncludes(convertAction, 'onPreview(result.fileId)', '转换结果卡预览走 onPreview(fileId)')
+expectIncludes(convertAction, 'onPrint(result.fileId)', '转换结果卡打印走 onPrint(fileId)')
+expectIncludes(convertAction, '链接已过期，请在列表里重新打开', '转换结果卡链接过期提示回列表')
+expectIncludes(page, 'onPreview=', '我的文档把既有预览处理器传给结果卡')
+expectIncludes(page, 'onPrint=', '我的文档把既有打印处理器传给结果卡')
+expectIncludes(page, 'documentForConvertedPdf', '结果卡预览/打印复用本页 open/print，不另起链路')
+expectIncludes(page, 'reprintable={isDocumentReprintable(doc)}', '结果卡打印按转换前记录的 reprintable 判定')
 expectIncludes(page, 'disabled={deleteDisabled}', '删除按钮保留禁用态')
 
-expectIncludes(page, 'role="dialog"', '保存期限确认弹层保留 dialog 语义')
+expectIncludes(retentionOverlay, 'role="dialog"', '保存期限确认弹层保留 dialog 语义')
 expectIncludes(page, 'aria-modal="true"', '保存期限确认弹层保留 aria-modal')
 expectIncludes(page, '还没有文档', '我的文档保留空态标题')
 expectIncludes(page, '保存简历 / 打印材料等文档后，这里会显示你的文档记录', '我的文档保留空态说明')
@@ -137,6 +154,8 @@ expectIncludes(page, '原始简历/求职材料默认 90 天', '我的文档保�
 
 for (const [label, source] of [
   ['MyDocumentsPage', page],
+  ['DocumentConvertAction', convertAction],
+  ['RetentionConfirmOverlay', retentionOverlay],
   ['me-detail-inkpaper.css', css],
 ]) {
   expectAbsent(source, /一键投递|立即投递|平台投递|投递简历/, `${label} 不出现招聘闭环禁用文案`)
@@ -175,6 +194,22 @@ const allowedChanged = new Set([
   'apps/kiosk/src/pages/print/PrintConfirmPage.tsx',
   'apps/kiosk/src/pages/print/PrintDonePage.tsx',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  // 包 L1 第 1 次（2026-09-07）：「我的文档」Word 转 PDF 与 reprintable 接线。
+  // MyDocumentsPage 已到 500 行预算，转换入口和保存期限确认弹层拆到子组件；
+  // 小程序两端同步接线。只加行，不改守卫判定逻辑。
+  'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
+  'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
+  'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
+  'apps/kiosk/scripts/verify-word-conversion-ui.mjs',
+  'apps/kiosk/scripts/verify-lightflow-profile-entry.mjs',
+  'apps/kiosk/scripts/verify-file-retention-ui.mjs',
+  'apps/miniapp/utils/api.js',
+  'apps/miniapp/scripts/api-contract.json',
+  'apps/miniapp/pages/documents/documents.js',
+  'apps/miniapp/pages/documents/documents.wxml',
+  'apps/miniapp/pages/documents/documents.wxss',
+  'apps/miniapp/pages/documents/documents-helpers.js',
+  'docs/reviews/result-layer-2026-09-06-packets.md',
   'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx',

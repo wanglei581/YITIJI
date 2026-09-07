@@ -34,6 +34,30 @@
             role="button" aria-label="重新加载文档列表">刷新</view>
     </view>
 
+    <view wx:if="{{convertResult}}" class="convert-result" role="status">
+      <view class="convert-result-title">{{convertResult.filename}}</view>
+      <view class="convert-result-meta">{{convertResult.pageLabel}} · {{convertResult.sizeLabel}}</view>
+      <view class="convert-result-meta">{{convertCountdown}}</view>
+      <view class="convert-result-meta">{{convertResult.disclosure}}</view>
+      <view wx:for="{{convertResult.warnings}}" wx:for-item="warning" wx:key="*this" class="convert-result-meta">{{warning}}</view>
+      <view class="doc-actions">
+        <view
+          class="doc-action {{(convertExpired || convertingId || previewing) ? 'is-disabled' : ''}}"
+          hover-class="tap-press"
+          aria-disabled="{{convertExpired || convertingId || previewing}}"
+          catchtap="openConvertedPdf"
+        >打开 PDF</view>
+        <view
+          class="doc-action {{(convertExpired || convertingId || previewing || !convertResult.reprintable) ? 'is-disabled' : ''}}"
+          hover-class="tap-press"
+          aria-disabled="{{convertExpired || convertingId || previewing || !convertResult.reprintable}}"
+          catchtap="reprintConvertedPdf"
+        >重新打印</view>
+      </view>
+      <view wx:if="{{convertExpired}}" class="doc-hint">链接已过期，请在列表里重新打开</view>
+      <view wx:if="{{!convertResult.reprintable}}" class="doc-hint">该报告仅可查看，不可打印</view>
+    </view>
+
     <view class="card" wx:if="{{loading}}">
       <view class="empty-slot"><view class="es-t">正在加载本人文档…</view></view>
     </view>
@@ -70,6 +94,25 @@
             <text class="chip">{{item.retentionLabel}}</text>
             <text class="doc-retention-hint" wx:if="{{item.retentionLocked}}">此类文件按系统策略保存，不可延长</text>
           </view>
+          <view class="doc-actions">
+            <view
+              wx:if="{{item.isWord}}"
+              class="doc-action {{(!wordConversionAvailable || convertingId) ? 'is-disabled' : ''}}"
+              hover-class="tap-press"
+              aria-disabled="{{!wordConversionAvailable || convertingId}}"
+              catchtap="convertDoc"
+              data-id="{{item.id}}"
+            >{{convertingId === item.id ? '转换中' : '转 PDF'}}</view>
+            <view
+              class="doc-action {{item.reprintable ? '' : 'is-disabled'}}"
+              hover-class="tap-press"
+              aria-disabled="{{!item.reprintable}}"
+              catchtap="reprintDoc"
+              data-id="{{item.id}}"
+            >重新打印</view>
+          </view>
+          <view wx:if="{{item.isWord}}" class="doc-hint">{{wordConversionCopy}}</view>
+          <view wx:if="{{!item.reprintable}}" class="doc-hint">该报告仅可查看，不可打印</view>
         </view>
         <view class="doc-more tap" hover-class="tap-press" catchtap="more" data-id="{{item.id}}">⋯</view>
       </view>
