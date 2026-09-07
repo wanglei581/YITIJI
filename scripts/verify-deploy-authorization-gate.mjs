@@ -45,10 +45,30 @@ assert.doesNotMatch(
   /EXPECTED_SHA='\$\{\{ (inputs|github\.event\.inputs)\./,
   'a dispatch input must never be used as the deploy target SHA without validation'
 )
+// 发布脚本把 CI_RUN 列为必需变量（deploy-api-release.sh 第 16 行 `: "${CI_RUN:?}"`）。
+// 2026-09-07 run 34134363402 实测：workflow_dispatch 时 github.event.workflow_run 为空，
+// 直接引用它会传空串，发布在写任何东西之前中止。两条触发路径都必须经由 resolve 步骤归一。
+assert.match(
+  deployJob,
+  /CI_RUN:\s*\$\{\{\s*steps\.target\.outputs\.run_id\s*\}\}/,
+  'CI_RUN must come from the validated resolve step so workflow_dispatch does not pass an empty value'
+)
+assert.doesNotMatch(
+  deployJob,
+  /CI_RUN:\s*\$\{\{\s*github\.event\.workflow_run\.id\s*\}\}/,
+  'CI_RUN must not be read straight off the workflow_run event; that is empty on workflow_dispatch'
+)
+assert.doesNotMatch(
+  deployJob,
+  /CI_RUN:\s*\$\{\{\s*(inputs|github\.event\.inputs)\./,
+  'CI_RUN must not be taken from an unvalidated dispatch input'
+)
+
 for (const [pattern, message] of [
   [/\.name'\)"?\s*$/m, 'resolve step must read the run workflow name'],
   [/if \[ "\$NAME" != "CI" \] \|\| \[ "\$BRANCH" != "main" \] \|\| \[ "\$CONCL" != "success" \]/, 'dispatch path must reject runs that are not a successful main CI'],
   [/grep -Eq '\^\[0-9a-f\]\{40\}\$'/, 'resolved SHA must be validated as a 40-hex commit id'],
+  [/grep -Eq '\^\[0-9\]\+\$'/, 'resolved CI run id must be validated as digits'],
 ]) {
   assert.match(workflow, pattern, message)
 }

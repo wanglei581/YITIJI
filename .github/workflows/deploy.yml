@@ -37,6 +37,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID_FROM_EVENT: ${{ github.event.workflow_run.id }}
           INPUT_RUN_ID: ${{ inputs.ci_run_id }}
         run: |
           set -euo pipefail
@@ -51,14 +52,25 @@ jobs:
               exit 1
             fi
             echo "手动补发：CI run $INPUT_RUN_ID（main，success）→ $SHA"
+            RUN_ID="$INPUT_RUN_ID"
           else
             SHA="$RUN_SHA"
+            RUN_ID="$RUN_ID_FROM_EVENT"
           fi
           if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "::error::解析出的目标 SHA 非法：$SHA" >&2
             exit 1
           fi
+          # CI_RUN 只写进 DEPLOY_SOURCE 供追溯，但发布脚本把它列为必需变量。
+          # workflow_dispatch 时 github.event.workflow_run 为空，直接引用会传空串，
+          # 发布脚本在第 16 行 `: "${CI_RUN:?}"` 处中止（2026-09-07 实测 run 34134363402）。
+          # 因此两条触发路径都在这里归一，并和 SHA 一样做格式校验。
+          if ! printf '%s' "$RUN_ID" | grep -Eq '^[0-9]+$'; then
+            echo "::error::解析出的 CI 运行号非法：$RUN_ID" >&2
+            exit 1
+          fi
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -230,7 +242,7 @@ jobs:
             echo "✅ 部署完成"
         env:
           TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
-          CI_RUN: ${{ github.event.workflow_run.id }}
+          CI_RUN: ${{ steps.target.outputs.run_id }}
           API_RELEASE_ENABLED: ${{ vars.DEPLOY_API_ENABLED }}
           DEPLOY_API_DIR: ${{ secrets.DEPLOY_API_DIR }}
           DEPLOY_PM2_NAME: ${{ secrets.DEPLOY_PM2_NAME }}
