@@ -411,23 +411,25 @@ F7 全屏抽查：未做
 
 ## 11. 第四轮任务（2026-09-07 之后）
 
-**不依赖新包，现在就能做（否则装了包也不接单）：**
+**已完成（Mac 侧 2026-09-07 20:30 服务器只读复核，无需重做）：**
 
-1. 管理员后台把 `KSK-001` 从 `maintenance` **恢复运行**（当前仍在维护中，服务端建单会直接拒 `PRINT_TERMINAL_NOT_ACTIVE`）。
-2. 重新注册 Kiosk 看门狗（第三轮为查看后台把计划任务停了，一体机不会自动拉起全屏页面）。
+1. ~~恢复运行~~ ✅ `lifecycleStatus=active` / `enabled=true`，`AuditLog` 18:50 有一条 `terminal.lifecycle.update`。
+2. ~~重新注册 Kiosk 看门狗~~ ✅ 前台在跑：过去 20 分钟持续轮询 `printer-status` / `screensaver` / `config`，`session-token/refresh` 每几分钟 201 成功。
+3. ~~按 2B 装新包~~ ✅ 心跳 `printerStatus` 自 **19:01:17** 起恢复 `ready`（此前连续 781 次 `unknown`；截至 20:50 已累计 261 次 ready）。旧映射不可能产出 ready，故 #911 的判定已在生产生效。领取每分钟 12 次全部 200，19 点后无任何 429。
 
-**装新包后：**
+**仍待现场执行：**
 
-3. 按 2B 同机升级（含 #906 安装脚本修复、#911 打印机就绪判定），升级后 `Set-Service aijobprintagent.exe -StartupType Automatic`。
-4. 验收两条：心跳 `printerStatus` 回到 `ready`（Mac 侧可远程只读确认）；一体机打印确认页的提交按钮可用、无「打印机未就绪」。
+4. ~~验收心跳与打印页~~ 心跳一半已由上条远程确认；仍需现场看一眼**一体机打印确认页的提交按钮可用、无「打印机未就绪」**。
 5. 用 `-UseExistingToken -ClaimIntervalMs 5000` 重跑一次重配，本次应成功；若仍失败，抄回 `[FAIL] commit stage=… reason=…` 原文。
 6. **F4 停用即拒（补做，硬性要求）**：点「停用」后**立即在 devtools 确认存在一条 `PATCH /api/v1/admin/terminals/KSK-001` 且返回 200**，再看页面与 Kiosk 表现。第三轮的结论无法复核正是因为缺这一步。做完立刻「启用」并「恢复运行」。
 7. 连续打印矩阵（顺序组 / 突发组）待 F4 判定后做。
 8. **执行单 4B 三条已解除阻塞**（2026-09-07 19:52 发布 `origin/main@9183cdb39`，deploy run `34118411969` success，ci_run `34115631887`）。Mac 侧只读复核：PM2 online、`/api/v1/health` = `ok/postgres`；两个控制器已在运行目录 dist 中；公网探针 `POST /resume/records/:taskId/export` 与 `POST /files/:id/convert` 均返回业务级 400（路由生效、DTO 校验先于鉴权，所有权由下游 requester 强制），`GET /health/cjk-font` 返回 401（需管理员 Bearer）。
-   - **前置一**：服务器 `.env` **未声明** `CONVERSION_ENGINE`（只读核过，计数 0），代码默认 `disabled`。因此两端 Word 转 PDF 入口会**诚实置灰**，这是正确行为；第 3 条（Word→PDF 出纸）此时应记「引擎未开放，待配置后重测」，**不得记为失败**。签约风险报告被服务端拦下这一半仍必须验。产品负责人配置后由 Mac 侧通知重测。
-   - **前置二**：用管理员账号取 `GET /api/v1/health/cjk-font` 的 `data.ok` / `path` / `family` 三个值抄进回执（字体自检唯一的线上证据）。
+   - **前置一（2026-09-07 21:0x 更新，取代 20:36 那版）**：服务器**已安装** LibreOffice 24.2.7.2 并把 `CONVERSION_ENGINE` 置为 `soffice`（`/usr/bin/soffice`，经 `/usr/local/bin/soffice-sandboxed` 包装：独立低权限用户、独立网络命名空间不出网、只读系统、内存 1G、120 秒超时、并发上限 2）。线上实测 `GET /api/v1/document-conversion/capabilities` 返回 `{"wordToPdf":true,"engine":"soffice","cjkFonts":true}`。
+     **因此第 3 条按「真实转换成功」验收**：上传 .docx → 转出 PDF → 出纸，纸面中文不得乱码或缺字。连续投多个 .docx 时第 3 个起会排队（并发 2），失败表现是 120 秒超时而非卡死，遇到请记为排队/超时、不要记成转换缺陷。签约风险报告仍必须被服务端拦下不出纸，这一半不变。
+   - **前置二**：用管理员账号取 `GET /api/v1/health/cjk-font` 的 `data.ok` / `path` / `family` 三个值抄进回执。Mac 侧无管理员账号，已按 `cjkFontCandidates()` 的解析顺序在服务器只读推定，回执请与端点实际返回**逐字比对**，不一致以端点为准：
+     `RESUME_PDF_FONT_PATH=/usr/share/fonts/truetype/wqy/wqy-microhei.ttc`（存在、`-rw-r--r--` 可读）、`RESUME_PDF_FONT_FAMILY=WenQuanYiMicroHei`，该项为候选列表第一顺位，故预期 `ok=true`、`path` 与 `family` 即上述两值；Noto CJK 为未被选中的次顺位。
 
-**扫码器：本轮不重测**，结论直接引用 PR #913 写入 [`bench-acceptance-2026-08-16.md`](./bench-acceptance-2026-08-16.md) A 项的真机实测：HID 键盘模式（章程 D-4「扫码零集成」成立，Agent 不需要串口读取）、扫出字符串无前后缀、无后缀不影响取件认领（取件页按「输入静默 250ms」触发而非回车）、模组为接近感应触发而非常亮、能读手机屏幕二维码但需调高手机亮度。仅 **A4 付款码**（微信/支付宝 18 位）待支付商户配置就位后另测。
+**扫码器 A4 付款码现在可测**（2026-09-07 晚支付通道已开通，`GET /api/v1/payment/channels` 实测返回 `["alipay","wechat"]`）：这是**真实收款通道**，只用最小金额、本人账号，不得下真实大额单；测完记录是否读到 18 位数字串。其余四项本轮不重测**，结论直接引用 PR #913 写入 [`bench-acceptance-2026-08-16.md`](./bench-acceptance-2026-08-16.md) A 项的真机实测：HID 键盘模式（章程 D-4「扫码零集成」成立，Agent 不需要串口读取）、扫出字符串无前后缀、无后缀不影响取件认领（取件页按「输入静默 250ms」触发而非回车）、模组为接近感应触发而非常亮、能读手机屏幕二维码但需调高手机亮度。仅 **A4 付款码**（微信/支付宝 18 位）待支付商户配置就位后另测。
 
 **运营须知（进现场清单）**：扫码读取依赖手机屏幕亮度。取件页与小程序出码页需提示用户调高亮度，否则现场会出现「扫不上 → 以为码坏了」的误判。
 
