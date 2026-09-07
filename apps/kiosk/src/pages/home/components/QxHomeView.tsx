@@ -293,7 +293,7 @@ export function QxHomeView({
       <footer className="qx-home-truth">
         <ShieldCheckIcon aria-hidden="true" />
         <div>
-          <p><strong>能力状态以真实接口为准。</strong>岗位与招聘会仅展示第三方或官方来源，本终端不代收简历。</p>
+          <p><strong>能力状态以真实接口为准。</strong>岗位与招聘会仅展示第三方或官方来源；本终端仅展示与跳转，不代收简历。</p>
           <p className="qx-home-legal">
             <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">鲁ICP备2026023517号-2</a>
             <span aria-hidden="true">·</span>
