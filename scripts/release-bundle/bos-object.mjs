@@ -56,7 +56,10 @@ export function createAuthorization({ accessKey, secretKey, method, host, canoni
     '',
     canonicalHeaders(headers, signedHeaders),
   ].join('\n')
-  const signingKey = hmacSha256(secretKey, authStringPrefix)
+  // BCE 认证 v1：SigningKey 是 HMAC-SHA256(sk, authStringPrefix) 的**十六进制字符串**，
+  // 再以该字符串（不是原始字节）作为密钥对 CanonicalRequest 做 HMAC。传原始 Buffer 会得到
+  // 一个稳定但错误的签名（服务端回 SignatureDoesNotMatch），2026-09-07 生产首次接入实测踩坑。
+  const signingKey = hmacSha256(secretKey, authStringPrefix, 'hex')
   const signature = hmacSha256(signingKey, canonicalRequest, 'hex')
   return `${authStringPrefix}/${signedHeaders.join(';')}/${signature}`
 }
@@ -112,7 +115,9 @@ function responseStatus(response, key) {
   if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) return
   const status = response.statusCode || 0
   response.resume()
-  const error = new Error(`BOS ${response.req.method} failed for ${key}: HTTP ${status}`)
+  // 带上 x-bce-request-id，排障时可直接向百度侧查；响应体不读（不放大失败路径），密钥永不进日志。
+  const requestId = response.headers['x-bce-request-id']
+  const error = new Error(`BOS ${response.req.method} failed for ${key}: HTTP ${status}${requestId ? ` requestId=${requestId}` : ''}`)
   error.statusCode = status
   throw error
 }
@@ -214,7 +219,7 @@ if (isNodeTest) {
         canonicalUri: '/release-abc.bundle',
         date: '2026-09-06T12:00:00Z',
       }),
-      'bce-auth-v1/AKIDEXAMPLE/2026-09-06T12:00:00Z/1800/host;x-bce-date/96f36567ce5187188cf3dd477ab70eb3cad075b2dd4ae45b7bd1032b0c645846',
+      'bce-auth-v1/AKIDEXAMPLE/2026-09-06T12:00:00Z/1800/host;x-bce-date/cc3c4bc3d040dd1e537db28e8389b9464c390086343ddd4c1f8aae5dca76bab9',
     )
   })
 } else if (process.argv[1] === fileURLToPath(import.meta.url)) {
