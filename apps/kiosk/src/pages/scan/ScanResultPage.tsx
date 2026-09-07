@@ -1,9 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
   FileTextIcon,
   FolderIcon,
+  HeadphonesIcon,
   HomeIcon,
   PrinterIcon,
   RotateCcwIcon,
@@ -11,11 +11,15 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { FileContentPreview } from '../../components/FileContentPreview'
-import { ScanFlowSteps } from './ScanFlowSteps'
 import { formatLabelFromMime } from './scanOutputFormat'
-import './styles/scan-fusion.css'
-
-type ScanType = 'resume' | 'id' | 'document'
+import {
+  ScanCta,
+  ScanNoteCard,
+  ScanPlan,
+  ScanStatusPanel,
+  ScanWorkbenchShell,
+} from './ScanWorkbenchChrome'
+import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 
 interface ScannedFile {
   fileId: string
@@ -27,6 +31,8 @@ interface ScannedFile {
   mimeType?: string
 }
 
+type ScanOutcome = 'completed' | 'completed-no-file' | 'failed' | 'expired'
+
 interface ScanResultState {
   scanType?: ScanType
   source?: string
@@ -35,15 +41,18 @@ interface ScanResultState {
   dpi?: number
   success?: boolean
   reason?: string
+  outcome?: ScanOutcome
   file?: ScannedFile
 }
 
-const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'file'])
+const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'file', 'outcome'])
 
-const SCAN_TYPE_LABELS: Record<ScanType, string> = {
-  resume: '简历扫描',
-  id: '证件扫描',
-  document: '普通文档',
+function deriveOutcome(state: ScanResultState): ScanOutcome {
+  if (state.outcome) return state.outcome
+  if (state.success === true && state.file) return 'completed'
+  if (state.reason?.includes('未拿到文件')) return 'completed-no-file'
+  if (state.reason?.includes('超时') || state.reason?.includes('过期')) return 'expired'
+  return 'failed'
 }
 
 export function ScanResultPage() {
@@ -55,6 +64,7 @@ export function ScanResultPage() {
   const success = state.success === true
   const reason = state.reason
   const file = state.file
+  const outcome = deriveOutcome(state)
 
   const handleRetry = () => {
     const retryState = Object.fromEntries(
@@ -93,79 +103,189 @@ export function ScanResultPage() {
     })
   }
 
-  if (!success) {
+  if (outcome === 'completed-no-file' || (!success && outcome !== 'completed')) {
+    const isNoFile = outcome === 'completed-no-file'
+    const isExpired = outcome === 'expired'
     return (
-      <KioskPageFrame className="w2-scan-page">
-        <div data-w2-page="scan-result" className="w2-scan-shell">
-          <KioskPageHeader title="扫描未完成" description="本次没有生成可用的扫描文件" onBack={() => navigate('/scan/start')} backLabel="返回扫描首页" />
-          <section className="w2-scan-content w2-scan-result-state">
-            <KioskStatePanel
-              tone="error"
-              title="扫描失败"
-              description={reason ?? '扫描任务未能完成，请重试或联系工作人员'}
-              actions={<><Button variant="secondary" size="lg" onClick={() => navigate('/')}>返回首页</Button><Button size="lg" onClick={handleRetry}>重试扫描</Button></>}
-            />
-          </section>
+      <ScanWorkbenchShell
+        page="scan-result"
+        state={isNoFile ? 'completed-no-file' : 'failed'}
+        title={isNoFile ? '已完成 · 回执里没有文件' : isExpired ? '会话已过期' : '扫描未完成'}
+        subtitle="本次没有生成可用的扫描文件"
+        status={{ tone: isNoFile || isExpired ? 'warn' : 'bad', label: isNoFile ? '已完成 · 回执里没有文件' : isExpired ? '会话已过期' : '扫描未完成' }}
+        ctabar={
+          <ScanCta>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
+              返回打印扫描
+            </button>
+            {isNoFile ? (
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
+                <HeadphonesIcon aria-hidden />
+                联系工作人员
+              </button>
+            ) : (
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>
+                返回首页
+              </button>
+            )}
+            <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry}>
+              重试扫描
+            </button>
+          </ScanCta>
+        }
+      >
+        <ScanStatusPanel
+          tone={isNoFile ? 'warn' : 'error'}
+          title={isNoFile ? '服务端说已完成，但这次回执里没有可用文件' : isExpired ? '扫描超时，会话已过期' : '扫描失败'}
+          chips={[
+            { label: isNoFile ? 'status completed' : isExpired ? '服务端确认过期' : '服务端确认失败', tone: isNoFile ? 'ok' : 'warn' },
+            { label: '本次会话没有文件', tone: 'warn' },
+          ]}
+        >
+          {isNoFile ? (
+            <>
+              <p>服务端确认<b>这次扫描已经完成</b>，可是同一份回执里<b>没有带可用的文件信息</b>（file 为 null，这在状态合同里是允许的取值，不是服务端出错）。</p>
+              <p>这份文件此刻还在不在服务端，<b>本机没有依据判断</b>。页面不替服务端说它还在，不说它已被删掉，也不承诺能找回来。</p>
+            </>
+          ) : (
+            <p>{reason ?? '扫描任务未能完成，请重试或联系工作人员'}</p>
+          )}
+        </ScanStatusPanel>
+        <div className="sw-grid2">
+          <ScanNoteCard title="现在能做什么" foot="重扫是另建一个会话，不是接着这一次。">
+            <ScanPlan items={[
+              '点右下角重试扫描：那是另一次任务。',
+              '重扫之前把纸取回来抚平、订书钉取掉。',
+              isNoFile ? '这个编号问不出文件，反复点也是同一句回执。' : '同一份材料连续失败两次，就找工作人员。',
+            ]} />
+          </ScanNoteCard>
+          <ScanNoteCard title="本机不会替服务端补话">
+            <ScanPlan items={[
+              '不猜纸张或机器故障原因，本机收不到这些事件。',
+              '不自动重扫，避免同一份材料出两份。',
+              '不说「稍后会好」，也不按等待时长改判结果。',
+            ]} />
+          </ScanNoteCard>
         </div>
-      </KioskPageFrame>
+      </ScanWorkbenchShell>
     )
   }
 
+  const aiEnabled = scanType === 'resume' && Boolean(file)
+  const printEnabled = Boolean(file)
+
   return (
-    <KioskPageFrame className="w2-scan-page">
-      <div data-w2-page="scan-result" className="w2-scan-shell">
-      <KioskPageHeader title="扫描完成" description="请核对文件信息，选择下一步操作" aside={<span className="w2-scan-status-chip is-ready"><span />扫描已完成</span>} />
-
-      <ScanFlowSteps activeIndex={3} />
-
-      <section className="w2-scan-content w2-scan-result-content">
-        {file ? (
-          <div className="grid gap-4">
-            <FileContentPreview
-              fileUrl={file.fileUrl}
-              fileName={file.name}
-              mimeType={file.mimeType}
-              format={displayFormat}
-            />
-            <section className="w2-scan-file-card">
-              <span className="w2-scan-file-icon"><FileTextIcon /></span>
-              <div><p>{SCAN_TYPE_LABELS[scanType]}</p><h2>{file.name}</h2><div className="w2-scan-chips"><small>{file.size}</small><small data-tone="ok">{displayFormat}</small><small>{file.pages != null ? `${file.pages} 页` : '页数以文件为准'}</small><small data-tone="warn">临时文件 · 设有效期</small></div></div>
-            </section>
+    <ScanWorkbenchShell
+      page="scan-result"
+      state="completed"
+      title="扫描完成"
+      subtitle="请核对文件信息，选择下一步操作"
+      status={{ tone: 'ok', label: '服务端已回完成并带回文件' }}
+      ctabar={
+        <ScanCta reason="未选择去向的临时文件会按服务端策略清理；本页不会伪造“已保存”">
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={handleRetry}>
+            <RotateCcwIcon aria-hidden />
+            重新扫描
+          </button>
+          <button type="button" className="qx-btn" data-variant="primary" disabled={!printEnabled} onClick={handlePrint}>
+            直接打印
+          </button>
+        </ScanCta>
+      }
+    >
+      <div className="sw-result qx-grow">
+        <div className="sw-preview">
+          <div className="sw-pvhead" data-testid="scan-workbench-file-brief">
+            <div className="sw-pvh-1">
+              <span className="sw-pvh-ic"><FileTextIcon size={24} aria-hidden /></span>
+              <span className="sw-pvh-t">服务端回执：已完成，并带回文件</span>
+              <span className="sw-chip is-ok">{SCAN_TYPE_LABELS[scanType]}</span>
+            </div>
+            {file ? (
+              <div className="sw-pvh-2">
+                <b>{file.name}</b>
+                <span className="sep">·</span>
+                <span>{displayFormat}</span>
+                <span className="sep">·</span>
+                <span>{file.size}</span>
+                <span className="sep">·</span>
+                <span>{file.pages != null ? `${file.pages} 页` : '页数以文件为准'}</span>
+              </div>
+            ) : null}
           </div>
-        ) : (
-          <KioskStatePanel compact tone="error" title="缺少扫描结果文件" description="本页未收到真实扫描结果，不会生成占位文件。请重新开始扫描。" />
-        )}
-
-        <section className="w2-scan-result-actions">
-          <h2>选择下一步操作</h2>
-          <div>
-            <button
-              type="button"
-              disabled={scanType !== 'resume' || !file}
-              onClick={handleResumeAI}
-              className="is-primary"
-            >
-              <SparklesIcon /><span><b>AI 简历识别</b><small>识别扫描件内容，进入简历诊断与优化</small></span>
-            </button>
-            <button type="button" disabled={!file} onClick={handlePrint}>
-              <PrinterIcon /><span><b>直接打印</b><small>按默认参数进入确认打印，可再修改</small></span>
-            </button>
-            <button type="button" disabled={!file || !isLoggedIn} onClick={handleDocuments}>
-              <FolderIcon /><span><b>{isLoggedIn ? '前往我的文档' : '本次不进入我的文档'}</b><small>{isLoggedIn ? '在「我的文档」查看与管理本次扫描件' : '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别'}</small></span>
-            </button>
-            <button type="button" onClick={() => navigate('/')}>
-              <HomeIcon /><span><b>返回首页</b><small>结束本次扫描，回到功能大厅</small></span>
-            </button>
+          <div className="sw-pvstage">
+            {file ? (
+              <FileContentPreview
+                fileUrl={file.fileUrl}
+                fileName={file.name}
+                mimeType={file.mimeType}
+                format={displayFormat}
+              />
+            ) : (
+              <ScanStatusPanel tone="error" title="缺少扫描结果文件">
+                <p>本页未收到真实扫描结果，不会生成占位文件。请重新开始扫描。</p>
+              </ScanStatusPanel>
+            )}
           </div>
-        </section>
-      </section>
-
-      <KioskActionBar leading={<span className="w2-scan-action-note">未选择去向的临时文件会按服务端策略清理；本页不会伪造“已保存”</span>}>
-        <Button variant="secondary" size="lg" onClick={handleRetry}>
-          <RotateCcwIcon />重新扫描
-        </Button>
-      </KioskActionBar>
+          <p className="sw-preview-cap">
+            预览走回执里那条签名内容链接（<b>/files/:id/content</b>，只验 HMAC），本页不调用要登录的预览签发接口。打不开只证明这一次没打开，不改判扫描已完成，也不能据此判断文件是否仍可用。
+          </p>
+        </div>
+      <div className="sw-actrow" data-testid="scan-workbench-exits">
+        <button
+          type="button"
+          className={`sw-exit${aiEnabled ? '' : ' is-off'}`}
+          disabled={!aiEnabled}
+          onClick={handleResumeAI}
+        >
+          <span className="sw-exit-ic"><SparklesIcon size={20} aria-hidden /></span>
+          <span className="sw-exit-body">
+            <span className="sw-exit-title">
+              AI 简历识别
+              {aiEnabled ? null : <span className="sw-offtag">暂不放行</span>}
+            </span>
+            <small>
+              {scanType === 'resume'
+                ? '识别扫描件内容，进入简历诊断与优化'
+                : `AI 简历识别只对简历扫描开放；这次扫的是「${SCAN_TYPE_LABELS[scanType]}」。`}
+            </small>
+          </span>
+        </button>
+        <button type="button" className="sw-exit" disabled={!printEnabled} onClick={handlePrint}>
+          <span className="sw-exit-ic"><PrinterIcon size={20} aria-hidden /></span>
+          <span className="sw-exit-body">
+            <span className="sw-exit-title">直接打印</span>
+            <small>按默认参数进入确认打印，可再修改。金额由服务端报价决定，本页不给价格。</small>
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`sw-exit${file && isLoggedIn ? '' : ' is-off'}`}
+          disabled={!file || !isLoggedIn}
+          onClick={handleDocuments}
+        >
+          <span className="sw-exit-ic"><FolderIcon size={20} aria-hidden /></span>
+          <span className="sw-exit-body">
+            <span className="sw-exit-title">
+              {isLoggedIn ? '前往我的文档' : '本次不进入我的文档'}
+              {isLoggedIn ? null : <span className="sw-offtag">暂不放行</span>}
+            </span>
+            <small>
+              {isLoggedIn
+                ? '在「我的文档」查看与管理本次扫描件'
+                : '未登录扫描件不会进入「我的文档」，请在本次操作内完成打印或识别'}
+            </small>
+          </span>
+        </button>
       </div>
-    </KioskPageFrame>
+      <button type="button" className="sw-exit sw-home-exit" onClick={() => navigate('/')}>
+        <span className="sw-exit-ic"><HomeIcon size={20} aria-hidden /></span>
+        <span className="sw-exit-body">
+          <span className="sw-exit-title">返回首页</span>
+          <small>结束本次扫描，回到功能大厅</small>
+        </span>
+      </button>
+      </div>
+    </ScanWorkbenchShell>
   )
 }

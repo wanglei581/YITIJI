@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
-import { ClockIcon, PrinterIcon } from 'lucide-react'
+import { ClockIcon } from 'lucide-react'
 import type { ScanSessionCreateResponse } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -9,11 +8,24 @@ import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
-import { ScanFlowSteps } from './ScanFlowSteps'
 import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
-import './styles/scan-fusion.css'
+import {
+  ScanChain,
+  ScanCta,
+  ScanKvCard,
+  ScanNoteCard,
+  ScanPanelMock,
+  ScanPlan,
+  ScanSec,
+  ScanStatusPanel,
+  ScanWorkbenchShell,
+} from './ScanWorkbenchChrome'
+import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 
-type ScanType = 'resume' | 'id' | 'document'
+function isScanType(value: unknown): value is ScanType {
+  return value === 'resume' || value === 'id' || value === 'document'
+}
+
 type SessionPhase = 'invalid' | 'loading' | 'success' | 'expired' | 'error'
 
 interface LocationState {
@@ -23,16 +35,6 @@ interface LocationState {
 interface SessionFailure {
   title: string
   description: string
-}
-
-const SCAN_TYPE_LABELS: Record<ScanType, string> = {
-  resume: '简历扫描',
-  id: '证件扫描',
-  document: '普通文档',
-}
-
-function isScanType(value: unknown): value is ScanType {
-  return value === 'resume' || value === 'id' || value === 'document'
 }
 
 function getCancellationCredentials(created: unknown): { scanTaskId: string; controlToken: string } | null {
@@ -223,6 +225,13 @@ export function ScanSettingsPage() {
   }
 
   if (phase !== 'success' || !scanType || !scanTaskId || !controlToken || !instructions || !expiresAt) {
+    const workbenchState = phase === 'invalid'
+      ? 'invalid'
+      : phase === 'loading'
+        ? 'create-loading'
+        : phase === 'expired'
+          ? 'expired'
+          : 'create-failed'
     const title = phase === 'invalid'
       ? '未创建扫描任务'
       : phase === 'loading'
@@ -233,78 +242,135 @@ export function ScanSettingsPage() {
       : phase === 'loading'
         ? '正在等待服务端返回真实会话，成功前不会显示任务信息或操作指引。'
         : failure?.description ?? '本次没有可用的扫描会话。'
+    const status = phase === 'loading'
+      ? { tone: 'unknown' as const, label: '正在建扫描会话' }
+      : phase === 'expired'
+        ? { tone: 'warn' as const, label: '会话已过期' }
+        : { tone: 'bad' as const, label: '会话创建失败' }
 
     return (
-      <KioskPageFrame className="w2-scan-page">
-        <div data-w2-page="scan-settings" className="w2-scan-shell">
-          <KioskPageHeader title={title} description={description} onBack={handleSafeReturn} backLabel="安全返回扫描首页" />
-          <section className="w2-scan-content">
-            <KioskStatePanel
-              tone={phase === 'loading' ? 'loading' : 'error'}
-              title={title}
-              description={description}
-              actions={<Button size="lg" variant="secondary" onClick={handleSafeReturn}>安全返回扫描首页</Button>}
-            />
-          </section>
-          <KioskActionBar leading={<span className="w2-scan-action-note">未确认成功前不显示扫描操作步骤</span>}>
-            <Button variant="secondary" size="lg" onClick={handleSafeReturn}>安全返回扫描首页</Button>
-          </KioskActionBar>
-        </div>
-      </KioskPageFrame>
+      <ScanWorkbenchShell
+        page="scan-settings"
+        state={workbenchState}
+        title={title}
+        subtitle={description}
+        status={status}
+        ctabar={
+          <ScanCta reason={phase === 'loading' ? '请求还在路上 —— 这一刻页面不做任何判断，也不给你一个假的编号' : '未确认成功前不显示扫描操作步骤'}>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
+              安全返回扫描首页
+            </button>
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="primary"
+              disabled
+              aria-disabled="true"
+            >
+              {phase === 'loading' ? '等服务端返回会话' : '未创建扫描任务'}
+            </button>
+          </ScanCta>
+        }
+      >
+        <ScanStatusPanel
+          tone={phase === 'loading' ? 'info' : phase === 'invalid' ? 'lock' : 'error'}
+          title={title}
+          breathe={phase === 'loading'}
+          chips={
+            phase === 'loading'
+              ? [
+                  { label: '正在等服务端回话' },
+                  { label: scanType ? `选中类型：${SCAN_TYPE_LABELS[scanType]}` : '未选择类型' },
+                ]
+              : [
+                  { label: '没有任务编号', tone: 'warn' },
+                  { label: '本机没有文件' },
+                ]
+          }
+        >
+          <p>{description}</p>
+          {phase === 'loading' ? <p>这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
+        </ScanStatusPanel>
+        {phase === 'loading' ? (
+          <div className="sw-grid2">
+            <ScanNoteCard title="会话建成之后会出现什么" foot="这三样都由服务端下发，本机一样都编不出来。">
+              <ScanPlan items={[
+                '服务端发的任务编号，用来认领待会儿回传的文件。',
+                '按扫描类型定制的面板操作指引，本机原样转达。',
+                '一枚只存在页面内存里的控制凭证，用来查询和取消。',
+              ]} />
+            </ScanNoteCard>
+            <ScanNoteCard title="这一刻你可以做什么" foot="这一刻页面还没有任何结论可写。">
+              <p>把要扫的纸先整理好、订书钉取掉，<b>但先别在面板上按开始</b> —— 会话还没建成，这时候扫出来的文件没人认领。</p>
+              <p>等待通常就是一两秒。一直转，多半是本机到服务端的网络有问题。</p>
+            </ScanNoteCard>
+          </div>
+        ) : (
+          <div className="sw-grid2">
+            <ScanNoteCard title="接下来怎么办" foot="本页不会自动重发，也不会自己变成成功。">
+              <ScanPlan items={[
+                '返回扫描首页，从选择类型重新走一遍。',
+                '连续失败就别在面板上扫了，扫了也没有会话认领。',
+                '叫工作人员看一眼这台机器到服务端的网络。',
+              ]} />
+            </ScanNoteCard>
+            <ScanNoteCard title="为什么不给你一个编号" foot="这一屏的空白是有意的，不是还没加载完。">
+              <p>编号是服务端发的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人认领。</p>
+            </ScanNoteCard>
+          </div>
+        )}
+      </ScanWorkbenchShell>
     )
   }
 
   return (
-    <KioskPageFrame className="w2-scan-page">
-      <div data-w2-page="scan-settings" className="w2-scan-shell">
-        <KioskPageHeader
-          title="扫描指引"
-          description="扫描任务已创建，请仅按服务端返回的当前会话指引操作"
-          onBack={handleSafeReturn}
-          backLabel="上一步（取消任务）"
-          aside={<span className="w2-scan-status-chip is-ready"><span />扫描任务已创建</span>}
-        />
-
-        <ScanFlowSteps activeIndex={1} />
-
-        <section className="w2-scan-content w2-scan-two-column">
-          <section className="w2-scan-primary-card">
-            <div className="w2-scan-card-title">
-              <span><PrinterIcon /></span>
-              <div><h2>当前会话的服务端指引</h2><p>以下内容全部来自刚刚创建的扫描会话。</p></div>
-            </div>
-            <div className="w2-scan-guide-list">
-              {instructions.map((instruction, index) => (
-                <div key={`${instruction}-${index}`} className="w2-scan-guide-row">
-                  <span>{index + 1}</span><div><b>服务端指引 {index + 1}</b><p>{instruction}</p></div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <aside className="w2-scan-sidebar">
-            <section className="w2-scan-info-card">
-              <h2>任务信息</h2>
-              {[
-                ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-                ['任务编号', scanTaskId],
-                ['剩余时间', countdown],
-                ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-              ].map(([key, value]) => (
-                <div key={key}><span>{key}</span><b>{value}</b></div>
-              ))}
-            </section>
-            <p className="w2-scan-warning">仅当前会话有效。点击返回会取消这个未确认的任务。</p>
-          </aside>
-        </section>
-
-        <KioskActionBar leading={<span className="w2-scan-action-note"><ClockIcon />任务剩余 {countdown}</span>}>
-          <Button variant="secondary" size="lg" onClick={handleSafeReturn}>返回（取消任务）</Button>
-          <Button size="lg" disabled={starting} onClick={handleConfirm}>
+    <ScanWorkbenchShell
+      page="scan-settings"
+      state="panel-instruction"
+      title="扫描指引"
+      subtitle="扫描任务已创建，请仅按服务端返回的当前会话指引操作"
+      status={{ tone: 'ok', label: '第 2 步 · 去面板操作' }}
+      ctabar={
+        <ScanCta>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
+            返回（取消任务）
+          </button>
+          <button type="button" className="qx-btn" data-variant="primary" disabled={starting} onClick={handleConfirm}>
             {starting ? '正在进入等待…' : '我已操作，开始等待'}
-          </Button>
-        </KioskActionBar>
-      </div>
-    </KioskPageFrame>
+          </button>
+        </ScanCta>
+      }
+    >
+      <ScanSec no="01" title="照着做：全在机器面板上" hint="服务端下发原文，本机不改写" grow>
+        <ScanPanelMock
+          instructions={instructions.map((instruction) => instruction)}
+          scanLabel={SCAN_TYPE_LABELS[scanType]}
+        />
+      </ScanSec>
+      <ScanSec no="02" title="现在在第一段" hint="链路位置，不是百分比">
+        <ScanChain active={0} />
+      </ScanSec>
+      <ScanSec no="03" title="这次会话">
+        <div className="sw-grid2">
+          <ScanKvCard
+            title="任务信息"
+            rows={[
+              ['扫描类型', SCAN_TYPE_LABELS[scanType]],
+              ['任务编号', scanTaskId],
+              ['剩余时间', countdown],
+              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
+              ['控制凭证', '只在页面内存里，不上屏、不进链接、不落存储'],
+            ]}
+          />
+          <ScanNoteCard title="按完面板之后" foot={<><ClockIcon size={16} aria-hidden /> 任务剩余 {countdown}。仅当前会话有效。点击返回会取消这个未确认的任务。</>}>
+            <ScanPlan items={[
+              '点「我已操作，开始等待」。',
+              '进了等待页本机就每隔几秒自动查一次，你不用一直点。',
+              '文件回来之前不显示扫到第几张：链路上没有这种事件。',
+            ]} />
+          </ScanNoteCard>
+        </div>
+      </ScanSec>
+    </ScanWorkbenchShell>
   )
 }

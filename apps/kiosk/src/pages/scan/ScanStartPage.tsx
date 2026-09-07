@@ -1,67 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
-import {
-  ArrowRightIcon,
-  CheckIcon,
-  CreditCardIcon,
-  FileTextIcon,
-  HeadphonesIcon,
-  RefreshCwIcon,
-  ScanIcon,
-  ShieldCheckIcon,
-  UploadIcon,
-} from 'lucide-react'
+import { HeadphonesIcon, RefreshCwIcon, UploadIcon } from 'lucide-react'
 import {
   loadConfiguredCapabilities,
   type ConfiguredCapability,
 } from '../../services/api/printScanCapabilities'
-import { ScanFlowSteps } from './ScanFlowSteps'
-import './styles/scan-fusion.css'
+import {
+  ScanChain,
+  ScanCta,
+  ScanNoteCard,
+  ScanPlan,
+  ScanSec,
+  ScanStatusPanel,
+  ScanTypeCards,
+  ScanWorkbenchShell,
+} from './ScanWorkbenchChrome'
+import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 
-type ScanType = 'resume' | 'id' | 'document'
 /** 能力门禁态：禁止伪装硬件已就绪。 */
 type ScanGate = 'loading' | 'allowed' | 'blocked' | 'unknown'
-
-interface ScanTypeOption {
-  type: ScanType
-  label: string
-  description: string
-  chips: { label: string; tone?: 'ok' | 'warn' }[]
-  icon: React.ComponentType<{ className?: string }>
-}
-
-const SCAN_TYPES: ScanTypeOption[] = [
-  {
-    type: 'resume',
-    label: '简历扫描',
-    description: '扫描纸质简历，按设备回传格式保存，可进入 AI 识别与优化，也可打印',
-    chips: [{ label: '支持 AI 简历识别', tone: 'ok' }, { label: '按回传格式保存' }],
-    icon: FileTextIcon,
-  },
-  {
-    type: 'id',
-    label: '证件扫描',
-    description: '扫描证件原件存档；证件类文件设有效期并自动清理',
-    chips: [{ label: '敏感文件 · 自动清理', tone: 'warn' }, { label: '按回传格式保存' }],
-    icon: CreditCardIcon,
-  },
-  {
-    type: 'document',
-    label: '普通文档',
-    description: '扫描通用材料，按设备回传格式保存；未登录不会进入「我的文档」',
-    chips: [{ label: '按回传格式保存' }, { label: '可打印' }],
-    icon: ScanIcon,
-  },
-]
-
-const FLOW_STEPS = [
-  ['选择扫描类型', '下一步会创建真实扫描会话'],
-  ['获取服务端指引', '只在会话创建成功后显示；含面板扫描到本机接收目录'],
-  ['在设备上扫描', '按当前会话的服务端指引在打印机面板操作'],
-  ['选择文件去向', '打印或 AI 简历识别；未登录文件不会进入「我的文档」'],
-] as const
 
 const CAPABILITY_STATUS_NOTES: Record<string, string> = {
   testing: '测试中，暂未对用户开放',
@@ -78,6 +36,8 @@ function resolveGate(scanCap: ConfiguredCapability | undefined, loadStatus: 'ok'
 
 export function ScanStartPage() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const usbPanel = params.get('mode') === 'usb-panel'
   const [selected, setSelected] = useState<ScanType>('resume')
   const [gate, setGate] = useState<ScanGate>('loading')
   const [blockedNote, setBlockedNote] = useState<string | null>(null)
@@ -106,158 +66,208 @@ export function ScanStartPage() {
     void refreshGate()
   }, [refreshGate])
 
-  const blocked = gate === 'blocked' || gate === 'unknown' || gate === 'loading'
-  const statusLabel =
-    gate === 'loading' ? '正在确认扫描能力' :
-    gate === 'blocked' ? '扫描能力暂未开放' :
-    gate === 'unknown' ? '能力状态暂不可用' :
-    '可创建扫描任务 · 需面板操作'
-  const statusChipClass =
-    gate === 'allowed' ? 'is-ready' :
-    gate === 'loading' ? 'is-busy' :
-    'is-offline'
+  const blocked = !usbPanel && (gate === 'blocked' || gate === 'unknown' || gate === 'loading')
+  const workbenchState = usbPanel
+    ? 'usb-panel'
+    : gate === 'loading'
+      ? 'loading'
+      : gate === 'unknown'
+        ? 'unknown'
+        : gate === 'blocked'
+          ? 'blocked'
+          : 'setup'
+  const status =
+    usbPanel
+      ? { tone: 'warn' as const, label: '独立路径 · 扫描到 U 盘' }
+      : gate === 'loading'
+        ? { tone: 'unknown' as const, label: '正在确认扫描能力' }
+        : gate === 'blocked'
+          ? { tone: 'bad' as const, label: '扫描能力暂未开放' }
+          : gate === 'unknown'
+            ? { tone: 'unknown' as const, label: '能力状态暂不可用' }
+            : { tone: 'ok' as const, label: '可创建扫描任务 · 需面板操作' }
+
+  const subtitle = usbPanel
+    ? '这是打印机自己的独立能力，不经过平台扫描会话'
+    : blocked
+      ? '当前无法创建扫描任务，请查看说明或改用其他方式'
+      : '请先选择扫描类型；本页尚未创建任务。下一步会创建真实扫描会话'
 
   return (
-    <KioskPageFrame className="w2-scan-page">
-      <div data-w2-page="scan-start" className="w2-scan-shell">
-        <KioskPageHeader
-          title="材料扫描"
-          description={
-            blocked
-              ? '当前无法创建扫描任务，请查看说明或改用其他方式'
-              : '请先选择扫描类型；本页尚未创建任务。下一步会创建真实扫描会话'
-          }
-          onBack={() => navigate('/print-scan')}
-          backLabel="返回打印扫描服务"
-          aside={<span className={`w2-scan-status-chip ${statusChipClass}`}><span />{statusLabel}</span>}
-        />
-
-        <ScanFlowSteps activeIndex={0} />
-
-        <section className="w2-scan-content">
-          {blocked ? (
-            <>
-              <p className="w2-scan-notice is-warn">
-                {gate === 'loading'
-                  ? '正在确认本终端是否开放扫描服务，请稍候。'
-                  : gate === 'unknown'
-                    ? '暂时无法确认扫描能力状态，不会创建扫描任务；请重试或联系工作人员。'
-                    : `扫描能力暂未开放${blockedNote ? `：${blockedNote}` : ''}。`}
-              </p>
-              <div className="w2-scan-off-wrap">
-                <section className="w2-scan-off-main" aria-label="扫描能力不可用">
-                  <KioskStatePanel
-                    tone="offline"
-                    title={gate === 'loading' ? '正在确认扫描能力' : gate === 'unknown' ? '能力状态暂不可用' : '扫描能力暂未开放'}
-                    description={
-                      gate === 'loading'
-                        ? '正在读取本终端的扫描服务配置。'
-                        : gate === 'unknown'
-                          ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
-                          : (blockedNote ?? '管理员尚未对本终端开放扫描服务，或该能力处于维护 / 待验收状态。')
-                    }
-                    icon={<ScanIcon aria-hidden="true" />}
-                    actions={(
-                      <>
-                        <Button size="lg" className="min-h-14" disabled={checking || gate === 'loading'} onClick={() => void refreshGate()}>
-                          <RefreshCwIcon aria-hidden="true" />
-                          {checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
-                        </Button>
-                        <Button size="lg" variant="secondary" className="min-h-14" onClick={() => navigate('/help')}>
-                          <HeadphonesIcon aria-hidden="true" />
-                          联系工作人员
-                        </Button>
-                      </>
-                    )}
-                  />
-                </section>
-                <aside className="w2-scan-side-card w2-scan-alt-card">
-                  <h2>你现在还能做什么</h2>
-                  <ul className="w2-scan-alt-list">
-                    <li>
-                      <span className="w2-scan-alt-copy">
-                        <b>上传文件打印</b>
-                        <span>手机 / U盘里的现成文件仍可打印</span>
-                      </span>
-                      <small data-tone="ok">可使用</small>
-                    </li>
-                    <li>
-                      <span className="w2-scan-alt-copy">
-                        <b>本机扫描任务</b>
-                        <span>当前终端扫描能力未开放或状态未知</span>
-                      </span>
-                      <small data-tone="warn">暂不可用</small>
-                    </li>
-                  </ul>
-                  <div className="w2-scan-privacy">
-                    <ShieldCheckIcon aria-hidden="true" />
-                    若长时间未恢复，请到服务台联系现场工作人员检查终端能力配置。
-                  </div>
-                </aside>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="w2-scan-notice">
-                下一步会创建真实扫描会话。只有服务端成功返回会话后，下一页才会显示任务编号和设备操作指引（在打印机面板扫描到本机已配置的网络接收目录）。
-              </p>
-              <div className="w2-scan-start-grid">
-                <section className="w2-scan-type-list" aria-label="扫描类型">
-                  {SCAN_TYPES.map(({ type, label, description, chips, icon: Icon }) => {
-                    const isSelected = selected === type
-                    return (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setSelected(type)}
-                        className={`w2-scan-choice ${isSelected ? 'is-selected' : ''}`}
-                        aria-pressed={isSelected}
-                      >
-                        <span className="w2-scan-choice-icon"><Icon /></span>
-                        <span className="w2-scan-choice-copy">
-                          <b>{label}</b><span>{description}</span>
-                          <span className="w2-scan-chips">
-                            {chips.map((chip) => (
-                              <small key={chip.label} data-tone={chip.tone}>{chip.label}</small>
-                            ))}
-                          </span>
-                        </span>
-                        <span className="w2-scan-choice-check"><CheckIcon /></span>
-                      </button>
-                    )
-                  })}
-                </section>
-                <aside className="w2-scan-side-card">
-                  <h2>扫描流程（共 4 步）</h2>
-                  {FLOW_STEPS.map(([title, copy], index) => (
-                    <div key={title} className="w2-scan-flow-row">
-                      <span>{index + 1}</span><p><b>{title}</b>，{copy}</p>
-                    </div>
-                  ))}
-                  <div className="w2-scan-privacy"><ShieldCheckIcon />扫描文件设有效期；未登录扫描件不会进入「我的文档」，请在本次操作内完成。</div>
-                </aside>
-              </div>
-            </>
-          )}
-        </section>
-
-        {blocked ? (
-          <KioskActionBar leading={<span className="w2-scan-action-note">能力确认前不会创建扫描任务</span>}>
-            <Button variant="secondary" size="lg" onClick={() => navigate('/print-scan')}>返回打印扫描</Button>
-            <Button size="lg" onClick={() => navigate('/print/upload')}>
+    <ScanWorkbenchShell
+      page="scan-start"
+      state={workbenchState}
+      title="材料扫描"
+      subtitle={subtitle}
+      status={status}
+      facts={
+        usbPanel
+          ? ['不创建平台任务', '文件只在你的 U 盘', 'Windows / 奔图真机尚未验收']
+          : blocked
+            ? undefined
+            : ['这台机器的接收目录已由管理员配好，面板上直接选就行，不用你填任何地址。']
+      }
+      ctabar={
+        usbPanel ? (
+          <ScanCta>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
+              <HeadphonesIcon aria-hidden="true" />
+              联系工作人员
+            </button>
+            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print-scan')}>
+              完成后回打印扫描
+            </button>
+          </ScanCta>
+        ) : blocked ? (
+          <ScanCta reason="能力确认前不会创建扫描任务">
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
+              返回打印扫描
+            </button>
+            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
               <UploadIcon aria-hidden="true" />
               改用上传文件打印
-            </Button>
-          </KioskActionBar>
+            </button>
+          </ScanCta>
         ) : (
-          <KioskActionBar leading={<span className="w2-scan-action-note">进入下一步后才会向服务端创建真实会话</span>}>
-            <Button variant="secondary" size="lg" onClick={() => navigate('/print-scan')}>返回</Button>
-            <Button size="lg" onClick={() => navigate('/scan/settings', { state: { scanType: selected } })}>
-              下一步 · 创建扫描会话 <ArrowRightIcon />
-            </Button>
-          </KioskActionBar>
-        )}
-      </div>
-    </KioskPageFrame>
+          <ScanCta>
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="ghost"
+              onClick={() => navigate('/scan/start?mode=usb-panel')}
+            >
+              改用面板扫描到 U 盘
+            </button>
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="primary"
+              onClick={() => navigate('/scan/settings', { state: { scanType: selected } })}
+            >
+              下一步 · 创建扫描会话
+            </button>
+          </ScanCta>
+        )
+      }
+    >
+      {usbPanel ? (
+        <>
+          <ScanSec no="01" title="在奔图面板选择「扫描到 U 盘」" hint="这是打印机自己的独立能力，不经过平台扫描会话" grow>
+            <div className="sw-grid2">
+              <ScanNoteCard
+                title="面板上怎么做"
+                foot="具体菜单名称、可选格式和 USB 接口位置以现场奔图面板为准。"
+              >
+                <ScanPlan items={[
+                  '把 U 盘插到打印机支持的 USB 接口。',
+                  '在奔图操作面板打开「扫描」，选择「扫描到 U 盘」。',
+                  '按面板提示选择文件格式与保存位置，再开始扫描。',
+                  '完成后先按面板提示安全结束，再拔出 U 盘。',
+                ]} />
+              </ScanNoteCard>
+              <ScanNoteCard
+                title="这条路与平台扫描的区别"
+                foot="平台不会读取、上传或保留这次扫描产生的文件。"
+              >
+                <ScanPlan items={[
+                  '不创建平台扫描任务，所以本页没有任务编号。',
+                  '不显示扫描进度或结果，成功失败只看打印机面板。',
+                  '不进入「我的文档」，文件只保存在你的 U 盘。',
+                  '当前尚未完成 Windows / 奔图真机验收，不能把这条说明当成真机通过。',
+                ]} />
+              </ScanNoteCard>
+            </div>
+          </ScanSec>
+          <ScanSec no="02" title="完成之后怎么继续" hint="U 盘里的文件要重新导入才能在本机办理">
+            <div className="sw-grid2">
+              <ScanNoteCard title="要打印或继续加工" foot="导入链路仍以 Terminal Agent 与本地令牌状态为准。">
+                <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
+              </ScanNoteCard>
+              <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">
+                <p>不要在本页反复点击。请联系工作人员确认机型、固件和现场 USB 配置。</p>
+              </ScanNoteCard>
+            </div>
+          </ScanSec>
+        </>
+      ) : blocked ? (
+        <>
+          <ScanStatusPanel
+            tone={gate === 'loading' ? 'info' : 'error'}
+            title={gate === 'loading' ? '正在确认扫描能力' : gate === 'unknown' ? '能力状态暂不可用' : '扫描能力暂未开放'}
+            breathe={gate === 'loading'}
+            chips={[
+              { label: gate === 'loading' ? '正在读取配置' : gate === 'unknown' ? '状态未知' : '暂未开放', tone: 'warn' },
+              { label: '不会创建扫描任务' },
+            ]}
+          >
+            <p>
+              {gate === 'loading'
+                ? '正在读取本终端的扫描服务配置。'
+                : gate === 'unknown'
+                  ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
+                  : (blockedNote ?? '管理员尚未对本终端开放扫描服务，或该能力处于维护 / 待验收状态。')}
+            </p>
+          </ScanStatusPanel>
+          <div className="sw-grid2">
+            <ScanNoteCard title="你现在还能做什么">
+              <ScanPlan items={[
+                '上传文件打印：手机 / U 盘里的现成文件仍可打印。',
+                '本机扫描任务：当前终端扫描能力未开放或状态未知。',
+                '改用面板扫描到 U 盘：不经过平台会话，文件只进你的 U 盘。',
+              ]} />
+            </ScanNoteCard>
+            <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查终端能力配置。">
+              <p>本页不会假装扫描仪已经就绪，也不会在能力未知时创建任务。</p>
+              <div className="sw-cta-row sw-note-actions">
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="ghost"
+                  disabled={checking || gate === 'loading'}
+                  onClick={() => void refreshGate()}
+                >
+                  <RefreshCwIcon aria-hidden="true" />
+                  {checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
+                </button>
+                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
+                  <HeadphonesIcon aria-hidden="true" />
+                  联系工作人员
+                </button>
+              </div>
+            </ScanNoteCard>
+          </div>
+        </>
+      ) : (
+        <>
+          <ScanSec no="01" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
+            <ScanTypeCards selected={selected} onPick={setSelected} />
+          </ScanSec>
+          <ScanSec no="02" title="这条链路长这样" hint="四段都走完，文件才到你手上">
+            <ScanChain active={-1} />
+          </ScanSec>
+          <ScanSec no="03" title="动手之前先看两件事" grow>
+            <div className="sw-grid2">
+              <ScanNoteCard
+                title="为什么屏幕上没有「开始扫描」"
+                foot="合同类材料的扫描从「合同审阅」工作台发起，本屏不重复开口子。"
+              >
+                <p>这台一体机的扫描<b>只能在奔图自己的操作面板上启动</b>，网页不能远程驱动扫描仪。本机负责建会话、转达服务端指引、等文件回传。</p>
+                <p>所以这一屏不会有「一键扫描」，也不会有扫到第几张的进度。</p>
+              </ScanNoteCard>
+              <ScanNoteCard
+                title="扫完之后这份文件能干什么"
+                foot="费用以办理时服务端报价与现场规则为准。未登录扫描件不会进入「我的文档」。"
+              >
+                <ScanPlan items={[
+                  '简历扫描件可以进 AI 识别，做诊断与优化。',
+                  '拿去打印：到打印流程重新选定，由服务端报价后出纸。',
+                  '留存按文件类型与服务端规则；本屏无登录步骤，匿名件不进「我的文档」。',
+                ]} />
+              </ScanNoteCard>
+            </div>
+          </ScanSec>
+        </>
+      )}
+    </ScanWorkbenchShell>
   )
 }

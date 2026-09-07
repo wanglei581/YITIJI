@@ -90,7 +90,7 @@ test('direct scan settings access never posts a session @kiosk', async ({ page, 
 
   await page.goto('/scan/settings')
   await expect(page.getByText('\u672a\u521b\u5efa\u626b\u63cf\u4efb\u52a1', { exact: true }).first()).toBeVisible()
-  await expect(page.locator('footer').getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' }).first()).toBeVisible()
   await expect(page.getByText('\u4efb\u52a1\u7f16\u53f7', { exact: true })).toHaveCount(0)
   await expect(page.getByText('\u653e\u597d\u539f\u4ef6', { exact: true })).toHaveCount(0)
   await page.waitForTimeout(300)
@@ -111,7 +111,7 @@ test('creation failure shows no created state, task metadata, or operation steps
   await expect(page.getByText('\u626b\u63cf\u4efb\u52a1\u5df2\u521b\u5efa', { exact: true })).toHaveCount(0)
   await expect(page.getByText('\u4efb\u52a1\u7f16\u53f7', { exact: true })).toHaveCount(0)
   await expect(page.getByText('\u653e\u597d\u539f\u4ef6', { exact: true })).toHaveCount(0)
-  await expect(page.locator('footer').getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' }).first()).toBeVisible()
   expect(createRequests()).toBe(1)
 })
 
