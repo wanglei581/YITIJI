@@ -102,6 +102,7 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  */
 const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/pickup-claim',
+  '/print/upload',
   '/print/confirm',
   '/resume/report',
   '/resume/optimize',
@@ -179,24 +180,6 @@ function KioskShell() {
   // 由页面自带顶栏 + 返回箭头承载导航。
   // 青序流光已迁移路由退出旧壳：判定见模块级 isQxMigratedPath（精确集合 + 带参前缀）。
   const isQxRoute = isQxMigratedPath(pathname)
-  // ── 青序流光已迁移路由 ────────────────────────────────────────
-  // 这些页已按 docs/design/kiosk-redesign-2026-08/ 的新稿重做，自带 QxPageFrame
-  // 提供的顶栏、页头与操作条。它们必须退出 KioskLayout 的旧外壳——
-  // 后者带 presentation="fusion-youth"，即暖褐配色（--k-ink #1A1714）；
-  // 与青序流光（#10302b）叠在同一页上就是两套色系打架，正是上一代 V6
-  // "只迁移了一半所以效果不好"的成因。
-  //
-  // 逐页加进来，不做一次性大爆炸替换：51 页全部迁完后，KioskLayout 与旧样式
-  // 一并删除，这个集合也随之消失。
-  const QX_MIGRATED_ROUTES = new Set<string>([
-    '/print/pickup-claim',
-    '/print/upload',
-    '/resume/report',
-    '/resume/optimize',
-    '/resume/optimize/compare',
-    '/resume/generate/preview',
-  ])
-  const isQxRoute = QX_MIGRATED_ROUTES.has(pathname)
 
   const isCampusZone = pathname === '/campus'
   const v6Shell = V6_SHELL_ROUTES.get(pathname) ?? null
