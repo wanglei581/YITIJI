@@ -286,3 +286,51 @@ F7 全屏抽查：未做
 补充证据：生产 Kiosk 首次不带启动票的测试提交被安全门禁拒绝；随后通过本机 Agent 新取启动票进入 Kiosk，完成上传、材料检查、黑白单面 1 页免费打印。Agent 日志记录领取、文件哈希校验、打印成功、`completed` 回传和临时文件删除；现场确认纸张已从奔图出纸口出来。首次提交页显示订单号 `ORD-20260906-9D3B5DA26F`，完成页显示另一内部订单标识，需后续核对订单号展示口径。
 
 风险记录：Agent 日志在 13:02–13:06 UTC（北京时间 21:02–21:06）多次出现 `task-runner: claim cycle error — HTTP 429 [RATE_LIMITED]`，13:06:22 UTC 才成功领取本次任务；期间心跳仍被确认，最终任务正常完成。该现象未导致本次打印失败，但上线前需核对云端 claim 限流窗口、Agent 领取间隔和多终端高峰行为，不能把本次最终完成当作限流问题已解决。
+
+## 9. 第二轮回执（2026-09-07）
+
+执行分支：`field/windows-429-and-phase-f-2026-09-07`，基于 `origin/main@f0aa458e5c27220b089b1cf9941c4b4e3d79a156`。本轮未改 `services/**`、`apps/kiosk/**`、`apps/admin/**`、`apps/miniapp/**`、`.github/**`；未记录或输出 token、绑定码、桥接令牌。
+
+### 第 1 件：止血
+
+- 时间：2026-09-07 12:06–12:10（北京时间）。只读配置确认 `terminalId=t_ksk_001`、`terminalCode=KSK-001`、`printerName=Pantum CM2800ADN Series`、`apiBaseUrl=https://zyidai.cn/api/v1`、原 `claimIntervalMs=1000`。
+- 已安装脚本两次执行均在原子提交阶段失败：`Local API allowed origin cannot be empty`（未传 Origin 的首次尝试），以及 `Could not commit production config and terminal token locally`（显式传回原有 Origin 后仍失败）。配置未被半写入。
+- 为完成本机止血，停服后仅修改结构化 `agent-config.json` 的 `claimIntervalMs` 为 `5000`，保留其他非密字段和 DPAPI 文件，随后启动服务。
+- 验收：配置 `claimIntervalMs=5000`；日志 `[2026-09-07T04:06:53.760Z] INFO task-runner: starting — interval=5000ms`；服务 `Running/Automatic`；boot ticket `success=true, expiresInSeconds=60`。止血后观察窗口内无新的旧式 `HTTP 429 [RATE_LIMITED]`。
+
+### 第 2 件：安装新 Agent
+
+- 时间：2026-09-07 12:18–12:30。GitHub Actions run `34079704036` 产物下载命令因 GitHub CLI 长时间无输出中止，随后用同一 run 的 artifact `terminal-agent-unsigned-installer-candidates`（artifact id `10003476659`）下载并解压。
+- `candidate-identity.json`：`sourceCommit=f0aa458e5c27220b089b1cf9941c4b4e3d79a156`，`productVersion=0.4.11`；安装器 SHA-256 与 identity 一致。
+- EXE Burn 界面进程无可控窗口且停在半升级状态，已结束安装器进程；随后同一候选 MSI 静默同机升级返回 `0`。安装目录运行 `dist/index.js` 与 MSI 解包后的候选文件 SHA-256 相同，证明 payload 已更新。配置、SQLite 与凭证保持原位，无重新绑定。
+- 验收：`aijobprintagent.exe` `Running/Automatic`；`POST http://127.0.0.1:9527/local/terminal-boot-ticket` 返回 `success=true`、`expiresInSeconds=60`；日志 `task-runner: starting — interval=5000ms`。安装器未保留 Automatic，已手动恢复并记录为安装器行为。
+
+### 第 3 件：真机 429 退避
+
+- 时间：2026-09-07 12:32–12:41。临时将配置设为 `1000ms`，对真实 API 运行约 8 分钟后恢复 `5000ms`。
+- 脱敏日志：
+
+```text
+[2026-09-07T04:32:37.315Z] WARN task-runner: configured claim interval 1000ms is below the server rate-limit budget
+[2026-09-07T04:32:37.315Z] INFO task-runner: starting — interval=1000ms
+[2026-09-07T04:33:03.706Z] WARN task-runner: claim rate limited (HTTP 429) — pausing claims for 60.2s
+[2026-09-07T04:34:34.530Z] WARN task-runner: claim rate limited (HTTP 429) — pausing claims for 60.5s
+[2026-09-07T04:36:06.384Z] WARN task-runner: claim rate limited (HTTP 429) — pausing claims for 60.2s
+[2026-09-07T04:37:37.223Z] WARN task-runner: claim rate limited (HTTP 429) — pausing claims for 60.7s
+[2026-09-07T04:39:09.049Z] WARN task-runner: claim rate limited (HTTP 429) — pausing claims for 60.5s
+[2026-09-07T04:40:40.867Z] WARN task-runner: claim rate limited (HTTP 429) — pausing claims for 60.9s
+[2026-09-07T04:41:04.967Z] INFO task-runner: starting — interval=5000ms
+```
+
+- 429 暂停期间没有每秒刷 429；未出现 `claim unauthorized`，未观察到任务被标 `failed`。最终配置和服务恢复为 `5000ms` / `Running/Automatic`。
+
+### 第 4 件：Phase F 与延迟溯源
+
+- F4 停用即拒：**未验收**。管理员设备页现场返回 `共 0 台终端`，无法安全选择 `KSK-001` 做停用/恢复；需要 Mac 侧处理线上设备列表/API 数据问题。未点「紧急吊销凭证」。
+- F5 Agent 掉线自愈：**未验收/失败**。完整复验记录了 `boot ticket unavailable after automatic retry window; launching without ticket` 与 `bootTicket=False`；恢复服务后心跳恢复，但观察 75 秒未出现执行单预期的自动重启日志 `local Agent is reachable again; restarting ticketless kiosk browser with a boot ticket`。随后手动关闭无票浏览器，12 秒内看门狗重新启动 `bootTicket=True`。需要 Mac 侧处理看门狗恢复触发逻辑或安装目录版本差异。
+- F6 断网恢复：通过。2026-09-07 12:43:47–12:45:56 禁用 WLAN/以太网约 70 秒后恢复；断网期间日志为 `getaddrinfo ENOTFOUND zyidai.cn` 与 2/4/6 秒重试，恢复后 `[2026-09-07T04:45:15.947Z] INFO heartbeat: ✓ acknowledged`，未重启服务。
+- F7 全屏抽查：通过。看门狗 `Running`，动作指向 `C:\Program Files\AIJobPrintAgent\kiosk\kiosk-watchdog.ps1`；Kiosk Edge 以 `--kiosk`、`--edge-kiosk-type=fullscreen`、`--aijobprint-kiosk=1` 运行并带启动票。
+- 连续多订单矩阵（顺序组/突发组）：**未验收**。本轮未造订单、未造未支付单；后台设备列表为 0，无法安全建立矩阵任务。
+- 2026-09-06 延迟溯源：第一条 429 为 `[2026-09-06T13:02:21.264Z]`，领取成功为 `[2026-09-06T13:06:22.766Z] INFO task-runner: claimed task ptask_kiosk_73db2dfb9b9546e0`，间隔约 241.5 秒。期间心跳仍为 acknowledged；13:02–13:06 UTC 共记录 182 条 `task-runner` 行，且为约 1 秒一次的旧 Agent 重试序列。随后 13:06:25.042Z 打印成功、13:06:29.416Z completed。该证据表明旧 Agent 未按 Retry-After 退避，4 分钟来自持续 429 重试叠加服务端窗口，仍需 Mac 侧结合服务端限流日志确认是否有第二个窗口。
+
+交付说明：本轮没有新增功能入口或外部依赖；未做 B3 闭环、未做连续打印矩阵；上述未验项保持未验收。
