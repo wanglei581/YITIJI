@@ -1,10 +1,11 @@
 /**
  * AI 简历扫码上传 HTTP 端到端验证。
  *
- * 前置：
- * - API 已在本机运行：默认 http://localhost:3010/api/v1
- * - 运行命令必须显式使用本地存储，例如：
- *   FILE_STORAGE_DRIVER=local UPLOAD_SESSION_HTTP_BASE=http://localhost:3010/api/v1 pnpm --filter @ai-job-print/api verify:upload-sessions:http
+ * 自包含：进程内 NestFactory 起 AppModule（镜像 main.ts 的 prefix/pipe/filter），
+ * 随机端口监听，跑完清理并关闭。不再假设外部 API 已在 3010 运行。
+ *
+ * 前置：Redis 在线（REDIS_URL）+ JWT_SECRET 已配 + 本地库可写。
+ * 本脚本强制 FILE_STORAGE_DRIVER=local，绝不触达 COS。
  *
  * 覆盖：
  * create session -> control token gate -> phone multipart upload -> kiosk status
@@ -18,13 +19,20 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { BadRequestException, ValidationPipe } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { Redis } from 'ioredis'
+import { AppModule } from '../src/app.module'
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 import { PrismaService } from '../src/prisma/prisma.service'
 
-const BASE = process.env['UPLOAD_SESSION_HTTP_BASE'] ?? 'http://localhost:3010/api/v1'
+process.env['FILE_STORAGE_DRIVER'] = 'local'
+process.env['FILE_SIGNING_SECRET'] ||= 'verify-upload-sessions-secret-0123456789-abcdef'
+
+let BASE = ''
 const PDF_BYTES = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n')
 
 interface ApiEnvelope<T> {
@@ -48,6 +56,8 @@ interface FileView {
   mimeType: string
   sha256?: string
   fileExpiresAt?: string | null
+  /** kiosk confirm 才签发的短时 HMAC 内容 URL；手机端上传/状态响应不得出现。 */
+  fileUrl?: string | null
 }
 
 interface SessionStatusResponse {
@@ -148,11 +158,26 @@ function assertNoSignedUrl(file: FileView | null | undefined, label: string): vo
   assert.equal(Object.prototype.hasOwnProperty.call(file, 'fileExpiresAt'), true, `${label}: fileExpiresAt contract field is required`)
 }
 
+function assertKioskConfirmFile(file: FileView | null | undefined, label: string): void {
+  assert.ok(file, `${label}: file is required`)
+  const allowed = new Set(['fileId', 'filename', 'sizeBytes', 'mimeType', 'sha256', 'fileExpiresAt', 'fileUrl'])
+  const unexpected = Object.keys(file).filter((key) => !allowed.has(key))
+  assert.deepEqual(unexpected, [], `${label}: unexpected file fields exposed: ${unexpected.join(', ')}`)
+  assert.ok(file.sha256, `${label}: sha256 is required`)
+  assert.equal(Object.prototype.hasOwnProperty.call(file, 'fileExpiresAt'), true, `${label}: fileExpiresAt contract field is required`)
+  assert.equal(typeof file.fileUrl, 'string', `${label}: confirm must return kiosk HMAC fileUrl`)
+  const fileUrl = file.fileUrl as string
+  assert.equal(fileUrl.startsWith('/api/v1/files/'), true, `${label}: fileUrl must be a relative HMAC content path`)
+  assert.equal(fileUrl.includes('expires='), true, `${label}: fileUrl must include expires`)
+  assert.equal(fileUrl.includes('sig='), true, `${label}: fileUrl must include sig`)
+  assert.equal(/^https?:\/\//i.test(fileUrl), false, `${label}: fileUrl must not be an absolute URL`)
+}
+
 function assertLocalOnly(): void {
   const baseUrl = new URL(BASE)
   assert.ok(
     ['localhost', '127.0.0.1', '[::1]'].includes(baseUrl.hostname),
-    `UPLOAD_SESSION_HTTP_BASE must point to localhost, got ${BASE}`,
+    `verifier HTTP base must point to localhost, got ${BASE}`,
   )
 
   const nodeEnv = process.env['NODE_ENV']?.trim().toLowerCase()
@@ -445,7 +470,7 @@ async function runVerifier(): Promise<void> {
   const confirmedData = expectOkData(confirmed.status, confirmed.body, 'confirm with control token succeeds')
   assert.equal(confirmedData.status, 'confirmed')
   assert.equal(confirmedData.file?.fileId, uploadedData.file?.fileId)
-  assertNoSignedUrl(confirmedData.file, 'confirm response')
+  assertKioskConfirmFile(confirmedData.file, 'confirm response')
 
   const cancelConfirmed = await requestJson<ApiEnvelope<unknown>>(`/upload-sessions/${created.sessionId}`, {
     method: 'DELETE',
@@ -555,21 +580,49 @@ async function cleanup(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  let primaryError: unknown
-  try {
-    await runVerifier()
-  } catch (error) {
-    primaryError = error
+  if (!process.env['REDIS_URL']?.trim()) {
+    throw new Error('REDIS_URL 未配置（本验证需真实 Redis 会话）')
+  }
+  if (!process.env['JWT_SECRET']?.trim()) {
+    throw new Error('JWT_SECRET 未配置')
   }
 
+  const app = await NestFactory.create(AppModule, { logger: false })
+  app.setGlobalPrefix('api/v1')
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    exceptionFactory: () => new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: '请求参数校验失败' } }),
+  }))
+  app.useGlobalFilters(new HttpExceptionFilter())
+
+  let primaryError: unknown
   try {
-    await cleanup()
-  } catch (cleanupError) {
-    if (primaryError) {
-      console.warn('\nCleanup failed after verifier failure:', cleanupError)
-    } else {
-      throw cleanupError
+    await app.listen(0, '127.0.0.1')
+    const address = app.getHttpServer().address()
+    if (!address || typeof address === 'string') {
+      throw new Error('upload-sessions HTTP verifier failed to bind a TCP port')
     }
+    BASE = `http://127.0.0.1:${address.port}/api/v1`
+
+    try {
+      await runVerifier()
+    } catch (error) {
+      primaryError = error
+    }
+
+    try {
+      await cleanup()
+    } catch (cleanupError) {
+      if (primaryError) {
+        console.warn('\nCleanup failed after verifier failure:', cleanupError)
+      } else {
+        throw cleanupError
+      }
+    }
+  } finally {
+    await app.close()
   }
 
   if (primaryError) throw primaryError
