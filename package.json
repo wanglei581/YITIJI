@@ -28,6 +28,7 @@
     "verify:repository-integrity": "node scripts/verify-repository-integrity.mjs",
     "verify:deploy-gates-in-sync": "node scripts/verify-deploy-gates-in-sync.mjs",
     "verify:release-bundle": "node scripts/verify-release-bundle.mjs",
+    "verify:prod-readonly-probe": "node scripts/verify-prod-readonly-probe.mjs",
     "verify:deploy-authorization-gate": "node scripts/verify-deploy-authorization-gate.mjs",
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
     "verify:compliance-copy": "node scripts/verify-compliance-copy.mjs && pnpm run verify:datetime-honesty && pnpm run verify:list-truncation-honesty && pnpm run verify:no-raw-error-render",

@@ -82,6 +82,7 @@ jobs:
           # 生产闸门 ↔ 部署脚本持久化清单必须同步（2026-09-06 缺一个键让发布在 PM2 重启后失败）
           pnpm verify:deploy-gates-in-sync
           pnpm verify:release-bundle
+          pnpm verify:prod-readonly-probe
           pnpm verify:ci-gate-coverage
           pnpm verify:fixture-time-bombs
 
