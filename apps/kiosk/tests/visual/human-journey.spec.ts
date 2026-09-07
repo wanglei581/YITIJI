@@ -47,39 +47,49 @@ async function step(page: Page, s: Step, label: string): Promise<void> {
   expect(small, `${tag} 有低于 48px 的可点控件`).toEqual([])
 }
 
-/** 真实岗位数据 —— 生产库里 217 条已审核但未发布，这里按同样形状喂三条。 */
+/**
+ * 岗位夹具 —— 形状以 packages/shared/src/types/job.ts 为准，不按项目惯例猜：
+ *   列表 = PaginatedResponse<ExternalJobDTO> = { data: T[], pagination }，**不带 success 信封**
+ *   ExternalJobSource 必填：sourceOrgId / externalId / sourceName / sourceUrl / syncTime
+ *                          / reviewStatus / publishStatus
+ *   ExternalJobDTO 必填：salaryDisplay / dataSourceNote（注释里写明「合规来源说明（必须展示）」）
+ * 2026-09-08 实测：包成 { success, data: { items } } 会让列表页整页落到兜底错误页。
+ */
 function seedJobs(api: ApiRouter): void {
   const job = (id: string, title: string, company: string) => ({
     id,
     title,
-    companyName: company,
+    company,
     city: '青岛市',
-    salaryText: '8-12K·13薪',
-    educationText: '本科',
-    experienceText: '1-3 年',
-    sourceName: '青岛市公共就业服务中心',
-    sourceOrgName: '青岛市公共就业服务中心',
-    externalId: `EXT-${id}`,
-    sourceUrl: 'https://example.gov.cn/jobs/' + id,
-    syncedAt: '2026-09-06T02:00:00.000Z',
-    publishStatus: 'published',
-    reviewStatus: 'approved',
     tags: ['五险一金', '双休'],
+    description: '岗位职责与任职要求（模拟数据）。',
+    requirements: '本科及以上学历。',
+    sourceOrgId: 'org-qd-employment',
+    externalId: `EXT-${id}`,
+    sourceName: '青岛市公共就业服务中心',
+    sourceUrl: `https://example.gov.cn/jobs/${id}`,
+    syncTime: '2026-09-06T02:00:00.000Z',
+    reviewStatus: 'approved' as const,
+    publishStatus: 'published' as const,
+    salaryDisplay: '8,000–12,000 元/月',
+    dataSourceNote: '本岗位信息来自青岛市公共就业服务中心，本终端仅展示与跳转，不代收简历。',
+    category: 'fulltime' as const,
+    workType: 'full_time' as const,
+    educationRequirement: '本科',
+    experienceRequirement: '1-3 年',
+    salaryMin: 8000,
+    salaryMax: 12000,
+    salaryUnit: 'monthly' as const,
   })
-  const items = [
+  const data = [
     job('job-001', '前端开发工程师', '青岛某某科技有限公司'),
     job('job-002', '人力资源专员', '某某人力资源服务有限公司'),
     job('job-003', '数控机床操作工', '某某智能制造股份有限公司'),
   ]
-  api.respond('GET', '/api/v1/jobs', {
-    status: 200,
-    json: { success: true, data: { items, total: items.length }, pagination: { page: 1, pageSize: 20, total: items.length, totalPages: 1 } },
-  })
-  for (const it of items) {
-    api.respond('GET', `/api/v1/jobs/${it.id}`, {
-      status: 200,
-      json: { success: true, data: { ...it, description: '岗位职责与任职要求（模拟数据）。', requirements: '本科及以上学历。' } },
-    })
+  const paged = { data, pagination: { page: 1, pageSize: 20, total: data.length, totalPages: 1 } }
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: paged })
+  for (const it of data) {
+    api.respond('GET', `/api/v1/jobs/${it.id}`, { status: 200, json: { success: true, data: it } })
   }
 }
 
@@ -202,6 +212,15 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(2500)
     await step(page, s, 'jobs-list')
 
+    // 「岗位信息」进的是服务目录页 /jobs-service（8 张分类卡），列表还要再点一层。
+    // 这一层是走查发现的：直达 /jobs 会跳过目录，真人不会那样走。
+    const fullTime = page.getByRole('button', { name: /全职岗位/ }).first()
+    if (await fullTime.count()) {
+      await fullTime.click()
+      await page.waitForTimeout(3000)
+      await step(page, s, 'jobs-fulltime')
+    }
+
     // 列表里点第一条岗位
     const first = page.getByText('前端开发工程师').first()
     if (await first.count()) {
@@ -209,9 +228,22 @@ test.describe('真人走查（模拟数据）', () => {
       await page.waitForTimeout(2500)
       await step(page, s, 'job-detail')
       const body = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
-      // 合规硬约束：必须展示来源机构 / 同步时间 / 外部 ID，且不得出现平台内投递文案
-      for (const banned of ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理']) {
-        expect(body, `岗位详情出现违规文案「${banned}」`).not.toContain(banned)
+      // 合规硬约束：必须展示来源机构 / 同步时间 / 外部 ID，且不得出现平台内投递文案。
+      //
+      // **必须先剔白名单再查黑名单**，不是优化是正确性要求 —— 本项目的合规写法就是在
+      // 违规写法前面加限定词，所以白名单天然包含黑名单：
+      //   「去来源平台投递」⊃「平台投递」   「来源平台投递页」⊃「平台投递」
+      //   「去来源平台预约」⊃「平台预约」   「扫码投递」⊃「投递」
+      // 2026-09-08 实测：不剔白名单直接查，会把合规的「打开来源平台投递页」判成违规。
+      const ALLOWED = ['去来源平台投递', '来源平台投递页', '来源平台', '扫码投递', '去来源平台预约', '扫码预约']
+      let scan = body
+      for (const ok of ALLOWED) scan = scan.split(ok).join('')
+      for (const banned of ['一键投递', '立即投递', '平台投递', '平台内投递', '企业收简历', '候选人管理', '简历筛选', '面试邀约']) {
+        expect(scan, `岗位详情出现违规文案「${banned}」`).not.toContain(banned)
+      }
+      // 合规必展示的四要素（缺一不可）
+      for (const must of ['青岛市公共就业服务中心', 'EXT-job-001', '同步时间', '不接收简历']) {
+        expect(body, `岗位详情缺少必须展示的「${must}」`).toContain(must)
       }
       console.log(`\n  岗位详情含来源机构：${body.includes('青岛市公共就业服务中心')}`)
       console.log(`  岗位详情含外部ID：${/EXT-job-001/.test(body)}`)
