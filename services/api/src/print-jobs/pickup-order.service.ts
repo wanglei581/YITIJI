@@ -16,6 +16,13 @@ import {
   recordPickupClaimFailure,
 } from './pickup-claim-lockout'
 
+/**
+ * 视为「钱已经在退回路上」的支付态：这三个态下不得出纸，也不得推进取件状态。
+ * 取值与 payment.types.ts 的 PayStatus 对齐；refund.service.ts 退款成功写 'refunded'，
+ * 发起后到成功之间是 'refunding'，部分退款是 'partial_refunded'。
+ */
+const REFUNDED_PAY_STATUSES = new Set(['refunding', 'partial_refunded', 'refunded'])
+
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 
@@ -86,6 +93,20 @@ export class PickupOrderService {
     // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
     await clearPickupClaimFailures(this.redis, terminal.id)
 
+    // 已退款 / 退款中的订单：在任何状态写入之前拦住。
+    // 2026-09-07 产品裁决：「如果退款的话就不出文件」。此前这里没有退款判断，
+    // 一枚已退款订单的到机码仍会先被写成 pickupStatus='claimed' + taskStatus='awaiting_payment'，
+    // 然后才以 ORDER_PAYMENT_UNAVAILABLE「订单当前无法付款」报错 —— 既污染了订单状态
+    // （对账与待退款信号都会读到一个假的「已认领待付款」），也把「钱已退给你」
+    // 说成了「你付不了款」。用户是来取文件的，不是来付款的。
+    if (REFUNDED_PAY_STATUSES.has(order.payStatus)) {
+      throw new BadRequestException({
+        error: {
+          code: 'ORDER_REFUNDED',
+          message: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度。',
+        },
+      })
+    }
     if (order.pickupStatus === 'used' && order.printTaskId) return this.releasedView(order)
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })

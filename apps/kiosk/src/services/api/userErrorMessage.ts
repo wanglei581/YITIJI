@@ -42,6 +42,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_UNAVAILABLE: '这个到机码对应的文件暂时不可用，请联系现场工作人员',
+  // 2026-09-07 产品裁决「退款则不出文件」：服务端在任何状态写入前拦下，这里给同义稳定文案。
+  ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
   PICKUP_CODE_LENGTH: '到机码位数不对，请重新输入',
   PICKUP_CODE_PATTERN: '到机码格式不对，请重新输入',
   REQUEST_TIMEOUT: '本次请求响应超时，请重试',
