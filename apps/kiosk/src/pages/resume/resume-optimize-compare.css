@@ -49,7 +49,7 @@
 .qxc-diff { padding-top: 2px; }
 .qxc-diff > p { margin: 0 0 8px; color: var(--qx-ink-2); font-size: 16px; }
 .qxc-diff-body { max-height: 270px; overflow: auto; border: 1px solid var(--qx-line); border-radius: var(--qx-r); }
-.qxc-diff-body table { font-family: var(--qx-sans); font-size: 17px; }
+.qxc-diff-text { margin: 0; padding: 12px 14px; font-family: var(--qx-sans); font-size: 19px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
 .qxc-diff-body ins { font-weight: 900; text-decoration: underline 3px; text-underline-offset: 4px; }
 .qxc-diff-body del { text-decoration: line-through 3px; }
 .qxc-facts { padding: 14px 16px; border-radius: var(--qx-r); background: var(--qx-teal-soft); }

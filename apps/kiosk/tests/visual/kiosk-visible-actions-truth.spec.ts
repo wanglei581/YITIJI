@@ -21,6 +21,8 @@ function registerResumeCompare(api: Parameters<typeof registerW4Api>[0]) {
 }
 
 async function openResumeCompare(page: Page, api: Parameters<typeof registerW4Api>[0]): Promise<Request> {
+  registerW4Api(api)
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
   registerResumeCompare(api)
   await page.addInitScript(({ taskId, accessToken }) => {
     window.sessionStorage.setItem('ai-job-print:current-ai-resume', JSON.stringify({ taskId, accessToken }))
@@ -138,7 +140,8 @@ test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page
   expect(returnedState).toEqual({
     taskId: COMPARE_TASK_ID,
     accessToken: COMPARE_ACCESS_TOKEN,
-    decisions: { 'module-1': 'optimized', 'module-2': 'original' },
+    // 裁决键与优化页同源（resume-deliver/resumeDecisions.ts moduleKeyOf：`m<序号>:<标题>`）
+    decisions: { 'm0:项目成果': 'optimized', 'm1:团队协作': 'original' },
   })
 })
 

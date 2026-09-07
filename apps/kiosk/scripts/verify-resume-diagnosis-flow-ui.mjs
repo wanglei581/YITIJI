@@ -121,9 +121,9 @@ assertIncludes(optimize, '表达调整参考', 'optimize page uses qualitative i
 assertIncludes(optimize, 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimize page prevents standby during export, print navigation or AI adjustment')
 assertIncludes(optimize, 'printNavigating', 'optimize page locks repeated print navigation')
 assertIncludes(optimize, 'confirmLeave', 'optimize page protects edited resume content before leaving')
-assertIncludes(optimizeCompare, 'splitView={false}', 'optimize diff uses touch-safe inline comparison')
+assertIncludes(optimizeCompare, 'wordDiff(props.item.before, props.item.after)', 'optimize diff uses in-house inline word diff (no third-party viewer fold buttons)')
 assertIncludes(optimize, "confirmLeave ? 'overflow-hidden'", 'optimize page locks background scroll behind leave dialog')
-assertIncludes(optimizeCompare, '[&_pre]:whitespace-pre-wrap', 'optimize diff wraps long lines on touch screens')
+assertIncludes(optimizeCompare, 'className="qxc-diff-text"', 'optimize diff wraps long lines on touch screens (.qxc-diff-text is pre-wrap + overflow-wrap anywhere)')
 // 拆页后母页不得再同屏渲染 diff，否则等于没拆。
 assertNotIncludes(optimize, 'ReactDiffViewer', 'optimize page no longer renders per-item diff inline (split to compare page)')
 assertIncludes(optimize, "navigate('/resume/optimize/compare'", 'optimize page links to the split comparison page')

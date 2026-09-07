@@ -1,7 +1,7 @@
-import ReactDiffViewer from 'react-diff-viewer-continued'
 import { ChevronLeftIcon } from 'lucide-react'
 import type { ResumeCompareDecision, ResumeCompareDecisions, ResumeCompareItem } from './resumeCompareModel'
 import { draftTextFor } from './resumeCompareModel'
+import { wordDiff } from './wordDiff'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -58,8 +58,15 @@ export function ResumeCompareCard(props: {
 
         <section className="qxc-diff" aria-label="逐字差异">
           <p>逐字差异：删除内容带删除线，新增内容带下划线加粗。</p>
-          <div className="qxc-diff-body [&_pre]:whitespace-pre-wrap [overflow-wrap:anywhere]">
-            <ReactDiffViewer oldValue={props.item.before} newValue={props.item.after} splitView={false} disableWordDiff={false} hideLineNumbers useDarkTheme={false} />
+          <div className="qxc-diff-body">
+            <p className="qxc-diff-text">
+              {wordDiff(props.item.before, props.item.after).map((segment, index) => {
+                const key = `${segment.type}-${index}`
+                if (segment.type === 'del') return <del key={key}>{segment.text}</del>
+                if (segment.type === 'ins') return <ins key={key}>{segment.text}</ins>
+                return <span key={key}>{segment.text}</span>
+              })}
+            </p>
           </div>
         </section>
 
