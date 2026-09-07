@@ -94,26 +94,19 @@ test('unknown tool feature key fails closed with a real recovery action @w2', as
   await expectHealthy(page, errors, 'print-scan-feature')
 })
 
-test('conversion page renders a server conversion error without fabricating output @w2', async ({ page, api }) => {
-  const errors = collectRuntimeErrors(page)
-  await page.route('**/w2-fixtures/image.png', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'image/png',
-      body: Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        'base64',
-      ),
-    }),
-  )
-  registerShell(api)
+const PNG_BYTES = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+)
+
+function registerConvertUpload(api: ApiRouter, filename = 'w2-image.png', fileId = 'w2-image-001'): void {
   api.respond('POST', '/api/v1/files/kiosk-upload', {
     status: 200,
     json: {
       success: true,
       data: {
-        fileId: 'w2-image-001',
-        filename: 'w2-image.png',
+        fileId,
+        filename,
         sizeBytes: 1024,
         mimeType: 'image/png',
         sha256: 'c'.repeat(64),
@@ -123,6 +116,19 @@ test('conversion page renders a server conversion error without fabricating outp
       },
     },
   })
+}
+
+async function fulfillFixtureImage(page: Page): Promise<void> {
+  await page.route('**/w2-fixtures/image.png', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: PNG_BYTES }),
+  )
+}
+
+test('conversion page renders a server conversion error without fabricating output @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api)
   api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
     status: 422,
     json: { success: false, error: { code: 'CONVERT_FAILED', message: '合成图片尺寸不受支持' } },
@@ -135,10 +141,112 @@ test('conversion page renders a server conversion error without fabricating outp
   const thumbnail = page.getByRole('img', { name: 'w2-image.png 缩略图' })
   await expect(thumbnail).toBeVisible()
   await expect.poll(() => thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
-  await page.getByRole('button', { name: /生成 PDF/ }).click()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
   await expect(page.getByText('合成图片尺寸不受支持', { exact: true })).toBeVisible()
+  await expect(page.getByText('已生成', { exact: false })).toHaveCount(0)
   await expect(page).toHaveURL(/\/print-scan\/convert$/)
   await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+test('conversion payload order matches the visible list after reorder @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  api.respondWith('POST', '/api/v1/files/kiosk-upload', (requestNumber) => ({
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: `w2-image-00${requestNumber}`,
+        filename: `w2-image-${requestNumber}.png`,
+        sizeBytes: 1024,
+        mimeType: 'image/png',
+        sha256: 'c'.repeat(64),
+        signedUrl: '/w2-fixtures/image.png',
+        signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+        fileExpiresAt: '2026-07-25T00:00:00.000Z',
+      },
+    },
+  }))
+  const convertBodies: Array<{ sources?: Array<{ fileId?: string }> }> = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/print/convert/images-to-pdf')) {
+      convertBodies.push(request.postDataJSON() as { sources?: Array<{ fileId?: string }> })
+    }
+  })
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'w2-pdf-001',
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5: 'd'.repeat(32),
+        sizeBytes: 4096,
+        pages: 2,
+      },
+    },
+  })
+
+  await page.goto('/print-scan/convert')
+  const upload = page.locator('input[type="file"]')
+  await upload.setInputFiles({ name: 'w2-image-1.png', mimeType: 'image/png', buffer: Buffer.from('synthetic-w2-image-1') })
+  await expect(page.getByText('w2-image-1.png', { exact: true })).toBeVisible()
+  await upload.setInputFiles({ name: 'w2-image-2.png', mimeType: 'image/png', buffer: Buffer.from('synthetic-w2-image-2') })
+  await expect(page.getByText('w2-image-2.png', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '选中第 1 张：w2-image-1.png' }).click()
+  await page.getByRole('button', { name: '下移' }).click()
+  await expect(page.locator('[data-testid="img2pdf-order"]')).toHaveAttribute(
+    'data-sent-payload',
+    'w2-image-2.png | w2-image-1.png',
+  )
+  await page.getByRole('button', { name: /合成 2 张为一份 PDF/ }).click()
+  await expect.poll(() => convertBodies.length).toBe(1)
+  expect(convertBodies[0]?.sources?.map((source) => source.fileId)).toEqual(['w2-image-002', 'w2-image-001'])
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  await expect(page.getByText('共 2 页', { exact: false })).toBeVisible()
+  await expect(page).toHaveURL(/\/print-scan\/convert$/)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+test('conversion success stays on the page until the print CTA and does not claim save for guests @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerConvertUpload(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'w2-pdf-guest',
+        printFileUrl: '/w2-fixtures/image.png',
+        fileMd5: 'e'.repeat(32),
+        sizeBytes: 2048,
+        pages: 1,
+      },
+    },
+  })
+
+  await page.goto('/print-scan/convert')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'w2-image.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('synthetic-w2-image'),
+  })
+  await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /合成 1 张为一份 PDF/ }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  await expect(page.getByText('未登录 · 不进我的文档', { exact: true })).toBeVisible()
+  await expect(page.getByText('已保存', { exact: false })).toHaveCount(0)
+  const printCta = page.getByRole('button', { name: '拿这份 PDF 去打印' })
+  await expect(printCta).toBeVisible()
+  const box = await printCta.boundingBox()
+  expect(box, '主按钮必须能量到尺寸').not.toBeNull()
+  expect(box!.height, '主按钮高度（1080 舞台未缩放）不得小于 56px').toBeGreaterThanOrEqual(56)
+  await printCta.click()
+  await expect(page).toHaveURL(/\/print\/material-check$/)
+  expect(errors).toEqual([])
 })
 
 const W2_MEMBER_TOKEN = 'w2-sign-memory-token'
