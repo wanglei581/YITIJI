@@ -61,3 +61,31 @@ pnpm --filter @ai-job-print/api verify:toolbox-preprod-acceptance   # 百宝箱�
 
 ## Done（WP4+WP5）
 A–E 全通过 + `/health` = PG + 日志无敏感正文 + CI 双绿 → 回写 [current-progress.md](../progress/current-progress.md)，列已通过脚本，不贴任何密钥/正文。
+
+---
+
+## 一键只读巡检（发布后 / 上线彩排复验）
+
+在**开发机**对公网复验，不登录服务器、不读密钥、不写任何数据。本机 DNS 把 `*.sslip.io` 劫持到 `198.18.1.0`，脚本按 IP 建连并用 `servername` / `Host` 指定域名（等价 `curl --resolve <域名>:443:<IP>`），见 [production-server-cleanup-2026-09-06.md](./production-server-cleanup-2026-09-06.md) §八「复验探针注意」。
+
+```bash
+node scripts/prod-readonly-probe.mjs
+node scripts/prod-readonly-probe.mjs --host 120.48.13.190 --domains zyidai.cn,admin.zyidai.cn,partner.zyidai.cn
+node scripts/prod-readonly-probe.mjs --expect-sha <本次发布 SHA 前缀>
+node scripts/prod-readonly-probe.mjs --json
+```
+
+`--expect-sha` 只打印在报告头，请人工与服务器 `DEPLOY_SOURCE.txt` 核对。`--scheme http` / `--port` 仅供本地桩，CI 门禁 `pnpm verify:prod-readonly-probe` 不连生产。
+
+有 FAIL 退出码 1，WARN / INFO 仍为 0。公开列表 `total=0` 是 INFO（内容录入是负责人的事），不是 FAIL。
+
+| 项 | 判定 |
+|---|---|
+| `GET /api/v1/health` | 200 且 `data.status=ok`、`data.db=postgres`、`degraded=[]`；否则 FAIL，打印原文前 200 字 |
+| `GET /api/v1/health/ready` | 200 |
+| 三域名 `GET /` | 200，抽出 `assets/index-*.js` hash；同一 hash 出现在两个域名上 WARN（打到了默认 vhost） |
+| `GET /api/v1/jobs`、`/job-fairs`、`/policies` | 取 `pagination.total` 或 `items.length`；0 为 INFO |
+| `GET /api/v1/kiosk/legal/privacy_policy`、`/terms_of_service` | 200 且 `data` 非空 |
+| `GET /api/v1/kiosk/legal/unknown_type` | **400**（#835） |
+| `POST /api/v1/terminals/session-token` 空体 | **400**（存在，非 404；#833） |
+| `GET /api/v1/admin/alerts?limit=5` 无鉴权 | **401**（#841 端点存在且受保护） |
