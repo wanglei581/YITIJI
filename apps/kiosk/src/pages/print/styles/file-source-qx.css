@@ -376,7 +376,12 @@
 .fs-hidden-input {
   position: absolute;
   width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0);
+  /* 不用传统的 margin:-1px —— 它把元素推到 left=-1，踩中 fusion-w6-routes
+     的「不得包含越过视口边界的元素」（判据 rect.left >= -0.5）。
+     改用 clip-path 裁剪：元素留在原位、仍是 1×1、读屏照常能读到。 */
+  padding: 0; margin: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap; border: 0;
 }
