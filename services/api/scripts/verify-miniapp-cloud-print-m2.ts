@@ -455,6 +455,36 @@ async function main(): Promise<void> {
     if (claimedAgain.released !== false || claimedAgain.orderId !== created.id) fail('重复认领未保持同一订单')
     pass('同机认领幂等，未付款仍不创建打印任务')
 
+    // 退款则不出纸（2026-09-07 产品裁决）。三个退款态逐个验：既要拒绝，
+    // 也**不得**在拒绝前把订单状态写坏 —— 此前的实现会先把 pickupStatus 推成 'claimed'、
+    // taskStatus 推成 'awaiting_payment'，再报「订单当前无法付款」，对账和待退款信号都会读到假状态。
+    {
+      const before = await prisma.order.findUnique({ where: { id: created.id } })
+      if (!before) fail('退款用例前置：订单读取失败')
+      for (const refundState of ['refunding', 'partial_refunded', 'refunded']) {
+        await prisma.order.update({ where: { id: created.id }, data: { payStatus: refundState } })
+        await expectCode(
+          () => pickup.claim(created.pickupCode, terminalId),
+          'ORDER_REFUNDED',
+          `payStatus=${refundState} 的到机码认领必须以 ORDER_REFUNDED 拒绝（退款则不出纸）`,
+        )
+        const after = await prisma.order.findUnique({ where: { id: created.id } })
+        if (!after) fail('退款用例：订单读取失败')
+        if (after.pickupStatus !== before.pickupStatus || after.taskStatus !== before.taskStatus) {
+          fail(
+            `payStatus=${refundState} 被拒绝时不得改动取件/任务状态，实际 ` +
+              `pickupStatus ${before.pickupStatus}→${after.pickupStatus}、taskStatus ${before.taskStatus}→${after.taskStatus}`,
+          )
+        }
+        if (await prisma.printTask.count({ where: { orderId: created.id } }) !== 0) {
+          fail(`payStatus=${refundState} 不得创建打印任务`)
+        }
+      }
+      await prisma.order.update({ where: { id: created.id }, data: { payStatus: before.payStatus } })
+      redis.reset()
+    }
+    pass('已退款 / 退款中 / 部分退款的到机码一律 ORDER_REFUNDED 拒绝，且不写坏订单状态、不建打印任务')
+
     await prisma.documentProcessTask.updateMany({
       where: { sourceFileId: fileId, kind: 'pii_scan' },
       data: { paramsJson: JSON.stringify({ sourceSha256: 'c'.repeat(64) }) },
