@@ -18,10 +18,12 @@ import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
 import { OptimizeWorkArea } from './components/resume-deliver/OptimizeWorkArea'
+import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
 import { optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
+import { ResumeOptimizeNavbar } from './components/resume-deliver/ResumeOptimizeNavbar'
 import { ResumeStatePanel } from './components/resume-deliver/ResumeStatePanel'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
 import { useResumeDraftAutosave } from './components/resume-deliver/useResumeDraftAutosave'
@@ -40,6 +42,7 @@ import {
 import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
 import './resume-optimize-qx.css'
+import './optimize-empty-state-qx.css'
 
 type LeaveAction = () => void
 
@@ -193,9 +196,16 @@ export function ResumeOptimizePage() {
     } finally { setAdjusting(null) }
   }
 
+  const goToReport = () => {
+    const search = taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''
+    navigate(`/resume/report${search}`, { state: { ...state, taskId, accessToken } })
+  }
+
+  const navbar = <ResumeOptimizeNavbar />
+
   const ctabar = (
     <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => requestLeave(() => navigate(-1))}>返回报告</button>
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => requestLeave(goToReport)}>返回报告</button>
       {assembled && editorOpen && (
         <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen('resume') }}>
           {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
@@ -206,7 +216,7 @@ export function ResumeOptimizePage() {
 
   if (consent.needsPrompt && !syntheticReady) {
     return (
-      <QxPageFrame title="优化建议" subtitle="基于已有内容优化表达" ctabar={ctabar}>
+      <QxPageFrame title="优化建议" subtitle="基于已有内容优化表达" ctabar={ctabar} navbar={navbar}>
         <section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="qx-resume-optimize" data-optimize-state="loading" />
         <ResumeAiConsentDialog busy={consent.busy} error={consent.error} guest={!token} onCancel={() => navigate(-1)} onConfirm={() => { void consent.confirm() }} />
       </QxPageFrame>
@@ -230,7 +240,7 @@ export function ResumeOptimizePage() {
   )
 
   return (
-    <QxPageFrame title="优化建议" subtitle="换模板出新稿 · 表达调整参考，只重组原文事实" ctabar={ctabar}>
+    <QxPageFrame title="优化建议" subtitle="换模板出新稿 · 表达调整参考，只重组原文事实" ctabar={ctabar} navbar={navbar}>
       <section
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-optimize"
@@ -241,6 +251,13 @@ export function ResumeOptimizePage() {
       >
         <ResumeAigcBadge synthetic={resolved.synthetic} />
         {stateBody}
+        {view !== 'ready' && (
+          <OptimizeEmptyState
+            onReport={goToReport}
+            onManualEdit={() => navigate('/me/resumes')}
+            onMyResumes={() => navigate('/me/resumes')}
+          />
+        )}
         {view === 'ready' && (
           <ResumeDraftBanner
             guest={!token}
