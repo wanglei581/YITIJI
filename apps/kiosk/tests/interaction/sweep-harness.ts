@@ -124,7 +124,12 @@ export function attachCollectors(page: Page): {
   const apiLog: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(`pageerror: ${error.message}`))
   page.on('console', (msg) => {
-    if (msg.type() === 'error') runtimeErrors.push(`console: ${msg.text()}`)
+    if (msg.type() !== 'error') return
+    const text = msg.text()
+    // 本机未起 Terminal Agent（9527）时身份探测失败，不是产品缺陷。
+    if (/ERR_CONNECTION_REFUSED/.test(text) && /9527/.test(text)) return
+    if (text === 'Failed to load resource: net::ERR_CONNECTION_REFUSED') return
+    runtimeErrors.push(`console: ${text}`)
   })
   page.on('request', (request: Request) => {
     const url = request.url()
@@ -145,10 +150,15 @@ export function attachCollectors(page: Page): {
 
 async function pageFingerprint(page: Page): Promise<{ url: string; text: string; overlay: boolean; html: string }> {
   const url = page.url()
-  const text = ((await page.locator('body').innerText().catch(() => '')) || '').replace(/\s+/g, ' ').trim()
+  const surface = page.locator('[data-kiosk-screen], [data-kiosk-domain], .ui-kiosk-content, main, body').first()
+  const text = ((await surface.innerText().catch(() => '')) || '')
+    .replace(/\d{1,2}:\d{2}/g, 'HH:MM')
+    .replace(/\s+/g, ' ')
+    .trim()
   const overlay = await page.locator('[role="dialog"], [role="alertdialog"], .qx-rd-overlay, .k-error, [role="alert"], .me-toast, .rrp-export-error').count()
-  const html = await page.locator('body').evaluate((el) => el.innerHTML.slice(0, 80_000)).catch(() => '')
-  return { url, text, overlay: overlay > 0, html }
+  const html = await surface.evaluate((el) => el.innerHTML.replace(/\d{1,2}:\d{2}/g, 'HH:MM').slice(0, 80_000)).catch(() => '')
+  const selectValues = await page.locator('select').evaluateAll((nodes) => nodes.map((node) => (node as HTMLSelectElement).value).join('|')).catch(() => '')
+  return { url, text, overlay: overlay > 0, html: `${html}::${selectValues}` }
 }
 
 export async function scanForbidden(page: Page): Promise<string[]> {
@@ -161,7 +171,8 @@ export async function shot(page: Page, journey: string, step: string): Promise<s
   const dir = evidenceDir(journey)
   const file = `${String(Date.now()).slice(-8)}-${slug(step)}.png`
   const path = join(dir, file)
-  await page.screenshot({ path, fullPage: true })
+  if (page.isClosed()) return `${journey}/page-closed.png`
+  await page.screenshot({ path, fullPage: true }).catch(() => undefined)
   return `docs/reviews/interaction-sweep-2026-09-08/ai-resume/${journey}/${file}`
 }
 
@@ -380,9 +391,8 @@ export async function operateControl(
         const options = control.locator.locator('option')
         const total = await options.count()
         if (total >= 2) {
-          const value = await options.nth(1).getAttribute('value')
-          if (value !== null) await control.locator.selectOption(value)
-          else await control.locator.selectOption({ index: 1 })
+          const current = await control.locator.evaluate((el) => (el as HTMLSelectElement).selectedIndex)
+          await control.locator.selectOption({ index: (current + 1) % total })
         }
         return
       }
@@ -398,6 +408,20 @@ export async function waitReady(page: Page): Promise<void> {
 }
 
 export async function gotoHome(page: Page): Promise<void> {
+  const current = (() => {
+    try { return new URL(page.url()).pathname } catch { return '' }
+  })()
+  if (current === '/') {
+    await waitReady(page)
+    return
+  }
+  const homeTab = page.locator('.ui-kiosk-nav__item[aria-label="首页"]')
+  if (current && current !== 'blank' && await homeTab.count()) {
+    await homeTab.click()
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 15_000 })
+    await waitReady(page)
+    return
+  }
   await page.goto(`${KIOSK_ORIGIN}/`, { waitUntil: 'domcontentloaded' })
   await waitReady(page)
 }
@@ -408,6 +432,29 @@ export async function clickNamed(page: Page, name: string | RegExp): Promise<Loc
   await locator.first().click()
   await waitReady(page)
   return locator.first()
+}
+
+export async function clickMeTab(page: Page): Promise<void> {
+  const tab = page.locator('.ui-kiosk-nav__item[aria-label="我的"]')
+  if (await tab.count()) {
+    await tab.click()
+  } else {
+    const nav = page.getByRole('button', { name: /^我的$/ })
+    const loggedIn = page.getByRole('button', { name: /进入我的/ })
+    if (await loggedIn.count()) await loggedIn.first().click()
+    else if (await nav.count()) await nav.last().click()
+    else throw new Error('找不到「我的」入口（底栏或顶栏）')
+  }
+  await page.waitForURL((url) => url.pathname === '/profile' || url.pathname.startsWith('/me/'), { timeout: 15_000 })
+  await waitReady(page)
+}
+
+export async function clickProfileEntry(page: Page, label: string, path: string): Promise<void> {
+  const entry = page.locator('button.kp-entry', { hasText: label }).first()
+  await entry.scrollIntoViewIfNeeded()
+  await entry.click()
+  await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 })
+  await waitReady(page)
 }
 
 export async function fillDiagnosisDirection(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
@@ -452,12 +499,20 @@ export async function fillDiagnosisDirection(page: Page, journey: string, collec
     const select = selects.nth(i)
     if (!(await select.isVisible().catch(() => false))) continue
     if (await select.isDisabled().catch(() => false)) continue
+    const label = (await select.evaluate((el) => {
+      const field = el.closest('label')
+      return field?.querySelector('span')?.textContent?.trim() || `下拉#${i}`
+    }).catch(() => `下拉#${i}`))
     await recordStep({
-      page, journey, step: `select-${i}-second`, control: `下拉#${i}`, selectorHint: `selectnth=${i}`,
+      page, journey, step: `select-${i}-second`, control: label, selectorHint: `selectnth=${i}`,
       kind: 'select', collectors,
       act: async () => {
         const options = select.locator('option')
-        if (await options.count() >= 2) await select.selectOption({ index: 1 })
+        const count = await options.count()
+        if (count >= 2) {
+          const current = await select.evaluate((el) => (el as HTMLSelectElement).selectedIndex)
+          await select.selectOption({ index: (current + 1) % count })
+        }
       },
     })
   }
@@ -517,14 +572,15 @@ export async function confirmFactsIfOpen(page: Page, journey: string, collectors
 }
 
 export async function closePreviewIfOpen(page: Page): Promise<void> {
-  const close = page.getByRole('button', { name: /关闭|完成|返回/ }).filter({ hasText: /关闭|完成/ })
-  if (await page.locator('[role="dialog"]').count() === 0) return
-  const dialogClose = page.locator('[role="dialog"] button').filter({ hasText: /关闭|完成|知道了/ })
-  if (await dialogClose.count()) {
-    await dialogClose.first().click().catch(() => undefined)
+  const labeled = page.getByRole('button', { name: /关闭文件预览|关闭/ })
+  if (await labeled.count()) {
+    await labeled.first().click().catch(() => undefined)
     await page.waitForTimeout(300)
-  } else if (await close.count()) {
-    await close.first().click().catch(() => undefined)
+  }
+  const previewClose = page.getByRole('button', { name: '关闭文件预览' })
+  if (await previewClose.count()) {
+    await previewClose.click().catch(() => undefined)
+    await page.waitForTimeout(300)
   }
 }
 

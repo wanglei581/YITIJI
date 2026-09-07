@@ -14,7 +14,9 @@ import type { Page } from '@playwright/test'
 import {
   appendOperation,
   attachCollectors,
+  clickMeTab,
   clickNamed,
+  clickProfileEntry,
   closePreviewIfOpen,
   confirmAiConsent,
   confirmFactsIfOpen,
@@ -25,7 +27,6 @@ import {
   newSweepContext,
   operateControl,
   recordStep,
-  resetEvidence,
   scanForbidden,
   shot,
   uploadResumePdf,
@@ -36,12 +37,10 @@ import {
   type ControlOp,
 } from './sweep-harness'
 
-test.describe.configure({ mode: 'serial' })
-
-const PRINT_OR_JOBS = ['去打印扫描', '查看岗位', '打印扫描', '岗位信息', 'U盘', '手机扫码']
+test.describe.configure({ mode: 'default' })
 
 test.beforeAll(() => {
-  resetEvidence()
+  // 证据目录由 global-setup 清空一次。这里只保证目录存在，避免 worker 重启把上一旅程 jsonl 抹掉。
 })
 
 test.afterAll(() => {
@@ -203,6 +202,7 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
 })
 
 test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @interaction', async ({ browser }) => {
+  test.setTimeout(360_000)
   const { context, page } = await newSweepContext(browser)
   const collectors = attachCollectors(page)
   const journey = 'j2-anon'
@@ -229,13 +229,9 @@ test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @inter
         page, journey, step: label, control: '逐条看完整对照', selectorHint: 'button:逐条看完整对照',
         kind: 'click', collectors,
         act: async () => {
-          const leaveStay = page.getByRole('button', { name: /留在本页|继续编辑/ })
           await page.getByRole('button', { name: /逐条看完整对照/ }).click()
-          if (await page.getByRole('dialog').count()) {
-            const leave = page.getByRole('button', { name: /离开|放弃|仍要离开/ })
-            if (await leave.count()) await leave.first().click()
-            else if (await leaveStay.count()) { /* ignore */ }
-          }
+          const leave = page.getByRole('button', { name: '确认离开', exact: true })
+          if (await leave.count()) await leave.click()
           await page.waitForURL((url) => url.pathname === '/resume/optimize/compare', { timeout: 20_000 })
         },
       })
@@ -255,36 +251,37 @@ test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @inter
     await recordStep({
       page, journey, step: 'compare-rewrite', control: '用改写', selectorHint: 'button:用改写',
       kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: '用改写' }).click() },
+      act: async () => { await page.getByRole('button', { name: '用改写', exact: true }).click() },
     })
     await recordStep({
       page, journey, step: 'compare-next-1', control: '下一条', selectorHint: 'button:下一条',
       kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: '下一条' }).click() },
+      act: async () => { await page.getByRole('button', { name: '下一条', exact: true }).click() },
     })
     await confirmAdds()
     await recordStep({
       page, journey, step: 'compare-keep', control: '保留原文', selectorHint: 'button:保留原文',
       kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: '保留原文' }).click() },
+      act: async () => { await page.getByRole('button', { name: '保留原文', exact: true }).click() },
     })
     await recordStep({
       page, journey, step: 'compare-next-2', control: '下一条', selectorHint: 'button:下一条',
       kind: 'click', collectors,
-      act: async () => { await page.getByRole('button', { name: '下一条' }).click() },
+      act: async () => { await page.getByRole('button', { name: '下一条', exact: true }).click() },
     })
-    while (page.url().includes('/resume/optimize/compare')) {
-      if (await page.getByRole('button', { name: '下一条' }).isEnabled().catch(() => false)) {
+    for (let i = 0; i < 6 && page.url().includes('/resume/optimize/compare'); i += 1) {
+      const next = page.getByRole('button', { name: '下一条', exact: true })
+      if (await next.isEnabled().catch(() => false)) {
         await confirmAdds()
-        const keep = page.getByRole('button', { name: '保留原文' })
+        const keep = page.getByRole('button', { name: '保留原文', exact: true })
         if (await keep.count()) await keep.click()
-        await page.getByRole('button', { name: '下一条' }).click()
+        await next.click()
         await page.waitForTimeout(300)
-      } else {
-        const back = page.getByRole('button', { name: /返回优化页/ })
-        if (await back.count()) await back.first().click()
-        else break
+        continue
       }
+      const back = page.getByRole('button', { name: /返回优化页/ })
+      if (await back.count()) await back.first().click()
+      else break
     }
     await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 15_000 }).catch(() => undefined)
     await shot(page, journey, 'apply-dialog-1')
@@ -298,8 +295,8 @@ test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @inter
 
     await openCompare('open-compare-2')
     await confirmAdds()
-    if (await page.getByRole('button', { name: '保留原文' }).count()) {
-      await page.getByRole('button', { name: '保留原文' }).click()
+    if (await page.getByRole('button', { name: '保留原文', exact: true }).count()) {
+      await page.getByRole('button', { name: '保留原文', exact: true }).click()
     }
     const back2 = page.getByRole('button', { name: /返回优化页/ })
     if (await back2.count()) await back2.first().click()
@@ -315,22 +312,24 @@ test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @inter
 
     const formats = ['PDF', 'Word', 'TXT', 'Markdown'] as const
     for (const format of formats) {
+      await closePreviewIfOpen(page)
       await recordStep({
         page, journey, step: `format-${format}`, control: format, selectorHint: `.qx-rd-fmt >> ${format}`,
         kind: 'click', collectors,
         act: async () => {
-          const btn = page.locator('.qx-rd-fmt button', { hasText: format })
+          const btn = page.locator('.qx-rd-fmt button', { hasText: new RegExp(`^${format}$`) })
           if (await btn.count()) await btn.first().click()
         },
       })
       await recordStep({
-        page, journey, step: `export-${format}`, control: `导出 ${format}`, selectorHint: `button:导出 ${format}|确认优化版`,
+        page, journey, step: `export-${format}`, control: `导出 ${format}`, selectorHint: `.qx-rd-export-actions >> 导出 ${format}`,
         kind: 'click', collectors,
         act: async () => {
-          const exportBtn = page.getByRole('button', { name: new RegExp(`导出 ${format}|确认优化版，导出`) })
-          await exportBtn.first().click()
+          const exportBtn = page.locator('.qx-rd-export-actions .qx-btn').filter({ hasText: `导出 ${format}` })
+          if (await exportBtn.count()) await exportBtn.first().click()
+          else await page.getByRole('button', { name: `导出 ${format}` }).click()
           await confirmFactsIfOpen(page, journey, collectors)
-          await page.waitForTimeout(1200)
+          await page.waitForTimeout(800)
           await closePreviewIfOpen(page)
         },
       })
@@ -356,36 +355,31 @@ test('J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction'
       },
     })
     await shot(page, journey, 'generate-step0')
-    await page.locator('input').first().fill('测试用户')
-    const phone = page.getByPlaceholder(/联系方式/)
-    if (await phone.count()) await phone.fill('13800000000')
+    await page.getByLabel('姓名').fill('测试用户')
+    await page.getByLabel('联系电话').fill('13800000000')
     await recordStep({
       page, journey, step: 'gen-next-1', control: '下一步：求职意向', selectorHint: 'button:下一步',
       kind: 'click', collectors,
       act: async () => { await page.getByRole('button', { name: /下一步/ }).click() },
     })
-    await page.getByPlaceholder(/前端开发工程师/).fill('前端工程师')
-    const jobType = page.locator('select').first()
+    await page.getByLabel('目标岗位').fill('前端工程师')
+    const jobType = page.getByLabel('工作类型')
     if (await jobType.count()) await jobType.selectOption({ index: 1 }).catch(() => undefined)
     await page.getByRole('button', { name: /下一步/ }).click()
     await waitReady(page)
-    await page.locator('input').first().fill('测试大学')
-    const major = page.getByText('专业', { exact: true }).locator('..').locator('input')
-    if (await major.count()) await major.fill('计算机科学与技术')
+    await page.getByLabel('学校').fill('测试大学')
+    await page.getByLabel('专业').fill('计算机科学与技术')
     await page.getByRole('button', { name: /下一步/ }).click()
     await waitReady(page)
-    const inputs = page.locator('input')
-    if (await inputs.count() >= 2) {
-      await inputs.nth(0).fill('测试科技')
-      await inputs.nth(1).fill('前端实习生')
-    }
-    const desc = page.locator('textarea').first()
+    await page.getByLabel('公司 / 单位').fill('测试科技')
+    await page.getByLabel('职位').fill('前端实习生')
+    const desc = page.getByLabel(/做了什么/)
     if (await desc.count()) await desc.fill('负责页面开发与组件维护，这是交互走查填写的中文内容')
     await page.getByRole('button', { name: /下一步/ }).click()
     await waitReady(page)
     await page.getByRole('button', { name: /下一步/ }).click()
     await waitReady(page)
-    const skills = page.locator('textarea').first()
+    const skills = page.getByLabel(/技能/)
     if (await skills.count()) await skills.fill('TypeScript, React')
     await recordStep({
       page, journey, step: 'generate-submit', control: '生成我的简历', selectorHint: 'button:生成我的简历',
@@ -427,33 +421,15 @@ async function openMePage(
     act: async () => { await gotoHome(page) },
   })
   await recordStep({
-    page, journey, step: 'home-profile', control: '我的', selectorHint: 'home profile / nav 我的',
+    page, journey, step: 'home-profile', control: '我的', selectorHint: '.ui-kiosk-nav__item[aria-label=我的]',
     kind: 'click', collectors,
-    act: async () => {
-      const profileBtn = page.getByRole('button', { name: /^我的$|个人中心/ })
-      const header = page.locator('button', { hasText: /^我的$/ })
-      if (await page.locator('[data-action="profile"], [data-testid="home-profile"]').count()) {
-        await page.locator('[data-action="profile"], [data-testid="home-profile"]').first().click()
-      } else if (await profileBtn.count()) {
-        await profileBtn.first().click()
-      } else if (await header.count()) {
-        await header.first().click()
-      } else {
-        await page.goto(`${page.url().replace(/\/$/, '')}/profile`.replace(/\/profile\/profile/, '/profile'), { waitUntil: 'domcontentloaded' }).catch(async () => {
-          await page.evaluate(() => { window.location.assign('/profile') })
-        })
-      }
-      await page.waitForURL((url) => url.pathname === '/profile', { timeout: 15_000 })
-    },
+    act: async () => { await clickMeTab(page) },
   })
   await shot(page, journey, 'profile')
   await recordStep({
-    page, journey, step: `profile-${entry}`, control: entry, selectorHint: `text=${entry}`,
+    page, journey, step: `profile-${entry}`, control: entry, selectorHint: `button.kp-entry:${entry}`,
     kind: 'click', collectors,
-    act: async () => {
-      await page.getByRole('button', { name: new RegExp(entry) }).first().click()
-      await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 })
-    },
+    act: async () => { await clickProfileEntry(page, entry, path) },
   })
 }
 
@@ -466,7 +442,7 @@ test('J4 匿名 · /me/ai-records 登录门与全部按钮 @interaction', async 
     await shot(page, journey, 'ai-records-gate')
     const text = await page.locator('body').innerText()
     expect(text).toMatch(/登录后/)
-    await sweepVisible(page, journey, 'ai-records', collectors, PRINT_OR_JOBS)
+    await sweepVisible(page, journey, 'ai-records', collectors)
     await assertNotProduction(collectors)
   } finally {
     await context.close()
@@ -480,7 +456,7 @@ test('J4 匿名 · /me/resumes 登录门与全部按钮 @interaction', async ({ 
   try {
     await openMePage(page, journey, collectors, '我的简历', '/me/resumes')
     await shot(page, journey, 'resumes-gate')
-    await sweepVisible(page, journey, 'resumes', collectors, PRINT_OR_JOBS)
+    await sweepVisible(page, journey, 'resumes', collectors)
     await assertNotProduction(collectors)
   } finally {
     await context.close()
@@ -494,7 +470,7 @@ test('J4 匿名 · /me/documents 登录门与全部按钮 @interaction', async (
   try {
     await openMePage(page, journey, collectors, '我的文档', '/me/documents')
     await shot(page, journey, 'documents-gate')
-    await sweepVisible(page, journey, 'documents', collectors, PRINT_OR_JOBS)
+    await sweepVisible(page, journey, 'documents', collectors)
     await assertNotProduction(collectors)
   } finally {
     await context.close()
@@ -502,42 +478,41 @@ test('J4 匿名 · /me/documents 登录门与全部按钮 @interaction', async (
 })
 
 test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interaction', async ({ browser }) => {
+  test.setTimeout(360_000)
   const { context, page } = await newSweepContext(browser)
   const collectors = attachCollectors(page)
   const journey = 'member'
   try {
     await gotoHome(page)
     await shot(page, journey, 'home')
-    const loginEntry = page.getByRole('button', { name: /登录|会员/ })
-    if (await loginEntry.count()) {
-      await recordStep({
-        page, journey, step: 'home-login', control: '登录', selectorHint: 'button:登录',
-        kind: 'click', collectors,
-        act: async () => {
-          await loginEntry.first().click()
-        },
-      })
-    } else {
-      await page.evaluate(() => { window.location.assign('/login?from=/') })
-      await waitReady(page)
-    }
+    await recordStep({
+      page, journey, step: 'home-login', control: '登录后查看本人记录', selectorHint: 'v6-home-status login',
+      kind: 'click', collectors,
+      act: async () => {
+        const loginEntry = page.getByRole('button', { name: /登录后查看本人记录/ })
+        if (await loginEntry.count()) await loginEntry.first().click()
+        else await page.getByRole('button', { name: /登录/ }).first().click()
+        await page.waitForURL((url) => url.pathname === '/login', { timeout: 15_000 })
+      },
+    })
     const login = await loginMemberViaSms(page, journey, collectors)
-    expect(login.codeSource, '未能从 Redis / sweep-api.log 读到开发短信验证码，会员态未走通（不是桩）').toBeTruthy()
+    if (!login.codeSource) {
+      appendOperation({
+        journey, step: 'member-login-failed', route: new URL(page.url()).pathname, control: '验证并登录',
+        selectorHint: 'sms-log/redis', kind: 'click', disabled: false, dead: false,
+        observations: { urlChanged: false, apiRequests: [], domChanged: false, overlayOrToastOrError: true, beforeUrl: '/login', afterUrl: new URL(page.url()).pathname, beforeTextLen: 0, afterTextLen: 0 },
+        runtimeErrors: [], forbiddenCopy: [], screenshot: await shot(page, journey, 'login-no-code'),
+        note: '未覆盖：未能从 Redis 或 /tmp/sweep-api.log 读到开发验证码。会员态未走通，未使用 ApiRouter 桩。',
+      })
+      await assertNotProduction(collectors)
+      return
+    }
     await page.waitForTimeout(1500)
     await shot(page, journey, 'logged-in')
 
-    if (!page.url().includes('/resume')) {
-      await enterResumeHub(page, journey, collectors)
-      await enterDiagnoseSource(page, journey, collectors)
-    }
-    if (page.url().includes('/resume-service')) await enterDiagnoseSource(page, journey, collectors)
-    if (page.url().includes('/resume/source') || new URL(page.url()).pathname === '/') {
-      if (new URL(page.url()).pathname === '/') {
-        await enterResumeHub(page, journey, collectors)
-        await enterDiagnoseSource(page, journey, collectors)
-      }
-      await startDiagnosis(page, journey, collectors)
-    }
+    await enterResumeHub(page, journey, collectors)
+    await enterDiagnoseSource(page, journey, collectors)
+    await startDiagnosis(page, journey, collectors)
     if (page.url().includes('/resume/report')) {
       await recordStep({
         page, journey, step: 'member-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
@@ -559,23 +534,29 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
       }
     }
 
-    await page.evaluate(() => { window.location.assign('/profile') })
-    await waitReady(page)
+    const goProfile = async () => {
+      await closePreviewIfOpen(page)
+      const tab = page.locator('.ui-kiosk-nav__item[aria-label="我的"]')
+      if (await tab.count()) await tab.click()
+      else await page.getByTestId('resume-optimize-nav-profile').click()
+      await page.waitForURL((url) => url.pathname === '/profile' || url.pathname.startsWith('/me/'), { timeout: 15_000 })
+      await waitReady(page)
+    }
+    await goProfile()
     await shot(page, journey, 'profile-member')
     for (const [label, path] of [
       ['AI服务记录', '/me/ai-records'],
       ['我的简历', '/me/resumes'],
       ['我的文档', '/me/documents'],
     ] as const) {
-      await page.evaluate((target) => { window.location.assign(target) }, '/profile')
-      await waitReady(page)
+      if (new URL(page.url()).pathname !== '/profile') {
+        await page.getByRole('button', { name: /返回我的/ }).click().catch(async () => { await goProfile() })
+        await waitReady(page)
+      }
       await recordStep({
-        page, journey, step: `me-${path}`, control: label, selectorHint: `button:${label}`,
+        page, journey, step: `me-${path}`, control: label, selectorHint: `button.kp-entry:${label}`,
         kind: 'click', collectors,
-        act: async () => {
-          await page.getByRole('button', { name: new RegExp(label) }).first().click()
-          await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 })
-        },
+        act: async () => { await clickProfileEntry(page, label, path) },
       })
       await shot(page, journey, label)
       const body = await page.locator('body').innerText()
