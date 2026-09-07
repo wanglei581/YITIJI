@@ -27,6 +27,12 @@
   route: /print/material-check（context / check-*）+ /print/preview（preview / file-unsupported /
          capability-* / device-*）。/print/params 是指向 /print/preview 的兼容重定向，不单列状态。
 
+  api（材料检查 / PII，services/api/src/materials/materials.controller.ts；前缀 /api/v1）：
+    POST /materials/tasks
+    GET  /materials/tasks/:id
+    GET  /materials/tasks/:id/print-param-suggestions
+    POST /materials/tasks/:id/pii-findings/decisions
+
   本页只做一件事：把上一步搬进来的那**一份**文件，从「检查」走到「参数设好、能力和设备都确认过」，
   然后交给 14-print-confirm.html 由服务端报价。**本页不显示任何金额、权益抵扣、支付或成功结论**。
 

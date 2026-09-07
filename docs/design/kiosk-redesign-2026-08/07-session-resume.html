@@ -553,17 +553,17 @@ V['empty']=function(){
    + linkRow({id:'print',tone:'slate',icon:'printer',href:'10-print-hub.html',route:'/print-scan',
         title:'直接办新的',sub:'上传文件、扫描原件、用手机传过来，几步就能开印。',
         chips:['上传文件','扫描原件','手机传输','U盘导入']})
-   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/arrival-code',
+   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/pickup-claim',
         title:'手机上已经下过单',sub:'到机码<b>还在有效期内、且就在这台机器上核销</b>时，可以直接继续那一单。',
         chips:['输入到机码','扫码核销']})
-   + linkRow({id:'records',tone:'teal',icon:'inbox',href:'39-member-records.html',route:'/me/records',
+   + linkRow({id:'records',tone:'teal',icon:'inbox',href:'39-member-records.html',route:'/me/activity',
         title:'查以前办过的',sub:'打印订单、服务记录、我的文档都在我的记录里，只有本人看得到。',
         chips:['打印订单','我的文档','服务记录']})
    + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
         title:'刚下过单却看不到',sub:'先确认是不是<b>用另一个手机号</b>建的单；这里只列当前登录账号名下的任务。',
         chips:['换号核对','现场求助']}),
   cta: btn('ghost','01-home.html','/','返回首页')
-     + btn('ghost','39-member-records.html','/me/records','我的记录')
+     + btn('ghost','39-member-records.html','/me/activity','我的记录')
      + '<a class="btn primary press" style="flex:1.25" href="10-print-hub.html" data-route="/print-scan" data-testid="'+SCREEN+'-primary">去打印扫描</a>'
  };
 };
@@ -580,10 +580,10 @@ V['unavailable']=function(){
    + linkRow({id:'retry-hint',tone:'wheat',icon:'refresh',href:'?state=unavailable',route:ROUTE,
         title:'先重试一次',sub:'网络抖一下就会这样，多数时候再读一次就好。',
         chips:['重新读取','不改变任何任务']})
-   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/arrival-code',
+   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/pickup-claim',
         title:'用到机码继续',sub:'到机码<b>还在有效期内、且就在这台机器上核销</b>时，可以绕开这一页。',
         chips:['输入到机码','扫码核销']})
-   + linkRow({id:'records',tone:'teal',icon:'inbox',href:'39-member-records.html',route:'/me/records',
+   + linkRow({id:'records',tone:'teal',icon:'inbox',href:'39-member-records.html',route:'/me/activity',
         title:'去我的记录看看',sub:'打印订单和状态在我的记录里，同样能确认这一单还在不在。',
         chips:['打印订单','订单状态']})
    + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
@@ -610,7 +610,7 @@ V['session-expired']=function(){
    + linkRow({id:'print',tone:'slate',icon:'printer',href:'10-print-hub.html',route:'/print-scan',
         title:'不登录也能打印',sub:'直接去打印扫描上传文件即可；登录只是为了留下记录。',
         chips:['上传文件','扫描原件']})
-   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/arrival-code',
+   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/pickup-claim',
         title:'手机上下过单',sub:'到机码<b>还在有效期内、且就在这台机器上核销</b>时，不用先登录也能继续。',
         chips:['输入到机码','扫码核销']})
    + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
