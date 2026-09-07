@@ -215,7 +215,48 @@ Admin 列表查询**不按 endUserId 过滤**（`where: { status?, category? }` 
 
 ---
 
-## 7. 本手册未验证的（需要服务器权限）
+## 7. BOS 增量包下发
+
+### 数据流
+
+```text
+main push -> CI 三个既有验证 job 通过 -> release-bundle job
+  -> 读 BOS latest-deployed.txt（已部署 SHA）
+  -> 基线是本次 SHA 的祖先：git bundle create 增量包 + SHA-256 文件 -> 私有 BOS
+  -> Deploy 生产机：下载 bundle + 校验 SHA-256 + git bundle verify + git fetch 本地 bundle
+  -> 成功：检出精确 CI SHA；失败：保留现有 GitHub 精确 SHA 拉取回退
+  -> 发布成功后 best-effort 回写 latest-deployed.txt
+```
+
+CI 使用 GitHub Secrets `BOS_RELEASE_ACCESS_KEY` 和 `BOS_RELEASE_SECRET_KEY`；生产机只从
+`/srv/ai-job-print-secrets/bos-release.env` 读取同名变量。该文件还包含
+`BOS_RELEASE_ENDPOINT=bj.bcebos.com` 与 `BOS_RELEASE_BUCKET=ai-job-print-release`，权限必须是 `0600`。
+密钥不经 SSH action `envs` 转发、不写入仓库，也不出现在 CI 日志。
+
+### 首次启用
+
+1. 负责人登录生产机，在已检出本功能的仓库运行
+   `bash scripts/release-bundle/install-bos-secret.sh`，按提示录入两项密钥。脚本会以 `head latest-deployed.txt`
+   做连通性检查，只输出“可达”或“不可达”。
+2. 第一次发布时，生产机当前检出还没有 `scripts/release-bundle/bos-object.mjs`，因此自动走 GitHub 回退；
+   这不是失败。也可以由运维先手工预置 bundle。
+3. 第一次成功发布会 best-effort 写入 `latest-deployed.txt`。之后 main push 的 CI 才能由该基线生成增量 bundle。
+
+### 故障判断与基线重置
+
+- Deploy 日志出现 `bundle 来自 BOS，跳过 GitHub 拉取`：本次走 BOS。
+- 出现 `BOS 未配置`、`当前检出尚无 BOS 客户端` 或 `BOS bundle 不可用或校验失败，走 GitHub 拉取`：本次走回退。
+  后两种不会单独阻断受控发布；应检查 BOS 对象、服务器密钥文件权限和 bundle/checksum 是否同时存在。
+- 要重置基线时，在具备 BOS 密钥的受控环境写入一个确认已部署的完整 SHA：
+
+  ```bash
+  printf '%s' '<confirmed-deployed-40-char-sha>' > /tmp/latest.txt
+  node scripts/release-bundle/bos-object.mjs put latest-deployed.txt /tmp/latest.txt
+  ```
+
+  只可写入生产实际已部署且仍是目标提交祖先的 SHA；错误基线会使 CI 放弃上传并让下一次发布回退 GitHub。
+
+## 8. 本手册未验证的（需要服务器权限）
 
 1. `/srv/ai-job-print/DEPLOY_SOURCE.txt` 的实际内容 —— 运行 SHA 是从 deploy run 日志推断的（证据强：受控发布九步完整走完 + `health/ready` 404 佐证），但没读过该文件
 2. 备份目录实际剩余空间与保留组数
@@ -227,7 +268,7 @@ Admin 列表查询**不按 endUserId 过滤**（`where: { status?, category? }` 
 
 ---
 
-## 8. 已被订正的过时说法（不要再引用）
+## 9. 已被订正的过时说法（不要再引用）
 
 | 出处 | 说法 | 事实 |
 |---|---|---|

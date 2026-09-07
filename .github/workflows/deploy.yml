@@ -42,6 +42,33 @@ jobs:
               echo "服务器已在目标提交 $EXPECTED_SHA，跳过拉取"
             else
               FETCH_OK=0
+              if [ ! -f /srv/ai-job-print-secrets/bos-release.env ]; then
+                echo "BOS 未配置，走 GitHub 拉取"
+              elif [ ! -f scripts/release-bundle/bos-object.mjs ]; then
+                echo "当前检出尚无 BOS 客户端，首次发布走 GitHub 拉取"
+              else
+                echo "尝试从 BOS 拉取增量 bundle"
+                if (
+                  set -a
+                  . /srv/ai-job-print-secrets/bos-release.env
+                  set +a
+                  rm -f /tmp/release.bundle /tmp/release.sha256
+                  node scripts/release-bundle/bos-object.mjs get "release-$EXPECTED_SHA.bundle" /tmp/release.bundle &&
+                    node scripts/release-bundle/bos-object.mjs get "release-$EXPECTED_SHA.sha256" /tmp/release.sha256 &&
+                    (
+                      cd /tmp
+                      sha256sum -c release.sha256
+                    ) &&
+                    git bundle verify /tmp/release.bundle &&
+                    git fetch --no-tags /tmp/release.bundle "$EXPECTED_SHA"
+                ); then
+                  FETCH_OK=1
+                  echo "bundle 来自 BOS，跳过 GitHub 拉取"
+                else
+                  echo "BOS bundle 不可用或校验失败，走 GitHub 拉取"
+                  rm -f /tmp/release.bundle /tmp/release.sha256
+                fi
+              fi
               # --depth=1 拉的是该提交的**完整快照**（约 23MB gzip），不是增量：
               # shallow 仓库没有可复用的历史对象，每次发布都要重传整棵树。
               # 2026-08-17 run 32035882349：4 次尝试各恰好卡满 180s 后被 timeout
@@ -52,22 +79,24 @@ jobs:
               # 那说明问题在通道而非预算，应转向根治方案（见下方 TODO）。
               # TODO(根治): 改由 CI 产出制品经国内端点（阿里云 OSS / Codeup 镜像）
               # 下发，生产机不再直连 github.com。跨境直连是这里的结构性瓶颈。
-              for ATTEMPT in 1 2; do
-                echo "fetch exact CI SHA attempt $ATTEMPT/2"
-                FETCH_STARTED_AT="$(date +%s)"
-                # HTTP/1.1 可规避部分代理的 HTTP/2 长连接中断。
-                # 目标 SHA 必须可从 origin/main 到达。
-                if timeout --foreground --kill-after=10s 600s \
-                  git -c http.version=HTTP/1.1 fetch --no-tags --depth=1 origin "$EXPECTED_SHA"; then
-                  echo "fetch 成功，耗时 $(( $(date +%s) - FETCH_STARTED_AT ))s"
-                  FETCH_OK=1
-                  break
-                fi
-                # 记录实际耗时：贴住 600s 说明是超时，远小于 600s 说明是真的断连。
-                # 这两种情况的修法不同，下次失败时不必再靠猜。
-                echo "fetch 失败，耗时 $(( $(date +%s) - FETCH_STARTED_AT ))s（预算 600s）"
-                sleep "$((ATTEMPT * 5))"
-              done
+              if [ "$FETCH_OK" != "1" ]; then
+                for ATTEMPT in 1 2; do
+                  echo "fetch exact CI SHA attempt $ATTEMPT/2"
+                  FETCH_STARTED_AT="$(date +%s)"
+                  # HTTP/1.1 可规避部分代理的 HTTP/2 长连接中断。
+                  # 目标 SHA 必须可从 origin/main 到达。
+                  if timeout --foreground --kill-after=10s 600s \
+                    git -c http.version=HTTP/1.1 fetch --no-tags --depth=1 origin "$EXPECTED_SHA"; then
+                    echo "fetch 成功，耗时 $(( $(date +%s) - FETCH_STARTED_AT ))s"
+                    FETCH_OK=1
+                    break
+                  fi
+                  # 记录实际耗时：贴住 600s 说明是超时，远小于 600s 说明是真的断连。
+                  # 这两种情况的修法不同，下次失败时不必再靠猜。
+                  echo "fetch 失败，耗时 $(( $(date +%s) - FETCH_STARTED_AT ))s（预算 600s）"
+                  sleep "$((ATTEMPT * 5))"
+                done
+              fi
               test "$FETCH_OK" = "1"
               # 只部署 CI 已验证的精确 SHA；即使 main 在此期间继续前进（文档/其他合并），
               # 也不 ff 到新 tip，避免发布未经该次 CI 验证的提交。
@@ -142,6 +171,16 @@ jobs:
 
             echo "=== 重载 nginx ==="
             nginx -s reload || systemctl reload nginx
+
+            if test -f scripts/release-bundle/bos-object.mjs; then
+              (
+                set -a
+                . /srv/ai-job-print-secrets/bos-release.env 2>/dev/null || exit 1
+                set +a
+                printf '%s' "$EXPECTED_SHA" > /tmp/latest.txt
+                node scripts/release-bundle/bos-object.mjs put latest-deployed.txt /tmp/latest.txt
+              ) || echo "latest-deployed.txt 回写失败（不影响本次发布）"
+            fi
 
             echo "✅ 部署完成"
         env:

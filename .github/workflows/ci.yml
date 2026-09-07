@@ -81,6 +81,7 @@ jobs:
           pnpm verify:repository-integrity
           # 生产闸门 ↔ 部署脚本持久化清单必须同步（2026-09-06 缺一个键让发布在 PM2 重启后失败）
           pnpm verify:deploy-gates-in-sync
+          pnpm verify:release-bundle
           pnpm verify:ci-gate-coverage
           pnpm verify:fixture-time-bombs
 
@@ -1097,3 +1098,45 @@ jobs:
             test-results/partner-e2e-report/**
           if-no-files-found: ignore
           retention-days: 7
+
+  release-bundle:
+    # BOS failure must not prevent Deploy from receiving a successful CI workflow_run.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-and-verify, postgres-readiness, kiosk-browser-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read BOS deployed baseline
+        id: bos-baseline
+        continue-on-error: true
+        env:
+          BOS_RELEASE_ACCESS_KEY: ${{ secrets.BOS_RELEASE_ACCESS_KEY }}
+          BOS_RELEASE_SECRET_KEY: ${{ secrets.BOS_RELEASE_SECRET_KEY }}
+        run: |
+          if node scripts/release-bundle/bos-object.mjs get latest-deployed.txt "$RUNNER_TEMP/latest-deployed.txt"; then
+            printf 'base=%s\n' "$(tr -d '\r\n' < "$RUNNER_TEMP/latest-deployed.txt")" >> "$GITHUB_OUTPUT"
+          else
+            echo 'latest-deployed.txt 不存在或 BOS 不可用'
+          fi
+
+      - name: Create and upload incremental release bundle
+        continue-on-error: true
+        env:
+          BOS_RELEASE_ACCESS_KEY: ${{ secrets.BOS_RELEASE_ACCESS_KEY }}
+          BOS_RELEASE_SECRET_KEY: ${{ secrets.BOS_RELEASE_SECRET_KEY }}
+          BASE_SHA: ${{ steps.bos-baseline.outputs.base }}
+        run: |
+          RELEASE_SHA="$GITHUB_SHA"
+          if [ -z "${BASE_SHA:-}" ] || ! git merge-base --is-ancestor "$BASE_SHA" "$RELEASE_SHA"; then
+            echo '无可用基线，本次发布将回退到 GitHub 拉取'
+            exit 0
+          fi
+          BUNDLE="release-$RELEASE_SHA.bundle"
+          CHECKSUM="release-$RELEASE_SHA.sha256"
+          git bundle create "$BUNDLE" "$RELEASE_SHA" "^$BASE_SHA"
+          sha256sum "$BUNDLE" | sed "s|  $BUNDLE$|  release.bundle|" > "$CHECKSUM"
+          node scripts/release-bundle/bos-object.mjs put "$BUNDLE" "$BUNDLE"
+          node scripts/release-bundle/bos-object.mjs put "$CHECKSUM" "$CHECKSUM"
