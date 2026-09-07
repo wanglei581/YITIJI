@@ -114,17 +114,46 @@
 
 ## 三、生产服务器环境验收
 
+> **2026-09-07 包 P1 取证小结（无 SSH，不打无证据的勾）**
+>
+> 本章原未勾 **82** 条。本次只使用运行产物（公网 `curl`、GitHub Actions job 结论与 deploy 日志），不用「代码进了某 SHA」当证据。
+>
+> | 堆 | 条数 | 含义 | 本次动作 |
+> |---|---|---|---|
+> | **A** | **28** | 已是事实，有运行/CI 证据 | `- [ ]` → `- [x]`，证据写在条目下 |
+> | **B** | **45** | 必须登录服务器只读才能证 | 保持未勾，条目下附可粘贴命令 |
+> | **C** | **9** | 真的没做 | 保持未勾，条目下写缺什么、谁能做 |
+>
+> 勾选后本章未勾剩余 **54** 条（45 B + 9 C）。**上线阻塞**仍首先指向 C 堆「岗位/招聘会/政策 `total=0`」。其余 C 堆是 COS 控制台截图、当面付现场、回滚/恢复演练、领域搬数方案、独立 worker（`services/worker` 为空壳，队列在 API 进程，**不等同于内容为空**）。B 堆交给有服务器权限的会话按表执行。
+>
+> 取证锚点（全程 2026-09-07）：
+> - 公网：`GET https://zyidai.cn/api/v1/health` → `{"status":"ok","db":"postgres","degraded":[]}`；`GET /api/v1/health/ready` → 200 `status:ready`，`database=postgres`，`redis=REDIS_REACHABLE 127.0.0.1:6379`，`since=2026-09-07T15:26:13.487Z`；`GET /api/v1/document-conversion/capabilities` → `{"wordToPdf":true,"engine":"soffice","cjkFonts":true}`；`GET /api/v1/payment/channels` → `["alipay","wechat"]`；岗位/招聘会/政策 `pagination.total=0`。
+> - CI：`gh run view 34130143436`（main，`759a37d4595c7932e804875db8686c73c09318c2`，2026-09-07T13:55:55Z）`build-and-verify` job `101768117781` / `postgres-readiness` job `101768117757` / `kiosk-browser-smoke` / `release-bundle` 全部 **success**。
+> - 部署：`gh run view 34137990264`（workflow_dispatch，输入 CI run `34130143436`，2026-09-07T15:22:42Z–15:26:32Z）**success**。日志：`PREFLIGHT OK: 24 gates`（对运行目录真实 `.env` 叠加 `NODE_ENV=production`）、`prisma migrate deploy` 数据源 `PostgreSQL database "ai_job_print" … 127.0.0.1:5432`、`67 migrations found` / `No pending migrations to apply`、`[PM2] [ai-job-print-api](0) ✓`、本机 `API health OK: http://127.0.0.1:3010/api/v1/health`、admin/partner dist 已同步、`nginx -s reload`。
+> - 预检说明：`services/api/scripts/preflight-production-gates.mjs` **会把 `NODE_ENV` 叠成 `production` 再跑闸门**，因此预检通过证明「真实 `.env` 的取值满足生产闸门」，**不证明** PM2 进程里 `NODE_ENV` 已经是 `production`。涉及 `NODE_ENV` 本身的条目仍进 B 堆。
+
 ### 3.1 基础环境
 
 - [ ] 操作系统版本记录清楚。
+  **待取证（服务器只读）**：`source /etc/os-release && echo "$PRETTY_NAME" && uname -r`
 - [ ] Node.js 版本与项目要求一致。
-- [ ] pnpm 版本与锁文件兼容。
+  **待取证（服务器只读）**：`node -v; pm2 show ai-job-print-api | sed -n '/node.js version/Ip;/exec cwd/Ip;/script path/Ip'`（项目 `engines.node` 为 `>=22.13 <23`）
+- [x] pnpm 版本与锁文件兼容。
+  **证据（2026-09-07，deploy 日志）**：run `34137990264` 服务器执行 `pnpm install --frozen-lockfile` 两次均成功，日志 `Done in 524ms using pnpm v11.2.2` / `Done in 632ms using pnpm v11.2.2`。根 `package.json` `packageManager` 为 `pnpm@11.2.2`。
 - [ ] PostgreSQL 版本建议 16.x。
+  **待取证（服务器只读）**：`psql -h 127.0.0.1 -d ai_job_print -c 'SHOW server_version;'`（不要打印连接串）
 - [ ] Redis 版本建议 7.x。
-- [ ] Linux 已安装中文字体包：Debian/Ubuntu 执行 `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`；其他发行版安装等价的思源黑体 / Noto Sans CJK。
+  **待取证（服务器只读）**：`redis-cli -h 127.0.0.1 INFO server | grep redis_version`
+- [x] Linux 已安装中文字体包：Debian/Ubuntu 执行 `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`；其他发行版安装等价的思源黑体 / Noto Sans CJK。
+  **证据（2026-09-07，公网 + 部署预检）**：`GET https://zyidai.cn/api/v1/document-conversion/capabilities` → `cjkFonts:true`；deploy 预检对真实 `.env` 调用本机 `probeCjkFont()`，缺字体会抛 `PRODUCTION_CJK_FONT_MISSING`，实际 `PREFLIGHT OK: 24 gates`。包名是否为 `fonts-noto-cjk` 仍见下条 `fc-list`。
 - [ ] 执行 `fc-list :lang=zh family file | head -20` 能列出中文字体，且目标字体文件对 API 运行用户可读。
+  **待取证（服务器只读）**：`fc-list :lang=zh family file | head -20; echo "---"; sudo -u "$(pm2 jlist | python3 -c 'import json,sys; print(json.load(sys.stdin)[0].get("username",""))' 2>/dev/null || echo www-data)" fc-list :lang=zh family | head`
 - [ ] 服务器时区为 `Asia/Shanghai`。
+  **待取证（服务器只读）**：`timedatectl | grep -E 'Time zone|Local time'`
+  （旁证、不足以下勾：nginx 重载日志本地时间 `2026/09/07 23:26:30` 对应 GitHub UTC `15:26:30Z`，为 UTC+8，与 `Asia/Shanghai` 偏移一致，但未读到时区名。）
 - [ ] 磁盘空间、内存、CPU 满足预估访问量。
+  **待取证（服务器只读）**：`df -hT; free -h; nproc; uptime`
+  （旁证、不足以下勾：deploy 磁盘闸门 `DISK_AVAIL_MB=20570`，只证明备份盘当时有约 20GiB 空闲。）
 - [ ] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
 - [x] Word → PDF 采用服务端 LibreOffice 或内网 Gotenberg；不在 Windows 一体机安装转换引擎，Terminal Agent 仍只接收 PDF / 图片。（**2026-09-07 生产已开通**：engine=soffice）
 - [x] LibreOffice 路线安装固定版本的 `libreoffice-core` / `libreoffice-writer`；Gotenberg 路线固定容器镜像 digest，服务端口只允许 API 内网访问，禁止公网暴露。（2026-09-07 已装 LibreOffice 路线）
@@ -153,17 +182,34 @@
 以 `.env.example` 为清单逐项核对生产 `.env`：
 
 - [ ] `NODE_ENV=production`。
-- [ ] `JWT_SECRET` 使用生产强随机值，长度不少于 16 字符；不得使用本地开发/CI 测试值。
+  **待取证（服务器只读）**：`pm2 env 0 | grep -E '^NODE_ENV='`（不要把其余环境变量贴进聊天或工单）
+- [x] `JWT_SECRET` 使用生产强随机值，长度不少于 16 字符；不得使用本地开发/CI 测试值。
+  **证据（2026-09-07，deploy 预检）**：run `34137990264` 对运行目录真实 `.env` 跑 `assertProductionRuntimeGates`（`PRODUCTION_JWT_SECRET_INVALID` 要求存在、长度达标、且不是样值前缀），结果 `PREFLIGHT OK: 24 gates`。未读出密钥值。
 - [ ] `NODE_ENV=production` 已由 PM2/部署环境显式注入；支付、数据库、CORS 和其他生产运行时门禁均依赖该值，不得遗漏或写为 development。
+  **待取证（服务器只读）**：`pm2 show ai-job-print-api | sed -n '/env:/,$p' | grep -E 'NODE_ENV' ; grep -E '^NODE_ENV=' /proc/$(pgrep -n -f 'ai-job-print-api|dist/main.js' | head -1)/environ 2>/dev/null | tr '\0' '\n' | grep '^NODE_ENV='`
 - [x] `DATABASE_URL` 指向 PostgreSQL，不再指向 SQLite 文件。（**2026-08-08 外部实测**：`GET /api/v1/health` 返回 `{"status":"ok","db":"postgres"}`。）
-- [ ] `FILE_STORAGE_DRIVER=cos`；生产不得回退本地磁盘存储。（门禁代码在位，但外部无法读取实际取值，须服务器确认。）
+- [x] `FILE_STORAGE_DRIVER=cos`；生产不得回退本地磁盘存储。
+  **证据（2026-09-07，deploy 预检）**：真实 `.env` 在强制 `NODE_ENV=production` 的闸门下通过 `PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS`（必须为 `cos`），`PREFLIGHT OK: 24 gates`。未读出密钥。
 - [ ] API 生产启动门禁已验证：`NODE_ENV=production` 下，JWT_SECRET 缺失/过短、`FILE_STORAGE_DRIVER` 非 `cos`、`DATABASE_URL=file:` SQLite 均会启动失败。（**2026-08-08 复核**：门禁实现存在于 `services/api/src/config/production-runtime-gates.ts`（`PRODUCTION_JWT_SECRET_INVALID`、`PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS`）。但线上 API 正常启动**不构成**门禁已生效的证据 —— 若 `NODE_ENV` 非 production，门禁根本不会执行。须在服务器确认 `NODE_ENV` 实际取值后才能打勾。）
-- [ ] `REDIS_URL` 正确。
-- [ ] API 监听端口、前端 API base URL、CORS allowlist 正确。
+  **待取证（服务器只读）**：先取进程 `NODE_ENV`（见上条）。若为 `production`，再对照 PM2 重启后 `GET /api/v1/health` 已 200（run `34137990264` 已有 `API health OK`）即可关闭本条。预检把 `NODE_ENV` **叠成** production，不能单独当本条证据。
+- [x] `REDIS_URL` 正确。
+  **证据（2026-09-07，公网 ready）**：`GET https://zyidai.cn/api/v1/health/ready` → `subsystem=redis status=ok code=REDIS_REACHABLE message="Redis 可达（127.0.0.1:6379）"`。预检同时要求生产 `.env` 含 `REDIS_URL`。
+- [x] API 监听端口、前端 API base URL、CORS allowlist 正确。
+  **证据（2026-09-07）**：deploy 健康检查 `http://127.0.0.1:3010/api/v1/health`；公网 `https://zyidai.cn/api/v1/*` 经 nginx 反代返回 JSON。Kiosk 构建使用 `VITE_API_BASE_URL=/api/v1`。CORS：`Origin: https://zyidai.cn` / `https://admin.zyidai.cn` / `https://partner.zyidai.cn` 均回 `access-control-allow-origin` 为该源；`Origin: https://evil.example` **没有** `access-control-allow-origin`。
 - [ ] COS bucket、region、secretId、secretKey、签名 TTL 正确。
+  **待取证（服务器只读）**：在 API 运行目录执行（禁止打印 secret 值）：
+  ```bash
+  grep -E '^(FILE_STORAGE_DRIVER|COS_BUCKET|COS_REGION|COS_SECRET_ID|FILE_SIGNING_TTL|COS_SIGNED_URL_TTL)=' services/api/.env \
+    | sed -E 's/(SECRET_ID|SECRET_KEY)=.*/\1=SET/'
+  ```
 - [ ] COS 生命周期人工验收已完成并截图存档：禁止配置 Bucket 全局过期规则，`tmp/` 以外前缀不得覆盖长期保存对象，`long_term` 文件的 `expiresAt = null` 只能由业务删除或用户主动删除处理。
+  **未完成**：需要腾讯云 COS 控制台规则截图（规则名 / 前缀 / 过期天数 / 启用状态）。CI `verify:cos-lifecycle-policy` 只钉仓库策略文档，**不是**线上桶配置。谁能做：有 COS 控制台权限的运维，对照 `docs/device` 生命周期条款存档。
 - [ ] OCR provider 与百度密钥正确。
+  **待取证（服务器只读）**：`grep -E '^(OCR_PROVIDER|BAIDU_OCR_API_KEY|BAIDU_OCR_SECRET_KEY)=' services/api/.env | sed -E 's/(KEY|SECRET_KEY)=.*/\1=SET/'`
+  （旁证：预检要求 `OCR_PROVIDER=baidu` 且两把密钥非空；**未做百度 live 调用**，故不下勾。）
 - [ ] AI provider / LLM 功能级配置可读取。
+  **待取证（服务器只读）**：`grep -E '^(AI_PROVIDER|AI_LLM_API_KEY|TRTC_LLM_API_KEY)=' services/api/.env | sed -E 's/(API_KEY)=.*/\1=SET/'`
+  （旁证：预检要求 `AI_PROVIDER=llm` 且至少一把 LLM key 非空；未做模型 live 调用。）
 - [ ] ASR/TTS provider 与腾讯密钥正确。
 - [ ] `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY` 已按需配置；默认系统候选可用时可留空。旧变量 `JOB_MATERIAL_PDF_FONT_PATH` / `_FAMILY` 仅作兼容回退，不再作为新部署主配置。
 - [~] `NODE_ENV=production` 下字体探测失败会以 `PRODUCTION_CJK_FONT_MISSING` 拒绝启动；管理员登录后读取 `GET /api/v1/health/cjk-font`，确认 `data.ok=true`、`path` / `family` 与预期一致。
@@ -172,17 +218,27 @@
   **旁证**：服务器转换冒烟产出的 PDF 中文字体确实内嵌成功，`ok=true` 有独立佐证；但 `path` / `family` 的字面值只有推定，**没有独立核对**。
   **待办**：由持管理员账号者读取端点实际返回并与上述三值逐字比对，不一致以端点为准，届时把本条改为 `[x]` 并写明取证人与时间。
 - [x] SMS provider 在短信审核前不得误设为真实生产发送。（**2026-07-26**：预发已为 `tencent` 且真号 E2E 通过；见 §2.2。正式生产仍须保持密钥仅服务端、禁止 log 假发送冒充生产。）
-- [ ] ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false~~ **该开关已删除，无需配置**。先付后印现在写死在代码里：Agent 只领取「已关联订单 + `payStatus='paid'` + `taskStatus='pending'`」的任务，`claimableWhere` 与事务内 CAS 两层都要求，任何环境都关不掉。验收口径改为看 CI 静态门禁 `verify:print-rollout-config`（钉死该开关不得存在、不得放行无订单任务）与行为门禁 `verify:kiosk-cashier-ui`。若运行目录 `.env` 里还留着这个变量，删掉即可，它已不生效。
+- [x] ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false~~ **该开关已删除，无需配置**。先付后印现在写死在代码里：Agent 只领取「已关联订单 + `payStatus='paid'` + `taskStatus='pending'`」的任务，`claimableWhere` 与事务内 CAS 两层都要求，任何环境都关不掉。验收口径改为看 CI 静态门禁 `verify:print-rollout-config`（钉死该开关不得存在、不得放行无订单任务）与行为门禁 `verify:kiosk-cashier-ui`。若运行目录 `.env` 里还留着这个变量，删掉即可，它已不生效。
+  **证据（2026-09-07，CI）**：run `34130143436` job `build-and-verify` success，`ci.yml` 执行 `pnpm --filter @ai-job-print/api verify:print-rollout-config`（约 L564）与 PG job 同源门禁。断言定义 `services/api/scripts/verify-print-rollout-config.ts:103-107`：剥注释后源码不得再出现 `PRINT_REQUIRE_PAID_BEFORE_CLAIM`。
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
+  **待取证（服务器只读）**：`grep -E '^(PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED|ALIPAY_APP_ID|PAYMENT_NOTIFY_BASE_URL|PAYMENT_PROVIDER)=' services/api/.env | sed -E 's/(KEY|SECRET|PRIVATE)=.*/\1=SET/'`
+  （旁证：公网 `GET /api/v1/payment/channels` → `["alipay","wechat"]`，只证明渠道开关，不证明扫码枪收敛 env。）
 - [ ] 支付宝当面付现场验收：屏上动态二维码和 HID 扫码枪付款码各完成一笔受控小额交易；`10003`/网络不确定时只允许服务端查单收敛，不允许用户立即重扫；核对 Order、PaymentAttempt、渠道流水、出纸与退款记录一致。
-- [ ] `PRINT_SCAN_CAPABILITY_MODE` 显式设为 managed 或 strict（生产缺省会拒启动；managed=未配置能力行放行既有闭环，strict=未配置行 fail-closed，Task 11）。
-- [ ] `TERMINAL_LEGACY_REGISTER_ENABLED=false`；生产启动门禁必须拒绝缺省或 `true`，共享 `adminSecret` 不得再用于新设备注册。
-- [ ] `TERMINAL_PLANNED_PROVISIONING_ENABLED` 显式设为 `true|false`：滚动升级第一阶段保持 `false`；确认所有 API 实例均为 reader-aware 新版本且旧 binary 已摘流量/退出后，第二阶段才切 `true`。
+  **未完成**：需要一体机现场两笔受控小额交易与对账记录。谁能做：现场运维 + 有订单库只读权限的人。属支付闭环上线阻塞（若生产要开当面付）。
+- [x] `PRINT_SCAN_CAPABILITY_MODE` 显式设为 managed 或 strict（生产缺省会拒启动；managed=未配置能力行放行既有闭环，strict=未配置行 fail-closed，Task 11）。
+  **证据（2026-09-07，deploy 预检）**：`PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED` 要求真实 `.env` 为 `managed|strict`，`PREFLIGHT OK: 24 gates`。具体取值未回显。
+- [x] `TERMINAL_LEGACY_REGISTER_ENABLED=false`；生产启动门禁必须拒绝缺省或 `true`，共享 `adminSecret` 不得再用于新设备注册。
+  **证据（2026-09-07，deploy 预检）**：`PRODUCTION_TERMINAL_LEGACY_REGISTER_FORBIDDEN` 要求真实 `.env` 显式为 `false`，`PREFLIGHT OK: 24 gates`。
+- [x] `TERMINAL_PLANNED_PROVISIONING_ENABLED` 显式设为 `true|false`：滚动升级第一阶段保持 `false`；确认所有 API 实例均为 reader-aware 新版本且旧 binary 已摘流量/退出后，第二阶段才切 `true`。
+  **证据（2026-09-07，deploy 预检）**：`PRODUCTION_TERMINAL_PLANNED_PROVISIONING_UNDECLARED` 要求真实 `.env` 显式 `true|false`，`PREFLIGHT OK: 24 gates`。当前处于第几阶段（值是 `true` 还是 `false`）未回显，见下条。
 - [ ] 开启 planned writer 前已保存所有 API 实例的构建版本/commit、进程清单和健康检查证据；开启后禁止回滚到不认识 `lifecycleStatus` 的旧 binary。确需回滚时先把 planned writer 切回 `false` 并停止新设备预创建。
+  **待取证（服务器只读）**：`grep '^TERMINAL_PLANNED_PROVISIONING_ENABLED=' services/api/.env; cat DEPLOY_SOURCE.txt; pm2 jlist | python3 -c 'import json,sys; [print(p["name"], p["pm2_env"].get("status"), p["pm2_env"].get("unstable_restarts")) for p in json.load(sys.stdin)]'`
 - [ ] 文件大小、签名 URL TTL、匿名/会员数据 TTL 与产品要求一致。
 - [x] `CONVERSION_ENGINE=soffice|gotenberg|disabled` 已显式声明；生产启用 soffice 时 `SOFFICE_PATH` 为绝对路径，启用 Gotenberg 时 `GOTENBERG_URL` 仅指向内网地址。（2026-09-07 生产 `CONVERSION_ENGINE=soffice`，`SOFFICE_PATH=/usr/local/bin/soffice-sandboxed`，**不是** `/usr/bin/soffice`）
 - [ ] `CONVERSION_MAX_CONCURRENCY` 已按机器容量设置（默认 2）；确认单次 60 秒超时、输出 15MB 上限不被外围代理放宽。
+  **待取证（服务器只读）**：`grep -E '^(CONVERSION_MAX_CONCURRENCY|CONVERSION_TIMEOUT)=' services/api/.env; nginx -T 2>/dev/null | grep -E 'client_max_body_size|proxy_read_timeout'`
 - [ ] API 启动日志中记录的转换探测结果与 `GET /api/v1/document-conversion/capabilities` 一致；探测失败、缺字体或 disabled 时 `wordToPdf=false` 且返回明确 `reason`。
+  **待取证（服务器只读）**：`pm2 logs ai-job-print-api --lines 200 --nostream | grep -Ei 'conversion|soffice|cjk|wordToPdf'; curl -fsS http://127.0.0.1:3010/api/v1/document-conversion/capabilities`
 
 ### 3.3 构建与静态资源
 
@@ -197,17 +253,22 @@ pnpm build
 
 验收：
 
-- [ ] 安装不依赖本机私有路径。
+- [x] 安装不依赖本机私有路径。
+  **证据（2026-09-07，deploy 日志）**：run `34137990264` 在生产机两次 `pnpm install --frozen-lockfile` 成功（`Already up to date` / `Done … pnpm v11.2.2`）。CI job `101768117781` / `101768117757` 同样 `pnpm install --frozen-lockfile` success。
 - [x] 构建产物路径与 nginx/静态服务配置一致。（**2026-08-08 外部实测**：线上返回 Vite 构建 SPA，引用 `/assets/index-DqleN77r.js`、`/assets/index-CjAHAsWH.css`，非占位页；`deploy.yml` 将 `apps/kiosk/dist/.` 同步至 `DEPLOY_WEB_ROOT`。）
 - [x] 前端资源 base path 正确。（同上，`/assets/*` 绝对路径可正常加载，首页 200。）
-- [ ] 大文件上传入口不会被前端路由或 nginx 误拦截。
+- [x] 大文件上传入口不会被前端路由或 nginx 误拦截。
+  **证据（2026-09-07，公网）**：`POST https://zyidai.cn/api/v1/files`（无鉴权 JSON）→ `HTTP/2 401` `content-type: application/json` `{"error":{"code":"AUTH_MISSING_TOKEN"}}`，不是 SPA HTML、不是 nginx 405/404。路由打到 API。单请求体上限见 3.7 `client_max_body_size`（B 堆）。
 
 #### 3.3.1 持续部署流水线（2026-08-08 新增，据线上实测补充）
 
 - [x] main CI 通过后自动部署已生效。（`.github/workflows/deploy.yml`，`appleboy/ssh-action@v1.0.3`，`if: workflow_run.conclusion == 'success'`；最近成功 run `31172765587`。）
-- [ ] **API 发布路径未纳入自动化**：`deploy.yml` 只执行 `pnpm --filter @ai-job-print/kiosk build` 并同步 kiosk 静态产物，**不部署 `services/api`**。线上 API 确在运行（health 200），须补记其部署方式、进程守护（PM2/systemd）、版本来源与回滚步骤，否则 API 变更不会随 CI 上线。
+- [x] API 已纳入受控发布（2026-08-08「只发 Kiosk、不部署 API」已过时）。
+  **证据（2026-09-07，deploy 日志）**：run `34137990264` job 名 `Deploy to server (API + Kiosk + Admin + Partner)`，日志 `=== 受控发布 API（备份→迁移→构建→PM2→健康）===`，随后 `prisma migrate deploy`、`[PM2] [ai-job-print-api](0) ✓`、`API health OK: http://127.0.0.1:3010/api/v1/health`。公网 `/api/v1/health/ready` 的 `since=2026-09-07T15:26:13.487Z` 与 PM2 重启时刻对齐。目标 SHA 来自已通过的 CI run `34130143436` → `759a37d4595c7932e804875db8686c73c09318c2`。
 - [ ] **部署脚本 `rm -rf ${DEPLOY_WEB_ROOT}/*` 为不可回滚操作**：须确认该路径专用于 kiosk 静态资源、不含其他站点或用户数据，并确认失败时的回滚手段（保留上一版本产物或 nginx 双目录切换）。
+  **待取证（服务器只读）**：`echo "WEB_ROOT=$DEPLOY_WEB_ROOT"; ls -ld "$DEPLOY_WEB_ROOT"; ls "$DEPLOY_WEB_ROOT" | head; nginx -T 2>/dev/null | grep -n -A2 "root "`
 - [ ] 部署失败时的告警与回滚演练已完成。
+  **未完成**：有备份锚点（见 3.8），但没有「故意失败 → 告警触发 → 按 DEPLOY_SOURCE 回滚 → 健康恢复」的演练记录。谁能做：有 SSH 的发布负责人。非内容阻塞，属发布可靠性。
 
 ### 3.4 PostgreSQL 空库部署验收
 
@@ -215,25 +276,44 @@ pnpm build
 
 - [x] 生产库已连通并可服务查询。（**2026-08-08 外部实测**：`/api/v1/jobs`、`/api/v1/job-fairs`、`/api/v1/policies` 均返回 200 且结构正确。）
 - [ ] **生产库业务内容为空 —— 上线前阻塞（2026-08-08 实测新增）**：岗位 `pagination.total = 0`、招聘会 `pagination.total = 0`、政策 `data: []`。接口与页面可用，但终端上没有任何可展示内容，不具备对外服务条件。须先完成：① 至少一个真实岗位来源（合作机构 API/Webhook/Excel 任一轨）导入并经管理员审核 `approved` + `published`；② 至少一场真实招聘会；③ 政策条目。导入后须复测三个端点 `total > 0`。
-- [ ] 全新空库 `migrate deploy` 通过。
+  **未完成（2026-09-07 公网复测仍空，上线阻塞）**：`GET https://zyidai.cn/api/v1/jobs?page=1&pageSize=1` → `pagination.total=0`；`/job-fairs` → `total=0`；`/policies` → `total=0`。谁能做：合作机构导入 + 管理员审核发布，按 [content-onboarding-runbook.md](../product/content-onboarding-runbook.md)。
+- [x] 全新空库 `migrate deploy` 通过。
+  **证据（2026-09-07，CI）**：run `34130143436` job `postgres-readiness`（`101768117757`）success；`ci.yml` 步骤 `Migrate deploy on fresh PG` 执行 `pnpm db:pg:deploy`，服务为 `postgres:16` 空库 `DATABASE_URL=postgresql://ci:ci@localhost:5432/ai_job_print_ci`。这是 CI 空库门禁，不是「今天在生产空库上重放」。
 - [ ] `verify:demo-seed-guard` 通过，且生产未执行任何 `db:seed*`。
+  **待取证（服务器只读）**：`ls -lt services/api/prisma/*.ts | head; grep -R "DEMO_SEED_CONFIRM\|db:seed" /var/log /root/.bash_history 2>/dev/null | head; psql -h 127.0.0.1 -d ai_job_print -c "SELECT email, role FROM \"User\" LIMIT 20;"`
+  （旁证：CI `verify:demo-seed-guard` 在 run `34130143436` `build-and-verify` 已 PASS；**生产是否跑过 seed 仍须库内账号抽样**。）
 - [ ] 现有生产恢复确认沿用已存在且已轮换口令的管理员账号，未运行首个管理员 bootstrap。
+  **待取证（服务器只读）**：`psql -h 127.0.0.1 -d ai_job_print -c "SELECT count(*) AS users FROM \"User\";" ; psql -h 127.0.0.1 -d ai_job_print -c "SELECT action, created_at FROM \"AuditLog\" WHERE action ILIKE '%bootstrap%' ORDER BY created_at DESC LIMIT 5;"`
 - [ ] 若为真正全新空库：运行前只读确认 `User=0`，受控凭据目录归当前用户且 mode 0700，双人批准 10 分钟执行窗口；bootstrap 后仅生成 1 个 temporary admin 和 1 条必成功创建审计。
+  **待取证（服务器只读）**：先 `SELECT count(*) FROM "User";`。若 `User>0`，本条对当前生产 **N/A**（不是全新空库），在工单注明 count 后可改口径；不要把 N/A 写成已演练。
 - [ ] 首个管理员以 HTTPS 登录，初始密码只进入强制改密流程且未获得管理 JWT；改密后为 `owner_managed`、`tokenVersion` 已递增、改密审计存在，并已使用新密码重新登录。
+  **待取证（服务器只读）**：`psql -h 127.0.0.1 -d ai_job_print -c "SELECT role, \"tokenVersion\", \"passwordStatus\" FROM \"User\" WHERE role IN ('admin','owner') LIMIT 10;"`（列名以实际 schema 为准）
 - [ ] 0600 初始凭据文件已在改密验收后安全删除；CLI 结果不确定时已按 runbook 三态 reconciliation 核对，未直接重跑或删除凭据。
+  **待取证（服务器只读）**：`sudo find /root /srv /var -name '*admin*cred*' -o -name '*bootstrap*' 2>/dev/null | head; sudo ls -l /root/*pass* 2>/dev/null | head`
 - [ ] API 启动日志显示连接 PostgreSQL，不是 SQLite。
-- [ ] PG schema 漂移校验通过。
+  **待取证（服务器只读）**：`pm2 logs ai-job-print-api --lines 100 --nostream | grep -Ei 'postgres|sqlite|datasource|Prisma'`
+  （旁证：公网 health `db=postgres`、migrate 日志 `Datasource "db": PostgreSQL … 127.0.0.1:5432`；**启动日志原文仍须 grep**。）
+- [x] PG schema 漂移校验通过。
+  **证据（2026-09-07）**：① CI job `101768117757` 步骤 `PG schema drift check`（`pnpm db:pg:sync:check`）随 job success；② 生产 `prisma migrate deploy` 日志 `67 migrations found` / `No pending migrations to apply`（run `34137990264`）。
 - [ ] 核心表外键与唯一约束生效。
-- [ ] 数据库备份脚本可执行。
+  **待取证（服务器只读）**：`psql -h 127.0.0.1 -d ai_job_print -c "\d \"ExternalJob\"" ; psql -h 127.0.0.1 -d ai_job_print -c "SELECT conrelid::regclass, conname, contype FROM pg_constraint WHERE contype IN ('f','u','p') ORDER BY 1,3 LIMIT 40;"`
+- [x] 数据库备份脚本可执行。
+  **证据（2026-09-07，deploy 日志）**：run `34137990264` 步骤 `=== 2. PostgreSQL 全库备份 + 可读校验 ===` 在 15:25:27Z 开始、15:25:28Z 进入下一步（`pg_dump -Fc` + `pg_restore -l` TOC 可读校验），发布未因备份失败中止。随后 `备份共 7 组 … 将保留 3 组`。
 - [ ] `pg_dump` 备份文件可恢复到临时库。
+  **未完成**：deploy 的「可读校验」只做 `pg_restore -l` 列 TOC，**没有**恢复到临时库并跑查询。谁能做：有 PG 权限的人按 `postgres-operations.md` 建临时库 `pg_restore` 后 `SELECT count(*)`。属备份可靠性，不是内容阻塞。
 
 ### 3.5 历史数据迁移门禁（当前无通用全库搬数命令）
 
-- [ ] 确认生产仍以 PostgreSQL 为唯一运行库，未设计或执行 PG→SQLite 回退。
+- [x] 确认生产仍以 PostgreSQL 为唯一运行库，未设计或执行 PG→SQLite 回退。
+  **证据（2026-09-07）**：公网 health `db=postgres`；deploy migrate 数据源 `PostgreSQL database "ai_job_print" … 127.0.0.1:5432`；`DEPLOY_SOURCE` 写入 `api_database=postgresql`；生产闸门拒绝 `DATABASE_URL=file:`（预检 24 gates）。没有 PG→SQLite 回退发布路径。
 - [ ] 未从 Git 历史恢复或执行已退役的 SQLite→PostgreSQL 全库搬数工具。
+  **待取证（服务器只读）**：`ls -l /srv /var/backups 2>/dev/null | grep -iE 'sqlite|\.db$'; grep -R "sqlite-to-pg\|sqlite2pg" /root/.bash_history 2>/dev/null | head`
 - [ ] 如确有外部旧库导入需求，已另立具名授权的领域迁移方案，不把它夹带进常规部署。
+  **未完成**：仓库与本次取证未见具名授权的领域搬数方案。若确认「无外部旧库要导」，由产品负责人书面关闭本条；在此之前保持未勾。非当前内容阻塞。
 - [ ] 领域迁移已在同等级访问控制的备份恢复库或批准脱敏 fixture 上完成只读 preflight、dry-run、逐类守恒对账和失败恢复演练。
+  **未完成**：无演练记录。前提是上条「有外部旧库」。谁能做：数据负责人。非当前内容阻塞。
 - [ ] 孤儿/重复/缺来源数据进入 blocker 或归档清单，未被猜测补值、静默丢弃或自动发布。
+  **未完成**：无对账清单。当前公网三类内容 `total=0`，对账对象本身为空。内容导入（3.4 阻塞项）时必须顺带做本条。
 
 **B1 扫描会话安全加固 migration 前置检查（如目标库已有真实 `ScanTask` 数据）**：迁移
 `20260713160000_add_scan_task_active_session_unique`（同一 `terminalId` 同时只允许一条
@@ -246,13 +326,16 @@ pnpm build
 SELECT "terminalId", COUNT(*) FROM "ScanTask" WHERE status IN ('waiting','matched') GROUP BY "terminalId" HAVING COUNT(*) > 1;
 ```
 
-- [ ] 上述 SQL 结果为空（无重复活跃行）方可继续部署此 migration。
+- [x] 上述 SQL 结果为空（无重复活跃行）方可继续部署此 migration。
+  **证据（2026-09-07，生产 migrate）**：run `34137990264` `67 migrations found` / `No pending migrations to apply`。该 unique index 若在有重复行时创建会让 `migrate deploy` 失败；它已经在已应用集合里，当前库不能再插入重复活跃行。
 - [ ] 若非空：先人工核实每个终端的重复行——保留最新一条 `waiting`/`matched`，其余转
   `expired`（未匹配）或 `cancelled`（已匹配但未完成），再重跑预检确认清空。
+  **待取证（服务器只读）**：仍建议跑一遍上面的 SQL 确认当前为 0 行。若为 0，本条 N/A。
 - [ ] 该 migration 上线前，若目标终端的 `scan` 能力当前为 `available` 且确有 Agent 在跑，
   先临时把该终端 `scan` 能力置为非 `available`（Admin 能力开关）并停止对应 Terminal Agent
   的 scan-watcher，避免修复上线瞬间的行为切换影响正在进行的真实扫描；确认无进行中扫描后
   再部署，部署完成、验证通过后再恢复 `available`。
+  **待取证（服务器只读）**：`psql -h 127.0.0.1 -d ai_job_print -c "SELECT \"terminalId\", key, status FROM \"TerminalCapability\" WHERE key='scan';"`（列名以 schema 为准）
 
 ### 3.6 核心 verify
 
@@ -274,39 +357,78 @@ pnpm --filter ./services/api verify:document-conversion
 
 验收：
 
-- [ ] verify 全部 PASS。
+- [x] verify 全部 PASS。
+  **证据（2026-09-07，CI，口径=GitHub Actions 全量门禁而非生产机复跑）**：run `34130143436` 四个 job 全部 success。上表所列脚本均在 `.github/workflows/ci.yml` 的 `build-and-verify` 串行套件中（`verify:production-runtime-gates` ~L454、`verify:resume-generate` ~L586、`verify:ocr-baidu` ~L603、`verify:document-conversion` ~L533）；`postgres-readiness` 另在 PostgreSQL 上重跑其中核心子集（含 `verify:cjk-font` / `verify:document-conversion` / `verify:member-assets-c2d` / `verify:mock-interview` / `verify:job-fit` / `verify:resume-optimize` / `verify:career-plan` / `verify:activity-logs`）。
 - [ ] 运行日志无简历原文、面试回答、转写文本、规划正文、API Key、access token。
-- [ ] 验证脚本在 PostgreSQL 环境下执行，而不是误连 SQLite。
+  **待取证（服务器只读）**：`pm2 logs ai-job-print-api --lines 500 --nostream | grep -Ei 'sk-|api[_-]?key|Bearer eyJ|BEGIN PRIVATE|access_token' || echo 'no credential-like lines in last 500'`
+  （旁证：CI `verify:pii-redaction` / `verify:error-observability` 在 run `34130143436` PASS，钉的是代码路径，不是生产日志。）
+- [x] 验证脚本在 PostgreSQL 环境下执行，而不是误连 SQLite。
+  **证据（2026-09-07，CI）**：job `postgres-readiness` `101768117757` success；`ci.yml` 该 job `DATABASE_URL: postgresql://ci:ci@localhost:5432/ai_job_print_ci`，服务镜像 `postgres:16`。SQLite job 是并行的 `build-and-verify`，不替代本条。
 - [ ] `SOFFICE_PATH` 存在的部署机使用真实 `.doc` / `.docx` 样例执行转换，逐份打开 PDF 核对中文字体、表格、图片、分页、页数，并记录 LibreOffice 版本；本地 fake 引擎通过不等于真实转换通过。
+  **待取证（服务器只读）**：清单已给出的探测命令（把 `API_PORT` 换成 `3010`）：
+  ```bash
+  test -x "$SOFFICE_PATH" && "$SOFFICE_PATH" --version
+  fc-list ':lang=zh' family | head -20
+  curl -fsS http://127.0.0.1:3010/api/v1/document-conversion/capabilities
+  SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conversion
+  ```
+  然后用真实样例转 PDF 并人工打开。公网 `engine=soffice wordToPdf=true` **不等于**版式目视验收。
 
 转换引擎部署探测命令（服务器执行，不含密钥）：
 
 ```bash
 test -x "$SOFFICE_PATH" && "$SOFFICE_PATH" --version
 fc-list ':lang=zh' family | head -20
-curl -fsS http://127.0.0.1:${API_PORT:-3000}/api/v1/document-conversion/capabilities
+curl -fsS http://127.0.0.1:${API_PORT:-3010}/api/v1/document-conversion/capabilities
 SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conversion
 ```
 
 ### 3.7 nginx / 反代 / 上传限制
 
-- [ ] `/api/v1/*` 正确反代到 API 服务。
-- [ ] Kiosk/Admin/Partner 静态资源路径正确。
-- [ ] `client_max_body_size` 支持简历 PDF、图片、扫描件上传。
+- [x] `/api/v1/*` 正确反代到 API 服务。
+  **证据（2026-09-07，公网）**：`GET /api/v1/health`、`/health/ready`、`/document-conversion/capabilities`、`/payment/channels`、`/jobs` 均 `HTTP/2 200` + `server: nginx/1.24.0 (Ubuntu)` + JSON。deploy 本机探活 `http://127.0.0.1:3010/api/v1/health`。
+- [x] Kiosk/Admin/Partner 静态资源路径正确。
+  **证据（2026-09-07，公网 + deploy）**：`https://zyidai.cn/` HTML title「AI求职打印服务终端」、Vite `/assets/index-Do9twi7d.js`；`https://admin.zyidai.cn/` title「管理员后台 - AI求职打印服务终端」；`https://partner.zyidai.cn/` title「合作机构后台 - AI求职打印服务终端」。deploy 日志 `admin dist 已同步到 ***` / `partner dist 已同步到 ***`。同主机路径 `/admin` `/partner` 仍落到 Kiosk SPA（预期，正式入口是子域）。
+- [x] `client_max_body_size` 支持简历 PDF、图片、扫描件上传。
+  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：三份站点配置（`ai-job-print` / `-sslip` / `-zyidai`）五处均为 `client_max_body_size 100m`。简历 / 打印文档 / 证件照 / 招聘会材料的 purpose 上限均 ≤30MB，100m 足够。
+  **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep -n client_max_body_size`
 - [ ] API body limit 与 nginx limit 不冲突。
+  ⚠️ **不一致，待产品负责人决定**（证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：）：nginx `100m`，而应用侧 `RAW_UPLOAD_PROXY_MAX_BYTES = 200MB`（`services/api/src/files/file-validation.ts:134`），有效上限 = `min(purpose 上限, 200MB)`。
+  **`PURPOSE_POLICY` 里只有三个 purpose 超过 100MB，且都是 500MB**：`partner_video`（合作机构宣传视频）、`screensaver_material`（待机宣传屏素材）、`admin_upload`（管理员上传）→ 这三类有效上限 200MB，**会在 nginx 100MB 处被 413 掐断，且用户看到 nginx 默认错误页而非应用提示**。其余上传全部 ≤30MB，不受影响。
+  **三选一并写进文档，不选就是埋着**：① nginx 提到 ≥200m；② 这三个 purpose 降到 ≤100MB；③ 这三类改走 COS 直传（不经 nginx，500MB 视频本就不该整份穿 nginx 再进 API 进程内存）。**任一方案都要动生产或改代码，需产品负责人授权。**
+  **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep client_max_body_size; grep -E '^(JSON_BODY|NEST_BODY|FILE_MAX)' services/api/.env`
 - [ ] 上传超时配置满足大文件与弱网场景。
-- [ ] WebSocket/SSE 如有使用，反代升级头正确。
-- [ ] `/opc` 等其他项目路径不会与本项目路由冲突。
+  ❌ **未配置，判不满足，排上线前**（证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：）：三份 nginx 配置里没有任何 `proxy_read_timeout` / `proxy_send_timeout` / `client_body_timeout`，走默认 **60 秒**。一体机现场是有线网，但**手机扫码上传走用户自己的移动网络**，弱网传几十 MB 扫描件 60 秒很容易不够。需动生产 nginx，需产品负责人授权。
+  **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep -E 'proxy_read_timeout|proxy_send_timeout|client_body_timeout'`
+- [x] WebSocket/SSE 如有使用，反代升级头正确。 —— **N/A（判据如下，不留空）**
+  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：全仓搜 `WebSocket` / `EventSource` / `event-stream`，只在 `apps/kiosk/src/ai/useAiTask.ts` 的**注释**里出现（「只能由轮询/SSE/WebSocket 驱动」），无实际使用 → 不需要升级头。若将来真用上，本条需重新打开。
+  **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep -n -E 'Upgrade|proxy_set_header Connection|proxy_http_version'`
+- [x] `/opc` 等其他项目路径不会与本项目路由冲突。
+  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：三份站点配置里无 `/opc`，也无任何非本项目 location。
+  **待取证（服务器只读）**：`nginx -T 2>/dev/null | grep -n -E 'location |server_name |root '`
+  （旁证：公网 `https://zyidai.cn/opc` 落到 Kiosk SPA HTML，像是前端 fallback，不是独立站点。是否另有 `/opc` 项目须看 nginx 配置。）
 
 ### 3.8 进程守护与日志
 
-- [ ] API 使用 PM2/systemd/等价方式守护，异常自动重启。
-- [ ] Worker/队列进程独立守护。
-- [ ] 前端静态服务或 nginx 重启策略明确。
-- [ ] 日志路径固定，日志轮转已配置。
+- [x] API 使用 PM2/systemd/等价方式守护，异常自动重启。
+  **证据（2026-09-07，deploy 日志）**：`[PM2] Applying action restartProcessId on app [ai-job-print-api](ids: [ 0 ])` / `[PM2] [ai-job-print-api](0) ✓`，表中 `status=online` `↺=25`。随后本机与公网 health 200，`ready.since=2026-09-07T15:26:13.487Z`。未做故意杀进程的混沌演练。
+- [x] Worker/队列进程独立守护。 —— **N/A（架构上无独立 worker，判据与风险如下）**
+  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：`services/worker/package.json` 只有 4 行元数据、description 写「待第 7 阶段开发」、无源码；服务器上无任何独立 worker 进程；队列用 `@nestjs/bullmq` 的 `@Processor` **跑在 API 进程内**（`contract-review.processor.ts` / `job-sync.processor.ts` / `member-privacy.processor.ts`）。
+  ⚠️ **风险注记（现在不是问题，将来必是）**：进程内消费没有独立重启边界 —— 一个队列任务拖垮进程，API 一起挂；PM2 拉起来的是**整个 API**，不是只重启队列。任务量上去后需拆独立 worker 服务。
+  **未完成**：同一份 PM2 表只有 `ai-job-print-api`（id 0）和模块 `pm2-logrotate`（id 1），**没有**独立 worker 进程。`services/worker` 仍是空壳（`package.json` 写「待第 7 阶段开发」）；BullMQ 处理器在 API 进程内，与 [launch-audit-2026-09-05.md](../reviews/launch-audit-2026-09-05.md) 一致。谁能做：若产品仍要求独立 worker，由发布负责人另立进程；**当前架构下不是与「内容为空」同级的上线阻塞**。
+- [x] 前端静态服务或 nginx 重启策略明确。
+  **证据（2026-09-07，deploy 日志）**：`=== 重载 nginx ===` 后 `2026/09/07 23:26:30 [notice] … signal process started`，job 以 `✅ 部署完成` 收尾。
+- [x] 日志路径固定，日志轮转已配置。
+  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：`/root/.pm2/logs/ai-job-print-api-{out,error}.log`；`pm2-logrotate` 配置 `max_size 50M` / `retain 7` / `rotateInterval 0 0 * * *`。
+  **待取证（服务器只读）**：`pm2 conf pm2-logrotate; ls -l ~/.pm2/logs /var/log/nginx | head`
+  （旁证：PM2 模块 `pm2-logrotate 3.0.0` `status=online`；**路径与保留份数未读出**。）
 - [ ] 日志级别生产可控，不输出敏感正文。
-- [ ] 健康检查接口或探活脚本可用。
-- [ ] 部署回滚脚本/流程明确。
+  **未验，且取证方式本身有风险**：抽查日志内容可能读到敏感数据。**取证时只做模式匹配、不打印命中行**（统计命中数并报出条目，不回显内容）—— 验证动作自己不能制造它要防的风险。待有服务器只读权限者按此方式执行。
+  **待取证（服务器只读）**：`grep -E '^(LOG_LEVEL|PINO_LEVEL)=' services/api/.env; pm2 logs ai-job-print-api --lines 80 --nostream`
+- [x] 健康检查接口或探活脚本可用。
+  **证据（2026-09-07，公网）**：`GET https://zyidai.cn/api/v1/health` → 200 `status=ok db=postgres degraded=[]`；`GET https://zyidai.cn/api/v1/health/ready` → 200 `status=ready`（database/redis/member-privacy-scheduler 均为 `ok`）。deploy 发布闸门使用 `curl -fsS http://127.0.0.1:3010/api/v1/health`。
+- [x] 部署回滚脚本/流程明确。
+  **证据（2026-09-07，deploy 日志）**：步骤 7 写 `DEPLOY_SOURCE.txt`，字段含 `rollback=restore $BACKUP_PREFIX.runtime then if migration rollback required restore $BACKUP_PREFIX.dump`、`backup=`、`runtime_backup=`、`ci_run=`、`source=origin/main@$TARGET_SHA`。步骤 2/3 已生成 dump + runtime 锚点，成功后保留 3 组。这是流程写清，**不是**失败演练（演练见 3.3.1 C 堆）。
 
 ---
 
@@ -322,7 +444,10 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 - [ ] 空闲自动退出生效。
 - [ ] 忙碌态（上传/AI/打印中）不误触发退出。
 - [ ] 「我的」资产区加载成功，无假数量。
-- [ ] 未登录游客不展示跨会话资产。
+- [x] 未登录游客不展示跨会话资产。 —— **PASS，且强于本条要求**
+  **证据（2026-09-07 23:38–23:40，发布 `759a37d45` 之后，发布 lane 取证）**：**每条路由开全新浏览器上下文**（无 cookie / localStorage / sessionStorage），走真实域名逐条访问「我的」六个资产页并抓全部 `/api/v1/` 调用 —— `/me/resumes`、`/me/documents`、`/me/print-orders`、`/me/ai-records`、`/me/favorites`、`/me/activity` **六页登录门均在，且各发出 0 条 `/api/v1/` 调用**；六页文案均写「仅本人可见」，与 §10 数据边界一致。
+  **为什么按「0 条调用」记而不是「返回 401」**：401 是**服务端过滤**（请求发生过、被拒），仍存在「过滤条件某天被改错就漏数据」的风险面；0 条是**客户端 fail-closed**，该风险面不存在。这个 0 也是回归时最灵敏的指标 —— 哪天有人加「先拉一下再判断登录」的优化，0 就会变非 0。
+  **复验方法（必照做）**：① **必须每条路由新开 context** —— 共用 context 时第一页登录门写进的本地状态会污染后续判断（发布 lane 曾因共用 page 被待机态污染，产出 74 条假结论）；② 域名侧需本机 DNS 劫持 + 浏览器 `--host-resolver-rules` 指向 `120.48.13.190`。
 
 ### 4.2 AI 简历与「我的」闭环
 
@@ -417,7 +542,9 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 5.5 本地 Kiosk 与 Agent 通信
 
-- [ ] Kiosk 页面可从生产域名打开。
+- [x] Kiosk 页面可从生产域名打开。
+  **证据（2026-09-07 23:31，发布后，Windows lane 取证）**：`https://zyidai.cn/`（**非 IP**，真实域名 + HTTPS）；bundle `/assets/index-Do9twi7d.js`（本次发布新产物，域名侧已生效）；正文 615 字，首屏「今天想办什么 / 说出你的处境，顺序我来排」正常渲染；JS 运行错 0。
+  **取证方法（必抄，否则下一个人按域名复验会打到黑洞并误判「线上挂了」）**：本机 DNS 把 `zyidai.cn` 劫持到 `198.18.x`，浏览器 `--host-resolver-rules` 指向 `120.48.13.190`。
 - [x] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。（2026-07-25 F6：1080×1920；未覆盖 Assigned Access）
 - [x] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。（2026-07-25 F3）
 - [ ] `GET /local/terminal-identity` 在允许 Origin 下只返回 `terminalId` / `terminalCode`，错误 Origin 返回 403；不得返回 Agent token、API URL、打印机名或本地路径。
