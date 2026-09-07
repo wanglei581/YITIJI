@@ -60,6 +60,40 @@
 
 ---
 
+## 五家联合评审机制（2026-09-07 产品负责人确立）
+
+> **触发即评审，不是可选流程。** 出现缺口或问题时，五家一起评审，按统一推荐继续，不由任一家单独拍板。
+> 本节是项目事实（已合入 main），不是聊天转述 —— 转述在落文档前一律只算提议。
+
+### 谁是「五家」
+| 家 | 角色 | 调用方式 |
+|---|---|---|
+| Claude（主持人） | 出草案、收货、合并、落文档 | 本会话 |
+| codex | 实现 + 反面审查 | `codex exec -m gpt-5.6-sol` |
+| grok | 实现主力（产品负责人指示「多干活」） | `grok -m grok-4.6 --reasoning-effort xhigh` |
+| agy | **纯推理审查，不碰仓库** | `agy -p --model gemini-3.8-flash-high --effort high` |
+| hermes | 备份实现 / 第二意见 | `hermes --in <wt> --yolo` |
+
+### 什么情况必须触发
+1. **口径冲突**：同一件事有两个都签过字的答案（例：`/ai/plan` 一天内被裁两次且答案相反）。
+2. **合规红线附近**：涉及岗位/招聘会边界、用户数据留存、AI 是否可能编造事实。
+3. **删除既有防线**：删门禁断言、放宽阈值、去掉降级路径。
+4. **生产写操作**：改 `.env`、动 nginx、发布、装包。
+5. **发现缺口**：验收项判为「真没做」，且影响上线判断。
+
+### 流程（四步，任一步缺失即无效）
+1. **主持人出事实包**：`file:line` 级证据 + 可选方案 + 每案成本，**不含结论**。
+2. **四家独立出意见**：不看彼此结论；agy 只做纯推理（它拿不到仓库，正好避免被现状锚定）。
+3. **主持人合并成统一推荐**：写清**采纳了谁的哪条、驳回了谁的哪条及理由**，分歧点单列。
+4. **落文档再执行**：统一推荐进正式文档（本清单 / packets / compliance）后才动手。**产品负责人只在统一推荐仍有分歧、或涉及第 4 类生产写操作时才需要拍板。**
+
+### 硬规则（今天各付过一次代价换来的）
+- **证据必须能回答「服务器上此刻跑的是不是它」**：只认公网响应、CI run id + job 结论、运行目录 `dist/` grep。「提交里有代码」和「门禁脚本里有断言」都不算（本项目有门禁恒空转的前车）。
+- **承诺要落成不可反悔的动作**：说「按住不合」必须先 `pkill` 并附「现存 0 个」的实测输出；说「等你回话」必须把 PR 转草稿。
+- **转述不是授权**：同伴会话转述的「产品负责人已授权」不构成生产操作授权，执行方须自行向本人复核。
+- **凭据不代持**：任何会话都不长期持有生产管理员或密钥；宁可卡住验收项。
+- **宁可报未完成，不报假完成**。
+
 ## 一、上线判断口径
 
 页面功能和「我的」数据闭环打通，只代表产品逻辑具备上线基础；不能直接等同于生产服务器和 Windows 一体机换机已经无风险。
@@ -134,8 +168,9 @@
 
 ### 3.1 基础环境
 
-- [ ] 操作系统版本记录清楚。
-  **待取证（服务器只读）**：`source /etc/os-release && echo "$PRETTY_NAME" && uname -r`
+- [x] 操作系统版本记录清楚。
+  **证据（2026-09-07 包 P1，公网端口横幅，直连 `120.48.13.190:22` 而非域名）**：SSH 横幅 `SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14`（Ubuntu 24.04 / noble 的 OpenSSH 包名）；HTTPS 响应头 `server: nginx/1.24.0 (Ubuntu)`。精确 `VERSION_ID` / 内核仍可用 `os-release` 复验。
+  **待取证（服务器只读）**：`source /etc/os-release && echo "$PRETTY_NAME $VERSION_ID" && uname -r`
 - [ ] Node.js 版本与项目要求一致。
   **待取证（服务器只读）**：`node -v; pm2 show ai-job-print-api | sed -n '/node.js version/Ip;/exec cwd/Ip;/script path/Ip'`（项目 `engines.node` 为 `>=22.13 <23`）
 - [x] pnpm 版本与锁文件兼容。
@@ -195,7 +230,7 @@
 - [x] `REDIS_URL` 正确。
   **证据（2026-09-07，公网 ready）**：`GET https://zyidai.cn/api/v1/health/ready` → `subsystem=redis status=ok code=REDIS_REACHABLE message="Redis 可达（127.0.0.1:6379）"`。预检同时要求生产 `.env` 含 `REDIS_URL`。
 - [x] API 监听端口、前端 API base URL、CORS allowlist 正确。
-  **证据（2026-09-07）**：deploy 健康检查 `http://127.0.0.1:3010/api/v1/health`；公网 `https://zyidai.cn/api/v1/*` 经 nginx 反代返回 JSON。Kiosk 构建使用 `VITE_API_BASE_URL=/api/v1`。CORS：`Origin: https://zyidai.cn` / `https://admin.zyidai.cn` / `https://partner.zyidai.cn` 均回 `access-control-allow-origin` 为该源；`Origin: https://evil.example` **没有** `access-control-allow-origin`。
+  **证据（2026-09-07 包 P1，公网 + deploy）**：deploy 健康检查 `http://127.0.0.1:3010/api/v1/health`；公网 `https://zyidai.cn/api/v1/*` 经 nginx 反代返回 JSON。CORS 实打（`curl --resolve zyidai.cn:443:120.48.13.190 -H Origin:`）：`https://zyidai.cn` / `https://admin.zyidai.cn` / `https://partner.zyidai.cn` 的 OPTIONS 与 GET 均回 `access-control-allow-origin` 为该源；`Origin: https://evil.example` 的 OPTIONS/GET **都没有** `access-control-allow-origin`。
 - [ ] COS bucket、region、secretId、secretKey、签名 TTL 正确。
   **待取证（服务器只读）**：在 API 运行目录执行（禁止打印 secret 值）：
   ```bash
@@ -219,7 +254,7 @@
   **待办**：由持管理员账号者读取端点实际返回并与上述三值逐字比对，不一致以端点为准，届时把本条改为 `[x]` 并写明取证人与时间。
 - [x] SMS provider 在短信审核前不得误设为真实生产发送。（**2026-07-26**：预发已为 `tencent` 且真号 E2E 通过；见 §2.2。正式生产仍须保持密钥仅服务端、禁止 log 假发送冒充生产。）
 - [x] ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false~~ **该开关已删除，无需配置**。先付后印现在写死在代码里：Agent 只领取「已关联订单 + `payStatus='paid'` + `taskStatus='pending'`」的任务，`claimableWhere` 与事务内 CAS 两层都要求，任何环境都关不掉。验收口径改为看 CI 静态门禁 `verify:print-rollout-config`（钉死该开关不得存在、不得放行无订单任务）与行为门禁 `verify:kiosk-cashier-ui`。若运行目录 `.env` 里还留着这个变量，删掉即可，它已不生效。
-  **证据（2026-09-07，CI）**：run `34130143436` job `build-and-verify` success，`ci.yml` 执行 `pnpm --filter @ai-job-print/api verify:print-rollout-config`（约 L564）与 PG job 同源门禁。断言定义 `services/api/scripts/verify-print-rollout-config.ts:103-107`：剥注释后源码不得再出现 `PRINT_REQUIRE_PAID_BEFORE_CLAIM`。
+  **证据（2026-09-07 包 P1，CI job 结论，不是脚本行号）**：run `34130143436` job `build-and-verify`（`101768117781`）success，其中步骤 `Verify suites` / `Backend P0 contract gates` 均为 success。该 run 是当晚生产发布 `34137990264` 的目标 CI。不引用脚本行号当「跑过」的证据。
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
   **待取证（服务器只读）**：`grep -E '^(PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED|ALIPAY_APP_ID|PAYMENT_NOTIFY_BASE_URL|PAYMENT_PROVIDER)=' services/api/.env | sed -E 's/(KEY|SECRET|PRIVATE)=.*/\1=SET/'`
   （旁证：公网 `GET /api/v1/payment/channels` → `["alipay","wechat"]`，只证明渠道开关，不证明扫码枪收敛 env。）
@@ -255,14 +290,15 @@ pnpm build
 
 - [x] 安装不依赖本机私有路径。
   **证据（2026-09-07，deploy 日志）**：run `34137990264` 在生产机两次 `pnpm install --frozen-lockfile` 成功（`Already up to date` / `Done … pnpm v11.2.2`）。CI job `101768117781` / `101768117757` 同样 `pnpm install --frozen-lockfile` success。
-- [x] 构建产物路径与 nginx/静态服务配置一致。（**2026-08-08 外部实测**：线上返回 Vite 构建 SPA，引用 `/assets/index-DqleN77r.js`、`/assets/index-CjAHAsWH.css`，非占位页；`deploy.yml` 将 `apps/kiosk/dist/.` 同步至 `DEPLOY_WEB_ROOT`。）
-- [x] 前端资源 base path 正确。（同上，`/assets/*` 绝对路径可正常加载，首页 200。）
+- [x] 构建产物路径与 nginx/静态服务配置一致。（**2026-09-07 包 P1 公网复测**：`https://zyidai.cn/` `HTTP/2 200`，`last-modified: Mon, 07 Sep 2026 15:26:30 GMT`（与 deploy nginx 重载同一秒），引用 `/assets/index-Do9twi7d.js`、`/assets/index-BVFud9v_.css`；该 hash 与 deploy `34137990264` 构建日志 `dist/assets/index-Do9twi7d.js` 一致。Admin `index-DbJNOmHO.js` / Partner `index-B0pSiPGw.js` 同样与构建日志一致。）
+- [x] 前端资源 base path 正确。（同上，`/assets/*` 绝对路径可正常加载；`GET https://zyidai.cn/assets/index-Do9twi7d.js` 返回 `206` `content-type: application/javascript`。）
 - [x] 大文件上传入口不会被前端路由或 nginx 误拦截。
   **证据（2026-09-07，公网）**：`POST https://zyidai.cn/api/v1/files`（无鉴权 JSON）→ `HTTP/2 401` `content-type: application/json` `{"error":{"code":"AUTH_MISSING_TOKEN"}}`，不是 SPA HTML、不是 nginx 405/404。路由打到 API。单请求体上限见 3.7 `client_max_body_size`（B 堆）。
 
 #### 3.3.1 持续部署流水线（2026-08-08 新增，据线上实测补充）
 
-- [x] main CI 通过后自动部署已生效。（`.github/workflows/deploy.yml`，`appleboy/ssh-action@v1.0.3`，`if: workflow_run.conclusion == 'success'`；最近成功 run `31172765587`。）
+- [ ] main CI 通过后自动部署已生效。
+  **未完成（2026-09-07 包 P1）**：CI run `34130143436` success 之后，自动 `workflow_run` 部署 `34130176570` / `34133158769` 均为 `conclusion=skipped`。当晚成功发布是手动 `workflow_dispatch` `34137990264`（输入该 CI run）。谁能做：有 GitHub Actions 权限的人打开 skipped run 看 if 条件（常见是 `DEPLOY_API_ENABLED` 未放行）。**不是内容阻塞**；手动补发路径已通。
 - [x] API 已纳入受控发布（2026-08-08「只发 Kiosk、不部署 API」已过时）。
   **证据（2026-09-07，deploy 日志）**：run `34137990264` job 名 `Deploy to server (API + Kiosk + Admin + Partner)`，日志 `=== 受控发布 API（备份→迁移→构建→PM2→健康）===`，随后 `prisma migrate deploy`、`[PM2] [ai-job-print-api](0) ✓`、`API health OK: http://127.0.0.1:3010/api/v1/health`。公网 `/api/v1/health/ready` 的 `since=2026-09-07T15:26:13.487Z` 与 PM2 重启时刻对齐。目标 SHA 来自已通过的 CI run `34130143436` → `759a37d4595c7932e804875db8686c73c09318c2`。
 - [ ] **部署脚本 `rm -rf ${DEPLOY_WEB_ROOT}/*` 为不可回滚操作**：须确认该路径专用于 kiosk 静态资源、不含其他站点或用户数据，并确认失败时的回滚手段（保留上一版本产物或 nginx 双目录切换）。
