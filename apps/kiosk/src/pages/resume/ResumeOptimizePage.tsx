@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { makePrintParams } from '@ai-job-print/shared'
-import type { GeneratedResume, ResumeExportFormat, ResumeGenerateExportResponse, ResumeOptimizeModule, ResumeTemplate } from '@ai-job-print/shared'
+import { makePrintParams, type ResumeExportFormat } from '@ai-job-print/shared'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useAuth } from '../../auth/useAuth'
@@ -13,20 +12,30 @@ import {
   type ResumeLayoutAdjustAction,
 } from '../../services/api'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { useResumeLayout } from './hooks/useResumeLayout'
+import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
 import { readAiResumeSession } from './aiResumeSession'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
-import { OptimizeReadyBody } from './components/resume-deliver/OptimizeReadyBody'
+import { OptimizeWorkArea } from './components/resume-deliver/OptimizeWorkArea'
 import { optimizeStateDescription, optimizeStateTitle } from './components/resume-deliver/optimizeStateCopy'
-import { ResumeDeliverPanel } from './components/resume-deliver/ResumeDeliverPanel'
+import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
+import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
 import { ResumeStatePanel } from './components/resume-deliver/ResumeStatePanel'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
+import { useResumeDraftAutosave } from './components/resume-deliver/useResumeDraftAutosave'
 import { detectUnconfirmedAdditions, extractConfirmableFacts } from './components/resume-deliver/facts'
 import { parseOptimizeQuery, resolveOptimizeView } from './components/resume-deliver/optimizeQuery'
 import { useOptimizeLoad } from './components/resume-deliver/useOptimizeLoad'
+import { printFileSizeLabel, useOptimizeSession } from './components/resume-deliver/useOptimizeSession'
+import {
+  applyResumeDecisions,
+  moduleKeyOf,
+  parseDecisionMap,
+  toggleModuleDecision,
+  type ResumeModuleDecision,
+} from './components/resume-deliver/resumeDecisions'
 import './resume-optimize-qx.css'
 
 type LeaveAction = () => void
@@ -48,32 +57,18 @@ export function ResumeOptimizePage() {
   const access = { token, accessToken }
   const pricing = useResumeExportPricing(access, token)
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
-
-  const [modules, setModules] = useState<ResumeOptimizeModule[]>([])
-  const [optimizedResume, setOptimizedResume] = useState<GeneratedResume | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [failKind, setFailKind] = useState<'retry' | 'reparse' | 'expired' | 'consent' | 'outage'>('reparse')
-  const [failMsg, setFailMsg] = useState<string | null>(null)
-  const [retryNonce, setRetryNonce] = useState(0)
-  const [exporting, setExporting] = useState(false)
-  const [printNavigating, setPrintNavigating] = useState(false)
-  const [exportFormat, setExportFormat] = useState<ResumeExportFormat>(query.format)
-  const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
-  const [exportKind, setExportKind] = useState<'resume' | 'change_list'>('resume')
-  const [exportVersion, setExportVersion] = useState(0)
-  const [previewOpen, setPreviewOpen] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
-  const [resumeTemplates, setResumeTemplates] = useState<ResumeTemplate[]>([])
-  const [templatesError, setTemplatesError] = useState(false)
-  const [selectedTemplateId, setSelectedTemplateId] = useState('')
-  const [isDirty, setIsDirty] = useState(false)
-  const [confirmLeave, setConfirmLeave] = useState<LeaveAction | null>(null)
-  const [adjusting, setAdjusting] = useState<ResumeLayoutAdjustAction | null>(null)
-  const [lastResumeBeforeAiAdjust, setLastResumeBeforeAiAdjust] = useState<GeneratedResume | null>(null)
-  const [adjustWarnings, setAdjustWarnings] = useState<string[]>([])
-  const [adjustError, setAdjustError] = useState<string | null>(null)
-  const [factOpen, setFactOpen] = useState<'resume' | 'change_list' | null>(null)
-  const [savedToDocuments, setSavedToDocuments] = useState<boolean | undefined>(undefined)
+  const {
+    modules, setModules, optimizedResume, setOptimizedResume, loading, setLoading,
+    failKind, setFailKind, failMsg, setFailMsg, retryNonce, setRetryNonce,
+    exporting, setExporting, printNavigating, setPrintNavigating, exportFormat, setExportFormat,
+    exported, setExported, exportKind, setExportKind, exportVersion, setExportVersion,
+    previewOpen, setPreviewOpen, exportError, setExportError, resumeTemplates, setResumeTemplates,
+    templatesError, setTemplatesError, selectedTemplateId, setSelectedTemplateId,
+    isDirty, setIsDirty, confirmLeave, setConfirmLeave, adjusting, setAdjusting,
+    lastResumeBeforeAiAdjust, setLastResumeBeforeAiAdjust, adjustWarnings, setAdjustWarnings,
+    adjustError, setAdjustError, factOpen, setFactOpen, savedToDocuments, setSavedToDocuments,
+    decisions, setDecisions, draftAccepted, setDraftAccepted,
+  } = useOptimizeSession(query.format, Boolean(token))
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
   const syntheticReady = query.capture || query.debug
@@ -84,11 +79,20 @@ export function ResumeOptimizePage() {
     setTemplatesError, setResumeTemplates, setSelectedTemplateId,
   })
 
+  const draft = useResumeDraftAutosave({
+    taskId, token: token ?? null, resume: optimizedResume, layout, decisions, skipFetch: syntheticReady,
+    enabled: Boolean(token && taskId && draftAccepted && optimizedResume && !syntheticReady),
+  })
+
+  useEffect(() => {
+    if (!token || syntheticReady) { setDraftAccepted(true); return }
+    if (!consent.ready || draft.loading) return
+    if (!draft.hasDraft) setDraftAccepted(true)
+  }, [token, syntheticReady, consent.ready, draft.loading, draft.hasDraft, setDraftAccepted])
+
   const live = {
     hasTask: Boolean(taskId) || (syntheticReady && (query.requested === 'ready' || query.requested === 'empty')),
-    loading,
-    outage: failKind === 'outage',
-    readError: Boolean(failMsg) && failKind === 'reparse',
+    loading, outage: failKind === 'outage', readError: Boolean(failMsg) && failKind === 'reparse',
     failed: Boolean(failMsg) && (failKind === 'retry' || failKind === 'expired'),
     empty: !loading && !failMsg && Boolean(taskId) && !optimizedResume && modules.length === 0,
     ready: Boolean(optimizedResume),
@@ -96,21 +100,44 @@ export function ResumeOptimizePage() {
   const resolved = resolveOptimizeView(query, live)
   const view = resolved.view
   const resume = optimizedResume
-  const unconfirmed = resume ? detectUnconfirmedAdditions(resume, modules) : []
-  const facts = resume ? extractConfirmableFacts(resume) : []
-  const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !resume || exporting
-  const estimatedPagesLabel = exported?.pageCount
-    ? `共 ${exported.pageCount} 页（上次导出）`
-    : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
+  const assembled = resume ? applyResumeDecisions(resume, modules, decisions) : null
+  const unconfirmed = assembled ? detectUnconfirmedAdditions(assembled, modules) : []
+  const facts = assembled ? extractConfirmableFacts(assembled) : []
+  const exportBlocked = pricing.unavailable || pricing.chargedBlocked || !assembled || exporting
+  const estimatedPagesLabel = exported?.pageCount ? `共 ${exported.pageCount} 页（上次导出）` : '导出后显示真实页数。若担心第二页只剩两三行，可先点「压到一页」。'
+  const editorOpen = view === 'ready' && Boolean(resume) && draftAccepted && !draft.loading
+  const choicePending = Boolean(token && draft.hasDraft && !draftAccepted && view === 'ready')
 
   const markEdited = () => { setIsDirty(true); setPreviewOpen(false); if (exported) setExported(null) }
-  const requestLeave = (action: LeaveAction) => { if (isDirty && !exported) { setConfirmLeave(() => action); return } action() }
+  const requestLeave = (action: LeaveAction) => {
+    if (draft.unsaved || (isDirty && !exported && !token)) { setConfirmLeave(() => action); return }
+    action()
+  }
   const handleLayoutChange = (next: typeof layout) => { setLayout(next); markEdited() }
   const handleTemplateChange = (id: string) => { setSelectedTemplateId(id); setExportError(null); if (exported) setExported(null) }
   const handleExportFormatChange = (format: ResumeExportFormat) => { setExportFormat(format); setPreviewOpen(false); if (exported) setExported(null) }
+  const handleDecisionChange = (key: string, next: ResumeModuleDecision) => {
+    const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
+    if (index < 0 || !optimizedResume) return
+    setOptimizedResume(toggleModuleDecision(optimizedResume, modules[index], decisions[key] ?? 'optimized', next))
+    setDecisions((prev) => ({ ...prev, [key]: next }))
+    markEdited()
+  }
+  const handleContinueDraft = () => {
+    const payload = draft.remoteDraft
+    if (payload?.resume) {
+      const nextDecisions = parseDecisionMap(payload.decisions)
+      setDecisions(nextDecisions)
+      setOptimizedResume(applyResumeDecisions(payload.resume, modules, nextDecisions))
+      if (payload.layout) setLayout({ ...DEFAULT_RESUME_LAYOUT, ...payload.layout })
+    }
+    setIsDirty(false)
+    setDraftAccepted(true)
+  }
 
   const runResumeExport = async (factsConfirmedAt: string) => {
-    if (!optimizedResume) return
+    if (!assembled) return
+    const optimizedResume = assembled
     setExporting(true); setExportError(null); setPreviewOpen(false)
     try {
       const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined, undefined, { benefitGrantId: pricing.benefitGrantId, factsConfirmedAt })
@@ -138,11 +165,7 @@ export function ResumeOptimizePage() {
     setPrintNavigating(true)
     navigate('/print/confirm', {
       state: {
-        file: {
-          name: exported.filename,
-          size: exported.sizeBytes >= 1024 * 1024 ? `${(exported.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB`,
-          pages: exported.pageCount, fileId: exported.fileId, fileUrl: exported.printFileUrl, mimeType: 'application/pdf',
-        },
+        file: { name: exported.filename, size: printFileSizeLabel(exported.sizeBytes), pages: exported.pageCount, fileId: exported.fileId, fileUrl: exported.printFileUrl, mimeType: 'application/pdf' },
         params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
@@ -162,7 +185,7 @@ export function ResumeOptimizePage() {
   const ctabar = (
     <>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => requestLeave(() => navigate(-1))}>返回报告</button>
-      {resume && (
+      {assembled && editorOpen && (
         <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen('resume') }}>
           {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
         </button>
@@ -179,22 +202,21 @@ export function ResumeOptimizePage() {
     )
   }
 
-  const stateBody = view !== 'ready' ? (
+  const retryable = view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent'
+  const stateBody = view === 'ready' ? null : (
     <ResumeStatePanel
-      tone={view === 'unavailable' || view === 'read-error' || view === 'optimize-failed' || view === 'illegal' ? 'error' : view === 'loading' ? 'info' : 'empty'}
+      tone={view === 'loading' ? 'info' : view === 'empty' || view === 'no-context' ? 'empty' : 'error'}
       title={optimizeStateTitle(view)}
       description={optimizeStateDescription(view, failMsg)}
       synthetic={resolved.synthetic}
       actions={
         <>
-          {(view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent') && (
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => { setFailMsg(null); setRetryNonce((n) => n + 1) }}>重试</button>
-          )}
+          {retryable && <button type="button" className="qx-btn" data-variant="primary" onClick={() => { setFailMsg(null); setRetryNonce((n) => n + 1) }}>重试</button>}
           <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/resume/source?intent=optimize')}>重新上传简历</button>
         </>
       }
     />
-  ) : null
+  )
 
   return (
     <QxPageFrame title="优化建议" subtitle="换模板出新稿 · 表达调整参考，只重组原文事实" ctabar={ctabar}>
@@ -208,58 +230,68 @@ export function ResumeOptimizePage() {
       >
         <ResumeAigcBadge synthetic={resolved.synthetic} />
         {stateBody}
-        {view === 'ready' && resume && (
-          <div className="qx-rd-work">
-            <OptimizeReadyBody
-              resume={resume}
-              modules={modules}
-              unconfirmed={unconfirmed}
-              layout={layout}
-              previewClassName={previewClassName}
-              previewStyle={previewStyle}
-              loading={loading}
-              exporting={exporting}
-              adjusting={adjusting}
-              lastResumeBeforeAiAdjust={lastResumeBeforeAiAdjust}
-              adjustWarnings={adjustWarnings}
-              adjustError={adjustError}
-              onResumeChange={(next) => { markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
-              onCompare={() => requestLeave(() => navigate('/resume/optimize/compare', { state: { taskId, accessToken } }))}
-              onAiAdjust={(action) => { void handleAiAdjust(action) }}
-              onUndoAi={() => { setOptimizedResume(lastResumeBeforeAiAdjust!); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setExported(null); setIsDirty(true) }}
-            />
-            <ResumeDeliverPanel
-              layout={layout}
-              onLayoutChange={handleLayoutChange}
-              templates={resumeTemplates}
-              templatesError={templatesError}
-              selectedTemplateId={selectedTemplateId}
-              onTemplateChange={handleTemplateChange}
-              exportFormat={exportFormat}
-              onExportFormatChange={handleExportFormatChange}
-              exporting={exporting}
-              printNavigating={printNavigating}
-              exported={exported}
-              exportKind={exportKind}
-              exportError={exportError}
-              exportVersion={exportVersion}
-              pricing={pricing.pricing}
-              pricingLoading={pricing.loading}
-              blockedReason={pricing.blockedReason}
-              exportBlocked={exportBlocked}
-              onRequestExport={() => setFactOpen('resume')}
-              onChangeList={() => setFactOpen('change_list')}
-              changeListBusy={exporting && factOpen === 'change_list'}
-              showChangeList={Boolean(taskId)}
-              onPrint={handlePrint}
-              onOpenPreview={() => setPreviewOpen(true)}
-              guest={!token}
-              savedToDocuments={savedToDocuments}
-              estimatedPagesLabel={estimatedPagesLabel}
-            />
-          </div>
+        {view === 'ready' && (
+          <ResumeDraftBanner
+            guest={!token}
+            loading={Boolean(token && draft.loading)}
+            choicePending={choicePending}
+            draftUpdatedAt={draft.remoteDraft?.updatedAt}
+            onContinue={handleContinueDraft}
+            onRestart={() => { setDecisions({}); draft.requestOverwrite(); setDraftAccepted(true) }}
+            saveStatus={draft.status}
+            savedAt={draft.savedAt}
+          />
         )}
-        {factOpen && resume && (
+        {editorOpen && resume && assembled && (
+          <OptimizeWorkArea
+            resume={resume}
+            modules={modules}
+            decisions={decisions}
+            unconfirmed={unconfirmed}
+            layout={layout}
+            previewClassName={previewClassName}
+            previewStyle={previewStyle}
+            loading={loading}
+            exporting={exporting}
+            adjusting={adjusting}
+            lastResumeBeforeAiAdjust={lastResumeBeforeAiAdjust}
+            adjustWarnings={adjustWarnings}
+            adjustError={adjustError}
+            templates={resumeTemplates}
+            templatesError={templatesError}
+            selectedTemplateId={selectedTemplateId}
+            exportFormat={exportFormat}
+            printNavigating={printNavigating}
+            exported={exported}
+            exportKind={exportKind}
+            exportError={exportError}
+            exportVersion={exportVersion}
+            pricing={pricing.pricing}
+            pricingLoading={pricing.loading}
+            blockedReason={pricing.blockedReason}
+            exportBlocked={exportBlocked}
+            changeListBusy={exporting && factOpen === 'change_list'}
+            showChangeList={Boolean(taskId)}
+            guest={!token}
+            savedToDocuments={savedToDocuments}
+            estimatedPagesLabel={estimatedPagesLabel}
+            taskId={taskId}
+            token={token}
+            onDecisionChange={handleDecisionChange}
+            onResumeChange={(next) => { markEdited(); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setOptimizedResume(next) }}
+            onCompare={() => requestLeave(() => navigate('/resume/optimize/compare', { state: { taskId, accessToken } }))}
+            onAiAdjust={(action) => { void handleAiAdjust(action) }}
+            onUndoAi={() => { setOptimizedResume(lastResumeBeforeAiAdjust!); setLastResumeBeforeAiAdjust(null); setAdjustWarnings([]); setAdjustError(null); setExported(null); setIsDirty(true) }}
+            onLayoutChange={handleLayoutChange}
+            onTemplateChange={handleTemplateChange}
+            onExportFormatChange={handleExportFormatChange}
+            onRequestExport={() => setFactOpen('resume')}
+            onChangeList={() => setFactOpen('change_list')}
+            onPrint={handlePrint}
+            onOpenPreview={() => setPreviewOpen(true)}
+          />
+        )}
+        {factOpen && assembled && (
           <ResumeFactConfirmDialog
             facts={facts}
             unconfirmed={unconfirmed}
@@ -272,16 +304,11 @@ export function ResumeOptimizePage() {
           <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportKind === 'change_list' ? 'pdf' : exportFormat} mimeType={exportKind === 'change_list' ? 'application/pdf' : undefined} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} onClose={() => setPreviewOpen(false)} />
         )}
         {confirmLeave && (
-          <div className="qx-rd-overlay">
-            <div className="qx-rd-leave">
-              <p>离开前确认</p>
-              <p>你已经修改了优化版简历。未导出 PDF 前离开，本次编辑内容不会保存。</p>
-              <div className="qx-rd-leave-actions">
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setConfirmLeave(null)}>继续编辑</button>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={() => { const action = confirmLeave; setConfirmLeave(null); action() }}>确认离开</button>
-              </div>
-            </div>
-          </div>
+          <ResumeOptimizeLeaveDialog
+            guest={!token}
+            onStay={() => setConfirmLeave(null)}
+            onLeave={() => { const action = confirmLeave; setConfirmLeave(null); action() }}
+          />
         )}
       </section>
     </QxPageFrame>

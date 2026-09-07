@@ -12,8 +12,10 @@
 
 import type {
   GeneratedResume,
+  ResumeDraftResponse,
   ResumeExportFormat,
   ResumeExportPricing,
+  ResumeFactCheckResponse,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -24,12 +26,15 @@ import type {
   ResumeOptimizeResponse,
   ResumeReportExportKind,
   ResumeReportExportResponse,
+  ResumeVersionsResponse,
   AssistantChatRequest,
   AssistantChatResponse,
   AssistantSessionSummaryResponse,
   AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
 import type {
+  ResumeDraftSaveInput,
+  ResumeDraftSaveResponse,
   ResumeExportChargeOptions,
   ResumeLayoutAdjustAction,
   ResumeLayoutAdjustResponse,
@@ -149,13 +154,19 @@ async function post<T>(path: string, body: unknown, token?: string | null, timeo
   return res.json() as Promise<T>
 }
 
-async function postWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+async function sendJson<T>(
+  method: 'POST' | 'PUT',
+  path: string,
+  body: unknown,
+  access?: ResumeReadAccess,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), timeoutMs)
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
+      method,
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -185,6 +196,14 @@ async function postWithAccess<T>(path: string, body: unknown, access?: ResumeRea
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<T>
+}
+
+async function postWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  return sendJson<T>('POST', path, body, access, timeoutMs)
+}
+
+async function putWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  return sendJson<T>('PUT', path, body, access, timeoutMs)
 }
 
 async function postForm<T>(path: string, body: FormData, timeoutMs = LLM_TIMEOUT_MS): Promise<T> {
@@ -329,6 +348,34 @@ export const aiHttpAdapter = {
         ...(body.benefitGrantId ? { benefitGrantId: body.benefitGrantId } : {}),
         ...(body.factsConfirmedAt ? { factsConfirmedAt: body.factsConfirmedAt } : {}),
       },
+      access,
+    )
+  },
+
+  async getResumeDraft(taskId: string, token: string): Promise<ResumeDraftResponse> {
+    return get<ResumeDraftResponse>(`/resume/records/${encodeURIComponent(taskId)}/draft`, { token })
+  },
+
+  async saveResumeDraft(taskId: string, input: ResumeDraftSaveInput, token: string): Promise<ResumeDraftSaveResponse> {
+    return putWithAccess<ResumeDraftSaveResponse>(
+      `/resume/records/${encodeURIComponent(taskId)}/draft`,
+      {
+        resume: input.resume,
+        ...(input.layout ? { layout: input.layout } : {}),
+        ...(input.decisions ? { decisions: input.decisions } : {}),
+      },
+      { token },
+    )
+  },
+
+  async listResumeVersions(taskId: string, token: string): Promise<ResumeVersionsResponse> {
+    return get<ResumeVersionsResponse>(`/resume/records/${encodeURIComponent(taskId)}/versions`, { token })
+  },
+
+  async factCheckResume(taskId: string, access?: ResumeReadAccess): Promise<ResumeFactCheckResponse> {
+    return postWithAccess<ResumeFactCheckResponse>(
+      `/resume/records/${encodeURIComponent(taskId)}/fact-check`,
+      {},
       access,
     )
   },

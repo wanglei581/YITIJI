@@ -11,8 +11,10 @@
 
 import type {
   GeneratedResume,
+  ResumeDraftResponse,
   ResumeExportFormat,
   ResumeExportPricing,
+  ResumeFactCheckResponse,
   ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeGenerateInput,
@@ -23,6 +25,7 @@ import type {
   ResumeOptimizeResponse,
   ResumeReportExportKind,
   ResumeReportExportResponse,
+  ResumeVersionsResponse,
   AssistantChatRequest,
   AssistantChatResponse,
   AssistantSessionSummaryResponse,
@@ -30,6 +33,8 @@ import type {
   AssistantVoiceTranscribeResponse,
 } from '@ai-job-print/shared'
 import type {
+  ResumeDraftSaveInput,
+  ResumeDraftSaveResponse,
   ResumeExportChargeOptions,
   ResumeLayoutAdjustAction,
   ResumeLayoutAdjustResponse,
@@ -317,6 +322,33 @@ export const aiMockAdapter = {
     void _access
     await delay(40)
     return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '当前免费，不扣权益' }
+  },
+
+  getResumeDraft(taskId: string, _token: string): Promise<ResumeDraftResponse> {
+    void _token
+    return Promise.resolve({ taskId, draft: null })
+  },
+
+  saveResumeDraft(
+    _taskId: string,
+    _input: ResumeDraftSaveInput,
+    _token: string,
+  ): Promise<ResumeDraftSaveResponse> {
+    void _taskId
+    void _input
+    void _token
+    return rejectMockMode('简历草稿保存')
+  },
+
+  listResumeVersions(taskId: string, _token: string): Promise<ResumeVersionsResponse> {
+    void _token
+    return Promise.resolve({ taskId, latestVersion: null, items: [] })
+  },
+
+  factCheckResume(taskId: string, _access?: ResumeReadAccess): Promise<ResumeFactCheckResponse> {
+    void taskId
+    void _access
+    return rejectMockMode('简历事实核对')
   },
 
   exportResumeRecord(

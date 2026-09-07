@@ -3,11 +3,15 @@ import type { GeneratedResume, ResumeLayoutSettings, ResumeOptimizeModule } from
 import type { CSSProperties } from 'react'
 import { OptimizedResumeEditor } from '../OptimizedResumeEditor'
 import { ResumeHtmlPreviewNote } from './ResumeAigcBadge'
+import { ResumeModuleDecisions } from './ResumeModuleDecisions'
+import type { ResumeDecisionMap, ResumeModuleDecision } from './resumeDecisions'
 import type { ResumeLayoutAdjustAction } from '../../../../services/api/ai'
 
 export function OptimizeReadyBody(props: {
   resume: GeneratedResume
   modules: ResumeOptimizeModule[]
+  decisions: ResumeDecisionMap
+  onDecisionChange: (key: string, next: ResumeModuleDecision) => void
   unconfirmed: string[]
   layout: ResumeLayoutSettings
   previewClassName: string
@@ -28,14 +32,13 @@ export function OptimizeReadyBody(props: {
   return (
     <div className="qx-rd-main">
       <p>{COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}页面只展示表达调整参考，不承诺提分或招聘结果。</p>
-      {props.modules.length > 0 && (
-        <div className="qx-card qx-rd-mods">
-          <p>{props.modules.length} 组可对照修改项。对照要一条一条读才有用。</p>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onCompare}>
-            逐条看完整对照
-          </button>
-        </div>
-      )}
+      <ResumeModuleDecisions
+        modules={props.modules}
+        decisions={props.decisions}
+        onDecisionChange={props.onDecisionChange}
+        onCompare={props.onCompare}
+        disabled={aiAdjustDisabled}
+      />
       {props.unconfirmed.length > 0 && <p className="qx-rd-unconfirmed">待本人确认：{props.unconfirmed.join('、')}</p>}
       <ResumeHtmlPreviewNote />
       <OptimizedResumeEditor
