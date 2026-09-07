@@ -205,4 +205,139 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await expect(page.getByRole('checkbox', { name: /主导/ })).not.toBeChecked()
   await expect(page.getByText('项目成果 · 待定')).toBeVisible()
   await expect(page.getByText('团队协作 · 待定')).toBeVisible()
+const GENERATE_TASK_ID = 'gen-preview-1'
+const GENERATE_RESUME = {
+  basic: { name: '青岛求职者', phone: '13800001111', city: '青岛' },
+  intention: { position: '前端开发', city: '青岛' },
+  summary: '按本人填写内容润色的摘要。',
+  education: [{ school: '青岛理工', major: '计算机', degree: '本科', period: '2018-2022', description: '完成本科学业。' }],
+  experience: [{ company: '青岛示例科技', role: '实习生', period: '2022-2023', description: '参与前端页面开发。' }],
+  projects: [{ name: '校园活动站', role: '成员', description: '按任务书完成页面改版。' }],
+  skills: ['TypeScript', 'React'],
+  certificates: ['英语四级'],
+}
+
+function registerGeneratePreviewBaseline(api: Parameters<typeof registerW4Api>[0]) {
+  registerW4Api(api)
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
+}
+
+async function stageScaleOf(page: Page): Promise<number> {
+  const transform = await page.locator('.kiosk-stage').evaluate((element) => getComputedStyle(element).transform)
+  return transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+}
+
+test('生成预览空态按稿只留两个出口且都能到达 @kiosk', async ({ page, api }) => {
+  registerGeneratePreviewBaseline(api)
+  await page.goto('/resume/generate/preview')
+  await expect(page.locator('[data-kiosk-screen="resume-generate-preview"]')).toBeVisible()
+  await expect(page.getByText('生成结果已清除')).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新填写生成', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重新填写', exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('resume-generate-preview-cta-home')).toHaveText('返回服务大厅')
+  await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('重新填一份')
+  await expect(page.getByRole('button', { name: '重新填一份' })).toHaveCount(1)
+  const scale = await stageScaleOf(page)
+  for (const testid of ['resume-generate-preview-cta-home', 'resume-generate-preview-cta-refill']) {
+    const control = page.getByTestId(testid)
+    const box = await control.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.height / scale).toBeGreaterThanOrEqual(56)
+    expect(box!.width / scale).toBeGreaterThanOrEqual(48)
+    const hits = await control.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      const inset = Math.min(8, rect.width / 4, rect.height / 4)
+      return [
+        [rect.left + inset, rect.top + inset],
+        [rect.left + rect.width / 2, rect.top + rect.height / 2],
+        [rect.right - inset, rect.bottom - inset],
+      ].map(([x, y]) => {
+        const top = document.elementFromPoint(x, y)
+        return Boolean(top && (element === top || element.contains(top)))
+      })
+    })
+    expect(hits).toEqual([true, true, true])
+  }
+  await page.screenshot({ path: test.info().outputPath('generate-preview-empty-1080x1920.png') })
+
+  await page.getByTestId('resume-generate-preview-cta-refill').click()
+  await expect(page).toHaveURL(/\/resume\/generate$/)
+  await expect(page.locator('[data-kiosk-screen="resume-generate"]')).toBeVisible()
+  await expect(page.getByText('AI 简历生成').first()).toBeVisible()
+
+  await page.goto('/resume/generate/preview')
+  await page.getByTestId('resume-generate-preview-cta-home').click()
+  await expect(page).toHaveURL(/\/$/)
+})
+
+test('生成预览读回真实结果后导出 payload 正确 @kiosk', async ({ page, api }) => {
+  registerGeneratePreviewBaseline(api)
+  api.respond('GET', `/api/v1/resume/generate/${GENERATE_TASK_ID}`, {
+    status: 200,
+    json: {
+      taskId: GENERATE_TASK_ID,
+      status: 'completed',
+      providerName: 'deepseek',
+      resume: GENERATE_RESUME,
+      missingHints: ['未填写联系邮箱，招聘方可能无法联系你'],
+    },
+  })
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId: 'gen-export-1',
+      filename: 'AI简历_青岛求职者.pdf',
+      sizeBytes: 4096,
+      pageCount: 1,
+      signedUrl: '/e2e-fixtures/generated-resume.pdf',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: '/api/v1/files/gen-export-1/content?expires=1&sig=test',
+    },
+  })
+  await page.route('**/e2e-fixtures/generated-resume.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' }),
+  )
+
+  const generateGet = page.waitForRequest((request) => (
+    request.method() === 'GET' && new URL(request.url()).pathname === `/api/v1/resume/generate/${GENERATE_TASK_ID}`
+  ))
+  await page.goto(`/resume/generate/preview?taskId=${GENERATE_TASK_ID}`)
+  await generateGet
+  await expect(page.getByText('青岛求职者', { exact: true })).toBeVisible()
+  await expect(page.getByText('未填写联系邮箱，招聘方可能无法联系你')).toBeVisible()
+  await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('回去改资料')
+  await expect(page.getByTestId('resume-generate-preview-cta-export')).toHaveText('内容没问题，去导出')
+  await page.screenshot({ path: test.info().outputPath('generate-preview-ready-1080x1920.png') })
+
+  const exportRequest = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  for (const box of await page.getByRole('checkbox').all()) {
+    await box.check()
+  }
+  await page.getByRole('button', { name: '确认导出' }).click()
+  const posted = await exportRequest
+  const payload = posted.postDataJSON() as { taskId?: string; format?: string; basic?: { name?: string }; factsConfirmedAt?: string }
+  expect(payload.taskId).toBe(GENERATE_TASK_ID)
+  expect(payload.format).toBe('pdf')
+  expect(payload.basic?.name).toBe('青岛求职者')
+  expect(payload.factsConfirmedAt).toBeUndefined()
+  await expect(page.getByRole('dialog', { name: 'AI简历_青岛求职者.pdf' })).toBeVisible()
+})
+
+test('生成预览读回失败展示空态而不是伪造结果 @kiosk', async ({ page, api }) => {
+  registerGeneratePreviewBaseline(api)
+  api.respond('GET', '/api/v1/resume/generate/missing-task', {
+    status: 404,
+    json: { error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新生成简历' } },
+  })
+  await page.goto('/resume/generate/preview?taskId=missing-task')
+  await expect(page.getByText('没有可看的结果')).toBeVisible()
+  await expect(page.getByText('青岛求职者')).toHaveCount(0)
+  await expect(page.getByTestId('resume-generate-preview-cta-source')).toHaveText('返回简历服务')
+  await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('去填资料')
+  await page.getByTestId('resume-generate-preview-cta-source').click()
+  await expect(page).toHaveURL(/\/resume\/source$/)
+  await expect(page.locator('[data-kiosk-screen="resume-source"]')).toBeVisible()
 })

@@ -26,6 +26,7 @@ import { useResumeExportPricing } from './components/resume-deliver/useResumeExp
 import { detectUnconfirmedAdditions, extractConfirmableFacts } from './components/resume-deliver/facts'
 import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
+import { GeneratePreviewCta, GeneratePreviewEmptyExits, GeneratePreviewNavbar } from './GeneratePreviewChrome'
 import './resume-generate-qx.css'
 
 interface LocationState {
@@ -64,6 +65,7 @@ export function ResumeGeneratePreviewPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [editing, setEditing] = useState(false)
   const [factOpen, setFactOpen] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   useBusyLock(exporting || printNavigating)
   const synthetic = query.capture || query.debug
@@ -88,7 +90,7 @@ export function ResumeGeneratePreviewPage() {
       .catch(() => { if (!cancelled) setRestoreFailed(true) })
       .finally(() => { if (!cancelled) setRestoring(false) })
     return () => { cancelled = true }
-  }, [restoreTaskId, token, synthetic, query.requested])
+  }, [restoreTaskId, token, synthetic, query.requested, retryNonce])
 
   useEffect(() => {
     let cancelled = false
@@ -167,20 +169,23 @@ export function ResumeGeneratePreviewPage() {
           : { title: '生成结果已清除', description: '公共设备不保留个人信息。请重新填写后生成简历预览。' }
 
   const showWorkspace = Boolean(resume && result) && !['session-lost', 'preview-no-result', 'preview-loading', 'preview-failed', 'illegal'].includes(view)
-
-  const ctabar = (
-    <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/resume/generate')}>重新填写</button>
-      {showWorkspace && resume && (
-        <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || undefined} onClick={() => { if (!exportBlocked) setFactOpen(true) }}>
-          {exporting ? '正在生成文件…' : `确认内容，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
-        </button>
-      )}
-    </>
-  )
+  const canRetry = Boolean(restoreTaskId) && !synthetic
+  const go = (to: string) => navigate(to)
+  const ctabar = GeneratePreviewCta({
+    view,
+    showWorkspace,
+    exportBlocked,
+    exporting,
+    canRetry,
+    onHome: () => go('/'),
+    onSource: () => go('/resume/source'),
+    onRefill: () => go('/resume/generate'),
+    onRetry: () => { setRestoreFailed(false); setRestoring(true); setRetryNonce((n) => n + 1) },
+    onExport: () => setFactOpen(true),
+  })
 
   return (
-    <QxPageFrame title="简历预览" subtitle="核对内容后带走 · 语音生成的结果同样走这一套导出" ctabar={ctabar}>
+    <QxPageFrame title="简历预览" subtitle="核对内容后带走 · 语音生成的结果同样走这一套导出" navbar={<GeneratePreviewNavbar onNavigate={go} />} ctabar={ctabar ?? undefined}>
       <section
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-generate-preview"
@@ -191,18 +196,18 @@ export function ResumeGeneratePreviewPage() {
       >
         <ResumeAigcBadge synthetic={resolved.synthetic} />
         {!showWorkspace && (
-          <ResumeStatePanel
-            tone={view === 'preview-failed' || view === 'illegal' ? 'error' : view === 'preview-loading' ? 'info' : 'empty'}
-            title={emptyCopy.title}
-            description={emptyCopy.description}
-            synthetic={resolved.synthetic}
-            actions={
-              <>
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/resume/generate')}>重新填写生成</button>
-              </>
-            }
-          />
+          <>
+            <ResumeStatePanel
+              tone={view === 'preview-failed' || view === 'illegal' ? 'error' : view === 'preview-loading' ? 'info' : 'empty'}
+              title={emptyCopy.title}
+              description={emptyCopy.description}
+              synthetic={resolved.synthetic}
+            />
+            {view === 'preview-failed' && !canRetry && (
+              <p id="resume-generate-preview-retry-why" className="qx-rd-why">没有记录标识，读不回来。请重新填一份，或从「我的简历」打开还在留存期内的版本。</p>
+            )}
+            <GeneratePreviewEmptyExits view={view} onNavigate={go} />
+          </>
         )}
         {showWorkspace && resume && result && (
           <div className="qx-rd-work">

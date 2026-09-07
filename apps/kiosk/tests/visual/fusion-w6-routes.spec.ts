@@ -91,6 +91,41 @@ async function expectResumeCompareControls(page: Page): Promise<void> {
   }
 }
 
+async function expectGeneratePreviewExits(page: Page): Promise<void> {
+  const scaler = page.locator('.kiosk-stage')
+  const transform = await scaler.evaluate((element) => getComputedStyle(element).transform)
+  const scale = transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+  await expect(page.getByRole('button', { name: '重新填写生成', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重新填写', exact: true })).toHaveCount(0)
+  const home = page.getByTestId('resume-generate-preview-cta-home')
+  const refill = page.getByTestId('resume-generate-preview-cta-refill')
+  await expect(home).toHaveText('返回服务大厅')
+  await expect(refill).toHaveText('重新填一份')
+  for (const control of [home, refill]) {
+    const box = await control.boundingBox()
+    expect(box, 'preview CTA must have a box').not.toBeNull()
+    expect(box!.height / scale, 'preview CTA CSS height after stage scale must be ≥56px').toBeGreaterThanOrEqual(56)
+    expect(box!.width / scale, 'preview CTA CSS width after stage scale must be ≥48px').toBeGreaterThanOrEqual(48)
+    const hits = await control.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      const inset = Math.min(8, rect.width / 4, rect.height / 4)
+      const samples: Array<[number, number]> = [
+        [rect.left + inset, rect.top + inset],
+        [rect.left + rect.width / 2, rect.top + rect.height / 2],
+        [rect.right - inset, rect.bottom - inset],
+      ]
+      return samples.map(([x, y]) => {
+        const top = document.elementFromPoint(x, y)
+        return Boolean(top && (element === top || element.contains(top)))
+      })
+    })
+    expect(hits, 'preview CTA box must receive pointer events at corners and center').toEqual([true, true, true])
+  }
+  await expect(page.getByTestId('resume-generate-preview-nav-home')).toBeVisible()
+  await expect(page.getByTestId('resume-generate-preview-nav-advisor')).toBeVisible()
+  await expect(page.getByTestId('resume-generate-preview-nav-profile')).toBeVisible()
+}
+
 function screenshotName(route: W6RouteCase): string {
   const name = route.pattern === '/' ? 'home' : route.pattern.slice(1).replaceAll('/', '__').replaceAll(':', '_')
   return `${name}.png`
@@ -177,6 +212,7 @@ async function acceptRoute(page: Page, route: W6RouteCase, errors: string[]): Pr
   await assertNoHorizontalOverflow(page)
   if (route.requiresTouchTargets) await expectTouchTargets(page)
   if (route.pattern === '/resume/optimize/compare') await expectResumeCompareControls(page)
+  if (route.pattern === '/resume/generate/preview') await expectGeneratePreviewExits(page)
   expect(errors, `路由 ${route.pattern} 不得产生脚本错误或关键资源失败`).toEqual([])
 }
 

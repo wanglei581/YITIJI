@@ -36,6 +36,11 @@ export class ApiRouter {
       status: 200,
       json: { data: { wordToPdf: false, engine: 'none', cjkFonts: false, reason: '服务端未配置转换引擎' } },
     })
+    // 生成预览 / 优化页挂载时都会读模板列表。默认空列表，不伪造模板；需要模板的用例自行覆盖。
+    this.respond('GET', '/api/v1/job-materials/templates', {
+      status: 200,
+      json: { success: true, data: [] },
+    })
   }
 
   async install(): Promise<void> {
