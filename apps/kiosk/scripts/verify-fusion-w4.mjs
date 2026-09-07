@@ -134,7 +134,7 @@ const jobsFairsFoundationCss = read('src/pages/styles/jobs-fairs-foundation.css'
 const jobsCompaniesCss = read('src/pages/styles/jobs-companies-fusion.css')
 const fairCompanyDetailSections = read('src/pages/job-fairs/components/FairCompanyDetailSections.tsx')
 const campusWelcome = read('src/pages/placeholders/CampusWelcomePage.tsx')
-const campusInsights = read('src/pages/placeholders/FreshmanInsightsPage.tsx')
+const campusInsights = read('src/pages/campus/FreshmanInsightsPage.tsx')
 const smartHome = read('src/pages/smart-campus/SmartCampusHomePage.tsx')
 const smartInsights = read('src/pages/smart-campus/FreshmanInsightsPage.tsx')
 const renshi = read('src/pages/renshi/RenshiPage.tsx')
@@ -279,6 +279,15 @@ check('campus and smart-campus stay honest and distinct', () => {
   assert.match(campusPage, /getJobFairs\(terminalId \? \{ terminalId \} : undefined\)/)
   assert.doesNotMatch(campusWelcome, /待开发/)
   assert.doesNotMatch(campusInsights, /待开发/)
+  assert.match(campusInsights, /暂无经核验的校园招聘统计/)
+  assert.match(campusInsights, /不会展示示例数据/)
+  assert.match(campusInsights, /查看招聘会/)
+  assert.doesNotMatch(campusInsights, /一键投递|立即投递|平台投递|候选人管理|录用率|签约率/)
+  assert.match(read('src/routes/index.tsx'), /pages\/campus\/FreshmanInsightsPage/)
+  assert.doesNotMatch(
+    read('src/routes/index.tsx'),
+    /path:\s*'campus\/freshman-insights'[\s\S]{0,220}placeholders\/FreshmanInsightsPage/,
+  )
   assert.match(smartHome, /ToolboxLaunchModals/)
   assert.match(smartHome, /placement="smart_campus"/)
   assert.match(smartInsights, /迎新服务导览/)
@@ -344,7 +353,6 @@ const w4Dirs = ['jobs', 'companies', 'offline-agencies', 'job-fairs', 'campus', 
 const w4Files = w4Dirs.flatMap((dir) => collectTsx(join(KIOSK_ROOT, 'src/pages', dir)))
   .concat([
     join(KIOSK_ROOT, 'src/pages/placeholders/CampusWelcomePage.tsx'),
-    join(KIOSK_ROOT, 'src/pages/placeholders/FreshmanInsightsPage.tsx'),
   ])
 const w4Source = w4Files
   .filter((path) => !path.endsWith('jobs/utils/jobDisplay.ts'))

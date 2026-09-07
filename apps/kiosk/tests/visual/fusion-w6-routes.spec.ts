@@ -253,3 +253,11 @@ test('/resume/career-plan mobile breakpoint @w6-mobile', async ({ page, api }) =
   registerW6Api(api)
   await acceptRoute(page, route, errors)
 })
+
+test('/campus/freshman-insights mobile breakpoint @w6-mobile', async ({ page, api }) => {
+  const route = w6KioskCases.find(({ pattern }) => pattern === '/campus/freshman-insights')
+  if (!route) throw new Error('W6 campus freshman-insights route case is missing')
+  const errors = collectRuntimeErrors(page)
+  registerW6Api(api)
+  await acceptRoute(page, route, errors)
+})
