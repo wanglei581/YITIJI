@@ -199,8 +199,8 @@ export function SignStampPage() {
           />
         )}
 
-        <input ref={flow.docInputRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => void flow.handleLocalDoc(e)} />
-        <input ref={flow.stampInputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => void flow.handleLocalStamp(e)} />
+        <input ref={flow.docInputRef} type="file" accept="application/pdf" className="ss-hidden-file" onChange={(e) => void flow.handleLocalDoc(e)} />
+        <input ref={flow.stampInputRef} type="file" accept="image/jpeg,image/png" className="ss-hidden-file" onChange={(e) => void flow.handleLocalStamp(e)} />
 
         {flow.showQr ? (
           <div className="ss-qr">
