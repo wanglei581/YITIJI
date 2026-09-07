@@ -345,9 +345,9 @@
 .fs-preview-body { flex: 1; min-height: 0; background: var(--qx-deep); }
 
 .fs-phone-slot { min-height: 280px; }
-.fs-phone-slot .fs-qr-blank {
+.fs-qr-blank,
+.fs-qr-live {
   min-height: 280px;
-  border: 1px dashed var(--qx-line-2);
   border-radius: 26px;
   display: flex;
   flex-direction: column;
@@ -355,10 +355,23 @@
   justify-content: center;
   gap: 12px;
   text-align: center;
-  color: var(--qx-ink-3);
   padding: 24px;
 }
-.fs-phone-slot .fs-qr-blank strong { font-size: 22px; color: var(--qx-ink-2); }
+.fs-qr-blank {
+  border: 1px dashed var(--qx-line-2);
+  color: var(--qx-ink-3);
+}
+.fs-qr-blank strong { font-size: 22px; color: var(--qx-ink-2); }
+.fs-qr-live {
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  gap: 16px;
+}
+.fs-qr-live span {
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qx-ink-3);
+}
 
 .fs-hidden-input {
   position: absolute;

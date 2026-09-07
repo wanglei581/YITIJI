@@ -2,12 +2,6 @@ import type { ReactNode, Ref } from 'react'
 import { FileTextIcon, SparklesIcon } from 'lucide-react'
 import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
 import { FileContentPreview } from '../../../components/FileContentPreview'
-import {
-  UploadSessionQrPanel,
-  type PhoneSessionChange,
-  type PhoneUploadedFile,
-  type UploadSessionQrPanelHandle,
-} from '../../upload/components/UploadSessionQrPanel'
 import type { UsbFileListItem } from '../../../services/files/usbImportApi'
 import {
   FILE_SOURCE_HAS_FILE,
@@ -28,6 +22,7 @@ import {
   FileSourceTruth,
   HelpMini,
   NowFileCard,
+  PhoneQrSlot,
 } from './FileSourceBits'
 import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
 import '../styles/file-source-qx.css'
@@ -53,10 +48,8 @@ export interface FileSourceViewProps {
   usbDriveLabel: string | null
   formatBytes: (bytes: number) => string
   phone: PhoneSessionView
-  phonePanelRef: Ref<UploadSessionQrPanelHandle>
-  onPhoneSessionChange: (snapshot: PhoneSessionChange) => void
-  onQrUploaded: (file: PhoneUploadedFile) => void
-  onQrBusy: (busy: boolean) => void
+  qrUrl: string | null
+  expiresLabel: string
   previewOpen: boolean
   previewToken: string | null
   localRejectKind: LocalRejectKind | null
@@ -155,12 +148,11 @@ export function FileSourceView(props: FileSourceViewProps) {
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, isResumePrint,
     showFileChannel, showScan, tab, usbMode, currentFile, blockedName, blockedMeta,
-    wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, previewOpen,
-    previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onHelp,
-    onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
+    wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
+    previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit,
+    onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
     onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
     onPhoneRetryStatus, onFileInputChange, inputRef, printAccept, photoOnly,
-    onPhoneSessionChange, onQrUploaded, onQrBusy, phonePanelRef,
   } = props
 
   const channelKeys: UploadTab[] = showFileChannel ? ['qr', 'file', 'usb'] : ['qr', 'usb']
@@ -285,30 +277,11 @@ export function FileSourceView(props: FileSourceViewProps) {
 
   const phonePanel = (
     <div className="fs-phone-slot">
-      {!phone.hasQr && !phone.loading ? (
-        <div className="fs-qr-blank" data-testid="file-source-qr">
-          <strong>{screen === 'phone-gen-failed' ? '码没出来' : '码还没出来'}</strong>
-          <span>
-            {screen === 'phone-gen-failed'
-              ? '向服务端要上传会话失败了。本机不会先出一张假码。'
-              : '拿到服务端下发的一次性链接之后这里才会出现二维码'}
-          </span>
-        </div>
-      ) : null}
-      <UploadSessionQrPanel
-        ref={phonePanelRef}
-        purpose="print_doc"
-        title="手机扫码上传"
-        description={
-          isResumePrint
-            ? '手机扫码上传简历（PDF/图片）；一体机确认后进入打印材料检查。'
-            : '手机或其他联网设备打开链接上传文件；一体机上确认后自动填入本次打印任务。'
-        }
-        confirmLabel="确认使用这份文件"
-        embedded
-        onUploaded={onQrUploaded}
-        onBusyChange={onQrBusy}
-        onSessionChange={onPhoneSessionChange}
+      <PhoneQrSlot
+        qrUrl={qrUrl}
+        loading={phone.loading}
+        failed={screen === 'phone-gen-failed'}
+        expiresLabel={expiresLabel}
       />
     </div>
   )

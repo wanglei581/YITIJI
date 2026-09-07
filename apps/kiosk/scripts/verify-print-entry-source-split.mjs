@@ -56,6 +56,10 @@ assert(
     !/isResumePrint\s*\?\s*\[[\s\S]*?key:\s*'file'[\s\S]*?\]\s*:\s*\[/.test(uploadPage),
   'PrintUploadPage 简历打印同样提供本机上传 / 扫码上传 / U盘导入',
 )
+assert(
+  !/KioskPageFrame/.test(uploadPage),
+  'PrintUploadPage has left the V6 frame',
+)
 
 assert(
   uploadPage.includes("source === 'document'") &&

@@ -39,11 +39,7 @@ import {
   WORD_CONVERSION_DISCLOSURE,
   WORD_CONVERSION_UNAVAILABLE_COPY,
 } from '../../services/api/documentConversion'
-import {
-  type PhoneSessionChange,
-  type PhoneUploadedFile,
-  type UploadSessionQrPanelHandle,
-} from '../upload/components/UploadSessionQrPanel'
+import { useUploadSession, type PhoneUploadedFile } from '../upload/hooks/useUploadSession'
 import {
   clearPrintMaterialSession,
   savePrintMaterialSession,
@@ -62,7 +58,6 @@ import {
   isUsbSafeIdExpired,
   type FileOrigin,
   type LocalRejectKind,
-  type PhoneSessionView,
 } from './file-source/fileSourceModel'
 
 type UploadTab = 'file' | 'qr' | 'usb'
@@ -84,19 +79,6 @@ const PRINT_WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxml
 const PRINT_UPLOAD_MAX_BYTES = PRINT_UPLOAD_MAX_MB * 1024 * 1024
 
 type UploadedFile = PrintFileState & { fileId: string; fileUrl: string; fileMd5: string }
-
-const EMPTY_PHONE: PhoneSessionView = {
-  status: null,
-  loading: false,
-  confirming: false,
-  cancelling: false,
-  cancelFailed: false,
-  confirmFailed: false,
-  error: null,
-  hasQr: false,
-  pendingName: null,
-  pendingSize: null,
-}
 
 // 单位换算按「四舍五入后是否还落在本档」判定,不能只比原始字节数。
 // 反例(2026-08-17 走查):1 048 500 B < 1MiB 走 KB 档,(1048500/1024).toFixed(0) = "1024",
@@ -145,7 +127,6 @@ export function PrintUploadPage() {
   const wordConversionAvailable = conversionCapabilities.wordToPdf
   const printAccept = wordConversionAvailable ? `${PRINT_BASE_ACCEPT},${PRINT_WORD_ACCEPT}` : PRINT_BASE_ACCEPT
   const inputRef = useRef<HTMLInputElement>(null)
-  const phonePanelRef = useRef<UploadSessionQrPanelHandle>(null)
   const lastLocalFileRef = useRef<File | null>(null)
   const source: PrintMaterialSource =
     searchParams.get('source') === 'resume' ? 'resume' : 'document'
@@ -198,8 +179,6 @@ export function PrintUploadPage() {
   const [localRejectKind, setLocalRejectKind] = useState<LocalRejectKind | null>(null)
   const [blockedName, setBlockedName] = useState<string | null>(null)
   const [blockedMeta, setBlockedMeta] = useState<string | null>(null)
-  const [qrBusy, setQrBusy] = useState(false)
-  const [phone, setPhone] = useState<PhoneSessionView>(EMPTY_PHONE)
   const [usbConfigured] = useState(() => isUsbImportConfigured())
   const [usbStatus, setUsbStatus] = useState<UsbStatus | null>(null)
   const [usbFiles, setUsbFiles] = useState<UsbFileListItem[] | null>(null)
@@ -212,7 +191,6 @@ export function PrintUploadPage() {
   const [usbReadFailed, setUsbReadFailed] = useState(false)
   const [usbPollKey, setUsbPollKey] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)
-  useBusyLock(uploading || qrBusy || usbUploading)
 
   const showFileChannel = !isTerminalKiosk()
   const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
@@ -273,6 +251,33 @@ export function PrintUploadPage() {
     })
   }, [contentCategory, source])
 
+  const handleQrUploaded = useCallback((uploaded: PhoneUploadedFile) => {
+    if (!uploaded.fileUrl) {
+      setUploadError('文件签名链接生成失败，请刷新二维码重试')
+      return
+    }
+    setUploadError(null)
+    const nextFile: UploadedFile = {
+      name: uploaded.name,
+      size: uploaded.size,
+      pages: null,
+      fileId: uploaded.fileId,
+      fileUrl: uploaded.fileUrl,
+      fileMd5: uploaded.sha256 ?? '',
+      mimeType: uploaded.mimeType,
+    }
+    persistFile(nextFile, 'qr')
+  }, [persistFile])
+
+  const phoneEnabled = tab === 'qr' && channelActive && !file
+  const phoneSession = useUploadSession({
+    purpose: 'print_doc',
+    enabled: phoneEnabled,
+    onUploaded: handleQrUploaded,
+  })
+  const phone = phoneSession.snapshot
+  useBusyLock(uploading || usbUploading || phone.loading || phone.confirming || phone.cancelling)
+
   const uploadLocalFile = useCallback(async (selected: File) => {
     const verdict = classifyLocalFile(selected, {
       acceptWord: wordConversionAvailable && !isPhotoEntry,
@@ -323,24 +328,6 @@ export function PrintUploadPage() {
       return
     }
     await uploadLocalFile(selected)
-  }
-
-  const handleQrUploaded = (uploaded: PhoneUploadedFile) => {
-    if (!uploaded.fileUrl) {
-      setUploadError('文件签名链接生成失败，请刷新二维码重试')
-      return
-    }
-    setUploadError(null)
-    const nextFile: UploadedFile = {
-      name: uploaded.name,
-      size: uploaded.size,
-      pages: null,
-      fileId: uploaded.fileId,
-      fileUrl: uploaded.fileUrl,
-      fileMd5: uploaded.sha256 ?? '',
-      mimeType: uploaded.mimeType,
-    }
-    persistFile(nextFile, 'qr')
   }
 
   const handleUsbFileSelect = async (safeId: string) => {
@@ -425,21 +412,6 @@ export function PrintUploadPage() {
     setUsbPollKey((key) => key + 1)
   }
 
-  const handlePhoneSessionChange = useCallback((snapshot: PhoneSessionChange) => {
-    setPhone({
-      status: snapshot.status,
-      loading: snapshot.loading,
-      confirming: snapshot.confirming,
-      cancelling: snapshot.cancelling,
-      cancelFailed: snapshot.cancelFailed,
-      confirmFailed: snapshot.confirmFailed,
-      error: snapshot.error,
-      hasQr: snapshot.hasQr,
-      pendingName: snapshot.pendingName,
-      pendingSize: snapshot.pendingSize,
-    })
-  }, [])
-
   const exitPath = isTransferMode ? '/print-scan' : '/'
   const terminalCode = getTerminalCode()
   const screen = deriveFileSourceScreen({
@@ -501,10 +473,8 @@ export function PrintUploadPage() {
       usbDriveLabel={usbStatus?.driveLabel ?? null}
       formatBytes={formatBytes}
       phone={phone}
-      phonePanelRef={phonePanelRef}
-      onPhoneSessionChange={handlePhoneSessionChange}
-      onQrUploaded={handleQrUploaded}
-      onQrBusy={setQrBusy}
+      qrUrl={phoneSession.qrUrl}
+      expiresLabel={phoneSession.expiresLabel}
       previewOpen={previewOpen}
       previewToken={getToken()}
       localRejectKind={localRejectKind}
@@ -544,10 +514,10 @@ export function PrintUploadPage() {
       onUsbSelect={(safeId) => void handleUsbFileSelect(safeId)}
       onUsbImport={() => void handleUsbImport()}
       onUsbRescan={handleUsbRescan}
-      onPhoneRefresh={() => void phonePanelRef.current?.refresh()}
-      onPhoneConfirm={() => void phonePanelRef.current?.confirm()}
-      onPhoneCancel={() => void phonePanelRef.current?.cancel()}
-      onPhoneRetryStatus={() => void phonePanelRef.current?.refresh()}
+      onPhoneRefresh={() => void phoneSession.refresh()}
+      onPhoneConfirm={() => void phoneSession.confirm()}
+      onPhoneCancel={() => void phoneSession.cancel()}
+      onPhoneRetryStatus={() => void phoneSession.refresh()}
     />
     </>
   )

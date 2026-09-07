@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
@@ -6,6 +7,7 @@ import {
   FolderIcon,
   HelpCircleIcon,
   InfoIcon,
+  Loader2Icon,
   ScanLineIcon,
   SmartphoneIcon,
   UsbIcon,
@@ -332,6 +334,42 @@ export function HelpMini({ onHelp, text }: { onHelp: () => void; text: string })
       <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？找人帮忙</span></h4>
       <p>{text}</p>
     </button>
+  )
+}
+
+export function PhoneQrSlot({
+  qrUrl,
+  loading,
+  failed,
+  expiresLabel,
+}: {
+  qrUrl: string | null
+  loading: boolean
+  failed: boolean
+  expiresLabel: string
+}) {
+  if (qrUrl && !loading) {
+    return (
+      <div className="fs-qr-live" data-testid="file-source-qr">
+        <QRCodeSVG value={qrUrl} size={180} level="M" marginSize={1} />
+        <span>
+          {expiresLabel
+            ? `二维码有效期 ${expiresLabel}，文件最大 10MB。`
+            : '有效期以服务端返回时间为准，文件最大 10MB。'}
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div className="fs-qr-blank" data-testid="file-source-qr">
+      {loading ? <Loader2Icon size={36} aria-hidden="true" /> : null}
+      <strong>{failed ? '码没出来' : '码还没出来'}</strong>
+      <span>
+        {failed
+          ? '向服务端要上传会话失败了。本机不会先出一张假码。'
+          : '拿到服务端下发的一次性链接之后这里才会出现二维码'}
+      </span>
+    </div>
   )
 }
 
