@@ -417,10 +417,12 @@ test('/job-fairs 预约离开平台且 mock 统计为空 @w4', async ({ page, ap
   await page.goto('/job-fairs/fair-001')
   await expect(page.getByRole('button', { name: /扫码预约|去来源平台预约/ }).first()).toBeVisible()
   await expect(page.locator('iframe[src*="openstreetmap"]')).toHaveCount(0)
-  await expect(page.getByText('暂无地图，请以场馆地址为准')).toBeVisible()
-  await page.getByRole('button', { name: '数据大屏' }).click()
   await expect(page.getByText(/暂无真实统计/)).toBeVisible()
+  await page.getByRole('button', { name: '现场统计' }).click()
+  await expect(page).toHaveURL(/\/job-fairs\/fair-001\/stats$/)
+  await expect(page.getByText(/真实数据正在接入|暂无真实统计/)).toBeVisible()
   await expect(page.getByText(/签到成功|确认签到/)).toHaveCount(0)
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-stats-empty.png' })
   await verifyPage(page, errors)
 })
 
@@ -457,6 +459,7 @@ test('/job-fairs/checkin 只展示来源签到 @w4', async ({ page, api }) => {
   await expect(sourceCheckinNote).toHaveCount(1)
   await expect(sourceCheckinNote).toContainText('本系统不记录签到结果')
   await expect(page.getByText(/签到成功|确认签到/)).toHaveCount(0)
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-checkin-guide.png' })
   await verifyPage(page, errors)
 })
 
@@ -717,4 +720,103 @@ test('/renshi 库内政策与内置指引分区渲染 @w4', async ({ page, api }
   await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
   await expect(builtin.getByText('高校毕业生就业服务指引')).toHaveCount(0)
   await verifyPage(page, errors)
+})
+
+const CTA_WHITELIST = [
+  '查看岗位',
+  '去来源平台投递',
+  '扫码投递',
+  '查看招聘会',
+  '去来源平台预约',
+  '扫码预约',
+  '复制来源链接',
+] as const
+
+async function assertAppointmentCtaClosedWhitelist(page: Page): Promise<void> {
+  const labels = await page.locator('button, a[href], [role="button"]').all()
+  for (const el of labels) {
+    const aria = (await el.getAttribute('aria-label')) ?? ''
+    const text = ((await el.innerText().catch(() => '')) || '').replace(/\s+/g, '')
+    const name = (aria || text).trim()
+    if (!name || !/投递|预约/.test(name)) continue
+    expect(CTA_WHITELIST, `CTA 文案越界：${name}`).toContain(name)
+  }
+}
+
+test('/job-fairs 列表渲染真实场次并在接口失败时落 error @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerW4Api(api)
+  await page.goto('/job-fairs')
+  await expect(page.getByTestId('list-state-ready')).toBeVisible()
+  await expect(page.getByText('2026 青岛高校毕业生招聘会')).toBeVisible()
+  await expect(page.getByText('青岛公共就业服务网').first()).toBeVisible()
+  await expect(page.getByText(/外部编号/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '扫码预约' }).first()).toBeVisible()
+  await assertAppointmentCtaClosedWhitelist(page)
+  await assertTapTargetPointerHit(page.getByRole('button', { name: '扫码预约' }).first())
+  await assertNoElementCrossesViewport(page)
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-list-ready.png' })
+
+  api.abort('GET', '/api/v1/job-fairs', 'internetdisconnected')
+  await page.reload()
+  await expect(page.getByTestId('list-state-error')).toBeVisible()
+  await expect(page.getByTestId('list-fallback').getByText('场次名单这次没取到')).toBeVisible()
+  await expect(page.getByText(/不显示上一次的缓存场次/)).toBeVisible()
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-list-error.png' })
+  await expect(errors).toEqual([])
+})
+
+test('/job-fairs/:id 扫码预约只出二维码且不 POST 简历 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerW4Api(api)
+  const posts: Array<{ url: string; body: string }> = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST') {
+      posts.push({ url: request.url(), body: request.postData() ?? '' })
+    }
+  })
+  await page.goto('/job-fairs/fair-001')
+  await expect(page.getByTestId('detail-state-detail')).toBeVisible()
+  await expect(page.getByText('来源机构')).toBeVisible()
+  await expect(page.getByText('ext-fair-001')).toBeVisible()
+  const book = page.getByRole('button', { name: /扫码预约|去来源平台预约/ }).first()
+  await expect(book).toBeVisible()
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-detail-detail.png' })
+  await book.click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('扫码预约')).toBeVisible()
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-detail-qr.png' })
+  const dialogText = await dialog.innerText()
+  for (const banned of ['一键投递', '立即投递', '立即报名', '签到成功', '确认签到']) {
+    expect(dialogText, `禁用文案：${banned}`).not.toContain(banned)
+  }
+  await assertAppointmentCtaClosedWhitelist(page)
+  for (const post of posts) {
+    expect(post.body, '预约类 CTA 不得携带简历标识').not.toMatch(/resumeId|documentId/)
+    expect(post.url, '预约类 CTA 不得向招聘会提交简历').not.toMatch(/\/job-fairs\/.+\/(apply|submit|register)/)
+  }
+  await expect(errors).toEqual([])
+})
+
+test('/job-fairs/:id/visit-plan 缺简历落 missing-context；物料空态诚实 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerW4Api(api)
+  api.respond('GET', '/api/v1/job-fairs/fair-001/materials', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 } },
+  })
+  await page.goto('/job-fairs/fair-001/visit-plan')
+  await expect(page.getByTestId('visit-plan-state-missing-context')).toBeVisible()
+  await expect(page.getByText('还没有选')).toBeVisible()
+  await expect(page.getByRole('button', { name: '选择本人简历' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '去上传简历' })).toBeVisible()
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-visit-plan-missing-context.png' })
+
+  await page.goto('/job-fairs/fair-001/materials')
+  await expect(page.getByTestId('materials-state-empty')).toBeVisible()
+  await expect(page.getByTestId('materials-fallback').getByText('这场还没有可下载的物料')).toBeVisible()
+  await expect(page.getByText(/不生成一份「参考版」/)).toBeVisible()
+  await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-materials-empty.png' })
+  await expect(errors).toEqual([])
 })

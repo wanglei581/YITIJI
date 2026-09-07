@@ -127,6 +127,8 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/scan/progress',
   '/scan/result',
   '/jobs',
+  '/job-fairs',
+  '/job-fairs/checkin',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
@@ -148,10 +150,25 @@ const QX_MIGRATED_EXACT_PATTERNS: readonly RegExp[] = [
   /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
 ]
 
+/** 招聘会带参路由逐条后缀。不用 `/job-fairs/` 宽前缀，
+ *  否则会把尚未迁移的 `/job-fairs/:id/companies/:companyId`（稿 44）送进空壳。 */
+const QX_JOB_FAIR_ID_SUFFIXES = ['/companies', '/map', '/materials', '/visit-plan', '/stats'] as const
+
+function isQxJobFairMigratedPath(pathname: string): boolean {
+  const parts = pathname.split('/').filter(Boolean)
+  if (parts[0] !== 'job-fairs') return false
+  if (parts.length === 2 && parts[1] !== 'checkin') return true
+  if (parts.length === 3) {
+    return (QX_JOB_FAIR_ID_SUFFIXES as readonly string[]).includes(`/${parts[2]}`)
+  }
+  return false
+}
+
 function isQxMigratedPath(pathname: string): boolean {
   if (QX_MIGRATED_ROUTES.has(pathname)) return true
   if (QX_MIGRATED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
+  return isQxJobFairMigratedPath(pathname)
 }
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {

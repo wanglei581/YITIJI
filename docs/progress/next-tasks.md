@@ -60,6 +60,12 @@ jobs / job-fairs / policies 均 0，companies 3）。**微信审核对「功能�
 - USB「扫描到 U 盘」是打印机面板独立路径，本页只说明、不建平台会话；Windows / 奔图真机尚未验收。
 - 稿里 cancelled / cancel-race / session-lost 停留屏：运行时仍按已验证闭环跳转（取消成功回 `/scan/start`，完成带文件进结果页，无 controlToken 回起点），避免拆掉 w2/w6 契约。
 ## 2026-09-07 打印交付页青序迁移残留
+## 2026-09-07 招聘会青序迁移残留（本页不挡合入）
+
+- `/job-fairs/:id/companies/:companyId`（稿 44）仍走 V6 壳，本批故意不迁，避免宽前缀误伤。
+- 列表服务端分页：当前 `pageSize: 100`，超过 100 场只展示已加载集合；稿上的翻页器没有接到真实 `pagination`，不画假页码。
+- 企业名单页的「查看」进入尚未迁移的企业详情；详情页仍是旧视觉，直到稿 44 那条 lane。
+- 场馆导览 Tab 的 `VenueGuideTab` 仍嵌在 `/map` 以保留 `getFairVenueGuide` 能力，视觉未按 28 号稿重画（稿本身没有独立导览 Tab）。
 
 - `partial-output` / `paid-no-output` 两态已按 2026-09-07 产品裁决删除：Agent 拿不到页级出纸事件，台账也禁止逐页递增。运行时不实现、不伪造「已出 2/3 页」。
 - 出纸口灯效联动本期不做，进度页只保留出纸口位置引导，不暗示机身灯。

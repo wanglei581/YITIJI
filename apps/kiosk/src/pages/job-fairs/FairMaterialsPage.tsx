@@ -2,32 +2,27 @@ import { useEffect, useState } from 'react'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 import { useNavigate, useParams } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairMaterialDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import type { FairMaterialType } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
-import { BriefcaseIcon, CalendarIcon, FileTextIcon, MapIcon, MapPinIcon, NewspaperIcon, PrinterIcon } from 'lucide-react'
+import { AlertTriangleIcon, BriefcaseIcon, CalendarIcon, FileTextIcon, MapIcon, MapPinIcon, NewspaperIcon, PrinterIcon } from 'lucide-react'
 import { getFairMaterials, getJobFairById, prepareFairMaterialPrint } from '../../services/api'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { API_MODE } from '../../services/api/client'
-import { FusionBadge, FusionNotice, FusionSectionHead, FusionSourceMeta, FusionStepStrip, KioskPageFrame } from '../jobs/components/W4Presentation'
+import {
+  QxFairCta,
+  QxFairNavRow,
+  QxFairShell,
+  QxFairSkel,
+  QxFairSourceCard,
+  QxFairState,
+} from './qx/qxFairChrome'
 
 function formatSize(kb: number) {
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`
 }
 
-/** Material type → CSS variant class */
-const MTYPE_CLASS: Record<FairMaterialType, string> = {
-  schedule:      'sch',
-  venue_map:     'map',
-  company_list:  'co',
-  position_list: 'pos',
-  brochure:      'bro',
-  other:         'bro',
-}
-
-/** Material type → icon component */
 function MaterialIcon({ type }: { type: FairMaterialType }) {
   switch (type) {
     case 'schedule':      return <CalendarIcon aria-hidden="true" />
@@ -37,6 +32,10 @@ function MaterialIcon({ type }: { type: FairMaterialType }) {
     case 'brochure':      return <FileTextIcon aria-hidden="true" />
     default:              return <MapPinIcon aria-hidden="true" />
   }
+}
+
+function isExpiredPrintError(message: string) {
+  return /过期|expired|EXPIRED|签名/.test(message)
 }
 
 export function FairMaterialsPage() {
@@ -100,41 +99,106 @@ export function FairMaterialsPage() {
   }
 
   if (loading) {
-    return <LoadingState className="h-full" />
+    return (
+      <QxFairShell
+        title="活动物料"
+        subtitle="链接由服务端临时签发；打印价格以现场公示与服务端报价为准。"
+        status={{ tone: 'unknown', label: '正在取活动物料' }}
+        screen="materials"
+        state="loading"
+        ctabar={<QxFairCta variant="primary" testId="materials-primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</QxFairCta>}
+      >
+        <QxFairSkel rows={3} />
+      </QxFairShell>
+    )
   }
 
+  const expired = Boolean(printError && isExpiredPrintError(printError))
+  const printFailed = Boolean(printError && !expired)
+  const viewState = printFailed ? 'print-failed' : expired ? 'expired' : error ? 'error' : materials.length === 0 ? 'empty' : 'list'
+  const pill = viewState === 'list'
+    ? { tone: 'ok' as const, label: '物料链接由服务端临时签发' }
+    : viewState === 'print-failed'
+      ? { tone: 'bad' as const, label: '这次打印没有成功' }
+      : viewState === 'expired'
+        ? { tone: 'warn' as const, label: '物料链接已过期' }
+        : viewState === 'empty'
+          ? { tone: 'unknown' as const, label: '这场还没有可下载的物料' }
+          : { tone: 'bad' as const, label: '物料这次没取到' }
+
   return (
-    <KioskPageFrame
-      tone="wheat"
-      title="活动资料"
-      subtitle={`${fair ? `${fair.name} · ` : ''}${materialsTotal > materials.length ? `已取回 ${materials.length} / 共 ${materialsTotal} 份资料` : `${materials.length} 份资料`}`}
-      backLabel="返回详情"
-      onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<FusionBadge icon={FileTextIcon}>活动资料</FusionBadge>}
-      actionBar={
-        <>
-          <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
-            参会企业
-          </button>
-          <div className="jf-spacer" />
-          <button type="button" className="jf-btn dark" onClick={() => navigate(`/job-fairs/${fairId}`)}>
-            查看招聘会
-          </button>
-        </>
+    <QxFairShell
+      title="活动物料"
+      subtitle={`${fair ? `${fair.name} · ` : ''}${materialsTotal > materials.length ? `已取回 ${materials.length} / 共 ${materialsTotal} 份资料` : '链接由服务端临时签发；打印价格以现场公示与服务端报价为准。'}`}
+      status={pill}
+      screen="materials"
+      state={viewState}
+      ctabar={
+        viewState === 'list' ? (
+          <>
+            <QxFairCta onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</QxFairCta>
+            <QxFairCta variant="primary" testId="materials-primary" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
+              参会企业
+            </QxFairCta>
+          </>
+        ) : viewState === 'print-failed' ? (
+          <>
+            <QxFairCta onClick={() => navigate('/help')}>找工作人员处理</QxFairCta>
+            <QxFairCta variant="primary" testId="materials-primary" onClick={() => navigate('/print/progress')}>
+              查看打印订单状态
+            </QxFairCta>
+          </>
+        ) : viewState === 'expired' ? (
+          <>
+            <QxFairCta onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</QxFairCta>
+            <QxFairCta variant="primary" testId="materials-primary" onClick={() => { setPrintError(null) }}>
+              重新获取链接
+            </QxFairCta>
+          </>
+        ) : (
+          <>
+            <QxFairCta onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</QxFairCta>
+            <QxFairCta variant="primary" testId="materials-primary" onClick={() => navigate('/print-scan')}>
+              打印你自己的材料
+            </QxFairCta>
+          </>
+        )
       }
     >
-        {printError && (
-          <p className="rounded-lg bg-error-bg px-5 py-4 text-[18px] text-error-fg">
-            {printError}
-          </p>
-        )}
-
-        {error ? (
-          <ErrorState message="加载失败，请稍后重试" className="flex-1" />
-        ) : materials.length === 0 ? (
-          <EmptyState icon={FileTextIcon} title="暂无可用活动资料" className="flex-1" />
-        ) : (
-          <section className="jf-list">
+      {viewState === 'print-failed' ? (
+        <>
+          <QxFairState screen="materials" tone="error" icon={AlertTriangleIcon} title="这次打印没有成功">
+            打印机回流的状态是失败。<b>没出纸就是没出纸</b>，本机不会把它记成已完成。如果已经扣费，请带着订单号找工作人员处理。
+            {printError ? <p>{printError}</p> : null}
+          </QxFairState>
+          <div className="qx-rows">
+            <QxFairNavRow icon={FileTextIcon} title="回到物料列表" description="可以换一份或重新发起打印。" onClick={() => setPrintError(null)} testId="materials-back" />
+          </div>
+        </>
+      ) : viewState === 'expired' ? (
+        <QxFairState screen="materials" tone="info" icon={CalendarIcon} title="物料链接已过期">
+          为了保护文件，物料使用<b>限时签名链接</b>，超时就会失效。重新获取一次即可，内容不变。
+        </QxFairState>
+      ) : error ? (
+        <QxFairState screen="materials" tone="error" icon={AlertTriangleIcon} title="物料这次没取到">
+          请求失败。本机不生成一份「参考版」冒充官方物料。
+        </QxFairState>
+      ) : materials.length === 0 ? (
+        <>
+          <QxFairState screen="materials" tone="empty" icon={FileTextIcon} title="这场还没有可下载的物料">
+            主办方没有上传名单、手册或指引。本机<b>不生成一份「参考版」冒充官方物料</b>。
+          </QxFairState>
+          <div className="qx-rows">
+            <QxFairNavRow icon={FileTextIcon} title="返回招聘会" description="时间地点和参展名单仍可查看。" onClick={() => navigate(`/job-fairs/${fairId}`)} testId="materials-fair" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="qx-sec-h">
+            <span className="t">活动物料</span>
+            <span className="hint">共 {materials.length} 份 · 链接由服务端临时签发</span>
+          </div>
+          <div className="qx-fair-list" data-testid="materials-list">
             {materials.map((mat) => {
               const isPreparingThis = printingId === mat.id
               const canPrint = mat.allowPrint && API_MODE === 'http' && !printingId
@@ -142,93 +206,62 @@ export function FairMaterialsPage() {
                 ? '正在准备打印文件…'
                 : API_MODE !== 'http'
                   ? '暂不可打印'
-                  : `打印(${mat.pageCount} 页)`
+                  : `去打印(${mat.pageCount} 页)`
 
               return (
-                <div
-                  key={mat.id}
-                  className={`jf-row align-start${!mat.allowPrint ? ' off' : ''}`}
-                >
-                  <span className="jf-company-icon">
-                    <MaterialIcon type={mat.type} />
-                  </span>
-                  <div className="jf-row-main">
-                    <div className="jf-row-title">
-                      <b>{mat.name}</b>
-                      <span className={`jf-mtype ${MTYPE_CLASS[mat.type]}`}>
-                        {FAIR_MATERIAL_TYPE_LABELS[mat.type]}
+                <div key={mat.id} className="qx-fair-item">
+                  <div className="qx-fair-item-link">
+                    <span className="qx-fair-item-ic" data-tone="teal"><MaterialIcon type={mat.type} /></span>
+                    <span className="qx-fair-item-tx">
+                      <span className="qx-fair-item-t">
+                        {mat.name}
+                        <span className="qx-fair-tag" style={{ marginLeft: 8 }}>{FAIR_MATERIAL_TYPE_LABELS[mat.type]}</span>
                       </span>
-                    </div>
-                    {mat.description && (
-                      <p className="mt-1.5 text-[17px] leading-snug text-[var(--muted)]">{mat.description}</p>
-                    )}
-                    <div className="jf-row-info">
-                      <span>
-                        <FileTextIcon aria-hidden="true" />
-                        {mat.pageCount} 页 · {formatSize(mat.fileSizeKB)}
+                      {mat.description ? <span className="qx-fair-item-sub">{mat.description}</span> : null}
+                      <span className="qx-fair-item-sub">
+                        <span>页数 {mat.pageCount}</span>
+                        <span>{formatSize(mat.fileSizeKB)}</span>
                       </span>
-                      {/*
-                        2026-08-11（CLAUDE.md §9）：原为「已打印 {mat.printCount} 次」。
-                        FairMaterial.printCount 全后端**没有出纸完成后递增的写路径**
-                        （资料转打印文件时只更新桥接记录 fair-material-print-bridge.service.ts:82），
-                        故恒为 0——对求职者显示「已打印 0 次」既不实也无决策价值，直接移除。
-                        恢复条件：打印完成回调中递增该字段后，方可重新展示。
-                      */}
-                    </div>
-                  </div>
-                  {mat.allowPrint ? (
-                    <div className="flex-none self-center text-right">
-                      {/* printingId 是瞬时态（保留原生 disabled）；演示模式没有后端是能力门禁，
-                          改 aria-disabled + 常显原因 —— 原来只写在 title 里，触屏读不到。 */}
-                      <button
-                        type="button"
-                        className="jf-btn sm ghost"
-                        disabled={printingId !== null}
-                        aria-disabled={API_MODE !== 'http' || undefined}
-                        aria-describedby={API_MODE !== 'http' ? `fair-material-blocked-${mat.id}` : undefined}
-                        onClick={() => { if (canPrint) handlePrint(mat) }}
-                      >
-                        {printLabel}
-                      </button>
-                      {API_MODE !== 'http' ? (
-                        <span id={`fair-material-blocked-${mat.id}`} className="jf-blocked-reason">
-                          {DEMO_MODE_NO_REAL_FILE_REASON}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <span className="flex-none self-center text-[18px] text-[var(--muted)]">
-                      该资料暂不开放打印
                     </span>
-                  )}
+                    {mat.allowPrint ? (
+                      <span>
+                        <button
+                          type="button"
+                          className="qx-fair-mini"
+                          data-variant="primary"
+                          disabled={printingId !== null}
+                          aria-disabled={API_MODE !== 'http' || undefined}
+                          aria-describedby={API_MODE !== 'http' ? `fair-material-blocked-${mat.id}` : undefined}
+                          onClick={() => { if (canPrint) handlePrint(mat) }}
+                        >
+                          <PrinterIcon size={18} aria-hidden />
+                          {printLabel}
+                        </button>
+                        {API_MODE !== 'http' ? (
+                          <span id={`fair-material-blocked-${mat.id}`} className="qx-fair-blocked">
+                            {DEMO_MODE_NO_REAL_FILE_REASON}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      <span className="qx-fair-blocked">该资料暂不开放打印</span>
+                    )}
+                  </div>
                 </div>
               )
             })}
+          </div>
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">关于打印这些物料</div>
+            <div className="qx-fair-rules">
+              <p className="qx-fair-rule"><i>1</i><span>物料链接<b>有有效期</b>，过期后需要重新获取，不能用旧链接直接打印。</span></p>
+              <p className="qx-fair-rule"><i>2</i><span>打印份数、单双面与黑白彩色在打印页选择，<b>价格以现场公示与服务端报价为准</b>。</span></p>
+              <p className="qx-fair-rule"><i>3</i><span>打印是否成功以打印机回流的状态为准；本页不显示逐页进度。</span></p>
+            </div>
           </section>
-        )}
-
-      <section className="jf-card accented">
-        <FusionSectionHead icon={PrinterIcon} title="如何打印" subtitle="三步完成" />
-        <FusionStepStrip
-          steps={[
-            { title: '选择一份资料', desc: '点击对应资料的「打印」' },
-            { title: '确认打印参数', desc: '黑白 / 双面等参数已按推荐预设' },
-            { title: '取纸', desc: '在出纸口领取，注意保管个人物品' },
-          ]}
-        />
-      </section>
-
-      {fair && (
-        <FusionSourceMeta
-          sourceName={fair.sourceName}
-          syncTime={fair.syncTime}
-          externalId={fair.externalId}
-        />
+          <QxFairSourceCard sourceName={fair?.sourceName} syncTime={fair?.syncTime} externalId={fair?.externalId} />
+        </>
       )}
-
-      <FusionNotice>
-        资料由主办方 / 机构上传；标记为可打印的资料可在本机打印，费用以下单时报价为准，实际页数以文件为准。
-      </FusionNotice>
-    </KioskPageFrame>
+    </QxFairShell>
   )
 }

@@ -17,22 +17,35 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { FairVisitPlanResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
+  AlertTriangleIcon,
   BuildingIcon,
-  ClipboardListIcon,
   FileTextIcon,
-  HelpCircleIcon,
   Loader2Icon,
   PrinterIcon,
   SparklesIcon,
-
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { generateFairVisitPlan, getLatestFairVisitPlan, printFairVisitPlan } from '../../services/api/fairVisitPlan'
+import {
+  FairVisitPlanApiError,
+  generateFairVisitPlan,
+  getLatestFairVisitPlan,
+  printFairVisitPlan,
+} from '../../services/api/fairVisitPlan'
 import { getJobFairById } from '../../services/api/jobFairs'
 import { readAiResumeSession } from '../resume/aiResumeSession'
-import { FusionBadge, FusionNotice, FusionSectionHead, KioskPageFrame } from '../jobs/components/W4Presentation'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import {
+  QxFairCta,
+  QxFairNavRow,
+  QxFairShell,
+  QxFairSkel,
+  QxFairState,
+} from './qx/qxFairChrome'
+
+function isAiUnavailableError(err: unknown): boolean {
+  return err instanceof FairVisitPlanApiError && (err.code === 'MOCK_MODE' || err.status === 503 || err.status === 502)
+}
 
 interface PageState {
   taskId?: string
@@ -91,6 +104,7 @@ export function FairVisitPlanPage() {
   const [generating, setGenerating] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [aiUnavailable, setAiUnavailable] = useState(false)
 
   useBusyLock(generating || printing)
 
@@ -116,7 +130,7 @@ export function FairVisitPlanPage() {
     let cancelled = false
     getLatestFairVisitPlan(fairId, taskId, { token: getToken(), accessToken })
       .then((result) => { if (!cancelled && result.status === 'completed') setPlan(result) })
-      .catch(() => undefined)
+      .catch((err) => { if (!cancelled && isAiUnavailableError(err)) setAiUnavailable(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [fairId, taskId, accessToken, getToken])
@@ -130,6 +144,7 @@ export function FairVisitPlanPage() {
       if (result.status === 'failed') setError(result.failReason ?? '生成未完成，请稍后重试')
       else setPlan(result)
     } catch (err) {
+      if (isAiUnavailableError(err)) setAiUnavailable(true)
       setError(userMessageOf(err, '参会准备单生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
@@ -163,240 +178,268 @@ export function FairVisitPlanPage() {
     }
   }
 
-  if (!taskId) {
+  const viewState = !taskId
+    ? 'missing-context'
+    : loading || generating
+      ? (generating ? 'generating' : 'loading')
+      : aiUnavailable
+        ? 'ai-unavailable'
+        : error && !plan
+          ? 'failed'
+          : plan
+            ? 'ready'
+            : 'missing-context'
+
+  if (viewState === 'missing-context') {
     return (
-      <KioskPageFrame
-        tone="wheat"
+      <QxFairShell
         title={copy.title}
         subtitle={copy.subtitleHint}
-        backLabel="返回详情"
-        onBack={() => navigate(`/job-fairs/${fairId}`)}
-        badge={<FusionBadge icon={SparklesIcon}>需要简历</FusionBadge>}
+        status={{ tone: 'warn', label: '缺少简历或参展上下文' }}
+        screen="visit-plan"
+        state="missing-context"
+        ctabar={
+          <QxFairCta variant="primary" testId="visit-plan-primary" onClick={() => navigate('/me/resumes')}>
+            选择本人简历
+          </QxFairCta>
+        }
       >
-        <section className="jf-card accented text-center">
-          <FusionSectionHead icon={SparklesIcon} title={copy.emptyLead} subtitle="系统不会把简历发送给企业" />
-          <p className="mx-auto max-w-[720px] text-[20px] leading-relaxed text-[var(--muted)]">
-            {isReview
-              ? '参会回顾基于你的真实简历和该场招聘会的公开信息生成，仅供本人后续跟进参考。'
-              : '参会准备单基于你的真实简历和当前招聘会公开信息生成，仅供本人参会准备参考。'}
-          </p>
-          <div className="mt-7 flex justify-center gap-4">
-            <button type="button" className="jf-btn dark" onClick={() => navigate('/resume/source?intent=diagnose')}>
-            去上传简历
-            </button>
-            <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>
-            打印活动资料
-            </button>
-          </div>
+        <div className="qx-fair-aibar">
+          <span className="qx-fair-ai-ic"><SparklesIcon size={26} aria-hidden /></span>
+          <span>
+            <span className="qx-fair-ai-t">参会准备清单需要两样东西</span>
+            <span className="qx-fair-ai-d">{copy.emptyLead}。系统不会把简历发送给企业。不排路线、不承诺结果。</span>
+          </span>
+        </div>
+        <section className="qx-card">
+          <div className="qx-fair-blk-h">当前上下文</div>
+          <dl className="qx-fair-kv">
+            <div className="qx-fair-kv-row"><dt>本人简历</dt><dd><span className="qx-fair-tag warn">还没有选</span></dd></div>
+            <div className="qx-fair-kv-row"><dt>参展名单</dt><dd>打开这场的参展名单即可核对，不依赖模型</dd></div>
+          </dl>
         </section>
-        <FusionNotice>活动预约、岗位办理和结果均以来源平台为准，本系统不接收简历。</FusionNotice>
-      </KioskPageFrame>
+        <div className="qx-fair-state-acts">
+          <QxFairCta onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</QxFairCta>
+          <QxFairCta onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</QxFairCta>
+        </div>
+        <p className="qx-fair-local-note">活动预约、岗位办理和结果均以来源平台为准，本系统不接收简历。</p>
+      </QxFairShell>
     )
   }
 
-  if (loading) {
+  if (viewState === 'loading' || viewState === 'generating') {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-neutral-400">
-        <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" />
-        正在加载…
-      </div>
+      <QxFairShell
+        title={copy.title}
+        subtitle={copy.subtitleHint}
+        status={{ tone: 'unknown', label: generating ? '已提交，等服务端返回' : '正在加载' }}
+        screen="visit-plan"
+        state={generating ? 'generating' : 'loading'}
+        ctabar={
+          <QxFairCta variant="primary" testId="visit-plan-primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
+            返回招聘会
+          </QxFairCta>
+        }
+      >
+        {generating ? (
+          <QxFairState screen="visit-plan" tone="info" icon={Loader2Icon} title="正在按你的简历和这场名单生成清单">
+            任务已经提交，结果由服务端返回后才会显示。这中间<b>没有百分比可以给你</b>，本机不会编一个进度条。
+          </QxFairState>
+        ) : (
+          <QxFairSkel rows={2} />
+        )}
+        <div className="qx-rows">
+          <QxFairNavRow icon={BuildingIcon} title="先看参展名单" description="名单和 AI 清单是两条线，互不影响。" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} testId="visit-plan-companies" />
+        </div>
+      </QxFairShell>
+    )
+  }
+
+  if (viewState === 'ai-unavailable') {
+    return (
+      <QxFairShell
+        title={copy.title}
+        subtitle={copy.subtitleHint}
+        status={{ tone: 'warn', label: 'AI 不可用，浏览与打印不受影响' }}
+        screen="visit-plan"
+        state="ai-unavailable"
+        ctabar={
+          <QxFairCta variant="primary" testId="visit-plan-primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
+            返回招聘会
+          </QxFairCta>
+        }
+      >
+        <QxFairState screen="visit-plan" tone="info" icon={AlertTriangleIcon} title="参会准备清单暂时生成不了">
+          本机没有拿到可用的模型服务。参展名单、展位索引、物料打印和来源预约<b>都不依赖它</b>，可以照常使用。
+        </QxFairState>
+        <div className="qx-rows">
+          <QxFairNavRow icon={BuildingIcon} title="自己看参展名单" description="不用 AI 也能挑出想去的单位。" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} testId="visit-plan-companies-off" />
+          <QxFairNavRow icon={FileTextIcon} title="打印一份纸质名单" description="拿在手上逐家勾，比屏幕好用。" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} testId="visit-plan-materials" />
+        </div>
+      </QxFairShell>
+    )
+  }
+
+  if (viewState === 'failed') {
+    return (
+      <QxFairShell
+        title={copy.title}
+        subtitle={copy.subtitleHint}
+        status={{ tone: 'bad', label: '本次生成失败' }}
+        screen="visit-plan"
+        state="failed"
+        ctabar={
+          <>
+            <QxFairCta onClick={() => navigate('/me/resumes')}>换一份简历再试</QxFairCta>
+            <QxFairCta variant="primary" testId="visit-plan-primary" onClick={() => void handleGenerate()}>
+              重新生成
+            </QxFairCta>
+          </>
+        }
+      >
+        <QxFairState screen="visit-plan" tone="error" icon={AlertTriangleIcon} title="这次没生成出来">
+          服务端返回失败。可能是简历内容不完整、参展名单还没回来，或者模型这会儿不稳定。<b>本机不会拿一份通用参会攻略冒充结果</b>。
+          {error ? <p>{error}</p> : null}
+        </QxFairState>
+      </QxFairShell>
     )
   }
 
   if (plan) {
     return (
-      <KioskPageFrame
-        tone="wheat"
+      <QxFairShell
         title={copy.title}
         subtitle={`${plan.basedOn?.fairName ?? plan.fair?.title ?? '招聘会'} · ${plan.basedOn?.companyCount ?? 0} 家企业 / ${plan.basedOn?.positionCount ?? 0} 个岗位`}
-        backLabel="返回详情"
-        onBack={() => navigate(`/job-fairs/${fairId}`)}
-        badge={<FusionBadge icon={SparklesIcon}>已生成</FusionBadge>}
-        actionBar={
+        status={{ tone: 'ok', label: '清单已由服务端返回' }}
+        screen="visit-plan"
+        state="ready"
+        ctabar={
           <>
-            <button type="button" className="jf-btn ghost" disabled={generating} onClick={() => void handleGenerate()}>
+            <QxFairCta disabled={generating} onClick={() => void handleGenerate()}>
               {generating ? '正在生成' : '重新生成'}
-            </button>
-            <div className="jf-spacer" />
-            <button type="button" className="jf-btn dark" disabled={printing} onClick={() => void handlePrint()}>
-              <PrinterIcon aria-hidden="true" />
+            </QxFairCta>
+            <QxFairCta variant="primary" testId="visit-plan-primary" disabled={printing} onClick={() => void handlePrint()}>
+              <PrinterIcon aria-hidden />
               {printing ? copy.printing : copy.print}
-            </button>
+            </QxFairCta>
           </>
         }
       >
-          <FusionNotice>
-            {isReview
-              ? '本回顾仅供本人后续跟进参考；岗位办理和结果均以来源平台为准，本系统不接收简历。'
-              : '本准备单仅供本人参会准备参考；活动预约、岗位办理和结果均以来源平台为准，本系统不接收简历。'}
-          </FusionNotice>
-
-          <section className="jf-card accented">
-            <FusionSectionHead icon={FileTextIcon} title="总览" subtitle={`结合你的简历方向与本场公开信息`} />
-            <p className="text-[20px] leading-relaxed text-[var(--ink)]">{plan.summary}</p>
+        <div className="qx-fair-aibar">
+          <span className="qx-fair-ai-ic"><SparklesIcon size={26} aria-hidden /></span>
+          <span>
+            <span className="qx-fair-ai-t">清单已生成，内容可以改也可以删</span>
+            <span className="qx-fair-ai-d">
+              {isReview
+                ? '本回顾仅供本人后续跟进参考；岗位办理和结果均以来源平台为准，本系统不接收简历。'
+                : '本准备单仅供本人参会准备参考；活动预约、岗位办理和结果均以来源平台为准，本系统不接收简历。'}
+            </span>
+          </span>
+        </div>
+        <section className="qx-card">
+          <div className="qx-fair-blk-h">总览</div>
+          <p className="qx-fair-local-note" style={{ color: 'var(--qx-ink)', fontSize: 20 }}>{plan.summary}</p>
+        </section>
+        <div className="qx-fair-two-col">
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">{copy.companies.title}<span className="hint">{copy.companies.subtitle}</span></div>
+            {(plan.priorityCompanies ?? []).length === 0 ? (
+              <p className="qx-fair-local-note">
+                {isReview
+                  ? '本场企业信息有限，可前往来源平台查看该主办方发布的企业与在招岗位。'
+                  : '本场企业信息有限，建议先打印活动资料并按现场展位逐一了解。'}
+              </p>
+            ) : (
+              <dl className="qx-fair-kv">
+                {(plan.priorityCompanies ?? []).map((company) => (
+                  <div key={company.companyName} className="qx-fair-kv-row">
+                    <dt>{company.companyName}</dt>
+                    <dd>{company.reason}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </section>
-
-          {/* 两列：优先企业 + 准备清单 */}
-          <div className="jf-two-col">
-            <section className="jf-card">
-              <FusionSectionHead icon={BuildingIcon} title={copy.companies.title} subtitle={copy.companies.subtitle} />
-              {(plan.priorityCompanies ?? []).length === 0 ? (
-                <p className="text-[20px] text-[var(--muted)]">
-                  {isReview
-                    ? '本场企业信息有限，可前往来源平台查看该主办方发布的企业与在招岗位。'
-                    : '本场企业信息有限，建议先打印活动资料并按现场展位逐一了解。'}
-                </p>
-              ) : (
-                <div className="jf-co-pick">
-                  {(plan.priorityCompanies ?? []).map((company) => (
-                    <div key={company.companyName} className="jf-cp">
-                      <div className="jf-cp-top">
-                        <b>{company.companyName}</b>
-                      </div>
-                      <p>{company.reason}</p>
-                    </div>
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">{isReview ? '后续可做的跟进动作' : '参会前准备清单'}</div>
+            <ul className="qx-fair-checklist">
+              {((isReview ? plan.followUpActions : plan.preparationChecklist) ?? []).map((item) => (
+                <li key={item} className="qx-fair-check"><span className="box" aria-hidden="true" />{item}</li>
+              ))}
+            </ul>
+          </section>
+        </div>
+        <div className="qx-fair-two-col">
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">{isReview ? '本场概况' : '本场看点'}</div>
+            <ul className="qx-fair-bullets">
+              {(plan.fairHighlights ?? []).map((item) => <li key={item} className="qx-fair-bullet"><i />{item}</li>)}
+            </ul>
+          </section>
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">{isReview ? '下次同类活动可提前准备的问题' : '现场可咨询问题'}</div>
+            <ul className="qx-fair-bullets">
+              {((isReview ? plan.nextTimeQuestions : plan.questionsToAsk) ?? []).map((item) => (
+                <li key={item} className="qx-fair-bullet"><i />{item}</li>
+              ))}
+            </ul>
+          </section>
+        </div>
+        {!isReview && (plan.onsiteTips ?? []).length > 0 && (
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">现场提醒<span className="hint">AI 生成，仅供参考</span></div>
+            <ul className="qx-fair-bullets">
+              {(plan.onsiteTips ?? []).map((item) => <li key={item} className="qx-fair-bullet"><i />{item}</li>)}
+            </ul>
+          </section>
+        )}
+        {isReview && (
+          <section className="qx-card" data-review-records>
+            <div className="qx-fair-blk-h">你在本机留下的记录<span className="hint">非 AI 生成，来自本机真实记录</span></div>
+            {plan.localRecords?.requiresLogin ? (
+              <p className="qx-fair-local-note">未登录会员，无法关联你在本机的浏览与跳转记录。</p>
+            ) : (plan.localRecords?.openedCompanySourceEntries ?? []).length > 0 ? (
+              <>
+                <p className="qx-fair-local-note">你在本机打开过这些参展企业的来源投递入口：</p>
+                <ul className="qx-fair-bullets">
+                  {(plan.localRecords?.openedCompanySourceEntries ?? []).map((name) => (
+                    <li key={name} className="qx-fair-bullet"><i />{name}</li>
                   ))}
-                </div>
-              )}
-            </section>
-
-            <section className="jf-card">
-              <FusionSectionHead
-                icon={ClipboardListIcon}
-                title={isReview ? '后续可做的跟进动作' : '参会前准备清单'}
-                subtitle={isReview ? '活动已结束，这些是现在就能做的' : '出发前逐项核对'}
-              />
-              <ul className="jf-checklist">
-                {((isReview ? plan.followUpActions : plan.preparationChecklist) ?? []).map((item) => (
-                  <li key={item} className="jf-check">
-                    <span className="box" aria-hidden="true" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-
-          {/* 两列：本场看点 + 可咨询问题 */}
-          <div className="jf-two-col">
-            <section className="jf-card">
-              <FusionSectionHead icon={SparklesIcon} title={isReview ? '本场概况' : '本场看点'} />
-              <ul className="jf-bullets">
-                {(plan.fairHighlights ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
-              </ul>
-            </section>
-
-            <section className="jf-card">
-              <FusionSectionHead
-                icon={HelpCircleIcon}
-                title={isReview ? '下次同类活动可提前准备的问题' : '现场可咨询问题'}
-              />
-              <ul className="jf-bullets">
-                {((isReview ? plan.nextTimeQuestions : plan.questionsToAsk) ?? []).map((item) => (
-                  <li key={item} className="jf-bullet"><i />{item}</li>
-                ))}
-              </ul>
-            </section>
-          </div>
-
-          {/* 现场提醒只在未结束场次出现：活动结束后「现场提醒」没有存在意义。 */}
-          {!isReview && (plan.onsiteTips ?? []).length > 0 && (
-            <section className="jf-card">
-              <FusionSectionHead icon={SparklesIcon} title="现场提醒" subtitle="AI 生成，仅供参考" />
-              <ul className="jf-tips-row">
-                {(plan.onsiteTips ?? []).map((item) => <li key={item} className="jf-tip"><i className="inline-block w-3 h-3 flex-none mt-2 rounded bg-[var(--wheat)]" />{item}</li>)}
-              </ul>
-            </section>
-          )}
-
-          {/* 本机记录：非 AI 事实区。只列本机真实记录的动作，绝不推断现场发生了什么。 */}
-          {isReview && (
-            <section className="jf-card" data-review-records>
-              <FusionSectionHead icon={FileTextIcon} title="你在本机留下的记录" subtitle="非 AI 生成，来自本机真实记录" />
-              {plan.localRecords?.requiresLogin ? (
-                <p className="text-[20px] leading-relaxed text-[var(--muted)]">
-                  未登录会员，无法关联你在本机的浏览与跳转记录。
-                </p>
-              ) : (plan.localRecords?.openedCompanySourceEntries ?? []).length > 0 ? (
-                <>
-                  <p className="text-[20px] leading-relaxed text-[var(--ink)]">
-                    你在本机打开过这些参展企业的来源投递入口：
-                  </p>
-                  <ul className="jf-bullets mt-2">
-                    {(plan.localRecords?.openedCompanySourceEntries ?? []).map((name) => (
-                      <li key={name} className="jf-bullet"><i />{name}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="text-[20px] leading-relaxed text-[var(--muted)]">
-                  本机没有你在这场招聘会打开来源投递入口的记录。
-                </p>
-              )}
-              <p className="mt-4 text-[18px] leading-relaxed text-[var(--muted)]">{REVIEW_DISCLOSURE}</p>
-            </section>
-          )}
-
-          {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
-      </KioskPageFrame>
+                </ul>
+              </>
+            ) : (
+              <p className="qx-fair-local-note">本机没有你在这场招聘会打开来源投递入口的记录。</p>
+            )}
+            <p className="qx-fair-local-note">{REVIEW_DISCLOSURE}</p>
+          </section>
+        )}
+        {error ? <p className="qx-fair-blocked">{error}</p> : null}
+      </QxFairShell>
     )
   }
 
   return (
-    <KioskPageFrame
-      tone="wheat"
+    <QxFairShell
       title="AI参会准备单"
       subtitle="基于本人简历与本场招聘会公开信息生成"
-      backLabel="返回详情"
-      onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<FusionBadge icon={SparklesIcon}>待生成</FusionBadge>}
-      actionBar={
+      status={{ tone: 'unknown', label: '待生成' }}
+      screen="visit-plan"
+      state="missing-context"
+      ctabar={
         <>
-          <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>
-            打印活动资料
-          </button>
-          <div className="jf-spacer" />
-          <button type="button" className="jf-btn dark" disabled={generating} onClick={() => void handleGenerate()}>
-            {generating ? (
-              <>
-                <Loader2Icon aria-hidden="true" />
-                正在生成
-              </>
-            ) : (
-              copy.generate
-            )}
-          </button>
+          <QxFairCta onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</QxFairCta>
+          <QxFairCta variant="primary" testId="visit-plan-primary" disabled={generating} onClick={() => void handleGenerate()}>
+            {generating ? <><Loader2Icon aria-hidden />正在生成</> : copy.generate}
+          </QxFairCta>
         </>
       }
     >
-        <FusionNotice>
-          本准备单只服务本人参会准备；系统不会代办活动预约，也不会接收或转交简历。
-        </FusionNotice>
-        <section className="jf-card accented">
-          <FusionSectionHead icon={SparklesIcon} title="将为你生成" subtitle="结合简历诊断和招聘会公开快照" />
-          <div className="jf-two-col">
-            <div className="jf-tile tinted">
-              <span className="jf-tile-icon"><FileTextIcon aria-hidden="true" /></span>
-              <span><b>活动看点</b><span>本场活动看点与现场路线提醒</span></span>
-            </div>
-            <div className="jf-tile">
-              <span className="jf-tile-icon"><BuildingIcon aria-hidden="true" /></span>
-              <span><b>优先企业</b><span>可优先了解的参展企业清单</span></span>
-            </div>
-            <div className="jf-tile">
-              <span className="jf-tile-icon"><ClipboardListIcon aria-hidden="true" /></span>
-              <span><b>准备清单</b><span>参会前准备清单</span></span>
-            </div>
-            <div className="jf-tile">
-              <span className="jf-tile-icon"><HelpCircleIcon aria-hidden="true" /></span>
-              <span><b>咨询问题</b><span>现场可咨询的问题</span></span>
-            </div>
-          </div>
-          <p className="mt-5 text-[18px] leading-relaxed text-[var(--muted)]">
-            如 AI 服务暂时不可用，你仍可以打印活动资料，按来源平台信息办理后续事项。
-          </p>
-        </section>
-        {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
-    </KioskPageFrame>
+      <section className="qx-card">
+        <div className="qx-fair-blk-h">将为你生成<span className="hint">结合简历诊断和招聘会公开快照</span></div>
+        <p className="qx-fair-local-note">本准备单只服务本人参会准备；系统不会代办活动预约，也不会接收或转交简历。</p>
+        <p className="qx-fair-local-note">如 AI 服务暂时不可用，你仍可以打印活动资料，按来源平台信息办理后续事项。</p>
+      </section>
+      {error ? <p className="qx-fair-blocked">{error}</p> : null}
+    </QxFairShell>
   )
 }

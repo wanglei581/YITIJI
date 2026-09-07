@@ -26,7 +26,7 @@ function OptionGrid({ options, onPick }: { options: string[]; onPick: (v: string
         <button
           key={o}
           onClick={() => onPick(o)}
-          className="flex min-h-[44px] items-center justify-center rounded-lg bg-neutral-50 px-2 text-center text-sm text-neutral-700 transition-colors hover:bg-primary-50 hover:text-primary-700 active:bg-primary-100"
+          className="flex min-h-[48px] items-center justify-center rounded-lg bg-neutral-50 px-2 text-center text-sm text-neutral-700 transition-colors hover:bg-primary-50 hover:text-primary-700 active:bg-primary-100"
         >
           {o}
         </button>
@@ -104,7 +104,7 @@ export function RegionPicker({
             {/* 头部 */}
             <div className="flex items-center justify-between">
               <p className="text-base font-semibold text-neutral-800">选择地区</p>
-              <button onClick={() => setOpen(false)} className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100" aria-label="关闭">
+              <button onClick={() => setOpen(false)} className="flex h-12 w-12 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100" aria-label="关闭">
                 <XIcon className="h-5 w-5" />
               </button>
             </div>

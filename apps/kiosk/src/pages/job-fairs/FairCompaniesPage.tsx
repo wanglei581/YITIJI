@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
-import { BriefcaseIcon, BuildingIcon, ChevronRightIcon, SearchIcon } from 'lucide-react'
+import { AlertTriangleIcon, BuildingIcon, SearchIcon } from 'lucide-react'
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
-import { FusionBadge, FusionNotice, FusionSourceMeta, KioskPageFrame } from '../jobs/components/W4Presentation'
+import {
+  QxFairCta,
+  QxFairNavRow,
+  QxFairShell,
+  QxFairSkel,
+  QxFairSourceCard,
+  QxFairState,
+} from './qx/qxFairChrome'
 
 export function FairCompaniesPage() {
   const navigate = useNavigate()
-  const { id }   = useParams<{ id: string }>()
-  const fairId   = id ?? ''
+  const { id } = useParams<{ id: string }>()
+  const fairId = id ?? ''
 
-  const [fair,      setFair]      = useState<ExternalJobFairDTO | null>(null)
+  const [fair, setFair] = useState<ExternalJobFairDTO | null>(null)
   const [companies, setCompanies] = useState<FairCompanyDTO[]>([])
-  const [zones,     setZones]     = useState<FairZoneDTO[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(false)
-
-  const [search,     setSearch]     = useState('')
+  const [zones, setZones] = useState<FairZoneDTO[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [search, setSearch] = useState('')
   const [zoneFilter, setZoneFilter] = useState('')
 
   useEffect(() => {
@@ -53,137 +58,112 @@ export function FairCompaniesPage() {
     })
   }, [companies, search, zoneFilter])
 
-  const pageFrameProps = {
-    tone: 'wheat' as const,
-    title: '参会企业',
-    subtitle: fair ? `${fair.name} · ${companies.length} 家企业` : `${companies.length} 家企业`,
-    backLabel: '返回详情',
-    onBack: () => navigate(`/job-fairs/${fairId}`),
-  }
-
-  if (loading) {
-    return (
-      <KioskPageFrame {...pageFrameProps}>
-        <LoadingState className="h-full" />
-      </KioskPageFrame>
-    )
-  }
-
-  if (error) {
-    return (
-      <KioskPageFrame {...pageFrameProps}>
-        <ErrorState
-          message="加载失败，请稍后重试"
-          onRetry={() => navigate(`/job-fairs/${fairId}`)}
-          className="h-full"
-        />
-      </KioskPageFrame>
-    )
-  }
-
-  if (companies.length === 0) {
-    return (
-      <KioskPageFrame {...pageFrameProps}>
-        <EmptyState icon={BuildingIcon} title="暂无企业数据" className="h-full" />
-      </KioskPageFrame>
-    )
-  }
+  const viewState = loading ? 'loading' : error ? 'error' : companies.length === 0 ? 'empty' : 'list'
+  const pill = viewState === 'list'
+    ? { tone: 'ok' as const, label: '名单由主办方提供' }
+    : viewState === 'error'
+      ? { tone: 'bad' as const, label: '参展名单没取到' }
+      : viewState === 'empty'
+        ? { tone: 'unknown' as const, label: '主办方还没有提供名单' }
+        : { tone: 'unknown' as const, label: '正在取参展名单' }
 
   return (
-    <KioskPageFrame
-      {...pageFrameProps}
-      badge={<FusionBadge icon={BuildingIcon}>{filtered.length} 家匹配</FusionBadge>}
-      actionBar={
-        <>
-          <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/map`)}>
-            场馆导览
-          </button>
-          <div className="jf-spacer" />
-          <button type="button" className="jf-btn dark" onClick={() => navigate(`/job-fairs/${fairId}`)}>
-            查看招聘会
-          </button>
-        </>
+    <QxFairShell
+      title="参展企业"
+      subtitle="名单由主办方提供；本机不代收简历，不提供平台内投递。"
+      status={pill}
+      screen="companies"
+      state={viewState}
+      ctabar={
+        <QxFairCta variant="primary" testId="companies-primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
+          返回招聘会
+        </QxFairCta>
       }
     >
-        <div className="jf-searchbox">
-          <SearchIcon aria-hidden="true" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索企业名称或行业"
-          />
-        </div>
-        <div className="jf-filter-bar">
-          {zoneOptions.map((z) => (
-            <button
-              key={z.id || 'all'}
-              type="button"
-              onClick={() => setZoneFilter(z.id)}
-              className={`jf-f-chip sm ${zoneFilter === z.id ? 'on' : ''}`}
-            >
-              {z.name}
-            </button>
-          ))}
-        </div>
-
-      <section className="jf-list">
-        {filtered.length === 0 ? (
-          <div className="jf-card compact text-center text-[var(--muted)]">无匹配企业</div>
-        ) : (
-          filtered.map((company) => (
-            <button
-              key={company.id}
-              type="button"
-              className="jf-row align-start"
-              onClick={() => navigate(`/job-fairs/${fairId}/companies/${company.id}`, { state: { company } })}
-            >
-              <span className="jf-company-icon">{company.companyName.slice(0, 1)}</span>
-              <span className="jf-row-main">
-                <span className="jf-row-title">
-                  <b>{company.companyName}</b>
-                  {/* 规模原样显示来源文本。来源没给就不出这个标签——不写「中型」之类的猜测。 */}
-                  {company.scale ? <span className="jf-scale-tag">{company.scale}</span> : null}
-                  {/* 签到状态 chip 已撤：系统不追踪签到，接口也不返回该字段。 */}
-                </span>
-                <span className="jf-row-info">
-                  {company.boothNumber && (
-                    <span className="jf-booth-label">展位 {company.boothNumber}</span>
-                  )}
-                  <span>{company.industry}</span>
-                  {company.positions.length > 0 && (
-                    <span>
-                      <BriefcaseIcon aria-hidden="true" />
-                      招聘 {company.positions.reduce((s, p) => s + p.headcount, 0)} 人 · {company.positions.length} 岗
+      {viewState === 'loading' ? (
+        <>
+          <div className="qx-sec-h"><span className="t">正在取参展名单</span><span className="hint">未返回前不显示家数</span></div>
+          <QxFairSkel rows={3} />
+        </>
+      ) : viewState === 'error' ? (
+        <>
+          <QxFairState screen="companies" tone="error" icon={AlertTriangleIcon} title="参展名单没取到">
+            请求失败。名单关系到你到现场先去哪几家，<b>取不到就先不显示</b>，不给你一份可能过时的清单。
+          </QxFairState>
+          <div className="qx-rows">
+            <QxFairNavRow icon={BuildingIcon} title="活动物料" description="物料里通常也有一份纸质名单可以打印。" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} testId="companies-materials" />
+          </div>
+        </>
+      ) : viewState === 'empty' ? (
+        <>
+          <QxFairState screen="companies" tone="empty" icon={BuildingIcon} title="主办方还没有提供参展名单">
+            名单通常在开展前几天才发布。本机<b>不会用往期名单或猜测的单位填上去</b>。
+          </QxFairState>
+          <div className="qx-rows">
+            <QxFairNavRow icon={BuildingIcon} title="企业目录" description="平时收录的用人单位，与本场名单是两份数据。" onClick={() => navigate('/companies')} testId="companies-dir" />
+            <QxFairNavRow icon={BuildingIcon} title="岗位信息" description="先按岗位看，来源与有效期照样标注。" onClick={() => navigate('/jobs')} testId="companies-jobs" />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="qx-sec-h">
+            <span className="t">参展企业名单</span>
+            <span className="hint">共 {companies.length} 家 · 名单由主办方提供</span>
+          </div>
+          <div className="qx-fair-qbar">
+            <span className="qi"><SearchIcon size={28} aria-hidden /></span>
+            <input
+              className="qx-fair-qinput"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索企业名称或行业"
+              aria-label="搜索参展企业"
+            />
+          </div>
+          <div className="qx-fair-chips" role="group" aria-label="展区筛选">
+            {zoneOptions.map((z) => (
+              <button
+                key={z.id || 'all'}
+                type="button"
+                onClick={() => setZoneFilter(z.id)}
+                className="qx-fair-chip"
+                aria-pressed={zoneFilter === z.id}
+              >
+                {z.name}
+              </button>
+            ))}
+          </div>
+          <ul className="qx-fair-list" data-testid="companies-list">
+            {filtered.length === 0 ? (
+              <li className="qx-card">无匹配企业</li>
+            ) : filtered.map((company) => (
+              <li key={company.id} className="qx-fair-item">
+                <button
+                  type="button"
+                  className="qx-fair-item-link"
+                  onClick={() => navigate(`/job-fairs/${fairId}/companies/${company.id}`, { state: { company } })}
+                >
+                  <span className="qx-fair-item-ic" data-tone="slate">{company.companyName.slice(0, 1)}</span>
+                  <span className="qx-fair-item-tx">
+                    <span className="qx-fair-item-t">
+                      {company.companyName}
+                      {company.scale ? <span className="qx-fair-tag" style={{ marginLeft: 8 }}>{company.scale}</span> : null}
                     </span>
-                  )}
-                </span>
-                {company.description && (
-                  <span className="mt-2 block line-clamp-1 text-[17px] leading-relaxed text-[var(--muted)]">
-                    {company.description}
+                    <span className="qx-fair-item-sub">
+                      {company.boothNumber ? <span>展位号 {company.boothNumber}</span> : null}
+                      <span>在招岗位 {company.positions.length}</span>
+                    </span>
                   </span>
-                )}
-              </span>
-              <span className="jf-btn sm ghost">
-                查看详情 / 扫码查看
-              </span>
-              <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
-            </button>
-          ))
-        )}
-      </section>
-
-      {fair && (
-        <FusionSourceMeta
-          sourceName={fair.sourceName}
-          syncTime={fair.syncTime}
-          externalId={fair.externalId}
-        />
+                  <span className="qx-fair-item-go">查看</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <QxFairSourceCard sourceName={fair?.sourceName} syncTime={fair?.syncTime} externalId={fair?.externalId} />
+          <p className="qx-fair-local-note">系统仅展示参展企业信息，如需办理请扫码前往来源平台，系统不参与招聘闭环。</p>
+        </>
       )}
-
-      <FusionNotice>
-        系统仅展示参展企业信息，如需办理请扫码前往来源平台，系统不参与招聘闭环。
-      </FusionNotice>
-    </KioskPageFrame>
+    </QxFairShell>
   )
 }
