@@ -262,6 +262,7 @@ includes('src/pages/resume/ResumeOptimizePage.tsx', 'confirmLeave', 'optimizatio
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimization keeps busy lock')
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'setExported(null)', 'content/layout changes invalidate stale export')
 includes('src/layouts/KioskRoot.tsx', "'/resume/optimize'", 'optimize route is registered as Qingxu-migrated')
+includes('src/layouts/KioskRoot.tsx', "'/resume/optimize/compare'", 'optimize compare route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/resume/generate/preview'", 'generate preview route is registered as Qingxu-migrated')
 check(!existsSync(join(ROOT, 'src/pages/resume/ResumeExportPage.tsx')), 'AI-07 ResumeExportPage is deleted')
 includes('src/routes/index.tsx', 'path: \'resume/export\'', 'AI-07 keeps /resume/export as a compatibility route')

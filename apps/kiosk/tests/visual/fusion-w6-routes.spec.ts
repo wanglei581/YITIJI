@@ -77,6 +77,20 @@ async function expectTouchTargets(page: Page): Promise<void> {
   expect(visible, '触控优先页面必须至少有一个可见交互目标').toBeGreaterThan(0)
 }
 
+async function expectResumeCompareControls(page: Page): Promise<void> {
+  const scaler = page.locator('.kiosk-stage')
+  const transform = await scaler.evaluate((element) => getComputedStyle(element).transform)
+  const scale = transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+  const controls = page.getByRole('button', { name: /^(?:用改写|保留原文|下一条)$/ })
+  await expect(controls).toHaveCount(3)
+  for (let index = 0; index < 3; index += 1) {
+    const box = await controls.nth(index).boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.height / scale, '对照页底部主操作换算到舞台 CSS px 后必须 ≥56px').toBeGreaterThanOrEqual(56)
+    expect(box!.width / scale, '对照页底部操作换算到舞台 CSS px 后可点宽度必须 ≥48px').toBeGreaterThanOrEqual(48)
+  }
+}
+
 function screenshotName(route: W6RouteCase): string {
   const name = route.pattern === '/' ? 'home' : route.pattern.slice(1).replaceAll('/', '__').replaceAll(':', '_')
   return `${name}.png`
@@ -162,6 +176,7 @@ async function acceptRoute(page: Page, route: W6RouteCase, errors: string[]): Pr
   expect(overflowingElements, `${route.pattern} 不得包含越过视口边界的元素`).toEqual([])
   await assertNoHorizontalOverflow(page)
   if (route.requiresTouchTargets) await expectTouchTargets(page)
+  if (route.pattern === '/resume/optimize/compare') await expectResumeCompareControls(page)
   expect(errors, `路由 ${route.pattern} 不得产生脚本错误或关键资源失败`).toEqual([])
 }
 
@@ -180,3 +195,11 @@ for (const route of w6MobileCases) {
     await acceptRoute(page, route, errors)
   })
 }
+
+test('/resume/optimize/compare mobile breakpoint @w6-mobile', async ({ page, api }) => {
+  const route = w6KioskCases.find(({ pattern }) => pattern === '/resume/optimize/compare')
+  if (!route) throw new Error('W6 compare route case is missing')
+  const errors = collectRuntimeErrors(page)
+  registerW6Api(api)
+  await acceptRoute(page, route, errors)
+})

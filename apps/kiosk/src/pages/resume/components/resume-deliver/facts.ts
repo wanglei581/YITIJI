@@ -31,6 +31,18 @@ export function extractConfirmableFacts(resume: GeneratedResume): ConfirmableFac
 const DIGIT_RE = /\d+(?:\.\d+)?%?/g
 const DUTY_WORDS = ['主导', '负责', '带领', '季度之星'] as const
 
+/** 逐条对照共用的机械规则：after 有、before 无的数字与职责词。 */
+export function detectUnconfirmedTextAdditions(afterText: string, beforeText: string): string[] {
+  const hits: string[] = []
+  for (const token of afterText.match(DIGIT_RE) ?? []) {
+    if (token && !beforeText.includes(token) && !hits.includes(token)) hits.push(token)
+  }
+  for (const word of DUTY_WORDS) {
+    if (afterText.includes(word) && !beforeText.includes(word) && !hits.includes(word)) hits.push(word)
+  }
+  return hits
+}
+
 function collectBeforeText(
   modules: ResumeOptimizeModule[] | undefined,
   originalInput: ResumeGenerateInput | undefined,
@@ -60,11 +72,8 @@ export function detectUnconfirmedAdditions(
   ]
   const hits: string[] = []
   for (const text of afterParts) {
-    for (const token of text.match(DIGIT_RE) ?? []) {
-      if (token && !beforeText.includes(token) && !hits.includes(token)) hits.push(token)
-    }
-    for (const word of DUTY_WORDS) {
-      if (text.includes(word) && !beforeText.includes(word) && !hits.includes(word)) hits.push(word)
+    for (const addition of detectUnconfirmedTextAdditions(text, beforeText)) {
+      if (!hits.includes(addition)) hits.push(addition)
     }
   }
   return hits

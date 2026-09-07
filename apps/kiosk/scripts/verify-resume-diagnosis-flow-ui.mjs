@@ -52,7 +52,12 @@ const deliver = [
 const optimize = `${read('src/pages/resume/ResumeOptimizePage.tsx')}\n${deliver}`
 const generatePreview = `${read('src/pages/resume/ResumeGeneratePreviewPage.tsx')}\n${deliver}`
 // S2-1 拆页：逐条 diff 搬到对照页，因此 diff 的触控安全断言随之搬过去（覆盖面不缩水）。
-const optimizeCompare = read('src/pages/resume/ResumeOptimizeComparePage.tsx')
+const optimizeCompare = [
+  'src/pages/resume/ResumeOptimizeComparePage.tsx',
+  'src/pages/resume/components/resume-compare/ResumeCompareCard.tsx',
+  'src/pages/resume/components/resume-compare/ResumeCompareState.tsx',
+  'src/pages/resume/components/resume-compare/resumeCompareModel.ts',
+].map((path) => read(path)).join('\n')
 const generate = read('src/pages/resume/ResumeGeneratePage.tsx')
 const resumeVoiceButton = read('src/pages/resume/components/ResumeVoiceInputButton.tsx')
 const resumeVoiceDialog = read('src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx')
@@ -125,6 +130,12 @@ assertIncludes(optimize, "navigate('/resume/optimize/compare'", 'optimize page l
 // 拆出去的那页必须诚实说明「本次选择不保存」——没有采纳落库端点。
 assertIncludes(optimizeCompare, '未保存', 'compare page states the adoption selection is not persisted')
 assertNotIncludes(optimizeCompare, '已采纳', 'compare page avoids copy implying the selection was saved')
+assertIncludes(optimizeCompare, 'setModules([])', 'compare page clears stale modules before reading another task')
+assertIncludes(optimizeCompare, 'loadedTaskId === taskId', 'compare page renders modules only for the current task')
+assertIncludes(optimizeCompare, 'setDecisions({})', 'compare page clears stale decisions before reading another task')
+assertIncludes(optimizeCompare, 'setConfirmedByModule({})', 'compare page clears stale fact confirmations before reading another task')
+assertIncludes(optimizeCompare, "label: '缺少简历'", 'compare page does not label missing context as ready for a decision')
+assertIncludes(optimizeCompare, 'aria-pressed={decisions[moduleKeyOf(currentIndex)]', 'compare page exposes the current decision non-visually')
 
 // 2026-08-18：这三条原本断言「mock 报告的分项 key 与 SSOT 对齐」（objective /
 // quantification / readability），前提是 mock **会返回一份报告**。走查证明那份报告

@@ -98,6 +98,23 @@ export function registerW6Api(api: ApiRouter): void {
     })
   )
   get('/api/v1/job-materials/templates', success([]))
+  get('/api/v1/resume/records/w6-compare/optimize', {
+    taskId: 'w6-compare',
+    status: 'completed',
+    providerName: 'deepseek',
+    modules: [
+      {
+        title: '项目成果',
+        before: '参与数据整理工作。',
+        after: '主导数据整理，完成 5000 条记录校验。',
+      },
+      {
+        title: '团队协作',
+        before: '与团队沟通需求并跟进问题。',
+        after: '与团队对齐需求，持续跟进问题至闭环。',
+      },
+    ],
+  })
   post('/api/v1/member/auth/sms-code', success({ sent: true, cooldownSeconds: 60, expiresInSeconds: 300 }))
   post('/api/v1/member/auth/login', success({
     token: W6_MEMBER_TOKEN,
