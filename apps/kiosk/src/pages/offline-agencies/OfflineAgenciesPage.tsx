@@ -53,8 +53,13 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           {agency.district ? <span className="dw-chip">{agency.district}</span> : null}
           {agency.orgCode ? <span className="dw-chip">来源编号 {agency.orgCode}</span> : null}
           {/* 平台审核的是「机构信息」，不是「机构资质」——两者不能混说。
-              backend P0 门禁把这条钉死：本页必须出现下面这个标签，
-              且不得出现声称资质已核验的说法（原词见 verify-backend-p0-contracts.mjs:86）。 */}
+              三条门禁同时钉这一点：本页必须出现下面这个标签，且不得出现另外两类说法。
+              判据与被禁词原文见：
+                services/api/scripts/verify-backend-p0-contracts.mjs:85-88
+                apps/kiosk/scripts/verify-fusion-w4.mjs:180
+                apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs:35
+              ⚠️ 注释里不要复述被禁词本身 —— 门禁扫的是整个文件，
+                 写进注释同样判红（这一处已经因此红过两轮）。 */}
           <span className="dw-chip dw-chip-ok">机构信息已审核</span>
         </div>
       </div>
