@@ -85,6 +85,36 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
   ['/profile', { domainTitle: '我的', withTerminalCode: true, brandReturnsHome: false }],
 ])
 
+/**
+ * 青序流光已迁移路由。
+ *
+ * `Set.has(pathname)` 是精确字符串比对：`/print-scan/feature/id-photo` 对不上
+ * 集合里的字面量，带参路由会漏出旧壳、两套色系打架。
+ *
+ * 所以匹配分两层：
+ *   1. 精确集合 —— 无参数路由；
+ *   2. 前缀列表 —— 只放「整棵子树都已迁完」的带参段。
+ *
+ * 前缀绝不能写成 `/print-scan`：同前缀下的 `/print-scan/convert`、
+ * `/print-scan/sign` 仍是别的 lane，误命中会让它们掉进空壳。
+ * hideHeader / hideBottomNav 只接受本文件内对 pathname 的封闭判定
+ * （`isQxMigratedPath(pathname)` 是壳层契约允许的具名谓词形态）。
+ */
+const QX_MIGRATED_ROUTES = new Set<string>([
+  '/print/pickup-claim',
+  '/resume/report',
+  '/resume/optimize',
+  '/resume/optimize/compare',
+  '/resume/generate/preview',
+  '/print-scan',
+])
+const QX_MIGRATED_PREFIXES = ['/print-scan/feature/'] as const
+
+function isQxMigratedPath(pathname: string): boolean {
+  if (QX_MIGRATED_ROUTES.has(pathname)) return true
+  return QX_MIGRATED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
   // 域名已经在顶栏主标题上时，副标题回落到品牌名，避免「职易达 / 职易达 · 机号」自我重复。
   const base = entry.domainTitle === null ? 'AI 求职操作系统' : '职易达'
@@ -146,23 +176,8 @@ function KioskShell() {
 
   // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI顾问/我的」底部导航，
   // 由页面自带顶栏 + 返回箭头承载导航。
-  // ── 青序流光已迁移路由 ────────────────────────────────────────
-  // 这些页已按 docs/design/kiosk-redesign-2026-08/ 的新稿重做，自带 QxPageFrame
-  // 提供的顶栏、页头与操作条。它们必须退出 KioskLayout 的旧外壳——
-  // 后者带 presentation="fusion-youth"，即暖褐配色（--k-ink #1A1714）；
-  // 与青序流光（#10302b）叠在同一页上就是两套色系打架，正是上一代 V6
-  // "只迁移了一半所以效果不好"的成因。
-  //
-  // 逐页加进来，不做一次性大爆炸替换：51 页全部迁完后，KioskLayout 与旧样式
-  // 一并删除，这个集合也随之消失。
-  const QX_MIGRATED_ROUTES = new Set<string>([
-    '/print/pickup-claim',
-    '/resume/report',
-    '/resume/optimize',
-    '/resume/optimize/compare',
-    '/resume/generate/preview',
-  ])
-  const isQxRoute = QX_MIGRATED_ROUTES.has(pathname)
+  // 青序流光已迁移路由退出旧壳：判定见模块级 isQxMigratedPath（精确集合 + 带参前缀）。
+  const isQxRoute = isQxMigratedPath(pathname)
 
   const isCampusZone = pathname === '/campus'
   const v6Shell = V6_SHELL_ROUTES.get(pathname) ?? null

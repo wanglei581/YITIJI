@@ -190,7 +190,6 @@ for (const path of presentationFiles) {
 }
 
 const printScanPages = new Map([
-  ['src/pages/print-scan/PrintScanFeatureInfoPage.tsx', 'print-scan-feature'],
   ['src/pages/print-scan/ConvertImagesPage.tsx', 'print-scan-convert'],
   ['src/pages/print-scan/SignStampPage.tsx', 'print-scan-sign'],
 ])
@@ -204,30 +203,45 @@ for (const [path, marker] of printScanPages) {
     `${path} imports the scoped W2 stylesheet`
   )
 }
+const printScanFeature = read('src/pages/print-scan/PrintScanFeatureInfoPage.tsx')
+assert.match(printScanFeature, /QxPageFrame/, 'feature info page uses Qingxu page frame')
+assert.match(
+  printScanFeature,
+  /data-w2-page=["']print-scan-feature["']/,
+  'feature info page retains the route ownership marker'
+)
+assert.match(
+  printScanFeature,
+  /print-hub-qx\.css/,
+  'feature info page imports the Qingxu hub stylesheet'
+)
+assert.doesNotMatch(printScanFeature, /KioskPageFrame/, 'feature info page has left the V6 frame')
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
-const printScanHomeView = read('src/pages/print-scan/components/V6PrintHubView.tsx')
-const printHubV6Css = read('src/pages/print-scan/styles/print-hub-v6.css')
-assert.match(printScanHome, /KioskPageFrame/, 'V6 print-scan home uses the frozen page frame')
+const printScanHomeView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
+const printHubQxCss = read('src/pages/print-scan/styles/print-hub-qx.css')
+assert.match(printScanHome, /QxPageFrame/, 'print-scan hub uses Qingxu page frame')
 assert.match(
   printScanHome,
-  /V6PrintHubView/,
-  'V6 print-scan home delegates presentation to V6PrintHubView'
+  /QxPrintHubView/,
+  'print-scan home delegates presentation to QxPrintHubView'
 )
 assert.match(
   printScanHome,
-  /\.\/styles\/print-hub-v6\.css/,
-  'V6 print-scan home imports its scoped stylesheet'
+  /\.\/styles\/print-hub-qx\.css/,
+  'print-scan home imports its Qingxu stylesheet'
 )
 assert.match(
   printScanHomeView,
   /data-w2-page=["']print-scan-home["']/,
-  'V6 print-scan view retains the route ownership marker'
+  'print-scan view retains the route ownership marker'
 )
 assert.match(
   printScanHomeView,
-  /data-v6-page=["']print-hub["']/,
-  'V6 print-scan view exposes its design-language marker'
+  /data-qx-page=["']print-hub["']/,
+  'print-scan view exposes its Qingxu design-language marker'
 )
+assert.match(printHubQxCss, /var\(--qx-ink\)/, 'hub CSS consumes Qingxu tokens')
+assert.match(printHubQxCss, /--qx-tap-min/, 'hub CSS keeps the 48px touch floor token')
 const printScanFusionCss = read('src/pages/print-scan/styles/print-scan-fusion.css')
 const frameContentPaddingContracts = new Map([
   ['src/pages/print-scan/styles/print-scan-fusion.css', 'w2-print-scan-page'],
@@ -243,11 +257,6 @@ for (const [path, frameClass] of frameContentPaddingContracts) {
     `${frameClass} neutralizes direct kiosk page content padding`
   )
 }
-assert.match(
-  printHubV6Css,
-  /\.v6-print-hub-page\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0\s*;/,
-  'V6 print hub neutralizes direct kiosk page content padding'
-)
 assert.match(
   printScanFusionCss,
   /\.w2-print-scan-shell\s*>\s*:is\(main,\s*section\)\s*\{/,
@@ -311,9 +320,9 @@ assert.doesNotMatch(
   'arrival-code entry stays ungated by local print/scan capability probing'
 )
 assert.match(
-  printHubV6Css,
-  /\.v6-print-hub\s*\{[^}]*padding:\s*0\s+48px\s+40px\s*;/,
-  'V6 print hub uses the 48px content gutter without adding top padding to the pagehead'
+  printHubQxCss,
+  /\.ph-cap\s*\{[^}]*min-height:\s*196px/,
+  'capability cards stay well above the 48px touch floor'
 )
 // 尾部允许再挂参数（2026-08-19 入口直达加了 &mode=transfer）。本断言要守的是两件事：
 // 必须落到一体机自己的扫码会话 tab、不得指向手机 H5 路由 —— 这两条一个字没放松，
