@@ -65,7 +65,9 @@
     "GET /resume/job-fit/:p",
     "GET /resume/job-fit/consent/:p",
     "GET /resume/records/:p",
+    "GET /resume/records/:p/draft",
     "GET /resume/records/:p/optimize",
+    "GET /resume/records/:p/versions",
     "GET /resume/self-assessment/:p",
     "GET /resume/self-assessment/questions",
     "GET /terminals/public",
@@ -126,9 +128,11 @@
     "POST /resume/job-fit/consent",
     "POST /resume/parse",
     "POST /resume/records/:p/export",
+    "POST /resume/records/:p/fact-check",
     "POST /resume/self-assessment",
     "POST /resume/self-assessment/:p/print",
-    "POST /resume/voice/transcribe"
+    "POST /resume/voice/transcribe",
+    "PUT /resume/records/:p/draft"
   ],
   "knownMissing": {
     "POST /orders/package/:p/cancel": "同上，材料包取消。"
