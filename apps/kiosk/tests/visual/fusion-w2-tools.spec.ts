@@ -72,7 +72,7 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   // 两个码必须在卡面上被区分开，否则用户拿错码白跑一趟。
   await expect(entry).toContainText('不是付款后的取件凭证码')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
-  await expect(page.locator('.v6-ph-grid .v6-ph-card')).toHaveCount(8) // 7 张能力卡 + 1 张状态卡
+  await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(8)
   await entry.click()
 
   await expect(page).toHaveURL(/\/print\/pickup-claim$/)

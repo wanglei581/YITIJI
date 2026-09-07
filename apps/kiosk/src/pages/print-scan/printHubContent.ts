@@ -1,19 +1,22 @@
 // ============================================================
-// printHubContent — P39 打印域首屏的文案真值表
+// printHubContent — 打印域 Hub 的文案与状态轴
 //
-// 设计源：docs/design/kiosk-ai-os-v3-2026-08/39-print-hub.html
-// 迁移方向是单向的：原型 → 生产。本文件把原型里散在 DOM 上的
-// data-when / data-probe-when 分支文案收成结构化数据，
-// 视图只做渲染，不再在 JSX 里堆条件文案。
-//
-// 为什么把文案单独成文件：
-//   · 原型每张卡在「四态 × 探测态」下各有一句话，塞进 JSX 会让视图
-//     直接破 500 行（.ccg 工程规模口径），而且 diff 时读不出改了哪一态；
-//   · 后续 47 页照同一套做法搬迁时，这一层是唯一需要逐字校对原型的地方。
+// 视觉真值：docs/design/kiosk-redesign-2026-08/10-print-hub.html
+// 状态机与两轴分治仍沿用已验证实现（探测轴 + MFP 轴），本文件只收文案。
 // ============================================================
 
-/** 原型 .hcard 上的 data-cap，迁移时逐字保留，便于和原型逐卡对照。 */
-export type PrintHubCap = 'doc' | 'phone' | 'scan' | 'photo' | 'idphoto' | 'convert' | 'sign'
+/** 原型能力卡 data-cap / key，迁移时逐字保留，便于和原型逐卡对照。 */
+export type PrintHubCap = 'doc' | 'phone' | 'usb' | 'scan' | 'photo' | 'idphoto' | 'convert' | 'sign'
+
+/** 原型 STATES。Hub 页覆盖前五态；后两态在 /print-scan/feature/:key。 */
+export type HubUiState =
+  | 'capability-loading'
+  | 'default'
+  | 'capability-error'
+  | 'locked'
+  | 'device-off'
+  | 'feature-id-photo'
+  | 'feature-not-found'
 
 /** 能力探测轴（原型 data-probe）：本机连自己的能力配置都读不到时为 unknown。 */
 export type ProbeStatus = 'loading' | 'ok' | 'error'
@@ -204,17 +207,47 @@ export const PRINT_HUB_PROBE_UNKNOWN_TECH_NOTE =
 
 // ── 分组标题右侧的副文案（随两条轴切换） ─────────────────────
 
-export function capabilityGroupHint(probe: ProbeStatus, mfp: MfpStatus): string {
-  if (probe !== 'ok') return '七项现在都开不了 · 状态确认后自动恢复'
-  if (mfp === 'unavailable') return '要出纸的四项停了 · 上传、转换、签章照常'
-  return '右上角标了是不是 AI'
+export function capabilityGroupHint(probe: ProbeStatus, mfp: MfpStatus, locked = false): string {
+  if (probe === 'loading') return '正在读取本机能力配置'
+  if (probe !== 'ok') return '能力配置读取失败'
+  if (mfp === 'unavailable') return '一体机确认离线'
+  if (locked) return '部分能力被管理员关闭'
+  return '能力已读取，具体状态进入后确认'
 }
 
-export function recordsGroupHint(signedIn: boolean, mfp: MfpStatus): string {
-  if (!signedIn) return '现在没登录，进去只会看到空的'
-  if (mfp === 'unavailable') return '记录在你账号里 · 一体机离线也照常查'
-  return '登录后可查看历史记录与凭证'
+export function recordsGroupHint(): string {
+  return '到机码不受能力配置管辖'
 }
+
+/** 顶栏胶囊。Hub 页绝不用 tone=ok 把未证实的就绪写成结论（CLAUDE.md §9）。 */
+export const HUB_PILL: Record<
+  HubUiState,
+  { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+> = {
+  'capability-loading': { tone: 'unknown', label: '正在读取本机能力' },
+  default: { tone: 'unknown', label: '能力与设备状态以办理时确认' },
+  'capability-error': { tone: 'bad', label: '服务状态无法确认 · 任务暂不开放' },
+  locked: { tone: 'warn', label: '部分能力已被管理员关闭' },
+  'device-off': { tone: 'warn', label: '一体机离线 · 出纸类暂停' },
+  'feature-id-photo': { tone: 'warn', label: '证件照尚未开放' },
+  'feature-not-found': { tone: 'warn', label: '能力说明不存在' },
+}
+
+export const HUB_ASK: Record<HubUiState, { text: string; em: string }> = {
+  'capability-loading': { text: '正在确认这台机器能做什么。', em: '这台机器' },
+  default: { text: '你的文件，现在在哪？', em: '现在在哪' },
+  'capability-error': { text: '本机能力没读到。', em: '没读到' },
+  locked: { text: '有几项被关掉了。', em: '被关掉了' },
+  'device-off': { text: '这台机器出不了纸。', em: '出不了纸' },
+  'feature-id-photo': { text: '证件照还没开放。', em: '还没开放' },
+  'feature-not-found': { text: '这个能力名我不认识。', em: '我不认识' },
+}
+
+export const HUB_TRUTH = [
+  { k: '价格', v: '以服务端报价为准，本机不预设单价，也不提供促销承诺。' },
+  { k: '纸张', v: '只按 A4 出纸；彩色与自动双面需本机真机验证后由管理员开放。' },
+  { k: '隐私', v: '结束会话或闲置超时清除本机登录态与临时会话信息；文件与订单按服务端留存期限管理。' },
+] as const
 
 /**
  * 到机码分组标题右侧副文案。原型 39-print-hub.html:595-601。
@@ -247,3 +280,24 @@ export function arrivalCodeStateNote(probe: ProbeStatus, mfp: MfpStatus): string
  */
 export const PRINT_HUB_PRICE_NOTICE =
   '本页不核价、不结算，价格以打印工作台核价与现场公示价为准。'
+
+export function deriveHubUiState(input: {
+  probe: ProbeStatus
+  mfp: MfpStatus
+  locked: boolean
+}): Exclude<HubUiState, 'feature-id-photo' | 'feature-not-found'> {
+  if (input.probe === 'loading') return 'capability-loading'
+  if (input.probe === 'error') return 'capability-error'
+  if (input.mfp === 'unavailable') return 'device-off'
+  if (input.locked) return 'locked'
+  return 'default'
+}
+
+/** 轴芯片「彩色 / 双面」：未在本机登记 available 就写未验证，不谎报。 */
+export function colorDuplexChip(colorOn: boolean, duplexOn: boolean): string {
+  if (!colorOn && !duplexOn) return '彩色 / 双面 · 未验证'
+  const bits = [colorOn ? '彩色已开放' : null, duplexOn ? '双面已开放' : null].filter(
+    (v): v is string => v !== null,
+  )
+  return bits.join(' · ')
+}

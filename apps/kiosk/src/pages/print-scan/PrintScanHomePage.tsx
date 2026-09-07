@@ -1,23 +1,17 @@
 // ============================================================
-// PrintScanHomePage — V6 打印扫描域首屏（P39）。
+// PrintScanHomePage — 打印扫描 Hub（青序流光 10-print-hub）。
 //
-// 视觉与文案真值：docs/design/kiosk-ai-os-v3-2026-08/39-print-hub.html
-// （含 PR #644 补的「到机码核销」入口卡）。迁移方向单向：原型 → 生产。
+// 视觉真值：docs/design/kiosk-redesign-2026-08/10-print-hub.html
+// 本文件只做容器：读真实状态、算每张卡能不能点，把结果交给 QxPrintHubView。
 //
-// 本文件只做容器：读真实状态、算每张卡能不能点、把结果交给 V6PrintHubView。
-// 一切文案在 printHubContent.ts，一切样式在 styles/print-hub-v6.css。
-//
-// ══ 两条独立的状态轴（原型 CSS 头注释的裁定，迁移时逐条落地）══
-//   ① 能力探测轴 probe：GET /terminals/:id/capabilities 读不到 → 七项一律不开，
-//      只留不依赖本机能力的记录类入口。
+// ══ 两条独立的状态轴 ══
+//   ① 能力探测轴 probe：GET /terminals/:id/capabilities 读不到 → 八项一律不开，
+//      只留不依赖本机能力的记录类入口（到机码核销）。
 //   ② 打印机（MFP）轴 mfp：GET /terminals/:id/printer-status。
-//      **这一轴此前生产页完全没接** —— 原型的 device-off 说的就是它：
-//      要出纸的四项（文档打印 / 照片打印 / 材料扫描 / 证件照）停，
-//      纯软件的三项（手机扫码上传 / 格式转换 / 签名盖章）照常。
-//      读不到状态时只说「读不到」，绝不声称「离线」（CLAUDE.md §9 不伪造能力）。
+//      fail-closed：null / 心跳过期 / 请求失败一律不算在线。
+//      读不到状态时只说「读不到」，顶栏胶囊不得默认写成设备可用。
 // ============================================================
 
-import { KioskPageFrame } from '@ai-job-print/ui'
 import {
   COMPLIANCE_COPY,
   canCreateFormalPrintScanTask,
@@ -37,10 +31,10 @@ import {
   ScanLineIcon,
   SmartphoneIcon,
   TicketIcon,
+  UsbIcon,
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
-import { useAuth } from '../../auth/useAuth'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import {
   loadConfiguredCapabilities,
@@ -48,22 +42,26 @@ import {
   type ConfiguredCapabilityMap,
 } from '../../services/api/printScanCapabilities'
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
+  HUB_PILL,
   PRINT_HUB_PRICE_NOTICE,
-  arrivalCodeHint,
   arrivalCodeStateNote,
   capabilityGroupHint,
+  colorDuplexChip,
+  deriveHubUiState,
   recordsGroupHint,
   type MfpStatus,
   type PrintHubCap,
   type ProbeStatus,
 } from './printHubContent'
 import {
-  V6PrintHubView,
-  type V6PrintQuickLinkView,
-} from './components/V6PrintHubView'
-import './styles/print-hub-v6.css'
+  PrintHubNavbar,
+  QxPrintHubView,
+  type QxPrintQuickLinkView,
+} from './components/QxPrintHubView'
+import './styles/print-hub-qx.css'
 
 interface CapabilityDefinition {
   key: string
@@ -85,9 +83,11 @@ interface CapabilityDefinition {
   mfpOffStateNote?: string
   note?: string
   unavailableBadge?: string
-  /** 原型 device-off 时这张卡的停用理由，逐字来自 39-print-hub.html。 */
+  /** 原型 device-off 时这张卡的停用理由。 */
   mfpOffBadge?: string
   mfpOffNote?: string
+  iconTone: 'teal' | 'slate' | 'clay' | 'wheat'
+  wide?: boolean
 }
 
 // 七件事。顺序照原型 39-print-hub.html:644-914 的栅格顺序（2 列 × 4 行）。
@@ -113,18 +113,14 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     cap: 'doc',
     icon: FileTextIcon,
     title: '文档打印',
-    // 彩色 / 双面是否可选取决于**本机**能力登记，静态文案不得替真机打包票；
-    // 实际展示由下方 describeDocPrint() 按 color_print / duplex_print 动态改写。
     description: 'PDF、图片上传后设参数打印，A4 黑白',
     to: '/print/upload?source=document&tab=file',
     aiRole: 'ai',
     needsMfp: true,
     available: true,
-    // 真有的：/print/material-check（页数识别 + A4 规范化评估 + 隐私片段检查）。
-    // 没有的：打印参数建议 —— 后端 GET materials/tasks/:id/print-param-suggestions
-    // 已实现，但前端零消费，用户拿不到，所以不写进卡面。
-    stateNote: '可用 · 第 2 步材料体检：页数、A4 规范化、隐私片段；打印参数由你自己设',
-    mfpOffBadge: '暂停 · 打印扫描一体机出不了纸',
+    iconTone: 'teal',
+    stateNote: 'A4 · 黑白单面',
+    mfpOffBadge: '这台机器现在出不了纸',
     mfpOffNote: '这台机器出不了纸。文件可以先传上来存着，换一台再打。',
   },
   {
@@ -133,15 +129,43 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     icon: SmartphoneIcon,
     title: '手机扫码上传',
     description: '手机或其他联网设备扫码，把文件传到这台机器',
-    // mode=transfer 让落地页直达扫码面板并把标题改成本卡的名字，不再让用户
-    // 在通道网格里把「扫码上传」重选一遍。不能用 tab 表达 —— 文档打印和照片打印
-    // 也带 tab，见 PrintUploadPage 里的说明。
     to: '/print/upload?source=document&tab=qr&mode=transfer',
     aiRole: 'none',
     needsMfp: false,
     available: true,
-    stateNote: '可用 · 只是搬运，传完再去「文档打印」设参数',
+    iconTone: 'slate',
+    stateNote: '不用登录 · 不占打印机',
     mfpOffStateNote: '照常可用 · 这一步不经过打印机，传上来先存着',
+  },
+  {
+    key: 'usb-import',
+    cap: 'usb',
+    icon: UsbIcon,
+    title: 'U 盘导入打印',
+    description: '从 U 盘根目录选一份文件，导入后继续材料检查与打印。',
+    to: '/print/upload?source=document&tab=usb&mode=transfer',
+    aiRole: 'none',
+    needsMfp: false,
+    available: true,
+    iconTone: 'slate',
+    stateNote: '本地网桥已实现 · Windows 真机未验收',
+    mfpOffStateNote: '照常可用 · 导入不经过打印机，传上来先存着',
+  },
+  {
+    key: 'photo-print',
+    cap: 'photo',
+    icon: ImageIcon,
+    title: '照片打印',
+    description: '照片上传后设参数打印，与文档同一条流程。',
+    to: '/print/upload?source=document&tab=file&category=photo',
+    state: { category: 'photo' },
+    aiRole: 'ai',
+    needsMfp: true,
+    available: true,
+    iconTone: 'clay',
+    stateNote: '与文档打印同链路',
+    mfpOffBadge: '这台机器现在出不了纸',
+    mfpOffNote: '照片走文档打印同一条出纸链路，那条停了，这条也出不了。',
   },
   {
     key: 'scan',
@@ -153,48 +177,10 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     aiRole: 'ai',
     needsMfp: true,
     available: true,
-    // 扫描这一步本身不做文字识别（services/api/src/scan-tasks/ 全目录零 OCR）。
-    // OCR 在结果页选「AI 简历识别」之后的简历链路里才发生，置信度也在那边的报告页
-    // 如实标注（ResumeReportPage.tsx:62）。「需人工复核」这个标记全链路不存在。
-    stateNote: '可用 · 按设备回传格式保存；文字识别在结果页的「AI 简历识别」里做，不在这一步',
-    mfpOffBadge: '暂停 · 扫描仪就在这台一体机上',
+    iconTone: 'slate',
+    stateNote: '面板手动扫描 · 无一键启动',
+    mfpOffBadge: '这台机器现在出不了纸',
     mfpOffNote: '打印和扫描是同一台机器，它出不了纸，扫描一起停。',
-  },
-  {
-    key: 'photo-print',
-    cap: 'photo',
-    icon: ImageIcon,
-    title: '照片打印',
-    description: '和文档打印同一条流程：进去第 1 步选图片（本机上传 / 手机扫码传），再设参数',
-    // category 同时走 query：原先只用 router state 传，刷新或直接输 URL 就丢，
-    // 落地页会退回「文档打印」标题，用户以为自己点错了卡。
-    to: '/print/upload?source=document&tab=file&category=photo',
-    state: { category: 'photo' },
-    aiRole: 'ai',
-    needsMfp: true,
-    available: true,
-    // 走的就是文档打印那条流程，所以体检是同一套。「彩色与纸张的取舍理由」
-    // 没有任何实现 —— 颜色、纸张、份数都在预览页由用户自己设。
-    stateNote: '可用 · 和文档打印同一条流程、同一套材料体检；彩色与纸张由你自己设',
-    mfpOffBadge: '暂停 · 同一台打印机',
-    mfpOffNote: '照片走文档打印同一条出纸链路，那条停了，这条也出不了。',
-  },
-  {
-    key: 'id-photo',
-    cap: 'idphoto',
-    icon: UserSquareIcon,
-    title: '证件照',
-    description: '常见规格证件照排版打印，当前可先用「照片打印」',
-    to: '/print-scan/feature/id-photo',
-    aiRole: 'ai',
-    needsMfp: true,
-    available: false,
-    // /print-scan/feature/id-photo 是 PrintScanFeatureInfoPage 的一个静态说明页。
-    // 「规格体检」「换底」在前后端都没有任何实现，不能写成这张卡的能力。
-    stateNote: '进去只有常见规格说明 · 本机现在不做证件照排版，也不做换底',
-    unavailableBadge: '尚未开放 · 可先了解',
-    mfpOffBadge: '尚未开放 · 出片也要这台打印机',
-    mfpOffNote: '功能本身还没开放；就算排好版，出片也要这台机器。',
   },
   {
     key: 'convert',
@@ -203,12 +189,11 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     title: '格式转换',
     description: '多张图片（最多 20 张）合并成一份 PDF，便于打印和存档',
     to: '/print-scan/convert',
-    // ConvertImagesPage 全页只有手动「上移 / 下移 / 移除」，服务端 print-convert
-    // 也没有任何 LLM / OCR 调用。这条链路自始至终不依赖 AI，标 ai 是虚标。
     aiRole: 'none',
     needsMfp: false,
     available: true,
-    stateNote: '可用 · 页序用「上移 / 下移」自己排；本机不识别方向、不自动排序',
+    iconTone: 'teal',
+    stateNote: '最多 20 张 · 单张 ≤10MB',
     mfpOffStateNote: '照常可用 · 合并不经过打印机，合完先存着',
   },
   {
@@ -218,13 +203,29 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     title: '签名盖章',
     description: '在 PDF 上叠加签名 / 印章图片（版式合成，非 CA 电子签）',
     to: '/print-scan/sign',
-    // POST /print/sign/inspect 只返回 { pages }（print-sign.service.ts:78-95），
-    // 服务端 print-sign 目录零 LLM / 零 OCR。落款位没有任何建议能力。
     aiRole: 'none',
     needsMfp: false,
     available: true,
-    stateNote: '可用 · 本机只读出总页数；落款页码、方位与大小全部由你选',
+    iconTone: 'clay',
+    stateNote: '图像合成，不是电子签名',
     mfpOffStateNote: '照常可用 · 合成不经过打印机，出纸要换机',
+  },
+  {
+    key: 'id-photo',
+    cap: 'idphoto',
+    icon: UserSquareIcon,
+    title: '证件照',
+    description: '本机尚未开放，先看说明和替代路径。',
+    to: '/print-scan/feature/id-photo',
+    aiRole: 'ai',
+    needsMfp: false,
+    available: false,
+    iconTone: 'wheat',
+    wide: true,
+    stateNote: '说明页 · 未开放',
+    unavailableBadge: '说明页 · 未开放',
+    mfpOffBadge: '说明页 · 未开放',
+    mfpOffNote: '功能本身还没开放；了解说明不需要这台打印机。',
   },
 ]
 
@@ -247,13 +248,14 @@ const ARRIVAL_CODE_ENTRY = {
   icon: TicketIcon,
   title: '到机码核销',
   description:
-    '小程序下单后拿到的 10 位到机码，扫码或手输，核销后付款出纸 · 不是付款后的取件凭证码',
+    '手机上下过单拿到的 8 位数字到机码；早期发出的 10 位字母数字历史码同样能用。扫码或手输都行。不是付款后的取件凭证码',
   to: '/print/pickup-claim',
 } as const
 
 const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
   'doc-print': 'document_print',
   'phone-upload': 'phone_upload',
+  'usb-import': 'usb_import',
   'photo-print': 'document_print',
   scan: 'scan',
   'id-photo': 'id_photo',
@@ -272,7 +274,7 @@ const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> 
 /** 反馈入口的 key。它不跳路由，而是就地打开匿名反馈弹层（见 handleQuickLink）。 */
 const FEEDBACK_QUICK_LINK_KEY = 'feedback'
 
-const QUICK_LINKS: readonly (V6PrintQuickLinkView & { to?: string })[] = [
+const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
   {
     key: 'documents',
     icon: FilesIcon,
@@ -306,7 +308,6 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 
 export function PrintScanHomePage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
   const device = useTerminalDeviceStatus()
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
@@ -375,11 +376,8 @@ export function PrintScanHomePage() {
           resolved = {
             ...capability,
             available,
-            to: available
-              ? capability.to
-              : capability.to.startsWith('/print-scan/feature/')
-                ? capability.to
-                : '',
+            // 管理员关掉的项整卡停用（含证件照说明）。未配置的「尚未开放」说明页仍可进。
+            to: available ? capability.to : '',
             state: available ? capability.state : undefined,
             note: available
               ? capability.note
@@ -388,21 +386,19 @@ export function PrintScanHomePage() {
           }
         }
 
-        // ③ MFP 轴：确定出不了纸时，停掉要出纸的四项，其余照常。
-        //    「说明页」类入口（证件照）保留可达 —— 了解详情不需要打印机。
+        // ③ MFP 轴：确定出不了纸时，停掉 needsMfp 的项。读不到状态不算离线。
         if (mfp === 'unavailable') {
           if (resolved.needsMfp) {
             return {
               ...resolved,
               available: false,
-              to: resolved.to.startsWith('/print-scan/feature/') ? resolved.to : '',
+              to: '',
               state: undefined,
               stateNote: undefined,
               note: resolved.mfpOffNote ?? resolved.note,
               unavailableBadge: resolved.mfpOffBadge ?? `暂停 · ${device.printerLabel}`,
             }
           }
-          // 不经过打印机的三项：状态行换成「照常可用」，明说为什么不受影响。
           return { ...resolved, stateNote: resolved.mfpOffStateNote ?? resolved.stateNote }
         }
 
@@ -433,34 +429,62 @@ export function PrintScanHomePage() {
     if (link?.to) navigate(link.to)
   }
 
-  const signedIn = Boolean(user)
+  const locked =
+    confirmed &&
+    Object.values(capabilityLoad.map).some(
+      (item) => item != null && !canCreateFormalPrintScanTask(item.status),
+    )
+  const hubState = deriveHubUiState({ probe, mfp, locked })
+  const pill = HUB_PILL[hubState]
 
   return (
-    <KioskPageFrame className="v6-print-hub-page">
-      <V6PrintHubView
+    <QxPageFrame
+      title="打印扫描服务"
+      status={pill}
+      terminalLabel="就业服务大厅"
+      navbar={
+        <PrintHubNavbar
+          onHome={() => navigate('/')}
+          onAdvisor={() => navigate('/assistant')}
+          onProfile={() => navigate('/profile')}
+        />
+      }
+    >
+      <QxPrintHubView
+        hubState={hubState}
         probe={probe}
         mfp={mfp}
-        mfpLabel={device.printerLabel}
-        signedIn={signedIn}
+        colorDuplexLabel={colorDuplexChip(
+          capabilityLoad.map.color_print?.status === 'available',
+          capabilityLoad.map.duplex_print?.status === 'available',
+        )}
         capabilities={capabilities.map((capability) => ({
-          ...capability,
+          key: capability.key,
+          icon: capability.icon,
+          title: capability.title,
+          description: capability.description,
+          iconTone: capability.iconTone,
+          wide: capability.wide,
+          available: capability.available,
           actionable: Boolean(capability.to),
+          stateNote: capability.stateNote,
+          unavailableBadge: capability.unavailableBadge,
+          note: capability.note,
         }))}
         arrivalCode={{
           ...ARRIVAL_CODE_ENTRY,
-          hint: arrivalCodeHint(signedIn, probe, mfp),
           stateNote: arrivalCodeStateNote(probe, mfp),
         }}
         quickLinks={QUICK_LINKS}
-        capabilityGroupHint={capabilityGroupHint(probe, mfp)}
-        recordsGroupHint={recordsGroupHint(signedIn, mfp)}
+        capabilityGroupHint={capabilityGroupHint(probe, mfp, locked)}
+        recordsGroupHint={recordsGroupHint()}
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE,
           PRINT_HUB_PRICE_NOTICE,
         ]}
-        onAdvisor={() => navigate('/assistant')}
         onRetry={loadCapabilities}
+        onHelp={() => navigate('/help')}
         onCapability={handleCapability}
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
@@ -471,6 +495,6 @@ export function PrintScanHomePage() {
         issueOptions={PRINT_HUB_ISSUE_OPTIONS}
         description="选择这次遇到的问题，工作人员会核实后现场处理"
       />
-    </KioskPageFrame>
+    </QxPageFrame>
   )
 }
