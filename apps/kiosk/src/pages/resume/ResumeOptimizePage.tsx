@@ -30,12 +30,14 @@ import { parseOptimizeQuery, resolveOptimizeView } from './components/resume-del
 import { useOptimizeLoad } from './components/resume-deliver/useOptimizeLoad'
 import { printFileSizeLabel, useOptimizeSession } from './components/resume-deliver/useOptimizeSession'
 import {
+  applyDecisionChanges,
   applyResumeDecisions,
   moduleKeyOf,
   parseDecisionMap,
   toggleModuleDecision,
   type ResumeModuleDecision,
 } from './components/resume-deliver/resumeDecisions'
+import { CompareDecisionsApplyDialog } from './components/resume-deliver/CompareDecisionsApplyDialog'
 import { useCompareDecisionsReturn } from './components/resume-deliver/useCompareDecisionsReturn'
 import './resume-optimize-qx.css'
 
@@ -124,19 +126,12 @@ export function ResumeOptimizePage() {
     setDecisions((prev) => ({ ...prev, [key]: next }))
     markEdited()
   }
-  useCompareDecisionsReturn({
+  const compareReturn = useCompareDecisionsReturn({
     state, modules, optimizedResume, decisions, ready: editorOpen,
     apply: (changes) => {
       if (!optimizedResume) return
-      let nextResume = optimizedResume
-      const nextDecisions = { ...decisions }
-      for (const [key, next] of changes) {
-        const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
-        if (index < 0) continue
-        nextResume = toggleModuleDecision(nextResume, modules[index], nextDecisions[key] ?? 'optimized', next)
-        nextDecisions[key] = next
-      }
-      setOptimizedResume(nextResume); setDecisions(nextDecisions); markEdited()
+      const next = applyDecisionChanges(optimizedResume, modules, decisions, changes)
+      setOptimizedResume(next.resume); setDecisions(next.decisions); markEdited()
     },
   })
   const handleContinueDraft = () => {
@@ -324,6 +319,14 @@ export function ResumeOptimizePage() {
             guest={!token}
             onStay={() => setConfirmLeave(null)}
             onLeave={() => { const action = confirmLeave; setConfirmLeave(null); action() }}
+          />
+        )}
+        {compareReturn.pending && (
+          <CompareDecisionsApplyDialog
+            count={compareReturn.pending.count}
+            customCount={compareReturn.pending.customCount}
+            onApply={compareReturn.confirm}
+            onSkip={compareReturn.dismiss}
           />
         )}
       </section>

@@ -48,6 +48,8 @@ const deliver = [
   'src/pages/resume/components/resume-deliver/generatePreviewQuery.ts',
   'src/pages/resume/components/resume-deliver/facts.ts',
   'src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx',
+  'src/pages/resume/components/resume-deliver/CompareDecisionsApplyDialog.tsx',
+  'src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts',
 ].map((path) => readOptional(path)).join('\n')
 const optimize = `${read('src/pages/resume/ResumeOptimizePage.tsx')}\n${deliver}`
 const generatePreview = `${read('src/pages/resume/ResumeGeneratePreviewPage.tsx')}\n${deliver}`
@@ -57,6 +59,9 @@ const optimizeCompare = [
   'src/pages/resume/components/resume-compare/ResumeCompareCard.tsx',
   'src/pages/resume/components/resume-compare/ResumeCompareState.tsx',
   'src/pages/resume/components/resume-compare/resumeCompareModel.ts',
+  'src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx',
+  'src/pages/resume/components/resume-compare/ResumeCompareDraft.tsx',
+  'src/pages/resume/components/resume-compare/ResumeCompareCustomEditor.tsx',
 ].map((path) => read(path)).join('\n')
 const generate = read('src/pages/resume/ResumeGeneratePage.tsx')
 const resumeVoiceButton = read('src/pages/resume/components/ResumeVoiceInputButton.tsx')
@@ -129,7 +134,17 @@ assertNotIncludes(optimize, 'ReactDiffViewer', 'optimize page no longer renders 
 assertIncludes(optimize, "navigate('/resume/optimize/compare'", 'optimize page links to the split comparison page')
 // 拆出去的那页必须诚实说明「本次选择不保存」——没有采纳落库端点。
 assertIncludes(optimizeCompare, '未保存', 'compare page states the adoption selection is not persisted')
-assertNotIncludes(optimizeCompare, '已采纳', 'compare page avoids copy implying the selection was saved')
+assertNotIncludes(optimizeCompare, '已保存', 'compare page avoids copy implying the selection was saved')
+assertIncludes(optimizeCompare, '这是阅读草稿，不是简历最终稿', 'compare draft states it is a reading draft, not the final resume')
+assertIncludes(optimizeCompare, '已采纳', 'compare draft labels adopted items as 已采纳 (reading-layer, not persisted)')
+assertIncludes(optimizeCompare, '可采纳的全部采纳', 'compare page exposes batch adopt')
+assertIncludes(optimizeCompare, '其余保留原文', 'compare page exposes batch keep original')
+assertIncludes(optimizeCompare, '清空全部裁决', 'compare page exposes batch clear')
+assertIncludes(optimizeCompare, 'data-tone="danger"', 'compare clear action uses danger tone')
+assertIncludes(optimize, 'CompareDecisionsApplyDialog', 'optimize page asks before applying compare decisions')
+assertIncludes(optimize, '应用到编辑区', 'optimize apply dialog confirms writing into the editor')
+assertIncludes(optimize, '暂不应用', 'optimize apply dialog can discard compare decisions')
+assertNotIncludes(optimize, 'if (changes.length > 0) apply(changes)', 'optimize page no longer auto-applies compare decisions')
 assertIncludes(optimizeCompare, 'setModules([])', 'compare page clears stale modules before reading another task')
 assertIncludes(optimizeCompare, 'loadedTaskId === taskId', 'compare page renders modules only for the current task')
 assertIncludes(optimizeCompare, 'setDecisions({})', 'compare page clears stale decisions before reading another task')

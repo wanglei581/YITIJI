@@ -7,19 +7,24 @@ import { useAuth } from '../../auth/useAuth'
 import { aiErrorMessageOf, isAiOutage } from '../../ai'
 import { getResumeOptimize } from '../../services/api'
 import { readAiResumeSession } from './aiResumeSession'
+import { ResumeCompareBatchBar } from './components/resume-compare/ResumeCompareBatchBar'
 import { ResumeCompareCard } from './components/resume-compare/ResumeCompareCard'
+import { ResumeCompareDraft } from './components/resume-compare/ResumeCompareDraft'
 import { ResumeCompareState } from './components/resume-compare/ResumeCompareState'
 import {
+  adoptEligible,
   buildCompareItems,
+  keepUndecided,
   moduleKeyOf,
   initialDecisionsFrom,
+  type ResumeCompareDecision,
   type ResumeCompareDecisions,
 } from './components/resume-compare/resumeCompareModel'
 import './resume-optimize-compare.css'
 
 const OPTIMIZE_ROUTE = '/resume/optimize'
 const UNSAVED_NOTICE =
-  '裁决草稿只在本次页面流转，未保存、未生成文件；返回优化页后仍需在编辑区核对内容。'
+  '裁决是阅读决策，未保存、未生成文件；返回优化页时可以选择是否应用到编辑区。只有编辑区的内容会进入导出。'
 
 export function ResumeOptimizeComparePage() {
   const navigate = useNavigate()
@@ -48,6 +53,8 @@ export function ResumeOptimizeComparePage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [decisions, setDecisions] = useState<ResumeCompareDecisions>(() => initialDecisionsFrom(state))
   const [confirmedByModule, setConfirmedByModule] = useState<Record<string, string[]>>({})
+  const [customByModule, setCustomByModule] = useState<Record<string, string>>({})
+  const [batchNote, setBatchNote] = useState<string | null>(null)
 
   useEffect(() => {
     if (!taskId) {
@@ -64,6 +71,8 @@ export function ResumeOptimizeComparePage() {
     setCurrentIndex(0)
     setDecisions({})
     setConfirmedByModule({})
+    setCustomByModule({})
+    setBatchNote(null)
     getResumeOptimize(taskId, { token: getToken(), accessToken })
       .then((response) => {
         if (cancelled) return
@@ -108,7 +117,7 @@ export function ResumeOptimizeComparePage() {
     setRetryNonce((value) => value + 1)
   }
 
-  const choose = (decision: 'original' | 'optimized') => {
+  const choose = (decision: ResumeCompareDecision) => {
     if (!current) return
     const key = keyAt(currentIndex)
     if (decision === 'optimized') {
@@ -147,7 +156,7 @@ export function ResumeOptimizeComparePage() {
   return (
     <QxPageFrame
       title="逐条改写对照"
-      subtitle={isDemoResult ? '演示内容不是你的简历原文。' : '左边原文，右边改写；一次只裁决一条。'}
+      subtitle={isDemoResult ? '演示内容不是你的简历原文。' : '左边原文，右边改写；裁决是阅读决策，回优化页时再选择是否应用。'}
       status={pageStatus}
       terminalLabel="就业服务大厅"
       ctabar={ctabar}
@@ -164,33 +173,64 @@ export function ResumeOptimizeComparePage() {
         ) : failure || !current ? (
           <ResumeCompareState title="本次没有可对照的改写" description={failure ?? '服务没有返回可裁决的逐条候选。'} actionLabel="重新读取" onAction={retry} />
         ) : (
-          <ResumeCompareCard
-            item={current}
-            index={currentIndex}
-            total={items.length}
-            decision={decisions[keyAt(currentIndex)]}
-            decisions={decisions}
-            allItems={items}
-            confirmed={confirmedByModule[keyAt(currentIndex)] ?? []}
-            isDemoResult={isDemoResult}
-            onExit={backToOptimize}
-            onConfirm={(addition, checked) => setConfirmedByModule((previous) => {
-              const key = keyAt(currentIndex)
-              const nextConfirmed = new Set(previous[key] ?? [])
-              if (checked) nextConfirmed.add(addition)
-              else {
-                nextConfirmed.delete(addition)
-                setDecisions((currentDecisions) => {
-                  if (currentDecisions[key] !== 'optimized') return currentDecisions
-                  const nextDecisions = { ...currentDecisions }
-                  delete nextDecisions[key]
-                  return nextDecisions
-                })
-              }
-              return { ...previous, [key]: [...nextConfirmed] }
-            })}
-            onPrevious={currentIndex > 0 ? () => setCurrentIndex((index) => index - 1) : undefined}
-          />
+          <>
+            <ResumeCompareBatchBar
+              note={batchNote}
+              onAdoptEligible={() => {
+                const result = adoptEligible(items, confirmedByModule, decisions)
+                setDecisions(result.next)
+                setBatchNote(`已采纳 ${result.adopted} 条；跳过 ${result.skipped} 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。`)
+              }}
+              onKeepUndecided={() => {
+                const result = keepUndecided(items, decisions)
+                setDecisions(result.next)
+                setBatchNote(`已把 ${result.count} 条还没决定的记为「保留原文」。裁决可以反复改，随时逐条回去重选。`)
+              }}
+              onClear={() => {
+                setDecisions({})
+                setConfirmedByModule({})
+                setCustomByModule({})
+                setBatchNote('已清空全部裁决，连事实确认标记一起清掉 —— 回到刚读到建议时的样子。')
+              }}
+            />
+            <ResumeCompareCard
+              item={current}
+              index={currentIndex}
+              total={items.length}
+              decision={decisions[keyAt(currentIndex)]}
+              confirmed={confirmedByModule[keyAt(currentIndex)] ?? []}
+              customText={customByModule[keyAt(currentIndex)] ?? ''}
+              isDemoResult={isDemoResult}
+              onExit={backToOptimize}
+              onSaveCustom={(text) => {
+                const key = keyAt(currentIndex)
+                setCustomByModule((previous) => ({ ...previous, [key]: text }))
+                setDecisions((previous) => ({ ...previous, [key]: 'custom' }))
+              }}
+              onConfirm={(addition, checked) => setConfirmedByModule((previous) => {
+                const key = keyAt(currentIndex)
+                const nextConfirmed = new Set(previous[key] ?? [])
+                if (checked) nextConfirmed.add(addition)
+                else {
+                  nextConfirmed.delete(addition)
+                  setDecisions((currentDecisions) => {
+                    if (currentDecisions[key] !== 'optimized') return currentDecisions
+                    const nextDecisions = { ...currentDecisions }
+                    delete nextDecisions[key]
+                    return nextDecisions
+                  })
+                }
+                return { ...previous, [key]: [...nextConfirmed] }
+              })}
+              onPrevious={currentIndex > 0 ? () => setCurrentIndex((index) => index - 1) : undefined}
+            />
+            <ResumeCompareDraft
+              items={items}
+              decisions={decisions}
+              confirmedByModule={confirmedByModule}
+              customByModule={customByModule}
+            />
+          </>
         )}
       </section>
     </QxPageFrame>

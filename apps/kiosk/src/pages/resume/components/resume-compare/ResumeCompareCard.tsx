@@ -1,6 +1,6 @@
 import { ChevronLeftIcon } from 'lucide-react'
-import type { ResumeCompareDecision, ResumeCompareDecisions, ResumeCompareItem } from './resumeCompareModel'
-import { draftTextFor } from './resumeCompareModel'
+import type { ResumeCompareDecision } from './resumeCompareModel'
+import { ResumeCompareCustomEditor } from './ResumeCompareCustomEditor'
 import { wordDiff } from './wordDiff'
 
 function escapeRegExp(value: string): string {
@@ -16,16 +16,16 @@ function HighlightedAfter({ text, additions }: { text: string; additions: string
 }
 
 export function ResumeCompareCard(props: {
-  item: ResumeCompareItem
+  item: { title: string; before: string; after: string; additions: string[] }
   index: number
   total: number
   decision?: ResumeCompareDecision
-  decisions: ResumeCompareDecisions
-  allItems: ResumeCompareItem[]
   confirmed: string[]
+  customText: string
   isDemoResult: boolean
   onExit: () => void
   onConfirm: (addition: string, checked: boolean) => void
+  onSaveCustom: (text: string) => void
   onPrevious?: () => void
 }) {
   const confirmed = new Set(props.confirmed)
@@ -88,18 +88,14 @@ export function ResumeCompareCard(props: {
             </>
           )}
         </section>
-      </article>
 
-      <details className="qx-card qxc-draft">
-        <summary>裁决草稿预览</summary>
-        <p>草稿未保存，也不是最终简历；待决定条目暂用原文。</p>
-        <ol>
-          {props.allItems.map((item, index) => {
-            const draft = draftTextFor(item, index, props.decisions)
-            return <li key={`${item.title}-${index}`}><b>{draft.label}</b><span>{draft.text}</span></li>
-          })}
-        </ol>
-      </details>
+        <ResumeCompareCustomEditor
+          decision={props.decision}
+          value={props.customText}
+          seed={props.item.before}
+          onSave={props.onSaveCustom}
+        />
+      </article>
     </>
   )
 }
