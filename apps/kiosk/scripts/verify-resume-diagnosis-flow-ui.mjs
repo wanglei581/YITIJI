@@ -52,7 +52,7 @@ const deliver = [
   'src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts',
 ].map((path) => readOptional(path)).join('\n')
 const optimize = `${read('src/pages/resume/ResumeOptimizePage.tsx')}\n${deliver}`
-const generatePreview = `${read('src/pages/resume/ResumeGeneratePreviewPage.tsx')}\n${deliver}`
+const generatePreview = `${read('src/pages/resume/ResumeGeneratePreviewPage.tsx')}\n${read('src/pages/resume/GeneratePreviewChrome.tsx')}\n${deliver}`
 // S2-1 拆页：逐条 diff 搬到对照页，因此 diff 的触控安全断言随之搬过去（覆盖面不缩水）。
 const optimizeCompare = [
   'src/pages/resume/ResumeOptimizeComparePage.tsx',
@@ -407,6 +407,16 @@ assertIncludes(wavRecorder, 'lateStream.getTracks().forEach((track) => track.sto
 
 assertIncludes(optimize, 'QxPageFrame', 'optimize page uses the Qingxu frame')
 assertIncludes(generatePreview, 'QxPageFrame', 'generate preview uses the Qingxu frame')
+assertIncludes(generatePreview, 'navbar={<GeneratePreviewNavbar', 'generate preview uses the QxPageFrame navbar slot instead of a page-local bar')
+assertIncludes(generatePreview, '返回服务大厅', 'session-lost CTA matches prototype 返回服务大厅 → /')
+assertIncludes(generatePreview, '重新填一份', 'session-lost / failed CTA keeps the refill action under the prototype name')
+assertIncludes(generatePreview, '回去改资料', 'ready CTA refill is named 回去改资料')
+assertIncludes(generatePreview, '内容没问题，去导出', 'ready CTA export is named 内容没问题，去导出')
+assertIncludes(generatePreview, '去填资料', 'preview-no-result CTA refill is named 去填资料')
+assertIncludes(generatePreview, '再读一次', 'preview-failed keeps the reread action')
+assertNotIncludes(generatePreview, '重新填写生成', 'generate preview no longer duplicates refill as the old third control')
+assertNotIncludes(generatePreview, '>重新填写<', 'generate preview no longer has a third same-meaning refill control')
+assertNotIncludes(generatePreview, '>返回首页<', 'empty-state home exit uses prototype hub/home labels, not a third home control next to refill')
 assertIncludes(optimize, '合成演示', 'optimize capture fixtures are labeled synthetic')
 assertIncludes(optimize, "q.get('capture') === '1'", 'optimize fixtures require capture=1')
 assertIncludes(optimize, 'AI 优化稿，请自行核对', 'optimize keeps the on-screen AIGC mark')

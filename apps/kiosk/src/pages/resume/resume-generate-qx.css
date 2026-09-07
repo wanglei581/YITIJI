@@ -17,6 +17,10 @@
   line-height: 1.4;
 }
 
+.qx-resume-generate .qx-rd-exits { margin-top: 16px; }
+
+.qx-stage:has(.qx-resume-generate) .qx-ctabar > .qx-btn { flex: 1; }
+
 @media (prefers-reduced-motion: reduce) {
   .qx-resume-generate *,
   .qx-resume-generate *::before,
