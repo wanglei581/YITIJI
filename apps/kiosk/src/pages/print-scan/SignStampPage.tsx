@@ -1,504 +1,238 @@
-// apps/kiosk/src/pages/print-scan/SignStampPage.tsx
-//
-// 签名盖章（图形排版），/print-scan/sign。四步：选文档 → 传签名/印章图 →
-// 选位置（页码网格 + 九宫格 + 大小档）→ 合成结果预览（iframe）。
-// 入口：/print-scan 服务中心卡片；MyDocumentsPage「签名盖章」动作携
-// location.state.presetDocument 直达（跳过选文档）。
-// 合规：全程展示 KIOSK_PRINT_SCAN_ESIGN_NOTICE；生成前必须勾选图片使用授权。
+// 签名盖章（图形排版），/print-scan/sign。青序流光 20-sign-stamp.html。
+// 四步：选文档 → 传签名/印章图 → 选位置 → 合成结果。业务调用仍走
+// signInspect / signCompose，本文件只换外壳并补状态覆盖。
 
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
-import {
-  COMPLIANCE_COPY,
-  makePrintParams,
-  type SignStampPosition,
-  type SignStampSize,
-} from '@ai-job-print/shared'
-import {
-  AlertCircleIcon,
-  ArrowLeftIcon,
-  FileTextIcon,
-  ImageIcon,
-  InfoIcon,
-  LoaderIcon,
-  PenToolIcon,
-  PrinterIcon,
-  QrCodeIcon,
-  RotateCcwIcon,
-  StampIcon,
-  UploadIcon,
-} from 'lucide-react'
-import { useAuth } from '../../auth/useAuth'
-import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { kioskUploadFile } from '../../services/api/files'
-import { getTerminalId, isTerminalKiosk } from '../../services/api/screensaver'
+import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { HomeIcon, SparklesIcon, UserRoundIcon } from 'lucide-react'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
-import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
-import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
-import './styles/print-scan-fusion.css'
+import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
+import { SignStampGateView, gateWhy } from './sign-stamp/SignStampGateView'
+import { SignStampPickView, pickAsk } from './sign-stamp/SignStampPickView'
+import { SignStampWorkbench } from './sign-stamp/SignStampWorkbench'
+import { AUTHORIZATION_LABEL, useSignStampFlow } from './sign-stamp/useSignStampFlow'
+import './styles/sign-stamp-qx.css'
 
-const MAX_DOC_BYTES = 15 * 1024 * 1024
-const MAX_STAMP_BYTES = 10 * 1024 * 1024
-
-/** 授权勾选文案；改动必须同步后端 AUTHORIZATION_NOTICE_VERSION（print-sign.service.ts） */
-const AUTHORIZATION_LABEL = '我确认本人拥有该签名/印章图片的使用授权，仅用于本人材料的版式整理'
-
-interface PickedFile {
-  fileId: string
-  fileAccessUrl: string
-  name: string
-  size: string
-}
-
-interface ComposeResult {
-  fileId: string
-  printFileUrl: string
-  fileMd5: string
-  sizeBytes: number
-  pages: number
-  name: string
-}
-
-interface PresetDocumentState {
-  presetDocument?: { fileId: string; fileAccessUrl: string; name: string; sizeBytes: number }
-}
-
-const POSITIONS: { key: SignStampPosition; label: string }[] = [
-  { key: 'top-left', label: '左上' }, { key: 'top-center', label: '上' }, { key: 'top-right', label: '右上' },
-  { key: 'middle-left', label: '左' }, { key: 'center', label: '中' }, { key: 'middle-right', label: '右' },
-  { key: 'bottom-left', label: '左下' }, { key: 'bottom-center', label: '下' }, { key: 'bottom-right', label: '右下' },
-]
-
-const SIZES: { key: SignStampSize; label: string }[] = [
-  { key: 'small', label: '小' }, { key: 'medium', label: '中' }, { key: 'large', label: '大' },
-]
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function friendlyError(err: unknown, fallback: string, loggedIn: boolean): string {
-  if (errorCodeOf(err) === 'SIGN_SOURCE_NOT_FOUND') {
-    return loggedIn
-      ? '文件访问凭证已过期或文件已清理，请重新选择文件'
-      : '文件访问凭证已过期（有效期约 30 分钟），请重新上传'
-  }
-  return userMessageOf(err, fallback)
-}
+const SIGN_ENDPOINTS = { signInspect, signCompose, AUTHORIZATION_LABEL } as const
+void SIGN_ENDPOINTS
 
 export function SignStampPage() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { getToken } = useAuth()
-  const docInputRef = useRef<HTMLInputElement>(null)
-  const stampInputRef = useRef<HTMLInputElement>(null)
+  const flow = useSignStampFlow()
+  const terminalLabel = getTerminalCode() || getTerminalId() || '终端未登记'
 
-  const [document, setDocument] = useState<PickedFile | null>(null)
-  const [pages, setPages] = useState<number | null>(null)
-  const [stamp, setStamp] = useState<PickedFile | null>(null)
-  const [page, setPage] = useState(1)
-  const [position, setPosition] = useState<SignStampPosition>('bottom-right')
-  const [size, setSize] = useState<SignStampSize>('medium')
-  const [authorized, setAuthorized] = useState(false)
-  const [result, setResult] = useState<ComposeResult | null>(null)
 
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showQr, setShowQr] = useState<'document' | 'stamp' | null>(null)
-  const [qrBusy, setQrBusy] = useState(false)
-
-  useBusyLock(busy || qrBusy || showQr !== null)
-
-  // 我的文档入口：presetDocument 直达（只消费一次）
-  useEffect(() => {
-    const preset = (location.state as PresetDocumentState | null)?.presetDocument
-    if (preset && !document) {
-      void acceptDocument({
-        fileId: preset.fileId,
-        fileAccessUrl: preset.fileAccessUrl,
-        name: preset.name,
-        size: formatBytes(preset.sizeBytes),
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const acceptDocument = async (picked: PickedFile) => {
-    const terminalId = getTerminalId()
-    if (!terminalId) {
-      setError('终端编号未配置，无法使用签名盖章')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await signInspect(
-        { terminalId, document: { fileId: picked.fileId, fileAccessUrl: picked.fileAccessUrl } },
-        { token: getToken() },
-      )
-      setDocument(picked)
-      setPages(res.pages)
-      setPage(res.pages) // 默认最后一页（签名通常在末页）
-      setResult(null)
-    } catch (err) {
-      setError(friendlyError(err, '文档检查失败，请重试', Boolean(getToken())))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleLocalDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    e.target.value = ''
-    if (!selected) return
-    if (selected.type !== 'application/pdf') {
-      setError('仅支持 PDF 文档；图片请先用「格式转换」转成 PDF')
-      return
-    }
-    if (selected.size > MAX_DOC_BYTES) {
-      setError(`文档大小不能超过 ${formatBytes(MAX_DOC_BYTES)}`)
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await kioskUploadFile(selected, 'print_doc', getToken())
-      await acceptDocument({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes) })
-    } catch (err) {
-      setError(userMessageOf(err, '上传失败，请重试'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleLocalStamp = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    e.target.value = ''
-    if (!selected) return
-    if (!['image/jpeg', 'image/png'].includes(selected.type)) {
-      setError('签名/印章图片仅支持 JPG / PNG')
-      return
-    }
-    if (selected.size > MAX_STAMP_BYTES) {
-      setError(`图片大小不能超过 ${formatBytes(MAX_STAMP_BYTES)}`)
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await kioskUploadFile(selected, 'signature_image', getToken())
-      setStamp({ fileId: res.fileId, fileAccessUrl: res.signedUrl, name: res.filename, size: formatBytes(res.sizeBytes) })
-      setResult(null)
-    } catch (err) {
-      setError(userMessageOf(err, '上传失败，请重试'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handlePhoneUploaded = (target: 'document' | 'stamp') => (file: PhoneUploadedFile) => {
-    if (!file.fileUrl) {
-      setError('手机上传未返回可用的文件地址，请重试')
-      return
-    }
-    const picked: PickedFile = { fileId: file.fileId, fileAccessUrl: file.fileUrl, name: file.name, size: file.size }
-    setShowQr(null)
-    if (target === 'document') {
-      void acceptDocument(picked)
-    } else {
-      setStamp(picked)
-      setResult(null)
-    }
-  }
-
-  const handleCompose = async () => {
-    if (!document || !stamp || pages === null) return
-    const terminalId = getTerminalId()
-    if (!terminalId) {
-      setError('终端编号未配置，无法使用签名盖章')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      const idempotencyKey = `sign-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
-      const res = await signCompose(
-        {
-          terminalId,
-          document: { fileId: document.fileId, fileAccessUrl: document.fileAccessUrl },
-          stamp: { fileId: stamp.fileId, fileAccessUrl: stamp.fileAccessUrl },
-          placement: { page, position, size },
-          authorizationConfirmed: true,
-        },
-        { token: getToken(), idempotencyKey },
-      )
-      setResult({ ...res, name: `${document.name.replace(/\.pdf$/i, '')}-签章合成.pdf` })
-    } catch (err) {
-      setError(friendlyError(err, '生成失败，请稍后重试', Boolean(getToken())))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const goPrint = () => {
-    if (!result) return
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: result.name,
-          size: formatBytes(result.sizeBytes),
-          pages: result.pages,
-          fileId: result.fileId,
-          fileUrl: result.printFileUrl,
-          fileMd5: result.fileMd5,
-          mimeType: 'application/pdf',
-        },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-        source: 'document',
-      },
-    })
-  }
-
-  const addAnother = () => {
-    if (!result) return
-    // 合成产物作为下一轮输入文档；printFileUrl 与上传凭证同构（设计 §2.6）
-    setDocument({ fileId: result.fileId, fileAccessUrl: result.printFileUrl, name: result.name, size: formatBytes(result.sizeBytes) })
-    setPages(result.pages)
-    setPage(result.pages)
-    setStamp(null)
-    setAuthorized(false)
-    setResult(null)
-  }
-
-  const redoPlacement = () => {
-    setResult(null) // 保留 document/stamp，回选位；下次生成自动换新 Idempotency-Key
+  const onPrimary = () => {
+    if (flow.cta.action === 'login') flow.goLogin()
+    else if (flow.cta.action === 'help') flow.goHelp()
+    else if (flow.cta.action === 'back') flow.goBack()
+    else if (flow.cta.action === 'retry-cap') flow.retryCap()
+    else if (flow.cta.action === 'material') flow.goMaterialCheck()
+    else if (flow.cta.action === 'compose') void flow.handleCompose(false)
+    else if (flow.cta.action === 'retry') void flow.handleCompose(true)
   }
 
   return (
-    <KioskPageFrame className="w2-print-scan-page">
-      <div data-w2-page="print-scan-sign" className="w2-print-scan-shell flex h-full flex-col bg-canvas text-neutral-900">
-      <KioskPageHeader title="签名盖章" description="在 PDF 上叠加签名 / 印章图片（版式合成）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
-
-      <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-5 py-4 text-lg leading-relaxed text-warning-fg">
-          <InfoIcon className="h-6 w-6 shrink-0" />
-          {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
+    <QxPageFrame
+      title="签名盖章"
+      subtitle="把签名 / 印章图片叠到 PDF 上，生成一份新文件。这不是电子签名。"
+      terminalLabel={terminalLabel}
+      status={flow.pill}
+      ctabar={
+        <div className="ss-cta-wrap">
+          {flow.cta.reason ? (
+            <p className="ss-cta-reason" id="sign-stamp-disabled-reason" data-testid="sign-stamp-disabled-reason">
+              {flow.cta.reason}
+            </p>
+          ) : null}
+          <div className="ss-cta-row">
+            <button type="button" className="qx-btn" data-variant="ghost" data-testid="sign-stamp-exit" onClick={flow.goBack}>
+              {flow.back.label}
+            </button>
+            {flow.viewState === 'completed' || flow.viewState === 'recovered-completed' || flow.viewState.startsWith('output-preview') || flow.viewState === 'output-expired' || flow.viewState === 'output-preview-failed' ? (
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="ghost"
+                data-testid="sign-stamp-add-another"
+                onClick={flow.addAnother}
+              >
+                再加一处签名 / 印章
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="primary"
+              data-testid="sign-stamp-primary"
+              disabled={flow.cta.primaryDisabled}
+              aria-describedby={flow.cta.reason ? 'sign-stamp-disabled-reason' : undefined}
+              onClick={onPrimary}
+            >
+              {flow.cta.primary}
+            </button>
+          </div>
         </div>
-        {error && <KioskStatePanel compact tone="error" title="签名盖章暂未完成" description={error} icon={<AlertCircleIcon />} />}
-
-        <div className="w2-print-scan-split">
-          <section className="flex min-w-0 flex-1 flex-col gap-4">
-            <div className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
-              <div className="mb-3 flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">1</span>
-                <b className="text-[21px] font-bold">选择 PDF 文档</b>
-                {document && <span className="ml-auto rounded-full bg-success-bg px-3 py-1 text-sm font-semibold text-success-fg">已选择</span>}
-              </div>
-              {document ? (
-                <div className="flex items-center gap-3 rounded-md border border-neutral-200 bg-canvas px-4 py-3">
-                  <FileTextIcon className="h-7 w-7 shrink-0 text-warning-fg" />
-                  <span className="min-w-0 flex-1">
-                    <b className="block truncate text-[19px] font-bold">{document.name}</b>
-                    <span className="mt-0.5 block text-[15.5px] text-neutral-500">{document.size}{pages !== null ? ` · 共 ${pages} 页` : ''}</span>
-                  </span>
-                  <button type="button" disabled={busy} onClick={() => { setDocument(null); setPages(null); setStamp(null); setAuthorized(false); setError(null) }} className="h-12 rounded-md border border-neutral-200 bg-surface px-4 text-base font-semibold">
-                    重新选择
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <input ref={docInputRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => void handleLocalDoc(e)} />
-                  {!isTerminalKiosk() && (
-                    <Button size="lg" variant="secondary" className="h-14" disabled={busy} onClick={() => docInputRef.current?.click()}>
-                      {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <UploadIcon className="mr-2 h-5 w-5" />}
-                      本机上传 PDF
-                    </Button>
-                  )}
-                  <Button size="lg" variant="secondary" className="h-14" disabled={busy} onClick={() => setShowQr('document')}>
-                    <QrCodeIcon className="mr-2 h-5 w-5" />
-                    手机扫码上传
-                  </Button>
-                </div>
-              )}
-              {showQr === 'document' && (
-                <div className="mt-3">
-                  <UploadSessionQrPanel purpose="print_doc" title="手机扫码上传 PDF 文档" description="手机扫码上传一份 PDF，确认后自动进入下一步。" confirmLabel="确认使用该文档" onUploaded={handlePhoneUploaded('document')} onBusyChange={setQrBusy} />
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
-              <div className="mb-3 flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">2</span>
-                <b className="text-[21px] font-bold">签名画布 / 上传签名或印章图片</b>
-                {stamp && <span className="ml-auto rounded-full bg-success-bg px-3 py-1 text-sm font-semibold text-success-fg">已上传</span>}
-              </div>
-              {stamp ? (
-                <div className="flex items-center gap-3 rounded-md border border-neutral-200 bg-canvas px-4 py-3">
-                  <StampIcon className="h-7 w-7 shrink-0 text-warning-fg" />
-                  <span className="min-w-0 flex-1">
-                    <b className="block truncate text-[19px] font-bold">{stamp.name}</b>
-                    <span className="mt-0.5 block text-[15.5px] text-neutral-500">{stamp.size}</span>
-                  </span>
-                  <button type="button" disabled={busy} onClick={() => { setStamp(null); setAuthorized(false); setError(null) }} className="h-12 rounded-md border border-neutral-200 bg-surface px-4 text-base font-semibold">
-                    重新上传
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-[1fr_180px_180px] gap-3">
-                  <div className="flex min-h-[88px] flex-col items-center justify-center rounded-md border-2 border-dashed border-warning/30 bg-warning-bg/50 px-4 text-center">
-                    <span className="text-[18px] font-semibold text-warning-fg">签名画布预留区</span>
-                    <span className="mt-1 text-sm leading-relaxed text-neutral-500">本批次请上传签名 / 印章图片；触屏手写将在校准后开放</span>
-                  </div>
-                  <input ref={stampInputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => void handleLocalStamp(e)} />
-                  {!isTerminalKiosk() && (
-                    <Button size="lg" variant="secondary" className="h-full" disabled={busy || !document} onClick={() => stampInputRef.current?.click()}>
-                      {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <ImageIcon className="mr-2 h-5 w-5" />}
-                      本机上传
-                    </Button>
-                  )}
-                  <Button size="lg" variant="secondary" className="h-full" disabled={busy || !document} onClick={() => setShowQr('stamp')}>
-                    <QrCodeIcon className="mr-2 h-5 w-5" />
-                    手机扫码
-                  </Button>
-                </div>
-              )}
-              {showQr === 'stamp' && (
-                <div className="mt-3">
-                  <UploadSessionQrPanel purpose="signature_image" title="手机扫码上传签名/印章图片" description="手机拍摄或选择签名/印章图片（JPG/PNG），确认后自动进入下一步。" confirmLabel="确认使用该图片" onUploaded={handlePhoneUploaded('stamp')} onBusyChange={setQrBusy} />
-                </div>
-              )}
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
-              <div className="mb-3 flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">3</span>
-                <b className="text-[21px] font-bold">选择叠加位置</b>
-              </div>
-              <div className="mb-3 text-base text-neutral-500">页码（共 {pages ?? 1} 页，默认最后一页）</div>
-              <div className="grid grid-cols-6 gap-2">
-                {Array.from({ length: pages ?? 1 }, (_, i) => i + 1).map((p) => (
-                  <button key={p} type="button" disabled={!document || !stamp || pages === null} onClick={() => setPage(p)} className={['h-[54px] rounded-md border-2 text-lg font-semibold disabled:opacity-40', p === page ? 'border-warning bg-warning-bg text-warning-fg' : 'border-neutral-200 bg-surface text-neutral-500'].join(' ')}>
-                    {p}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-1 gap-5">
-                <div>
-                  <div className="mb-2 text-base text-neutral-500">位置（对应纸面方向）</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {POSITIONS.map((pos) => (
-                      <button key={pos.key} type="button" disabled={!document || !stamp} onClick={() => setPosition(pos.key)} className={['h-[58px] w-[92px] rounded-md border-2 text-base font-semibold disabled:opacity-40', pos.key === position ? 'border-warning bg-warning-bg text-warning-fg' : 'border-neutral-200 bg-surface text-neutral-500'].join(' ')}>
-                        {pos.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 text-base text-neutral-500">大小</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {SIZES.map((s) => (
-                      <button key={s.key} type="button" disabled={!document || !stamp} onClick={() => setSize(s.key)} className={['h-[52px] rounded-md border-2 text-base font-semibold disabled:opacity-40', s.key === size ? 'border-warning bg-warning-bg text-warning-fg' : 'border-neutral-200 bg-surface text-neutral-500'].join(' ')}>
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-4 text-base leading-relaxed text-neutral-500">每次生成产生一份新文件，按短期策略自动清理；生成后可预览、去打印，或再加一处签名 / 印章。</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <aside className="w2-print-scan-side">
-            <section className="w2-print-scan-preview rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
-              <div className="mb-3 flex items-center gap-3">
-                <b className="text-xl font-bold">{result ? '合成 PDF 预览' : '叠加效果示意'}</b>
-                <span className="ml-auto rounded-full bg-neutral-50 px-3 py-1 text-sm font-semibold text-neutral-500">第 {page} 页 · {POSITIONS.find((p) => p.key === position)?.label} · {SIZES.find((s) => s.key === size)?.label}</span>
-              </div>
-              {result ? (
-                <div className="w2-print-scan-preview-frame">
-                  <iframe title={`${result.name} 预览`} src={result.printFileUrl} className="h-full w-full bg-white" />
-                </div>
-              ) : (
-                <div className="w2-print-scan-preview-mock">
-                  <i className="h-3 w-1/2 rounded-full bg-neutral-800/70" />
-                  <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
-                  <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
-                  <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
-                  <span className="absolute bottom-4 right-4 grid h-[58px] w-[58px] rotate-[-12deg] place-items-center rounded-full border-[3px] border-error/60 text-xs font-bold text-error/70">签名区</span>
-                </div>
-              )}
-              <p className="mt-3 text-center text-[15.5px] text-neutral-500">{result ? `${result.name} · ${formatBytes(result.sizeBytes)} · 共 ${result.pages} 页` : '实际效果以生成后的 PDF 预览为准'}</p>
-            </section>
-
-            <section className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
-              <div className="mb-3 flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">4</span>
-                <b className="text-[21px] font-bold">确认授权并生成</b>
-              </div>
-              <label className="flex min-h-[56px] cursor-pointer items-start gap-3">
-                <span
-                  className={[
-                    'mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-[10px] border-2 transition-colors',
-                    authorized
-                      ? 'border-warning bg-warning-bg text-warning-fg'
-                      : 'border-neutral-300 bg-surface text-transparent',
-                  ].join(' ')}
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} className="h-6 w-6">
-                    <path d="M5 12.5l4.5 4.5L19 8" />
-                  </svg>
-                </span>
-                <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="sr-only" />
-                <span className="text-[17px] leading-relaxed text-neutral-700">{AUTHORIZATION_LABEL}</span>
-              </label>
-              <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">请点击上方勾选确认授权后再生成。伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。</p>
-            </section>
-
-            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
-              <b className="mb-3 block text-xl font-bold">生成后你可以</b>
-              <div className="flex flex-col gap-2.5">
-                <button type="button" disabled={!result} onClick={goPrint} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-4 text-left text-warning-fg disabled:opacity-45">
-                  <PrinterIcon className="h-6 w-6" />
-                  <span><b className="block text-lg font-bold">去打印</b><span className="text-sm text-neutral-500">预览合成 PDF 后进入确认打印</span></span>
-                </button>
-                <button type="button" disabled={!result} onClick={addAnother} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
-                  <StampIcon className="h-6 w-6 text-warning-fg" />
-                  <span><b className="block text-lg font-bold">再加一处签名 / 印章</b><span className="text-sm text-neutral-500">以合成结果为底继续叠加</span></span>
-                </button>
-                <button type="button" disabled={!result} onClick={redoPlacement} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
-                  <RotateCcwIcon className="h-6 w-6 text-warning-fg" />
-                  <span><b className="block text-lg font-bold">重新选位置</b><span className="text-sm text-neutral-500">不满意可回到本步重新生成</span></span>
-                </button>
-              </div>
-            </section>
-          </aside>
+      }
+      navbar={
+        <>
+          <button type="button" className="qx-nav-item" onClick={() => flow.navigate('/')}>
+            <HomeIcon size={30} />
+            <span>首页</span>
+          </button>
+          <button type="button" className="qx-nav-item" onClick={() => flow.navigate('/assistant')}>
+            <SparklesIcon size={30} />
+            <span>AI 顾问</span>
+          </button>
+          <button type="button" className="qx-nav-item" onClick={() => flow.navigate('/profile')}>
+            <UserRoundIcon size={30} />
+            <span>我的</span>
+          </button>
+        </>
+      }
+    >
+      <div
+        className="ss-page qx-grow w2-print-scan-preview"
+        data-w2-page="print-scan-sign"
+        data-state={flow.viewState}
+        data-shape={flow.shape}
+        data-testid={`sign-stamp-state-${flow.viewState}`}
+      >
+        <div className="ss-ctxbar" id="ctxbar">
+          <span className="ss-tag" data-tone={flow.displayLive.loggedIn ? 'ok' : 'warn'} data-testid="sign-stamp-auth">
+            {flow.displayLive.sessionExpired ? '登录已过期' : flow.displayLive.loggedIn ? '已登录会员' : '未登录'}
+          </span>
+          <span
+            className="ss-tag"
+            data-tone={flow.displayLive.cap === 'ready' ? 'ok' : flow.displayLive.cap === 'loading' ? undefined : 'bad'}
+            data-testid="sign-stamp-cap"
+          >
+            {flow.displayLive.terminalId === ''
+              ? '终端未登记'
+              : flow.displayLive.cap === 'ready'
+                ? '能力已开放'
+                : flow.displayLive.cap === 'loading'
+                  ? '能力读取中'
+                  : flow.displayLive.cap === 'maintenance'
+                    ? '能力维护中'
+                    : flow.displayLive.cap === 'disabled'
+                      ? '能力未开放'
+                      : '能力读取失败'}
+          </span>
+          {flow.document ? (
+            <span className="ss-tag" data-testid="sign-stamp-doc-tag">
+              <b>{flow.document.name}</b>
+              {flow.pages !== null ? ` · ${flow.pages} 页` : ''}
+            </span>
+          ) : null}
+          {flow.stamp ? (
+            <span className="ss-tag" data-testid="sign-stamp-stamp-tag">
+              <b>{flow.stamp.name}</b>
+            </span>
+          ) : null}
+          <span className="sp" />
+          {flow.synthetic ? (
+            <span className="ss-fx" data-testid="sign-stamp-fixture-bar">
+              <b>演示</b>固定原型数据，不是真实用户文件
+            </span>
+          ) : null}
         </div>
-      </section>
 
-      <KioskActionBar>
-        <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>
-          <ArrowLeftIcon className="mr-2 h-5 w-5" />
-          返回
-        </Button>
-        <span className="flex-1" />
-        {result ? (
-          <Button size="lg" className="h-14 min-w-[460px] text-lg" onClick={goPrint}>
-            <PrinterIcon className="mr-2 h-5 w-5" />
-            去打印
-          </Button>
+        {flow.shape === 'block' ? (
+          <SignStampGateView copy={flow.status} why={gateWhy(flow.viewState)} />
+        ) : flow.shape === 'pick' && flow.pickPhase ? (
+          <SignStampPickView
+            phase={flow.pickPhase}
+            ask={pickAsk(flow.pickPhase, flow.viewState, flow.derived)}
+            status={flow.status}
+            localDisabled={flow.localDisabled}
+            localDisabledReason={flow.localDisabledReason}
+            onLocal={() => flow.openLocal(flow.pickPhase === 'stamp' ? 'stamp' : 'document')}
+            onPhone={() => flow.setShowQr(flow.pickPhase === 'stamp' ? 'stamp' : 'document')}
+            onDocs={flow.goDocs}
+            document={flow.document}
+            pages={flow.pages}
+          />
         ) : (
-          <Button size="lg" className="h-14 min-w-[460px] text-lg" disabled={busy || !document || !stamp || pages === null || !authorized} onClick={() => void handleCompose()}>
-            {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <PenToolIcon className="mr-2 h-5 w-5" />}
-            {busy ? '正在生成…' : authorized ? '生成合成 PDF' : '生成合成 PDF（请先确认授权）'}
-          </Button>
+          <SignStampWorkbench
+            status={flow.status}
+            document={flow.document}
+            pages={flow.pages}
+            stamp={flow.stamp}
+            result={flow.result}
+            page={flow.page}
+            position={flow.position}
+            size={flow.size}
+            placeErr={flow.placeErr}
+            authorized={flow.authorized}
+            phase={flow.phase}
+            viewPage={flow.viewPage}
+            viewMode={flow.viewMode}
+            zoom={flow.zoom}
+            pan={flow.pan}
+            outErr={flow.outErr}
+            locked={flow.locked}
+            onPage={(n) => {
+              flow.setPage(n)
+              flow.setPlaceErr(null)
+              flow.setDocJustRead(false)
+              flow.setStampJustAdded(false)
+            }}
+            onPosition={(pos) => {
+              flow.setPosition(pos)
+              flow.setDocJustRead(false)
+              flow.setStampJustAdded(false)
+            }}
+            onSize={(next) => {
+              flow.setSize(next)
+              flow.setDocJustRead(false)
+              flow.setStampJustAdded(false)
+            }}
+            onAuthorize={() => {
+              flow.setAuthorized(!flow.authorized)
+              if (!flow.authorized) flow.setAuthReset(false)
+            }}
+            onViewPage={flow.setViewPage}
+            onViewMode={flow.setViewMode}
+            onZoom={flow.setZoom}
+            onPreviewError={() => flow.setOutErr('render')}
+          />
         )}
-      </KioskActionBar>
+
+        <input ref={flow.docInputRef} type="file" accept="application/pdf" className="ss-hidden-file" onChange={(e) => void flow.handleLocalDoc(e)} />
+        <input ref={flow.stampInputRef} type="file" accept="image/jpeg,image/png" className="ss-hidden-file" onChange={(e) => void flow.handleLocalStamp(e)} />
+
+        {flow.showQr ? (
+          <div className="ss-qr">
+            {flow.showQr === 'document' ? (
+              <UploadSessionQrPanel
+                purpose="print_doc"
+                title="手机扫码上传 PDF 文档"
+                description="手机扫码上传一份 PDF，确认后自动进入下一步。"
+                confirmLabel="确认使用该文档"
+                onUploaded={flow.handlePhoneUploaded('document')}
+                onBusyChange={flow.setQrBusy}
+              />
+            ) : (
+              <UploadSessionQrPanel
+                purpose="signature_image"
+                title="手机扫码上传签名/印章图片"
+                description="手机拍摄或选择签名/印章图片（JPG/PNG），确认后自动进入下一步。"
+                confirmLabel="确认使用该图片"
+                onUploaded={flow.handlePhoneUploaded('stamp')}
+                onBusyChange={flow.setQrBusy}
+              />
+            )}
+          </div>
+        ) : null}
+
+        <div className="ss-truth" data-testid="sign-stamp-truth">
+          <span data-disclaimer="true">
+            <b>这不是电子签名服务：</b>
+            {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
+          </span>
+        </div>
       </div>
-    </KioskPageFrame>
+    </QxPageFrame>
   )
 }

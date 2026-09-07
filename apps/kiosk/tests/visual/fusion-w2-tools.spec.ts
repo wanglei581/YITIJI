@@ -23,6 +23,10 @@ function registerShell(api: ApiRouter): void {
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
   })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: [] },
+  })
 }
 
 async function expectHealthy(page: Page, errors: string[], marker: string): Promise<void> {
@@ -137,15 +141,243 @@ test('conversion page renders a server conversion error without fabricating outp
   await expectHealthy(page, errors, 'print-scan-convert')
 })
 
-test('signature compose remains gated by explicit authorization @w2', async ({ page, api }) => {
+const W2_MEMBER_TOKEN = 'w2-sign-memory-token'
+const W2_MEMBER_PHONE = '13800138000'
+const W2_MEMBER_CODE = '123456'
+
+function registerSignCapabilities(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: {
+      capabilities: [
+        {
+          capabilityKey: 'signature_stamp',
+          status: 'available',
+          note: null,
+          configured: true,
+          updatedAt: null,
+        },
+      ],
+    },
+  })
+}
+
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        token: W2_MEMBER_TOKEN,
+        user: { id: 'member-w2-sign', phoneMasked: '138****8000', nickname: '签章验收用户' },
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+}
+
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  for (const digit of W2_MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of W2_MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
+
+test('signature page fails closed for anonymous users @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
+  registerSignCapabilities(api)
 
   await page.goto('/print-scan/sign')
-  const generate = page.getByRole('button', { name: '生成合成 PDF（请先确认授权）' })
-  await expect(generate).toBeDisabled()
-  await expect(page.getByRole('checkbox', { name: /我确认本人拥有该签名\/印章图片的使用授权/ })).not.toBeChecked()
+  await expect(page.locator('[data-testid="sign-stamp-state-login-required"]')).toBeVisible()
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('先登录才能做签名盖章')
   await expect(page.locator('[data-w2-page="print-scan-sign"]')).toContainText('不提供 CA 电子签')
+  await expectHealthy(page, errors, 'print-scan-sign')
+  await page.getByTestId('sign-stamp-primary').click()
+  await expect(page).toHaveURL(/\/login/)
+})
+
+test('signature inspect renders server pages and compose sends placement payload @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerSignCapabilities(api)
+  registerMemberLogin(api)
+  api.respondWith('POST', '/api/v1/files/kiosk-upload', (n) =>
+    n === 1
+      ? {
+          status: 200,
+          json: {
+            success: true,
+            data: {
+              fileId: 'w2-sign-doc',
+              filename: '就业协议.pdf',
+              sizeBytes: 1800,
+              mimeType: 'application/pdf',
+              sha256: 'a'.repeat(64),
+              signedUrl: '/w2-fixtures/doc.pdf',
+              signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+              fileExpiresAt: '2026-07-25T00:00:00.000Z',
+            },
+          },
+        }
+      : {
+          status: 200,
+          json: {
+            success: true,
+            data: {
+              fileId: 'w2-sign-stamp',
+              filename: '签名.png',
+              sizeBytes: 240,
+              mimeType: 'image/png',
+              sha256: 'b'.repeat(64),
+              signedUrl: '/w2-fixtures/stamp.png',
+              signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+              fileExpiresAt: '2026-07-24T01:00:00.000Z',
+            },
+          },
+        },
+  )
+  api.respond('POST', '/api/v1/print/sign/inspect', {
+    status: 200,
+    json: { success: true, data: { pages: 6 } },
+  })
+  api.respond('POST', '/api/v1/print/sign/compose', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'w2-sign-out',
+        printFileUrl: '',
+        fileMd5: 'c'.repeat(32),
+        sizeBytes: 2100,
+        pages: 6,
+      },
+    },
+  })
+
+  const composeBodies: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/print/sign/compose')) {
+      composeBodies.push(request.postData() ?? '')
+    }
+  })
+
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await expect(page.getByText('选要盖章的 PDF')).toBeVisible()
+  await page.locator('input[accept="application/pdf"]').setInputFiles({
+    name: '就业协议.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4'),
+  })
+  await expect(page.getByTestId('sign-stamp-doc-tag')).toContainText('就业协议.pdf')
+  await expect(page.getByTestId('sign-stamp-doc-tag')).toContainText('6 页')
+  await page.locator('input[accept="image/jpeg,image/png"]').setInputFiles({
+    name: '签名.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('png'),
+  })
+  await expect(page.getByTestId('sign-stamp-stamp-tag')).toContainText('签名.png')
+  const authorize = page.getByRole('checkbox', { name: /我确认本人拥有该签名\/印章图片的使用授权/ })
+  await expect(authorize).not.toBeChecked()
+  await expect(page.getByRole('button', { name: '生成合成 PDF（请先确认授权）' })).toBeDisabled()
+  await authorize.click()
+  await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('新的派生 PDF 已生成')
+  expect(composeBodies).toHaveLength(1)
+  const payload = JSON.parse(composeBodies[0]) as {
+    authorizationConfirmed: boolean
+    placement: { page: number; position: string; size: string }
+    document: { fileId: string }
+    stamp: { fileId: string }
+  }
+  expect(payload.authorizationConfirmed).toBe(true)
+  expect(payload.placement).toEqual({ page: 6, position: 'bottom-right', size: 'medium' })
+  expect(payload.document.fileId).toBe('w2-sign-doc')
+  expect(payload.stamp.fileId).toBe('w2-sign-stamp')
+  await expectHealthy(page, errors, 'print-scan-sign')
+})
+
+test('signature compose 429 shows rate-limited and does not silently retry @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerSignCapabilities(api)
+  registerMemberLogin(api)
+  api.respondWith('POST', '/api/v1/files/kiosk-upload', (n) =>
+    n === 1
+      ? {
+          status: 200,
+          json: {
+            success: true,
+            data: {
+              fileId: 'w2-sign-doc-rl',
+              filename: '协议.pdf',
+              sizeBytes: 1200,
+              mimeType: 'application/pdf',
+              sha256: 'd'.repeat(64),
+              signedUrl: '/w2-fixtures/doc.pdf',
+              signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+              fileExpiresAt: '2026-07-25T00:00:00.000Z',
+            },
+          },
+        }
+      : {
+          status: 200,
+          json: {
+            success: true,
+            data: {
+              fileId: 'w2-sign-stamp-rl',
+              filename: '章.png',
+              sizeBytes: 200,
+              mimeType: 'image/png',
+              sha256: 'e'.repeat(64),
+              signedUrl: '/w2-fixtures/stamp.png',
+              signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+              fileExpiresAt: '2026-07-24T01:00:00.000Z',
+            },
+          },
+        },
+  )
+  api.respond('POST', '/api/v1/print/sign/inspect', {
+    status: 200,
+    json: { success: true, data: { pages: 2 } },
+  })
+  api.respond('POST', '/api/v1/print/sign/compose', {
+    status: 429,
+    json: { success: false, error: { code: 'RATE_LIMITED', message: '提交太频繁' } },
+  })
+
+  await loginThroughVisibleUi(page, '/print-scan/sign')
+  await page.locator('input[accept="application/pdf"]').setInputFiles({
+    name: '协议.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4'),
+  })
+  await expect(page.getByTestId('sign-stamp-doc-tag')).toContainText('协议.pdf')
+  await page.locator('input[accept="image/jpeg,image/png"]').setInputFiles({
+    name: '章.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('png'),
+  })
+  await page.getByRole('checkbox', { name: /我确认本人拥有该签名\/印章图片的使用授权/ }).click()
+  await page.getByRole('button', { name: '生成合成 PDF', exact: true }).click()
+  await expect(page.getByTestId('sign-stamp-fallback')).toContainText('提交太频繁了')
+  await expect(page.locator('[data-testid="sign-stamp-state-rate-limited"]')).toBeVisible()
+  await expect(page.getByText('新的派生 PDF 已生成')).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/print/sign/compose')).toBe(1)
   await expectHealthy(page, errors, 'print-scan-sign')
 })
 

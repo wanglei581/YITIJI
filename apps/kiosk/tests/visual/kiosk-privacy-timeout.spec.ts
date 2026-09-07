@@ -32,6 +32,10 @@ function registerKioskShell(api: ApiRouter): void {
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
   })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: [] },
+  })
   api.respond('GET', '/api/v1/terminals/KSK-001/smart-campus', {
     status: 200,
     json: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
