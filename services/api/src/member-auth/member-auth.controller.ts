@@ -10,6 +10,7 @@ import { SendMemberStepUpCodeDto, VerifyMemberStepUpDto } from './dto/member-ste
 import { ClaimQrLoginDto, ConfirmQrLoginDto, CreateQrLoginDto } from './dto/qr-login.dto'
 import { SendSmsCodeDto } from './dto/send-sms-code.dto'
 import { WxMiniappLoginDto } from './dto/wx-miniapp-login.dto'
+import { WxMiniappResigninDto } from './dto/wx-miniapp-resignin.dto'
 import {
   MemberAuthService,
   type MemberAuthUser,
@@ -83,6 +84,16 @@ export class MemberAuthController {
         clientIp(req),
       ),
     )
+  }
+
+  /**
+   * 已绑定微信的会员凭 wx.login code 静默续签。
+   * 不建号、不绑手机；未绑定走 401 MEMBER_NOT_BOUND，让小程序进正常登录。
+   */
+  @Post('auth/wx-resignin')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async wxResignin(@Body() dto: WxMiniappResigninDto): Promise<ApiResponse<MemberLoginResult>> {
+    return ApiResponse.ok(await this.service.wxResignin(dto.code))
   }
 
   /** 已登录会员为数据导出/账号注销等敏感动作发送二次验证短信。 */

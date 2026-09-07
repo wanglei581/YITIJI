@@ -809,6 +809,8 @@ async function main(): Promise<void> {
       FILE_SIGNING_SECRET: 'a-strong-file-signing-secret-0123456789',
       SECRET_ENCRYPTION_KEY: 'a-strong-secret-encryption-key-01234567',
       PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
+      TERMINAL_ADMIN_SECRET: 'a-strong-terminal-admin-secret-01234567',
+      TERMINAL_ACTION_TOKEN_SECRET: 'a-strong-terminal-action-secret-0123456',
       TERMINAL_LEGACY_REGISTER_ENABLED: 'false',
       TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true',
       PRINT_REQUIRE_PII_SCAN: 'true', // 商用生产必须阻断未完成 PII 检查的原始材料

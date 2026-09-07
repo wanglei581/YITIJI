@@ -847,3 +847,20 @@ export interface FairVisitPlanPrintResponse {
   /** 系统 HMAC content URL，仅供 /print/jobs 使用；signedUrl 只用于预览/下载。 */
   printFileUrl?: string
 }
+
+// ── 一体机 AI 能力仪表（GET /kiosk/ai/capabilities）────────────────────────
+// 匿名可读。状态只从 llm-config 解析结果与既有降级判断推导，不调用计费 AI，
+// 不回密钥、不回模型名以外的配置细节。
+
+export type KioskAiCapabilityStatus = 'available' | 'degraded' | 'off'
+
+export interface KioskAiCapabilityItem {
+  key: string
+  status: KioskAiCapabilityStatus
+  reason?: string
+  providerName?: string
+}
+
+export interface KioskAiCapabilitiesResponse {
+  items: KioskAiCapabilityItem[]
+}

@@ -53,6 +53,7 @@ const TERMINAL_SCOPED_ROUTES = [
   { file: 'src/terminals/terminals.controller.ts', handler: 'claimTasks' },
   { file: 'src/ai/ai.controller.ts', handler: 'submitResumeParse' },
   { file: 'src/ai/ai.controller.ts', handler: 'chatWithAssistant' },
+  { file: 'src/ai/kiosk-ai-capabilities.controller.ts', handler: 'listCapabilities' },
 ] as const
 
 // ---------------------------------------------------------------------------

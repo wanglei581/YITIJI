@@ -28,6 +28,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
 import { AuthService } from '../src/auth/auth.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
 
 process.env['DATABASE_URL'] ||= 'file:./prisma/dev.db'
 process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-admin-orgs-secret-32-bytes-ok'
@@ -190,7 +191,10 @@ async function main() {
       pass('5b. 账号恢复后登录恢复')
 
       // DB 已提交后 Redis DEL 失败必须如实回报补偿状态，而不能把业务成功伪报成 500。
+      // AuthService.login 的 tryRedis 会因本夹具缺 get 而进入静默期；这里清掉，
+      // 否则 invalidate 会被 skipped_cooldown，DEL 一次都不发。
       failSessionInvalidation = true
+      resetRedisCooldownForTests()
       const invalidationsBefore = sessionInvalidationCalls
       const disabledWithRedisFailure = await svc.setAccountStatus(orgId, accountId, 'disable', admin)
       if (
@@ -208,11 +212,13 @@ async function main() {
       if (!warningAudit || !warningAudit.payloadJson.includes('"level":"warn"') || !warningAudit.payloadJson.includes('REDIS_SESSION_INVALIDATION_FAILED')) {
         fail('5c. Redis 失效失败必须落 warn 审计且不暴露原始错误')
       }
+      resetRedisCooldownForTests()
       await svc.setAccountStatus(orgId, accountId, 'disable', admin)
       if (sessionInvalidationCalls !== invalidationsBefore + 2) {
         fail(`5c. 目标状态重试仍必须重新失效缓存：调用次数=${sessionInvalidationCalls - invalidationsBefore}`)
       }
       failSessionInvalidation = false
+      resetRedisCooldownForTests()
       const reenabledAfterRetry = await svc.setAccountStatus(orgId, accountId, 'enable', admin)
       if (reenabledAfterRetry.sessionInvalidation !== 'ok') fail('5c. Redis 恢复后失效应返回 ok')
       pass('5c. Redis 失效失败不伪报业务失败，写 warn 审计；同目标状态重试仍会再次失效缓存')

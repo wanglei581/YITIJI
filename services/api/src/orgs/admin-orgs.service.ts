@@ -22,6 +22,7 @@ import {
 import { encryptPhone, hashPhone, normalizePhone } from '../common/crypto/phone-identity'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
+import { tryRedis } from '../common/redis/redis-degradation'
 import { Prisma } from '../generated/prisma/client'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
@@ -818,27 +819,31 @@ export class AdminOrgsService {
     userId: string,
     actor?: Pick<AuthedUser, 'userId' | 'role'>,
   ): Promise<SessionInvalidationResult> {
-    try {
-      await this.redis.del(this.sessionStateKey(userId))
+    const attempt = await tryRedis(
+      'admin-org-session-invalidate',
+      () => this.redis.del(this.sessionStateKey(userId)),
+      this.logger,
+    )
+    if (attempt.ok) {
       return { sessionInvalidation: 'ok' }
-    } catch {
-      // internal:session-state 是数据库真源的最多 60 秒缓存。DB 已提交但 DEL
-      // 失败、旧缓存仍可读时，旧 token 最长会被接受到该 TTL 结束；重试操作会再尝试 DEL。
-      const staleWindowSeconds = INTERNAL_SESSION_CACHE_TTL_SECONDS
-      const code = 'REDIS_SESSION_INVALIDATION_FAILED'
-      this.logger.warn(`account session invalidation failed: accountId=${userId} code=${code}`)
-      if (actor) {
-        await this.audit.write({
-          actorId: actor.userId,
-          actorRole: actor.role,
-          action: 'org.account.session_invalidation_failed',
-          targetType: 'user',
-          targetId: userId,
-          payload: { accountId: userId, code, level: 'warn', staleWindowSeconds },
-        })
-      }
-      return { sessionInvalidation: 'failed', staleWindowSeconds }
     }
+    // internal:session-state 是数据库真源的最多 60 秒缓存。DB 已提交但 DEL
+    // 失败、旧缓存仍可读时，旧 token 最长会被接受到该 TTL 结束；重试操作会再尝试 DEL。
+    // Redis 抖动不得把已提交的启停/改密/换邮箱打成 500。
+    const staleWindowSeconds = INTERNAL_SESSION_CACHE_TTL_SECONDS
+    const code = 'REDIS_SESSION_INVALIDATION_FAILED'
+    this.logger.warn(`account session invalidation failed: accountId=${userId} code=${code}`)
+    if (actor) {
+      await this.audit.write({
+        actorId: actor.userId,
+        actorRole: actor.role,
+        action: 'org.account.session_invalidation_failed',
+        targetType: 'user',
+        targetId: userId,
+        payload: { accountId: userId, code, level: 'warn', staleWindowSeconds },
+      })
+    }
+    return { sessionInvalidation: 'failed', staleWindowSeconds }
   }
 
   /**
@@ -852,23 +857,27 @@ export class AdminOrgsService {
     tokenVersion: number
     deletedAt: Date
   }): Promise<void> {
-    try {
-      await this.redis.setJsonIfVersionNotOlder(
+    const payload = JSON.stringify({
+      userId: user.id,
+      role: user.role,
+      orgId: user.orgId,
+      enabled: false,
+      tokenVersion: user.tokenVersion,
+      deletedAt: user.deletedAt.toISOString(),
+      orgEnabled: false,
+    })
+    const attempt = await tryRedis(
+      'admin-org-session-publish-deleted',
+      () => this.redis.setJsonIfVersionNotOlder(
         this.sessionStateKey(user.id),
         INTERNAL_SESSION_CACHE_TTL_SECONDS,
-        JSON.stringify({
-          userId: user.id,
-          role: user.role,
-          orgId: user.orgId,
-          enabled: false,
-          tokenVersion: user.tokenVersion,
-          deletedAt: user.deletedAt.toISOString(),
-          orgEnabled: false,
-        }),
+        payload,
         user.tokenVersion,
-      )
-    } catch {
-      await this.invalidateAccountSession(user.id).catch(() => undefined)
+      ),
+      this.logger,
+    )
+    if (!attempt.ok) {
+      await this.invalidateAccountSession(user.id)
       this.logger.warn(`account deletion session state publish failed: userId=${user.id}`)
     }
   }
