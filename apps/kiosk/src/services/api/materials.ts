@@ -67,6 +67,41 @@ export interface PiiFindingDecision {
   action: PiiFindingDecisionAction
 }
 
+export type PrintParamSuggestionField = 'copies' | 'colorMode' | 'duplex' | 'pagesPerSheet'
+
+export interface PrintParamSuggestionItem {
+  field: PrintParamSuggestionField
+  label: string
+  status: 'suggested' | 'not_derivable'
+  suggestedValue: string | number | null
+  basis: { code: string; evidenceLevel: 'E1' | 'E2'; text: string; facts: Record<string, unknown> } | null
+  reason: { code: string; text: string } | null
+  blockedPreference: { value: string | number; code: string; text: string } | null
+  editable: true
+}
+
+export interface PrintParamSuggestionView {
+  taskId: string
+  featureKey: 'print_param_prefill'
+  derivation: 'deterministic_rules'
+  advisory: true
+  available: boolean
+  unavailableReason: { code: string; text: string } | null
+  capabilityProfile: {
+    paperSize: 'A4'
+    verifiedColorModes: string[]
+    verifiedDuplexModes: string[]
+    verifiedPagesPerSheet: number[]
+    copiesRange: { min: number; max: number }
+    note: string
+  }
+  items: PrintParamSuggestionItem[]
+  notices: Array<{ code: string; severity: 'info' | 'warning'; text: string }>
+  evidence: Record<string, unknown> | null
+  disclaimer: string
+  generatedAt: string
+}
+
 interface ResponseEnvelope<T> {
   success?: boolean
   data?: T
@@ -257,6 +292,45 @@ export async function getMaterialTask(
 
   return request<DocumentProcessTaskView>(
     `/materials/tasks/${encodeURIComponent(taskId)}`,
+    { method: 'GET' },
+    access,
+  )
+}
+
+export async function getPrintParamSuggestions(
+  taskId: string,
+  access?: MaterialTaskAccess,
+): Promise<PrintParamSuggestionView> {
+  if (API_MODE !== 'http') {
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    return {
+      taskId,
+      featureKey: 'print_param_prefill',
+      derivation: 'deterministic_rules',
+      advisory: true,
+      available: false,
+      unavailableReason: {
+        code: 'MOCK_MODE',
+        text: '参数建议仅在连接材料服务后可用，当前请手动设置。',
+      },
+      capabilityProfile: {
+        paperSize: 'A4',
+        verifiedColorModes: ['black_white'],
+        verifiedDuplexModes: ['simplex'],
+        verifiedPagesPerSheet: [1],
+        copiesRange: { min: 1, max: 99 },
+        note: '流程演示模式',
+      },
+      items: [],
+      notices: [],
+      evidence: null,
+      disclaimer: '建议不可用时不会影响手动设置打印参数。',
+      generatedAt: new Date().toISOString(),
+    }
+  }
+
+  return request<PrintParamSuggestionView>(
+    `/materials/tasks/${encodeURIComponent(taskId)}/print-param-suggestions`,
     { method: 'GET' },
     access,
   )

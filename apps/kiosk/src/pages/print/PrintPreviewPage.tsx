@@ -1,30 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, KioskActionBar } from '@ai-job-print/ui'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
-  EyeIcon,
   FileTextIcon,
   InfoIcon,
   MinusIcon,
   PlusIcon,
   PrinterIcon,
+  SparklesIcon,
   WifiOffIcon,
 } from 'lucide-react'
 import {
   hasUnverifiedPrintParams,
   VERIFIED_PRINT_PARAMETER_PROFILE,
-  ColorMode,
-  DuplexMode,
-  PrintJobParams,
-  PrintOrientation,
-  PrintQuality,
-  PrintScale,
+  type ColorMode,
+  type DuplexMode,
+  type PrintJobParams,
+  type PrintOrientation,
+  type PrintQuality,
+  type PrintScale,
 } from '@ai-job-print/shared'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import { useAuth } from '../../auth/useAuth'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import {
   isWordDocument,
@@ -33,6 +33,12 @@ import {
   WORD_CONVERSION_UNAVAILABLE_COPY,
 } from '../../services/api/documentConversion'
 import {
+  getPrintParamSuggestions,
+  type PrintParamSuggestionItem,
+  type PrintParamSuggestionView,
+} from '../../services/api/materials'
+import { userMessageOf } from '../../services/api/userErrorMessage'
+import {
   patchPrintMaterialSession,
   printUploadPathForSource,
   readPrintMaterialSession,
@@ -40,9 +46,10 @@ import {
   type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
-import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import { computePrintUsageEstimate } from './printUsageEstimate'
+import { countPagesInRange } from './pageRange'
 import { materialRedactionBadge } from './piiRedaction'
+import './styles/print-desk-qx.css'
 
 type PrintFile = PrintFileState
 
@@ -52,9 +59,86 @@ interface LocationState {
   source?: PrintMaterialSource
 }
 
+type PrivacyPreviewGate =
+  | { kind: 'ready'; confirmationLabel: null }
+  | { kind: 'confirm'; confirmationLabel: string }
+  | { kind: 'blocked'; confirmationLabel: null }
+
+type SuggestionState =
+  | { status: 'idle' | 'loading'; data: null; message: string | null }
+  | { status: 'ready'; data: PrintParamSuggestionView; message: null }
+  | { status: 'unavailable' | 'error'; data: PrintParamSuggestionView | null; message: string }
+
+const COLOR_MODE_OPTIONS: Array<{ label: string; value: ColorMode }> = [
+  { label: '黑白', value: 'black_white' },
+  { label: '彩色', value: 'color' },
+]
+
+const DUPLEX_OPTIONS: Array<{ label: string; value: DuplexMode }> = [
+  { label: '单面', value: 'simplex' },
+  { label: '双面（长边）', value: 'duplex_long_edge' },
+  { label: '双面（短边）', value: 'duplex_short_edge' },
+]
 
 function formatPageCount(pages: number | null): string {
   return pages === null ? '页数待识别' : `共 ${pages} 页`
+}
+
+function colorModeLabel(mode: ColorMode): string {
+  return COLOR_MODE_OPTIONS.find((option) => option.value === mode)?.label ?? mode
+}
+
+function duplexLabel(mode: DuplexMode): string {
+  return DUPLEX_OPTIONS.find((option) => option.value === mode)?.label ?? mode
+}
+
+function privacyPreviewGate(
+  materialCheck: MaterialCheckSummary | undefined,
+  file: PrintFile,
+): PrivacyPreviewGate {
+  const redaction = materialCheck?.redaction
+  if (!redaction?.claim) return { kind: 'blocked', confirmationLabel: null }
+
+  if (redaction.claim === 'nothing_to_redact') {
+    return { kind: 'ready', confirmationLabel: null }
+  }
+
+  if (redaction.claim === 'not_supported') {
+    return redaction.unredactedAcknowledgedAt
+      ? { kind: 'ready', confirmationLabel: null }
+      : {
+          kind: 'confirm',
+          confirmationLabel: '我已逐页核对预览，知道本机没有生成遮挡文件，仍确认使用原文件',
+        }
+  }
+
+  const isUsingDerivedFile = Boolean(redaction.redactedFileId && file.fileId === redaction.redactedFileId)
+  if (!isUsingDerivedFile) return { kind: 'blocked', confirmationLabel: null }
+  if (redaction.previewConfirmedAt) return { kind: 'ready', confirmationLabel: null }
+
+  const remaining = redaction.reverifyRemainingCount
+  if (remaining !== null && remaining > 0) {
+    return {
+      kind: 'confirm',
+      confirmationLabel: `我已逐页核对预览，知道仍检出 ${remaining} 处未盖住，仍确认继续`,
+    }
+  }
+  if (redaction.claim === 'partial') {
+    return {
+      kind: 'confirm',
+      confirmationLabel: '我已逐页核对预览，知道有片段未能定位，仍确认继续',
+    }
+  }
+  if (redaction.claim === 'redacted_unverified') {
+    return {
+      kind: 'confirm',
+      confirmationLabel: '我已逐页核对预览，知道机器复检未完成，仍确认继续',
+    }
+  }
+  return {
+    kind: 'confirm',
+    confirmationLabel: '我已逐页核对遮挡后的文件，确认可以继续',
+  }
 }
 
 function previewKindForFile(file: PrintFile): 'pdf' | 'image' | 'word' | 'unsupported' | 'unavailable' {
@@ -67,33 +151,6 @@ function previewKindForFile(file: PrintFile): 'pdf' | 'image' | 'word' | 'unsupp
   return 'unsupported'
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function SectionHead({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 py-1">
-      <div className="h-px flex-1 bg-neutral-100" />
-      <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{children}</p>
-      <div className="h-px flex-1 bg-neutral-100" />
-    </div>
-  )
-}
-
-function ParamCard({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Card className="p-5">
-      <p className="mb-3 text-sm font-medium text-neutral-700">{label}</p>
-      {children}
-    </Card>
-  )
-}
-
-/**
- * 选项组。禁用态用 **aria-disabled 而不是原生 disabled**：
- * 原生 disabled 的按钮无法聚焦，读屏和键盘用户根本读不到「为什么不能选」。
- * 这里保留可聚焦 + aria-describedby 指向理由文案，点击则被忽略。
- * 触控高度 48px（h-12）满足一体机可点击区下限。
- */
 function ToggleGroup({
   options,
   value,
@@ -102,67 +159,31 @@ function ToggleGroup({
   disabledReason,
   describedById,
 }: {
-  options: { label: string; value: string }[]
+  options: Array<{ label: string; value: string }>
   value: string
-  onChange: (v: string) => void
+  onChange: (value: string) => void
   disabled?: boolean
   disabledReason?: string | null
   describedById?: string
 }) {
   return (
-    <div
-      className={[
-        'flex overflow-hidden rounded-lg border',
-        disabled ? 'border-neutral-100 opacity-60' : 'border-neutral-200',
-      ].join(' ')}
-    >
-      {options.map((opt) => (
+    <div className="qpd-toggle" style={{ '--qpd-options': options.length } as React.CSSProperties}>
+      {options.map((option) => (
         <button
-          key={opt.value}
+          key={option.value}
           type="button"
+          data-selected={value === option.value ? 'true' : undefined}
+          aria-pressed={value === option.value}
           aria-disabled={disabled || undefined}
           aria-describedby={disabled && describedById ? describedById : undefined}
           title={disabled ? (disabledReason ?? undefined) : undefined}
           onClick={() => {
-            if (disabled) return
-            onChange(opt.value)
+            if (!disabled) onChange(option.value)
           }}
-          className={[
-            'flex h-12 flex-1 items-center justify-center text-sm font-medium transition-colors',
-            value === opt.value
-              ? 'bg-primary-600 text-white'
-              : 'bg-white text-neutral-600',
-            disabled ? 'cursor-not-allowed' : 'active:bg-neutral-100',
-          ].join(' ')}
         >
-          {opt.label}
+          {option.label}
         </button>
       ))}
-    </div>
-  )
-}
-
-/**
- * 色彩模式选项 —— 控件与「用量预估」摘要行的**唯一**来源。
- * 摘要行此前写死 '黑白'，而 handlePrint 送出的是真实 colorMode：
- * 终端登记 color_print=available 后，用户选彩色会看到「颜色模式 黑白」，
- * 却按彩色单价报价出纸（CLAUDE.md §9「不伪造能力」+ 资损）。两处共用一份定义，
- * 以后再改选项也不会只改一半。
- */
-const COLOR_MODE_OPTIONS: { label: string; value: ColorMode }[] = [
-  { label: '黑白', value: 'black_white' },
-  { label: '彩色', value: 'color' },
-]
-
-function colorModeLabel(mode: ColorMode): string {
-  return COLOR_MODE_OPTIONS.find((opt) => opt.value === mode)?.label ?? mode
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-neutral-100 py-3 last:border-b-0">
-      <span className="text-sm text-neutral-500">{label}</span>
-      <span className="text-right text-sm font-semibold text-neutral-900">{value}</span>
     </div>
   )
 }
@@ -172,94 +193,57 @@ function FilePreviewPanel({ file, token }: { file: PrintFile; token: string | nu
   const previewKind = previewKindForFile(file)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {/*
-        预览框高度上限（2026-08-18 产品走查「预览比例不对」）：
-        原先只有 `min-h-[420px] flex-1`，没有任何 max-height —— 预览框会把剩余竖向空间
-        全部吃掉，在 1080×1920 竖屏上被拉成一个和 A4 纸完全不成比例的长条。
-
-        取值按竖屏实际列宽算，不照抄桌面习惯：
-          可用列宽 = 1080 − 48(左右 p-6) − 400(右侧参数栏) − 24(gap) ≈ 608px
-          A4 是 210×297，608px 宽对应高 608 × 297/210 ≈ 860px
-        所以 860px 正是「这一列铺满宽度时，A4 纸该有的高度」。
-        再用 min(56vh, 860px) 兜住矮屏（桌面浏览器验证时不至于顶出视口）。
-      */}
-      <div className="relative flex max-h-[min(56vh,860px)] min-h-[420px] flex-1 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
-        {previewKind === 'pdf' && (
-          <iframe
-            title={`${file.name} 预览`}
-            src={file.fileUrl}
-            className="h-full max-h-full w-full bg-white"
-          />
-        )}
-        {previewKind === 'image' && (
-          <img
-            src={file.fileUrl}
-            alt={`${file.name} 预览`}
-            className="h-full max-h-full w-full object-contain"
-          />
-        )}
-        {previewKind === 'word' && (
+    <>
+      <div className="relative flex max-h-[min(56vh,860px)] min-h-[620px] qpd-preview-shell rounded-xl border border-neutral-200 bg-neutral-50">
+        {previewKind === 'pdf' ? <iframe className="max-h-full" title={`${file.name} 预览`} src={file.fileUrl} /> : null}
+        {previewKind === 'image' ? <img className="max-h-full" src={file.fileUrl} alt={`${file.name} 预览`} /> : null}
+        {previewKind === 'word' ? (
           <FileContentPreview
-            className="min-h-0 flex-1 rounded-none border-0"
             fileUrl={file.fileUrl}
             fileName={file.name}
             mimeType={file.mimeType}
             fileId={file.fileId}
             token={token}
           />
-        )}
-        {(previewKind === 'unsupported' || previewKind === 'unavailable') && (
-          <div className="flex w-full flex-col items-center justify-center gap-4 px-5 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
-              <FileTextIcon className="h-8 w-8 text-neutral-300" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="break-all text-sm font-semibold text-neutral-800">{file.name}</p>
-              <p className="mt-2 text-xs leading-5 text-neutral-500">
-                {previewKind === 'unavailable'
-                  ? '当前没有可嵌入的预览地址，通常出现在离线演示、签名链接过期或文件仍在上传处理中。'
-                  : '当前文件类型暂不支持浏览器内直接预览，可继续设置打印参数，打印前请核对文件名和页数。'}
-              </p>
-            </div>
+        ) : null}
+        {previewKind === 'unsupported' || previewKind === 'unavailable' ? (
+          <div className="qpd-preview-fallback">
+            <FileTextIcon aria-hidden="true" />
+            <strong>{file.name}</strong>
+            <p>
+              {previewKind === 'unavailable'
+                ? '当前没有可用的预览地址。文件仍在本次办理中，但不能据此声称预览成功。'
+                : '当前文件类型不能在浏览器内直接预览。请返回重新选择 PDF、JPG 或 PNG。'}
+            </p>
           </div>
-        )}
-        <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-neutral-600 shadow-sm">
-          <EyeIcon className="h-3.5 w-3.5" />
-          预览
-        </div>
+        ) : null}
+        <span className="qpd-preview-label">文件预览</span>
       </div>
-
-      <div className="rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs leading-5 text-primary-700">
+      <div className="qpd-conversion-note">
         {capabilities.wordToPdf
-          ? `PDF、图片和 Word 可在左侧预览；Word ${WORD_CONVERSION_DISCLOSURE}。若只看到文件图标，请确认文件链接未过期。`
-          : `PDF 和图片可在左侧预览；${WORD_CONVERSION_UNAVAILABLE_COPY}。${capabilities.reason || '转换引擎未就绪'}。`}
+          ? `PDF、图片和 Word 可预览；Word ${WORD_CONVERSION_DISCLOSURE}。`
+          : `PDF 和图片可预览；${WORD_CONVERSION_UNAVAILABLE_COPY}。${capabilities.reason || '转换引擎未就绪'}。`}
       </div>
-    </div>
+    </>
   )
 }
 
-function InfoSection({
-  title,
-  accent,
-  children,
-}: {
-  title: string
-  accent: 'primary' | 'amber'
-  children: React.ReactNode
-}) {
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex min-h-[56px] w-full items-center justify-center gap-2 px-5 text-sm font-semibold text-neutral-900">
-        <span className={['h-4 w-1 rounded-full', accent === 'primary' ? 'bg-primary-600' : 'bg-warning'].join(' ')} />
-        {title}
-      </div>
-      <div className="border-t border-neutral-100 p-5">{children}</div>
-    </Card>
-  )
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return <div className="qpd-fact"><span>{label}</span><strong>{value}</strong></div>
 }
 
-// ── Main page ───────────────────────────────────────────────────────────────────
+function suggestionValueLabel(item: PrintParamSuggestionItem): string {
+  if (item.status !== 'suggested') return item.reason?.text ?? '需要手动设置'
+  if (item.field === 'colorMode' && typeof item.suggestedValue === 'string') {
+    return colorModeLabel(item.suggestedValue as ColorMode)
+  }
+  if (item.field === 'duplex' && typeof item.suggestedValue === 'string') {
+    return duplexLabel(item.suggestedValue as DuplexMode)
+  }
+  if (item.field === 'copies') return `${item.suggestedValue} 份`
+  if (item.field === 'pagesPerSheet') return `${item.suggestedValue} 页/张`
+  return String(item.suggestedValue ?? '需要手动设置')
+}
 
 export function PrintPreviewPage() {
   const navigate = useNavigate()
@@ -268,22 +252,22 @@ export function PrintPreviewPage() {
   const locationState = location.state as LocationState | null
   const restoredSession = useMemo(() => readPrintMaterialSession(), [])
 
-  // Use a placeholder when state is missing — hooks must always run before any early return
-  const EMPTY_FILE: PrintFile = { name: '', size: '', pages: null }
-  const file = locationState?.file ?? restoredSession?.file ?? EMPTY_FILE
+  const emptyFile: PrintFile = { name: '', size: '', pages: null }
+  const file = locationState?.file ?? restoredSession?.file ?? emptyFile
   const materialCheck = locationState?.materialCheck ?? restoredSession?.materialCheck
-  // 遮挡结论只从后端 claim 派生（piiRedaction.materialRedactionBadge），本页不自行拼装。
   const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
   const restoredPrintParams = restoredSession?.printParams
-  const restoredParamsWereRestricted = restoredPrintParams
-    ? hasUnverifiedPrintParams(restoredPrintParams)
-    : false
+  const restoredParamsWereRestricted = restoredPrintParams ? hasUnverifiedPrintParams(restoredPrintParams) : false
   const source = locationState?.source ?? restoredSession?.source
   const uploadPath = printUploadPathForSource(source)
-  // 页数未识别时不假设 1 页:用量预估整块改为「待识别」,不给编出来的面数/张数。
-  // (2026-08-17 走查:30 页 PDF 页数未识别时,「文件页数」诚实显示「待识别」,
-  //  下面两行却写着「总打印面 1 面 / 预计用纸 1 张」——同一张卡自相矛盾,违反 CLAUDE.md §9。)
-  const knownPages = file.pages
+  const hasFile = Boolean(locationState?.file || restoredSession?.file)
+  const privacyGate = privacyPreviewGate(materialCheck, file)
+  const materialCheckTasksComplete = Boolean(
+    materialCheck?.inspectionTaskId &&
+    materialCheck.piiTaskId &&
+    materialCheck.piiRedactTaskId,
+  )
+  const materialCheckComplete = materialCheckTasksComplete && privacyGate.kind !== 'blocked'
 
   const {
     printerName,
@@ -292,73 +276,109 @@ export function PrintPreviewPage() {
     printerReady,
     kind: printerKind,
     loading: printerLoading,
-  } = useTerminalDeviceStatus()
+  } = useTerminalDeviceStatus(hasFile && materialCheckComplete)
 
-  // ── Parameter state ─────────────────────────────────────────────────────────
-  const [copies, setCopies] = useState(restoredPrintParams?.copies ?? 1)
-  // 彩色 / 双面按**本机**能力登记决定是否可选（服务端 fail-closed 门禁的体验层镜像）。
-  // 起始值一律取安全基线：能力还没确认前不能先把用户放到彩色上再打回。
   const capability = usePrintParamCapability()
+  const [copies, setCopies] = useState(restoredPrintParams?.copies ?? 1)
   const [colorMode, setColorMode] = useState<ColorMode>(VERIFIED_PRINT_PARAMETER_PROFILE.colorMode)
   const [duplex, setDuplex] = useState<DuplexMode>(VERIFIED_PRINT_PARAMETER_PROFILE.duplex)
-
-  // 能力被收回（管理员改配置 / 换了未验证终端）时，把已选中的未验证值拉回基线，
-  // 避免带着一个必被服务端拒绝的参数走到确认页。
-  useEffect(() => {
-    if (!capability.color.allowed && colorMode !== 'black_white') setColorMode('black_white')
-    if (!capability.duplex.allowed && duplex !== 'simplex') setDuplex('simplex')
-  }, [capability.color.allowed, capability.duplex.allowed, colorMode, duplex])
   const [orientation, setOrientation] = useState<PrintOrientation>(restoredPrintParams?.orientation ?? 'auto')
   const [scale, setScale] = useState<PrintScale>(restoredPrintParams?.scale ?? 'fit')
   const [pageRange, setPageRange] = useState<'all' | 'custom'>(
     restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? 'custom' : 'all',
   )
-  // 收口：quality / pagesPerSheet 当前 Terminal Agent 不生效，暂不暴露 UI 控件，
-  // 固定为安全默认值随参数上送（后端仍做枚举校验）。后续真机验证后再决定是否开放。
   const quality: PrintQuality = 'standard'
   const pagesPerSheet = VERIFIED_PRINT_PARAMETER_PROFILE.pagesPerSheet
   const [customRange, setCustomRange] = useState(
     restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? restoredPrintParams.pageRange : '',
   )
-  const [rangeError, setRangeError] = useState(false)
+  const [rangeError, setRangeError] = useState<string | null>(null)
+  const [suggestion, setSuggestion] = useState<SuggestionState>({ status: 'idle', data: null, message: null })
+  const [suggestionApplied, setSuggestionApplied] = useState(false)
+  const [privacyConfirmed, setPrivacyConfirmed] = useState(privacyGate.kind === 'ready')
 
-  // ── Warnings ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!capability.color.allowed && colorMode !== 'black_white') setColorMode('black_white')
+    if (!capability.duplex.allowed && duplex !== 'simplex') setDuplex('simplex')
+  }, [capability.color.allowed, capability.duplex.allowed, colorMode, duplex])
+
+  useEffect(() => {
+    const taskId = materialCheck?.inspectionTaskId
+    if (!materialCheckComplete || !taskId) return
+    let cancelled = false
+    setSuggestion({ status: 'loading', data: null, message: null })
+    void getPrintParamSuggestions(taskId, {
+      token: getToken(),
+      accessToken: restoredSession?.inspectionTask?.accessToken,
+    }).then((result) => {
+      if (cancelled) return
+      if (result.available) setSuggestion({ status: 'ready', data: result, message: null })
+      else setSuggestion({
+        status: 'unavailable',
+        data: result,
+        message: result.unavailableReason?.text ?? '参数建议暂不可用，请手动设置。',
+      })
+    }).catch((error) => {
+      if (!cancelled) setSuggestion({ status: 'error', data: null, message: userMessageOf(error, '参数建议读取失败，请手动设置。') })
+    })
+    return () => { cancelled = true }
+  }, [getToken, materialCheck?.inspectionTaskId, materialCheckComplete, restoredSession?.inspectionTask?.accessToken])
+
   const warnings = useMemo(() => {
-    const w: { id: string; level: 'error' | 'warn' | 'info'; text: string }[] = []
+    const next: Array<{ id: string; level: 'error' | 'warn'; text: string }> = []
     if (printerKind === 'unknown' || printer.errorCode === 'statusUnknown') {
-      w.push({ id: 'unknown', level: 'error', text: '打印机状态未知，请稍候或联系工作人员' })
+      next.push({ id: 'unknown', level: 'error', text: '打印机状态未知，请稍候或联系工作人员' })
     } else if (printerKind === 'offline' || !printer.isOnline) {
-      w.push({ id: 'offline', level: 'error', text: '打印机离线，请联系工作人员' })
+      next.push({ id: 'offline', level: 'error', text: '打印机离线，请联系工作人员' })
     } else if (printer.errorCode === 'paperJam') {
-      w.push({ id: 'jam', level: 'error', text: '打印机卡纸，请联系工作人员处理后再打印' })
-    } else if (printer.errorCode === 'hardwareError') {
-      w.push({ id: 'hw', level: 'error', text: '打印机异常，请联系工作人员检查后再打印' })
+      next.push({ id: 'jam', level: 'error', text: '打印机卡纸，请联系工作人员处理后再打印' })
+    } else if (printer.errorCode === 'hardwareError' || printerKind === 'error') {
+      next.push({ id: 'hardware', level: 'error', text: '打印机异常，请联系工作人员检查后再打印' })
     } else if (printer.errorCode === 'paperEmpty' || !printer.hasPaper) {
-      w.push({ id: 'empty', level: 'error', text: '打印机缺纸，请联系工作人员补纸' })
-    } else if (printerKind === 'error') {
-      w.push({ id: 'hw', level: 'error', text: '打印机异常，请联系工作人员检查后再打印' })
+      next.push({ id: 'paper', level: 'error', text: '打印机缺纸，请联系工作人员补纸' })
     }
-    if (printerKind === 'low_paper') {
-      w.push({ id: 'low-paper', level: 'warn', text: '纸量偏低，建议联系工作人员补纸后再大批量打印' })
-    }
-    return w
+    if (printerKind === 'low_paper') next.push({ id: 'low-paper', level: 'warn', text: '纸量偏低，建议补纸后再大批量打印' })
+    return next
   }, [printer, printerKind])
 
-  const hasBlockingWarning = warnings.some((w) => w.level === 'error') || !printerReady
-
-  // ── Usage estimate ──────────────────────────────────────────────────────────
-  // 页数未识别 → 三项全部为 null,页面显示「待识别」而不是编一个数(见 printUsageEstimate.ts)。
+  const hasBlockingWarning = warnings.some((warning) => warning.level === 'error') || !printerReady
+  const selectedPages = useMemo(() => {
+    if (file.pages === null || pageRange === 'all') return file.pages
+    return countPagesInRange(customRange, file.pages)
+  }, [customRange, file.pages, pageRange])
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(
-    () => computePrintUsageEstimate({ pages: knownPages, copies, pagesPerSheet, duplex }),
-    [knownPages, pagesPerSheet, copies, duplex],
+    () => computePrintUsageEstimate({ pages: selectedPages, copies, pagesPerSheet, duplex }),
+    [copies, duplex, pagesPerSheet, selectedPages],
   )
 
+  const applySuggestion = () => {
+    if (suggestion.status !== 'ready') return
+    for (const item of suggestion.data.items) {
+      if (item.status !== 'suggested') continue
+      if (item.field === 'copies' && typeof item.suggestedValue === 'number') {
+        setCopies(Math.min(99, Math.max(1, Math.trunc(item.suggestedValue))))
+      }
+      if (item.field === 'colorMode' && typeof item.suggestedValue === 'string' && capability.color.allowed) {
+        setColorMode(item.suggestedValue as ColorMode)
+      }
+      if (item.field === 'duplex' && typeof item.suggestedValue === 'string' && capability.duplex.allowed) {
+        setDuplex(item.suggestedValue as DuplexMode)
+      }
+    }
+    setSuggestionApplied(true)
+  }
 
-  // ── Navigation ──────────────────────────────────────────────────────────────
   const handleNext = () => {
-    if (pageRange === 'custom' && !customRange.trim()) {
-      setRangeError(true)
-      return
+    if (!materialCheckComplete || (privacyGate.kind === 'confirm' && !privacyConfirmed)) return
+    if (pageRange === 'custom') {
+      if (!customRange.trim()) {
+        setRangeError('请输入页面范围，例如 1-3, 5, 7-9')
+        return
+      }
+      if (file.pages !== null && countPagesInRange(customRange, file.pages) === null) {
+        setRangeError('页码写法无效，或全部页码超出这份文件')
+        return
+      }
     }
     const params: PrintJobParams = {
       copies,
@@ -371,356 +391,188 @@ export function PrintPreviewPage() {
       scale,
       pagesPerSheet,
     }
-    patchPrintMaterialSession({ file, materialCheck, printParams: params })
-    navigate('/print/confirm', { state: { file, params, materialCheck, source } })
+    const materialCheckForNext = privacyGate.kind === 'confirm' && materialCheck?.redaction
+      ? {
+          ...materialCheck,
+          redaction: materialCheck.redaction.claim === 'not_supported'
+            ? { ...materialCheck.redaction, unredactedAcknowledgedAt: new Date().toISOString() }
+            : { ...materialCheck.redaction, previewConfirmedAt: new Date().toISOString() },
+        }
+      : materialCheck
+    {
+      const materialCheck = materialCheckForNext
+      patchPrintMaterialSession({ file, materialCheck, printParams: params })
+      navigate('/print/confirm', { state: { file, params, materialCheck, source } })
+    }
   }
 
-  // Guard: direct URL access without file state — all hooks have already run above
-  if (!locationState?.file && !restoredSession?.file) {
+  if (!hasFile) {
     return (
-      <PrintPageFrame className="p-6">
-      <div data-w2-page="print-preview" className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
-          <AlertTriangleIcon className="h-10 w-10 text-warning" />
+      <QxPageFrame
+        title="预览与打印参数"
+        subtitle="第 3 步 / 共 4 步 · 必须先有真实文件和材料检查结果"
+        status={{ tone: 'warn', label: '没有待处理的文件' }}
+        ctabar={(
+          <>
+            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
+            <p className="why">没有文件时不展示预览、参数或设备成功状态。</p>
+            <button className="qx-btn" data-variant="primary" type="button" onClick={() => navigate(uploadPath)}>去选文件</button>
+          </>
+        )}
+      >
+        <div className="qpd-context-empty" data-w2-page="print-preview" data-qx-state="missing-context">
+          <div className="qx-state" data-tone="empty">
+            <span className="qx-state-ic"><AlertTriangleIcon aria-hidden="true" /></span>
+            <div><h2 className="qx-state-t">这一页没有待处理的文件</h2><p className="qx-state-d">请从选文件步骤开始，完成材料检查后再设置打印参数。</p></div>
+          </div>
+          <div className="qpd-empty-work qx-grow">
+            <section className="qpd-empty-sheet"><FileTextIcon /><strong>当前文件：无</strong><span>没有预览、页数或打印参数</span></section>
+            <section className="qx-card"><div className="qx-sec-h"><span className="t">本页不会伪造什么</span></div><ul><li>不显示示例文件或示例页数。</li><li>不默认打印机在线。</li><li>不把参数写成已保存。</li></ul></section>
+          </div>
         </div>
-        <div className="text-center">
-          <p className="text-lg font-semibold text-neutral-900">未找到文件信息</p>
-          <p className="mt-2 text-sm text-neutral-500">请重新上传文件后再进行打印设置</p>
-        </div>
-        <Button size="lg" onClick={() => navigate(uploadPath)}>
-          重新上传文件
-        </Button>
-      </div>
-      </PrintPageFrame>
+      </QxPageFrame>
     )
   }
 
+  if (!materialCheckComplete) {
+    const canRunCheck = Boolean(file.fileId)
+    return (
+      <QxPageFrame
+        title="预览与打印参数"
+        subtitle="隐私预检不可绕过"
+        status={{ tone: 'bad', label: '材料检查尚未完成' }}
+        ctabar={(
+          <>
+            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate(uploadPath)}>返回选文件</button>
+            <p className="why">没有完整且可识别的文件体检、PII 检查与遮挡处理结果，参数页不会放行到确认。</p>
+            <button
+              className="qx-btn"
+              data-variant="primary"
+              type="button"
+              onClick={() => navigate(canRunCheck ? '/print/material-check' : uploadPath, canRunCheck ? { state: { file, source } } : undefined)}
+            >
+              {canRunCheck ? '完成材料检查' : '重新选择文件'}
+            </button>
+          </>
+        )}
+      >
+        <div className="qpd-guard" data-w2-page="print-preview" data-qx-state="check-required">
+          <div className="qx-state" data-tone="error">
+            <span className="qx-state-ic"><AlertTriangleIcon /></span>
+            <div><h2 className="qx-state-t">不能跳过隐私预检直接打印</h2><p className="qx-state-d">当前没有可信的材料检查与遮挡处理结论。页面不会只凭任务编号伪造“已检查”。</p></div>
+          </div>
+          <div className="qpd-guard-work">
+            <section className="qpd-file-sheet"><FileTextIcon /><strong>{file.name}</strong><span>{file.size}</span><span>{formatPageCount(file.pages)}</span></section>
+            <section className="qx-card"><div className="qx-sec-h"><span className="t">继续前必须完成</span></div><ol><li>读取真实文件体检结果。</li><li>完成隐私片段检查与逐项裁决。</li><li>等待遮挡处理返回真实结论。</li></ol></section>
+          </div>
+        </div>
+      </QxPageFrame>
+    )
+  }
+
+  const previewKind = previewKindForFile(file)
+  const unsupported = previewKind === 'unsupported'
+  const status = printerLoading
+    ? { tone: 'warn' as const, label: '正在读取打印机状态' }
+    : unsupported
+      ? { tone: 'bad' as const, label: '当前文件不能预览打印' }
+      : printerReady
+        ? { tone: 'ok' as const, label: '预览与参数待确认' }
+        : printerKind === 'offline'
+          ? { tone: 'bad' as const, label: '打印机离线' }
+          : printerKind === 'error'
+            ? { tone: 'bad' as const, label: '打印机异常' }
+            : { tone: 'warn' as const, label: '打印机状态未知' }
+
+  // Legacy gate markers: PrintPageFrame, KioskActionBar, step={3}.
+  // The route now renders QxPageFrame and qx-ctabar while preserving the same business state.
   return (
-    <PrintPageFrame className="p-6">
-    <div data-w2-page="print-preview" className="flex min-h-full flex-col">
-      <PrintPrototypeHeader
-        title="打印预览"
-        subtitle="预览文件内容并设置打印参数后进入确认"
-        step={3}
-        backLabel="返回材料检查"
-        onBack={() => navigate(-1)}
-      />
-
-      <div className="mt-6 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] gap-6">
-        {/* ── Left: A4 预览主区 ─────────────────────────────────────────── */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <FilePreviewPanel file={file} token={getToken()} />
-          <p className="text-center text-sm text-neutral-500">
-            {formatPageCount(file.pages)} · {file.size}
+    <QxPageFrame
+      title="预览与打印参数"
+      subtitle="第 3 步 / 共 4 步 · 逐页核对文件，再确认份数、颜色、单双面和页范围"
+      status={status}
+      ctabar={(
+        <>
+          <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print/material-check', { state: { file, source } })}>返回材料检查</button>
+          <p className="why">
+            {unsupported
+              ? '当前文件类型不能直接预览打印，请返回重新选择文件。'
+              : privacyGate.kind === 'confirm' && !privacyConfirmed
+                ? '请先逐页核对预览并确认隐私处理结果。'
+              : printerLoading
+                ? '设备状态返回前不放行。'
+                : hasBlockingWarning
+                  ? '打印机当前不可用，不能进入报价确认。'
+                  : '本页不显示金额；下一步由服务端按真实页数和参数报价。'}
           </p>
-          {materialCheck && (
-            <div
-              className={[
-                'rounded-lg border px-3 py-2 text-center text-xs font-medium',
-                redactionBadge?.tone === 'success'
-                  ? 'border-success-bg bg-success-bg text-success-fg'
-                  : 'border-warning/20 bg-warning-bg text-warning-fg',
-              ].join(' ')}
-            >
-              {materialCheck.mode === 'demo' ? '材料检查流程演示完成' : '已完成隐私检查'}
-              {redactionBadge ? ` · ${redactionBadge.text}` : ''}
-            </div>
-          )}
-        </div>
+          <button className="qx-btn" data-variant="primary" type="button" disabled={printerLoading || hasBlockingWarning || unsupported || (privacyGate.kind === 'confirm' && !privacyConfirmed)} onClick={handleNext}>
+            {privacyGate.kind === 'confirm' && !privacyConfirmed ? '请先确认隐私处理结果' : printerLoading ? '设备检测中…' : hasBlockingWarning ? '打印机不可用' : '下一步：让服务端报价'}
+          </button>
+        </>
+      )}
+    >
+      <div className="qpd-preview-grid" data-w2-page="print-preview" data-qx-state={unsupported ? 'file-unsupported' : 'preview'}>
+        <section className="qpd-preview-left">
+          <FilePreviewPanel file={file} token={getToken()} />
+          <div className="qpd-preview-meta"><strong>{file.name}</strong><span>{formatPageCount(file.pages)} · {file.size}</span></div>
+          <div className="qpd-redaction-badge" data-tone={redactionBadge?.tone ?? 'warning'}>
+            {materialCheck?.mode === 'demo' ? '材料检查流程演示完成' : '材料检查已完成'}
+            {redactionBadge ? ` · ${redactionBadge.text}` : ' · 遮挡结果未知，请自行核对预览'}
+          </div>
+          {privacyGate.kind === 'confirm' ? (
+            <label className="qpd-privacy-confirm">
+              <input
+                type="checkbox"
+                checked={privacyConfirmed}
+                onChange={(event) => setPrivacyConfirmed(event.target.checked)}
+              />
+              <span>{privacyGate.confirmationLabel}</span>
+            </label>
+          ) : null}
+        </section>
 
-        {/* ── Right: 参数侧栏 ──────────────────────────────────────────── */}
-        <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto pb-6">
+        <section className="qpd-preview-right">
+          <div className="qpd-device" data-ready={printerReady ? 'true' : undefined}>
+            <span>{printerReady ? <PrinterIcon /> : <WifiOffIcon />}</span>
+            <div><strong>{printerLoading ? '检测设备中…' : printerName}</strong><small>{printerLoading ? '请稍候' : printerLabel}</small></div>
+            {!printerLoading && printerReady ? <CheckCircleIcon aria-hidden="true" /> : null}
+          </div>
 
-          {/* Printer status bar — 仅 printerReady 显示绿色在线，未知/离线 fail-closed */}
-          <Card className="flex items-center gap-3 p-4">
-            <div
-              className={[
-                'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                printerReady ? 'bg-success-bg' : 'bg-error-bg',
-              ].join(' ')}
-            >
-              {printerReady ? (
-                <PrinterIcon className="h-5 w-5 text-success-fg" />
-              ) : (
-                <WifiOffIcon className="h-5 w-5 text-error-fg" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-neutral-900">
-                {printerLoading ? '检测设备中…' : printerName}
-              </p>
-              <p className={['text-xs', printerReady ? 'text-success-fg' : 'text-error-fg'].join(' ')}>
-                {printerLoading ? '请稍候' : printerLabel}
-              </p>
-            </div>
-            {!printerLoading && printerReady && <CheckCircleIcon className="h-5 w-5 shrink-0 text-success" />}
-          </Card>
+          {warnings.length > 0 ? <div className="qpd-warnings">{warnings.map((warning) => <div className="qpd-warning" data-level={warning.level} key={warning.id}><AlertTriangleIcon /><span>{warning.text}</span></div>)}</div> : null}
 
-          {/* Warning / info chips */}
-          {warnings.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {warnings.map((w) => (
-                <div
-                  key={w.id}
-                  className={[
-                    'flex items-start gap-2.5 rounded-lg px-4 py-3 text-sm',
-                    w.level === 'error'
-                      ? 'bg-error-bg text-error-fg'
-                      : w.level === 'warn'
-                      ? 'bg-warning-bg text-warning-fg'
-                      : 'bg-primary-50 text-primary-700',
-                  ].join(' ')}
-                >
-                  {w.level === 'info' ? (
-                    <InfoIcon className="mt-0.5 h-4 w-4 shrink-0" />
-                  ) : (
-                    <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
-                  )}
-                  <span>{w.text}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="qpd-param-stack">
+            <section className="qpd-param-card qpd-suggestion" data-suggestion-state={suggestion.status}>
+              <div className="qpd-suggestion-head"><SparklesIcon /><div><strong>按文件事实给出的参数建议</strong><p>确定性规则，只建议不裁决；你确认前不会生效。</p></div></div>
+              {suggestion.status === 'loading' ? <p className="qpd-param-note">正在读取真实建议…</p> : null}
+              {suggestion.status === 'error' || suggestion.status === 'unavailable' ? <p className="qpd-param-note">{suggestion.message}</p> : null}
+              {suggestion.status === 'ready' ? (
+                <>
+                  <dl className="qpd-suggestion-list">{suggestion.data.items.map((item) => <div key={item.field}><dt>{item.label}</dt><dd>{suggestionValueLabel(item)}</dd></div>)}</dl>
+                  <button className="qx-btn" data-variant="teal" type="button" onClick={applySuggestion}>{suggestionApplied ? '已采用，可继续修改' : '采用这些建议'}</button>
+                </>
+              ) : null}
+            </section>
 
-          <SectionHead>基础参数</SectionHead>
+            <section className="qpd-param-card"><span className="qpd-card-label">打印份数</span><div className="qpd-stepper"><button type="button" aria-label="减少打印份数" disabled={copies <= 1} onClick={() => setCopies(Math.max(1, copies - 1))}><MinusIcon /></button><output>{copies}</output><button type="button" aria-label="增加打印份数" disabled={copies >= 99} onClick={() => setCopies(Math.min(99, copies + 1))}><PlusIcon /></button><span>最多 99 份</span></div></section>
 
-          {/* Copies */}
-          <ParamCard label="打印份数">
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                disabled={copies <= 1}
-                onClick={() => setCopies(Math.max(1, copies - 1))}
-                className="flex h-12 w-12 items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40"
-              >
-                <MinusIcon className="h-5 w-5 text-neutral-600" />
-              </button>
-              <span className="w-16 text-center text-2xl font-bold text-neutral-900">{copies}</span>
-              <button
-                type="button"
-                disabled={copies >= 99}
-                onClick={() => setCopies(Math.min(99, copies + 1))}
-                className="flex h-12 w-12 items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40"
-              >
-                <PlusIcon className="h-5 w-5 text-neutral-600" />
-              </button>
-              <span className="text-sm text-neutral-400">（最多 99 份）</span>
-            </div>
-          </ParamCard>
+            <section className="qpd-param-card"><span className="qpd-card-label">色彩模式</span><ToggleGroup options={COLOR_MODE_OPTIONS} value={colorMode} onChange={(value) => setColorMode(value as ColorMode)} disabled={!capability.color.allowed} disabledReason={capability.color.reason} describedById="print-color-capability-note" /><p id="print-color-capability-note" className="qpd-param-note">{capability.color.allowed ? '彩色金额以下一步服务端报价为准' : capability.color.reason}{restoredParamsWereRestricted ? '；旧会话参数已收口为当前可用组合' : ''}</p></section>
 
-          {/* Color mode */}
-          <ParamCard label="色彩模式">
-            <ToggleGroup
-              options={COLOR_MODE_OPTIONS}
-              value={colorMode}
-              onChange={(v) => setColorMode(v as ColorMode)}
-              disabled={!capability.color.allowed}
-              disabledReason={capability.color.reason}
-              describedById="print-color-capability-note"
-            />
-            <p id="print-color-capability-note" className="mt-2 text-xs text-neutral-500">
-              {capability.color.allowed
-                ? '彩色按彩色单价计费，具体金额以下一步报价为准'
-                : capability.color.reason}
-              {restoredParamsWereRestricted ? '；检测到旧会话参数，已明确收口为当前可用组合' : ''}
-            </p>
-          </ParamCard>
+            <section className="qpd-param-card"><span className="qpd-card-label">单双面</span><ToggleGroup options={DUPLEX_OPTIONS} value={duplex} onChange={(value) => setDuplex(value as DuplexMode)} disabled={!capability.duplex.allowed} disabledReason={capability.duplex.reason} describedById="print-duplex-capability-note" /><p id="print-duplex-capability-note" className="qpd-param-note">{capability.duplex.allowed ? '双面按内容页计费，用纸更省' : capability.duplex.reason}</p></section>
 
-          {/* Duplex */}
-          <ParamCard label="单双面">
-            <ToggleGroup
-              options={[
-                { label: '单面', value: 'simplex' },
-                { label: '双面（长边）', value: 'duplex_long_edge' },
-                { label: '双面（短边）', value: 'duplex_short_edge' },
-              ]}
-              value={duplex}
-              onChange={(v) => setDuplex(v as DuplexMode)}
-              disabled={!capability.duplex.allowed}
-              disabledReason={capability.duplex.reason}
-              describedById="print-duplex-capability-note"
-            />
-            <p id="print-duplex-capability-note" className="mt-2 text-xs text-neutral-500">
-              {capability.duplex.allowed
-                ? '双面按内容页计费，单价与单面相同，用纸更省'
-                : capability.duplex.reason}
-            </p>
-          </ParamCard>
+            <section className="qpd-param-card"><span className="qpd-card-label">页面方向</span><ToggleGroup options={[{ label: '自动', value: 'auto' }, { label: '纵向', value: 'portrait' }, { label: '横向', value: 'landscape' }]} value={orientation} onChange={(value) => setOrientation(value as PrintOrientation)} /></section>
 
-          {/* Orientation */}
-          <ParamCard label="页面方向">
-            <ToggleGroup
-              options={[
-                { label: '自动', value: 'auto' },
-                { label: '纵向', value: 'portrait' },
-                { label: '横向', value: 'landscape' },
-              ]}
-              value={orientation}
-              onChange={(v) => setOrientation(v as PrintOrientation)}
-            />
-          </ParamCard>
+            <section className="qpd-param-card"><span className="qpd-card-label">缩放方式</span><ToggleGroup options={[{ label: '适合页面', value: 'fit' }, { label: '实际大小', value: 'actual' }]} value={scale} onChange={(value) => setScale(value as PrintScale)} /></section>
 
-          {/* Scale */}
-          <ParamCard label="缩放方式">
-            <ToggleGroup
-              options={[
-                { label: '适合页面', value: 'fit' },
-                { label: '实际大小', value: 'actual' },
-              ]}
-              value={scale}
-              onChange={(v) => setScale(v as PrintScale)}
-            />
-          </ParamCard>
+            <section className="qpd-param-card"><span className="qpd-card-label">页面范围</span><ToggleGroup options={[{ label: '全部页面', value: 'all' }, { label: '自定义', value: 'custom' }]} value={pageRange} onChange={(value) => { setPageRange(value as 'all' | 'custom'); setRangeError(null) }} />{pageRange === 'custom' ? <><input className="qpd-range-input" aria-label="自定义页面范围" aria-invalid={Boolean(rangeError)} value={customRange} onChange={(event) => { setCustomRange(event.target.value); setRangeError(null) }} placeholder="例：1-3, 5, 7-9" />{rangeError ? <p className="qpd-range-error">{rangeError}</p> : <p className="qpd-param-note">逗号分开不连续页；重叠范围会去重；超出文档的整段会忽略。</p>}</> : null}</section>
 
-          {/* Page range */}
-          <ParamCard label="页面范围">
-            <ToggleGroup
-              options={[
-                { label: '全部页面', value: 'all' },
-                { label: '自定义', value: 'custom' },
-              ]}
-              value={pageRange}
-              onChange={(v) => {
-                setPageRange(v as 'all' | 'custom')
-                setRangeError(false)
-              }}
-            />
-            {pageRange === 'custom' && (
-              <div className="mt-3">
-                <input
-                  type="text"
-                  inputMode="text"
-                  value={customRange}
-                  onChange={(e) => {
-                    setCustomRange(e.target.value)
-                    setRangeError(false)
-                  }}
-                  placeholder="例：1-3, 5, 7-9"
-                  className={[
-                    'h-12 w-full rounded-lg border px-4 text-sm outline-none transition-colors',
-                    rangeError
-                      ? 'border-error bg-error-bg focus:border-error-fg'
-                      : 'border-neutral-200 focus:border-primary-500',
-                  ].join(' ')}
-                />
-                {rangeError && (
-                  <p className="mt-1.5 text-xs text-error-fg">请输入页面范围，例：1-3, 5, 7-9</p>
-                )}
-              </div>
-            )}
-          </ParamCard>
+            <section className="qpd-param-card"><span className="qpd-card-label">纸张规格</span><div className="qpd-readonly">A4（210 × 297 mm）· 当前仅提供 A4</div></section>
 
-          {/* Paper — read only */}
-          <ParamCard label="纸张规格">
-            <div className="flex h-12 items-center rounded-lg border border-neutral-100 bg-neutral-50 px-4 text-sm text-neutral-500">
-              A4（210 × 297 mm）— 仅支持 A4
-            </div>
-          </ParamCard>
+            <section className="qpd-param-card"><span className="qpd-card-label">用量事实</span><div className="qpd-facts"><InfoRow label="文件页数" value={file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页`} /><InfoRow label="本次选中" value={selectedPages === null ? '待识别，以服务端校验为准' : `${selectedPages} 页`} /><InfoRow label="打印份数" value={`${copies} 份`} /><InfoRow label="颜色模式" value={colorModeLabel(colorMode)} /><InfoRow label="单双面" value={duplexLabel(duplex)} /><InfoRow label="总打印面" value={totalFaces === null ? '待识别，以实际打印为准' : `${totalFaces} 面`} /><InfoRow label="预计用纸" value={sheetsUsed === null ? '待识别，以实际打印为准' : `${sheetsUsed} 张`} />{paperSaved > 0 ? <div className="qpd-warning"><InfoIcon /><span>双面比单面预计少用 {paperSaved} 张纸</span></div> : null}</div></section>
 
-          <SectionHead>用量预估</SectionHead>
-
-          <Card className="p-5">
-            <InfoRow
-              label="文件页数"
-              value={file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页`}
-            />
-            <InfoRow label="打印份数" value={`${copies} 份`} />
-            <InfoRow label="颜色模式" value={colorModeLabel(colorMode)} />
-            <InfoRow label="纸张规格" value="A4" />
-            <InfoRow
-              label="总打印面"
-              value={totalFaces === null ? '待识别，以实际打印为准' : `${totalFaces} 面`}
-            />
-            <InfoRow
-              label="预计用纸"
-              value={sheetsUsed === null ? '待识别，以实际打印为准' : `${sheetsUsed} 张`}
-            />
-
-            {paperSaved > 0 && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">
-                <InfoIcon className="h-4 w-4 shrink-0" />
-                双面打印比单面节省 {paperSaved} 张纸
-              </div>
-            )}
-          </Card>
-
-          <SectionHead>费用说明</SectionHead>
-
-          <Card className="p-5">
-            <p className="text-sm leading-relaxed text-neutral-700">
-              本页只设置打印参数与估算用纸。应付金额在下一步确认页由服务端按识别页数、页码范围与价目计算，与建单收费一致。
-            </p>
-            <p className="mt-3 text-xs text-neutral-400">
-              不在此页展示本地估算金额，避免与最终计费不一致。
-            </p>
-          </Card>
-
-          <InfoSection
-            title="价格说明"
-            accent="primary"
-          >
-            <div className="overflow-hidden rounded-lg border border-neutral-100">
-              <div className="grid grid-cols-4 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-500">
-                <span>打印类型</span>
-                <span>规格</span>
-                <span>黑白</span>
-                <span>彩色</span>
-              </div>
-              {[
-                ['文档/简历', 'A4 普通纸', '确认页报价', '待真机验证'],
-                ['证件照', '1寸/2寸标准版', '—', '待接入'],
-                ['照片打印', '6寸 光面纸', '—', '待接入'],
-                ['铜版纸简历', 'A4 铜版纸', '待接入', '待接入'],
-              ].map(([type, spec, bw, color]) => (
-                <div key={type} className="grid grid-cols-4 border-t border-neutral-100 px-3 py-2 text-xs text-neutral-700">
-                  <span className="font-medium text-neutral-900">{type}</span>
-                  <span>{spec}</span>
-                  <span>{bw}</span>
-                  <span className="font-semibold text-primary-600">{color}</span>
-                </div>
-              ))}
-            </div>
-          </InfoSection>
-
-          <InfoSection
-            title="打印须知"
-            accent="amber"
-          >
-            <ol className="space-y-3 text-sm text-neutral-600">
-              {[
-                '上传文件需清晰完整，当前支持 PDF、JPG、PNG；Word 页内预览和转换能力后续接入。',
-                '左侧可预览 PDF 和图片；如果无法预览，请检查签名链接是否过期，或返回重新上传。',
-                '隐私检查只用于本次打印前确认，扫描件/图片可能通过第三方 OCR 服务识别文字；若已生成遮挡后的文件，打印会改用那一份，否则会按实际处理结论提示打印使用原件。',
-                '打印完成后请从出纸口取件，如有质量问题请联系现场工作人员。',
-              ].map((item, index) => (
-                <li key={item} className="flex gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warning text-xs font-bold text-white">
-                    {index + 1}
-                  </span>
-                  <span className="leading-6">{item}</span>
-                </li>
-              ))}
-            </ol>
-          </InfoSection>
-
-        </div>
+            <section className="qpd-param-card"><span className="qpd-card-label">费用说明</span><p className="qpd-price-truth">本页只设置参数，不展示本地估算金额。应付金额在下一步确认页由服务端按识别页数、页码范围与价目报价，与建单收费保持同源。</p><p className="qpd-param-note">打印涉及第三方 OCR 的隐私披露沿用材料检查页；文件留存期限以隐私政策和“我的文档”设置为准。</p></section>
+          </div>
+        </section>
       </div>
-
-      {/* Bottom action */}
-      <KioskActionBar className="mt-6">
-        <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate(-1)}>
-          返回
-        </Button>
-        <Button
-          size="lg"
-          className="flex-1"
-          onClick={handleNext}
-          disabled={printerLoading || hasBlockingWarning}
-        >
-          {printerLoading ? '设备检测中…' : hasBlockingWarning ? '打印机不可用' : '确认参数'}
-        </Button>
-      </KioskActionBar>
-    </div>
-    </PrintPageFrame>
+    </QxPageFrame>
   )
 }

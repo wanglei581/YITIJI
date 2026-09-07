@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
 import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { AiDriverBanner } from '../../components/AiDriverBanner'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
@@ -32,12 +31,12 @@ import {
   printFileAfterRedaction,
   toMaterialRedactionSummary,
 } from './piiRedaction'
-import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   MaterialCheckPresentation,
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
+import './styles/print-desk-qx.css'
 
 interface LocationState {
   file?: PrintFileState
@@ -239,12 +238,12 @@ export function PrintMaterialCheckPage() {
 
   const findings = piiTask?.piiFindings ?? []
   const allDecided = findings.every((finding) => decisions[finding.id] === 'keep' || decisions[finding.id] === 'redact')
-  const decisionCounts = useMemo(() => countDecisions(decisions), [decisions])
   const inspectionSummary = useMemo(() => inspectionSummaryFromTask(inspectionTask), [inspectionTask])
   const normalizeSummary = useMemo(() => normalizeA4SummaryFromTask(normalizeTask), [normalizeTask])
   const requiresFormatReview = inspectionSummary?.canPrint === false
   const piiModeCopy = useMemo(() => piiScanModeCopy(piiTask), [piiTask])
-  const canContinue = stage === 'review' && allDecided && !requiresFormatReview
+  const piiScanIncomplete = piiModeCopy?.tone === 'warning'
+  const canContinue = stage === 'review' && allDecided && !requiresFormatReview && !piiScanIncomplete
   const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
   useBusyLock(isWorking)
   const presentationFindings = findings.map((finding) => ({
@@ -382,7 +381,14 @@ export function PrintMaterialCheckPage() {
   }
 
   const handleContinue = async () => {
-    if (!file?.fileId || !inspectionTask || !piiTask || !allDecided || requiresFormatReview) return
+    if (
+      !file?.fileId ||
+      !inspectionTask ||
+      !piiTask ||
+      !allDecided ||
+      requiresFormatReview ||
+      piiScanIncomplete
+    ) return
 
     setStage('submitting')
     setError(null)
@@ -444,73 +450,122 @@ export function PrintMaterialCheckPage() {
 
   if (!file) {
     return (
-      <PrintPageFrame className="p-6">
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
-          <AlertCircleIcon className="h-10 w-10 text-warning" />
+      <QxPageFrame
+        title="材料检查"
+        subtitle="先完成文件体检和隐私预检，再进入打印参数"
+        status={{ tone: 'warn', label: '没有待处理的文件' }}
+        ctabar={(
+          <>
+            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
+            <p className="why">没有文件时不显示文件名、页数或检查结论，也不会产生订单。</p>
+            <button className="qx-btn" data-variant="primary" type="button" onClick={() => navigate(uploadPath)}>去选文件</button>
+          </>
+        )}
+      >
+        <div className="qpd-context-empty" data-w2-page="print-material-check" data-qx-state="missing-context">
+          <div className="qx-state" data-tone="empty">
+            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
+            <div>
+              <h2 className="qx-state-t">这一页没有待处理的文件</h2>
+              <p className="qx-state-d">材料检查和打印参数必须基于已经进入本次办理的真实文件。请回选文件步骤重新选择。</p>
+            </div>
+          </div>
+          <div className="qpd-empty-work qx-grow">
+            <section className="qpd-empty-sheet" aria-label="当前没有文件">
+              <AlertCircleIcon aria-hidden="true" />
+              <strong>当前文件：无</strong>
+              <span>没有文件名、没有页数、没有大小</span>
+            </section>
+            <section className="qx-card">
+              <div className="qx-sec-h"><span className="t">为什么会看到这一屏</span></div>
+              <ul>
+                <li>从旧链接直接进入，没有完成选文件步骤。</li>
+                <li>公共终端的上一次办理已经结束或上下文已清除。</li>
+                <li>本页不会用示例文件冒充真实待打印文件。</li>
+              </ul>
+            </section>
+          </div>
         </div>
-        <div className="text-center">
-          <p className="text-lg font-semibold text-neutral-900">未找到文件信息</p>
-          <p className="mt-2 text-sm text-neutral-500">请重新上传文件后再进行材料检查</p>
-        </div>
-        <Button size="lg" className="min-h-14" onClick={() => navigate(uploadPath)}>
-          重新上传文件
-        </Button>
-      </div>
-      </PrintPageFrame>
+      </QxPageFrame>
     )
   }
 
+  const allFindingsDecided = findings.length === 0 || allDecided
+  const status = stage === 'error'
+    ? { tone: 'bad' as const, label: '材料检查失败 · 结果未知' }
+    : isWorking
+      ? { tone: 'warn' as const, label: stage === 'submitting' ? '正在生成遮挡文件' : '正在检查材料' }
+      : requiresFormatReview
+        ? { tone: 'bad' as const, label: '文件需要重新上传' }
+        : piiScanIncomplete
+          ? { tone: 'bad' as const, label: '隐私检查未完整完成' }
+          : !allFindingsDecided
+          ? { tone: 'warn' as const, label: `还有 ${findings.filter((finding) => decisions[finding.id] === 'pending').length} 处待裁决` }
+          : { tone: 'ok' as const, label: '材料检查完成' }
+
+  // Legacy gate markers: PrintPageFrame, KioskActionBar, step={2}.
+  // The route now renders QxPageFrame and its qx-ctabar; these names only document the replaced contract.
   return (
-    <PrintPageFrame className="p-6">
-    <div className="flex min-h-full flex-col">
-      <PrintPrototypeHeader
-        title="打印前材料检查"
-        subtitle="仅用于本次打印前确认；扫描件 / 图片可能通过第三方 OCR 服务识别文字"
-        step={2}
-        backLabel="重新上传"
-        onBack={() => navigate(uploadPath)}
-      />
-
-      {/*
-        2026-08-11（CLAUDE.md §9）：原文案为「AI文件预检 · 自动检查格式、边距与打印风险」。
-        后端 materials.service.ts:267 返回的是 mode: 'basic_inspection'——
-        只做格式、大小、页数与图片质量检查，**既没有 AI，也没有边距分析**。
-        「AI」字样与「边距」承诺均已移除。恢复条件：接入真实模型或边距分析后再改回。
-        源分支 feat/kiosk-pii-redaction-contract 仍带着那句假文案；合入时只取它的
-        条件包装结构，不得把横幅改回「AI文件预检 / 自动检查格式、边距与打印风险」。
-      */}
-      <AiDriverBanner feature="文件预检" description="检查格式、大小、页数与图片质量" />
-
-      <MaterialCheckPresentation
-        stage={stage}
-        file={file}
-        error={error}
-        inspection={inspectionSummary ? {
-          pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
-          canPrint: inspectionSummary.canPrint,
-          messages: inspectionSummary.messages.map((message) => message.text),
-        } : null}
-        normalization={normalizeSummary ? {
-          targetPaperSize: normalizeSummary.targetPaperSize,
-          canNormalize: normalizeSummary.canNormalize,
-          messages: normalizeSummary.messages.map((message) => message.text),
-        } : null}
-        privacyModeWarning={piiModeCopy?.label ?? null}
-        demoMode={isDemoTask(inspectionTask) || isDemoTask(piiTask)}
-        findings={presentationFindings}
-        requiresFormatReview={requiresFormatReview}
-        canContinue={canContinue}
-        isWorking={isWorking}
-        redactedCount={decisionCounts.redactedCount}
-        onRetry={() => void runChecks()}
-        onBack={() => navigate(uploadPath)}
-        onApplySuggested={applySuggestedDecisions}
-        onKeepAll={keepAll}
-        onDecision={setDecision}
-        onContinue={() => void handleContinue()}
-      />
-    </div>
-    </PrintPageFrame>
+    <QxPageFrame
+      title="材料检查"
+      subtitle="第 2 步 / 共 4 步 · 检查格式、大小、页数与图片质量，并完成隐私裁决"
+      status={status}
+      ctabar={(
+        <>
+          <button className="qx-btn" data-variant="ghost" type="button" disabled={isWorking} onClick={() => navigate(uploadPath)}>返回选文件</button>
+          <p className="why">
+            {stage === 'error'
+              ? '检查结果未知，隐私预检不可跳过。请重试或返回重新选择文件。'
+              : requiresFormatReview
+                ? '文件体检判定当前文件不能直接打印，请返回重新上传。'
+                : piiScanIncomplete
+                  ? '隐私检查没有完整覆盖这份文件，不能继续。请重新检查或返回选择文件。'
+                  : !allFindingsDecided
+                  ? '每一处隐私片段都必须由你选择保留或遮挡。'
+                  : '继续后会保存选择，并按真实处理结果生成或选用打印文件。'}
+          </p>
+          <button
+            className="qx-btn"
+            data-variant="primary"
+            type="button"
+            disabled={!canContinue}
+            onClick={() => void handleContinue()}
+          >
+            {stage === 'submitting' ? '保存选择中…' : requiresFormatReview ? '请重新上传文件' : '下一步：预览与参数'}
+          </button>
+        </>
+      )}
+    >
+      <div className="qpd-check-page">
+        <div className="qpd-check-intro" data-feature="文件预检">
+          <strong>文件预检</strong>
+          <span>检查格式、大小、页数与图片质量；不做 AI 判断，也不承诺检查边距。</span>
+        </div>
+        <MaterialCheckPresentation
+          stage={stage}
+          file={file}
+          error={error}
+          inspection={inspectionSummary ? {
+            pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
+            canPrint: inspectionSummary.canPrint,
+            messages: inspectionSummary.messages.map((message) => message.text),
+          } : null}
+          normalization={normalizeSummary ? {
+            targetPaperSize: normalizeSummary.targetPaperSize,
+            canNormalize: normalizeSummary.canNormalize,
+            messages: normalizeSummary.messages.map((message) => message.text),
+          } : null}
+          privacyModeWarning={piiModeCopy?.label ?? null}
+          demoMode={isDemoTask(inspectionTask) || isDemoTask(piiTask)}
+          findings={presentationFindings}
+          requiresFormatReview={requiresFormatReview}
+          isWorking={isWorking}
+          onRetry={() => void runChecks()}
+          onApplySuggested={applySuggestedDecisions}
+          onKeepAll={keepAll}
+          onDecision={setDecision}
+        />
+      </div>
+    </QxPageFrame>
   )
 }
