@@ -1,5 +1,9 @@
 # 下一步任务
 
+## 2026-09-07 打印预览 PDF 插件文档导航
+
+- Chromium 在 React Router SPA 跳走时会把仍在加载的 PDF `document` 请求 abort（`net::ERR_ABORTED`）。iframe 留在 `document.body`、改 blob URL 都会 abort。当前预览框改为立刻完成的 `srcdoc` + `fetch` 读字节，避免 document abort；**逐页 PDF 插件预览**因此不在运行时里。要恢复页内看稿，需要不走 iframe/object document 导航的渲染（例如 pdf.js 画到 canvas），不能再把 PDF URL 交给 iframe `src`。
+
 ## 2026-09-07 报价确认页青序迁移残留
 
 - 优惠券 / 机端核销仍未接通：确认页按稿保留入口，禁用并写明「服务端还没有下发券面值与适用范围」。要真正核销须先有打印适用范围、面值上限、退款恢复规则，不能把整单免掉。

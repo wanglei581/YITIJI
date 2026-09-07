@@ -405,25 +405,31 @@ test('pickup hid invalid code shows the server error without fabricating success
 
 /** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
 function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
+function quoteResponseJson(opts?: { amountCents?: number; billablePages?: number; unitCents?: number }) {
   const billablePages = opts?.billablePages ?? 2
   const unitCents = opts?.unitCents ?? 100
   const amountCents = opts?.amountCents ?? billablePages * unitCents
+  return {
+    amountCents,
+    billablePages,
+    billingPageSource: 'detected' as const,
+    priceLines: [
+      {
+        serviceKey: 'print_bw_page',
+        description: '黑白打印',
+        unitCents,
+        quantity: billablePages,
+        amountCents,
+      },
+    ],
+  }
+}
+
+/** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
+function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
   api.respond('POST', '/api/v1/orders/quote', {
     status: 200,
-    json: {
-      amountCents,
-      billablePages,
-      billingPageSource: 'detected',
-      priceLines: [
-        {
-          serviceKey: 'print_bw_page',
-          description: '黑白打印',
-          unitCents,
-          quantity: billablePages,
-          amountCents,
-        },
-      ],
-    },
+    json: quoteResponseJson(opts),
   })
 }
 
@@ -659,7 +665,7 @@ test('material checks require a PII decision, create the redacted task, and carr
   await page.getByRole('button', { name: '遮挡', exact: true }).click()
   await page.getByRole('button', { name: '下一步：预览与参数' }).click()
   await page.waitForURL('**/print/preview')
-  await expect(page.getByTitle('w2-sample.pdf 预览')).toHaveAttribute('src', '/w2-fixtures/sample-redacted.pdf')
+  await expect(page.getByTitle('w2-sample.pdf 预览')).toHaveAttribute('data-preview-src', '/w2-fixtures/sample-redacted.pdf')
   expect(decisionBody).toEqual({ decisions: [{ findingId: 'w2-finding-phone', action: 'redact' }] })
   expect(redactionCreated).toBe(true)
   await expect(page.getByText('raw-w2-fixture-token')).toHaveCount(0)
@@ -691,7 +697,7 @@ test('direct preview restores the material session and completes the PDF respons
 
   await page.goto('/print/preview')
   await expect(page.getByTitle(`${W2_FILE.name} 预览`)).toBeVisible()
-  await expect.poll(() => page.locator(`iframe[src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
+  await expect.poll(() => page.locator(`iframe[data-preview-src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
   binary.assertPdfCompleted()
   await expectHealthy(page, errors, 'print-preview')
 })
@@ -751,12 +757,6 @@ test('print parameter suggestions are advisory until applied and then flow to co
   registerShell(api)
   registerPrice(api)
   registerQuote(api, { amountCents: 600, billablePages: 6, unitCents: 100 })
-  let quoteBody: unknown = null
-  page.on('request', (request) => {
-    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/orders/quote') {
-      quoteBody = request.postDataJSON()
-    }
-  })
   api.respond('GET', '/api/v1/materials/tasks/w2-inspection-001/print-param-suggestions', {
     status: 200,
     json: { success: true, data: printParamSuggestions({ copies: 3 }) },
@@ -764,6 +764,28 @@ test('print parameter suggestions are advisory until applied and then flow to co
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
   await seedMaterialSession(page)
+  // 预览→确认是 SPA 导航。Playwright 在这个窗口里对已拦截 POST 的 postDataJSON()
+  // 为空（页面已按 registerQuote 渲染 ¥6.00，请求确实发出了）。
+  // page.route + fallback 会把报价挂死；自己 fulfill 也读不到 body。
+  // 所以在页面 fetch 出口抓 payload，应答仍只由 registerQuote 提供。
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+      if (method === 'POST' && String(url).includes('/orders/quote')) {
+        const marker = window as Window & { __w2QuoteBodies?: unknown[] }
+        marker.__w2QuoteBodies = marker.__w2QuoteBodies ?? []
+        const body = typeof init?.body === 'string' ? init.body : null
+        try {
+          marker.__w2QuoteBodies.push(body ? JSON.parse(body) : null)
+        } catch {
+          marker.__w2QuoteBodies.push(body)
+        }
+      }
+      return originalFetch(input, init)
+    }
+  })
 
   await page.goto('/print/preview')
   await expect(page.locator('.qpd-stepper output')).toHaveText('1')
@@ -772,11 +794,16 @@ test('print parameter suggestions are advisory until applied and then flow to co
   await expect(page.locator('.qpd-stepper output')).toHaveText('3')
   await page.getByRole('button', { name: '下一步：让服务端报价' }).click()
   await page.waitForURL('**/print/confirm')
-  // 报价确认页迁青序流光（#916）后「3 份」出现在两处：摘要行的 <dd> 与报价行的 <strong>。
-  // 两处都断言，比原来那条会撞 strict mode 的宽泛匹配更强，不是放宽。
-  await expect(page.locator('dd').filter({ hasText: /^3 份$/ })).toBeVisible()
-  await expect(page.locator('strong').filter({ hasText: /^3 份$/ })).toBeVisible()
-  expect(quoteBody).toMatchObject({ params: { copies: 3 } })
+  // 确认页摘要用 data-sum-row + <b class="v">，报价金额来自 POST /orders/quote。
+  // 预览页才有「3 份」的 dd/strong；不能用它们冒充确认页断言。
+  await expect(page.locator('[data-sum-row="打印份数"] .v')).toHaveText('3 份')
+  await expect(page.getByTestId('print-confirm-amount')).toHaveText(/6\.00/)
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const bodies = (window as Window & { __w2QuoteBodies?: Array<{ params?: { copies?: number } }> }).__w2QuoteBodies
+      return bodies?.[bodies.length - 1] ?? null
+    })
+  }).toMatchObject({ params: { copies: 3 } })
   await expectHealthy(page, errors, 'print-confirm')
 })
 

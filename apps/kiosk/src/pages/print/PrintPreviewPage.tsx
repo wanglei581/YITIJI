@@ -26,6 +26,7 @@ import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import { useAuth } from '../../auth/useAuth'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { FileContentPreview } from '../../components/FileContentPreview'
+import { PdfPreviewFrame } from './PdfPreviewFrame'
 import {
   isWordDocument,
   useDocumentConversionCapabilities,
@@ -195,7 +196,9 @@ function FilePreviewPanel({ file, token }: { file: PrintFile; token: string | nu
   return (
     <>
       <div className="relative flex max-h-[min(56vh,860px)] min-h-[620px] qpd-preview-shell rounded-xl border border-neutral-200 bg-neutral-50">
-        {previewKind === 'pdf' ? <iframe className="max-h-full" title={`${file.name} 预览`} src={file.fileUrl} /> : null}
+        {previewKind === 'pdf' && file.fileUrl ? (
+          <PdfPreviewFrame className="max-h-full" title={`${file.name} 预览`} src={file.fileUrl} />
+        ) : null}
         {previewKind === 'image' ? <img className="max-h-full" src={file.fileUrl} alt={`${file.name} 预览`} /> : null}
         {previewKind === 'word' ? (
           <FileContentPreview
