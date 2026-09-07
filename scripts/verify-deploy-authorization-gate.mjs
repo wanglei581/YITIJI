@@ -14,8 +14,14 @@ const releaseScript = fs.readFileSync(releaseScriptPath, 'utf8')
 const deployJob = workflow.match(/^  deploy:\n[\s\S]*$/m)?.[0]
 assert.ok(deployJob, 'deploy.yml must contain the deploy job')
 
+// 2026-09-07：新增 workflow_dispatch 手动补发（原因见 deploy.yml 的注释：多 lane 并行时
+// 发布前 CI 几乎抢不到窗口）。本门禁守的不变量**没有放宽**，只是拆成两半各自钉死：
+//   ① job 级仍必须同时要求「CI 成功 或 手动补发」与 DEPLOY_API_ENABLED=true；
+//   ② 手动补发这条路径必须由 resolve 步骤逐项校验所给运行号（CI 工作流 / main 分支 /
+//      conclusion=success），且发布用的 SHA 只能来自该步骤输出 —— 见下方 dispatch 段断言。
+// 二者合起来仍等价于「只发布 CI 已验证的精确提交」。
 const explicitAuthorizationGate =
-  /^    if:\s*\$\{\{\s*github\.event\.workflow_run\.conclusion\s*==\s*'success'\s*&&\s*vars\.DEPLOY_API_ENABLED\s*==\s*'true'\s*\}\}\s*$/m
+  /^    if:\s*\$\{\{\s*\(github\.event_name\s*==\s*'workflow_dispatch'\s*\|\|\s*github\.event\.workflow_run\.conclusion\s*==\s*'success'\)\s*&&\s*vars\.DEPLOY_API_ENABLED\s*==\s*'true'\s*\}\}\s*$/m
 
 assert.equal(
   (deployJob.match(/^    if:/gm) ?? []).length,
@@ -27,6 +33,25 @@ assert.match(
   explicitAuthorizationGate,
   'deploy job must require successful CI and DEPLOY_API_ENABLED=true at job level'
 )
+
+// ── 手动补发路径：必须逐项校验运行号，且目标 SHA 只能来自校验后的输出 ──────────
+assert.match(
+  deployJob,
+  /EXPECTED_SHA='\$\{\{ steps\.target\.outputs\.sha \}\}'/,
+  'deploy must take the target SHA from the validated resolve step, never straight from a dispatch input'
+)
+assert.doesNotMatch(
+  deployJob,
+  /EXPECTED_SHA='\$\{\{ (inputs|github\.event\.inputs)\./,
+  'a dispatch input must never be used as the deploy target SHA without validation'
+)
+for (const [pattern, message] of [
+  [/\.name'\)"?\s*$/m, 'resolve step must read the run workflow name'],
+  [/if \[ "\$NAME" != "CI" \] \|\| \[ "\$BRANCH" != "main" \] \|\| \[ "\$CONCL" != "success" \]/, 'dispatch path must reject runs that are not a successful main CI'],
+  [/grep -Eq '\^\[0-9a-f\]\{40\}\$'/, 'resolved SHA must be validated as a 40-hex commit id'],
+]) {
+  assert.match(workflow, pattern, message)
+}
 
 const gateOffset = deployJob.search(explicitAuthorizationGate)
 const sshOffset = deployJob.indexOf('uses: appleboy/ssh-action@')
