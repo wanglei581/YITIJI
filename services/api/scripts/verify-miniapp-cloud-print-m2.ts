@@ -4,11 +4,12 @@
  */
 import 'dotenv/config'
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { validateSync } from 'class-validator'
 import { AuditService } from '../src/audit/audit.service'
+import { FilesService } from '../src/files/files.service'
 import { PICKUP_CODE_LENGTH, PICKUP_CODE_PATTERN, randomPickupCode } from '../src/common/pickup-code'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { ClaimPickupDto } from '../src/print-jobs/dto/claim-pickup.dto'
@@ -75,12 +76,12 @@ async function captureHttpError(
 }
 
 async function expectCode(action: () => Promise<unknown>, expected: string, label: string): Promise<void> {
-  try { await action(); fail(`${label}: expected ${expected}`) }
-  catch (error) {
-    const actual = codeOf(error)
-    if (!actual.includes(expected)) fail(`${label}: expected ${expected}, got ${actual}`)
-    pass(label)
-  }
+  let thrown: unknown
+  try { await action() } catch (error) { thrown = error }
+  if (!thrown) fail(`${label}: expected ${expected}`)
+  const actual = codeOf(thrown)
+  if (!actual.includes(expected)) fail(`${label}: expected ${expected}, got ${actual}`)
+  pass(label)
 }
 /**
  * 最小 Redis 替身：只实现锁定模块用到的 4 个命令（get / setEx / incrWithTtl / del）。
@@ -264,9 +265,10 @@ async function main(): Promise<void> {
   const capabilities = new TerminalCapabilitiesService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
   const quote = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma))
+  const files = new FilesService(prisma, audit, storage)
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
   const redis = new FakeRedis()
-  const pickup = new PickupOrderService(prisma, capabilities, audit, redis as unknown as RedisService)
+  const pickup = new PickupOrderService(prisma, capabilities, audit, redis as unknown as RedisService, storage)
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const userId = `eu_m2_${suffix}`
   const terminalId = `terminal_m2_${suffix}`
@@ -294,14 +296,40 @@ async function main(): Promise<void> {
     await prisma.fileObject.create({
       data: {
         id, storageKey, bucket: LOCAL_BUCKET_SENTINEL, region: 'local', filename: `${label}.pdf`, mimeType: 'application/pdf',
-        sizeBytes: pdf.length, sha256: 'a'.repeat(64), endUserId: userId, ownerType: 'user', ownerId: userId,
+        sizeBytes: pdf.length, sha256: createHash('sha256').update(pdf).digest('hex'), endUserId: userId, ownerType: 'user', ownerId: userId,
         purpose: 'print_doc', status: 'active', expiresAt: new Date(Date.now() + expiresInMs),
       },
     })
     const task = await prisma.documentProcessTask.create({
-      data: { kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: id, endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+      data: {
+        kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: id,
+        endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(pdf).digest('hex') }),
+      },
     })
     await prisma.piiFinding.create({ data: { taskId: task.id, type: 'phone', label: '手机号', action: piiAction } })
+  }
+  async function seedTamperedDirectFile(label: string): Promise<string> {
+    const directIntent = await files.createUploadIntent({
+      body: { purpose: 'print_doc', filename: `${label}.pdf`, mimeType: 'application/pdf', sizeBytes: 1024 },
+      uploaderId: null,
+      endUserId: userId,
+    })
+    const directRecord = await prisma.fileObject.findUniqueOrThrow({ where: { id: directIntent.fileId } })
+    storageKeys.push(directRecord.storageKey)
+    const directPdf = buildRealPdf(1)
+    await storage.putObject(directRecord.storageKey, directPdf, 'application/pdf', directRecord.bucket)
+    await files.completeUpload(directIntent.fileId, { kind: 'member', endUserId: userId })
+    const directScan = await prisma.documentProcessTask.create({
+      data: {
+        kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: directIntent.fileId,
+        endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(directPdf).digest('hex') }),
+      },
+    })
+    await prisma.piiFinding.create({ data: { taskId: directScan.id, type: 'phone', label: '手机号', action: 'keep' } })
+    await storage.putObject(directRecord.storageKey, buildRealPdf(2), 'application/pdf', directRecord.bucket)
+    return directIntent.fileId
   }
 
   try {
@@ -347,6 +375,34 @@ async function main(): Promise<void> {
       fail(`小程序云打印建单 channel 应为 'miniapp_cloud'，实际: ${JSON.stringify(stored.channel)}`)
     }
     pass('小程序建单为 Order-only；页数与金额来自服务端；到机码仅 hash + 密文落库')
+
+    await prisma.documentProcessTask.updateMany({
+      where: { sourceFileId: fileId, kind: 'pii_scan' },
+      data: { paramsJson: JSON.stringify({ sourceSha256: 'b'.repeat(64) }) },
+    })
+
+    const directForOrder = await seedTamperedDirectFile('直传建单篡改件')
+    await expectCode(
+      () => memberOrders.create(userId, { fileId: directForOrder, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
+      'FILE_CONTENT_CHANGED',
+      'RES-2 complete 后内容变化 → 建单 409 FILE_CONTENT_CHANGED',
+    )
+    const directForRead = await seedTamperedDirectFile('直传读取篡改件')
+    await expectCode(
+      () => files.readContentForEndUser(directForRead, userId),
+      'FILE_CONTENT_CHANGED',
+      'RES-2 complete 后内容变化 → 读取 409 FILE_CONTENT_CHANGED',
+    )
+    await expectCode(
+      () => memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
+      'PII_SCAN_STALE',
+      'RES-1 member-print-order sha256 不一致 → 409 PII_SCAN_STALE',
+    )
+    const sourceSha = (await prisma.fileObject.findUniqueOrThrow({ where: { id: fileId }, select: { sha256: true } })).sha256
+    await prisma.documentProcessTask.updateMany({
+      where: { sourceFileId: fileId, kind: 'pii_scan' },
+      data: { paramsJson: JSON.stringify({ sourceSha256: sourceSha }) },
+    })
 
     const cancellable = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' })
     await memberOrders.cancel(userId, cancellable.id, { reason: 'verify cancellation' })
@@ -398,6 +454,20 @@ async function main(): Promise<void> {
     const claimedAgain = await pickup.claim(created.pickupCode, terminalId)
     if (claimedAgain.released !== false || claimedAgain.orderId !== created.id) fail('重复认领未保持同一订单')
     pass('同机认领幂等，未付款仍不创建打印任务')
+
+    await prisma.documentProcessTask.updateMany({
+      where: { sourceFileId: fileId, kind: 'pii_scan' },
+      data: { paramsJson: JSON.stringify({ sourceSha256: 'c'.repeat(64) }) },
+    })
+    await expectCode(
+      () => pickup.claim(created.pickupCode, terminalId),
+      'PII_SCAN_STALE',
+      'RES-1 pickup-order sha256 不一致 → 409 PII_SCAN_STALE',
+    )
+    await prisma.documentProcessTask.updateMany({
+      where: { sourceFileId: fileId, kind: 'pii_scan' },
+      data: { paramsJson: JSON.stringify({ sourceSha256: sourceSha }) },
+    })
 
     await expectCode(
       () => pickup.release(created.id, terminalId, claimed.paymentSessionToken),

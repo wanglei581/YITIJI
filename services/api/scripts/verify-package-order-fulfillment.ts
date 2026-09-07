@@ -6,7 +6,7 @@
  */
 import 'dotenv/config'
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { AuditService } from '../src/audit/audit.service'
@@ -40,6 +40,21 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] = 'verify-terminal-action-token-secr
 
 function pass(message: string): void { console.log(`  PASS ${message}`) }
 function fail(message: string): never { throw new Error(message) }
+function codeOf(error: unknown): string {
+  const ex = error as { getResponse?: () => unknown; response?: unknown; message?: string }
+  const response = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
+    | { error?: { code?: string }; message?: string }
+    | undefined
+  return response?.error?.code ?? response?.message ?? ex.message ?? 'UNKNOWN'
+}
+async function expectCode(action: () => Promise<unknown>, expected: string, label: string): Promise<void> {
+  let thrown: unknown
+  try { await action() } catch (error) { thrown = error }
+  if (!thrown) fail(`${label}: expected ${expected}`)
+  const actual = codeOf(thrown)
+  if (!actual.includes(expected)) fail(`${label}: expected ${expected}, got ${actual}`)
+  pass(label)
+}
 
 class FakeRedis {
   private readonly values = new Map<string, string>()
@@ -83,7 +98,7 @@ async function main(): Promise<void> {
   const quotes = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma), capabilities, prisma)
   const packages = new PackageOrderService(prisma, quotes, capabilities, audit)
   const statuses = new OrderStatusService(prisma, audit)
-  const pickup = new PickupOrderService(prisma, capabilities, audit, new FakeRedis() as unknown as RedisService)
+  const pickup = new PickupOrderService(prisma, capabilities, audit, new FakeRedis() as unknown as RedisService, storage)
   const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
   const agent = new TerminalAgentService(prisma, audit)
 
@@ -107,7 +122,7 @@ async function main(): Promise<void> {
         filename: `材料包第${seq + 1}份.pdf`,
         mimeType: 'application/pdf',
         sizeBytes: pdf.length,
-        sha256: 'a'.repeat(63) + seq,
+        sha256: createHash('sha256').update(pdf).digest('hex'),
         endUserId: userId,
         ownerType: 'user',
         ownerId: userId,
@@ -120,6 +135,7 @@ async function main(): Promise<void> {
       data: {
         kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: fileId,
         endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(pdf).digest('hex') }),
       },
     })
     await prisma.piiFinding.create({ data: { taskId: task.id, type: 'phone', label: '手机号', action: 'keep' } })
@@ -142,6 +158,26 @@ async function main(): Promise<void> {
     await prisma.terminalCapability.create({ data: { terminalId, capabilityKey: 'document_print', status: 'available' } })
     await seedDevDefaultPriceConfig(prisma)
     await Promise.all(fileIds.map(seedFile))
+
+    await prisma.documentProcessTask.updateMany({
+      where: { sourceFileId: fileIds[1], kind: 'pii_scan' },
+      data: { paramsJson: JSON.stringify({ sourceSha256: 'b'.repeat(64) }) },
+    })
+    await expectCode(
+      () => packages.create(userId, {
+        terminalId,
+        files: fileIds.map((fileId) => ({ fileId })),
+        params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+      }),
+      'PII_SCAN_STALE',
+      'RES-1 package-order sha256 不一致 → 409 PII_SCAN_STALE',
+    )
+    const restoredPdf = buildRealPdf(2)
+    // buildRealPdf is deterministic; restore the exact server-side fixture hash.
+    await prisma.documentProcessTask.updateMany({
+      where: { sourceFileId: fileIds[1], kind: 'pii_scan' },
+      data: { paramsJson: JSON.stringify({ sourceSha256: createHash('sha256').update(restoredPdf).digest('hex') }) },
+    })
 
     const created = await packages.create(userId, {
       terminalId,

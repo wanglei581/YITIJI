@@ -7,6 +7,9 @@ import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
+import { assertPiiScanned } from './pii-scan-gate'
+import { assertFileContentIntegrity } from '../files/file-content-integrity'
+import { StorageService } from '../storage/storage.service'
 import {
   clearPickupClaimFailures,
   isPickupClaimLocked,
@@ -23,6 +26,7 @@ export class PickupOrderService {
     private readonly capabilities: TerminalCapabilitiesService,
     private readonly audit: AuditService,
     private readonly redis: RedisService,
+    private readonly storage: StorageService,
   ) {}
 
   /**
@@ -267,14 +271,15 @@ export class PickupOrderService {
     if (!file || file.status !== 'active' || (file.expiresAt && file.expiresAt <= new Date())) {
       throw new BadRequestException({ error: { code: 'PRINT_FILE_EXPIRED', message: '打印文件已失效，请重新上传' } })
     }
+    await assertFileContentIntegrity({ prisma: this.prisma, storage: this.storage, fileId })
     if (['print_doc', 'resume_upload', 'resume_scan'].includes(file.purpose)) {
-      const scan = await this.prisma.documentProcessTask.findFirst({
-        where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
-        orderBy: { createdAt: 'desc' }, select: { id: true },
+      await assertPiiScanned({
+        prisma: this.prisma,
+        fileId,
+        requireCompleted: true,
+        missingMessage: '打印隐私检查尚未完成',
+        pendingMessage: '打印隐私检查尚未完成',
       })
-      if (!scan || await this.prisma.piiFinding.count({ where: { taskId: scan.id, action: 'pending' } }) > 0) {
-        throw new BadRequestException({ error: { code: 'PRINT_PII_SCAN_REQUIRED', message: '打印隐私检查尚未完成' } })
-      }
     }
   }
 

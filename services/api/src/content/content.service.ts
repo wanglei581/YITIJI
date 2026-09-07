@@ -273,17 +273,21 @@ export class ContentService {
 
   // ── 播放方案 ────────────────────────────────────────────────────────────────
 
-  async listPlaylists(page = 1, pageSize = 50): Promise<AdPlaylistView[]> {
+  async listPlaylists(page = 1, pageSize = 50): Promise<{ data: AdPlaylistView[]; total: number }> {
     const take = Math.min(100, Math.max(1, pageSize))
     const skip = (Math.max(1, page) - 1) * take
-    const records = await this.prisma.adPlaylist.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take,
-      include: { items: { include: { asset: true }, orderBy: { order: 'asc' } } },
-    })
-    return records.map(toPlaylistView)
+    const where = { deletedAt: null }
+    const [records, total] = await Promise.all([
+      this.prisma.adPlaylist.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        include: { items: { include: { asset: true }, orderBy: { order: 'asc' } } },
+      }),
+      this.prisma.adPlaylist.count({ where }),
+    ])
+    return { data: records.map(toPlaylistView), total }
   }
 
   async createPlaylist(input: {

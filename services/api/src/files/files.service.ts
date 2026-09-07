@@ -50,6 +50,7 @@ import {
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
 import { parseContentFileId, signFileUrl } from './signing'
+import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './file-content-integrity'
 
 /**
  * COS 直传 completeUpload 阶段允许整读回嗅探的对象大小上限。
@@ -428,9 +429,29 @@ export class FilesService {
       sha256 = createHash('sha256').update(bytes).digest('hex')
     }
 
-    const cas = await this.prisma.fileObject.updateMany({
-      where: { id: fileId, status: 'uploading' },
-      data: { sizeBytes: head.sizeBytes, sha256, status: 'active' },
+    // COS already-issued PUT URLs remain usable until their own expiry. The API
+    // cannot revoke them, so subsequent controlled reads validate this baseline.
+    const cas = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.fileObject.updateMany({
+        where: { id: fileId, status: 'uploading' },
+        data: { sizeBytes: head.sizeBytes, sha256, status: 'active' },
+      })
+      if (updated.count !== 1) return updated
+      await tx.auditLog.create({
+        data: {
+          actorId: null,
+          actorRole: 'system',
+          action: DIRECT_UPLOAD_COMPLETE_ACTION,
+          targetType: 'file',
+          targetId: record.id,
+          payloadJson: JSON.stringify({
+            sizeBytes: head.sizeBytes,
+            sha256Present: Boolean(sha256),
+            objectEtag: head.etag,
+          }),
+        },
+      })
+      return updated
     })
     if (cas.count !== 1) this.throwFileAlreadyFinalized()
     return {
@@ -532,6 +553,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertContentIntegrity(record.id)
 
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
 
@@ -582,6 +604,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    await this.assertContentIntegrity(record.id)
     const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
     const signed = this.storage.getDownloadUrl(
       {
@@ -623,6 +646,7 @@ export class FilesService {
     ) {
       this.throwFileNotFound()
     }
+    await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
       buffer,
@@ -654,6 +678,7 @@ export class FilesService {
         error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
       })
     }
+    await this.assertContentIntegrity(record.id)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
       buffer,
@@ -1210,6 +1235,10 @@ export class FilesService {
     options: { allowMemberDataExport?: boolean; allowContractReviewReport?: boolean } = {},
   ) {
     return this.requireFile(fileId, { ...options, allowExpired: false })
+  }
+
+  async assertContentIntegrity(fileId: string): Promise<void> {
+    await assertFileContentIntegrity({ prisma: this.prisma, storage: this.storage, fileId })
   }
 
   /** 对外 URL / content 只允许 active；uploading/quarantined 一律按不存在处理。 */

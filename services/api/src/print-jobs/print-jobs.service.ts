@@ -20,9 +20,7 @@ import type { BillingPageSource } from './print-page-count.types'
 import { assertVerifiedPrintParameters } from './verified-print-parameters'
 import { DocumentConversionService } from '../document-conversion/document-conversion.service'
 import { WORD_MIME_TYPES } from '../document-conversion/document-conversion.types'
-
-/** 服务端 sha256 必须是 64 位小写十六进制（PII 扫描比对 / 报告完整性校验共用）。 */
-const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
+import { assertPiiScanned } from './pii-scan-gate'
 
 export interface PrintJobCreated {
   taskId:    string
@@ -224,8 +222,6 @@ function makeOrderNo(): string {
  * 派生产物与系统生成物（cover_letter / self_assessment_report / fair_material 等）
  * 不在此列——它们由本机生成，不是用户手里可能夹带证件号的原件。
  */
-const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
-
 /**
  * 打印前隐私预检门控。默认关闭，由 PRINT_REQUIRE_PII_SCAN=true 显式开启；
  * 关闭时只记录不拦截，便于先观察真实流量中有多少文件绕过了 material-check，
@@ -564,65 +560,14 @@ export class PrintJobsService {
    * 门控关闭时（默认）只写审计不拦截，用于先观察真实绕过量。
    */
   private async assertPiiScanned(fileId: string): Promise<void> {
-    const file = await this.prisma.fileObject.findUnique({
-      where: { id: fileId },
-      select: { purpose: true, assetCategory: true, sha256: true },
-    })
-    // 文件不存在交由后续既有校验处理，此处不越权报错
-    if (!file) return
-
-    const isDerived = file.assetCategory === 'derived' || file.assetCategory === 'optimized'
-    if (isDerived || !PII_SCAN_REQUIRED_PURPOSES.has(file.purpose)) return
-
-    const scan = await this.prisma.documentProcessTask.findFirst({
-      where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, paramsJson: true },
-    })
-
-    let pendingFindings = 0
-    if (scan) {
-      pendingFindings = await this.prisma.piiFinding.count({
-        where: { taskId: scan.id, action: 'pending' },
-      })
-    }
-
-    const ok = Boolean(scan) && pendingFindings === 0
-    if (ok) {
-      const scanSha = readPiiScanSourceSha256(scan!.paramsJson)
-      if (!SHA256_HEX_PATTERN.test(file.sha256) || file.sha256 !== scanSha) {
-        throw new ConflictException({
-          error: {
-            code: 'PII_SCAN_STALE',
-            message: '文件在隐私检查后又被改过，请重新检查后再打印',
-          },
-        })
-      }
-      return
-    }
-
-    const reason = !scan ? 'PII_SCAN_MISSING' : 'PII_DECISIONS_PENDING'
-
-    if (!requirePiiScanBeforePrint()) {
-      // 观察期：不拦截，只留痕，便于统计真实绕过量后再收紧
-      await this.audit.write({
-        actorId:    null,
-        actorRole:  'kiosk',
-        action:     'print_job.pii_scan_bypassed',
-        targetType: 'file_object',
-        targetId:   fileId,
-        payload: { reason, purpose: file.purpose, assetCategory: file.assetCategory, pendingFindings },
-      }).catch(() => undefined)
-      return
-    }
-
-    throw new BadRequestException({
-      error: {
-        code: 'PRINT_PII_SCAN_REQUIRED',
-        message: !scan
-          ? '这份文件还没做隐私检查，请返回材料检查步骤完成后再打印'
-          : '还有隐私片段没有确认保留或遮挡，请逐项确认后再打印',
-      },
+    await assertPiiScanned({
+      prisma: this.prisma,
+      audit: this.audit,
+      fileId,
+      requireCompleted: requirePiiScanBeforePrint(),
+      actorRole: 'kiosk',
+      missingMessage: '这份文件还没做隐私检查，请返回材料检查步骤完成后再打印',
+      pendingMessage: '还有隐私片段没有确认保留或遮挡，请逐项确认后再打印',
     })
   }
 
@@ -896,14 +841,5 @@ export class PrintJobsService {
     if (!session.ok && !memberOk) printTaskNotFound()
 
     return { task, order: task.order, file: task.file }
-  }
-}
-
-function readPiiScanSourceSha256(paramsJson: string | null): string {
-  try {
-    const parsed = JSON.parse(paramsJson || '{}') as { sourceSha256?: unknown }
-    return typeof parsed.sourceSha256 === 'string' ? parsed.sourceSha256 : ''
-  } catch {
-    return ''
   }
 }

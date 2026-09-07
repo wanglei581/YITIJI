@@ -161,6 +161,15 @@ async function main() {
 
     const p2 = await content.createPlaylist({ name: '方案B(脏外链)', status: 'active', createdBy: null, items: [{ assetId: extDirty.id, order: 0, enabled: true }] })
     playlistIds.push(p2.id)
+    const playlistPage = await content.listPlaylists(1, 1)
+    if (playlistPage.data.length === 1 && playlistPage.total >= 2) pass('3b. 播放方案分页返回 { data, total }')
+    else fail(`3b. 播放方案分页形状异常: ${JSON.stringify(playlistPage)}`)
+    const adminScreensaverSource = readFileSync(join(__dirname, '../../../apps/admin/src/services/api/screensaver.ts'), 'utf8')
+    if (adminScreensaverSource.includes("req<{ data: AdPlaylistView[]; total: number }>('GET', '/admin/ad-playlists')") && adminScreensaverSource.includes('return result.data')) {
+      pass('3c. Admin HTTP 适配器解包播放方案 { data, total }')
+    } else fail('3c. Admin HTTP 适配器未适配播放方案分页形状')
+    if (adminScreensaverSource.includes('async listPlaylists() {\n    return mockPlaylists')) pass('3d. Admin mock 保持 listPlaylists 数组契约')
+    else fail('3d. Admin mock 未保持 listPlaylists 数组契约')
 
     // ── 4. 启用/禁用 + 软删 + 脏数据制造 ─────────────────────────────
     const upd = await content.updateAsset(imgDisabled.id, { status: 'disabled' })
