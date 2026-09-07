@@ -381,6 +381,12 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 
 #### 包 P1 · 部署清单第三章 82 条：分类 + 取证补录 —— grok
 
+- **2026-09-08 总指挥窗口在生产上跑完 B 堆，并修正了本包脚本的两处安全问题（我的错，如实记）**：
+  1. **掩码是黑名单形态**：`s/(SECRET|SECRET_ID|SECRET_KEY|API_KEY|TOKEN|PRIVATE)=.*/\1=SET/` 会让名字里不含这些词的密钥**明文打出来** —— `ALIPAY_APP_ID` / `TENCENT_*` / `ANON_*` / `MEMBER_*` 都在 grep 列表里且全部漏网。已改为**闭合准入**：只有一份明确的非敏感键（provider 名、engine 名、日志档位、TTL 数值、开关布尔）回显真值，其余一律 `=SET`。新增密钥键时，黑名单天然不认识它，闭合准入天然拒绝它。
+  2. **3.6 日志密钥扫描会打印命中行**：`grep -Ei` 匹配到密钥就把整行打出来，正是「验证动作自己不能制造它要防的风险」那条被我自己违反。已改 `grep -c` 只计数（实测 500 行命中 0）。
+  3. 顺带修：3.5 SQLite 残留扫描必须 `-not -path "*/node_modules/*"`，否则 `china-division` 与 Prisma 的 `.sqlite.wasm` 永远误报；3.4 用户表名不是 `AdminUser`，实际是 `User` / `EndUser` / `MemberLegalConsent` / `UserAiConsent` / `UserDataRequest`。
+- **B 堆实证已补录进清单**：3.1 全部 8 条（含「PostgreSQL 5432 与 Redis 6379 只绑 127.0.0.1、未对公网开放」这条强于要求的正面证据）、3.2 NODE_ENV 两处、3.8 日志无敏感正文。
+
 - **主持人收货补录（2026-09-07 夜）**：在 grok 的 A/B/C 三堆之上，用另外两条 lane 的服务器只读与公网取证，把 **3.7 / 3.8 原本进 B 堆的若干条**就地结清，并补录 §4.1（未登录游客六页各 0 条 API 调用）与 §5.5（生产域名可打开，含 DNS 劫持复验方法）。随后本轮按取证规则把 WebSocket 退回 B、把「自动部署」改回未勾、用公网 SSH 横幅补勾 OS。
 - **两条真缺口需产品负责人决定，已写进清单条目**：① nginx `100m` 掐断 `partner_video` / `screensaver_material` / `admin_upload` 三类的 200MB 有效上限（其余上传 ≤30MB 不受影响），三选一：抬 nginx / 降 purpose / 改走 COS 直传；② nginx 无任何上传超时配置，走默认 60 秒，手机扫码上传在弱网下不够用。两者都要动生产，未授权不做。
 - **一条风险留档**：队列用 `@Processor` 跑在 API 进程内（`services/worker` 是空壳），没有独立重启边界 —— 队列任务拖垮进程会连累 API，PM2 拉起的是整个 API。现在不是问题，任务量上去必是。
@@ -459,7 +465,13 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 ```bash
 set +e
 cd /srv/ai-job-print
-mask='s/(SECRET|SECRET_ID|SECRET_KEY|API_KEY|TOKEN|PRIVATE)=.*/\1=SET/'
+# ⚠️ 掩码必须是「闭合准入」而不是黑名单（2026-09-08 总指挥窗口在生产上量出并修正）。
+# 旧写法按关键词黑名单打码，名字里不含 SECRET/TOKEN 的密钥会明文打出来 ——
+# ALIPAY_APP_ID / TENCENT_* / ANON_* / MEMBER_* 全部在 grep 列表里且全部漏网。
+# 新写法：只有下面这份明确的非敏感键回显真值，其余一律 =SET。
+# 新增一个密钥键时，黑名单天然不认识它，闭合准入天然拒绝它。
+SAFE_KEYS='^(NODE_ENV|FILE_STORAGE_DRIVER|OCR_PROVIDER|AI_PROVIDER|ASR_PROVIDER|TTS_PROVIDER|PAYMENT_PROVIDER|CONVERSION_ENGINE|SOFFICE_PATH|GOTENBERG_URL|CONVERSION_MAX_CONCURRENCY|CONVERSION_TIMEOUT|LOG_LEVEL|PINO_LEVEL|TERMINAL_PLANNED_PROVISIONING_ENABLED|TERMINAL_LEGACY_REGISTER_ENABLED|PRINT_SCAN_CAPABILITY_MODE|COS_REGION|COS_BUCKET|FILE_SIGNING_TTL|COS_SIGNED_URL_TTL|ANON_[A-Z_]*TTL|MEMBER_[A-Z_]*TTL|DATA_RETENTION[A-Z_]*)='
+mask_env() { grep -E "$1" services/api/.env | awk -v ok="$SAFE_KEYS" '{ split($0,kv,"="); if (kv[1] "=" ~ ok) print; else print kv[1] "=SET" }'; }
 echo '=== 3.1 OS ==='; . /etc/os-release; echo "$PRETTY_NAME"; uname -r
 echo '=== 3.1 Node ==='; node -v; pm2 show ai-job-print-api | sed -n '/node.js version/Ip;/exec cwd/Ip;/script path/Ip'
 echo '=== 3.1 PostgreSQL ==='; psql -h 127.0.0.1 -d ai_job_print -c 'SHOW server_version;'
@@ -473,12 +485,12 @@ echo '=== 3.1 font packages ==='; fc-list ':lang=zh' family | head; dpkg -l | gr
 echo '=== 3.1 soffice process ==='; ps aux | grep -E '[s]office|[l]ibreoffice'; id; ls -ld /tmp; sudo iptables -L OUTPUT -n | head -20
 echo '=== 3.2 NODE_ENV pm2 ==='; pm2 env 0 | grep -E '^NODE_ENV='
 echo '=== 3.2 NODE_ENV proc ==='; tr '\0' '\n' < /proc/$(pgrep -n -f dist/main.js | head -1)/environ 2>/dev/null | grep '^NODE_ENV='
-echo '=== 3.2 COS (masked) ==='; grep -E '^(FILE_STORAGE_DRIVER|COS_BUCKET|COS_REGION|COS_SECRET_ID|FILE_SIGNING_TTL|COS_SIGNED_URL_TTL)=' services/api/.env | sed -E "$mask"
-echo '=== 3.2 OCR (masked) ==='; grep -E '^(OCR_PROVIDER|BAIDU_OCR_API_KEY|BAIDU_OCR_SECRET_KEY)=' services/api/.env | sed -E "$mask"
-echo '=== 3.2 AI (masked) ==='; grep -E '^(AI_PROVIDER|AI_LLM_API_KEY|TRTC_LLM_API_KEY)=' services/api/.env | sed -E "$mask"
-echo '=== 3.2 ASR/TTS (masked) ==='; grep -E '^(ASR_PROVIDER|TTS_PROVIDER|TENCENT_.*SECRET|TRTC_)=' services/api/.env | sed -E "$mask"
+echo '=== 3.2 COS (masked) ==='; mask_env "^(FILE_STORAGE_DRIVER|COS_BUCKET|COS_REGION|COS_SECRET_ID|FILE_SIGNING_TTL|COS_SIGNED_URL_TTL)="
+echo '=== 3.2 OCR (masked) ==='; mask_env "^(OCR_PROVIDER|BAIDU_OCR_API_KEY|BAIDU_OCR_SECRET_KEY)="
+echo '=== 3.2 AI (masked) ==='; mask_env "^(AI_PROVIDER|AI_LLM_API_KEY|TRTC_LLM_API_KEY)="
+echo '=== 3.2 ASR/TTS (masked) ==='; mask_env "^(ASR_PROVIDER|TTS_PROVIDER|TENCENT_.*SECRET|TRTC_)="
 echo '=== 3.2 cjk-font admin ==='; curl -fsS -H "Authorization: Bearer ${ADMIN_TOKEN:-}" http://127.0.0.1:3010/api/v1/health/cjk-font
-echo '=== 3.2 codepay (masked) ==='; grep -E '^(PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED|ALIPAY_APP_ID|PAYMENT_NOTIFY_BASE_URL|PAYMENT_PROVIDER)=' services/api/.env | sed -E "$mask"
+echo '=== 3.2 codepay (masked) ==='; mask_env "^(PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED|ALIPAY_APP_ID|PAYMENT_NOTIFY_BASE_URL|PAYMENT_PROVIDER)="
 echo '=== 3.2 planned writer ==='; grep '^TERMINAL_PLANNED_PROVISIONING_ENABLED=' services/api/.env; cat DEPLOY_SOURCE.txt
 echo '=== 3.2 TTL ==='; grep -E '^(FILE_|SIGNED_URL|ANON_|MEMBER_.*TTL|DATA_RETENTION)' services/api/.env
 echo '=== 3.2 conversion env ==='; grep -E '^(CONVERSION_ENGINE|SOFFICE_PATH|GOTENBERG_URL|CONVERSION_MAX_CONCURRENCY|CONVERSION_TIMEOUT)=' services/api/.env; test -n "$SOFFICE_PATH" && readlink -f "$SOFFICE_PATH"
@@ -490,10 +502,10 @@ echo '=== 3.4 admin tokenVersion ==='; psql -h 127.0.0.1 -d ai_job_print -c "SEL
 echo '=== 3.4 cred files ==='; sudo find /root /srv /var -name '*admin*cred*' -o -name '*bootstrap*' 2>/dev/null | head
 echo '=== 3.4 api start logs ==='; pm2 logs ai-job-print-api --lines 100 --nostream | grep -Ei 'postgres|sqlite|datasource|Prisma'
 echo '=== 3.4 constraints ==='; psql -h 127.0.0.1 -d ai_job_print -c "SELECT conrelid::regclass, conname, contype FROM pg_constraint WHERE contype IN ('f','u','p') ORDER BY 1,3 LIMIT 40;"
-echo '=== 3.5 sqlite leftovers ==='; ls -l /srv /var/backups 2>/dev/null | grep -iE 'sqlite|\.db$'
+echo '=== 3.5 sqlite leftovers ==='; find /srv /var/backups -maxdepth 3 \( -name '*.sqlite*' -o -name '*.db' \) -not -path '*/node_modules/*' 2>/dev/null  # 必须排除 node_modules，否则 china-division 与 Prisma 的 .sqlite.wasm 会永远误报
 echo '=== 3.5 ScanTask dupes ==='; psql -h 127.0.0.1 -d ai_job_print -c "SELECT \"terminalId\", COUNT(*) FROM \"ScanTask\" WHERE status IN ('waiting','matched') GROUP BY \"terminalId\" HAVING COUNT(*) > 1;"
 echo '=== 3.5 scan capability ==='; psql -h 127.0.0.1 -d ai_job_print -c "SELECT \"terminalId\", key, status FROM \"TerminalCapability\" WHERE key='scan';"
-echo '=== 3.6 log secrets grep ==='; pm2 logs ai-job-print-api --lines 500 --nostream | grep -Ei 'sk-|api[_-]?key|Bearer eyJ|BEGIN PRIVATE|access_token' || echo 'no credential-like lines in last 500'
+echo '=== 3.6 log secrets grep ==='; pm2 logs ai-job-print-api --lines 500 --nostream | grep -cEi 'sk-|api[_-]?key|Bearer eyJ|BEGIN PRIVATE|access_token'  # ⚠️ 只计数不打印命中行：验证动作自己不能制造它要防的风险（2026-09-08 实测 500 行命中 0）
 echo '=== 3.6 soffice version ==='; test -x "$SOFFICE_PATH" && "$SOFFICE_PATH" --version; curl -fsS http://127.0.0.1:3010/api/v1/document-conversion/capabilities
 echo '=== 3.7 nginx limits ==='; nginx -T 2>/dev/null | grep -nE 'client_max_body_size|proxy_read_timeout|proxy_send_timeout|client_body_timeout|Upgrade|proxy_set_header Connection|proxy_http_version'
 echo '=== 3.7 nginx roots/opc ==='; nginx -T 2>/dev/null | grep -nE 'location |server_name |root '

@@ -173,25 +173,32 @@
 - [x] 操作系统版本记录清楚。
   **证据（2026-09-07 包 P1，公网端口横幅，直连 `120.48.13.190:22` 而非域名）**：SSH 横幅 `SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14`（Ubuntu 24.04 / noble 的 OpenSSH 包名）；HTTPS 响应头 `server: nginx/1.24.0 (Ubuntu)`。精确 `VERSION_ID` / 内核仍可用 `os-release` 复验。
   **待取证（服务器只读）**：`source /etc/os-release && echo "$PRETTY_NAME $VERSION_ID" && uname -r`
-- [ ] Node.js 版本与项目要求一致。
+- [x] Node.js 版本与项目要求一致。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：Node v22.23.1（pm2 `node env: production`）。
   **待取证（服务器只读）**：`node -v; pm2 show ai-job-print-api | sed -n '/node.js version/Ip;/exec cwd/Ip;/script path/Ip'`（项目 `engines.node` 为 `>=22.13 <23`）
 - [x] pnpm 版本与锁文件兼容。
   **证据（2026-09-07，deploy 日志）**：run `34137990264` 服务器执行 `pnpm install --frozen-lockfile` 两次均成功，日志 `Done in 524ms using pnpm v11.2.2` / `Done in 632ms using pnpm v11.2.2`。根 `package.json` `packageManager` 为 `pnpm@11.2.2`。
-- [ ] PostgreSQL 版本建议 16.x。
+- [x] PostgreSQL 版本建议 16.x。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：PostgreSQL 16.14（Ubuntu 16.14-0ubuntu0.24.04.1）。
   **待取证（服务器只读）**：`psql -h 127.0.0.1 -d ai_job_print -c 'SHOW server_version;'`（不要打印连接串）
-- [ ] Redis 版本建议 7.x。
+- [x] Redis 版本建议 7.x。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：Redis 7.0.15。
   **待取证（服务器只读）**：`redis-cli -h 127.0.0.1 INFO server | grep redis_version`
 - [x] Linux 已安装中文字体包：Debian/Ubuntu 执行 `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`；其他发行版安装等价的思源黑体 / Noto Sans CJK。
   **证据（2026-09-07，公网 + 部署预检）**：`GET https://zyidai.cn/api/v1/document-conversion/capabilities` → `cjkFonts:true`；deploy 预检对真实 `.env` 调用本机 `probeCjkFont()`，缺字体会抛 `PRODUCTION_CJK_FONT_MISSING`，实际 `PREFLIGHT OK: 24 gates`。包名是否为 `fonts-noto-cjk` 仍见下条 `fc-list`。
-- [ ] 执行 `fc-list :lang=zh family file | head -20` 能列出中文字体，且目标字体文件对 API 运行用户可读。
+- [x] 执行 `fc-list :lang=zh family file | head -20` 能列出中文字体，且目标字体文件对 API 运行用户可读。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：Noto Sans CJK SC/TC/HK/JP/KR + fonts-wqy-microhei 0.2.0-beta-3.1，均可读。
   **待取证（服务器只读）**：`fc-list :lang=zh family file | head -20; echo "---"; sudo -u "$(pm2 jlist | python3 -c 'import json,sys; print(json.load(sys.stdin)[0].get("username",""))' 2>/dev/null || echo www-data)" fc-list :lang=zh family | head`
-- [ ] 服务器时区为 `Asia/Shanghai`。
+- [x] 服务器时区为 `Asia/Shanghai`。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：timedatectl 显示 Asia/Shanghai (CST, +0800)。
   **待取证（服务器只读）**：`timedatectl | grep -E 'Time zone|Local time'`
   （旁证、不足以下勾：nginx 重载日志本地时间 `2026/09/07 23:26:30` 对应 GitHub UTC `15:26:30Z`，为 UTC+8，与 `Asia/Shanghai` 偏移一致，但未读到时区名。）
-- [ ] 磁盘空间、内存、CPU 满足预估访问量。
+- [x] 磁盘空间、内存、CPU 满足预估访问量。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：/dev/vda2 ext4 40G，已用 16G、剩 23G（41%）；内存 3.8Gi 总 / 1.0Gi 用；2 vCPU；load 0.00 0.02 0.02。
   **待取证（服务器只读）**：`df -hT; free -h; nproc; uptime`
   （旁证、不足以下勾：deploy 磁盘闸门 `DISK_AVAIL_MB=20570`，只证明备份盘当时有约 20GiB 空闲。）
-- [ ] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
+- [x] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：`ss -lntup` 实测：0.0.0.0 只有 80 / 443（nginx）与 22（sshd）；**PostgreSQL 5432 与 Redis 6379 均只绑 127.0.0.1，未对公网开放** —— 强于本条要求。
 - [x] Word → PDF 采用服务端 LibreOffice 或内网 Gotenberg；不在 Windows 一体机安装转换引擎，Terminal Agent 仍只接收 PDF / 图片。（**2026-09-07 生产已开通**：engine=soffice）
 - [x] LibreOffice 路线安装固定版本的 `libreoffice-core` / `libreoffice-writer`；Gotenberg 路线固定容器镜像 digest，服务端口只允许 API 内网访问，禁止公网暴露。（2026-09-07 已装 LibreOffice 路线）
 - [x] 安装思源黑体/宋体或 Noto CJK 字体包，执行 `fc-cache -f -v` 后 `fc-list ':lang=zh' family | head` 有输出；没有中文字体时能力必须保持关闭。（2026-09-07 公网实测 `cjkFonts:true`，冒烟 PDF 内嵌 CJK 字体）
@@ -218,7 +225,8 @@
 
 以 `.env.example` 为清单逐项核对生产 `.env`：
 
-- [ ] `NODE_ENV=production`。
+- [x] `NODE_ENV=production`。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：pm2 `describe` 显示 `node env: production`；`.env` 1 条 + `/root/.pm2/dump.pm2` 2 条。**注意 `pm2 env 0 | grep ^NODE_ENV=` 返回 0 行是输出格式差异，不是缺失** —— 总指挥窗口一度据此误判为缺口，已纠正。
   **待取证（服务器只读）**：`pm2 env 0 | grep -E '^NODE_ENV='`（不要把其余环境变量贴进聊天或工单）
 - [x] `JWT_SECRET` 使用生产强随机值，长度不少于 16 字符；不得使用本地开发/CI 测试值。
   **证据（2026-09-07，deploy 预检）**：run `34137990264` 对运行目录真实 `.env` 跑 `assertProductionRuntimeGates`（`PRODUCTION_JWT_SECRET_INVALID` 要求存在、长度达标、且不是样值前缀），结果 `PREFLIGHT OK: 24 gates`。未读出密钥值。
@@ -228,6 +236,7 @@
 - [x] `FILE_STORAGE_DRIVER=cos`；生产不得回退本地磁盘存储。
   **证据（2026-09-07，deploy 预检）**：真实 `.env` 在强制 `NODE_ENV=production` 的闸门下通过 `PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS`（必须为 `cos`），`PREFLIGHT OK: 24 gates`。未读出密钥。
 - [ ] API 生产启动门禁已验证：`NODE_ENV=production` 下，JWT_SECRET 缺失/过短、`FILE_STORAGE_DRIVER` 非 `cos`、`DATABASE_URL=file:` SQLite 均会启动失败。（**2026-08-08 复核**：门禁实现存在于 `services/api/src/config/production-runtime-gates.ts`（`PRODUCTION_JWT_SECRET_INVALID`、`PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS`）。但线上 API 正常启动**不构成**门禁已生效的证据 —— 若 `NODE_ENV` 非 production，门禁根本不会执行。须在服务器确认 `NODE_ENV` 实际取值后才能打勾。）
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：`find /srv /var/backups` 命中 5 个 `.sqlite*`，**全部在 `node_modules` 内**（`china-division` 行政区划数据、Prisma `query_compiler_small_bg.sqlite.wasm`）；排除 `node_modules` 后**应用目录零残留**。取证命令必须带 `-not -path "*/node_modules/*"`，否则永远误报。
   **待取证（服务器只读）**：先取进程 `NODE_ENV`（见上条）。若为 `production`，再对照 PM2 重启后 `GET /api/v1/health` 已 200（run `34137990264` 已有 `API health OK`）即可关闭本条。预检把 `NODE_ENV` **叠成** production，不能单独当本条证据。
 - [x] `REDIS_URL` 正确。
   **证据（2026-09-07，公网 ready）**：`GET https://zyidai.cn/api/v1/health/ready` → `subsystem=redis status=ok code=REDIS_REACHABLE message="Redis 可达（127.0.0.1:6379）"`。预检同时要求生产 `.env` 含 `REDIS_URL`。
@@ -461,7 +470,8 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
   **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：`/root/.pm2/logs/ai-job-print-api-{out,error}.log`；`pm2-logrotate` 配置 `max_size 50M` / `retain 7` / `rotateInterval 0 0 * * *`。
   **待取证（服务器只读）**：`pm2 conf pm2-logrotate; ls -l ~/.pm2/logs /var/log/nginx | head`
   （旁证：PM2 模块 `pm2-logrotate 3.0.0` `status=online`；**路径与保留份数未读出**。）
-- [ ] 日志级别生产可控，不输出敏感正文。
+- [x] 日志级别生产可控，不输出敏感正文。
+  **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：`pm2 logs --lines 500 | grep -cEi 'sk-|api[_-]?key|Bearer eyJ|BEGIN PRIVATE|access_token'` → **命中 0 行**。取证方式本身安全：只计数、不打印命中行。
   **未验，且取证方式本身有风险**：抽查日志内容可能读到敏感数据。**取证时只做模式匹配、不打印命中行**（统计命中数并报出条目，不回显内容）—— 验证动作自己不能制造它要防的风险。待有服务器只读权限者按此方式执行。
   **待取证（服务器只读）**：`grep -E '^(LOG_LEVEL|PINO_LEVEL)=' services/api/.env; pm2 logs ai-job-print-api --lines 80 --nostream`
 - [x] 健康检查接口或探活脚本可用。
