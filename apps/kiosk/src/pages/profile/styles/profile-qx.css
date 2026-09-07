@@ -1,0 +1,264 @@
+/* 「我的」主页 · 青序流光
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/30-my-profile.html
+ * 地基按钮 / 卡片 / 列表行不在这里重复定义。
+ */
+
+.pf-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pf-idcard {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 24px 26px;
+  border-radius: var(--qx-r);
+  background: linear-gradient(135deg, var(--qx-deep-2), var(--qx-deep));
+  color: var(--qx-paper);
+}
+
+.pf-avatar {
+  flex: none;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--qx-emerald), var(--qx-teal));
+  color: var(--qx-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  font-weight: 700;
+}
+
+.pf-idtx { flex: 1; min-width: 0; }
+.pf-idname { display: block; font-size: 30px; font-weight: 700; letter-spacing: 1px; }
+.pf-idsub {
+  display: block;
+  margin-top: 8px;
+  font-size: 19px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--qx-paper) 66%, transparent);
+}
+
+.pf-idbtn {
+  flex: none;
+  min-height: 60px;
+  padding: 0 22px;
+  border-radius: var(--qx-r);
+  border: 1px solid color-mix(in srgb, var(--qx-paper) 34%, transparent);
+  background: transparent;
+  color: var(--qx-paper);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.pf-todo {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 112px;
+}
+.pf-todo-ic {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--qx-r);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+}
+.pf-todo-ic[data-tone='teal'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.pf-todo-ic[data-tone='wheat'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+.pf-todo-tx { flex: 1; min-width: 0; }
+.pf-todo-t { display: block; font-size: 23px; font-weight: 700; }
+.pf-todo-d { display: block; margin-top: 5px; font-size: 19px; line-height: 1.4; color: var(--qx-ink-2); }
+.pf-todo-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 19px;
+  color: var(--qx-ink-2);
+  line-height: 1.45;
+}
+.pf-todo-meta i { margin: 0 8px; font-style: normal; color: var(--qx-line-2); }
+.pf-todo-btn {
+  flex: none;
+  min-height: 60px;
+  padding: 0 22px;
+  border-radius: var(--qx-r);
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  font-size: 20px;
+  font-weight: 700;
+}
+.pf-todo-btn--teal {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+
+.pf-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.pf-asset {
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  padding: 26px 24px 22px;
+  min-height: 194px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pf-asset-t { font-size: 25px; font-weight: 700; }
+.pf-asset-d { font-size: 17px; color: var(--qx-ink-3); line-height: 1.5; }
+.pf-asset-n { margin-top: auto; display: flex; align-items: baseline; gap: 6px; }
+.pf-asset-num { font: 800 56px/1 var(--qx-mono); color: var(--qx-ink); }
+.pf-asset-num[data-unloaded] { color: var(--qx-ink-3); font-weight: 400; font-size: 40px; }
+.pf-asset-unit { font-size: 17px; color: var(--qx-ink-3); }
+
+.pf-morelinks {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.pf-mlink {
+  flex: 1;
+  min-width: 0;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  font-size: 19px;
+  font-weight: 650;
+  color: var(--qx-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.pf-mlink .qx-num,
+.pf-mlink .pf-asset-num {
+  margin-left: auto;
+  font: 700 22px/1 var(--qx-mono);
+  color: var(--qx-ink-3);
+}
+
+.kp-session-records .kp-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 2px;
+}
+.kp-session-records .kp-section-head .t { font-size: 25px; font-weight: 700; }
+.kp-session-records .kp-section-head .hint { margin-left: auto; font-size: 17px; color: var(--qx-ink-3); }
+.kp-session-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  min-height: var(--qx-row-h);
+  width: 100%;
+  border-bottom: 1px solid var(--qx-line);
+}
+.kp-session-list .kp-session-row:last-child { border-bottom: 0; }
+
+.pf-session-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.pf-session-actions .qx-btn {
+  min-height: var(--qx-tap-min);
+  padding: 0 16px;
+  font-size: 18px;
+}
+
+.pf-note {
+  padding: 16px 20px;
+  border-radius: var(--qx-r);
+  background: var(--qx-teal-soft);
+  color: var(--qx-ink-2);
+  font-size: 18px;
+  line-height: 1.55;
+}
+.pf-note b { color: var(--qx-ink); }
+.pf-note-t {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.pf-truth {
+  flex: none;
+  min-height: 58px;
+  padding: 11px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--qx-ink-3);
+  font-size: 17px;
+  line-height: 1.45;
+}
+.pf-truth b { color: var(--qx-ink-2); font-weight: 600; }
+.pf-truth button {
+  flex: none;
+  min-height: var(--qx-tap-min);
+  padding: 0 14px;
+  border-radius: var(--qx-r-s);
+  background: transparent;
+  border: 0;
+  color: var(--qx-teal-d);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.pf-skel {
+  height: 20px;
+  border-radius: var(--qx-r-s);
+  background: var(--qx-line);
+}
+.pf-skel-num {
+  display: inline-block;
+  width: 64px;
+  height: 36px;
+  border-radius: var(--qx-r-s);
+  background: var(--qx-line);
+}
+
+.pf-meta2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+.pf-meta2 div {
+  padding: 14px 16px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-paper);
+}
+.pf-meta2 small { display: block; font-size: 16px; font-weight: 700; color: var(--qx-ink-3); }
+.pf-meta2 b { display: block; margin-top: 6px; font-size: 19px; line-height: 1.35; font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-page, .pf-page * { animation: none !important; transition: none !important; }
+}

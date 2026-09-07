@@ -164,18 +164,18 @@ const activityPage = read('src/pages/profile/me/MyActivityPage.tsx')
 const packageJson = read('package.json')
 const lightflowProfileVerify = read('scripts/verify-lightflow-profile-entry.mjs')
 
-// 1) /profile 主入口恢复 4188 独立页面语法，且不再保留 InkPaper 壳层。
-expectIncludes(profile, "import './profile-inkpaper.css'", 'ProfilePage 引入局部 profile-inkpaper.css')
+// 1) /profile 主入口迁入青序流光（30-my-profile），不再使用 V6 / LightFlow 壳。
+expectIncludes(profile, "import './styles/profile-qx.css'", 'ProfilePage 引入青序局部 profile-qx.css')
+expectIncludes(profile, 'QxPageFrame', 'ProfilePage 使用青序页框')
+expectAbsent(profile, /KioskPageFrame/, 'ProfilePage has left the V6 frame')
 expectAbsent(profile, /ReferenceServiceNav|lf-reference-/, 'ProfilePage 移除首页专属导航与服务卡骨架')
-expectMatches(profile, /useInkRipple\(\s*'\.kprofile/, 'ProfilePage 只在 .kprofile 作用域启用涟漪')
-expectClassTokens(profile, ['kprofile', 'kprofile-lightflow'], 'ProfilePage 外层容器使用局部 LightFlow 根')
-expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage 仅保留读屏可见的 我的 标题')
-expectMatches(profile, /className="kp-inner"/, 'ProfilePage 使用 .kp-inner 内容宽度容器')
-expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage 使用五区服务目录')
-expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage 数据驱动渲染五个真实区块')
+expectAbsent(profile, /kprofile-sr-only/, 'ProfilePage 不再用负 margin 的 sr-only 标题')
+expectIncludes(profile, 'ProfileAssetGrid', 'ProfilePage 用资产网格承接概览数量')
+expectIncludes(profile, 'ProfileContinueCard', 'ProfilePage 用待办卡承接 /me/pending-tasks')
+expectIncludes(profile, 'getPendingTasks', 'ProfilePage 读取真实待办而不是编造继续办理')
 expectAbsent(header, /p-hero|<h[1-6][^>]*>\s*我的\s*<\//, 'ProfileHeader 不再使用 p-hero 或 我的 标题')
-expectIncludes(header, 'className="kp-profile-header', 'ProfileHeader 使用开放式身份摘要')
-expectIncludes(header, 'className="kp-profile-main"', 'ProfileHeader 保留身份主行')
+expectIncludes(header, 'className="pf-idcard"', 'ProfileHeader 使用青序身份卡')
+expectIncludes(header, 'className="pf-idtx"', 'ProfileHeader 保留身份主行')
 expectAbsent(header, /kp-profile-boundary/, 'ProfileHeader 移除原型 14 不存在的额外信息边界面板')
 expectIncludes(section, 'className="kp-section"', 'ProfileEntrySection 使用独立信息区块')
 expectIncludes(section, 'className="kp-section-head"', 'ProfileEntrySection 使用原型分区标题')
@@ -190,6 +190,10 @@ expectAbsent(section, /sec-head/, 'ProfileEntrySection 不再使用 sec-head 旧
 expectAbsent(combinedProfileCss, /p-hero|sec-head|--paper:|#f4f1e8|repeating-linear-gradient/, 'Profile CSS 不回退旧入口骨架或裸色纸纹')
 expectIncludes(combinedProfileCss, '--lf-serif:', 'Profile CSS 保留原型 14 的展示字体 token')
 expectMatches(combinedProfileCss, /box-shadow:\s*0 3px 14px/, 'Profile CSS 仅恢复原型 14 的轻量卡片投影')
+const profileQxCss = read('src/pages/profile/styles/profile-qx.css')
+expectIncludes(profileQxCss, 'var(--qx-ink)', 'profile-qx.css 消费青序令牌')
+expectIncludes(profileQxCss, '--qx-tap-min', 'profile-qx.css 保留 48px 触控下限令牌')
+expectAbsent(profileQxCss, /#[0-9a-fA-F]{3,8}|rgb\(/, 'profile-qx.css 不写裸色值')
 
 const expectedCssImports = [
   "@import './profile-lightflow-shell.css';",
@@ -227,14 +231,14 @@ expectAbsent(combinedProfileCss, /lf-reference-/, 'Profile CSS 不保留首页�
 // 2) 入口、route、tag、真实会话和登录行为保持现有合同。
 for (const marker of [
   'useAuth()',
-  'useMemberProfileOverview(isLoggedIn, getToken)',
-  'reserveBannerSpace={isLoggedIn && hasSessionRecords}',
-  '<PendingTaskBanner',
+  'useMemberAssetCounts(isLoggedIn, getToken, reloadKey)',
+  'getPendingTasks(token)',
+  '<ProfileContinueCard',
   '<ProfileSessionRecords',
-  'hasSessionRecords &&',
   "navigate('/me/settings')",
   "navigate('/me/notifications')",
   "navigate('/print/preview'",
+  "clearSessionTo({ path: '/profile' })",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }
@@ -295,7 +299,6 @@ for (const [route, element] of [
 
 for (const [label, source] of [
   ['MyFavoritesPage', favoritesPage],
-  ['MyBenefitsPage', benefitsPage],
   ['MySettingsPage', settingsPage],
 ]) {
   expectIncludes(source, "import './me-detail-inkpaper.css'", `${label} 引入明细页局部 CSS`)
@@ -303,6 +306,9 @@ for (const [label, source] of [
   expectClassTokens(source, ['me-inkdetail'], `${label} 使用 .me-inkdetail 根作用域`)
   expectIncludes(source, 'KIcon', `${label} 复用 KIcon 图标系统`)
 }
+expectIncludes(benefitsPage, "import './styles/benefits-qx.css'", 'MyBenefitsPage 引入青序局部 CSS')
+expectIncludes(benefitsPage, 'QxPageFrame', 'MyBenefitsPage 使用青序页框')
+expectAbsent(benefitsPage, /KioskPageFrame/, 'MyBenefitsPage has left the V6 frame')
 
 // 方案 B：明细页纸面绑定 --k-paper / --color-canvas，不再锁定米纸裸 hex。
 expectMatches(
@@ -363,9 +369,14 @@ const allowedProfileLandingChanged = new Set([
   'apps/kiosk/src/pages/profile/profile-lightflow-shell.css',
   'apps/kiosk/src/pages/profile/profile-lightflow-directory.css',
   'apps/kiosk/src/pages/profile/profile-lightflow-state.css',
+  'apps/kiosk/src/pages/profile/styles/profile-qx.css',
+  'apps/kiosk/src/pages/profile/assets/useMemberAssetCounts.ts',
   'apps/kiosk/src/pages/profile/components/ProfileHeader.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx',
+  'apps/kiosk/src/pages/profile/components/ProfileContinueCard.tsx',
+  'apps/kiosk/src/pages/profile/components/ProfileAssetGrid.tsx',
+  'apps/kiosk/src/pages/profile/components/QxMemberNavbar.tsx',
   'apps/kiosk/scripts/verify-lightflow-profile-entry.mjs',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
 ])
@@ -398,6 +409,10 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/styles/me-orders.css',
   'apps/kiosk/src/pages/profile/me/styles/me-records.css',
   'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
+  'apps/kiosk/src/pages/profile/me/styles/benefits-qx.css',
+  'apps/kiosk/src/pages/profile/me/styles/feedback-qx.css',
+  'apps/kiosk/src/pages/profile/me/styles/privacy-qx.css',
+  'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs',

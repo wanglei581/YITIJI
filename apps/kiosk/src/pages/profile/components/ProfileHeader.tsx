@@ -1,25 +1,23 @@
-import { KIcon } from '../../../components/kiosk-icon'
+import { UserIcon } from 'lucide-react'
 import type { ProfileHeaderStats } from '../profileTypes'
 
 export function ProfileHeader({
   isLoggedIn,
   displayName,
   phoneMasked,
-  stats,
-  statsLoading,
+  stats: _stats,
+  statsLoading: _statsLoading,
   reserveBannerSpace,
   onLogin,
-  onLogout,
+  onLogout: _onLogout,
   onOpenSettings,
-  onOpenNotifications,
+  onOpenNotifications: _onOpenNotifications,
 }: {
   isLoggedIn: boolean
   displayName: string
   phoneMasked: string
-  // null = 账号概览统计尚未加载完成（展示「—」而非误导性的 0）
   stats: ProfileHeaderStats
   statsLoading: boolean
-  // 保留本次服务记录的真实状态，供入口页在身份面板后衔接待办记录。
   reserveBannerSpace: boolean
   onLogin: () => void
   onLogout: () => void
@@ -28,63 +26,31 @@ export function ProfileHeader({
 }) {
   return (
     <section
-      className="kp-profile-header"
+      className="pf-idcard"
       data-has-session-records={reserveBannerSpace ? 'true' : undefined}
       aria-label={isLoggedIn ? '账号概览' : '登录引导'}
     >
-      <div className="kp-profile-main">
-        <div className={isLoggedIn ? 'p-ava' : 'p-ava guest'}>
-          {isLoggedIn ? avatarInitial(displayName) : <KIcon name="user" />}
-        </div>
-        <div className="p-id">
-          <strong className="p-name">{isLoggedIn ? displayName : '登录后查看本人记录'}</strong>
-          <span className="p-kicker">
-            {isLoggedIn ? `${phoneMasked || '手机号已绑定'} · 已登录` : '游客 · 仅本次会话'}
-          </span>
-        </div>
-
-        {isLoggedIn && (
-          <div className="p-stats">
-            <ProfileStat value={stats.aiRecords} label="AI记录" loading={statsLoading} />
-            <ProfileStat value={stats.favorites} label="收藏记录" loading={statsLoading} />
-            <ProfileStat value={stats.documents} label="文档记录" loading={statsLoading} />
-          </div>
-        )}
-
-        <div className={`p-actions ${isLoggedIn ? 'p-actions--member' : 'p-actions--guest'}`}>
-          {isLoggedIn ? (
-            <>
-              <button type="button" className="p-iconbtn" aria-label="消息通知" onClick={onOpenNotifications}>
-                <KIcon name="bell" />
-              </button>
-              <button type="button" className="p-iconbtn" aria-label="账号设置" onClick={onOpenSettings}>
-                <KIcon name="settings" />
-              </button>
-              <button type="button" className="p-btn ghost" onClick={onLogout}>
-                退出登录
-              </button>
-            </>
-          ) : (
-            <button type="button" className="p-btn primary" onClick={onLogin}>
-              <KIcon name="phone" />
-              手机号登录
-            </button>
-          )}
-        </div>
-      </div>
+      <span className="pf-avatar" aria-hidden="true">
+        {isLoggedIn ? avatarInitial(displayName) : <UserIcon size={40} />}
+      </span>
+      <span className="pf-idtx">
+        <span className="pf-idname">{isLoggedIn ? displayName : '还没有登录'}</span>
+        <span className="pf-idsub">
+          {isLoggedIn
+            ? `手机号 ${phoneMasked || '已遮挡'} · 公共终端默认不显示完整个人信息`
+            : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
+        </span>
+      </span>
+      {isLoggedIn ? (
+        <button type="button" className="pf-idbtn" data-testid="profile-account" onClick={onOpenSettings}>
+          账号设置
+        </button>
+      ) : (
+        <button type="button" className="pf-idbtn" data-testid="profile-login" onClick={onLogin}>
+          去登录
+        </button>
+      )}
     </section>
-  )
-}
-
-function ProfileStat({ value, label, loading }: { value: number | null; label: string; loading: boolean }) {
-  const unloaded = value === null
-  return (
-    <div className="p-stat" aria-label={`${label}：${unloaded ? (loading ? '加载中' : '暂无数据') : value}`}>
-      <b className={[unloaded ? 'unloaded' : '', unloaded && loading ? 'pulse' : ''].filter(Boolean).join(' ')}>
-        {unloaded ? '—' : value}
-      </b>
-      <span>{label}</span>
-    </div>
   )
 }
 
