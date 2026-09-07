@@ -112,51 +112,54 @@ const yuan = (cents: number): string => `¥${(cents / 100).toFixed(2)}`
 // 摘要卡的每一行都带 data-sum-row=<行名>，不依赖类名或 DOM 层级。
 const summaryValue = (page: Page, label: string) => page.locator(`[data-sum-row="${label}"] .v`)
 
-for (const scenario of [
-  // 已登记彩色的终端 + 用户选彩色：这就是产品负责人标完 color_print 后的真实生产路径。
-  { name: 'color', chosen: 'color' as ColorMode, available: ['color_print'] },
-  // 未登记彩色 + 用户仍带着彩色进页：前端 fail-closed 收口成黑白，展示也必须跟着说黑白。
-  { name: 'black_white', chosen: 'black_white' as ColorMode, available: [] },
-]) {
-  test(`print confirm shows the same color mode it prices (${scenario.name}) @kiosk`, async ({ page, api }) => {
-    const pageErrors: string[] = []
-    page.on('pageerror', (error) => pageErrors.push(error.message))
+test('print confirm shows the same color mode it prices (color) @kiosk', async ({ page, api }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
 
-    registerShell(api, scenario.available)
-    const seen: { colorMode?: string } = {}
-    await routePricingQuote(page, W2_FILE.pages, seen)
+  registerShell(api, ['color_print'])
+  const seen: { colorMode?: string } = {}
+  await routePricingQuote(page, W2_FILE.pages, seen)
 
-    await page.goto('/print/confirm')
-    await setReactRouterState(page, '/print/confirm', {
-      file: W2_FILE,
-      params: { ...W2_PRINT_PARAMS, colorMode: 'color' },
-      source: 'document',
-    })
-
-    await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
-    // 能力查询返回前，前端 fail-closed 先按黑白报一次价；能力落地后才按真实选择重报。
-    // 等最终单价出现 = 等这一页稳定，避免读到中间态。
-    // ③ 计费方式行的单价，必须是价目表里**该色彩模式**的单价。
-    await expect(page.locator('[data-cost-calc]')).toHaveText(
-      `${yuan(UNIT_CENTS[scenario.chosen])}/页 × ${W2_FILE.pages} 页`,
-    )
-
-    // ① 页面实际拿去计价的色彩模式（观测值，来自 /orders/quote 请求体）。
-    const pricedColorMode = seen.colorMode as ColorMode
-    expect(pricedColorMode).toBe(scenario.chosen)
-
-    // ② 核心断言：摘要卡展示的色彩模式，必须与用于计价的色彩模式一致。
-    //    展示侧写死时，两个 scenario 必有一个红 —— 写死成哪个值都躲不掉。
-    await expect(summaryValue(page, '色彩模式')).toHaveText(COLOR_MODE_TEXT[pricedColorMode])
-
-    // ④ 反向：色彩模式那一行绝不能出现另一种模式的名字。
-    const other: ColorMode = pricedColorMode === 'color' ? 'black_white' : 'color'
-    await expect(summaryValue(page, '色彩模式')).not.toContainText(COLOR_MODE_TEXT[other])
-
-    // ⑤ 同一张卡里的邻居行也必须读真实参数（同类写死的回归网）。
-    await expect(summaryValue(page, '打印份数')).toHaveText(`${W2_PRINT_PARAMS.copies} 份`)
-    await expect(summaryValue(page, '单双面')).toHaveText('单面')
-
-    expect(pageErrors).toEqual([])
+  await page.goto('/print/confirm')
+  await setReactRouterState(page, '/print/confirm', {
+    file: W2_FILE,
+    params: { ...W2_PRINT_PARAMS, colorMode: 'color' },
+    source: 'document',
   })
-}
+
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
+  await expect(page.locator('[data-cost-calc]')).toHaveText(
+    `${yuan(UNIT_CENTS.color)}/页 × ${W2_FILE.pages} 页`,
+  )
+
+  const pricedColorMode = seen.colorMode as ColorMode
+  expect(pricedColorMode).toBe('color')
+  await expect(summaryValue(page, '色彩模式')).toHaveText(COLOR_MODE_TEXT.color)
+  await expect(summaryValue(page, '色彩模式')).not.toContainText(COLOR_MODE_TEXT.black_white)
+  await expect(summaryValue(page, '打印份数')).toHaveText(`${W2_PRINT_PARAMS.copies} 份`)
+  await expect(summaryValue(page, '单双面')).toHaveText('单面')
+  expect(pageErrors).toEqual([])
+})
+
+test('print confirm blocks unverified color instead of quoting it @kiosk', async ({ page, api }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+
+  registerShell(api, [])
+  const seen: { colorMode?: string } = {}
+  await routePricingQuote(page, W2_FILE.pages, seen)
+
+  await page.goto('/print/confirm')
+  await setReactRouterState(page, '/print/confirm', {
+    file: W2_FILE,
+    params: { ...W2_PRINT_PARAMS, colorMode: 'color' },
+    source: 'document',
+  })
+
+  await expect(page.locator('[data-testid="print-confirm-state-capability-invalid-params"]')).toBeVisible()
+  await expect(summaryValue(page, '色彩模式')).toContainText('彩色')
+  await expect(summaryValue(page, '色彩模式')).toContainText('暂不可用')
+  await expect(page.getByText('金额暂不可用')).toBeVisible()
+  expect(seen.colorMode).toBeUndefined()
+  expect(pageErrors).toEqual([])
+})

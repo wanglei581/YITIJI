@@ -465,7 +465,6 @@ for (const kind of ['inspection', 'normalize_a4', 'pii_scan', 'pii_redact']) {
 
 const printSetupPages = new Map([
   ['src/pages/print/PrintPreviewPage.tsx', 'print-preview'],
-  ['src/pages/print/PrintConfirmPage.tsx', 'print-confirm'],
 ])
 for (const [path, marker] of printSetupPages) {
   const body = read(path)
@@ -473,6 +472,38 @@ for (const [path, marker] of printSetupPages) {
   assert.match(body, /PrintPageFrame/, `${path} uses the shared print frame`)
   assert.match(body, /KioskActionBar/, `${path} uses the frozen action bar`)
 }
+const printConfirmQx = read('src/pages/print/PrintConfirmPage.tsx')
+const printConfirmView = read('src/pages/print/components/PrintConfirmView.tsx')
+assert.match(
+  printConfirmView,
+  /data-w2-page=["']print-confirm["']/,
+  'src/pages/print/PrintConfirmPage.tsx exposes print-confirm',
+)
+assert.match(printConfirmQx, /QxPageFrame/, 'PrintConfirmPage uses the Qingxu page frame')
+assert.match(printConfirmQx, /qx-btn/, 'PrintConfirmPage uses Qingxu action buttons')
+assert.doesNotMatch(printConfirmQx, /KioskPageFrame/, 'print-confirm has left the V6 frame')
+assert.doesNotMatch(printConfirmQx, /PrintPageFrame/, 'print-confirm has left the V6 print frame')
+assert.doesNotMatch(printConfirmView, /KioskPageFrame/, 'print-confirm view has left the V6 frame')
+assert.match(
+  printConfirmQx,
+  /usePrintConfirmQueryGuard/,
+  'print-confirm sanitizes the address bar against price-tampering query keys',
+)
+assert.match(
+  read('src/pages/print/printConfirmQuery.ts'),
+  /missing-context['"][\s\S]*zero-amount/,
+  'print-confirm covers the eight Qingxu confirm states',
+)
+assert.match(
+  read('src/pages/print/printConfirmQuery.ts'),
+  /same.*参数出现了不止一次|duplicate/,
+  'duplicate query keys fail-closed to invalid-context',
+)
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /QX_MIGRATED_ROUTES[\s\S]*['"]\/print\/confirm['"]/,
+  '/print/confirm is registered in QX_MIGRATED_ROUTES',
+)
 for (const path of ['src/pages/print/PrintPreviewPage.tsx']) {
   const body = read(path)
   for (const marker of [

@@ -877,7 +877,8 @@ test('benefit card reports 价目拉不到 when the quote fails and shows no amo
   // 反向：报价失败时既不显示金额，也不给出任何「有可用 / 已用完」结论。
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /按以上设置打印原文件/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /按以上设置打印原文件/ })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -1022,5 +1023,102 @@ test('benefit card says 读不出来 instead of 没有权益 when /me/benefits f
   // 反向：读取失败绝不能显示成「没有可核销的权益」。
   await expect(page.getByText('当前没有可核销的权益')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('print confirm renders the server quote amount and never a local estimate @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  let quoteBody: { fileUrl?: string; params?: { colorMode?: string; copies?: number } } | null = null
+  await page.route('**/api/v1/orders/quote', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    quoteBody = route.request().postDataJSON() as typeof quoteBody
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        amountCents: 200,
+        billablePages: 2,
+        billingPageSource: 'detected',
+        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+      }),
+    })
+  })
+  await seedMaterialSession(page)
+  await page.goto('/print/confirm')
+  await expect(page.locator('[data-testid="print-confirm-state-quoted"]')).toBeVisible()
+  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
+  expect(quoteBody?.fileUrl).toBe(W2_FILE.fileUrl)
+  expect(quoteBody?.params?.colorMode).toBe('black_white')
+  expect(quoteBody?.params?.copies).toBe(1)
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('print confirm create-job payload matches the quoted file and params @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  let jobBody: { fileUrl?: string; fileName?: string; params?: { colorMode?: string; copies?: number } } | null = null
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    jobBody = route.request().postDataJSON() as typeof jobBody
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        taskId: W2_ORDER.taskId,
+        status: 'pending',
+        createdAt: NOW,
+        orderId: W2_ORDER.orderId,
+        orderNo: W2_ORDER.orderNo,
+        amountCents: 200,
+        payStatus: 'unpaid',
+        priceLines: [],
+        billablePages: 2,
+        billingPageSource: 'detected',
+        paymentSessionToken: W2_ORDER.paymentSessionToken,
+      }),
+    })
+  })
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+  await seedMaterialSession(page)
+  await page.goto('/print/confirm')
+  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: /按以上设置打印原文件/ }).click()
+  await page.waitForURL('**/print/cashier')
+  expect(jobBody?.fileUrl).toBe(W2_FILE.fileUrl)
+  expect(jobBody?.fileName).toBe(W2_FILE.name)
+  expect(jobBody?.params?.colorMode).toBe('black_white')
+  expect(jobBody?.params?.copies).toBe(1)
+  await expectHealthy(page, errors, 'print-cashier')
+})
+
+test('print confirm fail-closes duplicate query keys and missing file context @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.goto('/print/confirm?copies=1&copies=2')
+  await expect(page.locator('[data-testid="print-confirm-state-invalid-context"]')).toBeVisible()
+  await expect(page.getByTestId('print-confirm-invalid-reason')).toBeVisible()
+  await expect(page.getByTestId('print-confirm-invalid-reason')).not.toHaveText(/copies=2|1&copies/)
+  expect(new URL(page.url()).searchParams.getAll('copies')).toEqual([])
+  expect(page.url()).toContain('state=invalid-context')
+  expect(page.url()).not.toContain('#')
+  await expect(page.getByRole('button', { name: '重新选文件' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '返回打印台' })).toBeVisible()
+
+  await page.goto('/print/confirm')
+  await expect(page.locator('[data-testid="print-confirm-state-missing-context"]')).toBeVisible()
+  await expect(page.getByText('未找到文件信息')).toBeVisible()
+  await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
