@@ -1142,7 +1142,13 @@ jobs:
           fi
           BUNDLE="release-$RELEASE_SHA.bundle"
           CHECKSUM="release-$RELEASE_SHA.sha256"
-          git bundle create "$BUNDLE" "$RELEASE_SHA" "^$BASE_SHA"
+          # git bundle 的 rev 必须能命名成 ref：传裸 SHA 会以
+          # "fatal: Refusing to create empty bundle." 退出 128（2026-09-07 实测，
+          # 因为 continue-on-error 这一步一直"绿着"却从未上传过任何包）。
+          # actions/checkout 让 HEAD 正好指向 GITHUB_SHA，用具名 ref 才有 bundle 头。
+          git update-ref refs/release/target "$RELEASE_SHA"
+          git bundle create "$BUNDLE" refs/release/target "^$BASE_SHA"
+          git bundle verify "$BUNDLE"
           sha256sum "$BUNDLE" | sed "s|  $BUNDLE$|  release.bundle|" > "$CHECKSUM"
           node scripts/release-bundle/bos-object.mjs put "$BUNDLE" "$BUNDLE"
           node scripts/release-bundle/bos-object.mjs put "$CHECKSUM" "$CHECKSUM"
