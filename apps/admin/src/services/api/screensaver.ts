@@ -103,7 +103,10 @@ const httpAdapter: ScreensaverServiceInterface = {
   updateAsset: (id, patch) => req<AdAssetView>('PATCH', `/admin/ad-assets/${id}`, patch),
   deleteAsset: (id) => req<AdAssetView>('DELETE', `/admin/ad-assets/${id}`),
 
-  listPlaylists: () => req<AdPlaylistView[]>('GET', '/admin/ad-playlists'),
+  listPlaylists: async () => {
+    const result = await req<{ data: AdPlaylistView[]; total: number }>('GET', '/admin/ad-playlists')
+    return result.data
+  },
   createPlaylist: (input) => req<AdPlaylistView>('POST', '/admin/ad-playlists', input),
   updatePlaylist: (id, input) => req<AdPlaylistView>('PUT', `/admin/ad-playlists/${id}`, input),
   async deletePlaylist(id) {

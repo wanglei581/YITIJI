@@ -83,6 +83,8 @@ const DISABLED_ORG = 'test-sc-org-disabled'
 const T_A = 'TEST-SC-KSK-A'
 const T_B = 'TEST-SC-KSK-B'
 const T_ADMIN = 'TEST-SC-KSK-ADMIN' // 归属可变终端，admin 归属用例专用
+const T_UNRELATED = 'TEST-SC-KSK-UNRELATED'
+const T_PRESET = 'TEST-SC-KSK-PRESET'
 
 function onlyWelcome(): SaveSmartCampusConfigInput {
   return { enabled: true, modules: { welcome: true, bigdata: false, luggage: false, panorama: false } }
@@ -129,8 +131,8 @@ function cleanupTempDatabase(prepared: { previousUrl: string | undefined; dbPath
 }
 
 async function cleanup(prisma: PrismaService): Promise<void> {
-  await prisma.terminalSmartCampusConfig.deleteMany({ where: { terminalId: { in: [T_A, T_B, T_ADMIN] } } })
-  await prisma.terminal.deleteMany({ where: { id: { in: [T_A, T_B, T_ADMIN] } } })
+  await prisma.terminalSmartCampusConfig.deleteMany({ where: { terminalId: { in: [T_A, T_B, T_ADMIN, T_PRESET] } } })
+  await prisma.terminal.deleteMany({ where: { id: { in: [T_A, T_B, T_ADMIN, T_UNRELATED] } } })
   await prisma.auditLog.deleteMany({ where: { actorId: ADMIN_USER_ID } })
   await prisma.user.deleteMany({ where: { id: ADMIN_USER_ID } })
   await prisma.organization.deleteMany({ where: { id: { in: [SCHOOL_A, SCHOOL_B, NONSCHOOL, DISABLED_ORG] } } })
@@ -159,10 +161,18 @@ async function main(): Promise<void> {
     await prisma.terminal.create({ data: { id: T_A, terminalCode: T_A, agentToken: 'test-sc-token-a', deviceFingerprint: 'test-sc-fp-a', orgId: SCHOOL_A } })
     await prisma.terminal.create({ data: { id: T_B, terminalCode: T_B, agentToken: 'test-sc-token-b', deviceFingerprint: 'test-sc-fp-b', orgId: SCHOOL_B } })
     await prisma.terminal.create({ data: { id: T_ADMIN, terminalCode: T_ADMIN, agentToken: 'test-sc-token-admin', deviceFingerprint: 'test-sc-fp-admin', orgId: null } })
+    await prisma.terminal.create({ data: { id: T_UNRELATED, terminalCode: T_UNRELATED, agentToken: 'test-sc-token-unrelated', deviceFingerprint: 'test-sc-fp-unrelated', orgId: null } })
+    await prisma.terminalSmartCampusConfig.create({
+      data: { terminalId: T_PRESET, enabled: true, modulesJson: JSON.stringify({ welcome: true, bigdata: false, luggage: false, panorama: false }) },
+    })
     // 平台管理员夹具：仅用于 Case13 admin 写操作的审计 actor 外键（跑完清理）。
     await prisma.user.create({ data: { id: ADMIN_USER_ID, username: 'test-sc-admin', passwordHash: 'x', name: '验证用管理员', role: 'admin' } })
 
     const userA = { userId: 'test-sc-user-a', orgId: SCHOOL_A }
+    const adminRows = await svc.listSmartCampusTerminals()
+    if (adminRows.some((row) => row.terminalId === T_PRESET && row.terminalCode === null) && !adminRows.some((row) => row.terminalId === T_UNRELATED)) {
+      pass('Case0 Admin 只查配置关联终端，保留未注册预置配置行')
+    } else fail(`Case0 Admin 智慧校园终端列表过滤异常: ${JSON.stringify(adminRows)}`)
     const seesAdminTerminal = async (): Promise<boolean> =>
       (await svc.listPartnerSmartCampusTerminals(SCHOOL_A)).some((t) => t.terminalCode === T_ADMIN)
 

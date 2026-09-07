@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CreatePackageOrderDto } from './dto/create-package-order.dto'
+import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
 
 const PICKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
@@ -166,14 +167,13 @@ export class PackageOrderService {
   }
 
   private async assertPiiReady(fileId: string): Promise<void> {
-    const task = await this.prisma.documentProcessTask.findFirst({
-      where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
+    await assertPiiScanned({
+      prisma: this.prisma,
+      fileId,
+      requireCompleted: true,
+      missingMessage: '请先完成材料包文件的打印隐私检查',
+      pendingMessage: '请先完成材料包文件的打印隐私检查',
     })
-    if (!task || await this.prisma.piiFinding.count({ where: { taskId: task.id, action: 'pending' } }) > 0) {
-      throw new BadRequestException({ error: { code: 'PRINT_PII_SCAN_REQUIRED', message: '请先完成材料包文件的打印隐私检查' } })
-    }
   }
 
   /**

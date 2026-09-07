@@ -234,6 +234,14 @@ async function main() {
       'FILE_ALREADY_FINALIZED',
       'API-27a complete 后再 PUT raw → 409 FILE_ALREADY_FINALIZED',
     )
+    await storage.putObject(intentRec!.storageKey, Buffer.from('%PDF-1.4 rewritten after complete ' + sfx), 'application/pdf', intentRec!.bucket)
+    await expectThrowCode(
+      () => files.readContent(intent.fileId),
+      'FILE_CONTENT_CHANGED',
+      'RES-2 complete 后内容变化 → readContent 409 FILE_CONTENT_CHANGED',
+    )
+    const tampered = await prisma.fileObject.findUnique({ where: { id: intent.fileId } })
+    ok(tampered?.status === 'quarantined', 'RES-2 内容变化后文件标记 quarantined')
 
     // ── E. 软删除 ───────────────────────────────────────────────────────
     console.log('\n[E] 软删除 + 物理回收')

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import { verifyFileSignature } from '../files/signing'
 import { isSinglePageImage, resolvePdfPageCount } from '../files/file-page-count.util'
+import { assertFileContentIntegrity } from '../files/file-content-integrity'
 import type { PrintPageCount } from './print-page-count.types'
 
 const CONTRACT_REPORT_MIN_PRINT_REMAINING_MS = 30 * 60 * 1000
@@ -36,6 +37,7 @@ export class PrintPageCountService {
 
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!file || file.deletedAt) throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
+    await assertFileContentIntegrity({ prisma: this.prisma, storage: this.storage, fileId })
 
     if (
       file.purpose === 'contract_review_report' && (

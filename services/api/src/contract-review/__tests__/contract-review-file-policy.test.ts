@@ -96,6 +96,8 @@ function makeFileAccessHarness(
   let deleteObjectCalls = 0
   const signedTtlSeconds: number[] = []
   const prisma = {
+    // RES-2 文件内容完整性复核会先查直传基线审计；这些用例都是代理上传，无基线 → 跳过
+    auditLog: { findFirst: async () => null, create: async () => ({}) },
     fileObject: {
       findUnique: async ({ where }: { where: { id: string } }) =>
         where.id === 'missing-file' ? null : record,
@@ -198,6 +200,8 @@ test('contract upload is locked to an exact two-hour system session', () => {
 test('FilesService ignores weaker or longer client policy attempts for contract uploads', async () => {
   let createData: Record<string, unknown> | undefined
   const prisma = {
+    // RES-2 文件内容完整性复核会先查直传基线审计；这些用例都是代理上传，无基线 → 跳过
+    auditLog: { findFirst: async () => null, create: async () => ({}) },
     fileObject: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         createData = data
@@ -266,6 +270,8 @@ test('FilesService clamps the initial contract download URL to the persisted fil
   const signedTtlSeconds: number[] = []
   const persistedExpiry = new Date(Date.now() + 10 * 60 * 1000)
   const prisma = {
+    // RES-2 文件内容完整性复核会先查直传基线审计；这些用例都是代理上传，无基线 → 跳过
+    auditLog: { findFirst: async () => null, create: async () => ({}) },
     fileObject: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         createData = data
@@ -647,6 +653,8 @@ test('contract scans map to contract_upload', () => {
 test('member document queries exclude contract originals and locked session derivatives; kept reports are listed', async () => {
   const whereClauses: Array<Record<string, unknown>> = []
   const prisma = {
+    // RES-2 文件内容完整性复核会先查直传基线审计；这些用例都是代理上传，无基线 → 跳过
+    auditLog: { findFirst: async () => null, create: async () => ({}) },
     fileObject: {
       count: async ({ where }: { where: Record<string, unknown> }) => {
         whereClauses.push(where)

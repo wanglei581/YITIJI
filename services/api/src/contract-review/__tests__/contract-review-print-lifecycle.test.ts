@@ -55,6 +55,7 @@ test('quote and create page counting reject a contract report with less than thi
   const fileId = 'report-too-close-to-expiry'
   let storageReads = 0
   const service = new PrintPageCountService({
+    auditLog: { findFirst: async () => null, create: async () => ({}) },
     fileObject: {
       async findUnique() {
         return {
@@ -95,6 +96,8 @@ function createHarness(input: { tasks: TaskRow[]; files: FileRow[] }) {
   const terminal = new Set(['completed', 'failed', 'cancelled', 'abandoned'])
   const active = new Set(['pending', 'claimed', 'printing'])
   const prisma = {
+    // RES-2 文件内容完整性复核会先查直传基线审计；这些用例都是代理上传，无基线 → 跳过
+    auditLog: { findFirst: async () => null, create: async () => ({}) },
     printTask: {
       async findUnique(args: { where: { id: string } }) {
         return tasks.get(args.where.id) ?? null

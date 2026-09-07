@@ -13,6 +13,7 @@ import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
+import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
 
 /**
  * 取件码有效期上限：7 天（产品裁决 2026-08-18 方案 A，原 24 小时）。
@@ -236,18 +237,14 @@ export class MemberPrintOrderCreateService {
   }
 
   private async assertPiiReady(fileId: string): Promise<void> {
-    const task = await this.prisma.documentProcessTask.findFirst({
-      where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
+    await assertPiiScanned({
+      prisma: this.prisma,
+      fileId,
+      requireCompleted: true,
+      missingMessage: '请先完成打印隐私检查',
+      pendingMessage: '请先确认隐私检查结果',
+      pendingCode: 'PRINT_PII_DECISIONS_REQUIRED',
     })
-    if (!task) {
-      throw new BadRequestException({ error: { code: 'PRINT_PII_SCAN_REQUIRED', message: '请先完成打印隐私检查' } })
-    }
-    const pending = await this.prisma.piiFinding.count({ where: { taskId: task.id, action: 'pending' } })
-    if (pending > 0) {
-      throw new BadRequestException({ error: { code: 'PRINT_PII_DECISIONS_REQUIRED', message: '请先确认隐私检查结果' } })
-    }
   }
 
   private async requireOwned(endUserId: string, orderId: string) {
