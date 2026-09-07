@@ -254,7 +254,7 @@ export function ResumeOptimizePage() {
         {view !== 'ready' && (
           <OptimizeEmptyState
             onReport={goToReport}
-            onManualEdit={() => navigate('/me/resumes')}
+            onManualEdit={() => navigate('/resume/generate')}
             onMyResumes={() => navigate('/me/resumes')}
           />
         )}

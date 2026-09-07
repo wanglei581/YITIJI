@@ -26,10 +26,13 @@ export function OptimizeEmptyState(props: {
       action: props.onReport,
     },
     {
+      // 稿 23-resume-optimize.html:961 —— data-route 是 /resume/generate，
+      // 副标题也逐字取自稿。此前指向 /me/resumes，与下面「打开我的简历」同去向，
+      // 读起来像两张重复的卡；稿里本来就是两个不同出口。
       title: '手动逐项修改',
-      description: '选择已完成的简历记录，继续编辑优化版',
+      description: '自己填写并原样导出草稿，不经过模型',
       icon: PencilLineIcon,
-      route: '/me/resumes',
+      route: '/resume/generate',
       testId: 'resume-optimize-empty-manual',
       action: props.onManualEdit,
     },
@@ -37,6 +40,9 @@ export function OptimizeEmptyState(props: {
       title: '打开我的简历',
       description: '查看和整理已保存的版本',
       icon: FolderOpenIcon,
+      // 稿 :962 的 data-route 写的是 /me/ai-records，但它自己的 href 指向
+      // 39-member-records.html?view=resumes，而运行时保存版本的路由是 /me/resumes
+      // （包 L6 订正 24 页时按运行时改过）。此处以运行时为准，稿的 data-route 待订正。
       route: '/me/resumes',
       testId: 'resume-optimize-empty-resumes',
       action: props.onMyResumes,
