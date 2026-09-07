@@ -71,7 +71,7 @@ import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
-import { firstQueryString } from './jobs-shared'
+import { firstQueryString, type PartnerListQuery } from './jobs-shared'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -87,6 +87,28 @@ function optionalPaging(page?: string, pageSize?: string): { page: number; pageS
     page: safeInt(page, 1, 1, 10_000),
     pageSize: safeInt(pageSize, 20, 1, 100),
   }
+}
+
+function optionalPartnerListQuery(raw: {
+  page?: string
+  pageSize?: string
+  reviewStatus?: string
+  publishStatus?: string
+  jobType?: string
+  status?: string
+}): PartnerListQuery | undefined {
+  const paging = optionalPaging(raw.page, raw.pageSize)
+  const filters: PartnerListQuery = {
+    reviewStatus: raw.reviewStatus?.trim() || undefined,
+    publishStatus: raw.publishStatus?.trim() || undefined,
+    jobType: raw.jobType?.trim() || undefined,
+    status: raw.status?.trim() || undefined,
+  }
+  const hasFilter = Boolean(
+    filters.reviewStatus || filters.publishStatus || filters.jobType || filters.status,
+  )
+  if (!paging && !hasFilter) return undefined
+  return { ...paging, ...filters }
 }
 
 /**
@@ -454,8 +476,14 @@ export class JobsController {
     @CurrentUser() user: AuthedUser,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('publishStatus') publishStatus?: string,
+    @Query('jobType') jobType?: string,
   ) {
-    return this.jobsService.getPartnerJobs(user, optionalPaging(page, pageSize))
+    return this.jobsService.getPartnerJobs(
+      user,
+      optionalPartnerListQuery({ page, pageSize, reviewStatus, publishStatus, jobType }),
+    )
   }
 
   @Get('partner/jobs/quality-summary')
@@ -521,8 +549,14 @@ export class JobsController {
     @CurrentUser() user: AuthedUser,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('reviewStatus') reviewStatus?: string,
+    @Query('publishStatus') publishStatus?: string,
+    @Query('status') status?: string,
   ) {
-    return this.jobsService.getPartnerFairs(user, optionalPaging(page, pageSize))
+    return this.jobsService.getPartnerFairs(
+      user,
+      optionalPartnerListQuery({ page, pageSize, reviewStatus, publishStatus, status }),
+    )
   }
 
   @Post('partner/fairs/import')

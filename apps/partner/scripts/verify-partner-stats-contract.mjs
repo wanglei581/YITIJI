@@ -91,6 +91,11 @@ mustContain(
   ['/partner/stats?period=${period}`'],
   'A1b. adapter 请求串只带 period 一个参数',
 )
+mustContain(
+  ADAPTER,
+  ['pendingReviewJobs', 'pendingReviewFairs', 'pendingReviewPolicies', 'pendingReviewCompanies'],
+  'A1c. snapshot 类型含 pending+reviewing 分类型字段',
+)
 
 // A2. 不再解包 body.data：orgs 模块控制器一律返回裸对象
 codeMustNotContain(
@@ -192,13 +197,23 @@ mustNotContain(
 // B9. PTR-13：工作台「待审核」与统计页同一服务端口径 snapshot.pendingReview
 mustContain(
   DASHBOARD,
-  ['getPartnerStats', 'stats.snapshot.pendingReview', 'pendingReview'],
+  ['getPartnerStats', 'stats.snapshot', 'pendingReview'],
   'B9. 工作台待审核数取自 GET /partner/stats snapshot.pendingReview',
 )
 mustNotContain(
   DASHBOARD,
   ['data.pendingTotal', 'pendingTotal }'],
   'B9b. 工作台待审核标题不再使用 dashboard.pendingTotal',
+)
+mustContain(
+  DASHBOARD,
+  ['snapshot.pendingReviewJobs', 'snapshot.pendingReviewFairs', 'snapshot.pendingReviewPolicies', 'firstPendingPath(snapshot)'],
+  'B9c. 去查看跳转与计数同用 snapshot 的 pending+reviewing 分类型字段',
+)
+mustNotContain(
+  DASHBOARD,
+  ['data.jobs.pending > 0', 'data.fairs.pending > 0', 'data.policies.pending > 0'],
+  'B9d. firstPendingPath 不再按 dashboard 的 pending-only 计数跳转',
 )
 
 // ── C. 与 honest-placeholders 门禁的交接 ───────────────────────────────────

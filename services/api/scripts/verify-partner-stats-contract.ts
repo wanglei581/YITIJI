@@ -117,6 +117,14 @@ function assertSourceContract(): void {
     '1d. 服务不查 BrowseLog / ExternalJumpLog（避免可漂移的归因）',
     !service.includes('browseLog') && !service.includes('externalJumpLog'),
   )
+
+  assert(
+    '1e. snapshot 暴露 pending+reviewing 分类型字段供工作台跳转',
+    service.includes('pendingReviewJobs: pendingJobs')
+      && service.includes('pendingReviewFairs: pendingFairs')
+      && service.includes('pendingReviewPolicies: pendingPolicies')
+      && service.includes('pendingReviewCompanies: pendingCompanies'),
+  )
 }
 
 // ── 2. ValidationPipe 真跑：证明 timezone 会被拒 ───────────────────────────
@@ -222,6 +230,7 @@ async function main(): Promise<void> {
         { sourceOrgId: orgA, sourceId: srcA, externalId: ext('a-j1'), sourceName: 'A源', sourceUrl: 'https://example.com/a1', title: 'A岗位1', company: 'A公司', city: '青岛', reviewStatus: 'approved', publishStatus: 'published' },
         { sourceOrgId: orgA, sourceId: srcA, externalId: ext('a-j2'), sourceName: 'A源', sourceUrl: 'https://example.com/a2', title: 'A岗位2', company: 'A公司', city: '青岛', reviewStatus: 'approved', publishStatus: 'published' },
         { sourceOrgId: orgA, sourceId: srcA, externalId: ext('a-j3'), sourceName: 'A源', sourceUrl: 'https://example.com/a3', title: 'A待审岗位', company: 'A公司', city: '青岛', reviewStatus: 'pending', publishStatus: 'draft' },
+        { sourceOrgId: orgA, sourceId: srcA, externalId: ext('a-j4'), sourceName: 'A源', sourceUrl: 'https://example.com/a4', title: 'A审核中岗位', company: 'A公司', city: '青岛', reviewStatus: 'reviewing', publishStatus: 'draft' },
         // B 的内容必须完全不进 A 的统计
         { sourceOrgId: orgB, sourceId: srcB, externalId: ext('b-j1'), sourceName: 'B源', sourceUrl: 'https://example.com/b1', title: 'B岗位', company: 'B公司', city: '青岛', reviewStatus: 'approved', publishStatus: 'published' },
         { sourceOrgId: orgB, sourceId: srcB, externalId: ext('b-j2'), sourceName: 'B源', sourceUrl: 'https://example.com/b2', title: 'B岗位2', company: 'B公司', city: '青岛', reviewStatus: 'approved', publishStatus: 'published' },
@@ -291,9 +300,22 @@ async function main(): Promise<void> {
       `实际 ${a.snapshot.publishedPolicies}`,
     )
     assert(
-      '3f. 待审核数为本机构真实计数（A：岗位1 + 政策1 = 2）',
-      a.snapshot.pendingReview === 2,
+      '3f. 待审核数为本机构真实计数（A：岗位 pending+reviewing 2 + 政策1 = 3）',
+      a.snapshot.pendingReview === 3,
       `实际 ${a.snapshot.pendingReview}`,
+    )
+    assert(
+      '3f2. snapshot 分类型 pending+reviewing 与总数一致（问后端字段，不前端各算）',
+      a.snapshot.pendingReviewJobs === 2
+        && a.snapshot.pendingReviewFairs === 0
+        && a.snapshot.pendingReviewPolicies === 1
+        && a.snapshot.pendingReviewCompanies === 0
+        && a.snapshot.pendingReview
+          === a.snapshot.pendingReviewJobs
+            + a.snapshot.pendingReviewFairs
+            + a.snapshot.pendingReviewPolicies
+            + a.snapshot.pendingReviewCompanies,
+      `jobs=${a.snapshot.pendingReviewJobs} fairs=${a.snapshot.pendingReviewFairs} policies=${a.snapshot.pendingReviewPolicies} companies=${a.snapshot.pendingReviewCompanies}`,
     )
 
     // 3g. 时区由服务端声明

@@ -172,6 +172,9 @@ export const partnerHttpAdapter = {
     const params: Record<string, string> = {}
     if (query?.page) params.page = String(query.page)
     if (query?.pageSize) params.pageSize = String(query.pageSize)
+    if (query?.reviewStatus) params.reviewStatus = query.reviewStatus
+    if (query?.publishStatus) params.publishStatus = query.publishStatus
+    if (query?.jobType) params.jobType = query.jobType
     return get<PartnerJobPage>('/partner/jobs', params)
   },
   getPartnerJobQualitySummary: () =>
@@ -190,6 +193,9 @@ export const partnerHttpAdapter = {
     const params: Record<string, string> = {}
     if (query?.page) params.page = String(query.page)
     if (query?.pageSize) params.pageSize = String(query.pageSize)
+    if (query?.reviewStatus) params.reviewStatus = query.reviewStatus
+    if (query?.publishStatus) params.publishStatus = query.publishStatus
+    if (query?.status) params.status = query.status
     return get<PartnerFairPage>('/partner/fairs', params)
   },
   unpublishPartnerFair: (id: string) =>

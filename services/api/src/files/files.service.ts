@@ -59,6 +59,24 @@ import { assertFileContentIntegrity, DIRECT_UPLOAD_COMPLETE_ACTION } from './fil
  */
 export const DIRECT_UPLOAD_SNIFF_MAX_BYTES = 32 * 1024 * 1024
 
+const FILE_SENSITIVE_LEVELS = new Set<FileSensitiveLevel>(['normal', 'sensitive', 'highly_sensitive'])
+const FILE_RETENTION_POLICIES = new Set<FileRetentionPolicy>(['months_3', 'months_6', 'long_term', 'system_short'])
+
+function parseFileSensitiveLevel(raw?: string): FileSensitiveLevel | undefined {
+  const v = raw?.trim()
+  return v && FILE_SENSITIVE_LEVELS.has(v as FileSensitiveLevel) ? (v as FileSensitiveLevel) : undefined
+}
+
+function parseFileRetentionPolicy(raw?: string): FileRetentionPolicy | undefined {
+  const v = raw?.trim()
+  return v && FILE_RETENTION_POLICIES.has(v as FileRetentionPolicy) ? (v as FileRetentionPolicy) : undefined
+}
+
+function parseFileExpiry(raw?: string): 'active' | 'expired' | undefined {
+  const v = raw?.trim()
+  return v === 'active' || v === 'expired' ? v : undefined
+}
+
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
  *   - user:  后台 User(admin / partner / kiosk),来自 User JWT。
@@ -698,12 +716,19 @@ export class FilesService {
       purpose?: string
       limit?: number
       includeDeleted?: boolean
+      sensitiveLevel?: string
+      retentionPolicy?: string
+      expiry?: string
     } = {},
   ): Promise<{ items: FileMetadata[]; total: number }> {
     const search = args.search?.trim()
     const deleted = args.deleted ?? (args.includeDeleted ? 'all' : false)
     const skip = Math.max(0, Math.floor(args.skip ?? 0))
     const take = Math.min(Math.max(1, Math.floor(args.limit ?? 100)), 100)
+    const sensitiveLevel = parseFileSensitiveLevel(args.sensitiveLevel)
+    const retentionPolicy = parseFileRetentionPolicy(args.retentionPolicy)
+    const expiry = parseFileExpiry(args.expiry)
+    const now = new Date()
     const where = {
       ...(deleted === 'all'
         ? {}
@@ -713,6 +738,12 @@ export class FilesService {
       ...(args.purpose
         ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
         : { purpose: { not: 'contract_review_report' } }),
+      ...(sensitiveLevel ? { sensitiveLevel } : {}),
+      ...(retentionPolicy ? { retentionPolicy } : {}),
+      ...(expiry === 'expired' ? { expiresAt: { lte: now } } : {}),
+      ...(expiry === 'active'
+        ? { AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }] }
+        : {}),
       ...(search
         ? {
             OR: [

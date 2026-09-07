@@ -3,6 +3,8 @@
  * Run: pnpm --filter @ai-job-print/api exec tsx scripts/verify-member-data-export-files.ts
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { FilesController } from '../src/files/files.controller'
@@ -92,6 +94,7 @@ function createHarness(options: HarnessOptions = {}) {
   let headObjectCount = 0
   let getObjectCount = 0
   let cleanupWhere: Record<string, unknown> | null = null
+  let listWhere: Record<string, unknown> | null = null
 
   const prisma = {
     fileObject: {
@@ -104,7 +107,8 @@ function createHarness(options: HarnessOptions = {}) {
       async findUnique() {
         return record
       },
-      async count() {
+      async count(input?: { where?: Record<string, unknown> }) {
+        if (input?.where) listWhere = input.where
         return record ? 1 : 0
       },
       async findMany(input?: { where?: Record<string, unknown> }) {
@@ -115,6 +119,7 @@ function createHarness(options: HarnessOptions = {}) {
           cleanupWhere = where
           return []
         }
+        listWhere = where
         return record ? [record] : []
       },
       async update(input: { data: Record<string, unknown> }) {
@@ -200,6 +205,9 @@ function createHarness(options: HarnessOptions = {}) {
     },
     get cleanupWhere() {
       return cleanupWhere
+    },
+    get listWhere() {
+      return listWhere
     },
   }
 }
@@ -508,6 +516,48 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
       assert.equal(Array.isArray(page.items), true)
       assert.equal(page.total, 1)
       assert.equal(page.items.length, 1)
+    },
+  },
+  {
+    name: 'admin list 把 sensitiveLevel/retentionPolicy/expiry 推进 where',
+    async run() {
+      const serviceSrc = readFileSync(join(process.cwd(), 'src/files/files.service.ts'), 'utf8')
+      const controllerSrc = readFileSync(join(process.cwd(), 'src/files/files.controller.ts'), 'utf8')
+      assert.equal(controllerSrc.includes("@Query('sensitiveLevel')"), true)
+      assert.equal(controllerSrc.includes("@Query('retentionPolicy')"), true)
+      assert.equal(controllerSrc.includes("@Query('expiry')"), true)
+      assert.equal(serviceSrc.includes('parseFileSensitiveLevel'), true)
+      assert.equal(serviceSrc.includes('parseFileRetentionPolicy'), true)
+      assert.equal(serviceSrc.includes("expiry === 'expired'"), true)
+      const harness = createHarness({ initialRecord: makeFileRow() })
+      await harness.files.list({
+        skip: 0,
+        limit: 20,
+        sensitiveLevel: 'highly_sensitive',
+        retentionPolicy: 'system_short',
+        expiry: 'active',
+      })
+      const where = harness.listWhere
+      assert.ok(where)
+      assert.equal(where['sensitiveLevel'], 'highly_sensitive')
+      assert.equal(where['retentionPolicy'], 'system_short')
+      const and = where['AND'] as Array<Record<string, unknown>> | undefined
+      assert.equal(Array.isArray(and), true)
+      const expiryOr = and?.[0]?.['OR'] as Array<Record<string, unknown>> | undefined
+      assert.equal(Array.isArray(expiryOr), true)
+      assert.equal(expiryOr?.some((clause) => clause['expiresAt'] === null), true)
+
+      const expired = createHarness({ initialRecord: makeFileRow() })
+      await expired.files.list({ expiry: 'expired' })
+      const expiredAt = expired.listWhere?.['expiresAt'] as { lte?: Date } | undefined
+      assert.equal(expiredAt?.lte instanceof Date, true)
+
+      const ignored = createHarness({ initialRecord: makeFileRow() })
+      await ignored.files.list({ sensitiveLevel: 'not-a-level', retentionPolicy: 'forever', expiry: 'soon' })
+      assert.equal(ignored.listWhere?.['sensitiveLevel'], undefined)
+      assert.equal(ignored.listWhere?.['retentionPolicy'], undefined)
+      assert.equal(ignored.listWhere?.['expiresAt'], undefined)
+      assert.equal(ignored.listWhere?.['AND'], undefined)
     },
   },
   {

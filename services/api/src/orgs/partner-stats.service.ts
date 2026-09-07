@@ -175,6 +175,10 @@ export class PartnerStatsService {
         activeSources,
         /** 待管理员审核（pending + reviewing）的内容总数，用于解释「为什么还没有数据」 */
         pendingReview,
+        pendingReviewJobs: pendingJobs,
+        pendingReviewFairs: pendingFairs,
+        pendingReviewPolicies: pendingPolicies,
+        pendingReviewCompanies: pendingCompanies,
       },
       /**
        * 浏览 / 外部跳转 / 打印的机构归因。

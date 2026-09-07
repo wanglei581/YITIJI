@@ -198,6 +198,32 @@ async function main() {
       if (paged.pagination.total < 1) fail('PTR-22. 政策 total 未计入本机构行')
       pass('PTR-22. 政策列表缺省保持数组，带 page/pageSize 走 skip/take + count')
     }
+
+    {
+      const pendingRow = await prisma.policyPost.create({
+        data: {
+          sourceOrgId: orgA, sourceName: `政策机构A_${suffix}`, kind: 'notice', title: `筛选待审_${suffix}`,
+          category: 'notice', reviewStatus: 'pending', publishStatus: 'draft',
+        },
+      })
+      const approvedRow = await prisma.policyPost.create({
+        data: {
+          sourceOrgId: orgA, sourceName: `政策机构A_${suffix}`, kind: 'notice', title: `筛选已过_${suffix}`,
+          category: 'notice', reviewStatus: 'approved', publishStatus: 'published',
+        },
+      })
+      const pendingOnly = await svc.getPartnerPolicies(partnerA, { page: 1, pageSize: 50, reviewStatus: 'pending' })
+      if (!('data' in pendingOnly)) fail('RES-5. 政策带筛选分页应返回 {data,pagination}')
+      if (pendingOnly.data.some((p) => p.reviewStatus !== 'pending')) fail('RES-5. 政策 reviewStatus=pending 混入其他态')
+      if (!pendingOnly.data.some((p) => p.id === pendingRow.id)) fail('RES-5. 政策 pending 筛选漏目标行')
+      if (pendingOnly.data.some((p) => p.id === approvedRow.id)) fail('RES-5. 政策 pending 筛选含已通过')
+      const publishedOnly = await svc.getPartnerPolicies(partnerA, { page: 1, pageSize: 50, publishStatus: 'published' })
+      if (publishedOnly.data.some((p) => p.publishStatus !== 'published')) fail('RES-5. 政策 publishStatus 未下推')
+      const ignored = await svc.getPartnerPolicies(partnerA, { page: 1, pageSize: 50, reviewStatus: 'not-a-status' })
+      const unfiltered = await svc.getPartnerPolicies(partnerA, { page: 1, pageSize: 50 })
+      if (ignored.pagination.total !== unfiltered.pagination.total) fail('RES-5. 政策非法 reviewStatus 应收口为缺省')
+      pass('RES-5. Partner 政策列表筛选下推 where，非法值缺省不变')
+    }
     // ── 9. ADM-C15 GET /admin/policy-sources 可选分页 ───────────────────
     {
       const controller = readFileSync(join(process.cwd(), 'src/policies/policies.controller.ts'), 'utf8')

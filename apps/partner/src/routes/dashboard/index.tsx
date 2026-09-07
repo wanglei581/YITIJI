@@ -15,12 +15,12 @@ import {
   ScrollTextIcon,
 } from 'lucide-react'
 import { getPartnerDashboard, type PartnerDashboardData } from '../../services/api/orgSelf'
-import { getPartnerStats } from '../../services/api/stats'
+import { getPartnerStats, type PartnerStatsResponse } from '../../services/api/stats'
 
-function firstPendingPath(data: PartnerDashboardData): string {
-  if (data.jobs.pending > 0) return '/jobs'
-  if (data.fairs.pending > 0) return '/fairs'
-  if (data.policies.pending > 0) return '/policy'
+function firstPendingPath(snapshot: PartnerStatsResponse['snapshot']): string {
+  if (snapshot.pendingReviewJobs > 0) return '/jobs'
+  if (snapshot.pendingReviewFairs > 0) return '/fairs'
+  if (snapshot.pendingReviewPolicies > 0) return '/policy'
   return '/companies'
 }
 
@@ -65,13 +65,14 @@ function PendingReviewCallout({ count, onView }: { count: number; onView: () => 
 
 function MetricsGrid({
   data,
-  pendingReview,
+  snapshot,
   onGo,
 }: {
   data: PartnerDashboardData
-  pendingReview: number
+  snapshot: PartnerStatsResponse['snapshot']
   onGo: (path: string) => void
 }) {
+  const pendingReview = snapshot.pendingReview
   const metrics = [
     {
       label: '已上传岗位', value: data.jobs.total,
@@ -96,7 +97,7 @@ function MetricsGrid({
     {
       label: '待审核数据', value: pendingReview,
       note: pendingReview > 0 ? '含审核中与企业资料，与统计页相同' : '当前无待审核',
-      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: firstPendingPath(data),
+      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: firstPendingPath(snapshot),
     },
     {
       label: '数据源', value: data.sources.total,
@@ -208,7 +209,7 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<PartnerDashboardData | null>(null)
-  const [pendingReview, setPendingReview] = useState(0)
+  const [snapshot, setSnapshot] = useState<PartnerStatsResponse['snapshot'] | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -219,7 +220,7 @@ export default function DashboardPage() {
       .then(([d, stats]) => {
         if (cancelled) return
         setData(d)
-        setPendingReview(stats.snapshot.pendingReview)
+        setSnapshot(stats.snapshot)
         setState('ready')
       })
       .catch(() => {
@@ -234,12 +235,12 @@ export default function DashboardPage() {
     <Page title="工作台" subtitle={withFrontendHint('本机构数据概览（实时统计）', FRONTEND_HINT.none)}>
       {state === 'loading' ? (
         <LoadingState className="py-20" />
-      ) : state === 'error' || !data ? (
+      ) : state === 'error' || !data || !snapshot ? (
         <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
       ) : (
         <div className="flex flex-col gap-6">
-          <PendingReviewCallout count={pendingReview} onView={() => navigate(firstPendingPath(data))} />
-          <MetricsGrid data={data} pendingReview={pendingReview} onGo={(p) => navigate(p)} />
+          <PendingReviewCallout count={snapshot.pendingReview} onView={() => navigate(firstPendingPath(snapshot))} />
+          <MetricsGrid data={data} snapshot={snapshot} onGo={(p) => navigate(p)} />
           <SyncLogSection data={data} onGoLogs={() => navigate('/sync-logs')} />
         </div>
       )}
