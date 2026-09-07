@@ -102,6 +102,7 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  */
 const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/pickup-claim',
+  '/print/upload',
   '/print/confirm',
   '/resume/report',
   '/resume/optimize',

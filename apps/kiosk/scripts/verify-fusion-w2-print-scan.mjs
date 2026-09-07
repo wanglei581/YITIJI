@@ -374,29 +374,58 @@ assert.doesNotMatch(
   'sign-stamp does not echo the signature/stamp image on the public screen',
 )
 
-const printUpload = read('src/pages/print/PrintUploadPage.tsx')
+const printUploadPage = read('src/pages/print/PrintUploadPage.tsx')
+const printUploadView = read('src/pages/print/file-source/FileSourceView.tsx')
+const printUploadBits = read('src/pages/print/file-source/FileSourceBits.tsx')
+const printUpload = `${printUploadPage}\n${printUploadView}\n${printUploadBits}`
 assert.match(
-  printUpload,
+  printUploadPage,
   /type UploadTab = 'file' \| 'qr' \| 'usb'/,
   'print upload keeps exactly three selectable tabs'
 )
 assert.match(
-  printUpload,
+  printUploadPage,
   /navigate\('\/scan\/start'\)/,
   'print upload keeps scan as an independent CTA'
 )
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
 assert.match(printUpload, /w2-print-upload-source-grid/, 'print upload exposes the 2x2 source grid')
 assert.match(printUpload, /print-upload-footer/, 'print upload exposes a semantic footer selector')
+assert.match(printUploadView, /QxPageFrame/, 'print upload uses Qingxu page frame')
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /['"]\/print\/upload['"]/,
+  'print upload is registered in QX_MIGRATED_ROUTES'
+)
 assert.match(
   read('src/pages/print/styles/print-upload.css'),
   /\.w2-print-upload-source-grid\b/,
   'print upload stylesheet owns the live source grid selector'
 )
+assert.match(
+  read('src/pages/print/styles/file-source-qx.css'),
+  /\.w2-print-upload-source-grid\b/,
+  'qingxu file-source stylesheet owns the live source grid selector'
+)
 assert.equal(
-  (printUpload.match(/<UploadSessionQrPanel\b/g) ?? []).length,
+  (printUpload.match(/useUploadSession\(/g) ?? []).length,
   1,
-  'print upload renders one QR session panel'
+  'print upload uses one QR upload session hook'
+)
+assert.doesNotMatch(
+  printUpload,
+  /<UploadSessionQrPanel\b/,
+  'print upload does not mount the frozen QR panel'
+)
+assert.doesNotMatch(
+  printUploadPage,
+  /KioskPageFrame/,
+  'print upload page has left the V6 frame'
+)
+assert.doesNotMatch(
+  printUploadView,
+  /KioskPageFrame/,
+  'print upload view has left the V6 frame'
 )
 const printPrototypeLayout = read('src/pages/print/PrintPrototypeLayout.tsx')
 assert.match(
@@ -934,5 +963,84 @@ assert.match(
   /getTerminalId\(\)/,
   'sign-stamp remains the reference deep-link gate that convert must copy',
 )
+
+const fileSourceCss = read('src/pages/print/styles/file-source-qx.css')
+const fileSourceModel = read('src/pages/print/file-source/fileSourceModel.ts')
+const uploadSessionHook = read('src/pages/upload/hooks/useUploadSession.ts')
+assert.match(printUploadPage, /import \{ FileSourceView \}/, 'page composes FileSourceView')
+assert.match(printUploadView, /import '\.\.\/styles\/file-source-qx\.css'/, 'view imports Qingxu CSS')
+assert.match(fileSourceCss, /var\(--qx-ink\)/, 'page CSS uses Qingxu tokens')
+assert.match(fileSourceCss, /--qx-tap-min/, 'page CSS keeps 48px touch floor token')
+assert.doesNotMatch(fileSourceCss, /#[0-9a-fA-F]{3,8}\b/, 'page CSS has no naked hex')
+const FILE_SOURCE_STATES = [
+  'source-chooser', 'missing-file', 'unknown',
+  'local-guide', 'local-picking', 'local-cancelled', 'local-rejected', 'local-oversize',
+  'local-unreadable', 'local-uploading', 'local-upload-failed', 'local-ready',
+  'phone-generating', 'phone-gen-failed', 'phone-ready', 'phone-waiting', 'phone-uploading',
+  'phone-status-unknown', 'phone-expired', 'phone-uploaded', 'phone-confirming',
+  'phone-confirm-failed', 'phone-confirmed', 'phone-cancel-requesting', 'phone-cancel-failed',
+  'phone-cancelled',
+  'usb-unavailable', 'usb-agent-offline', 'usb-wait', 'usb-detecting', 'usb-empty', 'usb-list',
+  'usb-read-failed', 'usb-selected', 'usb-safeid-expired', 'usb-importing', 'usb-import-failed',
+  'usb-ready',
+]
+assert.equal(FILE_SOURCE_STATES.length, 38, 'prototype state list has 38 entries')
+for (const state of FILE_SOURCE_STATES) {
+  assert.match(fileSourceModel, new RegExp(`'${state}'`), `model lists state ${state}`)
+}
+assert.match(fileSourceModel, /function deriveFileSourceScreen/, 'runtime derives screens from real data')
+assert.doesNotMatch(printUploadPage, /capture=1/, 'runtime does not implement capture fixtures that fake uploaded files')
+assert.doesNotMatch(printUploadView, /合成演示/, 'runtime does not label synthetic uploaded files')
+assert.match(
+  printUploadPage,
+  /navigate\('\/print\/material-check', \{ state: \{ file, source \} \}\)/,
+  'only material-check is the forward exit, and it carries file+source'
+)
+assert.doesNotMatch(printUploadPage, /navigate\('\/print\/preview'/, 'upload page never skips to preview')
+assert.doesNotMatch(printUploadPage, /navigate\('\/print\/confirm'/, 'upload page never skips to confirm')
+assert.doesNotMatch(printUploadPage, /materialCheck\s*:/, 'upload page does not write a fake materialCheck summary')
+assert.match(printUploadView, /FILE_SOURCE_HAS_FILE\.has\(screen\)/, 'primary continue is gated on a confirmed current file')
+assert.match(printUploadPage, /if \(!file\) return/, 'handleNext refuses to continue without a file')
+assert.match(printUploadBits, /本机选文件/, 'channel copy uses 本机选文件')
+assert.match(printUploadBits, /手机扫码上传/, 'channel copy uses 手机扫码上传')
+assert.match(printUploadBits, /U 盘导入/, 'channel copy uses U 盘导入')
+assert.match(printUploadBits, /扫描纸质原件/, 'scan is a real independent entry')
+assert.match(printUploadBits, /我的文档 \/ 最近打印/, 'member documents is a real independent entry')
+assert.match(printUpload, /第三方网盘尚未接入/, 'cloud drive is marked not connected')
+assert.doesNotMatch(printUpload, /一键投递|立即投递|平台投递/, 'compliance: no platform apply copy')
+assert.match(printUploadPage, /classifyLocalFile/, 'local files are classified before upload')
+assert.match(fileSourceModel, /'local-uploading'/, 'uploading is a real screen')
+assert.match(
+  printUploadView,
+  /本页无取消动作|没有「取消本次上传」/,
+  'local-uploading does not offer a fake cancel-upload action'
+)
+assert.match(uploadSessionHook, /cancelFailed/, 'upload session hook tracks cancel failure instead of swallowing it')
+assert.doesNotMatch(
+  uploadSessionHook,
+  /handleCancel[\s\S]{0,400}catch \{\s*\/\/ best-effort only\s*\}/,
+  'upload session hook does not swallow DELETE failure then clear the session'
+)
+assert.doesNotMatch(
+  uploadSessionHook,
+  /catch \{\s*\/\/ best-effort only\s*\}/,
+  'upload session hook has no best-effort cancel swallow'
+)
+assert.match(uploadSessionHook, /这次会话没能取消，文件还留着/, 'cancel failure keeps an honest user message')
+assert.match(
+  uploadSessionHook,
+  /status: 'cancelled'/,
+  'successful cancel records cancelled, does not invent success without the server'
+)
+assert.match(uploadSessionHook, /await revokePreviousSession\(existing\)/, 'refresh revokes the previous QR before minting a replacement')
+assert.match(
+  uploadSessionHook,
+  /statusRef\.current\?\.status === 'uploaded'/,
+  'refresh refuses to discard an already-uploaded file'
+)
+assert.match(printUploadPage, /usbSelected/, 'USB select-then-import is a real two-step')
+assert.match(printUploadPage, /isUsbSafeIdExpired/, 'USB 410/expired safeId is a distinct failure')
+assert.match(printUploadView, /file-source-primary/, 'primary CTA has a stable test id')
+assert.match(printUploadView, /下一步：材料检查/, 'ready-state primary names the real next step')
 
 console.log('ALL PASS fusion W2 print/scan contract')

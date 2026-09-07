@@ -100,6 +100,11 @@ check(
 
 // ── 2. formatBytes：单位换算边界 ───────────────────────────────────────────────
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
+const uploadModule = [
+  uploadSrc,
+  read('src/pages/print/file-source/FileSourceView.tsx'),
+  read('src/pages/print/file-source/FileSourceBits.tsx'),
+].join('\n')
 const fmtMatch = uploadSrc.match(/function formatBytes\(bytes: number\): string \{([\s\S]*?)\n\}/)
 if (!fmtMatch) {
   fail('未找到 formatBytes')
@@ -218,21 +223,33 @@ if (!truncMatch) {
   }
 }
 
-// 上传页 5 处文件名必须全部走 helper，不得留裸 `truncate`（只截尾部）
-const uploadPage = read('src/pages/print/PrintUploadPage.tsx')
+// 上传页文件名必须全部走 helper，不得留裸 `truncate`（只截尾部）。
+// V6 是页内 5 处直接 truncateFileNameMiddle(file.name / f.filename / item.fileName)；
+// 青序收成 FileRow / NowFileCard 的 displayFileName(name) + 预览标题 currentFile.name，
+// 覆盖当前文件、U 盘列表、被挡文件、手机会话待确认文件。条数按调用点钉，不许再降到「至少 1 处」。
+const uploadPage = uploadModule
 const helperCalls = (uploadPage.match(/truncateFileNameMiddle\(/g) ?? []).length
-check(helperCalls === 5, `上传页 5 处文件名全部走中段截断 helper（实际 ${helperCalls} 处）`)
+check(helperCalls === 2, `上传页中段截断 helper 调用点（displayFileName + 预览标题，实际 ${helperCalls} 处）`)
 check(
-  !/truncate[^"]*"\s*>\s*\{\s*(?:file\.name|f\.filename|item\.fileName)/.test(uploadPage),
+  !/truncate[^"]*"\s*>\s*\{\s*(?:file\.name|f\.filename|item\.fileName|currentFile\.name|item\.filename)/.test(uploadPage),
   '上传页不再把文件名直接交给裸 `truncate`（尾部截断会吃掉扩展名）',
 )
-for (const expr of ['file.name', 'f.filename', 'item.fileName']) {
-  check(
-    new RegExp(`truncateFileNameMiddle\\(\\s*${expr.replace('.', '\\.')}`).test(uploadPage) ||
-      new RegExp(`truncateFileNameMiddle\\(${expr.replace('.', '\\.')}`).test(uploadPage),
-    `上传页 ${expr} 经中段截断呈现`,
-  )
-}
+check(
+  /function displayFileName\(name: string\)[\s\S]{0,80}truncateFileNameMiddle\(name/.test(uploadPage),
+  '上传页 FileRow / NowFileCard 经 displayFileName → truncateFileNameMiddle 呈现',
+)
+check(
+  /truncateFileNameMiddle\(\s*currentFile\.name/.test(uploadPage),
+  '上传页 currentFile.name 经中段截断呈现',
+)
+check(
+  /name=\{item\.filename\}/.test(uploadPage) && /name=\{currentFile\.name\}/.test(uploadPage),
+  '上传页 U 盘列表 item.filename 与当前文件 currentFile.name 都交给中段截断组件',
+)
+check(
+  /name=\{blockedName\}/.test(uploadPage) && /name=\{phone\.pendingName\}/.test(uploadPage),
+  '上传页被挡文件与手机会话待确认文件名走 FileRow / displayFileName',
+)
 
 console.log(failures === 0 ? '\n全部通过\n' : `\n${failures} 项失败\n`)
 process.exit(failures === 0 ? 0 : 1)

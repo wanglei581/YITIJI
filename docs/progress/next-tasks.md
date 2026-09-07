@@ -4,6 +4,13 @@
 
 - 优惠券 / 机端核销仍未接通：确认页按稿保留入口，禁用并写明「服务端还没有下发券面值与适用范围」。要真正核销须先有打印适用范围、面值上限、退款恢复规则，不能把整单免掉。
 - `quoted` / `zero-amount` / `benefit-unverified` 在静态原型里是 `?debug=1` 合成排版；运行时只认服务端报价，不摆写死金额。
+## 2026-09-07 `/print/upload` 青序迁移残留（本页 PARTIAL，不挡合入）
+
+- `local-picking`：真实一体机是系统文件窗口，运行时不能也不该画原型那份演示目录。关掉窗口 → `local-cancelled`。
+- 原型 `?state=` + `capture=1` 夹具（missing-file / unknown 以及带写死文件名的 38 态）运行时不做：会伪造「已上传」。运行时态由真实上传 / 轮询推导。
+- 手机通道已改用 `useUploadSession` + 青序 `PhoneQrSlot`，冻结组件 `UploadSessionQrPanel.tsx` 未改（哈希仍是 PR #598 的 `6e9fdb90…f3c0`）。其它页（简历来源 / 图片转 PDF / 签名盖章等）仍用冻结面板的 `catch { /* best-effort only */ }` 取消；后续可收敛到同一 hook，本轮不动冻结文件。
+- 完整预览用真实 `FileContentPreview`，不渲染原型里那份「王雷」演示简历。
+- `FileSourceView.tsx` 约 751 行，低于 800 停写线，超过 500 行拆分建议；后续可按通道把 screen body 再拆。
 
 ## 2026-09-07 收口记录：P2 D 桶已清零（11 个 PR 全部合入）
 

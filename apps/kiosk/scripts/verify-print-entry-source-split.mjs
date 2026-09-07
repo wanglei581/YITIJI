@@ -13,7 +13,11 @@ function assert(condition, message) {
 }
 
 const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
-const uploadPage = read('src/pages/print/PrintUploadPage.tsx')
+const uploadPage = [
+  read('src/pages/print/PrintUploadPage.tsx'),
+  read('src/pages/print/file-source/FileSourceView.tsx'),
+  read('src/pages/print/file-source/FileSourceBits.tsx'),
+].join('\n')
 const session = read('src/pages/print/printMaterialSession.ts')
 const flowPages = [
   'src/pages/print/PrintMaterialCheckPage.tsx',
@@ -46,11 +50,15 @@ assert(
 
 // 简历打印与文档打印共用三种上传通道；不得再把 source=resume 收成单一「上传简历」Tab。
 assert(
-  uploadPage.includes("label: isResumePrint ? '上传简历' : '选择文件'") &&
-    uploadPage.includes("label: '扫码上传'") &&
-    uploadPage.includes("label: 'U盘导入'") &&
+  uploadPage.includes('本机选文件') &&
+    uploadPage.includes('手机扫码上传') &&
+    uploadPage.includes('U 盘导入') &&
     !/isResumePrint\s*\?\s*\[[\s\S]*?key:\s*'file'[\s\S]*?\]\s*:\s*\[/.test(uploadPage),
   'PrintUploadPage 简历打印同样提供本机上传 / 扫码上传 / U盘导入',
+)
+assert(
+  !/KioskPageFrame/.test(uploadPage),
+  'PrintUploadPage has left the V6 frame',
 )
 
 assert(
@@ -72,13 +80,23 @@ assert(
 // contentCategory 审计字段且 U 盘路径为多行调用，故按 handler 逐一正则断言。
 // source 必须是简写属性（后跟 , 或 }），排除 source: undefined 等同名不同值的误匹配。
 const saveWithSourcePattern = /savePrintMaterialSession\(\{\s*file:\s*nextFile,\s*source\s*[,}]/
-for (const handler of ['handleFileChange', 'handleQrUploaded', 'handleUsbFileSelect']) {
+const persistStart = uploadPage.indexOf('const persistFile')
+const persistBody = uploadPage.slice(persistStart, persistStart + 600)
+assert(
+  persistStart >= 0 && saveWithSourcePattern.test(persistBody),
+  'persistFile 上传成功后把 source 写入当前打印材料 session',
+)
+for (const [handler, marker] of [
+  ['uploadLocalFile', 'persistFile(nextFile, \'file\')'],
+  ['handleQrUploaded', 'persistFile(nextFile, \'qr\')'],
+  ['handleUsbImport', 'persistFile(nextFile, \'usb\')'],
+]) {
   const start = uploadPage.indexOf(`const ${handler}`)
   const nextTopLevelDecl = uploadPage.indexOf('\n  const ', start + 1)
   const body = uploadPage.slice(start, nextTopLevelDecl === -1 ? undefined : nextTopLevelDecl)
   assert(
-    start >= 0 && saveWithSourcePattern.test(body),
-    `${handler} 上传成功后把 source 写入当前打印材料 session`,
+    start >= 0 && body.includes(marker),
+    `${handler} 上传成功后经 persistFile 把 source 写入当前打印材料 session`,
   )
 }
 
