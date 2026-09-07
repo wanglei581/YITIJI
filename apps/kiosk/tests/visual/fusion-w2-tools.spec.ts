@@ -148,35 +148,6 @@ test('conversion page renders a server conversion error without fabricating outp
   await expectHealthy(page, errors, 'print-scan-convert')
 })
 
-const W2_MEMBER_TOKEN = 'w2-sign-memory-token'
-const W2_MEMBER_PHONE = '13800138000'
-const W2_MEMBER_CODE = '123456'
-
-function registerSignCapabilities(api: ApiRouter): void {
-  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
-    status: 200,
-    json: {
-      capabilities: [
-        {
-          capabilityKey: 'signature_stamp',
-          status: 'available',
-          note: null,
-          configured: true,
-          updatedAt: null,
-        },
-      ],
-    },
-  })
-}
-
-function registerMemberLogin(api: ApiRouter): void {
-  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
-  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
-  api.respond('POST', '/api/v1/member/auth/sms-code', {
-    status: 200,
-    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
-  })
-  api.respond('POST', '/api/v1/member/auth/login', {
 test('conversion payload order matches the visible list after reorder @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   await fulfillFixtureImage(page)
@@ -186,30 +157,6 @@ test('conversion payload order matches the visible list after reorder @w2', asyn
     json: {
       success: true,
       data: {
-        token: W2_MEMBER_TOKEN,
-        user: { id: 'member-w2-sign', phoneMasked: '138****8000', nickname: '签章验收用户' },
-      },
-    },
-  })
-  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
-  api.respond('GET', '/api/v1/me/favorites', {
-    status: 200,
-    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
-  })
-}
-
-async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
-  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
-  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
-  for (const digit of W2_MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
-  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
-  for (const digit of W2_MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
-  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === returnTo)
-}
-
-test('signature page fails closed for anonymous users @w2', async ({ page, api }) => {
         fileId: `w2-image-00${requestNumber}`,
         filename: `w2-image-${requestNumber}.png`,
         sizeBytes: 1024,
@@ -302,7 +249,63 @@ test('conversion success stays on the page until the print CTA and does not clai
   expect(errors).toEqual([])
 })
 
-test('signature compose remains gated by explicit authorization @w2', async ({ page, api }) => {
+const W2_MEMBER_TOKEN = 'w2-sign-memory-token'
+const W2_MEMBER_PHONE = '13800138000'
+const W2_MEMBER_CODE = '123456'
+
+function registerSignCapabilities(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: {
+      capabilities: [
+        {
+          capabilityKey: 'signature_stamp',
+          status: 'available',
+          note: null,
+          configured: true,
+          updatedAt: null,
+        },
+      ],
+    },
+  })
+}
+
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        token: W2_MEMBER_TOKEN,
+        user: { id: 'member-w2-sign', phoneMasked: '138****8000', nickname: '签章验收用户' },
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+}
+
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  for (const digit of W2_MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of W2_MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
+
+test('signature page fails closed for anonymous users @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerSignCapabilities(api)
