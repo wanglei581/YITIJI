@@ -19,8 +19,15 @@ export function parseDecisionMap(raw: Record<string, unknown> | undefined): Resu
 
 export function replaceResumeText(resume: GeneratedResume, from: string, to: string): GeneratedResume {
   if (!from || from === to) return resume
+  let replaced = false
   const walk = (value: unknown): unknown => {
-    if (typeof value === 'string') return value.includes(from) ? value.split(from).join(to) : value
+    if (replaced) return value
+    if (typeof value === 'string') {
+      const index = value.indexOf(from)
+      if (index === -1) return value
+      replaced = true
+      return value.slice(0, index) + to + value.slice(index + from.length)
+    }
     if (Array.isArray(value)) return value.map(walk)
     if (value && typeof value === 'object') {
       const out: Record<string, unknown> = {}
@@ -41,6 +48,23 @@ export function toggleModuleDecision(
   if (current === next) return resume
   if (next === 'original') return replaceResumeText(resume, module.after, module.before)
   return replaceResumeText(resume, module.before, module.after)
+}
+
+export function applyDecisionChanges(
+  resume: GeneratedResume,
+  modules: ResumeOptimizeModule[],
+  current: ResumeDecisionMap,
+  changes: Array<[string, ResumeModuleDecision]>,
+): { resume: GeneratedResume; decisions: ResumeDecisionMap } {
+  let nextResume = resume
+  const nextDecisions = { ...current }
+  for (const [key, next] of changes) {
+    const index = modules.findIndex((item, i) => moduleKeyOf(item, i) === key)
+    if (index < 0) continue
+    nextResume = toggleModuleDecision(nextResume, modules[index], nextDecisions[key] ?? 'optimized', next)
+    nextDecisions[key] = next
+  }
+  return { resume: nextResume, decisions: nextDecisions }
 }
 
 /** 导出时按裁决组装：已回退原文的模块不得再带出优化稿。 */

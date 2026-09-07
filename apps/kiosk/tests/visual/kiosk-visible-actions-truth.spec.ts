@@ -5,6 +5,22 @@ import { registerW4Api } from '../fixtures/fusion-w4-api'
 const COMPARE_TASK_ID = 'visible-compare'
 const COMPARE_ACCESS_TOKEN = 'visible-compare-access'
 
+const COMPARE_RESUME = {
+  basic: { name: '对照样本', phone: '13800000000', city: '青岛' },
+  intention: { position: '运营', city: '青岛' },
+  summary: '对齐需求，持续跟进问题至闭环。',
+  education: [],
+  experience: [{
+    company: '对照公司',
+    role: '专员',
+    period: '2023-2024',
+    description: '主导数据整理，完成 5000 条记录校验。',
+  }],
+  projects: [],
+  skills: ['TypeScript'],
+  certificates: [],
+}
+
 function registerResumeCompare(api: Parameters<typeof registerW4Api>[0]) {
   api.respond('GET', `/api/v1/resume/records/${COMPARE_TASK_ID}/optimize`, {
     status: 200,
@@ -16,6 +32,7 @@ function registerResumeCompare(api: Parameters<typeof registerW4Api>[0]) {
         { title: '项目成果', before: '参与数据整理。', after: '主导数据整理，完成 5000 条记录校验。' },
         { title: '团队协作', before: '沟通需求并跟进问题。', after: '对齐需求，持续跟进问题至闭环。' },
       ],
+      optimizedResume: COMPARE_RESUME,
     },
   })
 }
@@ -133,7 +150,7 @@ test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page
   await page.getByRole('button', { name: '下一条' }).click()
   await expect(page.getByText('第 2 / 2 条')).toBeVisible()
   await expect(page.getByText('对齐需求，持续跟进问题至闭环。')).toBeVisible()
-  await page.getByRole('button', { name: '保留原文' }).click()
+  await page.getByRole('button', { name: '保留原文', exact: true }).click()
   await page.getByRole('button', { name: '下一条' }).click()
   await expect(page).toHaveURL(/\/resume\/optimize$/)
   const returnedState = await page.evaluate(() => window.history.state?.usr)
@@ -143,6 +160,13 @@ test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page
     // 裁决键与优化页同源（resume-deliver/resumeDecisions.ts moduleKeyOf：`m<序号>:<标题>`）
     decisions: { 'm0:项目成果': 'optimized', 'm1:团队协作': 'original' },
   })
+  await expect(page.getByRole('dialog', { name: '对照页有 2 条裁决' })).toBeVisible()
+  await expect(page.getByText('应用后会改写下面编辑区的对应文字；只有编辑区的内容会进入导出。')).toBeVisible()
+  await expect(page.locator('textarea').first()).toHaveValue('对齐需求，持续跟进问题至闭环。')
+  await page.getByRole('button', { name: '暂不应用' }).click()
+  await expect(page.getByRole('dialog', { name: '对照页有 2 条裁决' })).toHaveCount(0)
+  await expect(page.locator('textarea').first()).toHaveValue('对齐需求，持续跟进问题至闭环。')
+  await expect(page.getByText('沟通需求并跟进问题。')).toHaveCount(0)
 })
 
 test('逐条对照手机断点无横向溢出且操作区换算合格 @mobile', async ({ page, api }) => {
@@ -151,10 +175,34 @@ test('逐条对照手机断点无横向溢出且操作区换算合格 @mobile', 
   const stage = page.locator('.kiosk-stage')
   const transform = await stage.evaluate((element) => getComputedStyle(element).transform)
   const scale = transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
-  for (const name of ['用改写', '保留原文', '下一条']) {
+  for (const name of [/^用改写$/, /^保留原文$/, /^下一条$/, /可采纳的全部采纳/, /其余保留原文/, /清空全部裁决/]) {
     const box = await page.getByRole('button', { name }).boundingBox()
     expect(box).not.toBeNull()
     expect(box!.height / scale).toBeGreaterThanOrEqual(56)
     expect(box!.width / scale).toBeGreaterThanOrEqual(48)
   }
+})
+
+test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk', async ({ page, api }) => {
+  await openResumeCompare(page, api)
+
+  await page.getByRole('button', { name: '可采纳的全部采纳' }).click()
+  await expect(page.getByText('已采纳 1 条；跳过 1 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。')).toBeVisible()
+  await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
+  await page.getByText('裁决草稿').click()
+  await expect(page.getByText('项目成果 · 待定')).toBeVisible()
+  await expect(page.getByText('团队协作 · 已采纳')).toBeVisible()
+
+  await page.getByRole('checkbox', { name: /5000/ }).check()
+  await page.getByRole('checkbox', { name: /主导/ }).check()
+  await page.getByRole('button', { name: '用改写' }).click()
+  await expect(page.getByRole('button', { name: '用改写' })).toHaveAttribute('aria-pressed', 'true')
+
+  await page.getByRole('button', { name: '清空全部裁决' }).click()
+  await expect(page.getByText('已清空全部裁决，连事实确认标记一起清掉 —— 回到刚读到建议时的样子。')).toBeVisible()
+  await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
+  await expect(page.getByRole('checkbox', { name: /5000/ })).not.toBeChecked()
+  await expect(page.getByRole('checkbox', { name: /主导/ })).not.toBeChecked()
+  await expect(page.getByText('项目成果 · 待定')).toBeVisible()
+  await expect(page.getByText('团队协作 · 待定')).toBeVisible()
 })
