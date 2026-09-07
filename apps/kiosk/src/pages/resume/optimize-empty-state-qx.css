@@ -1,0 +1,113 @@
+.qx-resume-optimize[data-optimize-state]:not([data-optimize-state='ready']) {
+  overflow-y: auto;
+  padding: 12px 0 18px;
+  scrollbar-width: none;
+}
+
+.qx-resume-optimize[data-optimize-state]:not([data-optimize-state='ready'])::-webkit-scrollbar {
+  display: none;
+}
+
+.qx-resume-optimize[data-optimize-state]:not([data-optimize-state='ready']) .qx-rd-aigc {
+  margin-top: 0;
+}
+
+.qx-resume-optimize[data-optimize-state]:not([data-optimize-state='ready']) .qx-rd-state {
+  flex: 0 0 auto;
+  min-height: 150px;
+}
+
+.qx-optimize-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.qx-optimize-empty__section {
+  flex: none;
+  padding: 18px 22px;
+}
+
+.qx-optimize-empty__section .qx-sec-h {
+  margin-bottom: 12px;
+}
+
+.qx-optimize-empty__section .qx-sec-h h2 {
+  font-size: 25px;
+}
+
+.qx-optimize-empty__section .qx-sec-h span {
+  margin-left: auto;
+  color: var(--qx-ink-3);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.qx-optimize-empty__row {
+  width: 100%;
+  min-height: 88px;
+  text-align: left;
+}
+
+.qx-optimize-empty__row .qx-row-tx {
+  flex: 1;
+  min-width: 0;
+}
+
+.qx-optimize-empty__steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qx-optimize-empty__steps li {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 66px;
+  padding: 8px 16px;
+  border: 1px solid var(--qx-line);
+  border-radius: 17px;
+  background: var(--qx-paper);
+  color: var(--qx-ink-2);
+  font-size: 19px;
+  line-height: 1.38;
+}
+
+.qx-optimize-empty__steps li > span {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 12px;
+  background: var(--qx-surface);
+  color: var(--qx-teal-d);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.qx-optimize-empty__steps p {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .qx-optimize-empty__steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 稿 23-resume-optimize.html:1061 给出口行写的是
+   grid-template-rows:repeat(3,minmax(0,1fr))。**照抄到运行时会把页面弄坏**：
+   稿里那个 grid 处在有界容器内，运行时这一屏没有同样的上界，
+   三行等分会各自涨到约 350px，把下面「不用 AI，也能自己改」的 8 步清单
+   挤出视口（实测只剩第 1、2 步可见）。1080×1920 实拍见
+   /private/tmp/qx/rt-rsempty2/resume_optimize.png。
+   所以这里保持出口行的自然高度：内容完整可见优先于填满版面 ——
+   这也正是稿第 1059 行的态度「本页不会为了把版面填满而编几条建议出来」。
+   下半屏残留的空白按同一条口径保留，不塞占位块。 */
