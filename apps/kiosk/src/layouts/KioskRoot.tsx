@@ -85,7 +85,6 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
   ['/fairs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
   ['/interview-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
   ['/policy-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/profile', { domainTitle: '我的', withTerminalCode: true, brandReturnsHome: false }],
 ])
 
 /**
