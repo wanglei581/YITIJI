@@ -236,11 +236,22 @@ for (const marker of [
   '<ProfileContinueCard',
   '<ProfileSessionRecords',
   "navigate('/me/settings')",
-  "navigate('/me/notifications')",
   "navigate('/print/preview'",
   "clearSessionTo({ path: '/profile' })",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
+}
+
+/* 2026-09-08 青序流光迁移（稿 30-my-profile）：ProfilePage 不再直接写
+ * navigate('/me/notifications')，消息通知移到了页面自己的磁贴列表
+ * （ProfilePage.tsx 的 `{ icon: BellIcon, title: '消息通知', to: '/me/notifications' }`）。
+ * 形状变了，能力没变——把一条形状锚点换成两条能力锚点，只增不减。
+ * 同一处替换也已应用于 verify-lightflow-profile-entry.mjs。 */
+for (const [marker, message] of [
+  ["'/me/notifications'", 'ProfilePage 仍能到达消息通知'],
+  ['消息通知', 'ProfilePage 仍展示消息通知入口'],
+]) {
+  expectIncludes(profile, marker, message)
 }
 for (const marker of ['onPrintFile', 'onDeleteResume', 'onDeleteScan', 'onDeleteAiRecord']) {
   expectIncludes(records, marker, `ProfileSessionRecords preserves ${marker}`)
