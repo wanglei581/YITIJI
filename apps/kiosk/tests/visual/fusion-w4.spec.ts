@@ -459,12 +459,14 @@ test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   await verifyPage(page, errors)
 })
 
-test('/campus AI求职「开始模拟」进入 /interview/setup @w4', async ({ page, api }) => {
+test('/campus AI求职「开始模拟」进入面试设置 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus')
   await page.getByRole('button', { name: 'AI求职' }).click()
   await page.getByRole('button', { name: '开始模拟' }).click()
-  await expect(page).toHaveURL(/\/interview\/setup$/)
+  // /interview/setup 现在是带状态的重定向（→ /interview?stage=setup）。
+  // 入口行为没变：仍然落到面试设置这一步。
+  await expect(page).toHaveURL(/\/interview(\/setup$|\?stage=setup$)/)
   await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
   await verifyPage(page, errors)
 })
