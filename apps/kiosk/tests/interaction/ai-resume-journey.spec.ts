@@ -506,6 +506,11 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
         note: '未覆盖：未能从 Redis 或 /tmp/sweep-api.log 读到开发验证码。会员态未走通，未使用 ApiRouter 桩。',
       })
       await assertNotProduction(collectors)
+      // 2026-09-08：这里原来是裸 `return` —— 拿不到验证码时用例**照常 PASS**，
+      // 8 秒跑完、零覆盖，而它正是 §4.2「AI 简历与我的闭环」唯一的会员态守卫。
+      // 「跑通了」和「什么都没做」在结果里长得一模一样，是最坏的一种绿。
+      // 改成 test.skip：结果显示 skipped 而不是 passed，人一眼能看出这轮没验到会员态。
+      test.skip(true, '未能读到开发验证码（Redis 或 /tmp/sweep-api.log），会员态未覆盖 —— 不是通过')
       return
     }
     await page.waitForTimeout(1500)
@@ -514,7 +519,13 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     await enterResumeHub(page, journey, collectors)
     await enterDiagnoseSource(page, journey, collectors)
     await startDiagnosis(page, journey, collectors)
-    if (page.url().includes('/resume/report')) {
+    // 会员态必须真的走到报告页。原来这里是 `if (url.includes('/resume/report'))`，
+    // 诊断没跑起来时整段优化 / 导出被静默跳过，用例仍然绿。
+    // 2026-09-08 实测就撞上了：会员登录成功、点了「开始 AI 诊断」，
+    // 但 upload-pdf 那步 0 条 API —— 文件根本没传上去，诊断自然不启动，
+    // 而当时唯一暴露它的是后面一句没加守卫的 click 超时，报的还是「找不到我的按钮」这种误导性错误。
+    expect(page.url(), '会员诊断未走到报告页：多半是简历来源页在登录态下走了另一条上传路径').toContain('/resume/report')
+    {
       await recordStep({
         page, journey, step: 'member-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
         kind: 'click', collectors,
@@ -525,9 +536,11 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
       })
       await confirmAiConsent(page, journey, collectors)
     }
-    if (page.url().includes('/resume/optimize')) {
+    expect(page.url(), '会员未走到优化页').toContain('/resume/optimize')
+    {
       const exportBtn = page.getByRole('button', { name: /确认优化版，导出 PDF|导出 PDF/ })
-      if (await exportBtn.count()) {
+      expect(await exportBtn.count(), '优化页没有导出按钮 —— 会员导出闭环无法验证').toBeGreaterThan(0)
+      {
         await exportBtn.first().click()
         await confirmFactsIfOpen(page, journey, collectors)
         await page.waitForTimeout(1200)
