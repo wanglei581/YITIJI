@@ -326,6 +326,53 @@ async function main(): Promise<void> {
     )
     expect(cleanApi.endpoint === 'https://api.example.com/v1/jobs', 'clean API endpoint is stored without redaction')
     pass('PTR-25. API endpoint query credentials are rejected; clean URLs remain')
+    // ── PTR-25b：连写形式与 userinfo ──────────────────────────────────────
+    // 上面两条只覆盖了带分隔符的 `token=` / `api_key=`，而判据正则要求凭证词前面是
+    // 开头或 `_` / `-`。2026-09-08 走查实测：`?apikey=` `?appsecret=` `?accesstoken=`
+    // `?appkey=` 四种连写形式一条都没拦住，`https://u:p@host/` 的 userinfo 更是压根
+    // 不在 query 里、旧实现完全看不到。`appsecret` 尤其严重 —— CLAUDE.md §12 把
+    // 「appSecret 只能保存在服务端」列为红线，而它能被写进 endpoint 存库并随同步请求
+    // 发出去。这几条断言就是钉死那次实测暴露的缺口。
+    let seq = 0
+    for (const endpoint of [
+      'https://api.example.com/v1/jobs?apikey=abc',
+      'https://api.example.com/v1/jobs?appsecret=abc',
+      'https://api.example.com/v1/jobs?accesstoken=abc',
+      'https://api.example.com/v1/jobs?appkey=abc',
+      'https://api.example.com/v1/jobs?clientSecret=abc',
+      'https://api.example.com/v1/jobs?a=1&refreshToken=abc',
+      'https://user:pass@api.example.com/v1/jobs',
+      'https://user@api.example.com/v1/jobs',
+    ]) {
+      seq += 1
+      await expectCode(
+        () => partner.createPartnerDataSource(
+          { name: `API cred form ${seq}`, accessMode: 'api', sourceKind: 'school', endpoint },
+          school,
+        ),
+        'API_ENDPOINT_CONTAINS_CREDENTIAL',
+        `endpoint 携带凭证被拒：${endpoint}`,
+      )
+    }
+
+    // 反向对照：这些参数名长得像凭证但不是，误拦会让正常数据源配不进来。
+    // `?monkey=banana` 是当初特意避开的反例，放宽判据时最容易踩。
+    let okSeq = 0
+    for (const endpoint of [
+      'https://api.example.com/v1/jobs?monkey=banana',
+      'https://api.example.com/v1/jobs?keyword=java',
+      'https://api.example.com/v1/jobs?signal=1',
+      'https://api.example.com/v1/jobs?passwordHint=1',
+      'https://api.example.com/v1/jobs?page=1&pageSize=20',
+    ]) {
+      okSeq += 1
+      const row = await partner.createPartnerDataSource(
+        { name: `API clean form ${okSeq}`, accessMode: 'api', sourceKind: 'school', endpoint },
+        school,
+      )
+      expect(row.endpoint === endpoint, `非凭证参数不被误拦且原样保存：${endpoint}`)
+    }
+    pass('PTR-25b. 连写凭证参数与 userinfo 被拒；形似非凭证的参数不误拦')
   } finally {
     await prisma.job.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })
     await prisma.jobFair.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })
