@@ -79,16 +79,89 @@ node node_modules/@playwright/test/cli.js test tests/interaction/ai-resume-journ
 
 ### 缺陷与问题（发现即记录，本包不修）
 
-#### D1. 会员优化导出成功，但「我的文档」看不到导出稿
+#### D1. 登录会员导出优化稿必定 400，「我的文档」当然看不到 —— 上线阻塞（已定位，已修）
+
+> **2026-09-08 更正**：本条初记为「导出成功但文档列表看不到」，**标题与结论都错了**。
+> 导出根本没成功。下面是复盘后按数据库与源码重定的根因，原文保留在末尾「初记原文」以便追溯。
 
 - **路由**：`/resume/optimize` → `/me/documents`
 - **控件**：优化页「确认导出」；「我的文档」列表
 - **期望**：§4.2「简历优化 → 导出 PDF → 我的文档可见」
-- **实际**：会员 `POST /api/v1/resume/generate/export` 已发出；「我的文档」只有上传原件 `valid-2p.pdf`（2 KB，与夹具体积一致），没有优化稿 PDF。删除该原件后空态诚实。
-- **四观测量**（导出）：URL 不变，有 `POST /resume/generate/export`，DOM 变（事实核对弹层），有弹层。  
-  （「我的文档」）：URL `/me/documents`，有 `GET /me/documents`，列表 1 条原件。
-- **复现**：会员登录 → 诊断 → 优化导出 PDF → 底栏「我的」→「我的文档」。
-- **口径**：模拟数据下的接线缺口，**不是**线上证据。
+- **实际**：会员点「确认导出」→ 后端返回 `400 RESUME_FACTS_NOT_CONFIRMED`，**不写文件、不写审计**，
+  所以「我的文档」里只有上传原件 `valid-2p.pdf`。**匿名用户不受影响**。
+- **影响面**：所有登录会员的「简历优化导出」**100% 失败**，无一例外。
+  `ResumeGeneratePreviewPage` 走同一适配层方法，同样受影响。
+
+**根因（三段证据，均可复核）**
+
+1. 后端闸门 `services/api/src/ai/resume/resume-draft.store.ts` `assertFactsConfirmed`：
+   `if (!input.endUserId || !input.taskId) return` —— **匿名早返回不校验**；
+   登录会员且 optimize 行未过期时，`factsConfirmedAt` 缺失即抛 `400 RESUME_FACTS_NOT_CONFIRMED`。
+2. DTO `services/api/src/ai/dto/resume-generate.dto.ts:215-216` **早已收该字段**
+   （`@IsOptional() @IsISO8601({ strict: true })`），`forbidNonWhitelisted` 不会拒它。
+3. 前端适配层 `apps/kiosk/src/services/api/aiHttpAdapter.ts` 的 `exportGeneratedResume`
+   **故意不发这个字段**，理由写在一条**已经过期**的注释里：「DTO 尚无该字段（包 H）」。
+   包 H 之后 DTO 补上了，注释没跟着改。调用侧 `ResumeOptimizePage.runResumeExport(factsConfirmedAt)`
+   本来就把值传下来了，在适配层被丢掉。
+   **同一文件里的兄弟方法 `exportResumeRecord` 是对的**，它照常转发该字段 —— 一对一的反证。
+
+**走查数据佐证**（`services/api/prisma/sweep.db`，本地夹具库）
+
+| 事实 | 数值 |
+|---|---|
+| `optimized` 类导出文件 | 12 条，`endUserId` 全为 NULL（都是匿名旅程产出） |
+| 带会员 id 的文件 | 仅 1 条，是上传原件，不是导出稿 |
+| 会员旅程审计序列 | `file.upload` → `parse_submitted` → `optimize_requested` → `ai_record_delete` → `file.delete` |
+| 会员旅程的 `resume.generate_exported` | **0 条**（点过「确认导出」，POST 也发了，但没有成功审计） |
+| `BenefitGrant` 表 | 0 行 —— 排除「权益不足」这一路解释 |
+| `UserAiConsent` | 会员在 16:57:26 已有有效 `resume_ai` 同意 —— 排除「同意缺失」这一路解释 |
+
+**为什么走查当场没看出来**：匿名旅程导出 12 次全成功，会员旅程只跑了 1 次；
+四观测量只记 method+path 不记状态码，400 和 200 在日志里长得一样。
+**这类只打登录态、匿名全绿的缺陷，靠「点一遍」发现不了**，必须比对后端落库。
+
+- **修复**：适配层补发该字段 + 新增门禁 `verify:resume-export-facts-contract` 防回归。**后端未改动**（后端是对的）。
+
+**运行期复验（2026-09-08 11:5x，本地 API + sweep.db，会员 `cmtrh2nqh…` 真登录）**
+
+不是「代码里有这一行」，是真的对着跑起来的服务端做了 A/B：
+
+```
+基线  GET /me/documents                                  → 条数: 0
+
+A)  POST /resume/generate/export  不带 factsConfirmedAt
+    {"code":"RESUME_FACTS_NOT_CONFIRMED",
+     "message":"导出前请先核对优化稿中的学校、公司、时间、证书和联系方式"}
+    [HTTP 400]                                           ← 修复前每个会员都撞这个
+
+B)  POST /resume/generate/export  带 factsConfirmedAt（= 修好的前端现在发的 body）
+    {"fileId":"7b2c205a…","filename":"AI简历_演示用户.pdf",
+     "sizeBytes":85476,"pageCount":1,"signedUrl":"/api/v1/files/…"}
+    [HTTP 201]
+
+C)  GET /me/documents                                    → 条数: 1
+    - AI简历_演示用户.pdf | optimized | 85476
+
+D)  落库归属  SELECT … FROM FileObject
+    AI简历_演示用户.pdf | optimized | cmtrh2nqh0017t9yb4j1si1vg | active | ai_resume_generate
+```
+
+**0 条 → 1 条，且归属是本人会员 id。** 至此整条链闭合：前端确实发出该字段（Playwright payload 用例）、
+后端收下并建出本人文件（上面 A/B）、文件出现在「我的文档」（C/D）。
+
+**顺带修掉一个潜伏的走查骨架缺陷**：`sweep-harness.ts` 的 `waitReport` 把 `text=` 混进了 CSS 选择器列表
+（`'[data-kiosk-screen="resume-report"], .rrp-page, text=简历诊断报告'`），Playwright 直接抛
+`Unexpected token "="`，**这条等待从来没真正等到过报告页**。它只在解析慢到跳 `/resume/parse` 时才被调用，
+而 `AI_PROVIDER=mock` 通常一步到位，所以昨晚没踩到 —— **换成真实 AI Provider（慢）它必然天天炸**。
+已拆成 CSS 与文本两个 locator 再 `.or()`。
+
+<details><summary>初记原文（2026-09-08 更正前）</summary>
+
+原标题：「会员优化导出成功，但「我的文档」看不到导出稿」；
+原实际：「会员 `POST /api/v1/resume/generate/export` 已发出；「我的文档」只有上传原件 `valid-2p.pdf`（2 KB，与夹具体积一致），没有优化稿 PDF。删除该原件后空态诚实。」；
+原口径：「模拟数据下的接线缺口，**不是**线上证据。」
+
+</details>
 
 #### D2. 「打印这份报告」能进确认页，但本机报价失败（诚实，未出纸）
 
@@ -98,7 +171,23 @@ node node_modules/@playwright/test/cli.js test tests/interaction/ai-resume-journ
 - **实际**：进入报价确认，状态「报价失败 · 未建单」。文案「暂时无法获取报价」「打印机离线。当前不能下单，不会扣费」「终端安全校验失败」。console 伴随 404 / 400（`orders/quote` 等）。未建单、未扣费，符合不伪造能力。
 - **四观测量**：URL 变到打印确认（截图 `j1-anon/00149479-report-print-landed.png`），有 `GET /terminals/KSK-001/capabilities`、`POST /orders/quote`、`GET /print/price-config`，DOM 变，有失败提示。
 - **复现**：报告页先导出，再点「打印这份报告」。
-- **说明**：出纸与终端身份属打印包 / 真机，本包不深追。连续先点「导出修改清单」再打印时，确认页文件名是 `修改清单_*.pdf` 而不是诊断报告——打印的是**最后一次导出**，请产品确认是否要写清。
+- **说明**：出纸与终端身份属打印包 / 真机，本包不深追。
+
+**2026-09-08 补：跨会话残留排查结论 —— 不是隐私事故**
+
+评审时有人担心「按钮状态残留会让下一位用户打印出上一位的简历」。已按源码逐条排除：
+
+| 问题 | 结论 | 依据 |
+|---|---|---|
+| 导出结果存在哪 | 组件内 `useState`，无 module 级变量、无 `localStorage`/`sessionStorage` | `ResumeReportTakeaway.tsx:118` |
+| 清场会不会留下它 | 不会。清场是**整页重载**，React 树连同 state 一起销毁 | `KioskPrivacyGuard.tsx` `pushSanitizedDestination` → `window.history.pushState(...)` + `window.location.reload()` |
+| 路由 state 里的签名链接呢 | 一并清掉：重载前把 `history.state.usr` 覆写为 `null`，并写入 `minHistoryIndex` 隐私边界拦截旧历史 | 同上 |
+| 匿名会不会漏计时 | 不会，空闲守卫**匿名同样生效**（C-2A 已去掉登录门槛） | `useIdleLogout.ts` 头注释 |
+
+- **真正要修的只有文案**：按钮固定写死「打印这份报告」，但 `handlePrint` 打的是**最后一次导出**的文件。
+  先导诊断报告、再导修改清单，按钮仍说「报告」，实际送去打印的是修改清单。
+  已修：label 跟随 `exportKind`（`change_list` → 「打印修改清单」）。打印逻辑本身未动。
+- **报价失败部分不是缺陷**：本机无 Agent、打印机离线，页面如实说「不能下单、不会扣费」且未建单，符合 CLAUDE.md §9「不伪造能力」。
 
 #### D3. 优化页「离开前确认」弹层会挡住后续按钮（文案是「确认离开 / 继续编辑」）
 

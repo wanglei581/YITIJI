@@ -185,7 +185,7 @@ export function ResumeReportTakeaway(props: {
         <ResumePricingBar pricing={pricing} loading={pricingLoading} blockedReason={blockedReason} />
         <div className="rrp-export">
           <TakeawayButton
-            label="打印这份报告"
+            label={exportKind === 'change_list' ? '打印修改清单' : '打印这份报告'}
             hint={printNavigating ? '正在进入打印确认…' : !exported ? '请先导出' : printReady ? null : '链接未就绪'}
             blocked={printBlocked}
             describedBy={reasonId}
