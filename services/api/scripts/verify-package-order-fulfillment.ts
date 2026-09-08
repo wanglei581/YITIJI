@@ -206,6 +206,33 @@ async function main(): Promise<void> {
     pass('三行材料包建单只落 OrderItem；Order.sourceFileId 为空且 itemsJson 未存履约行')
     pass('材料包建单返回既有支付 API 可验证的 paymentSessionToken')
 
+    // ── 材料包订单列表（GET /orders/package）──────────────────────────────
+    // 为什么必须有：材料包订单在既有的会员订单列表里一条都看不到 ——
+    // /me/print-orders 查 PrintTask（派发前 printTaskId 为 null）、
+    // /me/print-orders/cloud 的 where 带 sourceFileId: { not: null }（材料包该字段本就为 null）、
+    // /me/print-orders/:orderId 的 requireOwned 同一条过滤。用户下完单一旦离开，
+    // 手上只剩一个到机码，而到机码不能反查订单。（2026-09-08 走查实测）
+    const listed = await packages.list(userId, { cursor: null, pageSize: 20 })
+    const listedRow = listed.items.find((row) => row.orderId === created.orderId)
+    if (!listedRow) fail('材料包订单必须能在 GET /orders/package 列表里找回')
+    if (listed.total < 1) fail('列表 total 必须是同条件真实 count，不能拿页内条数冒充')
+    if (listedRow!.pickupCode !== created.pickupCode) {
+      fail('列表回的到机码必须与建单/详情一致 —— 找回它正是本端点存在的理由')
+    }
+    if (listedRow!.itemCount !== 3) fail('列表必须回真实条目数')
+    // 下面两条是刻意的收口，不是遗漏：列表一次返回 N 个付款令牌只会放大暴露面，
+    // 逐文件明细进详情页取即可。改动实现时若顺手把它们加回来，这两条会红。
+    if ('paymentSessionToken' in (listedRow as Record<string, unknown>)) {
+      fail('列表不得签发 paymentSessionToken（付款令牌由 detail 现取）')
+    }
+    if ('items' in (listedRow as Record<string, unknown>)) {
+      fail('列表不得返回逐文件明细（明细进详情页）')
+    }
+    // 归属隔离：换一个 endUserId 不得看到本人订单。
+    const foreign = await packages.list(`${userId}-not-me`, { cursor: null, pageSize: 20 })
+    if (foreign.items.length !== 0 || foreign.total !== 0) fail('材料包订单列表必须按 endUserId 隔离')
+    pass('GET /orders/package 能找回订单与到机码；不签发付款令牌、不回明细；按本人隔离')
+
     const claim = await pickup.claim(created.pickupCode!, terminalId)
     await statuses.markPaid(created.orderId, { paymentSource: 'offline', operatorId: 'verify-package' })
     const released = await pickup.release(created.orderId, terminalId, claim.paymentSessionToken)

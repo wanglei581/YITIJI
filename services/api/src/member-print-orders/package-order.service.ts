@@ -12,6 +12,7 @@ import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CreatePackageOrderDto } from './dto/create-package-order.dto'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
+import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
 const PICKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
@@ -155,6 +156,46 @@ export class PackageOrderService {
   async detail(endUserId: string, orderId: string) {
     const order = await this.requireOwned(endUserId, orderId)
     return this.toView(order, this.visibleCode(order))
+  }
+
+  /**
+   * 我的材料包订单列表（本人），游标分页。
+   *
+   * 为什么必须有这个端点：材料包订单在既有的会员订单列表里**一条都看不到** ——
+   * `/me/print-orders` 查的是 PrintTask（材料包派发前 printTaskId 为 null），
+   * `/me/print-orders/cloud` 的 where 带 `sourceFileId: { not: null }`（材料包是多文件、
+   * 该字段本就为 null），`/me/print-orders/:orderId` 的 requireOwned 同一条过滤。
+   * 用户下完单一旦离开，手上只剩一个到机码，而到机码不能反查订单。
+   * （2026-09-08 走查实测，见 utils/package-feature.js 开闸前置条件第 d 条。）
+   *
+   * 与 toView 的两点差异，都是有意的：
+   *   1. **不签发 paymentSessionToken**。那是「到机器前要付款」这一步才需要的凭证，
+   *      由 detail 现取；列表一次返回 N 个付款令牌只会放大暴露面，没有对应收益。
+   *   2. **不返回逐文件明细**（items）。列表只回条目数，明细进详情页拿。
+   *
+   * 到机码照常返回：找回它正是本端点存在的理由，且判据与 detail 完全一致
+   * （visibleCode：pending 且未过期才给），不另开一套口径。
+   */
+  async list(endUserId: string, page: MemberPageQuery) {
+    const where = { endUserId, orderItems: { some: {} } }
+    const total = await this.prisma.order.count({ where })
+    const rows = await this.prisma.order.findMany({
+      where,
+      include: { orderItems: { select: { id: true } } },
+      ...memberPageArgs(page),
+    })
+    return buildMemberPage(rows, page, total, (order) => ({
+      orderId: order.id,
+      orderNo: order.orderNo,
+      pickupCode: this.visibleCode(order),
+      expiresAt: order.pickupCodeExpiresAt?.toISOString() ?? null,
+      pickupStatus: order.pickupStatus,
+      payStatus: order.payStatus,
+      taskStatus: order.taskStatus,
+      amountCents: order.amountCents,
+      itemCount: order.orderItems.length,
+      createdAt: order.createdAt.toISOString(),
+    }))
   }
 
   private async requireOwned(endUserId: string, orderId: string) {
