@@ -226,7 +226,11 @@ test('all three fallback paths and the navbar perform real registered-route navi
 
   const cases = [
     { testId: 'resume-optimize-empty-report', path: '/resume/report' },
-    { testId: 'resume-optimize-empty-manual', path: '/me/resumes' },
+    // 「手动逐项修改」的去向 2026-09 按稿 23-resume-optimize.html:961 从 /me/resumes
+    // 改到了 /resume/generate（依据写在 OptimizeEmptyState.tsx 的注释里：此前它和
+    // 下面「打开我的简历」同去向，读起来像两张重复的卡）。本行原先钉的是旧去向，
+    // 用例又从未在 CI 跑过，所以一直没红。按稿更新，不是照行为改断言。
+    { testId: 'resume-optimize-empty-manual', path: '/resume/generate' },
     { testId: 'resume-optimize-empty-resumes', path: '/me/resumes' },
     { testId: 'resume-optimize-nav-home', path: '/' },
     { testId: 'resume-optimize-nav-advisor', path: '/assistant' },
