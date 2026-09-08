@@ -8,7 +8,13 @@ import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 
 const SHOTS = process.env.JOURNEY_SHOTS_DIR ?? 'test-results/account-assets-journey'
-const ASSET_ROUTES = ['/me/resumes', '/me/documents'] as const
+// 登录门的标题现在**逐页各说各的**——门上直接写清挡住的是什么，比一句通用文案强，
+// 所以这里也逐页给期望值，而不是拿一句去套所有页（那样迁移一页就红一次，
+// 且红的是「文案变了」不是「登录门没了」）。
+const ASSET_ROUTES = [
+  { path: '/me/resumes', gate: '登录后查看我的简历' },
+  { path: '/me/documents', gate: '登录后查看本人记录' },
+] as const
 
 type Step = { n: number }
 
@@ -48,7 +54,7 @@ test.describe('账号资产页（未登录）', () => {
     test.setTimeout(90_000)
     const s: Step = { n: 0 }
 
-    for (const path of ASSET_ROUTES) {
+    for (const { path, gate } of ASSET_ROUTES) {
       const context = await browser.newContext({
         viewport: { width: 1080, height: 1920 },
         locale: 'zh-CN',
@@ -69,8 +75,8 @@ test.describe('账号资产页（未登录）', () => {
       try {
         await page.goto(path)
         await expect(
-          page.getByRole('heading', { name: '登录后查看本人记录' }),
-          `${path} 未出现登录门`,
+          page.getByRole('heading', { name: gate }),
+          `${path} 未出现登录门（期望标题「${gate}」）`,
         ).toBeVisible({ timeout: 15_000 })
         await expect(page.getByRole('button', { name: '手机号登录' })).toBeVisible()
         await step(page, s, path.slice(1).replaceAll('/', '-'))
