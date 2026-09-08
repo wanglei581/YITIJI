@@ -431,6 +431,20 @@ F7 全屏抽查：未做
 
 ### 现场开工顺序与两处流程口径（2026-09-08 定，避免误判为缺陷）
 
+**第 0 步：先跑一次只读取证脚本，把 21 条机械项一次性收齐。** 管理员 PowerShell：
+
+```powershell
+& "C:\Program Files\AIJobPrintAgent\provision\collect-field-evidence.ps1" -OutFile "$env:USERPROFILE\Desktop\field-evidence.md"
+```
+
+输出是可直接粘进回执的 Markdown 表格，覆盖 §5.1 环境 5 条、§5.3 Agent 7 条、§5.5 本地通信 6 条、§5.6 打印机 3 条；末尾单列**必须人眼看**的项。脚本全程只读，除 `-OutFile` 外不写任何文件，不打印任何令牌明文。
+
+- 想连带验「错误桥接令牌应被拒」，加 `-IncludeBridgeProbe`。
+- 打印机名默认从 Agent 配置读；配置里没有时用 `-PrinterName "<Get-Printer 的真实名>"` 传入。
+- **首次运行请人盯一遍输出是否合理**（21 项从未在真机跑过）。任何一项显示 `ERROR:` 不影响其余项，把该行原样抄回回执即可。
+- 表格里判定为 FAIL 的项，不要当场改配置去「修绿」，先把原始值抄回——今天两次无法复核的结论都来自现场即时改动后再取证。
+
+
 **第一件事先查 U 盘桥接令牌。** §5.5 三条 + §5.7 三条 + §5.8 一条共 7 条全部依赖 Agent `agent-config.json` 的 `localApiBridgeToken` 与 Kiosk 构建变量 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 一致。历史上 Gate 0k 的 USB bridge Phase W 因一体机策略拦截文件传输而未完成，服务器侧看不到 Agent 配置。**未确认前这 7 条一条都开不了工**，且令牌只能离线搬运，不得贴进聊天、工单或仓库。查法：只读比对配置里该字段是否非空，再用错误令牌调 `/local/usb/*` 期望 403 `LOCAL_USB_BRIDGE_TOKEN_INVALID`。
 
 **彩色 / 双面必须分两段做，顺序不能反。** 生产库 `TerminalCapability` 对 `t_ksk_001` 目前**只有 `scan=available` 一行**，没有 `color_print` / `duplex` 登记；服务端 `assertPrintParamsAllowed` 对未登记参数 fail-closed。因此直接去一体机页面选彩色或双面**必然点不出来，这是设计，不是缺陷**。正确顺序：
