@@ -192,7 +192,7 @@ export default function MeActivityDetailPage() {
       truth="投递 / 预约结果以来源平台为准，本系统不记录也不参与。"
       ctabar={ctabar}
     >
-      <section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="me-detail-scroll">
+      <section className="me-detail-scroll">
         {inner}
       </section>
     </QxMePage>

@@ -102,6 +102,13 @@ export function MyResumesPage() {
   } else if (items.length === 0) {
     body = (
       <>
+        <QxMeSummary
+          icon={<FileTextIcon size={32} />}
+          label="简历记录"
+          big={total}
+          desc="仅展示本人简历服务元数据，不展示原文或诊断正文"
+          minis={[`诊断 ${parseCount}`, `生成 ${generateCount}`, `完成 ${completedCount}`]}
+        />
         <QxMeBannerEmpty />
         <section className="qx-me-list qx-me-grow" aria-label="从这里开始">
           <QxMeStartRow icon={UploadIcon} title="上传一份现有简历" desc="上传后可以做诊断、优化，并生成可打印的版本" label="去上传" route="/resume/source" testid="member-records-start-upload" onClick={() => navigate('/resume/source')} />
