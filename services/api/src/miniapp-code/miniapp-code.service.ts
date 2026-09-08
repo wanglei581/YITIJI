@@ -38,9 +38,6 @@ function imageMime(body: Buffer): 'image/jpeg' | 'image/png' | null {
   return null
 }
 
-function isImage(body: Buffer): boolean {
-  return imageMime(body) !== null
-}
 
 export interface MiniappCodeResult {
   /** 图片字节（实测为 JPEG；微信未承诺格式，调用方不应假设）。 */
@@ -100,7 +97,7 @@ export class MiniappCodeService {
     const mimeType = imageMime(body)
     if (mimeType) return { image: body, mimeType, envVersion }
 
-    const { errcode, errmsg } = this.parseWxError(body)
+    const { errcode } = this.parseWxError(body)
     // 只记错误码，不记 errmsg 里可能带的 rid 之外的内容，也不记任何凭据。
     this.logger.warn(`wxacode failed: errcode=${errcode} env=${envVersion}`)
     throw new HttpException(
@@ -117,12 +114,16 @@ export class MiniappCodeService {
     return '小程序码生成失败，请稍后再试'
   }
 
-  private parseWxError(body: Buffer): { errcode: number | null; errmsg: string } {
+  /**
+   * 只取 errcode。微信的 errmsg 里带 rid（请求追踪号）等上游标识，
+   * 对用户没有意义，也不应进日志或响应体 —— 故意不返回它。
+   */
+  private parseWxError(body: Buffer): { errcode: number | null } {
     try {
-      const parsed = JSON.parse(body.toString('utf8')) as { errcode?: number; errmsg?: string }
-      return { errcode: typeof parsed.errcode === 'number' ? parsed.errcode : null, errmsg: parsed.errmsg ?? '' }
+      const parsed = JSON.parse(body.toString('utf8')) as { errcode?: number }
+      return { errcode: typeof parsed.errcode === 'number' ? parsed.errcode : null }
     } catch {
-      return { errcode: null, errmsg: '' }
+      return { errcode: null }
     }
   }
 
