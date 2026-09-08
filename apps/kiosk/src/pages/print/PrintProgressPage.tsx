@@ -394,6 +394,10 @@ export function PrintProgressPage() {
   if (!hasContext || (!isHttpMode && !canSimulate)) {
     return (
       <QxPageFrame
+        /* 稿 15-print-fulfill 原文：aria-label="返回首页"。
+       *  返回 ≠ 取消：打印任务在服务端，离开这一屏不会终止它，
+       *  用户可以从「我的打印订单」再回来看进度。 */
+        back={{ label: '返回首页', onBack: () => navigate('/') }}
         title="未找到打印任务"
         subtitle="请从上传文件重新开始打印流程"
         status={{ tone: 'unknown', label: '状态未知' }}
