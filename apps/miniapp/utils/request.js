@@ -4,6 +4,7 @@
 
 const config = require('./config');
 const auth = require('./auth');
+const { displayableServerMessage, SHARED_USER_MESSAGES } = require('./user-error');
 
 /**
  * 底层请求。仅在 config.USE_MOCK=false 时被 api 层调用。
@@ -113,7 +114,7 @@ function rawRequest(path, options = {}) {
               return;
             }
             if ('code' in body && body.code !== 0 && body.code !== 200) {
-              reject(makeError(body.message || '请求失败', statusCode, body.code));
+              reject(makeServerError(body.message, statusCode, body.code));
               return;
             }
           }
@@ -265,22 +266,39 @@ function makeError(message, statusCode, code) {
 }
 
 /**
+ * 用服务端错误体构造给页面的 Error。
+ *
+ * `err.message` 只在服务端文案**确实面向用户**时才有值（判据见 utils/user-error.js）;
+ * 否则留空,让页面里 `(err && err.message) || '中文兜底句'` 的那句中文真正生效。
+ * 服务端原文始终留在 `err.serverMessage` 供日志/排查,但任何页面都不得直接展示它。
+ */
+function makeServerError(serverMessage, statusCode, code) {
+  const shown = displayableServerMessage(serverMessage, code);
+  const shared = code && Object.prototype.hasOwnProperty.call(SHARED_USER_MESSAGES, code)
+    ? SHARED_USER_MESSAGES[code]
+    : '';
+  const e = makeError(shared || shown || '', statusCode, code);
+  if (typeof serverMessage === 'string' && serverMessage) e.serverMessage = serverMessage;
+  return e;
+}
+
+/**
  * 后端错误体形如 { error: { code, message } }(NestJS HttpException 约定),
  * 校验失败也可能是 { message: [...] }。抽出可展示文案与业务错误码。
  */
 function extractError(body, statusCode) {
   if (body && typeof body === 'object') {
     if (body.error && typeof body.error === 'object') {
-      return makeError(body.error.message || `服务异常(${statusCode})`, statusCode, body.error.code);
+      return makeServerError(body.error.message, statusCode, body.error.code);
     }
     if (Array.isArray(body.message)) {
-      return makeError(body.message[0] || `服务异常(${statusCode})`, statusCode);
+      return makeServerError(body.message[0], statusCode);
     }
     if (typeof body.message === 'string' && body.message) {
-      return makeError(body.message, statusCode);
+      return makeServerError(body.message, statusCode);
     }
   }
-  return makeError(`服务异常(${statusCode})`, statusCode);
+  return makeError('', statusCode);
 }
 
 module.exports = { request, uploadFile };
