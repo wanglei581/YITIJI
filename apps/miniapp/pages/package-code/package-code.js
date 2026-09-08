@@ -3,6 +3,20 @@ const app = getApp()
 const { guardPackageChain } = require('../../utils/package-feature')
 const api = require('../../utils/api')
 
+/**
+ * 有效期展示。服务端下发的是 ISO 串（2026-09-09T10:29:15.155Z），直接塞进模板会让
+ * 用户看到 `2026-09-09T10:` 这种半截技术串。小程序端没有 Intl 完整支持，按本地时间
+ * 手工拼「MM-DD HH:mm」，解析失败时返回空串（模板里 expireTime 为空即不显示该行），
+ * 绝不把原始串兜底显示出去。
+ */
+function formatExpire(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const pad = n => (n < 10 ? '0' + n : String(n))
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 Page({
   data: {
     // 默认 false：模板里的「材料包创建成功」是写死的，必须等守卫放行后才允许渲染。
@@ -51,7 +65,7 @@ Page({
           loading: false,
           pickupCode: order.pickupCode || '',
           fileCount: Array.isArray(order.items) ? order.items.length : 0,
-          expireTime: order.expiresAt || '',
+          expireTime: formatExpire(order.expiresAt),
           totalPrice: ((Number(order.amountCents) || 0) / 100).toFixed(2),
         })
       })
