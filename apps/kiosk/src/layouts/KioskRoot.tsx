@@ -74,9 +74,11 @@ interface V6ShellRoute {
  * 要把一条路由改成 V6，只改这张表；不要在别处另写 pathname === '/xxx' 的判断。
  * 表外路由继续用旧的深藏青顶栏，互不污染。
  */
+/* 只列**仍在用 V6 壳**的路由。迁到青序流光的路由必须从这里移出去——
+ * `isV6Route` 虽然已经用 `!isQxRoute` 挡住了它们，但这张表本身也是运行时真值，
+ * fusion-w6-routes.spec.ts:32 会拿它和实际壳归属对账，留着就是自相矛盾。
+ * 2026-09-08 移出：'/'（首页迁入青序流光）、'/print-scan'（早已迁入，本次一并清理）。 */
 const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
-  ['/', { domainTitle: null, withTerminalCode: false, brandReturnsHome: false }],
-  ['/print-scan', { domainTitle: '打印扫描服务', withTerminalCode: true, brandReturnsHome: true }],
   ['/resume-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
   ['/jobs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
   ['/fairs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],

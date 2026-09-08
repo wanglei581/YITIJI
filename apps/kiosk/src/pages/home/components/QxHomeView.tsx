@@ -116,7 +116,7 @@ export function QxHomeView({
   const campusReady = campusKnown && campus.enabled
 
   return (
-    <main className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home">
+    <div className="qx-home qx-scroll" data-qx-page="home" data-testid="qx-home">
       <section className="qx-home-hero" aria-label="小青助手">
         <div className="qx-home-assistant">
           <span className="qx-home-avatar" aria-hidden="true">青</span>
@@ -266,6 +266,6 @@ export function QxHomeView({
           </p>
         </div>
       </footer>
-    </main>
+    </div>
   )
 }

@@ -202,8 +202,10 @@ export const w6MobileCases = w6RouteCases.filter(({ viewport }) => viewport === 
  * 表内路由必须真的挂上 V6 壳且顶栏是浅色纸面，表外路由不得被误伤染成 V6。
  */
 export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
-  '/',
-  '/print-scan',
+  /* 2026-09-08 移出 '/' 与 '/print-scan'：两条已迁入青序流光，运行时不再挂 V6 壳
+   * （KioskRoot 的 `isV6Route` 带 `!isQxRoute`，且两条已从 `V6_SHELL_ROUTES` 移出）。
+   * 契约一字未改——表内仍要求真的挂上 V6 壳、表外仍要求不得被误伤染成 V6；
+   * 这两条只是从表内挪到表外，于是现在被断言「不是 V6 壳」，正是迁移后的事实。 */
   '/resume-service',
   '/jobs-service',
   '/fairs-service',
