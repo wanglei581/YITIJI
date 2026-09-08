@@ -189,12 +189,19 @@ export function JobFairsPage() {
   const upcomingCount = useMemo(() => visible.filter((f) => f.status === 'upcoming').length, [visible])
   const ongoingCount = useMemo(() => visible.filter((f) => f.status === 'ongoing').length, [visible])
 
+  /* 「一条都没有」和「筛选筛空」必须分开说，两边说反了都是伪造能力（CLAUDE.md §9）：
+   *   - 服务端就返回 0 条时说「请调整筛选」→ 用户一个筛选都没设过，只会更懵；
+   *     新机器开机时岗位/招聘会/政策三个板块都是彻底空的，这是常态不是异常。
+   *   - 用户真设了筛选筛空时说「主办方还没有发布」→ 反过来在替主办方说谎，
+   *     明明有场次，只是不符合这次筛选。
+   * 判据：fairs 是服务端这次返回的全量，visible 是本地再筛一道之后的。 */
+  const hasAnyFair = fairs.length > 0
   const viewState = loading
     ? 'loading'
     : error
       ? 'error'
       : visible.length === 0
-        ? (favoritesOnly ? 'favorites-empty' : 'empty')
+        ? (favoritesOnly ? 'favorites-empty' : hasAnyFair ? 'filtered-empty' : 'empty')
         : 'ready'
   const pill = viewState === 'ready'
     ? { tone: 'ok' as const, label: '已返回场次；继续按真实字段展示' }
@@ -204,7 +211,9 @@ export function JobFairsPage() {
         ? { tone: 'bad' as const, label: '场次名单这次没取到' }
         : viewState === 'favorites-empty'
           ? { tone: 'unknown' as const, label: '还没有收藏的场次' }
-          : { tone: 'unknown' as const, label: '近期没有已发布的场次' }
+          : viewState === 'filtered-empty'
+            ? { tone: 'unknown' as const, label: '这次筛选没有匹配的场次' }
+            : { tone: 'unknown' as const, label: '近期没有已发布的场次' }
 
   return (
     <QxFairShell
@@ -282,6 +291,10 @@ export function JobFairsPage() {
       ) : viewState === 'favorites-empty' ? (
         <QxFairState screen="list" tone="empty" icon={StarIcon} title="还没有收藏的招聘会">
           收藏只是这台终端的浏览辅助，不代表已预约、已报名，也不代表到过现场。
+        </QxFairState>
+      ) : viewState === 'filtered-empty' ? (
+        <QxFairState screen="list" tone="empty" icon={CalendarIcon} title="这次筛选没有匹配的场次">
+          本机<b>有已发布的场次</b>，只是不符合当前的搜索、地区、状态或日期条件。放宽任一条即可看到。
         </QxFairState>
       ) : viewState === 'empty' ? (
         <>
