@@ -45,9 +45,20 @@ assert(!/options\./.test(catchBlock), '订单查询失败的分支里不读 opti
 // ② package-confirm 的提交载荷
 console.log('\n② package-confirm 提交载荷与服务端 DTO 一致')
 const confirm = read('pages/package-confirm/package-confirm.js')
-const filesBlock = confirm.slice(confirm.indexOf('const files ='), confirm.indexOf('const files =') + 500)
+// 锚点必须落在**提交路径**那个 files 上：本文件里 `const files =` 出现多次，
+// 取第一处会检到只做展示统计的那个块，断言就成了摆设（这条门禁自己踩过）。
+const submitIdx = confirm.indexOf('api.createPackageOrder')
+assert(submitIdx > 0, 'package-confirm.js 里能找到 api.createPackageOrder 调用点')
+const filesIdx = confirm.lastIndexOf('const files =', submitIdx)
+assert(filesIdx > 0 && submitIdx - filesIdx < 1200, '提交调用前能定位到它使用的 files 构造块')
+const filesBlock = confirm.slice(filesIdx, submitIdx)
 for (const field of ['filename', 'pageCount', 'totalAmount']) {
   assert(!new RegExp(`${field}\\s*:`).test(filesBlock), `提交的 files 不含 ${field}（服务端白名单会整单 400，且金额页数须由服务端查证）`)
+}
+// 提交调用体本身也不得夹带这些字段
+const callBlock = confirm.slice(submitIdx, submitIdx + 500)
+for (const field of ['totalAmount', 'amountCents', 'totalPrice']) {
+  assert(!new RegExp(`${field}\\s*:`).test(callBlock), `createPackageOrder 调用不传 ${field}（计费口径不能由前端左右）`)
 }
 // 跳转 URL 不得携带凭证
 const navBlock = confirm.slice(confirm.indexOf("'/pages/package-code/package-code'"), confirm.indexOf("'/pages/package-code/package-code'") + 600)
