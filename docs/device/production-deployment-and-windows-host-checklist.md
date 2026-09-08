@@ -501,7 +501,19 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 ### 4.2 AI 简历与「我的」闭环
 
 - [ ] 上传简历 → AI诊断 → 报告页 → 「我的」AI服务记录可见。
-- [ ] 简历优化 → 优化结果 → 导出 PDF → 我的文档可见。
+- [ ] 简历优化 → 优化结果 → 导出 PDF → 我的文档可见。 —— **生产域名仍待验**；本地真实后端已 PASS
+  **本地证据（2026-09-08，[会员闭环运行期证据](../reviews/member-closure-runtime-evidence-2026-09-08.md)）**：
+  一次不间断的真人旅程留下完整审计链 `file.upload → parse_submitted → optimize_requested →
+  resume.generate_exported → member.ai_record_delete → file.delete`，导出稿 `endUserId` 为本人会员。
+  **最后两条 `actorRole=enduser` 是闭环的证明** —— 会员必须先在「我的文档」里看见文件才可能点删除，
+  删除动作比截图更难伪造。这是 [#946](https://github.com/wanglei581/YITIJI/pull/946) 的反面证据：
+  缺陷期该链路对登录会员 100% 失败（0 文件 0 审计）。
+  **为什么仍不勾**：本地是 SQLite + 本地存储 + `AI_PROVIDER=mock`，与生产的 PostgreSQL + COS +
+  真实 LLM 不同构；§4.2 要求的是生产或预生产域名上的真实浏览器验收，本地证据不能替代。
+  **同轮附带发现**：走查脚本的 `recordStep` 吞掉每一步异常继续走（记录型设计），
+  却被包在 `test()` 里当判定型门禁用 —— 缺验证码时整条会员用例 **8.4 秒跑完且 PASS、零覆盖**。
+  已在阶段交界处插硬断言（缺码 → `test.skip()` 显示 skipped 而非 passed）。
+  **记录型工具报绿只说明它走完了，不说明它验到了** —— 复验时别拿这类脚本的绿当证据。
 - [ ] AI简历生成 → 预览/编辑 → PDF → 我的简历/我的文档可见。
 - [ ] 岗位匹配参考 → AI服务记录可见。
 - [ ] 模拟面试 → 报告 → 「我的」模拟面试报告子区可见 → 可返回报告。
