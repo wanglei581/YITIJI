@@ -197,6 +197,8 @@ export function CompaniesPage() {
 
   return (
     <QxPageFrame
+      // 稿 43 原文：data-route="/jobs-service" aria-label="返回岗位服务"。
+      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
       title="找企业"
       subtitle={state === 'loading' ? '企业列表与在招岗位数一起返回，取到之前不显示数字。' : '先定行业和地区，再看企业与在招岗位。'}
       status={pill}

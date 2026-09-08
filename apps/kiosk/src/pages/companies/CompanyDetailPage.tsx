@@ -117,6 +117,8 @@ export function CompanyDetailPage() {
   const firstJob = jobs[0]
   return (
     <QxPageFrame
+      // 稿 43 的目录页返回「岗位服务」；本页是详情段，返回落到目录本身。
+      back={{ label: '返回找企业', onBack: () => navigate('/companies') }}
       title={company?.name ?? '企业详情'}
       subtitle="来源企业与岗位导览 · 资料、岗位与来源主页缺哪项就不显示哪项。"
       status={pill}

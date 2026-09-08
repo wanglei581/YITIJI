@@ -88,6 +88,8 @@ export default function OfflineAgencyDetailPage() {
 
   return (
     <QxPageFrame
+      // 稿 42 的目录页返回「岗位服务」；本页是它的详情段，返回落到目录本身。
+      back={{ label: '返回机构列表', onBack: () => navigate('/offline-agencies') }}
       title={agency?.name ?? '机构详情'}
       subtitle={
         loading ? '正在读取机构资料和岗位清单。'
