@@ -161,7 +161,7 @@ test('home exposes an honest job-fair error and a real retry @w1-kiosk', async (
   const retry = page.getByTestId('qx-home').getByRole('button', { name: /招聘会.*重新加载/ })
   await expect(retry).toBeVisible()
   await expect(retry.getByText('读取失败', { exact: true })).toBeVisible()
-  await expect(retry.getByText('没有使用缓存或示例数据', { exact: true })).toBeVisible()
+  await expect(retry.getByText('没有使用缓存或示例数据，请稍后重试。', { exact: true })).toBeVisible()
   expect(api.requestCount('GET', '/api/v1/job-fairs')).toBe(1)
   const retryRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/job-fairs')
   await retry.click()

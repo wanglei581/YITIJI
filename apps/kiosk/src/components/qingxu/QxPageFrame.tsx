@@ -68,7 +68,7 @@ export function QxPageFrame({
       <div className="qx-body">{children}</div>
 
       {ctabar ? <div className="qx-ctabar">{ctabar}</div> : null}
-      {navbar ? <nav className="qx-navbar">{navbar}</nav> : null}
+      {navbar ? <nav className="qx-navbar" aria-label="主导航">{navbar}</nav> : null}
     </div>
   )
 }

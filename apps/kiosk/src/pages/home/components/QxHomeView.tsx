@@ -47,6 +47,8 @@ interface HomeTileProps {
   size?: 'feature' | 'regular' | 'slim'
   disabled?: boolean
   statusText?: string
+  /** 挂在磁贴根节点上的额外 data-* 标记（如设备/招聘会面板的状态标记）。 */
+  panelAttrs?: Record<string, string>
   onAction: (actionId: HomeV6ActionId) => void
 }
 
@@ -61,6 +63,7 @@ function HomeTile({
   size = 'regular',
   disabled = false,
   statusText,
+  panelAttrs,
   onAction,
 }: HomeTileProps) {
   return (
@@ -73,6 +76,7 @@ function HomeTile({
       disabled={disabled}
       onClick={() => onAction(actionId)}
       aria-describedby={statusText ? `qx-home-${actionId}-status` : undefined}
+      {...panelAttrs}
     >
       <span className="qx-home-tile-head">
         <span className="qx-home-tile-icon"><Icon aria-hidden="true" /></span>
@@ -231,19 +235,31 @@ export function QxHomeView({
             statusText={printStatus.note}
             icon={PrinterIcon}
             size="feature"
+            /* 设备状态面板标记。判据沿用 V6HomeFooterPanels.tsx:119 的
+               `device.loading ? 'loading' : device.kind`，状态语义逐字一致，
+               只是青序流光把它挂在打印磁贴上而不是首页底部的独立面板。 */
+            panelAttrs={{ 'data-home-device-panel': '', 'data-panel-state': device.loading ? 'loading' : device.kind }}
             onAction={onAction}
           />
           <HomeTile actionId="resume-hub" title="AI 简历" description="诊断、逐条优化、生成新版本" foot="进入简历服务" badge="AI 服务" icon={FileTextIcon} onAction={onAction} />
           <HomeTile actionId="interview-hub" title="模拟面试" description="问答对练，可跳过，不做录用判断" foot="进入面试服务" badge="练习服务" icon={MicIcon} onAction={onAction} />
           <HomeTile actionId="jobs-hub" title="岗位信息" description="查看来源与更新时间，去来源平台投递" foot="查看岗位" badge="第三方来源" icon={BriefcaseBusinessIcon} tone="slate" onAction={onAction} />
           {jobFair.status === 'error' ? (
-            <button type="button" className="qx-home-tile" data-action="fairs-retry" data-tone="clay" onClick={jobFair.retry}>
+            <button
+              type="button"
+              className="qx-home-tile"
+              data-action="fairs-retry"
+              data-tone="clay"
+              data-home-job-fair-panel=""
+              data-panel-state="error"
+              onClick={jobFair.retry}
+            >
               <span className="qx-home-tile-head">
                 <span className="qx-home-tile-icon"><RotateCwIcon aria-hidden="true" /></span>
                 <span className="qx-home-tile-badge">读取失败</span>
               </span>
               <strong>招聘会</strong>
-              <span className="qx-home-tile-desc">没有使用缓存或示例数据</span>
+              <span className="qx-home-tile-desc">没有使用缓存或示例数据，请稍后重试。</span>
               <span className="qx-home-tile-foot">重新加载 <RotateCwIcon aria-hidden="true" /></span>
             </button>
           ) : (
@@ -252,6 +268,8 @@ export function QxHomeView({
               className="qx-home-tile"
               data-action="fairs-hub"
               data-tone="clay"
+              data-home-job-fair-panel=""
+              data-panel-state={jobFair.status}
               onClick={() => jobFair.status === 'ready' ? onOpenFair(jobFair.fair.id) : onAction('fairs-hub')}
             >
               <span className="qx-home-tile-head">
