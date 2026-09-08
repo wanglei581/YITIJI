@@ -1,5 +1,50 @@
 # 下一步任务
 
+## 2026-09-08 两条描述订正（照旧描述派活会重造轮子）
+
+### JobApplication：**只缺前端两端**，后端已就绪
+
+文档里此前写「`JobApplication` 两端接入」，容易被读成「前后端都要做」。对 `origin/main` 复验：
+
+```
+services/api/src/job-applications/     6 个文件齐全
+controller.ts:27  @Controller('me/job-applications')
+           :33 @Get   :46 @Post   :55 @Patch(':id')   :65 @Delete(':id')
+app.module.ts:113  JobApplicationsModule 已挂
+git grep "job-applications|jobApplication" -- apps/kiosk/src apps/miniapp  → 零命中
+```
+
+正确描述：**JobApplication 前端两端接入**（后端已就绪，直接对接
+`/me/job-applications` 的 list / create / update / remove，**不要重造后端**）。
+
+配套件别漏：它已接进 `member-privacy/member-data-export.mapper.ts` —— 用户导出个人数据
+能带走本人自填的求职进度，是 [compliance-boundary.md §4.4A](../compliance/compliance-boundary.md) 的配套。
+
+### `factsConfirmedAt`：不是「暂缺」，是**已存在但客户端说了算**
+
+原描述「服务端签发 `factsConfirmedAt` 未做」没错，但漏了它当前的真实状态。复验：
+
+- `ai.controller.ts:467` 先 `delete` 简历对象上的该字段，`:469` 把 **DTO 传入的**
+  `dto.factsConfirmedAt` 一路传到 `ai.service.ts:755/856`。
+- `resume-draft.store.ts:229 assertFactsConfirmed` 的唯一判据是
+  `parseFactsConfirmedAt(input.factsConfirmedAt)`，而它只校验「能解析成时间且落在
+  `[now-24h, now+60s]`」（`:304-312`）。服务端全程只搬运、**不签发、不比对任何服务端记录**。
+
+所以这道闸是 **deterrent-grade，不是 evidence-grade**：客户端忘了做确认步骤会拿到 400
+（有用），但想跳过只需送一个 `new Date().toISOString()`。**不要在任何验收或争议场景里
+把它当作「用户已核对事实」的证据。**
+
+要变成真闸，**不能只是「改成查服务端记录」** —— 调用先后已复验：
+`ai.service.ts:752` 的 `assertFactsConfirmed`（闸）和 `:852` 的 `persistConfirmed`（写记录）
+在**同一个 `exportGeneratedResume` 里，闸在前、写在后**。首次导出时那条
+`optimize_confirmed` 记录根本还不存在，改成查它会把所有正常导出全部拒掉。
+
+真正的方向是**补一个独立的确认端点**：用户在核对页点「已核对」时调用它，服务端当场
+签发并落一条确认记录（带 endUserId + taskId + 服务端时间），导出时只查这条记录、
+完全不看 DTO。这是一次功能改动（新端点 + 一体机/小程序两端接线），不是改几行判据。
+在它落地之前，本条闸按上面的定性使用。
+
+
 ## 2026-09-08 内容冷启动：只能由产品负责人本人做的事
 
 小程序「求职」Tab 背后三个库线上全是 0 条（`https://zyidai.cn/api/v1/` 实测：
@@ -52,6 +97,33 @@ jobs / job-fairs / policies 均 0，companies 3）。**微信审核对「功能�
 - 不接「只给数据不给授权」的合作 —— 来源机构名与来源链接要对外展示，
   展示一个没授权的来源，风险比空着大。
 - 政策不找商业机构代录：`assertPolicyCapableOrgType` 从工程上就拒写。
+## 2026-09-08 BL-06：三个业务板块线上零内容（产品负责人 / 运营）
+
+三个板块线上 `total` 全为 0（15:00 实测，数据与上一节「内容冷启动」同源，不重复列）。
+
+代码全通、页面全在、空态是诚实的（无假数据，合规声明在位，设备状态如实写「状态未知 /
+未单独上报」）。所以**这不是代码缺陷**，是内容与授权来源问题 —— 但此前没有被登记为硬阻塞，
+于是每次判定都从缝里漏掉。现已登记为 `delivery.yaml` 的 **BL-06**。
+
+**不要当成「配置一开就有」**：库里此前那 217 条岗位经审查**拒绝发布** —— 200 条已过期；
+来源机构名字就叫「预生产…样本」「演示」；机构表里含 `111`、`的撒的` 等垃圾数据。
+按 CLAUDE.md §10 发出去等于让求职者照着失效岗位去投递。**需要真实数据源与授权**。
+
+本条与上一节的关系：上一节写**怎么办**（拿授权、平台侧、录入量），本条写**它是硬阻塞**
+（已登记进 `docs/delivery/kiosk-redesign-r1/delivery.yaml` 的 BL-06）。
+后果具体化：一体机六个首页入口里有三个进去是空态；真机验收（BL-03）时这三条走不出有意义的用例。
+
+## 2026-09-08 小程序重新发布的前置顺序（不要搞反）
+
+**#972（登录失败说不出原因）必须在「重新上传 → 提审 → 发布小程序」之前合入。**
+
+判据：`#953`（引入该回归）只改 `apps/miniapp/**` 四个文件，而 `deploy.yml` 只拷
+`apps/kiosk/dist` / `apps/admin/dist` / `apps/partner/dist` + API，**一个字节的
+`apps/miniapp` 都不碰**。所以这个回归**当前不在生产上**，也没有被 2026-09-08 那次发布带出去；
+它只会在小程序重新发布时才到达用户。
+
+顺序搞反的代价是要再走一轮微信提审才能修回来。最坏症状：用户不知道要重新勾选协议，
+只看到「登录失败，请重试」，一直重试一直失败。
 
 ## 2026-09-08 ⚠️ 小程序重新发布的时序约束（先看这条再发布）
 
