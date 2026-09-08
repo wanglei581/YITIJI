@@ -42,10 +42,13 @@ export function PrintDeskPage() {
 
   useEffect(() => {
     if (requested === view) return
-    if (requested === 'preview' && view === 'preview') return
-    if (requested == null) {
-      setSearchParams({ step: view }, { replace: true })
-    }
+    // 两种情况都要把 URL 拉回真实阶段：
+    //   1. 没带 ?step= 进来（首屏 / 复水），补上当前阶段
+    //   2. 带了 ?step=preview 但检查还没过 —— resolvePrintDeskView 已经把界面按回
+    //      check，URL 必须跟着改回来。留着 preview 会让 URL 和屏幕说两套话，
+    //      现场排障时看日志会以为用户真的在预览。
+    // 一律 replace：阶段纠正不是用户的一次导航，不该进历史。
+    setSearchParams({ step: view }, { replace: true })
   }, [requested, view, setSearchParams])
 
   const go = (step: PrintDeskStep) => {
