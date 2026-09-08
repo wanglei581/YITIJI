@@ -247,14 +247,15 @@ if (contract && routeManifest) {
     }
   })
 
-  check('nine redirects never create visual pairs', () => {
+  check('fourteen redirects never create visual pairs', () => {
     const expectedRedirects = Object.entries(compatibilityRedirects)
     // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
     // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
-    // 2026-09-08：打印台合并，材料检查 / 预览改为重定向，由 7 增至 9。
-    assert.equal(expectedRedirects.length, 9, 'frozen redirect count')
+    // 2026-09-08：打印台合并，材料检查 / 预览改为重定向，由 7 增至 9；
+    // 2026-09-08：面试工作台合并，五条旧面试路由改为重定向，由 9 增至 14。
+    assert.equal(expectedRedirects.length, 14, 'frozen redirect count')
     const redirects = routeEvidenceDispositions.filter(({ referenceKind }) => referenceKind === 'REDIRECT')
-    assert.equal(redirects.length, 9, 'evidence redirect count')
+    assert.equal(redirects.length, 14, 'evidence redirect count')
     for (const [source, destination] of expectedRedirects) {
       const disposition = redirects.find(({ routePattern }) => routePattern === source)
       assert.ok(disposition, `missing redirect disposition ${source}`)

@@ -202,9 +202,15 @@ await runGroup('compatibility redirect target parity', async (fail) => {
   const manifestSources = Object.keys(manifestRedirects)
   // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
   // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
+<<<<<<< HEAD
   // 2026-09-08：打印台合并，材料检查 / 预览改为重定向，由 7 增至 9。
   if (manifestSources.length !== 9) {
     fail(`${displayPath(manifestPath)}: expected exactly 9 compatibility redirects, actual ${manifestSources.length}`)
+=======
+  // 2026-09-08：面试工作台合并，五条旧面试路由改为重定向，由 7 增至 12。
+  if (manifestSources.length !== 12) {
+    fail(`${displayPath(manifestPath)}: expected exactly 12 compatibility redirects, actual ${manifestSources.length}`)
+>>>>>>> ca6522249 (feat(kiosk): 面试训练五页合成 /interview 工作台（稿 29）)
   }
 
   const missingFromManifest = routerSources.filter((sourcePath) => !(sourcePath in manifestRedirects))

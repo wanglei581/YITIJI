@@ -1,6 +1,7 @@
 export const productionRoutePatterns = [
   '/', '/login', '/member/qr-login', '/upload/phone', '/legal/:doc',
-  '/resume/job-fit', '/resume/job-fit/actions', '/resume/career-plan', '/interview/setup',
+  '/resume/job-fit', '/resume/job-fit/actions', '/resume/career-plan', '/interview',
+  '/interview/setup',
   '/interview/session', '/interview/report', '/interview/tips',
   '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   '/assistant', '/profile', '/me/resumes', '/me/print-orders', '/me/documents',
@@ -41,7 +42,7 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 107 routes (was 106; 2026-09-08 打印台合并新增 /print/desk)
+] as const // 108 routes (106 + /print/desk 打印台合并 + /interview 面试工作台合并，均 2026-09-08)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
@@ -56,4 +57,10 @@ export const compatibilityRedirects = {
   '/resume/upload': '/resume/source',
   // AI-07：/resume/export 孤儿占位页下线，真实导出在优化页。
   '/resume/export': '/resume/optimize',
+  // 2026-09-08：青序流光 29-interview-training 把五页合成 /interview 工作台。
+  '/interview/setup': '/interview?stage=setup',
+  '/interview/session': '/interview?stage=session',
+  '/interview/report': '/interview?stage=report',
+  '/interview/tips': '/interview?stage=tips',
+  '/interview/reports': '/interview?stage=reports',
 } as const

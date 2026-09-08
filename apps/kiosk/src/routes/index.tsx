@@ -8,11 +8,7 @@ import { LegalDocPage } from '../pages/legal/LegalDocPage'
 import { JobFitPage } from '../pages/resume/JobFitPage'
 import { JobFitActionsPage } from '../pages/resume/JobFitActionsPage'
 import { CareerPlanPage } from '../pages/resume/CareerPlanPage'
-import { InterviewSetupPage } from '../pages/interview/InterviewSetupPage'
-import { InterviewSessionPage } from '../pages/interview/InterviewSessionPage'
-import { InterviewReportPage } from '../pages/interview/InterviewReportPage'
-import { InterviewTipsPage } from '../pages/interview/InterviewTipsPage'
-import { InterviewReportsPage } from '../pages/interview/InterviewReportsPage'
+import { InterviewWorkbenchPage } from '../pages/interview/InterviewWorkbenchPage'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
 import { JobFairCheckinPage } from '../pages/job-fairs/JobFairCheckinPage'
@@ -110,11 +106,14 @@ export const kioskRouter = createBrowserRouter([
       { path: '/resume/self-assessment/questions', element: <SelfAssessmentQuizPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/self-assessment/result', element: <SelfAssessmentResultPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/self-assessment/history', element: <SelfAssessmentHistoryPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/interview/setup', element: <InterviewSetupPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/interview/session', element: <InterviewSessionPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/interview/report', element: <InterviewReportPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/interview/tips', element: <InterviewTipsPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/interview/reports', element: <InterviewReportsPage />, errorElement: <KioskRouteErrorPage /> },
+      // 2026-09-08 下线：青序流光 29-interview-training 把设置 / 作答 / 报告 / 技巧 / 记录
+      // 画成同一工作台的阶段。旧地址可能被收藏夹 / 二维码 / 外部链接引用，保留 replace 重定向。
+      // `?stage=` 是意图不是授权：没有会话落到 session 仍由阶段页空态拦下。
+      { path: '/interview/setup', element: <Navigate to="/interview?stage=setup" replace /> },
+      { path: '/interview/session', element: <Navigate to="/interview?stage=session" replace /> },
+      { path: '/interview/report', element: <Navigate to="/interview?stage=report" replace /> },
+      { path: '/interview/tips', element: <Navigate to="/interview?stage=tips" replace /> },
+      { path: '/interview/reports', element: <Navigate to="/interview?stage=reports" replace /> },
       {
         path: '/contract-review',
         ...(contractReviewEnabled
@@ -312,6 +311,7 @@ export const kioskRouter = createBrowserRouter([
         path: 'fairs-service',
         lazy: async () => ({ Component: (await import('../pages/job-fairs/FairsServiceHubPage')).FairsServiceHubPage }),
       },
+      { path: 'interview', element: <InterviewWorkbenchPage /> },
       {
         path: 'interview-service',
         lazy: async () => ({ Component: (await import('../pages/interview/InterviewServiceHubPage')).InterviewServiceHubPage }),

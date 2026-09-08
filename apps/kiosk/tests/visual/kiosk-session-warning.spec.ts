@@ -169,13 +169,13 @@ test('ordinary idle warns before clearing and can resume the previous route', as
 }) => {
   registerKioskShell(api)
   await page.goto('/interview/tips')
-  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await expect(page).toHaveURL(/\/interview\?stage=tips/)
 
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写内容或练习内容会清除', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '继续使用', exact: true }).click()
 
-  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await expect(page).toHaveURL(/\/interview\?stage=tips/)
 })
 
 test('warning keeps sensitive history state only on the original adjacent entry', async ({
@@ -184,7 +184,7 @@ test('warning keeps sensitive history state only on the original adjacent entry'
 }) => {
   registerKioskShell(api)
   await page.goto('/interview/tips')
-  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await expect(page).toHaveURL(/\/interview\?stage=tips/)
   await page.evaluate(() => {
     window.history.replaceState(
       {
@@ -199,7 +199,7 @@ test('warning keeps sensitive history state only on the original adjacent entry'
   expect(await page.evaluate(() => window.history.state?.usr ?? null)).toBeNull()
 
   await page.getByRole('button', { name: '继续使用', exact: true }).click()
-  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await expect(page).toHaveURL(/\/interview\?stage=tips/)
   expect(await page.evaluate(() => window.history.state?.usr?.accessToken ?? null)).toBe(
     'must-stay-on-original-entry'
   )
@@ -224,7 +224,7 @@ test('screensaver idle warns before expiry and wakes to a clean homepage', async
 }) => {
   registerKioskShell(api, { screensaverEnabled: true, idleTimeoutSec: 4 })
   await page.goto('/interview/tips')
-  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await expect(page).toHaveURL(/\/interview\?stage=tips/)
 
   await expectWarningWithinThreeSeconds(page)
   await expect(page).toHaveURL(/\/screensaver$/, { timeout: 3_500 })
@@ -240,7 +240,7 @@ test('session warning actions remain touch-safe without horizontal overflow', as
 }) => {
   registerKioskShell(api)
   await page.goto('/interview/tips')
-  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await expect(page).toHaveURL(/\/interview\?stage=tips/)
 
   await expectWarningWithinThreeSeconds(page)
 
@@ -311,7 +311,7 @@ test('screensaver-mode immediate exit always hard-clears and never falls into th
 }) => {
   registerKioskShell(api, { screensaverEnabled: true, idleTimeoutSec: 4 })
   await page.goto('/interview/tips')
-  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await expect(page).toHaveURL(/\/interview\?stage=tips/)
   await page.evaluate(({ key, value }) => window.sessionStorage.setItem(key, value), {
     key: SENSITIVE_SESSION_KEY,
     value: 'screensaver-exit-sensitive',
@@ -864,6 +864,7 @@ const SENSITIVE_SESSION_KEYS_ALL = [
   'ai-job-print:current-print-material-check',
   'ai-job-print:job-material-draft:v1',
   'self_assessment_session_v1',
+  'ai-job-print:current-interview-workbench',
 ] as const
 
 const IDLE_WINDOW_SETTLE_MS = 7_000

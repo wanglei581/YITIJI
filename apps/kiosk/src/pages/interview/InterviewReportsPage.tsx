@@ -7,20 +7,23 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, FileSearchIcon, LogInIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
-import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
+import { InterviewShell } from './InterviewShell'
+import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
+import './styles/interview-workbench-qx.css'
 
 function formatTime(iso: string) {
   const d = new Date(iso)
   return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-export function InterviewReportsPage() {
+export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberInterviewItem[]>([])
@@ -68,25 +71,37 @@ export function InterviewReportsPage() {
     }
   }
 
+  const copy = INTERVIEW_STAGE_COPY.reports
+  const titleParts = emphasizedTitle(copy)
+  const goSetup = () => {
+    patchInterviewWorkbenchSession({ stage: 'setup' })
+    if (onGoStage) onGoStage('setup')
+    else navigate('/interview/setup')
+  }
+  const openReport = (sessionId: string) => {
+    patchInterviewWorkbenchSession({ stage: 'report', report: { sessionId } })
+    if (onGoStage) onGoStage('report')
+    else navigate('/interview/report', { state: { sessionId } })
+  }
+
   return (
-    <KioskFullscreenShell showBottomNav activeTab="profile">
-    <KioskPageFrame className="fusion-w3 fusion-w3--interview h-full min-h-0 flex-1">
-    <main data-kiosk-domain="interview" data-kiosk-screen="interview-reports" className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
-      <KioskPageHeader
-        className="interview-pagehead"
-        title="面试报告"
-        description="模拟面试练习的历史报告，仅本人可见 · 模拟练习，仅供参考"
-        aside={
-          <div className="flex flex-wrap gap-2">
-            {isLoggedIn && (
-              <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/profile')}>
-                AI服务记录
-              </Button>
-            )}
-            <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
-          </div>
-        }
-      />
+    <InterviewShell
+      title={<>{isLoggedIn ? '登录后，' : '你的练习记录，'}<em>{titleParts.em}</em>。</>}
+      subtitle={copy.subtitle}
+      ctabar={
+        <>
+          {isLoggedIn && (
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/ai-records')}>
+              AI服务记录
+            </button>
+          )}
+          <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
+            开始模拟面试
+          </button>
+        </>
+      }
+    >
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-reports" data-qx-interview="" className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
 
       {hint && (
         <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
@@ -99,17 +114,17 @@ export function InterviewReportsPage() {
           <Card className="interview-card interview-reports__guest flex flex-col items-center gap-4 p-10 text-center">
             <FileSearchIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
             <div>
-              <p className="text-base font-semibold text-neutral-900">登录后可保存练习报告</p>
+              <p className="text-base font-semibold text-neutral-900">登录后可保存面试报告</p>
               <p className="mt-1 text-sm text-neutral-500">
                 游客模式的练习报告短期有效（约 2 小时）；登录后报告保存 7 天，可随时回看与打印
               </p>
             </div>
             <div className="flex gap-3">
-              <Button size="lg" className="h-14 px-6" onClick={() => navigate('/login', { state: { from: '/interview/reports' } })}>
+              <Button size="lg" className="h-14 px-6" onClick={() => navigate('/login', { state: { from: '/interview?stage=reports' } })}>
                 <LogInIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
                 手机号登录
               </Button>
-              <Button size="lg" variant="secondary" className="h-14 px-6" onClick={() => navigate('/interview/setup')}>
+              <Button size="lg" variant="secondary" className="h-14 px-6" onClick={goSetup}>
                 开始模拟面试
               </Button>
             </div>
@@ -125,7 +140,7 @@ export function InterviewReportsPage() {
               title="还没有练习报告"
               description="完成一次模拟面试后，这里会展示你的练习报告"
               className="py-12"
-              action={<Button size="lg" className="h-14 px-8" onClick={() => navigate('/interview/setup')}>开始模拟面试</Button>}
+              action={<Button size="lg" className="h-14 px-8" onClick={goSetup}>开始模拟面试</Button>}
             />
           </Card>
         ) : (
@@ -146,7 +161,7 @@ export function InterviewReportsPage() {
                     size="sm"
                     variant="secondary"
                     className="h-12 shrink-0"
-                    onClick={() => navigate('/interview/report', { state: { sessionId: it.sessionId } })}
+                    onClick={() => openReport(it.sessionId)}
                   >
                     <EyeIcon className="mr-1 h-4 w-4" aria-hidden="true" />
                     查看
@@ -173,8 +188,7 @@ export function InterviewReportsPage() {
           </div>
         )}
       </div>
-    </main>
-    </KioskPageFrame>
-    </KioskFullscreenShell>
+    </div>
+    </InterviewShell>
   )
 }

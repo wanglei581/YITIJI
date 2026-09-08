@@ -81,11 +81,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
   { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次岗位匹配参考', requiresFusionRoot: false },
   { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '求职方案', requiresFusionRoot: false },
-  { pattern: '/interview/setup', url: '/interview/setup', marker: screen('interview-setup'), featureText: '模拟面试', requiresFusionRoot: false },
-  { pattern: '/interview/session', url: '/interview/session', marker: screen('interview-session'), featureText: '会话已失效', requiresFusionRoot: false },
-  { pattern: '/interview/report', url: '/interview/report', marker: screen('interview-report'), featureText: '报告不存在或已过期', requiresFusionRoot: false },
-  { pattern: '/interview/tips', url: '/interview/tips', marker: screen('interview-tips'), featureText: '面试', requiresFusionRoot: false },
-  { pattern: '/interview/reports', url: '/interview/reports', marker: screen('interview-reports'), featureText: '面试报告', requiresFusionRoot: false },
+  { pattern: '/interview', url: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
+  { pattern: '/interview/setup', url: '/interview/setup', expectedPath: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
+  { pattern: '/interview/session', url: '/interview/session', expectedPath: '/interview', marker: screen('interview-session'), featureText: '会话已失效' },
+  { pattern: '/interview/report', url: '/interview/report', expectedPath: '/interview', marker: screen('interview-report'), featureText: '报告不存在或已过期' },
+  { pattern: '/interview/tips', url: '/interview/tips', expectedPath: '/interview', marker: screen('interview-tips'), featureText: '面试' },
+  { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '面试报告' },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '触摸屏幕开始使用', landmark: 'presentation', seed: seedScreensaver },
   { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '网络连接中断' },
@@ -189,7 +190,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
-] as const // 107 routes (was 106; 2026-09-08 打印台合并新增 /print/desk)
+] as const // 108 routes (106 + /print/desk 打印台合并 + /interview 面试工作台合并，均 2026-09-08)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -224,5 +225,5 @@ if (duplicates.length || missing.length || unexpected.length || actualPatterns.l
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-// 2026-09-08 打印台合并新增 /print/desk；kiosk 由 104 增至 105；mobile 仍为 2。
+// 2026-09-08 两次合并各新增一条（/print/desk、/interview）；kiosk 由 104 增至 106；mobile 仍为 2。
 if (w6KioskCases.length !== 105) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)

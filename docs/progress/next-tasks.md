@@ -61,6 +61,11 @@
 - **2026-09-07 补漏 L 组**：L1–L6 六包全部合入（squash 号见 current-progress.md 同日「结果层补漏 L 组」条目）；用户现在能在两端摸到转 PDF、草稿 / 版本、事实核对、对照页新视觉；小程序 401 续签端点、终端密钥启动门禁、Kiosk AI 能力端点也已在 main。剩余：服务端签发 `factsConfirmedAt`、具名多版本、`JobApplication` 两端接入、branch protection（负责人 GitHub 设置）。
 - 判定：`PRODUCTION NO-GO` 仍不变 —— 代码侧结果层已闭环，但**服务器真 LibreOffice 转换复验**（部署清单字体 / 引擎两项）与 **Windows 真机打印回归**（导出 PDF → 打印链路）尚未在生产环境跑过；两项过了才允许把诊断 / 优化写成「可交付」。
 
+## 2026-09-08 面试工作台合并残留
+
+- 顶栏返回键等 `QxPageFrame.back`（PR #955）合入后再接到 `/interview-service`。当前 main 上的页壳没有该槽，本批未另写一份。
+- 会话进行中的语音录音态无法跨 reload 恢复（MediaRecorder 不能复水）；刷新后回到文字作答与已确认的对话记录。
+
 ## 当前主线：51 页新稿迁移（2026-09-02 建立，取代下方全部历史队列的优先级）
 
 **边界与判定（project-delivery-governance G2/G3 逐页版）。** 已核实的事实基线（`6d74c2f17` 重算图谱后）：

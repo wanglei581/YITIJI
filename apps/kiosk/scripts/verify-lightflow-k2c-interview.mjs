@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
@@ -151,7 +152,11 @@ check(
   fullscreenShell.includes('h-screen') || fullscreenShell.includes('100vh') || fullscreenShell.includes('100dvh'),
   'KioskFullscreenShell 未锁定完整视口高度',
 )
-check(interviewShell.includes('KioskFullscreenShell'), 'InterviewShell 未接入共享全屏壳')
+check(interviewShell.includes('QxPageFrame'), 'InterviewShell 未接入青序流光页壳')
+check(interviewShell.includes('QxAppNavbar'), 'InterviewShell 未接入共享底栏')
+check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('readInterviewWorkbenchSession'), '工作台未从 sessionStorage 复水')
+check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('replace: true'), '阶段切换必须 replace 历史')
+check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('parseInterviewStage'), '工作台必须解析 ?stage=')
 check(
   /\.interview-flow\s*\{[\s\S]*?(?:height:\s*100%|flex:\s*1)/.test(interviewShellCss),
   '顶级面试页未在全屏壳内填满可用高度',
@@ -165,6 +170,9 @@ const packageJson = read('package.json')
 const ci = read('../../.github/workflows/ci.yml')
 check(packageJson.includes('"verify:lightflow-k2c-interview"'), 'Kiosk package.json 未注册 K2c 门禁')
 check(ci.includes('pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview'), 'CI 未注册 K2c LightFlow 门禁')
+
+const modelTest = spawnSync(process.execPath, ['--test', resolve(root, 'scripts/tests/interview-workbench-model.test.mjs')], { encoding: 'utf8' })
+check(modelTest.status === 0, `interview workbench model unit test failed: ${modelTest.stderr || modelTest.stdout}`)
 
 if (failures.length > 0) {
   // 先逐条打印失败断言，再打汇总：CI 日志被 tail 截断时，

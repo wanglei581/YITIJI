@@ -200,7 +200,7 @@ const WAVE_ROUTES = new Map([
     '/resume/optimize/compare',
     '/resume/export', '/resume/templates', '/resume/materials', '/resume/job-fit',
     '/resume/job-fit/actions',
-    '/resume/career-plan', '/assistant', '/interview/setup', '/interview/session',
+    '/resume/career-plan', '/assistant', '/interview', '/interview/setup', '/interview/session',
     '/interview/report', '/interview/tips', '/interview/reports',
     '/ai/plan', '/session-resume', '/resume-service', '/interview-service',
   ]],
@@ -244,8 +244,13 @@ check('107/107 routes', () => {
   assert.deepEqual([...actual].sort(), [...manifest.paths].sort(), 'router and frozen manifest differ')
   // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
   // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
+<<<<<<< HEAD
   // 2026-09-08：打印台合并新增 /print/desk，材料检查 / 预览改为重定向，由 7 增至 9。
   assert.equal(manifest.redirects.size, 9, 'manifest must contain nine compatibility redirects')
+=======
+  // 2026-09-08：面试工作台合并新增 /interview，五条旧路由改为重定向，由 7 增至 12。
+  assert.equal(manifest.redirects.size, 12, 'manifest must contain twelve compatibility redirects')
+>>>>>>> ca6522249 (feat(kiosk): 面试训练五页合成 /interview 工作台（稿 29）)
   for (const [path, target] of manifest.redirects) {
     const route = routeInventory.find((candidate) => candidate.path === path)
     assert.ok(route?.redirect, `${path} must render Navigate`)
@@ -514,7 +519,11 @@ check('W6 route acceptance contract', () => {
   assert.equal(routes.length, 107, 'W6 route cases must total 107')
   assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 107, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
+<<<<<<< HEAD
   // 107 = 105 kiosk + 2 mobile。2026-09-08 打印台合并新增 /print/desk。
+=======
+  // 107 = 105 kiosk + 2 mobile。2026-09-08 面试工作台合并新增 /interview。
+>>>>>>> ca6522249 (feat(kiosk): 面试训练五页合成 /interview 工作台（稿 29）)
   assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 105, 'W6 kiosk allocation')
   assert.equal(routes.filter(({ viewport }) => viewport === 'mobile').length, 2, 'W6 mobile allocation')
 })

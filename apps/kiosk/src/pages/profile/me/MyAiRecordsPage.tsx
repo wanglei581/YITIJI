@@ -23,6 +23,7 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { JobAiSessionRecords } from './JobAiSessionRecords'
 import { MockInterviewRecords } from './MockInterviewRecords'
+import { patchInterviewWorkbenchSession } from '../../interview/interviewWorkbenchSession'
 import './me-detail-inkpaper.css'
 
 type AiRecordView = MemberAiRecordItem & {
@@ -291,7 +292,10 @@ export function MyAiRecordsPage() {
           items={interviews}
           confirmId={confirmInterviewId}
           busyId={busyInterviewId}
-          onOpen={(sessionId) => navigate('/interview/report', { state: { sessionId } })}
+          onOpen={(sessionId) => {
+            patchInterviewWorkbenchSession({ stage: 'report', report: { sessionId } })
+            navigate('/interview/report', { state: { sessionId } })
+          }}
           onDelete={(sessionId) => void removeInterview(sessionId)}
         />
 

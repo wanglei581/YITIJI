@@ -8,8 +8,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
-import { AlertCircleIcon } from 'lucide-react'
+import { InterviewSessionInvalid } from './session/InterviewSessionInvalid'
+import { resolveInterviewSessionState } from './session/resolveInterviewSessionState'
 import { answerInterview, endInterview, fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
 import {
@@ -25,9 +25,16 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
+import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
+import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import {
+  patchInterviewWorkbenchSession,
+  readInterviewWorkbenchSession,
+} from './interviewWorkbenchSession'
 import './interview-service-desk.css'
+import './styles/interview-workbench-qx.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const advisorPortrait = '/assets/ai-advisor.png'
@@ -58,21 +65,24 @@ function speak(text: string, onState?: (speaking: boolean) => void): void {
   }
 }
 
-export function InterviewSessionPage() {
+export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
-  const state = location.state as InterviewSessionRouteState | null
+  const storedLive = readInterviewWorkbenchSession()?.live
+  const state = resolveInterviewSessionState(location.state as InterviewSessionRouteState | null)
 
   const [messages, setMessages] = useState<InterviewMessage[]>(() =>
-    state?.firstQuestion ? [{ role: 'interviewer', content: state.firstQuestion }] : [],
+    storedLive?.messages?.length
+      ? storedLive.messages
+      : state?.firstQuestion ? [{ role: 'interviewer', content: state.firstQuestion }] : [],
   )
-  const [questionIndex, setQuestionIndex] = useState(1)
+  const [questionIndex, setQuestionIndex] = useState(storedLive?.questionIndex ?? 1)
   const [draft, setDraft] = useState('')
   const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
   const [error, setError] = useState<string | null>(null)
-  const [omitPrintAnswers, setOmitPrintAnswers] = useState(false)
-  const [remainingSec, setRemainingSec] = useState((state?.durationMin ?? 5) * 60)
+  const [omitPrintAnswers, setOmitPrintAnswers] = useState(storedLive?.omitPrintAnswers ?? false)
+  const [remainingSec, setRemainingSec] = useState(storedLive?.remainingSec ?? (state?.durationMin ?? 5) * 60)
   const listRef = useRef<HTMLDivElement>(null)
 
   const [asrEnabled, setAsrEnabled] = useState(false)
@@ -98,6 +108,14 @@ export function InterviewSessionPage() {
     voice.kind === 'recording' ||
     voice.kind === 'transcribing',
   )
+
+  useInterviewLivePersist({
+    state,
+    messages,
+    questionIndex,
+    remainingSec,
+    omitPrintAnswers,
+  })
 
   const access = useMemo(
     () => ({ token: getToken(), accessToken: state?.accessToken ?? null }),
@@ -205,20 +223,9 @@ export function InterviewSessionPage() {
 
   if (!state?.sessionId) {
     return (
-      <InterviewShell>
-      <main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-error-bg text-error-fg">
-          <AlertCircleIcon className="h-9 w-9" aria-hidden="true" />
-        </div>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-neutral-900">会话已失效，请重新开始</h1>
-          <p className="mt-2 text-base text-neutral-500">公共设备不会保留面试会话状态，刷新或直接访问后需要重新创建练习。</p>
-        </div>
-        <Button size="lg" className="h-14 px-10 text-base" onClick={() => navigate('/interview/setup')}>
-          重新开始练习
-        </Button>
-      </main>
-      </InterviewShell>
+      <InterviewSessionInvalid
+        onRestart={() => onGoStage ? onGoStage('setup') : navigate('/interview/setup')}
+      />
     )
   }
 
@@ -354,7 +361,12 @@ export function InterviewSessionPage() {
       const report = await endInterview(state.sessionId, access, {
         includeAnswersInPrint: !omitPrintAnswers,
       })
-      navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
+      patchInterviewWorkbenchSession({
+        stage: 'report',
+        report: { sessionId: state.sessionId, accessToken: state.accessToken },
+      })
+      if (onGoStage) onGoStage('report')
+      else navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
     } catch (err) {
       setError(userMessageOf(err, '报告生成失败，请重试'))
       setPhase(messages.some((m) => m.role === 'candidate' && !m.skipped) ? 'done_suggest' : 'answering')
@@ -390,9 +402,17 @@ export function InterviewSessionPage() {
     : !asrEnabled ? '语音转写服务未启用，请用文字作答'
     : null
 
+  const copy = INTERVIEW_STAGE_COPY.session
+  const titleParts = emphasizedTitle(copy)
+
   return (
-    <InterviewShell>
-    <main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
+    <InterviewShell
+      title={<>第 {questionIndex} 题，<em>{titleParts.em}</em>。</>}
+      subtitle={copy.subtitle}
+      status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : '模拟练习' }}
+      navbar={false}
+    >
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-session" data-qx-interview="" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels
         advisorPortrait={advisorPortrait}
         interviewerLabel={interviewerLabel}
@@ -465,7 +485,7 @@ export function InterviewSessionPage() {
         omitPrintAnswers={omitPrintAnswers}
         onOmitPrintAnswersChange={setOmitPrintAnswers}
       />
-    </main>
+    </div>
     </InterviewShell>
   )
 }

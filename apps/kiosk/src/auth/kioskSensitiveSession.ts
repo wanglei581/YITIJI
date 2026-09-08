@@ -6,6 +6,10 @@ import {
   SESSION_STORAGE_KEY as SELF_ASSESSMENT_SESSION_KEY,
 } from '../pages/resume/selfAssessmentSession'
 import {
+  clearInterviewWorkbenchSession,
+  INTERVIEW_WORKBENCH_SESSION_KEY,
+} from '../pages/interview/interviewWorkbenchSession'
+import {
   clearAllLocalFavorites,
   hasLocalFavorites,
 } from '../favorites/localFavorites'
@@ -26,6 +30,7 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   'ai-job-print:current-ai-resume',
   'ai-job-print:job-material-draft:v1',
   SELF_ASSESSMENT_SESSION_KEY,
+  INTERVIEW_WORKBENCH_SESSION_KEY,
 ] as const
 
 export function clearKioskSensitiveSession(): void {
@@ -34,6 +39,7 @@ export function clearKioskSensitiveSession(): void {
   clearAiResumeSession()
   clearJobMaterialDraft()
   clearSelfAssessmentSession()
+  clearInterviewWorkbenchSession()
 }
 
 /**
