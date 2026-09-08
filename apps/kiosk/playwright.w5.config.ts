@@ -12,7 +12,7 @@ process.env.no_proxy = mergedProxyBypass
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /fusion-w5\.spec\.ts$/,
+  testMatch: /(?:fusion-w5|profile-qx)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-fusion-w5',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

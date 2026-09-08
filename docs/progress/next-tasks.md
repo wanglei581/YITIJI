@@ -214,6 +214,12 @@ POST /api/v1/upload-sessions/scene/resolve → 端点存在，乱码统一回 UP
 ## 2026-09-07 `/ai/plan` 小青作业面 · 填槽 / 比对入口缺口
 
 一体机前台目前只有「保存本次要点」会产出 `qa_pins` 并导航到 `/ai/plan`。`slot_draft` / `compare_report` 的会话（`POST /advisor/sessions` + `/run`）在 kiosk 还没有作业型采集页，本页能渲染这两种产物（`?capture=1` 与带 `sessionId`+`artifactId` 的真实 GET），但没有「从对话里发起填槽 / 比对」的入口。未放点了没反应的按钮。要补入口须先做顾问作业型会话页，不在本页假装有。
+## 2026-09-07 「我的」青序迁移残留（批 3 profile，不挡合入）
+
+- `30-my-profile.html` 的 `/me/settings` 换绑四步与清场版式本批未迁（任务只含 `/profile`）；设置页仍是既有运行时。
+- `31-benefits.html` 的 `/activities`、`/activities/:id` 领取态本批未迁（不新增路由，台账页 Tab 仍跳既有活动列表）。
+- `GET /me/pending-tasks` 没有取件码字段，出纸待办卡不编造取件码，主按钮走已验证的 `/print/progress`。
+- 冻结的 `profileEntries.ts` 仍列 22 个常用服务入口；30 号稿是「概览 + 继续办」，运行时不再把五区目录堆回「我的」。
 
 ## 2026-09-07 报价确认页青序迁移残留
 
