@@ -1,39 +1,44 @@
-// ============================================================
 // 我的权益 — /me/benefits（本人，只读）。
 // 只展示 BenefitGrant 元数据；不接支付、不核销、不承诺补贴办理结果。
-// ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState } from '@ai-job-print/ui'
 import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-print/shared'
-import { GiftIcon } from 'lucide-react'
+import { FlagIcon, GiftIcon, PrinterIcon, SparklesIcon, BookOpenIcon } from 'lucide-react'
 import { getMyBenefits } from '../../../services/api/memberFavorites'
 import { useAuth } from '../../../auth/useAuth'
-import { KIcon, type KioskIconName } from '../../../components/kiosk-icon'
-import { useInkRipple } from '../../../hooks/useInkRipple'
+import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
+import { getTerminalCode } from '../../../services/api/screensaver'
 import { formatTime } from '../assets/format'
-import { MeListShell, type MeListState } from './MeListShell'
-import './me-detail-inkpaper.css'
+import { QxMemberNavbar } from '../components/QxMemberNavbar'
+import './styles/benefits-qx.css'
 
-const TYPE_META: Record<BenefitType, { label: string; icon: KioskIconName; tone: string }> = {
-  coupon: { label: '优惠券', icon: 'ticket', tone: 'rose' },
-  free_quota: { label: '免费次数', icon: 'sparkle', tone: 'teal' },
-  package_entitlement: { label: '服务额度', icon: 'toolbox', tone: 'wheat' },
-  subsidy_eligibility_hint: { label: '政策资格提示', icon: 'policy', tone: 'slate' },
+const TYPE_META: Record<BenefitType, { label: string; tone: 'teal' | 'wheat' | 'plum' | 'slate' }> = {
+  coupon: { label: '优惠券', tone: 'teal' },
+  free_quota: { label: '免费次数', tone: 'wheat' },
+  package_entitlement: { label: '套餐额度', tone: 'plum' },
+  subsidy_eligibility_hint: { label: '政策资格提示', tone: 'slate' },
 }
 
-const STATUS_META: Record<BenefitStatus, { label: string; cls: string }> = {
-  active: { label: '可用', cls: 'is-active' },
-  used_up: { label: '已用完', cls: 'is-muted' },
-  expired: { label: '已过期', cls: 'is-warning' },
-  revoked: { label: '已撤销', cls: 'is-danger' },
+const STATUS_META: Record<BenefitStatus, { label: string; tone: 'teal' | 'warn' | 'bad' }> = {
+  active: { label: '可用', tone: 'teal' },
+  used_up: { label: '已用完', tone: 'warn' },
+  expired: { label: '已过期', tone: 'warn' },
+  revoked: { label: '已撤销', tone: 'bad' },
+}
+
+const SOURCE_LABEL: Record<MemberBenefitItem['sourceType'], string> = {
+  platform: '平台',
+  campus: '校园',
+  gov: '政府',
+  fair: '招聘会',
+  partner: '合作机构',
 }
 
 function quantityLine(item: MemberBenefitItem): string {
-  if (item.benefitType === 'subsidy_eligibility_hint') return '仅作政策资格与官方入口指引'
-  if (item.quantityTotal === null || item.quantityRemaining === null) return '一次性权益'
-  return `剩余 ${item.quantityRemaining} / ${item.quantityTotal}`
+  if (item.benefitType === 'subsidy_eligibility_hint') return '不适用 · 仅提供政策说明、材料清单与官方入口'
+  if (item.quantityTotal === null || item.quantityRemaining === null) return '一次性权益；说明与状态都以服务端返回为准'
+  return `总量 ${item.quantityTotal} · 剩余 ${item.quantityRemaining}；说明与状态都以服务端返回为准`
 }
 
 function validityLine(item: MemberBenefitItem): string {
@@ -43,112 +48,263 @@ function validityLine(item: MemberBenefitItem): string {
   return `自 ${formatTime(item.validFrom!)} 起有效`
 }
 
+type BenefitsUiState = 'signed-out' | 'loading' | 'error' | 'empty' | 'list'
+
 export function MyBenefitsPage() {
-  const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberBenefitItem[]>([])
-  const [state, setState] = useState<MeListState>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
-  useInkRipple('.me-inkdetail .me-ripple')
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
-      setState('ready')
+      setItems([])
+      setLoadState('ready')
       return
     }
-    setState('loading')
+    setLoadState('loading')
     getMyBenefits(getToken(), { pageSize: 50 })
-      .then((r) => {
-        setItems(r.items)
-        setState('ready')
+      .then((result) => {
+        setItems(result.items)
+        setLoadState('ready')
       })
-      .catch(() => setState('error'))
+      .catch(() => setLoadState('error'))
   }, [isLoggedIn, getToken])
 
   useEffect(() => {
     load()
   }, [load, reloadKey])
 
-  return (
-    <div className="me-inkdetail me-inkdetail-benefits h-full">
-      <MeListShell
-      signedOutDescription="这里存的是你名下的权益与活动核销记录。是否有可用权益由服务端判定，不登录无法确认身份。"
-        title="我的权益"
-        subtitle="本人优惠券、免费次数、服务额度与政策资格提示"
-        loginFrom="/me/benefits"
-        isLoggedIn={isLoggedIn}
-        state={state}
-        onRetry={() => setReloadKey((k) => k + 1)}
-        aside={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" className="me-ripple min-h-12" onClick={() => navigate('/activities')}>
-              去权益活动领取
-            </Button>
-            <Button size="sm" variant="secondary" className="me-ripple min-h-12" onClick={() => navigate('/profile')}>
-              返回我的
-            </Button>
-          </div>
-        }
-      >
-        <section className="me-detail-summary" aria-label="权益概览">
-          <span className="me-summary-icon me-tone-clay" aria-hidden="true">
-            <KIcon name="ticket" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p>权益口袋</p>
-            <strong>{items.length}</strong>
-            <span>仅展示本人已领取或已发放权益，不接支付、不做核销</span>
-          </div>
-          <div className="me-summary-mini" aria-label="权益状态数量">
-            <span>可用 {items.filter((item) => item.status === 'active').length}</span>
-            <span>已结束 {items.filter((item) => item.status !== 'active').length}</span>
-          </div>
-        </section>
+  const uiState: BenefitsUiState = !isLoggedIn
+    ? 'signed-out'
+    : loadState === 'loading'
+      ? 'loading'
+      : loadState === 'error'
+        ? 'error'
+        : items.length === 0
+          ? 'empty'
+          : 'list'
 
-        {items.length === 0 ? (
-          <Card className="me-empty-card">
-            <EmptyState
-              icon={GiftIcon}
-              title="还没有权益"
-              description="可先到权益活动领取；管理员发放后也会显示在这里。不接支付、不做核销。"
-              className="py-12"
-            />
-            <div className="flex justify-center pb-4">
-              <Button size="lg" className="me-ripple min-h-14 px-8" onClick={() => navigate('/activities')}>
-                去权益活动领取
-              </Button>
+  const status = uiState === 'error'
+    ? { tone: 'bad' as const, label: '权益台账这次没取到' }
+    : uiState === 'loading'
+      ? { tone: 'unknown' as const, label: '正在取你的权益台账' }
+      : { tone: 'unknown' as const, label: '权益与资格均由服务端判定' }
+
+  return (
+    <div
+      className="fusion-w5 h-full"
+      data-kiosk-screen="member-list"
+      data-state={uiState}
+      data-testid={`benefits-state-${uiState}`}
+    >
+      <QxPageFrame
+        title="我的权益"
+        subtitle="名称、有效期与可用状态都由服务端返回；是否收费以活动说明与现场核价为准。"
+        status={status}
+        terminalLabel={getTerminalCode() || '就业服务大厅'}
+        ctabar={<BenefitsCta uiState={uiState} onRetry={() => setReloadKey((key) => key + 1)} />}
+        navbar={<QxMemberNavbar current="profile" />}
+      >
+        <div className="qx-scroll qx-grow bf-page">
+          <BenefitsTabs current="benefits" />
+          {uiState === 'signed-out' ? (
+            <div className="qx-state" data-tone="info" data-testid="benefits-fallback">
+              <span className="qx-state-ic" />
+              <span>
+                <div className="qx-state-t">权益台账需要先登录</div>
+                <p className="qx-state-d">
+                  权益绑定在<b>你本人的账号</b>上。公共终端不会凭匿名会话显示任何人的权益，也不会替你领取。
+                </p>
+              </span>
             </div>
-          </Card>
-        ) : (
-          items.map((item) => {
-            const type = TYPE_META[item.benefitType]
-            const status = STATUS_META[item.status]
-            return (
-              <Card key={item.id} className="me-benefit-card me-ripple">
-                <div className="flex items-start gap-4">
-                  <span className={['me-row-icon', `me-tone-${type.tone}`].join(' ')}>
-                    <KIcon name={type.icon} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="me-chip">{type.label}</span>
-                      <span className={['me-status', status.cls].join(' ')}>{status.label}</span>
-                    </div>
-                    <p className="me-row-title mt-2">{item.title}</p>
-                    {item.description && <p className="mt-1 text-xs leading-relaxed text-[color:var(--ink-2)]">{item.description}</p>}
-                    <p className="mt-2 text-xs text-[color:var(--muted)]">
-                      {quantityLine(item)} · {validityLine(item)}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            )
-          })
-        )}
-        <p className="me-legal-note">
-          权益仅用于本终端服务与打印辅助；政策资格提示只提供信息指引，具体办理与结果以官方平台为准。
-        </p>
-      </MeListShell>
+          ) : null}
+          {uiState === 'loading' ? (
+            <>
+              <div className="qx-sec-h"><span className="t">正在取你的权益台账</span><span className="hint">未返回前不显示条数</span></div>
+              <div className="bf-skel-row"><div className="bf-skel-line" style={{ width: '44%' }} /></div>
+              <div className="bf-skel-row"><div className="bf-skel-line" style={{ width: '50%' }} /></div>
+              <p className="bf-legal">只显示整体等待，不画百分比，也不显示上一次的权益。</p>
+            </>
+          ) : null}
+          {uiState === 'error' ? (
+            <div className="qx-state" data-tone="error" data-testid="benefits-fallback">
+              <span className="qx-state-ic" />
+              <span>
+                <div className="qx-state-t">权益台账这次没取到</div>
+                <p className="qx-state-d">
+                  请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或被核销，你会白跑一趟。
+                </p>
+              </span>
+            </div>
+          ) : null}
+          {uiState === 'empty' ? (
+            <div className="qx-state" data-tone="info" data-testid="benefits-fallback">
+              <span className="qx-state-ic" />
+              <span>
+                <div className="qx-state-t">还没有权益</div>
+                <p className="qx-state-d">
+                  没有就是没有。本机<b>不会造几张券让这一页看起来热闹</b>。可以去看看正在进行的活动，符合条件的可以领取。
+                </p>
+              </span>
+            </div>
+          ) : null}
+          {uiState === 'list' ? (
+            <>
+              <div className="qx-sec-h">
+                <span className="t">权益台账</span>
+                <span className="hint">名称、额度与有效期都以服务端返回为准</span>
+              </div>
+              <ul className="bf-list" data-testid="benefits-list">
+                {items.map((item) => {
+                  const type = TYPE_META[item.benefitType]
+                  const statusMeta = STATUS_META[item.status]
+                  return (
+                    <li key={item.id} className="bf-item" data-benefit-type={item.benefitType} data-benefit-status={item.status}>
+                      <div className="bf-item-link">
+                        <span className="bf-item-ic" data-tone={type.tone}><GiftIcon size={28} aria-hidden /></span>
+                        <span className="bf-item-tx">
+                          <span className="bf-item-t">
+                            {type.label} · {item.title}
+                            <span className="bf-tag" data-tone={statusMeta.tone}>{statusMeta.label}</span>
+                          </span>
+                          {item.description ? <span className="bf-item-sub">{item.description}</span> : null}
+                          <span className="bf-item-sub">
+                            <span>来源 {SOURCE_LABEL[item.sourceType]}</span>
+                            <span>有效期 {validityLine(item)}</span>
+                          </span>
+                          <span className="bf-item-note">{quantityLine(item)}</span>
+                        </span>
+                        <span className="bf-item-go">只读</span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+              <LedgerRules />
+            </>
+          ) : null}
+          {uiState !== 'list' && uiState !== 'loading' ? <ServiceAlts /> : null}
+          <p className="bf-legal">
+            <b>权益只对应本机服务与打印，不等于政府补贴已经发放。</b>
+            政策资格提示只提供信息指引，具体办理与结果以官方平台为准。本机不代办、不收取额外费用。
+          </p>
+        </div>
+      </QxPageFrame>
     </div>
+  )
+}
+
+function BenefitsTabs({ current }: { current: 'benefits' | 'activities' }) {
+  const navigate = useNavigate()
+  return (
+    <div className="bf-tabs">
+      <button
+        type="button"
+        className="bf-tab"
+        data-testid="tab-benefits"
+        aria-current={current === 'benefits' ? 'page' : undefined}
+        onClick={() => navigate('/me/benefits')}
+      >
+        <GiftIcon size={24} aria-hidden />我的权益
+      </button>
+      <button
+        type="button"
+        className="bf-tab"
+        data-testid="tab-activities"
+        aria-current={current === 'activities' ? 'page' : undefined}
+        onClick={() => navigate('/activities')}
+      >
+        <FlagIcon size={24} aria-hidden />可参加的活动
+      </button>
+    </div>
+  )
+}
+
+function LedgerRules() {
+  return (
+    <section className="qx-card">
+      <div className="qx-sec-h">
+        <span className="t">资格、核销与收费由谁说了算</span>
+        <span className="hint">与本机是否有权益无关</span>
+      </div>
+      <div className="bf-rules">
+        <span className="bf-rule"><i /><span>是否符合条件：由服务端按主办方的官方规则逐条比对后返回，本机与小青都<b>不替你判定资格</b>。</span></span>
+        <span className="bf-rule"><i /><span>能不能用、还能不能再用：以<b>核销时服务端返回的结果</b>为准，本页不预判。</span></span>
+        <span className="bf-rule" data-no="true"><i /><span>是否收费、收多少：以活动说明与现场公示价为准；补贴类只给说明与官方入口，<b>本机不代办</b>。</span></span>
+      </div>
+    </section>
+  )
+}
+
+function ServiceAlts() {
+  const navigate = useNavigate()
+  const rows = [
+    { icon: PrinterIcon, title: '打印与扫描', desc: 'A4 黑白或彩色，价格以现场公示与服务端报价为准。', to: '/print-scan' },
+    { icon: SparklesIcon, title: 'AI 简历服务', desc: '诊断、优化、生成与材料工坊，都不需要权益。', to: '/resume-service' },
+    { icon: BookOpenIcon, title: '就业政策与补贴指引', desc: '政策原文与官方申请入口，本机不代办、不收代办费。', to: '/renshi' },
+  ]
+  return (
+    <div className="bf-alt">
+      <div className="bf-alt-h">没有权益也照常可用的服务</div>
+      {rows.map((row) => (
+        <button type="button" key={row.to} className="bf-alt-row" onClick={() => navigate(row.to)}>
+          <span className="bf-alt-ic"><row.icon size={26} aria-hidden /></span>
+          <span className="bf-alt-tx">
+            <span className="bf-alt-t">{row.title}</span>
+            <span className="bf-alt-d">{row.desc}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: () => void }) {
+  const navigate = useNavigate()
+  if (uiState === 'signed-out') {
+    return (
+      <>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/activities')}>先看看有哪些活动</button>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/login', { state: { from: '/me/benefits' } })}>
+          去登录
+        </button>
+      </>
+    )
+  }
+  if (uiState === 'loading') {
+    return (
+      <button type="button" className="qx-btn" data-variant="ghost" data-testid="benefits-primary" onClick={() => navigate('/profile')}>
+        返回我的
+      </button>
+    )
+  }
+  if (uiState === 'error') {
+    return (
+      <>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={onRetry}>
+          重新加载
+        </button>
+      </>
+    )
+  }
+  if (uiState === 'empty') {
+    return (
+      <>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>直接去打印</button>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/activities')}>
+          看可参加的活动
+        </button>
+      </>
+    )
+  }
+  return (
+    <>
+      <p className="why">列表只读；能否使用以核销时服务端的最新状态为准。</p>
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/activities')}>
+        看可参加的活动
+      </button>
+    </>
   )
 }
