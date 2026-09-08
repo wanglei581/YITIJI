@@ -7,6 +7,11 @@ const STORAGE_KEY = 'terminal_session_token_v1'
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000]
 const RETRY_WINDOW_MS = 60_000
 const REQUEST_TIMEOUT_MS = 4_000
+// 本地 Agent 桥接：会话票失效后由页面自行重新引导用（与看门狗取票同一来源、同一端点）。
+const LOCAL_AGENT_BASE_URL = ((import.meta.env['VITE_TERMINAL_AGENT_LOCAL_URL'] ?? '').trim() || 'http://127.0.0.1:9527').replace(/\/+$/, '')
+const LOCAL_BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
+const LOCAL_TICKET_TIMEOUT_MS = 4_000
+const BOOT_TICKET_PATTERN = /^[A-Za-z0-9_-]{32,128}$/
 // 仅 Playwright 浏览器套件（API 被路由 mock）设置；生产 / deploy 构建禁止出现该变量（verify-runtime-terminal-identity 断言）。
 const MOCK_TOKEN = (import.meta.env['VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN'] ?? 'mock-terminal-session-fixture').trim()
 const HAS_E2E_MOCK_TOKEN = Boolean(import.meta.env['VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN']?.trim())
@@ -71,6 +76,35 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
   saveToken(payload.sessionToken)
 }
 
+/**
+ * 向本机 Agent 桥接要一张新的引导票。
+ *
+ * 存在的理由：会话票过期或被吊销后，`/session-token/refresh` 会 401，而 401 按设计
+ * 不重试（重试不会变好）。此前页面到此就永久停在 failed —— 引导票**只从 URL 读一次**，
+ * 而 URL 上的票是看门狗启动浏览器时塞的。于是一体机只能靠看门狗重启浏览器才恢复，
+ * 期间用户看到的是「终端安全校验失败」且按钮全灰。
+ * 2026-09-08 生产实测：17:10:57 刷新 401 之后页面再没恢复，直到看门狗介入。
+ *
+ * 这里让页面自己走看门狗走的那条路（同一端点、同一信任来源），不降低安全性：
+ * 桥接令牌未配置（例如在普通浏览器里打开）时直接放弃，仍然 fail-closed。
+ */
+async function requestLocalBootTicket(): Promise<string | null> {
+  if (!LOCAL_BRIDGE_TOKEN) return null
+  try {
+    const response = await fetchWithTimeout(`${LOCAL_AGENT_BASE_URL}/local/terminal-boot-ticket`, {
+      method: 'POST',
+      headers: { 'X-Local-Bridge-Token': LOCAL_BRIDGE_TOKEN, Accept: 'application/json' },
+      cache: 'no-store',
+    }, LOCAL_TICKET_TIMEOUT_MS)
+    if (!response.ok) return null
+    const payload = (await response.json()) as { data?: { bootTicket?: string } }
+    const ticket = payload.data?.bootTicket
+    return typeof ticket === 'string' && BOOT_TICKET_PATTERN.test(ticket) ? ticket : null
+  } catch {
+    return null
+  }
+}
+
 async function refreshOnce(timeoutMs: number): Promise<void> {
   const response = await fetchWithTimeout(url('/terminals/session-token/refresh'), {
     method: 'POST', headers: headers({ Accept: 'application/json' }),
@@ -127,8 +161,27 @@ async function retryRefreshOnce(): Promise<void> {
       if (!transient(error)) break
     }
   }
+  // 刷新走不通了（票被吊销 / 过期，重试无益）。在放弃之前，向本机 Agent 要一张新引导票
+  // 重新建会话 —— 这是看门狗重启浏览器时走的同一条路，页面自己走一遍就不必等浏览器重启。
+  // 桥接令牌未配置（普通浏览器打开）时 requestLocalBootTicket 返回 null，此处仍然 fail-closed。
+  if (await reBootstrapFromLocalAgent()) return
+
   setState('failed')
   throw lastError
+}
+
+/** 用本机 Agent 的新引导票重建会话。成功返回 true 并已置为 ready。 */
+async function reBootstrapFromLocalAgent(): Promise<boolean> {
+  const ticket = await requestLocalBootTicket()
+  if (!ticket) return false
+  try {
+    await exchangeBootTicket(ticket, REQUEST_TIMEOUT_MS)
+  } catch {
+    return false
+  }
+  setState('ready')
+  scheduleRefresh()
+  return true
 }
 
 function scheduleRefresh(): void {
@@ -155,7 +208,14 @@ async function initializeTerminalSessionOnce(): Promise<void> {
     await retryBootTicketExchange(bootTicket)
     return
   }
-  if (!token()) { setState('failed'); return }
+  // 没有 URL 引导票时：先用存量会话票续期；连存量票都没有（例如浏览器被单独重开、
+  // sessionStorage 已清）就直接向本机 Agent 取票，而不是立刻判失败。
+  if (!token()) {
+    setState('checking')
+    if (await reBootstrapFromLocalAgent()) return
+    setState('failed')
+    return
+  }
   try { await retryRefresh() } catch { /* state remains fail-closed */ }
 }
 

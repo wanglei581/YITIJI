@@ -136,6 +136,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:print-done-truth
           pnpm --filter @ai-job-print/kiosk verify:print-entry-source-split
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
+          pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
           pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
