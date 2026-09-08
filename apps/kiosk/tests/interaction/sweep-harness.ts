@@ -545,7 +545,14 @@ export async function confirmAiConsent(page: Page, journey: string, collectors: 
 export async function waitReport(page: Page): Promise<void> {
   await page.waitForURL((url) => url.pathname === '/resume/report', { timeout: 90_000 })
   await waitReady(page)
-  await page.locator('[data-kiosk-screen="resume-report"], .rrp-page, text=简历诊断报告').first().waitFor({ timeout: 20_000 })
+  // Playwright 不接受 CSS 选择器列表里混 `text=`（会报 Unexpected token "="）。
+  // 这条 waitFor 因此**从来没有真正等到过报告页**，一律直接抛错 —— 会员旅程走到这里就断，
+  // 而匿名旅程不经过本函数，所以走查看起来是绿的。CSS 与文本必须分成两个 locator 再 or()。
+  await page
+    .locator('[data-kiosk-screen="resume-report"], .rrp-page')
+    .or(page.getByText('简历诊断报告'))
+    .first()
+    .waitFor({ timeout: 20_000 })
 }
 
 export async function confirmFactsIfOpen(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {

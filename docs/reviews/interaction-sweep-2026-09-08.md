@@ -122,6 +122,39 @@ node node_modules/@playwright/test/cli.js test tests/interaction/ai-resume-journ
 
 - **修复**：适配层补发该字段 + 新增门禁 `verify:resume-export-facts-contract` 防回归。**后端未改动**（后端是对的）。
 
+**运行期复验（2026-09-08 11:5x，本地 API + sweep.db，会员 `cmtrh2nqh…` 真登录）**
+
+不是「代码里有这一行」，是真的对着跑起来的服务端做了 A/B：
+
+```
+基线  GET /me/documents                                  → 条数: 0
+
+A)  POST /resume/generate/export  不带 factsConfirmedAt
+    {"code":"RESUME_FACTS_NOT_CONFIRMED",
+     "message":"导出前请先核对优化稿中的学校、公司、时间、证书和联系方式"}
+    [HTTP 400]                                           ← 修复前每个会员都撞这个
+
+B)  POST /resume/generate/export  带 factsConfirmedAt（= 修好的前端现在发的 body）
+    {"fileId":"7b2c205a…","filename":"AI简历_演示用户.pdf",
+     "sizeBytes":85476,"pageCount":1,"signedUrl":"/api/v1/files/…"}
+    [HTTP 201]
+
+C)  GET /me/documents                                    → 条数: 1
+    - AI简历_演示用户.pdf | optimized | 85476
+
+D)  落库归属  SELECT … FROM FileObject
+    AI简历_演示用户.pdf | optimized | cmtrh2nqh0017t9yb4j1si1vg | active | ai_resume_generate
+```
+
+**0 条 → 1 条，且归属是本人会员 id。** 至此整条链闭合：前端确实发出该字段（Playwright payload 用例）、
+后端收下并建出本人文件（上面 A/B）、文件出现在「我的文档」（C/D）。
+
+**顺带修掉一个潜伏的走查骨架缺陷**：`sweep-harness.ts` 的 `waitReport` 把 `text=` 混进了 CSS 选择器列表
+（`'[data-kiosk-screen="resume-report"], .rrp-page, text=简历诊断报告'`），Playwright 直接抛
+`Unexpected token "="`，**这条等待从来没真正等到过报告页**。它只在解析慢到跳 `/resume/parse` 时才被调用，
+而 `AI_PROVIDER=mock` 通常一步到位，所以昨晚没踩到 —— **换成真实 AI Provider（慢）它必然天天炸**。
+已拆成 CSS 与文本两个 locator 再 `.or()`。
+
 <details><summary>初记原文（2026-09-08 更正前）</summary>
 
 原标题：「会员优化导出成功，但「我的文档」看不到导出稿」；
