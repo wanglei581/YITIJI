@@ -127,7 +127,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/preview', url: '/print/preview', marker: w2('print-preview'), featureText: '这一页没有待处理的文件' },
   { pattern: '/print/params', url: '/print/params', expectedPath: compatibilityRedirects['/print/params'], marker: w2('print-preview'), featureText: '这一页没有待处理的文件' },
   { pattern: '/print/confirm', url: '/print/confirm', marker: w2('print-confirm'), featureText: '未找到文件信息' },
-  { pattern: '/print/cashier', url: '/print/cashier', marker: 'p:text-is("未找到待支付订单")', featureText: '未找到待支付订单' },
+  // 青序流光迁移（稿 32-cashier）把空态文案改为「没有待支付的订单」——
+  // 与稿逐字一致（稿内 state-h 原文）。marker 仍是 text-is 精确匹配、
+  // featureText 仍是同样具体的整句，未放松成通用词。
+  { pattern: '/print/cashier', url: '/print/cashier', marker: '.qx-state-t:text-is("没有待支付的订单")', featureText: '没有待支付的订单' },
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
   // 青序流光 11-arrival-code.html 把本页从「扫码取件」重定位为「输入你的到机码」；

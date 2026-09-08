@@ -463,8 +463,16 @@ check('W2-W5 state coverage', () => {
     "name: 'closed order', status: 'closed', attempt: { attemptId: 'w2-closed', channel: 'wechat', status: 'expired'",
     "name: 'refunded order', status: 'refunded', attempt: { attemptId: 'w2-refunded', channel: 'wechat', status: 'success'",
     "test(`cashier keeps ${scenario.name} out of print fulfillment @w2`",
-    "page.getByText(scenario.copy, { exact: true })",
-    "expect(page.getByRole('button', { name: '等待支付…' })).toBeDisabled()",
+    // 青序流光迁移（稿 32-cashier）后这三条证据随之更新，**强度只增不减**：
+    //   ① 文案锚点从全页 getByText 换成 .qx-state-t 元素内匹配 —— 青序把同一句话同时
+    //      放进状态卡标题与摘要 <dd>，全页匹配撞 strict mode。锚元素比全页更精确。
+    //   ② 终态主按钮按稿改为「重新发起打印」，取代旧的禁用「等待支付…」。
+    //   ③ 新增：真按一次并断言落在 /print/upload 且**不进** /print/progress。
+    //      旧版只证明按钮点不动（UI 断言），新版证明点了也进不了出纸（资损断言）。
+    "page.locator('.qx-state-t', { hasText: scenario.copy })",
+    "await expect(page.getByRole('button', { name: '开始打印' })).toHaveCount(0)",
+    "await expect(page).toHaveURL(scenario.nextPath)",
+    "await expect(page).not.toHaveURL(/\\/print\\/progress/)",
   ]) assert.ok(paymentSource.includes(evidence), `payment state coverage missing exact evidence: ${evidence}`)
 })
 

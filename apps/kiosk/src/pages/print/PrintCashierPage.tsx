@@ -16,10 +16,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, KioskActionBar } from '@ai-job-print/ui'
-import { AlertCircleIcon, CreditCardIcon, FileTextIcon, InfoIcon, QrCodeIcon, RefreshCwIcon, ScanLineIcon, XCircleIcon } from 'lucide-react'
+import { CircleHelpIcon, FilePlus2Icon, ListOrderedIcon, QrCodeIcon, RefreshCwIcon, XCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { API_MODE } from '../../services/api/client'
 import {
   createCodePayAttempt,
@@ -33,15 +33,18 @@ import {
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   deriveCashierView,
-  formatCents,
   isPaymentAttemptSelectionLocked,
-  PAY_CHANNEL_LABEL,
   paymentMethodForAttempt,
   type CashierView,
 } from './cashierStatus'
-import { CashierPaymentPanel, type CashierSnapshot, type PaymentMethod } from './CashierPaymentPanel'
+import type { CashierSnapshot, PaymentMethod } from './CashierPaymentPanel'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
-import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
+import {
+  CashierQxView,
+  deriveCashierQxState,
+  type ChannelLoadState,
+} from './components/CashierQxView'
+import './styles/cashier-qx.css'
 
 interface CashierLocationState {
   orderId?: string
@@ -60,15 +63,17 @@ interface CashierLocationState {
 const PAY_POLL_TERMINAL: ReadonlySet<string> = new Set(['closed', 'failed', 'refunded', 'refunding', 'partial_refunded'])
 const POLL_INTERVAL_MS = 2500
 const AUTO_RECONCILE_INTERVAL_MS = 3500
+/** 两种收银方式的用户可见文案。稿 32-cashier 把「方式名」与「按钮动作」分开用：
+ *    name   —— 方式名，出现在正文与状态里（「选『屏上收款码』立刻出码」「屏上收款码已过期」）
+ *    action —— 按钮上的动作文案（稿的选项表写的是「手机扫屏幕上的码」「出示你的付款码」）
+ *  两者都真实渲染：action 上按钮、name 进状态说明。放在页面而不是呈现层，
+ *  因为文案属于业务口径（付款码是一次性凭证、屏上收款码即时出码）。 */
+const PAYMENT_METHOD_LABELS = {
+  qr: { name: '屏上收款码', action: '手机扫屏幕上的码' },
+  code: { name: '扫付款码', action: '出示你的付款码' },
+} as const
 
-const SERVICE_KEY_LABEL: Record<string, string> = {
-  print_bw_page: '黑白打印',
-  print_color_page: '彩色打印',
-}
-
-function lineLabel(line: PrintPriceLine): string {
-  return SERVICE_KEY_LABEL[line.serviceKey] ?? line.description ?? line.serviceKey
-}
+const REFUND_ASSISTANCE_COPY = '如需退款请联系现场工作人员协助处理，本机不提供自助退款'
 
 export function PrintCashierPage() {
   const navigate = useNavigate()
@@ -87,10 +92,13 @@ export function PrintCashierPage() {
   const [nowMs, setNowMs] = useState(() => Date.now())
   /** 服务端已启用通道；null=加载中。多通道时用户显式选择后才出码。 */
   const [channels, setChannels] = useState<string[] | null>(null)
+  const [channelLoadState, setChannelLoadState] = useState<ChannelLoadState>('loading')
+  const [channelReloadKey, setChannelReloadKey] = useState(0)
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
   const [codeSubmitting, setCodeSubmitting] = useState(false)
   const [reconciling, setReconciling] = useState(false)
+  const [releaseFailed, setReleaseFailed] = useState(false)
   const navigatedRef = useRef(false)
   const cancelRef = useRef(false)
   const codeSubmitLockRef = useRef(false)
@@ -105,6 +113,7 @@ export function PrintCashierPage() {
   const proceedToPrint = useCallback(async () => {
     if (navigatedRef.current) return
     navigatedRef.current = true
+    setReleaseFailed(false)
     let nextState = state
     try {
       // 小程序 Order-only 流程在付款前没有 PrintTask；支付成功后由服务端原子释放且幂等返回同一任务。
@@ -116,6 +125,7 @@ export function PrintCashierPage() {
       navigate('/print/progress', { state: nextState })
     } catch (error) {
       navigatedRef.current = false
+      setReleaseFailed(true)
       setIssueError(userMessageOf(error, '订单已付款，但创建打印任务失败，请重试或联系现场工作人员'))
     }
   }, [navigate, state, orderId, paymentSessionToken])
@@ -159,21 +169,24 @@ export function PrintCashierPage() {
         const list = await fetchPaymentChannels()
         if (cancelRef.current) return
         setChannels(list)
-        const first = list[0] ?? null
+        setChannelLoadState(list.length === 0 ? 'empty' : 'ready')
+        // 单通道可由服务端唯一事实直接采用；多通道必须由用户显式选择，绝不默认第一项。
+        const first = list.length === 1 ? list[0] ?? null : null
         setSelectedChannel(first)
-        if (!first) {
+        if (list.length === 0) {
           setIssueError('线上支付未开通，请联系现场工作人员')
         }
       } catch (err) {
         if (cancelRef.current) return
         setChannels([])
+        setChannelLoadState('error')
         setIssueError(userMessageOf(err, '获取支付通道失败，请检查网络后重试'))
       }
     })()
     return () => {
       cancelRef.current = true
     }
-  }, [orderId, paymentSessionToken, amountCents, issue])
+  }, [orderId, paymentSessionToken, amountCents, channelReloadKey])
 
   const attemptPaymentMethod = paymentMethodForAttempt(snapshot?.attempt ?? null)
   const hasActivePaymentAttempt = isPaymentAttemptSelectionLocked(snapshot?.attempt ?? null, nowMs)
@@ -191,6 +204,14 @@ export function PrintCashierPage() {
     },
     [selectedChannel, snapshot, issuing, codeSubmitting, hasActivePaymentAttempt],
   )
+
+  const resetChannelSelection = useCallback(() => {
+    if (issuing || codeSubmitting || hasActivePaymentAttempt) return
+    setSelectedChannel(null)
+    setPaymentMethod(null)
+    setSnapshot(null)
+    setIssueError(null)
+  }, [issuing, codeSubmitting, hasActivePaymentAttempt])
 
   const selectPaymentMethod = useCallback(
     (method: PaymentMethod) => {
@@ -227,17 +248,27 @@ export function PrintCashierPage() {
       if (result.status === 'success') {
         if (cancelRef.current) return
         setSnapshot({
-          payStatus: 'paid',
+          payStatus: 'paying',
           attempt: {
             attemptId: result.attemptId,
             channel: selectedChannel,
-            status: 'success',
+            status: 'pending',
             qrCodeContent: null,
             expiresAt: null,
           },
         })
-        // 服务端只有完成金额校验并幂等入账后才返回 success，直接进入打印进度，避免成功后的状态查询网络抖动阻塞用户。
-        void proceedToPrint()
+        // code-pay 的尝试结果不直接驱动出纸。必须再读取订单 pay-status，只有服务端订单终态
+        // 明确为 paid 才能进入 release；网络失败或仍在 paying 都留在本页继续轮询。
+        try {
+          const confirmed = await getPayStatus({ orderId, paymentSessionToken })
+          if (cancelRef.current) return
+          setSnapshot({ payStatus: confirmed.payStatus, attempt: confirmed.attempt })
+          if (confirmed.payStatus === 'paid') void proceedToPrint()
+        } catch (error) {
+          if (!cancelRef.current) {
+            setIssueError(userMessageOf(error, '付款码已提交，暂未取得付款结果，请勿重复扫码'))
+          }
+        }
         return
       }
       setSnapshot({
@@ -260,6 +291,16 @@ export function PrintCashierPage() {
     }
   }, [orderId, paymentSessionToken, selectedChannel, codeSubmitting, proceedToPrint])
 
+  const reloadChannels = useCallback(() => {
+    setChannels(null)
+    setChannelLoadState('loading')
+    setSelectedChannel(null)
+    setPaymentMethod(null)
+    setSnapshot(null)
+    setIssueError(null)
+    setChannelReloadKey((value) => value + 1)
+  }, [])
+
   // ── 轮询支付状态 ──
   useEffect(() => {
     if (API_MODE !== 'http' || !orderId || !paymentSessionToken) return
@@ -272,7 +313,7 @@ export function PrintCashierPage() {
         setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
         // 支付终态（关闭 / 失败 / 已退款）后再轮询没有意义：停掉，不再每 2.5s 打 pay-status。
         if (PAY_POLL_TERMINAL.has(s.payStatus) && timer) { clearInterval(timer); timer = null; return }
-        if (s.payStatus === 'paid') void proceedToPrint()
+        if (s.payStatus === 'paid' && !releaseFailed) void proceedToPrint()
         // 回调是首选路径；回调延迟/丢失时，所有真实 pending 尝试（屏上收款码和付款码）
         // 都按服务端最小间隔主动查账。sandbox 没有真实渠道账本，绝不伪造查单能力。
         const shouldAutoReconcile =
@@ -286,7 +327,7 @@ export function PrintCashierPage() {
             const reconciled = await reconcilePayment({ orderId, paymentSessionToken })
             if (cancelRef.current) return
             setSnapshot({ payStatus: reconciled.payStatus, attempt: reconciled.attempt })
-            if (reconciled.payStatus === 'paid') proceedToPrint()
+            if (reconciled.payStatus === 'paid' && !releaseFailed) proceedToPrint()
           } catch {
             // 自动查单失败不覆盖当前状态；下一周期继续以服务端限流为准重试。
           }
@@ -298,7 +339,7 @@ export function PrintCashierPage() {
     void tick()
     timer = setInterval(() => void tick(), POLL_INTERVAL_MS)
     return () => { if (timer) clearInterval(timer) }
-  }, [orderId, paymentSessionToken, proceedToPrint])
+  }, [orderId, paymentSessionToken, proceedToPrint, releaseFailed])
 
   // 1s 心跳：驱动倒计时 + 动态码过期本地即时翻面（不必等下次轮询）。
   useEffect(() => {
@@ -349,6 +390,22 @@ export function PrintCashierPage() {
     }
   }, [orderId, paymentSessionToken, reconciling, proceedToPrint])
 
+  const refreshStatus = useCallback(async () => {
+    if (!orderId || !paymentSessionToken || reconciling) return
+    setReconciling(true)
+    try {
+      const s = await getPayStatus({ orderId, paymentSessionToken })
+      if (cancelRef.current) return
+      setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
+      setIssueError(null)
+      if (s.payStatus === 'paid' && !releaseFailed) void proceedToPrint()
+    } catch (err) {
+      if (!cancelRef.current) setIssueError(userMessageOf(err, '暂未取得最新支付结果，请稍后重试'))
+    } finally {
+      if (!cancelRef.current) setReconciling(false)
+    }
+  }, [orderId, paymentSessionToken, reconciling, proceedToPrint, releaseFailed])
+
   const devSimulate = useCallback(
     async (result: 'success' | 'failed') => {
       const attemptId = snapshot?.attempt?.attemptId
@@ -367,303 +424,156 @@ export function PrintCashierPage() {
     [snapshot, orderId, paymentSessionToken, proceedToPrint],
   )
 
-  // ── 守卫：直达 / 非法进入 ──
-  if (!orderId || amountCents === null) {
-    return (
-      <GuardScreen
-        title="未找到待支付订单"
-        hint="请从上传文件重新开始打印流程"
-        actionLabel="重新上传文件"
-        onAction={() => navigate(uploadPath)}
-      />
-    )
-  }
-  if (!paymentSessionToken) {
-    return (
-      <GuardScreen
-        title="支付会话已失效"
-        hint="请返回确认页重新创建订单"
-        actionLabel="返回确认页"
-        onAction={() => navigate('/print/confirm', { state })}
-      />
-    )
-  }
-  if (amountCents <= 0) {
-    // 免费单不应进入收银页；纠偏到履约（不伪造支付）。
-    return (
-      <GuardScreen
-        title="该订单无需支付"
-        hint="正在进入打印…"
-        actionLabel="继续"
-        onAction={() => navigate('/print/progress', { state: { ...state } })}
-      />
-    )
-  }
-  if (API_MODE !== 'http') {
-    return (
-      <GuardScreen
-        title="收银功能需连接后端"
-        hint="当前为演示模式，未连接支付服务"
-        actionLabel="返回首页"
-        onAction={() => navigate('/')}
-      />
-    )
-  }
-
-  const total = formatCents(amountCents)
-  /**
-   * 金额文案只能说本单的真话。
-   *
-   * 本页三个入口（确认页建单 / 继续上次 / 到机码核验）带进来的 amountCents 一律来自
-   * 服务端已建订单，且本页在 API_MODE !== 'http' 时直接走 GuardScreen —— 没有任何
-   * 演示 / mock 路径能走到这张卡。出码时服务端把 Order.amountCents 快照进支付尝试
-   * （online-payment.service「金额快照自服务端订单，绝不信任前端」），回调金额与订单
-   * 不符即判失败；确认页那侧也已明说「实付以收银台为准」。所以这个数就是本单实付，
-   * 既不是「示例金额」，也不会再被现场公示价改写 —— 后台此后调价只影响新订单。
-   *
-   * 唯一「钱不会真的动」的路径是 sandbox 测试支付通道；只有它才允许说不真实扣款。
-   */
-  const isSandboxAttempt = snapshot?.attempt?.channel === 'sandbox'
-  const amountNote = isSandboxAttempt
-    ? '测试支付通道 · 不会真实扣款'
-    : '本单实付金额 · 已按下单时公示价锁定'
   const canProceed = view?.canProceed ?? false
   const canReissue = view?.canReissue ?? false
-  const isPaymentFailed = view != null && ['failed', 'closed', 'refunded'].includes(view.phase)
+
+  const qxState = deriveCashierQxState({
+    hasOrder: Boolean(orderId),
+    hasSession: Boolean(paymentSessionToken),
+    amountCents,
+    channelState: API_MODE === 'http' ? channelLoadState : 'error',
+    channels: channels ?? [],
+    selectedChannel,
+    paymentMethod,
+    snapshot,
+    nowMs,
+    releaseFailed,
+    reconciling,
+  })
+
+  const status = (() => {
+    if (qxState === 'paid') return { tone: 'ok' as const, label: '服务端确认已付' }
+    if (qxState === 'free-order') return { tone: 'ok' as const, label: '无需付款 · 订单已建立' }
+    if (['channel-empty', 'channel-failed', 'attempt-failed', 'order-failed', 'closed', 'refunded'].includes(qxState)) {
+      return { tone: 'bad' as const, label: qxState === 'closed' ? '订单已超时关闭' : '当前不可继续支付' }
+    }
+    if (['pending-verification', 'release-failed', 'display-expired-reconciling', 'expired', 'attempt-channel-unknown', 'refunding', 'partial-refunded'].includes(qxState)) {
+      return { tone: 'warn' as const, label: qxState === 'release-failed' ? '打印任务待恢复' : '支付状态需处理' }
+    }
+    return { tone: 'unknown' as const, label: qxState === 'channel-loading' ? '正在读取支付通道' : '支付尚未确认' }
+  })()
+
+  const secondaryAction = (() => {
+    if (['no-order', 'free-order', 'refunding', 'partial-refunded', 'refunded', 'paid', 'pending-qr'].includes(qxState)) {
+      return { label: '我的打印订单', icon: <ListOrderedIcon aria-hidden="true" />, run: () => navigate('/me/print-orders') }
+    }
+    if (qxState === 'channel-empty') return { label: '改天再打', icon: <XCircleIcon aria-hidden="true" />, run: () => navigate(uploadPath) }
+    if (qxState === 'expired') return { label: '重新下单修改参数', icon: <FilePlus2Icon aria-hidden="true" />, run: () => navigate(uploadPath) }
+    if (qxState === 'attempt-channel-unknown' || qxState === 'session-expired') return { label: '联系工作人员', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
+    if (qxState === 'attempt-failed' && (channels?.length ?? 0) > 1) return { label: '换个支付通道', icon: <ListOrderedIcon aria-hidden="true" />, run: resetChannelSelection }
+    if (qxState === 'pending-scan') return { label: '改用屏上收款码', icon: <QrCodeIcon aria-hidden="true" />, run: () => selectPaymentMethod('qr') }
+    if (qxState === 'channel-selected' && (channels?.length ?? 0) > 1) return { label: '重新选通道', icon: <RefreshCwIcon aria-hidden="true" />, run: resetChannelSelection }
+    if (['pending', 'channel-selected', 'channel-loading'].includes(qxState)) {
+      return { label: '返回确认页', icon: <XCircleIcon aria-hidden="true" />, run: () => navigate('/print/confirm', { state }) }
+    }
+    return { label: '联系工作人员', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
+  })()
+
+  /** 订单已建、钱还没付成的那些状态。用户在这里最容易被困住：
+   *  扫了码没付、付款码读不出、在等服务端确认——这几个分支下 secondaryAction
+   *  会落到「联系工作人员」，等于没有出口。青序流光迁移时（PR #933）把
+   *  main 上一直存在的「退出支付」整个丢了，privacy 用例
+   *  kiosk-privacy-timeout.spec.ts:355 因此红。退出必须是**无条件**可达的：
+   *  订单超时未支付会自动关闭、不扣款，用户有权直接走人。 */
+  const isOpenUnpaidOrder = [
+    'pending',
+    'channel-loading',
+    'channel-selected',
+    'pending-qr',
+    'pending-scan',
+    'awaiting-code-confirmation',
+    'pending-verification',
+    'display-expired-reconciling',
+  ].includes(qxState)
+
+
+  const primaryAction = (() => {
+    if (qxState === 'no-order') return { label: '重新发起打印', run: () => navigate(uploadPath), disabled: false }
+    if (qxState === 'session-expired' || qxState === 'attempt-channel-unknown') return { label: '从我的打印订单重进', run: () => navigate('/me/print-orders'), disabled: false }
+    if (qxState === 'free-order' || qxState === 'paid' || qxState === 'release-failed') return { label: qxState === 'release-failed' ? '重试创建打印任务' : '开始打印', run: () => void proceedToPrint(), disabled: false }
+    if (qxState === 'channel-failed') return { label: '重新读取支付通道', run: reloadChannels, disabled: false }
+    if (qxState === 'channel-empty' || qxState === 'refunding' || qxState === 'partial-refunded') return { label: '联系工作人员', run: () => navigate('/help'), disabled: false }
+    if (qxState === 'pending-qr' || qxState === 'awaiting-code-confirmation' || qxState === 'pending-verification' || qxState === 'display-expired-reconciling') return { label: reconciling ? '正在刷新付款结果' : '刷新付款结果', run: () => void refreshStatus(), disabled: reconciling }
+    if (qxState === 'expired' || qxState === 'attempt-failed') return { label: '重新发起支付', run: handleReissue, disabled: issuing }
+    if (qxState === 'order-failed' || qxState === 'closed' || qxState === 'refunded') return { label: '重新发起打印', run: () => navigate(uploadPath), disabled: false }
+    return { label: qxState === 'pending-scan' ? '等待读取付款码' : qxState === 'channel-selected' ? '选择上方扫码方式' : '选择上方支付通道', run: () => undefined, disabled: true }
+  })()
 
   return (
-    <PrintPageFrame>
-    <div data-w2-page="print-cashier" className="flex min-h-full flex-col">
-      <PrintPrototypeHeader
-        title="订单支付"
-        subtitle={isPaymentFailed ? '本次支付未成功；未产生扣款，也未创建打印任务' : '请完成支付后开始打印；支付结果由系统自动确认'}
+    <div data-w2-page="print-cashier" className="cashier-qx-route">
+    <QxPageFrame
+      title="订单支付"
+      subtitle="选择服务端已启用通道；支付确认到账后才会释放打印任务"
+      terminalLabel={state.orderNo ? `订单 ${state.orderNo}` : '就业服务大厅'}
+      status={status}
+      ctabar={
+        <>
+          <button type="button" className="qx-btn cashier-qx-cta-secondary" data-variant="ghost" onClick={secondaryAction.run}>
+            {secondaryAction.icon}{secondaryAction.label}
+          </button>
+          {qxState === 'attempt-failed' ? (
+            <button type="button" className="qx-btn cashier-qx-cta-secondary" data-variant="ghost" onClick={() => navigate(uploadPath)}>
+              <FilePlus2Icon aria-hidden="true" />重新下单修改参数
+            </button>
+          ) : isOpenUnpaidOrder ? (
+            <button
+              type="button"
+              className="qx-btn cashier-qx-cta-secondary"
+              data-variant="ghost"
+              data-cashier-exit=""
+              onClick={() => navigate('/', { replace: true })}
+            >
+              <XCircleIcon aria-hidden="true" />退出支付
+            </button>
+          ) : <p className="why">金额与状态均来自服务端；未确认 paid 前不会出纸。</p>}
+          <button
+            type="button"
+            className="qx-btn cashier-qx-cta-primary"
+            data-variant="primary"
+            disabled={primaryAction.disabled}
+            onClick={primaryAction.run}
+          >
+            {primaryAction.disabled ? null : ['channel-failed', 'expired', 'attempt-failed', 'release-failed'].includes(qxState) ? <RefreshCwIcon aria-hidden="true" /> : <FilePlus2Icon aria-hidden="true" />}
+            {primaryAction.label}
+          </button>
+        </>
+      }
+    >
+      <CashierQxView
         step={5}
-        backLabel="返回确认"
-        onBack={() => navigate('/print/confirm', { state })}
-        aside={isPaymentFailed ? (
-          <span className="cashier-status-badge">
-            <XCircleIcon aria-hidden="true" />
-            支付未成功
-          </span>
-        ) : undefined}
+        state={qxState}
+        orderNo={state.orderNo}
+        orderId={orderId}
+        amountCents={amountCents}
+        priceLines={priceLines}
+        channels={channels ?? []}
+        selectedChannel={selectedChannel}
+        displayedChannel={displayedChannel}
+        paymentMethod={paymentMethod}
+        displayedPaymentMethod={displayedPaymentMethod}
+        snapshot={snapshot}
+        view={view}
+        issuing={issuing}
+        codeSubmitting={codeSubmitting}
+        authCodeBufferRef={authCodeBufferRef}
+        qrContent={qrContent}
+        remainSec={remainSec}
+        reconciling={reconciling}
+        canReissue={canReissue}
+        canProceed={canProceed}
+        issueError={issueError}
+        refundAssistanceCopy={REFUND_ASSISTANCE_COPY}
+        isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
+        selectionLocked={hasActivePaymentAttempt}
+        onSelectChannel={switchChannel}
+        methodLabels={PAYMENT_METHOD_LABELS}
+        onSelectMethod={selectPaymentMethod}
+        onSubmitCode={() => void submitCodePayment()}
+        onReconcile={() => void handleReconcile()}
+        onReissue={handleReissue}
+        onSimulateSandbox={(result) => void devSimulate(result)}
       />
-
-      <div className="cashier-split mt-4 flex-1">
-        {/* ── 左列：价目明细 + 规则 + 提示 ── */}
-        <div className="cashier-left">
-          {/* 价目明细 */}
-          <div className="cashier-detail-card">
-            <div className="cashier-card-head">
-              <span className="cashier-card-icon">
-                <FileTextIcon aria-hidden="true" />
-              </span>
-              <div>
-                <div className="cashier-card-title">价目明细</div>
-                <div className="cashier-card-sub">
-                  {state.orderNo ? `订单号 ${state.orderNo}` : orderId ? `订单 ${orderId}` : '打印订单'}
-                </div>
-              </div>
-            </div>
-            {priceLines.length === 0 ? (
-              <div className="cashier-sum-row">
-                <span className="cashier-sum-key">打印费用</span>
-                <span className="cashier-sum-val">{total}</span>
-              </div>
-            ) : (
-              priceLines.map((line, i) => (
-                <div key={`${line.serviceKey}-${i}`} className="cashier-sum-row">
-                  <span className="cashier-sum-key">
-                    {lineLabel(line)}
-                    <small>
-                      {formatCents(line.unitCents)} × {line.quantity}
-                    </small>
-                  </span>
-                  <span className="cashier-sum-val">{formatCents(line.subtotalCents)}</span>
-                </div>
-              ))
-            )}
-            <div className="cashier-amount-row">
-              <span className="cashier-amount-label">
-                应付金额
-                <br />
-                <span data-cashier-amount-note={isSandboxAttempt ? 'sandbox' : 'real'}>{amountNote}</span>
-              </span>
-              <span className="cashier-amount-num" data-cashier-amount="">
-                <small>¥</small>
-                {total.replace('¥', '')}
-              </span>
-            </div>
-          </div>
-
-          {/* 支付与退款规则 */}
-          <div className="cashier-rule-card">
-            <h3>{isPaymentFailed ? '为什么支付会失败？' : '支付与退款规则'}</h3>
-            <ul>
-              {isPaymentFailed ? (
-                <>
-                  <li>收款码超过 5 分钟有效期未完成支付，或中途取消。</li>
-                  <li>手机网络中断、余额不足，或支付平台返回失败。</li>
-                  <li>支付平台提示「待核实」时请勿重复扫码，可点「重新支付」重新出码。</li>
-                  <li>如手机已扣款但此处仍显示未成功，请勿再次支付，立即联系现场工作人员核实。</li>
-                </>
-              ) : (
-                <>
-                  <li>屏上收款码有效期 5 分钟；到期后重新出码或切换支付方式会先关闭旧码。</li>
-                  <li>付款码支付如提示待核实，请勿重复扫码，等待系统查单。</li>
-                  <li>订单超时未支付将自动关闭，不会扣款。</li>
-                  <li>如需退款请联系现场工作人员协助处理，本机不提供自助退款。</li>
-                </>
-              )}
-            </ul>
-          </div>
-
-          {/* 提示条 */}
-          {isPaymentFailed ? (
-            <div className="cashier-notice-warn">
-              <InfoIcon aria-hidden="true" />
-              支付未完成前不会开始打印；你的文件仍保留在本次会话中，可重新支付或退出。
-            </div>
-          ) : (
-            <div className="cashier-notice">
-              <InfoIcon aria-hidden="true" />
-              支付完成后自动进入打印，请勿离开；若长时间未响应，请联系现场工作人员。
-            </div>
-          )}
-        </div>
-
-        {/* ── 右列：通道 + 方式 + 收款码 ── */}
-        <div className={`cashier-pay-card${isPaymentFailed ? ' cashier-pay-card--failed' : ''}`}>
-          {!isPaymentFailed && (
-            <>
-          <div className="cashier-card-head">
-            <span className="cashier-card-icon">
-              <CreditCardIcon aria-hidden="true" />
-            </span>
-            <div>
-              <div className="cashier-card-title">选择支付方式</div>
-              <div className="cashier-card-sub">先选通道，再选扫码方式</div>
-            </div>
-          </div>
-
-          {/* 通道切换（全部已启用通道均展示） */}
-          {channels !== null && channels.length > 0 && (
-            <div className="cashier-ch-row">
-              {channels.map((ch) => (
-                <button
-                  key={ch}
-                  type="button"
-                  data-active={displayedChannel === ch ? 'true' : undefined}
-                  onClick={() => switchChannel(ch)}
-                  disabled={issuing || codeSubmitting || hasActivePaymentAttempt}
-                  className="cashier-ch-btn"
-                >
-                  {PAY_CHANNEL_LABEL[ch] ?? ch}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* 支付方式 */}
-          <div className="cashier-mode-row">
-            <button
-              type="button"
-              data-active={displayedPaymentMethod === 'qr' ? 'true' : undefined}
-              onClick={() => selectPaymentMethod('qr')}
-              disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
-              className="cashier-mode-btn"
-            >
-              <QrCodeIcon aria-hidden="true" />
-              屏上收款码
-            </button>
-            <button
-              type="button"
-              data-active={displayedPaymentMethod === 'code' ? 'true' : undefined}
-              onClick={() => selectPaymentMethod('code')}
-              disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
-              className="cashier-mode-btn"
-            >
-              <ScanLineIcon aria-hidden="true" />
-              扫付款码
-            </button>
-          </div>
-            </>
-          )}
-
-          <CashierPaymentPanel
-            paymentMethod={paymentMethod}
-            attemptPaymentMethod={attemptPaymentMethod}
-            snapshot={snapshot}
-            view={view}
-            channelsLoading={channels === null}
-            issuing={issuing}
-            codeSubmitting={codeSubmitting}
-            authCodeBufferRef={authCodeBufferRef}
-            qrContent={qrContent}
-            remainSec={remainSec}
-            reconciling={reconciling}
-            canReissue={canReissue}
-            isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
-            canProceed={canProceed}
-            onSubmitCode={() => void submitCodePayment()}
-            onReconcile={() => void handleReconcile()}
-            onReissue={handleReissue}
-            onSimulateSandbox={(result) => void devSimulate(result)}
-          />
-
-          {issueError && (
-            <div className="cashier-error-strip">
-              <AlertCircleIcon aria-hidden="true" />
-              <span>{issueError}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 底部行动条 */}
-      <KioskActionBar className="cashier-actionbar">
-        <button type="button" className="cashier-btn-ghost" onClick={() => navigate('/')}>
-          <XCircleIcon aria-hidden="true" />
-          {isPaymentFailed ? '退出 · 不打印' : '退出支付'}
-        </button>
-        <span className="cashier-bar-note">
-          {isPaymentFailed
-            ? '退出后订单自动关闭，不会扣款；文件在本次会话结束后清理'
-            : '支付确认到账后自动进入打印；退出后订单超时未支付将自动关闭，不会扣款'}
-        </span>
-        {canReissue ? (
-          <button type="button" className="cashier-btn-primary" onClick={handleReissue}>
-            <RefreshCwIcon aria-hidden="true" style={{ width: 24, height: 24 }} />
-            重新支付
-          </button>
-        ) : (
-          <button type="button" className="cashier-btn-primary" disabled={!canProceed} onClick={proceedToPrint}>
-            {canProceed ? '开始打印' : '等待支付…'}
-          </button>
-        )}
-      </KioskActionBar>
+    </QxPageFrame>
     </div>
-    </PrintPageFrame>
-  )
-}
-
-// ── 守卫 / 直达占位屏 ──
-function GuardScreen(props: { title: string; hint: string; actionLabel: string; onAction: () => void }) {
-  return (
-    <PrintPageFrame>
-      <div data-w2-page="print-cashier" className="print-confirm-body">
-        <div className="print-confirm-guard">
-          <div className="print-confirm-guard-icon">
-            <AlertCircleIcon aria-hidden="true" />
-          </div>
-          <div>
-            <p className="print-confirm-guard-title">{props.title}</p>
-            <p className="print-confirm-guard-hint">{props.hint}</p>
-          </div>
-          <Button size="lg" onClick={props.onAction}>
-            {props.actionLabel}
-          </Button>
-        </div>
-      </div>
-    </PrintPageFrame>
   )
 }
