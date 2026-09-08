@@ -2,7 +2,7 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
-import { setReactRouterState, writeScanWorkbenchSession, W2_FILE } from './fixtures/fusion-w2-state'
+import { setReactRouterState, writeScanWorkbenchSession, SCAN_WORKBENCH_SESSION_KEY, W2_FILE } from './fixtures/fusion-w2-state'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 
 const SCAN_TASK_ID = 'w2-scan-001'
@@ -129,7 +129,11 @@ async function seedScanLive(page: Page, extras: Record<string, unknown> = {}): P
 }
 
 async function seedScanResult(page: Page, result: Record<string, unknown>): Promise<void> {
-  await page.goto('/scan')
+  // 必须显式请求 start：裸 `/scan` 会沿用 sessionStorage 里上一步的 stage，
+  // 若那是 progress + live，进度页就会挂载并开始轮询——轮询回调会 patch 同一个
+  // sessionStorage 键，和下面这次写入抢，慢机器上把种进去的 result 冲掉。
+  // 表现是 30 行开外一句 `getByText('w2-scan.pdf')` 找不到元素，极难归因。
+  await page.goto('/scan?stage=start')
   await writeScanWorkbenchSession(page, {
     stage: 'result',
     scanType: typeof result.scanType === 'string' ? result.scanType : 'resume',
@@ -146,6 +150,18 @@ async function seedScanResult(page: Page, result: Record<string, unknown>): Prom
       file: result.file,
     },
   })
+  // 写完当场核一次：万一还是被别的写入冲掉，就在这里失败并说清原因，
+  // 而不是让调用方在 30 行开外收到一句「元素找不到」。
+  await expect
+    .poll(async () => page.evaluate((key) => {
+      try {
+        const raw = window.sessionStorage.getItem(key)
+        return raw ? (JSON.parse(raw) as { stage?: string }).stage ?? null : null
+      } catch {
+        return null
+      }
+    }, SCAN_WORKBENCH_SESSION_KEY), { message: '种进去的 result 阶段被别的写入冲掉了' })
+    .toBe('result')
 }
 
 function scanStatus(status: 'waiting' | 'completed') {

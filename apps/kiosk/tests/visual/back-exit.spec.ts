@@ -60,14 +60,15 @@ const EXEMPT = new Map<string, string>([
  *
  * 裁定后每一条要么补上返回槽（从这里删），要么进 EXEMPT 并写清为什么不是流程中段。
  */
+// 2026-09-09 归零：七条欠账全部裁定完毕，一条都没进 EXEMPT。
+// /jobs /ai/plan /print/cashier /print/progress 在 #986 补槽后销账；
+// /scan/{start,settings,progress} 随本 PR 把三条路由合并成 /scan 工作台一起退休，
+// 工作台的返回槽在 ScanWorkbenchChrome 里，三个 stage 共用，落到 /print-scan（稿 18）。
+// LIMIT 归 0 之后，任何新页漏填返回槽都会当场红——这正是这张表存在的目的。
 const UNDECIDED = new Map<string, string>([
-  ['/jobs', '从首页进来的一级业务页。底部主导航能回首页，但回不到“上一步”。'],
-  ['/ai/plan', '同上：一级 AI 服务页。'],
-  ['/print/cashier', '付款页已有 CTA 次级出口「退出支付」，但没有顶栏返回槽 —— 两者是否都要，需裁定。'],
-  ['/print/progress', '打印进行中：同 /scan/progress，退出语义未定。'],
 ])
 /** 只许降不许升。升它等于给新的漏填开口子。 */
-const UNDECIDED_LIMIT = 4
+const UNDECIDED_LIMIT = 0
 
 test.describe('每一页都要能回上一步 @kiosk', () => {
   test('未裁定欠账不得增长 @kiosk', () => {

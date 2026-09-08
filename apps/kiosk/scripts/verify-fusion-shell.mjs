@@ -415,15 +415,32 @@ const contractV6Routes = collectStringLiteralRouteKeys(
   'fusion-w6-route-cases.ts',
 )
 
-assert.ok(runtimeV6Routes.length >= 8, `V6_SHELL_ROUTES must stay a declared table, received ${runtimeV6Routes.length}`)
+/* 2026-09-08：原来这里有两条**时点快照**式断言，它们会主动阻止迁移：
+ *   assert.ok(runtimeV6Routes.length >= 8, 'must stay a declared table')
+ *   for (const r of ['/', '/print-scan', …8 条硬编码]) assert.ok(includes(r))
+ * 迁移的本意就是让这张表逐条变短、最终为空，所以「至少 8 条」「必须包含 /」
+ * 是把某一天的现状钉成了永久要求 —— 首页与 /print-scan 迁入青序流光后必然撞红。
+ *
+ * 「保持是张声明表」这件事其实已有更硬的保障：`collectStringLiteralRouteKeys`
+ * 在找不到声明时自己就 `assert.ok(initializer, ...)` 失败（本文件 389 行）。
+ *
+ * 换成真正的不变量，且比原来强 —— 它钉的是**规则**而不是**某天的名单**： */
 assert.deepEqual(
   runtimeV6Routes,
   contractV6Routes,
   'KioskRoot V6_SHELL_ROUTES and fusion-w6 V6_SHELL_ROUTE_PATTERNS must list the same routes',
 )
-for (const requiredRoute of ['/', '/print-scan', '/resume-service', '/jobs-service', '/fairs-service', '/interview-service', '/policy-service', '/profile']) {
-  assert.ok(runtimeV6Routes.includes(requiredRoute), `V6_SHELL_ROUTES must keep ${requiredRoute} on the V6 shell`)
-}
+/* 一条路由不能既「已迁入青序流光」又「仍挂 V6 壳」。
+ * 这正是 2026-09-08 撞出来的那个 bug：/ 与 /print-scan 迁完了却留在表里，
+ * 运行时不再挂 V6 壳、名单还说它挂着，fusion-w6-routes 的壳归属对账因此红。
+ * 硬编码名单抓不到这种矛盾（它只会要求名单别变短），这条能。 */
+const migratedRoutes = collectStringLiteralRouteKeys(root, 'QX_MIGRATED_ROUTES', 'KioskRoot.tsx')
+const shellAndMigrated = runtimeV6Routes.filter((route) => migratedRoutes.includes(route))
+assert.deepEqual(
+  shellAndMigrated,
+  [],
+  `迁入青序流光的路由必须从 V6_SHELL_ROUTES 移出，同时出现在两张表里：${shellAndMigrated.join(', ')}`,
+)
 assert.match(
   shellBody,
   /const\s+isV6Route\s*=\s*v6Shell\s*!==\s*null/,
