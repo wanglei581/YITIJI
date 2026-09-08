@@ -63,14 +63,11 @@ const EXEMPT = new Map<string, string>([
 const UNDECIDED = new Map<string, string>([
   ['/jobs', '从首页进来的一级业务页。底部主导航能回首页，但回不到“上一步”。'],
   ['/ai/plan', '同上：一级 AI 服务页。'],
-  ['/scan/start', '扫描流程第一步。是入口还是中段，取决于它上面还有没有 Hub。'],
-  ['/scan/settings', '扫描流程中段，按语义应当能退回上一步。'],
-  ['/scan/progress', '进行中态：退出是否等于取消扫描任务，需要产品定。'],
   ['/print/cashier', '付款页已有 CTA 次级出口「退出支付」，但没有顶栏返回槽 —— 两者是否都要，需裁定。'],
   ['/print/progress', '打印进行中：同 /scan/progress，退出语义未定。'],
 ])
 /** 只许降不许升。升它等于给新的漏填开口子。 */
-const UNDECIDED_LIMIT = 7
+const UNDECIDED_LIMIT = 4
 
 test.describe('每一页都要能回上一步 @kiosk', () => {
   test('未裁定欠账不得增长 @kiosk', () => {
