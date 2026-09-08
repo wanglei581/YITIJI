@@ -41,8 +41,8 @@
   font-family: var(--qx-serif); font-size: 38px; font-weight: 800;
 }
 .qx-home-assistant div { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
-.qx-home-assistant strong { font-family: var(--qx-serif); font-size: 31px; }
-.qx-home-assistant strong,
+.qx-home-assistant h2 { margin: 0; font-family: var(--qx-serif); font-size: 31px; font-weight: 700; }
+.qx-home-assistant h2,
 .qx-home-assistant span:last-child { overflow-wrap: anywhere; }
 .qx-home-assistant span:last-child { color: color-mix(in srgb, var(--qx-paper) 72%, transparent); font-size: 17px; }
 .qx-home-clock { flex: none; display: flex; flex-direction: column; align-items: flex-end; margin-left: auto; }
@@ -220,7 +220,7 @@
   .qx-home-hero, .qx-home-board { padding-left: 16px; padding-right: 16px; }
   .qx-home-hero { margin-bottom: 18px; }
   .qx-home-board { flex: none; min-height: auto; }
-  .qx-home-assistant strong { font-size: 23px; }
+  .qx-home-assistant h2 { font-size: 23px; }
   .qx-home-assistant span:last-child { font-size: 14px; }
   .qx-home-clock { display: none; }
   .qx-home-avatar { width: 58px; height: 58px; font-size: 28px; }

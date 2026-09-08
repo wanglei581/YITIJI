@@ -170,7 +170,7 @@ export function QxHomeView({
         <div className="qx-home-assistant">
           <span className="qx-home-avatar" aria-hidden="true">青</span>
           <div>
-            <strong>{isLoggedIn && displayName ? `${displayName}，你好，我是小青` : '你好，我是小青'}</strong>
+            <h2>{isLoggedIn && displayName ? `${displayName}，你好，我是小青` : '你好，我是小青'}</h2>
             <span>说一句你想办的事，我带你一步一步办</span>
           </div>
           <QxHomeClock />
