@@ -96,10 +96,18 @@ check(
   '纸张、碳粉、扫描仪不伪造原型百分比或就绪状态'
 )
 check(
-  home.includes("navigate(`/job-fairs/${encodeURIComponent(fairId)}`)") &&
-    footer.includes("onAction('fairs-hub')") &&
-    footer.includes('actionId="print-hub"'),
-  '招聘会详情、招聘会服务与打印扫描均复用现有真实入口'
+  footer.includes("onAction('fairs-hub')") && footer.includes('actionId="print-hub"'),
+  '招聘会服务与打印扫描均复用现有真实入口'
+)
+// 稿 01-home 的招聘会磁贴 href="16-service-hubs.html?hub=fairs"、脚注「进入招聘会服务 →」，
+// 落点是**服务台**。此前 ready 态直接 navigate 到 /job-fairs/<id>，绕过服务台跳进被高亮的
+// 那一场——只要有一场在进行，首页就再也进不去招聘会列表（首页没有第二个招聘会入口，
+// 「查看全部服务」是 disabled 的），而磁贴脚注还写着「查看招聘会」，承诺列表、给单场。
+// 这条钉的是「不许绕过服务台」，比原来那条「有没有复用真实入口」更贴近稿。
+check(
+  !home.includes('/job-fairs/${encodeURIComponent(fairId)}') &&
+    !footer.includes('onOpenFair('),
+  '首页招聘会磁贴落到招聘会服务台，不绕过它直跳单场（稿 01-home）'
 )
 
 const domainManifest = manifest.slice(manifest.indexOf('export const HOME_V6_DOMAINS'))
