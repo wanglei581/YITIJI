@@ -169,6 +169,7 @@ export function OfflineAgenciesPage() {
 
   return (
     <QxPageFrame
+      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
       title="线下招聘机构"
       subtitle={
         uiState === 'list-loading' ? '正在读取名单，取到之前不显示机构名称或数量。'

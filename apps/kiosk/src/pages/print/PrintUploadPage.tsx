@@ -493,6 +493,9 @@ export function PrintUploadPage() {
         else inputRef.current?.click()
       }}
       onNext={handleNext}
+      // 稿 12-file-source 的返回键 data-route="/print-scan"：回服务 Hub，
+      // 不用 navigate(-1) —— 一体机上「上一步」是确定的业务落点，不是浏览器历史。
+      onBack={() => navigate('/print-scan')}
       onExit={() => navigate(exitPath)}
       onHelp={() => navigate('/help')}
       onScan={() => navigate('/scan/start')}

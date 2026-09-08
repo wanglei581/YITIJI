@@ -34,6 +34,7 @@ export function SignStampPage() {
 
   return (
     <QxPageFrame
+      back={{ label: '返回打印扫描', onBack: () => flow.navigate('/print-scan') }}
       title="签名盖章"
       subtitle="把签名 / 印章图片叠到 PDF 上，生成一份新文件。这不是电子签名。"
       terminalLabel={terminalLabel}

@@ -301,6 +301,8 @@ export function PrintPickupClaimPage() {
   if (guide === 'hid') {
     return (
       <QxPageFrame
+        // 稿 11 原文：aria-label="返回打印扫描"。终态「认领成功」不放返回键——它的出口是自己的主行动。
+        back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
         title="输入你的到机码"
         subtitle={<>不用手输：<strong>把手机上的码，对准机身扫码区</strong>。</>}
         terminalLabel="就业服务大厅"
@@ -353,6 +355,8 @@ export function PrintPickupClaimPage() {
   // ── 输入界面 ──────────────────────────────────────────────────
   return (
     <QxPageFrame
+      // 稿 11 原文：aria-label="返回打印扫描"。终态「认领成功」不放返回键——它的出口是自己的主行动。
+      back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
       title="输入你的到机码"
       subtitle={`在手机小程序「我的 → 打印订单」里拿到的那串码，新码是 ${CODE_LEN} 位纯数字。`}
       terminalLabel="就业服务大厅"

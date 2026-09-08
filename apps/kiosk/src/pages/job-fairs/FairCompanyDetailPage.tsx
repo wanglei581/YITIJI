@@ -138,6 +138,8 @@ export function FairCompanyDetailPage() {
 
   return (
     <QxPageFrame
+      // 稿 44 原文：data-route="/job-fairs/:id/companies" aria-label="返回参展企业列表"。
+      back={{ label: '返回参展企业列表', onBack: () => navigate(`/job-fairs/${id}/companies`) }}
       title="招聘会参展企业"
       subtitle={
         uiState === 'loading' ? '正在读取展位与岗位，取到之前不显示数字。'

@@ -80,6 +80,8 @@ export default function OfflineJobDetailPage() {
 
   return (
     <QxPageFrame
+      // 岗位挂在机构下：能拿到 agencyId 就回那家机构，拿不到回目录（不做 history back）。
+      back={{ label: '返回机构详情', onBack: () => navigate(job ? `/offline-agencies/${job.agencyId}` : '/offline-agencies') }}
       title="线下机构岗位"
       subtitle={incomplete ? '缺少可核对的来源要素，外跳和到店指引一律不给。' : '先看岗位信息，再决定要不要自行到店咨询。'}
       status={pill}

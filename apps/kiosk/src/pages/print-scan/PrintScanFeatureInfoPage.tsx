@@ -54,6 +54,7 @@ export function PrintScanFeatureInfoPage() {
   if (!found) {
     return (
       <QxPageFrame
+        back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
         title="未找到该功能"
         status={pill}
         terminalLabel="就业服务大厅"

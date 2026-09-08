@@ -459,6 +459,7 @@ export function PrintMaterialCheckPage({
   if (!file) {
     return (
       <QxPageFrame
+        back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
         title="材料检查"
         subtitle="先完成文件体检和隐私预检，再进入打印参数"
         status={{ tone: 'warn', label: '没有待处理的文件' }}

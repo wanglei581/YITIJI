@@ -439,6 +439,7 @@ export function PrintScanHomePage() {
 
   return (
     <QxPageFrame
+      back={{ label: '返回首页', onBack: () => navigate('/') }}
       title="打印扫描服务"
       status={pill}
       terminalLabel="就业服务大厅"
