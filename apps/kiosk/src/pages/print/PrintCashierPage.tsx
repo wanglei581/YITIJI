@@ -469,6 +469,24 @@ export function PrintCashierPage() {
     return { label: '联系工作人员', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
   })()
 
+  /** 订单已建、钱还没付成的那些状态。用户在这里最容易被困住：
+   *  扫了码没付、付款码读不出、在等服务端确认——这几个分支下 secondaryAction
+   *  会落到「联系工作人员」，等于没有出口。青序流光迁移时（PR #933）把
+   *  main 上一直存在的「退出支付」整个丢了，privacy 用例
+   *  kiosk-privacy-timeout.spec.ts:355 因此红。退出必须是**无条件**可达的：
+   *  订单超时未支付会自动关闭、不扣款，用户有权直接走人。 */
+  const isOpenUnpaidOrder = [
+    'pending',
+    'channel-loading',
+    'channel-selected',
+    'pending-qr',
+    'pending-scan',
+    'awaiting-code-confirmation',
+    'pending-verification',
+    'display-expired-reconciling',
+  ].includes(qxState)
+
+
   const primaryAction = (() => {
     if (qxState === 'no-order') return { label: '重新发起打印', run: () => navigate(uploadPath), disabled: false }
     if (qxState === 'session-expired' || qxState === 'attempt-channel-unknown') return { label: '从我的打印订单重进', run: () => navigate('/me/print-orders'), disabled: false }
@@ -496,6 +514,16 @@ export function PrintCashierPage() {
           {qxState === 'attempt-failed' ? (
             <button type="button" className="qx-btn cashier-qx-cta-secondary" data-variant="ghost" onClick={() => navigate(uploadPath)}>
               <FilePlus2Icon aria-hidden="true" />重新下单修改参数
+            </button>
+          ) : isOpenUnpaidOrder ? (
+            <button
+              type="button"
+              className="qx-btn cashier-qx-cta-secondary"
+              data-variant="ghost"
+              data-cashier-exit=""
+              onClick={() => navigate('/', { replace: true })}
+            >
+              <XCircleIcon aria-hidden="true" />退出支付
             </button>
           ) : <p className="why">金额与状态均来自服务端；未确认 paid 前不会出纸。</p>}
           <button
