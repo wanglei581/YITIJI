@@ -1,0 +1,106 @@
+/* 26-browse-list.html -> /jobs。业务组件仍复用既有真实接口与收藏/AI 状态机。 */
+.qx-jobs-page {
+  --paper: var(--qx-paper);
+  --surface: var(--qx-surface);
+  --ink: var(--qx-ink);
+  --muted: var(--qx-ink-3);
+  --line: var(--qx-line);
+  --teal: var(--qx-teal);
+  --teal-deep: var(--qx-teal-d);
+  --teal-soft: var(--qx-teal-soft);
+  --clay: var(--qx-wheat);
+  --clay-deep: var(--qx-wheat-d);
+  --clay-soft: var(--qx-wheat-soft);
+  --wheat: var(--qx-wheat);
+  --wheat-deep: var(--qx-wheat-d);
+  --wheat-soft: var(--qx-wheat-soft);
+  --plum: var(--qx-plum);
+  --plum-deep: var(--qx-plum-d);
+  --plum-soft: var(--qx-plum-soft);
+  --slate: var(--qx-slate);
+  --slate-deep: var(--qx-slate-d);
+  --slate-soft: var(--qx-slate-soft);
+  --error: var(--qx-cinnabar);
+  --error-soft: var(--qx-cinnabar-soft);
+  gap: 14px;
+  padding-bottom: 16px;
+}
+
+.qx-jobs-ai {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 112px;
+}
+
+.qx-jobs-ai-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: var(--qx-r);
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+
+.qx-jobs-ai-icon svg { width: 30px; height: 30px; }
+.qx-jobs-ai-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.qx-jobs-ai-copy b { font-size: 24px; }
+.qx-jobs-ai-copy span { color: var(--qx-ink-2); font-size: 18px; line-height: 1.45; }
+
+.qx-jobs-page .jf-filter-bar,
+.qx-jobs-page .jf-list-meta,
+.qx-jobs-page .jf-quick-row,
+.qx-jobs-page .jf-list {
+  flex: none;
+}
+
+.qx-jobs-page .jf-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.qx-jobs-page .jf-f-chip,
+.qx-jobs-page .jf-searchbox,
+.qx-jobs-page .jf-searchbox input {
+  min-height: var(--qx-tap-min);
+}
+
+.qx-jobs-page .jf-searchbox { flex: 1 1 320px; }
+.qx-jobs-page .jf-list-meta { font-size: 17px; line-height: 1.5; }
+.qx-jobs-page .jf-row { min-height: 142px; border-radius: var(--qx-r); }
+.qx-jobs-page .jf-fav { min-width: var(--qx-tap-min); min-height: var(--qx-tap-min); }
+
+.qx-job-view {
+  flex: none;
+  min-width: 150px;
+  min-height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--qx-deep);
+  border-radius: var(--qx-r);
+  background: var(--qx-deep);
+  color: var(--qx-paper);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.qx-job-view:disabled { opacity: .48; cursor: not-allowed; }
+.qx-job-view svg { width: 22px; height: 22px; }
+.qx-job-blocked-note { max-width: 150px; color: var(--qx-cinnabar-d); font-size: 15px; line-height: 1.35; }
+
+.qx-jobs-page .qx-state.qx-grow { min-height: 280px; align-items: center; }
+.qx-jobs-page .qx-state .qx-btn { margin-left: auto; }
+
+@media (max-width: 760px) {
+  .qx-jobs-ai { align-items: stretch; flex-wrap: wrap; }
+  .qx-jobs-ai .qx-btn { width: 100%; }
+  .qx-job-view { min-width: 122px; }
+}

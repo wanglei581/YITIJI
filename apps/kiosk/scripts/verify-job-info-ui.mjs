@@ -41,7 +41,7 @@ const required = [
   ['jobHttpAdapter', /query\.sourceOrgId\s*=\s*params\.sourceOrgId/],
   ['components', '岗位摘要'],
   ['components', '职责与要求'],
-  ['components', '来源可信区'],
+  ['components', '信息来源'],
   ['components', '后续动作'],
   ['components', '去来源平台投递'],
   ['components', '扫码投递'],
@@ -49,7 +49,7 @@ const required = [
   ['detailPage', 'isTerminalKiosk'],
   ['detailPage', 'getTerminalId'],
   ['components', 'SourceUrlQr value={job.sourceUrl}'],
-  ['components', '放大二维码'],
+  ['components', '扫码投递'],
   ['detailPage', /<JobAntiFraudNotice\s*\/>/],
   ['components', '防骗提示'],
   ['components', '12333'],
@@ -62,6 +62,11 @@ const required = [
   ['components', '来源机构'],
   ['components', '同步时间'],
   ['components', '外部ID'],
+  ['components', '外部投递链接'],
+  ['components', '数据来源说明：'],
+  ['components', '投递怎么走'],
+  ['components', '去来源平台自行操作'],
+  ['components', '本终端不接收或转交简历'],
 ]
 
 const forbidden = [

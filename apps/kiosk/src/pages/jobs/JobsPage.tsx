@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import { formatDateTime, parseInstant, type ExternalJobDTO, type JobAiRecommendationDTO, type MemberResumeItem } from '@ai-job-print/shared'
-import { Building2Icon, FilterIcon, RefreshCwIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
-import { AiDriverBanner } from '../../components/AiDriverBanner'
+import { Building2Icon, FilterIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { getJobs } from '../../services/api'
 import {
@@ -18,9 +18,10 @@ import { JobAiConsentModal } from './components/JobAiConsentModal'
 import { JobAiResultPanel } from './components/JobAiResultPanel'
 import { ResumeSelectModal } from './components/ResumeSelectModal'
 import { JobResultsSection } from './components/JobResultsSection'
+import { JobsQxAiEntry, JobsQxSourceNotice, JobsQxState } from './components/JobsQxChrome'
 import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
-import { FusionBadge, FusionNotice, KioskPageFrame } from './components/W4Presentation'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import './styles/jobs-list-qx.css'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
@@ -269,22 +270,26 @@ export function JobsPage() {
     setAiError(null)
   }
 
+  const screenState = facetLoading ? 'loading' : error ? 'error' : displayedJobs.length === 0 ? 'empty' : hasAnyFilter ? 'filtered' : 'default'
   return (
-    <KioskPageFrame
-      tone="clay"
+    <QxPageFrame
       title="岗位信息"
-      subtitle="第三方 / 官方来源岗位入口，去来源平台投递"
-      backLabel="返回"
-      onBack={() => navigate('/')}
-      badge={<FusionBadge icon={RefreshCwIcon}>按来源定时同步</FusionBadge>}
-      tight
-      actionBar={
+      subtitle="只展示已审核发布且在有效期内的第三方与官方岗位；来源要素不完整时仅保留只读详情。"
+      status={facetLoading
+        ? { tone: 'unknown', label: '正在向服务端取岗位名单' }
+        : error
+          ? { tone: 'bad', label: '岗位接口这次没有返回' }
+          : { tone: 'ok', label: '岗位与来源信息来自服务端' }}
+      terminalLabel="就业服务大厅"
+      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
+      ctabar={
         <>
-          <span className="jf-action-note">本系统仅展示来源岗位信息，不接收简历、不参与招聘流程。</span>
-          <div className="jf-spacer" />
-          <button type="button" className="jf-btn ghost" onClick={() => navigate('/companies')}>
-            <Building2Icon aria-hidden="true" />
-            找企业
+          <p className="why">本机不代收简历、不代替投递。岗位由来源平台发布，投递在来源平台完成。</p>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/offline-agencies')}>
+            <StoreIcon aria-hidden="true" />线下招聘机构
+          </button>
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/jobs/online-platforms')}>
+            官方与合作平台目录
           </button>
         </>
       }
@@ -333,11 +338,10 @@ export function JobsPage() {
         }}
         onClose={() => setShowFilterPicker(false)}
       />
-      <AiDriverBanner feature="AI岗位研判" description="结合你的简历分析匹配度" />
-      {facetLoading ? (
-        <LoadingState className="flex-1" />
-      ) : error ? (
-        <ErrorState message={error} onRetry={() => setRetryKey((key) => key + 1)} className="flex-1" />
+      <div className="qx-scroll qx-jobs-page" data-screen="jobs" data-state={screenState} data-testid={`jobs-state-${screenState}`}>
+        <JobsQxAiEntry onStart={() => void startAiRecommend()} />
+      {facetLoading || error ? (
+        <JobsQxState error={error} onRetry={() => setRetryKey((key) => key + 1)} />
       ) : (
         <>
           <div className="jf-filter-bar">
@@ -459,7 +463,11 @@ export function JobsPage() {
           )}
 
           <div className="jf-quick-row">
-            <button type="button" className="jf-tile tinted" onClick={() => void startAiRecommend()}>
+            <button
+              type="button"
+              className="jf-tile tinted"
+              onClick={aiRecommendations ? clearAiRecommendations : () => void startAiRecommend()}
+            >
               <span className="jf-tile-icon"><SparklesIcon aria-hidden="true" /></span>
               <span><b>{aiRecommendations ? '退出 AI 推荐' : 'AI岗位推荐'}</b><span>登录后基于本人简历推荐，仅供参考</span></span>
             </button>
@@ -469,12 +477,11 @@ export function JobsPage() {
             </button>
           </div>
 
-          <FusionNotice>
-            本系统仅展示客户接入并经审核发布的岗位信息，不接收简历、不参与招聘流程，请前往来源平台办理。{hasAnyFilter && activeSourceName ? ` 当前来源：${activeSourceName}。` : ''}
-          </FusionNotice>
+          <JobsQxSourceNotice activeSourceName={hasAnyFilter ? activeSourceName : undefined} />
         </>
       )}
-    </KioskPageFrame>
+      </div>
+    </QxPageFrame>
   )
 }
 

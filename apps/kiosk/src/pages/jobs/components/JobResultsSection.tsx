@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { EmptyState } from '@ai-job-print/ui'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
-import { BriefcaseIcon, BuildingIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, QrCodeIcon, StarIcon } from 'lucide-react'
+import { BriefcaseIcon, BuildingIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, StarIcon } from 'lucide-react'
 import { CATEGORY_LABEL, CATEGORY_STYLE, formatSync } from '../utils/jobDisplay'
 import { evaluateJobSourceTrust } from '../utils/sourceTrust'
 
@@ -42,12 +41,13 @@ export function JobResultsSection({
       {listLoading && <span className="text-xs text-neutral-400">加载中...</span>}
 
       {jobs.length === 0 ? (
-        <EmptyState
-          icon={favoritesOnly ? StarIcon : BriefcaseIcon}
-          title={favoritesOnly ? '还没有收藏的岗位' : '暂无符合条件的岗位'}
-          description={favoritesOnly ? '在岗位卡片上点击星标即可收藏，方便稍后查看' : '请尝试调整关键词、城市、行业、类型或来源机构'}
-          className="py-12"
-        />
+        <div className="qx-state qx-grow" data-tone="empty">
+          <span className="qx-state-ic">{favoritesOnly ? <StarIcon aria-hidden="true" /> : <BriefcaseIcon aria-hidden="true" />}</span>
+          <span>
+            <span className="qx-state-t">{favoritesOnly ? '还没有收藏的岗位' : '这组条件下没有已发布的岗位'}</span>
+            <span className="qx-state-d">{favoritesOnly ? '在岗位行点击收藏，方便稍后查看。' : '本机不会拿示例岗位把列表填满，请调整关键词、城市、行业、类型或来源机构。'}</span>
+          </span>
+        </div>
       ) : (
         <>
           {visibleJobs.map((job) => (
@@ -92,12 +92,10 @@ function JobResultCard({
   onToggleFavorite: () => void
   onOpen: () => void
 }) {
-  // 判据必须与详情页的放行门禁同源：这张卡上写「可扫码投递」，而详情页只在
-  // 来源四要素齐全时才真的放行外跳与扫码。只看 sourceUrl 会让列表先许下一个
-  // 详情页兑现不了的承诺（用户点进去发现按钮是灰的）。
+  // 列表只承诺进入只读详情；外跳与扫码仍由详情页按四要素 fail-closed。
   const validSource = evaluateJobSourceTrust(job).ok
   return (
-    <div className="jf-row" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter') onOpen() }}>
+    <article className={`jf-row${validSource ? '' : ' is-source-blocked'}`} aria-label={job.title}>
       <div className="jf-row-main">
         <div className="jf-row-title">
           <b>{job.title}</b>
@@ -115,12 +113,7 @@ function JobResultCard({
           <span className="jf-chip">同步 <b>{formatSync(job.syncTime)}</b></span>
           <span className="jf-chip">外部ID <b>{job.externalId}</b></span>
           <span className={`jf-chip ${validSource ? 'ok' : 'warn'}`}>
-            {validSource ? (
-              <>
-                <QrCodeIcon className="h-3 w-3" aria-hidden="true" />
-                线上平台 · 可扫码投递
-              </>
-            ) : '来源要素待补齐'}
+            {validSource ? '来源四要素齐全' : '来源要素待补齐'}
           </span>
         </div>
       </div>
@@ -136,7 +129,11 @@ function JobResultCard({
       >
         <StarIcon className={favorite ? 'fill-current' : ''} aria-hidden="true" />
       </button>
-      <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
-    </div>
+      <button type="button" className="qx-job-view" onClick={onOpen}>
+        查看岗位
+        <ChevronRightIcon aria-hidden="true" />
+      </button>
+      {validSource ? null : <span className="qx-job-blocked-note">详情可读，外部入口待来源补全</span>}
+    </article>
   )
 }

@@ -1,7 +1,7 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { registerW4Api, w4TerminalConfig } from '../fixtures/fusion-w4-api'
-import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow } from './assert-layout'
+import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 
 function runtimeErrors(page: Page): string[] {
   const errors: string[] = []
@@ -25,6 +25,56 @@ const SMART_CAMPUS_URLS = [
   ['/smart-campus/service/luggage', '行李帮运'],
   ['/smart-campus/service/panorama', 'VR校园'],
 ] as const
+
+const JOB_MEMBER_TOKEN = 'jobs-w4-browser-memory-token'
+const JOB_CTA_WHITELIST = [
+  '查看岗位',
+  '去来源平台投递',
+  '扫码投递',
+  '查看招聘会',
+  '去来源平台预约',
+  '扫码预约',
+  '复制来源链接',
+] as const
+const JOB_BANNED_COPY = [
+  '一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理',
+  '我要应聘', '递交简历', '直投', '争取面试', '立即报名', '投递展位企业', '确认投递',
+] as const
+
+async function expectJobsComplianceCopy(scope: Locator): Promise<void> {
+  await expect(scope.getByText(/^(一键投递|立即投递|平台投递|我要应聘|递交简历|直投\s*HR|争取面试|立即报名|投递展位企业|确认投递)$/)).toHaveCount(0)
+
+  const controls = scope.locator('button, a[href], [role="button"]')
+  for (let index = 0; index < await controls.count(); index += 1) {
+    const control = controls.nth(index)
+    const label = (
+      await control.getAttribute('aria-label')
+      ?? await control.getAttribute('title')
+      ?? await control.innerText()
+    ).trim()
+    if (!label || !/投递|预约|应聘|报名|候选人|复制来源链接/.test(label)) continue
+    expect(JOB_CTA_WHITELIST, `岗位 CTA 文案越界：${label}`).toContain(label as typeof JOB_CTA_WHITELIST[number])
+  }
+}
+
+async function expectOpenedComplianceSurface(scope: Locator): Promise<void> {
+  let flattened = await scope.innerText()
+  for (const allowed of JOB_CTA_WHITELIST) flattened = flattened.replaceAll(allowed, '')
+  for (const banned of JOB_BANNED_COPY) {
+    expect(flattened, `已打开的岗位弹层出现违禁文案：${banned}`).not.toContain(banned)
+  }
+}
+
+async function loginForJobs(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  for (const digit of '13800138000') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of '123456') await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
 
 async function captureCapabilityRefresh(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -51,8 +101,22 @@ async function runCapabilityRefresh(page: Page): Promise<void> {
 test('/jobs 保留线上与线下双轨 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/jobs')
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
   await expect(page.getByText('前端工程师').first()).toBeVisible()
+  await expect(page.getByText('青岛公共就业服务网').first()).toBeVisible()
+  await expect(page.getByText('ext-job-001').first()).toBeVisible()
+  await expect(page.getByText(/7月24日更新/).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看岗位' })).toBeVisible()
   await expect(page.getByRole('button', { name: /线下机构门店/ })).toBeVisible()
+  const filteredRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url())
+    return url.pathname === '/api/v1/jobs' && url.searchParams.get('category') === 'fulltime'
+  })
+  await page.getByRole('button', { name: '全职', exact: true }).click()
+  const requestUrl = new URL((await filteredRequest).url())
+  expect(requestUrl.searchParams.get('category')).toBe('fulltime')
+  expect(requestUrl.searchParams.get('page')).toBe('1')
+  expect(requestUrl.searchParams.get('pageSize')).toBe('100')
   await page.getByRole('button', { name: '城市 / 行业筛选' }).click()
   const jobFilterDialog = page.getByRole('dialog', { name: '城市与行业筛选' })
   await expect(jobFilterDialog).toBeVisible()
@@ -61,15 +125,164 @@ test('/jobs 保留线上与线下双轨 @w4', async ({ page, api }) => {
   await expect(jobFilterDialog.getByRole('button', { name: '青岛市', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await jobFilterDialog.getByRole('button', { name: '完成' }).click()
   await expect(page.getByRole('button', { name: '城市 / 行业筛选 (1)' })).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('jobs-list-1080x1920.png') })
+  await assertNoElementCrossesViewport(page)
   await verifyPage(page, errors)
 })
 
 test('/jobs/:id 只提供来源 CTA @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
-  await page.goto('/jobs/job-001')
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', {
+    status: 200,
+    json: { success: true, data: null },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', {
+    status: 200,
+    json: { success: true, data: null },
+  })
+  api.respond('POST', '/api/v1/member/auth/sms-code', { status: 200, json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } } })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: { success: true, data: { token: JOB_MEMBER_TOKEN, user: { id: 'member-jobs-w4', phoneMasked: '138****8000', nickname: '岗位验收会员' } } },
+  })
+  api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('POST', '/api/v1/activity/browse', { status: 200, json: { success: true, data: { recorded: true } } })
+  let externalJumpBody: unknown = null
+  api.respondWith('POST', '/api/v1/activity/external-jump', async () => ({ status: 200, json: { success: true, data: { recorded: true } } }))
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/activity/external-jump') {
+      externalJumpBody = request.postDataJSON()
+    }
+  })
+  await loginForJobs(page, '/jobs/job-001')
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
   await expect(page.getByText(/信息以来源平台为准/).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: '扫码投递' })).toBeVisible()
-  await expect(page.getByText(/一键投递|立即投递/)).toHaveCount(0)
+  await expect(page.getByText('青岛公共就业服务网').first()).toBeVisible()
+  await expect(page.getByText('ext-job-001').first()).toBeVisible()
+  await expect(page.getByText('https://jobs.example.gov.cn/jobs/job-001')).toBeVisible()
+  await expect(page.getByText('数据来源说明：信息来自官方来源平台，以来源平台为准。')).toBeVisible()
+  const applyGuide = page.getByRole('heading', { name: '投递怎么走' }).locator('..')
+  await expect(applyGuide).toContainText('先核对岗位原文与来源四要素')
+  await expect(applyGuide).toContainText('去来源平台自行操作')
+  await expect(applyGuide).toContainText('结果以来源平台为准')
+  await expect(applyGuide).toContainText('本终端不接收或转交简历')
+  const primary = page.getByRole('button', { name: '去来源平台投递' })
+  await assertTapTargetPointerHit(primary)
+  const primaryBox = await primary.boundingBox()
+  expect(primaryBox?.height).toBeGreaterThanOrEqual(56)
+  await page.screenshot({ path: test.info().outputPath('job-detail-1080x1920.png') })
+  await page.getByRole('button', { name: '扫码投递' }).last().click()
+  const qrDialog = page.getByRole('dialog', { name: '扫码投递' })
+  await expect(qrDialog).toBeVisible()
+  await expect(qrDialog.getByText('请使用手机扫码前往来源平台自行操作')).toBeVisible()
+  await expectOpenedComplianceSurface(qrDialog)
+  await expect.poll(() => externalJumpBody).toEqual({ targetType: 'job', targetId: 'job-001', action: 'external_apply' })
+  expect(JSON.stringify(externalJumpBody)).not.toMatch(/resumeId|documentId|resumeText|简历正文/)
+  await expectJobsComplianceCopy(page.locator('body'))
+  await assertNoElementCrossesViewport(page)
+  await verifyPage(page, errors)
+})
+
+test('/jobs 接口失败显示真实异常态且不回填岗位 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  api.abort('GET', '/api/v1/jobs', 'internetdisconnected')
+  await page.goto('/jobs')
+  await expect(page.getByTestId('jobs-state-error')).toBeVisible()
+  await expect(page.getByText('岗位名单这次没取到')).toBeVisible()
+  await expect(page.getByText('前端工程师')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重新加载' })).toBeVisible()
+  await assertNoElementCrossesViewport(page)
+  await verifyPage(page, errors)
+})
+
+test('/jobs 挂起请求显示加载态，空回执显示空态 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  let releaseJobs!: () => void
+  const jobsGate = new Promise<void>((resolve) => { releaseJobs = resolve })
+  api.respondWith('GET', '/api/v1/jobs', async () => {
+    await jobsGate
+    return {
+      status: 200,
+      json: { success: true, data: [], pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 } },
+    }
+  })
+  await page.goto('/jobs')
+  await expect(page.getByTestId('jobs-state-loading')).toBeVisible()
+  await expect(page.getByText('正在取岗位名单')).toBeVisible()
+  releaseJobs()
+  await expect(page.getByTestId('jobs-state-empty')).toBeVisible()
+  await expect(page.getByText('这组条件下没有已发布的岗位')).toBeVisible()
+  await expect(page.getByText('前端工程师')).toHaveCount(0)
+  await assertNoElementCrossesViewport(page)
+  await verifyPage(page, errors)
+})
+
+test('/jobs 来源不完整仍可读详情，但详情停发外部动作 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  const incompleteJob = {
+    id: 'job-incomplete', title: '来源待补岗位', company: '来源机构公开企业', city: '青岛市',
+    salary: '', salaryDisplay: '', category: 'fulltime', tags: [], description: '来源岗位原文。', requirements: '',
+    sourceOrgId: 'source-001', externalId: '', sourceName: '青岛公共就业服务网', sourceUrl: '',
+    syncTime: '2026-07-24T08:00:00.000Z', reviewStatus: 'approved', publishStatus: 'published',
+    dataSourceNote: '信息来自官方来源平台，以来源平台为准。',
+  }
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { success: true, data: [incompleteJob], pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 } },
+  })
+  await page.goto('/jobs')
+  await expect(page.getByText('来源要素待补齐')).toBeVisible()
+  await expect(page.getByText('详情可读，外部入口待来源补全')).toBeVisible()
+  await page.getByRole('button', { name: '查看岗位' }).click()
+  await expect(page).toHaveURL(/\/jobs\/job-incomplete$/)
+  await expect(page.getByTestId('job-detail-state-source-unavailable')).toBeVisible()
+  await expect(page.getByRole('button', { name: '去来源平台投递' })).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByRole('button', { name: '扫码投递' }).last()).toHaveAttribute('aria-disabled', 'true')
+  await assertNoElementCrossesViewport(page)
+  await verifyPage(page, errors)
+})
+
+test('/jobs/:id 来源四要素缺失时停发外跳与扫码 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  api.respond('GET', '/api/v1/jobs/job-001', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        id: 'job-001', title: '前端工程师', company: '青岛示例制造有限公司', city: '青岛市',
+        salary: '8000-12000', salaryDisplay: '8,000–12,000 元/月', category: 'fulltime', tags: ['React'],
+        description: '负责来源岗位信息系统前端开发。', requirements: '熟悉 TypeScript。',
+        sourceOrgId: 'source-001', externalId: '', sourceName: '青岛公共就业服务网', sourceUrl: '',
+        syncTime: '2026-07-24T08:00:00.000Z', reviewStatus: 'approved', publishStatus: 'published',
+        dataSourceNote: '信息来自官方来源平台，以来源平台为准。',
+      },
+    },
+  })
+  await page.goto('/jobs/job-001')
+  await expect(page.getByTestId('job-detail-state-source-unavailable')).toBeVisible()
+  await expect(page.getByText(/来源要素不完整，前往来源平台与扫码已停用/)).toBeVisible()
+  await expect(page.getByText('来源平台未提供', { exact: true }).first()).toBeVisible()
+  const sourceButton = page.getByRole('button', { name: '去来源平台投递' })
+  const qrButtons = page.getByRole('button', { name: '扫码投递' })
+  await expect(sourceButton).toHaveAttribute('aria-disabled', 'true')
+  // 来源四要素缺失时，页面上**每一个**扫码投递都必须停发——不是只停最后一个。
+  const qrCount = await qrButtons.count()
+  expect(qrCount).toBeGreaterThan(0)
+  for (let index = 0; index < qrCount; index += 1) {
+    await expect(qrButtons.nth(index)).toHaveAttribute('aria-disabled', 'true')
+  }
+  // 合规红线不能只靠 aria-disabled 属性挡，**处理函数本身**也必须不开二维码。
+  // 用 dispatchEvent 直接在元素上派发 click，绕过命中测试：
+  // 试过 click({ force: true }) —— 一体机是 1080×1920 舞台等比缩放，
+  // force 的坐标落不到这个按钮上，处理函数压根没被调到，反向变异（去掉
+  // openSourceQr 里的 sourceCanApply 守卫）时用例照样绿，等于断言是空的。
+  for (let index = 0; index < qrCount; index += 1) {
+    await qrButtons.nth(index).dispatchEvent('click')
+  }
+  await expect(page.getByText('请使用手机扫码前往来源平台自行操作')).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: '扫码投递' })).toHaveCount(0)
+  await assertNoElementCrossesViewport(page)
   await verifyPage(page, errors)
 })
 

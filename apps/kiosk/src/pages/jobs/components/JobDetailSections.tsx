@@ -38,12 +38,18 @@ export function QrOverlay({
   const valid = isValidSourceUrl(job.sourceUrl)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="relative w-[22rem] max-w-full rounded-2xl bg-white p-7 shadow-xl" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="relative w-[22rem] max-w-full rounded-2xl bg-white p-7 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="扫码投递"
+        onClick={(event) => event.stopPropagation()}
+      >
         <button onClick={onClose} aria-label="关闭" className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100">
           <XIcon className="h-5 w-5" />
         </button>
 
-        <p className="text-center text-base font-semibold text-neutral-800">扫码前往来源平台投递</p>
+        <p className="text-center text-base font-semibold text-neutral-800">扫码投递</p>
 
         <div className="mt-5 flex justify-center">
           <SourceUrlQr value={job.sourceUrl} size={196} />
@@ -59,7 +65,7 @@ export function QrOverlay({
         <div className="mt-4 flex items-start gap-2">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
           <p className="text-xs leading-relaxed text-neutral-500">
-            请使用手机扫码前往来源平台办理投递，本系统不接收简历、不参与招聘流程。
+            请使用手机扫码前往来源平台自行操作，本系统不接收简历、不参与招聘流程。
           </p>
         </div>
       </div>
@@ -231,7 +237,7 @@ export function JobTrustSection({ job, trust }: { job: ExternalJobDTO; trust: Jo
       <div className="jf-card-head">
         <span className="jf-g-icon"><ShieldCheckIcon aria-hidden="true" /></span>
         <div>
-          <h2>来源可信区</h2>
+          <h2>信息来源</h2>
           {/* 规则常显，不只在触发时才出现 —— 照 27-browse-detail.html「信息来源」卡头右侧的
               `四要素缺一即不放行外跳`，让用户在正常态就知道这个入口是有前置条件的。 */}
           <div className="sub">第三方来源信息，请核对后前往办理 · 来源四要素缺一即不放行外跳与扫码</div>
@@ -276,7 +282,7 @@ export function JobTrustSection({ job, trust }: { job: ExternalJobDTO; trust: Jo
       {/* 链接这一行只看链接本身：门禁是四要素的合取，链接没问题时不该把它也说成「未提供」。 */}
       <div className="mt-4 flex items-center gap-2 text-[18px] text-[var(--muted)]">
         <Link2Icon className="h-5 w-5 shrink-0 opacity-70" />
-        来源链接 <b className="break-all text-[var(--ink)]">{trust.present.sourceUrl ? job.sourceUrl : '来源平台未提供有效链接'}</b>
+        外部投递链接 <b className="break-all text-[var(--ink)]">{trust.present.sourceUrl ? job.sourceUrl : '来源平台未提供有效链接'}</b>
         {sourceCanApply && <span className="ml-2 shrink-0">(完整链接见扫码页)</span>}
       </div>
 
@@ -306,7 +312,9 @@ export function JobTrustSection({ job, trust }: { job: ExternalJobDTO; trust: Jo
         <p>
           本岗位来自第三方/官方来源，本系统不接收简历、不参与招聘流程。
           <span className="mt-1 block">{SOURCE_ORG_TRUST_DISCLAIMER}</span>
-          <span className="mt-1 block text-neutral-400">{job.dataSourceNote}</span>
+          <span className="mt-1 block text-neutral-400">
+            数据来源说明：{job.dataSourceNote?.trim() || '信息来自第三方或官方来源平台，以来源平台原文为准。'}
+          </span>
         </p>
       </div>
     </section>
@@ -353,6 +361,14 @@ export function JobNextActionsSection({
             <div className="sub">AI 内容仅供参考，需登录后使用</div>
           </div>
         </div>
+        <section className="qx-job-apply-guide" aria-labelledby="job-apply-guide-title">
+          <h3 id="job-apply-guide-title">投递怎么走</h3>
+          <ol>
+            <li><b>先核对岗位原文与来源四要素</b><span>确认来源机构、同步时间、外部 ID 和外部投递链接都已返回。</span></li>
+            <li><b>去来源平台自行操作</b><span>通过下方来源二维码或外部链接前往来源平台，本终端不接收或转交简历。</span></li>
+            <li><b>结果以来源平台为准</b><span>后续进展由来源平台处理，本终端不读取企业筛选、面试或录用结果。</span></li>
+          </ol>
+        </section>
         <div className="jf-next-grid">
           <ActionButton tinted icon={SparklesIcon} label="AI岗位解读" hint="看懂职责与准备点" onClick={onExplainAi} />
           <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint="用本人简历做准备" onClick={onMatchAi} />
@@ -393,7 +409,7 @@ export function JobNextActionsSection({
           onClick={onOpenQr}
         >
           <QrCodeIcon aria-hidden="true" />
-          放大二维码
+          扫码投递
         </button>
       </div>
     </div>
