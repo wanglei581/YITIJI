@@ -449,6 +449,48 @@ test.describe('真人走查（模拟数据）', () => {
     console.log(`\n  旅程 E 终点：${new URL(page.url()).pathname}`)
   })
 
+  // 岗位行的键盘可达性。列表卡片在青序流光迁移里一度完全不可点（#976 修复），
+  // 修复时同时补了 role/tabIndex/onKeyDown —— 而**键盘那一半在触屏上没人会发现它没了**，
+  // 后续重构里最容易被悄悄删掉。所以单独钉住，不并进旅程 C。
+  test('岗位行：Enter 与 Space 都能进详情，且 Space 不带出页面滚动 @kiosk', async ({ page, api }) => {
+    registerW6Api(api)
+    // 全程只 goto 一次。第二次整页 goto 会被 KioskPrivacyGuard 判为越过隐私边界
+    // （整页加载拿不到 history.state.idx，historyIndex === null 即 fail-closed 清场），
+    // 页面会变成清场覆盖层而不是岗位列表 —— 那会让本用例红在一个与键盘无关的原因上。
+    await page.goto('/jobs', { waitUntil: 'domcontentloaded' })
+    const row = page.locator('[data-testid="job-row-job-001"]')
+    await expect(row, '岗位行必须带 data-testid，供键盘用例定位').toBeVisible({ timeout: 15_000 })
+    await expect(row).toHaveAttribute('role', 'button')
+    await expect(row).toHaveAttribute('tabindex', '0')
+
+    // ① Enter 激活
+    await row.press('Enter')
+    await page.waitForURL((u) => /\/jobs\/job-001$/.test(u.pathname), { timeout: 10_000 })
+    // 只钉「进到了这条岗位的详情」。详情页版式与来源四要素由旅程 C 负责，
+    // 这里再钉标题的角色/层级只会在详情页改版时假红。
+    // 钉「详情页真的渲染出来了」，不钉标题文字。
+    // W6 夹具里 job-001 的**列表标题是「前端开发工程师」、详情标题是「前端工程师」**
+    // （2026-09-08 实测），钉标题会红在一个与键盘可达性无关的夹具不一致上。
+    // 「进的是不是这一条」由上面的 URL 断言保证。
+    await expect(page.locator('body')).toContainText('岗位详情', { timeout: 10_000 })
+
+    // SPA 内后退，不用整页 goto（理由同上）
+    await page.goBack()
+    await expect(row).toBeVisible({ timeout: 15_000 })
+
+    // ② Space 激活 + preventDefault。
+    //    测试通常只写 Enter，而 Space 是按钮的标准激活键 —— 只钉一条，另一条被删掉没人发现。
+    //    preventDefault 直接读原生事件的 defaultPrevented：比测滚动位置可靠（导航会把页面整个换掉）。
+    //    少了它，Space 会在激活的同时滚动页面。
+    const spacePrevented = await row.evaluate((el) => {
+      const ev = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+      el.dispatchEvent(ev)
+      return ev.defaultPrevented
+    })
+    expect(spacePrevented, 'Space 必须 preventDefault，否则激活的同时页面会滚动').toBe(true)
+    await page.waitForURL((u) => /\/jobs\/job-001$/.test(u.pathname), { timeout: 10_000 })
+  })
+
   // 旅程 F：扫描链路 —— Hub「材料扫描」进去，一路点到扫描结果。
   // 真机上纸张在打印机端走，这里只验前端状态机与按钮去向。
   test('旅程 F：Hub → 材料扫描 → 扫描设置 → 进度 → 结果 @kiosk', async ({ page, api }) => {
