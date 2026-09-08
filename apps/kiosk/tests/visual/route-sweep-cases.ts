@@ -74,7 +74,11 @@ export function resolveLandedPath(pattern: ProductionRoutePattern, url: string):
     return FAIL_CLOSED_LANDINGS[pattern as keyof typeof FAIL_CLOSED_LANDINGS]
   }
   if (pattern in compatibilityRedirects) {
-    return compatibilityRedirects[pattern as keyof typeof compatibilityRedirects]
+    const target = compatibilityRedirects[pattern as keyof typeof compatibilityRedirects]
+    // 重定向目标可能带查询串（打印台合并后是 `/print/desk?step=preview`：
+    // 带状态透传是有意的，裸 replace 会把深链进来的用户静默重置到第 1 步）。
+    // 调用方 route-sweep.spec.ts:78 比的是 `url.pathname`，不含查询串，所以这里剥掉。
+    return target.split('?')[0] ?? target
   }
   return url.split('?')[0] ?? url
 }
