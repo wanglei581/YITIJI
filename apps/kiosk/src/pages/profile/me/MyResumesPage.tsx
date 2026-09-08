@@ -199,7 +199,7 @@ function QxMeBannerEmpty() {
     <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
       <span className="qx-me-banner-ico" aria-hidden="true"><FileTextIcon size={34} /></span>
       <span className="qx-me-banner-main">
-        <span className="qx-me-banner-t">还没有登录后保存的简历</span>
+        <h2 className="qx-me-banner-t">还没有登录后保存的简历</h2>
         <span className="qx-me-banner-p">公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历才会出现在这里。<b>空就是空</b>，本页不会造几条记录让页面好看。</span>
       </span>
       <span className="qx-me-banner-mini"><i>共 0</i></span>

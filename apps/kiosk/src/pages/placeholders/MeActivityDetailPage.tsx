@@ -91,7 +91,7 @@ export default function MeActivityDetailPage() {
         <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
           <span className="qx-me-banner-ico" aria-hidden="true"><EyeIcon size={34} /></span>
           <span className="qx-me-banner-main">
-            <span className="qx-me-banner-t">未找到这条记录</span>
+            <h2 className="qx-me-banner-t">未找到这条记录</h2>
             <span className="qx-me-banner-p">记录可能已清理，或不属于当前登录账号。<b>本页不会拿别的记录顶替。</b></span>
           </span>
         </section>

@@ -105,7 +105,7 @@ export function MyFavoritesPage() {
         <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
           <span className="qx-me-banner-ico" aria-hidden="true"><HeartIcon size={34} /></span>
           <span className="qx-me-banner-main">
-            <span className="qx-me-banner-t">还没有收藏</span>
+            <h2 className="qx-me-banner-t">还没有收藏</h2>
             <span className="qx-me-banner-p">在岗位 / 招聘会 / 政策详情页点收藏之后，才会出现在这里。<b>空就是空</b>。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>

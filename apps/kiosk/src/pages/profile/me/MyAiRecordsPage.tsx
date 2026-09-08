@@ -277,7 +277,7 @@ export function MyAiRecordsPage() {
         <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
           <span className="qx-me-banner-ico" aria-hidden="true"><SparklesIcon size={34} /></span>
           <span className="qx-me-banner-main">
-            <span className="qx-me-banner-t">还没有 AI 服务记录</span>
+            <h2 className="qx-me-banner-t">还没有 AI 服务记录</h2>
             <span className="qx-me-banner-p">完成简历诊断、优化、模拟面试、岗位 AI 参考、职业规划或参会准备后，这里会显示记录。<b>空就是空</b>。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>
