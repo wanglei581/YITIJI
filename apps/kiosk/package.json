@@ -116,7 +116,8 @@
     "verify:scan-input-safety": "node scripts/verify-scan-input-safety.mjs",
     "test:browser:scan-safety": "playwright test --config=playwright.scan-safety.config.ts",
     "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs",
-    "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs"
+    "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs",
+    "verify:terminal-session-self-heal": "node scripts/verify-terminal-session-self-heal.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",
