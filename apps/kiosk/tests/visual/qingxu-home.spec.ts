@@ -27,6 +27,12 @@ function homeFair(): Record<string, unknown> {
 }
 
 function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()]): void {
+  // 本套件最后一步会点主 CTA 进 /assistant，助手页挂载即请求语音能力。
+  // 不 stub 的话，fixture 拆卸时会以「未处理请求」判失败——那是竞态不是缺陷。
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { asrEnabled: false, ttsEnabled: false },
+  })
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
     status: 200,
     json: { enabled: false, idleTimeoutSec: 180, items: [] },

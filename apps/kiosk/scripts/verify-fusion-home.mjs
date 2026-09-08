@@ -12,7 +12,13 @@ const check = (condition, message) => {
 }
 
 const home = read('src/pages/home/HomePage.tsx')
-const view = read('src/pages/home/components/QxHomeView.tsx')
+const viewOnly = read('src/pages/home/components/QxHomeView.tsx')
+const homeTile = read('src/pages/home/components/HomeTile.tsx')
+/* 2026-09-08：QxHomeView 超了文末的 320 行预算，把纯展示组件 HomeTile 拆了出去
+ * （CLAUDE.md §8：500 行以上评估拆分；这里不调阈值，改代码）。
+ * 按内容查的断言读这两个文件的合集——断言内容一字未改，只是源集合跟着代码走；
+ * 文末的体积断言仍只量 QxHomeView 本身，否则拆分就白拆了。 */
+const view = `${viewOnly}\n${homeTile}`
 const footer = view
 const fairHook = read('src/pages/home/hooks/useHomeJobFairHighlight.ts')
 const manifest = read('src/pages/home/homeV6Domains.ts')
@@ -258,7 +264,8 @@ check(
 )
 check(
   home.split('\n').length < 120 &&
-    view.split('\n').length < 320 &&
+    viewOnly.split('\n').length < 320 &&
+    homeTile.split('\n').length < 120 &&
     css.split('\n').length < 300 &&
     fairHook.split('\n').length < 120 &&
     manifest.split('\n').length < 180,
