@@ -59,11 +59,7 @@ export function HomePage() {
         terminalLabel={`就业服务大厅 · ${terminalCode}`}
         status={deviceStatus}
         navbar={
-          <QxHomeNavbar
-            isLoggedIn={auth.isLoggedIn}
-            displayName={auth.displayName}
-            onAction={handleAction}
-          />
+          <QxHomeNavbar onAction={handleAction} />
         }
       >
         <QxHomeView

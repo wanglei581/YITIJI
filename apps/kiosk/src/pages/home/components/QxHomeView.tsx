@@ -71,10 +71,8 @@ function QxHomeClock() {
 }
 
 export function QxHomeNavbar({
-  isLoggedIn,
-  displayName,
   onAction,
-}: Pick<QxHomeViewProps, 'isLoggedIn' | 'displayName' | 'onAction'>) {
+}: Pick<QxHomeViewProps, 'onAction'>) {
   return (
     <>
       <Link className="qx-nav-item" aria-current="page" to="/">
@@ -85,9 +83,12 @@ export function QxHomeNavbar({
         <BotIcon aria-hidden="true" />
         <span>AI 顾问</span>
       </button>
-      <button type="button" className="qx-nav-item" onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}>
+      {/* 直达 /profile，不在导航上设登录闸门：/profile 自己有未登录态（「登录后查看本人记录」），
+          且 KioskFullscreenShell 与 QxAppNavbar 的「我的」历来都是按 path 直达。
+          在这里拦成登录弹窗会让未登录用户根本到不了那一页。 */}
+      <button type="button" className="qx-nav-item" data-route="/profile" onClick={() => onAction('profile')}>
         <UserIcon aria-hidden="true" />
-        <span>{isLoggedIn ? displayName || '我的' : '我的'}</span>
+        <span>我的</span>
       </button>
     </>
   )
@@ -126,6 +127,15 @@ export function QxHomeView({
           </div>
           <QxHomeClock />
         </div>
+        <button
+          type="button"
+          className="qx-home-identity"
+          onClick={() => onAction(isLoggedIn ? 'profile' : 'login')}
+          data-testid="home-identity"
+        >
+          <UserIcon aria-hidden="true" />
+          <span>{isLoggedIn ? `${displayName || '本人'} · 进入我的` : '登录后查看本人记录'}</span>
+        </button>
         <button
           type="button"
           className="qx-home-voice"

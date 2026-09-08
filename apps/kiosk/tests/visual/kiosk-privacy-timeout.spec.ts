@@ -320,10 +320,16 @@ test('member report hard-replaces a clean homepage after the privacy deadline @p
 
   expect(new URL(page.url()).pathname).toBe('/')
   expect(await readDocumentMarker(page)).toBeNull()
-  // 断言意图是「清场后回到未登录态首页」。V6 首页把该入口文案由「登录 / 注册」
-  // 改为「登录后查看本人记录」，仍是同一个未登录态 button（登录后变成「…·进入我的」），
-  // 因此只换锚点、不改语义：已登录文案出现即说明清场失败，本断言依然能抓住。
+  // 断言意图是「清场后回到未登录态首页」，两条一起钉，互补：
+  // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
+  //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
+  //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
+  // 2) 问候语精确等于未登录态那句（登录态为 `${displayName}，你好，我是小青`）
+  //    —— 抓「姓名残留」。
+  // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
+  // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '你好，我是小青', exact: true })).toBeVisible()
 })
 
 test('member privacy clear sends the original bearer and blocks authenticated re-entry @privacy-kiosk', async ({ page, api }) => {
@@ -339,10 +345,11 @@ test('member privacy clear sends the original bearer and blocks authenticated re
     status: 200,
     json: { success: true, data: { status: 'ok' } },
   })
-  // V6 首页该入口文案为「AI 面试训练」（AI 与中文之间有空格），旧首页无空格。
-  // 用 \s* 容忍两种写法，避免下次文案微调再挂；本用例真正的断言在后面的
-  // interview-reports 屏与 bearer 拦截，不依赖这个入口的具体排版。
-  await page.getByRole('button', { name: /AI\s*面试训练/ }).click()
+  // 青序流光首页该磁贴叫「模拟面试」（QxHomeView 的 actionId="interview-hub"）；
+  // V6 首页叫「AI 面试训练」。两种写法都容忍，避免文案微调再挂 ——
+  // 本用例真正的断言在后面的 interview-reports 屏与 bearer 拦截，
+  // 这个入口只是到达路径，不依赖它的具体排版。
+  await page.getByRole('button', { name: /模拟面试|AI\s*面试训练/ }).click()
   await page.getByRole('button', { name: /训练报告/ }).click()
   await expect(page.locator('[data-kiosk-screen="interview-reports"]')).toBeVisible()
   expect.soft(requests.reportRequestCount()).toBe(1)
@@ -383,10 +390,16 @@ test('legal documents cannot suspend an authenticated kiosk privacy deadline @pr
   expect(new URL(page.url()).pathname).toBe('/')
   expect(await readDocumentMarker(page)).toBeNull()
   expect(requests.logoutAuthorization()).toEqual([`Bearer ${MEMBER_TOKEN}`])
-  // 断言意图是「清场后回到未登录态首页」。V6 首页把该入口文案由「登录 / 注册」
-  // 改为「登录后查看本人记录」，仍是同一个未登录态 button（登录后变成「…·进入我的」），
-  // 因此只换锚点、不改语义：已登录文案出现即说明清场失败，本断言依然能抓住。
+  // 断言意图是「清场后回到未登录态首页」，两条一起钉，互补：
+  // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
+  //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
+  //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
+  // 2) 问候语精确等于未登录态那句（登录态为 `${displayName}，你好，我是小青`）
+  //    —— 抓「姓名残留」。
+  // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
+  // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '你好，我是小青', exact: true })).toBeVisible()
 })
 
 test('anonymous interview state is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
@@ -594,10 +607,16 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
 
   expect(new URL(page.url()).pathname).toBe('/')
   expect(requests.logoutAuthorization()).toEqual([`Bearer ${MEMBER_TOKEN}`])
-  // 断言意图是「清场后回到未登录态首页」。V6 首页把该入口文案由「登录 / 注册」
-  // 改为「登录后查看本人记录」，仍是同一个未登录态 button（登录后变成「…·进入我的」），
-  // 因此只换锚点、不改语义：已登录文案出现即说明清场失败，本断言依然能抓住。
+  // 断言意图是「清场后回到未登录态首页」，两条一起钉，互补：
+  // 1) 身份入口文案必须是未登录态（登录态为「…·进入我的」）—— 抓「其实还登着」。
+  //    青序流光把底栏「我的」两种状态都写成「我的」，担不起这个职责，
+  //    所以 hero 里单列了 .qx-home-identity，本断言钉的是它。
+  // 2) 问候语精确等于未登录态那句（登录态为 `${displayName}，你好，我是小青`）
+  //    —— 抓「姓名残留」。
+  // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
+  // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '你好，我是小青', exact: true })).toBeVisible()
 })
 
 test('hard clear stops active scan polling without cancelling the backend task @privacy-kiosk', async ({ page, api }) => {

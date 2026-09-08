@@ -73,6 +73,16 @@
 .qx-home-quick button:disabled,
 .qx-home-section-head > button:disabled { cursor: not-allowed; opacity: .68; }
 
+/* 身份入口：登录前后必须肉眼可辨，否则上一个人走后没人看得出会话是否已清场。
+   底栏「我的」在两种状态下都只写「我的」，担不起这个职责，所以在 hero 里单列一颗。 */
+.qx-home-identity {
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 48px; margin-top: 12px; padding: 0 18px;
+  border: 1px solid color-mix(in srgb, var(--qx-paper) 28%, transparent); border-radius: 999px;
+  color: var(--qx-paper); background: color-mix(in srgb, var(--qx-paper) 8%, transparent); cursor: pointer;
+}
+.qx-home-identity svg { width: 22px; height: 22px; }
+
 .qx-home-continue { min-height: 84px; margin-top: 8px; }
 .qx-home-continue:has(.continue) > .qx-home-empty-context { display: none; }
 .qx-home-empty-context,
