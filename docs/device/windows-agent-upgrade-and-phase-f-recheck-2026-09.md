@@ -429,6 +429,18 @@ F7 全屏抽查：未做
    - **前置二**：用管理员账号取 `GET /api/v1/health/cjk-font` 的 `data.ok` / `path` / `family` 三个值抄进回执。Mac 侧无管理员账号，已按 `cjkFontCandidates()` 的解析顺序在服务器只读推定，回执请与端点实际返回**逐字比对**，不一致以端点为准：
      `RESUME_PDF_FONT_PATH=/usr/share/fonts/truetype/wqy/wqy-microhei.ttc`（存在、`-rw-r--r--` 可读）、`RESUME_PDF_FONT_FAMILY=WenQuanYiMicroHei`，该项为候选列表第一顺位，故预期 `ok=true`、`path` 与 `family` 即上述两值；Noto CJK 为未被选中的次顺位。
 
+### 现场开工顺序与两处流程口径（2026-09-08 定，避免误判为缺陷）
+
+**第一件事先查 U 盘桥接令牌。** §5.5 三条 + §5.7 三条 + §5.8 一条共 7 条全部依赖 Agent `agent-config.json` 的 `localApiBridgeToken` 与 Kiosk 构建变量 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 一致。历史上 Gate 0k 的 USB bridge Phase W 因一体机策略拦截文件传输而未完成，服务器侧看不到 Agent 配置。**未确认前这 7 条一条都开不了工**，且令牌只能离线搬运，不得贴进聊天、工单或仓库。查法：只读比对配置里该字段是否非空，再用错误令牌调 `/local/usb/*` 期望 403 `LOCAL_USB_BRIDGE_TOKEN_INVALID`。
+
+**彩色 / 双面必须分两段做，顺序不能反。** 生产库 `TerminalCapability` 对 `t_ksk_001` 目前**只有 `scan=available` 一行**，没有 `color_print` / `duplex` 登记；服务端 `assertPrintParamsAllowed` 对未登记参数 fail-closed。因此直接去一体机页面选彩色或双面**必然点不出来，这是设计，不是缺陷**。正确顺序：
+
+1. **本地驱动直打（不经 Kiosk）**：Windows 上用驱动直接打一份彩色 PDF、一份双面 PDF。确认驱动参数真的可控，并**实测双面长边/短边的翻页方向**（名字只是名字，搞反了装订方向就是错的）。留出纸照片。
+2. **管理员登记能力**：第 1 步通过后，由管理员在后台把该终端的 `color_print` / `duplex` 登记为 available；未通过则保持未登记，不得为了推进度先登记。
+3. **走 Kiosk 端到端**：再从一体机选彩色/双面下单出纸，验计价与实际出纸一致。
+
+**任一段失败即停在该段**，不得跳过第 1 段直接登记能力——那会出现「按彩色计价、实际出黑白纸」的资损。
+
 **扫码器 A4 付款码现在可测**（2026-09-07 晚支付通道已开通，`GET /api/v1/payment/channels` 实测返回 `["alipay","wechat"]`）：这是**真实收款通道**，只用最小金额、本人账号，不得下真实大额单；测完记录是否读到 18 位数字串。其余四项本轮不重测**，结论直接引用 PR #913 写入 [`bench-acceptance-2026-08-16.md`](./bench-acceptance-2026-08-16.md) A 项的真机实测：HID 键盘模式（章程 D-4「扫码零集成」成立，Agent 不需要串口读取）、扫出字符串无前后缀、无后缀不影响取件认领（取件页按「输入静默 250ms」触发而非回车）、模组为接近感应触发而非常亮、能读手机屏幕二维码但需调高手机亮度。仅 **A4 付款码**（微信/支付宝 18 位）待支付商户配置就位后另测。
 
 **运营须知（进现场清单）**：扫码读取依赖手机屏幕亮度。取件页与小程序出码页需提示用户调高亮度，否则现场会出现「扫不上 → 以为码坏了」的误判。
