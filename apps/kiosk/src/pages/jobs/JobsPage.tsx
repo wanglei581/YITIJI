@@ -453,6 +453,7 @@ export function JobsPage() {
             <JobResultsSection
               jobs={displayedJobs}
               favoritesOnly={favoritesOnly}
+              hasFilter={hasAnyFilter}
               listLoading={listLoading}
               favoriteSet={favoriteSet}
               sortMode={sortMode}
