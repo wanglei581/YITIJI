@@ -1,0 +1,1017 @@
+{
+  "generatedAt": "2026-09-07T16:57:40.082Z",
+  "journeys": [
+    "j1-anon",
+    "j2-anon",
+    "j3-anon",
+    "j4-anon-ai-records",
+    "j4-anon-resumes",
+    "j4-anon-documents",
+    "member"
+  ],
+  "routes": [
+    "/",
+    "/resume-service",
+    "/resume/source?intent=optimize",
+    "/resume/generate",
+    "/resume/templates",
+    "/resume/career-plan",
+    "/resume/materials",
+    "/resume/job-fit",
+    "/me/resumes",
+    "/me/ai-records",
+    "/resume/self-assessment/intro",
+    "/assistant",
+    "/profile",
+    "/resume/source?intent=diagnose",
+    "/resume/report",
+    "/resume/optimize",
+    "/resume/optimize/compare",
+    "/resume/generate/preview",
+    "/login",
+    "/print-scan",
+    "/jobs",
+    "/resume/source",
+    "/me/documents",
+    "/resume/parse"
+  ],
+  "controls": 151,
+  "dead": [
+    {
+      "journey": "j2-anon",
+      "step": "format-PDF",
+      "route": "/resume/optimize",
+      "control": "PDF",
+      "selectorHint": ".qx-rd-fmt >> PDF",
+      "kind": "click",
+      "disabled": false,
+      "dead": true,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/optimize",
+        "afterUrl": "/resume/optimize",
+        "beforeTextLen": 927,
+        "afterTextLen": 927
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j2-anon/00166563-format-PDF.png"
+    },
+    {
+      "journey": "member",
+      "step": "home",
+      "route": "/",
+      "control": "(open /)",
+      "selectorHint": "goto /",
+      "kind": "click",
+      "disabled": false,
+      "dead": true,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/",
+        "afterUrl": "/",
+        "beforeTextLen": 643,
+        "afterTextLen": 643
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00239825-home.png"
+    }
+  ],
+  "errors": [
+    {
+      "journey": "j1-anon",
+      "step": "report-/打印这份报告/",
+      "route": "/resume/report",
+      "control": "/打印这份报告/",
+      "selectorHint": "button:/打印这份报告/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [
+          "GET /api/v1/terminals/KSK-001/capabilities",
+          "GET /api/v1/terminals/KSK-001/printer-status",
+          "POST /api/v1/orders/quote",
+          "GET /api/v1/print/price-config",
+          "GET /api/v1/terminals/KSK-001/capabilities",
+          "GET /api/v1/terminals/KSK-001/printer-status",
+          "POST /api/v1/orders/quote",
+          "GET /api/v1/print/price-config",
+          "GET /api/v1/resume/export/pricing",
+          "GET /api/v1/resume/export/pricing"
+        ],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 1290,
+        "afterTextLen": 1246
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00150493-report-打印这份报告.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-optimize",
+      "route": "/resume/optimize",
+      "control": "查看优化建议",
+      "selectorHint": "[data-testid=resume-report-primary]",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/optimize",
+        "beforeTextLen": 1246,
+        "afterTextLen": 927
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)",
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00151661-report-optimize.png"
+    },
+    {
+      "journey": "j4-anon-ai-records",
+      "step": "ai-records-去打印扫描",
+      "route": "/print-scan",
+      "control": "去打印扫描",
+      "selectorHint": "button|button|去打印扫描|2",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/ai-records",
+        "afterUrl": "/print-scan",
+        "beforeTextLen": 183,
+        "afterTextLen": 1298
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-ai-records/00203586-ai-records-去打印扫描.png"
+    },
+    {
+      "journey": "j4-anon-ai-records",
+      "step": "ai-records-查看岗位",
+      "route": "/jobs",
+      "control": "查看岗位",
+      "selectorHint": "button|button|查看岗位|3",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/ai-records",
+        "afterUrl": "/jobs",
+        "beforeTextLen": 183,
+        "afterTextLen": 1039
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-ai-records/00204655-ai-records-查看岗位.png"
+    },
+    {
+      "journey": "j4-anon-ai-records",
+      "step": "ai-records-首页",
+      "route": "/",
+      "control": "首页",
+      "selectorHint": "button|button|首页|4",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/ai-records",
+        "afterUrl": "/",
+        "beforeTextLen": 183,
+        "afterTextLen": 634
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-ai-records/00205707-ai-records-首页.png"
+    },
+    {
+      "journey": "j4-anon-ai-records",
+      "step": "ai-records-AI顾问",
+      "route": "/assistant",
+      "control": "AI顾问",
+      "selectorHint": "button|button|AI顾问|5",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/ai-records",
+        "afterUrl": "/assistant",
+        "beforeTextLen": 183,
+        "afterTextLen": 838
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-ai-records/00206825-ai-records-AI顾问.png"
+    },
+    {
+      "journey": "j4-anon-ai-records",
+      "step": "ai-records-我的",
+      "route": "/profile",
+      "control": "我的",
+      "selectorHint": "button|button|我的|6",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/ai-records",
+        "afterUrl": "/profile",
+        "beforeTextLen": 183,
+        "afterTextLen": 534
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-ai-records/00207889-ai-records-我的.png"
+    },
+    {
+      "journey": "j4-anon-resumes",
+      "step": "resumes-去打印扫描",
+      "route": "/print-scan",
+      "control": "去打印扫描",
+      "selectorHint": "button|button|去打印扫描|3",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/resumes",
+        "afterUrl": "/print-scan",
+        "beforeTextLen": 172,
+        "afterTextLen": 1298
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-resumes/00215720-resumes-去打印扫描.png"
+    },
+    {
+      "journey": "j4-anon-resumes",
+      "step": "resumes-查看岗位",
+      "route": "/jobs",
+      "control": "查看岗位",
+      "selectorHint": "button|button|查看岗位|4",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/resumes",
+        "afterUrl": "/jobs",
+        "beforeTextLen": 172,
+        "afterTextLen": 1039
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-resumes/00216791-resumes-查看岗位.png"
+    },
+    {
+      "journey": "j4-anon-resumes",
+      "step": "resumes-首页",
+      "route": "/",
+      "control": "首页",
+      "selectorHint": "button|button|首页|5",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/resumes",
+        "afterUrl": "/",
+        "beforeTextLen": 172,
+        "afterTextLen": 634
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-resumes/00217832-resumes-首页.png"
+    },
+    {
+      "journey": "j4-anon-resumes",
+      "step": "resumes-AI顾问",
+      "route": "/assistant",
+      "control": "AI顾问",
+      "selectorHint": "button|button|AI顾问|6",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/resumes",
+        "afterUrl": "/assistant",
+        "beforeTextLen": 172,
+        "afterTextLen": 838
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-resumes/00218954-resumes-AI顾问.png"
+    },
+    {
+      "journey": "j4-anon-resumes",
+      "step": "resumes-我的",
+      "route": "/profile",
+      "control": "我的",
+      "selectorHint": "button|button|我的|7",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/resumes",
+        "afterUrl": "/profile",
+        "beforeTextLen": 172,
+        "afterTextLen": 534
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-resumes/00220022-resumes-我的.png"
+    },
+    {
+      "journey": "j4-anon-documents",
+      "step": "documents-去打印扫描",
+      "route": "/print-scan",
+      "control": "去打印扫描",
+      "selectorHint": "button|button|去打印扫描|2",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/documents",
+        "afterUrl": "/print-scan",
+        "beforeTextLen": 148,
+        "afterTextLen": 1298
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-documents/00226821-documents-去打印扫描.png"
+    },
+    {
+      "journey": "j4-anon-documents",
+      "step": "documents-查看岗位",
+      "route": "/jobs",
+      "control": "查看岗位",
+      "selectorHint": "button|button|查看岗位|3",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/documents",
+        "afterUrl": "/jobs",
+        "beforeTextLen": 148,
+        "afterTextLen": 1039
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-documents/00227881-documents-查看岗位.png"
+    },
+    {
+      "journey": "j4-anon-documents",
+      "step": "documents-首页",
+      "route": "/",
+      "control": "首页",
+      "selectorHint": "button|button|首页|4",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/documents",
+        "afterUrl": "/",
+        "beforeTextLen": 148,
+        "afterTextLen": 634
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-documents/00228953-documents-首页.png"
+    },
+    {
+      "journey": "j4-anon-documents",
+      "step": "documents-AI顾问",
+      "route": "/assistant",
+      "control": "AI顾问",
+      "selectorHint": "button|button|AI顾问|5",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/documents",
+        "afterUrl": "/assistant",
+        "beforeTextLen": 148,
+        "afterTextLen": 838
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-documents/00230087-documents-AI顾问.png"
+    },
+    {
+      "journey": "j4-anon-documents",
+      "step": "documents-我的",
+      "route": "/profile",
+      "control": "我的",
+      "selectorHint": "button|button|我的|6",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/documents",
+        "afterUrl": "/profile",
+        "beforeTextLen": 148,
+        "afterTextLen": 534
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "console: Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j4-anon-documents/00231155-documents-我的.png"
+    },
+    {
+      "journey": "member",
+      "step": "fact-confirm-export",
+      "route": "/resume/optimize",
+      "control": "确认导出",
+      "selectorHint": "dialog >> 确认导出",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [
+          "POST /api/v1/resume/generate/export"
+        ],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/resume/optimize",
+        "afterUrl": "/resume/optimize",
+        "beforeTextLen": 1097,
+        "afterTextLen": 968
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00250915-fact-confirm-export.png"
+    },
+    {
+      "journey": "member",
+      "step": "me-/me/ai-records",
+      "route": "/me/ai-records",
+      "control": "AI服务记录",
+      "selectorHint": "button.kp-entry:AI服务记录",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [
+          "GET /api/v1/me/ai-records",
+          "GET /api/v1/me/job-ai-sessions",
+          "GET /api/v1/me/mock-interviews",
+          "GET /api/v1/me/ai-records",
+          "GET /api/v1/me/job-ai-sessions",
+          "GET /api/v1/me/mock-interviews"
+        ],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/profile",
+        "afterUrl": "/me/ai-records",
+        "beforeTextLen": 567,
+        "afterTextLen": 387
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00253674-me-meai-records.png"
+    },
+    {
+      "journey": "member",
+      "step": "AI服务记录-presence",
+      "route": "/me/ai-records",
+      "control": "(page-body)",
+      "selectorHint": "body",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/me/ai-records",
+        "afterUrl": "/me/ai-records",
+        "beforeTextLen": 0,
+        "afterTextLen": 400
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00253796-AI服务记录-body.png",
+      "note": "has-content: 就业服务大厅 · KSK-001\nAI求职打印服务终端\n2026年9月8日 00:57\n打印机离线\nAI服务记录\n\n本人 AI 简历、岗位匹配、职业规划与参会准备服务记录（仅元数据）\n\n返回我的\n\nAI 服务记录\n\n2\n仅展示本人服务元数据，不展示简历原文、诊断正文或模型原始输出\n已完成 2\n处理中 0\n简历与规划 AI 记录\n\n仅展示本人 AI 服务元数据"
+    },
+    {
+      "journey": "member",
+      "step": "AI服务记录-delete",
+      "route": "/me/ai-records",
+      "control": "删除",
+      "selectorHint": "button:删除",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [
+          "DELETE /api/v1/me/ai-records/cmtrhhci7003jt9ybf92h2hok"
+        ],
+        "domChanged": true,
+        "overlayOrToastOrError": true,
+        "beforeUrl": "/me/ai-records",
+        "afterUrl": "/me/ai-records",
+        "beforeTextLen": 387,
+        "afterTextLen": 318
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00255237-AI服务记录-delete.png"
+    },
+    {
+      "journey": "member",
+      "step": "me-/me/resumes",
+      "route": "/me/resumes",
+      "control": "我的简历",
+      "selectorHint": "button.kp-entry:我的简历",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [
+          "GET /api/v1/me/resumes",
+          "GET /api/v1/me/resumes"
+        ],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/profile",
+        "afterUrl": "/me/resumes",
+        "beforeTextLen": 567,
+        "afterTextLen": 281
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00256742-me-meresumes.png"
+    },
+    {
+      "journey": "member",
+      "step": "我的简历-presence",
+      "route": "/me/resumes",
+      "control": "(page-body)",
+      "selectorHint": "body",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/me/resumes",
+        "afterUrl": "/me/resumes",
+        "beforeTextLen": 0,
+        "afterTextLen": 290
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00256859-我的简历-body.png",
+      "note": "has-content: 就业服务大厅 · KSK-001\nAI求职打印服务终端\n2026年9月8日 00:57\n打印机离线\n我的简历\n\n本人上传诊断与 AI 生成的简历记录（仅元数据）\n\n去上传简历\n返回我的\n\n简历档案\n\n1\n仅展示本人简历服务元数据，不展示原文或诊断正文\n诊断 1\n生成 0\n完成 1\n上传诊断简历\n已完成\n未优化\n\n上传简历后生成的诊断记录\n\nmock · 任务"
+    },
+    {
+      "journey": "member",
+      "step": "me-/me/documents",
+      "route": "/me/documents",
+      "control": "我的文档",
+      "selectorHint": "button.kp-entry:我的文档",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": true,
+        "apiRequests": [
+          "GET /api/v1/me/documents",
+          "GET /api/v1/me/documents"
+        ],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/profile",
+        "afterUrl": "/me/documents",
+        "beforeTextLen": 567,
+        "afterTextLen": 283
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00258308-me-medocuments.png"
+    },
+    {
+      "journey": "member",
+      "step": "我的文档-presence",
+      "route": "/me/documents",
+      "control": "(page-body)",
+      "selectorHint": "body",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/me/documents",
+        "afterUrl": "/me/documents",
+        "beforeTextLen": 0,
+        "afterTextLen": 292
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00258427-我的文档-body.png",
+      "note": "has-content: 就业服务大厅 · KSK-001\nAI求职打印服务终端\n2026年9月8日 00:57\n打印机离线\n我的文档\n\n本人保存的文档（仅本人可见，到期自动清理）\n\n返回我的\n\n文档资产\n\n1\n查看和打印时才换取短期访问链接；到期或删除后不可恢复\n可用 1\n长期 0\n到期 0\n\nvalid-2p.pdf\n\n2 KB · 9月8日 00:57 · 有效期至 12月7日"
+    },
+    {
+      "journey": "member",
+      "step": "我的文档-delete",
+      "route": "/me/documents",
+      "control": "删除",
+      "selectorHint": "button:删除",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [
+          "DELETE /api/v1/files/52a7437127544c6b9e8add4bf421fc56"
+        ],
+        "domChanged": true,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/me/documents",
+        "afterUrl": "/me/documents",
+        "beforeTextLen": 283,
+        "afterTextLen": 126
+      },
+      "runtimeErrors": [
+        "console: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/member/00259832-我的文档-delete.png"
+    }
+  ],
+  "forbidden": [],
+  "skipped": [
+    {
+      "journey": "j1-anon",
+      "step": "hub-AI简历诊断 上传PDF或图片简历，AI自动解析结构、识别问题，给出针对性改进建议 进入",
+      "route": "/resume-service",
+      "control": "AI简历诊断 上传PDF或图片简历，AI自动解析结构、识别问题，给出针对性改进建议 进入",
+      "selectorHint": "button|button|AI简历诊断 上传PDF或图片简历，AI自动解析结构、识别问题，给出针对性改进建议 进入|1",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "journey-skip:AI简历诊断 上传PDF或图片简历，AI自动解析结构、识别问题，给出针对性改进建议 进入",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume-service",
+        "afterUrl": "/resume-service",
+        "beforeTextLen": 511,
+        "afterTextLen": 511
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00124533-hub-AI简历诊断-上传PDF或图片简历AI自动解析结构识别问题给出针对性改进建议-进入.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "hub-简历打印 优化完成后直接在本机打印，走标准文档打印流程 进入",
+      "route": "/resume-service",
+      "control": "简历打印 优化完成后直接在本机打印，走标准文档打印流程 进入",
+      "selectorHint": "button|button|简历打印 优化完成后直接在本机打印，走标准文档打印流程 进入|7",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "journey-skip:简历打印 优化完成后直接在本机打印，走标准文档打印流程 进入",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume-service",
+        "afterUrl": "/resume-service",
+        "beforeTextLen": 511,
+        "afterTextLen": 511
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00130406-hub-简历打印-优化完成后直接在本机打印走标准文档打印流程-进入.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-listed-/重新诊断/",
+      "route": "/resume/report",
+      "control": "/重新诊断/",
+      "selectorHint": "button:/重新诊断/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "kept-for-j1-continue-or-out-of-scope",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 0,
+        "afterTextLen": 0
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00150583-report-skip.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-listed-/查看优化建议|继续生成优化版简历/",
+      "route": "/resume/report",
+      "control": "/查看优化建议|继续生成优化版简历/",
+      "selectorHint": "button:/查看优化建议|继续生成优化版简历/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "kept-for-j1-continue-or-out-of-scope",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 0,
+        "afterTextLen": 0
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00150652-report-skip.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-listed-/目标岗位匹配参考/",
+      "route": "/resume/report",
+      "control": "/目标岗位匹配参考/",
+      "selectorHint": "button:/目标岗位匹配参考/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "kept-for-j1-continue-or-out-of-scope",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 0,
+        "afterTextLen": 0
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00150736-report-skip.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-listed-/做一次自我探索/",
+      "route": "/resume/report",
+      "control": "/做一次自我探索/",
+      "selectorHint": "button:/做一次自我探索/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "kept-for-j1-continue-or-out-of-scope",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 0,
+        "afterTextLen": 0
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00150819-report-skip.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-listed-/首页/",
+      "route": "/resume/report",
+      "control": "/首页/",
+      "selectorHint": "button:/首页/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "kept-for-j1-continue-or-out-of-scope",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 0,
+        "afterTextLen": 0
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00150903-report-skip.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-listed-/AI 顾问/",
+      "route": "/resume/report",
+      "control": "/AI 顾问/",
+      "selectorHint": "button:/AI 顾问/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "kept-for-j1-continue-or-out-of-scope",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 0,
+        "afterTextLen": 0
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00150986-report-skip.png"
+    },
+    {
+      "journey": "j1-anon",
+      "step": "report-listed-/我的/",
+      "route": "/resume/report",
+      "control": "/我的/",
+      "selectorHint": "button:/我的/",
+      "kind": "click",
+      "disabled": false,
+      "dead": false,
+      "skipped": "kept-for-j1-continue-or-out-of-scope",
+      "observations": {
+        "urlChanged": false,
+        "apiRequests": [],
+        "domChanged": false,
+        "overlayOrToastOrError": false,
+        "beforeUrl": "/resume/report",
+        "afterUrl": "/resume/report",
+        "beforeTextLen": 0,
+        "afterTextLen": 0
+      },
+      "runtimeErrors": [],
+      "forbiddenCopy": [],
+      "screenshot": "docs/reviews/interaction-sweep-2026-09-08/ai-resume/j1-anon/00151071-report-skip.png"
+    }
+  ],
+  "operations": 160
+}

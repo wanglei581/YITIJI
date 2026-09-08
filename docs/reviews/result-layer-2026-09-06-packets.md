@@ -379,7 +379,161 @@ POST /api/v1/files/:id/convert  body { target: 'pdf' }
 - **执行记录**：
   > 2026-09-07 **包 N2**（worktree `rl-n2-campus-stats`，本地工作区，未 commit、未 push、未开 PR、未部署）。**A 聚合端点**：新增 `GET /api/v1/kiosk/campus/recruitment-stats`（`KioskCampusRecruitmentStatsController`，匿名可读、`@TerminalScopedThrottle(30)`、不调计费 AI）。只聚合 `reviewStatus=approved` 且 `publishStatus=published` 的校园招聘会（theme=`campus`/`campus_corp` 或标题/场馆/来源/简介命中与 `/campus` 同一套校招词）以及 `category=campus` 的已发布岗位（`buildPublishedJobWhere`，含有效期）。按 `sourceOrgId` 分组返回场次数、参会企业数（场内企业名去重）、在招岗位数（校招岗位条数 + 场内 FairCompanyPosition 条数，不去重）、按开场月份的时间分布，每组带 `sourceOrgId` / `sourceName` / 最近 `syncTime`。无数据返回 `groups: []` + `reason: 'no_published_campus_records'`，不编数字。共享类型 `packages/shared/src/types/campusRecruitmentStats.ts`（只加）。jobs.controller.ts 已 749 行，未往里堆。`verify:ai-throttle-dimension` 扫描 523 条 HTTP 路由派生 33 条计费路由，本端点不在其中。**B 一体机页**：删除 `placeholders/FreshmanInsightsPage.tsx`，真页 `pages/campus/FreshmanInsightsPage.tsx` + `CampusInsightsGroups.tsx`，路由 lazy 指向新文件。有数据：每组 `FusionSourceMeta` 写来源机构与同步时间，指标用既有 `jf-stat-card` 令牌，底栏「查看招聘会」→ `/job-fairs`。无数据：保留「暂无经核验的校园招聘统计」+「不会展示示例数据」。失败可「重新加载」，不伪造。主按钮 `jf-btn` 88px / 窄屏 58px，无裸 hex。mock 模式诚实空集合，不编数字。**C 合作机构上传官方统计：本包不做。** 现有 `FieldMappingRule.dataType` 只有 `'job' | 'fair'`；Excel 白名单 `JOB_STANDARD_FIELDS` / `FAIR_STANDARD_FIELDS` 是岗位/招聘会名录字段，没有学校维度官方统计行。`JobFair.expectedAttendance` / `seekerIntentJson` 是单场预计值且意向分布接近候选人漏斗，硬塞会把名录和官方统计混在一起。建议下一包 additive：新 `dataType='campus_stats'`（或独立只读模型）+ 审核流默认 pending，管理员通过后才进本聚合。**未做**：Prisma 模型、`.github/**`、`docs/graph/**`、`current-progress.md`、`apps/miniapp/**`、`apps/kiosk/src/pages/smart-campus/**`、既有端点形状。未 commit / push / 部署。**验证（实跑）**：shared/api/kiosk `tsc --noEmit` 0；改动文件 eslint `--max-warnings=0` 0。`verify:campus-recruitment-stats` 114 PASS（挂在既有 `verify:job-requirement-stats` 之后进 CI 闭包）；`verify:throttle-dimension`（8 条按台路由含本端点）/ `ai-throttle-dimension`（523 路由 / 33 计费，本端点非计费）/ `llm-timeout-concurrency` 78 / `job-requirement-stats` 121 / isolated `job-data-quality` / `job-review` / `jobfair-review` 全绿。kiosk `verify:fusion-w4` / `fusion-w6` / `fusion-shell` / `kiosk-visual-unity` / `ai-down-fallbacks` / `smart-campus-ui` / `profile-commercial-first-batch` 全绿。根 `verify:compliance-copy` / `fixture-time-bombs`（无新增危险带日期）/ `ci-gate-coverage`（409/414 闭包，新门禁经 job-requirement-stats 间接执行）全绿。Playwright w6 `-g campus/freshman-insights` 3 passed：`/campus/freshman-insights` 1080×1920、手机 390×844、以及未改的 `/smart-campus/freshman-insights`。
 
+#### 包 P1 · 部署清单第三章 82 条：分类 + 取证补录 —— grok
+
+- **2026-09-08 总指挥窗口在生产上跑完 B 堆，并修正了本包脚本的两处安全问题（我的错，如实记）**：
+  1. **掩码是黑名单形态**：`s/(SECRET|SECRET_ID|SECRET_KEY|API_KEY|TOKEN|PRIVATE)=.*/\1=SET/` 会让名字里不含这些词的密钥**明文打出来** —— `ALIPAY_APP_ID` / `TENCENT_*` / `ANON_*` / `MEMBER_*` 都在 grep 列表里且全部漏网。已改为**闭合准入**：只有一份明确的非敏感键（provider 名、engine 名、日志档位、TTL 数值、开关布尔）回显真值，其余一律 `=SET`。新增密钥键时，黑名单天然不认识它，闭合准入天然拒绝它。
+  2. **3.6 日志密钥扫描会打印命中行**：`grep -Ei` 匹配到密钥就把整行打出来，正是「验证动作自己不能制造它要防的风险」那条被我自己违反。已改 `grep -c` 只计数（实测 500 行命中 0）。
+  3. 顺带修：3.5 SQLite 残留扫描必须 `-not -path "*/node_modules/*"`，否则 `china-division` 与 Prisma 的 `.sqlite.wasm` 永远误报；3.4 用户表名不是 `AdminUser`，实际是 `User` / `EndUser` / `MemberLegalConsent` / `UserAiConsent` / `UserDataRequest`。
+- **B 堆实证已补录进清单**：3.1 全部 8 条（含「PostgreSQL 5432 与 Redis 6379 只绑 127.0.0.1、未对公网开放」这条强于要求的正面证据）、3.2 NODE_ENV 两处、3.8 日志无敏感正文。
+
+- **主持人收货补录（2026-09-07 夜）**：在 grok 的 A/B/C 三堆之上，用另外两条 lane 的服务器只读与公网取证，把 **3.7 / 3.8 原本进 B 堆的若干条**就地结清，并补录 §4.1（未登录游客六页各 0 条 API 调用）与 §5.5（生产域名可打开，含 DNS 劫持复验方法）。随后本轮按取证规则把 WebSocket 退回 B、把「自动部署」改回未勾、用公网 SSH 横幅补勾 OS。
+- **两条真缺口需产品负责人决定，已写进清单条目**：① nginx `100m` 掐断 `partner_video` / `screensaver_material` / `admin_upload` 三类的 200MB 有效上限（其余上传 ≤30MB 不受影响），三选一：抬 nginx / 降 purpose / 改走 COS 直传；② nginx 无任何上传超时配置，走默认 60 秒，手机扫码上传在弱网下不够用。两者都要动生产，未授权不做。
+- **一条风险留档**：队列用 `@Processor` 跑在 API 进程内（`services/worker` 是空壳），没有独立重启边界 —— 队列任务拖垮进程会连累 API，PM2 拉起的是整个 API。现在不是问题，任务量上去必是。
+- **一条取证方法论**：验「日志不含敏感正文」时只做模式匹配、不打印命中行 —— **验证动作自己不能制造它要防的风险**。
+
+- **条目**：产品负责人指令「剩余问题全部解决」。目标不是把勾打满，是把已经是事实的条目用运行产物钉住、把真的没做的暴露出来。
+- **禁改**：`.github/**`、`services/**`、`apps/**`、`packages/**`、`docs/progress/current-progress.md`、`docs/graph/**`。只改清单与本段。
+- **执行记录**：
+  > 2026-09-07 **包 P1**（worktree `rl-p1-checklist-evidence`，分支 `claude/rl-p1-checklist-evidence`。先前会话有 commit `ed6e60d1d`；本轮只补证据规则违规项，**未再 commit、未 push、未开 PR、未部署、未 SSH**）。清单第三章原未勾 82 / 已勾 7。
+  >
+  > **本轮相对 `ed6e60d1d` 的证据规则修正**
+  > 1. 去掉「`ci.yml` 约 L564 / 脚本 `:103-107`」这种不合格形状；改引 run `34130143436` 的 job/step **结论**。
+  > 2. 「自动部署已生效」改回未勾：CI `34130143436` success 后 `workflow_run` `34130176570` / `34133158769` 均为 skipped；成功发布是手动 `workflow_dispatch` `34137990264`。
+  > 3. 构建产物 hash 从 08-08 的 `index-DqleN77r.js` 改为今晚公网 `index-Do9twi7d.js`（与 deploy 构建日志一致）。
+  > 4. HTTPS 证书复测：`notBefore=Sep 4 2026` / `notAfter=Dec 3 2026`（已续期）；timer 仍 B。
+  > 5. OS：直连 `120.48.13.190:22` 横幅 `OpenSSH_9.6p1 Ubuntu-3ubuntu13.14` → Ubuntu 24.04，补勾。
+  > 6. CORS 本轮实打 OPTIONS/GET：三源有 ACAO，`evil.example` 无 ACAO。
+  > 7. WebSocket 条目退回 B（仓库搜注释 ≠ 服务器 nginx 配置）。
+  > 8. Worker 已勾的判据改成 deploy PM2 表（只有 api + logrotate），不再用「package.json 是空壳」当运行证据。
+  >
+  > **取证锚点（本轮复测）**
+  > - DNS：本机 `zyidai.cn` → `198.18.0.110`。一律 `curl --resolve …:443:120.48.13.190`。
+  > - 公网：`GET /api/v1/health` → `{"status":"ok","db":"postgres","degraded":[]}`；`GET /api/v1/health/ready` → 200 `status=ready`，redis `REDIS_REACHABLE 127.0.0.1:6379`，`since=2026-09-07T15:26:13.487Z`；`GET /api/v1/document-conversion/capabilities` → `wordToPdf:true engine:soffice cjkFonts:true`；`GET /api/v1/payment/channels` → `["alipay","wechat"]`；`jobs` / `job-fairs` / `policies` 均为 `pagination.total=0`。Kiosk / Admin / Partner 三主机 title 与 bundle 与 deploy 日志一致。`POST /api/v1/files` → 401 JSON `AUTH_MISSING_TOKEN`。
+  > - CI：`34130143436`（main `759a37d4595c7932e804875db8686c73c09318c2`）四 job success：`build-and-verify` `101768117781`、`postgres-readiness` `101768117757`、`kiosk-browser-smoke`、`release-bundle`。
+  > - 部署：`34137990264` workflow_dispatch 输入该 CI run，15:22:42Z–15:26:32Z success。`PREFLIGHT OK: 24 gates`（对真实 `.env` **叠加** `NODE_ENV=production`）、PG `ai_job_print@127.0.0.1:5432`、`67 migrations` / `No pending`、PM2 `ai-job-print-api` online、本机 health `127.0.0.1:3010`。预检叠加 NODE_ENV，**不能**单独给「进程内已是 production」打勾。
+  > - 对 `120.48.13.190` 的 5432/6379/3010：TCP SYN 有响应但协议横幅超时，**不**当作「已对公网关闭」或「已对公网开放」。22 有 OpenSSH 横幅。
+  >
+  > **小结**：原 82 = A 33 / B 39 / C 10；另把「自动部署」改回未勾。本章现已勾 39 / 未勾 50。上线阻塞首先是 C「三类内容 total=0」。
+  >
+  > **没做**：未 SSH、未改 workflow / API / 前端 / Prisma、未写 `current-progress.md`、未动 `docs/graph/`、本轮未 commit / push。未把预检叠 NODE_ENV 写成进程内 production。未把 `engine=soffice` 写成版式目视验收。§5.5 只抄 Windows lane 现成证据（含 DNS 劫持复验方法）。
+
+##### A 堆（33，已勾，证据在清单条目下）
+
+| # | 节 | 条目 | 证据（2026-09-07） |
+|---|---|---|---|
+| 1 | 3.1 | OS 版本 | 直连 `120.48.13.190:22` 横幅 `OpenSSH_9.6p1 Ubuntu-3ubuntu13.14`（24.04）+ `nginx/1.24.0 (Ubuntu)` |
+| 2 | 3.1 | pnpm 与锁文件兼容 | deploy `34137990264` 两次 `pnpm install --frozen-lockfile` 成功，`pnpm v11.2.2` |
+| 3 | 3.1 | Linux 已装中文字体 | 公网 `cjkFonts:true` + 预检真实 `probeCjkFont()` → `PREFLIGHT OK: 24 gates`（包名仍 B） |
+| 4 | 3.1 | Word→PDF 走服务端 soffice | 公网 `engine:soffice wordToPdf:true` |
+| 5 | 3.2 | JWT_SECRET 长度/非样值 | 预检过（未读密钥） |
+| 6 | 3.2 | `FILE_STORAGE_DRIVER=cos` | 预检 `PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS` 过 |
+| 7 | 3.2 | `REDIS_URL` 正确 | ready `REDIS_REACHABLE 127.0.0.1:6379` |
+| 8 | 3.2 | 监听端口 / API base / CORS | 本机 3010；公网 `/api/v1`；OPTIONS/GET 三源有 ACAO，`evil.example` 无 |
+| 9 | 3.2 | 字体路径可留空 | 预检 `probeCjkFont` + `cjkFonts:true` |
+| 10 | 3.2 | 先付后印开关已删 | run `34130143436` job `101768117781` 的 `Verify suites` / `Backend P0 contract gates` success（不引脚本行号） |
+| 11 | 3.2 | `PRINT_SCAN_CAPABILITY_MODE` 已声明 | 预检过（具体 managed/strict 未回显） |
+| 12 | 3.2 | `TERMINAL_LEGACY_REGISTER_ENABLED=false` | 预检过 |
+| 13 | 3.2 | `TERMINAL_PLANNED_PROVISIONING_ENABLED` 已声明 | 预检过（true/false 未回显） |
+| 14 | 3.3 | 安装不依赖本机私有路径 | 生产机 + CI 均 frozen-lockfile success |
+| 15 | 3.3 | 上传入口不被 SPA/nginx 误拦 | `POST /api/v1/files` → 401 JSON `AUTH_MISSING_TOKEN` |
+| 16 | 3.3.1 | API 已纳入受控发布 | deploy「受控发布 API」+ PM2 重启 + ready.since 对齐 |
+| 17 | 3.4 | 全新空库 migrate deploy | CI `postgres-readiness` 步骤 `Migrate deploy on fresh PG` success |
+| 18 | 3.4 | PG schema 漂移校验 | CI `PG schema drift check` success + 生产 `No pending migrations` |
+| 19 | 3.4 | 数据库备份脚本可执行 | deploy `PostgreSQL 全库备份 + 可读校验` 后继续发布 |
+| 20 | 3.5 | 生产唯一库仍是 PostgreSQL | health `db=postgres`；migrate `127.0.0.1:5432` |
+| 21 | 3.5 | ScanTask unique index 已在已应用集合 | 生产 `67 migrations` / `No pending`（重复活跃行会让当时 migrate 失败） |
+| 22 | 3.6 | verify 全部 PASS | run `34130143436` 四 job success（step 结论，不引 ci.yml 行号） |
+| 23 | 3.6 | verify 在 PostgreSQL 上跑 | job `101768117757` 步骤 `Core verify suites on PG` success |
+| 24 | 3.7 | `/api/v1/*` 反代 | 多条公网 JSON + nginx/1.24.0 + 本机 3010 |
+| 25 | 3.7 | Kiosk/Admin/Partner 静态路径 | 三主机 title + bundle 与 deploy 构建日志一致 |
+| 26 | 3.7 | `client_max_body_size` | 发布 lane 服务器只读：三份站点配置五处均为 `100m` |
+| 27 | 3.7 | `/opc` 不与其它项目冲突 | 发布 lane nginx 无 `/opc` location；公网 `/opc` 落到本项目 Kiosk SPA |
+| 28 | 3.8 | API 用 PM2 守护 | `[PM2] [ai-job-print-api](0) ✓` `status=online` |
+| 29 | 3.8 | Worker 独立守护 | **N/A**：同一张 PM2 表只有 api + `pm2-logrotate`，无独立 worker 进程 |
+| 30 | 3.8 | nginx 重载策略 | `nginx -s reload` + `signal process started` |
+| 31 | 3.8 | 日志路径与轮转 | 发布 lane：`pm2-logrotate` `max_size 50M` / `retain 7` |
+| 32 | 3.8 | 健康检查可用 | 公网 `/api/v1/health` 与 `/health/ready` 200；发布闸门 curl 3010 |
+| 33 | 3.8 | 回滚流程已写清 | `DEPLOY_SOURCE.txt` 含 rollback 字段（不是失败演练） |
+
+##### B 堆（39，保持未勾；整段脚本给有 SSH 的会话直接粘贴）
+
+覆盖：3.1 Node / PG 版本 / Redis 版本 / fc-list / 时区 / 磁盘内存CPU / 防火墙 / LibreOffice 版本 / 字体包名 / soffice 隔离 / certbot timer；3.2 进程 NODE_ENV / PM2 注入 / 闸门对真实 NODE_ENV / COS 桶名 / OCR / LLM / ASR-TTS / cjk-font 管理端 / 扫码枪 env / planned writer 值 / TTL / SOFFICE_PATH / 并发 / 启动日志 vs capabilities；3.3.1 WEB_ROOT；3.4 seed 抽样 / bootstrap / User 计数 / 改密 / 0600 文件 / 启动日志 / 外键；3.5 sqlite 残骸 / ScanTask 当前 SQL / scan 能力；3.6 日志无密钥 / soffice --version；3.7 WebSocket Upgrade 头；3.8 日志级别。清单每条下面也有同一条命令。OS 已用公网 SSH 横幅勾上，脚本里仍保留 `os-release` 作精确 `VERSION_ID`。
+
+默认运行目录 `/srv/ai-job-print`。禁止把密钥值贴进聊天。`ADMIN_TOKEN` 需事先导出。3.6 真实样例转 PDF 仍要人工打开，脚本只打版本与 capabilities。
+
+```bash
+set +e
+cd /srv/ai-job-print
+# ⚠️ 掩码必须是「闭合准入」而不是黑名单（2026-09-08 总指挥窗口在生产上量出并修正）。
+# 旧写法按关键词黑名单打码，名字里不含 SECRET/TOKEN 的密钥会明文打出来 ——
+# ALIPAY_APP_ID / TENCENT_* / ANON_* / MEMBER_* 全部在 grep 列表里且全部漏网。
+# 新写法：只有下面这份明确的非敏感键回显真值，其余一律 =SET。
+# 新增一个密钥键时，黑名单天然不认识它，闭合准入天然拒绝它。
+SAFE_KEYS='^(NODE_ENV|FILE_STORAGE_DRIVER|OCR_PROVIDER|AI_PROVIDER|ASR_PROVIDER|TTS_PROVIDER|PAYMENT_PROVIDER|CONVERSION_ENGINE|SOFFICE_PATH|GOTENBERG_URL|CONVERSION_MAX_CONCURRENCY|CONVERSION_TIMEOUT|LOG_LEVEL|PINO_LEVEL|TERMINAL_PLANNED_PROVISIONING_ENABLED|TERMINAL_LEGACY_REGISTER_ENABLED|PRINT_SCAN_CAPABILITY_MODE|COS_REGION|COS_BUCKET|FILE_SIGNING_TTL|COS_SIGNED_URL_TTL|ANON_[A-Z_]*TTL|MEMBER_[A-Z_]*TTL|DATA_RETENTION[A-Z_]*)='
+mask_env() { grep -E "$1" services/api/.env | awk -v ok="$SAFE_KEYS" '{ split($0,kv,"="); if (kv[1] "=" ~ ok) print; else print kv[1] "=SET" }'; }
+echo '=== 3.1 OS ==='; . /etc/os-release; echo "$PRETTY_NAME"; uname -r
+echo '=== 3.1 Node ==='; node -v; pm2 show ai-job-print-api | sed -n '/node.js version/Ip;/exec cwd/Ip;/script path/Ip'
+echo '=== 3.1 PostgreSQL ==='; psql -h 127.0.0.1 -d ai_job_print -c 'SHOW server_version;'
+echo '=== 3.1 Redis ==='; redis-cli -h 127.0.0.1 INFO server | grep redis_version
+echo '=== 3.1 fc-list ==='; fc-list :lang=zh family file | head -20
+echo '=== 3.1 timezone ==='; timedatectl | grep -E 'Time zone|Local time'
+echo '=== 3.1 disk/mem/cpu ==='; df -hT; free -h; nproc; uptime
+echo '=== 3.1 firewall ==='; sudo ss -lntup | grep -E ':(80|443|22|3010|5432|6379)\s'; sudo ufw status verbose 2>/dev/null || sudo iptables -L INPUT -n | head -40
+echo '=== 3.1 libreoffice ==='; dpkg -l libreoffice-core libreoffice-writer 2>/dev/null | awk 'NR==1 || /libreoffice/'; test -n "$SOFFICE_PATH" && "$SOFFICE_PATH" --version; ss -lnt | grep -E ':(3000|3001)\s' || true
+echo '=== 3.1 font packages ==='; fc-list ':lang=zh' family | head; dpkg -l | grep -Ei 'fonts-noto-cjk|fonts-wqy|source-han'
+echo '=== 3.1 soffice process ==='; ps aux | grep -E '[s]office|[l]ibreoffice'; id; ls -ld /tmp; sudo iptables -L OUTPUT -n | head -20
+echo '=== 3.2 NODE_ENV pm2 ==='; pm2 env 0 | grep -E '^NODE_ENV='
+echo '=== 3.2 NODE_ENV proc ==='; tr '\0' '\n' < /proc/$(pgrep -n -f dist/main.js | head -1)/environ 2>/dev/null | grep '^NODE_ENV='
+echo '=== 3.2 COS (masked) ==='; mask_env "^(FILE_STORAGE_DRIVER|COS_BUCKET|COS_REGION|COS_SECRET_ID|FILE_SIGNING_TTL|COS_SIGNED_URL_TTL)="
+echo '=== 3.2 OCR (masked) ==='; mask_env "^(OCR_PROVIDER|BAIDU_OCR_API_KEY|BAIDU_OCR_SECRET_KEY)="
+echo '=== 3.2 AI (masked) ==='; mask_env "^(AI_PROVIDER|AI_LLM_API_KEY|TRTC_LLM_API_KEY)="
+echo '=== 3.2 ASR/TTS (masked) ==='; mask_env "^(ASR_PROVIDER|TTS_PROVIDER|TENCENT_.*SECRET|TRTC_)="
+echo '=== 3.2 cjk-font admin ==='; curl -fsS -H "Authorization: Bearer ${ADMIN_TOKEN:-}" http://127.0.0.1:3010/api/v1/health/cjk-font
+echo '=== 3.2 codepay (masked) ==='; mask_env "^(PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED|ALIPAY_APP_ID|PAYMENT_NOTIFY_BASE_URL|PAYMENT_PROVIDER)="
+echo '=== 3.2 planned writer ==='; grep '^TERMINAL_PLANNED_PROVISIONING_ENABLED=' services/api/.env; cat DEPLOY_SOURCE.txt
+echo '=== 3.2 TTL ==='; grep -E '^(FILE_|SIGNED_URL|ANON_|MEMBER_.*TTL|DATA_RETENTION)' services/api/.env
+echo '=== 3.2 conversion env ==='; grep -E '^(CONVERSION_ENGINE|SOFFICE_PATH|GOTENBERG_URL|CONVERSION_MAX_CONCURRENCY|CONVERSION_TIMEOUT)=' services/api/.env; test -n "$SOFFICE_PATH" && readlink -f "$SOFFICE_PATH"
+echo '=== 3.2 conversion logs ==='; pm2 logs ai-job-print-api --lines 200 --nostream | grep -Ei 'conversion|soffice|cjk|wordToPdf'; curl -fsS http://127.0.0.1:3010/api/v1/document-conversion/capabilities
+echo '=== 3.3.1 web root ==='; ls -ld "${DEPLOY_WEB_ROOT:-/var/www}"; ls "${DEPLOY_WEB_ROOT:-/var/www}" | head; nginx -T 2>/dev/null | grep -n -A2 "root "
+echo '=== 3.4 users sample ==='; psql -h 127.0.0.1 -d ai_job_print -c 'SELECT email, role FROM "User" LIMIT 20;'
+echo '=== 3.4 user count / bootstrap audit ==='; psql -h 127.0.0.1 -d ai_job_print -c 'SELECT count(*) AS users FROM "User";'; psql -h 127.0.0.1 -d ai_job_print -c "SELECT action, created_at FROM \"AuditLog\" WHERE action ILIKE '%bootstrap%' ORDER BY created_at DESC LIMIT 5;"
+echo '=== 3.4 admin tokenVersion ==='; psql -h 127.0.0.1 -d ai_job_print -c "SELECT role, \"tokenVersion\" FROM \"User\" WHERE role IN ('admin','owner') LIMIT 10;"
+echo '=== 3.4 cred files ==='; sudo find /root /srv /var -name '*admin*cred*' -o -name '*bootstrap*' 2>/dev/null | head
+echo '=== 3.4 api start logs ==='; pm2 logs ai-job-print-api --lines 100 --nostream | grep -Ei 'postgres|sqlite|datasource|Prisma'
+echo '=== 3.4 constraints ==='; psql -h 127.0.0.1 -d ai_job_print -c "SELECT conrelid::regclass, conname, contype FROM pg_constraint WHERE contype IN ('f','u','p') ORDER BY 1,3 LIMIT 40;"
+echo '=== 3.5 sqlite leftovers ==='; find /srv /var/backups -maxdepth 3 \( -name '*.sqlite*' -o -name '*.db' \) -not -path '*/node_modules/*' 2>/dev/null  # 必须排除 node_modules，否则 china-division 与 Prisma 的 .sqlite.wasm 会永远误报
+echo '=== 3.5 ScanTask dupes ==='; psql -h 127.0.0.1 -d ai_job_print -c "SELECT \"terminalId\", COUNT(*) FROM \"ScanTask\" WHERE status IN ('waiting','matched') GROUP BY \"terminalId\" HAVING COUNT(*) > 1;"
+echo '=== 3.5 scan capability ==='; psql -h 127.0.0.1 -d ai_job_print -c "SELECT \"terminalId\", key, status FROM \"TerminalCapability\" WHERE key='scan';"
+echo '=== 3.6 log secrets grep ==='; pm2 logs ai-job-print-api --lines 500 --nostream | grep -cEi 'sk-|api[_-]?key|Bearer eyJ|BEGIN PRIVATE|access_token'  # ⚠️ 只计数不打印命中行：验证动作自己不能制造它要防的风险（2026-09-08 实测 500 行命中 0）
+echo '=== 3.6 soffice version ==='; test -x "$SOFFICE_PATH" && "$SOFFICE_PATH" --version; curl -fsS http://127.0.0.1:3010/api/v1/document-conversion/capabilities
+echo '=== 3.7 nginx limits ==='; nginx -T 2>/dev/null | grep -nE 'client_max_body_size|proxy_read_timeout|proxy_send_timeout|client_body_timeout|Upgrade|proxy_set_header Connection|proxy_http_version'
+echo '=== 3.7 nginx roots/opc ==='; nginx -T 2>/dev/null | grep -nE 'location |server_name |root '
+echo '=== 3.7 api body env ==='; grep -E '^(JSON_BODY|NEST_BODY|FILE_MAX)' services/api/.env
+echo '=== 3.8 logrotate ==='; pm2 conf pm2-logrotate; ls -l ~/.pm2/logs /var/log/nginx | head
+echo '=== 3.8 log level ==='; grep -E '^(LOG_LEVEL|PINO_LEVEL)=' services/api/.env; pm2 logs ai-job-print-api --lines 80 --nostream
+```
+
+##### C 堆（10 条来自原 82，另 + 自动部署改回未勾）
+
+| 节 | 条目 | 缺什么 / 谁能做 | 上线阻塞？ |
+|---|---|---|---|
+| 3.2 | COS 生命周期控制台截图 | 腾讯云 COS 规则截图（名/前缀/天数/启用）。CI `verify:cos-lifecycle-policy` 不是线上桶 | 文件保留合规；不挡「页面能开」 |
+| 3.2 | 支付宝当面付现场两笔 | 屏上码 + HID 枪各一笔受控小额并对账。现场运维 | **是**（若生产要开当面付） |
+| 3.3.1 | 自动 `workflow_run` 部署 | CI success 后 run `34130176570` / `34133158769` skipped。有 Actions 权限的人看 if 条件 | 否（手动 `workflow_dispatch` `34137990264` 已通） |
+| 3.3.1 | 部署失败告警与回滚演练 | 故意失败 → 告警 → 按 DEPLOY_SOURCE 回滚 → health 恢复 | 否（发布可靠性；锚点已有） |
+| 3.4 | 岗位/招聘会/政策 `total=0` | 真实来源导入 + 管理员 `approved`+`published`。2026-09-07 公网复测仍全 0 | **是（内容阻塞）** |
+| 3.4 | pg_dump 恢复到临时库 | 现网只做了 TOC 可读校验。有 PG 权限的人建临时库 `pg_restore` 后 `SELECT count(*)` | 否（备份可靠性） |
+| 3.5 | 具名授权领域搬数方案 | 未见方案。无外部旧库则产品负责人书面关闭 | 否 |
+| 3.5 | 领域迁移 dry-run / 对账 | 依赖上条 | 否 |
+| 3.5 | 孤儿/重复/缺来源清单 | 当前三类内容为空，导入时必须做 | 随内容导入 |
+| 3.7 | API body 与 nginx 100m 冲突 | `partner_video` / `screensaver_material` / `admin_upload` 有效上限 200MB，会在 nginx 100m 被 413。产品负责人三选一 | 仅这三类上传；其余 ≤30MB 不受影响 |
+| 3.7 | nginx 上传超时未配 | 无 `proxy_read_timeout` 等，默认 60s。手机弱网扫码上传可能不够。要动生产 nginx | 扫码上传弱网场景 |
+
+> **验证（实跑，本轮改文档后）**：`npx pnpm@11.2.2 verify:repository-integrity` OK（3998 tracked files 无冲突标记，6 个 workflow YAML 语法有效）。图谱：`verify:cos-lifecycle-policy` passed；`verify:file-assets-trial-acceptance` passed（脚本声明「静态文档检查 ≠ 生产验收」）；`verify:profile-documents-inkpaper` ALL PASS（本包未触碰 `/me/documents` 明细页，守卫按设计跳过范围 allowlist）。
+
 ## 第三波（P1 补全，商用完整）
+
 
 ≥3 套真实模板 + 真实缩略图；DOCX 吃 layout / 模板；具名多版本与对比；跨端续办；PDF → 图片；gotenberg 适配器 + 队列化；Puppeteer 替换 pdfkit 评估；缩略图；助手会话要点；政策核对材料清单出纸。
 

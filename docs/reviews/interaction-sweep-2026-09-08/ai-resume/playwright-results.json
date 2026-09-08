@@ -1,0 +1,330 @@
+{
+  "config": {
+    "configFile": "/Users/wanglei/AI求职打印服务终端/.claude/worktrees/rl-p1-checklist-evidence/apps/kiosk/playwright.interaction.config.ts",
+    "rootDir": "/Users/wanglei/AI求职打印服务终端/.claude/worktrees/rl-p1-checklist-evidence/apps/kiosk/tests/interaction",
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "/Users/wanglei/AI求职打印服务终端/.claude/worktrees/rl-p1-checklist-evidence/apps/kiosk/tests/interaction/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../../docs/reviews/interaction-sweep-2026-09-08/ai-resume/playwright-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/wanglei/AI求职打印服务终端/.claude/worktrees/rl-p1-checklist-evidence/test-results/kiosk-interaction",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "kiosk-interaction-1080x1920",
+        "name": "kiosk-interaction-1080x1920",
+        "testDir": "/Users/wanglei/AI求职打印服务终端/.claude/worktrees/rl-p1-checklist-evidence/apps/kiosk/tests/interaction",
+        "testIgnore": [],
+        "testMatch": [
+          "/.*\\.spec\\.ts$/"
+        ],
+        "timeout": 240000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.55.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "ai-resume-journey.spec.ts",
+      "file": "ai-resume-journey.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "J1 匿名 · 首页→诊断→报告页按钮 @interaction",
+          "ok": true,
+          "tags": [
+            "interaction"
+          ],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "kiosk-interaction-1080x1920",
+              "projectName": "kiosk-interaction-1080x1920",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 31678,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-07T16:55:20.017Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df260013ed1fcc5f31e7-6599931342603a9bb64f",
+          "file": "ai-resume-journey.spec.ts",
+          "line": 129,
+          "column": 1
+        },
+        {
+          "title": "J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @interaction",
+          "ok": true,
+          "tags": [
+            "interaction"
+          ],
+          "tests": [
+            {
+              "timeout": 360000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "kiosk-interaction-1080x1920",
+              "projectName": "kiosk-interaction-1080x1920",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 34694,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-07T16:55:52.012Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df260013ed1fcc5f31e7-746c2ab1ff0843797e35",
+          "file": "ai-resume-journey.spec.ts",
+          "line": 204,
+          "column": 1
+        },
+        {
+          "title": "J3 匿名 · AI 帮你生成一份 → 预览 → 导出 PDF @interaction",
+          "ok": true,
+          "tags": [
+            "interaction"
+          ],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "kiosk-interaction-1080x1920",
+              "projectName": "kiosk-interaction-1080x1920",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10688,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-07T16:56:26.712Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df260013ed1fcc5f31e7-a50dbc59e2399840a37f",
+          "file": "ai-resume-journey.spec.ts",
+          "line": 343,
+          "column": 1
+        },
+        {
+          "title": "J4 匿名 · /me/ai-records 登录门与全部按钮 @interaction",
+          "ok": true,
+          "tags": [
+            "interaction"
+          ],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "kiosk-interaction-1080x1920",
+              "projectName": "kiosk-interaction-1080x1920",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11058,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-07T16:56:37.406Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df260013ed1fcc5f31e7-38561b58daf2802a8b5f",
+          "file": "ai-resume-journey.spec.ts",
+          "line": 436,
+          "column": 1
+        },
+        {
+          "title": "J4 匿名 · /me/resumes 登录门与全部按钮 @interaction",
+          "ok": true,
+          "tags": [
+            "interaction"
+          ],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "kiosk-interaction-1080x1920",
+              "projectName": "kiosk-interaction-1080x1920",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12120,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-07T16:56:48.474Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df260013ed1fcc5f31e7-3c69593c840c4bedc3d8",
+          "file": "ai-resume-journey.spec.ts",
+          "line": 452,
+          "column": 1
+        },
+        {
+          "title": "J4 匿名 · /me/documents 登录门与全部按钮 @interaction",
+          "ok": true,
+          "tags": [
+            "interaction"
+          ],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "kiosk-interaction-1080x1920",
+              "projectName": "kiosk-interaction-1080x1920",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11130,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-07T16:57:00.600Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df260013ed1fcc5f31e7-cb722eae77f141a635c5",
+          "file": "ai-resume-journey.spec.ts",
+          "line": 466,
+          "column": 1
+        },
+        {
+          "title": "会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interaction",
+          "ok": true,
+          "tags": [
+            "interaction"
+          ],
+          "tests": [
+            {
+              "timeout": 360000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "kiosk-interaction-1080x1920",
+              "projectName": "kiosk-interaction-1080x1920",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 28342,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-07T16:57:11.734Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df260013ed1fcc5f31e7-323d9ce18a14098d84c1",
+          "file": "ai-resume-journey.spec.ts",
+          "line": 480,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-07T16:55:19.657Z",
+    "duration": 140524.06199999998,
+    "expected": 7,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
