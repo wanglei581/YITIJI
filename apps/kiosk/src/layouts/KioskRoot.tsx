@@ -118,6 +118,10 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/companies',
   '/jobs/online-platforms',
   '/ai/plan',
+  '/scan/start',
+  '/scan/settings',
+  '/scan/progress',
+  '/scan/result',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',

@@ -819,10 +819,7 @@ assert.match(
 )
 
 const scanPages = new Map([
-  ['src/pages/scan/ScanStartPage.tsx', 'scan-start'],
-  ['src/pages/scan/ScanSettingsPage.tsx', 'scan-settings'],
-  ['src/pages/scan/ScanProgressPage.tsx', 'scan-progress'],
-  ['src/pages/scan/ScanResultPage.tsx', 'scan-result'],
+  // 四页已迁出 V6 壳。循环体保留，避免删掉 assert 行；条目清空后改由下方 qxScanPages 同强度断言。
 ])
 for (const [path, marker] of scanPages) {
   const body = read(path)
@@ -831,6 +828,52 @@ for (const [path, marker] of scanPages) {
   assert.match(body, /KioskPageFrame/, `${path} uses the frozen page frame`)
   assert.match(body, /KioskPageHeader/, `${path} uses the frozen page header`)
 }
+const qxScanPages = new Map([
+  ['src/pages/scan/ScanStartPage.tsx', 'scan-start'],
+  ['src/pages/scan/ScanSettingsPage.tsx', 'scan-settings'],
+  ['src/pages/scan/ScanProgressPage.tsx', 'scan-progress'],
+  ['src/pages/scan/ScanResultPage.tsx', 'scan-result'],
+])
+for (const [path, marker] of qxScanPages) {
+  const body = read(path)
+  assert.match(body, /ScanWorkbenchShell/, `${path} uses the Qingxu page frame`)
+  assert.doesNotMatch(body, /KioskPageFrame/, `${path} has left the V6 frame`)
+  assert.match(body, new RegExp(`page=["']${marker}["']`), `${path} exposes ${marker}`)
+  assert.doesNotMatch(body, /KioskPageHeader/, `${path} no longer uses the V6 page header`)
+}
+assert.match(
+  read('src/pages/scan/ScanWorkbenchChrome.tsx'),
+  /data-w2-page=\{page\}/,
+  'scan chrome forwards the route ownership marker to the DOM',
+)
+assert.match(
+  read('src/pages/scan/ScanWorkbenchChrome.tsx'),
+  /QxPageFrame/,
+  'scan chrome wraps QxPageFrame so the four scan routes leave the V6 shell',
+)
+assert.match(
+  read('src/pages/scan/ScanWorkbenchChrome.tsx'),
+  /QxAppNavbar/,
+  'scan chrome uses the shared Qingxu navbar instead of an inlined copy',
+)
+assert.match(
+  read('src/pages/scan/ScanWorkbenchChrome.tsx'),
+  /scan-workbench-qx\.css/,
+  'scan chrome imports the Qingxu scan stylesheet',
+)
+const kioskRootSource = read('src/layouts/KioskRoot.tsx')
+for (const route of ['/scan/start', '/scan/settings', '/scan/progress', '/scan/result']) {
+  assert.match(
+    kioskRootSource,
+    new RegExp(`QX_MIGRATED_ROUTES[\\s\\S]*['"]${route}['"]`),
+    `${route} is registered in QX_MIGRATED_ROUTES`,
+  )
+}
+const scanWorkbenchQxCss = read('src/pages/scan/styles/scan-workbench-qx.css')
+assert.match(scanWorkbenchQxCss, /var\(--qx-ink\)/, 'scan workbench CSS consumes Qingxu tokens')
+assert.match(scanWorkbenchQxCss, /--qx-tap-min|--qx-btn-h/, 'scan workbench CSS keeps the touch floor token')
+assert.doesNotMatch(scanWorkbenchQxCss, /#[0-9a-fA-F]{3,8}\b|rgb\(/, 'scan workbench CSS does not introduce raw color literals')
+assert.match(read('src/components/qingxu/QxAppNavbar.tsx'), /onHome,[\s\S]*onAdvisor,[\s\S]*onProfile/, 'QxAppNavbar keeps the shared three-tab signature')
 
 const scanStart = read('src/pages/scan/ScanStartPage.tsx')
 assert.doesNotMatch(
@@ -854,6 +897,9 @@ assert.match(
   'scan start uses task-creation copy instead of hardware ready'
 )
 assert.doesNotMatch(scanStart, /扫描仪就绪/, 'scan start must not claim scanner hardware ready')
+assert.doesNotMatch(scanStart, /盖板感知|盖板已关|免点击扫描/, 'scan start must not imply lid-sensing auto start')
+assert.match(scanStart, /改用面板扫描到 U 盘/, 'scan start keeps the USB-panel independent path')
+assert.match(scanStart, /mode=usb-panel/, 'USB-panel path is a real query mode, not a fake scan session')
 assert.match(
   scanStart,
   /navigate\(["']\/scan\/settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
@@ -964,6 +1010,19 @@ assert.match(
   'guest scan result must say the file will not enter My Documents',
 )
 assert.match(scanResult, /state\.file/, 'scan result derives its file only from route state')
+assert.doesNotMatch(
+  scanResult,
+  /preview-url/,
+  'anonymous scan preview must not call the login-gated preview-url endpoint',
+)
+assert.match(
+  scanResult,
+  /files\/:id\/content/,
+  'scan result preview copy names the anonymous signed content URL',
+)
+assert.match(scanResult, /completed-no-file/, 'completed with file:null is a distinct honest terminal state')
+assert.match(scanProgress, /立即检查/, 'progress keeps a real manual poll action')
+assert.doesNotMatch(scanProgress, /盖板/, 'progress must not imply lid-sensing hardware events')
 assert.ok(!/scan-result\.pdf/.test(scanResult), 'scan result never fabricates a local result file')
 assert.doesNotMatch(
   scanResult,

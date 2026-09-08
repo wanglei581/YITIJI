@@ -1,26 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import {
-  AlertCircleIcon,
-  CheckIcon,
-  CircleIcon,
-  ClockIcon,
-  FileTextIcon,
-  ScanIcon,
-  XCircleIcon,
-} from 'lucide-react'
-import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
+import { AlertCircleIcon, XCircleIcon } from 'lucide-react'
 import type { ScanSessionFileView } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { ScanFlowSteps } from './ScanFlowSteps'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
-import './styles/scan-fusion.css'
+import {
+  ScanChain,
+  ScanCta,
+  ScanKvCard,
+  ScanNoteCard,
+  ScanPlan,
+  ScanSec,
+  ScanStatusPanel,
+  ScanWorkbenchShell,
+} from './ScanWorkbenchChrome'
+import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 
-type ScanType = 'resume' | 'id' | 'document'
 type ScanBusyPhase = 'active' | 'terminal'
 
 interface LocationState {
@@ -33,12 +32,6 @@ const POLL_INTERVAL_MS = 3000
 // 扫描轮询兜底：总时长 10 分钟、连续失败 20 次即判失败，不再无限轮询（MSC-08）
 const MAX_SCAN_POLL_MS = 10 * 60 * 1000
 const MAX_SCAN_POLL_FAILS = 20
-
-const SCAN_TYPE_LABELS: Record<ScanType, string> = {
-  resume: '简历扫描',
-  id: '证件扫描',
-  document: '普通文档',
-}
 
 function formatElapsed(startedAt: number): string {
   const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
@@ -76,13 +69,13 @@ export function ScanProgressPage() {
   const [error, setError] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState('00:00')
   const [busyPhase, setBusyPhase] = useState<ScanBusyPhase>('active')
+  const [pollInFlight, setPollInFlight] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [polls, setPolls] = useState(0)
   const startedAtRef = useRef(Date.now())
   const cancellingRef = useRef(false)
+  const pollNowRef = useRef<() => void>(() => undefined)
 
-  // 锁只在 active 阶段持有。终态（completed/expired/failed/cancelled）切换到
-  // terminal 之后 useBusyLock 的依赖 active=false,下一次 effect render 时
-  // 不再申请新锁;旧锁随组件卸载或 effect cleanup 释放给 busy context。
-  // 网络错误保持 active,等下一次 poll 重新拿到状态。
   useBusyLock(hasTaskIdentity && busyPhase === 'active')
 
   useEffect(() => {
@@ -99,44 +92,51 @@ export function ScanProgressPage() {
 
     let stopped = false
     let timer: number | undefined
+    let inFlight = false
 
-    // 只在上一次 poll 完全落地（成功导航返回，或失败已安排重试）之后才安排下一次，
-    // 不用固定 setInterval——网络变慢时固定间隔会让多个请求堆叠并发，而不是退避。
     const scheduleNext = () => {
       if (stopped) return
       timer = window.setTimeout(() => void poll(), POLL_INTERVAL_MS)
     }
 
     const poll = async () => {
+      if (stopped || inFlight || cancellingRef.current) return
+      inFlight = true
+      setPollInFlight(true)
       try {
         const status = await getScanSessionStatus(scanTaskId, controlToken, getToken())
         if (stopped) return
+        setPolls((count) => count + 1)
+        setError(null)
         if (status.status === 'completed' && status.file) {
           setBusyPhase('terminal')
           navigate('/scan/result', {
             replace: true,
-            state: { scanType, success: true, file: buildResultFileState(status.file) },
+            state: { scanType, success: true, outcome: 'completed', file: buildResultFileState(status.file) },
           })
           return
         }
         if (status.status === 'completed' && !status.file) {
           setBusyPhase('terminal')
-          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描已完成但未拿到文件，请重新扫描' } })
+          navigate('/scan/result', {
+            replace: true,
+            state: { scanType, success: false, outcome: 'completed-no-file', reason: '扫描已完成但未拿到文件，请重新扫描' },
+          })
           return
         }
         if (Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
           setBusyPhase('terminal')
-          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描超时，请返回重新开始' } })
+          navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'expired', reason: '扫描超时，请返回重新开始' } })
           return
         }
         if (status.status === 'expired') {
           setBusyPhase('terminal')
-          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描超时，请返回重新开始' } })
+          navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'expired', reason: '扫描超时，请返回重新开始' } })
           return
         }
         if (status.status === 'failed') {
           setBusyPhase('terminal')
-          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: status.errorMessage ?? '扫描处理失败，请重试' } })
+          navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'failed', reason: status.errorMessage ?? '扫描处理失败，请重试' } })
           return
         }
         if (status.status === 'cancelled') {
@@ -148,20 +148,30 @@ export function ScanProgressPage() {
       } catch (err) {
         if (!stopped) {
           setError(userMessageOf(err, '查询扫描状态失败，请稍后重试'))
+          setPolls((count) => count + 1)
           pollFailsRef.current += 1
           if (pollFailsRef.current >= MAX_SCAN_POLL_FAILS || Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
             setBusyPhase('terminal')
-            navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '长时间无法查询扫描状态，请联系工作人员或重新开始' } })
+            navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'failed', reason: '长时间无法查询扫描状态，请联系工作人员或重新开始' } })
             return
           }
           scheduleNext()
         }
+      } finally {
+        inFlight = false
+        if (!stopped) setPollInFlight(false)
       }
+    }
+
+    pollNowRef.current = () => {
+      if (timer !== undefined) window.clearTimeout(timer)
+      void poll()
     }
 
     void poll()
     return () => {
       stopped = true
+      pollNowRef.current = () => undefined
       if (timer !== undefined) window.clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -170,19 +180,12 @@ export function ScanProgressPage() {
   const handleCancel = async () => {
     if (!scanTaskId || !controlToken || cancellingRef.current) return
     cancellingRef.current = true
+    setCancelling(true)
     try {
       await cancelScanSession(scanTaskId, controlToken, getToken())
-      // 离开本页：标记 terminal,后续 React effect 渲染 busyPhase==='terminal'
-      // 时 useBusyLock 不会再向 busy context 申请一把新锁;旧的锁在组件卸载 /
-      // effect cleanup 时释放到 busy context,目的页挂载即重新进入 idle 计时。
       setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     } catch (err) {
-      // 取消请求送达时任务恰好已经完成（Agent 并发投递刚好抢先完成,后端会返回
-      // SCAN_TASK_ALREADY_COMPLETED）：补查一次真实状态,能拿到文件就直接进
-      // 结果页;查不到、或补查本身失败、或是网络错误等其它取消失败原因,则退回默认
-      // 路径,不阻塞用户。所有离开分支都走 setBusyPhase('terminal') + navigate,
-      // 锁的释放由 unmount / effect cleanup 接手,不在 catch 这里手动调度。
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
         try {
@@ -191,7 +194,7 @@ export function ScanProgressPage() {
             setBusyPhase('terminal')
             navigate('/scan/result', {
               replace: true,
-              state: { scanType, success: true, file: buildResultFileState(latest.file) },
+              state: { scanType, success: true, outcome: 'completed', file: buildResultFileState(latest.file) },
             })
             return
           }
@@ -204,65 +207,125 @@ export function ScanProgressPage() {
     }
   }
 
+  const workbenchState = cancelling
+    ? 'cancelling'
+    : pollInFlight
+      ? 'polling'
+      : error
+        ? 'poll-failed'
+        : 'waiting-delivery'
+  const status = cancelling
+    ? { tone: 'unknown' as const, label: '正在发送取消请求' }
+    : pollInFlight
+      ? { tone: 'unknown' as const, label: '正在查询服务端' }
+      : error
+        ? { tone: 'warn' as const, label: '查状态失败 · 不改判' }
+        : { tone: 'unknown' as const, label: '等待文件回传' }
+
   return (
-    <KioskPageFrame className="w2-scan-page">
-      <div data-w2-page="scan-progress" className="w2-scan-shell">
-        <KioskPageHeader title="等待扫描完成" description="请在打印机面板完成扫描到本机接收目录；本页每 3 秒自动检测结果" aside={<span className="w2-scan-status-chip is-busy"><span />等待面板回传</span>} />
-
-      <ScanFlowSteps activeIndex={2} />
-
-      <section className="w2-scan-content w2-scan-two-column">
-        <section className="w2-scan-waiting-card">
-          <span className="w2-scan-pulse"><ScanIcon /></span>
-          <h2>等待打印机端扫描完成</h2>
-          <p>
-            扫描完成后会自动进入结果页，请勿离开；<br />
-            如打印机仍在进纸，请等待整叠原件全部扫完
-          </p>
-          {error && <KioskStatePanel compact tone="error" title="暂时无法更新扫描状态" description={`${error}；系统会继续自动重试。`} icon={<AlertCircleIcon />} />}
-        </section>
-
-        <aside className="w2-scan-sidebar">
-          <section className="w2-scan-info-card">
-            <h2>任务信息</h2>
-            {[
-              ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-              ['任务编号', scanTaskId ?? '未创建'],
-              ['开始等待', `已等待 ${elapsed}`],
-              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-            ].map(([key, value]) => (
-              <div key={key}><span>{key}</span><b>{value}</b></div>
-            ))}
-          </section>
-
-          <section className="w2-scan-progress-list">
-            <h2>流程说明 <small>实际进度以打印机端为准</small></h2>
-            {[
-              ['任务已创建', '本机已就绪，等待打印机端发起', 'done'],
-              ['等待扫描回传', '打印机扫描并回传文件中', 'active'],
-              ['保存扫描文件', '按设备回传的原格式保存，服务端不做转换', 'pending'],
-              ['进入结果页', '选择打印、保存或 AI 识别', 'pending'],
-            ].map(([title, copy, state]) => (
-              <div key={title} data-state={state}>
-                <span>
-                  {state === 'done' ? <CheckIcon className="h-5 w-5" /> : state === 'active' ? <CircleIcon className="h-5 w-5 fill-current" /> : <FileTextIcon className="h-5 w-5" />}
-                </span>
-                <div><b>{title}</b><small>{copy}</small></div>
-              </div>
-            ))}
-          </section>
-
-          <p className="w2-scan-warning"><AlertCircleIcon />扫描中请勿翻动或抽拉原件；任务超时未收到结果会提示重新开始。</p>
-        </aside>
-      </section>
-
-      <KioskActionBar leading={<span className="w2-scan-action-note"><ClockIcon />已等待 {elapsed} · 系统会持续自动检查</span>}>
-        <Button variant="secondary" size="lg" className="w2-scan-cancel" onClick={handleCancel}>
-          <XCircleIcon />取消扫描
-        </Button>
-      </KioskActionBar>
+    <ScanWorkbenchShell
+      page="scan-progress"
+      state={workbenchState}
+      title="等待打印机端扫描完成"
+      subtitle="请在打印机面板完成扫描到本机接收目录；本页每 3 秒自动检测结果"
+      status={status}
+      facts={['面板扫完就回到这台屏幕：本机每隔几秒自动查一次，有结果会自动切过去。']}
+      ctabar={
+        <ScanCta
+          reason={
+            cancelling
+              ? '正在等取消回执 —— 这一刻既不说已取消，也不说已完成'
+              : pollInFlight
+                ? '正在等这次查询的回执 —— 这一刻不改判任务状态'
+                : undefined
+          }
+        >
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="ghost"
+            disabled={cancelling || pollInFlight}
+            onClick={() => void handleCancel()}
+          >
+            <XCircleIcon aria-hidden />
+            取消扫描
+          </button>
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="primary"
+            disabled={cancelling || pollInFlight}
+            onClick={() => pollNowRef.current()}
+          >
+            立即检查
+          </button>
+        </ScanCta>
+      }
+    >
+      <ScanStatusPanel
+        tone={error ? 'warn' : 'info'}
+        icon={error ? AlertCircleIcon : undefined}
+        title={
+          cancelling
+            ? '正在发送取消请求'
+            : pollInFlight
+              ? '正在查询服务端'
+              : error
+                ? '查状态失败，任务仍按进行中处理'
+                : '正在等文件回传'
+        }
+        breathe={!error}
+        chips={[
+          { label: error ? '正在自动重试' : '正在自动检查', tone: error ? 'warn' : 'ok' },
+          { label: `已查询 ${polls} 次` },
+          { label: '没有页级进度' },
+        ]}
+      >
+        {cancelling ? (
+          <>
+            <p>本机正在请求服务端取消这次会话。<b>服务端没回之前，页面不说已取消</b> —— 取消成不成功由服务端定。</p>
+            <p>如果这一刻文件刚好投递完成，取消就会来不及，那时以服务端结果为准。</p>
+          </>
+        ) : pollInFlight ? (
+          <>
+            <p>本机正在问服务端：这次扫描现在是什么状态。<b>回执没回来之前，这一页不改任何判断</b>。</p>
+            <p>查询是一次纯读取：查多少次都不会重扫，服务端不做转换。</p>
+          </>
+        ) : error ? (
+          <>
+            <p>这一次查询没拿到服务端回执：<b>{error}</b>。</p>
+            <p><b>查不到不等于扫描失败</b> —— 这一页不改判任务状态，还当它在进行中，下次继续查。</p>
+          </>
+        ) : (
+          <>
+            <p>面板扫完之后，文件还要经过本机接收和投递才到服务端。<b>这中间没有可显示的张数</b>，所以这里只告诉你服务端最近一次说了什么、已经查过几次。</p>
+            <p><b>本机正在自动检查</b>：每隔几秒替你问一次服务端。想马上知道，点右下角「立即检查」就行。</p>
+          </>
+        )}
+      </ScanStatusPanel>
+      <ScanSec no="01" title="链路走到哪一段" hint="不是百分比">
+        <ScanChain active={-1} />
+      </ScanSec>
+      <div className="sw-grid2">
+        <ScanKvCard
+          title="任务信息"
+          rows={[
+            ['扫描类型', SCAN_TYPE_LABELS[scanType]],
+            ['任务编号', scanTaskId ?? '未创建'],
+            ['开始等待', `已等待 ${elapsed}`],
+            ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
+            ['保存策略', '按设备回传的原格式保存，服务端不做转换'],
+          ]}
+        />
+        <ScanNoteCard title="这一屏现在会做什么" foot="自动检查是一次纯读取：不会重扫，也不会改变服务端那边的任何东西。">
+          <ScanPlan items={[
+            '本机每隔几秒自动查一次，你什么都不用做。',
+            '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
+            '不想扫了就点「取消扫描」，取消成不成由服务端定。',
+          ]} />
+        </ScanNoteCard>
       </div>
-    </KioskPageFrame>
+    </ScanWorkbenchShell>
   )
 }
 

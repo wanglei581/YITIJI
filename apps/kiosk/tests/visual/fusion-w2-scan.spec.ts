@@ -59,7 +59,13 @@ function registerScanCapability(
 }
 
 async function expectHealthy(page: Page, errors: string[]): Promise<void> {
-  await expect(page.locator('[data-kiosk-presentation="fusion-youth"]').first()).toBeVisible()
+  const path = new URL(page.url()).pathname
+  if (path.startsWith('/scan/')) {
+    await expect(page.locator('[data-qx-frame="true"]').first()).toBeVisible()
+    await expect(page.locator('[data-qx-page="scan-workbench"]').first()).toBeVisible()
+  } else {
+    await expect(page.locator('[data-kiosk-presentation="fusion-youth"]').first()).toBeVisible()
+  }
   await assertNoHorizontalOverflow(page)
   expect(errors).toEqual([])
 }
@@ -153,7 +159,14 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   const next = page.getByRole('button', { name: /下一步 · 创建扫描会话/ })
   await expect(next).toBeEnabled()
   expect(legacyDeviceRequests).toBe(0)
+  const createRequest = page.waitForRequest((request) =>
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions',
+  )
   await next.click()
+  const posted = await createRequest
+  const postedBody = posted.postDataJSON() as { scanType?: string; terminalId?: string }
+  expect(postedBody.scanType).toBe('resume')
+  expect(postedBody.terminalId, 'create session must bind the current terminal').toBeTruthy()
   await page.waitForURL('**/scan/settings')
   await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
   await expectHealthy(page, errors)
@@ -193,6 +206,10 @@ test('scan settings uses server instructions and waiting-to-completed polling re
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
   })
 
+  const previewPaths: string[] = []
+  page.on('request', (request) => {
+    previewPaths.push(new URL(request.url()).pathname)
+  })
   await page.goto('/scan/settings')
   await setReactRouterState(page, '/scan/settings', { scanType: 'resume' })
   await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
@@ -200,6 +217,8 @@ test('scan settings uses server instructions and waiting-to-completed polling re
   await page.waitForURL('**/scan/result', { timeout: 8_000 })
   await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => window.sessionStorage.getItem('w2-scan-control'))).toBeNull()
+  await expect(page.locator('[data-file-preview-kind="pdf"]').locator('iframe')).toHaveAttribute('src', W2_FILE.fileUrl)
+  expect(previewPaths.some((path) => path.includes('/preview-url'))).toBe(false)
   await expectHealthy(page, errors)
 })
 
@@ -279,7 +298,7 @@ test('successful scan result can continue to printing @w2', async ({ page, api }
     response.request().method() === 'POST'
       && new URL(response.url()).pathname === '/api/v1/orders/quote',
   )
-  await page.getByRole('button', { name: /直接打印/ }).click()
+  await page.getByRole('button', { name: /直接打印/ }).first().click()
   await page.waitForURL('**/print/confirm')
   await quoteResponse
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
@@ -353,5 +372,113 @@ test('failed scan retry strips control fields but preserves scan parameters @w2'
   const retryState = await page.evaluate(() => window.history.state?.usr as Record<string, unknown>)
   expect(retryState).toMatchObject({ scanType: 'document', source: 'feeder', pageMode: 'multi', color: 'gray', dpi: 300 })
   for (const field of ['success', 'reason', 'simulateFailure', 'failReason', 'file']) expect(retryState).not.toHaveProperty(field)
+  await expectHealthy(page, errors)
+})
+
+test('completed scan without a file is a terminal no-file state @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          scanTaskId: SCAN_TASK_ID,
+          status: 'completed',
+          scanType: 'resume',
+          file: null,
+          errorCode: null,
+          errorMessage: null,
+          expiresAt: LATER,
+        },
+      }),
+    })
+  })
+
+  await page.goto('/scan/progress')
+  await setReactRouterState(page, '/scan/progress', { scanTaskId: SCAN_TASK_ID, scanType: 'resume', controlToken: CONTROL_TOKEN })
+  await page.waitForURL('**/scan/result')
+  await expect(page.getByText('服务端说已完成，但这次回执里没有可用文件').first()).toBeVisible()
+  await expect(page.getByText('w2-scan.pdf')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重试扫描' })).toBeVisible()
+  await expectHealthy(page, errors)
+})
+
+test('poll requests send the in-memory control token header @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let seenControlHeader: string | null = null
+  await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+    seenControlHeader = route.request().headers()['x-scan-session-control'] ?? null
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(scanStatus('waiting')),
+    })
+  })
+
+  await page.goto('/scan/progress')
+  await setReactRouterState(page, '/scan/progress', { scanTaskId: SCAN_TASK_ID, scanType: 'resume', controlToken: CONTROL_TOKEN })
+  await expect.poll(() => seenControlHeader).toBe(CONTROL_TOKEN)
+  await expect(page.getByRole('button', { name: '立即检查' })).toBeEnabled()
+  await expectHealthy(page, errors)
+})
+
+test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api }, testInfo) => {
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  const shot = async (name: string) => {
+    await page.screenshot({ path: testInfo.outputPath(name), fullPage: false })
+  }
+
+  await page.goto('/scan/start')
+  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  await shot('qx-scan-start.png')
+
+  registerScanCapability(api, 'maintenance', '扫描仪正在保养')
+  await page.reload()
+  await expect(page.getByText('扫描能力暂未开放', { exact: true }).first()).toBeVisible()
+  await shot('qx-scan-start-blocked.png')
+
+  registerScanCapability(api, 'available')
+  registerCreatedScan(api)
+  await page.goto('/scan/settings')
+  await setReactRouterState(page, '/scan/settings', { scanType: 'resume' })
+  await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
+  await shot('qx-scan-settings.png')
+
+  await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(scanStatus('waiting')) })
+  })
+  await page.goto('/scan/progress')
+  await setReactRouterState(page, '/scan/progress', { scanTaskId: SCAN_TASK_ID, scanType: 'resume', controlToken: CONTROL_TOKEN })
+  await expect(page.getByRole('button', { name: '立即检查' })).toBeVisible()
+  await shot('qx-scan-progress.png')
+
+  await page.goto('/scan/result')
+  await setReactRouterState(page, '/scan/result', resultState)
+  await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
+  await shot('qx-scan-result.png')
+
+  await expectHealthy(page, errors)
+})
+
+test('usb-panel path does not create a platform scan session @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let createCount = 0
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions') createCount += 1
+  })
+
+  await page.goto('/scan/start?mode=usb-panel')
+  await expect(page.getByText('文件只进你的 U 盘').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '完成后回打印扫描' })).toBeVisible()
+  expect(createCount).toBe(0)
   await expectHealthy(page, errors)
 })
