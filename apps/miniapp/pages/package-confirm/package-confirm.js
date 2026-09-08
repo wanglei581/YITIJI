@@ -90,11 +90,15 @@ Page({
       return
     }
 
-    const files = (packageData.files || []).map(f => ({
-      fileId:    f.fileId || f.id || '',
-      filename:  f.name   || f.filename || '',
-      pageCount: Number(f.pageCount || f.pages || 0),
-    }))
+    // 服务端 CreatePackageOrderDto 是白名单校验（forbidNonWhitelisted），只收 fileId /
+    // pageRange。多传 filename / pageCount 会整单 400 VALIDATION_FAILED。这不是接口疏漏
+    // 而是刻意的：DTO 注释写明「页数、金额与文件名全部由服务端查证，前端传值不作为事实」，
+    // 前端报出来的页数不能参与计费。
+    const files = (packageData.files || []).map(f => {
+      const item = { fileId: f.fileId || f.id || '' }
+      if (f.pageRange) item.pageRange = String(f.pageRange)
+      return item
+    })
 
     if (!files.length || files.some(f => !f.fileId)) {
       wx.showModal({ title: '文件缺失', content: '材料包文件信息不完整，请返回重新添加', showCancel: false })
@@ -117,14 +121,13 @@ Page({
 
       wx.hideLoading()
 
-      // 服务端直接下发 orderId / pickupCode / qrCodeUrl / expiresAt，无需本地生成
+      // 只把 orderId 交给下一页。到机码 / 金额 / 有效期一律由 package-code 自己带登录态
+      // 向服务端查（GET /orders/package/:id 有归属校验），不经 URL 传递 —— 否则一条构造
+      // 出来的链接或一张转发出去的卡片就能渲染出一张带到机码的「创建成功」页。
+      // storeName 只作为服务端查回订单后的显示补充，不参与任何凭证展示。
       const url = '/pages/package-code/package-code' +
-        '?orderId='    + encodeURIComponent(order.orderId    || '') +
-        '&pickupCode=' + encodeURIComponent(order.pickupCode || '') +
-        '&storeName='  + encodeURIComponent((storeData.displayName || storeData.name) || '') +
-        '&expireTime=' + encodeURIComponent(order.expiresAt  || '') +
-        '&fileCount='  + (files.length) +
-        '&qrCodeUrl='  + encodeURIComponent(order.qrCodeUrl  || '')
+        '?orderId='   + encodeURIComponent(order.orderId || '') +
+        '&storeName=' + encodeURIComponent((storeData.displayName || storeData.name) || '')
 
       wx.redirectTo({
         url,

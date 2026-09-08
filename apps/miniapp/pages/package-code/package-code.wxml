@@ -8,11 +8,17 @@
     <text class="nav-title">到机码</text>
   </view>
 
-  <!-- ready 由 onLoad 守卫放行后才置 true。「材料包创建成功」是写死在模板里的，
-       不加这层 wx:if 的话，深链/分享打开时首屏会先闪出一句没有订单支撑的成功宣告。 -->
-  <view wx:if="{{!ready}}" class="code-body">
-    <view class="section-t">材料包尚未开放</view>
-    <view class="qr-hint">服务端下单接口尚未上线，本页不展示任何到机码。</view>
+  <!-- ready 只在服务端确认订单存在且属于当前账号后才为 true。「材料包创建成功」是写死
+       在模板里的，不加这层 wx:if 的话，深链/分享打开时首屏会先闪出一句没有订单支撑的
+       成功宣告。查不到订单时走下面的失败态，绝不退回 URL 里的值渲染。 -->
+  <view wx:if="{{loading}}" class="code-body">
+    <view class="section-t">正在核对订单…</view>
+  </view>
+
+  <view wx:if="{{!ready && !loading}}" class="code-body">
+    <view class="section-t">未能显示到机码</view>
+    <view class="qr-hint">{{loadError || '材料包尚未开放，本页不展示任何到机码。'}}</view>
+    <view wx:if="{{orderId && loadError}}" class="tap retry-btn" hover-class="tap-press" bindtap="retryLoad" role="button">重新加载</view>
   </view>
 
   <scroll-view wx:if="{{ready}}" class="code-scroll" scroll-y enhanced show-scrollbar="{{false}}">
