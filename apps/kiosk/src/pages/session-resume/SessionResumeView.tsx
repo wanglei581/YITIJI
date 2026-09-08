@@ -105,6 +105,7 @@ export function SessionResumeView({
           const look = resumeRowCopy(task)
           const amount = formatResumeAmount(task.resume.amountCents)
           const orderNo = task.resume.orderNo
+          const taskName = task.fileName ?? '未命名打印任务'
           return (
             <li
               key={task.id}
@@ -117,7 +118,7 @@ export function SessionResumeView({
             >
               <span className="sr-row-ic" data-tone={look.tone} />
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="sr-fn">{task.fileName ?? '未命名打印任务'}</span>
+                <span className="sr-fn">{taskName}</span>
                 <span className="sr-sub">{look.sub}</span>
                 <span className="sr-meta">
                   <span className="sr-chip">{look.label}</span>
@@ -133,13 +134,16 @@ export function SessionResumeView({
                     className="qx-btn"
                     data-variant="primary"
                     data-testid={`session-resume-continue-${task.id}`}
+                    /* 可见文案只说去哪,不说是哪一份——待办有好几条时,这些按钮读起来
+                       一模一样,屏读用户听不出点的是哪个材料。把文件名并进无障碍名。 */
+                    aria-label={`${taskName} · ${resumeContinueRoute(verdict.dest) === '/print/cashier' ? '去收银台付款' : '去打印进度'}`}
                     onClick={() => onContinue(task)}
                   >
                     {resumeContinueRoute(verdict.dest) === '/print/cashier' ? '去收银台付款' : '去打印进度'}
                   </button>
                 ) : (
                   <>
-                    <button type="button" className="qx-btn" aria-disabled="true" disabled data-testid={`session-resume-continue-${task.id}`}>
+                    <button type="button" className="qx-btn" aria-disabled="true" disabled aria-label={`${taskName} · 继续（暂不可用）`} data-testid={`session-resume-continue-${task.id}`}>
                       继续（暂不可用）
                     </button>
                     <span className="sr-why" data-testid={`session-resume-why-${task.id}`}>{verdict.why}</span>
