@@ -466,7 +466,9 @@ test('/campus AI求职「开始模拟」进入面试设置 @w4', async ({ page, 
   await page.getByRole('button', { name: '开始模拟' }).click()
   // /interview/setup 现在是带状态的重定向（→ /interview?stage=setup）。
   // 入口行为没变：仍然落到面试设置这一步。
-  await expect(page).toHaveURL(/\/interview(\/setup$|\?stage=setup$)/)
+  // 只认重定向**之后**的最终落点：toHaveURL 会重试到稳定态，
+  // 两种都认等于「重定向没发生也算过」，那是放松断言。
+  await expect(page).toHaveURL(/\/interview\?stage=setup$/)
   await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
   await verifyPage(page, errors)
 })
