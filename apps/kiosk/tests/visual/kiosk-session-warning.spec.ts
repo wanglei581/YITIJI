@@ -130,6 +130,20 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
+test('image-to-pdf editing warns that unsaved work is lost, not the generic clear copy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  // /print-scan/convert 上放着用户已经挑好、还没转换的图片。它不在 /print /scan 域内
+  // （/print-scan 是另一个前缀），也不在 /resume /interview 里，以前会落到
+  // 「登录状态和本机临时会话将清除」——那句话没提用户会丢掉刚挑的图。
+  registerKioskShell(api, { screensaverEnabled: false })
+  await page.goto('/print-scan/convert')
+  await expectWarningWithinThreeSeconds(page)
+  await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
+  await expect(page.getByText('登录状态和本机临时会话将清除', { exact: true })).toHaveCount(0)
+})
+
 test('hardware warning tells anonymous users that background work continues without recovery', async ({
   page,
   api,
@@ -174,7 +188,7 @@ test('ordinary idle warns before clearing and can resume the previous route', as
   await expect(page).toHaveURL(/\/interview\/tips$/)
 
   await expectWarningWithinThreeSeconds(page)
-  await expect(page.getByText('未保存的填写内容或练习内容会清除', { exact: true })).toBeVisible()
+  await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '继续使用', exact: true }).click()
 
   await expect(page).toHaveURL(/\/interview\/tips$/)
@@ -278,7 +292,7 @@ test('refreshing a warning fails closed instead of restoring the previous task',
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
-  await expect(page.getByText('未保存的填写内容或练习内容会清除', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toHaveCount(0)
 })
 
 test('immediate exit hard-clears the session and blocks back-forward task recovery', async ({

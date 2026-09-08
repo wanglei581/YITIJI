@@ -51,11 +51,20 @@ export default function SessionTimeoutPage() {
   // 所以域根和子路径都要认。
   const inDomain = (root: string) => sourcePath === root || sourcePath.startsWith(`${root}/`)
   const isHardware = inDomain('/print') || inDomain('/scan')
-  const isAiWork = sourcePath === '/assistant' || inDomain('/resume') || inDomain('/interview')
+  // 这两页握着用户当场做的、还没提交的活：/print-scan/convert 是已选好待转 PDF 的图片，
+  // /print-scan/sign 是已上传的文档 + 印章 + 落章位置。清场会全部丢掉，必须说出来。
+  // **逐条列，不能用 inDomain('/print-scan')** —— /print-scan 本身是入口 Hub，
+  // 上面没有未保存的东西，套进来就成了吓唬人。
+  const EDITING_ROUTES = ['/print-scan/convert', '/print-scan/sign']
+  const isAiWork =
+    sourcePath === '/assistant' ||
+    inDomain('/resume') ||
+    inDomain('/interview') ||
+    EDITING_ROUTES.includes(sourcePath)
   const sessionImpact = isHardware
     ? '已创建的打印/扫描任务会继续运行，终端页面将清除'
     : isAiWork
-      ? '未保存的填写内容或练习内容会清除'
+      ? '未保存的填写、编辑或练习内容会清除'
       : '登录状态和本机临时会话将清除'
   const canContinue = warning?.canContinue === true
 
