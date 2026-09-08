@@ -191,7 +191,7 @@ const WAVE_ROUTES = new Map([
     '/print-scan', '/print-scan/feature/:key', '/print-scan/convert', '/print-scan/sign',
     '/print/scan-convert', '/print/scan-sign', '/print/scan-feature', '/print/upload',
     '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
-    '/print/cashier', '/print/progress', '/print/done', '/print/pickup-claim', '/scan/start', '/scan/settings',
+    '/print/cashier', '/print/progress', '/print/done', '/print/pickup-claim', '/scan', '/scan/start', '/scan/settings',
     '/scan/progress', '/scan/result',
   ]],
   ['W3', [
@@ -235,17 +235,17 @@ const WAVE_ROUTES = new Map([
 const routeInventory = routerInventory()
 const manifest = manifestInventory()
 
-check('107/107 routes', () => {
+check('108/108 routes', () => {
   const actual = routeInventory.map((route) => route.path)
-  assert.equal(actual.length, 107, `router exposes ${actual.length} normalized route patterns`)
-  assert.equal(new Set(actual).size, 107, 'router route patterns must be unique')
-  assert.equal(manifest.paths.length, 107, `manifest exposes ${manifest.paths.length} route patterns`)
-  assert.equal(new Set(manifest.paths).size, 107, 'manifest route patterns must be unique')
+  assert.equal(actual.length, 108, `router exposes ${actual.length} normalized route patterns`)
+  assert.equal(new Set(actual).size, 108, 'router route patterns must be unique')
+  assert.equal(manifest.paths.length, 108, `manifest exposes ${manifest.paths.length} route patterns`)
+  assert.equal(new Set(manifest.paths).size, 108, 'manifest route patterns must be unique')
   assert.deepEqual([...actual].sort(), [...manifest.paths].sort(), 'router and frozen manifest differ')
   // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
   // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
-  // 2026-09-08：打印台合并新增 /print/desk，材料检查 / 预览改为重定向，由 7 增至 9。
-  assert.equal(manifest.redirects.size, 9, 'manifest must contain nine compatibility redirects')
+  // 2026-09-08：打印台合并由 7 增至 9；扫描工作台合并再增 4，由 9 增至 13。
+  assert.equal(manifest.redirects.size, 13, 'manifest must contain thirteen compatibility redirects')
   for (const [path, target] of manifest.redirects) {
     const route = routeInventory.find((candidate) => candidate.path === path)
     assert.ok(route?.redirect, `${path} must render Navigate`)
@@ -265,7 +265,7 @@ check('wave ownership', () => {
   }
   const invalid = [...owners].filter(([, waves]) => waves.length !== 1)
   assert.deepEqual(invalid, [], `missing/duplicate ownership: ${JSON.stringify(invalid)}`)
-  assert.equal([...WAVE_ROUTES.values()].flat().length, 107, 'wave inventories must total 107')
+  assert.equal([...WAVE_ROUTES.values()].flat().length, 108, 'wave inventories must total 108')
 })
 
 function jsxDescendant(source, rootName, descendantName) {
@@ -426,7 +426,7 @@ check('production fixture isolation', () => {
 check('W2-W5 state coverage', () => {
   assertExactEvidence('tests/visual/fusion-w2-scan.spec.ts', "'scan settings uses server instructions and waiting-to-completed polling reaches result @w2'", [
     "scanStatus(polls++ === 0 ? 'waiting' : 'completed')",
-    "page.waitForURL('**/scan/result'",
+    "page.waitForURL(/\\/scan\\?stage=result/",
     "page.getByText('w2-scan.pdf', { exact: true })",
   ])
   assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'resumes expose authenticated API error and recovered empty states through visible login @w5-kiosk'", [
@@ -511,11 +511,11 @@ check('W6 route acceptance contract', () => {
     assert.notEqual(marker, 'main', `${pattern} must use a page-level marker rather than generic main`)
     return { pattern, viewport }
   })
-  assert.equal(routes.length, 107, 'W6 route cases must total 107')
-  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 107, 'W6 route cases must be unique')
+  assert.equal(routes.length, 108, 'W6 route cases must total 108')
+  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 108, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
-  // 107 = 105 kiosk + 2 mobile。2026-09-08 打印台合并新增 /print/desk。
-  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 105, 'W6 kiosk allocation')
+  // 108 = 106 kiosk + 2 mobile。2026-09-08 打印台 + 扫描工作台各新增一条工作台路由。
+  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 106, 'W6 kiosk allocation')
   assert.equal(routes.filter(({ viewport }) => viewport === 'mobile').length, 2, 'W6 mobile allocation')
 })
 

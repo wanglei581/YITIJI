@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -125,5 +126,35 @@ assert.match(scanFormat, /mime === 'image\/jpeg'[\s\S]{0,40}return 'JPEG'/, 'jpe
 assert.match(scanFormat, /mime === 'image\/png'[\s\S]{0,40}return 'PNG'/, 'png mime maps to PNG')
 assert.match(scanFormat, /mime === 'application\/pdf'[\s\S]{0,40}return 'PDF'/, 'pdf mime maps to PDF')
 assert.match(scanFormat, /if \(!mime\) return '未知格式'/, 'missing mime maps to 未知格式')
+
+const workbench = read('src/pages/scan/ScanWorkbenchPage.tsx')
+assert.match(workbench, /readScanWorkbenchSession/, 'workbench rehydrates from sessionStorage')
+assert.match(workbench, /replace: true/, 'workbench stage changes replace history')
+assert.doesNotMatch(
+  workbench,
+  /clearScanWorkbenchSession/,
+  'workbench must not clear the scan session on unmount',
+)
+assert.match(
+  read('src/auth/kioskSensitiveSession.ts'),
+  /SCAN_WORKBENCH_SESSION_KEY/,
+  'scan workbench session key is registered for leftover detection',
+)
+assert.match(
+  read('src/pages/scan/scanWorkbenchSession.ts'),
+  /sessionStorage/,
+  'scan live credentials persist only in the dedicated session module',
+)
+
+const modelTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-workbench-model.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  modelTest.status,
+  0,
+  `scan workbench model unit test failed: ${modelTest.stderr || modelTest.stdout}`,
+)
 
 console.log('ALL PASS scan session truth contract')

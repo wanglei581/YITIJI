@@ -20,6 +20,12 @@ import {
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanStage } from './scanWorkbenchModel'
+import {
+  patchScanWorkbenchSession,
+  readScanWorkbenchSession,
+  type ScanOutcome,
+} from './scanWorkbenchSession'
 
 interface ScannedFile {
   fileId: string
@@ -30,8 +36,6 @@ interface ScannedFile {
   format: string
   mimeType?: string
 }
-
-type ScanOutcome = 'completed' | 'completed-no-file' | 'failed' | 'expired'
 
 interface ScanResultState {
   scanType?: ScanType
@@ -55,11 +59,24 @@ function deriveOutcome(state: ScanResultState): ScanOutcome {
   return 'failed'
 }
 
-export function ScanResultPage() {
+export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { isLoggedIn } = useAuth()
-  const state = (location.state ?? {}) as ScanResultState
+  const stored = readScanWorkbenchSession()
+  const locationState = (location.state ?? {}) as ScanResultState
+  const state: ScanResultState = {
+    ...locationState,
+    scanType: stored?.scanType ?? locationState.scanType,
+    source: stored?.extras?.source ?? locationState.source,
+    pageMode: stored?.extras?.pageMode ?? locationState.pageMode,
+    color: stored?.extras?.color ?? locationState.color,
+    dpi: stored?.extras?.dpi ?? locationState.dpi,
+    success: stored?.result?.success ?? locationState.success,
+    reason: stored?.result?.reason ?? locationState.reason,
+    outcome: stored?.result?.outcome ?? locationState.outcome,
+    file: stored?.result?.file ?? locationState.file,
+  }
   const scanType = state.scanType ?? 'document'
   const success = state.success === true
   const reason = state.reason
@@ -70,6 +87,22 @@ export function ScanResultPage() {
     const retryState = Object.fromEntries(
       Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)),
     )
+    patchScanWorkbenchSession({
+      stage: 'settings',
+      scanType,
+      extras: {
+        source: state.source,
+        pageMode: state.pageMode,
+        color: state.color,
+        dpi: state.dpi,
+      },
+      live: undefined,
+      result: undefined,
+    })
+    if (onGoStage) {
+      onGoStage('settings')
+      return
+    }
     navigate('/scan/settings', { state: retryState })
   }
 

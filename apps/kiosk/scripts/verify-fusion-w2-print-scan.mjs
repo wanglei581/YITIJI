@@ -20,10 +20,6 @@ const directRoutes = new Map([
   ['/print/progress', 'PrintProgressPage'],
   ['/print/done', 'PrintDonePage'],
   ['/print/pickup-claim', 'PrintPickupClaimPage'],
-  ['/scan/start', 'ScanStartPage'],
-  ['/scan/settings', 'ScanSettingsPage'],
-  ['/scan/progress', 'ScanProgressPage'],
-  ['/scan/result', 'ScanResultPage'],
 ])
 const redirects = new Map([
   ['/print/scan-convert', '/print-scan/convert'],
@@ -34,6 +30,11 @@ const redirects = new Map([
   ['/print/params', '/print/desk?step=preview'],
   ['/print/material-check', '/print/desk?step=check'],
   ['/print/preview', '/print/desk?step=preview'],
+  // 2026-09-08：扫描四页合并为 /scan，旧地址带 ?stage= 透传意图。
+  ['/scan/start', '/scan?stage=start'],
+  ['/scan/settings', '/scan?stage=settings'],
+  ['/scan/progress', '/scan?stage=progress'],
+  ['/scan/result', '/scan?stage=result'],
 ])
 const frozenHashes = new Map([
   // 2026-08-18 重新冻结（PR #598 手机扫码上传公共界面收口）：刷新二维码时先 await 撤销
@@ -155,6 +156,25 @@ for (const [path, target] of redirects)
   assert.equal(actualRedirects.get(path), target, `${path} redirect`)
 assert.equal(directRoutes.size + redirects.size, 20)
 assert.equal(actualRoutes.get('/print/desk'), 'PrintDeskPage', '/print/desk owner')
+assert.equal(actualRoutes.get('/scan'), 'ScanWorkbenchPage', '/scan owner')
+assert.match(read('src/pages/scan/ScanWorkbenchPage.tsx'), /readScanWorkbenchSession/)
+assert.match(read('src/pages/scan/ScanWorkbenchPage.tsx'), /replace:\s*true/)
+assert.match(read('src/pages/scan/ScanWorkbenchPage.tsx'), /parseScanStage/)
+assert.doesNotMatch(
+  read('src/pages/scan/ScanWorkbenchPage.tsx'),
+  /clearScanWorkbenchSession/,
+  'scan workbench must not clear the session on unmount; kioskSensitiveSession owns that',
+)
+assert.match(
+  read('src/auth/kioskSensitiveSession.ts'),
+  /clearScanWorkbenchSession\(\)/,
+  'sensitive-session clear centrally wipes the scan workbench session',
+)
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /['"]\/scan['"]/,
+  '/scan is registered in QX_MIGRATED_ROUTES',
+)
 for (const [path, hash] of frozenHashes) assert.equal(sha256(path), hash, `${path} remains frozen`)
 
 assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageFrame/)
@@ -941,7 +961,7 @@ assert.match(
   'scan chrome imports the Qingxu scan stylesheet',
 )
 const kioskRootSource = read('src/layouts/KioskRoot.tsx')
-for (const route of ['/scan/start', '/scan/settings', '/scan/progress', '/scan/result']) {
+for (const route of ['/scan', '/scan/start', '/scan/settings', '/scan/progress', '/scan/result']) {
   assert.match(
     kioskRootSource,
     new RegExp(`QX_MIGRATED_ROUTES[\\s\\S]*['"]${route}['"]`),
