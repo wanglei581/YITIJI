@@ -130,3 +130,52 @@ PASS  旧签名 URL 已失效     删除前铸的签名链接现在 404
 
 注意第 2、3 条与「Word 能力诚实」那条 PASS 的关系：**本机 `wordToPdf=false` 正是能验「能力为假时诚实置灰」的原因，
 也正是验不了「能力为真时的转换流程」的原因。** 同一个条件，一条能验一条不能，不要混为一谈。
+
+## 附二：§4.4「岗位收藏 / 浏览与跳转记录」本地取证（2026-09-08）
+
+脚本 `apps/kiosk/scripts/probe-activity-favorites-44.mjs`。**9 项断言全 PASS**：
+
+```
+PASS  岗位收藏进入我的收藏        收藏 1 条，含 job-uni-0041
+PASS  取消收藏生效               剩 0 条
+PASS  浏览记录可见               1 条
+PASS  浏览记录可删除             删后剩 0 条
+PASS  跳转记录可见               1 条 action=external_apply
+PASS  跳转记录可删除             删后剩 0 条
+PASS  BrowseLog 无结果字段        11 个字段，无结果类
+PASS  ExternalJumpLog 无结果字段  12 个字段，无结果类
+PASS  跳转 action 只记打开入口     external_apply / external_appointment / external_checkin_open / external_open
+```
+
+### 后三项才是这组的重点
+
+前六项是功能项 —— **坏了用户会发现**。后三项钉的是 [CLAUDE.md §10](../../CLAUDE.md) 的合规红线
+「系统只记录浏览 / 收藏 / 外部跳转，**不记录第三方后续结果**」，**越界了没有人会发现**，
+因为它表现为「多了一个很有用的字段」，而不是「某个功能坏了」。
+
+两条机械判据：
+
+1. `BrowseLog` / `ExternalJumpLog` 的**列名**不得命中
+   `status|result|outcome|stage|applied|interview|offer|hired|progress`。
+2. `ActivityJumpAction` 的**取值**必须全部是 `external_*` 打开语义，且同样不得命中上面的结果词。
+   当前四个取值 `external_apply / external_appointment / external_checkin_open / external_open`
+   全部是「打开了外部入口」，没有一个表示「投递成功 / 进入面试 / 拿到 offer」。
+   **`external_apply` 记的是「用户点开了来源平台的投递页」，不是「用户投递了」** —— 这个区别就是许可证边界。
+
+### 阳性对照（证明这三条不是恒真）
+
+```
+同一条列名规则打在 FileObject  → 命中 [status]              → 判 FAIL ✔
+同一条列名规则打在 PrintTask   → 命中 [status,printOutcome]  → 判 FAIL ✔
+action 规则打在 [external_apply, apply_succeeded]   → 判 FAIL ✔
+action 规则打在 [external_open, interview_scheduled] → 判 FAIL ✔
+```
+
+**合规类断言尤其需要阳性对照** —— 一条永远为真的合规断言，比没有断言更危险：
+它会让人以为这条红线被守着。
+
+### §4.4 本地证不了的部分
+
+招聘会资料打印进我的文档 + 打印订单（需打印链路）、政策材料打印（需真实材料源，当前 info-only）。
+岗位/招聘会/政策三类的收藏与记录走同一套 `targetType` 通道，本探针只实测了 `job`，
+另两类是同代码路径但**未实测**，不按 PASS 记。

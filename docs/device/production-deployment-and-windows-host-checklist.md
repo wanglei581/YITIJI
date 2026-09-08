@@ -546,9 +546,15 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 ### 4.4 岗位/招聘会/政策
 
 - [ ] 岗位列表/详情真实数据展示来源机构、同步时间、外部 ID。
-- [ ] 岗位收藏进入我的收藏。
-- [ ] 去来源平台投递只记录打开入口行为，不记录第三方后续结果。
-- [ ] 岗位浏览与外部入口打开在「我的」浏览与跳转记录可见，可删除。
+- [ ] 岗位收藏进入我的收藏。 —— 生产待验；**本地 PASS**（收藏 / 取消收藏均实测）
+- [ ] 去来源平台投递只记录打开入口行为，不记录第三方后续结果。 —— 生产待验；**本地 PASS，且已落成机械判据**
+  两条判据（见 `apps/kiosk/scripts/probe-activity-favorites-44.mjs`）：
+  ① `BrowseLog` / `ExternalJumpLog` 列名不得命中 `status|result|outcome|stage|applied|interview|offer|hired|progress`；
+  ② `ActivityJumpAction` 取值必须全是 `external_*` 打开语义。当前四个取值全部是「打开了外部入口」——
+  **`external_apply` 记的是「用户点开了来源平台的投递页」，不是「用户投递了」，这个区别就是许可证边界。**
+  已做阳性对照：同一条规则打在 `FileObject`（有 `status`）与 `PrintTask`（有 `status,printOutcome`）上都会判 FAIL，
+  证明它不是恒真断言。**合规类断言尤其需要阳性对照 —— 一条永远为真的合规断言，比没有断言更危险。**
+- [ ] 岗位浏览与外部入口打开在「我的」浏览与跳转记录可见，可删除。 —— 生产待验；**本地 PASS**（写入 → 可见 → 删除 → 不再可见，四步实测）
 - [ ] 招聘会详情真实数据可见。
 - [ ] 招聘会收藏进入我的收藏。
 - [ ] 招聘会浏览与外部预约入口打开在「我的」浏览与跳转记录可见，可删除。
