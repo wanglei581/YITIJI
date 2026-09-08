@@ -466,7 +466,7 @@ export function PrintConfirmPage() {
       return (
         <>
           <p className="why">重新从有文件的那一步进来。这一趟没有创建订单，也没有扣款。</p>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print/material-check')}>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print/desk')}>
             返回打印台
           </button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>

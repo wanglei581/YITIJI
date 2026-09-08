@@ -89,9 +89,9 @@ const fusionState = (input: Omit<Parameters<typeof evidenceTarget>[0], 'targetGr
 export const visualEvidenceTargets: readonly VisualEvidenceTarget[] = [
   primary({ targetId: '01', prototypePath: 'docs/design/kiosk-proto-2026-07/01-home.html', referenceKind: 'PRIMARY', routeOrState: ['/'], captureUrls: ['/'], precondition: 'Open as a guest with fail-closed service fixtures.', readyMarker: '[data-v6-page="home"]' }),
   primary({ targetId: '02', prototypePath: 'docs/design/kiosk-proto-2026-07/02-print-hub.html', referenceKind: 'PRIMARY', routeOrState: ['/print-scan'], captureUrls: ['/print-scan'], precondition: 'Return the configured print/scan capabilities envelope.', readyMarker: '[data-w2-page="print-scan-home"]' }),
-  // 03（打印参数原型）自 2026-08-18 起由 /print/preview 承载：参数控件本来就全在预览页内，
-  // /print/params 已下线为兼容重定向，不再产出独立视觉对。
-  primary({ targetId: '03', prototypePath: 'docs/design/kiosk-proto-2026-07/03-print-settings.html', referenceKind: 'PRIMARY', routeOrState: ['/print/preview'], captureUrls: ['/print/preview'], precondition: 'Enter with a contract file context and price configuration.', readyMarker: '[data-w2-page="print-preview"]' }),
+  // 03（打印参数原型）自 2026-08-18 起由预览阶段承载：参数控件本来就全在预览页内，
+  // /print/params 已下线为兼容重定向；2026-09-08 预览并入 /print/desk。
+  primary({ targetId: '03', prototypePath: 'docs/design/kiosk-proto-2026-07/03-print-settings.html', referenceKind: 'PRIMARY', routeOrState: ['/print/desk'], captureUrls: ['/print/desk'], precondition: 'Enter with a contract file context and price configuration.', readyMarker: '[data-w2-page="print-preview"]' }),
   primary({ targetId: '04', prototypePath: 'docs/design/kiosk-proto-2026-07/04-print-progress.html', referenceKind: 'PRIMARY', routeOrState: ['/print/progress#active'], captureUrls: ['/print/progress'], precondition: 'Enter from the confirmed print flow with an active contract task.', readyMarker: '[data-w2-page="print-progress"]' }),
   primary({ targetId: '05', prototypePath: 'docs/design/kiosk-proto-2026-07/05-resume-source.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/source'], captureUrls: ['/resume/source'], precondition: 'Open the resume source chooser with no user document injected.', readyMarker: '[data-kiosk-screen="resume-source"]' }),
   primary({ targetId: '06', prototypePath: 'docs/design/kiosk-proto-2026-07/06-resume-diagnosis.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/report'], captureUrls: ['/resume/report'], precondition: 'Provide a synthetic diagnosis response through the current API envelope.', readyMarker: '[data-kiosk-screen="resume-report"]' }),
@@ -121,7 +121,7 @@ export const visualEvidenceTargets: readonly VisualEvidenceTarget[] = [
   primary({ targetId: '28', prototypePath: 'docs/design/kiosk-proto-2026-07/28-resume-export.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/optimize'], captureUrls: ['/resume/optimize'], precondition: 'Capture the real export surface on optimize; the orphan /resume/export route is a compatibility redirect.', readyMarker: '[data-kiosk-screen="resume-optimize"]' }),
   primary({ targetId: '29', prototypePath: 'docs/design/kiosk-proto-2026-07/29-resume-templates.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/templates'], captureUrls: ['/resume/templates'], precondition: 'Return synthetic template metadata without downloadable user files.', readyMarker: '[data-kiosk-screen="resume-templates"]' }),
   primary({ targetId: '30', prototypePath: 'docs/design/kiosk-proto-2026-07/30-resume-materials.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/materials'], captureUrls: ['/resume/materials'], precondition: 'Return synthetic job-material template metadata.', readyMarker: '[data-kiosk-screen="resume-materials"]' }),
-  primary({ targetId: '31', prototypePath: 'docs/design/kiosk-proto-2026-07/31-print-material-check.html', referenceKind: 'PRIMARY', routeOrState: ['/print/material-check'], captureUrls: ['/print/material-check'], precondition: 'Enter with a synthetic uploaded-file context and inspection envelope.', readyMarker: '[data-w2-page="print-material-check"]' }),
+  primary({ targetId: '31', prototypePath: 'docs/design/kiosk-proto-2026-07/31-print-material-check.html', referenceKind: 'PRIMARY', routeOrState: ['/print/desk'], captureUrls: ['/print/desk'], precondition: 'Enter with a synthetic uploaded-file context and inspection envelope.', readyMarker: '[data-w2-page="print-material-check"]' }),
   primary({ targetId: '32', prototypePath: 'docs/design/kiosk-proto-2026-07/32-print-cashier.html', referenceKind: 'PRIMARY', routeOrState: ['/print/cashier#pending'], captureUrls: ['/print/cashier'], precondition: 'Enter with a synthetic unpaid order; never expose reusable payment data.', readyMarker: '[data-w2-page="print-cashier"]' }),
   primary({ targetId: '33', prototypePath: 'docs/design/kiosk-proto-2026-07/33-print-done.html', referenceKind: 'PRIMARY', routeOrState: ['/print/done#completed'], captureUrls: ['/print/done'], precondition: 'Provide a synthetic task whose server status is completed.', readyMarker: '[data-w2-page="print-done"]' }),
   primary({ targetId: '34', prototypePath: 'docs/design/kiosk-proto-2026-07/34-scan-start.html', referenceKind: 'PRIMARY', routeOrState: ['/scan/start#ready'], captureUrls: ['/scan/start'], precondition: 'Open the scan chooser before creating any scan session.', readyMarker: '[data-w2-page="scan-start"]' }),
@@ -154,7 +154,7 @@ export const visualEvidenceTargets: readonly VisualEvidenceTarget[] = [
   primary({ targetId: '61', prototypePath: 'docs/design/kiosk-proto-2026-07/61-error-offline.html', referenceKind: 'PRIMARY', routeOrState: ['/error-offline'], captureUrls: ['/error-offline'], precondition: 'Abort the health request with internetdisconnected.', readyMarker: '[data-kiosk-screen="error-offline"]' }),
   primary({ targetId: '62', prototypePath: 'docs/design/kiosk-proto-2026-07/62-phone-upload.html', referenceKind: 'PRIMARY', routeOrState: ['/upload/phone'], captureUrls: ['/upload/phone'], viewport: MOBILE_VIEWPORT, precondition: 'Open an expired synthetic upload session; do not select a real file.', readyMarker: '[data-kiosk-screen="phone-upload"]' }),
   primary({ targetId: '63', prototypePath: 'docs/design/kiosk-proto-2026-07/63-qr-login-mobile.html', referenceKind: 'PRIMARY', routeOrState: ['/member/qr-login'], captureUrls: ['/member/qr-login?ticketId=evidence-ticket'], viewport: MOBILE_VIEWPORT, precondition: 'Open a synthetic non-reusable ticket and intercept current login endpoints.', readyMarker: '[data-kiosk-screen="member-qr-login"]' }),
-  primary({ targetId: '64', prototypePath: 'docs/design/kiosk-proto-2026-07/64-print-preview.html', referenceKind: 'PRIMARY', routeOrState: ['/print/preview'], captureUrls: ['/print/preview'], precondition: 'Enter with synthetic file metadata and price configuration.', readyMarker: '[data-w2-page="print-preview"]' }),
+  primary({ targetId: '64', prototypePath: 'docs/design/kiosk-proto-2026-07/64-print-preview.html', referenceKind: 'PRIMARY', routeOrState: ['/print/desk'], captureUrls: ['/print/desk'], precondition: 'Enter with synthetic file metadata and price configuration.', readyMarker: '[data-w2-page="print-preview"]' }),
   primary({ targetId: '65', prototypePath: 'docs/design/kiosk-proto-2026-07/65-print-confirm.html', referenceKind: 'PRIMARY', routeOrState: ['/print/confirm'], captureUrls: ['/print/confirm'], precondition: 'Enter with synthetic inspected-file and print-parameter context.', readyMarker: '[data-w2-page="print-confirm"]' }),
   primary({ targetId: '66', prototypePath: 'docs/design/kiosk-proto-2026-07/66-print-scan-convert.html', referenceKind: 'PRIMARY', routeOrState: ['/print-scan/convert'], captureUrls: ['/print-scan/convert'], precondition: 'Open the empty conversion workspace; do not upload a real image.', readyMarker: '[data-w2-page="print-scan-convert"]' }),
   primary({ targetId: '67', prototypePath: 'docs/design/kiosk-proto-2026-07/67-print-scan-sign.html', referenceKind: 'PRIMARY', routeOrState: ['/print-scan/sign'], captureUrls: ['/print-scan/sign'], precondition: 'Open the empty signing workspace; do not upload a real signature.', readyMarker: '[data-w2-page="print-scan-sign"]' }),
@@ -253,9 +253,10 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   redirect('/print/scan-sign', '/print-scan/sign'),
   redirect('/print/scan-feature', '/print-scan/feature/id-photo'),
   route('/print/upload', ['77']),
-  route('/print/material-check', ['31']),
-  route('/print/preview', ['64', '03']),
-  redirect('/print/params', '/print/preview'),
+  route('/print/desk', ['31', '64', '03']),
+  redirect('/print/material-check', '/print/desk?step=check'),
+  redirect('/print/preview', '/print/desk?step=preview'),
+  redirect('/print/params', '/print/desk?step=preview'),
   route('/print/confirm', ['65']),
   route('/print/cashier', ['32', '32A'], '/print/cashier'),
   route('/print/progress', ['04']),

@@ -6,6 +6,9 @@
 - USB「扫描到 U 盘」是打印机面板独立路径，本页只说明、不建平台会话；Windows / 奔图真机尚未验收。
 - 稿里 cancelled / cancel-race / session-lost 停留屏：运行时仍按已验证闭环跳转（取消成功回 `/scan/start`，完成带文件进结果页，无 controlToken 回起点），避免拆掉 w2/w6 契约。
 
+## 2026-09-08 打印台合并后的路由基线
+
+- 一体机生产路由由 106 增至 **107**：新增活路由 `/print/desk`，`/print/material-check` 与 `/print/preview` 改为带 `?step=` 的兼容重定向。后续冻结计数以 107 为准，不要按旧 106 回退。
 ## 2026-09-07 打印预览 PDF 插件文档导航
 
 - Chromium 在 React Router SPA 跳走时会把仍在加载的 PDF `document` 请求 abort（`net::ERR_ABORTED`）。iframe 留在 `document.body`、改 blob URL 都会 abort。当前预览框改为立刻完成的 `srcdoc` + `fetch` 读字节，避免 document abort；**逐页 PDF 插件预览**因此不在运行时里。要恢复页内看稿，需要不走 iframe/object document 导航的渲染（例如 pdf.js 画到 canvas），不能再把 PDF URL 交给 iframe `src`。

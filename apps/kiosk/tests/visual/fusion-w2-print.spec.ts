@@ -4,7 +4,7 @@ import type { DocumentProcessTaskView } from '../../src/services/api/materials'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
-import { seedMaterialSession, setReactRouterState, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
+import { seedMaterialSession, setReactRouterState, writeMaterialSession, W2_FILE, W2_ORDER, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
 const NOW = '2026-07-24T00:00:00.000Z'
 const LATER = '2099-07-24T00:10:00.000Z'
@@ -656,13 +656,13 @@ test('material checks require a PII decision, create the redacted task, and carr
   const binary = new FusionW2BinaryRoute(page)
   await binary.install()
 
-  await page.goto('/print/material-check')
-  await setReactRouterState(page, '/print/material-check', { file: W2_FILE, source: 'document' })
+  await page.goto('/print/desk?step=check')
+  await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
   await expect(page.getByText('发现 1 个需确认片段', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
   await page.getByRole('button', { name: '遮挡', exact: true }).click()
   await page.getByRole('button', { name: '下一步：预览与参数' }).click()
-  await page.waitForURL('**/print/preview')
+  await page.waitForURL(/\/print\/desk\?step=preview/)
   await expect(page.getByTitle('w2-sample.pdf 预览')).toHaveAttribute('data-preview-src', '/w2-fixtures/sample-redacted.pdf')
   expect(decisionBody).toEqual({ decisions: [{ findingId: 'w2-finding-phone', action: 'redact' }] })
   expect(redactionCreated).toBe(true)
@@ -678,8 +678,8 @@ test('material check failure exposes its real retry action @w2', async ({ page, 
     json: { success: false, error: { code: 'MATERIAL_UNAVAILABLE', message: '材料服务暂不可用' } },
   })
 
-  await page.goto('/print/material-check')
-  await setReactRouterState(page, '/print/material-check', { file: W2_FILE, source: 'document' })
+  await page.goto('/print/desk?step=check')
+  await setReactRouterState(page, '/print/desk?step=check', { file: W2_FILE, source: 'document' })
   await expect(page.getByRole('heading', { name: '材料检查未完成' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重试检查' })).toBeVisible()
   await expectHealthy(page, errors, 'print-material-check')
@@ -693,7 +693,7 @@ test('direct preview restores the material session and completes the PDF respons
   await binary.install()
   await seedMaterialSession(page)
 
-  await page.goto('/print/preview')
+  await page.goto('/print/desk?step=preview')
   await expect(page.getByTitle(`${W2_FILE.name} 预览`)).toBeVisible()
   await expect.poll(() => page.locator(`iframe[data-preview-src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
   binary.assertPdfCompleted()
@@ -704,8 +704,8 @@ test('direct preview without a completed PII summary is fail-closed @w2', async 
   const errors = collectRuntimeErrors(page)
   registerShell(api)
 
-  await page.goto('/print/preview')
-  await setReactRouterState(page, '/print/preview', { file: W2_FILE, source: 'document' })
+  await page.goto('/print/desk?step=preview')
+  await setReactRouterState(page, '/print/desk?step=preview', { file: W2_FILE, source: 'document' })
 
   const preview = page.locator('[data-w2-page="print-preview"]')
   await expect(preview).toHaveAttribute('data-qx-state', 'check-required')
@@ -719,8 +719,8 @@ test('preview rejects task ids without a trustworthy redaction result @w2', asyn
   const errors = collectRuntimeErrors(page)
   registerShell(api)
 
-  await page.goto('/print/preview')
-  await setReactRouterState(page, '/print/preview', {
+  await page.goto('/print/desk?step=preview')
+  await setReactRouterState(page, '/print/desk?step=preview', {
     file: W2_FILE,
     source: 'document',
     materialCheck: {
@@ -785,7 +785,7 @@ test('print parameter suggestions are advisory until applied and then flow to co
     }
   })
 
-  await page.goto('/print/preview')
+  await page.goto('/print/desk?step=preview')
   await expect(page.locator('.qpd-stepper output')).toHaveText('1')
   await expect(page.getByText('3 份', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '采用这些建议' }).click()
@@ -827,7 +827,7 @@ test('unverified terminal disables color and duplex with an honest reason @w2', 
   registerPrice(api)
   await seedMaterialSession(page)
 
-  await page.goto('/print/preview')
+  await page.goto('/print/desk?step=preview')
   const preview = page.locator('[data-w2-page="print-preview"]')
 
   // 理由必须说「本机尚未通过真机验证」，不能说「不支持」—— 硬件确实支持，说不支持是谎报。
@@ -872,7 +872,7 @@ test('terminal verified for color and duplex can actually select them @w2', asyn
   })
   await seedMaterialSession(page)
 
-  await page.goto('/print/preview')
+  await page.goto('/print/desk?step=preview')
   const preview = page.locator('[data-w2-page="print-preview"]')
 
   const colorBtn = preview.getByRole('button', { name: '彩色', exact: true })
@@ -899,11 +899,67 @@ test('retired params route redirects into preview with real printer fixtures @w2
   await seedMaterialSession(page)
 
   await page.goto('/print/params')
-  await expect(page).toHaveURL(/\/print\/preview$/)
+  await expect(page).toHaveURL(/\/print\/desk\?step=preview/)
   const preview = page.locator('[data-w2-page="print-preview"]')
   await expect(preview.getByText('已配置打印机', { exact: true })).toBeVisible()
   await expect(preview.getByText('打印机在线', { exact: true })).toBeVisible()
   await expectHealthy(page, errors, 'print-preview')
+})
+
+test('legacy material-check and preview routes redirect with step intent @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print/material-check')
+  await expect(page).toHaveURL(/\/print\/desk\?step=check/)
+  await expect(page.locator('[data-print-desk-step="check"]')).toHaveCount(1)
+  await expect(page.getByRole('heading', { name: '这一页没有待处理的文件' })).toBeVisible()
+
+  await seedMaterialSession(page)
+  await page.goto('/print/preview')
+  await expect(page).toHaveURL(/\/print\/desk\?step=preview/)
+  await expect(page.locator('[data-w2-page="print-preview"]')).toBeVisible()
+  await expectHealthy(page, errors, 'print-preview')
+})
+
+test('preview stage survives reload from sessionStorage @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  registerPrice(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+
+  await page.goto('/print/desk?step=preview')
+  await writeMaterialSession(page)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL(/\/print\/desk\?step=preview/)
+  await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'preview')
+  await expect(page.locator('[data-print-desk-step="preview"]')).toHaveCount(1)
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toHaveCount(0)
+  await expect(page.getByText(W2_FILE.name)).toBeVisible()
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'preview')
+  await expectHealthy(page, errors, 'print-preview')
+})
+
+test('sensitive session clear returns the desk to empty without the previous file name @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/print/desk?step=preview')
+  await writeMaterialSession(page)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByText(W2_FILE.name)).toBeVisible()
+
+  await page.evaluate(() => {
+    window.sessionStorage.removeItem('ai-job-print:current-print-material-check')
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+
+  await expect(page.getByRole('heading', { name: '这一页没有待处理的文件' })).toBeVisible()
+  await expect(page.getByText(W2_FILE.name)).toHaveCount(0)
+  await expect(page.getByText('当前文件：无')).toBeVisible()
+  expect(errors).toEqual([])
 })
 
 test('paid print-job amount routes confirmation to cashier @w2', async ({ page, api }) => {

@@ -123,9 +123,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/scan-sign', url: '/print/scan-sign', expectedPath: compatibilityRedirects['/print/scan-sign'], marker: w2('print-scan-sign'), featureText: '签名盖章' },
   { pattern: '/print/scan-feature', url: '/print/scan-feature', expectedPath: compatibilityRedirects['/print/scan-feature'], marker: w2('print-scan-feature'), featureText: '证件照' },
   { pattern: '/print/upload', url: '/print/upload', marker: w2('print-upload'), featureText: '文档打印' },
-  { pattern: '/print/material-check', url: '/print/material-check', marker: 'h2:text-is("这一页没有待处理的文件")', featureText: '这一页没有待处理的文件' },
-  { pattern: '/print/preview', url: '/print/preview', marker: w2('print-preview'), featureText: '这一页没有待处理的文件' },
-  { pattern: '/print/params', url: '/print/params', expectedPath: compatibilityRedirects['/print/params'], marker: w2('print-preview'), featureText: '这一页没有待处理的文件' },
+  { pattern: '/print/desk', url: '/print/desk', marker: 'h2:text-is("这一页没有待处理的文件")', featureText: '这一页没有待处理的文件' },
+  { pattern: '/print/material-check', url: '/print/material-check', expectedPath: '/print/desk', marker: 'h2:text-is("这一页没有待处理的文件")', featureText: '这一页没有待处理的文件' },
+  { pattern: '/print/preview', url: '/print/preview', expectedPath: '/print/desk', marker: w2('print-preview'), featureText: '这一页没有待处理的文件' },
+  { pattern: '/print/params', url: '/print/params', expectedPath: '/print/desk', marker: w2('print-preview'), featureText: '这一页没有待处理的文件' },
   { pattern: '/print/confirm', url: '/print/confirm', marker: w2('print-confirm'), featureText: '未找到文件信息' },
   // 青序流光迁移（稿 32-cashier）把空态文案改为「没有待支付的订单」——
   // 与稿逐字一致（稿内 state-h 原文）。marker 仍是 text-is 精确匹配、
@@ -186,7 +187,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
-] as const // 106 routes (was 104)
+] as const // 107 routes (was 106; 2026-09-08 打印台合并新增 /print/desk)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -217,9 +218,9 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 106) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 107) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-// S2-1 / S2-2 两条新拆页都是一体机竖屏页，kiosk 由 102 增至 104；mobile 仍为 2。
-if (w6KioskCases.length !== 104) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+// 2026-09-08 打印台合并新增 /print/desk；kiosk 由 104 增至 105；mobile 仍为 2。
+if (w6KioskCases.length !== 105) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)

@@ -15,8 +15,6 @@ const directRoutes = new Map([
   ['/print-scan/convert', 'ConvertImagesPage'],
   ['/print-scan/sign', 'SignStampPage'],
   ['/print/upload', 'PrintUploadPage'],
-  ['/print/material-check', 'PrintMaterialCheckPage'],
-  ['/print/preview', 'PrintPreviewPage'],
   ['/print/confirm', 'PrintConfirmPage'],
   ['/print/cashier', 'PrintCashierPage'],
   ['/print/progress', 'PrintProgressPage'],
@@ -32,7 +30,10 @@ const redirects = new Map([
   ['/print/scan-sign', '/print-scan/sign'],
   ['/print/scan-feature', '/print-scan/feature/id-photo'],
   // 2026-08-18：打印参数页下线为兼容重定向（控件与预览页完全重复且全站零导航）。
-  ['/print/params', '/print/preview'],
+  // 2026-09-08：材料检查 / 预览合并为 /print/desk，旧地址带 ?step= 透传意图。
+  ['/print/params', '/print/desk?step=preview'],
+  ['/print/material-check', '/print/desk?step=check'],
+  ['/print/preview', '/print/desk?step=preview'],
 ])
 const frozenHashes = new Map([
   // 2026-08-18 重新冻结（PR #598 手机扫码上传公共界面收口）：刷新二维码时先 await 撤销
@@ -153,11 +154,36 @@ for (const [path, owner] of directRoutes)
 for (const [path, target] of redirects)
   assert.equal(actualRedirects.get(path), target, `${path} redirect`)
 assert.equal(directRoutes.size + redirects.size, 20)
+assert.equal(actualRoutes.get('/print/desk'), 'PrintDeskPage', '/print/desk owner')
 for (const [path, hash] of frozenHashes) assert.equal(sha256(path), hash, `${path} remains frozen`)
 
 assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageFrame/)
 assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageHeader/)
 assert.match(read('src/pages/print/PrintMaterialCheckPage.tsx'), /MaterialCheckPresentation/)
+assert.match(read('src/pages/print/PrintDeskPage.tsx'), /readPrintMaterialSession/)
+assert.match(read('src/pages/print/PrintDeskPage.tsx'), /replace:\s*true/)
+assert.match(read('src/pages/print/PrintDeskPage.tsx'), /parsePrintDeskStep/)
+assert.match(read('src/pages/print/PrintDeskPage.tsx'), /isPrintDeskPreviewAuthorized/)
+assert.doesNotMatch(
+  read('src/pages/print/PrintDeskPage.tsx'),
+  /clearPrintMaterialSession/,
+  'print desk must not clear the material session on unmount; kioskSensitiveSession owns that',
+)
+assert.match(
+  read('src/pages/print/printDeskModel.ts'),
+  /requested === 'preview'/,
+  'desk model keeps preview as an intent even before authorization',
+)
+assert.match(
+  read('src/auth/kioskSensitiveSession.ts'),
+  /clearPrintMaterialSession\(\)/,
+  'sensitive-session clear still centrally wipes the print material session',
+)
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /['"]\/print\/desk['"]/,
+  '/print/desk is registered in QX_MIGRATED_ROUTES',
+)
 for (const css of [
   'print-upload.css',
   'print-material-check.css',

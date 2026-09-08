@@ -110,8 +110,8 @@ expect(
 )
 
 expect(
-  /path: 'print\/params',\s*element: <Navigate to="\/print\/preview" replace \/>/.test(routes),
-  '/print/params 保留为指向 /print/preview 的兼容重定向（106 路由冻结基线不变）',
+  /path: 'print\/params',\s*element: <Navigate to="\/print\/desk\?step=preview" replace \/>/.test(routes),
+  '/print/params 保留为指向 /print/desk?step=preview 的兼容重定向',
 )
 expect(!routes.includes('PrintParamsPage'), 'routes 不再 import 已删除的 PrintParamsPage')
 expect(

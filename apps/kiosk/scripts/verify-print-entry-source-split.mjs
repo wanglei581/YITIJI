@@ -106,7 +106,7 @@ assert(
     materialCheckPage.includes('state?.source ?? session?.source') &&
     /navigate\('\/print\/preview',\s*\{\s*state:\s*\{\s*file(?:: printFile)?,\s*materialCheck,\s*source\s*\}\s*\}\)/.test(materialCheckPage) &&
     previewPage.includes('source?: PrintMaterialSource') &&
-    previewPage.includes('locationState?.source ?? restoredSession?.source') &&
+    previewPage.includes('restoredSession?.source ?? locationState?.source') &&
     previewPage.includes("navigate('/print/confirm', { state: { file, params, materialCheck, source } })") &&
     confirmPage.includes('source?: PrintMaterialSource') &&
     confirmPage.includes('state?.source ?? restoredSession?.source'),

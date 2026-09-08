@@ -32,8 +32,7 @@ import { ScanSettingsPage } from '../pages/scan/ScanSettingsPage'
 import { ScanProgressPage } from '../pages/scan/ScanProgressPage'
 import { ScanResultPage } from '../pages/scan/ScanResultPage'
 import { PrintUploadPage } from '../pages/print/PrintUploadPage'
-import { PrintMaterialCheckPage } from '../pages/print/PrintMaterialCheckPage'
-import { PrintPreviewPage } from '../pages/print/PrintPreviewPage'
+import { PrintDeskPage } from '../pages/print/PrintDeskPage'
 import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
@@ -220,13 +219,17 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/scan-feature',      element: <Navigate to="/print-scan/feature/id-photo" replace /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
-      { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
-      { path: 'print/preview',     element: <PrintPreviewPage /> },
+      { path: 'print/desk',        element: <PrintDeskPage /> },
+      // 2026-09-08 下线：青序流光 13-print-desk 把材料检查与预览画成同一工作台的两个阶段。
+      // 旧地址可能被收藏夹 / 二维码 / 外部链接引用，保留 replace 重定向。
+      // `?step=` 是意图不是授权：检查没过时落到 preview 仍由前置条件拦下。
+      { path: 'print/material-check', element: <Navigate to="/print/desk?step=check" replace /> },
+      { path: 'print/preview',        element: <Navigate to="/print/desk?step=preview" replace /> },
       // 2026-08-18 下线：/print/params 的每一个可编辑控件（份数/色彩/双面/方向/缩放/纸张）
-      // 都和 /print/preview 完全重复，页范围那张卡自己写着「（在预览步骤设置）」，
+      // 都和预览阶段完全重复，页范围那张卡自己写着「（在预览步骤设置）」，
       // 且全站零运行时导航指向它 —— 用户只能手敲 URL 才到得了。
-      // 保留路由做兼容重定向（不改 106 路由冻结基线），页面本体已删。
-      { path: 'print/params',      element: <Navigate to="/print/preview" replace /> },
+      // 保留路由做兼容重定向；2026-09-08 起随预览一并进入打印台。
+      { path: 'print/params',      element: <Navigate to="/print/desk?step=preview" replace /> },
       { path: 'print/confirm',     element: <PrintConfirmPage /> },
       { path: 'print/cashier',     element: <PrintCashierPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },

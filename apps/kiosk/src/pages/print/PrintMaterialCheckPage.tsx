@@ -215,7 +215,11 @@ function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string;
   return { label: '本次隐私检查结果状态未知，请人工确认文件不含敏感信息', tone: 'warning' }
 }
 
-export function PrintMaterialCheckPage() {
+export function PrintMaterialCheckPage({
+  onAdvanceToPreview,
+}: {
+  onAdvanceToPreview?: () => void
+} = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -441,7 +445,11 @@ export function PrintMaterialCheckPage() {
         materialCheck,
       })
       setStage('done')
-      navigate('/print/preview', { state: { file: printFile, materialCheck, source } })
+      if (onAdvanceToPreview) {
+        onAdvanceToPreview()
+      } else {
+        navigate('/print/preview', { state: { file: printFile, materialCheck, source } })
+      }
     } catch (err) {
       setError(userMessageOf(err, '保存隐私选择失败，请重试'))
       setStage('review')

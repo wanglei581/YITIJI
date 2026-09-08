@@ -32,6 +32,7 @@ function statusToneFor(kind: string, printerReady: boolean, loading: boolean): s
 
 const ACTIONBAR_ROUTES = new Set([
   '/print/upload',
+  '/print/desk',
   '/print/material-check',
   '/print/preview',
   '/print/confirm',
@@ -105,6 +106,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print/cashier',
   '/print/upload',
   '/print/confirm',
+  '/print/desk',
   '/print/material-check',
   '/print/preview',
   '/resume/report',

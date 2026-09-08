@@ -416,7 +416,7 @@ test.describe('真人走查（模拟数据）', () => {
     })
     await seedMaterialSession(page)
 
-    await page.goto('/print/preview')
+    await page.goto('/print/desk?step=preview')
     await page.waitForTimeout(3000)
     await step(page, s, 'E-preview')
 
