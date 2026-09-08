@@ -412,6 +412,7 @@ export function PrintPreviewPage() {
   if (!hasFile) {
     return (
       <QxPageFrame
+        back={{ label: '返回选文件', onBack: () => navigate('/print/upload') }}
         title="预览与打印参数"
         subtitle="第 3 步 / 共 4 步 · 必须先有真实文件和材料检查结果"
         status={{ tone: 'warn', label: '没有待处理的文件' }}

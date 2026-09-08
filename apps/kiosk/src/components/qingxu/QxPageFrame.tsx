@@ -34,6 +34,11 @@ export interface QxPageFrameProps {
   ctabar?: ReactNode
   /** 底部导航。流程页一般不传（避免用户中途跳走丢失进度）。 */
   navbar?: ReactNode
+  /** 顶栏左上角返回键。51 张稿里几乎每一张都有这个键（`aria-label="返回…"`），
+   *  它是一体机上唯一的「上一步」——公共终端没有浏览器后退键、也没有手势返回。
+   *  缺了它用户选错入口就只能等待机超时，这是 2026-09-08 产品负责人实际使用时发现的。
+   *  传 { label, onBack } 才渲染；流程页按稿决定指向哪里（不一定是 history back）。 */
+  back?: { label: string; onBack: () => void }
 }
 
 export function QxPageFrame({
@@ -44,10 +49,19 @@ export function QxPageFrame({
   children,
   ctabar,
   navbar,
+  back,
 }: QxPageFrameProps) {
   return (
     <div className="qx-stage" data-qx-frame="true">
       <header className="qx-topbar">
+        {back ? (
+          <button type="button" className="qx-topbar-back" onClick={back.onBack} aria-label={back.label}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        ) : null}
         <span className="qx-topbar-brand">
           <span className="qx-topbar-mark">职</span>
           职易达

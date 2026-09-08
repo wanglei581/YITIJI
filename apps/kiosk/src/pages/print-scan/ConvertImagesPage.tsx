@@ -268,6 +268,7 @@ export function ConvertImagesPage() {
 
   return (
     <QxPageFrame
+      back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
       title="图片转 PDF"
       subtitle="几张图拼成一份 PDF。顺序你自己排，一张一页。"
       status={status}

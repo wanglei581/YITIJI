@@ -61,6 +61,8 @@ export interface FileSourceViewProps {
   onOpenPicker: () => void
   onRetryLocal: () => void
   onNext: () => void
+  /** 顶栏返回：稿 12-file-source 的返回键 data-route="/print-scan"。 */
+  onBack: () => void
   onExit: () => void
   onHelp: () => void
   onScan: () => void
@@ -149,7 +151,7 @@ export function FileSourceView(props: FileSourceViewProps) {
     screen, pageTitle, pageSubtitle, terminalLabel, status, isResumePrint,
     showFileChannel, showScan, tab, usbMode, currentFile, blockedName, blockedMeta,
     wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
-    previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit,
+    previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
     onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
     onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
     onPhoneRetryStatus, onFileInputChange, inputRef, printAccept, photoOnly,
@@ -638,6 +640,7 @@ export function FileSourceView(props: FileSourceViewProps) {
       subtitle={pageSubtitle}
       terminalLabel={terminalLabel}
       status={status}
+      back={{ label: '返回打印扫描', onBack }}
       ctabar={ctabar}
     >
       <input

@@ -75,6 +75,7 @@ export function OnlinePlatformsPage() {
 
   return (
     <QxPageFrame
+      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
       title="线上招聘平台"
       subtitle={
         screen === 'qr' ? '扫码打开官网，浏览、登录和投递都在该平台完成。'

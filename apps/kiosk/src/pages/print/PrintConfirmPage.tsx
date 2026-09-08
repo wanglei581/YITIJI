@@ -619,6 +619,7 @@ export function PrintConfirmPage() {
 
   return (
     <QxPageFrame
+      back={{ label: '返回预览与参数', onBack: () => navigate('/print/preview') }}
       title="报价确认"
       subtitle={ask.doing}
       status={status}

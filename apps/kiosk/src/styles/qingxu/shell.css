@@ -107,3 +107,18 @@
 @media (prefers-reduced-motion: reduce) {
   .qx-stage, .qx-stage * { animation: none !important; transition: none !important; }
 }
+
+/* 顶栏返回键。稿里每一张都有（aria-label="返回…"），一体机上它是唯一的「上一步」——
+   公共终端没有浏览器后退键，也没有手势返回。尺寸按 --qx-tap-min 的两倍留足触控余量。 */
+.qx-topbar-back {
+  flex: none;
+  width: 64px; height: 64px;
+  margin-right: 4px;
+  border-radius: 20px;
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.qx-topbar-back:active { background: var(--qx-line); }
