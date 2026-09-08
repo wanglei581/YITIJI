@@ -281,7 +281,7 @@ export function JobFairsPage() {
         </>
       ) : viewState === 'favorites-empty' ? (
         <QxFairState screen="list" tone="empty" icon={StarIcon} title="还没有收藏的招聘会">
-          收藏只是这台终端的浏览辅助，不代表已预约、已报名或已签到。
+          收藏只是这台终端的浏览辅助，不代表已预约、已报名，也不代表到过现场。
         </QxFairState>
       ) : viewState === 'empty' ? (
         <>
