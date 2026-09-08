@@ -297,7 +297,8 @@
     "verify:throttle-dimension": "node -r @swc-node/register scripts/verify-throttle-dimension.ts",
     "verify:ai-public-quota": "node -r @swc-node/register scripts/verify-ai-public-quota.ts",
     "verify:ai-throttle-dimension": "node -r @swc-node/register scripts/verify-ai-throttle-dimension.ts",
-    "verify:kiosk-ai-capabilities": "node -r @swc-node/register scripts/verify-kiosk-ai-capabilities.ts"
+    "verify:kiosk-ai-capabilities": "node -r @swc-node/register scripts/verify-kiosk-ai-capabilities.ts",
+    "verify:conversion-queue-bound": "node scripts/verify-conversion-queue-bound.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

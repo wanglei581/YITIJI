@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { ConcurrencyLimiter } from './concurrency-limiter'
 import { setWordToPdfUploadAvailable } from './document-conversion-capability-state'
 import {
+  ConversionBusyError,
   ConversionTimeoutError,
   DOCUMENT_CONVERSION_ADAPTER,
   DOCUMENT_CONVERSION_FONT_PROBE,
@@ -242,6 +243,12 @@ export class DocumentConversionService implements OnModuleInit {
 
   private toHttpError(error: unknown): HttpException {
     if (error instanceof HttpException) return error
+    if (error instanceof ConversionBusyError) {
+      return new HttpException(
+        { error: { code: 'CONVERSION_BUSY', message: '转换服务正忙，请稍后重试' } },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      )
+    }
     if (error instanceof ConversionTimeoutError) {
       return new HttpException(
         { error: { code: 'CONVERSION_TIMEOUT', message: '文档转换超时，请稍后重试' } },

@@ -42,6 +42,18 @@ export type ConversionRequester = FileRequester
 export const DOCUMENT_CONVERSION_ADAPTER = Symbol('DOCUMENT_CONVERSION_ADAPTER')
 export const DOCUMENT_CONVERSION_FONT_PROBE = Symbol('DOCUMENT_CONVERSION_FONT_PROBE')
 
+/**
+ * 转换排队已满。与超时不同：超时是「开始了但太慢」，这条是「根本没轮到你」。
+ * 分开是为了让调用方与运维看到的原因是真的 —— 混成 CONVERSION_FAILED 会让
+ * 「机器过载」被误读成「这份文件有问题」。
+ */
+export class ConversionBusyError extends Error {
+  constructor() {
+    super('document conversion queue is full')
+    this.name = 'ConversionBusyError'
+  }
+}
+
 export class ConversionTimeoutError extends Error {
   constructor() {
     super('document conversion timed out')
