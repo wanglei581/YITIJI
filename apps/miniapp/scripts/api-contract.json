@@ -117,7 +117,6 @@
     "POST /mock-interviews/:p/start",
     "POST /mock-interviews/:p/transcribe",
     "POST /orders/package",
-    "POST /orders/package/:p/cancel",
     "POST /orders/quote",
     "POST /policies/eligibility-check",
     "POST /resume/career-plan/:p",
@@ -134,9 +133,9 @@
     "POST /resume/self-assessment/:p/append",
     "POST /resume/self-assessment/:p/print",
     "POST /resume/voice/transcribe",
+    "POST /upload-sessions/:p/files",
+    "POST /upload-sessions/scene/resolve",
     "PUT /resume/records/:p/draft"
   ],
-  "knownMissing": {
-    "POST /orders/package/:p/cancel": "同上，材料包取消。"
-  }
+  "knownMissing": {}
 }

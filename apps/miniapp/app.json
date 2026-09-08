@@ -60,6 +60,7 @@
     "pages/notifications/notifications",
     "pages/fair-reminders/fair-reminders",
     "pages/kiosk-login/kiosk-login",
+    "pages/kiosk-send/kiosk-send",
     "pages/daily-report/daily-report",
     "pages/community/community",
     "pages/feedback/feedback"

@@ -7,6 +7,14 @@ const auth = require('../../utils/auth')
 // 从扫码结果 URL 里提取 ticketId（容错：带或不带 domain 前缀）
 const TICKET_RE = /[?&]ticketId=([A-Za-z0-9_%-]{20,200})/
 
+/**
+ * 一体机「手机扫码上传」的码：`<origin><path>#sessionId=xx&token=xx`。
+ * 参数在 **fragment** 里而不是 query —— 一体机侧 buildPhoneUploadUrl 是这么拼的，
+ * 用 `[?&]` 匹配不到，必须认 `#` 与 `&`。
+ */
+const UPLOAD_SESSION_RE = /[#&]sessionId=([A-Za-z0-9_%-]{8,200})/
+const UPLOAD_TOKEN_RE = /[#&]token=([A-Za-z0-9_.%-]{8,400})/
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -58,11 +66,26 @@ Page({
   },
 
   async _handleScanResult(raw) {
+    // 一体机屏幕上有两类码：登录票据、手机上传会话。先按码型分流，
+    // 不能一律当登录码处理 —— 那会让扫上传码的人看到「这不是一体机登录码」，
+    // 而他扫的恰恰就是终端屏幕上的码。
+    const session = raw.match(UPLOAD_SESSION_RE)
+    const token = raw.match(UPLOAD_TOKEN_RE)
+    if (session && token) {
+      this.setData({ phase: 'idle' })
+      wx.navigateTo({
+        url: '/pages/kiosk-send/kiosk-send'
+          + '?sessionId=' + encodeURIComponent(decodeURIComponent(session[1]))
+          + '&token=' + encodeURIComponent(decodeURIComponent(token[1])),
+      })
+      return
+    }
+
     const match = raw.match(TICKET_RE)
     if (!match) {
       this.setData({
         phase: 'error',
-        errorMsg: '这不是一体机登录码，请确认扫的是终端屏幕上的二维码',
+        errorMsg: '这不是一体机上的二维码，请确认扫的是终端屏幕上的登录码或上传码',
       })
       return
     }
