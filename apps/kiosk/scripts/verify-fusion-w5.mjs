@@ -267,4 +267,22 @@ for (const path of concretePages) {
   assert.match(source, /fusion-w5|data-kiosk-presentation=["']fusion-youth["']|MeListShell/, `${path} exposes W5 fusion scope`)
 }
 
+const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
+const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')
+const feedbackPageQx = read('src/pages/profile/me/MyFeedbackPage.tsx')
+const privacyPageQx = read('src/pages/profile/me/MyPrivacyRequestsPage.tsx')
+assert.match(profilePageQx, /QxPageFrame/, 'ProfilePage uses Qingxu page frame')
+assert.doesNotMatch(profilePageQx, /KioskPageFrame/, 'ProfilePage has left the V6 frame')
+assert.match(benefitsPageQx, /QxPageFrame/, 'MyBenefitsPage uses Qingxu page frame')
+assert.doesNotMatch(benefitsPageQx, /KioskPageFrame/, 'MyBenefitsPage has left the V6 frame')
+assert.match(feedbackPageQx, /QxPageFrame/, 'MyFeedbackPage uses Qingxu page frame')
+assert.doesNotMatch(feedbackPageQx, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
+assert.match(privacyPageQx, /QxPageFrame/, 'MyPrivacyRequestsPage uses Qingxu page frame')
+assert.doesNotMatch(privacyPageQx, /KioskPageFrame/, 'MyPrivacyRequestsPage has left the V6 frame')
+assert.match(profilePageQx, /getPendingTasks/, 'ProfilePage reads /me/pending-tasks instead of inventing continue-todo')
+assert.doesNotMatch(profilePageQx, /一键投递|立即投递|平台投递|投递简历/, 'ProfilePage stays inside the recruitment copy whitelist')
+assert.doesNotMatch(benefitsPageQx, /立即支付|去支付|确认核销|核销成功|办理成功/, 'MyBenefitsPage does not add payment or redemption success copy')
+assert.doesNotMatch(feedbackPageQx, /一键投递|立即投递|平台投递|投递简历/, 'MyFeedbackPage stays inside the recruitment copy whitelist')
+assert.doesNotMatch(privacyPageQx, /全部个人数据已删除|账号注销成功/, 'MyPrivacyRequestsPage does not claim account deletion')
+
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')

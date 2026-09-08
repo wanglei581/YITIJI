@@ -212,8 +212,19 @@ test('/jobs 挂起请求显示加载态，空回执显示空态 @w4', async ({ p
   await expect(page.getByText('正在取岗位名单')).toBeVisible()
   releaseJobs()
   await expect(page.getByTestId('jobs-state-empty')).toBeVisible()
-  await expect(page.getByText('这组条件下没有已发布的岗位')).toBeVisible()
+  // 本场景没设任何筛选（新机器开机常态：服务端 total=0）。
+  // 这时必须说「本机暂未上架」，不能说「这组条件下」——
+  // 对一个筛选都没设过的用户说「这组条件下」，等于暗示他设过筛选。
+  await expect(page.getByText('本机暂未上架已审核的岗位')).toBeVisible()
+  await expect(page.getByText('这组条件下没有已发布的岗位')).toHaveCount(0)
   await expect(page.getByText('前端工程师')).toHaveCount(0)
+
+  // 反过来：设了关键词再筛空，就必须说「这组条件下」，不能说「本机暂未上架」——
+  // 明明有岗位，只是不符合这次条件。两个方向都钉住，避免修好一头掉进另一头。
+  await page.getByPlaceholder('搜索职位 / 公司').fill('不存在的岗位关键词')
+  await expect(page.getByText('这组条件下没有已发布的岗位')).toBeVisible()
+  await expect(page.getByText('本机暂未上架已审核的岗位')).toHaveCount(0)
+
   await assertNoElementCrossesViewport(page)
   await verifyPage(page, errors)
 })

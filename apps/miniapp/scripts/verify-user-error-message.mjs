@@ -88,6 +88,44 @@ console.log('\nE. 共享技术码')
   assert(/登录/.test(e.message || ''), `登录失效给出中文提示（实际「${e.message}」）`)
 }
 
+// G. 登录失败必须说得出原因
+//
+// 2026-09-08 回归：本模块首版把登录链路的码一并挡在 fail-closed 之外，用户在
+// 「协议版本已更新，请重新阅读并勾选后再登录」时只看到页面兜底的「登录失败，请重试」，
+// 于是一直重试一直失败，永远不知道要重新勾协议 —— 产品负责人报「无法正常登录」。
+// request.js 里 401 分支的注释当初就写明过这个风险，首版没读到就收紧了判据。
+//
+// 判据不是「这些码现在在白名单里」（那等于照现状写断言），而是：**登录失败必须给出
+// 用户可执行的下一步**。下面每条都断言服务端那句面向求职者的中文能原样到达用户。
+console.log('\nG. 登录链路：失败必须说得出原因')
+{
+  const LOGIN_CASES = [
+    ['LEGAL_VERSION_STALE', '协议版本已更新，请重新阅读并勾选后再登录'],
+    ['SMS_CODE_INVALID', '验证码不正确，请重新输入'],
+    ['SMS_TOO_FREQUENT', '验证码发送过于频繁,请 60 秒后再试'],
+    ['WX_CONFIG_MISSING', '微信小程序登录暂不可用，请使用短信验证码登录'],
+    ['QR_LOGIN_NOT_FOUND', '扫码登录已过期或不存在'],
+    ['QR_LOGIN_ALREADY_CLAIMED', '扫码登录已被领取'],
+    ['PHONE_ALREADY_BOUND', '该手机号已绑定其他账号'],
+  ]
+  for (const [code, serverMessage] of LOGIN_CASES) {
+    const e = await errorOf(401, { success: false, error: { code, message: serverMessage } })
+    assert(e.message === serverMessage, `${code} 的服务端中文原样到达用户（实际「${e.message || '(空→页面兜底句)'}」）`)
+  }
+  // 收口没有被整体放开。
+  //
+  // 这里**不能**拿机器码当样本：机器码会被更早的 isMachineErrorCode 拦住，
+  // 就算把 fail-closed 默认改成全放开也照样绿 —— 首版断言就是这么写的，
+  // 变异测试里「默认改成 return text」没红，暴露了这个盲区。
+  // 要测默认，样本必须是**非机器码、且不面向用户**的字符串：
+  // 用一体机 userErrorMessage.ts 记下的那个真实反例（中文，但在教运维配环境变量）。
+  const opsFacing = '服务器缺少可用中文字体，无法生成求职材料 PDF；请配置 JOB_MATERIAL_PDF_FONT_PATH'
+  const still = await errorOf(500, { success: false, error: { code: 'JOB_MATERIAL_PDF_FONT_MISSING', message: opsFacing } })
+  assert(!still.message, 'fail-closed 默认仍然生效：未登记的码即便文案是中文也不透传（含中文≠面向用户）')
+  const stillCode = await errorOf(400, { success: false, error: { code: 'SOME_INTERNAL_CODE', message: 'SOME_INTERNAL_CODE' } })
+  assert(!stillCode.message, '未登记的机器码仍然被挡住')
+}
+
 // F. 200 包体内的失败标记同样收敛
 console.log('\nF. HTTP 200 但业务失败')
 {

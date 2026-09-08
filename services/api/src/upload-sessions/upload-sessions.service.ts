@@ -16,6 +16,7 @@ import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import type { Redis } from 'ioredis'
+import { isWellFormedSceneToken, mintSceneToken, sceneIndexKey } from './upload-scene'
 import type {
   UploadSessionChannel,
   UploadSessionMode,
@@ -37,6 +38,24 @@ export interface UploadSessionCreateResponse {
   uploadToken: string
   controlToken: string
   expiresAt: string
+  /**
+   * 小程序场景码。一体机把它交给 `/miniapp-code` 换二维码，用户扫码即进小程序。
+   * 与 uploadToken 一样只在创建时返回一次（服务端只留哈希）。
+   */
+  sceneToken: string
+}
+
+/**
+ * 场景码兑换结果。**不返回会话的 controlToken** —— 那是一体机侧的控制凭据，
+ * 手机端拿不到也不该拿到；手机端只需要能把文件传上来。
+ */
+export interface UploadSessionSceneResolveResponse {
+  sessionId: string
+  purpose: FilePurpose
+  mode: UploadSessionMode
+  expiresAt: string
+  /** 轮换出来的新上传令牌（旧的当场作废，先兑先得）。 */
+  uploadToken: string
 }
 
 export interface UploadSessionFileView {
@@ -81,6 +100,11 @@ interface StoredUploadSession {
   pendingEndUserId: string | null
   uploadTokenHash: string
   controlTokenHash: string
+  /**
+   * 可选：滚动升级期间，旧构建创建的会话没有这个字段。缺失时场景码兑换一律拒绝
+   * （fail-closed），而不是当成「任何 scene 都对」。
+   */
+  sceneTokenHash?: string
   file: UploadSessionFileView | null
   uploadedAt: string | null
   confirmedAt: string | null
@@ -154,6 +178,7 @@ export class UploadSessionsService {
     const sessionId = randomUUID().replace(/-/g, '')
     const uploadToken = randomBytes(32).toString('base64url')
     const controlToken = randomBytes(32).toString('base64url')
+    const sceneToken = mintSceneToken()
     const now = new Date()
     const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000)
     const record: StoredUploadSession = {
@@ -166,6 +191,7 @@ export class UploadSessionsService {
       pendingEndUserId: input.mode === 'member' ? (input.endUserId ?? null) : null,
       uploadTokenHash: hashToken(uploadToken),
       controlTokenHash: hashToken(controlToken),
+      sceneTokenHash: hashToken(sceneToken),
       file: null,
       uploadedAt: null,
       confirmedAt: null,
@@ -175,11 +201,14 @@ export class UploadSessionsService {
 
     await this.redis.setEx(sessionKey(sessionId), sessionRedisTtlSeconds(), JSON.stringify(record))
     await this.redisClient.zadd(UPLOAD_EXPIRY_INDEX_KEY, expiresAt.getTime(), sessionId)
+    // 场景码索引与会话同生命周期：会话过期后索引自然消失，不需要单独回收。
+    await this.redis.setEx(sceneIndexKey(sceneToken), sessionRedisTtlSeconds(), sessionId)
     await this.persistCleanupRecord(record)
     return {
       sessionId,
       uploadToken,
       controlToken,
+      sceneToken,
       uploadUrl: input.uploadUrl,
       expiresAt: record.expiresAt,
     }
@@ -192,6 +221,46 @@ export class UploadSessionsService {
     const record = await this.load(sessionId)
     this.assertControlToken(record, controlToken)
     return this.toStatusResponse(this.markExpired(record))
+  }
+
+  /**
+   * 场景码兑换：小程序扫码进来后，用 scene 换回可用的上传凭据。
+   *
+   * 兑换是**一次性**的，靠 Redis 的 GETDEL 原子完成 —— 两个人同时拿同一张码，
+   * 只有一个能拿到 sessionId，另一个看到的是「二维码已失效」。用先 GET 再 DEL
+   * 会有窗口期，两边都成功。
+   *
+   * 所有失败路径**返回同一个错误码**。区分「格式不对 / 没这张码 / 已过期 /
+   * 已被用掉」对合法用户没有价值（补救动作都是「回一体机刷新二维码」），
+   * 对探测者却是一台预言机。
+   */
+  async resolveScene(scene: string): Promise<UploadSessionSceneResolveResponse> {
+    // 格式不对就不查 Redis：省一次往返，也不制造可测量的时间差。
+    if (!isWellFormedSceneToken(scene)) throw sceneUnusableException()
+
+    const sessionId = await this.redis.getDel(sceneIndexKey(scene))
+    if (!sessionId) throw sceneUnusableException()
+
+    const record = this.markExpired(await this.load(sessionId))
+    if (record.status !== 'pending') throw sceneUnusableException()
+    // 纵深防御：索引命中还不够，会话记录里的哈希也必须对得上。
+    // 旧构建创建的会话没有 sceneTokenHash —— 缺失即拒绝，不是「随便什么 scene 都行」。
+    if (!record.sceneTokenHash || !safeEquals(record.sceneTokenHash, hashToken(scene))) {
+      throw sceneUnusableException()
+    }
+
+    // 轮换上传令牌：服务端只留哈希，换不回创建时那把明文（见 upload-scene.ts ①②）。
+    // 轮换的副作用正是我们想要的 —— 同一个会话的旧网页二维码当场作废。
+    const uploadToken = randomBytes(32).toString('base64url')
+    await this.persist({ ...record, uploadTokenHash: hashToken(uploadToken) })
+
+    return {
+      sessionId: record.sessionId,
+      purpose: record.purpose,
+      mode: record.mode,
+      expiresAt: record.expiresAt,
+      uploadToken,
+    }
   }
 
   async uploadFile(args: {
@@ -589,6 +658,16 @@ function uploadLockKey(sessionId: string): string {
 
 function cleanupKey(sessionId: string): string {
   return `${UPLOAD_CLEANUP_PREFIX}${sessionId}`
+}
+
+/**
+ * 场景码不可用的统一出口。刻意**不区分**原因：格式错、查不到、已过期、已被兑换，
+ * 对合法用户的补救动作完全一样，对探测者却会变成一台预言机。
+ */
+function sceneUnusableException(): BadRequestException {
+  return new BadRequestException({
+    error: { code: 'UPLOAD_SCENE_UNUSABLE', message: '二维码已失效，请回到一体机重新生成' },
+  })
 }
 
 function expiredSessionException(): BadRequestException {

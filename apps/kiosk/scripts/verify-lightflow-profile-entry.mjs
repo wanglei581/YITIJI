@@ -130,20 +130,13 @@ expectIncludes(
 )
 
 expectNotIncludes(profile, 'ReferenceServiceNav', 'ProfilePage removes the homepage-only reference navigation')
-expectMatches(
-  profile,
-  /className="[^"]*\bkprofile\s+kprofile-lightflow\b[^"]*"/,
-  'ProfilePage binds the LightFlow root on its page shell',
-)
-expectMatches(
-  profile,
-  /<KioskPageFrame\b[^>]*className="[^"]*\bfusion-w5--profile-entry\b[^"]*"/,
-  'ProfilePage exposes a dedicated frame class for exact prototype gutter control',
-)
-expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage keeps an accessible-only page heading without visible 我的 copy')
-expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage groups existing entries in the compact service directory')
-expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage renders all five real sections from the existing entry configuration')
+expectIncludes(profile, 'QxPageFrame', 'ProfilePage uses the Qingxu page frame')
+expectNotIncludes(profile, 'KioskPageFrame', 'ProfilePage has left the V6 frame')
+expectIncludes(profile, "import './styles/profile-qx.css'", 'ProfilePage imports its Qingxu stylesheet')
+expectIncludes(profile, 'ProfileAssetGrid', 'ProfilePage renders the 30-my-profile asset grid')
+expectIncludes(profile, 'ProfileContinueCard', 'ProfilePage renders the pending-task continue card')
 expectNotIncludes(profile, 'lf-reference-', 'ProfilePage does not reuse homepage service-card primitives')
+expectNotIncludes(profile, 'kprofile-sr-only', 'ProfilePage does not use a negatively-margined sr-only heading')
 expectNotIncludes(header, 'lf-reference-', 'ProfileHeader does not reuse homepage service-card primitives')
 expectNotIncludes(section, 'lf-reference-', 'ProfileEntrySection does not reuse homepage service-card primitives')
 expectNotIncludes(sessionRecords, 'lf-reference-', 'ProfileSessionRecords does not reuse homepage service-card primitives')
@@ -153,36 +146,33 @@ expectIncludes(kioskRootSource, 'presentation="fusion-youth"', 'KioskRoot keeps 
 expectNotIncludes(kioskRootSource, 'SERVICE_DESK_EXACT_ROUTES', 'KioskRoot no longer maintains a LightFlow route whitelist')
 
 const profileHeaderMountIndex = profile.indexOf('<ProfileHeader')
-const pendingTaskMountIndex = profile.indexOf('{isLoggedIn && hasSessionRecords && <PendingTaskBanner')
-const toastMountIndex = profile.indexOf('{toastMsg && (')
-const sessionRecordsMountIndex = profile.indexOf('{hasSessionRecords && (\n          <ProfileSessionRecords')
-const serviceDirectoryIndex = profile.indexOf('<div className="kp-service-directory">')
+const continueMountIndex = profile.indexOf('<ProfileContinueCard')
+const assetMountIndex = profile.indexOf('<ProfileAssetGrid')
+const sessionRecordsMountIndex = profile.indexOf('<ProfileSessionRecords')
 expect(
   [
     profileHeaderMountIndex,
-    pendingTaskMountIndex,
-    toastMountIndex,
+    continueMountIndex,
+    assetMountIndex,
     sessionRecordsMountIndex,
-    serviceDirectoryIndex,
   ].every((index) => index !== -1)
-    && profileHeaderMountIndex < pendingTaskMountIndex
-    && pendingTaskMountIndex < toastMountIndex
-    && toastMountIndex < sessionRecordsMountIndex
-    && sessionRecordsMountIndex < serviceDirectoryIndex,
-  'ProfileHeader, pending task, toast, session records, and five-section directory mount in the required strict order',
+    && profileHeaderMountIndex < continueMountIndex
+    && continueMountIndex < assetMountIndex
+    && assetMountIndex < sessionRecordsMountIndex,
+  'ProfileHeader, continue card, asset grid, and session records mount in the required order',
 )
 
 for (const marker of [
   'useAuth()',
-  'useMemberProfileOverview(isLoggedIn, getToken)',
+  'useMemberAssetCounts(isLoggedIn, getToken, reloadKey)',
+  'getPendingTasks(token)',
   '<ProfileHeader',
-  '<PendingTaskBanner',
+  '<ProfileContinueCard',
   '<ProfileSessionRecords',
-  'hasSessionRecords &&',
   "const goLogin = () => navigate('/login', { state: { from: location.pathname } })",
   "navigate('/me/settings')",
-  "navigate('/me/notifications')",
   "navigate('/print/preview'",
+  "clearSessionTo({ path: '/profile' })",
 ]) {
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }
@@ -190,14 +180,28 @@ for (const marker of [
 for (const marker of [
   'reserveBannerSpace',
   'onLogin',
-  'onLogout',
   'onOpenSettings',
-  'onOpenNotifications',
-  'className="kp-profile-header',
-  'className="kp-profile-main"',
-  'className="p-stats"',
+  'className="pf-idcard"',
+  'className="pf-idtx"',
+  'className="pf-idname"',
 ]) {
   expectIncludes(header, marker, `ProfileHeader preserves ${marker}`)
+}
+
+/* 2026-09-08 青序流光迁移（稿 30-my-profile）：
+ * ProfileHeader 不再持有 onLogout / onOpenNotifications，ProfilePage 也不再直接写
+ * navigate('/me/notifications') —— 这两件事移到了页面自己的磁贴列表和底部行动条。
+ * **形状变了，能力没变**，所以把上面三条「这个字符串在不在」换成下面四条
+ * 「这几件事还能不能做」。条数 3 → 4，只增不减。
+ * 退出键按稿 30 叫「结束使用」（稿里 13 处这么写，「退出登录」只出现在说明文字里，
+ * 见 30-my-profile.html:519「离开前请点『结束使用』；这会退出登录并清掉…」）。 */
+for (const [marker, message] of [
+  ["'/me/notifications'", 'ProfilePage 仍能到达消息通知'],
+  ['消息通知', 'ProfilePage 仍展示消息通知入口'],
+  ['结束使用', 'ProfilePage 仍提供退出（稿 30 的「结束使用」）'],
+  ['onEnd', 'ProfilePage 的退出键接着真实的结束会话动作'],
+]) {
+  expectIncludes(profile, marker, message)
 }
 expectNotIncludes(header, 'kp-profile-boundary', 'ProfileHeader removes the non-prototype boundary panel')
 expectNotIncludes(header, 'p-hero', 'ProfileHeader removes the old p-hero visual shell')
@@ -322,7 +326,12 @@ expectMatches(
   /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/,
   'Profile icon actions exceed the 48px secondary touch-target minimum',
 )
-expectIncludes(header, "className={`p-actions ${isLoggedIn ? 'p-actions--member' : 'p-actions--guest'}`}", 'ProfileHeader distinguishes guest/member action layouts')
+expectIncludes(header, 'data-testid="profile-login"', 'ProfileHeader keeps the guest login control')
+expectIncludes(header, 'data-testid="profile-account"', 'ProfileHeader keeps the member account-settings control')
+const profileQxCss = read('src/pages/profile/styles/profile-qx.css')
+expectIncludes(profileQxCss, 'var(--qx-ink)', 'profile-qx.css consumes Qingxu tokens')
+expectIncludes(profileQxCss, '--qx-tap-min', 'profile-qx.css keeps the 48px touch floor')
+expectNotIncludes(profileQxCss, '#', 'profile-qx.css does not use raw hex colors')
 expectMatches(
   combinedProfileCss,
   /\.p-actions--guest\s*\{[^}]*display:\s*flex;[^}]*margin-inline-start:\s*0;/,
@@ -407,6 +416,12 @@ const allowedMeChanges = new Set([
   // verify-profile-print-orders-inkpaper.mjs 顶部注释。
   'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
+  'apps/kiosk/src/pages/profile/me/styles/benefits-qx.css',
+  'apps/kiosk/src/pages/profile/me/styles/feedback-qx.css',
+  'apps/kiosk/src/pages/profile/me/styles/privacy-qx.css',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx',
 ])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),

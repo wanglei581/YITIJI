@@ -1,0 +1,65 @@
+<!--pages/kiosk-send/kiosk-send.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" aria-label="返回">
+      <text class="ficon i-right"></text>
+    </view>
+    <view class="nav-title">传文件到一体机</view>
+  </view>
+
+  <view class="content">
+
+    <!-- 空闲：可以选文件 -->
+    <block wx:if="{{phase === 'idle'}}">
+      <view class="guide-card">
+        <text class="guide-icon ficon i-printer"></text>
+        <view class="guide-title">已连上终端</view>
+        <view class="guide-desc">选一份文件传过去，终端屏幕上会自己出现。单个文件不超过 10MB。</view>
+        <button class="btn-primary" bindtap="chooseAndSend">选择文件</button>
+      </view>
+    </block>
+
+    <!-- 兑换扫码凭据中（微信扫小程序码进来的那条入口）-->
+    <block wx:elif="{{phase === 'resolving'}}">
+      <view class="state-card">
+        <view class="sc-title">正在连接终端…</view>
+        <view class="sc-desc">正在核对二维码</view>
+      </view>
+    </block>
+
+    <!-- 传输中 -->
+    <block wx:elif="{{phase === 'uploading'}}">
+      <view class="state-card">
+        <view class="sc-title">正在传给终端…</view>
+        <view class="sc-desc">请不要关闭小程序</view>
+      </view>
+    </block>
+
+    <!-- 完成：允许接着传下一份 -->
+    <block wx:elif="{{phase === 'done'}}">
+      <view class="state-card">
+        <text class="sc-icon ficon i-check"></text>
+        <view class="sc-title">已传给终端</view>
+        <view class="sc-desc">请回到一体机屏幕继续操作</view>
+        <view class="sent-list">
+          <view class="sent-item" wx:for="{{sent}}" wx:key="index">{{item.name}}</view>
+        </view>
+        <button class="btn-secondary" bindtap="chooseAndSend">再传一份</button>
+      </view>
+    </block>
+
+    <!-- 失败 -->
+    <block wx:elif="{{phase === 'error'}}">
+      <view class="state-card">
+        <view class="sc-title">没能传过去</view>
+        <view class="sc-desc">{{errorMsg}}</view>
+        <!-- scene 码是一次性的，兑换失败给重试只会再失败一次；此时唯一有效动作是回机器重扫 -->
+        <button wx:if="{{!sceneFailed}}" class="btn-primary" bindtap="retry">重试</button>
+        <view wx:else class="sc-desc">请回到一体机屏幕重新生成二维码</view>
+      </view>
+    </block>
+
+  </view>
+</view>

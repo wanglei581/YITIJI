@@ -18,12 +18,13 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
-import { CreateUploadSessionDto, PhoneUploadSessionDto } from './upload-sessions.dto'
+import { CreateUploadSessionDto, PhoneUploadSessionDto, ResolveUploadSceneDto } from './upload-sessions.dto'
 import {
   UploadSessionsService,
   type UploadSessionCancelResponse,
   type UploadSessionConfirmResponse,
   type UploadSessionCreateResponse,
+  type UploadSessionSceneResolveResponse,
   type UploadSessionStatusResponse,
 } from './upload-sessions.service'
 
@@ -49,6 +50,23 @@ export class UploadSessionsController {
       uploadUrl: buildPhoneUploadUrl(req),
     })
     return ApiResponse.ok(result)
+  }
+
+  /**
+   * 小程序扫码后用 scene 换上传凭据。
+   *
+   * 必须声明在 `@Get(':sessionId')` 之类的参数路由之前，避免将来有人加
+   * `@Post(':sessionId')` 时把 `scene` 当成 sessionId 吃掉。
+   *
+   * 公开无鉴权：手机端此刻还没有任何本系统的身份，scene 本身就是凭据。
+   * 因此限流收得比创建更紧 —— 兑换会消耗码，暴力探测的代价必须够高。
+   */
+  @Post('scene/resolve')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  async resolveScene(
+    @Body() body: ResolveUploadSceneDto,
+  ): Promise<ApiResponse<UploadSessionSceneResolveResponse>> {
+    return ApiResponse.ok(await this.sessions.resolveScene(body.scene))
   }
 
   @Get(':sessionId')

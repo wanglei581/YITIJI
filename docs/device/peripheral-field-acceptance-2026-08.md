@@ -83,6 +83,7 @@
 
 ## 6. 衔接文档
 
+- 首单打印验收记录（2026-08-07）：`docs/device/print-first-order-evidence-2026-08-07.md`
 - Windows 现场总执行单：`docs/device/windows-field-acceptance-runsheet-2026-08.md`
 - SMB 扫描现场包：`docs/device/gate-0k-smb-scan-field-acceptance.md`
 - 商户开通：`docs/device/merchant-onboarding-checklist.md`、`docs/device/payment-production-env-checklist.md`

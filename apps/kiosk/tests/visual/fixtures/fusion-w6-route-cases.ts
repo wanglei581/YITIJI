@@ -86,7 +86,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/session', url: '/interview/session', expectedPath: '/interview', marker: screen('interview-session'), featureText: '会话已失效' },
   { pattern: '/interview/report', url: '/interview/report', expectedPath: '/interview', marker: screen('interview-report'), featureText: '报告不存在或已过期' },
   { pattern: '/interview/tips', url: '/interview/tips', expectedPath: '/interview', marker: screen('interview-tips'), featureText: '面试' },
-  { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '面试报告' },
+  { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '触摸屏幕开始使用', landmark: 'presentation', seed: seedScreensaver },
   { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '网络连接中断' },

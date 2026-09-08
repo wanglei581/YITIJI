@@ -1,16 +1,12 @@
-// ============================================================
 // 我的意见反馈 — /me/feedback（本人）。
 // 分类限定为设备 / 打印 / 文件处理 / 一般建议，不涉及招聘闭环承诺。
-// ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Card, EmptyState } from '@ai-job-print/ui'
-import { MessageSquareIcon } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../auth/useAuth'
-import { KIcon } from '../../../components/kiosk-icon'
-import { useInkRipple } from '../../../hooks/useInkRipple'
+import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
 import { API_MODE } from '../../../services/api/client'
+import { getTerminalCode } from '../../../services/api/screensaver'
 import {
   addMyFeedbackReply,
   closeMyFeedback,
@@ -21,45 +17,56 @@ import {
   type MemberFeedbackTicketDetail,
   type MemberFeedbackTicketItem,
 } from '../../../services/api/memberFeedback'
-import { MeListShell, type MeListState } from './MeListShell'
+import { QxMemberNavbar } from '../components/QxMemberNavbar'
 import { FeedbackDetailPanel } from './feedback/FeedbackDetailPanel'
 import { FeedbackFormPanel } from './feedback/FeedbackFormPanel'
 import { FeedbackListPanel } from './feedback/FeedbackListPanel'
 import { emptyFeedbackForm, parseFeedbackCategory, type FeedbackFormState } from './feedback/types'
-import './me-detail-inkpaper.css'
+import './styles/feedback-qx.css'
+
+type FeedbackUiState =
+  | 'login'
+  | 'service-unavailable'
+  | 'loading'
+  | 'error'
+  | 'list-empty'
+  | 'form-list'
+  | 'detail-loading'
+  | 'detail-ready'
 
 export function MyFeedbackPage() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberFeedbackTicketItem[]>([])
-  const [state, setState] = useState<MeListState>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [form, setForm] = useState<FeedbackFormState>(emptyFeedbackForm)
   const [selected, setSelected] = useState<MemberFeedbackTicketDetail | null>(null)
   const [replyContent, setReplyContent] = useState('')
   const [busy, setBusy] = useState<'submit' | 'detail' | 'reply' | 'close' | null>(null)
   const [hint, setHint] = useState<string | null>(null)
-  useInkRipple('.me-inkdetail .me-ripple')
 
   const canUseRemote = API_MODE === 'http' && Boolean(getToken())
   const selectedId = searchParams.get('ticket')
   const relatedPrintTaskId = searchParams.get('relatedPrintTaskId')?.trim() ?? ''
   const categoryFromQuery = parseFeedbackCategory(searchParams.get('category'))
+  const loginFrom = '/me/feedback' // loginFrom="/me/feedback"
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
       setItems([])
       setSelected(null)
-      setState('ready')
+      setLoadState('ready')
       return
     }
-    setState('loading')
+    setLoadState('loading')
     getMyFeedback(getToken(), { pageSize: 50 })
       .then((page) => {
         setItems(page.items)
-        setState('ready')
+        setLoadState('ready')
       })
-      .catch(() => setState('error'))
+      .catch(() => setLoadState('error'))
   }, [getToken, isLoggedIn])
 
   useEffect(() => {
@@ -175,57 +182,119 @@ export function MyFeedbackPage() {
 
   const totalLabel = useMemo(() => (items.length > 0 ? `${items.length} 条反馈` : '暂无反馈记录'), [items.length])
 
+  const uiState: FeedbackUiState = !isLoggedIn
+    ? 'login'
+    : !canUseRemote
+      ? 'service-unavailable'
+      : loadState === 'loading'
+        ? 'loading'
+        : loadState === 'error'
+          ? 'error'
+          : selectedId && busy === 'detail'
+            ? 'detail-loading'
+            : selected
+              ? 'detail-ready'
+              : items.length === 0
+                ? 'list-empty'
+                : 'form-list'
+
+  const status = uiState === 'error'
+    ? { tone: 'bad' as const, label: '反馈列表这次没取到' }
+    : uiState === 'loading' || uiState === 'detail-loading'
+      ? { tone: 'unknown' as const, label: '正在读取本人工单' }
+      : { tone: 'unknown' as const, label: '本人工单，不承诺回复时限' }
+
   return (
-    <div className="me-inkdetail me-inkdetail-feedback h-full">
-      <MeListShell
+    <div
+      className="fusion-w5 h-full"
+      data-kiosk-screen="member-list"
+      data-state={uiState}
+      data-testid={`member-feedback-state-${uiState}`}
+      data-login-from={loginFrom}
+    >
+      <QxPageFrame
         title="意见反馈"
-        subtitle="提交设备、打印、文件处理与一般建议"
-        loginFrom="/me/feedback"
-        isLoggedIn={isLoggedIn}
-        state={state}
-        onRetry={refresh}
+        subtitle="登录后提交的是本人工单，可以查看进度、追加描述和关闭。"
+        status={status}
+        terminalLabel={getTerminalCode() || '就业服务大厅'}
+        ctabar={
+          <FeedbackCta
+            uiState={uiState}
+            onLogin={() => navigate('/login', { state: { from: loginFrom } })}
+            onRetry={refresh}
+            onHome={() => navigate('/profile')}
+          />
+        }
+        navbar={<QxMemberNavbar current="profile" />}
       >
-        {hint && (
-          <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
-            {hint}
-          </div>
-        )}
+        <div className="qx-scroll qx-grow fb-page">
+          <section className="fb-xq">
+            <div className="fb-xq-eyebrow">MY FEEDBACK</div>
+            <h2 className="fb-xq-ask">设备和服务哪里不顺，<em>直接告诉我们</em>。</h2>
+            <p className="fb-xq-doing">登录后提交的是<b>本人工单</b>，可以查看进度、追加描述和关闭。</p>
+          </section>
 
-        <section className="me-detail-summary" aria-label="意见反馈概览">
-          <span className="me-summary-icon me-tone-rose" aria-hidden="true">
-            <KIcon name="feedback" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p>服务反馈</p>
-            <strong>{items.length}</strong>
-            <span>本人设备、打印、文件处理与一般建议，不涉及招聘平台闭环承诺</span>
-          </div>
-          <div className="me-summary-mini" aria-label="反馈状态">
-            <span>{canUseRemote ? '可提交' : '待登录'}</span>
-            <span>{totalLabel}</span>
-          </div>
-        </section>
+          {hint ? (
+            <div role="status" className="fb-toast" data-tone={hint.includes('失败') ? 'bad' : undefined}>
+              {hint}
+            </div>
+          ) : null}
 
-        {!canUseRemote ? (
-          <Card className="me-empty-card">
-            <EmptyState
-              icon={MessageSquareIcon}
-              title="当前无法提交反馈"
-              description="连接真实服务并登录后，可查看和提交本人反馈"
-              className="py-12"
-            />
-          </Card>
-        ) : (
-          <>
-            <FeedbackFormPanel
-              form={form}
-              relatedPrintTaskId={relatedPrintTaskId}
-              submitBusy={busy === 'submit'}
-              onFormChange={setForm}
-              onSubmit={() => void submit()}
-            />
+          <section className="fb-summary" aria-label="意见反馈概览">
+            <div className="fb-summary-main">
+              <b>服务反馈</b>
+              <strong>{items.length}</strong>
+              <span>本人设备、打印、文件处理与一般建议，不涉及招聘平台闭环承诺</span>
+            </div>
+            <div>
+              <span className="fb-st">{canUseRemote ? '可提交' : '待登录'}</span>
+              <p className="fb-legal" style={{ marginTop: 8 }}>{totalLabel}</p>
+            </div>
+          </section>
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+          {uiState === 'login' || uiState === 'service-unavailable' ? (
+            <div className="qx-state" data-tone="info" data-testid="member-feedback-fallback">
+              <span className="qx-state-ic" />
+              <span>
+                <div className="qx-state-t">{uiState === 'login' ? '请先登录' : '当前无法提交反馈'}</div>
+                <p className="qx-state-d">
+                  {uiState === 'login'
+                    ? '登录后可查看和提交本人反馈。本页是会员工单，与免登录的一体机问题反馈不是同一条链路。'
+                    : '连接真实服务并登录后，可查看和提交本人反馈'}
+                </p>
+              </span>
+            </div>
+          ) : null}
+
+          {uiState === 'loading' ? (
+            <div className="qx-state" data-tone="info">
+              <span className="qx-state-ic" />
+              <span>
+                <div className="qx-state-t">正在加载本人记录</div>
+                <p className="qx-state-d">请稍候，不会展示其他账号的数据</p>
+              </span>
+            </div>
+          ) : null}
+
+          {uiState === 'error' ? (
+            <div className="qx-state" data-tone="error" data-testid="member-feedback-fallback">
+              <span className="qx-state-ic" />
+              <span>
+                <div className="qx-state-t">暂时无法加载</div>
+                <p className="qx-state-d">请检查网络后重试。这次加载失败不会删除任何工单。</p>
+              </span>
+            </div>
+          ) : null}
+
+          {canUseRemote && loadState === 'ready' ? (
+            <>
+              <FeedbackFormPanel
+                form={form}
+                relatedPrintTaskId={relatedPrintTaskId}
+                submitBusy={busy === 'submit'}
+                onFormChange={setForm}
+                onSubmit={() => void submit()}
+              />
               <FeedbackListPanel
                 items={items}
                 selected={selected}
@@ -234,7 +303,6 @@ export function MyFeedbackPage() {
                 totalLabel={totalLabel}
                 onOpen={(id) => void openDetail(id)}
               />
-
               <FeedbackDetailPanel
                 detail={selected}
                 loading={busy === 'detail'}
@@ -245,10 +313,46 @@ export function MyFeedbackPage() {
                 replyBusy={busy === 'reply'}
                 closeBusy={busy === 'close'}
               />
-            </div>
-          </>
-        )}
-      </MeListShell>
+            </>
+          ) : null}
+
+          <p className="fb-legal">
+            <b>诚实说明</b>
+            本页是登录后的本人工单，与免登录的一体机问题反馈不是同一条链路；不承诺受理结论或回复时限。
+          </p>
+        </div>
+      </QxPageFrame>
     </div>
+  )
+}
+
+function FeedbackCta({
+  uiState,
+  onLogin,
+  onRetry,
+  onHome,
+}: {
+  uiState: FeedbackUiState
+  onLogin: () => void
+  onRetry: () => void
+  onHome: () => void
+}) {
+  if (uiState === 'login' || uiState === 'service-unavailable') {
+    return (
+      <>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>返回我的</button>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-feedback-primary" onClick={onLogin}>
+          手机号登录
+        </button>
+      </>
+    )
+  }
+  if (uiState === 'error') {
+    return (
+      <button type="button" className="qx-btn" data-variant="primary" onClick={onRetry}>重新加载</button>
+    )
+  }
+  return (
+    <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>返回我的</button>
   )
 }

@@ -165,6 +165,8 @@ jobs:
           # KIOSK-DEBT 三处前端欠账（同意版本 / 跨页上下文 / 禁用原因）。
           # 纯读 apps/kiosk 源码，不连库、不起服务，两个 job 都能跑。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
+          # 浏览器用例必须真的在 CI 里跑：纯静态解析 ci.yml × package.json × playwright config。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-browser-spec-coverage
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
@@ -542,6 +544,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:cjk-font
           # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
           pnpm --filter @ai-job-print/api verify:document-conversion
+          pnpm --filter @ai-job-print/api verify:miniapp-code
           pnpm --filter @ai-job-print/api verify:conversion-queue-bound
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
@@ -638,6 +641,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
+          pnpm --filter @ai-job-print/api verify:launch-audit-p5
           # LLM 超时 + 全局并发闸门：派生式扫描所有 LLM 调用点都带 signal，
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
@@ -666,6 +670,10 @@ jobs:
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
           pnpm --filter @ai-job-print/api verify:upload-sessions
+          # 扫码上传的小程序场景码：明文不落库、兑换一次性、兑换即轮换上传令牌、
+          # 失败路径不当预言机。跑进程内 RESP 桩，不连库不连外部 Redis，
+          # 所以只挂在本 job（postgres-readiness 那边加一遍纯属重复耗时）。
+          pnpm --filter @ai-job-print/api verify:upload-scene
           # 进程内 NestFactory 起 AppModule、随机端口监听（无需外部 API 服务），
           # 覆盖扫码上传 HTTP 契约与手机端错误信封不泄露。会员会话需要真实 Redis。
           pnpm --filter @ai-job-print/api verify:upload-sessions:http
@@ -877,6 +885,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
+          pnpm --filter @ai-job-print/api verify:launch-audit-p5
           # LLM 超时 + 全局并发闸门：派生式扫描所有 LLM 调用点都带 signal，
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
@@ -1068,6 +1077,11 @@ jobs:
           # 引用它 —— 打印完成页「不得伪造已出纸」和匿名反馈入口的断言全在这一套里，
           # 长期处于「写了但从不运行」的状态。挂进来，否则它守不住任何东西。
           pnpm --filter @ai-job-print/kiosk test:browser:truth
+          # 走查类用例（human-journey 等 7 个）。它们此前写了但**从不运行** ——
+          # 没有 config 的 testMatch 命中、ci.yml 也没点名，于是随页面迁移悄悄烂掉：
+          # 2026-09-08 实测其中三个已经对着 main 跑不过。接线的同时加了
+          # verify:kiosk-browser-spec-coverage，防止下一个 spec 再这样悄悄失效。
+          pnpm --filter @ai-job-print/kiosk test:browser:journeys
 
       - name: Run Admin browser E2E
         working-directory: apps/admin

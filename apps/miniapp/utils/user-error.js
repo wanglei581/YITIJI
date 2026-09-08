@@ -65,8 +65,45 @@ const PASSTHROUGH_MESSAGE_CODES = [
   'PRINT_TERMINAL_OFFLINE',      // 目标终端当前离线，请稍后重试
   'PRINT_TERMINAL_NOT_ACTIVE',   // 目标终端当前不接收打印订单
   'PRINT_ORDER_NOT_CANCELLABLE', // 订单当前状态不能取消
-  'SMS_TOO_FREQUENT',            // 验证码发送过于频繁,请 60 秒后再试
   'PICKUP_CODE_EXPIRED',         // 到机码已过期，请在小程序重新下单
+
+  // ── 登录 / 认证链路 ────────────────────────────────────────────────
+  // 2026-09-08 回归修复：本模块首版把这些码一并挡在 fail-closed 之外，
+  // 结果**登录彻底说不清为什么失败**。最严重的是 LEGAL_VERSION_STALE ——
+  // 服务端说「协议版本已更新，请重新阅读并勾选后再登录」，用户只看到页面兜底的
+  // 「登录失败，请重试」，于是一直重试一直失败，永远不知道要重新勾协议。
+  // request.js 里 401 分支的注释当初就写明了这一点：
+  //   「401 不都是同一回事：MEMBER_LEGAL_VERSION_STALE 要告诉用户……
+  //     丢掉响应体，这道合规闸门的告知意图就永远到不了用户面前」
+  // 首版没读到那段注释就收紧了判据。**登录失败必须说得出原因**，否则用户
+  // 没有任何可执行的下一步。以下每条都逐字核对过服务端源码里的实际文案。
+  'LEGAL_VERSION_STALE',         // 协议版本已更新，请重新阅读并勾选后再登录
+  'SMS_CODE_INVALID',            // 验证码不正确，请重新输入
+  'SMS_TOO_FREQUENT',            // 验证码发送过于频繁,请 60 秒后再试
+  'SMS_SEND_FAILED',             // 短信发送失败，请稍后再试
+  'WX_CONFIG_MISSING',           // 微信小程序登录暂不可用，请使用短信验证码登录
+  'WX_CODE_INVALID',             // 微信登录凭证无效或已过期，请重试
+  'WX_CODE2SESSION_FAILED',      // 微信登录服务异常，请稍后再试
+  'WX_TOKEN_FAILED',             // 微信服务暂不可用，请稍后再试
+  'WX_PHONE_FAILED',             // 无法获取手机号，请使用短信验证码登录
+  'WX_PHONE_INVALID',            // 无法获取手机号，请使用短信验证码登录
+  'MEMBER_SESSION_EXPIRED',      // 会话已失效,请重新登录（同时在 SHARED 里有统一文案）
+  'PHONE_ALREADY_BOUND',         // 该手机号已绑定其他账号
+  'PHONE_CONFLICT',              // 该手机号已绑定其他账号，无法换绑
+  'PHONE_NOT_BOUND',             // 当前账号未绑定登录手机号
+  'PHONE_BIND_TICKET_INVALID',   // 绑定请求已失效，请重新获取验证码
+  'PHONE_BIND_CONFLICT',         // 账号手机号状态已变化，请重新登录后再试
+  'PHONE_SELF_ALREADY_BOUND',    // 当前账号已绑定手机号，请刷新页面确认状态
+
+  // 扫码登录一体机：这些码直接对应用户眼前那台机器的状态，
+  // 换成页面兜底句会让人不知道是码过期了、被别人扫了、还是扫错了机器。
+  'QR_LOGIN_NOT_FOUND',          // 扫码登录已过期或不存在
+  'QR_LOGIN_ALREADY_CLAIMED',    // 扫码登录已被领取
+  'QR_LOGIN_ALREADY_CONFIRMED',  // 扫码登录已确认
+  'QR_LOGIN_TICKET_INVALID',     // 扫码登录票据格式无效
+  'QR_LOGIN_CLAIM_INVALID',      // 扫码登录凭证无效
+  'QR_LOGIN_TERMINAL_MISMATCH',  // 扫码登录终端不匹配
+  'QR_LOGIN_NOT_CONFIRMED',      // 扫码登录尚未确认
 ];
 
 /**

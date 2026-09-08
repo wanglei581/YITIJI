@@ -27,6 +27,7 @@
     "verify:resume-diagnosis-context": "node -r @swc-node/register scripts/verify-resume-diagnosis-context.ts",
     "verify:resume-report-export": "node -r @swc-node/register scripts/verify-resume-report-export.ts",
     "verify-real-resume-diagnosis": "node -r @swc-node/register scripts/verify-real-resume-diagnosis.ts && pnpm run verify:resume-report-export",
+    "verify:upload-scene": "node -r @swc-node/register scripts/verify-upload-scene.ts",
     "verify:upload-sessions": "node -r @swc-node/register scripts/verify-upload-sessions.ts",
     "verify:upload-sessions:http": "node -r @swc-node/register scripts/verify-upload-sessions-http.ts",
     "verify:partner-smart-campus": "node -r @swc-node/register scripts/verify-partner-smart-campus.ts",
@@ -291,6 +292,7 @@
     "verify:legal-doc-version": "node -r @swc-node/register scripts/verify-legal-doc-version.ts",
     "verify:self-assessment": "node -r @swc-node/register scripts/verify-self-assessment.ts",
     "verify:self-assessment-consent": "node -r @swc-node/register --test src/ai/resume/__tests__/self-assessment-consent.test.ts",
+    "verify:launch-audit-p5": "node -r @swc-node/register --test src/common/__tests__/launch-audit-p5.test.ts",
     "verify:assess-isolation": "node -r @swc-node/register scripts/verify-assess-isolation.ts",
     "verify:compliance": "node -r @swc-node/register scripts/verify-compliance.ts",
     "verify:fair-stats-truth": "node -r @swc-node/register scripts/verify-fair-stats-truth.ts",
@@ -298,7 +300,8 @@
     "verify:ai-public-quota": "node -r @swc-node/register scripts/verify-ai-public-quota.ts",
     "verify:ai-throttle-dimension": "node -r @swc-node/register scripts/verify-ai-throttle-dimension.ts",
     "verify:kiosk-ai-capabilities": "node -r @swc-node/register scripts/verify-kiosk-ai-capabilities.ts",
-    "verify:conversion-queue-bound": "node scripts/verify-conversion-queue-bound.mjs"
+    "verify:conversion-queue-bound": "node scripts/verify-conversion-queue-bound.mjs",
+    "verify:miniapp-code": "node scripts/verify-miniapp-code.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
