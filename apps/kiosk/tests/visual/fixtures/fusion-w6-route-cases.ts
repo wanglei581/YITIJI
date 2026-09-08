@@ -132,7 +132,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // 与稿逐字一致（稿内 state-h 原文）。marker 仍是 text-is 精确匹配、
   // featureText 仍是同样具体的整句，未放松成通用词。
   { pattern: '/print/cashier', url: '/print/cashier', marker: '.qx-state-t:text-is("没有待支付的订单")', featureText: '没有待支付的订单' },
-  { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
+  // 交付页迁移后空态文案成了 QxPageFrame 的 title，渲染为 <h1>（QxPageFrame.tsx:78），
+  // 不再是旧壳的 <p>。文案一字未改，只换标签选择器。
+  { pattern: '/print/progress', url: '/print/progress', marker: 'h1:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
   // 青序流光 11-arrival-code.html 把本页从「扫码取件」重定位为「输入你的到机码」；
   // marker / featureText 改指新页身份，强度不变：删掉页头或 data-w2-page 仍然会红。

@@ -739,6 +739,59 @@ assert.doesNotMatch(printProgress, /:\s*'正在打印'\s*}/, '真实任务主状
 const printDone = read('src/pages/print/PrintDonePage.tsx')
 assert.match(printDone, /getPayStatus/, 'print done obtains pickup code from payment status')
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')
+assert.match(printProgress, /QxPageFrame/, 'print progress uses Qingxu page frame')
+assert.match(printDone, /QxPageFrame/, 'print done uses Qingxu page frame')
+assert.doesNotMatch(printProgress, /KioskPageFrame/, 'print progress has left the V6 frame')
+assert.doesNotMatch(printDone, /KioskPageFrame/, 'print done has left the V6 frame')
+assert.doesNotMatch(printProgress, /PrintPageFrame/, 'print progress has left the V6 print frame')
+assert.doesNotMatch(printDone, /PrintPageFrame/, 'print done has left the V6 print frame')
+assert.match(
+  printProgress,
+  /print-fulfill-qx\.css/,
+  'print progress imports the Qingxu fulfill stylesheet'
+)
+assert.match(
+  printDone,
+  /print-fulfill-qx\.css/,
+  'print done imports the Qingxu fulfill stylesheet'
+)
+assert.match(printProgress, /QxAppNavbar/, 'print progress uses the shared Qingxu navbar')
+assert.match(printDone, /QxAppNavbar/, 'print done uses the shared Qingxu navbar')
+assert.doesNotMatch(
+  printProgress,
+  /机身灯亮绿/,
+  'print progress does not imply output-tray light linkage'
+)
+assert.doesNotMatch(
+  printDone,
+  /机身灯亮绿/,
+  'print done does not imply output-tray light linkage'
+)
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /QX_MIGRATED_ROUTES[\s\S]*['"]\/print\/progress['"]/,
+  '/print/progress is registered in QX_MIGRATED_ROUTES'
+)
+assert.match(
+  read('src/layouts/KioskRoot.tsx'),
+  /QX_MIGRATED_ROUTES[\s\S]*['"]\/print\/done['"]/,
+  '/print/done is registered in QX_MIGRATED_ROUTES'
+)
+assert.match(
+  read('src/components/qingxu/QxAppNavbar.tsx'),
+  /export function QxAppNavbar/,
+  'shared Qingxu navbar component exists'
+)
+assert.match(
+  printProgress,
+  /POLL_INTERVAL_MS = 3000/,
+  'print progress still polls every 3 seconds from Agent hardware reflux'
+)
+assert.match(
+  printDone,
+  /clearPrintMaterialSession\(\)/,
+  'print done wipe actually clears the print material session'
+)
 
 const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')
 const pickupClaimCss = read('src/pages/print/styles/print-pickup-claim.css')

@@ -1,12 +1,12 @@
 // ============================================================
-// PrintProgressPage — W6
+// PrintProgressPage — 青序流光 15-print-fulfill /print/progress
 //
 // Two modes:
 //   REAL  — state.taskId is set (API_MODE=http, real job submitted)
 //           Polls GET /api/v1/print/jobs/:taskId every 3s.
-//           Maps backend status → UI steps.
+//           Maps backend status → UI steps. Agent 硬件回流为唯一进度真值。
 //   SIM   — no taskId (mock mode or virtual file from W5 enterprise flow)
-//           Same setTimeout-based animation as before.
+//           Same setTimeout-based animation as before；演示结束停留本页，不跳成功。
 //
 // Status mapping (backend → UI step index):
 //   pending  / claimed  → step 1 "排队等待"  (step 0 "提交任务" already done)
@@ -17,7 +17,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { KioskActionBar } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -27,9 +26,10 @@ import {
   CreditCardIcon,
   FileTextIcon,
   InfoIcon,
-  PrinterIcon,
-  XCircleIcon,
+  ShieldIcon,
 } from 'lucide-react'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/printJobsApi'
@@ -37,9 +37,8 @@ import { wakeLocalPrintQueue } from '../../services/print/localPrintWakeApi'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
-import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
-
-// ── Display helpers ────────────────────────────────────────────────────────────
+import { formatCents } from './cashierStatus'
+import './styles/print-fulfill-qx.css'
 
 const DUPLEX_LABELS: Record<string, string> = {
   simplex: '单面',
@@ -90,8 +89,6 @@ function tlItemClass(tlIdx: number, currentIdx: number, isRealApi: boolean): str
   return ''
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type Step = 'submitting' | 'queuing' | 'printing'
 
 const STEPS: { key: Step; label: string; duration: number }[] = [
@@ -107,8 +104,6 @@ const FAIL_REASONS = [
   '文件解析失败，请重新上传文件',
 ]
 
-// 后端/Agent errorCode → 清晰中文提示。优先按错误码给出可操作文案，
-// 再回退到后端 errorMessage，最后回退到默认。
 const ERROR_CODE_MESSAGES: Record<string, string> = {
   DOWNLOAD_HASH_MISMATCH: '文件校验未通过（上传可能中断或文件已变化），请返回重新上传后再打印',
   PRINTER_NOT_FOUND: '未找到打印机，请联系工作人员检查打印机连接',
@@ -128,12 +123,10 @@ function errorCodeToMessage(code?: string): string | undefined {
 
 const POLL_INTERVAL_MS = 3000
 const POLL_FAIL_LIMIT = 5
-const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes — guard against Agent never claiming without false timeout
+const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000
 const STATUS_READ_ERROR_TEXT = '暂时无法读取状态'
 
 const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
-
-// ── Status → UI step mapping ──────────────────────────────────────────────────
 
 function backendStatusToStep(status: BackendJobStatus): Step {
   if (status === 'printing') return 'printing'
@@ -193,8 +186,6 @@ function realStatusPresentation(status: BackendJobStatus | null) {
   }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function PrintProgressPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -206,15 +197,11 @@ export function PrintProgressPage() {
   const isHttpMode = API_MODE === 'http'
   const useRealApi = isHttpMode && Boolean(taskId)
 
-  // 直达守卫：合法流程必带 taskId（真实任务）或 file（mock/上传流程）上下文。
-  // 二者皆无 = 用户直接打开 /print/progress，禁止跑模拟动画并伪造"打印成功"。
   const hasFileContext = Boolean((state as { file?: unknown } | null)?.file)
   const hasContext = Boolean(taskId) || hasFileContext
   const canSimulate = !isHttpMode && hasFileContext
-  // isSim：严格对应非真实 API / SIM 演示路径（与 canSimulate 同义）
   const isSim = canSimulate
 
-  // simulateFailure — dev/mock only
   const shouldFail = canSimulate && state?.simulateFailure === true
   const failReason = typeof state?.failReason === 'string' ? state.failReason : FAIL_REASONS[0]
 
@@ -231,13 +218,10 @@ export function PrintProgressPage() {
   const failTimerRef            = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wakeRequestedTaskIdRef  = useRef<string | null>(null)
 
-  // 仅真实任务或 SIM 演示仍在执行时抑制普通待机；非法、失败、超时和结束态释放。
   useBusyLock(
     (useRealApi && !failed && !timedOut) ||
     (isSim && !failed && !simDone),
   )
-
-  // ── Navigation helpers ────────────────────────────────────────────────────
 
   const navigateFail = useCallback(
     (reason: string) => {
@@ -261,14 +245,10 @@ export function PrintProgressPage() {
     navigate('/print/done', { state: { ...state, success: true } })
   }, [navigate, state])
 
-  // ── DEV helper (sim only) ─────────────────────────────────────────────────
-
   const handleDevFail = useCallback(() => {
     cancelRef.current = true
     navigateFail(FAIL_REASONS[0])
   }, [navigateFail])
-
-  // ── SIM mode: setTimeout animation（演示结束停留本页，不跳转成功页）────────
 
   useEffect(() => {
     if (useRealApi || !canSimulate) return
@@ -302,15 +282,10 @@ export function PrintProgressPage() {
     }
   }, [useRealApi, canSimulate, navigateFail, shouldFail, failReason])
 
-  // ── REAL mode: poll backend ───────────────────────────────────────────────
-
   useEffect(() => {
     if (!useRealApi || !taskId) return
 
     cancelRef.current = false
-
-    // Step 0 is already "done" — we submitted before landing here.
-    // Start showing step 1 immediately.
     setCurrent('queuing')
 
     if (wakeRequestedTaskIdRef.current !== taskId) {
@@ -329,10 +304,6 @@ export function PrintProgressPage() {
           return
         }
         if (result.status === 'failed') {
-          // 失败原因优先用后端下发的安全文案 failureReasonForUser；
-          // 再回退到本地 errorCode 映射；最后默认文案。
-          // 不再回退到 result.errorMessage —— 该字段可能承载 Agent 原始排障细节，
-          // 前台一律不直接透出（后端亦已收口，此处再做一层防御）。
           navigateFail(
             result.failureReasonForUser ?? errorCodeToMessage(result.errorCode) ?? FAIL_REASONS[0],
           )
@@ -349,7 +320,6 @@ export function PrintProgressPage() {
         }
         pollFailsRef.current = 0
         setStatusReadError(false)
-        // pending | claimed | printing — update step
         backendStatusRef.current = result.status
         setBackendStatus(result.status)
         if (result.status === 'printing') setTimedOut(false)
@@ -364,12 +334,9 @@ export function PrintProgressPage() {
       }
     }
 
-    // Poll immediately, then on interval
     void tick()
     const timer = setInterval(() => void tick(), POLL_INTERVAL_MS)
 
-    // 超时只针对「终端迟迟没接单 / 没开始」：正在出纸（printing）不算超时，顺延一个窗口；
-    // 超时后也不停轮询、不置 cancelRef，之后 completed / failed 仍能正常跳转。
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null
     const onTimeout = () => {
       if (cancelRef.current) return
@@ -385,102 +352,158 @@ export function PrintProgressPage() {
     }
   }, [useRealApi, taskId, navigateFail, navigateSuccess])
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   const currentIdx = stepIndex(current)
   const realStatus = realStatusPresentation(backendStatus)
 
-  // 任务信息展示字段
   const file   = (state?.file  as PrintFileState | undefined) ?? null
   const params = (state?.params as PrintJobParams | undefined) ?? null
   const orderNo = typeof state?.orderNo === 'string' ? state.orderNo
                 : typeof state?.orderId === 'string' ? state.orderId
                 : null
-  // amountCents=0（免费单 / PAYMENT_PROVIDER=sandbox 默认路径）→ 不展示支付相关文案。
+  const amountCents = typeof state?.amountCents === 'number' ? state.amountCents : null
   const isFreeOrder = (typeof state?.amountCents === 'number' ? state.amountCents : 1) === 0
-
   const submitTimeFormatted = useMemo(() => formatSubmitTime(new Date()), [])
+  const pageCount = file?.pages ?? null
 
-  // Guard：直达 /print/progress（无任务上下文）—— 不展示进度/不伪造成功，引导重新上传。
+  const navbar = (
+    <QxAppNavbar
+      onHome={() => navigate('/')}
+      onAdvisor={() => navigate('/assistant')}
+      onProfile={() => navigate('/profile')}
+    />
+  )
+
+  const pillLabel = isSim
+    ? (simDone ? '演示已结束' : '演示进行中')
+    : isFreeOrder
+      ? '本次未收款 · 系统报价 0 元'
+      : amountCents != null
+        ? `已付 ${formatCents(amountCents)} · 只收纸张费`
+        : realStatus.badge
+
+  const frameStatus = !hasContext || (isHttpMode && !taskId)
+    ? { tone: 'unknown' as const, label: '状态未知' }
+    : timedOut
+      ? { tone: 'warn' as const, label: pillLabel }
+      : failed
+        ? { tone: 'bad' as const, label: isSim ? '演示失败' : '处理出错' }
+        : backendStatus == null && useRealApi
+          ? { tone: 'unknown' as const, label: '状态未知' }
+          : { tone: 'ok' as const, label: pillLabel }
+
   if (!hasContext || (!isHttpMode && !canSimulate)) {
     return (
-      <PrintPageFrame className="p-6">
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
-          <AlertCircleIcon className="h-10 w-10 text-warning" />
+      <QxPageFrame
+        title="未找到打印任务"
+        subtitle="请从上传文件重新开始打印流程"
+        status={{ tone: 'unknown', label: '状态未知' }}
+        terminalLabel="就业服务大厅"
+        ctabar={
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>
+            重新上传文件
+          </button>
+        }
+        navbar={navbar}
+      >
+        <div data-w2-page="print-progress" data-print-flow-step={6} data-testid="print-fulfill-state-missing-context" className="qx-scroll pff-page">
+          <div className="qx-state" data-tone="empty">
+            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
+            <div>
+              <div className="qx-state-t">未找到打印任务</div>
+              <div className="qx-state-d">请从上传文件重新开始打印流程。本页不会编造进度或打印结果。</div>
+            </div>
+          </div>
         </div>
-        <div className="text-center">
-          <p className="text-lg font-semibold text-neutral-900">未找到打印任务</p>
-          <p className="mt-2 text-sm text-neutral-500">请从上传文件重新开始打印流程</p>
-        </div>
-        <button
-          onClick={() => navigate(uploadPath)}
-          className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
-        >
-          重新上传文件
-        </button>
-      </div>
-      </PrintPageFrame>
+      </QxPageFrame>
     )
   }
 
-  // 生产 / http 模式必须依赖真实后端任务。即使存在 file 上下文，
-  // 没有 taskId 也不能回退到 SIM 动画并展示成功。
   if (isHttpMode && !taskId) {
     return (
-      <PrintPageFrame className="p-6">
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
-          <AlertCircleIcon className="h-10 w-10 text-warning" />
+      <QxPageFrame
+        title="打印任务尚未创建"
+        subtitle="请返回确认页重试"
+        status={{ tone: 'unknown', label: '状态未知' }}
+        terminalLabel="就业服务大厅"
+        ctabar={
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/confirm', { state })}>
+            返回确认页
+          </button>
+        }
+        navbar={navbar}
+      >
+        <div data-w2-page="print-progress" data-print-flow-step={6} data-testid="print-fulfill-state-missing-context" className="qx-scroll pff-page">
+          <div className="qx-state" data-tone="error">
+            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
+            <div>
+              <div className="qx-state-t">打印任务尚未创建</div>
+              <div className="qx-state-d">没有真实 taskId，不能展示打印进度，也不会假装已经出纸。</div>
+            </div>
+          </div>
         </div>
-        <div className="text-center">
-          <p className="text-lg font-semibold text-neutral-900">打印任务尚未创建</p>
-          <p className="mt-2 text-sm text-neutral-500">请返回确认页重试</p>
-        </div>
-        <button
-          onClick={() => navigate('/print/confirm', { state })}
-          className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
-        >
-          返回确认页
-        </button>
-      </div>
-      </PrintPageFrame>
+      </QxPageFrame>
     )
   }
 
-  // Timeout screen — Agent never responded within 10 minutes
   if (timedOut) {
     return (
-      <PrintPageFrame className="p-6">
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-warning-bg">
-          <ClockIcon className="h-12 w-12 text-warning" />
-        </div>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-neutral-900">处理超时</h1>
-          <p className="mt-3 text-base text-neutral-500 max-w-xs">
-            {backendStatus === 'claimed'
-              ? '打印终端已接单但长时间未开始出纸。'
-              : '打印终端长时间未接单，任务仍在队列中。'}
-            <br />
-            请联系工作人员确认打印机状态；页面会继续同步任务状态。
-          </p>
-          {taskId && (
-            <p className="mt-3 text-xs text-neutral-400">任务编号：{taskId}</p>
-          )}
-        </div>
-        <button
-          onClick={() => navigate('/')}
-          className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
+      <QxPageFrame
+        title="暂时查不到打印结果"
+        subtitle="这不代表成功或失败，只是本机暂时没拿到最新状态"
+        status={{ tone: 'warn', label: amountCents != null ? `已付 ${formatCents(amountCents)} · 状态查询中` : '状态查询中' }}
+        terminalLabel="就业服务大厅"
+        ctabar={
+          <>
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="ghost"
+              data-testid="print-fulfill-primary"
+              onClick={() => setTimedOut(false)}
+            >
+              重新查询状态
+            </button>
+            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/help')}>
+              联系工作人员
+            </button>
+          </>
+        }
+        navbar={navbar}
+      >
+        <div
+          data-w2-page="print-progress" data-print-flow-step={6}
+          data-testid="print-fulfill-state-client-status-timeout"
+          className="qx-scroll pff-page"
         >
-          返回首页
-        </button>
-      </div>
-      </PrintPageFrame>
+          <section className="pff-xq">
+            <div className="pff-xq-row">
+              <div className="pff-xq-face" aria-hidden="true">青</div>
+              <div>
+                <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
+                <p className="pff-xq-ask">暂时<em>查不到</em>打印结果。</p>
+                <p className="pff-xq-doing">这不代表成功或失败，只是本机暂时没拿到最新状态。</p>
+              </div>
+            </div>
+          </section>
+          <div className="pff-issue" data-tone="wheat" data-testid="print-fulfill-fallback">
+            <div className="pff-issue-head">
+              <span className="pff-issue-ic"><AlertTriangleIcon aria-hidden="true" /></span>
+              <div className="pff-issue-t">
+                状态暂未确认，请联系工作人员
+                <small>本机连续查询 10 分钟没有拿到最终结果</small>
+              </div>
+            </div>
+            <p className="pff-issue-body">
+              这只是<b>查询超时</b>：服务端的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。
+              可以先重新查询，或直接找工作人员现场确认。
+              {taskId ? ` 任务编号 ${taskId}。` : null}
+            </p>
+          </div>
+        </div>
+      </QxPageFrame>
     )
   }
 
-  // ── 4步时间线定义（isSim 隔离真实话术；演示分支明确未建单/未支付/未出纸）──
   const TL_ITEMS = [
     {
       key: 'submit',
@@ -514,267 +537,311 @@ export function PrintProgressPage() {
     },
   ] as const
 
-  // ── 主体：两栏布局 ─────────────────────────────────────────────────────────
-  return (
-    <PrintPageFrame>
-    <div data-w2-page="print-progress" className="flex min-h-full flex-col">
-      <PrintPrototypeHeader
-        title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : realStatus.headerTitle}
-        subtitle={
-          isSim
-            ? (simDone
-              ? '未真实打印，未创建打印任务'
-              : '当前为演示模式，不会建单、支付或出纸')
-            : realStatus.headerSubtitle
-        }
-        step={6}
-        aside={
-          isSim ? (
-            <span className="pp-running-badge" role="note">
-              <InfoIcon aria-hidden="true" />
-              演示模式·非真实打印
-            </span>
-          ) : (
-            <span className="pp-running-badge" role="status" aria-live="polite">
-              <ClockIcon aria-hidden="true" />
-              任务进行中
-            </span>
-          )
-        }
-      />
+  const stageHeading = isSim
+    ? (simDone ? '演示流程已结束' : '流程演示中')
+    : realStatus.stageTitle
+  const stageLine = isSim
+    ? (simDone ? '未真实打印，可返回首页或重新上传' : '仅演示进度步骤，未建单、未支付、未出纸')
+    : realStatus.stageSubtitle
 
-      {/* SIM 常驻提示：演示模式·非真实打印 */}
+  const askTitle = isSim
+    ? (simDone ? <>演示流程已结束，<em>未真实打印</em>。</> : <>流程演示中，<em>不会出纸</em>。</>)
+    : failed
+      ? <>处理出错，<em>即将核对结果</em>。</>
+      : backendStatus === 'printing'
+        ? (isFreeOrder ? <>订单已建立，<em>正在出纸</em>。</> : <>支付成功，<em>正在出纸</em>。</>)
+        : <>{realStatus.headerTitle}，<em>请留在机器旁</em>。</>
+
+  // 小青这句必须和顶栏 subtitle 说不同的事：顶栏报状态，小青报「在印什么、你该干嘛」。
+  // 稿 15 原文是「两份文件依次打印。你可以先在旁边等，不用贴着机器。」
+  // 拿不到真实份数时只给等待指引，不编数字（§9 不伪造）。
+  const copiesText = params?.copies && params.copies > 1 ? `${params.copies} 份文件依次打印。` : ''
+  const askDoing = isSim
+    ? (simDone ? '未真实打印，未创建打印任务' : '当前为演示模式，不会建单、支付或出纸')
+    : failed
+      ? (isSim ? '仅模拟异常处理，未创建任务、未扣费、未发送打印' : '任务遇到问题，即将跳转至结果页')
+      : `${copiesText}你可以先在旁边等，不用贴着机器。`
+
+  return (
+    <QxPageFrame
+      title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : realStatus.headerTitle}
+      subtitle={
+        isSim
+          ? (simDone
+            ? '未真实打印，未创建打印任务'
+            : '当前为演示模式，不会建单、支付或出纸')
+          : realStatus.headerSubtitle
+      }
+      status={frameStatus}
+      terminalLabel="就业服务大厅"
+      ctabar={
+        isSim ? (
+          <span className="why">
+            {simDone ? '演示流程已结束 · 未真实打印' : '演示模式·非真实打印；动画结束后停留本页'}
+          </span>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="qx-btn pff-again"
+              data-variant="ghost"
+              data-testid="print-fulfill-reprint"
+              onClick={() => navigate(uploadPath)}
+            >
+              再印一份
+              <small>重新选文件、核价并支付 · 不免费</small>
+            </button>
+            <button type="button" className="qx-btn" data-variant="danger" disabled aria-disabled="true">
+              还在打印，完成后才能结束清空
+            </button>
+          </>
+        )
+      }
+      navbar={navbar}
+    >
+    <div
+      data-w2-page="print-progress" data-print-flow-step={6}
+      data-testid={failed ? 'print-fulfill-state-failed' : 'print-fulfill-state-printing'}
+      className="qx-scroll pff-page"
+    >
+      <section className="pff-xq">
+        <div className="pff-xq-row">
+          <div className="pff-xq-face" aria-hidden="true">青</div>
+          <div>
+            <div className="pff-xq-eyebrow">PRINT &amp; PICKUP</div>
+            <p className="pff-xq-ask">{askTitle}</p>
+            <p className="pff-xq-doing">{askDoing}</p>
+          </div>
+        </div>
+      </section>
+
+      {isSim ? (
+        <span className="pp-running-badge pff-sim-banner" role="note">
+          <InfoIcon aria-hidden="true" />
+          演示模式·非真实打印
+        </span>
+      ) : (
+        <span className="pp-running-badge" role="status" aria-live="polite">
+          <ClockIcon aria-hidden="true" />
+          任务进行中
+        </span>
+      )}
+
       {isSim && (
-        <div
-          className="mx-6 mt-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-center text-base font-semibold text-warning"
-          role="note"
-        >
+        <div className="pff-sim-banner" role="note">
           演示模式·非真实打印
         </div>
       )}
 
       {useRealApi && statusReadError && !failed && (
-        <div
-          className="mx-6 mt-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-center text-base font-semibold text-warning"
-          role="status"
-        >
+        <div className="pff-sim-banner" role="status">
           {STATUS_READ_ERROR_TEXT}
         </div>
       )}
 
-      {/* 主内容 */}
-      <div className="pp-main-content">
-        <div className="pp-split">
-
-          {/* 左：状态时间线卡片 */}
-          <div className="pp-left-col">
-            <div className="pp-stage-card">
-              {/* 大图标 */}
-              <div className="pp-stage-icon" aria-hidden="true">
-                {failed
-                  ? <XCircleIcon />
-                  : isSim && simDone
-                    ? <InfoIcon />
-                    : <PrinterIcon />
-                }
-              </div>
-              <div className="pp-stage-title">
-                {failed
-                  ? (isSim ? '演示失败场景已触发' : '处理出错')
-                  : isSim
-                    ? (simDone ? '演示流程已结束' : '流程演示中')
-                    : realStatus.stageTitle}
-              </div>
-              <div className="pp-stage-sub">
-                {failed
-                  ? (isSim
-                    ? '仅模拟异常处理，未创建任务、未扣费、未发送打印'
-                    : '任务遇到问题，即将跳转至结果页')
-                  : isSim
-                    ? (simDone
-                      ? '未真实打印，可返回首页或重新上传'
-                      : '仅演示进度步骤，未建单、未支付、未出纸')
-                    : realStatus.stageSubtitle}
-              </div>
-
-              {/* SIM 结束：停留本页，提供触控操作 */}
-              {isSim && simDone && (
-                <div className="mt-6 flex flex-col gap-3">
-                  <p className="text-center text-base font-semibold text-neutral-700">未真实打印</p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/')}
-                    className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
-                  >
-                    返回首页
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate(uploadPath)}
-                    className="rounded-xl border border-neutral-300 bg-white px-8 py-4 text-base font-semibold text-neutral-800 hover:bg-neutral-50 min-h-[56px]"
-                  >
-                    重新上传
-                  </button>
-                </div>
-              )}
-
-              {/* 时间线 */}
-              <div className="pp-tl" role="list" aria-label="打印进度">
-                {TL_ITEMS.map((item, tlIdx) => {
-                  const cls = isSim && simDone && !failed ? 'tl-done' : tlItemClass(tlIdx, currentIdx, useRealApi)
-                  const isDone   = cls === 'tl-done'
-                  const isActive = cls === 'tl-active'
-                  return (
-                    <div key={item.key} className={`pp-tl-item ${cls}`} role="listitem">
-                      <span className="pp-t-rail">
-                        <span className="pp-t-dot">
-                          {isDone || (isSim && simDone)
-                            ? <CheckIcon />
-                            : isActive
-                              ? <CircleDotIcon />
-                              : <ClockIcon />
-                          }
-                        </span>
-                        <span className="pp-t-line" aria-hidden="true" />
-                      </span>
-                      <span className="pp-t-body">
-                        <b>{item.label}</b>
-                        <span>{item.desc}</span>
-                        {isActive && !failed && (
-                          <span className="animate-pulse" style={{ fontSize: 16, color: 'var(--print-teal-deep)', marginTop: 4, display: 'block' }}>
-                            {useRealApi ? realStatus.activeHint : '演示中…'}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* 右：任务信息 + 常见情况 + 提示 */}
-          <div className="pp-side-col">
-            {/* SIM：独立演示说明区（不承诺真实任务） */}
-            {isSim && (
-              <section className="pp-info-card" aria-label="演示说明">
-                <b className="pp-info-hd">演示说明</b>
-                <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-neutral-700">
-                  <li>未创建真实打印任务</li>
-                  <li>未产生订单或费用</li>
-                  <li>未向打印机发送文件</li>
-                  <li>不会产生取件码</li>
-                </ul>
-              </section>
-            )}
-
-            {/* 任务信息（SIM 可展示演示输入；预计出纸仅真实任务） */}
-            <section className="pp-info-card" aria-label="任务信息">
-              <b className="pp-info-hd">任务信息</b>
-              <div className="pp-i-row">
-                <span className="pp-i-k">文件名</span>
-                <span className="pp-i-v">{file?.name ?? '—'}</span>
-              </div>
-              <div className="pp-i-row">
-                <span className="pp-i-k">打印参数</span>
-                <span className="pp-i-v">{formatParams(params)}</span>
-              </div>
-              <div className="pp-i-row">
-                <span className="pp-i-k">任务号</span>
-                <span className="pp-i-v">{taskId ?? '—'}</span>
-              </div>
-              <div className="pp-i-row">
-                <span className="pp-i-k">订单号</span>
-                <span className="pp-i-v">{orderNo ?? '—'}</span>
-              </div>
-              <div className="pp-i-row">
-                <span className="pp-i-k">提交时间</span>
-                <span className="pp-i-v">{submitTimeFormatted}</span>
-              </div>
-              {!isSim && (
-                <div className="pp-i-row">
-                  <span className="pp-i-k">预计出纸</span>
-                  <span className="pp-i-v">{expectedSheets(file, params)}</span>
-                </div>
-              )}
-            </section>
-
-            {/* 常见情况：仅真实任务 */}
-            {!isSim && (
-              <section className="pp-faq-card" aria-label="常见情况处理">
-                <b className="pp-faq-hd">遇到这些情况怎么办</b>
-                <div className="pp-faq-item">
-                  <AlertTriangleIcon className="pp-faq-icon" aria-hidden="true" />
-                  <p className="pp-faq-text">
-                    <b>打印机缺纸 / 卡纸</b>：任务会提示失败原因，请联系现场工作人员处理后重试。
-                  </p>
-                </div>
-                <div className="pp-faq-item">
-                  <ClockIcon className="pp-faq-icon" aria-hidden="true" />
-                  <p className="pp-faq-text">
-                    <b>长时间无响应</b>：超过 10 分钟未响应将提示处理超时，凭任务号联系工作人员确认。
-                  </p>
-                </div>
-                <div className="pp-faq-item">
-                  <FileTextIcon className="pp-faq-icon" aria-hidden="true" />
-                  <p className="pp-faq-text">
-                    <b>文件校验未通过</b>：上传可能中断或文件已变化，请返回重新上传后再打印。
-                  </p>
-                </div>
-                <div className="pp-faq-item">
-                  <CreditCardIcon className="pp-faq-icon" aria-hidden="true" />
-                  <p className="pp-faq-text">
-                    {isFreeOrder
-                      ? <><b>打印失败</b>：任务记录已保存，可在「我的 · 打印订单」查看详情并联系工作人员确认。</>
-                      : <><b>已支付但打印失败</b>：订单与支付记录已保存，可在「我的 · 打印订单」查看并联系退款。</>
+      <div className="pff-sec">
+        <div className="pff-sec-h">
+          <span className="t">打印进度</span>
+          <span className="hint">{isSim ? '演示步骤，不是硬件回流' : '状态来自打印服务，每 3 秒更新'}</span>
+        </div>
+        <div className="pff-jobs" data-testid="print-fulfill-list" role="list" aria-label="打印进度">
+          {TL_ITEMS.map((item, tlIdx) => {
+            const cls = isSim && simDone && !failed ? 'tl-done' : tlItemClass(tlIdx, currentIdx, useRealApi)
+            const isDone   = cls === 'tl-done'
+            const isActive = cls === 'tl-active'
+            return (
+              <div key={item.key} className={`pff-job pp-tl-item ${cls}`} role="listitem">
+                <span className="pff-t-rail">
+                  <span className="pff-t-dot">
+                    {isDone || (isSim && simDone)
+                      ? <CheckIcon aria-hidden="true" />
+                      : isActive
+                        ? <CircleDotIcon aria-hidden="true" />
+                        : <ClockIcon aria-hidden="true" />
                     }
-                  </p>
-                </div>
-              </section>
-            )}
-
-            {/* 提示条：仅真实任务 */}
-            {!isSim && (
-              <div className="pp-notice" role="note">
-                <InfoIcon className="pp-notice-icon" aria-hidden="true" />
-                请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。
+                  </span>
+                  <span className="pff-t-line" aria-hidden="true" />
+                </span>
+                <span className="pff-t-body">
+                  <b>{item.label}</b>
+                  <span>{item.desc}</span>
+                  {isActive && !failed && (
+                    <span className="animate-pulse" style={{ fontSize: 16, color: 'var(--qx-teal-d)', marginTop: 4, display: 'block' }}>
+                      {useRealApi ? realStatus.activeHint : '演示中…'}
+                    </span>
+                  )}
+                </span>
+                <span className="pff-job-state">
+                  {failed && tlIdx === currentIdx
+                    ? (isSim ? '演示失败' : '出错')
+                    : isDone || (isSim && simDone)
+                      ? (isSim ? '演示结束' : '完成')
+                      : isActive
+                        ? (isSim ? '演示中' : realStatus.badge)
+                        : '排队中'}
+                </span>
               </div>
-            )}
-          </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* 底部行动条 */}
-      <KioskActionBar className="pp-actionbar">
-        <span className="pp-actionbar-note">
-          {isSim
-            ? (simDone ? '演示流程已结束 · 未真实打印' : '演示模式·非真实打印；动画结束后停留本页')
-            : realStatus.actionNote}
-        </span>
-        <span className="pp-status-chip" role="status" aria-live="polite">
-          <i aria-hidden="true" />
-          {isSim ? (simDone ? '演示已结束' : '演示进行中') : realStatus.badge}
-        </span>
-      </KioskActionBar>
+      {isSim && simDone && (
+        <div className="mt-6 flex flex-col gap-3">
+          <p className="text-center text-base font-semibold">未真实打印</p>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="qx-btn"
+            data-variant="primary"
+          >
+            返回首页
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(uploadPath)}
+            className="qx-btn"
+            data-variant="ghost"
+          >
+            重新上传
+          </button>
+        </div>
+      )}
 
-      {/* DEV 专用：模拟失败按钮 */}
+      {!isSim && (
+        <div className="pff-out">
+          <div className="pff-out-stage" aria-hidden="true">
+            <div className="pff-out-slot" />
+            <div className="pff-out-paper" />
+            <div className="pff-out-tray" />
+          </div>
+          <div className="pff-out-main">
+            <div className="pff-out-status">
+              {backendStatus === 'printing' ? (
+                <span className="pff-pulse"><i /><i /><i />正在出纸</span>
+              ) : (
+                stageHeading
+              )}
+              {pageCount != null ? <span className="pages">共 {pageCount} 页</span> : null}
+            </div>
+            <div className="pff-out-sub">
+              {stageLine} 纸从<b>屏幕正下方出纸口</b>出来。页数只在服务端文件信息存在时展示，不逐页播报。
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSim && (
+        <section className="qx-card pff-info" aria-label="演示说明">
+          <b className="pff-info-hd">演示说明</b>
+          <ul className="mt-2 list-disc space-y-2 pl-5">
+            <li>未创建真实打印任务</li>
+            <li>未产生订单或费用</li>
+            <li>未向打印机发送文件</li>
+            <li>不会产生取件码</li>
+          </ul>
+        </section>
+      )}
+
+      <section className="qx-card pff-info" aria-label="任务信息">
+        <b className="pff-info-hd">任务信息</b>
+        <div className="pff-i-row">
+          <span className="pff-i-k">文件名</span>
+          <span className="pff-i-v">{file?.name ?? '—'}</span>
+        </div>
+        <div className="pff-i-row">
+          <span className="pff-i-k">打印参数</span>
+          <span className="pff-i-v">{formatParams(params)}</span>
+        </div>
+        <div className="pff-i-row">
+          <span className="pff-i-k">任务号</span>
+          <span className="pff-i-v">{taskId ?? '—'}</span>
+        </div>
+        <div className="pff-i-row">
+          <span className="pff-i-k">订单号</span>
+          <span className="pff-i-v">{orderNo ?? '—'}</span>
+        </div>
+        <div className="pff-i-row">
+          <span className="pff-i-k">提交时间</span>
+          <span className="pff-i-v">{submitTimeFormatted}</span>
+        </div>
+        {!isSim && (
+          <div className="pff-i-row">
+            <span className="pff-i-k">预计出纸</span>
+            <span className="pff-i-v">{expectedSheets(file, params)}</span>
+          </div>
+        )}
+      </section>
+
+      {!isSim && (
+        <section className="qx-card pff-info" aria-label="常见情况处理">
+          <b className="pff-info-hd">遇到这些情况怎么办</b>
+          <div className="pff-faq">
+            <div className="pff-faq-item">
+              <AlertTriangleIcon aria-hidden="true" />
+              <p><b>打印机缺纸 / 卡纸</b>：任务会提示失败原因，请联系现场工作人员处理后重试。</p>
+            </div>
+            <div className="pff-faq-item">
+              <ClockIcon aria-hidden="true" />
+              <p><b>长时间无响应</b>：超过 10 分钟未响应将提示处理超时，凭任务号联系工作人员确认。</p>
+            </div>
+            <div className="pff-faq-item">
+              <FileTextIcon aria-hidden="true" />
+              <p><b>文件校验未通过</b>：上传可能中断或文件已变化，请返回重新上传后再打印。</p>
+            </div>
+            <div className="pff-faq-item">
+              <CreditCardIcon aria-hidden="true" />
+              <p>
+                {isFreeOrder
+                  ? <><b>打印失败</b>：任务记录已保存，可在「我的 · 打印订单」查看详情并联系工作人员确认。</>
+                  : <><b>已支付但打印失败</b>：订单与支付记录已保存，可在「我的 · 打印订单」查看并联系退款。</>
+                }
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!isSim && (
+        <div className="pff-wipe" data-live="false">
+          <div>
+            <div className="pff-wipe-t"><ShieldIcon aria-hidden="true" />打印期间不会清空</div>
+            <p className="pff-wipe-s">全部打完、你拿走之后，才开始会话清空计时。倒计时不是催你走，你可以核对完再离开。</p>
+          </div>
+        </div>
+      )}
+
+      {!isSim && (
+        <div className="pff-help" data-testid="print-fulfill-fallback">
+          <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。</span>
+          <button type="button" className="pff-help-btn" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
+            联系工作人员
+          </button>
+        </div>
+      )}
+
+      {!isSim && (
+        <div className="pp-notice" role="note">
+          <InfoIcon className="pp-notice-icon" aria-hidden="true" />
+          请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。
+        </div>
+      )}
+
+      <span className="pp-status-chip" role="status" aria-live="polite">
+        {isSim ? (simDone ? '演示已结束' : '演示进行中') : realStatus.badge}
+      </span>
+
       {import.meta.env.DEV && canSimulate && !failed && (
         <button
           onClick={handleDevFail}
-          style={{ position: 'fixed', bottom: 100, right: 16, zIndex: 50 }}
-          className="rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
+          type="button"
+          className="qx-btn"
+          data-variant="ghost"
         >
           [DEV] 模拟失败
         </button>
       )}
-
-      {/* DEV 专用：任务 ID */}
-      {import.meta.env.DEV && useRealApi && taskId && (
-        <div style={{ position: 'fixed', bottom: 60, left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>
-          <p className="text-xs text-neutral-400">taskId: {taskId}</p>
-        </div>
-      )}
     </div>
-    </PrintPageFrame>
+    </QxPageFrame>
   )
 }
