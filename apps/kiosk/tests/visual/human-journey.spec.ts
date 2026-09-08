@@ -439,4 +439,95 @@ test.describe('真人走查（模拟数据）', () => {
     console.log(`\n  建单提交体：${JSON.stringify(orderBody)}`)
     console.log(`\n  旅程 E 终点：${new URL(page.url()).pathname}`)
   })
+
+  // 旅程 F：扫描链路 —— Hub「材料扫描」进去，一路点到扫描结果。
+  // 真机上纸张在打印机端走，这里只验前端状态机与按钮去向。
+  test('旅程 F：Hub → 材料扫描 → 扫描设置 → 进度 → 结果 @kiosk', async ({ page, api }) => {
+    registerW6Api(api)
+    const s: Step = { n: 0 }
+    const TASK = 'journey-scan-001'
+    let polls = 0
+    api.respond('POST', '/api/v1/scan/sessions', {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          scanTaskId: TASK, controlToken: 'journey-scan-control', status: 'waiting',
+          scanType: 'document', instructions: ['把原件放到玻璃板上', '在打印机面板按开始扫描'],
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      },
+    })
+    // 轮询：前两次仍在等，第三次起返回已完成 —— 真实设备就是这个节奏。
+    api.respondWith('GET', `/api/v1/scan/sessions/${TASK}`, () => {
+      polls += 1
+      const done = polls >= 3
+      return {
+        status: 200,
+        json: {
+          success: true,
+          data: {
+            scanTaskId: TASK, status: done ? 'completed' : 'waiting', scanType: 'document',
+            expiresAt: '2099-01-01T00:00:00.000Z',
+            // 进度页读的是 status.file **对象**（ScanProgressPage:114 `status.status==='completed' && status.file`）。
+            // 只给散字段 fileId/fileName 会走到 :122 的「已完成但未拿到文件」分支 —— 实测过。
+            ...(done
+              ? {
+                  // 形状是 **ScanSessionFileView**（packages/shared/src/types/scanTask.ts:25）：
+                  // filename / sizeBytes / mimeType / sha256 / fileUrl —— 不是展示层的 name/size/format。
+                  // 写成展示层字段会让 buildResultFileState 拿到 undefined，结果页崩在 .trim()。
+                  file: {
+                    fileId: 'journey-scan-file',
+                    filename: '扫描件-001.pdf',
+                    sizeBytes: 98304,
+                    mimeType: 'application/pdf',
+                    sha256: 'd'.repeat(64),
+                    fileUrl: '/journey-fixtures/scan-001.pdf',
+                  },
+                }
+              : {}),
+          },
+        },
+      }
+    })
+    api.respond('DELETE', `/api/v1/scan/sessions/${TASK}`, {
+      status: 200, json: { success: true, data: { scanTaskId: TASK, status: 'cancelled' } },
+    })
+
+    const pageErrors: string[] = []
+    page.on('pageerror', (e) => pageErrors.push(`${e.message}\n${(e.stack ?? '').split('\n').slice(0, 4).join('\n')}`))
+    page.on('console', (m) => { if (m.type() === 'error') pageErrors.push(`console: ${m.text().slice(0, 200)}`) })
+
+    await page.goto('/print-scan')
+    await expect(page.getByRole('button', { name: /材料扫描/ })).toBeVisible({ timeout: 15000 })
+    await step(page, s, 'F-hub')
+
+    await page.getByRole('button', { name: /材料扫描/ }).first().click()
+    await page.waitForTimeout(3000)
+    await step(page, s, 'F-scan-entry')
+
+    const BACK = /^(首页|AI ?顾问|我的)$|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
+    for (let hop = 0; hop < 5; hop += 1) {
+      const before = new URL(page.url()).pathname
+      const cands = await page.locator('button:visible').evaluateAll((els) =>
+        els.map((e, i) => ({ i, t: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), dis: (e as HTMLButtonElement).disabled === true })),
+      )
+      const fwd = cands.filter((c) => c.t && !c.dis && !BACK.test(c.t))
+      const pick = fwd[fwd.length - 1]
+      if (!pick) { console.log(`\n  ${before} 上没有可用的前进按钮`); break }
+      console.log(`\n  在 ${before} 点「${pick.t}」`)
+      await page.locator('button:visible').nth(pick.i).click()
+      await page.waitForTimeout(3200)
+      await step(page, s, `F-hop${hop + 1}`)
+      if (new URL(page.url()).pathname === before) { console.log(`    ⚠ 点了「${pick.t}」仍停在 ${before}`); break }
+    }
+    // 进度页在等设备。真人此时会站着等 —— 让轮询走到「已完成」，看它是否自动进结果页。
+    if (new URL(page.url()).pathname === '/scan/progress') {
+      await page.waitForURL((u) => u.pathname === '/scan/result', { timeout: 30000 }).catch(() => {})
+      await page.waitForTimeout(2000)
+      await step(page, s, 'F-scan-done')
+    }
+    console.log(`\n  旅程 F 终点：${new URL(page.url()).pathname}   轮询次数：${polls}`)
+    if (pageErrors.length) console.log(`\n  ⚠ 运行错误 ${pageErrors.length} 条：\n${pageErrors.slice(0, 3).join('\n---\n')}`)
+  })
 })
