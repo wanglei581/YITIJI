@@ -1,0 +1,88 @@
+/* 隐私与数据请求 · 青序流光
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/41-member-privacy.html
+ */
+
+.pr-root { position: relative; height: 100%; }
+.pr-page { display: flex; flex-direction: column; gap: 14px; }
+
+.pr-cap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  min-height: 132px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-paper);
+}
+.pr-cap[data-off='true'] { background: var(--qx-paper); opacity: 0.92; }
+.pr-cap-main { flex: 1; min-width: 0; }
+.pr-cap-t { display: block; font-size: 22px; font-weight: 800; }
+.pr-cap-p { display: block; margin-top: 6px; font-size: 17px; color: var(--qx-ink-3); line-height: 1.45; }
+.pr-flag {
+  flex: none;
+  min-height: var(--qx-tap-min);
+  padding: 0 14px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--qx-paper);
+  border: 1px solid var(--qx-line-2);
+  color: var(--qx-ink-3);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.pr-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  background: color-mix(in srgb, var(--qx-deep) 58%, transparent);
+}
+.pr-dlg {
+  width: 100%;
+  max-width: 780px;
+  padding: 34px 36px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+.pr-dlg h2 { margin: 0; font-size: 31px; font-weight: 700; }
+.pr-dlg p { margin-top: 14px; font-size: 21px; line-height: 1.6; color: var(--qx-ink-2); }
+.pr-dlg-acts { display: flex; gap: 14px; margin-top: 26px; }
+.pr-dlg-acts .qx-btn { flex: 1; }
+
+.pr-guide { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pr-guide-item {
+  padding: 18px 20px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+}
+.pr-guide-k { font-size: 16px; font-weight: 800; color: var(--qx-teal-d); }
+.pr-guide-t { margin-top: 8px; font-size: 21px; font-weight: 800; }
+.pr-guide-p { margin-top: 7px; font-size: 17px; line-height: 1.5; color: var(--qx-ink-3); }
+
+.pr-legal { font-size: 17px; line-height: 1.5; color: var(--qx-ink-3); }
+.pr-legal b { color: var(--qx-ink-2); }
+
+.pr-toast {
+  padding: 18px 26px;
+  border-radius: 22px;
+  background: var(--qx-deep);
+  color: var(--qx-paper);
+  font-size: 21px;
+  font-weight: 800;
+}
+.pr-toast[data-tone='bad'] {
+  background: var(--qx-cinnabar-soft);
+  color: var(--qx-cinnabar-d);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-page, .pr-page * { animation: none !important; transition: none !important; }
+}

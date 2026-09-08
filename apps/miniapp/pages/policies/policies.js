@@ -23,6 +23,12 @@ Page({
     this.loadPolicies()
   },
 
+  /** 「该分类下没有」时的唯一有效动作：回到全部政策。 */
+  showAllPolicies() {
+    if (this.data.activeCat === 'all') return
+    this.setData({ activeCat: 'all' }, () => this.loadPolicies())
+  },
+
   loadPolicies() {
     this.setData({ loading: true, loadError: '' })
     const audience = this.data.activeCat === 'all' ? undefined : this.data.activeCat

@@ -148,6 +148,44 @@ async function main(): Promise<void> {
     if ((await auditCount()) === auditsBeforeRejectedPaths) pass('全部拒绝路径零新增审计')
     else fail('rejected paths wrote audits')
 
+    // (4b) 0 元确认必须说出**组合后果**，不只说「这一项会跳过收银」。
+    // 2026-09-08 生产实测：黑白 50 分 / 彩色 0 分，且描述是人为配的 ——
+    // 说明当时确认的人只看到单项后果，没看到「另一档还在收费，用户会一直选免费那档」。
+    {
+      const bwNow = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_bw_page' } })
+      if (bwNow.unitCents <= 0 || !bwNow.active) fail('前置不成立：本段需要黑白仍在收费')
+      let message = ''
+      try {
+        await billing.updatePriceConfig('print_color_page', { unitCents: 0 }, operatorId)
+        fail('彩色设 0 未被拒')
+      } catch (e) {
+        const body = (e as { response?: { error?: { message?: string } } }).response
+        message = body?.error?.message ?? ''
+      }
+      const yuan = (bwNow.unitCents / 100).toFixed(2)
+      if (!message.includes(yuan)) fail(`0 元确认提示未说出对侧现价（应含 ${yuan}）：${message}`)
+      if (!message.includes('黑白')) fail(`0 元确认提示未点名对侧档位：${message}`)
+      if (!message.includes('免单')) fail(`0 元确认提示未说出后果（用户会选免费那档）：${message}`)
+      pass('0 元确认提示带上了对侧价格与可预见后果')
+
+      // 反向：两档都免费时不该硬塞这段话 —— 那是真·免费试运营，没有「收便宜送贵」的问题。
+      const colorNow = await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_color_page' } })
+      await billing.updatePriceConfig('print_bw_page', { unitCents: 0, confirmZeroPrice: true }, operatorId)
+      let plain = ''
+      try {
+        await billing.updatePriceConfig('print_color_page', { unitCents: 0 }, operatorId)
+        fail('彩色设 0 未被拒（两档全免场景）')
+      } catch (e) {
+        plain = ((e as { response?: { error?: { message?: string } } }).response?.error?.message) ?? ''
+      }
+      if (plain.includes('免单')) fail(`两档都免费时不应追加组合后果文案：${plain}`)
+      pass('两档都免费时提示保持简洁，不误报「收便宜送贵」')
+      await billing.updatePriceConfig('print_bw_page', { unitCents: bwNow.unitCents }, operatorId)
+      if (colorNow.unitCents !== (await prisma.priceConfig.findUniqueOrThrow({ where: { serviceKey: 'print_color_page' } })).unitCents) {
+        fail('彩色价在本段被意外改动')
+      }
+    }
+
     const zero = await billing.updatePriceConfig('print_bw_page', { unitCents: 0, confirmZeroPrice: true }, operatorId)
     if (zero.unitCents !== 0) fail('显式确认后应允许设置 0 元')
     await billing.updatePriceConfig('print_bw_page', { unitCents: oldBw }, operatorId)

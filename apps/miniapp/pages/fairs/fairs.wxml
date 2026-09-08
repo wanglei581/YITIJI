@@ -36,10 +36,22 @@
       <view class="state-retry tap" hover-class="tap-press" bindtap="reload">重试</view>
     </view>
 
+    <!-- 空态分两种，补救动作完全不同，不能合成一句：
+         ① 本机一场都没接入 —— 用户没设过任何筛选，让他「切换筛选条件」是把人往
+            一个他根本没动过的开关上引，切完还是空。
+         ② 接入了但当前筛选筛空 —— 这时「看全部」才是有效动作。
+         判据用 fairs（全量）而不是 filteredFairs（筛后），两者都在 data 里，不用加接口。 -->
+    <view wx:elif="{{fairs.length === 0}}" class="state-card">
+      <view class="state-icon"><text class="ficon i-calendar"></text></view>
+      <view class="state-title">本机尚未接入招聘会来源</view>
+      <view class="state-desc">招聘会信息来自第三方或官方主办方，本机接入后会在这里显示。可先到线下服务窗口咨询近期场次。</view>
+    </view>
+
     <view wx:elif="{{filteredFairs.length === 0}}" class="state-card">
       <view class="state-icon"><text class="ficon i-calendar"></text></view>
-      <view class="state-title">暂无符合条件的招聘会</view>
-      <view class="state-desc">可以切换筛选条件，或稍后再来查看最新排期</view>
+      <view class="state-title">当前筛选下没有招聘会</view>
+      <view class="state-desc">已接入 {{fairs.length}} 场，换个筛选条件看看</view>
+      <view class="state-retry tap" hover-class="tap-press" bindtap="showAllFairs">看全部</view>
     </view>
 
     <block wx:else>
