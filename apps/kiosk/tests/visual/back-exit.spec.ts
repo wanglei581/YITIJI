@@ -79,8 +79,15 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       `未裁定条目从 ${UNDECIDED_LIMIT} 涨到了 ${UNDECIDED.size}。`
         + '新页漏填返回槽不该往这里加 —— 要么补上，要么连同理由进 EXEMPT。',
     ).toBeLessThanOrEqual(UNDECIDED_LIMIT)
+    const patterns = new Set(sweepCases.map((c) => c.pattern))
     for (const [route, reason] of UNDECIDED) {
       expect(reason.trim().length, `未裁定项「${route}」必须写清为什么还没定`).toBeGreaterThan(12)
+      // 路由被合并或改名后，这条欠账会变成指向不存在路由的死条目 —— 它永远不会再被执行，
+      // 也就永远不会自退休。#984 把 /scan/{start,settings,progress} 合成 /scan 就是这种情况。
+      expect(
+        patterns.has(route as never),
+        `未裁定项「${route}」不在 productionRoutePatterns 里（路由被合并/改名？），应清理`,
+      ).toBe(true)
     }
   })
 
@@ -135,8 +142,17 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       }
       const pending = UNDECIDED.get(route.pattern)
       if (pending) {
-        // 已登记的欠账：不让它红，但也不当它对 —— 输出里留痕，裁定后必须从 UNDECIDED 删掉。
-        console.log(`  [未裁定] ${route.pattern} 无顶栏返回槽（${pending}）当前出口计数=${total}`)
+        // 欠账**自退休**：这一页一旦补上返回槽，就必须从 UNDECIDED 里删掉，否则它会变成
+        // 「已经修好、却仍被豁免」的陈账 —— 下次这一页再丢返回键，门禁不会红。
+        //
+        // 这是 EXEMPT 那条反向断言的同一件事：**豁免清单必须会过期**。
+        // 只写「不让它红」的欠账清单，用不了多久就变成永久免死金牌。
+        expect(
+          bySelector,
+          `「${route.pattern}」已经有顶栏返回槽了，请从 UNDECIDED 删掉这一条`
+            + `（登记时的疑问：${pending}）。留着它等于给这一页发永久免死金牌。`,
+        ).toBe(0)
+        console.log(`  [未裁定] ${route.pattern} 仍无顶栏返回槽（${pending}）；其它出口计数=${total - bySelector}`)
         return
       }
       expect(
