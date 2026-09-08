@@ -136,7 +136,9 @@ test('hardware warning tells anonymous users that background work continues with
 }) => {
   registerKioskShell(api, { screensaverEnabled: false })
   await page.goto('/scan/start')
-  await expect(page).toHaveURL(/\/scan(\?stage=start)?$|\/scan\?stage=start/)
+  // 连 stage 一起钉：光认 /scan 的话，兼容重定向丢掉 ?stage=start、把用户扔回
+  // 工作台默认步骤，这里也会算通过。
+  await expect(page).toHaveURL(/\/scan\?stage=start$/)
 
   // Assert real page rendered (not a wildcard error page)
   await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
