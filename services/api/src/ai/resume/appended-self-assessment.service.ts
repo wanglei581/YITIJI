@@ -55,6 +55,7 @@ export class AppendedSelfAssessmentService {
     filename: string
     sizeBytes: number
     pageCount: number
+    appendixPageCount: number
     signedUrl: string
     expiresAt: string
     printFileUrl: string
@@ -100,6 +101,9 @@ export class AppendedSelfAssessmentService {
     const assessment = await PDFDocument.load(saBuffer, { ignoreEncryption: true })
     const copied = await merged.copyPages(assessment, assessment.getPageIndices())
     copied.forEach((p) => merged.addPage(p))
+    // 报价 / 展示必须用合并后的真实总页数。saPageCount 是附录页数，只进审计与
+    // appendixPageCount；写成 pageCount 会让 2 页简历 + 1 页附录按 1 页下单。
+    const mergedPageCount = merged.getPageCount()
     const out = await merged.save({ useObjectStreams: false })
 
     // 6) 上传合并后的 PDF（仅本人打印用途，不进分享用途）
@@ -138,7 +142,8 @@ export class AppendedSelfAssessmentService {
       fileId: uploaded.fileId,
       filename: uploaded.filename,
       sizeBytes: uploaded.sizeBytes,
-      pageCount: saPageCount,
+      pageCount: mergedPageCount,
+      appendixPageCount: saPageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
       // `/print/jobs` 只认内部 HMAC 签名 URL，不认对象存储的 signedUrl。

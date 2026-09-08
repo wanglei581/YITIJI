@@ -153,6 +153,25 @@ try {
       ...violations.map((v) => `  - [${v.rule}] ${v.file}:${v.line}  ${v.snippet}`),
     ].join('\n'),
   )
+  const appendSrc = readFileSync(
+    join(REPO_ROOT, 'services', 'api', 'src', 'ai', 'resume', 'appended-self-assessment.service.ts'),
+    'utf8',
+  )
+  assert.match(
+    appendSrc,
+    /mergedPageCount = merged\.getPageCount\(\)/,
+    'append 必须在合并后读取 merged.getPageCount()，不能用附录页数冒充总页数',
+  )
+  assert.match(
+    appendSrc,
+    /pageCount:\s*mergedPageCount/,
+    'append 响应 pageCount 必须是合并后总页数',
+  )
+  assert.doesNotMatch(
+    appendSrc,
+    /^\s*pageCount:\s*saPageCount/m,
+    'append 响应不得把 saPageCount 写成 pageCount（那是附录页数；审计字段才用这个名字）',
+  )
   // eslint-disable-next-line no-console
   console.log(`verify:assess-isolation: PASS (scanned ${TARGET_DIRECTORIES.length} trees, no isolation violations)`)
   process.exit(0)

@@ -242,6 +242,62 @@
         <view wx:if="{{canManage}}" class="wd-desc">撤回后服务端会删除这次的五维强度与解读，并留下一条删除审计记录。</view>
       </view>
 
+      <view wx:if="{{canManage}}" class="card card-inner rise-d5 append-card">
+        <view class="sec-t">附到简历一起打印</view>
+        <view class="append-copy">这份附录只给本人打印带走，平台不发给任何企业。请你自己判断是否随简历带去。</view>
+        <view class="cbox tap" hover-class="tap-press" bindtap="toggleAppendConfirmed"
+              role="checkbox" aria-checked="{{appendConfirmed}}" aria-label="{{appendConfirmed ? '已确认自行判断是否随简历带去，点击取消' : '确认自行判断是否随简历带去，默认未选中'}}">
+          <view class="cb {{appendConfirmed ? 'on' : ''}}"><text wx:if="{{appendConfirmed}}" class="ficon i-check"></text></view>
+          <view class="cb-body">
+            <view class="cb-title">我自行判断是否将这份附录随简历带去</view>
+            <view class="cb-desc">默认不选；选择后才能从本页列出的本人 PDF 简历里挑一份合并打印。</view>
+          </view>
+        </view>
+
+        <view wx:if="{{appendConfirmed}}" class="resume-picker">
+          <view class="rp-label">选择一份本人 PDF 简历</view>
+          <view class="rp-hint">只列出你上传或扫描的 PDF 简历，Word 或其他材料不会出现在这里。</view>
+
+          <view wx:if="{{resumePickerLoading}}" class="rp-state">正在读取你的文档…</view>
+          <view wx:elif="{{resumePickerError}}" class="rp-state">
+            <view>{{resumePickerError}}</view>
+            <view class="rp-link tap" hover-class="tap-press" bindtap="retryResumeOptions"
+                  role="button" aria-label="重新加载本人简历">重新加载</view>
+          </view>
+          <view wx:elif="{{resumeOptions.length}}" class="rp-list" role="radiogroup" aria-label="本人 PDF 简历">
+            <view wx:for="{{resumeOptions}}" wx:key="id"
+                  class="rp-item tap {{selectedResumeId === item.id ? 'on' : ''}}"
+                  hover-class="tap-press"
+                  bindtap="selectResumeForAppend"
+                  data-id="{{item.id}}"
+                  role="radio"
+                  aria-checked="{{selectedResumeId === item.id}}"
+                  aria-label="{{item.name}}">
+              <view class="rp-name">{{item.name}}</view>
+              <view class="rp-meta">
+                <text wx:if="{{item.pages}}">{{item.pages}} 页</text>
+                <text wx:else>页数未返回</text>
+                <text wx:if="{{item.time}}"> · {{item.time}}</text>
+              </view>
+            </view>
+            <view wx:if="{{resumePickerTruncated}}" class="rp-hint">文档较多，这里只加载了最近若干份里的 PDF 简历。</view>
+          </view>
+          <view wx:else class="rp-empty">
+            <view class="rp-empty-t">暂无可选 PDF 简历</view>
+            <view class="rp-empty-d">请先上传本人 PDF 简历。没有可选项时不能合并打印。</view>
+            <view class="rp-upload tap" hover-class="tap-press" bindtap="goUploadResumeForAppend"
+                  role="button" aria-label="去上传 PDF 简历">去上传 PDF 简历</view>
+          </view>
+        </view>
+
+        <view class="append-action tap {{appendConfirmed && selectedResumeId && !appending ? '' : 'disabled'}}" hover-class="tap-press"
+              bindtap="confirmAppendToResume" role="button"
+              aria-disabled="{{!appendConfirmed || !selectedResumeId || appending}}"
+              aria-label="把自我探索报告附到所选简历并去打印">
+          <text class="ficon i-printer ab-ic"></text>{{appending ? '正在合并…' : '合并并去打印'}}
+        </view>
+      </view>
+
       <view class="compliance-note">本页只做本人自助参考，不参与任何岗位或招聘会的排序与筛选，也不会向企业、合作机构展示。</view>
       <view class="spacer-lg"></view>
     </block>

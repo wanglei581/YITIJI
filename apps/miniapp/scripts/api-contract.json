@@ -131,6 +131,7 @@
     "POST /resume/records/:p/export",
     "POST /resume/records/:p/fact-check",
     "POST /resume/self-assessment",
+    "POST /resume/self-assessment/:p/append",
     "POST /resume/self-assessment/:p/print",
     "POST /resume/voice/transcribe",
     "PUT /resume/records/:p/draft"
