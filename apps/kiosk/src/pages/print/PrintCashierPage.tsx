@@ -63,12 +63,14 @@ interface CashierLocationState {
 const PAY_POLL_TERMINAL: ReadonlySet<string> = new Set(['closed', 'failed', 'refunded', 'refunding', 'partial_refunded'])
 const POLL_INTERVAL_MS = 2500
 const AUTO_RECONCILE_INTERVAL_MS = 3500
-/** 两种收银方式的用户可见文案。放在页面而不是呈现层：
- *  文案属于业务口径（付款码是一次性凭证、屏上收款码即时出码），
- *  且 verify-payment-codepay 断言本文件同时出现这两种方式。 */
+/** 两种收银方式的用户可见文案。稿 32-cashier 把「方式名」与「按钮动作」分开用：
+ *    name   —— 方式名，出现在正文与状态里（「选『屏上收款码』立刻出码」「屏上收款码已过期」）
+ *    action —— 按钮上的动作文案（稿的选项表写的是「手机扫屏幕上的码」「出示你的付款码」）
+ *  两者都真实渲染：action 上按钮、name 进状态说明。放在页面而不是呈现层，
+ *  因为文案属于业务口径（付款码是一次性凭证、屏上收款码即时出码）。 */
 const PAYMENT_METHOD_LABELS = {
-  qr: '屏上收款码',
-  code: '扫付款码 · 出示手机付款码',
+  qr: { name: '屏上收款码', action: '手机扫屏幕上的码' },
+  code: { name: '扫付款码', action: '出示你的付款码' },
 } as const
 
 const REFUND_ASSISTANCE_COPY = '如需退款请联系现场工作人员协助处理，本机不提供自助退款'

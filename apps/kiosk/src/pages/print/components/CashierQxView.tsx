@@ -158,7 +158,10 @@ interface CashierQxViewProps {
   isDevSandbox: boolean
   selectionLocked: boolean
   onSelectChannel: (channel: string) => void
-  methodLabels: { readonly qr: string; readonly code: string }
+  methodLabels: {
+    readonly qr: { readonly name: string; readonly action: string }
+    readonly code: { readonly name: string; readonly action: string }
+  }
   onSelectMethod: (method: PaymentMethod) => void
   onSubmitCode: () => void
   onReconcile: () => void
@@ -198,7 +201,7 @@ export function CashierQxView(props: CashierQxViewProps) {
             </div>
           </div>
           <div className="cashier-qx-picker-group">
-            <span className="cashier-qx-picker-label">扫码方式</span>
+            <span className="cashier-qx-picker-label">扫码方式：{props.methodLabels.qr.name} / {props.methodLabels.code.name}</span>
             <div className="cashier-qx-picker-options">
               <button
                 type="button"
@@ -207,7 +210,7 @@ export function CashierQxView(props: CashierQxViewProps) {
                 disabled={!props.selectedChannel || props.issuing || props.codeSubmitting || props.selectionLocked}
                 onClick={() => props.onSelectMethod('qr')}
               >
-                <QrCodeIcon aria-hidden="true" /><span>手机扫屏幕上的码</span>
+                <QrCodeIcon aria-hidden="true" /><span>{props.methodLabels.qr.action}</span>
               </button>
               <button
                 type="button"
@@ -216,7 +219,7 @@ export function CashierQxView(props: CashierQxViewProps) {
                 disabled={!props.selectedChannel || props.issuing || props.codeSubmitting || props.selectionLocked}
                 onClick={() => props.onSelectMethod('code')}
               >
-                <ScanLineIcon aria-hidden="true" /><span>{props.methodLabels.code}</span>
+                <ScanLineIcon aria-hidden="true" /><span>{props.methodLabels.code.action}</span>
               </button>
             </div>
           </div>

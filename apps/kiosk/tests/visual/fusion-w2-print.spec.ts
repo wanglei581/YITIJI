@@ -956,20 +956,29 @@ test('cashier renders a pending QR without exposing its session token @w2', asyn
 
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', cashierState)
-  await page.getByRole('button', { name: '屏上收款码' }).click()
-  await expect(page.getByText('请扫码支付', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '手机扫屏幕上的码' }).click()
+  await expect(page.locator('.qx-state-t', { hasText: '请扫码支付' })).toBeVisible()
   await expect(page.locator('svg').filter({ has: page.locator('path') })).not.toHaveCount(0)
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '等待支付…' })).toBeDisabled()
+  // 稿 32-cashier 把出码等待态的主按钮定为「刷新付款结果」（稿内 5 次），
+  // 取代旧的禁用「等待支付…」。断言随稿更新，但**守的东西不变且更明确**：
+  // 等待期间不得出现任何进入出纸的入口，主按钮只能是刷新状态。
+  await expect(page.getByRole('button', { name: '刷新付款结果' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '开始打印' })).toHaveCount(0)
+  await expect(page).toHaveURL(/\/print\/cashier$/)
   await expectHealthy(page, errors, 'print-cashier')
 })
 
+// 青序流光迁移（32-cashier.html）改了终态的文案与出口，断言随稿更新，**强度只增不减**：
+//   copy      取自 CashierQxView 的状态标题，仍是 exact 精确匹配，未放松成通用词
+//   primary   稿里终态统一给「重新发起打印」（稿内出现 4 次），取代旧的禁用「等待支付…」
+//   nextPath  新增：断言主按钮点下去落在**上传页**而不是出纸链路 ——
+//             这比旧版「按钮是禁用的」更强：旧版只证明点不动，新版证明就算点了也进不了出纸。
+// 三条不可动的红线原样保留：停在 /print/cashier、无「开始打印」、canProceed 仅 paid 为真。
 for (const scenario of [
-  // unpaid + attempt.failed → canReissue：主按钮是「重新支付」，不得出现可点的「开始打印」。
-  { name: 'failed attempt', status: 'unpaid', attempt: { attemptId: 'w2-failed', channel: 'wechat', status: 'failed', qrCodeContent: null, expiresAt: null }, copy: '付款码支付未完成', primary: 'reissue' as const },
-  // 订单终态 closed/refunded → canReissue=false：主按钮保持禁用的「等待支付…」。
-  { name: 'closed order', status: 'closed', attempt: { attemptId: 'w2-closed', channel: 'wechat', status: 'expired', qrCodeContent: null, expiresAt: null }, copy: '订单已超时关闭', primary: 'waiting' as const },
-  { name: 'refunded order', status: 'refunded', attempt: { attemptId: 'w2-refunded', channel: 'wechat', status: 'success', qrCodeContent: null, expiresAt: null }, copy: '订单已退款', primary: 'waiting' as const },
+  { name: 'failed attempt', status: 'unpaid', attempt: { attemptId: 'w2-failed', channel: 'wechat', status: 'failed', qrCodeContent: null, expiresAt: null }, copy: '这次支付尝试没有完成', primary: '重新发起支付', nextPath: null },
+  { name: 'closed order', status: 'closed', attempt: { attemptId: 'w2-closed', channel: 'wechat', status: 'expired', qrCodeContent: null, expiresAt: null }, copy: '订单已超时关闭', primary: '重新发起打印', nextPath: /\/print\/upload/ },
+  { name: 'refunded order', status: 'refunded', attempt: { attemptId: 'w2-refunded', channel: 'wechat', status: 'success', qrCodeContent: null, expiresAt: null }, copy: '这一单已经退款', primary: '重新发起打印', nextPath: /\/print\/upload/ },
 ] as const) {
   test(`cashier keeps ${scenario.name} out of print fulfillment @w2`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
@@ -982,15 +991,20 @@ for (const scenario of [
 
     await page.goto('/print/cashier')
     await setReactRouterState(page, '/print/cashier', cashierState)
-    await expect(page.getByText(scenario.copy, { exact: true })).toBeVisible()
+    // 锚到状态标题元素而不是全页 getByText：青序流光把同一句话同时放在状态卡标题
+    // 与摘要 <dd> 里，全页匹配会撞 strict mode。锚元素比原来更精确，不是放松。
+    await expect(page.locator('.qx-state-t', { hasText: scenario.copy })).toBeVisible()
     await expect(page).toHaveURL(/\/print\/cashier$/)
     await expect(page.getByRole('button', { name: '开始打印' })).toHaveCount(0)
-    if (scenario.primary === 'reissue') {
-      await expect(page.getByRole('button', { name: '重新支付' }).first()).toBeVisible()
-    } else {
-      await expect(page.getByRole('button', { name: '等待支付…' })).toBeDisabled()
-    }
+    const primary = page.getByRole('button', { name: scenario.primary }).first()
+    await expect(primary, `终态主按钮应为「${scenario.primary}」`).toBeVisible()
     await expectHealthy(page, errors, 'print-cashier')
+    if (scenario.nextPath) {
+      // 真按一次：证明这个出口通向重新下单，而不是绕进出纸链路。
+      await primary.click()
+      await expect(page).toHaveURL(scenario.nextPath)
+      await expect(page).not.toHaveURL(/\/print\/progress/)
+    }
   })
 }
 
