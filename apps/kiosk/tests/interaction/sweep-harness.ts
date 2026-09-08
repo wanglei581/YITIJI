@@ -4,6 +4,25 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, BrowserContext, Locator, Page, Request } from '@playwright/test'
+import {
+  COMPLIANCE_ALLOWED_PHRASES,
+  COMPLIANCE_FORBIDDEN_PHRASES,
+  SOURCE_FOUR_ELEMENT_LABELS,
+  assertSourceFourElements,
+  formatMissingSourceFourElements,
+  missingSourceFourElements,
+  scanForbiddenCopy,
+} from '../../scripts/lib/sweep-copy-guards.mjs'
+
+export {
+  COMPLIANCE_ALLOWED_PHRASES,
+  COMPLIANCE_FORBIDDEN_PHRASES,
+  SOURCE_FOUR_ELEMENT_LABELS,
+  assertSourceFourElements,
+  formatMissingSourceFourElements,
+  missingSourceFourElements,
+  scanForbiddenCopy,
+}
 
 export const KIOSK_ORIGIN = process.env.INTERACTION_KIOSK_ORIGIN ?? 'http://127.0.0.1:5273'
 export const API_ORIGIN = process.env.INTERACTION_API_ORIGIN ?? 'http://127.0.0.1:3010'
@@ -12,8 +31,13 @@ export const EVIDENCE_ROOT = join(
   fileURLToPath(new URL('../../../../docs/reviews/interaction-sweep-2026-09-08/ai-resume/', import.meta.url)),
 )
 
-export const FORBIDDEN_APPLY = /一键投递|立即投递|平台投递/
-export const ALLOWED_APPLY = /去来源平台投递|扫码前往来源平台投递|来源平台投递页|来源平台投递/g
+/** 禁词清单的正则形式；走查请用 scanForbidden / scanForbiddenCopy（先剥白名单）。 */
+export const FORBIDDEN_APPLY = new RegExp(COMPLIANCE_FORBIDDEN_PHRASES.join('|'))
+/** 白名单清单的正则形式；走查请用 scanForbidden / scanForbiddenCopy（先剥白名单）。 */
+export const ALLOWED_APPLY = new RegExp(
+  [...COMPLIANCE_ALLOWED_PHRASES].sort((a, b) => b.length - a.length).join('|'),
+  'g',
+)
 export const PRODUCTION_HOST = /zyidai\.cn|120\.48\.13\.190/i
 export const MEMBER_PHONE = '13800000000'
 const SMS_LOG = '/tmp/sweep-api.log'
@@ -162,9 +186,28 @@ async function pageFingerprint(page: Page): Promise<{ url: string; text: string;
 }
 
 export async function scanForbidden(page: Page): Promise<string[]> {
-  const text = ((await page.locator('body').innerText().catch(() => '')) || '').replace(ALLOWED_APPLY, '')
-  const hits = text.match(FORBIDDEN_APPLY)
-  return hits ? [...new Set(hits)] : []
+  // WHY: 子串误报的真实案例：合规文案「去来源平台投递」含黑名单词「平台投递」。
+  // 必须先把白名单短语从文本里剔掉，再查黑名单；实现见 scanForbiddenCopy。
+  const text = ((await page.locator('body').innerText().catch(() => '')) || '')
+  return scanForbiddenCopy(text)
+}
+
+/**
+ * 岗位 / 招聘会详情页的正向断言：CLAUDE.md §10 四要素都必须在页面上。
+ *
+ * WHY: 缺陷可以表现为该显示的没显示，黑名单查不出来。
+ * 返回缺失项的中文标签；空数组表示四要素都在。不要只报 true/false。
+ */
+export async function scanSourceFourElements(page: Page): Promise<string[]> {
+  const text = ((await page.locator('body').innerText().catch(() => '')) || '')
+  return missingSourceFourElements(text)
+}
+
+export async function assertSourceFourElementsOnPage(page: Page): Promise<void> {
+  const missing = await scanSourceFourElements(page)
+  if (missing.length > 0) {
+    throw new Error(formatMissingSourceFourElements(missing))
+  }
 }
 
 export async function shot(page: Page, journey: string, step: string): Promise<string> {
