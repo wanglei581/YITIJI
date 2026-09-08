@@ -145,7 +145,14 @@ PASS  跳转记录可删除             删后剩 0 条
 PASS  BrowseLog 无结果字段        11 个字段，无结果类
 PASS  ExternalJumpLog 无结果字段  12 个字段，无结果类
 PASS  跳转 action 只记打开入口     external_apply / external_appointment / external_checkin_open / external_open
+PASS  招聘会收藏 / 浏览 / 跳转       fair-hr-1k-2026q2，action=external_appointment
+SKIP  政策收藏 / 浏览 / 跳转         本地夹具 PolicyPost 0 行，未实测
 ```
+
+**三类目标（岗位 / 招聘会 / 政策）走同一套 `targetType` 通道，但逐类实测过才算数。**
+只测 `job` 会留下「同代码路径所以应该也行」的推断，而**推断不是证据**。
+政策类本地夹具是 0 行 —— 拿一个合成 id 也能让端点返回 200、凑出一个 PASS，
+但那证明的是「通道能收任意字符串」，不是「政策收藏可用」。**所以如实记 SKIP。**
 
 ### 后三项才是这组的重点
 
@@ -176,6 +183,5 @@ action 规则打在 [external_open, interview_scheduled] → 判 FAIL ✔
 
 ### §4.4 本地证不了的部分
 
-招聘会资料打印进我的文档 + 打印订单（需打印链路）、政策材料打印（需真实材料源，当前 info-only）。
-岗位/招聘会/政策三类的收藏与记录走同一套 `targetType` 通道，本探针只实测了 `job`，
-另两类是同代码路径但**未实测**，不按 PASS 记。
+招聘会资料打印进我的文档 + 打印订单（需打印链路）、政策材料打印（需真实材料源，当前 info-only）、
+政策类的收藏与记录（本地 `PolicyPost` 0 行，seed 未覆盖）。

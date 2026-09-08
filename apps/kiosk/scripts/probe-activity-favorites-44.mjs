@@ -29,6 +29,11 @@ const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'
 console.log('会员登录成功\n')
 
 const JOB = q("SELECT id FROM Job WHERE reviewStatus='approved' AND publishStatus='published' LIMIT 1;") || 'job-001'
+const FAIR = q("SELECT id FROM JobFair LIMIT 1;")
+// 三类目标（岗位 / 招聘会 / 政策）走同一套 targetType 通道。只测 job 会留下
+// 「同代码路径所以应该也行」的推断，而推断不是证据 —— 所以逐类实测。
+// 政策：本地夹具 PolicyPost 为 0 行，如实跳过而不是拿合成 id 凑一个 PASS。
+const POLICY = q("SELECT id FROM PolicyPost LIMIT 1;")
 const items = (d) => d?.data?.items ?? d?.data ?? []
 
 // 1) 收藏岗位 → 我的收藏可见
@@ -61,6 +66,30 @@ if (jl) {
   await fetch(`${API}/me/external-jump-logs/${jl.id}`, { method: 'DELETE', headers: H })
   jumps = items(await j(await fetch(`${API}/me/external-jump-logs`, { headers: H })))
   rec('4.4-跳转记录可删除', !jumps.some(l => l.id === jl.id), `删后剩 ${jumps.length} 条`)
+}
+
+// 4b) 招聘会 / 政策：同一通道逐类实测，不做「同代码路径」的推断
+for (const [label, type, id, action] of [
+  ['招聘会', 'job_fair', FAIR, 'external_appointment'],
+  ['政策', 'policy', POLICY, 'external_open'],
+]) {
+  if (!id) { console.log(`SKIP  4.4-${label}收藏与记录  本地夹具 0 行，未实测（不按 PASS 记）`); continue }
+  await fetch(`${API}/me/favorites`, { method: 'POST', headers: H, body: JSON.stringify({ targetType: type, targetId: id }) })
+  const f = items(await j(await fetch(`${API}/me/favorites`, { headers: H })))
+  rec(`4.4-${label}收藏进入我的收藏`, f.some(x => x.targetId === id), `收藏 ${f.length} 条，含 ${id}`)
+  await fetch(`${API}/me/favorites/${type}/${id}`, { method: 'DELETE', headers: H })
+
+  await fetch(`${API}/activity/browse`, { method: 'POST', headers: H, body: JSON.stringify({ targetType: type, targetId: id, targetTitle: `探针${label}`, sourceName: '青岛市公共就业服务中心', externalId: 'EXT-probe' }) })
+  const bs = items(await j(await fetch(`${API}/me/browse-logs`, { headers: H })))
+  const b2 = bs.find(l => l.targetId === id)
+  rec(`4.4-${label}浏览记录可见`, Boolean(b2), `浏览记录 ${bs.length} 条`)
+  if (b2) await fetch(`${API}/me/browse-logs/${b2.id}`, { method: 'DELETE', headers: H })
+
+  await fetch(`${API}/activity/external-jump`, { method: 'POST', headers: H, body: JSON.stringify({ targetType: type, targetId: id, action, targetTitle: `探针${label}`, sourceName: '青岛市公共就业服务中心', sourceUrl: 'https://example.invalid/entry', externalId: 'EXT-probe' }) })
+  const js2 = items(await j(await fetch(`${API}/me/external-jump-logs`, { headers: H })))
+  const j2 = js2.find(l => l.targetId === id)
+  rec(`4.4-${label}跳转记录可见`, Boolean(j2), `跳转记录 ${js2.length} 条 action=${j2?.action}`)
+  if (j2) await fetch(`${API}/me/external-jump-logs/${j2.id}`, { method: 'DELETE', headers: H })
 }
 
 // 5) 合规红线（CLAUDE.md §10）：两张日志表都不得有「第三方后续结果」类字段。
