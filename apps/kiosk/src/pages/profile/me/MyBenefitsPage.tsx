@@ -51,6 +51,7 @@ function validityLine(item: MemberBenefitItem): string {
 type BenefitsUiState = 'signed-out' | 'loading' | 'error' | 'empty' | 'list'
 
 export function MyBenefitsPage() {
+  const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberBenefitItem[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -101,6 +102,8 @@ export function MyBenefitsPage() {
       <QxPageFrame
         title="我的权益"
         subtitle="名称、有效期与可用状态都由服务端返回；是否收费以活动说明与现场核价为准。"
+        /* 稿 31-benefits 原文：data-route="/profile" aria-label="返回我的"。 */
+        back={{ label: '返回我的', onBack: () => navigate('/profile') }}
         status={status}
         terminalLabel={getTerminalCode() || '就业服务大厅'}
         ctabar={<BenefitsCta uiState={uiState} onRetry={() => setReloadKey((key) => key + 1)} />}
