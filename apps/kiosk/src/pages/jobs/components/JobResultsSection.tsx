@@ -9,6 +9,7 @@ export type JobSortMode = 'latest' | 'salary_first'
 export function JobResultsSection({
   jobs,
   favoritesOnly,
+  hasFilter,
   listLoading,
   favoriteSet,
   sortMode,
@@ -18,6 +19,8 @@ export function JobResultsSection({
 }: {
   jobs: ExternalJobDTO[]
   favoritesOnly: boolean
+  /** 用户是否真的设过筛选（含关键词 / 分类 / 收藏）。决定空态说哪句话。 */
+  hasFilter: boolean
   listLoading: boolean
   favoriteSet: Set<string>
   sortMode: JobSortMode
@@ -44,8 +47,8 @@ export function JobResultsSection({
         <div className="qx-state qx-grow" data-tone="empty">
           <span className="qx-state-ic">{favoritesOnly ? <StarIcon aria-hidden="true" /> : <BriefcaseIcon aria-hidden="true" />}</span>
           <span>
-            <span className="qx-state-t">{favoritesOnly ? '还没有收藏的岗位' : '这组条件下没有已发布的岗位'}</span>
-            <span className="qx-state-d">{favoritesOnly ? '在岗位行点击收藏，方便稍后查看。' : '本机不会拿示例岗位把列表填满，请调整关键词、城市、行业、类型或来源机构。'}</span>
+            <span className="qx-state-t">{favoritesOnly ? '还没有收藏的岗位' : hasFilter ? '这组条件下没有已发布的岗位' : '本机暂未上架已审核的岗位'}</span>
+            <span className="qx-state-d">{favoritesOnly ? '在岗位行点击收藏，方便稍后查看。' : hasFilter ? '本机不会拿示例岗位把列表填满，请调整关键词、城市、行业、类型或来源机构。' : '来源机构还没有可展示的岗位。本机不会拿示例岗位把列表填满，也不会显示未经审核的来源。'}</span>
           </span>
         </div>
       ) : (
@@ -95,7 +98,19 @@ function JobResultCard({
   // 列表只承诺进入只读详情；外跳与扫码仍由详情页按四要素 fail-closed。
   const validSource = evaluateJobSourceTrust(job).ok
   return (
-    <article className={`jf-row${validSource ? '' : ' is-source-blocked'}`} aria-label={job.title}>
+    <article
+      className={`jf-row${validSource ? '' : ' is-source-blocked'}`}
+      aria-label={job.title}
+      role="button"
+      tabIndex={0}
+      data-testid={`job-row-${job.id}`}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onOpen()
+      }}
+    >
       <div className="jf-row-main">
         <div className="jf-row-title">
           <b>{job.title}</b>
@@ -129,7 +144,15 @@ function JobResultCard({
       >
         <StarIcon className={favorite ? 'fill-current' : ''} aria-hidden="true" />
       </button>
-      <button type="button" className="qx-job-view" onClick={onOpen}>
+      <button
+        type="button"
+        className="qx-job-view"
+        onClick={(event) => {
+          // 整卡已经可点，这里不挡冒泡会让一次点击触发两次 onOpen。
+          event.stopPropagation()
+          onOpen()
+        }}
+      >
         查看岗位
         <ChevronRightIcon aria-hidden="true" />
       </button>
