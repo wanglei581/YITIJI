@@ -19,8 +19,33 @@
 //   a. 目标终端 5 分钟内有心跳且本地任务库可用；
 //   b. 材料包内每个文件都已完成打印隐私检查；
 //   c. 生产环境已配置 print_bw_page / print_color_page 价目。
-// 这三条属于上线部署与运营配置，须按 docs/device 的部署清单验收后再放开；在此之前四页
-// 保持关闭，不让用户走进一条最后一步必然失败的流程。放开时删掉本文件与四处调用即可。
+// 这三条属于上线部署与运营配置，须按 docs/device 的部署清单验收后再放开。
+//
+// 还有第四条，性质不同 —— 它是**代码缺口**，不是配置：
+//   d. 材料包订单目前没有任何列表入口，用户下完单一旦离开就找不回来。
+//
+// 2026-09-08 实测（本地真实后端，同一会员账号下真单后逐个查）：
+//   GET /me/print-orders            → 0 条（查的是 PrintTask 表；材料包订单在派发前
+//                                      printTaskId 为 null，因此不在其中）
+//   GET /me/print-orders/cloud      → []  （where 带 `sourceFileId: { not: null }`，
+//                                      而材料包是多文件、该字段本就为 null）
+//   GET /me/print-orders/:orderId   → PRINT_ORDER_NOT_FOUND（requireOwned 同一条过滤）
+//   GET /orders/package/:id         → 正常返回（唯一能拿到的入口，但要先有 orderId）
+//   PackageOrdersController 只有 @Post() 与 @Get(':id')，**没有 list**。
+//
+// 这不是 listCloud 写错了：那几个端点是单文件云打印订单的口径，材料包有自己的一套
+// （多文件 orderItems、逐文件报价）。两套订单面共用 Order 表但互不可见，缺的是材料包
+// 自己的列表端点。
+//
+// 唯一的例外是「今日提醒」：daily-brief 的 pickupExpiring 不按 sourceFileId 过滤，
+// 所以**已付款**且 24 小时内到期的材料包单会出现在那里。**未付款的在任何地方都看不到。**
+//
+// 为什么这条必须在开闸前解决：package-code 已改成凭 orderId 向服务端查（见
+// fix/miniapp-package-chain），用户返回上一页或关掉小程序后，没有任何界面能再给出
+// 那个 orderId —— 他手上只剩一个到机码，而到机码不能反查订单。
+//
+// 在此之前四页保持关闭，不让用户走进一条最后一步必然失败、或者失败后找不回来的流程。
+// 放开时：先补材料包订单列表端点与「我的」入口，再删掉本文件与四处调用。
 
 const PACKAGE_UNAVAILABLE_TITLE = '材料包 · 尚未开放'
 const PACKAGE_UNAVAILABLE_REASON =
