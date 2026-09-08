@@ -180,6 +180,9 @@ Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\install-production-agent.ps1") `
   -Destination (Join-Path $provisionRoot "install-production-agent.ps1")
 Copy-WindowsPowerShellScript `
+  -Source (Join-Path $agentRoot "scripts\collect-field-evidence.ps1") `
+  -Destination (Join-Path $provisionRoot "collect-field-evidence.ps1")
+Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\service-identity.ps1") `
   -Destination (Join-Path $provisionRoot "service-identity.ps1")
 Copy-WindowsPowerShellScript `
