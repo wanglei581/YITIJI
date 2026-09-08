@@ -3,6 +3,12 @@
 ## 2026-09-07 打印预览 PDF 插件文档导航
 
 - Chromium 在 React Router SPA 跳走时会把仍在加载的 PDF `document` 请求 abort（`net::ERR_ABORTED`）。iframe 留在 `document.body`、改 blob URL 都会 abort。当前预览框改为立刻完成的 `srcdoc` + `fetch` 读字节，避免 document abort；**逐页 PDF 插件预览**因此不在运行时里。要恢复页内看稿，需要不走 iframe/object document 导航的渲染（例如 pdf.js 画到 canvas），不能再把 PDF URL 交给 iframe `src`。
+## 2026-09-07 目录页青序迁移残留（批 3）
+
+- 页内 AI-CONTEXT（整理到店问题 / 排序 / 展位提问 / 搜索词）运行时没有对应模型端点：控件保留，点「整理」后如实报「小青这次没接上」，并给出不靠 AI 的手工回退。不要拿编造清单去填。
+- 找企业省市区仍用 `<select>`（稿如此）。一体机 Kiosk 模式可能弹出系统选择器；类型/行业 12+18 项继续走已有触控弹层。若现场系统选择器阻断流程，再改成与类型弹层同构的触控选择，不新增路由。
+- 参展企业 `FairCompanyDTO` 没有来源机构 / 同步时间 / 外部ID 三字段，运行时只按 `sourceUrl` fail-closed（与 main 既有行为一致），并展示 `applyNote`。补齐四要素要后端改 DTO，不在本批。
+- 原型 `?state=` + `capture=1` 的空槽演示态运行时不做：会伪造机构名/岗位数。运行时态由真实接口推导。
 
 ## 2026-09-07 报价确认页青序迁移残留
 

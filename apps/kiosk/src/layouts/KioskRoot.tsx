@@ -113,12 +113,31 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/print-scan',
   '/print-scan/sign',
   '/print-scan/convert',
+  '/offline-agencies',
+  '/companies',
+  '/jobs/online-platforms',
 ])
-const QX_MIGRATED_PREFIXES = ['/print-scan/feature/'] as const
+const QX_MIGRATED_PREFIXES = [
+  '/print-scan/feature/',
+  // 42 号稿机构目录的详情段；同前缀下只有 /offline-agencies/:id。
+  '/offline-agencies/',
+  // 43 号稿企业目录的详情段；同前缀下只有 /companies/:id。
+  '/companies/',
+] as const
+/**
+ * 带参路由但父段还有未迁兄弟页：不能写宽前缀。
+ * - /jobs/:id/offline 不能用 /jobs/（会误伤 /jobs/:id、/jobs/online-platforms）
+ * - /job-fairs/:id/companies/:companyId 不能用 /job-fairs/（会误伤列表、详情、地图、资料）
+ */
+const QX_MIGRATED_EXACT_PATTERNS: readonly RegExp[] = [
+  /^\/jobs\/[^/]+\/offline$/,
+  /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
+]
 
 function isQxMigratedPath(pathname: string): boolean {
   if (QX_MIGRATED_ROUTES.has(pathname)) return true
-  return QX_MIGRATED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  if (QX_MIGRATED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true
+  return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
