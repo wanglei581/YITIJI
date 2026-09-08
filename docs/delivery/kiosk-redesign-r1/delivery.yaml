@@ -22,7 +22,9 @@ environments:
     url: "macOS 开发机；kiosk vite dev"
   - name: "production"
     purpose: "线上部署（百度云）"
-    url: "120.48.13.190 —— 当前生产提交落后 origin/main 107 个提交，未复验"
+    # 2026-09-08 15:2x 订正：按域名走。按 IP 探 /admin/ /partner/ 永远返回 kiosk，
+    # 复验必须用域名或 curl --resolve，否则会得出「后台没部署」的错误结论。
+    url: "https://zyidai.cn（IP 120.48.13.190）—— 2026-09-08 14:49 发布 b790767f6 成功；此刻落后 origin/main 3 个提交（#968 / #971 / #973）"
   - name: "windows-kiosk"
     purpose: "一体机真机（打印/扫描/Terminal Agent）"
     url: "PENDING —— 新 Windows 主机未验收"
@@ -39,19 +41,47 @@ gates:
 
 # ── 判定边界（不得合并成更强的整体结论）──────────────────────
 verdict_by_boundary:
-  local_build: "PARTIAL —— 代码可构建、门禁通过；新稿 4/51 落地（/print/pickup-claim、/resume/report、/resume/optimize、/resume/generate/preview，见 KioskRoot.tsx 的 QX_MIGRATED_ROUTES），其余 47 页功能定义未实现"
-  production:  "NO-GO —— 生产提交落后 origin/main 107 个提交，未复验；新稿未落地"
+  # 2026-09-08 订正：「4/51」已被事实推翻。origin/main 的 KioskRoot.tsx 里
+  # QX_MIGRATED_ROUTES 精确路由 = 25 条，另有 QX_MIGRATED_PREFIXES 与
+  # QX_MIGRATED_EXACT_PATTERNS 两组模式再覆盖若干。
+  # 注意「路由数 ≠ 51 页台账的页数」——一页可能对应多条路由，也可能一条路由承载合并后的多页
+  # （如 /print/desk 由材料检查 + 预览两页合成）。所以这里**只记可直接点数的路由数**，
+  # 不再写一个会持续腐坏的 N/51；页数以 docs/reviews/page-migration-inventory-2026-09-02.md
+  # 对当时 main 现算为准。写死页数正是这份文档此前失真的原因。
+  local_build: "PARTIAL —— 代码可构建、门禁通过；青序流光已迁 25 条精确路由（另有前缀/模式两组），打印链路 8 屏中 7 屏为新稿；其余页仍为旧版式"
+  production:  "NO-GO —— 2026-09-08 14:49 已发布 b790767f6 并复验（health ok / db postgres / degraded []，前端 bundle index-DRu6kBzl.js → index-C6cJNZjg.js），新稿已在线上；仍判 NO-GO 的理由换成 BL-06：岗位/招聘会/政策三个板块线上零内容"
   device:      "NO-GO —— Windows 一体机与打印扫描真机未验收（domain-overlays: 物理设备不接受截图或绿色状态徽章作为 GO 证据）"
 
 # ── 硬阻塞（任一未清即不得宣称商用交付）──────────────────────
 hard_blockers:
   - id: BL-01
-    desc: "运行时 0/51 页按新稿实现；用户看到的仍是 V6/Gen1 旧版式"
+    # 2026-09-08 15:2x 实测证伪：清掉浏览器隐私边界令牌后加载 https://zyidai.cn/jobs，
+    # DOM 上是 data-kiosk-presentation="fusion-youth"、29 个 qx-* 类、文案为迁移后新版。
+    # 取证注意：直接输网址会被 KioskPrivacyGuard 判为越过隐私边界而整页清场
+    # （historyIndex === null 即 fail-closed），不清存储会误判成「页面挂了」。
+    desc: "运行时新稿覆盖不全：已迁部分（打印链路、岗位、招聘会等）线上生效，其余页仍是旧版式。原描述「0/51 页」与「用户看到的仍是 V6/Gen1」已被实测推翻"
     owner: "工程"
     status: OPEN
   - id: BL-02
-    desc: "生产实例落后 origin/main 107 个提交，未做部署复验"
+    desc: "生产实例落后 origin/main 且未做部署复验"
     owner: "运维"
+    status: CLOSED
+    closed_at: "2026-09-08"
+    # 手动补发 deploy（workflow_dispatch + ci_run_id=34235749915）对 b790767f6 成功。
+    # 复验：/api/v1/health 回 {"status":"ok","db":"postgres","degraded":[]}，
+    # 前端 bundle 由 index-DRu6kBzl.js 变为 index-C6cJNZjg.js（证明产物确实换了，
+    # 而不是只看 workflow 绿灯）。
+    # ⚠️ 复验口径：`gh run view <deploy>` 的 headSha **不是**发布目标 ——
+    # 那是 deploy 工作流自己 checkout 的 SHA。发布目标只能读
+    # 「Resolve CI-verified target SHA」那一步的日志输出。此处曾据此误报过一次。
+  - id: BL-06
+    desc: "岗位 / 招聘会 / 政策三个业务板块线上零内容：2026-09-08 15:00 实测生产
+      /api/v1/jobs、/api/v1/job-fairs、/api/v1/policies 三个 total 全为 0。
+      代码全通、页面全在、空态诚实（无假数据、合规声明在位），所以这不是代码缺陷 ——
+      是内容与授权来源问题。注意它不是「配置一开就有」：库里此前那 217 条岗位经审查拒绝发布
+      （200 条已过期；来源机构名为「预生产…样本」「演示」；机构表内含 111、的撒的 等垃圾数据），
+      按 CLAUDE.md §10 发布出去等于让求职者照着失效岗位去投递。需要真实数据源与授权。"
+    owner: "产品负责人 / 运营"
     status: OPEN
   - id: BL-03
     desc: "Windows 一体机真机打印/扫描/Terminal Agent 未验收"
