@@ -521,15 +521,26 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 4.3 打印/文件闭环
 
+> **2026-09-08 本地取证**：本节 4 条已在本地真实后端跑出运行期证据（11 项断言全 PASS，
+> 含阳性对照证明断言不恒真），明细见
+> [会员闭环运行期证据](../reviews/member-closure-runtime-evidence-2026-09-08.md) 的 §4.3 附录，
+> 脚本 `apps/kiosk/scripts/probe-file-closure-43.mjs`。
+> **本地 PASS 不等于可勾** —— 本地是 SQLite + 本地存储 + `AI_PROVIDER=mock`，与生产的
+> PostgreSQL + COS + 真实 LLM 不同构，本节要求的是生产或预生产域名上的真实浏览器验收。
+> 其余 6 条本地证不了的原因已在附录里逐条列出（Word 转换需 soffice、打印链路需 Agent 与打印机）。
+
+
 - [ ] 按 [用户文件与简历资产生产/试运营验收证据包](../acceptance/user-file-assets-trial-acceptance.md) 完成用户文件与简历资产证据包，留存命令日志、浏览器截图、COS 控制台截图、PostgreSQL 抽样和审计查询结果；不得以本地 SQLite/local storage verify 代替 PostgreSQL + COS + 会员账号真实验收。
-- [ ] 上传文件 → 我的文档可见。
-- [ ] 文档预览使用短期签名 URL。
-- [ ] 文档下载成功。
+- [ ] 上传文件 → 我的文档可见。 —— 生产待验；**本地 PASS**
+- [ ] 文档预览使用短期签名 URL。 —— 生产待验；**本地 PASS**（`sig` 存在、TTL 1800s ≤ 上限）
+- [ ] 文档下载成功。 —— 生产待验；**本地 PASS**（200 / 字节与原件一致 / `application/pdf`）
 - [ ] 再打印进入打印链路。
 - [ ] `.doc` / `.docx` 上传后仅在 capabilities `wordToPdf=true` 时允许「转 PDF / Word 预览 / Word 打印」；否则入口置灰并展示服务端返回的 reason。
 - [ ] Word 转换后的界面固定展示「由转换引擎生成，复杂版式可能有偏差，请预览核对」，用户确认预览后才进入打印建单。
 - [ ] Word 打印任务关联的是 `createdBy=document_conversion`、`assetCategory=derived`、`sourceFileId=原件` 的派生 PDF；Agent 下载 MIME 为 `application/pdf`，不直接下发 Word。
-- [ ] 删除文档后对象存储与数据库状态一致，删除审计存在。
+- [ ] 删除文档后对象存储与数据库状态一致，删除审计存在。 —— 生产待验；**本地 PASS**
+  本地还多验一条清单没写、但更该验的：**删除前已经铸出去的签名链接，删除后必须失效**（实测 404）。
+  只查「DB status 改成 deleted」的断言，对「字段改了但文件还能下」这种缺陷是瞎的。建议生产复验时照此加验。
 - [ ] 打印任务进入打印订单，状态展示正确。
 
 ### 4.4 岗位/招聘会/政策

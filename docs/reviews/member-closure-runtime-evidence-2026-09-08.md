@@ -85,3 +85,48 @@ API 启动必需，缺任一项都以**运行期 500** 而非启动失败的形�
 - **不能**据此勾生产域名的 §4.2。本页是本地 SQLite + 本地存储 + `AI_PROVIDER=mock`。
 - **不能**据此判断真实 LLM / OCR 行为。
 - 打印链路未覆盖（本机无 Agent、打印机离线）。
+
+## 附：§4.3「打印/文件闭环」本地取证（同一套环境，2026-09-08）
+
+脚本 `apps/kiosk/scripts/probe-file-closure-43.mjs`，一次跑完文件的完整生命周期。
+**11 项断言全 PASS**：
+
+```
+PASS  上传                fileId=ecb29a69…
+PASS  我的文档可见         列表 1 条，含本次上传
+PASS  预览短期签名 URL     sig=true  TTL=1800s（要求 >0 且 ≤1800s）
+PASS  下载成功            200 / 75867 字节与原件一致 / content-type=application/pdf
+PASS  再打印入口          reprintable=true
+PASS  Word 能力诚实        wordToPdf=false engine=none reason="服务端未配置转换引擎"
+PASS  删除请求            200
+PASS  删除后 DB 状态       FileObject.status=deleted
+PASS  删除审计存在         近 2 分钟 file.delete 审计 2 条
+PASS  物理文件已清理       /tmp/sweep-storage 残留 0 个
+PASS  旧签名 URL 已失效     删除前铸的签名链接现在 404
+```
+
+**最后一条是这组里最有价值的**：它证明删除不是「只把 DB 里的 status 改成 deleted」——
+删除前已经发出去的签名链接会当场失效。只查 DB 状态的断言，对「字段改了但文件还能下」这种缺陷是瞎的。
+
+**11 PASS / 0 FAIL 做过阳性对照**（否则不敢信）：
+往存储目录塞一个同 id 的残留文件，`find` 命中 1 个 → 物理清理断言判 FAIL；
+拿一条 `status=active` 的行问同一条 SQL → 状态断言判 FAIL。**这些断言不是恒真的。**
+
+### 过程中修正的一次自己的误判
+
+探针最初按「列表里内嵌签名 URL」写，报了 FAIL。查下去发现列表给的是
+`previewUrlPath` / `downloadUrlPath`，**签名 URL 按需铸造** ——
+这是比内嵌**更好**的设计（暴露窗口更短）。差点把一个正确设计报成缺陷。
+**探针报 FAIL 时，先怀疑探针的假设，再怀疑被测对象。**
+
+### §4.3 本地证不了的部分（如实列出，不算 PASS）
+
+| 条目 | 为什么本地证不了 |
+|---|---|
+| 证据包（PostgreSQL + COS + 真会员） | 本地是 SQLite + 本地存储，架构不同构 |
+| Word 转换后的界面文案与确认流 | 需要 `wordToPdf=true`，本机无 soffice |
+| Word 打印任务关联派生 PDF（`createdBy=document_conversion`） | 同上 |
+| 打印任务进入打印订单、状态展示 | 本机无 Terminal Agent、打印机离线 |
+
+注意第 2、3 条与「Word 能力诚实」那条 PASS 的关系：**本机 `wordToPdf=false` 正是能验「能力为假时诚实置灰」的原因，
+也正是验不了「能力为真时的转换流程」的原因。** 同一个条件，一条能验一条不能，不要混为一谈。
