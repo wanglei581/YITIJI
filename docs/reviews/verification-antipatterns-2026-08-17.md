@@ -183,7 +183,7 @@ rebase 时 git **没报冲突**。但「无冲突」只保证**文本能合**，
 B 侧的 `scanForbiddenCopy` 接线仍有 6 处 + 2 处，并对改到的 5 个 `.ts/.mjs` 跑
 `ts.createSourceFile().parseDiagnostics`（0 bad）、复跑单测（7 pass）。
 
-参见 [[rebase 冲突处置]]：「两侧都保留」的自动策略**只对 `docs/progress/*.md` 这类纯追加文档安全**，
+相关口径：rebase 冲突时「两侧都保留」的自动策略**只对 `docs/progress/*.md` 这类纯追加文档安全**，
 代码与 workflow 一律人工解。
 
 ---
