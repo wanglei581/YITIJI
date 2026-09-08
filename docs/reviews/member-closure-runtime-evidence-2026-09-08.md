@@ -289,3 +289,55 @@ PASS  删除后不残留幽灵记录         删除 200，列表少一条，直�
 
 岗位匹配闭环（本地 provider 未配置）、模拟面试闭环（同样依赖未配置的语音 / LLM 路径）。
 两条都不按 PASS 记。
+
+## 附五：§4.1「账号与资产」本地取证（2026-09-08）
+
+### 一、空闲退出 / 忙碌豁免 —— **不用新写，既有 CI 套件已覆盖**
+
+动手前先查了既有资产：`apps/kiosk/tests/visual/kiosk-privacy-timeout.spec.ts`，**23 条用例**，
+配置 idle 3s + 忙碌锁顺延 2s（`VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC`），
+由 `ci.yml:1053-1054` 的 `test:browser:privacy` 与 `test:browser:warning` 两条 job 在 CI 里跑。
+
+覆盖面比清单那两条更宽：
+
+```
+member report hard-replaces a clean homepage after the privacy deadline
+member privacy clear sends the original bearer and blocks authenticated re-entry
+manual profile logout clears token-bearing cashier history
+legal documents cannot suspend an authenticated kiosk privacy deadline
+anonymous interview state is hard-cleared and browser back cannot restore it
+older sensitive history entries are sanitized after a privacy boundary
+privacy clear truncates sensitive forward history after the user went back
+privacy clear remains fail-closed when session storage rejects the boundary write
+```
+
+**本地复跑：`23 passed (2.4m)`。**
+
+**所以没有新写用例。** 重复覆盖只增加维护面，还会让人误以为多了一层保障。
+**动手前先查既有资产，是比写得快更重要的一步。**
+
+### 二、会话闭环 —— 脚本 `apps/kiosk/scripts/probe-member-session-41.mjs`，5 PASS
+
+```
+PASS  手机号登录成功            201，拿到 token
+PASS  登录态可读本人资产        GET /me/documents 200
+PASS  验证码不可重放            重放同一码 → 401 SMS_CODE_EXPIRED
+PASS  登出后旧 token 立即失效    logout 201，之后同一请求 401
+PASS  未登录不返回数量          401，响应里 0 个计数字段
+```
+
+第 2 项是第 4 项的**内建阳性对照**：同一个 `GET /me/documents`，登出前 200、登出后 401。
+**这才证明第 4 项分辨得了「登出了」和「没登出」**，而不是那个接口本来就总是 401。
+
+### 三、两个「不是缺陷」的失败，值得记
+
+| 现象 | 真相 |
+|---|---|
+| 登录连续 401 | `SMS_IP_LIMIT` —— 一天的探针把短信接口 IP 小时配额打满了。**这是频控在正常工作**。本地隔离环境清 `member:sms:ip:*` 计数键即可，做法写进脚本注释。 |
+| 登录莫名 401（另一种） | 探针按 `codes.at(-1)` 从**共享日志**取验证码，而并行探针与上一轮残留都往同一个日志写，经常拿到别人的码。**症状像「登录坏了」，实际是探针取错了值。** 改为按本次手机号掩码（`138****9179`）匹配。 |
+
+第二条是本轮第三次同形错误：**探针从共享资源里取「最后一条」，而共享资源有别的写者。**
+
+### §4.1 本地证不了的部分
+
+QR 扫码登录、二维码基址可被手机访问 —— 需要真手机与 Terminal Agent，不记。

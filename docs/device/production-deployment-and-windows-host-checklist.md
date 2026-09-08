@@ -487,12 +487,12 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 4.1 账号与资产
 
-- [ ] 手机号登录/登出成功。
+- [ ] 手机号登录/登出成功。 —— 生产待验；**本地 PASS**（登出后旧 token 立即 401，且以「登出前同一请求 200」为内建阳性对照）
 - [ ] QR 扫码登录成功：Kiosk 通过 Terminal Agent 本地桥接创建二维码，手机打开二维码 URL 后只确认登录，一体机拿到会员态；手机端不接收 member token。
 - [ ] QR 二维码 URL 的公网/局域网基址可被手机访问；如果 Kiosk 页面运行在 `localhost`，必须显式配置手机可访问的 `VITE_QR_LOGIN_PUBLIC_BASE_URL`。
-- [ ] 空闲自动退出生效。
-- [ ] 忙碌态（上传/AI/打印中）不误触发退出。
-- [ ] 「我的」资产区加载成功，无假数量。
+- [ ] 空闲自动退出生效。 —— 生产待验；**已有 CI 覆盖**：`kiosk-privacy-timeout.spec.ts` 23 条用例，`ci.yml:1053-1054` 两条 job 在跑，本地复跑 `23 passed`。
+- [ ] 忙碌态（上传/AI/打印中）不误触发退出。 —— 生产待验；**同上套件覆盖**（忙碌锁顺延 `VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC`）。
+- [ ] 「我的」资产区加载成功，无假数量。 —— 生产待验；**本地 PASS**（未登录 401 且响应里 0 个计数字段）
 - [x] 未登录游客不展示跨会话资产。 —— **PASS，且强于本条要求**
   **证据（2026-09-07 23:38–23:40，发布 `759a37d45` 之后，发布 lane 取证）**：**每条路由开全新浏览器上下文**（无 cookie / localStorage / sessionStorage），走真实域名逐条访问「我的」六个资产页并抓全部 `/api/v1/` 调用 —— `/me/resumes`、`/me/documents`、`/me/print-orders`、`/me/ai-records`、`/me/favorites`、`/me/activity` **六页登录门均在，且各发出 0 条 `/api/v1/` 调用**；六页文案均写「仅本人可见」，与 §10 数据边界一致。
   **为什么按「0 条调用」记而不是「返回 401」**：401 是**服务端过滤**（请求发生过、被拒），仍存在「过滤条件某天被改错就漏数据」的风险面；0 条是**客户端 fail-closed**，该风险面不存在。这个 0 也是回归时最灵敏的指标 —— 哪天有人加「先拉一下再判断登录」的优化，0 就会变非 0。
