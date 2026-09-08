@@ -88,3 +88,65 @@ assert.doesNotMatch(installer, /ReadAllText\(\$configPath\)/, 'existing config m
 assert.doesNotMatch(installer, /Write-(?:Host|Output)[^\r\n]*(?:effectiveBridgeToken|secureBridgeToken|effectiveBindCode|secureBindCode)/i)
 
 console.log('ALL PASS: production Agent provisioning contract')
+
+const fieldEvidence = fs.readFileSync(path.join(scriptDir, 'collect-field-evidence.ps1'), 'utf8')
+
+console.log('\n=== verify field evidence collector contract ===')
+
+assert.doesNotMatch(
+  fieldEvidence,
+  /Get-Content.*agent\.token/,
+  'field evidence collector must not read agent.token contents',
+)
+assert.match(
+  fieldEvidence,
+  /IsNullOrWhiteSpace.*localApiBridgeToken/,
+  'field evidence collector must report localApiBridgeToken only as configured/length',
+)
+assert.doesNotMatch(
+  fieldEvidence,
+  /Write-(?:Host|Output)[^\r\n]*localApiBridgeToken/,
+  'field evidence collector must not print localApiBridgeToken value',
+)
+assert.doesNotMatch(
+  fieldEvidence,
+  /DefaultPassword/,
+  'field evidence collector must not read Winlogon DefaultPassword',
+)
+assert.doesNotMatch(
+  fieldEvidence,
+  /Pantum/,
+  'field evidence collector must not hard-code a printer model',
+)
+assert.match(
+  fieldEvidence,
+  /PrinterStatus/,
+  'field evidence collector must capture Win32 PrinterStatus',
+)
+assert.match(
+  fieldEvidence,
+  /DetectedErrorState/,
+  'field evidence collector must capture Win32 DetectedErrorState',
+)
+assert.match(
+  fieldEvidence,
+  /WorkOffline/,
+  'field evidence collector must capture Win32 WorkOffline',
+)
+
+// 闭合准入：配置字段只能逐个白名单回显（见 5.3-8 的 $parts 列表），
+// 任何形式的整对象序列化都会把 localApiBridgeToken 一并打出来。
+// 今天在服务器取证脚本上已经栽过一次同类问题：黑名单式掩码漏掉了
+// 名字里不含关键词的密钥键。
+assert.doesNotMatch(
+  fieldEvidence,
+  /ConvertTo-Json/,
+  'field evidence collector must never serialize whole objects; echo only allow-listed config keys',
+)
+assert.doesNotMatch(
+  fieldEvidence,
+  /\$script:Config\s*\|/,
+  'field evidence collector must not pipe the whole config object anywhere',
+)
+
+console.log('ALL PASS: field evidence collector contract')
