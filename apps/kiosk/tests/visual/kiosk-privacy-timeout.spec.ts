@@ -141,6 +141,13 @@ async function openResumedPaymentCashier(page: Page, api: ApiRouter): Promise<{
 }> {
   registerKioskShell(api)
   registerMemberLogin(api)
+  // 本用例要经过 /profile 才能点「结束使用」，青序流光的「我的」主页挂载即请求会员权益。
+  // 不 stub 的话 fixture 拆卸时会以「未处理请求」判失败——那是竞态不是缺陷。
+  // 返回空权益，不伪造任何已领取状态。
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 200,
+    json: { success: true, data: { items: [], total: 0 } },
+  })
   api.respond('GET', '/api/v1/payment/channels', {
     status: 200,
     json: { channels: ['sandbox'] },
