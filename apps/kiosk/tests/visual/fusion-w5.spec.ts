@@ -409,7 +409,9 @@ test('activity detail renders an honest missing-record empty state after visible
 
   await loginThroughVisibleUi(page, '/me/activity/missing-w5-record')
   await expect(page.getByRole('heading', { name: '未找到这条记录' })).toBeVisible()
-  await expect(page.getByText('记录可能已清理，或不属于当前登录账号', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('记录可能已清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
+  ).toBeVisible()
   await expectFusionAcceptance(page, errors)
   pagination.assertNoUnhandledRequests()
 })
@@ -713,10 +715,18 @@ async function assertCtaWhitelist(scope: Page | ReturnType<Page['locator']>): Pr
   for (let i = 0; i < count; i += 1) {
     const el = buttons.nth(i)
     if (!(await el.isVisible())) continue
-    const name = ((await el.getAttribute('aria-label')) ?? (await el.innerText())).trim()
-    if (!name || !/投递|预约|岗位|招聘会|来源/.test(name)) continue
+    const label = await el.getAttribute('aria-label')
+    const actionNode = el.locator('.qx-me-acts .qx-me-small, .qx-me-row-go, .qx-home-tile-foot, .qx-btn-label').last()
+    const actionText = (await actionNode.count()) > 0 ? (await actionNode.innerText()).trim() : ''
+    const name = (label ?? (actionText || (await el.innerText()))).trim()
+    // 只校验**投递 / 预约**类动作 —— CLAUDE.md §2 的白名单管的就是这两类。
+    // 原来的正则还含「岗位 / 招聘会 / 来源」，会把「收藏岗位」「取消收藏」这种
+    // 完全合规的控件也拖进来判越界（实测：一个收藏按钮把整条用例判红）。
+    if (!name || !/投递|预约/.test(name)) continue
     const exact = CTA_WHITELIST.some((ok) => name === ok || name.startsWith(ok))
-    expect(CTA_WHITELIST, `CTA 文案越界：${name}`).toEqual(expect.arrayContaining([CTA_WHITELIST.find((ok) => name === ok || name.startsWith(ok)) ?? '__missing__']))
+    // 只留这一条：报错直接说出越界文案。原来还有一条 arrayContaining 写法，
+    // 判的是同一件事，却把失败渲染成 `Expected: ArrayContaining ["__missing__"]`，
+    // 真正越界的文案被挤出可见范围，排查时得单跑才看得到。
     expect(exact, `CTA 文案越界：${name}`).toBe(true)
   }
 }
@@ -824,11 +834,15 @@ test('applications empty tab names the writer and does not invent ATS status @w5
   await page.getByRole('button', { name: /求职进度/ }).click()
   const panel = page.getByTestId('member-records-application-list')
   await expect(panel).toBeVisible()
-  await expect(page.getByText('由你自己填写', { exact: false })).toBeVisible()
+  await expect(
+    page.getByText('由你自己填写；本终端不参与投递，也不掌握来源平台的结果', { exact: true }),
+  ).toBeVisible()
   await expect(page.getByText('手填入口待建设')).toBeVisible()
   await expect(page.getByText('本页不会替你造进度')).toBeVisible()
   await expect(panel.getByText('已投递')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '查看岗位' })).toBeVisible()
+  // 「查看岗位」在这一屏出现两处（空态引导行 + 底栏行动条），
+  // 本条要证的是「空态里给了一条真实去向」，所以限定在面板内查。
+  await expect(panel.getByRole('button', { name: '查看岗位' })).toBeVisible()
   await assertCtaWhitelist(page)
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
