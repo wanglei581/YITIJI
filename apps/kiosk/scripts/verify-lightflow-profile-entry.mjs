@@ -171,7 +171,6 @@ for (const marker of [
   '<ProfileSessionRecords',
   "const goLogin = () => navigate('/login', { state: { from: location.pathname } })",
   "navigate('/me/settings')",
-  "navigate('/me/notifications')",
   "navigate('/print/preview'",
   "clearSessionTo({ path: '/profile' })",
 ]) {
@@ -181,14 +180,28 @@ for (const marker of [
 for (const marker of [
   'reserveBannerSpace',
   'onLogin',
-  'onLogout',
   'onOpenSettings',
-  'onOpenNotifications',
   'className="pf-idcard"',
   'className="pf-idtx"',
   'className="pf-idname"',
 ]) {
   expectIncludes(header, marker, `ProfileHeader preserves ${marker}`)
+}
+
+/* 2026-09-08 青序流光迁移（稿 30-my-profile）：
+ * ProfileHeader 不再持有 onLogout / onOpenNotifications，ProfilePage 也不再直接写
+ * navigate('/me/notifications') —— 这两件事移到了页面自己的磁贴列表和底部行动条。
+ * **形状变了，能力没变**，所以把上面三条「这个字符串在不在」换成下面四条
+ * 「这几件事还能不能做」。条数 3 → 4，只增不减。
+ * 退出键按稿 30 叫「结束使用」（稿里 13 处这么写，「退出登录」只出现在说明文字里，
+ * 见 30-my-profile.html:519「离开前请点『结束使用』；这会退出登录并清掉…」）。 */
+for (const [marker, message] of [
+  ["'/me/notifications'", 'ProfilePage 仍能到达消息通知'],
+  ['消息通知', 'ProfilePage 仍展示消息通知入口'],
+  ['结束使用', 'ProfilePage 仍提供退出（稿 30 的「结束使用」）'],
+  ['onEnd', 'ProfilePage 的退出键接着真实的结束会话动作'],
+]) {
+  expectIncludes(profile, marker, message)
 }
 expectNotIncludes(header, 'kp-profile-boundary', 'ProfileHeader removes the non-prototype boundary panel')
 expectNotIncludes(header, 'p-hero', 'ProfileHeader removes the old p-hero visual shell')

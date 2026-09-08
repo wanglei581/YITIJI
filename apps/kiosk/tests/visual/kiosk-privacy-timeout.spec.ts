@@ -357,7 +357,7 @@ test('manual profile logout clears token-bearing cashier history @privacy-kiosk 
   await page.getByRole('button', { name: '我的', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/profile')
 
-  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+  await page.getByRole('button', { name: '结束使用', exact: true }).click()
   await expect(page.getByRole('button', { name: '手机号登录', exact: true })).toBeVisible()
   const requestCountAfterLogout = requests.paymentRequests().length
 
