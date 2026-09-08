@@ -136,8 +136,8 @@ if (contract && routeManifest) {
 
   check('frozen route inventory matches runtime route declarations', () => {
     const declared = declaredRoutePatterns(routeSourcePath)
-    assert.equal(declared.length, 107, 'runtime route declaration count')
-    assert.equal(new Set(declared).size, 107, 'runtime route declarations must be unique')
+    assert.equal(declared.length, 108, 'runtime route declaration count')
+    assert.equal(new Set(declared).size, 108, 'runtime route declarations must be unique')
     assert.deepEqual(sorted(declared), sorted(productionRoutePatterns))
   })
 
@@ -217,11 +217,11 @@ if (contract && routeManifest) {
     assert.match(byId.get('34A')?.knownLimits ?? '', /no scanner-status knowledge/i)
   })
 
-  check('107 routes each have exactly one disposition', () => {
+  check('108 routes each have exactly one disposition', () => {
     assert.ok(Array.isArray(routeEvidenceDispositions), 'routeEvidenceDispositions must be an array')
-    assert.equal(routeEvidenceDispositions.length, 107, 'route disposition count')
+    assert.equal(routeEvidenceDispositions.length, 108, 'route disposition count')
     const patterns = routeEvidenceDispositions.map(({ routePattern }) => routePattern)
-    assert.equal(new Set(patterns).size, 107, 'route dispositions must be unique')
+    assert.equal(new Set(patterns).size, 108, 'route dispositions must be unique')
     assert.deepEqual(sorted(patterns), sorted(productionRoutePatterns), 'route disposition inventory must equal the frozen 107-route manifest')
     for (const disposition of routeEvidenceDispositions) {
       const label = `route ${disposition.routePattern}`
