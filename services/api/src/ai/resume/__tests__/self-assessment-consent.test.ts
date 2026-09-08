@@ -57,7 +57,9 @@ interface AuditEvent {
   payload: unknown
 }
 
-function makeHarness() {
+function makeHarness(opts: { resumePages?: number; reportPages?: number } = {}) {
+  const resumePages = opts.resumePages ?? 1
+  const reportPages = opts.reportPages ?? 2
   const rows: StoredRow[] = []
   const audits: AuditEvent[] = []
   const uploads: Array<{ fileId: string; filename: string; buffer: Buffer }> = []
@@ -106,7 +108,7 @@ function makeHarness() {
         signedUrlExpiresAt: new Date(Date.now() + 300_000).toISOString(),
       }
     },
-    readContent: async () => ({ buffer: await makePdf(1) }),
+    readContent: async () => ({ buffer: await makePdf(resumePages) }),
   }
 
   const llm = {
@@ -118,7 +120,7 @@ function makeHarness() {
     }),
   }
 
-  const pdf = { render: async () => ({ buffer: await makePdf(2), pageCount: 2 }) }
+  const pdf = { render: async () => ({ buffer: await makePdf(reportPages), pageCount: reportPages }) }
   const log = { record: () => {} }
 
   const service = new SelfAssessmentService(
@@ -351,10 +353,31 @@ test('B3 append 产出带内部 HMAC printFileUrl，且不与预览 signedUrl �
 test('B4 合并页数 = 简历页数 + 报告页数（内容真的被追加了）', async () => {
   const h = makeHarness()
   const { taskId, accessToken } = await seedAssessment(h)
-  await h.appendService.appendToResume({
+  const out = await h.appendService.appendToResume({
     taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1',
   })
   const merged = await PDFDocument.load(h.uploads.at(-1)!.buffer)
   // mock 简历 1 页 + mock 报告 2 页；页数变少即说明发生了替换而非追加。
   assert.equal(merged.getPageCount(), 3, '合并结果必须包含简历与报告全部页面')
+  assert.equal(out.pageCount, 3, '响应 pageCount 必须是合并后总页数，不能是附录页数')
+  assert.equal(out.pageCount, merged.getPageCount(), '响应 pageCount 必须与合并 PDF 实际页数一致')
+  assert.equal(out.appendixPageCount, 2, 'appendixPageCount 才是附录页数')
+})
+
+test('B5 简历 2 页 + 附录 1 页时 pageCount 为 3，而不是附录的 1', async () => {
+  const h = makeHarness({ resumePages: 2, reportPages: 1 })
+  const { taskId, accessToken } = await seedAssessment(h)
+  const out = await h.appendService.appendToResume({
+    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1',
+  })
+  const merged = await PDFDocument.load(h.uploads.at(-1)!.buffer)
+  assert.equal(out.pageCount, 3, '2 页简历 + 1 页附录必须回报 3，回报 1 会按 1 页报价')
+  assert.equal(out.pageCount, 2 + 1, 'pageCount == 简历页数 + 附录页数')
+  assert.equal(out.pageCount, merged.getPageCount())
+  assert.equal(out.appendixPageCount, 1, '附录页数另字段给出，不改 pageCount 语义')
+  const printAudit = [...h.audits].reverse().find((a) => a.action === 'resume.self_assessment_print')
+  assert.ok(printAudit, 'append 必须写打印审计')
+  const payload = printAudit.payload as { saPageCount?: number; mode?: string }
+  assert.equal(payload.mode, 'append')
+  assert.equal(payload.saPageCount, 1, '审计 saPageCount 仍是附录页数，语义不变')
 })

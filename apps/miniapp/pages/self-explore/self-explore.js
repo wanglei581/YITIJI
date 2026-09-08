@@ -2,6 +2,7 @@ const app = getApp()
 // 雷达绘制抽到同目录 radar.js：主文件越过 §8 的 500 行评估阈值，
 // 而绘制只依赖画布/数据/尺寸，是天然接缝。
 const radar = require('./radar')
+const appendPrint = require('./append-print')
 const RADAR_COLORS = radar.RADAR_COLORS
 const DIM_COUNT_EXPECTED = radar.DIM_COUNT_EXPECTED
 const api = require('../../utils/api')
@@ -119,6 +120,13 @@ Page({
     canManage: false,
     manageBlockedReason: '',
     printing: false,
+    appendConfirmed: false,
+    appending: false,
+    resumeOptions: [],
+    resumePickerLoading: false,
+    resumePickerError: '',
+    resumePickerTruncated: false,
+    selectedResumeId: '',
     withdrawing: false,
   },
 
@@ -472,6 +480,13 @@ Page({
       radarStatus: 'pending',
       canManage,
       manageBlockedReason: blocked,
+      appendConfirmed: false,
+      appending: false,
+      resumeOptions: [],
+      resumePickerLoading: false,
+      resumePickerError: '',
+      resumePickerTruncated: false,
+      selectedResumeId: '',
     }, () => {
       wx.pageScrollTo({ scrollTop: 0, duration: 200 })
       this._drawRadar()
@@ -684,9 +699,23 @@ Page({
       consentTip: tip || '',
       radarStatus: 'pending',
       radarDrawable: false,
+      appendConfirmed: false,
+      appending: false,
+      resumeOptions: [],
+      resumePickerLoading: false,
+      resumePickerError: '',
+      resumePickerTruncated: false,
+      selectedResumeId: '',
     })
     wx.pageScrollTo({ scrollTop: 0, duration: 200 })
   },
 
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
+
+  ...appendPrint.methods,
+  toggleAppendConfirmed() { return appendPrint.methods.toggleAppendConfirmed.call(this) },
+  retryResumeOptions() { return appendPrint.methods.retryResumeOptions.call(this) },
+  selectResumeForAppend(e) { return appendPrint.methods.selectResumeForAppend.call(this, e) },
+  goUploadResumeForAppend() { return appendPrint.methods.goUploadResumeForAppend.call(this) },
+  confirmAppendToResume() { return appendPrint.methods.confirmAppendToResume.call(this) },
 })

@@ -1793,3 +1793,15 @@ const api = {
 
 
 module.exports = api;
+
+// 只能在本文件末尾追加：其他会话正在改动既有 API 门面，避免重排对象成员造成冲突。
+api.appendSelfAssessmentToResume = function appendSelfAssessmentToResume(taskId, resumeFileId, accessToken) {
+  if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索合并打印'));
+  return request(`/resume/self-assessment/${encodeURIComponent(taskId)}/append`, {
+    method: 'POST',
+    data: { resumeFileId },
+    header: tokenHeader(accessToken),
+    needAuth: true,
+    timeout: 60000,
+  });
+};

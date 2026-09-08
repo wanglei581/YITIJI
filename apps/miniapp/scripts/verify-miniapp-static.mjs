@@ -1011,6 +1011,41 @@ for (const page of PACKAGE_CHAIN_PAGES) {
 if (!packageFakeHits.length) ok('材料包四页无假电话 / 假坐标 / 本地硬编码计价')
 else bad('材料包侧链假数据', packageFakeHits.join('；'))
 
+// 自我探索附录只能由本人主动选择：结果页默认不选、明确不发给企业，并在本页列出
+// 本人 PDF 简历。不得跳「我的文档」、不得用 getOpenerEventChannel。
+// api.js 是并发改动热点，这个封装必须是文件末尾的单独追加。
+const selfExploreJs = read('pages/self-explore/self-explore.js')
+const selfExploreWxml = read('pages/self-explore/self-explore.wxml')
+const appendPrintJs = read('pages/self-explore/append-print.js')
+const documentsWxml = read('pages/documents/documents.wxml')
+const apiAppendAtEnd = /module\.exports = api;\s*\/\/[\s\S]*?api\.appendSelfAssessmentToResume = function appendSelfAssessmentToResume[\s\S]*?\n};\s*$/.test(apiJs)
+const appendUsesInPagePicker = appendPrintJs.includes('api.getMyDocuments')
+  && appendPrintJs.includes('resume_upload')
+  && appendPrintJs.includes('resume_scan')
+  && appendPrintJs.includes("url: '/pages/resume-upload/resume-upload'")
+  && appendPrintJs.includes('api.appendSelfAssessmentToResume(this.data.taskId, resumeFileId, this._token)')
+  && appendPrintJs.includes('/pages/print-upload/print-upload?name=${name}&fileId=${encodeURIComponent(fileId)}&pages=${pages}')
+  && !/\bgetOpenerEventChannel\b/.test(appendPrintJs)
+  && !appendPrintJs.includes('/pages/documents/documents')
+if (
+  selfExploreJs.includes('appendConfirmed: false') &&
+  selfExploreJs.includes("require('./append-print')") &&
+  selfExploreJs.includes('...appendPrint.methods') &&
+  !selfExploreJs.includes('/pages/documents/documents') &&
+  !selfExploreJs.includes('getOpenerEventChannel') &&
+  appendUsesInPagePicker &&
+  selfExploreWxml.includes('附到简历一起打印') &&
+  selfExploreWxml.includes('只给本人打印带走，平台不发给任何企业') &&
+  selfExploreWxml.includes('我自行判断是否将这份附录随简历带去') &&
+  selfExploreWxml.includes('暂无可选 PDF 简历') &&
+  selfExploreWxml.includes('去上传 PDF 简历') &&
+  !documentsJs.includes('selectingResume') &&
+  !documentsWxml.includes('暂无可选 PDF 简历') &&
+  apiJs.includes('data: { resumeFileId }') &&
+  apiAppendAtEnd
+) ok('自我探索附录合并打印为本人主动选择，页内挑选真实 PDF 简历并进入打印链路')
+else bad('自我探索附录合并打印', '缺少默认未选确认、本人打印带走文案、页内 PDF 简历选择、append 调用、打印跳转、上传入口，或仍依赖 documents 页 / EventChannel / 非末尾追加封装')
+
 // WXSS 编译器比标准 CSS 严：注释后面跟一个多余的分号（`*/;`）、或连续分号
 // （`;;`），在浏览器和 postcss 里都是无害的空声明，会被静默忽略；WXSS 直接判编译
 // 失败，**整个视图层不渲染**——App 照常启动、getApp() 有值、页面栈恒为 0、模拟器

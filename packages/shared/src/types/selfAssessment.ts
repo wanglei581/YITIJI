@@ -176,7 +176,10 @@ export interface SelfAssessmentAppendResponse {
   fileId: string
   filename: string
   sizeBytes: number
+  /** 合并后 PDF 的真实总页数（简历页 + 附录页）。报价与展示必须用这个。 */
   pageCount: number
+  /** 附录（自我探索报告）自身的页数；不是总页数。 */
+  appendixPageCount: number
   signedUrl: string
   expiresAt: string
   printFileUrl: string
