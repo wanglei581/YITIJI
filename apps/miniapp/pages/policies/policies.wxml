@@ -56,10 +56,21 @@
       <view class="state-retry tap" hover-class="tap-press" bindtap="reload">重试</view>
     </view>
 
+    <!-- 同招聘会：分「本机没接入」与「该分类下没有」两种。
+         政策列表是服务端按 audience 过滤后回来的，客户端分不出「一条都没有」和
+         「这个分类没有」—— 除非当前就在「全部政策」。所以用 activeCat 判：
+         在「全部」下还是空，就是真的一条都没接入。 -->
+    <view wx:elif="{{policies.length === 0 && activeCat === 'all'}}" class="state-card">
+      <view class="state-icon"><text class="ficon i-file-text"></text></view>
+      <view class="state-title">本机尚未接入政策来源</view>
+      <view class="state-desc">政策信息来自官方来源，本机接入后会在这里显示。办理条件与时限请以官方原文及当地经办窗口为准。</view>
+    </view>
+
     <view wx:elif="{{policies.length === 0}}" class="state-card">
       <view class="state-icon"><text class="ficon i-file-text"></text></view>
-      <view class="state-title">暂无相关政策</view>
-      <view class="state-desc">可以切换人群分类，或稍后再来查看</view>
+      <view class="state-title">该人群分类下暂无政策</view>
+      <view class="state-desc">换个人群分类，或看全部政策</view>
+      <view class="state-retry tap" hover-class="tap-press" bindtap="showAllPolicies">看全部政策</view>
     </view>
 
     <view wx:else class="policy-list">
