@@ -34,7 +34,11 @@ globalThis.getApp = () => ({})
 
 const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
 const { request } = requireMiniapp('./request.js')
-const { isMachineErrorCode, SERVER_GENERIC_MESSAGE, PASSTHROUGH_MESSAGE_CODES } = requireMiniapp('./user-error.js')
+const { SERVER_GENERIC_MESSAGE, PASSTHROUGH_MESSAGE_CODES } = requireMiniapp('./user-error.js')
+
+// 判据由门禁自己持有，不复用被测模块的 isMachineErrorCode：那个函数本身也在
+// 被测范围内，用它做断言会让「判据坏掉」和「实现坏掉」互相掩护。
+const looksLikeMachineCode = (v) => typeof v === 'string' && /^[A-Z][A-Z0-9_]+$/.test(v)
 
 async function errorOf(status, body) {
   current = { status, body }
@@ -49,7 +53,7 @@ console.log('A. 服务端机器码')
 for (const code of ['PRICE_CONFIG_UNAVAILABLE', 'PAYMENT_SESSION_REQUIRED', 'ORDER_ALREADY_PAID']) {
   const e = await errorOf(400, { success: false, error: { code, message: code } })
   const shown = (e && e.message) || '页面兜底句'
-  assert(!isMachineErrorCode(shown), `${code} 不会作为 toast 文案出现（实际展示「${shown}」）`)
+  assert(!looksLikeMachineCode(shown), `${code} 不会作为 toast 文案出现（实际展示「${shown}」）`)
   assert(e.code === code, `${code} 的 error.code 仍完整保留，页面可据此分支`)
 }
 
@@ -89,7 +93,7 @@ console.log('\nF. HTTP 200 但业务失败')
 {
   const e = await errorOf(200, { code: 40001, message: 'PACKAGE_ORDER_UNAVAILABLE' })
   const shown = (e && e.message) || '页面兜底句'
-  assert(!isMachineErrorCode(shown), `200 包体里的机器码同样不外泄（实际展示「${shown}」）`)
+  assert(!looksLikeMachineCode(shown), `200 包体里的机器码同样不外泄（实际展示「${shown}」）`)
 }
 
 console.log(failed === 0 ? '\n全部通过\n' : `\n${failed} 条失败\n`)
