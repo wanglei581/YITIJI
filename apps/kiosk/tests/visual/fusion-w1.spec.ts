@@ -98,7 +98,7 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
   await expect(frame.locator('.qx-home[data-qx-page="home"]')).toBeVisible()
   await expect(frame.getByRole('heading', { name: /你好，我是小青/ })).toBeVisible()
   await expect(frame.getByText('说一句你想办的事', { exact: false })).toBeVisible()
-  await expect(frame.getByText('本终端不代收简历', { exact: false })).toBeVisible()
+  await expect(frame.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expectMinimumTargets(frame.locator('button:not(:disabled)'), 48)
   await expectMinimumTargets(frame.locator('[data-testid="home-primary"]'), 56)
   await assertNoHorizontalOverflow(page)

@@ -449,7 +449,7 @@ for (const scenario of [
       await backButton.click()
       await expect(page).toHaveURL(/\/$/)
       // 等待 V6 首页真实异步面板稳定后，再执行统一触控目标验收。
-      await expect(page.locator('[data-v6-page="home"]')).toBeVisible()
+      await expect(page.locator('[data-qx-page="home"]')).toBeVisible()
       await expect(page.locator('[data-home-job-fair-panel]')).toHaveAttribute('data-panel-state', 'empty')
       await expect(page.locator('[data-home-device-panel]')).toHaveAttribute('data-panel-state', 'ready')
     } else {

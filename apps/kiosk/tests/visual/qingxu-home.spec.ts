@@ -134,7 +134,7 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByRole('button', { name: /更多服务/ })).toBeDisabled()
   await expect(home.getByRole('button', { name: /查看全部服务/ })).toBeDisabled()
   await expect(home.getByRole('button', { name: /没有待继续的办理/ })).toBeDisabled()
-  await expect(home.getByText('本终端不代收简历', { exact: false })).toBeVisible()
+  await expect(home.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expect(home.getByRole('link', { name: '鲁ICP备2026023517号-2' })).toHaveAttribute('href', 'https://beian.miit.gov.cn/')
   await expect(home.getByRole('link', { name: '鲁公网安备37021402007308号' })).toHaveAttribute('href', /beian\.mps\.gov\.cn/)
 
