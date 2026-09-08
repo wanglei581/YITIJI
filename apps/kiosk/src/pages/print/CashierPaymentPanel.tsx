@@ -30,6 +30,8 @@ export interface CashierSnapshot {
 }
 
 interface CashierPaymentPanelProps {
+  /** 页面级状态条已经显示了同一句 view.title 时传 true，面板就不再重复写一遍。 */
+  titleShownByPage?: boolean
   paymentMethod: PaymentMethod | null
   attemptPaymentMethod: AttemptPaymentMethod | null
   snapshot: CashierSnapshot | null
@@ -63,6 +65,7 @@ interface CashierPaymentPanelProps {
 /** 收银方式的呈现层：不发请求、不持久化付款码，只把页面传入的状态映射为操作控件。 */
 export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
   const {
+    titleShownByPage = false,
     paymentMethod,
     attemptPaymentMethod,
     snapshot,
@@ -292,9 +295,9 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
   ) : terminalState ?? (
     <div className="cashier-qr-area">
       <div className="cashier-qr-panel">
-        {view.title || view.hint ? (
+        {(view.title && !titleShownByPage) || view.hint ? (
           <div className="cashier-tone-banner" data-tone={view.tone}>
-            <b>{view.title}</b>
+            {view.title && !titleShownByPage ? <b>{view.title}</b> : null}
             {view.hint && <p style={{ marginTop: 4 }}>{view.hint}</p>}
           </div>
         ) : null}

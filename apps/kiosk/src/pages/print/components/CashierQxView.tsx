@@ -210,7 +210,8 @@ export function CashierQxView(props: CashierQxViewProps) {
                 disabled={!props.selectedChannel || props.issuing || props.codeSubmitting || props.selectionLocked}
                 onClick={() => props.onSelectMethod('qr')}
               >
-                <QrCodeIcon aria-hidden="true" /><span>{props.methodLabels.qr.action}</span>
+                <QrCodeIcon aria-hidden="true" /><span>{props.methodLabels.qr.name}</span>
+                <small>{props.methodLabels.qr.action}</small>
               </button>
               <button
                 type="button"
@@ -219,7 +220,8 @@ export function CashierQxView(props: CashierQxViewProps) {
                 disabled={!props.selectedChannel || props.issuing || props.codeSubmitting || props.selectionLocked}
                 onClick={() => props.onSelectMethod('code')}
               >
-                <ScanLineIcon aria-hidden="true" /><span>{props.methodLabels.code.action}</span>
+                <ScanLineIcon aria-hidden="true" /><span>{props.methodLabels.code.name}</span>
+                <small>{props.methodLabels.code.action}</small>
               </button>
             </div>
           </div>
@@ -245,7 +247,7 @@ export function CashierQxView(props: CashierQxViewProps) {
               {props.displayedChannel === 'sandbox'
                 ? '测试支付通道，不会真实扣款'
                 : amountAvailable
-                  ? '金额来自服务端已建订单，前端不重新计算'
+                  ? '本单实付金额 · 来自服务端已建订单，前端不重新计算'
                   : '未取得服务端订单金额，不显示估算值'}
             </p>
             <div className="cashier-qx-lines">
@@ -264,7 +266,6 @@ export function CashierQxView(props: CashierQxViewProps) {
               <div><dt>打印流程</dt><dd>第 {props.step} 步 · 支付</dd></div>
               <div><dt>订单号</dt><dd className="qx-num">{props.orderNo ?? props.orderId ?? '状态未知'}</dd></div>
               <div><dt>支付通道</dt><dd>{channelLabel}</dd></div>
-              <div><dt>页面状态</dt><dd>{copy.title}</dd></div>
               <div><dt>出纸条件</dt><dd>{props.canProceed ? '服务端已确认 paid' : '尚未满足'}</dd></div>
             </dl>
             <div className="cashier-qx-truth">
@@ -277,6 +278,7 @@ export function CashierQxView(props: CashierQxViewProps) {
         {showPaymentPanel ? (
           <section className="qx-card cashier-qx-payment" data-live="true">
             <CashierPaymentPanel
+              titleShownByPage
               paymentMethod={props.paymentMethod}
               attemptPaymentMethod={props.snapshot?.attempt?.qrCodeContent === null ? 'code' : props.snapshot?.attempt ? 'qr' : null}
               snapshot={props.snapshot}
