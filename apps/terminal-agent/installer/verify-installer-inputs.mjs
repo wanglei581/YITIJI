@@ -219,6 +219,16 @@ assert.match(runtimeSecurity, /S-1-5-80-956008885-3418522649-1831038044-18532926
 assert.match(runtimeSecurity, /if \(-not \(Test-WriteLikeFileSystemRights \$rule\.FileSystemRights\)\)[\s\S]*continue[\s\S]*ConvertTo-SidValue \$rule\.IdentityReference/)
 assert.match(stagedPowerShellVerify, /BUILTIN Users must not be treated as privileged/)
 assert.match(staging, /install-production-agent\.ps1/)
+assert.match(
+  staging,
+  /-Destination \(Join-Path \$provisionRoot "collect-field-evidence\.ps1"\)/,
+  'collect-field-evidence.ps1 must be staged into provision',
+)
+assert.match(
+  stagedPowerShellVerify,
+  /foreach \(\$required in @\([^)]*collect-field-evidence\.ps1[^)]*\)\) \{\s*if \(-not \(Test-Path -LiteralPath \(Join-Path \$provisionRoot \$required\)/,
+  'collect-field-evidence.ps1 must be listed in the provision required list',
+)
 assert.match(provisionWizard, /-PromptForBindCode/)
 assert.match(provisionWizard, /-InstalledAgentRoot\s+\$agentRoot/)
 assert.match(provisionWizard, /https:\/\/zyidai\.cn\/api\/v1/)
