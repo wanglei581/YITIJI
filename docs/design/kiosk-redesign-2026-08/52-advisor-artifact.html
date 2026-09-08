@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小青的作业面 · 职易达</title>
+<link rel="stylesheet" href="kimi-full-coverage-v2/design-system/kiosk-motion.css">
+<!--
+  route: /ai/plan —— apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx
+  state: no-artifact | qa-pins | slot-draft | slot-draft-blanks | compare-report
+       | compare-all-covered | print-unavailable | expired
+
+  ── 这张稿为什么存在（先读这段，别照着旧版式做）────────────────────────
+  /ai/plan 原来的版式是「你的目标 / 已有材料 / 尚需准备 / 执行计划」，
+  100% 渲染写死的假内容，且全站零入口（用户只能手敲 URL 到达）。
+  产品负责人 2026-09-07 裁决：**按三种真实产物重新设计**，并接上真实入口。
+  所以本稿不是给旧版式补数据，是换成后端真的产得出来的东西。
+
+  ── 后端真的有什么（services/api/src/advisor/advisor-artifact.types.ts）──
+  三种作业型 ↔ 三种产物，一一对应，kind 是判别式联合的 tag：
+
+  qa（问答型）→ AdvisorArtifact(kind='qa_pins')
+      tagline「有用的记得钉住 —— 对话不保存，钉住的能打成纸」
+      payload: { title?, pins: [{ content, evidenceLevel, sourceNote }] }
+      ⚠ 对话本身不落盘。本页只呈现**用户主动钉住**的条目，不呈现问答过程。
+
+  slot_fill（填槽型）→ AdvisorArtifact(kind='slot_draft')
+      tagline「她问，你答，最后拼成一段可以直接念的话」
+      payload: { draft, blanks: string[], summary, basedOn: [{ slotKey, prompt, value }] }
+      ⚠ basedOn 是**成稿所依据的用户原话**（E1），打印时一并带出，不可省。
+
+  compare（比对型）→ AdvisorArtifact(kind='compare_report')
+      tagline「逐条比『有没有写到』，不比『写得好不好』」
+      payload: { items: [{ requirement, verdict, evidence }], extras: [{ point, note }], summary }
+      verdict = covered | missing | not_a_capability
+      ⚠ covered 的 evidence **必须是材料原文摘录**，服务端校验它真实出现过。
+        本页据此把 covered 的 evidence 显示为引文，不显示为 AI 的话。
+
+  证据级（advisor-skills.ts EVIDENCE_LEVELS）：
+      E1 你自己说过的原话  ·  E2 本机已有数据  ·  E3 AI 的判断与建议，仅供参考
+      图例常驻，不折叠 —— 用户要能一眼分清哪句是自己说的、哪句是 AI 猜的。
+
+  ── 端点边界（重要，别臆造）──────────────────────────────────────
+  现有：POST /api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print
+        GET  /api/v1/advisor/availability
+        （会话与产物的产生走 sessions/:id/run|ask|pins，不在本页）
+  **没有「列出我的全部产物」的端点。** 所以本页按「单次会话产出后立即呈现」设计，
+  产物由上游会话页带进来（router state / :artifactId），本页不做历史列表。
+  想做历史列表要先建端点 —— 那是另一件事，不要在这一页假装有。
+
+  ── 合规 ────────────────────────────────────────────────────
+  三种产物都不是投递物，本页无任何投递 / 预约动作，不出现岗位与招聘会外跳。
+  打印是唯一的对外产出，且必须由服务端 print 端点返回后才算数（不伪造已打印）。
+
+  原型演示控制：本页状态仅通过 ?state= 切换，不含生产业务逻辑，页面无计时器推进业务状态。
+  夹具门：带内容的态必须同时带 ?capture=1 或 ?debug=1，否则一律 fail-closed 回 no-artifact。
+  演示控制可见性：仅 ?debug=1 出现；其余 URL 下 hidden + inert + aria-hidden + display:none 兜底。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --plum:#7a5a86; --plum-soft:#efe8f2;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;
+  background:var(--paper);overflow:hidden;display:flex;flex-direction:column;}
+.serif{font-family:"Songti SC","STSong","SimSun",serif;}
+button{font:inherit;border:0;background:none;cursor:pointer;color:inherit;}
+button:disabled,button[aria-disabled="true"]{cursor:default;}
+
+/* 顶栏 */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;
+  background:var(--surface);border-bottom:1px solid var(--line);}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;background:var(--paper);}
+.logo{flex:none;display:flex;align-items:center;gap:12px;}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px;}
+.topbar .sp{flex:1;}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 24px;
+  border-radius:28px;background:var(--paper);border:1px solid var(--line-2);font-size:19px;color:var(--ink-2);}
+.pill i{width:10px;height:10px;border-radius:50%;background:var(--teal);}
+.pill[data-tone="warn"] i{background:var(--wheat);}
+.pill[data-tone="unknown"] i{background:var(--ink-3);}
+
+/* 小青意图区 */
+.hero{flex:none;margin:26px 36px 0;padding:34px 36px;border-radius:var(--r-lg);
+  background:linear-gradient(135deg,var(--deep) 0%,var(--deep-2) 100%);color:#eaf6f1;
+  display:flex;gap:26px;align-items:flex-start;}
+.avatar{flex:none;width:96px;height:96px;border-radius:50%;background:rgba(46,230,168,.14);
+  border:2px solid rgba(46,230,168,.5);display:flex;align-items:center;justify-content:center;
+  font-size:38px;font-weight:700;color:var(--emerald);}
+.hero-tx{flex:1;min-width:0;}
+.hero-kicker{font-size:17px;letter-spacing:3px;color:rgba(234,246,241,.62);text-transform:uppercase;}
+.hero-q{font-size:40px;line-height:1.34;font-weight:700;margin-top:8px;}
+.hero-q em{font-style:normal;color:var(--emerald);}
+.hero-sub{font-size:20px;line-height:1.6;color:rgba(234,246,241,.82);margin-top:12px;}
+
+/* 证据图例：常驻，不折叠 */
+.legend{flex:none;margin:20px 36px 0;display:flex;gap:12px;}
+.lg{flex:1;display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:18px;
+  background:var(--surface);border:1px solid var(--line);font-size:17px;color:var(--ink-2);}
+.lg b{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:16px;font-weight:700;}
+.lg[data-e="E1"] b{background:var(--teal-soft);color:var(--teal-d);}
+.lg[data-e="E2"] b{background:var(--slate-soft);color:var(--slate-d);}
+.lg[data-e="E3"] b{background:var(--wheat-soft);color:var(--wheat-d);}
+
+/* 主体 */
+.body{flex:1;min-height:0;margin:22px 36px 0;display:flex;flex-direction:column;gap:18px;overflow:hidden;}
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:26px 28px;}
+.sec.grow{flex:1;min-height:0;display:flex;flex-direction:column;}
+.sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;}
+.sec-n{font-size:17px;color:var(--teal-d);font-weight:700;letter-spacing:1px;}
+.sec-t{font-size:29px;font-weight:700;}
+.sec-hint{margin-left:auto;font-size:18px;color:var(--ink-3);}
+.scroll{flex:1;min-height:0;overflow-y:auto;}
+
+/* 钉住条目 */
+.pin{display:flex;gap:16px;padding:20px 0;border-top:1px solid var(--line);}
+.pin:first-child{border-top:0;padding-top:0;}
+.pin-e{flex:none;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:17px;font-weight:700;}
+.pin[data-e="E1"] .pin-e{background:var(--teal-soft);color:var(--teal-d);}
+.pin[data-e="E2"] .pin-e{background:var(--slate-soft);color:var(--slate-d);}
+.pin[data-e="E3"] .pin-e{background:var(--wheat-soft);color:var(--wheat-d);}
+.pin-tx{flex:1;min-width:0;}
+.pin-c{font-size:22px;line-height:1.62;}
+.pin-s{font-size:17px;color:var(--ink-3);margin-top:8px;}
+
+/* 成稿 */
+.draft{font-size:23px;line-height:1.78;white-space:pre-wrap;padding:22px 24px;border-radius:18px;
+  background:var(--paper);border:1px solid var(--line);}
+.blanks{margin-top:18px;padding:18px 22px;border-radius:18px;background:var(--wheat-soft);
+  border:1px solid #e6d8b4;}
+.blanks-t{font-size:20px;font-weight:700;color:var(--wheat-d);}
+.blanks-l{margin-top:10px;font-size:19px;line-height:1.7;color:var(--ink-2);}
+.based{margin-top:18px;}
+.based-t{font-size:19px;color:var(--ink-3);margin-bottom:10px;}
+.based-i{display:flex;gap:14px;padding:14px 0;border-top:1px dashed var(--line-2);font-size:19px;}
+.based-i:first-of-type{border-top:0;}
+.based-k{flex:none;width:200px;color:var(--ink-3);}
+.based-v{flex:1;min-width:0;color:var(--ink);}
+
+/* 比对逐条 */
+.cmp{display:flex;gap:16px;padding:20px 0;border-top:1px solid var(--line);}
+.cmp:first-child{border-top:0;padding-top:0;}
+.cmp-v{flex:none;width:104px;height:44px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:18px;font-weight:700;}
+.cmp[data-v="covered"] .cmp-v{background:var(--teal-soft);color:var(--teal-d);}
+.cmp[data-v="missing"] .cmp-v{background:var(--cinnabar-soft);color:var(--cinnabar);}
+.cmp[data-v="not_a_capability"] .cmp-v{background:var(--plum-soft);color:#6b4a77;}
+.cmp-tx{flex:1;min-width:0;}
+.cmp-r{font-size:22px;line-height:1.55;font-weight:600;}
+.cmp-e{font-size:19px;line-height:1.66;color:var(--ink-2);margin-top:8px;}
+.cmp[data-v="covered"] .cmp-e{padding-left:14px;border-left:3px solid var(--teal);color:var(--ink);}
+.extras{margin-top:18px;padding:18px 22px;border-radius:18px;background:var(--slate-soft);border:1px solid #d3ddef;}
+.extras-t{font-size:20px;font-weight:700;color:var(--slate-d);}
+.extras-l{margin-top:10px;font-size:19px;line-height:1.72;color:var(--ink-2);}
+
+/* 空态 */
+.state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:16px;padding:60px 40px;}
+.state-ic{width:120px;height:120px;border-radius:36px;display:flex;align-items:center;
+  justify-content:center;background:var(--teal-soft);}
+.state[data-tone="warn"] .state-ic{background:var(--wheat-soft);}
+.state-t{font-size:31px;font-weight:700;}
+.state-d{font-size:21px;line-height:1.72;color:var(--ink-2);max-width:660px;}
+
+/* CTA */
+.cta{flex:none;margin:0 36px;padding:22px 0 18px;display:flex;gap:16px;align-items:center;}
+.btn{height:96px;padding:0 40px;border-radius:26px;font-size:25px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:12px;}
+.btn[data-v="ghost"]{background:var(--surface);border:1px solid var(--line-2);color:var(--ink);}
+.btn[data-v="primary"]{background:var(--deep);color:#fff;flex:1;}
+.btn[aria-disabled="true"]{opacity:.45;}
+.cta-note{font-size:18px;color:var(--ink-3);line-height:1.6;}
+
+/* 底部导航 */
+.nav{flex:none;height:112px;display:flex;background:var(--surface);border-top:1px solid var(--line);}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  font-size:19px;color:var(--ink-3);}
+.nav button[aria-current="page"]{color:var(--teal-d);font-weight:700;}
+
+/* 状态可见性：由 JS 给不匹配的元素加 hidden，CSS 只做兜底。
+   不要用「[data-show]{display:none} + 各态 display:revert」那一套 ——
+   .sec.grow 之类的类选择器特异度更高会把它压掉，行内 style 更是直接盖死。
+   我第一版就是这么写的，结果 compare-report 态渲染出的是空态正文。 */
+[data-show][hidden]{display:none!important;}
+
+html[data-flat="1"] *{animation:none!important;transition:none!important;}
+
+/* 演示控制：非 debug 一律不存在 */
+#demo-tab,#demo-panel{display:none!important;}
+html.debug #demo-tab{display:flex!important;position:fixed;right:16px;bottom:16px;z-index:99;
+  height:56px;padding:0 20px;border-radius:28px;background:var(--deep);color:#fff;font-size:18px;
+  align-items:center;}
+html.debug #demo-panel[data-open="1"]{display:block!important;position:fixed;right:16px;bottom:84px;
+  z-index:99;background:#fff;border:1px solid var(--line-2);border-radius:20px;padding:14px;max-width:420px;}
+#demo-panel a{display:block;padding:8px 10px;font-size:16px;color:var(--ink);}
+</style>
+</head>
+<body>
+<main id="stage" data-screen="advisor-artifact" data-route="/ai/plan" data-state="no-artifact"
+      data-testid="advisor-artifact-main">
+
+  <header class="topbar">
+    <button class="back" data-route="/assistant" aria-label="返回问小青">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <span class="logo"><span class="logo-mark">职</span><span class="logo-name">职易达</span></span>
+    <span class="sp"></span>
+    <span class="pill" data-tone="unknown" data-testid="advisor-artifact-status">
+      <i></i><span data-show="no-artifact expired">没有可看的产物</span>
+      <span data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered">这一趟的产物已生成</span>
+      <span data-show="print-unavailable">打印能力读不到</span>
+    </span>
+  </header>
+
+  <section class="hero">
+    <span class="avatar">青</span>
+    <span class="hero-tx">
+      <span class="hero-kicker">ADVISOR OUTPUT</span>
+      <p class="hero-q serif">
+        <span data-show="no-artifact">这一趟<em>还没有</em>能带走的东西。</span>
+        <span data-show="qa-pins">你钉住的，我都<em>整理好了</em>。</span>
+        <span data-show="slot-draft slot-draft-blanks">拼成了一段<em>可以直接念</em>的话。</span>
+        <span data-show="compare-report compare-all-covered">逐条比过了：<em>有没有写到</em>。</span>
+        <span data-show="expired">这份产物<em>已经过期</em>了。</span>
+        <span data-show="print-unavailable">东西在，<em>但打印读不到</em>。</span>
+      </p>
+      <p class="hero-sub">
+        <span data-show="qa-pins">对话本身不保存，只有你钉住的条目留了下来。</span>
+        <span data-show="slot-draft">下面这段全部来自你自己说过的话，我只做了拼接。</span>
+        <span data-show="slot-draft-blanks">还有几处你没答，我留了空 —— 不替你编。</span>
+        <span data-show="compare-report compare-all-covered">只比「有没有写到」，不评价「写得好不好」。</span>
+        <span data-show="no-artifact">先去问小青，产出的东西会回到这一页。</span>
+        <span data-show="expired">公共终端按留存期清理，过期后不再展示正文。</span>
+        <span data-show="print-unavailable">正文仍可看，打印按钮先不放出来。</span>
+      </p>
+    </span>
+  </section>
+
+  <section class="legend" data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered"
+          >
+    <span class="lg" data-e="E1"><b>E1</b>你自己说过的原话</span>
+    <span class="lg" data-e="E2"><b>E2</b>本机已有的数据</span>
+    <span class="lg" data-e="E3"><b>E3</b>AI 的判断，仅供参考</span>
+  </section>
+
+  <div class="body">
+
+    <!-- 空态 / 过期 / 打印不可用 -->
+    <section class="sec grow state" data-tone="info" data-show="no-artifact"
+             data-testid="advisor-artifact-empty">
+      <span class="state-ic">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </span>
+      <p class="state-t">这一页只显示刚做出来的产物</p>
+      <p class="state-d">小青的问答、填槽、比对做完之后，结果会回到这一页，能看也能打印。
+        现在没有可显示的产物 —— 不会拿旧的或编的顶上。</p>
+    </section>
+
+    <section class="sec grow state" data-tone="warn" data-show="expired"
+             data-testid="advisor-artifact-expired">
+      <span class="state-ic">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#8a6219" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      </span>
+      <p class="state-t">产物已过留存期</p>
+      <p class="state-d">公共终端不长期保存个人材料。过期后正文不再展示，也无法再打印；
+        需要的话回去重做一次，很快。</p>
+    </section>
+
+    <section class="sec grow state" data-tone="warn" data-show="print-unavailable"
+             data-testid="advisor-artifact-print-unavailable">
+      <span class="state-ic">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#8a6219" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </span>
+      <p class="state-t">读不到打印能力，先不放打印按钮</p>
+      <p class="state-d">这台机器的打印状态暂时确认不了。产物正文还在，可以先看；
+        能力恢复后再打印，或者去问工作人员。</p>
+    </section>
+
+    <!-- 问答型：钉住条目单 -->
+    <section class="sec grow" data-show="qa-pins" data-testid="advisor-artifact-qa">
+      <div class="sec-h"><span class="sec-n">01</span><span class="sec-t">你钉住的条目</span>
+        <span class="sec-hint">共 4 条 · 对话未保存</span></div>
+      <div class="scroll">
+        <div class="pin" data-e="E1"><span class="pin-e">E1</span><span class="pin-tx">
+          <p class="pin-c">我做过两年社群运营，最多同时管 6 个群。</p>
+          <p class="pin-s">来源：你在第 2 轮说的原话</p></span></div>
+        <div class="pin" data-e="E2"><span class="pin-e">E2</span><span class="pin-tx">
+          <p class="pin-c">你在本机的简历里写了「用户增长」相关经历，可以在面试里直接引用。</p>
+          <p class="pin-s">来源：本机已有的简历诊断结果</p></span></div>
+        <div class="pin" data-e="E3"><span class="pin-e">E3</span><span class="pin-tx">
+          <p class="pin-c">被问到离职原因时，可以把重点放在「想做更靠近用户的岗位」。</p>
+          <p class="pin-s">AI 的建议，仅供参考 —— 说不说、怎么说由你定</p></span></div>
+        <div class="pin" data-e="E1"><span class="pin-e">E1</span><span class="pin-tx">
+          <p class="pin-c">我能接受青岛市内通勤，不接受长期出差。</p>
+          <p class="pin-s">来源：你在第 5 轮说的原话</p></span></div>
+      </div>
+    </section>
+
+    <!-- 填槽型：成稿 -->
+    <section class="sec grow" data-show="slot-draft slot-draft-blanks"
+             data-testid="advisor-artifact-slot">
+      <div class="sec-h"><span class="sec-n">01</span><span class="sec-t">拼出来的这段话</span>
+        <span class="sec-hint">全部来自你自己说过的话</span></div>
+      <div class="scroll">
+        <p class="draft">我做过两年社群运营，最多同时管 6 个群，日常处理入群审核、活动通知和答疑。
+去年负责的一次线下招聘会宣讲，从建群到活动结束一共来了 180 多人。
+我想换到更靠近用户的岗位，因为我更喜欢直接听到用户怎么说。</p>
+
+        <div class="blanks" data-show="slot-draft-blanks">
+          <p class="blanks-t">还有 2 处你没答，我留了空</p>
+          <p class="blanks-l">· 你最想让对方记住的一个结果<br>· 你为什么选这家公司</p>
+        </div>
+
+        <div class="based">
+          <p class="based-t">这段话依据的原话（打印时一并带出）</p>
+          <div class="based-i"><span class="based-k">现在做什么</span>
+            <span class="based-v">社群运营，两年，最多同时管 6 个群</span></div>
+          <div class="based-i"><span class="based-k">最拿得出手的结果</span>
+            <span class="based-v">线下招聘会宣讲来了 180 多人</span></div>
+          <div class="based-i"><span class="based-k">为什么想做这个岗位</span>
+            <span class="based-v">想更靠近用户，喜欢直接听用户怎么说</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 比对型：逐条判定 -->
+    <section class="sec grow" data-show="compare-report compare-all-covered"
+             data-testid="advisor-artifact-compare">
+      <div class="sec-h"><span class="sec-n">01</span><span class="sec-t">逐条比对</span>
+        <span class="sec-hint" data-show="compare-report">5 条要求 · 2 条没写到</span>
+        <span class="sec-hint" data-show="compare-all-covered">5 条要求 · 都写到了</span></div>
+      <div class="scroll">
+        <div class="cmp" data-v="covered"><span class="cmp-v">写到了</span><span class="cmp-tx">
+          <p class="cmp-r">两年以上社群或用户运营经验</p>
+          <p class="cmp-e">「我做过两年社群运营，最多同时管 6 个群」</p></span></div>
+        <div class="cmp" data-v="covered"><span class="cmp-v">写到了</span><span class="cmp-tx">
+          <p class="cmp-r">有线下活动组织经验</p>
+          <p class="cmp-e">「线下招聘会宣讲，从建群到活动结束一共来了 180 多人」</p></span></div>
+        <div class="cmp" data-v="missing" data-show="compare-report"><span class="cmp-v">没写到</span><span class="cmp-tx">
+          <p class="cmp-r">熟练使用数据分析工具（如 Excel / SQL）</p>
+          <p class="cmp-e">材料里没有出现相关表述。要是你会，补一句写清「用什么工具、做到什么程度」。</p></span></div>
+        <div class="cmp" data-v="missing" data-show="compare-report"><span class="cmp-v">没写到</span><span class="cmp-tx">
+          <p class="cmp-r">有内容撰写或短视频经验</p>
+          <p class="cmp-e">材料里没有出现相关表述。</p></span></div>
+        <div class="cmp" data-v="covered" data-show="compare-all-covered"><span class="cmp-v">写到了</span><span class="cmp-tx">
+          <p class="cmp-r">熟练使用数据分析工具（如 Excel / SQL）</p>
+          <p class="cmp-e">「日常用 Excel 做群活跃度周报」</p></span></div>
+        <div class="cmp" data-v="not_a_capability"><span class="cmp-v">不是能力项</span><span class="cmp-tx">
+          <p class="cmp-r">本科及以上学历</p>
+          <p class="cmp-e">这是硬性条件，不是能写进材料的能力，本机不做判定。</p></span></div>
+
+        <div class="extras">
+          <p class="extras-t">你材料里有、岗位正文没提的</p>
+          <p class="extras-l">· 有基础的平面设计能力（岗位没提，面试时可以主动说）</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="cta">
+    <button class="btn" data-v="ghost" data-route="/assistant" data-testid="advisor-artifact-cta-back">
+      <span data-show="no-artifact">去问小青</span>
+      <span data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered expired print-unavailable">再问一轮</span>
+    </button>
+    <button class="btn" data-v="primary"
+            data-show="qa-pins slot-draft slot-draft-blanks compare-report compare-all-covered"
+            data-testid="advisor-artifact-cta-print">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      打印带走
+    </button>
+    <button class="btn" data-v="primary" data-route="/me/ai-records" data-show="no-artifact"
+            data-testid="advisor-artifact-cta-records">看我的 AI 服务记录</button>
+    <span class="cta-note" data-show="print-unavailable">
+      打印能力读不到，按钮先不放出来 —— 不做点了没反应的按钮。</span>
+  </div>
+
+  <nav class="nav">
+    <button data-route="/" data-testid="advisor-artifact-nav-home">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>首页</button>
+    <button data-route="/assistant" aria-current="page" data-testid="advisor-artifact-nav-advisor">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.4L20 10l-5.8 1.6L12 17l-2.2-5.4L4 10l5.8-1.6z"/></svg>问小青</button>
+    <button data-route="/profile" data-testid="advisor-artifact-nav-profile">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>我的</button>
+  </nav>
+</main>
+
+<button id="demo-tab" hidden inert aria-hidden="true">原型演示控制</button>
+<div id="demo-panel" hidden inert aria-hidden="true"></div>
+
+<script>
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);
+  document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
+fit();addEventListener('resize',fit);
+
+var q=new URLSearchParams(location.search);
+if(q.get('flat')==='1')document.documentElement.setAttribute('data-flat','1');
+
+var STATES=['no-artifact','qa-pins','slot-draft','slot-draft-blanks','compare-report',
+            'compare-all-covered','print-unavailable','expired'];
+/* 夹具门：带内容的态必须同时带 capture=1 或 debug=1，否则 fail-closed 回空态。
+   理由与其余 20 页一致：静态稿没有会话上下文，裸 ?state= 直接展示正文
+   会让人误以为「这一页自己有数据」。 */
+var FIXTURE = q.get('capture')==='1' || q.get('debug')==='1';
+var NON_FIXTURE={'no-artifact':1};
+var want=q.get('state')||'no-artifact';
+var state=(STATES.indexOf(want)>=0 && (FIXTURE||NON_FIXTURE[want])) ? want : 'no-artifact';
+document.getElementById('stage').setAttribute('data-state',state);
+
+/* 按 data-show 白名单决定可见性。data-show 缺省 = 所有态都显示。 */
+(function applyStateVisibility(){
+  var nodes=document.querySelectorAll('[data-show]');
+  for(var i=0;i<nodes.length;i++){
+    var list=nodes[i].getAttribute('data-show').split(/\s+/);
+    nodes[i].hidden = list.indexOf(state)<0;
+  }
+})();
+
+/* 原型演示控制闸门：只影响演示控制自身，不读写任何业务状态。 */
+(function protoControlGate(){
+  var tab=document.getElementById('demo-tab'),panel=document.getElementById('demo-panel');
+  if(!tab||!panel||q.get('debug')!=='1')return;
+  document.documentElement.classList.add('debug');
+  [tab,panel].forEach(function(el){el.hidden=false;el.removeAttribute('inert');el.removeAttribute('aria-hidden');});
+  panel.innerHTML=STATES.map(function(s){
+    var p=new URLSearchParams(location.search);p.set('state',s);p.set('debug','1');
+    return '<a href="?'+p.toString()+'">'+s+'</a>';
+  }).join('');
+  tab.addEventListener('click',function(){
+    panel.setAttribute('data-open', panel.getAttribute('data-open')==='1'?'0':'1');
+  });
+})();
+</script>
+</body>
+</html>

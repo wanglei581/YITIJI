@@ -185,11 +185,13 @@ const screens = new Map([
   ['src/pages/interview/InterviewReportPage.tsx', 'interview-report'],
   ['src/pages/interview/InterviewTipsPage.tsx', 'interview-tips'],
   ['src/pages/interview/InterviewReportsPage.tsx', 'interview-reports'],
+  ['src/pages/ai-plan/AiPlanPage.tsx', 'advisor-artifact'],
 ])
 const qxScreens = new Set([
   'src/pages/resume/ResumeReportPage.tsx',
   'src/pages/resume/ResumeGeneratePreviewPage.tsx',
   'src/pages/resume/ResumeOptimizePage.tsx',
+  'src/pages/ai-plan/AiPlanPage.tsx',
 ])
 for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
@@ -264,6 +266,14 @@ includes('src/pages/resume/ResumeOptimizePage.tsx', 'setExported(null)', 'conten
 includes('src/layouts/KioskRoot.tsx', "'/resume/optimize'", 'optimize route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/resume/optimize/compare'", 'optimize compare route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/resume/generate/preview'", 'generate preview route is registered as Qingxu-migrated')
+includes('src/layouts/KioskRoot.tsx', "'/ai/plan'", 'advisor artifact route is registered as Qingxu-migrated')
+check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('KioskPageFrame'), 'ai-plan has left the V6 frame')
+check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('DEFAULT_PLAN'), 'ai-plan no longer ships a hardcoded plan')
+check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('prototype-v1.css'), 'ai-plan has left prototype-v1')
+includes('src/pages/assistant/AssistantSessionSummaryBar.tsx', 'navigate(`/ai/plan?', 'saving session highlights navigates to the advisor artifact page')
+includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', 'data-testid="advisor-artifact-quote"', 'covered evidence is rendered as a quotation landmark')
+includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', '<blockquote className="aa-quote"', 'covered evidence uses a blockquote, not an AI voice')
+includes('src/pages/ai-plan/AiPlanPage.tsx', 'printAdvisorArtifact', 'artifact page prints through the existing print endpoint')
 check(!existsSync(join(ROOT, 'src/pages/resume/ResumeExportPage.tsx')), 'AI-07 ResumeExportPage is deleted')
 includes('src/routes/index.tsx', 'path: \'resume/export\'', 'AI-07 keeps /resume/export as a compatibility route')
 includes('src/routes/index.tsx', '<Navigate to="/resume/optimize" replace />', 'AI-07 /resume/export redirects to real optimize export')
@@ -293,7 +303,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow)\\.spec\\.ts$/', 'W3 browser config collects W3 and the sensitive self-assessment preview scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
-  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
