@@ -51,6 +51,32 @@ export class AdminBillingService {
     }
   }
 
+  /** 打印两档互为对侧：设其中一档为 0 时，把另一档的现价一起说出来。 */
+  private static readonly PRINT_PRICE_SIBLING: Readonly<Record<string, string>> = {
+    print_bw_page: 'print_color_page',
+    print_color_page: 'print_bw_page',
+  }
+
+  /**
+   * 0 元确认提示。默认只说「会跳过收银」；如果这是打印两档之一、而对侧仍在收费，
+   * 额外把对侧价格和可预见的后果说清楚 —— 用户会一直选免费那一档。
+   */
+  private async zeroPriceMessage(serviceKey: string): Promise<string> {
+    const base = '设置 0 元会跳过收银，需明确确认'
+    const siblingKey = AdminBillingService.PRINT_PRICE_SIBLING[serviceKey]
+    if (!siblingKey) return base
+    const sibling = await this.prisma.priceConfig.findUnique({ where: { serviceKey: siblingKey } })
+    if (!sibling || !sibling.active || sibling.unitCents <= 0) return base
+    const yuan = (sibling.unitCents / 100).toFixed(2)
+    const thisLabel = serviceKey === 'print_color_page' ? '彩色' : '黑白'
+    const siblingLabel = serviceKey === 'print_color_page' ? '黑白' : '彩色'
+    return (
+      `${base}。注意：${siblingLabel}打印当前仍按 ${yuan} 元/页收费，`
+      + `把${thisLabel}设为 0 后用户只要选${thisLabel}就免单，${siblingLabel}这档实际收不到钱。`
+      + '若确为免费试运营，应当两档一起设 0；若只想暂不开放这一档，应当停用它而不是标价 0。'
+    )
+  }
+
   /** 改价/启停（唯一合法改价路径）：old/new 快照进审计，空 patch / 无实际变化拒绝。 */
   async updatePriceConfig(
     serviceKey: string,
@@ -74,7 +100,17 @@ export class AdminBillingService {
       (next.description ?? null) !== (existing.description ?? null)
     if (!changed) throw new BadRequestException('PRICE_PATCH_NO_CHANGE')
     if (next.unitCents === 0 && patch.confirmZeroPrice !== true) {
-      throw new BadRequestException({ error: { code: 'ZERO_PRICE_CONFIRMATION_REQUIRED', message: '设置 0 元会跳过收银，需明确确认' } })
+      // 单项确认看不见**组合后果**：把彩色设成 0 而黑白仍收费时，用户只要选彩色就免单，
+      // 而彩色的耗材成本更高 —— 于是「收便宜的、送贵的」。
+      // 2026-09-08 生产实测就是这个状态（黑白 50 分 / 彩色 0 分，且描述是人为配的），
+      // 说明当时确认的人只看到了「这一项会跳过收银」，没看到「另一项还在收费」。
+      // 所以提示语要把对侧价格一起说出来，让确认的人知道自己在确认什么。
+      throw new BadRequestException({
+        error: {
+          code: 'ZERO_PRICE_CONFIRMATION_REQUIRED',
+          message: await this.zeroPriceMessage(serviceKey),
+        },
+      })
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {

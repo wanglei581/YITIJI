@@ -1,0 +1,31 @@
+/* pages/kiosk-send/kiosk-send.wxss
+   类名与 kiosk-login 对齐，避免同一条动线上两页观感割裂。 */
+.page-wrap { min-height: 100vh; background: #f5f7fa; }
+
+.navbar { display: flex; align-items: center; height: 88rpx; padding: 0 24rpx; background: #fff; }
+.nav-back { width: 96rpx; height: 96rpx; display: flex; align-items: center; justify-content: center; }
+.nav-back .ficon { transform: rotate(180deg); font-size: 36rpx; color: #1f2937; }
+.nav-title { flex: 1; text-align: center; font-size: 34rpx; font-weight: 600; color: #1f2937; padding-right: 96rpx; }
+
+.content { padding: 32rpx 32rpx 64rpx; }
+
+.guide-card, .state-card {
+  background: #fff; border-radius: 24rpx; padding: 56rpx 40rpx;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.guide-icon, .sc-icon { font-size: 88rpx; color: #1677ff; margin-bottom: 24rpx; }
+.guide-title, .sc-title { font-size: 36rpx; font-weight: 600; color: #1f2937; margin-bottom: 16rpx; }
+.guide-desc, .sc-desc { font-size: 28rpx; color: #6b7280; line-height: 1.6; margin-bottom: 40rpx; }
+
+.sent-list { width: 100%; margin-bottom: 32rpx; }
+.sent-item {
+  font-size: 26rpx; color: #4b5563; padding: 16rpx 24rpx; background: #f3f4f6;
+  border-radius: 12rpx; margin-bottom: 12rpx; word-break: break-all;
+}
+
+.btn-primary, .btn-secondary {
+  width: 100%; min-height: 96rpx; line-height: 96rpx;
+  border-radius: 48rpx; font-size: 32rpx; border: none;
+}
+.btn-primary { background: #1677ff; color: #fff; }
+.btn-secondary { background: #eef2ff; color: #1677ff; }

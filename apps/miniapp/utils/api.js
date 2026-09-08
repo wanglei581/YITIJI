@@ -529,6 +529,68 @@ const api = {
    * @param {string} filePath 本地临时路径
    * @param {string} [displayName] 期望服务端落库的文件名；见 utils/upload-name.js
    */
+  /**
+   * 把文件传进**一体机的上传会话**（扫一体机屏幕上的码进来的那条路）。
+   *
+   * 与 uploadPrintFile / uploadResumeFile 是两条不同的链路，别混用：
+   *   - 那两个走 /files/kiosk-upload，落的是**本人文件库**，回 fileId；
+   *   - 这个走 /upload-sessions/:id/files，落的是**某台终端的这次会话**，
+   *     一体机侧已经在轮询 GET /upload-sessions/:sessionId，传完它自己就看见了。
+   *
+   * `needAuth: false` 是照服务端契约来的，不是漏写：该端点只认 body 里的
+   * uploadToken（会话创建时随二维码一起下发），不要求会员登录 —— 与一体机现有的
+   * H5 手机上传页口径一致。站在机器前把文件递进去这件事，不应该先逼人注册。
+   *
+   * @param {string} sessionId 扫码得到的会话 id
+   * @param {string} uploadToken 扫码得到的上传令牌（只进 body，不进 URL）
+   * @param {string} filePath 本地临时路径
+   * @param {string} [displayName] 期望服务端落库的文件名；见 utils/upload-name.js
+   */
+  /**
+   * 兑换一体机扫码上传的**小程序场景码**。
+   *
+   * 微信 getwxacodeunlimit 的 scene 上限 32 个可见字符，装不下 sessionId(32位hex)
+   * + uploadToken(43字符)，所以码里只带一个短的不透明凭据，由服务端换回会话。
+   * 也不能直接拿 sessionId 当 scene —— 它今天会出现在日志和监控里，一旦同时是上传
+   * 凭据，那些历史日志会**追溯性地**变成凭据泄露。（契约见
+   * docs/api/upload-scene-miniapp-contract.md）
+   *
+   * 三条调用方必须知道的行为：
+   *   1. **一次性**：服务端用 Redis GETDEL 原子消费，第二次兑换必失败。
+   *      所以不要重试，也不要在 onShow 里重复兑换。
+   *   2. **兑换会轮换 uploadToken**：同一会话的旧网页二维码当场作废。
+   *   3. **失败一律 UPLOAD_SCENE_UNUSABLE**：格式错 / 查无此码 / 已过期 / 已用掉
+   *      都是同一个码。**不要按原因分支** —— 区分原因对用户没价值（补救动作都是
+   *      「回一体机重新生成」），对探测者却是一台预言机。
+   *
+   * 不返回 controlToken：那是一体机侧的凭据，手机端不该拿到。
+   *
+   * @param {string} scene 微信下发的 scene（已 decodeURIComponent）
+   * @returns {Promise<{sessionId,purpose,mode,expiresAt,uploadToken}>}
+   */
+  resolveUploadScene(scene) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('扫码上传'));
+    return request('/upload-sessions/scene/resolve', {
+      method: 'POST',
+      data: { scene },
+      needAuth: false, // 手机端此刻还没有本系统身份，scene 本身就是凭据
+    });
+  },
+
+  uploadToKioskSession(sessionId, uploadToken, filePath, displayName) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('传文件到一体机'));
+    return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>
+      uploadFile(`/upload-sessions/${encodeURIComponent(sessionId)}/files`, prepared.filePath, {
+        name: 'file',
+        formData: { uploadToken },
+        needAuth: false,
+      }).then(
+        (res) => { prepared.cleanup(); return res; },
+        (err) => { prepared.cleanup(); throw err; }
+      )
+    );
+  },
+
   uploadPrintFile(filePath, displayName) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印文件上传'));
     return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>

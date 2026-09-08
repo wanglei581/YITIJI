@@ -39,6 +39,14 @@ Page({
       .catch((err) => this.setData({ loading: false, loadError: (err && err.message) || '加载失败' }))
   },
 
+  /** 「当前筛选筛空」时的唯一有效动作：回到全部。索引 0 即「全部」。 */
+  showAllFairs() {
+    this.setData({
+      activeFilter: 0,
+      filteredFairs: this._filterFairs(this.data.fairs, 0),
+    })
+  },
+
   _filterFairs(list, index) {
     if (index === 1) return list.filter((item) => item.live === true || item.tag === '进行中')
     if (index === 2) return list.filter((item) => item.tag === '即将开始')
