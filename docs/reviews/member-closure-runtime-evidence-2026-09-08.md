@@ -185,3 +185,58 @@ action 规则打在 [external_open, interview_scheduled] → 判 FAIL ✔
 
 招聘会资料打印进我的文档 + 打印订单（需打印链路）、政策材料打印（需真实材料源，当前 info-only）、
 政策类的收藏与记录（本地 `PolicyPost` 0 行，seed 未覆盖）。
+
+## 附三：§4.5「AI / 外部服务」失败诚实性本地取证（2026-09-08）
+
+脚本 `apps/kiosk/scripts/probe-ai-failure-honesty-45.mjs`。
+
+清单 4.5 每条都有两半：「真实调用成功」和「失败时诚实」。前一半需要真 LLM / OCR 密钥，本地做不到；
+**后一半本地做得到，而且它才是安全关键的那一半 —— 调用成功了用户自己看得见，伪造成功了没有人看得见。**
+
+### 必须跑两种配置才算数
+
+| 配置 | 三条「失败诚实」断言的期望 |
+|---|---|
+| A：`AI_PROVIDER=openai` + 假密钥（provider 必失败） | **必须 PASS** |
+| B：`AI_PROVIDER=mock`（provider 可用） | **必须 FAIL** |
+
+B 是阳性对照。**只跑 A 的话，一条恒真断言也会全绿。**
+
+实测：
+
+```
+配置 A（注入失败）
+  PASS  LLM 失败诚实报错        status=501 code=Not Implemented
+  PASS  失败不写假结果          AI 结果行 5→5（新增 0），AI 产出文件 2→2（新增 0）
+  PASS  服务日志如实记失败       parseResume/failed/NotImplementedException
+  PASS  语音能力如实上报         asrEnabled=false ttsEnabled=false
+  PASS  语音关闭不阻断文字路径    创建会话 status=400（不是 404/501）
+
+配置 B（阳性对照，provider 可用）
+  FAIL  LLM 失败诚实报错        status=201          ← 调用成功了，断言正确地转红
+  FAIL  失败不写假结果          AI 结果行 5→6      ← 真写了结果行
+  FAIL  服务日志如实记失败       parseResume/success ← 日志记的是成功
+  PASS  语音能力如实上报         （与 provider 无关，仍应 PASS）
+  PASS  语音关闭不阻断文字路径    （同上）
+```
+
+**三条断言在两种配置下给出相反结论 —— 这就是它们能分辨真假的证明。**
+
+### 写这个探针时踩的三个坑，全都指向「假 PASS」
+
+| 坑 | 为什么危险 |
+|---|---|
+| 请求体不合法，被 DTO 挡在 LLM 之前 | 返回 `400 VALIDATION_FAILED`，我的「有错误码就算诚实」判据**照样 PASS** —— 测到的根本不是 LLM 失败。已收紧为「错误码不得是 `VALIDATION_FAILED`」。 |
+| 按 `status='success'` 过滤 AI 结果行 | 该表 status 词表里**只有 `completed`**，没有 `success`。这条过滤永远返回 0，断言恒真。 |
+| 用 `createdAt > datetime('now','-2 minutes')` 过滤 | `createdAt` 存 ISO（`2026-09-08T10:51:41.250+00:00`），`datetime('now')` 出 `2026-09-08 12:36:44`。字符串比较里 `'T'(0x54) > ' '(0x20)`，于是**每一行都命中**，时间过滤等于没写。 |
+
+后两个坑**都朝同一个方向出错 —— 让断言更容易 PASS**。改用「前后计数差」之后不依赖任何格式假设。
+另外第一版把探针自己上传的原件也算成了「伪造结果」，改为只数 `createdBy LIKE 'ai_%'` 的 AI 流水线产出。
+
+**SQL 里的字符串比较与枚举值假设，是断言恒真的高发区。** 写完先问一句：
+这条 `WHERE` 在什么情况下会命中？答不上来就先去数一遍。
+
+### §4.5 本地证不了的部分
+
+「LLM 真实调用成功」「OCR 图片 / 扫描 PDF 成功、低置信度提示复核」「ASR/TTS 在支持环境可用」
+—— 三条的「成功半边」都需要真实密钥与真实环境，本地一律不记。

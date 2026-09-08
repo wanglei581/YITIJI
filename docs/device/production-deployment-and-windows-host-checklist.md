@@ -568,7 +568,11 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 - [ ] LLM 真实调用成功，失败时有诚实错误提示。
 - [ ] OCR 图片/扫描 PDF 成功，低置信度提示复核。
 - [ ] ASR/TTS 在支持环境可用；失败时文字兜底可用。
-- [ ] 外部服务失败不伪造成功、不写入假结果。
+- [ ] 外部服务失败不伪造成功、不写入假结果。 —— 生产待验；**本地 PASS，且做了双配置对照**
+  脚本 `apps/kiosk/scripts/probe-ai-failure-honesty-45.mjs`。注入 provider 失败后：
+  接口 501 诚实报错、`AiResumeResult` 与 AI 产出文件均**零新增**、`AiServiceLog` 记 `parseResume/failed`。
+  **阳性对照**：换回可用 provider 后同样三条断言全部转红（201 / 结果行 +1 / 日志记 success）——
+  **两种配置给出相反结论，才证明它们分辨得了真假**。只跑失败态的话，一条恒真断言也会全绿。
 
 ---
 
