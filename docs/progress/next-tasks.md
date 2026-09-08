@@ -1,5 +1,43 @@
 # 下一步任务
 
+## 2026-09-08 两条描述订正（照旧描述派活会重造轮子）
+
+### JobApplication：**只缺前端两端**，后端已就绪
+
+文档里此前写「`JobApplication` 两端接入」，容易被读成「前后端都要做」。对 `origin/main` 复验：
+
+```
+services/api/src/job-applications/     6 个文件齐全
+controller.ts:27  @Controller('me/job-applications')
+           :33 @Get   :46 @Post   :55 @Patch(':id')   :65 @Delete(':id')
+app.module.ts:113  JobApplicationsModule 已挂
+git grep "job-applications|jobApplication" -- apps/kiosk/src apps/miniapp  → 零命中
+```
+
+正确描述：**JobApplication 前端两端接入**（后端已就绪，直接对接
+`/me/job-applications` 的 list / create / update / remove，**不要重造后端**）。
+
+配套件别漏：它已接进 `member-privacy/member-data-export.mapper.ts` —— 用户导出个人数据
+能带走本人自填的求职进度，是 [compliance-boundary.md §4.4A](../compliance/compliance-boundary.md) 的配套。
+
+### `factsConfirmedAt`：不是「暂缺」，是**已存在但客户端说了算**
+
+原描述「服务端签发 `factsConfirmedAt` 未做」没错，但漏了它当前的真实状态。复验：
+
+- `ai.controller.ts:467` 先 `delete` 简历对象上的该字段，`:469` 把 **DTO 传入的**
+  `dto.factsConfirmedAt` 一路传到 `ai.service.ts:755/856`。
+- `resume-draft.store.ts:229 assertFactsConfirmed` 的唯一判据是
+  `parseFactsConfirmedAt(input.factsConfirmedAt)`，而它只校验「能解析成时间且落在
+  `[now-24h, now+60s]`」（`:304-312`）。服务端全程只搬运、**不签发、不比对任何服务端记录**。
+
+所以这道闸是 **deterrent-grade，不是 evidence-grade**：客户端忘了做确认步骤会拿到 400
+（有用），但想跳过只需送一个 `new Date().toISOString()`。**不要在任何验收或争议场景里
+把它当作「用户已核对事实」的证据。**
+
+要变成真闸，方向是让 `assertFactsConfirmed` 去查服务端已有的确认记录
+（`persistConfirmed` 写的 `optimize_confirmed` 行），而不是信 DTO —— 需先确认两者的调用先后。
+
+
 ## 2026-09-08 内容冷启动：只能由产品负责人本人做的事
 
 小程序「求职」Tab 背后三个库线上全是 0 条（`https://zyidai.cn/api/v1/` 实测：
