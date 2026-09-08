@@ -214,7 +214,6 @@ export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
   '/fairs-service',
   '/interview-service',
   '/policy-service',
-  '/profile',
 ])
 
 const actualPatterns = w6RouteCases.map(({ pattern }) => pattern)
