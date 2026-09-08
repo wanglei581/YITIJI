@@ -150,7 +150,7 @@
 .qx-me-summary-ico[data-tone='slate'] { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .qx-me-banner-main,
 .qx-me-summary-main { flex: 1; min-width: 0; }
-.qx-me-banner-t { display: block; font-size: 28px; font-weight: 800; line-height: 1.28; }
+.qx-me-banner-t { display: block; margin: 0; font-size: 28px; font-weight: 800; line-height: 1.28; }
 .qx-me-banner-p { display: block; margin-top: 7px; font-size: 19px; line-height: 1.5; color: var(--qx-ink-3); }
 .qx-me-banner-p b { color: var(--qx-ink-2); }
 .qx-me-summary-main b { display: block; font-size: 19px; color: var(--qx-ink-3); font-weight: 700; }

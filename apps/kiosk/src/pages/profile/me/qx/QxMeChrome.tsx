@@ -150,7 +150,7 @@ export function QxMeBanner({
     <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind={tone}>
       <span className="qx-me-banner-ico" data-tone={tone} aria-hidden="true"><Icon size={34} /></span>
       <span className="qx-me-banner-main">
-        <span className="qx-me-banner-t">{title}</span>
+        <h2 className="qx-me-banner-t">{title}</h2>
         <span className="qx-me-banner-p">{desc}</span>
       </span>
       {minis && minis.length > 0 ? (

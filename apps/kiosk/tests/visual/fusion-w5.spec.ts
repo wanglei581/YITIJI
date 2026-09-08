@@ -295,7 +295,7 @@ test('resumes expose authenticated API error and recovered empty states through 
   })
 
   await loginThroughVisibleUi(page, '/me/resumes')
-  await expect(page.getByText('简历记录这次没有加载出来')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '简历记录这次没有加载出来' })).toBeVisible()
   api.respond('GET', '/api/v1/me/resumes', {
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
