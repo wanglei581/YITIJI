@@ -116,7 +116,7 @@ function seedJobs(api: ApiRouter): void {
     salaryUnit: 'monthly' as const,
   })
   const data = [
-    job('job-001', '前端开发工程师', '青岛某某科技有限公司'),
+    job('job-001', '前端工程师', '青岛某某科技有限公司'),
     job('job-002', '人力资源专员', '某某人力资源服务有限公司'),
     job('job-003', '数控机床操作工', '某某智能制造股份有限公司'),
   ]
@@ -199,8 +199,8 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
 
     await fullTime.click()
     await page.waitForURL((u) => u.pathname === '/jobs', { timeout: 10000 })
-    const first = page.getByText('前端开发工程师').first()
-    await expect(first, '全职列表必须出现夹具岗位「前端开发工程师」').toBeVisible({ timeout: 15000 })
+    const first = page.getByText('前端工程师').first()
+    await expect(first, '全职列表必须出现夹具岗位「前端工程师」').toBeVisible({ timeout: 15000 })
     await step(page, s, 'jobs-list')
 
     // 进详情必须点「查看岗位」：青序流光迁移（#941）后列表卡片 <article className="jf-row">
@@ -208,7 +208,7 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     // 所以这处失效一直没人看见（见同批 PR 补的 verify:kiosk-browser-spec-coverage）。
     await page.getByRole('button', { name: '查看岗位' }).first().click()
     await page.waitForURL((u) => /\/jobs\/job-001$/.test(u.pathname), { timeout: 10000 })
-    await expect(page.getByRole('heading', { name: '前端开发工程师' })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('heading', { name: '前端工程师' })).toBeVisible({ timeout: 10000 })
     await step(page, s, 'job-detail')
 
     const body = (await page.locator('body').innerText()).replace(/\s+/g, ' ')

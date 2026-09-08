@@ -87,7 +87,7 @@ function seedJobs(api: ApiRouter): void {
     salaryUnit: 'monthly' as const,
   })
   const data = [
-    job('job-001', '前端开发工程师', '青岛某某科技有限公司'),
+    job('job-001', '前端工程师', '青岛某某科技有限公司'),
     job('job-002', '人力资源专员', '某某人力资源服务有限公司'),
     job('job-003', '数控机床操作工', '某某智能制造股份有限公司'),
   ]
@@ -256,7 +256,7 @@ test.describe('真人走查（模拟数据）', () => {
       console.log(`\n  岗位详情含来源机构：${body.includes('青岛市公共就业服务中心')}`)
       console.log(`  岗位详情含外部ID：${/EXT-job-001/.test(body)}`)
     } else {
-      console.log('\n  ⚠ 列表里没找到「前端开发工程师」，岗位入口的数据形状与夹具不符')
+      console.log('\n  ⚠ 列表里没找到「前端工程师」，岗位入口的数据形状与夹具不符')
     }
     console.log(`\n  旅程 C 终点：${new URL(page.url()).pathname}`)
   })
@@ -468,10 +468,14 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForURL((u) => /\/jobs\/job-001$/.test(u.pathname), { timeout: 10_000 })
     // 只钉「进到了这条岗位的详情」。详情页版式与来源四要素由旅程 C 负责，
     // 这里再钉标题的角色/层级只会在详情页改版时假红。
-    // 钉「详情页真的渲染出来了」，不钉标题文字。
-    // W6 夹具里 job-001 的**列表标题是「前端开发工程师」、详情标题是「前端工程师」**
-    // （2026-09-08 实测），钉标题会红在一个与键盘可达性无关的夹具不一致上。
     // 「进的是不是这一条」由上面的 URL 断言保证。
+    //
+    // 订正（2026-09-09）：上一版注释写的是「W6 夹具里 job-001 列表标题是
+    // 『前端开发工程师』、详情标题是『前端工程师』」——**位置说错了**。
+    // fusion-w6-api.ts:2 是 `import { registerW4Api }`，W6 整个复用 W4，
+    // 列表和详情是同一个字符串，内部不存在不一致。真正的两套标题是
+    // 本文件与 job-fair-policy-journey.spec.ts 的局部夹具（'前端开发工程师'）
+    // 对上共享的 fusion-w4-api.ts（'前端工程师'）。本次已统一为后者。
     await expect(page.locator('body')).toContainText('岗位详情', { timeout: 10_000 })
 
     // SPA 内后退，不用整页 goto（理由同上）
