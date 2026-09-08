@@ -135,8 +135,13 @@ async function loginThroughVisibleUi(page: Page, returnTo = '/interview/reports'
   }
   await page.getByRole('button', { name: '验证并登录', exact: true }).click()
   await page.waitForURL((url) => {
-    if (returnTo === '/interview/reports' || returnTo.startsWith('/interview')) {
-      return url.pathname === '/interview' || url.pathname === returnTo
+    // 面试五页合并成一张工作台后，/interview/<stage> 会 Navigate 到 /interview?stage=<stage>
+    // （routes/index.tsx 的兼容重定向）。这里必须连 stage 一起钉：只认「落在 /interview」
+    // 的话，「登录后被丢回设置页」也会算通过，而本 helper 存在的全部意义就是
+    // 「登录后回到原来那一步」。
+    const merged = /^\/interview\/(.+)$/.exec(returnTo)
+    if (merged) {
+      return url.pathname === '/interview' && url.searchParams.get('stage') === merged[1]
     }
     return url.pathname === returnTo
   })

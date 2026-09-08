@@ -114,7 +114,7 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
           <Card className="interview-card interview-reports__guest flex flex-col items-center gap-4 p-10 text-center">
             <FileSearchIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
             <div>
-              <p className="text-base font-semibold text-neutral-900">登录后可保存面试报告</p>
+              <p className="text-base font-semibold text-neutral-900">登录后可保存练习报告</p>
               <p className="mt-1 text-sm text-neutral-500">
                 游客模式的练习报告短期有效（约 2 小时）；登录后报告保存 7 天，可随时回看与打印
               </p>
