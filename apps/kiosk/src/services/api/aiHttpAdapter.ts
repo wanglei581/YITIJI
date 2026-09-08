@@ -326,7 +326,8 @@ export const aiHttpAdapter = {
         ...(templateId ? { templateId } : {}),
         ...(draft ? { draft: true } : {}),
         ...(charge?.benefitGrantId ? { benefitGrantId: charge.benefitGrantId } : {}),
-        // factsConfirmedAt 不能放进本 body：全局 forbidNonWhitelisted，DTO 尚无该字段（包 H）。
+        // DTO 已收该字段，登录会员必发，否则 400。
+        ...(charge?.factsConfirmedAt ? { factsConfirmedAt: charge.factsConfirmedAt } : {}),
       },
       token,
     )

@@ -1,4 +1,7 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 function read(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
@@ -301,6 +304,13 @@ assertIncludes(httpAdapter, 'format?: ResumeExportFormat', 'http adapter accepts
 assertIncludes(httpAdapter, 'layout?: ResumeLayoutSettings', 'http adapter accepts optional layout')
 assertIncludes(httpAdapter, 'format ?? ', 'http adapter defaults export format to pdf when omitted')
 assertIncludes(httpAdapter, '...(layout ? { layout } : {})', 'http adapter sends layout only when provided')
+assertIncludes(
+  httpAdapter,
+  '...(charge?.factsConfirmedAt ? { factsConfirmedAt: charge.factsConfirmedAt } : {})',
+  'http adapter forwards factsConfirmedAt on generate/export',
+)
+assertIncludes(httpAdapter, 'DTO 已收该字段，登录会员必发，否则 400', 'http adapter documents that members must send factsConfirmedAt')
+assertNotIncludes(httpAdapter, 'DTO 尚无该字段', 'http adapter no longer omits factsConfirmedAt for the old DTO whitelist')
 
 // ── Wave1 wrapper-consistency fix:导出格式必须走统一 API wrapper,不直连 adapter ──
 const aiWrapper = read('src/services/api/ai.ts')
@@ -430,6 +440,12 @@ for (const stateName of ['no-context', 'loading', 'ready', 'empty', 'read-error'
 }
 for (const stateName of ['preview-no-result', 'preview-loading', 'preview-failed', 'preview-ready', 'preview-hints', 'preview-editing', 'export-chooser', 'export-exporting', 'export-failed', 'export-ready', 'export-url-expired', 'export-print-unavailable', 'session-lost', 'illegal']) {
   assertIncludes(generatePreview, `'${stateName}'`, `generate preview view state ${stateName} is registered`)
+}
+
+const factsTest = join(dirname(fileURLToPath(import.meta.url)), 'tests/export-generated-resume-facts.test.mjs')
+const factsRun = spawnSync(process.execPath, ['--test', factsTest], { stdio: 'inherit' })
+if (factsRun.status !== 0) {
+  throw new Error(`exportGeneratedResume factsConfirmedAt unit test failed (exit ${factsRun.status ?? 'null'})`)
 }
 
 console.log('PASS resume diagnosis flow UI verification')

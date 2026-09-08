@@ -324,7 +324,7 @@ test('生成预览读回真实结果后导出 payload 正确 @kiosk', async ({ p
   expect(payload.taskId).toBe(GENERATE_TASK_ID)
   expect(payload.format).toBe('pdf')
   expect(payload.basic?.name).toBe('青岛求职者')
-  expect(payload.factsConfirmedAt).toBeUndefined()
+  expect(payload.factsConfirmedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
   await expect(page.getByRole('dialog', { name: 'AI简历_青岛求职者.pdf' })).toBeVisible()
 })
 

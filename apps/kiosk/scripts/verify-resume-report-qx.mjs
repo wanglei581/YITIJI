@@ -55,6 +55,7 @@ assert(has(files.page, 'res.targetContext'), 'refresh recovers targetContext fro
 assert(!has(all, '报告导出端点上线后开放'), 'placeholder export-unavailable reason is gone')
 assert(has(files.takeaway, 'aria-disabled'), 'export actions use aria-disabled, not native disabled')
 assert(!/<(button|input)[^>]*\sdisabled(\s|=|>)/.test(`${files.actions}\n${files.takeaway}`), 'export actions must not use native disabled')
+assert(has(files.takeaway, "exportKind === 'change_list' ? '打印修改清单' : '打印这份报告'"), 'print button label follows last export kind')
 assert(has(files.takeaway, '请先导出'), 'print/QR stay gated until a PDF is exported')
 assert(has(files.takeaway, 'printFileUrl'), 'print becomes available only after printFileUrl exists')
 assert(has(files.takeaway, "navigate('/print/confirm'"), 'print navigates to /print/confirm after export')
