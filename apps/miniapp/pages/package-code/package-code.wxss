@@ -170,3 +170,17 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   flex: 1;
   height: 112rpx;
 }
+
+/* 订单核对失败时的重试按钮。触控目标不小于 48px（CLAUDE.md §9）。 */
+.retry-btn {
+  margin: 24rpx auto 0;
+  min-height: 96rpx;
+  line-height: 96rpx;
+  padding: 0 48rpx;
+  border-radius: 48rpx;
+  background: #1677ff;
+  color: #fff;
+  font-size: 30rpx;
+  text-align: center;
+  display: inline-block;
+}

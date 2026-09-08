@@ -1444,8 +1444,16 @@ const api = {
 
   /**
    * 创建材料包打印订单（一体机现场取件）
-   * @param {object} data { terminalId, files: [{ fileId, filename, pageCount }], params: { colorMode, duplex, copies }, totalAmount }
-   * @returns {Promise<{ orderId, pickupCode, qrCodeUrl, expiresAt }>}
+   *
+   * 入参形状必须与服务端 CreatePackageOrderDto 完全一致：该 DTO 走白名单校验
+   * （forbidNonWhitelisted），多带一个字段就整单 400 VALIDATION_FAILED。特别是
+   * **不要传 filename / pageCount / totalAmount** —— DTO 注释写明「页数、金额与
+   * 文件名全部由服务端查证，前端传值不作为事实」，让前端报页数报金额本身就是错的。
+   *
+   * @param {object} data { terminalId, files: [{ fileId, pageRange? }], params: { colorMode, duplex, copies } }
+   * @returns {Promise<{ orderId, orderNo, pickupCode, expiresAt, amountCents, payStatus,
+   *                     pickupStatus, taskStatus, paymentSessionToken, items }>}
+   *          注意没有 qrCodeUrl：服务端从不下发该字段，旧注释是错的。
    */
   createPackageOrder(data) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包订单'));
@@ -1453,7 +1461,9 @@ const api = {
   },
 
   /**
-   * 获取材料包订单详情
+   * 获取材料包订单详情。服务端有 requireOwned 归属校验：非本人订单 404
+   * PACKAGE_ORDER_NOT_FOUND，未登录 401。到机码 / 金额 / 有效期只能从这里取，
+   * 不允许经 URL 传递后直接渲染。
    * @param {string} orderId
    */
   getPackageOrder(orderId) {
@@ -1461,19 +1471,10 @@ const api = {
     return request(`/orders/package/${encodeURIComponent(orderId)}`, { method: 'GET', needAuth: true });
   },
 
-  /**
-   * 取消材料包订单
-   * @param {string} orderId
-   * @param {string} reason
-   */
-  cancelPackageOrder(orderId, reason) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消订单'));
-    return request(`/orders/package/${encodeURIComponent(orderId)}/cancel`, {
-      method: 'POST',
-      data: { reason },
-      needAuth: true
-    });
-  },
+  // 这里曾有 cancelPackageOrder()，调 POST /orders/package/:id/cancel。
+  // 2026-09-08 实测：该端点在服务端不存在（PackageOrdersController 只有 @Post() 与
+  // @Get(':id')），任何调用必得 404。全仓无人调用，故删除而不是留着当哑弹。
+  // 材料包取消能力要开放的话，先在服务端补端点，再在此处按真实返回补方法。
 
   // ---------- 最新动态 / 今日提醒 ----------
   /**
