@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 522,
+    "endpointCount": 524,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -6227,6 +6227,23 @@
         "services": []
       },
       {
+        "controller": "services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts",
+        "handler": "KioskCampusRecruitmentStatsController.getRecruitmentStats",
+        "method": "GET",
+        "models": [
+          "Job",
+          "JobFair"
+        ],
+        "path": "/api/v1/kiosk/campus/recruitment-stats",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/jobs/campus-recruitment-stats.service.ts"
+        ],
+        "services": [
+          "CampusRecruitmentStatsService"
+        ]
+      },
+      {
         "controller": "services/api/src/member-feedback/kiosk-feedback.controller.ts",
         "handler": "KioskFeedbackController.submit",
         "method": "POST",
@@ -7764,6 +7781,26 @@
         ],
         "services": [
           "BenefitRedemptionService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-print-orders/package-orders.controller.ts",
+        "handler": "PackageOrdersController.list",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "FileObject",
+          "Order",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/orders/package",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-print-orders/package-order.service.ts"
+        ],
+        "services": [
+          "PackageOrderService"
         ]
       },
       {
@@ -11519,7 +11556,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 478,
+      "reachableFileCount": 526,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -11612,6 +11649,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /me/mock-interviews/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -11676,6 +11714,7 @@
           "component": "CampusPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -11725,7 +11764,17 @@
             "GET /companies/:param",
             "GET /companies/:param/jobs",
             "GET /companies/filters",
-            "GET /companies/stats"
+            "GET /companies/stats",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
           ],
           "file": "apps/kiosk/src/pages/companies/CompaniesPage.tsx",
           "layout": [
@@ -11734,7 +11783,13 @@
             "Outlet"
           ],
           "path": "/companies",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -11744,7 +11799,17 @@
             "GET /companies/:param",
             "GET /companies/:param/jobs",
             "GET /companies/filters",
-            "GET /companies/stats"
+            "GET /companies/stats",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
           ],
           "file": "apps/kiosk/src/pages/companies/CompanyDetailPage.tsx",
           "layout": [
@@ -11753,7 +11818,13 @@
             "Outlet"
           ],
           "path": "/companies/:id",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
@@ -11951,6 +12022,7 @@
           "component": "JobFairsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -11997,6 +12069,7 @@
           "component": "JobFairDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12043,6 +12116,7 @@
           "component": "FairCompaniesPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12089,6 +12163,7 @@
           "component": "FairCompanyDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12128,13 +12203,20 @@
             "Outlet"
           ],
           "path": "/job-fairs/:id/companies/:companyId",
-          "styles": [],
+          "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
+          ],
           "wrappers": []
         },
         {
           "component": "FairMapPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12181,6 +12263,7 @@
           "component": "FairMaterialsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12227,6 +12310,7 @@
           "component": "FairStatsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12298,6 +12382,7 @@
           "component": "JobFairCheckinPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12344,6 +12429,7 @@
           "component": "JobsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12390,6 +12476,7 @@
           "component": "JobDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12436,6 +12523,7 @@
           "component": "LegalDocPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -12837,7 +12925,11 @@
           "path": "/print-scan",
           "styles": [
             "apps/kiosk/src/components/styles/kiosk-feedback-dialog.css",
-            "apps/kiosk/src/pages/print-scan/styles/print-hub-v6.css"
+            "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -12863,7 +12955,11 @@
           ],
           "path": "/print-scan/convert",
           "styles": [
-            "apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css"
+            "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -12878,7 +12974,11 @@
           ],
           "path": "/print-scan/feature/:key",
           "styles": [
-            "apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css"
+            "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -12906,7 +13006,11 @@
           ],
           "path": "/print-scan/sign",
           "styles": [
-            "apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css"
+            "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -12932,12 +13036,11 @@
           ],
           "path": "/print/cashier",
           "styles": [
-            "apps/kiosk/src/pages/print/print-prototype.css",
-            "apps/kiosk/src/pages/print/styles/print-cashier.css",
-            "apps/kiosk/src/pages/print/styles/print-material-check.css",
-            "apps/kiosk/src/pages/print/styles/print-preview-params.css",
-            "apps/kiosk/src/pages/print/styles/print-progress-result.css",
-            "apps/kiosk/src/pages/print/styles/print-upload.css"
+            "apps/kiosk/src/pages/print/styles/cashier-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -12968,12 +13071,11 @@
           ],
           "path": "/print/confirm",
           "styles": [
-            "apps/kiosk/src/pages/print/print-prototype.css",
-            "apps/kiosk/src/pages/print/styles/print-cashier.css",
-            "apps/kiosk/src/pages/print/styles/print-material-check.css",
-            "apps/kiosk/src/pages/print/styles/print-preview-params.css",
-            "apps/kiosk/src/pages/print/styles/print-progress-result.css",
-            "apps/kiosk/src/pages/print/styles/print-upload.css"
+            "apps/kiosk/src/pages/print/styles/print-confirm-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13031,12 +13133,11 @@
           ],
           "path": "/print/material-check",
           "styles": [
-            "apps/kiosk/src/pages/print/print-prototype.css",
-            "apps/kiosk/src/pages/print/styles/print-cashier.css",
-            "apps/kiosk/src/pages/print/styles/print-material-check.css",
-            "apps/kiosk/src/pages/print/styles/print-preview-params.css",
-            "apps/kiosk/src/pages/print/styles/print-progress-result.css",
-            "apps/kiosk/src/pages/print/styles/print-upload.css"
+            "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13106,12 +13207,11 @@
           ],
           "path": "/print/preview",
           "styles": [
-            "apps/kiosk/src/pages/print/print-prototype.css",
-            "apps/kiosk/src/pages/print/styles/print-cashier.css",
-            "apps/kiosk/src/pages/print/styles/print-material-check.css",
-            "apps/kiosk/src/pages/print/styles/print-preview-params.css",
-            "apps/kiosk/src/pages/print/styles/print-progress-result.css",
-            "apps/kiosk/src/pages/print/styles/print-upload.css"
+            "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13207,12 +13307,11 @@
           ],
           "path": "/print/upload",
           "styles": [
-            "apps/kiosk/src/pages/print/print-prototype.css",
-            "apps/kiosk/src/pages/print/styles/print-cashier.css",
-            "apps/kiosk/src/pages/print/styles/print-material-check.css",
-            "apps/kiosk/src/pages/print/styles/print-preview-params.css",
-            "apps/kiosk/src/pages/print/styles/print-progress-result.css",
-            "apps/kiosk/src/pages/print/styles/print-upload.css"
+            "apps/kiosk/src/pages/print/styles/file-source-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13314,6 +13413,7 @@
           "component": "ResumeGeneratePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13368,6 +13468,7 @@
           "component": "ResumeGeneratePreviewPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13423,6 +13524,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13550,6 +13652,7 @@
           "component": "ResumeOptimizePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13591,6 +13694,7 @@
           ],
           "path": "/resume/optimize",
           "styles": [
+            "apps/kiosk/src/pages/resume/optimize-empty-state-qx.css",
             "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -13603,6 +13707,7 @@
           "component": "ResumeOptimizeComparePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13656,6 +13761,7 @@
           "component": "ResumeParsePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13711,6 +13817,7 @@
           "component": "ResumeReportPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13881,6 +13988,7 @@
           "component": "ResumeSourcePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -13998,7 +14106,11 @@
           ],
           "path": "/scan/progress",
           "styles": [
-            "apps/kiosk/src/pages/scan/styles/scan-fusion.css"
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14024,7 +14136,11 @@
           ],
           "path": "/scan/result",
           "styles": [
-            "apps/kiosk/src/pages/scan/styles/scan-fusion.css"
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14050,7 +14166,11 @@
           ],
           "path": "/scan/settings",
           "styles": [
-            "apps/kiosk/src/pages/scan/styles/scan-fusion.css"
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14076,7 +14196,11 @@
           ],
           "path": "/scan/start",
           "styles": [
-            "apps/kiosk/src/pages/scan/styles/scan-fusion.css"
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14234,7 +14358,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 500
+      "sourceFileCount": 550
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -15161,6 +15285,7 @@
           "services/api/src/job-ai/job-quality.service.ts",
           "services/api/src/job-applications/job-applications.service.ts",
           "services/api/src/job-sync/job-sync.service.ts",
+          "services/api/src/jobs/campus-recruitment-stats.service.ts",
           "services/api/src/jobs/job-requirement-stats.service.ts",
           "services/api/src/jobs/jobs-admin.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
@@ -15238,6 +15363,7 @@
           "services/api/src/bulk-publish/bulk-publish.service.ts",
           "services/api/src/job-sync/job-sync.service.ts",
           "services/api/src/jobs/admin-fairs.service.ts",
+          "services/api/src/jobs/campus-recruitment-stats.service.ts",
           "services/api/src/jobs/fair-company-print.service.ts",
           "services/api/src/jobs/fair-company-zone.service.ts",
           "services/api/src/jobs/fair-material.service.ts",
@@ -15992,6 +16118,7 @@
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
+      "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-release-bundle.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -16007,6 +16134,7 @@
     ],
     ".github/workflows/deploy.yml": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
+      "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-deploy-authorization-gate.mjs",
       "scripts/verify-release-bundle.mjs"
     ],
@@ -16358,6 +16486,9 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
+    "apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
@@ -16544,6 +16675,9 @@
     "apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx": [
       "apps/kiosk/scripts/verify-fusion-shell.mjs"
     ],
+    "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts": [
       "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -16578,7 +16712,9 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-fusion-w6.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-kiosk-shell-active-nav.mjs",
@@ -16587,6 +16723,7 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs",
@@ -16622,6 +16759,12 @@
     "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
+    "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
     "apps/kiosk/src/pages/assistant/AdvisorConversation.tsx": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
@@ -16644,6 +16787,9 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
+    ],
+    "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/src/pages/assistant/advisorProvider.ts": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
@@ -16752,12 +16898,19 @@
     "apps/kiosk/src/pages/auth/styles/login-shell.css": [
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
     ],
+    "apps/kiosk/src/pages/campus/CampusInsightsGroups.tsx": [
+      "services/api/scripts/verify-campus-recruitment-stats.ts"
+    ],
     "apps/kiosk/src/pages/campus/CampusPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-page-size.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "services/api/scripts/verify-activity-logs.ts"
+    ],
+    "apps/kiosk/src/pages/campus/FreshmanInsightsPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
+      "services/api/scripts/verify-campus-recruitment-stats.ts"
     ],
     "apps/kiosk/src/pages/campus/components/CampusTabs.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -16936,6 +17089,7 @@
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-page-size.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
@@ -17037,6 +17191,9 @@
     "apps/kiosk/src/pages/jobs/JobsServiceHubPage.tsx": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs"
+    ],
     "apps/kiosk/src/pages/jobs/components/JobAiConsentModal.tsx": [
       "apps/kiosk/scripts/verify-job-ai-ui.mjs"
     ],
@@ -17077,6 +17234,7 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "apps/kiosk/src/pages/offline-agencies/OfflineJobDetailPage.tsx": [
@@ -17087,9 +17245,6 @@
     ],
     "apps/kiosk/src/pages/placeholders/ErrorOfflinePage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
-    ],
-    "apps/kiosk/src/pages/placeholders/FreshmanInsightsPage.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/src/pages/placeholders/MeActivityDetailPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
@@ -17111,8 +17266,17 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
     "apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
@@ -17132,14 +17296,23 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
-    "apps/kiosk/src/pages/print-scan/components/V6PrintHubView.tsx": [
+    "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/convert-images-model.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/printHubContent.ts": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
-    "apps/kiosk/src/pages/print-scan/styles/print-hub-v6.css": [
+    "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
@@ -17156,6 +17329,9 @@
     ],
     "apps/kiosk/src/pages/print/DevSandboxControls.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print/PdfPreviewFrame.tsx": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/print/PrintCashierPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -17257,6 +17433,12 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
     ],
+    "apps/kiosk/src/pages/print/components/PickupHidGuide.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
     ],
@@ -17266,6 +17448,19 @@
     "apps/kiosk/src/pages/print/components/printFileRetention.ts": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
     ],
+    "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx": [
+      "apps/kiosk/scripts/verify-file-display-truth.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
+    ],
+    "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx": [
+      "apps/kiosk/scripts/verify-file-display-truth.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
+    ],
+    "apps/kiosk/src/pages/print/file-source/fileSourceModel.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/print/piiRedaction.ts": [
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
     ],
@@ -17274,6 +17469,9 @@
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
       "apps/kiosk/scripts/verify-print-cta-contrast.mjs"
     ],
+    "apps/kiosk/src/pages/print/printConfirmQuery.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/print/printMaterialSession.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
@@ -17281,6 +17479,9 @@
     ],
     "apps/kiosk/src/pages/print/printUsageEstimate.ts": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/print/styles/file-source-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
@@ -17617,6 +17818,9 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
+    "apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
@@ -17740,13 +17944,32 @@
     "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCustomEditor.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareDraft.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareState.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-compare/resumeCompareModel.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/CompareDecisionsApplyDialog.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx": [
@@ -17780,6 +18003,12 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts": [
+      "apps/kiosk/scripts/verify-resume-decisions.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts": [
@@ -17917,10 +18146,16 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
+    "apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/scan/scanOutputFormat.ts": [
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
     ],
     "apps/kiosk/src/pages/scan/styles/scan-fusion.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx": [
@@ -17985,6 +18220,9 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
+    "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/upload/phone-upload-service-desk.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
@@ -18034,6 +18272,7 @@
     "apps/kiosk/src/services/api/aiHttpAdapter.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-export-facts-contract.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-llm-timeout-concurrency.ts"
     ],
@@ -18045,6 +18284,9 @@
     ],
     "apps/kiosk/src/services/api/benefitActivities.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
+    ],
+    "apps/kiosk/src/services/api/campusRecruitmentStats.ts": [
+      "services/api/scripts/verify-campus-recruitment-stats.ts"
     ],
     "apps/kiosk/src/services/api/careerPlan.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -18246,7 +18488,8 @@
       "services/api/scripts/verify-print-scan-first-release.ts"
     ],
     "apps/kiosk/src/services/terminalAuth.ts": [
-      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
+      "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
+      "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs"
     ],
     "apps/kiosk/src/styles/ai-primitives.css": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
@@ -18390,7 +18633,11 @@
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/pages/package-code/package-code.js": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
+    "apps/miniapp/pages/package-confirm/package-confirm.js": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/pages/print-pay/print-pay.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -18423,6 +18670,12 @@
     "apps/miniapp/pages/resumes/resumes.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/pages/self-explore/append-print.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/pages/self-explore/self-explore.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
     "apps/miniapp/pages/settings/settings.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
@@ -18440,6 +18693,7 @@
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "apps/miniapp/scripts/verify-miniapp-api-contract.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
@@ -18451,6 +18705,9 @@
     ],
     "apps/miniapp/utils/normalize.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
+    ],
+    "apps/miniapp/utils/package-feature.js": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/utils/pickup-qrcode.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -18819,15 +19076,15 @@
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-member-data-retention.ts"
     ],
-    "docs/design/kiosk-ai-os-v3-2026-08/39-print-hub.html": [
-      "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
-    ],
     "docs/design/kiosk-proto-2026-07-migration-matrix.md": [
       "apps/kiosk/scripts/verify-fusion-baseline.mjs",
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs"
     ],
     "docs/design/kiosk-proto-2026-07/73-assistant-call.html": [
       "apps/kiosk/scripts/verify-visual-evidence-manifest.mjs"
+    ],
+    "docs/design/kiosk-redesign-2026-08/10-print-hub.html": [
+      "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
     "docs/design/kiosk-redesign-2026-08/assets/bg-hero.jpg": [
       "scripts/verify-repository-integrity.mjs"
@@ -18982,6 +19239,7 @@
     "packages/shared/src/index.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-campus-recruitment-stats.ts",
       "services/api/scripts/verify-companies.ts",
       "services/api/scripts/verify-contract-review-contract.ts",
       "services/api/scripts/verify-job-ai.ts",
@@ -19012,6 +19270,9 @@
     ],
     "packages/shared/src/types/audit.ts": [
       "services/api/scripts/verify-change-password.ts"
+    ],
+    "packages/shared/src/types/campusRecruitmentStats.ts": [
+      "services/api/scripts/verify-campus-recruitment-stats.ts"
     ],
     "packages/shared/src/types/company.ts": [
       "services/api/scripts/verify-companies.ts"
@@ -19895,6 +20156,7 @@
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
     ],
     "services/api/src/ai/dto/resume-generate.dto.ts": [
+      "apps/kiosk/scripts/verify-resume-export-facts-contract.mjs",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
@@ -20734,6 +20996,9 @@
     "services/api/src/device-fleet/device-fleet.types.ts": [
       "services/api/scripts/verify-device-fleet-overview.ts"
     ],
+    "services/api/src/document-conversion/concurrency-limiter.ts": [
+      "services/api/scripts/verify-conversion-queue-bound.mjs"
+    ],
     "services/api/src/document-conversion/document-conversion-capability-state.ts": [
       "services/api/scripts/verify-document-conversion.ts"
     ],
@@ -20741,9 +21006,11 @@
       "services/api/scripts/verify-document-conversion.ts"
     ],
     "services/api/src/document-conversion/document-conversion.service.ts": [
+      "services/api/scripts/verify-conversion-queue-bound.mjs",
       "services/api/scripts/verify-document-conversion.ts"
     ],
     "services/api/src/document-conversion/document-conversion.types.ts": [
+      "services/api/scripts/verify-conversion-queue-bound.mjs",
       "services/api/scripts/verify-document-conversion.ts"
     ],
     "services/api/src/files/collect-raw-upload-body.ts": [
@@ -20999,6 +21266,12 @@
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-partner-fair-subresources.ts"
     ],
+    "services/api/src/jobs/campus-recruitment-stats.rules.ts": [
+      "services/api/scripts/verify-campus-recruitment-stats.ts"
+    ],
+    "services/api/src/jobs/campus-recruitment-stats.service.ts": [
+      "services/api/scripts/verify-campus-recruitment-stats.ts"
+    ],
     "services/api/src/jobs/data-source-credential-policy.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-partner-source-capabilities.ts"
@@ -21207,6 +21480,7 @@
     "services/api/src/jobs/jobs.module.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-campus-recruitment-stats.ts",
       "services/api/scripts/verify-job-data-quality.ts"
     ],
     "services/api/src/jobs/jobs.service.ts": [
@@ -21230,6 +21504,10 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-publish-expiry-completeness.ts",
       "services/api/scripts/verify-recruitment-integration-readiness.ts"
+    ],
+    "services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts": [
+      "services/api/scripts/verify-campus-recruitment-stats.ts",
+      "services/api/scripts/verify-throttle-dimension.ts"
     ],
     "services/api/src/jobs/partner-capabilities.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
@@ -23182,6 +23460,8 @@
           "apps/kiosk/src/lib/fileName.ts",
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/pages/print/printUsageEstimate.ts"
         ],
         "missing": []
@@ -23308,13 +23588,20 @@
           "services"
         ],
         "files": [
+          "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx",
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
+          "apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx",
+          "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
           "apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx",
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
-          "apps/kiosk/src/pages/print-scan/components/V6PrintHubView.tsx",
-          "apps/kiosk/src/pages/print-scan/styles/print-hub-v6.css",
+          "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx",
+          "apps/kiosk/src/pages/print-scan/convert-images-model.ts",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
+          "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css",
+          "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
           "apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css",
           "apps/kiosk/src/pages/print/CashierPaymentPanel.tsx",
           "apps/kiosk/src/pages/print/DevSandboxControls.tsx",
@@ -23329,8 +23616,15 @@
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
           "apps/kiosk/src/pages/print/cashierStatus.ts",
           "apps/kiosk/src/pages/print/components/MaterialCheckPresentation.tsx",
+          "apps/kiosk/src/pages/print/components/PickupHidGuide.tsx",
+          "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
+          "apps/kiosk/src/pages/print/file-source/fileSourceModel.ts",
           "apps/kiosk/src/pages/print/print-prototype.css",
+          "apps/kiosk/src/pages/print/printConfirmQuery.ts",
           "apps/kiosk/src/pages/print/printMaterialSession.ts",
+          "apps/kiosk/src/pages/print/styles/file-source-qx.css",
           "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
           "apps/kiosk/src/pages/print/styles/print-upload.css",
@@ -23338,8 +23632,11 @@
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
           "apps/kiosk/src/pages/scan/ScanStartPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanWorkbenchChrome.tsx",
           "apps/kiosk/src/pages/scan/styles/scan-fusion.css",
+          "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
           "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
+          "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts",
           "apps/kiosk/src/routes/index.tsx"
         ],
         "missing": []
@@ -23363,8 +23660,11 @@
           "apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx",
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx",
+          "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx",
           "apps/kiosk/src/pages/assistant/assistant-lightflow-shell.css",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx",
@@ -23385,6 +23685,7 @@
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/aiResumeSession.ts",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
           "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
           "apps/kiosk/src/pages/resume/jobMaterialDraft.ts",
@@ -23418,11 +23719,14 @@
           "apps/kiosk/src/pages"
         ],
         "files": [
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/campus/CampusPage.tsx",
+          "apps/kiosk/src/pages/campus/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/campus/components/CampusTabs.tsx",
           "apps/kiosk/src/pages/companies/CompaniesPage.tsx",
           "apps/kiosk/src/pages/companies/CompanyDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMapPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx",
@@ -23432,11 +23736,12 @@
           "apps/kiosk/src/pages/jobs-fairs-prototype.css",
           "apps/kiosk/src/pages/jobs/JobDetailPage.tsx",
           "apps/kiosk/src/pages/jobs/JobsPage.tsx",
+          "apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx",
           "apps/kiosk/src/pages/jobs/components/W4Presentation.tsx",
           "apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx",
+          "apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx",
           "apps/kiosk/src/pages/offline-agencies/OfflineJobDetailPage.tsx",
           "apps/kiosk/src/pages/placeholders/CampusWelcomePage.tsx",
-          "apps/kiosk/src/pages/placeholders/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",
           "apps/kiosk/src/pages/smart-campus/SmartCampusHomePage.tsx",
@@ -24206,7 +24511,9 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
-          "apps/kiosk/src/pages/resume/careerPlan-lightflow.css"
+          "apps/kiosk/src/pages/resume/careerPlan-lightflow.css",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
+          "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx"
         ],
         "missing": []
       },
@@ -24458,11 +24765,13 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx",
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
-          "apps/kiosk/src/pages/print-scan/components/V6PrintHubView.tsx",
+          "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx",
           "apps/kiosk/src/pages/print-scan/printHubContent.ts",
-          "apps/kiosk/src/pages/print-scan/styles/print-hub-v6.css",
-          "docs/design/kiosk-ai-os-v3-2026-08/39-print-hub.html"
+          "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
+          "docs/design/kiosk-redesign-2026-08/10-print-hub.html"
         ],
         "missing": []
       },
@@ -24555,6 +24864,8 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
+          "apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx",
+          "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
@@ -24629,6 +24940,8 @@
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/pages/print/printMaterialSession.ts"
         ],
         "missing": []
@@ -24652,6 +24965,7 @@
         ],
         "files": [
           "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/print/PdfPreviewFrame.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
@@ -25437,11 +25751,31 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/resume/components/resume-deliver/resumeDecisions.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-resume-decisions.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:resume-decisions"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [
           "services/api"
         ],
         "files": [
+          "apps/kiosk/scripts/tests/export-generated-resume-facts.test.mjs",
           "apps/kiosk/src/components/FileContentPreview.tsx",
+          "apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx",
@@ -25454,9 +25788,13 @@
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx",
           "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCustomEditor.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareDraft.tsx",
           "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareState.tsx",
           "apps/kiosk/src/pages/resume/components/resume-compare/resumeCompareModel.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/CompareDecisionsApplyDialog.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx",
@@ -25468,6 +25806,7 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/generatePreviewQuery.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeQuery.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/optimizeStateCopy.ts",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
@@ -25486,6 +25825,25 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:resume-diagnosis-flow-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/services/api/aiHttpAdapter.ts",
+          "services/api/src/ai/dto/resume-generate.dto.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-resume-export-facts-contract.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:resume-export-facts-contract"
       ],
       "wired": true
     },
@@ -25697,6 +26055,24 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/services/terminalAuth.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:terminal-session-self-heal"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/kiosk/src/pages/auth/LoginPage.tsx",
           "apps/kiosk/src/pages/profile/me/MySettingsPage.tsx",
           "apps/kiosk/src/pages/profile/profileEntries.ts"
@@ -25815,6 +26191,8 @@
           "apps/miniapp/pages/resume-optimize/resume-optimize.js",
           "apps/miniapp/pages/resume-parse/resume-parse.js",
           "apps/miniapp/pages/resumes/resumes.js",
+          "apps/miniapp/pages/self-explore/append-print.js",
+          "apps/miniapp/pages/self-explore/self-explore.js",
           "apps/miniapp/pages/settings/settings.js",
           "apps/miniapp/project.config.json",
           "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -25859,6 +26237,27 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/miniapp/pages/package-code/package-code.js",
+          "apps/miniapp/pages/package-confirm/package-confirm.js",
+          "apps/miniapp/utils/api.js",
+          "apps/miniapp/utils/package-feature.js"
+        ],
+        "missing": []
+      },
+      "file": "apps/miniapp/scripts/verify-package-chain.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/miniapp",
+      "scriptNames": [
+        "@ai-job-print/miniapp::verify:package-chain"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/miniapp/utils/pickup-qrcode.js"
         ],
         "missing": []
@@ -25869,6 +26268,22 @@
       "package": "@ai-job-print/miniapp",
       "scriptNames": [
         "@ai-job-print/miniapp::verify:static"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
+      "file": "apps/miniapp/scripts/verify-user-error-message.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/miniapp",
+      "scriptNames": [
+        "@ai-job-print/miniapp::verify:user-error"
       ],
       "wired": true
     },
@@ -26735,6 +27150,25 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:ci-gate-coverage"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/deploy.yml"
+        ],
+        "missing": []
+      },
+      "file": "scripts/verify-ci-main-runs-complete.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:ci-main-runs-complete"
       ],
       "wired": true
     },
@@ -28494,6 +28928,32 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/pages/campus/CampusInsightsGroups.tsx",
+          "apps/kiosk/src/pages/campus/FreshmanInsightsPage.tsx",
+          "apps/kiosk/src/services/api/campusRecruitmentStats.ts",
+          "packages/shared/src/index.ts",
+          "packages/shared/src/types/campusRecruitmentStats.ts",
+          "services/api/src/jobs/campus-recruitment-stats.rules.ts",
+          "services/api/src/jobs/campus-recruitment-stats.service.ts",
+          "services/api/src/jobs/jobs.module.ts",
+          "services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-campus-recruitment-stats.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:campus-recruitment-stats"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts",
@@ -28887,6 +29347,26 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:contract-review:timeout"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/document-conversion/concurrency-limiter.ts",
+          "services/api/src/document-conversion/document-conversion.service.ts",
+          "services/api/src/document-conversion/document-conversion.types.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-conversion-queue-bound.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:conversion-queue-bound"
       ],
       "wired": true
     },
@@ -33369,6 +33849,7 @@
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/kiosk-ai-capabilities.controller.ts",
           "services/api/src/common/throttler/terminal-throttle.ts",
+          "services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts",
           "services/api/src/materials/materials.controller.ts",
           "services/api/src/print-jobs/print-jobs.controller.ts",
           "services/api/src/scan-tasks/scan-tasks.controller.ts",
@@ -34002,6 +34483,19 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css",
+        "kind": "style",
+        "mentions": [
+          ".ccg/tasks/archive/2026-07/kiosk87-runtime-visual-defect-audit/plan.md",
+          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/styles/print-scan-home.css",
         "kind": "style",
         "mentions": [
@@ -34024,7 +34518,20 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/print/pageRange.ts",
+        "file": "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+          "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
+          "docs/design/kiosk-v6-migration-matrix.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/scan/ScanFlowSteps.tsx",
         "kind": "component",
         "mentions": [],
         "risk": "low",
@@ -34033,12 +34540,11 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
+        "file": "apps/kiosk/src/pages/scan/styles/scan-fusion.css",
         "kind": "style",
         "mentions": [
           "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-          "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
-          "docs/design/kiosk-v6-migration-matrix.md"
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md"
         ],
         "risk": "high",
         "scope": "kiosk",
@@ -34427,6 +34933,15 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/reviews/legacy-capability-inventory-2026-08-16.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/reviews/page-audit-print-2026-09-02.md",
         "kind": "doc",
         "mentions": [],
@@ -34473,6 +34988,15 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/reviews/project-normalization-task-evidence-triage.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/reviews/qx-b1-arrival-hid-2026-09-07/README.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",

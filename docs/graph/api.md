@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`522` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`524` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -470,6 +470,12 @@
 | GET | `/api/v1/partner/jobs/quality-summary` | JobsController.getPartnerJobQualitySummary | partner | JobQualityService | Job<br/>JobDataQualitySnapshot |
 | GET | `/api/v1/partner/sync-logs` | JobsController.getPartnerSyncLogs | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 
+## `services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/kiosk/campus/recruitment-stats` | KioskCampusRecruitmentStatsController.getRecruitmentStats | — | CampusRecruitmentStatsService | Job<br/>JobFair |
+
 ## `services/api/src/jobs/partner-fairs.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -635,6 +641,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/orders/package` | PackageOrdersController.list | — | PackageOrderService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/orders/package` | PackageOrdersController.create | — | PackageOrderService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/orders/package/:id` | PackageOrdersController.detail | — | PackageOrderService | AuditLog<br/>FileObject<br/>Order<br/>Terminal<br/>TerminalCapability |
 

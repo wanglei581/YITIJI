@@ -41,9 +41,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 11 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 13 |
 | **medium** | 只被文档或其它文件提及 | 8 |
-| **low** | 全仓零提及 | 84 |
+| **low** | 全仓零提及 | 86 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（84）
+## low — 全仓零提及（86）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -78,12 +78,12 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 | 路径 | 判定依据 |
 | --- | --- |
-| `apps/kiosk/src/pages/print/pageRange.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `apps/kiosk/src/pages/scan/ScanFlowSteps.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusMockAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 文档（78）
+### 文档（80）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -121,12 +121,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/progress/owners.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/branch-split-plan-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/kiosk-management-requirements-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/legacy-capability-inventory-2026-08-16.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/page-audit-print-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/page-audit-resume-profile-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/partner-capability-inventory-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-ignore-proposal.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-local-tools-landing.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-task-evidence-triage.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/qx-b1-arrival-hid-2026-09-07/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/real-file-print-2026-08-17/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/repo-size-and-structure-2026-09-06.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-03-deploy-data-safety-gate.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -199,7 +201,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（11）
+## high — 仍被 CI / 门禁 / 包脚本引用（13）
 
 ### 页面/组件（7）
 
@@ -213,12 +215,14 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-prod-build-config.mjs、apps/kiosk/scripts/verify-runtime-terminal-identity.mjs |
 | `apps/kiosk/src/pages/home/serviceGroups.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-jobfair-checkin.mjs、apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs |
 
-### 样式（3）
+### 样式（5）
 
 | 路径 | 判定依据 |
 | --- | --- |
+| `apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 | `apps/kiosk/src/pages/print/styles/print-pickup-claim.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
+| `apps/kiosk/src/pages/scan/styles/scan-fusion.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs |
 | `apps/kiosk/src/styles/kiosk-uplift.css` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs |
 
 ### 测试（1）
