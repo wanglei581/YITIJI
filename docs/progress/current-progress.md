@@ -1,5 +1,29 @@
 # 当前开发进度
 
+## 2026-09-08 抢救回一份被埋一个月的真机出纸证据
+
+`docs/device/print-first-order-evidence-2026-08-07.md` —— **2026-08-07 Windows 主机 +
+真实奔图打印机的真实打印首单**（任务 `ptask_kiosk_337d61d38b698d61` / 订单
+`cmsirshmc001clga8n1i2ind2`，已出纸，Kiosk 页面显示完成）。
+
+它一直只存在于 PR #548（2026-08-07 开，此后无动静），**从未进入 main**：核验时
+两个 ID 在 `origin/main` 上命中数均为 0。与此同时交付文档一直按「真机零验证」口径写，
+今天已有窗口据此对产品负责人说过「没有一张纸真的从机器里出来过」——那句话是错的。
+
+同份文档里还记着一条**会改变剩余验收工作量**的现场口径（产品负责人当时确认）：
+
+> 用户没有一体机整机，只有 Windows 主机 + 打印机 + 扫码枪 + 摄像头；
+> 「只要打开这个网站，在本地电脑能完成打印操作就行了」。
+
+**如果该口径仍然成立，`delivery.yaml` 的 BL-03「Windows 一体机真机打印/扫描/
+Terminal Agent 未验收」是在描述一台用户根本没有的设备。** 这一条不自行改写，
+需产品负责人确认后再动 BL-03。
+
+文档本身的边界照原样保留，不拔高：它明确写「不作整机商用通过结论」，
+并如实列出未完成项 —— 面板扫描（`scanWatchFolder` 未配置）、扫码枪付款码支付未实测、
+摄像头按决策不接入。
+
+
 
 2026-09-08 **材料包订单列表端点（分支 `feat/package-order-list`）**。补掉 #962 记录的开闸前置第 d 条：材料包订单在既有会员订单列表里一条都看不到 —— `/me/print-orders` 查 PrintTask（派发前 `printTaskId` 为 null）、`/me/print-orders/cloud` 的 where 带 `sourceFileId: { not: null }`（材料包多文件、该字段本就为 null）、`/me/print-orders/:orderId` 的 `requireOwned` 同一条过滤；用户下完单一旦离开，手上只剩一个到机码，而到机码不能反查订单。新增 `GET /orders/package`，复用既有 `member-page` 游标分页（不另起分页方案），路由声明在 `@Get(':id')` 之前避免被当成 id=''。**两处刻意收口**：列表不签发 `paymentSessionToken`（一次返回 N 个付款令牌只放大暴露面，付款令牌由 detail 现取）、不回逐文件明细。到机码照常返回且判据与 detail 完全一致（`visibleCode`：pending 且未过期）。实测（本地真实后端）：空态 / 未登录 401 / `pageSize=0` 400 `MEMBER_PAGE_INVALID` / 两单倒序且到机码可见 / `pageSize=1` 翻页不重复 / B 用户看不到 A 的单 / **B 拿 A 的游标同样取不到数据**。门禁并进既有 `verify:package-order-fulfillment`（不新建脚本）加 8 条断言，三方向变异全部正确变红：去掉 endUserId 过滤 → 红、把付款令牌加回来 → 红、不回到机码 → 红。typecheck 0 错误；`verify:member-print-orders` / `verify:member-assets-c2d` / `verify:backend-p0-http` 通过；项目图谱已 `pnpm graph` 重跑。**材料包四页守卫仍关闭**：还缺取消/退款端点，本轮不摘守卫。未部署、未真机。
 
@@ -21,6 +45,7 @@
 
 2026-09-07 **岗位列表与岗位详情迁入青序流光（分支 `claude/qx-b3-jobs`，原型 26 / 27，未合入、未部署）**。`/jobs` 登记进 `QX_MIGRATED_ROUTES`，`/jobs/:id` 通过单段 ID 精确模式退出旧壳，明确排除尚未迁移的 `/jobs/online-platforms` 与 `/jobs/:id/offline`，路由基线保持 106 条。两页改用 `QxPageFrame`、共享 `QxAppNavbar` 与页面私有 QX 样式，保留既有真实 `GET /jobs`、`GET /jobs/:id`、收藏、浏览记录、外部跳转记录和岗位 AI 授权 / 选简历 / 推荐 / 解读 / 匹配链路。详情页继续按来源机构、同步时间、外部 ID、外部投递链接四要素 fail-closed，缺任一项不生成二维码、不外跳、不写 `ExternalJumpLog`；数据来源说明常显，投递相关动作只使用「去来源平台投递 / 扫码投递」，不提供平台内投递或收简历。源码 typecheck、build、W4 / job-info / job-ai / shell / W6 106 路由 / visual-unity 门禁通过；W4 E2E 已新增真实数据、筛选请求参数、`external_apply` payload、加载 / 空 / 接口失败、来源阻断、违禁同义文案为零、触控命中和 1080×1920 截图断言。当前受控环境拒绝本地 `listen(127.0.0.1:4184)`（EPERM），Chrome 也按安全策略禁止 `file://`，故本机无法执行 Playwright 与产出真实截图；CI 配置将上传 `test-results/kiosk-fusion-w4/**`，PR 在 Actions 成功并取得两张 PNG 前必须保持 PARTIAL，不得合入。
 
+2026-09-07 **「我的」主页与会员台账页迁入青序流光（分支 `claude/qx-b3-profile`）**。对照稿 `30-my-profile.html` / `31-benefits.html` / `40-member-feedback.html` / `41-member-privacy.html`，把 `/profile`、`/me/benefits`、`/me/feedback`、`/me/privacy-requests` 登记进 `QX_MIGRATED_ROUTES`（精确集合，不加宽前缀）。四页改用 `QxPageFrame` + 页私有 `*-qx.css`。保留既有 `/me/*` 列表接口、待办 `GET /me/pending-tasks`、反馈提交/追加/关闭、隐私撤回授权（同步 POST，不乐观成功）。概览数量改为六路 `allSettled` 只读 `total`，失败显示「—」，不拿上次数字冒充。浏览/跳转记录不在「我的」聚合，也不给履约状态。「我的文档」页本批未碰。未部署、未真机。
 2026-09-07 **Windows 第三轮回执收货（#904）+ 两处 Agent 缺陷修复（#906、#911）**。**#911 是生产阻塞**：心跳 `printerStatus` 自当日 12:21 起连续 614 次 `unknown`（此前 785 次 `ready`），翻转点为第二轮升级重启——该版本的 AGT-05 把 `DetectedErrorState=0` 由 ready 改判 unknown，而奔图 CM2800ADN 驱动从不填该字段（本机只读实测 `PrinterStatus=3 / DetectedErrorState=0 / WorkOffline=False`；硬件加固清单 [N2] 记录空闲与关机都是 0，区分二者的是 `WorkOffline`）。服务端 PRT-03 不拦 `unknown`，但一体机 `printerBlocked = !printerReady`，**用户无法下单打印**；修复为 0 且未离线且 `PrinterStatus` 3/4/5 时判 ready，三处变异（删回退分支 / 删离线优先 / 放宽状态集合）各自使门禁红。**#906**：`-UseExistingToken` 重配此前从未成功过——该分支不设 `$tokenToPersist`，但形参是 `[AllowNull()][string]`，PowerShell 把 `$null` 绑定成空串，恒判「要写 token」后空值抛错；同批同步 `verify-agent-unauthorized` 钉住旧表达式的两条断言（本地只跑图谱列出的门禁会漏，须按 ci.yml 该步骤的完整清单跑）。**F4 仍未验收**：当日 `/api/v1/admin/*` 只有一次写操作（15:06:14 进入维护），`AuditLog` 同期只有一条 lifecycle 记录，数据库 `enabled=true`，16:07–16:56 列表 21 次全部 200/1336 字节（=2 台），停用请求从未到达服务器；当日管理端两次 429（15:04–15:07）时该 IP 仅约 22 请求/分钟，远低于每 IP 60，触发原因未解释，已交 API 侧。**现场遗留**：KSK-001 仍在 `maintenance`（建单会被 `PRINT_TERMINAL_NOT_ACTIVE` 拒）、Kiosk 看门狗被停，两项需先恢复，否则装了新包也不接单。第四轮任务与扫码器结论引用见执行单 §11。
 2026-09-07 **Windows KSK-001 第四轮现场复验（分支 `field/windows-printer-ready-and-f4-2026-09-07`）**：候选 Agent run `34111973596` / source `4cb8c9a8b` 已通过 MSI 同机升级，服务 `Running/Automatic`，boot ticket `200 + 60s`，claim 间隔 `5000ms`；心跳打印机状态恢复 `ready`，Kiosk 打印页显示“打印机在线”。修复后的 `-UseExistingToken -ClaimIntervalMs 5000` 重配成功，确认 DPAPI token 保留。补做只读 WMI：`PrinterStatus=3 / DetectedErrorState=0 / WorkOffline=False / PrinterState=0`，确认奔图空闲可用态。F4 停用动作已生效，但页面随后稳定显示“共 0 台终端”，未能取得 DevTools `PATCH /api/v1/admin/terminals/KSK-001/profile` 返回 200 证据，也无法通过页面完成启用/恢复运行；Kiosk 拒绝、看门狗自愈与恢复运行均记未验收，需 Mac 侧复核线上停用过滤与恢复入口。未造订单、未做连续打印矩阵、未做 4B 或 API 发布。
 2026-09-07 **打印参数页 PDF abort 与报价 body 抓取（分支 `claude/qx-b1-desk`，返工）**：`/print/preview` 点「下一步：让服务端报价」时，Chromium 会把仍在加载的 PDF `document` 请求 abort（`net::ERR_ABORTED`）。iframe 留在 `document.body`、改 blob URL 都会 abort。`PdfPreviewFrame` 改为立刻完成的 `srcdoc` iframe + `fetch` 读 PDF 字节，卸载只 `AbortController` 中止 fetch。报价 payload 在预览→确认的 SPA 窗口里 `postDataJSON()` 为空，改为页面 `fetch` 出口抓 body，应答仍由 `registerQuote` 提供。w2 print 33 passed。未部署、未真机。

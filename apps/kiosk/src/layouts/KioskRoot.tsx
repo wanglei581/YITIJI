@@ -127,6 +127,12 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/scan/progress',
   '/scan/result',
   '/jobs',
+  // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 尚未迁移的
+  // `/me/documents` `/me/settings` 等兄弟路由会被误命中掉进空壳。
+  '/profile',
+  '/me/benefits',
+  '/me/feedback',
+  '/me/privacy-requests',
   '/me/notifications',
   '/notifications',
   '/me/resumes',

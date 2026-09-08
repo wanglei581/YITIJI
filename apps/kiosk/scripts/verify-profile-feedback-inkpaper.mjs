@@ -65,10 +65,10 @@ const packageJson = read('package.json')
 const ci = readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
 const homeVerify = read('scripts/verify-profile-inkpaper-home.mjs')
 
-expectIncludes(page, "import './me-detail-inkpaper.css'", 'MyFeedbackPage 引入明细页局部 CSS')
-expectIncludes(page, "useInkRipple('.me-inkdetail .me-ripple')", 'MyFeedbackPage 只在 .me-inkdetail 作用域启用涟漪')
-expectMatches(page, /className="me-inkdetail me-inkdetail-feedback/, 'MyFeedbackPage 使用独立 me-inkdetail-feedback 根作用域')
-expectIncludes(page, 'KIcon', 'MyFeedbackPage 复用 KIcon 图标系统')
+expectIncludes(page, "import './styles/feedback-qx.css'", 'MyFeedbackPage 引入青序局部 CSS')
+expectIncludes(page, 'QxPageFrame', 'MyFeedbackPage 使用青序页框')
+expectAbsent(page, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
+expectIncludes(page, 'loginFrom="/me/feedback"', '意见反馈保留登录回跳来源')
 
 expectIncludes(page, 'getMyFeedback(getToken(), { pageSize: 50 })', '意见反馈保留本人反馈真实列表 API')
 expectIncludes(page, 'getMyFeedbackDetail(getToken(), selectedId)', '意见反馈保留 query ticket 详情拉取')
@@ -81,7 +81,6 @@ expectIncludes(page, 'closeMyFeedback(getToken(), selected.id)', '意见反馈�
 expectIncludes(page, "MemberFeedbackApiError && error.code === 'FEEDBACK_PRINT_TASK_INVALID'", '意见反馈保留关联打印订单错误提示')
 expectIncludes(page, 'setSearchParams({ ticket: detail.id })', '提交反馈后保留 ticket 深链')
 expectIncludes(page, 'setSearchParams({ ticket: id })', '打开详情后保留 ticket 深链')
-expectIncludes(page, "loginFrom=\"/me/feedback\"", '意见反馈保留登录回跳来源')
 expectIncludes(page, 'setItems([])', '意见反馈保留游客态清空列表')
 expectIncludes(page, 'setSelected(null)', '意见反馈保留游客态清空详情')
 expectIncludes(page, 'parseFeedbackCategory(searchParams.get', '意见反馈保留 category 查询参数解析')
@@ -159,11 +158,9 @@ const forbiddenChanged = changedFiles.filter((file) =>
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
-    'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
     'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
-    'apps/kiosk/src/pages/profile/ProfilePage.tsx',
   ].includes(file) ||
   /^apps\/kiosk\/src\/pages\/(assistant|campus|companies|help)\//.test(file) ||
   /^services\/|^packages\/shared\/|^apps\/terminal-agent\//.test(file) ||
