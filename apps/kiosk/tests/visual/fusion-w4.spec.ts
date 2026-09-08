@@ -264,11 +264,24 @@ test('/jobs/:id 来源四要素缺失时停发外跳与扫码 @w4', async ({ pag
   await expect(page.getByText(/来源要素不完整，前往来源平台与扫码已停用/)).toBeVisible()
   await expect(page.getByText('来源平台未提供', { exact: true }).first()).toBeVisible()
   const sourceButton = page.getByRole('button', { name: '去来源平台投递' })
-  const qrButton = page.getByRole('button', { name: '扫码投递' }).last()
+  const qrButtons = page.getByRole('button', { name: '扫码投递' })
   await expect(sourceButton).toHaveAttribute('aria-disabled', 'true')
-  await expect(qrButton).toHaveAttribute('aria-disabled', 'true')
-  await qrButton.click()
+  // 来源四要素缺失时，页面上**每一个**扫码投递都必须停发——不是只停最后一个。
+  const qrCount = await qrButtons.count()
+  expect(qrCount).toBeGreaterThan(0)
+  for (let index = 0; index < qrCount; index += 1) {
+    await expect(qrButtons.nth(index)).toHaveAttribute('aria-disabled', 'true')
+  }
+  // 合规红线不能只靠 aria-disabled 属性挡，**处理函数本身**也必须不开二维码。
+  // 用 dispatchEvent 直接在元素上派发 click，绕过命中测试：
+  // 试过 click({ force: true }) —— 一体机是 1080×1920 舞台等比缩放，
+  // force 的坐标落不到这个按钮上，处理函数压根没被调到，反向变异（去掉
+  // openSourceQr 里的 sourceCanApply 守卫）时用例照样绿，等于断言是空的。
+  for (let index = 0; index < qrCount; index += 1) {
+    await qrButtons.nth(index).dispatchEvent('click')
+  }
   await expect(page.getByText('请使用手机扫码前往来源平台自行操作')).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: '扫码投递' })).toHaveCount(0)
   await assertNoElementCrossesViewport(page)
   await verifyPage(page, errors)
 })
