@@ -76,7 +76,13 @@ async function expectTouchFloor(locator: Locator, minimumCssHeight: number): Pro
     expect(box!.height / scale).toBeGreaterThanOrEqual(minimumCssHeight)
     const hitTested = await target.evaluate((element) => {
       const rect = element.getBoundingClientRect()
-      const inset = Math.min(3, rect.width / 4, rect.height / 4)
+      // 圆角元素的四角在几何上不在元素内：半径 r 时，距角 3px 的点会落到外面，
+      // elementFromPoint 必然命中别人。按实际圆角算最小内缩——
+      // 45° 方向要退 r(1-√2/2) 才回到圆弧内侧，再留 2px 余量。
+      const radius = Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0
+      const effectiveRadius = Math.min(radius, rect.width / 2, rect.height / 2)
+      const cornerInset = effectiveRadius * (1 - Math.SQRT1_2) + 2
+      const inset = Math.max(Math.min(3, rect.width / 4, rect.height / 4), cornerInset)
       const points = [
         [rect.left + inset, rect.top + inset],
         [rect.right - inset, rect.top + inset],
