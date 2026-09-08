@@ -34,8 +34,15 @@ git grep "job-applications|jobApplication" -- apps/kiosk/src apps/miniapp  → �
 （有用），但想跳过只需送一个 `new Date().toISOString()`。**不要在任何验收或争议场景里
 把它当作「用户已核对事实」的证据。**
 
-要变成真闸，方向是让 `assertFactsConfirmed` 去查服务端已有的确认记录
-（`persistConfirmed` 写的 `optimize_confirmed` 行），而不是信 DTO —— 需先确认两者的调用先后。
+要变成真闸，**不能只是「改成查服务端记录」** —— 调用先后已复验：
+`ai.service.ts:752` 的 `assertFactsConfirmed`（闸）和 `:852` 的 `persistConfirmed`（写记录）
+在**同一个 `exportGeneratedResume` 里，闸在前、写在后**。首次导出时那条
+`optimize_confirmed` 记录根本还不存在，改成查它会把所有正常导出全部拒掉。
+
+真正的方向是**补一个独立的确认端点**：用户在核对页点「已核对」时调用它，服务端当场
+签发并落一条确认记录（带 endUserId + taskId + 服务端时间），导出时只查这条记录、
+完全不看 DTO。这是一次功能改动（新端点 + 一体机/小程序两端接线），不是改几行判据。
+在它落地之前，本条闸按上面的定性使用。
 
 
 ## 2026-09-08 内容冷启动：只能由产品负责人本人做的事
