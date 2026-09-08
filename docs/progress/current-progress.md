@@ -1,5 +1,29 @@
 # 当前开发进度
 
+## 2026-09-08 抢救回一份被埋一个月的真机出纸证据
+
+`docs/device/print-first-order-evidence-2026-08-07.md` —— **2026-08-07 Windows 主机 +
+真实奔图打印机的真实打印首单**（任务 `ptask_kiosk_337d61d38b698d61` / 订单
+`cmsirshmc001clga8n1i2ind2`，已出纸，Kiosk 页面显示完成）。
+
+它一直只存在于 PR #548（2026-08-07 开，此后无动静），**从未进入 main**：核验时
+两个 ID 在 `origin/main` 上命中数均为 0。与此同时交付文档一直按「真机零验证」口径写，
+今天已有窗口据此对产品负责人说过「没有一张纸真的从机器里出来过」——那句话是错的。
+
+同份文档里还记着一条**会改变剩余验收工作量**的现场口径（产品负责人当时确认）：
+
+> 用户没有一体机整机，只有 Windows 主机 + 打印机 + 扫码枪 + 摄像头；
+> 「只要打开这个网站，在本地电脑能完成打印操作就行了」。
+
+**如果该口径仍然成立，`delivery.yaml` 的 BL-03「Windows 一体机真机打印/扫描/
+Terminal Agent 未验收」是在描述一台用户根本没有的设备。** 这一条不自行改写，
+需产品负责人确认后再动 BL-03。
+
+文档本身的边界照原样保留，不拔高：它明确写「不作整机商用通过结论」，
+并如实列出未完成项 —— 面板扫描（`scanWatchFolder` 未配置）、扫码枪付款码支付未实测、
+摄像头按决策不接入。
+
+
 
 2026-09-08 **材料包订单列表端点（分支 `feat/package-order-list`）**。补掉 #962 记录的开闸前置第 d 条：材料包订单在既有会员订单列表里一条都看不到 —— `/me/print-orders` 查 PrintTask（派发前 `printTaskId` 为 null）、`/me/print-orders/cloud` 的 where 带 `sourceFileId: { not: null }`（材料包多文件、该字段本就为 null）、`/me/print-orders/:orderId` 的 `requireOwned` 同一条过滤；用户下完单一旦离开，手上只剩一个到机码，而到机码不能反查订单。新增 `GET /orders/package`，复用既有 `member-page` 游标分页（不另起分页方案），路由声明在 `@Get(':id')` 之前避免被当成 id=''。**两处刻意收口**：列表不签发 `paymentSessionToken`（一次返回 N 个付款令牌只放大暴露面，付款令牌由 detail 现取）、不回逐文件明细。到机码照常返回且判据与 detail 完全一致（`visibleCode`：pending 且未过期）。实测（本地真实后端）：空态 / 未登录 401 / `pageSize=0` 400 `MEMBER_PAGE_INVALID` / 两单倒序且到机码可见 / `pageSize=1` 翻页不重复 / B 用户看不到 A 的单 / **B 拿 A 的游标同样取不到数据**。门禁并进既有 `verify:package-order-fulfillment`（不新建脚本）加 8 条断言，三方向变异全部正确变红：去掉 endUserId 过滤 → 红、把付款令牌加回来 → 红、不回到机码 → 红。typecheck 0 错误；`verify:member-print-orders` / `verify:member-assets-c2d` / `verify:backend-p0-http` 通过；项目图谱已 `pnpm graph` 重跑。**材料包四页守卫仍关闭**：还缺取消/退款端点，本轮不摘守卫。未部署、未真机。
 
