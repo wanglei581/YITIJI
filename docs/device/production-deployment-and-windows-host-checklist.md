@@ -487,9 +487,22 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 4.1 账号与资产
 
+> **2026-09-08 本地取证**：本节 4 条已有本地运行期证据，2 条 QR 需真手机与 Terminal Agent、本地无法覆盖（下面逐条写明需要什么）。
+> 明细见 [会员闭环运行期证据](../reviews/member-closure-runtime-evidence-2026-09-08.md) 附五，
+> 脚本 `apps/kiosk/scripts/probe-member-session-41.mjs`。
+> **本地 PASS 不等于可勾** —— 本地是 SQLite + 本地存储 + `AI_PROVIDER=mock`，与生产不同构。
+
 - [ ] 手机号登录/登出成功。 —— 生产待验；**本地 PASS**（登出后旧 token 立即 401，且以「登出前同一请求 200」为内建阳性对照）
 - [ ] QR 扫码登录成功：Kiosk 通过 Terminal Agent 本地桥接创建二维码，手机打开二维码 URL 后只确认登录，一体机拿到会员态；手机端不接收 member token。
+  **本地无法覆盖**（如实记，不按 PASS 也不按 FAIL）：这条要求三样本地都没有 —— 运行中的 Terminal Agent（提供本地桥接）、
+  一台能扫码的真手机、以及手机可达的基址。纯后端探针只能证明 `POST /member/auth/qr/create` 与
+  `GET /member/auth/qr/:ticketId/status` 两个端点存在并按预期返回，**证明不了「手机扫了之后一体机真的拿到会员态」**，
+  更证明不了「手机端不接收 member token」这条安全要求 —— 后者恰恰只有在真手机上抓包才看得见。
+  **复验要点**：确认手机侧响应里**没有** member token（只有确认结果），一体机侧才拿到会员态。
 - [ ] QR 二维码 URL 的公网/局域网基址可被手机访问；如果 Kiosk 页面运行在 `localhost`，必须显式配置手机可访问的 `VITE_QR_LOGIN_PUBLIC_BASE_URL`。
+  **本地无法覆盖**：本地 Kiosk 跑在 `127.0.0.1:5273`，手机不可达，这条按定义就验不了。
+  **复验要点**：在一体机真机上打开二维码页，用手机（走一体机所在局域网或公网）实际打开该 URL；
+  只看二维码渲染出来了**不算通过** —— 二维码里编的可能正是 `localhost`，扫了才会发现打不开。
 - [ ] 空闲自动退出生效。 —— 生产待验；**已有 CI 覆盖**：`kiosk-privacy-timeout.spec.ts` 23 条用例，`ci.yml:1053-1054` 两条 job 在跑，本地复跑 `23 passed`。
 - [ ] 忙碌态（上传/AI/打印中）不误触发退出。 —— 生产待验；**同上套件覆盖**（忙碌锁顺延 `VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC`）。
 - [ ] 「我的」资产区加载成功，无假数量。 —— 生产待验；**本地 PASS**（未登录 401 且响应里 0 个计数字段）
