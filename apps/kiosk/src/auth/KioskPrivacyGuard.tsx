@@ -17,6 +17,7 @@ import {
 import { useKioskBusy } from '../contexts/KioskBusyContext'
 import { useAuth } from './useAuth'
 import { useIdleLogout, type KioskIdleWarningRequest } from './useIdleLogout'
+import '../pages/session-guard/styles/session-guard-qx.css'
 
 const DEFAULT_PRIVACY_IDLE_SEC = 300
 /** 忙碌锁顺延硬截止的上限（秒）。支付轮询成功 / 语音音频活动会重置活动时刻。 */
@@ -217,11 +218,15 @@ function pushSanitizedDestination(
 function PrivacyClearingOverlay() {
   return (
     <div
-      className="pointer-events-auto fixed inset-0 z-[2147483647] bg-slate-950"
+      className="qx-privacy-clearing pointer-events-auto"
       data-kiosk-privacy-clearing="true"
+      data-screen="session-guard"
+      data-state="clearing"
+      data-testid="session-guard-state-clearing"
       role="status"
       aria-live="assertive"
     >
+      <p>正在清除本机会话</p>
       <span className="sr-only">正在清除本次使用记录</span>
     </div>
   )

@@ -164,10 +164,12 @@ assert(
   '会员会话失效登录回跳只允许站内安全路径，并拒绝登录页自循环',
 )
 
+const loginGateModel = read('src/pages/auth/loginGateModel.ts')
 assert(
   loginPage.includes('new URLSearchParams(location.search)') &&
-    loginPage.includes('isSafeInternalPath(queryFrom)') &&
-    loginPage.includes('isSafeInternalPath(fromState)'),
+    loginPage.includes('resolveLoginReturnTo(fromState, queryFrom, isSafeInternalPath)') &&
+    loginGateModel.includes('isSafe(fromState)') &&
+    loginGateModel.includes('isSafe(queryFrom)'),
   'LoginPage 对 state.from 与 query.from 使用同一站内安全回跳校验',
 )
 
@@ -219,14 +221,15 @@ assert(
   'SessionResumePage 复用 useAuth 内存 token；未登录走统一登录页，不再发 credentials-only 的恒 401 请求',
 )
 
+const sessionResumeModel = read('src/pages/session-resume/sessionResumeModel.ts')
 assert(
   sessionResumePage.includes("task.resume.kind === 'payment'") &&
     sessionResumePage.includes("navigate('/print/cashier'") &&
     sessionResumePage.includes("navigate('/print/progress'") &&
     !sessionResumePage.includes('navigate(task.route)') &&
-    sessionResumePage.includes("case 'pending'") &&
-    sessionResumePage.includes("case 'claimed'") &&
-    sessionResumePage.includes("case 'printing'"),
+    sessionResumeModel.includes("status === 'pending'") &&
+    sessionResumeModel.includes("status === 'claimed'") &&
+    sessionResumeModel.includes("status === 'printing'"),
   'SessionResumePage 只把后端恢复动作映射到支付/打印两个固定站内路由，并诚实区分 pending/claimed/printing',
 )
 

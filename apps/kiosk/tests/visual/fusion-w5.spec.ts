@@ -622,8 +622,8 @@ test('direct visit to /session-timeout without a pending warning fails closed to
 
   await expect(page).toHaveURL('http://127.0.0.1:4185/', { timeout: 5_000 })
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '继续使用', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /我还在，继续使用/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '结束并清除本机会话', exact: true })).toHaveCount(0)
   await expect(page.getByText('秒后自动退出', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: /说出你的处境/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()

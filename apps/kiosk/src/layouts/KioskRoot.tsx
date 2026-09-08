@@ -127,6 +127,10 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/scan/progress',
   '/scan/result',
   '/jobs',
+  '/screensaver',
+  '/login',
+  '/session-timeout',
+  '/session-resume',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
