@@ -273,6 +273,8 @@ export function JobsPage() {
   const screenState = facetLoading ? 'loading' : error ? 'error' : displayedJobs.length === 0 ? 'empty' : hasAnyFilter ? 'filtered' : 'default'
   return (
     <QxPageFrame
+      /* 稿 26-browse-list 原文：data-route="/jobs-service" aria-label="返回岗位服务"。 */
+      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
       title="岗位信息"
       subtitle="只展示已审核发布且在有效期内的第三方与官方岗位；来源要素不完整时仅保留只读详情。"
       status={facetLoading
