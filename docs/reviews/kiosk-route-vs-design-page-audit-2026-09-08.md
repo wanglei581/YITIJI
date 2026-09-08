@@ -77,17 +77,24 @@
 
 现有路由：`/interview/setup`、`/session`、`/report`、`/tips`、`/reports`。
 
-### 2.6 招聘会：7 个路由 → 1 张稿
+### 2.6 招聘会：~~7 个路由 → 1 张稿~~ —— **本条已撤销**
 
-`28-jobfair-enhanced.html` 的状态：`index` / `loading` / `ready` / `preview` /
-`qr` / `requested` / `documents-ready`。
+原判断：稿 `28-jobfair-enhanced.html` 的 7 个状态
+（`index` / `loading` / `ready` / `preview` / `qr` / `requested` / `documents-ready`）
+对应 `/job-fairs/:id` 的 6 个子路由，可以合成一页。
 
-现有路由：`/job-fairs/:id`、`/companies`、`/companies/:companyId`、`/map`、
-`/materials`、`/visit-plan`、`/stats`。
+**2026-09-08 复核后撤销。** 这 7 个状态是**「活动资料申领」这一个子功能的事务状态机**
+（浏览资料包 → 生成预览 → 扫码 → 提交申领 → 就绪可取），只对应
+`/job-fairs/:id/materials` **一条**路由，不是 7 个子页。
 
-> 这条要谨慎：招聘会子页里「展位导览图」「参会企业名录」是 CLAUDE.md §9A
-> 点名的能力，合并时不能丢；稿把它们做成同一页内的分区而不是独立路由。
-> **需要逐个核对稿内是否真有对应分区**，不能照数字直接砍。
+判据是状态名的时序语义：`preview → qr → requested → documents-ready` 是一条
+单向事务链，不是并列的信息板块。而 `/map`（展位导览）、`/companies`（参会企业名录）、
+`/stats` 是 CLAUDE.md §9A 点名的**独立能力**，是重浏览的信息模块，
+在 27 寸竖屏上塞不进同一张工作台，也不该塞。
+
+**教训：用「稿的状态数」推「该合几个路由」，只在状态名与路由段能一一对应时成立**
+（第 2.1 条 self-assessment 那种）。状态名是一条事务链时，它描述的是**一个功能的生命周期**，
+不是多个功能的合集。这两种情况从状态数上看不出区别，必须读状态名的语义。
 
 ## 三、代码自身的重复（与稿无关，纯属堆叠）
 
@@ -139,8 +146,7 @@
 | 3 | 自我探索 4 → 1（稿 34） | 2~3 | 低，状态键逐字对应 |
 | 4 | 扫描 4 → 1（稿 18） | 2 | 中，涉硬件轮询 |
 | 5 | 面试训练 5 → 1（稿 29） | 2 | 中 |
-| 6 | 招聘会 7 → 1（稿 28） | 3 | **高**，须逐分区核对 §9A 能力不丢 |
-| 7 | `/print/progress` + `/print/done` → 一张交付页（稿 15） | 0 | 低，但 PR #938 已在改这两页，需协调 |
+| 6 | `/print/progress` + `/print/done` → 一张交付页（稿 15） | 0 | 低，但 PR #938 已在改这两页，需协调 |
 
 ## 六、关于「为什么会交替」
 
@@ -187,3 +193,59 @@
 > 记一笔方法教训：用正则找导航来源，遇到参数路由（`/a/:id/b`）必然大面积误判，
 > 因为真实调用是模板字面量。**初筛出来的每一条都必须手工复核**，
 > 否则会得出「招聘会 6 个子页全是死路由」这种完全相反的结论。
+
+---
+
+## 附二：合并路由在「公共终端」这个形态下的三条约束（2026-09-08 复核后补）
+
+一体机不是普通网页。把 N 个路由合成「一页 + N 个状态」，在这个形态下有三处
+普通 Web 不会遇到的坑。三条都已核对过当前代码，结论写在每条末尾。
+
+### 约束一：重定向必须带状态，裸 `replace` 有害
+
+原计划要求「旧路由一律保留为 `Navigate replace`」。**这条是错的。**
+
+裸的 `<Navigate to="/print/desk" replace />` 会把从 `/print/preview` 深链进来的用户
+**静默重置到第 1 步**——用户以为回到了预览，实际参数全丢，比直接报错更难排查。
+
+改为带状态透传：
+
+```tsx
+{ path: 'print/material-check', element: <Navigate to="/print/desk?step=check" replace /> },
+{ path: 'print/preview',        element: <Navigate to="/print/desk?step=preview" replace /> },
+```
+
+并且：**能否进入某阶段仍由真实前置条件决定**。检查没过就不许落到 preview，
+带了 `?step=preview` 也不行。URL 是意图，不是授权。
+
+> 一体机没有收藏夹，但有二维码深链接（手机扫码上传 `/upload/phone`、
+> 到机码取件 `/member/qr-login`），所以旧地址仍然会被外部持有，不能直接删。
+
+### 约束二：状态必须能从 `sessionStorage` 复水
+
+一体机有看门狗会自动 reload，夜间也有定时刷新。两个路由时靠 URL 记住走到哪；
+合成一页后若状态只在 React state 里，**一次刷新就跌回第 1 步**——
+用户若已扫码付款，这是死局。
+
+**当前代码这条已经是对的，合并时别改坏：**
+`apps/kiosk/src/pages/print/printMaterialSession.ts`（**冻结文件**）已把流程状态写进
+`sessionStorage`（`readPrintMaterialSession` / `savePrintMaterialSession` /
+`patchPrintMaterialSession`）。合并后的页必须首屏就复水，
+并有 E2E 钉死「走到 preview → reload → 仍在 preview」。
+
+### 约束三：换人清场不许改成挂 unmount
+
+多路由天然靠组件销毁做清理；单页多状态若改成手工 `resetState()`，
+一旦某个异常分支漏了清理，**下一个排队的人会看到上一个人的文件名 / 姓名 / 手机号**。
+
+**当前代码这条也已经是对的：** 清理是集中式的，走
+`apps/kiosk/src/auth/kioskSensitiveSession.ts:33` 的 `clearPrintMaterialSession()`，
+不依赖路由 unmount。所以合并路由**不会**引入隐私残留——前提是不许把清理搬到 unmount 上。
+
+### 一条没解决的：排障埋点会失焦
+
+多路由时，远程看板能直接看出用户卡在 `/print/material-check` 还是 `/print/preview`；
+合成一个 URL 后就看不出来了。一体机现场没有前端控制台，全靠上报。
+
+**未解决。** 合并时应把阶段名带进上报事件（而不是只报 URL），
+否则线上排障成本会上升。这条不阻塞合并，但要在实现时一并处理。
