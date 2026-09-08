@@ -639,6 +639,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
+          pnpm --filter @ai-job-print/api verify:launch-audit-p5
           # LLM 超时 + 全局并发闸门：派生式扫描所有 LLM 调用点都带 signal，
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
@@ -882,6 +883,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
+          pnpm --filter @ai-job-print/api verify:launch-audit-p5
           # LLM 超时 + 全局并发闸门：派生式扫描所有 LLM 调用点都带 signal，
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。
           pnpm --filter @ai-job-print/api verify:llm-timeout-concurrency
