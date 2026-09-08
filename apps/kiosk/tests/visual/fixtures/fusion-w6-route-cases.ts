@@ -208,7 +208,11 @@ export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
   /* 2026-09-08 移出 '/' 与 '/print-scan'：两条已迁入青序流光，运行时不再挂 V6 壳
    * （KioskRoot 的 `isV6Route` 带 `!isQxRoute`，且两条已从 `V6_SHELL_ROUTES` 移出）。
    * 契约一字未改——表内仍要求真的挂上 V6 壳、表外仍要求不得被误伤染成 V6；
-   * 这两条只是从表内挪到表外，于是现在被断言「不是 V6 壳」，正是迁移后的事实。 */
+   * 这两条只是从表内挪到表外，于是现在被断言「不是 V6 壳」，正是迁移后的事实。
+   *
+   * 2026-09-09 再移出 '/profile'：同样口径。#931 把它加进 QX_MIGRATED_ROUTES
+   * 却漏了这两张表，main 的 kiosk-browser-smoke 因此连红两次合并
+   * （run 34263887180：「同时出现在两张表里：/profile」）。 */
   '/resume-service',
   '/jobs-service',
   '/fairs-service',
