@@ -11,6 +11,11 @@ import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { seedMaterialSession, W2_FILE } from './fixtures/fusion-w2-state'
+import {
+  formatMissingSourceFourElements,
+  missingSourceFourElements,
+  scanForbiddenCopy,
+} from '../../scripts/lib/sweep-copy-guards.mjs'
 
 // 截图目录：CI 里落到 test-results 下随失败产物一起上传；本地可用 JOURNEY_SHOTS_DIR 覆盖。
 const SHOTS = process.env.JOURNEY_SHOTS_DIR ?? 'test-results/human-journey'
@@ -228,21 +233,15 @@ test.describe('真人走查（模拟数据）', () => {
       await page.waitForTimeout(2500)
       await step(page, s, 'job-detail')
       const body = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
-      // 合规硬约束：必须展示来源机构 / 同步时间 / 外部 ID，且不得出现平台内投递文案。
-      //
-      // **必须先剔白名单再查黑名单**，不是优化是正确性要求 —— 本项目的合规写法就是在
-      // 违规写法前面加限定词，所以白名单天然包含黑名单：
-      //   「去来源平台投递」⊃「平台投递」   「来源平台投递页」⊃「平台投递」
-      //   「去来源平台预约」⊃「平台预约」   「扫码投递」⊃「投递」
-      // 2026-09-08 实测：不剔白名单直接查，会把合规的「打开来源平台投递页」判成违规。
-      const ALLOWED = ['去来源平台投递', '来源平台投递页', '来源平台', '扫码投递', '去来源平台预约', '扫码预约']
-      let scan = body
-      for (const ok of ALLOWED) scan = scan.split(ok).join('')
-      for (const banned of ['一键投递', '立即投递', '平台投递', '平台内投递', '企业收简历', '候选人管理', '简历筛选', '面试邀约']) {
-        expect(scan, `岗位详情出现违规文案「${banned}」`).not.toContain(banned)
-      }
-      // 合规必展示的四要素（缺一不可）
-      for (const must of ['青岛市公共就业服务中心', 'EXT-job-001', '同步时间', '不接收简历']) {
+      // 合规硬约束：不得出现平台内投递文案，且必须展示来源四要素。
+      // 先剔白名单再查黑名单 —— WHY: 子串误报的真实案例：合规文案「去来源平台投递」含黑名单词「平台投递」。
+      const forbidden = scanForbiddenCopy(body)
+      expect(forbidden, `岗位详情出现违规文案「${forbidden.join('、')}」`).toEqual([])
+      // 正向断言 —— WHY: 缺陷可以表现为该显示的没显示，黑名单查不出来。
+      const missing = missingSourceFourElements(body)
+      expect(missing, formatMissingSourceFourElements(missing) || '来源四要素').toEqual([])
+      // 夹具值：来源机构名与外部ID 必须是这一条岗位的，不能只看见标签。
+      for (const must of ['青岛市公共就业服务中心', 'EXT-job-001', '不接收简历']) {
         expect(body, `岗位详情缺少必须展示的「${must}」`).toContain(must)
       }
       console.log(`\n  岗位详情含来源机构：${body.includes('青岛市公共就业服务中心')}`)

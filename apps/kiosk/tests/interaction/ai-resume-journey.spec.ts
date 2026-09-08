@@ -28,6 +28,7 @@ import {
   operateControl,
   recordStep,
   scanForbidden,
+  scanForbiddenCopy,
   shot,
   uploadResumePdf,
   waitReady,
@@ -139,7 +140,7 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     await startDiagnosis(page, journey, collectors)
     await shot(page, journey, 'report')
     const body = await page.locator('body').innerText()
-    expect(body.replace(/去来源平台投递|来源平台投递/g, ''), '合规禁词').not.toMatch(/一键投递|立即投递|平台投递/)
+    expect(scanForbiddenCopy(body), '合规禁词').toEqual([])
 
     const reportButtons = [
       { name: /导出 PDF/, skip: false },
