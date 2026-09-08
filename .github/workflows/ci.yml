@@ -12,9 +12,17 @@ on:
   pull_request:
   workflow_dispatch:
 
+# PR 分支上「新推送取消旧运行」是对的，省 CI 时间；
+# 但 main 上取消会让**发布永远拿不到绿运行号** —— 部署强制要求
+# `name=CI && head_branch=main && conclusion=success` 的运行号，
+# 而任何一次合并都会把正在跑的 main CI 掐掉。
+# 2026-09-08 实测：main 上最近 25 次 CI，**20 次 cancelled / 4 次 success**，
+# 一个上线阻塞级修复因此连续三轮发不出去。
+# 因此 main 的运行必须跑完；代价是快速连续合并时 main 上会并行几个运行，
+# 这个成本远低于「发不出去」。
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build-and-verify:
@@ -81,6 +89,7 @@ jobs:
           pnpm verify:repository-integrity
           # 生产闸门 ↔ 部署脚本持久化清单必须同步（2026-09-06 缺一个键让发布在 PM2 重启后失败）
           pnpm verify:deploy-gates-in-sync
+          pnpm verify:ci-main-runs-complete
           pnpm verify:release-bundle
           pnpm verify:prod-readonly-probe
           pnpm verify:ci-gate-coverage

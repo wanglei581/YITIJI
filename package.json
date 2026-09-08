@@ -35,7 +35,8 @@
     "verify:datetime-honesty": "node --experimental-strip-types scripts/verify-datetime-honesty.mjs",
     "verify:list-truncation-honesty": "node scripts/verify-list-truncation-honesty.mjs",
     "verify:no-raw-error-render": "node scripts/verify-no-raw-error-render.mjs",
-    "verify:mock-server-contract": "node scripts/verify-mock-server-contract.mjs"
+    "verify:mock-server-contract": "node scripts/verify-mock-server-contract.mjs",
+    "verify:ci-main-runs-complete": "node scripts/verify-ci-main-runs-complete.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
