@@ -354,11 +354,57 @@ export function partnerFairListWhere(
  */
 const CREDENTIAL_QUERY_KEY_RE = /(^|[_-])(token|key|secret|sign|signature|password|passwd|pwd)$/i
 
+/**
+ * 无分隔符的凭证参数名。
+ *
+ * 上面那条正则要求凭证词前面是开头或 `_` / `-`，于是 `apikey` / `appsecret` /
+ * `accesstoken` 这些**连写**形式全部漏过 —— 2026-09-08 走查实测：`?token=` 拦住了，
+ * `?apikey=` `?appsecret=` `?accesstoken=` `?appkey=` 四个一个没拦。`appsecret` 尤其
+ * 严重：CLAUDE.md §12 把「appSecret 只能保存在服务端」列为红线，而它能被合作机构
+ * 直接写进 endpoint 存库，再随同步请求发出去、随日志与 Partner 页面展示出来。
+ *
+ * 为什么用枚举而不是放宽正则：放宽成「参数名以 key 结尾」会把 `?monkey=banana` 误拦
+ * —— 那正是上面注释里记下的、当初特意避开的反例。连写形式没有构词规律可循，只能按
+ * 真实世界用过的参数名逐个登记；新增前请确认它确实是某个平台在用的凭证参数名。
+ */
+const CREDENTIAL_QUERY_KEY_EXACT = new Set([
+  'apikey', 'apisecret', 'apitoken', 'apipassword',
+  'appkey', 'appsecret', 'apptoken',
+  'accesskey', 'accesstoken', 'accesssecret',
+  'authkey', 'authtoken',
+  'secretkey', 'privatekey', 'publickey',
+  'clientkey', 'clientsecret',
+  'sessiontoken', 'bearertoken', 'refreshtoken', 'idtoken',
+  'signature', 'sig',
+])
+
+function queryKeyIsCredential(key: string): boolean {
+  const k = key.trim().toLowerCase()
+  return CREDENTIAL_QUERY_KEY_EXACT.has(k) || CREDENTIAL_QUERY_KEY_RE.test(k)
+}
+
+/**
+ * URL 的 userinfo 段（`https://user:pass@host/path`）同样是把凭证写进了地址，
+ * 但它根本不在 query 里，旧实现只看 `url.search`，所以完全看不到它。
+ */
+function endpointHasUserInfo(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint)
+    return url.username !== '' || url.password !== ''
+  } catch {
+    // URL 解析不了时退回字面判断：scheme 之后、第一个 `/` 之前若出现 `@` 即视为 userinfo。
+    const withoutScheme = endpoint.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    const authority = withoutScheme.split('/')[0] ?? ''
+    return authority.includes('@')
+  }
+}
+
 export function endpointQueryContainsCredential(endpoint: string): boolean {
+  if (endpointHasUserInfo(endpoint)) return true
   const query = extractUrlQuery(endpoint)
   if (query.length === 0) return false
   for (const key of new URLSearchParams(query).keys()) {
-    if (CREDENTIAL_QUERY_KEY_RE.test(key)) return true
+    if (queryKeyIsCredential(key)) return true
   }
   return false
 }
@@ -369,6 +415,9 @@ export function redactEndpointQueryCredentials(endpoint: string | null | undefin
   try {
     const url = new URL(endpoint)
     url.search = ''
+    // userinfo 也要抹掉：只清 search 会把 `https://u:p@host/` 原样留下。
+    url.username = ''
+    url.password = ''
     return url.toString()
   } catch {
     const q = endpoint.indexOf('?')
