@@ -14,11 +14,19 @@
 | 生成小程序码（`getwxacodeunlimit`） | ✅ 已合入 main（#968，`POST /api/v1/miniapp-code`） |
 | 场景码签发 + 兑换（服务端） | ✅ 本次合入 |
 | 一体机改成展示小程序码 | ⬜ 待做（本人 lane） |
-| **小程序读 `scene` 并兑换** | ⬜ **待做（小程序 lane）** —— 全仓当前零处理 `scene` |
+| **小程序读 `scene` 并兑换** | ✅ #974（新建 `pages/kiosk-send/kiosk-send`） |
 
-小程序那一半没做完之前，一体机**不要**切成小程序码：扫进去会落在
-`pages/print-upload/print-upload` 而参数被忽略，等于给用户一条走不通的路
-（CLAUDE.md §9「不伪造能力」）。
+### 落点：`pages/kiosk-send/kiosk-send`，不是 `pages/print-upload/print-upload`
+
+本文档第一版写的是 `pages/print-upload/print-upload`，**已作废**。小程序 lane 核实后
+没有采纳，理由成立：那个页是**云打印下单页**（接 `fileId`、按 `utils/print-pricing`
+算价、建打印订单），和「把文件递进面前这台机器的上传会话」是两条链路，混在一起两个
+流程会互相污染。#974 为此新建了 `pages/kiosk-send/kiosk-send`。
+
+因此 `getwxacodeunlimit` 的 `page` 参数取 **`pages/kiosk-send/kiosk-send`**。
+
+小程序那一半上线之前，一体机**不要**切成小程序码 —— 扫进去参数被忽略，
+等于给用户一条走不通的路（CLAUDE.md §9「不伪造能力」）。
 
 ## 为什么不能把 sessionId + token 直接塞进 scene
 
@@ -76,7 +84,7 @@ form-data: uploadToken=<上一步的 uploadToken>, file=<文件>
 ## 小程序侧需要做什么
 
 ```js
-// pages/print-upload/print-upload.js
+// pages/kiosk-send/kiosk-send.js
 onLoad(options) {
   // 扫小程序码进来时，微信把 scene 放在 options.scene，且是 URL 编码过的
   const scene = options.scene ? decodeURIComponent(options.scene) : ''
@@ -95,3 +103,15 @@ onLoad(options) {
 
 `pnpm --filter @ai-job-print/api verify:upload-scene` —— 17 条断言。
 有 `REDIS_URL` 时打真实 Redis（CI 即如此），没有时退到进程内 RESP 桩。
+
+## #974 实施时确认的三条（写进来免得下一个人重踩）
+
+1. **兑换失败不要给「重试」按钮。** 码已经被消费掉了，重试必然再失败一次，
+   只会让用户以为是网络抖动。此时唯一有效的动作是回一体机重新生成 —— 页面就该直接这么写。
+2. **小程序内扫码（相机）走的是另一条入口。** `kiosk-login` 原先只认登录票据
+   （正则写死 `ticketId`），扫上传码会报「这不是一体机登录码」—— 而用户扫的恰恰
+   就是终端屏幕上那个码。需要按码型分流。
+3. **网页上传码的参数在 fragment 里，不是 query。** 一体机侧
+   `buildPhoneUploadUrl` 用的是 `url.hash`（`#sessionId=..&token=..`），
+   用 `[?&]` 匹配不到。小程序码那条链路不受影响（scene 是 query 参数），
+   但同一个页要同时认这两种码时会踩到。
