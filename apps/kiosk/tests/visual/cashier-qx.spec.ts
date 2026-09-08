@@ -104,7 +104,15 @@ test('cashier exposes a failed channel request and retries the real endpoint @w2
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
   await expect(page.locator('[data-qx-state="channel-failed"]')).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('支付通道服务暂不可用')
+  // 原先逐字钉「支付通道服务暂不可用」。文案已改成
+  // 「服务暂时不可用，请稍后重试或联系现场工作人员」—— 更好（多给了下一步动作）。
+  // 改成钉**不变量**而不是句子：必须说了不可用，且必须给出可执行的下一步。
+  // 逐字钉整句会让每次文案打磨都变成一次假红，作者就会去改断言而不是看页面。
+  {
+    const alertText = (await page.getByRole('alert').innerText()).replace(/\s+/g, '')
+    expect(alertText, '通道拉取失败时必须明说不可用').toMatch(/不可用|失败/)
+    expect(alertText, '必须给出可执行的下一步，而不是只报故障').toMatch(/重试|稍后|工作人员/)
+  }
   await page.getByRole('button', { name: '重新读取支付通道' }).click()
   await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
   expect(api.requestCount('GET', '/api/v1/payment/channels')).toBe(2)
@@ -118,6 +126,13 @@ test('code-pay success cannot release print before pay-status reaches paid @w2',
     : { status: 200, json: payStatus('paying', {
         attemptId: 'qx-code-attempt', channel: 'wechat', status: 'pending', qrCodeContent: null, expiresAt: null,
       }) })
+  // 付款码链路现在多一步**对账**（先 reconcile 再决定能否放行），
+  // 这是付款安全上的加强，不是回归。缺这条 mock 时 ApiRouter 会以
+  // 「Unhandled API requests: POST /api/v1/orders/:id/pay/reconcile」失败。
+  api.respond('POST', `/api/v1/orders/${W2_ORDER.orderId}/pay/reconcile`, {
+    status: 200,
+    json: { success: true, data: { status: 'pending' } },
+  })
   let codePayPayload: unknown = null
   let releaseRequests = 0
   await routeExactJson(page, 'POST', `/api/v1/orders/${W2_ORDER.orderId}/code-pay`, async (route) => {
@@ -136,7 +151,9 @@ test('code-pay success cannot release print before pay-status reaches paid @w2',
 
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', { ...CASHIER_STATE, taskId: undefined })
-  await page.getByRole('button', { name: '出示手机付款码' }).click()
+  // 按钮文案已从「出示手机付款码」改成「扫付款码 / 出示你的付款码」。
+  // 用正则匹配可见文案，不逐字钉整块（那块是两行文案拼的）。
+  await page.getByRole('button', { name: /出示你的付款码/ }).click()
   await page.getByLabel('付款码输入区（内容不显示）').pressSequentially('123456789012345678')
 
   await expect(page.locator('[data-qx-state="awaiting-code-confirmation"]')).toBeVisible()
@@ -173,7 +190,17 @@ test('cashier 1080x1920 controls satisfy scaled hit targets and dispatch pointer
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
   await expect(page.locator('[data-qx-state="pending"]')).toBeVisible()
-  await expect(page.locator('.cashier-qx-route button')).toHaveCount(6)
+  // 原先写的是 toHaveCount(6)。那个 6 是在**「退出支付」还缺失时**数出来的 ——
+  // 等于把一个缺陷写成了期望值；后来按钮补回来（人工走查发现的），本该当场变红，
+  // 可这个 spec 那时哪个 playwright config 都没匹配到，一条都没跑过。
+  //
+  // 改成钉**必须存在的出口**：数量可以随产品增减，「能选通道」和「能退出去」不能少。
+  for (const required of ['微信支付', '支付宝', '返回确认页', '退出支付']) {
+    await expect(
+      page.getByRole('button', { name: required }),
+      `收银台必须保留「${required}」—— 少了它用户会被困在付款页`,
+    ).toHaveCount(1)
+  }
   await page.getByRole('button', { name: '微信支付' }).click()
   await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
 
@@ -184,7 +211,13 @@ test('cashier 1080x1920 controls satisfy scaled hit targets and dispatch pointer
     const controls = [...routeRoot.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]')]
     return controls.map((control) => {
       const rect = control.getBoundingClientRect()
-      const inset = Math.min(2, rect.width / 4, rect.height / 4)
+      // 角点必须落在**圆角之内**。原先固定 inset = 2px，而按钮 border-radius 是 8px ——
+      // 距角 2px 的点在圆角外面，elementFromPoint 必然返回父容器
+      // （实测 blocker 是 .cashier-qx-picker-options 与 .qx-ctabar，都是按钮自己的父元素，
+      //  不是任何遮挡层）。于是这条断言恒假：它测的是圆角，不是可触达性。
+      // 按半径取内缩，探点才真正落在控件上。
+      const radius = Number.parseFloat(getComputedStyle(control).borderTopLeftRadius) || 0
+      const inset = Math.min(Math.max(2, radius), rect.width / 4, rect.height / 4)
       const points = [
         [rect.left + inset, rect.top + inset],
         [rect.right - inset, rect.top + inset],
@@ -207,7 +240,9 @@ test('cashier 1080x1920 controls satisfy scaled hit targets and dispatch pointer
       }
     })
   })
-  expect(measurements).toHaveLength(5)
+  // 原先写死 5。收银台补回「退出支付」后变成 6 —— 又一个把当时状态当期望的魔法数字。
+  // 改成钉「每一个可点控件都要满足触控要求」，数量交给上面按名字的存在性断言去管。
+  expect(measurements.length, '收银台必须至少有通道选择 + 两个出口').toBeGreaterThanOrEqual(4)
   for (const control of measurements) {
     expect(control.cssWidth, `${control.label} width`).toBeGreaterThanOrEqual(48)
     expect(control.cssHeight, `${control.label} height`).toBeGreaterThanOrEqual(48)

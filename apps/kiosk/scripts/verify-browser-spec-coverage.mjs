@@ -64,22 +64,57 @@ function listSpecs(dir) {
   return out
 }
 const specs = [...new Set(listSpecs(join(kioskRoot, 'tests')))].sort()
+const specPathByName = new Map()
+;(function index(dir) {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    if (statSync(full).isDirectory()) index(full)
+    else if (name.endsWith('.spec.ts')) specPathByName.set(name, full)
+  }
+})(join(kioskRoot, 'tests'))
+/** 标签命中过的 spec（至少在某个 project 下能跑出用例）。 */
+const tagOk = new Set()
+/** 标签一条都不命中的 spec → 原因。 */
+const tagMiss = new Map()
 
 const invoked = [...new Set(ciYml.match(/test:browser[a-z:0-9-]*/g) ?? [])]
 const covered = new Set()
 for (const script of invoked) {
   const cmd = pkg[script]
   if (!cmd) continue
-  for (const file of cmd.match(/tests\/\S+?\.spec\.ts/g) ?? []) covered.add(basename(file))
-  for (const cfgName of cmd.match(/--config[= ]([^\s]+)/g) ?? []) {
-    const cfgPath = join(kioskRoot, cfgName.replace(/^--config[= ]/, ''))
+  const files = (cmd.match(/tests\/\S+?\.spec\.ts/g) ?? []).map((f) => basename(f))
+  for (const file of files) covered.add(file)
+  const cfgNames = (cmd.match(/--config[= ]([^\s]+)/g) ?? []).map((c) => c.replace(/^--config[= ]/, ''))
+  // 没写 --config 就是默认 playwright.config.ts
+  for (const cfgName of cfgNames.length > 0 ? cfgNames : ['playwright.config.ts']) {
     let cfg
-    try { cfg = readFileSync(cfgPath, 'utf8') } catch { continue }
+    try { cfg = readFileSync(join(kioskRoot, cfgName), 'utf8') } catch { continue }
     const tm = cfg.match(/testMatch:\s*\/(.+?)\/[a-z]*\s*,/)
-    // 没写 testMatch 的 config 会跑 testDir 下全部
-    if (!tm) { specs.forEach((s) => covered.add(s)); continue }
-    const rx = new RegExp(tm[1])
-    specs.filter((s) => rx.test(s)).forEach((s) => covered.add(s))
+    const matched = tm ? specs.filter((s) => new RegExp(tm[1]).test(s)) : (files.length > 0 ? files : specs)
+    // 显式点名的文件不受 testMatch 限制（playwright 会直接跑它）
+    for (const s of files.length > 0 ? files : matched) covered.add(s)
+    if (files.length === 0) for (const s of matched) covered.add(s)
+
+    // ── 标签闸：文件被跑到 ≠ 用例会跑 ──────────────────────────────────
+    // 每个 project 都有 grep（如 /@kiosk/）。spec 的用例标题不带那个标签，
+    // 这个文件跑起来就是 0 条用例，而且**没有任何报错** ——
+    // 2026-09-08 实测 cashier-qx.spec.ts 正是如此：它打的是 @w2，
+    // 却既不在 w2 config 的 testMatch 里，默认 config 又只吃 @kiosk，于是哪儿都不跑。
+    let projects = [...cfg.matchAll(/name:\s*'([^']+)'[^}]*?grep:\s*\/([^/]+)\//g)].map((m) => ({ name: m[1], grep: m[2] }))
+    const pinned = cmd.match(/--project=(\S+)/)
+    if (pinned) projects = projects.filter((p) => p.name === pinned[1])
+    for (const s of files.length > 0 ? files : matched) {
+      const specPath = specPathByName.get(s)
+      if (!specPath) continue
+      const src = readFileSync(specPath, 'utf8')
+      const titles = [...src.matchAll(/\btest(\.\w+)?\(\s*(['"`])([\s\S]*?)\2/g)]
+        .filter((m) => m[1] !== '.describe')
+        .map((m) => m[3])
+      if (titles.length === 0) continue
+      if (projects.length === 0) { tagOk.add(s); continue }
+      if (projects.some((p) => titles.some((title) => new RegExp(p.grep).test(title)))) tagOk.add(s)
+      else tagMiss.set(s, `${script} / ${cfgName} 的 project ${projects.map((p) => p.name).join('|')}（grep ${projects.map((p) => '/' + p.grep + '/').join(' ')}）下 ${titles.length} 条用例全不命中`)
+    }
   }
   if (/^playwright test$/.test(cmd.trim())) specs.forEach((s) => covered.add(s))
 }
@@ -96,6 +131,15 @@ check(
   orphans.length === 0,
   `以下 spec 没有任何 CI 步骤会跑到：\n      ${orphans.join('\n      ')}\n`
     + '    要么把它挂进 ci.yml 的某个 test:browser* 脚本，要么在本门禁的 EXEMPT 里写明为什么不该跑。',
+)
+
+const tagDead = [...tagMiss.keys()].filter((s) => !tagOk.has(s) && !EXEMPT.has(s))
+check(
+  '被 CI 跑到的 spec，至少有一条用例命中 project 的 grep',
+  tagDead.length === 0,
+  `以下 spec 文件进了 CI，但一条用例都不会跑：\n      `
+    + tagDead.map((s) => `${s} —— ${tagMiss.get(s)}`).join('\n      ')
+    + '\n    文件接进 CI ≠ 用例会跑：playwright 的 project 带 grep，标题不带那个标签就是 0 条，且不报错。',
 )
 
 // 豁免只许减不许增：写下当前值，改大必须显式改这个数并说明。
