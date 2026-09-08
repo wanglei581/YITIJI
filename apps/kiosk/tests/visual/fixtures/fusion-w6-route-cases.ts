@@ -73,7 +73,7 @@ async function seedResumeCompare(page: Page): Promise<void> {
 
 const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/', url: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
-  { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后，简历和记录', landmark: 'none' },
+  { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后继续办理', landmark: 'none' },
   { pattern: '/member/qr-login', url: '/member/qr-login?ticketId=w6-ticket', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '上传链接已失效' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
@@ -141,7 +141,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: w2('pickup-claim'), featureText: '输入你的到机码' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("小青的作业面")', featureText: '小青的作业面' },
-  { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续上次")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
+  { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续打印任务")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
   { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', marker: 'h1:text-is("线上招聘平台")', featureText: '线上招聘平台' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
