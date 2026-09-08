@@ -36,7 +36,7 @@ export function JobAiSessionRecords({
   if (items.length === 0) return null
   return (
     <>
-      <div className="qx-me-legal">岗位 AI 参考记录 · 仅展示会话元数据，不展示简历原文、提示词或模型原始输出。分析结果仅供参考</div>
+      <div className="qx-me-legal">岗位 AI 参考记录 · 仅展示岗位 AI 会话元数据，不展示简历原文、提示词或模型原始输出。分析结果仅供参考</div>
       {items.map((item) => {
         const meta = OPERATION_META[item.session.operation]
         const status = STATUS_META[item.session.status]
