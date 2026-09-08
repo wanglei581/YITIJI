@@ -226,8 +226,17 @@ test.describe('真人走查（模拟数据）', () => {
       await step(page, s, 'jobs-fulltime')
     }
 
-    // 列表里点第一条岗位
-    const first = page.getByText('前端开发工程师').first()
+    // 列表里点第一条岗位。
+    //
+    // 这里必须点「查看岗位」按钮，不能点标题：青序流光迁移（#941）之后
+    // 列表卡片 `<article className="jf-row">` 上没有 onClick，只有这颗按钮会跳转。
+    // 点标题什么也不会发生 —— 本用例此前正是这么写的，于是一路停在列表页，
+    // 却报成「岗位详情缺少来源四要素」。（它没在 CI 跑过，所以没人看见。）
+    //
+    // 卡片整体是否也该可点，是**产品问题不是测试问题**：那颗收藏按钮里写着
+    // `event.stopPropagation()`，而只有整卡可点时这行才有意义 —— 已单独反馈给迁移 lane。
+    // 本用例只钉住「有一条 sanctioned 的路径能进详情」，不替产品决定卡片交互。
+    const first = page.getByRole('button', { name: '查看岗位' }).first()
     if (await first.count()) {
       await first.click()
       await page.waitForTimeout(2500)
@@ -447,6 +456,25 @@ test.describe('真人走查（模拟数据）', () => {
     const s: Step = { n: 0 }
     const TASK = 'journey-scan-001'
     let polls = 0
+    // 扫描结果页现在直接接打印核价（迁移后新增的一步）。缺这两条 mock 时
+    // ApiRouter 会以「Unhandled API requests: POST /api/v1/orders/quote」失败 ——
+    // 那是产品新增了能力，不是回归。
+    api.respond('GET', '/api/v1/print/price-config', {
+      status: 200,
+      json: { success: true, data: { items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] } },
+    })
+    api.respond('POST', '/api/v1/orders/quote', {
+      status: 200,
+      json: {
+        amountCents: 100, billablePages: 1, billingPageSource: 'detected',
+        priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 1, amountCents: 100 }],
+      },
+    })
+    // 核价之后还会建单（付费单先建单再进收银），同样是迁移后新增的一步。
+    api.respond('POST', '/api/v1/print/jobs', {
+      status: 200,
+      json: { success: true, data: { orderId: 'journey-scan-order-001', jobId: 'journey-scan-job-001', status: 'pending_payment', amountCents: 100 } },
+    })
     api.respond('POST', '/api/v1/scan/sessions', {
       status: 200,
       json: {

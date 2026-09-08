@@ -11,6 +11,7 @@
     "test:browser": "playwright test",
     "test:browser:fusion-smoke": "playwright test tests/visual/fusion-smoke.spec.ts",
     "test:browser:smoke": "playwright test tests/visual/fusion-smoke.spec.ts tests/visual/route-sweep.spec.ts",
+    "test:browser:journeys": "playwright test tests/visual/human-journey.spec.ts tests/visual/job-fair-policy-journey.spec.ts tests/visual/account-assets-journey.spec.ts tests/visual/cashier-qx.spec.ts tests/visual/career-plan-materials.spec.ts tests/visual/resume-optimize-draft.spec.ts tests/visual/qr-login-render.spec.ts --project=kiosk-1080x1920",
     "test:browser:route-sweep": "playwright test tests/visual/route-sweep.spec.ts --project=kiosk-1080x1920",
     "test:browser:w1": "playwright test --config=playwright.w1.config.ts",
     "test:browser:w2": "playwright test --config=playwright.w2.config.ts",
@@ -115,6 +116,7 @@
     "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs",
     "verify:scan-input-safety": "node scripts/verify-scan-input-safety.mjs",
     "test:browser:scan-safety": "playwright test --config=playwright.scan-safety.config.ts",
+    "verify:kiosk-browser-spec-coverage": "node scripts/verify-browser-spec-coverage.mjs",
     "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs",
     "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs",
     "verify:terminal-session-self-heal": "node scripts/verify-terminal-session-self-heal.mjs"
