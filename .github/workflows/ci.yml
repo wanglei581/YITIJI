@@ -531,6 +531,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:cjk-font
           # 包 D：服务端文档转换（Word → PDF）契约 / 超时 / 并发 / 归属 / 能力为假时 fail-closed（fake 引擎，不需要 LibreOffice）
           pnpm --filter @ai-job-print/api verify:document-conversion
+          pnpm --filter @ai-job-print/api verify:conversion-queue-bound
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
