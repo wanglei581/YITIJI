@@ -79,6 +79,7 @@
     "verify:resume-diagnosis-flow-ui": "node scripts/verify-resume-diagnosis-flow-ui.mjs && pnpm run verify:resume-report-qx && pnpm run verify:resume-decisions",
     "verify:resume-report-qx": "node scripts/verify-resume-report-qx.mjs",
     "verify:resume-decisions": "node scripts/verify-resume-decisions.mjs",
+    "verify:resume-export-facts-contract": "node scripts/verify-resume-export-facts-contract.mjs",
     "verify:job-info-ui": "node scripts/verify-job-info-ui.mjs",
     "verify:job-ai-ui": "node scripts/verify-job-ai-ui.mjs",
     "verify:job-ai-history-privacy-ui": "node scripts/verify-job-ai-history-privacy-ui.mjs",
