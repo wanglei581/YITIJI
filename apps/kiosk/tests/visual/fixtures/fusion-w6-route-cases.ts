@@ -221,9 +221,9 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 107) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 108) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
 // 2026-09-08 两次合并各新增一条（/print/desk、/interview）；kiosk 由 104 增至 106；mobile 仍为 2。
-if (w6KioskCases.length !== 105) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 106) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
