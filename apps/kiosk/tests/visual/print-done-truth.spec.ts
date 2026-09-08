@@ -133,6 +133,15 @@ test('completed backend status overrides a forged failure state @kiosk', async (
   await expect(page.getByText('打印完成', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('请取走文件', { exact: true })).toBeVisible()
   await expect(page.getByText('伪造失败')).toHaveCount(0)
+  // 2026-09-08 反向变异：原先这里只有 `toHaveCount(0)`。满意度分组长在反馈弹层里、
+  // 弹层默认关闭（PrintDonePage 的 feedbackOpen 初值 false），所以那条断言**永远为真** ——
+  // 无论满意度功能是否还活着都不会红，属「断言所在的分支从不执行」。
+  // 现在改成两段：先确认它不裸露在完成页主界面，再驱动出弹层正向断言完成态收得到分
+  // （PrintDonePage 传 showSatisfaction={resultState === 'completed'}）。
+  await expect(page.getByRole('group', { name: '满意度评分' })).toHaveCount(0)
+  await page.getByRole('button', { name: '反馈问题' }).click()
+  await expect(page.getByRole('group', { name: '满意度评分' })).toBeVisible()
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('group', { name: '满意度评分' })).toHaveCount(0)
 
   await page.getByRole('button', { name: '使用帮助' }).click()
