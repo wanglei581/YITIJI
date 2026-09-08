@@ -58,6 +58,7 @@ assert.match(main, /\[kiosk-route-error\]/)
 // actionbar 由重定向目的地 /print/preview 提供，故从本清单移除。
 for (const path of [
   '/print/upload',
+  '/print/desk',
   '/print/material-check', '/print/preview', '/print/confirm',
   '/print/cashier', '/print/progress', '/scan/start', '/scan/settings',
   '/scan/progress', '/scan/result', '/print-scan/convert', '/print-scan/sign',

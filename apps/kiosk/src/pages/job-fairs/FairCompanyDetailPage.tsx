@@ -9,6 +9,7 @@ import { recordExternalJump } from '../../services/api/activity'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
+import { savePrintMaterialSession } from '../print/printMaterialSession'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import {
@@ -102,17 +103,17 @@ export function FairCompanyDetailPage() {
     try {
       const printable = await prepareFairCompanyPrint(fairId, company.id, variant)
       if (!printable.printFileUrl) throw new Error('打印链接未就绪')
+      const file = {
+        name: printable.filename,
+        size: formatSize(printable.sizeBytes),
+        pages: printable.pageCount > 0 ? printable.pageCount : null,
+        fileId: printable.fileId,
+        fileUrl: printable.printFileUrl,
+        mimeType: printable.mimeType,
+      }
+      savePrintMaterialSession({ file })
       navigate('/print/preview', {
-        state: {
-          file: {
-            name: printable.filename,
-            size: formatSize(printable.sizeBytes),
-            pages: printable.pageCount > 0 ? printable.pageCount : null,
-            fileId: printable.fileId,
-            fileUrl: printable.printFileUrl,
-            mimeType: printable.mimeType,
-          },
-        },
+        state: { file },
       })
     } catch (err) {
       setPrintError(userMessageOf(err, '打印文件准备失败，请稍后重试'))

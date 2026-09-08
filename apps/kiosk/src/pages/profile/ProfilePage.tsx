@@ -9,6 +9,7 @@ import { useMemberProfileOverview } from './assets/useMemberProfileOverview'
 import { ProfileEntrySection } from './components/ProfileEntrySection'
 import { ProfileHeader } from './components/ProfileHeader'
 import { PendingTaskBanner, ProfileSessionRecords } from './components/ProfileSessionRecords'
+import { savePrintMaterialSession } from '../print/printMaterialSession'
 import { SECTIONS } from './profileEntries'
 import type { AIRecord, Entry, IncomingState, ResumeItem, ScanItem } from './profileTypes'
 import './profile-inkpaper.css'
@@ -105,8 +106,10 @@ export function ProfilePage() {
   }
 
   const printFile = (file: { name: string; size: string; pages?: number }) => {
+    const next = { name: file.name, size: file.size, pages: file.pages ?? 1 }
+    savePrintMaterialSession({ file: next })
     navigate('/print/preview', {
-      state: { file: { name: file.name, size: file.size, pages: file.pages ?? 1 } },
+      state: { file: next },
     })
   }
 

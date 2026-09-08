@@ -16,6 +16,7 @@ import { getTerminalId, isTerminalKiosk } from '../../services/api/screensaver'
 import { getTerminalCode } from '../../services/api/terminalConfig'
 import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { savePrintMaterialSession } from '../print/printMaterialSession'
 import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { ConvertImagesCta } from './ConvertImagesPanels'
 import { ConvertImagesView } from './ConvertImagesView'
@@ -240,19 +241,18 @@ export function ConvertImagesPage() {
 
   const handlePrint = () => {
     if (!result) return
+    const file = {
+      name: outputFileName(result.pages),
+      size: formatBytes(result.sizeBytes),
+      pages: result.pages,
+      fileId: result.fileId,
+      fileUrl: result.printFileUrl,
+      fileMd5: result.fileMd5,
+      mimeType: 'application/pdf',
+    }
+    savePrintMaterialSession({ file, source: 'document' })
     navigate('/print/material-check', {
-      state: {
-        file: {
-          name: outputFileName(result.pages),
-          size: formatBytes(result.sizeBytes),
-          pages: result.pages,
-          fileId: result.fileId,
-          fileUrl: result.printFileUrl,
-          fileMd5: result.fileMd5,
-          mimeType: 'application/pdf',
-        },
-        source: 'document',
-      },
+      state: { file, source: 'document' },
     })
   }
 

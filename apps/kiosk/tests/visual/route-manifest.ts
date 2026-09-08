@@ -13,7 +13,7 @@ export const productionRoutePatterns = [
   '/smart-campus/service/:key', '/print-scan', '/print-scan/feature/:key',
   '/print-scan/convert', '/print-scan/sign', '/print/scan-convert',
   '/print/scan-sign', '/print/scan-feature', '/print/upload',
-  '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
+  '/print/desk', '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
   '/print/cashier', '/print/progress', '/print/done', '/resume',
   '/resume/upload', '/resume/source', '/resume/generate',
   '/resume/generate/preview', '/resume/parse', '/resume/report',
@@ -41,15 +41,17 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 106 routes (was 104)
+] as const // 107 routes (was 106; 2026-09-08 打印台合并新增 /print/desk)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
   '/print/scan-sign': '/print-scan/sign',
   '/print/scan-feature': '/print-scan/feature/id-photo',
-  // 2026-08-18：打印参数页下线（控件与 /print/preview 完全重复且全站零导航），
-  // 路由保留为兼容重定向，106 路由冻结基线不变。
-  '/print/params': '/print/preview',
+  // 2026-08-18：打印参数页下线（控件与预览阶段完全重复且全站零导航），
+  // 2026-09-08 起随预览一并进入打印台。
+  '/print/params': '/print/desk?step=preview',
+  '/print/material-check': '/print/desk?step=check',
+  '/print/preview': '/print/desk?step=preview',
   '/resume': '/resume/source',
   '/resume/upload': '/resume/source',
   // AI-07：/resume/export 孤儿占位页下线，真实导出在优化页。

@@ -227,6 +227,23 @@ test('conversion success stays on the page until the print CTA and does not clai
       },
     },
   })
+  // 合成 PDF 进打印台后会立刻开始材料检查。本用例只断言出口落到 /print/desk，
+  // 不跑完整 PII 链，所以给一个最小完成态，避免 ApiRouter 把 POST 判成未处理。
+  api.respond('POST', '/api/v1/materials/tasks', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        id: 'w2-convert-inspection',
+        kind: 'inspection',
+        status: 'completed',
+        sourceFileId: 'w2-pdf-guest',
+        result: { mode: 'real', checks: { pageCount: 1, canPrint: true, messages: [] } },
+        createdAt: '2026-07-24T00:00:00.000Z',
+        updatedAt: '2026-07-24T00:00:00.000Z',
+      },
+    },
+  })
 
   await page.goto('/print-scan/convert')
   await page.locator('input[type="file"]').setInputFiles({
@@ -245,7 +262,7 @@ test('conversion success stays on the page until the print CTA and does not clai
   expect(box, '主按钮必须能量到尺寸').not.toBeNull()
   expect(box!.height, '主按钮高度（1080 舞台未缩放）不得小于 56px').toBeGreaterThanOrEqual(56)
   await printCta.click()
-  await expect(page).toHaveURL(/\/print\/material-check$/)
+  await expect(page).toHaveURL(/\/print\/desk\?step=check/)
   expect(errors).toEqual([])
 })
 

@@ -50,6 +50,7 @@ import {
 import { computePrintUsageEstimate } from './printUsageEstimate'
 import { countPagesInRange } from './pageRange'
 import { materialRedactionBadge } from './piiRedaction'
+import { isPrintDeskPreviewAuthorized, privacyPreviewGate } from './printDeskModel'
 import './styles/print-desk-qx.css'
 
 type PrintFile = PrintFileState
@@ -59,11 +60,6 @@ interface LocationState {
   materialCheck?: MaterialCheckSummary
   source?: PrintMaterialSource
 }
-
-type PrivacyPreviewGate =
-  | { kind: 'ready'; confirmationLabel: null }
-  | { kind: 'confirm'; confirmationLabel: string }
-  | { kind: 'blocked'; confirmationLabel: null }
 
 type SuggestionState =
   | { status: 'idle' | 'loading'; data: null; message: string | null }
@@ -91,55 +87,6 @@ function colorModeLabel(mode: ColorMode): string {
 
 function duplexLabel(mode: DuplexMode): string {
   return DUPLEX_OPTIONS.find((option) => option.value === mode)?.label ?? mode
-}
-
-function privacyPreviewGate(
-  materialCheck: MaterialCheckSummary | undefined,
-  file: PrintFile,
-): PrivacyPreviewGate {
-  const redaction = materialCheck?.redaction
-  if (!redaction?.claim) return { kind: 'blocked', confirmationLabel: null }
-
-  if (redaction.claim === 'nothing_to_redact') {
-    return { kind: 'ready', confirmationLabel: null }
-  }
-
-  if (redaction.claim === 'not_supported') {
-    return redaction.unredactedAcknowledgedAt
-      ? { kind: 'ready', confirmationLabel: null }
-      : {
-          kind: 'confirm',
-          confirmationLabel: '我已逐页核对预览，知道本机没有生成遮挡文件，仍确认使用原文件',
-        }
-  }
-
-  const isUsingDerivedFile = Boolean(redaction.redactedFileId && file.fileId === redaction.redactedFileId)
-  if (!isUsingDerivedFile) return { kind: 'blocked', confirmationLabel: null }
-  if (redaction.previewConfirmedAt) return { kind: 'ready', confirmationLabel: null }
-
-  const remaining = redaction.reverifyRemainingCount
-  if (remaining !== null && remaining > 0) {
-    return {
-      kind: 'confirm',
-      confirmationLabel: `我已逐页核对预览，知道仍检出 ${remaining} 处未盖住，仍确认继续`,
-    }
-  }
-  if (redaction.claim === 'partial') {
-    return {
-      kind: 'confirm',
-      confirmationLabel: '我已逐页核对预览，知道有片段未能定位，仍确认继续',
-    }
-  }
-  if (redaction.claim === 'redacted_unverified') {
-    return {
-      kind: 'confirm',
-      confirmationLabel: '我已逐页核对预览，知道机器复检未完成，仍确认继续',
-    }
-  }
-  return {
-    kind: 'confirm',
-    confirmationLabel: '我已逐页核对遮挡后的文件，确认可以继续',
-  }
 }
 
 function previewKindForFile(file: PrintFile): 'pdf' | 'image' | 'word' | 'unsupported' | 'unavailable' {
@@ -248,7 +195,11 @@ function suggestionValueLabel(item: PrintParamSuggestionItem): string {
   return String(item.suggestedValue ?? '需要手动设置')
 }
 
-export function PrintPreviewPage() {
+export function PrintPreviewPage({
+  onBackToCheck,
+}: {
+  onBackToCheck?: () => void
+} = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -256,21 +207,16 @@ export function PrintPreviewPage() {
   const restoredSession = useMemo(() => readPrintMaterialSession(), [])
 
   const emptyFile: PrintFile = { name: '', size: '', pages: null }
-  const file = locationState?.file ?? restoredSession?.file ?? emptyFile
-  const materialCheck = locationState?.materialCheck ?? restoredSession?.materialCheck
+  const file = restoredSession?.file ?? locationState?.file ?? emptyFile
+  const materialCheck = restoredSession?.materialCheck ?? locationState?.materialCheck
   const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
   const restoredPrintParams = restoredSession?.printParams
   const restoredParamsWereRestricted = restoredPrintParams ? hasUnverifiedPrintParams(restoredPrintParams) : false
-  const source = locationState?.source ?? restoredSession?.source
+  const source = restoredSession?.source ?? locationState?.source
   const uploadPath = printUploadPathForSource(source)
-  const hasFile = Boolean(locationState?.file || restoredSession?.file)
+  const hasFile = Boolean(restoredSession?.file || locationState?.file)
   const privacyGate = privacyPreviewGate(materialCheck, file)
-  const materialCheckTasksComplete = Boolean(
-    materialCheck?.inspectionTaskId &&
-    materialCheck.piiTaskId &&
-    materialCheck.piiRedactTaskId,
-  )
-  const materialCheckComplete = materialCheckTasksComplete && privacyGate.kind !== 'blocked'
+  const materialCheckComplete = isPrintDeskPreviewAuthorized(materialCheck, file)
 
   const {
     printerName,
@@ -452,7 +398,13 @@ export function PrintPreviewPage() {
               className="qx-btn"
               data-variant="primary"
               type="button"
-              onClick={() => navigate(canRunCheck ? '/print/material-check' : uploadPath, canRunCheck ? { state: { file, source } } : undefined)}
+              onClick={() => {
+                if (canRunCheck && onBackToCheck) {
+                  onBackToCheck()
+                  return
+                }
+                navigate(canRunCheck ? '/print/material-check' : uploadPath, canRunCheck ? { state: { file, source } } : undefined)
+              }}
             >
               {canRunCheck ? '完成材料检查' : '重新选择文件'}
             </button>
@@ -496,7 +448,13 @@ export function PrintPreviewPage() {
       status={status}
       ctabar={(
         <>
-          <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print/material-check', { state: { file, source } })}>返回材料检查</button>
+          <button className="qx-btn" data-variant="ghost" type="button" onClick={() => {
+            if (onBackToCheck) {
+              onBackToCheck()
+              return
+            }
+            navigate('/print/material-check', { state: { file, source } })
+          }}>返回材料检查</button>
           <p className="why">
             {unsupported
               ? '当前文件类型不能直接预览打印，请返回重新选择文件。'

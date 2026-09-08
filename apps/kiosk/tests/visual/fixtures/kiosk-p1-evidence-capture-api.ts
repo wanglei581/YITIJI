@@ -171,8 +171,13 @@ export async function prepareSessionTimeoutCapture(page: Page, api: ApiRouter): 
 
 export async function seedPrintFlow(page: Page, path: string, extra: Record<string, unknown> = {}): Promise<void> {
   await seedP1MaterialSession(page)
-  await page.goto(path)
-  await setReactRouterState(page, path, {
+  const dest = path === '/print/material-check'
+    ? '/print/desk?step=check'
+    : path === '/print/preview'
+      ? '/print/desk?step=preview'
+      : path
+  await page.goto(dest)
+  await setReactRouterState(page, dest, {
     file: W2_FILE,
     params: W2_PRINT_PARAMS,
     source: 'document',
