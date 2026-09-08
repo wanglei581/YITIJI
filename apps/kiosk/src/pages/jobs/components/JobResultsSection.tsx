@@ -98,7 +98,19 @@ function JobResultCard({
   // 列表只承诺进入只读详情；外跳与扫码仍由详情页按四要素 fail-closed。
   const validSource = evaluateJobSourceTrust(job).ok
   return (
-    <article className={`jf-row${validSource ? '' : ' is-source-blocked'}`} aria-label={job.title}>
+    <article
+      className={`jf-row${validSource ? '' : ' is-source-blocked'}`}
+      aria-label={job.title}
+      role="button"
+      tabIndex={0}
+      data-testid={`job-row-${job.id}`}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        onOpen()
+      }}
+    >
       <div className="jf-row-main">
         <div className="jf-row-title">
           <b>{job.title}</b>
@@ -132,7 +144,15 @@ function JobResultCard({
       >
         <StarIcon className={favorite ? 'fill-current' : ''} aria-hidden="true" />
       </button>
-      <button type="button" className="qx-job-view" onClick={onOpen}>
+      <button
+        type="button"
+        className="qx-job-view"
+        onClick={(event) => {
+          // 整卡已经可点，这里不挡冒泡会让一次点击触发两次 onOpen。
+          event.stopPropagation()
+          onOpen()
+        }}
+      >
         查看岗位
         <ChevronRightIcon aria-hidden="true" />
       </button>
