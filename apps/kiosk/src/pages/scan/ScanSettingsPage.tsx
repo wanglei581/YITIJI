@@ -328,7 +328,7 @@ export function ScanSettingsPage() {
       page="scan-settings"
       state="panel-instruction"
       title="扫描指引"
-      subtitle="扫描任务已创建，请仅按服务端返回的当前会话指引操作"
+      subtitle={<><b>扫描任务已创建</b>，请仅按服务端返回的当前会话指引操作。</>}
       status={{ tone: 'ok', label: '第 2 步 · 去面板操作' }}
       ctabar={
         <ScanCta>

@@ -226,7 +226,7 @@ export function ScanProgressPage() {
     <ScanWorkbenchShell
       page="scan-progress"
       state={workbenchState}
-      title="等待扫描完成"
+      title="等待打印机端扫描完成"
       subtitle="请在打印机面板完成扫描到本机接收目录；本页每 3 秒自动检测结果"
       status={status}
       facts={['面板扫完就回到这台屏幕：本机每隔几秒自动查一次，有结果会自动切过去。']}

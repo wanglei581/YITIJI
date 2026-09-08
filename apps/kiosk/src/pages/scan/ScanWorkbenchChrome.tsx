@@ -31,7 +31,7 @@ export function ScanWorkbenchShell({
   page: 'scan-start' | 'scan-settings' | 'scan-progress' | 'scan-result'
   state: ScanWorkbenchState
   title: string
-  subtitle: string
+  subtitle: ReactNode
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   ctabar: ReactNode
   facts?: readonly string[]
