@@ -552,11 +552,15 @@ export function PrintProgressPage() {
         ? (isFreeOrder ? <>订单已建立，<em>正在出纸</em>。</> : <>支付成功，<em>正在出纸</em>。</>)
         : <>{realStatus.headerTitle}，<em>请留在机器旁</em>。</>
 
+  // 小青这句必须和顶栏 subtitle 说不同的事：顶栏报状态，小青报「在印什么、你该干嘛」。
+  // 稿 15 原文是「两份文件依次打印。你可以先在旁边等，不用贴着机器。」
+  // 拿不到真实份数时只给等待指引，不编数字（§9 不伪造）。
+  const copiesText = params?.copies && params.copies > 1 ? `${params.copies} 份文件依次打印。` : ''
   const askDoing = isSim
     ? (simDone ? '未真实打印，未创建打印任务' : '当前为演示模式，不会建单、支付或出纸')
     : failed
       ? (isSim ? '仅模拟异常处理，未创建任务、未扣费、未发送打印' : '任务遇到问题，即将跳转至结果页')
-      : realStatus.headerSubtitle
+      : `${copiesText}你可以先在旁边等，不用贴着机器。`
 
   return (
     <QxPageFrame
