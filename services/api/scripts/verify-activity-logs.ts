@@ -349,25 +349,88 @@ async function main() {
       w('立即', '投递'),
       w('平台', '投递'),
     ]
-    for (const f of scanFiles) {
-      // 扫描的是用户侧文案（JSX / 字符串），跳过纯注释行——代码中的合规红线注释
-      // 需要引用禁词本身来说明「禁止什么」（如 CampusPage 红线注释），不属于违规文案。
-      // 「去来源平台投递/预约」「已登录用户」是合规文案，先剥离避免子串误中。
-      const content = readFileSync(join(repoRoot, f), 'utf8')
-        .split('\n')
-        .filter((line) => {
-          const t = line.trim()
-          return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*')
-        })
-        .join('\n')
+    // 否定词后到句末的片段视为否认句。句末以中英文句读为界，换行同样断句 ——
+    // 避免一个否定词把后面整段都豁免掉。
+    const DENIAL_CLAUSE =
+      /(?:不代表|不表示|不等于|不构成|不意味|不属于|并非|不是|不会|不提供|不接收|不参与|不做|无需|未)[^。；;.\n]*/g
+
+    /**
+     * 剥离「不算违规」的片段后再做禁词匹配。
+     *
+     * 真实文件扫描与下面的自检**必须调用同一个函数** —— 各写一份等于自检测的是副本，
+     * 改坏正本时自检照样绿（门禁自己在说谎）。
+     */
+    const stripCompliantPhrases = (text: string): string =>
+      text
         .replaceAll('来源平台投递', '')
         .replaceAll('来源平台预约', '')
         .replaceAll('登录用户', '')
         .replaceAll('记录用于', '')
+        // 剥离**否认句**：以否定词起、到句末标点为止的片段整段不参与禁词匹配。
+        //
+        // 起因（2026-09-08 实测）：JobFairsPage 的合规免责声明
+        // 「收藏只是这台终端的浏览辅助，不代表已预约、已报名或已签到。」被判违规 ——
+        // 子串匹配分不出「声称状态」和「否认状态」，而**否认恰恰是合规要求的写法**。
+        // 不修的话，每写一句诚实的免责声明都会撞红，作者只能去改措辞绕开门禁，
+        // 长期看会把「不敢写免责声明」变成事实标准。
+        //
+        // 只剥到下一个句读为止，所以「不代表已预约。已签到」里的第二个仍会被抓。
+        .replace(DENIAL_CLAUSE, '')
+
+    for (const f of scanFiles) {
+      // 扫描的是用户侧文案（JSX / 字符串），跳过纯注释行——代码中的合规红线注释
+      // 需要引用禁词本身来说明「禁止什么」（如 CampusPage 红线注释），不属于违规文案。
+      // 「去来源平台投递/预约」「已登录用户」是合规文案，先剥离避免子串误中。
+      const content = stripCompliantPhrases(
+        readFileSync(join(repoRoot, f), 'utf8')
+          .split('\n')
+          .filter((line) => {
+            const t = line.trim()
+            return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*')
+          })
+          .join('\n'),
+      )
       for (const w of bannedCopy) {
         if (content.includes(w)) fail(`13. ${f} 含违规状态文案「${w}」`)
       }
     }
+
+    // ── 自检：否认句剥离必须双向正确 ──────────────────────────────────
+    // 放松一条合规门禁时，光验「以前红的现在绿了」是不够的 —— 必须同时证明
+    // 「真正的违规仍然被抓」。否则这次修复本身就是给违规发通行证。
+    //
+    // 样本一律用 w() 拼，理由和 bannedCopy 一样：不让字面禁词出现在本文件源码里。
+    //
+    // 每条样本**原文必须真的命中禁词**（下面的元断言会验）。否则用例是空的 ——
+    // 2026-09-08 第一版就栽了两次：期望「抓住」的样本写了「已报名」，而禁词表里
+    // 只有「报名成功」；期望「放行」的样本原文压根不含禁词，剥不剥离都绿。
+    // 两处都是照我自己的假设写断言，不是照真实禁词表写。
+    const denialSelfTest: Array<[boolean, string]> = [
+      // 必须放行：合规免责声明（否认状态，不是声称状态）
+      [false, `收藏只是这台终端的浏览辅助，不代表已预约、已报名或${w('已', '签到')}。`],
+      [false, `本终端不提供${w('一键', '投递')}，请去来源平台投递。`],
+      [false, `打开来源平台不代表${w('投递', '成功')}。`],
+      [false, `本页不会记录${w('预约', '成功')}与否。`],
+      // 必须抓住：真的在声称状态
+      [true, `你${w('已', '签到')}，请入场。`],
+      [true, `${w('预约', '成功')}！座位已锁定。`],
+      [true, `点击${w('一键', '投递')}`],
+      // 否认句只剥到句末，后半句仍要抓 —— 这条钉住「不会因一个否定词豁免整段」
+      [true, `不代表已预约。${w('已', '签到')} 3 家企业。`],
+      [true, `${w('报名', '成功')}，凭二维码入场`],
+      [true, `恭喜你被${w('录', '用')}`],
+    ]
+    for (const [shouldHit, sample] of denialSelfTest) {
+      // 元断言：样本原文必须含禁词，否则这条用例什么也没证明。
+      if (!bannedCopy.some((word) => sample.includes(word))) {
+        fail(`13. 否认句自检样本无效（原文不含任何禁词）：${sample.slice(0, 24)}`)
+      }
+      const hit = bannedCopy.some((word) => stripCompliantPhrases(sample).includes(word))
+      if (hit !== shouldHit) {
+        fail(`13. 否认句自检不符（期望${shouldHit ? '抓住' : '放行'}）：${sample.slice(0, 24)}`)
+      }
+    }
+
     const kioskApi = readFileSync(join(repoRoot, 'apps/kiosk/src/services/api/activity.ts'), 'utf8')
     if (!kioskApi.includes('.catch(() => {')) fail('13. 前端上报封装必须吞掉失败（fire-and-forget）')
     if (!/recordBrowse[\s\S]{0,200}?\): void/.test(kioskApi)) fail('13. recordBrowse 应为 void（调用方不可 await 阻塞）')
