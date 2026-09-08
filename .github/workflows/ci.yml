@@ -667,6 +667,10 @@ jobs:
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
           pnpm --filter @ai-job-print/api verify:upload-sessions
+          # 扫码上传的小程序场景码：明文不落库、兑换一次性、兑换即轮换上传令牌、
+          # 失败路径不当预言机。跑进程内 RESP 桩，不连库不连外部 Redis，
+          # 所以只挂在本 job（postgres-readiness 那边加一遍纯属重复耗时）。
+          pnpm --filter @ai-job-print/api verify:upload-scene
           # 进程内 NestFactory 起 AppModule、随机端口监听（无需外部 API 服务），
           # 覆盖扫码上传 HTTP 契约与手机端错误信封不泄露。会员会话需要真实 Redis。
           pnpm --filter @ai-job-print/api verify:upload-sessions:http
