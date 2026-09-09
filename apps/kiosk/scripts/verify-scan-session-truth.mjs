@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -125,5 +126,62 @@ assert.match(scanFormat, /mime === 'image\/jpeg'[\s\S]{0,40}return 'JPEG'/, 'jpe
 assert.match(scanFormat, /mime === 'image\/png'[\s\S]{0,40}return 'PNG'/, 'png mime maps to PNG')
 assert.match(scanFormat, /mime === 'application\/pdf'[\s\S]{0,40}return 'PDF'/, 'pdf mime maps to PDF')
 assert.match(scanFormat, /if \(!mime\) return '未知格式'/, 'missing mime maps to 未知格式')
+
+const workbench = read('src/pages/scan/ScanWorkbenchPage.tsx')
+assert.match(workbench, /readScanWorkbenchSession/, 'workbench rehydrates from sessionStorage')
+assert.match(workbench, /replace: true/, 'workbench stage changes replace history')
+
+/* 2026-09-08 补：三条公共终端约束里，「复水」和「replace」上面已有断言，
+ * 但「URL 是意图不是授权」和「离开进度阶段必须停轮询」当时只在代码里，没被钉住。
+ * 这两条恰恰是最容易被后人一行改回去的：
+ *   - 把 resolveScanView 改成直接返回 requested，深链就能伪造一场扫描；
+ *   - 把 ScanProgressPage 提到条件外常驻，轮询就在别的阶段一直打接口。 */
+const workbenchModel = read('src/pages/scan/scanWorkbenchModel.ts')
+assert.match(
+  workbenchModel,
+  /isScanStageAuthorized\s*\(/,
+  'URL 是意图不是授权：阶段准入必须过 isScanStageAuthorized，不能直接采信 ?stage=',
+)
+assert.match(
+  workbenchModel,
+  /if \(stage === 'progress'\) return hasLiveSession/,
+  '没有扫描会话时 progress 阶段不许落地（深链也不行）',
+)
+assert.match(
+  workbenchModel,
+  /if \(stage === 'result'\) return hasResult/,
+  '没有扫描结果时 result 阶段不许落地（不伪造已完成）',
+)
+assert.match(
+  workbench,
+  /view === 'progress' \? \(\s*<ScanProgressPage/,
+  '轮询只在 progress 阶段挂载：ScanProgressPage 必须条件渲染，常驻会让轮询在别的阶段继续打接口',
+)
+assert.doesNotMatch(
+  workbench,
+  /clearScanWorkbenchSession/,
+  'workbench must not clear the scan session on unmount',
+)
+assert.match(
+  read('src/auth/kioskSensitiveSession.ts'),
+  /SCAN_WORKBENCH_SESSION_KEY/,
+  'scan workbench session key is registered for leftover detection',
+)
+assert.match(
+  read('src/pages/scan/scanWorkbenchSession.ts'),
+  /sessionStorage/,
+  'scan live credentials persist only in the dedicated session module',
+)
+
+const modelTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-workbench-model.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  modelTest.status,
+  0,
+  `scan workbench model unit test failed: ${modelTest.stderr || modelTest.stdout}`,
+)
 
 console.log('ALL PASS scan session truth contract')

@@ -62,7 +62,7 @@ async function fulfillCreatedSession(route: Route): Promise<void> {
 async function enterSettingsFromVisibleStart(page: Page): Promise<void> {
   await page.goto('/scan/start')
   await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
-  await page.waitForURL('**/scan/settings')
+  await page.waitForURL(/\/scan\?stage=settings/)
 }
 
 test('scan start does not probe a nonexistent device endpoint and carries explicit state @kiosk', async ({ page, api }) => {
@@ -80,8 +80,9 @@ test('scan start does not probe a nonexistent device endpoint and carries explic
   expect(deviceRequests()).toBe(0)
 
   await next.click()
-  await page.waitForURL('**/scan/settings')
-  expect(await page.evaluate(() => window.history.state?.usr)).toMatchObject({ scanType: 'resume' })
+  await page.waitForURL(/\/scan\?stage=settings/)
+  const stored = await page.evaluate((key) => JSON.parse(window.sessionStorage.getItem(key) ?? '{}') as { scanType?: string }, 'ai-job-print:current-scan-workbench')
+  expect(stored).toMatchObject({ scanType: 'resume' })
 })
 
 test('direct scan settings access never posts a session @kiosk', async ({ page, api }) => {
@@ -149,18 +150,22 @@ test('success renders only server instructions and creates and cancels once in S
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toBeVisible()
   await expect(page.getByText('\u626b\u63cf\u4efb\u52a1\u5df2\u521b\u5efa', { exact: true })).toBeVisible()
   expect(createRequests()).toBe(1)
-  const persistedControlToken = await page.evaluate((token) => {
-    const values = (storage: Storage) => Array.from({ length: storage.length }, (_, index) => {
-      const key = storage.key(index)
-      return key === null ? null : storage.getItem(key)
-    })
-    return [...values(window.localStorage), ...values(window.sessionStorage)]
-      .some((value) => value?.includes(token))
+  const persisted = await page.evaluate((token) => {
+    const inLocal = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
+      .some((key) => key !== null && (window.localStorage.getItem(key) ?? '').includes(token))
+    const workbench = window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? ''
+    return {
+      inLocal,
+      inWorkbench: workbench.includes(token),
+      inUrl: window.location.href.includes(token),
+    }
   }, CONTROL_TOKEN)
-  expect(persistedControlToken).toBe(false)
+  expect(persisted.inLocal).toBe(false)
+  expect(persisted.inUrl).toBe(false)
+  expect(persisted.inWorkbench).toBe(true)
 
   await page.getByRole('button', { name: '\u8fd4\u56de\uff08\u53d6\u6d88\u4efb\u52a1\uff09' }).click()
-  await page.waitForURL('**/scan/start')
+  await page.waitForURL(/\/scan(\?stage=start)?$|\/scan\?stage=start/)
   await expect.poll(cancelRequests).toBe(1)
 })
 
@@ -258,7 +263,7 @@ test('leaving while creation is in flight cancels the late-created session once 
   await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
   await createReceived
   await page.getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' }).first().click()
-  await page.waitForURL('**/scan/start')
+  await page.waitForURL(/\/scan(\?stage=start)?$|\/scan\?stage=start/)
   releaseCreate?.()
   await expect.poll(cancelRequests).toBe(1)
 })

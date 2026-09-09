@@ -18,7 +18,7 @@ export const productionRoutePatterns = [
   '/resume/upload', '/resume/source', '/resume/generate',
   '/resume/generate/preview', '/resume/parse', '/resume/report',
   '/resume/optimize', '/resume/optimize/compare', '/resume/export', '/resume/templates', '/resume/materials', '/resume-service',
-  '/scan/start', '/scan/settings', '/scan/progress', '/scan/result', '/jobs',
+  '/scan', '/scan/start', '/scan/settings', '/scan/progress', '/scan/result', '/jobs',
   '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/jobs-service', '/notifications',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
   '/job-fairs/:id', '/job-fairs/:id/companies', '/fairs-service',
@@ -41,7 +41,7 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 107 routes (was 106; 2026-09-08 打印台合并新增 /print/desk)
+] as const // 108 routes (was 107; 2026-09-08 扫描工作台合并新增 /scan)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
@@ -56,4 +56,9 @@ export const compatibilityRedirects = {
   '/resume/upload': '/resume/source',
   // AI-07：/resume/export 孤儿占位页下线，真实导出在优化页。
   '/resume/export': '/resume/optimize',
+  // 2026-09-08：青序流光 18-scan-workbench 把四页合成 /scan 工作台。
+  '/scan/start': '/scan?stage=start',
+  '/scan/settings': '/scan?stage=settings',
+  '/scan/progress': '/scan?stage=progress',
+  '/scan/result': '/scan?stage=result',
 } as const

@@ -19,6 +19,12 @@ import {
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanStage } from './scanWorkbenchModel'
+import {
+  patchScanWorkbenchSession,
+  readScanWorkbenchSession,
+  type ScanResultSnapshot,
+} from './scanWorkbenchSession'
 
 type ScanBusyPhase = 'active' | 'terminal'
 
@@ -53,16 +59,17 @@ function buildResultFileState(file: ScanSessionFileView) {
   }
 }
 
-export function ScanProgressPage() {
+export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as LocationState
-  const scanTaskId = state.scanTaskId
-  const scanType = state.scanType ?? 'document'
-  // controlToken 只经由 router state 在内存中传递（不落 localStorage/sessionStorage），
-  // 刷新本页会丢失、必须回 /scan/start 重新发起——这是刻意的，见 B1-8 任务说明。
-  const controlToken = state.controlToken
+  const stored = readScanWorkbenchSession()
+  const scanTaskId = stored?.live?.scanTaskId ?? state.scanTaskId
+  const scanType = stored?.scanType ?? state.scanType ?? 'document'
+  // controlToken 优先读本次一体机会话（kioskSensitiveSession 清场会清掉），
+  // 其次才是 router state。不上屏、不进链接、不进 localStorage。
+  const controlToken = stored?.live?.controlToken ?? state.controlToken
 
   const hasTaskIdentity = Boolean(scanTaskId && controlToken)
   const pollFailsRef = useRef(0)
@@ -76,6 +83,25 @@ export function ScanProgressPage() {
   const cancellingRef = useRef(false)
   const pollNowRef = useRef<() => void>(() => undefined)
 
+  const returnToStart = () => {
+    patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
+    if (onGoStage) onGoStage('start')
+    else navigate('/scan/start', { replace: true })
+  }
+
+  const finishWithResult = (result: ScanResultSnapshot) => {
+    patchScanWorkbenchSession({
+      stage: 'result',
+      scanType,
+      result,
+    })
+    if (onGoStage) {
+      onGoStage('result')
+      return
+    }
+    navigate('/scan/result', { replace: true, state: { scanType, ...result } })
+  }
+
   useBusyLock(hasTaskIdentity && busyPhase === 'active')
 
   useEffect(() => {
@@ -86,7 +112,9 @@ export function ScanProgressPage() {
 
   useEffect(() => {
     if (!scanTaskId || !controlToken) {
-      navigate('/scan/start', { replace: true })
+      patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
+      if (onGoStage) onGoStage('start')
+      else navigate('/scan/start', { replace: true })
       return undefined
     }
 
@@ -110,38 +138,44 @@ export function ScanProgressPage() {
         setError(null)
         if (status.status === 'completed' && status.file) {
           setBusyPhase('terminal')
-          navigate('/scan/result', {
-            replace: true,
-            state: { scanType, success: true, outcome: 'completed', file: buildResultFileState(status.file) },
+          finishWithResult({
+            outcome: 'completed',
+            success: true,
+            file: buildResultFileState(status.file),
           })
           return
         }
         if (status.status === 'completed' && !status.file) {
           setBusyPhase('terminal')
-          navigate('/scan/result', {
-            replace: true,
-            state: { scanType, success: false, outcome: 'completed-no-file', reason: '扫描已完成但未拿到文件，请重新扫描' },
+          finishWithResult({
+            outcome: 'completed-no-file',
+            success: false,
+            reason: '扫描已完成但未拿到文件，请重新扫描',
           })
           return
         }
         if (Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
           setBusyPhase('terminal')
-          navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'expired', reason: '扫描超时，请返回重新开始' } })
+          finishWithResult({ outcome: 'expired', success: false, reason: '扫描超时，请返回重新开始' })
           return
         }
         if (status.status === 'expired') {
           setBusyPhase('terminal')
-          navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'expired', reason: '扫描超时，请返回重新开始' } })
+          finishWithResult({ outcome: 'expired', success: false, reason: '扫描超时，请返回重新开始' })
           return
         }
         if (status.status === 'failed') {
           setBusyPhase('terminal')
-          navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'failed', reason: status.errorMessage ?? '扫描处理失败，请重试' } })
+          finishWithResult({
+            outcome: 'failed',
+            success: false,
+            reason: status.errorMessage ?? '扫描处理失败，请重试',
+          })
           return
         }
         if (status.status === 'cancelled') {
           setBusyPhase('terminal')
-          navigate('/scan/start', { replace: true })
+          returnToStart()
           return
         }
         scheduleNext()
@@ -152,7 +186,11 @@ export function ScanProgressPage() {
           pollFailsRef.current += 1
           if (pollFailsRef.current >= MAX_SCAN_POLL_FAILS || Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
             setBusyPhase('terminal')
-            navigate('/scan/result', { replace: true, state: { scanType, success: false, outcome: 'failed', reason: '长时间无法查询扫描状态，请联系工作人员或重新开始' } })
+            finishWithResult({
+              outcome: 'failed',
+              success: false,
+              reason: '长时间无法查询扫描状态，请联系工作人员或重新开始',
+            })
             return
           }
           scheduleNext()
@@ -184,7 +222,7 @@ export function ScanProgressPage() {
     try {
       await cancelScanSession(scanTaskId, controlToken, getToken())
       setBusyPhase('terminal')
-      navigate('/scan/start', { replace: true })
+      returnToStart()
     } catch (err) {
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
@@ -192,9 +230,10 @@ export function ScanProgressPage() {
           const latest = await getScanSessionStatus(scanTaskId, controlToken, getToken())
           if (latest.status === 'completed' && latest.file) {
             setBusyPhase('terminal')
-            navigate('/scan/result', {
-              replace: true,
-              state: { scanType, success: true, outcome: 'completed', file: buildResultFileState(latest.file) },
+            finishWithResult({
+              outcome: 'completed',
+              success: true,
+              file: buildResultFileState(latest.file),
             })
             return
           }
@@ -203,7 +242,7 @@ export function ScanProgressPage() {
         }
       }
       setBusyPhase('terminal')
-      navigate('/scan/start', { replace: true })
+      returnToStart()
     }
   }
 
