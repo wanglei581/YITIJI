@@ -4,8 +4,19 @@
 // 保护不变量：
 // 1. Kiosk 业务页面不得持有任何硬编码单价常量（PRICE_BW/PRICE_COLOR 及 ¥x.x/面 字样）；
 //    展示价唯一来源 = services/print/priceConfigApi.ts（GET /print/price-config）。
-// 2. 预览/确认页估价必须经 estimatePrintCents（与服务端「按内容页」口径同源），
-//    不得自行乘「面数」。
+// 2. **前端默认不做本地估价**：确认页展示的总价来自服务端报价（quote.amountCents），
+//    页数未识别或取价失败时显示「以收银台金额为准」，不给假总价。
+//    `estimatePrintCents` 是**唯一被认可的本地公式**（单价×内容页×份数，与服务端
+//    PricingService 同源），由下方断言钉住其形状；页面**不得**自行乘「面数」或另写一份。
+//
+//    注释更正（2026-09-10）：本条此前写成「预览/确认页估价**必须经** estimatePrintCents」，
+//    与第 ~77 行 `expectAbsent(preview, /estimatePrintCents\(/)`（**禁止**预览页调它）
+//    直接矛盾。矛盾的方向恰好会把后人引回「前端自己算一遍」，正是本门禁要防的第二真源。
+//    真实设计是两条一起看：**总价只由服务端出；本地公式保留一份且只保留一份。**
+//    实测 origin/main：`estimatePrintCents` 当前零调用点（`PrintConfirmPage.tsx:191/264/410`
+//    用的是 quote.amountCents / quote.unitCents，本地 `unitCentsFor` 只兜底显示单价）——
+//    **零调用不等于该删**：本门禁刻意钉住它，让「万一要本地估价」时只有一条正确路径。
+//
 // 3. priceConfigApi 的 DEMO 价目仅 mock 演示模式可达（API_MODE 门控），http 模式
 //    取价失败进入 error 态，绝不回退 DEMO/硬编码价。
 // 4. 服务端契约存在：PricingService.listActivePriceConfig + GET print/price-config 路由。

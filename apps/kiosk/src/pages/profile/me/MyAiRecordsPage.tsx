@@ -26,6 +26,7 @@ import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome
 import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
 import { JobAiSessionRecords } from './JobAiSessionRecords'
 import { MockInterviewRecords } from './MockInterviewRecords'
+import { patchInterviewWorkbenchSession } from '../../interview/interviewWorkbenchSession'
 import './styles/member-records-qx.css'
 
 type AiRecordView = MemberAiRecordItem & {
@@ -306,7 +307,12 @@ export function MyAiRecordsPage() {
             items={interviews}
             confirmId={confirmInterviewId}
             busyId={busyInterviewId}
-            onOpen={(sessionId) => navigate('/interview/report', { state: { sessionId } })}
+            onOpen={(sessionId) => {
+              // 五页合成一张工作台之后，/interview/report 是工作台的一个 stage 而不是独立路由。
+              // 只 navigate 会落到工作台默认 stage（setup），看不到这条记录的报告。
+              patchInterviewWorkbenchSession({ stage: 'report', report: { sessionId } })
+              navigate('/interview/report', { state: { sessionId } })
+            }}
             onDelete={(sessionId) => void removeInterview(sessionId)}
           />
           <JobAiSessionRecords

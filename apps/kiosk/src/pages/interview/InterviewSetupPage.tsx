@@ -5,13 +5,13 @@
 // 合规：仅供本人练习参考，不代表任何招聘结果承诺。
 // ============================================================
 
-import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
 import { isTerminalKiosk } from '../../services/api/screensaver'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
-import { Button, Card, ComplianceBanner, KioskPageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner } from '@ai-job-print/ui'
 import {
   DEFAULT_EMPLOYMENT_INDUSTRY,
   EMPLOYMENT_INDUSTRY_SECTORS,
@@ -51,9 +51,15 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
 import { ResumeUsbImportPanel } from '../resume/components/ResumeUsbImportPanel'
 import { InterviewShell } from './InterviewShell'
+import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import {
+  patchInterviewWorkbenchSession,
+  readInterviewWorkbenchSession,
+} from './interviewWorkbenchSession'
 
 type ResumeChannel = 'phone' | 'usb' | 'desktop'
 import './interview-service-desk.css'
+import './styles/interview-workbench-qx.css'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }> = [
   { key: 'hr', label: 'HR 初筛', desc: '自我介绍 · 求职动机 · 稳定性 · 薪资沟通' },
@@ -121,19 +127,20 @@ function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: s
   )
 }
 
-export function InterviewSetupPage() {
+export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const { getToken } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const setupDraft = readInterviewWorkbenchSession()?.setup
 
-  const [interviewerType, setInterviewerType] = useState<InterviewerType>('hr')
-  const [industry, setIndustry] = useState(DEFAULT_EMPLOYMENT_INDUSTRY)
+  const [interviewerType, setInterviewerType] = useState<InterviewerType>(setupDraft?.interviewerType ?? 'hr')
+  const [industry, setIndustry] = useState(setupDraft?.industry ?? DEFAULT_EMPLOYMENT_INDUSTRY)
   const [showIndustryPicker, setShowIndustryPicker] = useState(false)
-  const [position, setPosition] = useState('')
-  const [experience, setExperience] = useState<InterviewExperience>('fresh')
-  const [difficulty, setDifficulty] = useState<InterviewDifficulty>('standard')
-  const [duration, setDuration] = useState<InterviewDuration>(5)
-  const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(null)
+  const [position, setPosition] = useState(setupDraft?.position ?? '')
+  const [experience, setExperience] = useState<InterviewExperience>(setupDraft?.experience ?? 'fresh')
+  const [difficulty, setDifficulty] = useState<InterviewDifficulty>(setupDraft?.difficulty ?? 'standard')
+  const [duration, setDuration] = useState<InterviewDuration>(setupDraft?.duration ?? 5)
+  const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(setupDraft?.resumeFile ?? null)
   const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
   const [qrBusy, setQrBusy] = useState(false)
@@ -145,11 +152,11 @@ export function InterviewSetupPage() {
    * 真正调 LLM 的是紧随其后的 `/start`。所以 start 503 之后这个 sessionId 仍然有效 ——
    * 它是通用题目单唯一的落点（题目单端点要凭它做归属校验并取本场配置）。
    */
-  const [pendingSession, setPendingSession] = useState<{ sessionId: string; accessToken?: string } | null>(null)
+  const [pendingSession, setPendingSession] = useState<{ sessionId: string; accessToken?: string } | null>(setupDraft?.pendingSession ?? null)
   /** AI 能力级不可用的真实原因；null 表示未观测到不可用。 */
-  const [aiOutage, setAiOutage] = useState<string | null>(null)
+  const [aiOutage, setAiOutage] = useState<string | null>(setupDraft?.aiOutage ?? null)
   /** 已完成过一次真实往返 —— 没探到之前一律 fail-closed（aiOutage.ts 口径）。 */
-  const [probed, setProbed] = useState(false)
+  const [probed, setProbed] = useState(setupDraft?.probed ?? false)
   /** 通用题目单生成中（不经过模型，只是服务端排版 + 上传）。 */
   const [printingSheet, setPrintingSheet] = useState(false)
   /**
@@ -158,9 +165,27 @@ export function InterviewSetupPage() {
    * 不能直接用 `error` 判：本页的 `error` 也承载「请先填写目标岗位」这类**表单校验**提示，
    * 拿它去点亮 ai-down 降级区，等于把用户少填一个字说成 AI 挂了 —— 那是另一种伪造。
    */
-  const [startFailed, setStartFailed] = useState(false)
+  const [startFailed, setStartFailed] = useState(setupDraft?.startFailed ?? false)
 
   useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
+
+  useEffect(() => {
+    patchInterviewWorkbenchSession({
+      setup: {
+        interviewerType,
+        industry,
+        position,
+        experience,
+        difficulty,
+        duration,
+        resumeFile,
+        pendingSession,
+        aiOutage,
+        startFailed,
+        probed,
+      },
+    })
+  }, [interviewerType, industry, position, experience, difficulty, duration, resumeFile, pendingSession, aiOutage, startFailed, probed])
 
   const positionReady = position.trim().length > 0
   const visibleIndustries = POPULAR_INDUSTRIES.includes(industry)
@@ -209,19 +234,40 @@ export function InterviewSetupPage() {
       setPendingSession({ sessionId: created.sessionId, accessToken: created.accessToken })
       const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
       setProbed(true)
-      navigate('/interview/session', {
-        state: {
+      patchInterviewWorkbenchSession({
+        stage: 'session',
+        live: {
           sessionId: created.sessionId,
           accessToken: created.accessToken,
           questionTarget: created.questionTarget,
           durationMin: duration,
           interviewerType,
           position: pos,
-          firstQuestion: first.question,
-          // 不传 firstQType：会话页读的是 firstQuestion / questionTarget 等键，
-          // 从未读过 qType。类型里声明过不等于有人消费。
+          firstQuestion: first.question ?? '',
+          messages: [{ role: 'interviewer', content: first.question ?? '' }],
+          questionIndex: 1,
+          remainingSec: duration * 60,
+          omitPrintAnswers: false,
         },
       })
+      if (onGoStage) {
+        onGoStage('session')
+      } else {
+        navigate('/interview/session', {
+          replace: true,
+          state: {
+            sessionId: created.sessionId,
+            accessToken: created.accessToken,
+            questionTarget: created.questionTarget,
+            durationMin: duration,
+            interviewerType,
+            position: pos,
+            firstQuestion: first.question ?? '',
+            // 不传 firstQType：会话页读的是 firstQuestion / questionTarget 等键，
+            // 从未读过 qType。类型里声明过不等于有人消费。
+          },
+        })
+      }
     } catch (err) {
       const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
       setError(message)
@@ -319,8 +365,26 @@ export function InterviewSetupPage() {
         ...sheetAction,
       }
 
+  const copy = INTERVIEW_STAGE_COPY.setup
+  const titleParts = emphasizedTitle(copy)
+
   return (
-    <InterviewShell>
+    <InterviewShell
+      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
+      subtitle={copy.subtitle}
+      ctabar={
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="primary"
+          data-testid="interview-primary"
+          disabled={creating || uploading}
+          onClick={() => void handleStart()}
+        >
+          {creating ? '正在为你准备面试官…' : positionReady ? '开始模拟面试' : '填写目标岗位后开始'}
+        </button>
+      }
+    >
     <KioskFilterPickerModal
       open={showIndustryPicker}
       title="选择面试行业"
@@ -337,16 +401,7 @@ export function InterviewSetupPage() {
       onClear={() => setIndustry(DEFAULT_EMPLOYMENT_INDUSTRY)}
       onClose={() => setShowIndustryPicker(false)}
     />
-    <main data-kiosk-domain="interview" data-kiosk-screen="interview-setup" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
-      <KioskPageHeader
-        className="interview-pagehead"
-        title="模拟面试"
-        description="模拟练习，仅供参考 · 配置本次练习场景，进入 AI 面试间"
-        aside={
-          <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
-        }
-      />
-
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-setup" data-qx-interview="" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
       <AiDriverBanner feature="AI模拟面试反馈" description="面试后即时给出评分与改进建议" />
 
       <div className="interview-flow__scroll min-h-0 flex-1 overflow-y-auto pb-28">
@@ -536,25 +591,19 @@ export function InterviewSetupPage() {
           <Button
             variant="secondary"
             className="mt-3 flex min-h-[56px] w-full items-center justify-center gap-2 text-base"
-            onClick={() => navigate('/interview/tips')}
+            onClick={() => onGoStage ? onGoStage('tips') : navigate('/interview/tips')}
           >
             <NotebookPenIcon className="h-5 w-5" aria-hidden="true" />
             查看面试准备要点（本机固定内容，不依赖 AI）
           </Button>
         )}
+        <div className="interview-rail" aria-label="练习边界">
+          <span>只供本人练习参考</span>
+          <span>不发送给任何企业</span>
+          <span>不预测录用结果</span>
+        </div>
       </div>
-
-      <div className="interview-flow__action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <Button size="lg" className="h-14 w-full text-base" disabled={creating || uploading} onClick={() => void handleStart()}>
-          {creating ? (
-            <>
-              <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
-              正在为你准备面试官…
-            </>
-          ) : positionReady ? '开始模拟面试' : '填写目标岗位后开始'}
-        </Button>
-      </div>
-    </main>
+    </div>
     </InterviewShell>
   )
 }
