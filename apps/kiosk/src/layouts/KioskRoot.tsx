@@ -129,14 +129,18 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/scan/progress',
   '/scan/result',
   '/jobs',
-  // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀，以免尚未迁移的
-  // `/me/resumes` `/me/documents` `/me/settings` 等兄弟路由掉进空壳。
   // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 尚未迁移的
-  // `/me/resumes` `/me/documents` `/me/settings` 等兄弟路由会被误命中掉进空壳。
+  // `/me/documents` `/me/settings` 等兄弟路由会被误命中掉进空壳。
   '/profile',
   '/me/benefits',
   '/me/feedback',
   '/me/privacy-requests',
+  '/me/notifications',
+  '/notifications',
+  '/me/resumes',
+  '/me/favorites',
+  '/me/ai-records',
+  '/me/activity',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
@@ -144,6 +148,8 @@ const QX_MIGRATED_PREFIXES = [
   '/offline-agencies/',
   // 43 号稿企业目录的详情段；同前缀下只有 /companies/:id。
   '/companies/',
+// /me/activity/:id 用精确前缀，避免误伤尚未迁移的 /me/* 兄弟路由。
+  '/me/activity/',
 ] as const
 /**
  * 带参路由但父段还有未迁兄弟页：不能写宽前缀。

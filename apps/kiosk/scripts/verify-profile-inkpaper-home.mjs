@@ -308,8 +308,13 @@ for (const [route, element] of [
   expectMatches(routes, new RegExp(`path:\\s*'${route}'[\\s\\S]{0,80}?element:\\s*<${element}\\s*/>`), `目标路由存在：/${route} -> ${element}`)
 }
 
+expectIncludes(favoritesPage, "import './styles/member-records-qx.css'", 'MyFavoritesPage 引入青序记录页 CSS')
+expectIncludes(favoritesPage, 'QxMePage', 'MyFavoritesPage 使用青序记录壳')
+expectAbsent(favoritesPage, /KioskPageFrame/, 'MyFavoritesPage 已离开 V6 KioskPageFrame')
+// 这张表列的是「还留在墨青明细设计上的页」，不是能力清单：页一旦迁进青序流光就
+// 必须移出，否则等于断言它不许迁。MyBenefitsPage（#931）与 MyFavoritesPage（#934）
+// 都已迁走，各自的青序断言在下方 311-313 / 324-326 行，覆盖没有减少。
 for (const [label, source] of [
-  ['MyFavoritesPage', favoritesPage],
   ['MySettingsPage', settingsPage],
 ]) {
   expectIncludes(source, "import './me-detail-inkpaper.css'", `${label} 引入明细页局部 CSS`)
@@ -351,15 +356,13 @@ expectIncludes(settingsPage, '退出登录', '账号设置保留退出登录操�
 // Wave 2 已实现换绑，只有注销和数据导出仍未开放
 expectIncludes(settingsPage, '账号注销和数据导出尚未开放', '账号设置明确尚未开放的账户能力')
 
-expectIncludes(aiRecordsPage, "import './me-detail-inkpaper.css'", 'AI服务记录引入明细页局部 CSS')
-expectIncludes(aiRecordsPage, "useInkRipple('.me-inkdetail", 'AI服务记录只在 .me-inkdetail 作用域启用涟漪')
-expectClassTokens(aiRecordsPage, ['me-inkdetail'], 'AI服务记录使用 .me-inkdetail 根作用域')
+expectIncludes(aiRecordsPage, "import './styles/member-records-qx.css'", 'AI服务记录引入青序记录页 CSS')
+expectIncludes(aiRecordsPage, 'QxMePage', 'AI服务记录使用青序记录壳')
 expectIncludes(aiRecordsPage, 'deleteMyAiRecord', 'AI服务记录保留本人 AI 记录删除接口')
 expectIncludes(jobAiRecords, '删除岗位 AI 参考记录', '岗位 AI 参考记录保留删除操作文案')
 
-expectIncludes(activityPage, "import './me-detail-inkpaper.css'", '浏览与跳转记录引入明细页局部 CSS')
-expectIncludes(activityPage, "useInkRipple('.me-inkdetail", '浏览与跳转记录只在 .me-inkdetail 作用域启用涟漪')
-expectClassTokens(activityPage, ['me-inkdetail'], '浏览与跳转记录使用 .me-inkdetail 根作用域')
+expectIncludes(activityPage, "import './styles/member-records-qx.css'", '浏览与跳转记录引入青序记录页 CSS')
+expectIncludes(activityPage, 'QxMePage', '浏览与跳转记录使用青序记录壳')
 expectIncludes(activityPage, 'getMyBrowseLogs', '浏览与跳转记录保留浏览记录真实 API 拉取')
 expectIncludes(activityPage, 'getMyJumpLogs', '浏览与跳转记录保留外部跳转真实 API 拉取')
 expectIncludes(activityPage, '投递 / 预约结果以来源平台为准，本系统不记录', '浏览与跳转记录保留投递/预约边界文案')
@@ -420,6 +423,11 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/styles/me-orders.css',
   'apps/kiosk/src/pages/profile/me/styles/me-records.css',
   'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
+  'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
+  'apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx',
+  'apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css',
+  'apps/kiosk/src/pages/profile/me/styles/notifications-qx.css',
+  'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/benefits-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/feedback-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/privacy-qx.css',

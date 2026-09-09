@@ -433,7 +433,7 @@ check('W2-W5 state coverage', () => {
     "registerMemberLogin(api)",
     "loginThroughVisibleUi(page, '/me/resumes')",
     "status: 503",
-    "page.getByRole('heading', { name: '暂时无法加载' })",
+    "page.getByRole('heading', { name: '简历记录这次没有加载出来' })",
     "json: { success: true, data: { items: [], nextCursor: null, total: 0 } }",
     "page.getByText('还没有登录后保存的简历', { exact: true })",
   ])
