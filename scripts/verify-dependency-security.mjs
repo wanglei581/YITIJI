@@ -433,6 +433,35 @@ function isRemediatedBraceExpansion(item) {
   )
 }
 
+/**
+ * overrides 里的 key 可能带版本选择器（`nanoid@3.3.12`），也可能是 scope 包
+ * （`@xmldom/xmldom`）。取出纯包名，用来和 audit 的 module_name 对齐。
+ */
+function overrideSelectorToPackageName(selector) {
+  if (selector.startsWith('@')) {
+    const at = selector.indexOf('@', 1)
+    return at === -1 ? selector : selector.slice(0, at)
+  }
+  const at = selector.indexOf('@')
+  return at === -1 ? selector : selector.slice(0, at)
+}
+
+/**
+ * 本仓在 pnpm-workspace.yaml 里钉住的包 → 钉的版本。
+ * 用途只有一个：审计报出公告时，判断「这个包是不是我们自己钉住的」——
+ * 如果是，说明那个钉子本身已经过期，而不是某个上游依赖需要升级。
+ * 从配置现算，不写常量，所以新增 override 自动纳入。
+ */
+function pinnedOverridePackages() {
+  const workspace = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8')
+  const map = workspaceMapping(workspace, 'overrides')
+  const byName = new Map()
+  for (const [selector, version] of Object.entries(map)) {
+    byName.set(overrideSelectorToPackageName(selector), { selector, version })
+  }
+  return byName
+}
+
 function assertAuditAcceptable(label, auditJson) {
   const highs = highAdvisories(auditJson)
   const unexpected = []
@@ -451,7 +480,36 @@ function assertAuditAcceptable(label, auditJson) {
     unexpected.push(`${item.severity} ${item.module_name} ${id || item.url || item.title}`)
   }
   if (unexpected.length > 0) {
-    fail(`${label}: unaccepted critical/high advisories remain:\n- ${unexpected.join('\n- ')}`)
+    // 把「我们自己钉住的包」单独点名。二者的处置完全不同：
+    //   钉住的包中招 → 是我们那颗钉子过期了，要改 pnpm-workspace.yaml（以及本脚本里
+    //                  对应的 REQUIRED_* 常量，两处不同步会让门禁自相矛盾）
+    //   没钉的包中招 → 是上游依赖，要顺依赖树找载体
+    // 2026-09-09 的实例：js-yaml 被钉在 4.3.1，而 GHSA-2883-xcg3-v3hh 影响 >=4.0.0 <4.3.2，
+    // 钉子本身落在受影响区间内。当时门禁先打印「js-yaml 4.3.1 override ... verified」，
+    // 再报一条笼统的 advisories remain —— 两句话都对，合起来却把人指错方向。
+    const pinned = pinnedOverridePackages()
+    const stalePins = []
+    const upstream = []
+    for (const item of unexpected) {
+      const moduleName = item.split(' ')[1]
+      const pin = pinned.get(moduleName)
+      if (pin) {
+        stalePins.push(`${item}  ← 本仓已把 ${pin.selector} 钉在 ${pin.version}，该钉子已过期`)
+      } else {
+        upstream.push(item)
+      }
+    }
+    const sections = []
+    if (stalePins.length > 0) {
+      sections.push(
+        `本仓 override 钉住的版本自身中招（改 pnpm-workspace.yaml 的 overrides，` +
+          `并同步本脚本里对应的 REQUIRED_* 常量）：\n- ${stalePins.join('\n- ')}`
+      )
+    }
+    if (upstream.length > 0) {
+      sections.push(`上游/传递依赖（顺依赖树找载体）：\n- ${upstream.join('\n- ')}`)
+    }
+    fail(`${label}: unaccepted critical/high advisories remain:\n${sections.join('\n')}`)
   }
   if (acceptedRsc > 1) {
     fail(
@@ -466,12 +524,21 @@ function assertAuditAcceptable(label, auditJson) {
 console.log('\n=== verify dependency security ===')
 assertPnpmToolchain()
 assertSecurityOverrides()
-console.log(`OK: pnpm ${REQUIRED_PNPM_VERSION} pinned; workspace security overrides verified`)
+console.log(
+  `OK: pnpm ${REQUIRED_PNPM_VERSION} pinned; security overrides declared as expected ` +
+    `(声明与期望常量一致——是否安全由下面的 audit 阶段判定)`
+)
 assertBracePatchesDeclared()
 assertBracePatchesEffective()
-console.log('OK: brace-expansion overrides verified (upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)')
+console.log(
+  'OK: brace-expansion overrides declared and effective at runtime ' +
+    '(upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)——是否安全由下面的 audit 阶段判定'
+)
 assertJsYamlRuntime()
-console.log(`OK: js-yaml ${REQUIRED_JS_YAML_VERSION} override and standard YAML parsing verified`)
+console.log(
+  `OK: js-yaml pinned to ${REQUIRED_JS_YAML_VERSION} — 单实例、且标准 YAML 解析正常。` +
+    `本行只说明「装的就是我们钉的那个版本」，不代表该版本安全；安全性由下面的 audit 阶段判定`
+)
 assertSpaArchitectureGuard()
 console.log('OK: Admin/Kiosk/Partner remain Vite SPA + createBrowserRouter Data Mode')
 
