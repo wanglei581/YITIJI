@@ -30,7 +30,10 @@ export function SessionGuardView({
           <span>秒后按本机计时清场</span>
         </div>
         <div>
-          <div className="sg-title" id="session-timeout-title">{title}</div>
+          {/* 必须是真 heading：这一屏是全屏接管，屏幕阅读器要靠它知道「现在在说什么」。
+              外层 QxPageFrame 已经渲染 <h1>，所以这里是 h2。
+              写成 div 时 `getByRole('heading')` 抓不到——2026-09-09 五条会话告警用例因此全红。 */}
+          <h2 className="sg-title" id="session-timeout-title">{title}</h2>
           <p className="sg-copy">{copy}</p>
           {state === 'warning' ? (
             <div className="sg-from">

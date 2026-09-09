@@ -15,7 +15,8 @@
   color: var(--qx-emerald); font-variant-numeric: tabular-nums;
 }
 .sg-num span { margin-top: 10px; font-size: 20px; color: rgba(242, 239, 228, 0.66); text-align: center; }
-.sg-title { font-family: var(--qx-serif); font-size: 44px; line-height: 1.24; font-weight: 700; }
+/* h2（不是 div）：全屏接管屏要有真 heading 供屏幕阅读器定位；margin 归零保持原版式。 */
+.sg-title { margin: 0; font-family: var(--qx-serif); font-size: 44px; line-height: 1.24; font-weight: 700; }
 .sg-title em { font-style: normal; color: var(--qx-emerald); }
 .sg-copy { margin-top: 14px; font-size: 21px; line-height: 1.6; color: rgba(242, 239, 228, 0.76); }
 .sg-from {
