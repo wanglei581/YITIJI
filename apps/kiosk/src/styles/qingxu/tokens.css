@@ -47,6 +47,17 @@
   /* 反白文字：用于 deep / cinnabar 等深色实底之上 */
   --qx-on-solid:     #ffffff;
 
+  /* 失效 / 关闭 / 标记态。会员台账几页需要一组比 --qx-line 更沉的中性色，
+     此前散落成 11 个近似裸 hex（#ece7d9 / #e6e2d7 / #eeeade 一组，
+     #dcd7c9 / #ddd8c8 / #ded9cb 一组，#84867e / #6d7069 一组）。
+     合并成下面 4 个语义令牌 —— 近似值本来就该是同一个值。 */
+  --qx-muted-bg:   #ece7d9;
+  --qx-muted-line: #dcd7c9;
+  --qx-muted-ink:  #6d7069;
+  /* 描边色的浅色变体：用于需要边框而 soft 底太淡的场合 */
+  --qx-teal-line:     #8dc4b5;
+  --qx-cinnabar-line: #d9b8b2;
+
   /* 描边与圆角 */
   --qx-line:   #e3ddcb;
   --qx-line-2: #d4cdb6;

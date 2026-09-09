@@ -19,9 +19,8 @@
 //   ⑦ 越权不可能：读、改、删都只命中本人的行
 //   ⑧ 不存在按岗位 / 企业 / 来源机构聚合投递的方法（重建候选人漏斗）
 //   ⑨ 没有给 Favorite / BrowseLog / ExternalJumpLog 扩状态字段
-//   ⑩ 前端面确实是空的：整棵 apps/kiosk/src 无任何求职进度引用（本波不接运行时，
-//     那片是冻结区）。禁词覆盖交给 verify:compliance-copy，本门禁不自造第二份清单。
-//     前端接入时把 checkUserFacingCopy 改成真实的文案断言，并同步本行。
+//   ⑩ 一体机「我的足迹」求职进度 Tab 只读本人自填列表：每条带不可隐藏的「本人自填」
+//     标签；浏览/跳转记录不得出现履约状态；手填入口待建设（不发 POST）。
 //   ⑪ 两份 schema 都有模型；⑫ 已纳入个人信息导出
 //
 // 纯内存假 Prisma + 真实 service，不连数据库、不起 HTTP。
@@ -531,36 +530,43 @@ function checkNoStatusLeakIntoOtherTables(): void {
 // ── ⑩ 用户可见文案 ──────────────────────────────────────────────────────────
 
 function checkUserFacingCopy(): void {
-  console.log('\n[6] 前端面：整棵 kiosk 源码树无求职进度引用')
+  console.log('\n[6] 前端面：一体机求职进度只读本人自填，浏览/跳转不加履约状态')
 
-  // 本波**只交付后端与判据**，Kiosk 运行时不接入。原因不是做不动，是那片是冻结区：
-  //   - verify-fusion-w5 对 profileEntries.ts 逐字节冻结
-  //   - verify-user-check-wave0 硬断言 Profile 恰好 22 个已接真目的地（Wave 0 产品决策）
-  //   - verify-profile-inkpaper-home 断言 me-detail-inkpaper.css 的 import 集合封闭
-  // 加第 23 个入口是改产品范围，需产品负责人授权，不是工程侧能自行决定的。
-  //
-  // 初版只钉死三个文件名 + 一个客户端路径，被指出那不是「前端面为空」的全称证明：
-  // 换个文件名、换句文案、把调用塞进别的 service 就能绕过。改为**整棵源码树扫描** ——
-  // 要绕过就得完全不引用这个能力，那正是本断言想要的性质。
-  // 前端接入时把本函数改成真实的文案断言（并同步文件头 ⑩）。
   const kioskFiles = walk(join(REPO_ROOT, 'apps/kiosk/src'))
   assert('已扫到 kiosk 源码（断言不是空跑）', kioskFiles.length > 100, String(kioskFiles.length))
 
+  const allowed = new Set([
+    'apps/kiosk/src/services/api/jobApplications.ts',
+    'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+    'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
+  ])
   const MARKERS = [
-    'job-applications',      // API 路径与客户端文件名
-    'jobApplication',        // 模型 / Prisma 委托 / 客户端函数名
-    'JobApplication',        // 类型名
+    'job-applications',
+    'jobApplication',
+    'JobApplication',
     '求职进度',
     '记录一次投递',
     'tab=applications',
   ]
   const leaked: string[] = []
   for (const full of kioskFiles) {
+    const rel = relative(REPO_ROOT, full)
+    if (allowed.has(rel)) continue
     const src = readFileSync(full, 'utf-8')
     const hit = MARKERS.filter((m) => src.includes(m))
-    if (hit.length) leaked.push(`${relative(REPO_ROOT, full)} (${hit.join('/')})`)
+    if (hit.length) leaked.push(`${rel} (${hit.join('/')})`)
   }
-  assert('apps/kiosk/src 无任何求职进度引用', leaked.length === 0, leaked.join(', '))
+  assert('求职进度引用只落在允许的只读接入文件', leaked.length === 0, leaked.join(', '))
+
+  const activity = read('apps/kiosk/src/pages/profile/me/MyActivityPage.tsx')
+  const api = read('apps/kiosk/src/services/api/jobApplications.ts')
+  assert('足迹页含不可隐藏的本人自填标签', activity.includes('本人自填'))
+  assert('足迹页只读 listMyJobApplications', activity.includes('listMyJobApplications'))
+  assert('足迹页不发 POST 新建进度', !/method:\s*'POST'/.test(activity) && !activity.includes('createMyJobApplication'))
+  assert('手填入口待建设（不承诺假按钮）', activity.includes('手填入口待建设'))
+  assert('浏览/跳转说明不含企业反馈', !/企业反馈|面试通知/.test(activity))
+  assert('客户端只导出列表查询', api.includes('listMyJobApplications') && !api.includes("method: 'POST'"))
+  assert('客户端注释写明不发 POST', api.includes('本客户端不发 POST'))
 
   // 服务端错误文案同样受合规约束：不得出现暗示平台参与投递的措辞。
   //
