@@ -83,6 +83,7 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
     json: { enabled: false, idleTimeoutSec: 180, items: [] },
   })
   // 青序首页真实请求招聘会列表；给 200 空列表，首页呈现诚实 empty 态。
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
@@ -109,6 +110,7 @@ test('production home does not request terminal config without a local identity 
   // 本用例的合同是「无本机身份时不得发出终端作用域请求 /api/v1/terminals//」，
   // 由下面的 emptyIdentityRequests 断言守住。V6 首页新增的 /job-fairs 不是终端作用域
   // 请求，不违反该合同；这里只是补注册让 ApiRouter 的 fail-closed 不误报。
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },

@@ -75,6 +75,7 @@ function registerKioskShell(api: ApiRouter): void {
   // empty 态。这是不含身份信息的公开只读列表，注册它不会削弱本套件的隐私断言
   // ——「清场后不得携带旧 bearer / 不得恢复敏感历史」仍由各用例自己的断言守住。
   // 其余未注册 API 仍由 ApiRouter fail-closed。
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
