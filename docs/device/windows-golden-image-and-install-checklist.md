@@ -43,7 +43,22 @@
       **有效时长按现场情况设，建议 30–60 分钟**而不是默认 10；生成后弹窗只显示这一次，
       关掉就看不到了。按后台给出的命令安装（它用 `-PromptForBindCode` 交互输入，
       **不要把码写进命令行**，那样它会留在 PowerShell 历史里）。
-- [ ] B6 双击桌面「设备绑定」（`provision-terminal.cmd`）：按序号选择打印机（必须与 A6 名称一致）→ 在提示框输入绑定码 → 等待「心跳在线」提示。如需 U 盘/扫码桥接，在同一向导里输入桥接令牌。
+- [ ] B6 双击桌面「设备绑定」（`provision-terminal.cmd`）：按序号选择打印机（必须与 A6 名称一致）→ 在提示框输入绑定码 → 等待「心跳在线」提示。如需 U 盘/扫码桥接，在同一向导里输入桥接令牌 —— **值见下方说明，不能现编**。
+
+> **桥接令牌的值从哪来（2026-09-10 补）**：它必须与**已部署的 Kiosk 构建里内联的那个值完全相同**。
+> Kiosk 侧是构建期内联（`apps/kiosk/src/services/auth/memberQrLoginApi.ts:8` 读
+> `import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN']`），发布时由 GitHub Actions secret
+> `KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN` 注入（`deploy.yml:169` 未配置即拒绝发布）。
+> **GitHub secret 写进去就读不回来**，所以现场要用的值只能取自团队自己保管的那份
+> （设置该 secret 时用的同一个来源），完整流程见
+> [gate-0k-usb-bridge-token-field-acceptance.md](gate-0k-usb-bridge-token-field-acceptance.md)。
+>
+> **输错或跳过不会报错，会静默降级**：扫码登录显示「本机扫码登录服务未正确配置，请使用手机号登录」
+> （`ScanQrLoginPanel.tsx:237`），U 盘导入显示「当前终端未配置 U 盘导入，请联系现场工作人员」
+> （`userErrorMessage.ts:79`）。手机号登录与其它上传方式仍可用 —— 这是设计上的诚实降级，
+> **但如果你没预期到，会以为设备坏了**。
+>
+> 值丢了只能轮换：换新 secret → 重新发布 Kiosk → **每一台机器都要重配**。
 - [ ] B7 重启一次。验证：自动登录 → Edge 全屏进入 Kiosk 首页 → 顶栏显示本机终端编码与「打印机在线」。
 - [ ] B7b **逃逸实测**（对应 A11b）：在 Kiosk 全屏下依次按 `Alt+Tab`、Win 键、`Ctrl+Shift+Esc`，三个都不得露出桌面或任务管理器；再从任意上传入口打开文件选择框，确认点不进系统盘。**任一项能逃出去即视为未交付** —— 一期是普通 Windows 主机（口径「打开这个网站，在本地电脑能完成打印操作就行」），不是锁死的整机，这一条比二期更要紧。
 - [ ] B8 现场三步实测：用手机扫码上传一页 PDF → 走完确认与支付（免费/测试价）→ 真实出纸；再做一次扫描原件 → 结果页显示真实文件。
