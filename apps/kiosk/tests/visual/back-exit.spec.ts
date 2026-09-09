@@ -120,6 +120,18 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       if (framed === 0 && !why) {
         test.skip(true, `${route.pattern} 冷开未渲染青序流光壳（多为 fail-closed 守卫态），不在本条判据范围内`)
       }
+      // 冷开落到**首页内容**（URL 还停在本路由，但渲染出来的是首页）时同样不判。
+      // 2026-09-09 实测：/contract-review 三条冷开渲染的是首页
+      //（「登录后查看本人记录 / 改简历 / 找工作 …」），本条判据会去问首页
+      // 「你的返回上一步在哪」——问错了对象，首页本来就是根。
+      //
+      // 这个假阳性是被 #932 触发的：首页迁进青序流光后带上了 data-qx-frame，
+      // 上面那句「没渲染青序壳就跳过」从此不再拦住这三条。**门禁没变、页面没变，
+      // 变的是兜底页的壳** —— 所以判据必须能分辨「这一页自己的壳」和「兜底页的壳」。
+      const landedOnHome = await page.locator('[data-testid="qx-home"]').count()
+      if (landedOnHome > 0 && route.pattern !== '/' && !why) {
+        test.skip(true, `${route.pattern} 冷开落到首页内容而非本页，不在本条判据范围内`)
+      }
 
       const bySelector = await page.locator(EXIT_SELECTOR).count()
       const byText = await page.evaluate((src) => {
