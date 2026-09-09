@@ -45,11 +45,14 @@ export default function SessionTimeoutPage() {
   }, [deadlineAt, expireFromCountdown])
 
   const sourcePath = warning?.sourcePath ?? ''
-  const isHardware = sourcePath.startsWith('/print/') || sourcePath.startsWith('/scan/')
-  const isAiWork =
-    sourcePath === '/assistant' ||
-    sourcePath.startsWith('/resume/') ||
-    sourcePath.startsWith('/interview/')
+  // 带斜杠的 startsWith 判不中**域根本身**：'/interview' 不匹配 '/interview/'。
+  // 本 PR 把 /interview/{setup,session,tips,report,reports} 合成一张工作台 /interview
+  // 之后，从工作台触发的会话告警就落到了通用清场文案「登录状态和本机临时会话将清除」，
+  // 而它握着用户没保存的练习内容。/print /scan /resume 是同一个 bug，只是暂时没有
+  // 域根路由走到（/print 域根在路由表里根本不存在）——改成通用谓词，将来加了自动生效。
+  const inDomain = (root: string) => sourcePath === root || sourcePath.startsWith(`${root}/`)
+  const isHardware = inDomain('/print') || inDomain('/scan')
+  const isAiWork = sourcePath === '/assistant' || inDomain('/resume') || inDomain('/interview')
   const sessionImpact = isHardware
     ? '已创建的打印/扫描任务会继续运行，终端页面将清除'
     : isAiWork
