@@ -1,8 +1,8 @@
-import type { AccessMode } from './job'
+import type { AccessMode, PartnerImportDataType } from './job'
 
 export const RECRUITMENT_INTEGRATION_CONTRACT_VERSION = '2026-08-10.v1' as const
 
-export type RecruitmentIntegrationDataType = 'job' | 'fair'
+export type RecruitmentIntegrationDataType = PartnerImportDataType
 
 export interface RecruitmentIntegrationSchema {
   dataType: RecruitmentIntegrationDataType
