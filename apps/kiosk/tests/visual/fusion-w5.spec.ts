@@ -222,6 +222,7 @@ test('home fair loading, empty and error states remain honest and stable @w5-kio
     json: terminalConfig({ enabled: false, items: [] }),
   })
   let releaseFair!: (result: { status: number; json: unknown }) => void
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respondWith('GET', '/api/v1/job-fairs', (requestNumber) => {
     if (requestNumber === 1) return new Promise((resolve) => { releaseFair = resolve })
     if (requestNumber === 2) {
