@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-09-09 **路由计数门禁从写死数字改为从 `route-manifest.ts` 现算（分支 `chore/counts`）**。`verify-fusion-baseline` / `verify-fusion-w6` / `verify-visual-evidence-manifest` 不再把 108/13/106 写成精确相等；条数跟 `productionRoutePatterns` / `compatibilityRedirects` 走，路由表↔运行时声明的集合相等保留，增长用 `PRODUCTION_ROUTE_QUOTA` / `COMPATIBILITY_REDIRECT_QUOTA` / `KIOSK_VIEWPORT_ROUTE_QUOTA` 封顶。反向变异：`routes/index.tsx` 加一条可编译假路由（`Navigate`，tsc 绿）三门禁转红，删回转绿。不改页面 UI。
+2026-09-09 **路由计数门禁去掉配额上限，只留集合相等（分支 `chore/counts`）**。`PRODUCTION_ROUTE_QUOTA` / `COMPATIBILITY_REDIRECT_QUOTA` / `KIOSK_VIEWPORT_ROUTE_QUOTA` 三个常量及全部引用已删——108/13/106 是某天 main 的快照，不是产品决策，#967 合入即超。防线是 router ↔ `productionRoutePatterns`、Navigate ↔ `compatibilityRedirects`、W6 cases 一对一 ownership。反向变异：只在 `route-manifest.ts` 偷加 `'/zz-sneaked-route'` 三门禁转红，删回转绿。不改页面 UI。
 
 2026-09-08 **扫描四页合成一张工作台 `/scan`（分支 `feat/qx-scan-merge`，稿 18-scan-workbench）**。`/scan/start` `/scan/settings` `/scan/progress` `/scan/result` 保留为带 `?stage=` 的 replace 重定向；阶段切换只 replace 历史。没有扫描会话时 progress/result 即使带 `?stage=` 也落到 start。刷新从 sessionStorage 复水；换人清场仍走 `kioskSensitiveSession`，不在组件卸载时清会话或取消后台任务。progress 阶段才轮询，离开即停；待机忙碌豁免仍挂在 progress/settings 的 `useBusyLock`。「等待打印机端扫描完成」「扫描任务已创建」逐字保留。未部署、未真机。
 ## 2026-09-08 夜 bug 检查与工程优化线：五条可复用的结论

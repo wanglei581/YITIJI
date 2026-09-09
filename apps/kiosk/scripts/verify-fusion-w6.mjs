@@ -3,11 +3,6 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, extname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import {
-  COMPATIBILITY_REDIRECT_QUOTA,
-  KIOSK_VIEWPORT_ROUTE_QUOTA,
-  PRODUCTION_ROUTE_QUOTA,
-} from './lib/fusion-baseline-contract.mjs'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = join(kioskRoot, '..', '..')
@@ -246,15 +241,7 @@ check('router matches frozen route manifest', () => {
   assert.equal(actual.length, expected.length, `router exposes ${actual.length} patterns; manifest has ${expected.length}`)
   assert.equal(new Set(actual).size, actual.length, 'router route patterns must be unique')
   assert.equal(new Set(expected).size, expected.length, 'manifest route patterns must be unique')
-  assert.ok(
-    expected.length <= PRODUCTION_ROUTE_QUOTA,
-    `manifest ${expected.length} route patterns exceed production route quota ${PRODUCTION_ROUTE_QUOTA}`,
-  )
   assert.deepEqual([...actual].sort(), [...expected].sort(), 'router and frozen manifest differ')
-  assert.ok(
-    manifest.redirects.size <= COMPATIBILITY_REDIRECT_QUOTA,
-    `manifest ${manifest.redirects.size} compatibility redirects exceed quota ${COMPATIBILITY_REDIRECT_QUOTA}`,
-  )
   const routerRedirectSources = routeInventory.filter((route) => route.redirect).map((route) => route.path)
   assert.deepEqual(
     [...routerRedirectSources].sort(),
@@ -529,12 +516,7 @@ check('W6 route acceptance contract', () => {
   assert.equal(routes.length, manifest.paths.length, 'W6 route cases must follow productionRoutePatterns')
   assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, routes.length, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
-  const kioskCount = routes.filter(({ viewport }) => viewport === 'kiosk').length
   const mobileCount = routes.filter(({ viewport }) => viewport === 'mobile').length
-  assert.ok(
-    kioskCount <= KIOSK_VIEWPORT_ROUTE_QUOTA,
-    `W6 kiosk allocation ${kioskCount} exceeds quota ${KIOSK_VIEWPORT_ROUTE_QUOTA}`,
-  )
   assert.equal(mobileCount, 2, 'W6 mobile allocation')
 })
 

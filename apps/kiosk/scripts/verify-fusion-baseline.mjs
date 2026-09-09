@@ -11,8 +11,6 @@ import {
   findForbiddenFusionReferences,
   listRegularFilesRecursively,
   sha256File,
-  PRODUCTION_ROUTE_QUOTA,
-  COMPATIBILITY_REDIRECT_QUOTA,
 } from './lib/fusion-baseline-contract.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -161,9 +159,6 @@ await runGroup('immutable fusion source hashes', async (fail) => {
 
 await runGroup('router route inventory', async (fail) => {
   const routes = await readDeclaredRoutes(fail)
-  if (routes !== null && routes.length > PRODUCTION_ROUTE_QUOTA) {
-    fail(`${displayPath(routerPath)}: ${routes.length} normalized routes exceed production route quota ${PRODUCTION_ROUTE_QUOTA}`)
-  }
   if (routes !== null) {
     const duplicates = listDuplicateValues(routes)
     if (duplicates.length > 0) {
@@ -180,9 +175,6 @@ await runGroup('Playwright route manifest parity', async (fail) => {
   const manifestRoutes = extractManifestRoutePatterns(manifestSource)
   if (manifestRoutes.length !== routes.length) {
     fail(`${displayPath(manifestPath)}: expected ${routes.length} route patterns (runtime declaration count), received ${manifestRoutes.length}`)
-  }
-  if (manifestRoutes.length > PRODUCTION_ROUTE_QUOTA) {
-    fail(`${displayPath(manifestPath)}: ${manifestRoutes.length} route patterns exceed production route quota ${PRODUCTION_ROUTE_QUOTA}`)
   }
   const manifestDuplicates = listDuplicateValues(manifestRoutes)
   if (manifestDuplicates.length > 0) {
@@ -205,9 +197,6 @@ await runGroup('compatibility redirect target parity', async (fail) => {
   const manifestRedirects = extractManifestRedirects(manifestSource)
   const routerSources = Object.keys(routerRedirects)
   const manifestSources = Object.keys(manifestRedirects)
-  if (manifestSources.length > COMPATIBILITY_REDIRECT_QUOTA) {
-    fail(`${displayPath(manifestPath)}: ${manifestSources.length} compatibility redirects exceed quota ${COMPATIBILITY_REDIRECT_QUOTA}`)
-  }
   if (manifestSources.length !== routerSources.length) {
     fail(`${displayPath(manifestPath)}: expected ${routerSources.length} compatibility redirects (runtime Navigate count), actual ${manifestSources.length}`)
   }

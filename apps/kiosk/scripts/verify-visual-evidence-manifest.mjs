@@ -4,10 +4,6 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import {
-  COMPATIBILITY_REDIRECT_QUOTA,
-  PRODUCTION_ROUTE_QUOTA,
-} from './lib/fusion-baseline-contract.mjs'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = join(kioskRoot, '..', '..')
@@ -144,10 +140,6 @@ if (contract && routeManifest) {
     assert.equal(declared.length, expected.length, 'runtime route declaration count must follow productionRoutePatterns')
     assert.equal(new Set(declared).size, declared.length, 'runtime route declarations must be unique')
     assert.equal(new Set(expected).size, expected.length, 'productionRoutePatterns must be unique')
-    assert.ok(
-      expected.length <= PRODUCTION_ROUTE_QUOTA,
-      `productionRoutePatterns ${expected.length} exceeds quota ${PRODUCTION_ROUTE_QUOTA}`,
-    )
     assert.deepEqual(sorted(declared), sorted(expected))
   })
 
@@ -259,10 +251,6 @@ if (contract && routeManifest) {
 
   check('compatibility redirects never create visual pairs', () => {
     const expectedRedirects = Object.entries(compatibilityRedirects)
-    assert.ok(
-      expectedRedirects.length <= COMPATIBILITY_REDIRECT_QUOTA,
-      `compatibilityRedirects ${expectedRedirects.length} exceeds quota ${COMPATIBILITY_REDIRECT_QUOTA}`,
-    )
     const redirects = routeEvidenceDispositions.filter(({ referenceKind }) => referenceKind === 'REDIRECT')
     assert.equal(redirects.length, expectedRedirects.length, 'evidence redirect count must follow compatibilityRedirects')
     for (const [source, destination] of expectedRedirects) {
