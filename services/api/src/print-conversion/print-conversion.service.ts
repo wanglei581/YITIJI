@@ -156,6 +156,7 @@ export class PrintConversionService {
       fileMd5: state.fileMd5!,
       sizeBytes: state.sizeBytes!,
       pages: state.pages!,
+      hasEndUser: Boolean(endUserId),
     }
   }
 
@@ -287,6 +288,7 @@ export class PrintConversionService {
       fileMd5: uploaded.sha256,
       sizeBytes: uploaded.sizeBytes,
       pages: pageCount,
+      hasEndUser: Boolean(endUserId),
     }
   }
 

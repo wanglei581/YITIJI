@@ -58,6 +58,38 @@ if (/<li>生成后自动进入确认打印；PDF 已保存到「我的文档」�
   pass('格式转换不再无条件承诺已保存到我的文档')
 }
 
+// 完成态「已进我的文档」只许说后端认过的事。
+// 本机 token 不是依据：print-conversion.controller 用 resolveOptionalEndUser，
+// 而 common/auth/optional-end-user.ts 对过期/无效 JWT（catch → return null）和
+// Redis 会话不匹配都是**静默返回 null**，不抛异常也不返回 401 ——
+// 转换照常成功、endUserId 落 null、前端收不到任何错误。此时按 getToken() 判断，
+// 页面就会说「已进我的文档 · 约 24 小时」而文件根本没进（CLAUDE.md §9）。
+// 唯一可信来源是转换响应的 hasEndUser。
+// 规则卡（Retention / i2p-truth 的「留存」行）说的是「会不会进」而非「已经进了」，
+// 不在本断言范围内，仍可按本机会话渲染。
+if (/已进我的文档/.test(convertSrc)) {
+  expectMatches(
+    convertSrc,
+    /typeof\s+result\.hasEndUser\s*===\s*'boolean'/,
+    '图片转 PDF 的归属取自转换响应 hasEndUser，不得用本机 token 自行判断',
+  )
+  expectMatches(
+    convertSrc,
+    /typeof\s+hasEndUser\s*===\s*'boolean'/,
+    '归属未知（undefined）时完成态那格不渲染 —— 失败关闭，不猜',
+  )
+  if (/loggedIn\s*\?\s*'已进我的文档/.test(convertSrc)) {
+    fail('完成态「已进我的文档」不得由 loggedIn / getToken() 决定')
+  } else {
+    pass('完成态「已进我的文档」不由本机 token 决定')
+  }
+  if (/hasEndUser\s*===\s*false/.test(convertSrc)) {
+    pass('「你现在没登录」用严格 === false，undefined 不触发')
+  } else {
+    fail('「你现在没登录」必须用 hasEndUser === false，不得用取反（undefined 会误报未登录）')
+  }
+}
+
 const confirmSrc = read(CONFIRM)
 const progressSrc = read(PROGRESS)
 const localPrintWakeSrc = read(LOCAL_PRINT_WAKE)

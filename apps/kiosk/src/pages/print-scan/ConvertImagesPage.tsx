@@ -66,7 +66,10 @@ export function ConvertImagesPage() {
 
   const atLimit = images.length >= MAX_IMAGES
   const kiosk = isTerminalKiosk()
+  // Retention 是转换前规则说明，继续用本机会话；完成态声称必须读响应里的 hasEndUser。
   const loggedIn = Boolean(getToken())
+  const hasEndUser =
+    result != null && typeof result.hasEndUser === 'boolean' ? result.hasEndUser : undefined
   const phase = derivePhase({
     usbOpen,
     uploading,
@@ -263,7 +266,7 @@ export function ConvertImagesPage() {
     void runConvert('recheck', false, lastSubmitted)
   }
 
-  // 未登录时 PDF 不会进入「我的文档」——按登录态在 ConvertImagesView 分别渲染，游客不得看到已保存。
+  // 未登录时 PDF 不会进入「我的文档」——完成态按转换响应 hasEndUser 分别渲染，游客不得看到已保存。
   const terminalLabel = getTerminalCode() ? `就业服务大厅 · ${getTerminalCode()}` : '就业服务大厅'
 
   return (
@@ -281,7 +284,7 @@ export function ConvertImagesPage() {
           generating={generating}
           rechecking={rechecking}
           uploading={uploading}
-          loggedIn={loggedIn}
+          hasEndUser={hasEndUser}
           onBack={() => navigate('/print-scan')}
           onConvert={() => void runConvert('convert')}
           onRecheck={() => void runConvert('recheck')}
@@ -321,6 +324,7 @@ export function ConvertImagesPage() {
     >
       <ConvertImagesView
         loggedIn={loggedIn}
+        hasEndUser={hasEndUser}
         kiosk={kiosk}
         phase={phase}
         images={images}
