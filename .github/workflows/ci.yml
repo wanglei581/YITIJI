@@ -1021,7 +1021,27 @@ jobs:
   kiosk-browser-smoke:
     runs-on: ubuntu-latest
     # 本 job 现在同时跑 kiosk 多套 + admin + partner 三家浏览器用例，取较大的上限。
-    timeout-minutes: 45
+    #
+    # 2026-09-09 实测把 45 提到 70：45 的余量只剩 13%，已经在制造假失败。
+    # 同一天 main 上最近 9 次的本 job 时长（分钟）：
+    #   45.3 ← cancelled（撞上限，run 34367481668，21 步只跑到第 16 步）
+    #   39.0  37.6  37.5  37.5  37.5  34.0  33.7  33.3  ← 全部 success
+    # 成功区间 33–39，上限 45 —— runner 慢一点或迁移线再加几条用例就撞线。
+    # 撞线的表现是 `conclusion=cancelled`，看起来像随机故障，实际堵住合并与发布：
+    # 那次 build-and-verify(41/41) 与 postgres-readiness(22/22) 都已 success，
+    # 唯独本 job 被判 cancelled，整个 run 因此不是 success，发布拿不到运行号。
+    #
+    # 同 workflow 另两个 job 的余量作参照：
+    #   build-and-verify    上限 30 / 典型 18.4  → 余量 39%
+    #   postgres-readiness  上限 20 / 典型  8.3  → 余量 59%
+    #   kiosk-browser-smoke 上限 45 / 典型 33-39 → 余量 13%   ← 明显偏紧
+    # 70 让最差观测（39）也有 44% 余量，与另两个 job 同量级；
+    # 真的挂死仍会被 70 分钟兜住（正常跑绝不会到 70）。
+    #
+    # 下次它又开始撞线时：**先量一次再调，别直接加十分钟**。
+    # 量法：gh api repos/<owner>/<repo>/actions/runs/<id>/jobs，
+    # 用 started_at / completed_at 算时长；只看 conclusion=success 的那些定基线。
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
 

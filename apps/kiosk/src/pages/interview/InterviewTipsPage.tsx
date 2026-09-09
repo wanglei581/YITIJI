@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, KioskPageHeader } from '@ai-job-print/ui'
+import { Card, ComplianceBanner } from '@ai-job-print/ui'
 import {
   CheckSquareIcon,
   ChevronDownIcon,
@@ -19,7 +19,10 @@ import {
   MicIcon,
 } from 'lucide-react'
 import { InterviewShell } from './InterviewShell'
+import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
+import './styles/interview-workbench-qx.css'
 
 const CHECKLIST: Array<{ title: string; desc: string }> = [
   { title: '背景调研', desc: '了解公司核心业务、近期动态、企业文化，并在面试中自然地表达出来' },
@@ -102,7 +105,7 @@ const INTRO_STRUCTURES: Array<{ duration: string; points: string[] }> = [
   { duration: '3 分钟', points: ['我是谁', '我做过什么（2-3 段经历 + 量化成绩）', '我为什么适合这个岗位', '我希望在这个岗位解决什么问题'] },
 ]
 
-export function InterviewTipsPage() {
+export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const [openFaq, setOpenFaq] = useState<number | null>(0)
@@ -116,17 +119,25 @@ export function InterviewTipsPage() {
     })
   }
 
+  const copy = INTERVIEW_STAGE_COPY.tips
+  const titleParts = emphasizedTitle(copy)
+  const goSetup = () => {
+    patchInterviewWorkbenchSession({ stage: 'setup' })
+    if (onGoStage) onGoStage('setup')
+    else navigate('/interview/setup')
+  }
+
   return (
-    <InterviewShell>
-    <main data-kiosk-domain="interview" data-kiosk-screen="interview-tips" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
-      <KioskPageHeader
-        className="interview-pagehead"
-        title="面试技巧"
-        description="面试前准备工具：清单逐项过一遍，再开始模拟练习（通用建议，仅供参考）"
-        aside={
-          <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
-        }
-      />
+    <InterviewShell
+      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
+      subtitle={copy.subtitle}
+      ctabar={
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
+          开始模拟面试
+        </button>
+      }
+    >
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-tips" data-qx-interview="" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
 
       <div className="interview-flow__scroll flex-1 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
@@ -269,17 +280,13 @@ export function InterviewTipsPage() {
         </div>
       </div>
 
-      {/* 底部 CTA */}
-      <div className="interview-flow__action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <div className="flex justify-center">
-          <Button size="lg" className="h-14 w-full max-w-[680px] text-base" onClick={() => navigate('/interview/setup')}>
-            开始模拟面试
-          </Button>
-        </div>
-        {/* 打印准备清单：完成模拟面试后报告自带准备清单且可打印，此处不放未接线的死按钮 */}
-        <p className="mt-2 text-center text-[11px] text-neutral-400">完成一次模拟面试后，练习报告将附带个性化准备清单，可直接打印</p>
+      <p className="mt-2 text-center text-[11px] text-neutral-400">完成一次模拟面试后，练习报告将附带个性化准备清单，可直接打印</p>
+      <div className="interview-rail" aria-label="练习边界">
+        <span>只供本人练习参考</span>
+        <span>不发送给任何企业</span>
+        <span>不预测录用结果</span>
       </div>
-    </main>
+    </div>
     </InterviewShell>
   )
 }

@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, ErrorState, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
+import { Card, ComplianceBanner, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { InterviewReportResponse } from '@ai-job-print/shared'
 
 type InterviewQaExcerpt = {
@@ -30,15 +30,19 @@ import {
   HelpCircleIcon,
   LightbulbIcon,
   MessageSquareTextIcon,
-  PrinterIcon,
-  RotateCcwIcon,
   TargetIcon,
 } from 'lucide-react'
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewShell } from './InterviewShell'
+import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import {
+  patchInterviewWorkbenchSession,
+  readInterviewWorkbenchSession,
+} from './interviewWorkbenchSession'
 import './interview-service-desk.css'
+import './styles/interview-workbench-qx.css'
 
 interface ReportState {
   sessionId?: string
@@ -78,11 +82,17 @@ function Bullets({ items }: { items: string[] }) {
   )
 }
 
-export function InterviewReportPage() {
+export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
-  const state = (location.state ?? {}) as ReportState
+  const storedReport = readInterviewWorkbenchSession()?.report
+  const locationState = (location.state ?? {}) as ReportState
+  const state: ReportState = {
+    sessionId: locationState.sessionId ?? storedReport?.sessionId,
+    accessToken: locationState.accessToken ?? storedReport?.accessToken,
+    report: locationState.report,
+  }
 
   const [data, setData] = useState<InterviewReportView | null>(state.report ?? null)
   const [loading, setLoading] = useState(!state.report && !!state.sessionId)
@@ -101,6 +111,14 @@ export function InterviewReportPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [data, state.sessionId, state.accessToken, getToken])
+
+  useEffect(() => {
+    if (!state.sessionId) return
+    patchInterviewWorkbenchSession({
+      stage: 'report',
+      report: { sessionId: state.sessionId, accessToken: state.accessToken },
+    })
+  }, [state.sessionId, state.accessToken])
 
   const handlePrint = async () => {
     if (!data) return
@@ -129,10 +147,17 @@ export function InterviewReportPage() {
     }
   }
 
+  const goSetup = () => onGoStage ? onGoStage('setup') : navigate('/interview/setup')
+  const goReports = () => onGoStage ? onGoStage('reports') : navigate('/interview/reports')
+
   if (loading) {
     return (
-      <InterviewShell>
-        <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewShell
+        title={<>正在核对<em>报告状态</em>。</>}
+        subtitle="报告必须由本场会话和当前凭证读取；加载中不展示上一次内容，也不提前放开打印。"
+        status={{ tone: 'unknown', label: '正在读取' }}
+      >
+        <div data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
           <LoadingState className="py-24" />
         </div>
       </InterviewShell>
@@ -140,28 +165,51 @@ export function InterviewReportPage() {
   }
   if (loadError || !data) {
     return (
-      <InterviewShell>
-      <main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewShell
+        title={<>这份报告暂时<em>不能查看</em>。</>}
+        subtitle="报告可能尚未生成、已经过期，或当前账号没有访问权限；不能用固定内容替代实际结果。"
+        status={{ tone: 'bad', label: '报告不可用' }}
+        ctabar={
+          <>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={goReports}>查看报告历史</button>
+            <button type="button" className="qx-btn" data-variant="primary" onClick={goSetup}>重新开始练习</button>
+          </>
+        }
+      >
+      <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
         <ErrorState message="报告不存在或已过期" className="py-4" />
-        <Button size="lg" className="min-h-14" onClick={() => navigate('/interview/setup')}>重新开始练习</Button>
-      </main>
+      </div>
       </InterviewShell>
     )
   }
 
   const level = LEVEL_META[data.report.overall.level] ?? LEVEL_META['pass']
+  const copy = INTERVIEW_STAGE_COPY.report
+  const titleParts = emphasizedTitle(copy)
 
   return (
-    <InterviewShell>
-    <main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
-      <KioskPageHeader
-        className="interview-pagehead"
-        title="模拟面试练习报告"
-        description={`模拟练习，仅供参考 · ${data.position} · ${data.industry} · ${data.interviewerLabel}`}
-        aside={
-          <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
-        }
-      />
+    <InterviewShell
+      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
+      subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}。练习表现等级只用于本人复盘，不代表通过率或录用结果。`}
+      ctabar={
+        <>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={goSetup}>
+            重新练习
+          </button>
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="primary"
+            data-testid="interview-primary"
+            disabled={printing}
+            onClick={() => void handlePrint()}
+          >
+            {printing ? '正在生成打印版…' : '打印报告'}
+          </button>
+        </>
+      }
+    >
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-report" data-qx-interview="" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
 
       <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
@@ -253,22 +301,13 @@ export function InterviewReportPage() {
         </Section>
 
         {printError && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{printError}</p>}
-      </div>
-
-      {/* 底部操作 */}
-      <div className="interview-flow__action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <div className="flex gap-3">
-          <Button size="lg" className="h-14 flex-1 text-base" disabled={printing} onClick={() => void handlePrint()}>
-            <PrinterIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-            {printing ? '正在生成打印版…' : '打印报告'}
-          </Button>
-          <Button size="lg" variant="secondary" className="h-14 flex-1 text-base" onClick={() => navigate('/interview/setup')}>
-            <RotateCcwIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-            重新练习
-          </Button>
+        <div className="interview-rail" aria-label="练习边界">
+          <span>只供本人练习参考</span>
+          <span>不发送给任何企业</span>
+          <span>不预测录用结果</span>
         </div>
       </div>
-    </main>
+    </div>
     </InterviewShell>
   )
 }
