@@ -887,6 +887,67 @@ test('returning to a visible tab immediately compensates for throttled privacy t
   expect(storedAfterVisibility).toEqual(EMPTY_SENSITIVE_SESSION)
 })
 
+test('privacy clear still lands when requestAnimationFrame never fires @privacy-kiosk', async ({ page, api }) => {
+  // 真机形态：页面不可见时浏览器**完全不调度 rAF**。清场的恢复动作
+  // （pushSanitizedDestination → pushState + location.reload）此前只挂在 rAF 上，
+  // 而硬清场路径的 clearingModeRef 只在屏保分支重置 —— 那一帧没来就永远不会有
+  // 第二次机会，遮罩（fixed inset-0 / z-[2147483647] / pointer-events-auto 的不透明层）
+  // 永久留在屏上。2026-09-09 生产实测：挂了 82 秒不恢复，页面从未重载。
+  //
+  // **这条用例存在的理由是它补的是一个结构性盲区**：headless 里 document.hidden
+  // 恒为 false、rAF 永远正常触发，那条失效路径**永远走不到**——写多少常规用例都测不出来。
+  // 所以这里不去模拟"不可见"（模拟了 rAF 照样触发，等于没测），
+  // 而是直接把 rAF 换成不触发的空实现，确定性地复现同一条路径。
+  //
+  // 触发方式与上一条用例逐字相同（Date.now 前移 + visibilitychange），
+  // 唯一变量就是 rAF —— 所以它红/绿只能由「恢复动作依不依赖 rAF」决定。
+  registerKioskShell(api)
+  await page.goto('/')
+  await markCurrentDocument(page, 'raf-suspended-document')
+  await page.evaluate((keys) => {
+    keys.forEach((key, index) => window.sessionStorage.setItem(key, `raf-sensitive-${index}`))
+  }, SENSITIVE_SESSION_KEYS)
+
+  await page.waitForTimeout(100)
+  const reloaded = page.waitForEvent('framenavigated', (frame) => frame === page.mainFrame())
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      configurable: true,
+      value: () => 0,
+    })
+    const realDateNow = Date.now.bind(Date)
+    Object.defineProperty(Date, 'now', {
+      configurable: true,
+      value: () => realDateNow() + 4_000,
+    })
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+
+  // rAF 不触发时，兜底定时器必须把恢复动作执行掉：页面重载、落回首页、敏感态清空。
+  await reloaded
+  await page.waitForLoadState('domcontentloaded')
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 2_000 }).toBe('/')
+  await expect.poll(async () => {
+    try {
+      return await readDocumentMarker(page)
+    } catch {
+      return 'navigation-in-progress'
+    }
+  }, { timeout: 3_000 }).toBeNull()
+  const storedAfterRafSuspended = await page.evaluate(
+    (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
+    SENSITIVE_SESSION_KEYS,
+  )
+  expect(storedAfterRafSuspended).toEqual(EMPTY_SENSITIVE_SESSION)
+
+  // 遮罩不得留在屏上（真机上它吃掉所有触摸）。
+  await expect(page.locator('[data-kiosk-privacy-clearing="true"]')).toHaveCount(0)
+})
+
 test('a newer stored boundary overrides an older sanitized landing entry @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
   api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {

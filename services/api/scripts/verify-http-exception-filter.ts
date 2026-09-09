@@ -92,7 +92,14 @@ function main(): void {
 
   const rawHumanReadable = capture(new HttpException('redis://user:secret@example.internal:6379 failed', HttpStatus.BAD_REQUEST))
   assert(rawHumanReadable.statusCode === 400, 'raw human-readable HttpException keeps HTTP 400')
-  assert(rawHumanReadable.body.error.code === 'INTERNAL_SERVER_ERROR', 'raw human-readable HttpException keeps generic default code')
+  // 这条断言此前钉的是 `code === 'INTERNAL_SERVER_ERROR'` —— **把缺陷写成了期望值**：
+  // 一个 HTTP 400 的机器码说「服务端内部错误」，调用方按 code 分支会当成服务端崩了
+  // 去重试或报障，而真相是「你的请求有问题」。2026-09-09 生产实测同形态：
+  //   POST /api/v1/payment/sandbox/simulate
+  //   → HTTP 404 {"error":{"code":"INTERNAL_SERVER_ERROR","message":"请求的内容不存在"}}
+  // message 早在 #975 修对了，code 一直没跟上；而本门禁把没跟上的那一半钉住了。
+  assert(rawHumanReadable.body.error.code === 'BAD_REQUEST', 'raw human-readable HttpException falls back to a 4xx-shaped code')
+  assert(rawHumanReadable.body.error.code !== 'INTERNAL_SERVER_ERROR', 'a 400 must not carry an internal-server-error code')
   // 泄露防线是这条用例存在的理由：原文里带连接串、内网域名和口令。
   // 逐个词查，而不是只比一句固定文案 —— 后者在兜底句变化时会悄悄失去判别力。
   for (const secret of ['redis://', 'user:secret', 'example.internal', '6379']) {
@@ -113,6 +120,13 @@ function main(): void {
   assert(!unmatchedRoute.body.error.message.includes('Cannot GET'), 'unmatched route does not echo the raw path')
   assert(unmatchedRoute.body.error.message !== '服务器内部错误', 'a 404 must not claim an internal server error')
 
+  // 裸抛（响应体里没有 error.code）时，机器码同样必须跟上状态码。
+  // 这正是 2026-09-09 生产实测那一发的形状：`throw new NotFoundException()`。
+  const bareNotFound = capture(new HttpException({}, HttpStatus.NOT_FOUND))
+  assert(bareNotFound.statusCode === 404, 'bare NotFound keeps HTTP 404')
+  assert(bareNotFound.body.error.code === 'NOT_FOUND', 'bare NotFound carries a 404-shaped machine code')
+  assert(bareNotFound.body.error.message === '请求的内容不存在', 'bare NotFound says the content is missing')
+
   for (const [status, expected] of [
     [HttpStatus.UNAUTHORIZED, '身份校验未通过，请重新登录后再试'],
     [HttpStatus.FORBIDDEN, '没有权限执行该操作'],
@@ -123,6 +137,11 @@ function main(): void {
     assert(got.statusCode === status, `${status} keeps its status`)
     assert(got.body.error.message === expected, `${status} falls back to a status-appropriate message`)
     assert(!got.body.error.message.includes('some internal detail'), `${status} does not expose raw message`)
+    // 机器码和给人看的那句必须同时说对方向；只修一半就是今天这个 bug 的来源。
+    assert(
+      got.body.error.code !== 'INTERNAL_SERVER_ERROR',
+      `${status} must not carry an internal-server-error machine code`,
+    )
   }
 
   // 反向：5xx 仍然必须说「服务器内部错误」。否则这次改动就把真故障也说糊了。

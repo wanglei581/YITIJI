@@ -164,10 +164,12 @@ assert(
   '会员会话失效登录回跳只允许站内安全路径，并拒绝登录页自循环',
 )
 
+const loginGateModel = read('src/pages/auth/loginGateModel.ts')
 assert(
   loginPage.includes('new URLSearchParams(location.search)') &&
-    loginPage.includes('isSafeInternalPath(queryFrom)') &&
-    loginPage.includes('isSafeInternalPath(fromState)'),
+    loginPage.includes('resolveLoginReturnTo(fromState, queryFrom, isSafeInternalPath)') &&
+    loginGateModel.includes('isSafe(fromState)') &&
+    loginGateModel.includes('isSafe(queryFrom)'),
   'LoginPage 对 state.from 与 query.from 使用同一站内安全回跳校验',
 )
 
@@ -219,14 +221,15 @@ assert(
   'SessionResumePage 复用 useAuth 内存 token；未登录走统一登录页，不再发 credentials-only 的恒 401 请求',
 )
 
+const sessionResumeModel = read('src/pages/session-resume/sessionResumeModel.ts')
 assert(
   sessionResumePage.includes("task.resume.kind === 'payment'") &&
     sessionResumePage.includes("navigate('/print/cashier'") &&
     sessionResumePage.includes("navigate('/print/progress'") &&
     !sessionResumePage.includes('navigate(task.route)') &&
-    sessionResumePage.includes("case 'pending'") &&
-    sessionResumePage.includes("case 'claimed'") &&
-    sessionResumePage.includes("case 'printing'"),
+    sessionResumeModel.includes("status === 'pending'") &&
+    sessionResumeModel.includes("status === 'claimed'") &&
+    sessionResumeModel.includes("status === 'printing'"),
   'SessionResumePage 只把后端恢复动作映射到支付/打印两个固定站内路由，并诚实区分 pending/claimed/printing',
 )
 
@@ -238,6 +241,28 @@ assert(
     kioskPrivacyGuard.includes('establishPrivacyBoundary()') &&
     /clearSessionTo\(\{\s*path:\s*'\/profile'\s*\}\)/s.test(profilePage),
   'Profile 手动退出统一建立隐私 history boundary，不再直接清会话后留下 token-bearing 历史',
+)
+
+// 清场后跳回干净入口这一步，不能只挂在 requestAnimationFrame 上。
+// rAF 在 document.hidden 时完全不触发；而硬清场路径的 clearingModeRef 只在屏保
+// 分支被重置，'hard' 分支不重置 —— 那一帧没来就再也没有第二次机会。
+// 2026-09-09 生产实测（标签不可见）：遮罩挂了 82 秒不恢复，页面从未重载，
+// #root 只剩 fixed inset-0 / z-[2147483647] / pointer-events-auto 的不透明层，
+// 可见文字 0 条 —— 一体机就是一块吃掉所有触摸的黑屏，只能人工重启。
+assert(
+  kioskPrivacyGuard.includes('scheduleSanitizedDestination') &&
+    /window\.setTimeout\(run,\s*SANITIZED_DESTINATION_FALLBACK_MS\)/.test(kioskPrivacyGuard) &&
+    // 调用点必须走调度器，不得直接 rAF 到 pushSanitizedDestination
+    !/requestAnimationFrame\(\s*\(\)\s*=>\s*pushSanitizedDestination/.test(kioskPrivacyGuard),
+  '清场恢复不只依赖 rAF：有 setTimeout 兜底，页面不可见时也能跳回干净入口（否则永久黑屏）',
+)
+
+// 兜底只能补触发，不能变成「跳两次」。run 必须有 once 卫兵。
+assert(
+  /let\s+dispatched\s*=\s*false[\s\S]{0,200}if\s*\(dispatched\)\s*return[\s\S]{0,80}dispatched\s*=\s*true/.test(
+    kioskPrivacyGuard,
+  ),
+  '兜底与 rAF 之间有 once 卫兵，不会把 pushSanitizedDestination 执行两次',
 )
 
 const settingsLogout = extractConstFunction(mySettingsPage, 'handleLogout')

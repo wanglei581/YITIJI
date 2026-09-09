@@ -5,7 +5,8 @@
 // 不区分微信/支付宝通道。视觉对齐 login-trio-v1 原型 ① 扫码面板（样式见 ./login.css）。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleCheckIcon, QrCodeIcon, RefreshCwIcon, ShieldCheckIcon, SmartphoneIcon } from 'lucide-react'
+import { QrCodeIcon } from 'lucide-react'
+import { deriveQrGateState, type LoginQrState } from './loginGateModel'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   type LoginResult,
@@ -33,18 +34,23 @@ export function ScanQrLoginPanel({
   onAgreementRequired,
   onLoginSuccess,
   onUsePhoneLogin,
+  onPhaseChange,
+  onRegisterRefresh,
 }: {
   returnTo: string
   agreed: boolean
   onAgreementRequired: () => void
   onLoginSuccess: (result: LoginResult) => void
   onUsePhoneLogin: () => void
+  onPhaseChange?: (phase: LoginQrState) => void
+  onRegisterRefresh?: (refresh: () => void) => void
 }) {
   const [qr, setQr] = useState<QrLoginState | null>(null)
   const [loading, setLoading] = useState(false)
   const [claiming, setClaiming] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [displaySeconds, setDisplaySeconds] = useState<number | null>(null)
   const claimingRef = useRef(false)
   const refreshingRef = useRef(false)
@@ -64,6 +70,7 @@ export function ScanQrLoginPanel({
     claimingRef.current = false
     setNotice(null)
     setError(null)
+    setErrorStatus(null)
     try {
       const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim()
       const deviceLabel = terminalName || `一体机 ${window.location.host}`
@@ -81,11 +88,16 @@ export function ScanQrLoginPanel({
     } catch (err) {
       setQr(null)
       setError(localQrErrorMessage(err))
+      setErrorStatus(err instanceof MemberApiError ? err.status : 0)
     } finally {
       refreshingRef.current = false
       setLoading(false)
     }
   }, [agreed, onAgreementRequired, returnTo])
+
+  useEffect(() => {
+    onRegisterRefresh?.(() => { void refresh() })
+  }, [onRegisterRefresh, refresh])
 
   useEffect(() => {
     void refresh()
@@ -125,11 +137,12 @@ export function ScanQrLoginPanel({
             ? { ...current, status: status.status, expiresInSeconds: status.expiresInSeconds }
             : current)
           setError(null)
+          setErrorStatus(null)
 
           if (status.status !== 'confirmed') return
           claimingRef.current = true
           setClaiming(true)
-          setNotice('手机已确认，正在登录一体机...')
+          setNotice('手机已确认，正在换取登录态')
           const claimed = await claimQrLoginViaLocalAgent(qr.ticketId)
           if (!agreed) {
             setNotice(null)
@@ -144,6 +157,7 @@ export function ScanQrLoginPanel({
           const message = resolveMemberApiErrorMessage(err, '扫码登录状态获取失败，请刷新二维码重试')
           setNotice(null)
           setError(message)
+          setErrorStatus(err instanceof MemberApiError ? err.status : 0)
           setClaiming(false)
           claimingRef.current = false
           if (err instanceof MemberApiError && (err.status === 404 || err.status === 410 || err.status === 401)) {
@@ -156,91 +170,61 @@ export function ScanQrLoginPanel({
     return () => window.clearInterval(timer)
   }, [agreed, onAgreementRequired, onLoginSuccess, qr?.ticketId])
 
-  const showScanline = !!qr && qr.status === 'pending' && !loading
+  const phase = deriveQrGateState({
+    agreed,
+    loading,
+    claiming,
+    hasTicket: Boolean(qr?.qrValue),
+    displaySeconds,
+    errorStatus,
+    hasError: Boolean(error),
+  })
+
+  useEffect(() => {
+    onPhaseChange?.(phase)
+  }, [onPhaseChange, phase])
+
+  const slotTitle = phase === 'qr-ready'
+    ? '请用手机扫描'
+    : phase === 'qr-expired'
+      ? '二维码已失效'
+      : phase === 'qr-confirmed'
+        ? '手机已确认'
+        : phase === 'qr-error'
+          ? '扫码登录暂不可用'
+          : '等待你勾选协议'
+  const slotDesc = phase === 'qr-ready'
+    ? (displaySeconds !== null && displaySeconds > 0 ? `二维码 ${displaySeconds}s 后过期` : '请刷新后重扫')
+    : phase === 'qr-loading'
+      ? '没有勾选协议之前，这台机器不会向服务端申请票据，这里也不会出现任何可扫的图形。'
+      : phase === 'qr-confirmed'
+        ? '这台机器正在换取登录态，换成功才算登录。'
+        : phase === 'qr-error'
+          ? '申请票据或查询状态的请求没有成功。本页不显示一张可能已经失效的二维码。'
+          : '重新生成后，新的二维码会显示在这里。'
 
   return (
-    <div className="service-desk k1-scan-qr-login k-pane">
-      <div className="k-scan">
-        <div className="k-qrwrap">
-          <div className="k-qrframe">
-            <span className="corner tl" />
-            <span className="corner tr" />
-            <span className="corner bl" />
-            <span className="corner br" />
-            {loading && <span className="k-qr-loading">二维码生成中…</span>}
-            {!loading && qr?.qrValue && <QRCodeSVG value={qr.qrValue} size={252} level="M" marginSize={1} />}
-            {!loading && !qr?.qrValue && <QrCodeIcon className="k-qr-placeholder" size={72} aria-hidden="true" />}
-            {showScanline && <div className="scanline" />}
-          </div>
-          <div className="k-qrmeta">
-            {qr && displaySeconds !== null && displaySeconds > 0 ? (
-              <span>
-                二维码 <b>{displaySeconds}</b>s 后过期
-              </span>
-            ) : qr ? (
-              <span>二维码已过期，请刷新</span>
-            ) : (
-              <span>二维码有效期 3 分钟</span>
-            )}
-            <button type="button" className="k-refresh ripple-host" onClick={() => void refresh()} disabled={loading || claiming}>
-              <RefreshCwIcon size={15} aria-hidden="true" />
-              {claiming ? '登录中…' : loading ? '刷新中…' : '刷新'}
-            </button>
-          </div>
-        </div>
-
-        <div className="k-scan-right">
-          <div className="k-steps">
-            <div className="k-step">
-              <div className="rail-v">
-                <span className="no">1</span>
-                <span className="vline" />
-              </div>
-              <div className="txt">
-                打开手机<b>相机</b>或微信「扫一扫」，扫描左侧二维码
-              </div>
-            </div>
-            <div className="k-step">
-              <div className="rail-v">
-                <span className="no">2</span>
-                <span className="vline" />
-              </div>
-              <div className="txt">
-                在手机页面输入<b>手机号和短信验证码</b>完成验证
-              </div>
-            </div>
-            <div className="k-step">
-              <div className="rail-v">
-                <span className="no">3</span>
-              </div>
-              <div className="txt">
-                本机自动进入登录态，<b>无需再操作屏幕</b>
-              </div>
-            </div>
-          </div>
-
-          {notice && (
-            <div className="k-notice" role="status" aria-live="polite">
-              <CircleCheckIcon size={20} aria-hidden="true" />
-              <span>{notice}</span>
-            </div>
-          )}
-          {error && (
-            <div className="k-error" role="alert" aria-live="polite">
-              <span>{error}</span>
-            </div>
-          )}
-
-          <button type="button" className="k-scan-fallback ripple-host" onClick={onUsePhoneLogin}>
-            <SmartphoneIcon size={16} aria-hidden="true" />
-            本机服务不可用？改用手机号登录
-          </button>
-
-          <div className="k-scan-note">
-            <ShieldCheckIcon size={19} aria-hidden="true" />
-            <span>登录凭证只保存在本终端本机，离开前请在「我的」中退出登录。</span>
-          </div>
-        </div>
+    <div className="service-desk k1-scan-qr-login lg-qrwrap">
+      <div className="lg-qrslot k-qrframe" data-testid="login-gate-qr-slot" role="group" aria-label={slotTitle}>
+        {phase === 'qr-ready' && qr?.qrValue ? (
+          <QRCodeSVG value={qr.qrValue} size={280} level="M" marginSize={1} />
+        ) : (
+          <QrCodeIcon className="k-qr-placeholder" size={72} aria-hidden="true" />
+        )}
+        <b id="qr-slot-title">{slotTitle}</b>
+        <span id="qr-slot-desc">{slotDesc}</span>
+      </div>
+      <div className="qrside">
+        <ol className="lg-steps">
+          <li><span className="sn">1</span><span>勾选下面的协议，这台机器才会去申请登录票据。</span></li>
+          <li><span className="sn">2</span><span>用手机相机或微信扫左边的二维码，在手机上完成手机号验证并确认。</span></li>
+          <li><span className="sn">3</span><span>手机确认不等于已经登录；还要这台机器再换一次登录态。</span></li>
+        </ol>
+        {notice ? <p className="lg-echo" role="status">{notice}</p> : null}
+        {error ? <p className="lg-reason" role="alert">{error}</p> : null}
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={onUsePhoneLogin}>
+          改用手机号登录
+        </button>
       </div>
     </div>
   )
