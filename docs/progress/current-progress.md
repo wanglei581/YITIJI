@@ -1,5 +1,9 @@
 # 当前开发进度
 
+2026-09-09 **删除青序流光迁移后的死页组件（分支 `chore/deadpages`）**。重跑图谱后按 CLAUDE.md §8 五条取证。已删：V6HomeView 及 home-v6*.css、serviceGroups.ts、PrintPrototypeLayout 及未加载的 print-prototype/scan-fusion/print-scan-fusion/kiosk-uplift 样式、ComingSoonNotice、KioskDeviceStatusPills、useHomeDeviceStatus、ScanFlowSteps、InterviewTopbar、KioskNumPad、jobs-fairs-prototype.tsx、JobFilterAssistant/JobListInsights/JobAiEntryPanel、contractReviewReportPrintFlow、profile/assets/ui.tsx。门禁改钉活面（首页域/服务中心、Qx CSS、useHomeJobFairHighlight），不是把断言删掉。
+
+**未删（待定）**：ScanStart/Settings/Progress/Result 与 PrintMaterialCheck/PrintPreview 仍被 `/scan`、`/print/desk` 当阶段组件挂载；jobs-fairs-prototype.css 被 index.css 全局引入且 `.jf-row` 仍给招聘会活页用；MemberLoginDialog 被 `verify:member-login-dialog` 大段快照内部结构，LoginPage 已用同一套 pane/hook 但门禁还锁着对话框文件；ProfileEntrySection / profileEntries / profile-inkpaper 被 fusion-w5 冻结哈希 + 多条 inkpaper/lightflow 门禁锁成「我的」期望，活页已是 profile-qx，改钉需整段重写这些门禁。未改路由表中的页面、未改 `.github/**`。未部署、未真机。
+
 2026-09-08 **扫描四页合成一张工作台 `/scan`（分支 `feat/qx-scan-merge`，稿 18-scan-workbench）**。`/scan/start` `/scan/settings` `/scan/progress` `/scan/result` 保留为带 `?stage=` 的 replace 重定向；阶段切换只 replace 历史。没有扫描会话时 progress/result 即使带 `?stage=` 也落到 start。刷新从 sessionStorage 复水；换人清场仍走 `kioskSensitiveSession`，不在组件卸载时清会话或取消后台任务。progress 阶段才轮询，离开即停；待机忙碌豁免仍挂在 progress/settings 的 `useBusyLock`。「等待打印机端扫描完成」「扫描任务已创建」逐字保留。未部署、未真机。
 ## 2026-09-08 夜 bug 检查与工程优化线：五条可复用的结论
 
