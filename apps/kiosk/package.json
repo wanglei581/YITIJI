@@ -119,7 +119,12 @@
     "verify:kiosk-browser-spec-coverage": "node scripts/verify-browser-spec-coverage.mjs",
     "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs",
     "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs",
-    "verify:terminal-session-self-heal": "node scripts/verify-terminal-session-self-heal.mjs"
+    "verify:terminal-session-self-heal": "node scripts/verify-terminal-session-self-heal.mjs",
+    "verify:probe-member-session-41": "node scripts/probe-member-session-41.mjs",
+    "verify:probe-ai-resume-closure-42": "node scripts/probe-ai-resume-closure-42.mjs",
+    "verify:probe-file-closure-43": "node scripts/probe-file-closure-43.mjs",
+    "verify:probe-activity-favorites-44": "node scripts/probe-activity-favorites-44.mjs",
+    "verify:probe-ai-failure-honesty-45": "node scripts/probe-ai-failure-honesty-45.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",
