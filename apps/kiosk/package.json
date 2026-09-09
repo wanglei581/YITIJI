@@ -124,7 +124,8 @@
     "verify:probe-ai-resume-closure-42": "node scripts/probe-ai-resume-closure-42.mjs",
     "verify:probe-file-closure-43": "node scripts/probe-file-closure-43.mjs",
     "verify:probe-activity-favorites-44": "node scripts/probe-activity-favorites-44.mjs",
-    "verify:probe-ai-failure-honesty-45": "node scripts/probe-ai-failure-honesty-45.mjs"
+    "verify:probe-ai-failure-honesty-45": "node scripts/probe-ai-failure-honesty-45.mjs",
+    "walkthrough:inventory": "playwright test --config=scripts/walkthrough/playwright.config.ts"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

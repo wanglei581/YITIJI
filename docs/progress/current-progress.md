@@ -1,7 +1,7 @@
 # 当前开发进度
 
+2026-09-09 **一体机走查取证脚本**（分支 `chore/walkthrough-harness`）。`apps/kiosk/scripts/walkthrough/` 冷开 `productionRoutePatterns` 全表，记下落地 pathname、主标题、主行动按钮、顶栏返回 / CTA 次级出口、disabled 按钮、壳标记，截图 1080×1920。产出 `docs/reviews/kiosk-walkthrough-inventory-2026-09-09.md` 与 `docs/progress/evidence/walkthrough-2026-09-09/`。用 W6 那套 webServer env 与 `fusion-w6-api` 夹具。不进 CI、无断言、不改 `apps/kiosk/src/**`。未部署。
 2026-09-09 **路由计数门禁去掉配额上限，只留集合相等（分支 `chore/counts`）**。`PRODUCTION_ROUTE_QUOTA` / `COMPATIBILITY_REDIRECT_QUOTA` / `KIOSK_VIEWPORT_ROUTE_QUOTA` 三个常量及全部引用已删——108/13/106 是某天 main 的快照，不是产品决策，#967 合入即超。防线是 router ↔ `productionRoutePatterns`、Navigate ↔ `compatibilityRedirects`、W6 cases 一对一 ownership。反向变异：只在 `route-manifest.ts` 偷加 `'/zz-sneaked-route'` 三门禁转红，删回转绿。不改页面 UI。
-
 2026-09-08 **扫描四页合成一张工作台 `/scan`（分支 `feat/qx-scan-merge`，稿 18-scan-workbench）**。`/scan/start` `/scan/settings` `/scan/progress` `/scan/result` 保留为带 `?stage=` 的 replace 重定向；阶段切换只 replace 历史。没有扫描会话时 progress/result 即使带 `?stage=` 也落到 start。刷新从 sessionStorage 复水；换人清场仍走 `kioskSensitiveSession`，不在组件卸载时清会话或取消后台任务。progress 阶段才轮询，离开即停；待机忙碌豁免仍挂在 progress/settings 的 `useBusyLock`。「等待打印机端扫描完成」「扫描任务已创建」逐字保留。未部署、未真机。
 ## 2026-09-08 夜 bug 检查与工程优化线：五条可复用的结论
 

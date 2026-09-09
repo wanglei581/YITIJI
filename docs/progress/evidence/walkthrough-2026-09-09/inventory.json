@@ -1,0 +1,4651 @@
+{
+  "generatedAt": "2026-09-09T16:01:36.136Z",
+  "elapsedMs": 48220,
+  "rows": [
+    {
+      "pattern": "/",
+      "requestUrl": "/",
+      "requestPathname": "/",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/root.png",
+      "captureError": null,
+      "landedPathname": "/",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "首页"
+        },
+        {
+          "tag": "h2",
+          "text": "你好，我是小青"
+        },
+        {
+          "tag": "h2",
+          "text": "直接办"
+        }
+      ],
+      "title": "首页",
+      "mainActions": [
+        "登录后查看本人记录",
+        "点这里说话，比如“帮我打一份简历”进入助手",
+        "改简历",
+        "找工作",
+        "查政策",
+        "打印机在线打印 · 扫描简历、证明材料与照片，进入后核验打印与扫描能力开始选择材料",
+        "AI 服务AI 简历诊断、逐条优化、生成新版本进入简历服务",
+        "练习服务模拟面试问答对练，可跳过，不做录用判断进入面试服务",
+        "第三方来源岗位信息查看来源与更新时间，去来源平台投递查看岗位",
+        "暂无场次招聘会暂无进行中或即将开始的场次查看招聘会",
+        "就业政策资格与办理条件以官方核验为准",
+        "已上架百宝箱进入本机已上架的扩展服务",
+        "已授权智慧校园进入本机已授权的校园服务",
+        "鲁ICP备2026023517号-2",
+        "鲁公网安备37021402007308号"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/login",
+      "requestUrl": "/login",
+      "requestPathname": "/login",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/login.png",
+      "captureError": null,
+      "landedPathname": "/login",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "登录后继续办理"
+        }
+      ],
+      "title": "登录后继续办理",
+      "mainActions": [
+        "手机号登录",
+        "手机扫码登录",
+        "手机号（11 位本人号码）",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "清空",
+        "0",
+        "删除",
+        "打印与扫描文档、照片、扫描与格式转换，进入后按真实能力状态继续。",
+        "到机码核销手机上下过单，拿到机码直接来这台机器取。",
+        "岗位与招聘会来源机构发布的信息，投递与预约都在来源平台自行完成。",
+        "我已阅读并同意",
+        "《用户服务协议》",
+        "《隐私政策》",
+        "不登录，继续使用"
+      ],
+      "topbarBack": [
+        "返回首页"
+      ],
+      "ctaSecondary": [
+        "不登录，继续使用"
+      ],
+      "ctaAll": [
+        {
+          "text": "不登录，继续使用",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "验证并登录",
+          "variant": "primary",
+          "disabled": true
+        }
+      ],
+      "disabledButtons": [
+        "获取验证码",
+        "短信验证码",
+        "验证并登录"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/member/qr-login",
+      "requestUrl": "/member/qr-login",
+      "requestPathname": "/member/qr-login",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/member_qr-login.png",
+      "captureError": null,
+      "landedPathname": "/member/qr-login",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "就业服务大厅 · 当前一体机"
+        },
+        {
+          "tag": "h2",
+          "text": "暂时无法确认登录"
+        }
+      ],
+      "title": "就业服务大厅 · 当前一体机",
+      "mainActions": [],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/upload/phone",
+      "requestUrl": "/upload/phone",
+      "requestPathname": "/upload/phone",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/upload_phone.png",
+      "captureError": null,
+      "landedPathname": "/upload/phone",
+      "landedSearch": "",
+      "headings": [],
+      "title": "",
+      "mainActions": [],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/legal/:doc",
+      "requestUrl": "/legal/privacy",
+      "requestPathname": "/legal/privacy",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/legal_doc.png",
+      "captureError": null,
+      "landedPathname": "/legal/privacy",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "隐私政策"
+        },
+        {
+          "tag": "h2",
+          "text": "AI求职打印服务终端 · 隐私政策"
+        }
+      ],
+      "title": "隐私政策",
+      "mainActions": [
+        "返回",
+        "缩小字号",
+        "放大字号",
+        "用户服务协议",
+        "隐私政策"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/job-fit",
+      "requestUrl": "/resume/job-fit",
+      "requestPathname": "/resume/job-fit",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_job-fit.png",
+      "captureError": null,
+      "landedPathname": "/resume/job-fit",
+      "landedSearch": "",
+      "headings": [],
+      "title": "",
+      "mainActions": [
+        "去上传简历"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/job-fit/actions",
+      "requestUrl": "/resume/job-fit/actions",
+      "requestPathname": "/resume/job-fit/actions",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_job-fit_actions.png",
+      "captureError": null,
+      "landedPathname": "/resume/job-fit/actions",
+      "landedSearch": "",
+      "headings": [],
+      "title": "",
+      "mainActions": [
+        "去做岗位匹配参考"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/career-plan",
+      "requestUrl": "/resume/career-plan",
+      "requestPathname": "/resume/career-plan",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_career-plan.png",
+      "captureError": null,
+      "landedPathname": "/resume/career-plan",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "先准备简历，再看四栏方案"
+        }
+      ],
+      "title": "先准备简历，再看四栏方案",
+      "mainActions": [
+        "去上传简历"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/interview/setup",
+      "requestUrl": "/interview/setup",
+      "requestPathname": "/interview/setup",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/interview_setup.png",
+      "captureError": null,
+      "landedPathname": "/interview/setup",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "模拟面试"
+        },
+        {
+          "tag": "h2",
+          "text": "岗位与行业"
+        },
+        {
+          "tag": "h2",
+          "text": "面试官与难度"
+        },
+        {
+          "tag": "h2",
+          "text": "经验"
+        },
+        {
+          "tag": "h2",
+          "text": "时长"
+        },
+        {
+          "tag": "h2",
+          "text": "简历（可选）"
+        }
+      ],
+      "title": "模拟面试",
+      "mainActions": [
+        "返回",
+        "制造业",
+        "信息传输、软件和信息技术服务业",
+        "金融业",
+        "教育",
+        "卫生和社会工作",
+        "公共管理、社会保障和社会组织",
+        "选择行业 (20)",
+        "前端开发工程师",
+        "行政专员",
+        "市场运营",
+        "机械工程师",
+        "会计",
+        "销售代表",
+        "HR 初筛自我介绍 · 求职动机 · 稳定性 · 薪资沟通",
+        "业务主管过往经历 · 岗位理解 · 协作与执行",
+        "技术面试官专业技能 · 项目细节 · 问题解决",
+        "校招面试官校园经历 · 学习能力 · 职业规划",
+        "终面负责人价值观 · 长期发展 · 综合判断",
+        "轻松练习适合第一次练习，问题更基础",
+        "标准面试接近真实面试节奏",
+        "压力面试更多追问与细节验证",
+        "应届生",
+        "1 年以内",
+        "1-3 年",
+        "3-5 年",
+        "5 年以上",
+        "转行求职",
+        "3 分钟快速练习 · 约 3-4 题",
+        "5 分钟标准练习 · 约 4-6 题",
+        "8 分钟深度练习 · 约 6-8 题",
+        "手机扫码上传",
+        "U盘导入",
+        "本机文件（桌面验证）",
+        "填写目标岗位后开始"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/interview/session",
+      "requestUrl": "/interview/session",
+      "requestPathname": "/interview/session",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/interview_session.png",
+      "captureError": null,
+      "landedPathname": "/interview/session",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "会话已失效，请重新开始"
+        }
+      ],
+      "title": "会话已失效，请重新开始",
+      "mainActions": [
+        "重新开始练习"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/interview/report",
+      "requestUrl": "/interview/report",
+      "requestPathname": "/interview/report",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/interview_report.png",
+      "captureError": null,
+      "landedPathname": "/interview/report",
+      "landedSearch": "",
+      "headings": [],
+      "title": "",
+      "mainActions": [
+        "重新开始练习"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/interview/tips",
+      "requestUrl": "/interview/tips",
+      "requestPathname": "/interview/tips",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/interview_tips.png",
+      "captureError": null,
+      "landedPathname": "/interview/tips",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "面试技巧"
+        },
+        {
+          "tag": "h2",
+          "text": "面试前准备清单"
+        },
+        {
+          "tag": "h2",
+          "text": "行为面试技巧（STAR 法则）"
+        },
+        {
+          "tag": "h2",
+          "text": "高频问题应对"
+        },
+        {
+          "tag": "h2",
+          "text": "自我介绍结构建议"
+        }
+      ],
+      "title": "面试技巧",
+      "mainActions": [
+        "返回",
+        "背景调研了解公司核心业务、近期动态、企业文化，并在面试中自然地表达出来",
+        "岗位匹配提取岗位 JD（职位描述）中的关键词，对应准备你的经历故事",
+        "基础演练准备 1 分钟 / 3 分钟自我介绍，回顾简历上每段经历的细节（不能有被问住的空白）",
+        "形象着装根据公司性质（互联网偏休闲，金融/国企偏正装）选择合适着装，保持整洁精神",
+        "面试材料简历、作品集、证件、纸质材料按需备齐（可在本终端打印简历）",
+        "面试安排确认时间、地点、交通路线；线上面试提前测试设备与网络",
+        "「请简单自我介绍一下？」",
+        "「你为什么想应聘这个岗位？」",
+        "「你最大的优势是什么？」",
+        "「你最大的不足是什么？」",
+        "「讲一个你解决困难或挫折的经历。」",
+        "「你为什么想来我们公司？」",
+        "「你对薪资有什么期待？」",
+        "「你还有什么想问我们的？」",
+        "开始模拟面试"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/interview/reports",
+      "requestUrl": "/interview/reports",
+      "requestPathname": "/interview/reports",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/interview_reports.png",
+      "captureError": null,
+      "landedPathname": "/interview/reports",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "面试报告"
+        }
+      ],
+      "title": "面试报告",
+      "mainActions": [
+        "返回",
+        "手机号登录",
+        "开始模拟面试"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/screensaver",
+      "requestUrl": "/screensaver",
+      "requestPathname": "/screensaver",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/screensaver.png",
+      "captureError": null,
+      "landedPathname": "/",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "首页"
+        },
+        {
+          "tag": "h2",
+          "text": "你好，我是小青"
+        },
+        {
+          "tag": "h2",
+          "text": "直接办"
+        }
+      ],
+      "title": "首页",
+      "mainActions": [
+        "登录后查看本人记录",
+        "点这里说话，比如“帮我打一份简历”进入助手",
+        "改简历",
+        "找工作",
+        "查政策",
+        "打印机在线打印 · 扫描简历、证明材料与照片，进入后核验打印与扫描能力开始选择材料",
+        "AI 服务AI 简历诊断、逐条优化、生成新版本进入简历服务",
+        "练习服务模拟面试问答对练，可跳过，不做录用判断进入面试服务",
+        "第三方来源岗位信息查看来源与更新时间，去来源平台投递查看岗位",
+        "暂无场次招聘会暂无进行中或即将开始的场次查看招聘会",
+        "就业政策资格与办理条件以官方核验为准",
+        "已上架百宝箱进入本机已上架的扩展服务",
+        "已授权智慧校园进入本机已授权的校园服务",
+        "鲁ICP备2026023517号-2",
+        "鲁公网安备37021402007308号"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/session-timeout",
+      "requestUrl": "/session-timeout",
+      "requestPathname": "/session-timeout",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/session-timeout.png",
+      "captureError": null,
+      "landedPathname": "/",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "首页"
+        },
+        {
+          "tag": "h2",
+          "text": "你好，我是小青"
+        },
+        {
+          "tag": "h2",
+          "text": "直接办"
+        }
+      ],
+      "title": "首页",
+      "mainActions": [
+        "登录后查看本人记录",
+        "点这里说话，比如“帮我打一份简历”进入助手",
+        "改简历",
+        "找工作",
+        "查政策",
+        "打印机在线打印 · 扫描简历、证明材料与照片，进入后核验打印与扫描能力开始选择材料",
+        "AI 服务AI 简历诊断、逐条优化、生成新版本进入简历服务",
+        "练习服务模拟面试问答对练，可跳过，不做录用判断进入面试服务",
+        "第三方来源岗位信息查看来源与更新时间，去来源平台投递查看岗位",
+        "暂无场次招聘会暂无进行中或即将开始的场次查看招聘会",
+        "就业政策资格与办理条件以官方核验为准",
+        "已上架百宝箱进入本机已上架的扩展服务",
+        "已授权智慧校园进入本机已授权的校园服务",
+        "鲁ICP备2026023517号-2",
+        "鲁公网安备37021402007308号"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/error-offline",
+      "requestUrl": "/error-offline",
+      "requestPathname": "/error-offline",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/error-offline.png",
+      "captureError": null,
+      "landedPathname": "/error-offline",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "网络连接中断"
+        },
+        {
+          "tag": "h2",
+          "text": "当前功能状态"
+        }
+      ],
+      "title": "网络连接中断",
+      "mainActions": [
+        "重试连接",
+        "联系工作人员"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/assistant",
+      "requestUrl": "/assistant",
+      "requestPathname": "/assistant",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/assistant.png",
+      "captureError": null,
+      "landedPathname": "/assistant",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI顾问"
+        },
+        {
+          "tag": "h2",
+          "text": "你好，我是小青"
+        },
+        {
+          "tag": "h2",
+          "text": "选择咨询主题"
+        },
+        {
+          "tag": "h2",
+          "text": "AI 专项工具"
+        },
+        {
+          "tag": "h2",
+          "text": "与小青的本次咨询"
+        }
+      ],
+      "title": "AI顾问",
+      "mainActions": [
+        "语音咨询",
+        "简历与求职材料项目经历、简历格式与求职材料准备",
+        "面试与沟通面试准备、自我介绍与谈薪沟通",
+        "岗位与选择岗位理解、Offer 对比与求职方向",
+        "入职与职场入职材料、试用期与社保公积金常识",
+        "直接问小青其他问题，不选主题直接咨询",
+        "AI 自我介绍生成描述经历，生成1/3分钟可打印文稿",
+        "AI 求职信生成描述公司岗位和经历，生成可打印求职信",
+        "AI 材料准备清单面试/招聘会前，生成个性化可打印清单",
+        "AI 简历 JD 匹配简历与岗位对比，找出差距和加分建议",
+        "AI 岗位 JD 解读拆解招聘要求，区分门槛与加分项",
+        "AI 面试题预测预测高频题目与回答思路，可打印带走",
+        "AI 企业面试速查面试前5分钟了解企业风格和考察方向",
+        "AI 求职方向探索不知道做什么？对话梳理方向和行动路径",
+        "应届生没什么经验，简历怎么写工作经历？",
+        "简历打印用什么纸、什么格式比较合适？",
+        "灵活就业社保补贴怎么申请？需要什么材料？",
+        "语音咨询",
+        "拼音键盘"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [
+        "发送"
+      ],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/profile",
+      "requestUrl": "/profile",
+      "requestPathname": "/profile",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/profile.png",
+      "captureError": null,
+      "landedPathname": "/profile",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "我的"
+        }
+      ],
+      "title": "我的",
+      "mainActions": [
+        "去登录",
+        "你自己的简历与文档解析过的简历、生成的材料与扫描件。",
+        "打印订单与办理进度订单状态由服务端返回，可继续办理。",
+        "权益台账与活动记录是否有可用权益由接口判定。",
+        "我的简历这次要用哪一份—条",
+        "我的文档传上来和生成的文件—条",
+        "打印订单含取件码与出纸状态—条",
+        "我的收藏—",
+        "我的权益—",
+        "AI 服务记录—",
+        "隐私说明",
+        "回首页",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "回首页"
+      ],
+      "ctaAll": [
+        {
+          "text": "回首页",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/resumes",
+      "requestUrl": "/me/resumes",
+      "requestPathname": "/me/resumes",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_resumes.png",
+      "captureError": null,
+      "landedPathname": "/me/resumes",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "我的简历"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看我的简历"
+        }
+      ],
+      "title": "我的简历",
+      "mainActions": [
+        "简历诊断与生成",
+        "收藏岗位·招聘会·政策",
+        "AI记录服务元数据",
+        "足迹浏览·跳转·进度",
+        "看第三方岗位与招聘会来源机构、更新时间与外部入口都在详情页里查看岗位",
+        "打印或扫描材料当场办完的打印、扫描不需要登录，也不会绑定到账号去打印扫描",
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/print-orders",
+      "requestUrl": "/me/print-orders",
+      "requestPathname": "/me/print-orders",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_print-orders.png",
+      "captureError": null,
+      "landedPathname": "/me/print-orders",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "打印订单"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看本人记录"
+        }
+      ],
+      "title": "打印订单",
+      "mainActions": [
+        "返回我的",
+        "手机号登录",
+        "去打印扫描",
+        "查看岗位"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/documents",
+      "requestUrl": "/me/documents",
+      "requestPathname": "/me/documents",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_documents.png",
+      "captureError": null,
+      "landedPathname": "/me/documents",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "我的文档"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看本人记录"
+        }
+      ],
+      "title": "我的文档",
+      "mainActions": [
+        "返回我的",
+        "手机号登录",
+        "去打印扫描",
+        "查看岗位"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/favorites",
+      "requestUrl": "/me/favorites",
+      "requestPathname": "/me/favorites",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_favorites.png",
+      "captureError": null,
+      "landedPathname": "/me/favorites",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "我的收藏"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看我的收藏"
+        }
+      ],
+      "title": "我的收藏",
+      "mainActions": [
+        "简历诊断与生成",
+        "收藏岗位·招聘会·政策",
+        "AI记录服务元数据",
+        "足迹浏览·跳转·进度",
+        "看第三方岗位与招聘会来源机构、更新时间与外部入口都在详情页里查看岗位",
+        "打印或扫描材料当场办完的打印、扫描不需要登录，也不会绑定到账号去打印扫描",
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/ai-records",
+      "requestUrl": "/me/ai-records",
+      "requestPathname": "/me/ai-records",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_ai-records.png",
+      "captureError": null,
+      "landedPathname": "/me/ai-records",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI服务记录"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看 AI 服务记录"
+        }
+      ],
+      "title": "AI服务记录",
+      "mainActions": [
+        "简历诊断与生成",
+        "收藏岗位·招聘会·政策",
+        "AI记录服务元数据",
+        "足迹浏览·跳转·进度",
+        "看第三方岗位与招聘会来源机构、更新时间与外部入口都在详情页里查看岗位",
+        "打印或扫描材料当场办完的打印、扫描不需要登录，也不会绑定到账号去打印扫描",
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/benefits",
+      "requestUrl": "/me/benefits",
+      "requestPathname": "/me/benefits",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_benefits.png",
+      "captureError": null,
+      "landedPathname": "/me/benefits",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "我的权益"
+        }
+      ],
+      "title": "我的权益",
+      "mainActions": [
+        "我的权益",
+        "可参加的活动",
+        "打印与扫描A4 黑白或彩色，价格以现场公示与服务端报价为准。",
+        "AI 简历服务诊断、优化、生成与材料工坊，都不需要权益。",
+        "就业政策与补贴指引政策原文与官方申请入口，本机不代办、不收代办费。",
+        "先看看有哪些活动",
+        "去登录"
+      ],
+      "topbarBack": [
+        "返回我的"
+      ],
+      "ctaSecondary": [
+        "先看看有哪些活动"
+      ],
+      "ctaAll": [
+        {
+          "text": "先看看有哪些活动",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/activity",
+      "requestUrl": "/me/activity",
+      "requestPathname": "/me/activity",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_activity.png",
+      "captureError": null,
+      "landedPathname": "/me/activity",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "浏览与跳转记录"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看本人记录"
+        }
+      ],
+      "title": "浏览与跳转记录",
+      "mainActions": [
+        "简历诊断与生成",
+        "收藏岗位·招聘会·政策",
+        "AI记录服务元数据",
+        "足迹浏览·跳转·进度",
+        "看第三方岗位与招聘会来源机构、更新时间与外部入口都在详情页里查看岗位",
+        "打印或扫描材料当场办完的打印、扫描不需要登录，也不会绑定到账号去打印扫描",
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/activity/:id",
+      "requestUrl": "/me/activity/sweep-record",
+      "requestPathname": "/me/activity/sweep-record",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_activity_id.png",
+      "captureError": null,
+      "landedPathname": "/me/activity/sweep-record",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "记录详情"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看本人记录"
+        }
+      ],
+      "title": "记录详情",
+      "mainActions": [
+        "简历诊断与生成",
+        "收藏岗位·招聘会·政策",
+        "AI记录服务元数据",
+        "足迹浏览·跳转·进度",
+        "看第三方岗位与招聘会来源机构、更新时间与外部入口都在详情页里查看岗位",
+        "打印或扫描材料当场办完的打印、扫描不需要登录，也不会绑定到账号去打印扫描",
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/notifications",
+      "requestUrl": "/me/notifications",
+      "requestPathname": "/me/notifications",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_notifications.png",
+      "captureError": null,
+      "landedPathname": "/me/notifications",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "消息通知"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看本人消息"
+        }
+      ],
+      "title": "消息通知",
+      "mainActions": [
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/feedback",
+      "requestUrl": "/me/feedback",
+      "requestPathname": "/me/feedback",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_feedback.png",
+      "captureError": null,
+      "landedPathname": "/me/feedback",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "意见反馈"
+        },
+        {
+          "tag": "h2",
+          "text": "设备和服务哪里不顺，直接告诉我们。"
+        }
+      ],
+      "title": "意见反馈",
+      "mainActions": [
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/settings",
+      "requestUrl": "/me/settings",
+      "requestPathname": "/me/settings",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_settings.png",
+      "captureError": null,
+      "landedPathname": "/me/settings",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "账号设置"
+        }
+      ],
+      "title": "账号设置",
+      "mainActions": [
+        "返回我的",
+        "手机号登录",
+        "用户服务协议服务范围、账号、收费与打印说明",
+        "隐私政策信息收集、使用与文件留存说明"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/me/privacy-requests",
+      "requestUrl": "/me/privacy-requests",
+      "requestPathname": "/me/privacy-requests",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/me_privacy-requests.png",
+      "captureError": null,
+      "landedPathname": "/me/privacy-requests",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "隐私与数据请求"
+        }
+      ],
+      "title": "隐私与数据请求",
+      "mainActions": [
+        "返回账号设置",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回账号设置"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回账号设置",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/help",
+      "requestUrl": "/help",
+      "requestPathname": "/help",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/help.png",
+      "captureError": null,
+      "landedPathname": "/help",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "帮助中心"
+        },
+        {
+          "tag": "h2",
+          "text": "联系现场工作人员"
+        }
+      ],
+      "title": "帮助中心",
+      "mainActions": [
+        "返回我的",
+        "全部",
+        "登录与账号",
+        "AI简历服务",
+        "打印与扫描",
+        "政策服务",
+        "岗位与招聘会",
+        "我的记录",
+        "隐私与留存",
+        "登录与账号一定要登录才能使用吗？",
+        "隐私与留存我上传的简历会被泄露或推送给企业吗？",
+        "登录与账号为什么离开或刷新后又变回游客了？",
+        "登录与账号怎么切换成另一个账号？",
+        "AI简历服务AI 简历服务能做什么？",
+        "AI简历服务AI 会保证我面试或录用成功吗？",
+        "打印与扫描怎么打印文件？",
+        "打印与扫描扫描的文件保存在哪里？",
+        "政策服务政策服务能帮我申请补贴吗？",
+        "岗位与招聘会可以在这里办理岗位申请吗？",
+        "我的记录在哪里查看我的文档和订单？",
+        "隐私与留存文件会保存多久？",
+        "鲁ICP备2026023517号-2",
+        "鲁公网安备37021402007308号"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/activities",
+      "requestUrl": "/activities",
+      "requestPathname": "/activities",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/activities.png",
+      "captureError": null,
+      "landedPathname": "/activities",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "权益活动"
+        }
+      ],
+      "title": "权益活动",
+      "mainActions": [
+        "返回我的",
+        "我的权益"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/activities/:id",
+      "requestUrl": "/activities/activity-001",
+      "requestPathname": "/activities/activity-001",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/activities_id.png",
+      "captureError": null,
+      "landedPathname": "/activities/activity-001",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "权益活动详情"
+        },
+        {
+          "tag": "h2",
+          "text": "W6 打印服务体验活动"
+        }
+      ],
+      "title": "权益活动详情",
+      "mainActions": [
+        "返回活动",
+        "登录后领取",
+        "我的权益"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/renshi",
+      "requestUrl": "/renshi",
+      "requestPathname": "/renshi",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/renshi.png",
+      "captureError": null,
+      "landedPathname": "/renshi",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "政策服务"
+        },
+        {
+          "tag": "h2",
+          "text": "高校毕业生就业服务指引"
+        }
+      ],
+      "title": "政策服务",
+      "mainActions": [
+        "返回首页",
+        "问 AI 助手",
+        "就业政策",
+        "条件核对",
+        "社保指南",
+        "就业登记",
+        "政策公告",
+        "全部",
+        "高校毕业生",
+        "灵活就业",
+        "返乡务工",
+        "创业人员",
+        "困难群体",
+        "政策发布高校毕业生就业服务指引青岛市人力资源和社会保障局更新 2026-07-24",
+        "收藏政策",
+        "补贴指引一次性求职创业补贴综合整理 · 国家政务服务平台口径",
+        "补贴指引灵活就业社保补贴综合整理 · 官方入口示例：青岛人社（其他地区请查询当地人社平台）",
+        "住房安家高校毕业生住房 / 安家政策综合整理 · 官方入口示例：青岛人才服务（其他地区请查询当地平台）",
+        "技能提升职业技能培训 / 技能提升补贴综合整理 · 人社培训补贴口径",
+        "创业扶持创业担保贷款 / 创业补贴综合整理 · 官方入口示例：青岛人社（其他地区请查询当地人社平台）",
+        "上传自备材料打印",
+        "扫码打开来源链接"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/campus",
+      "requestUrl": "/campus",
+      "requestPathname": "/campus",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/campus.png",
+      "captureError": null,
+      "landedPathname": "/campus",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "校园招聘专区"
+        },
+        {
+          "tag": "h1",
+          "text": "2026 青岛高校毕业生招聘会未开始"
+        },
+        {
+          "tag": "h2",
+          "text": "活动信息"
+        },
+        {
+          "tag": "h2",
+          "text": "现场服务快捷入口"
+        },
+        {
+          "tag": "h2",
+          "text": "热门企业"
+        }
+      ],
+      "title": "校园招聘专区",
+      "mainActions": [
+        "返回首页",
+        "企业速览",
+        "参展企业",
+        "导览图",
+        "AI求职",
+        "打印服务",
+        "扫码预约 · 去来源平台办理",
+        "参展企业查询1 家企业",
+        "招聘会导览图展位地图 / 日程",
+        "AI智能求职简历 / 面试 / 准备单",
+        "自助打印服务简历 / 活动资料",
+        "查看全部 1 家",
+        "青青岛示例制造有限公司前端工程师1 个岗位"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/campus/welcome",
+      "requestUrl": "/campus/welcome",
+      "requestPathname": "/campus/welcome",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/campus_welcome.png",
+      "captureError": null,
+      "landedPathname": "/campus/welcome",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "校园招聘迎新指引"
+        },
+        {
+          "tag": "h2",
+          "text": "当前没有独立迎新招聘内容"
+        }
+      ],
+      "title": "校园招聘迎新指引",
+      "mainActions": [
+        "返回校园招聘",
+        "返回校园招聘"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/campus/freshman-insights",
+      "requestUrl": "/campus/freshman-insights",
+      "requestPathname": "/campus/freshman-insights",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/campus_freshman-insights.png",
+      "captureError": null,
+      "landedPathname": "/campus/freshman-insights",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "校园招聘数据"
+        },
+        {
+          "tag": "h2",
+          "text": "暂无经核验的校园招聘统计"
+        }
+      ],
+      "title": "校园招聘数据",
+      "mainActions": [
+        "返回校园招聘",
+        "返回校园招聘",
+        "查看招聘会"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/toolbox",
+      "requestUrl": "/toolbox",
+      "requestPathname": "/toolbox",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/toolbox.png",
+      "captureError": null,
+      "landedPathname": "/toolbox",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "百宝箱"
+        }
+      ],
+      "title": "百宝箱",
+      "mainActions": [
+        "返回",
+        "使用帮助打开站内帮助进入服务"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/smart-campus",
+      "requestUrl": "/smart-campus",
+      "requestPathname": "/smart-campus",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/smart-campus.png",
+      "captureError": null,
+      "landedPathname": "/smart-campus",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "智慧校园"
+        }
+      ],
+      "title": "智慧校园",
+      "mainActions": [
+        "返回首页",
+        "迎新指引报到流程、办事窗口、入学与求职准备进入",
+        "行李帮运合作物流服务入口与服务点说明进入",
+        "VR校园360° 云游校园与重点场馆介绍进入",
+        "校园卡办理新生办卡、补卡、挂失后快速办理进入",
+        "一卡通开通开通食堂、门禁、图书馆等校园通行权限进入",
+        "校园网开通激活校园 Wi-Fi、宿舍网络与上网账号进入"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/smart-campus/welcome",
+      "requestUrl": "/smart-campus/welcome",
+      "requestPathname": "/smart-campus/welcome",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/smart-campus_welcome.png",
+      "captureError": null,
+      "landedPathname": "/smart-campus/welcome",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "迎新指引"
+        },
+        {
+          "tag": "h2",
+          "text": "报到流程"
+        },
+        {
+          "tag": "h2",
+          "text": "入学 & 求职准备"
+        },
+        {
+          "tag": "h2",
+          "text": "办事窗口"
+        }
+      ],
+      "title": "迎新指引",
+      "mainActions": [
+        "返回智慧校园",
+        "入学材料 / 表格打印报到表、承诺书等自助打印",
+        "第一份简历 · AI 诊断实习求职从这里开始",
+        "返回智慧校园",
+        "校园卡办理指引"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/smart-campus/freshman-insights",
+      "requestUrl": "/smart-campus/freshman-insights",
+      "requestPathname": "/smart-campus/freshman-insights",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/smart-campus_freshman-insights.png",
+      "captureError": null,
+      "landedPathname": "/smart-campus/freshman-insights",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "迎新服务导览"
+        }
+      ],
+      "title": "迎新服务导览",
+      "mainActions": [
+        "返回智慧校园",
+        "打印材料上传报到表、承诺书等 PDF 或图片，本机预览后打印。Word 需转换引擎开放后才能转 PDF。进入",
+        "简历服务上传简历做 AI 诊断与优化，或按引导生成草稿，并可进入本机打印。进入",
+        "校园招聘信息查看校园主题招聘会的参展企业、导览与材料。投递请去来源平台，本机不收简历。进入",
+        "政策服务查看就业政策、社保与档案登记材料指引。只展示已审核信息，不代办、不承诺结果。进入",
+        "我的文档登录后查看、预览或重新打印本人已保存的文件。未登录时会提示先登录。进入",
+        "返回智慧校园"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/smart-campus/service/:key",
+      "requestUrl": "/smart-campus/service/campus-card",
+      "requestPathname": "/smart-campus/service/campus-card",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/smart-campus_service_key.png",
+      "captureError": null,
+      "landedPathname": "/smart-campus/service/campus-card",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "校园卡办理"
+        },
+        {
+          "tag": "h2",
+          "text": "校园卡办理"
+        },
+        {
+          "tag": "h2",
+          "text": "办理事项"
+        },
+        {
+          "tag": "h2",
+          "text": "所需材料"
+        },
+        {
+          "tag": "h2",
+          "text": "办理地点"
+        }
+      ],
+      "title": "校园卡办理",
+      "mainActions": [
+        "返回智慧校园",
+        "入学材料 / 表格打印报到表、申请表等自助打印",
+        "返回智慧校园",
+        "查看迎新报到指引"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [
+        "证件照排版打印功能即将上线；当前可用手机照片在打印扫描页打印即将上线"
+      ],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/print-scan",
+      "requestUrl": "/print-scan",
+      "requestPathname": "/print-scan",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print-scan.png",
+      "captureError": null,
+      "landedPathname": "/print-scan",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "打印扫描服务"
+        },
+        {
+          "tag": "h2",
+          "text": "你的文件，现在在哪？"
+        }
+      ],
+      "title": "打印扫描服务",
+      "mainActions": [
+        "文档打印",
+        "手机扫码上传",
+        "U 盘导入打印",
+        "照片打印",
+        "材料扫描",
+        "格式转换",
+        "签名盖章",
+        "证件照",
+        "到机码核销不是取件码手机上下过单拿到的 8 位数字到机码；早期发出的 10 位字母数字历史码同样能用。扫码或手输都行。不是付款后的取件凭证码",
+        "我的文档已上传 / 生成的文件查看 →",
+        "打印订单任务状态与取件凭证码查看 →",
+        "反馈问题反馈打印或扫描问题，无需登录查看 →"
+      ],
+      "topbarBack": [
+        "返回首页"
+      ],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print-scan/feature/:key",
+      "requestUrl": "/print-scan/feature/id-photo",
+      "requestPathname": "/print-scan/feature/id-photo",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print-scan_feature_key.png",
+      "captureError": null,
+      "landedPathname": "/print-scan/feature/id-photo",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "证件照"
+        },
+        {
+          "tag": "h2",
+          "text": "证件照还没开放。"
+        }
+      ],
+      "title": "证件照",
+      "mainActions": [
+        "已经有证件照文件现在可用相册里已有的证件照，传进来按普通照片打印。尺寸和底色以你手上的原图为准。",
+        "纸质照片想留电子版在奔图面板上扫成 PDF，回本机取走。扫描不做裁切和底色处理。",
+        "返回打印扫描",
+        "先用照片打印"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "先用照片打印",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print-scan/convert",
+      "requestUrl": "/print-scan/convert",
+      "requestPathname": "/print-scan/convert",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print-scan_convert.png",
+      "captureError": null,
+      "landedPathname": "/print-scan/convert",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "图片转 PDF"
+        }
+      ],
+      "title": "图片转 PDF",
+      "mainActions": [
+        "本机上传一张",
+        "手机扫码上传一张",
+        "U 盘导入图片",
+        "返回打印扫描"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "至少加一张图再合成（还没有图片，没有可合成的内容）",
+          "variant": "primary",
+          "disabled": true
+        }
+      ],
+      "disabledButtons": [
+        "至少加一张图再合成（还没有图片，没有可合成的内容）"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print-scan/sign",
+      "requestUrl": "/print-scan/sign",
+      "requestPathname": "/print-scan/sign",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print-scan_sign.png",
+      "captureError": null,
+      "landedPathname": "/print-scan/sign",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "签名盖章"
+        }
+      ],
+      "title": "签名盖章",
+      "mainActions": [
+        "文档打印传文件、选参数、去打印。要打印机就绪",
+        "材料扫描把纸质材料扫成电子件。要扫描仪就绪",
+        "图片转 PDF几张照片拼成一份 PDF。不经过打印机",
+        "AI 顾问说不清就直接问她。随时可以问",
+        "返回打印扫描",
+        "去登录"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/scan-convert",
+      "requestUrl": "/print/scan-convert",
+      "requestPathname": "/print/scan-convert",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_scan-convert.png",
+      "captureError": null,
+      "landedPathname": "/print-scan/convert",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "图片转 PDF"
+        }
+      ],
+      "title": "图片转 PDF",
+      "mainActions": [
+        "本机上传一张",
+        "手机扫码上传一张",
+        "U 盘导入图片",
+        "返回打印扫描"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "至少加一张图再合成（还没有图片，没有可合成的内容）",
+          "variant": "primary",
+          "disabled": true
+        }
+      ],
+      "disabledButtons": [
+        "至少加一张图再合成（还没有图片，没有可合成的内容）"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/scan-sign",
+      "requestUrl": "/print/scan-sign",
+      "requestPathname": "/print/scan-sign",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_scan-sign.png",
+      "captureError": null,
+      "landedPathname": "/print-scan/sign",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "签名盖章"
+        }
+      ],
+      "title": "签名盖章",
+      "mainActions": [
+        "文档打印传文件、选参数、去打印。要打印机就绪",
+        "材料扫描把纸质材料扫成电子件。要扫描仪就绪",
+        "图片转 PDF几张照片拼成一份 PDF。不经过打印机",
+        "AI 顾问说不清就直接问她。随时可以问",
+        "返回打印扫描",
+        "去登录"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/scan-feature",
+      "requestUrl": "/print/scan-feature",
+      "requestPathname": "/print/scan-feature",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_scan-feature.png",
+      "captureError": null,
+      "landedPathname": "/print-scan/feature/id-photo",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "证件照"
+        },
+        {
+          "tag": "h2",
+          "text": "证件照还没开放。"
+        }
+      ],
+      "title": "证件照",
+      "mainActions": [
+        "已经有证件照文件现在可用相册里已有的证件照，传进来按普通照片打印。尺寸和底色以你手上的原图为准。",
+        "纸质照片想留电子版在奔图面板上扫成 PDF，回本机取走。扫描不做裁切和底色处理。",
+        "返回打印扫描",
+        "先用照片打印"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "先用照片打印",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/upload",
+      "requestUrl": "/print/upload",
+      "requestPathname": "/print/upload",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_upload.png",
+      "captureError": null,
+      "landedPathname": "/print/upload",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "文档打印"
+        }
+      ],
+      "title": "文档打印",
+      "mainActions": [
+        "手机扫码上传（PDF / JPG / PNG · 单份 ≤ 10MB）",
+        "本机选文件（PDF / JPG / PNG · 单份 ≤ 15MB）",
+        "扫描纸质原件",
+        "从我的文档或最近打印文件选择",
+        "退出 · 回打印扫描"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "退出 · 回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "退出 · 回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "下一步：材料检查（这一步还没有文件，先用上面任一通道把文件搬进来）",
+          "variant": "primary",
+          "disabled": true
+        }
+      ],
+      "disabledButtons": [
+        "U 盘导入（本机未接通 · 重试也没用）",
+        "下一步：材料检查（这一步还没有文件，先用上面任一通道把文件搬进来）"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/desk",
+      "requestUrl": "/print/desk",
+      "requestPathname": "/print/desk",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_desk.png",
+      "captureError": null,
+      "landedPathname": "/print/desk",
+      "landedSearch": "?step=check",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "材料检查"
+        },
+        {
+          "tag": "h2",
+          "text": "这一页没有待处理的文件"
+        }
+      ],
+      "title": "材料检查",
+      "mainActions": [
+        "返回打印扫描",
+        "去选文件"
+      ],
+      "topbarBack": [
+        "返回选文件"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去选文件",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/material-check",
+      "requestUrl": "/print/material-check",
+      "requestPathname": "/print/material-check",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_material-check.png",
+      "captureError": null,
+      "landedPathname": "/print/desk",
+      "landedSearch": "?step=check",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "材料检查"
+        },
+        {
+          "tag": "h2",
+          "text": "这一页没有待处理的文件"
+        }
+      ],
+      "title": "材料检查",
+      "mainActions": [
+        "返回打印扫描",
+        "去选文件"
+      ],
+      "topbarBack": [
+        "返回选文件"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去选文件",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/preview",
+      "requestUrl": "/print/preview",
+      "requestPathname": "/print/preview",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_preview.png",
+      "captureError": null,
+      "landedPathname": "/print/desk",
+      "landedSearch": "?step=preview",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "预览与打印参数"
+        },
+        {
+          "tag": "h2",
+          "text": "这一页没有待处理的文件"
+        }
+      ],
+      "title": "预览与打印参数",
+      "mainActions": [
+        "返回打印扫描",
+        "去选文件"
+      ],
+      "topbarBack": [
+        "返回选文件"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去选文件",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/params",
+      "requestUrl": "/print/params",
+      "requestPathname": "/print/params",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_params.png",
+      "captureError": null,
+      "landedPathname": "/print/desk",
+      "landedSearch": "?step=preview",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "预览与打印参数"
+        },
+        {
+          "tag": "h2",
+          "text": "这一页没有待处理的文件"
+        }
+      ],
+      "title": "预览与打印参数",
+      "mainActions": [
+        "返回打印扫描",
+        "去选文件"
+      ],
+      "topbarBack": [
+        "返回选文件"
+      ],
+      "ctaSecondary": [
+        "返回打印扫描"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回打印扫描",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去选文件",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/confirm",
+      "requestUrl": "/print/confirm",
+      "requestPathname": "/print/confirm",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_confirm.png",
+      "captureError": null,
+      "landedPathname": "/print/confirm",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "报价确认"
+        }
+      ],
+      "title": "报价确认",
+      "mainActions": [
+        "我的打印订单",
+        "重新选文件"
+      ],
+      "topbarBack": [
+        "返回预览与参数"
+      ],
+      "ctaSecondary": [
+        "我的打印订单"
+      ],
+      "ctaAll": [
+        {
+          "text": "我的打印订单",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "重新选文件",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/cashier",
+      "requestUrl": "/print/cashier",
+      "requestPathname": "/print/cashier",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_cashier.png",
+      "captureError": null,
+      "landedPathname": "/print/cashier",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "订单支付"
+        },
+        {
+          "tag": "h2",
+          "text": "付款提示"
+        }
+      ],
+      "title": "订单支付",
+      "mainActions": [
+        "我的打印订单",
+        "重新发起打印"
+      ],
+      "topbarBack": [
+        "返回我的打印订单"
+      ],
+      "ctaSecondary": [
+        "我的打印订单"
+      ],
+      "ctaAll": [
+        {
+          "text": "我的打印订单",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "重新发起打印",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/progress",
+      "requestUrl": "/print/progress",
+      "requestPathname": "/print/progress",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_progress.png",
+      "captureError": null,
+      "landedPathname": "/print/progress",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "未找到打印任务"
+        }
+      ],
+      "title": "未找到打印任务",
+      "mainActions": [
+        "重新上传文件"
+      ],
+      "topbarBack": [
+        "返回首页"
+      ],
+      "ctaSecondary": [],
+      "ctaAll": [
+        {
+          "text": "重新上传文件",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/done",
+      "requestUrl": "/print/done",
+      "requestPathname": "/print/done",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_done.png",
+      "captureError": null,
+      "landedPathname": "/print/done",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "无法确认打印结果"
+        }
+      ],
+      "title": "无法确认打印结果",
+      "mainActions": [
+        "返回首页",
+        "使用帮助"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回首页"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回首页",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "使用帮助",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume",
+      "requestUrl": "/resume",
+      "requestPathname": "/resume",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume.png",
+      "captureError": null,
+      "landedPathname": "/resume/source",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI 简历诊断"
+        },
+        {
+          "tag": "h2",
+          "text": "诊断方向设置"
+        }
+      ],
+      "title": "AI 简历诊断",
+      "mainActions": [
+        "返回首页",
+        "没有电子简历？AI 帮你生成一份填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）去生成",
+        "U盘上传从已插入一体机的 U 盘中选择简历文件只读取你主动选择的文件，上传完成后即可拔出 U 盘。",
+        "云端上传选择云盘同步目录或本机下载目录中的简历文件适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。",
+        "手机扫码上传用手机扫码选择简历文件，再回到一体机确认二维码只含一次性上传令牌；手机端不会获得一体机会员登录凭证。",
+        "点击上传文件Word 转换暂未开放，请另存为 PDF 上传；支持 PDF / 图片格式，单个文件最大 10MBPDFJPGPNGWEBP",
+        "切换为通用诊断",
+        "基础信息完整度",
+        "求职目标清晰度",
+        "经历表达清晰度",
+        "成果量化程度",
+        "岗位关键词覆盖",
+        "版式与可读性",
+        "选择行业方向"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [
+        "请先上传简历文件"
+      ],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/upload",
+      "requestUrl": "/resume/upload",
+      "requestPathname": "/resume/upload",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_upload.png",
+      "captureError": null,
+      "landedPathname": "/resume/source",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI 简历诊断"
+        },
+        {
+          "tag": "h2",
+          "text": "诊断方向设置"
+        }
+      ],
+      "title": "AI 简历诊断",
+      "mainActions": [
+        "返回首页",
+        "没有电子简历？AI 帮你生成一份填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）去生成",
+        "U盘上传从已插入一体机的 U 盘中选择简历文件只读取你主动选择的文件，上传完成后即可拔出 U 盘。",
+        "云端上传选择云盘同步目录或本机下载目录中的简历文件适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。",
+        "手机扫码上传用手机扫码选择简历文件，再回到一体机确认二维码只含一次性上传令牌；手机端不会获得一体机会员登录凭证。",
+        "点击上传文件Word 转换暂未开放，请另存为 PDF 上传；支持 PDF / 图片格式，单个文件最大 10MBPDFJPGPNGWEBP",
+        "切换为通用诊断",
+        "基础信息完整度",
+        "求职目标清晰度",
+        "经历表达清晰度",
+        "成果量化程度",
+        "岗位关键词覆盖",
+        "版式与可读性",
+        "选择行业方向"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [
+        "请先上传简历文件"
+      ],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/source",
+      "requestUrl": "/resume/source",
+      "requestPathname": "/resume/source",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_source.png",
+      "captureError": null,
+      "landedPathname": "/resume/source",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI 简历诊断"
+        },
+        {
+          "tag": "h2",
+          "text": "诊断方向设置"
+        }
+      ],
+      "title": "AI 简历诊断",
+      "mainActions": [
+        "返回首页",
+        "没有电子简历？AI 帮你生成一份填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）去生成",
+        "U盘上传从已插入一体机的 U 盘中选择简历文件只读取你主动选择的文件，上传完成后即可拔出 U 盘。",
+        "云端上传选择云盘同步目录或本机下载目录中的简历文件适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。",
+        "手机扫码上传用手机扫码选择简历文件，再回到一体机确认二维码只含一次性上传令牌；手机端不会获得一体机会员登录凭证。",
+        "点击上传文件Word 转换暂未开放，请另存为 PDF 上传；支持 PDF / 图片格式，单个文件最大 10MBPDFJPGPNGWEBP",
+        "切换为通用诊断",
+        "基础信息完整度",
+        "求职目标清晰度",
+        "经历表达清晰度",
+        "成果量化程度",
+        "岗位关键词覆盖",
+        "版式与可读性",
+        "选择行业方向"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [
+        "请先上传简历文件"
+      ],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/generate",
+      "requestUrl": "/resume/generate",
+      "requestPathname": "/resume/generate",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_generate.png",
+      "captureError": null,
+      "landedPathname": "/resume/generate",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI 简历生成"
+        }
+      ],
+      "title": "AI 简历生成",
+      "mainActions": [
+        "返回简历服务",
+        "返回"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [
+        "下一步：求职意向"
+      ],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/generate/preview",
+      "requestUrl": "/resume/generate/preview",
+      "requestPathname": "/resume/generate/preview",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_generate_preview.png",
+      "captureError": null,
+      "landedPathname": "/resume/generate/preview",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "简历预览"
+        }
+      ],
+      "title": "简历预览",
+      "mainActions": [
+        "打开我的简历登录之后，服务端留存期内的版本可以直接打开",
+        "返回简历服务上传、诊断、优化都在那一页",
+        "返回服务大厅",
+        "重新填一份"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回服务大厅"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回服务大厅",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "重新填一份",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/parse",
+      "requestUrl": "/resume/parse",
+      "requestPathname": "/resume/parse",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_parse.png",
+      "captureError": null,
+      "landedPathname": "/resume/parse",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "未找到简历文件"
+        }
+      ],
+      "title": "未找到简历文件",
+      "mainActions": [
+        "返回上传简历"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/report",
+      "requestUrl": "/resume/report",
+      "requestPathname": "/resume/report",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_report.png",
+      "captureError": null,
+      "landedPathname": "/resume/report",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "简历诊断报告"
+        },
+        {
+          "tag": "h2",
+          "text": "还没有诊断报告"
+        }
+      ],
+      "title": "简历诊断报告",
+      "mainActions": [
+        "返回简历来源",
+        "返回简历来源重新上传或扫描一份简历，交给解析",
+        "打开我的诊断记录从已保存的记录里挑一份继续",
+        "去打印 / 扫描不需要报告也能出纸",
+        "返回首页",
+        "去上传简历"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回首页"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回首页",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去上传简历",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/optimize",
+      "requestUrl": "/resume/optimize",
+      "requestPathname": "/resume/optimize",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_optimize.png",
+      "captureError": null,
+      "landedPathname": "/resume/optimize",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "优化建议"
+        },
+        {
+          "tag": "h2",
+          "text": "不靠这一步，也能继续"
+        },
+        {
+          "tag": "h2",
+          "text": "不用 AI，也能自己改"
+        }
+      ],
+      "title": "优化建议",
+      "mainActions": [
+        "重新上传简历",
+        "返回诊断报告看清楚要改哪几处，再决定怎么改",
+        "手动逐项修改自己填写并原样导出草稿，不经过模型",
+        "打开我的简历查看和整理已保存的版本",
+        "返回报告"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回报告"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回报告",
+          "variant": "ghost",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/optimize/compare",
+      "requestUrl": "/resume/optimize/compare",
+      "requestPathname": "/resume/optimize/compare",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_optimize_compare.png",
+      "captureError": null,
+      "landedPathname": "/resume/optimize/compare",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "逐条改写对照"
+        }
+      ],
+      "title": "逐条改写对照",
+      "mainActions": [
+        "去上传简历",
+        "返回优化页"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回优化页"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回优化页",
+          "variant": "ghost",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/export",
+      "requestUrl": "/resume/export",
+      "requestPathname": "/resume/export",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_export.png",
+      "captureError": null,
+      "landedPathname": "/resume/optimize",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "优化建议"
+        },
+        {
+          "tag": "h2",
+          "text": "不靠这一步，也能继续"
+        },
+        {
+          "tag": "h2",
+          "text": "不用 AI，也能自己改"
+        }
+      ],
+      "title": "优化建议",
+      "mainActions": [
+        "重新上传简历",
+        "返回诊断报告看清楚要改哪几处，再决定怎么改",
+        "手动逐项修改自己填写并原样导出草稿，不经过模型",
+        "打开我的简历查看和整理已保存的版本",
+        "返回报告"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回报告"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回报告",
+          "variant": "ghost",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/templates",
+      "requestUrl": "/resume/templates",
+      "requestPathname": "/resume/templates",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_templates.png",
+      "captureError": null,
+      "landedPathname": "/resume/templates",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "简历素材库"
+        }
+      ],
+      "title": "简历素材库",
+      "mainActions": [
+        "返回首页",
+        "全部",
+        "简历模板",
+        "通用"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/materials",
+      "requestUrl": "/resume/materials",
+      "requestPathname": "/resume/materials",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_materials.png",
+      "captureError": null,
+      "landedPathname": "/resume/materials",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "求职材料库"
+        }
+      ],
+      "title": "求职材料库",
+      "mainActions": [
+        "返回首页",
+        "全部",
+        "求职信",
+        "感谢信",
+        "作品集",
+        "材料清单",
+        "校招",
+        "社招",
+        "通用"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume-service",
+      "requestUrl": "/resume-service",
+      "requestPathname": "/resume-service",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume-service.png",
+      "captureError": null,
+      "landedPathname": "/resume-service",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI简历服务"
+        }
+      ],
+      "title": "AI简历服务",
+      "mainActions": [
+        "返回",
+        "AI简历诊断上传PDF或图片简历，AI自动解析结构、识别问题，给出针对性改进建议进入",
+        "AI简历优化输入目标岗位后，AI定向重写简历表达，提升岗位匹配度进入",
+        "简历生成引导式填写基本信息，AI生成完整简历草稿，可下载打印进入",
+        "简历素材库浏览版式参考和求职材料模板，辅助自主编辑进入",
+        "职业规划AI结合你的经历与目标，生成职业发展方向与行动建议进入",
+        "求职材料整理求职附件清单，生成求职信、自我介绍等辅助材料进入",
+        "简历打印优化完成后直接在本机打印，走标准文档打印流程进入",
+        "岗位匹配参考AI分析简历与目标岗位的匹配度，给出差距与提升方向进入",
+        "我的简历查看已保存的简历文件",
+        "AI服务记录查看历次AI诊断与优化",
+        "自我评估完成职业能力自我测评"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": true,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/scan",
+      "requestUrl": "/scan",
+      "requestPathname": "/scan",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/scan.png",
+      "captureError": null,
+      "landedPathname": "/scan",
+      "landedSearch": "?stage=start",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "材料扫描"
+        },
+        {
+          "tag": "h2",
+          "text": "扫描这一步，在机器面板上做。"
+        }
+      ],
+      "title": "材料扫描",
+      "mainActions": [
+        "选择扫描类型：简历扫描",
+        "选择扫描类型：证件扫描",
+        "选择扫描类型：普通文档",
+        "改用面板扫描到 U 盘",
+        "下一步 · 创建扫描会话"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "改用面板扫描到 U 盘"
+      ],
+      "ctaAll": [
+        {
+          "text": "改用面板扫描到 U 盘",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "下一步 · 创建扫描会话",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/scan/start",
+      "requestUrl": "/scan/start",
+      "requestPathname": "/scan/start",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/scan_start.png",
+      "captureError": null,
+      "landedPathname": "/scan",
+      "landedSearch": "?stage=start",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "材料扫描"
+        },
+        {
+          "tag": "h2",
+          "text": "扫描这一步，在机器面板上做。"
+        }
+      ],
+      "title": "材料扫描",
+      "mainActions": [
+        "选择扫描类型：简历扫描",
+        "选择扫描类型：证件扫描",
+        "选择扫描类型：普通文档",
+        "改用面板扫描到 U 盘",
+        "下一步 · 创建扫描会话"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "改用面板扫描到 U 盘"
+      ],
+      "ctaAll": [
+        {
+          "text": "改用面板扫描到 U 盘",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "下一步 · 创建扫描会话",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/scan/settings",
+      "requestUrl": "/scan/settings",
+      "requestPathname": "/scan/settings",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/scan_settings.png",
+      "captureError": null,
+      "landedPathname": "/scan",
+      "landedSearch": "?stage=settings",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "未创建扫描任务"
+        },
+        {
+          "tag": "h2",
+          "text": "这一页没有可创建的扫描类型。"
+        }
+      ],
+      "title": "未创建扫描任务",
+      "mainActions": [
+        "安全返回扫描首页"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "安全返回扫描首页"
+      ],
+      "ctaAll": [
+        {
+          "text": "安全返回扫描首页",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "未创建扫描任务",
+          "variant": "primary",
+          "disabled": true
+        }
+      ],
+      "disabledButtons": [
+        "未创建扫描任务"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/scan/progress",
+      "requestUrl": "/scan/progress",
+      "requestPathname": "/scan/progress",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/scan_progress.png",
+      "captureError": null,
+      "landedPathname": "/scan",
+      "landedSearch": "?stage=start",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "材料扫描"
+        },
+        {
+          "tag": "h2",
+          "text": "扫描这一步，在机器面板上做。"
+        }
+      ],
+      "title": "材料扫描",
+      "mainActions": [
+        "选择扫描类型：简历扫描",
+        "选择扫描类型：证件扫描",
+        "选择扫描类型：普通文档",
+        "改用面板扫描到 U 盘",
+        "下一步 · 创建扫描会话"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "改用面板扫描到 U 盘"
+      ],
+      "ctaAll": [
+        {
+          "text": "改用面板扫描到 U 盘",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "下一步 · 创建扫描会话",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/scan/result",
+      "requestUrl": "/scan/result",
+      "requestPathname": "/scan/result",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/scan_result.png",
+      "captureError": null,
+      "landedPathname": "/scan",
+      "landedSearch": "?stage=start",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "材料扫描"
+        },
+        {
+          "tag": "h2",
+          "text": "扫描这一步，在机器面板上做。"
+        }
+      ],
+      "title": "材料扫描",
+      "mainActions": [
+        "选择扫描类型：简历扫描",
+        "选择扫描类型：证件扫描",
+        "选择扫描类型：普通文档",
+        "改用面板扫描到 U 盘",
+        "下一步 · 创建扫描会话"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "改用面板扫描到 U 盘"
+      ],
+      "ctaAll": [
+        {
+          "text": "改用面板扫描到 U 盘",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "下一步 · 创建扫描会话",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/jobs",
+      "requestUrl": "/jobs",
+      "requestPathname": "/jobs",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/jobs.png",
+      "captureError": null,
+      "landedPathname": "/jobs",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "岗位信息"
+        }
+      ],
+      "title": "岗位信息",
+      "mainActions": [
+        "开始推荐",
+        "全部",
+        "全职",
+        "实习",
+        "校招",
+        "兼职",
+        "全部",
+        "青岛公共就业服务网",
+        "线下机构门店",
+        "城市 / 行业筛选",
+        "仅看收藏 0",
+        "最新同步",
+        "薪资标注优先",
+        "前端工程师",
+        "收藏岗位",
+        "查看岗位",
+        "AI岗位推荐登录后基于本人简历推荐，仅供参考",
+        "找企业来源企业与岗位导览",
+        "线下招聘机构",
+        "官方与合作平台目录"
+      ],
+      "topbarBack": [
+        "返回岗位服务"
+      ],
+      "ctaSecondary": [
+        "线下招聘机构"
+      ],
+      "ctaAll": [
+        {
+          "text": "线下招聘机构",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "官方与合作平台目录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [
+        "上一页",
+        "下一页"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/jobs/:id",
+      "requestUrl": "/jobs/job-001",
+      "requestPathname": "/jobs/job-001",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/jobs_id.png",
+      "captureError": null,
+      "landedPathname": "/jobs/job-001",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "岗位详情"
+        },
+        {
+          "tag": "h2",
+          "text": "前端工程师"
+        },
+        {
+          "tag": "h2",
+          "text": "职责与要求"
+        },
+        {
+          "tag": "h2",
+          "text": "信息来源"
+        },
+        {
+          "tag": "h2",
+          "text": "后续动作"
+        }
+      ],
+      "title": "岗位详情",
+      "mainActions": [
+        "收藏岗位",
+        "AI岗位解读看懂职责与准备点",
+        "岗位匹配参考用本人简历做准备",
+        "打印岗位信息A4 黑白 · 以现场公示价为准",
+        "扫码投递",
+        "返回岗位列表",
+        "扫码投递",
+        "去来源平台投递"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回岗位列表",
+        "扫码投递"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回岗位列表",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "扫码投递",
+          "variant": "teal",
+          "disabled": false
+        },
+        {
+          "text": "去来源平台投递",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [
+        "查看企业来源企业未关联"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/jobs/:id/offline",
+      "requestUrl": "/jobs/offline-job-001/offline",
+      "requestPathname": "/jobs/offline-job-001/offline",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/jobs_id_offline.png",
+      "captureError": null,
+      "landedPathname": "/jobs/offline-job-001/offline",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "线下机构岗位"
+        },
+        {
+          "tag": "h2",
+          "text": "现场咨询岗位"
+        }
+      ],
+      "title": "线下机构岗位",
+      "mainActions": [
+        "回机构目录重新找目录里的机构带地址与来源编号",
+        "先把材料打好不依赖这条岗位信息",
+        "查看来源机构门店",
+        "回机构目录"
+      ],
+      "topbarBack": [
+        "返回机构详情"
+      ],
+      "ctaSecondary": [
+        "查看来源机构门店"
+      ],
+      "ctaAll": [
+        {
+          "text": "查看来源机构门店",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "回机构目录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/offline-agencies",
+      "requestUrl": "/offline-agencies",
+      "requestPathname": "/offline-agencies",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/offline-agencies.png",
+      "captureError": null,
+      "landedPathname": "/offline-agencies",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "线下招聘机构"
+        }
+      ],
+      "title": "线下招聘机构",
+      "mainActions": [
+        "搜索",
+        "全部",
+        "市南区",
+        "清除全部",
+        "打印自备材料登记表、复印件、自带简历，A4 黑白",
+        "纸质材料扫成 PDF在奔图面板上扫，文件回本机取",
+        "简历先过一遍上传或扫描后做一次诊断",
+        "用本人简历",
+        "填写求职方向",
+        "返回岗位服务",
+        "查询机构目录"
+      ],
+      "topbarBack": [
+        "返回岗位服务"
+      ],
+      "ctaSecondary": [
+        "返回岗位服务"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回岗位服务",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "查询机构目录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/offline-agencies/:id",
+      "requestUrl": "/offline-agencies/agency-001",
+      "requestPathname": "/offline-agencies/agency-001",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/offline-agencies_id.png",
+      "captureError": null,
+      "landedPathname": "/offline-agencies/agency-001",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "青岛合规人力服务机构"
+        }
+      ],
+      "title": "青岛合规人力服务机构",
+      "mainActions": [
+        "查看岗位 现场咨询岗位",
+        "用本人简历",
+        "填写求职方向",
+        "返回机构目录",
+        "查看该机构岗位"
+      ],
+      "topbarBack": [
+        "返回机构列表"
+      ],
+      "ctaSecondary": [
+        "返回机构目录"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回机构目录",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "查看该机构岗位",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/jobs-service",
+      "requestUrl": "/jobs-service",
+      "requestPathname": "/jobs-service",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/jobs-service.png",
+      "captureError": null,
+      "landedPathname": "/jobs-service",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "岗位信息"
+        }
+      ],
+      "title": "岗位信息",
+      "mainActions": [
+        "返回",
+        "全职岗位第三方平台同步的全职岗位信息，可筛选行业、地区与薪资范围进入",
+        "实习岗位适合在校生与应届生的实习机会，来自第三方权威来源进入",
+        "兼职信息灵活就业与兼职机会，第三方来源展示，投递请前往来源平台进入",
+        "全部岗位按分类查看全部来源岗位，支持关键词搜索与综合筛选进入",
+        "找企业查看参与机构的企业信息与在招岗位来源，了解目标企业进入",
+        "岗位大师上传简历后，AI分析与岗位的匹配度，给出针对性优化建议进入",
+        "线上招聘平台扫码打开第三方招聘平台官网，岗位与投递均在该平台自行完成进入",
+        "线下招聘机构查看附近线下人力资源机构，直接咨询求职机会进入",
+        "浏览记录查看已浏览的岗位",
+        "外部跳转记录查看已打开的来源平台"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": true,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/notifications",
+      "requestUrl": "/notifications",
+      "requestPathname": "/notifications",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/notifications.png",
+      "captureError": null,
+      "landedPathname": "/notifications",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "消息通知"
+        },
+        {
+          "tag": "h2",
+          "text": "登录后查看本人消息"
+        }
+      ],
+      "title": "消息通知",
+      "mainActions": [
+        "返回我的",
+        "手机号登录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [
+        "返回我的"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回我的",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "手机号登录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/companies",
+      "requestUrl": "/companies",
+      "requestPathname": "/companies",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/companies.png",
+      "captureError": null,
+      "landedPathname": "/companies",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "找企业"
+        }
+      ],
+      "title": "找企业",
+      "mainActions": [
+        "全部",
+        "央企",
+        "国企",
+        "事业单位",
+        "选择类型 (12)",
+        "全部",
+        "智能制造",
+        "互联网/软件",
+        "AI/大数据",
+        "电子信息",
+        "新能源",
+        "选择行业 (18)",
+        "全部",
+        "社招",
+        "校招",
+        "实习",
+        "兼职",
+        "招聘会参展",
+        "全部",
+        "人社平台",
+        "大学就业网",
+        "招聘会主办方",
+        "第三方合规平台",
+        "青岛示例制造有限公司招聘会参展民营企业山东省 · 青岛市 · 崂山区来源 青岛公共就业服务网代表岗位：前端工程师",
+        "查看在招岗位",
+        "用本人简历",
+        "填写求职方向",
+        "返回岗位服务",
+        "按条件筛选"
+      ],
+      "topbarBack": [
+        "返回岗位服务"
+      ],
+      "ctaSecondary": [
+        "返回岗位服务"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回岗位服务",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "按条件筛选",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/companies/:id",
+      "requestUrl": "/companies/company-001",
+      "requestPathname": "/companies/company-001",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/companies_id.png",
+      "captureError": null,
+      "landedPathname": "/companies/company-001",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "青岛示例制造有限公司"
+        }
+      ],
+      "title": "青岛示例制造有限公司",
+      "mainActions": [
+        "去来源平台查看",
+        "查看岗位",
+        "去来源平台投递",
+        "用本人简历",
+        "填写求职方向",
+        "返回企业目录",
+        "查看在招岗位"
+      ],
+      "topbarBack": [
+        "返回找企业"
+      ],
+      "ctaSecondary": [
+        "返回企业目录"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回企业目录",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "查看在招岗位",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/job-fairs",
+      "requestUrl": "/job-fairs",
+      "requestPathname": "/job-fairs",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "招聘会"
+        }
+      ],
+      "title": "招聘会",
+      "mainActions": [
+        "返回首页",
+        "全部地区",
+        "按日期筛选招聘会",
+        "全部",
+        "即将开始",
+        "进行中",
+        "已结束",
+        "只看收藏",
+        "查看 2026 青岛高校毕业生招聘会 详情",
+        "收藏招聘会",
+        "扫码预约"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/job-fairs/checkin",
+      "requestUrl": "/job-fairs/checkin",
+      "requestPathname": "/job-fairs/checkin",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_checkin.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/checkin",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "来源平台入场入口"
+        },
+        {
+          "tag": "h2",
+          "text": "2026 青岛高校毕业生招聘会"
+        },
+        {
+          "tag": "h2",
+          "text": "签到步骤"
+        }
+      ],
+      "title": "来源平台入场入口",
+      "mainActions": [
+        "返回",
+        "查看详情",
+        "来源平台签到码",
+        "返回首页",
+        "查看招聘会"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/job-fairs/:id",
+      "requestUrl": "/job-fairs/fair-001",
+      "requestPathname": "/job-fairs/fair-001",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_id.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/fair-001",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "2026 青岛高校毕业生招聘会"
+        },
+        {
+          "tag": "h2",
+          "text": "现场服务"
+        },
+        {
+          "tag": "h2",
+          "text": "数据来源"
+        }
+      ],
+      "title": "2026 青岛高校毕业生招聘会",
+      "mainActions": [
+        "返回",
+        "收藏招聘会",
+        "详情与特色",
+        "参展企业与岗位",
+        "场馆导览",
+        "数据大屏",
+        "扫码在手机上导航",
+        "展馆导览查看会场布局",
+        "活动资料0 份 · 可打印",
+        "现场数据行业分布 · 岗位规模",
+        "AI参会准备单基于本人简历生成",
+        "AI准备单",
+        "扫码签到",
+        "打印资料",
+        "扫码预约"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/job-fairs/:id/companies",
+      "requestUrl": "/job-fairs/fair-001/companies",
+      "requestPathname": "/job-fairs/fair-001/companies",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_id_companies.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/fair-001/companies",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "参会企业"
+        }
+      ],
+      "title": "参会企业",
+      "mainActions": [
+        "返回详情",
+        "全部",
+        "智能制造专区",
+        "青青岛示例制造有限公司medium展位 A01智能制造招聘 2 人 · 1 岗示例参展企业。查看详情 / 扫码查看",
+        "场馆导览",
+        "查看招聘会"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/fairs-service",
+      "requestUrl": "/fairs-service",
+      "requestPathname": "/fairs-service",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/fairs-service.png",
+      "captureError": null,
+      "landedPathname": "/fairs-service",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "招聘会信息"
+        }
+      ],
+      "title": "招聘会信息",
+      "mainActions": [
+        "返回",
+        "社会招聘会查看企业社会招聘会场次，了解参会企业、时间和地点信息进入",
+        "校园招聘会查看高校或机构组织的校园专场招聘会，含企业名录和预约入口进入",
+        "扫码签到现场活动签到二维码展示与识别引导进入",
+        "AI参会规划告诉AI顾问你想参加的招聘会，小青为你生成参会清单和时间安排进入",
+        "求职材料准备提前准备好简历和求职材料，现场打印后直接使用进入",
+        "活动资料打印上传或扫描招聘会相关材料，本机直接打印备用进入",
+        "浏览记录查看最近浏览的招聘会",
+        "外部跳转记录查看已前往来源平台的记录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": true,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/job-fairs/:id/companies/:companyId",
+      "requestUrl": "/job-fairs/fair-001/companies/fair-company-001",
+      "requestPathname": "/job-fairs/fair-001/companies/fair-company-001",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_id_companies_companyId.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/fair-001/companies/fair-company-001",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "招聘会参展企业"
+        }
+      ],
+      "title": "招聘会参展企业",
+      "mainActions": [
+        "列表视图",
+        "海报视图",
+        "不限",
+        "不限",
+        "大专及以上",
+        "本科及以上",
+        "硕士及以上",
+        "不限",
+        "应届生",
+        "1年以上",
+        "3年以上",
+        "5年以上",
+        "不限",
+        "全职",
+        "兼职",
+        "实习",
+        "扫码投递手机扫码前往来源平台",
+        "去来源平台投递系统不接收简历",
+        "打印企业资料用于现场咨询准备",
+        "打印岗位清单按需打印本企业岗位",
+        "用本人简历",
+        "填写求职方向",
+        "联系工作人员",
+        "返回列表",
+        "去来源平台投递"
+      ],
+      "topbarBack": [
+        "返回参展企业列表"
+      ],
+      "ctaSecondary": [
+        "返回列表"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回列表",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去来源平台投递",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/job-fairs/:id/map",
+      "requestUrl": "/job-fairs/fair-001/map",
+      "requestPathname": "/job-fairs/fair-001/map",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_id_map.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/fair-001/map",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "场馆导览"
+        },
+        {
+          "tag": "h2",
+          "text": "场馆分区示意"
+        }
+      ],
+      "title": "场馆导览",
+      "mainActions": [
+        "返回详情",
+        "返回详情",
+        "查看参展企业",
+        "查看可打印导览资料"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [
+        "智能制造专区青岛市"
+      ],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/job-fairs/:id/materials",
+      "requestUrl": "/job-fairs/fair-001/materials",
+      "requestPathname": "/job-fairs/fair-001/materials",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_id_materials.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/fair-001/materials",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "活动资料"
+        },
+        {
+          "tag": "h2",
+          "text": "如何打印"
+        }
+      ],
+      "title": "活动资料",
+      "mainActions": [
+        "返回详情",
+        "参会企业",
+        "查看招聘会"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/job-fairs/:id/visit-plan",
+      "requestUrl": "/job-fairs/fair-001/visit-plan",
+      "requestPathname": "/job-fairs/fair-001/visit-plan",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_id_visit-plan.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/fair-001/visit-plan",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI参会准备单"
+        },
+        {
+          "tag": "h2",
+          "text": "先上传简历，再生成参会准备单"
+        }
+      ],
+      "title": "AI参会准备单",
+      "mainActions": [
+        "返回详情",
+        "去上传简历",
+        "打印活动资料"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": true
+    },
+    {
+      "pattern": "/job-fairs/:id/stats",
+      "requestUrl": "/job-fairs/fair-001/stats",
+      "requestPathname": "/job-fairs/fair-001/stats",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/job-fairs_id_stats.png",
+      "captureError": null,
+      "landedPathname": "/job-fairs/fair-001/stats",
+      "landedSearch": "",
+      "headings": [],
+      "title": "",
+      "mainActions": [],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/self-assessment/intro",
+      "requestUrl": "/resume/self-assessment/intro",
+      "requestPathname": "/resume/self-assessment/intro",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_self-assessment_intro.png",
+      "captureError": null,
+      "landedPathname": "/resume/self-assessment/intro",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "自我探索 · 倾向参考"
+        }
+      ],
+      "title": "自我探索 · 倾向参考",
+      "mainActions": [
+        "返回"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/self-assessment/questions",
+      "requestUrl": "/resume/self-assessment/questions",
+      "requestPathname": "/resume/self-assessment/questions",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_self-assessment_questions.png",
+      "captureError": null,
+      "landedPathname": "/resume/self-assessment/questions",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "自我探索 · 倾向参考"
+        }
+      ],
+      "title": "自我探索 · 倾向参考",
+      "mainActions": [
+        "返回",
+        "去看说明并同意"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/self-assessment/result",
+      "requestUrl": "/resume/self-assessment/result",
+      "requestPathname": "/resume/self-assessment/result",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_self-assessment_result.png",
+      "captureError": null,
+      "landedPathname": "/resume/self-assessment/result",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "自我探索 · 倾向参考"
+        }
+      ],
+      "title": "自我探索 · 倾向参考",
+      "mainActions": [
+        "重新作答"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/resume/self-assessment/history",
+      "requestUrl": "/resume/self-assessment/history",
+      "requestPathname": "/resume/self-assessment/history",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/resume_self-assessment_history.png",
+      "captureError": null,
+      "landedPathname": "/resume/self-assessment/history",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "自我探索 · 倾向参考"
+        }
+      ],
+      "title": "自我探索 · 倾向参考",
+      "mainActions": [
+        "返回",
+        "前往 AI 服务记录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": false,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/interview-service",
+      "requestUrl": "/interview-service",
+      "requestPathname": "/interview-service",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/interview-service.png",
+      "captureError": null,
+      "landedPathname": "/interview-service",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "AI面试训练"
+        }
+      ],
+      "title": "AI面试训练",
+      "mainActions": [
+        "返回",
+        "开始模拟面试立即开始选择岗位类型和难度，进入AI模拟面试间，完成后即时出报告进入",
+        "职业自我评估回答AI设计的问卷，获得个人优势、薄弱项与职业方向参考报告进入",
+        "职业规划建议结合你的经历与目标，AI生成阶段性职业发展路径与行动建议进入",
+        "面试技巧常见面试问题解析、自我介绍模板、薪资谈判要点等实用技巧进入",
+        "评估历史查看历次自我评估报告，追踪职业认知的成长变化进入",
+        "行业薪资参考问AI顾问了解目标岗位的市场薪资范围和谈薪技巧进入",
+        "AI服务记录查看历次AI服务调用记录",
+        "训练报告查看全部模拟面试报告"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": true,
+      "pageFrame": true,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/print/pickup-claim",
+      "requestUrl": "/print/pickup-claim",
+      "requestPathname": "/print/pickup-claim",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/print_pickup-claim.png",
+      "captureError": null,
+      "landedPathname": "/print/pickup-claim",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "输入你的到机码"
+        },
+        {
+          "tag": "h2",
+          "text": "三种码，别搞混"
+        }
+      ],
+      "title": "输入你的到机码",
+      "mainActions": [
+        "不用手输：把手机上的码，对准机身侧面的扫码区扫码模组靠接近感应触发，不会一直亮着。把手机屏幕亮度调高，再把屏幕凑近扫码区。",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "输入 10 位历史码",
+        "0",
+        "用机身扫码区免输码",
+        "问工作人员帮你查订单",
+        "返回"
+      ],
+      "topbarBack": [
+        "返回打印扫描"
+      ],
+      "ctaSecondary": [
+        "返回"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "确认校验",
+          "variant": "primary",
+          "disabled": true
+        }
+      ],
+      "disabledButtons": [
+        "删除",
+        "确认校验"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/ai/plan",
+      "requestUrl": "/ai/plan",
+      "requestPathname": "/ai/plan",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/ai_plan.png",
+      "captureError": null,
+      "landedPathname": "/ai/plan",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "小青的作业面"
+        }
+      ],
+      "title": "小青的作业面",
+      "mainActions": [
+        "去问小青",
+        "看我的 AI 服务记录"
+      ],
+      "topbarBack": [
+        "返回问小青"
+      ],
+      "ctaSecondary": [
+        "去问小青"
+      ],
+      "ctaAll": [
+        {
+          "text": "去问小青",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "看我的 AI 服务记录",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/session-resume",
+      "requestUrl": "/session-resume",
+      "requestPathname": "/session-resume",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/session-resume.png",
+      "captureError": null,
+      "landedPathname": "/login",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "登录后继续办理"
+        }
+      ],
+      "title": "登录后继续办理",
+      "mainActions": [
+        "手机号登录",
+        "手机扫码登录",
+        "手机号（11 位本人号码）",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "清空",
+        "0",
+        "删除",
+        "打印与扫描文档、照片、扫描与格式转换，进入后按真实能力状态继续。",
+        "到机码核销手机上下过单，拿到机码直接来这台机器取。",
+        "岗位与招聘会来源机构发布的信息，投递与预约都在来源平台自行完成。",
+        "我已阅读并同意",
+        "《用户服务协议》",
+        "《隐私政策》",
+        "不登录，继续使用"
+      ],
+      "topbarBack": [
+        "返回首页"
+      ],
+      "ctaSecondary": [
+        "不登录，继续使用"
+      ],
+      "ctaAll": [
+        {
+          "text": "不登录，继续使用",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "验证并登录",
+          "variant": "primary",
+          "disabled": true
+        }
+      ],
+      "disabledButtons": [
+        "获取验证码",
+        "短信验证码",
+        "验证并登录"
+      ],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/jobs/online-platforms",
+      "requestUrl": "/jobs/online-platforms",
+      "requestPathname": "/jobs/online-platforms",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/jobs_online-platforms.png",
+      "captureError": null,
+      "landedPathname": "/jobs/online-platforms",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "线上招聘平台"
+        }
+      ],
+      "title": "线上招聘平台",
+      "mainActions": [
+        "B第三方官网入口Boss直聘直聘平台www.zhipin.com手机扫码打开在官网继续浏览扫码打开来源平台",
+        "前第三方官网入口前程无忧综合平台www.51job.com手机扫码打开在官网继续浏览扫码打开来源平台",
+        "智第三方官网入口智联招聘综合平台www.zhaopin.com手机扫码打开在官网继续浏览扫码打开来源平台",
+        "猎第三方官网入口猎聘中高端平台www.liepin.com手机扫码打开在官网继续浏览扫码打开来源平台",
+        "AI 找岗方向快捷选项加自由填写，确认后再进入 AI 对话",
+        "用本人简历",
+        "填写求职方向",
+        "返回岗位服务",
+        "去看岗位信息"
+      ],
+      "topbarBack": [
+        "返回岗位服务"
+      ],
+      "ctaSecondary": [
+        "返回岗位服务"
+      ],
+      "ctaAll": [
+        {
+          "text": "返回岗位服务",
+          "variant": "ghost",
+          "disabled": false
+        },
+        {
+          "text": "去看岗位信息",
+          "variant": "primary",
+          "disabled": false
+        }
+      ],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/contract-review",
+      "requestUrl": "/contract-review",
+      "requestPathname": "/contract-review",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/contract-review.png",
+      "captureError": null,
+      "landedPathname": "/",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "首页"
+        },
+        {
+          "tag": "h2",
+          "text": "你好，我是小青"
+        },
+        {
+          "tag": "h2",
+          "text": "直接办"
+        }
+      ],
+      "title": "首页",
+      "mainActions": [
+        "登录后查看本人记录",
+        "点这里说话，比如“帮我打一份简历”进入助手",
+        "改简历",
+        "找工作",
+        "查政策",
+        "打印机在线打印 · 扫描简历、证明材料与照片，进入后核验打印与扫描能力开始选择材料",
+        "AI 服务AI 简历诊断、逐条优化、生成新版本进入简历服务",
+        "练习服务模拟面试问答对练，可跳过，不做录用判断进入面试服务",
+        "第三方来源岗位信息查看来源与更新时间，去来源平台投递查看岗位",
+        "暂无场次招聘会暂无进行中或即将开始的场次查看招聘会",
+        "就业政策资格与办理条件以官方核验为准",
+        "已上架百宝箱进入本机已上架的扩展服务",
+        "已授权智慧校园进入本机已授权的校园服务",
+        "鲁ICP备2026023517号-2",
+        "鲁公网安备37021402007308号"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/contract-review/processing",
+      "requestUrl": "/contract-review/processing",
+      "requestPathname": "/contract-review/processing",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/contract-review_processing.png",
+      "captureError": null,
+      "landedPathname": "/",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "首页"
+        },
+        {
+          "tag": "h2",
+          "text": "你好，我是小青"
+        },
+        {
+          "tag": "h2",
+          "text": "直接办"
+        }
+      ],
+      "title": "首页",
+      "mainActions": [
+        "登录后查看本人记录",
+        "点这里说话，比如“帮我打一份简历”进入助手",
+        "改简历",
+        "找工作",
+        "查政策",
+        "打印机在线打印 · 扫描简历、证明材料与照片，进入后核验打印与扫描能力开始选择材料",
+        "AI 服务AI 简历诊断、逐条优化、生成新版本进入简历服务",
+        "练习服务模拟面试问答对练，可跳过，不做录用判断进入面试服务",
+        "第三方来源岗位信息查看来源与更新时间，去来源平台投递查看岗位",
+        "暂无场次招聘会暂无进行中或即将开始的场次查看招聘会",
+        "就业政策资格与办理条件以官方核验为准",
+        "已上架百宝箱进入本机已上架的扩展服务",
+        "已授权智慧校园进入本机已授权的校园服务",
+        "鲁ICP备2026023517号-2",
+        "鲁公网安备37021402007308号"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/contract-review/result",
+      "requestUrl": "/contract-review/result",
+      "requestPathname": "/contract-review/result",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/contract-review_result.png",
+      "captureError": null,
+      "landedPathname": "/",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "首页"
+        },
+        {
+          "tag": "h2",
+          "text": "你好，我是小青"
+        },
+        {
+          "tag": "h2",
+          "text": "直接办"
+        }
+      ],
+      "title": "首页",
+      "mainActions": [
+        "登录后查看本人记录",
+        "点这里说话，比如“帮我打一份简历”进入助手",
+        "改简历",
+        "找工作",
+        "查政策",
+        "打印机在线打印 · 扫描简历、证明材料与照片，进入后核验打印与扫描能力开始选择材料",
+        "AI 服务AI 简历诊断、逐条优化、生成新版本进入简历服务",
+        "练习服务模拟面试问答对练，可跳过，不做录用判断进入面试服务",
+        "第三方来源岗位信息查看来源与更新时间，去来源平台投递查看岗位",
+        "暂无场次招聘会暂无进行中或即将开始的场次查看招聘会",
+        "就业政策资格与办理条件以官方核验为准",
+        "已上架百宝箱进入本机已上架的扩展服务",
+        "已授权智慧校园进入本机已授权的校园服务",
+        "鲁ICP备2026023517号-2",
+        "鲁公网安备37021402007308号"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": true,
+      "v6Shell": false,
+      "pageFrame": false,
+      "w4Frame": false
+    },
+    {
+      "pattern": "/policy-service",
+      "requestUrl": "/policy-service",
+      "requestPathname": "/policy-service",
+      "screenshot": "docs/progress/evidence/walkthrough-2026-09-09/policy-service.png",
+      "captureError": null,
+      "landedPathname": "/policy-service",
+      "landedSearch": "",
+      "headings": [
+        {
+          "tag": "h1",
+          "text": "政策服务"
+        }
+      ],
+      "title": "政策服务",
+      "mainActions": [
+        "返回",
+        "就业政策就业补贴、灵活就业等政策信息，由合作机构提交并经平台审核后展示进入",
+        "社保指南参保流程、社保办事材料清单，含城镇职工和灵活就业人员险种说明进入",
+        "档案 / 登记人事档案托管办理材料指引、毕业生就业登记流程与证明开具说明进入",
+        "补贴指引就业补贴、失业保险、创业扶持政策说明与来源链接进入",
+        "AI政策助手提问政策疑问、补贴资格、办事材料，AI顾问给出个性化解答进入",
+        "政策收藏查看已收藏的政策，方便随时回顾进入",
+        "浏览记录查看最近浏览的政策文章",
+        "AI政策问答记录查看历次AI政策问答记录"
+      ],
+      "topbarBack": [],
+      "ctaSecondary": [],
+      "ctaAll": [],
+      "disabledButtons": [],
+      "qxFrame": false,
+      "v6Shell": true,
+      "pageFrame": true,
+      "w4Frame": false
+    }
+  ]
+}
