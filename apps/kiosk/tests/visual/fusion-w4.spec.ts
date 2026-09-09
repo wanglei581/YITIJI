@@ -785,7 +785,11 @@ test('/job-fairs/:id 扫码预约只出二维码且不 POST 简历 @w4', async (
   await book.click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByText('扫码预约')).toBeVisible()
+  // 钉的是「弹窗说清了去哪」，不是「标题恰好等于 CTA 那四个字」。
+  // 这条原本写成 `getByText('扫码预约')`——那是照着当时新页的标题写的，
+  // 而当时的标题正是迁移时从「扫码前往来源平台预约」缩水来的，等于把缩水固化成期望值。
+  // main 上的走查用例一直钉着完整形式，两条对撞才暴露出来。
+  await expect(dialog.getByText('扫码前往来源平台预约')).toBeVisible()
   await page.screenshot({ path: '../../docs/progress/evidence/qx-job-fairs-2026-09-07/runtime-detail-qr.png' })
   const dialogText = await dialog.innerText()
   for (const banned of ['一键投递', '立即投递', '立即报名', '签到成功', '确认签到']) {

@@ -252,9 +252,10 @@ export function JobFairDetailPage() {
         </>
       ) : null}
 
-      {/* 预约弹窗标题说清「去哪」：下面的签到弹窗用的就是完整形式「扫码前往来源平台签到」，
-          预约这边缩成「扫码预约」不一致，旧页写的也是完整形式。
-          合规白名单（CLAUDE.md §2）两种都允许，取信息量大的那个。 */}
+      {/* 标题是完整形式「扫码前往来源平台预约」，和 main 上一致，也和下面的签到弹窗一致。
+          §2 的 CTA 白名单管的是**按钮文案**（CTA 条上那颗按钮仍是「扫码预约」），
+          弹窗标题不在其列——`assertAppointmentCtaClosedWhitelist` 只扫
+          button / a[href] / [role=button]，标题是 h2，不受约束。 */}
       {qr?.kind === 'book' && fair ? (
         <QxFairQrDialog
           title="扫码前往来源平台预约"

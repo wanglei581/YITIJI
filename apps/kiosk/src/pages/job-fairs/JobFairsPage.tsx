@@ -82,7 +82,7 @@ function FairRow({
         <CalendarIcon size={28} />
       </span>
       <div className="qx-fair-card-main">
-        <h2 className="qx-fair-card-title">
+        <h2 className="qx-fair-card-title" id={`qx-fair-name-${fair.id}`}>
           {fair.name}
           <span className="qx-fair-tag">{themeLabel}</span>
           <span className={`qx-fair-tag${sc.tag ? ` ${sc.tag}` : ''}`}>{sc.label}</span>
@@ -111,12 +111,18 @@ function FairRow({
           <StarIcon size={18} aria-hidden />
           收藏场次
         </button>
+        {/* 预约按钮的场次名走 aria-describedby，**不能进 aria-label**：
+            合规闭合白名单（fusion-w4 的 assertAppointmentCtaClosedWhitelist）读的是
+            aria-label 优先的可访问名，凡匹配 /投递|预约/ 就必须**精确**等于白名单里的词。
+            把场次名拼进 aria-label 会直接把 CTA 撑出白名单——我试过一次，当场红。
+            describedby 的内容屏幕阅读器仍会在名称之后读出来，两个要求都满足。
+            旁边「查看详情」「收藏」不匹配那两个词，所以照常用 aria-label。 */}
         {!isEnded ? (
           <button
             type="button"
             className="qx-fair-mini"
             data-variant="primary"
-            aria-label={`${BOOK_LABEL} ${fair.name}`}
+            aria-describedby={`qx-fair-name-${fair.id}`}
             onClick={onBook}
           >
             <QrCodeIcon size={18} aria-hidden />
