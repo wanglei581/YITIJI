@@ -23,6 +23,7 @@ import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
 import type { HomeV6ActionId } from '../homeV6Domains'
 import { printDomainStatus } from '../homeDomainStatus'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
+import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
 
 interface QxHomeViewProps {
   isLoggedIn: boolean
@@ -31,6 +32,7 @@ interface QxHomeViewProps {
   toolbox: ToolboxCapabilityState
   campus: SmartCampusCapabilityState
   jobFair: HomeJobFairHighlightState & { retry: () => void }
+  jobs: HomeJobHighlightState & { retry: () => void }
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
 }
@@ -51,6 +53,13 @@ function fairCopy(state: QxHomeViewProps['jobFair']): {
   if (state.status === 'loading') return { description: '正在读取已发布场次', badge: '读取中' }
   if (state.status === 'error') return { description: '暂时无法获取真实场次', badge: '读取失败' }
   return { description: '暂无进行中或即将开始的场次', badge: '暂无场次' }
+}
+
+function jobCopy(state: QxHomeViewProps['jobs']): { description: string; badge: string } {
+  if (state.status === 'ready') return { description: '查看来源与更新时间，去来源平台投递', badge: `${state.total} 个在招` }
+  if (state.status === 'loading') return { description: '正在读取已发布岗位', badge: '读取中' }
+  if (state.status === 'error') return { description: '暂时无法获取岗位数量', badge: '读取失败' }
+  return { description: '暂无在招岗位', badge: '暂无岗位' }
 }
 
 function QxHomeClock() {
@@ -100,6 +109,7 @@ export function QxHomeView({
   toolbox,
   campus,
   jobFair,
+  jobs,
   continueSlot,
   onAction,
 }: QxHomeViewProps) {
@@ -109,6 +119,7 @@ export function QxHomeView({
     deviceLabel: device.printerLabel,
   })
   const fair = fairCopy(jobFair)
+  const job = jobCopy(jobs)
   const toolboxKnown = toolbox.status === 'ready' && Boolean(toolbox.configVersion)
   const campusKnown = campus.status === 'ready' && Boolean(campus.configVersion)
   const toolboxReady = toolboxKnown && toolbox.enabled
@@ -190,7 +201,27 @@ export function QxHomeView({
           />
           <HomeTile actionId="resume-hub" title="AI 简历" description="诊断、逐条优化、生成新版本" foot="进入简历服务" badge="AI 服务" icon={FileTextIcon} onAction={onAction} />
           <HomeTile actionId="interview-hub" title="模拟面试" description="问答对练，可跳过，不做录用判断" foot="进入面试服务" badge="练习服务" icon={MicIcon} onAction={onAction} />
-          <HomeTile actionId="jobs-hub" title="岗位信息" description="查看来源与更新时间，去来源平台投递" foot="查看岗位" badge="第三方来源" icon={BriefcaseBusinessIcon} tone="slate" onAction={onAction} />
+          {jobs.status === 'error' ? (
+            <button
+              type="button"
+              className="qx-home-tile"
+              data-action="jobs-retry"
+              data-tone="slate"
+              data-home-jobs-panel=""
+              data-panel-state="error"
+              onClick={jobs.retry}
+            >
+              <span className="qx-home-tile-head">
+                <span className="qx-home-tile-icon"><RotateCwIcon aria-hidden="true" /></span>
+                <span className="qx-home-tile-badge">{job.badge}</span>
+              </span>
+              <strong>岗位信息</strong>
+              <span className="qx-home-tile-desc">{job.description}</span>
+              <span className="qx-home-tile-foot">重新加载 <RotateCwIcon aria-hidden="true" /></span>
+            </button>
+          ) : (
+            <HomeTile actionId="jobs-hub" title="岗位信息" description={job.description} foot="查看岗位" badge={job.badge} icon={BriefcaseBusinessIcon} tone="slate" panelAttrs={{ 'data-home-jobs-panel': '', 'data-panel-state': jobs.status }} onAction={onAction} />
+          )}
           {jobFair.status === 'error' ? (
             <button
               type="button"

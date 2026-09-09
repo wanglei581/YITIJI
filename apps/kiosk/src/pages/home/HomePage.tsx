@@ -13,6 +13,7 @@ import { ContinuePanel } from './components/ContinuePanel'
 import { QxHomeNavbar, QxHomeView } from './components/QxHomeView'
 import { HOME_V6_ROUTES, type HomeV6ActionId } from './homeV6Domains'
 import { useHomeJobFairHighlight } from './hooks/useHomeJobFairHighlight'
+import { useHomeJobHighlight } from './hooks/useHomeJobHighlight'
 import './styles/home-qx.css'
 
 const ASSISTANT_TOPICS: Partial<Record<HomeV6ActionId, 'resume' | 'jobfair'>> = {
@@ -27,6 +28,7 @@ export function HomePage() {
   const toolbox = useToolboxCapabilityState()
   const campus = useSmartCampusCapabilityState()
   const jobFair = useHomeJobFairHighlight()
+  const jobs = useHomeJobHighlight()
   const terminalCode = getTerminalCode() || '设备未绑定'
 
   const handleAction = (actionId: HomeV6ActionId) => {
@@ -69,6 +71,7 @@ export function HomePage() {
           toolbox={toolbox}
           campus={campus}
           jobFair={jobFair}
+          jobs={jobs}
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
         />

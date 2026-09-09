@@ -62,6 +62,7 @@ function registerHomeShellApi(api: ApiRouter) {
   })
   // V6 首页会真实请求招聘会列表；给精确的 200 空列表，让首页呈现诚实 empty 态。
   // 其余未注册 API 仍由 ApiRouter fail-closed。
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },

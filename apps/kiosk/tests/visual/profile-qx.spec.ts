@@ -41,6 +41,7 @@ function registerShell(api: ApiRouter): void {
       serverTime: '2026-09-07T00:00:00.000Z',
     },
   })
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },

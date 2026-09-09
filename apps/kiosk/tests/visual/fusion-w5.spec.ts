@@ -128,6 +128,7 @@ function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()]): void 
     status: 200,
     json: terminalConfig({ enabled: false, items: [] }),
   })
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { success: true, data: fairs, pagination: { page: 1, pageSize: 20, total: fairs.length, totalPages: fairs.length ? 1 : 0 } },
@@ -221,6 +222,7 @@ test('home fair loading, empty and error states remain honest and stable @w5-kio
     json: terminalConfig({ enabled: false, items: [] }),
   })
   let releaseFair!: (result: { status: number; json: unknown }) => void
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respondWith('GET', '/api/v1/job-fairs', (requestNumber) => {
     if (requestNumber === 1) return new Promise((resolve) => { releaseFair = resolve })
     if (requestNumber === 2) {
@@ -279,6 +281,7 @@ test('profile permission state uses the canonical fusion shell @w5-kiosk', async
     status: 200,
     json: { smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] }, toolbox: { enabled: false, items: [] }, configVersion: 'w5', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
   })
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
@@ -440,6 +443,7 @@ for (const scenario of [
       status: 200,
       json: terminalConfig(scenario.toolbox),
     })
+    api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
     api.respond('GET', '/api/v1/job-fairs', {
       status: 200,
       json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
@@ -620,6 +624,7 @@ test('direct visit to /session-timeout without a pending warning fails closed to
     status: 200,
     json: terminalConfig({ enabled: false, items: [] }),
   })
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
@@ -656,6 +661,7 @@ test('offline page follows a recovered health response in a fresh page @w5-kiosk
     status: 200,
     json: terminalConfig({ enabled: false, items: [] }),
   })
+  api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } } })
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
