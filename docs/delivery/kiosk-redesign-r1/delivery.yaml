@@ -48,8 +48,8 @@ verdict_by_boundary:
   # （如 /print/desk 由材料检查 + 预览两页合成）。所以这里**只记可直接点数的路由数**，
   # 不再写一个会持续腐坏的 N/51；页数以 docs/reviews/page-migration-inventory-2026-09-02.md
   # 对当时 main 现算为准。写死页数正是这份文档此前失真的原因。
-  local_build: "PARTIAL —— 代码可构建、门禁通过；青序流光已迁 25 条精确路由（另有前缀/模式两组），打印链路 8 屏中 7 屏为新稿；其余页仍为旧版式"
-  production:  "NO-GO —— 2026-09-09 07:47 已发布 930441bb3（deploy run 34325662631，依据 CI run 34279445389 name=CI/main/success；发布目标读「Resolve CI-verified target SHA」步骤日志，不看 deploy run 的 headSha）。复验：三端 200（zyidai.cn 内核 bundle index-DSgMkoxP.js、admin.zyidai.cn、partner.zyidai.cn 标题各自正确），/api/v1/health 回 status ok / db postgres / degraded []，GET 未知路径回「请求的内容不存在」（#975 的 4xx 文案修复确认在线）；青序流光首页已上线（生产 bundle 内含 qx-home 类，#932 引入）。仍判 NO-GO 的理由是 BL-06：岗位/招聘会/政策三个板块线上零内容"
+  local_build: "PARTIAL —— 代码可构建、门禁通过；青序流光已迁 42 条精确路由（另有前缀/模式两组）。稿页维度以 origin/main 现算为准：2026-09-10 对 b6379c43d 实算为已迁 30 / 部分 3 / 未迁 18（部分迁的三页：24-resume-generate、30-my-profile、31-benefits）。注意本周多条旧路由被收成一条活路由（/print/desk、/scan、/interview 各吃掉 2 / 4 / 5 条**旧路由屏**，对应的 HTML 稿各只有一张），因此页维度与路由维度会反向变动——合并一次是稿页 +1 而路由 −N，只报一个维度会看起来在倒退"
+  production:  "NO-GO —— 2026-09-09 15:58 已发布 a8a521cb1（deploy run 34373746190，依据 CI run 34365933727 name=CI/main/success；发布目标读「Resolve CI-verified target SHA」步骤日志，不看 deploy run 的 headSha）。复验用活体判据而非产物哈希：GET 一个不存在的 API 路径，机器码由 INTERNAL_SERVER_ERROR 变为 Not Found（#1010 的修复），证明 API 侧确实换版，比只比对前端 bundle 哈希硬。仍判 NO-GO 的理由不变：BL-06 岗位/招聘会/政策三个板块线上零内容（2026-09-10 复测 total 仍全为 0）"
   # 2026-09-08 产品负责人在「项目进展评估」会话中裁决现场形态为两期：
   # 一期 Windows 主机 + 外设（口径「打开这个网站，在本地电脑能完成打印操作就行」），
   # 二期才铺 27 寸一体机整机。因此本行必须分期表述 ——
@@ -129,7 +129,13 @@ hard_blockers:
   - id: BL-05
     desc: "百度 OCR 密钥曾在聊天暴露，上线前须在控制台重建应用轮换"
     owner: "产品负责人"
-    status: OPEN
+    status: CLOSED
+    closed_at: "2026-09-10"
+    note: "产品负责人 2026-09-10 在「项目进展评估」会话中明确答复「OCR 不用管，我已经解决了」，
+      系针对本条（当时正在向他解释本条的含义：密钥不是过期而是曾泄露、需在百度智能云控制台重建应用）。
+      **取证边界**：该密钥存放于服务端环境变量，仓库侧与公网侧均无法验证轮换是否已执行；
+      本条依据的是负责人对自己所属事项的声明，不是独立取证。
+      若后续需要硬证据，判据是：用旧 AK/SK 调百度 OCR 应返回鉴权失败。"
 
 # ── 进度口径 ────────────────────────────────────────────────
 # 本包只承载闸门、证据与验收签署。项目进度的唯一信源仍是
