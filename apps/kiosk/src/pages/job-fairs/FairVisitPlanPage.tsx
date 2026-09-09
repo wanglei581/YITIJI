@@ -197,6 +197,7 @@ export function FairVisitPlanPage() {
         subtitle={copy.subtitleHint}
         status={{ tone: 'warn', label: '缺少简历或参展上下文' }}
         screen="visit-plan"
+      fairId={fairId}
         state="missing-context"
         ctabar={
           <QxFairCta variant="primary" testId="visit-plan-primary" onClick={() => navigate('/me/resumes')}>

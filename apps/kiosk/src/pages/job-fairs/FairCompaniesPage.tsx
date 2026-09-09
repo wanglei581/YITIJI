@@ -73,6 +73,7 @@ export function FairCompaniesPage() {
       subtitle="名单由主办方提供；本机不代收简历，不提供平台内投递。"
       status={pill}
       screen="companies"
+      fairId={fairId}
       state={viewState}
       ctabar={
         <QxFairCta variant="primary" testId="companies-primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>

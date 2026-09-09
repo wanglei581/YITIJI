@@ -62,6 +62,7 @@ export function FairStatsPage() {
         subtitle="数值由主办方回传，本机不估算、不推算。"
         status={pill}
         screen="stats"
+      fairId={fairId}
         state="loading"
         ctabar={<QxFairCta variant="primary" testId="stats-primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</QxFairCta>}
       >

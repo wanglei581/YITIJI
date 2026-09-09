@@ -105,6 +105,7 @@ export function FairMaterialsPage() {
         subtitle="链接由服务端临时签发；打印价格以现场公示与服务端报价为准。"
         status={{ tone: 'unknown', label: '正在取活动物料' }}
         screen="materials"
+      fairId={fairId}
         state="loading"
         ctabar={<QxFairCta variant="primary" testId="materials-primary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</QxFairCta>}
       >

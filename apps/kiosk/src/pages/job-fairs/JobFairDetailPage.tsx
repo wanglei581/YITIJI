@@ -137,6 +137,7 @@ export function JobFairDetailPage() {
       subtitle="时间、地点与来源三要素由主办方发布，本机不代预约。"
       status={pill}
       screen="detail"
+      fairId={id}
       state={viewState}
       ctabar={
         viewState === 'detail' && fair ? (

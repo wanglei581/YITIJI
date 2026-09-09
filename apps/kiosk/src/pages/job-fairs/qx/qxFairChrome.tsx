@@ -38,6 +38,26 @@ export const QX_CTA_WHITELIST: readonly QxCtaLabel[] = [
   '复制来源链接',
 ]
 
+/**
+ * 返回落点照稿 28-jobfair-enhanced.html 的 `var BACK` 逐条搬过来，键就是稿里的 screen 名。
+ * 稿里八个屏各自写死了落点和文案，这里不重新发明——只把 `:id` 换成运行时的 fairId。
+ *
+ * 为什么集中在壳里而不是逐页传：QxPageFrame 的 `back` 是可选 prop，不传就没有返回键
+ * 且不会有任何报错。八个页面各传一次 = 八次漏传的机会；这里传一次，漏不掉。
+ * fair-company 一屏稿 28 没有，取稿 44-fair-company-detail 的「返回参展企业列表」。
+ */
+const FAIR_BACK: Record<string, { label: string; to: (fairId: string) => string }> = {
+  list: { label: '返回招聘会服务', to: () => '/fairs-service' },
+  checkin: { label: '返回场次列表', to: () => '/job-fairs' },
+  detail: { label: '返回场次列表', to: () => '/job-fairs' },
+  companies: { label: '返回招聘会详情', to: (id) => `/job-fairs/${id}` },
+  map: { label: '返回招聘会详情', to: (id) => `/job-fairs/${id}` },
+  materials: { label: '返回招聘会详情', to: (id) => `/job-fairs/${id}` },
+  'visit-plan': { label: '返回招聘会详情', to: (id) => `/job-fairs/${id}` },
+  stats: { label: '返回招聘会详情', to: (id) => `/job-fairs/${id}` },
+  'fair-company': { label: '返回参展企业列表', to: (id) => `/job-fairs/${id}/companies` },
+}
+
 export function QxFairShell({
   title,
   subtitle,
@@ -45,6 +65,7 @@ export function QxFairShell({
   ctabar,
   screen,
   state,
+  fairId = '',
   children,
 }: {
   title: ReactNode
@@ -53,12 +74,15 @@ export function QxFairShell({
   ctabar?: ReactNode
   screen: string
   state: string
+  fairId?: string
   children: ReactNode
 }) {
   const navigate = useNavigate()
+  const back = FAIR_BACK[screen]
   return (
     <QxPageFrame
       title={title}
+      back={back ? { label: back.label, onBack: () => navigate(back.to(fairId)) } : undefined}
       subtitle={subtitle}
       status={status}
       terminalLabel={getTerminalCode() || '设备未绑定'}
