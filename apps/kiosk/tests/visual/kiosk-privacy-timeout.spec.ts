@@ -20,6 +20,7 @@ const SENSITIVE_SESSION_KEYS = [
   'ai-job-print:current-ai-resume',
   'ai-job-print:job-material-draft:v1',
   'self_assessment_session_v1',
+  'ai-job-print:current-interview-workbench',
 ] as const
 const EMPTY_SENSITIVE_SESSION = SENSITIVE_SESSION_KEYS.map(() => null)
 
@@ -133,7 +134,17 @@ async function loginThroughVisibleUi(page: Page, returnTo = '/interview/reports'
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
   await page.getByRole('button', { name: '验证并登录', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === returnTo)
+  await page.waitForURL((url) => {
+    // 面试五页合并成一张工作台后，/interview/<stage> 会 Navigate 到 /interview?stage=<stage>
+    // （routes/index.tsx 的兼容重定向）。这里必须连 stage 一起钉：只认「落在 /interview」
+    // 的话，「登录后被丢回设置页」也会算通过，而本 helper 存在的全部意义就是
+    // 「登录后回到原来那一步」。
+    const merged = /^\/interview\/(.+)$/.exec(returnTo)
+    if (merged) {
+      return url.pathname === '/interview' && url.searchParams.get('stage') === merged[1]
+    }
+    return url.pathname === returnTo
+  })
 }
 
 async function openResumedPaymentCashier(page: Page, api: ApiRouter): Promise<{
@@ -430,7 +441,7 @@ test('anonymous interview state is hard-cleared and browser back cannot restore 
   await page.goto('/')
   await page.evaluate(
     ({ state, keys }) => {
-      window.history.pushState({ usr: state, key: 'privacy-interview', idx: 1 }, '', '/interview/session')
+      window.history.pushState({ usr: state, key: 'privacy-interview', idx: 1 }, '', '/interview?stage=session')
       keys.forEach((key, index) => window.sessionStorage.setItem(key, `sensitive-fixture-${index}`))
     },
     { state: routeState, keys: SENSITIVE_SESSION_KEYS },
@@ -481,8 +492,8 @@ test('older sensitive history entries are sanitized after a privacy boundary @pr
   await page.goto('/')
   await page.evaluate(
     ({ older, current }) => {
-      window.history.pushState({ usr: older, key: 'privacy-history-older', idx: 1 }, '', '/interview/session')
-      window.history.pushState({ usr: current, key: 'privacy-history-current', idx: 2 }, '', '/interview/session')
+      window.history.pushState({ usr: older, key: 'privacy-history-older', idx: 1 }, '', '/interview?stage=session')
+      window.history.pushState({ usr: current, key: 'privacy-history-current', idx: 2 }, '', '/interview?stage=session')
     },
     { older: stateFor(olderQuestion, 'older'), current: stateFor(currentQuestion, 'current') },
   )
@@ -522,8 +533,8 @@ test('privacy clear truncates sensitive forward history after the user went back
   await page.goto('/')
   await page.evaluate(
     ({ forward }) => {
-      window.history.pushState({ usr: null, key: 'privacy-forward-current', idx: 1 }, '', '/interview/tips')
-      window.history.pushState({ usr: forward, key: 'privacy-forward-future', idx: 2 }, '', '/interview/session')
+      window.history.pushState({ usr: null, key: 'privacy-forward-current', idx: 1 }, '', '/interview?stage=tips')
+      window.history.pushState({ usr: forward, key: 'privacy-forward-future', idx: 2 }, '', '/interview?stage=session')
     },
     { forward: forwardState },
   )
@@ -562,7 +573,7 @@ test('privacy clear remains fail-closed when session storage rejects the boundar
   await page.goto('/')
   await page.evaluate(
     ({ question, keys }) => {
-      window.history.pushState({ usr: null, key: 'privacy-screensaver-current', idx: 1 }, '', '/interview/tips')
+      window.history.pushState({ usr: null, key: 'privacy-screensaver-current', idx: 1 }, '', '/interview?stage=tips')
       window.history.pushState({
         usr: {
           sessionId: 'privacy-storage-failure',
@@ -576,7 +587,7 @@ test('privacy clear remains fail-closed when session storage rejects the boundar
         },
         key: 'privacy-storage-failure',
         idx: 1,
-      }, '', '/interview/session')
+      }, '', '/interview?stage=session')
       keys.forEach((key, index) => window.sessionStorage.setItem(key, `storage-failure-sensitive-${index}`))
     },
     { question: sensitiveQuestion, keys: SENSITIVE_SESSION_KEYS },
@@ -809,7 +820,7 @@ test('entering screensaver clears the session and establishes a history boundary
         },
         key: 'privacy-screensaver-route',
         idx: 2,
-      }, '', '/interview/session')
+      }, '', '/interview?stage=session')
       keys.forEach((key, index) => window.sessionStorage.setItem(key, `screensaver-sensitive-${index}`))
     },
     { question: sensitiveQuestion, keys: SENSITIVE_SESSION_KEYS },
@@ -967,7 +978,7 @@ test('a newer stored boundary overrides an older sanitized landing entry @privac
       },
       key: 'privacy-generation-future',
       idx: 2,
-    }, '', '/interview/session')
+    }, '', '/interview?stage=session')
   }, sensitiveQuestion)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByText(sensitiveQuestion, { exact: true })).toBeVisible()
@@ -1060,7 +1071,7 @@ test('screensaver history metadata survives storage rejection and a screensaver 
       },
       key: 'privacy-screen-storage-future',
       idx: 1,
-    }, '', '/interview/session')
+    }, '', '/interview?stage=session')
   }, sensitiveQuestion)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByText(sensitiveQuestion, { exact: true })).toBeVisible()

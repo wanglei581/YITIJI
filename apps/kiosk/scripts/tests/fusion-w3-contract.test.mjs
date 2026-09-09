@@ -13,7 +13,7 @@ const W3_ROUTES = [
   '/resume/generate/preview', '/resume/parse', '/resume/report',
   '/resume/optimize', '/resume/export', '/resume/templates',
   '/resume/materials', '/resume/job-fit', '/resume/career-plan',
-  '/assistant', '/interview/setup', '/interview/session',
+  '/assistant', '/interview', '/interview/setup', '/interview/session',
   '/interview/report', '/interview/tips', '/interview/reports',
 ]
 
@@ -63,9 +63,9 @@ function extractDirectNavigateRedirects(sourceText) {
   return redirects
 }
 
-test('W3 owns exactly 19 normalized route patterns', () => {
-  assert.equal(W3_ROUTES.length, 19)
-  assert.equal(new Set(W3_ROUTES).size, 19)
+test('W3 owns exactly 20 normalized route patterns', () => {
+  assert.equal(W3_ROUTES.length, 20)
+  assert.equal(new Set(W3_ROUTES).size, 20)
   const manifest = read('tests/visual/route-manifest.ts')
   for (const route of W3_ROUTES) assert.match(manifest, new RegExp(`['\"]${route.replaceAll('/', '\\/')}['\"]`))
 })
@@ -75,6 +75,11 @@ test('resume aliases stay redirects and prototype 73 stays a sub-state', () => {
   assert.equal(redirects.get('/resume'), '/resume/source')
   assert.equal(redirects.get('/resume/upload'), '/resume/source')
   assert.equal(redirects.get('/resume/export'), '/resume/optimize')
+  assert.equal(redirects.get('/interview/setup'), '/interview?stage=setup')
+  assert.equal(redirects.get('/interview/session'), '/interview?stage=session')
+  assert.equal(redirects.get('/interview/report'), '/interview?stage=report')
+  assert.equal(redirects.get('/interview/tips'), '/interview?stage=tips')
+  assert.equal(redirects.get('/interview/reports'), '/interview?stage=reports')
   assert.equal(redirects.has('/assistant/call'), false)
   assert.equal(redirects.has('/interview/call'), false)
 })

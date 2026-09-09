@@ -200,7 +200,7 @@ const WAVE_ROUTES = new Map([
     '/resume/optimize/compare',
     '/resume/export', '/resume/templates', '/resume/materials', '/resume/job-fit',
     '/resume/job-fit/actions',
-    '/resume/career-plan', '/assistant', '/interview/setup', '/interview/session',
+    '/resume/career-plan', '/assistant', '/interview', '/interview/setup', '/interview/session',
     '/interview/report', '/interview/tips', '/interview/reports',
     '/ai/plan', '/session-resume', '/resume-service', '/interview-service',
   ]],

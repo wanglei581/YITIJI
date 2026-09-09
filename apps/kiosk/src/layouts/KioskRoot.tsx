@@ -139,6 +139,7 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/me/privacy-requests',
   '/job-fairs',
   '/job-fairs/checkin',
+  '/interview',
   '/screensaver',
   '/login',
   '/session-timeout',
