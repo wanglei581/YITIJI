@@ -81,11 +81,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
   { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次岗位匹配参考', requiresFusionRoot: false },
   { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '求职方案', requiresFusionRoot: false },
-  { pattern: '/interview/setup', url: '/interview/setup', marker: screen('interview-setup'), featureText: '模拟面试', requiresFusionRoot: false },
-  { pattern: '/interview/session', url: '/interview/session', marker: screen('interview-session'), featureText: '会话已失效', requiresFusionRoot: false },
-  { pattern: '/interview/report', url: '/interview/report', marker: screen('interview-report'), featureText: '报告不存在或已过期', requiresFusionRoot: false },
-  { pattern: '/interview/tips', url: '/interview/tips', marker: screen('interview-tips'), featureText: '面试', requiresFusionRoot: false },
-  { pattern: '/interview/reports', url: '/interview/reports', marker: screen('interview-reports'), featureText: '面试报告', requiresFusionRoot: false },
+  { pattern: '/interview', url: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
+  { pattern: '/interview/setup', url: '/interview/setup', expectedPath: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
+  { pattern: '/interview/session', url: '/interview/session', expectedPath: '/interview', marker: screen('interview-session'), featureText: '会话已失效' },
+  { pattern: '/interview/report', url: '/interview/report', expectedPath: '/interview', marker: screen('interview-report'), featureText: '报告不存在或已过期' },
+  { pattern: '/interview/tips', url: '/interview/tips', expectedPath: '/interview', marker: screen('interview-tips'), featureText: '面试' },
+  { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '触摸屏幕开始使用', landmark: 'presentation', seed: seedScreensaver },
   { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '网络连接中断' },
@@ -191,7 +192,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
-] as const // 108 routes (was 107; 2026-09-08 扫描工作台合并新增 /scan)
+] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -227,9 +228,24 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 108) {
+// 不写死条数：`duplicates` / `missing` / `unexpected` 三条已经把 w6RouteCases 钉成
+// productionRoutePatterns 的一个排列——无重复、无缺失、无多余 ⟹ 长度必然相等。
+// 再写一个 `length !== 108` 是冗余的，而且它每次加路由都要人工重算：
+// 2026-09-09 三次工作台合并（/print/desk、/interview、/scan）就因为它连红两轮，
+// 而两个分支各自算的都只含自己那一半（一个 14 一个 13，正确答案 18）。
+if (duplicates.length || missing.length || unexpected.length) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
+// mobile 这条**故意**写死：它是一个有名有姓的小集合（扫码登录、手机上传），
+// 增减都该是深思熟虑的动作，撞红正是想要的效果。
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-// 2026-09-08 打印台 + 扫描工作台各新增一条工作台路由；kiosk 由 104 增至 106；mobile 仍为 2。
-if (w6KioskCases.length !== 106) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+// kiosk 这条**不写死**：它 = 总数 − mobile。改成分区完整性判据，比原来的 `!== 106` 强——
+// 既堵住 viewport 写错值（那种情况两个子集都收不到它，和会一直对不上），
+// 又不必每加一条路由就人工重算。原来那个 106 就是这么过期的：
+// 上面注释已改成 107，下面常量还停在 106，注释和代码各说各的。
+if (w6KioskCases.length + w6MobileCases.length !== actualPatterns.length) {
+  throw new Error(
+    `W6 viewport 分区不完整：kiosk ${w6KioskCases.length} + mobile ${w6MobileCases.length}`
+      + ` !== 总数 ${actualPatterns.length}（多半是某条的 viewport 写了第三种值）`,
+  )
+}

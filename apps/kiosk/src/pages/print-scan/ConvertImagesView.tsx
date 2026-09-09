@@ -27,6 +27,8 @@ import {
 
 interface ConvertImagesViewProps {
   loggedIn: boolean
+  /** 转换响应的真信号；缺省（尚未转换 / 旧响应）时完成态两句都不说。 */
+  hasEndUser: boolean | undefined
   kiosk: boolean
   phase: ConvertPhase
   images: SelectedImage[]
@@ -71,7 +73,7 @@ interface ConvertImagesViewProps {
 
 export function ConvertImagesView(props: ConvertImagesViewProps) {
   const {
-    loggedIn, kiosk, phase, images, selected, uploading, generating, rechecking,
+    loggedIn, hasEndUser, kiosk, phase, images, selected, uploading, generating, rechecking,
     showQr, error, result, recovered, requestKey, preview, previewFailed, inputRef, atLimit,
   } = props
   const advisor = advisorCopy(phase, images.length, error)
@@ -120,10 +122,20 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         ) : null}
 
         {phase === 'completed' && result ? (
-          <Band kind="info" title={recovered ? '用同一个标识把结果找回来了' : 'PDF 已生成'} chips={['服务端已返回结果', '一张图一页 · A4', loggedIn ? '已进我的文档 · 约 24 小时' : '未登录 · 不进我的文档']}>
+          <Band
+            kind="info"
+            title={recovered ? '用同一个标识把结果找回来了' : 'PDF 已生成'}
+            chips={[
+              '服务端已返回结果',
+              '一张图一页 · A4',
+              ...(typeof hasEndUser === 'boolean'
+                ? [hasEndUser ? '已进我的文档 · 约 24 小时' : '未登录 · 不进我的文档']
+                : []),
+            ]}
+          >
             <div className="i2p-band-p">
               服务端返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
-              {loggedIn ? null : <b>你现在没登录，这份 PDF 不会进「我的文档」</b>}
+              {hasEndUser === false ? <b>你现在没登录，这份 PDF 不会进「我的文档」</b> : null}
               {recovered ? ' 没有生成第二份，只是重新签发了一条新的临时打印链接。' : null}
             </div>
           </Band>

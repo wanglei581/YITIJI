@@ -81,7 +81,7 @@ async function gotoSession(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: '完成' }).click()
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
   await page.getByRole('button', { name: '开始模拟面试' }).click()
-  await page.waitForURL('/interview/session')
+  await page.waitForURL(/\/interview\?stage=session/)
 }
 
 // ── ① 没有音频输入设备时，绝不显示「语音可用」──────────────────────────

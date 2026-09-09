@@ -500,7 +500,7 @@ export function ConvertImagesCta(props: {
   generating: boolean
   rechecking: boolean
   uploading: boolean
-  loggedIn: boolean
+  hasEndUser: boolean | undefined
   onBack: () => void
   onConvert: () => void
   onRecheck: () => void
@@ -514,7 +514,7 @@ export function ConvertImagesCta(props: {
   onCloseUsb: () => void
   onPickLocal: () => void
 }) {
-  const { phase, imageCount, error, generating, rechecking, uploading, loggedIn } = props
+  const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser } = props
   const convertLabel = `合成 ${imageCount} 张为一份 PDF`
   const ghostBack = (
     <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onBack}>返回打印扫描</button>
@@ -568,9 +568,11 @@ export function ConvertImagesCta(props: {
   if (phase === 'completed') {
     return (
       <>
-        {loggedIn
-          ? <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onDocuments}>查看我的文档</button>
-          : <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onLogin}>先登录再保存</button>}
+        {typeof hasEndUser === 'boolean'
+          ? hasEndUser
+            ? <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onDocuments}>查看我的文档</button>
+            : <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onLogin}>先登录再保存</button>
+          : null}
         <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onPrint}>
           拿这份 PDF 去打印
         </button>
