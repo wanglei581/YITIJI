@@ -149,22 +149,17 @@ export function QxHomeView({
           <button type="button" onClick={() => onAction('resume-hub')}>改简历</button>
           <button type="button" onClick={() => onAction('jobs-hub')}>找工作</button>
           <button type="button" onClick={() => onAction('policy-hub')}>查政策</button>
-          <button type="button" disabled title="全部服务目录尚未迁入运行时路由">更多服务（目录迁移中）</button>
         </div>
         <div className="qx-home-continue" data-testid="home-context-region">
           {continueSlot}
-          <button
-            type="button"
-            className="qx-home-empty-context"
-            disabled
-            title="全部服务目录尚未迁入运行时路由"
-          >
+          {/* 空态是一句陈述，不是一个动作 —— 做成 disabled 按钮等于摆一颗点不动的控件，
+              一体机上没有鼠标悬停，用户看不到 title，只会反复去戳它。 */}
+          <div className="qx-home-empty-context" role="status">
             <span>
               <strong>这台机器上没有待继续的办理</strong>
-              <small>全部服务目录迁移中；可直接选择下方真实服务</small>
+              <small>下面的服务都能直接开始</small>
             </span>
-            目录迁移中 <ArrowRightIcon aria-hidden="true" />
-          </button>
+          </div>
         </div>
         <p className="qx-home-hero-law">AI 建议仅供参考 · 不替你投递 · 收费以现场公示价为准</p>
       </section>
@@ -175,9 +170,6 @@ export function QxHomeView({
             <h2 id="qx-home-services-title">直接办</h2>
             <span>选择一项真实服务开始</span>
           </div>
-          <button type="button" disabled title="全部服务目录尚未迁入运行时路由">
-            查看全部服务（目录迁移中）
-          </button>
         </header>
 
         <div className="qx-home-tiles">
