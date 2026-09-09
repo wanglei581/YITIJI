@@ -977,6 +977,35 @@ if (!/彻底销毁|彻底删除|已销毁/.test(doneCode + retentionHelperCode +
   fail('打印完成页不得承诺彻底销毁 / 彻底删除')
 }
 
+// ── 小程序归属提示：只许说后端认过的事 ────────────────────────────────
+// 本机 token 不能当归属依据：common/auth/optional-end-user.ts 的 resolveOptionalEndUser
+// 对过期/无效 JWT（catch → return null）和 Redis 会话不匹配都是**静默返回 null**，
+// 不抛异常也不返回 401。token 过期时打印照常成功、endUserId 落 null、前端收不到任何错误，
+// 此时若按 getToken() 判断，页面就会谎称「已经在你的小程序里」——CLAUDE.md §9 要挡的正是这个。
+// 唯一可信来源是建单响应的 hasEndUser（print-jobs.service 的 create() 返回）。
+if (/这单已经在你的小程序里/.test(doneCode)) {
+  expectMatches(
+    doneCode,
+    /const\s+hasEndUser\s*=\s*state\.hasEndUser/,
+    '小程序归属只认建单响应的 hasEndUser，不得用本机 token 自行判断',
+  )
+  expectMatches(
+    doneCode,
+    /typeof\s+hasEndUser\s*===\s*'boolean'/,
+    '归属未知（undefined）时整条提示不渲染 —— 失败关闭，不猜',
+  )
+  if (/hasEndUser[\s\S]{0,400}getToken\(\)/.test(doneCode)) {
+    fail('小程序归属判断附近不得出现 getToken() —— 本机 token 证明不了后端认了会话')
+  } else {
+    pass('小程序归属判断不依赖 getToken()')
+  }
+  if (/登录后即可查看|稍后同步|即将同步|正在同步/.test(doneCode)) {
+    fail('未归属文案不得暗示事后可补 —— endUserId 建单那刻写死，事后登录不会追认')
+  } else {
+    pass('未归属文案不暗示事后追认')
+  }
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Kiosk 打印确认页诚实性守卫未通过\n`)
   process.exit(1)

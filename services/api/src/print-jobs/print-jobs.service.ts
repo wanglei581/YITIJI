@@ -46,6 +46,8 @@ export interface PrintJobCreated {
   billingPageSource: BillingPageSource
   /** 短期支付会话 token（只授权本次订单出码 / 轮询；不含文件 URL 或密钥）。 */
   paymentSessionToken: string
+  /** 建单时是否绑定了 EndUser。前端必须读这个字段，不能用本机 token 自行判断。 */
+  hasEndUser: boolean
 }
 
 export interface PrintJobTakeawayUrlResult {
@@ -547,6 +549,8 @@ export class PrintJobsService {
         amountCents: order.amountCents,
         printTaskId: task.id,
       }),
+      // 前端不能用本机 token 判断：optional-end-user 对过期/无效 JWT 和 Redis 会话不匹配静默 return null，建单仍成功且 endUserId 落 null。
+      hasEndUser: Boolean(ctx.endUserId),
     }
   }
 

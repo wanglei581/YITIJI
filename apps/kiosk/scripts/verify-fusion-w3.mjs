@@ -91,10 +91,10 @@ const routes = [
   '/resume/generate/preview', '/resume/parse', '/resume/report',
   '/resume/optimize', '/resume/export', '/resume/templates',
   '/resume/materials', '/resume/job-fit', '/resume/career-plan',
-  '/assistant', '/interview/setup', '/interview/session',
+  '/assistant', '/interview', '/interview/setup', '/interview/session',
   '/interview/report', '/interview/tips', '/interview/reports',
 ]
-check(routes.length === 19 && new Set(routes).size === 19, 'W3 route inventory is exactly 19 unique patterns')
+check(routes.length === 20 && new Set(routes).size === 20, 'W3 route inventory is exactly 20 unique patterns')
 const manifest = read('tests/visual/route-manifest.ts')
 for (const route of routes) check(manifest.includes(`'${route}'`), `manifest retains ${route}`)
 
@@ -197,16 +197,23 @@ for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
   const frame = qxScreens.has(path)
     ? 'QxPageFrame'
-    : path === 'src/pages/interview/InterviewReportsPage.tsx'
-      ? 'KioskFullscreenShell'
-      : isInterview
-        ? 'InterviewShell'
-        : 'KioskPageFrame'
+    : isInterview
+      ? 'InterviewShell'
+      : 'KioskPageFrame'
   includes(path, frame, `${screen} consumes the frozen W1 frame`)
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }
-includes('src/pages/interview/InterviewShell.tsx', 'KioskFullscreenShell', 'interview shell uses shared fullscreen chrome')
-includes('src/pages/interview/InterviewShell.tsx', 'KioskPageFrame', 'interview shell still wraps KioskPageFrame')
+includes('src/pages/interview/InterviewShell.tsx', 'QxPageFrame', 'interview shell uses Qingxu page frame')
+includes('src/pages/interview/InterviewShell.tsx', 'QxAppNavbar', 'interview shell uses shared Qingxu navbar')
+includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'readInterviewWorkbenchSession', 'interview workbench rehydrates from sessionStorage')
+includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'replace: true', 'interview stage changes replace history')
+includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'parseInterviewStage', 'interview workbench parses ?stage=')
+includes('src/layouts/KioskRoot.tsx', "'/interview'", 'interview workbench is registered as Qingxu-migrated')
+includes('src/routes/index.tsx', '<Navigate to="/interview?stage=setup" replace />', 'legacy /interview/setup redirects with stage')
+includes('src/routes/index.tsx', '<Navigate to="/interview?stage=session" replace />', 'legacy /interview/session redirects with stage')
+includes('src/routes/index.tsx', '<Navigate to="/interview?stage=report" replace />', 'legacy /interview/report redirects with stage')
+includes('src/routes/index.tsx', '<Navigate to="/interview?stage=tips" replace />', 'legacy /interview/tips redirects with stage')
+includes('src/routes/index.tsx', '<Navigate to="/interview?stage=reports" replace />', 'legacy /interview/reports redirects with stage')
 
 const fullscreenShell = read('src/components/kiosk-shell/KioskFullscreenShell.tsx')
 check(fullscreenShell.includes('KioskStageFit'), 'fullscreen kiosk chrome uses the fixed 1080x1920 stage')
@@ -232,8 +239,7 @@ const interviewCss = read('src/pages/interview/styles/interview-shell.css')
 check(/(?:^|;)\s*display:\s*flex\s*;?/.test(cssRuleBody(interviewCss, '.interview-setup__stack')), 'interview setup stack is flex')
 check(/(?:^|;)\s*flex-direction:\s*column\s*;?/.test(cssRuleBody(interviewCss, '.interview-setup__stack')), 'interview setup stack is vertical')
 
-const interviewReports = read('src/pages/interview/InterviewReportsPage.tsx')
-includes('src/pages/interview/InterviewReportsPage.tsx', 'showBottomNav', 'interview reports restores prototype bottom navigation')
+includes('src/pages/interview/InterviewReportsPage.tsx', 'InterviewShell', 'interview reports keeps bottom navigation via InterviewShell')
 check(/<nav\s+aria-label=["']\u4e3b\u5bfc\u822a["']\s+className=["']ui-kiosk-nav["']>/.test(fullscreenShell), 'fullscreen bottom navigation retains main-nav semantics')
 for (const destination of ['/', '/assistant', '/profile']) {
   check(fullscreenShell.includes(`path: '${destination}'`), `fullscreen bottom navigation wires ${destination}`)
