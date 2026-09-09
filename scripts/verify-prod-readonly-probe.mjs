@@ -53,6 +53,7 @@ for (const needle of [
   '/api/v1/jobs',
   '/api/v1/job-fairs',
   '/api/v1/policies',
+  '/api/v1/companies',
   '/kiosk/legal/privacy_policy',
   '/kiosk/legal/terms_of_service',
   '/kiosk/legal/unknown_type',
@@ -128,6 +129,19 @@ function handle(req, res) {
   }
   if (req.method === 'GET' && path === '/api/v1/policies') {
     send(res, 200, { data: [{ id: 'p1' }, { id: 'p2' }], pagination: { page: 1, pageSize: 200, total: 2, totalPages: 1 } })
+    return
+  }
+  if (req.method === 'GET' && path === '/api/v1/companies') {
+    const items = mutation === 'companies_demo'
+      ? [
+          { id: 'c1', name: '未来智造科技有限公司（演示）', sourceName: '市人社公共就业平台（演示）' },
+          { id: 'c2', name: '正常企业股份有限公司', sourceName: '市人社公共就业平台' },
+        ]
+      : [
+          { id: 'c1', name: '正常企业股份有限公司', sourceName: '市人社公共就业平台' },
+          { id: 'c2', name: '另一家正常企业', sourceName: '市人社公共就业平台' },
+        ]
+    send(res, 200, { data: { items }, pagination: { page: 1, pageSize: 50, total: items.length, totalPages: 1 } })
     return
   }
   if (req.method === 'GET' && path === '/api/v1/kiosk/legal/privacy_policy') {
@@ -280,6 +294,30 @@ try {
   if (/GET \/api\/v1\/kiosk\/legal\/unknown_type\s+FAIL/.test(unknown.stdout || '')) {
     pass('表中 unknown_type 为 FAIL')
   } else fail('unknown_type 回 200 时表中该项应为 FAIL')
+
+  console.log('\n=== 变异：/companies 里留着开发期演示数据 ===')
+  // 这一条断的是「判得对」，不是「判得响」：演示数据是内容问题不是缺陷，
+  // 所以必须 WARN —— 判成 FAIL 会让巡检退出码变红、把内容问题混进故障里；
+  // 判成 PASS 则等于默许演示公司挂在生产上给用户看。
+  mutation = 'companies_demo'
+  const demo = await runProbe(port)
+  process.stdout.write(demo.stdout || '')
+  expectExit(demo, 0, '演示数据只 WARN 不改变退出码')
+  const demoLine = (demo.stdout || '').split('\n').find((l) => l.includes('/api/v1/companies')) || ''
+  if (/\sWARN\s/.test(demoLine)) pass('表中 companies 为 WARN')
+  else fail(`留着演示数据时 companies 应为 WARN,实际: ${demoLine.trim() || '(该行未出现)'}`)
+  // 锚在**桩里那家公司的名字**上,不是锚在「演示」两个字上——
+  // 「其中 N 条带演示标记」这句里本来就有「演示」,拿它当判据的话,
+  // 把名字整段删掉断言照样过(反向变异 M3 实测:退出码 0,漏了)。
+  if (demoLine.includes('未来智造科技有限公司')) pass('WARN 说明里点名了是哪几家')
+  else fail(`WARN 说明必须点名是哪几家,否则负责人不知道去删哪条。实际: ${demoLine.trim()}`)
+
+  console.log('\n=== 反向：企业干净时必须 PASS,不能一律 WARN ===')
+  mutation = 'ok'
+  const clean = await runProbe(port)
+  const cleanLine = (clean.stdout || '').split('\n').find((l) => l.includes('/api/v1/companies')) || ''
+  if (/\sPASS\s/.test(cleanLine)) pass('表中 companies 干净时为 PASS')
+  else fail(`企业干净时应为 PASS,实际: ${cleanLine.trim() || '(该行未出现)'}`)
 
   console.log('\n=== 恢复后合规桩 ===')
   mutation = 'ok'

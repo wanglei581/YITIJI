@@ -10,6 +10,10 @@
 //   JobsController @Get('jobs') / @Get('job-fairs')
 //   PoliciesController @Get('policies')
 // 信封为 { data, pagination.total }（缺 total 时退回 items.length / data.length）。
+// 企业 GET /companies：除条数外，还看有没有开发期演示数据留在生产。
+//   2026-09-10 实测生产只有 3 家，名字都带「（演示）」、sourceName 是「市人社公共就业平台（演示）」，
+//   而一体机 CompaniesPage 与小程序 pages/companies 都把 name 原样渲染给用户看。
+//   prisma/seed-guard.ts 的 assertDemoSeedAllowed 只拦「新写入」，拦不住已经躺在库里的行。
 // 法务 GET /kiosk/legal/:type；未知类型 400（#835）。
 // POST /terminals/session-token 空体 400（#833，存在而非 404）。
 // GET /admin/alerts 无鉴权 401（#841）。
@@ -28,6 +32,7 @@ const PATH_READY = '/api/v1/health/ready'
 const PATH_JOBS = '/api/v1/jobs'
 const PATH_FAIRS = '/api/v1/job-fairs'
 const PATH_POLICIES = '/api/v1/policies'
+const PATH_COMPANIES = '/api/v1/companies?pageSize=50'
 const PATH_PRIVACY = '/api/v1/kiosk/legal/privacy_policy'
 const PATH_TERMS = '/api/v1/kiosk/legal/terms_of_service'
 const PATH_UNKNOWN_LEGAL = '/api/v1/kiosk/legal/unknown_type'
@@ -233,6 +238,19 @@ function extractIndexHash(html) {
   return match ? match[1] : null
 }
 
+/** 用户看得见的演示标记。刻意只匹配这几个词：判据要能被人一眼复核。 */
+const DEMO_MARKER = /演示|示例|测试数据|demo|sample/i
+
+/** 从常见信封里取出列表行（与 listTotal 同源，缺失时回空数组而不是抛）。 */
+function listRows(parsed) {
+  for (const layer of [parsed, parsed?.data]) {
+    if (Array.isArray(layer)) return layer
+    if (Array.isArray(layer?.items)) return layer.items
+    if (Array.isArray(layer?.data)) return layer.data
+  }
+  return []
+}
+
 function row(item, result, detail, extra = {}) {
   return { item, result, detail, ...extra }
 }
@@ -321,6 +339,30 @@ async function runChecks(cli) {
       })(),
     )
   }
+
+  tasks.push(
+    (async () => {
+      const item = 'GET /api/v1/companies（企业 · 含演示数据检查）'
+      const res = await get(PATH_COMPANIES)
+      if (res.error) return row(item, 'FAIL', res.error)
+      if (res.status !== 200) return row(item, 'FAIL', `HTTP ${res.status} ${snippet(res.body)}`)
+      const parsed = parseJson(res.body)
+      const total = listTotal(parsed)
+      if (total == null) return row(item, 'FAIL', `无法读取 total / items.length；${snippet(res.body)}`)
+      const rows = listRows(parsed)
+      // 只认「摆在用户眼前的那几个字段」：name / sourceName。
+      // 不猜 id 前缀、不按 createdAt 推断 —— 那些用户看不到，判错了也没人能复核。
+      const demo = rows.filter((r) => DEMO_MARKER.test(String(r?.name ?? '') + String(r?.sourceName ?? '')))
+      if (total === 0) return row(item, 'INFO', 'total=0（内容录入是负责人的事）')
+      if (demo.length > 0) {
+        const names = demo.slice(0, 3).map((r) => String(r?.name ?? '?')).join('、')
+        return row(item, 'WARN',
+          `total=${total}，其中 ${demo.length} 条带演示标记（${names}${demo.length > 3 ? '…' : ''}）`
+          + '；这些名字会原样显示给终端用户，上线前需替换或下架')
+      }
+      return row(item, 'PASS', `total=${total}，无演示标记`)
+    })(),
+  )
 
   for (const path of [PATH_PRIVACY, PATH_TERMS]) {
     tasks.push(
