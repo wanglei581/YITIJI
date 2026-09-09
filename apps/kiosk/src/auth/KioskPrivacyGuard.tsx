@@ -214,6 +214,41 @@ function pushSanitizedDestination(
   }
 }
 
+/** 遮罩提交到 DOM 之后再跳转的兜底延时（毫秒）。可见时 rAF 先到，这条是空转。 */
+const SANITIZED_DESTINATION_FALLBACK_MS = 250
+
+/**
+ * 调度「清场后跳回干净入口」这一步：rAF 一帧 + 定时兜底，谁先到谁执行，只执行一次。
+ *
+ * 为什么不能只用 rAF：**rAF 在 document.hidden 时完全不触发**（后台节流/冻结），
+ * 而硬清场路径的唯一出口就是这里的 pushSanitizedDestination —— `clearingModeRef`
+ * 只在屏保路径被重置（见下方 onScreensaverRoute 那个 effect），`'hard'` 模式不重置，
+ * 所以这一帧没来就再也不会有第二次机会，`clearing` 也永远回不到 false。
+ *
+ * 2026-09-09 生产实测（zyidai.cn，浏览器标签不可见）：
+ *   · 清场遮罩持续 82 秒不恢复，页面从未重载（performance.now() 单调增长）
+ *   · 页内 requestAnimationFrame 2 秒内不触发，document.visibilityState === 'hidden'
+ *   · 此时 #root 只剩下面这个遮罩：fixed inset-0 / z-[2147483647] /
+ *     pointer-events-auto 的不透明层，可见文字 0 条（那句话是 sr-only）
+ * 也就是说，一体机在这种情况下是一块**吃掉所有触摸的黑屏**，只能人工重启。
+ *
+ * setTimeout 在后台会被节流（≥1s，深度节流更久），冻结时也会暂停——但它会在恢复后
+ * 补触发，而 rAF 不会。所以兜底用 timeout 而不是再挂一个 rAF。
+ */
+function scheduleSanitizedDestination(
+  boundary: PrivacyBoundary,
+  destination: KioskSessionClearDestination,
+): void {
+  let dispatched = false
+  const run = (): void => {
+    if (dispatched) return
+    dispatched = true
+    pushSanitizedDestination(boundary, destination)
+  }
+  window.requestAnimationFrame(run)
+  window.setTimeout(run, SANITIZED_DESTINATION_FALLBACK_MS)
+}
+
 function PrivacyClearingOverlay() {
   return (
     <div
@@ -297,7 +332,8 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     setWarning(null)
 
     // 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
-    window.requestAnimationFrame(() => pushSanitizedDestination(nextBoundary, destination))
+    // 页面不可见时 rAF 不会到，兜底定时器负责把这一步执行掉（否则永久黑屏）。
+    scheduleSanitizedDestination(nextBoundary, destination)
   }, [claimClearing, establishPrivacyBoundary, logout])
 
   const hardClear = useCallback(() => {
