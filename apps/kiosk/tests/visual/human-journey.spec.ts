@@ -103,10 +103,15 @@ test.describe('真人走查（模拟数据）', () => {
     registerW6Api(api)
     const s: Step = { n: 0 }
     await page.goto('/')
-    await expect(page.getByRole('button', { name: '进入打印扫描' })).toBeVisible({ timeout: 15000 })
+    // 青序流光首页的磁贴带 `data-action`（HomeTile.tsx:38），比拼接出来的无障碍名稳。
+    // V6 首页那颗叫「进入打印扫描」，青序改成了「打印 · 扫描 … 开始选择材料」——
+    // 钉钩子，另外单独断言一句可见文案，改版式不红、改语义才红。
+    const printTile = page.locator('[data-action="print-hub"]')
+    await expect(printTile).toBeVisible({ timeout: 15000 })
+    await expect(printTile).toContainText('打印')
     await step(page, s, 'home')
 
-    await page.getByRole('button', { name: '进入打印扫描' }).click()
+    await printTile.click()
     await page.waitForURL((u) => u.pathname === '/print-scan')
     await step(page, s, 'print-hub')
 
@@ -312,10 +317,15 @@ test.describe('真人走查（模拟数据）', () => {
     }
 
     await page.goto('/')
-    await expect(page.getByRole('button', { name: '进入打印扫描' })).toBeVisible({ timeout: 15000 })
+    // 青序流光首页的磁贴带 `data-action`（HomeTile.tsx:38），比拼接出来的无障碍名稳。
+    // V6 首页那颗叫「进入打印扫描」，青序改成了「打印 · 扫描 … 开始选择材料」——
+    // 钉钩子，另外单独断言一句可见文案，改版式不红、改语义才红。
+    const printTile = page.locator('[data-action="print-hub"]')
+    await expect(printTile).toBeVisible({ timeout: 15000 })
+    await expect(printTile).toContainText('打印')
     await step(page, s, 'D-home')
 
-    await page.getByRole('button', { name: '进入打印扫描' }).click()
+    await printTile.click()
     await page.waitForURL((u) => u.pathname === '/print-scan')
     await step(page, s, 'D-hub')
 

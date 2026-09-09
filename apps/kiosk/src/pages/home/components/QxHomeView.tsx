@@ -33,7 +33,6 @@ interface QxHomeViewProps {
   jobFair: HomeJobFairHighlightState & { retry: () => void }
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
-  onOpenFair: (fairId: string) => void
 }
 
 
@@ -103,7 +102,6 @@ export function QxHomeView({
   jobFair,
   continueSlot,
   onAction,
-  onOpenFair,
 }: QxHomeViewProps) {
   const printStatus = printDomainStatus({
     deviceLoading: device.loading,
@@ -227,7 +225,13 @@ export function QxHomeView({
               data-tone="clay"
               data-home-job-fair-panel=""
               data-panel-state={jobFair.status}
-              onClick={() => jobFair.status === 'ready' ? onOpenFair(jobFair.fair.id) : onAction('fairs-hub')}
+              /* 稿 01-home 这颗磁贴 `href="16-service-hubs.html?hub=fairs"`、脚注写
+                 「进入招聘会服务 →」——落点是招聘会服务台，不是某一场。
+                 此前 ready 态直接跳进被高亮的那一场，等于**首页再也进不去招聘会列表**：
+                 只要有一场在进行，用户就看不到其它场次；而磁贴脚注还写着「查看招聘会」，
+                 承诺的是列表、给的是单场。高亮显示（名称/地点/进行中）保留，那是真实信息；
+                 落点按稿改回服务台。 */
+              onClick={() => onAction('fairs-hub')}
             >
               <span className="qx-home-tile-head">
                 <span className="qx-home-tile-icon"><CalendarDaysIcon aria-hidden="true" /></span>

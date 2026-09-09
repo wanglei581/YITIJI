@@ -71,7 +71,6 @@ export function HomePage() {
           jobFair={jobFair}
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
-          onOpenFair={(fairId) => navigate(`/job-fairs/${encodeURIComponent(fairId)}`)}
         />
       </QxPageFrame>
     </div>
