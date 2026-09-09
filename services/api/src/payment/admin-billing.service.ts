@@ -16,6 +16,7 @@ import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AdminUpdatePriceConfigDto } from './dto/admin-billing.dto'
 import { ensureResumeExportPriceConfig } from './price-config.seed'
+import { descriptionContradictsAmount, statedYuanIn } from './price-description'
 
 export interface AdminPriceConfigItem {
   serviceKey: string
@@ -92,11 +93,9 @@ export class AdminBillingService {
    * 描述里根本没写金额（如「黑白打印每页」）不受约束 —— 那不是在陈述价格。
    */
   private static assertDescriptionMatchesAmount(description: string | null, unitCents: number): void {
-    if (!description) return
-    const stated = [...description.matchAll(/(\d+(?:\.\d+)?)\s*元/g)].map((m) => Number(m[1]))
-    if (stated.length === 0) return
+    if (!descriptionContradictsAmount(description, unitCents)) return
+    const stated = statedYuanIn(description)
     const actualYuan = unitCents / 100
-    if (stated.some((y) => Math.abs(y - actualYuan) < 1e-9)) return
     throw new BadRequestException({
       error: {
         code: 'PRICE_DESCRIPTION_CONTRADICTS_AMOUNT',

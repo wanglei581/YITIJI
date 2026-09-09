@@ -199,6 +199,53 @@ async function main(): Promise<void> {
       else fail(`多金额描述被误拒: ${JSON.stringify(multi)}`)
     }
 
+    // (4d) 闸门只拦**新的**写入；库里早于闸门的坏行还在。
+    // 分工：管理端原样返回（改价的人必须看得见矛盾才能去改），
+    //       公开接口摘掉描述（匿名可读，不能对外播一句假价），金额两侧都照发。
+    {
+      await prisma.priceConfig.update({
+        where: { serviceKey: 'print_color_page' },
+        data: { unitCents: 100, description: '免费试运营：彩色打印 0 元/页', active: true },
+      })
+
+      const adminItem = (await billing.listPriceConfig()).items.find((i) => i.serviceKey === 'print_color_page')
+      if (adminItem?.description === '免费试运营：彩色打印 0 元/页' && adminItem.unitCents === 100) {
+        pass('管理端原样返回矛盾描述 → 改价的人看得见')
+      } else {
+        fail(`管理端把矛盾描述吞了或改了价: ${JSON.stringify(adminItem)}`)
+      }
+
+      const publicItem = (await pricing.listActivePriceConfig()).items.find(
+        (i) => i.serviceKey === 'print_color_page',
+      )
+      if (publicItem?.description === null) pass('公开接口摘掉矛盾描述 → 对外不播假价')
+      else fail(`公开接口把矛盾描述播出去了: ${JSON.stringify(publicItem)}`)
+      if (publicItem?.unitCents === 100) pass('摘描述不动金额 → 前端估价不受影响')
+      else fail(`公开接口的金额被改了: ${JSON.stringify(publicItem)}`)
+
+      // 反向：描述自洽时必须原样保留 —— 否则等于把 description 焊死成 null
+      await prisma.priceConfig.update({
+        where: { serviceKey: 'print_color_page' },
+        data: { unitCents: 100, description: '彩色打印 1 元/页' },
+      })
+      const okPublic = (await pricing.listActivePriceConfig()).items.find(
+        (i) => i.serviceKey === 'print_color_page',
+      )
+      if (okPublic?.description === '彩色打印 1 元/页') pass('描述自洽 → 公开接口原样保留')
+      else fail(`自洽描述被误摘: ${JSON.stringify(okPublic)}`)
+
+      // 反向：描述不写金额时不受约束
+      await prisma.priceConfig.update({
+        where: { serviceKey: 'print_color_page' },
+        data: { description: '彩色打印每页（正式价）' },
+      })
+      const noAmountPublic = (await pricing.listActivePriceConfig()).items.find(
+        (i) => i.serviceKey === 'print_color_page',
+      )
+      if (noAmountPublic?.description === '彩色打印每页（正式价）') pass('描述不写金额 → 公开接口不受约束')
+      else fail(`无金额描述被误摘: ${JSON.stringify(noAmountPublic)}`)
+    }
+
     // (4b) 0 元确认必须说出**组合后果**，不只说「这一项会跳过收银」。
     // 2026-09-08 生产实测：黑白 50 分 / 彩色 0 分，且描述是人为配的 ——
     // 说明当时确认的人只看到单项后果，没看到「另一档还在收费，用户会一直选免费那档」。
