@@ -35,13 +35,28 @@ function commandApiBaseUrl(): string {
   return API_BASE_URL
 }
 
+/**
+ * 安装命令用 `-PromptForBindCode` 交互输入绑定码，**不把码拼进命令行**。
+ *
+ * 这不是偏好，是本仓已经写死的口径 ——
+ * docs/device/production-agent-onboarding.md:14 原文：
+ *   「通过 `-PromptForBindCode` 安全交互输入一次性绑定码（推荐）…
+ *     兼容参数 `-BindCode` 仅用于受控旧流程，**因为它会进入进程命令行**」
+ * 该文档给出的示例命令用的也是 `-PromptForBindCode`（第 29 行）。
+ *
+ * 本对话框此前生成的是 `-BindCode "<码>"` —— 正是文档判为「仅用于旧流程」的那种：
+ * 码会落进 PowerShell 的 ConsoleHost_history.txt，安装期间也出现在进程命令行里。
+ * 运营人员照后台复制粘贴，就会拿到被弃用的那条路径，而文档说的是另一条。
+ *
+ * 码本身仍然显示在弹窗里，供运营人员在脚本提示时粘贴 —— 少的只是「写进命令行」这一步。
+ */
 function buildInstallCommand(bindCode: TerminalBindCodeCreated): string {
   return [
     'powershell -ExecutionPolicy Bypass -File .\\apps\\terminal-agent\\scripts\\install-production-agent.ps1',
     `-ApiBaseUrl "${commandApiBaseUrl()}"`,
     `-TerminalCode "${bindCode.terminalCode}"`,
     `-TerminalId "${bindCode.terminalId}"`,
-    `-BindCode "${bindCode.bindCode}"`,
+    '-PromptForBindCode',
     '-PrinterName "<Windows 实际打印机名>"',
   ].join(' `\n  ')
 }
@@ -156,8 +171,9 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
           <div className="space-y-4">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
               绑定码仅返回一次，关闭弹窗后无法再次查看；请在 Windows 一体机上运行<br />
-              <code className="rounded bg-amber-100 px-1.5 py-0.5">install-production-agent.ps1 -BindCode "&lt;一次性码&gt;"</code><br />
-              完成首次授权。建议先在 Windows 端核对打印机名后再生成码，避免码过期浪费。
+              <code className="rounded bg-amber-100 px-1.5 py-0.5">install-production-agent.ps1 -PromptForBindCode</code><br />
+              脚本会提示输入绑定码，届时粘贴即可 —— <strong>不要把码写进命令行</strong>，那样它会留在
+              PowerShell 命令历史里。建议先在 Windows 端核对打印机名后再生成码，避免码过期浪费。
             </div>
             <label className="block">
               <span className="text-xs font-medium text-gray-700">有效时长（分钟，最长 60）</span>
