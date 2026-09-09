@@ -18,7 +18,6 @@ console.log('\n=== Kiosk 打印参数已验证能力合同 ===')
 const shared = read(repoRoot, 'packages/shared/src/types/print.ts')
 const preview = read(kioskRoot, 'src/pages/print/PrintPreviewPage.tsx')
 const confirm = read(kioskRoot, 'src/pages/print/PrintConfirmPage.tsx')
-const layout = read(kioskRoot, 'src/pages/print/PrintPrototypeLayout.tsx')
 const routes = read(kioskRoot, 'src/routes/index.tsx')
 const kioskRootLayout = read(kioskRoot, 'src/layouts/KioskRoot.tsx')
 
@@ -75,20 +74,15 @@ expect(
   !existsSync(resolve(kioskRoot, 'src/pages/print/PrintParamsPage.tsx')),
   'PrintParamsPage.tsx 已删除（不得复活与预览页重复的第二个参数页）',
 )
-
-const stepsMatch = layout.match(/const PRINT_STEPS = \[([^\]]*)\]/)
-expect(Boolean(stepsMatch), 'PrintPrototypeLayout 仍导出 PRINT_STEPS 常量')
-const steps = stepsMatch[1].split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
-expect(steps.length === 6, `步骤条为 6 步（实际 ${steps.length}：${steps.join('/')}）`)
-expect(!steps.includes('参数'), '步骤条不再出现用户走不到的「参数」步')
 expect(
-  steps.join('/') === '上传/材料检查/预览/确认/支付/打印',
-  `步骤条文案与真实链路一致（实际 ${steps.join('/')}）`,
+  !existsSync(resolve(kioskRoot, 'src/pages/print/PrintPrototypeLayout.tsx')),
+  'PrintPrototypeLayout.tsx 已删除（V6 六步条不再是运行时壳；参数仍只在预览页）',
 )
 expect(
-  /export type PrintFlowStep = 1 \| 2 \| 3 \| 4 \| 5 \| 6\b/.test(layout) &&
-    !/PrintFlowStep = [^\n]*\| 7/.test(layout),
-  'PrintFlowStep 类型上界收成 6（越界 step 编译期即报错）',
+  !preview.includes('PrintPrototypeLayout') &&
+    !preview.includes('PrintPrototypeHeader') &&
+    !confirm.includes('PrintPrototypeLayout'),
+  '预览/确认页不再挂载已下线的 V6 打印原型壳',
 )
 
 // 每一步都必须真的有页面声明，且 1..6 连续无跳号

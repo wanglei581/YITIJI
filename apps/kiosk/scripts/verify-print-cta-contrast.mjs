@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url'
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (rel) => readFileSync(join(kioskRoot, rel), 'utf8')
 
-const proto = read('src/pages/print/print-prototype.css')
-const cashier = read('src/pages/print/styles/print-cashier.css')
+const tokens = read('src/styles/qingxu/tokens.css')
+const primitives = read('src/styles/qingxu/primitives.css')
+const cashierQx = read('src/pages/print/styles/cashier-qx.css')
 
 let failures = 0
 function check(label, run) {
@@ -20,19 +21,24 @@ function check(label, run) {
   }
 }
 
-check('print tokens resolve with teal fallbacks (not bare var(--k-teal) at :root)', () => {
-  // :root { --print-teal: var(--k-teal) } is invalid when --k-teal is only defined on fusion-youth.
-  // Require explicit fallback so primary CTAs cannot paint transparent + cream text.
-  assert.match(proto, /--print-teal:\s*var\(--k-teal,\s*#[0-9a-fA-F]{3,8}\)/)
-  assert.match(proto, /--print-teal-deep:\s*var\(--k-teal-deep,\s*#[0-9a-fA-F]{3,8}\)/)
-  assert.match(proto, /--print-teal-soft:\s*var\(--k-teal-soft,\s*#[0-9a-fA-F]{3,8}\)/)
-  assert.doesNotMatch(proto, /--print-teal:\s*var\(--k-teal\)\s*;/)
+check('qingxu tokens define opaque paper/deep/teal as hex literals', () => {
+  // 原断言钉 print-prototype.css 的 --print-teal fallback，防 CTA 画成透明底+浅字。
+  // 活页面已改用青序令牌；令牌必须自带字面 hex，不能再依赖未定义的 --k-teal。
+  assert.match(tokens, /--qx-deep:\s*#[0-9a-fA-F]{3,8}/)
+  assert.match(tokens, /--qx-paper:\s*#[0-9a-fA-F]{3,8}/)
+  assert.match(tokens, /--qx-teal:\s*#[0-9a-fA-F]{3,8}/)
 })
 
-check('print-confirm-primary keeps opaque teal background and light text with fallbacks', () => {
-  const block = cashier.match(/\.print-confirm-primary\s*\{[^}]+\}/)?.[0] ?? ''
-  assert.ok(block.includes('background: var(--print-teal, var(--k-teal, #1f9e86))'), 'background must include teal fallbacks')
-  assert.ok(block.includes('color: var(--k-surface, var(--color-surface, #fffdf8))'), 'color must include surface fallbacks')
+check('primary CTA uses opaque deep background and light text', () => {
+  const block = primitives.match(/\.qx-btn\[data-variant='primary'\]\s*\{[^}]+\}/)?.[0] ?? ''
+  assert.ok(block.includes('background: var(--qx-deep)'), 'primary background must be --qx-deep')
+  assert.ok(block.includes('color: var(--qx-paper)'), 'primary text must be --qx-paper')
+})
+
+check('cashier active channel choice uses opaque deep background and light text', () => {
+  const block = cashierQx.match(/\.cashier-qx-choice\[data-active='true'\]\s*\{[^}]+\}/)?.[0] ?? ''
+  assert.ok(block.includes('background: var(--qx-deep)'), 'active choice background must be --qx-deep')
+  assert.ok(block.includes('color: var(--qx-paper)'), 'active choice text must be --qx-paper')
 })
 
 if (failures) {

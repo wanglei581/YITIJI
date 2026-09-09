@@ -135,10 +135,6 @@ const pageCssFiles = walkCss(join(kioskRoot, 'src'))
 const hexRe = /#[0-9a-fA-F]{3,8}\b/g
 const legacyHexAllowlist = new Set([
   'src/pages/assistant/assistant-advisor.css',
-  'src/pages/print/print-prototype.css',
-  'src/pages/print/styles/print-cashier.css',
-  'src/pages/print-scan/styles/print-scan-uplift.css',
-  'src/styles/kiosk-uplift.css',
   'src/styles/prototype-v1.css',
   'src/styles/warm-professional-override.css',
 ])
