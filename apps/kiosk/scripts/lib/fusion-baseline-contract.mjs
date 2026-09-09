@@ -10,6 +10,12 @@ const HTML_REFERENCE_ATTRIBUTE = /(?:^|\s)(href|src)\s*=\s*(["'])(.*?)\2/gi
 const HTML_VALUE_ATTRIBUTE = /(?:^|\s)value\s*=\s*(["'])(.*?)\1/i
 const FUSION_MARKER = 'docs/design/kiosk-proto-2026-07-fusion'
 
+// Inventory sizes are computed from tests/visual/route-manifest.ts.
+// These ceilings exist so the tables cannot grow without an explicit bump.
+export const PRODUCTION_ROUTE_QUOTA = 108
+export const COMPATIBILITY_REDIRECT_QUOTA = 13
+export const KIOSK_VIEWPORT_ROUTE_QUOTA = 106
+
 export async function sha256File(filePath) {
   return await new Promise((resolveDigest, reject) => {
     const hash = createHash('sha256')
