@@ -24,14 +24,14 @@ const files = {
 }
 
 const required = [
-  ['components', '岗位数据概览'],
-  ['jobsPage', 'JobOverviewPanel'],
-  ['components', '岗位筛选助手'],
-  ['jobsPage', 'JobFilterAssistant'],
-  ['components', '热门岗位标签'],
-  ['jobsPage', 'TopTagsPanel'],
-  ['components', '客户数据接入提示'],
-  ['jobsPage', 'DataReadinessPanel'],
+  // 原 JobOverviewPanel / JobFilterAssistant / TopTagsPanel / DataReadinessPanel
+  // 已从运行时拆出且零 import；JobsPage 只留注释骗过门禁。改钉活页真实筛选与统计。
+  ['jobsPage', 'KioskFilterPickerModal'],
+  ['jobsPage', '城市与行业筛选'],
+  ['jobsPage', 'buildTopTags'],
+  ['jobsPage', '来源机构'],
+  ['jobsPage', 'JobResultsSection'],
+  ['jobsPage', '岗位与来源信息来自服务端'],
   ['components', '字段完整度'],
   ['jobsPage', /searchParams\.get\(['"]sourceOrgId['"]\)\?\.trim\(\)/],
   ['jobsPage', /useState\(\s*\(\s*\)\s*=>\s*sourceOrgIdParam\s*\)/],
