@@ -252,9 +252,12 @@ export function JobFairDetailPage() {
         </>
       ) : null}
 
+      {/* 预约弹窗标题说清「去哪」：下面的签到弹窗用的就是完整形式「扫码前往来源平台签到」，
+          预约这边缩成「扫码预约」不一致，旧页写的也是完整形式。
+          合规白名单（CLAUDE.md §2）两种都允许，取信息量大的那个。 */}
       {qr?.kind === 'book' && fair ? (
         <QxFairQrDialog
-          title={SCAN_BOOK}
+          title="扫码前往来源平台预约"
           subtitle={fair.name}
           value={fair.sourceUrl}
           meta={[{ label: '来源机构', value: fair.sourceName }, { label: '外部编号', value: fair.externalId }]}

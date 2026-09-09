@@ -104,7 +104,7 @@ function FairRow({
         <button
           type="button"
           className="qx-fair-mini"
-          aria-label={favorite ? '取消收藏' : '收藏招聘会'}
+          aria-label={favorite ? `取消收藏 ${fair.name}` : `收藏 ${fair.name}`}
           aria-pressed={favorite}
           onClick={onToggleFavorite}
         >
@@ -112,12 +112,26 @@ function FairRow({
           收藏场次
         </button>
         {!isEnded ? (
-          <button type="button" className="qx-fair-mini" data-variant="primary" onClick={onBook}>
+          <button
+            type="button"
+            className="qx-fair-mini"
+            data-variant="primary"
+            aria-label={`${BOOK_LABEL} ${fair.name}`}
+            onClick={onBook}
+          >
             <QrCodeIcon size={18} aria-hidden />
             {BOOK_LABEL}
           </button>
         ) : null}
-        <button type="button" className="qx-fair-mini" onClick={onDetail}>
+        {/* 列表里每张卡都有一颗「查看详情」，可见文字一样。不带场次名的话，
+            屏幕阅读器读出来是 N 遍「查看详情」，用户分不出是哪一场。
+            旧页有这个 aria-label，迁移时丢了——补回。 */}
+        <button
+          type="button"
+          className="qx-fair-mini"
+          aria-label={`查看 ${fair.name} 详情`}
+          onClick={onDetail}
+        >
           查看详情
         </button>
       </div>
