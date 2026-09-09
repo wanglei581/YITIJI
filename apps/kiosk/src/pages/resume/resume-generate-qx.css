@@ -21,7 +21,7 @@
 
 .qx-stage:has(.qx-resume-generate) .qx-ctabar > .qx-btn { flex: 1; }
 
-/* 填写半页：主栏表单 + 侧栏进度。只补预览半页没有的控件。 */
+/* 填写半页：单栏，表单占满宽。Stepper 在卡片上方横向铺满。 */
 .qx-resume-generate .qx-rd-label { display: block; }
 .qx-resume-generate .qx-rd-label > span {
   display: block;
@@ -86,73 +86,44 @@
   margin-bottom: 12px;
 }
 .qx-resume-generate .qx-rd-heading b { font-size: 20px; }
-.qx-resume-generate .qx-rd-prog {
+
+/* 本页单栏：覆盖 resume-optimize-qx.css 的双栏 grid，不改那份共享文件。 */
+.qx-resume-generate .qx-rd-work {
   display: flex;
   flex-direction: column;
+}
+.qx-resume-generate .qx-rd-main {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Stepper 在表单卡片上方铺满整行；6 步均分，标题不逐字折行。 */
+.qx-resume-generate .qx-rd-steps {
+  flex: none;
+  width: 100%;
+}
+.qx-resume-generate .qx-rd-steps > * {
+  width: 100%;
+}
+.qx-resume-generate .qx-rd-steps ol {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
   gap: 8px;
 }
-.qx-resume-generate .qx-rd-prog-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: var(--qx-tap-min);
-  padding: 0 14px;
-  border: 1px solid var(--qx-line);
-  border-radius: 12px;
-  background: var(--qx-paper);
+.qx-resume-generate .qx-rd-steps li {
+  flex: 1 1 0;
+  min-width: 0;
 }
-.qx-resume-generate .qx-rd-prog-item.is-done { border-color: var(--qx-teal); }
-.qx-resume-generate .qx-rd-prog-item.is-now {
-  border-color: var(--qx-deep);
-  background: var(--qx-teal-soft);
+.qx-resume-generate .qx-rd-steps li:last-child {
+  flex: 1 1 0;
 }
-.qx-resume-generate .qx-rd-prog-dot {
-  width: 32px;
-  height: 32px;
-  flex: none;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  font-weight: 700;
-  background: var(--qx-surface);
-  border: 2px solid var(--qx-line-2);
-  color: var(--qx-ink-3);
-}
-.qx-resume-generate .qx-rd-prog-item.is-done .qx-rd-prog-dot {
-  background: var(--qx-teal);
-  border-color: var(--qx-teal);
-  color: var(--qx-paper);
-}
-.qx-resume-generate .qx-rd-prog-item.is-now .qx-rd-prog-dot {
-  background: var(--qx-deep);
-  border-color: var(--qx-deep);
-  color: var(--qx-emerald);
-}
-.qx-resume-generate .qx-rd-prog-title { font-size: 17px; font-weight: 700; }
-.qx-resume-generate .qx-rd-prog-status {
-  margin-left: auto;
-  font-size: 14px;
-  color: var(--qx-ink-3);
+.qx-resume-generate .qx-rd-steps li > div:nth-child(2) {
   white-space: nowrap;
 }
-.qx-resume-generate .qx-rd-prog-item.is-done .qx-rd-prog-status,
-.qx-resume-generate .qx-rd-prog-item.is-now .qx-rd-prog-status {
-  color: var(--qx-teal-d);
-  font-weight: 700;
-}
-.qx-resume-generate .qx-rd-notes {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.qx-resume-generate .qx-rd-notes p {
-  margin: 0;
-  display: flex;
-  gap: 8px;
-  font-size: 15px;
-  line-height: 1.45;
-  color: var(--qx-ink-2);
+.qx-resume-generate .qx-rd-steps li > div.h-px {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -162,4 +133,59 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* 第一步的说明卡与自查行（照稿 input-basic 态补齐，填掉删侧栏后的空屏） */
+.qx-resume-generate .qx-rd-lead {
+  margin-bottom: 16px;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: var(--qx-deep);
+  color: var(--qx-paper);
+}
+.qx-resume-generate .qx-rd-lead b { display: block; font-size: 26px; line-height: 1.3; }
+.qx-resume-generate .qx-rd-lead p { margin: 6px 0 0; font-size: 17px; line-height: 1.5; opacity: .85; }
+.qx-resume-generate .qx-rd-lead em { font-style: normal; font-weight: 700; color: var(--qx-teal-soft); }
+
+.qx-resume-generate .qx-rd-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.qx-resume-generate .qx-rd-notes .qx-card b { display: block; font-size: 19px; margin-bottom: 6px; }
+.qx-resume-generate .qx-rd-notes .qx-card p { margin: 0; font-size: 16px; line-height: 1.55; }
+
+.qx-resume-generate .qx-rd-selfcheck {
+  margin: 18px 0 0;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--qx-wheat-soft);
+  color: var(--qx-wheat-d);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/*
+  卡片撑满可用高度（2026-09-09 第 5 条并排比对，第 3 轮）。
+  空洞的直接成因不是「内容不够」—— 补完说明卡后 textLen 已从 370 升到 389，超过基线；
+  是卡片按自然高度收在 870px，下面 780px 归了背景。
+  设计稿 input-basic 的表单卡是撑满可用高度、内部元素分散排布的。
+  只在本页作用域内做，不动共享的 .qx-card。
+*/
+.qx-resume-generate .qx-rd-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.qx-resume-generate .qx-rd-main > .qx-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+/* 字段区吃掉多余空间，说明卡与自查行自然沉到卡片下部 */
+.qx-resume-generate .qx-rd-main > .qx-card > .grid {
+  flex: 1;
+  align-content: start;
 }

@@ -25,10 +25,8 @@ import { AiTaskRegion, useAiTask, isAiOutage, type AiAvailability, type AiTaskFa
 import {
   GraduationCapIcon,
   BriefcaseIcon,
-  CheckIcon,
   FolderGitIcon,
   PlusIcon,
-  ShieldCheckIcon,
   SparklesIcon,
   Trash2Icon,
   UserRoundIcon,
@@ -51,50 +49,6 @@ const STEPS = [
   { title: '项目经历', description: '可选' },
   { title: '技能证书', description: '技能与自我评价' },
 ] as const
-
-/** 右侧进度侧栏——展示6个填写阶段的完成状态 */
-function ProgressSidebar({ currentStep }: { currentStep: number }) {
-  return (
-    <aside className="qx-rd-side" aria-label="填写进度">
-      <div className="qx-card">
-        <h3>填写进度</h3>
-        <p>完成必填项后继续下一步</p>
-        <div className="qx-rd-prog">
-          {STEPS.map((s, idx) => {
-            const done = idx < currentStep
-            const now = idx === currentStep
-            return (
-              <div
-                key={idx}
-                className={['qx-rd-prog-item', done ? 'is-done' : now ? 'is-now' : ''].filter(Boolean).join(' ')}
-              >
-                <span className="qx-rd-prog-dot" aria-hidden="true">
-                  {done ? <CheckIcon className="h-4 w-4" /> : idx + 1}
-                </span>
-                <span className="qx-rd-prog-title">{s.title}</span>
-                <span className="qx-rd-prog-status">{done ? '已填' : now ? '填写中' : s.description}</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="qx-card">
-        <h3>生成说明</h3>
-        <div className="qx-rd-notes">
-          <p>
-            <ShieldCheckIcon aria-hidden="true" />
-            <span>AI 只润色你填写的真实信息，不会替你编造学历、证书、公司或项目经历；没填的内容会提示你补充。</span>
-          </p>
-          <p>
-            <SparklesIcon aria-hidden="true" />
-            <span>本机为公共设备：填写内容仅用于本次生成，离开页面即清除；生成结果与导出文件短期保留后自动清理。</span>
-          </p>
-        </div>
-      </div>
-    </aside>
-  )
-}
 
 const inputCls = 'qx-rd-field'
 
@@ -416,9 +370,11 @@ export function ResumeGeneratePage() {
     >
     <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate">
       <div className="qx-rd-work">
+        <div className="qx-rd-steps">
+          <Stepper steps={[...STEPS]} currentIndex={step} />
+        </div>
         <div className="qx-rd-main">
             <div className="qx-card">
-              <Stepper steps={[...STEPS]} currentIndex={step} />
               <div className="qx-rd-heading">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
                   <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
@@ -427,6 +383,17 @@ export function ResumeGeneratePage() {
               </div>
 
           {step === 0 && (
+            <>
+            {/*
+              这一步在说什么（2026-09-09 第 5 条并排比对补齐）：
+              设计稿 24-resume-generate 的 input-basic 态，正文之外还有一张说明卡、
+              两张「为什么要填」卡和一条底部自查行；正是它们把 1080×1920 竖屏填满。
+              删掉稿里没有的右侧「填写进度」面板之后，这些必须补上，否则下半屏是空的。
+            */}
+            <div className="qx-rd-lead">
+              <b>先留下能联系上你的方式</b>
+              <p>这一步只有<em>姓名必填</em>，其余三项可以空着，生成后会提示你回来补。</p>
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="姓名" required>
                 <input className={inputCls} value={basic.name} onChange={(e) => setBasic((b) => ({ ...b, name: e.target.value }))} />
@@ -441,6 +408,20 @@ export function ResumeGeneratePage() {
                 <input className={inputCls} inputMode="email" value={basic.email} onChange={(e) => setBasic((b) => ({ ...b, email: e.target.value }))} />
               </Field>
             </div>
+            <div className="qx-rd-notes">
+              <div className="qx-card">
+                <b>这几项印在最上面</b>
+                <p>姓名和联系方式是对方找到你的唯一入口。写错一个数字，后面全白做 —— 这一栏值得你自己核一遍。</p>
+              </div>
+              <div className="qx-card">
+                <b>除了姓名都能空着</b>
+                <p>城市、手机号、邮箱空着也能往下走。空着的话，生成之后会算一条提示让你回来补，AI 不会替你编一个。</p>
+              </div>
+            </div>
+            <p className="qx-rd-selfcheck">
+              姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。需要帮忙可以找现场工作人员，或问 AI 顾问。
+            </p>
+            </>
           )}
 
           {step === 1 && (
@@ -617,8 +598,6 @@ export function ResumeGeneratePage() {
               fallback={fallback}
             />
         </div>
-
-        <ProgressSidebar currentStep={step} />
       </div>
     </section>
     {showConsent && (
