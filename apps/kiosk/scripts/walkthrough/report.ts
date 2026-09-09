@@ -29,8 +29,32 @@ function redirected(row: RouteRow): boolean {
   return row.landedPathname !== row.requestPathname
 }
 
-function noExit(row: RouteRow): boolean {
-  return row.topbarBack.length === 0 && row.ctaSecondary.length === 0
+/**
+ * 顶栏返回三态。选择器来源：
+ * - 青序：`QxPageFrame` 的 `.qx-topbar-back`
+ * - 旧壳：`packages/ui` `KioskPageHeader` 的 `.ui-kiosk-back-button`（aria-label = backLabel）
+ * 落地 pathname 为 `/` 且两种返回键都没有 →「根页面，不适用」。
+ * 两种都有时并列写出，不丢信息。
+ */
+export function backExitLabel(row: Pick<RouteRow, 'landedPathname' | 'topbarBack' | 'legacyBack'>): string {
+  const parts: string[] = []
+  if (row.topbarBack.length > 0) {
+    parts.push(`青序返回槽（${list(row.topbarBack)}）`)
+  }
+  if (row.legacyBack.length > 0) {
+    parts.push(`旧壳返回键（${list(row.legacyBack)}）`)
+  }
+  if (parts.length > 0) return parts.join(' · ')
+  if (row.landedPathname === '/') return '根页面，不适用'
+  return '无'
+}
+
+/** 真正两者都没有：无青序槽、无旧壳键；CTA 次级也不算有出口。落地 `/` 不算。 */
+export function isTrueNoExit(
+  row: Pick<RouteRow, 'landedPathname' | 'topbarBack' | 'legacyBack' | 'ctaSecondary'>,
+): boolean {
+  if (row.landedPathname === '/') return false
+  return row.topbarBack.length === 0 && row.legacyBack.length === 0 && row.ctaSecondary.length === 0
 }
 
 function notQxShell(row: RouteRow): boolean {
@@ -57,7 +81,7 @@ export type ReportMeta = {
 
 export function renderReport(meta: ReportMeta, rows: RouteRow[]): string {
   const redirects = rows.filter(redirected)
-  const noExits = rows.filter(noExit)
+  const noExits = rows.filter(isTrueNoExit)
   const oldShells = rows.filter(notQxShell)
 
   const lines: string[] = [
@@ -83,7 +107,9 @@ export function renderReport(meta: ReportMeta, rows: RouteRow[]): string {
     '',
     '## 全表',
     '',
-    '| # | 模式 | 请求 pathname | 落地 pathname | 主标题 | 主行动按钮 | 顶栏返回 `.qx-topbar-back` | CTA 次级出口 | `button[disabled]` | 壳 | 采集异常 |',
+    '「顶栏返回」三态：`青序返回槽`（`.qx-topbar-back`） / `旧壳返回键`（`KioskPageHeader` 的 `.ui-kiosk-back-button`，括号里是 backLabel） / `无`。落地 `/` 且两种都没有则标 `根页面，不适用`。',
+    '',
+    '| # | 模式 | 请求 pathname | 落地 pathname | 主标题 | 主行动按钮 | 顶栏返回 | CTA 次级出口 | `button[disabled]` | 壳 | 采集异常 |',
     '|---|---|---|---|---|---|---|---|---|---|---|',
   ]
 
@@ -97,7 +123,7 @@ export function renderReport(meta: ReportMeta, rows: RouteRow[]): string {
         cell(landedOf(row)),
         cell(row.title),
         list(row.mainActions),
-        list(row.topbarBack),
+        cell(backExitLabel(row)),
         list(row.ctaSecondary),
         list(row.disabledButtons),
         cell(shellMarks(row)),
@@ -130,7 +156,9 @@ export function renderReport(meta: ReportMeta, rows: RouteRow[]): string {
     '',
     '## 没有任何出口的',
     '',
-    '判据（只描述怎么数，不是结论）：落地页看不到 `.qx-topbar-back`，且 `.qx-ctabar` 里没有 `data-variant` 不是 `primary` 的按钮。底部主导航不计入。',
+    '判据（只描述怎么数，不是结论）：落地 pathname 不是 `/`，看不到 `.qx-topbar-back`，也看不到 `KioskPageHeader` 的 `.ui-kiosk-back-button`，且 `.qx-ctabar` 里没有 `data-variant` 不是 `primary` 的按钮。底部主导航不计入。首页 `/` 是根页面，标「根页面，不适用」，不算无出口。',
+    '',
+    '这张表现在的判别力取决于上面两个选择器认全了没有——如果将来又出现第三种壳，它会重新产生假阳性。',
     '',
     `共 ${noExits.length} 条。`,
     '',
@@ -142,7 +170,7 @@ export function renderReport(meta: ReportMeta, rows: RouteRow[]): string {
   } else {
     for (const row of noExits) {
       lines.push(
-        `| ${cell(row.pattern)} | ${cell(row.requestPathname)} | ${cell(landedOf(row))} | ${list(row.topbarBack)} | ${list(row.ctaSecondary)} | ${cell(shellMarks(row))} |`,
+        `| ${cell(row.pattern)} | ${cell(row.requestPathname)} | ${cell(landedOf(row))} | ${cell(backExitLabel(row))} | ${list(row.ctaSecondary)} | ${cell(shellMarks(row))} |`,
       )
     }
   }

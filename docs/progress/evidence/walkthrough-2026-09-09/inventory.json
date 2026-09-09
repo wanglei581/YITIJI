@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-09T16:01:36.136Z",
-  "elapsedMs": 48220,
+  "generatedAt": "2026-09-09T16:25:57.091Z",
+  "elapsedMs": 50751,
   "rows": [
     {
       "pattern": "/",
@@ -43,6 +43,7 @@
         "鲁公网安备37021402007308号"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -93,6 +94,7 @@
       "topbarBack": [
         "返回首页"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "不登录，继续使用"
       ],
@@ -139,6 +141,7 @@
       "title": "就业服务大厅 · 当前一体机",
       "mainActions": [],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -159,6 +162,7 @@
       "title": "",
       "mainActions": [],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -187,13 +191,15 @@
       ],
       "title": "隐私政策",
       "mainActions": [
-        "返回",
         "缩小字号",
         "放大字号",
         "用户服务协议",
         "隐私政策"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -216,6 +222,7 @@
         "去上传简历"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -238,6 +245,7 @@
         "去做岗位匹配参考"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -265,6 +273,7 @@
         "去上传简历"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -346,6 +355,7 @@
         "填写目标岗位后开始"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -373,6 +383,7 @@
         "重新开始练习"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -395,6 +406,7 @@
         "重新开始练习"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -453,6 +465,7 @@
         "开始模拟面试"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -482,6 +495,7 @@
         "开始模拟面试"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -531,6 +545,7 @@
         "鲁公网安备37021402007308号"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -580,6 +595,7 @@
         "鲁公网安备37021402007308号"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -612,6 +628,7 @@
         "联系工作人员"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -673,6 +690,7 @@
         "拼音键盘"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [
@@ -714,6 +732,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "回首页"
       ],
@@ -765,6 +784,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -812,6 +832,7 @@
         "查看岗位"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -846,6 +867,7 @@
         "查看岗位"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -884,6 +906,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -935,6 +958,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -983,6 +1007,7 @@
       "topbarBack": [
         "返回我的"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "先看看有哪些活动"
       ],
@@ -1034,6 +1059,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -1085,6 +1111,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -1130,6 +1157,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -1175,6 +1203,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -1218,6 +1247,7 @@
         "隐私政策信息收集、使用与文件留存说明"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1246,6 +1276,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回账号设置"
       ],
@@ -1287,7 +1318,6 @@
       ],
       "title": "帮助中心",
       "mainActions": [
-        "返回我的",
         "全部",
         "登录与账号",
         "AI简历服务",
@@ -1312,6 +1342,9 @@
         "鲁公网安备37021402007308号"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回我的"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1336,10 +1369,12 @@
       ],
       "title": "权益活动",
       "mainActions": [
-        "返回我的",
         "我的权益"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回我的"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1368,11 +1403,13 @@
       ],
       "title": "权益活动详情",
       "mainActions": [
-        "返回活动",
         "登录后领取",
         "我的权益"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回活动"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1401,7 +1438,6 @@
       ],
       "title": "政策服务",
       "mainActions": [
-        "返回首页",
         "问 AI 助手",
         "就业政策",
         "条件核对",
@@ -1425,6 +1461,9 @@
         "扫码打开来源链接"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回首页"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1465,7 +1504,6 @@
       ],
       "title": "校园招聘专区",
       "mainActions": [
-        "返回首页",
         "企业速览",
         "参展企业",
         "导览图",
@@ -1480,6 +1518,9 @@
         "青青岛示例制造有限公司前端工程师1 个岗位"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回首页"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1508,10 +1549,12 @@
       ],
       "title": "校园招聘迎新指引",
       "mainActions": [
-        "返回校园招聘",
         "返回校园招聘"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回校园招聘"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1541,10 +1584,12 @@
       "title": "校园招聘数据",
       "mainActions": [
         "返回校园招聘",
-        "返回校园招聘",
         "查看招聘会"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回校园招聘"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1569,10 +1614,12 @@
       ],
       "title": "百宝箱",
       "mainActions": [
-        "返回",
         "使用帮助打开站内帮助进入服务"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1597,7 +1644,6 @@
       ],
       "title": "智慧校园",
       "mainActions": [
-        "返回首页",
         "迎新指引报到流程、办事窗口、入学与求职准备进入",
         "行李帮运合作物流服务入口与服务点说明进入",
         "VR校园360° 云游校园与重点场馆介绍进入",
@@ -1606,6 +1652,9 @@
         "校园网开通激活校园 Wi-Fi、宿舍网络与上网账号进入"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回首页"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1642,13 +1691,15 @@
       ],
       "title": "迎新指引",
       "mainActions": [
-        "返回智慧校园",
         "入学材料 / 表格打印报到表、承诺书等自助打印",
         "第一份简历 · AI 诊断实习求职从这里开始",
         "返回智慧校园",
         "校园卡办理指引"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回智慧校园"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1673,7 +1724,6 @@
       ],
       "title": "迎新服务导览",
       "mainActions": [
-        "返回智慧校园",
         "打印材料上传报到表、承诺书等 PDF 或图片，本机预览后打印。Word 需转换引擎开放后才能转 PDF。进入",
         "简历服务上传简历做 AI 诊断与优化，或按引导生成草稿，并可进入本机打印。进入",
         "校园招聘信息查看校园主题招聘会的参展企业、导览与材料。投递请去来源平台，本机不收简历。进入",
@@ -1682,6 +1732,9 @@
         "返回智慧校园"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回智慧校园"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1722,12 +1775,14 @@
       ],
       "title": "校园卡办理",
       "mainActions": [
-        "返回智慧校园",
         "入学材料 / 表格打印报到表、申请表等自助打印",
         "返回智慧校园",
         "查看迎新报到指引"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回智慧校园"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [
@@ -1774,6 +1829,7 @@
       "topbarBack": [
         "返回首页"
       ],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -1808,6 +1864,7 @@
         "先用照片打印"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -1853,6 +1910,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -1902,6 +1960,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -1947,6 +2006,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -1996,6 +2056,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -2043,6 +2104,7 @@
         "先用照片打印"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -2089,6 +2151,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "退出 · 回打印扫描"
       ],
@@ -2139,6 +2202,7 @@
       "topbarBack": [
         "返回选文件"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -2186,6 +2250,7 @@
       "topbarBack": [
         "返回选文件"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -2233,6 +2298,7 @@
       "topbarBack": [
         "返回选文件"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -2280,6 +2346,7 @@
       "topbarBack": [
         "返回选文件"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回打印扫描"
       ],
@@ -2323,6 +2390,7 @@
       "topbarBack": [
         "返回预览与参数"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "我的打印订单"
       ],
@@ -2370,6 +2438,7 @@
       "topbarBack": [
         "返回我的打印订单"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "我的打印订单"
       ],
@@ -2412,6 +2481,7 @@
       "topbarBack": [
         "返回首页"
       ],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [
         {
@@ -2446,6 +2516,7 @@
         "使用帮助"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回首页"
       ],
@@ -2487,7 +2558,6 @@
       ],
       "title": "AI 简历诊断",
       "mainActions": [
-        "返回首页",
         "没有电子简历？AI 帮你生成一份填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）去生成",
         "U盘上传从已插入一体机的 U 盘中选择简历文件只读取你主动选择的文件，上传完成后即可拔出 U 盘。",
         "云端上传选择云盘同步目录或本机下载目录中的简历文件适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。",
@@ -2503,6 +2573,9 @@
         "选择行业方向"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回首页"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [
@@ -2533,7 +2606,6 @@
       ],
       "title": "AI 简历诊断",
       "mainActions": [
-        "返回首页",
         "没有电子简历？AI 帮你生成一份填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）去生成",
         "U盘上传从已插入一体机的 U 盘中选择简历文件只读取你主动选择的文件，上传完成后即可拔出 U 盘。",
         "云端上传选择云盘同步目录或本机下载目录中的简历文件适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。",
@@ -2549,6 +2621,9 @@
         "选择行业方向"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回首页"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [
@@ -2579,7 +2654,6 @@
       ],
       "title": "AI 简历诊断",
       "mainActions": [
-        "返回首页",
         "没有电子简历？AI 帮你生成一份填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）去生成",
         "U盘上传从已插入一体机的 U 盘中选择简历文件只读取你主动选择的文件，上传完成后即可拔出 U 盘。",
         "云端上传选择云盘同步目录或本机下载目录中的简历文件适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。",
@@ -2595,6 +2669,9 @@
         "选择行业方向"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回首页"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [
@@ -2621,10 +2698,12 @@
       ],
       "title": "AI 简历生成",
       "mainActions": [
-        "返回简历服务",
         "返回"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回简历服务"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [
@@ -2657,6 +2736,7 @@
         "重新填一份"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回服务大厅"
       ],
@@ -2697,6 +2777,7 @@
         "返回上传简历"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -2733,6 +2814,7 @@
         "去上传简历"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回首页"
       ],
@@ -2785,6 +2867,7 @@
         "返回报告"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回报告"
       ],
@@ -2821,6 +2904,7 @@
         "返回优化页"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回优化页"
       ],
@@ -2868,6 +2952,7 @@
         "返回报告"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回报告"
       ],
@@ -2906,6 +2991,7 @@
         "通用"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -2941,6 +3027,7 @@
         "通用"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -2965,7 +3052,6 @@
       ],
       "title": "AI简历服务",
       "mainActions": [
-        "返回",
         "AI简历诊断上传PDF或图片简历，AI自动解析结构、识别问题，给出针对性改进建议进入",
         "AI简历优化输入目标岗位后，AI定向重写简历表达，提升岗位匹配度进入",
         "简历生成引导式填写基本信息，AI生成完整简历草稿，可下载打印进入",
@@ -2979,6 +3065,9 @@
         "自我评估完成职业能力自我测评"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -3016,6 +3105,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "改用面板扫描到 U 盘"
       ],
@@ -3066,6 +3156,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "改用面板扫描到 U 盘"
       ],
@@ -3112,6 +3203,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "安全返回扫描首页"
       ],
@@ -3164,6 +3256,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "改用面板扫描到 U 盘"
       ],
@@ -3214,6 +3307,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "改用面板扫描到 U 盘"
       ],
@@ -3275,6 +3369,7 @@
       "topbarBack": [
         "返回岗位服务"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "线下招聘机构"
       ],
@@ -3341,6 +3436,7 @@
         "去来源平台投递"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回岗位列表",
         "扫码投递"
@@ -3398,6 +3494,7 @@
       "topbarBack": [
         "返回机构详情"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "查看来源机构门店"
       ],
@@ -3450,6 +3547,7 @@
       "topbarBack": [
         "返回岗位服务"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回岗位服务"
       ],
@@ -3496,6 +3594,7 @@
       "topbarBack": [
         "返回机构列表"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回机构目录"
       ],
@@ -3533,7 +3632,6 @@
       ],
       "title": "岗位信息",
       "mainActions": [
-        "返回",
         "全职岗位第三方平台同步的全职岗位信息，可筛选行业、地区与薪资范围进入",
         "实习岗位适合在校生与应届生的实习机会，来自第三方权威来源进入",
         "兼职信息灵活就业与兼职机会，第三方来源展示，投递请前往来源平台进入",
@@ -3546,6 +3644,9 @@
         "外部跳转记录查看已打开的来源平台"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -3578,6 +3679,7 @@
         "手机号登录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回我的"
       ],
@@ -3648,6 +3750,7 @@
       "topbarBack": [
         "返回岗位服务"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回岗位服务"
       ],
@@ -3696,6 +3799,7 @@
       "topbarBack": [
         "返回找企业"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回企业目录"
       ],
@@ -3733,7 +3837,6 @@
       ],
       "title": "招聘会",
       "mainActions": [
-        "返回首页",
         "全部地区",
         "按日期筛选招聘会",
         "全部",
@@ -3746,6 +3849,9 @@
         "扫码预约"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回首页"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -3778,13 +3884,15 @@
       ],
       "title": "来源平台入场入口",
       "mainActions": [
-        "返回",
         "查看详情",
         "来源平台签到码",
         "返回首页",
         "查看招聘会"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -3817,7 +3925,6 @@
       ],
       "title": "2026 青岛高校毕业生招聘会",
       "mainActions": [
-        "返回",
         "收藏招聘会",
         "详情与特色",
         "参展企业与岗位",
@@ -3834,6 +3941,9 @@
         "扫码预约"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -3858,7 +3968,6 @@
       ],
       "title": "参会企业",
       "mainActions": [
-        "返回详情",
         "全部",
         "智能制造专区",
         "青青岛示例制造有限公司medium展位 A01智能制造招聘 2 人 · 1 岗示例参展企业。查看详情 / 扫码查看",
@@ -3866,6 +3975,9 @@
         "查看招聘会"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回详情"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -3890,7 +4002,6 @@
       ],
       "title": "招聘会信息",
       "mainActions": [
-        "返回",
         "社会招聘会查看企业社会招聘会场次，了解参会企业、时间和地点信息进入",
         "校园招聘会查看高校或机构组织的校园专场招聘会，含企业名录和预约入口进入",
         "扫码签到现场活动签到二维码展示与识别引导进入",
@@ -3901,6 +4012,9 @@
         "外部跳转记录查看已前往来源平台的记录"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -3954,6 +4068,7 @@
       "topbarBack": [
         "返回参展企业列表"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回列表"
       ],
@@ -3996,11 +4111,13 @@
       "title": "场馆导览",
       "mainActions": [
         "返回详情",
-        "返回详情",
         "查看参展企业",
         "查看可打印导览资料"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回详情"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [
@@ -4031,11 +4148,13 @@
       ],
       "title": "活动资料",
       "mainActions": [
-        "返回详情",
         "参会企业",
         "查看招聘会"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回详情"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4064,11 +4183,13 @@
       ],
       "title": "AI参会准备单",
       "mainActions": [
-        "返回详情",
         "去上传简历",
         "打印活动资料"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回详情"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4089,6 +4210,7 @@
       "title": "",
       "mainActions": [],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4116,6 +4238,7 @@
         "返回"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4144,6 +4267,7 @@
         "去看说明并同意"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4171,6 +4295,7 @@
         "重新作答"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4199,6 +4324,7 @@
         "前往 AI 服务记录"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4223,7 +4349,6 @@
       ],
       "title": "AI面试训练",
       "mainActions": [
-        "返回",
         "开始模拟面试立即开始选择岗位类型和难度，进入AI模拟面试间，完成后即时出报告进入",
         "职业自我评估回答AI设计的问卷，获得个人优势、薄弱项与职业方向参考报告进入",
         "职业规划建议结合你的经历与目标，AI生成阶段性职业发展路径与行动建议进入",
@@ -4234,6 +4359,9 @@
         "训练报告查看全部模拟面试报告"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4281,6 +4409,7 @@
       "topbarBack": [
         "返回打印扫描"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回"
       ],
@@ -4327,6 +4456,7 @@
       "topbarBack": [
         "返回问小青"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "去问小青"
       ],
@@ -4390,6 +4520,7 @@
       "topbarBack": [
         "返回首页"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "不登录，继续使用"
       ],
@@ -4444,6 +4575,7 @@
       "topbarBack": [
         "返回岗位服务"
       ],
+      "legacyBack": [],
       "ctaSecondary": [
         "返回岗位服务"
       ],
@@ -4506,6 +4638,7 @@
         "鲁公网安备37021402007308号"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4555,6 +4688,7 @@
         "鲁公网安备37021402007308号"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4604,6 +4738,7 @@
         "鲁公网安备37021402007308号"
       ],
       "topbarBack": [],
+      "legacyBack": [],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],
@@ -4628,7 +4763,6 @@
       ],
       "title": "政策服务",
       "mainActions": [
-        "返回",
         "就业政策就业补贴、灵活就业等政策信息，由合作机构提交并经平台审核后展示进入",
         "社保指南参保流程、社保办事材料清单，含城镇职工和灵活就业人员险种说明进入",
         "档案 / 登记人事档案托管办理材料指引、毕业生就业登记流程与证明开具说明进入",
@@ -4639,6 +4773,9 @@
         "AI政策问答记录查看历次AI政策问答记录"
       ],
       "topbarBack": [],
+      "legacyBack": [
+        "返回"
+      ],
       "ctaSecondary": [],
       "ctaAll": [],
       "disabledButtons": [],

@@ -54,6 +54,7 @@ function emptyDom(requestPathname: string): DomShot {
     title: '',
     mainActions: [],
     topbarBack: [],
+    legacyBack: [],
     ctaSecondary: [],
     ctaAll: [],
     disabledButtons: [],

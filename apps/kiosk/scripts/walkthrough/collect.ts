@@ -10,6 +10,8 @@ export type DomShot = {
   title: string
   mainActions: string[]
   topbarBack: string[]
+  /** `KioskPageHeader` 的返回键（`packages/ui` `.ui-kiosk-back-button`），文案取 aria-label / `.ui-kiosk-back-label`。 */
+  legacyBack: string[]
   ctaSecondary: string[]
   ctaAll: CtaShot[]
   disabledButtons: string[]
@@ -70,6 +72,7 @@ function collectFromDom(): DomShot {
         '.qx-navbar',
         '.qx-nav-item',
         '.qx-topbar-back',
+        '.ui-kiosk-back-button',
         '[aria-label="主导航"]',
         '.ui-kiosk-tabbar',
         '.ui-kiosk-bottom-nav',
@@ -107,6 +110,13 @@ function collectFromDom(): DomShot {
     .map(visibleName)
     .filter(Boolean)
 
+  // 旧壳：`packages/ui` KioskPageHeader 在传入 onBack 时渲染
+  // <button class="ui-kiosk-back-button" aria-label={backLabel}> + .ui-kiosk-back-label。
+  // visibleName 优先读 aria-label，与 backLabel 一致。
+  const legacyBack = [...document.querySelectorAll('.ui-kiosk-back-button')]
+    .filter(displayed)
+    .map((el) => visibleName(el) || '（无文案）')
+
   const ctaNodes = [...document.querySelectorAll('.qx-ctabar button, .qx-ctabar a[href], .qx-ctabar [role="button"]')]
     .filter(displayed)
   const ctaAll = ctaNodes.map((el) => {
@@ -133,6 +143,7 @@ function collectFromDom(): DomShot {
     title,
     mainActions,
     topbarBack,
+    legacyBack,
     ctaSecondary,
     ctaAll,
     disabledButtons,
