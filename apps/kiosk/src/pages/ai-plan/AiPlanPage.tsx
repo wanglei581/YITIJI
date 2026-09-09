@@ -159,6 +159,8 @@ export function AiPlanPage() {
 
   return (
     <QxPageFrame
+      /* 稿 52-advisor-artifact 原文：data-route="/assistant" aria-label="返回问小青"。 */
+      back={{ label: '返回问小青', onBack: () => navigate('/assistant') }}
       title="小青的作业面"
       status={{ tone: copy.statusTone, label: copy.statusLabel }}
       terminalLabel="就业服务大厅"

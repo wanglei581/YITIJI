@@ -251,7 +251,9 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
 
     await page.goto('/')
     // 无障碍名是「招聘会」+「场次、企业与现场导览」，中间可能有空格。
-    const fairsEntry = page.locator('[data-domain-id="fairs"] button.v6-home-domain__main')
+    // V6 首页是 `[data-domain-id="fairs"] button.v6-home-domain__main`；青序流光首页
+    // 换成带 `data-action="fairs-hub"` 的磁贴（QxHomeView.tsx:226）。钉钩子不钉 class。
+    const fairsEntry = page.locator('[data-action="fairs-hub"]')
     await expect(fairsEntry).toBeVisible({ timeout: 15000 })
     await step(page, s, 'home')
 
@@ -301,7 +303,8 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    const policyEntry = page.getByRole('button', { name: /政策服务/ }).first()
+    // 青序流光首页这颗磁贴叫「就业政策」（V6 叫「政策服务」），带 data-action="policy-hub"。
+    const policyEntry = page.locator('[data-action="policy-hub"]')
     await expect(policyEntry).toBeVisible({ timeout: 15000 })
     await step(page, s, 'home')
 

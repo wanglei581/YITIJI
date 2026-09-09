@@ -61,16 +61,16 @@ const EXEMPT = new Map<string, string>([
  * 裁定后每一条要么补上返回槽（从这里删），要么进 EXEMPT 并写清为什么不是流程中段。
  */
 const UNDECIDED = new Map<string, string>([
-  ['/jobs', '从首页进来的一级业务页。底部主导航能回首页，但回不到“上一步”。'],
-  ['/ai/plan', '同上：一级 AI 服务页。'],
-  ['/scan/start', '扫描流程第一步。是入口还是中段，取决于它上面还有没有 Hub。'],
-  ['/scan/settings', '扫描流程中段，按语义应当能退回上一步。'],
-  ['/scan/progress', '进行中态：退出是否等于取消扫描任务，需要产品定。'],
-  ['/print/cashier', '付款页已有 CTA 次级出口「退出支付」，但没有顶栏返回槽 —— 两者是否都要，需裁定。'],
-  ['/print/progress', '打印进行中：同 /scan/progress，退出语义未定。'],
+  // 这三条已裁定：稿 18 把扫描四页画成一张工作台，共用一个返回键落到 /print-scan。
+  // 但落地在 #984——那个 PR 把 /scan/{start,settings,progress} 合成 /scan，
+  // 三条路由本身会消失。所以留在这里等它合入，由 #984 连同路由一起删；
+  // 现在就删会让门禁去要求三条即将不存在的路由补槽。
+  ['/scan/start', '已裁定补槽（稿 18 共用返回键 → /print-scan）；路由在 #984 合并为 /scan 时随之删除。'],
+  ['/scan/settings', '同 /scan/start：裁定已出，等 #984 合并工作台后删除。'],
+  ['/scan/progress', '同 /scan/start：裁定已出，等 #984 合并工作台后删除。'],
 ])
 /** 只许降不许升。升它等于给新的漏填开口子。 */
-const UNDECIDED_LIMIT = 7
+const UNDECIDED_LIMIT = 3
 
 test.describe('每一页都要能回上一步 @kiosk', () => {
   test('未裁定欠账不得增长 @kiosk', () => {
@@ -119,6 +119,18 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       const framed = await page.locator('[data-qx-frame="true"]').count()
       if (framed === 0 && !why) {
         test.skip(true, `${route.pattern} 冷开未渲染青序流光壳（多为 fail-closed 守卫态），不在本条判据范围内`)
+      }
+      // 冷开落到**首页内容**（URL 还停在本路由，但渲染出来的是首页）时同样不判。
+      // 2026-09-09 实测：/contract-review 三条冷开渲染的是首页
+      //（「登录后查看本人记录 / 改简历 / 找工作 …」），本条判据会去问首页
+      // 「你的返回上一步在哪」——问错了对象，首页本来就是根。
+      //
+      // 这个假阳性是被 #932 触发的：首页迁进青序流光后带上了 data-qx-frame，
+      // 上面那句「没渲染青序壳就跳过」从此不再拦住这三条。**门禁没变、页面没变，
+      // 变的是兜底页的壳** —— 所以判据必须能分辨「这一页自己的壳」和「兜底页的壳」。
+      const landedOnHome = await page.locator('[data-testid="qx-home"]').count()
+      if (landedOnHome > 0 && route.pattern !== '/' && !why) {
+        test.skip(true, `${route.pattern} 冷开落到首页内容而非本页，不在本条判据范围内`)
       }
 
       const bySelector = await page.locator(EXIT_SELECTOR).count()
