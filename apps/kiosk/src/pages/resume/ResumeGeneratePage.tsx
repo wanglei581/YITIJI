@@ -9,7 +9,9 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
+import { Stepper } from '@ai-job-print/ui'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import type {
   GeneratedResume,
   ResumeGenEducation,
@@ -39,8 +41,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
-import './resume-authoring-lightflow.css'
-import './resume-fusion-youth.css'
+import './resume-generate-qx.css'
 
 const STEPS = [
   { title: '基本信息', description: '姓名与联系方式' },
@@ -54,54 +55,53 @@ const STEPS = [
 /** 右侧进度侧栏——展示6个填写阶段的完成状态 */
 function ProgressSidebar({ currentStep }: { currentStep: number }) {
   return (
-    <aside className="resume-lightflow__sidebar" aria-label="填写进度">
-      <div className="fy-side-card">
+    <aside className="qx-rd-side" aria-label="填写进度">
+      <div className="qx-card">
         <h3>填写进度</h3>
-        <p className="fy-side-sub">完成必填项后继续下一步</p>
-        <div className="fy-prog-list">
+        <p>完成必填项后继续下一步</p>
+        <div className="qx-rd-prog">
           {STEPS.map((s, idx) => {
             const done = idx < currentStep
             const now = idx === currentStep
             return (
               <div
                 key={idx}
-                className={['fy-prog-item', done ? 'done' : now ? 'now' : ''].filter(Boolean).join(' ')}
+                className={['qx-rd-prog-item', done ? 'is-done' : now ? 'is-now' : ''].filter(Boolean).join(' ')}
               >
-                <span className="fy-prog-dot" aria-hidden="true">
+                <span className="qx-rd-prog-dot" aria-hidden="true">
                   {done ? <CheckIcon className="h-4 w-4" /> : idx + 1}
                 </span>
-                <span className="fy-prog-title">{s.title}</span>
-                <span className="fy-prog-status">{done ? '已填' : now ? '填写中' : s.description}</span>
+                <span className="qx-rd-prog-title">{s.title}</span>
+                <span className="qx-rd-prog-status">{done ? '已填' : now ? '填写中' : s.description}</span>
               </div>
             )
           })}
         </div>
       </div>
 
-      <div className="fy-side-card">
+      <div className="qx-card">
         <h3>生成说明</h3>
-        <div className="fy-hint-list">
-          <div className="fy-hint-item">
+        <div className="qx-rd-notes">
+          <p>
             <ShieldCheckIcon aria-hidden="true" />
             <span>AI 只润色你填写的真实信息，不会替你编造学历、证书、公司或项目经历；没填的内容会提示你补充。</span>
-          </div>
-          <div className="fy-hint-item">
+          </p>
+          <p>
             <SparklesIcon aria-hidden="true" />
             <span>本机为公共设备：填写内容仅用于本次生成，离开页面即清除；生成结果与导出文件短期保留后自动清理。</span>
-          </div>
+          </p>
         </div>
       </div>
     </aside>
   )
 }
 
-const inputCls =
-  'resume-lightflow__field w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+const inputCls = 'qx-rd-field'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <label className="resume-lightflow__field-label block">
-      <span className="mb-1.5 block text-sm font-medium text-neutral-700">
+    <label className="qx-rd-label">
+      <span>
         {label}
         {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
@@ -134,23 +134,23 @@ function EntryList<T>({
         <p className="rounded-xl bg-neutral-50 py-6 text-center text-sm text-neutral-400">{emptyHint}</p>
       )}
       {items.map((item, i) => (
-        <Card key={i} className="resume-lightflow__entry-card relative p-4">
+        <div key={i} className="qx-card qx-rd-entry">
           <button
             type="button"
             onClick={() => onRemove(i)}
-            className="resume-lightflow__entry-remove absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg text-neutral-300 hover:bg-error-bg hover:text-error-fg"
+            className="qx-rd-remove"
             aria-label="删除该条"
           >
             <Trash2Icon className="h-5 w-5" />
           </button>
           <div className="pr-10">{renderItem(item, i)}</div>
-        </Card>
+        </div>
       ))}
       {items.length < maxItems && (
         <button
           type="button"
           onClick={onAdd}
-          className="resume-lightflow__add-entry flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 text-base font-medium text-neutral-500 hover:border-primary-300 hover:text-primary-600"
+          className="qx-rd-add"
         >
           <PlusIcon className="h-5 w-5" />
           {addLabel}
@@ -370,29 +370,60 @@ export function ResumeGeneratePage() {
   const stepIcon = [UserRoundIcon, BriefcaseIcon, GraduationCapIcon, BriefcaseIcon, FolderGitIcon, WrenchIcon][step]
   const StepIcon = stepIcon
 
-  return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
-      <div className="resume-lightflow__header px-6 pt-6">
-        <KioskPageHeader
-          title="AI 简历生成"
-          description="填写你的真实信息，AI 帮你润色成一份结构化简历"
-          onBack={() => navigate('/resume/source')}
-          backLabel="返回简历服务"
-        />
-        <div className="resume-lightflow__stepper mt-4">
-          <Stepper steps={[...STEPS]} currentIndex={step} />
-        </div>
-      </div>
+  const ctabar = (
+    <>
+      <button
+        type="button"
+        className="qx-btn"
+        data-variant="ghost"
+        disabled={generating}
+        onClick={() => (step === 0 ? navigate('/resume/source') : setStep((s) => s - 1))}
+      >
+        {step === 0 ? '返回' : '上一步'}
+      </button>
+      {step < STEPS.length - 1 ? (
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="primary"
+          disabled={!canNext}
+          onClick={() => setStep((s) => s + 1)}
+        >
+          下一步：{STEPS[step + 1].title}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="primary"
+          disabled={generating}
+          onClick={() => void handleGenerate()}
+        >
+          <SparklesIcon className="h-5 w-5" />
+          {generating ? 'AI 生成中…' : '生成我的简历'}
+        </button>
+      )}
+    </>
+  )
 
-      <div className="resume-lightflow__content mt-4 flex-1 min-h-0 px-6 pb-6">
-        <div className="resume-lightflow__form-col">
-            <Card className="resume-lightflow__work-card p-5">
-              <div className="resume-lightflow__section-heading mb-4 flex items-center gap-2">
+  return (
+    <QxPageFrame
+      title="AI 简历生成"
+      subtitle="填写你的真实信息，AI 帮你润色成一份结构化简历"
+      back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
+      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
+      ctabar={ctabar}
+    >
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate">
+      <div className="qx-rd-work">
+        <div className="qx-rd-main">
+            <div className="qx-card">
+              <Stepper steps={[...STEPS]} currentIndex={step} />
+              <div className="qx-rd-heading">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
                   <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
                 </span>
-                <p className="text-lg font-semibold text-neutral-900">{STEPS[step].title}</p>
+                <b>{STEPS[step].title}</b>
               </div>
 
           {step === 0 && (
@@ -569,7 +600,7 @@ export function ResumeGeneratePage() {
               </Field>
             </div>
           )}
-        </Card>
+            </div>
 
             {/*
               失败态不再只剩一行红字。红字保留（它是原因），下面挂上不依赖 AI 的出路：
@@ -577,7 +608,7 @@ export function ResumeGeneratePage() {
               必填 prop，由类型系统保证这条支线不会在后续改动里被悄悄摘掉。
             */}
             {error && (
-              <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>
+              <p className="qx-rd-error" role="alert">{error}</p>
             )}
             <AiTaskRegion
               className="resume-generate-fallback mt-3"
@@ -589,31 +620,6 @@ export function ResumeGeneratePage() {
 
         <ProgressSidebar currentStep={step} />
       </div>
-
-      {/* 底部操作条 */}
-      <KioskActionBar className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
-        <div className="flex gap-3">
-          <Button
-            size="lg"
-            variant="secondary"
-            className="flex-1"
-            disabled={generating}
-            onClick={() => (step === 0 ? navigate('/resume/source') : setStep((s) => s - 1))}
-          >
-            {step === 0 ? '返回' : '上一步'}
-          </Button>
-          {step < STEPS.length - 1 ? (
-            <Button size="lg" className="flex-[2]" disabled={!canNext} onClick={() => setStep((s) => s + 1)}>
-              下一步：{STEPS[step + 1].title}
-            </Button>
-          ) : (
-            <Button size="lg" className="flex flex-[2] items-center justify-center gap-2" disabled={generating} onClick={() => void handleGenerate()}>
-              <SparklesIcon className="h-5 w-5" />
-              {generating ? 'AI 生成中…' : '生成我的简历'}
-            </Button>
-          )}
-        </div>
-      </KioskActionBar>
     </section>
     {showConsent && (
       <ResumeAiConsentDialog
@@ -630,6 +636,6 @@ export function ResumeGeneratePage() {
         }}
       />
     )}
-    </KioskPageFrame>
+    </QxPageFrame>
   )
 }

@@ -21,6 +21,140 @@
 
 .qx-stage:has(.qx-resume-generate) .qx-ctabar > .qx-btn { flex: 1; }
 
+/* 填写半页：主栏表单 + 侧栏进度。只补预览半页没有的控件。 */
+.qx-resume-generate .qx-rd-label { display: block; }
+.qx-resume-generate .qx-rd-label > span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--qx-ink-2);
+}
+.qx-resume-generate .qx-rd-field {
+  width: 100%;
+  min-height: var(--qx-tap-min);
+  padding: 12px 16px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: 14px;
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font: inherit;
+  font-size: 18px;
+}
+.qx-resume-generate textarea.qx-rd-field { min-height: 88px; resize: none; }
+.qx-resume-generate .qx-rd-field:focus {
+  outline: 3px solid var(--qx-teal);
+  outline-offset: 2px;
+}
+.qx-resume-generate .qx-rd-entry { position: relative; }
+.qx-resume-generate .qx-rd-remove {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--qx-ink-3);
+  cursor: pointer;
+}
+.qx-resume-generate .qx-rd-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--qx-btn-h);
+  border: 2px dashed var(--qx-line-2);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--qx-ink-2);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.qx-resume-generate .qx-rd-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--qx-tap-min);
+  margin-bottom: 12px;
+}
+.qx-resume-generate .qx-rd-heading b { font-size: 20px; }
+.qx-resume-generate .qx-rd-prog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qx-resume-generate .qx-rd-prog-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--qx-tap-min);
+  padding: 0 14px;
+  border: 1px solid var(--qx-line);
+  border-radius: 12px;
+  background: var(--qx-paper);
+}
+.qx-resume-generate .qx-rd-prog-item.is-done { border-color: var(--qx-teal); }
+.qx-resume-generate .qx-rd-prog-item.is-now {
+  border-color: var(--qx-deep);
+  background: var(--qx-teal-soft);
+}
+.qx-resume-generate .qx-rd-prog-dot {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--qx-surface);
+  border: 2px solid var(--qx-line-2);
+  color: var(--qx-ink-3);
+}
+.qx-resume-generate .qx-rd-prog-item.is-done .qx-rd-prog-dot {
+  background: var(--qx-teal);
+  border-color: var(--qx-teal);
+  color: var(--qx-paper);
+}
+.qx-resume-generate .qx-rd-prog-item.is-now .qx-rd-prog-dot {
+  background: var(--qx-deep);
+  border-color: var(--qx-deep);
+  color: var(--qx-emerald);
+}
+.qx-resume-generate .qx-rd-prog-title { font-size: 17px; font-weight: 700; }
+.qx-resume-generate .qx-rd-prog-status {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--qx-ink-3);
+  white-space: nowrap;
+}
+.qx-resume-generate .qx-rd-prog-item.is-done .qx-rd-prog-status,
+.qx-resume-generate .qx-rd-prog-item.is-now .qx-rd-prog-status {
+  color: var(--qx-teal-d);
+  font-weight: 700;
+}
+.qx-resume-generate .qx-rd-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qx-resume-generate .qx-rd-notes p {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--qx-ink-2);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .qx-resume-generate *,
   .qx-resume-generate *::before,

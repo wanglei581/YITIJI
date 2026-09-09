@@ -189,6 +189,7 @@ const screens = new Map([
 ])
 const qxScreens = new Set([
   'src/pages/resume/ResumeReportPage.tsx',
+  'src/pages/resume/ResumeGeneratePage.tsx',
   'src/pages/resume/ResumeGeneratePreviewPage.tsx',
   'src/pages/resume/ResumeOptimizePage.tsx',
   'src/pages/ai-plan/AiPlanPage.tsx',
@@ -265,6 +266,7 @@ includes('src/pages/resume/ResumeOptimizePage.tsx', 'useBusyLock(exporting || pr
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'setExported(null)', 'content/layout changes invalidate stale export')
 includes('src/layouts/KioskRoot.tsx', "'/resume/optimize'", 'optimize route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/resume/optimize/compare'", 'optimize compare route is registered as Qingxu-migrated')
+includes('src/layouts/KioskRoot.tsx', "'/resume/generate'", 'generate route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/resume/generate/preview'", 'generate preview route is registered as Qingxu-migrated')
 includes('src/layouts/KioskRoot.tsx', "'/ai/plan'", 'advisor artifact route is registered as Qingxu-migrated')
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('KioskPageFrame'), 'ai-plan has left the V6 frame')

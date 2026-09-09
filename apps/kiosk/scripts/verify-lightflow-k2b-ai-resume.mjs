@@ -92,7 +92,7 @@ expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-
 for (const [page, sourceCode, rootClass, cssPath] of [
   ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],
   ['parse', parse, 'resume-parse-lightflow', './resume-diagnosis-lightflow.css'],
-  ['generate', generate, 'resume-generate-lightflow', './resume-authoring-lightflow.css'],
+  ['generate', generate, 'qx-resume-generate', './resume-generate-qx.css'],
   ['generate preview', preview, 'qx-resume-generate', './resume-generate-qx.css'],
   ['optimize', optimize, 'qx-resume-optimize', './resume-optimize-qx.css'],
   ['templates', templates, 'resume-templates-lightflow', './resume-library-lightflow.css'],
