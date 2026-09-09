@@ -85,10 +85,57 @@ expect(
   '预览/确认页不再挂载已下线的 V6 打印原型壳',
 )
 
+// V6 PRINT_STEPS 六步条文案「上传/材料检查/预览/确认/支付/打印」随 PrintPrototypeLayout
+// 删除。青序活页改名为「选文件/材料检查/预览与参数/报价确认」+ 收银「支付」+ 履约第 6 步。
+// 独立「参数」步仍不得复活（参数只在预览页）。
+const confirmView = read(kioskRoot, 'src/pages/print/components/PrintConfirmView.tsx')
+const cashierView = read(kioskRoot, 'src/pages/print/components/CashierQxView.tsx')
+const fileSourceView = read(kioskRoot, 'src/pages/print/file-source/FileSourceView.tsx')
+const materialCheck = read(kioskRoot, 'src/pages/print/PrintMaterialCheckPage.tsx')
+const progress = read(kioskRoot, 'src/pages/print/PrintProgressPage.tsx')
+const confirmStepsMatch = confirmView.match(/const STEPS = \[([^\]]*)\]/)
+expect(Boolean(confirmStepsMatch), '确认页仍导出打印流程 STEPS')
+const confirmSteps = confirmStepsMatch[1].split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+expect(confirmSteps.length === 4, `确认页步骤条为前 4 步（实际 ${confirmSteps.length}：${confirmSteps.join('/')}）`)
+expect(
+  confirmSteps.join('/') === '选文件/材料检查/预览与参数/报价确认',
+  `确认页步骤条文案与青序打印链路前 4 步一致（实际 ${confirmSteps.join('/')}）`,
+)
+expect(!confirmSteps.includes('参数'), '步骤条不再出现用户走不到的独立「参数」步')
+expect(
+  /data-print-flow-step=\{1\}/.test(fileSourceView),
+  '选文件（原「上传」）由 FileSourceView 声明为第 1 步',
+)
+expect(
+  /title="材料检查"/.test(materialCheck) && /第 2 步/.test(materialCheck),
+  '材料检查页标题与「第 2 步」副标题仍在活页上',
+)
+expect(
+  /title="预览与打印参数"/.test(preview) && /第 3 步/.test(preview),
+  '预览页标题与「第 3 步」副标题仍在活页上（参数合入预览，不是独立第 4 格）',
+)
+expect(
+  /step=\{4\}/.test(confirm) && /title="报价确认"/.test(confirm),
+  '报价确认（原「确认」）仍是第 4 步',
+)
+expect(
+  /step:\s*4\b/.test(confirmView),
+  'PrintConfirmView 把 step 钉成字面量 4（越界 step 编译期即报错）',
+)
+expect(
+  /step:\s*5\b/.test(cashierView) && /第 \{props\.step\} 步 · 支付/.test(cashierView),
+  '收银页（原「支付」）仍是第 5 步且用户可见「支付」',
+)
+expect(
+  /data-print-flow-step=\{6\}/.test(progress),
+  '打印履约（原「打印」）仍是第 6 步',
+)
+
 // 每一步都必须真的有页面声明，且 1..6 连续无跳号
 const declaredSteps = new Set()
 for (const file of [
   'src/pages/print/PrintUploadPage.tsx',
+  'src/pages/print/file-source/FileSourceView.tsx',
   'src/pages/print/PrintMaterialCheckPage.tsx',
   'src/pages/print/PrintPreviewPage.tsx',
   'src/pages/print/PrintConfirmPage.tsx',

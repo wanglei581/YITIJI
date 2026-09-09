@@ -37,7 +37,7 @@ assert(
 )
 
 assert(
-  /title:\s*'文档打印'[\s\S]*?to:\s*'\/print\/upload\?source=document/.test(printHub),
+  /title:\s*'文档打印'(?:(?!title:)[\s\S])*?to:\s*'\/print\/upload\?source=document(?:&|')/.test(printHub),
   '打印扫描 Hub 的文档打印入口进入 source=document 打印流',
 )
 

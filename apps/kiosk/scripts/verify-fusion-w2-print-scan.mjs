@@ -522,6 +522,34 @@ assert.doesNotMatch(
   /from ['"][^'"]*PrintPrototypeLayout['"]/,
   'print upload does not import the retired V6 print prototype frame',
 )
+const qxTokens = read('src/styles/qingxu/tokens.css')
+const qxShell = read('src/styles/qingxu/shell.css')
+const qxPrimitives = read('src/styles/qingxu/primitives.css')
+assert.match(
+  qxTokens,
+  /--qx-gutter:\s*40px\s*;/,
+  'qingxu declares the page gutter once (40px token; V6 --print-page-gutter 48px equivalent)',
+)
+assert.match(
+  qxShell,
+  /\.qx-body\s*\{[^}]*padding:\s*0\s+var\(--qx-gutter\)\s*;/,
+  'qx-body applies the shared page gutter as content padding',
+)
+assert.match(
+  qxShell,
+  /\.qx-pagehead\s*\{[^}]*margin:\s*18px\s+var\(--qx-gutter\)\s+0\s*;/,
+  'pagehead sits on the shared gutter instead of stacking extra padding',
+)
+assert.match(
+  qxShell,
+  /\.qx-topbar\s*\{[^}]*padding:\s*0\s+var\(--qx-gutter\)\s*;/,
+  'topbar uses the same gutter token',
+)
+assert.match(
+  qxPrimitives,
+  /\.qx-ctabar\s*\{[^}]*padding:\s*18px\s+var\(--qx-gutter\)\s*;[^}]*border-top:\s*1px\s+solid\s+var\(--qx-line\)\s*;/,
+  'ctabar follows the prototype actionbar geometry: gutter padding + top border',
+)
 const materialPresentation = read('src/pages/print/components/MaterialCheckPresentation.tsx')
 assert.match(
   materialPresentation,
@@ -797,13 +825,24 @@ assert.match(
   'pickup scanner Enter suffix reuses the same guarded submission path'
 )
 const pickupClaimQxCss = read('src/pages/print/styles/pickup-claim-qx.css')
-for (const selector of [
-  '.pcp-input',
-  '.pcp-help',
-  '.pickup-claim-success',
-]) {
-  assert.ok(pickupClaimQxCss.includes(selector), `qingxu pickup claim CSS retains ${selector}`)
-}
+assert.ok(pickupClaimQxCss.includes('.pickup-claim-page'), 'qingxu pickup claim CSS retains .pickup-claim-page')
+assert.ok(pickupClaimQxCss.includes('.pcp-input'), 'qingxu pickup claim CSS retains .pcp-input')
+assert.ok(
+  pickupClaim.includes('className="qx-btn pcp-submit"'),
+  'pickup submit button keeps locatable qx-btn pcp-submit class (V6 .pcp-submit.k-btn equivalent)',
+)
+assert.match(
+  pickupClaim,
+  /className="qx-btn pcp-submit"[\s\S]{0,200}data-variant="primary"/,
+  'pickup submit is the page primary action (V6 .pcp-submit.k-btn min-height now inherited from qx-btn primary)',
+)
+assert.match(
+  qxPrimitives,
+  /\.qx-btn\[data-variant='primary'\]\s*\{[^}]*min-height:\s*var\(--qx-btn-h-lg\)/,
+  'primary qx-btn keeps the large tap floor the pickup submit inherits',
+)
+assert.ok(pickupClaimQxCss.includes('.pcp-help'), 'qingxu pickup claim CSS retains .pcp-help')
+assert.ok(pickupClaimQxCss.includes('.pickup-claim-success'), 'qingxu pickup claim CSS retains .pickup-claim-success')
 assert.match(
   pickupClaimQxCss,
   /@media \(max-height: 900px\) and \(orientation: landscape\)/,
@@ -1070,13 +1109,41 @@ assert.match(
 const signStampQxCss = read('src/pages/print-scan/styles/sign-stamp-qx.css')
 assert.match(
   signStampQxCss,
+  /\.ss-page\s*\{[^}]*margin:\s*0\s+calc\(-1\s*\*\s*var\(--qx-gutter\)\)\s*;/,
+  'sign-stamp page bleeds through the shared gutter the way V6 print-proto bled --print-page-gutter',
+)
+assert.match(
+  signStampQxCss,
+  /\.ss-work\s*\{[^}]*flex:\s*1/,
+  'sign-stamp work area grows with remaining height',
+)
+assert.match(
+  signStampQxCss,
+  /\.ss-pvcol\s*\{[^}]*width:\s*600px/,
+  'sign-stamp preview column is a 600px pane, not a stub strip',
+)
+assert.match(
+  signStampQxCss,
   /\.ss-pv-frame\s*\{[^}]*flex:\s*1/,
   'sign-stamp preview frame grows with remaining space'
 )
 assert.match(
   signStampQxCss,
-  /\.ss-pv-frame\s*\{[^}]*min-height:\s*0/,
-  'sign-stamp preview is not a fixed short box'
+  /\.ss-pv-view\s*\{[^}]*flex:\s*1/,
+  'sign-stamp live preview view grows with remaining space',
+)
+assert.match(
+  signStampQxCss,
+  /\.ss-pv-ghost\s*\{[^}]*aspect-ratio:\s*840\s*\/\s*1188/,
+  'sign-stamp empty preview ghost keeps the A4 proportion floor',
+)
+const ghostMaxWidth = Number(
+  (signStampQxCss.match(/\.ss-pv-ghost\s*\{[^}]*max-width:\s*(\d+)px/) ?? [])[1] ?? '',
+)
+const ghostFloorPx = ghostMaxWidth * (1188 / 840)
+assert.ok(
+  Number.isFinite(ghostFloorPx) && ghostFloorPx >= 360,
+  `sign-stamp empty preview ghost is at least 360px tall (V6 preview-frame min-height; actual ${ghostFloorPx.toFixed(0)}px at max-width ${ghostMaxWidth}px)`,
 )
 assert.match(signStamp, /w2-print-scan-preview/, 'sign-stamp uses the densified preview shell')
 assert.doesNotMatch(

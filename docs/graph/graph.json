@@ -17505,6 +17505,9 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "services/api/scripts/verify-payment-codepay.ts"
     ],
+    "apps/kiosk/src/pages/print/components/CashierQxView.tsx": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
+    ],
     "apps/kiosk/src/pages/print/components/MaterialCheckPresentation.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs"
@@ -17513,7 +17516,8 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx": [
-      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
@@ -17532,7 +17536,8 @@
     "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
+      "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
     "apps/kiosk/src/pages/print/file-source/fileSourceModel.ts": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
@@ -18634,9 +18639,14 @@
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
     "apps/kiosk/src/styles/qingxu/primitives.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-print-cta-contrast.mjs"
     ],
+    "apps/kiosk/src/styles/qingxu/shell.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/styles/qingxu/tokens.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-print-cta-contrast.mjs"
     ],
     "apps/kiosk/src/styles/warm-professional-override.css": [
@@ -23907,7 +23917,10 @@
           "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
           "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
           "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts",
-          "apps/kiosk/src/routes/index.tsx"
+          "apps/kiosk/src/routes/index.tsx",
+          "apps/kiosk/src/styles/qingxu/primitives.css",
+          "apps/kiosk/src/styles/qingxu/shell.css",
+          "apps/kiosk/src/styles/qingxu/tokens.css"
         ],
         "missing": [
           "src/pages/print-scan/styles/print-scan-fusion.css",
@@ -25279,6 +25292,9 @@
           "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
+          "apps/kiosk/src/pages/print/components/CashierQxView.tsx",
+          "apps/kiosk/src/pages/print/components/PrintConfirmView.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "packages/shared/src/types/print.ts"
         ],
