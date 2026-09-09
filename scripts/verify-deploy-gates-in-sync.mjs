@@ -122,12 +122,21 @@ if (
 // 后台照样渲染出一整套假数据（假机构、假岗位、假价目、假法务文本），
 // 运营人员照着它决策，而且外观上完全看不出来。
 //
-// kiosk 早就装了 `import.meta.env.PROD && API_MODE !== 'http'` 的 fail-closed 断言；
-// 2026-09-09 实测 admin / partner **各 0 处**，两边只有 `import.meta.env.DEV` 下的
-// console.warn —— 生产构建里那句话根本不执行。
+// kiosk 装了 `import.meta.env.PROD && API_MODE !== 'http'` 的运行时断言。
+// **这条不能照抄给 admin / partner**，2026-09-10 实测过代价：
 //
-// 与本门禁开头那次事故同形态：两处清单各自维护、没人比对。
-// 所以两边都断言：部署脚本必须传，前端必须在没传时 fail-closed。
+//   `import.meta.env.PROD` 不是「production 模式」的意思 —— `vite build` 无论
+//   `--mode` 传什么都把它折成 `true`（同一份产物里 `import.meta.env.DEV` 分支
+//   被折成 false 整段消失，可交叉印证）。
+//   kiosk 的 E2E webServer 用 `VITE_API_MODE=http` 构建，所以条件为假、守卫沉默；
+//   admin / partner 的 E2E 刻意走 mock（`VITE_API_MODE=mock vite build --mode development`），
+//   条件折成恒真，产物里就是一句**无条件 throw**，应用在模块导入期就炸。
+//   实测后果：Admin 浏览器 E2E 从 0.7 分钟变成 36.6 分钟未完成，
+//   整个 kiosk-browser-smoke job 撞满 70 分钟上限被取消。
+//
+// 所以判据按 app 分开：kiosk 必须有（它的 E2E 走 http，安全且有价值）；
+// admin / partner 必须**没有**（它们的 E2E 走 mock，有了就是自伤）。
+// 真正把关生产的是下面 vite.config 的构建期闸门，那条对三个 app 一视同仁。
 {
   const FRONTENDS = [
     { app: 'kiosk', client: 'apps/kiosk/src/services/api/client.ts' },
@@ -142,8 +151,19 @@ if (
     const failsClosed =
       /import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/.test(src) &&
       /throw new Error\(/.test(src.slice(src.search(/import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/)))
-    if (failsClosed) pass(`${app} 运行时也对 mock 模式 fail-closed（与 kiosk 对齐的纵深防御，主闸门在 vite.config）`)
-    else fail(`${app} 生产构建未对 mock 模式 fail-closed —— 漏传 VITE_API_MODE 会静默发布假数据后台（${client}）`)
+    if (app === 'kiosk') {
+      if (failsClosed) pass('kiosk 运行时对 mock 模式 fail-closed（它的 E2E 走 http，这条守卫不会误伤）')
+      else fail(`kiosk 运行时守卫丢了（${client}）`)
+    } else if (failsClosed) {
+      fail(
+        `${app} 不得有 import.meta.env.PROD 运行时守卫（${client}）：`
+        + 'vite build 把 PROD 折成 true，而本 app 的 E2E 走 mock，'
+        + '这条会变成无条件 throw 把浏览器用例整段挂死（2026-09-10 实测 36.6 分钟未完成）。'
+        + '生产侧的防线是 vite.config 的 assertProdApiMode。',
+      )
+    } else {
+      pass(`${app} 没有会误伤 mock E2E 的运行时守卫（生产侧由 vite.config 闸门把关）`)
+    }
   }
 
   // ── 真正把关的是 vite.config 的构建期闸门，它必须存在 ──────────────────
