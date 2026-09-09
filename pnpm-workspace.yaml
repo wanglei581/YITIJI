@@ -10,8 +10,30 @@ overrides:
   uuid: 14.0.0
   shell-quote: 1.9.0
   hono: 4.12.27
-  multer: 2.2.0
-  js-yaml: 4.3.1
+  # multer: 2026-09-08 新发三条 high，全部首修 2.3.0（2026-08-28 发布，已过 minimumReleaseAge）
+  #   GHSA-wc9g-mqfw-jrwm（构造 multipart 字段名致 DoS，影响 < 2.3.0）
+  #   GHSA-535w-7cp7-47q4（字段名里超大数组下标致 DoS，影响 < 2.3.0）
+  #   GHSA-qfvm-cv95-jqjf（上传中断时文件描述符泄漏，影响 = 2.2.0）
+  # services/api 声明的是 ^2.2.0，caret 本来就允许 2.3.0 —— 是这条 override 把它钉死的，
+  # 所以必须改这里，只刷 lockfile 没用。
+  # 载体不是边缘依赖：multer 在**用户文件上传主链路**上（files / ai(简历) / content /
+  # jobs / admin-fairs / partner-fairs 六个 controller），简历、证件照、身份证复印件都走它。
+  multer: 2.3.0
+  # js-yaml: GHSA-2883-xcg3-v3hh（HIGH，2026-09-08 发布）
+  # maxTotalMergeKeys 不限制「空合并源」的 CPU 消耗；影响 >=4.0.0 <4.3.2，首修 4.3.2。
+  # 原先钉的 4.3.1 当初也是安全修复，被新公告覆盖。取 4.3.2（2026-08-26）不跨大版本；
+  # 不取 5.x：5.x 改了默认 schema 与 API，越过一条公告的代价不成比例。
+  # 改这里必须同步改 scripts/verify-dependency-security.mjs 的 REQUIRED_JS_YAML_VERSION，
+  # 那条门禁会断言两者一致。
+  js-yaml: 4.3.2
+  # @xmldom/xmldom: 2026-09-08 一次性新发八条 high
+  #   GHSA-w2rr-34g9-rvrj / 4w3w-2rp5-g8jm      首修 0.8.14
+  #   GHSA-c7q8-3ch8-vqpv / 27p8-2357-5qqv / 8344-3jmq-59r6 / x4fp-j954-r2f4 /
+  #   GHSA-965w-775f-mr7g / 93r5-fhx6-vmg9      首修 0.8.15
+  # 取 0.8.15（0.8 线最新，2026-08-21）越过全部八条；不跨到 0.9.x：那是另一条大版本线，
+  # 而载体只需要 0.8 的 API。
+  # 载体路径：mammoth@1.12.0 → @xmldom/xmldom@0.8.13（docx 解析，走文件转换链路）。
+  '@xmldom/xmldom': 0.8.15
   # fast-uri: 2026-09-02/03 新发四条 high，全部影响 <3.1.6、首修 3.1.6 ——
   #   GHSA-5jgf-p345-68v8（IDN 规范化被跳过导致 host 混淆）
   #   GHSA-f65p-4m7j-42xc（畸形 IPv6 导致 SSRF）
