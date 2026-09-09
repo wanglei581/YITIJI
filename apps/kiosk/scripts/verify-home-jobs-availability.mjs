@@ -10,7 +10,7 @@
  * 2. useHomeJobHighlight 不得再读 reviewStatus / publishStatus
  *    （公开列表 DTO 不下发这两个字段，客户端一比就全员不合格）。
  *    变异：对 response.data 按 item.reviewStatus 过滤 → 红。
- * 3. hook 必须调用列表页同一个 getJobs，并带上全职列表的 category + 相同 pageSize，
+ * 3. hook 必须调用列表页同一个 getJobs，且**不按 category 收窄**（卡片覆盖整个岗位域），pageSize 只取计数，
  *    只读 pagination.total；不得另写 fetch。
  *    变异：改成 fetch(...) 或丢掉 getJobs 导入 → 红。
  *
@@ -356,18 +356,22 @@ else pass('3. JobsPage 列表查询把 category 传给 getJobs')
 if (!hookQuery) fail('3. hook 没有 getJobs({...}) 调用')
 else pass('3. hook 通过对象参数调用 getJobs')
 
-if (hookQuery && /category\s*:\s*['"]fulltime['"]/.test(hookQuery)) {
-  pass("3. hook 使用全职列表的 category: 'fulltime'")
+// 卡片覆盖整个岗位域（服务台下有全职/实习/兼职/全部四个入口），
+// 因此 hook **不得**按 category 收窄 —— 只数其中一类，另一类有内容时
+// 卡片会写「暂无岗位」，用户就不点了，比不显示还糟。
+if (hookQuery && /category\s*:/.test(hookQuery)) {
+  fail(`3. hook 不得按 category 收窄（卡片代表整个岗位域，服务台下有全职/实习/兼职/全部四个入口）。实际: ${hookQuery}`)
 } else {
-  fail("3. hook 必须使用 category: 'fulltime'（与 /jobs?category=fulltime 同构）")
+  pass('3. hook 不按 category 收窄,与「全部岗位」同构')
 }
 
-const listPageSize = listListQuery?.match(/pageSize\s*:\s*(\d+)/)?.[1]
-const hookPageSize = hookQuery?.match(/pageSize\s*:\s*(\d+)/)?.[1]
-if (listPageSize && hookPageSize && listPageSize === hookPageSize) {
-  pass(`3. hook pageSize=${hookPageSize} 与列表页一致`)
+// pageSize 不参与 total 计算（服务端 count 独立于 skip/take），
+// 所以只要求它「小」——首页为显示一个数字不该把整页数据拉回来。
+const hookPageSize = Number(hookQuery?.match(/pageSize\s*:\s*(\d+)/)?.[1] ?? NaN)
+if (Number.isFinite(hookPageSize) && hookPageSize <= 5) {
+  pass(`3. hook pageSize=${hookPageSize}（只取计数,不拉整页）`)
 } else {
-  fail(`3. hook pageSize 必须与列表页一致（list=${listPageSize} hook=${hookPageSize}）`)
+  fail(`3. hook 只需要 pagination.total,pageSize 应 ≤5;实际 ${hookQuery}`)
 }
 
 if (/pagination\s*\.\s*total/.test(hookCode)) pass('3. hook 只按 pagination.total 判断有无岗位')
