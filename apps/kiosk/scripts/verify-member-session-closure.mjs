@@ -240,6 +240,28 @@ assert(
   'Profile 手动退出统一建立隐私 history boundary，不再直接清会话后留下 token-bearing 历史',
 )
 
+// 清场后跳回干净入口这一步，不能只挂在 requestAnimationFrame 上。
+// rAF 在 document.hidden 时完全不触发；而硬清场路径的 clearingModeRef 只在屏保
+// 分支被重置，'hard' 分支不重置 —— 那一帧没来就再也没有第二次机会。
+// 2026-09-09 生产实测（标签不可见）：遮罩挂了 82 秒不恢复，页面从未重载，
+// #root 只剩 fixed inset-0 / z-[2147483647] / pointer-events-auto 的不透明层，
+// 可见文字 0 条 —— 一体机就是一块吃掉所有触摸的黑屏，只能人工重启。
+assert(
+  kioskPrivacyGuard.includes('scheduleSanitizedDestination') &&
+    /window\.setTimeout\(run,\s*SANITIZED_DESTINATION_FALLBACK_MS\)/.test(kioskPrivacyGuard) &&
+    // 调用点必须走调度器，不得直接 rAF 到 pushSanitizedDestination
+    !/requestAnimationFrame\(\s*\(\)\s*=>\s*pushSanitizedDestination/.test(kioskPrivacyGuard),
+  '清场恢复不只依赖 rAF：有 setTimeout 兜底，页面不可见时也能跳回干净入口（否则永久黑屏）',
+)
+
+// 兜底只能补触发，不能变成「跳两次」。run 必须有 once 卫兵。
+assert(
+  /let\s+dispatched\s*=\s*false[\s\S]{0,200}if\s*\(dispatched\)\s*return[\s\S]{0,80}dispatched\s*=\s*true/.test(
+    kioskPrivacyGuard,
+  ),
+  '兜底与 rAF 之间有 once 卫兵，不会把 pushSanitizedDestination 执行两次',
+)
+
 const settingsLogout = extractConstFunction(mySettingsPage, 'handleLogout')
 const settingsSwitch = extractConstFunction(mySettingsPage, 'handleSwitch')
 const settingsRebindDone = extractConstFunction(mySettingsPage, 'handleRebindDone')
