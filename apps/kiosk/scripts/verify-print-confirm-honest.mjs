@@ -73,10 +73,17 @@ if (/已进我的文档/.test(convertSrc)) {
     /typeof\s+result\.hasEndUser\s*===\s*'boolean'/,
     '图片转 PDF 的归属取自转换响应 hasEndUser，不得用本机 token 自行判断',
   )
+  // 按文件分别断言：convertSrc 是 Page+View+Panels 拼接，只查拼接串的话，
+  // 某一个文件里删掉守卫会被另一个文件的同名守卫掩盖（变异实测过这种假绿）。
   expectMatches(
-    convertSrc,
+    read('src/pages/print-scan/ConvertImagesView.tsx'),
     /typeof\s+hasEndUser\s*===\s*'boolean'/,
-    '归属未知（undefined）时完成态那格不渲染 —— 失败关闭，不猜',
+    '结果卡：归属未知时那格不渲染 —— 失败关闭，不猜',
+  )
+  expectMatches(
+    read('src/pages/print-scan/ConvertImagesPanels.tsx'),
+    /typeof\s+hasEndUser\s*===\s*'boolean'/,
+    '完成态 CTA：归属未知时两个按钮都不出 —— 失败关闭，不猜',
   )
   if (/loggedIn\s*\?\s*'已进我的文档/.test(convertSrc)) {
     fail('完成态「已进我的文档」不得由 loggedIn / getToken() 决定')
