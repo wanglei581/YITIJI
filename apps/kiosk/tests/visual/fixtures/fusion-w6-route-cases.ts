@@ -72,7 +72,7 @@ async function seedResumeCompare(page: Page): Promise<void> {
 }
 
 const w6RouteDefinitions: readonly W6RouteDefinition[] = [
-  { pattern: '/', url: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
+  { pattern: '/', url: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后，简历和记录', landmark: 'none' },
   { pattern: '/member/qr-login', url: '/member/qr-login?ticketId=w6-ticket', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '上传链接已失效' },
@@ -87,7 +87,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/tips', url: '/interview/tips', marker: screen('interview-tips'), featureText: '面试', requiresFusionRoot: false },
   { pattern: '/interview/reports', url: '/interview/reports', marker: screen('interview-reports'), featureText: '面试报告', requiresFusionRoot: false },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '触摸屏幕开始使用', landmark: 'presentation', seed: seedScreensaver },
-  { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
+  { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '网络连接中断' },
   { pattern: '/assistant', url: '/assistant', marker: screen('assistant'), featureText: '小青' },
   { pattern: '/profile', url: '/profile', marker: screen('profile'), featureText: '我的' },
@@ -185,9 +185,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
   { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("AI面试训练")', featureText: 'AI面试训练' },
   // 合同审查 production_default=false；默认构建直接访问也必须安全回首页。
-  { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
-  { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
-  { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
+  { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
+  { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
+  { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
 ] as const // 107 routes (was 106; 2026-09-08 打印台合并新增 /print/desk)
 
@@ -205,14 +205,19 @@ export const w6MobileCases = w6RouteCases.filter(({ viewport }) => viewport === 
  * 表内路由必须真的挂上 V6 壳且顶栏是浅色纸面，表外路由不得被误伤染成 V6。
  */
 export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
-  '/',
-  '/print-scan',
+  /* 2026-09-08 移出 '/' 与 '/print-scan'：两条已迁入青序流光，运行时不再挂 V6 壳
+   * （KioskRoot 的 `isV6Route` 带 `!isQxRoute`，且两条已从 `V6_SHELL_ROUTES` 移出）。
+   * 契约一字未改——表内仍要求真的挂上 V6 壳、表外仍要求不得被误伤染成 V6；
+   * 这两条只是从表内挪到表外，于是现在被断言「不是 V6 壳」，正是迁移后的事实。
+   *
+   * 2026-09-09 再移出 '/profile'：同样口径。#931 把它加进 QX_MIGRATED_ROUTES
+   * 却漏了这两张表，main 的 kiosk-browser-smoke 因此连红两次合并
+   * （run 34263887180：「同时出现在两张表里：/profile」）。 */
   '/resume-service',
   '/jobs-service',
   '/fairs-service',
   '/interview-service',
   '/policy-service',
-  '/profile',
 ])
 
 const actualPatterns = w6RouteCases.map(({ pattern }) => pattern)

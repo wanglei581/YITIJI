@@ -487,12 +487,25 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 4.1 账号与资产
 
-- [ ] 手机号登录/登出成功。
+> **2026-09-08 本地取证**：本节 4 条已有本地运行期证据，2 条 QR 需真手机与 Terminal Agent、本地无法覆盖（下面逐条写明需要什么）。
+> 明细见 [会员闭环运行期证据](../reviews/member-closure-runtime-evidence-2026-09-08.md) 附五，
+> 脚本 `apps/kiosk/scripts/probe-member-session-41.mjs`。
+> **本地 PASS 不等于可勾** —— 本地是 SQLite + 本地存储 + `AI_PROVIDER=mock`，与生产不同构。
+
+- [ ] 手机号登录/登出成功。 —— 生产待验；**本地 PASS**（登出后旧 token 立即 401，且以「登出前同一请求 200」为内建阳性对照）
 - [ ] QR 扫码登录成功：Kiosk 通过 Terminal Agent 本地桥接创建二维码，手机打开二维码 URL 后只确认登录，一体机拿到会员态；手机端不接收 member token。
+  **本地无法覆盖**（如实记，不按 PASS 也不按 FAIL）：这条要求三样本地都没有 —— 运行中的 Terminal Agent（提供本地桥接）、
+  一台能扫码的真手机、以及手机可达的基址。纯后端探针只能证明 `POST /member/auth/qr/create` 与
+  `GET /member/auth/qr/:ticketId/status` 两个端点存在并按预期返回，**证明不了「手机扫了之后一体机真的拿到会员态」**，
+  更证明不了「手机端不接收 member token」这条安全要求 —— 后者恰恰只有在真手机上抓包才看得见。
+  **复验要点**：确认手机侧响应里**没有** member token（只有确认结果），一体机侧才拿到会员态。
 - [ ] QR 二维码 URL 的公网/局域网基址可被手机访问；如果 Kiosk 页面运行在 `localhost`，必须显式配置手机可访问的 `VITE_QR_LOGIN_PUBLIC_BASE_URL`。
-- [ ] 空闲自动退出生效。
-- [ ] 忙碌态（上传/AI/打印中）不误触发退出。
-- [ ] 「我的」资产区加载成功，无假数量。
+  **本地无法覆盖**：本地 Kiosk 跑在 `127.0.0.1:5273`，手机不可达，这条按定义就验不了。
+  **复验要点**：在一体机真机上打开二维码页，用手机（走一体机所在局域网或公网）实际打开该 URL；
+  只看二维码渲染出来了**不算通过** —— 二维码里编的可能正是 `localhost`，扫了才会发现打不开。
+- [ ] 空闲自动退出生效。 —— 生产待验；**已有 CI 覆盖**：`kiosk-privacy-timeout.spec.ts` 23 条用例，`ci.yml:1053-1054` 两条 job 在跑，本地复跑 `23 passed`。
+- [ ] 忙碌态（上传/AI/打印中）不误触发退出。 —— 生产待验；**同上套件覆盖**（忙碌锁顺延 `VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC`）。
+- [ ] 「我的」资产区加载成功，无假数量。 —— 生产待验；**本地 PASS**（未登录 401 且响应里 0 个计数字段）
 - [x] 未登录游客不展示跨会话资产。 —— **PASS，且强于本条要求**
   **证据（2026-09-07 23:38–23:40，发布 `759a37d45` 之后，发布 lane 取证）**：**每条路由开全新浏览器上下文**（无 cookie / localStorage / sessionStorage），走真实域名逐条访问「我的」六个资产页并抓全部 `/api/v1/` 调用 —— `/me/resumes`、`/me/documents`、`/me/print-orders`、`/me/ai-records`、`/me/favorites`、`/me/activity` **六页登录门均在，且各发出 0 条 `/api/v1/` 调用**；六页文案均写「仅本人可见」，与 §10 数据边界一致。
   **为什么按「0 条调用」记而不是「返回 401」**：401 是**服务端过滤**（请求发生过、被拒），仍存在「过滤条件某天被改错就漏数据」的风险面；0 条是**客户端 fail-closed**，该风险面不存在。这个 0 也是回归时最灵敏的指标 —— 哪天有人加「先拉一下再判断登录」的优化，0 就会变非 0。
@@ -500,7 +513,7 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 
 ### 4.2 AI 简历与「我的」闭环
 
-- [ ] 上传简历 → AI诊断 → 报告页 → 「我的」AI服务记录可见。
+- [ ] 上传简历 → AI诊断 → 报告页 → 「我的」AI服务记录可见。 —— 生产待验；**本地 PASS**
 - [ ] 简历优化 → 优化结果 → 导出 PDF → 我的文档可见。 —— **生产域名仍待验**；本地真实后端已 PASS
   **本地证据（2026-09-08，[会员闭环运行期证据](../reviews/member-closure-runtime-evidence-2026-09-08.md)）**：
   一次不间断的真人旅程留下完整审计链 `file.upload → parse_submitted → optimize_requested →
@@ -514,35 +527,55 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
   却被包在 `test()` 里当判定型门禁用 —— 缺验证码时整条会员用例 **8.4 秒跑完且 PASS、零覆盖**。
   已在阶段交界处插硬断言（缺码 → `test.skip()` 显示 skipped 而非 passed）。
   **记录型工具报绿只说明它走完了，不说明它验到了** —— 复验时别拿这类脚本的绿当证据。
-- [ ] AI简历生成 → 预览/编辑 → PDF → 我的简历/我的文档可见。
-- [ ] 岗位匹配参考 → AI服务记录可见。
+- [ ] AI简历生成 → 预览/编辑 → PDF → 我的简历/我的文档可见。 —— 生产待验；**本地 PASS**（导出 201，我的文档 1→2）
+- [ ] 岗位匹配参考 → AI服务记录可见。 —— **本地未实测**：job-fit provider 未配置，端点如实回 503。另注意它走 `job_ai` 而非 `resume_ai` 授权，是有意的颗粒度设计，复验时要分别授权，别把它当缺陷。
 - [ ] 模拟面试 → 报告 → 「我的」模拟面试报告子区可见 → 可返回报告。
-- [ ] 删除 AI记录后不残留幽灵记录。
+- [ ] 删除 AI记录后不残留幽灵记录。 —— 生产待验；**本地 PASS，两处同验**
+  **只断言「列表里没有了」不够** —— 记录可能只是被列表查询过滤掉，直连 `GET /resume/records/:taskId` 仍读得到。
+  本地同时验：列表少一条 **且** 直连读取 404。阳性对照：对未删除的记录做同样直连读取回 200，
+  幽灵条件成立、断言会判 FAIL，**证明它分辨得了「删了」和「没删」**。生产复验建议照此两处同验。
 
 ### 4.3 打印/文件闭环
 
+> **2026-09-08 本地取证**：本节 4 条已在本地真实后端跑出运行期证据（11 项断言全 PASS，
+> 含阳性对照证明断言不恒真），明细见
+> [会员闭环运行期证据](../reviews/member-closure-runtime-evidence-2026-09-08.md) 的 §4.3 附录，
+> 脚本 `apps/kiosk/scripts/probe-file-closure-43.mjs`。
+> **本地 PASS 不等于可勾** —— 本地是 SQLite + 本地存储 + `AI_PROVIDER=mock`，与生产的
+> PostgreSQL + COS + 真实 LLM 不同构，本节要求的是生产或预生产域名上的真实浏览器验收。
+> 其余 6 条本地证不了的原因已在附录里逐条列出（Word 转换需 soffice、打印链路需 Agent 与打印机）。
+
+
 - [ ] 按 [用户文件与简历资产生产/试运营验收证据包](../acceptance/user-file-assets-trial-acceptance.md) 完成用户文件与简历资产证据包，留存命令日志、浏览器截图、COS 控制台截图、PostgreSQL 抽样和审计查询结果；不得以本地 SQLite/local storage verify 代替 PostgreSQL + COS + 会员账号真实验收。
-- [ ] 上传文件 → 我的文档可见。
-- [ ] 文档预览使用短期签名 URL。
-- [ ] 文档下载成功。
+- [ ] 上传文件 → 我的文档可见。 —— 生产待验；**本地 PASS**
+- [ ] 文档预览使用短期签名 URL。 —— 生产待验；**本地 PASS**（`sig` 存在、TTL 1800s ≤ 上限）
+- [ ] 文档下载成功。 —— 生产待验；**本地 PASS**（200 / 字节与原件一致 / `application/pdf`）
 - [ ] 再打印进入打印链路。
 - [ ] `.doc` / `.docx` 上传后仅在 capabilities `wordToPdf=true` 时允许「转 PDF / Word 预览 / Word 打印」；否则入口置灰并展示服务端返回的 reason。
 - [ ] Word 转换后的界面固定展示「由转换引擎生成，复杂版式可能有偏差，请预览核对」，用户确认预览后才进入打印建单。
 - [ ] Word 打印任务关联的是 `createdBy=document_conversion`、`assetCategory=derived`、`sourceFileId=原件` 的派生 PDF；Agent 下载 MIME 为 `application/pdf`，不直接下发 Word。
-- [ ] 删除文档后对象存储与数据库状态一致，删除审计存在。
+- [ ] 删除文档后对象存储与数据库状态一致，删除审计存在。 —— 生产待验；**本地 PASS**
+  本地还多验一条清单没写、但更该验的：**删除前已经铸出去的签名链接，删除后必须失效**（实测 404）。
+  只查「DB status 改成 deleted」的断言，对「字段改了但文件还能下」这种缺陷是瞎的。建议生产复验时照此加验。
 - [ ] 打印任务进入打印订单，状态展示正确。
 
 ### 4.4 岗位/招聘会/政策
 
 - [ ] 岗位列表/详情真实数据展示来源机构、同步时间、外部 ID。
-- [ ] 岗位收藏进入我的收藏。
-- [ ] 去来源平台投递只记录打开入口行为，不记录第三方后续结果。
-- [ ] 岗位浏览与外部入口打开在「我的」浏览与跳转记录可见，可删除。
+- [ ] 岗位收藏进入我的收藏。 —— 生产待验；**本地 PASS**（收藏 / 取消收藏均实测）
+- [ ] 去来源平台投递只记录打开入口行为，不记录第三方后续结果。 —— 生产待验；**本地 PASS，且已落成机械判据**
+  两条判据（见 `apps/kiosk/scripts/probe-activity-favorites-44.mjs`）：
+  ① `BrowseLog` / `ExternalJumpLog` 列名不得命中 `status|result|outcome|stage|applied|interview|offer|hired|progress`；
+  ② `ActivityJumpAction` 取值必须全是 `external_*` 打开语义。当前四个取值全部是「打开了外部入口」——
+  **`external_apply` 记的是「用户点开了来源平台的投递页」，不是「用户投递了」，这个区别就是许可证边界。**
+  已做阳性对照：同一条规则打在 `FileObject`（有 `status`）与 `PrintTask`（有 `status,printOutcome`）上都会判 FAIL，
+  证明它不是恒真断言。**合规类断言尤其需要阳性对照 —— 一条永远为真的合规断言，比没有断言更危险。**
+- [ ] 岗位浏览与外部入口打开在「我的」浏览与跳转记录可见，可删除。 —— 生产待验；**本地 PASS**（写入 → 可见 → 删除 → 不再可见，四步实测）
 - [ ] 招聘会详情真实数据可见。
-- [ ] 招聘会收藏进入我的收藏。
-- [ ] 招聘会浏览与外部预约入口打开在「我的」浏览与跳转记录可见，可删除。
+- [ ] 招聘会收藏进入我的收藏。 —— 生产待验；**本地 PASS**（`fair-hr-1k-2026q2` 实测）
+- [ ] 招聘会浏览与外部预约入口打开在「我的」浏览与跳转记录可见，可删除。 —— 生产待验；**本地 PASS**（`action=external_appointment`）
 - [ ] 招聘会资料打印进入我的文档 + 打印订单。
-- [ ] 政策收藏进入我的收藏。
+- [ ] 政策收藏进入我的收藏。 —— **本地未实测**：`PolicyPost` 夹具 0 行。拿合成 id 也能让端点回 200 凑出 PASS，但那证明的是「通道能收任意字符串」，不是「政策收藏可用」，所以不记。
 - [ ] 政策浏览与官方入口打开在「我的」浏览与跳转记录可见，可删除。
 - [ ] 政策材料打印仅在真实材料源启用后验收；当前 info-only 卡片不得伪造我的文档或打印订单。
 
@@ -551,7 +584,11 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 - [ ] LLM 真实调用成功，失败时有诚实错误提示。
 - [ ] OCR 图片/扫描 PDF 成功，低置信度提示复核。
 - [ ] ASR/TTS 在支持环境可用；失败时文字兜底可用。
-- [ ] 外部服务失败不伪造成功、不写入假结果。
+- [ ] 外部服务失败不伪造成功、不写入假结果。 —— 生产待验；**本地 PASS，且做了双配置对照**
+  脚本 `apps/kiosk/scripts/probe-ai-failure-honesty-45.mjs`。注入 provider 失败后：
+  接口 501 诚实报错、`AiResumeResult` 与 AI 产出文件均**零新增**、`AiServiceLog` 记 `parseResume/failed`。
+  **阳性对照**：换回可用 provider 后同样三条断言全部转红（201 / 结果行 +1 / 日志记 success）——
+  **两种配置给出相反结论，才证明它们分辨得了真假**。只跑失败态的话，一条恒真断言也会全绿。
 
 ---
 
