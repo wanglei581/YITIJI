@@ -307,7 +307,7 @@
 
 ### 8.2 生产路由全集（87 个 normalized patterns）
 
-- 系统与顶级页面：`/`、`/login`、`/member/qr-login`、`/upload/phone`、`/legal/:doc`、`/resume/job-fit`、`/resume/job-fit/actions`、`/resume/career-plan`、`/interview/setup`、`/interview/session`、`/interview/report`、`/interview/tips`、`/interview/reports`、`/screensaver`、`/session-timeout`、`/error-offline`。
+- 系统与顶级页面：`/`、`/login`、`/member/qr-login`、`/upload/phone`、`/legal/:doc`、`/resume/job-fit`、`/resume/job-fit/actions`、`/resume/career-plan`、`/interview`、`/interview/setup`、`/interview/session`、`/interview/report`、`/interview/tips`、`/interview/reports`、`/screensaver`、`/session-timeout`、`/error-offline`。
 - 助手、我的与公共入口：`/assistant`、`/profile`、`/me/resumes`、`/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/ai-records`、`/me/benefits`、`/me/activity`、`/me/activity/:id`、`/me/notifications`、`/me/feedback`、`/me/settings`、`/me/privacy-requests`、`/help`、`/activities`、`/activities/:id`、`/renshi`。
 - 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox`、`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
 - 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/desk`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/print/pickup-claim`、`/ai/plan`、`/session-resume`、`/jobs/online-platforms`。

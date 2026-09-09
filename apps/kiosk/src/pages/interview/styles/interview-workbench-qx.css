@@ -1,0 +1,74 @@
+/* 模拟面试工作台 · 青序流光
+ * 视觉真值：docs/design/kiosk-redesign-2026-08/29-interview-training.html
+ * 地基按钮 / 卡片 / 操作条不在这里重复。
+ */
+
+[data-qx-interview] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  flex: 1;
+}
+
+[data-qx-interview] .interview-flow__scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+[data-qx-interview] .interview-card {
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  border-radius: 29px;
+}
+
+[data-qx-interview] .interview-option {
+  min-height: var(--qx-tap-min);
+  border-radius: 18px;
+  border: 1.5px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-size: 19px;
+  font-weight: 800;
+}
+[data-qx-interview] .interview-option[aria-pressed='true'] {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+
+[data-qx-interview] .interview-rail {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 15px 20px;
+  border: 1px dashed var(--qx-line-2);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--qx-deep) 3.5%, transparent);
+  color: var(--qx-ink-3);
+  font-size: 17px;
+}
+[data-qx-interview] .interview-rail span::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--qx-teal-d);
+  font-weight: 800;
+}
+
+[data-qx-interview] .interview-setup-fallback {
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+}
+
+[data-qx-interview] em {
+  font-style: normal;
+  color: var(--qx-teal-d);
+}
+
+[data-qx-frame='true'] h1 em {
+  font-style: normal;
+  color: var(--qx-emerald);
+}
