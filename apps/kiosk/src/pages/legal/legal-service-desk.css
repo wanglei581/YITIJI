@@ -48,3 +48,16 @@
   .k1-legal-doc .legal-doc-body { padding: 22px 20px 28px; }
 }
 @media (prefers-reduced-motion: reduce) { .k1-legal-doc .legal-doc-body { scroll-behavior: auto; } }
+
+/* 读不到服务端正式版本时的显式提示。必须与正文明显区分——它此前和正式版
+   长得一模一样，用户无从分辨。配色沿用本页告警色，不新增令牌。 */
+.k1-legal-doc .legal-doc-fallback-warning {
+  margin: 0 0 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--color-warning-300, var(--color-neutral-300));
+  border-radius: 14px;
+  background: var(--color-warning-50, var(--color-neutral-50));
+  color: var(--color-warning-800, var(--color-neutral-700));
+  font-size: 17px;
+  line-height: 1.7;
+}
