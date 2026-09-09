@@ -224,6 +224,7 @@ test('conversion success stays on the page until the print CTA and does not clai
         fileMd5: 'e'.repeat(32),
         sizeBytes: 2048,
         pages: 1,
+        hasEndUser: false,
       },
     },
   })

@@ -25,4 +25,10 @@ export interface ConvertImagesResponse {
   fileMd5: string
   sizeBytes: number
   pages: number
+  /**
+   * 本次结果是否绑定了会员。
+   * 前端必须读这个字段，不能用本机 token 自行判断：`resolveOptionalEndUser`
+   * 对过期/无效 JWT 和 Redis 会话不匹配静默 return null，转换仍成功且 endUserId 落 null。
+   */
+  hasEndUser: boolean
 }
