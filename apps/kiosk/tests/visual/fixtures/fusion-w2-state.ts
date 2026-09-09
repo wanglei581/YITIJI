@@ -87,3 +87,17 @@ export async function seedMaterialSession(page: Page): Promise<void> {
     { key: MATERIAL_SESSION_KEY, value: MATERIAL_SESSION_VALUE },
   )
 }
+
+export const SCAN_WORKBENCH_SESSION_KEY = 'ai-job-print:current-scan-workbench'
+
+export async function writeScanWorkbenchSession(
+  page: Page,
+  session: Record<string, unknown>,
+): Promise<void> {
+  await page.evaluate(
+    ({ key, value }) => {
+      window.sessionStorage.setItem(key, JSON.stringify(value))
+    },
+    { key: SCAN_WORKBENCH_SESSION_KEY, value: session },
+  )
+}

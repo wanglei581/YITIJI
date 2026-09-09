@@ -148,6 +148,57 @@ async function main(): Promise<void> {
     if ((await auditCount()) === auditsBeforeRejectedPaths) pass('全部拒绝路径零新增审计')
     else fail('rejected paths wrote audits')
 
+
+    // (4c) 描述与实际单价必须自洽。
+    // 2026-09-09 生产实测：彩色 unitCents=100（1.00 元/页），描述仍是上一轮免费试
+    // 运营时期的「免费试运营：彩色打印 0 元/页」—— 价格改对了，描述没跟着改，
+    // 而管理后台价目表照原样显示描述，下一个改价的人会照着错的那句决策。
+    await expectCode(
+      '描述写 0 元、实价非 0 → 拒绝（生产原样复现）',
+      'PRICE_DESCRIPTION_CONTRADICTS_AMOUNT',
+      () => billing.updatePriceConfig(
+        'print_color_page',
+        { unitCents: 100, description: '免费试运营：彩色打印 0 元/页' },
+        operatorId,
+      ),
+    )
+    // 只改价、描述留着旧的 —— 正是生产那次的动作，同样必须被拦下
+    await prisma.priceConfig.update({
+      where: { serviceKey: 'print_color_page' },
+      data: { description: '免费试运营：彩色打印 0 元/页', unitCents: 0 },
+    })
+    await expectCode(
+      '只改价不改描述 → 拒绝（描述是上一轮留下的）',
+      'PRICE_DESCRIPTION_CONTRADICTS_AMOUNT',
+      () => billing.updatePriceConfig('print_color_page', { unitCents: 100 }, operatorId),
+    )
+    // 放行侧：一个都不能少验，否则等于把改价焊死
+    {
+      const okDesc = await billing.updatePriceConfig(
+        'print_color_page',
+        { unitCents: 100, description: '彩色打印 1 元/页' },
+        operatorId,
+      )
+      if (okDesc.unitCents === 100) pass('描述与实价一致 → 放行')
+      else fail(`一致场景被拒或写错: ${JSON.stringify(okDesc)}`)
+
+      const noAmount = await billing.updatePriceConfig(
+        'print_color_page',
+        { description: '彩色打印每页（正式价）' },
+        operatorId,
+      )
+      if (noAmount.description === '彩色打印每页（正式价）') pass('描述不写金额 → 不受本校验约束')
+      else fail(`无金额描述被拒: ${JSON.stringify(noAmount)}`)
+
+      const multi = await billing.updatePriceConfig(
+        'print_color_page',
+        { description: '原价 2 元/页，现 1 元/页' },
+        operatorId,
+      )
+      if (multi.description?.includes('现 1 元')) pass('多个金额里有一个对得上 → 放行（判据故意留松）')
+      else fail(`多金额描述被误拒: ${JSON.stringify(multi)}`)
+    }
+
     // (4b) 0 元确认必须说出**组合后果**，不只说「这一项会跳过收银」。
     // 2026-09-08 生产实测：黑白 50 分 / 彩色 0 分，且描述是人为配的 ——
     // 说明当时确认的人只看到单项后果，没看到「另一档还在收费，用户会一直选免费那档」。

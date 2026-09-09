@@ -592,7 +592,7 @@ test.describe('真人走查（模拟数据）', () => {
 
     const BACK = /^(首页|AI ?顾问|我的)$|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
     for (let hop = 0; hop < 5; hop += 1) {
-      const before = new URL(page.url()).pathname
+      const before = page.url()
       const cands = await page.locator('button:visible').evaluateAll((els) =>
         els.map((e, i) => ({ i, t: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), dis: (e as HTMLButtonElement).disabled === true })),
       )
@@ -603,11 +603,11 @@ test.describe('真人走查（模拟数据）', () => {
       await page.locator('button:visible').nth(pick.i).click()
       await page.waitForTimeout(3200)
       await step(page, s, `F-hop${hop + 1}`)
-      if (new URL(page.url()).pathname === before) { console.log(`    ⚠ 点了「${pick.t}」仍停在 ${before}`); break }
+      if (page.url() === before) { console.log(`    ⚠ 点了「${pick.t}」仍停在 ${before}`); break }
     }
     // 进度页在等设备。真人此时会站着等 —— 让轮询走到「已完成」，看它是否自动进结果页。
-    if (new URL(page.url()).pathname === '/scan/progress') {
-      await page.waitForURL((u) => u.pathname === '/scan/result', { timeout: 30000 }).catch(() => {})
+    if (new URL(page.url()).searchParams.get('stage') === 'progress') {
+      await page.waitForURL((u) => u.searchParams.get('stage') === 'result', { timeout: 30000 }).catch(() => {})
       await page.waitForTimeout(2000)
       await step(page, s, 'F-scan-done')
     }

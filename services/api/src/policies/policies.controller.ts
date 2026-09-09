@@ -15,7 +15,7 @@ import {
 } from './dto/policy.dto'
 import { POLICY_RULE_MANUAL_MODE, type PolicyRuleMatchMode } from './policy-eligibility.types'
 import { ReviewActionDto } from '../jobs/dto/review.dto'
-import { PublishActionDto } from '../jobs/dto/publish.dto'
+import { PartnerUnpublishActionDto, PublishActionDto } from '../jobs/dto/publish.dto'
 
 /**
  * 政策服务(阶段1D)。
@@ -216,7 +216,7 @@ export class PoliciesController {
   @Patch('partner/policies/:id/publish')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  unpublishPartnerPolicy(@Param('id') id: string, @Body() _dto: PublishActionDto, @CurrentUser() user: AuthedUser) {
+  unpublishPartnerPolicy(@Param('id') id: string, @Body() _dto: PartnerUnpublishActionDto, @CurrentUser() user: AuthedUser) {
     return this.policies.unpublishPartnerPolicy(id, user)
   }
 

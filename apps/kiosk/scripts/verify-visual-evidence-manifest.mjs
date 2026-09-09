@@ -136,8 +136,8 @@ if (contract && routeManifest) {
 
   check('frozen route inventory matches runtime route declarations', () => {
     const declared = declaredRoutePatterns(routeSourcePath)
-    assert.equal(declared.length, 108, 'runtime route declaration count')
-    assert.equal(new Set(declared).size, 108, 'runtime route declarations must be unique')
+    assert.equal(declared.length, 109, 'runtime route declaration count')
+    assert.equal(new Set(declared).size, 109, 'runtime route declarations must be unique')
     assert.deepEqual(sorted(declared), sorted(productionRoutePatterns))
   })
 
@@ -205,8 +205,8 @@ if (contract && routeManifest) {
     assert.deepEqual(byId.get('73')?.routeOrState, ['/assistant#voice-gate'])
     assert.deepEqual(byId.get('73')?.captureUrls, ['/assistant'])
     assert.equal(byId.get('73')?.prototypePath, 'docs/design/kiosk-proto-2026-07/73-assistant-call.html')
-    assert.deepEqual(byId.get('34A')?.routeOrState, ['/scan/start#pre-session', '/scan/settings#session-create-failed'])
-    assert.deepEqual(byId.get('34A')?.captureUrls, ['/scan/start', '/scan/settings'])
+    assert.deepEqual(byId.get('34A')?.routeOrState, ['/scan#pre-session', '/scan#session-create-failed'])
+    assert.deepEqual(byId.get('34A')?.captureUrls, ['/scan', '/scan'])
     assert.deepEqual(byId.get('34A')?.capturePairs.map(({ captureKey }) => captureKey), ['scan-start', 'scan-settings'])
     assert.deepEqual(byId.get('34A')?.capturePairs.map(({ readyMarker }) => readyMarker), [
       '[data-w2-page="scan-start"]:has-text("本页尚未创建任务")',
@@ -217,12 +217,13 @@ if (contract && routeManifest) {
     assert.match(byId.get('34A')?.knownLimits ?? '', /no scanner-status knowledge/i)
   })
 
-  check('108 routes each have exactly one disposition', () => {
+  check('109 routes each have exactly one disposition', () => {
     assert.ok(Array.isArray(routeEvidenceDispositions), 'routeEvidenceDispositions must be an array')
-    assert.equal(routeEvidenceDispositions.length, 108, 'route disposition count')
+    assert.equal(routeEvidenceDispositions.length, 109, 'route disposition count')
     const patterns = routeEvidenceDispositions.map(({ routePattern }) => routePattern)
-    assert.equal(new Set(patterns).size, 108, 'route dispositions must be unique')
-    assert.deepEqual(sorted(patterns), sorted(productionRoutePatterns), 'route disposition inventory must equal the frozen 107-route manifest')
+    assert.equal(new Set(patterns).size, 109, 'route dispositions must be unique')
+    assert.deepEqual(sorted(patterns), sorted(productionRoutePatterns), 'route disposition inventory must equal the frozen 109-route manifest')
+
     for (const disposition of routeEvidenceDispositions) {
       const label = `route ${disposition.routePattern}`
       assert.ok(allowedReferenceKinds.has(disposition.referenceKind), `${label} referenceKind ${disposition.referenceKind}`)
@@ -247,15 +248,16 @@ if (contract && routeManifest) {
     }
   })
 
-  check('fourteen redirects never create visual pairs', () => {
+  check('eighteen redirects never create visual pairs', () => {
     const expectedRedirects = Object.entries(compatibilityRedirects)
     // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
     // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
-    // 2026-09-08：打印台合并，材料检查 / 预览改为重定向，由 7 增至 9；
-    // 2026-09-08：面试工作台合并，五条旧面试路由改为重定向，由 9 增至 14。
-    assert.equal(expectedRedirects.length, 14, 'frozen redirect count')
+    // 2026-09-08 三次工作台合并：打印台把材料检查 / 预览改为重定向，由 7 增至 9；
+    //   面试工作台把五条旧面试路由改为重定向，由 9 增至 14；
+    //   扫描工作台再把四条改为重定向，由 14 增至 18。
+    assert.equal(expectedRedirects.length, 18, 'frozen redirect count')
     const redirects = routeEvidenceDispositions.filter(({ referenceKind }) => referenceKind === 'REDIRECT')
-    assert.equal(redirects.length, 14, 'evidence redirect count')
+    assert.equal(redirects.length, 18, 'evidence redirect count')
     for (const [source, destination] of expectedRedirects) {
       const disposition = redirects.find(({ routePattern }) => routePattern === source)
       assert.ok(disposition, `missing redirect disposition ${source}`)
@@ -286,7 +288,7 @@ if (contract && routeManifest) {
     const scannerOfflineRoutes = routeEvidenceDispositions
       .filter(({ targetIds }) => targetIds.includes('34A'))
       .map(({ routePattern }) => routePattern)
-    assert.deepEqual(sorted(scannerOfflineRoutes), ['/scan/settings', '/scan/start'])
+    assert.deepEqual(sorted(scannerOfflineRoutes), ['/scan'])
   })
 }
 

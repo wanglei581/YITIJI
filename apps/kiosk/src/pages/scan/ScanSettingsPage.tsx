@@ -21,6 +21,12 @@ import {
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanStage } from './scanWorkbenchModel'
+import {
+  patchScanWorkbenchSession,
+  readScanWorkbenchSession,
+  type ScanLiveState,
+} from './scanWorkbenchSession'
 
 function isScanType(value: unknown): value is ScanType {
   return value === 'resume' || value === 'id' || value === 'document'
@@ -64,25 +70,41 @@ function formatCountdown(expiresAt: string): string {
   return `${minutes}:${String(remain).padStart(2, '0')}`
 }
 
-export function ScanSettingsPage() {
+function liveSessionStillValid(live: ScanLiveState | undefined): live is ScanLiveState {
+  if (!live) return false
+  return Date.parse(live.expiresAt) > Date.now() && live.instructions.length > 0
+}
+
+export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as LocationState
-  const scanType = isScanType(state.scanType) ? state.scanType : null
+  const stored = readScanWorkbenchSession()
+  const storedType = stored?.scanType
+  const storedLive = stored?.live
+  const scanType = isScanType(state.scanType)
+    ? state.scanType
+    : isScanType(storedType)
+      ? storedType
+      : null
+  const restoredLive = liveSessionStillValid(storedLive) ? storedLive : null
 
-  const [phase, setPhase] = useState<SessionPhase>(scanType ? 'loading' : 'invalid')
+  const [phase, setPhase] = useState<SessionPhase>(
+    restoredLive && scanType ? 'success' : scanType ? 'loading' : 'invalid',
+  )
   const [failure, setFailure] = useState<SessionFailure | null>(null)
-  const [instructions, setInstructions] = useState<string[] | null>(null)
+  const [instructions, setInstructions] = useState<string[] | null>(restoredLive?.instructions ?? null)
   const [starting, setStarting] = useState(false)
-  const [scanTaskId, setScanTaskId] = useState<string | null>(null)
-  const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [scanTaskId, setScanTaskId] = useState<string | null>(restoredLive?.scanTaskId ?? null)
+  const [expiresAt, setExpiresAt] = useState<string | null>(restoredLive?.expiresAt ?? null)
   const [countdown, setCountdown] = useState('--:--')
-  const [controlToken, setControlToken] = useState<string | null>(null)
+  const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
 
   const confirmedRef = useRef(false)
-  const createdIdRef = useRef<string | null>(null)
-  const controlTokenRef = useRef<string | null>(null)
+  const createdIdRef = useRef<string | null>(restoredLive?.scanTaskId ?? null)
+  const controlTokenRef = useRef<string | null>(restoredLive?.controlToken ?? null)
+  const skipCreateRef = useRef(Boolean(restoredLive && scanType))
   const sessionPromiseRef = useRef<Promise<ScanSessionCreateResponse> | null>(null)
   const generationRef = useRef(0)
   const cancelRequestedRef = useRef(false)
@@ -99,6 +121,7 @@ export function ScanSettingsPage() {
 
   useEffect(() => {
     if (!scanType) return
+    if (skipCreateRef.current) return
 
     const myGeneration = ++generationRef.current
     let cancelled = false
@@ -142,6 +165,16 @@ export function ScanSettingsPage() {
         setControlToken(created.controlToken)
         setExpiresAt(created.expiresAt)
         setPhase('success')
+        patchScanWorkbenchSession({
+          stage: 'settings',
+          scanType,
+          live: {
+            scanTaskId: created.scanTaskId,
+            controlToken: created.controlToken,
+            instructions: created.instructions,
+            expiresAt: created.expiresAt,
+          },
+        })
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -214,6 +247,11 @@ export function ScanSettingsPage() {
     if (createdIdRef.current && controlTokenRef.current && !confirmedRef.current) {
       cancelSessionOnce(createdIdRef.current, controlTokenRef.current)
     }
+    patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
+    if (onGoStage) {
+      onGoStage('start')
+      return
+    }
     navigate('/scan/start')
   }
 
@@ -221,6 +259,20 @@ export function ScanSettingsPage() {
     if (!scanType || !scanTaskId || !controlToken || starting) return
     confirmedRef.current = true
     setStarting(true)
+    patchScanWorkbenchSession({
+      stage: 'progress',
+      scanType,
+      live: {
+        scanTaskId,
+        controlToken,
+        instructions: instructions ?? [],
+        expiresAt: expiresAt ?? new Date().toISOString(),
+      },
+    })
+    if (onGoStage) {
+      onGoStage('progress')
+      return
+    }
     navigate('/scan/progress', { state: { scanTaskId, scanType, controlToken } })
   }
 
@@ -359,7 +411,7 @@ export function ScanSettingsPage() {
               ['任务编号', scanTaskId],
               ['剩余时间', countdown],
               ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-              ['控制凭证', '只在页面内存里，不上屏、不进链接、不落存储'],
+              ['控制凭证', '不上屏、不进链接；本次一体机会话内存里，换人清场会清掉'],
             ]}
           />
           <ScanNoteCard title="按完面板之后" foot={<><ClockIcon size={16} aria-hidden /> 任务剩余 {countdown}。仅当前会话有效。点击返回会取消这个未确认的任务。</>}>

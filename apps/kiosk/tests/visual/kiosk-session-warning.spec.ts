@@ -130,13 +130,29 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
   await page.waitForURL((url) => url.pathname === returnTo)
 }
 
+test('image-to-pdf editing warns that unsaved work is lost, not the generic clear copy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  // /print-scan/convert 上放着用户已经挑好、还没转换的图片。它不在 /print /scan 域内
+  // （/print-scan 是另一个前缀），也不在 /resume /interview 里，以前会落到
+  // 「登录状态和本机临时会话将清除」——那句话没提用户会丢掉刚挑的图。
+  registerKioskShell(api, { screensaverEnabled: false })
+  await page.goto('/print-scan/convert')
+  await expectWarningWithinThreeSeconds(page)
+  await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
+  await expect(page.getByText('登录状态和本机临时会话将清除', { exact: true })).toHaveCount(0)
+})
+
 test('hardware warning tells anonymous users that background work continues without recovery', async ({
   page,
   api,
 }) => {
   registerKioskShell(api, { screensaverEnabled: false })
   await page.goto('/scan/start')
-  await expect(page).toHaveURL(/\/scan\/start$/)
+  // 连 stage 一起钉：光认 /scan 的话，兼容重定向丢掉 ?stage=start、把用户扔回
+  // 工作台默认步骤，这里也会算通过。
+  await expect(page).toHaveURL(/\/scan\?stage=start$/)
 
   // Assert real page rendered (not a wildcard error page)
   await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
@@ -172,7 +188,7 @@ test('ordinary idle warns before clearing and can resume the previous route', as
   await expect(page).toHaveURL(/\/interview\?stage=tips/)
 
   await expectWarningWithinThreeSeconds(page)
-  await expect(page.getByText('未保存的填写内容或练习内容会清除', { exact: true })).toBeVisible()
+  await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '继续使用', exact: true }).click()
 
   await expect(page).toHaveURL(/\/interview\?stage=tips/)
@@ -276,7 +292,7 @@ test('refreshing a warning fails closed instead of restoring the previous task',
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
-  await expect(page.getByText('未保存的填写内容或练习内容会清除', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toHaveCount(0)
 })
 
 test('immediate exit hard-clears the session and blocks back-forward task recovery', async ({
@@ -583,20 +599,23 @@ async function gotoScanProgressWithHistory(
   page: Page,
   options: ScanBusyOptions,
 ): Promise<void> {
-  await page.goto('/')
+  await page.goto('/scan')
   await page.evaluate(
-    ({ state }) => {
-      window.history.pushState({ usr: state, key: 'scan-busy-route', idx: 1 }, '', '/scan/progress')
-    },
-    {
-      state: {
-        scanTaskId: options.scanTaskId,
+    ({ taskId, token }) => {
+      window.sessionStorage.setItem('ai-job-print:current-scan-workbench', JSON.stringify({
+        stage: 'progress',
         scanType: 'resume',
-        controlToken: options.controlToken,
-      },
+        live: {
+          scanTaskId: taskId,
+          controlToken: token,
+          instructions: ['放好原件'],
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }))
     },
+    { taskId: options.scanTaskId, token: options.controlToken },
   )
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.goto('/scan?stage=progress')
 }
 
 async function expectNoWarningWithin(
@@ -613,20 +632,9 @@ test('scan busy stays released when the scan task id is missing @scan-busy @warn
   api,
 }) => {
   registerKioskShell(api)
-  await page.goto('/')
-  await page.evaluate(
-    ({ token }) => {
-      window.history.pushState(
-        { usr: { scanType: 'resume', controlToken: token }, key: 'scan-busy-missing-id', idx: 1 },
-        '',
-        '/scan/progress',
-      )
-    },
-    { token: SCAN_CONTROL_TOKEN },
-  )
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.goto('/scan?stage=progress')
 
-  // 缺少 scanTaskId 时,组件第一时间 navigate('/scan/start');busy 的作用是
+  // 缺少扫描会话时，工作台把 ?stage=progress 按回 start；busy 的作用是
   // 抑制空闲警告(suppresses idle warning),不会拦截路由跳转。E2E 这一组测试
   // 要锁住的是用户可见的承诺:身份不完整时,idle 计时器继续工作,提示用户在
   // 3s 内弹出 /session-timeout。不去对内部 active===false 这种实现细节
@@ -639,18 +647,18 @@ test('scan busy stays released when the scan control token is missing @scan-busy
   api,
 }) => {
   registerKioskShell(api)
-  await page.goto('/')
+  await page.goto('/scan')
   await page.evaluate(
     ({ taskId }) => {
-      window.history.pushState(
-        { usr: { scanType: 'resume', scanTaskId: taskId }, key: 'scan-busy-missing-token', idx: 1 },
-        '',
-        '/scan/progress',
-      )
+      window.sessionStorage.setItem('ai-job-print:current-scan-workbench', JSON.stringify({
+        stage: 'progress',
+        scanType: 'resume',
+        live: { scanTaskId: taskId, controlToken: '', instructions: ['放好原件'], expiresAt: '2099-01-01T00:00:00.000Z' },
+      }))
     },
     { taskId: SCAN_TASK_ID },
   )
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.goto('/scan?stage=progress')
 
   await expectWarningWithinThreeSeconds(page)
 })
@@ -677,7 +685,7 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
   // /session-timeout 必然在这窗口内弹。窗口长度是回归测试粒度的选择,
   // 跟组件里 POLL_INTERVAL_MS=3000 没有一一对应关系。
   await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
-  await expect(page).toHaveURL(/\/scan\/progress$/)
+  await expect(page).toHaveURL(/\/scan\?stage=progress/)
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   expect(waitingCount.statusRequests()).toBeGreaterThanOrEqual(1)
   expect(waitingCount.deleteRequests()).toBe(0)
@@ -692,7 +700,7 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
     status: 'processing',
   })
   await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
-  await expect(page).toHaveURL(/\/scan\/progress$/)
+  await expect(page).toHaveURL(/\/scan\?stage=progress/)
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   expect(processingCount.statusRequests()).toBeGreaterThanOrEqual(1)
 
@@ -702,7 +710,7 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
     networkError: true,
   })
   await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
-  await expect(page).toHaveURL(/\/scan\/progress$/)
+  await expect(page).toHaveURL(/\/scan\?stage=progress/)
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   expect(networkRetryCount.statusRequests()).toBeGreaterThanOrEqual(1)
   expect(networkRetryCount.deleteRequests()).toBe(0)
@@ -729,7 +737,7 @@ test('completed poll status navigates to /scan/result without sending DELETE @sc
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
   })
-  await expect(page).toHaveURL(/\/scan\/result$/, { timeout: 6_000 })
+  await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   // 终态由 poll 触发,页面走 unmount 而非 handleCancel,DELETE 不应被发送。
   expect(counts.deleteRequests()).toBe(0)
@@ -749,7 +757,7 @@ test('expired poll status navigates to /scan/result without sending DELETE @scan
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
   })
-  await expect(page).toHaveURL(/\/scan\/result$/, { timeout: 6_000 })
+  await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(counts.deleteRequests()).toBe(0)
 })
@@ -768,7 +776,7 @@ test('failed poll status navigates to /scan/result without sending DELETE @scan-
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
   })
-  await expect(page).toHaveURL(/\/scan\/result$/, { timeout: 6_000 })
+  await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(counts.deleteRequests()).toBe(0)
 })
@@ -787,7 +795,7 @@ test('server-cancelled poll status navigates back to /scan/start without sending
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
   })
-  await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
+  await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(counts.deleteRequests()).toBe(0)
 })
@@ -812,7 +820,7 @@ test('explicit user cancel sends exactly one DELETE before navigating away @scan
   const deleteBefore = cancelCounts.deleteRequests()
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
 
-  await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
+  await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   // 每次 install 都 unroute 旧 handler,所以 cancelCounts 严格只数这一次
   // install 内收到的 DELETE 流量;不需要再去手工减去历史基准。
@@ -843,7 +851,7 @@ test('user cancel with a failing DELETE sends exactly one attempt and falls back
   // DELETE 抛错 → catch 走默认 fallback,busy 在 effect 渲染后释放,
   // 落地到 /scan/start。/scan/start 上 idle 计时器重新开始,3s 内
   // /session-timeout 弹出。
-  await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
+  await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
 })

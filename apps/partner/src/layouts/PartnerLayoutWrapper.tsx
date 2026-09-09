@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { ContentTrustBanner } from '../components/ContentTrustBanner'
 import { PartnerLayout, type NavItem } from '@ai-job-print/ui'
 import { useEffect, useState } from 'react'
 import {
@@ -170,6 +171,11 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
         </div>
       }
     >
+      {/* 合作机构没有「发布」动作（partner 的 /publish 路由实际只下架），内容上架由管理员
+          执行、并受「内容可信」闸门约束。未核验时机构会看到「审核通过了但终端上没有」而
+          得不到原因 —— 这条横幅补的就是原因与该找谁。挂布局层：三个管理页各 500+ 行，
+          逐页塞会漂移、新增页会漏。 */}
+      <ContentTrustBanner />
       <Outlet />
     </PartnerLayout>
   )

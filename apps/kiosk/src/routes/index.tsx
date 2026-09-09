@@ -23,10 +23,7 @@ import { JobsPage } from '../pages/jobs/JobsPage'
 import { CompaniesPage } from '../pages/companies/CompaniesPage'
 import { CompanyDetailPage } from '../pages/companies/CompanyDetailPage'
 import { JobDetailPage } from '../pages/jobs/JobDetailPage'
-import { ScanStartPage } from '../pages/scan/ScanStartPage'
-import { ScanSettingsPage } from '../pages/scan/ScanSettingsPage'
-import { ScanProgressPage } from '../pages/scan/ScanProgressPage'
-import { ScanResultPage } from '../pages/scan/ScanResultPage'
+import { ScanWorkbenchPage } from '../pages/scan/ScanWorkbenchPage'
 import { PrintUploadPage } from '../pages/print/PrintUploadPage'
 import { PrintDeskPage } from '../pages/print/PrintDeskPage'
 import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
@@ -251,10 +248,14 @@ export const kioskRouter = createBrowserRouter([
       { path: 'resume/templates',  element: <ResumeTemplateLibraryPage /> },
       { path: 'resume/materials',   element: <JobMaterialLibraryPage /> },
       // 扫描流程（Phase 3）
-      { path: 'scan/start',        element: <ScanStartPage /> },
-      { path: 'scan/settings',     element: <ScanSettingsPage /> },
-      { path: 'scan/progress',     element: <ScanProgressPage /> },
-      { path: 'scan/result',       element: <ScanResultPage /> },
+      { path: 'scan', element: <ScanWorkbenchPage /> },
+      // 2026-09-08 下线：青序流光 18-scan-workbench 把选类型 / 建会话 / 等待回传 / 结果
+      // 画成同一工作台的阶段。旧地址可能被收藏夹 / 二维码 / 外部链接引用，保留 replace 重定向。
+      // `?stage=` 是意图不是授权：没有扫描会话落到 progress/result 仍由前置条件拦下。
+      { path: 'scan/start',    element: <Navigate to="/scan?stage=start" replace /> },
+      { path: 'scan/settings', element: <Navigate to="/scan?stage=settings" replace /> },
+      { path: 'scan/progress', element: <Navigate to="/scan?stage=progress" replace /> },
+      { path: 'scan/result',   element: <Navigate to="/scan?stage=result" replace /> },
       // 岗位 / 招聘会（Phase 4）
       { path: 'jobs',                                  element: <JobsPage /> },
       { path: 'jobs/:id',                              element: <JobDetailPage /> },

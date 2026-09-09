@@ -667,18 +667,23 @@ test('hard clear stops active scan polling without cancelling the backend task @
     })
   })
 
-  await page.goto('/')
+  await page.goto('/scan')
   await page.evaluate(
     ({ taskId, controlToken }) => {
-      window.history.pushState(
-        { usr: { scanTaskId: taskId, scanType: 'resume', controlToken }, key: 'privacy-scan', idx: 1 },
-        '',
-        '/scan/progress',
-      )
+      window.sessionStorage.setItem('ai-job-print:current-scan-workbench', JSON.stringify({
+        stage: 'progress',
+        scanType: 'resume',
+        live: {
+          scanTaskId: taskId,
+          controlToken,
+          instructions: ['放好原件'],
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }))
     },
     { taskId: SCAN_TASK_ID, controlToken: SCAN_CONTROL_TOKEN },
   )
-  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.goto('/scan?stage=progress')
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   await expect.poll(() => pollRequests).toBeGreaterThan(0)
   await markCurrentDocument(page, 'scan-progress-document')
@@ -721,13 +726,9 @@ test('hard clear does not cancel a created scan settings session @privacy-kiosk'
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
   })
 
-  await page.goto('/')
+  await page.goto('/scan')
   await page.evaluate(() => {
-    window.history.pushState(
-      { usr: { scanType: 'resume' }, key: 'privacy-scan-settings', idx: 1 },
-      '',
-      '/scan/settings',
-    )
+    window.history.replaceState({ usr: { scanType: 'resume' }, key: 'privacy-scan-settings', idx: 0 }, '', '/scan?stage=settings')
   })
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()

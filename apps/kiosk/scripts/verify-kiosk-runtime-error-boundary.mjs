@@ -60,7 +60,7 @@ for (const path of [
   '/print/upload',
   '/print/desk',
   '/print/material-check', '/print/preview', '/print/confirm',
-  '/print/cashier', '/print/progress', '/scan/start', '/scan/settings',
+  '/print/cashier', '/print/progress', '/scan', '/scan/start', '/scan/settings',
   '/scan/progress', '/scan/result', '/print-scan/convert', '/print-scan/sign',
   '/resume/source', '/resume/generate', '/resume/generate/preview', '/resume/report',
 ]) {

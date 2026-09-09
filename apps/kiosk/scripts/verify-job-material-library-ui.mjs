@@ -98,6 +98,8 @@ assertContains('src/auth/kioskSensitiveSession.ts', 'clearSelfAssessmentSession(
 assertContains('src/auth/kioskSensitiveSession.ts', 'SELF_ASSESSMENT_SESSION_KEY', 'Self-assessment sessionStorage key is registered for leftover detection')
 assertContains('src/auth/kioskSensitiveSession.ts', 'clearInterviewWorkbenchSession()', 'Sensitive session cleanup clears interview workbench session')
 assertContains('src/auth/kioskSensitiveSession.ts', 'INTERVIEW_WORKBENCH_SESSION_KEY', 'Interview workbench sessionStorage key is registered for leftover detection')
+assertContains('src/auth/kioskSensitiveSession.ts', 'clearScanWorkbenchSession()', 'Sensitive session cleanup clears scan workbench session')
+assertContains('src/auth/kioskSensitiveSession.ts', 'SCAN_WORKBENCH_SESSION_KEY', 'Scan workbench sessionStorage key is registered for leftover detection')
 assertContains('src/auth/kioskSensitiveSession.ts', 'clearKioskSharedDeviceResidue', 'Kiosk exposes shared-device residue cleanup for guest local favorites')
 assertContains('src/auth/kioskSensitiveSession.ts', 'hasLocalFavorites()', 'Leftover detection includes guest local favorites')
 assertContains('src/auth/AuthContext.tsx', 'clearKioskSharedDeviceResidue()', 'Logout clears guest local favorites so the next visitor cannot see them')

@@ -537,12 +537,23 @@ export async function seedScanProgress(page: Page, api: ApiRouter): Promise<void
       },
     },
   })
-  await page.goto('/scan/progress')
-  await setReactRouterState(page, '/scan/progress', {
-    scanTaskId,
-    scanType: 'resume',
-    controlToken,
-  })
+  await page.goto('/scan')
+  await page.evaluate(
+    ({ taskId, token }) => {
+      window.sessionStorage.setItem('ai-job-print:current-scan-workbench', JSON.stringify({
+        stage: 'progress',
+        scanType: 'resume',
+        live: {
+          scanTaskId: taskId,
+          controlToken: token,
+          instructions: ['放好原件'],
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+      }))
+    },
+    { taskId: scanTaskId, token: controlToken },
+  )
+  await page.goto('/scan?stage=progress')
 }
 
 export async function openLoginVerificationError(page: Page, api: ApiRouter): Promise<void> {
