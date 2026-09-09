@@ -7,8 +7,11 @@ import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
  * 模拟面试域外壳：青序流光 QxPageFrame + 共享 QxAppNavbar。
  * 舞台缩放由 KioskRoot 的 KioskStageFit 负责，本壳不再套 KioskFullscreenShell。
  *
- * TODO(PR #955): QxPageFrame 的 back 槽合入后，顶栏返回指向 /interview-service。
- * 当前 main 上的 QxPageFrame 没有 back prop，不在本文件另写一份。
+ * 顶栏返回照稿 29-interview-training.html：`<a class="back" href="16-service-hubs.html?hub=interview"
+ * aria-label="返回面试服务">`，对应运行时 /interview-service。
+ *
+ * 接在壳里而不是逐页传：QxPageFrame 的 `back` 是可选 prop，不传就没有返回键、
+ * 也不会有任何报错。五个屏各传一次就是五次漏传的机会。
  */
 export function InterviewShell({
   title,
@@ -31,6 +34,7 @@ export function InterviewShell({
       title={title}
       subtitle={subtitle}
       status={status ?? { tone: 'ok', label: '模拟练习' }}
+      back={{ label: '返回面试服务', onBack: () => navigate('/interview-service') }}
       terminalLabel="就业服务大厅"
       ctabar={ctabar}
       navbar={
