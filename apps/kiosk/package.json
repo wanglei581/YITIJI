@@ -118,7 +118,7 @@
     "test:browser:scan-safety": "playwright test --config=playwright.scan-safety.config.ts",
     "verify:kiosk-browser-spec-coverage": "node scripts/verify-browser-spec-coverage.mjs",
     "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs",
-    "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs",
+    "verify:qingxu-proto-geometry": "node scripts/verify-qingxu-proto-geometry.mjs && node scripts/verify-qingxu-motion-layer.mjs",
     "verify:terminal-session-self-heal": "node scripts/verify-terminal-session-self-heal.mjs",
     "verify:probe-member-session-41": "node scripts/probe-member-session-41.mjs",
     "verify:probe-ai-resume-closure-42": "node scripts/probe-ai-resume-closure-42.mjs",
