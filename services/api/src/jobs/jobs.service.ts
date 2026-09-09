@@ -27,7 +27,7 @@ import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-ed
 import type { FieldMapping } from './dto/excel-import.dto'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
-import type { PartnerListQuery } from './jobs-shared'
+import type { PartnerImportDataType, PartnerListQuery } from './jobs-shared'
 
 // ─── Re-export all types that controllers / other services import from here ───
 export type {
@@ -216,7 +216,7 @@ export class JobsService {
     buffer: Buffer
     fileName: string
     sourceId: string
-    dataType: 'job' | 'fair'
+    dataType: PartnerImportDataType
     fieldMapping: FieldMapping
     user: AuthedUser
   }) {
@@ -227,7 +227,7 @@ export class JobsService {
     return this.excel.confirmExcelImport(batchId, user)
   }
 
-  getMappingRule(sourceId: string, dataType: 'job' | 'fair', user: AuthedUser) {
+  getMappingRule(sourceId: string, dataType: PartnerImportDataType, user: AuthedUser) {
     return this.excel.getMappingRule(sourceId, dataType, user)
   }
 }

@@ -71,7 +71,7 @@ import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
-import { firstQueryString, type PartnerListQuery } from './jobs-shared'
+import { firstQueryString, type PartnerImportDataType, type PartnerListQuery } from './jobs-shared'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -719,7 +719,7 @@ export class JobsController {
       buffer: file.buffer,
       fileName: file.originalname,
       sourceId,
-      dataType: dataType as 'job' | 'fair',
+      dataType: dataType as PartnerImportDataType,
       fieldMapping,
       user,
     })

@@ -12,6 +12,7 @@ import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { assertDataSourceCapability, assertPartnerDataTypeCapability } from '../jobs/partner-capabilities'
 import { mapJobWorkTypeToCategory } from '../jobs/work-type'
+import type { PartnerImportDataType } from '../jobs/jobs-shared'
 import {
   JOB_SYNC_QUEUE,
   JOB_SYNC_JOB_NAME,
@@ -925,7 +926,7 @@ export class JobSyncService {
 
   private async writeSyncLog(
     sourceId: string, orgId: string,
-    dataType: 'job' | 'fair',
+    dataType: PartnerImportDataType,
     added: number, updated: number, dup: number, error: number,
     result: 'success' | 'partial' | 'failed',
     errorDetail?: string,

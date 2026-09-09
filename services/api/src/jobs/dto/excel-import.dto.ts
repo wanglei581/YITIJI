@@ -1,4 +1,5 @@
 import { IsIn, IsNotEmpty, IsString } from 'class-validator'
+import type { PartnerImportDataType } from '../jobs-shared'
 
 /**
  * 敏感列关键词列表（大小写不敏感、含子串匹配）。
@@ -27,7 +28,7 @@ export class ExcelPreviewDto {
   sourceId!: string
 
   @IsIn(['job', 'fair'])
-  dataType!: 'job' | 'fair'
+  dataType!: PartnerImportDataType
 
   /** JSON 序列化的字段映射，例 '{"externalId":"外部ID","title":"职位名称",...}' */
   @IsString() @IsNotEmpty()

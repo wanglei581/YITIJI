@@ -22,6 +22,7 @@ import type {
   ExcelPreviewResult,
   ExcelConfirmResult,
   FieldMappingRuleResult,
+  PartnerImportDataType,
   PartnerSmartCampusTerminal,
   SaveSmartCampusConfigPayload,
   TerminalSmartCampusConfigView,
@@ -218,7 +219,7 @@ export const partnerHttpAdapter = {
   },
 
   // Excel Import
-  downloadExcelTemplate: async (dataType: 'job' | 'fair') => {
+  downloadExcelTemplate: async (dataType: PartnerImportDataType) => {
     const res = await fetch(resolveApiUrl('/partner/excel/template', { dataType }), {
       method: 'GET',
       headers: {
@@ -244,7 +245,7 @@ export const partnerHttpAdapter = {
   },
 
   // T1: 读取上次保存的字段映射规则(自动回填)
-  getMappingRule: (sourceId: string, dataType: 'job' | 'fair') =>
+  getMappingRule: (sourceId: string, dataType: PartnerImportDataType) =>
     get<FieldMappingRuleResult>('/partner/excel/mapping-rule', { sourceId, dataType }),
 
   parseExcel: (file: File) => {
@@ -268,7 +269,7 @@ export const partnerHttpAdapter = {
   previewExcel: (
     file: File,
     sourceId: string,
-    dataType: 'job' | 'fair',
+    dataType: PartnerImportDataType,
     fieldMapping: Record<string, string>,
   ) => {
     const form = new FormData()

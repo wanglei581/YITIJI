@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common'
-import type { AccessMode, SourceKind } from './jobs-shared'
+import type { AccessMode, PartnerImportDataType, SourceKind } from './jobs-shared'
 
 export const ADMIN_MANAGED_ACCESS_MODES = ['api', 'webhook'] as const satisfies readonly AccessMode[]
 
@@ -149,7 +149,7 @@ export function assertDataSourceCapability(orgType: string, accessMode: string, 
   }
 }
 
-export function assertPartnerDataTypeCapability(orgType: string, dataType: 'job' | 'fair'): void {
+export function assertPartnerDataTypeCapability(orgType: string, dataType: PartnerImportDataType): void {
   const capabilities = getPartnerCapabilities(orgType)
   if (dataType === 'job' && !capabilities.canImportJobs) {
     deny(`机构类型 ${orgType} 不允许录入通用岗位数据`)
