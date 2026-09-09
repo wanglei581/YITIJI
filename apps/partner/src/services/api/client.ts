@@ -5,6 +5,14 @@ export const API_MODE: ApiMode =
 
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
+// 这里**故意没有** `if (import.meta.env.PROD && API_MODE !== 'http') throw`。
+// 理由与 apps/admin/src/services/api/client.ts 同一处注释完全一致：
+// `import.meta.env.PROD` 不等于「production 模式」——`vite build` 无论 `--mode`
+// 传什么都把它折成 `true`，于是这条守卫会在 mock 模式的 E2E 预览包里变成
+// 一句无条件 `throw`，把浏览器用例整段挂死。
+// 生产侧的防线在 `vite.config.ts` 的 `assertProdApiMode`（配置加载期就拒），
+// 守着那个闸门的是 `scripts/verify-deploy-gates-in-sync.mjs`。
+
 if (import.meta.env.DEV && API_MODE === 'http' && !import.meta.env.VITE_API_BASE_URL) {
   console.warn('[Partner API Client] VITE_API_MODE=http 要求同时配置 VITE_API_BASE_URL，否则请求将发往 /api/v1')
 }

@@ -115,6 +115,91 @@ if (
   fail('预检命令必须引用 REQUIRED_PRODUCTION_GATES（与 3b 同一份清单）')
 }
 
+// ── 前端版的同一形态：部署脚本传 VITE_API_MODE=http，前端必须在没传时炸掉 ──────
+//
+// admin / partner / kiosk 的 `API_MODE` 都是「只有精确等于 'http' 才走真接口，
+// 否则一律 mock」。少传或写错这个变量，构建**不会报错**，会静默打包 mock 适配器 ——
+// 后台照样渲染出一整套假数据（假机构、假岗位、假价目、假法务文本），
+// 运营人员照着它决策，而且外观上完全看不出来。
+//
+// kiosk 装了 `import.meta.env.PROD && API_MODE !== 'http'` 的运行时断言。
+// **这条不能照抄给 admin / partner**，2026-09-10 实测过代价：
+//
+//   `import.meta.env.PROD` 不是「production 模式」的意思 —— `vite build` 无论
+//   `--mode` 传什么都把它折成 `true`（同一份产物里 `import.meta.env.DEV` 分支
+//   被折成 false 整段消失，可交叉印证）。
+//   kiosk 的 E2E webServer 用 `VITE_API_MODE=http` 构建，所以条件为假、守卫沉默；
+//   admin / partner 的 E2E 刻意走 mock（`VITE_API_MODE=mock vite build --mode development`），
+//   条件折成恒真，产物里就是一句**无条件 throw**，应用在模块导入期就炸。
+//   实测后果：Admin 浏览器 E2E 从 0.7 分钟变成 36.6 分钟未完成，
+//   整个 kiosk-browser-smoke job 撞满 70 分钟上限被取消。
+//
+// 所以判据按 app 分开：kiosk 必须有（它的 E2E 走 http，安全且有价值）；
+// admin / partner 必须**没有**（它们的 E2E 走 mock，有了就是自伤）。
+// 真正把关生产的是下面 vite.config 的构建期闸门，那条对三个 app 一视同仁。
+{
+  const FRONTENDS = [
+    { app: 'kiosk', client: 'apps/kiosk/src/services/api/client.ts' },
+    { app: 'admin', client: 'apps/admin/src/services/api/client.ts' },
+    { app: 'partner', client: 'apps/partner/src/services/api/client.ts' },
+  ]
+  const deployYml = readFileSync(join(repoRoot, '.github/workflows/deploy.yml'), 'utf8')
+
+  for (const { app, client } of FRONTENDS) {
+    const src = readFileSync(join(repoRoot, client), 'utf8')
+    // 判据只看「PROD 且非 http 就抛」这一条，不看注释里怎么解释。
+    const failsClosed =
+      /import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/.test(src) &&
+      /throw new Error\(/.test(src.slice(src.search(/import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/)))
+    if (app === 'kiosk') {
+      if (failsClosed) pass('kiosk 运行时对 mock 模式 fail-closed（它的 E2E 走 http，这条守卫不会误伤）')
+      else fail(`kiosk 运行时守卫丢了（${client}）`)
+    } else if (failsClosed) {
+      fail(
+        `${app} 不得有 import.meta.env.PROD 运行时守卫（${client}）：`
+        + 'vite build 把 PROD 折成 true，而本 app 的 E2E 走 mock，'
+        + '这条会变成无条件 throw 把浏览器用例整段挂死（2026-09-10 实测 36.6 分钟未完成）。'
+        + '生产侧的防线是 vite.config 的 assertProdApiMode。',
+      )
+    } else {
+      pass(`${app} 没有会误伤 mock E2E 的运行时守卫（生产侧由 vite.config 闸门把关）`)
+    }
+  }
+
+  // ── 真正把关的是 vite.config 的构建期闸门，它必须存在 ──────────────────
+  //
+  // 2026-09-09 实测更正：本节最初写的是「漏传 VITE_API_MODE → 构建不报错 → 静默
+  // 打包 mock」。**那是错的，我没真的构建一次就下了结论。** 实际不传时：
+  //
+  //   $ VITE_API_BASE_URL=/api/v1 vite build        （admin / partner 均如此）
+  //   Error: [admin] 生产构建被拒绝：VITE_API_MODE 必须为 "http"（当前 "未设置"）。
+  //          默认 mock 会把内存假数据打进产物，造成上线即假数据。
+  //   at assertProdApiMode (apps/admin/vite.config.ts)   → exit 1，无 dist 产出
+  //
+  // 三个 app 的 vite.config.ts 都有 `assertProdApiMode`，在**配置加载阶段**就拒绝，
+  // 比运行时抛错更早、更硬。所以「静默发布假数据后台」这个失效模式不成立。
+  //
+  // 但它**没有任何门禁保护**（全仓 grep：scripts/ 与各 app scripts/ 下 0 命中）——
+  // 谁从某个 config 里删掉它，那个失效模式当场成立，而且没人会发现。
+  // 这才是真缺口，所以钉的是它。
+  for (const { app } of FRONTENDS) {
+    const cfg = readFileSync(join(repoRoot, `apps/${app}/vite.config.ts`), 'utf8')
+    const hasGuard =
+      /function\s+assertProdApiMode|const\s+assertProdApiMode/.test(cfg) &&
+      /assertProdApiMode\s*\(/.test(cfg.replace(/function\s+assertProdApiMode|const\s+assertProdApiMode/g, ''))
+    if (hasGuard) pass(`${app}/vite.config.ts 有构建期闸门 assertProdApiMode 且被调用`)
+    else fail(`${app}/vite.config.ts 缺少构建期闸门 assertProdApiMode（或定义了没调用）—— 漏传 VITE_API_MODE 会静默产出 mock 版本`)
+  }
+
+  // 另一半：部署脚本必须真的传。三个构建各出现一次，别只传其中一两个。
+  const modeCount = (deployYml.match(/VITE_API_MODE=http/g) ?? []).length
+  if (modeCount >= FRONTENDS.length) {
+    pass(`deploy.yml 为 ${FRONTENDS.length} 个前端都传了 VITE_API_MODE=http（实测 ${modeCount} 处）`)
+  } else {
+    fail(`deploy.yml 只有 ${modeCount} 处 VITE_API_MODE=http，少于前端个数 ${FRONTENDS.length}`)
+  }
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 生产闸门与部署脚本不同步，发布会在最坏时点失败\n`)
   process.exit(1)
