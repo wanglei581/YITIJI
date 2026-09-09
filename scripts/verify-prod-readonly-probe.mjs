@@ -306,8 +306,11 @@ try {
   const demoLine = (demo.stdout || '').split('\n').find((l) => l.includes('/api/v1/companies')) || ''
   if (/\sWARN\s/.test(demoLine)) pass('表中 companies 为 WARN')
   else fail(`留着演示数据时 companies 应为 WARN,实际: ${demoLine.trim() || '(该行未出现)'}`)
-  if (demoLine.includes('演示')) pass('WARN 说明里点名了演示企业')
-  else fail('WARN 说明必须点名是哪几家,否则负责人不知道去删哪条')
+  // 锚在**桩里那家公司的名字**上,不是锚在「演示」两个字上——
+  // 「其中 N 条带演示标记」这句里本来就有「演示」,拿它当判据的话,
+  // 把名字整段删掉断言照样过(反向变异 M3 实测:退出码 0,漏了)。
+  if (demoLine.includes('未来智造科技有限公司')) pass('WARN 说明里点名了是哪几家')
+  else fail(`WARN 说明必须点名是哪几家,否则负责人不知道去删哪条。实际: ${demoLine.trim()}`)
 
   console.log('\n=== 反向：企业干净时必须 PASS,不能一律 WARN ===')
   mutation = 'ok'
