@@ -231,7 +231,15 @@ export function LegalDocPage() {
               </>
             ) : (
               <>
-                <p className="legal-doc-meta">更新日期 {displayedAt} · 全文共 {meta.sections.length} 章</p>
+                {/* 读不到服务端「当前已激活版本」时走这里。此前这一支和正式版长得
+                    一模一样（同样的标题、同样的「更新日期」），用户无从分辨自己读到的
+                    不是正式文本 —— 而底部那句免责声明当时是**无条件**挂着的，
+                    正式版展示时也挂，于是它不携带任何信息。现在只在本支出现。 */}
+                <p className="legal-doc-fallback-warning" role="status" data-testid="legal-doc-fallback-warning">
+                  当前无法读取正式版本，以下为本机留存的说明文本，<strong>不作为正式版本</strong>。
+                  请稍后重试，或向现场工作人员索取正式文本。
+                </p>
+                <p className="legal-doc-meta">本机留存文本 · 更新日期 {displayedAt} · 全文共 {meta.sections.length} 章</p>
                 <div className="legal-doc-intro">
                   <span className="legal-doc-icon"><Icon aria-hidden="true" /></span>
                   <p>请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。</p>
@@ -250,8 +258,12 @@ export function LegalDocPage() {
           </div>
         </article>
 
+        {/* 这句只对「本机留存文本」成立。正式版本（服务端已激活版本）不该被自己
+            标成「试运营版本」—— 无条件挂着等于永远亮的警告灯，谁也不会再看它一眼。 */}
         <p className="legal-doc-notice">
-          本文本为试运营版本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。
+          {apiContent
+            ? '以上为运营方当前发布的有效版本；如有疑问可咨询现场工作人员。'
+            : '本文本为本机留存的试运营文本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。'}
         </p>
         </div>
       </KioskPageFrame>

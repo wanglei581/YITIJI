@@ -54,7 +54,7 @@ import type { Response } from 'express'
 import { JobsService } from './jobs.service'
 import { AdminFairsService } from './admin-fairs.service'
 import { ReviewActionDto } from './dto/review.dto'
-import { PublishActionDto } from './dto/publish.dto'
+import { PartnerUnpublishActionDto, PublishActionDto } from './dto/publish.dto'
 import { ImportJobsDto } from './dto/import-jobs.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -520,7 +520,7 @@ export class JobsController {
   @Roles('partner')
   unpublishPartnerJob(
     @Param('id') id: string,
-    @Body() _dto: PublishActionDto,
+    @Body() _dto: PartnerUnpublishActionDto,
     @CurrentUser() user: AuthedUser,
   ) {
     return this.jobsService.unpublishPartnerJob(id, user)
@@ -571,7 +571,7 @@ export class JobsController {
   @Roles('partner')
   unpublishPartnerFair(
     @Param('id') id: string,
-    @Body() _dto: PublishActionDto,
+    @Body() _dto: PartnerUnpublishActionDto,
     @CurrentUser() user: AuthedUser,
   ) {
     return this.jobsService.unpublishPartnerFair(id, user)

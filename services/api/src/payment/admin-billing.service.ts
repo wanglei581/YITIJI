@@ -77,6 +77,38 @@ export class AdminBillingService {
     )
   }
 
+  /**
+   * 描述里写出的价格必须和实际单价对得上。
+   *
+   * 为什么需要这条：改价和改描述是两个字段，只改其中一个不会有任何提示。
+   * 2026-09-09 生产实测就是这个状态 —— 彩色 `unitCents=100`（1.00 元/页），
+   * 描述却仍是上一轮免费试运营时期的「免费试运营：彩色打印 0 元/页」。
+   * Kiosk 与小程序都只读 `unitCents` 不读 description，所以终端用户看不到假价；
+   * 但 `GET /admin/billing/price-config` 会把 description 原样返回，
+   * **下一个改价的人看到的价目表是自相矛盾的**，而他正是要据此决策的人。
+   *
+   * 判据故意留松：描述里但凡有**一个** N 元与实际单价相等就放行
+   * （允许「原价 2 元，现 1 元」这类写法）；一个都对不上才拒。
+   * 描述里根本没写金额（如「黑白打印每页」）不受约束 —— 那不是在陈述价格。
+   */
+  private static assertDescriptionMatchesAmount(description: string | null, unitCents: number): void {
+    if (!description) return
+    const stated = [...description.matchAll(/(\d+(?:\.\d+)?)\s*元/g)].map((m) => Number(m[1]))
+    if (stated.length === 0) return
+    const actualYuan = unitCents / 100
+    if (stated.some((y) => Math.abs(y - actualYuan) < 1e-9)) return
+    throw new BadRequestException({
+      error: {
+        code: 'PRICE_DESCRIPTION_CONTRADICTS_AMOUNT',
+        message:
+          `描述里写的价格（${stated.map((y) => `${y} 元`).join('、')}）和实际单价 `
+          + `${actualYuan.toFixed(2)} 元对不上。改价时请把描述一起改，`
+          + '否则管理后台的价目表会自相矛盾，下一个改价的人会照着错的那句决策。'
+          + '（描述里不写金额也可以，那样不受本校验约束。）',
+      },
+    })
+  }
+
   /** 改价/启停（唯一合法改价路径）：old/new 快照进审计，空 patch / 无实际变化拒绝。 */
   async updatePriceConfig(
     serviceKey: string,
@@ -112,6 +144,8 @@ export class AdminBillingService {
         },
       })
     }
+
+    AdminBillingService.assertDescriptionMatchesAmount(next.description ?? null, next.unitCents)
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.priceConfig.update({

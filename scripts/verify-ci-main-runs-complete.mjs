@@ -13,6 +13,21 @@
  * （终端会话失效后页面永久卡死）因此连续三轮发布失败。
  *
  * 正确形态：PR 分支照常取消（省时间），main 必须跑完。
+ *
+ * ── 2026-09-09 复发：上面那条修对了一半 ────────────────────────────────────
+ * `cancel-in-progress: false` 保住的是**正在跑**的 run；**排队中**的 run 不受它保护 ——
+ * 同一个 concurrency group 里 GitHub 只保留最新的那个待跑 run，更早的一律取消。
+ * main CI 要跑 ~30 分钟而合并每 ~6 分钟一次，于是每一次都在排队阶段被顶掉。
+ *
+ * 决定性判据是 **job 数**（不是 conclusion）：
+ *   run 34346438000 / 34347178593 / 34347730125 全部 conclusion=cancelled，
+ *   而三者 `GET /actions/runs/:id/jobs` 返回的 **job 数都是 0** —— 一个 job 都没启动过。
+ *   取消时刻分别精确等于下一次 run 的创建时刻。
+ * 后果与去年那次相同：四次合并之后 main 没有任何一次完整跑过，
+ * 最后一次绿停在合并之前，发布再次落进「状态未知」区间。
+ *
+ * 所以本门禁此前的断言不够：它断言的是「配置写成了我相信的那个样子」，
+ * 而那个样子挡不住排队阶段的取消。现在补断言「main 上不同提交不得共用 group」。
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -49,6 +64,14 @@ check(
 check(
   '并发分组仍按 ref 隔离（不同分支互不影响）',
   /group:\s*ci-\$\{\{\s*github\.ref\s*\}\}/.test(concurrency),
+)
+check(
+  'main 上不同提交不得共用 concurrency group',
+  /github\.ref\s*==\s*'refs\/heads\/main'\s*&&\s*format\(\s*'-\{0\}'\s*,\s*github\.sha\s*\)/.test(
+    concurrency,
+  ),
+  "共用 group 时，排队中的旧 run 会被新 run 顶掉（cancel-in-progress 管不到排队）；"
+    + "main 段必须把 github.sha 拼进 group",
 )
 
 // ── 二、被保护的那条不变量仍在（否则本门禁就没有意义）────────────────────

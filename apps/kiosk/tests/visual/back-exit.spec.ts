@@ -60,17 +60,15 @@ const EXEMPT = new Map<string, string>([
  *
  * 裁定后每一条要么补上返回槽（从这里删），要么进 EXEMPT 并写清为什么不是流程中段。
  */
+// 2026-09-09 归零：七条欠账全部裁定完毕，一条都没进 EXEMPT。
+// /jobs /ai/plan /print/cashier /print/progress 在 #986 补槽后销账；
+// /scan/{start,settings,progress} 随本 PR 把三条路由合并成 /scan 工作台一起退休，
+// 工作台的返回槽在 ScanWorkbenchChrome 里，三个 stage 共用，落到 /print-scan（稿 18）。
+// LIMIT 归 0 之后，任何新页漏填返回槽都会当场红——这正是这张表存在的目的。
 const UNDECIDED = new Map<string, string>([
-  // 这三条已裁定：稿 18 把扫描四页画成一张工作台，共用一个返回键落到 /print-scan。
-  // 但落地在 #984——那个 PR 把 /scan/{start,settings,progress} 合成 /scan，
-  // 三条路由本身会消失。所以留在这里等它合入，由 #984 连同路由一起删；
-  // 现在就删会让门禁去要求三条即将不存在的路由补槽。
-  ['/scan/start', '已裁定补槽（稿 18 共用返回键 → /print-scan）；路由在 #984 合并为 /scan 时随之删除。'],
-  ['/scan/settings', '同 /scan/start：裁定已出，等 #984 合并工作台后删除。'],
-  ['/scan/progress', '同 /scan/start：裁定已出，等 #984 合并工作台后删除。'],
 ])
 /** 只许降不许升。升它等于给新的漏填开口子。 */
-const UNDECIDED_LIMIT = 3
+const UNDECIDED_LIMIT = 0
 
 test.describe('每一页都要能回上一步 @kiosk', () => {
   test('未裁定欠账不得增长 @kiosk', () => {

@@ -21,7 +21,22 @@ on:
 # 因此 main 的运行必须跑完；代价是快速连续合并时 main 上会并行几个运行，
 # 这个成本远低于「发不出去」。
 concurrency:
-  group: ci-${{ github.ref }}
+  # main 上每个提交各占一个 group；PR 仍按分支合并成一个 group。
+  #
+  # 为什么不能只靠 cancel-in-progress:false（#959 那次的修法）——那次修对了一半：
+  # 它保住了**正在跑**的 run，但保不住**排队中**的 run。同一个 concurrency group 里，
+  # GitHub 只保留最新的那个待跑 run，更早的待跑 run 一律取消，与 cancel-in-progress 无关。
+  #
+  # 2026-09-09 实测（决定性判据是 job 数）：
+  #   run 34346438000 / 34347178593 / 34347730125 全部 conclusion=cancelled，
+  #   而三者的 **job 数都是 0** —— 一个 job 都没启动过，是在排队阶段被顶掉的，
+  #   取消时刻分别精确等于下一次 run 的创建时刻（11:45:01 / 11:51:38 / 12:08:44）。
+  #   后果：那天四次合并之后，main 上没有任何一次完整跑过，最后一次绿停在合并之前。
+  #   而发布需要一个「CI 通过的目标 SHA」，于是发布被卡在「状态未知」区间。
+  #
+  # 代价是 main 上可能同时跑多个 run（合并密集时约 2–3 个）。这是有意的交换：
+  # runner 分钟换「每个进 main 的提交都有自己的结论」。
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
