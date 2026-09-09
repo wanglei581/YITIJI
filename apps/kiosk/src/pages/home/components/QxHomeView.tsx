@@ -245,6 +245,7 @@ export function QxHomeView({
             tone="neutral"
             size="slim"
             disabled={!toolboxReady}
+            disabledReason="capability:toolbox"
             onAction={onAction}
           />
           <HomeTile
@@ -256,6 +257,7 @@ export function QxHomeView({
             tone="neutral"
             size="slim"
             disabled={!campusReady}
+            disabledReason="capability:smart-campus"
             onAction={onAction}
           />
         </div>

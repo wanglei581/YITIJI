@@ -150,19 +150,29 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
   await expect(home.getByRole('button', { name: /没有待继续的办理/ })).toHaveCount(0)
 
-  // 首页上不许出现「点不动、且只有开发者看得懂为什么」的控件。
-  // 2026-09-09 生产实走抓到三颗：「更多服务（目录迁移中）」「查看全部服务（目录迁移中）」
-  // 和被做成 disabled 按钮的空态，三颗 title 都是「全部服务目录尚未迁入运行时路由」。
-  // 一体机上没有鼠标悬停，用户根本看不到 title，只会反复去戳。
+  // 首页上每一颗点不动的按钮，都必须说得出「因为哪条能力闸门」。
   //
-  // 判据钉的是**话术**不是那三颗的名字——将来任何人再往首页放一颗
-  // 「XX 迁移中 / 待接入 / TODO」的死按钮，这条一样红。
-  const deadJargon = await home.evaluate(() =>
+  // 2026-09-09 生产实走抓到三颗点不动的控件（「更多服务（目录迁移中）」
+  // 「查看全部服务（目录迁移中）」和被做成 disabled 按钮的空态），
+  // title 全是「全部服务目录尚未迁入运行时路由」——一体机没有鼠标悬停，
+  // 那句解释根本没人看得到，用户只会反复去戳。
+  //
+  // **判据是结构不是禁词表。** 第一版写成 `/迁移中|待接入|TODO/` 的黑名单，
+  // 只能抓写进表里的词；换一句「建设中」「敬请期待」就漏。现在要求每颗 disabled
+  // 按钮带 `data-disabled-reason="capability:<配置项>"`，
+  // 语义是「本机没开通这项服务」——真实状态、用户看得懂、运营改配置就能变。
+  // 功能没做完不属于这一类：那种情况不该在首页摆按钮，直接不渲染。
+  const unexplainedDisabled = await home.evaluate(() =>
     [...document.querySelectorAll('button[disabled], [aria-disabled="true"]')]
-      .map((el) => `${(el as HTMLElement).innerText} ${el.getAttribute('title') ?? ''}`)
-      .filter((t) => /迁移中|尚未迁入|待接入|待接线|TODO|占位/.test(t)),
+      .filter((el) => !/^capability:/.test(el.getAttribute('data-disabled-reason') ?? ''))
+      .map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ').trim()),
   )
-  expect(deadJargon, `首页出现了带开发者话术的死控件：${deadJargon.join(' / ')}`).toEqual([])
+  expect(
+    unexplainedDisabled,
+    `首页出现了说不出理由的死控件：${unexplainedDisabled.join(' / ')}。`
+      + `点不动只有一个正当理由——本机没开通这项能力，那就带上 data-disabled-reason="capability:x"；`
+      + `功能没做完不要在首页摆按钮。`,
+  ).toEqual([])
   await expect(home.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expect(home.getByRole('link', { name: '鲁ICP备2026023517号-2' })).toHaveAttribute('href', 'https://beian.miit.gov.cn/')
   await expect(home.getByRole('link', { name: '鲁公网安备37021402007308号' })).toHaveAttribute('href', /beian\.mps\.gov\.cn/)
