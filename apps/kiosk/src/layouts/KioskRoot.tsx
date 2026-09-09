@@ -137,6 +137,12 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/me/privacy-requests',
   '/job-fairs',
   '/job-fairs/checkin',
+  '/me/notifications',
+  '/notifications',
+  '/me/resumes',
+  '/me/favorites',
+  '/me/ai-records',
+  '/me/activity',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
@@ -144,6 +150,8 @@ const QX_MIGRATED_PREFIXES = [
   '/offline-agencies/',
   // 43 号稿企业目录的详情段；同前缀下只有 /companies/:id。
   '/companies/',
+// /me/activity/:id 用精确前缀，避免误伤尚未迁移的 /me/* 兄弟路由。
+  '/me/activity/',
 ] as const
 /**
  * 带参路由但父段还有未迁兄弟页：不能写宽前缀。

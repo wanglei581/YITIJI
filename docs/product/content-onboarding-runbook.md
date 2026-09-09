@@ -196,6 +196,11 @@ PR **#637**(信息源批量发布)提供:**先预览 → 可筛选 → 逐条审
 
 ---
 
+> **政策没有导入管道。** 岗位/招聘会有 Excel 导入轨，政策只能在 Partner 后台一条条手建
+> （`services/api/src/policies/` 里 excel / webhook 零命中）。要不要给它补一条轨、
+> 成本多少、砍掉内容板块的话这笔账还算不算数 —— 见
+> [policy-import-track-assessment.md](policy-import-track-assessment.md)。
+
 ## 5B. 冷启动最低门槛:给数字,不给形容词(2026-09-08 补)
 
 第 7 节的验收条件写的是「total 都不为 0」。**那是下限不是门槛** —— 1 条也满足,

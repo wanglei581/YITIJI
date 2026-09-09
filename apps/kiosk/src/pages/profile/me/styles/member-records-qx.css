@@ -1,0 +1,15 @@
+@import './qx-me-shared.css';
+
+.qx-me-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  border-radius: 26px;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  flex: none;
+}
+.qx-me-detail-head .qx-me-row-ico { width: 70px; height: 70px; }
+.qx-me-detail-head h2 { margin: 0; font-size: 31px; font-weight: 800; line-height: 1.28; }
+.qx-me-detail-head p { margin: 6px 0 0; font-size: 18px; color: var(--qx-ink-3); }
