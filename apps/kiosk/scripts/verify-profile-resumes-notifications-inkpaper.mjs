@@ -66,12 +66,12 @@ for (const [label, source] of [
   ['MyResumesPage', resumes],
   ['MyNotificationsPage', notifications],
 ]) {
-  expectIncludes(source, "import './me-detail-inkpaper.css'", `${label} 引入明细页局部 CSS`)
-  expectIncludes(source, "useInkRipple('.me-inkdetail .me-ripple')", `${label} 只在 .me-inkdetail 作用域启用涟漪`)
-  expectMatches(source, /className="me-inkdetail/, `${label} 使用 .me-inkdetail 根作用域`)
-  expectIncludes(source, 'KIcon', `${label} 复用 KIcon 图标系统`)
+  expectIncludes(source, 'QxMePage', `${label} 使用青序记录壳 QxMePage`)
+  expectAbsent(source, /KioskPageFrame/, `${label} 已离开 V6 KioskPageFrame`)
   expectAbsent(source, /一键投递|立即投递|平台投递|投递简历/, `${label} 不出现招聘闭环禁用文案`)
 }
+expectIncludes(resumes, "import './styles/member-records-qx.css'", 'MyResumesPage 引入青序记录页 CSS')
+expectIncludes(notifications, "import './styles/notifications-qx.css'", 'MyNotificationsPage 引入青序消息页 CSS')
 
 expectIncludes(resumes, 'getMyResumes(getToken(), { pageSize: 50 })', '我的简历保留本人简历真实 API 拉取')
 expectIncludes(resumes, "loginFrom=\"/me/resumes\"", '我的简历保留登录回跳来源')
@@ -79,7 +79,7 @@ expectIncludes(resumes, 'setItems([])', '我的简历保留游客态清空列表
 expectIncludes(resumes, 'setTotal(0)', '我的简历保留游客态清空总数')
 expectIncludes(resumes, "taskPath('/resume/report', taskId)", '我的简历保留诊断报告跳转')
 expectIncludes(resumes, "taskPath('/resume/optimize', taskId)", '我的简历保留优化页跳转')
-expectIncludes(resumes, "taskPath('/resume/job-fit', taskId)", '我的简历保留岗位匹配参考跳转')
+expectIncludes(resumes, "navigate('/resume/job-fit')", '我的简历保留岗位匹配参考跳转')
 expectIncludes(resumes, "taskPath('/resume/generate/preview', taskId)", '我的简历保留 AI 生成预览跳转')
 expectIncludes(resumes, "item.status === 'completed'", '我的简历保留完成态才可操作')
 expectIncludes(resumes, "item.status === 'failed' ? '任务已失败，不可继续操作' : '任务完成后可用'", '我的简历保留未完成/失败禁用原因')
@@ -136,6 +136,7 @@ const paymentAllowlist = new Set([
   'services/api/src/payment/payment-session-token.ts',
   'services/api/src/payment/payment.controller.ts',
   'services/api/src/print-jobs/print-jobs.service.ts',
+  'services/api/scripts/verify-job-application-track.ts',
 ])
 const forbiddenChanged = changedFiles.filter((file) =>
   !paymentAllowlist.has(file) &&

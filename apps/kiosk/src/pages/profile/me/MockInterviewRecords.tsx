@@ -1,4 +1,3 @@
-import { Card } from '@ai-job-print/ui'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, Trash2Icon } from 'lucide-react'
 import { KIcon } from '../../../components/kiosk-icon'
@@ -24,55 +23,46 @@ export function MockInterviewRecords({
 }) {
   if (items.length === 0) return null
   return (
-    <section aria-label="模拟面试记录" className="space-y-3">
-      <div className="me-section-copy">
-        <h2>模拟面试</h2>
-        <p>数据来自本人练习记录，仅展示元数据；报告可回看，不向企业转交。</p>
-      </div>
+    <>
+      <div className="qx-me-legal">模拟面试 · 数据来自本人练习记录，仅展示元数据；报告可回看，不向企业转交。</div>
       {items.map((item) => {
         const confirming = confirmId === item.sessionId
         return (
-          <Card key={item.sessionId} className="me-benefit-card me-ripple">
-            <div className="flex items-center gap-4">
-              <span className="me-row-icon me-tone-plum" aria-hidden="true">
-                <KIcon name="sparkle" />
+          <div key={item.sessionId} className="qx-me-row" data-flag={confirming ? 'true' : undefined}>
+            <span className="qx-me-row-ico" data-tone="plum" aria-hidden="true">
+              <KIcon name="sparkle" />
+            </span>
+            <span className="qx-me-row-main">
+              <span className="qx-me-row-head">
+                <span className="qx-me-chip">{item.interviewerLabel}</span>
+                <span className="qx-me-st" data-tone={item.hasReport ? undefined : 'run'}>{item.hasReport ? '已完成' : '无报告'}</span>
               </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="me-chip">{item.interviewerLabel}</span>
-                  <span className={['me-status', item.hasReport ? 'is-active' : 'is-muted'].join(' ')}>
-                    {item.hasReport ? '已完成' : '无报告'}
-                  </span>
-                </div>
-                <p className="me-row-title mt-2">{item.position}</p>
-                <p className="me-row-meta">{metaLine(item)}</p>
-              </div>
-              {item.hasReport && (
-                <button
-                  type="button"
-                  className="me-ripple me-doc-action"
-                  onClick={() => onOpen(item.sessionId)}
-                  aria-label={`查看模拟面试报告 ${item.position}`}
-                >
+              <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.position}</span>
+              <span className="qx-me-row-sub">{metaLine(item)}</span>
+            </span>
+            <span className="qx-me-acts">
+              {item.hasReport ? (
+                <button type="button" className="qx-me-small" onClick={() => onOpen(item.sessionId)} aria-label={`查看模拟面试报告 ${item.position}`}>
                   <EyeIcon className="h-4 w-4" aria-hidden="true" />
                   <span className="ml-1">查看</span>
                 </button>
-              )}
+              ) : null}
               <button
                 type="button"
+                className={['qx-me-small me-delete-button', confirming ? 'is-confirm' : ''].join(' ')}
+                data-variant="danger"
                 disabled={busyId === item.sessionId}
                 onClick={() => onDelete(item.sessionId)}
                 title={confirming ? '再次点击确认删除' : '删除'}
                 aria-label={confirming ? '再次点击确认删除模拟面试记录' : '删除模拟面试记录'}
-                className={['me-delete-button me-ripple', confirming ? 'is-confirm' : ''].join(' ')}
               >
                 <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-                {confirming && <span className="ml-1">确认删除</span>}
+                {confirming ? <span className="ml-1">确认删除</span> : '删除'}
               </button>
-            </div>
-          </Card>
+            </span>
+          </div>
         )
       })}
-    </section>
+    </>
   )
 }

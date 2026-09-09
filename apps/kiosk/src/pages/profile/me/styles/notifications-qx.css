@@ -1,0 +1,15 @@
+@import './qx-me-shared.css';
+
+.qx-me-notice-body {
+  display: block;
+  margin-top: 8px;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--qx-ink-2);
+}
+.qx-me-row-foot {
+  margin-top: 10px;
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}

@@ -157,7 +157,16 @@ assert.match(meShell, /KioskPageFrame/, 'member list shell uses the frozen W1 fr
 assert.match(meShell, /KioskStatePanel/, 'member list shell uses the frozen W1 state panel')
 assert.match(meShell, /<section data-kiosk-domain="profile" data-kiosk-screen="member-list" className="flex min-h-0 flex-1 flex-col px-6">/, 'member list content keeps its exact neutral wrapper')
 assert.doesNotMatch(meShell, /<\/?main\b/, 'member list shell leaves the main landmark to KioskLayout')
-assert.match(activityDetail, /<section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="me-detail-scroll">/, 'activity detail keeps its exact neutral wrapper')
+/* 2026-09-08 青序流光迁移：`data-kiosk-domain` / `data-kiosk-screen` 由外层壳
+ * `QxMeChrome`（QxMeChrome.tsx:84-85）按 `screen` prop 统一渲染，页面不再自己写一份。
+ * 内层 section 只剩滚动容器。原来那条按 V6 内层写法逐字匹配的断言因此过时——
+ * 而且**页面确实不该再写**：两处同时带 `data-kiosk-screen="activity-detail"` 会让
+ * `locator('[data-kiosk-screen="activity-detail"]')` 命中两个元素，
+ * kiosk-privacy-timeout 的 activity detail 用例因此 strict mode 违规。
+ * 换成三条同等含义的断言（标识仍在 + 容器仍中性 + 不抢 main 地标），1 → 3，只增不减。 */
+assert.match(activityDetail, /screen="activity-detail"/, 'activity detail still declares its screen id to the shell')
+assert.match(activityDetail, /<section className="me-detail-scroll">/, 'activity detail keeps its neutral scroll wrapper')
+assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to the shell')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
 assertSharedPageShell(benefitActivityDetail, 'BenefitActivityDetailPage')
 assert.match(
@@ -239,14 +248,9 @@ for (const path of productionFiles) {
 
 const concretePages = [
   'src/pages/profile/ProfilePage.tsx',
-  'src/pages/profile/me/MyResumesPage.tsx',
   'src/pages/profile/me/MyPrintOrdersPage.tsx',
   'src/pages/profile/me/MyDocumentsPage.tsx',
-  'src/pages/profile/me/MyFavoritesPage.tsx',
-  'src/pages/profile/me/MyAiRecordsPage.tsx',
   'src/pages/profile/me/MyBenefitsPage.tsx',
-  'src/pages/profile/me/MyActivityPage.tsx',
-  'src/pages/profile/me/MyNotificationsPage.tsx',
   'src/pages/profile/me/MyFeedbackPage.tsx',
   'src/pages/profile/me/MySettingsPage.tsx',
   'src/pages/profile/me/MyPrivacyRequestsPage.tsx',
@@ -267,6 +271,36 @@ for (const path of concretePages) {
   assert.match(source, /fusion-w5|data-kiosk-presentation=["']fusion-youth["']|MeListShell/, `${path} exposes W5 fusion scope`)
 }
 
+const qxMePages = [
+  'src/pages/profile/me/MyResumesPage.tsx',
+  'src/pages/profile/me/MyFavoritesPage.tsx',
+  'src/pages/profile/me/MyAiRecordsPage.tsx',
+  'src/pages/profile/me/MyActivityPage.tsx',
+  'src/pages/profile/me/MyNotificationsPage.tsx',
+  'src/pages/placeholders/MeActivityDetailPage.tsx',
+]
+for (const path of qxMePages) {
+  const source = read(path)
+  assert.match(source, /QxMePage/, `${path} uses Qingxu member chrome`)
+  assert.doesNotMatch(source, /KioskPageFrame/, `${path} has left the V6 frame`)
+  assert.doesNotMatch(source, /className="qx-nav-item"/, `${path} does not inline navbar items`)
+}
+const qxMeChrome = read('src/pages/profile/me/qx/QxMeChrome.tsx')
+assert.match(qxMeChrome, /QxPageFrame/, 'member chrome uses Qingxu page frame')
+assert.match(qxMeChrome, /QxAppNavbar/, 'member chrome uses shared QxAppNavbar')
+assert.match(qxMeChrome, /current="profile"/, 'member chrome marks 我的 as the current nav item')
+assert.doesNotMatch(qxMeChrome, /KioskPageFrame/, 'member chrome has left the V6 frame')
+const qxNavbar = read('src/components/qingxu/QxAppNavbar.tsx')
+assert.match(qxNavbar, /aria-current=\{current === 'profile' \? 'page' : undefined\}/, 'shared navbar can mark 我的 as current')
+const kioskRootSrc = read('src/layouts/KioskRoot.tsx')
+assert.match(kioskRootSrc, /['"]\/me\/notifications['"]/, '/me/notifications is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/notifications['"]/, '/notifications is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/resumes['"]/, '/me/resumes is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/favorites['"]/, '/me/favorites is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/ai-records['"]/, '/me/ai-records is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/activity['"]/, '/me/activity is registered as a Qingxu migrated route')
+assert.match(kioskRootSrc, /['"]\/me\/activity\/['"]/, '/me/activity/:id uses a precise prefix')
+assert.doesNotMatch(kioskRootSrc, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/me\/['"]/, 'does not use a wide /me/ prefix')
 const profilePageQx = read('src/pages/profile/ProfilePage.tsx')
 const benefitsPageQx = read('src/pages/profile/me/MyBenefitsPage.tsx')
 const feedbackPageQx = read('src/pages/profile/me/MyFeedbackPage.tsx')

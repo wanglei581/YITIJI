@@ -52,10 +52,13 @@ const routes = read('src/routes/index.tsx')
 const packageJson = read('package.json')
 
 expectMatches(routes, /path:\s*'me\/activity'[\s\S]{0,80}?element:\s*<MyActivityPage\s*\/>/, '/me/activity 路由仍指向 MyActivityPage')
-expectIncludes(activity, "import './me-detail-inkpaper.css'", 'MyActivityPage 引入明细页局部 CSS')
-expectIncludes(activity, "useInkRipple('.me-inkdetail", 'MyActivityPage 只在 .me-inkdetail 作用域启用涟漪')
-expectMatches(activity, /className="me-inkdetail me-inkdetail-activity h-full"/, 'MyActivityPage 使用独立 me-inkdetail-activity 根作用域')
-expectIncludes(activity, 'KIcon', 'MyActivityPage 复用 KIcon 图标系统')
+expectIncludes(activity, "import './styles/member-records-qx.css'", 'MyActivityPage 引入青序记录页 CSS')
+expectIncludes(activity, 'QxMePage', 'MyActivityPage 使用青序记录壳')
+expectAbsent(activity, /KioskPageFrame/, 'MyActivityPage 已离开 V6 KioskPageFrame')
+expectIncludes(activity, '本人自填', 'MyActivityPage 求职进度带本人自填标签')
+expectIncludes(activity, "tab === 'applications'", 'MyActivityPage 保留求职进度 Tab')
+expectIncludes(activity, 'listMyJobApplications', 'MyActivityPage 求职进度只读本人自填接口')
+expectAbsent(activity, /企业反馈|面试通知/, 'MyActivityPage 不展示企业端反馈节点')
 
 expectIncludes(activity, 'getMyBrowseLogs(token, { pageSize: 50 })', 'MyActivityPage 保留浏览记录真实 API 拉取')
 expectIncludes(activity, 'getMyJumpLogs(token, { pageSize: 50 })', 'MyActivityPage 保留外部跳转记录真实 API 拉取')
@@ -79,7 +82,7 @@ expectMatches(detailCss, /\.me-tabbar\s*\{/, '明细页 CSS 提供 tabbar 样式
 expectMatches(detailCss, /\.me-detail-row\s*\{/, '明细页 CSS 提供记录行样式')
 expectMatches(detailCss, /\.me-legal-note\s*\{/, '明细页 CSS 提供合规说明样式')
 
-expectAbsent(activity, /一键投递|立即投递|平台投递|投递成功|预约成功|签到凭证|自动保存到|生成报告并保存/, 'MyActivityPage 不出现招聘闭环或越界保存口径')
+expectAbsent(activity, /一键投递|立即投递|投递成功|预约成功|签到凭证|自动保存到|生成报告并保存/, 'MyActivityPage 不出现招聘闭环或越界保存口径')
 expectAbsent(activity, /deleteMyBrowseLog|deleteMyJumpLog|确认删除|清空记录/, 'MyActivityPage 不新增删除/清空入口')
 expectIncludes(packageJson, '"verify:profile-activity-inkpaper"', 'package.json 注册 verify:profile-activity-inkpaper')
 

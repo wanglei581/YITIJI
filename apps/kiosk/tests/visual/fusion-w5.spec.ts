@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
-import { assertNoHorizontalOverflow } from './assert-layout'
+import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTargetPointerHit } from './assert-layout'
 import { FusionW5PaginationRoute } from './fixtures/fusion-w5-pagination-route'
 
 const MEMBER_TOKEN = 'w5-browser-memory-token'
@@ -300,7 +300,7 @@ test('resumes expose authenticated API error and recovered empty states through 
   })
 
   await loginThroughVisibleUi(page, '/me/resumes')
-  await expect(page.getByRole('heading', { name: '暂时无法加载' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '简历记录这次没有加载出来' })).toBeVisible()
   api.respond('GET', '/api/v1/me/resumes', {
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
@@ -317,14 +317,14 @@ test('notification alias and member path render the same canonical capability @w
 
   await page.goto('/me/notifications')
   await expect(page.getByRole('heading', { name: '消息通知' })).toBeVisible()
-  await expect(page.getByText('登录后查看本人记录', { exact: true })).toBeVisible()
-  await expect(page.locator('.me-inkdetail-notifications')).toBeVisible()
+  await expect(page.getByText('登录后查看本人消息', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="member-list"]')).toBeVisible()
   await expectFusionAcceptance(page, errors)
 
   await page.goto('/notifications')
   await expect(page.getByRole('heading', { name: '消息通知' })).toBeVisible()
-  await expect(page.getByText('登录后查看本人记录', { exact: true })).toBeVisible()
-  await expect(page.locator('.me-inkdetail-notifications')).toBeVisible()
+  await expect(page.getByText('登录后查看本人消息', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="member-list"]')).toBeVisible()
   await expectFusionAcceptance(page, errors)
 })
 
@@ -414,7 +414,9 @@ test('activity detail renders an honest missing-record empty state after visible
 
   await loginThroughVisibleUi(page, '/me/activity/missing-w5-record')
   await expect(page.getByRole('heading', { name: '未找到这条记录' })).toBeVisible()
-  await expect(page.getByText('记录可能已清理，或不属于当前登录账号', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('记录可能已清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
+  ).toBeVisible()
   await expectFusionAcceptance(page, errors)
   pagination.assertNoUnhandledRequests()
 })
@@ -708,3 +710,192 @@ test('phone upload renders a real upload failure without exposing fixture creden
   await expect(page.getByText('w5-one-time-upload')).toHaveCount(0)
   await expectFusionAcceptance(page, errors)
 })
+
+const CTA_WHITELIST = ['查看岗位', '去来源平台投递', '扫码投递', '查看招聘会', '去来源平台预约', '扫码预约', '复制来源链接']
+const BANNED_COPY = ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理', '我要应聘', '递交简历', '直投', '立即报名']
+
+async function assertCtaWhitelist(scope: Page | ReturnType<Page['locator']>): Promise<void> {
+  const buttons = scope.locator('button, a[href], [role="button"]')
+  const count = await buttons.count()
+  for (let i = 0; i < count; i += 1) {
+    const el = buttons.nth(i)
+    if (!(await el.isVisible())) continue
+    const label = await el.getAttribute('aria-label')
+    const actionNode = el.locator('.qx-me-acts .qx-me-small, .qx-me-row-go, .qx-home-tile-foot, .qx-btn-label').last()
+    const actionText = (await actionNode.count()) > 0 ? (await actionNode.innerText()).trim() : ''
+    const name = (label ?? (actionText || (await el.innerText()))).trim()
+    // 只校验**投递 / 预约**类动作 —— CLAUDE.md §2 的白名单管的就是这两类。
+    // 原来的正则还含「岗位 / 招聘会 / 来源」，会把「收藏岗位」「取消收藏」这种
+    // 完全合规的控件也拖进来判越界（实测：一个收藏按钮把整条用例判红）。
+    if (!name || !/投递|预约/.test(name)) continue
+    const exact = CTA_WHITELIST.some((ok) => name === ok || name.startsWith(ok))
+    // 只留这一条：报错直接说出越界文案。原来还有一条 arrayContaining 写法，
+    // 判的是同一件事，却把失败渲染成 `Expected: ArrayContaining ["__missing__"]`，
+    // 真正越界的文案被挤出可见范围，排查时得单跑才看得到。
+    expect(exact, `CTA 文案越界：${name}`).toBe(true)
+  }
+}
+
+async function assertBannedCopy(text: string): Promise<void> {
+  let cleaned = text
+  for (const ok of CTA_WHITELIST) cleaned = cleaned.replaceAll(ok, '')
+  for (const banned of BANNED_COPY) {
+    expect(cleaned, `禁用文案：${banned}`).not.toContain(banned)
+  }
+}
+
+test('notifications mark-all-read toast is server-driven and stays inside the compliance whitelist @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const item = {
+    id: 'n-print-1',
+    kind: 'personal',
+    title: '打印订单状态更新',
+    content: '你的一笔打印订单状态有变化，具体进度以服务端返回为准。',
+    category: 'print',
+    relatedType: null,
+    relatedId: null,
+    isRead: false,
+    createdAt: '2026-09-01T08:00:00.000Z',
+  }
+  api.respond('GET', '/api/v1/me/notifications', {
+    status: 200,
+    json: { success: true, data: { items: [item], nextCursor: null, total: 1, unreadCount: 1 } },
+  })
+  api.respond('PATCH', '/api/v1/me/notifications/read-all', {
+    status: 200,
+    json: { success: true, data: { updated: 1 } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/notifications')
+  const row = page.getByText('打印订单状态更新', { exact: true })
+  await expect(row).toBeVisible()
+  await assertTapTargetPointerHit(page.getByRole('button', { name: '全部标记为已读' }))
+  await page.getByRole('button', { name: '全部标记为已读' }).click()
+  const toast = page.getByRole('status').filter({ hasText: '已标记全部已读' })
+  await expect(toast).toBeVisible()
+  await assertBannedCopy(await toast.innerText())
+  await assertCtaWhitelist(page)
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('activity jump records stay action facts and never show fulfillment statuses @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/me/browse-logs', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [{ id: 'b1', targetType: 'job', targetId: 'job-1', targetTitle: '示例岗位浏览', sourceName: '来源机构', sourceUrl: 'https://jobs.example.gov.cn/1', externalId: 'ext-1', createdAt: '2026-09-01T08:00:00.000Z' }],
+        nextCursor: null,
+        total: 1,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/external-jump-logs', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [{ id: 'j1', targetType: 'job', targetId: 'job-1', targetTitle: '示例岗位跳转', sourceName: '来源机构', sourceUrl: 'https://jobs.example.gov.cn/1', externalId: 'ext-1', action: 'external_apply', createdAt: '2026-09-01T09:00:00.000Z' }],
+        nextCursor: null,
+        total: 1,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/job-applications', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/activity')
+  await expect(page.getByText('示例岗位浏览', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /外部跳转记录/ }).click()
+  const jumpList = page.getByRole('region', { name: '浏览与跳转记录' })
+  await expect(jumpList.getByText('示例岗位跳转', { exact: true })).toBeVisible()
+  await expect(jumpList.getByText('已投递')).toHaveCount(0)
+  await expect(jumpList.getByText('待面试')).toHaveCount(0)
+  await expect(jumpList.getByText('已录用')).toHaveCount(0)
+  await expect(page.getByText('企业反馈')).toHaveCount(0)
+  await expect(page.getByText('面试通知')).toHaveCount(0)
+  await assertCtaWhitelist(page)
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('applications empty tab names the writer and does not invent ATS status @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/me/browse-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/external-jump-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/job-applications', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+
+  await loginThroughVisibleUi(page, '/me/activity')
+  await page.getByRole('button', { name: /求职进度/ }).click()
+  const panel = page.getByTestId('member-records-application-list')
+  await expect(panel).toBeVisible()
+  await expect(
+    page.getByText('由你自己填写；本终端不参与投递，也不掌握来源平台的结果', { exact: true }),
+  ).toBeVisible()
+  await expect(page.getByText('手填入口待建设')).toBeVisible()
+  await expect(page.getByText('本页不会替你造进度')).toBeVisible()
+  await expect(panel.getByText('已投递')).toHaveCount(0)
+  // 「查看岗位」在这一屏出现两处（空态引导行 + 底栏行动条），
+  // 本条要证的是「空态里给了一条真实去向」，所以限定在面板内查。
+  await expect(panel.getByRole('button', { name: '查看岗位' })).toBeVisible()
+  await assertCtaWhitelist(page)
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('AI record delete waits for the server and keeps the row on failure @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const record = {
+    id: 'ai-1',
+    kind: 'optimize',
+    status: 'completed',
+    taskId: 'task-1',
+    provider: 'demo',
+    optimized: false,
+    hasDraft: false,
+    latestVersion: null,
+    createdAt: '2026-09-01T08:00:00.000Z',
+    expiresAt: null,
+  }
+  api.respond('GET', '/api/v1/me/ai-records', {
+    status: 200,
+    json: { success: true, data: { items: [record], nextCursor: null, total: 1 } },
+  })
+  api.respond('GET', '/api/v1/me/job-ai-sessions', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  api.respond('GET', '/api/v1/me/mock-interviews', {
+    status: 200,
+    json: { success: true, data: { items: [] } },
+  })
+  api.respond('DELETE', '/api/v1/me/ai-records/ai-1', {
+    status: 500,
+    json: { success: false, error: { code: 'GONE', message: 'expired' } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/ai-records')
+  await expect(page.getByText('基于诊断生成的优化建议')).toBeVisible()
+  await page.getByRole('button', { name: '删除 AI 服务记录' }).click()
+  await expect(page.getByText('本页不会提前显示成功')).toBeVisible()
+  await page.getByRole('button', { name: '确认删除这条记录，删除后不可恢复' }).click()
+  const toast = page.getByRole('status').filter({ hasText: '删除失败，记录可能已到期或被清理' })
+  await expect(toast).toBeVisible()
+  await expect(page.getByText('基于诊断生成的优化建议')).toBeVisible()
+  await expect(page.getByText('记录已删除')).toHaveCount(0)
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+})
+
