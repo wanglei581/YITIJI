@@ -115,6 +115,46 @@ if (
   fail('预检命令必须引用 REQUIRED_PRODUCTION_GATES（与 3b 同一份清单）')
 }
 
+// ── 前端版的同一形态：部署脚本传 VITE_API_MODE=http，前端必须在没传时炸掉 ──────
+//
+// admin / partner / kiosk 的 `API_MODE` 都是「只有精确等于 'http' 才走真接口，
+// 否则一律 mock」。少传或写错这个变量，构建**不会报错**，会静默打包 mock 适配器 ——
+// 后台照样渲染出一整套假数据（假机构、假岗位、假价目、假法务文本），
+// 运营人员照着它决策，而且外观上完全看不出来。
+//
+// kiosk 早就装了 `import.meta.env.PROD && API_MODE !== 'http'` 的 fail-closed 断言；
+// 2026-09-09 实测 admin / partner **各 0 处**，两边只有 `import.meta.env.DEV` 下的
+// console.warn —— 生产构建里那句话根本不执行。
+//
+// 与本门禁开头那次事故同形态：两处清单各自维护、没人比对。
+// 所以两边都断言：部署脚本必须传，前端必须在没传时 fail-closed。
+{
+  const FRONTENDS = [
+    { app: 'kiosk', client: 'apps/kiosk/src/services/api/client.ts' },
+    { app: 'admin', client: 'apps/admin/src/services/api/client.ts' },
+    { app: 'partner', client: 'apps/partner/src/services/api/client.ts' },
+  ]
+  const deployYml = readFileSync(join(repoRoot, '.github/workflows/deploy.yml'), 'utf8')
+
+  for (const { app, client } of FRONTENDS) {
+    const src = readFileSync(join(repoRoot, client), 'utf8')
+    // 判据只看「PROD 且非 http 就抛」这一条，不看注释里怎么解释。
+    const failsClosed =
+      /import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/.test(src) &&
+      /throw new Error\(/.test(src.slice(src.search(/import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/)))
+    if (failsClosed) pass(`${app} 生产构建对 mock 模式 fail-closed`)
+    else fail(`${app} 生产构建未对 mock 模式 fail-closed —— 漏传 VITE_API_MODE 会静默发布假数据后台（${client}）`)
+  }
+
+  // 另一半：部署脚本必须真的传。三个构建各出现一次，别只传其中一两个。
+  const modeCount = (deployYml.match(/VITE_API_MODE=http/g) ?? []).length
+  if (modeCount >= FRONTENDS.length) {
+    pass(`deploy.yml 为 ${FRONTENDS.length} 个前端都传了 VITE_API_MODE=http（实测 ${modeCount} 处）`)
+  } else {
+    fail(`deploy.yml 只有 ${modeCount} 处 VITE_API_MODE=http，少于前端个数 ${FRONTENDS.length}`)
+  }
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 生产闸门与部署脚本不同步，发布会在最坏时点失败\n`)
   process.exit(1)
