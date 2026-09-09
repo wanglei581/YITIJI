@@ -145,12 +145,12 @@ console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
 }
 
 {
-  const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
-  const checkinEntry = homeServiceGroups.match(/扫码签到[\s\S]{0,800}/)?.[0] ?? ''
+  const fairsHub = read('src/pages/job-fairs/FairsServiceHubPage.tsx')
+  const checkinEntry = fairsHub.match(/扫码签到[\s\S]{0,800}/)?.[0] ?? ''
   if (!checkinEntry.includes("to: '/job-fairs/checkin'") || /disabled:\s*true/.test(checkinEntry)) {
     fail('扫码签到入口必须进入 /job-fairs/checkin，且不得继续使用禁用占位')
   } else {
-    pass('扫码签到入口进入真实来源签到列表，未伪造签到二维码')
+    pass('招聘会服务中心扫码签到入口进入真实来源签到列表，未伪造签到二维码')
   }
 }
 

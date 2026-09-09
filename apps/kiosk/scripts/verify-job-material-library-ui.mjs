@@ -48,21 +48,23 @@ function assertNotContains(path, patterns, message) {
 
 console.log('\n=== Kiosk job material library UI verification ===')
 
-const homeServicesPath = 'src/pages/home/serviceGroups.ts'
+const resumeHubPath = 'src/pages/resume/ResumeServiceHubPage.tsx'
 
 assertContains('package.json', '"verify:job-material-library-ui"', 'Kiosk package exposes job material UI verifier')
 assertContains('src/services/api/index.ts', './jobMaterials', 'Kiosk API exports jobMaterials service')
 assertContains('src/services/api/jobMaterials.ts', 'generateJobMaterial', 'Kiosk service can generate job material')
 assertContains('src/services/api/jobMaterials.ts', 'getResumeTemplates', 'Kiosk service exposes resume template loader')
 assertContains('src/services/api/jobMaterials.ts', 'isJobMaterialDocumentTemplate', 'Kiosk service separates resume templates from generated job materials')
-assertContains(homeServicesPath, "title: '简历素材库'", 'Homepage keeps existing resume material tile')
-assertContains(homeServicesPath, "title: '求职材料'", 'Homepage keeps existing job material tile')
-assertContains(homeServicesPath, "to: '/resume/templates'", 'Homepage routes resume template tile to resume template library')
-assertContains(homeServicesPath, "to: '/resume/materials'", 'Homepage routes job material tile to job material library')
+// 原断言钉死代码 serviceGroups.ts（首页已不渲染那组瓦片）。
+// 活入口在 /resume-service：简历素材库 → /resume/templates，求职材料 → /resume/materials。
+assertContains(resumeHubPath, "title: '简历素材库'", 'Resume hub keeps existing resume material tile')
+assertContains(resumeHubPath, "title: '求职材料'", 'Resume hub keeps existing job material tile')
+assertContains(resumeHubPath, "to: '/resume/templates'", 'Resume hub routes resume template tile to resume template library')
+assertContains(resumeHubPath, "to: '/resume/materials'", 'Resume hub routes job material tile to job material library')
 assertNotContains(
-  homeServicesPath,
-  [/title:\s*'简历素材库'[^}]*disabled:\s*true/s, /title:\s*'求职材料'[^}]*disabled:\s*true/s],
-  'Homepage job material tiles are no longer disabled',
+  resumeHubPath,
+  [/title:\s*'简历素材库'[\s\S]*?available:\s*false/, /title:\s*'求职材料'[\s\S]*?available:\s*false/],
+  'Resume hub job material tiles stay available',
 )
 assertContains('src/routes/index.tsx', 'JobMaterialLibraryPage', 'Kiosk routes job material library as a standalone page')
 assertContains('src/routes/index.tsx', /path:\s*'resume\/templates'[\s\S]*?<ResumeTemplateLibraryPage \/>/, 'Kiosk keeps /resume/templates mapped to resume template library')
