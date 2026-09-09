@@ -10,8 +10,14 @@ overrides:
   uuid: 14.0.0
   shell-quote: 1.9.0
   hono: 4.12.27
-  multer: 2.2.0
-  js-yaml: 4.3.1
+  # multer: GHSA-wc9g-mqfw-jrwm / GHSA-535w-7cp7-47q4（影响 <2.3.0）+ GHSA-qfvm-cv95-jqjf（精确命中 =2.2.0）。
+  #   package.json 写的是 ^2.2.0，caret 本就允许 2.3.0，是这里钉住了。multer 在用户文件上传主链路上
+  #   （files / ai / content / jobs / admin-fairs / partner-fairs 六个 controller），三条 high 不能挂着。
+  multer: 2.3.0
+  # js-yaml: GHSA-2883-xcg3-v3hh（影响 >=4.0.0 <4.3.2，首修 4.3.2）。原先钉的 4.3.1 当初本身是安全修复，
+  #   现被新公告覆盖。不取 5.x：跨大版本且 4.3.2 已越过该公告。改此处必须同步
+  #   scripts/verify-dependency-security.mjs 的 REQUIRED_JS_YAML_VERSION。
+  js-yaml: 4.3.2
   # fast-uri: 2026-09-02/03 新发四条 high，全部影响 <3.1.6、首修 3.1.6 ——
   #   GHSA-5jgf-p345-68v8（IDN 规范化被跳过导致 host 混淆）
   #   GHSA-f65p-4m7j-42xc（畸形 IPv6 导致 SSRF）
@@ -63,6 +69,10 @@ overrides:
   # 同 major 升级，且比已有的 deepmerge-ts 7.1.5 → 8.0.0（同样来自 prisma@7.8.0，跨 major）更保守。
   # 3.22 的行为变化就是漏洞修复本身：默认关掉 mysql_clear_password。
   mysql2: 3.24.0
+  # @xmldom/xmldom: 一次进来 8 条 high。传递依赖，锁文件此前解析到 0.8.13。
+  #   取 0.8.15 而非 0.9.x：GHSA-93r5-fhx6-vmg9 影响 <=0.8.14，0.8.15 越过全部 8 条；
+  #   0.9 是另一条大版本线，作为传递依赖跨过去风险不成比例。
+  '@xmldom/xmldom': 0.8.15
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true
