@@ -502,6 +502,10 @@ export function PrintCashierPage() {
   return (
     <div data-w2-page="print-cashier" className="cashier-qx-route">
     <QxPageFrame
+      /* 稿 32-cashier 原文：data-route="/me/print-orders" aria-label="返回我的打印订单"。
+       *  和 CTA 上的「退出支付」是两件事：返回=去看这张待付订单（订单还在），
+       *  退出支付=放弃这次支付回首页。两个都要，缺一都会让人在收银台里困住。 */
+      back={{ label: '返回我的打印订单', onBack: () => navigate('/me/print-orders') }}
       title="订单支付"
       subtitle="选择服务端已启用通道；支付确认到账后才会释放打印任务"
       terminalLabel={state.orderNo ? `订单 ${state.orderNo}` : '就业服务大厅'}

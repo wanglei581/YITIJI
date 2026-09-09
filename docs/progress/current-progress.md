@@ -1,5 +1,90 @@
 # 当前开发进度
 
+## 2026-09-08 夜 bug 检查与工程优化线：五条可复用的结论
+
+本条只记**下次还会用到的判据**，不复述改了什么（改了什么看 PR）。
+
+### 一、「用例写了」不等于「用例在跑」——同一天在两个模块各发现一批
+
+- `apps/kiosk/tests/` 32 个 spec，**9 个从未在 CI 跑过**；其中 3 个已经对着 main 跑不过。
+- 另一条线在 API 侧发现 **10 条上线体检安全用例同样从未执行**（#985）。
+- `ci.yml` 里 `test:browser:truth` 的注释记着**上一次发作**（定义了但没人引用）。同一个坑第二次踩，
+  说明它是机制问题不是记性问题。
+
+已加 `verify:kiosk-browser-spec-coverage`（#977）。**它有两层，缺一层就漏**：
+
+1. **文件层**：从 `ci.yml` 抽出被调用的 `test:browser*` → 解析 `package.json` 命令 →
+   显式文件名 + `--config` 的 `testMatch` 正则，剩下的就是没人跑的。
+2. **标签层**：Playwright 的 project 带 `grep`（如 `/@kiosk/`），**用例标题不带那个标签就是 0 条，
+   且不报任何错**。我自己接线时就栽在这层：`cashier-qx.spec.ts` 挂进 CI 后照样贡献 0 条，
+   「18 passed」里一条都不来自它。归位跑起来后 5 条里 3 条红。
+
+**运行时那一层（日志里数得出条数）暂不做**：静态标签检查已覆盖唯一**已知**的失效形态；
+运行时计数要为每种输出格式写解析，而它能多抓的「标签对但被 skip」目前**没有实例**。
+按假想的失效形态写门禁，就是照假设写断言。等出现第一个真实实例再做。
+
+### 二、把当时的现状写死，是同一个病的三个方向
+
+- **魔法数字**：收银台 `toHaveCount(6)` —— 那个 6 是在「退出支付」**还缺失时**数出来的，
+  等于把缺陷写成了期望值。按钮补回来本该当场红，可这个 spec 那时哪个 config 都没匹配到。
+- **快照式断言**：`V6_SHELL_ROUTES.length >= 8` 之类，迁移推进时**撞红的不是缺陷是进度**。
+- **不过期的豁免**：欠账清单里的条目修好了不下架，那一页就永久不再受检。
+
+三者的解法一致：**钉不变量，并让清单会过期**。`back-exit.spec.ts` 的 `UNDECIDED` 因此加了
+「修好即下架」「路由没了即清理」两条反向断言（#977）。
+
+### 三、放松一条合规门禁，举证责任是双向的
+
+`verify:activity-logs` 把诚实的免责声明判成违规（子串匹配分不出「声称状态」和「否认状态」）。
+修法是先剥否认句再查禁词 —— 但**光验「以前红的现在绿了」不够**，必须同时证明真违规仍被抓。
+故把 10 条双向用例内嵌进门禁本体，并与文件扫描**共用同一个剥离函数**
+（各写一份等于自检测的是副本）。另加元断言：每条样本原文必须真的命中禁词，否则判用例无效 ——
+这条当场抓到两个照假设写的样本。（#971）
+
+### 四、探针读数为 0 有两种可能：真的没有，或者根本没测到
+
+本夜实测三例，全部差点变成误报：
+
+| 现象 | 我差点得出的结论 | 真相 |
+|---|---|---|
+| `.qx-topbar-back` 在 107 条路由上全数到 0 | 「返回键全丢了」 | 66 条冷开落到 fail-closed 守卫态，没渲染青序流光壳 |
+| 反向变异后用例没红 | 「断言是空的」 | `--grep 键盘` 一条都没匹配到（标题带 describe 前缀），**根本没跑** |
+| 生产 `/jobs` 显示「正在清除本次使用记录」 | 「线上挂了」 | 直接输网址被隐私边界判越界而清场（`historyIndex === null` 即 fail-closed），
+  而那句中文是 `sr-only` 标签被 `innerText` 捞出来的 |
+
+**拿到 0 之前先做阳性对照**：在明知有目标的场景上跑同一个探针，确认它读得出非 0。
+
+### 五、猜路径探生产，会把「路径不对」误报成「功能不存在」
+
+同样三例：`/api/v1/miniapp-code`（真实 `/api/v1/miniapp/code`）、`/api/v1/print/pricing`
+（真实 `/print/price-config`）、`zyidai.cn/admin/`（真实 `admin.zyidai.cn`，**子域才是正式入口**，
+且 `docs/device/production-deployment-and-windows-host-checklist.md:440` 早就写明同主机路径落到
+Kiosk SPA 是预期行为）。
+
+第一例我还把错结论转告了别的 lane，让他们以为端点没上线。
+
+**SPA 兜底特别会骗人**：`/admin/任意不存在路径` 也回 200，且与 `/` 的 index 逐字节相同。
+决定性判据是**拿一个必然不存在的路径去打，看是否同样 200 且内容相同**。
+
+**探端点前先 `git grep '@Controller\|@Post\|@Get'` 取真实路由；探站点入口前先查 docs 里的既有验收记录。**
+
+---
+
+### 交给产品负责人的三件（工程侧做不了）
+
+1. **彩色 0 元 / 黑白 0.5 元**：用户选彩色即免单且不经过收银台（`CashierQxView` 判
+   `amountCents <= 0` 走 free-order），而彩色是打印扫描页自己标明「尚未通过真机验证」的能力。
+   非漏配 —— `updatePriceConfig` 早就要求 `confirmZeroPrice`，是有人确认过的；缺的是**组合后果**，
+   #987 已把对侧价格写进确认提示。改不改是商业决策。
+2. **专利申请文件无版本保护**：`origin/main` 上 `docs/patent/drafts/` 跟踪数 **0**、`*.tif` **0**，
+   主干只有 7 份技术交底 `.md`；磁盘上是 116 文件（68 docx + 28 tif + 14 png + 5 pdf + 1 doc）。
+   `rev-list --all` 里那 49 个对象不在 main 上，**分支一删或 gc 一跑就进不可达状态，不算保护**。
+   已有同机第二份拷贝，异地那份只能由产品负责人做。
+3. **BL-06 三板块线上零内容**：已登记进 `delivery.yaml`。注意它不是「配置一开就有」——
+   库里 217 条经审查拒绝发布（200 条已过期、来源机构名为「预生产…样本」「演示」、
+   机构表含 `111`/`的撒的`）。需要真实数据源与授权。
+
+
 ## 2026-09-08 抢救回一份被埋一个月的真机出纸证据
 
 `docs/device/print-first-order-evidence-2026-08-07.md` —— **2026-08-07 Windows 主机 +
@@ -59,6 +144,11 @@ Terminal Agent 未验收」是在描述一台用户根本没有的设备。** �
 
 2026-09-07 **`/resume/generate/preview` 按 24 号稿收口重复出口（分支 `claude/qx-r3-generate-preview`）**。1080×1920 实拍空态同时出现「返回首页 / 重新填写生成 / 重新填写」三个控件，后两个同义。按 `24-resume-generate.html?capture=1&flat=1`：空态 CTA 只留两个且按稿定名（session-lost「返回服务大厅 + 重新填一份」、preview-no-result「返回简历服务 + 去填资料」、preview-failed「重新填一份 + 再读一次」、illegal「回首页 + 从第 1 步开始」），工作区改为「回去改资料 + 内容没问题，去导出」；重新填写动作保留为真实路由 `/resume/generate`。底部导航走 `QxPageFrame` 的 `navbar` 槽（首页 / AI 顾问 / 我的），不在页面里再造一条。空态正文出口与 CTA 不同目的地。未改 `resume-deliver/` 草稿 / 版本 / 裁决逻辑。未部署。
 2026-09-07 **`/resume/optimize` 空态补齐零模型降级路径（分支 `claude/qx-r1-optimize-empty`，待 PR）**。按青序流光 `23-resume-optimize.html` 补齐「不靠这一步，也能继续」三条真实出口、逐字一致的 8 步手动清单，以及首页 / AI 顾问 / 我的底部导航；手动修改与我的简历均复用已注册 `/me/resumes` 资产入口，不新增第三条编辑链，返回报告保留现有 `taskId` / 匿名访问上下文。新增 Playwright 强业务断言覆盖真实空响应、匿名访问令牌请求头、能力级故障、六个导航动作和触控命中。源码侧 typecheck、lint、build 与六条 owner 指定静态 verify 已通过（本 worktree 的共享 `node_modules` 状态不可写，组合脚本以 `pnpm_config_verify_deps_before_run=warn` 禁止 pnpm 自动修复依赖，项目脚本本身未改）；当前受控执行沙箱拒绝本地 `listen()`（`EPERM`）并中止 Chrome（`SIGABRT`），因此 1080×1920 截图和需 webServer 的 Playwright 尚未形成有效证据，PR 必须按 `PARTIAL` 标注，待 CI / 可启动浏览器的验收机补跑后方可合入。
+2026-09-07 **报价确认页迁入青序流光（分支 `claude/qx-b1-print-confirm`，原型 14-print-confirm.html）**。`/print/confirm` 登记进 `QX_MIGRATED_ROUTES`，页面改用 `QxPageFrame` + `print-confirm-qx.css`。保留既有 `POST /orders/quote` / `POST /print/jobs` / `GET /print/price-config` 与建单分流（付费进收银、零元仍先建单）。地址栏按稿白名单 fail-closed：表外键、同名键重复、不可回显取值、非空 `#` 一律落到 `invalid-context` 并 `replaceState` 清洗，取值不进 DOM。八态均有真实对应：`missing-context` / `invalid-context` / `quoting` / `quoted` / `quote-failed` / `capability-invalid-params` / `benefit-unverified` / `zero-amount`。优惠券入口保留为「功能尚未接通」禁用态 + 常驻原因（服务端打印核销仍 fail-closed）。未部署、未真机。
+
+2026-09-07 **一体机首页 `/` 青序流光迁移候选（分支 `claude/qx-b1-home`，PARTIAL）**：运行时首页从上一代 V6 视图切换为 `QxPageFrame + QxHomeView`，保留 `useAuth`、终端设备状态、百宝箱 / 智慧校园能力开关、招聘会真实高亮与原样 `ContinuePanel` 数据链；`/` 登记进 `QX_MIGRATED_ROUTES`，窄屏不再叠加旧 `kiosk-home-mobile` / V6 壳。原型对应的 `/services` 全部服务目录尚无运行时路由，因此“更多服务”“查看全部服务”及无续办态目录入口均保留为带原因的禁用控件，缺口登记在 `next-tasks.md`。首页 1080×1920 与 390×844 E2E 已接入 W1 配置，覆盖真实招聘会数据与 terminalId 查询参数、异常态与重试、设备未知态、受控入口、合规文案、真实导航、壳唯一性、尺寸及 PointerEvent 命中；本沙箱禁止监听本地端口、Chromium Mach rendezvous 被拒且浏览器策略禁止 `file://`，故浏览器用例和新截图未实际跑成。kiosk typecheck、lint、生产参数 build及首页关联静态门禁通过，W1 共收集 10 条用例；旧 `V6HomeView` / `home-v6.css` 保留；不代表已合入、已部署或真机验收。
+
+2026-09-07 **打印扫描 Hub 迁入青序流光（分支 `claude/qx-b1-hub`，原型 10-print-hub.html）**。`/print-scan` 与 `/print-scan/feature/:key` 登记进 `QX_MIGRATED_ROUTES`：精确集合收无参路由，前缀只收 `/print-scan/feature/`，避免误伤尚未迁移的 `/print-scan/convert`、`/print-scan/sign`。页面改用 `QxPageFrame` + `print-hub-qx.css`，保留能力探测轴 / MFP 轴状态机。顶栏胶囊默认 `unknown`「能力与设备状态以办理时确认」，拿不到打印机状态不写设备可用（fail-closed）。Hub 八张能力卡按新稿（含 U 盘导入，标注 Windows 真机未验收）；证件照走说明页。未部署、未真机。
 
 2026-09-07 **青序流光批 1「材料检查 + 打印参数」本地候选（分支 `claude/qx-b1-desk`，PARTIAL，未部署）**：`/print/material-check`、`/print/preview` 已改用 `QxPageFrame` + 页面私有 `print-desk-qx.css`，并登记进 `QX_MIGRATED_ROUTES`；保留 inspection / normalize_a4 / pii_scan / pii_redact 顺序任务、轮询、匿名任务 token、设备能力、页范围和下游报价链。原型声明的 4 个材料端点经项目图谱核实均存在；预览页新增读取真实 `GET /materials/tasks/:id/print-param-suggestions`，建议默认不生效，只有用户点「采用这些建议」后才写入既有参数并传给确认页。隐私预检改为 fail-closed：扫描不完整时 `handleContinue` 与主按钮双重阻断；预览页不再只凭任务 ID 放行，后端 claim 未知、成功却无对应派生文件时退回材料检查，partial / redacted_unverified / 复检残留 / not_supported 必须逐页核对并明确确认，确认时间随 `MaterialCheckSummary` 进入后续下单；原型中过期的「跳过检查」入口未实现。新增 W2 E2E 源码覆盖真实 PII 决策 payload、`pii_redact` 派生件、直达绕过阻断、参数建议显式采用及 `/orders/quote` 的 `copies` payload；测试源码 TypeScript 编译通过。kiosk typecheck、lint（0 error / 10 条既有 Fast Refresh warning）、真实 API 模式生产 build、图谱关联门禁（含 fusion W2/W6、PII、参数能力、设备状态、报价真值、来源传递）和 API 隔离 SQLite 能力/计价门禁通过。**未完成证据**：沙箱启动 `127.0.0.1:4177` 返回 `listen EPERM`，Playwright 未进入用例，因此 1080×1920 原型逐态截图、22 态实际网络注入、stage-scale 后触控尺寸与 PointerEvent 命中测试仍为 `UNREVIEWED`，不得写成浏览器或真机通过。
 2026-09-07 **青序流光批 1：图片转 PDF 页迁移（`/print-scan/convert`，原型 19-img2pdf.html）**。`ConvertImagesPage` 改用 `QxPageFrame` + `convert-images-qx.css`，登记进 `QX_MIGRATED_ROUTES`。保留既有 `kioskUploadFile` / `convertImagesToPdf` / `UploadSessionQrPanel` 与错误处理；列表数组顺序即 POST `sources` 顺序即 PDF 页序；同一有序输入复用同一个 Idempotency-Key。成功后停在本页展示服务端回执，主按钮「拿这份 PDF 去打印」进 `/print/material-check`，不再直达确认/收银。旋转 90° 与 U 盘导入保留为禁用/能力边界（接口无旋转字段、本页未接 U 盘列表）。多图列表 `overflow-y: auto`，不照抄原型 20 张只露出 3 张。游客文案仍写「未登录时 PDF 不会进入「我的文档」」。未部署、未真机。

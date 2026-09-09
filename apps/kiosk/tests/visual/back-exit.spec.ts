@@ -61,16 +61,16 @@ const EXEMPT = new Map<string, string>([
  * 裁定后每一条要么补上返回槽（从这里删），要么进 EXEMPT 并写清为什么不是流程中段。
  */
 const UNDECIDED = new Map<string, string>([
-  ['/jobs', '从首页进来的一级业务页。底部主导航能回首页，但回不到“上一步”。'],
-  ['/ai/plan', '同上：一级 AI 服务页。'],
-  ['/scan/start', '扫描流程第一步。是入口还是中段，取决于它上面还有没有 Hub。'],
-  ['/scan/settings', '扫描流程中段，按语义应当能退回上一步。'],
-  ['/scan/progress', '进行中态：退出是否等于取消扫描任务，需要产品定。'],
-  ['/print/cashier', '付款页已有 CTA 次级出口「退出支付」，但没有顶栏返回槽 —— 两者是否都要，需裁定。'],
-  ['/print/progress', '打印进行中：同 /scan/progress，退出语义未定。'],
+  // 这三条已裁定：稿 18 把扫描四页画成一张工作台，共用一个返回键落到 /print-scan。
+  // 但落地在 #984——那个 PR 把 /scan/{start,settings,progress} 合成 /scan，
+  // 三条路由本身会消失。所以留在这里等它合入，由 #984 连同路由一起删；
+  // 现在就删会让门禁去要求三条即将不存在的路由补槽。
+  ['/scan/start', '已裁定补槽（稿 18 共用返回键 → /print-scan）；路由在 #984 合并为 /scan 时随之删除。'],
+  ['/scan/settings', '同 /scan/start：裁定已出，等 #984 合并工作台后删除。'],
+  ['/scan/progress', '同 /scan/start：裁定已出，等 #984 合并工作台后删除。'],
 ])
 /** 只许降不许升。升它等于给新的漏填开口子。 */
-const UNDECIDED_LIMIT = 7
+const UNDECIDED_LIMIT = 3
 
 test.describe('每一页都要能回上一步 @kiosk', () => {
   test('未裁定欠账不得增长 @kiosk', () => {
@@ -93,14 +93,51 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
 
   test('豁免清单闭合：每条豁免都指向真实路由且写了理由 @kiosk', () => {
     const patterns = new Set(sweepCases.map((c) => c.pattern))
+    const landings = new Set<string>(sweepCases.map((c) => c.landedPath))
     for (const [route, reason] of EXEMPT) {
-      expect(patterns.has(route as never), `豁免「${route}」不在 productionRoutePatterns 里，应清理`).toBe(true)
+      // 豁免键既可以是路由本身，也可以是某条路由的落地页（/login 是 /session-resume 的落地）。
+      expect(
+        patterns.has(route as never) || landings.has(route),
+        `豁免「${route}」既不是 productionRoutePatterns 里的路由，也不是任何路由的落地页，应清理`,
+      ).toBe(true)
       expect(reason.trim().length, `豁免「${route}」理由太短`).toBeGreaterThan(12)
     }
   })
 
   for (const route of sweepCases) {
-    const why = EXEMPT.get(route.pattern)
+    // **按落地页判，不按输入的地址判。** 我们查的是落地那一页的 DOM，豁免自然也要按它查。
+    //
+    // 本文件第一版按 route.pattern 查豁免：`/` 明明在 EXEMPT 里，用 `/contract-review`
+    // 这个键却查不到，于是门禁去问首页「你的返回上一步在哪」。那时首页尚未迁入青序流光、
+    // 没有 data-qx-frame，被下面 framed===0 的跳过分支盖住；首页迁完（#932）盖子一掀，
+    // 三条 /contract-review* 当场误报（#991 用「落到首页就跳过」先止了血）。
+    // **#932 不是原因，是揭开的人；错在第一版就写下了。**
+    //
+    // 同期还有三条从来没被真正判过，只是碰巧过了：
+    //   /session-resume → /login（登录页恰好有「返回首页」，按文案蒙对）
+    //   /screensaver → /、/scan/progress → /scan/start
+    const judged = route.landedPath
+    // 「被重定向走了」的判据是**落地页 ≠ 我们导航过去的地址**，
+    // 不是「落地页 ≠ 路由模式」—— 后者对每条带参路由都成立（/jobs/:id 落到 /jobs/job-001），
+    // 会把几十条正常路由一并豁免掉。写这条时先按后者写过，实测 20 条误判。
+    const navigatedTo = route.url.split('?')[0]
+    const redirected = judged !== navigatedTo
+    // 人工豁免与「被重定向走了」必须分开：EXEMPT 带一条**反向断言**
+    //（已渲染出返回槽 → 豁免过期，要求下架），那是为人工清单设计的。
+    // 自动派生的重定向跳过不能套它 —— 落地页（/login、/scan/start）本来就该有返回槽，
+    // 套上去会把 7 条正常页判成「豁免过期」。
+    //
+    // ⚠️ 变异验证的诚实记录（2026-09-09）：
+    //   M1 让 redirected 恒假        → 0 红（EXEMPT.get(judged) 那一半仍然兜住）
+    //   M3 查表键退回 route.pattern  → 0 红（redirected 那一半仍然兜住）
+    //   M2 把反向断言套回重定向跳过  → **7 红**
+    // 即：**修掉缺陷的是「按落地页查豁免」，redirected 对今天这批路由不是独立必要的**。
+    // 留着它的理由只有两条，都不是「今天会红」：① 失败归因 —— 没有它，落地页的问题会挂在
+    // 入口路由的用例名下（报「/scan/progress 没有出口」实际说的是 /scan/start）；
+    // ② 未来若出现「fail-closed 落到一个既不在 EXEMPT 也不在 UNDECIDED 的页」，
+    // 没有它就会拿入口路由的名义去判那一页。
+    // 写下来是因为「两条改动都过不了单独变异」很容易被后人当成「其中一条是废的」而删掉。
+    const why = EXEMPT.get(judged)
     test(`${route.pattern} ${why ? '按豁免不要求出口' : '必须提供离开这一页的出口'} @kiosk`, async ({ page, api }) => {
       registerW6Api(api)
       await page.goto(route.url, { waitUntil: 'domcontentloaded' })
@@ -119,6 +156,17 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       const framed = await page.locator('[data-qx-frame="true"]').count()
       if (framed === 0 && !why) {
         test.skip(true, `${route.pattern} 冷开未渲染青序流光壳（多为 fail-closed 守卫态），不在本条判据范围内`)
+      }
+      // 冷开落到**首页内容**（URL 还停在本路由，但渲染出来的是首页）时同样不判。
+      // 2026-09-09 实测：/contract-review 三条冷开渲染的是首页
+      //（「登录后查看本人记录 / 改简历 / 找工作 …」），本条判据会去问首页
+      // 「你的返回上一步在哪」——问错了对象，首页本来就是根。
+      //
+      // 这个假阳性是被 #932 触发的：首页迁进青序流光后带上了 data-qx-frame，
+      if (redirected && !why) {
+        // 冷开被 fail-closed 送走：判的是落地那一页，而那一页有没有出口由它自己那条用例负责
+        //（/、/login、/scan/start 都在 productionRoutePatterns 里，各有各的用例，不丢覆盖）。
+        test.skip(true, `${route.pattern} 冷开从 ${navigatedTo} 被送到 ${judged}，不在本条判据范围内`)
       }
 
       const bySelector = await page.locator(EXIT_SELECTOR).count()
@@ -140,7 +188,7 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
         ).toBe(0)
         return
       }
-      const pending = UNDECIDED.get(route.pattern)
+      const pending = UNDECIDED.get(judged)
       if (pending) {
         // 欠账**自退休**：这一页一旦补上返回槽，就必须从 UNDECIDED 里删掉，否则它会变成
         // 「已经修好、却仍被豁免」的陈账 —— 下次这一页再丢返回键，门禁不会红。

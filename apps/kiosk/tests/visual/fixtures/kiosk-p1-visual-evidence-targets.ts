@@ -87,7 +87,7 @@ const primary = (input: Omit<Parameters<typeof evidenceTarget>[0], 'targetGroup'
 const fusionState = (input: Omit<Parameters<typeof evidenceTarget>[0], 'targetGroup' | 'referenceKind'>) => evidenceTarget({ targetGroup: 'FUSION_STATE_REFERENCE', referenceKind: 'ROUTE_STATE', ...input })
 
 export const visualEvidenceTargets: readonly VisualEvidenceTarget[] = [
-  primary({ targetId: '01', prototypePath: 'docs/design/kiosk-proto-2026-07/01-home.html', referenceKind: 'PRIMARY', routeOrState: ['/'], captureUrls: ['/'], precondition: 'Open as a guest with fail-closed service fixtures.', readyMarker: '[data-v6-page="home"]' }),
+  primary({ targetId: '01', prototypePath: 'docs/design/kiosk-redesign-2026-08/01-home.html', referenceKind: 'PRIMARY', routeOrState: ['/'], captureUrls: ['/'], precondition: 'Open as a guest with fail-closed service fixtures.', readyMarker: '[data-qx-page="home"]' }),
   primary({ targetId: '02', prototypePath: 'docs/design/kiosk-proto-2026-07/02-print-hub.html', referenceKind: 'PRIMARY', routeOrState: ['/print-scan'], captureUrls: ['/print-scan'], precondition: 'Return the configured print/scan capabilities envelope.', readyMarker: '[data-w2-page="print-scan-home"]' }),
   // 03（打印参数原型）自 2026-08-18 起由预览阶段承载：参数控件本来就全在预览页内，
   // /print/params 已下线为兼容重定向；2026-09-08 预览并入 /print/desk。
