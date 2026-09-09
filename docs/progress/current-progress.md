@@ -1,5 +1,6 @@
 # 当前开发进度
 
+2026-09-08 **扫描四页合成一张工作台 `/scan`（分支 `feat/qx-scan-merge`，稿 18-scan-workbench）**。`/scan/start` `/scan/settings` `/scan/progress` `/scan/result` 保留为带 `?stage=` 的 replace 重定向；阶段切换只 replace 历史。没有扫描会话时 progress/result 即使带 `?stage=` 也落到 start。刷新从 sessionStorage 复水；换人清场仍走 `kioskSensitiveSession`，不在组件卸载时清会话或取消后台任务。progress 阶段才轮询，离开即停；待机忙碌豁免仍挂在 progress/settings 的 `useBusyLock`。「等待打印机端扫描完成」「扫描任务已创建」逐字保留。未部署、未真机。
 ## 2026-09-08 夜 bug 检查与工程优化线：五条可复用的结论
 
 本条只记**下次还会用到的判据**，不复述改了什么（改了什么看 PR）。

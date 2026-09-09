@@ -17,6 +17,8 @@ import {
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanStage } from './scanWorkbenchModel'
+import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
 
 /** 能力门禁态：禁止伪装硬件已就绪。 */
 type ScanGate = 'loading' | 'allowed' | 'blocked' | 'unknown'
@@ -34,11 +36,12 @@ function resolveGate(scanCap: ConfiguredCapability | undefined, loadStatus: 'ok'
   return canCreateFormalPrintScanTask(scanCap.status) ? 'allowed' : 'blocked'
 }
 
-export function ScanStartPage() {
+export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
+  const [params, setSearchParams] = useSearchParams()
   const usbPanel = params.get('mode') === 'usb-panel'
-  const [selected, setSelected] = useState<ScanType>('resume')
+  const storedType = readScanWorkbenchSession()?.scanType
+  const [selected, setSelected] = useState<ScanType>(storedType ?? 'resume')
   const [gate, setGate] = useState<ScanGate>('loading')
   const [blockedNote, setBlockedNote] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -134,7 +137,13 @@ export function ScanStartPage() {
               type="button"
               className="qx-btn"
               data-variant="ghost"
-              onClick={() => navigate('/scan/start?mode=usb-panel')}
+              onClick={() => {
+                if (onGoStage) {
+                  setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
+                  return
+                }
+                navigate('/scan/start?mode=usb-panel')
+              }}
             >
               改用面板扫描到 U 盘
             </button>
@@ -142,7 +151,19 @@ export function ScanStartPage() {
               type="button"
               className="qx-btn"
               data-variant="primary"
-              onClick={() => navigate('/scan/settings', { state: { scanType: selected } })}
+              onClick={() => {
+                patchScanWorkbenchSession({
+                  stage: 'settings',
+                  scanType: selected,
+                  live: undefined,
+                  result: undefined,
+                })
+                if (onGoStage) {
+                  onGoStage('settings')
+                  return
+                }
+                navigate('/scan/settings', { state: { scanType: selected } })
+              }}
             >
               下一步 · 创建扫描会话
             </button>

@@ -10,7 +10,7 @@ import {
   AdminCreateCompanyDto, AdminLinkJobsDto, AdminPublishCompanyDto, AdminReviewCompanyDto,
   AdminUpdateCompanyDto, PartnerImportCompaniesDto, PartnerUpdateCompanyDto,
 } from './dto/company.dto'
-import { PublishActionDto } from '../jobs/dto/publish.dto'
+import { PartnerUnpublishActionDto } from '../jobs/dto/publish.dto'
 
 // ============================================================
 // 企业展示（CompanyProfile）：
@@ -188,11 +188,12 @@ export class CompaniesController {
     return ApiResponse.ok(await this.companies.partnerUpdate(user.orgId!, id, dto, user))
   }
 
-  // P1-A④ Partner 下架本机构企业资料（端点只下架；body 复用 PublishActionDto 仅作契约一致，处理强制 unpublish）
+  // P1-A④ Partner 下架本机构企业资料。端点只下架：body 用 PartnerUnpublishActionDto，
+  // `action:'publish'` 由 ValidationPipe 直接 400 拒掉（合作机构无上架权，见该 DTO 的说明）。
   @Patch('partner/companies/:id/publish')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  async partnerUnpublish(@Param('id') id: string, @Body() _dto: PublishActionDto, @CurrentUser() user: AuthedUser) {
+  async partnerUnpublish(@Param('id') id: string, @Body() _dto: PartnerUnpublishActionDto, @CurrentUser() user: AuthedUser) {
     return ApiResponse.ok(await this.companies.partnerUnpublish(user.orgId!, id, user))
   }
 }

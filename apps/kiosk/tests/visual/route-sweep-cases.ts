@@ -40,7 +40,6 @@ const PARAM_SAMPLES = {
  * - /screensaver：夹具 playlist.enabled=false，无素材则退出回首页
  * - /session-resume：未登录切登录页
  * - /contract-review*：生产默认关闭，Navigate 回首页
- * - /scan/progress：无 task identity 则回扫描起点
  */
 const FAIL_CLOSED_LANDINGS = {
   '/session-timeout': '/',
@@ -49,7 +48,6 @@ const FAIL_CLOSED_LANDINGS = {
   '/contract-review': '/',
   '/contract-review/processing': '/',
   '/contract-review/result': '/',
-  '/scan/progress': '/scan/start',
 } as const satisfies Partial<Record<ProductionRoutePattern, `/${string}`>>
 
 export const parameterizedPatterns: ProductionRoutePattern[] = productionRoutePatterns.filter((pattern) =>
@@ -75,9 +73,9 @@ export function resolveLandedPath(pattern: ProductionRoutePattern, url: string):
   }
   if (pattern in compatibilityRedirects) {
     const target = compatibilityRedirects[pattern as keyof typeof compatibilityRedirects]
-    // 重定向目标可能带查询串（打印台合并后是 `/print/desk?step=preview`：
-    // 带状态透传是有意的，裸 replace 会把深链进来的用户静默重置到第 1 步）。
-    // 调用方 route-sweep.spec.ts:78 比的是 `url.pathname`，不含查询串，所以这里剥掉。
+    // 重定向目标可能带查询串（`/print/desk?step=preview`、`/scan?stage=progress`）：
+    // 带状态透传是有意的，裸 replace 会把深链进来的用户静默重置到第 1 步。
+    // 调用方 route-sweep.spec.ts 比的是 `url.pathname`，不含查询串，所以这里剥掉。
     return target.split('?')[0] ?? target
   }
   return url.split('?')[0] ?? url
