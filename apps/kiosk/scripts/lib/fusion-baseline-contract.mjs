@@ -10,6 +10,28 @@ const HTML_REFERENCE_ATTRIBUTE = /(?:^|\s)(href|src)\s*=\s*(["'])(.*?)\2/gi
 const HTML_VALUE_ATTRIBUTE = /(?:^|\s)value\s*=\s*(["'])(.*?)\1/i
 const FUSION_MARKER = 'docs/design/kiosk-proto-2026-07-fusion'
 
+// 这里不设条数上限。库存从 tests/visual/route-manifest.ts 现算。
+//
+// 曾经写过 PRODUCTION_ROUTE_QUOTA=108 / COMPATIBILITY_REDIRECT_QUOTA=13 /
+// KIOSK_VIEWPORT_ROUTE_QUOTA=106，那是某天 main 的快照，不是产品决策：
+// 「一体机不该超过 108 条路由」从未有人定过。51 页迁移期间加路由是常态，
+// #967（面试五页合成 /interview）合入即 109 条路由 / 18 条重定向，配额会
+// 把合法进度判红。`<= QUOTA` 只比 `=== N` 好在减路由不用改数，加路由仍要
+// 人工抬上限，是同一个病。
+//
+// 真实防线是集合相等，不是条数：
+// - verify-fusion-baseline：router 声明 ↔ productionRoutePatterns；
+//   Navigate 源/目标 ↔ compatibilityRedirects
+// - verify-fusion-w6：同上，外加 W6 cases ↔ productionRoutePatterns
+//   （每条 manifest 路由恰好一个 owner）
+// - verify-visual-evidence-manifest：runtime 声明 ↔ productionRoutePatterns；
+//   REDIRECT dispositions ↔ compatibilityRedirects
+//
+// 复现（把配额抬到 9999 仍被抓住）：只在 route-manifest.ts 的
+// productionRoutePatterns 偷加一条 '/zz-sneaked-route'，三条门禁全红
+// （baseline: manifest → router missing；w6: missing/duplicate ownership；
+// visual-evidence-manifest）。删回即绿。变异保持可编译。
+
 export async function sha256File(filePath) {
   return await new Promise((resolveDigest, reject) => {
     const hash = createHash('sha256')

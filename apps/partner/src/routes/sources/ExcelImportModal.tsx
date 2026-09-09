@@ -9,7 +9,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import { parseExcel, previewExcel, confirmExcelImport, cancelExcelImport, getMappingRule, downloadExcelTemplate } from '../../services/api'
-import type { ExcelPreviewResult } from '../../services/api'
+import type { ExcelPreviewResult, PartnerImportDataType } from '../../services/api'
 import { useCapability } from '../../services/capabilities'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
   const canImportJobs = useCapability('canImportJobs')
   const canImportFairs = useCapability('canImportFairs')
   const [step, setStep]         = useState<Step>('upload')
-  const [dataType, setDataType] = useState<'job' | 'fair'>(canImportJobs || !canImportFairs ? 'job' : 'fair')
+  const [dataType, setDataType] = useState<PartnerImportDataType>(canImportJobs || !canImportFairs ? 'job' : 'fair')
   const [file, setFile]         = useState<File | null>(null)
   const [columns, setColumns]   = useState<string[]>([])
   const [mapping, setMapping]   = useState<Record<string, string>>({})

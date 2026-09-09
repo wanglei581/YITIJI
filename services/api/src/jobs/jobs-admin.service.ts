@@ -29,6 +29,7 @@ import {
   type AdminJobDto,
   type AdminFairDto,
   type AdminImportBatchDto,
+  type PartnerImportDataType,
   prismaJobToAdminDto,
   prismaFairToAdminDto,
 } from './jobs-shared'
@@ -352,7 +353,7 @@ export class JobsAdminService {
       sourceName: b.source.name,
       orgId: b.orgId,
       orgName: orgMap.get(b.orgId) ?? b.orgId,
-      dataType: b.dataType as 'job' | 'fair',
+      dataType: b.dataType as PartnerImportDataType,
       fileName: b.fileName,
       totalRows: b.totalRows,
       validRows: b.validRows,

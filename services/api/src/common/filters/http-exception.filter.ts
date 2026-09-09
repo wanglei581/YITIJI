@@ -14,6 +14,7 @@ function isMachineErrorCode(value: string): boolean {
 }
 
 /** 500 的兜底句。只有真的是服务端故障时才该出现这句。 */
+const DEFAULT_ERROR_CODE = 'INTERNAL_SERVER_ERROR'
 const DEFAULT_ERROR_MESSAGE = '服务器内部错误'
 
 /**
@@ -37,6 +38,33 @@ function clientErrorFallbackMessage(status: number): string {
 }
 
 /**
+ * 4xx 落到兜底时的**机器码**。与上面那句话配对：状态码说 4xx，`error.code` 就不能说 500。
+ *
+ * 2026-09-09 生产实测发现的不一致 —— 一个裸 `throw new NotFoundException()`（响应体里
+ * 没有 `error.code`）会得到：
+ *   HTTP 404  {"error":{"code":"INTERNAL_SERVER_ERROR","message":"请求的内容不存在"}}
+ * message 是对的（那是 #975 修的），`code` 却还挂着 500 的默认值。
+ * 调用方按 `code` 分支时会当成「服务端崩了」去重试或报障，而实际是「这个东西不存在」。
+ *
+ * 只在 code 仍是默认值 `INTERNAL_SERVER_ERROR` 时才改；任何显式设过 code 的错误原样保留。
+ * 已经带状态文案（如 Nest 默认的 `Not Found`）的也不动 —— 那本来就与状态一致，
+ * 且小程序侧的既有夹具按那个形状写着（apps/miniapp/scripts/verify-user-error-message.mjs:63）。
+ */
+function clientErrorFallbackCode(status: number): string {
+  switch (status) {
+    case HttpStatus.BAD_REQUEST:  return 'BAD_REQUEST'
+    case HttpStatus.UNAUTHORIZED: return 'UNAUTHORIZED'
+    case HttpStatus.FORBIDDEN:    return 'FORBIDDEN'
+    case HttpStatus.NOT_FOUND:    return 'NOT_FOUND'
+    case HttpStatus.METHOD_NOT_ALLOWED: return 'METHOD_NOT_ALLOWED'
+    case HttpStatus.CONFLICT:     return 'CONFLICT'
+    case HttpStatus.GONE:         return 'GONE'
+    case HttpStatus.UNPROCESSABLE_ENTITY: return 'UNPROCESSABLE_ENTITY'
+    default:                      return 'CLIENT_ERROR'
+  }
+}
+
+/**
  * 全局异常过滤器。除了把异常整形成统一错误响应，还负责**唯一一条**
  * 服务端异常日志 —— 此前这里一行日志都不写，所有 500 在服务端零痕迹。
  *
@@ -55,7 +83,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request  = ctx.getRequest<Request & { requestId?: string; requestStartedAt?: number }>()
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR
-    let code = 'INTERNAL_SERVER_ERROR'
+    let code = DEFAULT_ERROR_CODE
     let message: string = DEFAULT_ERROR_MESSAGE
     let details: string[] | undefined
 
@@ -92,7 +120,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
         // Fallback: only expose machine codes from NestJS/custom shorthand bodies.
         // Human-readable raw messages may contain internal details.
-        if (code === 'INTERNAL_SERVER_ERROR' && typeof b['message'] === 'string' && isMachineErrorCode(b['message'])) {
+        if (code === DEFAULT_ERROR_CODE && typeof b['message'] === 'string' && isMachineErrorCode(b['message'])) {
           code = b['message']
           message = b['message']
         }
@@ -103,7 +131,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // 旧逻辑会把页面文案塌成「服务器内部错误」，登录页误报为宕机。
     if (
       status === HttpStatus.TOO_MANY_REQUESTS &&
-      (code === 'INTERNAL_SERVER_ERROR' || code === 'Too Many Requests')
+      (code === DEFAULT_ERROR_CODE || code === 'Too Many Requests')
     ) {
       code = 'RATE_LIMITED'
       message = '尝试过于频繁，请稍后再试'
@@ -132,6 +160,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // 429 / 413 早先各打过一个补丁，这里按状态码统一收口，免得下一个状态码再来一次。
     if (status < HttpStatus.INTERNAL_SERVER_ERROR && message === DEFAULT_ERROR_MESSAGE) {
       message = clientErrorFallbackMessage(status)
+    }
+    // 同一处漏了机器码：上面只换了给人看的那句，`error.code` 还挂着 500 的默认值。
+    // 4xx 里 code 说 INTERNAL_SERVER_ERROR，等于告诉调用方「服务端崩了」，
+    // 于是它会去重试、去报障，而真相是「你请求的东西不存在 / 没权限」。
+    if (status < HttpStatus.INTERNAL_SERVER_ERROR && code === DEFAULT_ERROR_CODE) {
+      code = clientErrorFallbackCode(status)
     }
 
     // 记日志绝不能反过来把错误响应打掉：过滤器自己抛异常会落到 Nest 默认处理，

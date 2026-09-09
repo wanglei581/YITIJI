@@ -25,6 +25,7 @@ import type {
   ExcelPreviewResult,
   ExcelConfirmResult,
   FieldMappingRuleResult,
+  PartnerImportDataType,
   PartnerSmartCampusTerminal,
   SaveSmartCampusConfigPayload,
   TerminalSmartCampusConfigView,
@@ -102,7 +103,7 @@ function escapeCsvCell(value: string): string {
   return `"${value.split('"').join('""')}"`
 }
 
-function downloadBlankTemplate(dataType: 'job' | 'fair'): void {
+function downloadBlankTemplate(dataType: PartnerImportDataType): void {
   const headers = dataType === 'job' ? JOB_TEMPLATE_HEADERS : FAIR_TEMPLATE_HEADERS
   const csv = `${headers.map(escapeCsvCell).join(',')}\n`
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
@@ -121,7 +122,7 @@ function downloadBlankTemplate(dataType: 'job' | 'fair'): void {
 // PENDING_BATCH_MAPPINGS: preview 时按 batchId 暂存映射，confirm 时再落入 SAVED_MAPPINGS，
 // 与真实后端「映射随 ImportBatch，确认导入时才保存为复用规则」一致。
 const SAVED_MAPPINGS = new Map<string, { mapping: Record<string, string>; updatedAt: string }>()
-const PENDING_BATCH_MAPPINGS = new Map<string, { sourceId: string; dataType: 'job' | 'fair'; mapping: Record<string, string> }>()
+const PENDING_BATCH_MAPPINGS = new Map<string, { sourceId: string; dataType: PartnerImportDataType; mapping: Record<string, string> }>()
 
 // ─── Data Sources ─────────────────────────────────────────────────────────────
 
@@ -472,7 +473,7 @@ export const partnerMockAdapter = {
   },
 
   // Excel Import (mock)
-  async downloadExcelTemplate(dataType: 'job' | 'fair'): Promise<void> {
+  async downloadExcelTemplate(dataType: PartnerImportDataType): Promise<void> {
     await delay()
     downloadBlankTemplate(dataType)
   },
@@ -488,7 +489,7 @@ export const partnerMockAdapter = {
       ],
     }
   },
-  async previewExcel(file: File, sourceId: string, dataType: 'job' | 'fair', fieldMapping: Record<string, string>): Promise<ExcelPreviewResult> {
+  async previewExcel(file: File, sourceId: string, dataType: PartnerImportDataType, fieldMapping: Record<string, string>): Promise<ExcelPreviewResult> {
     void file
     await delay()
     const batchId = `batch-${sourceId}-${Date.now()}`
@@ -530,7 +531,7 @@ export const partnerMockAdapter = {
     await delay()
     return { success: true }
   },
-  async getMappingRule(sourceId: string, dataType: 'job' | 'fair'): Promise<FieldMappingRuleResult> {
+  async getMappingRule(sourceId: string, dataType: PartnerImportDataType): Promise<FieldMappingRuleResult> {
     await delay()
     const saved = SAVED_MAPPINGS.get(`${sourceId}:${dataType}`)
     return {

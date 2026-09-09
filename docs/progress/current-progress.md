@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-09-09 **路由计数门禁去掉配额上限，只留集合相等（分支 `chore/counts`）**。`PRODUCTION_ROUTE_QUOTA` / `COMPATIBILITY_REDIRECT_QUOTA` / `KIOSK_VIEWPORT_ROUTE_QUOTA` 三个常量及全部引用已删——108/13/106 是某天 main 的快照，不是产品决策，#967 合入即超。防线是 router ↔ `productionRoutePatterns`、Navigate ↔ `compatibilityRedirects`、W6 cases 一对一 ownership。反向变异：只在 `route-manifest.ts` 偷加 `'/zz-sneaked-route'` 三门禁转红，删回转绿。不改页面 UI。
+
 2026-09-08 **扫描四页合成一张工作台 `/scan`（分支 `feat/qx-scan-merge`，稿 18-scan-workbench）**。`/scan/start` `/scan/settings` `/scan/progress` `/scan/result` 保留为带 `?stage=` 的 replace 重定向；阶段切换只 replace 历史。没有扫描会话时 progress/result 即使带 `?stage=` 也落到 start。刷新从 sessionStorage 复水；换人清场仍走 `kioskSensitiveSession`，不在组件卸载时清会话或取消后台任务。progress 阶段才轮询，离开即停；待机忙碌豁免仍挂在 progress/settings 的 `useBusyLock`。「等待打印机端扫描完成」「扫描任务已创建」逐字保留。未部署、未真机。
 ## 2026-09-08 夜 bug 检查与工程优化线：五条可复用的结论
 
@@ -110,6 +112,8 @@ Terminal Agent 未验收」是在描述一台用户根本没有的设备。** �
 摄像头按决策不接入。
 
 
+
+2026-09-08 **会话生命周期四页迁入青序流光（分支 `feat/qx-session-lifecycle`）**。对照稿 `00-standby` / `03-login-gate` / `04-session-guard` / `07-session-resume`，把 `/screensaver`、`/login`、`/session-timeout`、`/session-resume` 登记进 `QX_MIGRATED_ROUTES`。形态：小编排页 + 阶段子组件 + 纯函数模型（`standbyModel` / `loginGateModel` / `sessionGuardModel` / `sessionResumeModel`，模型单测 5 条）。**出口**：待机整屏唤醒回首页；登录门返回首页 + 「不登录，继续使用」；会话守卫「我还在，继续使用」回来源或「结束并清除本机会话」；续办返回首页 / 去打印扫描。**隐私**：待机挂载仍走 `clearKioskSensitiveSession` + `logout`，无素材仍 exit 回首页不伪造宣传图；登录去掉「登录成功」过场，claim 成功才写入会话；守卫 fail-closed 后清场遮罩有归途文案，清场仍是 Guard 集中式清理，不挂 unmount。续办 `resumeVerdict` 对 claimed/printing + unpaid 主动不放行，无订单早期任务不写「已支付」。门禁 `verify:qx-session-lifecycle` 挂进既有 CI 命令 `verify:member-session-closure`。反向变异：去掉「不登录，继续使用」门禁红；claimed+unpaid 放行模型单测红。未改 `apps/miniapp/**`、`.github/**`、仓库根 `scripts/verify-*`、`services/api/**`。未部署、未真机。
 
 2026-09-08 **材料包订单列表端点（分支 `feat/package-order-list`）**。补掉 #962 记录的开闸前置第 d 条：材料包订单在既有会员订单列表里一条都看不到 —— `/me/print-orders` 查 PrintTask（派发前 `printTaskId` 为 null）、`/me/print-orders/cloud` 的 where 带 `sourceFileId: { not: null }`（材料包多文件、该字段本就为 null）、`/me/print-orders/:orderId` 的 `requireOwned` 同一条过滤；用户下完单一旦离开，手上只剩一个到机码，而到机码不能反查订单。新增 `GET /orders/package`，复用既有 `member-page` 游标分页（不另起分页方案），路由声明在 `@Get(':id')` 之前避免被当成 id=''。**两处刻意收口**：列表不签发 `paymentSessionToken`（一次返回 N 个付款令牌只放大暴露面，付款令牌由 detail 现取）、不回逐文件明细。到机码照常返回且判据与 detail 完全一致（`visibleCode`：pending 且未过期）。实测（本地真实后端）：空态 / 未登录 401 / `pageSize=0` 400 `MEMBER_PAGE_INVALID` / 两单倒序且到机码可见 / `pageSize=1` 翻页不重复 / B 用户看不到 A 的单 / **B 拿 A 的游标同样取不到数据**。门禁并进既有 `verify:package-order-fulfillment`（不新建脚本）加 8 条断言，三方向变异全部正确变红：去掉 endUserId 过滤 → 红、把付款令牌加回来 → 红、不回到机码 → 红。typecheck 0 错误；`verify:member-print-orders` / `verify:member-assets-c2d` / `verify:backend-p0-http` 通过；项目图谱已 `pnpm graph` 重跑。**材料包四页守卫仍关闭**：还缺取消/退款端点，本轮不摘守卫。未部署、未真机。
 

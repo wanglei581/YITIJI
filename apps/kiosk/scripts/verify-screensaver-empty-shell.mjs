@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const page = readFileSync(join(kioskRoot, 'src/pages/screensaver/ScreensaverPage.tsx'), 'utf8')
+const view = readFileSync(join(kioskRoot, 'src/pages/screensaver/StandbyView.tsx'), 'utf8')
+const source = `${page}\n${view}`
 
 let failures = 0
 function check(label, run) {
@@ -26,11 +28,11 @@ check('no-media branch is not a blank aria-hidden shell', () => {
 })
 
 check('no-media / empty shell still exposes wake copy and screensaver marker', () => {
-  assert.match(page, /触摸屏幕开始使用/)
+  assert.match(source, /触摸屏幕开始使用/)
   assert.match(page, /data-kiosk-screen="screensaver"/)
   // Must keep an honest shell path that renders wake prompt without requiring mediaUrl.
   assert.match(
-    page,
+    source,
     /screensaver-wake-prompt[\s\S]{0,240}触摸屏幕开始使用/,
   )
   assert.match(page, /role="presentation"/)
