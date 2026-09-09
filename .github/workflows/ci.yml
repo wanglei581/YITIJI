@@ -212,7 +212,12 @@ jobs:
 
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
+        # 先摘掉用不到的第三方 apt 源:它的索引一旦不一致会让 apt-get update exit 100,
+        # 把整条 CI 拖红(缘由见 scripts/ci/drop-unused-apt-sources.sh)
+        run: |
+          bash scripts/ci/drop-unused-apt-sources.sh
+          sudo apt-get update -q
+          sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
 
       - name: PG schema drift check
         working-directory: services/api
@@ -826,7 +831,11 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
       - name: Install CJK font + sqlite3 + redis-server (PDF / member data verify)
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
+        # 同上:先摘掉用不到的第三方 apt 源(scripts/ci/drop-unused-apt-sources.sh)
+        run: |
+          bash scripts/ci/drop-unused-apt-sources.sh
+          sudo apt-get update -q
+          sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
@@ -1059,7 +1068,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @ai-job-print/kiosk exec playwright install --with-deps chromium
+        # `--with-deps` 内部会跑 apt-get update,同样会被第三方源的坏索引拖死,
+        # 所以这里也先摘一次(scripts/ci/drop-unused-apt-sources.sh)
+        run: |
+          bash scripts/ci/drop-unused-apt-sources.sh
+          pnpm --filter @ai-job-print/kiosk exec playwright install --with-deps chromium
 
       - name: Typecheck Kiosk workspace-source dependencies
         run: |
