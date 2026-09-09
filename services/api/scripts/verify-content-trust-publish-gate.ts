@@ -20,6 +20,8 @@
 // 另外还证明:
 //   ⑤ unpublish(下架)不受闸门限制 —— 否则不可信内容将无法被撤下,事故无法处置
 //   ⑥ 源码层没有第二条「绕过闸门」的发布路径(publish 命名方法必须在清单内)
+//   ⑦ 合作机构侧 /publish 路由只能下架:请求 action:'publish' 被校验层显式 400 拒绝
+//      (此前是 handler 丢掉 body 静默下架,回 200 却做了相反的事)
 //
 // 纯内存假 Prisma + 真实 service,不连数据库、不起 HTTP,两个 CI job 都能直接跑。
 //
@@ -36,6 +38,8 @@ import {
   contentTrustDenialMessage,
   isContentTrustActive,
 } from '../src/common/content-trust'
+import { validateSync } from 'class-validator'
+import { PartnerUnpublishActionDto, PublishActionDto } from '../src/jobs/dto/publish.dto'
 import { JobsAdminService } from '../src/jobs/jobs-admin.service'
 import { PoliciesService } from '../src/policies/policies.service'
 import { CompaniesService } from '../src/companies/companies.service'
@@ -464,6 +468,89 @@ function checkSourceInventory(): void {
       '文件里找不到闸门调用 —— 闸门被删了或从未装上',
     )
   }
+
+  // ── ⑦ 合作机构侧:/publish 路由只能下架,请求上架必须被显式拒绝 ──────────────
+  //
+  // 为什么这条属于本门禁:上面 ①–⑥ 证明的是「非可信机构的内容发不出去」,
+  // 判据全部落在 `@Roles('admin')` 后面的 service 里。合作机构侧另有四条
+  // `PATCH partner/*/publish`,它们**不走** assertOrgContentTrustActive ——
+  // 合规上这是对的(合作机构本就无上架权,见 docs/product/role-boundary.md:79、
+  // docs/reviews/four-chain-data-integrity-ledger-2026-08.md:45),
+  // 但边界必须由**校验层显式拒绝**来守,不能靠 handler 把 body 丢掉来守。
+  //
+  // 2026-09-09 之前正是后者:DTO 是 `@IsIn(['publish','unpublish'])`,handler
+  // 把整个 body 丢掉(形参写成 `_dto`)强制 unpublish。发 `{action:'publish'}`
+  // 会拿到 **200 + 内容被下架** —— 回了成功却做了相反的事。
+  //
+  // 两层都要断言,少一层就会退回「写了但不跑」:
+  //   A 行为层:DTO 拿到 'publish' 真的判失败(否则 DTO 是空的)
+  //   B 接线层:四条路由真的用了这个 DTO(否则 DTO 对了但没人用)
+  checkPartnerUnpublishOnly()
+}
+
+/** 抽出 controller 里所有 partner 侧 publish 路由及其 @Body() 的 DTO 类型名。 */
+function partnerPublishRoutes(): { file: string; route: string; dto: string | null }[] {
+  const out: { file: string; route: string; dto: string | null }[] = []
+  for (const full of walk(SRC_ROOT).filter((f) => f.endsWith('.controller.ts'))) {
+    const lines = readFileSync(full, 'utf8').split('\n')
+    const rel = relative(SRC_ROOT, full).split('\\').join('/')
+    for (let i = 0; i < lines.length; i++) {
+      const m = /@(?:Patch|Post|Put)\(\s*['"`](partner\/[^'"`]*publish)['"`]/.exec(lines[i]!)
+      if (!m) continue
+      // 往下最多 12 行找 @Body() 形参的类型;找不到记 null(下面会红)
+      let dto: string | null = null
+      for (let j = i + 1; j < Math.min(i + 13, lines.length); j++) {
+        const b = /@Body\(\)\s*_?\w+\s*:\s*([A-Za-z_$][\w$]*)/.exec(lines[j]!)
+        if (b) { dto = b[1]!; break }
+        if (/^\s*\}/.test(lines[j]!)) break
+      }
+      out.push({ file: rel, route: m[1]!, dto })
+    }
+  }
+  return out
+}
+
+function checkPartnerUnpublishOnly(): void {
+  // ── B 接线层 ──────────────────────────────────────────────────────────────
+  const routes = partnerPublishRoutes()
+  console.log(`      partner /publish 路由: ${routes.map((r) => r.route).join(', ') || '(无)'}`)
+
+  // 阳性对照:探针必须真的读到了东西。数量不写死(将来加第五条路由不该无故转红),
+  // 但为 0 一定是探针坏了 —— partner 侧确实存在这类路由。
+  assert(
+    '探针读得到 partner 侧 /publish 路由(读数为 0 说明探针坏了,不是路由没了)',
+    routes.length > 0,
+    '一条都没扫到:@Patch 写法变了,或路由被挪走 —— 先确认是哪一种再改本断言',
+  )
+
+  const wrong = routes.filter((r) => r.dto !== 'PartnerUnpublishActionDto')
+  assert(
+    '每条 partner /publish 路由的 body 都用 PartnerUnpublishActionDto(而不是放行 publish 的那个)',
+    wrong.length === 0,
+    wrong.map((r) => `${r.file} ${r.route} → ${r.dto ?? '未识别到 @Body 类型'}`).join('; '),
+  )
+
+  // ── A 行为层 ──────────────────────────────────────────────────────────────
+  const okErrors = validateSync(Object.assign(new PartnerUnpublishActionDto(), { action: 'unpublish' }))
+  assert('DTO 放行 unpublish(只验拒绝等于把下架也焊死了)', okErrors.length === 0,
+    JSON.stringify(okErrors.map((e) => e.constraints)))
+
+  const bad = Object.assign(new PartnerUnpublishActionDto(), { action: 'publish' }) as unknown as object
+  const badErrors = validateSync(bad)
+  assert('DTO 拒绝 publish —— 合作机构无上架权,必须显式 400 而不是静默下架', badErrors.length === 1,
+    `实际 ${badErrors.length} 条错误`)
+
+  const msg = Object.values(badErrors[0]?.constraints ?? {}).join(' ')
+  // 不断言逐字文案(会随文案微调无故转红),只断言它**说清了出路**:
+  // 默认的 class-validator 文案是 "action must be one of the following values: unpublish",
+  // 那句话对合作机构运营人员是无效信息。
+  assert('拒绝文案告诉对方该怎么办(提到审核/管理员),而不是只报字段名',
+    /审核|管理员/.test(msg), `实际文案: ${msg}`)
+
+  // 反向:原 DTO 仍然放行 publish —— 管理端要用它,不能被一起收紧
+  const adminOk = validateSync(Object.assign(new PublishActionDto(), { action: 'publish' }))
+  assert('管理端的 PublishActionDto 仍放行 publish(收紧只针对合作机构侧)', adminOk.length === 0,
+    JSON.stringify(adminOk.map((e) => e.constraints)))
 
   // controller 只做转发:带 publish 路由的 controller 不得自己写库
   // (否则它就是一条绕过 service 层闸门的发布路径)。
