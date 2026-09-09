@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 //
 // 硬约束（CLAUDE.md §9 不伪造能力）：
 // 1) PrintPreview 不得再内联 mapPrinterStatus / 假耗材 100% / fail-open default
-// 2) PrintPreview / KioskRoot /（可选）KioskDeviceStatusPills 统一消费 useTerminalDeviceStatus
+// 2) PrintPreview / KioskRoot 统一消费 useTerminalDeviceStatus
 // 3) hook 必须走 API_BASE_URL + /terminals/:id/printer-status，禁止 /admin/*
 // 4) mapTerminalPrinterStatus 的 default 不得返回 isOnline:true
 // 5) HomePage 不得硬编码「打印机在线」「网络正常」（设备态由共享顶栏展示）
@@ -41,7 +41,6 @@ const previewSrc = read('src/pages/print/PrintPreviewPage.tsx')
 const confirmSrc = read('src/pages/print/PrintConfirmPage.tsx')
 const homeSrc = read('src/pages/home/HomePage.tsx')
 const warmOverrideSrc = read('src/styles/warm-professional-override.css')
-const pillsSrc = read('src/components/KioskDeviceStatusPills.tsx')
 const rootSrc = read('src/layouts/KioskRoot.tsx')
 
 expectMatches(
@@ -157,12 +156,11 @@ expectMatches(
   '暖色主题为离线/异常状态提供非绿色状态点',
 )
 
-expectMatches(
-  pillsSrc,
-  /useTerminalDeviceStatus/,
-  'KioskDeviceStatusPills 仍消费 useTerminalDeviceStatus（备用组件）',
-)
-expectNotMatches(pillsSrc, /\/admin\//, '状态药丸组件禁止 /admin/*')
+if (fs.existsSync(path.join(root, 'src/components/KioskDeviceStatusPills.tsx'))) {
+  fail('KioskDeviceStatusPills.tsx 已下线（零消费备用组件），不得复活')
+} else {
+  pass('KioskDeviceStatusPills.tsx 保持删除；设备状态只由 hook + KioskRoot / PrintPreview / PrintConfirm 消费')
+}
 
 expectMatches(rootSrc, /useTerminalDeviceStatus/, 'KioskRoot 消费 useTerminalDeviceStatus')
 expectMatches(

@@ -33,7 +33,9 @@ const terminalScopedConsumers = [
   'src/services/print/printJobsApi.ts',
   'src/services/api/printScanCapabilities.ts',
   'src/hooks/useAiAdvisorCallSession.ts',
-  'src/pages/home/hooks/useHomeDeviceStatus.ts',
+  // 首页设备 hook useHomeDeviceStatus 已下线（首页改读 KioskRoot 共享快照）。
+  // 仍要守「首页终端相关请求不得读构建期 VITE_TERMINAL_ID」：改钉活着的招聘会高亮 hook。
+  'src/pages/home/hooks/useHomeJobFairHighlight.ts',
 ].map((path) => [path, read(path)])
 
 assert.match(identity, /\/local\/terminal-identity/, 'Kiosk must read identity from the local Agent')

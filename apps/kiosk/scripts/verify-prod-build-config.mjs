@@ -110,7 +110,8 @@ if (!existsSync(ASSETS)) {
     'src/services/print/printJobsApi.ts',
     'src/services/api/printScanCapabilities.ts',
     'src/hooks/useAiAdvisorCallSession.ts',
-    'src/pages/home/hooks/useHomeDeviceStatus.ts',
+    // 原 useHomeDeviceStatus 已下线；首页仍走运行时身份的活消费者是招聘会高亮 hook。
+    'src/pages/home/hooks/useHomeJobFairHighlight.ts',
   ].map((relativePath) => readRequired(join(ROOT, relativePath), `B7 ${relativePath} 已纳入运行时身份检查`))
   if (terminalConsumerSources.every((source) => !source.includes('VITE_TERMINAL_ID'))) {
     pass('B7 终端敏感请求未直接读取构建期终端 ID')
