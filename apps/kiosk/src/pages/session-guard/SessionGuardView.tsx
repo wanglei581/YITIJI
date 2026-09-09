@@ -1,15 +1,28 @@
-import { SESSION_GUARD_ASKS, SESSION_GUARD_CLEARS, type SessionGuardState } from './sessionGuardModel'
+import { SESSION_GUARD_ASKS, sessionGuardClears, type SessionGuardState } from './sessionGuardModel'
 
 export function SessionGuardView({
   state,
   seconds,
   sourcePath,
   sourceKnown,
+  sessionImpact,
+  isAnonymous,
+  accountLabel,
 }: {
   state: SessionGuardState
   seconds: number
   sourcePath: string
   sourceKnown: boolean
+  /**
+   * 按来源域定制的一句影响说明（「已创建的打印/扫描任务会继续运行…」等）。
+   * 「这次会清掉什么」那几张卡说的是**所有会话都一样**的清除范围；
+   * 这一句说的是**你这一趟**特有的后果——正在扫描的人最需要知道的是
+   * 「任务会继续跑」，而不是通用的「登录态会清除」。
+   */
+  sessionImpact: string
+  /** 匿名与已登录的后果不同：匿名这一趟清掉就没了，登录用户服务端上的数据不受影响。 */
+  isAnonymous: boolean
+  accountLabel: string
 }) {
   const title = state === 'warning-no-continue'
     ? <>这次<em>不能</em>就地继续</>
@@ -57,8 +70,16 @@ export function SessionGuardView({
 
       <section className="sg-sec">
         <div className="sg-sec-h"><span className="t">这次会清掉什么</span></div>
+        <p className="sg-impact" data-testid="session-guard-impact">{sessionImpact}</p>
+        <p className="sg-impact" data-testid="session-guard-identity">
+          <span>{isAnonymous ? '当前会话：' : '当前登录：'}<b>{accountLabel}</b></span>
+          {' · '}
+          {/* 独立 span：用例按 exact 匹配这一句，混在同一个元素里会匹配不到，
+              而这句是匿名用户唯一能看到的「退出就没了」的提示，不能被稀释。 */}
+          <span>{isAnonymous ? '匿名任务退出后无法恢复' : '账号中已保存的数据不受本次终端清场影响'}</span>
+        </p>
         <div className="sg-grid">
-          {SESSION_GUARD_CLEARS.map((card) => (
+          {sessionGuardClears(isAnonymous).map((card) => (
             <div key={card.title} className="sg-card">
               <h3>{card.title}</h3>
               <ul>

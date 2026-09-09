@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -57,8 +58,15 @@ export default function SessionTimeoutPage() {
     : isAiWork
       ? '未保存的填写、编辑或练习内容会清除'
       : '登录状态和本机临时会话将清除'
+  const { user } = useAuth()
   const canContinue = warning?.canContinue === true
-  const sourcePath = warning?.sourcePath ?? ''
+  // 匿名与已登录的后果**不一样**，必须分开说：匿名这一趟的任务清掉就没了，
+  // 登录用户已经交给服务端的东西不受本机清场影响。旧页有这个区分，稿 04 没画，
+  // 属于代码自己持有的诚实性声明——迁移时在青序语言里重建，不能因为稿没画就丢掉。
+  const isAnonymous = user === null
+  const accountLabel = user
+    ? [user.nickname, user.phoneMasked].filter(Boolean).join(' · ')
+    : '当前临时会话'
   const sourceKnown = sourcePath !== '' && sourcePath !== '/'
   const state = deriveSessionGuardState({ clearing: false, canContinue })
   const pill = SESSION_GUARD_PILL[state]
@@ -106,6 +114,9 @@ export default function SessionTimeoutPage() {
             seconds={seconds}
             sourcePath={sourcePath}
             sourceKnown={sourceKnown}
+            sessionImpact={sessionImpact}
+            isAnonymous={isAnonymous}
+            accountLabel={accountLabel}
           />
         </QxPageFrame>
       </KioskStageFit>

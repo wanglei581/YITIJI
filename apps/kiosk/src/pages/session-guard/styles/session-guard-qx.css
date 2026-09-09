@@ -51,3 +51,6 @@
 @media (prefers-reduced-motion: reduce) {
   .sg-page, .sg-page *, .qx-privacy-clearing { animation: none !important; }
 }
+
+/* 按来源域定制的一句影响说明；下面几张卡说的是通用范围，这一句说的是你这一趟。 */
+.sg-impact { margin: 0 0 14px; font-size: 26px; line-height: 1.5; color: var(--qx-ink-2, inherit); }
