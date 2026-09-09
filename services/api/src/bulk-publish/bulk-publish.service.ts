@@ -31,8 +31,9 @@ import {
   isBulkPublishExpired,
   bulkPublishExpiredMessage,
 } from './bulk-publish-expiry'
+import type { PartnerImportDataType } from '../jobs/jobs-shared'
 
-export type BulkPublishKind = 'job' | 'fair' | 'policy'
+export type BulkPublishKind = PartnerImportDataType | 'policy'
 
 /**
  * 单次 execute 请求的硬上限。
