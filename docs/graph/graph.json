@@ -25854,7 +25854,9 @@
           "docs/progress/next-tasks.md",
           "docs/superpowers/plans/2026-07-04-print-status-tracking-ui.md"
         ],
-        "missing": []
+        "missing": [
+          "apps/kiosk/src/pages/profile/assets/ui.tsx"
+        ]
       },
       "file": "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
       "helper": true,
