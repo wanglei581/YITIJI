@@ -35,7 +35,7 @@
     "verify:legal-retention-copy": "node scripts/verify-legal-retention-copy.mjs",
     "verify:qr-login-ui": "node scripts/verify-qr-login-ui.mjs",
     "verify:smart-campus-ui": "node scripts/verify-smart-campus-ui.mjs",
-    "verify:member-session-closure": "node scripts/verify-member-session-closure.mjs",
+    "verify:member-session-closure": "node scripts/verify-member-session-closure.mjs && node scripts/verify-qx-session-lifecycle.mjs && node --test scripts/tests/session-lifecycle-model.test.mjs",
     "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",
     "verify:production-real-services": "node scripts/verify-production-real-services.mjs",
     "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",

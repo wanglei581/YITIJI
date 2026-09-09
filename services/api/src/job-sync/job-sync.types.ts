@@ -1,3 +1,5 @@
+import type { PartnerImportDataType } from '../jobs/jobs-shared'
+
 export const JOB_SYNC_QUEUE = 'job-sync'
 export const JOB_SYNC_JOB_NAME = 'sync.api.source'
 
@@ -8,14 +10,14 @@ export interface ApiSyncJobData {
 
 /**
  * JobSource.responseConfig 的 JSON 结构。
- * dataType:  同步的数据类型 ('job' | 'fair')，默认 'job'
+ * dataType:  同步的数据类型（PartnerImportDataType），默认 'job'
  * rootPath:  点分路径定位 JSON 响应中的数组，如 "data.jobs"、"items"；
  *            为 null 时 auto-detect 常见 key (jobs/items/data/results/list)
  * fields:    标准字段 → 源字段名的映射，不写则与标准字段名一致，
  *            如 { "externalId":"id", "title":"position", "company":"employer" }
  */
 export interface JobSourceResponseConfig {
-  dataType: 'job' | 'fair'
+  dataType: PartnerImportDataType
   rootPath?: string
   fields?: Record<string, string>
 }

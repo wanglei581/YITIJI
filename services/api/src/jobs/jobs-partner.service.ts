@@ -36,6 +36,7 @@ import {
 } from './partner-capabilities'
 import {
   type AccessMode,
+  type PartnerImportDataType,
   type PartnerDataSourceDto,
   type PartnerJobDto,
   type PartnerFairDto,
@@ -1045,7 +1046,7 @@ export class JobsPartnerService {
         id: r.id,
         no: r.id,
         source: r.source?.name ?? r.sourceId,
-        dataType: r.dataType as 'job' | 'fair',
+        dataType: r.dataType as PartnerImportDataType,
         addedCount: r.addedCount,
         updatedCount: r.updatedCount,
         errorCount: r.errorCount,

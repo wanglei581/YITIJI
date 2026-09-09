@@ -122,6 +122,12 @@ export type SourceKind =
  */
 export type AccessMode = 'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
 
+/**
+ * 合作机构导入数据类型（Excel 模板 / 字段映射 / 同步配置）。
+ * 当前仅岗位与招聘会；本轮不加 policy。
+ */
+export type PartnerImportDataType = 'job' | 'fair'
+
 export type DataSourceStatus = 'active' | 'inactive' | 'error' | 'syncing'
 
 /** bearer / oauth2 / api_key / basic / custom — 不允许使用 "key" 缩写 */

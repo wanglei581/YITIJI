@@ -84,8 +84,8 @@ Windows 驱动识别名称（真机确认）：`Pantum CM2800ADN Series`
 | 能力 | 硬件（本地驱动，Phase 8.1 主方案） | Pantum 开放打印 API（未来预留） |
 |------|-----------------------------------|-------------------------------|
 | 黑白打印 | ✅ 已确认 | ✅ `mode:"bw"` 已确认 |
-| 彩色打印 | ✅ 硬件支持，Phase 8.1 驱动控制待真机验证 | ⚠️ TODO：彩色 mode 取值待奔图厂家确认 |
-| 自动双面 | ✅ 硬件支持，Phase 8.1 DEVMODE 控制待验证 | ⚠️ 待确认 |
+| 彩色打印 | ✅ **2026-09-02 产品负责人真机验证通过**（本地驱动路径可控彩色，证据 EV-013） | ⚠️ TODO：彩色 mode 取值待奔图厂家确认 |
+| 自动双面 | ✅ **2026-09-02 真机验证可自动双面出纸**（EV-013）；**长边/短边翻页方向仍未核对** | ⚠️ 待确认 |
 | 份数控制 | ✅ 已验证 | ✅ copies 字段已确认 |
 
 ### Pantum 开放打印 API 安全规则（服务端必须遵守）
@@ -98,6 +98,25 @@ sign = md5Hex(body + "&nonce=" + nonce + "&timeStamp=" + timeStamp + "&" + appSe
 - `appKey` 放 Header，**不参与签名**
 - `appSecret` **只允许保存在后端**，Kiosk / Agent / 前端不得保存
 - 回调必须验签；timeStamp 建议限制 5 分钟窗口；nonce 必须防重放；回调处理必须幂等
+
+> **2026-09-09 口径修正**：上表彩色/自动双面两行此前写的是「驱动控制待真机验证」，
+> 而 `docs/delivery/kiosk-redesign-r1/evidence-ledger.csv` 的 **EV-013（2026-09-02，
+> 产品负责人真机实操，PASS）** 早已把这两项验过，证据在
+> `docs/delivery/kiosk-redesign-r1/evidence/EV-013-device-color-duplex.txt`。
+> EV-013 自称「三处标注已同步更新」，实测只同步了两处（`packages/shared/src/types/print.ts`、
+> `apps/terminal-agent/src/printer/types.ts`），**本文件与
+> `services/api/src/terminals/terminal-capabilities.types.ts` 都没跟上**——
+> 于是产品负责人自己验过的能力，在项目文档里仍写着「未验证」。
+>
+> **验证通过 ≠ 终端已开通。** 服务端对 `color_print` / `duplex_print` 是 fail-closed
+> （`DEFAULT_DENY_CAPABILITY_KEYS`，未登记即拒绝），这条**不变**且**不该变**：
+> EV-013 验的是那一台机器，新机器仍须各自验过再登记。开通路径只有一条 ——
+> 管理员后台逐台把该能力配成 `available`。
+>
+> **开通彩色前必须先改价目描述。** 生产上 `print_color_page` 的 `unitCents=100`（1.00 元/页），
+> 而 `description` 仍是「免费试运营：彩色打印 0 元/页」。两者今天各自无害（用户看不到
+> description、彩色也点不了），一旦开通彩色就凑成一对：后台价目表说免费、实收 1 元/页，
+> 运营照着后台报价会报错。顺序不能反。
 
 ### 注意事项
 

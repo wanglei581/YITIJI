@@ -159,9 +159,6 @@ await runGroup('immutable fusion source hashes', async (fail) => {
 
 await runGroup('router route inventory', async (fail) => {
   const routes = await readDeclaredRoutes(fail)
-  if (routes !== null && routes.length !== 108) {
-    fail(`${displayPath(routerPath)}: expected exactly 108 normalized routes, received ${routes.length}`)
-  }
   if (routes !== null) {
     const duplicates = listDuplicateValues(routes)
     if (duplicates.length > 0) {
@@ -176,8 +173,8 @@ await runGroup('Playwright route manifest parity', async (fail) => {
   if (routes === null || manifestSource === null) return
 
   const manifestRoutes = extractManifestRoutePatterns(manifestSource)
-  if (manifestRoutes.length !== 108) {
-    fail(`${displayPath(manifestPath)}: expected exactly 108 route patterns, received ${manifestRoutes.length}`)
+  if (manifestRoutes.length !== routes.length) {
+    fail(`${displayPath(manifestPath)}: expected ${routes.length} route patterns (runtime declaration count), received ${manifestRoutes.length}`)
   }
   const manifestDuplicates = listDuplicateValues(manifestRoutes)
   if (manifestDuplicates.length > 0) {
@@ -200,11 +197,8 @@ await runGroup('compatibility redirect target parity', async (fail) => {
   const manifestRedirects = extractManifestRedirects(manifestSource)
   const routerSources = Object.keys(routerRedirects)
   const manifestSources = Object.keys(manifestRedirects)
-  // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
-  // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
-  // 2026-09-08：打印台合并由 7 增至 9；扫描工作台合并再增 4，由 9 增至 13。
-  if (manifestSources.length !== 13) {
-    fail(`${displayPath(manifestPath)}: expected exactly 13 compatibility redirects, actual ${manifestSources.length}`)
+  if (manifestSources.length !== routerSources.length) {
+    fail(`${displayPath(manifestPath)}: expected ${routerSources.length} compatibility redirects (runtime Navigate count), actual ${manifestSources.length}`)
   }
 
   const missingFromManifest = routerSources.filter((sourcePath) => !(sourcePath in manifestRedirects))

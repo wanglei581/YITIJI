@@ -62,7 +62,7 @@ function registerKioskShell(api: ApiRouter, options: KioskShellOptions = {}): vo
 
 async function expectWarningWithinThreeSeconds(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/session-timeout$/, { timeout: 3_000 })
-  await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /还在用吗/ })).toBeVisible()
 }
 
 async function readSensitiveSession(page: Page): Promise<string | null | undefined> {
@@ -189,7 +189,7 @@ test('ordinary idle warns before clearing and can resume the previous route', as
 
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '继续使用', exact: true }).click()
+  await page.getByRole('button', { name: /我还在，继续使用/ }).click()
 
   await expect(page).toHaveURL(/\/interview\/tips$/)
 })
@@ -214,7 +214,7 @@ test('warning keeps sensitive history state only on the original adjacent entry'
   await expectWarningWithinThreeSeconds(page)
   expect(await page.evaluate(() => window.history.state?.usr ?? null)).toBeNull()
 
-  await page.getByRole('button', { name: '继续使用', exact: true }).click()
+  await page.getByRole('button', { name: /我还在，继续使用/ }).click()
   await expect(page).toHaveURL(/\/interview\/tips$/)
   expect(await page.evaluate(() => window.history.state?.usr?.accessToken ?? null)).toBe(
     'must-stay-on-original-entry'
@@ -260,8 +260,8 @@ test('session warning actions remain touch-safe without horizontal overflow', as
 
   await expectWarningWithinThreeSeconds(page)
 
-  const continueButton = page.getByRole('button', { name: '继续使用', exact: true })
-  const exitButton = page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })
+  const continueButton = page.getByRole('button', { name: /我还在，继续使用/ })
+  const exitButton = page.getByRole('button', { name: '结束并清除本机会话', exact: true })
   await expect(continueButton).toBeVisible()
   await expect(exitButton).toBeVisible()
 
@@ -307,7 +307,7 @@ test('immediate exit hard-clears the session and blocks back-forward task recove
   })
 
   await expectWarningWithinThreeSeconds(page)
-  await page.getByRole('button', { name: '立即退出并清除本机会话', exact: true }).click()
+  await page.getByRole('button', { name: '结束并清除本机会话', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
@@ -336,7 +336,7 @@ test('screensaver-mode immediate exit always hard-clears and never falls into th
   await expectWarningWithinThreeSeconds(page)
   // 屏保模式预警倒计时自然结束应进 /screensaver,但用户点击"立即退出并清除本机会话"
   // 必须立即 hardClear 回干净首页——按钮共享倒计时动作会把用户带进屏保。
-  await page.getByRole('button', { name: '立即退出并清除本机会话', exact: true }).click()
+  await page.getByRole('button', { name: '结束并清除本机会话', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
   await expectSensitiveSessionCleared(page)
@@ -415,10 +415,10 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
       const heading = document.querySelector('#session-timeout-title')
       const buttons = Array.from(document.querySelectorAll('button'))
       const exitButton = buttons.find((button) =>
-        /立即退出并清除本机会话/.test(button.textContent ?? '')
+        /结束并清除本机会话/.test(button.textContent ?? '')
       )
       const continueButton = buttons.find((button) =>
-        /继续使用|返回首页并清除本机会话/.test(button.textContent ?? '')
+        /我还在，继续使用|结束并清除本机会话/.test(button.textContent ?? '')
       )
       const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
         /当前登录：|当前会话：/.test(el.textContent ?? '')
@@ -624,7 +624,7 @@ async function expectNoWarningWithin(
 ): Promise<void> {
   await page.waitForTimeout(ms)
   await expect(page).not.toHaveURL(/\/session-timeout$/)
-  await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: /还在用吗/ })).toHaveCount(0)
 }
 
 test('scan busy stays released when the scan task id is missing @scan-busy @warning-kiosk', async ({
@@ -938,7 +938,7 @@ test('clean standby homepage never raises the privacy exit countdown @warning-ki
 
   expect(await sightings()).toBe(0)
   await expect(page).toHaveURL('http://127.0.0.1:4188/')
-  await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: /还在用吗/ })).toHaveCount(0)
 })
 
 test('a completed privacy clear does not immediately re-arm another countdown @warning-kiosk', async ({

@@ -1,6 +1,6 @@
 import type { ImportFairItemDto } from './dto/import-fairs.dto'
 import type { ImportJobItemDto } from './dto/import-jobs.dto'
-import type { AccessMode, SourceKind } from './jobs-shared'
+import type { AccessMode, PartnerImportDataType, SourceKind } from './jobs-shared'
 
 // services/api 使用 CommonJS，不能直接运行时依赖 ESM-only 的 shared 包。
 // 这里的响应形状与 packages/shared/src/types/recruitmentIntegration.ts 保持一致。
@@ -21,7 +21,7 @@ export interface RecruitmentIntegrationContract {
   orgType: string
   allowedAccessModes: AccessMode[]
   schemas: Array<{
-    dataType: 'job' | 'fair'
+    dataType: PartnerImportDataType
     allowed: boolean
     requiredFields: string[]
     optionalFields: string[]
@@ -51,7 +51,7 @@ export interface RecruitmentIntegrationContract {
 
 export interface RecruitmentIntegrationPreflightResult {
   contractVersion: typeof RECRUITMENT_INTEGRATION_CONTRACT_VERSION
-  dataType: 'job' | 'fair'
+  dataType: PartnerImportDataType
   accepted: true
   itemCount: number
   persistence: 'none'
@@ -175,7 +175,7 @@ export function summarizeFairPreflight(
 }
 
 function summarize(
-  dataType: 'job' | 'fair',
+  dataType: PartnerImportDataType,
   items: object[],
   optionalFields: string[],
   dimensionField: string

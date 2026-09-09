@@ -387,6 +387,7 @@ export function PrintConfirmPage() {
           amountCents: created.amountCents,
           priceLines:  created.priceLines,
           paymentSessionToken: created.paymentSessionToken,
+          hasEndUser:  created.hasEndUser,
         }
         if (created.amountCents > 0 && created.payStatus !== 'paid') {
           navigate('/print/cashier', { state: nextState })

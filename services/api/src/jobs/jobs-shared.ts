@@ -25,6 +25,7 @@ export type WorkType      = JobWorkTypeValue
 export type ConnStatus    = 'connected' | 'error' | 'disabled'
 export type SourceKind    = 'job_platform' | 'hr_company' | 'school' | 'fair_organizer' | 'aggregator' | 'manual'
 export type AccessMode    = 'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
+export type PartnerImportDataType = 'job' | 'fair'
 export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual'
 
 // ─── Query helpers (internal) ─────────────────────────────────────────────────
@@ -438,7 +439,7 @@ export interface SyncLogDto {
   id: string
   no: string
   source: string
-  dataType: 'job' | 'fair'
+  dataType: PartnerImportDataType
   addedCount: number
   updatedCount: number
   errorCount: number
@@ -455,7 +456,7 @@ export interface AdminImportBatchDto {
   sourceName: string
   orgId: string
   orgName: string
-  dataType: 'job' | 'fair'
+  dataType: PartnerImportDataType
   fileName: string
   totalRows: number
   validRows: number
@@ -488,7 +489,7 @@ export interface ExcelPreviewRowDto {
 
 export interface FieldMappingRuleDto {
   sourceId: string
-  dataType: 'job' | 'fair'
+  dataType: PartnerImportDataType
   mapping: Record<string, string>
   updatedAt: string | null
 }

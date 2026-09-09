@@ -9,6 +9,7 @@ import {
   ValidatorConstraint,
   type ValidatorConstraintInterface,
 } from 'class-validator'
+import type { PartnerImportDataType } from '../../jobs/jobs-shared'
 
 const RESPONSE_FIELD_KEYS = new Set([
   'externalId', 'title', 'company', 'city', 'sourceUrl', 'salary', 'description', 'requirements',
@@ -40,7 +41,7 @@ class ResponseFieldMapConstraint implements ValidatorConstraintInterface {
 
 export class UpdateResponseConfigDto {
   @IsIn(['job', 'fair'])
-  dataType!: 'job' | 'fair'
+  dataType!: PartnerImportDataType
 
   @IsOptional()
   @IsString()

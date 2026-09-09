@@ -90,15 +90,42 @@ if (
   fail('admin terminals page must contain 生成绑定码 entry + modal state')
 }
 
-if (
-  dialog.includes('install-production-agent.ps1') &&
-  dialog.includes('-BindCode') &&
-  dialog.includes('-PrinterName') &&
-  dialog.includes("join(' `\\n  ')")
-) {
-  pass('弹窗展示 PowerShell install-production-agent.ps1 命令示例（包含 -BindCode/-PrinterName 和反引号续行）')
-} else {
-  fail('modal must surface PowerShell install-production-agent.ps1 command sample with -BindCode + -PrinterName')
+// 安装命令必须用 `-PromptForBindCode` 交互输入，**不得把绑定码拼进命令行**。
+//
+// 本仓已有口径，不是偏好：docs/device/production-agent-onboarding.md:14 原文
+//   「通过 `-PromptForBindCode` 安全交互输入一次性绑定码（推荐）…
+//     兼容参数 `-BindCode` 仅用于受控旧流程，**因为它会进入进程命令行**」
+// 该文档的示例命令用的也是 `-PromptForBindCode`。
+//
+// 本断言此前钉的是 `dialog.includes('-BindCode')` —— 把当时的现状写成了永久要求，
+// 于是「改成文档推荐的安全形态」这个正确动作反而会撞红。现在钉的是不变量：
+// 用交互输入、且命令里不出现把码拼进去的插值。
+{
+  // 只看 buildInstallCommand 的**函数体**，不看整份文件。
+  //
+  // 第一版就栽在这：写成 `dialog.includes('-PromptForBindCode')` 后，
+  // 把该 flag 从命令数组里删掉、只留上面那段解释用的注释，门禁照样绿（实测 exit=0）。
+  // **注释和文档引用不是行为。** 同族教训：断言匹配到的那一串，必须在代码路径上。
+  const fnStart = dialog.indexOf('function buildInstallCommand')
+  if (fnStart < 0) fail('TerminalBindCodeDialog 缺少 buildInstallCommand')
+  const fnEnd = dialog.indexOf('\n}', fnStart)
+  const cmdBody = dialog.slice(fnStart, fnEnd < 0 ? dialog.length : fnEnd)
+
+  const buildsInlineBindCode = /-BindCode\s+"\$\{/.test(cmdBody) || /`-BindCode "\$\{/.test(cmdBody)
+  if (
+    cmdBody.includes('install-production-agent.ps1') &&
+    cmdBody.includes('-PromptForBindCode') &&
+    !buildsInlineBindCode &&
+    cmdBody.includes('-PrinterName') &&
+    cmdBody.includes("join(' `\\n  ')")
+  ) {
+    pass('弹窗给出的安装命令用 -PromptForBindCode 交互输入，绑定码不进命令行')
+  } else {
+    fail(
+      'modal must generate the install command with -PromptForBindCode (never interpolate the code into -BindCode)'
+        + ` — hasPrompt=${cmdBody.includes('-PromptForBindCode')} inlineBindCode=${buildsInlineBindCode}（判据只看函数体，不看注释）`,
+    )
+  }
 }
 
 if (

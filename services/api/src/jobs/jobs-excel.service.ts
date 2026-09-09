@@ -43,6 +43,7 @@ import {
   parseMappedNumber,
   parseMappedDate,
   toPreviewRow,
+  type PartnerImportDataType,
 } from './jobs-shared'
 
 @Injectable()
@@ -165,7 +166,7 @@ export class JobsExcelService {
     buffer: Buffer
     fileName: string
     sourceId: string
-    dataType: 'job' | 'fair'
+    dataType: PartnerImportDataType
     fieldMapping: FieldMapping
     user: AuthedUser
   }): Promise<ExcelPreviewDto> {
@@ -356,7 +357,7 @@ export class JobsExcelService {
     if (!org || !org.enabled) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
     }
-    assertPartnerDataTypeCapability(org.type, batch.dataType as 'job' | 'fair')
+    assertPartnerDataTypeCapability(org.type, batch.dataType as PartnerImportDataType)
     const source = await this.prisma.jobSource.findUnique({ where: { id: batch.sourceId } })
     if (!source || source.orgId !== user.orgId || !source.enabled) {
       throw new BadRequestException({ error: { code: 'DATA_SOURCE_DISABLED', message: '数据源已停用，不能确认导入' } })
@@ -565,7 +566,7 @@ export class JobsExcelService {
     return { imported, syncLogId }
   }
 
-  async getMappingRule(sourceId: string, dataType: 'job' | 'fair', user: AuthedUser): Promise<FieldMappingRuleDto> {
+  async getMappingRule(sourceId: string, dataType: PartnerImportDataType, user: AuthedUser): Promise<FieldMappingRuleDto> {
     if (!user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }

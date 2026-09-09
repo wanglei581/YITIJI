@@ -1,5 +1,11 @@
 # 下一步任务
 
+## 2026-09-08 会话生命周期四页青序迁移残留
+
+- `/screensaver` 无素材 / 未启用仍 **exit 回首页**（route-sweep 与 empty-shell 契约），稿里的「暂无宣传内容」只作为加载中的诚实壳，不把空播放列表留在待机屏上冒充宣传。
+- `/login` 底部主按钮在发码前仍写「验证并登录」（既有 E2E 合同），稿文案是「确认登录」；视觉与状态机已按 03-login-gate。
+- `/session-timeout` 的 `cleared` / `continue-failed` 原型停留屏运行时不做：守卫 fail-closed 直接 `hardClear()` 重载首页，避免停在「还能继续」的假象上。
+- `/session-resume` 不实现 `?state=` + `fixture=1` 演示任务；列表只来自 `GET /me/pending-tasks`。
 ## 2026-09-08 两条描述订正（照旧描述派活会重造轮子）
 
 ### JobApplication：**只缺前端两端**，后端已就绪
