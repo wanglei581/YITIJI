@@ -73,7 +73,7 @@ async function seedResumeCompare(page: Page): Promise<void> {
 
 const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/', url: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
-  { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后，简历和记录', landmark: 'none' },
+  { pattern: '/login', url: '/login', marker: screen('login'), featureText: '登录后继续办理', landmark: 'none' },
   { pattern: '/member/qr-login', url: '/member/qr-login?ticketId=w6-ticket', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '上传链接已失效' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },

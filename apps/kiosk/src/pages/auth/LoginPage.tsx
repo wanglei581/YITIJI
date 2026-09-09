@@ -229,7 +229,7 @@ export function LoginPage() {
 
             <section className="qx-card" style={{ marginTop: 18 }}>
               <h3>登录之后多出什么</h3>
-              <p>我的文档、打印订单、AI 服务记录归到你名下，只有本人可见。手机上下单拿到的到机码能和这台机器对上号。</p>
+              <p>我的文档、打印订单、AI 服务记录、岗位与招聘会浏览记录归到你名下，只有本人可见。手机上下单拿到的到机码能和这台机器对上号。</p>
             </section>
 
             <section style={{ marginTop: 18 }}>
