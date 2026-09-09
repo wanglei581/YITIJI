@@ -1,0 +1,84 @@
+/* 五个服务台的青序流光样式。骨架与配色取自稿 16-service-hubs.html。
+   触控尺寸按 CLAUDE.md §9：可点区域不小于 48px，主行动不小于 56px。 */
+
+.qx-hub { display: flex; flex-direction: column; gap: 26px; padding: 0 var(--qx-gutter) 28px; }
+
+/* 目标分段：稿里是首屏「先选目标，再进流程」 */
+.qx-hub-goals { display: flex; flex-direction: column; gap: 12px; }
+.qx-hub-goals-hint { font-size: 22px; color: var(--qx-ink-2, #64766f); }
+.qx-hub-goals-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.qx-hub-goal {
+  min-height: 56px; padding: 0 24px;
+  border: 1px solid color-mix(in srgb, var(--qx-deep) 22%, transparent); border-radius: 999px;
+  background: var(--qx-surface, #fffdf8); color: var(--qx-ink, #10302b);
+  font-size: 24px; cursor: pointer;
+}
+.qx-hub-goal:active { transform: scale(.99); }
+
+/* 后端不可用时的解释条：说清「什么还能用」，不是只说坏了 */
+.qx-hub-degraded {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px;
+  min-height: 84px; padding: 14px 20px; border-radius: var(--qx-r);
+  border: 1px solid color-mix(in srgb, var(--qx-clay, #a95336) 34%, transparent);
+  background: color-mix(in srgb, var(--qx-clay, #a95336) 8%, transparent);
+}
+.qx-hub-degraded > div { display: flex; flex-direction: column; gap: 4px; }
+.qx-hub-degraded strong { font-size: 24px; }
+.qx-hub-degraded span { font-size: 20px; color: var(--qx-ink-2, #64766f); }
+.qx-hub-degraded button {
+  min-height: 56px; min-width: 112px; padding: 0 22px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--qx-deep) 26%, transparent);
+  background: var(--qx-surface, #fffdf8); font-size: 22px; cursor: pointer;
+}
+
+.qx-hub-board { display: flex; flex-direction: column; gap: 16px; }
+.qx-hub-board > h2 { font-family: var(--qx-serif); font-size: 34px; }
+.qx-hub-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
+.qx-hub-card {
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+  min-height: 208px; padding: 20px; text-align: left;
+  border: 1px solid color-mix(in srgb, var(--qx-deep) 14%, transparent);
+  border-radius: var(--qx-r); background: var(--qx-surface, #fffdf8);
+  color: var(--qx-ink, #10302b); cursor: pointer;
+}
+.qx-hub-card:active { transform: scale(.995); }
+.qx-hub-card-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 18px;
+  background: color-mix(in srgb, var(--qx-emerald, #16866f) 12%, transparent);
+  color: var(--qx-emerald, #16866f);
+}
+.qx-hub-card h3 { font-family: var(--qx-serif); font-size: 27px; }
+.qx-hub-card p { font-size: 20px; line-height: 1.5; color: var(--qx-ink-2, #64766f); }
+.qx-hub-card-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; margin-top: auto; padding-top: 8px; font-size: 19px;
+}
+.qx-hub-badge { color: var(--qx-ink-2, #64766f); }
+.qx-hub-go { color: var(--qx-emerald, #16866f); }
+
+/* 不可用态：**不是灰掉的按钮，是一张说明为什么进不去的卡片**。
+   稿的做法是把「进入 →」换成具体原因，并让它不再是可点控件——
+   用户看得出是「这台机器现在没这个能力」，而不是「这个功能没了」。 */
+.qx-hub-card.is-unavailable {
+  cursor: default; opacity: .78;
+  border-style: dashed;
+  background: color-mix(in srgb, var(--qx-deep) 4%, transparent);
+}
+.qx-hub-card.is-unavailable .qx-hub-card-icon {
+  background: color-mix(in srgb, var(--qx-deep) 10%, transparent);
+  color: var(--qx-ink-2, #64766f);
+}
+.qx-hub-why { color: var(--qx-clay, #a95336); }
+
+/* 合规与诚实性声明区：逐字来自稿，位置固定在底部，不随内容滚动出视野之外 */
+.qx-hub-truth {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 18px 20px; border-radius: var(--qx-r);
+  border: 1px solid color-mix(in srgb, var(--qx-deep) 12%, transparent);
+  background: color-mix(in srgb, var(--qx-deep) 4%, transparent);
+}
+.qx-hub-truth-title, .qx-hub-note-title { font-size: 22px; font-weight: 700; }
+.qx-hub-truth-copy, .qx-hub-note-copy { font-size: 20px; line-height: 1.5; color: var(--qx-ink-2, #64766f); }
+.qx-hub-note-title { margin-top: 8px; }

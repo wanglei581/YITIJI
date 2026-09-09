@@ -81,11 +81,6 @@ interface V6ShellRoute {
  * fusion-w6-routes.spec.ts:32 会拿它和实际壳归属对账，留着就是自相矛盾。
  * 2026-09-08 移出：'/'（首页迁入青序流光）、'/print-scan'（早已迁入，本次一并清理）。 */
 const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
-  ['/resume-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/jobs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/fairs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/interview-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/policy-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
 ])
 
 /**
@@ -104,6 +99,11 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  * （`isQxMigratedPath(pathname)` 是壳层契约允许的具名谓词形态）。
  */
 const QX_MIGRATED_ROUTES = new Set<string>([
+  '/resume-service',
+  '/jobs-service',
+  '/fairs-service',
+  '/interview-service',
+  '/policy-service',
   '/',
   '/print/pickup-claim',
   '/print/cashier',
