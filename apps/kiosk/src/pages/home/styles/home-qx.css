@@ -92,8 +92,8 @@
   border: 1px solid color-mix(in srgb, var(--qx-paper) 22%, transparent); border-radius: var(--qx-r);
   color: var(--qx-paper); background: color-mix(in srgb, var(--qx-paper) 8%, transparent);
 }
-.qx-home-empty-context { grid-template-columns: 1fr auto auto; text-align: left; cursor: pointer; }
-.qx-home-empty-context:disabled { cursor: not-allowed; opacity: .72; }
+/* 空态是陈述不是动作：单列、不可点、不用 disabled 的灰化——它没有「被禁用」这回事。 */
+.qx-home-empty-context { grid-template-columns: 1fr; text-align: left; }
 .qx-home-empty-context span,
 .qx-home .continue .c-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .qx-home-empty-context strong,

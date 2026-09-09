@@ -141,11 +141,38 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(home.getByText('2026 青岛秋季高校毕业生招聘会', { exact: true })).toBeVisible()
   expect(fairRequestUrl.searchParams.get('terminalId')).toBe('KSK-001')
   await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
+  // 百宝箱 / 智慧校园是**能力闸门**：本机没开通就该点不动，浏览器不是绑定终端，
+  // 所以这里必须 disabled。这两条钉的是 fail-closed，不是钉「当前恰好是灰的」。
   await expect(home.getByRole('button', { name: /百宝箱/ })).toBeDisabled()
   await expect(home.getByRole('button', { name: /智慧校园/ })).toBeDisabled()
-  await expect(home.getByRole('button', { name: /更多服务/ })).toBeDisabled()
-  await expect(home.getByRole('button', { name: /查看全部服务/ })).toBeDisabled()
-  await expect(home.getByRole('button', { name: /没有待继续的办理/ })).toBeDisabled()
+
+  // 空态是陈述不是动作：它不能是按钮（无论 disabled 与否）。
+  await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
+  await expect(home.getByRole('button', { name: /没有待继续的办理/ })).toHaveCount(0)
+
+  // 首页上每一颗点不动的按钮，都必须说得出「因为哪条能力闸门」。
+  //
+  // 2026-09-09 生产实走抓到三颗点不动的控件（「更多服务（目录迁移中）」
+  // 「查看全部服务（目录迁移中）」和被做成 disabled 按钮的空态），
+  // title 全是「全部服务目录尚未迁入运行时路由」——一体机没有鼠标悬停，
+  // 那句解释根本没人看得到，用户只会反复去戳。
+  //
+  // **判据是结构不是禁词表。** 第一版写成 `/迁移中|待接入|TODO/` 的黑名单，
+  // 只能抓写进表里的词；换一句「建设中」「敬请期待」就漏。现在要求每颗 disabled
+  // 按钮带 `data-disabled-reason="capability:<配置项>"`，
+  // 语义是「本机没开通这项服务」——真实状态、用户看得懂、运营改配置就能变。
+  // 功能没做完不属于这一类：那种情况不该在首页摆按钮，直接不渲染。
+  const unexplainedDisabled = await home.evaluate(() =>
+    [...document.querySelectorAll('button[disabled], [aria-disabled="true"]')]
+      .filter((el) => !/^capability:/.test(el.getAttribute('data-disabled-reason') ?? ''))
+      .map((el) => (el as HTMLElement).innerText.replace(/\s+/g, ' ').trim()),
+  )
+  expect(
+    unexplainedDisabled,
+    `首页出现了说不出理由的死控件：${unexplainedDisabled.join(' / ')}。`
+      + `点不动只有一个正当理由——本机没开通这项能力，那就带上 data-disabled-reason="capability:x"；`
+      + `功能没做完不要在首页摆按钮。`,
+  ).toEqual([])
   await expect(home.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expect(home.getByRole('link', { name: '鲁ICP备2026023517号-2' })).toHaveAttribute('href', 'https://beian.miit.gov.cn/')
   await expect(home.getByRole('link', { name: '鲁公网安备37021402007308号' })).toHaveAttribute('href', /beian\.mps\.gov\.cn/)
