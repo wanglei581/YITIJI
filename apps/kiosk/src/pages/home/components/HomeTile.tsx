@@ -11,6 +11,12 @@ export interface HomeTileProps {
   tone?: 'teal' | 'slate' | 'clay' | 'neutral'
   size?: 'feature' | 'regular' | 'slim'
   disabled?: boolean
+  /**
+   * 为什么点不动。**只允许填能力闸门**（`capability:<配置项>`）——
+   * 「本机没开通这项服务」是真实状态，用户看得懂、运营改配置就能变。
+   * 功能没做完不属于这一类：那种情况不该在首页摆一颗按钮，直接不渲染。
+   */
+  disabledReason?: `capability:${string}`
   statusText?: string
   /** 挂在磁贴根节点上的额外 data-* 标记（如设备/招聘会面板的状态标记）。 */
   panelAttrs?: Record<string, string>
@@ -27,6 +33,7 @@ export function HomeTile({
   tone = 'teal',
   size = 'regular',
   disabled = false,
+  disabledReason,
   statusText,
   panelAttrs,
   onAction,
@@ -39,6 +46,7 @@ export function HomeTile({
       data-tone={tone}
       data-size={size}
       disabled={disabled}
+      data-disabled-reason={disabled ? disabledReason : undefined}
       onClick={() => onAction(actionId)}
       aria-describedby={statusText ? `qx-home-${actionId}-status` : undefined}
       {...panelAttrs}

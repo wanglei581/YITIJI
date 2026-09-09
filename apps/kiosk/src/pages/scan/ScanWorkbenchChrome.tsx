@@ -41,6 +41,12 @@ export function ScanWorkbenchShell({
   const ask = SCAN_ASK[state]
   return (
     <QxPageFrame
+      /* 稿 18-scan-workbench 原文：data-route="/print-scan" aria-label="返回打印扫描"。
+       *  一张工作台四个阶段共用这一个返回键，落点是打印扫描 Hub，不是「上一阶段」——
+       *  稿就是这么画的：阶段之间用 CTA 前进/后退，顶栏返回是「离开这条流程」。
+       *  返回 ≠ 取消：扫描会话在服务端，离开这一屏不会终止它。
+       *  取消是 progress 阶段单独的动作（稿里 cancel-* 是独立状态）。 */
+      back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
       title={title}
       subtitle={subtitle}
       status={status}

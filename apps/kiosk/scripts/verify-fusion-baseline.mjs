@@ -159,8 +159,8 @@ await runGroup('immutable fusion source hashes', async (fail) => {
 
 await runGroup('router route inventory', async (fail) => {
   const routes = await readDeclaredRoutes(fail)
-  if (routes !== null && routes.length !== 107) {
-    fail(`${displayPath(routerPath)}: expected exactly 107 normalized routes, received ${routes.length}`)
+  if (routes !== null && routes.length !== 108) {
+    fail(`${displayPath(routerPath)}: expected exactly 108 normalized routes, received ${routes.length}`)
   }
   if (routes !== null) {
     const duplicates = listDuplicateValues(routes)
@@ -176,8 +176,8 @@ await runGroup('Playwright route manifest parity', async (fail) => {
   if (routes === null || manifestSource === null) return
 
   const manifestRoutes = extractManifestRoutePatterns(manifestSource)
-  if (manifestRoutes.length !== 107) {
-    fail(`${displayPath(manifestPath)}: expected exactly 107 route patterns, received ${manifestRoutes.length}`)
+  if (manifestRoutes.length !== 108) {
+    fail(`${displayPath(manifestPath)}: expected exactly 108 route patterns, received ${manifestRoutes.length}`)
   }
   const manifestDuplicates = listDuplicateValues(manifestRoutes)
   if (manifestDuplicates.length > 0) {
@@ -202,9 +202,9 @@ await runGroup('compatibility redirect target parity', async (fail) => {
   const manifestSources = Object.keys(manifestRedirects)
   // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
   // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
-  // 2026-09-08：打印台合并，材料检查 / 预览改为重定向，由 7 增至 9。
-  if (manifestSources.length !== 9) {
-    fail(`${displayPath(manifestPath)}: expected exactly 9 compatibility redirects, actual ${manifestSources.length}`)
+  // 2026-09-08：打印台合并由 7 增至 9；扫描工作台合并再增 4，由 9 增至 13。
+  if (manifestSources.length !== 13) {
+    fail(`${displayPath(manifestPath)}: expected exactly 13 compatibility redirects, actual ${manifestSources.length}`)
   }
 
   const missingFromManifest = routerSources.filter((sourcePath) => !(sourcePath in manifestRedirects))

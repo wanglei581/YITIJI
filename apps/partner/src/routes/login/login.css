@@ -929,6 +929,14 @@
   font-size: 12.5px;
   line-height: 1.75;
   color: var(--muted);
+  /* 正文来自服务端 Markdown，段内换行必须保留（口径同 admin login.css）。 */
+  white-space: pre-wrap;
+}
+/* 读不到当前有效版本时的错误态。没有它这句话会渲染成无样式正文，
+   看起来像协议的一部分 —— 与 admin 同名同色。 */
+.clogin .c-doc-error {
+  color: var(--red);
+  font-weight: 700;
 }
 .clogin .c-doc-tabs {
   display: flex;

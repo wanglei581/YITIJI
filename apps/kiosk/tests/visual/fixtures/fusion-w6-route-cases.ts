@@ -156,10 +156,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
   { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("AI简历服务")', featureText: 'AI简历服务' },
-  { pattern: '/scan/start', url: '/scan/start', marker: w2('scan-start'), featureText: '扫描服务' },
-  { pattern: '/scan/settings', url: '/scan/settings', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
-  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan/start', marker: w2('scan-start'), featureText: '扫描服务' },
-  { pattern: '/scan/result', url: '/scan/result', marker: w2('scan-result'), featureText: '扫描未完成' },
+  { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+  { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+  { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
+  { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+  { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
+
   { pattern: '/jobs', url: '/jobs', marker: qx, featureText: '岗位信息' },
   { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("岗位信息")', featureText: '岗位信息' },
   { pattern: '/jobs/:id', url: '/jobs/job-001', marker: qx, featureText: '前端工程师' },
@@ -189,7 +191,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
-] as const // 107 routes (was 106; 2026-09-08 打印台合并新增 /print/desk)
+] as const // 108 routes (was 107; 2026-09-08 扫描工作台合并新增 /scan)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -225,9 +227,9 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 107) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 108) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-// 2026-09-08 打印台合并新增 /print/desk；kiosk 由 104 增至 105；mobile 仍为 2。
-if (w6KioskCases.length !== 105) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+// 2026-09-08 打印台 + 扫描工作台各新增一条工作台路由；kiosk 由 104 增至 106；mobile 仍为 2。
+if (w6KioskCases.length !== 106) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
