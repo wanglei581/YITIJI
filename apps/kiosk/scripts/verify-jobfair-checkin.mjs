@@ -43,9 +43,9 @@ function mustNotContain(rel, words, label) {
 console.log('\n=== Kiosk 招聘会来源签到入口防回退验证 ===')
 
 mustContain(
-  'src/pages/home/serviceGroups.ts',
+  'src/pages/job-fairs/FairsServiceHubPage.tsx',
   ["title: '扫码签到'", "to: '/job-fairs/checkin'"],
-  '首页扫码签到入口进入来源签到列表',
+  '招聘会服务中心扫码签到入口进入来源签到列表',
 )
 
 mustContain(
@@ -85,7 +85,7 @@ mustContain(
 )
 
 for (const rel of [
-  'src/pages/home/serviceGroups.ts',
+  'src/pages/job-fairs/FairsServiceHubPage.tsx',
   'src/pages/job-fairs/JobFairCheckinPage.tsx',
   'src/pages/job-fairs/JobFairDetailPage.tsx',
 ]) {

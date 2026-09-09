@@ -177,8 +177,25 @@ assert.match(
 )
 for (const [path, hash] of frozenHashes) assert.equal(sha256(path), hash, `${path} remains frozen`)
 
-assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageFrame/)
-assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageHeader/)
+const retiredPrintScanShell = [
+  'src/pages/print/PrintPrototypeLayout.tsx',
+  'src/pages/print/print-prototype.css',
+  'src/pages/print/styles/print-upload.css',
+  'src/pages/print/styles/print-material-check.css',
+  'src/pages/print/styles/print-preview-params.css',
+  'src/pages/print/styles/print-cashier.css',
+  'src/pages/print/styles/print-progress-result.css',
+  'src/pages/print/styles/print-pickup-claim.css',
+  'src/pages/print-scan/styles/print-scan-fusion.css',
+  'src/pages/print-scan/styles/print-scan-uplift.css',
+  'src/pages/print-scan/styles/print-scan-home.css',
+  'src/pages/scan/styles/scan-fusion.css',
+  'src/styles/kiosk-uplift.css',
+]
+for (const path of retiredPrintScanShell) {
+  assert.equal(existsSync(join(kioskRoot, path)), false, `${path} stays deleted (V6/fusion shell no longer loaded)`)
+}
+
 assert.match(read('src/pages/print/PrintMaterialCheckPage.tsx'), /MaterialCheckPresentation/)
 assert.match(read('src/pages/print/PrintDeskPage.tsx'), /readPrintMaterialSession/)
 assert.match(read('src/pages/print/PrintDeskPage.tsx'), /replace:\s*true/)
@@ -204,17 +221,6 @@ assert.match(
   /['"]\/print\/desk['"]/,
   '/print/desk is registered in QX_MIGRATED_ROUTES',
 )
-for (const css of [
-  'print-upload.css',
-  'print-material-check.css',
-  'print-preview-params.css',
-  'print-cashier.css',
-  'print-progress-result.css',
-])
-  assert.match(
-    read('src/pages/print/print-prototype.css'),
-    new RegExp(`@import ["']\\./styles/${css}["']`)
-  )
 
 const presentationFiles = ['src/pages/print/components/MaterialCheckPresentation.tsx']
 const forbiddenPresentationMarkers = [
@@ -278,31 +284,8 @@ assert.match(
 )
 assert.match(printHubQxCss, /var\(--qx-ink\)/, 'hub CSS consumes Qingxu tokens')
 assert.match(printHubQxCss, /--qx-tap-min/, 'hub CSS keeps the 48px touch floor token')
-const printScanFusionCss = read('src/pages/print-scan/styles/print-scan-fusion.css')
-const frameContentPaddingContracts = new Map([
-  ['src/pages/print-scan/styles/print-scan-fusion.css', 'w2-print-scan-page'],
-  ['src/pages/scan/styles/scan-fusion.css', 'w2-scan-page'],
-  ['src/pages/print/print-prototype.css', 'print-proto'],
-])
-for (const [path, frameClass] of frameContentPaddingContracts) {
-  assert.match(
-    read(path),
-    new RegExp(
-      `\\[data-kiosk-presentation=['"]fusion-youth['"]\\]\\s+\\.${frameClass}\\s*>\\s*\\.ui-kiosk-page-content\\s*\\{[^}]*padding:\\s*0\\s*;`
-    ),
-    `${frameClass} neutralizes direct kiosk page content padding`
-  )
-}
-assert.match(
-  printScanFusionCss,
-  /\.w2-print-scan-shell\s*>\s*:is\(main,\s*section\)\s*\{/,
-  'print-scan shell isolation must support both main and section content roots'
-)
-assert.doesNotMatch(
-  printScanFusionCss,
-  /\.w2-print-scan-shell\s*>\s*main\s*\{/,
-  'print-scan shell isolation must not drift back to a main-only selector'
-)
+assert.match(printScanHome, /QxPageFrame/, 'print-scan hub padding is owned by QxPageFrame, not V6 page-content zeroing')
+assert.doesNotMatch(printScanHome, /KioskPageFrame/, 'print-scan hub has left the V6 frame')
 for (const marker of [
   'loadConfiguredCapabilities',
   'CARD_CAPABILITY_KEY',
@@ -510,11 +493,6 @@ assert.match(
   'print upload is registered in QX_MIGRATED_ROUTES'
 )
 assert.match(
-  read('src/pages/print/styles/print-upload.css'),
-  /\.w2-print-upload-source-grid\b/,
-  'print upload stylesheet owns the live source grid selector'
-)
-assert.match(
   read('src/pages/print/styles/file-source-qx.css'),
   /\.w2-print-upload-source-grid\b/,
   'qingxu file-source stylesheet owns the live source grid selector'
@@ -539,42 +517,38 @@ assert.doesNotMatch(
   /KioskPageFrame/,
   'print upload view has left the V6 frame'
 )
-const printPrototypeLayout = read('src/pages/print/PrintPrototypeLayout.tsx')
+assert.doesNotMatch(
+  printUploadPage,
+  /from ['"][^'"]*PrintPrototypeLayout['"]/,
+  'print upload does not import the retired V6 print prototype frame',
+)
+const qxTokens = read('src/styles/qingxu/tokens.css')
+const qxShell = read('src/styles/qingxu/shell.css')
+const qxPrimitives = read('src/styles/qingxu/primitives.css')
 assert.match(
-  printPrototypeLayout,
-  /classNames\.includes\(["']p-6["']\)/,
-  'shared print frame recognizes legacy p-6 callers that need the unified gutter'
+  qxTokens,
+  /--qx-gutter:\s*40px\s*;/,
+  'qingxu declares the page gutter once (40px token; V6 --print-page-gutter 48px equivalent)',
 )
 assert.match(
-  printPrototypeLayout,
-  /className\s*!==\s*["']p-6["']/,
-  'shared print frame removes legacy outer padding instead of stacking it around the pagehead'
+  qxShell,
+  /\.qx-body\s*\{[^}]*padding:\s*0\s+var\(--qx-gutter\)\s*;/,
+  'qx-body applies the shared page gutter as content padding',
 )
 assert.match(
-  printPrototypeLayout,
-  /contentClassName=\{usesUnifiedGutter\s*\?\s*["']print-proto-content--guttered["']\s*:\s*undefined\}/,
-  'shared print frame moves legacy callers onto its content gutter contract'
-)
-const printPrototypeCss = read('src/pages/print/print-prototype.css')
-assert.match(
-  printPrototypeCss,
-  /--print-page-gutter:\s*48px\s*;/,
-  'print flow declares the prototype 48px gutter once'
+  qxShell,
+  /\.qx-pagehead\s*\{[^}]*margin:\s*18px\s+var\(--qx-gutter\)\s+0\s*;/,
+  'pagehead sits on the shared gutter instead of stacking extra padding',
 )
 assert.match(
-  printPrototypeCss,
-  /\.print-proto\s*>\s*\.ui-kiosk-page-content\.print-proto-content--guttered\s*\{[^}]*padding-inline:\s*var\(--print-page-gutter\)\s*;/,
-  'legacy print callers receive the shared 48px content gutter'
+  qxShell,
+  /\.qx-topbar\s*\{[^}]*padding:\s*0\s+var\(--qx-gutter\)\s*;/,
+  'topbar uses the same gutter token',
 )
 assert.match(
-  printPrototypeCss,
-  /\.print-proto-content--guttered[\s\S]*?>\s*:is\(\.ui-kiosk-page-header,\s*\.ui-kiosk-steps,\s*\.ui-kiosk-action-bar\)\s*\{[^}]*margin-inline:\s*calc\(-1\s*\*\s*var\(--print-page-gutter\)\)\s*;/,
-  'pagehead, steps and actionbar bleed through the content gutter without absolute positioning'
-)
-assert.match(
-  printPrototypeCss,
-  /\[data-w2-page=["']print-upload["']\]\s*>\s*\.print-upload-footer\s*\{[^}]*margin:\s*22px\s+calc\(-1\s*\*\s*var\(--print-page-gutter\)\)\s+0\s*;[^}]*padding:\s*26px\s+var\(--print-page-gutter\)\s+34px\s*;[^}]*border-top:\s*1px\s+solid\s+var\(--print-line\)\s*;/,
-  'print upload ordinary footer buttons follow the prototype actionbar geometry'
+  qxPrimitives,
+  /\.qx-ctabar\s*\{[^}]*padding:\s*18px\s+var\(--qx-gutter\)\s*;[^}]*border-top:\s*1px\s+solid\s+var\(--qx-line\)\s*;/,
+  'ctabar follows the prototype actionbar geometry: gutter padding + top border',
 )
 const materialPresentation = read('src/pages/print/components/MaterialCheckPresentation.tsx')
 assert.match(
@@ -814,7 +788,6 @@ assert.match(
 )
 
 const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')
-const pickupClaimCss = read('src/pages/print/styles/print-pickup-claim.css')
 for (const marker of [
   'claimLockRef',
   // 到机码改 8 位后符号更名：扫码路径仍必须先过格式判据，且新旧两种码各有分支
@@ -851,21 +824,25 @@ assert.match(
   /onKeyDown=\{e => \{ if \(e\.key === 'Enter'\) void handleClaim\(code\) \}\}/,
   'pickup scanner Enter suffix reuses the same guarded submission path'
 )
-for (const selector of [
-  '.pickup-claim-page',
-  '.pcp-input',
-  '.pcp-submit.k-btn',
-  '.pcp-help',
-  '.pickup-claim-success',
-]) {
-  assert.ok(pickupClaimCss.includes(selector), `pickup claim CSS retains ${selector}`)
-}
-assert.match(
-  pickupClaimCss,
-  /@media \(max-height: 900px\) and \(orientation: landscape\)/,
-  'pickup claim keeps a compact Windows landscape layout'
-)
 const pickupClaimQxCss = read('src/pages/print/styles/pickup-claim-qx.css')
+assert.ok(pickupClaimQxCss.includes('.pickup-claim-page'), 'qingxu pickup claim CSS retains .pickup-claim-page')
+assert.ok(pickupClaimQxCss.includes('.pcp-input'), 'qingxu pickup claim CSS retains .pcp-input')
+assert.ok(
+  pickupClaim.includes('className="qx-btn pcp-submit"'),
+  'pickup submit button keeps locatable qx-btn pcp-submit class (V6 .pcp-submit.k-btn equivalent)',
+)
+assert.match(
+  pickupClaim,
+  /className="qx-btn pcp-submit"[\s\S]{0,200}data-variant="primary"/,
+  'pickup submit is the page primary action (V6 .pcp-submit.k-btn min-height now inherited from qx-btn primary)',
+)
+assert.match(
+  qxPrimitives,
+  /\.qx-btn\[data-variant='primary'\]\s*\{[^}]*min-height:\s*var\(--qx-btn-h-lg\)/,
+  'primary qx-btn keeps the large tap floor the pickup submit inherits',
+)
+assert.ok(pickupClaimQxCss.includes('.pcp-help'), 'qingxu pickup claim CSS retains .pcp-help')
+assert.ok(pickupClaimQxCss.includes('.pickup-claim-success'), 'qingxu pickup claim CSS retains .pickup-claim-success')
 assert.match(
   pickupClaimQxCss,
   /@media \(max-height: 900px\) and \(orientation: landscape\)/,
@@ -917,16 +894,6 @@ assert.match(
   'pickup claim page must render the extracted hid guide screen'
 )
 
-const scanPages = new Map([
-  // 四页已迁出 V6 壳。循环体保留，避免删掉 assert 行；条目清空后改由下方 qxScanPages 同强度断言。
-])
-for (const [path, marker] of scanPages) {
-  const body = read(path)
-  assert.match(body, new RegExp(`data-w2-page=["']${marker}["']`), `${path} exposes ${marker}`)
-  assert.match(body, /\.\/styles\/scan-fusion\.css/, `${path} imports the scoped W2 stylesheet`)
-  assert.match(body, /KioskPageFrame/, `${path} uses the frozen page frame`)
-  assert.match(body, /KioskPageHeader/, `${path} uses the frozen page header`)
-}
 const qxScanPages = new Map([
   ['src/pages/scan/ScanStartPage.tsx', 'scan-start'],
   ['src/pages/scan/ScanSettingsPage.tsx', 'scan-settings'],
@@ -1129,26 +1096,54 @@ assert.doesNotMatch(
   'scan result must not imply a completed save action'
 )
 
-const scanFusionCss = read('src/pages/scan/styles/scan-fusion.css')
 assert.match(
-  scanFusionCss,
-  /\.w2-scan-two-column\s*,[\s\S]*?align-items:\s*stretch/,
-  'scan dual columns stretch to equal height'
+  scanWorkbenchQxCss,
+  /\.sw-chain\s*\{[^}]*align-items:\s*stretch/,
+  'scan workbench chain columns stretch to equal height'
 )
 assert.match(
-  scanFusionCss,
-  /\.w2-scan-progress-list\s*>\s*div\s*\{[^}]*flex:\s*0\s+0\s+auto/,
-  'scan progress rows do not vertically explode empty space'
+  scanWorkbenchQxCss,
+  /\.sw-panel\s*\{[^}]*align-items:\s*stretch/,
+  'scan workbench panel columns stretch to equal height'
+)
+const signStampQxCss = read('src/pages/print-scan/styles/sign-stamp-qx.css')
+assert.match(
+  signStampQxCss,
+  /\.ss-page\s*\{[^}]*margin:\s*0\s+calc\(-1\s*\*\s*var\(--qx-gutter\)\)\s*;/,
+  'sign-stamp page bleeds through the shared gutter the way V6 print-proto bled --print-page-gutter',
 )
 assert.match(
-  printScanFusionCss,
-  /\.w2-print-scan-split\s*\{[^}]*align-items:\s*stretch/,
-  'print-scan split columns stretch to equal height'
+  signStampQxCss,
+  /\.ss-work\s*\{[^}]*flex:\s*1/,
+  'sign-stamp work area grows with remaining height',
 )
 assert.match(
-  printScanFusionCss,
-  /\.w2-print-scan-preview-frame\s*\{[^}]*min-height:\s*360px/,
-  'sign-stamp preview frame grows instead of a fixed short box'
+  signStampQxCss,
+  /\.ss-pvcol\s*\{[^}]*width:\s*600px/,
+  'sign-stamp preview column is a 600px pane, not a stub strip',
+)
+assert.match(
+  signStampQxCss,
+  /\.ss-pv-frame\s*\{[^}]*flex:\s*1/,
+  'sign-stamp preview frame grows with remaining space'
+)
+assert.match(
+  signStampQxCss,
+  /\.ss-pv-view\s*\{[^}]*flex:\s*1/,
+  'sign-stamp live preview view grows with remaining space',
+)
+assert.match(
+  signStampQxCss,
+  /\.ss-pv-ghost\s*\{[^}]*aspect-ratio:\s*840\s*\/\s*1188/,
+  'sign-stamp empty preview ghost keeps the A4 proportion floor',
+)
+const ghostMaxWidth = Number(
+  (signStampQxCss.match(/\.ss-pv-ghost\s*\{[^}]*max-width:\s*(\d+)px/) ?? [])[1] ?? '',
+)
+const ghostFloorPx = ghostMaxWidth * (1188 / 840)
+assert.ok(
+  Number.isFinite(ghostFloorPx) && ghostFloorPx >= 360,
+  `sign-stamp empty preview ghost is at least 360px tall (V6 preview-frame min-height; actual ${ghostFloorPx.toFixed(0)}px at max-width ${ghostMaxWidth}px)`,
 )
 assert.match(signStamp, /w2-print-scan-preview/, 'sign-stamp uses the densified preview shell')
 assert.doesNotMatch(

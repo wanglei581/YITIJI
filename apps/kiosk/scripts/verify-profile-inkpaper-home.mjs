@@ -476,6 +476,10 @@ const allowedHonestCopyChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
 ])
+/** 零 import 的 RowIconButton 死文件；删它不是换装，是清死代码。 */
+const allowedDeadPageCleanupChanged = new Set([
+  'apps/kiosk/src/pages/profile/assets/ui.tsx',
+])
 const allowedChanged = new Set([
   'apps/kiosk/src/layouts/KioskRoot.tsx',
   ...allowedProfileLandingChanged,
@@ -483,6 +487,7 @@ const allowedChanged = new Set([
   ...allowedPrintOrderRefreshChanged,
   ...allowedPrintOrdersInkpaperChanged,
   ...allowedHonestCopyChanged,
+  ...allowedDeadPageCleanupChanged,
 ])
 const profileRelatedChanged = changedFiles.filter(
   (file) => file.startsWith('apps/kiosk/src/pages/profile/') || file.startsWith('apps/kiosk/scripts/verify-profile-inkpaper-home'),

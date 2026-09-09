@@ -33,7 +33,7 @@ const socialPanel = read('src/pages/renshi/SocialPanel.tsx')
 const registerPanel = read('src/pages/renshi/RegisterPanel.tsx')
 const noticePanel = read('src/pages/renshi/NoticePanel.tsx')
 const components = read('src/pages/renshi/components.tsx')
-const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
+const policyHub = read('src/pages/policy/PolicyServiceHubPage.tsx')
 const packageJson = read('package.json')
 
 const allRenshi = page + shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel + components
@@ -91,11 +91,18 @@ if (['graduate', 'flexible', 'migrant', 'startup', 'hardship'].every((k) => shar
   fail('E. 人群筛选必须与后端 POLICY_AUDIENCES 对齐（含 flexible 与 migrant）')
 }
 
-// F. 首页入口与 Tab 对应
-if (homeServiceGroups.includes("{ title: '社保指南', description: '社保办事材料参考', icon: 'ticket', to: '/renshi?tab=social' }") && !homeServiceGroups.includes("title: '补贴指引'")) {
-  pass('F. 首页「社保指南」入口指向 tab=social，无错位「补贴指引」入口')
+// F. 政策服务中心入口与 Tab 对应。
+// 原断言钉死代码 serviceGroups.ts，且禁止出现「补贴指引」标题。
+// 活入口在 /policy-service：社保指南必须进 tab=social；
+// 「补贴指引」标题可以有，但不得再指向不存在的 ?tab=subsidy（会被静默丢弃）。
+if (
+  policyHub.includes("title: '社保指南'") &&
+  policyHub.includes("to: '/renshi?tab=social'") &&
+  !policyHub.includes("to: '/renshi?tab=subsidy'")
+) {
+  pass('F. 政策服务中心「社保指南」指向 tab=social，无错位 tab=subsidy')
 } else {
-  fail('F. 首页政策服务子入口必须与 Tab 一一对应（社保指南→tab=social）')
+  fail('F. 政策服务中心子入口必须与 Tab 对应（社保指南→tab=social，不得写 tab=subsidy）')
 }
 
 // G. 越界文案。「不代办 / 不代申请」属合规声明；其余代办表述一律视为正向承诺。

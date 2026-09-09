@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(root, path), 'utf8')
 const result = read('src/pages/contract-review/ContractReviewResultPage.tsx')
-const flow = read('src/pages/contract-review/contractReviewReportPrintFlow.ts')
 const api = read('src/services/api/contractReview.ts')
 const printJobs = readFileSync(join(root, '..', '..', 'services/api/src/print-jobs/print-jobs.service.ts'), 'utf8')
 
-assert.match(flow, /CONTRACT_REVIEW_REPORT_PRINT_FORBIDDEN/)
-assert.doesNotMatch(flow, /import\.meta\.env\.VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT/)
+assert.equal(
+  existsSync(join(root, 'src/pages/contract-review/contractReviewReportPrintFlow.ts')),
+  false,
+  'unused print-flow helper stays deleted; print forbid is enforced by result page + print-jobs.service',
+)
 assert.doesNotMatch(result, /VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT|REPORT_PRINT_ENABLED|prepareContractReviewReportPrint/)
 assert.doesNotMatch(result, /navigate\('\/print\/confirm'/)
 assert.match(result, /keepContractReviewReport/)

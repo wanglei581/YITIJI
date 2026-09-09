@@ -196,14 +196,24 @@ mustNotContain(
 
 // ── G. 首页补贴文案保持 info-only ─────────────────────────────────────────
 mustNotContain(
-  'src/pages/home/serviceGroups.ts',
+  'src/pages/home/homeV6Domains.ts',
   ['补贴快申', '补贴申请'],
-  'G1. 首页无「补贴快申/补贴申请」承诺式文案(info-only)',
+  'G1. 首页域清单无「补贴快申/补贴申请」承诺式文案(info-only)',
+)
+mustNotContain(
+  'src/pages/home/components/QxHomeView.tsx',
+  ['补贴快申', '补贴申请'],
+  'G1b. 首页青序视图无「补贴快申/补贴申请」承诺式文案',
 )
 mustContain(
-  'src/pages/home/serviceGroups.ts',
-  ["'/job-fairs'", "'/campus'"],
-  'G2. 首页保留招聘会/校园招聘会入口',
+  'src/pages/job-fairs/FairsServiceHubPage.tsx',
+  ["to: '/job-fairs'", "to: '/campus'"],
+  'G2. 招聘会服务中心保留社会招聘会/校园招聘会入口',
+)
+mustContain(
+  'src/pages/home/homeV6Domains.ts',
+  ["'fairs-hub': '/fairs-service'"],
+  'G2b. 首页招聘会域进入 /fairs-service 服务中心',
 )
 
 // ── H. 合规红线禁词 ───────────────────────────────────────────────────────

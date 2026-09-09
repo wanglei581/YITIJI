@@ -420,9 +420,15 @@ check('W4 pages no longer depend on legacy presentation helpers', () => {
   assert.doesNotMatch(w4Source, /\b(?:Proto[A-Z]\w*|CardHead|SourceMetaChips)\b/)
 })
 
-check('ComingSoonNotice remains zero-consumer', () => {
+check('ComingSoonNotice stays deleted', () => {
+  // 原断言：这个占位组件必须零消费。文件本身已无运行时引用，
+  // 继续要求它存在等于把死代码锁成期望值。改为「文件不存在 + 源码不再提到它」。
+  assert.equal(
+    existsSync(join(KIOSK_ROOT, 'src/components/ComingSoonNotice.tsx')),
+    false,
+    'ComingSoonNotice.tsx must not be resurrected',
+  )
   const consumers = collectTsx(join(KIOSK_ROOT, 'src'))
-    .filter((path) => !path.endsWith('components/ComingSoonNotice.tsx'))
     .filter((path) => readFileSync(path, 'utf8').includes('ComingSoonNotice'))
     .map((path) => relative(KIOSK_ROOT, path))
   assert.deepEqual(consumers, [])
