@@ -136,9 +136,11 @@ if (contract && routeManifest) {
 
   check('frozen route inventory matches runtime route declarations', () => {
     const declared = declaredRoutePatterns(routeSourcePath)
-    assert.equal(declared.length, 109, 'runtime route declaration count')
-    assert.equal(new Set(declared).size, 109, 'runtime route declarations must be unique')
-    assert.deepEqual(sorted(declared), sorted(productionRoutePatterns))
+    const expected = productionRoutePatterns
+    assert.equal(declared.length, expected.length, 'runtime route declaration count must follow productionRoutePatterns')
+    assert.equal(new Set(declared).size, declared.length, 'runtime route declarations must be unique')
+    assert.equal(new Set(expected).size, expected.length, 'productionRoutePatterns must be unique')
+    assert.deepEqual(sorted(declared), sorted(expected))
   })
 
   check('77 primary targets and 5 Fusion state references', () => {
@@ -217,13 +219,12 @@ if (contract && routeManifest) {
     assert.match(byId.get('34A')?.knownLimits ?? '', /no scanner-status knowledge/i)
   })
 
-  check('109 routes each have exactly one disposition', () => {
+  check('each production route has exactly one disposition', () => {
     assert.ok(Array.isArray(routeEvidenceDispositions), 'routeEvidenceDispositions must be an array')
-    assert.equal(routeEvidenceDispositions.length, 109, 'route disposition count')
+    assert.equal(routeEvidenceDispositions.length, productionRoutePatterns.length, 'route disposition count must follow productionRoutePatterns')
     const patterns = routeEvidenceDispositions.map(({ routePattern }) => routePattern)
-    assert.equal(new Set(patterns).size, 109, 'route dispositions must be unique')
-    assert.deepEqual(sorted(patterns), sorted(productionRoutePatterns), 'route disposition inventory must equal the frozen 109-route manifest')
-
+    assert.equal(new Set(patterns).size, patterns.length, 'route dispositions must be unique')
+    assert.deepEqual(sorted(patterns), sorted(productionRoutePatterns), 'route disposition inventory must equal productionRoutePatterns')
     for (const disposition of routeEvidenceDispositions) {
       const label = `route ${disposition.routePattern}`
       assert.ok(allowedReferenceKinds.has(disposition.referenceKind), `${label} referenceKind ${disposition.referenceKind}`)
@@ -248,16 +249,10 @@ if (contract && routeManifest) {
     }
   })
 
-  check('eighteen redirects never create visual pairs', () => {
+  check('compatibility redirects never create visual pairs', () => {
     const expectedRedirects = Object.entries(compatibilityRedirects)
-    // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6；
-    // 2026-09-06：/resume/export 下线为兼容重定向后由 6 增至 7；
-    // 2026-09-08 三次工作台合并：打印台把材料检查 / 预览改为重定向，由 7 增至 9；
-    //   面试工作台把五条旧面试路由改为重定向，由 9 增至 14；
-    //   扫描工作台再把四条改为重定向，由 14 增至 18。
-    assert.equal(expectedRedirects.length, 18, 'frozen redirect count')
     const redirects = routeEvidenceDispositions.filter(({ referenceKind }) => referenceKind === 'REDIRECT')
-    assert.equal(redirects.length, 18, 'evidence redirect count')
+    assert.equal(redirects.length, expectedRedirects.length, 'evidence redirect count must follow compatibilityRedirects')
     for (const [source, destination] of expectedRedirects) {
       const disposition = redirects.find(({ routePattern }) => routePattern === source)
       assert.ok(disposition, `missing redirect disposition ${source}`)

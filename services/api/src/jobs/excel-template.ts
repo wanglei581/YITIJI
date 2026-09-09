@@ -8,8 +8,9 @@ import {
   type JobStandardField,
 } from './dto/excel-import.dto'
 import { JOB_WORK_TYPE_VALUES } from './work-type'
+import type { PartnerImportDataType } from './jobs-shared'
 
-export type PartnerExcelDataType = 'job' | 'fair'
+export type PartnerExcelDataType = PartnerImportDataType
 
 export interface PartnerExcelTemplateField<T extends string = string> {
   key: T
