@@ -42,3 +42,12 @@ export function actionLabel(action: ActivityJumpAction, targetType: ActivityTarg
   if (action === 'external_apply') return '岗位来源入口'
   return ACTION_LABEL[action]
 }
+
+/** 本人自填进度的展示名。主语是用户，不是平台履约。 */
+export const APPLICATION_STATUS_LABEL = {
+  intention: '意向中',
+  applied: '已投递',
+  interviewing: '面试中',
+  offered: '已拿Offer',
+  rejected: '已拒绝',
+} as const

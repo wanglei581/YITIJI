@@ -49,8 +49,12 @@ verdict_by_boundary:
   # 不再写一个会持续腐坏的 N/51；页数以 docs/reviews/page-migration-inventory-2026-09-02.md
   # 对当时 main 现算为准。写死页数正是这份文档此前失真的原因。
   local_build: "PARTIAL —— 代码可构建、门禁通过；青序流光已迁 25 条精确路由（另有前缀/模式两组），打印链路 8 屏中 7 屏为新稿；其余页仍为旧版式"
-  production:  "NO-GO —— 2026-09-08 14:49 已发布 b790767f6 并复验（health ok / db postgres / degraded []，前端 bundle index-DRu6kBzl.js → index-C6cJNZjg.js），新稿已在线上；仍判 NO-GO 的理由换成 BL-06：岗位/招聘会/政策三个板块线上零内容"
-  device:      "NO-GO —— Windows 一体机与打印扫描真机未验收（domain-overlays: 物理设备不接受截图或绿色状态徽章作为 GO 证据）"
+  production:  "NO-GO —— 2026-09-09 07:47 已发布 930441bb3（deploy run 34325662631，依据 CI run 34279445389 name=CI/main/success；发布目标读「Resolve CI-verified target SHA」步骤日志，不看 deploy run 的 headSha）。复验：三端 200（zyidai.cn 内核 bundle index-DSgMkoxP.js、admin.zyidai.cn、partner.zyidai.cn 标题各自正确），/api/v1/health 回 status ok / db postgres / degraded []，GET 未知路径回「请求的内容不存在」（#975 的 4xx 文案修复确认在线）；青序流光首页已上线（生产 bundle 内含 qx-home 类，#932 引入）。仍判 NO-GO 的理由是 BL-06：岗位/招聘会/政策三个板块线上零内容"
+  # 2026-09-08 产品负责人在「项目进展评估」会话中裁决现场形态为两期：
+  # 一期 Windows 主机 + 外设（口径「打开这个网站，在本地电脑能完成打印操作就行」），
+  # 二期才铺 27 寸一体机整机。因此本行必须分期表述 ——
+  # 合成一句「一体机未验收」会把一期读成零验证，而一期首单实际已出纸（见 BL-03a）。
+  device:      "分期判定 —— 一期（Windows 主机 + 打印机 + 扫码枪，外设形态）PARTIAL：真机打印首单已完成，剩余面板扫描与扫码枪付款码两项未实测，见 BL-03a；二期（27 寸一体机整机）NO-GO，见 BL-03b。domain-overlays 不变：物理设备不接受截图或绿色状态徽章作为 GO 证据"
 
 # ── 硬阻塞（任一未清即不得宣称商用交付）──────────────────────
 hard_blockers:
@@ -83,8 +87,34 @@ hard_blockers:
       按 CLAUDE.md §10 发布出去等于让求职者照着失效岗位去投递。需要真实数据源与授权。"
     owner: "产品负责人 / 运营"
     status: OPEN
-  - id: BL-03
-    desc: "Windows 一体机真机打印/扫描/Terminal Agent 未验收"
+  # BL-03 于 2026-09-09 拆为 a/b 两条。
+  # 起因：原描述「Windows 一体机真机未验收」描述的是一期并不存在的设备 ——
+  # 2026-09-08 产品负责人在「项目进展评估」会话中裁决现场形态为两期
+  # （一期 Windows 主机 + 打印机 + 扫码枪 + 摄像头，二期才铺 27 寸一体机整机）。
+  # 该裁决为该会话内的第一手记录；本文件由该会话落笔，出处即在此。
+  # 合成一条会同时造成两个失真：把一期读成零验证（首单实际已出纸），
+  # 并把二期的整机验收伪装成「快做完了」。
+  - id: BL-03a
+    desc: "一期（外设形态）真机验收未完成：Windows 主机 + 奔图打印机的打印首单已于 2026-08-07
+      真实出纸（任务 ptask_kiosk_337d61d38b698d61 / 订单 cmsirshmc001clga8n1i2ind2，Agent 日志在档；
+      本地 9527 API fail-closed 实测：无 Origin → 403 LOCAL_QR_ORIGIN_FORBIDDEN，
+      带 Origin: https://zyidai.cn → 200 t_ksk_001 / KSK-001）。证据见
+      docs/device/print-first-order-evidence-2026-08-07.md（#981 抢救进 main；此前该文档与两个 ID
+      在 origin/main 上 grep 命中数均为 0，即证据存在但从未进过主干）。
+      **剩余两项**：① 打印机面板扫描 —— Agent 日志反复报
+      `scan-watcher: scanWatchFolder 未配置，跳过扫描监听`，需配置后按
+      docs/device/peripheral-field-acceptance-2026-08.md 复验；
+      ② 扫码枪 → 微信付款码支付 —— 未实测，需先确认商户「付款码支付」已开通，
+      并探测 18 位 / 25–30 位码格式。摄像头按既有决策不接入。
+      **边界**：该证据文档自述「不作整机商用通过结论」，本条不得据此宣称一期已通过；
+      且首单发生于 2026-08-07，此后 main 前进数百提交，重新宣称前应在当前 main 上复打一单。"
+    owner: "现场"
+    status: OPEN
+  - id: BL-03b
+    desc: "二期（27 寸一体机整机）真机打印/扫描/Terminal Agent 未验收。整机到货后按全套真机验收重跑。
+      Windows Agent 受控在线更新（PR #606）归属本条，不在一期上线承诺内，该 PR 保持挂起不关闭。
+      注意 CLAUDE.md §9 的触控硬约束不因一期是本地电脑而放松（主按钮 ≥56px、可点击区 ≥48px、
+      27 寸竖屏适配继续保留），二期复用同一套前端。"
     owner: "现场"
     status: OPEN
   - id: BL-04

@@ -379,6 +379,7 @@ const allowedMeChanges = new Set([
   // W22：系统通知页迁共享壳 + 诚实空态（仍复用 /me/notifications 真实路由）
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx',
   // 包 J 第 1 次（2026-09-06）：模拟面试记录分区从 MyAiRecordsPage 拆出，数据来自
   // GET /me/mock-interviews。只加这一行，不改守卫逻辑。
   'apps/kiosk/src/pages/profile/me/MockInterviewRecords.tsx',
@@ -416,6 +417,11 @@ const allowedMeChanges = new Set([
   // verify-profile-print-orders-inkpaper.mjs 顶部注释。
   'apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts',
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
+  'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
+  'apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx',
+  'apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css',
+  'apps/kiosk/src/pages/profile/me/styles/notifications-qx.css',
+  'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/benefits-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/feedback-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/privacy-qx.css',

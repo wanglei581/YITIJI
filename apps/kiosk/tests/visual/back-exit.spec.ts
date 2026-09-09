@@ -155,6 +155,7 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       // 所以判据钉在这里：**用了这个壳，就必须填 back 槽**。
       const framed = await page.locator('[data-qx-frame="true"]').count()
       if (framed === 0 && !why) {
+        console.log(`[back-exit] SKIP ${route.pattern} — 冷开未渲染青序流光壳`)
         test.skip(true, `${route.pattern} 冷开未渲染青序流光壳（多为 fail-closed 守卫态），不在本条判据范围内`)
       }
       // 冷开落到**首页内容**（URL 还停在本路由，但渲染出来的是首页）时同样不判。
@@ -166,9 +167,18 @@ test.describe('每一页都要能回上一步 @kiosk', () => {
       if (redirected && !why) {
         // 冷开被 fail-closed 送走：判的是落地那一页，而那一页有没有出口由它自己那条用例负责
         //（/、/login、/scan/start 都在 productionRoutePatterns 里，各有各的用例，不丢覆盖）。
+        console.log(`[back-exit] SKIP ${route.pattern} — 冷开被送到 ${judged}`)
         test.skip(true, `${route.pattern} 冷开从 ${navigatedTo} 被送到 ${judged}，不在本条判据范围内`)
       }
 
+      // 判据面随迁移进度增长：未迁进青序流光的路由这条门禁根本不判。
+      // 把「判到 / 跳过」打成可 grep 的行，否则跳过率只有翻 CI 日志才知道 ——
+      // 2026-09-09 实测当时是 68 跳过 / 43 判到（约 61% 跳过），而那个数字
+      // 在 Playwright 汇总里和其它 6 个 spec 混在一起，没人看得出是谁跳的。
+      //
+      // **只打印不设上限**：设上限会在「新增一个尚未迁移的路由」时转红 ——
+      // 那是进度不是缺陷。跳过率高的正确解法是把页迁完，不是让门禁少跳。
+      console.log(`[back-exit] JUDGE ${route.pattern}`)
       const bySelector = await page.locator(EXIT_SELECTOR).count()
       const byText = await page.evaluate((src) => {
         const rx = new RegExp(src)
