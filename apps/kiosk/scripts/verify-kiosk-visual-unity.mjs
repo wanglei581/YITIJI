@@ -115,10 +115,11 @@ expect(
   '首页不再自绘顶栏/底栏组件'
 )
 expect(
-  home.includes('className="v6-home-page"') && !home.includes('kpv1--content-only'),
-  '首页内容区只声明 V6 页面作用域'
+  home.includes('className="qx-home-host"') && !home.includes('kpv1--content-only'),
+  '首页内容区只声明青序页面作用域'
 )
-expect(home.includes('KioskPageFrame'), '首页使用 KioskPageFrame')
+expect(home.includes('QxPageFrame'), '首页使用 QxPageFrame')
+expect(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
 
 expect(layout.includes('ui-kiosk-topbar') || topbar.includes('ui-kiosk-topbar'), '共享顶栏类名存在')
 expect(layout.includes('ui-kiosk-nav'), '共享底栏类名存在')

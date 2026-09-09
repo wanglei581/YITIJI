@@ -1,20 +1,19 @@
-// HomePage — V6 首页运行时纵切。
-// 视觉真值：docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html。
-// 本页只负责读取真实状态与执行封闭 action；视图不复制原型脚本或伪造任务进度。
+// HomePage — 青序流光首页运行时纵切。
+// 视觉真值：docs/design/kiosk-redesign-2026-08/01-home.html。
+// 本页只负责读取真实状态与执行封闭 action；展示细节交给 QxHomeView。
 
-import { KioskPageFrame } from '@ai-job-print/ui'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
+import { getTerminalCode } from '../../services/api/terminalConfig'
 import { ContinuePanel } from './components/ContinuePanel'
-import { V6HomeFooterPanels } from './components/V6HomeFooterPanels'
-import { V6HomeView } from './components/V6HomeView'
+import { QxHomeNavbar, QxHomeView } from './components/QxHomeView'
 import { HOME_V6_ROUTES, type HomeV6ActionId } from './homeV6Domains'
 import { useHomeJobFairHighlight } from './hooks/useHomeJobFairHighlight'
-import './styles/home-v6.css'
-import './styles/home-v6-footer.css'
+import './styles/home-qx.css'
 
 const ASSISTANT_TOPICS: Partial<Record<HomeV6ActionId, 'resume' | 'jobfair'>> = {
   'assistant-resume': 'resume',
@@ -28,6 +27,7 @@ export function HomePage() {
   const toolbox = useToolboxCapabilityState()
   const campus = useSmartCampusCapabilityState()
   const jobFair = useHomeJobFairHighlight()
+  const terminalCode = getTerminalCode() || '设备未绑定'
 
   const handleAction = (actionId: HomeV6ActionId) => {
     if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled)) return
@@ -42,27 +42,37 @@ export function HomePage() {
     navigate(HOME_V6_ROUTES[actionId], topic ? { state: { topic } } : undefined)
   }
 
+  const deviceStatus = device.loading
+    ? { tone: 'unknown' as const, label: '设备检查中' }
+    : device.printerReady
+      ? { tone: 'ok' as const, label: device.printerLabel }
+      : device.kind === 'error'
+        ? { tone: 'bad' as const, label: device.printerLabel }
+        : device.kind === 'offline'
+          ? { tone: 'warn' as const, label: device.printerLabel }
+          : { tone: 'unknown' as const, label: '状态未知' }
+
   return (
-    <KioskPageFrame className="v6-home-page">
-      <V6HomeView
-        isLoggedIn={auth.isLoggedIn}
-        displayName={auth.displayName}
-        deviceLabel={device.loading ? '设备检查中' : device.printerLabel}
-        deviceReady={device.printerReady}
-        deviceLoading={device.loading}
-        toolboxEnabled={toolbox.status === 'ready' && toolbox.enabled}
-        campusEnabled={campus.status === 'ready' && campus.enabled}
-        continueSlot={<ContinuePanel />}
-        footerSlot={
-          <V6HomeFooterPanels
-            jobFair={jobFair}
-            device={device}
-            onAction={handleAction}
-            onOpenFair={(fairId) => navigate(`/job-fairs/${encodeURIComponent(fairId)}`)}
-          />
+    <div className="qx-home-host">
+      <QxPageFrame
+        title="首页"
+        terminalLabel={`就业服务大厅 · ${terminalCode}`}
+        status={deviceStatus}
+        navbar={
+          <QxHomeNavbar onAction={handleAction} />
         }
-        onAction={handleAction}
-      />
-    </KioskPageFrame>
+      >
+        <QxHomeView
+          isLoggedIn={auth.isLoggedIn}
+          displayName={auth.displayName}
+          device={device}
+          toolbox={toolbox}
+          campus={campus}
+          jobFair={jobFair}
+          continueSlot={<ContinuePanel />}
+          onAction={handleAction}
+        />
+      </QxPageFrame>
+    </div>
   )
 }

@@ -179,34 +179,35 @@ test('home restores real fair and device panels with balanced 1080x1920 geometry
   ])
 
   await page.goto('/')
-  const panels = page.locator('.v6-home-footer-panels')
+  const tiles = page.locator('.qx-home-tiles')
   const fairPanel = page.locator('[data-home-job-fair-panel]')
   const devicePanel = page.locator('[data-home-device-panel]')
-  const boundary = page.locator('.v6-home-boundary')
   const bottomNav = page.getByRole('navigation', { name: '主导航' })
   await expect(fairPanel).toHaveAttribute('data-panel-state', 'ready')
-  await expect(fairPanel.getByRole('heading', { name: '2026 秋季高校毕业生招聘会' })).toBeVisible()
+  await expect(fairPanel.getByText('2026 秋季高校毕业生招聘会')).toBeVisible()
   await expect(fairPanel.getByText('2026 冬季专场招聘会')).toHaveCount(0)
   await expect(devicePanel).toHaveAttribute('data-panel-state', 'ready')
-  await expect(devicePanel.getByText('未单独上报')).toHaveCount(3)
-  const [panelBox, fairBox, deviceBox, boundaryBox, navBox] = await Promise.all([
-    panels.boundingBox(),
+  // V6 首页底部有一块设备遥测栏，纸 / 碳粉 / 扫描仪各标「未单独上报」。
+  // 稿 01-home 没有这块栏，青序流光把打印机状态收进打印磁贴的徽标。
+  // 那条诚实性保证（不编造耗材遥测）改成更直接的表达：这些字段一个都不许出现。
+  await expect(devicePanel.getByText(/纸盒|碳粉|扫描仪/)).toHaveCount(0)
+  const [tilesBox, fairBox, deviceBox, navBox] = await Promise.all([
+    tiles.boundingBox(),
     fairPanel.boundingBox(),
     devicePanel.boundingBox(),
-    boundary.boundingBox(),
     bottomNav.boundingBox(),
   ])
-  expect(panelBox).not.toBeNull()
+  expect(tilesBox).not.toBeNull()
   expect(fairBox).not.toBeNull()
   expect(deviceBox).not.toBeNull()
-  expect(boundaryBox).not.toBeNull()
   expect(navBox).not.toBeNull()
-  expect(panelBox!.height).toBeGreaterThanOrEqual(212)
-  expect(panelBox!.width).toBeLessThanOrEqual(968)
-  expect(Math.abs(fairBox!.y - deviceBox!.y)).toBeLessThanOrEqual(1)
-  expect(Math.abs(fairBox!.height - deviceBox!.height)).toBeLessThanOrEqual(1)
-  expect(boundaryBox!.y - panelBox!.y - panelBox!.height).toBeLessThanOrEqual(24)
-  expect(navBox!.y - boundaryBox!.y - boundaryBox!.height).toBeLessThanOrEqual(160)
+  // 两块磁贴都在网格内，且不被底栏压住。
+  expect(fairBox!.x).toBeGreaterThanOrEqual(tilesBox!.x - 1)
+  expect(deviceBox!.x).toBeGreaterThanOrEqual(tilesBox!.x - 1)
+  expect(fairBox!.x + fairBox!.width).toBeLessThanOrEqual(tilesBox!.x + tilesBox!.width + 1)
+  expect(deviceBox!.x + deviceBox!.width).toBeLessThanOrEqual(tilesBox!.x + tilesBox!.width + 1)
+  expect(fairBox!.y + fairBox!.height).toBeLessThanOrEqual(navBox!.y + 1)
+  expect(deviceBox!.y + deviceBox!.height).toBeLessThanOrEqual(navBox!.y + 1)
   await expectTouchTargets(page)
   await assertNoHorizontalOverflow(page)
   expect(errors).toEqual([])
@@ -261,8 +262,12 @@ test('home device offline state does not invent paper toner or scanner telemetry
   await page.goto('/')
   const devicePanel = page.locator('[data-home-device-panel]')
   await expect(devicePanel).toHaveAttribute('data-panel-state', 'offline')
-  await expect(devicePanel.getByRole('heading', { name: '打印机离线' })).toBeVisible()
-  await expect(devicePanel.getByText('未单独上报')).toHaveCount(3)
+  // 青序流光把打印机状态收进打印磁贴的徽标（稿 01-home 没有独立设备面板），
+  // 不再是 V6 那种带标题的面板。文案一字未改，只是元素从 heading 变成徽标。
+  await expect(devicePanel.getByText('打印机离线', { exact: true })).toBeVisible()
+  // V6 用「未单独上报 ×3」表达「没有纸/碳粉/扫描仪遥测」。青序流光的做法是
+  // 根本不显示这些字段，所以改成断言它们一个都不出现——比数占位符更直接。
+  await expect(devicePanel.getByText(/纸盒|碳粉|扫描仪/)).toHaveCount(0)
   await expect(devicePanel.getByText(/78%|62%|碳粉充足|扫描仪就绪/)).toHaveCount(0)
   await expectFusionAcceptance(page, errors)
 })
@@ -449,7 +454,7 @@ for (const scenario of [
       await backButton.click()
       await expect(page).toHaveURL(/\/$/)
       // 等待 V6 首页真实异步面板稳定后，再执行统一触控目标验收。
-      await expect(page.locator('[data-v6-page="home"]')).toBeVisible()
+      await expect(page.locator('[data-qx-page="home"]')).toBeVisible()
       await expect(page.locator('[data-home-job-fair-panel]')).toHaveAttribute('data-panel-state', 'empty')
       await expect(page.locator('[data-home-device-panel]')).toHaveAttribute('data-panel-state', 'ready')
     } else {
@@ -625,7 +630,7 @@ test('direct visit to /session-timeout without a pending warning fails closed to
   await expect(page.getByRole('button', { name: /我还在，继续使用/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '结束并清除本机会话', exact: true })).toHaveCount(0)
   await expect(page.getByText('秒后自动退出', { exact: true })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: /说出你的处境/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /你好，我是小青/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(errors).toEqual([])

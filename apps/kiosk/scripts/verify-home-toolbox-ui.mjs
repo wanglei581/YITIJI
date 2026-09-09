@@ -31,7 +31,7 @@ const fail = (msg) => {
 
 const home = read('src/pages/home/HomePage.tsx')
 const homeDomains = read('src/pages/home/homeV6Domains.ts')
-const homeView = read('src/pages/home/components/V6HomeView.tsx')
+const homeView = read('src/pages/home/components/QxHomeView.tsx')
 const toolboxPage = read('src/pages/toolbox/ToolboxZonePage.tsx')
 const launchHelpers = read('src/pages/home/components/kioskAppLaunch.ts')
 const toolboxHook = read('src/hooks/useToolboxConfig.ts')
@@ -58,7 +58,7 @@ if (
   fail('A. /toolbox 区页必须 config 驱动且保留内部防御性待配置分支')
 }
 
-// B. V6 首页固定展示八个服务域；百宝箱在智慧校园之前，且 → /toolbox。
+// B. 青序首页固定展示服务域；百宝箱在智慧校园之前，且 → /toolbox。
 const toolboxCard = homeDomains.indexOf("id: 'toolbox'")
 const campusCard = homeDomains.indexOf("id: 'campus'")
 if (
@@ -67,9 +67,9 @@ if (
   toolboxCard < campusCard &&
   /toolbox:\s*['"]\/toolbox['"]/.test(homeDomains)
 ) {
-  pass('B. V6 首页百宝箱排在智慧校园前且 action 映射进入 /toolbox')
+  pass('B. 青序首页百宝箱排在智慧校园前且 action 映射进入 /toolbox')
 } else {
-  fail('B. V6 首页百宝箱必须排在智慧校园前并进入 /toolbox')
+  fail('B. 青序首页百宝箱必须排在智慧校园前并进入 /toolbox')
 }
 
 // /toolbox 路由已注册
@@ -121,20 +121,20 @@ if (
   fail('C2. 百宝箱外部 H5 必须先展示离场提示，不得点击时直接跳转')
 }
 
-// D. V6 首页保留两个域的位置，但配置关闭时必须 disabled + 可见原因，不能隐藏或放行。
+// D. 青序首页保留两个域的位置，但配置关闭时必须 disabled + 可见原因，不能隐藏或放行。
 if (
   home.includes('useSmartCampusCapabilityState()') &&
   home.includes('useToolboxCapabilityState()') &&
   home.includes("campus.status === 'ready' && campus.enabled") &&
   home.includes("toolbox.status === 'ready' && toolbox.enabled") &&
-  /domain\.id === 'toolbox'[\s\S]{0,80}\? !toolboxEnabled/.test(homeView) &&
-  /domain\.id === 'campus'[\s\S]{0,80}\? !campusEnabled/.test(homeView) &&
-  homeView.includes('本机默认关闭，学校接入并完成配置后开放') &&
+  homeView.includes('disabled={!toolboxReady}') &&
+  homeView.includes('disabled={!campusReady}') &&
+  homeView.includes('需终端或机构授权后使用') &&
   homeView.includes('本机尚未上架扩展服务')
 ) {
-  pass('D. V6 首页保留百宝箱/智慧校园位置，关闭时真实禁用并说明原因')
+  pass('D. 青序首页保留百宝箱/智慧校园位置，关闭时真实禁用并说明原因')
 } else {
-  fail('D. V6 首页百宝箱/智慧校园必须可见但关闭时 fail-closed')
+  fail('D. 青序首页百宝箱/智慧校园必须可见但关闭时 fail-closed')
 }
 
 // E. 终端底层兼容默认不能成为路由授权；能力边界必须只接受 ready+有效启动项。

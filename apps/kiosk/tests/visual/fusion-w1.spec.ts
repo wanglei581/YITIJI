@@ -82,7 +82,7 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
     status: 200,
     json: { enabled: false, idleTimeoutSec: 180, items: [] },
   })
-  // V6 首页真实请求招聘会列表；给 200 空列表，首页呈现诚实 empty 态。
+  // 青序首页真实请求招聘会列表；给 200 空列表，首页呈现诚实 empty 态。
   api.respond('GET', '/api/v1/job-fairs', {
     status: 200,
     json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
@@ -92,16 +92,15 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
 
   const shell = page.locator('.ui-kiosk-shell[data-kiosk-presentation="fusion-youth"]')
   await expect(shell).toHaveAttribute('data-kiosk-viewport', 'kiosk')
-  // 选择器随 V6 首页迁移（旧 .kpv1 原型框与旧文案已不存在），但本用例的实质合同不变：
-  // 首页在 fusion 壳内渲染、合规来源声明可见、触控目标不低于 CLAUDE.md §9 的下限、无横向溢出。
-  const frame = page.locator('.v6-home-page[data-kiosk-component="page-frame"]')
+  // 首页退出旧视觉壳，QxPageFrame 自带青序顶栏与导航；旧 KioskLayout 只保留安全布局容器。
+  const frame = page.locator('[data-qx-frame="true"]')
   await expect(frame).toBeVisible()
-  await expect(frame.locator('.v6-home[data-v6-page="home"]')).toBeVisible()
-  await expect(frame.getByRole('heading', { name: /说出你的处境/ })).toBeVisible()
-  await expect(frame.getByText('先盘点材料，再排办理顺序', { exact: false })).toBeVisible()
+  await expect(frame.locator('.qx-home[data-qx-page="home"]')).toBeVisible()
+  await expect(frame.getByRole('heading', { name: /你好，我是小青/ })).toBeVisible()
+  await expect(frame.getByText('说一句你想办的事', { exact: false })).toBeVisible()
   await expect(frame.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expectMinimumTargets(frame.locator('button:not(:disabled)'), 48)
-  await expectMinimumTargets(frame.locator('.v6-home-domain__main, .v6-home-command__cta'), 56)
+  await expectMinimumTargets(frame.locator('[data-testid="home-primary"]'), 56)
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
 })
