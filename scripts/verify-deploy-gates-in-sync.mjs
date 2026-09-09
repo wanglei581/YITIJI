@@ -142,8 +142,33 @@ if (
     const failsClosed =
       /import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/.test(src) &&
       /throw new Error\(/.test(src.slice(src.search(/import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/)))
-    if (failsClosed) pass(`${app} 生产构建对 mock 模式 fail-closed`)
+    if (failsClosed) pass(`${app} 运行时也对 mock 模式 fail-closed（与 kiosk 对齐的纵深防御，主闸门在 vite.config）`)
     else fail(`${app} 生产构建未对 mock 模式 fail-closed —— 漏传 VITE_API_MODE 会静默发布假数据后台（${client}）`)
+  }
+
+  // ── 真正把关的是 vite.config 的构建期闸门，它必须存在 ──────────────────
+  //
+  // 2026-09-09 实测更正：本节最初写的是「漏传 VITE_API_MODE → 构建不报错 → 静默
+  // 打包 mock」。**那是错的，我没真的构建一次就下了结论。** 实际不传时：
+  //
+  //   $ VITE_API_BASE_URL=/api/v1 vite build        （admin / partner 均如此）
+  //   Error: [admin] 生产构建被拒绝：VITE_API_MODE 必须为 "http"（当前 "未设置"）。
+  //          默认 mock 会把内存假数据打进产物，造成上线即假数据。
+  //   at assertProdApiMode (apps/admin/vite.config.ts)   → exit 1，无 dist 产出
+  //
+  // 三个 app 的 vite.config.ts 都有 `assertProdApiMode`，在**配置加载阶段**就拒绝，
+  // 比运行时抛错更早、更硬。所以「静默发布假数据后台」这个失效模式不成立。
+  //
+  // 但它**没有任何门禁保护**（全仓 grep：scripts/ 与各 app scripts/ 下 0 命中）——
+  // 谁从某个 config 里删掉它，那个失效模式当场成立，而且没人会发现。
+  // 这才是真缺口，所以钉的是它。
+  for (const { app } of FRONTENDS) {
+    const cfg = readFileSync(join(repoRoot, `apps/${app}/vite.config.ts`), 'utf8')
+    const hasGuard =
+      /function\s+assertProdApiMode|const\s+assertProdApiMode/.test(cfg) &&
+      /assertProdApiMode\s*\(/.test(cfg.replace(/function\s+assertProdApiMode|const\s+assertProdApiMode/g, ''))
+    if (hasGuard) pass(`${app}/vite.config.ts 有构建期闸门 assertProdApiMode 且被调用`)
+    else fail(`${app}/vite.config.ts 缺少构建期闸门 assertProdApiMode（或定义了没调用）—— 漏传 VITE_API_MODE 会静默产出 mock 版本`)
   }
 
   // 另一半：部署脚本必须真的传。三个构建各出现一次，别只传其中一两个。
