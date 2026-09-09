@@ -12,7 +12,10 @@ process.env.no_proxy = mergedProxyBypass
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /kiosk-session-warning\.spec\.ts$/,
+  // session-impact-domain 与 kiosk-session-warning 需要同一组构建期 env
+  //（VITE_KIOSK_LOGOUT_IDLE_SEC / VITE_KIOSK_SESSION_WARNING_SEC）——
+  // 默认 config 不设它们，空闲告警永远不触发，那条门禁会恒超时。
+  testMatch: /(?:kiosk-session-warning|session-impact-domain)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-session-warning',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
