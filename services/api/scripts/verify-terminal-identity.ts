@@ -2,10 +2,13 @@
 import 'reflect-metadata'
 import { UnauthorizedException } from '@nestjs/common'
 import { ServiceUnavailableException } from '@nestjs/common'
+import { GUARDS_METADATA } from '@nestjs/common/constants'
 import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { TerminalIdentityGuard } from '../src/terminals/terminal-identity.guard'
 import { TerminalSessionService } from '../src/terminals/terminal-session.service'
+import { PrintJobsController } from '../src/print-jobs/print-jobs.controller'
 
 type Row = { enabled: boolean; credentialGeneration: number }
 
@@ -49,6 +52,13 @@ async function main(): Promise<void> {
   const terminals = { async validateTerminalToken() { return undefined } }
   const sessions = new TerminalSessionService(redis as never, prisma as never, terminals as never)
   const guard = new TerminalIdentityGuard(sessions)
+  for (const handler of ['claimPickup', 'releasePickup'] as const) {
+    const guards = Reflect.getMetadata(GUARDS_METADATA, PrintJobsController.prototype[handler]) ?? []
+    if (!guards.includes(TerminalIdentityGuard)) {
+      fail(`${handler} is missing TerminalIdentityGuard`)
+    }
+    pass(`${handler} includes TerminalIdentityGuard (handler metadata, not HTTP execution)`)
+  }
 
   const boot = await sessions.createBootTicket('term_identity_a', 'Bearer fixture')
   const session = await sessions.exchangeBootTicket(boot.bootTicket)
@@ -130,6 +140,11 @@ async function main(): Promise<void> {
     fail('printer-status and capabilities routes must remain available')
   }
   pass('printer-status and capabilities remain public without a terminal session')
+  execFileSync(process.execPath, ['-r', '@swc-node/register', path.join(__dirname, 'verify-pickup-terminal-http.ts')], {
+    cwd: root,
+    stdio: 'inherit',
+    timeout: 30_000,
+  })
   console.log('ALL PASS')
 }
 

@@ -158,9 +158,9 @@ function assertCrossSurfaceWiring(): void {
     [memberController.includes("@Controller('me/print-orders')") && memberController.includes('@Post()'), '会员 Order-only 建单路由已注册'],
     [pickupController.includes("@Post('claim-pickup')") && pickupController.includes("@Post(':orderId/release')"), '到机认领/release 路由已注册'],
     [miniappApi.includes("request('/me/print-orders', { method: 'POST'") && miniappPay.includes('api.createCloudPrintOrder'), '小程序确实调用 Order-only 建单'],
-    [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
+    [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes('await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/claim-pickup`'), 'Kiosk 使用终端鉴权核验后按释放状态进收银或进度'],
     [kioskCashier.includes('releasePickupOrder') && kioskCashier.includes('if (!state.taskId && orderId && paymentSessionToken)'), 'Kiosk 付款后才触发 Order-only release'],
-    [kioskPaymentApi.includes("/print/jobs/${encodeURIComponent(input.orderId)}/release") && kioskPaymentApi.includes("'x-terminal-id': terminalId"), 'Kiosk release 请求携带终端与支付会话绑定'],
+    [kioskPaymentApi.includes('await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`') && kioskPaymentApi.includes('...paymentSessionHeaders(input)'), 'Kiosk release 使用终端鉴权并保留支付会话绑定'],
   ]
   for (const [ok, label] of checks) {
     if (!ok) fail(`跨端契约断裂: ${label}`)

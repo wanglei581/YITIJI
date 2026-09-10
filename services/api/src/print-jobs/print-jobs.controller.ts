@@ -1,7 +1,7 @@
 // ============================================================
 // PrintJobs Controller — W7
 //
-// Kiosk-facing endpoints (no auth — Kiosk is a controlled device).
+// Kiosk writes for create, pickup and retry require terminal identity.
 //
 // Routes (all prefixed with /api/v1):
 //   POST  /print/jobs          — Kiosk submits a new print job (rate-limited: 10/min per IP)
@@ -34,6 +34,7 @@ export class PrintJobsController {
   @Post('claim-pickup')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @UseGuards(TerminalIdentityGuard)
   claimPickup(@Body() dto: ClaimPickupDto, @Headers('x-terminal-id') terminalId: string | undefined) {
     return this.pickupOrders.claim(dto.code, terminalId)
   }
@@ -41,6 +42,7 @@ export class PrintJobsController {
   @Post(':orderId/release')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @UseGuards(TerminalIdentityGuard)
   releasePickup(
     @Param('orderId') orderId: string,
     @Headers('x-terminal-id') terminalId: string | undefined,

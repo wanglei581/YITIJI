@@ -7,7 +7,9 @@
 //   GET  /orders/:id/pay-status       — 轮询支付状态（含惰性过期/关单、paid 后 pickupCode）
 //   POST /payment/sandbox/simulate    — 沙箱模拟支付（**仅非生产**；DEV 构建 + 后端非 production 才可用）
 //
-// 鉴权口径：与 printJobsApi 一致 —— Kiosk 匿名层，orderId 为不可猜 cuid，不带登录态。
+// 鉴权口径：与 printJobsApi 一致 —— Kiosk 无会员登录态，orderId 为不可猜 cuid。
+// 例外是 releasePickupOrder：后端 :orderId/release 已挂 TerminalIdentityGuard，
+// 必须携带终端身份（x-terminal-id + 已验签的 x-terminal-session-token），故走 terminalProtectedFetch。
 // 仅在 API_MODE === 'http' 下调用（mock 模式打印流程走 SIM，不进收银页）。
 // 调用方需处理错误（网络/404/ONLINE_PAYMENT_DISABLED 等），不得静默伪造已支付。
 //
@@ -19,6 +21,7 @@ import { ApiHttpError } from '../api/httpAdapter'
 import { networkError, throwHttpError } from '../api/throwHttpError'
 import type { CodePayAttemptView, PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
 import { getTerminalId } from '../api/screensaver'
+import { terminalProtectedFetch } from '../terminalAuth'
 
 export interface PaymentSessionInput {
   orderId: string
@@ -122,23 +125,35 @@ export interface PickupReleaseView {
   paymentSessionToken: string
 }
 
-/** Order-only 订单付款成功后，绑定本机并原子创建唯一 PrintTask。 */
-export async function releasePickupOrder(input: PaymentSessionInput): Promise<PickupReleaseView> {
+/**
+ * Order-only 订单付款成功后，绑定本机并原子创建唯一 PrintTask。
+ *
+ * `staleSignal`：收银页卸载 / 隐私清场时 abort。它不取消已在途的这次 release
+ * （服务端可能已经把任务建好，取消只会让客户端不知道），只让 401 刷新之后不再重放。
+ */
+export async function releasePickupOrder(
+  input: PaymentSessionInput & { staleSignal?: AbortSignal },
+): Promise<PickupReleaseView> {
   const terminalId = getTerminalId()
   if (!terminalId) {
     throw new ApiHttpError('TERMINAL_NOT_READY', '本机设备未就绪，请联系现场工作人员后再试', 0)
   }
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`, {
+    // x-terminal-id / x-terminal-session-token 由 terminalProtectedFetch 统一写入
+    // （守卫要两个头都在，手拼只有一半会被 401）；会话票失效时它刷新一次再重发。
+    // 支付会话 token 仍由本文件下发，两者是不同凭证，不能互相替代。
+    res = await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-terminal-id': terminalId,
         ...paymentSessionHeaders(input),
       },
+      staleSignal: input.staleSignal,
     })
   } catch (err) {
+    // networkError 对 ApiHttpError 原样透传，因此会话未就绪抛出的
+    // TERMINAL_SESSION_INVALID 不会被误报成「网络连接失败」。
     throw networkError(err)
   }
   if (!res.ok) await throwHttpError(res)

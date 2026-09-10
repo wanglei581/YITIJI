@@ -1,5 +1,48 @@
 # 当前开发进度
 
+## 2026-09-10 PR #1035 已创建，下一批盘点
+
+- 经用户确认继续独立 PR 路线，鉴权候选提交 `b21879989` 已推送，PR #1035 已创建；最近查询三个 CI job 均 pending。未合并、未部署、未执行真实支付/打印。下方“未提交”是候选阶段历史状态。
+- 指定模型实调用：Claude Opus 5 max、Grok 4.6 xhigh、AGY Gemini 3.8 Flash High、Hermes DeepSeek V4 Pro max，单次上限 15 分钟。Claude 给出五 hub 旧壳迁移盘点，优先简历/岗位/政策；尚未浏览器视觉验收，不作为已迁移证据。
+- AGY 提出三项跨端候选问题：signature_image 上传 DTO 白名单遗漏（Codex 已核对源码）；claim 双分支展示字段不对称；材料包订单可能被单文件详情过滤排除。后两项尚待实际调用链与用例复现，禁止直接删除所有权/类型过滤来修。
+- Grok 本轮读取工具多次错误，退出 0 但无最终实质审查，记 UNREVIEWED；不能当作认可。Hermes 的部署报告用了主工作区旧 HEAD，部署顺序及行号不能作为当前候选依据，待针对当前脚本复核。未执行其建议的生产 POST 探测。
+
+## 2026-09-10 到机码终端鉴权候选（未合并、未部署）
+
+### 当前判定：LOCAL CANDIDATE READY
+
+Codex 已完成当前差异的定向最终审查，未发现本专项新增的合并阻塞；下方过程记录中的 MERGE HOLD 被本判定替代，仅限此隔离候选。尚未提交、推送、合并或部署，不等于生产 GO，也不覆盖完整 UI/小程序交付。
+
+- 验收证据：HTTP 20/20；默认/非 mock-token 浏览器专项各 7/7；既有浏览器 20/20；真实 helper/错误解析器六组；隔离 SQLite M2 唯一任务/响应丢失/并发回归；两处 HTTP 守卫、两处 helper 取消保护、收银页迟到导航反向变异均捕获失败。正常源码重建后专项 7/7。
+- API/Kiosk typecheck、定向 ESLint、仓库完整性、diff whitespace、终端身份/自愈、W2、输入安全、原始错误展示、后端 P0、打印确认诚实性及浏览器 spec 覆盖门禁通过。根目录无 `verify:print-confirm-honest`，实际通过命令为 kiosk 包下同名门禁。
+- 团队证据：Claude 为前端实现作者；Grok 早期提供后端候选建议，但最新最终审查 TIMEOUT/UNREVIEWED；AGY 最新最终审查 TIMEOUT/UNREVIEWED；Hermes 对正确基线提供实质审查并执行 helper 门禁，覆盖缺口已修补，其意见范围为 PARTIAL；Codex 集成、复验和最终判断。没有五方独立实机验收或一致通过结论。
+- 边界：HTTP 使用内存依赖，浏览器换票/支付状态为 fixture，数据库证据为隔离 SQLite；非 mock-token 模式是本地显式运行，不宣称 CI 已执行。生产需前后端同步升级，不得兼容放行；真实支付、打印、部署仍未执行。
+- 版本绑定：远端 main 只读复验为 `fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。关键 SHA-256：terminalAuth `e071cbf54a9310221958adc76f2b08d6fc50949300407c91645e37a78e5194bc`；cashier `7fd77393317dcfd726d42326f5fcd4f0d315aeedbb77754b14fdb752aa30f8d3`；生命周期 spec `e7f11c3360566a6a44bbc37417b4c5f3ba1123351e44b96cd8ddb5917058749d`；HTTP spec `40b09611e45b1bba5fd9c611114081b1879a1fbdcb81d30e9ef3fb86bd90dc33`。修改候选后需重验。
+
+### 过程记录
+
+- 基线 `fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，隔离分支 `codex/pickup-terminal-auth-20260910`。Grok 输出两处后端守卫及注册测试补丁，Codex 校正路径/注释并应用；Claude 修改 Kiosk 两处调用。
+- `claim-pickup` 与 `:orderId/release` 增加现有 `TerminalIdentityGuard`；前端同步改用 `terminalProtectedFetch`，保留支付会话凭证、请求内容和业务错误。
+- 已执行通过：API/Kiosk typecheck、`verify:terminal-identity`、`verify:terminal-session-self-heal`、`verify:fusion-w2`、`verify:scan-input-safety`、`verify:no-raw-error-render`、`verify:print-confirm-honest`、`verify:miniapp-cloud-print-m2`。
+- M2 首次因断言要求页面手拼终端头而失败；增加 1 个既有测试文件预算，改为检查两条具体受保护调用，保留收银/进度分流及支付凭证断言。隔离 SQLite 服务层回归已通过，覆盖退款、未付、错终端、响应丢失与并发唯一任务。静态调用断言仍需浏览器行为证据补强。
+- 本轮新增 `verify-pickup-terminal-http.ts` 并接入既有 `verify:terminal-identity`：真实 Nest controller/guard/session 服务、本机随机端口、内存依赖，16/16 通过；缺失/错误/跨终端凭证 401、Redis 故障 503，业务调用为零。不是全应用/真实数据库 HTTP 链路。
+- 分别移除 claim/release 守卫的两次反向变异均以退出码 1 抓到 200 != 401；恢复后 16/16 再次通过。变异已恢复。
+- 现有 W2 `fusion-w2-print.spec.ts` + `cashier-qx.spec.ts` 筛选 pickup/cashier/code-pay，竖屏单 worker 浏览器回归 20/20 通过（2.4 分钟，受控 API fixture）。
+- 独立审查新增 P2 待复现风险：401 刷新等待期间离页/隐私清场，helper 仍可重放旧 claim/release；需 Claude 补调用生命周期/隐私边界及结果导航检查，不取消已经创建的后台任务。当前测试未覆盖该竞态与真实 token 轮换；保持 LOCAL PARTIAL / MERGE HOLD。
+- 后续候选补丁：Claude 已为 claim/release 增加页面生命周期信号、收银页过期导航检查；认领页捕获本次信号，helper 在首次发起前及 401 刷新后检查取消，不取消已在途业务请求。Codex 本轮重跑 Kiosk typecheck 和自愈门禁，退出码均为 0。
+- Codex 通过 TypeScript 转译并执行当前 helper 源码的临时隔离 harness，6/6 通过：正常成功、刷新后使用新 token、刷新期间取消不重放、发起前取消零请求、业务 403 不刷新、第二次 401 不再刷新；检查请求体及支付凭证保留、生命周期信号不传给 fetch。依赖及网络均受控，此证据不是浏览器页面卸载/隐私清场或真实服务器 token 验收；仍需持久化回归、浏览器行为和前端反向变异。此前 W2 20/20 早于生命周期补丁，不能替代新补丁验收。
+- 本轮 Grok 测试设计调用达到 max-turns，且读取了未含生命周期补丁的独立工作区，无可用审查结论，记 UNREVIEWED。Claude 未能执行图谱命令即继续修改，属于流程偏差；Codex 已补查两文件影响图，但不追认为修改前门禁通过。
+- 后续验证：Codex 将上述六组 helper 行为测试纳入既有 `verify:terminal-session-self-heal`（仅测试代码，前端实现未改），原断言保留，6/6 通过。通过子进程只在内存读取时分别移除两处取消检查，两次门禁退出码均为 1，分别捕获取消后重放及已取消仍发起；磁盘源码未变异。最新生命周期补丁上的 W2 pickup/cashier/code-pay 浏览器基础回归重新执行，20/20 通过（28.7 秒）。该构建仍使用 E2E mock terminal token，尚不能证明浏览器中真实刷新与离页/隐私清场竞态，继续 MERGE HOLD。
+- 浏览器竞态新增 `pickup-auth-lifecycle.spec.ts` 并接入 W2 testMatch，避免继续向超长既有 spec 堆代码。两例通过（12.8 秒）：claim 首次 401、挂起刷新，停留页时重放一次；点击返回离页后刷新完成不重放、不显示旧订单。首跑夹具误用顶层 `code` 导致未触发刷新，改成真实解析器所需的 `error.code` 后通过；未放宽断言。此发现也说明 helper harness 的 `readHttpError` 桩过于简化，后续应加载真实解析器。尚缺非 mock-token 浏览器轮换、release 及隐私清场用例，仍 MERGE HOLD。
+- 后续已修复 helper harness 简化解析器问题：执行真实 `throwHttpError.ts`，错误响应采用 `error.code`，六组运行时测试再通过。W2 配置增加可选 `KIOSK_TEST_REAL_SESSION=1`（默认固定 token 行为不变），该模式清空 E2E token 构建变量，浏览器走引导票换票/存储/刷新链路。两条 claim 用例在此模式 2/2 通过（14.0 秒），断言首次旧 token、正常重放新 token、离页不重放。换票和刷新 HTTP 仍为本地 fixture，不代表生产验签；release、隐私清场及五方复核尚未闭合，继续 MERGE HOLD。
+- release 浏览器回归新增两例并与 claim 一起在非 mock-token 模式运行，4/4 通过（16.0 秒）。Order-only 付款状态 fixture 触发真实收银页 release：正常刷新后携新 token、保留支付凭证并进入进度；刷新期间点击返回则不重放、不跳回进度。未触发真实付款/打印；隐私清场、在途成功响应离页后的导航检查及最终多方复核仍待补齐。
+- 后续专项浏览器回归扩为 6/6 通过（非 mock-token 构建，15.8 秒）：新增 release 已发出后离页、迟到 200 不导航；以及刷新挂起时 BFCache pageshow 触发真实隐私清场，遮罩替换收银页后放行刷新、不重放且不导航。清场用例仅暂缓该同步事件内 rAF/250ms 首页跳转调度，随后立即恢复调度 API，避免以硬刷新取消网络冒充页面保护。未证明所有隐私入口；claim 清场对照、当前完整门禁和最终独立审查仍待收口。
+- claim 清场对照已补齐：非 mock-token 专项浏览器 7/7 通过（16.5 秒），清场后输入框卸载、刷新完成不重放、不展示旧订单。当前后端 `verify:terminal-identity` 再通过（含 16 条真实 HTTP/内存依赖场景）；`verify:runtime-terminal-identity`、`verify:fusion-w2`、浏览器 spec 覆盖门禁及 `git diff --check` 通过。覆盖门禁须从 kiosk 包运行，根目录同名命令不存在；默认 CI 闭包识别新 spec，但非 mock-token 开关尚未配置为 CI 独立运行。最终独立审查及剩余相关检查未完成，仍 MERGE HOLD。
+- 最新独立审查：Hermes 读取正确隔离基线并给出实质报告，实际运行自愈门禁通过；指出 HTTP 层缺少禁用终端/凭证代次轮换场景。Codex 已补这两类双路由用例，`verify:terminal-identity` 含 HTTP 20/20 再通过（拒绝均业务调用为零）。Hermes 对跨终端测试经过 guard 哪个分支的描述有前后矛盾，不采纳为分支覆盖证据；只采纳已复核的覆盖缺口。其余限制：冷却恢复用例仅证明原票可读，不证明重新取票；未审服务端事务。Grok、AGY 本轮各 100 秒退出 124，没有最终实质结果，记 TIMEOUT/UNREVIEWED。API/Kiosk typecheck、`verify:scan-input-safety`、`verify:no-raw-error-render`、`verify:backend-p0-contracts` 本轮通过。尚未形成五方通过结论，保持 MERGE HOLD。
+- 收尾复验：`verify:miniapp-cloud-print-m2` 在脚本自建隔离 SQLite/PDF 夹具上再次 ALL PASS，覆盖未付款拒绝、付款后唯一任务、响应丢失重试及并发 CAS；不是生产支付或物理打印。默认固定 token W2 专项也 7/7 通过（17.5 秒），与此前非 mock-token 模式形成双配置证据。已同步 next-tasks 顶部，移除“刷新清场新用例尚缺”的过期描述，保留最终浏览器导航变异、完整 diff/main 兼容性与审查判定待办。
+- 导航反向变异已取证：通过 Node 预加载仅在构建读取内存中移除 `PrintCashierPage.tsx` 的 stale 检查（有 mutation-applied 阳性标记），leave-success 浏览器用例实际跳回 `/print/progress`，测试退出码 1。未修改磁盘前端源码；随后正常源码重新构建，非 mock-token 专项恢复 7/7 通过（17.5 秒），不保留变异构建作为候选。远端只读 `git ls-remote origin refs/heads/main` 仍返回 `fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，与候选 HEAD 一致；`git diff --check` 通过。最终审查判定仍未标完成。
+- AGY/Hermes/Grok 已给事实包审查意见，未执行五方独立用户流程。不采纳身份失败兼容放行或 Redis 故障 fail-open；不操作真实付款、打印、部署或旧分支。
+
 2026-09-10 **生产内容取证 + CI 基础设施解堵（分支 `project-bug-review-optimization-d9eafd` 调度线）**。三条对生产的实测结论，都带阳性对照：①**公开价目在对外播假价** —— 匿名 `GET /print/price-config` 回 `print_color_page unitCents=100` 而 `description="免费试运营：彩色打印 0 元/页"`。后果范围不夸大：Kiosk `PrintConfirmPage` 走 `unitCentsFor` 只读 `unitCents`，小程序各 wxml 无一处渲染价目描述，**当前无终端用户看到假价**；但该接口匿名可读，彩色一旦开通它就是链上第一个说错话的地方。已修（#1026 已合）：管理端原样返回、公开端只摘描述不动金额，判据抽成 `services/api/src/payment/price-description.ts` 供写入闸门与公开视图共用。②**找企业板块三条全是演示数据** —— `GET /companies` 回 3 条，名字全带「（演示）」、`sourceName` 为「市人社公共就业平台（演示）」、`openJobCount` 全 0；而一体机 `CompaniesPage` 与小程序 `pages/companies/companies.wxml:50` 都把 `name` 原样渲染，**这三个名字现在就显示在用户眼前**。`prisma/seed-guard.ts` 只拦新写入，拦不住已在库的行 —— 与①同形状（闸门管未来不管过去）。已把这项补进既有的 `scripts/prod-readonly-probe.mjs`（不另起脚本，#1032），判 WARN 而非 FAIL：演示数据是内容问题不是故障。③**小程序契约 60 个 GET 端点全部在线**（阳性对照：乱编路径回 `404 code:"Not Found"`、公开端点 200、需鉴权端点 `401 MEMBER_MISSING_TOKEN`，三种回法互不混淆），**零路由缺失**；但 `/jobs`、`/job-fairs`、`/policies` 三个板块 `total=0`，链路已逐环核到底：`app.json` 四 Tab 的「求职」→ `pages/jobs/jobs.js:48` 调 `api.getJobs()` → 生产回 0 → `jobs.wxml:73` 渲染「暂无岗位」，**小程序主 Tab 之一提审时是一张空页**。这不是新阻塞，是 BL-06 的具体后果与位置。另：**CI 被一个从不使用的第三方 apt 源判红** —— `dl.google.com` 索引 Hash Sum mismatch 使 `apt-get update` exit 100，连带 `postgres-readiness`、`kiosk-browser-smoke`（`playwright install --with-deps` 内部也跑 apt）整 job 起不来。做了对照实验排除「索引自愈」这个混淆：17:24:15 前的 apt 步骤全绿、之后全红，无修复分支两次尝试（17:32、17:38）3/3 红，有修复分支夹在中间（17:36）3/3 绿。**接手会话注意：main 现在是红的，但不是代码问题** —— 09-09 17:44~18:00 的四次 main CI （`ee536d26` `8751de56` `9df58808` `8cfb944d`）全红，逐个查过：**12 个失败 job 无一例外挂在那两个 apt 步骤，零条测试/门禁失败**。#1030 合入前，新合的提交也会照样红；别去追代码回归。已修（#1030）：三个碰 apt 的步骤前先摘掉这类源（`scripts/ci/drop-unused-apt-sources.sh`，删的是源清单不是已装的包，`channel:'chrome'` 那条用例不受影响）。判定 **PRODUCTION NO-GO 不变**，BL-06 仍是唯一理由。
 
 2026-09-10 **图片转 PDF 完成态不再用本机 token 声称已进「我的文档」（分支 `grok/convert-honest`）**。`POST /print/convert/images-to-pdf` 响应补 `hasEndUser: Boolean(endUserId)`（与打印链路同名）。结果页 chips / 「你现在没登录」只认 `typeof hasEndUser === 'boolean'`，缺省时第三格不渲染、两句都不说。`Retention` 仍按 `getToken()`——那是转换前规则说明，不是完成态声称。未 commit、未部署、未真机。

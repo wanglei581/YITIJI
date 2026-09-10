@@ -1,5 +1,19 @@
 # 下一步任务
 
+## 2026-09-10 当前候选：到机码鉴权联合验收
+
+`codex/pickup-terminal-auth-20260910` 已完成本地候选验收，状态为 LOCAL CANDIDATE READY，尚未提交、合并发布。Codex 已完成最终定向差异审查，未发现本专项新增合并阻塞；旧 MERGE HOLD 过程状态不再代表当前判定。五方证据不齐如实保留，不以外部审查超时无限阻断已有工程证据：
+
+1. 已完成真实 Nest 路由/守卫的 20 项 HTTP 夹具验证，含终端禁用和凭证代次轮换，拒绝时业务调用为零；独立 SQLite M2 服务层复验通过，含未付拒绝、并发唯一任务、响应丢失重试。两层分开取证，不宣称全应用 HTTP/数据库贯通。
+2. Claude 已完成 claim/release 生命周期信号、首次请求前及刷新后取消检查、收银页迟到响应导航检查，不取消在途后台任务。专项浏览器默认固定 token 与 `KIOSK_TEST_REAL_SESSION=1` 构建各 7/7 通过：正常刷新、离页、两页面隐私清场、release 迟到成功响应。非 mock-token 模式校验旧/新凭证，但换票 HTTP 仍为本地 fixture。
+3. 既有 pickup/cashier/code-pay 浏览器 20/20 通过；真实 helper/错误解析器六组运行时回归通过。两处 helper 取消保护的内存反向变异退出码均为 1；两处 HTTP 守卫删除变异历史记录均退出码 1。浏览器导航变异已完成：构建进程内去掉收银页 stale 检查，leave-success 用例因跳回 `/print/progress` 退出 1；正常源码重新构建后专项 7/7 通过。远端 `git ls-remote` 核验 main 仍为基线 `fea6f3705df49720d288bb2e5b26e3e9f5e6f331`；最终定向差异审查已完成，结果见 current-progress 顶部。
+4. Hermes 已返回正确基线的实质审查并运行 helper 测试，HTTP 覆盖缺口已修补；Grok、AGY 最新审查超时，无有效最终回执，不能算认可。Codex 最终判定为本专项本地候选可提交审查，逐方状态详见 current-progress 顶部，不宣称五方通过。
+5. 生产旧客户端必须同步升级，不能为兼容而取消鉴权。当前未推送、合并、部署或执行真实付款/打印；本地候选通过不等于完整新 UI、小程序或商业交付完成。
+
+下一步为另行授权后的提交/PR/CI 和同步发布评估，不在本轮执行。若 main 或候选源码变化，先重新核验差异及相关测试；非 mock-token 专项可用 `KIOSK_TEST_REAL_SESSION=1 pnpm exec playwright test --config=playwright.w2.config.ts pickup-auth-lifecycle.spec.ts --project=kiosk-1080x1920 --workers=1` 在 apps/kiosk 下复跑。
+
+以下历史“代码无已知阻塞”不覆盖该新发现，也不覆盖用户要求的完整新 UI 与小程序联动交付范围。
+
 ## 2026-09-10 商业收口还差什么（给接手会话的判据，不是待办堆）
 
 **一句话：代码侧没有已知的上线阻塞了，卡住商用的是三件「只有产品负责人能做」的事 + 两件真机验收。**

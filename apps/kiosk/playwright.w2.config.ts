@@ -7,6 +7,9 @@ const proxyBypass = new Set(
     .filter(Boolean),
 )
 const mergedProxyBypass = [...proxyBypass].join(',')
+const terminalSessionEnv = process.env.KIOSK_TEST_REAL_SESSION === '1'
+  ? 'VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN='
+  : 'VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture'
 process.env.NO_PROXY = mergedProxyBypass
 process.env.no_proxy = mergedProxyBypass
 
@@ -14,7 +17,7 @@ export default defineConfig({
   testDir: './tests',
   // cashier-qx 的 5 条用例打的就是 @w2，却一直不在这条 testMatch 里，而默认 config 的 kiosk project 只吃 @kiosk ——
   // 于是它**哪个套件都跑不到**（2026-09-08 实测）。归位到这里。
-  testMatch: /(?:fusion-w2-(?:print|scan|tools)|print-hub-qx|print-fulfill-qx|cashier-qx)\.spec\.ts$/,
+  testMatch: /(?:fusion-w2-(?:print|scan|tools)|print-hub-qx|print-fulfill-qx|cashier-qx|pickup-auth-lifecycle)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-fusion-w2',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
@@ -46,7 +49,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:3010 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4182 --strictPort',
+    command: `VITE_API_MODE=http ${terminalSessionEnv} VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:3010 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4182 --strictPort`,
     url: 'http://127.0.0.1:4182',
     reuseExistingServer: false,
     timeout: 180_000,

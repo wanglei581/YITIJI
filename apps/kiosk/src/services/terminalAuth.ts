@@ -247,14 +247,39 @@ export function subscribeTerminalSession(listener: (next: TerminalSessionState) 
   return () => listeners.delete(listener)
 }
 
-export async function terminalProtectedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+export interface TerminalProtectedFetchInit extends RequestInit {
+  /**
+   * 「这次请求还有没有人要」的信号：页面卸载（含隐私清场把 children 换成遮罩）时由调用方 abort。
+   *
+   * 它**不会**被传给 fetch，这是刻意的 —— 已经发出去的业务请求不取消：claim-pickup /
+   * release 在服务端可能已经把任务建好了，abort 只会让客户端不知道，而不会让它没发生。
+   *
+   * 它只决定 401 之后要不要**重放**。retryRefresh 最长要 60 秒（4 档退避 + 本机 Agent
+   * 换票），这段时间里用户完全可能已经走人、机器已经清场换了下一个人。此时重放等于
+   * 替上一位用户重新下了一单，而且新响应还会把他的订单号推回 27 寸公共屏幕上。
+   */
+  staleSignal?: AbortSignal
+}
+
+export async function terminalProtectedFetch(
+  input: RequestInfo | URL,
+  init: TerminalProtectedFetchInit = {},
+): Promise<Response> {
+  const { staleSignal, ...requestInit } = init
+  // 调用方在发起前就已经离页 / 清场（例如队列里排在后面的那次提交）：一次都不要发出去。
+  // 这与「已发出的不取消」不矛盾 —— 这里还没有任何请求在途。抛标准 AbortError，
+  // 调用方按 signal.aborted 早退的分支照常成立。
+  if (staleSignal?.aborted) throw new DOMException('请求已取消', 'AbortError')
   if (state !== 'ready') throw new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
-  let response = await fetch(input, { ...init, headers: headers(init.headers) })
+  let response = await fetch(input, { ...requestInit, headers: headers(requestInit.headers) })
   if (response.ok) return response
   const error = await asHttpError(response.clone())
   // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动 / 503 重试）；其它错误原样交给调用方。
   if (!sessionInvalid(error)) return response
   await retryRefresh()
-  response = await fetch(input, { ...init, headers: headers(init.headers) })
+  // 刷新期间调用方可能已经离页 / 本机已隐私清场。不重放，把原样 401 交回去：
+  // response 的 body 还没被读过（上面读的是 clone），调用方的错误分支照常能解析。
+  if (staleSignal?.aborted) return response
+  response = await fetch(input, { ...requestInit, headers: headers(requestInit.headers) })
   return response
 }
