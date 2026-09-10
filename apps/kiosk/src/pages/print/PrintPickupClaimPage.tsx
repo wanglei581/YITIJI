@@ -8,7 +8,11 @@
 // 到机码规格：8 位纯数字（2026-08-18 方案 A 定案）。规格常量来自
 // @ai-job-print/shared 的 pickupCode —— 本页**不许再内联自己那份正则**，
 // 内联副本正是「小程序发一种长度、一体机收另一种长度」的事故来源。
-// 认领接口无需登录态（Kiosk = 可控设备层），后端 Throttle 20次/min/IP 防滥用。
+// 认领接口不需要**会员登录态**，但需要**终端身份**：后端 claim-pickup 已挂
+// TerminalIdentityGuard，请求必须同时带 x-terminal-id 与已验签的 x-terminal-session-token。
+// 因此这里走 terminalProtectedFetch（会话票失效时它自己刷一次再重发），
+// 不能用裸 fetch 手拼 x-terminal-id —— 那样只有一半凭证，会被守卫 401。
+// 后端另有 Throttle 20次/min 防滥用。
 //
 // 过渡期：同时受理 10 位存量码。删除条件与后端一致（上线满 24h，到机码 TTL 到期）。
 // ============================================================
@@ -29,6 +33,7 @@ import {
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
+import { terminalProtectedFetch } from '../../services/terminalAuth'
 import './styles/pickup-claim-qx.css'
 import { KioskNumpad } from '../../components/kiosk-numpad/KioskNumpad'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
@@ -75,14 +80,23 @@ interface ClaimPickupResult {
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
 type GuideMode = 'keypad' | 'hid'
 
-// ── API 调用（无登录态，Kiosk 匿名层） ────────────────────────
-async function claimPickup(code: string): Promise<ClaimPickupResult> {
+// ── API 调用（无会员登录态；终端身份由 terminalProtectedFetch 附带） ──
+async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<ClaimPickupResult> {
+  // 先判本机身份：取不到就连会话票都不会有，早退给出可执行文案，
+  // 好过让守卫回一个 401 再翻译成「终端安全校验失败」。
   const terminalId = getTerminalId()
   if (!terminalId) throw new Error('终端身份尚未就绪，请稍后重试')
-  const res = await fetch(`${API_BASE_URL}/print/jobs/claim-pickup`, {
+  // x-terminal-id / x-terminal-session-token 由 terminalProtectedFetch 统一写入，
+  // 这里不再手拼；会话票失效时它会刷新一次再重发本请求。
+  // 会话未就绪时它抛 ApiHttpError(TERMINAL_SESSION_INVALID)，直接交给 userMessageOf
+  // 映射成中文，不要在这里改判成网络错误。
+  // staleSignal：本页卸载（含隐私清场）后不再重放这次认领——刷新最长要 60 秒，
+  // 那时站在机器前的很可能已经是下一个人了。已发出的这次请求不取消。
+  const res = await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/claim-pickup`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-terminal-id': terminalId },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ code }),
+    staleSignal,
   })
   const body = (await res.json()) as {
     taskId?: string
@@ -112,6 +126,10 @@ export function PrintPickupClaimPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const claimLockRef = useRef(false)
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 「这一页还在不在」的信号。隐私清场会把 children 换成遮罩，等于卸载本页，
+  // 所以卸载即 abort 已经同时覆盖「用户自己走了」和「本机清场了」两种情况。
+  // 每次挂载重新建一个：StrictMode 双调用下不能复用已经 abort 过的那只。
+  const pageAliveRef = useRef<AbortController | null>(null)
 
   const [code, setCode] = useState('')
   const [state, setState] = useState<ClaimState>('idle')
@@ -138,6 +156,12 @@ export function PrintPickupClaimPage() {
   useEffect(() => cancelSettle, [])
 
   useEffect(() => {
+    const controller = new AbortController()
+    pageAliveRef.current = controller
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
     if (state === 'success') return
     const id = window.setTimeout(() => inputRef.current?.focus(), 80)
     return () => window.clearTimeout(id)
@@ -151,11 +175,19 @@ export function PrintPickupClaimPage() {
     setCode(submittedCode)
     setState('loading')
     setErrorMsg('')
+    // 提交时就把本次的信号取下来。await 之后 pageAliveRef.current 已经可能是**下一次挂载**
+    // 新建的那只未 abort 的控制器（隐私清场卸载 → 重新进本页），回读它等于问错了人：
+    // 上一位用户的认领结果会被判成「还有人要」而渲染到这块公共屏幕上。
+    const staleSignal = pageAliveRef.current?.signal
     try {
-      const data = await claimPickup(submittedCode)
+      const data = await claimPickup(submittedCode, staleSignal)
+      // 认领期间用户已离页 / 本机已清场：任务在服务端该建的照建（不撤销），
+      // 但不能把上一位用户的订单号再渲染到这块公共屏幕上。
+      if (staleSignal?.aborted) return
       setResult(data)
       setState('success')
     } catch (err) {
+      if (staleSignal?.aborted) return
       claimLockRef.current = false
       setCode('')
       setErrorMsg(userMessageOf(err, '请求失败，请重试'))

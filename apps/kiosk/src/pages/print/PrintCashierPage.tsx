@@ -109,21 +109,46 @@ export function PrintCashierPage() {
    */
   const authCodeBufferRef = useRef('')
   const lastAutoReconcileAtRef = useRef(0)
+  /**
+   * 「这一页还在不在」的信号，与 PrintPickupClaimPage 同一范式。隐私清场会把 children
+   * 换成遮罩，等于卸载本页，所以卸载即 abort 同时覆盖「用户自己走了」和「本机清场了」。
+   * 每次挂载重新建一个：StrictMode 双调用下不能复用已经 abort 过的那只。
+   *
+   * 注意它**不是** cancelRef 的替代：cancelRef 会在 channelReloadKey 变化（重读通道）
+   * 时被 cleanup 置 true，页面其实还挂着；释放任务这条链路只认本 controller。
+   */
+  const pageAliveRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    pageAliveRef.current = controller
+    return () => controller.abort()
+  }, [])
 
   const proceedToPrint = useCallback(async () => {
     if (navigatedRef.current) return
     navigatedRef.current = true
     setReleaseFailed(false)
+    // 本次调用捕获自己的 signal：后面所有判断都用这一只，不再回读 ref
+    // （重挂载后 ref 已指向新 controller，回读会拿到「还活着」的错误结论）。
+    const staleSignal = pageAliveRef.current?.signal
     let nextState = state
     try {
       // 小程序 Order-only 流程在付款前没有 PrintTask；支付成功后由服务端原子释放且幂等返回同一任务。
       if (!state.taskId && orderId && paymentSessionToken) {
-        const released = await releasePickupOrder({ orderId, paymentSessionToken })
+        const released = await releasePickupOrder({ orderId, paymentSessionToken, staleSignal })
+        // 释放期间用户已离页 / 本机已清场：任务在服务端该建的照建（不撤销、不重试），
+        // 但不能把上一位用户的订单推进到进度页——那时站在机器前的很可能已是下一个人。
+        // navigatedRef 保持 true：本页即将卸载，复位只会让残留的轮询回调再发一次 release。
+        if (staleSignal?.aborted) return
         nextState = { ...state, ...released, taskId: released.taskId, paymentSessionToken: released.paymentSessionToken }
       }
+      if (staleSignal?.aborted) return
       cancelRef.current = true
       navigate('/print/progress', { state: nextState })
     } catch (error) {
+      // 已离页就不要再往这块公共屏幕上写错误：页面已卸载，setState 也没有接收方。
+      if (staleSignal?.aborted) return
       navigatedRef.current = false
       setReleaseFailed(true)
       setIssueError(userMessageOf(error, '订单已付款，但创建打印任务失败，请重试或联系现场工作人员'))
