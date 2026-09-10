@@ -101,12 +101,24 @@ test('场馆导览只进入既有可打印材料页 @kiosk', async ({ page, api 
   })
   await page.goto('/job-fairs/fair-001/map')
   await expect(page.getByText('暂无场馆导览数据')).toBeVisible()
-  const materialsButton = page.getByRole('button', { name: '查看可打印导览资料' })
+  // 青序流光把这个出口从 CTA 栏挪到正文导航行，文案按稿 28 改成「活动物料」
+  // （稿里通篇是这个词，「查看可打印导览资料」是 V6 的旧写法）。
+  // 只换锚点、不减断言：下面三条——≥48px、无横向溢出、点击必须落到 /materials——原样保留。
+  // 同时钉 testId，保证钉的确实是空态那一行，不会被别的状态下的同名行顶替。
+  const materialsButton = page.getByTestId('map-materials-empty')
+  await expect(materialsButton).toHaveText(/活动物料/)
   expect(await materialsButton.evaluate((button) => button.getBoundingClientRect().height)).toBeGreaterThanOrEqual(48)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
   await materialsButton.click()
   await expect(page).toHaveURL(/\/job-fairs\/fair-001\/materials$/)
-  await expect(page.getByText('暂无可用活动资料')).toBeVisible()
+  // 稿 28 的物料空态：「这场还没有可下载的物料」（V6 写的是「暂无可用活动资料」）。
+  // 顺带钉住新页多说的那半句——不许拿「参考版」冒充官方物料，这是诚实性承诺不是排版。
+  // 钉正文那块状态（data-testid="<screen>-fallback"），不是顶栏那颗同文案的状态药丸——
+  // 两处文案相同，裸 getByText 会命中 2 个元素触发 strict mode。
+  const materialsEmpty = page.getByTestId('materials-fallback')
+  await expect(materialsEmpty).toBeVisible()
+  await expect(materialsEmpty).toContainText('这场还没有可下载的物料')
+  await expect(materialsEmpty).toContainText('不生成一份「参考版」冒充官方物料')
 })
 
 test('场馆导览加载失败后可原页重试并进入诚实空态 @kiosk', async ({ page, api }) => {
@@ -114,14 +126,25 @@ test('场馆导览加载失败后可原页重试并进入诚实空态 @kiosk', a
   api.abort('GET', '/api/v1/job-fairs/fair-001/map', 'internetdisconnected')
 
   await page.goto('/job-fairs/fair-001/map')
-  await expect(page.getByText('加载失败，请稍后重试')).toBeVisible()
+  // 稿 28 的展位错误态：「展位信息没取到」（V6 写的是「加载失败，请稍后重试」）。
+  // 同样钉住理由那半句：取不到时宁可先不显示，不能画个示意图糊弄。
+  const mapError = page.getByTestId('map-fallback')
+  await expect(mapError).toBeVisible()
+  await expect(mapError).toContainText('展位信息没取到')
+  await expect(mapError).toContainText('取不到时宁可先不显示')
 
   api.respond('GET', '/api/v1/job-fairs/fair-001/map', {
     status: 200,
     json: { success: true, data: { mapImageUrl: null, zones: [], booths: [] } },
   })
-  await page.getByRole('button', { name: '重试' }).click()
-  await expect(page.getByText('暂无场馆导览数据')).toBeVisible()
+  // 重试键按稿 28 改叫「重新加载」。钉 testId 保证点的是主 CTA，
+  // 并同时断言它的可见文案——改名可以，这个位置上不许换成别的动作。
+  const retry = page.getByTestId('map-primary')
+  await expect(retry).toContainText('重新加载')
+  await retry.click()
+  const mapEmpty = page.getByTestId('map-fallback')
+  await expect(mapEmpty).toBeVisible()
+  await expect(mapEmpty).toContainText('暂无场馆导览数据')
 })
 
 test('导出直达已下线为优化页兼容重定向 @kiosk', async ({ page, api }) => {

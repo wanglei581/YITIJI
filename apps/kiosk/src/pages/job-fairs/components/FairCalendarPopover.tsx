@@ -141,13 +141,13 @@ export function FairCalendarPopover({
         <>
           {/* 外部点击折叠 */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-neutral-200 bg-white p-4 shadow-xl">
+          <div className="absolute right-0 z-50 mt-2 w-[392px] max-w-[calc(100vw-48px)] rounded-2xl border border-neutral-200 bg-white p-4 shadow-xl">
             {/* 月份导航 */}
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={prevMonth}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
+                className="flex h-12 w-12 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
                 aria-label="上个月"
               >
                 <ChevronLeftIcon className="h-5 w-5" />
@@ -159,14 +159,14 @@ export function FairCalendarPopover({
                 <button
                   type="button"
                   onClick={goToday}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                  className="flex min-h-[48px] items-center rounded-lg px-3 text-sm font-medium text-primary-600 hover:bg-primary-50"
                 >
                   今天
                 </button>
                 <button
                   type="button"
                   onClick={nextMonth}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
+                  className="flex h-12 w-12 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
                   aria-label="下个月"
                 >
                   <ChevronRightIcon className="h-5 w-5" />
@@ -186,7 +186,7 @@ export function FairCalendarPopover({
             {/* 日期网格 */}
             <div className="mt-1 grid grid-cols-7 gap-y-1">
               {cells.map((key, idx) => {
-                if (!key) return <div key={`e-${idx}`} className="h-11" />
+                if (!key) return <div key={`e-${idx}`} className="h-12" />
                 const day = Number(key.slice(8, 10))
                 const mark = marks.get(key)
                 const isSelected = selectedDate === key
@@ -196,7 +196,7 @@ export function FairCalendarPopover({
                     key={key}
                     type="button"
                     onClick={() => pick(key)}
-                    className="flex h-11 flex-col items-center justify-center gap-0.5"
+                    className="flex h-12 min-h-[48px] flex-col items-center justify-center gap-0.5"
                   >
                     <span
                       className={[
@@ -247,7 +247,7 @@ export function FairCalendarPopover({
                     onSelectDate(null)
                     setOpen(false)
                   }}
-                  className="font-medium text-primary-600 hover:underline"
+                  className="flex min-h-[48px] items-center font-medium text-primary-600 hover:underline"
                 >
                   清除日期筛选
                 </button>
