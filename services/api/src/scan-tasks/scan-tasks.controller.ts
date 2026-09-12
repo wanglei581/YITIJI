@@ -8,7 +8,9 @@ import {
   Param,
   Post,
   Req,
+  UnauthorizedException,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -20,6 +22,7 @@ import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 import { TerminalsService } from '../terminals/terminals.service'
 import { CreateScanTaskDto } from './dto/create-scan-task.dto'
 import { ScanTasksService } from './scan-tasks.service'
@@ -35,8 +38,18 @@ export class ScanTasksController {
   ) {}
 
   @Post('scan/sessions')
+  @UseGuards(TerminalIdentityGuard)
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
-  async create(@Body() dto: CreateScanTaskDto, @Req() req: Request) {
+  async create(
+    @Body() dto: CreateScanTaskDto,
+    @Req() req: Request,
+    @Headers('x-terminal-id') headerTerminalId?: string,
+  ) {
+    if (!headerTerminalId || headerTerminalId !== dto.terminalId) {
+      throw new UnauthorizedException({
+        error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' },
+      })
+    }
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.scanTasks.create(dto, endUser?.endUserId ?? null)
     return ApiResponse.ok(result)
@@ -77,6 +90,7 @@ export class ScanTasksController {
   async deliver(
     @Param('terminalId') terminalId: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('observedAt') observedAt: unknown,
     @Headers('authorization') authHeader: string | undefined,
   ) {
     await this.terminals.assertAgentAuthorized(terminalId, authHeader)
@@ -88,6 +102,7 @@ export class ScanTasksController {
       buffer: file.buffer,
       filename: file.originalname,
       mimeType: file.mimetype,
+      observedAt,
     })
     return ApiResponse.ok(result)
   }

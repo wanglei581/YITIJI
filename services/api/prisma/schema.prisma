@@ -181,6 +181,7 @@ model ScanTask {
   endUser          EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
   fileId           String?
   matchedFileMtime DateTime?
+  lastAttemptHash  String?
   errorCode        String?
   errorMessage     String?
   controlTokenHash String?
@@ -194,6 +195,7 @@ model ScanTask {
   // create() 调用方需预期违反该约束时抛出 P2002。
   @@index([terminalId, status, createdAt])
   @@index([endUserId])
+  @@index([terminalId, lastAttemptHash, updatedAt])
 }
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────

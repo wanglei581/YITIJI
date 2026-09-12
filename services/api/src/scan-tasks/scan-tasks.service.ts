@@ -84,6 +84,26 @@ const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
  */
 export const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
 
+/**
+ * 观察时间未来容差（5 秒）。
+ *
+ * 终端 PC 与 API 服务端通过 NTP 同步，正常网络与时钟抖动在百毫秒级。
+ * 允许最大 5 秒的未来容差覆盖 NTP 微漂移，超出即视为伪造或严重时钟错乱。
+ */
+export const SCAN_MAX_FUTURE_OBSERVATION_MS = 5_000
+
+/**
+ * 扫描捕获时间陈旧性时钟容差（5 秒）。
+ *
+ * 理由：
+ * 1. 终端 PC（Agent 所在机）与 API 服务端之间存在由 NTP 同步微小抖动带来的时钟偏差（通常 < 1s）。
+ * 2. 真实用户在 Kiosk 创建扫描任务后，需要走到打印机、按键、扫描、SMB 传输、Agent 连续快照稳定性
+ *    检测（至少 2 秒采样窗），端到端物理耗时必定在 5-10 秒以上。
+ * 3. 5 秒容差既能避免正常极速扫描被 NTP 微抖动误拒，又能严格阻止跨用户陈旧扫描件（前一用户的残留文件，
+ *    观察时间早于新用户任务创建边界）错误归属到后续用户的新任务中（用户间操作间隔远大于 5 秒）。
+ */
+export const SCAN_STALE_CAPTURE_TOLERANCE_MS = 5_000
+
 export const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
   resume: 'resume_scan',
   id: 'id_scan',
@@ -454,21 +474,43 @@ export class ScanTasksService {
   }
 
   /**
-   * Agent 投递入口：找该终端最早一条仍在 waiting 且未过期的任务，建 FileObject，
-   * 标记任务完成。找不到匹配任务时抛 409，调用方（Agent）据此把文件移入隔离目录，
-   * 绝不猜测归属。
+   * Agent 投递入口：严格校验本地观察时间，查重已投递与已尝试内容，匹配该终端
+   * 唯一的 waiting 任务，校验文件生成未早于任务创建边界，建 FileObject，标记任务完成。
    */
   async deliverScanFile(args: {
     terminalId: string
     buffer: Buffer
     filename: string
     mimeType: string
+    observedAt?: unknown
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
 
-    // B1-11：内容级去重防"响应丢失后的重复投递"跨用户误挂载——见上方 SCAN_CONTENT_DEDUP_WINDOW_MS
-    // 注释。只看 fileId 非空的任务（真正建档完成过的），不影响 SCAN_TASK_STATE_CHANGED 那条
-    // 从未写入 fileId 的取消/竞态路径。
+    // 1. 严格校验观察时间：必须存在、非空字符串、合法 ISO 时间、不能明显超前于当前服务器时间。
+    if (
+      args.observedAt === undefined ||
+      args.observedAt === null ||
+      typeof args.observedAt !== 'string' ||
+      !args.observedAt.trim()
+    ) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '缺少有效的文件观察时间(observedAt)' },
+      })
+    }
+    const observedDate = new Date(args.observedAt)
+    if (!Number.isFinite(observedDate.getTime())) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '文件观察时间(observedAt)格式无效' },
+      })
+    }
+    if (observedDate.getTime() > now.getTime() + SCAN_MAX_FUTURE_OBSERVATION_MS) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '文件观察时间(observedAt)超出合理未来范围' },
+      })
+    }
+
+    // 2. 内容级去重防跨用户误挂载：
+    // (a) 已完成建档的任务去重（防响应丢失重试）
     const contentHash = createHash('sha256').update(args.buffer).digest('hex')
     const recentlyDeliveredForTerminal = await this.prisma.scanTask.findMany({
       where: {
@@ -496,9 +538,28 @@ export class ScanTasksService {
       }
     }
 
+    // (b) 失败尝试内容去重：通过 lastAttemptHash 防止曾匹配过但未完成建档（如 upload 阶段失败、
+    // 或并发取消）的文件重试时被错误挂到该终端后续新用户的 waiting 会话上。
+    const previouslyAttempted = await this.prisma.scanTask.findFirst({
+      where: {
+        terminalId: args.terminalId,
+        lastAttemptHash: contentHash,
+        updatedAt: { gt: new Date(now.getTime() - SCAN_CONTENT_DEDUP_WINDOW_MS) },
+      },
+      select: { id: true },
+    })
+    if (previouslyAttempted) {
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+          message: '该扫描文件此前已尝试投递但未完成，请勿重复上传',
+        },
+      })
+    }
+
+    // 3. 匹配该终端唯一的 waiting 任务（数据库层已有 partial unique index 保证每终端最多一个活跃任务）
     const task = await this.prisma.scanTask.findFirst({
       where: { terminalId: args.terminalId, status: 'waiting', expiresAt: { gt: now } },
-      orderBy: { createdAt: 'asc' },
     })
     if (!task) {
       throw new ConflictException({
@@ -506,10 +567,21 @@ export class ScanTasksService {
       })
     }
 
-    // CAS：先把任务标记为 matched，防止同一文件的重复投递请求并发匹配到同一任务。
+    // 4. 陈旧捕获拦截：只信任终端 PC 本地最终观察时间；若早于任务创建边界（允许极小时钟容差），
+    // 判定为陈旧捕获，拒绝绑定。当前 waiting 任务保持原样，不落任何文件。
+    if (observedDate.getTime() < task.createdAt.getTime() - SCAN_STALE_CAPTURE_TOLERANCE_MS) {
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_FILE_STALE_CAPTURE',
+          message: '扫描文件观察时间早于当前任务创建时间，可能属于先前的扫描会话，已拒绝绑定',
+        },
+      })
+    }
+
+    // 5. CAS：先把任务标记为 matched，并随 CAS 记录 lastAttemptHash 与 matchedFileMtime。
     const claimed = await this.prisma.scanTask.updateMany({
       where: { id: task.id, status: 'waiting' },
-      data: { status: 'matched', matchedFileMtime: now },
+      data: { status: 'matched', matchedFileMtime: observedDate, lastAttemptHash: contentHash },
     })
     if (claimed.count === 0) {
       throw new ConflictException({

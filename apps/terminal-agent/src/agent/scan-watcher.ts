@@ -305,9 +305,11 @@ export async function processCandidate(
       return
     }
 
+    const observedAt = new Date().toISOString()
     const verified = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
     const form = new FormData()
     form.append('file', verified.bytes, { filename, contentType: guessMimeType(filename) })
+    form.append('observedAt', observedAt)
 
     const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
@@ -363,6 +365,18 @@ export async function processCandidate(
       if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
         warn(`scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${maskScanName(filename)}`)
+        return
+      }
+
+      if (code === 'SCAN_FILE_PREVIOUSLY_ATTEMPTED') {
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+        warn(`scan-watcher: file content was previously attempted but not completed; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`)
+        return
+      }
+
+      if (code === 'SCAN_FILE_STALE_CAPTURE') {
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+        warn(`scan-watcher: file capture is stale for current session; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`)
         return
       }
 

@@ -1,5 +1,7 @@
 import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcdef'
+process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-tasks-admin-secret'
+process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-tasks-action-secret'
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -12,6 +14,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { Prisma } from '../src/generated/prisma/client'
 import { createPrismaClient, dbKindOf } from '../src/prisma/create-client'
@@ -19,6 +22,8 @@ import { ScanTaskReaperTask } from '../src/scan-tasks/scan-task-reaper.task'
 import {
   ScanTasksService,
   SCAN_CONTENT_DEDUP_WINDOW_MS,
+  SCAN_MAX_FUTURE_OBSERVATION_MS,
+  SCAN_STALE_CAPTURE_TOLERANCE_MS,
 } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
 // B1-11 follow-up：真实 DB 端到端跑一遍 deliverScanFile() 的内容级去重护栏，需要真实
@@ -56,6 +61,7 @@ interface StoredScanTask {
   endUserId: string | null
   fileId: string | null
   matchedFileMtime: Date | null
+  lastAttemptHash: string | null
   errorCode: string | null
   errorMessage: string | null
   controlTokenHash: string | null
@@ -164,6 +170,7 @@ class FakePrisma {
         endUserId: data.endUserId ?? null,
         fileId: null,
         matchedFileMtime: null,
+        lastAttemptHash: data.lastAttemptHash ?? null,
         errorCode: null,
         errorMessage: null,
         controlTokenHash: data.controlTokenHash ?? null,
@@ -179,16 +186,31 @@ class FakePrisma {
     findFirst: async ({
       where,
     }: {
-      where: { terminalId: string; status: string; expiresAt: { gt: Date } }
+      where: {
+        terminalId: string
+        status?: string
+        expiresAt?: { gt: Date }
+        lastAttemptHash?: string
+        updatedAt?: { gt: Date }
+      }
     }) => {
-      const candidates = Array.from(this.scanTasksById.values())
-        .filter(
-          (t) =>
-            t.terminalId === where.terminalId &&
-            t.status === where.status &&
-            t.expiresAt.getTime() > where.expiresAt.gt.getTime()
+      const candidates = Array.from(this.scanTasksById.values()).filter((t) => {
+        if (t.terminalId !== where.terminalId) return false
+        if (where.status !== undefined && t.status !== where.status) return false
+        if (where.lastAttemptHash !== undefined && t.lastAttemptHash !== where.lastAttemptHash)
+          return false
+        if (
+          where.expiresAt?.gt !== undefined &&
+          !(t.expiresAt.getTime() > where.expiresAt.gt.getTime())
         )
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          return false
+        if (
+          where.updatedAt?.gt !== undefined &&
+          !(t.updatedAt.getTime() > where.updatedAt.gt.getTime())
+        )
+          return false
+        return true
+      })
       return candidates[0] ?? null
     },
     // 服务层所有写路径都必须走 CAS 的 updateMany（无条件 update 会绕开状态匹配检查），
@@ -642,6 +664,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       buffer: bufferA,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredA.scanTaskId,
@@ -656,8 +679,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       'real DB sanity precondition: the real FilesService.upload() must have stored the true content sha256 (not a placeholder)'
     )
 
-    // member_b 在同一物理终端开了一个全新等待任务——deliverScanFile() 匹配"该终端最早一条
-    // waiting 任务"完全不知道下一次投递的字节属于谁，这正是去重护栏要挡住的窗口。
+    // member_b 在同一物理终端开了一个全新等待任务——deliverScanFile() 匹配该终端唯一的 waiting 任务
     const taskB = await service.create({ scanType: 'document', terminalId }, endUserBId)
 
     let caught: unknown
@@ -667,6 +689,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
         buffer: bufferA,
         filename: 'a-retry.pdf',
         mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
       })
     } catch (error) {
       caught = error
@@ -707,6 +730,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       buffer: differentBuffer,
       filename: 'b.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredB.scanTaskId,
@@ -752,6 +776,33 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       null,
       'real DB: an unrelated sha256 must not match any candidate row'
     )
+
+    // 真实 DB 下断言 SCAN_FILE_STALE_CAPTURE：观察时间早于任务创建边界时拒绝，任务保持 waiting 且无 FileObject
+    const taskC = await service.create({ scanType: 'document', terminalId }, endUserAId)
+    let caughtStaleRealDb: unknown
+    try {
+      await service.deliverScanFile({
+        terminalId,
+        buffer: Buffer.from('%PDF-1.4\nstale capture in real db\n%%EOF\n', 'latin1'),
+        filename: 'stale.pdf',
+        mimeType: 'application/pdf',
+        observedAt: new Date(Date.now() - 60_000).toISOString(),
+      })
+    } catch (e) {
+      caughtStaleRealDb = e
+    }
+    assert.ok(
+      caughtStaleRealDb instanceof ConflictException,
+      'real DB: stale capture must be rejected with ConflictException'
+    )
+    assert.equal(
+      ((caughtStaleRealDb as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_FILE_STALE_CAPTURE',
+      'real DB: stale capture rejection code must be SCAN_FILE_STALE_CAPTURE'
+    )
+    const taskCAfterStale = await client.scanTask.findUnique({ where: { id: taskC.scanTaskId } })
+    assert.equal(taskCAfterStale?.status, 'waiting', 'real DB: task C must remain waiting after stale delivery rejected')
+    assert.equal(taskCAfterStale?.fileId, null, 'real DB: task C must have no file attached')
   } finally {
     await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
     await client.fileObject
@@ -847,6 +898,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'contract.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(delivered.scanTaskId, created.scanTaskId)
     assert.equal(prisma.filesById.get(delivered.fileId)?.purpose, 'contract_upload')
@@ -916,6 +968,7 @@ async function main(): Promise<void> {
       buffer: Buffer.from('%PDF-1.4 scan'),
       filename: 'scan.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(delivered.scanTaskId, created.scanTaskId)
     // scanType -> FilePurpose 映射:document 扫描必须落 print_doc（顺带覆盖，不单开一个测试块）
@@ -1139,6 +1192,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'stray.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'no waiting task rejected'
@@ -1146,23 +1200,21 @@ async function main(): Promise<void> {
   }
 
   {
-    // 最早一条 waiting 任务优先匹配（而不是最新一条）
+    // 按终端唯一定位 waiting 任务（DB 层面已有单终端至多一条活跃任务约束，移除了 FIFO 排序与叙述）
     const { service } = makeService()
-    const first = await service.create(dto, null)
-    await new Promise((r) => setTimeout(r, 5))
-    const second = await service.create(dto, null)
+    const task = await service.create(dto, null)
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
       buffer: tinyPdf(),
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       delivered.scanTaskId,
-      first.scanTaskId,
-      'must match the oldest waiting task, not the newest'
+      task.scanTaskId,
+      'must match the unique waiting task for the terminal'
     )
-    void second
   }
 
   {
@@ -1183,6 +1235,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'late.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'expired task must not be matched'
@@ -1434,6 +1487,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     await expectRejects(
       () => service.cancel(created.scanTaskId, null, created.controlToken),
@@ -1467,6 +1521,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'id.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     const file = prisma.filesById.get(delivered.fileId)
     assert.equal(file?.purpose, 'id_scan')
@@ -1482,6 +1537,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'resume.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     const file = prisma.filesById.get(delivered.fileId)
     assert.equal(file?.purpose, 'resume_scan')
@@ -1526,6 +1582,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'broken.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       Error,
       'deliverScanFile must rethrow the original upload error'
@@ -1564,6 +1621,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'fresh.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       delivered.scanTaskId,
@@ -1609,6 +1667,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'race.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'deliver must refuse to complete a task cancelled during upload'
@@ -1682,6 +1741,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'race-cleanup-fails.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'original SCAN_TASK_STATE_CHANGED conflict must still surface even when compensating systemDelete() itself throws'
@@ -1942,6 +2002,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'heartbeat.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         })
 
         assert.equal(
@@ -1996,6 +2057,7 @@ async function main(): Promise<void> {
               buffer: tinyPdf(),
               filename: 'heartbeat-fail.pdf',
               mimeType: 'application/pdf',
+              observedAt: new Date().toISOString(),
             }),
           Error,
           'upload failure must still propagate'
@@ -2114,6 +2176,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
 
@@ -2127,6 +2190,7 @@ async function main(): Promise<void> {
         buffer,
         filename: 'a-retry.pdf',
         mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
       })
     } catch (error) {
       caught = error
@@ -2168,6 +2232,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
 
@@ -2181,6 +2246,7 @@ async function main(): Promise<void> {
       buffer: differentBuffer,
       filename: 'b.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredB.scanTaskId,
@@ -2203,6 +2269,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
 
     // 把 taskA 的 updatedAt 手工回拨到去重窗口之外（2 小时 + 5 分钟前）。
@@ -2218,6 +2285,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a-retry-old.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredB.scanTaskId,
@@ -2238,6 +2306,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
 
     const taskT2 = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
@@ -2246,6 +2315,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a-on-t2.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredT2.scanTaskId,
@@ -2255,17 +2325,10 @@ async function main(): Promise<void> {
   }
 
   {
-    // 设计边界验证：SCAN_TASK_STATE_CHANGED 分支（任务在上传期间被并发取消）永远不会给
-    // 对应任务写入 fileId（见 deliverScanFile() 的 CAS-to-completed 分支：
-    // completed.count === 0 时不落 fileId），因此本次新增的内容级去重（只查 fileId 非空
-    // 的任务）不会、也不应该拦住这类场景的重复投递——那条竞态的跨用户误挂载风险，是靠
-    // Agent 侧收到 SCAN_TASK_STATE_CHANGED 后立即隔离、绝不重试来防住的（见
-    // apps/terminal-agent/src/agent/scan-watcher.ts 的 B1-11 修复），不是本处内容去重
-    // 的职责。这里用真实 deliverScanFile() 复现一次 SCAN_TASK_STATE_CHANGED，然后证明
-    // "如果 Agent 没有照既定设计立即隔离、而是真的把同一份内容重试投递了"，服务端这层
-    // 内容去重确实拦不住（fileId 从未被写入）——这正是 Agent 侧必须绝不重试的理由，
-    // 不是服务端这层的漏网之鱼；防止未来有人误以为"反正服务端有去重了"就放宽 Agent
-    // 侧的立即隔离行为。
+    // 失败重试防御（codex/scan-binding-20260911）：SCAN_TASK_STATE_CHANGED 分支（任务在上传期间被并发取消）
+    // 虽然不会写入 fileId，但 CAS-to-matched 阶段已在 DB 中记录了 lastAttemptHash。
+    // 如果 Agent 或攻击者尝试将该失败文件重新投递，服务端 lastAttemptHash 防线将精准拦截，
+    // 抛出 409 SCAN_FILE_PREVIOUSLY_ATTEMPTED，绝不允许其误挂到后续新用户的 waiting 任务上。
     const prisma = new FakePrisma()
     const baseFiles = new FakeFilesService(prisma)
     let raceScanTaskId = ''
@@ -2294,27 +2357,54 @@ async function main(): Promise<void> {
           buffer,
           filename: 'race.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
-      'first attempt must hit SCAN_TASK_STATE_CHANGED as before (unrelated to this new dedup check)'
+      'first attempt must hit SCAN_TASK_STATE_CHANGED as before'
     )
     assert.equal(
       prisma.scanTasksById.get(raceScanTaskId)?.fileId,
       null,
       'sanity precondition: the state-changed task must never have fileId populated'
     )
+    assert.ok(
+      prisma.scanTasksById.get(raceScanTaskId)?.lastAttemptHash,
+      'matched CAS must have recorded lastAttemptHash'
+    )
 
+    // 新用户在同一终端开立新会话
     const taskB = await service.create(dto, null)
-    const deliveredRetry = await service.deliverScanFile({
-      terminalId: 't_1',
-      buffer,
-      filename: 'race-retry.pdf',
-      mimeType: 'application/pdf',
-    })
+    let caughtRetry: unknown
+    try {
+      await service.deliverScanFile({
+        terminalId: 't_1',
+        buffer,
+        filename: 'race-retry.pdf',
+        mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
+      })
+    } catch (e) {
+      caughtRetry = e
+    }
+    assert.ok(
+      caughtRetry instanceof ConflictException,
+      'previously attempted delivery must be rejected with ConflictException'
+    )
     assert.equal(
-      deliveredRetry.scanTaskId,
-      taskB.scanTaskId,
-      'content-hash dedup intentionally does NOT cover the SCAN_TASK_STATE_CHANGED scenario (fileId was never populated) — this gap is closed by the Agent-side immediate-quarantine fix instead, not here'
+      ((caughtRetry as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+      'previously attempted delivery must report SCAN_FILE_PREVIOUSLY_ATTEMPTED'
+    )
+    const taskBAfter = prisma.scanTasksById.get(taskB.scanTaskId)!
+    assert.equal(
+      taskBAfter.status,
+      'waiting',
+      'task B must remain waiting when previously attempted content is rejected'
+    )
+    assert.equal(
+      taskBAfter.fileId,
+      null,
+      'task B must not have any file attached'
     )
   }
 
@@ -2337,6 +2427,208 @@ async function main(): Promise<void> {
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }
+  }
+
+  {
+    // 门禁护栏 1 校验：POST /scan/sessions 必须挂载 TerminalIdentityGuard，且严格校验 x-terminal-id
+    const { ScanTasksController } = await import('../src/scan-tasks/scan-tasks.controller')
+    const { TerminalIdentityGuard } = await import('../src/terminals/terminal-identity.guard')
+    const guards = Reflect.getMetadata('__guards__', ScanTasksController.prototype.create) || []
+    assert.ok(
+      Array.isArray(guards) && guards.includes(TerminalIdentityGuard),
+      'ScanTasksController.create must be guarded with TerminalIdentityGuard'
+    )
+
+    const fakeScanTasksService = {
+      create: async () => ({
+        scanTaskId: 'st_ok',
+        controlToken: 'token',
+        expiresAt: new Date().toISOString(),
+        instructions: [],
+      }),
+    }
+    const fakeTerminalsService = {}
+    const fakeJwt = {}
+    const fakeRedis = {}
+    const fakePrisma = {}
+    const controller = new ScanTasksController(
+      fakeScanTasksService as any,
+      fakeTerminalsService as any,
+      fakeJwt as any,
+      fakeRedis as any,
+      fakePrisma as any
+    )
+
+    const dummyReq = {
+      headers: {},
+      header: () => undefined,
+    } as any
+
+    // 1) 匹配 terminalId：通过头部检查并进入创建流程
+    const okResult = await controller.create(
+      { scanType: 'document', terminalId: 't_1' },
+      dummyReq,
+      't_1'
+    )
+    assert.equal((okResult as any).data.scanTaskId, 'st_ok')
+
+    // 2) 终端 ID 不匹配：401 UnauthorizedException
+    await expectRejects(
+      () =>
+        controller.create(
+          { scanType: 'document', terminalId: 't_1' },
+          dummyReq,
+          't_2'
+        ),
+      UnauthorizedException,
+      'mismatched terminalId between header and body must throw UnauthorizedException'
+    )
+
+    // 3) 缺失 x-terminal-id 头部：401 UnauthorizedException
+    await expectRejects(
+      () =>
+        controller.create(
+          { scanType: 'document', terminalId: 't_1' },
+          dummyReq,
+          undefined
+        ),
+      UnauthorizedException,
+      'missing x-terminal-id header must throw UnauthorizedException'
+    )
+  }
+
+  {
+    // 观察时间 observedAt 严格校验：缺失、空值、非法格式、超出合理未来范围一律 400 BadRequestException (SCAN_OBSERVED_AT_INVALID)
+    const { service } = makeService()
+    await service.create(dto, null)
+
+    for (const badObserved of [undefined, null, '', '   ', 12345, true, {}]) {
+      let caught: unknown
+      try {
+        await service.deliverScanFile({
+          terminalId: 't_1',
+          buffer: tinyPdf(),
+          filename: 'test.pdf',
+          mimeType: 'application/pdf',
+          observedAt: badObserved as any,
+        })
+      } catch (e) {
+        caught = e
+      }
+      assert.ok(
+        caught instanceof BadRequestException,
+        `invalid observedAt ${String(badObserved)} must throw BadRequestException`
+      )
+      assert.equal(
+        ((caught as BadRequestException).getResponse() as { error?: { code?: string } }).error?.code,
+        'SCAN_OBSERVED_AT_INVALID'
+      )
+    }
+
+    // 非法日期格式
+    let caughtMalformed: unknown
+    try {
+      await service.deliverScanFile({
+        terminalId: 't_1',
+        buffer: tinyPdf(),
+        filename: 'test.pdf',
+        mimeType: 'application/pdf',
+        observedAt: 'not-a-valid-date',
+      })
+    } catch (e) {
+      caughtMalformed = e
+    }
+    assert.ok(
+      caughtMalformed instanceof BadRequestException,
+      'malformed date string must throw BadRequestException'
+    )
+    assert.equal(
+      ((caughtMalformed as BadRequestException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_OBSERVED_AT_INVALID'
+    )
+
+    // 明显超前服务器当前时间（> 5000ms）
+    const futureDate = new Date(Date.now() + SCAN_MAX_FUTURE_OBSERVATION_MS + 10_000).toISOString()
+    let caughtFuture: unknown
+    try {
+      await service.deliverScanFile({
+        terminalId: 't_1',
+        buffer: tinyPdf(),
+        filename: 'test.pdf',
+        mimeType: 'application/pdf',
+        observedAt: futureDate,
+      })
+    } catch (e) {
+      caughtFuture = e
+    }
+    assert.ok(
+      caughtFuture instanceof BadRequestException,
+      'future date must throw BadRequestException'
+    )
+    assert.equal(
+      ((caughtFuture as BadRequestException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_OBSERVED_AT_INVALID'
+    )
+  }
+
+  {
+    // 门禁护栏 2 校验：陈旧文件拦截（SCAN_FILE_STALE_CAPTURE）
+    // 观察时间早于任务创建时间减去容差（5s）的文件必须被拒绝，任务保持 waiting 且无 fileId
+    const { service, prisma } = makeService()
+    const task = await service.create(dto, null)
+    const taskStored = prisma.scanTasksById.get(task.scanTaskId)!
+
+    // 构造观察时间为任务创建前 10 秒的文件（超过 5s 容差）
+    const staleObservedAt = new Date(
+      taskStored.createdAt.getTime() - SCAN_STALE_CAPTURE_TOLERANCE_MS - 5_000
+    ).toISOString()
+
+    let caughtStale: unknown
+    try {
+      await service.deliverScanFile({
+        terminalId: 't_1',
+        buffer: tinyPdf(),
+        filename: 'stale-scan.pdf',
+        mimeType: 'application/pdf',
+        observedAt: staleObservedAt,
+      })
+    } catch (e) {
+      caughtStale = e
+    }
+    assert.ok(
+      caughtStale instanceof ConflictException,
+      'stale file delivery must be rejected with ConflictException'
+    )
+    assert.equal(
+      ((caughtStale as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_FILE_STALE_CAPTURE',
+      'rejection error code must be SCAN_FILE_STALE_CAPTURE'
+    )
+
+    // 关键断言：任务必须依然处于 waiting 状态，且未绑定任何文件
+    const taskAfterStale = prisma.scanTasksById.get(task.scanTaskId)!
+    assert.equal(
+      taskAfterStale.status,
+      'waiting',
+      'task must remain waiting after stale delivery is rejected'
+    )
+    assert.equal(
+      taskAfterStale.fileId,
+      null,
+      'task must not have any file attached after stale delivery is rejected'
+    )
+
+    // 随后正常的合法时间文件投递应该正常成功并绑定
+    const freshObservedAt = new Date(taskStored.createdAt.getTime() + 1_000).toISOString()
+    const deliveredFresh = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: Buffer.from('%PDF-1.4 fresh valid scan'),
+      filename: 'fresh-scan.pdf',
+      mimeType: 'application/pdf',
+      observedAt: freshObservedAt,
+    })
+    assert.equal(deliveredFresh.scanTaskId, task.scanTaskId)
+    assert.equal(prisma.scanTasksById.get(task.scanTaskId)?.status, 'completed')
   }
 
   console.log('PASS scan tasks verification')

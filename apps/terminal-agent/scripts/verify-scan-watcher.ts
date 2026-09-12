@@ -279,12 +279,13 @@ async function startGenericServerErrorStub(): Promise<{ baseUrl: string; close: 
  * 收到几次请求（in-flight 去重测试要用它证明"只投递了一次"）。
  */
 async function startSuccessBackendStub(
-  onRequest?: () => void,
+  onRequest?: (rawBody: string) => void,
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = http.createServer((req, res) => {
-    req.on('data', () => undefined)
+    const chunks: Buffer[] = []
+    req.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
     req.on('end', () => {
-      onRequest?.()
+      onRequest?.(Buffer.concat(chunks).toString('utf8'))
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: true, data: { scanTaskId: 'scan-task-verify-1', fileId: 'file-verify-1' } }))
     })
@@ -315,7 +316,10 @@ function makeConfig(apiBaseUrl: string, scanWatchFolder: string): AgentConfig {
 // 投递（200 OK），也就没有任何用例验证过 unlinkSync(filePath) 这条"投递成功后删除
 // 源文件"的核心隐私契约（扫描件不应该在共享目录里残留）。补上。
 async function verifySuccessfulDeliveryDeletesSourceFile(): Promise<void> {
-  const backend = await startSuccessBackendStub()
+  let capturedBody = ''
+  const backend = await startSuccessBackendStub((body) => {
+    capturedBody = body
+  })
   const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-success-'))
   try {
     const filename = 'success-delivery.pdf'
@@ -336,8 +340,9 @@ async function verifySuccessfulDeliveryDeletesSourceFile(): Promise<void> {
       'a successfully delivered file must NOT end up quarantined in _unclaimed',
     )
     assert.match(stdout, /delivered and removed source file/, 'success path must log that the source file was removed')
+    assert.match(capturedBody, /name="observedAt"/, 'successful delivery multipart body must include observedAt field')
 
-    console.log('PASS processCandidate success path: 200 OK delivery unlinkSync-es the source file and does not quarantine it')
+    console.log('PASS processCandidate success path: 200 OK delivery unlinkSync-es the source file and sends observedAt')
   } finally {
     await backend.close()
     rmSync(scanFolder, { recursive: true, force: true })
@@ -698,6 +703,82 @@ async function verifyScanFileAlreadyDeliveredQuarantinesImmediately(): Promise<v
   }
 }
 
+// ── Part 2g-2: SCAN_FILE_PREVIOUSLY_ATTEMPTED 立即隔离 ────────────────────────
+async function verifyScanFilePreviouslyAttemptedQuarantinesImmediately(): Promise<void> {
+  const backend = await startFailingBackendStub('SCAN_FILE_PREVIOUSLY_ATTEMPTED')
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-prev-attempt-'))
+  try {
+    const filename = 'prev-attempt.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 previously attempted scan')
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+
+    assert.equal(existsSync(filePath), false, 'a SCAN_FILE_PREVIOUSLY_ATTEMPTED file must be moved out of the main scan folder')
+    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
+    assert.equal(
+      existsSync(unclaimedPath),
+      true,
+      'SCAN_FILE_PREVIOUSLY_ATTEMPTED must quarantine to _unclaimed immediately, not leave the file for retry',
+    )
+    assert.equal(readFileSync(unclaimedPath, 'utf8'), '%PDF-1.4 previously attempted scan')
+
+    assert.match(
+      capturedStdout,
+      /file content was previously attempted but not completed/,
+      'log must clearly state the content was previously attempted',
+    )
+    assert.doesNotMatch(capturedStdout, /no waiting scan task/)
+    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/)
+    assert.doesNotMatch(capturedStdout, /scan task state changed after match/)
+    assert.doesNotMatch(capturedStdout, /already delivered previously/)
+
+    console.log('PASS processCandidate: SCAN_FILE_PREVIOUSLY_ATTEMPTED is quarantined immediately, with distinguishable log wording')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
+// ── Part 2g-3: SCAN_FILE_STALE_CAPTURE 立即隔离 ──────────────────────────────
+async function verifyScanFileStaleCaptureQuarantinesImmediately(): Promise<void> {
+  const backend = await startFailingBackendStub('SCAN_FILE_STALE_CAPTURE')
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-stale-capture-'))
+  try {
+    const filename = 'stale-capture.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 stale capture scan')
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+
+    assert.equal(existsSync(filePath), false, 'a SCAN_FILE_STALE_CAPTURE file must be moved out of the main scan folder')
+    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
+    assert.equal(
+      existsSync(unclaimedPath),
+      true,
+      'SCAN_FILE_STALE_CAPTURE must quarantine to _unclaimed immediately, not leave the file for retry',
+    )
+    assert.equal(readFileSync(unclaimedPath, 'utf8'), '%PDF-1.4 stale capture scan')
+
+    assert.match(
+      capturedStdout,
+      /file capture is stale for current session/,
+      'log must clearly state the capture is stale for current session',
+    )
+    assert.doesNotMatch(capturedStdout, /no waiting scan task/)
+    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/)
+    assert.doesNotMatch(capturedStdout, /scan task state changed after match/)
+    assert.doesNotMatch(capturedStdout, /already delivered previously/)
+
+    console.log('PASS processCandidate: SCAN_FILE_STALE_CAPTURE is quarantined immediately, with distinguishable log wording')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
 // ── Part 2h: B1-11 回归护栏 — 真正无法识别的 5xx（无 error.code）必须继续走既有重试路径 ──
 // 防止未来重构把匹配条件写宽（例如变成"任何非 2xx 都立即隔离"），意外吞掉合法的网络抖动/
 // 后端瞬时故障重试能力。同时兼作 NO_RETRY_CONFIG 修复的回归护栏：一次真实 500 必须快速
@@ -750,6 +831,8 @@ async function main(): Promise<void> {
   await verifyNoWaitingTaskStillDistinctFromRetryTimeout()
   await verifyScanTaskStateChangedQuarantinesImmediately()
   await verifyScanFileAlreadyDeliveredQuarantinesImmediately()
+  await verifyScanFilePreviouslyAttemptedQuarantinesImmediately()
+  await verifyScanFileStaleCaptureQuarantinesImmediately()
   await verifyGenericServerErrorStillRetriesNormally()
   await verifySymbolicLinkCandidateNeverReachesDelivery()
   await verifyAlternateOutsideFileBypassesAreRejected()
