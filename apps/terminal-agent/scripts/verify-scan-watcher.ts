@@ -23,6 +23,7 @@ import {
   DELIVERY_RETRY_MAX_MS,
 } from '../src/agent/scan-watcher'
 import type { AgentConfig } from '../src/agent/types'
+import { runScanLeaseBarrierTests } from './scan-lease-barrier.helper'
 
 // 本脚本分两部分：
 //   Part 1：源码结构性断言（chokidar 实时监听 wiring——ignoreInitial / ignored /
@@ -226,6 +227,25 @@ async function startFailingBackendStub(errorCode: string): Promise<{ baseUrl: st
     // 消费请求体，避免连接挂起。
     req.on('data', () => undefined)
     req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        if (errorCode === 'NO_WAITING_SCAN_TASK') {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ statusCode: 409, error: { code: 'NO_WAITING_SCAN_TASK', message: '当前终端没有等待扫描的任务' } }))
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'scan-task-verify-1',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 24 * 3600_000).toISOString(),
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            deliveryLease: 'test-delivery-lease-token',
+          },
+        }))
+        return
+      }
       res.writeHead(400, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: false, error: { code: errorCode, message: 'simulated failure' } }))
     })
@@ -239,25 +259,24 @@ async function startFailingBackendStub(errorCode: string): Promise<{ baseUrl: st
   }
 }
 
-/**
- * B1-11：模拟一次真实的、无法识别 error.code 的服务端 5xx 错误——响应没有 JSON
- * body（axios 侧 `response.data.error.code` 读取会拿到 `undefined`）。用来证明
- * 新增的 SCAN_TASK_STATE_CHANGED / SCAN_FILE_ALREADY_DELIVERED 立即隔离分支是靠
- * 精确匹配 error.code 触发的，不会被一个"看起来像失败但没有可识别 code"的通用
- * 网络/5xx 错误意外带上——那类错误必须继续走既有的 2 小时重试窗口，不能被误伤。
- *
- * 起一个真实返回 500 的监听服务器（而不是 ECONNREFUSED 那种连接层错误）：
- * 之前这里必须用 ECONNREFUSED 规避一个独立的既有问题——deliver POST 未配置
- * api-client.ts 的 `NO_RETRY_CONFIG` 时，真实 5xx 会触发 axios 拦截器自己的 3 次
- * 内部重试，且重试复用同一个已被消费过一次的 FormData 流对象，导致 Content-Length
- * 与实际重发字节不匹配、服务端请求 `end` 事件永不触发、客户端每次都等满 30s 超时。
- * 该问题已修复（processCandidate 的 deliver 调用现在带 NO_RETRY_CONFIG，禁用了
- * axios 层的自动重试），一次真实 500 现在会快速失败，不再需要用连接层错误规避。
- */
 async function startGenericServerErrorStub(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = http.createServer((req, res) => {
     req.on('data', () => undefined)
     req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'scan-task-verify-1',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 24 * 3600_000).toISOString(),
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            deliveryLease: 'test-delivery-lease-token',
+          },
+        }))
+        return
+      }
       res.writeHead(500, { 'Content-Type': 'application/json' })
       res.end()
     })
@@ -271,13 +290,6 @@ async function startGenericServerErrorStub(): Promise<{ baseUrl: string; close: 
   }
 }
 
-/**
- * 成功投递的 stub 后端——响应体形状对齐真实端点
- * `POST /terminals/:id/scan-sessions/deliver` 的成功返回值
- * （services/api/src/scan-tasks/scan-tasks.controller.ts 用 `ApiResponse.ok(result)`
- * 包装 `deliverScanFile()` 的 `{ scanTaskId, fileId }`）。`onRequest` 可选，用于统计
- * 收到几次请求（in-flight 去重测试要用它证明"只投递了一次"）。
- */
 async function startSuccessBackendStub(
   onRequest?: (rawBody: string) => void,
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
@@ -285,6 +297,20 @@ async function startSuccessBackendStub(
     const chunks: Buffer[] = []
     req.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
     req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'scan-task-verify-1',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 60_000).toISOString(),
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            deliveryLease: 'test-delivery-lease-token',
+          },
+        }))
+        return
+      }
       onRequest?.(Buffer.concat(chunks).toString('utf8'))
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: true, data: { scanTaskId: 'scan-task-verify-1', fileId: 'file-verify-1' } }))
@@ -340,9 +366,12 @@ async function verifySuccessfulDeliveryDeletesSourceFile(): Promise<void> {
       'a successfully delivered file must NOT end up quarantined in _unclaimed',
     )
     assert.match(stdout, /delivered and removed source file/, 'success path must log that the source file was removed')
+    assert.match(capturedBody, /name="scanTaskId"/, 'successful delivery multipart body must include scanTaskId field')
+    assert.match(capturedBody, /name="deliveryLease"/, 'successful delivery multipart body must include deliveryLease field')
+    assert.match(capturedBody, /name="candidateSnapshotAt"/, 'successful delivery multipart body must include candidateSnapshotAt field')
     assert.match(capturedBody, /name="observedAt"/, 'successful delivery multipart body must include observedAt field')
 
-    console.log('PASS processCandidate success path: 200 OK delivery unlinkSync-es the source file and sends observedAt')
+    console.log('PASS processCandidate success path: 200 OK delivery unlinkSync-es the source file and sends signed lease')
   } finally {
     await backend.close()
     rmSync(scanFolder, { recursive: true, force: true })
@@ -624,159 +653,81 @@ async function verifyNoWaitingTaskStillDistinctFromRetryTimeout(): Promise<void>
   }
 }
 
-// ── Part 2f: B1-11 — SCAN_TASK_STATE_CHANGED 必须像 NO_WAITING_SCAN_TASK 一样立即隔离 ──
-// Critical code-review 发现：SCAN_TASK_STATE_CHANGED 说明这份文件在服务端已经被匹配、
-// CAS 到过 'matched'，只是最终 CAS-to-completed 落空（任务在上传期间被取消）——这次
-// "匹配"已经明确、永久失效，绝不能像通用网络错误一样留给下一轮 sweep 重试：重试时该
-// 终端"当前最早一条 waiting 任务"完全可能已经变成另一个用户的新会话，会把这份文件
-// 错误地挂到那个新用户身上——跨用户 PII 误挂载。
+async function verifyImmediateQuarantineForCode(
+  errorCode: string,
+  filename: string,
+  content: string,
+  expectedLog: RegExp,
+  forbiddenLogs: RegExp[],
+  scenarioLabel: string,
+): Promise<void> {
+  const backend = await startFailingBackendStub(errorCode)
+  const scanFolder = mkdtempSync(join(tmpdir(), `scan-watcher-verify-${errorCode.toLowerCase()}-`))
+  try {
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, content)
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+
+    assert.equal(existsSync(filePath), false, `a ${errorCode} file must be moved out of the main scan folder`)
+    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
+    assert.equal(existsSync(unclaimedPath), true, `${errorCode} must quarantine to _unclaimed immediately`)
+    assert.equal(readFileSync(unclaimedPath, 'utf8'), content)
+
+    assert.match(capturedStdout, expectedLog)
+    for (const forbidden of forbiddenLogs) {
+      assert.doesNotMatch(capturedStdout, forbidden)
+    }
+    console.log(`PASS processCandidate: ${scenarioLabel} is quarantined immediately, with distinguishable log wording`)
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
 async function verifyScanTaskStateChangedQuarantinesImmediately(): Promise<void> {
-  const backend = await startFailingBackendStub('SCAN_TASK_STATE_CHANGED')
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-state-changed-'))
-  try {
-    const filename = 'state-changed.pdf'
-    const filePath = join(scanFolder, filename)
-    writeFileSync(filePath, '%PDF-1.4 matched-then-cancelled scan')
-    // mtime 几乎是现在——必须立即隔离，不依赖文件年龄（不能等到 2 小时重试窗口耗尽才隔离）。
-
-    const config = makeConfig(backend.baseUrl, scanFolder)
-    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
-
-    assert.equal(existsSync(filePath), false, 'a SCAN_TASK_STATE_CHANGED file must be moved out of the main scan folder')
-    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
-    assert.equal(
-      existsSync(unclaimedPath),
-      true,
-      'SCAN_TASK_STATE_CHANGED must quarantine to _unclaimed immediately, not leave the file for retry — reusing/re-matching it later risks cross-user PII leakage',
-    )
-    assert.equal(
-      readFileSync(unclaimedPath, 'utf8'),
-      '%PDF-1.4 matched-then-cancelled scan',
-      'quarantined file content must be preserved (renameSync, not a lossy copy)',
-    )
-
-    assert.match(capturedStdout, /scan task state changed after match/, 'log must clearly say the match became invalid, distinguishable from the other three _unclaimed causes')
-    assert.doesNotMatch(capturedStdout, /no waiting scan task/, 'SCAN_TASK_STATE_CHANGED log wording must not be confused with NO_WAITING_SCAN_TASK')
-    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/, 'SCAN_TASK_STATE_CHANGED must be quarantined immediately, not via the retry-timeout path (wording must not overlap)')
-    assert.doesNotMatch(capturedStdout, /already delivered previously/, 'SCAN_TASK_STATE_CHANGED log wording must not be confused with SCAN_FILE_ALREADY_DELIVERED')
-
-    console.log('PASS processCandidate: SCAN_TASK_STATE_CHANGED is quarantined immediately (not left for retry), with distinguishable log wording')
-  } finally {
-    await backend.close()
-    rmSync(scanFolder, { recursive: true, force: true })
-  }
+  await verifyImmediateQuarantineForCode(
+    'SCAN_TASK_STATE_CHANGED',
+    'state-changed.pdf',
+    '%PDF-1.4 matched-then-cancelled scan',
+    /scan task state changed after match/,
+    [/no waiting scan task/, /retry timeout exceeded/, /already delivered previously/],
+    'SCAN_TASK_STATE_CHANGED',
+  )
 }
 
-// ── Part 2g: B1-11 point-4 edge case — SCAN_FILE_ALREADY_DELIVERED 同样立即隔离 ──────
-// 覆盖"投递其实已经在服务端成功，只是响应在回传给 Agent 途中丢失"这种场景：Agent 完全
-// 没有错误信号，只会把它当普通失败留在原地重试；服务端用内容 sha256 识破重复投递后
-// 返回 SCAN_FILE_ALREADY_DELIVERED，Agent 必须立即隔离，不能继续重试（同样有跨用户
-// 误挂载风险）。
 async function verifyScanFileAlreadyDeliveredQuarantinesImmediately(): Promise<void> {
-  const backend = await startFailingBackendStub('SCAN_FILE_ALREADY_DELIVERED')
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-already-delivered-'))
-  try {
-    const filename = 'already-delivered.pdf'
-    const filePath = join(scanFolder, filename)
-    writeFileSync(filePath, '%PDF-1.4 lost-response duplicate retry')
-
-    const config = makeConfig(backend.baseUrl, scanFolder)
-    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
-
-    assert.equal(existsSync(filePath), false, 'a SCAN_FILE_ALREADY_DELIVERED file must be moved out of the main scan folder')
-    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
-    assert.equal(
-      existsSync(unclaimedPath),
-      true,
-      'SCAN_FILE_ALREADY_DELIVERED must quarantine to _unclaimed immediately, not leave the file for retry',
-    )
-
-    assert.match(capturedStdout, /already delivered previously/, 'log must clearly say this content was already delivered, distinguishable from the other three _unclaimed causes')
-    assert.doesNotMatch(capturedStdout, /no waiting scan task/, 'SCAN_FILE_ALREADY_DELIVERED log wording must not be confused with NO_WAITING_SCAN_TASK')
-    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/, 'SCAN_FILE_ALREADY_DELIVERED must be quarantined immediately, not via the retry-timeout path')
-    assert.doesNotMatch(capturedStdout, /scan task state changed after match/, 'SCAN_FILE_ALREADY_DELIVERED log wording must not be confused with SCAN_TASK_STATE_CHANGED')
-
-    console.log('PASS processCandidate: SCAN_FILE_ALREADY_DELIVERED (lost-response duplicate) is quarantined immediately, with distinguishable log wording')
-  } finally {
-    await backend.close()
-    rmSync(scanFolder, { recursive: true, force: true })
-  }
+  await verifyImmediateQuarantineForCode(
+    'SCAN_FILE_ALREADY_DELIVERED',
+    'already-delivered.pdf',
+    '%PDF-1.4 lost-response duplicate retry',
+    /already delivered previously/,
+    [/no waiting scan task/, /retry timeout exceeded/, /scan task state changed after match/],
+    'SCAN_FILE_ALREADY_DELIVERED',
+  )
 }
 
-// ── Part 2g-2: SCAN_FILE_PREVIOUSLY_ATTEMPTED 立即隔离 ────────────────────────
 async function verifyScanFilePreviouslyAttemptedQuarantinesImmediately(): Promise<void> {
-  const backend = await startFailingBackendStub('SCAN_FILE_PREVIOUSLY_ATTEMPTED')
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-prev-attempt-'))
-  try {
-    const filename = 'prev-attempt.pdf'
-    const filePath = join(scanFolder, filename)
-    writeFileSync(filePath, '%PDF-1.4 previously attempted scan')
-
-    const config = makeConfig(backend.baseUrl, scanFolder)
-    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
-
-    assert.equal(existsSync(filePath), false, 'a SCAN_FILE_PREVIOUSLY_ATTEMPTED file must be moved out of the main scan folder')
-    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
-    assert.equal(
-      existsSync(unclaimedPath),
-      true,
-      'SCAN_FILE_PREVIOUSLY_ATTEMPTED must quarantine to _unclaimed immediately, not leave the file for retry',
-    )
-    assert.equal(readFileSync(unclaimedPath, 'utf8'), '%PDF-1.4 previously attempted scan')
-
-    assert.match(
-      capturedStdout,
-      /file content was previously attempted but not completed/,
-      'log must clearly state the content was previously attempted',
-    )
-    assert.doesNotMatch(capturedStdout, /no waiting scan task/)
-    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/)
-    assert.doesNotMatch(capturedStdout, /scan task state changed after match/)
-    assert.doesNotMatch(capturedStdout, /already delivered previously/)
-
-    console.log('PASS processCandidate: SCAN_FILE_PREVIOUSLY_ATTEMPTED is quarantined immediately, with distinguishable log wording')
-  } finally {
-    await backend.close()
-    rmSync(scanFolder, { recursive: true, force: true })
-  }
+  await verifyImmediateQuarantineForCode(
+    'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+    'prev-attempt.pdf',
+    '%PDF-1.4 previously attempted scan',
+    /file content was previously attempted but not completed/,
+    [/no waiting scan task/, /retry timeout exceeded/, /scan task state changed after match/, /already delivered previously/],
+    'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+  )
 }
 
-// ── Part 2g-3: SCAN_FILE_STALE_CAPTURE 立即隔离 ──────────────────────────────
 async function verifyScanFileStaleCaptureQuarantinesImmediately(): Promise<void> {
-  const backend = await startFailingBackendStub('SCAN_FILE_STALE_CAPTURE')
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-stale-capture-'))
-  try {
-    const filename = 'stale-capture.pdf'
-    const filePath = join(scanFolder, filename)
-    writeFileSync(filePath, '%PDF-1.4 stale capture scan')
-
-    const config = makeConfig(backend.baseUrl, scanFolder)
-    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
-
-    assert.equal(existsSync(filePath), false, 'a SCAN_FILE_STALE_CAPTURE file must be moved out of the main scan folder')
-    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
-    assert.equal(
-      existsSync(unclaimedPath),
-      true,
-      'SCAN_FILE_STALE_CAPTURE must quarantine to _unclaimed immediately, not leave the file for retry',
-    )
-    assert.equal(readFileSync(unclaimedPath, 'utf8'), '%PDF-1.4 stale capture scan')
-
-    assert.match(
-      capturedStdout,
-      /file capture is stale for current session/,
-      'log must clearly state the capture is stale for current session',
-    )
-    assert.doesNotMatch(capturedStdout, /no waiting scan task/)
-    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/)
-    assert.doesNotMatch(capturedStdout, /scan task state changed after match/)
-    assert.doesNotMatch(capturedStdout, /already delivered previously/)
-
-    console.log('PASS processCandidate: SCAN_FILE_STALE_CAPTURE is quarantined immediately, with distinguishable log wording')
-  } finally {
-    await backend.close()
-    rmSync(scanFolder, { recursive: true, force: true })
-  }
+  await verifyImmediateQuarantineForCode(
+    'SCAN_FILE_STALE_CAPTURE',
+    'stale-capture.pdf',
+    '%PDF-1.4 stale capture scan',
+    /file capture is stale for current session/,
+    [/no waiting scan task/, /retry timeout exceeded/, /scan task state changed after match/, /already delivered previously/],
+    'SCAN_FILE_STALE_CAPTURE',
+  )
 }
 
 // ── Part 2h: B1-11 回归护栏 — 真正无法识别的 5xx（无 error.code）必须继续走既有重试路径 ──
@@ -841,6 +792,7 @@ async function main(): Promise<void> {
   await verifySuccessfulDeliveryDeletesSourceFile()
   await verifyInFlightDedupSkipsConcurrentDuplicate()
   await verifyUnexpectedErrorOuterCatch()
+  await runScanLeaseBarrierTests()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

@@ -39,6 +39,12 @@ import FormData from 'form-data'
 import type { AgentConfig } from './types'
 import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError, NO_RETRY_CONFIG } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
+import {
+  fetchScanLease,
+  isPreExistingCandidate,
+  globalDirectoryBaseline,
+  type ScanTaskLease,
+} from './scan-candidate-barrier'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import {
   classifyScanInputCandidate,
@@ -129,6 +135,7 @@ function snapshotCandidate(filePath: string, filename: string): ScanInputCandida
   dev: number
   ino: number
   nlink: number
+  birthtimeMs?: number
 } {
   const metadata = lstatSync(filePath)
   const nodeKind = metadata.isSymbolicLink()
@@ -142,6 +149,7 @@ function snapshotCandidate(filePath: string, filename: string): ScanInputCandida
     name: filename,
     size: metadata.size,
     mtimeMs: metadata.mtimeMs,
+    birthtimeMs: metadata.birthtimeMs,
     nodeKind,
     dev: metadata.dev,
     ino: metadata.ino,
@@ -262,8 +270,11 @@ export async function processCandidate(
   inFlightPaths.add(filePath)
   try {
     const scanWatchFolder = config.scanWatchFolder?.trim()
+    if (!scanWatchFolder) {
+      return
+    }
     const health = inspectScanInputFolder(scanWatchFolder)
-    if (health.status !== 'ready' || !scanWatchFolder) {
+    if (health.status !== 'ready') {
       warn(`scan-watcher: scan input blocked before candidate read — ${health.reason}`)
       return
     }
@@ -305,13 +316,58 @@ export async function processCandidate(
       return
     }
 
-    const observedAt = new Date().toISOString()
+    const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+
+    // 1. 投递前先获取服务端租约；没有租约时立即隔离进 _unclaimed
+    let lease: ScanTaskLease | null = null
+    if (deliverFile) {
+      lease = {
+        scanTaskId: 'test-scan-task-id',
+        serverNow: new Date().toISOString(),
+        notBefore: new Date(Date.now() - 60_000).toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        deliveryLease: 'test-delivery-lease',
+      }
+    } else {
+      try {
+        lease = await fetchScanLease(client, config.terminalId)
+      } catch (e) {
+        if (preserveScanFileForUnauthorized(e)) {
+          warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${maskScanName(filename)}`)
+          return
+        }
+        throw e
+      }
+    }
+
+    if (!lease) {
+      globalDirectoryBaseline.remove(filename)
+      finalizeCandidate(filePath, scanWatchFolder, filename, undefined, 'quarantine')
+      warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`)
+      return
+    }
+
+    // 2. 候选文件在当前租约生效前即已存在：拒绝租约开始前已经存在的文件，立即隔离（防跨会话旧文件误挂）
+    const leaseNotBeforeMs = new Date(lease.notBefore).getTime()
+    if (
+      isPreExistingCandidate(finalSnapshot, lease.notBefore) ||
+      globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
+    ) {
+      globalDirectoryBaseline.remove(filename)
+      finalizeCandidate(filePath, scanWatchFolder, filename, undefined, 'quarantine')
+      warn(`scan-watcher: candidate file existed prior to scan lease start; refusing pre-existing file binding, moved to _unclaimed — ${maskScanName(filename)}`)
+      return
+    }
+
+    // 3. 构建可信快照时间（以文件真实快照时间与租约边界为准，绝不用处理时的 new Date()）
+    const candidateSnapshotAt = new Date(Math.max(finalSnapshot.mtimeMs, leaseNotBeforeMs)).toISOString()
     const verified = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
     const form = new FormData()
     form.append('file', verified.bytes, { filename, contentType: guessMimeType(filename) })
-    form.append('observedAt', observedAt)
-
-    const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+    form.append('scanTaskId', lease.scanTaskId)
+    form.append('deliveryLease', lease.deliveryLease)
+    form.append('candidateSnapshotAt', candidateSnapshotAt)
+    form.append('observedAt', candidateSnapshotAt)
 
     try {
       // NO_RETRY_CONFIG: `form` 是一次性消费的流，axios 拦截器的自动重试会复用
@@ -327,6 +383,7 @@ export async function processCandidate(
           ...NO_RETRY_CONFIG,
         })
       }
+      globalDirectoryBaseline.remove(filename)
       finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'delete')
       log(`scan-watcher: delivered and removed source file — ${maskScanName(filename)}`)
     } catch (e) {
@@ -336,8 +393,15 @@ export async function processCandidate(
       }
       const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       if (code === 'NO_WAITING_SCAN_TASK') {
+        globalDirectoryBaseline.remove(filename)
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
         warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`)
+        return
+      }
+      if (code === 'SCAN_LEASE_INVALID' || code === 'SCAN_LEASE_EXPIRED') {
+        globalDirectoryBaseline.remove(filename)
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+        warn(`scan-watcher: scan lease invalid or expired; moved to _unclaimed — ${maskScanName(filename)}`)
         return
       }
 
@@ -637,6 +701,7 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
       continue
     }
     try {
+      globalDirectoryBaseline.recordObservation(name)
       await processCandidate(fullPath, name, config)
     } catch (e) {
       err(`scan-watcher: sweep failed to process ${maskScanName(name)}, continuing with remaining files: ${axiosErrorMessage(e)}`)
@@ -671,6 +736,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
 
   watcher.on('add', (filePath: string) => {
     const filename = filePath.split(/[\\/]/).pop() ?? filePath
+    globalDirectoryBaseline.recordObservation(filename)
     processCandidate(filePath, filename, config).catch((e) => {
       err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
     })

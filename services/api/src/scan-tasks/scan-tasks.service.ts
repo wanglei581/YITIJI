@@ -14,6 +14,11 @@ import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.
 import { signFileUrl } from '../files/signing'
 import type { FilePurpose } from '../files/file.types'
 import type { CreateScanTaskDto } from './dto/create-scan-task.dto'
+import {
+  buildScanDeliveryLease,
+  verifyScanDeliveryLease,
+  type ScanDeliveryLeaseResult,
+} from './scan-lease'
 
 /**
  * 契约本地副本。
@@ -474,30 +479,71 @@ export class ScanTasksService {
   }
 
   /**
-   * Agent 投递入口：严格校验本地观察时间，查重已投递与已尝试内容，匹配该终端
-   * 唯一的 waiting 任务，校验文件生成未早于任务创建边界，建 FileObject，标记任务完成。
+   * Agent 专用扫描租约签发：校验目标终端当前 waiting 任务，签发短期 deliveryLease。
+   */
+  async getScanDeliveryLease(terminalId: string): Promise<ScanDeliveryLeaseResult> {
+    const now = new Date()
+    const task = await this.prisma.scanTask.findFirst({
+      where: { terminalId, status: 'waiting', expiresAt: { gt: now } },
+    })
+    if (!task) {
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+      })
+    }
+    return buildScanDeliveryLease({
+      terminalId,
+      scanTaskId: task.id,
+      taskCreatedAt: task.createdAt,
+      taskExpiresAt: task.expiresAt,
+      now,
+    })
+  }
+
+  /**
+   * Agent 投递入口：严格按精确 scanTaskId 和 deliveryLease 校验签名归属，
+   * 彻底删除“find current waiting task并猜归属”。校验本地快照时间/基线证据、
+   * 查重已投递与已尝试内容、CAS 抢占并建档完成。
    */
   async deliverScanFile(args: {
     terminalId: string
+    scanTaskId: string
+    deliveryLease: string
     buffer: Buffer
     filename: string
     mimeType: string
+    candidateSnapshotAt?: unknown
     observedAt?: unknown
+    baselineEvidence?: unknown
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
 
-    // 1. 严格校验观察时间：必须存在、非空字符串、合法 ISO 时间、不能明显超前于当前服务器时间。
+    // 1. 严格校验精确任务 ID 与扫描租约签名
+    if (!args.scanTaskId || typeof args.scanTaskId !== 'string' || !args.scanTaskId.trim()) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_TASK_ID_MISSING', message: '缺少扫描任务ID(scanTaskId)' },
+      })
+    }
+    const leasePayload = verifyScanDeliveryLease(
+      args.deliveryLease,
+      args.terminalId,
+      args.scanTaskId,
+      now.getTime()
+    )
+
+    // 2. 严格校验候选本地快照观察时间
+    const rawObservedAt = args.candidateSnapshotAt ?? args.observedAt
     if (
-      args.observedAt === undefined ||
-      args.observedAt === null ||
-      typeof args.observedAt !== 'string' ||
-      !args.observedAt.trim()
+      rawObservedAt === undefined ||
+      rawObservedAt === null ||
+      typeof rawObservedAt !== 'string' ||
+      !rawObservedAt.trim()
     ) {
       throw new BadRequestException({
         error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '缺少有效的文件观察时间(observedAt)' },
       })
     }
-    const observedDate = new Date(args.observedAt)
+    const observedDate = new Date(rawObservedAt)
     if (!Number.isFinite(observedDate.getTime())) {
       throw new BadRequestException({
         error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '文件观察时间(observedAt)格式无效' },
@@ -509,7 +555,7 @@ export class ScanTasksService {
       })
     }
 
-    // 2. 内容级去重防跨用户误挂载：
+    // 3. 内容级去重防跨用户误挂载：
     // (a) 已完成建档的任务去重（防响应丢失重试）
     const contentHash = createHash('sha256').update(args.buffer).digest('hex')
     const recentlyDeliveredForTerminal = await this.prisma.scanTask.findMany({
@@ -557,17 +603,32 @@ export class ScanTasksService {
       })
     }
 
-    // 3. 匹配该终端唯一的 waiting 任务（数据库层已有 partial unique index 保证每终端最多一个活跃任务）
-    const task = await this.prisma.scanTask.findFirst({
-      where: { terminalId: args.terminalId, status: 'waiting', expiresAt: { gt: now } },
+    // 4. 精确按 scanTaskId 查询任务，彻底删除“find current waiting task并猜归属”
+    const task = await this.prisma.scanTask.findUnique({
+      where: { id: args.scanTaskId },
     })
-    if (!task) {
+    if (!task || task.terminalId !== args.terminalId) {
       throw new ConflictException({
-        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '指定的扫描任务不存在或不属于该终端' },
+      })
+    }
+    if (task.status !== 'waiting') {
+      throw new ConflictException({
+        error: { code: 'SCAN_TASK_STATE_CHANGED', message: '扫描任务状态已改变，请重新发起扫描' },
+      })
+    }
+    if (task.expiresAt.getTime() <= now.getTime()) {
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '扫描任务已过期' },
+      })
+    }
+    if (task.createdAt.getTime() !== leasePayload.taskCreatedAtEpoch) {
+      throw new ConflictException({
+        error: { code: 'SCAN_LEASE_INVALID', message: '扫描租约绑定的任务版本不一致' },
       })
     }
 
-    // 4. 陈旧捕获拦截：只信任终端 PC 本地最终观察时间；若早于任务创建边界（允许极小时钟容差），
+    // 5. 陈旧捕获拦截：只信任终端 PC 本地最终观察时间；若早于任务创建边界（允许极小时钟容差），
     // 判定为陈旧捕获，拒绝绑定。当前 waiting 任务保持原样，不落任何文件。
     if (observedDate.getTime() < task.createdAt.getTime() - SCAN_STALE_CAPTURE_TOLERANCE_MS) {
       throw new ConflictException({
@@ -578,14 +639,14 @@ export class ScanTasksService {
       })
     }
 
-    // 5. CAS：先把任务标记为 matched，并随 CAS 记录 lastAttemptHash 与 matchedFileMtime。
+    // 6. CAS：先把任务标记为 matched，并随 CAS 记录 lastAttemptHash 与 matchedFileMtime。
     const claimed = await this.prisma.scanTask.updateMany({
       where: { id: task.id, status: 'waiting' },
       data: { status: 'matched', matchedFileMtime: observedDate, lastAttemptHash: contentHash },
     })
     if (claimed.count === 0) {
       throw new ConflictException({
-        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+        error: { code: 'SCAN_TASK_STATE_CHANGED', message: '扫描任务状态已变化，请重新发起扫描' },
       })
     }
 

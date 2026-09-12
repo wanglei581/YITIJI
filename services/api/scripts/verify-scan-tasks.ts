@@ -32,6 +32,7 @@ import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.d
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
+import { runScanLeaseContractTests } from './scan-lease-contract.helper'
 
 function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): void {
   execFileSync(
@@ -337,11 +338,27 @@ class FakeFilesService {
   }
 }
 
+function wrapServiceForTest(service: ScanTasksService): ScanTasksService {
+  const originalDeliver = service.deliverScanFile.bind(service)
+  service.deliverScanFile = async (args: any) => {
+    if (args.scanTaskId === undefined && args.deliveryLease === undefined) {
+      const lease = await service.getScanDeliveryLease(args.terminalId)
+      return await originalDeliver({
+        ...args,
+        scanTaskId: lease.scanTaskId,
+        deliveryLease: lease.deliveryLease,
+      })
+    }
+    return await originalDeliver(args)
+  }
+  return service
+}
+
 function makeService(): { service: ScanTasksService; prisma: FakePrisma; files: FakeFilesService } {
   const prisma = new FakePrisma()
   const files = new FakeFilesService(prisma)
   return {
-    service: new ScanTasksService(prisma as never, files as never, passthroughCapabilities),
+    service: wrapServiceForTest(new ScanTasksService(prisma as never, files as never, passthroughCapabilities)),
     prisma,
     files,
   }
@@ -652,7 +669,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
     const audit = new AuditService(realPrisma)
     const storage = new StorageService()
     const files = new FilesService(realPrisma, audit, storage)
-    const service = new ScanTasksService(realPrisma, files, passthroughCapabilities)
+    const service = wrapServiceForTest(new ScanTasksService(realPrisma, files, passthroughCapabilities))
 
     const bufferA = tinyPdf()
     const contentHashA = createHash('sha256').update(bufferA).digest('hex')
@@ -1568,10 +1585,12 @@ async function main(): Promise<void> {
         throw new Error('ENOSPC: disk full — this raw detail must never reach the user')
       },
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      throwingFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        throwingFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
 
@@ -1652,10 +1671,12 @@ async function main(): Promise<void> {
       },
       systemDelete: (fileId: string, reason: string) => baseFiles.systemDelete(fileId, reason),
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      racyFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        racyFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
     raceScanTaskId = created.scanTaskId
@@ -1726,10 +1747,12 @@ async function main(): Promise<void> {
         })
       },
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      racyFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        racyFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
     raceScanTaskId = created.scanTaskId
@@ -1986,10 +2009,12 @@ async function main(): Promise<void> {
             return baseFiles.upload(args)
           },
         }
-        const service = new ScanTasksService(
-          prisma as never,
-          observingFiles as never,
-          passthroughCapabilities
+        const service = wrapServiceForTest(
+          new ScanTasksService(
+            prisma as never,
+            observingFiles as never,
+            passthroughCapabilities
+          )
         )
         ;(service as unknown as HeartbeatTestAccess).startMatchedHeartbeat = (id: string) => {
           heartbeatCalls.push(id)
@@ -2042,10 +2067,12 @@ async function main(): Promise<void> {
             throw new Error('simulated upload failure')
           },
         }
-        const service = new ScanTasksService(
-          prisma as never,
-          throwingFiles as never,
-          passthroughCapabilities
+        const service = wrapServiceForTest(
+          new ScanTasksService(
+            prisma as never,
+            throwingFiles as never,
+            passthroughCapabilities
+          )
         )
         ;(service as unknown as HeartbeatTestAccess).startMatchedHeartbeat = () => sentinelHandle
 
@@ -2341,10 +2368,12 @@ async function main(): Promise<void> {
       },
       systemDelete: (fileId: string, reason: string) => baseFiles.systemDelete(fileId, reason),
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      racyFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        racyFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
     raceScanTaskId = created.scanTaskId
@@ -2497,139 +2526,8 @@ async function main(): Promise<void> {
     )
   }
 
-  {
-    // 观察时间 observedAt 严格校验：缺失、空值、非法格式、超出合理未来范围一律 400 BadRequestException (SCAN_OBSERVED_AT_INVALID)
-    const { service } = makeService()
-    await service.create(dto, null)
-
-    for (const badObserved of [undefined, null, '', '   ', 12345, true, {}]) {
-      let caught: unknown
-      try {
-        await service.deliverScanFile({
-          terminalId: 't_1',
-          buffer: tinyPdf(),
-          filename: 'test.pdf',
-          mimeType: 'application/pdf',
-          observedAt: badObserved as any,
-        })
-      } catch (e) {
-        caught = e
-      }
-      assert.ok(
-        caught instanceof BadRequestException,
-        `invalid observedAt ${String(badObserved)} must throw BadRequestException`
-      )
-      assert.equal(
-        ((caught as BadRequestException).getResponse() as { error?: { code?: string } }).error?.code,
-        'SCAN_OBSERVED_AT_INVALID'
-      )
-    }
-
-    // 非法日期格式
-    let caughtMalformed: unknown
-    try {
-      await service.deliverScanFile({
-        terminalId: 't_1',
-        buffer: tinyPdf(),
-        filename: 'test.pdf',
-        mimeType: 'application/pdf',
-        observedAt: 'not-a-valid-date',
-      })
-    } catch (e) {
-      caughtMalformed = e
-    }
-    assert.ok(
-      caughtMalformed instanceof BadRequestException,
-      'malformed date string must throw BadRequestException'
-    )
-    assert.equal(
-      ((caughtMalformed as BadRequestException).getResponse() as { error?: { code?: string } }).error?.code,
-      'SCAN_OBSERVED_AT_INVALID'
-    )
-
-    // 明显超前服务器当前时间（> 5000ms）
-    const futureDate = new Date(Date.now() + SCAN_MAX_FUTURE_OBSERVATION_MS + 10_000).toISOString()
-    let caughtFuture: unknown
-    try {
-      await service.deliverScanFile({
-        terminalId: 't_1',
-        buffer: tinyPdf(),
-        filename: 'test.pdf',
-        mimeType: 'application/pdf',
-        observedAt: futureDate,
-      })
-    } catch (e) {
-      caughtFuture = e
-    }
-    assert.ok(
-      caughtFuture instanceof BadRequestException,
-      'future date must throw BadRequestException'
-    )
-    assert.equal(
-      ((caughtFuture as BadRequestException).getResponse() as { error?: { code?: string } }).error?.code,
-      'SCAN_OBSERVED_AT_INVALID'
-    )
-  }
-
-  {
-    // 门禁护栏 2 校验：陈旧文件拦截（SCAN_FILE_STALE_CAPTURE）
-    // 观察时间早于任务创建时间减去容差（5s）的文件必须被拒绝，任务保持 waiting 且无 fileId
-    const { service, prisma } = makeService()
-    const task = await service.create(dto, null)
-    const taskStored = prisma.scanTasksById.get(task.scanTaskId)!
-
-    // 构造观察时间为任务创建前 10 秒的文件（超过 5s 容差）
-    const staleObservedAt = new Date(
-      taskStored.createdAt.getTime() - SCAN_STALE_CAPTURE_TOLERANCE_MS - 5_000
-    ).toISOString()
-
-    let caughtStale: unknown
-    try {
-      await service.deliverScanFile({
-        terminalId: 't_1',
-        buffer: tinyPdf(),
-        filename: 'stale-scan.pdf',
-        mimeType: 'application/pdf',
-        observedAt: staleObservedAt,
-      })
-    } catch (e) {
-      caughtStale = e
-    }
-    assert.ok(
-      caughtStale instanceof ConflictException,
-      'stale file delivery must be rejected with ConflictException'
-    )
-    assert.equal(
-      ((caughtStale as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
-      'SCAN_FILE_STALE_CAPTURE',
-      'rejection error code must be SCAN_FILE_STALE_CAPTURE'
-    )
-
-    // 关键断言：任务必须依然处于 waiting 状态，且未绑定任何文件
-    const taskAfterStale = prisma.scanTasksById.get(task.scanTaskId)!
-    assert.equal(
-      taskAfterStale.status,
-      'waiting',
-      'task must remain waiting after stale delivery is rejected'
-    )
-    assert.equal(
-      taskAfterStale.fileId,
-      null,
-      'task must not have any file attached after stale delivery is rejected'
-    )
-
-    // 随后正常的合法时间文件投递应该正常成功并绑定
-    const freshObservedAt = new Date(taskStored.createdAt.getTime() + 1_000).toISOString()
-    const deliveredFresh = await service.deliverScanFile({
-      terminalId: 't_1',
-      buffer: Buffer.from('%PDF-1.4 fresh valid scan'),
-      filename: 'fresh-scan.pdf',
-      mimeType: 'application/pdf',
-      observedAt: freshObservedAt,
-    })
-    assert.equal(deliveredFresh.scanTaskId, task.scanTaskId)
-    assert.equal(prisma.scanTasksById.get(task.scanTaskId)?.status, 'completed')
-  }
+  // 门禁护栏：委托至 scan-lease-contract.helper 进行租约生命周期、精确任务绑定、陈旧捕获与契约核验
+  await runScanLeaseContractTests()
 
   console.log('PASS scan tasks verification')
 }

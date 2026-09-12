@@ -83,6 +83,30 @@ export class ScanTasksController {
     return ApiResponse.ok(result)
   }
 
+  /**
+   * 仅 Terminal Agent Bearer 调用：获取当前终端的精确扫描租约。
+   * 返回包含精确 scanTaskId、serverNow、notBefore、expiresAt 以及短期签名 deliveryLease。
+   */
+  @Get('terminals/:terminalId/scan-tasks/current-lease')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  async getLease(
+    @Param('terminalId') terminalId: string,
+    @Headers('authorization') authHeader: string | undefined,
+  ) {
+    await this.terminals.assertAgentAuthorized(terminalId, authHeader)
+    const result = await this.scanTasks.getScanDeliveryLease(terminalId)
+    return ApiResponse.ok(result)
+  }
+
+  @Get('terminals/:terminalId/scan-sessions/current-lease')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  async getSessionLease(
+    @Param('terminalId') terminalId: string,
+    @Headers('authorization') authHeader: string | undefined,
+  ) {
+    return this.getLease(terminalId, authHeader)
+  }
+
   /** 仅 Terminal Agent 调用：投递扫描到共享目录后产生的文件。 */
   @Post('terminals/:terminalId/scan-sessions/deliver')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
@@ -90,7 +114,11 @@ export class ScanTasksController {
   async deliver(
     @Param('terminalId') terminalId: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('scanTaskId') scanTaskId: unknown,
+    @Body('deliveryLease') deliveryLease: unknown,
+    @Body('candidateSnapshotAt') candidateSnapshotAt: unknown,
     @Body('observedAt') observedAt: unknown,
+    @Body('baselineEvidence') baselineEvidence: unknown,
     @Headers('authorization') authHeader: string | undefined,
   ) {
     await this.terminals.assertAgentAuthorized(terminalId, authHeader)
@@ -99,10 +127,14 @@ export class ScanTasksController {
     }
     const result = await this.scanTasks.deliverScanFile({
       terminalId,
+      scanTaskId: typeof scanTaskId === 'string' ? scanTaskId : '',
+      deliveryLease: typeof deliveryLease === 'string' ? deliveryLease : '',
       buffer: file.buffer,
       filename: file.originalname,
       mimeType: file.mimetype,
+      candidateSnapshotAt,
       observedAt,
+      baselineEvidence,
     })
     return ApiResponse.ok(result)
   }
