@@ -185,21 +185,38 @@ export function clearScanRescanAuthority(): void {
 }
 
 /**
- * 「重试扫描」：结束这一场，并把它那枚一次性授权移交给下一场。
+ * 「重试扫描（同一份材料）」：结束这一场，并把它那枚一次性授权移交给下一场。
  *
- * 这是唯一允许授权跨越代次的入口。三步必须在同一个同步块里按序做完：
+ * ## 拿不到授权就**什么都不做**
  *
- *   1. 先取出（校验代次 / 类型 / 有效期），此刻槽位已空；
+ * 第一句是 `if (!carried) return false` —— 在动任何东西之前。这不是风格问题：
+ * 早先的版本先 patch（`live: undefined` 抹掉本机唯一那份 scanTaskId + controlToken、
+ * 顺手清掉结果快照）再判断有没有授权，于是「拿不到授权」这条路径会把用户这一场的
+ * 全部凭证销毁掉，然后返回 false。调用方即使老老实实看返回值，也已经没有东西可退回 ——
+ * 结果页连那张失败回执都显示不出来，服务端那个任务也再没人能撤。
+ *
+ * 所以现在：没有可用的成对授权 → 一个字节都不改，返回 false。要不要改发一个**普通**
+ * 新会话，是用户在结果页上显式按下「重新开始一次扫描」的事（`beginPlainScanRestart`），
+ * 不是这个函数悄悄替他决定的。
+ *
+ * ## 有授权时，三步必须在同一个同步块里按序做完
+ *
+ *   1. 先取出（校验代次 / 类型 / 有效期），随即清空槽位；
  *   2. 推进代次并写回登记（`patchScanWorkbenchSession` 的 `live: undefined` 分支），
  *      这一步会再清一次槽位 —— 已经是空的，所以移交不会被自己清掉；
  *   3. 按**新**代次重新登记，`armedAtMs` 原样带走：移交不延长有效期，
  *      否则用户反复点「重试扫描」就能把一枚 15 分钟的授权无限续下去。
  *
  * 顺序反了（先 patch 再取）授权会在第 2 步被自己清空，重扫就静默退化成普通新会话；
- * 这正是本次要修的缺陷，所以 `verify:scan-session-truth` 把这段顺序钉住了。
+ * `verify:scan-session-truth` 把这段顺序和上面那个早退一起钉住了。
+ *
+ * `rescanIntent: true` 是写给**整页重载之后**的那一帧看的：凭据只活在内存里，重载就
+ * 没了，而设置页必须知道「这一场是带着重扫意图进来的」才能 fail-closed，
+ * 不然它会照常发一个普通创建。它只是一个布尔，不是凭证。
  */
 export function beginScanRescan(args: { scanType: ScanType; extras?: ScanRetryExtras }): boolean {
   const carried = usableRescanAuthority(args.scanType)
+  if (!carried) return false
   rescanAuthority = null
   patchScanWorkbenchSession({
     stage: 'settings',
@@ -207,10 +224,56 @@ export function beginScanRescan(args: { scanType: ScanType; extras?: ScanRetryEx
     extras: args.extras,
     live: undefined,
     result: undefined,
+    rescanIntent: true,
   })
-  if (!carried) return false
   rescanAuthority = { ...carried, generation: lifecycleGeneration }
   return true
+}
+
+/**
+ * 「重新开始一次扫描」——**不是**安全同字节重扫，由用户在页面上显式按下。
+ *
+ * 它和 `beginScanRescan` 的区别就是这次修复的全部要点：安全重扫拿不到授权时不许
+ * 自动退化成这一条。同一张纸走这一条，服务端那两小时的同字节去重会把回传的文件
+ * 原样拒掉，任务停在 waiting 直到过期 —— 用户在机器前白等十分钟，屏幕上看不见原因。
+ * 所以页面必须先把代价说清楚，再让用户自己选；选了就走这里。
+ *
+ * 明确清掉两样东西：槽位里任何残留的授权（这一场声明过「我不做安全重扫」），
+ * 以及登记里那笔 `rescanIntent`（否则设置页会对着一场普通会话 fail-closed）。
+ */
+export function beginPlainScanRestart(args: { scanType: ScanType; extras?: ScanRetryExtras }): void {
+  rescanAuthority = null
+  patchScanWorkbenchSession({
+    stage: 'settings',
+    scanType: args.scanType,
+    extras: args.extras,
+    live: undefined,
+    result: undefined,
+    rescanIntent: undefined,
+  })
+}
+
+/**
+ * 「本页带着安全重扫意图进来，凭据却已经不在内存里」——设置页据此 fail-closed。
+ *
+ * 唯一的成因是**整页重载**：授权只活在模块内存里（刻意的，见 `ScanRescanAuthority`），
+ * 看门狗一重载就没了，而登记里那笔 `rescanIntent` 还在。会话已经建成之后再重载不算
+ * （那时 `restoredLive` 能复水，本页根本不会再创建）。
+ *
+ * 判 true 时页面**绝不能**改发普通创建：用户按的是「同一份材料」，服务端会按同字节
+ * 去重把文件拒掉，人在机器前白等十分钟。出路只有一个显式动作（重新开始一次扫描，
+ * 并且把它不是安全重扫这件事说出来）。
+ */
+export function scanRescanCredentialsLost(args: {
+  session: ScanWorkbenchSession | null
+  scanType: ScanType | null
+  /** 本页复水出来的那份 live（必须是**校验过有效期**的那一份，不是 session.live 原样）。 */
+  restoredLive: ScanLiveState | null
+}): boolean {
+  if (args.session?.rescanIntent !== true) return false
+  if (!args.scanType) return false
+  if (args.restoredLive) return false
+  return !hasScanRescanAuthority(args.scanType)
 }
 
 export interface ScanLiveState {
@@ -252,6 +315,20 @@ export interface ScanWorkbenchSession {
   extras?: ScanRetryExtras
   live?: ScanLiveState
   result?: ScanResultSnapshot
+  /**
+   * 这一场是带着「安全重扫意图」进来的。**只是一个布尔，不含任何凭证** ——
+   * 凭据（上一场的 controlToken 明文）依旧只活在内存里，一个字节都不落存储。
+   *
+   * 它存在的唯一理由是整页重载：重载把内存里的授权抹掉，而用户还站在机器前、
+   * 手里还是同一张纸。设置页靠这一位判 fail-closed（见 `scanRescanCredentialsLost`），
+   * 否则它会照常发一个普通创建，把用户支到面板前去扫一张注定被去重拒收的纸。
+   *
+   * 它**不许比自己那一场活得久**：任何一次生命周期终结（`live: undefined` 的 patch、
+   * 清场）都会把它一起抹掉，见 `patchScanWorkbenchSession`。否则「安全返回扫描首页」
+   * 之后重新选类型开一场普通扫描，会被这一位误判成 fail-closed —— 好功能被一个
+   * 过期标记锁死。
+   */
+  rescanIntent?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -333,6 +410,9 @@ export function readScanWorkbenchSession(): ScanWorkbenchSession | null {
       extras: parseExtras(parsed.extras),
       live: parseLive(parsed.live),
       result: parseResult(parsed.result),
+      // 只认真正的 true：存储里任何别的值（字符串 'false'、1、被人手改过的字节）
+      // 都不足以把一场扫描锁进 fail-closed。
+      rescanIntent: parsed.rescanIntent === true ? true : undefined,
     }
   } catch {
     return null
@@ -353,13 +433,23 @@ export function patchScanWorkbenchSession(
   const current = readScanWorkbenchSession() ?? { stage: 'start' as const }
   // 显式把 live 抹掉 = 这一场扫描到此为止（安全返回 / 回到首页 / 重扫）。
   // 和清场同一个道理：之后才回来的创建响应不能再把 live 写回去。
-  if ('live' in patch && patch.live === undefined) endScanLifecycle()
+  const lifecycleEnding = 'live' in patch && patch.live === undefined
+  if (lifecycleEnding) endScanLifecycle()
   const next: ScanWorkbenchSession = {
     stage: patch.stage ?? current.stage,
     scanType: 'scanType' in patch ? patch.scanType : current.scanType,
     extras: 'extras' in patch ? patch.extras : current.extras,
     live: 'live' in patch ? patch.live : current.live,
     result: 'result' in patch ? patch.result : current.result,
+    // 「安全重扫意图」不许比它所属的那一场活得久：写了就按写的（beginScanRescan 会在
+    // 同一笔 patch 里把它立起来），这一笔是生命周期终结就一并抹掉，其余情况原样留着。
+    // 少了后半句，「安全返回扫描首页」之后开的那场普通扫描会继承一个过期的意图，
+    // 被设置页 fail-closed 锁死 —— 防线错杀正常路径，比没有防线更糟。
+    rescanIntent: 'rescanIntent' in patch
+      ? patch.rescanIntent
+      : lifecycleEnding
+        ? undefined
+        : current.rescanIntent,
   }
   saveScanWorkbenchSession(next)
   return next

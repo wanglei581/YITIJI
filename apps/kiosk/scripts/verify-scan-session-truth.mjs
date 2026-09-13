@@ -284,8 +284,9 @@ assert.doesNotMatch(
 )
 assert.match(
   workbenchSession,
-  /if \('live' in patch && patch\.live === undefined\) endScanLifecycle\(\)\s*\n\s*const next: ScanWorkbenchSession = \{/,
-  '显式抹掉 live = 这一场到此为止，代次要在写回之前推进（安全返回 / 回到首页 / 重扫都走这条）',
+  /const lifecycleEnding = 'live' in patch && patch\.live === undefined\s*\n\s*if \(lifecycleEnding\) endScanLifecycle\(\)\s*\n\s*const next: ScanWorkbenchSession = \{/,
+  '显式抹掉 live = 这一场到此为止，代次要在写回之前推进（安全返回 / 回到首页 / 重扫都走这条）。'
+    + '这一位另外还决定 rescanIntent 要不要跟着抹掉，所以它是一个具名常量而不是内联条件',
 )
 assert.match(
   workbenchSession,
@@ -620,10 +621,40 @@ assert.match(
 )
 assert.match(
   workbenchSession,
-  /export function beginScanRescan\([\s\S]*?const carried = usableRescanAuthority\(args\.scanType\)\s*\n\s*rescanAuthority = null\s*\n\s*patchScanWorkbenchSession\(\{[\s\S]*?live: undefined,[\s\S]*?\}\)\s*\n\s*if \(!carried\) return false\s*\n\s*rescanAuthority = \{ \.\.\.carried, generation: lifecycleGeneration \}/,
-  '移交顺序只有一种是对的：先取出 → 再推进代次（patch 的 live: undefined）→ 最后按**新**'
-    + '代次重新登记。先 patch 再取，授权会在推进代次那一步被自己清掉，重扫静默退化；'
-    + '而重新登记必须原样带走 armedAtMs（用 ...carried 展开），重新计时就等于可以无限续期',
+  /export function beginScanRescan\([\s\S]*?const carried = usableRescanAuthority\(args\.scanType\)\s*\n\s*if \(!carried\) return false\s*\n\s*rescanAuthority = null\s*\n\s*patchScanWorkbenchSession\(\{[\s\S]*?live: undefined,[\s\S]*?rescanIntent: true,\s*\n\s*\}\)\s*\n\s*rescanAuthority = \{ \.\.\.carried, generation: lifecycleGeneration \}/,
+  '两件事一起钉：\n'
+    + '  · 拿不到授权必须**在动任何东西之前**早退（`if (!carried) return false` 是第一句）。'
+    + '早先的版本先 patch 再判断，于是这条路径会把本机唯一那份 scanTaskId + controlToken'
+    + '连同结果快照一起销毁掉再返回 false —— 调用方就算看返回值也没有东西可退回，'
+    + '用户连那张失败回执都看不到，服务端那个任务也再没人能撤；\n'
+    + '  · 有授权时移交顺序只有一种对：先取出 → 再推进代次（patch 的 live: undefined）→ '
+    + '最后按**新**代次重新登记，且 armedAtMs 原样带走（`...carried`），重新计时等于可以无限续期。\n'
+    + '同一笔 patch 里立起 rescanIntent: true —— 那是写给整页重载之后那一帧的 fail-closed 判据。',
+)
+assert.match(
+  workbenchSession,
+  /export function beginPlainScanRestart\([\s\S]*?rescanAuthority = null\s*\n\s*patchScanWorkbenchSession\(\{[\s\S]*?live: undefined,[\s\S]*?rescanIntent: undefined,\s*\n\s*\}\)/,
+  '「重新开始一次扫描」必须是一条**独立**的显式入口：清掉槽位里任何残留授权，'
+    + '并且抹掉登记里那笔意图（否则设置页会对着一场普通会话 fail-closed）。'
+    + '把它和 beginScanRescan 合成一个函数，就等于把「拿不到授权自动降级」写回代码里',
+)
+assert.match(
+  workbenchSession,
+  /rescanIntent: 'rescanIntent' in patch\s*\n\s*\? patch\.rescanIntent\s*\n\s*: lifecycleEnding\s*\n\s*\? undefined\s*\n\s*: current\.rescanIntent,/,
+  '意图不许比它那一场活得久：生命周期终结（live: undefined）的同一笔 patch 必须把它抹掉。'
+    + '少了这一句，「安全返回扫描首页」之后开的那场普通扫描会继承一个过期意图，'
+    + '被设置页 fail-closed 锁死 —— 防线错杀正常路径比没有防线更糟',
+)
+assert.match(
+  workbenchSession,
+  /rescanIntent: parsed\.rescanIntent === true \? true : undefined/,
+  '只认真正的 true：存储里别的值不足以把一场扫描锁进 fail-closed',
+)
+assert.match(
+  workbenchSession,
+  /export function scanRescanCredentialsLost\(args: \{[\s\S]*?if \(args\.session\?\.rescanIntent !== true\) return false[\s\S]*?if \(args\.restoredLive\) return false\s*\n\s*return !hasScanRescanAuthority\(args\.scanType\)/,
+  'fail-closed 判据三段都不能少：没有意图不管（普通会话照常建）、会话已经建成不管'
+    + '（那时 restoredLive 能复水），只有「有意图 + 没 live + 内存里没凭据」才是重载丢凭据',
 )
 assert.doesNotMatch(
   workbenchSession,
@@ -643,10 +674,81 @@ assert.match(
   /armScanRescanAuthority\(\{ priorScanTaskId, priorControlToken, scanType \}\)/,
   '登记要用刚结束那一场的真实凭证，不能另造一份',
 )
+/* ── 安全重扫意图不许落成一个无签名的普通 POST（2026-09-14 第二轮） ──────────
+ *
+ * 结果页那一刻手里可能根本没有可用的成对授权：从来没铸过、已经被取用、超过本地
+ * 15 分钟、或者中间清过场。旧实现忽略 `beginScanRescan()` 的返回值照样跳设置页 ——
+ * 设置页接着建会话，`takeScanRescanAuthority()` 返回 null，于是发出去的是一个
+ * **普通**创建。用户按的是「同一份材料」，随后把同一张纸放回面板，服务端按两小时
+ * 同字节去重把文件拒掉，任务停在 waiting 直到过期：人在机器前白等十分钟，
+ * 屏幕上全程没有一句话解释。
+ *
+ * 下面钉三处：点击时先幂等补登记（关掉首屏那一帧的窗口）、返回值必须判、
+ * 以及「重新开始一次扫描」是一条**另外的、用户显式按下**的路径。 */
 assert.match(
   scanResult,
-  /beginScanRescan\(\{\s*\n\s*scanType,/,
-  '「重试扫描」必须走 beginScanRescan：直接 patch 阶段就是这次修复之前的行为',
+  /armIfPossible\(\)\s*\n\s*if \(!beginScanRescan\(\{ scanType, extras: retryExtras \}\)\) \{/,
+  '「重试扫描」必须：先幂等再登记一次（首屏那一帧 effect 还没跑，按钮已经能点了），'
+    + '然后**判返回值**。忽略返回值就是把安全重扫意图变成一次普通建单',
+)
+assert.match(
+  scanResult,
+  /if \(!beginScanRescan\([\s\S]{0,200}?setSafeRescanLost\(true\)\s*\n\s*setRescanAuthorized\(false\)\s*\n\s*return\s*\n\s*\}/,
+  '拿不到授权时必须在这里**停住**：不跳设置页（跳过去就会发普通创建），'
+    + '把状态改成实话，并且什么都不销毁',
+)
+assert.match(
+  scanResult,
+  /const handlePlainRestart = \(\) => \{\s*\n\s*beginPlainScanRestart\(\{ scanType, extras: retryExtras \}\)/,
+  '普通新会话只能走独立的 beginPlainScanRestart，且由用户按下那个另外的按钮',
+)
+assert.match(
+  scanResult,
+  /rescanAuthorized \? \([\s\S]{0,400}?重试扫描（同一份材料）[\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  '两个按钮不是一个按钮两种文案：拿到凭据是安全重扫，拿不到是普通新会话'
+    + '（同一张纸会被按重复件拒收）。代价不同，文案必须分开，且各自接自己的处置',
+)
+assert.match(
+  scanResult,
+  /setInterval\(\(\) => \{\s*\n\s*setRescanAuthorized\(hasScanRescanAuthority\(scanType\)\)\s*\n\s*\}, RESCAN_AUTHORITY_RECHECK_MS\)/,
+  '本地有效期会走完：不重新采样，按钮会一直挂着「（同一份材料）」那句话，'
+    + '用户照着它把同一张纸放回去，而那时本机其实已经没有可用凭据了',
+)
+assert.match(
+  scanResult,
+  /data-testid="scan-safe-rescan-lost"/,
+  '「刚才那份凭据已经用不了了」必须在屏幕上说出来：按钮按下去什么都没发生，'
+    + '而页面一言不发，比静默降级更难排查',
+)
+
+/* ── 成功页那三个去向也是「离开整条扫描流程」（2026-09-14 第二轮） ────────────
+ *
+ * 直接打印 / AI 简历识别 / 前往我的文档此前都是裸 navigate：本机登记原封不动留在
+ * sessionStorage 里 —— 里面有上一位的 live.controlToken 明文，以及 result.file
+ * （文件名 + 那条签名内容链接）。下一位在这台机器上进 /scan，阶段直接从登记复水到
+ * result，他看到的是上一位的扫描件。 */
+for (const [handler, destination] of [
+  ['handlePrint', '/print/confirm'],
+  ['handleDocuments', '/me/documents'],
+  ['handleResumeAI', '/resume/parse'],
+]) {
+  assert.match(
+    scanResult,
+    new RegExp(`const ${handler} = \\(\\) => \\{[\\s\\S]{0,200}?leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'`),
+    `${handler}（落点 ${destination}）必须走 leaveScanFlow：撤服务端任务 → 清本机登记 → `
+      + '再带着文件跳过去。裸 navigate 会把上一位的凭证与扫描件留在登记里给下一位复水',
+  )
+}
+assert.match(
+  scanResult,
+  /leaveScanFlow\('\/print\/confirm', \{\s*\n\s*state: \{/,
+  '清登记的同时必须把文件从路由 state 带过去：打印页读的是 location.state.file，'
+    + '不读扫描登记 —— 少了 state，清场就把这条去向弄断了',
+)
+assert.match(
+  scanResult,
+  /leaveScanFlow\('\/resume\/parse', \{\s*\n\s*state: \{/,
+  'AI 解析页读的是 state.fileId，同理',
 )
 /* ── E. 结果页自己的出口也必须把这枚授权收走 ───────────────────────────────
  *
@@ -657,9 +759,10 @@ assert.match(
  * 所以下面钉的不是「有几个出口」，而是「每个出口都必须走同一条 leaveScanFlow」。 */
 assert.match(
   scanResult,
-  /const leaveScanFlow = \(destination: string\): void => \{\s*\n\s*revokeLiveScanSession\(getToken\(\)\)\s*\n\s*clearScanWorkbenchSession\(\)\s*\n\s*navigate\(destination\)\s*\n\s*\}/,
+  /const leaveScanFlow = \(destination: string, options\?: NavigateOptions\): void => \{\s*\n\s*revokeLiveScanSession\(getToken\(\)\)\s*\n\s*clearScanWorkbenchSession\(\)\s*\n\s*navigate\(destination, options\)\s*\n\s*\}/,
   '结果页的出口与顶栏返回同一条语义：先撤服务端任务，再清本机登记'
-    + '（代次推进的同一步把授权扔掉），最后才走人',
+    + '（代次推进的同一步把授权扔掉），最后才走人。options 是给成功页那三个去向的 —— '
+    + '它们要带着文件走，但一样必须先清',
 )
 for (const destination of ['/print-scan', '/help', '/']) {
   assert.match(
@@ -696,7 +799,7 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /rescanRequested\s*\n?\s*\? \[\['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'\]/,
+  /rescanRequested\s*\n?\s*\? \['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'\]/,
   '「已放行」只许出现在创建成功之后的设置页：那一刻服务端确实已经消费掉那枚授权',
 )
 assert.match(
@@ -708,9 +811,69 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /restoredFromStorageRef\.current\s*\n?\s*\? \[\['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断'\]/,
+  /restoredFromStorageRef\.current\s*\n?\s*\? \['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断'\]/,
   '复水出来的会话只能如实说无从判断：猜「安全重扫」会让用户把同一张纸放回去'
     + '（可能被去重拒收），猜「普通会话」会让他白换一份材料',
+)
+assert.match(
+  scanSettings,
+  /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通会话：你已确认这一次不是安全同字节重扫'\]/,
+  '用户在 fail-closed 那一屏选的普通会话要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
+)
+
+/* ── 整页重载把内存里那份凭据抹掉之后：fail-closed（2026-09-14 第二轮） ────────
+ *
+ * 安全重扫的凭据只活在模块内存里（刻意的，公共设备不给它落存储）。看门狗整页重载
+ * 一发生，它就没了，而用户还站在机器前、手里还是同一张纸。设置页此刻若照常创建，
+ * 发出去的就是一个普通会话 —— 同一张纸回传时被服务端两小时同字节去重拒掉，
+ * 任务停在 waiting 直到过期，人白等十分钟。
+ *
+ * 所以登记里留一位**布尔**意图（不是凭证），设置页据此 fail-closed，
+ * 并且只给一个显式出路。 */
+assert.match(
+  scanSettings,
+  /const \[rescanCredentialsLost, setRescanCredentialsLost\] = useState\(\(\) =>\s*\n\s*scanRescanCredentialsLost\(\{ session: stored, scanType, restoredLive \}\),\s*\n\s*\)/,
+  '两件事一起钉：\n'
+    + '  · 判据要用**校验过有效期**的 restoredLive —— 拿 session.live 原样判，一场已经过期的'
+    + '会话会被当成「已经建成」放行，于是又发出去一个普通创建；\n'
+    + '  · 必须是挂载那一刻算一次的 state，不能每帧重算。每帧重算会坏在正常路径上：'
+    + '创建 effect 一开跑就把一次性授权取走，槽位随即变空，下一帧重算就把一场正在正常'
+    + '创建的会话判成「凭据没了」，effect 重跑并早退，再没有人给那个还在飞的响应挂处置 ——'
+    + '页面永远停在「正在创建扫描任务」，服务端那个任务也没人认领',
+)
+assert.match(
+  scanSettings,
+  /if \(rescanCredentialsLost\) return\s*\n\s*\/\/ 终端安全会话还在换票/,
+  'fail-closed 必须排在终端会话那两个分支**之前**（页面要说的是「凭据没了」，'
+    + '不是「正在做终端安全校验」），而且它 return 掉的正是那一个会悄悄发出去的普通创建',
+)
+assert.match(
+  scanSettings,
+  /\}, \[terminalSession, rescanCredentialsLost\]\)/,
+  'fail-closed 那一位必须进依赖：用户显式选了「重新开始一次扫描」之后它变 false，'
+    + '这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生',
+)
+assert.match(
+  scanSettings,
+  /const handlePlainRestart = \(\) => \{\s*\n\s*if \(!scanType\) return\s*\n\s*beginPlainScanRestart\(\{ scanType, extras: stored\?\.extras \}\)\s*\n\s*setRescanCredentialsLost\(false\)/,
+  '出路只有这一条显式动作：走 beginPlainScanRestart（它抹掉那笔意图），'
+    + '并且当场把 fail-closed 那一位放下来 —— 否则按钮按下去什么都不会发生',
+)
+assert.match(
+  scanSettings,
+  /rescanCredentialsLost \? \([\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  '只有这一屏有一个能按的主行动；其余失败态仍然什么都不许按（本页不自动重发）',
+)
+assert.match(
+  scanSettings,
+  /title: '安全重扫凭据已随本页重载消失'/,
+  'fail-closed 要有自己的结论屏，不能混进「扫描任务未创建」的通用兜底',
+)
+assert.match(
+  scanSettings,
+  /本页不会替你改发一次普通重扫/,
+  '必须对用户明说不会自动降级 —— 降级本身不危险，但它会把用户支到面板前去扫一张'
+    + '注定被去重拒收的纸',
 )
 assert.doesNotMatch(
   scanResult,

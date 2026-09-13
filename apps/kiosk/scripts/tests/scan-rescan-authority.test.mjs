@@ -259,17 +259,194 @@ test('handing off does not restart the clock', async () => {
   }
 })
 
-test('beginScanRescan without an armed authority still ends the session honestly', async () => {
+/** 一场「已经结束、但凭证还在登记里」的扫描 —— 结果页那一刻的真实登记形状。 */
+function seedFinishedScan(mod, store) {
+  mod.patchScanWorkbenchSession({
+    stage: 'result',
+    scanType: 'resume',
+    live: {
+      scanTaskId: PRIOR.priorScanTaskId,
+      controlToken: PRIOR.priorControlToken,
+      instructions: ['放好原件'],
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    },
+    result: { outcome: 'failed', success: false, reason: '扫描文件处理失败' },
+  })
+  return store.get(mod.SCAN_WORKBENCH_SESSION_KEY)
+}
+
+test('beginScanRescan without an armed authority changes nothing at all', async () => {
+  const store = installStorage()
+  const mod = await loadSessionModule()
+  const before = seedFinishedScan(mod, store)
+  const generationBefore = mod.scanLifecycleGeneration()
+
+  // 上一场根本没走到取件（服务端不会铸授权），或者整页重载把内存清了。
+  assert.equal(mod.beginScanRescan({ scanType: 'resume' }), false)
+  assert.equal(mod.takeScanRescanAuthority('resume'), null, '拿不到就是拿不到，不许本机造一份')
+
+  /* 旧实现在这条路径上先 patch（live: undefined）再返回 false：本机唯一那份
+   * scanTaskId + controlToken 连同结果快照一起被销毁，调用方就算看返回值也没有
+   * 东西可退回 —— 用户连那张失败回执都看不到，服务端那个任务也再没人能撤。
+   * 所以这里断言的是**逐字节没动**，而不是「大致还在」。 */
+  assert.equal(store.get(mod.SCAN_WORKBENCH_SESSION_KEY), before, '一个字节都不许改')
+  assert.equal(mod.scanLifecycleGeneration(), generationBefore, '代次也不许推进')
+  const stored = mod.readScanWorkbenchSession()
+  assert.equal(stored.stage, 'result')
+  assert.equal(stored.live.controlToken, PRIOR.priorControlToken)
+  assert.equal(stored.result.outcome, 'failed')
+})
+
+test('an expired authority is refused without destroying the session', async () => {
+  const store = installStorage()
+  const mod = await loadSessionModule()
+  const realNow = Date.now
+  try {
+    seedFinishedScan(mod, store)
+    mod.armScanRescanAuthority(PRIOR)
+    const before = store.get(mod.SCAN_WORKBENCH_SESSION_KEY)
+
+    // 用户在结果页上停了超过 15 分钟才抬手点「重试扫描（同一份材料）」。
+    Date.now = () => realNow() + mod.SCAN_RESCAN_AUTHORITY_TTL_MS + 1
+    assert.equal(mod.beginScanRescan({ scanType: 'resume' }), false, '超过本地有效期就不许移交')
+    assert.equal(store.get(mod.SCAN_WORKBENCH_SESSION_KEY), before, '被拒也不许动登记')
+  } finally {
+    Date.now = realNow
+  }
+})
+
+test('the explicit plain restart is the only thing that ends the session without an authority', async () => {
+  const store = installStorage()
+  const mod = await loadSessionModule()
+  seedFinishedScan(mod, store)
+  mod.armScanRescanAuthority(PRIOR)
+
+  // 用户看完「没有安全重扫凭据」的说明，自己按下「重新开始一次扫描」。
+  mod.beginPlainScanRestart({ scanType: 'resume', extras: { source: 'feeder' } })
+
+  const stored = mod.readScanWorkbenchSession()
+  assert.equal(stored.stage, 'settings')
+  assert.equal(stored.live, undefined, '上一场的凭证必须跟着这一步消失')
+  assert.equal(stored.result, undefined)
+  assert.equal(stored.rescanIntent, undefined, '普通会话不许带着安全重扫意图进设置页')
+  assert.deepEqual(stored.extras, { source: 'feeder' }, '扫描参数照旧带过去')
+  assert.equal(
+    mod.takeScanRescanAuthority('resume'),
+    null,
+    '显式普通重开必须把槽位里的授权也扔掉：它声明的就是「这一次不是安全重扫」',
+  )
+  const persisted = store.get(mod.SCAN_WORKBENCH_SESSION_KEY)
+  assert.equal(persisted.includes(PRIOR.priorControlToken), false)
+})
+
+test('the rescan intent marker lives exactly as long as its own session', async () => {
+  const store = installStorage()
+  const mod = await loadSessionModule()
+  seedFinishedScan(mod, store)
+  mod.armScanRescanAuthority(PRIOR)
+
+  assert.equal(mod.beginScanRescan({ scanType: 'resume' }), true)
+  assert.equal(mod.readScanWorkbenchSession().rescanIntent, true, '意图要写进登记（它是重载之后唯一的线索）')
+  // 布尔而已：凭证一个字节都不在里面。
+  const persisted = store.get(mod.SCAN_WORKBENCH_SESSION_KEY)
+  assert.equal(persisted.includes(PRIOR.priorControlToken), false)
+  assert.equal(persisted.includes(PRIOR.priorScanTaskId), false)
+
+  // 会话建成（写 live）不动它：那一刻页面还在同一场里。
+  mod.patchScanWorkbenchSession({
+    stage: 'settings',
+    live: { scanTaskId: 'scan-new-1', controlToken: 'new-token', instructions: [], expiresAt: '2099-01-01T00:00:00.000Z' },
+  })
+  assert.equal(mod.readScanWorkbenchSession().rescanIntent, true)
+
+  /* 而「安全返回扫描首页」（live: undefined）必须把它一起抹掉。少了这一句，
+   * 用户随后重新选类型开的那场**普通**扫描会继承一个过期意图，被设置页
+   * fail-closed 锁死 —— 防线错杀正常路径，比没有防线更糟。 */
+  mod.patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
+  assert.equal(mod.readScanWorkbenchSession().rescanIntent, undefined)
+})
+
+test('a privacy clear takes the intent marker with it', async () => {
+  const store = installStorage()
+  const mod = await loadSessionModule()
+  seedFinishedScan(mod, store)
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+
+  mod.clearScanWorkbenchSession()
+  assert.equal(mod.readScanWorkbenchSession(), null)
+  assert.equal(store.get(mod.SCAN_WORKBENCH_SESSION_KEY), undefined)
+})
+
+test('only a literal true in storage counts as a rescan intent', async () => {
+  const store = installStorage()
+  const mod = await loadSessionModule()
+  store.set(mod.SCAN_WORKBENCH_SESSION_KEY, JSON.stringify({
+    stage: 'settings',
+    scanType: 'resume',
+    rescanIntent: 'true',
+  }))
+  assert.equal(
+    mod.readScanWorkbenchSession().rescanIntent,
+    undefined,
+    '被人手改过的字节不足以把一场扫描锁进 fail-closed',
+  )
+})
+
+test('the fail-closed predicate fires only on a reload that lost the credentials', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  const live = { scanTaskId: 'scan-live-1', controlToken: 'live-token', instructions: [], expiresAt: '2099-01-01T00:00:00.000Z' }
+
+  // 没有意图 = 普通会话，照常创建。
+  assert.equal(
+    mod.scanRescanCredentialsLost({ session: { stage: 'settings', scanType: 'resume' }, scanType: 'resume', restoredLive: null }),
+    false,
+  )
+  // 有意图、凭据也还在内存里 = 这一帧就是点完「重试扫描」跳过来的，照常创建（带两半）。
+  mod.armScanRescanAuthority(PRIOR)
+  assert.equal(
+    mod.scanRescanCredentialsLost({
+      session: { stage: 'settings', scanType: 'resume', rescanIntent: true },
+      scanType: 'resume',
+      restoredLive: null,
+    }),
+    false,
+  )
+  // 有意图、会话已经建成（复水到 live）= 这一笔意图早就兑现了，本页根本不会再创建。
+  mod.clearScanRescanAuthority()
+  assert.equal(
+    mod.scanRescanCredentialsLost({
+      session: { stage: 'settings', scanType: 'resume', rescanIntent: true },
+      scanType: 'resume',
+      restoredLive: live,
+    }),
+    false,
+  )
+  // 有意图、没有 live、内存里也没有凭据 = 整页重载把凭据抹掉了 → fail-closed。
+  assert.equal(
+    mod.scanRescanCredentialsLost({
+      session: { stage: 'settings', scanType: 'resume', rescanIntent: true },
+      scanType: 'resume',
+      restoredLive: null,
+    }),
+    true,
+  )
+})
+
+test('a cold module can still arm and hand off on the click itself', async () => {
   installStorage()
   const mod = await loadSessionModule()
 
-  // 上一场根本没走到取件（服务端不会铸授权），或者整页重载把内存清了。
-  assert.equal(mod.beginScanRescan({ scanType: 'document' }), false)
-  assert.equal(mod.takeScanRescanAuthority('document'), null, '拿不到就是拿不到，不许本机造一份')
-  const stored = mod.readScanWorkbenchSession()
-  assert.equal(stored.stage, 'settings')
-  assert.equal(stored.live, undefined)
-  assert.equal(stored.result, undefined)
+  /* 首屏那一帧：结果页的 useEffect 还没跑，模块内存里什么都没有，而按钮已经能点了。
+   * 点击那一刻先幂等登记再移交 —— 这就是「快点两下也不会变成普通建单」靠的那一步。 */
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+  assert.equal(mod.armScanRescanAuthority(PRIOR), true)
+  assert.equal(mod.beginScanRescan({ scanType: 'resume' }), true)
+  assert.deepEqual(mod.takeScanRescanAuthority('resume'), {
+    retryOfScanTaskId: PRIOR.priorScanTaskId,
+    priorControlToken: PRIOR.priorControlToken,
+  })
 })
 
 test('incomplete credentials are refused at arming time', async () => {

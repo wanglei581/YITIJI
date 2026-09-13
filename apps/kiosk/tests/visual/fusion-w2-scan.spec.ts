@@ -415,7 +415,9 @@ test('failed scan retry strips control fields but preserves scan parameters @w2'
     response.request().method() === 'POST'
       && new URL(response.url()).pathname === '/api/v1/scan/sessions',
   )
-  await page.getByRole('button', { name: '重试扫描' }).click()
+  // 这一场没有任何安全重扫凭据（种进去的登记里没有 live），所以主行动是显式的
+  // 「重新开始一次扫描」——它不是安全同字节重扫，页面也不许把它说成重试。
+  await page.getByRole('button', { name: '重新开始一次扫描', exact: true }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
   await createResponse
   await expect(page.locator('[data-w2-page="scan-settings"]')).toBeVisible()
@@ -454,7 +456,7 @@ test('completed scan without a file is a terminal no-file state @w2', async ({ p
   await page.waitForURL(/\/scan\?stage=result/)
   await expect(page.getByText('服务端说已完成，但这次回执里没有可用文件').first()).toBeVisible()
   await expect(page.getByText('w2-scan.pdf')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '重试扫描' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
   await expectHealthy(page, errors)
 })
 

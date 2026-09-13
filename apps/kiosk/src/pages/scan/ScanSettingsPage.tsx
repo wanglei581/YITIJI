@@ -29,9 +29,11 @@ import {
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import {
+  beginPlainScanRestart,
   patchScanWorkbenchSession,
   readScanWorkbenchSession,
   scanLifecycleGeneration,
+  scanRescanCredentialsLost,
   takeScanRescanAuthority,
   type ScanLiveState,
 } from './scanWorkbenchSession'
@@ -56,6 +58,21 @@ const SCAN_RESCAN_REJECTION_CODES = new Set([
   'SCAN_RETRY_TASK_ID_MISSING',
   'SCAN_RESCAN_AUTHORITY_INCOMPLETE',
 ])
+
+/**
+ * 整页重载把内存里那份重扫凭据抹掉之后，这一屏说的话。
+ *
+ * 三件事必须都说到：为什么不能继续（凭据只活在内存里）、本页**没有**替他改发普通
+ * 重扫（否则同一张纸会撞上两小时的重复件拒收）、以及他现在能按哪一个。
+ */
+const RESCAN_CREDENTIALS_LOST_FAILURE = {
+  title: '安全重扫凭据已随本页重载消失',
+  description: '你刚才选的是「同一份材料」重扫。那份凭据只存在页面内存里（不落存储，'
+    + '换人清场也带不走），本页重载之后它就没了，本机无法再向服务端申请放行。'
+    + '本页不会替你改发一次普通重扫 —— 同一张纸走普通会话会被服务端按重复件拒收，'
+    + '你会在机器前白等到会话过期。可以安全返回扫描首页，'
+    + '或者按「重新开始一次扫描」建一个普通会话（那不是安全重扫，建议换一份材料）。',
+} as const
 
 interface LocationState {
   scanType?: unknown
@@ -112,11 +129,38 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       ? storedType
       : null
   const restoredLive = liveSessionStillValid(storedLive) ? storedLive : null
+  /**
+   * fail-closed：本页是带着「安全重扫意图」进来的，凭据却已经不在内存里。
+   *
+   * 唯一的成因是整页重载（授权刻意只活在内存里，看门狗一重载就没了，而登记里那笔
+   * 意图还在）。**这一刻绝不能照常发普通创建**：用户按的是「同一份材料」，手里还是
+   * 同一张纸，普通会话回传时会被服务端两小时的同字节去重拒掉，任务停在 waiting
+   * 直到过期 —— 人在机器前白等十分钟，屏幕上全程没有一句话解释。
+   *
+   * 必须是**挂载那一刻算一次**的状态，不能每帧重算。每帧重算试过，会坏在这里：
+   * 正常的安全重扫路径上，创建 effect 一开跑就把授权取走（一次性），槽位随即变空 ——
+   * 下一帧重算就会把一场**正在正常创建**的会话判成「凭据没了」，effect 因依赖变化重跑
+   * 并在 fail-closed 处早退，于是再没有人给那个还在飞的响应挂处置：页面永远停在
+   * 「正在创建扫描任务」，服务端那个任务也没人认领。
+   *
+   * 唯一允许它改口的是用户显式按下「重新开始一次扫描」（handlePlainRestart）。
+   */
+  const [rescanCredentialsLost, setRescanCredentialsLost] = useState(() =>
+    scanRescanCredentialsLost({ session: stored, scanType, restoredLive }),
+  )
 
   const [phase, setPhase] = useState<SessionPhase>(
-    restoredLive && scanType ? 'success' : scanType ? 'loading' : 'invalid',
+    rescanCredentialsLost
+      ? 'error'
+      : restoredLive && scanType
+        ? 'success'
+        : scanType
+          ? 'loading'
+          : 'invalid',
   )
-  const [failure, setFailure] = useState<SessionFailure | null>(null)
+  const [failure, setFailure] = useState<SessionFailure | null>(
+    rescanCredentialsLost ? RESCAN_CREDENTIALS_LOST_FAILURE : null,
+  )
   const [instructions, setInstructions] = useState<string[] | null>(restoredLive?.instructions ?? null)
   const [starting, setStarting] = useState(false)
   const [scanTaskId, setScanTaskId] = useState<string | null>(restoredLive?.scanTaskId ?? null)
@@ -127,6 +171,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   // （成功时告诉用户可以照原样再扫同一份材料），不参与任何放行判断 ——
   // 授权成不成立由服务端判，本机只负责不把话说反。
   const [rescanRequested, setRescanRequested] = useState(false)
+  // 用户在 fail-closed 那一屏显式按了「重新开始一次扫描」。只用于如实标注这一场的性质：
+  // 它是一次普通会话，而且是他自己选的，不是本页悄悄降级的。
+  const [plainRestartChosen, setPlainRestartChosen] = useState(false)
   // POST /scan/sessions 挂着 TerminalIdentityGuard（scan-tasks.controller.ts）：
   // 没有终端会话令牌就是 401。和打印确认页同一口径 —— 订阅状态，不猜、不抢跑。
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
@@ -211,6 +258,12 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     //   · 也不在这里顺手重建一次 —— 页面已经对用户宣告过「终端安全校验失败」，
     //     恢复路径只有「安全返回扫描首页」重走一遍，扫不扫由用户自己决定。
     if (creationAbandonedRef.current) return
+    /* fail-closed：带着安全重扫意图进来，凭据却已经不在内存里（整页重载抹掉的）。
+     * 这一条必须排在终端会话那两个分支**之前** —— 页面此刻要说的是「凭据没了」，
+     * 不是「正在做终端安全校验」。它是这次修复的核心：这里 return 掉的正是那一个
+     * 会悄悄发出去的普通创建。用户按下「重新开始一次扫描」之后，
+     * rescanCredentialsLost 当帧变 false，本 effect 再跑一次，那时才创建。 */
+    if (rescanCredentialsLost) return
     // 终端安全会话还在换票：什么都不发，页面停在等待态。抢跑只会拿回一个 401，
     // 还会把一次「本可以成功」的创建写成失败。
     if (terminalSession === 'checking') return
@@ -396,9 +449,11 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       cancelled = true
     }
     // StrictMode 需要在同一组 refs 上复用唯一创建 promise，不按渲染重发。
-    // 依赖只有终端会话状态：它从 checking / failed 回到 ready 时要能补发这一次创建。
+    // 依赖两个：终端会话状态（从 checking / failed 回到 ready 时要能补发这一次创建），
+    // 以及 fail-closed 那一位（用户显式选了「重新开始一次扫描」之后它变 false，
+    // 这一次普通创建就该发出去了 —— 那是他自己按的）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession])
+  }, [terminalSession, rescanCredentialsLost])
 
   useEffect(() => {
     if (!expiresAt) return
@@ -436,6 +491,22 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       return
     }
     navigate('/scan?stage=start')
+  }
+
+  /**
+   * fail-closed 那一屏上的出路：用户显式选择「重新开始一次扫描」。
+   *
+   * 它做的事只有一件 —— 把登记里那笔安全重扫意图抹掉（`beginPlainScanRestart`），
+   * 于是上面那条创建 effect 的 fail-closed 判据当帧变 false，普通创建才发出去。
+   * 这一条不是降级的捷径：文案已经说清它不是安全同字节重扫，按下它是用户的选择。
+   */
+  const handlePlainRestart = () => {
+    if (!scanType) return
+    beginPlainScanRestart({ scanType, extras: stored?.extras })
+    setRescanCredentialsLost(false)
+    setPlainRestartChosen(true)
+    setFailure(null)
+    setPhase('loading')
   }
 
   const handleConfirm = () => {
@@ -499,15 +570,24 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
               安全返回扫描首页
             </button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              disabled
-              aria-disabled="true"
-            >
-              {phase === 'loading' ? '等服务端返回会话' : '未创建扫描任务'}
-            </button>
+            {/* 只有「凭据随重载消失」这一屏有一个能按的主行动：它是普通新会话，
+                代价已经在正文里说清，按不按由用户决定。其余失败态仍然什么都不许按 ——
+                本页不会自动重发，也不会自己变成成功。 */}
+            {rescanCredentialsLost ? (
+              <button type="button" className="qx-btn" data-variant="primary" onClick={handlePlainRestart}>
+                重新开始一次扫描
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="primary"
+                disabled
+                aria-disabled="true"
+              >
+                {phase === 'loading' ? '等服务端返回会话' : '未创建扫描任务'}
+              </button>
+            )}
           </ScanCta>
         }
       >
@@ -562,6 +642,26 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     )
   }
 
+  /**
+   * 「本次性质」那一行说什么，取决于本机**确实知道**什么。null = 无可声明。
+   *
+   * 四种情况，一句都不许互相顶替：
+   *   · 这一次真的带了重扫两半且创建成功 —— 服务端已经把那枚授权消费掉了，
+   *     所以「已放行」在这一行是可以说的（结果页那边不行，它手里只有凭据）；
+   *   · 用户在 fail-closed 那一屏显式选了普通会话 —— 把这个选择记下来，
+   *     免得下一屏看起来像是本页悄悄降级的；
+   *   · 复水出来的会话 —— 授权只活在内存里，重载后本页说不出当初带没带，
+   *     就如实说无从判断，不猜；
+   *   · 普通新建 —— 不多这一行，没什么要声明的。
+   */
+  const natureRow: [string, string] | null = rescanRequested
+    ? ['本次性质', '安全重扫：服务端已放行同一份材料再扫一次']
+    : plainRestartChosen
+      ? ['本次性质', '普通会话：你已确认这一次不是安全同字节重扫']
+      : restoredFromStorageRef.current
+        ? ['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断']
+        : null
+
   return (
     <ScanWorkbenchShell
       page="scan-settings"
@@ -598,17 +698,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               ['任务编号', scanTaskId],
               ['剩余时间', countdown],
               ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-              // 三种情况三种说法，一句都不许互相顶替：
-              //   · 这一次真的带了重扫两半且创建成功 —— 服务端已经把那枚授权消费掉了，
-              //     所以「已放行」在这一行是可以说的（结果页那边不行，它只有凭据）；
-              //   · 复水出来的会话 —— 授权只活在内存里，重载后本页说不出当初带没带，
-              //     就如实说无从判断，不猜；
-              //   · 普通新建 —— 不多这一行，没什么要声明的。
-              ...(rescanRequested
-                ? [['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'] as [string, string]]
-                : restoredFromStorageRef.current
-                  ? [['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断'] as [string, string]]
-                  : []),
+              ...(natureRow ? [natureRow] : []),
               ['控制凭证', '不上屏、不进链接；本次一体机会话内存里，换人清场会清掉'],
             ]}
           />
