@@ -9,6 +9,10 @@ const read = (relativePath) => readFileSync(resolve(kioskRoot, relativePath), 'u
 
 const scanStart = read('src/pages/scan/ScanStartPage.tsx')
 const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+/* 2026-09-14 结构收敛：拒绝码表与两屏结论文案、以及「失败码 → 说什么」的纯翻译
+ * 搬到了 scanRescanRecovery.ts（ScanSettingsPage 触到 800 行硬线）。搬的是无状态的
+ * 那一半，副作用仍在页面里。下面凡是钉这些常量/文案的断言改钉这份源，**判据一个没减**。 */
+const rescanRecovery = read('src/pages/scan/scanRescanRecovery.ts')
 
 assert.doesNotMatch(
   scanStart,
@@ -271,14 +275,17 @@ assert.match(
 )
 assert.match(
   workbenchSession,
-  /function endScanLifecycle\(\): void \{\s*\n\s*lifecycleGeneration \+= 1\s*\n\s*rescanAuthority = null\s*\n\s*\}/,
+  /function endScanLifecycle\(\): void \{\s*\n\s*lifecycleGeneration \+= 1\s*\n\s*rescanAuthority = null\s*\n(?:\s*\/\/[^\n]*\n)*\s*takenRescanAuthority = null\s*\n\s*\}/,
   '推进代次必须是同步自增，并在**同一步**里把一次性重扫授权扔掉。'
     + '两件事的理由不同，别混：自增必须同步，是因为任何 await / 存储 IO 都会让它晚于'
     + '还在飞的响应；而扔掉授权这一句管的是**留存** —— 授权里那份 controlToken 是'
     + '上一位用户的明文凭证，这一场结束之后不该继续被模块变量引着。'
     + '注意它不是「防止被下一位取用」的那道闸（那道是 usableRescanAuthority 里的代次比对，'
     + '删掉本句不会让授权重新可用 —— 2026-09-14 实测行为用例全绿）；'
-    + '两道是纵深，少一道就少一道。',
+    + '两道是纵深，少一道就少一道。\n'
+    + '同一步还要扔掉**寄存格**（takenRescanAuthority）：那一份是取走后待裁决的，'
+    + '删掉它就等于留了一条真实的复活路径 —— 离开 / 清场之后回来的失败响应'
+    + '仍能把上一场的凭证恢复进槽位，这一条和上面那句不同，它是真闸不是纵深。',
 )
 assert.doesNotMatch(
   workbenchSession,
@@ -643,8 +650,8 @@ assert.match(
 )
 
 // ── C. 被拒不许静默降级 ────────────────────────────────────────────────────
-const rejectionCodeTable = /const SCAN_RESCAN_REJECTION_CODES = new Set\(\[([\s\S]*?)\]\)/.exec(scanSettings)?.[1]
-assert.ok(rejectionCodeTable, '扫描设置页必须有一张显式的重扫拒绝码表')
+const rejectionCodeTable = /export const SCAN_RESCAN_REJECTION_CODES = new Set\(\[([\s\S]*?)\]\)/.exec(rescanRecovery)?.[1]
+assert.ok(rejectionCodeTable, '必须有一张显式的重扫拒绝码表（scanRescanRecovery）')
 for (const code of ['SCAN_RETRY_NOT_AUTHORIZED', 'SCAN_RETRY_CONFLICT', 'SCAN_RETRY_TASK_ID_MISSING']) {
   assert.match(
     apiScanService,
@@ -665,17 +672,26 @@ assert.match(
   '本机成对校验抛的码也要在表里：否则半对凭据会被当成一次普通创建失败',
 )
 assert.match(
-  scanSettings,
+  rescanRecovery,
   /RESCAN_REFUSED_FAILURE = \{\s*\n\s*title: '安全重扫授权已失效'/,
   '重扫被拒要有自己的结论屏，不能和「服务端没能创建扫描会话」混成一句',
 )
+/* 原来这一条用一个跨越「码表 → 置位 → 结论屏」的长正则钉在页面里。结构收敛之后
+ * 翻译那一半在 helper、置位那一半在页面，所以拆成两条 —— 合起来的判据一个没减：
+ * 拒绝码必须翻译成它**自己那张**结论屏，且页面必须据此立起「服务端不认」这一位。 */
 assert.match(
-  scanSettings,
-  /SCAN_RESCAN_REJECTION_CODES\.has\(code \?\? ''\)[\s\S]{0,1600}?setRescanRefusedByServer\(true\)[\s\S]{0,300}?title: RESCAN_REFUSED_FAILURE\.title/,
-  '拒绝码那条分支必须既立起「服务端不认」这一位，又挂上它自己那张结论屏',
+  rescanRecovery,
+  /isRescanRefusedByServer\(code\)\) \{[\s\S]{0,400}?refusedRescan: true,[\s\S]{0,300}?title: RESCAN_REFUSED_FAILURE\.title/,
+  '拒绝码必须翻译成它自己那张结论屏，不能掉进「扫描任务未创建」的通用兜底',
 )
 assert.match(
   scanSettings,
+  /if \(verdict\.refusedRescan\) setRescanRefusedByServer\(true\)\s*\n\s*setFailure\(verdict\.failure\)/,
+  '页面必须据此立起「服务端不认」这一位，并把那张结论屏挂上去：'
+    + '少了置位，CTA 就不会切成显式的普通重启，用户在这一屏无路可走',
+)
+assert.match(
+  rescanRecovery,
   /本页不会自动改用普通重扫/,
   '必须对用户明说不会自动降级：降级本身不危险，但它会把用户支到面板前去扫一张'
     + '注定被去重拒收的纸，白等十分钟且毫无提示',
@@ -697,12 +713,21 @@ assert.equal(
  * 它仍然不是自动降级：按钮由用户按下，文案写明它不是同字节重扫、同一张纸可能被拒收。 */
 assert.match(
   scanSettings,
-  /\{rescanCredentialsLost \|\| rescanRefusedByServer \? \(\s*\n\s*<button[^>]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  /rescanCredentialsLost \|\| rescanRefusedByServer \? \(\s*\n\s*<button[^>]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
   '两种 fail-closed 都必须给出同一个显式主行动「重新开始一次扫描」：'
     + '只给其中一种，另一种就是一条注定失败的死路',
 )
+/* 第三条分支：安全重扫这条路**还通着**（失败码证明不了服务端消费过那枚授权）。
+ * 它必须排在上面那两条 fail-closed 之前 —— 顺序反了的话，一次限流 / 断网就会把用户
+ * 推到「重新开始一次扫描」上去，同一张纸随后撞上服务端两小时的同字节去重。 */
 assert.match(
   scanSettings,
+  /\{rescanRetryable \? \(\s*\n\s*<button[^>]*onClick=\{handleRescanRetry\}>\s*\n\s*再试一次安全重扫\s*\n\s*<\/button>\s*\n\s*\) : rescanCredentialsLost \|\| rescanRefusedByServer \? \(/,
+  '「还能再试一次成对重扫」必须是 CTA 的第一条分支，且优先于两条 fail-closed 的普通重启：'
+    + '把它排在后面或干脆不给，等于让一次 429 永久烧掉用户那枚一次性授权',
+)
+assert.match(
+  rescanRecovery,
   /RESCAN_REFUSED_FAILURE[\s\S]{0,600}?可能按重复件拒收/,
   '那颗按钮的代价必须写在同一屏：它不是同字节重扫，同一张纸可能被服务端拒收',
 )
@@ -959,11 +984,12 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer\]\)/,
-  '两个 fail-closed 标志都必须进依赖：用户显式选了「重新开始一次扫描」之后它们变 false，'
-    + '这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
+  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable\]\)/,
+  '三个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
+    + '它们变 false，这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
     + 'rescanRefusedByServer 这一位尤其容易被判成冗余 —— 服务端拒绝那条路径上'
-    + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。',
+    + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。\n'
+    + 'rescanRetryable 是「再试一次安全重扫」唯一的复跑开关，同理。',
 )
 assert.match(
   scanSettings,
@@ -980,9 +1006,126 @@ assert.match(
     + '服务端那种情况从不铸授权、必然 403 —— 最常见的失败路径上主行动注定失败。',
 )
 assert.match(
-  scanSettings,
+  rescanRecovery,
   /RESCAN_CREDENTIALS_LOST_FAILURE = \{\s*\n\s*title: '安全重扫凭据已经不在本机'/,
   'fail-closed 要有自己的结论屏，不能混进「扫描任务未创建」的通用兜底',
+)
+
+/* ── C3. 创建失败之后那枚一次性授权的归属 ──────────────────────────────────
+ *
+ * 取用排在请求发出之前（并发双击、effect 重跑都得撞空槽位），所以失败回来时本机那份
+ * 已经不在槽位里。而服务端那一半的消费（retryConsumedAt 的 CAS）在
+ * scan-tasks.service.ts 的 $transaction **内部**，限流（12 次/分）与终端态检查更在
+ * 事务之前就抛 —— 429 / SCAN_TERMINAL_BUSY / 断网 / 5xx 回来时，服务端那枚授权
+ * 原封没动，只有本机把它自己扔了。
+ *
+ * 扔掉不是「少一个便利功能」：授权只在任务 matched 之后才铸，而 matched 同时写下
+ * lastAttemptHash —— 那正是两小时同字节去重的键。两个条件必然同时成立，所以只要曾经
+ * 有过授权，同一张纸走普通会话就必定撞 SCAN_FILE_PREVIOUSLY_ATTEMPTED：Agent 把文件
+ * 隔离进 _unclaimed 且不重试，任务停在 waiting，用户白等到十分钟轮询上限。
+ *
+ * 下面钉的就是那条二选一，以及它绝不许放宽的三个边界。 */
+assert.match(
+  scanSettings,
+  /const serverRefusedRescan = isRescanRefusedByServer\(code\)/,
+  '恢复与丢弃的判据只能是失败码本身：按别的东西（重试次数、是否超时）分叉，'
+    + '等于在猜服务端有没有消费那枚授权',
+)
+assert.match(
+  rescanRecovery,
+  /export function isRescanRefusedByServer\(code: string \| undefined\): boolean \{\s*\n\s*return SCAN_RESCAN_REJECTION_CODES\.has\(code \?\? ''\)\s*\n\s*\}/,
+  '那个判据必须就是拒绝码表本身（一个薄包装，不许在里面加别的条件）',
+)
+assert.match(
+  scanSettings,
+  /if \(rescanCarriesOver\) \{\s*\n\s*rescanStillUsable = restoreScanRescanAuthority\(scanType\)\s*\n\s*\} else \{\s*\n\s*discardTakenScanRescanAuthority\(\)\s*\n\s*\}/,
+  '二选一必须是显式的：证明不了服务端消费过就原样放回，服务端明确不认就永久丢弃。'
+    + '少了 restore 那一支，一次 429 就永久烧掉用户那枚一次性授权；'
+    + '少了 discard 那一支，屏幕上会挂一句「可以再试一次安全重扫」的假承诺。',
+)
+assert.match(
+  scanSettings,
+  /const rescanCarriesOver = !serverRefusedRescan\s*\n\s*&& createGeneration !== null\s*\n\s*&& scanLifecycleGeneration\(\) === createGeneration\s*\n\s*&& !unmountedRef\.current/,
+  '恢复必须和**发起这次创建时**那个代次配对，并且页面还挂着：\n'
+    + '  · 代次一变就说明这一场已经结束（离开 / 清场 / 换人 / 安全返回都会推进它），'
+    + '那一刻回来的失败响应不许把上一场的凭证立回槽位 —— 下一位用户会继承它；\n'
+    + '  · 卸载后没有人会再用它，而它握着上一场的 controlToken 明文。',
+)
+assert.match(
+  scanSettings,
+  /const serverRefusedRescan = isRescanRefusedByServer[\s\S]{0,1200}?if \(cancelled\) return/,
+  '这段裁决必须排在 `if (cancelled) return` **之前**：cancelled 只表示本轮 effect 过时'
+    + '（终端会话 checking/ready 切一次就置位），和授权归谁无关。排在后面的话，'
+    + '正好在换票窗口里失败的那一次会两头落空 —— 既没恢复也没丢弃。',
+)
+assert.match(
+  scanSettings,
+  /\.then\(\(created\) => \{\s*\n(?:\s*\/\/[^\n]*\n)*\s*discardTakenScanRescanAuthority\(\)/,
+  '拿到 2xx 就意味着服务端跑过 handler、事务里的 CAS 已经消费掉那枚授权，'
+    + '寄存的那一份必须在 .then 的**第一句**永久丢弃 —— 无论这份响应本身可不可用。'
+    + '漏掉这一句，一次成功的创建会把上一场的 controlToken 明文继续留在模块内存里，'
+    + '而它已经没有任何用途了',
+)
+assert.match(
+  scanSettings,
+  /if \(rescanStillUsable\) setRescanRetryable\(true\)/,
+  '只许在真的恢复成功时立起那一位，且**从不**在 catch 里写回 false：'
+    + '本 promise 已经 settle，后续每一轮 effect 都会再挂一次 catch，那时寄存格已空、'
+    + '恢复必然返回 false，照写就会把上一轮刚立起来的按钮当场按灭',
+)
+assert.match(
+  scanSettings,
+  /const handleRescanRetry = \(\) => \{\s*\n\s*if \(!scanType\) return\s*\n\s*sessionPromiseRef\.current = null\s*\n\s*setRescanRetryable\(false\)/,
+  '「再试一次安全重扫」必须置空那个已经 reject 的 sessionPromiseRef（否则 effect 重跑'
+    + '只会给同一个 rejection 再挂一遍 then/catch，新的 POST 永远发不出去，页面停在 loading）',
+)
+assert.doesNotMatch(
+  scanSettings,
+  /const handleRescanRetry = \(\) => \{[\s\S]{0,400}?rescanIntentRef\.current = false/,
+  '「再试一次安全重扫」绝不能解除延迟取用闸门：它仍然是一次「同一份材料」，'
+    + '万一取用时授权已经过期，必须照旧 fail-closed，而不是放一个无签名的普通创建出去',
+)
+assert.match(
+  scanSettings,
+  /rescanRetryable \?[\s\S]{0,600}?这次失败没有用掉你的安全重扫凭据[\s\S]{0,300}?重试不会延长/,
+  '这一屏必须如实说明「凭据还在」与「有效期不会因为重试而延长」：'
+    + '只给按钮不给这两句，用户会以为同一份材料已经扫不成了，转头去开一场'
+    + '注定被同字节去重拒收的普通会话',
+)
+
+// ── C4. 恢复语义本体（scanWorkbenchSession）────────────────────────────────
+assert.match(
+  workbenchSession,
+  /export function restoreScanRescanAuthority\(scanType: ScanType\): boolean \{\s*\n\s*const pending = takenRescanAuthority\s*\n\s*takenRescanAuthority = null\s*\n\s*if \(!pending\) return false\s*\n\s*if \(pending\.generation !== lifecycleGeneration\) return false\s*\n\s*if \(pending\.scanType !== scanType\) return false\s*\n\s*if \(rescanAuthority\) return false\s*\n\s*rescanAuthority = pending\s*\n\s*return usableRescanAuthority\(scanType\) !== null\s*\n\s*\}/,
+  '恢复的形状一条都不能少：\n'
+    + '  · 先取出寄存格再清空（恢复是一次性的，同一次失败不许被恢复两遍）；\n'
+    + '  · 代次 / 类型必须配对，否则上一场的凭证会被下一位继承；\n'
+    + '  · 槽位已经有主就让路（期间用户可能已经重新 arm 过）；\n'
+    + '  · 放回的是**同一个对象**（armedAtMs 原样），返回值只说明它此刻还可不可用。',
+)
+assert.doesNotMatch(
+  workbenchSession,
+  /export function restoreScanRescanAuthority\([\s\S]{0,800}?(Date\.now\(\)|armedAtMs:)/,
+  '恢复绝不能重新计时：只要出现 Date.now() 或重写 armedAtMs，'
+    + '「失败一次就续 15 分钟」就成立，本机窗口会长过服务端那枚授权，'
+    + '页面会照着一句已经不成立的承诺让用户把纸放回去',
+)
+assert.match(
+  workbenchSession,
+  /function endScanLifecycle\(\): void \{\s*\n\s*lifecycleGeneration \+= 1\s*\n\s*rescanAuthority = null\s*\n(?:\s*\/\/[^\n]*\n)*\s*takenRescanAuthority = null/,
+  '代次推进时寄存格必须和槽位一起扔掉：少了这一句，用户离开 / 清场 / 换人之后，'
+    + '一个还在飞的失败响应回来仍然能把上一场的凭证恢复进槽位',
+)
+assert.match(
+  workbenchSession,
+  /export function clearScanRescanAuthority\(\): void \{\s*\n\s*rescanAuthority = null\s*\n(?:\s*\/\/[^\n]*\n)*\s*takenRescanAuthority = null/,
+  '「明确扔掉」这条入口也要清寄存格，否则等于给它留了一扇从失败响应里被恢复回来的后门',
+)
+assert.match(
+  workbenchSession,
+  /export function takeScanRescanAuthority[\s\S]{0,500}?takenRescanAuthority = authority\s*\n\s*if \(!authority\) return null/,
+  '取用时必须把取走的那一份寄存起来（且在早退之前）：不寄存就没有东西可以恢复，'
+    + '一次 429 依旧会把授权永久烧掉',
 )
 assert.doesNotMatch(
   scanSettings,
@@ -991,7 +1134,7 @@ assert.doesNotMatch(
     + '走的是同一屏。把成因写死成其中一种，另一种发生时就是一句假的诊断',
 )
 assert.match(
-  scanSettings,
+  rescanRecovery,
   /本页不会替你改发一次普通重扫/,
   '必须对用户明说不会自动降级 —— 降级本身不危险，但它会把用户支到面板前去扫一张'
     + '注定被去重拒收的纸',

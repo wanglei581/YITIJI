@@ -34,6 +34,33 @@ let lifecycleGeneration = 0
  */
 let rescanAuthority: ScanRescanAuthority | null = null
 
+/**
+ * 上一次被 `takeScanRescanAuthority()` 取走、**还没有证据说明服务端已经消费**的那一份。
+ *
+ * ## 为什么需要这个第二格
+ *
+ * 取用必须排在请求**发出之前**（并发双击、effect 重跑都得撞在空槽位上），但那一刻
+ * 谁都不知道这次创建会不会成。而服务端那一半的消费（`retryConsumedAt` 的 CAS）发生在
+ * `scan-tasks.service.ts` 的 `$transaction` **内部**，限流（12 次/分）与终端态检查更在
+ * 事务之前就抛 —— 也就是说 429 / `SCAN_TERMINAL_BUSY` / 断网 / 5xx 这几条路径上，
+ * 服务端那枚授权**原封不动还在**，只有本机这一份被自己扔了。
+ *
+ * 扔掉的代价不是「少一个便利功能」：授权只在任务 matched 之后才铸，而 matched 同时
+ * 写下 `lastAttemptHash` —— 那正是两小时同字节去重的键。两个条件必然同时成立，所以
+ * 只要曾经有过授权，同一张纸走普通会话就**必定**撞 `SCAN_FILE_PREVIOUSLY_ATTEMPTED`：
+ * Agent 把文件隔离进 `_unclaimed` 且不重试，服务端任务停在 waiting，用户在机器前
+ * 白等到十分钟轮询上限，屏幕上一句解释都没有。
+ *
+ * 所以取走的那一份先落在这里，由调用方按**失败码**二选一：
+ *   · 服务端明确不认（`SCAN_RESCAN_REJECTION_CODES`）→ `discardTakenScanRescanAuthority()`，
+ *     永久丢弃。它已经被消费或本来就不成立，留着只会让下一次白发一个必然 403 的请求；
+ *   · 证明不了服务端消费过 → `restoreScanRescanAuthority()`，**原样**放回。
+ *
+ * 它和 `rescanAuthority` 一样只活在模块内存里，并且由 `endScanLifecycle()` 一并扔掉 ——
+ * 离开、清场、换人、屏保、整页重载都带不走它。
+ */
+let takenRescanAuthority: ScanRescanAuthority | null = null
+
 /** 取当前代次。发出创建请求之前取一份，响应回来时比对。 */
 export function scanLifecycleGeneration(): number {
   return lifecycleGeneration
@@ -49,6 +76,10 @@ export function scanLifecycleGeneration(): number {
 function endScanLifecycle(): void {
   lifecycleGeneration += 1
   rescanAuthority = null
+  // 待决的那一份也必须一起扔。少了这一句，用户离开 / 清场 / 换人之后，
+  // 一个还在飞的失败响应回来时仍然能把上一场的凭证「恢复」进槽位 ——
+  // 授权就这样活过了它那一场，下一位用户会拿到它。
+  takenRescanAuthority = null
 }
 
 /**
@@ -172,6 +203,9 @@ export function hasScanRescanAuthority(scanType: ScanType): boolean {
 export function takeScanRescanAuthority(scanType: ScanType): ScanRescanAuthorization | null {
   const authority = usableRescanAuthority(scanType)
   rescanAuthority = null
+  // 槽位清空是无条件的（并发双击必须撞空），但「取走」≠「用掉」：这一次创建成不成、
+  // 服务端有没有真的消费那枚授权，此刻还不知道。先寄存，由调用方按失败码裁决。
+  takenRescanAuthority = authority
   if (!authority) return null
   return {
     retryOfScanTaskId: authority.priorScanTaskId,
@@ -179,9 +213,64 @@ export function takeScanRescanAuthority(scanType: ScanType): ScanRescanAuthoriza
   }
 }
 
+/**
+ * 把刚取走那一份**原样**放回槽位 —— 用在「证明不了服务端消费过」的失败上
+ * （429、断网、5xx、`SCAN_TERMINAL_BUSY`、终端会话失效……）。
+ *
+ * ## 三条不许放宽
+ *
+ * 1. **不重新计时。** 放回去的是同一个对象，`armedAtMs` 原样带走。绝不能改走
+ *    `armScanRescanAuthority()` —— 那条在任务/代次不匹配时会按 `Date.now()` 重新起算，
+ *    等于「失败一次就续 15 分钟」，本机窗口会长过服务端那枚授权，用户照着一句
+ *    已经不成立的承诺把纸放回去。
+ * 2. **必须和当前代次配对。** 代次一变就说明这一场已经结束（离开、清场、换人、
+ *    安全返回都会推进它），那一刻回来的失败响应不许把上一场的凭证立回来。
+ *    整页重载更不用管：模块内存连 `takenRescanAuthority` 都没了。
+ *
+ *    说清它今天的分量，免得下一个人高估它：**这一行目前是纵深，不是当前生效的那道闸。**
+ *    推进代次的唯一入口 `endScanLifecycle()` 会在同一步把寄存格也清空，所以真正拦下
+ *    「离开之后又被恢复」的是那一句，走到这里时 `pending` 已经是 null。
+ *    2026-09-14 实测：只删这一行，33 条行为用例全绿（红的是 verify:scan-session-truth
+ *    那条形状断言）。留着它，是因为一旦哪天 `endScanLifecycle` 不再清寄存格，
+ *    它就是唯一挡住凭证跨场复活的东西。改动这两处中的任何一处，都要把另一处一起看。
+ * 3. **不覆盖已经有主的槽位。** 槽位非空说明期间发生过一次新的登记（例如用户已经
+ *    回到结果页重新 arm 过），那一份才是当前这一场的，寄存的这一份必须让路。
+ *
+ * 无论结果如何，寄存格都会被清空：恢复是一次性的，同一次失败不会被恢复两遍。
+ *
+ * @returns 放回之后这份授权**此刻是否仍然可用**（同代次、同类型、未过本地有效期）。
+ *   `false` 有两种：没东西可放 / 放回去了但已经过期。两种都不许让页面说「可以重试」——
+ *   过期那一种会在下一次取用时撞上延迟取用闸门，如实落到「凭据已经不在本机」那一屏。
+ */
+export function restoreScanRescanAuthority(scanType: ScanType): boolean {
+  const pending = takenRescanAuthority
+  takenRescanAuthority = null
+  if (!pending) return false
+  if (pending.generation !== lifecycleGeneration) return false
+  if (pending.scanType !== scanType) return false
+  if (rescanAuthority) return false
+  rescanAuthority = pending
+  return usableRescanAuthority(scanType) !== null
+}
+
+/**
+ * 永久丢弃刚取走那一份 —— 用在**服务端明确不认**的失败上（403 已被消费 / 已过期 /
+ * 血缘被占，400 半对凭据）。
+ *
+ * 这条和 `restoreScanRescanAuthority` 是互斥的二选一，判据只有一个：失败码属不属于
+ * `SCAN_RESCAN_REJECTION_CODES`。服务端说不认，本机再留着它只会让用户白发一次
+ * 注定 403 的请求，还会在屏幕上挂着一句「可以再试一次安全重扫」的假承诺。
+ */
+export function discardTakenScanRescanAuthority(): void {
+  takenRescanAuthority = null
+}
+
 /** 明确扔掉授权（成功终态、离开、换人）。不导出给业务页随手调也没关系：它是幂等的。 */
 export function clearScanRescanAuthority(): void {
   rescanAuthority = null
+  // 寄存格一并清掉：这条入口的语义是「这一场不该再有任何授权」，
+  // 留着待决的那一份，等于给它开了一扇从失败响应里被恢复回来的后门。
+  takenRescanAuthority = null
 }
 
 /**

@@ -460,3 +460,213 @@ test('incomplete credentials are refused at arming time', async () => {
   assert.equal(mod.armScanRescanAuthority({ ...PRIOR, priorScanTaskId: '' }), false)
   assert.equal(mod.hasScanRescanAuthority('resume'), false)
 })
+
+/* ══ 取走之后的裁决：这一次失败到底用没用掉那枚授权 ═══════════════════════════
+ *
+ * 取用必须排在请求发出**之前**（并发双击、effect 重跑都得撞空槽位），所以失败回来时
+ * 本机那一份已经不在槽位里了。而服务端那一半的消费（`retryConsumedAt` 的 CAS）在
+ * `scan-tasks.service.ts` 的 `$transaction` **内部**，限流（12 次/分）与终端态检查更在
+ * 事务之前就抛 —— 429 / `SCAN_TERMINAL_BUSY` / 断网 / 5xx 回来时，服务端那枚授权
+ * 原封没动，只有本机把它自己扔了。
+ *
+ * 扔掉不是「少一个便利功能」：授权只在任务 matched 之后才铸，而 matched 同时写下
+ * `lastAttemptHash` —— 那正是两小时同字节去重的键。两个条件必然同时成立，所以只要
+ * 曾经有过授权，同一张纸走普通会话就**必定**撞 `SCAN_FILE_PREVIOUSLY_ATTEMPTED`。
+ *
+ * 下面把那条二选一、以及它绝不许放宽的三个边界逐条跑一遍。
+ */
+
+test('a failure that cannot prove server consumption puts the authority back', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+
+  // 设置页发请求前取走 → 槽位空。
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+
+  // 429 / 断网 / 5xx 回来：服务端那枚没动，本机原样放回。
+  assert.equal(mod.restoreScanRescanAuthority('resume'), true)
+  assert.equal(mod.hasScanRescanAuthority('resume'), true)
+
+  // 再点一次「再试一次安全重扫」，取到的仍是**同一对**凭据 —— 不是无签名的普通创建。
+  assert.deepEqual(mod.takeScanRescanAuthority('resume'), {
+    retryOfScanTaskId: PRIOR.priorScanTaskId,
+    priorControlToken: PRIOR.priorControlToken,
+  })
+})
+
+test('restoring never extends the TTL: it still expires on the original armedAtMs', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  const realNow = Date.now
+  try {
+    mod.armScanRescanAuthority(PRIOR)
+    mod.beginScanRescan({ scanType: 'resume' })
+
+    // 14 分钟后第一次创建失败（限流），凭据放回。
+    Date.now = () => realNow() + mod.SCAN_RESCAN_AUTHORITY_TTL_MS - 60_000
+    assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+    assert.equal(mod.restoreScanRescanAuthority('resume'), true, '还在窗口内，放回后仍可用')
+
+    /* 关键断言：如果恢复走的是 armScanRescanAuthority（按 Date.now 重新起算），
+     * 这一刻窗口会被续到「第 14 分钟 + 15 分钟」，下面这条就会是 true。
+     * 有效期必须始终从上一场铸出来那一刻算起 —— 失败几次都不延长。 */
+    Date.now = () => realNow() + mod.SCAN_RESCAN_AUTHORITY_TTL_MS + 1
+    assert.equal(mod.hasScanRescanAuthority('resume'), false, '恢复不许续期：原 armedAtMs 一到点就作废')
+    assert.equal(mod.takeScanRescanAuthority('resume'), null)
+  } finally {
+    Date.now = realNow
+  }
+})
+
+test('an already-expired authority is put back but reported unusable', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  const realNow = Date.now
+  try {
+    mod.armScanRescanAuthority(PRIOR)
+    mod.beginScanRescan({ scanType: 'resume' })
+    assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+    // 请求在飞的这段时间里本地窗口走完了。放回去不算错，但绝不能报「可以重试」——
+    // 页面据此改说「凭据已经不在本机」，而不是挂一句已经不成立的承诺。
+    Date.now = () => realNow() + mod.SCAN_RESCAN_AUTHORITY_TTL_MS + 1
+    assert.equal(mod.restoreScanRescanAuthority('resume'), false)
+    assert.equal(mod.hasScanRescanAuthority('resume'), false)
+  } finally {
+    Date.now = realNow
+  }
+})
+
+test('an explicit server refusal is never restored', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+  // 403 已被消费 / 已过期 / 血缘被占，或 400 半对凭据：服务端说不认，永久丢弃。
+  mod.discardTakenScanRescanAuthority()
+  assert.equal(mod.restoreScanRescanAuthority('resume'), false, '丢弃之后再想恢复也没有东西可恢复')
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+  assert.equal(mod.takeScanRescanAuthority('resume'), null)
+})
+
+/* 下面两条证明的是**结果**（离开 / 清场之后恢复不回来），不是「代次比对那一行在起作用」：
+ * 推进代次的 endScanLifecycle() 会在同一步清空寄存格，所以实际拦下它们的是那一句，
+ * 走到代次比对时 pending 已经是 null。代次那一行今天是纵深，它的检测器是
+ * verify:scan-session-truth 的形状断言（实测：只删那一行，本文件 33 条全绿、门禁红）。
+ * 不要因为这两条绿了就以为代次比对被行为覆盖了。 */
+test('leaving the flow between the take and the failure kills the restore', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+  // 「安全返回扫描首页」——创建请求还在飞。
+  mod.patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
+
+  assert.equal(mod.restoreScanRescanAuthority('resume'), false, '这一场已经结束，凭证不许复活')
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+})
+
+test('a privacy clear between the take and the failure kills the restore', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+  // 隐私空闲 / 屏保 / 退出 / 换人，全走这一个入口。下一位用户绝不能继承上一位的凭证。
+  mod.clearScanWorkbenchSession()
+
+  assert.equal(mod.restoreScanRescanAuthority('resume'), false)
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+})
+
+test('the restore is one-shot and never resurrects a second time', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+  assert.equal(mod.restoreScanRescanAuthority('resume'), true)
+  /* 同一个已经 settle 的 promise 上，后续每一轮 effect 都会再挂一次 catch，于是
+   * restore 会被连着调用好几遍。**中间没有新的 take**，所以第二遍必须是空操作 ——
+   * 页面正是靠这一点才敢「只在恢复成功时点亮按钮、从不写回 false」。
+   * 如果第二遍还返回 true，就说明寄存格没被取空，一份授权能被恢复两次。 */
+  assert.equal(mod.restoreScanRescanAuthority('resume'), false, '寄存格取完即空')
+  assert.equal(mod.hasScanRescanAuthority('resume'), true, '第一次恢复的成果不受影响')
+})
+
+test('a resolved create consumes the parked authority for good', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+  /* 服务端回了 2xx，说明它真的跑过 handler：事务里的 CAS 已经把那枚授权消费掉。
+   * 设置页在 .then 的第一句就丢弃寄存的那一份，之后谁都恢复不回来。 */
+  mod.discardTakenScanRescanAuthority()
+  assert.equal(mod.restoreScanRescanAuthority('resume'), false)
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+})
+
+test('a restore never overwrites an authority that already has an owner', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+  // 期间用户回到结果页，为**另一场**重新登记过一份。那一份才是当前这一场的。
+  const NEWER = { ...PRIOR, priorScanTaskId: 'scan-prior-002', priorControlToken: 'newer-token' }
+  assert.equal(mod.armScanRescanAuthority(NEWER), true)
+
+  assert.equal(mod.restoreScanRescanAuthority('resume'), false, '槽位已经有主，寄存的那一份必须让路')
+  assert.deepEqual(mod.takeScanRescanAuthority('resume'), {
+    retryOfScanTaskId: NEWER.priorScanTaskId,
+    priorControlToken: NEWER.priorControlToken,
+  })
+})
+
+test('the restore is bound to one scan type', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  assert.notEqual(mod.takeScanRescanAuthority('resume'), null)
+
+  assert.equal(mod.restoreScanRescanAuthority('id'), false, '换了扫描类型就不是同一份材料')
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+  assert.equal(mod.hasScanRescanAuthority('id'), false)
+})
+
+test('a plain create leaves nothing to restore', async () => {
+  installStorage()
+  const mod = await loadSessionModule()
+
+  // 用户从头新开一场（没有 arm 过）。取用返回 null，寄存格里也该是空的 ——
+  // 否则一次普通创建失败也会点亮「再试一次安全重扫」，那是句假话。
+  assert.equal(mod.takeScanRescanAuthority('resume'), null)
+  assert.equal(mod.restoreScanRescanAuthority('resume'), false)
+  assert.equal(mod.hasScanRescanAuthority('resume'), false)
+})
+
+test('the restored token still never reaches any browser storage', async () => {
+  const store = installStorage()
+  const mod = await loadSessionModule()
+  mod.armScanRescanAuthority(PRIOR)
+  mod.beginScanRescan({ scanType: 'resume' })
+  mod.takeScanRescanAuthority('resume')
+  mod.restoreScanRescanAuthority('resume')
+
+  const bytes = JSON.stringify([...store.entries()])
+  assert.equal(bytes.includes(PRIOR.priorControlToken), false, '恢复路径同样不许把明文凭证落盘')
+  assert.equal(bytes.includes(PRIOR.priorScanTaskId), false)
+})

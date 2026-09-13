@@ -356,12 +356,25 @@ function installSameSheetScanServer(page: Page): {
    * 自己取消），所以这条 route 不 fulfill、也不 abort —— 挂住就是它要模拟的状态。
    */
   hangNextCreate: () => void
+  /**
+   * 让下一次创建以一个「证明不了服务端消费过那枚授权」的失败收场。
+   *
+   * 这类失败在真实服务端上全部发生在消费之前：限流（`@Throttle` 12 次/分）与终端态
+   * 检查在 `$transaction` 之前就抛，`SCAN_TERMINAL_BUSY` 是事务里的唯一索引冲突导致
+   * **整个事务回滚**，断网则请求根本没落地。也就是说这一刻服务端那枚授权原封没动，
+   * 只有本机那一份被取走了 —— 它必须能被原样放回。
+   *
+   * `kind: 'offline'` 走 `route.abort()`：浏览器侧是 TypeError，页面据此判
+   * outcomeUnknown（「服务端可能已经收到，结果未知」），和 HTTP 错误不是同一条分支。
+   */
+  failNextCreate: (failure: { kind: 'offline' } | { status: number; code: string; message: string }) => void
 } {
   const creates: CreateAttempt[] = []
   const authorized = new Set<string>()
   const known = new Set<string>()
   let authorityConsumed = false
   let hangNext = false
+  let failNext: { kind: 'offline' } | { status: number; code: string; message: string } | null = null
 
   const json = (route: Route, status: number, body: unknown) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
@@ -381,6 +394,17 @@ function installSameSheetScanServer(page: Page): {
     if (hangNext) {
       hangNext = false
       await new Promise(() => {})
+      return
+    }
+
+    /* 这一支刻意排在任何重扫判定**之前**：真实服务端上这类失败也发生在消费之前，
+     * 所以这里绝不能顺手把 authorityConsumed 立起来 —— 立了就等于在断言
+     * 「服务端已经用掉它」，而那正是这条用例要证伪的前提。 */
+    if (failNext) {
+      const failure = failNext
+      failNext = null
+      if ('kind' in failure) await route.abort('connectionfailed')
+      else await fail(route, failure.status, failure.code, failure.message)
       return
     }
 
@@ -466,6 +490,7 @@ function installSameSheetScanServer(page: Page): {
     creates,
     consumeAuthorityUpfront: () => { authorityConsumed = true },
     hangNextCreate: () => { hangNext = true },
+    failNextCreate: (failure) => { failNext = failure },
   }
 }
 
@@ -1291,6 +1316,177 @@ test('a rescan deferred past its local window sends no unsigned create @scan-saf
   await expect.poll(() => server.creates.length, { timeout: 5_000 }).toBe(1)
   expect(server.creates[0]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[0]!.headers['x-scan-retry-control']).toBeUndefined()
+
+  expect(errors).toEqual([])
+})
+
+/* ══ 一次「证明不了服务端消费过」的失败，不许烧掉那枚一次性授权 ═══════════════
+ *
+ * 取用必须排在请求发出之前（并发双击、effect 重跑都得撞空槽位），所以失败回来时
+ * 本机那一份已经不在槽位里了。而服务端那一半的消费（retryConsumedAt 的 CAS）在
+ * scan-tasks.service.ts 的 $transaction **内部**，限流（12 次/分）与终端态检查更在
+ * 事务之前就抛 —— 429 / SCAN_TERMINAL_BUSY / 断网 / 5xx 回来时，服务端那枚授权
+ * 原封没动，只有本机把它自己扔了。
+ *
+ * 扔掉的代价不是「少一个便利功能」。授权只在任务 matched 之后才铸，而 matched 同时
+ * 写下 lastAttemptHash —— 那正是两小时同字节去重的键。两个条件必然同时成立，所以只要
+ * 曾经有过授权，同一张纸走普通会话就**必定**撞 SCAN_FILE_PREVIOUSLY_ATTEMPTED：
+ * Agent 把文件隔离进 _unclaimed 且不重试，服务端任务停在 waiting，用户在机器前
+ * 白等到十分钟轮询上限，屏幕上一句解释都没有。
+ *
+ * 旧实现在这条路径上是一条死路：结果快照已被 beginScanRescan 抹掉（回不去重新登记）、
+ * 主按钮是 disabled、唯一能按的「安全返回扫描首页」还会推进代次把残留意图也清掉。
+ */
+
+/** 走到「安全重扫的创建失败了」那一屏，并返回这一次用的服务端桩。 */
+async function landOnInterruptedRescan(
+  page: Page,
+  server: ReturnType<typeof installSameSheetScanServer>,
+  failure: { kind: 'offline' } | { status: number; code: string; message: string },
+): Promise<void> {
+  await landOnFailedPriorScan(page)
+  server.failNextCreate(failure)
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+  await page.waitForURL(/\/scan\?stage=settings/)
+}
+
+const INTERRUPTED_CREATES = [
+  {
+    key: 'rate-limited',
+    failure: { status: 429, code: 'RATE_LIMITED', message: '请求过于频繁' } as const,
+    title: '请求过于频繁',
+  },
+  {
+    key: 'terminal-busy',
+    failure: { status: 409, code: 'SCAN_TERMINAL_BUSY', message: '该终端当前有正在进行的扫描' } as const,
+    title: '本机正在扫描中',
+  },
+  {
+    key: 'offline',
+    failure: { kind: 'offline' } as const,
+    title: '无法确认扫描任务状态',
+  },
+] as const
+
+for (const attempt of INTERRUPTED_CREATES) {
+  test(`a ${attempt.key} create keeps the safe rescan and the retry stays paired @scan-safety`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerScanCapabilities(api)
+    const server = installSameSheetScanServer(page)
+
+    await landOnInterruptedRescan(page, server, attempt.failure)
+
+    // ① 如实说明这一次失败了，而且**没有**把它压成「安全重扫授权已失效」——
+    //    服务端根本没说过那句话。
+    await expect(page.getByText(attempt.title, { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('安全重扫授权已失效', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('安全重扫凭据已经不在本机', { exact: true })).toHaveCount(0)
+
+    // ② 不伪造会话。
+    await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
+
+    // ③ 不自动重发：发出去几次由用户按，本页不循环。
+    await page.waitForTimeout(1_200)
+    expect(server.creates).toHaveLength(1)
+
+    /* ④ 凭据还在，而且页面**把这件事说出来**了。只给按钮不给这两句，用户会以为
+     *    同一份材料已经扫不成了，转头去开一场注定被同字节去重拒收的普通会话。 */
+    await expect(page.getByTestId('scan-rescan-still-held')).toBeVisible()
+    await expect(page.getByText(/这次失败没有用掉你的安全重扫凭据/).first()).toBeVisible()
+    await expect(page.getByText(/重试不会延长/).first()).toBeVisible()
+
+    /* ⑤ 主行动是「再试一次安全重扫」，不是降级成普通会话，也不是灰掉的死路。
+     *    这一屏上绝不能出现「重新开始一次扫描」—— 那会把用户往去重拒收上推。 */
+    const retry = page.getByRole('button', { name: '再试一次安全重扫', exact: true })
+    await expect(retry).toBeVisible()
+    await expect(retry).toBeEnabled()
+    await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '未创建扫描任务' })).toHaveCount(0)
+
+    /* ⑥ 这一条是整条用例的结论：第二次创建仍然是**成对**的（body 里的 prior id +
+     *    X-Scan-Retry-Control 头），绝不是一个无签名的普通创建。 */
+    await retry.click()
+    await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+    expect(server.creates).toHaveLength(2)
+    expect(server.creates[1]!.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
+    expect(server.creates[1]!.headers['x-scan-retry-control']).toBe(PRIOR_CONTROL_TOKEN)
+
+    // ⑦ 成功之后这一场的性质要如实标注：服务端确实放行了同一份材料。
+    await expect(page.getByText(/服务端已放行同一份材料再扫一次/).first()).toBeVisible()
+
+    // ⑧ 而且这一次真的能把同一张纸扫回来（桩只对配对创建回 completed）。
+    await page.getByRole('button', { name: '我已操作，开始等待' }).click()
+    await expect(page.getByText('扫描完成', { exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false }).first()).toBeVisible()
+
+    expect(errors).toEqual([])
+  })
+}
+
+test('a server refusal after an interrupted create still only offers a plain restart @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  // 第一次限流（服务端没消费）→ 凭据放回；第二次服务端明确不认（它在别处被用掉了）。
+  await landOnInterruptedRescan(page, server, { status: 429, code: 'RATE_LIMITED', message: '请求过于频繁' })
+  await expect(page.getByTestId('scan-rescan-still-held')).toBeVisible()
+  server.consumeAuthorityUpfront()
+  await page.getByRole('button', { name: '再试一次安全重扫', exact: true }).click()
+
+  // 403 之后必须换口径：授权是真的没了，这一次不许再挂「还能重试」的承诺。
+  await expect(page.getByText('安全重扫授权已失效', { exact: true }).first()).toBeVisible()
+  await expect(page.getByTestId('scan-rescan-still-held')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '再试一次安全重扫' })).toHaveCount(0)
+
+  // 出路只剩显式的普通新会话，且它必须真的发得出去。
+  const restart = page.getByRole('button', { name: '重新开始一次扫描', exact: true })
+  await expect(restart).toBeVisible()
+  await restart.click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(server.creates).toHaveLength(3)
+  expect(server.creates[2]!.body.retryOfScanTaskId).toBeUndefined()
+  expect(server.creates[2]!.headers['x-scan-retry-control']).toBeUndefined()
+  await expect(page.getByText(/你已确认这一次不是安全同字节重扫/).first()).toBeVisible()
+
+  expect(errors).toEqual([])
+})
+
+test('leaving after an interrupted create never resurrects the rescan authority @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrintScanHub(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnInterruptedRescan(page, server, { status: 429, code: 'RATE_LIMITED', message: '请求过于频繁' })
+  await expect(page.getByTestId('scan-rescan-still-held')).toBeVisible()
+
+  // 用户走了。代次推进，寄存格和槽位一起被扔掉 —— 下一位绝不能继承这枚授权。
+  await page.getByRole('button', { name: '安全返回扫描首页', exact: true }).click()
+  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+
+  // 下一位在这台机器上从头选类型开一场：必须是干净的普通创建，一个字节的血缘都不许带。
+  await page.getByRole('button', { name: /下一步/ }).click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(server.creates).toHaveLength(2)
+  expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
+  expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
+  // 也不许把这一场说成安全重扫。
+  await expect(page.getByText(/服务端已放行同一份材料再扫一次/)).toHaveCount(0)
+
+  const residue = await page.evaluate(
+    (token) => JSON.stringify(Object.fromEntries(
+      Array.from({ length: window.sessionStorage.length }, (_, i) => window.sessionStorage.key(i))
+        .filter((key): key is string => key !== null)
+        .map((key) => [key, window.sessionStorage.getItem(key) ?? '']),
+    )).includes(token),
+    PRIOR_CONTROL_TOKEN,
+  )
+  expect(residue).toBe(false)
 
   expect(errors).toEqual([])
 })

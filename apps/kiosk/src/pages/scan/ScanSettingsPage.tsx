@@ -16,6 +16,12 @@ import {
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
 import {
+  classifyCreateFailure,
+  isRescanRefusedByServer,
+  RESCAN_CREDENTIALS_LOST_FAILURE,
+  type SessionFailure,
+} from './scanRescanRecovery'
+import {
   ScanChain,
   ScanCta,
   ScanKvCard,
@@ -30,8 +36,10 @@ import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import {
   beginPlainScanRestart,
+  discardTakenScanRescanAuthority,
   patchScanWorkbenchSession,
   readScanWorkbenchSession,
+  restoreScanRescanAuthority,
   scanLifecycleGeneration,
   scanRescanCredentialsLost,
   takeScanRescanAuthority,
@@ -44,71 +52,8 @@ function isScanType(value: unknown): value is ScanType {
 
 type SessionPhase = 'invalid' | 'loading' | 'success' | 'expired' | 'error'
 
-/**
- * 服务端（或本机成对校验）判「这次安全重扫不作数」的四个码。
- *
- * 前三个来自 scan-tasks.service.ts：授权无效 / 已过期 / 已被消费（403）、
- * 授权正被并发处理或血缘已被占用（409）、只给了凭证没给原任务 id（400）。
- * 第四个来自本机 scanTasks.ts：拿到的是半对凭据，请求根本没发出去。
- * 四个的用户处置完全一样，所以合成一张表，页面不按码分叉。
- */
-const SCAN_RESCAN_REJECTION_CODES = new Set([
-  'SCAN_RETRY_NOT_AUTHORIZED',
-  'SCAN_RETRY_CONFLICT',
-  'SCAN_RETRY_TASK_ID_MISSING',
-  'SCAN_RESCAN_AUTHORITY_INCOMPLETE',
-])
-
-/**
- * 带着「同一份材料」的意图进来，凭据却已经不在内存里 —— 这一屏说的话。
- *
- * **成因不止一个，所以措辞不能只说其中一个。** 已知两条，用户处置完全一样：
- *   · 整页重载（看门狗）：授权刻意只活在内存里，重载就没了，而登记里那笔意图还在；
- *   · 延迟取用：本页在等终端换票（`terminalSession === 'checking'`）的那一会儿，
- *     本地 15 分钟窗口走完，或者别处发生过一次清场，于是真正取用那一刻槽位已空。
- * 早先这里写死「已随本页重载消失」，第二条成因发生时就是一句假的诊断。
- *
- * 三件事必须都说到：为什么不能继续、本页**没有**替他改发普通重扫（否则同一张纸会
- * 撞上两小时的重复件拒收）、以及他现在能按哪一个。
- */
-const RESCAN_CREDENTIALS_LOST_FAILURE = {
-  title: '安全重扫凭据已经不在本机',
-  description: '你刚才选的是「同一份材料」重扫。那份凭据只存在页面内存里（不落存储，'
-    + '换人清场也带不走）：本页重载过、或者它已经超过 15 分钟、或者中间清过场，'
-    + '现在都取不到了，本机无法再向服务端申请放行。'
-    + '本页不会替你改发一次普通重扫 —— 同一张纸走普通会话会被服务端按重复件拒收，'
-    + '你会在机器前白等到会话过期。可以安全返回扫描首页，'
-    + '或者按「重新开始一次扫描」建一个普通会话（那不是安全重扫，建议换一份材料）。',
-} as const
-
-/**
- * 服务端把这次安全重扫判为不作数（403 / 409 / 400）之后，这一屏说的话。
- *
- * 和上面那条的区别只在**是谁判的**：上面是本机取不到凭据，这条是凭据发出去了、
- * 服务端不认。用户处置一样，所以两条都必须给出同一个显式出路
- * （「重新开始一次扫描」），并且都必须把代价说清楚。
- *
- * 早先这条只说「请返回扫描首页重新开始一次扫描」，屏幕上却没有任何叫这个名字的按钮 ——
- * 唯一能按的是「安全返回扫描首页」，用户得自己走回选类型那一屏再来一遍。而这一屏
- * 最常见的来源恰恰是「上一场根本没走到取件」（服务端那种情况从不铸授权，必然 403），
- * 于是最常见的失败路径上，主行动是一个注定失败的按钮。
- */
-const RESCAN_REFUSED_FAILURE = {
-  title: '安全重扫授权已失效',
-  description: '服务端不认这次的安全重扫凭据（过期、已被用掉，或者上一场根本没走到取件'
-    + '——那种情况服务端不会铸授权）。本页不会自动改用普通重扫。'
-    + '你可以按「重新开始一次扫描」建一个普通会话：那不是同字节重扫，'
-    + '如果放回去的还是同一张纸，服务端可能按重复件拒收（两小时内），'
-    + '建议换一份材料或找工作人员；也可以安全返回扫描首页。',
-} as const
-
 interface LocationState {
   scanType?: unknown
-}
-
-interface SessionFailure {
-  title: string
-  description: string
 }
 
 function getCancellationCredentials(created: unknown): { scanTaskId: string; controlToken: string } | null {
@@ -211,6 +156,16 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
    * 说假话；各自留一个，CTA 那里取并集。
    */
   const [rescanRefusedByServer, setRescanRefusedByServer] = useState(false)
+  /**
+   * 创建失败了，但失败码**证明不了服务端已经消费**那枚授权（429 / 断网 / 5xx /
+   * `SCAN_TERMINAL_BUSY` / 终端票失效）。凭据已被原样放回，所以出路不是
+   * 「重新开始一次扫描」，而是再发一次同样成对的请求。
+   *
+   * 和另外两位分得很清楚：那两位是「安全重扫这条路走不通了」，只能显式开普通会话；
+   * 这一位是「路还通着，只是这一次没发出去」—— 降级反而会让同一张纸撞上两小时的
+   * 同字节去重。所以 CTA 里它排在最前面。
+   */
+  const [rescanRetryable, setRescanRetryable] = useState(false)
   // POST /scan/sessions 挂着 TerminalIdentityGuard（scan-tasks.controller.ts）：
   // 没有终端会话令牌就是 401。和打印确认页同一口径 —— 订阅状态，不猜、不抢跑。
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
@@ -378,6 +333,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
 
     sessionPromiseRef.current
       .then((created) => {
+        // 2xx = 服务端真的跑过 handler，事务里的 CAS 已经消费掉那枚授权。所以无论这份
+        // 响应本身可不可用（字段缺失、页面已离开都算），寄存的那一份都必须永久丢弃。
+        discardTakenScanRescanAuthority()
         const cancellationCredentials = getCancellationCredentials(created)
         if (cancellationCredentials) {
           createdIdRef.current = cancellationCredentials.scanTaskId
@@ -448,57 +406,40 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         })
       })
       .catch((error: unknown) => {
-        if (cancelled) return
         const code = errorCodeOf(error)
-        const outcomeUnknown = error instanceof ApiHttpError && (error.code === 'NETWORK_ERROR' || error.status === 0)
-        if (outcomeUnknown) {
-          setFailure({
-            title: '无法确认扫描任务状态',
-            description: '网络连接中断，无法确认服务端是否收到请求。为避免重复创建，本页不会自动重发。请检查网络后返回重试。',
-          })
-        } else if (SCAN_RESCAN_REJECTION_CODES.has(code ?? '')) {
-          /* 安全重扫被服务端拒了（过期 / 已被用掉 / 血缘被占 / 上一场根本没走到取件）。
-           *
-           * 这里**不自动改发一次普通创建**。普通创建本身不危险，但它会把用户支到面板前
-           * 去扫同一张纸，而那份字节可能落在服务端的 2 小时去重窗口里 —— 文件投回来会被拒，
-           * 任务停在 waiting 直到过期，用户在这台机器前白等十分钟，且全程没有任何提示。
-           * 静默降级正是这条防线要挡的东西。
-           *
-           * 但「不自动降级」不等于「不给出路」。这一屏最常见的来源是**上一场根本没走到
-           * 取件**（服务端那种情况从不铸授权，必然 403），把它做成一个只能原路退回的
-           * 死胡同，等于让最常见的失败路径上主行动注定失败。所以：出路给出来，
-           * 代价写清楚，按不按由用户决定 —— 这和「本页替他按」是两件事。 */
-          setRescanRefusedByServer(true)
-          setFailure({
-            title: RESCAN_REFUSED_FAILURE.title,
-            description: userMessageOf(error, RESCAN_REFUSED_FAILURE.description),
-          })
-        } else if (code === 'SCAN_TERMINAL_BUSY') {
-          setFailure({
-            title: '本机正在扫描中',
-            description: userMessageOf(error, '请等待当前扫描任务完成后再试。'),
-          })
-        } else if (code === 'SCAN_TERMINAL_DISABLED') {
-          setFailure({
-            title: '扫描功能已停用',
-            description: userMessageOf(error, '请联系现场工作人员。'),
-          })
-        } else if (code === 'TERMINAL_SESSION_INVALID') {
-          setFailure({
-            title: '终端安全校验失败',
-            description: userMessageOf(error, '终端安全校验失败，请联系现场工作人员'),
-          })
-        } else if (code === 'RATE_LIMITED' || (error instanceof ApiHttpError && error.status === 429)) {
-          setFailure({
-            title: '请求过于频繁',
-            description: userMessageOf(error, '请稍后再试。'),
-          })
+
+        /* 那枚一次性授权的裁决（为什么失败之后它多半还活着，见 scanWorkbenchSession
+         * 的 takenRescanAuthority）。二选一，判据只有失败码：服务端明确不认 → 永久丢弃；
+         * 其余一律原样放回。
+         *
+         * 必须排在 `if (cancelled) return` **之前**：cancelled 只表示本轮 effect 过时
+         * （终端会话 checking/ready 切一次就置位），和授权归谁无关。排在后面的话，
+         * 正好在换票窗口里失败的那一次会两头落空 —— 既没恢复也没丢弃。 */
+        const serverRefusedRescan = isRescanRefusedByServer(code)
+        const createGeneration = createGenerationRef.current
+        const rescanCarriesOver = !serverRefusedRescan
+          && createGeneration !== null
+          && scanLifecycleGeneration() === createGeneration
+          && !unmountedRef.current
+        // 代次没变但页面已经卸载时也走丢弃：没有人会再用它，而它握着上一场的
+        // controlToken 明文，留在模块内存里只是多一份可被下一位继承的残留。
+        let rescanStillUsable = false
+        if (rescanCarriesOver) {
+          rescanStillUsable = restoreScanRescanAuthority(scanType)
         } else {
-          setFailure({
-            title: '扫描任务未创建',
-            description: userMessageOf(error, '服务端未能创建扫描会话。请返回重试，或联系现场工作人员。'),
-          })
+          discardTakenScanRescanAuthority()
         }
+        // 只在真的恢复成功时立起这一位，**从不**在这里把它写回 false。
+        // 本 promise 已经 settle，后续每一轮 effect 都会再挂一次 catch；那时寄存格已空、
+        // 恢复必然返回 false，若照写就会把上一轮刚立起来的按钮当场按灭。
+        if (rescanStillUsable) setRescanRetryable(true)
+
+        if (cancelled) return
+        // 结论文案按失败码翻译，纯函数、不碰状态（scanRescanRecovery）。
+        // 「服务端不认」那一支的授权已在上面丢弃，这里只负责把出路切成普通新会话。
+        const verdict = classifyCreateFailure(error)
+        if (verdict.refusedRescan) setRescanRefusedByServer(true)
+        setFailure(verdict.failure)
         setPhase('error')
       })
 
@@ -516,8 +457,12 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     // `rescanRefusedByServer` 必须在这里，而且这一条容易被判成冗余：服务端拒绝时
     // `rescanCredentialsLost` 从头到尾都是 false，复位它不构成依赖变化，effect 不会重跑，
     // 「重新开始一次扫描」按下去就毫无反应。true→false 的那一位只有它。
+    //
+    // `rescanRetryable` 同理，是「再试一次安全重扫」那颗按钮的复跑开关：handleRescanRetry
+    // 把它由 true 打回 false，effect 因此重跑，并在 sessionPromiseRef 已被置空的前提下
+    // 重新取一次授权（那正是刚被原样放回去的同一份）→ 发出去的仍然是成对的重扫请求。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer])
+  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable])
 
   useEffect(() => {
     if (!expiresAt) return
@@ -582,7 +527,27 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     sessionPromiseRef.current = null
     setRescanCredentialsLost(false)
     setRescanRefusedByServer(false)
+    // 用户选的是普通会话：那颗「再试一次安全重扫」必须一起下台，
+    // 否则这一屏会同时挂着两个互相矛盾的主行动。
+    setRescanRetryable(false)
     setPlainRestartChosen(true)
+    setFailure(null)
+    setPhase('loading')
+  }
+
+  /**
+   * 「再试一次安全重扫」——把刚被原样放回的那枚授权再发一次，**仍然成对**，不降级。
+   *
+   * 置空 sessionPromiseRef 与「复位标志让 effect 重跑」两件事的理由同 handlePlainRestart。
+   * 差别只在两处，而它们正是这条存在的全部意义：
+   *   · `rescanIntentRef` 保持 true —— 这仍然是一次「同一份材料」，万一取用时授权已经
+   *     过期，延迟取用闸门必须照旧 fail-closed，而不是放一个无签名的普通创建出去；
+   *   · 不碰 armedAtMs —— 有效期始终从上一场铸出来那一刻算起，点几次都不会延长。
+   */
+  const handleRescanRetry = () => {
+    if (!scanType) return
+    sessionPromiseRef.current = null
+    setRescanRetryable(false)
     setFailure(null)
     setPhase('loading')
   }
@@ -648,11 +613,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
               安全返回扫描首页
             </button>
-            {/* 两种「安全重扫走不下去」的屏各有一个能按的主行动：本机取不到凭据
-                （重载 / 过期 / 清过场），以及服务端不认。它们是普通新会话，代价已经在
-                正文里说清，按不按由用户决定 —— 这和「本页替他按」是两件事。
-                其余失败态仍然什么都不许按：本页不会自动重发，也不会自己变成成功。 */}
-            {rescanCredentialsLost || rescanRefusedByServer ? (
+            {/* 三条分支，按「安全重扫这条路还通不通」排序，顺序不能反：还通的排最前
+                （再发一次成对的重扫，不是降级）—— 排在后面的话，一次限流就会把用户推去
+                开普通会话，同一张纸再撞上两小时的同字节去重。其次是两条 fail-closed 的
+                显式普通重启；最后是与重扫无关的失败：什么都不许按。 */}
+            {rescanRetryable ? (
+              <button type="button" className="qx-btn" data-variant="primary" onClick={handleRescanRetry}>
+                再试一次安全重扫
+              </button>
+            ) : rescanCredentialsLost || rescanRefusedByServer ? (
               <button type="button" className="qx-btn" data-variant="primary" onClick={handlePlainRestart}>
                 重新开始一次扫描
               </button>
@@ -688,6 +657,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         >
           <p>{description}</p>
           {phase === 'loading' ? <p>这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
+          {/* 必须把「凭据还在」和「有效期不会因为重试而延长」都说出来：只给按钮不给这
+              两句，用户会以为同一份材料已经扫不成了，转头去开一场注定被去重拒收的会话。 */}
+          {rescanRetryable ? (
+            <p data-testid="scan-rescan-still-held">
+              <b>这次失败没有用掉你的安全重扫凭据</b> —— 本机把它原样留着，
+              有效期照旧从上一场算起（<b>重试不会延长</b>）。按「再试一次安全重扫」发出去的
+              仍然是同一份材料的授权；本页<b>不会</b>替你改发普通重扫。
+            </p>
+          ) : null}
         </ScanStatusPanel>
         {phase === 'loading' ? (
           <div className="sw-grid2">
@@ -706,8 +684,12 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         ) : (
           <div className="sw-grid2">
             <ScanNoteCard title="接下来怎么办" foot="本页不会自动重发，也不会自己变成成功。">
+              {/* 指路跟着 ctabar 的分支走：写死「返回扫描首页」时，拿着凭据的那一屏上
+                  最该按的那颗按钮反而没人提。 */}
               <ScanPlan items={[
-                '返回扫描首页，从选择类型重新走一遍。',
+                rescanRetryable
+                  ? '点右下角「再试一次安全重扫」：同一份材料的授权还在手上。'
+                  : '返回扫描首页，从选择类型重新走一遍。',
                 '连续失败就别在面板上扫了，扫了也没有会话认领。',
                 '叫工作人员看一眼这台机器到服务端的网络。',
               ]} />
