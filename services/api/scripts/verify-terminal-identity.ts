@@ -28,6 +28,42 @@ async function expectCode(label: string, expected: string, action: () => Promise
   fail(`${label}: unexpectedly succeeded`)
 }
 
+function routeDecoratorBlock(source: string, decorator: string): string {
+  const match = new RegExp(`${decorator}([\\s\\S]*?)(?=\\n\\s*@(?:Get|Post|Put|Patch|Delete)\\(|$)`).exec(source)
+  return match?.[0] ?? ''
+}
+
+function pickupGuards(source: string): { claim: boolean; release: boolean; takeaway: boolean } {
+  const hit = (decorator: string) => routeDecoratorBlock(source, decorator).includes('@UseGuards(TerminalIdentityGuard)')
+  return {
+    claim: hit("@Post\\('claim-pickup'\\)"),
+    release: hit("@Post\\(':orderId/release'\\)"),
+    takeaway: hit("@Post\\(':taskId/takeaway-url'\\)"),
+  }
+}
+
+function assertPickupGuardMetadata(source: string, label: string): void {
+  const found = pickupGuards(source)
+  if (!found.claim || !found.release) {
+    fail(`${label}: claim-pickup and :orderId/release must carry TerminalIdentityGuard (claim=${found.claim} release=${found.release})`)
+  }
+  if (found.takeaway) fail(`${label}: takeaway-url must NOT carry TerminalIdentityGuard`)
+}
+
+function expectPickupGuardMutationFails(source: string, label: string, expectedSubstring: string): void {
+  try {
+    assertPickupGuardMetadata(source, label)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!message.includes(expectedSubstring)) {
+      fail(`${label}: failed for unexpected reason: ${message}`)
+    }
+    pass(label)
+    return
+  }
+  fail(`${label}: expected guard-metadata check to fail`)
+}
+
 async function main(): Promise<void> {
   console.log('\n=== terminal identity dynamic verification ===')
   const data = new Map<string, string>()
@@ -70,6 +106,8 @@ async function main(): Promise<void> {
   })
   for (const endpoint of [
     'POST /print/jobs',
+    'POST /print/jobs/claim-pickup',
+    'POST /print/jobs/:orderId/release',
     'GET /terminals/:id/config',
     'POST /terminals/:id/toolbox-events',
   ]) {
@@ -81,6 +119,61 @@ async function main(): Promise<void> {
     fail('guard must allow a body.terminalId equal to the verified header')
   }
   pass('guard allows body.terminalId equal to the verified header')
+
+  const pickupCalls = { claim: 0, release: 0 }
+  const pickupService = {
+    claim: () => { pickupCalls.claim += 1 },
+    release: () => { pickupCalls.release += 1 },
+  }
+  async function invokePickup(
+    action: 'claim' | 'release',
+    ctx: ReturnType<typeof context>,
+  ): Promise<void> {
+    await guard.canActivate(ctx as never)
+    pickupService[action]()
+  }
+  function assertZeroPickupCalls(label: string): void {
+    if (pickupCalls.claim !== 0 || pickupCalls.release !== 0) {
+      fail(`${label}: service was called (claim=${pickupCalls.claim} release=${pickupCalls.release})`)
+    }
+  }
+
+  for (const action of ['claim', 'release'] as const) {
+    const route = action === 'claim' ? 'claim-pickup' : 'release'
+    pickupCalls.claim = 0
+    pickupCalls.release = 0
+    await expectCode(
+      `${route} missing terminal session rejects before service call`,
+      'TERMINAL_SESSION_INVALID',
+      () => invokePickup(action, context('term_identity_a', undefined)),
+    )
+    assertZeroPickupCalls(`${route} missing session`)
+    await expectCode(
+      `${route} invalid terminal session rejects before service call`,
+      'TERMINAL_SESSION_INVALID',
+      () => invokePickup(action, context('term_identity_a', 'not-a-session-token')),
+    )
+    assertZeroPickupCalls(`${route} invalid session`)
+    await expectCode(
+      `${route} header/session terminal mismatch rejects before service call`,
+      'TERMINAL_SESSION_INVALID',
+      () => invokePickup(action, context('term_identity_b', session.sessionToken)),
+    )
+    assertZeroPickupCalls(`${route} header mismatch`)
+    await expectCode(
+      `${route} body.terminalId mismatch rejects before service call`,
+      'TERMINAL_SESSION_INVALID',
+      () => invokePickup(action, context('term_identity_a', session.sessionToken, undefined, 'term_identity_b')),
+    )
+    assertZeroPickupCalls(`${route} body mismatch`)
+    await invokePickup(action, context('term_identity_a', session.sessionToken))
+    if (pickupCalls[action] !== 1) {
+      fail(`${route}: verified terminal must reach the service exactly once, got ${pickupCalls[action]}`)
+    }
+    const other = action === 'claim' ? 'release' : 'claim'
+    if (pickupCalls[other] !== 0) fail(`${route}: leaked a ${other} service call`)
+    pass(`${route} verified session reaches service; missing/invalid/mismatch never do`)
+  }
 
   data.delete(sessions.sessionKey(session.sessionToken))
   await expectCode('expired or deleted session is 401', 'TERMINAL_SESSION_INVALID', () => sessions.validate('term_identity_a', session.sessionToken))
@@ -104,11 +197,33 @@ async function main(): Promise<void> {
   const printController = readFileSync(path.join(root, 'src/print-jobs/print-jobs.controller.ts'), 'utf8')
   const terminalsController = readFileSync(path.join(root, 'src/terminals/terminals.controller.ts'), 'utf8')
   const terminalSessionService = readFileSync(path.join(root, 'src/terminals/terminal-session.service.ts'), 'utf8')
-  const protectedRoute = (source: string, decorator: string) => new RegExp(`${decorator}[\\s\\S]{0,240}@UseGuards\\(TerminalIdentityGuard\\)`).test(source)
-  if (!protectedRoute(printController, '@Post\\(\\)') || !protectedRoute(terminalsController, "@Get\\('terminals/:terminalId/config'\\)") || !protectedRoute(terminalsController, "@Post\\('terminals/:terminalId/toolbox-events'\\)")) {
-    fail('all three protected endpoints must carry TerminalIdentityGuard')
+  const protectedRoute = (source: string, decorator: string) =>
+    routeDecoratorBlock(source, decorator).includes('@UseGuards(TerminalIdentityGuard)')
+  if (!protectedRoute(printController, '@Post\\(\\)')
+    || !protectedRoute(printController, "@Post\\('claim-pickup'\\)")
+    || !protectedRoute(printController, "@Post\\(':orderId/release'\\)")
+    || !protectedRoute(terminalsController, "@Get\\('terminals/:terminalId/config'\\)")
+    || !protectedRoute(terminalsController, "@Post\\('terminals/:terminalId/toolbox-events'\\)")) {
+    fail('all five protected endpoints must carry TerminalIdentityGuard')
   }
-  pass('three protected endpoints carry TerminalIdentityGuard')
+  pass('five protected endpoints carry TerminalIdentityGuard')
+  assertPickupGuardMetadata(printController, 'production print controller')
+  pass('claim-pickup and release carry TerminalIdentityGuard; takeaway-url does not')
+  expectPickupGuardMutationFails(
+    printController.replace(/@Post\('claim-pickup'\)[\s\S]*?@UseGuards\(TerminalIdentityGuard\)/, "@Post('claim-pickup')"),
+    'mutation: dropping TerminalIdentityGuard on claim-pickup is caught',
+    'claim-pickup and :orderId/release must carry TerminalIdentityGuard',
+  )
+  expectPickupGuardMutationFails(
+    printController.replace(/@Post\(':orderId\/release'\)[\s\S]*?@UseGuards\(TerminalIdentityGuard\)/, "@Post(':orderId/release')"),
+    'mutation: dropping TerminalIdentityGuard on :orderId/release is caught',
+    'claim-pickup and :orderId/release must carry TerminalIdentityGuard',
+  )
+  expectPickupGuardMutationFails(
+    printController.replace(/@Post\(':taskId\/takeaway-url'\)/, "@Post(':taskId/takeaway-url')\n  @UseGuards(TerminalIdentityGuard)"),
+    'mutation: adding TerminalIdentityGuard on takeaway-url is caught',
+    'takeaway-url must NOT carry TerminalIdentityGuard',
+  )
   const guardSource = readFileSync(path.join(root, 'src/terminals/terminal-identity.guard.ts'), 'utf8')
   if (!/typeof bodyTerminalId === 'string' && bodyTerminalId !== terminalId/.test(guardSource)) {
     fail('TerminalIdentityGuard must reject a request body terminalId that differs from the verified x-terminal-id (cross-terminal print job injection)')
