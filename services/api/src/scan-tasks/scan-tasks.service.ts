@@ -390,8 +390,10 @@ export class ScanTasksService {
         error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
       })
     }
-    // 同 getStatus()：controlToken 校验叠加在 endUserId 校验之上，会员+游客一视同仁；
-    // 历史行（controlTokenHash 为 null）一律拒绝。
+    // controlToken 仍是硬门槛（会员+游客一视同仁；历史行 controlTokenHash 为 null 一律拒绝）。
+    // 登出/会话失效后 optional endUserId 会变成 null：此时只要 token 正确，仍必须允许取消
+    // waiting/matched 会员任务，否则 B1-2 活跃唯一约束会把同终端下一场扫描永久挡住。
+    // 非空且错配的调用方身份（另一个仍登录的会员）继续 403。getStatus 的归属校验不走这条放宽。
     if (
       !task.controlTokenHash ||
       !controlToken ||
@@ -401,7 +403,7 @@ export class ScanTasksService {
         error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' },
       })
     }
-    if (task.endUserId && task.endUserId !== endUserId) {
+    if (endUserId !== null && task.endUserId && task.endUserId !== endUserId) {
       throw new ForbiddenException({
         error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' },
       })

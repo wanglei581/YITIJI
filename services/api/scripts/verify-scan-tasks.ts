@@ -218,14 +218,20 @@ class FakePrisma {
     // 这里刻意不提供 update() 方法——如果服务代码回退到无条件 update，测试会直接因方法不存在而报错，
     // 而不是悄悄通过。
     //
-    // 支持两种调用形态：
+    // 支持三种调用形态：
     //   1) 服务层的单行 CAS：{ where: { id, status } }（status 命中才更新，返回 count 0|1）
     //   2) B1-5 reaper 的批量收敛：{ where: { status, updatedAt: { lt } } }（无 id，可能命中多行）
+    //   3) waiting 过期 reaper：{ where: { status, expiresAt: { lte } } }（无 id，可能命中多行）
     updateMany: async ({
       where,
       data,
     }: {
-      where: { id?: string; status?: StatusMatcher; updatedAt?: { lt: Date } }
+      where: {
+        id?: string
+        status?: StatusMatcher
+        updatedAt?: { lt: Date }
+        expiresAt?: { lte: Date }
+      }
       data: Partial<StoredScanTask>
     }) => {
       const matches = Array.from(this.scanTasksById.values()).filter((t) => {
@@ -234,6 +240,11 @@ class FakePrisma {
         if (
           where.updatedAt?.lt !== undefined &&
           !(t.updatedAt.getTime() < where.updatedAt.lt.getTime())
+        )
+          return false
+        if (
+          where.expiresAt?.lte !== undefined &&
+          !(t.expiresAt.getTime() <= where.expiresAt.lte.getTime())
         )
           return false
         return true
@@ -840,6 +851,111 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
 }
 
 /**
+ * waiting 过期 reaper 必须用条件更新把 expiresAt<=now 的 waiting 行收敛为 expired，
+ * 从而释放 B1-2 partial unique index，让同终端可以再 create()。getStatus() 的惰性过期
+ * 在无人查询时不会落盘，所以这条路径不能只靠读接口。
+ */
+async function assertRealDbWaitingExpiryReaperUnblocksTerminal(dbUrl: string): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  const terminalWaitingId = `realdb_wait_reap_w_${randomBytes(4).toString('hex')}`
+  const terminalMatchedId = `realdb_wait_reap_m_${randomBytes(4).toString('hex')}`
+  try {
+    for (const [id, suffix] of [
+      [terminalWaitingId, 'W'],
+      [terminalMatchedId, 'M'],
+    ] as const) {
+      await client.terminal.create({
+        data: {
+          id,
+          terminalCode: `RDB-WR-${suffix}-${randomBytes(3).toString('hex')}`,
+          agentToken: randomBytes(16).toString('hex'),
+          deviceFingerprint: 'verify-scan-tasks-realdb-waiting-reaper-fixture',
+          enabled: true,
+        },
+      })
+    }
+
+    const service = new ScanTasksService(client as never, {} as never, passthroughCapabilities)
+    const reaper = new ScanTaskReaperTask(client as never)
+
+    const expiredWaiting = await service.create(
+      { scanType: 'document', terminalId: terminalWaitingId },
+      null
+    )
+    await client.scanTask.updateMany({
+      where: { id: expiredWaiting.scanTaskId },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    })
+
+    const matchedPastExpiry = await client.scanTask.create({
+      data: {
+        terminalId: terminalMatchedId,
+        scanType: 'document',
+        status: 'matched',
+        expiresAt: new Date(Date.now() - 1000),
+      },
+      select: { id: true, updatedAt: true },
+    })
+
+    let blocked: unknown
+    try {
+      await service.create({ scanType: 'document', terminalId: terminalWaitingId }, null)
+    } catch (error) {
+      blocked = error
+    }
+    assert.ok(
+      blocked instanceof ConflictException,
+      `real DB: an expired-but-still-waiting row must keep the partial unique index closed before the waiting reaper runs, got ${(blocked as Error)?.constructor?.name}`
+    )
+    assert.equal(
+      ((blocked as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_TERMINAL_BUSY',
+      'real DB: same-terminal create before waiting reap must map to SCAN_TERMINAL_BUSY'
+    )
+
+    const reaped = await reaper.reapExpiredWaiting()
+    assert.ok(
+      reaped.count >= 1,
+      `real DB: waiting reaper must converge at least the expired waiting row, got ${reaped.count}`
+    )
+
+    const waitingAfter = await client.scanTask.findUnique({
+      where: { id: expiredWaiting.scanTaskId },
+    })
+    assert.equal(
+      waitingAfter?.status,
+      'expired',
+      'real DB: expired waiting row must be conditionally updated to expired'
+    )
+
+    const matchedAfter = await client.scanTask.findUnique({
+      where: { id: matchedPastExpiry.id },
+    })
+    assert.equal(
+      matchedAfter?.status,
+      'matched',
+      'real DB: waiting reaper must not rewrite a matched row even when expiresAt is in the past'
+    )
+
+    const second = await service.create({ scanType: 'document', terminalId: terminalWaitingId }, null)
+    assert.ok(
+      second.scanTaskId,
+      'real DB: same terminal must be able to create again after waiting expiry was reaped'
+    )
+    assert.notEqual(second.scanTaskId, expiredWaiting.scanTaskId)
+  } finally {
+    await client.scanTask.deleteMany({
+      where: { terminalId: { in: [terminalWaitingId, terminalMatchedId] } },
+    })
+    await client.terminal.deleteMany({
+      where: { id: { in: [terminalWaitingId, terminalMatchedId] } },
+    })
+    await client.$disconnect()
+  }
+}
+
+/**
  * B1-11 follow-up（code review Important）：SCAN_CONTENT_DEDUP_WINDOW_MS（本包，
  * scan-tasks.service.ts）与 DELIVERY_RETRY_MAX_MS（apps/terminal-agent，
  * scan-watcher.ts）是两个独立部署包里各自声明的字面量常量，语义上必须相等——见
@@ -1122,6 +1238,7 @@ async function main(): Promise<void> {
       runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
 
       await assertRealDbPartialUniqueIndex(dbUrl, 'sqlite')
+      await assertRealDbWaitingExpiryReaperUnblocksTerminal(dbUrl)
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }
@@ -1372,6 +1489,100 @@ async function main(): Promise<void> {
     )
     const cancelled = await service.cancel(created.scanTaskId, 'member_1', created.controlToken)
     assert.equal(cancelled.status, 'cancelled')
+  }
+
+  {
+    // 登出/会话失效后 optional endUserId 为 null：正确 controlToken 必须仍能取消
+    // waiting/matched 会员任务。getStatus 的会员归属校验不得一并放宽。
+    for (const liveStatus of ['waiting', 'matched'] as const) {
+      const { service, prisma } = makeService()
+      const created = await service.create(dto, 'member_logout')
+      if (liveStatus === 'matched') {
+        const task = prisma.scanTasksById.get(created.scanTaskId)!
+        prisma.scanTasksById.set(created.scanTaskId, { ...task, status: 'matched' })
+      }
+
+      await expectRejects(
+        () => service.getStatus(created.scanTaskId, null, created.controlToken),
+        ForbiddenException,
+        `anonymous getStatus must still be forbidden for a member ${liveStatus} task`
+      )
+      assert.equal(
+        prisma.scanTasksById.get(created.scanTaskId)?.status,
+        liveStatus,
+        `rejected anonymous status read must not mutate a member ${liveStatus} task`
+      )
+      assert.equal(
+        prisma.scanTasksById.get(created.scanTaskId)?.endUserId,
+        'member_logout',
+        'rejected anonymous status read must not clear stored ownership'
+      )
+
+      const cancelled = await service.cancel(created.scanTaskId, null, created.controlToken)
+      assert.equal(cancelled.status, 'cancelled')
+      const stored = prisma.scanTasksById.get(created.scanTaskId)!
+      assert.equal(stored.status, 'cancelled', `member ${liveStatus} task must cancel with a valid token after logout`)
+      assert.equal(
+        stored.endUserId,
+        'member_logout',
+        'token-authenticated anonymous cancel must not clear stored ownership'
+      )
+
+      await expectRejects(
+        () => service.getStatus(created.scanTaskId, null, created.controlToken),
+        ForbiddenException,
+        'anonymous getStatus must remain forbidden after token-authenticated cancel'
+      )
+      const ownerStatus = await service.getStatus(
+        created.scanTaskId,
+        'member_logout',
+        created.controlToken
+      )
+      assert.equal(ownerStatus.status, 'cancelled')
+    }
+  }
+
+  {
+    // 错/缺 controlToken 在 endUserId 为 null 时仍 403，不得取消会员任务，状态与读归属都不变。
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, 'member_logout')
+    const wrongToken = randomBytes(24).toString('hex')
+    assert.notEqual(
+      wrongToken,
+      created.controlToken,
+      'sanity: fixture must generate a genuinely different token'
+    )
+
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, null, wrongToken),
+      ForbiddenException,
+      'wrong controlToken must not cancel a member task after logout'
+    )
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, null, undefined),
+      ForbiddenException,
+      'missing controlToken must not cancel a member task after logout'
+    )
+
+    const stored = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.equal(stored.status, 'waiting', 'rejected anonymous cancel must leave status unchanged')
+    assert.equal(
+      stored.endUserId,
+      'member_logout',
+      'rejected anonymous cancel must leave stored ownership unchanged'
+    )
+
+    await expectRejects(
+      () => service.getStatus(created.scanTaskId, null, created.controlToken),
+      ForbiddenException,
+      'read ownership must stay closed to anonymous callers after a rejected cancel'
+    )
+    const ownerStatus = await service.getStatus(
+      created.scanTaskId,
+      'member_logout',
+      created.controlToken
+    )
+    assert.equal(ownerStatus.status, 'waiting')
   }
 
   {
@@ -1977,6 +2188,128 @@ async function main(): Promise<void> {
     )
     assert.equal(staleAAfter.errorCode, 'SCAN_MATCHED_TIMEOUT')
     assert.equal(staleBAfter.errorCode, 'SCAN_MATCHED_TIMEOUT')
+  }
+
+  {
+    // waiting 过期 reaper：只把 expiresAt<=now 的 waiting 条件更新为 expired；
+    // 未到期 waiting、以及 matched/completed/cancelled/failed（即使 expiresAt 已过）都不得改写。
+    // 跑完 waiting reaper 后，matched stale reaper 仍必须能独立收敛卡死的 matched 行。
+    const { service, prisma } = makeService()
+    const reaper = new ScanTaskReaperTask(prisma as never)
+    const past = new Date(Date.now() - 1000)
+    const future = new Date(Date.now() + 60_000)
+
+    const expiredWaiting = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    prisma.scanTasksById.set(expiredWaiting.scanTaskId, {
+      ...prisma.scanTasksById.get(expiredWaiting.scanTaskId)!,
+      expiresAt: past,
+    })
+
+    const futureWaiting = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
+    prisma.scanTasksById.set(futureWaiting.scanTaskId, {
+      ...prisma.scanTasksById.get(futureWaiting.scanTaskId)!,
+      expiresAt: future,
+    })
+
+    const seed = async (
+      status: 'matched' | 'completed' | 'cancelled' | 'failed',
+      extra?: Partial<StoredScanTask>
+    ): Promise<string> => {
+      const created = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+      prisma.scanTasksById.set(created.scanTaskId, {
+        ...prisma.scanTasksById.get(created.scanTaskId)!,
+        status,
+        expiresAt: past,
+        ...extra,
+      })
+      return created.scanTaskId
+    }
+
+    const matchedPastExpiryId = await seed('matched')
+    const completedPastExpiryId = await seed('completed')
+    const cancelledPastExpiryId = await seed('cancelled')
+    const failedPastExpiryId = await seed('failed')
+    const staleMatchedId = await seed('matched', {
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000),
+      expiresAt: future,
+    })
+
+    const waitingResult = await reaper.reapExpiredWaiting()
+    assert.equal(
+      waitingResult.count,
+      1,
+      `waiting reaper must hit exactly the expired waiting row, got ${waitingResult.count}`
+    )
+    assert.equal(
+      prisma.scanTasksById.get(expiredWaiting.scanTaskId)?.status,
+      'expired',
+      'expired waiting row must be reaped to expired'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(futureWaiting.scanTaskId)?.status,
+      'waiting',
+      'future waiting row must not be touched by the waiting reaper'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(matchedPastExpiryId)?.status,
+      'matched',
+      'waiting reaper must not rewrite matched rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(completedPastExpiryId)?.status,
+      'completed',
+      'waiting reaper must not rewrite completed rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(cancelledPastExpiryId)?.status,
+      'cancelled',
+      'waiting reaper must not rewrite cancelled rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(failedPastExpiryId)?.status,
+      'failed',
+      'waiting reaper must not rewrite failed rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(staleMatchedId)?.status,
+      'matched',
+      'waiting reaper must leave stale matched rows for the matched reaper'
+    )
+
+    const secondOnSameTerminal = await service.create(
+      { scanType: 'document', terminalId: 't_1' },
+      null
+    )
+    assert.ok(
+      secondOnSameTerminal.scanTaskId,
+      'same terminal must be able to create after the expired waiting row was reaped'
+    )
+    assert.notEqual(secondOnSameTerminal.scanTaskId, expiredWaiting.scanTaskId)
+
+    const matchedResult = await reaper.reapStuckMatched()
+    assert.equal(
+      matchedResult.count,
+      1,
+      'matched stale reaper must still converge the stale matched row after waiting reap'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(staleMatchedId)?.status,
+      'failed',
+      'stale matched row must still be reaped to failed'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(matchedPastExpiryId)?.status,
+      'matched',
+      'fresh matched row must remain unmatched by the matched stale reaper'
+    )
+
+    const waitingSecondRun = await reaper.reapExpiredWaiting()
+    assert.equal(waitingSecondRun.count, 0, 'second waiting reap must be a stable no-op')
+    assert.equal(
+      prisma.scanTasksById.get(expiredWaiting.scanTaskId)?.status,
+      'expired',
+      'already-expired waiting row must stay expired on a second waiting reap'
+    )
   }
 
   {
