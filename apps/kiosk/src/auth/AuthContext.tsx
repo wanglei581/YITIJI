@@ -3,6 +3,7 @@ import { memberLogout } from '../services/auth/memberAuthApi'
 import { onMemberSessionExpired } from '../services/auth/memberSessionEvents'
 import { AuthContext, deriveDisplayName, type AuthContextValue, type AuthUser } from './context'
 import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from './kioskSensitiveSession'
+import { clearGuestScanBeforeMemberLogin } from './kioskClearScope'
 import { isLoginPath, loginPathForCurrentLocation } from './returnPath'
 
 /**
@@ -41,6 +42,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 换人：撤销服务端扫描任务必须用**上一位**的令牌（服务端按 endUserId 校验取消权限，
       // 用新登录这位的令牌只会被 403 顶回来，旧任务原地存活）。
       clearKioskSensitiveSession(current.token)
+    } else if (!current) {
+      // 游客 → 会员。上面那句「视为同一人继续办理」对打印材料成立，对**扫描**不成立：
+      // 上一位游客扫完没按出口就走了，下一位一碰屏幕就把隐私空闲计时重置，
+      // 他一登录就会继承那份扫描件和登记里那枚 controlToken 明文。
+      // 扫描流程自己从不把人送去登录（结果页未登录时那颗按钮是禁用的，任何出口都会先
+      // leaveScanFlow 清干净），所以这里没有可信的延续标记，按 fail-closed 收掉扫描。
+      // 范围只到扫描，其余敏感会话不动；判据与理由见 kioskClearScope。
+      clearGuestScanBeforeMemberLogin()
     }
     sessionExpiredRedirectingRef.current = false
     userRef.current = next

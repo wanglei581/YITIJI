@@ -827,7 +827,7 @@ test('a reload while the paired create is in flight fails closed @scan-safety', 
   await page.reload()
 
   // ① fail-closed：不发第二个请求，尤其不发那个不带两半的普通创建。
-  await expect(page.getByText('安全重扫凭据已随本页重载消失', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('安全重扫凭据已经不在本机', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
   await page.waitForTimeout(1_000)
@@ -917,10 +917,13 @@ function registerCompletedExitDestinations(api: ApiRouter): void {
   })
 }
 
+// carriesFile：这个去向要不要把文件随路由 state 一起带过去。
+// 打印确认页读 `state.file`、解析页读 `state.fileId`；「我的文档」不带文件（它自己去查）。
+// 这一位是「清场不许连落点一起清掉」的判据 —— 见下面 history 那一组的断言 ①。
 const COMPLETED_EXITS = [
-  { key: 'print', button: '直接打印', url: /\/print\/confirm$/, needsLogin: false },
-  { key: 'resume-ai', button: 'AI 简历识别', url: /\/resume\/parse$/, needsLogin: false },
-  { key: 'documents', button: '前往我的文档', url: /\/me\/documents$/, needsLogin: true },
+  { key: 'print', button: '直接打印', url: /\/print\/confirm$/, needsLogin: false, carriesFile: true },
+  { key: 'resume-ai', button: 'AI 简历识别', url: /\/resume\/parse$/, needsLogin: false, carriesFile: true },
+  { key: 'documents', button: '前往我的文档', url: /\/me\/documents$/, needsLogin: true, carriesFile: false },
 ] as const
 
 for (const exit of COMPLETED_EXITS) {
@@ -986,6 +989,188 @@ for (const exit of COMPLETED_EXITS) {
   })
 }
 
+/* ══ 离开完成态之后，后退 / 前进都回不到那一屏 ═══════════════════════════════
+ *
+ * 清 sessionStorage 只决定了「下一位进 /scan 会复水到哪一屏」。历史条目是另一回事：
+ * push 之后 `/scan?stage=result` 仍然在浏览器历史里，并且带着当时那笔 location.state
+ * （ScanProgressPage 的非工作台路径会把 file 写进去），而结果页取数是
+ * `stored?.result?.file ?? locationState.file` —— 存储清了，路由 state 还能把上一位
+ * 那份文件名与签名内容链接补回来。
+ *
+ * 所以这一组**必须**用 goBack/goForward 来证，用 page.goto 证不了：goto 建的是新条目，
+ * 永远碰不到历史里那一条。
+ *
+ * ## 判据为什么是「后退落在哪个 pathname」，而不是「URL 里还有没有 stage=result」
+ *
+ * 后者试过，是个假绿：push 之后后退确实落在 `/scan?stage=result` 那一条，但登记已经
+ * 被清掉，ScanWorkbenchPage 当帧就把 view 解析成 start 并 `setSearchParams(replace)`
+ * 把 URL 改写成 `?stage=start` —— 断言 stage 不等于 result，push 和 replace 一样绿。
+ * （删掉 replace 跑一遍，那版断言 3/3 全过，什么都没测到。）
+ *
+ * 所以这里先在结果条目**之前**插一条非 /scan 的历史条目。于是两种实现后退第一站不同：
+ *   · replace：结果条目被落点换掉 → 后退第一站是 `/print-scan`；
+ *   · push   ：结果条目还在       → 后退第一站是 `/scan`。
+ * pathname 不会被那次 URL 自愈改写，这一位才真的分得开。 */
+for (const exit of COMPLETED_EXITS) {
+  test(`browser history cannot return to a completed scan left by ${exit.key} @scan-safety`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    registerPrintScanHub(api)
+    registerScanCapabilities(api)
+    registerCompletedExitDestinations(api)
+    if (exit.needsLogin) registerMemberLogin(api)
+    installSameSheetScanServer(page)
+
+    if (exit.needsLogin) await loginThroughVisibleUi(page, '/scan')
+    else await page.goto('/scan?stage=start')
+    // 结果条目之前必须是一条**非 /scan** 的条目（见上面的判据说明）。
+    // 用 pushState + popstate 在同一个 document 里插，理由和 landOnCompletedScan 一样：
+    // page.goto 是整页加载，会把内存里的登录态一起抹掉，documents 那一条就跑不了了。
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/print-scan')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await expect(page).toHaveURL(/\/print-scan$/)
+
+    // landOnCompletedScan 同样用 pushState，所以历史里确实多出 `/scan?stage=result`
+    // 这一条 —— 正是要证明它离开之后不再可达的那一条。
+    await landOnCompletedScan(page)
+    expect(new URL(page.url()).searchParams.get('stage')).toBe('result')
+
+    await page.getByRole('button', { name: exit.button }).first().click()
+    await expect(page).toHaveURL(exit.url)
+
+    /* ① 落点必须**立刻就能用**那份文件。
+     *
+     * replace 换掉的是扫描结果那一条历史，不是落点这一条：路由 state 原样送达。
+     * 这条断言防的是「为了清干净把落点也一起清掉」—— 那样打印确认页会退回
+     * 「未知文件」、解析页拿不到 fileId，用户扫完的东西当场就废了。 */
+    const handedOverState = await page.evaluate(() => {
+      const usr = (window.history.state as { usr?: unknown } | null)?.usr ?? null
+      return usr === null ? null : JSON.stringify(usr)
+    })
+    if (exit.carriesFile) {
+      expect(handedOverState, '带文件的去向必须在落点那一条历史里收到 fileId').toContain(SAME_SHEET_FILE.fileId)
+    }
+
+    // ② 后退：越过整条扫描流程，第一站就是扫描之前那一页。
+    await page.goBack()
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 5_000 }).toBe('/print-scan')
+    await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
+    await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
+
+    // ③ 前进：落点还是落点（它靠路由 state 拿文件，这一点必须保住），
+    //    但前进链路上同样没有结果屏那一条。
+    await page.goForward()
+    await expect(page).toHaveURL(exit.url)
+    expect(new URL(page.url()).searchParams.get('stage')).toBeNull()
+
+    // ④ 再后退一次，仍然是扫描之前那一页；并且历史条目的 state 里没有那枚控制凭证。
+    await page.goBack()
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 5_000 }).toBe('/print-scan')
+    const historyResidue = await page.evaluate(
+      (token) => JSON.stringify(window.history.state ?? null).includes(token),
+      PRIOR_CONTROL_TOKEN,
+    )
+    expect(historyResidue, '历史条目的 state 里不许还留着上一场的控制凭证').toBe(false)
+
+    expect(errors).toEqual([])
+  })
+}
+
+/* ══ 换人：下一位登录，继承不到上一位游客那场无人认领的扫描 ══════════════════
+ *
+ * login() 的老规则是「只清别人的」：`current && current.id !== next.id` 才清场，
+ * 游客（current 为 null）中途登录一个字节都不清。对打印材料这条产品判断成立，
+ * 对扫描不成立 —— 扫描件是上一位的身份证 / 简历原件，登记里还带着那一场的
+ * controlToken 明文。
+ *
+ * 真实链路：上一位游客扫完走了（没按任何出口，所以本机登记还在，隐私空闲也没到点）→
+ * 下一位走上来，一碰屏幕就把空闲计时重置了 → 他去登录 → 老规则不清 →
+ * 他现在是「会员」，而本机登记里躺着上一位的扫描件。
+ *
+ * ## 为什么是 fail-closed，而不是找一个延续标记
+ *
+ * 「同一人继续办理」只有在**这条流程自己把人送去登录**时才说得过去。扫描流程今天
+ * 没有这样的入口，这一点是可查的而不是假设的：结果页未登录时那颗「前往我的文档」
+ * 是禁用的（`disabled={!file || !isLoggedIn}`，文案写「本次不进入我的文档」），
+ * 选类型页明写「本屏无登录步骤」，顶栏返回与底栏三项都先 `leaveScanFlow`
+ * （撤服务端任务 + 清本机登记）再走人。也就是说一个真正在办事的游客走到 /login 时，
+ * 他的扫描早就被他自己那一次离开清掉了 —— 这条闸门对他是空操作。
+ * 既然没有可信的延续标记，就在接受新身份之前先收掉扫描。
+ *
+ * ## 范围只到扫描（下面断言 ⑤ 钉住这一条）
+ *
+ * 「游客中途登录视为同一人继续办理，打印材料仍在」这条产品判断依然有效。
+ * 本闸门不碰打印材料 / AI 简历 / 面试工作台；把它们一起清掉就是借着修隐私洞
+ * 顺手改掉一条产品行为。 */
+test('a later member cannot reopen the previous guest scan @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrintScanHub(api)
+  registerScanCapabilities(api)
+  registerMemberLogin(api)
+  const server = installSameSheetScanServer(page)
+
+  // 上一位是**游客**：先落到完成态，再确认登记确实还在（否则这条用例会假绿）。
+  await page.goto('/scan?stage=start')
+  await landOnCompletedScan(page)
+  // 同时种一份**打印材料**会话：它代表「游客中途登录视为同一人继续办理」那条产品判断，
+  // 必须在这次登录之后活下来。少了它，这条用例就只证明「清得掉」，
+  // 证明不了「没有清过头」。
+  await page.evaluate(() => {
+    window.sessionStorage.setItem(
+      'ai-job-print:current-print-material-check',
+      JSON.stringify({ file: { fileId: 'guest-print-material', name: '游客打印材料.pdf' } }),
+    )
+  })
+  const guestRegistry = await page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_SESSION_KEY)
+  expect(guestRegistry, '前置条件：游客那场扫描此刻确实还在本机登记里').toContain(PRIOR_CONTROL_TOKEN)
+
+  // 下一位在同一台机器上登录。整页加载只抹内存态，sessionStorage 照样活着 ——
+  // 这正是现场的真实形状，也是这条闸门唯一的着力点。
+  await loginThroughVisibleUi(page, '/scan')
+
+  // ① 登记必须已经没了。
+  const afterLogin = await page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_SESSION_KEY)
+  expect(afterLogin).toBeNull()
+  // ② 落在选类型那一屏，看不到上一位的结果与文件。
+  await expect(page.getByText('下一步会创建真实扫描会话', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
+  await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
+  // ③ 任何存储里都不许再有那枚控制凭证。
+  const residue = await page.evaluate((token) => ({
+    session: JSON.stringify(Object.fromEntries(
+      Array.from({ length: window.sessionStorage.length }, (_, i) => window.sessionStorage.key(i))
+        .filter((key): key is string => key !== null)
+        .map((key) => [key, window.sessionStorage.getItem(key) ?? '']),
+    )).includes(token),
+    local: JSON.stringify(Object.fromEntries(
+      Array.from({ length: window.localStorage.length }, (_, i) => window.localStorage.key(i))
+        .filter((key): key is string => key !== null)
+        .map((key) => [key, window.localStorage.getItem(key) ?? '']),
+    )).includes(token),
+  }), PRIOR_CONTROL_TOKEN)
+  expect(residue).toEqual({ session: false, local: false })
+  /* ⑤ 但**只**清扫描：打印材料必须原样活着。
+   *
+   * 这一条和 ①–③ 是一对，缺了它这条用例就只证明「清得掉」。「游客中途登录视为同一人
+   * 继续办理」是一条现存的产品判断，借着修隐私洞把它一起改掉，属于越界。 */
+  const printMaterial = await page.evaluate(
+    () => window.sessionStorage.getItem('ai-job-print:current-print-material-check'),
+  )
+  expect(printMaterial, '闸门范围只到扫描：游客的打印材料不许被这次登录清掉').toContain('guest-print-material')
+
+  // ⑥ 这位会员自己开的那一场不许继承上一位的重扫血缘。
+  await page.getByRole('button', { name: /下一步/ }).click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(server.creates).toHaveLength(1)
+  expect(server.creates[0]!.body.retryOfScanTaskId).toBeUndefined()
+  expect(server.creates[0]!.headers['x-scan-retry-control']).toBeUndefined()
+
+  expect(errors).toEqual([])
+})
+
 test('a refused rescan authority is reported honestly and never falls back to a plain create @scan-safety', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -1010,8 +1195,102 @@ test('a refused rescan authority is reported honestly and never falls back to a 
   await page.waitForTimeout(1_500)
   expect(server.creates).toHaveLength(1)
   expect(server.creates[0]!.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
-  // ④ 出路是用户自己按的那一个。
+
+  /* ④ 出路必须是**能按下去并且真的管用**的那一个。
+   *
+   * 「不自动降级」和「不给出路」是两件事，早先的实现把它们混成了一件：这一屏只有
+   * 「安全返回扫描首页」，主行动是灰掉的「未创建扫描任务」。而这一屏最常见的来源恰恰是
+   * 上一场根本没走到取件 —— 服务端那种情况从不铸授权，必然 403。于是最常见的失败路径上，
+   * 主行动注定失败，用户得原路退回重选一次类型再来一遍。 */
   await expect(page.getByRole('button', { name: '安全返回扫描首页' }).first()).toBeVisible()
+  const restart = page.getByRole('button', { name: '重新开始一次扫描', exact: true })
+  await expect(restart).toBeVisible()
+  await expect(page.getByText(/可能按重复件拒收/).first()).toBeVisible()
+
+  // ⑤ 按下去要真的发出一次**普通**创建（不带两半），而不是被 fail-closed 闸门再判一次，
+  //    也不是给那个已经 reject 的 promise 再挂一遍处置（那样按钮按下去毫无反应）。
+  await restart.click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(server.creates).toHaveLength(2)
+  expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
+  expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
+  // ⑥ 这一场的性质要如实标注：是用户自己选的普通会话，不是本页悄悄降级的。
+  await expect(page.getByText(/你已确认这一次不是安全同字节重扫/).first()).toBeVisible()
+
+  expect(errors).toEqual([])
+})
+
+/* ══ 延迟取用：意图还在、凭据已经不在了，一个请求都不许发 ══════════════════════
+ *
+ * `rescanCredentialsLost` 是**挂载那一刻**算一次的（必须如此，否则正常重扫路径上
+ * 授权一被取走就会把自己判成 fail-closed）。但真正取用可能晚几十秒：终端会话换票时
+ * 本页停在 checking 等着，等完才创建。这中间本地 15 分钟窗口会走完。
+ *
+ * 那一刻取用返回 null，而登记里那笔意图还在。没有闸门的话，页面会照常发一个
+ * **不带签名**的普通创建 —— 用户按的是「同一份材料」，手里还是同一张纸，
+ * 回传时撞上服务端两小时的同字节去重，任务停在 waiting 直到过期。
+ *
+ * 这条用例是上面「a stale safe rescan is refused at click time」够不着的那一半：
+ * 那条里用户还没离开结果页，这条里创建流程已经开始、只是被终端换票拖住了。 */
+test('a rescan deferred past its local window sends no unsigned create @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  // 换票挂住不放，本页就会停在 checking —— 这正是「取用被推迟」的真实成因。
+  let openRefresh: () => void = () => undefined
+  const refreshGate = new Promise<void>((resolve) => { openRefresh = resolve })
+  let markRefreshArrived: () => void = () => undefined
+  const refreshArrived = new Promise<void>((resolve) => { markRefreshArrived = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async () => {
+    markRefreshArrived()
+    await refreshGate
+    return { status: 200, json: { sessionToken: 'rotated-terminal-session-token' } }
+  })
+
+  // 时钟装在导航之前（clock 只能这样用）。装完是暂停的，由用例自己推进。
+  await page.clock.install()
+  await landOnFailedPriorScan(page)
+
+  // 先让续期在飞，再按「重试扫描（同一份材料）」：设置页挂载时状态就是 checking，
+  // 创建 effect 在终端分支早退，授权还原封不动躺在内存槽位里。
+  await page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { startRefresh: () => void } }).__terminalSessionE2E
+    if (!hooks) throw new Error('terminalAuth 的 E2E 测试缝缺失，无法驱动终端会话状态')
+    hooks.startRefresh()
+  })
+  await refreshArrived
+
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).dispatchEvent('click')
+  await page.waitForURL(/\/scan\?stage=settings/)
+  await expect(page.getByText('正在做终端安全校验', { exact: true }).first()).toBeVisible()
+  expect(server.creates, '换票没出结果之前一个创建请求都不许发').toHaveLength(0)
+
+  // 等在 checking 的这段时间里，本地那 15 分钟窗口走完了。
+  await page.clock.setSystemTime(new Date(Date.now() + 16 * 60 * 1000))
+  openRefresh()
+
+  // ① 取不到凭据 ⇒ 什么都不发。旧实现会在这里发出一个不带两半的普通创建。
+  await expect(page.getByText('安全重扫凭据已经不在本机', { exact: true }).first()).toBeVisible()
+  expect(server.creates, '意图还在却取不到凭据时，一个请求都不许发').toHaveLength(0)
+  // ② 不伪造会话。
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+  // ③ 成因要说全，不能写死成「本页重载过」——这条路径压根没重载。
+  await expect(page.getByText(/超过 15 分钟/).first()).toBeVisible()
+
+  /* ④ 出路仍然是用户显式按下的那一个，而且它发出去的是**普通**创建。
+   *
+   * 这里只断到请求层，不断「扫描任务已创建」上屏 —— 不是放水，是时钟的算术：
+   * 共用的服务端夹具按 **Node 侧真实时钟** 铸 `expiresAt = now + 10min`，而页面的时钟
+   * 已经被推到 +16min，于是那个 expiresAt 在页面看来早就过期了，
+   * `isValidCreatedSession` 会（正确地）拒收它。那是夹具与假时钟的交互，
+   * 不是本条要证的东西。这颗按钮端到端能建出会话，由上一条
+   * （a refused rescan authority…）在不动时钟的情况下证。 */
+  await page.getByRole('button', { name: '重新开始一次扫描', exact: true }).click()
+  await expect.poll(() => server.creates.length, { timeout: 5_000 }).toBe(1)
+  expect(server.creates[0]!.body.retryOfScanTaskId).toBeUndefined()
+  expect(server.creates[0]!.headers['x-scan-retry-control']).toBeUndefined()
 
   expect(errors).toEqual([])
 })

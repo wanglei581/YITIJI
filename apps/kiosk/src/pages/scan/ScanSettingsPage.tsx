@@ -60,18 +60,46 @@ const SCAN_RESCAN_REJECTION_CODES = new Set([
 ])
 
 /**
- * 整页重载把内存里那份重扫凭据抹掉之后，这一屏说的话。
+ * 带着「同一份材料」的意图进来，凭据却已经不在内存里 —— 这一屏说的话。
  *
- * 三件事必须都说到：为什么不能继续（凭据只活在内存里）、本页**没有**替他改发普通
- * 重扫（否则同一张纸会撞上两小时的重复件拒收）、以及他现在能按哪一个。
+ * **成因不止一个，所以措辞不能只说其中一个。** 已知两条，用户处置完全一样：
+ *   · 整页重载（看门狗）：授权刻意只活在内存里，重载就没了，而登记里那笔意图还在；
+ *   · 延迟取用：本页在等终端换票（`terminalSession === 'checking'`）的那一会儿，
+ *     本地 15 分钟窗口走完，或者别处发生过一次清场，于是真正取用那一刻槽位已空。
+ * 早先这里写死「已随本页重载消失」，第二条成因发生时就是一句假的诊断。
+ *
+ * 三件事必须都说到：为什么不能继续、本页**没有**替他改发普通重扫（否则同一张纸会
+ * 撞上两小时的重复件拒收）、以及他现在能按哪一个。
  */
 const RESCAN_CREDENTIALS_LOST_FAILURE = {
-  title: '安全重扫凭据已随本页重载消失',
+  title: '安全重扫凭据已经不在本机',
   description: '你刚才选的是「同一份材料」重扫。那份凭据只存在页面内存里（不落存储，'
-    + '换人清场也带不走），本页重载之后它就没了，本机无法再向服务端申请放行。'
+    + '换人清场也带不走）：本页重载过、或者它已经超过 15 分钟、或者中间清过场，'
+    + '现在都取不到了，本机无法再向服务端申请放行。'
     + '本页不会替你改发一次普通重扫 —— 同一张纸走普通会话会被服务端按重复件拒收，'
     + '你会在机器前白等到会话过期。可以安全返回扫描首页，'
     + '或者按「重新开始一次扫描」建一个普通会话（那不是安全重扫，建议换一份材料）。',
+} as const
+
+/**
+ * 服务端把这次安全重扫判为不作数（403 / 409 / 400）之后，这一屏说的话。
+ *
+ * 和上面那条的区别只在**是谁判的**：上面是本机取不到凭据，这条是凭据发出去了、
+ * 服务端不认。用户处置一样，所以两条都必须给出同一个显式出路
+ * （「重新开始一次扫描」），并且都必须把代价说清楚。
+ *
+ * 早先这条只说「请返回扫描首页重新开始一次扫描」，屏幕上却没有任何叫这个名字的按钮 ——
+ * 唯一能按的是「安全返回扫描首页」，用户得自己走回选类型那一屏再来一遍。而这一屏
+ * 最常见的来源恰恰是「上一场根本没走到取件」（服务端那种情况从不铸授权，必然 403），
+ * 于是最常见的失败路径上，主行动是一个注定失败的按钮。
+ */
+const RESCAN_REFUSED_FAILURE = {
+  title: '安全重扫授权已失效',
+  description: '服务端不认这次的安全重扫凭据（过期、已被用掉，或者上一场根本没走到取件'
+    + '——那种情况服务端不会铸授权）。本页不会自动改用普通重扫。'
+    + '你可以按「重新开始一次扫描」建一个普通会话：那不是同字节重扫，'
+    + '如果放回去的还是同一张纸，服务端可能按重复件拒收（两小时内），'
+    + '建议换一份材料或找工作人员；也可以安全返回扫描首页。',
 } as const
 
 interface LocationState {
@@ -174,6 +202,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   // 用户在 fail-closed 那一屏显式按了「重新开始一次扫描」。只用于如实标注这一场的性质：
   // 它是一次普通会话，而且是他自己选的，不是本页悄悄降级的。
   const [plainRestartChosen, setPlainRestartChosen] = useState(false)
+  /**
+   * 服务端把这次安全重扫判为不作数（SCAN_RESCAN_REJECTION_CODES）。
+   *
+   * 和 `rescanCredentialsLost` 分开两个变量而不是合成一个，是因为它们的**成因**不同，
+   * 正文要说的话也不同（本机取不到 vs 服务端不认）。但它们给的出路必须是同一个：
+   * 一个显式的、写清代价的「重新开始一次扫描」。合并成一个布尔会让正文只能二选一地
+   * 说假话；各自留一个，CTA 那里取并集。
+   */
+  const [rescanRefusedByServer, setRescanRefusedByServer] = useState(false)
   // POST /scan/sessions 挂着 TerminalIdentityGuard（scan-tasks.controller.ts）：
   // 没有终端会话令牌就是 401。和打印确认页同一口径 —— 订阅状态，不猜、不抢跑。
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
@@ -190,6 +227,20 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
    * 「本页重载过」—— 那是句假话。skipCreateRef 从同一个判断派生，两者本来就是同一件事。
    */
   const restoredFromStorageRef = useRef(Boolean(restoredLive && scanType))
+  /**
+   * 这一场是带着「同一份材料」的意图进来的（`beginScanRescan` 在跳过来之前写的登记位）。
+   *
+   * 挂载时取一次，此后只由用户显式按下「重新开始一次扫描」改成 false。
+   *
+   * 它守的是**延迟取用**那个洞：`rescanCredentialsLost` 是挂载那一刻算一次的
+   * （必须如此，理由见它自己的注释），而真正取用授权的那一刻可能
+   * 晚得多 —— 终端会话在换票时本页会停在 checking 等着，等完才创建。这中间本地 15 分钟
+   * 窗口可能走完、别处可能清过场，于是取用返回 null。没有这一位的话，下一行就会照常
+   * 发一个**不带签名**的普通创建：用户按的是「同一份材料」，手里还是同一张纸，
+   * 回传时被两小时同字节去重拒掉，人在机器前白等十分钟。
+   * 有了它，那一刻 fail-closed，一个请求都不发。
+   */
+  const rescanIntentRef = useRef(stored?.rescanIntent === true)
   const skipCreateRef = useRef(restoredFromStorageRef.current)
   const sessionPromiseRef = useRef<Promise<ScanSessionCreateResponse> | null>(null)
   const cancelRequestedRef = useRef(false)
@@ -304,11 +355,19 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       setPhase('loading')
       createGenerationRef.current = scanLifecycleGeneration()
       createTokenRef.current = getToken()
-      // 安全重扫授权只取一次，而且必须和代次在同一个同步块里取 ——
-      // 它就是按代次校验的，中间隔一次 await 就可能取到属于上一场的那一份。
-      // 取到 null 是正常情况（上一场根本没走到取件、或者用户是从头新开一场）：
-      // 那就发普通创建，绝不会捎带重扫头（两半都由这一个对象派生，见 scanTasks.ts）。
+      // 授权只取一次，且必须和代次在同一个同步块里取（按代次校验，隔一次 await
+      // 就可能取到属于上一场的那一份）。取到 null 有两种含义，下一行的闸门负责分开：
+      // 用户从头新开一场 = 正常，发普通创建；意图还在却取不到 = 延迟取用，什么都不发。
       const rescan = takeScanRescanAuthority(scanType)
+      // 延迟取用闸门。判据、成因与「为什么锁在 ref 里」见 rescanIntentRef 的声明处。
+      // 早退之前不碰 sessionPromiseRef（仍是 null），用户显式按下「重新开始一次扫描」
+      // 之后 effect 重跑就能正常发出那一次普通创建。
+      if (!rescan && rescanIntentRef.current) {
+        setRescanCredentialsLost(true)
+        setFailure(RESCAN_CREDENTIALS_LOST_FAILURE)
+        setPhase('error')
+        return undefined
+      }
       setRescanRequested(rescan !== null)
       sessionPromiseRef.current = createScanSession(
         { scanType, terminalId: getTerminalId() },
@@ -398,20 +457,21 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             description: '网络连接中断，无法确认服务端是否收到请求。为避免重复创建，本页不会自动重发。请检查网络后返回重试。',
           })
         } else if (SCAN_RESCAN_REJECTION_CODES.has(code ?? '')) {
-          /* 安全重扫被服务端拒了（过期 / 已被用掉 / 血缘被占）。
+          /* 安全重扫被服务端拒了（过期 / 已被用掉 / 血缘被占 / 上一场根本没走到取件）。
            *
            * 这里**不自动改发一次普通创建**。普通创建本身不危险，但它会把用户支到面板前
-           * 去扫同一张纸，而那份字节在服务端的 2 小时去重窗口里 —— 文件投回来会被拒，
+           * 去扫同一张纸，而那份字节可能落在服务端的 2 小时去重窗口里 —— 文件投回来会被拒，
            * 任务停在 waiting 直到过期，用户在这台机器前白等十分钟，且全程没有任何提示。
-           * 静默降级正是本次要修的缺陷本身，所以到此为止，把选择权交回给用户：
-           * 「安全返回扫描首页」重开一场是他自己按的，页面也已经说清了代价。 */
+           * 静默降级正是这条防线要挡的东西。
+           *
+           * 但「不自动降级」不等于「不给出路」。这一屏最常见的来源是**上一场根本没走到
+           * 取件**（服务端那种情况从不铸授权，必然 403），把它做成一个只能原路退回的
+           * 死胡同，等于让最常见的失败路径上主行动注定失败。所以：出路给出来，
+           * 代价写清楚，按不按由用户决定 —— 这和「本页替他按」是两件事。 */
+          setRescanRefusedByServer(true)
           setFailure({
-            title: '安全重扫授权已失效',
-            description: userMessageOf(
-              error,
-              '上一次扫描的安全重扫授权已过期或已被使用，本页不会自动改用普通重扫。'
-                + '请返回扫描首页重新开始一次扫描；若用的还是同一张纸，请先取回整理好再放入。',
-            ),
+            title: RESCAN_REFUSED_FAILURE.title,
+            description: userMessageOf(error, RESCAN_REFUSED_FAILURE.description),
           })
         } else if (code === 'SCAN_TERMINAL_BUSY') {
           setFailure({
@@ -449,11 +509,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       cancelled = true
     }
     // StrictMode 需要在同一组 refs 上复用唯一创建 promise，不按渲染重发。
-    // 依赖两个：终端会话状态（从 checking / failed 回到 ready 时要能补发这一次创建），
-    // 以及 fail-closed 那一位（用户显式选了「重新开始一次扫描」之后它变 false，
-    // 这一次普通创建就该发出去了 —— 那是他自己按的）。
+    // 依赖三个：终端会话状态（从 checking / failed 回到 ready 时要能补发这一次创建），
+    // 以及两个 fail-closed 标志 —— 用户显式选了「重新开始一次扫描」之后它们变 false，
+    // 这一次普通创建就该发出去了（那是他自己按的）。
+    //
+    // `rescanRefusedByServer` 必须在这里，而且这一条容易被判成冗余：服务端拒绝时
+    // `rescanCredentialsLost` 从头到尾都是 false，复位它不构成依赖变化，effect 不会重跑，
+    // 「重新开始一次扫描」按下去就毫无反应。true→false 的那一位只有它。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession, rescanCredentialsLost])
+  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer])
 
   useEffect(() => {
     if (!expiresAt) return
@@ -494,16 +558,30 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   }
 
   /**
-   * fail-closed 那一屏上的出路：用户显式选择「重新开始一次扫描」。
+   * fail-closed 两屏共用的出路：用户显式选择「重新开始一次扫描」。
    *
-   * 它做的事只有一件 —— 把登记里那笔安全重扫意图抹掉（`beginPlainScanRestart`），
-   * 于是上面那条创建 effect 的 fail-closed 判据当帧变 false，普通创建才发出去。
+   * 覆盖两种成因 —— 本机取不到凭据（`rescanCredentialsLost`，含整页重载与延迟取用）
+   * 和服务端不认（`rescanRefusedByServer`）。两屏的正文各说各的成因，出路只有这一个。
    * 这一条不是降级的捷径：文案已经说清它不是安全同字节重扫，按下它是用户的选择。
+   *
+   * 四件事缺一不可：
+   *   1. `beginPlainScanRestart` 抹掉登记里那笔安全重扫意图（也顺手清空授权槽位）；
+   *   2. `rescanIntentRef` 跟着变 false —— 否则上面那道延迟取用闸门会把这一次
+   *      **用户亲手选的**普通创建当成「意图还在却没凭据」再判一次 fail-closed，
+   *      按钮按下去什么都不会发生；
+   *   3. `sessionPromiseRef.current = null` —— 服务端拒绝那条路径上它握着一个**已经
+   *      reject 的 promise**。不置空的话 effect 重跑只会给那个 rejection 再挂一遍
+   *      then/catch，新的 POST 永远发不出去，页面停在 loading。
+   *      （凭据丢失那条路径上它本来就是 null，正是这个差别让人容易漏掉这一行。）
+   *   4. 两个 fail-closed 标志都复位，effect 依赖随之变化并重跑。
    */
   const handlePlainRestart = () => {
     if (!scanType) return
     beginPlainScanRestart({ scanType, extras: stored?.extras })
+    rescanIntentRef.current = false
+    sessionPromiseRef.current = null
     setRescanCredentialsLost(false)
+    setRescanRefusedByServer(false)
     setPlainRestartChosen(true)
     setFailure(null)
     setPhase('loading')
@@ -570,10 +648,11 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
               安全返回扫描首页
             </button>
-            {/* 只有「凭据随重载消失」这一屏有一个能按的主行动：它是普通新会话，
-                代价已经在正文里说清，按不按由用户决定。其余失败态仍然什么都不许按 ——
-                本页不会自动重发，也不会自己变成成功。 */}
-            {rescanCredentialsLost ? (
+            {/* 两种「安全重扫走不下去」的屏各有一个能按的主行动：本机取不到凭据
+                （重载 / 过期 / 清过场），以及服务端不认。它们是普通新会话，代价已经在
+                正文里说清，按不按由用户决定 —— 这和「本页替他按」是两件事。
+                其余失败态仍然什么都不许按：本页不会自动重发，也不会自己变成成功。 */}
+            {rescanCredentialsLost || rescanRefusedByServer ? (
               <button type="button" className="qx-btn" data-variant="primary" onClick={handlePlainRestart}>
                 重新开始一次扫描
               </button>

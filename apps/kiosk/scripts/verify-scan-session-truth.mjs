@@ -196,6 +196,9 @@ assert.match(
   /disabled=\{!file \|\| !isLoggedIn\}/,
   'guest must not be sent to login as if the scan file will be claimed',
 )
+
+/* 离开结果页那条历史条目必须被 replace 掉，不是压上去 —— 判据在下面 E 段
+ * （leaveScanFlow 那条断言）里和撤销/清场一起钉，不在这里重复一遍。 */
 assert.match(
   scanStart,
   /未登录不会进入「我的文档」|未登录扫描件不会进入「我的文档」/,
@@ -373,6 +376,40 @@ assert.match(
   authContext,
   /const login = useCallback\([\s\S]*?clearKioskSensitiveSession\(current\.token\)/,
   '换人时必须用**上一位**的令牌撤销（新登录这位发只会 403，旧任务原地存活）',
+)
+
+/* ── 游客 → 会员：无人认领的扫描不许被下一个人继承 ─────────────────────────
+ *
+ * login() 的老规则是「只清别人的」：current && current.id !== next.id 才清场，
+ * 理由是「游客中途登录视为同一人继续办理，打印材料仍在」。对打印材料成立，
+ * 对扫描不成立 —— 扫描件是上一位的身份证/简历原件，登记里还带着那一场的
+ * controlToken 明文：
+ *
+ *   上一位游客扫完走了（没按出口，所以登记还在，隐私空闲也没到点）→
+ *   下一位走上来一碰屏幕就把空闲计时重置了 → 他去登录 → current 是 null，
+ *   老规则一个字节都不清 → 他现在是会员，而登记里躺着上一位的扫描件。
+ *
+ * 扫描流程今天没有「登录后存进我的文档」这类自己把人送去登录的入口
+ * （结果页未登录时那颗按钮是禁用的，任何出口都会先 leaveScanFlow 清干净），
+ * 所以没有可信的延续标记，按 fail-closed 判。范围只到扫描：其余敏感会话不动。 */
+assert.match(
+  authContext,
+  /\} else if \(!current\) \{[\s\S]{0,600}?clearGuestScanBeforeMemberLogin\(\)/,
+  '游客 → 会员那一刻必须先收掉扫描：这条分支正是老规则一个字节都不清的那一条',
+)
+const clearScope = read('src/auth/kioskClearScope.ts')
+assert.match(
+  clearScope,
+  /export function clearGuestScanBeforeMemberLogin\(\): boolean \{[\s\S]*?revokeLiveScanSession\(null\)\s*\n[\s\S]{0,400}?clearScanWorkbenchSession\(\)/,
+  '顺序与 clearKioskSensitiveSession 一致：先撤服务端任务再清本地登记；'
+    + '身份传 null —— 游客的任务在服务端 endUserId 就是 null，'
+    + '拿新登录这位的令牌去发只会被 403 顶回来，旧任务原地存活',
+)
+assert.doesNotMatch(
+  clearScope,
+  /clearPrintMaterialSession|clearAiResumeSession|clearInterviewWorkbenchSession/,
+  '这条闸门的范围只到扫描：整体清场是 logout / 屏保 / 隐私空闲那三条既有边界的事，'
+    + '在登录路径上顺手扩大范围会把「游客中途登录仍能继续办理」那条产品判断一起改掉',
 )
 assert.match(
   authContext,
@@ -552,9 +589,41 @@ assert.doesNotMatch(
 // ── B. 取用时机：和代次同一个同步块，且每次创建只取一次 ──────────────────────
 assert.match(
   scanSettings,
-  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,600}?const rescan = takeScanRescanAuthority\(scanType\)[\s\S]{0,300}?sessionPromiseRef\.current = createScanSession\(/,
-  '授权必须在「取代次」与「发创建请求」之间取：授权本身按代次校验，'
-    + '中间隔一次 await 就可能取到属于上一场的那一份',
+  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,600}?const rescan = takeScanRescanAuthority\(scanType\)[\s\S]{0,400}?if \(!rescan && rescanIntentRef\.current\) \{[\s\S]{0,400}?return undefined\s*\n\s*\}[\s\S]{0,200}?sessionPromiseRef\.current = createScanSession\(/,
+  '三件事的**顺序**一起钉死：\n'
+    + '  · 授权必须在「取代次」与「发创建请求」之间取 —— 授权本身按代次校验，'
+    + '中间隔一次 await 就可能取到属于上一场的那一份；\n'
+    + '  · 取完立刻是延迟取用闸门，再往下才允许出现 createScanSession。',
+)
+
+/* ── B2. 延迟取用：意图还在、凭据没了，一个请求都不许发 ───────────────────────
+ *
+ * rescanCredentialsLost 是**挂载那一刻**算一次的（必须如此，否则正常重扫路径上
+ * 授权一被取走就会把自己判成 fail-closed）。但真正取用可能晚几十秒：终端会话换票时
+ * 本页停在 checking 等着，等完才创建。这中间本地 15 分钟窗口可能走完、别处可能清过场。
+ *
+ * 那一刻 takeScanRescanAuthority() 返回 null，而登记里那笔意图还在。旧代码会照常
+ * 发一个**不带签名**的普通创建 —— 用户按的是「同一份材料」，同一张纸回传时撞上
+ * 服务端两小时的同字节去重，任务停在 waiting 直到过期。
+ *
+ * 判据必须是「登记里那笔意图」而不是「rescanCredentialsLost 这一帧的值」：
+ * 后者在这条路径上恒为 false，拿它当判据等于没有闸门。 */
+assert.match(
+  scanSettings,
+  /const rescanIntentRef = useRef\(stored\?\.rescanIntent === true\)/,
+  '延迟取用闸门的判据必须是挂载时登记里那笔 rescanIntent，并且锁在 ref 里：'
+    + '每帧重算会把一场正在正常创建的会话判成「凭据没了」',
+)
+assert.match(
+  scanSettings,
+  /if \(!rescan && rescanIntentRef\.current\) \{\s*\n\s*setRescanCredentialsLost\(true\)[\s\S]{0,200}?setPhase\('error'\)\s*\n\s*return undefined/,
+  '延迟取用闸门必须 fail-closed 到那一屏并直接 return：任何「继续往下走」的写法'
+    + '都会让一次安全重扫意图落成无签名的普通创建',
+)
+assert.match(
+  scanSettings,
+  /rescanIntentRef\.current = false/,
+  '唯一允许解除那道闸门的是用户显式按下「重新开始一次扫描」（handlePlainRestart）',
 )
 assert.match(
   scanSettings,
@@ -597,8 +666,13 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /SCAN_RESCAN_REJECTION_CODES\.has\(code \?\? ''\)[\s\S]{0,1200}?title: '安全重扫授权已失效'/,
+  /RESCAN_REFUSED_FAILURE = \{\s*\n\s*title: '安全重扫授权已失效'/,
   '重扫被拒要有自己的结论屏，不能和「服务端没能创建扫描会话」混成一句',
+)
+assert.match(
+  scanSettings,
+  /SCAN_RESCAN_REJECTION_CODES\.has\(code \?\? ''\)[\s\S]{0,1600}?setRescanRefusedByServer\(true\)[\s\S]{0,300}?title: RESCAN_REFUSED_FAILURE\.title/,
+  '拒绝码那条分支必须既立起「服务端不认」这一位，又挂上它自己那张结论屏',
 )
 assert.match(
   scanSettings,
@@ -611,6 +685,30 @@ assert.equal(
   1,
   '全页只许有一处创建调用：重扫被拒之后另开一处「改发普通创建」就是静默降级',
 )
+
+/* ── C2. 不许自动降级，但必须给一个显式出路 ─────────────────────────────────
+ *
+ * 「不自动降级」和「不给出路」是两件事，早先的实现把它们混成了一件：服务端拒绝之后
+ * 屏幕上唯一能按的是「安全返回扫描首页」，主行动是灰掉的「未创建扫描任务」。
+ * 而这一屏最常见的来源恰恰是**上一场根本没走到取件** —— 服务端那种情况从不铸授权，
+ * 必然 403。于是最常见的失败路径上，主行动注定失败，用户得原路退回重走一遍。
+ *
+ * 现在两种 fail-closed（本机取不到 / 服务端不认）共用同一个显式出路。
+ * 它仍然不是自动降级：按钮由用户按下，文案写明它不是同字节重扫、同一张纸可能被拒收。 */
+assert.match(
+  scanSettings,
+  /\{rescanCredentialsLost \|\| rescanRefusedByServer \? \(\s*\n\s*<button[^>]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  '两种 fail-closed 都必须给出同一个显式主行动「重新开始一次扫描」：'
+    + '只给其中一种，另一种就是一条注定失败的死路',
+)
+assert.match(
+  scanSettings,
+  /RESCAN_REFUSED_FAILURE[\s\S]{0,600}?可能按重复件拒收/,
+  '那颗按钮的代价必须写在同一屏：它不是同字节重扫，同一张纸可能被服务端拒收',
+)
+/* 「显式出路必须解除延迟取用闸门、并置空那个已经 reject 的 sessionPromiseRef」
+ * 与「两个 fail-closed 标志都要进 effect 依赖」这两条，和 handlePlainRestart 的
+ * 其余形状一起钉在下面（搜 `const handlePlainRestart`），不在这里重复一遍。 */
 
 // ── D. 授权不得被下一位用户继承 ────────────────────────────────────────────
 assert.match(
@@ -759,10 +857,22 @@ assert.match(
  * 所以下面钉的不是「有几个出口」，而是「每个出口都必须走同一条 leaveScanFlow」。 */
 assert.match(
   scanResult,
-  /const leaveScanFlow = \(destination: string, options\?: NavigateOptions\): void => \{\s*\n\s*revokeLiveScanSession\(getToken\(\)\)\s*\n\s*clearScanWorkbenchSession\(\)\s*\n\s*navigate\(destination, options\)\s*\n\s*\}/,
+  /const leaveScanFlow = \(destination: string, options\?: NavigateOptions\): void => \{\s*\n\s*revokeLiveScanSession\(getToken\(\)\)\s*\n\s*clearScanWorkbenchSession\(\)\s*\n\s*navigate\(destination, \{ \.\.\.options, replace: true \}\)\s*\n\s*\}/,
   '结果页的出口与顶栏返回同一条语义：先撤服务端任务，再清本机登记'
-    + '（代次推进的同一步把授权扔掉），最后才走人。options 是给成功页那三个去向的 —— '
-    + '它们要带着文件走，但一样必须先清',
+    + '（代次推进的同一步把授权扔掉），最后 replace 掉这条历史再走人。'
+    + 'options 是给成功页那三个去向的 —— 它们要带着文件走，但一样必须先清。\n'
+    + 'replace 那一位不是风格问题：清 sessionStorage 只决定「下一位进 /scan 复水到哪一屏」，'
+    + 'push 之后 `/scan?stage=result` 仍是历史里的一条，并且带着当时那笔 location.state'
+    + '（ScanProgressPage 的非工作台路径会把 file 写进去），而结果页取数是'
+    + '`stored?.result?.file ?? locationState.file` —— 存储清了，路由 state 还能把上一位'
+    + '那份文件名与签名内容链接补回来。改回 push，后退/前进就又能走到那一屏。',
+)
+const scanResultNavigates = scanResult.match(/\bnavigate\(/g) ?? []
+assert.equal(
+  scanResultNavigates.length,
+  2,
+  '结果页只许有两处 navigate：leaveScanFlow 里那一处（replace），以及 goToSettings 的'
+    + '非工作台兜底。多出来的一处就是一个绕开了撤销/清场/replace 的出口',
 )
 for (const destination of ['/print-scan', '/help', '/']) {
   assert.match(
@@ -849,25 +959,36 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /\}, \[terminalSession, rescanCredentialsLost\]\)/,
-  'fail-closed 那一位必须进依赖：用户显式选了「重新开始一次扫描」之后它变 false，'
-    + '这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生',
+  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer\]\)/,
+  '两个 fail-closed 标志都必须进依赖：用户显式选了「重新开始一次扫描」之后它们变 false，'
+    + '这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
+    + 'rescanRefusedByServer 这一位尤其容易被判成冗余 —— 服务端拒绝那条路径上'
+    + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。',
 )
 assert.match(
   scanSettings,
-  /const handlePlainRestart = \(\) => \{\s*\n\s*if \(!scanType\) return\s*\n\s*beginPlainScanRestart\(\{ scanType, extras: stored\?\.extras \}\)\s*\n\s*setRescanCredentialsLost\(false\)/,
+  /const handlePlainRestart = \(\) => \{\s*\n\s*if \(!scanType\) return\s*\n\s*beginPlainScanRestart\(\{ scanType, extras: stored\?\.extras \}\)\s*\n\s*rescanIntentRef\.current = false\s*\n\s*sessionPromiseRef\.current = null\s*\n\s*setRescanCredentialsLost\(false\)\s*\n\s*setRescanRefusedByServer\(false\)/,
   '出路只有这一条显式动作：走 beginPlainScanRestart（它抹掉那笔意图），'
     + '并且当场把 fail-closed 那一位放下来 —— 否则按钮按下去什么都不会发生',
 )
 assert.match(
   scanSettings,
-  /rescanCredentialsLost \? \([\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
-  '只有这一屏有一个能按的主行动；其余失败态仍然什么都不许按（本页不自动重发）',
+  /rescanCredentialsLost \|\| rescanRefusedByServer \? \([\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  '两种 fail-closed（本机取不到凭据 / 服务端不认）都要有同一个能按的主行动；'
+    + '其余失败态仍然什么都不许按（本页不自动重发）。\n'
+    + '只给其中一种就会留下一条死路：服务端拒绝那一屏最常见的来源是「上一场根本没走到取件」，'
+    + '服务端那种情况从不铸授权、必然 403 —— 最常见的失败路径上主行动注定失败。',
 )
 assert.match(
   scanSettings,
-  /title: '安全重扫凭据已随本页重载消失'/,
+  /RESCAN_CREDENTIALS_LOST_FAILURE = \{\s*\n\s*title: '安全重扫凭据已经不在本机'/,
   'fail-closed 要有自己的结论屏，不能混进「扫描任务未创建」的通用兜底',
+)
+assert.doesNotMatch(
+  scanSettings,
+  /title: '安全重扫凭据已随本页重载消失'/,
+  '这一屏的成因不止「整页重载」一种：延迟取用（等终端换票期间本地窗口走完 / 别处清过场）'
+    + '走的是同一屏。把成因写死成其中一种，另一种发生时就是一句假的诊断',
 )
 assert.match(
   scanSettings,

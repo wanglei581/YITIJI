@@ -220,11 +220,27 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
    * 撤销那一句对已终态的任务是 no-op：`revokeLiveScanSession` 见到结果快照就不发 DELETE
    * （scanSessionRevoke 的 hasResult 分支）。留着它是为了「离开的语义只有一份」——
    * 结果页也可能在只有 live、还没写进结果快照的那一帧被按下出口。
+   *
+   * ## 为什么一律 replace，不 push
+   *
+   * 清 sessionStorage 只清掉了「下一位进 /scan 会复水到哪一屏」。**历史条目本身还在**：
+   * push 之后 `/scan?stage=result` 仍是浏览器历史里的一条，它带着当时那笔 `location.state`
+   * （结果页的 `file` 与 `scanType` 会经由 `ScanProgressPage.finishWithResult` 的
+   * 非工作台路径写进去），而结果页取数是 `stored?.result?.file ?? locationState.file` ——
+   * 存储清了，路由 state 还能把上一位那份文件名与签名内容链接补回来。
+   * 一体机没有可见的后退键，但 Kiosk 浏览器的手势/外设、以及隐私清场自己的
+   * back/forward 编排都能走到这条历史条目上。
+   *
+   * replace 把**这一条**直接换成落点：
+   *   · 后退：越过整条扫描流程，落在进 /scan 之前那一页，永远回不到结果屏；
+   *   · 前进：那条结果条目已经不存在，前进也无从复现。
+   * 落点自己那一条仍然带着 `file`（打印确认页 / 解析页靠它工作，这是「保留落点
+   * 立即可用文件」的要求），它由各自页面的生命周期与隐私边界管，不在本页职责内。
    */
   const leaveScanFlow = (destination: string, options?: NavigateOptions): void => {
     revokeLiveScanSession(getToken())
     clearScanWorkbenchSession()
-    navigate(destination, options)
+    navigate(destination, { ...options, replace: true })
   }
 
   /* ── 成功页那三个去向也是「离开整条扫描流程」 ──────────────────────────────
@@ -335,7 +351,12 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
         <div className="sw-grid2">
           <ScanNoteCard title="现在能做什么" foot="重扫是另建一个会话，不是接着这一次。">
             <ScanPlan items={[
-              '点右下角重试扫描：那是另一次任务。',
+              /* 按钮文案是两条分支（见 ctabar），这句指路也必须跟着分支走。
+               * 写死「点右下角重试扫描」时，没有凭据的那一屏上根本没有叫这个名字的按钮
+               * —— 同一屏两个名字，用户会以为自己少看见了一个控件。 */
+              rescanAuthorized
+                ? '点右下角「重试扫描（同一份材料）」：那是另一次任务。'
+                : '点右下角「重新开始一次扫描」：那是另一次任务，也不是同字节重扫。',
               '重扫之前把纸取回来抚平、订书钉取掉。',
               /* 服务端对「取过件但没建档成功」的同一份字节有两小时去重（它挡的是把上一位的
                * 扫描件误挂到下一位头上）。所以这句必须按手里有没有那份凭据分开说。

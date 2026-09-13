@@ -141,6 +141,22 @@ export interface AdminTerminalRecord {
   printerStatus: TerminalPrinterStatus | string | null
   wiredNetworkStatus: 'connected' | 'disconnected' | 'unknown' | string | null
   printerNetworkStatus: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown' | string | null
+  /**
+   * 扫描输入闸门的心跳遥测（Agent 上报 → TerminalHeartbeat → AdminTerminalView）。
+   *
+   * 四个字段**同生同死**：服务端 `assertScanInputTelemetry` 只接受「四个全给」或
+   * 「一个都不给」，所以前端也只按整组判断，不去拼半组。
+   *
+   * 都写成可选：老版本 Agent 不报这一组，mock 适配器也没有它们，
+   * 缺失必须渲染成「未上报」而**不是**「正常」——把没测到说成健康，正是这条遥测要防的事。
+   *
+   * `scanInputReason` 是服务端枚举白名单里的原因码（`SCAN_INPUT_REASONS`），
+   * 不是自由文本；页面按码查中文表，查不到就原样显示码，绝不拼接任意载荷。
+   */
+  scanInputHealth?: 'healthy' | 'locked_out' | 'unknown' | string | null
+  scanInputAction?: 'none' | 'restart_required' | string | null
+  scanInputReason?: string | null
+  scanInputObservedAt?: string | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
