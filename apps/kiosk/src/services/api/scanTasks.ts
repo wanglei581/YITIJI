@@ -1,9 +1,11 @@
 import type {
+  ScanRescanAuthorization,
   ScanSessionCancelResponse,
   ScanSessionCreateRequest,
   ScanSessionCreateResponse,
   ScanSessionStatusResponse,
 } from '@ai-job-print/shared'
+import { SCAN_RETRY_CONTROL_HEADER } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
@@ -91,15 +93,59 @@ async function requestJson<T>(
   return payload as T
 }
 
-export function createScanSession(
+/**
+ * 安全重扫的两半必须同生同死。
+ *
+ * 服务端把 body 的 `retryOfScanTaskId` 和 `X-Scan-Retry-Control` 头当一对看：
+ * 只有头 → 400 `SCAN_RETRY_TASK_ID_MISSING`；只有 id → 403 `SCAN_RETRY_NOT_AUTHORIZED`。
+ * 所以这里**不从调用方给的 body 里取** `retryOfScanTaskId` —— body 按白名单重建，
+ * 两半都只从同一个 authorization 对象派生：
+ *
+ *   · 没给授权 → body 里不会有 id，头也不会出现（普通创建绝不会误带重扫头）；
+ *   · 给了授权 → 两半必然同时出现，且指向同一场。
+ *
+ * 半对（只有 id 或只有 token）在这里当场拒，不降级成普通创建 —— 静默降级正是这次
+ * 要修的缺陷本身：用户以为在做安全重扫，实际发出去的是一个会被同字节去重拒掉的新会话。
+ */
+function assertPairedRescan(
+  rescan: ScanRescanAuthorization | null | undefined,
+): ScanRescanAuthorization | null {
+  if (!rescan) return null
+  const retryOfScanTaskId = rescan.retryOfScanTaskId?.trim() ?? ''
+  const priorControlToken = rescan.priorControlToken?.trim() ?? ''
+  if (retryOfScanTaskId.length === 0 || priorControlToken.length === 0) {
+    // status 必须非 0：本仓约定 status===0 表示「压根没拿到 HTTP 响应，结果未知」，
+    // 而这里请求根本还没发出去，结论是确定的。
+    throw new ApiHttpError(
+      'SCAN_RESCAN_AUTHORITY_INCOMPLETE',
+      '安全重扫凭证不完整，本次不会改用普通重扫',
+      400,
+    )
+  }
+  return { retryOfScanTaskId, priorControlToken }
+}
+
+export async function createScanSession(
   input: ScanSessionCreateRequest,
   token?: string | null,
+  rescan?: ScanRescanAuthorization | null,
 ): Promise<ScanSessionCreateResponse> {
+  const paired = assertPairedRescan(rescan)
+  // body 按白名单重建：调用方传进来的 retryOfScanTaskId 一律不采信，
+  // 它只能来自上面那份成对校验过的授权。
+  const body: ScanSessionCreateRequest = { scanType: input.scanType, terminalId: input.terminalId }
+  const headers: Record<string, string> = {}
+  if (paired) {
+    body.retryOfScanTaskId = paired.retryOfScanTaskId
+    // 凭证只走 header：不进 body、不进 query string、不落任何浏览器存储、不进日志。
+    headers[SCAN_RETRY_CONTROL_HEADER] = paired.priorControlToken
+  }
   return requestJson<ScanSessionCreateResponse>('/scan/sessions', {
     method: 'POST',
     token,
     terminalProtected: true,
-    body: JSON.stringify(input),
+    headers,
+    body: JSON.stringify(body),
   })
 }
 

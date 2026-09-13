@@ -32,6 +32,7 @@ import {
   patchScanWorkbenchSession,
   readScanWorkbenchSession,
   scanLifecycleGeneration,
+  takeScanRescanAuthority,
   type ScanLiveState,
 } from './scanWorkbenchSession'
 
@@ -40,6 +41,21 @@ function isScanType(value: unknown): value is ScanType {
 }
 
 type SessionPhase = 'invalid' | 'loading' | 'success' | 'expired' | 'error'
+
+/**
+ * 服务端（或本机成对校验）判「这次安全重扫不作数」的四个码。
+ *
+ * 前三个来自 scan-tasks.service.ts：授权无效 / 已过期 / 已被消费（403）、
+ * 授权正被并发处理或血缘已被占用（409）、只给了凭证没给原任务 id（400）。
+ * 第四个来自本机 scanTasks.ts：拿到的是半对凭据，请求根本没发出去。
+ * 四个的用户处置完全一样，所以合成一张表，页面不按码分叉。
+ */
+const SCAN_RESCAN_REJECTION_CODES = new Set([
+  'SCAN_RETRY_NOT_AUTHORIZED',
+  'SCAN_RETRY_CONFLICT',
+  'SCAN_RETRY_TASK_ID_MISSING',
+  'SCAN_RESCAN_AUTHORITY_INCOMPLETE',
+])
 
 interface LocationState {
   scanType?: unknown
@@ -107,6 +123,10 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [expiresAt, setExpiresAt] = useState<string | null>(restoredLive?.expiresAt ?? null)
   const [countdown, setCountdown] = useState('--:--')
   const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
+  // 本次创建是否带了一次性安全重扫授权。只用于**如实说明**这一次是什么性质的会话
+  // （成功时告诉用户可以照原样再扫同一份材料），不参与任何放行判断 ——
+  // 授权成不成立由服务端判，本机只负责不把话说反。
+  const [rescanRequested, setRescanRequested] = useState(false)
   // POST /scan/sessions 挂着 TerminalIdentityGuard（scan-tasks.controller.ts）：
   // 没有终端会话令牌就是 401。和打印确认页同一口径 —— 订阅状态，不猜、不抢跑。
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
@@ -114,7 +134,16 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const confirmedRef = useRef(false)
   const createdIdRef = useRef<string | null>(restoredLive?.scanTaskId ?? null)
   const controlTokenRef = useRef<string | null>(restoredLive?.controlToken ?? null)
-  const skipCreateRef = useRef(Boolean(restoredLive && scanType))
+  /**
+   * 挂载那一刻这一场就已经在本机登记里了 —— 也就是说它是**复水**出来的，不是本页
+   * 这一次创建的（看门狗整页重载、从别处回到本阶段都会走这条）。
+   *
+   * 必须锁在初次渲染（ref），不能每次渲染重算：创建成功之后本页自己会把 live 写回
+   * 登记，重算的话下一帧 `restoredLive` 就非空了，一个刚刚在本页建成的会话会被说成
+   * 「本页重载过」—— 那是句假话。skipCreateRef 从同一个判断派生，两者本来就是同一件事。
+   */
+  const restoredFromStorageRef = useRef(Boolean(restoredLive && scanType))
+  const skipCreateRef = useRef(restoredFromStorageRef.current)
   const sessionPromiseRef = useRef<Promise<ScanSessionCreateResponse> | null>(null)
   const cancelRequestedRef = useRef(false)
   const expiryHandledRef = useRef(false)
@@ -222,7 +251,17 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       setPhase('loading')
       createGenerationRef.current = scanLifecycleGeneration()
       createTokenRef.current = getToken()
-      sessionPromiseRef.current = createScanSession({ scanType, terminalId: getTerminalId() }, getToken())
+      // 安全重扫授权只取一次，而且必须和代次在同一个同步块里取 ——
+      // 它就是按代次校验的，中间隔一次 await 就可能取到属于上一场的那一份。
+      // 取到 null 是正常情况（上一场根本没走到取件、或者用户是从头新开一场）：
+      // 那就发普通创建，绝不会捎带重扫头（两半都由这一个对象派生，见 scanTasks.ts）。
+      const rescan = takeScanRescanAuthority(scanType)
+      setRescanRequested(rescan !== null)
+      sessionPromiseRef.current = createScanSession(
+        { scanType, terminalId: getTerminalId() },
+        getToken(),
+        rescan,
+      )
     }
 
     sessionPromiseRef.current
@@ -304,6 +343,22 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           setFailure({
             title: '无法确认扫描任务状态',
             description: '网络连接中断，无法确认服务端是否收到请求。为避免重复创建，本页不会自动重发。请检查网络后返回重试。',
+          })
+        } else if (SCAN_RESCAN_REJECTION_CODES.has(code ?? '')) {
+          /* 安全重扫被服务端拒了（过期 / 已被用掉 / 血缘被占）。
+           *
+           * 这里**不自动改发一次普通创建**。普通创建本身不危险，但它会把用户支到面板前
+           * 去扫同一张纸，而那份字节在服务端的 2 小时去重窗口里 —— 文件投回来会被拒，
+           * 任务停在 waiting 直到过期，用户在这台机器前白等十分钟，且全程没有任何提示。
+           * 静默降级正是本次要修的缺陷本身，所以到此为止，把选择权交回给用户：
+           * 「安全返回扫描首页」重开一场是他自己按的，页面也已经说清了代价。 */
+          setFailure({
+            title: '安全重扫授权已失效',
+            description: userMessageOf(
+              error,
+              '上一次扫描的安全重扫授权已过期或已被使用，本页不会自动改用普通重扫。'
+                + '请返回扫描首页重新开始一次扫描；若用的还是同一张纸，请先取回整理好再放入。',
+            ),
           })
         } else if (code === 'SCAN_TERMINAL_BUSY') {
           setFailure({
@@ -543,11 +598,25 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               ['任务编号', scanTaskId],
               ['剩余时间', countdown],
               ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
+              // 三种情况三种说法，一句都不许互相顶替：
+              //   · 这一次真的带了重扫两半且创建成功 —— 服务端已经把那枚授权消费掉了，
+              //     所以「已放行」在这一行是可以说的（结果页那边不行，它只有凭据）；
+              //   · 复水出来的会话 —— 授权只活在内存里，重载后本页说不出当初带没带，
+              //     就如实说无从判断，不猜；
+              //   · 普通新建 —— 不多这一行，没什么要声明的。
+              ...(rescanRequested
+                ? [['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'] as [string, string]]
+                : restoredFromStorageRef.current
+                  ? [['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断'] as [string, string]]
+                  : []),
               ['控制凭证', '不上屏、不进链接；本次一体机会话内存里，换人清场会清掉'],
             ]}
           />
           <ScanNoteCard title="按完面板之后" foot={<><ClockIcon size={16} aria-hidden /> 任务剩余 {countdown}。仅当前会话有效。点击返回会取消这个未确认的任务。</>}>
             <ScanPlan items={[
+              ...(rescanRequested
+                ? ['把刚才那份原件照原样放回去 —— 这一次服务端认它，不会当成重复件拒掉。']
+                : []),
               '点「我已操作，开始等待」。',
               '进了等待页本机就每隔几秒自动查一次，你不用一直点。',
               '文件回来之前不显示扫到第几张：链路上没有这种事件。',

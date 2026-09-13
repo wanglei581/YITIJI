@@ -59,7 +59,7 @@ assert.match(scanSettings, /controlTokenRef/, 'control token must remain in memo
  * 下面钉住这条闸门的三块可被一行改坏的地方。 */
 assert.match(
   scanSettings,
-  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,200}?createScanSession\(/,
+  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,900}?createScanSession\(/,
   '代次必须在**发出创建请求之前**取；请求发出后再取就永远等于当前值，闸门恒真',
 )
 assert.match(
@@ -268,8 +268,14 @@ assert.match(
 )
 assert.match(
   workbenchSession,
-  /function endScanLifecycle\(\): void \{\s*\n\s*lifecycleGeneration \+= 1\s*\n\s*\}/,
-  '推进代次必须是同步自增：任何 await / 存储 IO 都会让它晚于还在飞的响应',
+  /function endScanLifecycle\(\): void \{\s*\n\s*lifecycleGeneration \+= 1\s*\n\s*rescanAuthority = null\s*\n\s*\}/,
+  '推进代次必须是同步自增，并在**同一步**里把一次性重扫授权扔掉。'
+    + '两件事的理由不同，别混：自增必须同步，是因为任何 await / 存储 IO 都会让它晚于'
+    + '还在飞的响应；而扔掉授权这一句管的是**留存** —— 授权里那份 controlToken 是'
+    + '上一位用户的明文凭证，这一场结束之后不该继续被模块变量引着。'
+    + '注意它不是「防止被下一位取用」的那道闸（那道是 usableRescanAuthority 里的代次比对，'
+    + '删掉本句不会让授权重新可用 —— 2026-09-14 实测行为用例全绿）；'
+    + '两道是纵深，少一道就少一道。',
 )
 assert.doesNotMatch(
   workbenchSession,
@@ -452,6 +458,291 @@ assert.match(
   scanSettings,
   /TERMINAL_SESSION_INVALID/,
   '终端身份不可用时页面按终端安全校验失败呈现，不伪造会话',
+)
+
+/* ══ 一次性安全重扫授权（2026-09-14） ══════════════════════════════════════
+ *
+ * ## 修的是什么
+ *
+ * 服务端对「已经取到文件（matched）但没建档成功」的同一份字节做 2 小时去重
+ * （scan-tasks.service.ts 的 SCAN_CONTENT_DEDUP_WINDOW_MS / SCAN_FILE_PREVIOUSLY_ATTEMPTED）。
+ * 这道防线本身必须留 —— 它挡的是把上一位用户的扫描件误挂到下一位的等待中任务上。
+ * 代价落在合法用户身上：上一场在取件之后失败了，他把**同一张纸**再扫一遍，字节一模一样，
+ * 文件回传会被那条去重原样拒掉，任务停在 waiting 直到过期。用户在机器前白等十分钟，
+ * 全程没有任何提示，因为那次拒绝发生在 Agent 与服务端之间，屏幕上看不见。
+ *
+ * 服务端为此铸了一枚一次性授权（15 分钟，绑定用户 / 终端 / 扫描类型 / 内容 hash /
+ * 上一场 controlToken，CAS 消费一次）。前台这条链路此前完全没接：结果页的「重试扫描」
+ * 只是 patch 一下阶段就回设置页重新建会话 —— 一个普通新会话，照样撞去重。
+ *
+ * ## 下面钉的四组
+ *
+ *   A 两半同生同死：body 的 retryOfScanTaskId 与 X-Scan-Retry-Control 头只能成对出现；
+ *   B 取用时机：授权必须和代次在同一个同步块里取，且每次创建只取一次；
+ *   C 被拒不许静默降级：服务端说不作数时页面照实说，不自动改发普通创建；
+ *   D 授权不得被下一位用户继承：代次一推进就扔掉，成功终态也扔掉。
+ *
+ * 头名与字段名一律从**服务端源码**反查，不跟着本仓某个常量自说自话 ——
+ * 只对着自己写的常量断言，两端改一边就只剩一份绿色的假证据。 */
+const repoRoot = resolve(kioskRoot, '../..')
+const readRepo = (relativePath) => readFileSync(resolve(repoRoot, relativePath), 'utf8')
+
+const scanTaskContract = readRepo('packages/shared/src/types/scanTask.ts')
+const apiScanController = readRepo('services/api/src/scan-tasks/scan-tasks.controller.ts')
+const apiScanDto = readRepo('services/api/src/scan-tasks/dto/create-scan-task.dto.ts')
+const apiScanService = readRepo('services/api/src/scan-tasks/scan-tasks.service.ts')
+
+// ── A. 两半同生同死 ────────────────────────────────────────────────────────
+const sharedHeaderName = /SCAN_RETRY_CONTROL_HEADER = '([^']+)'/.exec(scanTaskContract)?.[1]
+assert.ok(sharedHeaderName, '共享契约必须导出 SCAN_RETRY_CONTROL_HEADER，两端不各写各的字面量')
+assert.match(
+  apiScanController,
+  new RegExp(`@Headers\\('${sharedHeaderName.toLowerCase()}'\\)`),
+  `服务端读的头名必须与共享契约一致（当前契约值 ${sharedHeaderName}）；`
+    + '对不上就是前端发了一个服务端永远读不到的头，重扫静默退化成普通创建',
+)
+assert.match(
+  apiScanDto,
+  /retryOfScanTaskId\?: string/,
+  '服务端 body 字段名必须仍是 retryOfScanTaskId；改名而前端不跟，授权就永远取不到',
+)
+assert.match(
+  scanTaskContract,
+  /export interface ScanRescanAuthorization \{[\s\S]*?retryOfScanTaskId: string[\s\S]*?priorControlToken: string[\s\S]*?\}/,
+  '两半必须收在同一个类型里：分开传参就一定会有人只传一半',
+)
+const createRequestBody = /export interface ScanSessionCreateRequest \{([\s\S]*?)\n\}/.exec(scanTaskContract)?.[1]
+assert.ok(createRequestBody, '共享契约里必须还有 ScanSessionCreateRequest')
+assert.match(
+  createRequestBody,
+  /retryOfScanTaskId\?: string/,
+  '进 body 的那一半就是 retryOfScanTaskId，必须留在请求体类型里',
+)
+assert.doesNotMatch(
+  createRequestBody,
+  /[Cc]ontrolToken/,
+  '凭证不得进 body 类型：它只走 header（body 会进请求日志与回放，header 通常不会）',
+)
+
+const scanTasksApiSource = read('src/services/api/scanTasks.ts')
+assert.match(
+  scanTasksApiSource,
+  /const body: ScanSessionCreateRequest = \{ scanType: input\.scanType, terminalId: input\.terminalId \}/,
+  'body 必须按白名单重建：直接展开调用方给的 input，就可能带进一个没有配对凭证的 '
+    + 'retryOfScanTaskId，服务端 403，而页面以为自己在做安全重扫',
+)
+assert.match(
+  scanTasksApiSource,
+  /if \(paired\) \{\s*\n\s*body\.retryOfScanTaskId = paired\.retryOfScanTaskId\s*\n\s*[\s\S]{0,200}?headers\[SCAN_RETRY_CONTROL_HEADER\] = paired\.priorControlToken\s*\n\s*\}/,
+  '两半必须在同一个 if 里从同一个对象派生：分成两处写，普通创建迟早会误带重扫头，'
+    + '或者带了 id 却没带凭证',
+)
+assert.match(
+  scanTasksApiSource,
+  /if \(retryOfScanTaskId\.length === 0 \|\| priorControlToken\.length === 0\) \{[\s\S]{0,400}?throw new ApiHttpError\(\s*\n?\s*'SCAN_RESCAN_AUTHORITY_INCOMPLETE'/,
+  '半对凭据必须当场拒，不许当成「没有授权」发普通创建 —— 那正是这次要修的静默降级',
+)
+assert.doesNotMatch(
+  scanTasksApiSource,
+  /body: JSON\.stringify\(input\)/,
+  '不得再原样序列化 input：两半的配对保证全靠按白名单重建的那个 body',
+)
+
+// ── B. 取用时机：和代次同一个同步块，且每次创建只取一次 ──────────────────────
+assert.match(
+  scanSettings,
+  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,600}?const rescan = takeScanRescanAuthority\(scanType\)[\s\S]{0,300}?sessionPromiseRef\.current = createScanSession\(/,
+  '授权必须在「取代次」与「发创建请求」之间取：授权本身按代次校验，'
+    + '中间隔一次 await 就可能取到属于上一场的那一份',
+)
+assert.match(
+  scanSettings,
+  /if \(!sessionPromiseRef\.current\) \{[\s\S]{0,900}?takeScanRescanAuthority\(scanType\)/,
+  '取用必须在「只创建一次」那道闸里：闸外取的话，终端会话 checking→ready 每切一次'
+    + '就白消耗一枚授权，而真正那次创建反倒拿不到',
+)
+assert.equal(
+  (scanSettings.match(/takeScanRescanAuthority\(/g) ?? []).length,
+  1,
+  '整页只许取一次：一次性授权取过就没了，第二处调用必然拿到 null 并静默退化成普通创建',
+)
+assert.match(
+  scanSettings,
+  /createScanSession\(\s*\n\s*\{ scanType, terminalId: getTerminalId\(\) \},\s*\n\s*getToken\(\),\s*\n\s*rescan,\s*\n\s*\)/,
+  '取到的授权必须真的传给创建请求；取了不传 = 白取一枚，重扫照旧退化',
+)
+
+// ── C. 被拒不许静默降级 ────────────────────────────────────────────────────
+const rejectionCodeTable = /const SCAN_RESCAN_REJECTION_CODES = new Set\(\[([\s\S]*?)\]\)/.exec(scanSettings)?.[1]
+assert.ok(rejectionCodeTable, '扫描设置页必须有一张显式的重扫拒绝码表')
+for (const code of ['SCAN_RETRY_NOT_AUTHORIZED', 'SCAN_RETRY_CONFLICT', 'SCAN_RETRY_TASK_ID_MISSING']) {
+  assert.match(
+    apiScanService,
+    new RegExp(`code: '${code}'`),
+    `服务端仍会抛 ${code}，前端必须继续认它`,
+  )
+  assert.match(
+    rejectionCodeTable,
+    new RegExp(`'${code}'`),
+    `${code} 必须在拒绝码表**里面**（不是文件里某处出现过就算），否则它会掉进`
+      + '「扫描任务未创建」的通用兜底：用户读不出「重扫授权失效」这件事，'
+      + '也不知道该不该再把同一张纸放回去',
+  )
+}
+assert.match(
+  rejectionCodeTable,
+  /'SCAN_RESCAN_AUTHORITY_INCOMPLETE'/,
+  '本机成对校验抛的码也要在表里：否则半对凭据会被当成一次普通创建失败',
+)
+assert.match(
+  scanSettings,
+  /SCAN_RESCAN_REJECTION_CODES\.has\(code \?\? ''\)[\s\S]{0,1200}?title: '安全重扫授权已失效'/,
+  '重扫被拒要有自己的结论屏，不能和「服务端没能创建扫描会话」混成一句',
+)
+assert.match(
+  scanSettings,
+  /本页不会自动改用普通重扫/,
+  '必须对用户明说不会自动降级：降级本身不危险，但它会把用户支到面板前去扫一张'
+    + '注定被去重拒收的纸，白等十分钟且毫无提示',
+)
+assert.equal(
+  (scanSettings.match(/createScanSession\(/g) ?? []).length,
+  1,
+  '全页只许有一处创建调用：重扫被拒之后另开一处「改发普通创建」就是静默降级',
+)
+
+// ── D. 授权不得被下一位用户继承 ────────────────────────────────────────────
+assert.match(
+  workbenchSession,
+  /export function takeScanRescanAuthority\(scanType: ScanType\): ScanRescanAuthorization \| null \{\s*\n\s*const authority = usableRescanAuthority\(scanType\)\s*\n\s*rescanAuthority = null/,
+  '取用必须**无条件**清空槽位（先取后清，清在校验结果之前）：只在成功时清，'
+    + '一份过期/错类型的授权会一直留在内存里等下一位用户',
+)
+assert.match(
+  workbenchSession,
+  /export function beginScanRescan\([\s\S]*?const carried = usableRescanAuthority\(args\.scanType\)\s*\n\s*rescanAuthority = null\s*\n\s*patchScanWorkbenchSession\(\{[\s\S]*?live: undefined,[\s\S]*?\}\)\s*\n\s*if \(!carried\) return false\s*\n\s*rescanAuthority = \{ \.\.\.carried, generation: lifecycleGeneration \}/,
+  '移交顺序只有一种是对的：先取出 → 再推进代次（patch 的 live: undefined）→ 最后按**新**'
+    + '代次重新登记。先 patch 再取，授权会在推进代次那一步被自己清掉，重扫静默退化；'
+    + '而重新登记必须原样带走 armedAtMs（用 ...carried 展开），重新计时就等于可以无限续期',
+)
+assert.doesNotMatch(
+  workbenchSession,
+  /(setItem|JSON\.stringify)\([\s\S]{0,120}rescanAuthority/,
+  '授权含上一场 controlToken 明文，一个字节都不许写进浏览器存储（公共设备，跨刷新跨用户）',
+)
+assert.match(
+  scanResult,
+  /if \(outcome !== 'failed' && outcome !== 'expired'\) \{\s*\n\s*clearScanRescanAuthority\(\)/,
+  '只有 failed / expired 才可能有授权（服务端只在 matched 之后落到那几条路径时铸）；'
+    + 'completed 与「完成但没带文件」的任务已建档（fileId 非空）按契约不会有授权，'
+    + '这时必须把手里那份显式扔掉。这一句是纵深：今天成功终态之前必然先经过一次'
+    + '一次性取用（槽位那时已空），它守的是那个前提被改坏的将来',
+)
+assert.match(
+  scanResult,
+  /armScanRescanAuthority\(\{ priorScanTaskId, priorControlToken, scanType \}\)/,
+  '登记要用刚结束那一场的真实凭证，不能另造一份',
+)
+assert.match(
+  scanResult,
+  /beginScanRescan\(\{\s*\n\s*scanType,/,
+  '「重试扫描」必须走 beginScanRescan：直接 patch 阶段就是这次修复之前的行为',
+)
+/* ── E. 结果页自己的出口也必须把这枚授权收走 ───────────────────────────────
+ *
+ * 顶栏返回与底栏三项走的是 ScanWorkbenchChrome 的 leaveScanFlow（上面已单独钉）。
+ * 结果页 ctabar 上那几个出口是**另一套按钮**，此前只是裸 navigate —— 同一屏两种命运：
+ * 从顶栏走的人本机登记被清干净，从 ctabar 走的人把 live 登记（含刚结束那一场的
+ * controlToken 明文）和这枚一次性授权一起留在原地，下一位用户接着用这台机器就继承了。
+ * 所以下面钉的不是「有几个出口」，而是「每个出口都必须走同一条 leaveScanFlow」。 */
+assert.match(
+  scanResult,
+  /const leaveScanFlow = \(destination: string\): void => \{\s*\n\s*revokeLiveScanSession\(getToken\(\)\)\s*\n\s*clearScanWorkbenchSession\(\)\s*\n\s*navigate\(destination\)\s*\n\s*\}/,
+  '结果页的出口与顶栏返回同一条语义：先撤服务端任务，再清本机登记'
+    + '（代次推进的同一步把授权扔掉），最后才走人',
+)
+for (const destination of ['/print-scan', '/help', '/']) {
+  assert.match(
+    scanResult,
+    new RegExp(`leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'\\)`),
+    `结果页落点 ${destination} 的出口必须走 leaveScanFlow`,
+  )
+  assert.doesNotMatch(
+    scanResult,
+    new RegExp(`onClick=\\{\\(\\) => navigate\\('${destination.replaceAll('/', '\\/')}'\\)\\}`),
+    `落点 ${destination} 一旦改回裸 navigate，这一屏又会把上一位的凭证和授权留给下一位`,
+  )
+}
+
+/* ── F. 谁有资格说「服务端已放行」 ─────────────────────────────────────────
+ *
+ * 结果页只知道「我手里有一份上一场的凭据」，**不知道服务端到底铸没铸那枚授权** ——
+ * 服务端只在任务已经取到文件（matched + lastAttemptHash）之后落到 failed /
+ * cancelled / expired 时才铸；而本机在一个还停在 waiting 的任务上放弃轮询也会走到
+ * 这一屏，那种情况根本没有授权，凭据照样在手里。
+ *
+ * 设置页相反：那一行只在创建成功之后才渲染，而带着重扫两半的创建能成功，
+ * 等于服务端已经把授权消费掉了 —— 所以「已放行」只有它说得出口。 */
+assert.doesNotMatch(
+  scanResult,
+  /服务端给的安全重扫放行|服务端已放行/,
+  '结果页不得替服务端下结论：这一刻它只有凭据，没有放行结果',
+)
+assert.match(
+  scanResult,
+  /去申请安全重扫放行[\s\S]{0,120}?不会悄悄按普通重扫处理/,
+  '结果页只能说「带着凭据去申请」，并当场承诺不会悄悄降级 —— 用户据此决定'
+    + '要不要把同一张纸放回去',
+)
+assert.match(
+  scanSettings,
+  /rescanRequested\s*\n?\s*\? \[\['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'\]/,
+  '「已放行」只许出现在创建成功之后的设置页：那一刻服务端确实已经消费掉那枚授权',
+)
+assert.match(
+  scanSettings,
+  /const restoredFromStorageRef = useRef\(Boolean\(restoredLive && scanType\)\)/,
+  '设置页必须能分辨「这一场是复水出来的」：那一刻它说不出当初带没带重扫授权。'
+    + '而且必须锁在初次渲染（ref）—— 创建成功之后本页自己会把 live 写回登记，'
+    + '每帧重算会把一个刚在本页建成的会话说成「本页重载过」',
+)
+assert.match(
+  scanSettings,
+  /restoredFromStorageRef\.current\s*\n?\s*\? \[\['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断'\]/,
+  '复水出来的会话只能如实说无从判断：猜「安全重扫」会让用户把同一张纸放回去'
+    + '（可能被去重拒收），猜「普通会话」会让他白换一份材料',
+)
+assert.doesNotMatch(
+  scanResult,
+  /patchScanWorkbenchSession\(/,
+  '结果页不得再自己 patch：移交那三步必须原子，散在页面里迟早被改成先 patch 再取',
+)
+// 服务端的资格集合与 TTL 变了，本机这两条判据（只在 failed/expired 登记、15 分钟）就得跟。
+assert.match(
+  apiScanService,
+  /SCAN_RETRY_ELIGIBLE_STATUSES = \['failed', 'cancelled', 'expired'\]/,
+  '服务端的可重扫状态集合变了：结果页的登记条件与本地有效期都要重新核一遍',
+)
+assert.match(
+  apiScanService,
+  /SCAN_RETRY_AUTHORITY_TTL_MS = 15 \* 60 \* 1000/,
+  '服务端授权有效期变了：scanWorkbenchSession 的 SCAN_RESCAN_AUTHORITY_TTL_MS 必须同步',
+)
+assert.match(
+  workbenchSession,
+  /SCAN_RESCAN_AUTHORITY_TTL_MS = 15 \* 60 \* 1000/,
+  '本地有效期与服务端取同一个值：短了会在服务端还认的时候静默降级，长了只是多发一次 403',
+)
+
+const rescanAuthorityTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-rescan-authority.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  rescanAuthorityTest.status,
+  0,
+  `scan rescan authority behaviour test failed: ${rescanAuthorityTest.stderr || rescanAuthorityTest.stdout}`,
 )
 
 const modelTest = spawnSync(

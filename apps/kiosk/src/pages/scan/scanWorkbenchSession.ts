@@ -1,3 +1,4 @@
+import type { ScanRescanAuthorization } from '@ai-job-print/shared'
 import { isScanType, type ScanType } from './scanWorkbench'
 import { parseScanStage, type ScanStage } from './scanWorkbenchModel'
 
@@ -26,6 +27,13 @@ export const SCAN_WORKBENCH_SESSION_KEY = 'ai-job-print:current-scan-workbench'
  */
 let lifecycleGeneration = 0
 
+/**
+ * 当前这一场可用的一次性安全重扫授权，没有就是 null。
+ * 声明提到这里，是因为 `endScanLifecycle()` 要在推进代次的同一步里把它扔掉；
+ * 它是什么、什么时候登记、什么时候消失，见下方 `ScanRescanAuthority` 的注释。
+ */
+let rescanAuthority: ScanRescanAuthority | null = null
+
 /** 取当前代次。发出创建请求之前取一份，响应回来时比对。 */
 export function scanLifecycleGeneration(): number {
   return lifecycleGeneration
@@ -40,6 +48,169 @@ export function scanLifecycleGeneration(): number {
  */
 function endScanLifecycle(): void {
   lifecycleGeneration += 1
+  rescanAuthority = null
+}
+
+/**
+ * 一次性安全重扫授权（内存态）。
+ *
+ * ## 它是什么
+ *
+ * 上一场扫描在文件已经被取走（服务端 matched）之后失败 / 被取消 / 过期时，服务端会
+ * 铸一枚 15 分钟的一次性授权：绑定用户 + 终端 + 扫描类型 + 那份内容的 hash + 上一场的
+ * controlToken，CAS 消费一次。带着它创建的新任务才被允许把**同一份纸**再投一次，
+ * 否则会撞上服务端 2 小时的同字节去重（`SCAN_FILE_PREVIOUSLY_ATTEMPTED`）。
+ *
+ * 本机这一份只是那枚授权的**取用凭据**，用来发请求，判定权始终在服务端。
+ *
+ * ## 为什么只活在内存里
+ *
+ * `priorControlToken` 是上一场任务的控制凭证明文。**这枚授权自己一个字节都不落存储**：
+ * 不进 body、不进 query string、不写 localStorage / sessionStorage，只走
+ * `X-Scan-Retry-Control` 头。写进 `ai-job-print:current-scan-workbench` 它就会跨刷新、
+ * 跨用户活下来，而这台机器是公共设备。
+ *
+ * 但话要说完整，否则下一个读代码的人会以为这份凭证只存在于本模块内存里：**它的取用
+ * 来源是既有的 live 登记**（`live.controlToken`），而那份登记为了让看门狗重载之后还能
+ * 继续轮询同一场扫描，本来就写在 sessionStorage 里（`ScanSettingsPage` 写、
+ * `ScanProgressPage` 复水）。所以真实的存活边界是：
+ *   · 结果页整页重载之后，授权会按同一份 live 登记**重新登记**（不是丢失）；
+ *   · 让这份凭证真正消失的是清场 —— `clearScanWorkbenchSession()` 同一步抹掉 live 登记
+ *     和本模块这枚授权，隐私空闲 / 屏保 / 退出 / 换人 / 离开扫描流程全走那一条。
+ * 设置页那边没有这条复水：整页重载之后它说不出「这一场当初是不是安全重扫」，
+ * 所以它什么都不宣称，只如实说「本机无从判断」。
+ *
+ * ## 它什么时候消失
+ *
+ * 任何一次代次推进都会把它扔掉（见 `endScanLifecycle`）：清场、退出、屏保、离开扫描
+ * 流程、安全返回、明确放弃，全都走那条。**唯一**允许它跨越代次的入口是
+ * `beginScanRescan()` —— 那是用户按下「重试扫描」的那一刻，取出、推进代次、按新代次
+ * 重新登记三件事在同一个同步块里做完，中间没有第二段可写入的窗口。
+ */
+export interface ScanRescanAuthority {
+  priorScanTaskId: string
+  priorControlToken: string
+  scanType: ScanType
+  /** 铸下这份授权时的扫描代次。代次一变它就作废。 */
+  generation: number
+  /** 本机记下的登记时刻，用于本地有效期判断。 */
+  armedAtMs: number
+}
+
+/**
+ * 本地有效期，与服务端 `SCAN_RETRY_AUTHORITY_TTL_MS`（15 分钟）取同一个值。
+ *
+ * 刻意不取更短：短了会在服务端其实还认的时候把授权扔掉，用户被静默降级成普通重扫，
+ * 正是这次要修的那个缺陷。也不取更长：长了只会多发一次注定被 403 的请求。
+ * 两边都不是判定方 —— 服务端才是，这里只是不把明显已经过期的凭据再发出去。
+ */
+export const SCAN_RESCAN_AUTHORITY_TTL_MS = 15 * 60 * 1000
+
+/** 校验「这份授权此刻还能不能用」：同一代次、同一扫描类型、未超本地有效期。 */
+function usableRescanAuthority(scanType: ScanType): ScanRescanAuthority | null {
+  const authority = rescanAuthority
+  if (!authority) return null
+  if (authority.generation !== lifecycleGeneration) return null
+  if (authority.scanType !== scanType) return null
+  if (Date.now() - authority.armedAtMs >= SCAN_RESCAN_AUTHORITY_TTL_MS) return null
+  return authority
+}
+
+/**
+ * 登记一枚可能存在的重扫授权。
+ *
+ * 由结果页在**服务端可能真的铸过授权**的终态上调用（failed / expired）。成功、
+ * 「完成但没带文件」这两种终态一律不登记 —— 那两种任务服务端已经建了档（fileId 非空），
+ * 按契约根本不会发授权，登记只会让下一次白发一个必然 403 的请求。
+ *
+ * @returns 是否登记成功（凭据齐全才登记）。
+ */
+export function armScanRescanAuthority(input: {
+  priorScanTaskId: string
+  priorControlToken: string
+  scanType: ScanType
+}): boolean {
+  if (input.priorScanTaskId.trim().length === 0) return false
+  if (input.priorControlToken.trim().length === 0) return false
+  const resident = rescanAuthority
+  // 同一场重复登记必须**保留原来的 armedAtMs**。结果页每次挂载都会走一遍这里
+  // （React 重渲染、阶段来回切），按 Date.now() 重新计时就是「回一次结果页续 15 分钟」，
+  // 而服务端那枚授权是从它铸出来的那一刻开始算的 —— 本机的窗口只能比它短，不能比它长。
+  //
+  // 整页重载是这条幂等管不到的一种情况：模块内存连 resident 都没了，只能重新计时。
+  // 那种情况下本机窗口会比服务端的长一截，而这个方向是可以接受的那一边 ——
+  // 判定方始终是服务端：窗口估长，代价是多发一次注定 403 的请求，页面当场如实说明；
+  // 窗口估短，用户会被本机判成「没有授权」，拿着同一张纸去撞那条两小时的同字节去重，
+  // 白等十分钟且屏幕上看不见原因。
+  const armedAtMs = resident
+    && resident.priorScanTaskId === input.priorScanTaskId
+    && resident.scanType === input.scanType
+    && resident.generation === lifecycleGeneration
+    ? resident.armedAtMs
+    : Date.now()
+  rescanAuthority = {
+    priorScanTaskId: input.priorScanTaskId,
+    priorControlToken: input.priorControlToken,
+    scanType: input.scanType,
+    generation: lifecycleGeneration,
+    armedAtMs,
+  }
+  return true
+}
+
+/** 只问「现在还有没有可用的授权」，不消费。供页面决定文案与按钮，不参与发请求。 */
+export function hasScanRescanAuthority(scanType: ScanType): boolean {
+  return usableRescanAuthority(scanType) !== null
+}
+
+/**
+ * 取走授权（**一次性**：取过就没了，无论这次请求成不成功）。
+ *
+ * 取不到就是取不到，本模块不会替调用方造一份 —— 调用方拿到 null 时发的是普通创建，
+ * 页面必须如实说清那不是安全重扫。
+ */
+export function takeScanRescanAuthority(scanType: ScanType): ScanRescanAuthorization | null {
+  const authority = usableRescanAuthority(scanType)
+  rescanAuthority = null
+  if (!authority) return null
+  return {
+    retryOfScanTaskId: authority.priorScanTaskId,
+    priorControlToken: authority.priorControlToken,
+  }
+}
+
+/** 明确扔掉授权（成功终态、离开、换人）。不导出给业务页随手调也没关系：它是幂等的。 */
+export function clearScanRescanAuthority(): void {
+  rescanAuthority = null
+}
+
+/**
+ * 「重试扫描」：结束这一场，并把它那枚一次性授权移交给下一场。
+ *
+ * 这是唯一允许授权跨越代次的入口。三步必须在同一个同步块里按序做完：
+ *
+ *   1. 先取出（校验代次 / 类型 / 有效期），此刻槽位已空；
+ *   2. 推进代次并写回登记（`patchScanWorkbenchSession` 的 `live: undefined` 分支），
+ *      这一步会再清一次槽位 —— 已经是空的，所以移交不会被自己清掉；
+ *   3. 按**新**代次重新登记，`armedAtMs` 原样带走：移交不延长有效期，
+ *      否则用户反复点「重试扫描」就能把一枚 15 分钟的授权无限续下去。
+ *
+ * 顺序反了（先 patch 再取）授权会在第 2 步被自己清空，重扫就静默退化成普通新会话；
+ * 这正是本次要修的缺陷，所以 `verify:scan-session-truth` 把这段顺序钉住了。
+ */
+export function beginScanRescan(args: { scanType: ScanType; extras?: ScanRetryExtras }): boolean {
+  const carried = usableRescanAuthority(args.scanType)
+  rescanAuthority = null
+  patchScanWorkbenchSession({
+    stage: 'settings',
+    scanType: args.scanType,
+    extras: args.extras,
+    live: undefined,
+    result: undefined,
+  })
+  if (!carried) return false
+  rescanAuthority = { ...carried, generation: lifecycleGeneration }
+  return true
 }
 
 export interface ScanLiveState {
