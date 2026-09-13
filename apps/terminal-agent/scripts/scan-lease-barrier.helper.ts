@@ -27,6 +27,15 @@ import {
   noteScanInputUnavailableForTest,
   noteScanWatcherRebuildForTest,
   isScanDeliveryPausedForTest,
+  beginScanWatchSessionForTest,
+  getScanInputStateForTest,
+  lockOutScanInputForTest,
+  stopScanWatchSessionForTest,
+  setScanCandidateTestHooks,
+  holdScanLifecycleExclusiveForTest,
+  runPeriodicScanSweepForTest,
+  getScanLifecycleExclusiveStatsForTest,
+  startScanWatcher,
 } from '../src/agent/scan-watcher'
 import type { TrustedWindowsCandidate } from '../src/agent/scan-input/windows-secure-reader'
 import {
@@ -607,7 +616,7 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
   }
 
   await runOverlappingStartupBacklogRaceTest()
-  await runScanInputRecoveryBarrierTests()
+  await runScanInputLockoutTests()
 
   console.log('PASS scan lease barrier helper checks')
 }
@@ -850,9 +859,14 @@ export async function runStartupInspectionFailureZeroDeliveryTest(): Promise<voi
   writeFileSync(oldPath, oldSecret)
   renameSync(scanFolder, offlineFolder)
   try {
-    const quarantined = await isolateStartupBacklog(scanFolder)
-    assert.equal(quarantined, 0, 'startup inspection failure must not quarantine by guessing')
+    beginScanWatchSessionForTest()
+    const { stdout } = await captureLogsAsync(async () => {
+      const quarantined = await isolateStartupBacklog(scanFolder)
+      assert.equal(quarantined, 0, 'startup inspection failure must not quarantine by guessing')
+    })
+    assert.equal(getScanInputStateForTest(), 'locked_out')
     assert.equal(isScanDeliveryPausedForTest(), true, 'startup inspection failure must pause delivery')
+    assert.match(stdout, /SCAN_INPUT_RESTART_REQUIRED/)
     await processCandidate(oldPath, oldName, makeHelperConfig(backend.baseUrl, scanFolder))
     assert.equal(backend.leaseCount(), 0, 'startup inspection failure must NEVER request a scan lease')
     assert.equal(backend.deliverCount(), 0, 'startup inspection failure must NEVER deliver')
@@ -870,34 +884,33 @@ export async function runStartupInspectionFailureZeroDeliveryTest(): Promise<voi
   }
 }
 
-export async function runUnavailableToReadyRecoveryTest(): Promise<void> {
+export async function runLockoutUntilRestartSafetyTest(): Promise<void> {
   clearStartupBacklogForTest()
   const backend = await startCountingLeaseServer()
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-unavailable-ready-'))
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-lockout-until-restart-'))
   const offlineFolder = `${scanFolder}.offline`
   const oldName = 'remounted-old.pdf'
-  const newName = 'after-boundary.pdf'
+  const newName = 'after-lockout.pdf'
   const oldPath = join(scanFolder, oldName)
   const newPath = join(scanFolder, newName)
-  const oldSecret = '%PDF-1.4 REMOUNTED-OLD-MUST-NOT-BIND'
-  const newSecret = '%PDF-1.4 NEW-AFTER-BOUNDARY-MUST-DELIVER'
+  const oldSecret = '%PDF-1.4 LOCKOUT-OLD-MUST-NOT-BIND'
+  const newSecret = '%PDF-1.4 LOCKOUT-NEW-MUST-NOT-DELIVER-THIS-PROCESS'
   const config = makeHelperConfig(backend.baseUrl, scanFolder)
   try {
+    beginScanWatchSessionForTest()
     const isolated = await isolateStartupBacklog(scanFolder)
-    assert.equal(isolated, 0, 'empty running folder must establish a clean boundary')
-    assert.equal(isScanDeliveryPausedForTest(), false)
+    assert.equal(isolated, 0)
+    assert.equal(getScanInputStateForTest(), 'running')
 
     writeFileSync(oldPath, oldSecret)
     renameSync(scanFolder, offlineFolder)
-    await processCandidate(oldPath, oldName, config)
-    assert.equal(isScanDeliveryPausedForTest(), true, 'unavailable folder must pause delivery')
-    assert.equal(backend.leaseCount(), 0, 'paused unavailable window must NEVER request a scan lease')
-    assert.equal(backend.deliverCount(), 0, 'paused unavailable window must NEVER deliver')
-    assert.equal(
-      existsSync(join(offlineFolder, oldName)),
-      true,
-      'old file must remain on the offline volume until recovery',
-    )
+    const { stdout } = await captureLogsAsync(async () => {
+      await processCandidate(oldPath, oldName, config)
+    })
+    assert.equal(getScanInputStateForTest(), 'locked_out')
+    assert.equal(backend.leaseCount(), 0, 'unavailable window must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'unavailable window must NEVER deliver')
+    assert.match(stdout, /SCAN_INPUT_RESTART_REQUIRED/)
 
     renameSync(offlineFolder, scanFolder)
     const refreshed = Date.now()
@@ -905,24 +918,16 @@ export async function runUnavailableToReadyRecoveryTest(): Promise<void> {
     assert.equal(
       isPreExistingCandidate({ mtimeMs: refreshed, birthtimeMs: refreshed }, backend.leaseNotBeforeIso),
       false,
-      'refreshed timestamps must look new to the mtime/birthtime barrier — recovery must not rely on them',
+      'refreshed timestamps must look new to mtime/birthtime — lockout must not rely on them',
     )
-
-    await sweepFolder(scanFolder, config)
-    assert.equal(backend.leaseCount(), 0, 'recovered old file must NEVER request a scan lease')
-    assert.equal(backend.deliverCount(), 0, 'recovered old file must NEVER bind to the later waiting task')
-    assert.equal(existsSync(oldPath), false, 'old remounted file must leave the scan root')
-    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true, 'old remounted file must be quarantined')
-    assert.equal(readFileSync(join(scanFolder, '_unclaimed', oldName), 'utf8'), oldSecret)
 
     writeFileSync(newPath, newSecret)
     await processCandidate(newPath, newName, config)
-    assert.equal(backend.leaseCount(), 1, 'a file created after the clean boundary must request a lease')
-    assert.equal(backend.deliverCount(), 1, 'a file created after the clean boundary must still deliver')
-    assert.equal(existsSync(newPath), false, 'new file after the clean boundary must be removed on delivery')
-    assert.equal(existsSync(join(scanFolder, '_unclaimed', newName)), false, 'new file must not be quarantined')
+    assert.equal(backend.leaseCount(), 0, 'after lockout this process must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'after lockout this process must NEVER deliver')
+    assert.equal(getScanInputStateForTest(), 'locked_out')
 
-    console.log('PASS unavailable->ready recovery: old remounted file quarantined, later new file delivered')
+    console.log('PASS lockout-until-restart: unavailable then restored still lease=0/deliver=0')
   } finally {
     try {
       if (!existsSync(scanFolder) && existsSync(offlineFolder)) renameSync(offlineFolder, scanFolder)
@@ -935,20 +940,22 @@ export async function runUnavailableToReadyRecoveryTest(): Promise<void> {
   }
 }
 
-export async function runRootIdentityChangeRecoveryTest(): Promise<void> {
+export async function runRootIdentityLockoutTest(): Promise<void> {
   clearStartupBacklogForTest()
   const backend = await startCountingLeaseServer()
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-root-identity-'))
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-root-identity-lockout-'))
   const stashFolder = `${scanFolder}.stash`
   const oldName = 'identity-old.pdf'
   const newName = 'identity-new.pdf'
   const oldSecret = '%PDF-1.4 ROOT-IDENTITY-OLD-MUST-NOT-BIND'
-  const newSecret = '%PDF-1.4 ROOT-IDENTITY-NEW-MUST-DELIVER'
+  const newSecret = '%PDF-1.4 ROOT-IDENTITY-NEW-MUST-NOT-DELIVER'
   const config = makeHelperConfig(backend.baseUrl, scanFolder)
   try {
+    beginScanWatchSessionForTest()
     await isolateStartupBacklog(scanFolder)
     const previousIdentity = readScanFolderIdentity(scanFolder)
     assert.ok(previousIdentity, 'running folder must have a readable identity')
+    assert.equal(getScanInputStateForTest(), 'running')
 
     writeFileSync(join(scanFolder, oldName), oldSecret)
     renameSync(scanFolder, stashFolder)
@@ -965,18 +972,16 @@ export async function runRootIdentityChangeRecoveryTest(): Promise<void> {
     )
 
     await sweepFolder(scanFolder, config)
-    assert.equal(backend.leaseCount(), 0, 'root-identity change must NEVER lease the reappeared old file')
-    assert.equal(backend.deliverCount(), 0, 'root-identity change must NEVER deliver the reappeared old file')
-    assert.equal(existsSync(join(scanFolder, oldName)), false)
-    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true)
+    assert.equal(getScanInputStateForTest(), 'locked_out')
+    assert.equal(backend.leaseCount(), 0, 'root-identity change must NEVER lease')
+    assert.equal(backend.deliverCount(), 0, 'root-identity change must NEVER deliver')
 
     writeFileSync(join(scanFolder, newName), newSecret)
     await processCandidate(join(scanFolder, newName), newName, config)
-    assert.equal(backend.leaseCount(), 1)
-    assert.equal(backend.deliverCount(), 1)
-    assert.equal(existsSync(join(scanFolder, newName)), false)
+    assert.equal(backend.leaseCount(), 0)
+    assert.equal(backend.deliverCount(), 0)
 
-    console.log('PASS root identity change: reappeared children quarantined, later new file delivered')
+    console.log('PASS root identity lockout: this process never leases/delivers after identity change')
   } finally {
     await backend.close()
     rmSync(scanFolder, { recursive: true, force: true })
@@ -986,35 +991,35 @@ export async function runRootIdentityChangeRecoveryTest(): Promise<void> {
   }
 }
 
-export async function runWatcherRebuildRecoveryTest(): Promise<void> {
+export async function runWatcherErrorLockoutTest(): Promise<void> {
   clearStartupBacklogForTest()
   const backend = await startCountingLeaseServer()
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-rebuild-'))
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-rebuild-lockout-'))
   const oldName = 'rebuild-old.pdf'
   const newName = 'rebuild-new.pdf'
-  const oldSecret = '%PDF-1.4 WATCHER-REBUILD-OLD-MUST-NOT-BIND'
-  const newSecret = '%PDF-1.4 WATCHER-REBUILD-NEW-MUST-DELIVER'
+  const oldSecret = '%PDF-1.4 WATCHER-ERROR-OLD-MUST-NOT-BIND'
+  const newSecret = '%PDF-1.4 WATCHER-ERROR-NEW-MUST-NOT-DELIVER'
   const config = makeHelperConfig(backend.baseUrl, scanFolder)
   try {
+    beginScanWatchSessionForTest()
     await isolateStartupBacklog(scanFolder)
     writeFileSync(join(scanFolder, oldName), oldSecret)
     const now = Date.now()
     utimesSync(join(scanFolder, oldName), new Date(now), new Date(now))
     noteScanWatcherRebuildForTest()
+    assert.equal(getScanInputStateForTest(), 'locked_out')
     assert.equal(isScanDeliveryPausedForTest(), true)
 
     await sweepFolder(scanFolder, config)
-    assert.equal(backend.leaseCount(), 0, 'watcher rebuild must NEVER lease files present at rebuild')
-    assert.equal(backend.deliverCount(), 0, 'watcher rebuild must NEVER deliver files present at rebuild')
-    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true)
+    assert.equal(backend.leaseCount(), 0, 'watcher error/rebuild request must NEVER lease')
+    assert.equal(backend.deliverCount(), 0, 'watcher error/rebuild request must NEVER deliver')
 
     writeFileSync(join(scanFolder, newName), newSecret)
     await processCandidate(join(scanFolder, newName), newName, config)
-    assert.equal(backend.leaseCount(), 1)
-    assert.equal(backend.deliverCount(), 1)
-    assert.equal(existsSync(join(scanFolder, newName)), false)
+    assert.equal(backend.leaseCount(), 0)
+    assert.equal(backend.deliverCount(), 0)
 
-    console.log('PASS watcher rebuild: children present at rebuild quarantined, later new file delivered')
+    console.log('PASS watcher error lockout: this process never leases/delivers after rebuild request')
   } finally {
     await backend.close()
     rmSync(scanFolder, { recursive: true, force: true })
@@ -1035,9 +1040,11 @@ export async function runRecoveryEaccesRetryTest(): Promise<void> {
   const oldSecret = '%PDF-1.4 RECOVERY-EACCES-MUST-NOT-DELIVER'
   const config = makeHelperConfig(backend.baseUrl, scanFolder)
   try {
+    beginScanWatchSessionForTest()
     await isolateStartupBacklog(scanFolder)
     writeFileSync(oldPath, oldSecret)
     noteScanInputUnavailableForTest()
+    assert.equal(getScanInputStateForTest(), 'locked_out')
 
     const { stderr } = await captureLogsAsync(async () => {
       await sweepFolder(scanFolder, config)
@@ -1080,6 +1087,7 @@ export async function runPathCanonicalizationRecoveryTest(): Promise<void> {
   const dottedPath = join(scanFolder, '.', oldName)
   const config = makeHelperConfig(backend.baseUrl, scanFolder)
   try {
+    beginScanWatchSessionForTest()
     await isolateStartupBacklog(scanFolder)
     writeFileSync(directPath, oldSecret)
     noteScanInputUnavailableForTest()
@@ -1107,11 +1115,201 @@ export async function runPathCanonicalizationRecoveryTest(): Promise<void> {
   }
 }
 
-export async function runScanInputRecoveryBarrierTests(): Promise<void> {
+export async function runNormalStartupThenNewFileDeliversTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-normal-startup-'))
+  const oldName = 'startup-old.pdf'
+  const newName = 'after-running.pdf'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    writeFileSync(join(scanFolder, oldName), '%PDF-1.4 STARTUP-OLD')
+    beginScanWatchSessionForTest()
+    const quarantined = await isolateStartupBacklog(scanFolder)
+    assert.equal(quarantined, 1)
+    assert.equal(getScanInputStateForTest(), 'running')
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true)
+    assert.equal(backend.leaseCount(), 0)
+
+    writeFileSync(join(scanFolder, newName), '%PDF-1.4 AFTER-RUNNING')
+    await processCandidate(join(scanFolder, newName), newName, config)
+    assert.equal(backend.leaseCount(), 1)
+    assert.equal(backend.deliverCount(), 1)
+    assert.equal(existsSync(join(scanFolder, newName)), false)
+    console.log('PASS normal startup: old files isolated, files after RUNNING still deliver')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runRestartSimulationAfterLockoutTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-restart-sim-'))
+  const leftover = 'leftover-after-crash.pdf'
+  const fresh = 'after-restart.pdf'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    lockOutScanInputForTest('unavailable')
+    writeFileSync(join(scanFolder, leftover), '%PDF-1.4 LEFTOVER')
+    await processCandidate(join(scanFolder, leftover), leftover, config)
+    assert.equal(backend.leaseCount(), 0)
+    assert.equal(backend.deliverCount(), 0)
+
+    clearStartupBacklogForTest()
+    writeFileSync(join(scanFolder, leftover), '%PDF-1.4 LEFTOVER')
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    assert.equal(getScanInputStateForTest(), 'running')
+    assert.equal(existsSync(join(scanFolder, leftover)), false)
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', leftover)), true)
+    assert.equal(backend.leaseCount(), 0)
+
+    writeFileSync(join(scanFolder, fresh), '%PDF-1.4 AFTER-RESTART')
+    await processCandidate(join(scanFolder, fresh), fresh, config)
+    assert.equal(backend.leaseCount(), 1)
+    assert.equal(backend.deliverCount(), 1)
+    console.log('PASS restart simulation: new session isolates leftovers, then new files deliver')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runOldGenerationBlockedAfterStableTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-lockout-after-stable-'))
+  const filename = 'inflight-stable.pdf'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(join(scanFolder, filename), '%PDF-1.4 INFLIGHT-STABLE')
+    setScanCandidateTestHooks({
+      afterStable: () => lockOutScanInputForTest('unavailable'),
+    })
+    await processCandidate(join(scanFolder, filename), filename, config)
+    assert.equal(backend.leaseCount(), 0, 'lockout after stable wait must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'lockout after stable wait must NEVER deliver')
+    console.log('PASS old generation blocked after stable wait: 0 lease / 0 POST')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runOldGenerationBlockedAfterLeaseTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-lockout-after-lease-'))
+  const filename = 'inflight-lease.pdf'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(join(scanFolder, filename), '%PDF-1.4 INFLIGHT-LEASE')
+    setScanCandidateTestHooks({
+      afterLease: () => lockOutScanInputForTest('unavailable'),
+    })
+    await processCandidate(join(scanFolder, filename), filename, config)
+    assert.equal(backend.leaseCount(), 1, 'lease may already have returned')
+    assert.equal(backend.deliverCount(), 0, 'lockout after lease must NEVER POST deliver')
+    console.log('PASS old generation blocked after lease: lease returned, 0 POST')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runPeriodicSingleFlightAndStopRaceTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-exclusive-stop-'))
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  let releaseHold: () => void = () => undefined
+  const hold = new Promise<void>((resolve) => {
+    releaseHold = resolve
+  })
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    const held = holdScanLifecycleExclusiveForTest(hold)
+    const skipped = await runPeriodicScanSweepForTest(scanFolder, config)
+    assert.equal(skipped, 'skipped')
+    assert.ok(getScanLifecycleExclusiveStatsForTest().skipped >= 1)
+    releaseHold()
+    await held
+
+    writeFileSync(join(scanFolder, 'stop-race.pdf'), '%PDF-1.4 STOP-RACE')
+    setScanCandidateTestHooks({
+      afterStable: () => stopScanWatchSessionForTest(),
+    })
+    await processCandidate(join(scanFolder, 'stop-race.pdf'), 'stop-race.pdf', config)
+    assert.equal(backend.leaseCount(), 0, 'stop during in-flight must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0)
+    assert.equal(getScanInputStateForTest(), 'stopped')
+    assert.equal(
+      startScanWatcher(config),
+      undefined,
+      'stop must refuse a new watcher attach in this process',
+    )
+    console.log('PASS periodic single-flight and stop race: skip overlapping sweep, stop blocks attach and POST')
+  } finally {
+    releaseHold()
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runWindowsCaseFoldCanonicalKeyTest(): Promise<void> {
+  assert.equal(
+    canonicalizeScanPath('/Scan/Foo.PDF', 'win32'),
+    canonicalizeScanPath('/scan/foo.pdf', 'win32'),
+    'Windows path keys must case-fold',
+  )
+  assert.notEqual(
+    canonicalizeScanPath('/Scan/Foo.PDF', 'linux'),
+    canonicalizeScanPath('/scan/foo.pdf', 'linux'),
+    'non-Windows path keys stay case-sensitive',
+  )
+  const folder = mkdtempSync(join(tmpdir(), 'scan-watcher-casefold-'))
+  try {
+    const mixed = join(folder, 'Case.PDF')
+    assert.equal(
+      canonicalizeScanPath(join(folder, 'case.pdf'), 'win32'),
+      canonicalizeScanPath(mixed, 'win32'),
+    )
+    console.log('PASS Windows case-fold canonical key (8.3/fileId not claimed)')
+  } finally {
+    rmSync(folder, { recursive: true, force: true })
+  }
+}
+
+export async function runScanInputLockoutTests(): Promise<void> {
   await runStartupInspectionFailureZeroDeliveryTest()
-  await runUnavailableToReadyRecoveryTest()
-  await runRootIdentityChangeRecoveryTest()
-  await runWatcherRebuildRecoveryTest()
+  await runNormalStartupThenNewFileDeliversTest()
+  await runLockoutUntilRestartSafetyTest()
+  await runRootIdentityLockoutTest()
+  await runWatcherErrorLockoutTest()
+  await runRestartSimulationAfterLockoutTest()
+  await runOldGenerationBlockedAfterStableTest()
+  await runOldGenerationBlockedAfterLeaseTest()
+  await runPeriodicSingleFlightAndStopRaceTest()
+  await runWindowsCaseFoldCanonicalKeyTest()
   await runRecoveryEaccesRetryTest()
   await runPathCanonicalizationRecoveryTest()
 }

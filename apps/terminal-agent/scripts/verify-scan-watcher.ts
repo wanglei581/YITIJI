@@ -27,7 +27,7 @@ import type { AgentConfig } from '../src/agent/types'
 import {
   runOverlappingStartupBacklogRaceTest,
   runScanLeaseBarrierTests,
-  runUnavailableToReadyRecoveryTest,
+  runLockoutUntilRestartSafetyTest,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -36,18 +36,16 @@ const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: ever
     if (name === UNCLAIMED_DIRNAME) continue
     const fullPath = join(folder, name)
     if (!isDirectChild(fullPath, name, folder)) continue
-    startupBacklogPaths.add(resolve(fullPath))
+    startupBacklogPaths.add(canonicalizeScanPath(fullPath))
   }
 
 `
 
-const RECOVERY_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_RECOVERY_BACKLOG_PREMARK: every direct-child path is marked before any
-  // await so watcher add/sweep/process cannot deliver a remounted sibling.
-  for (const name of entries) {
-    if (name === UNCLAIMED_DIRNAME) continue
-    const fullPath = join(folder, name)
-    if (!isDirectChild(fullPath, name, folder)) continue
-    startupBacklogPaths.add(resolve(fullPath))
+const LOCKOUT_GENERATION_BLOCK = `  // ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION: in-flight candidates must not lease or POST
+  // after lockout or a generation change; only a new process may run again.
+  if (!globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)) {
+    warn(\`scan-watcher: delivery aborted — code=\${SCAN_INPUT_RESTART_REQUIRED}\`)
+    return true
   }
 
 `
@@ -74,22 +72,24 @@ function verifySourceStructure(): void {
     'must periodically re-sweep the folder, not rely solely on chokidar change events for retries',
   )
   assert.match(source, /await sweepFolder\(folder, config\)/, 'periodic sweep wrapper must still invoke sweepFolder')
-  assert.match(source, /tryEstablishScanInputRecoveryBarrier/, 'must gate delivery on the remount/recovery barrier')
-  assert.match(source, /ATOMIC_RECOVERY_BACKLOG_PREMARK/, 'recovery must synchronously premark current children')
-  assert.match(source, /globalScanDeliveryBarrier\.beginWatchSession/, 'watcher startup must begin fail-closed')
-  assert.match(source, /globalScanDeliveryBarrier\.noteWatcherRebuild/, 'watcher errors must require a recovery barrier')
-  assert.match(source, /globalScanDeliveryBarrier\.noteUnavailable/, 'unavailable scan input must pause delivery')
+  assert.match(source, /abortDeliveryIfScanInputLockout/, 'must abort lease/POST on lockout or generation change')
+  assert.match(source, /ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION/, 'lockout generation check must be explicit')
+  assert.match(source, /SCAN_INPUT_RESTART_REQUIRED/, 'lockout logs must use SCAN_INPUT_RESTART_REQUIRED')
+  assert.match(source, /globalScanDeliveryBarrier\.beginWatchSession/, 'watcher startup must begin initializing')
+  assert.match(source, /globalScanDeliveryBarrier\.noteWatcherError/, 'watcher errors must lock out, not rebuild')
+  assert.match(source, /allowsAttach\(\)/, 'stop must prevent a later attach in this process')
+  assert.doesNotMatch(source, /watcher = attachWatcher/, 'must not auto-rebuild a replacement watcher')
   assert.equal(
-    source.includes(RECOVERY_BACKLOG_PREMARK_BLOCK),
+    source.includes(LOCKOUT_GENERATION_BLOCK),
     true,
-    'tryEstablishScanInputRecoveryBarrier must synchronously premark every direct-child path before establishing a clean boundary',
+    'abortDeliveryIfScanInputLockout must refuse lease/POST after lockout or generation change',
   )
   assert.match(source, /ignored:\s*\(path: string\) => path\.includes\(UNCLAIMED_DIRNAME\)/, 'chokidar watch must also exclude the _unclaimed quarantine directory from live-watch events')
   assert.match(source, /if \(name === UNCLAIMED_DIRNAME\) continue/, 'sweepFolder must skip the _unclaimed quarantine directory itself in its main-file loop')
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
   assert.match(source, /const startupBacklogPaths\s*=\s*new Set<string>\(\)/, 'must have a startup backlog path tracking Set for never-deliver enforcement')
-  assert.match(source, /if\s*\(\s*startupBacklogPaths\.has\(resolvedCandidatePath\)\s*\)/, 'processCandidate must check startupBacklogPaths to prevent delivery')
+  assert.match(source, /startupBacklogPaths\.has\(resolvedCandidatePath\)/, 'processCandidate must check startupBacklogPaths to prevent delivery')
   assert.match(source, /startupBacklogPaths\.delete\(resolvedCandidatePath\)/, 'must clear backlog marker upon successful quarantine')
   {
     const isolateStart = source.indexOf('export async function isolateStartupBacklog')
@@ -114,8 +114,8 @@ function verifySourceStructure(): void {
     )
     assert.match(
       isolateBody,
-      /globalScanDeliveryBarrier\.noteUnavailable/,
-      'startup inspection/enumeration failure must pause delivery',
+      /globalScanDeliveryBarrier\.lockOut/,
+      'startup inspection/enumeration failure must lock out delivery',
     )
   }
   assert.match(
@@ -846,23 +846,23 @@ function verifyPlatformGapDisclosure(): void {
   )
 }
 
-function verifyRecoveryPremarkMutationMakesRecoveryTestNonzero(): void {
+function verifyLockoutGenerationMutationMakesSafetyTestNonzero(): void {
   const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
   const original = readFileSync(watcherPath, 'utf8')
   assert.equal(
-    original.includes(RECOVERY_BACKLOG_PREMARK_BLOCK),
+    original.includes(LOCKOUT_GENERATION_BLOCK),
     true,
-    'recovery premark-all block must exist before reverse mutation',
+    'lockout generation block must exist before reverse mutation',
   )
-  const mutated = original.replace(RECOVERY_BACKLOG_PREMARK_BLOCK, '')
-  assert.notEqual(mutated, original, 'removing recovery premark-all must actually change scan-watcher.ts')
+  const mutated = original.replace(LOCKOUT_GENERATION_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing lockout generation check must actually change scan-watcher.ts')
   try {
     writeFileSync(watcherPath, mutated)
     const childArgs = [...process.execArgv]
     if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
       childArgs.push(process.argv[1])
     }
-    childArgs.push(__filename, '--scan-input-recovery-barrier')
+    childArgs.push(__filename, '--scan-input-lockout')
     const result = spawnSync(process.execPath, childArgs, {
       encoding: 'utf8',
       cwd: join(__dirname, '..'),
@@ -870,17 +870,17 @@ function verifyRecoveryPremarkMutationMakesRecoveryTestNonzero(): void {
       env: process.env,
     })
     const output = `${result.stdout}\n${result.stderr}`
-    assert.notEqual(result.status, 0, `removing recovery premark-all must make recovery test nonzero\n${output}`)
+    assert.notEqual(result.status, 0, `removing lockout generation check must make safety test nonzero\n${output}`)
     assert.match(
       output,
       /must NEVER (?:request a scan lease|bind to the later waiting task|deliver)/,
-      `mutated recovery test must fail on old-file lease/delivery, not an unrelated error\n${output}`,
+      `mutated lockout test must fail on lease/delivery, not an unrelated error\n${output}`,
     )
-    console.log('PASS recovery premark-all reverse mutation: unavailable->ready test becomes nonzero')
+    console.log('PASS lockout generation reverse mutation: lockout safety test becomes nonzero')
   } finally {
     writeFileSync(watcherPath, original)
   }
-  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'recovery reverse mutation must restore scan-watcher.ts')
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'lockout reverse mutation must restore scan-watcher.ts')
 }
 
 function verifyPremarkAllMutationMakesOverlappingTestNonzero(): void {
@@ -921,8 +921,8 @@ function verifyPremarkAllMutationMakesOverlappingTestNonzero(): void {
 }
 
 async function main(): Promise<void> {
-  if (process.argv.includes('--scan-input-recovery-barrier')) {
-    await runUnavailableToReadyRecoveryTest()
+  if (process.argv.includes('--scan-input-lockout')) {
+    await runLockoutUntilRestartSafetyTest()
     return
   }
   if (process.argv.includes('--overlapping-startup-backlog-race')) {
@@ -948,7 +948,7 @@ async function main(): Promise<void> {
   await verifyUnexpectedErrorOuterCatch()
   await runScanLeaseBarrierTests()
   verifyPremarkAllMutationMakesOverlappingTestNonzero()
-  verifyRecoveryPremarkMutationMakesRecoveryTestNonzero()
+  verifyLockoutGenerationMutationMakesSafetyTestNonzero()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

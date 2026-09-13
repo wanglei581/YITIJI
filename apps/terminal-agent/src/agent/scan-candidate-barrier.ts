@@ -121,13 +121,23 @@ export class ScanDirectoryBaseline {
 
 export const globalDirectoryBaseline = new ScanDirectoryBaseline()
 
+export const SCAN_INPUT_RESTART_REQUIRED = 'SCAN_INPUT_RESTART_REQUIRED'
+
+export type ScanInputSessionState = 'idle' | 'initializing' | 'running' | 'locked_out' | 'stopped'
+
 /**
  * Canonical path identity for scan candidates. Always `path.resolve`.
- * Do not use realpath (follows links) and do not treat refreshed mtime/birthtime
- * as proof that a remounted file is a new capture.
+ * Do not use realpath (follows links / 8.3 / file-id). Windows keys are
+ * case-folded; that is not a claim that 8.3 short names or native file IDs
+ * are solved.
  */
-export function canonicalizeScanPath(filePath: string): string {
-  return resolve(filePath)
+export function canonicalizeScanPath(
+  filePath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const resolved = resolve(filePath)
+  if (platform === 'win32') return resolved.toLowerCase()
+  return resolved
 }
 
 export interface ScanFolderIdentity {
@@ -159,71 +169,110 @@ export function scanFolderIdentityChanged(
 }
 
 /**
- * Fail-closed delivery gate for SMB/Windows remount, watcher rebuild, and
- * root-identity change. Files present at the last complete enumeration are
- * marked never-deliver by the watcher; this class only tracks whether a new
- * enumeration is required before any later user can receive a file.
+ * Conservative lockout-until-restart gate. Automatic remount recovery is not
+ * implemented: a dirty scan-input session cannot return to RUNNING in-process.
+ * Only stop + a new process (tests: resetForTest) may run again.
  *
- * Default (unit tests that call processCandidate without a watcher session):
- * not paused, no established identity. startScanWatcher begins paused.
+ * idle: unit tests that call processCandidate without a watcher session.
+ * initializing: watcher registered, quarantine-only until ready + enum.
+ * running: delivery allowed for files after the startup boundary.
+ * locked_out / stopped: never lease or POST.
  */
 export class ScanDeliveryBarrier {
-  private paused = false
-  private unavailable = false
-  private watcherRebuildPending = false
+  private state: ScanInputSessionState = 'idle'
+  private generation = 0
   private identity: ScanFolderIdentity | undefined
+  private lockOutReason: string | undefined
 
-  isPaused(): boolean {
-    return this.paused
+  getState(): ScanInputSessionState {
+    return this.state
   }
 
-  wasUnavailable(): boolean {
-    return this.unavailable
-  }
-
-  isWatcherRebuildPending(): boolean {
-    return this.watcherRebuildPending
+  getGeneration(): number {
+    return this.generation
   }
 
   establishedIdentity(): ScanFolderIdentity | undefined {
     return this.identity
   }
 
+  lockOutCode(): string | undefined {
+    return this.lockOutReason
+  }
+
+  isPaused(): boolean {
+    return this.state !== 'idle' && this.state !== 'running'
+  }
+
+  allowsAttach(): boolean {
+    return this.state !== 'stopped'
+  }
+
   beginWatchSession(): void {
-    this.paused = true
-    this.unavailable = false
-    this.watcherRebuildPending = false
+    this.generation += 1
+    this.state = 'initializing'
     this.identity = undefined
+    this.lockOutReason = undefined
+  }
+
+  enterRunning(identity: ScanFolderIdentity): boolean {
+    if (this.state !== 'initializing') return false
+    this.identity = identity
+    this.state = 'running'
+    this.lockOutReason = undefined
+    return true
+  }
+
+  lockOut(reason: string): void {
+    if (this.state === 'stopped') return
+    this.generation += 1
+    this.state = 'locked_out'
+    this.lockOutReason = reason
+  }
+
+  stop(): void {
+    this.generation += 1
+    this.state = 'stopped'
+    this.lockOutReason = 'stopped'
   }
 
   noteUnavailable(): void {
-    this.paused = true
-    this.unavailable = true
+    this.lockOut('unavailable')
   }
 
   noteWatcherRebuild(): void {
-    this.paused = true
-    this.watcherRebuildPending = true
+    this.lockOut('watcher_rebuild')
   }
 
-  needsRecovery(current: ScanFolderIdentity | undefined): boolean {
-    if (this.paused || this.unavailable || this.watcherRebuildPending) return true
-    if (this.identity && scanFolderIdentityChanged(this.identity, current)) return true
-    return false
+  noteWatcherError(): void {
+    this.lockOut('watcher_error')
   }
 
-  establishCleanBoundary(identity: ScanFolderIdentity): void {
-    this.identity = identity
-    this.paused = false
-    this.unavailable = false
-    this.watcherRebuildPending = false
+  observeIdentityOrLockOut(current: ScanFolderIdentity | undefined): void {
+    if (this.state === 'stopped' || this.state === 'locked_out') return
+    if (!current) {
+      this.lockOut('identity_unavailable')
+      return
+    }
+    if (
+      this.identity
+      && (this.state === 'running' || this.state === 'initializing')
+      && scanFolderIdentityChanged(this.identity, current)
+    ) {
+      this.lockOut('root_identity_changed')
+    }
+  }
+
+  generationAllowsDelivery(capturedGeneration: number): boolean {
+    if (this.state !== 'idle' && this.state !== 'running') return false
+    return this.generation === capturedGeneration
   }
 
   resetForTest(): void {
-    this.paused = false
-    this.unavailable = false
-    this.watcherRebuildPending = false
+    this.state = 'idle'
+    this.generation = 0
     this.identity = undefined
+    this.lockOutReason = undefined
   }
 }
 

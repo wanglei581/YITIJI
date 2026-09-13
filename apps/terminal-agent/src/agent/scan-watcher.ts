@@ -17,9 +17,10 @@
  * 启动时 + 之后每 5 分钟做一次目录清点，处理 Agent 重启期间到达、
  * 或此前投递失败但文件本身未再变化的文件（不会有新的 chokidar change 事件）。
  *
- * 运行中 SMB/Windows 扫描目录不可用、watcher 重建、或根身份变化时：投递保持
- * fail-closed，恢复后必须先同步枚举并预标记当前直接子项再建立干净边界。
- * 不得把刷新过 mtime/birthtime 的旧文件挂到后一用户。
+ * 运行中 SMB/Windows 扫描目录不可用、watcher error、根身份变化或明确 rebuild
+ * 请求时：本进程立即 generation++ 并 LOCKED_OUT，禁止自动恢复为 RUNNING。
+ * 只能 stop + 新进程启动后重新初始化。不得把刷新过 mtime/birthtime 的旧文件
+ * 挂到后一用户。
  */
 
 import {
@@ -50,7 +51,7 @@ import {
   globalScanDeliveryBarrier,
   canonicalizeScanPath,
   readScanFolderIdentity,
-  scanFolderIdentityChanged,
+  SCAN_INPUT_RESTART_REQUIRED,
   type ScanTaskLease,
 } from './scan-candidate-barrier'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
@@ -169,7 +170,7 @@ function isDirectChild(filePath: string, filename: string, scanWatchFolder: stri
   return basename(filePath) === filename
     && !filename.includes('/')
     && !filename.includes('\\')
-    && resolve(dirname(filePath)) === resolve(scanWatchFolder)
+    && canonicalizeScanPath(dirname(filePath)) === canonicalizeScanPath(scanWatchFolder)
 }
 
 /** 等待候选文件的 lstat 快照连续两次一致，不跟随符号链接。 */
@@ -274,77 +275,114 @@ export function isStartupBacklogCandidate(filePath: string): boolean {
   return startupBacklogPaths.has(canonicalizeScanPath(filePath))
 }
 
+let scanLifecycleActive = 0
+let scanLifecycleSkipped = 0
+let scanCandidateTestHooks: { afterStable?: () => void; afterLease?: () => void } = {}
+
 export function clearStartupBacklogForTest(): void {
   startupBacklogPaths.clear()
   globalScanDeliveryBarrier.resetForTest()
+  scanCandidateTestHooks = {}
+  scanLifecycleSkipped = 0
 }
 
 export function noteScanInputUnavailableForTest(): void {
   globalScanDeliveryBarrier.noteUnavailable()
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
 }
 
 export function noteScanWatcherRebuildForTest(): void {
   globalScanDeliveryBarrier.noteWatcherRebuild()
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
 }
 
 export function isScanDeliveryPausedForTest(): boolean {
   return globalScanDeliveryBarrier.isPaused()
 }
 
-/**
- * Before any delivery: if the folder is unavailable, enumeration failed, the
- * watcher must be rebuilt, or the root identity changed, stay paused. On
- * recovery, synchronously enumerate and premark every current direct child so
- * remounted/old files cannot bind to a later user even when mtime/birthtime
- * were refreshed. Returns false when delivery must remain fail-closed.
- */
-export function tryEstablishScanInputRecoveryBarrier(folder: string): boolean {
+export function beginScanWatchSessionForTest(): void {
+  globalScanDeliveryBarrier.beginWatchSession()
+}
+
+export function getScanInputStateForTest(): string {
+  return globalScanDeliveryBarrier.getState()
+}
+
+export function getScanInputGenerationForTest(): number {
+  return globalScanDeliveryBarrier.getGeneration()
+}
+
+export function lockOutScanInputForTest(reason = 'test_lockout'): void {
+  globalScanDeliveryBarrier.lockOut(reason)
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+export function stopScanWatchSessionForTest(): void {
+  globalScanDeliveryBarrier.stop()
+}
+
+export function setScanCandidateTestHooks(hooks: { afterStable?: () => void; afterLease?: () => void }): void {
+  scanCandidateTestHooks = { ...hooks }
+}
+
+export function getScanLifecycleExclusiveStatsForTest(): { active: number; skipped: number } {
+  return { active: scanLifecycleActive, skipped: scanLifecycleSkipped }
+}
+
+async function runScanLifecycleExclusive(task: () => Promise<void>): Promise<'ran' | 'skipped'> {
+  if (scanLifecycleActive > 0) {
+    scanLifecycleSkipped += 1
+    return 'skipped'
+  }
+  scanLifecycleActive += 1
+  try {
+    await task()
+    return 'ran'
+  } finally {
+    scanLifecycleActive -= 1
+  }
+}
+
+export async function holdScanLifecycleExclusiveForTest(hold: Promise<void>): Promise<void> {
+  await runScanLifecycleExclusive(() => hold)
+}
+
+export async function runPeriodicScanSweepForTest(folder: string, config: AgentConfig): Promise<'ran' | 'skipped'> {
+  return runScanLifecycleExclusive(async () => {
+    if (globalScanDeliveryBarrier.getState() === 'stopped') return
+    await sweepFolder(folder, config)
+  })
+}
+
+function logScanInputRestartRequired(): void {
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+export function observeScanInputOrLockOut(folder: string): void {
+  if (globalScanDeliveryBarrier.getState() === 'stopped') return
   const health = inspectScanInputFolder(folder)
   if (health.status !== 'ready') {
-    globalScanDeliveryBarrier.noteUnavailable()
-    warn(`scan-watcher: scan input blocked; delivery paused — ${health.reason}`)
-    return false
+    const alreadyLocked = globalScanDeliveryBarrier.getState() === 'locked_out'
+    globalScanDeliveryBarrier.lockOut(health.reason)
+    if (!alreadyLocked) logScanInputRestartRequired()
+    return
   }
-  const identity = readScanFolderIdentity(folder)
-  if (!identity) {
-    globalScanDeliveryBarrier.noteUnavailable()
-    warn('scan-watcher: scan input identity unavailable; delivery paused')
-    return false
+  const before = globalScanDeliveryBarrier.getState()
+  globalScanDeliveryBarrier.observeIdentityOrLockOut(readScanFolderIdentity(folder))
+  if (before !== 'locked_out' && globalScanDeliveryBarrier.getState() === 'locked_out') {
+    logScanInputRestartRequired()
   }
-  if (!globalScanDeliveryBarrier.needsRecovery(identity)) {
+}
+
+export function abortDeliveryIfScanInputLockout(capturedGeneration: number): boolean {
+  // ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION: in-flight candidates must not lease or POST
+  // after lockout or a generation change; only a new process may run again.
+  if (!globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)) {
+    warn(`scan-watcher: delivery aborted — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return true
   }
-  const previousIdentity = globalScanDeliveryBarrier.establishedIdentity()
-  if (previousIdentity && scanFolderIdentityChanged(previousIdentity, identity)) {
-    warn('scan-watcher: scan input root identity changed; recovery barrier required')
-  } else if (globalScanDeliveryBarrier.isWatcherRebuildPending()) {
-    warn('scan-watcher: scan watcher rebuild pending; recovery barrier required')
-  } else if (globalScanDeliveryBarrier.wasUnavailable() || globalScanDeliveryBarrier.isPaused()) {
-    warn('scan-watcher: scan input recovered; recovery barrier required')
-  }
 
-  let entries: string[]
-  try {
-    entries = readdirSync(folder)
-  } catch (e) {
-    globalScanDeliveryBarrier.noteUnavailable()
-    warn(
-      `scan-watcher: scan input enumeration incomplete; delivery paused — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`,
-    )
-    return false
-  }
-  // ATOMIC_RECOVERY_BACKLOG_PREMARK: every direct-child path is marked before any
-  // await so watcher add/sweep/process cannot deliver a remounted sibling.
-  for (const name of entries) {
-    if (name === UNCLAIMED_DIRNAME) continue
-    const fullPath = join(folder, name)
-    if (!isDirectChild(fullPath, name, folder)) continue
-    startupBacklogPaths.add(resolve(fullPath))
-  }
-
-  globalScanDeliveryBarrier.establishCleanBoundary(identity)
-  warn('scan-watcher: scan input recovery barrier established; existing children will not bind to later tasks')
-  return true
+  return false
 }
 
 /** 处理单个候选文件：稳定性检查 → 投递 → 成功删除 / 未匹配隔离 / 其它错误留原地重试。 */
@@ -360,12 +398,14 @@ export async function processCandidate(
     return
   }
   inFlightPaths.add(filePath)
+  const capturedGeneration = globalScanDeliveryBarrier.getGeneration()
   try {
     const scanWatchFolder = config.scanWatchFolder?.trim()
     if (!scanWatchFolder) {
       return
     }
-    if (!tryEstablishScanInputRecoveryBarrier(scanWatchFolder)) {
+    observeScanInputOrLockOut(scanWatchFolder)
+    if (globalScanDeliveryBarrier.getState() === 'stopped') {
       return
     }
     if (!isDirectChild(filePath, filename, scanWatchFolder)) {
@@ -386,6 +426,7 @@ export async function processCandidate(
       warn(`scan-watcher: file did not stabilize in time, skipping this round — ${maskScanName(filename)}`)
       return
     }
+    scanCandidateTestHooks.afterStable?.()
 
     // 重新确认文件仍存在:稳定性检查通过后、真正处理前,文件有可能已被
     // 另一条并发路径处理完删除(理论上 inFlightPaths 已经防住了这种情况,
@@ -414,12 +455,18 @@ export async function processCandidate(
     // 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
     // 后续 sweep 仅重试安全隔离；成功后清理标记；失败需高严重度但不泄露文件名/内容。
     const resolvedCandidatePath = canonicalizeScanPath(filePath)
-    if (startupBacklogPaths.has(resolvedCandidatePath)) {
+    const lockoutAbort = abortDeliveryIfScanInputLockout(capturedGeneration)
+    const isBacklog = startupBacklogPaths.has(resolvedCandidatePath)
+    if (lockoutAbort || isBacklog) {
       try {
         globalDirectoryBaseline.remove(filename)
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
         startupBacklogPaths.delete(resolvedCandidatePath)
-        warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(filename)}`)
+        if (lockoutAbort) {
+          warn(`scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+        } else {
+          warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(filename)}`)
+        }
       } catch (e) {
         err(
           `scan-watcher: startup backlog quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
@@ -450,6 +497,19 @@ export async function processCandidate(
         }
         throw e
       }
+    }
+    scanCandidateTestHooks.afterLease?.()
+    if (abortDeliveryIfScanInputLockout(capturedGeneration)) {
+      try {
+        globalDirectoryBaseline.remove(filename)
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+        warn(`scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+      } catch (e) {
+        err(
+          `scan-watcher: startup backlog quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
+        )
+      }
+      return
     }
 
     if (!lease) {
@@ -790,17 +850,25 @@ function sanitizedErrorCode(error: unknown, fallback: string): string {
 export async function sweepFolder(scanWatchFolder: string, config: AgentConfig): Promise<void> {
   sweepUnclaimedDir(scanWatchFolder)
   if (isUnauthorized()) return
-  if (!tryEstablishScanInputRecoveryBarrier(scanWatchFolder)) {
-    return
-  }
+  if (globalScanDeliveryBarrier.getState() === 'stopped') return
+  observeScanInputOrLockOut(scanWatchFolder)
+  if (globalScanDeliveryBarrier.getState() === 'stopped') return
 
   let entries: string[]
   try {
     entries = readdirSync(scanWatchFolder)
   } catch (e) {
-    globalScanDeliveryBarrier.noteUnavailable()
-    warn(`scan-watcher: failed to read scanWatchFolder — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`)
+    globalScanDeliveryBarrier.lockOut('readdir_failed')
+    warn(`scan-watcher: failed to read scanWatchFolder — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return
+  }
+  if (globalScanDeliveryBarrier.getState() === 'locked_out' || globalScanDeliveryBarrier.getState() === 'initializing') {
+    for (const name of entries) {
+      if (name === UNCLAIMED_DIRNAME) continue
+      const fullPath = join(scanWatchFolder, name)
+      if (!isDirectChild(fullPath, name, scanWatchFolder)) continue
+      startupBacklogPaths.add(canonicalizeScanPath(fullPath))
+    }
   }
   for (const name of entries) {
     if (name === UNCLAIMED_DIRNAME) continue
@@ -841,8 +909,8 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
 
   const health = inspectScanInputFolder(folder)
   if (health.status !== 'ready') {
-    globalScanDeliveryBarrier.noteUnavailable()
-    warn(`scan-watcher: scan input startup backlog check blocked — ${health.reason}`)
+    globalScanDeliveryBarrier.lockOut(health.reason)
+    warn(`scan-watcher: scan input startup backlog check blocked — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return 0
   }
 
@@ -850,8 +918,8 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
   try {
     entries = readdirSync(folder)
   } catch (e) {
-    globalScanDeliveryBarrier.noteUnavailable()
-    warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`)
+    globalScanDeliveryBarrier.lockOut('readdir_failed')
+    warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return 0
   }
 
@@ -861,14 +929,13 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
     if (name === UNCLAIMED_DIRNAME) continue
     const fullPath = join(folder, name)
     if (!isDirectChild(fullPath, name, folder)) continue
-    startupBacklogPaths.add(resolve(fullPath))
+    startupBacklogPaths.add(canonicalizeScanPath(fullPath))
   }
 
   const identity = readScanFolderIdentity(folder)
-  if (identity) {
-    globalScanDeliveryBarrier.establishCleanBoundary(identity)
-  } else {
-    globalScanDeliveryBarrier.noteUnavailable()
+  if (!identity) {
+    globalScanDeliveryBarrier.lockOut('identity_unavailable')
+    warn(`scan-watcher: scan input startup identity unavailable — code=${SCAN_INPUT_RESTART_REQUIRED}`)
   }
 
   let quarantined = 0
@@ -876,7 +943,7 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
     if (name === UNCLAIMED_DIRNAME) continue
     const fullPath = join(folder, name)
     if (!isDirectChild(fullPath, name, folder)) continue
-    const resolvedPath = resolve(fullPath)
+    const resolvedPath = canonicalizeScanPath(fullPath)
     startupBacklogPaths.add(resolvedPath)
     if (inFlightPaths.has(fullPath)) continue
     inFlightPaths.add(fullPath)
@@ -901,6 +968,9 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
       inFlightPaths.delete(fullPath)
     }
   }
+  if (identity && globalScanDeliveryBarrier.getState() === 'initializing') {
+    globalScanDeliveryBarrier.enterRunning(identity)
+  }
   return quarantined
 }
 
@@ -908,10 +978,29 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
  * 启动扫描监听。未配置 config.scanWatchFolder 时直接返回 undefined，
  * 不影响心跳 / claim 等其余 Agent 功能。
  */
+function waitForWatcherReady(watcher: FSWatcher, timeoutMs = 10_000): Promise<boolean> {
+  return new Promise((resolveReady) => {
+    let settled = false
+    const finish = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolveReady(ok)
+    }
+    const timer = setTimeout(() => finish(false), timeoutMs)
+    watcher.once('ready', () => finish(true))
+    watcher.once('error', () => finish(false))
+  })
+}
+
 export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undefined {
   const folder = config.scanWatchFolder?.trim()
   if (!folder) {
     log('scan-watcher: scanWatchFolder 未配置，跳过扫描监听')
+    return undefined
+  }
+  if (!globalScanDeliveryBarrier.allowsAttach()) {
+    warn(`scan-watcher: session stopped; watcher not started — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return undefined
   }
 
@@ -927,62 +1016,75 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   startupBacklogPaths.clear()
   globalScanDeliveryBarrier.beginWatchSession()
 
-  const attachWatcher = (): FSWatcher => {
-    const next: FSWatcher = chokidar.watch(folder, {
-      ignoreInitial: true,
-      depth: 0,
-      ignored: (path: string) => path.includes(UNCLAIMED_DIRNAME),
+  const next: FSWatcher = chokidar.watch(folder, {
+    ignoreInitial: true,
+    depth: 0,
+    ignored: (path: string) => path.includes(UNCLAIMED_DIRNAME),
+  })
+  let watcher: FSWatcher | undefined = next
+  next.on('add', (filePath: string) => {
+    const filename = filePath.split(/[\\/]/).pop() ?? filePath
+    globalDirectoryBaseline.recordObservation(filename)
+    if (globalScanDeliveryBarrier.getState() !== 'running' && globalScanDeliveryBarrier.getState() !== 'idle') {
+      startupBacklogPaths.add(canonicalizeScanPath(filePath))
+    }
+    processCandidate(filePath, filename, config).catch((e) => {
+      err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
     })
-    next.on('add', (filePath: string) => {
-      const filename = filePath.split(/[\\/]/).pop() ?? filePath
-      globalDirectoryBaseline.recordObservation(filename)
-      processCandidate(filePath, filename, config).catch((e) => {
-        err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
-      })
-    })
-    next.on('error', (error: unknown) => {
-      err(`scan-watcher: watcher error — ${axiosErrorMessage(error)}`)
-      globalScanDeliveryBarrier.noteWatcherRebuild()
-    })
-    return next
-  }
-
-  let watcher: FSWatcher = attachWatcher()
+  })
+  next.on('error', (error: unknown) => {
+    err(`scan-watcher: watcher error — ${axiosErrorMessage(error)}`)
+    globalScanDeliveryBarrier.noteWatcherError()
+    logScanInputRestartRequired()
+  })
 
   const runPeriodicScanSweep = async (): Promise<void> => {
-    const rebuild = globalScanDeliveryBarrier.isWatcherRebuildPending()
-    if (rebuild) {
-      try {
-        await watcher.close()
-      } catch {
-        // Rebuild still requires a recovery barrier before delivery.
-      }
-    }
-    await sweepFolder(folder, config)
-    if (rebuild) {
-      watcher = attachWatcher()
-    }
+    await runScanLifecycleExclusive(async () => {
+      if (globalScanDeliveryBarrier.getState() === 'stopped') return
+      await sweepFolder(folder, config)
+    })
   }
 
-  // 启动时清点与隔离：立即将已有历史文件作为 startup backlog 安全隔离至 _unclaimed，
-  // 杜绝前序会话文件在 Agent 重启后误绑定到后续新用户的任务与租约。
-  // 若启动清点不可用或不完整，delivery 保持 paused，sweep 不得把旧文件挂到当前等待任务。
-  void (async () => {
+  // 启动：quarantine-only until watcher ready + complete enum/premark/isolate.
+  // Failure lockouts this process; no automatic watcher rebuild or remount recovery.
+  void runScanLifecycleExclusive(async () => {
+    const ready = await waitForWatcherReady(next)
+    if (!ready || globalScanDeliveryBarrier.getState() === 'stopped') {
+      if (globalScanDeliveryBarrier.getState() !== 'stopped') {
+        globalScanDeliveryBarrier.lockOut('watcher_ready_failed')
+        logScanInputRestartRequired()
+      }
+      return
+    }
     try {
       await isolateStartupBacklog(folder)
     } catch (e) {
-      globalScanDeliveryBarrier.noteUnavailable()
+      globalScanDeliveryBarrier.lockOut('startup_backlog_failed')
       err(`scan-watcher: startup backlog isolation threw unexpectedly: ${sanitizedErrorCode(e, 'STARTUP_BACKLOG_FAILED')}`)
+      logScanInputRestartRequired()
+      return
     }
-    void runPeriodicScanSweep()
-  })()
+    if (globalScanDeliveryBarrier.getState() === 'initializing') {
+      globalScanDeliveryBarrier.lockOut('startup_incomplete')
+      logScanInputRestartRequired()
+    }
+  })
 
   const sweepTimer = setInterval(() => void runPeriodicScanSweep(), SWEEP_INTERVAL_MS)
 
   return {
     stop: async () => {
+      globalScanDeliveryBarrier.stop()
       clearInterval(sweepTimer)
-      await watcher.close()
+      const deadline = Date.now() + 15_000
+      while (scanLifecycleActive > 0 && Date.now() < deadline) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, 20))
+      }
+      if (watcher) {
+        const closing = watcher
+        watcher = undefined
+        await closing.close()
+      }
     },
   }
 }
