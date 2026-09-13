@@ -31,6 +31,8 @@ import {
   runScanLeaseBarrierTests,
   runLockoutUntilRestartSafetyTest,
   runEnterRunningGenerationIsolationTest,
+  runLateCrossSessionCaptureTests,
+  runUnknownDirectoryListingFailClosedTest,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -64,6 +66,7 @@ const LOCKOUT_GENERATION_BLOCK = `  // ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION: in-
 // 长驻进程验收覆盖，不在本脚本中伪装通过。
 
 const source = readFileSync(join(__dirname, '../src/agent/scan-watcher.ts'), 'utf8')
+const barrierSource = readFileSync(join(__dirname, '../src/agent/scan-candidate-barrier.ts'), 'utf8')
 
 function verifySourceStructure(): void {
   assert.match(source, /export function startScanWatcher/, 'must export startScanWatcher')
@@ -77,6 +80,51 @@ function verifySourceStructure(): void {
   assert.match(source, /await sweepFolder\(folder, config\)/, 'periodic sweep wrapper must still invoke sweepFolder')
   assert.match(source, /abortDeliveryIfScanInputLockout/, 'must abort lease/POST on lockout or generation change')
   assert.match(source, /ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION/, 'lockout generation check must be explicit')
+  assert.match(source, /ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE/, 'capture lineage must bind to waiting-task identity, not mtime alone')
+  assert.match(source, /ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID/, 'invalid lease notBefore must fail closed')
+  assert.match(source, /let openingTaskId: string \| null \| undefined/, 'opening task identity must be per-file, not module-global')
+  assert.doesNotMatch(
+    source,
+    /lastKnownScanTaskId|rememberObservedScanTaskId|lastObservedScanTaskId/,
+    'must not keep a module-global last-known scan task id',
+  )
+  assert.doesNotMatch(
+    barrierSource,
+    /lastKnownScanTaskId|rememberObservedScanTaskId|lastObservedScanTaskId/,
+    'lease fetch must not stash capture identity on the module',
+  )
+  assert.match(
+    barrierSource,
+    /recordObservation\(\s*filename: string,\s*nowMs: number,\s*taskId: string \| null/,
+    'recordObservation must take an explicit observed task id',
+  )
+  assert.match(barrierSource, /retainLiveEntries/, 'stem observations must be bounded to live directory entries')
+  assert.match(barrierSource, /closeVanishedCapture/, 'vanished paths must adopt same-inode successors before dropping')
+  {
+    const listStart = source.indexOf('function listLiveBasenames')
+    const listEnd = source.indexOf('function lockOutLiveListingUnknown')
+    assert.ok(listStart >= 0 && listEnd > listStart, 'listLiveBasenames must precede lockOutLiveListingUnknown')
+    const listBody = source.slice(listStart, listEnd)
+    assert.match(listBody, /ATOMIC_SCAN_LIVE_LISTING_KNOWN/, 'readdir failure must be marked unknown, not empty')
+    assert.match(listBody, /return undefined/, 'readdir failure must return undefined')
+    assert.equal(listBody.includes('return new Set()'), false, 'readdir failure must not substitute an empty listing')
+  }
+  assert.match(source, /finishVanishedCapture/, 'finally must reconcile vanished paths, not blindly remove')
+  assert.doesNotMatch(
+    source,
+    /if \(!existsSync\(filePath\)\) globalDirectoryBaseline\.remove\(filename\)/,
+    'finally must not drop capture identity before same-inode adoption',
+  )
+  {
+    const fetchStart = barrierSource.indexOf('export async function fetchScanLease')
+    const fetchEnd = barrierSource.indexOf('export function isPreExistingCandidate')
+    assert.ok(fetchStart >= 0 && fetchEnd > fetchStart, 'fetchScanLease must precede isPreExistingCandidate')
+    const fetchBody = barrierSource.slice(fetchStart, fetchEnd)
+    assert.equal(fetchBody.includes('globalDirectoryBaseline'), false, 'fetchScanLease must not touch capture observations')
+    assert.equal(fetchBody.includes('recordObservation'), false, 'fetchScanLease must not record capture identity')
+  }
+  assert.match(source, /SCAN_CAPTURE_FOREIGN_LEASE/, 'foreign-lease quarantine must use a machine-readable code')
+  assert.match(source, /SCAN_LEASE_NOT_BEFORE_INVALID/, 'invalid notBefore quarantine must use a machine-readable code')
   assert.match(source, /SCAN_INPUT_RESTART_REQUIRED/, 'lockout logs must use SCAN_INPUT_RESTART_REQUIRED')
   assert.match(source, /globalScanDeliveryBarrier\.beginWatchSession/, 'watcher startup must begin initializing')
   assert.match(source, /globalScanDeliveryBarrier\.noteWatcherError/, 'watcher errors must lock out, not rebuild')
@@ -975,6 +1023,155 @@ function verifyEnterRunningGenerationMutationMakesIsolationTestNonzero(): void {
   assert.equal(readFileSync(barrierPath, 'utf8'), original, 'enterRunning reverse mutation must restore scan-candidate-barrier.ts')
 }
 
+const CAPTURE_LEASE_LINEAGE_BLOCK = `    // ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE: a capture opened under waiting task A
+    // (or with no waiting task) must not POST to a later waiting task B, even when
+    // mtime/observedAt is after B.notBefore. Recovery is a new panel file or
+    // server-authorized safe rescan of a fresh capture, not this bytes-on-disk.
+    const foreignCapture = deliverFile
+      ? false
+      : globalDirectoryBaseline.isForeignToLease(filename, lease.scanTaskId, closingLiveNames)
+        || (typeof openingTaskId === 'string' && openingTaskId !== lease.scanTaskId)
+        || openingTaskId === null
+    if (
+      foreignCapture
+      || isPreExistingCandidate(finalSnapshot, lease.notBefore)
+      || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
+    ) {`
+
+const CAPTURE_LEASE_LINEAGE_MUTATED = `    const foreignCapture = false
+    if (
+      foreignCapture
+      || isPreExistingCandidate(finalSnapshot, lease.notBefore)
+      || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
+    ) {`
+
+const NOT_BEFORE_VALID_BLOCK = `    // ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID: an unparsable notBefore cannot prove
+    // the file is newer than the waiting task; fail closed and quarantine.
+    if (!Number.isFinite(leaseNotBeforeMs)) {
+      globalDirectoryBaseline.remove(filename)
+      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+      warn(
+        \`scan-watcher: scan lease notBefore is invalid; refusing delivery, moved to _unclaimed — code=\${SCAN_LEASE_NOT_BEFORE_INVALID}\`,
+      )
+      return
+    }`
+
+function verifyCaptureLineageMutationMakesLateCrossSessionNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(CAPTURE_LEASE_LINEAGE_BLOCK), true, 'capture lineage block must exist before reverse mutation')
+  const mutated = original.replace(CAPTURE_LEASE_LINEAGE_BLOCK, CAPTURE_LEASE_LINEAGE_MUTATED)
+  assert.notEqual(mutated, original, 'removing capture lineage check must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--late-cross-session')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing capture lineage must make late A-to-B test nonzero\n${output}`)
+    assert.match(
+      output,
+      /A-to-B late appearance must NEVER upload|temp-to-pdf rename from A must NEVER upload to B/,
+      `mutated lineage test must fail on cross-session upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS capture lineage reverse mutation: late A-to-B test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'capture lineage reverse mutation must restore scan-watcher.ts')
+}
+
+function verifyInvalidNotBeforeMutationMakesFailClosedNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(NOT_BEFORE_VALID_BLOCK), true, 'invalid notBefore block must exist before reverse mutation')
+  const mutated = original.replace(NOT_BEFORE_VALID_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing invalid notBefore check must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--invalid-not-before')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing invalid notBefore check must make fail-closed test nonzero\n${output}`)
+    assert.match(
+      output,
+      /SCAN_LEASE_NOT_BEFORE_INVALID|invalid notBefore must NEVER upload/,
+      `mutated notBefore test must fail on the invalid-notBefore assertion\n${output}`,
+    )
+    console.log('PASS invalid notBefore reverse mutation: fail-closed test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'invalid notBefore reverse mutation must restore scan-watcher.ts')
+}
+
+const LIVE_LISTING_KNOWN_BLOCK = `function listLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  try {
+    return new Set(readdirSync(scanWatchFolder).filter((name) => name !== UNCLAIMED_DIRNAME))
+  } catch {
+    // ATOMIC_SCAN_LIVE_LISTING_KNOWN: failure is unknown, not an empty folder.
+    return undefined
+  }
+}`
+
+const LIVE_LISTING_KNOWN_MUTATED = `function listLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  try {
+    return new Set(readdirSync(scanWatchFolder).filter((name) => name !== UNCLAIMED_DIRNAME))
+  } catch {
+    return new Set()
+  }
+}`
+
+function verifyUnknownLiveListingMutationMakesFailClosedNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(LIVE_LISTING_KNOWN_BLOCK), true, 'unknown live listing block must exist before reverse mutation')
+  const mutated = original.replace(LIVE_LISTING_KNOWN_BLOCK, LIVE_LISTING_KNOWN_MUTATED)
+  assert.notEqual(mutated, original, 'substituting empty listing must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--unknown-live-listing')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `empty listing substitution must make unknown-listing test nonzero\n${output}`)
+    assert.match(
+      output,
+      /unknown directory listing must NEVER upload/,
+      `mutated listing test must fail on upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS unknown live listing reverse mutation: fail-closed test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'unknown live listing reverse mutation must restore scan-watcher.ts')
+}
+
 async function main(): Promise<void> {
   if (process.argv.includes('--scan-input-lockout')) {
     await runLockoutUntilRestartSafetyTest()
@@ -986,6 +1183,14 @@ async function main(): Promise<void> {
   }
   if (process.argv.includes('--enter-running-isolation')) {
     await runEnterRunningGenerationIsolationTest()
+    return
+  }
+  if (process.argv.includes('--late-cross-session') || process.argv.includes('--invalid-not-before')) {
+    await runLateCrossSessionCaptureTests()
+    return
+  }
+  if (process.argv.includes('--unknown-live-listing')) {
+    await runUnknownDirectoryListingFailClosedTest()
     return
   }
   verifySourceStructure()
@@ -1009,6 +1214,9 @@ async function main(): Promise<void> {
   verifyPremarkAllMutationMakesOverlappingTestNonzero()
   verifyLockoutGenerationMutationMakesSafetyTestNonzero()
   verifyEnterRunningGenerationMutationMakesIsolationTestNonzero()
+  verifyCaptureLineageMutationMakesLateCrossSessionNonzero()
+  verifyInvalidNotBeforeMutationMakesFailClosedNonzero()
+  verifyUnknownLiveListingMutationMakesFailClosedNonzero()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

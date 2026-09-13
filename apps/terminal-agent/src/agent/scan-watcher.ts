@@ -53,6 +53,12 @@ import {
   readScanFolderIdentity,
   scanFolderIdentityChanged,
   SCAN_INPUT_RESTART_REQUIRED,
+  SCAN_CAPTURE_FOREIGN_LEASE,
+  SCAN_LEASE_NOT_BEFORE_INVALID,
+  captureNameStem,
+  scanCaptureFileIdentity,
+  isSameScanCaptureFile,
+  type ScanCaptureFileIdentity,
   type ScanFolderIdentity,
   type ScanTaskLease,
 } from './scan-candidate-barrier'
@@ -280,7 +286,7 @@ export function isStartupBacklogCandidate(filePath: string): boolean {
 let scanLifecycleActive = 0
 let scanLifecycleSkipped = 0
 let scanCandidateTestHooks: {
-  afterStable?: () => void
+  afterStable?: (filename: string) => void | Promise<void>
   afterLease?: () => void
   duringStartupIsolation?: () => void
 } = {}
@@ -336,11 +342,127 @@ export function stopScanWatchSessionForTest(): void {
 }
 
 export function setScanCandidateTestHooks(hooks: {
-  afterStable?: () => void
+  afterStable?: (filename: string) => void | Promise<void>
   afterLease?: () => void
   duringStartupIsolation?: () => void
 }): void {
   scanCandidateTestHooks = { ...hooks }
+}
+
+function listLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  try {
+    return new Set(readdirSync(scanWatchFolder).filter((name) => name !== UNCLAIMED_DIRNAME))
+  } catch {
+    // ATOMIC_SCAN_LIVE_LISTING_KNOWN: failure is unknown, not an empty folder.
+    return undefined
+  }
+}
+
+function lockOutLiveListingUnknown(): void {
+  if (globalScanDeliveryBarrier.getState() === 'locked_out' || globalScanDeliveryBarrier.getState() === 'stopped') {
+    return
+  }
+  globalScanDeliveryBarrier.lockOut('readdir_failed')
+  warn(`scan-watcher: failed to read scanWatchFolder — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+function requireLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  const names = listLiveBasenames(scanWatchFolder)
+  if (names !== undefined) return names
+  lockOutLiveListingUnknown()
+  return undefined
+}
+
+function liveNameIdentity(scanWatchFolder: string, name: string): ScanCaptureFileIdentity | undefined {
+  try {
+    const metadata = lstatSync(join(scanWatchFolder, name))
+    return scanCaptureFileIdentity(metadata.dev, metadata.ino)
+  } catch {
+    return undefined
+  }
+}
+
+function findLiveSameInodeSuccessor(
+  scanWatchFolder: string,
+  vanishedName: string,
+  identity: ScanCaptureFileIdentity | undefined,
+  liveNames: ReadonlySet<string>,
+): string | undefined {
+  if (!identity) return undefined
+  const stem = captureNameStem(vanishedName)
+  for (const name of liveNames) {
+    if (name === vanishedName) continue
+    if (captureNameStem(name) !== stem) continue
+    if (isSameScanCaptureFile(identity, liveNameIdentity(scanWatchFolder, name)) === true) return name
+  }
+  return undefined
+}
+
+function finishVanishedCapture(
+  filePath: string,
+  filename: string,
+  scanWatchFolder: string | undefined,
+): void {
+  if (!scanWatchFolder) return
+  try {
+    if (existsSync(filePath)) return
+  } catch {
+    lockOutLiveListingUnknown()
+    return
+  }
+  const liveNames = listLiveBasenames(scanWatchFolder)
+  if (liveNames === undefined) {
+    lockOutLiveListingUnknown()
+    return
+  }
+  globalDirectoryBaseline.closeVanishedCapture(
+    filename,
+    liveNames,
+    (name) => liveNameIdentity(scanWatchFolder, name),
+  )
+}
+
+async function observeNonAcceptedCapture(
+  filePath: string,
+  filename: string,
+  config: AgentConfig,
+  capturedGeneration: number,
+  identity?: ScanCaptureFileIdentity,
+): Promise<void> {
+  const scanWatchFolder = config.scanWatchFolder?.trim()
+  if (!scanWatchFolder) return
+  let taskId: string | null = null
+  if (
+    globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)
+    && !startupBacklogPaths.has(canonicalizeScanPath(filePath))
+  ) {
+    try {
+      const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+      const lease = await fetchScanLease(client, config.terminalId)
+      taskId = lease?.scanTaskId ?? null
+    } catch (error) {
+      if (preserveScanFileForUnauthorized(error)) return
+      throw error
+    }
+  }
+  const liveNames = requireLiveBasenames(scanWatchFolder)
+  if (!liveNames) return
+  let bindName = filename
+  try {
+    if (!existsSync(filePath)) {
+      bindName = findLiveSameInodeSuccessor(scanWatchFolder, filename, identity, liveNames) ?? filename
+    }
+  } catch {
+    lockOutLiveListingUnknown()
+    return
+  }
+  globalDirectoryBaseline.bindCapture(
+    bindName,
+    Date.now(),
+    taskId,
+    liveNames,
+    identity,
+  )
 }
 
 export function getScanLifecycleExclusiveStatsForTest(): { active: number; skipped: number } {
@@ -417,8 +539,10 @@ export async function processCandidate(
   }
   inFlightPaths.add(filePath)
   const capturedGeneration = globalScanDeliveryBarrier.getGeneration()
+  let watchFolderForFinally: string | undefined
   try {
     const scanWatchFolder = config.scanWatchFolder?.trim()
+    watchFolderForFinally = scanWatchFolder
     if (!scanWatchFolder) {
       return
     }
@@ -432,19 +556,59 @@ export async function processCandidate(
     }
 
     const initial = snapshotCandidate(filePath, filename)
+    const openingIdentity = scanCaptureFileIdentity(initial.dev, initial.ino)
     const classification = classifyScanInputCandidate(initial)
     if (classification !== 'accepted' || initial.nlink !== 1) {
       const reason = initial.nlink !== 1 ? 'rejected_multiple_links' : classification
+      await observeNonAcceptedCapture(filePath, filename, config, capturedGeneration, openingIdentity)
       warn(`scan-watcher: unsafe scan input candidate rejected before read (${reason}) — ${maskScanName(filename)}`)
       return
     }
+
+    const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+    // Per-file opening identity for THIS path only. Never a module-global last lease.
+    let openingTaskId: string | null | undefined
+    if (
+      !deliverFile
+      && globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)
+      && !startupBacklogPaths.has(canonicalizeScanPath(filePath))
+    ) {
+      try {
+        const openingLease = await fetchScanLease(client, config.terminalId)
+        openingTaskId = openingLease?.scanTaskId ?? null
+      } catch (error) {
+        if (preserveScanFileForUnauthorized(error)) {
+          warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${maskScanName(filename)}`)
+          return
+        }
+        throw error
+      }
+    }
+    const liveNames = requireLiveBasenames(scanWatchFolder)
+    if (!liveNames) return
+    let bindName = filename
+    try {
+      if (!existsSync(filePath)) {
+        bindName = findLiveSameInodeSuccessor(scanWatchFolder, filename, openingIdentity, liveNames) ?? filename
+      }
+    } catch {
+      lockOutLiveListingUnknown()
+      return
+    }
+    globalDirectoryBaseline.bindCapture(
+      bindName,
+      Date.now(),
+      deliverFile ? null : openingTaskId ?? null,
+      liveNames,
+      openingIdentity,
+    )
 
     const stable = await waitForStableFile(filePath, filename)
     if (!stable) {
       warn(`scan-watcher: file did not stabilize in time, skipping this round — ${maskScanName(filename)}`)
       return
     }
-    scanCandidateTestHooks.afterStable?.()
+    await Promise.resolve(scanCandidateTestHooks.afterStable?.(filename))
 
     // 重新确认文件仍存在:稳定性检查通过后、真正处理前,文件有可能已被
     // 另一条并发路径处理完删除(理论上 inFlightPaths 已经防住了这种情况,
@@ -493,9 +657,7 @@ export async function processCandidate(
       return
     }
 
-    const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
-
-    // 1. 投递前先获取服务端租约；没有租约时立即隔离进 _unclaimed
+    // 1. 投递前再取一次当前租约。opening fetch 只用于血缘；closing 才是投递身份。
     let lease: ScanTaskLease | null = null
     if (deliverFile) {
       lease = {
@@ -537,15 +699,49 @@ export async function processCandidate(
       return
     }
 
-    // 2. 候选文件在当前租约生效前即已存在：拒绝租约开始前已经存在的文件，立即隔离（防跨会话旧文件误挂）
+    // 2. 血缘与陈旧捕获：mtime 不能单独当身份。等待中任务 A 上打开的捕获，
+    // 即使 PDF 在 B.notBefore 之后才稳定/可见，也不得 POST 给 B。
     const leaseNotBeforeMs = new Date(lease.notBefore).getTime()
+    // ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID: an unparsable notBefore cannot prove
+    // the file is newer than the waiting task; fail closed and quarantine.
+    if (!Number.isFinite(leaseNotBeforeMs)) {
+      globalDirectoryBaseline.remove(filename)
+      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+      warn(
+        `scan-watcher: scan lease notBefore is invalid; refusing delivery, moved to _unclaimed — code=${SCAN_LEASE_NOT_BEFORE_INVALID}`,
+      )
+      return
+    }
+    const closingLiveNames = requireLiveBasenames(scanWatchFolder)
+    if (!closingLiveNames) {
+      globalDirectoryBaseline.remove(filename)
+      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+      warn(`scan-watcher: unknown scan-folder listing; refusing delivery — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+      return
+    }
+    // ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE: a capture opened under waiting task A
+    // (or with no waiting task) must not POST to a later waiting task B, even when
+    // mtime/observedAt is after B.notBefore. Recovery is a new panel file or
+    // server-authorized safe rescan of a fresh capture, not this bytes-on-disk.
+    const foreignCapture = deliverFile
+      ? false
+      : globalDirectoryBaseline.isForeignToLease(filename, lease.scanTaskId, closingLiveNames)
+        || (typeof openingTaskId === 'string' && openingTaskId !== lease.scanTaskId)
+        || openingTaskId === null
     if (
-      isPreExistingCandidate(finalSnapshot, lease.notBefore) ||
-      globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
+      foreignCapture
+      || isPreExistingCandidate(finalSnapshot, lease.notBefore)
+      || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
     ) {
       globalDirectoryBaseline.remove(filename)
       finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-      warn(`scan-watcher: candidate file existed prior to scan lease start; refusing pre-existing file binding, moved to _unclaimed — ${maskScanName(filename)}`)
+      if (foreignCapture) {
+        warn(
+          `scan-watcher: capture lineage belongs to a different waiting task; refusing cross-session bind, moved to _unclaimed — code=${SCAN_CAPTURE_FOREIGN_LEASE}`,
+        )
+      } else {
+        warn(`scan-watcher: candidate file existed prior to scan lease start; refusing pre-existing file binding, moved to _unclaimed — ${maskScanName(filename)}`)
+      }
       return
     }
 
@@ -666,6 +862,7 @@ export async function processCandidate(
     err(`scan-watcher: unexpected error processing candidate, leaving file in place for retry — ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
   } finally {
     inFlightPaths.delete(filePath)
+    finishVanishedCapture(filePath, filename, watchFolderForFinally)
   }
 }
 
@@ -875,11 +1072,13 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
   let entries: string[]
   try {
     entries = readdirSync(scanWatchFolder)
-  } catch (e) {
+  } catch {
     globalScanDeliveryBarrier.lockOut('readdir_failed')
     warn(`scan-watcher: failed to read scanWatchFolder — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return
   }
+  const liveNames = new Set(entries.filter((name) => name !== UNCLAIMED_DIRNAME))
+  globalDirectoryBaseline.retainLiveEntries(liveNames)
   if (globalScanDeliveryBarrier.getState() === 'locked_out' || globalScanDeliveryBarrier.getState() === 'initializing') {
     for (const name of entries) {
       if (name === UNCLAIMED_DIRNAME) continue
@@ -894,6 +1093,13 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     try {
       const snapshot = snapshotCandidate(fullPath, name)
       if (classifyScanInputCandidate(snapshot) !== 'accepted' || snapshot.nlink !== 1) {
+        await observeNonAcceptedCapture(
+          fullPath,
+          name,
+          config,
+          globalScanDeliveryBarrier.getGeneration(),
+          scanCaptureFileIdentity(snapshot.dev, snapshot.ino),
+        )
         warn(`scan-watcher: unsafe scan input candidate skipped during sweep — ${maskScanName(name)}`)
         continue
       }
@@ -901,7 +1107,6 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
       continue
     }
     try {
-      globalDirectoryBaseline.recordObservation(name)
       await processCandidate(fullPath, name, config)
     } catch (e) {
       err(`scan-watcher: sweep failed to process ${maskScanName(name)}, continuing with remaining files: ${axiosErrorMessage(e)}`)
@@ -935,7 +1140,7 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
   let entries: string[]
   try {
     entries = readdirSync(folder)
-  } catch (e) {
+  } catch {
     globalScanDeliveryBarrier.lockOut('readdir_failed')
     warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return 0
@@ -1055,7 +1260,6 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   let watcher: FSWatcher | undefined = next
   next.on('add', (filePath: string) => {
     const filename = filePath.split(/[\\/]/).pop() ?? filePath
-    globalDirectoryBaseline.recordObservation(filename)
     if (globalScanDeliveryBarrier.getState() !== 'running' && globalScanDeliveryBarrier.getState() !== 'idle') {
       startupBacklogPaths.add(canonicalizeScanPath(filePath))
     }

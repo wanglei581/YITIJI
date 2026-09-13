@@ -14,6 +14,43 @@ export interface ScanTaskLease {
 
 export const SCAN_PRE_EXISTING_TOLERANCE_MS = 5_000
 
+/** Per-file quarantine: capture lineage belongs to a different waiting task. Not a process lockout. */
+export const SCAN_CAPTURE_FOREIGN_LEASE = 'SCAN_CAPTURE_FOREIGN_LEASE'
+/** Per-file quarantine: lease notBefore cannot be parsed, so newness cannot be proved. */
+export const SCAN_LEASE_NOT_BEFORE_INVALID = 'SCAN_LEASE_NOT_BEFORE_INVALID'
+
+export function captureNameStem(filename: string): string {
+  const base = filename.split(/[\\/]/).pop() ?? filename
+  const dot = base.lastIndexOf('.')
+  const stem = (dot > 0 ? base.slice(0, dot) : base).trim().toLowerCase()
+  return stem.length > 0 ? stem : base.toLowerCase()
+}
+
+export interface ScanCaptureFileIdentity {
+  dev: number
+  ino: number
+}
+
+interface ScanCaptureObservation {
+  firstSeenMs: number
+  seenUnderTaskId: string | null
+  identity?: ScanCaptureFileIdentity
+}
+
+/** Non-zero ino is a real directory-entry id; 0/missing cannot prove sameness. */
+export function scanCaptureFileIdentity(dev: number, ino: number): ScanCaptureFileIdentity | undefined {
+  if (!Number.isFinite(dev) || !Number.isFinite(ino) || ino === 0) return undefined
+  return { dev, ino }
+}
+
+export function isSameScanCaptureFile(
+  a: ScanCaptureFileIdentity | undefined,
+  b: ScanCaptureFileIdentity | undefined,
+): boolean | 'unknown' {
+  if (!a || !b) return 'unknown'
+  return a.dev === b.dev && a.ino === b.ino
+}
+
 /**
  * Windows SMB 可保证边界与设计考量：
  *
@@ -35,7 +72,14 @@ export const SCAN_PRE_EXISTING_TOLERANCE_MS = 5_000
  *    - 若取得租约，将候选文件的本地可信快照时间与租约生效时间（notBefore / task.createdAt）比对：
  *      任何在当前任务租约开始前已经存在的文件（mtime 或 birthtime 早于 notBefore - 5s 容差），
  *      判定为上一会话残留的旧文件，直接移入 _unclaimed 隔离，绝不投递至当前新任务中。
+ *    - 捕获血缘按本次 process 的 opening scanTaskId 绑定，不把 mtime 当用户身份，也不用
+ *      模块级“最近租约”。同 stem 只在同一目录项（rename，dev/ino 相同）上继承；隔离/删除
+ *      后该条目关闭，文件名复用不会继承已关闭捕获。notBefore 无法解析则 fail-closed。
+ *    - 若 Agent 从未见过 A 期间的任何目录项（原子 create/rename 在 B 下才首次可见），被动
+ *      SMB 无法证明归属；该物理歧义留给 Windows/奔图验收，不得声称完美归因。
  *    - 投递请求必须在 multipart 中携带 scanTaskId、短期 deliveryLease 和 candidateSnapshotAt。
+ *    - 误隔离的恢复路径：新的面板扫描产生新文件，或服务端签名安全重扫（retryOfScanTaskId +
+ *      prior controlToken）投递一份新捕获，而不是把磁盘上这份字节绑到后一用户。
  */
 export async function fetchScanLease(
   client: AxiosInstance,
@@ -71,7 +115,8 @@ export function isPreExistingCandidate(
   toleranceMs: number = SCAN_PRE_EXISTING_TOLERANCE_MS,
 ): boolean {
   const leaseNotBeforeMs = new Date(leaseNotBeforeIso).getTime()
-  if (!Number.isFinite(leaseNotBeforeMs)) return false
+  // Unparsable notBefore cannot prove the file is newer than the waiting task.
+  if (!Number.isFinite(leaseNotBeforeMs)) return true
   const barrierThresholdMs = leaseNotBeforeMs - toleranceMs
 
   // 1. 文件最后写入时间早于任务创建边界 -> 判定为前序任务残留
@@ -93,20 +138,128 @@ export function isPreExistingCandidate(
  * 内存目录观察基线，辅助记录文件初次被 Agent 发现的本地时间戳。
  */
 export class ScanDirectoryBaseline {
-  private readonly observedTimes = new Map<string, number>()
+  private readonly observations = new Map<string, ScanCaptureObservation>()
 
-  recordObservation(filename: string, nowMs: number = Date.now()): void {
-    if (!this.observedTimes.has(filename)) {
-      this.observedTimes.set(filename, nowMs)
-    }
+  /**
+   * First sight of this exact basename. `taskId` must be the lease observed for
+   * this file (or null if that fetch found no waiting task). There is no ambient
+   * "last lease" default — callers pass the value they just fetched.
+   * A later directory entry that reuses the name with a different dev/ino replaces
+   * the closed observation; same entry keeps first sight.
+   */
+  recordObservation(
+    filename: string,
+    nowMs: number,
+    taskId: string | null,
+    identity?: ScanCaptureFileIdentity,
+  ): void {
+    const existing = this.observations.get(filename)
+    if (existing && isSameScanCaptureFile(existing.identity, identity) !== false) return
+    this.observations.set(filename, { firstSeenMs: nowMs, seenUnderTaskId: taskId, identity })
   }
 
   remove(filename: string): void {
-    this.observedTimes.delete(filename)
+    this.observations.delete(filename)
   }
 
   clear(): void {
-    this.observedTimes.clear()
+    this.observations.clear()
+  }
+
+  /**
+   * Drop observations whose names are gone and whose stem has no live successor.
+   * Same-stem vanished names are kept only so the current live successor can adopt
+   * a same-inode rename; they are not a time-bounded cache.
+   */
+  retainLiveEntries(liveNames: ReadonlySet<string>): void {
+    const liveStems = new Set<string>()
+    for (const name of liveNames) liveStems.add(captureNameStem(name))
+    for (const name of [...this.observations.keys()]) {
+      if (liveNames.has(name)) continue
+      if (liveStems.has(captureNameStem(name))) continue
+      this.observations.delete(name)
+    }
+  }
+
+  /**
+   * Bind this basename to an explicit opening task, after absorbing vanished
+   * same-stem predecessors that are the same directory entry (temp → pdf rename).
+   * First sight / inherited same-inode predecessor wins; a later B fetch cannot
+   * overwrite A. Proven-different inodes are not inherited.
+   */
+  bindCapture(
+    filename: string,
+    nowMs: number,
+    taskId: string | null,
+    liveNames: ReadonlySet<string>,
+    identity?: ScanCaptureFileIdentity,
+  ): void {
+    const live = new Set(liveNames)
+    live.add(filename)
+    this.adoptVanishedStemPredecessors(filename, live, identity)
+    this.recordObservation(filename, nowMs, taskId, identity)
+    this.retainLiveEntries(live)
+  }
+
+  private adoptVanishedStemPredecessors(
+    filename: string,
+    liveNames: ReadonlySet<string>,
+    identity?: ScanCaptureFileIdentity,
+  ): void {
+    const stem = captureNameStem(filename)
+    let inherited: ScanCaptureObservation | undefined
+    for (const [name, rec] of [...this.observations]) {
+      if (name === filename) continue
+      if (captureNameStem(name) !== stem) continue
+      if (liveNames.has(name)) continue
+      this.observations.delete(name)
+      if (isSameScanCaptureFile(rec.identity, identity) === false) continue
+      if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec
+    }
+    if (inherited && !this.observations.has(filename)) {
+      this.observations.set(filename, {
+        firstSeenMs: inherited.firstSeenMs,
+        seenUnderTaskId: inherited.seenUnderTaskId,
+        identity: identity ?? inherited.identity,
+      })
+    }
+  }
+
+  /**
+   * Original path is gone. Move this observation onto a live same-stem name only
+   * when that name is the same directory entry (dev/ino). Otherwise drop it so a
+   * later reuse is not poisoned. Does nothing when the name was already closed.
+   */
+  closeVanishedCapture(
+    filename: string,
+    liveNames: ReadonlySet<string>,
+    identityOf: (name: string) => ScanCaptureFileIdentity | undefined,
+  ): string | undefined {
+    const rec = this.observations.get(filename)
+    if (!rec) return undefined
+    const stem = captureNameStem(filename)
+    let successor: string | undefined
+    let successorId: ScanCaptureFileIdentity | undefined
+    for (const name of liveNames) {
+      if (name === filename) continue
+      if (captureNameStem(name) !== stem) continue
+      const id = identityOf(name)
+      if (isSameScanCaptureFile(rec.identity, id) !== true) continue
+      successor = name
+      successorId = id
+      break
+    }
+    this.observations.delete(filename)
+    if (!successor) return undefined
+    const existing = this.observations.get(successor)
+    if (!existing || rec.firstSeenMs <= existing.firstSeenMs) {
+      this.observations.set(successor, {
+        firstSeenMs: rec.firstSeenMs,
+        seenUnderTaskId: rec.seenUnderTaskId,
+        identity: successorId ?? rec.identity,
+      })
+    }
+    return successor
   }
 
   isPreExisting(
@@ -114,9 +267,34 @@ export class ScanDirectoryBaseline {
     leaseNotBeforeMs: number,
     toleranceMs: number = SCAN_PRE_EXISTING_TOLERANCE_MS,
   ): boolean {
-    const observedMs = this.observedTimes.get(filename)
+    if (!Number.isFinite(leaseNotBeforeMs)) return true
+    const observedMs = this.observations.get(filename)?.firstSeenMs
     if (observedMs === undefined) return false
     return observedMs < leaseNotBeforeMs - toleranceMs
+  }
+
+  /**
+   * True when this name, or a still-live same-stem sibling, was first seen
+   * under a different waiting scanTaskId. Vanished predecessors must already
+   * have been adopted by `bindCapture`; this check does not consult a global
+   * stem cache.
+   */
+  isForeignToLease(
+    filename: string,
+    currentTaskId: string,
+    liveNames: ReadonlySet<string>,
+  ): boolean {
+    const current = currentTaskId.trim()
+    if (current.length === 0) return false
+    const rec = this.observations.get(filename)
+    if (rec?.seenUnderTaskId && rec.seenUnderTaskId !== current) return true
+    for (const [name, other] of this.observations) {
+      if (name === filename) continue
+      if (!liveNames.has(name)) continue
+      if (captureNameStem(name) !== captureNameStem(filename)) continue
+      if (other.seenUnderTaskId && other.seenUnderTaskId !== current) return true
+    }
+    return false
   }
 }
 
