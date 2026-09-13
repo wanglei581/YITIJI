@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
+import { SCAN_RETRY_AUTHORITY_TTL_MS } from './scan-tasks.service'
 
 /**
  * `deliverScanFile()` 上传期间会通过 `startMatchedHeartbeat()`
@@ -46,15 +47,39 @@ export class ScanTaskReaperTask {
   @Cron(CronExpression.EVERY_MINUTE)
   async reapStuckMatched(): Promise<{ count: number }> {
     const staleThreshold = new Date(Date.now() - MATCHED_STUCK_TIMEOUT_MS)
+    const retryAuthorityExpiresAt = new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
     try {
-      const result = await this.prisma.scanTask.updateMany({
-        where: { status: 'matched', updatedAt: { lt: staleThreshold } },
-        data: { status: 'failed', errorCode: 'SCAN_MATCHED_TIMEOUT', errorMessage: '扫描处理超时未完成' },
+      const retryable = await this.prisma.scanTask.updateMany({
+        where: {
+          status: 'matched',
+          updatedAt: { lt: staleThreshold },
+          lastAttemptHash: { not: null },
+        },
+        data: {
+          status: 'failed',
+          errorCode: 'SCAN_MATCHED_TIMEOUT',
+          errorMessage: '扫描处理超时未完成',
+          retryAuthorityExpiresAt,
+        },
       })
-      if (result.count > 0) {
-        this.logger.warn(`reaped ${result.count} scan task(s) stuck in 'matched' beyond timeout`)
+      const nonRetryable = await this.prisma.scanTask.updateMany({
+        where: {
+          status: 'matched',
+          updatedAt: { lt: staleThreshold },
+          lastAttemptHash: null,
+        },
+        data: {
+          status: 'failed',
+          errorCode: 'SCAN_MATCHED_TIMEOUT',
+          errorMessage: '扫描处理超时未完成',
+          retryAuthorityExpiresAt: null,
+        },
+      })
+      const count = retryable.count + nonRetryable.count
+      if (count > 0) {
+        this.logger.warn(`reaped ${count} scan task(s) stuck in 'matched' beyond timeout`)
       }
-      return { count: result.count }
+      return { count }
     } catch (err) {
       this.logger.error(`matched-state reaper failed: ${(err as Error).message}`)
       return { count: 0 }
@@ -74,7 +99,7 @@ export class ScanTaskReaperTask {
     try {
       const result = await this.prisma.scanTask.updateMany({
         where: { status: 'waiting', expiresAt: { lte: now } },
-        data: { status: 'expired' },
+        data: { status: 'expired', retryAuthorityExpiresAt: null },
       })
       if (result.count > 0) {
         this.logger.warn(`reaped ${result.count} waiting scan task(s) past expiresAt`)

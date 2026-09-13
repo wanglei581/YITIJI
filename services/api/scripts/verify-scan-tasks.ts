@@ -6,7 +6,17 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-tasks-action-secret
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
+import {
+  closeSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -51,6 +61,278 @@ function ensureSqliteFile(dbPath: string): void {
   closeSync(openSync(dbPath, 'a'))
 }
 
+const RETRY_HARDENING_MIGRATION = '20260913223000_harden_scan_retry_authority'
+const RETRY_HARDENING_PREVIOUS_MIGRATION = '20260913210000_add_scan_input_lockout_telemetry'
+
+function runPrismaExpectFailure(
+  apiRoot: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  label: string
+): void {
+  let failed = false
+  try {
+    runPrisma(apiRoot, args, env)
+  } catch {
+    failed = true
+  }
+  assert.equal(failed, true, `${label}: duplicate-data migration must fail`)
+}
+
+function createMigrationSandbox(
+  apiRoot: string,
+  sourceMigrationsRoot: string,
+  schemaPath: string,
+  provider: 'sqlite' | 'postgresql'
+): { root: string; migrationsRoot: string; configPath: string } {
+  const root = mkdtempSync(path.join(tmpdir(), `verify-scan-retry-upgrade-${provider}-`))
+  const migrationsRoot = path.join(root, 'migrations')
+  mkdirSync(migrationsRoot)
+  for (const entry of readdirSync(sourceMigrationsRoot, { withFileTypes: true })) {
+    if (entry.name === RETRY_HARDENING_MIGRATION) continue
+    cpSync(path.join(sourceMigrationsRoot, entry.name), path.join(migrationsRoot, entry.name), {
+      recursive: entry.isDirectory(),
+    })
+  }
+  const configPath = path.join(root, 'prisma.config.ts')
+  const prismaConfigModule = path.join(apiRoot, 'node_modules', 'prisma', 'config.js')
+  writeFileSync(
+    configPath,
+    `import { defineConfig } from ${JSON.stringify(prismaConfigModule)};\n` +
+      `export default defineConfig({ schema: ${JSON.stringify(schemaPath)}, migrations: { path: ${JSON.stringify(migrationsRoot)} }, datasource: { url: process.env[${JSON.stringify(provider === 'postgresql' ? 'POSTGRES_URL' : 'DATABASE_URL')}] } });\n`
+  )
+  return { root, migrationsRoot, configPath }
+}
+
+function addHardeningMigrationToSandbox(
+  sourceMigrationsRoot: string,
+  migrationsRoot: string
+): void {
+  cpSync(
+    path.join(sourceMigrationsRoot, RETRY_HARDENING_MIGRATION),
+    path.join(migrationsRoot, RETRY_HARDENING_MIGRATION),
+    { recursive: true }
+  )
+}
+
+function stripSqlComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, '\n').replace(/--[^\n]*/g, '')
+}
+
+function stripTypeScriptComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '\n').replace(/\/\/[^\n]*/g, '')
+}
+
+function assertRetryHardeningMigrationSql(
+  sql: string,
+  dialect: 'sqlite' | 'postgres',
+  label: string
+): void {
+  const body = stripSqlComments(sql)
+  const ddlMatch = body.match(/\b(?:ALTER|DROP|CREATE)\b/i)
+  assert.ok(ddlMatch && ddlMatch.index !== undefined, `${label}: hardening migration must contain DDL`)
+  const prefix = body.slice(0, ddlMatch.index)
+  assert.match(
+    prefix,
+    /retryOfScanTaskId/,
+    `${label}: duplicate-lineage preflight must inspect retryOfScanTaskId before any DDL`
+  )
+  assert.match(
+    prefix,
+    /retryConsumedByScanTaskId/,
+    `${label}: duplicate-lineage preflight must inspect retryConsumedByScanTaskId before any DDL`
+  )
+  assert.match(
+    prefix,
+    /HAVING\s+COUNT\s*\(\s*\*\s*\)\s*>\s*1/i,
+    `${label}: duplicate-lineage preflight must abort on grouped duplicates before any DDL`
+  )
+  if (dialect === 'sqlite') {
+    assert.match(
+      prefix,
+      /THEN\s+abs\s*\(\s*-9223372036854775808\s*\)/i,
+      `${label}: SQLite preflight must abort via integer overflow before any DDL`
+    )
+  } else {
+    assert.match(
+      prefix,
+      /RAISE\s+EXCEPTION\s+'SCAN_RETRY_LINEAGE_DUPLICATES'/i,
+      `${label}: PostgreSQL preflight must RAISE SCAN_RETRY_LINEAGE_DUPLICATES before any DDL`
+    )
+  }
+  assert.match(
+    body.slice(ddlMatch.index),
+    /^\s*ALTER\s+TABLE\s+"ScanTask"\s+ADD\s+COLUMN\s+"retryAuthorityExpiresAt"/i,
+    `${label}: first DDL after preflight must add retryAuthorityExpiresAt`
+  )
+  assert.match(
+    body,
+    /CREATE UNIQUE INDEX "ScanTask_retryOfScanTaskId_key"[\s\S]*?WHERE "retryOfScanTaskId" IS NOT NULL/,
+    `${label}: retryOfScanTaskId must be a partial unique index`
+  )
+  assert.match(
+    body,
+    /CREATE UNIQUE INDEX "ScanTask_retryConsumedByScanTaskId_key"[\s\S]*?WHERE "retryConsumedByScanTaskId" IS NOT NULL/,
+    `${label}: retryConsumedByScanTaskId must be a partial unique index`
+  )
+}
+
+function assertRetryHardeningMigrationContracts(apiRoot: string): void {
+  assertRetryHardeningMigrationSql(
+    readFileSync(
+      path.join(apiRoot, 'prisma', 'migrations', RETRY_HARDENING_MIGRATION, 'migration.sql'),
+      'utf8'
+    ),
+    'sqlite',
+    'SQLite harden_scan_retry_authority'
+  )
+  assertRetryHardeningMigrationSql(
+    readFileSync(
+      path.join(
+        apiRoot,
+        'prisma',
+        'postgres',
+        'migrations',
+        RETRY_HARDENING_MIGRATION,
+        'migration.sql'
+      ),
+      'utf8'
+    ),
+    'postgres',
+    'PostgreSQL harden_scan_retry_authority'
+  )
+}
+
+function assertDeliverScanFileRequiresBidirectionalLineage(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async deliverScanFile')
+  const end = source.indexOf('private effectiveStatus', start)
+  assert.ok(start >= 0 && end > start, 'deliverScanFile() must exist in scan-tasks.service.ts')
+  const body = stripTypeScriptComments(source.slice(start, end))
+  const required = [
+    'prior.retryConsumedByScanTaskId === task.id',
+    'prior.lastAttemptHash === contentHash',
+    'prior.endUserId === task.endUserId',
+    'prior.terminalId === task.terminalId',
+    'prior.scanType === task.scanType',
+    'prior.retryConsumedAt.getTime() <= prior.retryAuthorityExpiresAt.getTime()',
+  ]
+  for (const snippet of required) {
+    assert.ok(
+      body.includes(snippet),
+      `deliverScanFile() must keep bidirectional lineage check: ${snippet}`
+    )
+  }
+}
+
+function sqliteQuery(databasePath: string, sql: string): string {
+  return execFileSync('sqlite3', ['-batch', '-noheader', '-separator', '|', databasePath, sql], {
+    encoding: 'utf8',
+  }).trim()
+}
+
+function postgresQuery(databaseUrl: string, sql: string): string {
+  return execFileSync('psql', [databaseUrl, '-v', 'ON_ERROR_STOP=1', '-Atq', '-c', sql], {
+    encoding: 'utf8',
+  }).trim()
+}
+
+function retryUpgradeSeedSql(field: 'retryOfScanTaskId' | 'retryConsumedByScanTaskId'): string {
+  const duplicateValue = field === 'retryOfScanTaskId' ? 'prior_duplicate' : 'child_duplicate'
+  return `
+    INSERT INTO "Terminal" ("id", "terminalCode", "agentToken", "deviceFingerprint", "lastSeenAt")
+    VALUES ('upgrade_terminal', 'UPGRADE-TERMINAL', 'upgrade-agent-token', 'upgrade-fingerprint', CURRENT_TIMESTAMP);
+    INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "${field}", "expiresAt", "updatedAt")
+    VALUES
+      ('upgrade_scan_a', 'upgrade_terminal', 'document', 'failed', '${duplicateValue}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('upgrade_scan_b', 'upgrade_terminal', 'document', 'failed', '${duplicateValue}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  `
+}
+
+function assertSqliteHardeningStructure(
+  databasePath: string,
+  expected: 'previous' | 'hardened',
+  label: string
+): void {
+  const snapshot = sqliteQuery(
+    databasePath,
+    `
+      SELECT COUNT(*) FROM pragma_table_info('ScanTask') WHERE name = 'retryAuthorityExpiresAt';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryOfScanTaskId_idx';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryConsumedByScanTaskId_idx';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryOfScanTaskId_key';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryConsumedByScanTaskId_key';
+      SELECT COUNT(*) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}' AND finished_at IS NOT NULL;
+      SELECT COALESCE(MAX(applied_steps_count), 0) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}';
+    `
+  ).split('\n')
+  assert.deepEqual(
+    snapshot,
+    expected === 'previous'
+      ? ['0', '1', '1', '0', '0', '0', '0']
+      : ['1', '0', '0', '1', '1', '1', '1'],
+    `${label}: schema/index/migration state must remain ${expected}`
+  )
+  if (expected === 'hardened') {
+    for (const [indexName, column] of [
+      ['ScanTask_retryOfScanTaskId_key', 'retryOfScanTaskId'],
+      ['ScanTask_retryConsumedByScanTaskId_key', 'retryConsumedByScanTaskId'],
+    ] as const) {
+      const indexSql = sqliteQuery(
+        databasePath,
+        `SELECT sql FROM sqlite_master WHERE type = 'index' AND name = '${indexName}';`
+      )
+      assert.match(
+        indexSql,
+        new RegExp(`UNIQUE[\\s\\S]*WHERE\\s+"${column}"\\s+IS\\s+NOT\\s+NULL`, 'i'),
+        `${label}: ${indexName} must remain a partial unique index`
+      )
+    }
+  }
+}
+
+function assertPostgresHardeningStructure(
+  databaseUrl: string,
+  expected: 'previous' | 'hardened',
+  label: string
+): void {
+  const snapshot = postgresQuery(
+    databaseUrl,
+    `
+      SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ScanTask' AND column_name = 'retryAuthorityExpiresAt';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryOfScanTaskId_idx';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryConsumedByScanTaskId_idx';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryOfScanTaskId_key';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryConsumedByScanTaskId_key';
+      SELECT COUNT(*) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}' AND finished_at IS NOT NULL;
+      SELECT COALESCE(MAX(applied_steps_count), 0) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}';
+    `
+  ).split('\n')
+  assert.deepEqual(
+    snapshot,
+    expected === 'previous'
+      ? ['0', '1', '1', '0', '0', '0', '0']
+      : ['1', '0', '0', '1', '1', '1', '1'],
+    `${label}: schema/index/migration state must remain ${expected}`
+  )
+  if (expected === 'hardened') {
+    for (const [indexName, column] of [
+      ['ScanTask_retryOfScanTaskId_key', 'retryOfScanTaskId'],
+      ['ScanTask_retryConsumedByScanTaskId_key', 'retryConsumedByScanTaskId'],
+    ] as const) {
+      const indexSql = postgresQuery(
+        databaseUrl,
+        `SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = '${indexName}';`
+      )
+      assert.match(
+        indexSql,
+        new RegExp(`UNIQUE[\\s\\S]*WHERE[\\s\\S]*${column}[\\s\\S]*IS NOT NULL`, 'i'),
+        `${label}: ${indexName} must remain a partial unique index`
+      )
+    }
+  }
+}
+
 // Task 10 能力门禁直通 stub：门禁真实语义由 verify:admin-print-scan 覆盖，
 // 本脚本聚焦扫描任务状态机，不重复测门禁。
 const passthroughCapabilities = { assertUserTaskAllowed: async () => undefined } as never
@@ -71,6 +353,7 @@ interface StoredScanTask {
   retryContentHash: string | null
   retryConsumedAt: Date | null
   retryConsumedByScanTaskId: string | null
+  retryAuthorityExpiresAt: Date | null
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -184,6 +467,7 @@ class FakePrisma {
         retryContentHash: data.retryContentHash ?? null,
         retryConsumedAt: data.retryConsumedAt ?? null,
         retryConsumedByScanTaskId: data.retryConsumedByScanTaskId ?? null,
+        retryAuthorityExpiresAt: data.retryAuthorityExpiresAt ?? null,
         expiresAt: data.expiresAt!,
         createdAt: now,
         updatedAt: now,
@@ -206,7 +490,8 @@ class FakePrisma {
         fileId?: null
         retryConsumedAt?: Date | null
         expiresAt?: { gt: Date }
-        lastAttemptHash?: string
+        lastAttemptHash?: string | null | { not: null }
+        retryAuthorityExpiresAt?: { gt: Date }
         updatedAt?: { gt?: Date; lt?: Date }
       }
     }) => {
@@ -226,7 +511,20 @@ class FakePrisma {
           t.retryConsumedAt?.getTime() !== where.retryConsumedAt.getTime()
         )
           return false
-        if (where.lastAttemptHash !== undefined && t.lastAttemptHash !== where.lastAttemptHash)
+        if (where.lastAttemptHash !== undefined) {
+          if (where.lastAttemptHash === null) {
+            if (t.lastAttemptHash !== null) return false
+          } else if (typeof where.lastAttemptHash === 'object') {
+            if (t.lastAttemptHash === null) return false
+          } else if (t.lastAttemptHash !== where.lastAttemptHash) {
+            return false
+          }
+        }
+        if (
+          where.retryAuthorityExpiresAt?.gt !== undefined &&
+          !(t.retryAuthorityExpiresAt &&
+            t.retryAuthorityExpiresAt.getTime() > where.retryAuthorityExpiresAt.gt.getTime())
+        )
           return false
         if (
           where.expiresAt?.gt !== undefined &&
@@ -268,6 +566,8 @@ class FakePrisma {
         controlTokenHash?: string
         fileId?: null
         retryConsumedAt?: Date | null
+        lastAttemptHash?: string | null | { not: null }
+        retryAuthorityExpiresAt?: { gt: Date }
         updatedAt?: { gt?: Date; lt?: Date }
         expiresAt?: { lte: Date }
       }
@@ -286,6 +586,21 @@ class FakePrisma {
         if (
           where.retryConsumedAt instanceof Date &&
           t.retryConsumedAt?.getTime() !== where.retryConsumedAt.getTime()
+        )
+          return false
+        if (where.lastAttemptHash !== undefined) {
+          if (where.lastAttemptHash === null) {
+            if (t.lastAttemptHash !== null) return false
+          } else if (typeof where.lastAttemptHash === 'object') {
+            if (t.lastAttemptHash === null) return false
+          } else if (t.lastAttemptHash !== where.lastAttemptHash) {
+            return false
+          }
+        }
+        if (
+          where.retryAuthorityExpiresAt?.gt !== undefined &&
+          !(t.retryAuthorityExpiresAt &&
+            t.retryAuthorityExpiresAt.getTime() > where.retryAuthorityExpiresAt.gt.getTime())
         )
           return false
         if (
@@ -480,6 +795,7 @@ function makeRetryAuthority(
     ...task,
     status: 'failed',
     lastAttemptHash: createHash('sha256').update(content).digest('hex'),
+    retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
     updatedAt: new Date(),
     ...overrides,
   }
@@ -716,7 +1032,7 @@ async function assertRealDbRetryAuthorityCas(
   const taskId = `realdb_retry_authority_${label}_${randomBytes(4).toString('hex')}`
   const tokenHash = createHash('sha256').update('real-db-retry-token').digest('hex')
   const contentHash = createHash('sha256').update(tinyPdf()).digest('hex')
-  const retryCutoff = new Date(Date.now() - SCAN_RETRY_AUTHORITY_TTL_MS)
+  const retryAuthorityExpiresAt = new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
 
   try {
     await clientA.terminal.create({
@@ -736,6 +1052,7 @@ async function assertRealDbRetryAuthorityCas(
         status: 'failed',
         controlTokenHash: tokenHash,
         lastAttemptHash: contentHash,
+        retryAuthorityExpiresAt,
         expiresAt: new Date(Date.now() + 60_000),
       },
     })
@@ -752,7 +1069,7 @@ async function assertRealDbRetryAuthorityCas(
           fileId: null,
           lastAttemptHash: contentHash,
           retryConsumedAt: null,
-          updatedAt: { gt: retryCutoff },
+          retryAuthorityExpiresAt: { gt: new Date() },
         },
         data: { retryConsumedAt: new Date() },
       })
@@ -799,6 +1116,255 @@ async function assertRealDbRetryAuthorityCas(
   }
 }
 
+async function assertRealDbRetryLineageIndexes(
+  dbUrl: string,
+  label: 'sqlite' | 'postgres'
+): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  const terminalId = `realdb_retry_lineage_${label}_${randomBytes(4).toString('hex')}`
+  try {
+    await client.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `RDB-LINEAGE-${label}-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-retry-lineage-indexes',
+        enabled: true,
+      },
+    })
+
+    const sourceA = await client.scanTask.create({
+      data: {
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    const sourceB = await client.scanTask.create({
+      data: {
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    const childA = await client.scanTask.create({
+      data: {
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        retryOfScanTaskId: sourceA.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+
+    await assert.rejects(
+      () =>
+        client.scanTask.create({
+          data: {
+            terminalId,
+            scanType: 'document',
+            status: 'failed',
+            retryOfScanTaskId: sourceA.id,
+            expiresAt: new Date(Date.now() + 60_000),
+          },
+        }),
+      (error: unknown) =>
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002',
+      `real DB (${label}): retryOfScanTaskId must be one-to-one`
+    )
+
+    await client.scanTask.update({
+      where: { id: sourceA.id },
+      data: { retryConsumedByScanTaskId: childA.id },
+    })
+    await assert.rejects(
+      () =>
+        client.scanTask.update({
+          where: { id: sourceB.id },
+          data: { retryConsumedByScanTaskId: childA.id },
+        }),
+      (error: unknown) =>
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002',
+      `real DB (${label}): retryConsumedByScanTaskId must be one-to-one`
+    )
+  } finally {
+    await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
+    await client.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await client.$disconnect()
+  }
+}
+
+function assertSqliteRetryHardeningUpgrade(apiRoot: string): void {
+  const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'migrations')
+  const sandbox = createMigrationSandbox(
+    apiRoot,
+    sourceMigrationsRoot,
+    path.join(apiRoot, 'prisma', 'schema.prisma'),
+    'sqlite'
+  )
+  const previousDbPath = path.join(sandbox.root, 'previous.db')
+  const previousDbUrl = `file:${previousDbPath}`
+  try {
+    ensureSqliteFile(previousDbPath)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: previousDbUrl,
+    })
+    assert.equal(
+      sqliteQuery(
+        previousDbPath,
+        'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC, migration_name DESC LIMIT 1;'
+      ),
+      RETRY_HARDENING_PREVIOUS_MIGRATION,
+      'SQLite template must be at the immediately previous migration'
+    )
+    assertSqliteHardeningStructure(previousDbPath, 'previous', 'SQLite previous-version template')
+    addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+
+    const cleanDbPath = path.join(sandbox.root, 'clean.db')
+    cpSync(previousDbPath, cleanDbPath)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: `file:${cleanDbPath}`,
+    })
+    assertSqliteHardeningStructure(cleanDbPath, 'hardened', 'SQLite clean upgrade')
+
+    for (const field of ['retryOfScanTaskId', 'retryConsumedByScanTaskId'] as const) {
+      const duplicateDbPath = path.join(sandbox.root, `duplicate-${field}.db`)
+      cpSync(previousDbPath, duplicateDbPath)
+      execFileSync('sqlite3', ['-bail', duplicateDbPath], {
+        input: retryUpgradeSeedSql(field),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      runPrismaExpectFailure(
+        apiRoot,
+        ['migrate', 'deploy', '--config', sandbox.configPath],
+        { ...process.env, DATABASE_URL: `file:${duplicateDbPath}` },
+        `SQLite duplicate ${field}`
+      )
+      assertSqliteHardeningStructure(
+        duplicateDbPath,
+        'previous',
+        `SQLite duplicate ${field} rejection`
+      )
+      assert.equal(
+        sqliteQuery(
+          duplicateDbPath,
+          `SELECT COUNT(*) FROM "ScanTask" WHERE "${field}" IS NOT NULL;`
+        ),
+        '2',
+        `SQLite duplicate ${field}: preflight must not delete or rewrite lineage rows`
+      )
+    }
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
+function postgresDatabaseUrl(baseUrl: string, databaseName: string): string {
+  const url = new URL(baseUrl)
+  url.pathname = `/${databaseName}`
+  return url.toString()
+}
+
+function assertPostgresRetryHardeningUpgrade(apiRoot: string, pgUrl: string): void {
+  const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'postgres', 'migrations')
+  const sandbox = createMigrationSandbox(
+    apiRoot,
+    sourceMigrationsRoot,
+    path.join(apiRoot, 'prisma', 'postgres', 'schema.prisma'),
+    'postgresql'
+  )
+  const base = new URL(pgUrl)
+  const maintenanceDatabase = base.pathname.slice(1) || 'postgres'
+  const suffix = randomBytes(4).toString('hex')
+  const templateName = `scan_retry_prev_${suffix}`
+  const cleanName = `scan_retry_clean_${suffix}`
+  const duplicateNames = {
+    retryOfScanTaskId: `scan_retry_dup_of_${suffix}`,
+    retryConsumedByScanTaskId: `scan_retry_dup_by_${suffix}`,
+  } as const
+  const connectionArgs = ['-h', base.hostname, '-p', base.port || '5432', '-U', base.username || 'postgres', '-w']
+  const postgresCommandEnv = { ...process.env, ...(base.password ? { PGPASSWORD: base.password } : {}) }
+  const createdDatabases: string[] = []
+
+  const createDatabase = (name: string, template?: string): void => {
+    execFileSync(
+      'createdb',
+      [...connectionArgs, '--maintenance-db', maintenanceDatabase, ...(template ? ['--template', template] : []), name],
+      { env: postgresCommandEnv, stdio: 'pipe' }
+    )
+    createdDatabases.push(name)
+  }
+
+  try {
+    createDatabase(templateName)
+    const templateUrl = postgresDatabaseUrl(pgUrl, templateName)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: templateUrl,
+      POSTGRES_URL: templateUrl,
+    })
+    assert.equal(
+      postgresQuery(
+        templateUrl,
+        'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC, migration_name DESC LIMIT 1;'
+      ),
+      RETRY_HARDENING_PREVIOUS_MIGRATION,
+      'PostgreSQL template must be at the immediately previous migration'
+    )
+    assertPostgresHardeningStructure(templateUrl, 'previous', 'PostgreSQL previous-version template')
+    addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+
+    createDatabase(cleanName, templateName)
+    const cleanUrl = postgresDatabaseUrl(pgUrl, cleanName)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: cleanUrl,
+      POSTGRES_URL: cleanUrl,
+    })
+    assertPostgresHardeningStructure(cleanUrl, 'hardened', 'PostgreSQL clean upgrade')
+
+    for (const field of ['retryOfScanTaskId', 'retryConsumedByScanTaskId'] as const) {
+      const databaseName = duplicateNames[field]
+      createDatabase(databaseName, templateName)
+      const duplicateUrl = postgresDatabaseUrl(pgUrl, databaseName)
+      postgresQuery(duplicateUrl, retryUpgradeSeedSql(field))
+      runPrismaExpectFailure(
+        apiRoot,
+        ['migrate', 'deploy', '--config', sandbox.configPath],
+        { ...process.env, DATABASE_URL: duplicateUrl, POSTGRES_URL: duplicateUrl },
+        `PostgreSQL duplicate ${field}`
+      )
+      assertPostgresHardeningStructure(
+        duplicateUrl,
+        'previous',
+        `PostgreSQL duplicate ${field} rejection`
+      )
+      assert.equal(
+        postgresQuery(
+          duplicateUrl,
+          `SELECT COUNT(*) FROM "ScanTask" WHERE "${field}" IS NOT NULL;`
+        ),
+        '2',
+        `PostgreSQL duplicate ${field}: preflight must not delete or rewrite lineage rows`
+      )
+    }
+  } finally {
+    for (const databaseName of createdDatabases.reverse()) {
+      execFileSync(
+        'dropdb',
+        [...connectionArgs, '--maintenance-db', maintenanceDatabase, '--if-exists', '--force', databaseName],
+        { env: postgresCommandEnv, stdio: 'pipe' }
+      )
+    }
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
 async function assertRealDbRetryCreateAtomicity(dbUrl: string): Promise<void> {
   const { client: setupClient } = createPrismaClient(dbUrl)
   const { client: clientA } = createPrismaClient(dbUrl)
@@ -829,6 +1395,7 @@ async function assertRealDbRetryCreateAtomicity(dbUrl: string): Promise<void> {
       data: {
         status: 'failed',
         lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
       },
     })
 
@@ -873,6 +1440,7 @@ async function assertRealDbRetryCreateAtomicity(dbUrl: string): Promise<void> {
         endUserId,
         controlTokenHash: createHash('sha256').update(rollbackToken).digest('hex'),
         lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
         expiresAt: new Date(Date.now() + 60_000),
       },
     })
@@ -906,6 +1474,57 @@ async function assertRealDbRetryCreateAtomicity(dbUrl: string): Promise<void> {
       'real DB: failed retry create must roll back retryConsumedAt'
     )
     assert.equal(rollbackAuthority?.retryConsumedByScanTaskId, null)
+
+    // Force the child insert to collide on retryOfScanTaskId. This is a lineage conflict,
+    // not an active-session conflict, and the authority CAS must roll back with the insert.
+    await setupClient.scanTask.deleteMany({
+      where: { terminalId, status: { in: ['waiting', 'matched'] } },
+    })
+    const lineageToken = randomBytes(24).toString('hex')
+    const lineageAuthorityId = `lineage_authority_${randomBytes(4).toString('hex')}`
+    await setupClient.scanTask.create({
+      data: {
+        id: lineageAuthorityId,
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        endUserId,
+        controlTokenHash: createHash('sha256').update(lineageToken).digest('hex'),
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await setupClient.scanTask.create({
+      data: {
+        id: `lineage_blocker_${randomBytes(4).toString('hex')}`,
+        terminalId,
+        scanType: 'document',
+        status: 'cancelled',
+        retryOfScanTaskId: lineageAuthorityId,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await expectRejectCode(
+      () =>
+        serviceA.create(
+          { scanType: 'document', terminalId, retryOfScanTaskId: lineageAuthorityId },
+          endUserId,
+          lineageToken
+        ),
+      ConflictException,
+      'SCAN_RETRY_CONFLICT',
+      'retry lineage P2002 must not be misreported as terminal busy'
+    )
+    const lineageAuthority = await setupClient.scanTask.findUnique({
+      where: { id: lineageAuthorityId },
+    })
+    assert.equal(
+      lineageAuthority?.retryConsumedAt,
+      null,
+      'real DB: lineage-conflict retry create must roll back retryConsumedAt'
+    )
+    assert.equal(lineageAuthority?.retryConsumedByScanTaskId, null)
   } finally {
     await setupClient.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
     await setupClient.endUser.deleteMany({ where: { id: endUserId } }).catch(() => undefined)
@@ -1147,6 +1766,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       data: {
         status: 'failed',
         lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
       },
     })
     const safeRetry = await service.create(
@@ -1364,6 +1984,10 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
 }
 
 async function main(): Promise<void> {
+  const apiRootForContracts = path.resolve(__dirname, '..')
+  assertRetryHardeningMigrationContracts(apiRootForContracts)
+  assertDeliverScanFileRequiresBidirectionalLineage(apiRootForContracts)
+
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
 
   {
@@ -1458,7 +2082,8 @@ async function main(): Promise<void> {
         priorOwner: 'member_a',
         retryOwner: 'member_a',
         mutate: (task) => {
-          task.updatedAt = new Date(Date.now() - SCAN_RETRY_AUTHORITY_TTL_MS - 1)
+          task.retryAuthorityExpiresAt = new Date(Date.now() - 1)
+          task.updatedAt = new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
         },
       },
     ]
@@ -1623,6 +2248,124 @@ async function main(): Promise<void> {
   }
 
   {
+    // The child row is not self-authenticating. Every dedup bypass must be proven by a matching,
+    // consumed prior authority whose backlink points to this exact child.
+    const mutations: Array<{
+      label: string
+      mutate: (prior: StoredScanTask, child: StoredScanTask, prisma: FakePrisma) => void
+    }> = [
+      {
+        label: 'orphan child',
+        mutate: (_prior, child) => {
+          child.retryOfScanTaskId = 'missing-prior'
+        },
+      },
+      {
+        label: 'mismatched backlink',
+        mutate: (prior) => {
+          prior.retryConsumedByScanTaskId = 'different-child'
+        },
+      },
+      {
+        label: 'missing consumption time',
+        mutate: (prior) => {
+          prior.retryConsumedAt = null
+        },
+      },
+      {
+        label: 'missing authority expiry',
+        mutate: (prior) => {
+          prior.retryAuthorityExpiresAt = null
+        },
+      },
+      {
+        label: 'consumption after authority expiry',
+        mutate: (prior) => {
+          prior.retryAuthorityExpiresAt = new Date(prior.retryConsumedAt!.getTime() - 1)
+        },
+      },
+      {
+        label: 'ineligible prior status',
+        mutate: (prior) => {
+          prior.status = 'completed'
+        },
+      },
+      {
+        label: 'prior already has file',
+        mutate: (prior) => {
+          prior.fileId = 'forged-existing-file'
+        },
+      },
+      {
+        label: 'wrong owner',
+        mutate: (prior) => {
+          prior.endUserId = 'other-member'
+        },
+      },
+      {
+        label: 'wrong terminal',
+        mutate: (prior) => {
+          prior.terminalId = 't_2'
+        },
+      },
+      {
+        label: 'wrong scan type',
+        mutate: (prior) => {
+          prior.scanType = 'resume'
+        },
+      },
+      {
+        label: 'wrong content hash',
+        mutate: (prior) => {
+          prior.lastAttemptHash = 'f'.repeat(64)
+        },
+      },
+    ]
+
+    for (const mutation of mutations) {
+      const { service, prisma } = makeService()
+      const bytes = tinyPdf()
+      const prior = await service.create(dto, 'member_lineage')
+      makeRetryAuthority(prisma, prior.scanTaskId, bytes)
+      const retry = await service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_lineage',
+        prior.controlToken
+      )
+      const priorRow = prisma.scanTasksById.get(prior.scanTaskId)!
+      const retryRow = prisma.scanTasksById.get(retry.scanTaskId)!
+      prisma.scanTasksById.set(`lineage-dedup-evidence-${mutation.label}`, {
+        ...priorRow,
+        id: `lineage-dedup-evidence-${mutation.label}`,
+        retryConsumedAt: null,
+        retryConsumedByScanTaskId: null,
+        retryAuthorityExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      mutation.mutate(priorRow, retryRow, prisma)
+
+      await expectRejectCode(
+        () =>
+          service.deliverScanFile({
+            terminalId: 't_1',
+            buffer: bytes,
+            filename: `forged-${mutation.label}.pdf`,
+            mimeType: 'application/pdf',
+            observedAt: new Date().toISOString(),
+          }),
+        ConflictException,
+        'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+        `${mutation.label} lineage must not bypass dedup`
+      )
+      assert.equal(
+        prisma.scanTasksById.get(retry.scanTaskId)?.status,
+        'waiting',
+        `${mutation.label}: forged lineage must leave the child waiting and unclaimed`
+      )
+    }
+  }
+
+  {
     // contract scan 必须贯通专用高敏短期 purpose，不能退化到通用 print_doc。
     const { service, prisma } = makeService()
     const created = await service.create({ scanType: 'contract', terminalId: 't_1' }, null)
@@ -1772,6 +2515,37 @@ async function main(): Promise<void> {
   }
 
   {
+    for (const target of [['retryOfScanTaskId'], 'ScanTask_retryConsumedByScanTaskId_key'] as const) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, 'member_lineage_p2002')
+      makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+      const originalCreate = prisma.scanTask.create.bind(prisma.scanTask)
+      prisma.scanTask.create = (async () => {
+        throw new Prisma.PrismaClientKnownRequestError(
+          `Unique constraint failed on ${String(target)}`,
+          {
+            code: 'P2002',
+            clientVersion: 'verify-scan-tasks-fixture',
+            meta: { target },
+          }
+        )
+      }) as typeof originalCreate
+      await expectRejectCode(
+        () =>
+          service.create(
+            { ...dto, retryOfScanTaskId: prior.scanTaskId },
+            'member_lineage_p2002',
+            prior.controlToken
+          ),
+        ConflictException,
+        'SCAN_RETRY_CONFLICT',
+        `P2002 target ${String(target)} must map to SCAN_RETRY_CONFLICT, not SCAN_TERMINAL_BUSY`
+      )
+      prisma.scanTask.create = originalCreate as typeof prisma.scanTask.create
+    }
+  }
+
+  {
     // create() 必须只把 P2002 映射成 SCAN_TERMINAL_BUSY；其它数据库错误码/未知错误必须原样透出
     // （不能被误吞成"终端繁忙"，否则会掩盖真实故障，误导排障方向）。
     //
@@ -1834,6 +2608,7 @@ async function main(): Promise<void> {
     const dbUrl = `file:${dbPath}`
 
     try {
+      assertSqliteRetryHardeningUpgrade(apiRoot)
       ensureSqliteFile(dbPath)
       runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
 
@@ -1841,6 +2616,7 @@ async function main(): Promise<void> {
       await assertRealDbWaitingExpiryReaperUnblocksTerminal(dbUrl)
       await assertRealDbRetryAuthorityCas(dbUrl, 'sqlite')
       await assertRealDbRetryCreateAtomicity(dbUrl)
+      await assertRealDbRetryLineageIndexes(dbUrl, 'sqlite')
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }
@@ -1855,15 +2631,9 @@ async function main(): Promise<void> {
     // 真的对着那个连接跑两次 create() 去验证约束的 WHERE 子句在 Postgres 上语义正确——SQLite
     // 那半边测过不代表 Postgres 那半边也一定对（哪怕两份 .sql 文本几乎一样）。
     //
-    // 复用哪个数据库连接、要不要单独建库/建 schema：本仓库目前唯一存在的"对真实 Postgres 跑
-    // 测试"先例，是 postgres-readiness CI job 本身的架构——整个 job 起一个 Postgres service
-    // 容器、部署一次迁移、seed 一次，然后几十个 verify:* 脚本依次共用同一个数据库连接，靠各自
-    // 随机 ID + 用完自己清理来避免互相污染（见本文件其余 verify:* 脚本的调用方式：
-    // .github/workflows/ci.yml 的 postgres-readiness job）。这里跟随同一个约定：直接连到
-    // POSTGRES_URL（CI 场景）或退化到 DATABASE_URL（本地场景，与 prisma.postgres.config.ts
-    // 读取 env 的优先级一致），不额外发明"每个测试起一个独立 schema/database"的新隔离机制——
-    // assertRealDbPartialUniqueIndex() 内部沿用与 SQLite 块相同的随机 terminalId + finally
-    // 清理，不会残留数据。
+    // 普通行为断言继续复用 POSTGRES_URL 指向的专用库，并以随机 ID + finally 清理隔离。
+    // 上一版本升级断言需要同时保留 clean / duplicate 两种独立结构，因此只在同一临时集群内
+    // 创建随机测试数据库，验证完成后立即 drop；不会连接或修改 URL 指定集群之外的数据库。
     //
     // 没有配置 Postgres 环境时（例如本地开发者跑 `pnpm verify:scan-tasks` 没起 Postgres）优雅
     // 跳过，不失败——跟 scripts/verify-cos-live.ts 对未配置真实凭证时的处理方式一致（SKIPPED
@@ -1884,6 +2654,7 @@ async function main(): Promise<void> {
       )
     } else {
       const apiRoot = path.resolve(__dirname, '..')
+      assertPostgresRetryHardeningUpgrade(apiRoot, pgUrl)
       // 与 SQLite 块一致：不假设调用方已经在本进程之外部署过迁移，本块自己也跑一遍真实
       // `migrate deploy`（走 Postgres 专用配置/迁移目录，见 prisma.postgres.config.ts）。
       // migrate deploy 是幂等的，对已经部署过这条迁移的库（如 CI 提前 db:pg:deploy 过的库）
@@ -1896,6 +2667,8 @@ async function main(): Promise<void> {
 
       await assertRealDbPartialUniqueIndex(pgUrl, 'postgres')
       await assertRealDbRetryAuthorityCas(pgUrl, 'postgres')
+      await assertRealDbRetryCreateAtomicity(pgUrl)
+      await assertRealDbRetryLineageIndexes(pgUrl, 'postgres')
     }
   }
 
@@ -1965,6 +2738,22 @@ async function main(): Promise<void> {
     })
     const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'expired')
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryAuthorityExpiresAt,
+      null,
+      'waiting lazy expiry without lastAttemptHash must not mint retry authority'
+    )
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: created.scanTaskId },
+          null,
+          created.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'waiting expiry must not authorize a content-bound retry'
+    )
     await expectRejects(
       () =>
         service.deliverScanFile({
@@ -2018,15 +2807,22 @@ async function main(): Promise<void> {
     const { service, prisma } = makeService()
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
+    const attemptedHash = createHash('sha256').update(tinyPdf()).digest('hex')
     prisma.scanTasksById.set(created.scanTaskId, {
       ...task,
       status: 'matched',
+      lastAttemptHash: attemptedHash,
       expiresAt: new Date(Date.now() - 1000),
     })
 
     const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'expired')
-    assert.equal(prisma.scanTasksById.get(created.scanTaskId)?.status, 'expired')
+    const expiredRow = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.equal(expiredRow.status, 'expired')
+    assert.ok(
+      expiredRow.retryAuthorityExpiresAt && expiredRow.retryAuthorityExpiresAt.getTime() > Date.now(),
+      'matched lazy expiry with lastAttemptHash must atomically mint a dedicated retry authority'
+    )
   }
 
   {
@@ -2390,9 +3186,8 @@ async function main(): Promise<void> {
 
   {
     // deliverScanFile 的 catch 分支:this.files.upload() 抛错时，任务落 failed +
-    // errorCode: 'SCAN_UPLOAD_FAILED'，原始错误信息存入 DB 的 errorMessage，然后原样 rethrow。
-    // getStatus() 对外必须把 errorCode 映射成 USER_FACING_SCAN_ERROR 里的白名单文案，
-    // 绝不能把原始错误信息透出给用户。
+    // errorCode: 'SCAN_UPLOAD_FAILED'。原始错误只 rethrow 给 Agent，DB 与 getStatus()
+    // 都只保留 USER_FACING_SCAN_ERROR 白名单文案，绝不能把原始错误信息透出给用户。
     const prisma = new FakePrisma()
     const throwingFiles = {
       upload: async (): Promise<never> => {
@@ -2429,25 +3224,105 @@ async function main(): Promise<void> {
       '扫描文件处理失败，请重新扫描',
       'errorMessage must be the whitelisted user-facing string, not the raw thrown error message'
     )
+    const failedRow = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.equal(
+      failedRow.errorMessage,
+      '扫描文件处理失败，请重新扫描',
+      'DB errorMessage must store the whitelist text, not the raw upload error'
+    )
+    assert.ok(
+      failedRow.retryAuthorityExpiresAt && failedRow.retryAuthorityExpiresAt.getTime() > Date.now(),
+      'upload failure after matching must atomically mint retry authority'
+    )
+    const retryAfterUploadFailure = await service.create(
+      { ...dto, retryOfScanTaskId: created.scanTaskId },
+      null,
+      created.controlToken
+    )
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryConsumedByScanTaskId,
+      retryAfterUploadFailure.scanTaskId,
+      'matched upload failure must authorize exactly one identical-content retry'
+    )
+    const fixedAuthorityExpiry = failedRow.retryAuthorityExpiresAt!.getTime()
+    await prisma.scanTask.updateMany({
+      where: { id: created.scanTaskId, status: 'failed' },
+      data: { errorMessage: 'unrelated follow-up write' },
+    })
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryAuthorityExpiresAt?.getTime(),
+      fixedAuthorityExpiry,
+      'an unrelated update that bumps updatedAt must not extend retry authority expiry'
+    )
   }
 
   {
-    // cancel() 的 CAS 用 status:{in:['waiting','matched']}，已被投递匹配但尚未完成（matched）的任务同样可取消，
-    // 不能只认 waiting。
+    // cancel() only admits waiting/matched. Its CAS pins the exact state and hash snapshot,
+    // so a matched task remains cancellable without allowing terminal states to be rewritten.
     const { service, prisma } = makeService()
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
-    prisma.scanTasksById.set(created.scanTaskId, { ...task, status: 'matched' })
+    prisma.scanTasksById.set(created.scanTaskId, {
+      ...task,
+      status: 'matched',
+      lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+    })
     const cancelled = await service.cancel(created.scanTaskId, null, created.controlToken)
     assert.equal(cancelled.status, 'cancelled')
+    assert.ok(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryAuthorityExpiresAt,
+      'cancelling a matched task with lastAttemptHash must atomically mint retry authority'
+    )
+    const retryAfterMatchedCancel = await service.create(
+      { ...dto, retryOfScanTaskId: created.scanTaskId },
+      null,
+      created.controlToken
+    )
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryConsumedByScanTaskId,
+      retryAfterMatchedCancel.scanTaskId,
+      'matched cancellation with lastAttemptHash must authorize exactly one retry'
+    )
+  }
+
+  {
+    for (const terminalStatus of ['failed', 'expired', 'cancelled'] as const) {
+      const { service, prisma } = makeService()
+      const created = await service.create(dto, null)
+      const task = prisma.scanTasksById.get(created.scanTaskId)!
+      prisma.scanTasksById.set(created.scanTaskId, { ...task, status: terminalStatus })
+      await expectRejectCode(
+        () => service.cancel(created.scanTaskId, null, created.controlToken),
+        ConflictException,
+        'SCAN_TASK_CANCEL_CONFLICT',
+        `${terminalStatus} task must not be rewritten by cancel()`
+      )
+      assert.equal(prisma.scanTasksById.get(created.scanTaskId)?.status, terminalStatus)
+    }
   }
 
   {
     // 取消后的任务不再是 waiting，不能被后续投递误撞；投递必须匹配到之后新建的会话。
-    const { service } = makeService()
+    const { service, prisma } = makeService()
     const first = await service.create(dto, null)
     const cancelled = await service.cancel(first.scanTaskId, null, first.controlToken)
     assert.equal(cancelled.status, 'cancelled')
+    assert.equal(
+      prisma.scanTasksById.get(first.scanTaskId)?.retryAuthorityExpiresAt,
+      null,
+      'waiting cancellation without lastAttemptHash must not mint retry authority'
+    )
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: first.scanTaskId },
+          null,
+          first.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'waiting cancellation must not authorize a content-bound retry'
+    )
     const second = await service.create(dto, null)
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
@@ -2665,6 +3540,7 @@ async function main(): Promise<void> {
     // 4 分钟前——超过 reaper 的 3 分钟阈值。
     prisma.scanTasksById.set(stale.scanTaskId, {
       ...staleStored,
+      lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
       updatedAt: new Date(Date.now() - 4 * 60 * 1000),
     })
 
@@ -2692,6 +3568,10 @@ async function main(): Promise<void> {
       staleAfter.errorCode,
       'SCAN_MATCHED_TIMEOUT',
       'reaped task must carry errorCode SCAN_MATCHED_TIMEOUT'
+    )
+    assert.ok(
+      staleAfter.retryAuthorityExpiresAt && staleAfter.retryAuthorityExpiresAt.getTime() > Date.now(),
+      'matched timeout with lastAttemptHash must atomically mint retry authority'
     )
 
     // errorMessage 必须经 service.getStatus() 校验，而不是直接读裸 Prisma 行：getStatus() 会把
@@ -2737,6 +3617,28 @@ async function main(): Promise<void> {
       staleAfterSecondRun.errorCode,
       staleAfterFirstRun.errorCode,
       'second no-op run must not mutate an already-reaped task again'
+    )
+    assert.equal(
+      staleAfterSecondRun.retryAuthorityExpiresAt?.getTime(),
+      staleAfterFirstRun.retryAuthorityExpiresAt?.getTime(),
+      'a later reaper pass must not extend an already minted retry authority'
+    )
+
+    const noHash = await service.create(dto, null)
+    const noHashStored = prisma.scanTasksById.get(noHash.scanTaskId)!
+    prisma.scanTasksById.set(noHash.scanTaskId, {
+      ...noHashStored,
+      status: 'matched',
+      lastAttemptHash: null,
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000),
+    })
+    await reaper.reapStuckMatched()
+    const noHashAfter = prisma.scanTasksById.get(noHash.scanTaskId)!
+    assert.equal(noHashAfter.status, 'failed')
+    assert.equal(
+      noHashAfter.retryAuthorityExpiresAt,
+      null,
+      'matched timeout without lastAttemptHash must not mint usable retry authority'
     )
   }
 
@@ -2847,6 +3749,22 @@ async function main(): Promise<void> {
       prisma.scanTasksById.get(expiredWaiting.scanTaskId)?.status,
       'expired',
       'expired waiting row must be reaped to expired'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(expiredWaiting.scanTaskId)?.retryAuthorityExpiresAt,
+      null,
+      'waiting expiry reaper must not mint retry authority'
+    )
+    await expectRejectCode(
+      () =>
+        service.create(
+          { scanType: 'document', terminalId: 't_1', retryOfScanTaskId: expiredWaiting.scanTaskId },
+          null,
+          expiredWaiting.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'waiting expiry reaper must not authorize a content-bound retry'
     )
     assert.equal(
       prisma.scanTasksById.get(futureWaiting.scanTaskId)?.status,
