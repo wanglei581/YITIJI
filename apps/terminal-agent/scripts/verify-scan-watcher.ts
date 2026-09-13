@@ -24,10 +24,25 @@ import {
   DELIVERY_RETRY_MAX_MS,
 } from '../src/agent/scan-watcher'
 import type { AgentConfig } from '../src/agent/types'
-import { runOverlappingStartupBacklogRaceTest, runScanLeaseBarrierTests } from './scan-lease-barrier.helper'
+import {
+  runOverlappingStartupBacklogRaceTest,
+  runScanLeaseBarrierTests,
+  runUnavailableToReadyRecoveryTest,
+} from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
   // await so watcher add/sweep/process cannot deliver a later sibling.
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    startupBacklogPaths.add(resolve(fullPath))
+  }
+
+`
+
+const RECOVERY_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_RECOVERY_BACKLOG_PREMARK: every direct-child path is marked before any
+  // await so watcher add/sweep/process cannot deliver a remounted sibling.
   for (const name of entries) {
     if (name === UNCLAIMED_DIRNAME) continue
     const fullPath = join(folder, name)
@@ -53,7 +68,22 @@ function verifySourceStructure(): void {
   assert.match(source, /export function startScanWatcher/, 'must export startScanWatcher')
   assert.match(source, /scanWatchFolder\?\.trim\(\)/, 'must treat unconfigured scanWatchFolder as a no-op, not a crash')
   assert.match(source, /ignoreInitial:\s*true/, 'chokidar watch must ignore pre-existing files at boot (handled separately by sweepFolder)')
-  assert.match(source, /setInterval\(\(\) => void sweepFolder/, 'must periodically re-sweep the folder, not rely solely on chokidar change events for retries')
+  assert.match(
+    source,
+    /setInterval\(\(\) => void runPeriodicScanSweep/,
+    'must periodically re-sweep the folder, not rely solely on chokidar change events for retries',
+  )
+  assert.match(source, /await sweepFolder\(folder, config\)/, 'periodic sweep wrapper must still invoke sweepFolder')
+  assert.match(source, /tryEstablishScanInputRecoveryBarrier/, 'must gate delivery on the remount/recovery barrier')
+  assert.match(source, /ATOMIC_RECOVERY_BACKLOG_PREMARK/, 'recovery must synchronously premark current children')
+  assert.match(source, /globalScanDeliveryBarrier\.beginWatchSession/, 'watcher startup must begin fail-closed')
+  assert.match(source, /globalScanDeliveryBarrier\.noteWatcherRebuild/, 'watcher errors must require a recovery barrier')
+  assert.match(source, /globalScanDeliveryBarrier\.noteUnavailable/, 'unavailable scan input must pause delivery')
+  assert.equal(
+    source.includes(RECOVERY_BACKLOG_PREMARK_BLOCK),
+    true,
+    'tryEstablishScanInputRecoveryBarrier must synchronously premark every direct-child path before establishing a clean boundary',
+  )
   assert.match(source, /ignored:\s*\(path: string\) => path\.includes\(UNCLAIMED_DIRNAME\)/, 'chokidar watch must also exclude the _unclaimed quarantine directory from live-watch events')
   assert.match(source, /if \(name === UNCLAIMED_DIRNAME\) continue/, 'sweepFolder must skip the _unclaimed quarantine directory itself in its main-file loop')
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
@@ -81,6 +111,11 @@ function verifySourceStructure(): void {
       isolateBody.includes(STARTUP_BACKLOG_PREMARK_BLOCK),
       true,
       'isolateStartupBacklog must synchronously premark every direct-child path before the first await',
+    )
+    assert.match(
+      isolateBody,
+      /globalScanDeliveryBarrier\.noteUnavailable/,
+      'startup inspection/enumeration failure must pause delivery',
     )
   }
   assert.match(
@@ -811,6 +846,43 @@ function verifyPlatformGapDisclosure(): void {
   )
 }
 
+function verifyRecoveryPremarkMutationMakesRecoveryTestNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(
+    original.includes(RECOVERY_BACKLOG_PREMARK_BLOCK),
+    true,
+    'recovery premark-all block must exist before reverse mutation',
+  )
+  const mutated = original.replace(RECOVERY_BACKLOG_PREMARK_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing recovery premark-all must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--scan-input-recovery-barrier')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing recovery premark-all must make recovery test nonzero\n${output}`)
+    assert.match(
+      output,
+      /must NEVER (?:request a scan lease|bind to the later waiting task|deliver)/,
+      `mutated recovery test must fail on old-file lease/delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS recovery premark-all reverse mutation: unavailable->ready test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'recovery reverse mutation must restore scan-watcher.ts')
+}
+
 function verifyPremarkAllMutationMakesOverlappingTestNonzero(): void {
   const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
   const original = readFileSync(watcherPath, 'utf8')
@@ -849,6 +921,10 @@ function verifyPremarkAllMutationMakesOverlappingTestNonzero(): void {
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes('--scan-input-recovery-barrier')) {
+    await runUnavailableToReadyRecoveryTest()
+    return
+  }
   if (process.argv.includes('--overlapping-startup-backlog-race')) {
     await runOverlappingStartupBacklogRaceTest()
     return
@@ -872,6 +948,7 @@ async function main(): Promise<void> {
   await verifyUnexpectedErrorOuterCatch()
   await runScanLeaseBarrierTests()
   verifyPremarkAllMutationMakesOverlappingTestNonzero()
+  verifyRecoveryPremarkMutationMakesRecoveryTestNonzero()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

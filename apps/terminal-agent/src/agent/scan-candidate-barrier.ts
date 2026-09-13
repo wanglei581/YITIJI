@@ -1,3 +1,5 @@
+import { lstatSync } from 'fs'
+import { resolve } from 'path'
 import type { AxiosInstance } from 'axios'
 import { NO_RETRY_CONFIG } from './api-client'
 
@@ -118,3 +120,111 @@ export class ScanDirectoryBaseline {
 }
 
 export const globalDirectoryBaseline = new ScanDirectoryBaseline()
+
+/**
+ * Canonical path identity for scan candidates. Always `path.resolve`.
+ * Do not use realpath (follows links) and do not treat refreshed mtime/birthtime
+ * as proof that a remounted file is a new capture.
+ */
+export function canonicalizeScanPath(filePath: string): string {
+  return resolve(filePath)
+}
+
+export interface ScanFolderIdentity {
+  canonicalPath: string
+  dev: number
+  ino: number
+}
+
+export function readScanFolderIdentity(folder: string): ScanFolderIdentity | undefined {
+  try {
+    const canonicalPath = canonicalizeScanPath(folder)
+    const metadata = lstatSync(canonicalPath)
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) return undefined
+    return { canonicalPath, dev: metadata.dev, ino: metadata.ino }
+  } catch {
+    return undefined
+  }
+}
+
+export function scanFolderIdentityChanged(
+  previous: ScanFolderIdentity | undefined,
+  current: ScanFolderIdentity | undefined,
+): boolean {
+  if (!previous || !current) return true
+  if (previous.dev !== 0 || previous.ino !== 0 || current.dev !== 0 || current.ino !== 0) {
+    return previous.dev !== current.dev || previous.ino !== current.ino
+  }
+  return previous.canonicalPath !== current.canonicalPath
+}
+
+/**
+ * Fail-closed delivery gate for SMB/Windows remount, watcher rebuild, and
+ * root-identity change. Files present at the last complete enumeration are
+ * marked never-deliver by the watcher; this class only tracks whether a new
+ * enumeration is required before any later user can receive a file.
+ *
+ * Default (unit tests that call processCandidate without a watcher session):
+ * not paused, no established identity. startScanWatcher begins paused.
+ */
+export class ScanDeliveryBarrier {
+  private paused = false
+  private unavailable = false
+  private watcherRebuildPending = false
+  private identity: ScanFolderIdentity | undefined
+
+  isPaused(): boolean {
+    return this.paused
+  }
+
+  wasUnavailable(): boolean {
+    return this.unavailable
+  }
+
+  isWatcherRebuildPending(): boolean {
+    return this.watcherRebuildPending
+  }
+
+  establishedIdentity(): ScanFolderIdentity | undefined {
+    return this.identity
+  }
+
+  beginWatchSession(): void {
+    this.paused = true
+    this.unavailable = false
+    this.watcherRebuildPending = false
+    this.identity = undefined
+  }
+
+  noteUnavailable(): void {
+    this.paused = true
+    this.unavailable = true
+  }
+
+  noteWatcherRebuild(): void {
+    this.paused = true
+    this.watcherRebuildPending = true
+  }
+
+  needsRecovery(current: ScanFolderIdentity | undefined): boolean {
+    if (this.paused || this.unavailable || this.watcherRebuildPending) return true
+    if (this.identity && scanFolderIdentityChanged(this.identity, current)) return true
+    return false
+  }
+
+  establishCleanBoundary(identity: ScanFolderIdentity): void {
+    this.identity = identity
+    this.paused = false
+    this.unavailable = false
+    this.watcherRebuildPending = false
+  }
+
+  resetForTest(): void {
+    this.paused = false
+    this.unavailable = false
+    this.watcherRebuildPending = false
+    this.identity = undefined
+  }
+}
+
+export const globalScanDeliveryBarrier = new ScanDeliveryBarrier()

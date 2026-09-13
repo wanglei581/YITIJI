@@ -16,6 +16,10 @@
  *
  * 启动时 + 之后每 5 分钟做一次目录清点，处理 Agent 重启期间到达、
  * 或此前投递失败但文件本身未再变化的文件（不会有新的 chokidar change 事件）。
+ *
+ * 运行中 SMB/Windows 扫描目录不可用、watcher 重建、或根身份变化时：投递保持
+ * fail-closed，恢复后必须先同步枚举并预标记当前直接子项再建立干净边界。
+ * 不得把刷新过 mtime/birthtime 的旧文件挂到后一用户。
  */
 
 import {
@@ -43,6 +47,10 @@ import {
   fetchScanLease,
   isPreExistingCandidate,
   globalDirectoryBaseline,
+  globalScanDeliveryBarrier,
+  canonicalizeScanPath,
+  readScanFolderIdentity,
+  scanFolderIdentityChanged,
   type ScanTaskLease,
 } from './scan-candidate-barrier'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
@@ -263,11 +271,80 @@ const inFlightPaths = new Set<string>()
 const startupBacklogPaths = new Set<string>()
 
 export function isStartupBacklogCandidate(filePath: string): boolean {
-  return startupBacklogPaths.has(resolve(filePath))
+  return startupBacklogPaths.has(canonicalizeScanPath(filePath))
 }
 
 export function clearStartupBacklogForTest(): void {
   startupBacklogPaths.clear()
+  globalScanDeliveryBarrier.resetForTest()
+}
+
+export function noteScanInputUnavailableForTest(): void {
+  globalScanDeliveryBarrier.noteUnavailable()
+}
+
+export function noteScanWatcherRebuildForTest(): void {
+  globalScanDeliveryBarrier.noteWatcherRebuild()
+}
+
+export function isScanDeliveryPausedForTest(): boolean {
+  return globalScanDeliveryBarrier.isPaused()
+}
+
+/**
+ * Before any delivery: if the folder is unavailable, enumeration failed, the
+ * watcher must be rebuilt, or the root identity changed, stay paused. On
+ * recovery, synchronously enumerate and premark every current direct child so
+ * remounted/old files cannot bind to a later user even when mtime/birthtime
+ * were refreshed. Returns false when delivery must remain fail-closed.
+ */
+export function tryEstablishScanInputRecoveryBarrier(folder: string): boolean {
+  const health = inspectScanInputFolder(folder)
+  if (health.status !== 'ready') {
+    globalScanDeliveryBarrier.noteUnavailable()
+    warn(`scan-watcher: scan input blocked; delivery paused — ${health.reason}`)
+    return false
+  }
+  const identity = readScanFolderIdentity(folder)
+  if (!identity) {
+    globalScanDeliveryBarrier.noteUnavailable()
+    warn('scan-watcher: scan input identity unavailable; delivery paused')
+    return false
+  }
+  if (!globalScanDeliveryBarrier.needsRecovery(identity)) {
+    return true
+  }
+  const previousIdentity = globalScanDeliveryBarrier.establishedIdentity()
+  if (previousIdentity && scanFolderIdentityChanged(previousIdentity, identity)) {
+    warn('scan-watcher: scan input root identity changed; recovery barrier required')
+  } else if (globalScanDeliveryBarrier.isWatcherRebuildPending()) {
+    warn('scan-watcher: scan watcher rebuild pending; recovery barrier required')
+  } else if (globalScanDeliveryBarrier.wasUnavailable() || globalScanDeliveryBarrier.isPaused()) {
+    warn('scan-watcher: scan input recovered; recovery barrier required')
+  }
+
+  let entries: string[]
+  try {
+    entries = readdirSync(folder)
+  } catch (e) {
+    globalScanDeliveryBarrier.noteUnavailable()
+    warn(
+      `scan-watcher: scan input enumeration incomplete; delivery paused — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`,
+    )
+    return false
+  }
+  // ATOMIC_RECOVERY_BACKLOG_PREMARK: every direct-child path is marked before any
+  // await so watcher add/sweep/process cannot deliver a remounted sibling.
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    startupBacklogPaths.add(resolve(fullPath))
+  }
+
+  globalScanDeliveryBarrier.establishCleanBoundary(identity)
+  warn('scan-watcher: scan input recovery barrier established; existing children will not bind to later tasks')
+  return true
 }
 
 /** 处理单个候选文件：稳定性检查 → 投递 → 成功删除 / 未匹配隔离 / 其它错误留原地重试。 */
@@ -288,9 +365,7 @@ export async function processCandidate(
     if (!scanWatchFolder) {
       return
     }
-    const health = inspectScanInputFolder(scanWatchFolder)
-    if (health.status !== 'ready') {
-      warn(`scan-watcher: scan input blocked before candidate read — ${health.reason}`)
+    if (!tryEstablishScanInputRecoveryBarrier(scanWatchFolder)) {
       return
     }
     if (!isDirectChild(filePath, filename, scanWatchFolder)) {
@@ -338,7 +413,7 @@ export async function processCandidate(
 
     // 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
     // 后续 sweep 仅重试安全隔离；成功后清理标记；失败需高严重度但不泄露文件名/内容。
-    const resolvedCandidatePath = resolve(filePath)
+    const resolvedCandidatePath = canonicalizeScanPath(filePath)
     if (startupBacklogPaths.has(resolvedCandidatePath)) {
       try {
         globalDirectoryBaseline.remove(filename)
@@ -715,10 +790,7 @@ function sanitizedErrorCode(error: unknown, fallback: string): string {
 export async function sweepFolder(scanWatchFolder: string, config: AgentConfig): Promise<void> {
   sweepUnclaimedDir(scanWatchFolder)
   if (isUnauthorized()) return
-
-  const health = inspectScanInputFolder(scanWatchFolder)
-  if (health.status !== 'ready') {
-    warn(`scan-watcher: scan input sweep blocked — ${health.reason}`)
+  if (!tryEstablishScanInputRecoveryBarrier(scanWatchFolder)) {
     return
   }
 
@@ -726,7 +798,8 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
   try {
     entries = readdirSync(scanWatchFolder)
   } catch (e) {
-    warn(`scan-watcher: failed to read scanWatchFolder — ${axiosErrorMessage(e)}`)
+    globalScanDeliveryBarrier.noteUnavailable()
+    warn(`scan-watcher: failed to read scanWatchFolder — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`)
     return
   }
   for (const name of entries) {
@@ -768,6 +841,7 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
 
   const health = inspectScanInputFolder(folder)
   if (health.status !== 'ready') {
+    globalScanDeliveryBarrier.noteUnavailable()
     warn(`scan-watcher: scan input startup backlog check blocked — ${health.reason}`)
     return 0
   }
@@ -776,6 +850,7 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
   try {
     entries = readdirSync(folder)
   } catch (e) {
+    globalScanDeliveryBarrier.noteUnavailable()
     warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`)
     return 0
   }
@@ -787,6 +862,13 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
     const fullPath = join(folder, name)
     if (!isDirectChild(fullPath, name, folder)) continue
     startupBacklogPaths.add(resolve(fullPath))
+  }
+
+  const identity = readScanFolderIdentity(folder)
+  if (identity) {
+    globalScanDeliveryBarrier.establishCleanBoundary(identity)
+  } else {
+    globalScanDeliveryBarrier.noteUnavailable()
   }
 
   let quarantined = 0
@@ -843,37 +925,59 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
 
   globalDirectoryBaseline.clear()
   startupBacklogPaths.clear()
+  globalScanDeliveryBarrier.beginWatchSession()
 
-  const watcher: FSWatcher = chokidar.watch(folder, {
-    ignoreInitial: true,
-    depth: 0,
-    ignored: (path: string) => path.includes(UNCLAIMED_DIRNAME),
-  })
-
-  watcher.on('add', (filePath: string) => {
-    const filename = filePath.split(/[\\/]/).pop() ?? filePath
-    globalDirectoryBaseline.recordObservation(filename)
-    processCandidate(filePath, filename, config).catch((e) => {
-      err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
+  const attachWatcher = (): FSWatcher => {
+    const next: FSWatcher = chokidar.watch(folder, {
+      ignoreInitial: true,
+      depth: 0,
+      ignored: (path: string) => path.includes(UNCLAIMED_DIRNAME),
     })
-  })
+    next.on('add', (filePath: string) => {
+      const filename = filePath.split(/[\\/]/).pop() ?? filePath
+      globalDirectoryBaseline.recordObservation(filename)
+      processCandidate(filePath, filename, config).catch((e) => {
+        err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
+      })
+    })
+    next.on('error', (error: unknown) => {
+      err(`scan-watcher: watcher error — ${axiosErrorMessage(error)}`)
+      globalScanDeliveryBarrier.noteWatcherRebuild()
+    })
+    return next
+  }
 
-  watcher.on('error', (error: unknown) => {
-    err(`scan-watcher: watcher error — ${axiosErrorMessage(error)}`)
-  })
+  let watcher: FSWatcher = attachWatcher()
+
+  const runPeriodicScanSweep = async (): Promise<void> => {
+    const rebuild = globalScanDeliveryBarrier.isWatcherRebuildPending()
+    if (rebuild) {
+      try {
+        await watcher.close()
+      } catch {
+        // Rebuild still requires a recovery barrier before delivery.
+      }
+    }
+    await sweepFolder(folder, config)
+    if (rebuild) {
+      watcher = attachWatcher()
+    }
+  }
 
   // 启动时清点与隔离：立即将已有历史文件作为 startup backlog 安全隔离至 _unclaimed，
   // 杜绝前序会话文件在 Agent 重启后误绑定到后续新用户的任务与租约。
+  // 若启动清点不可用或不完整，delivery 保持 paused，sweep 不得把旧文件挂到当前等待任务。
   void (async () => {
     try {
       await isolateStartupBacklog(folder)
     } catch (e) {
+      globalScanDeliveryBarrier.noteUnavailable()
       err(`scan-watcher: startup backlog isolation threw unexpectedly: ${sanitizedErrorCode(e, 'STARTUP_BACKLOG_FAILED')}`)
     }
-    void sweepFolder(folder, config)
+    void runPeriodicScanSweep()
   })()
 
-  const sweepTimer = setInterval(() => void sweepFolder(folder, config), SWEEP_INTERVAL_MS)
+  const sweepTimer = setInterval(() => void runPeriodicScanSweep(), SWEEP_INTERVAL_MS)
 
   return {
     stop: async () => {

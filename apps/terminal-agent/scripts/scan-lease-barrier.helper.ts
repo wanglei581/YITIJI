@@ -13,17 +13,20 @@ import {
   linkSync,
   symlinkSync,
   readdirSync,
+  renameSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve as resolvePath } from 'node:path'
 import {
   processCandidate,
-  maskScanName,
   isolateStartupBacklog,
   finalizeCandidate,
   sweepFolder,
   isStartupBacklogCandidate,
   clearStartupBacklogForTest,
+  noteScanInputUnavailableForTest,
+  noteScanWatcherRebuildForTest,
+  isScanDeliveryPausedForTest,
 } from '../src/agent/scan-watcher'
 import type { TrustedWindowsCandidate } from '../src/agent/scan-input/windows-secure-reader'
 import {
@@ -31,7 +34,9 @@ import {
   ScanDirectoryBaseline,
   globalDirectoryBaseline,
   SCAN_PRE_EXISTING_TOLERANCE_MS,
-  type ScanTaskLease,
+  canonicalizeScanPath,
+  readScanFolderIdentity,
+  scanFolderIdentityChanged,
 } from '../src/agent/scan-candidate-barrier'
 import type { AgentConfig } from '../src/agent/types'
 
@@ -70,6 +75,7 @@ async function captureLogsAsync(fn: () => Promise<void>): Promise<{ stdout: stri
 }
 
 export async function runScanLeaseBarrierTests(): Promise<void> {
+  clearStartupBacklogForTest()
   // 1. isPreExistingCandidate 单元判定与容差测试
   {
     const leaseNotBeforeIso = '2026-09-12T10:00:10.000Z'
@@ -407,6 +413,7 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
       assert.equal(restartQuarantined, 0, 'on restart, files in _unclaimed are ignored and not re-quarantined')
     } finally {
       rmSync(scanFolder, { recursive: true, force: true })
+      clearStartupBacklogForTest()
       globalDirectoryBaseline.clear()
     }
   }
@@ -600,6 +607,7 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
   }
 
   await runOverlappingStartupBacklogRaceTest()
+  await runScanInputRecoveryBarrierTests()
 
   console.log('PASS scan lease barrier helper checks')
 }
@@ -772,4 +780,338 @@ export async function runOverlappingStartupBacklogRaceTest(): Promise<void> {
     clearStartupBacklogForTest()
     globalDirectoryBaseline.clear()
   }
+}
+
+async function startCountingLeaseServer(): Promise<{
+  baseUrl: string
+  close: () => Promise<void>
+  leaseCount: () => number
+  deliverCount: () => number
+  leaseNotBeforeIso: string
+}> {
+  let leaseCount = 0
+  let deliverCount = 0
+  const leaseNotBeforeIso = new Date(Date.now() - 30_000).toISOString()
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        leaseCount += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(
+          JSON.stringify({
+            success: true,
+            data: {
+              scanTaskId: 'task_recovery_must_not_bind_old',
+              serverNow: new Date().toISOString(),
+              notBefore: leaseNotBeforeIso,
+              expiresAt: new Date(Date.now() + 300_000).toISOString(),
+              deliveryLease: 'recovery_lease_token',
+            },
+          }),
+        )
+        return
+      }
+      if (req.method === 'POST' && req.url?.includes('/scan-sessions/deliver')) {
+        deliverCount += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(
+          JSON.stringify({
+            success: true,
+            data: { scanTaskId: 'task_recovery_must_not_bind_old', fileId: 'should_only_bind_new' },
+          }),
+        )
+        return
+      }
+      res.writeHead(404)
+      res.end()
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(typeof address === 'object' && address)
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}/api/v1`,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+    leaseCount: () => leaseCount,
+    deliverCount: () => deliverCount,
+    leaseNotBeforeIso,
+  }
+}
+
+export async function runStartupInspectionFailureZeroDeliveryTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-startup-inspect-fail-'))
+  const offlineFolder = `${scanFolder}.offline`
+  const oldName = 'startup-unseen.pdf'
+  const oldPath = join(scanFolder, oldName)
+  const oldSecret = '%PDF-1.4 STARTUP-INSPECT-FAIL-MUST-NOT-DELIVER'
+  writeFileSync(oldPath, oldSecret)
+  renameSync(scanFolder, offlineFolder)
+  try {
+    const quarantined = await isolateStartupBacklog(scanFolder)
+    assert.equal(quarantined, 0, 'startup inspection failure must not quarantine by guessing')
+    assert.equal(isScanDeliveryPausedForTest(), true, 'startup inspection failure must pause delivery')
+    await processCandidate(oldPath, oldName, makeHelperConfig(backend.baseUrl, scanFolder))
+    assert.equal(backend.leaseCount(), 0, 'startup inspection failure must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'startup inspection failure must NEVER deliver')
+    assert.equal(existsSync(join(offlineFolder, oldName)), true, 'unseen startup file must remain untouched')
+    console.log('PASS startup inspection failure: delivery stays paused, zero lease/delivery')
+  } finally {
+    try {
+      if (!existsSync(scanFolder) && existsSync(offlineFolder)) renameSync(offlineFolder, scanFolder)
+    } catch {}
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    rmSync(offlineFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runUnavailableToReadyRecoveryTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-unavailable-ready-'))
+  const offlineFolder = `${scanFolder}.offline`
+  const oldName = 'remounted-old.pdf'
+  const newName = 'after-boundary.pdf'
+  const oldPath = join(scanFolder, oldName)
+  const newPath = join(scanFolder, newName)
+  const oldSecret = '%PDF-1.4 REMOUNTED-OLD-MUST-NOT-BIND'
+  const newSecret = '%PDF-1.4 NEW-AFTER-BOUNDARY-MUST-DELIVER'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    const isolated = await isolateStartupBacklog(scanFolder)
+    assert.equal(isolated, 0, 'empty running folder must establish a clean boundary')
+    assert.equal(isScanDeliveryPausedForTest(), false)
+
+    writeFileSync(oldPath, oldSecret)
+    renameSync(scanFolder, offlineFolder)
+    await processCandidate(oldPath, oldName, config)
+    assert.equal(isScanDeliveryPausedForTest(), true, 'unavailable folder must pause delivery')
+    assert.equal(backend.leaseCount(), 0, 'paused unavailable window must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'paused unavailable window must NEVER deliver')
+    assert.equal(
+      existsSync(join(offlineFolder, oldName)),
+      true,
+      'old file must remain on the offline volume until recovery',
+    )
+
+    renameSync(offlineFolder, scanFolder)
+    const refreshed = Date.now()
+    utimesSync(oldPath, new Date(refreshed), new Date(refreshed))
+    assert.equal(
+      isPreExistingCandidate({ mtimeMs: refreshed, birthtimeMs: refreshed }, backend.leaseNotBeforeIso),
+      false,
+      'refreshed timestamps must look new to the mtime/birthtime barrier — recovery must not rely on them',
+    )
+
+    await sweepFolder(scanFolder, config)
+    assert.equal(backend.leaseCount(), 0, 'recovered old file must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'recovered old file must NEVER bind to the later waiting task')
+    assert.equal(existsSync(oldPath), false, 'old remounted file must leave the scan root')
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true, 'old remounted file must be quarantined')
+    assert.equal(readFileSync(join(scanFolder, '_unclaimed', oldName), 'utf8'), oldSecret)
+
+    writeFileSync(newPath, newSecret)
+    await processCandidate(newPath, newName, config)
+    assert.equal(backend.leaseCount(), 1, 'a file created after the clean boundary must request a lease')
+    assert.equal(backend.deliverCount(), 1, 'a file created after the clean boundary must still deliver')
+    assert.equal(existsSync(newPath), false, 'new file after the clean boundary must be removed on delivery')
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', newName)), false, 'new file must not be quarantined')
+
+    console.log('PASS unavailable->ready recovery: old remounted file quarantined, later new file delivered')
+  } finally {
+    try {
+      if (!existsSync(scanFolder) && existsSync(offlineFolder)) renameSync(offlineFolder, scanFolder)
+    } catch {}
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    rmSync(offlineFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runRootIdentityChangeRecoveryTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-root-identity-'))
+  const stashFolder = `${scanFolder}.stash`
+  const oldName = 'identity-old.pdf'
+  const newName = 'identity-new.pdf'
+  const oldSecret = '%PDF-1.4 ROOT-IDENTITY-OLD-MUST-NOT-BIND'
+  const newSecret = '%PDF-1.4 ROOT-IDENTITY-NEW-MUST-DELIVER'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    await isolateStartupBacklog(scanFolder)
+    const previousIdentity = readScanFolderIdentity(scanFolder)
+    assert.ok(previousIdentity, 'running folder must have a readable identity')
+
+    writeFileSync(join(scanFolder, oldName), oldSecret)
+    renameSync(scanFolder, stashFolder)
+    mkdirSync(scanFolder)
+    writeFileSync(join(scanFolder, oldName), oldSecret)
+    const now = Date.now()
+    utimesSync(join(scanFolder, oldName), new Date(now), new Date(now))
+    const currentIdentity = readScanFolderIdentity(scanFolder)
+    assert.ok(currentIdentity)
+    assert.equal(
+      scanFolderIdentityChanged(previousIdentity, currentIdentity),
+      true,
+      'replacing the directory must change root identity',
+    )
+
+    await sweepFolder(scanFolder, config)
+    assert.equal(backend.leaseCount(), 0, 'root-identity change must NEVER lease the reappeared old file')
+    assert.equal(backend.deliverCount(), 0, 'root-identity change must NEVER deliver the reappeared old file')
+    assert.equal(existsSync(join(scanFolder, oldName)), false)
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true)
+
+    writeFileSync(join(scanFolder, newName), newSecret)
+    await processCandidate(join(scanFolder, newName), newName, config)
+    assert.equal(backend.leaseCount(), 1)
+    assert.equal(backend.deliverCount(), 1)
+    assert.equal(existsSync(join(scanFolder, newName)), false)
+
+    console.log('PASS root identity change: reappeared children quarantined, later new file delivered')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    rmSync(stashFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runWatcherRebuildRecoveryTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-rebuild-'))
+  const oldName = 'rebuild-old.pdf'
+  const newName = 'rebuild-new.pdf'
+  const oldSecret = '%PDF-1.4 WATCHER-REBUILD-OLD-MUST-NOT-BIND'
+  const newSecret = '%PDF-1.4 WATCHER-REBUILD-NEW-MUST-DELIVER'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(join(scanFolder, oldName), oldSecret)
+    const now = Date.now()
+    utimesSync(join(scanFolder, oldName), new Date(now), new Date(now))
+    noteScanWatcherRebuildForTest()
+    assert.equal(isScanDeliveryPausedForTest(), true)
+
+    await sweepFolder(scanFolder, config)
+    assert.equal(backend.leaseCount(), 0, 'watcher rebuild must NEVER lease files present at rebuild')
+    assert.equal(backend.deliverCount(), 0, 'watcher rebuild must NEVER deliver files present at rebuild')
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true)
+
+    writeFileSync(join(scanFolder, newName), newSecret)
+    await processCandidate(join(scanFolder, newName), newName, config)
+    assert.equal(backend.leaseCount(), 1)
+    assert.equal(backend.deliverCount(), 1)
+    assert.equal(existsSync(join(scanFolder, newName)), false)
+
+    console.log('PASS watcher rebuild: children present at rebuild quarantined, later new file delivered')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runRecoveryEaccesRetryTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-recovery-eacces-'))
+  const unclaimedDir = join(scanFolder, '_unclaimed')
+  mkdirSync(unclaimedDir)
+  chmodSync(unclaimedDir, 0o555)
+  const oldName = 'recovery-eacces.pdf'
+  const oldPath = join(scanFolder, oldName)
+  const oldSecret = '%PDF-1.4 RECOVERY-EACCES-MUST-NOT-DELIVER'
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(oldPath, oldSecret)
+    noteScanInputUnavailableForTest()
+
+    const { stderr } = await captureLogsAsync(async () => {
+      await sweepFolder(scanFolder, config)
+    })
+    assert.equal(backend.leaseCount(), 0, 'EACCES recovery retry must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'EACCES recovery retry must NEVER deliver')
+    assert.equal(existsSync(oldPath), true, 'failed recovery quarantine must leave the file in place')
+    assert.equal(isStartupBacklogCandidate(oldPath), true, 'EACCES must retain the never-deliver marker')
+    assert.match(stderr, /code=EACCES/)
+    assert.doesNotMatch(stderr, /recovery-eacces\.pdf/)
+    assert.doesNotMatch(stderr, /RECOVERY-EACCES-MUST-NOT-DELIVER/)
+
+    chmodSync(unclaimedDir, 0o755)
+    await sweepFolder(scanFolder, config)
+    assert.equal(backend.leaseCount(), 0)
+    assert.equal(backend.deliverCount(), 0)
+    assert.equal(existsSync(oldPath), false)
+    assert.equal(existsSync(join(unclaimedDir, oldName)), true)
+    assert.equal(isStartupBacklogCandidate(oldPath), false)
+
+    console.log('PASS recovery EACCES retry: zero lease/delivery, marker retained then quarantined')
+  } finally {
+    try {
+      chmodSync(unclaimedDir, 0o755)
+    } catch {}
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runPathCanonicalizationRecoveryTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-canonical-path-'))
+  const oldName = 'canonical-old.pdf'
+  const oldSecret = '%PDF-1.4 CANONICAL-PATH-MUST-NOT-BIND'
+  const directPath = join(scanFolder, oldName)
+  const dottedPath = join(scanFolder, '.', oldName)
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(directPath, oldSecret)
+    noteScanInputUnavailableForTest()
+    await sweepFolder(scanFolder, config)
+
+    assert.equal(canonicalizeScanPath(dottedPath), canonicalizeScanPath(directPath))
+    assert.equal(canonicalizeScanPath(resolvePath(scanFolder, oldName)), canonicalizeScanPath(directPath))
+    assert.equal(backend.leaseCount(), 0)
+    assert.equal(backend.deliverCount(), 0)
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true)
+
+    writeFileSync(directPath, oldSecret)
+    noteScanWatcherRebuildForTest()
+    await processCandidate(dottedPath, oldName, config)
+    assert.equal(backend.leaseCount(), 0, 'non-canonical path must still hit the never-deliver marker')
+    assert.equal(backend.deliverCount(), 0)
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', oldName)), true)
+
+    console.log('PASS path canonicalization: dotted/resolved paths share never-deliver identity')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runScanInputRecoveryBarrierTests(): Promise<void> {
+  await runStartupInspectionFailureZeroDeliveryTest()
+  await runUnavailableToReadyRecoveryTest()
+  await runRootIdentityChangeRecoveryTest()
+  await runWatcherRebuildRecoveryTest()
+  await runRecoveryEaccesRetryTest()
+  await runPathCanonicalizationRecoveryTest()
 }
