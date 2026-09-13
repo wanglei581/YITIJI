@@ -638,7 +638,11 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
   await expect(page.getByRole('heading', { name: '你好，我是小青', exact: true })).toBeVisible()
 })
 
-test('hard clear stops active scan polling without cancelling the backend task @privacy-kiosk', async ({ page, api }) => {
+// 2026-09-13 口径反转：清场以前**不撤**服务端扫描任务，理由是「任务在服务端，离开这一屏
+// 不该终止它」。现场链路证明这条站不住 —— 本机登记被清掉之后，服务端任务仍停在 waiting
+// 等这台机器的下一份投递：下一位用户在面板上按下扫描，文件就投给了刚被清场的上一位。
+// 现在清本地之前必须先撤服务端；撤不掉（断网 / 已终态）也不拦着清场。
+test('hard clear stops active scan polling and revokes the backend task once @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
   let pollRequests = 0
   let cancelRequests = 0
@@ -647,6 +651,10 @@ test('hard clear stops active scan polling without cancelling the backend task @
     if (url.pathname === `/api/v1/scan/sessions/${SCAN_TASK_ID}` && request.method() === 'DELETE') {
       cancelRequests += 1
     }
+  })
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
   })
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     pollRequests += 1
@@ -696,10 +704,14 @@ test('hard clear stops active scan polling without cancelling the backend task @
   const pollsAfterClear = pollRequests
   await page.waitForTimeout(POLL_CLEANUP_OBSERVATION_MS)
   expect.soft(pollRequests).toBe(pollsAfterClear)
-  expect(cancelRequests).toBe(0)
+  // 一次，且只有一次：清场链路上 clearKioskSensitiveSession 会被调用多次
+  // （guard 清场 + logout 各一次），撤销自己去重。
+  expect(cancelRequests).toBe(1)
 })
 
-test('hard clear does not cancel a created scan settings session @privacy-kiosk', async ({ page, api }) => {
+// 同上反转：settings 阶段刚建好、用户还没按面板就被清场的任务，也必须撤掉 ——
+// 它是最容易变成孤儿的一种（本机没有任何界面再提到它）。
+test('hard clear revokes a created scan settings session @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
   let cancelRequests = 0
   page.on('request', (request) => {
@@ -739,7 +751,7 @@ test('hard clear does not cancel a created scan settings session @privacy-kiosk'
 
   expect.soft(new URL(page.url()).pathname).toBe('/')
   await page.waitForTimeout(300)
-  expect(cancelRequests).toBe(0)
+  expect(cancelRequests).toBe(1)
 })
 
 test('hard clear stops active print polling without cancelling the backend task @privacy-kiosk', async ({ page, api }) => {
@@ -1245,4 +1257,165 @@ test('phone upload is exempt from the kiosk hard privacy deadline @privacy-mobil
   expect(new URL(page.url()).pathname).toBe('/upload/phone')
   expect(await readDocumentMarker(page)).toBe('phone-upload-document')
   await expect(page.getByText('上传链接已失效', { exact: true })).toBeVisible()
+})
+
+// ── 扫描任务撤销：换人之前必须把服务端那份收掉 ─────────────────────────────
+//
+// 判据统一是「DELETE /scan/sessions/:id 恰好一次，且带的是**正在失效的那个身份**」。
+// 服务端 cancel 按 endUserId 校验权限：用新身份或空身份发，只会 403，旧任务原地存活。
+// 每条用例自己注册 api.respond —— ApiRouter 对未注册请求 fail-closed，共享兜底会让
+// 「本不该发生的请求」悄悄变绿。
+
+const SCAN_WORKBENCH_KEY = 'ai-job-print:current-scan-workbench'
+
+/** 记录每一次撤销请求的请求头（谁发的、带没带控制凭证）。 */
+function recordScanRevokes(page: Page): () => Array<Record<string, string>> {
+  const seen: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'DELETE') return
+    if (new URL(request.url()).pathname !== `/api/v1/scan/sessions/${SCAN_TASK_ID}`) return
+    seen.push(request.headers())
+  })
+  return () => [...seen]
+}
+
+/** 只写 sessionStorage，不刷新文档：登录态在内存里，page.goto 会把它丢掉。 */
+async function seedLiveScanSession(
+  page: Page,
+  extra: { result?: { outcome: string; success: boolean } } = {},
+): Promise<void> {
+  await page.evaluate(
+    ({ key, taskId, controlToken, result }) => {
+      window.sessionStorage.setItem(key, JSON.stringify({
+        stage: result ? 'result' : 'progress',
+        scanType: 'resume',
+        live: {
+          scanTaskId: taskId,
+          controlToken,
+          instructions: ['放好原件'],
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+        ...(result ? { result } : {}),
+      }))
+    },
+    { key: SCAN_WORKBENCH_KEY, taskId: SCAN_TASK_ID, controlToken: SCAN_CONTROL_TOKEN, result: extra.result ?? null },
+  )
+}
+
+function registerScanRevokeEndpoint(api: ApiRouter): void {
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+}
+
+test('screensaver entry revokes the scan task exactly once despite a repeated clear chain @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  registerScanRevokeEndpoint(api)
+  const revokes = recordScanRevokes(page)
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  // 待机屏挂载即清场：clearKioskSensitiveSession 在这一次页面生命周期里会被调用两次
+  // （屏保页自己一次、logout 里再一次）。撤销必须自己去重，否则同一个任务被 DELETE 两遍。
+  await page.goto('/screensaver')
+
+  await expect.poll(() => revokes().length).toBe(1)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+  await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)).toBeNull()
+})
+
+test('a scan task the server already finished is never revoked @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  // 故意**不注册** DELETE：真发出去就会撞 ApiRouter 的 fail-closed（Unhandled API），
+  // 用例当场红。这比数一个计数器更难被绕过。
+  const revokes = recordScanRevokes(page)
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page, { result: { outcome: 'completed', success: true } })
+  await page.goto('/screensaver')
+
+  await page.waitForTimeout(600)
+  expect(revokes()).toEqual([])
+})
+
+test('a rejected revoke never blocks the clear @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  // 服务端说「已完成，撤不了」。清场必须照常走完，不弹错、不卡遮罩。
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 400,
+    json: { success: false, error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' } },
+  })
+  const revokes = recordScanRevokes(page)
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  await page.goto('/screensaver')
+
+  await expect.poll(() => revokes().length).toBe(1)
+  await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)).toBeNull()
+  expect(pageErrors).toEqual([])
+})
+
+test('an aborted revoke never blocks the clear @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  // 断网：fetch 直接抛。清场同样必须走完 —— 撤销是尽力而为，清场是必须发生。
+  api.abort('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, 'internetdisconnected')
+  const revokes = recordScanRevokes(page)
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  await page.goto('/screensaver')
+
+  await expect.poll(() => revokes().length).toBe(1)
+  await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)).toBeNull()
+  expect(pageErrors).toEqual([])
+})
+
+test('结束使用 revokes the scan task with the outgoing member token @privacy-kiosk @privacy-manual-logout', async ({ page, api }) => {
+  registerKioskShell(api)
+  registerMemberLogin(api)
+  registerScanRevokeEndpoint(api)
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 200,
+    json: { success: true, data: { items: [], total: 0 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/logout', {
+    status: 200,
+    json: { success: true, data: { loggedOut: true } },
+  })
+  const revokes = recordScanRevokes(page)
+
+  await loginThroughVisibleUi(page, '/profile')
+  // 页内写入，不重载：会员令牌只在内存里，page.goto 会把这一位用户丢掉。
+  await seedLiveScanSession(page)
+  await page.getByRole('button', { name: '结束使用', exact: true }).click()
+
+  await expect.poll(() => revokes().length).toBe(1)
+  // 关键：带的是**正在失效的这位**的令牌。带错身份（或不带）服务端只会回 403，
+  // 任务留在原地等下一次投递 —— 那正是这条用例要挡住的事。
+  expect(revokes()[0]?.authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+})
+
+test('an orphan session-timeout route hard-clears and revokes the scan task @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  registerScanRevokeEndpoint(api)
+  const revokes = recordScanRevokes(page)
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page)
+  // 直接落在 /session-timeout 而没有 pendingWarning：guard 判定为孤儿路由，
+  // 立刻 hardClear（不是 idle 计时到点那条路径）。撤销必须跟着这条同步发生。
+  await page.goto('/session-timeout')
+
+  await expect.poll(() => revokes().length).toBe(1)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+  // 游客没有会员令牌：不带 Authorization 也要能撤（服务端对无主任务只校验控制凭证）。
+  expect(revokes()[0]?.authorization).toBeUndefined()
+  await expect.poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY)).toBeNull()
 })

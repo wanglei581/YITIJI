@@ -242,7 +242,7 @@ const expectedEntries = [
   ['简历模板', '/resume/templates'],
   ['文档打印', '/print/upload'],
   ['打印扫描', '/print-scan'],
-  ['扫描文件', '/scan/start'],
+  ['扫描文件', '/scan'],
   ['岗位信息', '/jobs'],
   ['招聘会', '/job-fairs'],
   ['AI顾问', '/assistant'],

@@ -42,7 +42,9 @@ for (const route of ['/screensaver', '/login', '/session-timeout', '/session-res
 }
 
 check('standby wakes to home and clears via kioskSensitiveSession', () => {
-  assert.match(files.standbyPage, /clearKioskSensitiveSession\(\)/)
+  // 2026-09-13：清场要带上「正在失效的那个会员令牌」，否则服务端扫描任务撤不掉
+  // （cancel 按 endUserId 校验权限）。断言连参数一起钉，防止有人改回无参调用。
+  assert.match(files.standbyPage, /clearKioskSensitiveSession\(getToken\(\)\)/)
   assert.match(files.standbyPage, /logout\(\)/)
   assert.match(files.standbyView, /data-testid="standby-primary"/)
   assert.match(files.standbyPage, /navigate\('\/'/)
@@ -81,7 +83,7 @@ check('session guard continue is fail-closed and clearing overlay still blocks',
   assert.match(files.sessionPage, /我还在，继续使用/)
   assert.match(files.overlay, /data-kiosk-privacy-clearing="true"/)
   assert.match(files.overlay, /正在清除本机会话/)
-  assert.match(files.overlay, /clearKioskSensitiveSession\(\)/)
+  assert.match(files.overlay, /clearKioskSensitiveSession\(getToken\(\)\)/)
   assert.doesNotMatch(files.sessionPage, /onClick=\{canContinue \? continueSession : hardClear\}/)
 })
 
