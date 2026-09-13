@@ -139,7 +139,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       // 终端身份是 fail-closed 的：这台机器现在证明不了自己是谁，就不创建扫描任务。
       // 恢复由 terminalAuth 负责（续期 / 向本机 Agent 重新取票）；一旦回到 ready，
       // 这个 effect 会再跑一次并正常创建。已经建成的会话不受影响。
-      if (!sessionPromiseRef.current) {
+      //
+      // 判据是「已经**建成**」（createdIdRef）而不是「已经**发起**」（sessionPromiseRef）：
+      // 终端会话被吊销时，那次创建多半还在飞，而 retryRefresh 先把状态推到 checking、
+      // 再推到 failed —— 依赖一变，上一轮 effect 的清理就把 cancelled 置了位，
+      // 那次创建随后 reject 时 `.catch` 第一行 `if (cancelled) return` 会把结论吞掉，
+      // 而 checking / failed 两个分支都在挂新 then/catch 之前就 return 了，没有人再写结论。
+      // 按「已经发起」判的后果是页面永远停在「正在创建扫描任务」——
+      // 把一个已经 fail-closed 的终端说成「还在加载」，正是 CLAUDE.md §9 不允许的伪造状态。
+      if (!createdIdRef.current) {
         setFailure({
           title: '终端安全校验失败',
           description: userMessageOf(

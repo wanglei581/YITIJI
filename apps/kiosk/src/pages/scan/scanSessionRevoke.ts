@@ -21,7 +21,7 @@ import { readScanWorkbenchSession, type ScanLiveState } from './scanWorkbenchSes
  *    由调用方在清空登录态**之前**取。
  * 2. **只发一次，不重试，不阻塞**。这条路径全部发生在页面正在被拆掉的那一刻
  *    （clearing 遮罩、logout、整页 reload）。keepalive 让请求在文档卸载后仍能送达；
- *    任何重试或等待都可能把清场卡住，而清场比撤销更要紧。
+ *    任何 await / 重试都可能把清场卡住，而清场比撤销更要紧。
  * 3. **已是终态就不发**。completed / failed / cancelled / expired 的任务再 DELETE，
  *    只会换回 400 SCAN_TASK_ALREADY_COMPLETED 或 404，白白制造一次噪音请求。
  */
