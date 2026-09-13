@@ -237,6 +237,10 @@ model TerminalHeartbeat {
   wiredNetworkStatus         String?
   printerNetworkStatus       String?
   localTaskDatabaseAvailable Boolean?
+  scanInputHealth            String?
+  scanInputAction            String?
+  scanInputReason            String?
+  scanInputObservedAt        DateTime?
   agentVersion               String?
   ipAddress                  String?
   diskFreeGb                 Float?

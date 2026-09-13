@@ -2,6 +2,7 @@ import { lstatSync } from 'fs'
 import { resolve } from 'path'
 import type { AxiosInstance } from 'axios'
 import { NO_RETRY_CONFIG } from './api-client'
+import type { ScanInputLockoutReason, ScanInputRuntimeTelemetry } from './types'
 
 export interface ScanTaskLease {
   scanTaskId: string
@@ -125,6 +126,30 @@ export const SCAN_INPUT_RESTART_REQUIRED = 'SCAN_INPUT_RESTART_REQUIRED'
 
 export type ScanInputSessionState = 'idle' | 'initializing' | 'running' | 'locked_out' | 'stopped'
 
+const SCAN_INPUT_LOCKOUT_REASONS = new Set<ScanInputLockoutReason>([
+  'not_configured',
+  'reparse_point_unverifiable',
+  'reparse_point',
+  'not_directory',
+  'unavailable',
+  'not_readable',
+  'watcher_rebuild',
+  'watcher_error',
+  'identity_unavailable',
+  'root_identity_changed',
+  'readdir_failed',
+  'watcher_ready_failed',
+  'startup_backlog_failed',
+  'startup_incomplete',
+  'unknown',
+])
+
+function safeLockoutReason(reason: string): ScanInputLockoutReason {
+  return SCAN_INPUT_LOCKOUT_REASONS.has(reason as ScanInputLockoutReason)
+    ? reason as ScanInputLockoutReason
+    : 'unknown'
+}
+
 /**
  * Canonical path identity for scan candidates. Always `path.resolve`.
  * Do not use realpath (follows links / 8.3 / file-id). Windows keys are
@@ -183,6 +208,7 @@ export class ScanDeliveryBarrier {
   private generation = 0
   private identity: ScanFolderIdentity | undefined
   private lockOutReason: string | undefined
+  private stateObservedAt = new Date().toISOString()
 
   getState(): ScanInputSessionState {
     return this.state
@@ -200,6 +226,36 @@ export class ScanDeliveryBarrier {
     return this.lockOutReason
   }
 
+  getTelemetry(): ScanInputRuntimeTelemetry {
+    if (this.state === 'locked_out') {
+      return {
+        health: 'locked_out',
+        requiredAction: 'restart_required',
+        reason: safeLockoutReason(this.lockOutReason ?? 'unknown'),
+        observedAt: this.stateObservedAt,
+      }
+    }
+    if (this.state === 'running') {
+      return {
+        health: 'healthy',
+        requiredAction: 'none',
+        reason: null,
+        observedAt: this.stateObservedAt,
+      }
+    }
+    return {
+      health: 'unknown',
+      requiredAction: 'none',
+      reason: null,
+      observedAt: this.stateObservedAt,
+    }
+  }
+
+  private transition(nextState: ScanInputSessionState): void {
+    this.state = nextState
+    this.stateObservedAt = new Date().toISOString()
+  }
+
   isPaused(): boolean {
     return this.state !== 'idle' && this.state !== 'running'
   }
@@ -211,7 +267,7 @@ export class ScanDeliveryBarrier {
   beginWatchSession(): boolean {
     if (this.state !== 'idle') return false
     this.generation += 1
-    this.state = 'initializing'
+    this.transition('initializing')
     this.identity = undefined
     this.lockOutReason = undefined
     return true
@@ -221,7 +277,7 @@ export class ScanDeliveryBarrier {
     if (this.state !== 'initializing') return false
     this.generation += 1
     this.identity = identity
-    this.state = 'running'
+    this.transition('running')
     this.lockOutReason = undefined
     return true
   }
@@ -229,14 +285,14 @@ export class ScanDeliveryBarrier {
   lockOut(reason: string): void {
     if (this.state === 'locked_out' || this.state === 'stopped') return
     this.generation += 1
-    this.state = 'locked_out'
+    this.transition('locked_out')
     this.lockOutReason = reason
   }
 
   stop(): void {
     if (this.state === 'stopped') return
     this.generation += 1
-    this.state = 'stopped'
+    this.transition('stopped')
     this.lockOutReason = 'stopped'
   }
 
@@ -277,6 +333,7 @@ export class ScanDeliveryBarrier {
     this.generation = 0
     this.identity = undefined
     this.lockOutReason = undefined
+    this.stateObservedAt = new Date().toISOString()
   }
 }
 

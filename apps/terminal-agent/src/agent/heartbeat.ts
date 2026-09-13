@@ -21,7 +21,13 @@
  */
 
 import os from 'os'
-import type { AgentConfig, HeartbeatPayload, HeartbeatResponse, PrinterStatus } from './types'
+import type {
+  AgentConfig,
+  HeartbeatPayload,
+  HeartbeatResponse,
+  PrinterStatus,
+  ScanInputRuntimeTelemetry,
+} from './types'
 import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
@@ -79,6 +85,8 @@ export interface HeartbeatOptions {
   localTaskDatabaseAvailable?: boolean
   /** Receives a PII-safe connectivity snapshot for the loopback status panel. */
   onObservation?: (observation: HeartbeatObservation) => void
+  /** Read on every send because heartbeat starts before the scan watcher. */
+  getScanInputTelemetry?: () => ScanInputRuntimeTelemetry
 }
 
 export interface HeartbeatObservation {
@@ -145,6 +153,13 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     reportedAt: new Date().toISOString(),
     localTaskDatabaseAvailable,
     ...networkDiagnostics,
+  }
+  const scanInputTelemetry = options.getScanInputTelemetry?.()
+  if (scanInputTelemetry) {
+    payload.scanInputHealth = scanInputTelemetry.health
+    payload.scanInputAction = scanInputTelemetry.requiredAction
+    payload.scanInputReason = scanInputTelemetry.reason
+    payload.scanInputObservedAt = scanInputTelemetry.observedAt
   }
 
   try {

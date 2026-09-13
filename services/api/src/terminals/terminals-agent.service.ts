@@ -18,6 +18,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common'
+import { isISO8601 } from 'class-validator'
 import { TERMINAL_CLAIM_INTERVAL_MS } from '../common/throttler/terminal-throttle'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
@@ -25,7 +26,12 @@ import { signFileUrl } from '../files/signing'
 import { PackageOrderFulfillmentService } from '../member-print-orders/package-order-fulfillment.service'
 import { ContractReportPrintLifecycleService } from '../files/contract-report-print-lifecycle.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
-import type { HeartbeatDto } from './dto/heartbeat.dto'
+import {
+  SCAN_INPUT_ACTIONS,
+  SCAN_INPUT_HEALTHS,
+  SCAN_INPUT_REASONS,
+  type HeartbeatDto,
+} from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
@@ -343,6 +349,7 @@ export class TerminalAgentService implements OnModuleInit {
     authHeader: string | undefined,
   ): Promise<{ acknowledged: true; config: { claimIntervalMs: number } }> {
     await this.credentialSecurity.validateTerminalToken(terminalId, authHeader, { allowDisabled: true })
+    this.assertScanInputTelemetry(dto)
     const profilePatch = await this.buildDeviceProfilePatch(dto, terminalId)
     const lastSeenAt = new Date()
 
@@ -377,6 +384,10 @@ export class TerminalAgentService implements OnModuleInit {
         wiredNetworkStatus: dto.wiredNetworkStatus ?? null,
         printerNetworkStatus: dto.printerNetworkStatus ?? null,
         localTaskDatabaseAvailable: dto.localTaskDatabaseAvailable ?? null,
+        scanInputHealth: dto.scanInputHealth ?? null,
+        scanInputAction: dto.scanInputAction ?? null,
+        scanInputReason: dto.scanInputReason ?? null,
+        scanInputObservedAt: dto.scanInputObservedAt ? new Date(dto.scanInputObservedAt) : null,
         diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
@@ -740,6 +751,44 @@ export class TerminalAgentService implements OnModuleInit {
     })
     if (!latestHeartbeat) return true
     return latestHeartbeat.status !== 'agent_degraded' && latestHeartbeat.localTaskDatabaseAvailable !== false
+  }
+
+  private assertScanInputTelemetry(dto: HeartbeatDto): void {
+    const values = [dto.scanInputHealth, dto.scanInputAction, dto.scanInputReason, dto.scanInputObservedAt]
+    const present = values.filter((value) => value !== undefined).length
+    if (present === 0) return
+    if (present !== values.length) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_INPUT_TELEMETRY_INCOMPLETE', message: '扫描输入状态字段必须完整上报' },
+      })
+    }
+    if (
+      !SCAN_INPUT_HEALTHS.includes(dto.scanInputHealth as (typeof SCAN_INPUT_HEALTHS)[number])
+      || !SCAN_INPUT_ACTIONS.includes(dto.scanInputAction as (typeof SCAN_INPUT_ACTIONS)[number])
+      || (dto.scanInputReason !== null
+        && !SCAN_INPUT_REASONS.includes(dto.scanInputReason as (typeof SCAN_INPUT_REASONS)[number]))
+      || typeof dto.scanInputObservedAt !== 'string'
+      || dto.scanInputObservedAt.length > 64
+      || !isISO8601(dto.scanInputObservedAt, { strict: true, strictSeparator: true })
+      || !/[zZ]|[+-]\d{2}:\d{2}$/.test(dto.scanInputObservedAt)
+    ) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_INPUT_TELEMETRY_INVALID', message: '扫描输入状态字段无效' },
+      })
+    }
+    if (dto.scanInputHealth === 'locked_out') {
+      if (dto.scanInputAction !== 'restart_required' || dto.scanInputReason === null) {
+        throw new BadRequestException({
+          error: { code: 'SCAN_INPUT_TELEMETRY_INVALID', message: '扫描输入锁死状态必须要求重启并提供原因码' },
+        })
+      }
+      return
+    }
+    if (dto.scanInputAction !== 'none' || dto.scanInputReason !== null) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_INPUT_TELEMETRY_INVALID', message: '非锁死状态不得要求恢复动作或携带锁死原因' },
+      })
+    }
   }
 
   private async buildDeviceProfilePatch(
