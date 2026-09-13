@@ -44,6 +44,7 @@ export class ScanTasksController {
     @Body() dto: CreateScanTaskDto,
     @Req() req: Request,
     @Headers('x-terminal-id') headerTerminalId?: string,
+    @Headers('x-scan-retry-control') retryControlToken?: string,
   ) {
     if (!headerTerminalId || headerTerminalId !== dto.terminalId) {
       throw new UnauthorizedException({
@@ -51,7 +52,11 @@ export class ScanTasksController {
       })
     }
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
-    const result = await this.scanTasks.create(dto, endUser?.endUserId ?? null)
+    const result = await this.scanTasks.create(
+      dto,
+      endUser?.endUserId ?? null,
+      retryControlToken
+    )
     return ApiResponse.ok(result)
   }
 

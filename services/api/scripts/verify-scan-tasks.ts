@@ -23,6 +23,7 @@ import {
   ScanTasksService,
   SCAN_CONTENT_DEDUP_WINDOW_MS,
   SCAN_MAX_FUTURE_OBSERVATION_MS,
+  SCAN_RETRY_AUTHORITY_TTL_MS,
   SCAN_STALE_CAPTURE_TOLERANCE_MS,
 } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
@@ -66,6 +67,10 @@ interface StoredScanTask {
   errorCode: string | null
   errorMessage: string | null
   controlTokenHash: string | null
+  retryOfScanTaskId: string | null
+  retryContentHash: string | null
+  retryConsumedAt: Date | null
+  retryConsumedByScanTaskId: string | null
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -175,6 +180,10 @@ class FakePrisma {
         errorCode: null,
         errorMessage: null,
         controlTokenHash: data.controlTokenHash ?? null,
+        retryOfScanTaskId: data.retryOfScanTaskId ?? null,
+        retryContentHash: data.retryContentHash ?? null,
+        retryConsumedAt: data.retryConsumedAt ?? null,
+        retryConsumedByScanTaskId: data.retryConsumedByScanTaskId ?? null,
         expiresAt: data.expiresAt!,
         createdAt: now,
         updatedAt: now,
@@ -188,16 +197,35 @@ class FakePrisma {
       where,
     }: {
       where: {
+        id?: string | { not: string }
         terminalId: string
-        status?: string
+        status?: StatusMatcher
+        scanType?: string
+        endUserId?: string | null
+        controlTokenHash?: string
+        fileId?: null
+        retryConsumedAt?: Date | null
         expiresAt?: { gt: Date }
         lastAttemptHash?: string
-        updatedAt?: { gt: Date }
+        updatedAt?: { gt?: Date; lt?: Date }
       }
     }) => {
       const candidates = Array.from(this.scanTasksById.values()).filter((t) => {
+        if (typeof where.id === 'string' && t.id !== where.id) return false
+        if (typeof where.id === 'object' && t.id === where.id.not) return false
         if (t.terminalId !== where.terminalId) return false
-        if (where.status !== undefined && t.status !== where.status) return false
+        if (where.status !== undefined && !statusMatches(t.status, where.status)) return false
+        if (where.scanType !== undefined && t.scanType !== where.scanType) return false
+        if (where.endUserId !== undefined && t.endUserId !== where.endUserId) return false
+        if (where.controlTokenHash !== undefined && t.controlTokenHash !== where.controlTokenHash)
+          return false
+        if (where.fileId === null && t.fileId !== null) return false
+        if (where.retryConsumedAt === null && t.retryConsumedAt !== null) return false
+        if (
+          where.retryConsumedAt instanceof Date &&
+          t.retryConsumedAt?.getTime() !== where.retryConsumedAt.getTime()
+        )
+          return false
         if (where.lastAttemptHash !== undefined && t.lastAttemptHash !== where.lastAttemptHash)
           return false
         if (
@@ -208,6 +236,11 @@ class FakePrisma {
         if (
           where.updatedAt?.gt !== undefined &&
           !(t.updatedAt.getTime() > where.updatedAt.gt.getTime())
+        )
+          return false
+        if (
+          where.updatedAt?.lt !== undefined &&
+          !(t.updatedAt.getTime() < where.updatedAt.lt.getTime())
         )
           return false
         return true
@@ -229,7 +262,13 @@ class FakePrisma {
       where: {
         id?: string
         status?: StatusMatcher
-        updatedAt?: { lt: Date }
+        terminalId?: string
+        scanType?: string
+        endUserId?: string | null
+        controlTokenHash?: string
+        fileId?: null
+        retryConsumedAt?: Date | null
+        updatedAt?: { gt?: Date; lt?: Date }
         expiresAt?: { lte: Date }
       }
       data: Partial<StoredScanTask>
@@ -237,9 +276,26 @@ class FakePrisma {
       const matches = Array.from(this.scanTasksById.values()).filter((t) => {
         if (where.id !== undefined && t.id !== where.id) return false
         if (where.status !== undefined && !statusMatches(t.status, where.status)) return false
+        if (where.terminalId !== undefined && t.terminalId !== where.terminalId) return false
+        if (where.scanType !== undefined && t.scanType !== where.scanType) return false
+        if (where.endUserId !== undefined && t.endUserId !== where.endUserId) return false
+        if (where.controlTokenHash !== undefined && t.controlTokenHash !== where.controlTokenHash)
+          return false
+        if (where.fileId === null && t.fileId !== null) return false
+        if (where.retryConsumedAt === null && t.retryConsumedAt !== null) return false
+        if (
+          where.retryConsumedAt instanceof Date &&
+          t.retryConsumedAt?.getTime() !== where.retryConsumedAt.getTime()
+        )
+          return false
         if (
           where.updatedAt?.lt !== undefined &&
           !(t.updatedAt.getTime() < where.updatedAt.lt.getTime())
+        )
+          return false
+        if (
+          where.updatedAt?.gt !== undefined &&
+          !(t.updatedAt.getTime() > where.updatedAt.gt.getTime())
         )
           return false
         if (
@@ -391,6 +447,44 @@ async function expectRejects<T extends Error>(
     )
   }
   assert.equal(rejected, true, `${label}: expected rejection`)
+}
+
+async function expectRejectCode(
+  action: () => Promise<unknown>,
+  errorType: new (...args: never[]) => Error,
+  code: string,
+  label: string
+): Promise<void> {
+  let caught: unknown
+  try {
+    await action()
+  } catch (error) {
+    caught = error
+  }
+  assert.ok(caught instanceof errorType, `${label}: expected ${errorType.name}`)
+  const response = (caught as { getResponse: () => unknown }).getResponse() as {
+    error?: { code?: string }
+  }
+  assert.equal(response.error?.code, code, `${label}: expected error code ${code}`)
+}
+
+function makeRetryAuthority(
+  prisma: FakePrisma,
+  scanTaskId: string,
+  content: Buffer,
+  overrides: Partial<StoredScanTask> = {}
+): StoredScanTask {
+  const task = prisma.scanTasksById.get(scanTaskId)
+  assert.ok(task, `retry authority ${scanTaskId} must exist`)
+  const authority: StoredScanTask = {
+    ...task,
+    status: 'failed',
+    lastAttemptHash: createHash('sha256').update(content).digest('hex'),
+    updatedAt: new Date(),
+    ...overrides,
+  }
+  prisma.scanTasksById.set(scanTaskId, authority)
+  return authority
 }
 
 function sleep(ms: number): Promise<void> {
@@ -607,6 +701,220 @@ async function assertRealDbPartialUniqueIndex(
     }
   } finally {
     await client.$disconnect()
+  }
+}
+
+async function assertRealDbRetryAuthorityCas(
+  dbUrl: string,
+  label: 'sqlite' | 'postgres'
+): Promise<void> {
+  const { client: clientA } = createPrismaClient(dbUrl)
+  const { client: clientB } = createPrismaClient(dbUrl)
+  await Promise.all([clientA.$connect(), clientB.$connect()])
+
+  const terminalId = `realdb_retry_cas_${label}_${randomBytes(4).toString('hex')}`
+  const taskId = `realdb_retry_authority_${label}_${randomBytes(4).toString('hex')}`
+  const tokenHash = createHash('sha256').update('real-db-retry-token').digest('hex')
+  const contentHash = createHash('sha256').update(tinyPdf()).digest('hex')
+  const retryCutoff = new Date(Date.now() - SCAN_RETRY_AUTHORITY_TTL_MS)
+
+  try {
+    await clientA.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `RDB-RETRY-${label}-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-retry-cas',
+        enabled: true,
+      },
+    })
+    await clientA.scanTask.create({
+      data: {
+        id: taskId,
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        controlTokenHash: tokenHash,
+        lastAttemptHash: contentHash,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+
+    const consume = (client: typeof clientA) =>
+      client.scanTask.updateMany({
+        where: {
+          id: taskId,
+          terminalId,
+          scanType: 'document',
+          endUserId: null,
+          status: { in: ['failed', 'cancelled', 'expired'] },
+          controlTokenHash: tokenHash,
+          fileId: null,
+          lastAttemptHash: contentHash,
+          retryConsumedAt: null,
+          updatedAt: { gt: retryCutoff },
+        },
+        data: { retryConsumedAt: new Date() },
+      })
+    const results = await Promise.allSettled([consume(clientA), consume(clientB)])
+    const successfulCounts = results
+      .filter((result): result is PromiseFulfilledResult<{ count: number }> => result.status === 'fulfilled')
+      .map((result) => result.value.count)
+    assert.equal(
+      successfulCounts.filter((count) => count === 1).length,
+      1,
+      `real DB (${label}): concurrent retry-authority CAS must yield exactly one winner`
+    )
+    if (label === 'postgres') {
+      assert.deepEqual(
+        successfulCounts.sort(),
+        [0, 1],
+        'real DB (postgres): the losing concurrent CAS must complete with count=0'
+      )
+    } else {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          assert.equal(
+            (result.reason as { code?: string }).code,
+            'P1008',
+            'real DB (sqlite): a rejected parallel writer may only be the known database lock timeout'
+          )
+        }
+      }
+      const afterLockRelease = await consume(clientA)
+      assert.equal(
+        afterLockRelease.count,
+        0,
+        'real DB (sqlite): after the writer lock releases, replay of the consumed CAS must return count=0'
+      )
+    }
+    assert.ok(
+      (await clientA.scanTask.findUnique({ where: { id: taskId } }))?.retryConsumedAt,
+      `real DB (${label}): winning CAS must persist retryConsumedAt`
+    )
+  } finally {
+    await clientA.scanTask.deleteMany({ where: { id: taskId } }).catch(() => undefined)
+    await clientA.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await Promise.all([clientA.$disconnect(), clientB.$disconnect()])
+  }
+}
+
+async function assertRealDbRetryCreateAtomicity(dbUrl: string): Promise<void> {
+  const { client: setupClient } = createPrismaClient(dbUrl)
+  const { client: clientA } = createPrismaClient(dbUrl)
+  const { client: clientB } = createPrismaClient(dbUrl)
+  await Promise.all([setupClient.$connect(), clientA.$connect(), clientB.$connect()])
+
+  const terminalId = `realdb_retry_create_${randomBytes(4).toString('hex')}`
+  const endUserId = `realdb_retry_member_${randomBytes(4).toString('hex')}`
+  try {
+    await setupClient.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `RDB-RETRY-CREATE-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-retry-create',
+        enabled: true,
+      },
+    })
+    await setupClient.endUser.create({
+      data: { id: endUserId, phoneHash: `hash_${endUserId}`, phoneEnc: 'enc' },
+    })
+
+    const serviceA = new ScanTasksService(clientA as never, {} as never, passthroughCapabilities)
+    const serviceB = new ScanTasksService(clientB as never, {} as never, passthroughCapabilities)
+    const prior = await serviceA.create({ scanType: 'document', terminalId }, endUserId)
+    await setupClient.scanTask.update({
+      where: { id: prior.scanTaskId },
+      data: {
+        status: 'failed',
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+      },
+    })
+
+    const request = (service: ScanTasksService) =>
+      service.create(
+        { scanType: 'document', terminalId, retryOfScanTaskId: prior.scanTaskId },
+        endUserId,
+        prior.controlToken
+      )
+    const results = await Promise.allSettled([request(serviceA), request(serviceB)])
+    const winners = results.filter(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof serviceA.create>>> =>
+        result.status === 'fulfilled'
+    )
+    assert.equal(winners.length, 1, 'real DB: two concurrent retry creates must have one winner')
+    const loser = results.find((result) => result.status === 'rejected') as PromiseRejectedResult
+    assert.ok(loser, 'real DB: two concurrent retry creates must have one rejected loser')
+    assert.ok(
+      loser.reason instanceof ForbiddenException || loser.reason instanceof ConflictException,
+      'real DB: concurrent retry loser must be a controlled authorization/conflict response'
+    )
+    const rows = await setupClient.scanTask.findMany({ where: { terminalId } })
+    assert.equal(rows.length, 2, 'real DB: authority plus exactly one retry task must persist')
+    const authority = rows.find((row) => row.id === prior.scanTaskId)!
+    assert.ok(authority.retryConsumedAt)
+    assert.equal(authority.retryConsumedByScanTaskId, winners[0].value.scanTaskId)
+
+    // Force the post-consumption create to fail on the active-session index. The transaction
+    // must roll back the authority consumption instead of leaving a consumed orphan.
+    await setupClient.scanTask.update({
+      where: { id: winners[0].value.scanTaskId },
+      data: { status: 'cancelled' },
+    })
+    const rollbackToken = randomBytes(24).toString('hex')
+    const rollbackAuthorityId = `rollback_authority_${randomBytes(4).toString('hex')}`
+    await setupClient.scanTask.create({
+      data: {
+        id: rollbackAuthorityId,
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        endUserId,
+        controlTokenHash: createHash('sha256').update(rollbackToken).digest('hex'),
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await setupClient.scanTask.create({
+      data: {
+        id: `active_blocker_${randomBytes(4).toString('hex')}`,
+        terminalId,
+        scanType: 'document',
+        status: 'waiting',
+        endUserId,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await expectRejectCode(
+      () =>
+        serviceA.create(
+          { scanType: 'document', terminalId, retryOfScanTaskId: rollbackAuthorityId },
+          endUserId,
+          rollbackToken
+        ),
+      ConflictException,
+      'SCAN_TERMINAL_BUSY',
+      'failed retry create transaction must remain atomic'
+    )
+    const rollbackAuthority = await setupClient.scanTask.findUnique({
+      where: { id: rollbackAuthorityId },
+    })
+    assert.equal(
+      rollbackAuthority?.retryConsumedAt,
+      null,
+      'real DB: failed retry create must roll back retryConsumedAt'
+    )
+    assert.equal(rollbackAuthority?.retryConsumedByScanTaskId, null)
+  } finally {
+    await setupClient.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
+    await setupClient.endUser.deleteMany({ where: { id: endUserId } }).catch(() => undefined)
+    await setupClient.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await Promise.all([
+      setupClient.$disconnect(),
+      clientA.$disconnect(),
+      clientB.$disconnect(),
+    ])
   }
 }
 
@@ -831,6 +1139,42 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
     const taskCAfterStale = await client.scanTask.findUnique({ where: { id: taskC.scanTaskId } })
     assert.equal(taskCAfterStale?.status, 'waiting', 'real DB: task C must remain waiting after stale delivery rejected')
     assert.equal(taskCAfterStale?.fileId, null, 'real DB: task C must have no file attached')
+
+    // A failed task with an exact attempted hash and its prior control token can authorize one
+    // real new task, and that new task can deliver the otherwise-deduplicated identical bytes.
+    await client.scanTask.update({
+      where: { id: taskC.scanTaskId },
+      data: {
+        status: 'failed',
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+      },
+    })
+    const safeRetry = await service.create(
+      {
+        scanType: 'document',
+        terminalId,
+        retryOfScanTaskId: taskC.scanTaskId,
+      },
+      endUserAId,
+      taskC.controlToken
+    )
+    const safeRetryDelivery = await service.deliverScanFile({
+      terminalId,
+      buffer: tinyPdf(),
+      filename: 'safe-identical-rescan.pdf',
+      mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
+    })
+    assert.equal(
+      safeRetryDelivery.scanTaskId,
+      safeRetry.scanTaskId,
+      'real DB: explicit one-time retry authority must permit its exact identical content'
+    )
+    const consumedAuthority = await client.scanTask.findUnique({
+      where: { id: taskC.scanTaskId },
+    })
+    assert.ok(consumedAuthority?.retryConsumedAt)
+    assert.equal(consumedAuthority?.retryConsumedByScanTaskId, safeRetry.scanTaskId)
   } finally {
     await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
     await client.fileObject
@@ -1021,6 +1365,262 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
 
 async function main(): Promise<void> {
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
+
+  {
+    // Explicit safe rescan: an eligible failed task plus its prior control token authorizes
+    // exactly one new task for the same owner, terminal, scan type and content hash.
+    const { service, prisma } = makeService()
+    const bytes = tinyPdf()
+    const prior = await service.create(dto, 'member_retry')
+    makeRetryAuthority(prisma, prior.scanTaskId, bytes)
+
+    const retry = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_retry',
+      prior.controlToken
+    )
+    const priorRow = prisma.scanTasksById.get(prior.scanTaskId)!
+    const retryRow = prisma.scanTasksById.get(retry.scanTaskId)!
+    assert.ok(priorRow.retryConsumedAt, 'prior retry authority must record consumption time')
+    assert.equal(
+      priorRow.retryConsumedByScanTaskId,
+      retry.scanTaskId,
+      'prior retry authority must link to the newly created task'
+    )
+    assert.equal(retryRow.retryOfScanTaskId, prior.scanTaskId)
+    assert.equal(retryRow.retryContentHash, createHash('sha256').update(bytes).digest('hex'))
+
+    const delivered = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: bytes,
+      filename: 'legitimate-identical-retry.pdf',
+      mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
+    })
+    assert.equal(delivered.scanTaskId, retry.scanTaskId)
+  }
+
+  {
+    // Missing/wrong token, owner mismatch (including strict guest/null semantics), terminal,
+    // type, completed state and expiry must all reject without consuming the authority.
+    const cases: Array<{
+      label: string
+      priorOwner: string | null
+      retryOwner: string | null
+      retryDto?: CreateScanTaskDto
+      token?: string
+      mutate?: (task: StoredScanTask) => void
+    }> = [
+      { label: 'missing prior token', priorOwner: 'member_a', retryOwner: 'member_a' },
+      {
+        label: 'wrong prior token',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        token: 'wrong-token',
+      },
+      {
+        label: 'member-to-member owner mismatch',
+        priorOwner: 'member_a',
+        retryOwner: 'member_b',
+      },
+      { label: 'guest authority used by member', priorOwner: null, retryOwner: 'member_a' },
+      { label: 'member authority used as guest', priorOwner: 'member_a', retryOwner: null },
+      {
+        label: 'cross-terminal retry',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        retryDto: { scanType: 'document', terminalId: 't_2' },
+      },
+      {
+        label: 'mismatched scan type',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        retryDto: { scanType: 'resume', terminalId: 't_1' },
+      },
+      {
+        label: 'completed task denial',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        mutate: (task) => {
+          task.status = 'completed'
+        },
+      },
+      {
+        label: 'delivered row cannot masquerade as failed authority',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        mutate: (task) => {
+          task.fileId = 'already_delivered_file'
+        },
+      },
+      {
+        label: 'expired retry authority',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        mutate: (task) => {
+          task.updatedAt = new Date(Date.now() - SCAN_RETRY_AUTHORITY_TTL_MS - 1)
+        },
+      },
+    ]
+
+    for (const testCase of cases) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, testCase.priorOwner)
+      const priorRow = makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+      testCase.mutate?.(priorRow)
+      await expectRejectCode(
+        () =>
+          service.create(
+            { ...(testCase.retryDto ?? dto), retryOfScanTaskId: prior.scanTaskId },
+            testCase.retryOwner,
+            testCase.token ?? (testCase.label === 'missing prior token' ? undefined : prior.controlToken)
+          ),
+        ForbiddenException,
+        'SCAN_RETRY_NOT_AUTHORIZED',
+        testCase.label
+      )
+      assert.equal(
+        prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedAt,
+        null,
+        `${testCase.label}: rejected attempt must not consume authority`
+      )
+    }
+  }
+
+  {
+    for (const eligibleStatus of ['cancelled', 'expired'] as const) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, 'member_terminal_state')
+      makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf(), { status: eligibleStatus })
+      const retry = await service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_terminal_state',
+        prior.controlToken
+      )
+      assert.equal(
+        prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedByScanTaskId,
+        retry.scanTaskId,
+        `${eligibleStatus} must be an explicitly eligible unsuccessful retry-authority state`
+      )
+    }
+  }
+
+  {
+    const { service, prisma } = makeService()
+    await expectRejectCode(
+      () => service.create(dto, null, 'orphan-retry-token'),
+      BadRequestException,
+      'SCAN_RETRY_TASK_ID_MISSING',
+      'retry token without retryOfScanTaskId'
+    )
+
+    const prior = await service.create(dto, null)
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const firstRetry = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.status = 'cancelled'
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          null,
+          prior.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'consumed authority replay'
+    )
+  }
+
+  {
+    // Two parallel consumers of one authority: the CAS permits exactly one winner.
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_parallel')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const results = await Promise.allSettled([
+      service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_parallel',
+        prior.controlToken
+      ),
+      service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_parallel',
+        prior.controlToken
+      ),
+    ])
+    const fulfilled = results.filter(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof service.create>>> =>
+        result.status === 'fulfilled'
+    )
+    const rejected = results.filter((result) => result.status === 'rejected')
+    assert.equal(fulfilled.length, 1, 'parallel retry authority consumption must have one winner')
+    assert.equal(rejected.length, 1, 'parallel retry authority consumption must have one loser')
+    assert.equal(
+      prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedByScanTaskId,
+      fulfilled[0].value.scanTaskId,
+      'authority must link to the sole parallel winner'
+    )
+  }
+
+  {
+    // A retry authority for hash A is not a general terminal dedup exemption for hash B.
+    const { service, prisma } = makeService()
+    const hashABytes = tinyPdf()
+    const hashBBytes = Buffer.from('%PDF-1.4\nalready delivered hash B\n%%EOF\n', 'latin1')
+    const prior = await service.create(dto, 'member_scope')
+    makeRetryAuthority(prisma, prior.scanTaskId, hashABytes)
+    const retry = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_scope',
+      prior.controlToken
+    )
+    const historicalFileId = 'file_hash_b'
+    prisma.filesById.set(historicalFileId, {
+      id: historicalFileId,
+      filename: 'hash-b.pdf',
+      sizeBytes: hashBBytes.length,
+      mimeType: 'application/pdf',
+      sha256: createHash('sha256').update(hashBBytes).digest('hex'),
+      purpose: 'print_doc',
+      endUserId: 'member_scope',
+      deletedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    const retryRow = prisma.scanTasksById.get(retry.scanTaskId)!
+    const historicalTask: StoredScanTask = {
+      ...retryRow,
+      id: 'historical_hash_b',
+      terminalId: 't_1',
+      status: 'completed',
+      fileId: historicalFileId,
+      endUserId: 'member_scope',
+      lastAttemptHash: createHash('sha256').update(hashBBytes).digest('hex'),
+      retryOfScanTaskId: null,
+      retryContentHash: null,
+      retryConsumedAt: null,
+      retryConsumedByScanTaskId: null,
+      updatedAt: new Date(),
+    }
+    prisma.scanTasksById.set(historicalTask.id, historicalTask)
+    await expectRejectCode(
+      () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          buffer: hashBBytes,
+          filename: 'wrong-hash-for-authority.pdf',
+          mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
+        }),
+      ConflictException,
+      'SCAN_FILE_ALREADY_DELIVERED',
+      'retry authorization must be scoped to its exact content hash'
+    )
+    assert.equal(prisma.scanTasksById.get(retry.scanTaskId)?.status, 'waiting')
+  }
 
   {
     // contract scan 必须贯通专用高敏短期 purpose，不能退化到通用 print_doc。
@@ -1239,6 +1839,8 @@ async function main(): Promise<void> {
 
       await assertRealDbPartialUniqueIndex(dbUrl, 'sqlite')
       await assertRealDbWaitingExpiryReaperUnblocksTerminal(dbUrl)
+      await assertRealDbRetryAuthorityCas(dbUrl, 'sqlite')
+      await assertRealDbRetryCreateAtomicity(dbUrl)
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }
@@ -1293,6 +1895,7 @@ async function main(): Promise<void> {
       })
 
       await assertRealDbPartialUniqueIndex(pgUrl, 'postgres')
+      await assertRealDbRetryAuthorityCas(pgUrl, 'postgres')
     }
   }
 
@@ -2801,13 +3404,17 @@ async function main(): Promise<void> {
       'ScanTasksController.create must be guarded with TerminalIdentityGuard'
     )
 
+    const createCalls: unknown[][] = []
     const fakeScanTasksService = {
-      create: async () => ({
+      create: async (...args: unknown[]) => {
+        createCalls.push(args)
+        return {
         scanTaskId: 'st_ok',
         controlToken: 'token',
         expiresAt: new Date().toISOString(),
         instructions: [],
-      }),
+        }
+      },
     }
     const fakeTerminalsService = {}
     const fakeJwt = {}
@@ -2828,11 +3435,21 @@ async function main(): Promise<void> {
 
     // 1) 匹配 terminalId：通过头部检查并进入创建流程
     const okResult = await controller.create(
-      { scanType: 'document', terminalId: 't_1' },
+      { scanType: 'document', terminalId: 't_1', retryOfScanTaskId: 'prior_scan' },
       dummyReq,
-      't_1'
+      't_1',
+      'prior-control-token'
     )
     assert.equal((okResult as any).data.scanTaskId, 'st_ok')
+    assert.deepEqual(
+      createCalls[0],
+      [
+        { scanType: 'document', terminalId: 't_1', retryOfScanTaskId: 'prior_scan' },
+        null,
+        'prior-control-token',
+      ],
+      'controller must pass retryOfScanTaskId in the DTO and prior control token separately from X-Scan-Retry-Control'
+    )
 
     // 2) 终端 ID 不匹配：401 UnauthorizedException
     await expectRejects(

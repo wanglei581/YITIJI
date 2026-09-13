@@ -185,6 +185,10 @@ model ScanTask {
   errorCode        String?
   errorMessage     String?
   controlTokenHash String?
+  retryOfScanTaskId         String?
+  retryContentHash          String?
+  retryConsumedAt           DateTime?
+  retryConsumedByScanTaskId String?
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -196,6 +200,8 @@ model ScanTask {
   @@index([terminalId, status, createdAt])
   @@index([endUserId])
   @@index([terminalId, lastAttemptHash, updatedAt])
+  @@index([retryOfScanTaskId])
+  @@index([retryConsumedByScanTaskId])
 }
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
