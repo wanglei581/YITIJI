@@ -36,6 +36,115 @@ function makeRecord() {
     retentionLockedReason: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    storageDeletedAt: null as Date | null,
+    storageDeletePendingAt: null as Date | null,
+    storageDeleteAttempts: null as number | null,
+    storageDeleteError: null as string | null,
+  }
+}
+
+type FileRecord = ReturnType<typeof makeRecord>
+
+function uploadPdfArgs() {
+  return {
+    buffer: Buffer.from('%PDF-1.4 verify-upload-compensation'),
+    filename: 'resume.pdf',
+    mimeType: 'application/pdf',
+    purpose: 'resume_upload' as const,
+    uploaderId: null,
+    endUserId: 'member-1',
+  }
+}
+
+function makeUploadHarness(options: { failSign?: boolean; failStorageDelete?: boolean } = {}) {
+  const filesById = new Map<string, FileRecord>()
+  const liveObjects = new Set<string>()
+  let putObjectCalls = 0
+  let deleteObjectCalls = 0
+  let getDownloadUrlCalls = 0
+
+  const prisma = {
+    fileObject: {
+      create: async ({ data }: { data: Partial<FileRecord> & { id: string } }) => {
+        const record: FileRecord = {
+          ...makeRecord(),
+          ...data,
+          deletedAt: data.deletedAt ?? null,
+          deletedBy: data.deletedBy ?? null,
+          deleteReason: data.deleteReason ?? null,
+          storageDeletedAt: null,
+          storageDeletePendingAt: null,
+          storageDeleteAttempts: null,
+          storageDeleteError: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+        filesById.set(record.id, record)
+        return record
+      },
+      findUnique: async ({ where }: { where: { id: string } }) => filesById.get(where.id) ?? null,
+      update: async ({ where, data }: { where: { id: string }; data: Partial<FileRecord> }) => {
+        const record = filesById.get(where.id)
+        if (!record) throw new Error('controlled missing file for update')
+        Object.assign(record, data)
+        return record
+      },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { id?: string; deletedAt?: Date | null }
+        data: Partial<FileRecord>
+      }) => {
+        const record = where.id ? filesById.get(where.id) : undefined
+        if (!record) return { count: 0 }
+        if (where.deletedAt === null && record.deletedAt) return { count: 0 }
+        Object.assign(record, data)
+        return { count: 1 }
+      },
+    },
+    printTask: { findMany: async () => [] as Array<{ fileId: string; fileUrl: string | null }> },
+  }
+  const storage = {
+    defaultBucket: 'private-files',
+    defaultRegion: 'local',
+    signTtlSeconds: 1800,
+    putObject: async (objectKey: string, buffer: Buffer) => {
+      putObjectCalls += 1
+      liveObjects.add(objectKey)
+      return { sizeBytes: buffer.length, sha256: 'b'.repeat(64) }
+    },
+    getDownloadUrl: () => {
+      getDownloadUrlCalls += 1
+      if (options.failSign) {
+        throw new Error('controlled download URL signing failure')
+      }
+      return {
+        url: 'https://files.local/signed',
+        expiresAt: new Date(Date.now() + 1800_000),
+      }
+    },
+    deleteObject: async (objectKey: string) => {
+      deleteObjectCalls += 1
+      if (options.failStorageDelete) {
+        throw new Error('controlled storage delete failure')
+      }
+      liveObjects.delete(objectKey)
+    },
+  }
+  return {
+    filesById,
+    liveObjects,
+    putObjectCalls: () => putObjectCalls,
+    deleteObjectCalls: () => deleteObjectCalls,
+    getDownloadUrlCalls: () => getDownloadUrlCalls,
+    onlyRecord(): FileRecord {
+      assert.equal(filesById.size, 1, 'upload must persist exactly one FileObject')
+      const record = [...filesById.values()][0]
+      assert.ok(record, 'upload FileObject missing after create')
+      return record
+    },
+    service: new FilesService(prisma as never, {} as never, storage as never),
   }
 }
 
@@ -360,6 +469,87 @@ async function main(): Promise<void> {
   assert.equal(cleanup.record.status, 'deleted')
   assert.ok(cleanup.record.deletedAt)
   assert.equal(cleanup.deleteObjectCalls(), 2)
+
+  const successfulUpload = makeUploadHarness()
+  const uploaded = await successfulUpload.service.upload(uploadPdfArgs())
+  assert.equal(successfulUpload.putObjectCalls(), 1)
+  assert.equal(successfulUpload.getDownloadUrlCalls(), 1)
+  assert.equal(successfulUpload.deleteObjectCalls(), 0, 'successful upload must not delete the object')
+  assert.equal(successfulUpload.liveObjects.size, 1)
+  assert.equal(successfulUpload.onlyRecord().status, 'active')
+  assert.equal(successfulUpload.onlyRecord().deletedAt, null)
+  assert.equal(uploaded.signedUrl, 'https://files.local/signed')
+
+  const signFailure = makeUploadHarness({ failSign: true })
+  await assert.rejects(
+    () => signFailure.service.upload(uploadPdfArgs()),
+    (err: unknown) => {
+      assert.equal(
+        err instanceof Error ? err.message : String(err),
+        'controlled download URL signing failure',
+        'original signing error must propagate; compensation must not replace it'
+      )
+      return true
+    }
+  )
+  assert.equal(signFailure.putObjectCalls(), 1)
+  assert.equal(signFailure.getDownloadUrlCalls(), 1)
+  assert.equal(signFailure.deleteObjectCalls(), 1, 'compensating systemDelete must attempt object deletion once')
+  const compensated = signFailure.onlyRecord()
+  assert.equal(compensated.status, 'deleted')
+  assert.ok(compensated.deletedAt, 'compensated FileObject must be tombstoned, not left active')
+  assert.equal(compensated.deletedBy, 'system')
+  assert.equal(compensated.deleteReason, 'upload response failed, compensating orphaned file')
+  assert.ok(compensated.storageDeletedAt, 'successful compensating delete must write the storage-delete ledger')
+  assert.equal(compensated.storageDeletePendingAt, null)
+  assert.equal(signFailure.liveObjects.size, 0, 'physical object must not remain after successful compensation')
+  await assert.rejects(
+    () =>
+      signFailure.service.getAccessUrl(
+        compensated.id,
+        { kind: 'member', endUserId: 'member-1' },
+        'inline'
+      ),
+    NotFoundException
+  )
+
+  const signFailureStoragePending = makeUploadHarness({ failSign: true, failStorageDelete: true })
+  await assert.rejects(
+    () => signFailureStoragePending.service.upload(uploadPdfArgs()),
+    (err: unknown) => {
+      assert.equal(
+        err instanceof Error ? err.message : String(err),
+        'controlled download URL signing failure',
+        'storage-delete failure during compensation must not replace the original signing error'
+      )
+      return true
+    }
+  )
+  const pending = signFailureStoragePending.onlyRecord()
+  assert.equal(pending.status, 'deleted', 'failed physical delete must still leave a tombstone, not an active orphan')
+  assert.ok(pending.deletedAt)
+  assert.equal(pending.deletedBy, 'system')
+  assert.ok(
+    pending.storageDeletePendingAt,
+    'physical delete failure must retain cleanup evidence on the deletion ledger'
+  )
+  assert.equal(pending.storageDeletedAt, null, 'failed physical delete must not forge a storageDeletedAt log')
+  assert.equal(pending.storageDeleteAttempts, 1)
+  assert.equal(pending.storageDeleteError, 'Error')
+  assert.equal(
+    signFailureStoragePending.liveObjects.size,
+    1,
+    'object bytes remain until reconcileStorageDeletions retries the pending ledger'
+  )
+  await assert.rejects(
+    () =>
+      signFailureStoragePending.service.getAccessUrl(
+        pending.id,
+        { kind: 'member', endUserId: 'member-1' },
+        'inline'
+      ),
+    NotFoundException
+  )
 
   console.log('PASS: file deletion tombstones metadata before idempotent object deletion')
 }

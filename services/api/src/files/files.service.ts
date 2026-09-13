@@ -240,31 +240,47 @@ export class FilesService {
       throw createError
     }
 
-    // 上传响应给至多 30 分钟的签名 URL，且不得越过文件自身寿命。
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
-    const signed = this.storage.getDownloadUrl(
-      {
-        objectKey: record.storageKey,
+    // FileObject 已是 active：此后签名/响应构造失败若直接抛出，会留下与任何
+    // 业务任务无关的活跃孤儿直到 TTL。必须走 systemDelete，才能复用 tombstone
+    // 先于对象删除、以及物理删除失败时的可重试账本（§11）。补偿失败不得替换
+    // 调用方看到的原始错误。
+    try {
+      const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
+      const signed = this.storage.getDownloadUrl(
+        {
+          objectKey: record.storageKey,
+          fileId: record.id,
+          filename: record.filename,
+          mimeType: record.mimeType,
+          ttlSeconds,
+          disposition: 'inline',
+        },
+        record.bucket
+      )
+      return {
         fileId: record.id,
         filename: record.filename,
+        sizeBytes: record.sizeBytes,
         mimeType: record.mimeType,
-        ttlSeconds,
-        disposition: 'inline',
-      },
-      record.bucket
-    )
-    return {
-      fileId: record.id,
-      filename: record.filename,
-      sizeBytes: record.sizeBytes,
-      mimeType: record.mimeType,
-      sha256: record.sha256,
-      signedUrl: signed.url,
-      signedUrlExpiresAt: this.ensureSignedExpiryWithinFileLifetime(
-        signed.expiresAt,
-        record.expiresAt
-      ).toISOString(),
-      fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
+        sha256: record.sha256,
+        signedUrl: signed.url,
+        signedUrlExpiresAt: this.ensureSignedExpiryWithinFileLifetime(
+          signed.expiresAt,
+          record.expiresAt
+        ).toISOString(),
+        fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
+      }
+    } catch (responseError) {
+      try {
+        await this.systemDelete(record.id, 'upload response failed, compensating orphaned file')
+      } catch (cleanupError) {
+        const errorType =
+          cleanupError instanceof Error ? cleanupError.constructor.name : typeof cleanupError
+        this.logger.warn(
+          `code=FILE_UPLOAD_RESPONSE_COMPENSATION_FAILED file=${digestFileId(record.id)} errorType=${errorType}`
+        )
+      }
+      throw responseError
     }
   }
 
