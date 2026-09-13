@@ -485,6 +485,102 @@ test('a terminal-session 401 on claim never replays the rejected session @w2', a
   expect(errors).toEqual([])
 })
 
+// ── 正常续期窗口：等票，而不是把用户判死 ──────────────────────────────────
+//
+// 健康的一体机每十分钟续一次会话票，续期那一两秒里 terminalAuth 的 state 真的是
+// checking。下面三条用例守的就是这个窄窗口：用户恰好在这时按「到机认领」或付款成功
+// 触发 Order-only 释放时，请求必须**等这次续期出结果**再发，而不是当场报
+// 「终端安全校验失败，请联系现场工作人员」—— 票其实好好的，只是正在换。
+//
+// 为什么不能只靠 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN 那条路：E2E 构建里会话恒为
+// ready，checking 窗口在浏览器里根本进不去（缺陷正是长在那段没人跑过的代码里）。
+// 因此这里用 terminalAuth 只在 E2E 构建挂出的测试缝发起一次**真实**续期
+// （与十分钟定时器调的是同一个 retryRefresh），再用路由 mock 扣住应答控制时机。
+// 状态仍由真实代码写、票仍由真实代码读发，用例控制的只有「续期什么时候回来」。
+
+interface HeldRefresh {
+  /** 续期请求已经真的打到路由 mock。 */
+  arrived: Promise<void>
+  /** 放行这次续期的应答。 */
+  open: () => void
+}
+
+function holdTerminalRefresh(api: ApiRouter, response: { status: number; json: unknown } = {
+  status: 200,
+  json: { sessionToken: 'w2-rotated-terminal-session' },
+}): HeldRefresh {
+  let open: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => { open = resolve })
+  let received: () => void = () => undefined
+  const arrived = new Promise<void>((resolve) => { received = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async () => {
+    received()
+    await gate
+    return response
+  })
+  return { arrived, open: () => open() }
+}
+
+async function startTerminalSessionRefresh(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { startRefresh: () => void } }).__terminalSessionE2E
+    // 缺了测试缝就是构建没带 E2E 标记，用例必须当场失败：否则它会退化成
+    // 「会话一直是 ready」的假绿，钉不住任何等待行为。
+    if (!hooks) throw new Error('terminalAuth 的 E2E 测试缝缺失，无法进入 checking 窗口')
+    hooks.startRefresh()
+  })
+}
+
+async function terminalSessionStateOf(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { state: () => string } }).__terminalSessionE2E
+    return hooks ? hooks.state() : 'missing'
+  })
+}
+
+test('pickup claim during a normal session refresh waits for the new ticket @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('POST', '/api/v1/print/jobs/claim-pickup', {
+    status: 200,
+    json: {
+      released: false,
+      orderId: 'w2-refresh-window-order',
+      orderNo: 'ORD-W2-REFRESH-WINDOW',
+      terminalId: 'KSK-001',
+      amountCents: 100,
+      priceLines: [],
+      paymentSessionToken: 'w2-refresh-window-payment-session',
+    },
+  })
+  const refresh = holdTerminalRefresh(api)
+
+  await page.goto('/print/pickup-claim')
+  await startTerminalSessionRefresh(page)
+  await refresh.arrived
+  expect(await terminalSessionStateOf(page), '续期在飞时会话状态必须真的是 checking').toBe('checking')
+
+  await page.getByLabel('到机码输入框').pressSequentially('12345678', { delay: 5 })
+  // 输满静默 250ms 后提交已经发生（页面进入认领中），但请求必须还扣在手里等换票。
+  await expect(page.locator('[data-w2-page="pickup-claim"][data-claim-state="loading"]')).toBeVisible()
+  await page.waitForTimeout(700)
+  expect(
+    api.requestCount('POST', '/api/v1/print/jobs/claim-pickup'),
+    '续期没出结果之前不许把认领请求发出去（旧票发出去只会被后端拒）',
+  ).toBe(0)
+  await expect(page.locator('#pcp-error-msg')).toHaveCount(0)
+
+  refresh.open()
+  await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+  expect(api.requestCount('POST', '/api/v1/print/jobs/claim-pickup'), '等完只发一次认领').toBe(1)
+  expect(
+    api.requestCount('POST', '/api/v1/terminals/session-token/refresh'),
+    '等的是在飞的那一次续期，不许自己再补发一次',
+  ).toBe(1)
+  expect(await terminalSessionStateOf(page)).toBe('ready')
+  expect(errors).toEqual([])
+})
+
 function quoteResponseJson(opts?: { amountCents?: number; billablePages?: number; unitCents?: number }) {
   const billablePages = opts?.billablePages ?? 2
   const unitCents = opts?.unitCents ?? 100
@@ -1205,6 +1301,117 @@ test('Order-only release carries the terminal session alongside the payment sess
   // 终端身份是新增的一道闸门，不是替换：付款方身份仍由这张短期支付会话票证明。
   expect(releaseHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)
   await expectHealthy(page, errors, 'print-progress')
+})
+
+test('Order-only release during a normal session refresh waits instead of failing @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  const releasedTaskId = 'w2-refresh-window-task'
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  // 先未付款：否则页面一挂载就释放，抢在续期开始之前，用例就钉不到那个窗口。
+  let paid = false
+  api.respondWith('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, () => ({
+    status: 200,
+    json: payStatus(paid ? 'paid' : 'unpaid'),
+  }))
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`, {
+    status: 200,
+    json: {
+      released: true,
+      taskId: releasedTaskId,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      terminalId: 'KSK-001',
+      taskStatus: 'pending',
+      printTaskStatus: 'pending',
+      paymentSessionToken: W2_ORDER.paymentSessionToken,
+    },
+  })
+  api.respond('GET', `/api/v1/print/jobs/${releasedTaskId}`, {
+    status: 200,
+    json: { taskId: releasedTaskId, status: 'pending' },
+  })
+  const refresh = holdTerminalRefresh(api)
+  const releaseRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST'
+      && new URL(request.url()).pathname === `/api/v1/print/jobs/${W2_ORDER.orderId}/release`,
+  )
+
+  await page.goto('/print/cashier')
+  // 小程序 Order-only 单在付款成功前没有 PrintTask —— 去掉 taskId 才会走 release 这条路。
+  await setReactRouterState(page, '/print/cashier', { ...cashierState, taskId: undefined })
+  // 只有一个通道时页面会自动选中它，落在「通道已选」这一态（未付款、未出码）。
+  await expect(page.locator('.qx-state-t', { hasText: '通道已选，请选择扫码方式' })).toBeVisible()
+
+  await startTerminalSessionRefresh(page)
+  await refresh.arrived
+  expect(await terminalSessionStateOf(page), '续期在飞时会话状态必须真的是 checking').toBe('checking')
+
+  // 钱已经收了。此刻释放必须等换票，而不是把一单已付款的活当场判成安全失败 ——
+  // 那会让站在机器前的人看到「打印任务尚未建立」，以为钱付了纸不出。
+  paid = true
+  await expect(page.locator('.qx-state-t', { hasText: '付款已由服务端确认' })).toBeVisible()
+  await page.waitForTimeout(700)
+  expect(
+    api.requestCount('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`),
+    '续期没出结果之前不许把释放请求发出去',
+  ).toBe(0)
+  await expect(page.locator('.qx-state-t', { hasText: '打印任务尚未建立' })).toHaveCount(0)
+  await expect(page).toHaveURL(/\/print\/cashier$/)
+
+  refresh.open()
+  await page.waitForURL('**/print/progress')
+  expect(
+    api.requestCount('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`),
+    '等完只释放一次：释放会在本机建任务出纸，重复发就是重复出纸的风险',
+  ).toBe(1)
+  expect(
+    api.requestCount('POST', '/api/v1/terminals/session-token/refresh'),
+    '等的是在飞的那一次续期，不许自己再补发一次',
+  ).toBe(1)
+  // 头是在等完之后才组的，因此带的是那时读到的会话票。
+  const releaseHeaders = (await releaseRequest).headers()
+  expect(releaseHeaders['x-terminal-session-token']).toBe(TERMINAL_SESSION_FIXTURE)
+  expect(releaseHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)
+  await expectHealthy(page, errors, 'print-progress')
+})
+
+test('a terminal-session 401 on Order-only release fails as terminal security, not network @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('paid') })
+  // 会话票真的废了：释放被判无效，续期也被拒。
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`, {
+    status: 401,
+    json: { error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+  })
+  api.respond('POST', '/api/v1/terminals/session-token/refresh', {
+    status: 401,
+    json: { error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+  })
+
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', { ...cashierState, taskId: undefined })
+
+  // 用户看到的必须是「终端安全校验失败」这件事本身。等待逻辑一旦把续期的原始错误
+  // 原样外抛（续期失败可能是 TypeError），这里就会变成「网络连接失败」——
+  // 把一次安全失败说成网络问题，现场工作人员会照着去查网线。
+  const alert = page.locator('.cashier-qx-error')
+  await expect(alert).toHaveText(/终端安全校验失败/)
+  await expect(alert).not.toHaveText(/网络连接失败/)
+  await expect(page.locator('.qx-state-t', { hasText: '打印任务尚未建立' })).toBeVisible()
+  await expect(page).toHaveURL(/\/print\/cashier$/)
+  expect(
+    api.requestCount('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`),
+    '刚被拒的票绝不重放：释放只发一次',
+  ).toBe(1)
+  expect(
+    api.requestCount('POST', '/api/v1/terminals/session-token/refresh'),
+    '401 不是抖动，续期只发一次',
+  ).toBe(1)
+  expect(errors).toEqual([])
 })
 
 test('print polling reaches done and pickup code comes from the paid response @w2', async ({ page, api }) => {

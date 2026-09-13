@@ -247,8 +247,45 @@ export function subscribeTerminalSession(listener: (next: TerminalSessionState) 
   return () => listeners.delete(listener)
 }
 
-export async function terminalProtectedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+/**
+ * 业务请求的会话闸门：等在飞的那一次续期，等不出 ready 就 fail-closed。
+ *
+ * 防的是一个只有一两秒宽的窗口：健康的一体机每十分钟续一次会话票，续期期间 state
+ * 被真实地置成 checking。此前只要用户恰好在这一两秒里按下「到机认领」，或者付款成功
+ * 触发 Order-only 释放，请求就当场抛 TERMINAL_SESSION_INVALID，屏幕上写
+ * 「终端安全校验失败，请联系现场工作人员」—— 票其实好好的，只是正在换。让用户去找
+ * 工作人员、或者以为自己的到机码作废了，都是这一句话造成的。
+ *
+ * 边界三条，一条都不放宽：
+ *   · 只等「checking 且确有在飞续期」。启动引导（checking 但没有 refreshInflight）
+ *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死。
+ *   · 自己绝不发起续期。等的永远是别人已经在飞的那个 Promise，因此并发业务请求
+ *     仍然只对应一次 /session-token/refresh。
+ *   · 等失败不降级：统一抛 TERMINAL_SESSION_INVALID，不把续期的原始错误（可能是
+ *     TypeError）甩给调用方 —— 那会让收银页显示「网络连接失败」，把一次安全失败
+ *     说成网络问题；更不会拿刚被换掉的旧票把业务请求发出去。
+ *
+ * 不会死锁：只有 terminalProtectedFetch 调它，而续期自身走 fetchWithTimeout 直连、
+ * 不经过本函数，因此不存在「续期等自己」的重入。
+ */
+async function awaitReadySessionOrFailClosed(): Promise<void> {
+  // 这两个值必须在同一个同步段里读完：await 之后 refreshInflight 已被 retryRefresh
+  // 的 finally 清空，再读就成 null 了。
+  const inflight = state === 'checking' ? refreshInflight : null
+  if (inflight) {
+    try {
+      await inflight
+    } catch {
+      /* 失败原因不外传，落到下面统一 fail-closed */
+    }
+  }
   if (state !== 'ready') throw new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401)
+}
+
+export async function terminalProtectedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  // 续期在飞就等它出结果。headers() 排在等待**之后**，因此发出去的一定是等完之后的
+  // 那张票（续期成功时新票已写进 sessionStorage），不会是刚被换掉的旧票。
+  if (state !== 'ready') await awaitReadySessionOrFailClosed()
   let response = await fetch(input, { ...init, headers: headers(init.headers) })
   if (response.ok) return response
   const error = await asHttpError(response.clone())
@@ -257,4 +294,28 @@ export async function terminalProtectedFetch(input: RequestInfo | URL, init: Req
   await retryRefresh()
   response = await fetch(input, { ...init, headers: headers(init.headers) })
   return response
+}
+
+// ── E2E 测试缝：只在设置了 mock 会话票的构建里挂出 ──────────────────────────
+// 生产 / deploy 构建绝不设置 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN（deploy.yml 那条由
+// verify-runtime-terminal-identity 钉死），所以这段在生产包里永远不会执行。
+//
+// 存在的理由：E2E 构建里会话恒为 ready，而真实的「续期在飞」只由十分钟定时器触发 ——
+// 浏览器用例既等不到它，也没有别的入口进到 checking 窗口，于是上面那段等待逻辑在浏览器里
+// 从来没被跑过（缺陷正是长在这段里）。这里只暴露两个动作：发起一次**真实**续期（与定时器
+// 调的是同一个 retryRefresh），和读一眼当前状态。它不放宽任何判定 —— 状态仍由真实代码写、
+// 票仍由真实代码读发，用例能控制的只是续期应答回来的时机。
+export interface TerminalSessionE2EHooks {
+  /** 发起一次真实续期，等价于十分钟定时器那一次。 */
+  startRefresh: () => void
+  /** 只读当前会话状态。 */
+  state: () => TerminalSessionState
+}
+
+if (HAS_E2E_MOCK_TOKEN) {
+  const host = window as unknown as { __terminalSessionE2E?: TerminalSessionE2EHooks }
+  host.__terminalSessionE2E = {
+    startRefresh: () => { void retryRefresh().catch(() => undefined) },
+    state: () => state,
+  }
 }

@@ -27,6 +27,24 @@ assert.doesNotMatch(terminalAuth, /import\.meta\.env\['E2E_MOCK_TERMINAL_SESSION
 const deployWorkflow = readFileSync(join(ROOT, '..', '..', '.github', 'workflows', 'deploy.yml'), 'utf8')
 assert.doesNotMatch(deployWorkflow, /E2E_MOCK_TERMINAL_SESSION_TOKEN/, 'production deploy builds must never set the E2E mock terminal session token')
 
+// terminalAuth 在 E2E 构建下会往 window 挂一个测试缝（只能发起一次真实续期 + 读一眼状态），
+// 用来让浏览器用例进到「续期在飞」的 checking 窗口 —— 那段等待逻辑否则在浏览器里根本跑不到，
+// 2026-09-13 的缺陷正是长在那里。缝本身不放宽任何判定，但挂在 window 上的东西一旦脱出
+// HAS_E2E_MOCK_TOKEN 门控就会进生产包。deploy 构建不设这个变量（上面刚断言过），
+// 所以只要赋值全在门控内，生产运行时就永远执行不到它。
+const seamAssignments = terminalAuth.split('.__terminalSessionE2E = ').length - 1
+if (seamAssignments > 0) {
+  const gateAt = terminalAuth.indexOf('if (HAS_E2E_MOCK_TOKEN) {')
+  assert.notEqual(gateAt, -1, 'the terminalAuth E2E seam must live inside an `if (HAS_E2E_MOCK_TOKEN)` block')
+  const gateEnd = terminalAuth.indexOf('\n}\n', gateAt)
+  const gatedBlock = terminalAuth.slice(gateAt, gateEnd === -1 ? terminalAuth.length : gateEnd)
+  assert.equal(
+    gatedBlock.split('.__terminalSessionE2E = ').length - 1,
+    seamAssignments,
+    'every window assignment of the terminalAuth E2E seam must stay inside the HAS_E2E_MOCK_TOKEN gate (an ungated seam ships in the production bundle)',
+  )
+}
+
 assert.match(identity, /export const isTerminalKiosk = \(\): boolean => getTerminalId\(\) !== '' && !IS_E2E_BUILD/, 'kiosk-only UI gating must be off in E2E builds and on whenever a real terminal identity exists')
 
 const terminalScopedConsumers = [
