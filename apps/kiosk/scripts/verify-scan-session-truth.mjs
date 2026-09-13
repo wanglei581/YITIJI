@@ -74,8 +74,37 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /if \(abandoned\) \{\s*\n\s*if \(cancellationCredentials\) abandonCreatedSession\(cancellationCredentials\)\s*\n\s*return\s*\n\s*\}[\s\S]*patchScanWorkbenchSession\(/,
-  '弃用分支必须排在任何 patchScanWorkbenchSession 之前：先 return 才谈得上「绝不回写」',
+  /if \(abandoned\) \{[\s\S]{0,200}?creationAbandonedRef\.current = true\s*\n\s*if \(cancellationCredentials\) abandonCreatedSession\(cancellationCredentials\)\s*\n\s*return\s*\n\s*\}[\s\S]*patchScanWorkbenchSession\(/,
+  '弃用分支必须排在任何 patchScanWorkbenchSession 之前（先 return 才谈得上「绝不回写」），'
+    + '并且要把「这一次创建已经丢弃」登记下来',
+)
+
+/* ── 丢弃是终局：终端恢复不得把已撤销的任务接回来（2026-09-13） ─────────────
+ *
+ * 上面那道闸门撤掉任务之后，页面停在「终端安全校验失败」。终端身份随后恢复
+ * （failed → ready）会让创建 effect 再跑一次 —— 而 sessionPromiseRef 里那个 promise
+ * 已经 resolve 了：重新挂上去，闸门这一轮全部判否（代次没变、页面没卸载、
+ * terminalFailClosedRef 刚被 ready 分支清成 false），于是一个**已经 DELETE 掉**的任务
+ * 被写成成功、连同控制凭证一起写回本机登记。用户照着屏上的编号去面板扫，
+ * 扫出来的文件没有任何任务认领。
+ *
+ * 所以这一笔必须不可逆，且要在 effect 重新挂 promise 之前就把整条 effect 拦住。 */
+assert.match(
+  scanSettings,
+  /if \(skipCreateRef\.current\) return[\s\S]{0,900}?if \(creationAbandonedRef\.current\) return[\s\S]{0,400}?if \(terminalSession === 'checking'\) return/,
+  '丢弃之后创建 effect 必须整条停掉，且这道闸要排在终端状态分支之前：'
+    + '排在后面就会先被 ready 分支重新挂上那个已经 resolve 的 promise',
+)
+assert.match(
+  scanSettings,
+  /if \(creationAbandonedRef\.current\) return[\s\S]*sessionPromiseRef\.current = createScanSession\(/,
+  '这道闸也必须排在创建之前：丢弃之后页面不自动重建会话，重不重扫由用户自己决定',
+)
+assert.doesNotMatch(
+  scanSettings,
+  /creationAbandonedRef\.current = false/,
+  '这一笔不可逆：任务已经撤掉了，服务端不会因为终端恢复把它变回 waiting；'
+    + '像 terminalFailClosedRef 那样在 ready 分支清掉，缺陷就原样回来了',
 )
 assert.match(
   scanSettings,

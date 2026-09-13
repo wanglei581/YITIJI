@@ -661,3 +661,155 @@ test('giving up on polling revokes the server task instead of orphaning it @kios
   await expect.poll(() => revokes().length).toBe(1)
   expect(revokes()[0]?.['x-scan-session-control']).toBe(REVOKE_CONTROL_TOKEN)
 })
+
+// ── 丢弃之后终端恢复：不许把已撤销的任务接回来（2026-09-13） ──────────────────
+//
+// 上面那条「迟到的响应」用例钉住的是前半段：创建在飞时终端 fail-closed，响应回来把
+// 任务撤掉、不回写本机登记。后半段一直没人跑过 —— 终端身份随后**恢复**了
+// （续期换到新票，或从本机 Agent 重新取到引导票）。
+//
+// 创建 effect 的依赖就是终端会话状态，failed → ready 会让它再跑一次；而
+// sessionPromiseRef 里那个 promise 已经 resolve 了。ready 分支把 terminalFailClosedRef
+// 清成 false 之后若直接把这个 promise 重新挂上，闸门这一轮会全部判否
+// （代次没变、页面没卸载、fail-closed 刚被清掉），于是一个**已经 DELETE 掉的任务**
+// 被写成「扫描任务已创建」：编号上屏、控制凭证写回本机登记。用户照着屏上的编号去面板
+// 上扫，扫出来的文件没有任何任务认领 —— 而这一刻页面说的是「已创建」。
+//
+// 终端状态全部由真实代码写：用例控制的只有「续期应答回什么」和「本机 Agent 取不取得到票」。
+
+const RECOVERED_TERMINAL_TOKEN = 'recovered-terminal-session-token'
+const ROTATED_TERMINAL_TOKEN = 'rotated-terminal-session-token'
+/** 本机 Agent 桥接取票端点：E2E 构建里配了桥接令牌，fail-closed 之前一定会走一次。 */
+const LOCAL_BOOT_TICKET_URL = 'http://127.0.0.1:9527/local/terminal-boot-ticket'
+
+/** 用 terminalAuth 只在 E2E 构建挂出的测试缝发起一次**真实**续期（同十分钟定时器那一次）。 */
+async function startTerminalSessionRefresh(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { startRefresh: () => void } }).__terminalSessionE2E
+    // 缺了测试缝就是构建没带 E2E 标记：必须当场失败，否则用例会退化成
+    // 「会话一直是 ready」的假绿，钉不住任何状态迁移。
+    if (!hooks) throw new Error('terminalAuth 的 E2E 测试缝缺失，无法驱动终端会话状态')
+    hooks.startRefresh()
+  })
+}
+
+async function terminalSessionStateOf(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { state: () => string } }).__terminalSessionE2E
+    return hooks ? hooks.state() : 'missing'
+  })
+}
+
+test('a terminal session that recovers after the abandoned task was revoked never revives it @kiosk', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  registerShell(api)
+  const revokes = recordRevokeRequests(page)
+  const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+  // 第一次续期：票已被吊销（401 按设计不重试，立即 fail-closed）；第二次：换到新票，终端恢复。
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', (requestNumber) => (
+    requestNumber === 1
+      ? {
+          status: 401,
+          json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+        }
+      : { status: 200, json: { sessionToken: RECOVERED_TERMINAL_TOKEN } }
+  ))
+  // 本机 Agent 取不到引导票 —— 第一次续期失败后就真的落到 fail-closed，
+  // 而不是取决于这台开发机 / CI runner 的 9527 端口上有没有人在听。
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+
+  let markCreateReceived: (() => void) | undefined
+  const createReceived = new Promise<void>((resolve) => { markCreateReceived = resolve })
+  let releaseCreate: (() => void) | undefined
+  const createReleased = new Promise<void>((resolve) => { releaseCreate = resolve })
+  await page.route('**/api/v1/scan/sessions', async (route) => {
+    const request = route.request()
+    if (request.method() !== 'POST' || new URL(request.url()).pathname !== '/api/v1/scan/sessions') {
+      await route.fallback()
+      return
+    }
+    markCreateReceived?.()
+    await createReleased
+    await fulfillCreatedSession(route)
+  })
+
+  await page.goto('/scan/start')
+  await page.getByRole('button', { name: /下一步/ }).click()
+  await createReceived
+  await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
+
+  // 创建还在飞的那一刻终端身份被吊销：页面据此对用户宣告失败。
+  await startTerminalSessionRefresh(page)
+  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  expect(await terminalSessionStateOf(page), '换票 401 且本机 Agent 取不到票时必须 fail-closed').toBe('failed')
+
+  // 迟到的创建响应：任务撤掉、不回写本机登记（已有闸门，先确认它成立，后半段才谈得上）。
+  releaseCreate?.()
+  await expect.poll(() => revokes().length).toBe(1)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(CONTROL_TOKEN)
+
+  // 终端身份恢复：这是本用例真正要钉的那一步。
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('ready')
+  // 错误的写回是异步的（重新挂上的 then 要等一个微任务）：立刻断言只能证明「这一帧还没写」。
+  await page.waitForTimeout(1_000)
+
+  // 1) 页面不得把一个已经撤掉的任务宣告成功，也不得把编号上屏。
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
+  // 2) 已经对用户说过的失败结论仍然在屏上：恢复的是终端身份，不是这一场扫描。
+  await expect(page.getByText('终端安全校验失败', { exact: true }).first()).toBeVisible()
+  // 3) 作废的凭证不得写回本机登记 —— 写回去，下一次进 /scan 会复水到一个已被撤销的任务。
+  const stored = await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '')
+  expect(stored).not.toContain(SCAN_TASK_ID)
+  expect(stored).not.toContain(CONTROL_TOKEN)
+  // 4) 只撤一次；也不因为终端恢复就自动重建一场（页面已经宣告失败，重不重扫由用户决定）。
+  expect(revokes()).toHaveLength(1)
+  expect(createRequests(), '恢复不等于重建：这条路径上不许出现第二次创建').toBe(1)
+})
+
+// 反面用例：上面那道「丢弃即终局」的闸门不许误伤**正常的** checking → ready。
+// 它如果写成「只要终端状态变过就不再创建」，这条会当场红：一体机每十分钟续一次票，
+// 用户恰好在那一两秒里走到设置页，就再也建不出扫描会话了。
+test('a create deferred by a terminal refresh still goes out once the new ticket is back @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
+  const createHeaders: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== '/api/v1/scan/sessions') return
+    createHeaders.push(request.headers())
+  })
+  api.respond('POST', '/api/v1/scan/sessions', { status: 200, json: createdSession() })
+
+  let openRefresh: () => void = () => undefined
+  const refreshGate = new Promise<void>((resolve) => { openRefresh = resolve })
+  let markRefreshArrived: () => void = () => undefined
+  const refreshArrived = new Promise<void>((resolve) => { markRefreshArrived = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async () => {
+    markRefreshArrived()
+    await refreshGate
+    return { status: 200, json: { sessionToken: ROTATED_TERMINAL_TOKEN } }
+  })
+
+  await page.goto('/scan/start')
+  await startTerminalSessionRefresh(page)
+  await refreshArrived
+  expect(await terminalSessionStateOf(page), '续期在飞时会话状态必须真的是 checking').toBe('checking')
+
+  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.waitForURL(/\/scan\?stage=settings/)
+  // 换票没出结果之前：不抢跑创建请求（抢跑只会拿回 401），也不谎称正在建扫描会话。
+  await expect(page.getByText('正在做终端安全校验', { exact: true }).first()).toBeVisible()
+  expect(createRequests(), '终端会话还在换票时不许发创建请求').toBe(0)
+
+  openRefresh()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(createRequests(), '换票回来之后补发且只发一次').toBe(1)
+  // 补发的这一次必须带换回来的新票：带旧票发出去，后端照样 401。
+  expect(createHeaders[0]?.['x-terminal-session-token']).toBe(ROTATED_TERMINAL_TOKEN)
+})

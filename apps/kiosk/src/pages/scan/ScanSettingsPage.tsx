@@ -131,6 +131,12 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   // 终端身份在本次创建在飞期间 fail-closed，且页面已据此对用户宣告失败。
   // 这一场不会再有人使用，响应回来必须把任务撤掉（否则它停在 waiting 收下一位的文件）。
   const terminalFailClosedRef = useRef(false)
+  // 这一次创建已经被丢弃：手里那份响应指向的任务已经 DELETE 掉了。
+  //
+  // 和 terminalFailClosedRef 的分工，是这条存在的全部理由：那条描述「终端此刻证明不了
+  // 自己」，终端一回到 ready 就作废；这条描述「那个任务已经撤了」，**不可逆** ——
+  // 服务端不会因为终端恢复而把它变回 waiting。
+  const creationAbandonedRef = useRef(false)
 
   useBusyLock(phase === 'loading' || phase === 'success' || starting)
 
@@ -167,6 +173,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   useEffect(() => {
     if (!scanType) return
     if (skipCreateRef.current) return
+    // 这一次创建已经被丢弃并撤销：服务端那个任务已经不在了，这条 effect 到此为止。
+    //
+    // 终端身份恢复（failed → ready）会让本 effect 再跑一次，但它**不能**把这一场接回来：
+    //   · 不重新挂那个已经 resolve 的 promise —— 它手里那份响应指向一个已经撤掉的任务，
+    //     写成成功等于把用户支到面板上去扫一份没人认领的文件，还会把这份作废的凭证
+    //     重新写回本机登记；
+    //   · 也不在这里顺手重建一次 —— 页面已经对用户宣告过「终端安全校验失败」，
+    //     恢复路径只有「安全返回扫描首页」重走一遍，扫不扫由用户自己决定。
+    if (creationAbandonedRef.current) return
     // 终端安全会话还在换票：什么都不发，页面停在等待态。抢跑只会拿回一个 401，
     // 还会把一次「本可以成功」的创建写成失败。
     if (terminalSession === 'checking') return
@@ -240,6 +255,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         const abandoned = !confirmedRef.current
           && (lifecycleEnded || unmountedRef.current || terminalFailClosedRef.current)
         if (abandoned) {
+          // 先登记再撤：登记这一笔之后，本 effect 不会再为这一场做任何事。
+          creationAbandonedRef.current = true
           if (cancellationCredentials) abandonCreatedSession(cancellationCredentials)
           return
         }
