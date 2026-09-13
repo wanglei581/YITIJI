@@ -5,6 +5,7 @@ import type { ScanSessionFileView } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
+import { revokeLiveScanSession } from './scanSessionRevoke'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
@@ -86,10 +87,22 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const returnToStart = () => {
     patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
     if (onGoStage) onGoStage('start')
-    else navigate('/scan/start', { replace: true })
+    else navigate('/scan?stage=start', { replace: true })
   }
 
-  const finishWithResult = (result: ScanResultSnapshot) => {
+  /**
+   * @param localGiveUp 本机放弃（轮询到点 / 连续查不动），**不是**服务端给的终态。
+   *   服务端那个任务这时多半还停在 waiting：不撤掉就会留下一个孤儿任务，把这台机器
+   *   下一次面板扫描出来的文件投给已经走掉的这一位。
+   *   服务端自己报的 completed / failed / expired / cancelled 不走这条 —— 那些任务
+   *   已经结束，再 DELETE 只会换回 400 / 404。
+   */
+  const finishWithResult = (result: ScanResultSnapshot, localGiveUp = false) => {
+    if (localGiveUp) revokeLiveScanSession(getToken())
+    // live 保持原样（和服务端终态路径一致）：这一帧本页还挂着，把 live 抹掉会让下面那个
+    // 依赖 scanTaskId 的 effect 立刻判「没有任务身份」并跳回 start，顺手把刚写的 result
+    // 也擦掉 —— 用户就看不到「为什么不等了」。撤销之后 result 快照本身就是「别再 DELETE」
+    // 的判据（见 scanSessionRevoke 的 hasResult 分支）。
     patchScanWorkbenchSession({
       stage: 'result',
       scanType,
@@ -99,7 +112,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       onGoStage('result')
       return
     }
-    navigate('/scan/result', { replace: true, state: { scanType, ...result } })
+    navigate('/scan?stage=result', { replace: true, state: { scanType, ...result } })
   }
 
   useBusyLock(hasTaskIdentity && busyPhase === 'active')
@@ -114,7 +127,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     if (!scanTaskId || !controlToken) {
       patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
       if (onGoStage) onGoStage('start')
-      else navigate('/scan/start', { replace: true })
+      else navigate('/scan?stage=start', { replace: true })
       return undefined
     }
 
@@ -155,8 +168,9 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           return
         }
         if (Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
+          // 本机计时到点，服务端刚刚还说它是进行中：这是本机放弃，不是服务端结束。
           setBusyPhase('terminal')
-          finishWithResult({ outcome: 'expired', success: false, reason: '扫描超时，请返回重新开始' })
+          finishWithResult({ outcome: 'expired', success: false, reason: '扫描超时，请返回重新开始' }, true)
           return
         }
         if (status.status === 'expired') {
@@ -190,7 +204,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               outcome: 'failed',
               success: false,
               reason: '长时间无法查询扫描状态，请联系工作人员或重新开始',
-            })
+            }, true)
             return
           }
           scheduleNext()

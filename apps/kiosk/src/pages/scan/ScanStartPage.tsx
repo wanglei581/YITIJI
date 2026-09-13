@@ -142,7 +142,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
                   return
                 }
-                navigate('/scan/start?mode=usb-panel')
+                navigate('/scan?stage=start&mode=usb-panel')
               }}
             >
               改用面板扫描到 U 盘
@@ -162,7 +162,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   onGoStage('settings')
                   return
                 }
-                navigate('/scan/settings', { state: { scanType: selected } })
+                navigate('/scan?stage=settings', { state: { scanType: selected } })
               }}
             >
               下一步 · 创建扫描会话

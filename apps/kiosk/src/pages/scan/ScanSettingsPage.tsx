@@ -7,6 +7,11 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
+import {
+  subscribeTerminalSession,
+  terminalSessionState,
+  type TerminalSessionState,
+} from '../../services/terminalAuth'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
 import {
@@ -100,6 +105,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [expiresAt, setExpiresAt] = useState<string | null>(restoredLive?.expiresAt ?? null)
   const [countdown, setCountdown] = useState('--:--')
   const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
+  // POST /scan/sessions 挂着 TerminalIdentityGuard（scan-tasks.controller.ts）：
+  // 没有终端会话令牌就是 401。和打印确认页同一口径 —— 订阅状态，不猜、不抢跑。
+  const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
 
   const confirmedRef = useRef(false)
   const createdIdRef = useRef<string | null>(restoredLive?.scanTaskId ?? null)
@@ -119,14 +127,37 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     void cancelScanSession(id, token, getToken()).catch(() => undefined)
   }
 
+  useEffect(() => subscribeTerminalSession(setTerminalSession), [])
+
   useEffect(() => {
     if (!scanType) return
     if (skipCreateRef.current) return
+    // 终端安全会话还在换票：什么都不发，页面停在等待态。抢跑只会拿回一个 401，
+    // 还会把一次「本可以成功」的创建写成失败。
+    if (terminalSession === 'checking') return
+    if (terminalSession === 'failed') {
+      // 终端身份是 fail-closed 的：这台机器现在证明不了自己是谁，就不创建扫描任务。
+      // 恢复由 terminalAuth 负责（续期 / 向本机 Agent 重新取票）；一旦回到 ready，
+      // 这个 effect 会再跑一次并正常创建。已经建成的会话不受影响。
+      if (!sessionPromiseRef.current) {
+        setFailure({
+          title: '终端安全校验失败',
+          description: userMessageOf(
+            { code: 'TERMINAL_SESSION_INVALID' },
+            '终端安全校验失败，请联系现场工作人员',
+          ),
+        })
+        setPhase('error')
+      }
+      return
+    }
 
     const myGeneration = ++generationRef.current
     let cancelled = false
 
     if (!sessionPromiseRef.current) {
+      setFailure(null)
+      setPhase('loading')
       sessionPromiseRef.current = createScanSession({ scanType, terminalId: getTerminalId() }, getToken())
     }
 
@@ -195,6 +226,11 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             title: '扫描功能已停用',
             description: userMessageOf(error, '请联系现场工作人员。'),
           })
+        } else if (code === 'TERMINAL_SESSION_INVALID') {
+          setFailure({
+            title: '终端安全校验失败',
+            description: userMessageOf(error, '终端安全校验失败，请联系现场工作人员'),
+          })
         } else if (code === 'RATE_LIMITED' || (error instanceof ApiHttpError && error.status === 429)) {
           setFailure({
             title: '请求过于频繁',
@@ -215,8 +251,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       // 只有用户明确点击返回、服务端响应无效或会话自然过期时才发送取消请求。
     }
     // StrictMode 需要在同一组 refs 上复用唯一创建 promise，不按渲染重发。
+    // 依赖只有终端会话状态：它从 checking / failed 回到 ready 时要能补发这一次创建。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [terminalSession])
 
   useEffect(() => {
     if (!expiresAt) return
@@ -252,7 +289,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       onGoStage('start')
       return
     }
-    navigate('/scan/start')
+    navigate('/scan?stage=start')
   }
 
   const handleConfirm = () => {
@@ -273,7 +310,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       onGoStage('progress')
       return
     }
-    navigate('/scan/progress', { state: { scanTaskId, scanType, controlToken } })
+    navigate('/scan?stage=progress', { state: { scanTaskId, scanType, controlToken } })
   }
 
   if (phase !== 'success' || !scanType || !scanTaskId || !controlToken || !instructions || !expiresAt) {
@@ -295,7 +332,11 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         ? '正在等待服务端返回真实会话，成功前不会显示任务信息或操作指引。'
         : failure?.description ?? '本次没有可用的扫描会话。'
     const status = phase === 'loading'
-      ? { tone: 'unknown' as const, label: '正在建扫描会话' }
+      ? {
+          tone: 'unknown' as const,
+          // 还在换终端票据时不能说「正在建扫描会话」—— 那一刻请求还没发出去。
+          label: terminalSession === 'checking' ? '正在做终端安全校验' : '正在建扫描会话',
+        }
       : phase === 'expired'
         ? { tone: 'warn' as const, label: '会话已过期' }
         : { tone: 'bad' as const, label: '会话创建失败' }
@@ -331,7 +372,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           chips={
             phase === 'loading'
               ? [
-                  { label: '正在等服务端回话' },
+                  { label: terminalSession === 'checking' ? '正在做终端安全校验' : '正在等服务端回话' },
                   { label: scanType ? `选中类型：${SCAN_TYPE_LABELS[scanType]}` : '未选择类型' },
                 ]
               : [

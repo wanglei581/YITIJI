@@ -278,7 +278,7 @@ function PrivacyClearingOverlay() {
 export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { logout, isLoggedIn, guestMode } = useAuth()
+  const { logout, isLoggedIn, guestMode, getToken } = useAuth()
   const kioskBusy = useKioskBusy()
   const busyRef = useRef(false)
   busyRef.current = kioskBusy
@@ -329,8 +329,10 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     returningWarningRef.current = false
 
     // 先 fail-closed 阻断交互；本地敏感状态同步清除，不等待网络。
+    // 传当前令牌：清掉本地扫描会话之前要先撤掉服务端那个还活着的扫描任务，
+    // 否则下一位用户在面板上按下扫描，文件会投给刚刚被清掉的这一位。
     setClearing(true)
-    clearKioskSensitiveSession()
+    clearKioskSensitiveSession(getToken())
     logout()
     const nextBoundary = establishPrivacyBoundary()
     pendingWarningRef.current = null
@@ -339,7 +341,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     // 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
     // 页面不可见时 rAF 不会到，兜底定时器负责把这一步执行掉（否则永久黑屏）。
     scheduleSanitizedDestination(nextBoundary, destination)
-  }, [claimClearing, establishPrivacyBoundary, logout])
+  }, [claimClearing, establishPrivacyBoundary, getToken, logout])
 
   const hardClear = useCallback(() => {
     clearSessionTo({ path: '/' })
@@ -360,7 +362,8 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     returningWarningRef.current = false
 
     setClearing(true)
-    clearKioskSensitiveSession()
+    // 同 hardClear：进屏保同样是「这一位用完了」，服务端扫描任务要跟着撤。
+    clearKioskSensitiveSession(getToken())
     logout()
     const nextBoundary = establishPrivacyBoundary()
     pendingWarningRef.current = null
@@ -371,7 +374,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
         privacyBoundary: nextBoundary,
       },
     })
-  }, [claimClearing, establishPrivacyBoundary, hardClear, logout, navigate])
+  }, [claimClearing, establishPrivacyBoundary, getToken, hardClear, logout, navigate])
 
   const startWarning = useCallback(
     (

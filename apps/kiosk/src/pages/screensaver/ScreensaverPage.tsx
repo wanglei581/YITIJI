@@ -18,7 +18,7 @@ import './screensaver-service-desk.css'
 export function ScreensaverPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { logout } = useAuth()
+  const { logout, getToken } = useAuth()
   const routeState = location.state as {
     playlist?: KioskScreensaverPlaylist
     privacyBoundary?: { token: string; minHistoryIndex: number; createdAt: number }
@@ -27,9 +27,11 @@ export function ScreensaverPage() {
   const privacyBoundary = routeState?.privacyBoundary
 
   useEffect(() => {
-    clearKioskSensitiveSession()
+    // 进屏保 = 这一位用完了。传当前令牌，本地扫描会话被清掉之前先撤服务端那个还活着的
+    // 扫描任务；否则下一位在面板上按下扫描，文件会投给刚离开的这一位。
+    clearKioskSensitiveSession(getToken())
     logout()
-  }, [logout])
+  }, [getToken, logout])
 
   const [items, setItems] = useState<KioskScreensaverItem[]>(statePlaylist?.items ?? [])
   const [enabled, setEnabled] = useState(statePlaylist ? statePlaylist.enabled : true)

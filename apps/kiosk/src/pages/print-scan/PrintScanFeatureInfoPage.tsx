@@ -31,7 +31,7 @@ import {
 import './styles/print-hub-qx.css'
 
 const PHOTO_FALLBACK = '/print/upload?source=document&tab=file&category=photo'
-const SCAN_FALLBACK = '/scan/start'
+const SCAN_FALLBACK = '/scan'
 
 function isIdPhoto(key: string | undefined): boolean {
   return key === 'id-photo'

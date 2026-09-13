@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { useAuth } from '../../auth/useAuth'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
+import { revokeLiveScanSession } from './scanSessionRevoke'
+import { clearScanWorkbenchSession } from './scanWorkbenchSession'
 import {
   SCAN_ASK,
   SCAN_CHAIN,
@@ -38,15 +41,24 @@ export function ScanWorkbenchShell({
   children: ReactNode
 }) {
   const navigate = useNavigate()
+  const { getToken } = useAuth()
   const ask = SCAN_ASK[state]
+  const leaveScanFlow = (): void => {
+    // 2026-09-13 起「离开」要连服务端一起收掉。此前这里只是 navigate：本机不再显示
+    // 这场扫描，服务端那个任务却还停在 waiting 等文件 —— 下一位用户走到面板前按下
+    // 扫描，文件会被投递给已经离开的这一位。撤销发不出去（断网 / 已终态）也不拦着走人。
+    revokeLiveScanSession(getToken())
+    clearScanWorkbenchSession()
+    navigate('/print-scan')
+  }
   return (
     <QxPageFrame
       /* 稿 18-scan-workbench 原文：data-route="/print-scan" aria-label="返回打印扫描"。
        *  一张工作台四个阶段共用这一个返回键，落点是打印扫描 Hub，不是「上一阶段」——
        *  稿就是这么画的：阶段之间用 CTA 前进/后退，顶栏返回是「离开这条流程」。
-       *  返回 ≠ 取消：扫描会话在服务端，离开这一屏不会终止它。
-       *  取消是 progress 阶段单独的动作（稿里 cancel-* 是独立状态）。 */
-      back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
+       *  离开整条流程会撤掉这次扫描会话（服务端任务 + 本机登记）；阶段之间来回走不会。
+       *  progress 阶段另有一个显式「取消扫描」，它等服务端回执再改判（稿里 cancel-* 是独立状态）。 */
+      back={{ label: '返回打印扫描', onBack: leaveScanFlow }}
       title={title}
       subtitle={subtitle}
       status={status}

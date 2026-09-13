@@ -498,7 +498,7 @@ export function PrintUploadPage() {
       onBack={() => navigate('/print-scan')}
       onExit={() => navigate(exitPath)}
       onHelp={() => navigate('/help')}
-      onScan={() => navigate('/scan/start')}
+      onScan={() => navigate('/scan')}
       onDocuments={() => {
         if (isLoggedIn) navigate('/me/documents')
         else navigate('/login', { state: { from: fromQuery } })

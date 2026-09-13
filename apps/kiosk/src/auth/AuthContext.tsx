@@ -38,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 只清别人的敏感会话：游客中途登录视为同一人继续办理，打印材料仍在。
     // 已登录会员换成另一个人时才清场。
     if (current && current.id !== next.id) {
-      clearKioskSensitiveSession()
+      // 换人：撤销服务端扫描任务必须用**上一位**的令牌（服务端按 endUserId 校验取消权限，
+      // 用新登录这位的令牌只会被 403 顶回来，旧任务原地存活）。
+      clearKioskSensitiveSession(current.token)
     }
     sessionExpiredRedirectingRef.current = false
     userRef.current = next
@@ -49,7 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     const token = userRef.current?.token ?? null
     sessionExpiredRedirectingRef.current = false
-    clearKioskSensitiveSession()
+    // 令牌上面刚从 userRef 取过：清空登录态之前把它交出去，
+    // 服务端扫描任务才撤得掉（401 过期链路走的也是这里）。
+    clearKioskSensitiveSession(token)
     // 游客本机收藏不能跟 login() 一起清，否则没机会合并到账号。
     clearKioskSharedDeviceResidue()
     // 先清本地状态，后端失败也不影响。

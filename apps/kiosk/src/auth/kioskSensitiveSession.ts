@@ -13,6 +13,7 @@ import {
   clearScanWorkbenchSession,
   SCAN_WORKBENCH_SESSION_KEY,
 } from '../pages/scan/scanWorkbenchSession'
+import { revokeLiveScanSession } from '../pages/scan/scanSessionRevoke'
 import {
   clearAllLocalFavorites,
   hasLocalFavorites,
@@ -38,13 +39,24 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
   SCAN_WORKBENCH_SESSION_KEY,
 ] as const
 
-export function clearKioskSensitiveSession(): void {
+/**
+ * 清掉本机这一位用户留下的敏感会话。
+ *
+ * @param outgoingMemberToken 正在失效的会员令牌（换人 / 退出 / 401 时是**旧**那一个，
+ *   游客为 null）。只用于在抹掉本地扫描会话之前撤销服务端那个还活着的扫描任务：
+ *   服务端按 endUserId 校验取消权限，用新用户的令牌发只会 403，旧任务照样等着
+ *   把下一次面板扫描的文件投给上一位用户。见 [scanSessionRevoke.ts]。
+ */
+export function clearKioskSensitiveSession(outgoingMemberToken?: string | null): void {
   clearContractReviewSession()
   clearPrintMaterialSession()
   clearAiResumeSession()
   clearJobMaterialDraft()
   clearSelfAssessmentSession()
   clearInterviewWorkbenchSession()
+  // 顺序不可调换：撤销要读本地登记的 scanTaskId / controlToken，
+  // clearScanWorkbenchSession() 一旦先跑，撤销就再也找不到要撤谁。
+  revokeLiveScanSession(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
 }
 

@@ -8,6 +8,7 @@ import { API_BASE_URL } from './client'
 import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
 import { notifySessionIfInvalid } from './throwHttpError'
+import { terminalProtectedFetch } from '../terminalAuth'
 
 interface ResponseEnvelope<T> {
   success?: boolean
@@ -21,7 +22,19 @@ function makeUrl(path: string): string {
 
 async function requestJson<T>(
   path: string,
-  init?: RequestInit & { token?: string | null; controlToken?: string | null },
+  init?: RequestInit & {
+    token?: string | null
+    controlToken?: string | null
+    /**
+     * 走终端身份闸门（`x-terminal-session-token` + 401 后单次换票重试）。
+     *
+     * 只有 `POST /scan/sessions` 需要：服务端在这个端点上挂了 `TerminalIdentityGuard`
+     * （scan-tasks.controller.ts），只带 `X-Terminal-Id` 会被 401 TERMINAL_SESSION_INVALID
+     * 顶回来。状态查询与取消没有这道闸门，也不能走它——终端会话未就绪时
+     * terminalProtectedFetch 直接抛 401，会让「取消一个已创建的任务」永远发不出去。
+     */
+    terminalProtected?: boolean
+  },
 ): Promise<T> {
   const token = init?.token
   const headers = new Headers(init?.headers)
@@ -37,9 +50,16 @@ async function requestJson<T>(
   if (terminalId) headers.set('X-Terminal-Id', terminalId)
 
   let res: Response
+  const request: RequestInit = { ...init, headers, credentials: 'include' }
   try {
-    res = await fetch(makeUrl(path), { ...init, headers, credentials: 'include' })
-  } catch {
+    res = init?.terminalProtected
+      ? await terminalProtectedFetch(makeUrl(path), request)
+      : await fetch(makeUrl(path), request)
+  } catch (error) {
+    // 终端身份闸门在会话未就绪时抛的是 ApiHttpError(TERMINAL_SESSION_INVALID, 401)，
+    // 那是一个明确的「请求根本没发出去」结论，不能被压成 NETWORK_ERROR/status 0——
+    // 后者在页面上表示「服务端可能已经收到，结果未知」，说反话会让用户不敢重试。
+    if (error instanceof ApiHttpError) throw error
     throw new ApiHttpError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
 
@@ -78,6 +98,7 @@ export function createScanSession(
   return requestJson<ScanSessionCreateResponse>('/scan/sessions', {
     method: 'POST',
     token,
+    terminalProtected: true,
     body: JSON.stringify(input),
   })
 }

@@ -103,7 +103,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
       onGoStage('settings')
       return
     }
-    navigate('/scan/settings', { state: retryState })
+    navigate('/scan?stage=settings', { state: retryState })
   }
 
   const handlePrint = () => {
