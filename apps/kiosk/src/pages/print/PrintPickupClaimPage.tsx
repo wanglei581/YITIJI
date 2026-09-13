@@ -8,7 +8,12 @@
 // 到机码规格：8 位纯数字（2026-08-18 方案 A 定案）。规格常量来自
 // @ai-job-print/shared 的 pickupCode —— 本页**不许再内联自己那份正则**，
 // 内联副本正是「小程序发一种长度、一体机收另一种长度」的事故来源。
-// 认领接口无需登录态（Kiosk = 可控设备层），后端 Throttle 20次/min/IP 防滥用。
+//
+// 鉴权口径：认领接口不要会员登录态，但**要终端身份** —— 后端 claim-pickup 由
+// TerminalIdentityGuard 把守（拿着别人的到机码在普通浏览器里核销、进而释放别人已付费的
+// 文件，是这道闸门挡的事）。因此必须走 terminalProtectedFetch，而不是裸 fetch：
+// 它统一补 x-terminal-id + x-terminal-session-token，并在会话票被拒时只刷新一次；
+// 刷新不通就直接失败，绝不拿刚被拒的旧票重放。后端另有 Throttle 20次/min/IP 防滥用。
 //
 // 过渡期：同时受理 10 位存量码。删除条件与后端一致（上线满 24h，到机码 TTL 到期）。
 // ============================================================
@@ -29,6 +34,7 @@ import {
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
+import { terminalProtectedFetch } from '../../services/terminalAuth'
 import './styles/pickup-claim-qx.css'
 import { KioskNumpad } from '../../components/kiosk-numpad/KioskNumpad'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
@@ -75,11 +81,13 @@ interface ClaimPickupResult {
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
 type GuideMode = 'keypad' | 'hid'
 
-// ── API 调用（无登录态，Kiosk 匿名层） ────────────────────────
+// ── API 调用（无会员登录态；终端身份由 terminalProtectedFetch 附带） ──
 async function claimPickup(code: string): Promise<ClaimPickupResult> {
   const terminalId = getTerminalId()
   if (!terminalId) throw new Error('终端身份尚未就绪，请稍后重试')
-  const res = await fetch(`${API_BASE_URL}/print/jobs/claim-pickup`, {
+  // x-terminal-id 仍显式写在这里：terminalProtectedFetch 会用 getTerminalId() 设同一个值，
+  // 但这一行是「本请求按哪台机器核销」的可读契约，也是跨端门禁的取证锚点，不省。
+  const res = await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/claim-pickup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-terminal-id': terminalId },
     body: JSON.stringify({ code }),

@@ -8,6 +8,10 @@ import { seedMaterialSession, setReactRouterState, writeMaterialSession, W2_FILE
 
 const NOW = '2026-07-24T00:00:00.000Z'
 const LATER = '2099-07-24T00:10:00.000Z'
+// playwright.w2.config.ts 的 webServer 用 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN 构建出这个值，
+// terminalAuth 在 E2E 构建下就拿它当终端会话票。下面的断言逐字对齐它，而不是只判非空 ——
+// 判非空的话，只要将来有谁往请求里塞了同名但无关的头，用例照样绿。
+const TERMINAL_SESSION_FIXTURE = 'playwright-terminal-session-fixture'
 
 function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[] {
   const errors: string[] = []
@@ -400,6 +404,84 @@ test('pickup hid invalid code shows the server error without fabricating success
   await expect(page.getByText('订单核验成功')).toHaveCount(0)
   await expect(page.getByTestId('arrival-code-state-hid')).toBeVisible()
   expect(claimCount).toBe(1)
+  expect(errors).toEqual([])
+})
+
+// ============================================================
+// 到机认领 / 释放的终端身份闸门
+//
+// 后端 claim-pickup 与 :orderId/release 都由 TerminalIdentityGuard 把守：认领一枚到机码
+// 会核销别人已付费的文件，释放会当场在本机创建打印任务并出纸 —— 这两件事只许在一台
+// 经服务端签发过会话票的机器上发生，光带一个可以随手编的 x-terminal-id 不算数。
+// 前台侧的判据就是「这两条请求必须经 terminalProtectedFetch 发出」。
+//
+// 本块钉认领两条；释放那条在下面收银段（Order-only release ...），
+// 另有一条钉 takeaway-url **不得**被一起升级成终端限定接口（在 print-done 段）。
+// ============================================================
+
+test('pickup claim carries the terminal session token, not just the terminal id @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('POST', '/api/v1/print/jobs/claim-pickup', {
+    status: 200,
+    json: {
+      released: false,
+      orderId: 'w2-terminal-auth-order',
+      orderNo: 'ORD-W2-TERMINAL-AUTH',
+      terminalId: 'KSK-001',
+      amountCents: 100,
+      priceLines: [],
+      paymentSessionToken: 'w2-terminal-auth-payment-session',
+    },
+  })
+  const claimRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST'
+      && new URL(request.url()).pathname === '/api/v1/print/jobs/claim-pickup',
+  )
+
+  await page.goto('/print/pickup-claim')
+  await page.getByLabel('到机码输入框').pressSequentially('12345678', { delay: 5 })
+  await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+
+  const claimHeaders = (await claimRequest).headers()
+  expect(
+    claimHeaders['x-terminal-session-token'],
+    '认领请求必须带服务端签发的终端会话票；裸 fetch 只会带上谁都能编的 x-terminal-id',
+  ).toBe(TERMINAL_SESSION_FIXTURE)
+  expect(claimHeaders['x-terminal-id']).toBe('KSK-001')
+  expect(errors).toEqual([])
+})
+
+test('a terminal-session 401 on claim never replays the rejected session @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  // 认领被判会话无效，续期也被拒 —— 这台机器的会话票是真的废了。
+  // 正确行为是当场诚实失败：既不能拿刚被拒的那张票把 claim 再打一遍（重放只会再被拒，
+  // 还白扣一次 20 次/min 的限流额度），也不能把它说成「到机码不对」让用户去重输码。
+  api.respond('POST', '/api/v1/print/jobs/claim-pickup', {
+    status: 401,
+    json: { error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+  })
+  api.respond('POST', '/api/v1/terminals/session-token/refresh', {
+    status: 401,
+    json: { error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+  })
+  const claimSessions: string[] = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== '/api/v1/print/jobs/claim-pickup') return
+    claimSessions.push(request.headers()['x-terminal-session-token'] ?? '')
+  })
+
+  await page.goto('/print/pickup-claim')
+  await page.getByLabel('到机码输入框').pressSequentially('87654321', { delay: 5 })
+
+  await expect(page.getByRole('alert')).toHaveText(/终端安全校验失败/)
+  await expect(page.getByText('订单核验成功')).toHaveCount(0)
+  // 恰好一次，且带的就是那张票：没有用旧票重放，也没有在续期失败后继续发请求。
+  expect(claimSessions).toEqual([TERMINAL_SESSION_FIXTURE])
+  expect(api.requestCount('POST', '/api/v1/terminals/session-token/refresh')).toBe(1)
   expect(errors).toEqual([])
 })
 
@@ -1080,6 +1162,51 @@ test('only a paid cashier response enters print progress @w2', async ({ page, ap
   await expectHealthy(page, errors, 'print-progress')
 })
 
+test('Order-only release carries the terminal session alongside the payment session @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  const releasedTaskId = 'w2-released-task-001'
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('paid') })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.orderId}/release`, {
+    status: 200,
+    json: {
+      released: true,
+      taskId: releasedTaskId,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      terminalId: 'KSK-001',
+      taskStatus: 'pending',
+      printTaskStatus: 'pending',
+      paymentSessionToken: W2_ORDER.paymentSessionToken,
+    },
+  })
+  api.respond('GET', `/api/v1/print/jobs/${releasedTaskId}`, {
+    status: 200,
+    json: { taskId: releasedTaskId, status: 'pending' },
+  })
+  const releaseRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST'
+      && new URL(request.url()).pathname === `/api/v1/print/jobs/${W2_ORDER.orderId}/release`,
+  )
+
+  await page.goto('/print/cashier')
+  // 小程序 Order-only 单在付款成功前没有 PrintTask —— 去掉 taskId 才会走 release 这条路。
+  await setReactRouterState(page, '/print/cashier', { ...cashierState, taskId: undefined })
+  await page.waitForURL('**/print/progress')
+
+  const releaseHeaders = (await releaseRequest).headers()
+  expect(
+    releaseHeaders['x-terminal-session-token'],
+    '释放会当场在本机建任务出纸，必须带服务端签发的终端会话票',
+  ).toBe(TERMINAL_SESSION_FIXTURE)
+  expect(releaseHeaders['x-terminal-id']).toBe('KSK-001')
+  // 终端身份是新增的一道闸门，不是替换：付款方身份仍由这张短期支付会话票证明。
+  expect(releaseHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)
+  await expectHealthy(page, errors, 'print-progress')
+})
+
 test('print polling reaches done and pickup code comes from the paid response @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -1125,6 +1252,55 @@ test('failed print status displays only the safe user reason and no pickup code 
   await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
   await expect(page.getByText('agent stack and local path must stay hidden')).toHaveCount(0)
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-done')
+})
+
+test('takeaway-url stays a payment-token recovery path with no terminal session requirement @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      failureReasonForUser: '打印机暂时离线，请联系现场工作人员',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/w2-takeaway',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: W2_ORDER.amountCents,
+      canRetry: false,
+    },
+  })
+  const takeawayRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST'
+      && new URL(request.url()).pathname === `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`,
+  )
+
+  await page.goto('/print/progress')
+  await setReactRouterState(page, '/print/progress', cashierState)
+  await page.waitForURL('**/print/done')
+  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+
+  const takeawayHeaders = (await takeawayRequest).headers()
+  expect(takeawayHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)
+  // 打印失败后「把文件带走」是这一单的兜底出口：用户可能已经离开机器、改用手机打开链接，
+  // 凭据只能是会员登录态或这张支付会话票。给它加终端会话要求等于把兜底路径也焊死在本机上，
+  // 打印机一坏就连文件都拿不走 —— 因此这条**必须**不带终端会话票。
+  expect(
+    takeawayHeaders['x-terminal-session-token'],
+    'takeaway-url 不得升级成终端限定接口，否则打印失败时用户拿不回自己已付费的文件',
+  ).toBeUndefined()
   await expectHealthy(page, errors, 'print-done')
 })
 
