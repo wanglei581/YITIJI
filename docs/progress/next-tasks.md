@@ -1,8 +1,33 @@
 # 下一步任务
 
+## 2026-09-13 扫描隐私 / 到机认证候选的收口顺序
+
+**当前总判定：LOCAL TESTED SOFTWARE PARTIAL，PRODUCTION / COMMERCIAL NO-GO。**
+候选为 `integration/scan-pickup-closeout-20260913@f957c8a96474f1389f6de42c27ae47d5c73823c8`，
+尚未合入 `main`、部署或做生产迁移。下面按判据完成，不能用 mock、CI 或旧真机证据互相替代。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 1 | API + Agent | 设计并实现安全的失败扫描重试能力；不得按同一用户、mtime、observedAt 或内容 hash 放宽 | 新扫描持有服务端签名重试能力（如 `retryOfScanTaskId + prior controlToken` 或消费 lease nonce）；旧文件不能重绑，合法相同字节重扫可成功；正常/失败/重放/跨用户用例及反向变异通过 |
+| 2 | Agent + Admin | 上报扫描输入 `healthy / locked_out / restart_required` 及原因、时间，后台可见且可审计 | 制造目录读取失败、目录身份变化和 watcher error 后，Agent 仍 fail-closed；Admin 能看到锁死状态，重启恢复有记录，不提供远程放宽隐私闸门 |
+| 2a | Claude / Kiosk | **已完成于 `f957c8a96`**：已放弃并撤销的扫描创建 Promise 永久失效，终端恢复不再把已取消任务写回成功态 | `creating -> terminal failed -> create late success -> revoke -> terminal ready` 与正常 `checking -> ready` 两条浏览器回归通过；完整扫描套件 33/33；删除闸门的反向变异退出码 1 |
+| 3 | API / PostgreSQL | 在最终候选 SHA 上跑两套 migration、partial index 与并发约束 | PostgreSQL 16 干净库和升级库均通过，索引/约束存在，并发 create/deliver/reap 无重复活跃任务或错绑 |
+| 4 | 集成 | 冻结新的单一候选 SHA，重跑 API/Kiosk/Agent 全套相关门禁和反向变异 | 工作区干净；所有检查绑定同一 SHA；Claude 最终确认所有 Kiosk 前端变化；至少一名独立安全 reviewer 给出可用报告且无 P0/P1 |
+| 5 | Windows / 奔图专用任务 | 同一 SHA 做面板扫描、打印、扫码枪、断网重连、Agent 重启和多用户连续操作 | 真实奔图 + Windows 逐项留任务/订单/文件 hash/状态回传/临时文件删除证据；旧文件不交给后来用户；锁死与恢复可观察 |
+| 6 | 产品负责人 + 运维 | 完成小程序、真实支付退款、内容授权、生产发布、回滚监控和客户 UAT | 小程序正式发布并打通到机码；真实支付/退款；jobs/job-fairs/policies 有授权内容且无演示数据；生产 provenance/健康/回滚通过；客户签字验收 |
+
+审查账本：Agy 对 `78fe3eb37` 的架构冷审为 GO；Claude 的前端 P1 已在 `3a087b5e2` 修复，后续前端冷审
+新增的 P2 已在 `f957c8a96` 修复；Hermes 对 `3a087b5e2` 为 `PARTIAL`，确认相同字节重扫和锁死遥测两个 P1。
+Grok 文档子审查已完成并确认文档陈旧，API/Agent 子审查仍为 `UNREVIEWED`；Agy 本轮重审为空输出。
+不得写成五模型一致通过。
+在第 1-4 项完成前不要合并为商用候选；第 5-6 项完成前不要发布商用结论。
+
 ## 2026-09-10 商业收口还差什么（给接手会话的判据，不是待办堆）
 
-**一句话：代码侧没有已知的上线阻塞了，卡住商用的是三件「只有产品负责人能做」的事 + 两件真机验收。**
+> 历史快照：该节形成于扫描隐私候选之前。当前优先级与判据以 2026-09-13 顶部清单为准；
+> 其中“代码侧没有已知上线阻塞”的旧结论已失效。
+
+**当时结论：代码侧没有已知的上线阻塞了，卡住商用的是三件「只有产品负责人能做」的事 + 两件真机验收。**
 
 ### 只有产品负责人能做（外部依赖，越早开始越好）
 

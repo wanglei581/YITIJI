@@ -1,5 +1,32 @@
 # 当前开发进度
 
+2026-09-13 **扫描隐私与到机认证候选完成集成，商业结论仍为 NO-GO**。隔离分支
+`integration/scan-pickup-closeout-20260913` 已冻结候选
+`f957c8a96474f1389f6de42c27ae47d5c73823c8`（基线
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`），工作区干净；候选尚未合入、部署或做生产迁移。
+本轮把扫描文件交付改成精确签名 lease / task 绑定，补齐取消与过期 waiting 回收、上传/签名失败孤儿补偿，
+并为扫描创建、到机认领和出纸释放补终端身份闸门；Kiosk 在终端票据续期窗口等待并使用轮换后的票据，
+Terminal Agent 对启动积压、目录身份变化、初始化代际和输入异常 fail-closed，进程内锁死不可逆。
+冻结 SHA 上 API 的 `verify:file-delete-consistency`、`verify:scan-tasks`、typecheck，Kiosk 的
+`verify:terminal-session-self-heal`、`verify:runtime-terminal-identity`、`verify:fusion-w2`、typecheck 与定向
+Playwright 3/3，Agent 的 `verify:scan-watcher`、`verify:scan-input-health`、
+`verify:scan-deletion-audit`、`verify:print-truth-hardening`、`verify:agent-unauthorized`、typecheck 均通过；
+三条反向变异能把对应防线判红。**证据边界**：最终 SHA 没有可用 PostgreSQL URL，PostgreSQL 专属部分索引/
+迁移复验未在该 SHA 上执行；未做 Windows/奔图、真实扫码枪、生产或真实多用户验收。
+
+独立复核不按模型票数算：Agy 对前一冻结点 `78fe3eb37` 给出 GO；Claude 随后发现 Kiosk E2E
+固定 mock ticket 不能证明轮换票据被使用，已在 `3a087b5e2` 修复并用反向变异判红；Hermes 对该冻结点给
+`PARTIAL`，未发现 P0，但确认两个 P1：同终端两小时内字节完全相同的合法重扫会被全局内容去重拒绝，
+以及 Agent 扫描输入锁死虽保护隐私，却没有心跳/后台可见性。安全重试不能按同一用户、mtime、observedAt
+或内容 hash 放宽，必须使用 `retryOfScanTaskId + prior controlToken`、消费 lease nonce，或等价的服务端签名
+重试能力。Claude 对前端另发现“已撤销的扫描创建 Promise 在终端会话恢复后被重新写成成功”的 P2；
+已由 Claude 在 `f957c8a96` 补不可逆丢弃闸门、正常换票反例与浏览器回归。Codex 在集成 SHA 上复验
+`verify:scan-session-truth`、`verify:fusion-w2`、运行时错误边界、原始错误渲染、Kiosk typecheck 和扫描浏览器
+套件 33/33 均通过；删除闸门的反向变异退出码为 1。Grok 文档子审查已完成并确认正式文档陈旧；Grok
+API/Agent 实现与审查线因工具错误、轮次耗尽、超时或零写入未形成可用结果，Agy 本轮重审为空输出，均记
+`UNREVIEWED`，不算批准。结论：**候选安全性显著优于基线，
+但在安全重试协议、锁死遥测、最终 SHA PostgreSQL、Windows/奔图、生产和业务验收完成前，仍不得称商用收口。**
+
 2026-09-10 **生产内容取证 + CI 基础设施解堵（分支 `project-bug-review-optimization-d9eafd` 调度线）**。三条对生产的实测结论，都带阳性对照：①**公开价目在对外播假价** —— 匿名 `GET /print/price-config` 回 `print_color_page unitCents=100` 而 `description="免费试运营：彩色打印 0 元/页"`。后果范围不夸大：Kiosk `PrintConfirmPage` 走 `unitCentsFor` 只读 `unitCents`，小程序各 wxml 无一处渲染价目描述，**当前无终端用户看到假价**；但该接口匿名可读，彩色一旦开通它就是链上第一个说错话的地方。已修（#1026 已合）：管理端原样返回、公开端只摘描述不动金额，判据抽成 `services/api/src/payment/price-description.ts` 供写入闸门与公开视图共用。②**找企业板块三条全是演示数据** —— `GET /companies` 回 3 条，名字全带「（演示）」、`sourceName` 为「市人社公共就业平台（演示）」、`openJobCount` 全 0；而一体机 `CompaniesPage` 与小程序 `pages/companies/companies.wxml:50` 都把 `name` 原样渲染，**这三个名字现在就显示在用户眼前**。`prisma/seed-guard.ts` 只拦新写入，拦不住已在库的行 —— 与①同形状（闸门管未来不管过去）。已把这项补进既有的 `scripts/prod-readonly-probe.mjs`（不另起脚本，#1032），判 WARN 而非 FAIL：演示数据是内容问题不是故障。③**小程序契约 60 个 GET 端点全部在线**（阳性对照：乱编路径回 `404 code:"Not Found"`、公开端点 200、需鉴权端点 `401 MEMBER_MISSING_TOKEN`，三种回法互不混淆），**零路由缺失**；但 `/jobs`、`/job-fairs`、`/policies` 三个板块 `total=0`，链路已逐环核到底：`app.json` 四 Tab 的「求职」→ `pages/jobs/jobs.js:48` 调 `api.getJobs()` → 生产回 0 → `jobs.wxml:73` 渲染「暂无岗位」，**小程序主 Tab 之一提审时是一张空页**。这不是新阻塞，是 BL-06 的具体后果与位置。另：**CI 被一个从不使用的第三方 apt 源判红** —— `dl.google.com` 索引 Hash Sum mismatch 使 `apt-get update` exit 100，连带 `postgres-readiness`、`kiosk-browser-smoke`（`playwright install --with-deps` 内部也跑 apt）整 job 起不来。做了对照实验排除「索引自愈」这个混淆：17:24:15 前的 apt 步骤全绿、之后全红，无修复分支两次尝试（17:32、17:38）3/3 红，有修复分支夹在中间（17:36）3/3 绿。**接手会话注意：main 现在是红的，但不是代码问题** —— 09-09 17:44~18:00 的四次 main CI （`ee536d26` `8751de56` `9df58808` `8cfb944d`）全红，逐个查过：**12 个失败 job 无一例外挂在那两个 apt 步骤，零条测试/门禁失败**。#1030 合入前，新合的提交也会照样红；别去追代码回归。已修（#1030）：三个碰 apt 的步骤前先摘掉这类源（`scripts/ci/drop-unused-apt-sources.sh`，删的是源清单不是已装的包，`channel:'chrome'` 那条用例不受影响）。判定 **PRODUCTION NO-GO 不变**，BL-06 仍是唯一理由。
 
 2026-09-10 **图片转 PDF 完成态不再用本机 token 声称已进「我的文档」（分支 `grok/convert-honest`）**。`POST /print/convert/images-to-pdf` 响应补 `hasEndUser: Boolean(endUserId)`（与打印链路同名）。结果页 chips / 「你现在没登录」只认 `typeof hasEndUser === 'boolean'`，缺省时第三格不渲染、两句都不说。`Retention` 仍按 `getToken()`——那是转换前规则说明，不是完成态声称。未 commit、未部署、未真机。
