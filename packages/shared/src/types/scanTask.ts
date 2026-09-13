@@ -38,6 +38,21 @@ export interface ScanSessionCreateRequest {
  * （15 分钟、绑定用户 + 终端 + 扫描类型 + 内容 hash + 上一场的 controlToken，CAS 消费一次）。
  * 带着它创建的新任务，且仅当投递的内容与上一场那份 hash 相同时，才被允许绕过去重一次。
  *
+ * ## 丢失响应的重放（一体机必须按这个接）
+ *
+ * `POST /scan/sessions` 一旦把 child waiting 任务提交成功，同一对
+ * `retryOfScanTaskId` + `X-Scan-Retry-Control`（同一用户 / 终端 / scanType）再发一次
+ * **必须拿回同一个 child**：`scanTaskId` 不变，`controlToken` 就是上一场那份明文
+ * （服务端把 child.controlTokenHash 写成 prior 的 hash，不落明文、不新铸）。
+ * 不会再消费一次授权，也不会再插第二条 child。waiting / matched 且未过期才恢复；
+ * 过期 / cancelled / failed / completed 回 409 `SCAN_RETRY_CHILD_NOT_RECOVERABLE`，
+ * 不许再开 grandchild。错 token / 用户 / 终端 / 类型一律 403
+ * `SCAN_RETRY_NOT_AUTHORIZED`，不泄露 child 是否存在。
+ *
+ * 一体机对「无法确认是否创建成功」的正确动作是：**再发同一对请求**，把 2xx 当成
+ * 同一场会话写进 live（`controlToken` 仍是 priorControlToken）。不要为此改发普通
+ * 创建。把 `SCAN_RETRY_CHILD_NOT_RECOVERABLE` 加进拒绝码表，与 403 一样永久丢弃授权。
+ *
  * ## 凭证的去向：只有 header，没有第二条路
  *
  * `priorControlToken` 是上一场任务的控制凭证明文。它**不得**进 body、不得进 query
@@ -64,6 +79,9 @@ export interface ScanRescanAuthorization {
  * `@Headers('x-scan-retry-control')` 读取（scan-tasks.controller.ts）。
  */
 export const SCAN_RETRY_CONTROL_HEADER = 'X-Scan-Retry-Control'
+
+/** 409：配对重扫的 child 已不在 waiting/matched，不能恢复，也不能再开第二条。 */
+export const SCAN_RETRY_CHILD_NOT_RECOVERABLE = 'SCAN_RETRY_CHILD_NOT_RECOVERABLE'
 
 export interface ScanSessionCreateResponse {
   scanTaskId: string

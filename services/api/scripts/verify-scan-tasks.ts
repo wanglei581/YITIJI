@@ -203,6 +203,27 @@ function assertRetryHardeningMigrationContracts(apiRoot: string): void {
   )
 }
 
+function assertRetryCreateRecoversLostResponse(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async create(')
+  const end = source.indexOf('async getStatus(')
+  assert.ok(start >= 0 && end > start, 'create() must exist in scan-tasks.service.ts')
+  const body = stripTypeScriptComments(source.slice(start, end))
+  const required = [
+    'recoverRetryChildIfPresent',
+    'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+    'RetryCreateRaceError',
+    'childControlTokenHash = prior.controlTokenHash',
+    'controlToken: args.retryControlToken',
+  ]
+  for (const needle of required) {
+    assert.ok(
+      body.includes(needle),
+      `create() lost-response recovery must keep ${needle}`
+    )
+  }
+}
+
 function assertDeliverScanFileRequiresBidirectionalLineage(apiRoot: string): void {
   const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
   const start = source.indexOf('async deliverScanFile')
@@ -389,6 +410,7 @@ function statusMatches(current: string, matcher: StatusMatcher): boolean {
 
 class FakePrisma {
   private seq = 1
+  private txMutex: Promise<void> = Promise.resolve()
   readonly scanTasksById = new Map<string, StoredScanTask>()
   readonly filesById = new Map<string, StoredFileObject>()
   readonly terminals = new Map<
@@ -444,11 +466,36 @@ class FakePrisma {
     },
   }
 
-  readonly $transaction = async <T>(callback: (tx: this) => Promise<T>): Promise<T> =>
-    callback(this)
+  readonly $transaction = async <T>(callback: (tx: this) => Promise<T>): Promise<T> => {
+    let release!: () => void
+    const previous = this.txMutex
+    this.txMutex = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    try {
+      return await callback(this)
+    } finally {
+      release()
+    }
+  }
 
   readonly scanTask = {
     create: async ({ data }: { data: Partial<StoredScanTask> }) => {
+      if (data.retryOfScanTaskId) {
+        for (const existing of this.scanTasksById.values()) {
+          if (existing.retryOfScanTaskId === data.retryOfScanTaskId) {
+            throw new Prisma.PrismaClientKnownRequestError(
+              'Unique constraint failed on the fields: (`retryOfScanTaskId`)',
+              {
+                code: 'P2002',
+                clientVersion: 'verify-scan-tasks-fixture',
+                meta: { target: ['retryOfScanTaskId'] },
+              }
+            )
+          }
+        }
+      }
       const id = `scan_${this.seq++}`
       const now = new Date()
       const record: StoredScanTask = {
@@ -1410,18 +1457,29 @@ async function assertRealDbRetryCreateAtomicity(dbUrl: string): Promise<void> {
       (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof serviceA.create>>> =>
         result.status === 'fulfilled'
     )
-    assert.equal(winners.length, 1, 'real DB: two concurrent retry creates must have one winner')
-    const loser = results.find((result) => result.status === 'rejected') as PromiseRejectedResult
-    assert.ok(loser, 'real DB: two concurrent retry creates must have one rejected loser')
-    assert.ok(
-      loser.reason instanceof ForbiddenException || loser.reason instanceof ConflictException,
-      'real DB: concurrent retry loser must be a controlled authorization/conflict response'
-    )
+    assert.ok(winners.length >= 1, 'real DB: at least one concurrent retry create must succeed')
+    const childId = winners[0].value.scanTaskId
+    for (const winner of winners) {
+      assert.equal(
+        winner.value.scanTaskId,
+        childId,
+        'real DB: concurrent retry creates must recover the same child'
+      )
+      assert.equal(
+        winner.value.controlToken,
+        prior.controlToken,
+        'real DB: retry child control token must be the prior token'
+      )
+    }
+    const replay = await request(serviceA)
+    assert.equal(replay.scanTaskId, childId, 'real DB: lost-response replay must return the same child')
+    assert.equal(replay.controlToken, prior.controlToken)
+    assert.equal(replay.expiresAt, winners[0].value.expiresAt, 'real DB: replay must not extend child TTL')
     const rows = await setupClient.scanTask.findMany({ where: { terminalId } })
     assert.equal(rows.length, 2, 'real DB: authority plus exactly one retry task must persist')
     const authority = rows.find((row) => row.id === prior.scanTaskId)!
     assert.ok(authority.retryConsumedAt)
-    assert.equal(authority.retryConsumedByScanTaskId, winners[0].value.scanTaskId)
+    assert.equal(authority.retryConsumedByScanTaskId, childId)
 
     // Force the post-consumption create to fail on the active-session index. The transaction
     // must roll back the authority consumption instead of leaving a consumed orphan.
@@ -1986,6 +2044,7 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
 async function main(): Promise<void> {
   const apiRootForContracts = path.resolve(__dirname, '..')
   assertRetryHardeningMigrationContracts(apiRootForContracts)
+  assertRetryCreateRecoversLostResponse(apiRootForContracts)
   assertDeliverScanFileRequiresBidirectionalLineage(apiRootForContracts)
 
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
@@ -2013,6 +2072,16 @@ async function main(): Promise<void> {
     )
     assert.equal(retryRow.retryOfScanTaskId, prior.scanTaskId)
     assert.equal(retryRow.retryContentHash, createHash('sha256').update(bytes).digest('hex'))
+    assert.equal(
+      retry.controlToken,
+      prior.controlToken,
+      'retry child must reuse the prior control token so a lost 2xx can be recovered'
+    )
+    assert.equal(
+      retryRow.controlTokenHash,
+      priorRow.controlTokenHash,
+      'retry child must store the prior control-token hash, never a second plaintext'
+    )
 
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
@@ -2146,6 +2215,64 @@ async function main(): Promise<void> {
       null,
       prior.controlToken
     )
+    const lostResponseReplay = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    assert.equal(
+      lostResponseReplay.scanTaskId,
+      firstRetry.scanTaskId,
+      'lost-response replay must return the exact same child task'
+    )
+    assert.equal(
+      lostResponseReplay.controlToken,
+      prior.controlToken,
+      'lost-response replay must return the prior control token as the child credential'
+    )
+    assert.equal(
+      lostResponseReplay.expiresAt,
+      firstRetry.expiresAt,
+      'lost-response replay must not extend the child TTL'
+    )
+    assert.equal(
+      [...prisma.scanTasksById.values()].filter((task) => task.retryOfScanTaskId === prior.scanTaskId)
+        .length,
+      1,
+      'lost-response replay must not insert a second child'
+    )
+
+    const polled = await service.getStatus(firstRetry.scanTaskId, null, prior.controlToken)
+    assert.equal(polled.scanTaskId, firstRetry.scanTaskId)
+    assert.equal(polled.status, 'waiting')
+
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.status = 'matched'
+    const matchedReplay = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    assert.equal(
+      matchedReplay.scanTaskId,
+      firstRetry.scanTaskId,
+      'waiting/matched response-loss recovery must include matched children'
+    )
+
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.status = 'waiting'
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.expiresAt = new Date(Date.now() - 1)
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          null,
+          prior.controlToken
+        ),
+      ConflictException,
+      'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+      'expired waiting child recovery must fail closed'
+    )
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.expiresAt = new Date(Date.now() + 60_000)
+
     prisma.scanTasksById.get(firstRetry.scanTaskId)!.status = 'cancelled'
     await expectRejectCode(
       () =>
@@ -2154,14 +2281,21 @@ async function main(): Promise<void> {
           null,
           prior.controlToken
         ),
-      ForbiddenException,
-      'SCAN_RETRY_NOT_AUTHORIZED',
-      'consumed authority replay'
+      ConflictException,
+      'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+      'consumed authority with a terminal child must fail closed'
+    )
+    assert.equal(
+      [...prisma.scanTasksById.values()].filter((task) => task.retryOfScanTaskId === prior.scanTaskId)
+        .length,
+      1,
+      'dead-child replay must not start a grandchild or second child'
     )
   }
 
   {
-    // Two parallel consumers of one authority: the CAS permits exactly one winner.
+    // Two parallel consumers of one authority: CAS still has one writer, but the
+    // loser must recover the same child instead of 403-ing a lost inbox.
     const { service, prisma } = makeService()
     const prior = await service.create(dto, 'member_parallel')
     makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
@@ -2182,13 +2316,154 @@ async function main(): Promise<void> {
         result.status === 'fulfilled'
     )
     const rejected = results.filter((result) => result.status === 'rejected')
-    assert.equal(fulfilled.length, 1, 'parallel retry authority consumption must have one winner')
-    assert.equal(rejected.length, 1, 'parallel retry authority consumption must have one loser')
+    assert.equal(fulfilled.length, 2, 'parallel retry creates must both return the single child')
+    assert.equal(rejected.length, 0, 'parallel retry loser must recover, not reject')
+    assert.equal(fulfilled[0].value.scanTaskId, fulfilled[1].value.scanTaskId)
+    assert.equal(fulfilled[0].value.controlToken, prior.controlToken)
+    assert.equal(fulfilled[1].value.controlToken, prior.controlToken)
     assert.equal(
       prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedByScanTaskId,
       fulfilled[0].value.scanTaskId,
-      'authority must link to the sole parallel winner'
+      'authority must link to the sole parallel child'
     )
+    assert.equal(
+      [...prisma.scanTasksById.values()].filter((task) => task.retryOfScanTaskId === prior.scanTaskId)
+        .length,
+      1,
+      'parallel retry creates must persist exactly one child'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_a')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_a',
+      prior.controlToken
+    )
+    const isolation = [
+      {
+        label: 'wrong prior token',
+        owner: 'member_a' as string | null,
+        dto: { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        token: 'wrong-token',
+      },
+      {
+        label: 'member-to-member owner mismatch',
+        owner: 'member_b' as string | null,
+        dto: { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+      {
+        label: 'member authority used as guest',
+        owner: null,
+        dto: { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+      {
+        label: 'cross-terminal retry',
+        owner: 'member_a' as string | null,
+        dto: { scanType: 'document' as const, terminalId: 't_2', retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+      {
+        label: 'mismatched scan type',
+        owner: 'member_a' as string | null,
+        dto: { scanType: 'resume' as const, terminalId: 't_1', retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+    ]
+    for (const testCase of isolation) {
+      await expectRejectCode(
+        () => service.create(testCase.dto, testCase.owner, testCase.token),
+        ForbiddenException,
+        'SCAN_RETRY_NOT_AUTHORIZED',
+        `${testCase.label}: must not discover or recover the child`
+      )
+    }
+    assert.equal(
+      prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedByScanTaskId,
+      child.scanTaskId
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_plain')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const unsigned = await service.create(dto, 'member_plain')
+    assert.notEqual(unsigned.scanTaskId, prior.scanTaskId)
+    assert.notEqual(
+      unsigned.controlToken,
+      prior.controlToken,
+      'plain create must keep minting a fresh control token'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(unsigned.scanTaskId)?.retryOfScanTaskId,
+      null,
+      'plain create must never obtain retry lineage or dedup exemption'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_reverse')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_reverse',
+      prior.controlToken
+    )
+    const access = service as unknown as {
+      recoverRetryChildIfPresent: (...args: unknown[]) => Promise<unknown>
+    }
+    const originalRecover = access.recoverRetryChildIfPresent.bind(service)
+    access.recoverRetryChildIfPresent = async () => null
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          'member_reverse',
+          prior.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'reverse mutation: dropping recoverRetryChildIfPresent must fail closed on replay'
+    )
+    access.recoverRetryChildIfPresent = originalRecover
+    const restored = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_reverse',
+      prior.controlToken
+    )
+    assert.equal(restored.scanTaskId, child.scanTaskId)
+  }
+
+  {
+    for (const deadStatus of ['failed', 'expired', 'completed'] as const) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, 'member_dead')
+      makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+      const child = await service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_dead',
+        prior.controlToken
+      )
+      prisma.scanTasksById.get(child.scanTaskId)!.status = deadStatus
+      await expectRejectCode(
+        () =>
+          service.create(
+            { ...dto, retryOfScanTaskId: prior.scanTaskId },
+            'member_dead',
+            prior.controlToken
+          ),
+        ConflictException,
+        'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+        `${deadStatus} child recovery must fail closed`
+      )
+    }
   }
 
   {

@@ -94,6 +94,26 @@ export const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
 export const SCAN_RETRY_AUTHORITY_TTL_MS = 15 * 60 * 1000
 
 const SCAN_RETRY_ELIGIBLE_STATUSES = ['failed', 'cancelled', 'expired'] as const
+const SCAN_RETRY_RECOVERABLE_CHILD_STATUSES = ['waiting', 'matched'] as const
+
+/**
+ * First-time retry create lost the race on consume/link. The caller must try
+ * to recover an already-committed child rather than mint a second authority.
+ * Not an HTTP exception — must not leak out of create().
+ */
+class RetryCreateRaceError extends Error {
+  constructor() {
+    super('SCAN_RETRY_CREATE_RACE')
+    this.name = 'RetryCreateRaceError'
+  }
+}
+
+type ScanRetryCreateResult = {
+  scanTaskId: string
+  controlToken: string
+  expiresAt: string
+  instructions: string[]
+}
 
 /**
  * 观察时间未来容差（5 秒）。
@@ -243,12 +263,7 @@ export class ScanTasksService {
     dto: CreateScanTaskDto,
     endUserId: string | null,
     retryControlToken?: string
-  ): Promise<{
-    scanTaskId: string
-    controlToken: string
-    expiresAt: string
-    instructions: string[]
-  }> {
+  ): Promise<ScanRetryCreateResult> {
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
@@ -275,12 +290,6 @@ export class ScanTasksService {
     // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'scan')
 
-    // 与 mock-interview.service.ts / materials.service.ts 的匿名 accessToken 同款惯例：
-    // randomBytes(24) 铸 192-bit 随机 token，DB 只存 sha256 hash，明文只在本次响应里返回一次。
-    const controlToken = randomBytes(24).toString('hex')
-    const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
-
-    const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
     const retryOfScanTaskId = dto.retryOfScanTaskId?.trim() || undefined
     if (!retryOfScanTaskId && retryControlToken) {
       throw new BadRequestException({
@@ -293,6 +302,32 @@ export class ScanTasksService {
     if (retryOfScanTaskId && !retryControlToken) {
       this.throwRetryNotAuthorized()
     }
+
+    // Lost-response replay: a paired retry whose child already committed must
+    // return that same child and the prior control token. Do this before the
+    // first-time CAS so a second POST never consumes a second authority.
+    if (retryOfScanTaskId && retryControlToken) {
+      const recovered = await this.recoverRetryChildIfPresent({
+        retryOfScanTaskId,
+        retryControlToken,
+        endUserId,
+        terminalId: terminal.id,
+        scanType: dto.scanType,
+      })
+      if (recovered) return recovered
+    }
+
+    // Plain create: mint a new 192-bit token (hash only in DB).
+    // Retry create: reuse the prior token as the child's control credential so a
+    // lost 2xx can be recovered from the same header the client already holds.
+    // Scope is still scanTaskId + hash; TTL is the child's expiresAt, not extended
+    // on replay. The prior row is already terminal, so the secret now names the child.
+    const controlToken =
+      retryOfScanTaskId && retryControlToken
+        ? retryControlToken
+        : randomBytes(24).toString('hex')
+    const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
+    const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
 
     let task: { id: string }
     try {
@@ -312,23 +347,29 @@ export class ScanTasksService {
 
         let retryContentHash: string | null = null
         let retryConsumedAt: Date | null = null
+        let childControlTokenHash = controlTokenHash
         if (retryOfScanTaskId) {
           const prior = await tx.scanTask.findUnique({ where: { id: retryOfScanTaskId } })
+          this.assertRetryIdentity(
+            prior,
+            endUserId,
+            terminal.id,
+            dto.scanType,
+            retryControlToken
+          )
+          if (!prior) this.throwRetryNotAuthorized()
+          if (prior.retryConsumedAt) {
+            throw new RetryCreateRaceError()
+          }
           const retryConsumedAtCandidate = new Date()
           if (
-            !prior ||
-            prior.endUserId !== endUserId ||
-            prior.terminalId !== terminal.id ||
-            prior.scanType !== dto.scanType ||
             !SCAN_RETRY_ELIGIBLE_STATUSES.includes(
               prior.status as (typeof SCAN_RETRY_ELIGIBLE_STATUSES)[number]
             ) ||
             !prior.retryAuthorityExpiresAt ||
             prior.retryAuthorityExpiresAt.getTime() <= retryConsumedAtCandidate.getTime() ||
             prior.fileId !== null ||
-            !prior.lastAttemptHash ||
-            prior.retryConsumedAt ||
-            !timingSafeEqualHex(retryControlToken, prior.controlTokenHash)
+            !prior.lastAttemptHash
           ) {
             this.throwRetryNotAuthorized()
           }
@@ -350,9 +391,10 @@ export class ScanTasksService {
             data: { retryConsumedAt },
           })
           if (consumed.count !== 1) {
-            this.throwRetryNotAuthorized()
+            throw new RetryCreateRaceError()
           }
           retryContentHash = prior.lastAttemptHash
+          childControlTokenHash = prior.controlTokenHash!
         }
 
         const created = await tx.scanTask.create({
@@ -361,7 +403,7 @@ export class ScanTasksService {
             scanType: dto.scanType,
             endUserId,
             expiresAt,
-            controlTokenHash,
+            controlTokenHash: childControlTokenHash,
             retryOfScanTaskId: retryOfScanTaskId ?? null,
             retryContentHash,
           },
@@ -373,17 +415,31 @@ export class ScanTasksService {
             data: { retryConsumedByScanTaskId: created.id },
           })
           if (linked.count !== 1) {
-            throw new ConflictException({
-              error: {
-                code: 'SCAN_RETRY_CONFLICT',
-                message: '重扫授权状态已变化，请重新发起扫描',
-              },
-            })
+            throw new RetryCreateRaceError()
           }
         }
         return created
       })
     } catch (e) {
+      if (
+        retryOfScanTaskId &&
+        retryControlToken &&
+        (e instanceof RetryCreateRaceError ||
+          isScanRetryLineageConflict(e) ||
+          isScanRetryTransactionConflict(e))
+      ) {
+        const recovered = await this.recoverRetryChildIfPresent({
+          retryOfScanTaskId,
+          retryControlToken,
+          endUserId,
+          terminalId: terminal.id,
+          scanType: dto.scanType,
+        })
+        if (recovered) return recovered
+        if (e instanceof RetryCreateRaceError) {
+          this.throwRetryNotAuthorized()
+        }
+      }
       if (retryOfScanTaskId && isScanRetryLineageConflict(e)) {
         throw new ConflictException({
           error: {
@@ -420,11 +476,103 @@ export class ScanTasksService {
     }
   }
 
+  /**
+   * Recover a committed retry child after a lost 2xx / concurrent loser.
+   *
+   * Identity failure (wrong token/user/terminal/type, missing prior) is always
+   * 403 SCAN_RETRY_NOT_AUTHORIZED — no oracle that a child exists.
+   * A proven owner whose child is gone or terminal is 409 SCAN_RETRY_CHILD_NOT_RECOVERABLE.
+   * Not-yet-consumed authority returns null so the caller can CAS-create.
+   */
+  private async recoverRetryChildIfPresent(args: {
+    retryOfScanTaskId: string
+    retryControlToken: string
+    endUserId: string | null
+    terminalId: string
+    scanType: string
+  }): Promise<ScanRetryCreateResult | null> {
+    const prior = await this.prisma.scanTask.findUnique({
+      where: { id: args.retryOfScanTaskId },
+    })
+    this.assertRetryIdentity(
+      prior,
+      args.endUserId,
+      args.terminalId,
+      args.scanType,
+      args.retryControlToken
+    )
+    if (!prior) this.throwRetryNotAuthorized()
+    if (!prior.retryConsumedAt) return null
+    if (!prior.retryConsumedByScanTaskId) return null
+
+    const child = await this.prisma.scanTask.findUnique({
+      where: { id: prior.retryConsumedByScanTaskId },
+    })
+    if (
+      !child ||
+      child.retryOfScanTaskId !== prior.id ||
+      child.endUserId !== args.endUserId ||
+      child.terminalId !== args.terminalId ||
+      child.scanType !== args.scanType ||
+      child.retryContentHash !== prior.lastAttemptHash ||
+      !timingSafeEqualHex(args.retryControlToken, child.controlTokenHash)
+    ) {
+      this.throwRetryChildNotRecoverable()
+    }
+    if (
+      !SCAN_RETRY_RECOVERABLE_CHILD_STATUSES.includes(
+        child.status as (typeof SCAN_RETRY_RECOVERABLE_CHILD_STATUSES)[number]
+      ) ||
+      child.expiresAt.getTime() <= Date.now()
+    ) {
+      this.throwRetryChildNotRecoverable()
+    }
+
+    return {
+      scanTaskId: child.id,
+      controlToken: args.retryControlToken,
+      expiresAt: child.expiresAt.toISOString(),
+      instructions: SCAN_TYPE_INSTRUCTIONS[args.scanType as ScanType],
+    }
+  }
+
+  private assertRetryIdentity(
+    prior: {
+      endUserId: string | null
+      terminalId: string
+      scanType: string
+      controlTokenHash: string | null
+    } | null,
+    endUserId: string | null,
+    terminalId: string,
+    scanType: string,
+    retryControlToken: string | undefined
+  ): void {
+    if (
+      !prior ||
+      prior.endUserId !== endUserId ||
+      prior.terminalId !== terminalId ||
+      prior.scanType !== scanType ||
+      !timingSafeEqualHex(retryControlToken, prior.controlTokenHash)
+    ) {
+      this.throwRetryNotAuthorized()
+    }
+  }
+
   private throwRetryNotAuthorized(): never {
     throw new ForbiddenException({
       error: {
         code: 'SCAN_RETRY_NOT_AUTHORIZED',
         message: '重扫授权无效、已过期或已使用',
+      },
+    })
+  }
+
+  private throwRetryChildNotRecoverable(): never {
+    throw new ConflictException({
+      error: {
+        code: 'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+        message: '重扫任务已结束，无法恢复该次安全重扫',
       },
     })
   }
