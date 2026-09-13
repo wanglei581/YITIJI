@@ -43,13 +43,22 @@ export function ScanWorkbenchShell({
   const navigate = useNavigate()
   const { getToken } = useAuth()
   const ask = SCAN_ASK[state]
-  const leaveScanFlow = (): void => {
-    // 2026-09-13 起「离开」要连服务端一起收掉。此前这里只是 navigate：本机不再显示
-    // 这场扫描，服务端那个任务却还停在 waiting 等文件 —— 下一位用户走到面板前按下
-    // 扫描，文件会被投递给已经离开的这一位。撤销发不出去（断网 / 已终态）也不拦着走人。
+  /**
+   * 离开整条扫描流程。四个阶段、四个出口（顶栏返回 + 底栏三项主导航）共用这一条。
+   *
+   * 2026-09-13 起「离开」要连服务端一起收掉。此前这里只是 navigate：本机不再显示
+   * 这场扫描，服务端那个任务却还停在 waiting 等文件 —— 下一位用户走到面板前按下
+   * 扫描，文件会被投递给已经离开的这一位。撤销发不出去（断网 / 已终态）也不拦着走人。
+   *
+   * 底栏三项当天只做了 `navigate(...)`：顶栏返回收得干干净净，而按「首页 / AI 顾问 /
+   * 我的」离开的用户，服务端任务和本机登记**两样都留在原地**——同一屏上两个出口
+   * 两种命运。所以出口有几个不重要，离开的语义只能有一份：一律
+   * 撤服务端 → 清本机登记 → 走人，只有落点不同。
+   */
+  const leaveScanFlow = (destination: string): void => {
     revokeLiveScanSession(getToken())
     clearScanWorkbenchSession()
-    navigate('/print-scan')
+    navigate(destination)
   }
   return (
     <QxPageFrame
@@ -58,17 +67,19 @@ export function ScanWorkbenchShell({
        *  稿就是这么画的：阶段之间用 CTA 前进/后退，顶栏返回是「离开这条流程」。
        *  离开整条流程会撤掉这次扫描会话（服务端任务 + 本机登记）；阶段之间来回走不会。
        *  progress 阶段另有一个显式「取消扫描」，它等服务端回执再改判（稿里 cancel-* 是独立状态）。 */
-      back={{ label: '返回打印扫描', onBack: leaveScanFlow }}
+      back={{ label: '返回打印扫描', onBack: () => leaveScanFlow('/print-scan') }}
       title={title}
       subtitle={subtitle}
       status={status}
       terminalLabel={scanTerminalLabel()}
       ctabar={ctabar}
       navbar={
+        /* 底栏三项也是「离开整条扫描流程」，不是页内切换：走同一条 leaveScanFlow，
+         *  只有落点不同。任何一个改回裸 navigate，这一屏就又会留下孤儿任务。 */
         <QxAppNavbar
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
+          onHome={() => leaveScanFlow('/')}
+          onAdvisor={() => leaveScanFlow('/assistant')}
+          onProfile={() => leaveScanFlow('/profile')}
         />
       }
     >

@@ -754,6 +754,100 @@ test('hard clear revokes a created scan settings session @privacy-kiosk', async 
   expect(cancelRequests).toBe(1)
 })
 
+// 上一条的盲区：那条里创建**早就回来了**，本机登记里有 live，撤销读得到要撤谁。
+// 真正会漏的是「创建还在飞的时候到点清场」——那一刻本机登记里什么都没有，
+// revokeLiveScanSession 无从读起，只能把本地那份抹掉；等响应回来，旧代码照旧
+// patch 回一份 live，于是**刚被清掉那一位的收件箱又被立了起来**：
+// 服务端任务停在 waiting，下一位在面板上按下扫描，文件就投给了上一位。
+//
+// 这条路径在 headless 里默认走不到：清场的恢复动作挂在 rAF 上，一帧（约 16ms）之后
+// 整页就重载了，响应根本来不及在同一个文档里落地。所以这里照 rAF 那条用例的办法，
+// 把 rAF 停掉让恢复退到 250ms 兜底定时器 —— 唯一的变量是「响应落在清场之后」，
+// 其余与真机一致。
+test('a scan session created after the privacy clear is revoked and never written back @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  const revokeHeaders: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'DELETE') return
+    if (new URL(request.url()).pathname !== `/api/v1/scan/sessions/${SCAN_TASK_ID}`) return
+    revokeHeaders.push(request.headers())
+  })
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+
+  let markCreateReceived: (() => void) | undefined
+  const createReceived = new Promise<void>((resolve) => { markCreateReceived = resolve })
+  let releaseCreate: (() => void) | undefined
+  const createReleased = new Promise<void>((resolve) => { releaseCreate = resolve })
+  await routeExact(page, 'POST', '/api/v1/scan/sessions', async (route) => {
+    markCreateReceived?.()
+    await createReleased
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          scanTaskId: SCAN_TASK_ID,
+          controlToken: SCAN_CONTROL_TOKEN,
+          status: 'waiting',
+          scanType: 'resume',
+          instructions: ['请在本机放好材料，并按设备面板指引开始扫描。'],
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        },
+      }),
+    })
+  })
+
+  await page.goto('/scan')
+  await page.evaluate(() => {
+    window.history.replaceState({ usr: { scanType: 'resume' }, key: 'privacy-scan-inflight', idx: 0 }, '', '/scan?stage=settings')
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await createReceived
+  await expect(page.getByText('正在创建扫描任务', { exact: true }).first()).toBeVisible()
+  expect(revokeHeaders).toHaveLength(0)
+
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'requestAnimationFrame', { configurable: true, value: () => 0 })
+  })
+
+  // 清场遮罩一挂上就放行响应：此刻本机登记已经被抹掉、代次已经推进，
+  // 而文档还活着（重载还在 250ms 兜底定时器上）。
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate(
+        () => document.querySelector('[data-kiosk-privacy-clearing="true"]') !== null,
+      )
+    } catch {
+      return false
+    }
+  }, { intervals: [25], timeout: 30_000 }).toBe(true)
+  releaseCreate?.()
+
+  // 1) 迟到的响应把任务撤掉了，且只撤一次，带的是响应里那份控制凭证
+  //    （本机登记已经没了，凭证只可能来自响应本身）。
+  await expect.poll(() => revokeHeaders.length).toBe(1)
+  expect(revokeHeaders[0]?.['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+
+  // 2) 清场落地之后，本机登记里不得再出现这一场扫描。sessionStorage 跨重载仍在，
+  //    所以这条断言在重载之后依然查得出「有没有被写回去」。
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 10_000 })
+  // 清场的最后一步是整页重载：这一刻读 sessionStorage 可能撞上「执行上下文已销毁」。
+  // 那是导航时序，不是结论 —— 重试到读得出为止（同 readDocumentMarker 的处理）。
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate(
+        () => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'),
+      )
+    } catch {
+      return 'navigation-in-progress'
+    }
+  }, { timeout: 10_000 }).toBeNull()
+})
+
 test('hard clear stops active print polling without cancelling the backend task @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
   let pollRequests = 0
@@ -1383,6 +1477,40 @@ test('结束使用 revokes the scan task with the outgoing member token @privacy
   api.respond('GET', '/api/v1/me/benefits', {
     status: 200,
     json: { success: true, data: { items: [], total: 0 } },
+  })
+  // 「我的」主行动按账号数据分叉，「结束使用」只出现在**有账号数据可清**的那一支：
+  //   · /me/pending-tasks 读不到 → error 态，CTA 是「重新加载」；
+  //   · 六项资产计数全为 0 且没有待办 → empty 态，CTA 是「回首页选服务」。
+  // 两种都走不到本用例要测的那一步。所以这里给一条真实形状的待办（空列表）
+  // 和一份已保存文档：这位会员**确实有东西要清**，正是「结束使用」该出现的场景。
+  api.respond('GET', '/api/v1/me/pending-tasks', {
+    status: 200,
+    json: { success: true, data: [] },
+  })
+  api.respond('GET', '/api/v1/me/documents', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [{
+          id: 'privacy-logout-doc-1',
+          filename: '求职证明.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 12000,
+          purpose: 'print_doc',
+          sensitiveLevel: 'normal',
+          assetCategory: 'original',
+          retentionPolicy: 'months_3',
+          allowedRetentionPolicies: ['months_3', 'months_6'],
+          createdAt: '2098-03-01T00:00:00.000Z',
+          expiresAt: '2099-03-01T00:00:00.000Z',
+          downloadUrlPath: '/files/privacy-logout-doc-1/download',
+          previewUrlPath: '/files/privacy-logout-doc-1/preview',
+        }],
+        nextCursor: null,
+        total: 1,
+      },
+    },
   })
   api.respond('POST', '/api/v1/member/auth/logout', {
     status: 200,

@@ -31,7 +31,9 @@ import { readScanWorkbenchSession, type ScanLiveState } from './scanWorkbenchSes
  *
  * 模块级：一次页面生命周期内每个任务最多发一次 DELETE。同一次清场往往会连着触发
  * 好几条链路（KioskPrivacyGuard.hardClear → logout → clearKioskSensitiveSession），
- * 没有这道去重就会对同一个任务发三次。
+ * 没有这道去重就会对同一个任务发三次。两个入口
+ * （`revokeLiveScanSession` 读本机登记、`revokeCreatedScanSession` 由创建方交凭证）
+ * 共用它：同一个任务两条路径合起来也只发一次。
  */
 const attempted = new Set<string>()
 
@@ -40,6 +42,43 @@ function revokeUrl(scanTaskId: string): string {
     `${API_BASE_URL}/scan/sessions/${encodeURIComponent(scanTaskId)}`,
     window.location.origin,
   ).toString()
+}
+
+/**
+ * 真正发出那一次 DELETE。去重、组头、keepalive、吞错都在这里，两个入口共用。
+ *
+ * @returns 是否真的发出了 DELETE（供调用方自测，不参与业务判断）。
+ */
+function sendRevoke(
+  scanTaskId: string,
+  controlToken: string,
+  outgoingMemberToken: string | null | undefined,
+): boolean {
+  if (attempted.has(scanTaskId)) return false
+  attempted.add(scanTaskId)
+
+  const headers = new Headers({
+    Accept: 'application/json',
+    'X-Scan-Session-Control': controlToken,
+  })
+  const terminalId = getTerminalId()
+  if (terminalId) headers.set('X-Terminal-Id', terminalId)
+  if (outgoingMemberToken) headers.set('Authorization', `Bearer ${outgoingMemberToken}`)
+
+  try {
+    void fetch(revokeUrl(scanTaskId), {
+      method: 'DELETE',
+      headers,
+      credentials: 'include',
+      // 页面正在被拆掉/重载：没有 keepalive 的请求会随文档一起被取消。
+      keepalive: true,
+      // 404 / 409 / 403 / 断网一律吞掉：清场不因为撤销失败而停下，
+      // 也不向正在离开的用户报一个他无法处理的错误。
+    }).catch(() => undefined)
+  } catch {
+    return false
+  }
+  return true
 }
 
 /**
@@ -63,29 +102,25 @@ export function revokeLiveScanSession(outgoingMemberToken: string | null | undef
   if (hasResult) return false
   // 本机已知过期：服务端的 reaper 会收掉它，这里再发 DELETE 只会拿回 404 / 400。
   if (!(Date.parse(live.expiresAt) > Date.now())) return false
-  if (attempted.has(live.scanTaskId)) return false
-  attempted.add(live.scanTaskId)
+  return sendRevoke(live.scanTaskId, live.controlToken, outgoingMemberToken)
+}
 
-  const headers = new Headers({
-    Accept: 'application/json',
-    'X-Scan-Session-Control': live.controlToken,
-  })
-  const terminalId = getTerminalId()
-  if (terminalId) headers.set('X-Terminal-Id', terminalId)
-  if (outgoingMemberToken) headers.set('Authorization', `Bearer ${outgoingMemberToken}`)
-
-  try {
-    void fetch(revokeUrl(live.scanTaskId), {
-      method: 'DELETE',
-      headers,
-      credentials: 'include',
-      // 页面正在被拆掉/重载：没有 keepalive 的请求会随文档一起被取消。
-      keepalive: true,
-      // 404 / 409 / 403 / 断网一律吞掉：清场不因为撤销失败而停下，
-      // 也不向正在离开的用户报一个他无法处理的错误。
-    }).catch(() => undefined)
-  } catch {
-    return false
-  }
-  return true
+/**
+ * 撤销一个**还没写进本机登记**的扫描任务。
+ *
+ * 创建请求在飞的那一刻被清场，是上面那条路径唯一够不着的情况：本机登记里还没有
+ * live，`revokeLiveScanSession` 无从读起；等响应回来时登记已经被抹掉，再写回去就是
+ * 把上一位的收件箱重新立起来。所以这条路径由**持有响应的那一方**直接交出凭证。
+ *
+ * 三点和上面一致，不再重复判断：
+ * 1. 凭证是服务端刚刚回的，必然不是终态、也必然没过期 —— 不再查 hasResult / expiresAt；
+ * 2. 身份必须是**发起创建的那一个**（服务端 `cancel()` 校验 `task.endUserId === endUserId`，
+ *    换人之后用新身份发只会 403，旧任务原地存活），所以入参由调用方在创建时取好；
+ * 3. 与 `revokeLiveScanSession` 共用 `attempted`：同一个 scanTaskId 合起来只发一次 DELETE。
+ */
+export function revokeCreatedScanSession(
+  credentials: { scanTaskId: string; controlToken: string },
+  creatingMemberToken: string | null | undefined,
+): boolean {
+  return sendRevoke(credentials.scanTaskId, credentials.controlToken, creatingMemberToken)
 }

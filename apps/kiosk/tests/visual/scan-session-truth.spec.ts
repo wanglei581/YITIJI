@@ -369,6 +369,145 @@ test('a revoked terminal session fails the creation closed and is not retried @k
   expect(createRequests()).toBe(1)
 })
 
+// ── 离开整条扫描流程：四个阶段 × 四个出口（2026-09-13） ───────────────────────
+//
+// 一张工作台四个阶段共用一个壳，壳上有四个出口：顶栏「返回打印扫描」和底栏三项主导航
+// （首页 / AI 顾问 / 我的）。四个都是「离开这条流程」——用户走了，本机这一场结束了。
+//
+// 当天只有顶栏返回会撤服务端任务，底栏三项是裸 navigate：按「首页 / AI 顾问 / 我的」
+// 离开的用户，服务端那个任务仍停在 waiting 等这台机器的下一份投递，本机登记也还在。
+// 下一位走到面板前按下扫描，文件就投给了上一位 —— 同一屏上两个出口两种命运。
+//
+// 逐个阶段 × 逐个出口断言同一件事，而不是只抽查一个：出口是各写各的时候，
+// 抽查任何一个都证明不了其余几个。
+
+type SeedStage = 'start' | 'settings' | 'progress' | 'result'
+
+/** 每个阶段都带一场「还活着」的服务端任务：离开时该撤的就是它。 */
+function seedScanWorkbenchStage(page: Page, stage: SeedStage): Promise<void> {
+  return page.evaluate(
+    ({ taskId, controlToken, seedStage }) => {
+      window.sessionStorage.setItem('ai-job-print:current-scan-workbench', JSON.stringify({
+        stage: seedStage,
+        scanType: 'resume',
+        live: {
+          scanTaskId: taskId,
+          controlToken,
+          instructions: ['服务端指引：第一步', '服务端指引：第二步'],
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        },
+        // result 阶段要有结果快照才准入（URL 是意图不是授权）。
+        // 刻意选「完成但没拿到文件」：它同样是终态，但不需要再造一份文件夹具。
+        result: seedStage === 'result'
+          ? { outcome: 'completed-no-file', success: false, reason: '扫描已完成但未拿到文件，请重新扫描' }
+          : undefined,
+      }))
+    },
+    { taskId: SCAN_TASK_ID, controlToken: REVOKE_CONTROL_TOKEN, seedStage: stage },
+  )
+}
+
+/** 四个阶段各自的「已经落到这一屏」判据，避免还没渲染完就去点出口。 */
+const SCAN_STAGE_LANDMARK: Record<SeedStage, string> = {
+  start: '下一步会创建真实扫描会话',
+  settings: '扫描任务已创建',
+  progress: '等待打印机端扫描完成',
+  result: '服务端说已完成，但这次回执里没有可用文件',
+}
+
+/**
+ * 四个出口。顶栏返回按 `.qx-topbar-back` 取 —— result 阶段的 CTA 条上另有一个同名
+ * 「返回打印扫描」按钮（ScanResultPage 的终态出口，不在本次改动范围内），
+ * 按可访问名取会一次命中两个。
+ */
+const SCAN_EXITS = [
+  { label: '返回打印扫描', destination: '/print-scan', topbar: true },
+  { label: '首页', destination: '/', topbar: false },
+  { label: 'AI 顾问', destination: '/assistant', topbar: false },
+  { label: '我的', destination: '/profile', topbar: false },
+] as const
+
+/** 离开扫描流程之后会落到的四个目的地，各自挂载时要读的接口。 */
+function registerScanExitDestinations(api: ApiRouter): void {
+  registerPrintScanHub(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/smart-campus', {
+    status: 200,
+    json: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
+  })
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
+  })
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  // /assistant 挂载即探语音能力。按「未开放」诚实应答，不伪造可用的语音通道。
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { success: true, data: { asrEnabled: false, ttsEnabled: false } },
+  })
+}
+
+for (const stage of ['start', 'settings', 'progress', 'result'] as const) {
+  for (const exit of SCAN_EXITS) {
+    test(`leaving the ${stage} stage through 「${exit.label}」 revokes the server task once @kiosk`, async ({ page, api }) => {
+      registerShell(api)
+      registerScanExitDestinations(api)
+      const revokes = recordRevokeRequests(page)
+      const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
+      api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+        status: 200,
+        json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+      })
+      if (stage === 'progress') {
+        // 等待页会自动轮询；给一个「还在等」的诚实回答，别让它改判。
+        api.respond('GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+          status: 200,
+          json: {
+            success: true,
+            data: {
+              scanTaskId: SCAN_TASK_ID,
+              status: 'waiting',
+              scanType: 'resume',
+              file: null,
+              errorCode: null,
+              errorMessage: null,
+              expiresAt: '2099-01-01T00:00:00.000Z',
+            },
+          },
+        })
+      }
+
+      await page.goto('/scan')
+      await seedScanWorkbenchStage(page, stage)
+      await page.goto(`/scan?stage=${stage}`)
+      await expect(page.getByText(SCAN_STAGE_LANDMARK[stage], { exact: false }).first()).toBeVisible()
+
+      await (exit.topbar
+        ? page.locator('.qx-topbar-back')
+        : page.getByRole('button', { name: exit.label, exact: true })
+      ).click()
+      await page.waitForURL((url) => url.pathname === exit.destination)
+
+      // 1) 服务端那个任务被撤掉了，且只撤一次，用的是本机登记里那份控制凭证。
+      //    result 阶段例外且必须例外：结果快照存在 = 服务端已经给过终态，
+      //    再 DELETE 只会换回 400 / 404，是一次纯噪音请求。
+      const expectedRevokes = stage === 'result' ? 0 : 1
+      if (expectedRevokes === 0) await page.waitForTimeout(300)
+      await expect.poll(() => revokes().length).toBe(expectedRevokes)
+      if (expectedRevokes === 1) {
+        expect(revokes()[0]?.['x-scan-session-control']).toBe(REVOKE_CONTROL_TOKEN)
+      }
+      // 2) 本机登记也清掉了：留着它，下一次进 /scan 会复水到一个已经被撤的任务。
+      expect(await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'))).toBeNull()
+      // 3) 离开不等于重建：这条路径上不许出现新的创建请求。
+      expect(createRequests()).toBe(0)
+    })
+  }
+}
+
 test('leaving the whole scan flow from the top bar revokes the server task once @kiosk', async ({ page, api }) => {
   registerShell(api)
   registerPrintScanHub(api)
@@ -389,6 +528,104 @@ test('leaving the whole scan flow from the top bar revokes the server task once 
   expect(revokes()[0]?.['x-scan-session-control']).toBe(REVOKE_CONTROL_TOKEN)
   // 撤销之后本机登记也必须清掉：留着它，下一次进 /scan 会复水到一个已经被撤的任务。
   expect(await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'))).toBeNull()
+})
+
+// ── 创建在飞时被清场（2026-09-13） ────────────────────────────────────────────
+//
+// POST /scan/sessions 还没回来的那一刻，本机登记里没有 live —— 清场读不到任何可撤的
+// 东西，只能把本地那份抹掉。等响应回来，旧代码照旧把 live 写回去：刚被清掉那一位的
+// 收件箱又立了起来，服务端任务停在 waiting，下一位在面板上按下扫描，文件投给了上一位。
+//
+// 下面这条用底栏「首页」制造清场（它和隐私清场、退出、屏保走的是同一个
+// clearScanWorkbenchSession，代次在抹掉登记之前同步 +1），因为它是**页内**导航，
+// 不重载文档 —— 「响应晚于清场落地」这件事才能被确定性地复现。
+test('a scan session that arrives after the user left is revoked and never written back @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerScanExitDestinations(api)
+  const revokes = recordRevokeRequests(page)
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+
+  let markCreateReceived: (() => void) | undefined
+  const createReceived = new Promise<void>((resolve) => { markCreateReceived = resolve })
+  let releaseCreate: (() => void) | undefined
+  const createReleased = new Promise<void>((resolve) => { releaseCreate = resolve })
+  await page.route('**/api/v1/scan/sessions', async (route) => {
+    const request = route.request()
+    if (request.method() !== 'POST' || new URL(request.url()).pathname !== '/api/v1/scan/sessions') {
+      await route.fallback()
+      return
+    }
+    markCreateReceived?.()
+    await createReleased
+    await fulfillCreatedSession(route)
+  })
+
+  await page.goto('/scan/start')
+  await page.getByRole('button', { name: /下一步/ }).click()
+  await createReceived
+  await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
+
+  await page.getByRole('button', { name: '首页', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/')
+  // 清场已经落地：此刻本机登记必须是空的。
+  expect(await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'))).toBeNull()
+
+  releaseCreate?.()
+
+  // 1) 迟到的响应把任务撤掉了 —— 而且只撤一次，用的是响应里那份控制凭证
+  //    （本机登记已经没了，凭证只可能来自响应本身）。
+  await expect.poll(() => revokes().length).toBe(1)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(CONTROL_TOKEN)
+  // 2) 也没有把 live 写回本机登记。写回去等于把已清场那一位的收件箱重新立起来。
+  await expect
+    .poll(() => page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench')))
+    .toBeNull()
+  // 3) 页面没有因为这个迟到的响应跳回扫描流程或宣告成功。
+  expect(new URL(page.url()).pathname).toBe('/')
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+})
+
+// 反面用例：正常走完 settings → progress **不得**出现任何取消。
+// 上面那道闸门如果写成「只要本页卸载就撤」，这条会当场红 ——
+// 确认之后进入等待页，settings 同样会卸载，而那个任务正要被用户使用。
+test('confirming the created session and entering the wait stage cancels nothing @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerLegacyReadyDevice(api)
+  const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
+  api.respond('POST', '/api/v1/scan/sessions', { status: 200, json: createdSession() })
+  api.respond('GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        scanTaskId: SCAN_TASK_ID,
+        status: 'waiting',
+        scanType: 'resume',
+        file: null,
+        errorCode: null,
+        errorMessage: null,
+        expiresAt: LATER,
+      },
+    },
+  })
+
+  await enterSettingsFromVisibleStart(page)
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '我已操作，开始等待' }).click()
+  await page.waitForURL(/\/scan\?stage=progress/)
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+
+  // 多等一会儿：迟到的取消也是取消，立刻断言只能证明「这一帧还没撤」。
+  await page.waitForTimeout(1_500)
+  expect(cancelRequests()).toBe(0)
+  // 本机登记仍然指着这场还活着的会话（progress 阶段要靠它认领回传的文件）。
+  const stored = await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'))
+  expect(stored).not.toBeNull()
+  expect(stored).toContain(SCAN_TASK_ID)
 })
 
 test('giving up on polling revokes the server task instead of orphaning it @kiosk', async ({ page, api }) => {

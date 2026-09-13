@@ -3,6 +3,45 @@ import { parseScanStage, type ScanStage } from './scanWorkbenchModel'
 
 export const SCAN_WORKBENCH_SESSION_KEY = 'ai-job-print:current-scan-workbench'
 
+/**
+ * 本机这一场扫描的「代次」。只活在页面内存里，不落存储。
+ *
+ * ## 它防的是哪一件事
+ *
+ * `POST /scan/sessions` 在飞的那一刻，本机登记里**还没有** live —— 所以清场
+ * （隐私空闲 / 退出 / 屏保 / 离开扫描流程）走到 `revokeLiveScanSession` 时读不到
+ * 任何可撤的东西，只能把本地那份抹掉。等创建响应回来，持有响应的那一方照旧
+ * `patchScanWorkbenchSession({ live })`，于是**刚被清掉的那一位用户的收件箱又被立了
+ * 起来**：服务端任务停在 waiting，下一位在面板上按下扫描，文件就投给了上一位。
+ *
+ * 代次就是这条竞态的判据：创建方发请求前取一份，响应回来时再比一次。不相等
+ * 说明「我属于上一场」—— 既不许回写存储，也不许把服务端任务留成孤儿
+ * （由创建方用手里那份凭证撤掉，见 `revokeCreatedScanSession`）。
+ *
+ * ## 为什么是同步的、为什么必须排在删除之前
+ *
+ * barrier 的全部意义就是**它比异步响应先落地**。`endScanLifecycle()` 只是一个
+ * 自增，没有 await、没有存储 IO，所以它一定先于任何还在飞的请求回来；而把它排在
+ * `removeItem` / 写回之前，保证「存储被动过」与「代次已推进」之间不存在中间态。
+ */
+let lifecycleGeneration = 0
+
+/** 取当前代次。发出创建请求之前取一份，响应回来时比对。 */
+export function scanLifecycleGeneration(): number {
+  return lifecycleGeneration
+}
+
+/**
+ * 宣告「这一场扫描到此为止」。
+ *
+ * 两个调用点，都在改存储**之前**：清空登记（`clearScanWorkbenchSession`）、
+ * 显式抹掉 live（`patchScanWorkbenchSession` 的 `live: undefined`）。
+ * 刻意不导出：谁能宣告一场扫描结束，由本模块的两个入口决定，不开放给业务页各自发挥。
+ */
+function endScanLifecycle(): void {
+  lifecycleGeneration += 1
+}
+
 export interface ScanLiveState {
   scanTaskId: string
   controlToken: string
@@ -141,6 +180,9 @@ export function patchScanWorkbenchSession(
   patch: Partial<ScanWorkbenchSession>,
 ): ScanWorkbenchSession {
   const current = readScanWorkbenchSession() ?? { stage: 'start' as const }
+  // 显式把 live 抹掉 = 这一场扫描到此为止（安全返回 / 回到首页 / 重扫）。
+  // 和清场同一个道理：之后才回来的创建响应不能再把 live 写回去。
+  if ('live' in patch && patch.live === undefined) endScanLifecycle()
   const next: ScanWorkbenchSession = {
     stage: patch.stage ?? current.stage,
     scanType: 'scanType' in patch ? patch.scanType : current.scanType,
@@ -153,6 +195,10 @@ export function patchScanWorkbenchSession(
 }
 
 export function clearScanWorkbenchSession(): void {
+  // 顺序不可调换：代次必须在抹掉登记**之前**同步推进。清场之后才回来的创建响应
+  // 靠它判断「我属于上一场」，从而既不回写登记，也不把服务端任务留成孤儿。
+  // 反过来写会留出一个窗口：登记已空、代次还是旧的，那一刻回来的响应照样能写回去。
+  endScanLifecycle()
   try {
     window.sessionStorage.removeItem(SCAN_WORKBENCH_SESSION_KEY)
   } catch {

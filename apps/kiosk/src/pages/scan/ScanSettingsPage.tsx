@@ -7,6 +7,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
+import { revokeCreatedScanSession } from './scanSessionRevoke'
 import {
   subscribeTerminalSession,
   terminalSessionState,
@@ -30,6 +31,7 @@ import { type ScanStage } from './scanWorkbenchModel'
 import {
   patchScanWorkbenchSession,
   readScanWorkbenchSession,
+  scanLifecycleGeneration,
   type ScanLiveState,
 } from './scanWorkbenchSession'
 
@@ -114,10 +116,21 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const controlTokenRef = useRef<string | null>(restoredLive?.controlToken ?? null)
   const skipCreateRef = useRef(Boolean(restoredLive && scanType))
   const sessionPromiseRef = useRef<Promise<ScanSessionCreateResponse> | null>(null)
-  const generationRef = useRef(0)
   const cancelRequestedRef = useRef(false)
-  const explicitCancelRequestedRef = useRef(false)
   const expiryHandledRef = useRef(false)
+  // 发出创建请求那一刻的扫描生命周期代次，以及当时用的那个会员身份。
+  // 响应回来时用代次判断「这一场还在不在」，用身份把任务撤干净——
+  // 服务端 cancel() 校验 endUserId，清场之后 getToken() 已经是空的，
+  // 拿它发只会 403：看起来撤了，其实没撤。
+  const createGenerationRef = useRef<number | null>(null)
+  const createTokenRef = useRef<string | null>(null)
+  // 「本页已经不在了」。刻意不复用 effect 的 cancelled：那个标志每次依赖变化
+  // （终端会话 checking / ready 来回切）都会置位，拿它当卸载判据会把一次正常的
+  // 终端重校验误判成「用户走了」，把一个好好的会话撤掉。
+  const unmountedRef = useRef(false)
+  // 终端身份在本次创建在飞期间 fail-closed，且页面已据此对用户宣告失败。
+  // 这一场不会再有人使用，响应回来必须把任务撤掉（否则它停在 waiting 收下一位的文件）。
+  const terminalFailClosedRef = useRef(false)
 
   useBusyLock(phase === 'loading' || phase === 'success' || starting)
 
@@ -127,7 +140,29 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     void cancelScanSession(id, token, getToken()).catch(() => undefined)
   }
 
+  /**
+   * 丢弃一个刚建成、却已经没有人会使用的任务。
+   *
+   * 和 cancelSessionOnce 的分工：那条是**页面还在**时的正常取消（等得起一次 await、
+   * 用当前身份发）；这条发生在清场 / 卸载之后，页面随时可能被拆掉或整页重载，
+   * 所以走 keepalive 的撤销通道，并且用**创建时**那个身份。
+   * 共用 cancelRequestedRef：两条合起来对同一个任务只发一次 DELETE。
+   */
+  const abandonCreatedSession = (credentials: { scanTaskId: string; controlToken: string }) => {
+    if (cancelRequestedRef.current) return
+    cancelRequestedRef.current = true
+    revokeCreatedScanSession(credentials, createTokenRef.current)
+  }
+
   useEffect(() => subscribeTerminalSession(setTerminalSession), [])
+
+  // 只认卸载：空依赖，终端会话状态怎么变都不会重跑。
+  useEffect(() => {
+    unmountedRef.current = false
+    return () => {
+      unmountedRef.current = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!scanType) return
@@ -148,6 +183,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       // 按「已经发起」判的后果是页面永远停在「正在创建扫描任务」——
       // 把一个已经 fail-closed 的终端说成「还在加载」，正是 CLAUDE.md §9 不允许的伪造状态。
       if (!createdIdRef.current) {
+        // 页面就此对用户宣告失败。如果那次创建其实成功了（响应还在路上），
+        // 它回来时就是个没人认领的任务 —— 登记这一笔，让它到时候把自己撤掉。
+        terminalFailClosedRef.current = true
         setFailure({
           title: '终端安全校验失败',
           description: userMessageOf(
@@ -160,12 +198,15 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       return
     }
 
-    const myGeneration = ++generationRef.current
+    // 回到 ready：上面那句失败结论作废（响应回来时按正常成功处理，不再撤销）。
+    terminalFailClosedRef.current = false
     let cancelled = false
 
     if (!sessionPromiseRef.current) {
       setFailure(null)
       setPhase('loading')
+      createGenerationRef.current = scanLifecycleGeneration()
+      createTokenRef.current = getToken()
       sessionPromiseRef.current = createScanSession({ scanType, terminalId: getTerminalId() }, getToken())
     }
 
@@ -176,6 +217,33 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           createdIdRef.current = cancellationCredentials.scanTaskId
           controlTokenRef.current = cancellationCredentials.controlToken
         }
+
+        /* ── 生命周期闸门：这个响应还属于「这一场扫描」吗 ─────────────────────
+         *
+         * 三种情况都意味着「没有人会再用这个刚建成的任务」：
+         *   · 代次变了 —— 清场（隐私空闲 / 退出 / 屏保）、离开扫描流程、安全返回，
+         *     全都在抹掉本机登记**之前**同步推进代次；
+         *   · 本页已卸载而用户从未确认 —— 他没走到等待页，任务不会有人认领；
+         *   · 终端身份在此期间 fail-closed，页面已据此对他宣告失败。
+         *
+         * 这一刻必须做两件事，且**先于任何写回**：
+         *   1. 绝不回写本机登记 —— 清场刚把它抹掉，写回去等于把上一位的收件箱
+         *      重新立起来，下一位在面板上按下扫描，文件就投给了他；
+         *   2. 用手里这份凭证把服务端任务撤掉 —— 不撤它就停在 waiting，
+         *      和上面是同一个后果，只是本机连界面都不再提它，更难被发现。
+         *
+         * 此前这里的判据是「只有用户显式点过返回才撤」，
+         * 于是清场和卸载这两条最常见的路径全都留下孤儿任务。 */
+        const createGeneration = createGenerationRef.current
+        const lifecycleEnded = createGeneration === null
+          || scanLifecycleGeneration() !== createGeneration
+        const abandoned = !confirmedRef.current
+          && (lifecycleEnded || unmountedRef.current || terminalFailClosedRef.current)
+        if (abandoned) {
+          if (cancellationCredentials) abandonCreatedSession(cancellationCredentials)
+          return
+        }
+
         if (!isValidCreatedSession(created)) {
           if (cancellationCredentials) {
             cancelSessionOnce(cancellationCredentials.scanTaskId, cancellationCredentials.controlToken)
@@ -189,13 +257,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         }
 
         if (cancelled) {
-          if (
-            generationRef.current === myGeneration
-            && explicitCancelRequestedRef.current
-            && !confirmedRef.current
-          ) {
-            cancelSessionOnce(created.scanTaskId, created.controlToken)
-          }
+          // 走到这里说明：这一场还活着、本页还挂着、只是本轮 effect 已经过时
+          // （终端会话状态变过一次）。撤销与否已经由上面的闸门判完，这里什么都不做，
+          // 把结论留给仍然有效的那一轮 —— 它挂在同一个 promise 上，随后就会跑。
           return
         }
 
@@ -254,9 +318,10 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       })
 
     return () => {
+      // 只表示「本轮 effect 过时了」。它每次依赖变化都会跑（终端会话 checking / ready
+      // 来回切也算），所以**不能**拿它当「用户走了」的判据 —— 真正的卸载判据是
+      // unmountedRef，撤不撤由上面那道生命周期闸门统一裁决。
       cancelled = true
-      // 路由卸载可能来自公共终端隐私清场；卸载本身绝不取消已创建的后台扫描任务。
-      // 只有用户明确点击返回、服务端响应无效或会话自然过期时才发送取消请求。
     }
     // StrictMode 需要在同一组 refs 上复用唯一创建 promise，不按渲染重发。
     // 依赖只有终端会话状态：它从 checking / failed 回到 ready 时要能补发这一次创建。
@@ -288,10 +353,11 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   }, [expiresAt])
 
   const handleSafeReturn = () => {
-    explicitCancelRequestedRef.current = true
     if (createdIdRef.current && controlTokenRef.current && !confirmedRef.current) {
       cancelSessionOnce(createdIdRef.current, controlTokenRef.current)
     }
+    // live: undefined 同时是「这一场到此为止」的宣告（代次 +1）：
+    // 创建请求还在飞的时候点返回，响应回来会因为代次对不上而自己把任务撤掉。
     patchScanWorkbenchSession({ stage: 'start', live: undefined, result: undefined })
     if (onGoStage) {
       onGoStage('start')

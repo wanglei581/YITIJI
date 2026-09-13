@@ -47,6 +47,61 @@ assert.match(
   'a malformed created session with usable credentials must be cancelled instead of orphaned',
 )
 assert.match(scanSettings, /controlTokenRef/, 'control token must remain in memory for cleanup')
+
+/* ── 创建在飞时被清场：生命周期闸门（2026-09-13） ──────────────────────────
+ *
+ * POST /scan/sessions 在飞的那一刻，本机登记里还没有 live —— 清场
+ * （隐私空闲 / 退出 / 屏保 / 离开扫描流程）走到 revokeLiveScanSession 时读不到
+ * 任何可撤的东西，只能把本地那份抹掉。旧代码等响应回来照旧把 live 写回去，
+ * 于是刚被清掉那一位的收件箱又被立了起来：服务端任务停在 waiting，
+ * 下一位在面板上按下扫描，文件投给了上一位。
+ *
+ * 下面钉住这条闸门的三块可被一行改坏的地方。 */
+assert.match(
+  scanSettings,
+  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,200}?createScanSession\(/,
+  '代次必须在**发出创建请求之前**取；请求发出后再取就永远等于当前值，闸门恒真',
+)
+assert.match(
+  scanSettings,
+  /const lifecycleEnded = createGeneration === null\s*\n\s*\|\| scanLifecycleGeneration\(\) !== createGeneration/,
+  '响应回来时要把代次和发请求时那一份比对：不相等就说明这一场已经被清掉了',
+)
+assert.match(
+  scanSettings,
+  /const abandoned = !confirmedRef\.current\s*\n\s*&& \(lifecycleEnded \|\| unmountedRef\.current \|\| terminalFailClosedRef\.current\)/,
+  '弃用判据是三选一（代次变了 / 本页已卸载 / 终端已 fail-closed），且用户已确认时一律不弃',
+)
+assert.match(
+  scanSettings,
+  /if \(abandoned\) \{\s*\n\s*if \(cancellationCredentials\) abandonCreatedSession\(cancellationCredentials\)\s*\n\s*return\s*\n\s*\}[\s\S]*patchScanWorkbenchSession\(/,
+  '弃用分支必须排在任何 patchScanWorkbenchSession 之前：先 return 才谈得上「绝不回写」',
+)
+assert.match(
+  scanSettings,
+  /revokeCreatedScanSession\(credentials, createTokenRef\.current\)/,
+  '撤销要用**创建时**那个身份：清场之后 getToken() 已经空了，拿它发只会 403（看起来撤了，其实没撤）',
+)
+assert.doesNotMatch(
+  scanSettings,
+  /explicitCancelRequestedRef/,
+  '旧判据「只有用户显式点返回才撤」必须消失：清场与卸载这两条最常见路径当时全都留下孤儿任务',
+)
+assert.match(
+  scanSettings,
+  /const unmountedRef = useRef\(false\)[\s\S]*useEffect\(\(\) => \{\s*\n\s*unmountedRef\.current = false\s*\n\s*return \(\) => \{\s*\n\s*unmountedRef\.current = true\s*\n\s*\}\s*\n\s*\}, \[\]\)/,
+  '卸载判据必须来自空依赖 effect：复用创建 effect 的 cancelled 会把一次终端重校验误判成「用户走了」',
+)
+assert.match(
+  scanSettings,
+  /terminalFailClosedRef\.current = true/,
+  '终端 fail-closed 且页面已对用户宣告失败时要登记：那次创建若其实成功了，回来必须自己撤掉',
+)
+assert.match(
+  scanSettings,
+  /terminalFailClosedRef\.current = false\s*\n\s*let cancelled = false/,
+  '终端回到 ready 时失败结论作废：不清掉这一笔，恢复后到达的成功响应会被当成孤儿撤掉',
+)
 assert.doesNotMatch(
   scanSettings,
   /localStorage|sessionStorage/,
@@ -168,10 +223,39 @@ assert.match(
   /SCAN_WORKBENCH_SESSION_KEY/,
   'scan workbench session key is registered for leftover detection',
 )
+const workbenchSession = read('src/pages/scan/scanWorkbenchSession.ts')
 assert.match(
-  read('src/pages/scan/scanWorkbenchSession.ts'),
+  workbenchSession,
   /sessionStorage/,
   'scan live credentials persist only in the dedicated session module',
+)
+/* 代次是「创建在飞时被清场」这条竞态的唯一判据，它必须比异步响应先落地：
+ * 同步自增、且排在任何存储改动之前。反过来写会留出一个窗口——
+ * 登记已空、代次还是旧的，那一刻回来的响应照样能把 live 写回去。 */
+assert.match(
+  workbenchSession,
+  /export function scanLifecycleGeneration\(\): number \{\s*\n\s*return lifecycleGeneration\s*\n\s*\}/,
+  '代次要能被创建方读到（发请求前取一份，响应回来比一次）',
+)
+assert.match(
+  workbenchSession,
+  /function endScanLifecycle\(\): void \{\s*\n\s*lifecycleGeneration \+= 1\s*\n\s*\}/,
+  '推进代次必须是同步自增：任何 await / 存储 IO 都会让它晚于还在飞的响应',
+)
+assert.doesNotMatch(
+  workbenchSession,
+  /export function endScanLifecycle/,
+  '不导出：谁能宣告一场扫描结束由本模块两个入口决定，开放出去就会各自发挥',
+)
+assert.match(
+  workbenchSession,
+  /if \('live' in patch && patch\.live === undefined\) endScanLifecycle\(\)\s*\n\s*const next: ScanWorkbenchSession = \{/,
+  '显式抹掉 live = 这一场到此为止，代次要在写回之前推进（安全返回 / 回到首页 / 重扫都走这条）',
+)
+assert.match(
+  workbenchSession,
+  /export function clearScanWorkbenchSession\(\): void \{[\s\S]*?endScanLifecycle\(\)\s*\n\s*try \{\s*\n\s*window\.sessionStorage\.removeItem/,
+  '清空登记时代次必须在 removeItem **之前**推进；顺序反了就留出可被写回的窗口',
 )
 
 /* ── 扫描会话撤销契约（2026-09-13） ────────────────────────────────────────
@@ -196,8 +280,26 @@ assert.match(scanRevoke, /keepalive:\s*true/, '清场会拆掉页面：没有 ke
 assert.match(scanRevoke, /const attempted = new Set<string>\(\)/, '同一次页面生命周期内每个任务只尝试一次')
 assert.match(
   scanRevoke,
-  /attempted\.add\(live\.scanTaskId\)/,
+  /if \(attempted\.has\(scanTaskId\)\) return false\s*\n\s*attempted\.add\(scanTaskId\)/,
   '去重必须在发请求之前登记，失败也不再补发（撤销是尽力而为）',
+)
+/* 两个入口共用同一条发送路径与同一个 attempted：读本机登记的那条够不着
+ * 「创建还在飞」的任务，所以另开一条由持有响应的一方交凭证；但同一个 scanTaskId
+ * 合起来仍然只许发一次 DELETE。各写各的 fetch 就会对同一个任务发两次。 */
+assert.match(
+  scanRevoke,
+  /export function revokeCreatedScanSession\(\s*\n\s*credentials: \{ scanTaskId: string; controlToken: string \},/,
+  '创建在飞时被清场：撤销只能由持有响应的一方交出凭证（本机登记里当时还没有 live）',
+)
+assert.match(
+  scanRevoke,
+  /return sendRevoke\(live\.scanTaskId, live\.controlToken, outgoingMemberToken\)/,
+  '读本机登记的入口也走同一条发送路径，否则两条各自去重 = 同一个任务发两次',
+)
+assert.match(
+  scanRevoke,
+  /return sendRevoke\(credentials\.scanTaskId, credentials\.controlToken, creatingMemberToken\)/,
+  '交凭证的入口同上；身份参数是**创建时**那一个，不是当前的',
 )
 assert.match(
   scanRevoke,
@@ -252,11 +354,35 @@ assert.match(
   '待机屏挂载清场同样要交出当前令牌',
 )
 
+/* ── 离开整条扫描流程只许有一份语义（2026-09-13） ──────────────────────────
+ *
+ * 一张工作台四个阶段、四个出口：顶栏返回 + 底栏三项主导航。它们都是「离开这条流程」，
+ * 不是页内切换。当天顶栏返回收得干干净净，底栏三项却还是裸 navigate ——
+ * 按「首页 / AI 顾问 / 我的」走的用户，服务端任务和本机登记两样都留在原地，
+ * 同一屏上两个出口两种命运。所以下面钉的不是「有几个出口」，而是
+ * 「每个出口都必须走同一条 leaveScanFlow，只有落点不同」。 */
 const scanChrome = read('src/pages/scan/ScanWorkbenchChrome.tsx')
 assert.match(
   scanChrome,
-  /revokeLiveScanSession\(getToken\(\)\)\s*\n\s*clearScanWorkbenchSession\(\)\s*\n\s*navigate\('\/print-scan'\)/,
-  '顶栏返回 = 离开整条扫描流程：先撤服务端任务，再清本地登记，最后才走人',
+  /const leaveScanFlow = \(destination: string\): void => \{\s*\n\s*revokeLiveScanSession\(getToken\(\)\)\s*\n\s*clearScanWorkbenchSession\(\)\s*\n\s*navigate\(destination\)\s*\n\s*\}/,
+  '离开 = 先撤服务端任务，再清本地登记，最后才走人；落点是参数，语义不随落点变',
+)
+for (const [prop, destination] of [
+  ['onBack', '/print-scan'],
+  ['onHome', '/'],
+  ['onAdvisor', '/assistant'],
+  ['onProfile', '/profile'],
+]) {
+  assert.match(
+    scanChrome,
+    new RegExp(`${prop}=?:? ?\\{?\\(\\) => leaveScanFlow\\('${destination.replace('/', '\\/')}'\\)`),
+    `${prop}（落点 ${destination}）必须走 leaveScanFlow，不能自己 navigate`,
+  )
+}
+assert.doesNotMatch(
+  scanChrome,
+  /on(Home|Advisor|Profile)=\{\(\) => navigate\(/,
+  '底栏三项一旦改回裸 navigate，这一屏就又会留下孤儿服务端任务',
 )
 
 assert.match(
