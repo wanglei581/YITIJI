@@ -9,6 +9,10 @@ import {
   utimesSync,
   mkdirSync,
   chmodSync,
+  lstatSync,
+  linkSync,
+  symlinkSync,
+  readdirSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -595,5 +599,177 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
     }
   }
 
+  await runOverlappingStartupBacklogRaceTest()
+
   console.log('PASS scan lease barrier helper checks')
+}
+
+/**
+ * Two regular files plus symlink/hardlink at startup. Hold the first accepted
+ * file in waitForStableFile while the second (and unsafe siblings) are processed.
+ * Premark-all must yield 0 lease / 0 deliver, retain the marker on EACCES, and
+ * never deliver symlink or hardlink candidates.
+ */
+export async function runOverlappingStartupBacklogRaceTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  let leaseRequestCount = 0
+  let deliverRequestCount = 0
+
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        leaseRequestCount += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(
+          JSON.stringify({
+            success: true,
+            data: {
+              scanTaskId: 'task_should_never_bind_overlap',
+              serverNow: new Date().toISOString(),
+              notBefore: new Date(Date.now() - 30_000).toISOString(),
+              expiresAt: new Date(Date.now() + 300_000).toISOString(),
+              deliveryLease: 'unauthorized_overlap_lease',
+            },
+          }),
+        )
+        return
+      }
+
+      if (req.method === 'POST' && req.url?.includes('/scan-sessions/deliver')) {
+        deliverRequestCount += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(
+          JSON.stringify({
+            success: true,
+            data: { scanTaskId: 'task_should_never_bind_overlap', fileId: 'leaked_overlap_id' },
+          }),
+        )
+        return
+      }
+
+      res.writeHead(404)
+      res.end()
+    })
+  })
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(typeof address === 'object' && address)
+  const baseUrl = `http://127.0.0.1:${address.port}/api/v1`
+
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'scan-watcher-overlapping-backlog-'))
+  const scanFolder = join(temporaryRoot, 'scan')
+  mkdirSync(scanFolder)
+  const unclaimedDir = join(scanFolder, '_unclaimed')
+  mkdirSync(unclaimedDir)
+  chmodSync(unclaimedDir, 0o555)
+
+  const holdName = 'a-startup-hold.pdf'
+  const raceName = 'b-startup-race.pdf'
+  const symlinkName = 'c-startup-symlink.pdf'
+  const hardlinkName = 'd-startup-hardlink.pdf'
+  const holdPath = join(scanFolder, holdName)
+  const racePath = join(scanFolder, raceName)
+  const symlinkPath = join(scanFolder, symlinkName)
+  const hardlinkPath = join(scanFolder, hardlinkName)
+  const outsideFile = join(temporaryRoot, 'outside-secret.pdf')
+  const holdSecret = '%PDF-1.4 CONFIDENTIAL-HOLD-STARTUP-BACKLOG'
+  const raceSecret = '%PDF-1.4 CONFIDENTIAL-RACE-STARTUP-BACKLOG'
+  const outsideSecret = '%PDF-1.4 CONFIDENTIAL-OUTSIDE-NEVER-DELIVER'
+
+  writeFileSync(holdPath, holdSecret)
+  writeFileSync(racePath, raceSecret)
+  writeFileSync(outsideFile, outsideSecret)
+  symlinkSync(outsideFile, symlinkPath, 'file')
+  linkSync(outsideFile, hardlinkPath)
+
+  const acceptedNames = readdirSync(scanFolder).flatMap((name) => {
+    if (name === '_unclaimed') return []
+    try {
+      const snapshot = lstatSync(join(scanFolder, name))
+      if (!snapshot.isFile() || snapshot.nlink !== 1 || !/\.pdf$/i.test(name)) return []
+      return [name]
+    } catch {
+      return []
+    }
+  })
+  assert.equal(acceptedNames.length, 2, 'overlapping race needs exactly two accepted regular startup files')
+  const firstName = acceptedNames[0]
+  const secondName = acceptedNames[1]
+  const firstPath = join(scanFolder, firstName)
+  const secondPath = join(scanFolder, secondName)
+
+  let holdFirst = true
+  const holdTimer = setInterval(() => {
+    if (!holdFirst) return
+    try {
+      writeFileSync(firstPath, `${holdSecret} ${Date.now()}`)
+    } catch {
+      // Isolation may move the hold file after we release the timer.
+    }
+  }, 120)
+  holdTimer.unref()
+
+  const config = makeHelperConfig(baseUrl, scanFolder)
+  try {
+    const { stderr } = await captureLogsAsync(async () => {
+      const isolatePromise = isolateStartupBacklog(scanFolder)
+      try {
+        await processCandidate(secondPath, secondName, config)
+        await processCandidate(symlinkPath, symlinkName, config)
+        await processCandidate(hardlinkPath, hardlinkName, config)
+      } finally {
+        holdFirst = false
+        clearInterval(holdTimer)
+      }
+      await isolatePromise
+    })
+
+    assert.equal(leaseRequestCount, 0, 'overlapping two-file race must NEVER request scan lease for the second file')
+    assert.equal(deliverRequestCount, 0, 'overlapping two-file race must NEVER deliver the second file')
+    assert.equal(isStartupBacklogCandidate(firstPath), true, 'EACCES on first file must retain startup backlog marker')
+    assert.equal(isStartupBacklogCandidate(secondPath), true, 'EACCES on second file must retain startup backlog marker')
+    assert.equal(isStartupBacklogCandidate(symlinkPath), true, 'symlink startup candidate must stay marked never-deliver')
+    assert.equal(isStartupBacklogCandidate(hardlinkPath), true, 'hardlink startup candidate must stay marked never-deliver')
+    assert.equal(existsSync(firstPath), true, 'failed quarantine must leave the held file in place')
+    assert.equal(existsSync(secondPath), true, 'failed quarantine must leave the overlapped file in place')
+    assert.equal(existsSync(symlinkPath), true, 'symlink must remain for operator review')
+    assert.equal(existsSync(hardlinkPath), true, 'hardlink must remain for operator review')
+    assert.equal(existsSync(join(unclaimedDir, firstName)), false)
+    assert.equal(existsSync(join(unclaimedDir, secondName)), false)
+    assert.match(stderr, /code=EACCES/, 'overlapping isolate/process must surface the EACCES quarantine retry')
+    assert.doesNotMatch(stderr, /a-startup-hold\.pdf|b-startup-race\.pdf|c-startup-symlink\.pdf|d-startup-hardlink\.pdf/)
+    assert.doesNotMatch(stderr, /CONFIDENTIAL-HOLD-STARTUP-BACKLOG|CONFIDENTIAL-RACE-STARTUP-BACKLOG|CONFIDENTIAL-OUTSIDE-NEVER-DELIVER/)
+    assert.equal(readFileSync(outsideFile, 'utf8'), outsideSecret, 'outside symlink/hardlink target must remain untouched')
+
+    chmodSync(unclaimedDir, 0o755)
+    await sweepFolder(scanFolder, config)
+
+    assert.equal(leaseRequestCount, 0, 'EACCES retry sweep must NEVER request scan lease')
+    assert.equal(deliverRequestCount, 0, 'EACCES retry sweep must NEVER deliver')
+    assert.equal(existsSync(firstPath), false, 'retried first file must leave the scan root')
+    assert.equal(existsSync(secondPath), false, 'retried second file must leave the scan root')
+    assert.equal(existsSync(join(unclaimedDir, firstName)), true, 'retried first file must land in _unclaimed')
+    assert.equal(existsSync(join(unclaimedDir, secondName)), true, 'retried second file must land in _unclaimed')
+    assert.equal(isStartupBacklogCandidate(firstPath), false, 'successful quarantine must clear the first marker')
+    assert.equal(isStartupBacklogCandidate(secondPath), false, 'successful quarantine must clear the second marker')
+    assert.equal(existsSync(symlinkPath), true, 'symlink must never be delivered or unlinked')
+    assert.equal(existsSync(hardlinkPath), true, 'hardlink must never be delivered or unlinked')
+    assert.equal(isStartupBacklogCandidate(symlinkPath), true, 'unsafe symlink marker must be retained')
+    assert.equal(isStartupBacklogCandidate(hardlinkPath), true, 'unsafe hardlink marker must be retained')
+    assert.equal(readFileSync(outsideFile, 'utf8'), outsideSecret)
+
+    console.log('PASS overlapping startup backlog race: zero lease/delivery, EACCES retry, unsafe never-deliver')
+  } finally {
+    holdFirst = false
+    clearInterval(holdTimer)
+    try {
+      chmodSync(unclaimedDir, 0o755)
+    } catch {}
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    rmSync(temporaryRoot, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
 }

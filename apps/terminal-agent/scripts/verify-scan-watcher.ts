@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import http from 'node:http'
 import {
   mkdtempSync,
@@ -13,7 +14,7 @@ import {
   symlinkSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve as resolvePath } from 'node:path'
 import {
   sweepUnclaimedDir,
   processCandidate,
@@ -23,7 +24,18 @@ import {
   DELIVERY_RETRY_MAX_MS,
 } from '../src/agent/scan-watcher'
 import type { AgentConfig } from '../src/agent/types'
-import { runScanLeaseBarrierTests } from './scan-lease-barrier.helper'
+import { runOverlappingStartupBacklogRaceTest, runScanLeaseBarrierTests } from './scan-lease-barrier.helper'
+
+const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
+  // await so watcher add/sweep/process cannot deliver a later sibling.
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    startupBacklogPaths.add(resolve(fullPath))
+  }
+
+`
 
 // 本脚本分两部分：
 //   Part 1：源码结构性断言（chokidar 实时监听 wiring——ignoreInitial / ignored /
@@ -49,6 +61,28 @@ function verifySourceStructure(): void {
   assert.match(source, /const startupBacklogPaths\s*=\s*new Set<string>\(\)/, 'must have a startup backlog path tracking Set for never-deliver enforcement')
   assert.match(source, /if\s*\(\s*startupBacklogPaths\.has\(resolvedCandidatePath\)\s*\)/, 'processCandidate must check startupBacklogPaths to prevent delivery')
   assert.match(source, /startupBacklogPaths\.delete\(resolvedCandidatePath\)/, 'must clear backlog marker upon successful quarantine')
+  {
+    const isolateStart = source.indexOf('export async function isolateStartupBacklog')
+    const isolateEnd = source.indexOf('export function startScanWatcher')
+    assert.ok(isolateStart >= 0 && isolateEnd > isolateStart, 'isolateStartupBacklog must precede startScanWatcher')
+    const isolateBody = source.slice(isolateStart, isolateEnd)
+    const readdirIdx = isolateBody.indexOf('readdirSync(folder)')
+    const premarkIdx = isolateBody.indexOf('ATOMIC_STARTUP_BACKLOG_PREMARK')
+    const firstAwaitIdx = isolateBody.indexOf('await waitForStableFile')
+    assert.ok(readdirIdx >= 0, 'isolateStartupBacklog must readdirSync the folder')
+    assert.ok(premarkIdx > readdirIdx, 'premark-all must run after readdir')
+    assert.ok(firstAwaitIdx > premarkIdx, 'premark-all must complete before any await')
+    assert.equal(
+      isolateBody.slice(readdirIdx, premarkIdx).includes('await'),
+      false,
+      'no await may appear between readdir and premark-all',
+    )
+    assert.equal(
+      isolateBody.includes(STARTUP_BACKLOG_PREMARK_BLOCK),
+      true,
+      'isolateStartupBacklog must synchronously premark every direct-child path before the first await',
+    )
+  }
   assert.match(
     source,
     /const trustedWindowsCandidate = readTrustedWindowsCandidate\(\s*scanWatchFolder,\s*filename,\s*stableSnapshot\s*\)/,
@@ -777,7 +811,48 @@ function verifyPlatformGapDisclosure(): void {
   )
 }
 
+function verifyPremarkAllMutationMakesOverlappingTestNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(
+    original.includes(STARTUP_BACKLOG_PREMARK_BLOCK),
+    true,
+    'premark-all block must exist before reverse mutation',
+  )
+  const mutated = original.replace(STARTUP_BACKLOG_PREMARK_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing premark-all must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--overlapping-startup-backlog-race')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing premark-all must make overlapping test nonzero\n${output}`)
+    assert.match(
+      output,
+      /overlapping two-file race must NEVER request scan lease for the second file/,
+      `mutated overlapping test must fail on nonzero lease, not an unrelated error\n${output}`,
+    )
+    console.log('PASS premark-all reverse mutation: overlapping test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'premark-all reverse mutation must restore scan-watcher.ts')
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes('--overlapping-startup-backlog-race')) {
+    await runOverlappingStartupBacklogRaceTest()
+    return
+  }
   verifySourceStructure()
   verifyUnclaimedCleanup()
   await verifyRetryCapExpired()
@@ -796,6 +871,7 @@ async function main(): Promise<void> {
   await verifyInFlightDedupSkipsConcurrentDuplicate()
   await verifyUnexpectedErrorOuterCatch()
   await runScanLeaseBarrierTests()
+  verifyPremarkAllMutationMakesOverlappingTestNonzero()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

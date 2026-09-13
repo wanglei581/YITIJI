@@ -754,7 +754,10 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
  * 启动时安全隔离目录内已有文件（fail-closed startup backlog）。
  * Agent 每次启动时，扫描目录下已存在的所有文件（启动前旧文件）
  * 均不能获得之后的新租约，必须立即安全隔离至 _unclaimed 目录。
+ * readdir 之后、任何 await / watcher add / sweep / process 之前，必须同步把每个
+ * 直接子路径记入 startupBacklogPaths；随后才按既有 Windows trusted token 串行隔离。
  * 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
+ * 隔离失败保留标记；成功才清除。unsafe / symlink / hardlink 只保留 never-deliver 标记，绝不投递。
  * 在 Windows 平台上严格使用 readVerifiedCandidate 获取的 TrustedWindowsCandidate
  * 原生凭据执行隔离，绝不抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING。
  * 隔离后文件在 _unclaimed 目录中，下次重启或周期性 sweep 均不会再次尝试匹配或投递。
@@ -775,6 +778,15 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
   } catch (e) {
     warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`)
     return 0
+  }
+
+  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
+  // await so watcher add/sweep/process cannot deliver a later sibling.
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    startupBacklogPaths.add(resolve(fullPath))
   }
 
   let quarantined = 0
