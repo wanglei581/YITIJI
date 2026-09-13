@@ -35,6 +35,7 @@ import {
   SCAN_MAX_FUTURE_OBSERVATION_MS,
   SCAN_RETRY_AUTHORITY_TTL_MS,
   SCAN_STALE_CAPTURE_TOLERANCE_MS,
+  SCAN_UNACKED_WAITING_GRACE_MS,
 } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
 // B1-11 follow-up：真实 DB 端到端跑一遍 deliverScanFile() 的内容级去重护栏，需要真实
@@ -63,6 +64,7 @@ function ensureSqliteFile(dbPath: string): void {
 
 const RETRY_HARDENING_MIGRATION = '20260913223000_harden_scan_retry_authority'
 const RETRY_HARDENING_PREVIOUS_MIGRATION = '20260913210000_add_scan_input_lockout_telemetry'
+const DELIVERY_ACK_MIGRATION = '20260914120000_add_scan_task_delivery_ack'
 
 function runPrismaExpectFailure(
   apiRoot: string,
@@ -89,7 +91,7 @@ function createMigrationSandbox(
   const migrationsRoot = path.join(root, 'migrations')
   mkdirSync(migrationsRoot)
   for (const entry of readdirSync(sourceMigrationsRoot, { withFileTypes: true })) {
-    if (entry.name === RETRY_HARDENING_MIGRATION) continue
+    if (entry.name === RETRY_HARDENING_MIGRATION || entry.name === DELIVERY_ACK_MIGRATION) continue
     cpSync(path.join(sourceMigrationsRoot, entry.name), path.join(migrationsRoot, entry.name), {
       recursive: entry.isDirectory(),
     })
@@ -222,6 +224,222 @@ function assertRetryCreateRecoversLostResponse(apiRoot: string): void {
       `create() lost-response recovery must keep ${needle}`
     )
   }
+}
+
+function assertLeaseRequiresDeliveryAck(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async getScanDeliveryLease')
+  const end = source.indexOf('async deliverScanFile', start)
+  assert.ok(start >= 0 && end > start, 'getScanDeliveryLease() must exist')
+  const body = stripTypeScriptComments(source.slice(start, end))
+  assert.ok(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(body),
+    'getScanDeliveryLease() must hard-require deliveryAckedAt: { not: null }'
+  )
+}
+
+function assertDeliveryAckMigrationContracts(apiRoot: string): void {
+  for (const [relative, label] of [
+    [path.join('prisma', 'migrations', DELIVERY_ACK_MIGRATION, 'migration.sql'), 'SQLite'],
+    [path.join('prisma', 'postgres', 'migrations', DELIVERY_ACK_MIGRATION, 'migration.sql'), 'PostgreSQL'],
+  ] as const) {
+    const sql = stripSqlComments(readFileSync(path.join(apiRoot, relative), 'utf8'))
+    assert.match(sql, /ADD COLUMN "deliveryAckedAt"/, `${label} ACK migration must add deliveryAckedAt`)
+    assert.match(
+      sql,
+      /SET "deliveryAckedAt" = "createdAt"[\s\S]*"status" IN \('waiting', 'matched'\)/,
+      `${label} ACK migration must backfill waiting/matched rows to createdAt`
+    )
+  }
+}
+
+function addAckMigrationToSandbox(sourceMigrationsRoot: string, migrationsRoot: string): void {
+  cpSync(
+    path.join(sourceMigrationsRoot, DELIVERY_ACK_MIGRATION),
+    path.join(migrationsRoot, DELIVERY_ACK_MIGRATION),
+    { recursive: true }
+  )
+}
+
+function assertSqliteDeliveryAckBackfill(apiRoot: string): void {
+  const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'migrations')
+  const sandbox = createMigrationSandbox(
+    apiRoot,
+    sourceMigrationsRoot,
+    path.join(apiRoot, 'prisma', 'schema.prisma'),
+    'sqlite'
+  )
+  const dbPath = path.join(sandbox.root, 'ack-backfill.db')
+  try {
+    ensureSqliteFile(dbPath)
+    addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: `file:${dbPath}`,
+    })
+    sqliteQuery(
+      dbPath,
+      `
+        INSERT INTO "Terminal" ("id", "terminalCode", "agentToken", "deviceFingerprint", "lastSeenAt")
+        VALUES ('ack_backfill_terminal', 'ACK-BACKFILL', 'ack-backfill-token', 'ack-backfill-fp', CURRENT_TIMESTAMP);
+        INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "createdAt", "updatedAt")
+        VALUES (
+          'legacy_waiting',
+          'ack_backfill_terminal',
+          'document',
+          'waiting',
+          datetime('now', '+10 minutes'),
+          datetime('now', '-90 seconds'),
+          datetime('now', '-90 seconds')
+        );
+      `
+    )
+    const createdAt = sqliteQuery(dbPath, `SELECT createdAt FROM "ScanTask" WHERE id = 'legacy_waiting';`)
+    addAckMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: `file:${dbPath}`,
+    })
+    assert.equal(
+      sqliteQuery(dbPath, `SELECT COUNT(*) FROM pragma_table_info('ScanTask') WHERE name = 'deliveryAckedAt';`),
+      '1',
+      'SQLite ACK migration must add deliveryAckedAt'
+    )
+    assert.equal(
+      sqliteQuery(dbPath, `SELECT deliveryAckedAt FROM "ScanTask" WHERE id = 'legacy_waiting';`),
+      createdAt,
+      'SQLite ACK migration must backfill waiting rows to createdAt'
+    )
+    sqliteQuery(dbPath, `UPDATE "ScanTask" SET "status" = 'expired' WHERE id = 'legacy_waiting';`)
+    sqliteQuery(
+      dbPath,
+      `
+        INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "createdAt", "updatedAt")
+        VALUES (
+          'fresh_waiting',
+          'ack_backfill_terminal',
+          'document',
+          'waiting',
+          datetime('now', '+10 minutes'),
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
+        );
+      `
+    )
+    assert.equal(
+      sqliteQuery(dbPath, `SELECT deliveryAckedAt FROM "ScanTask" WHERE id = 'fresh_waiting';`),
+      '',
+      'new waiting rows after ACK migration must remain unacked (NULL)'
+    )
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
+async function assertRealDbDeliveryAckGate(dbUrl: string, label: string): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  const terminalId = `realdb_ack_${label}_${randomBytes(4).toString('hex')}`
+  try {
+    await client.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `ACK-${label}-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-delivery-ack',
+        enabled: true,
+      },
+    })
+    const service = new ScanTasksService(client as never, {} as never, passthroughCapabilities)
+    const created = await service.create({ scanType: 'document', terminalId }, null)
+    const stored = await client.scanTask.findUnique({ where: { id: created.scanTaskId } })
+    assert.equal(stored?.deliveryAckedAt, null, `real DB (${label}): new create must start unacked`)
+    await expectRejectCode(
+      () => service.getScanDeliveryLease(terminalId),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      `real DB (${label}): unacked waiting must not be leasable`
+    )
+    const acked = await service.ack(created.scanTaskId, null, created.controlToken, terminalId)
+    const lease = await service.getScanDeliveryLease(terminalId)
+    assert.equal(lease.scanTaskId, created.scanTaskId)
+    const ackedAgain = await service.ack(created.scanTaskId, null, created.controlToken, terminalId)
+    assert.equal(ackedAgain.deliveryAckedAt, acked.deliveryAckedAt)
+
+    await service.cancel(created.scanTaskId, null, created.controlToken)
+    const prior = await service.create({ scanType: 'document', terminalId }, null)
+    await client.scanTask.update({
+      where: { id: prior.scanTaskId },
+      data: {
+        status: 'failed',
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+      },
+    })
+    const child = await service.create(
+      { scanType: 'document', terminalId, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    const childRow = await client.scanTask.findUnique({ where: { id: child.scanTaskId } })
+    assert.equal(childRow?.deliveryAckedAt, null, `real DB (${label}): retry child must start unacked`)
+    const replay = await service.create(
+      { scanType: 'document', terminalId, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    assert.equal(replay.scanTaskId, child.scanTaskId)
+    assert.equal(
+      (await client.scanTask.findUnique({ where: { id: child.scanTaskId } }))?.deliveryAckedAt,
+      null,
+      `real DB (${label}): lost-response replay must keep the child unacked`
+    )
+    await expectRejectCode(
+      () => service.getScanDeliveryLease(terminalId),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      `real DB (${label}): replayed retry child must not be leasable before ACK`
+    )
+    await service.ack(child.scanTaskId, null, prior.controlToken, terminalId)
+    assert.equal((await service.getScanDeliveryLease(terminalId)).scanTaskId, child.scanTaskId)
+
+    await service.cancel(child.scanTaskId, null, prior.controlToken)
+    const unacked = await service.create({ scanType: 'document', terminalId }, null)
+    await client.scanTask.update({
+      where: { id: unacked.scanTaskId },
+      data: { createdAt: new Date(Date.now() - SCAN_UNACKED_WAITING_GRACE_MS - 1000) },
+    })
+    const reaper = new ScanTaskReaperTask(client as never)
+    assert.ok((await reaper.reapUnackedWaiting()).count >= 1)
+    const reaped = await client.scanTask.findUnique({ where: { id: unacked.scanTaskId } })
+    assert.equal(reaped?.status, 'expired')
+    assert.equal(reaped?.retryAuthorityExpiresAt, null)
+    const afterReap = await service.create({ scanType: 'document', terminalId }, null)
+    assert.ok(afterReap.scanTaskId)
+  } finally {
+    await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
+    await client.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await client.$disconnect()
+  }
+}
+
+function assertLeaseAckFilterReverseMutation(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async getScanDeliveryLease')
+  const end = source.indexOf('async deliverScanFile', start)
+  const mutant = stripTypeScriptComments(source.slice(start, end)).replace(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}\s*,?/,
+    ''
+  )
+  assert.equal(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(mutant),
+    false,
+    'reverse mutation must actually drop the deliveryAckedAt lease filter'
+  )
+  assert.ok(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(stripTypeScriptComments(source.slice(start, end))),
+    'production getScanDeliveryLease must keep deliveryAckedAt: { not: null } (mutant without it is the red case)'
+  )
 }
 
 function assertDeliverScanFileRequiresBidirectionalLineage(apiRoot: string): void {
@@ -375,6 +593,7 @@ interface StoredScanTask {
   retryConsumedAt: Date | null
   retryConsumedByScanTaskId: string | null
   retryAuthorityExpiresAt: Date | null
+  deliveryAckedAt: Date | null
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -515,6 +734,7 @@ class FakePrisma {
         retryConsumedAt: data.retryConsumedAt ?? null,
         retryConsumedByScanTaskId: data.retryConsumedByScanTaskId ?? null,
         retryAuthorityExpiresAt: data.retryAuthorityExpiresAt ?? null,
+        deliveryAckedAt: data.deliveryAckedAt ?? null,
         expiresAt: data.expiresAt!,
         createdAt: now,
         updatedAt: now,
@@ -540,6 +760,7 @@ class FakePrisma {
         lastAttemptHash?: string | null | { not: null }
         retryAuthorityExpiresAt?: { gt: Date }
         updatedAt?: { gt?: Date; lt?: Date }
+        deliveryAckedAt?: Date | null | { not: null }
       }
     }) => {
       const candidates = Array.from(this.scanTasksById.values()).filter((t) => {
@@ -588,6 +809,15 @@ class FakePrisma {
           !(t.updatedAt.getTime() < where.updatedAt.lt.getTime())
         )
           return false
+        if (where.deliveryAckedAt === null && t.deliveryAckedAt !== null) return false
+        if (
+          where.deliveryAckedAt &&
+          typeof where.deliveryAckedAt === 'object' &&
+          'not' in where.deliveryAckedAt &&
+          where.deliveryAckedAt.not === null &&
+          t.deliveryAckedAt === null
+        )
+          return false
         return true
       })
       return candidates[0] ?? null
@@ -616,7 +846,9 @@ class FakePrisma {
         lastAttemptHash?: string | null | { not: null }
         retryAuthorityExpiresAt?: { gt: Date }
         updatedAt?: { gt?: Date; lt?: Date }
-        expiresAt?: { lte: Date }
+        expiresAt?: { lte?: Date; gt?: Date }
+        createdAt?: { lte?: Date }
+        deliveryAckedAt?: Date | null | { not: null }
       }
       data: Partial<StoredScanTask>
     }) => {
@@ -663,6 +895,25 @@ class FakePrisma {
         if (
           where.expiresAt?.lte !== undefined &&
           !(t.expiresAt.getTime() <= where.expiresAt.lte.getTime())
+        )
+          return false
+        if (
+          where.expiresAt?.gt !== undefined &&
+          !(t.expiresAt.getTime() > where.expiresAt.gt.getTime())
+        )
+          return false
+        if (
+          where.createdAt?.lte !== undefined &&
+          !(t.createdAt.getTime() <= where.createdAt.lte.getTime())
+        )
+          return false
+        if (where.deliveryAckedAt === null && t.deliveryAckedAt !== null) return false
+        if (
+          where.deliveryAckedAt &&
+          typeof where.deliveryAckedAt === 'object' &&
+          'not' in where.deliveryAckedAt &&
+          where.deliveryAckedAt.not === null &&
+          t.deliveryAckedAt === null
         )
           return false
         return true
@@ -771,6 +1022,23 @@ function wrapServiceForTest(service: ScanTasksService): ScanTasksService {
   const originalDeliver = service.deliverScanFile.bind(service)
   service.deliverScanFile = async (args: any) => {
     if (args.scanTaskId === undefined && args.deliveryLease === undefined) {
+      // Historical deliver tests omit lease and predate the ACK gate. Arm the
+      // current waiting row only on this convenience path so they still exercise
+      // deliverScanFile(); getScanDeliveryLease itself stays fail-closed.
+      const prisma = (service as unknown as {
+        prisma: {
+          scanTask: {
+            updateMany: (args: {
+              where: { terminalId: string; status: string; deliveryAckedAt: null }
+              data: { deliveryAckedAt: Date }
+            }) => Promise<unknown>
+          }
+        }
+      }).prisma
+      await prisma.scanTask.updateMany({
+        where: { terminalId: args.terminalId, status: 'waiting', deliveryAckedAt: null },
+        data: { deliveryAckedAt: new Date() },
+      })
       const lease = await service.getScanDeliveryLease(args.terminalId)
       return await originalDeliver({
         ...args,
@@ -2046,6 +2314,9 @@ async function main(): Promise<void> {
   assertRetryHardeningMigrationContracts(apiRootForContracts)
   assertRetryCreateRecoversLostResponse(apiRootForContracts)
   assertDeliverScanFileRequiresBidirectionalLineage(apiRootForContracts)
+  assertDeliveryAckMigrationContracts(apiRootForContracts)
+  assertLeaseRequiresDeliveryAck(apiRootForContracts)
+  assertLeaseAckFilterReverseMutation(apiRootForContracts)
 
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
 
@@ -2464,6 +2735,144 @@ async function main(): Promise<void> {
         `${deadStatus} child recovery must fail closed`
       )
     }
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const plain = await service.create(dto, null)
+    assert.equal(prisma.scanTasksById.get(plain.scanTaskId)?.deliveryAckedAt, null)
+    await expectRejectCode(
+      () => service.getScanDeliveryLease('t_1'),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      'plain create must not be leasable before ACK'
+    )
+    const acked = await service.ack(plain.scanTaskId, null, plain.controlToken, 't_1')
+    assert.ok(acked.deliveryAckedAt)
+    const lease = await service.getScanDeliveryLease('t_1')
+    assert.equal(lease.scanTaskId, plain.scanTaskId)
+    const ackedAgain = await service.ack(plain.scanTaskId, null, plain.controlToken, 't_1')
+    assert.equal(ackedAgain.deliveryAckedAt, acked.deliveryAckedAt, 'second ACK must be idempotent')
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_ack')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_ack',
+      prior.controlToken
+    )
+    assert.equal(prisma.scanTasksById.get(child.scanTaskId)?.deliveryAckedAt, null)
+    await expectRejectCode(
+      () => service.getScanDeliveryLease('t_1'),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      'retry create must not be leasable before ACK'
+    )
+    const replay = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_ack',
+      prior.controlToken
+    )
+    assert.equal(replay.scanTaskId, child.scanTaskId)
+    assert.equal(prisma.scanTasksById.get(child.scanTaskId)?.deliveryAckedAt, null)
+    await service.ack(child.scanTaskId, 'member_ack', prior.controlToken, 't_1')
+    const lease = await service.getScanDeliveryLease('t_1')
+    assert.equal(lease.scanTaskId, child.scanTaskId)
+  }
+
+  {
+    const { service } = makeService()
+    const memberTask = await service.create(dto, 'member_a')
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, 'member_a', 'wrong-token', 't_1'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'wrong control token must not ACK'
+    )
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, 'member_b', memberTask.controlToken, 't_1'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'wrong member must not ACK'
+    )
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, null, memberTask.controlToken, 't_1'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'guest must not ACK a member task'
+    )
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, 'member_a', memberTask.controlToken, 't_2'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'wrong terminal must not ACK'
+    )
+    await expectRejectCode(
+      () => service.ack('missing-task', 'member_a', memberTask.controlToken, 't_1'),
+      NotFoundException,
+      'SCAN_TASK_NOT_FOUND',
+      'missing task ACK is 404 not a presence oracle via 403'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, null)
+    for (const deadStatus of ['cancelled', 'failed', 'completed', 'expired'] as const) {
+      prisma.scanTasksById.get(created.scanTaskId)!.status = deadStatus
+      await expectRejectCode(
+        () => service.ack(created.scanTaskId, null, created.controlToken, 't_1'),
+        ConflictException,
+        'SCAN_TASK_ACK_NOT_ALLOWED',
+        `${deadStatus} task must not ACK`
+      )
+    }
+    prisma.scanTasksById.get(created.scanTaskId)!.status = 'waiting'
+    prisma.scanTasksById.get(created.scanTaskId)!.expiresAt = new Date(Date.now() - 1)
+    await expectRejectCode(
+      () => service.ack(created.scanTaskId, null, created.controlToken, 't_1'),
+      ConflictException,
+      'SCAN_TASK_ACK_NOT_ALLOWED',
+      'expired waiting task must not ACK'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, null)
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    const row = prisma.scanTasksById.get(child.scanTaskId)!
+    prisma.scanTasksById.set(child.scanTaskId, {
+      ...row,
+      createdAt: new Date(Date.now() - SCAN_UNACKED_WAITING_GRACE_MS - 1),
+    })
+    const reaper = new ScanTaskReaperTask(prisma as never)
+    const reaped = await reaper.reapUnackedWaiting()
+    assert.equal(reaped.count, 1)
+    const after = prisma.scanTasksById.get(child.scanTaskId)!
+    assert.equal(after.status, 'expired')
+    assert.equal(after.retryAuthorityExpiresAt, null, 'unacked reap must not mint retry authority')
+    const next = await service.create(dto, null)
+    assert.ok(next.scanTaskId)
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          null,
+          prior.controlToken
+        ),
+      ConflictException,
+      'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+      'reaped unacked retry child must not open a second child'
+    )
   }
 
   {
@@ -2892,6 +3301,8 @@ async function main(): Promise<void> {
       await assertRealDbRetryAuthorityCas(dbUrl, 'sqlite')
       await assertRealDbRetryCreateAtomicity(dbUrl)
       await assertRealDbRetryLineageIndexes(dbUrl, 'sqlite')
+      assertSqliteDeliveryAckBackfill(apiRoot)
+      await assertRealDbDeliveryAckGate(dbUrl, 'sqlite')
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }
@@ -2944,6 +3355,83 @@ async function main(): Promise<void> {
       await assertRealDbRetryAuthorityCas(pgUrl, 'postgres')
       await assertRealDbRetryCreateAtomicity(pgUrl)
       await assertRealDbRetryLineageIndexes(pgUrl, 'postgres')
+      assert.equal(
+        postgresQuery(
+          pgUrl,
+          `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ScanTask' AND column_name = 'deliveryAckedAt';`
+        ),
+        '1',
+        'PostgreSQL ACK migration must add deliveryAckedAt'
+      )
+      await assertRealDbDeliveryAckGate(pgUrl, 'postgres')
+      {
+        const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'postgres', 'migrations')
+        const sandbox = createMigrationSandbox(
+          apiRoot,
+          sourceMigrationsRoot,
+          path.join(apiRoot, 'prisma', 'postgres', 'schema.prisma'),
+          'postgresql'
+        )
+        const base = new URL(pgUrl)
+        const maintenanceDatabase = base.pathname.slice(1) || 'postgres'
+        const suffix = randomBytes(4).toString('hex')
+        const dbName = `scan_ack_backfill_${suffix}`
+        const connectionArgs = [
+          '-h',
+          base.hostname,
+          '-p',
+          base.port || '5432',
+          '-U',
+          base.username || 'postgres',
+          '-w',
+        ]
+        const postgresCommandEnv = {
+          ...process.env,
+          ...(base.password ? { PGPASSWORD: base.password } : {}),
+        }
+        try {
+          execFileSync(
+            'createdb',
+            [...connectionArgs, '--maintenance-db', maintenanceDatabase, dbName],
+            { env: postgresCommandEnv, stdio: 'pipe' }
+          )
+          addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+          const dbUrl = postgresDatabaseUrl(pgUrl, dbName)
+          runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+            ...process.env,
+            DATABASE_URL: dbUrl,
+            POSTGRES_URL: dbUrl,
+          })
+          postgresQuery(
+            dbUrl,
+            `
+              INSERT INTO "Terminal" ("id", "terminalCode", "agentToken", "deviceFingerprint", "lastSeenAt")
+              VALUES ('ack_backfill_terminal', 'ACK-BACKFILL', 'ack-backfill-token', 'ack-backfill-fp', NOW());
+              INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "createdAt", "updatedAt")
+              VALUES ('legacy_waiting', 'ack_backfill_terminal', 'document', 'waiting', NOW() + INTERVAL '10 minutes', NOW() - INTERVAL '90 seconds', NOW() - INTERVAL '90 seconds');
+            `
+          )
+          const createdAt = postgresQuery(dbUrl, `SELECT "createdAt" FROM "ScanTask" WHERE id = 'legacy_waiting';`)
+          addAckMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+          runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+            ...process.env,
+            DATABASE_URL: dbUrl,
+            POSTGRES_URL: dbUrl,
+          })
+          assert.equal(
+            postgresQuery(dbUrl, `SELECT "deliveryAckedAt" FROM "ScanTask" WHERE id = 'legacy_waiting';`),
+            createdAt,
+            'PostgreSQL ACK migration must backfill waiting rows to createdAt'
+          )
+        } finally {
+          execFileSync(
+            'dropdb',
+            [...connectionArgs, '--maintenance-db', maintenanceDatabase, '--if-exists', '--force', dbName],
+            { env: postgresCommandEnv, stdio: 'pipe' }
+          )
+          rmSync(sandbox.root, { recursive: true, force: true })
+        }
+      }
     }
   }
 
@@ -4598,6 +5086,7 @@ async function main(): Promise<void> {
     )
 
     const createCalls: unknown[][] = []
+    const ackCalls: unknown[][] = []
     const fakeScanTasksService = {
       create: async (...args: unknown[]) => {
         createCalls.push(args)
@@ -4607,6 +5096,10 @@ async function main(): Promise<void> {
         expiresAt: new Date().toISOString(),
         instructions: [],
         }
+      },
+      ack: async (...args: unknown[]) => {
+        ackCalls.push(args)
+        return { scanTaskId: 'st_ok', deliveryAckedAt: '2026-09-14T00:00:00.000Z' }
       },
     }
     const fakeTerminalsService = {}
@@ -4666,6 +5159,29 @@ async function main(): Promise<void> {
         ),
       UnauthorizedException,
       'missing x-terminal-id header must throw UnauthorizedException'
+    )
+
+    const ackGuards = Reflect.getMetadata('__guards__', ScanTasksController.prototype.ack) || []
+    assert.ok(
+      Array.isArray(ackGuards) && ackGuards.includes(TerminalIdentityGuard),
+      'ScanTasksController.ack must be guarded with TerminalIdentityGuard'
+    )
+    const ackOk = await controller.ack('st_ok', dummyReq, 't_1', 'control-token')
+    assert.equal((ackOk as { data: { scanTaskId: string } }).data.scanTaskId, 'st_ok')
+    assert.deepEqual(ackCalls[0], ['st_ok', null, 'control-token', 't_1'])
+    await expectRejects(
+      () => controller.ack('st_ok', dummyReq, undefined, 'control-token'),
+      UnauthorizedException,
+      'ACK without x-terminal-id must throw UnauthorizedException'
+    )
+    const ackSource = readFileSync(
+      path.join(apiRootForContracts, 'src/scan-tasks/scan-tasks.controller.ts'),
+      'utf8'
+    )
+    assert.match(
+      ackSource,
+      /@Post\('scan\/sessions\/:id\/ack'\)[\s\S]{0,400}@UseGuards\(TerminalIdentityGuard\)/,
+      'ACK route must declare TerminalIdentityGuard in source'
     )
   }
 

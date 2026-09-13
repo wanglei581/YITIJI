@@ -89,6 +89,34 @@ export class ScanTasksController {
   }
 
   /**
+   * Kiosk confirms it durably holds this session's control credentials.
+   * Agent current-lease stays empty until this succeeds.
+   */
+  @Post('scan/sessions/:id/ack')
+  @UseGuards(TerminalIdentityGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async ack(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Headers('x-terminal-id') headerTerminalId?: string,
+    @Headers('x-scan-session-control') controlToken?: string,
+  ) {
+    if (!headerTerminalId) {
+      throw new UnauthorizedException({
+        error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' },
+      })
+    }
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
+    const result = await this.scanTasks.ack(
+      id,
+      endUser?.endUserId ?? null,
+      controlToken,
+      headerTerminalId,
+    )
+    return ApiResponse.ok(result)
+  }
+
+  /**
    * 仅 Terminal Agent Bearer 调用：获取当前终端的精确扫描租约。
    * 返回包含精确 scanTaskId、serverNow、notBefore、expiresAt 以及短期签名 deliveryLease。
    */

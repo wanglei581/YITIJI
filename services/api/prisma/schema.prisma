@@ -190,6 +190,9 @@ model ScanTask {
   retryConsumedAt           DateTime?
   retryConsumedByScanTaskId String?   @unique
   retryAuthorityExpiresAt   DateTime?
+  // Null until Kiosk ACKs that it durably holds this task's control credentials.
+  // Agent current-lease must not see waiting rows while this is null.
+  deliveryAckedAt  DateTime?
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -206,6 +209,7 @@ model ScanTask {
   @@index([terminalId, status, createdAt])
   @@index([endUserId])
   @@index([terminalId, lastAttemptHash, updatedAt])
+  @@index([terminalId, deliveryAckedAt])
   @@unique([retryOfScanTaskId])
 }
 

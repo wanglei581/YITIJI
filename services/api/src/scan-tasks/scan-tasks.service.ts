@@ -43,6 +43,8 @@ export type ScanTaskStatus =
   | 'cancelled'
 
 const SCAN_TASK_TTL_MS = 10 * 60 * 1000
+/** Unacked waiting rows older than this are expired; must exceed kiosk lost-response replay (~25s). */
+export const SCAN_UNACKED_WAITING_GRACE_MS = 60 * 1000
 /** 建档后签发的内容 URL 有效期，与打印/上传会话链路同一惯例（30 分钟）。 */
 const SCAN_FILE_URL_TTL_MS = 30 * 60 * 1000
 
@@ -406,6 +408,7 @@ export class ScanTasksService {
             controlTokenHash: childControlTokenHash,
             retryOfScanTaskId: retryOfScanTaskId ?? null,
             retryContentHash,
+            deliveryAckedAt: null,
           },
           select: { id: true },
         })
@@ -575,6 +578,72 @@ export class ScanTasksService {
         message: '重扫任务已结束，无法恢复该次安全重扫',
       },
     })
+  }
+
+  /**
+   * Kiosk confirms it durably holds this task's control credentials.
+   * Until this CAS succeeds, Agent current-lease must not return the row.
+   */
+  async ack(
+    scanTaskId: string,
+    endUserId: string | null,
+    controlToken: string | undefined,
+    terminalRef: string
+  ): Promise<{ scanTaskId: string; deliveryAckedAt: string }> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
+      select: { id: true },
+    })
+    const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+    if (!task) {
+      throw new NotFoundException({
+        error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
+      })
+    }
+    this.assertTaskReadAccess(task, endUserId, controlToken)
+    if (!terminal || task.terminalId !== terminal.id) {
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权确认该扫描任务' },
+      })
+    }
+    if (task.deliveryAckedAt) {
+      return { scanTaskId: task.id, deliveryAckedAt: task.deliveryAckedAt.toISOString() }
+    }
+    const now = new Date()
+    if (
+      (task.status !== 'waiting' && task.status !== 'matched') ||
+      task.expiresAt.getTime() <= now.getTime()
+    ) {
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_TASK_ACK_NOT_ALLOWED',
+          message: '当前扫描任务状态不允许确认投递',
+        },
+      })
+    }
+    const ackedAt = now
+    const updated = await this.prisma.scanTask.updateMany({
+      where: {
+        id: task.id,
+        status: { in: ['waiting', 'matched'] },
+        deliveryAckedAt: null,
+        expiresAt: { gt: ackedAt },
+      },
+      data: { deliveryAckedAt: ackedAt },
+    })
+    if (updated.count === 0) {
+      const latest = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+      if (latest?.deliveryAckedAt) {
+        return { scanTaskId: latest.id, deliveryAckedAt: latest.deliveryAckedAt.toISOString() }
+      }
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_TASK_ACK_NOT_ALLOWED',
+          message: '当前扫描任务状态不允许确认投递',
+        },
+      })
+    }
+    return { scanTaskId: task.id, deliveryAckedAt: ackedAt.toISOString() }
   }
 
   async getStatus(
@@ -776,11 +845,17 @@ export class ScanTasksService {
 
   /**
    * Agent 专用扫描租约签发：校验目标终端当前 waiting 任务，签发短期 deliveryLease。
+   * Unacked waiting rows are invisible here until Kiosk POSTs /ack.
    */
   async getScanDeliveryLease(terminalId: string): Promise<ScanDeliveryLeaseResult> {
     const now = new Date()
     const task = await this.prisma.scanTask.findFirst({
-      where: { terminalId, status: 'waiting', expiresAt: { gt: now } },
+      where: {
+        terminalId,
+        status: 'waiting',
+        expiresAt: { gt: now },
+        deliveryAckedAt: { not: null },
+      },
     })
     if (!task) {
       throw new ConflictException({

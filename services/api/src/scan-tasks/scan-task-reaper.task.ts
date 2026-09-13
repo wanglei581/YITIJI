@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
-import { SCAN_RETRY_AUTHORITY_TTL_MS } from './scan-tasks.service'
+import { SCAN_RETRY_AUTHORITY_TTL_MS, SCAN_UNACKED_WAITING_GRACE_MS } from './scan-tasks.service'
 
 /**
  * `deliverScanFile()` 上传期间会通过 `startMatchedHeartbeat()`
@@ -93,6 +93,34 @@ export class ScanTaskReaperTask {
    * cancelled / failed / 未到期 waiting 改写成 expired。matched 卡死仍只由
    * reapStuckMatched() 按 updatedAt 收敛为 failed。
    */
+  /**
+   * Expire waiting rows that Kiosk never ACKed. Must not mint retry authority:
+   * these rows never matched, so there is no content-bound retry to preserve.
+   * Parent retry lineage stays consumed; replay of a dead child is
+   * SCAN_RETRY_CHILD_NOT_RECOVERABLE (no second child).
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async reapUnackedWaiting(): Promise<{ count: number }> {
+    const staleThreshold = new Date(Date.now() - SCAN_UNACKED_WAITING_GRACE_MS)
+    try {
+      const result = await this.prisma.scanTask.updateMany({
+        where: {
+          status: 'waiting',
+          deliveryAckedAt: null,
+          createdAt: { lte: staleThreshold },
+        },
+        data: { status: 'expired', retryAuthorityExpiresAt: null },
+      })
+      if (result.count > 0) {
+        this.logger.warn(`reaped ${result.count} unacked waiting scan task(s) past ack grace`)
+      }
+      return { count: result.count }
+    } catch (err) {
+      this.logger.error(`unacked-waiting reaper failed: ${(err as Error).message}`)
+      return { count: 0 }
+    }
+  }
+
   @Cron(CronExpression.EVERY_MINUTE)
   async reapExpiredWaiting(): Promise<{ count: number }> {
     const now = new Date()

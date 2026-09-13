@@ -83,6 +83,14 @@ export const SCAN_RETRY_CONTROL_HEADER = 'X-Scan-Retry-Control'
 /** 409：配对重扫的 child 已不在 waiting/matched，不能恢复，也不能再开第二条。 */
 export const SCAN_RETRY_CHILD_NOT_RECOVERABLE = 'SCAN_RETRY_CHILD_NOT_RECOVERABLE'
 
+/** 409：任务不是未过期的 waiting/matched，不能 ACK 投递闸门。 */
+export const SCAN_TASK_ACK_NOT_ALLOWED = 'SCAN_TASK_ACK_NOT_ALLOWED'
+
+export interface ScanSessionAckResponse {
+  scanTaskId: string
+  deliveryAckedAt: string
+}
+
 export interface ScanSessionCreateResponse {
   scanTaskId: string
   /** 明文只在本次创建响应里下发一次，后续 getStatus()/cancel() 必须带上它才能操作该会话（B1-4）。
