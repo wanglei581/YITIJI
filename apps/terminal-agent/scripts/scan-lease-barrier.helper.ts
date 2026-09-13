@@ -28,7 +28,10 @@ import {
   noteScanWatcherRebuildForTest,
   isScanDeliveryPausedForTest,
   beginScanWatchSessionForTest,
+  enterRunningForTest,
   getScanInputStateForTest,
+  getScanInputGenerationForTest,
+  getScanInputLockOutReasonForTest,
   lockOutScanInputForTest,
   stopScanWatchSessionForTest,
   setScanCandidateTestHooks,
@@ -39,6 +42,7 @@ import {
 } from '../src/agent/scan-watcher'
 import type { TrustedWindowsCandidate } from '../src/agent/scan-input/windows-secure-reader'
 import {
+  ScanDeliveryBarrier,
   isPreExistingCandidate,
   ScanDirectoryBaseline,
   globalDirectoryBaseline,
@@ -1299,7 +1303,368 @@ export async function runWindowsCaseFoldCanonicalKeyTest(): Promise<void> {
   }
 }
 
+export function runScanDeliveryBarrierUnitContractTests(): void {
+  const barrier = new ScanDeliveryBarrier()
+
+  // Contract 1: allowsAttach 只有 idle 为 true
+  assert.equal(barrier.allowsAttach(), true, 'idle allows attach')
+
+  // Contract 2: beginWatchSession 仅 idle 可成功并返回 boolean，非法调用不改变 state/generation/identity/reason
+  assert.equal(barrier.beginWatchSession(), true, 'beginWatchSession succeeds from idle')
+  assert.equal(barrier.getState(), 'initializing')
+  assert.equal(barrier.getGeneration(), 1)
+  assert.equal(barrier.establishedIdentity(), undefined)
+  assert.equal(barrier.lockOutCode(), undefined)
+  assert.equal(barrier.allowsAttach(), false, 'initializing does not allow attach')
+
+  // Calling beginWatchSession from initializing fails and mutates nothing
+  assert.equal(barrier.beginWatchSession(), false, 'beginWatchSession fails from initializing')
+  assert.equal(barrier.getState(), 'initializing')
+  assert.equal(barrier.getGeneration(), 1)
+  assert.equal(barrier.establishedIdentity(), undefined)
+  assert.equal(barrier.lockOutCode(), undefined)
+
+  // Contract 4: enterRunning 成功时必须隔离 generation (generation increments)
+  const fakeId = { canonicalPath: '/tmp/scan', dev: 1, ino: 2 }
+  assert.equal(barrier.enterRunning(fakeId), true, 'enterRunning succeeds from initializing')
+  assert.equal(barrier.getState(), 'running')
+  assert.equal(barrier.getGeneration(), 2, 'enterRunning must increment generation')
+  assert.equal(barrier.allowsAttach(), false, 'running does not allow attach')
+  assert.equal(barrier.generationAllowsDelivery(1), false, 'generation from initializing cannot deliver in running')
+  assert.equal(barrier.generationAllowsDelivery(2), true, 'generation matching running can deliver')
+
+  // Calling beginWatchSession from running fails and mutates nothing
+  assert.equal(barrier.beginWatchSession(), false, 'beginWatchSession fails from running')
+  assert.equal(barrier.getState(), 'running')
+  assert.equal(barrier.getGeneration(), 2)
+  assert.equal(barrier.establishedIdentity(), fakeId)
+  assert.equal(barrier.lockOutCode(), undefined)
+
+  // Calling enterRunning from running fails and mutates nothing
+  assert.equal(barrier.enterRunning(fakeId), false, 'enterRunning fails when already running')
+  assert.equal(barrier.getGeneration(), 2)
+
+  // Contract 3: lockOut 对 locked_out/stopped 幂等并保留首次 reason
+  barrier.lockOut('first_reason')
+  assert.equal(barrier.getState(), 'locked_out')
+  assert.equal(barrier.getGeneration(), 3)
+  assert.equal(barrier.lockOutCode(), 'first_reason')
+  assert.equal(barrier.allowsAttach(), false, 'locked_out does not allow attach')
+
+  // Second lockOut on locked_out is idempotent and preserves first reason
+  barrier.lockOut('second_reason')
+  assert.equal(barrier.getState(), 'locked_out')
+  assert.equal(barrier.getGeneration(), 3, 'lockOut on locked_out must not bump generation')
+  assert.equal(barrier.lockOutCode(), 'first_reason', 'lockOut on locked_out must retain first reason')
+
+  // Calling beginWatchSession from locked_out fails and mutates nothing
+  assert.equal(barrier.beginWatchSession(), false, 'beginWatchSession fails from locked_out')
+  assert.equal(barrier.getState(), 'locked_out')
+  assert.equal(barrier.getGeneration(), 3)
+  assert.equal(barrier.lockOutCode(), 'first_reason')
+
+  // Now test stopped state
+  barrier.stop()
+  assert.equal(barrier.getState(), 'stopped')
+  assert.equal(barrier.getGeneration(), 4)
+  assert.equal(barrier.lockOutCode(), 'stopped')
+  assert.equal(barrier.allowsAttach(), false, 'stopped does not allow attach')
+
+  // lockOut on stopped is idempotent and preserves first reason
+  barrier.lockOut('attempt_after_stopped')
+  assert.equal(barrier.getState(), 'stopped')
+  assert.equal(barrier.getGeneration(), 4, 'lockOut on stopped must not bump generation')
+  assert.equal(barrier.lockOutCode(), 'stopped', 'lockOut on stopped must retain stopped reason')
+
+  // beginWatchSession on stopped fails and mutates nothing
+  assert.equal(barrier.beginWatchSession(), false, 'beginWatchSession fails from stopped')
+  assert.equal(barrier.getState(), 'stopped')
+  assert.equal(barrier.getGeneration(), 4)
+  assert.equal(barrier.lockOutCode(), 'stopped')
+
+  console.log('PASS ScanDeliveryBarrier unit contract checks (allowsAttach, beginWatchSession, lockOut idempotency, generation isolation)')
+}
+
+export async function runEnterRunningGenerationIsolationTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-init-generation-isolation-'))
+  const initFilename = 'candidate-during-initializing.pdf'
+  const runningFilename = 'candidate-after-running.pdf'
+  const initPath = join(scanFolder, initFilename)
+  const runningPath = join(scanFolder, runningFilename)
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    // 1. Start watch session -> state becomes initializing (generation = 1)
+    beginScanWatchSessionForTest()
+    assert.equal(getScanInputStateForTest(), 'initializing')
+    assert.equal(getScanInputGenerationForTest(), 1)
+
+    // Write file that arrives during initializing
+    writeFileSync(initPath, '%PDF-1.4 CREATED-DURING-INITIALIZING')
+
+    // Hook afterStable: while candidate-during-initializing is waiting in waitForStableFile,
+    // isolateStartupBacklog completes and calls enterRunning, bumping generation to 2!
+    let enteredRunningDuringCandidate = false
+    setScanCandidateTestHooks({
+      afterStable: () => {
+        const id = readScanFolderIdentity(scanFolder)
+        if (id) {
+          enterRunningForTest(id)
+        }
+        enteredRunningDuringCandidate = true
+      },
+    })
+
+    await processCandidate(initPath, initFilename, config)
+    assert.equal(enteredRunningDuringCandidate, true, 'candidate must have experienced enterRunning transition')
+
+    // CONTRACT 4 VERIFICATION:
+    // The candidate captured during initializing must NEVER lease or deliver in running!
+    assert.equal(
+      backend.leaseCount(),
+      0,
+      'candidate captured during initializing must NEVER request a scan lease or deliver',
+    )
+    assert.equal(backend.deliverCount(), 0, 'candidate captured during initializing must NEVER deliver')
+    assert.equal(existsSync(initPath), false, 'initializing candidate must be moved out of scan folder')
+    assert.equal(
+      existsSync(join(scanFolder, '_unclaimed', initFilename)),
+      true,
+      'initializing candidate must be quarantined to _unclaimed',
+    )
+
+    // Clear test hooks
+    setScanCandidateTestHooks({})
+
+    // NOW VERIFY: new file arriving in running CAN deliver normally!
+    writeFileSync(runningPath, '%PDF-1.4 CREATED-AFTER-RUNNING')
+    await processCandidate(runningPath, runningFilename, config)
+    assert.equal(backend.leaseCount(), 1, 'candidate created in running must successfully request scan lease')
+    assert.equal(backend.deliverCount(), 1, 'candidate created in running must successfully deliver')
+    assert.equal(existsSync(runningPath), false, 'delivered file must be removed')
+
+    console.log('PASS enterRunning generation isolation: initializing candidate quarantined (0 lease/deliver), running candidate delivers (1 lease/deliver)')
+  } finally {
+    setScanCandidateTestHooks({})
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runIsolateStartupBacklogIdentityChangeLockoutTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-backlog-identity-change-'))
+  const stashFolder = `${scanFolder}.stash`
+  const testFile = 'startup-file.pdf'
+  writeFileSync(join(scanFolder, testFile), '%PDF-1.4 STARTUP-FILE')
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    beginScanWatchSessionForTest()
+    assert.equal(getScanInputStateForTest(), 'initializing')
+
+    // Hook during startup isolation: replace the directory before post-isolation check
+    setScanCandidateTestHooks({
+      duringStartupIsolation: () => {
+        renameSync(scanFolder, stashFolder)
+        mkdirSync(scanFolder)
+      },
+    })
+
+    await isolateStartupBacklog(scanFolder)
+
+    // CONTRACT 5 VERIFICATION:
+    // Identity changed during isolation -> must lockout, not enter running!
+    assert.equal(
+      getScanInputStateForTest(),
+      'locked_out',
+      'isolateStartupBacklog with changed identity must lockout',
+    )
+    assert.equal(
+      getScanInputLockOutReasonForTest(),
+      'root_identity_changed',
+      'lockout reason must be root_identity_changed',
+    )
+
+    // Subsequent candidate in this process must NEVER lease or deliver
+    const postFile = 'after-identity-change.pdf'
+    writeFileSync(join(scanFolder, postFile), '%PDF-1.4 AFTER-IDENTITY-CHANGE')
+    await processCandidate(join(scanFolder, postFile), postFile, config)
+    assert.equal(backend.leaseCount(), 0, 'locked-out process must NEVER lease')
+    assert.equal(backend.deliverCount(), 0, 'locked-out process must NEVER deliver')
+
+    console.log('PASS isolateStartupBacklog identity change lockout: lockOut root_identity_changed, 0 lease/deliver')
+  } finally {
+    setScanCandidateTestHooks({})
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    rmSync(stashFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runIsolateStartupBacklogIdentityMissingLockoutTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-backlog-identity-missing-'))
+  const stashFolder = `${scanFolder}.stash`
+  const testFile = 'startup-file-missing.pdf'
+  writeFileSync(join(scanFolder, testFile), '%PDF-1.4 STARTUP-FILE-MISSING')
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    beginScanWatchSessionForTest()
+    assert.equal(getScanInputStateForTest(), 'initializing')
+
+    // Hook: remove the folder completely so readScanFolderIdentity returns undefined
+    setScanCandidateTestHooks({
+      duringStartupIsolation: () => {
+        renameSync(scanFolder, stashFolder)
+      },
+    })
+
+    await isolateStartupBacklog(scanFolder)
+
+    // CONTRACT 5 VERIFICATION:
+    // Identity missing after isolation -> must lockout identity_unavailable, not enter running!
+    assert.equal(
+      getScanInputStateForTest(),
+      'locked_out',
+      'isolateStartupBacklog with missing identity must lockout',
+    )
+    assert.equal(
+      getScanInputLockOutReasonForTest(),
+      'identity_unavailable',
+      'lockout reason must be identity_unavailable',
+    )
+
+    console.log('PASS isolateStartupBacklog identity missing lockout: lockOut identity_unavailable')
+  } finally {
+    setScanCandidateTestHooks({})
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    rmSync(stashFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runStartScanWatcherInitialHealthLockoutTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const nonExistentFolder = join(tmpdir(), `non-existent-scan-dir-${Date.now()}`)
+  const config = makeHelperConfig(backend.baseUrl, nonExistentFolder)
+  try {
+    assert.equal(getScanInputStateForTest(), 'idle')
+
+    const handle = startScanWatcher(config)
+    assert.equal(handle, undefined, 'startScanWatcher on unready folder must return undefined')
+
+    // CONTRACT 6 VERIFICATION:
+    // Initial health not ready -> immediately lockout!
+    assert.equal(
+      getScanInputStateForTest(),
+      'locked_out',
+      'startScanWatcher initial health not ready must immediately lockout',
+    )
+    assert.equal(
+      getScanInputLockOutReasonForTest(),
+      'unavailable',
+      'lockout reason must match health reason',
+    )
+
+    // Secondary start must also be blocked
+    const secondHandle = startScanWatcher(config)
+    assert.equal(secondHandle, undefined, 'secondary start must return undefined')
+    assert.equal(getScanInputStateForTest(), 'locked_out')
+    assert.equal(getScanInputLockOutReasonForTest(), 'unavailable')
+
+    console.log('PASS startScanWatcher initial health lockout: immediately locked_out, reason recorded')
+  } finally {
+    await backend.close()
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runSecondaryStartBlockedAcrossStatesTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-secondary-start-'))
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  const testCandidate = 'sample-candidate.pdf'
+  const testCandidatePath = join(scanFolder, testCandidate)
+
+  const states = ['locked_out', 'running', 'initializing', 'stopped'] as const
+
+  try {
+    for (const targetState of states) {
+      clearStartupBacklogForTest()
+      globalDirectoryBaseline.clear()
+
+      // Set up target state
+      if (targetState === 'initializing') {
+        beginScanWatchSessionForTest()
+      } else if (targetState === 'running') {
+        beginScanWatchSessionForTest()
+        const id = readScanFolderIdentity(scanFolder)
+        assert.ok(id)
+        enterRunningForTest(id)
+      } else if (targetState === 'locked_out') {
+        lockOutScanInputForTest('setup_lockout')
+      } else if (targetState === 'stopped') {
+        stopScanWatchSessionForTest()
+      }
+      assert.equal(getScanInputStateForTest(), targetState)
+
+      // Set up baseline and backlog tracking
+      globalDirectoryBaseline.recordObservation(testCandidate, Date.now() - 20_000)
+      assert.equal(
+        globalDirectoryBaseline.isPreExisting(testCandidate, Date.now()),
+        true,
+        'baseline must have recorded observation',
+      )
+
+      // Mark candidate in backlog
+      writeFileSync(testCandidatePath, '%PDF-1.4 SAMPLE')
+      // Note down generation and state before secondary start
+      const genBefore = getScanInputGenerationForTest()
+      const stateBefore = getScanInputStateForTest()
+      const reasonBefore = getScanInputLockOutReasonForTest()
+
+      // Secondary start
+      const handle = startScanWatcher(config)
+
+      // Assertions for Contract 7:
+      assert.equal(handle, undefined, `startScanWatcher in ${targetState} must return undefined (no watcher)`)
+      assert.equal(getScanInputStateForTest(), stateBefore, `state must not change from ${targetState}`)
+      assert.equal(getScanInputGenerationForTest(), genBefore, `generation must not change from ${targetState}`)
+      assert.equal(getScanInputLockOutReasonForTest(), reasonBefore, `reason must not change from ${targetState}`)
+      assert.equal(
+        globalDirectoryBaseline.isPreExisting(testCandidate, Date.now()),
+        true,
+        `baseline must not be cleared on secondary start from ${targetState}`,
+      )
+
+      // Zero lease / zero POST
+      assert.equal(backend.leaseCount(), 0, `secondary start in ${targetState} must have 0 lease`)
+      assert.equal(backend.deliverCount(), 0, `secondary start in ${targetState} must have 0 deliver`)
+    }
+
+    console.log('PASS secondary start blocked across locked_out/running/initializing/stopped (no watcher, no clear, no state/gen change, 0 lease/POST)')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
 export async function runScanInputLockoutTests(): Promise<void> {
+  runScanDeliveryBarrierUnitContractTests()
   await runStartupInspectionFailureZeroDeliveryTest()
   await runNormalStartupThenNewFileDeliversTest()
   await runLockoutUntilRestartSafetyTest()
@@ -1312,4 +1677,9 @@ export async function runScanInputLockoutTests(): Promise<void> {
   await runWindowsCaseFoldCanonicalKeyTest()
   await runRecoveryEaccesRetryTest()
   await runPathCanonicalizationRecoveryTest()
+  await runEnterRunningGenerationIsolationTest()
+  await runIsolateStartupBacklogIdentityChangeLockoutTest()
+  await runIsolateStartupBacklogIdentityMissingLockoutTest()
+  await runStartScanWatcherInitialHealthLockoutTest()
+  await runSecondaryStartBlockedAcrossStatesTest()
 }

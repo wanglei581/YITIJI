@@ -20,6 +20,8 @@ import {
   processCandidate,
   startScanWatcher,
   maskScanName,
+  clearStartupBacklogForTest,
+  getScanInputStateForTest,
   UNCLAIMED_MAX_AGE_MS,
   DELIVERY_RETRY_MAX_MS,
 } from '../src/agent/scan-watcher'
@@ -28,6 +30,7 @@ import {
   runOverlappingStartupBacklogRaceTest,
   runScanLeaseBarrierTests,
   runLockoutUntilRestartSafetyTest,
+  runEnterRunningGenerationIsolationTest,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -548,8 +551,14 @@ function verifyWindowsUnverifiableFolderBlocksWatcherStartup(): void {
       )
     })
     assert.match(stdout, /scan input blocked; watcher not started — reparse_point_unverifiable/)
+    assert.equal(
+      getScanInputStateForTest(),
+      'locked_out',
+      'unverifiable reparse point must immediately lock out scan input',
+    )
     console.log('PASS startScanWatcher Windows boundary: unverifiable reparse-point safety blocks startup')
   } finally {
+    clearStartupBacklogForTest()
     Object.defineProperty(process, 'platform', platformDescriptor)
     rmSync(scanFolder, { recursive: true, force: true })
   }
@@ -920,6 +929,52 @@ function verifyPremarkAllMutationMakesOverlappingTestNonzero(): void {
   assert.equal(readFileSync(watcherPath, 'utf8'), original, 'premark-all reverse mutation must restore scan-watcher.ts')
 }
 
+const ENTER_RUNNING_GENERATION_BLOCK = `  enterRunning(identity: ScanFolderIdentity): boolean {
+    if (this.state !== 'initializing') return false
+    this.generation += 1`
+
+function verifyEnterRunningGenerationMutationMakesIsolationTestNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(
+    original.includes(ENTER_RUNNING_GENERATION_BLOCK),
+    true,
+    'enterRunning generation block must exist before reverse mutation',
+  )
+  const mutated = original.replace(
+    ENTER_RUNNING_GENERATION_BLOCK,
+    `  enterRunning(identity: ScanFolderIdentity): boolean {
+    if (this.state !== 'initializing') return false
+    // this.generation += 1`,
+  )
+  assert.notEqual(mutated, original, 'removing enterRunning generation bump must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--enter-running-isolation')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing enterRunning generation bump must make isolation test nonzero\n${output}`)
+    assert.match(
+      output,
+      /candidate captured during initializing must NEVER request a scan lease or deliver/,
+      `mutated isolation test must fail on nonzero lease/delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS enterRunning generation reverse mutation: initializing candidate isolation test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'enterRunning reverse mutation must restore scan-candidate-barrier.ts')
+}
+
 async function main(): Promise<void> {
   if (process.argv.includes('--scan-input-lockout')) {
     await runLockoutUntilRestartSafetyTest()
@@ -927,6 +982,10 @@ async function main(): Promise<void> {
   }
   if (process.argv.includes('--overlapping-startup-backlog-race')) {
     await runOverlappingStartupBacklogRaceTest()
+    return
+  }
+  if (process.argv.includes('--enter-running-isolation')) {
+    await runEnterRunningGenerationIsolationTest()
     return
   }
   verifySourceStructure()
@@ -949,6 +1008,7 @@ async function main(): Promise<void> {
   await runScanLeaseBarrierTests()
   verifyPremarkAllMutationMakesOverlappingTestNonzero()
   verifyLockoutGenerationMutationMakesSafetyTestNonzero()
+  verifyEnterRunningGenerationMutationMakesIsolationTestNonzero()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

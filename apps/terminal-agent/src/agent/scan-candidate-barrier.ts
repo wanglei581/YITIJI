@@ -205,18 +205,21 @@ export class ScanDeliveryBarrier {
   }
 
   allowsAttach(): boolean {
-    return this.state !== 'stopped'
+    return this.state === 'idle'
   }
 
-  beginWatchSession(): void {
+  beginWatchSession(): boolean {
+    if (this.state !== 'idle') return false
     this.generation += 1
     this.state = 'initializing'
     this.identity = undefined
     this.lockOutReason = undefined
+    return true
   }
 
   enterRunning(identity: ScanFolderIdentity): boolean {
     if (this.state !== 'initializing') return false
+    this.generation += 1
     this.identity = identity
     this.state = 'running'
     this.lockOutReason = undefined
@@ -224,13 +227,14 @@ export class ScanDeliveryBarrier {
   }
 
   lockOut(reason: string): void {
-    if (this.state === 'stopped') return
+    if (this.state === 'locked_out' || this.state === 'stopped') return
     this.generation += 1
     this.state = 'locked_out'
     this.lockOutReason = reason
   }
 
   stop(): void {
+    if (this.state === 'stopped') return
     this.generation += 1
     this.state = 'stopped'
     this.lockOutReason = 'stopped'

@@ -51,7 +51,9 @@ import {
   globalScanDeliveryBarrier,
   canonicalizeScanPath,
   readScanFolderIdentity,
+  scanFolderIdentityChanged,
   SCAN_INPUT_RESTART_REQUIRED,
+  type ScanFolderIdentity,
   type ScanTaskLease,
 } from './scan-candidate-barrier'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
@@ -277,7 +279,11 @@ export function isStartupBacklogCandidate(filePath: string): boolean {
 
 let scanLifecycleActive = 0
 let scanLifecycleSkipped = 0
-let scanCandidateTestHooks: { afterStable?: () => void; afterLease?: () => void } = {}
+let scanCandidateTestHooks: {
+  afterStable?: () => void
+  afterLease?: () => void
+  duringStartupIsolation?: () => void
+} = {}
 
 export function clearStartupBacklogForTest(): void {
   startupBacklogPaths.clear()
@@ -300,8 +306,12 @@ export function isScanDeliveryPausedForTest(): boolean {
   return globalScanDeliveryBarrier.isPaused()
 }
 
-export function beginScanWatchSessionForTest(): void {
-  globalScanDeliveryBarrier.beginWatchSession()
+export function beginScanWatchSessionForTest(): boolean {
+  return globalScanDeliveryBarrier.beginWatchSession()
+}
+
+export function enterRunningForTest(identity: ScanFolderIdentity): boolean {
+  return globalScanDeliveryBarrier.enterRunning(identity)
 }
 
 export function getScanInputStateForTest(): string {
@@ -310,6 +320,10 @@ export function getScanInputStateForTest(): string {
 
 export function getScanInputGenerationForTest(): number {
   return globalScanDeliveryBarrier.getGeneration()
+}
+
+export function getScanInputLockOutReasonForTest(): string | undefined {
+  return globalScanDeliveryBarrier.lockOutCode()
 }
 
 export function lockOutScanInputForTest(reason = 'test_lockout'): void {
@@ -321,7 +335,11 @@ export function stopScanWatchSessionForTest(): void {
   globalScanDeliveryBarrier.stop()
 }
 
-export function setScanCandidateTestHooks(hooks: { afterStable?: () => void; afterLease?: () => void }): void {
+export function setScanCandidateTestHooks(hooks: {
+  afterStable?: () => void
+  afterLease?: () => void
+  duringStartupIsolation?: () => void
+}): void {
   scanCandidateTestHooks = { ...hooks }
 }
 
@@ -968,8 +986,16 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
       inFlightPaths.delete(fullPath)
     }
   }
-  if (identity && globalScanDeliveryBarrier.getState() === 'initializing') {
-    globalScanDeliveryBarrier.enterRunning(identity)
+  scanCandidateTestHooks.duringStartupIsolation?.()
+  const postIsolationIdentity = readScanFolderIdentity(folder)
+  if (!postIsolationIdentity) {
+    globalScanDeliveryBarrier.lockOut('identity_unavailable')
+    logScanInputRestartRequired()
+  } else if (!identity || scanFolderIdentityChanged(identity, postIsolationIdentity)) {
+    globalScanDeliveryBarrier.lockOut('root_identity_changed')
+    logScanInputRestartRequired()
+  } else if (globalScanDeliveryBarrier.getState() === 'initializing') {
+    globalScanDeliveryBarrier.enterRunning(postIsolationIdentity)
   }
   return quarantined
 }
@@ -1006,15 +1032,20 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
 
   const health = inspectScanInputFolder(folder)
   if (health.status !== 'ready') {
+    globalScanDeliveryBarrier.lockOut(health.reason)
+    logScanInputRestartRequired()
     warn(`scan-watcher: scan input blocked; watcher not started — ${health.reason}`)
     return undefined
   }
 
   log(`scan-watcher: watching ${folder}`)
 
+  if (!globalScanDeliveryBarrier.beginWatchSession()) {
+    warn(`scan-watcher: session stopped; watcher not started — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return undefined
+  }
   globalDirectoryBaseline.clear()
   startupBacklogPaths.clear()
-  globalScanDeliveryBarrier.beginWatchSession()
 
   const next: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,
