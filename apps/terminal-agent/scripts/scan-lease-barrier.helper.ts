@@ -7,6 +7,8 @@ import {
   rmSync,
   readFileSync,
   utimesSync,
+  mkdirSync,
+  chmodSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,6 +17,9 @@ import {
   maskScanName,
   isolateStartupBacklog,
   finalizeCandidate,
+  sweepFolder,
+  isStartupBacklogCandidate,
+  clearStartupBacklogForTest,
 } from '../src/agent/scan-watcher'
 import type { TrustedWindowsCandidate } from '../src/agent/scan-input/windows-secure-reader'
 import {
@@ -441,6 +446,152 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
     } finally {
       Object.defineProperty(process, 'platform', platformDescriptor)
       rmSync(scanFolder, { recursive: true, force: true })
+    }
+  }
+
+  // 10. 真实执行测试：启动 backlog 隔离失败（EACCES / helper failure）后 never-deliver 屏障保持：
+  // 证明：
+  // (a) 启动识别为 backlog 的文件，在首次隔离失败（EACCES）后留在扫描根目录；
+  // (b) 随后的 sweep 周期中，该文件绝不进入 lease 申请（0 lease），绝不进入投递（0 deliver）；
+  // (c) 失败记录高严重度日志，且绝不泄露文件名或文件内容；
+  // (d) 修复目标权限后重试隔离，成功进入 _unclaimed，标记被正确清除；
+  // (e) 再次 sweep 依然 0 lease、0 deliver，源文件已不在根目录。
+  {
+    clearStartupBacklogForTest()
+    let leaseRequestCount = 0
+    let deliverRequestCount = 0
+
+    const server = http.createServer((req, res) => {
+      req.on('data', () => undefined)
+      req.on('end', () => {
+        if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+          leaseRequestCount += 1
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(
+            JSON.stringify({
+              success: true,
+              data: {
+                scanTaskId: 'task_should_never_bind',
+                serverNow: new Date().toISOString(),
+                notBefore: new Date(Date.now() - 30_000).toISOString(),
+                expiresAt: new Date(Date.now() + 300_000).toISOString(),
+                deliveryLease: 'unauthorized_backlog_lease',
+              },
+            }),
+          )
+          return
+        }
+
+        if (req.method === 'POST' && req.url?.includes('/scan-sessions/deliver')) {
+          deliverRequestCount += 1
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: true, data: { scanTaskId: 'task_should_never_bind', fileId: 'leaked_id' } }))
+          return
+        }
+
+        res.writeHead(404)
+        res.end()
+      })
+    })
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    assert.ok(typeof address === 'object' && address)
+    const baseUrl = `http://127.0.0.1:${address.port}/api/v1`
+
+    const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-backlog-never-deliver-'))
+    try {
+      const backlogFilename = 'startup_backlog_secret.pdf'
+      const backlogSecretContent = '%PDF-1.4 CONFIDENTIAL-STARTUP-BACKLOG-CONTENT-NEVER-DELIVER'
+      const backlogPath = join(scanFolder, backlogFilename)
+      writeFileSync(backlogPath, backlogSecretContent)
+
+      // 预先建立 _unclaimed 目录并剥夺写权限，精确模拟隔离目标不可写（EACCES 真实失败）
+      const unclaimedDir = join(scanFolder, '_unclaimed')
+      mkdirSync(unclaimedDir, { recursive: true })
+      chmodSync(unclaimedDir, 0o555)
+
+      const config = makeHelperConfig(baseUrl, scanFolder)
+
+      // 1. 首次启动隔离：因 _unclaimed 只读触发真实 EACCES
+      const { stdout: isolateStdout, stderr: isolateStderr } = await captureLogsAsync(async () => {
+        const quarantinedCount = await isolateStartupBacklog(scanFolder)
+        assert.equal(quarantinedCount, 0, 'quarantine must fail closed on EACCES and return 0 quarantined')
+      })
+
+      // 验证首次隔离失败后：
+      // 文件必须仍存在于扫描根目录（因为隔离失败未能移走）
+      assert.equal(existsSync(backlogPath), true, 'failed quarantine must leave file in place')
+      assert.equal(existsSync(join(unclaimedDir, backlogFilename)), false, 'file must not be in _unclaimed yet')
+      // 必须被记入 backlog 集合（永久 never-deliver 标记生效）
+      assert.equal(isStartupBacklogCandidate(backlogPath), true, 'failed candidate must remain marked as startup backlog')
+      // 首次启动过程绝不申请租约、绝不投递
+      assert.equal(leaseRequestCount, 0, 'isolateStartupBacklog must never request lease')
+      assert.equal(deliverRequestCount, 0, 'isolateStartupBacklog must never deliver file')
+      // 失败记录高严重度日志（写入 stderr）
+      assert.match(isolateStderr, /failed to isolate startup backlog candidate — code=EACCES/)
+      // 绝不泄露文件名或文件内容
+      assert.doesNotMatch(isolateStderr, /startup_backlog_secret\.pdf/, 'isolate failure stderr must not leak filename')
+      assert.doesNotMatch(isolateStderr, new RegExp(backlogSecretContent), 'isolate failure stderr must not leak content')
+      assert.doesNotMatch(isolateStdout, /startup_backlog_secret\.pdf/, 'isolate failure stdout must not leak filename')
+      assert.doesNotMatch(isolateStdout, new RegExp(backlogSecretContent), 'isolate failure stdout must not leak content')
+
+      // 2. 后续 sweep 周期（模拟第一次 sweep，目标依然只读）
+      const { stdout: sweep1Stdout, stderr: sweep1Stderr } = await captureLogsAsync(async () => {
+        await sweepFolder(scanFolder, config)
+      })
+
+      // 验证后续 sweep 零 lease、零 deliver
+      assert.equal(leaseRequestCount, 0, 'subsequent sweep 1 must NEVER request scan lease for backlog candidate')
+      assert.equal(deliverRequestCount, 0, 'subsequent sweep 1 must NEVER deliver backlog candidate')
+      assert.equal(existsSync(backlogPath), true, 'file must still be in root folder')
+      assert.equal(existsSync(join(unclaimedDir, backlogFilename)), false, 'file must not be in _unclaimed yet')
+      assert.equal(isStartupBacklogCandidate(backlogPath), true, 'candidate must still be marked as startup backlog')
+      // 隔离重试失败记录高严重度日志
+      assert.match(sweep1Stderr, /startup backlog quarantine retry failed — code=EACCES/)
+      // 绝不泄露文件名或内容
+      assert.doesNotMatch(sweep1Stderr, /startup_backlog_secret\.pdf/, 'sweep retry stderr must not leak filename')
+      assert.doesNotMatch(sweep1Stderr, new RegExp(backlogSecretContent), 'sweep retry stderr must not leak content')
+
+      // 3. 再次后续 sweep（模拟第二次 sweep，目标依然只读）
+      await sweepFolder(scanFolder, config)
+      assert.equal(leaseRequestCount, 0, 'subsequent sweep 2 must still NEVER request scan lease')
+      assert.equal(deliverRequestCount, 0, 'subsequent sweep 2 must still NEVER deliver')
+      assert.equal(isStartupBacklogCandidate(backlogPath), true, 'candidate must still be marked as startup backlog')
+
+      // 4. 恢复目标目录写权限，模拟重试成功
+      chmodSync(unclaimedDir, 0o755)
+
+      const { stdout: sweepSuccessStdout } = await captureLogsAsync(async () => {
+        await sweepFolder(scanFolder, config)
+      })
+
+      // 验证：重试隔离成功后，文件移入 _unclaimed，标记清除，零 lease、零 deliver
+      assert.equal(leaseRequestCount, 0, 'successful quarantine sweep must NEVER request lease')
+      assert.equal(deliverRequestCount, 0, 'successful quarantine sweep must NEVER deliver')
+      assert.equal(existsSync(backlogPath), false, 'quarantined file must be removed from root scan folder')
+      const targetQuarantinedPath = join(unclaimedDir, backlogFilename)
+      assert.equal(existsSync(targetQuarantinedPath), true, 'file must now exist in _unclaimed')
+      assert.equal(
+        readFileSync(targetQuarantinedPath, 'utf8'),
+        backlogSecretContent,
+        'file content in _unclaimed must be preserved',
+      )
+      assert.equal(isStartupBacklogCandidate(backlogPath), false, 'backlog candidate mark must be cleared upon success')
+      assert.match(sweepSuccessStdout, /startup backlog candidate quarantined/)
+
+      // 5. 再次运行 sweep：确认完全收敛，零 lease、零 deliver
+      await sweepFolder(scanFolder, config)
+      assert.equal(leaseRequestCount, 0)
+      assert.equal(deliverRequestCount, 0)
+    } finally {
+      try {
+        chmodSync(join(scanFolder, '_unclaimed'), 0o755)
+      } catch {}
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      rmSync(scanFolder, { recursive: true, force: true })
+      clearStartupBacklogForTest()
+      globalDirectoryBaseline.clear()
     }
   }
 

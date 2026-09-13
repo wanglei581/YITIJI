@@ -255,6 +255,21 @@ function guessMimeType(filename: string): string {
  */
 const inFlightPaths = new Set<string>()
 
+/**
+ * 启动时识别出的历史 backlog 文件路径集合（resolved absolute path）。
+ * 在本进程生命周期内永久 never-deliver：绝不能进入服务端租约申请或正常投递；
+ * 后续 sweep 仅重试安全隔离；成功隔离后清理标记；隔离失败记录高严重度日志但不泄露文件名或内容。
+ */
+const startupBacklogPaths = new Set<string>()
+
+export function isStartupBacklogCandidate(filePath: string): boolean {
+  return startupBacklogPaths.has(resolve(filePath))
+}
+
+export function clearStartupBacklogForTest(): void {
+  startupBacklogPaths.clear()
+}
+
 /** 处理单个候选文件：稳定性检查 → 投递 → 成功删除 / 未匹配隔离 / 其它错误留原地重试。 */
 export async function processCandidate(
   filePath: string,
@@ -320,6 +335,23 @@ export async function processCandidate(
     // 确保在 Windows 平台获得真实 TrustedWindowsCandidate 变异凭据，避免无租约或旧文件隔离抛出
     // SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING；同时复用同一份字节完成正常投递，避免双重读取。
     const verified = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
+
+    // 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
+    // 后续 sweep 仅重试安全隔离；成功后清理标记；失败需高严重度但不泄露文件名/内容。
+    const resolvedCandidatePath = resolve(filePath)
+    if (startupBacklogPaths.has(resolvedCandidatePath)) {
+      try {
+        globalDirectoryBaseline.remove(filename)
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
+        startupBacklogPaths.delete(resolvedCandidatePath)
+        warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(filename)}`)
+      } catch (e) {
+        err(
+          `scan-watcher: startup backlog quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
+        )
+      }
+      return
+    }
 
     const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
@@ -669,9 +701,14 @@ export function sweepUnclaimedDir(
 /** Store/log only bounded machine-readable codes, never exception messages containing paths. */
 function sanitizedErrorCode(error: unknown, fallback: string): string {
   const code = (error as NodeJS.ErrnoException | undefined)?.code
-  return typeof code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(code)
-    ? code.toUpperCase()
-    : fallback
+  if (typeof code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(code)) {
+    return code.toUpperCase()
+  }
+  const message = (error as Error | undefined)?.message
+  if (typeof message === 'string' && /^[A-Z0-9_]{1,64}$/.test(message)) {
+    return message
+  }
+  return fallback
 }
 
 /** 目录清点：处理当前已存在、不在 _unclaimed 子目录里的文件；同时清理 _unclaimed 里的过期文件。 */
@@ -717,6 +754,7 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
  * 启动时安全隔离目录内已有文件（fail-closed startup backlog）。
  * Agent 每次启动时，扫描目录下已存在的所有文件（启动前旧文件）
  * 均不能获得之后的新租约，必须立即安全隔离至 _unclaimed 目录。
+ * 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
  * 在 Windows 平台上严格使用 readVerifiedCandidate 获取的 TrustedWindowsCandidate
  * 原生凭据执行隔离，绝不抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING。
  * 隔离后文件在 _unclaimed 目录中，下次重启或周期性 sweep 均不会再次尝试匹配或投递。
@@ -735,7 +773,7 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
   try {
     entries = readdirSync(folder)
   } catch (e) {
-    warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — ${axiosErrorMessage(e)}`)
+    warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — code=${sanitizedErrorCode(e, 'READDIR_FAILED')}`)
     return 0
   }
 
@@ -743,10 +781,12 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
   for (const name of entries) {
     if (name === UNCLAIMED_DIRNAME) continue
     const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    const resolvedPath = resolve(fullPath)
+    startupBacklogPaths.add(resolvedPath)
     if (inFlightPaths.has(fullPath)) continue
     inFlightPaths.add(fullPath)
     try {
-      if (!isDirectChild(fullPath, name, folder)) continue
       const initial = snapshotCandidate(fullPath, name)
       if (classifyScanInputCandidate(initial) !== 'accepted' || initial.nlink !== 1) {
         continue
@@ -758,10 +798,11 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
       const verified = readVerifiedCandidate(fullPath, folder, name, finalSnapshot)
       globalDirectoryBaseline.remove(name)
       finalizeCandidate(fullPath, folder, name, verified.trustedWindowsCandidate, 'quarantine')
+      startupBacklogPaths.delete(resolvedPath)
       warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(name)}`)
       quarantined += 1
     } catch (e) {
-      err(`scan-watcher: failed to isolate startup backlog file ${maskScanName(name)}: ${axiosErrorMessage(e)}`)
+      err(`scan-watcher: failed to isolate startup backlog candidate — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`)
     } finally {
       inFlightPaths.delete(fullPath)
     }
@@ -789,6 +830,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   log(`scan-watcher: watching ${folder}`)
 
   globalDirectoryBaseline.clear()
+  startupBacklogPaths.clear()
 
   const watcher: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,
@@ -814,7 +856,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
     try {
       await isolateStartupBacklog(folder)
     } catch (e) {
-      err(`scan-watcher: startup backlog isolation threw unexpectedly: ${axiosErrorMessage(e)}`)
+      err(`scan-watcher: startup backlog isolation threw unexpectedly: ${sanitizedErrorCode(e, 'STARTUP_BACKLOG_FAILED')}`)
     }
     void sweepFolder(folder, config)
   })()

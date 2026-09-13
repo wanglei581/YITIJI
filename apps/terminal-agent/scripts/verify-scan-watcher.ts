@@ -46,6 +46,9 @@ function verifySourceStructure(): void {
   assert.match(source, /if \(name === UNCLAIMED_DIRNAME\) continue/, 'sweepFolder must skip the _unclaimed quarantine directory itself in its main-file loop')
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
+  assert.match(source, /const startupBacklogPaths\s*=\s*new Set<string>\(\)/, 'must have a startup backlog path tracking Set for never-deliver enforcement')
+  assert.match(source, /if\s*\(\s*startupBacklogPaths\.has\(resolvedCandidatePath\)\s*\)/, 'processCandidate must check startupBacklogPaths to prevent delivery')
+  assert.match(source, /startupBacklogPaths\.delete\(resolvedCandidatePath\)/, 'must clear backlog marker upon successful quarantine')
   assert.match(
     source,
     /const trustedWindowsCandidate = readTrustedWindowsCandidate\(\s*scanWatchFolder,\s*filename,\s*stableSnapshot\s*\)/,
