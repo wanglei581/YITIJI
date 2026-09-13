@@ -9,9 +9,14 @@ import { seedMaterialSession, setReactRouterState, writeMaterialSession, W2_FILE
 const NOW = '2026-07-24T00:00:00.000Z'
 const LATER = '2099-07-24T00:10:00.000Z'
 // playwright.w2.config.ts 的 webServer 用 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN 构建出这个值，
-// terminalAuth 在 E2E 构建下就拿它当终端会话票。下面的断言逐字对齐它，而不是只判非空 ——
-// 判非空的话，只要将来有谁往请求里塞了同名但无关的头，用例照样绿。
+// terminalAuth 在 E2E 构建下拿它当**初始**终端会话票（套件不走引导票交换，sessionStorage 起初是空的）。
+// 下面的断言逐字对齐它，而不是只判非空 —— 判非空的话，只要将来有谁往请求里塞了同名但无关的头，
+// 用例照样绿。
 const TERMINAL_SESSION_FIXTURE = 'playwright-terminal-session-fixture'
+// 续期应答下发的新票。初始票一旦被它换掉，terminalAuth 读到的就必须是这一张 ——
+// 「等完换票再组请求头」这件事的全部可观察性都落在这两个值不相等上：若哪天 headers 又被挪回
+// await 之前，发出去的会是上面那张初始票，下面钉住本值的断言当场红。
+const TERMINAL_SESSION_ROTATED = 'w2-rotated-terminal-session'
 
 function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[] {
   const errors: string[] = []
@@ -497,6 +502,10 @@ test('a terminal-session 401 on claim never replays the rejected session @w2', a
 // 因此这里用 terminalAuth 只在 E2E 构建挂出的测试缝发起一次**真实**续期
 // （与十分钟定时器调的是同一个 retryRefresh），再用路由 mock 扣住应答控制时机。
 // 状态仍由真实代码写、票仍由真实代码读发，用例控制的只有「续期什么时候回来」。
+//
+// 「等」只是一半：等完之后发出去的必须是**换回来的那张票**。所以下面的应答下发
+// TERMINAL_SESSION_ROTATED，断言钉的也是它 —— 只断言「请求发生在放行之后」是钉不住这件事的，
+// 请求可以等完再发却仍然带着等待之前就组好的旧票，后端照样 401。
 
 interface HeldRefresh {
   /** 续期请求已经真的打到路由 mock。 */
@@ -507,7 +516,7 @@ interface HeldRefresh {
 
 function holdTerminalRefresh(api: ApiRouter, response: { status: number; json: unknown } = {
   status: 200,
-  json: { sessionToken: 'w2-rotated-terminal-session' },
+  json: { sessionToken: TERMINAL_SESSION_ROTATED },
 }): HeldRefresh {
   let open: () => void = () => undefined
   const gate = new Promise<void>((resolve) => { open = resolve })
@@ -554,6 +563,11 @@ test('pickup claim during a normal session refresh waits for the new ticket @w2'
     },
   })
   const refresh = holdTerminalRefresh(api)
+  const claimRequest = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST'
+      && new URL(request.url()).pathname === '/api/v1/print/jobs/claim-pickup',
+  )
 
   await page.goto('/print/pickup-claim')
   await startTerminalSessionRefresh(page)
@@ -577,6 +591,14 @@ test('pickup claim during a normal session refresh waits for the new ticket @w2'
     api.requestCount('POST', '/api/v1/terminals/session-token/refresh'),
     '等的是在飞的那一次续期，不许自己再补发一次',
   ).toBe(1)
+  // 等完还不够：发出去的必须是换回来的新票。头一旦在 await 之前就组好，这里读到的会是
+  // TERMINAL_SESSION_FIXTURE —— 请求时机看着对，带的却是已经被换掉的票，后端照样判 401。
+  const claimHeaders = (await claimRequest).headers()
+  expect(
+    claimHeaders['x-terminal-session-token'],
+    '认领必须带续期换回来的新票；等于初始票就说明请求头在等待之前就组好了',
+  ).toBe(TERMINAL_SESSION_ROTATED)
+  expect(claimHeaders['x-terminal-id']).toBe('KSK-001')
   expect(await terminalSessionStateOf(page)).toBe('ready')
   expect(errors).toEqual([])
 })
@@ -1370,9 +1392,13 @@ test('Order-only release during a normal session refresh waits instead of failin
     api.requestCount('POST', '/api/v1/terminals/session-token/refresh'),
     '等的是在飞的那一次续期，不许自己再补发一次',
   ).toBe(1)
-  // 头是在等完之后才组的，因此带的是那时读到的会话票。
+  // 头是在等完之后才组的，因此带的是续期换回来的那张新票。若哪天它被挪回 await 之前，
+  // 这里读到的会是 TERMINAL_SESSION_FIXTURE：释放看着等到了，却拿已经作废的旧票去出纸。
   const releaseHeaders = (await releaseRequest).headers()
-  expect(releaseHeaders['x-terminal-session-token']).toBe(TERMINAL_SESSION_FIXTURE)
+  expect(
+    releaseHeaders['x-terminal-session-token'],
+    '释放必须带续期换回来的新票；等于初始票就说明请求头在等待之前就组好了',
+  ).toBe(TERMINAL_SESSION_ROTATED)
   expect(releaseHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)
   await expectHealthy(page, errors, 'print-progress')
 })

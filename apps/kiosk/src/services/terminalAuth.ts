@@ -27,9 +27,23 @@ function setState(next: TerminalSessionState): void {
   listeners.forEach((listener) => listener(next))
 }
 
+/**
+ * 发请求时带的那张票：永远是 sessionStorage 里的**当前**票。
+ *
+ * 生产行为不变 —— 没有 E2E mock 时这就是「读 sessionStorage，读不到就没有票」。
+ *
+ * E2E 构建里 mock 票只补**初始**那一格：套件不走引导票交换，sessionStorage 起初是空的，
+ * 没有它整个 http 套件第一次请求就没有票可带。但它到此为止 —— 真实续期一旦 saveToken，
+ * 这里必须读到新票。此前 mock 排在最前面短路返回，于是无论 headers() 组在等待之前还是
+ * 之后，发出去的都是同一个固定值：「等完换票再发请求」这件事在浏览器里根本观察不到，
+ * 用例只能断言那个固定值，把顺序缺陷原样盖住。
+ */
 function token(): string | null {
-  if (API_MODE !== 'http' || HAS_E2E_MOCK_TOKEN) return MOCK_TOKEN || 'mock-terminal-session-fixture'
-  try { return window.sessionStorage.getItem(STORAGE_KEY) } catch { return null }
+  if (API_MODE !== 'http') return MOCK_TOKEN || 'mock-terminal-session-fixture'
+  let stored: string | null = null
+  try { stored = window.sessionStorage.getItem(STORAGE_KEY) } catch { stored = null }
+  if (stored) return stored
+  return HAS_E2E_MOCK_TOKEN ? MOCK_TOKEN : null
 }
 
 function saveToken(value: string): void { window.sessionStorage.setItem(STORAGE_KEY, value) }
