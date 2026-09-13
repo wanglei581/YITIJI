@@ -54,7 +54,10 @@ export function signScanDeliveryLease(payload: ScanDeliveryLeasePayload): string
 
 /**
  * 校验扫描任务投递租约签名及有效性。
- * 严格按给定的 terminalId 和 scanTaskId 核实归属，杜绝任何未授权或跨任务跨终端重放。
+ * 严格按给定的 terminalId 和 scanTaskId 核实归属。
+ * 注意：payload 中的 nonce 仅作为短期签名签发熵源，服务端当前未在持久层或缓存中消费记录该 nonce。
+ * 租约到期前凭据本身可重放，但实际影响由精确 task/status/CAS（以及内容哈希查重）严格限制；
+ * 切勿声称 nonce 具备防重放能力；本轮不扩大数据库状态模型。
  */
 export function verifyScanDeliveryLease(
   lease: string | undefined | null,

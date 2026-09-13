@@ -98,15 +98,6 @@ export class ScanTasksController {
     return ApiResponse.ok(result)
   }
 
-  @Get('terminals/:terminalId/scan-sessions/current-lease')
-  @Throttle({ default: { ttl: 60_000, limit: 60 } })
-  async getSessionLease(
-    @Param('terminalId') terminalId: string,
-    @Headers('authorization') authHeader: string | undefined,
-  ) {
-    return this.getLease(terminalId, authHeader)
-  }
-
   /** 仅 Terminal Agent 调用：投递扫描到共享目录后产生的文件。 */
   @Post('terminals/:terminalId/scan-sessions/deliver')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
@@ -118,7 +109,6 @@ export class ScanTasksController {
     @Body('deliveryLease') deliveryLease: unknown,
     @Body('candidateSnapshotAt') candidateSnapshotAt: unknown,
     @Body('observedAt') observedAt: unknown,
-    @Body('baselineEvidence') baselineEvidence: unknown,
     @Headers('authorization') authHeader: string | undefined,
   ) {
     await this.terminals.assertAgentAuthorized(terminalId, authHeader)
@@ -134,7 +124,6 @@ export class ScanTasksController {
       mimeType: file.mimetype,
       candidateSnapshotAt,
       observedAt,
-      baselineEvidence,
     })
     return ApiResponse.ok(result)
   }

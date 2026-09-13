@@ -365,5 +365,59 @@ export async function runScanLeaseContractTests(): Promise<void> {
     assert.ok(taskAfter.fileId)
   }
 
+  // 7. 重复投递与重放边界：内容级查重 (SCAN_FILE_ALREADY_DELIVERED) 与已完成任务重放拦截 (SCAN_TASK_STATE_CHANGED)
+  {
+    const { service, prisma } = makeContractHarness()
+    const task1 = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    const lease1 = await service.getScanDeliveryLease('t_1')
+    const sharedBuffer = Buffer.from('%PDF-1.4 duplicate test content')
+
+    // 第一次投递成功
+    const delivered1 = await service.deliverScanFile({
+      terminalId: 't_1',
+      scanTaskId: task1.scanTaskId,
+      deliveryLease: lease1.deliveryLease,
+      buffer: sharedBuffer,
+      filename: 'doc1.pdf',
+      mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
+    })
+    assert.equal(delivered1.scanTaskId, task1.scanTaskId)
+
+    // (a) 重放相同文件字节到新任务：即使新任务拥有合法租约，由于内容查重护栏，绝不能跨会话重复投递
+    const task2 = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    const lease2 = await service.getScanDeliveryLease('t_1')
+    await assert.rejects(
+      async () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          scanTaskId: task2.scanTaskId,
+          deliveryLease: lease2.deliveryLease,
+          buffer: sharedBuffer,
+          filename: 'doc2.pdf',
+          mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
+        }),
+      (err: unknown) => (err as ConflictException).getResponse?.()['error']?.code === 'SCAN_FILE_ALREADY_DELIVERED',
+      'exact content hash duplicate within dedup window must be rejected',
+    )
+
+    // (b) 重放旧任务已用过的租约 lease1：由于 task1 状态已变为 completed，严格拒绝重放
+    await assert.rejects(
+      async () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          scanTaskId: task1.scanTaskId,
+          deliveryLease: lease1.deliveryLease,
+          buffer: Buffer.from('%PDF-1.4 completely different content'),
+          filename: 'doc3.pdf',
+          mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
+        }),
+      (err: unknown) => (err as ConflictException).getResponse?.()['error']?.code === 'SCAN_TASK_STATE_CHANGED',
+      'replaying signed lease against non-waiting task must fail with SCAN_TASK_STATE_CHANGED',
+    )
+  }
+
   console.log('PASS scan lease contract helper checks')
 }

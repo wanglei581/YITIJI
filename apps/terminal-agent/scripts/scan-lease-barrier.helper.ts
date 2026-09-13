@@ -13,7 +13,10 @@ import { join } from 'node:path'
 import {
   processCandidate,
   maskScanName,
+  isolateStartupBacklog,
+  finalizeCandidate,
 } from '../src/agent/scan-watcher'
+import type { TrustedWindowsCandidate } from '../src/agent/scan-input/windows-secure-reader'
 import {
   isPreExistingCandidate,
   ScanDirectoryBaseline,
@@ -308,6 +311,11 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
       assert.match(receivedMultipart, /name="deliveryLease"[\s\S]*valid_delivery_lease_token/)
       assert.match(receivedMultipart, /name="candidateSnapshotAt"/)
       assert.match(receivedMultipart, /name="observedAt"/)
+      assert.doesNotMatch(
+        receivedMultipart,
+        /name="candidateBirthtimeAt"/,
+        'candidateBirthtimeAt must not be part of multipart body; birthtime API contract revoked',
+      )
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
       rmSync(scanFolder, { recursive: true, force: true })
@@ -365,6 +373,74 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
     } finally {
       rmSync(scanFolder, { recursive: true, force: true })
       globalDirectoryBaseline.clear()
+    }
+  }
+
+  // 8. Fail-closed startup backlog：Agent 启动时已有文件立即安全隔离至 _unclaimed，重启仍不会误投递
+  {
+    const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-startup-backlog-'))
+    try {
+      const backlogFile1 = 'startup_backlog_1.pdf'
+      const backlogFile2 = 'startup_backlog_2.pdf'
+      writeFileSync(join(scanFolder, backlogFile1), '%PDF-1.4 backlog file 1')
+      writeFileSync(join(scanFolder, backlogFile2), '%PDF-1.4 backlog file 2')
+
+      const quarantinedCount = await isolateStartupBacklog(scanFolder)
+      assert.equal(quarantinedCount, 2, 'all pre-existing startup files must be quarantined')
+
+      assert.equal(existsSync(join(scanFolder, backlogFile1)), false, 'backlog file 1 must be moved out of scan folder')
+      assert.equal(existsSync(join(scanFolder, backlogFile2)), false, 'backlog file 2 must be moved out of scan folder')
+      assert.equal(existsSync(join(scanFolder, '_unclaimed', backlogFile1)), true, 'backlog file 1 must be quarantined in _unclaimed')
+      assert.equal(existsSync(join(scanFolder, '_unclaimed', backlogFile2)), true, 'backlog file 2 must be quarantined in _unclaimed')
+
+      // 模拟 Agent 再次重启：_unclaimed 中的历史文件已被排除，主目录已无新文件，隔离数应为 0
+      const restartQuarantined = await isolateStartupBacklog(scanFolder)
+      assert.equal(restartQuarantined, 0, 'on restart, files in _unclaimed are ignored and not re-quarantined')
+    } finally {
+      rmSync(scanFolder, { recursive: true, force: true })
+      globalDirectoryBaseline.clear()
+    }
+  }
+
+  // 9. Windows 平台安全变异约束：无凭据抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING，提供真实/合法凭据不抛该错误
+  {
+    const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-win-quarantine-'))
+    const testFile = 'win_token_test.pdf'
+    const filePath = join(scanFolder, testFile)
+    writeFileSync(filePath, '%PDF-1.4 win token test')
+
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+    assert.ok(platformDescriptor, 'process.platform descriptor must exist')
+    try {
+      Object.defineProperty(process, 'platform', { ...platformDescriptor, value: 'win32' })
+
+      // (a) 缺少 trustedWindowsCandidate 时必须严格抛出 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING
+      assert.throws(
+        () => finalizeCandidate(filePath, scanFolder, testFile, undefined, 'quarantine'),
+        (err: unknown) => (err as Error).message === 'SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING',
+        'Windows quarantine without trustedWindowsCandidate must fail-closed with token missing error',
+      )
+
+      // (b) 传入有效结构的 trustedWindowsCandidate 时绝不抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING
+      const fakeTrusted: TrustedWindowsCandidate = {
+        bytes: Buffer.from('%PDF-1.4 win token test'),
+        rootIdentity: { volume: 1, fileId: 100n },
+        candidateIdentity: { volume: 1, fileId: 200n },
+        size: 24,
+        mtimeMs: Date.now(),
+      }
+      try {
+        finalizeCandidate(filePath, scanFolder, testFile, fakeTrusted, 'quarantine')
+      } catch (err: unknown) {
+        assert.notEqual(
+          (err as Error).message,
+          'SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING',
+          'must not throw token missing when trusted candidate is supplied',
+        )
+      }
+    } finally {
+      Object.defineProperty(process, 'platform', platformDescriptor)
+      rmSync(scanFolder, { recursive: true, force: true })
     }
   }
 

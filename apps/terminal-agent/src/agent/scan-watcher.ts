@@ -187,7 +187,7 @@ async function waitForStableFile(
   return undefined
 }
 
-function readVerifiedCandidate(
+export function readVerifiedCandidate(
   filePath: string,
   scanWatchFolder: string,
   filename: string,
@@ -218,7 +218,7 @@ function readVerifiedCandidate(
   }
 }
 
-function finalizeCandidate(
+export function finalizeCandidate(
   filePath: string,
   scanWatchFolder: string,
   filename: string,
@@ -316,6 +316,11 @@ export async function processCandidate(
       return
     }
 
+    // 先通过 readVerifiedCandidate 获取真实安全候选对象与 verified bytes，
+    // 确保在 Windows 平台获得真实 TrustedWindowsCandidate 变异凭据，避免无租约或旧文件隔离抛出
+    // SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING；同时复用同一份字节完成正常投递，避免双重读取。
+    const verified = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
+
     const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
     // 1. 投递前先获取服务端租约；没有租约时立即隔离进 _unclaimed
@@ -342,7 +347,7 @@ export async function processCandidate(
 
     if (!lease) {
       globalDirectoryBaseline.remove(filename)
-      finalizeCandidate(filePath, scanWatchFolder, filename, undefined, 'quarantine')
+      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
       warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`)
       return
     }
@@ -354,14 +359,13 @@ export async function processCandidate(
       globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
     ) {
       globalDirectoryBaseline.remove(filename)
-      finalizeCandidate(filePath, scanWatchFolder, filename, undefined, 'quarantine')
+      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
       warn(`scan-watcher: candidate file existed prior to scan lease start; refusing pre-existing file binding, moved to _unclaimed — ${maskScanName(filename)}`)
       return
     }
 
-    // 3. 构建可信快照时间（以文件真实快照时间与租约边界为准，绝不用处理时的 new Date()）
-    const candidateSnapshotAt = new Date(Math.max(finalSnapshot.mtimeMs, leaseNotBeforeMs)).toISOString()
-    const verified = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
+    // 3. 构建可信快照时间（传原始 finalSnapshot.mtimeMs，严禁使用 Math.max 夹值伪造时间证据）
+    const candidateSnapshotAt = new Date(finalSnapshot.mtimeMs).toISOString()
     const form = new FormData()
     form.append('file', verified.bytes, { filename, contentType: guessMimeType(filename) })
     form.append('scanTaskId', lease.scanTaskId)
@@ -410,7 +414,7 @@ export async function processCandidate(
       // 状态变化——服务端已经用 systemDelete() 补偿删掉了那次真实上传出的孤儿文件，见
       // scan-tasks.service.ts deliverScanFile() 的 SCAN_TASK_STATE_CHANGED 分支）。这次"匹配"
       // 已经明确、永久失效——不是网络抖动，绝不能留给下一轮 sweep 重试：重试时该终端"当前
-      // 最早一条 waiting 任务"完全可能已经变成另一个用户的新会话（原用户的任务已经不在，
+      // waiting 任务"完全可能已经变成另一个用户的新会话（原用户的任务已经不在，
       // 终端已经空出来），继续重试会把这份文件错误地挂到那个新用户身上——跨用户 PII 误挂载。
       // 必须像 NO_WAITING_SCAN_TASK 一样立即隔离，绝不重试；日志措辞与两个既有 _unclaimed
       // 归宿（无等待任务 / 重试超时）分别不同，避免运维排查时混淆三种不同的原因。
@@ -424,7 +428,7 @@ export async function processCandidate(
       // 真正投递成功过——最可能的原因是上一次投递其实已经在服务端完成，只是 HTTP 响应在
       // 回传给本 Agent 的路上丢失，本 Agent 才把它误当成失败留在原地准备重试。继续重试
       // 没有意义（内容已经交付过），而且和 SCAN_TASK_STATE_CHANGED 一样有跨用户误挂载
-      // 风险（重试会被匹配到该终端当前最早一条 waiting 任务，可能已经属于另一个用户）——
+      // 风险（重试会被匹配到该终端当前 waiting 任务，可能已经属于另一个用户）——
       // 同样必须立即隔离，不重试。
       if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
@@ -710,6 +714,62 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
 }
 
 /**
+ * 启动时安全隔离目录内已有文件（fail-closed startup backlog）。
+ * Agent 每次启动时，扫描目录下已存在的所有文件（启动前旧文件）
+ * 均不能获得之后的新租约，必须立即安全隔离至 _unclaimed 目录。
+ * 在 Windows 平台上严格使用 readVerifiedCandidate 获取的 TrustedWindowsCandidate
+ * 原生凭据执行隔离，绝不抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING。
+ * 隔离后文件在 _unclaimed 目录中，下次重启或周期性 sweep 均不会再次尝试匹配或投递。
+ */
+export async function isolateStartupBacklog(scanWatchFolder: string): Promise<number> {
+  const folder = scanWatchFolder?.trim()
+  if (!folder) return 0
+
+  const health = inspectScanInputFolder(folder)
+  if (health.status !== 'ready') {
+    warn(`scan-watcher: scan input startup backlog check blocked — ${health.reason}`)
+    return 0
+  }
+
+  let entries: string[]
+  try {
+    entries = readdirSync(folder)
+  } catch (e) {
+    warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — ${axiosErrorMessage(e)}`)
+    return 0
+  }
+
+  let quarantined = 0
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (inFlightPaths.has(fullPath)) continue
+    inFlightPaths.add(fullPath)
+    try {
+      if (!isDirectChild(fullPath, name, folder)) continue
+      const initial = snapshotCandidate(fullPath, name)
+      if (classifyScanInputCandidate(initial) !== 'accepted' || initial.nlink !== 1) {
+        continue
+      }
+      const stable = await waitForStableFile(fullPath, name)
+      if (!stable || !existsSync(fullPath)) continue
+
+      const finalSnapshot = snapshotCandidate(fullPath, name)
+      const verified = readVerifiedCandidate(fullPath, folder, name, finalSnapshot)
+      globalDirectoryBaseline.remove(name)
+      finalizeCandidate(fullPath, folder, name, verified.trustedWindowsCandidate, 'quarantine')
+      warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(name)}`)
+      quarantined += 1
+    } catch (e) {
+      err(`scan-watcher: failed to isolate startup backlog file ${maskScanName(name)}: ${axiosErrorMessage(e)}`)
+    } finally {
+      inFlightPaths.delete(fullPath)
+    }
+  }
+  return quarantined
+}
+
+/**
  * 启动扫描监听。未配置 config.scanWatchFolder 时直接返回 undefined，
  * 不影响心跳 / claim 等其余 Agent 功能。
  */
@@ -727,6 +787,8 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   }
 
   log(`scan-watcher: watching ${folder}`)
+
+  globalDirectoryBaseline.clear()
 
   const watcher: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,
@@ -746,8 +808,16 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
     err(`scan-watcher: watcher error — ${axiosErrorMessage(error)}`)
   })
 
-  // 启动时清点一次（处理 Agent 重启期间到达、被 ignoreInitial 跳过的文件）
-  void sweepFolder(folder, config)
+  // 启动时清点与隔离：立即将已有历史文件作为 startup backlog 安全隔离至 _unclaimed，
+  // 杜绝前序会话文件在 Agent 重启后误绑定到后续新用户的任务与租约。
+  void (async () => {
+    try {
+      await isolateStartupBacklog(folder)
+    } catch (e) {
+      err(`scan-watcher: startup backlog isolation threw unexpectedly: ${axiosErrorMessage(e)}`)
+    }
+    void sweepFolder(folder, config)
+  })()
 
   const sweepTimer = setInterval(() => void sweepFolder(folder, config), SWEEP_INTERVAL_MS)
 

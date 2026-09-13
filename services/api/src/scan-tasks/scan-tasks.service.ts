@@ -60,10 +60,8 @@ const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
  * Agent 的路上丢失（进程被杀在响应写出之后 / 连接被重置在 Agent 收完之前）——这种情况下
  * Agent 完全没有任何错误信号，只会把它当成一次普通网络失败，留在原地交给下一轮 sweep
  * 按既有 2 小时窗口重试（scan-watcher.ts DELIVERY_RETRY_MAX_MS，这段"网络错误默认重试"
- * 行为本身没问题，不能改）。问题是：重试投递的还是同一份物理文件字节，而 deliverScanFile()
- * 本身对"这份内容是否已经交付过"没有任何记忆——它只会重新去找该终端"当前"最早一条
- * waiting 任务去匹配。如果原任务对应的用户会话已经结束、同一物理终端上有新用户开了
- * 新的等待中任务，这次重试就会把第一个用户的扫描内容错误地挂到第二个用户身上——
+ * 行为本身没问题，不能改）。问题是：重试投递的还是同一份物理文件字节，如果原任务对应的用户会话已经结束、
+ * 同一物理终端上有新用户开了新的等待中任务，若重试请求未能与原精确任务隔离，就会把第一个用户的扫描内容错误地挂到第二个用户身上——
  * 和 SCAN_TASK_STATE_CHANGED 那条竞态是同一类"跨用户 PII 误挂载"风险，只是触发路径
  * 不同（这里是"响应丢失"而不是"CAS 冲突"），而且完全没有错误信号可以让 Agent 察觉。
  *
@@ -514,7 +512,6 @@ export class ScanTasksService {
     mimeType: string
     candidateSnapshotAt?: unknown
     observedAt?: unknown
-    baselineEvidence?: unknown
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
 
@@ -628,9 +625,12 @@ export class ScanTasksService {
       })
     }
 
-    // 5. 陈旧捕获拦截：只信任终端 PC 本地最终观察时间；若早于任务创建边界（允许极小时钟容差），
+    // 5. 陈旧捕获拦截：只信任终端 PC 本地最终观察时间；若早于任务创建/租约生效边界（允许极小时钟容差），
     // 判定为陈旧捕获，拒绝绑定。当前 waiting 任务保持原样，不落任何文件。
-    if (observedDate.getTime() < task.createdAt.getTime() - SCAN_STALE_CAPTURE_TOLERANCE_MS) {
+    if (
+      observedDate.getTime() < leasePayload.notBeforeEpoch - SCAN_STALE_CAPTURE_TOLERANCE_MS ||
+      observedDate.getTime() < task.createdAt.getTime() - SCAN_STALE_CAPTURE_TOLERANCE_MS
+    ) {
       throw new ConflictException({
         error: {
           code: 'SCAN_FILE_STALE_CAPTURE',
