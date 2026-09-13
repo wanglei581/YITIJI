@@ -33,6 +33,8 @@ import {
   runEnterRunningGenerationIsolationTest,
   runLateCrossSessionCaptureTests,
   runUnknownDirectoryListingFailClosedTest,
+  runStemChangingInodeRenameTests,
+  runStartupBacklogTempRenameTest,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -42,8 +44,16 @@ const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: ever
     const fullPath = join(folder, name)
     if (!isDirectChild(fullPath, name, folder)) continue
     startupBacklogPaths.add(canonicalizeScanPath(fullPath))
+    // ATOMIC_STARTUP_BACKLOG_IDENTITY: never-deliver follows the directory
+    // entry (dev/ino) across a later rename; a new basename is not a new capture.
+    markStartupBacklogIdentity(fullPath)
   }
 
+`
+
+const STARTUP_BACKLOG_IDENTITY_BLOCK = `    // ATOMIC_STARTUP_BACKLOG_IDENTITY: never-deliver follows the directory
+    // entry (dev/ino) across a later rename; a new basename is not a new capture.
+    markStartupBacklogIdentity(fullPath)
 `
 
 const LOCKOUT_GENERATION_BLOCK = `  // ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION: in-flight candidates must not lease or POST
@@ -100,6 +110,11 @@ function verifySourceStructure(): void {
   )
   assert.match(barrierSource, /retainLiveEntries/, 'stem observations must be bounded to live directory entries')
   assert.match(barrierSource, /closeVanishedCapture/, 'vanished paths must adopt same-inode successors before dropping')
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_INODE_LINEAGE/,
+    'same-inode rename must inherit opening task across stem changes',
+  )
   {
     const listStart = source.indexOf('function listLiveBasenames')
     const listEnd = source.indexOf('function lockOutLiveListingUnknown')
@@ -140,8 +155,10 @@ function verifySourceStructure(): void {
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
   assert.match(source, /const startupBacklogPaths\s*=\s*new Set<string>\(\)/, 'must have a startup backlog path tracking Set for never-deliver enforcement')
-  assert.match(source, /startupBacklogPaths\.has\(resolvedCandidatePath\)/, 'processCandidate must check startupBacklogPaths to prevent delivery')
-  assert.match(source, /startupBacklogPaths\.delete\(resolvedCandidatePath\)/, 'must clear backlog marker upon successful quarantine')
+  assert.match(source, /const startupBacklogIdentities\s*=\s*new Set<string>\(\)/, 'must track startup leftover inodes so rename cannot escape by basename')
+  assert.match(source, /isStartupBacklogCandidate\(filePath, candidateIdentity\)/, 'processCandidate must treat renamed startup leftovers as backlog')
+  assert.match(source, /forgetStartupBacklog\(filePath, candidateIdentity\)/, 'must clear path and inode backlog marks upon successful quarantine')
+  assert.match(source, /ATOMIC_STARTUP_BACKLOG_IDENTITY/, 'startup premark must record directory-entry identity')
   {
     const isolateStart = source.indexOf('export async function isolateStartupBacklog')
     const isolateEnd = source.indexOf('export function startScanWatcher')
@@ -1139,6 +1156,94 @@ const LIVE_LISTING_KNOWN_MUTATED = `function listLiveBasenames(scanWatchFolder: 
   }
 }`
 
+const INODE_LINEAGE_BLOCK = `      const sameEntry = isSameScanCaptureFile(rec.identity, identity)
+      // ATOMIC_SCAN_CAPTURE_INODE_LINEAGE: a vanished directory entry is the
+      // same capture when dev/ino match, even if the basename stem changed
+      // (job.pdf.tmp -> job.pdf). Stem-only matching cannot prove sameness.
+      if (sameEntry === true) {
+        this.observations.delete(name)
+        if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec
+        continue
+      }
+      if (sameEntry === false) {
+        if (captureNameStem(name) === stem) this.observations.delete(name)
+        continue
+      }
+      if (captureNameStem(name) !== stem) continue
+      this.observations.delete(name)
+      if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec`
+
+const INODE_LINEAGE_MUTATED = `      if (captureNameStem(name) !== stem) continue
+      this.observations.delete(name)
+      if (isSameScanCaptureFile(rec.identity, identity) === false) continue
+      if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec`
+
+function verifyInodeLineageMutationMakesStemChangingRenameNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(INODE_LINEAGE_BLOCK), true, 'inode lineage block must exist before reverse mutation')
+  const mutated = original.replace(INODE_LINEAGE_BLOCK, INODE_LINEAGE_MUTATED)
+  assert.notEqual(mutated, original, 'restoring stem-only adoption must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--stem-changing-inode-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `stem-only adoption must make stem-changing rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /stem-changing temp rename from A must NEVER upload to B/,
+      `mutated inode lineage test must fail on the job.pdf.tmp upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS inode lineage reverse mutation: stem-changing rename test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'inode lineage reverse mutation must restore scan-candidate-barrier.ts')
+}
+
+function verifyStartupBacklogIdentityMutationMakesRenameNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(STARTUP_BACKLOG_IDENTITY_BLOCK), true, 'startup identity block must exist before reverse mutation')
+  const mutated = original.replace(STARTUP_BACKLOG_IDENTITY_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing startup identity mark must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--startup-backlog-identity-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing startup identity mark must make leftover rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /startup leftover temp renamed to pdf must NEVER upload/,
+      `mutated startup identity test must fail on leftover upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS startup backlog identity reverse mutation: leftover rename test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'startup identity reverse mutation must restore scan-watcher.ts')
+}
+
 function verifyUnknownLiveListingMutationMakesFailClosedNonzero(): void {
   const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
   const original = readFileSync(watcherPath, 'utf8')
@@ -1193,6 +1298,14 @@ async function main(): Promise<void> {
     await runUnknownDirectoryListingFailClosedTest()
     return
   }
+  if (process.argv.includes('--stem-changing-inode-rename')) {
+    await runStemChangingInodeRenameTests()
+    return
+  }
+  if (process.argv.includes('--startup-backlog-identity-rename')) {
+    await runStartupBacklogTempRenameTest()
+    return
+  }
   verifySourceStructure()
   verifyUnclaimedCleanup()
   await verifyRetryCapExpired()
@@ -1215,6 +1328,8 @@ async function main(): Promise<void> {
   verifyLockoutGenerationMutationMakesSafetyTestNonzero()
   verifyEnterRunningGenerationMutationMakesIsolationTestNonzero()
   verifyCaptureLineageMutationMakesLateCrossSessionNonzero()
+  verifyInodeLineageMutationMakesStemChangingRenameNonzero()
+  verifyStartupBacklogIdentityMutationMakesRenameNonzero()
   verifyInvalidNotBeforeMutationMakesFailClosedNonzero()
   verifyUnknownLiveListingMutationMakesFailClosedNonzero()
   verifyPlatformGapDisclosure()

@@ -209,6 +209,35 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
     )
     gone.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf']), otherEntry)
     assert.equal(gone.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])), false)
+
+    const crossStem = new ScanDirectoryBaseline()
+    crossStem.recordObservation('job.pdf.tmp', now, 'task_A', sameEntry)
+    crossStem.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf']), sameEntry)
+    assert.equal(
+      crossStem.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])),
+      true,
+      'same-inode vanished job.pdf.tmp under A is foreign to B after rename to job.pdf',
+    )
+
+    const crossStemOther = new ScanDirectoryBaseline()
+    crossStemOther.recordObservation('job.pdf.tmp', now, 'task_A', sameEntry)
+    crossStemOther.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf']), otherEntry)
+    assert.equal(
+      crossStemOther.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])),
+      false,
+      'a different inode at job.pdf must not inherit A from job.pdf.tmp',
+    )
+
+    const transferredCross = new ScanDirectoryBaseline()
+    transferredCross.recordObservation('job.pdf.tmp', now, 'task_A', sameEntry)
+    assert.equal(
+      transferredCross.closeVanishedCapture('job.pdf.tmp', new Set(['job.pdf']), (name) => (
+        name === 'job.pdf' ? sameEntry : undefined
+      )),
+      'job.pdf',
+      'closeVanishedCapture must adopt a same-inode successor across stem changes',
+    )
+    assert.equal(transferredCross.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])), true)
     baseline.clear()
   }
 
@@ -1125,7 +1154,152 @@ export async function runLateCrossSessionCaptureTests(): Promise<void> {
     }
   }
 
+  await runStemChangingInodeRenameTests()
   await runUnknownDirectoryListingFailClosedTest()
+}
+
+function listenScanStub(onLease: () => { scanTaskId: string; notBeforeMs: number }, onDeliver: () => void): Promise<{
+  server: http.Server
+  baseUrl: string
+  close: () => Promise<void>
+}> {
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        const lease = onLease()
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: lease.scanTaskId,
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(lease.notBeforeMs).toISOString(),
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            deliveryLease: `lease_${lease.scanTaskId}`,
+          },
+        }))
+        return
+      }
+      if (req.method === 'POST' && req.url?.includes('/scan-sessions/deliver')) {
+        onDeliver()
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true, data: { scanTaskId: 'ignored', fileId: 'leaked' } }))
+        return
+      }
+      res.writeHead(404)
+      res.end()
+    })
+  })
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      assert.ok(typeof address === 'object' && address)
+      resolve({
+        server,
+        baseUrl: `http://127.0.0.1:${address.port}/api/v1`,
+        close: () => new Promise<void>((done) => server.close(() => done())),
+      })
+    })
+  })
+}
+
+export async function runStemChangingInodeRenameTests(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+
+  {
+    let currentTaskId = 'task_A'
+    let leaseNotBeforeMs = Date.now() - 30_000
+    let deliverCount = 0
+    const stub = await listenScanStub(
+      () => ({ scanTaskId: currentTaskId, notBeforeMs: leaseNotBeforeMs }),
+      () => { deliverCount += 1 },
+    )
+    const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-pdf-tmp-ab-'))
+    const tmpName = 'job.pdf.tmp'
+    const pdfName = 'job.pdf'
+    const tmpPath = join(scanFolder, tmpName)
+    const pdfPath = join(scanFolder, pdfName)
+    try {
+      beginScanWatchSessionForTest()
+      await isolateStartupBacklog(scanFolder)
+      writeFileSync(tmpPath, '%PDF-1.4 bytes belonging to user A')
+      const config = makeHelperConfig(stub.baseUrl, scanFolder)
+      await processCandidate(tmpPath, tmpName, config)
+      currentTaskId = 'task_B'
+      leaseNotBeforeMs = Date.now()
+      renameSync(tmpPath, pdfPath)
+      const { stdout } = await captureLogsAsync(() => processCandidate(pdfPath, pdfName, config))
+      assert.equal(deliverCount, 0, 'stem-changing temp rename from A must NEVER upload to B')
+      assert.equal(existsSync(pdfPath), false)
+      assert.equal(existsSync(join(scanFolder, '_unclaimed', pdfName)), true)
+      assert.match(stdout, new RegExp(SCAN_CAPTURE_FOREIGN_LEASE))
+      console.log('PASS A-to-B job.pdf.tmp -> job.pdf rename: quarantined, 0 deliver')
+
+      writeFileSync(pdfPath, '%PDF-1.4 later legitimate B capture')
+      const later = lstatSync(pdfPath)
+      const quarantined = lstatSync(join(scanFolder, '_unclaimed', pdfName))
+      assert.notEqual(later.ino, quarantined.ino, 'later B pdf must be a new directory entry')
+      await processCandidate(pdfPath, pdfName, config)
+      assert.equal(deliverCount, 1, 'later different-inode B capture must still deliver')
+      assert.equal(existsSync(pdfPath), false)
+      console.log('PASS later different-inode B file after stem-changing rename still delivers')
+    } finally {
+      await stub.close()
+      rmSync(scanFolder, { recursive: true, force: true })
+      clearStartupBacklogForTest()
+      globalDirectoryBaseline.clear()
+    }
+  }
+
+  await runStartupBacklogTempRenameTest()
+}
+
+export async function runStartupBacklogTempRenameTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+  let deliverCount = 0
+  const stub = await listenScanStub(
+    () => ({ scanTaskId: 'task_B', notBeforeMs: Date.now() - 1_000 }),
+    () => { deliverCount += 1 },
+  )
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-startup-pdf-tmp-'))
+  const tmpName = 'job.pdf.tmp'
+  const pdfName = 'job.pdf'
+  const tmpPath = join(scanFolder, tmpName)
+  const pdfPath = join(scanFolder, pdfName)
+  try {
+    writeFileSync(tmpPath, '%PDF-1.4 leftover from before this process')
+    const leftover = lstatSync(tmpPath)
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    assert.equal(existsSync(tmpPath), true, 'non-accepted startup temp must remain until rename')
+    renameSync(tmpPath, pdfPath)
+    const renamed = lstatSync(pdfPath)
+    assert.equal(renamed.dev, leftover.dev)
+    assert.equal(renamed.ino, leftover.ino)
+    const { stdout } = await captureLogsAsync(() =>
+      processCandidate(pdfPath, pdfName, makeHelperConfig(stub.baseUrl, scanFolder)),
+    )
+    assert.equal(deliverCount, 0, 'startup leftover temp renamed to pdf must NEVER upload')
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', pdfName)), true)
+    assert.match(stdout, /startup backlog candidate quarantined|SCAN_CAPTURE_FOREIGN_LEASE/)
+    console.log('PASS startup leftover job.pdf.tmp -> job.pdf: quarantined, 0 deliver')
+
+    writeFileSync(pdfPath, '%PDF-1.4 new B capture after leftover quarantine')
+    const fresh = lstatSync(pdfPath)
+    assert.notEqual(fresh.ino, leftover.ino, 'post-quarantine B pdf must not reuse leftover inode')
+    await processCandidate(pdfPath, pdfName, makeHelperConfig(stub.baseUrl, scanFolder))
+    assert.equal(deliverCount, 1, 'new inode after startup leftover quarantine must deliver')
+    assert.equal(existsSync(pdfPath), false)
+    console.log('PASS later different-inode B file after startup leftover rename still delivers')
+  } finally {
+    await stub.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
 }
 
 export async function runUnknownDirectoryListingFailClosedTest(): Promise<void> {

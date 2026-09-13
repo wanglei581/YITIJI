@@ -55,8 +55,8 @@ import {
   SCAN_INPUT_RESTART_REQUIRED,
   SCAN_CAPTURE_FOREIGN_LEASE,
   SCAN_LEASE_NOT_BEFORE_INVALID,
-  captureNameStem,
   scanCaptureFileIdentity,
+  scanCaptureIdentityKey,
   isSameScanCaptureFile,
   type ScanCaptureFileIdentity,
   type ScanFolderIdentity,
@@ -276,11 +276,47 @@ const inFlightPaths = new Set<string>()
  * 启动时识别出的历史 backlog 文件路径集合（resolved absolute path）。
  * 在本进程生命周期内永久 never-deliver：绝不能进入服务端租约申请或正常投递；
  * 后续 sweep 仅重试安全隔离；成功隔离后清理标记；隔离失败记录高严重度日志但不泄露文件名或内容。
+ *
+ * `startupBacklogIdentities` 跟上同一批目录项的 dev/ino。rename 会换 basename，
+ * 不能只靠新路径判断「这是不是启动时那份文件」。
  */
 const startupBacklogPaths = new Set<string>()
+const startupBacklogIdentities = new Set<string>()
 
-export function isStartupBacklogCandidate(filePath: string): boolean {
-  return startupBacklogPaths.has(canonicalizeScanPath(filePath))
+function readStartupBacklogFileIdentity(filePath: string): ScanCaptureFileIdentity | undefined | 'unknown' {
+  try {
+    const metadata = lstatSync(filePath)
+    return scanCaptureFileIdentity(metadata.dev, metadata.ino) ?? 'unknown'
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code
+    if (code === 'ENOENT') return undefined
+    return 'unknown'
+  }
+}
+
+function markStartupBacklogIdentity(filePath: string): void {
+  const identity = readStartupBacklogFileIdentity(filePath)
+  if (identity === 'unknown') {
+    globalScanDeliveryBarrier.lockOut('identity_unavailable')
+    warn(`scan-watcher: startup backlog file identity unavailable — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return
+  }
+  if (!identity) return
+  startupBacklogIdentities.add(scanCaptureIdentityKey(identity))
+}
+
+function forgetStartupBacklog(filePath: string, identity?: ScanCaptureFileIdentity): void {
+  startupBacklogPaths.delete(canonicalizeScanPath(filePath))
+  if (identity) startupBacklogIdentities.delete(scanCaptureIdentityKey(identity))
+}
+
+export function isStartupBacklogCandidate(filePath: string, identity?: ScanCaptureFileIdentity): boolean {
+  if (identity && startupBacklogIdentities.has(scanCaptureIdentityKey(identity))) return true
+  if (!startupBacklogPaths.has(canonicalizeScanPath(filePath))) return false
+  // Path mark without a matching inode: a later file reusing the basename after
+  // the original directory entry was renamed or quarantined is not that leftover.
+  if (identity) return false
+  return true
 }
 
 let scanLifecycleActive = 0
@@ -293,6 +329,7 @@ let scanCandidateTestHooks: {
 
 export function clearStartupBacklogForTest(): void {
   startupBacklogPaths.clear()
+  startupBacklogIdentities.clear()
   globalScanDeliveryBarrier.resetForTest()
   scanCandidateTestHooks = {}
   scanLifecycleSkipped = 0
@@ -389,10 +426,8 @@ function findLiveSameInodeSuccessor(
   liveNames: ReadonlySet<string>,
 ): string | undefined {
   if (!identity) return undefined
-  const stem = captureNameStem(vanishedName)
   for (const name of liveNames) {
     if (name === vanishedName) continue
-    if (captureNameStem(name) !== stem) continue
     if (isSameScanCaptureFile(identity, liveNameIdentity(scanWatchFolder, name)) === true) return name
   }
   return undefined
@@ -434,7 +469,7 @@ async function observeNonAcceptedCapture(
   let taskId: string | null = null
   if (
     globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)
-    && !startupBacklogPaths.has(canonicalizeScanPath(filePath))
+    && !isStartupBacklogCandidate(filePath, identity)
   ) {
     try {
       const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
@@ -462,6 +497,7 @@ async function observeNonAcceptedCapture(
     taskId,
     liveNames,
     identity,
+    (name) => liveNameIdentity(scanWatchFolder, name),
   )
 }
 
@@ -571,7 +607,7 @@ export async function processCandidate(
     if (
       !deliverFile
       && globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)
-      && !startupBacklogPaths.has(canonicalizeScanPath(filePath))
+      && !isStartupBacklogCandidate(filePath, openingIdentity)
     ) {
       try {
         const openingLease = await fetchScanLease(client, config.terminalId)
@@ -601,6 +637,7 @@ export async function processCandidate(
       deliverFile ? null : openingTaskId ?? null,
       liveNames,
       openingIdentity,
+      (name) => liveNameIdentity(scanWatchFolder, name),
     )
 
     const stable = await waitForStableFile(filePath, filename)
@@ -636,14 +673,14 @@ export async function processCandidate(
 
     // 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
     // 后续 sweep 仅重试安全隔离；成功后清理标记；失败需高严重度但不泄露文件名/内容。
-    const resolvedCandidatePath = canonicalizeScanPath(filePath)
     const lockoutAbort = abortDeliveryIfScanInputLockout(capturedGeneration)
-    const isBacklog = startupBacklogPaths.has(resolvedCandidatePath)
+    const candidateIdentity = scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino)
+    const isBacklog = isStartupBacklogCandidate(filePath, candidateIdentity)
     if (lockoutAbort || isBacklog) {
       try {
         globalDirectoryBaseline.remove(filename)
         finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        startupBacklogPaths.delete(resolvedCandidatePath)
+        forgetStartupBacklog(filePath, candidateIdentity)
         if (lockoutAbort) {
           warn(`scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`)
         } else {
@@ -1078,13 +1115,17 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     return
   }
   const liveNames = new Set(entries.filter((name) => name !== UNCLAIMED_DIRNAME))
-  globalDirectoryBaseline.retainLiveEntries(liveNames)
+  globalDirectoryBaseline.retainLiveEntries(
+    liveNames,
+    (name) => liveNameIdentity(scanWatchFolder, name),
+  )
   if (globalScanDeliveryBarrier.getState() === 'locked_out' || globalScanDeliveryBarrier.getState() === 'initializing') {
     for (const name of entries) {
       if (name === UNCLAIMED_DIRNAME) continue
       const fullPath = join(scanWatchFolder, name)
       if (!isDirectChild(fullPath, name, scanWatchFolder)) continue
       startupBacklogPaths.add(canonicalizeScanPath(fullPath))
+      markStartupBacklogIdentity(fullPath)
     }
   }
   for (const name of entries) {
@@ -1119,9 +1160,11 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
  * Agent 每次启动时，扫描目录下已存在的所有文件（启动前旧文件）
  * 均不能获得之后的新租约，必须立即安全隔离至 _unclaimed 目录。
  * readdir 之后、任何 await / watcher add / sweep / process 之前，必须同步把每个
- * 直接子路径记入 startupBacklogPaths；随后才按既有 Windows trusted token 串行隔离。
- * 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
- * 隔离失败保留标记；成功才清除。unsafe / symlink / hardlink 只保留 never-deliver 标记，绝不投递。
+ * 直接子路径记入 startupBacklogPaths，并把能证明的 dev/ino 记入
+ * startupBacklogIdentities；随后才按既有 Windows trusted token 串行隔离。
+ * 启动时识别为 backlog 的目录项，在本进程中必须永久 never-deliver（rename 换名
+ * 也不行），隔离失败也不能进入正常投递。
+ * 隔离失败保留标记；成功才清除路径和 inode。unsafe / symlink / hardlink 只保留 never-deliver 标记，绝不投递。
  * 在 Windows 平台上严格使用 readVerifiedCandidate 获取的 TrustedWindowsCandidate
  * 原生凭据执行隔离，绝不抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING。
  * 隔离后文件在 _unclaimed 目录中，下次重启或周期性 sweep 均不会再次尝试匹配或投递。
@@ -1153,6 +1196,9 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
     const fullPath = join(folder, name)
     if (!isDirectChild(fullPath, name, folder)) continue
     startupBacklogPaths.add(canonicalizeScanPath(fullPath))
+    // ATOMIC_STARTUP_BACKLOG_IDENTITY: never-deliver follows the directory
+    // entry (dev/ino) across a later rename; a new basename is not a new capture.
+    markStartupBacklogIdentity(fullPath)
   }
 
   const identity = readScanFolderIdentity(folder)
@@ -1182,7 +1228,7 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
       const verified = readVerifiedCandidate(fullPath, folder, name, finalSnapshot)
       globalDirectoryBaseline.remove(name)
       finalizeCandidate(fullPath, folder, name, verified.trustedWindowsCandidate, 'quarantine')
-      startupBacklogPaths.delete(resolvedPath)
+      forgetStartupBacklog(fullPath, scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino))
       warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(name)}`)
       quarantined += 1
     } catch (e) {
@@ -1251,6 +1297,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   }
   globalDirectoryBaseline.clear()
   startupBacklogPaths.clear()
+  startupBacklogIdentities.clear()
 
   const next: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,
@@ -1262,6 +1309,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
     const filename = filePath.split(/[\\/]/).pop() ?? filePath
     if (globalScanDeliveryBarrier.getState() !== 'running' && globalScanDeliveryBarrier.getState() !== 'idle') {
       startupBacklogPaths.add(canonicalizeScanPath(filePath))
+      markStartupBacklogIdentity(filePath)
     }
     processCandidate(filePath, filename, config).catch((e) => {
       err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)

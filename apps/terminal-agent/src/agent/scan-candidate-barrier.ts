@@ -51,6 +51,10 @@ export function isSameScanCaptureFile(
   return a.dev === b.dev && a.ino === b.ino
 }
 
+export function scanCaptureIdentityKey(identity: ScanCaptureFileIdentity): string {
+  return `${identity.dev}:${identity.ino}`
+}
+
 /**
  * Windows SMB 可保证边界与设计考量：
  *
@@ -73,8 +77,10 @@ export function isSameScanCaptureFile(
  *      任何在当前任务租约开始前已经存在的文件（mtime 或 birthtime 早于 notBefore - 5s 容差），
  *      判定为上一会话残留的旧文件，直接移入 _unclaimed 隔离，绝不投递至当前新任务中。
  *    - 捕获血缘按本次 process 的 opening scanTaskId 绑定，不把 mtime 当用户身份，也不用
- *      模块级“最近租约”。同 stem 只在同一目录项（rename，dev/ino 相同）上继承；隔离/删除
- *      后该条目关闭，文件名复用不会继承已关闭捕获。notBefore 无法解析则 fail-closed。
+ *      模块级“最近租约”。同一目录项（rename，dev/ino 相同）跨 basename/stem 继承
+ *      （job.pdf.tmp → job.pdf）；仅当 inode 无法证明时，同 stem 才 fail-closed 继承。
+ *      隔离/删除后该条目关闭，文件名复用或不同 inode 不会继承已关闭捕获。
+ *      notBefore 无法解析则 fail-closed。
  *    - 若 Agent 从未见过 A 期间的任何目录项（原子 create/rename 在 B 下才首次可见），被动
  *      SMB 无法证明归属；该物理歧义留给 Windows/奔图验收，不得声称完美归因。
  *    - 投递请求必须在 multipart 中携带 scanTaskId、短期 deliveryLease 和 candidateSnapshotAt。
@@ -167,23 +173,42 @@ export class ScanDirectoryBaseline {
   }
 
   /**
-   * Drop observations whose names are gone and whose stem has no live successor.
-   * Same-stem vanished names are kept only so the current live successor can adopt
-   * a same-inode rename; they are not a time-bounded cache.
+   * Drop observations whose names are gone and that have no live successor.
+   * A vanished name is kept only so a live same-inode rename (any stem) or a
+   * same-stem successor can adopt it. Isolation/delete with no successor drops
+   * the capture so a later different inode is not poisoned.
    */
-  retainLiveEntries(liveNames: ReadonlySet<string>): void {
+  retainLiveEntries(
+    liveNames: ReadonlySet<string>,
+    identityOf?: (name: string) => ScanCaptureFileIdentity | undefined,
+  ): void {
     const liveStems = new Set<string>()
     for (const name of liveNames) liveStems.add(captureNameStem(name))
-    for (const name of [...this.observations.keys()]) {
+    const liveIdentityKeys = new Set<string>()
+    let liveIdentitiesComplete = !identityOf
+    if (identityOf) {
+      liveIdentitiesComplete = true
+      for (const name of liveNames) {
+        const identity = identityOf(name)
+        if (!identity) {
+          liveIdentitiesComplete = false
+          continue
+        }
+        liveIdentityKeys.add(scanCaptureIdentityKey(identity))
+      }
+    }
+    for (const [name, rec] of [...this.observations]) {
       if (liveNames.has(name)) continue
       if (liveStems.has(captureNameStem(name))) continue
+      if (rec.identity && liveIdentityKeys.has(scanCaptureIdentityKey(rec.identity))) continue
+      if (rec.identity && !liveIdentitiesComplete) continue
       this.observations.delete(name)
     }
   }
 
   /**
    * Bind this basename to an explicit opening task, after absorbing vanished
-   * same-stem predecessors that are the same directory entry (temp → pdf rename).
+   * predecessors that are the same directory entry (temp → pdf rename, any stem).
    * First sight / inherited same-inode predecessor wins; a later B fetch cannot
    * overwrite A. Proven-different inodes are not inherited.
    */
@@ -193,15 +218,16 @@ export class ScanDirectoryBaseline {
     taskId: string | null,
     liveNames: ReadonlySet<string>,
     identity?: ScanCaptureFileIdentity,
+    identityOf?: (name: string) => ScanCaptureFileIdentity | undefined,
   ): void {
     const live = new Set(liveNames)
     live.add(filename)
-    this.adoptVanishedStemPredecessors(filename, live, identity)
+    this.adoptVanishedPredecessors(filename, live, identity)
     this.recordObservation(filename, nowMs, taskId, identity)
-    this.retainLiveEntries(live)
+    this.retainLiveEntries(live, identityOf ?? (name => (name === filename ? identity : undefined)))
   }
 
-  private adoptVanishedStemPredecessors(
+  private adoptVanishedPredecessors(
     filename: string,
     liveNames: ReadonlySet<string>,
     identity?: ScanCaptureFileIdentity,
@@ -210,10 +236,22 @@ export class ScanDirectoryBaseline {
     let inherited: ScanCaptureObservation | undefined
     for (const [name, rec] of [...this.observations]) {
       if (name === filename) continue
-      if (captureNameStem(name) !== stem) continue
       if (liveNames.has(name)) continue
+      const sameEntry = isSameScanCaptureFile(rec.identity, identity)
+      // ATOMIC_SCAN_CAPTURE_INODE_LINEAGE: a vanished directory entry is the
+      // same capture when dev/ino match, even if the basename stem changed
+      // (job.pdf.tmp -> job.pdf). Stem-only matching cannot prove sameness.
+      if (sameEntry === true) {
+        this.observations.delete(name)
+        if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec
+        continue
+      }
+      if (sameEntry === false) {
+        if (captureNameStem(name) === stem) this.observations.delete(name)
+        continue
+      }
+      if (captureNameStem(name) !== stem) continue
       this.observations.delete(name)
-      if (isSameScanCaptureFile(rec.identity, identity) === false) continue
       if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec
     }
     if (inherited && !this.observations.has(filename)) {
@@ -226,9 +264,10 @@ export class ScanDirectoryBaseline {
   }
 
   /**
-   * Original path is gone. Move this observation onto a live same-stem name only
-   * when that name is the same directory entry (dev/ino). Otherwise drop it so a
-   * later reuse is not poisoned. Does nothing when the name was already closed.
+   * Original path is gone. Move this observation onto a live name only when
+   * that name is the same directory entry (dev/ino), regardless of stem.
+   * Otherwise drop it so a later reuse is not poisoned. Does nothing when
+   * the name was already closed.
    */
   closeVanishedCapture(
     filename: string,
@@ -237,12 +276,10 @@ export class ScanDirectoryBaseline {
   ): string | undefined {
     const rec = this.observations.get(filename)
     if (!rec) return undefined
-    const stem = captureNameStem(filename)
     let successor: string | undefined
     let successorId: ScanCaptureFileIdentity | undefined
     for (const name of liveNames) {
       if (name === filename) continue
-      if (captureNameStem(name) !== stem) continue
       const id = identityOf(name)
       if (isSameScanCaptureFile(rec.identity, id) !== true) continue
       successor = name
@@ -275,9 +312,9 @@ export class ScanDirectoryBaseline {
 
   /**
    * True when this name, or a still-live same-stem sibling, was first seen
-   * under a different waiting scanTaskId. Vanished predecessors must already
-   * have been adopted by `bindCapture`; this check does not consult a global
-   * stem cache.
+   * under a different waiting scanTaskId. Vanished same-inode predecessors
+   * must already have been adopted by `bindCapture`; this check does not
+   * consult a module-global last task.
    */
   isForeignToLease(
     filename: string,
