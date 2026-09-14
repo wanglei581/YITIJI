@@ -55,6 +55,64 @@ export function scanCaptureIdentityKey(identity: ScanCaptureFileIdentity): strin
   return `${identity.dev}:${identity.ino}`
 }
 
+export interface ScanCaptureIdentityFlight {
+  previous: Promise<void> | undefined
+  release: () => void
+}
+
+interface ScanCaptureIdentityFlightEntry {
+  done: Promise<void>
+  resolve: () => void
+}
+
+const scanCaptureIdentityFlights = new Map<string, ScanCaptureIdentityFlightEntry>()
+let scanCaptureIdentityFlightClaims = 0
+
+/**
+ * Single-flight for a proven directory entry. Callers must invoke this
+ * synchronously after lstat and before any lease await so a same-inode
+ * rename cannot bind a later task while the opening observation is in flight.
+ * Unknown identity (ino === 0 / missing) cannot prove sameness: this is a
+ * no-op, not a Windows/SMB proof.
+ */
+export function beginScanCaptureIdentityFlight(
+  identity: ScanCaptureFileIdentity | undefined,
+): ScanCaptureIdentityFlight {
+  if (!identity) {
+    return { previous: undefined, release() {} }
+  }
+  scanCaptureIdentityFlightClaims += 1
+  // ATOMIC_SCAN_CAPTURE_IDENTITY_FLIGHT: proven dev/ino is owned before any
+  // lease await. A missing identity cannot take a lock.
+  const key = scanCaptureIdentityKey(identity)
+  const previous = scanCaptureIdentityFlights.get(key)?.done
+  let released = false
+  let resolve!: () => void
+  const done = new Promise<void>((r) => { resolve = r })
+  scanCaptureIdentityFlights.set(key, { done, resolve })
+  return {
+    previous,
+    release() {
+      if (released) return
+      released = true
+      resolve()
+      if (scanCaptureIdentityFlights.get(key)?.done === done) {
+        scanCaptureIdentityFlights.delete(key)
+      }
+    },
+  }
+}
+
+export function getScanCaptureIdentityFlightClaimCountForTest(): number {
+  return scanCaptureIdentityFlightClaims
+}
+
+export function resetScanCaptureIdentityFlightsForTest(): void {
+  for (const entry of scanCaptureIdentityFlights.values()) entry.resolve()
+  scanCaptureIdentityFlights.clear()
+  scanCaptureIdentityFlightClaims = 0
+}
+
 /**
  * Windows SMB 可保证边界与设计考量：
  *

@@ -53,6 +53,9 @@ import {
   canonicalizeScanPath,
   readScanFolderIdentity,
   scanFolderIdentityChanged,
+  beginScanCaptureIdentityFlight,
+  getScanCaptureIdentityFlightClaimCountForTest,
+  resetScanCaptureIdentityFlightsForTest,
 } from '../src/agent/scan-candidate-barrier'
 import type { AgentConfig } from '../src/agent/types'
 
@@ -255,6 +258,78 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
       false,
       'never-observed capture bound under B is not foreign to B',
     )
+
+    resetScanCaptureIdentityFlightsForTest()
+    {
+      const same = { dev: 1, ino: 10 }
+      const other = { dev: 1, ino: 11 }
+      const holdFirst = deferred()
+      const firstEntered = deferred()
+      let secondRanBeforeRelease = false
+      const first = beginScanCaptureIdentityFlight(same)
+      const firstTask = (async () => {
+        try {
+          if (first.previous) await first.previous
+          firstEntered.resolve()
+          await holdFirst.promise
+        } finally {
+          first.release()
+        }
+      })()
+      await firstEntered.promise
+      const second = beginScanCaptureIdentityFlight(same)
+      const secondTask = (async () => {
+        try {
+          if (second.previous) await second.previous
+          secondRanBeforeRelease = true
+        } finally {
+          second.release()
+        }
+      })()
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      assert.equal(second.previous !== undefined, true, 'same proven inode must see the in-flight owner')
+      assert.equal(secondRanBeforeRelease, false, 'same-inode successor must not run before the owner releases')
+      holdFirst.resolve()
+      await Promise.all([firstTask, secondTask])
+      assert.equal(secondRanBeforeRelease, true)
+
+      resetScanCaptureIdentityFlightsForTest()
+      const holdA = deferred()
+      const aEntered = deferred()
+      let bRanDuringA = false
+      const flightA = beginScanCaptureIdentityFlight(same)
+      const taskA = (async () => {
+        try {
+          if (flightA.previous) await flightA.previous
+          aEntered.resolve()
+          await holdA.promise
+        } finally {
+          flightA.release()
+        }
+      })()
+      await aEntered.promise
+      const flightB = beginScanCaptureIdentityFlight(other)
+      const taskB = (async () => {
+        try {
+          if (flightB.previous) await flightB.previous
+          bRanDuringA = true
+        } finally {
+          flightB.release()
+        }
+      })()
+      await taskB
+      assert.equal(bRanDuringA, true, 'different inodes must not share the identity flight')
+      holdA.resolve()
+      await taskA
+
+      const unknownA = beginScanCaptureIdentityFlight(undefined)
+      const unknownB = beginScanCaptureIdentityFlight(undefined)
+      assert.equal(unknownA.previous, undefined, 'unknown identity cannot take a flight')
+      assert.equal(unknownB.previous, undefined, 'unknown identity flights must not serialize each other')
+      unknownA.release()
+      unknownB.release()
+      resetScanCaptureIdentityFlightsForTest()
+    }
     baseline.clear()
   }
 
@@ -766,6 +841,7 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
 
   await runLateCrossSessionCaptureTests()
   await runNullOpeningInodeRenameTests()
+  await runNullOpeningOverlappingInodeRenameTests()
   await runOverlappingStartupBacklogRaceTest()
   await runScanInputLockoutTests()
 
@@ -1401,6 +1477,127 @@ export async function runNullOpeningInodeRenameTests(): Promise<void> {
     assert.equal(existsSync(pdfPath), false)
     console.log('PASS later different-inode B file after null-opening rename still delivers')
   } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runNullOpeningOverlappingInodeRenameTests(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+
+  let leaseGets = 0
+  let deliverCount = 0
+  const firstLease = deferred()
+  const holdFirstLease = deferred()
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        leaseGets += 1
+        const n = leaseGets
+        if (n === 1) {
+          firstLease.resolve()
+          void holdFirstLease.promise.then(() => {
+            res.writeHead(409, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({
+              statusCode: 409,
+              error: { code: 'NO_WAITING_SCAN_TASK', message: '当前终端没有等待扫描的任务' },
+            }))
+          })
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'task_B',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 30_000).toISOString(),
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            deliveryLease: 'lease_B',
+          },
+        }))
+        return
+      }
+      if (req.method === 'POST' && req.url?.includes('/scan-sessions/deliver')) {
+        deliverCount += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true, data: { scanTaskId: 'task_B', fileId: 'leaked' } }))
+        return
+      }
+      res.writeHead(404)
+      res.end()
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(typeof address === 'object' && address)
+  const baseUrl = `http://127.0.0.1:${address.port}/api/v1`
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-null-opening-overlap-'))
+  const tmpName = 'job.pdf.tmp'
+  const pdfName = 'job.pdf'
+  const tmpPath = join(scanFolder, tmpName)
+  const pdfPath = join(scanFolder, pdfName)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(tmpPath, '%PDF-1.4 bytes observed under no waiting lease')
+    const leftover = lstatSync(tmpPath)
+    const config = makeHelperConfig(baseUrl, scanFolder)
+    const tmpDone = processCandidate(tmpPath, tmpName, config)
+    await firstLease.promise
+    assert.equal(
+      getScanCaptureIdentityFlightClaimCountForTest(),
+      1,
+      'tmp opening must claim proven identity before the lease await',
+    )
+    renameSync(tmpPath, pdfPath)
+    const renamed = lstatSync(pdfPath)
+    assert.equal(renamed.dev, leftover.dev)
+    assert.equal(renamed.ino, leftover.ino)
+    const pdfDone = processCandidate(pdfPath, pdfName, config)
+    const claimDeadline = Date.now() + 2_000
+    while (getScanCaptureIdentityFlightClaimCountForTest() < 2) {
+      assert.equal(
+        Date.now() < claimDeadline,
+        true,
+        'pdf successor must claim the same-inode flight while tmp opening is still in flight',
+      )
+      await new Promise<void>((resolve) => setImmediate(resolve))
+    }
+    // Unlocked successor fetches B and bindCapture's before this wait ends.
+    // Locked successor stays at leaseGets === 1 until tmp is released.
+    const bindDeadline = Date.now() + 500
+    while (leaseGets < 2 && Date.now() < bindDeadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 10))
+    }
+    if (leaseGets >= 2) {
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      await new Promise<void>((resolve) => setImmediate(resolve))
+    }
+    const { stdout } = await captureLogsAsync(async () => {
+      holdFirstLease.resolve()
+      await Promise.all([tmpDone, pdfDone])
+    })
+    assert.equal(deliverCount, 0, 'overlapping same-inode tmp->pdf rename must NEVER upload to later lease B')
+    assert.equal(existsSync(pdfPath), false)
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', pdfName)), true)
+    assert.match(stdout, new RegExp(SCAN_CAPTURE_FOREIGN_LEASE))
+    console.log('PASS overlapping null-opening job.pdf.tmp -> job.pdf: quarantined, 0 deliver')
+
+    writeFileSync(pdfPath, '%PDF-1.4 later legitimate B capture after overlapping null-opening quarantine')
+    const later = lstatSync(pdfPath)
+    const quarantined = lstatSync(join(scanFolder, '_unclaimed', pdfName))
+    assert.notEqual(later.ino, quarantined.ino, 'later B pdf must be a new directory entry')
+    await processCandidate(pdfPath, pdfName, config)
+    assert.equal(deliverCount, 1, 'later different-inode B capture after overlapping quarantine must still deliver')
+    assert.equal(existsSync(pdfPath), false)
+    console.log('PASS later different-inode B file after overlapping null-opening rename still delivers')
+  } finally {
+    holdFirstLease.resolve()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     rmSync(scanFolder, { recursive: true, force: true })
     clearStartupBacklogForTest()

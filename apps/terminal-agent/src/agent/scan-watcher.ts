@@ -58,7 +58,10 @@ import {
   scanCaptureFileIdentity,
   scanCaptureIdentityKey,
   isSameScanCaptureFile,
+  beginScanCaptureIdentityFlight,
+  resetScanCaptureIdentityFlightsForTest,
   type ScanCaptureFileIdentity,
+  type ScanCaptureIdentityFlight,
   type ScanFolderIdentity,
   type ScanTaskLease,
 } from './scan-candidate-barrier'
@@ -331,6 +334,7 @@ export function clearStartupBacklogForTest(): void {
   startupBacklogPaths.clear()
   startupBacklogIdentities.clear()
   globalScanDeliveryBarrier.resetForTest()
+  resetScanCaptureIdentityFlightsForTest()
   scanCandidateTestHooks = {}
   scanLifecycleSkipped = 0
 }
@@ -576,6 +580,7 @@ export async function processCandidate(
   inFlightPaths.add(filePath)
   const capturedGeneration = globalScanDeliveryBarrier.getGeneration()
   let watchFolderForFinally: string | undefined
+  let identityFlight: ScanCaptureIdentityFlight | undefined
   try {
     const scanWatchFolder = config.scanWatchFolder?.trim()
     watchFolderForFinally = scanWatchFolder
@@ -593,6 +598,15 @@ export async function processCandidate(
 
     const initial = snapshotCandidate(filePath, filename)
     const openingIdentity = scanCaptureFileIdentity(initial.dev, initial.ino)
+    identityFlight = beginScanCaptureIdentityFlight(openingIdentity)
+    if (identityFlight.previous) {
+      await identityFlight.previous
+      if (!existsSync(filePath)) return
+      const resumed = snapshotCandidate(filePath, filename)
+      if (isSameScanCaptureFile(openingIdentity, scanCaptureFileIdentity(resumed.dev, resumed.ino)) !== true) {
+        return
+      }
+    }
     const classification = classifyScanInputCandidate(initial)
     if (classification !== 'accepted' || initial.nlink !== 1) {
       const reason = initial.nlink !== 1 ? 'rejected_multiple_links' : classification
@@ -899,6 +913,7 @@ export async function processCandidate(
   } finally {
     inFlightPaths.delete(filePath)
     finishVanishedCapture(filePath, filename, watchFolderForFinally)
+    identityFlight?.release()
   }
 }
 
@@ -1133,13 +1148,20 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     try {
       const snapshot = snapshotCandidate(fullPath, name)
       if (classifyScanInputCandidate(snapshot) !== 'accepted' || snapshot.nlink !== 1) {
-        await observeNonAcceptedCapture(
-          fullPath,
-          name,
-          config,
-          globalScanDeliveryBarrier.getGeneration(),
-          scanCaptureFileIdentity(snapshot.dev, snapshot.ino),
-        )
+        const sweepIdentity = scanCaptureFileIdentity(snapshot.dev, snapshot.ino)
+        const sweepFlight = beginScanCaptureIdentityFlight(sweepIdentity)
+        try {
+          if (sweepFlight.previous) await sweepFlight.previous
+          await observeNonAcceptedCapture(
+            fullPath,
+            name,
+            config,
+            globalScanDeliveryBarrier.getGeneration(),
+            sweepIdentity,
+          )
+        } finally {
+          sweepFlight.release()
+        }
         warn(`scan-watcher: unsafe scan input candidate skipped during sweep — ${maskScanName(name)}`)
         continue
       }

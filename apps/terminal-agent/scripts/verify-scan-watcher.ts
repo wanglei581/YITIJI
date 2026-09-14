@@ -36,6 +36,7 @@ import {
   runStemChangingInodeRenameTests,
   runStartupBacklogTempRenameTest,
   runNullOpeningInodeRenameTests,
+  runNullOpeningOverlappingInodeRenameTests,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -121,6 +122,24 @@ function verifySourceStructure(): void {
     /ATOMIC_SCAN_CAPTURE_NULL_OPENING/,
     'observation under no waiting lease must be foreign to every later lease',
   )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_IDENTITY_FLIGHT/,
+    'proven same-inode captures must single-flight before any lease await',
+  )
+  {
+    const procStart = source.indexOf('export async function processCandidate')
+    const procEnd = source.indexOf('export function sweepUnclaimedDir')
+    assert.ok(procStart >= 0 && procEnd > procStart, 'processCandidate must precede sweepUnclaimedDir')
+    const procBody = source.slice(procStart, procEnd)
+    const flightIdx = procBody.indexOf('beginScanCaptureIdentityFlight(openingIdentity)')
+    const observeIdx = procBody.indexOf('await observeNonAcceptedCapture')
+    const leaseIdx = procBody.indexOf('await fetchScanLease')
+    assert.ok(flightIdx >= 0, 'processCandidate must claim identity flight after lstat')
+    assert.ok(observeIdx > flightIdx, 'identity flight must be claimed before observeNonAcceptedCapture lease fetch')
+    assert.ok(leaseIdx > flightIdx, 'identity flight must be claimed before opening fetchScanLease')
+    assert.match(procBody, /if \(identityFlight\.previous\) \{/, 'successor must wait for the in-flight same-inode owner')
+  }
   {
     const foreignStart = barrierSource.indexOf('isForeignToLease(')
     const foreignEnd = barrierSource.indexOf('export const globalDirectoryBaseline')
@@ -1286,6 +1305,61 @@ function verifyNullOpeningMutationMakesRenameNonzero(): void {
   assert.equal(readFileSync(barrierPath, 'utf8'), original, 'null-opening reverse mutation must restore scan-candidate-barrier.ts')
 }
 
+const IDENTITY_FLIGHT_BLOCK = `  // ATOMIC_SCAN_CAPTURE_IDENTITY_FLIGHT: proven dev/ino is owned before any
+  // lease await. A missing identity cannot take a lock.
+  const key = scanCaptureIdentityKey(identity)
+  const previous = scanCaptureIdentityFlights.get(key)?.done
+  let released = false
+  let resolve!: () => void
+  const done = new Promise<void>((r) => { resolve = r })
+  scanCaptureIdentityFlights.set(key, { done, resolve })
+  return {
+    previous,
+    release() {
+      if (released) return
+      released = true
+      resolve()
+      if (scanCaptureIdentityFlights.get(key)?.done === done) {
+        scanCaptureIdentityFlights.delete(key)
+      }
+    },
+  }`
+
+const IDENTITY_FLIGHT_MUTATED = `  return { previous: undefined, release() {} }`
+
+function verifyIdentityFlightMutationMakesOverlappingRenameNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(IDENTITY_FLIGHT_BLOCK), true, 'identity flight block must exist before reverse mutation')
+  const mutated = original.replace(IDENTITY_FLIGHT_BLOCK, IDENTITY_FLIGHT_MUTATED)
+  assert.notEqual(mutated, original, 'dropping proven-identity single-flight must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--null-opening-overlapping-inode-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping identity single-flight must make overlapping rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /overlapping same-inode tmp->pdf rename must NEVER upload to later lease B/,
+      `mutated identity flight test must fail on the overlapping upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS identity flight reverse mutation: overlapping same-inode rename test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'identity flight reverse mutation must restore scan-candidate-barrier.ts')
+}
+
 function verifyStartupBacklogIdentityMutationMakesRenameNonzero(): void {
   const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
   const original = readFileSync(watcherPath, 'utf8')
@@ -1385,6 +1459,10 @@ async function main(): Promise<void> {
     await runNullOpeningInodeRenameTests()
     return
   }
+  if (process.argv.includes('--null-opening-overlapping-inode-rename')) {
+    await runNullOpeningOverlappingInodeRenameTests()
+    return
+  }
   verifySourceStructure()
   verifyUnclaimedCleanup()
   await verifyRetryCapExpired()
@@ -1409,6 +1487,7 @@ async function main(): Promise<void> {
   verifyCaptureLineageMutationMakesLateCrossSessionNonzero()
   verifyInodeLineageMutationMakesStemChangingRenameNonzero()
   verifyNullOpeningMutationMakesRenameNonzero()
+  verifyIdentityFlightMutationMakesOverlappingRenameNonzero()
   verifyStartupBacklogIdentityMutationMakesRenameNonzero()
   verifyInvalidNotBeforeMutationMakesFailClosedNonzero()
   verifyUnknownLiveListingMutationMakesFailClosedNonzero()
