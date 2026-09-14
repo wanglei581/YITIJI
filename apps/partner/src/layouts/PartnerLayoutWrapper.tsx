@@ -4,6 +4,7 @@ import { PartnerLayout, type NavItem } from '@ai-job-print/ui'
 import { useEffect, useState } from 'react'
 import {
   BarChart2Icon,
+  GaugeIcon,
   BriefcaseIcon,
   Building2Icon,
   CalendarIcon,
@@ -28,6 +29,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/fairs':      'fairs',
   '/smart-campus': 'smart-campus',
   '/policy':     'policy',
+  '/screen':     'screen',
   '/stats':      'stats',
   '/sources':    'sources',
   '/sync-logs':  'sync-logs',
@@ -48,7 +50,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon, href: KEY_TO_PATH.policy },
   { key: 'sources',    label: '数据源管理',     icon: DatabaseIcon, href: KEY_TO_PATH.sources },
   { key: 'sync-logs',  label: '同步日志',       icon: RefreshCwIcon, href: KEY_TO_PATH['sync-logs'] },
-  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, group: '数据与账号', href: KEY_TO_PATH.stats },
+  { key: 'screen',     label: '数据大屏',       icon: GaugeIcon, group: '数据与账号', href: KEY_TO_PATH.screen },
+  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, href: KEY_TO_PATH.stats },
   { key: 'account',    label: '账号',           icon: UserCogIcon, href: KEY_TO_PATH.account },
 ]
 

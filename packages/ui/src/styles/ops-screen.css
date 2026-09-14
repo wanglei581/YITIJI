@@ -1,0 +1,994 @@
+/* ============================================================
+   运营数据大屏样式（Admin / Partner 两个后台专用）
+
+   色值全部取自 packages/ui/src/styles/inkpaper.css 的墨青 / 青玉两族，
+   不新造设计语言 —— 大屏是同一个产品的另一种观看距离，不是另一套皮肤。
+   与后台的唯一差异：底色用暗色族（墙面显示器 / 投影常在暗环境远看）。
+
+   来源：docs/design/ops-screen-2026-09/screen.css（1920×1080 定稿原型）。
+   与原型的差异只有两处，都是「从静态稿变成真实路由」必须做的：
+     1. 原型把 1920×1080 写死在 body 上；这里改成 .ops-stage 舞台 + 外层等比缩放，
+        因为大屏要嵌在已登录的后台路由里，不能霸占 body。
+     2. 新增 desk 档（常规后台桌面）。舞台档缩到桌面宽度会让 13px 变成 8px，
+        直接破可读下限，所以 desk 不是「缩小的 wall」，是另一套字阶 + 流式栅格。
+
+   本文件只被 apps/admin 与 apps/partner 引入，Kiosk 不引入。
+   全文件无 :root / html / body 裸选择器，一切挂在 [data-ops-screen] 下。
+   ============================================================ */
+
+[data-ops-screen] {
+  --ops-p-200: #c8e7db;
+  --ops-p-300: #a0d5c2;
+  --ops-p-400: #62bda1;
+  --ops-p-500: #35ab8e;
+  --ops-p-600: #1f9e86;
+  --ops-ok: #35ab8e;
+  --ops-warn: #d8905c;
+  --ops-err: #e0705a;
+  --ops-info: #6f9bd8;
+  --ops-dark: #0b241f;
+  --ops-panel: #10302b;
+  --ops-panel-2: #143a33;
+  --ops-line: #22483f;
+  --ops-ink: #eef6f2;
+  --ops-ink-2: #a9c4bb;
+  --ops-ink-3: #6f8d84;
+  --ops-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  color: var(--ops-ink);
+  background: var(--ops-dark);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 舞台档：固定 1920×1080，外层等比缩放居中 ---------- */
+.ops-stage-host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--ops-dark);
+}
+
+.ops-stage-scaler {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+}
+
+.ops-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+}
+
+/* ---------- 屏体 ---------- */
+.ops-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-screen {
+  height: 1080px;
+  padding: 22px 28px 18px;
+}
+
+[data-ops-screen='desk'] .ops-screen {
+  gap: 12px;
+  padding: 16px 18px 18px;
+  border-radius: 14px;
+}
+
+/* ---------- 页眉：标题 + 数据时间戳。时间戳不是装饰，是验收要看的东西 ---------- */
+.ops-hd {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex: none;
+  flex-wrap: wrap;
+}
+
+.ops-hd h1 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ops-hd .ops-sub {
+  margin: 6px 0 0;
+  color: var(--ops-ink-2);
+  max-width: 86ch;
+}
+
+.ops-stamp {
+  text-align: right;
+  color: var(--ops-ink-2);
+  line-height: 1.7;
+  min-width: 0;
+}
+
+.ops-stamp b {
+  color: var(--ops-ink);
+  font-weight: 600;
+  font-family: var(--ops-mono);
+}
+
+.ops-stamp .ops-win {
+  display: block;
+  color: var(--ops-ink-3);
+}
+
+.ops-stamp.is-stale b {
+  color: var(--ops-warn);
+}
+
+.ops-hd-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ops-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9px;
+  border: 1px solid var(--ops-line);
+  background: var(--ops-panel);
+  color: var(--ops-ink-2);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ops-btn:hover:not(:disabled) {
+  background: var(--ops-panel-2);
+  color: var(--ops-ink);
+}
+
+.ops-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ops-btn[aria-pressed='true'] {
+  background: var(--ops-p-600);
+  border-color: var(--ops-p-600);
+  color: #05201a;
+}
+
+.ops-seg {
+  display: inline-flex;
+  border: 1px solid var(--ops-line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.ops-seg .ops-btn {
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---------- 横幅：整屏级状态，低干扰但明确 ---------- */
+.ops-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: none;
+  border-radius: 10px;
+  border: 1px solid var(--ops-line);
+  background: var(--ops-panel);
+  color: var(--ops-ink-2);
+}
+
+.ops-banner .ops-banner-dot {
+  flex: none;
+  border-radius: 50%;
+  background: var(--ops-ink-3);
+  align-self: center;
+}
+
+.ops-banner.is-warn {
+  border-color: #5a4030;
+  color: var(--ops-warn);
+}
+
+.ops-banner.is-warn .ops-banner-dot {
+  background: var(--ops-warn);
+}
+
+.ops-banner.is-error {
+  border-color: #63332b;
+  color: var(--ops-err);
+}
+
+.ops-banner.is-error .ops-banner-dot {
+  background: var(--ops-err);
+}
+
+.ops-banner b {
+  color: inherit;
+  font-weight: 700;
+}
+
+/* ---------- 栅格：wall 与 desk 共用 12 列语义，行高与断点不同 ---------- */
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 0;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-grid {
+  flex: 1;
+}
+
+[data-ops-screen='wall'] .ops-grid.ops-grid-gov {
+  grid-template-rows: 192px minmax(0, 1fr) 266px;
+}
+
+[data-ops-screen='wall'] .ops-grid.ops-grid-ops {
+  grid-template-rows: 192px minmax(0, 1fr) 268px;
+}
+
+[data-ops-screen='wall'] .ops-grid.ops-grid-partner {
+  grid-template-rows: 192px minmax(0, 1fr) minmax(0, 248px);
+}
+
+[data-ops-screen='desk'] .ops-grid {
+  gap: 12px;
+  grid-auto-rows: minmax(172px, auto);
+}
+
+.ops-span-2 { grid-column: span 2; }
+.ops-span-3 { grid-column: span 3; }
+.ops-span-4 { grid-column: span 4; }
+.ops-span-6 { grid-column: span 6; }
+.ops-span-8 { grid-column: span 8; }
+.ops-span-12 { grid-column: span 12; }
+
+[data-ops-screen='desk'] .ops-tall {
+  grid-row: span 2;
+}
+
+/* ---------- 卡片：唯一一层，内部块一律是平面，不做卡中卡 ---------- */
+.ops-card {
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-card { padding: 14px 18px; }
+[data-ops-screen='desk'] .ops-card { padding: 12px 14px; }
+
+.ops-card > h2 {
+  margin: 0 0 10px;
+  font-weight: 600;
+  color: var(--ops-ink-2);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+}
+
+.ops-card > h2 .ops-h2-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-card > h2 .ops-tag {
+  flex: none;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--ops-panel-2);
+  color: var(--ops-ink-3);
+  border: 1px solid var(--ops-line);
+  white-space: nowrap;
+}
+
+.ops-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ops-card.ops-tall > .ops-body {
+  justify-content: stretch;
+}
+
+/* ---------- 口径脚注：每块必须有，写清来源与窗口 ---------- */
+.ops-foot {
+  flex: none;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ops-line);
+  color: var(--ops-ink-3);
+  line-height: 1.45;
+}
+
+.ops-foot b {
+  color: var(--ops-ink-2);
+  font-weight: 600;
+}
+
+/* ---------- KPI ---------- */
+.ops-kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ops-kpi .ops-n {
+  font-weight: 700;
+  font-family: var(--ops-mono);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.ops-kpi .ops-n.is-warn { color: var(--ops-warn); }
+.ops-kpi .ops-n.is-error { color: var(--ops-err); }
+
+.ops-kpi .ops-u {
+  font-weight: 500;
+  color: var(--ops-ink-2);
+  margin-left: 6px;
+}
+
+.ops-kpi .ops-lb {
+  color: var(--ops-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-kpi .ops-lb-muted {
+  color: var(--ops-ink-3);
+}
+
+/* ---------- 未接入：不是 0，不是占位动画，是一句说明 ---------- */
+.ops-na {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  background: repeating-linear-gradient(135deg, rgba(111, 141, 132, 0.05) 0 8px, transparent 8px 16px);
+  border-radius: 10px;
+  height: 100%;
+  min-width: 0;
+}
+
+[data-ops-screen='wall'] .ops-na { padding: 14px; }
+[data-ops-screen='desk'] .ops-na { padding: 10px 12px; }
+
+.ops-na .ops-na-t {
+  font-weight: 600;
+  color: var(--ops-ink-3);
+}
+
+.ops-na .ops-na-d {
+  color: var(--ops-ink-3);
+  line-height: 1.55;
+  overflow: hidden;
+}
+
+.ops-card.is-na {
+  border-style: dashed;
+  border-color: #2c534a;
+}
+
+/* 取数失败与结构性未接入必须长得不一样：一个下次刷新会回来，一个要改数据层 */
+.ops-card.is-failed {
+  border-style: solid;
+  border-color: #5a4030;
+}
+
+.ops-card.is-failed .ops-na {
+  background: repeating-linear-gradient(135deg, rgba(216, 144, 92, 0.08) 0 8px, transparent 8px 16px);
+}
+
+.ops-card.is-failed .ops-na-t {
+  color: var(--ops-warn);
+}
+
+/* ---------- 设备墙 ---------- */
+.ops-fleet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+}
+
+.ops-fleet-sum {
+  display: flex;
+  gap: 30px;
+  flex: none;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.ops-frow {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.ops-frow .ops-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  align-self: center;
+}
+
+.ops-frow .ops-v {
+  font-weight: 700;
+  font-family: var(--ops-mono);
+}
+
+.ops-frow .ops-k {
+  color: var(--ops-ink-2);
+}
+
+.ops-dots {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 10px;
+  align-content: stretch;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+[data-ops-screen='desk'] .ops-dots {
+  grid-template-columns: repeat(auto-fill, minmax(26px, 1fr));
+  grid-auto-rows: 18px;
+  gap: 6px;
+}
+
+.ops-d {
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.ops-d.is-ok { background: rgba(53, 171, 142, 0.3); border-color: var(--ops-ok); }
+.ops-d.is-warn { background: rgba(216, 144, 92, 0.3); border-color: var(--ops-warn); border-style: dashed; }
+.ops-d.is-err { background: rgba(224, 112, 90, 0.32); border-color: var(--ops-err); border-style: double; }
+.ops-d.is-unk { background: rgba(111, 141, 132, 0.16); border-color: #33564d; border-style: dotted; }
+
+/* ---------- 横条统计 ---------- */
+.ops-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  justify-content: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.ops-card.ops-tall .ops-bars {
+  justify-content: space-evenly;
+}
+
+.ops-bar-r {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 74px;
+  align-items: center;
+  gap: 11px;
+}
+
+[data-ops-screen='desk'] .ops-bar-r {
+  grid-template-columns: 88px minmax(0, 1fr) 62px;
+  gap: 8px;
+}
+
+.ops-bar-r .ops-bl {
+  color: var(--ops-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-bar-t {
+  height: 11px;
+  border-radius: 6px;
+  background: var(--ops-panel-2);
+  overflow: hidden;
+}
+
+[data-ops-screen='desk'] .ops-bar-t { height: 8px; }
+
+.ops-bar-f {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--ops-p-500);
+}
+
+.ops-bar-f.is-warn { background: var(--ops-warn); }
+.ops-bar-f.is-error { background: var(--ops-err); }
+.ops-bar-f.is-info { background: var(--ops-info); }
+
+.ops-bar-r .ops-bv {
+  font-family: var(--ops-mono);
+  text-align: right;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 分项小格（平面块，不是卡片） ---------- */
+.ops-mini {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 14px;
+  height: 100%;
+  align-content: stretch;
+  min-width: 0;
+}
+
+.ops-mini .ops-m {
+  background: var(--ops-panel-2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.ops-mini .ops-mv {
+  font-weight: 700;
+  font-family: var(--ops-mono);
+  line-height: 1.1;
+}
+
+.ops-mini .ops-mv.is-na {
+  color: var(--ops-ink-3);
+  font-family: inherit;
+}
+
+.ops-mini .ops-mk {
+  color: var(--ops-ink-2);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-mini .ops-ms {
+  color: var(--ops-ink-3);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops-mini.is-sm {
+  gap: 9px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: auto;
+}
+
+.ops-mini.is-sm .ops-m { padding: 8px 12px; }
+.ops-mini.is-sm .ops-ms { margin-top: 1px; }
+
+/* ---------- 列表（告警 / 归并说明），平面块 ---------- */
+.ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  height: 100%;
+  min-width: 0;
+}
+
+.ops-card.ops-tall .ops-list {
+  justify-content: flex-start;
+  gap: 11px;
+}
+
+.ops-li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--ops-panel-2);
+  border-radius: 9px;
+  padding: 9px 12px;
+  flex: none;
+  min-width: 0;
+}
+
+.ops-card.ops-tall .ops-li { padding: 12px 14px; }
+
+.ops-li .ops-sev {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 3px;
+  flex: none;
+  background: var(--ops-info);
+}
+
+.ops-li .ops-sev.is-error { background: var(--ops-err); }
+.ops-li .ops-sev.is-warn { background: var(--ops-warn); }
+
+.ops-li .ops-tx {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-li .ops-tm {
+  color: var(--ops-ink-3);
+  font-family: var(--ops-mono);
+  flex: none;
+}
+
+.ops-empty {
+  color: var(--ops-ink-3);
+  text-align: center;
+  padding: 22px 0;
+}
+
+.ops-more {
+  flex: none;
+  color: var(--ops-ink-3);
+  text-align: right;
+  padding-top: 2px;
+}
+
+/* ---------- 未接入归并面板（Partner）：平面行，不是卡中卡 ---------- */
+.ops-gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
+.ops-gap-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 12px;
+  align-items: start;
+  background: var(--ops-panel-2);
+  border-radius: 9px;
+  padding: 9px 12px;
+  min-width: 0;
+}
+
+.ops-gap-row .ops-gap-keys {
+  color: var(--ops-ink-2);
+  min-width: 0;
+}
+
+.ops-gap-row .ops-gap-why {
+  color: var(--ops-ink-3);
+  line-height: 1.45;
+  min-width: 0;
+}
+
+/* ---------- 折线 ---------- */
+.ops-spark {
+  width: 100%;
+  height: 100%;
+  display: block;
+  min-height: 0;
+}
+
+/* ---------- 整屏状态面板（未登录 / 403 / 全局错误 / mock） ---------- */
+.ops-panel-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  border-radius: 14px;
+  border: 1px solid var(--ops-line);
+  background: var(--ops-panel);
+  padding: 48px 32px;
+  min-height: 320px;
+}
+
+.ops-panel-state .ops-ps-t {
+  font-weight: 700;
+  color: var(--ops-ink);
+}
+
+.ops-panel-state .ops-ps-d {
+  color: var(--ops-ink-2);
+  max-width: 64ch;
+  line-height: 1.6;
+}
+
+/* ---------- 骨架：静态占位，不做呼吸动画（3 米外只会晃眼） ---------- */
+.ops-skel {
+  border-radius: 8px;
+  background: var(--ops-panel-2);
+}
+
+/* ---------- 字阶：wall 3 米可读，下限 13px ---------- */
+[data-ops-screen='wall'] { font-size: 16px; }
+[data-ops-screen='wall'] .ops-hd h1 { font-size: 34px; }
+[data-ops-screen='wall'] .ops-hd .ops-sub { font-size: 15px; }
+[data-ops-screen='wall'] .ops-stamp { font-size: 15px; }
+[data-ops-screen='wall'] .ops-stamp .ops-win { font-size: 14px; }
+[data-ops-screen='wall'] .ops-btn { font-size: 14px; padding: 8px 14px; min-height: 40px; }
+[data-ops-screen='wall'] .ops-banner { font-size: 14px; padding: 10px 14px; gap: 10px; }
+[data-ops-screen='wall'] .ops-banner .ops-banner-dot { width: 9px; height: 9px; }
+[data-ops-screen='wall'] .ops-card > h2 { font-size: 15px; }
+[data-ops-screen='wall'] .ops-card > h2 .ops-tag { font-size: 13px; }
+[data-ops-screen='wall'] .ops-foot { font-size: 13px; }
+[data-ops-screen='wall'] .ops-kpi .ops-n { font-size: 46px; }
+[data-ops-screen='wall'] .ops-kpi .ops-u { font-size: 17px; }
+[data-ops-screen='wall'] .ops-kpi .ops-lb { font-size: 16px; }
+[data-ops-screen='wall'] .ops-na .ops-na-t { font-size: 19px; }
+[data-ops-screen='wall'] .ops-na .ops-na-d { font-size: 14px; }
+[data-ops-screen='wall'] .ops-frow .ops-v { font-size: 29px; }
+[data-ops-screen='wall'] .ops-frow .ops-k { font-size: 16px; }
+[data-ops-screen='wall'] .ops-bar-r .ops-bl { font-size: 15px; }
+[data-ops-screen='wall'] .ops-bar-r .ops-bv { font-size: 16px; }
+[data-ops-screen='wall'] .ops-mini .ops-mv { font-size: 40px; }
+[data-ops-screen='wall'] .ops-mini .ops-mv.is-na { font-size: 19px; }
+[data-ops-screen='wall'] .ops-mini .ops-mk { font-size: 14px; }
+[data-ops-screen='wall'] .ops-mini .ops-ms { font-size: 13px; }
+[data-ops-screen='wall'] .ops-mini.is-sm .ops-mv { font-size: 24px; }
+[data-ops-screen='wall'] .ops-mini.is-sm .ops-mv.is-na { font-size: 16px; }
+[data-ops-screen='wall'] .ops-mini.is-sm .ops-mk { font-size: 13px; }
+[data-ops-screen='wall'] .ops-mini.is-sm .ops-ms { font-size: 13px; }
+[data-ops-screen='wall'] .ops-li .ops-tx { font-size: 14px; }
+[data-ops-screen='wall'] .ops-li .ops-tm { font-size: 13px; }
+[data-ops-screen='wall'] .ops-empty { font-size: 15px; }
+[data-ops-screen='wall'] .ops-more { font-size: 13px; }
+[data-ops-screen='wall'] .ops-gap-row { font-size: 14px; }
+[data-ops-screen='wall'] .ops-gap-row .ops-gap-why { font-size: 13px; }
+[data-ops-screen='wall'] .ops-panel-state .ops-ps-t { font-size: 24px; }
+[data-ops-screen='wall'] .ops-panel-state .ops-ps-d { font-size: 16px; }
+
+/* ---------- 字阶：desk 60cm 可读，下限 12px ---------- */
+[data-ops-screen='desk'] { font-size: 14px; }
+[data-ops-screen='desk'] .ops-hd h1 { font-size: 22px; }
+[data-ops-screen='desk'] .ops-hd .ops-sub { font-size: 13px; }
+[data-ops-screen='desk'] .ops-stamp { font-size: 13px; }
+[data-ops-screen='desk'] .ops-stamp .ops-win { font-size: 12px; }
+[data-ops-screen='desk'] .ops-btn { font-size: 13px; padding: 7px 12px; min-height: 36px; }
+[data-ops-screen='desk'] .ops-banner { font-size: 13px; padding: 9px 12px; }
+[data-ops-screen='desk'] .ops-banner .ops-banner-dot { width: 8px; height: 8px; }
+[data-ops-screen='desk'] .ops-card > h2 { font-size: 13px; margin-bottom: 8px; }
+[data-ops-screen='desk'] .ops-card > h2 .ops-tag { font-size: 12px; }
+[data-ops-screen='desk'] .ops-foot { font-size: 12px; margin-top: 8px; padding-top: 6px; }
+[data-ops-screen='desk'] .ops-kpi .ops-n { font-size: 34px; }
+[data-ops-screen='desk'] .ops-kpi .ops-u { font-size: 14px; }
+[data-ops-screen='desk'] .ops-kpi .ops-lb { font-size: 13px; }
+[data-ops-screen='desk'] .ops-na .ops-na-t { font-size: 15px; }
+[data-ops-screen='desk'] .ops-na .ops-na-d { font-size: 12px; }
+[data-ops-screen='desk'] .ops-fleet { gap: 10px; }
+[data-ops-screen='desk'] .ops-fleet-sum { gap: 18px; }
+[data-ops-screen='desk'] .ops-frow .ops-v { font-size: 22px; }
+[data-ops-screen='desk'] .ops-frow .ops-k { font-size: 13px; }
+[data-ops-screen='desk'] .ops-frow .ops-dot { width: 10px; height: 10px; }
+[data-ops-screen='desk'] .ops-bars { gap: 8px; }
+[data-ops-screen='desk'] .ops-bar-r .ops-bl { font-size: 13px; }
+[data-ops-screen='desk'] .ops-bar-r .ops-bv { font-size: 13px; }
+[data-ops-screen='desk'] .ops-mini { gap: 10px; }
+[data-ops-screen='desk'] .ops-mini .ops-m { padding: 10px 12px; }
+[data-ops-screen='desk'] .ops-mini .ops-mv { font-size: 28px; }
+[data-ops-screen='desk'] .ops-mini .ops-mv.is-na { font-size: 15px; }
+[data-ops-screen='desk'] .ops-mini .ops-mk { font-size: 12px; }
+[data-ops-screen='desk'] .ops-mini .ops-ms { font-size: 12px; }
+[data-ops-screen='desk'] .ops-mini.is-sm { gap: 8px; }
+[data-ops-screen='desk'] .ops-mini.is-sm .ops-mv { font-size: 20px; }
+[data-ops-screen='desk'] .ops-mini.is-sm .ops-mv.is-na { font-size: 13px; }
+[data-ops-screen='desk'] .ops-list { gap: 6px; }
+[data-ops-screen='desk'] .ops-card.ops-tall .ops-list { gap: 7px; }
+[data-ops-screen='desk'] .ops-li { padding: 7px 10px; gap: 8px; }
+[data-ops-screen='desk'] .ops-card.ops-tall .ops-li { padding: 8px 10px; }
+[data-ops-screen='desk'] .ops-li .ops-tx { font-size: 13px; }
+[data-ops-screen='desk'] .ops-li .ops-tm { font-size: 12px; }
+[data-ops-screen='desk'] .ops-empty { font-size: 13px; padding: 14px 0; }
+[data-ops-screen='desk'] .ops-more { font-size: 12px; }
+[data-ops-screen='desk'] .ops-gap-list { gap: 7px; }
+[data-ops-screen='desk'] .ops-gap-row { font-size: 13px; padding: 8px 10px; }
+[data-ops-screen='desk'] .ops-gap-row .ops-gap-why { font-size: 12px; }
+[data-ops-screen='desk'] .ops-panel-state { padding: 36px 24px; min-height: 260px; }
+[data-ops-screen='desk'] .ops-panel-state .ops-ps-t { font-size: 18px; }
+[data-ops-screen='desk'] .ops-panel-state .ops-ps-d { font-size: 13px; }
+
+/* ---------- desk 窄屏折叠：只在 desk 生效，wall 永远是 1920 舞台 ---------- */
+@media (max-width: 1380px) {
+  [data-ops-screen='desk'] .ops-span-2 { grid-column: span 3; }
+  [data-ops-screen='desk'] .ops-span-4 { grid-column: span 6; }
+}
+
+@media (max-width: 1080px) {
+  [data-ops-screen='desk'] .ops-span-2,
+  [data-ops-screen='desk'] .ops-span-3 { grid-column: span 6; }
+  [data-ops-screen='desk'] .ops-span-4,
+  [data-ops-screen='desk'] .ops-span-6,
+  [data-ops-screen='desk'] .ops-span-8 { grid-column: span 12; }
+  [data-ops-screen='desk'] .ops-tall { grid-row: span 1; }
+  [data-ops-screen='desk'] .ops-gap-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+@media (max-width: 760px) {
+  [data-ops-screen='desk'] .ops-span-2,
+  [data-ops-screen='desk'] .ops-span-3,
+  [data-ops-screen='desk'] .ops-span-4,
+  [data-ops-screen='desk'] .ops-span-6,
+  [data-ops-screen='desk'] .ops-span-8 { grid-column: span 12; }
+  [data-ops-screen='desk'] .ops-mini.is-sm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-ops-screen='desk'] .ops-stamp { text-align: left; }
+  [data-ops-screen='desk'] .ops-hd-actions { justify-content: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-btn { transition: none; }
+}
+
+/* ============================================================
+   空间层次（2026-09-14 增强）
+
+   要求是「高级、科技感、有空间/3D 效果」，同时不能牺牲读数与真实性。
+   做法与不做法：
+
+   做：用 CSS 3D（perspective + translateZ）给终端矩阵一点真实的纵深，
+       纵深量**绑定真实健康态** —— 故障的格子离观众更近，正常的退到后面。
+       这样「空间」本身携带信息，不是装饰。
+   做：卡片顶部一道极淡的高光线 + 内阴影，做出面板厚度。
+   做：屏底一层极慢的扫描光带，纯装饰但幅度极小、不遮挡任何文字。
+
+   不做：WebGL / Three.js。本轮没有余量做「非空画布 + 移动交互 + 降级」
+         这一整套验证，装一个 3D 引擎却证明不了它能降级，是拿可靠性换观感。
+   不做：任何随机 / 插值 / 补间出来的数据形状。曲线只画真实点。
+
+   全部动效在 prefers-reduced-motion 与 [data-ops-motion='off'] 下关闭，
+   关闭后布局与配色完全不变，只是不动 —— 降级不掉信息。
+   ============================================================ */
+
+[data-ops-screen] .ops-card {
+  position: relative;
+  box-shadow: inset 0 1px 0 rgba(168, 224, 205, 0.06), 0 10px 26px rgba(3, 14, 12, 0.34);
+}
+
+[data-ops-screen] .ops-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(90deg, transparent, rgba(53, 171, 142, 0.36), transparent);
+  pointer-events: none;
+}
+
+[data-ops-screen] .ops-card.is-na::before {
+  background: linear-gradient(90deg, transparent, rgba(111, 141, 132, 0.24), transparent);
+}
+
+[data-ops-screen] .ops-card.is-failed::before {
+  background: linear-gradient(90deg, transparent, rgba(216, 144, 92, 0.4), transparent);
+}
+
+/* ---------- 终端矩阵的纵深：z 位移由健康态决定，不是随机 ---------- */
+[data-ops-screen] .ops-dots {
+  perspective: 900px;
+  perspective-origin: 50% 38%;
+}
+
+[data-ops-screen] .ops-d {
+  transform-style: preserve-3d;
+  transition: transform 0.45s ease, box-shadow 0.45s ease;
+}
+
+/* 正常态退到后面：它不需要被注意 */
+[data-ops-screen] .ops-d.is-ok {
+  transform: translateZ(-10px);
+  box-shadow: inset 0 0 10px rgba(53, 171, 142, 0.16);
+}
+
+/* 未知态更远 */
+[data-ops-screen] .ops-d.is-unk {
+  transform: translateZ(-18px);
+}
+
+/* 需要处理的往前顶：告警在中层，离线在最前 */
+[data-ops-screen] .ops-d.is-warn {
+  transform: translateZ(10px);
+  box-shadow: 0 4px 14px rgba(216, 144, 92, 0.3), inset 0 0 12px rgba(216, 144, 92, 0.22);
+}
+
+[data-ops-screen] .ops-d.is-err {
+  transform: translateZ(20px);
+  box-shadow: 0 6px 20px rgba(224, 112, 90, 0.38), inset 0 0 14px rgba(224, 112, 90, 0.26);
+}
+
+/* 呼吸只给真的在故障的格子。没有故障的屏是完全静止的 —— 这本身是信息。 */
+@keyframes ops-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.62; }
+}
+
+[data-ops-motion='on'] [data-ops-screen] .ops-d.is-err,
+[data-ops-screen][data-ops-motion='on'] .ops-d.is-err {
+  animation: ops-pulse 2.6s ease-in-out infinite;
+}
+
+[data-ops-motion='on'] [data-ops-screen] .ops-d.is-warn,
+[data-ops-screen][data-ops-motion='on'] .ops-d.is-warn {
+  animation: ops-pulse 3.8s ease-in-out infinite;
+}
+
+/* ---------- 屏底扫描光带：纯装饰，幅度极小，不压任何文字 ---------- */
+[data-ops-screen] .ops-screen {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-ops-screen] .ops-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 74% at 12% 0%, rgba(31, 158, 134, 0.1), transparent 62%),
+    radial-gradient(96% 62% at 88% 100%, rgba(111, 155, 216, 0.07), transparent 58%);
+}
+
+@keyframes ops-sweep {
+  0% { transform: translate3d(0, -12%, 0); opacity: 0.5; }
+  50% { opacity: 0.85; }
+  100% { transform: translate3d(0, 12%, 0); opacity: 0.5; }
+}
+
+[data-ops-motion='on'] [data-ops-screen] .ops-screen::before,
+[data-ops-screen][data-ops-motion='on'] .ops-screen::before {
+  animation: ops-sweep 22s ease-in-out infinite alternate;
+}
+
+/* ---------- 降级：动效全关，纵深保留（纵深是静态的，不耗性能） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  [data-ops-screen] .ops-d,
+  [data-ops-screen] .ops-screen::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* 显式关闭：低性能机器或无动画诉求时由页面切 data-ops-motion='off' */
+[data-ops-motion='off'] [data-ops-screen] .ops-d,
+[data-ops-screen][data-ops-motion='off'] .ops-d,
+[data-ops-motion='off'] [data-ops-screen] .ops-screen::before,
+[data-ops-screen][data-ops-motion='off'] .ops-screen::before {
+  animation: none !important;
+}

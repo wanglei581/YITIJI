@@ -12,6 +12,7 @@ import {
   FileSpreadsheetIcon,
   FileTextIcon,
   FolderIcon,
+  GaugeIcon,
   GiftIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
@@ -37,6 +38,7 @@ import { adminOpsService } from '../services/api/adminOps'
 // 这里把它们一并映射到 devices 菜单 key,保证侧栏高亮一致。
 const PATH_TO_KEY: Record<string, string> = {
   '/':             'dashboard',
+  '/screen':       'screen',
   '/devices':      'devices',
   '/terminals':    'devices',
   '/printers':     'devices',
@@ -88,6 +90,7 @@ const KEY_TO_PATH: Record<string, string> = (() => {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon, href: KEY_TO_PATH.dashboard },
+  { key: 'screen',       label: '数据大屏',    icon: GaugeIcon,    href: KEY_TO_PATH.screen },
   { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维', href: KEY_TO_PATH.devices },
   { key: 'screensaver',  label: '宣传屏',       icon: MonitorPlayIcon, href: KEY_TO_PATH.screensaver },
   { key: 'toolbox',      label: '百宝箱',       icon: PackageIcon, href: KEY_TO_PATH.toolbox },

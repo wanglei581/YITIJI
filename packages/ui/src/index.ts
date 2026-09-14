@@ -27,6 +27,32 @@ export { TrendLineChart } from './charts/TrendLineChart'
 export { FunnelCard } from './charts/FunnelCard'
 export { MetricGrid } from './charts/MetricGrid'
 
+/* ── Ops data screen (Admin / Partner 数据大屏) ────────── */
+export { SCREEN_REASON_COPY, SCREEN_SOURCE_ENTRY_NOTE, screenReasonCopy } from './screen/screenCopy'
+export {
+  ScreenBarList,
+  ScreenCard,
+  ScreenKpi,
+  ScreenMetricCard,
+  ScreenMiniGrid,
+  ScreenUnavailable,
+  screenCount,
+} from './screen/ScreenPrimitives'
+export { ScreenFleetWall, screenFleetOnlineText, screenFleetScopeNote } from './screen/ScreenFleetWall'
+export { ScreenSparkline } from './screen/ScreenSparkline'
+export { ScreenAlertList, ScreenGapList } from './screen/ScreenLists'
+export {
+  ScreenBanner,
+  ScreenBody,
+  ScreenDesk,
+  ScreenGrid,
+  ScreenHeader,
+  ScreenStage,
+  ScreenStatePanel,
+  useScreenMotion,
+  useScreenPresent,
+} from './screen/ScreenFrame'
+
 /* ── State components ─────────────────────────────────── */
 export { Spinner } from './components/Spinner'
 export { EmptyState } from './components/EmptyState'
@@ -59,6 +85,37 @@ export type { ResumeRadarChartProps, ResumeRadarDimension, ResumeRadarSeries } f
 export type { TrendLineChartProps, TrendSeries } from './charts/TrendLineChart'
 export type { FunnelCardProps, FunnelStep } from './charts/FunnelCard'
 export type { MetricGridProps, MetricItem } from './charts/MetricGrid'
+export type { ScreenReasonCopy } from './screen/screenCopy'
+export type {
+  ScreenBarItem,
+  ScreenBarListProps,
+  ScreenCardProps,
+  ScreenKpiProps,
+  ScreenMetricCardProps,
+  ScreenMetricLike,
+  ScreenMiniGridProps,
+  ScreenMiniItem,
+  ScreenTone,
+  ScreenUnavailableProps,
+} from './screen/ScreenPrimitives'
+export type { ScreenFleetHealthLike, ScreenFleetValueLike, ScreenFleetWallProps } from './screen/ScreenFleetWall'
+export type { ScreenSparkDay, ScreenSparklineProps } from './screen/ScreenSparkline'
+export type {
+  ScreenAlertListProps,
+  ScreenAlertRow,
+  ScreenGapEntry,
+  ScreenGapListProps,
+} from './screen/ScreenLists'
+export type {
+  ScreenBannerProps,
+  ScreenBannerTone,
+  ScreenBodyProps,
+  ScreenGridProps,
+  ScreenHeaderProps,
+  ScreenMode,
+  ScreenStageProps,
+  ScreenStatePanelProps,
+} from './screen/ScreenFrame'
 export type { SpinnerProps } from './components/Spinner'
 export type { EmptyStateProps } from './components/EmptyState'
 export type { LoadingStateProps } from './components/LoadingState'
