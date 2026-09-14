@@ -13,7 +13,7 @@ import {
   clearScanWorkbenchSession,
   SCAN_WORKBENCH_SESSION_KEY,
 } from '../pages/scan/scanWorkbenchSession'
-import { revokeLiveScanSession } from '../pages/scan/scanSessionRevoke'
+import { beginScanSessionCleanup } from '../pages/scan/scanCleanupGate'
 import {
   clearAllLocalFavorites,
   hasLocalFavorites,
@@ -45,7 +45,17 @@ const SENSITIVE_SESSION_STORAGE_KEYS = [
  * @param outgoingMemberToken 正在失效的会员令牌（换人 / 退出 / 401 时是**旧**那一个，
  *   游客为 null）。只用于在抹掉本地扫描会话之前撤销服务端那个还活着的扫描任务：
  *   服务端按 endUserId 校验取消权限，用新用户的令牌发只会 403，旧任务照样等着
- *   把下一次面板扫描的文件投给上一位用户。见 [scanSessionRevoke.ts]。
+ *   把下一次面板扫描的文件投给上一位用户。它**只在内存里**流向那一次撤销请求，
+ *   不落存储、不进 URL、不进 history。
+ *
+ * ## 本函数只负责「立刻清干净本机」，收尾归 scanCleanupGate
+ *
+ * 这里同步做完的每一件事都不等网络：屏幕上那一位的 PII 一个字节都不多留。
+ * 服务端那条扫描任务撤没撤干净是另一件事 —— 它要等回执，而这里**不能等**
+ * （logout / 清场链路都是同步调用）。所以这一步只把凭证交给
+ * {@link beginScanSessionCleanup}，由它重试到服务端确认为止；
+ * 清场链路那一端（KioskPrivacyGuard）在拿到确认之前不许整页重载 / 进屏保 ——
+ * 重载会把补偿逻辑连同执行环境一起杀掉，那正是 2026-09-15 那条 P1 的成因。
  */
 export function clearKioskSensitiveSession(outgoingMemberToken?: string | null): void {
   clearContractReviewSession()
@@ -54,9 +64,9 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   clearJobMaterialDraft()
   clearSelfAssessmentSession()
   clearInterviewWorkbenchSession()
-  // 顺序不可调换：撤销要读本地登记的 scanTaskId / controlToken，
-  // clearScanWorkbenchSession() 一旦先跑，撤销就再也找不到要撤谁。
-  revokeLiveScanSession(outgoingMemberToken ?? null)
+  // 顺序不可调换：收尾要读本地登记的 scanTaskId / controlToken，
+  // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
+  beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
 }
 

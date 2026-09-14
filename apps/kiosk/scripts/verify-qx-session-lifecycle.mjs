@@ -18,6 +18,11 @@ const files = {
   sessionView: read('src/pages/session-guard/SessionGuardView.tsx'),
   sessionModel: read('src/pages/session-guard/sessionGuardModel.ts'),
   overlay: read('src/auth/KioskPrivacyGuard.tsx'),
+  /* 2026-09-15：清场遮罩的标记从 KioskPrivacyGuard 搬进了自己的组件（它现在还要
+     如实展示收尾闸在等什么）。断言跟着搬，判据一个字没变 —— 遮罩仍然必须挂住整屏、
+     仍然必须说「正在清除本机会话」。 */
+  clearingOverlay: read('src/auth/KioskClearingOverlay.tsx'),
+  clearingOverlayCss: read('src/pages/session-guard/styles/session-guard-qx.css'),
   sensitive: read('src/auth/kioskSensitiveSession.ts'),
   resumePage: read('src/pages/session-resume/SessionResumePage.tsx'),
   resumeView: read('src/pages/session-resume/SessionResumeView.tsx'),
@@ -81,10 +86,29 @@ check('session guard continue is fail-closed and clearing overlay still blocks',
   assert.match(files.sessionPage, /hardClear/)
   assert.match(files.sessionPage, /结束并清除本机会话/)
   assert.match(files.sessionPage, /我还在，继续使用/)
-  assert.match(files.overlay, /data-kiosk-privacy-clearing="true"/)
-  assert.match(files.overlay, /正在清除本机会话/)
+  assert.match(files.clearingOverlay, /data-kiosk-privacy-clearing="true"/)
+  assert.match(files.clearingOverlay, /正在清除本机会话/)
   assert.match(files.overlay, /clearKioskSensitiveSession\(getToken\(\)\)/)
+  // 遮罩仍然是 KioskPrivacyGuard 在 clearing / 陈旧历史项 / 孤儿会话路由三种情况下
+  // 画的那一块；换成别的组件（或忘了挂）就等于把上一位的页面露出来。
+  assert.match(
+    files.overlay,
+    /clearing \|\| isStaleHistoryEntry \|\| isOrphanSessionTimeoutRoute \? \(\s*\n\s*<KioskClearingOverlay/,
+  )
   assert.doesNotMatch(files.sessionPage, /onClick=\{canContinue \? continueSession : hardClear\}/)
+})
+
+check('clearing overlay tells the truth while it waits for the server, and stays touchable', () => {
+  /* 收尾闸按住换人时，这块遮罩是用户唯一能看到的东西。它要回答三件事：
+     我的东西清了没有、这机器为什么不让我用、还要多久。少任何一件，
+     屏幕上就只剩一块吃掉所有触摸的黑板。 */
+  assert.match(files.clearingOverlay, /本机这一份使用记录已经清掉了/)
+  assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-status"/)
+  assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-deadline"/)
+  assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-retry"/)
+  // CLAUDE.md §9：27 寸竖屏触控，主要按钮不小于 56px。这颗「立即重试」是这一屏
+  // 唯一可点的东西 —— 它按不准，用户就只剩「等」这一个选项。
+  assert.match(files.clearingOverlayCss, /\.qx-clearing-retry \{[\s\S]*?min-height: 56px/)
 })
 
 check('session resume maps only cashier/progress and fail-closes invalid rows', () => {

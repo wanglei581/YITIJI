@@ -174,3 +174,140 @@ export function revokeCreatedScanSession(
 ): boolean {
   return sendRevoke(credentials.scanTaskId, credentials.controlToken, creatingMemberToken, intent)
 }
+
+/* ══ 以下是「等服务端把话说完」的那一条撤销通道（2026-09-15 P1） ════════════════
+ *
+ * 上面那套是 fire-and-forget：发出去就算，回执一律吞掉。它对**页面还活着**的离开
+ * （leaveScanFlow / 结果页出口）是对的 —— 那一刻还有人在看着，ACK 补偿也还跑得动。
+ *
+ * 但清场（隐私空闲 / 屏保 / 退出 / 换人）不一样：它的最后一步是整页重载，
+ * 而重载会把「ACK 回来之后补一次撤销」那段代码连同执行环境一起干掉。于是
+ *   ① 离开时发的 DELETE 在路上丢了（本机永远不会知道，因为回执被吞了）；
+ *   ② 还在飞的那次 ACK 随后成功了；
+ *   ③ 重载把补偿代码杀了；
+ * 三件事一撞，服务端就留下一条 `deliveryAckedAt` 非空、状态仍是 waiting 的任务：
+ * 60 秒未确认回收器收不到它（它已确认），而 Agent 的 current-lease 看得见它
+ * （`deliveryAckedAt: { not: null }`，scan-tasks.service.ts 的 getScanDeliveryLease）。
+ * 它会一直可投递到自然过期 —— 下一位在面板上按下扫描，文件投给已经走掉的上一位。
+ *
+ * 所以清场这条路上撤销必须**等服务端回话**，并且在拿到确认之前不许重载。
+ * 这里只负责发一次并把回答翻译成「确认了没有」；等待、退避、上限、界面归
+ * `scanCleanupGate.ts` 管。
+ */
+
+/**
+ * 一次「等回话」的撤销的结论。
+ *
+ * `confirmed: true` 的三种理由，判据都来自 scan-tasks.service.ts 的 `cancel()`
+ * 与 `getScanDeliveryLease()`，共同点是**这条任务此后不可能再被 Agent 领走**：
+ *   · `cancelled` —— 200，服务端刚把它 CAS 成 cancelled；
+ *   · `not-found` —— 404 `SCAN_TASK_NOT_FOUND`，服务端那边根本没有这条任务；
+ *   · `already-terminal` —— 400 `SCAN_TASK_ALREADY_COMPLETED` 或 409
+ *     `SCAN_TASK_CANCEL_CONFLICT`。后者的判据是 `status !== 'waiting' && !== 'matched'`，
+ *     也就是它已经是 cancelled / failed / expired / completed 之一。租约查询只签
+ *     `status: 'waiting'` 的行，所以这几种一律领不走。
+ *
+ * `confirmed: false` 的三种，一种都不许当成「清干净了」：
+ *   · `forbidden` —— 403，本机手里这份身份/凭据动不了那条任务（它可能仍是 waiting）；
+ *   · `server-error` —— 5xx / 429 / 其它非终态码，服务端没给结论；
+ *   · `unreachable` —— 请求压根没拿到应答（断网、被掐断）。
+ */
+export type ScanRevokeVerdict =
+  | { confirmed: true; reason: 'cancelled' | 'not-found' | 'already-terminal' }
+  | { confirmed: false; reason: 'forbidden' | 'server-error' | 'unreachable' }
+
+/** 服务端明确说「这条任务已经不可能被领走了」的两个码。 */
+const TERMINAL_CANCEL_CODES = new Set(['SCAN_TASK_ALREADY_COMPLETED', 'SCAN_TASK_CANCEL_CONFLICT'])
+
+async function readErrorCode(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: { code?: unknown } } | null
+    const code = body?.error?.code
+    return typeof code === 'string' ? code : ''
+  } catch {
+    // 非 JSON（网关的 HTML 错误页之类）：当作「服务端没给结论」，由调用方继续重试。
+    return ''
+  }
+}
+
+function revokeHeaders(controlToken: string, identityToken: string | null): Headers {
+  const headers = new Headers({
+    Accept: 'application/json',
+    'X-Scan-Session-Control': controlToken,
+  })
+  const terminalId = getTerminalId()
+  if (terminalId) headers.set('X-Terminal-Id', terminalId)
+  if (identityToken) headers.set('Authorization', `Bearer ${identityToken}`)
+  return headers
+}
+
+/**
+ * 发一次 DELETE 并**等服务端回话**，把回答翻译成 {@link ScanRevokeVerdict}。
+ *
+ * 三点和上面那条 fire-and-forget 通道刻意不同，每一点都是这条路径的必需：
+ *   1. **不带 keepalive**。keepalive 的意义是「文档正在被拆掉也要把请求送出去」，
+ *      而这条路径的全部前提恰恰是**先别拆文档**；keepalive 请求还受额外配额限制，
+ *      拿回执反而更不可靠。
+ *   2. **不走 `scanTasks.ts` 的 `requestJson`**。那条通道带 `notifySessionIfInvalid`：
+ *      用一个刚失效的会员令牌发请求拿回 401 时，它会广播「会员会话过期」，
+ *      而 AuthContext 的处置是 `window.location.assign(...)` —— 一次硬跳转，
+ *      正好把这里等着的清理连同执行环境一起杀掉。清场路径不能踩这颗雷。
+ *   3. **不参与 {@link REVOKE_ATTEMPT_CAP} 的按次上限**。那道上限是为「尽力而为、
+ *      不重试」设的；这条路径的职责相反 —— 重试到服务端给出确认为止，
+ *      次数由 scanCleanupGate 按退避表与服务端给的自然过期时刻收口。
+ *
+ * @param identityToken 发起这一场的那个会员令牌（游客 / 已登出为 null）。
+ *   服务端 `cancel()` 对 `endUserId === null` 的调用方只校验 controlToken —— 那是它
+ *   刻意为「登出之后仍要撤得掉」留的路（见 scan-tasks.service.ts 里那段注释），
+ *   所以传 null 是合法调用，不是绕过校验。
+ */
+export async function requestConfirmedScanRevoke(
+  credentials: { scanTaskId: string; controlToken: string },
+  identityToken: string | null,
+): Promise<ScanRevokeVerdict> {
+  let res: Response
+  try {
+    res = await fetch(revokeUrl(credentials.scanTaskId), {
+      method: 'DELETE',
+      headers: revokeHeaders(credentials.controlToken, identityToken),
+      credentials: 'include',
+    })
+  } catch {
+    return { confirmed: false, reason: 'unreachable' }
+  }
+
+  if (res.ok) return { confirmed: true, reason: 'cancelled' }
+  const code = await readErrorCode(res)
+  if (res.status === 404 || code === 'SCAN_TASK_NOT_FOUND') {
+    return { confirmed: true, reason: 'not-found' }
+  }
+  if (TERMINAL_CANCEL_CODES.has(code)) return { confirmed: true, reason: 'already-terminal' }
+  if (res.status === 403 || code === 'SCAN_TASK_FORBIDDEN') {
+    return { confirmed: false, reason: 'forbidden' }
+  }
+  return { confirmed: false, reason: 'server-error' }
+}
+
+/**
+ * 文档真的要走了（`pagehide`）时的最后一发。
+ *
+ * 只在这一种时刻用：浏览器被关掉、一体机被拔电、Kiosk 外壳自己重启 —— 那一刻没有
+ * 任何界面能再等回执，keepalive 是唯一还有机会送达的形式。它**不是**清场路径的
+ * 正常出口（正常出口是上面那条等回话的通道），所以刻意不参与按次上限：
+ * 文档都要没了，「别刷请求」这条顾虑不成立，而漏发一次的代价是一条可投递的孤儿任务。
+ */
+export function sendUnloadRevokeBeacon(
+  credentials: { scanTaskId: string; controlToken: string },
+  identityToken: string | null,
+): void {
+  try {
+    void fetch(revokeUrl(credentials.scanTaskId), {
+      method: 'DELETE',
+      headers: revokeHeaders(credentials.controlToken, identityToken),
+      credentials: 'include',
+      keepalive: true,
+    }).catch(() => undefined)
+  } catch {
+    /* 文档正在消失，这里没有第二条出路，也没有人能看见错误。 */
+  }
+}

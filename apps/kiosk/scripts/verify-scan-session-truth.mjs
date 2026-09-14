@@ -24,6 +24,18 @@ const scanSettingsModel = read('src/pages/scan/scanSettingsModel.ts')
  * 投递确认本身的码表与文案在 scanDeliveryAck.ts。 */
 const scanSettingsView = read('src/pages/scan/ScanSettingsStatusView.tsx')
 const scanDeliveryAck = read('src/pages/scan/scanDeliveryAck.ts')
+/* 2026-09-15 第五轮（清场收尾闸）：设置页「这一场到此为止」的四种收场
+ * （cancelSessionOnce / abandonCreatedSession / discardCreatedSession /
+ * failClosedOnAckRefusal）整组搬到了 scanSettingsTeardown.ts —— 同一条理由
+ * （800 行硬线），同一条边界：它们的**判据、顺序、注释一个字都没改**，只是按
+ * refs + setters 装配出来。下面凡是钉这四条定义的断言改钉这份源；
+ * 调用点仍在设置页里，那些断言原地不动。 */
+const scanSettingsTeardown = read('src/pages/scan/scanSettingsTeardown.ts')
+/* 清场收尾闸本身：等服务端确认之前不许换人。这一轮 P1 的本体。 */
+const scanCleanupGate = read('src/pages/scan/scanCleanupGate.ts')
+const privacyGuard = read('src/auth/KioskPrivacyGuard.tsx')
+/* 清场遮罩自己的组件：它现在除了「正在清除本机会话」，还要如实说出收尾闸在等什么。 */
+const clearingOverlay = read('src/auth/KioskClearingOverlay.tsx')
 
 assert.doesNotMatch(
   scanStart,
@@ -103,10 +115,15 @@ assert.match(
  * 被写成成功、连同控制凭证一起写回本机登记。用户照着屏上的编号去面板扫，
  * 扫出来的文件没有任何任务认领。
  *
- * 所以这一笔必须不可逆，且要在 effect 重新挂 promise 之前就把整条 effect 拦住。 */
+ * 所以这一笔必须不可逆，且要在 effect 重新挂 promise 之前就把整条 effect 拦住。
+ *
+ * 2026-09-15 新增第五道 `if (cleanupHolding)`：上一位的扫描还没收完尾时一个创建
+ * 请求都不发（服务端的租约取的是这台终端最早那条「已确认 + waiting」的行，
+ * 现在建会话，下一位扫出来的纸会落到上一位名下）。它同样要排在终端状态分支
+ * **之前** —— 排在后面，换票窗口里那一次就会抢在收尾完成之前把请求发出去。 */
 assert.match(
   scanSettings,
-  /if \(skipCreateRef\.current\) return[\s\S]{0,900}?if \(creationAbandonedRef\.current\) return[\s\S]{0,600}?if \(ackRefused\) return[\s\S]{0,900}?if \(rescanCredentialsLost\) return[\s\S]{0,400}?if \(terminalSession === 'checking'\) return/,
+  /if \(skipCreateRef\.current\) return[\s\S]{0,900}?if \(creationAbandonedRef\.current\) return[\s\S]{0,600}?if \(ackRefused\) return[\s\S]{0,900}?if \(rescanCredentialsLost\) return[\s\S]{0,400}?if \(cleanupHolding\) \{[\s\S]{0,600}?if \(terminalSession === 'checking'\) return/,
   '丢弃之后创建 effect 必须整条停掉，且这道闸要排在终端状态分支之前：'
     + '排在后面就会先被 ready 分支重新挂上那个已经 resolve 的 promise。\n'
     + '2026-09-14 起同一串里还多一道：投递授权被服务端明确拒绝（ackRefused）之后，'
@@ -125,8 +142,8 @@ assert.doesNotMatch(
     + '像 terminalFailClosedRef 那样在 ready 分支清掉，缺陷就原样回来了',
 )
 assert.match(
-  scanSettings,
-  /revokeCreatedScanSession\(credentials, createTokenRef\.current, intent\)/,
+  scanSettingsTeardown,
+  /revokeCreatedScanSession\(credentials, refs\.createTokenRef\.current, intent\)/,
   '撤销要用**创建时**那个身份：清场之后 getToken() 已经空了，拿它发只会 403（看起来撤了，其实没撤）',
 )
 assert.doesNotMatch(
@@ -415,17 +432,37 @@ assert.match(
 assert.match(scanRevoke, /\.catch\(\(\) => undefined\)/, '网络错误 / 409 / 已终态一律吞掉，不打断清场')
 // 注释里会解释「为什么不 await / 不重试」，所以这条只能对**代码**判，先剥注释。
 const stripComments = (source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+/* 2026-09-15：这个文件从此有**两条**撤销通道，判据相反，必须分开判。
+ *
+ * 上半条仍是 fire-and-forget（页内离开 / 结果页出口用它）：页面还活着，ACK 补偿也
+ * 还跑得动，所以「不重试、不 await、不阻塞」这条原判据一个字都不能松。
+ * 下半条是清场专用的「等服务端把话说完」：它的职责正是等回执，所以对它判 await
+ * 反而是必须的（见下面那一组）。
+ *
+ * 切点取源码里那句分界注释。取不到就直接失败 —— 分界没了意味着两条通道又混在
+ * 一起，那时上半条的原判据会被下半条的 await 悄悄绕过，闸看起来还在，实际空转。 */
+const REVOKE_CONFIRMED_CHANNEL_MARK = '以下是「等服务端把话说完」的那一条撤销通道'
+const revokeChannelSplit = scanRevoke.indexOf(REVOKE_CONFIRMED_CHANNEL_MARK)
+assert.ok(
+  revokeChannelSplit > 0,
+  'scanSessionRevoke 必须保留两条通道之间那句分界注释：没有它就没法只对 fire-and-forget '
+    + '那一半判「不重试、不 await」，而那正是页内离开路径赖以不被清场逻辑拖慢的判据',
+)
 assert.doesNotMatch(
-  stripComments(scanRevoke),
+  stripComments(scanRevoke.slice(0, revokeChannelSplit)),
   /setTimeout|setInterval|for \(|while \(|await /,
-  '撤销只尝试一次：不重试、不轮询、不 await（清场比撤销要紧）',
+  '尽力而为那条通道只尝试一次：不重试、不轮询、不 await（清场比撤销要紧）',
 )
 
 const sensitiveSession = read('src/auth/kioskSensitiveSession.ts')
+/* 2026-09-15：清场这条路上「撤一次就走」换成了「交给收尾闸，等服务端确认」。
+ * 顺序判据一个字没变 —— 要撤谁、凭什么撤仍然只写在本机登记里，先抹就再也找不到。
+ * 变的只是接手的那一方：revokeLiveScanSession（发完就算）→ beginScanSessionCleanup
+ * （重试到服务端回话确认为止，期间不许换人）。 */
 assert.match(
   sensitiveSession,
-  /revokeLiveScanSession\(outgoingMemberToken \?\? null\)\s*\n\s*clearScanWorkbenchSession\(\)/,
-  '顺序：先撤服务端任务，再清本地登记。反过来就找不到要撤谁了',
+  /beginScanSessionCleanup\(outgoingMemberToken \?\? null\)\s*\n\s*clearScanWorkbenchSession\(\)/,
+  '顺序：先把要撤的那一场交给收尾闸，再清本地登记。反过来就找不到要撤谁了',
 )
 assert.match(
   sensitiveSession,
@@ -462,8 +499,8 @@ assert.match(
 const clearScope = read('src/auth/kioskClearScope.ts')
 assert.match(
   clearScope,
-  /export function clearGuestScanBeforeMemberLogin\(\): boolean \{[\s\S]*?revokeLiveScanSession\(null\)\s*\n[\s\S]{0,400}?clearScanWorkbenchSession\(\)/,
-  '顺序与 clearKioskSensitiveSession 一致：先撤服务端任务再清本地登记；'
+  /export function clearGuestScanBeforeMemberLogin\(\): boolean \{[\s\S]*?beginScanSessionCleanup\(null\)\s*\n[\s\S]{0,400}?clearScanWorkbenchSession\(\)/,
+  '顺序与 clearKioskSensitiveSession 一致：先把要撤的那一场交给收尾闸再清本地登记；'
     + '身份传 null —— 游客的任务在服务端 endUserId 就是 null，'
     + '拿新登录这位的令牌去发只会被 403 顶回来，旧任务原地存活',
 )
@@ -704,8 +741,50 @@ assert.equal(
 )
 assert.match(
   scanSettings,
-  /createScanSession\(\s*\n\s*\{ scanType, terminalId: getTerminalId\(\) \},\s*\n\s*getToken\(\),\s*\n\s*rescan,\s*\n\s*\)/,
-  '取到的授权必须真的传给创建请求；取了不传 = 白取一枚，重扫照旧退化',
+  /createScanSession\(\s*\n\s*\{ scanType, terminalId: getTerminalId\(\) \},\s*\n\s*identityToken,\s*\n\s*rescan,\s*\n\s*\)/,
+  '取到的授权必须真的传给创建请求；取了不传 = 白取一枚，重扫照旧退化。\n'
+    + '身份那一格必须是 identityToken（创建那一刻的快照），不是现取的 getToken()——见下一条。',
+)
+
+/* ── 身份快照：创建 / 重放 / 撤销 / 确认必须绑同一份（2026-09-15 第五轮）───────
+ *
+ * 此前是两处取值：effect 里写一次 `createTokenRef.current = getToken()`，`sendCreate`
+ * 里又写一次 `getToken()` —— 中间隔着最长 24 秒的丢失响应重放。用户在那 24 秒里退出 /
+ * 换人 / 会话过期的话，重放会用**新身份**（或匿名）去建任务，而 createTokenRef 里还是
+ * 旧的那一个。服务端 cancel() 与 ack() 都按 endUserId 校验，于是那条 child 以另一个人
+ * 的名义活着，谁都撤不掉，一直等到自然过期。
+ *
+ * 判据钉的是「整条创建 effect 里 getToken() 只出现一次，并且那一次就是写快照」。 */
+const createEffectStart = scanSettings.indexOf('if (!sessionPromiseRef.current) {')
+const createEffectEnd = scanSettings.indexOf('sessionPromiseRef.current\n      .then(')
+assert.ok(
+  createEffectStart > 0 && createEffectEnd > createEffectStart,
+  '创建闸门那一段必须还在：找不到它，下面几条身份断言就全是空转',
+)
+// 注释里会解释「为什么不能再取一次」，所以只对**代码**数，先剥注释。
+const createBlock = stripComments(scanSettings.slice(createEffectStart, createEffectEnd))
+assert.match(
+  createBlock,
+  /const identityToken = getToken\(\)\s*\n\s*createTokenRef\.current = identityToken/,
+  '身份**只取一次**并当场存成这一场的快照：撤销、确认、重放三件事必须绑同一份',
+)
+assert.equal(
+  (createBlock.match(/getToken\(\)/g) ?? []).length,
+  1,
+  '创建这一段里 getToken() 只许出现一次（写快照那一次）。第二处取值会在重放窗口里'
+    + '取到**另一个人**的身份：任务以他的名义建成，撤销时按 endUserId 校验只会 403',
+)
+assert.match(
+  scanSettings,
+  /const memberToken = createTokenRef\.current\s*\n\s*let stale = false/,
+  '投递确认也用**建这一场时**那份快照。现取的话，用户中途退出之后拿回的 403 会被'
+    + '这一屏读成「服务端不认这一场」—— 把本机的身份漂移说成服务端的结论',
+)
+assert.match(
+  scanSettings,
+  /if \(restoredFromStorageRef\.current && createTokenRef\.current === null\) \{\s*\n\s*createTokenRef\.current = getToken\(\)/,
+  '复水进来的那一场没走过创建，快照是空的：挂载这一刻就要补上。'
+    + '等到确认 effect 再补是不够的 —— 用户可能在确认回来之前就按下「返回（取消任务）」',
 )
 
 /* ── B3. 丢失响应的重放：把「看不见的收件箱」收回来（2026-09-14 第三轮）───────
@@ -1198,20 +1277,26 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /if \(rescanCredentialsLost\) return\s*\n\s*\/\/ 终端安全会话还在换票/,
+  /if \(rescanCredentialsLost\) return\s*\n[\s\S]{0,700}?if \(cleanupHolding\) \{[\s\S]{0,400}?\}\s*\n\s*\/\/ 终端安全会话还在换票/,
   'fail-closed 必须排在终端会话那两个分支**之前**（页面要说的是「凭据没了」，'
-    + '不是「正在做终端安全校验」），而且它 return 掉的正是那一个会悄悄发出去的普通创建',
+    + '不是「正在做终端安全校验」），而且它 return 掉的正是那一个会悄悄发出去的普通创建。\n'
+    + '2026-09-15 起同一位置上还多一道：上一位的扫描没收完尾时一个创建都不许发'
+    + '（cleanupHolding）。它同样必须排在终端状态分支之前 —— 排在后面的话，'
+    + '换票窗口里那一次就会抢在收尾完成之前把请求发出去。',
 )
 assert.match(
   scanSettings,
-  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused\]\)/,
-  '四个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
+  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding\]\)/,
+  '五个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
     + '它们变 false，这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
     + 'rescanRefusedByServer 这一位尤其容易被判成冗余 —— 服务端拒绝那条路径上'
     + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。\n'
     + 'rescanRetryable 是「再试一次安全重扫」唯一的复跑开关，同理。\n'
     + 'ackRefused（2026-09-14）同理，而且它还多守一头：置位时让 effect 早退，'
-    + '否则这一场刚被撤掉，effect 转身就重建一条。',
+    + '否则这一场刚被撤掉，effect 转身就重建一条。\n'
+    + 'cleanupHolding（2026-09-15）是唯一一个**不由用户按钮**复位的：上一场收完尾时'
+    + '订阅把它打回 false，这一次创建才发得出去。不进依赖的话页面会永远停在'
+    + '「还在收上一场的尾」，而收尾其实早就结束了。',
 )
 assert.match(
   scanSettings,
@@ -1528,13 +1613,13 @@ assert.match(
 /* 双层闸门：本页的 cancelRequestedRef 也必须给补偿留口子。只放开 scanSessionRevoke
  * 那一层是不够的 —— handleSafeReturn / 过期取消都会把这一位立起来，补偿照样发不出去。 */
 assert.match(
-  scanSettings,
-  /if \(cancelRequestedRef\.current && intent !== 'ack-compensation'\) return\s*\n\s*cancelRequestedRef\.current = true\s*\n\s*revokeCreatedScanSession\(credentials, createTokenRef\.current, intent\)/,
+  scanSettingsTeardown,
+  /if \(refs\.cancelRequestedRef\.current && intent !== 'ack-compensation'\) return\s*\n\s*refs\.cancelRequestedRef\.current = true[\s\S]{0,900}?revokeCreatedScanSession\(credentials, refs\.createTokenRef\.current, intent\)/,
   'abandonCreatedSession 自己那道去重也要认意图：只放开 scanSessionRevoke 那一层，'
     + '本页这一层照样会把补偿挡掉（handleSafeReturn / 过期取消都会置位 cancelRequestedRef）',
 )
 assert.match(
-  scanSettings,
+  scanSettingsTeardown,
   /const discardCreatedSession = \([\s\S]{0,600}?abandonCreatedSession\(credentials\)\s*\n\s*patchScanWorkbenchSession\(\{ stage: 'settings', live: undefined \}\)/,
   'fail-closed 的公共那一半：撤服务端任务 + 抹本机登记（live: undefined 同时推进代次）。'
     + '只抹本机不撤服务端，那条任务会留在终端上占住活动会话；'
@@ -1543,8 +1628,8 @@ assert.match(
 /* 两处成因（服务端不给投递授权 / 凭据没能落进登记）必须走同一段丢弃逻辑。
  * 各写一份的话，改动其中一份时另一份会悄悄停在旧语义上 —— 那正是这四件事最容易漏掉的方式。 */
 assert.match(
-  scanSettings,
-  /const failClosedOnAckRefusal = \([^)]*\) => \{\s*\n\s*discardCreatedSession\(credentials, ackFailure\)\s*\n\s*setAckRefused\(true\)/,
+  scanSettingsTeardown,
+  /const failClosedOnAckRefusal = \([\s\S]{0,200}?\): void => \{\s*\n\s*discardCreatedSession\(credentials, ackFailure\)\s*\n\s*setters\.setAckRefused\(true\)/,
   '「服务端不认投递授权」这一支必须复用 discardCreatedSession，只额外立起它自己那位 fail-closed 标志',
 )
 assert.match(
@@ -1681,9 +1766,170 @@ assert.match(
 )
 assert.match(
   scanSettingsView,
-  /liveNotDurable \? '本机存储不可用，无法建会话' : '未创建扫描任务'/,
+  /liveNotDurable\s*\n?\s*\? '本机存储不可用，无法建会话'[\s\S]{0,300}?cleanupHolding \? '等本机收完上一场的尾' : '未创建扫描任务'/,
   '这一支上任务**建过**（随后被本页撤掉）：禁用按钮写死「未创建扫描任务」就是句假话，'
-    + '必须按 liveNotDurable 分开说',
+    + '必须按 liveNotDurable 分开说。\n'
+    + '2026-09-15 再多一支：收尾闸挡住时本页**一个请求都没发**，'
+    + '「未创建扫描任务」虽然不算错，却没说出为什么按不了，用户会以为是自己漏了一步。',
+)
+
+/* ── 收尾闸挡住时那一屏不许说成「会话创建失败」（2026-09-15 第五轮）───────────
+ *
+ * 成因在**上一位**身上，而这一刻本页一个创建请求都没发出去。说「会话创建失败」
+ * 等于把一次根本没发生的请求说成失败了，还把责任说给了服务端 —— CLAUDE.md §9
+ * 「不伪造能力」这条两头都犯。 */
+assert.match(
+  scanSettingsView,
+  /cleanupHolding\s*\n?\s*\? \{ tone: 'warn' as const, label: '正在收上一场的尾' \}/,
+  '状态条要说的是「在等上一场的回执」，不是「会话创建失败」：本页此刻没发过任何请求',
+)
+assert.match(
+  scanSettingsView,
+  /cleanupHolding\s*\n?\s*\? 'cleanup-holding'/,
+  '这一屏要有自己的 data-state：混进 create-failed 的话，'
+    + '视觉与证据链上再也分不出「没建成」和「还没轮到你建」',
+)
+
+/* ══ F. 清场收尾闸：确认之前不许换人（2026-09-15 第五轮 P1）══════════════════
+ *
+ * ## 修的是哪一个缺陷
+ *
+ * 清场（隐私空闲 / 屏保 / 退出 / 换人）此前是：发一次 fire-and-forget 的 keepalive
+ * DELETE → 同步抹本机 → logout() → 一帧后 window.location.reload()。三件事一撞就漏：
+ *   ① 那次 DELETE 在路上丢了（回执一律吞掉，本机永远不会知道）；
+ *   ② 离开那一刻还在飞的那次 ACK **成功了**；
+ *   ③ 重载把「ACK 回来之后补一次撤销」那段补偿代码连同执行环境一起干掉。
+ * 服务端于是留下一条 `deliveryAckedAt` 非空、状态仍 waiting 的任务：60 秒未确认
+ * 回收器收不到它，Agent 的 current-lease 看得见它 —— 一个可投递却没人看着的收件箱，
+ * 活到自然过期，接走下一位在面板上扫出来的文件。跨用户串件。
+ *
+ * ## 下面钉的边界（少一条它就退回原样）
+ *
+ * 本地清场照旧**同步、立即、不等网络**；变的只是「把机器交给下一位」这一步。 */
+
+/* 这一组钉的是**时序**，而 KioskPrivacyGuard 里解释时序的注释比代码还长（本来就该这样）。
+ * 所以先剥注释：连注释一起判会让「把那几句挪个位置」只要注释没动就照样绿。 */
+const privacyGuardCode = stripComments(privacyGuard)
+
+// F1. 本机 PII 一个字节都不多留：清场那几句仍然同步跑在等待之前。
+assert.match(
+  privacyGuardCode,
+  /setClearing\(true\)\s*\n\s*clearKioskSensitiveSession\(getToken\(\)\)\s*\n\s*logout\(\)[\s\S]{0,400}?hold\(\(\) => scheduleSanitizedDestination\(nextBoundary, destination\)\)/,
+  '顺序不可调换：先 fail-closed 遮罩 + 同步清本机 + logout，**然后**才是等收尾。\n'
+    + '把等待挪到清本机之前，就等于让上一位的 PII 在网络不好时多留在屏幕上几十秒 ——\n'
+    + '那是拿一个隐私问题去换另一个隐私问题。',
+)
+// F2. 整页重载必须被按住 —— 它是杀掉 ACK 补偿的那一步。
+assert.doesNotMatch(
+  privacyGuardCode,
+  /\n\s*scheduleSanitizedDestination\(nextBoundary, destination\)\s*\n/,
+  '重载那一步只许走 hold(...)：裸调一次就把「等服务端确认」整条闸绕过去了',
+)
+// F3. 进屏保同样是换人。它不重载，但一样会把设置页（连同那段 ACK 补偿）拆掉，
+//     而屏保页一被触摸就唤醒成一台可用的机器。
+assert.match(
+  privacyGuardCode,
+  /hold\(\(\) => \{\s*\n\s*navigate\('\/screensaver', \{/,
+  '进屏保也必须等收尾：那一刻服务端那条扫描任务必须已经收到确认',
+)
+// F4. 遮罩要如实说在等什么。没有这一块，屏幕上只剩一块吃掉所有触摸的黑板。
+assert.match(clearingOverlay, /data-testid="session-guard-cleanup-hold"/)
+assert.match(clearingOverlay, /data-testid="session-guard-cleanup-retry"/)
+assert.match(
+  clearingOverlay,
+  /cleanup\.holding \? <CleanupHoldPanel status=\{cleanup\} \/> : null/,
+  '收尾已经结束时这一块不许出现：那会把最常见的那条清场路径说成「有事没办完」',
+)
+// F5. 这一屏一个凭证、一个任务编号、一句服务端原文都不许出现（CLAUDE.md §11）：
+//     27 寸竖屏摆在人才市场大厅，站在旁边的人和使用者看到的是同一块屏。
+for (const leak of [/controlToken/, /scanTaskId/, /identityToken/, /status\.(?:message|detail)/]) {
+  assert.doesNotMatch(clearingOverlay, leak, `清场遮罩里不许出现 ${leak} —— 旁边站着的人看的是同一块屏`)
+}
+assert.match(
+  scanCleanupGate,
+  /export type ScanCleanupOutcome = 'none' \| 'unreachable' \| 'server-error' \| 'rejected'/,
+  '对外只给这四种收敛值：把服务端原文透出去，错误串就会直接上 27 寸大屏',
+)
+
+/* F6. 「确认了」只认服务端**亲口**说的那三种。这条是整条闸的判据本体：
+ *     放宽任何一格，闸就从「等确认」退化成「等一会儿」。 */
+assert.match(
+  scanRevoke,
+  /if \(res\.ok\) return \{ confirmed: true, reason: 'cancelled' \}/,
+  '200 = 服务端刚把它 CAS 成 cancelled',
+)
+assert.match(
+  scanRevoke,
+  /if \(res\.status === 403 \|\| code === 'SCAN_TASK_FORBIDDEN'\) \{\s*\n\s*return \{ confirmed: false, reason: 'forbidden' \}/,
+  '403 = 本机手里这份身份动不了那条任务，它可能仍是 waiting —— 绝不许当成清干净了',
+)
+assert.match(
+  scanRevoke,
+  /return \{ confirmed: false, reason: 'server-error' \}\s*\n\}/,
+  '兜底必须是 confirmed:false：认不出的状态码一律按「服务端没给结论」，继续重试',
+)
+/* F7. 这条通道**必须等回执**，而上半条 fire-and-forget 的通道必须不等。
+ *     两条判据相反，混在一起哪一条都守不住。 */
+assert.match(
+  stripComments(scanRevoke.slice(revokeChannelSplit)),
+  /res = await fetch\(revokeUrl\(credentials\.scanTaskId\), \{[\s\S]{0,400}?\}\)/,
+  '等回话那条通道必须 await fetch：拿不到回执就没有「确认」可言',
+)
+assert.doesNotMatch(
+  stripComments(scanRevoke.slice(revokeChannelSplit)).replace(
+    /export function sendUnloadRevokeBeacon[\s\S]*$/,
+    '',
+  ),
+  /keepalive: true/,
+  'requestConfirmedScanRevoke 不许带 keepalive：keepalive 的意义是「文档正在被拆掉也要发出去」，\n'
+    + '而这条路径的全部前提恰恰是**先别拆文档**；它还受额外配额限制，拿回执反而更不可靠。\n'
+    + '（pagehide 上那一发是例外，它就是为文档要没了准备的。）',
+)
+
+/* F8. 等待必然收敛：要么服务端确认，要么走到**服务端给的**那个有效期。
+ *     没有这一条，网络坏掉时这台机器会永远停在清场屏上 —— 比它要防的问题更糟。 */
+assert.match(
+  scanCleanupGate,
+  /function isNotLeasableByTime\(task: PendingTask\): boolean \{[\s\S]{0,300}?return Date\.now\(\) >= task\.expiresAt/,
+  '自然过期这一支必须在：服务端的租约查询带 `expiresAt: { gt: now }`，过了这一刻它签不出租约了。\n'
+    + '这是服务端给的事实，不是本机给自己的宽限 —— 换成任何一个本机拍脑袋的超时，闸就变成了摆设。',
+)
+assert.match(
+  scanCleanupGate,
+  /if \(expiresAt === null\) \{\s*\n\s*settledIds\.add\(scanTaskId\)\s*\n\s*revokeCreatedScanSession\(\{ scanTaskId, controlToken \}, identityToken\)/,
+  '没有截止时刻的那一支（半残响应）只许退回尽力而为，**不许按住**：\n'
+    + '本机拿不出任何收敛依据，按住就成了一块永远不放行的黑屏。\n'
+    + '退回去是安全的 —— 凭据没落进登记就永远不会 ACK，而租约只签已确认的行。',
+)
+
+/* F9. 三处 fail-closed 都要接在同一条闸上，少一处那一处就是缺口。 */
+assert.match(
+  scanDeliveryAck,
+  /if \(scanDeliveryAckBlocked\(\)\) \{\s*\n\s*return \{ ok: false, definitive: false, failure: SCAN_ACK_PENDING_FAILURE \}/,
+  '收尾期间一个 ACK 都不许发：确认成功等于把一个没人看着的收件箱重新点亮。\n'
+    + '并且不许判成 definitive —— 服务端一个字都没说过，页面不能据此把这一场撤掉',
+)
+assert.match(
+  scanSettingsTeardown,
+  /if \(scanCleanupInProgress\(\)\) return\s*\n\s*revokeCreatedScanSession\(credentials, refs\.createTokenRef\.current, intent\)/,
+  '这一场已经交给收尾闸了（创建时就连同身份快照交了出去）：再发一次拿不到回执的 keepalive\n'
+    + '既证明不了什么，也可能和闸里那次请求赛跑',
+)
+assert.match(
+  scanCreateReplay,
+  /if \(options\.shouldContinue && !options\.shouldContinue\(\)\) break\s*\n\s*options\.onReplay\?\.\(attempt \+ 1\)/,
+  '收手判据必须问在**发出之前**：问在发出之后，清场屏还要再干等一整个退避窗口',
+)
+assert.match(
+  scanSettings,
+  /shouldContinue: \(\) => !scanCleanupInProgress\(\),/,
+  '清场开始之后不再发新的重放：这一位已经走了，把 child 领回来没有意义，而重放最长 24 秒',
+)
+assert.match(
+  scanSettings,
+  /trackScanSessionCreation\(sessionPromiseRef\.current, identityToken\)/,
+  '每一次创建都要连同**创建那一刻的身份快照**交给收尾闸：清场发生在创建在飞的那一刻时，\n'
+    + '本机登记里还没有 live，闸从登记里读不到任何可撤的东西，而本页的 .then 会被整页重载杀掉',
 )
 
 const rescanAuthorityTest = spawnSync(
@@ -1754,6 +2000,20 @@ assert.equal(
   revokeTest.status,
   0,
   `scan session revoke behaviour test failed: ${revokeTest.stderr || revokeTest.stdout}`,
+)
+
+/* 「确认之前不许换人」是一条时序判据：谁先跑、等了多久、什么时候放行 ——
+ * 源码断言一条都证明不了。真把模块装起来，用假时钟把退避、自然过期、
+ * 「等创建回话」的上限全走一遍。 */
+const cleanupGateTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-cleanup-gate.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  cleanupGateTest.status,
+  0,
+  `scan cleanup gate behaviour test failed: ${cleanupGateTest.stderr || cleanupGateTest.stdout}`,
 )
 
 console.log('ALL PASS scan session truth contract')

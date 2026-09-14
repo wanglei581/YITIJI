@@ -76,18 +76,26 @@ let seed = 0
  *
  * @param {(scanTaskId: string, controlToken: string, token: unknown) => Promise<unknown>} impl
  */
-async function loadAckModule(impl) {
+async function loadAckModule(impl, options = {}) {
   seed += 1
   const calls = []
   globalThis.__ackCalls = globalThis.__ackCalls ?? new Map()
   const key = `ack-${seed}`
-  globalThis.__ackCalls.set(key, { calls, impl })
+  globalThis.__ackCalls.set(key, { calls, impl, blocked: options.cleanupHolding === true })
   const scanTasksStub = toDataUrl(`
 export const SCAN_ACK_CREDENTIALS_INCOMPLETE = ${JSON.stringify(CREDENTIALS_INCOMPLETE)}
 export async function ackScanSession(scanTaskId, controlToken, token) {
   const box = globalThis.__ackCalls.get(${JSON.stringify(key)})
   box.calls.push({ scanTaskId, controlToken, token })
   return box.impl(scanTaskId, controlToken, token)
+}
+`)
+  /* 收尾闸（2026-09-15）：清场还没拿到服务端「上一场已取消」的回执时，一个 ACK
+     都不许发。这里用受控替身，因为要测的不是闸怎么判（那归 scan-cleanup-gate.test.mjs），
+     而是**确认这一侧有没有真的去问它**。 */
+  const cleanupGateStub = toDataUrl(`
+export function scanDeliveryAckBlocked() {
+  return globalThis.__ackCalls.get(${JSON.stringify(key)}).blocked
 }
 `)
   const userErrors = toDataUrl(
@@ -98,6 +106,7 @@ export async function ackScanSession(scanTaskId, controlToken, token) {
     .replaceAll("'@ai-job-print/shared'", `'${SHARED_STUB}'`)
     .replaceAll("'../../services/api/scanTasks'", `'${scanTasksStub}'`)
     .replaceAll("'../../services/api/userErrorMessage'", `'${userErrors}'`)
+    .replaceAll("'./scanCleanupGate'", `'${cleanupGateStub}'`)
   const mod = await import(toDataUrl(`${code}\n// instance ${seed}\n`))
   return { mod, calls }
 }
@@ -214,4 +223,35 @@ test('替身没有漂移：真 ApiHttpError 仍然是 code + status 的那三件
     /export class ApiHttpError extends Error \{\s*\n\s*constructor\(\s*\n\s*public readonly code: string,\s*\n\s*message: string,\s*\n\s*public readonly status: number,/,
     'classifyAckFailure 读的就是 code；真类改了字段，替身上的结论就不作数了',
   )
+})
+
+/* ── 收尾闸挡住时一个确认都不许发（2026-09-15 第五轮）─────────────────────────
+ *
+ * ACK 成功那一刻服务端那条任务就变得可投递，而清场收尾的全部目的正是让它
+ * **不可投递**。这一刻放一次确认出去，等于本机一边撤一边把它重新点亮，两个请求
+ * 赛跑，赢家由网络决定 —— 而输的那一边留下的是一个可投递却没人看着的收件箱。
+ *
+ * 挡在 `acknowledgeScanDelivery` 这个唯一出口上，而不是各页面里：页面有三处
+ * （设置页、等待页、复水重试），漏一处就等于没挡。 */
+test('清场收尾还没走完时，一个投递确认都不许发出去', async () => {
+  const { mod, calls } = await loadAckModule(async () => ({
+    scanTaskId: 'scan-1',
+    deliveryAckedAt: '2026-09-15T10:00:00.000Z',
+  }), { cleanupHolding: true })
+  const outcome = await mod.acknowledgeScanDelivery(CREDENTIALS, 'member-token')
+  assert.deepEqual(calls, [], '发出去就晚了：服务端那条任务当场变得可投递')
+  assert.equal(outcome.ok, false)
+  // 服务端一个字都没说过，这一场也没有被它否掉 —— 判成「明确不认」会让页面
+  // 把这一场撤掉，而它其实只是要再等几百毫秒。
+  assert.equal(outcome.definitive, false)
+})
+
+test('收尾走完之后，同一次确认照常发得出去', async () => {
+  const { mod, calls } = await loadAckModule(async () => ({
+    scanTaskId: 'scan-1',
+    deliveryAckedAt: '2026-09-15T10:00:00.000Z',
+  }), { cleanupHolding: false })
+  const outcome = await mod.acknowledgeScanDelivery(CREDENTIALS, 'member-token')
+  assert.equal(outcome.ok, true, '判据是「还在收尾」而不是「清过场」：收完之后下一位当然要确认得了')
+  assert.equal(calls.length, 1)
 })

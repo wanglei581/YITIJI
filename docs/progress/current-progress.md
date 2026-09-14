@@ -1,5 +1,47 @@
 # 当前开发进度
 
+2026-09-15 **清场收尾闸：服务端确认上一场扫描已取消之前，一体机不许换人（Kiosk 侧，分支
+`claude/kiosk-hardclear-failclosed-20260915`，基线 `206568f23`）**。仅改 `apps/kiosk/**`，
+未触碰 `services/api/**`、Terminal Agent、小程序、schema、生产配置与密钥，未推送 / 未开 PR。
+
+修的是一条跨用户串件：清场（隐私空闲 / 屏保 / 退出 / 游客换会员）此前发一次 fire-and-forget 的
+keepalive DELETE 就同步抹本机、`logout()`、一帧后整页重载。**那次 DELETE 在路上丢了（回执一律
+吞掉）+ 离开那一刻还在飞的 ACK 随后成功了 + 重载把「ACK 回来之后补一次撤销」的补偿代码连同执行
+环境一起杀掉**，三者一撞，服务端就留下一条 `deliveryAckedAt` 非空、状态仍 `waiting` 的任务：
+60 秒未确认回收器收不到它，Agent 的 current-lease 看得见它，它一直可投递到自然过期 ——
+下一位在奔图面板上按下扫描，文件投给已经走掉的上一位。
+
+改法（新增 `src/pages/scan/scanCleanupGate.ts` 一条收尾闸）：本机 PII 仍然**同步、立即、不等
+网络**地清掉；变的只是「把机器交给下一位」这一步 —— 整页重载 / 进屏保必须等到服务端**亲口**
+确认那条任务不可能再被领走（200 cancelled / 404 not-found / 400 已完成 / 409 撤销冲突），
+或者走到服务端给的那个 `expiresAt`（租约查询带 `expiresAt: { gt: now }`，过了就签不出）。
+403 / 5xx / 断网一律不算确认，按退避表重试；403 之后按服务端为「登出后仍要撤得掉」留的那条路
+摘掉身份再试一次。等待期间：一个 ACK 都不许发（`scanDeliveryAckBlocked`），设置页对下一位
+fail-closed（第五道闸 `cleanupHolding`，自带 `data-state="cleanup-holding"` 一屏，不冒充
+「会话创建失败」），创建重放收手（`shouldContinue`）。凭证只活在模块内存里，不落存储 / URL /
+history；清场遮罩多出一块诚实面板（在等什么、已发出几次、最迟等到几分几秒、「立即重试」56px），
+一个任务编号、一个控制凭证、一句服务端原文都不上屏。
+
+顺带修掉同一条链上的身份漂移：创建的身份此前取两次（effect 里一次、`sendCreate` 里再一次），
+中间隔着最长 24 秒的丢失响应重放 —— 用户在那期间退出 / 换人，重放就会用**新身份**建任务，
+而撤销按 `endUserId` 校验只会 403，那条 child 谁都撤不掉。现在创建 / 重放 / 撤销 / ACK 绑同一份
+创建时快照；复水进来的那一场在挂载时补一份。
+
+验证（本地，全部绿）：Kiosk typecheck、`eslint src/` 0 error、`verify:scan-session-truth`（新增
+清场闸契约断言 + 新行为测试 `scripts/tests/scan-cleanup-gate.test.mjs` 18/18）、
+`verify:member-session-closure`、`verify:fusion-w2`、`verify:fusion-shell`、
+`verify:kiosk-visual-unity`、`verify:kiosk-browser-spec-coverage`、`verify:kiosk-frontend-debt`、
+`verify:scan-input-safety`、根 `verify:no-raw-error-render` / `compliance-copy` /
+`datetime-honesty` / `fixture-time-bombs` / `ci-gate-coverage`；Playwright 1080×1920：
+privacy 35/35（含 4 条新用例：撤销未确认不交机器、失败后重试成功才交、ACK 在清场途中回来仍以
+确认取消收尾、会员登录在上一场收尾期间建不了会话）、privacy-warning 27/27、
+scan-session-truth 38/38、W2 94/94。反向变异逐条见下一段。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；Windows / 奔图真机与生产环境这一轮
+一次都没碰。`onMemberSessionExpired` 的 401 硬跳转（`window.location.assign`）没有接这条闸 ——
+那条路径是同一位用户去重新登录，不是换人，兜底是 `pagehide` 上那一发 keepalive 与服务端两条
+回收器；要不要接，留作 P1。
+
 2026-09-14 **扫描隐私 / 到机认证 R2 已推送并完成实现锚点 CI，等待合并决策；生产与商业仍为 NO-GO**。
 隔离分支 `integration/scan-pickup-closeout-r2-20260913` 基于
 `origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，实现证据锚点为

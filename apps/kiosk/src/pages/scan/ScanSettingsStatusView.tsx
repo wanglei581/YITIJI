@@ -27,6 +27,7 @@ import type { TerminalSessionState } from '../../services/terminalAuth'
  *   · create-loading —— 创建请求在路上（含丢失响应的有界重放窗口）；
  *   · awaiting-ack —— **会话已经建成，但还没拿到投递授权**（2026-09-14 新增，见下）；
  *   · expired —— 服务端给的有效期走完了；
+ *   · cleanup-holding —— **上一位的扫描还没收完尾**（2026-09-15 新增，见下）；
  *   · create-failed —— 创建失败的各种结论屏。
  *
  * ## awaiting-ack 这一屏为什么必须存在
@@ -34,6 +35,16 @@ import type { TerminalSessionState } from '../../services/terminalAuth'
  * 服务端 2026-09-14 起把「建成」和「可投递」拆成两段：新建会话一律
  * `deliveryAckedAt = null`，Agent 的 current-lease **看不见**它，直到本机
  * `POST /scan/sessions/:id/ack` 确认自己确实握着这一场的控制凭据。
+ *
+ * ## cleanup-holding 这一屏为什么不能说成「会话创建失败」
+ *
+ * 它的成因在**上一位**身上：清场收尾闸还没拿到服务端「上一场已取消」的回执
+ * （scanCleanupGate）。这一刻本页**一个创建请求都没发出去** —— 说「会话创建失败」
+ * 就是把一次根本没发生的请求说成失败了，也把责任说给了服务端。所以它自带一屏：
+ * 状态条说「还在收上一场的尾」，主行动是禁用的，正文解释为什么现在扫会出事。
+ * 出路刻意不是一颗按钮：收尾是本机自己在重试，好了这一页会自己往下走。
+ *
+ * ## awaiting-ack（续）
  *
  * 于是这一刻屏幕上绝不能出现面板操作指引或「我已操作，开始等待」：任务在服务端是
  * 不可投递的，用户照着指引扫一张纸，那份文件不会进他的会话。它不会被别人收走
@@ -53,6 +64,8 @@ export interface ScanSettingsStatusViewProps {
   ackRefused: boolean
   /** 凭据没能真正落进本机登记：这一屏不给「重新开始一次扫描」，理由见 scanSettingsModel。 */
   liveNotDurable: boolean
+  /** 上一位的扫描还没收完尾：本页一个创建请求都没发，所以不许说成「会话创建失败」。 */
+  cleanupHolding: boolean
   handleSafeReturn: () => void
   handlePlainRestart: () => void
   handleRescanRetry: () => void
@@ -71,6 +84,7 @@ export function ScanSettingsStatusView({
   rescanRefusedByServer,
   ackRefused,
   liveNotDurable,
+  cleanupHolding,
   handleSafeReturn,
   handlePlainRestart,
   handleRescanRetry,
@@ -83,13 +97,15 @@ export function ScanSettingsStatusView({
 
   const workbenchState = awaitingAck
     ? 'awaiting-ack'
-    : phase === 'invalid'
-      ? 'invalid'
-      : phase === 'loading'
-        ? 'create-loading'
-        : phase === 'expired'
-          ? 'expired'
-          : 'create-failed'
+    : cleanupHolding
+      ? 'cleanup-holding'
+      : phase === 'invalid'
+        ? 'invalid'
+        : phase === 'loading'
+          ? 'create-loading'
+          : phase === 'expired'
+            ? 'expired'
+            : 'create-failed'
   const title = awaitingAck
     ? failure?.title ?? '正在确认投递授权'
     : phase === 'invalid'
@@ -119,7 +135,10 @@ export function ScanSettingsStatusView({
         }
       : phase === 'expired'
         ? { tone: 'warn' as const, label: '会话已过期' }
-        : { tone: 'bad' as const, label: '会话创建失败' }
+        /* 没发过请求就不许说「创建失败」：这一屏等的是上一场的收尾回执。 */
+        : cleanupHolding
+          ? { tone: 'warn' as const, label: '正在收上一场的尾' }
+          : { tone: 'bad' as const, label: '会话创建失败' }
 
   return (
     <ScanWorkbenchShell
@@ -135,7 +154,9 @@ export function ScanSettingsStatusView({
               ? '没拿到投递授权前不显示面板操作步骤 —— 这一刻扫出来的文件不会投到这一场'
               : phase === 'loading'
                 ? '请求还在路上 —— 这一刻页面不做任何判断，也不给你一个假的编号'
-                : '未确认成功前不显示扫描操作步骤'
+                : cleanupHolding
+                  ? '上一场还没收完尾 —— 这一刻建会话，你扫的那张纸可能落到上一位名下'
+                  : '未确认成功前不显示扫描操作步骤'
           }
         >
           <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
@@ -177,7 +198,11 @@ export function ScanSettingsStatusView({
               {phase === 'loading'
                 ? '等服务端返回会话'
                 /* 这一支上任务**建过**（随后被本页撤掉），说「未创建」就是句假话。 */
-                : liveNotDurable ? '本机存储不可用，无法建会话' : '未创建扫描任务'}
+                : liveNotDurable
+                  ? '本机存储不可用，无法建会话'
+                  /* 这一支上一个请求都没发过，说「未创建扫描任务」不算错，但没说出
+                     为什么按不了 —— 用户会以为是自己哪一步做漏了。 */
+                  : cleanupHolding ? '等本机收完上一场的尾' : '未创建扫描任务'}
             </button>
           )}
         </ScanCta>
@@ -187,7 +212,9 @@ export function ScanSettingsStatusView({
         tone={
           awaitingAck
             ? ackRetryable ? 'warn' : 'info'
-            : phase === 'loading' ? 'info' : phase === 'invalid' ? 'lock' : 'error'
+            : phase === 'loading' ? 'info'
+              // cleanup-holding 是一道闸，不是一次失败：用锁不用错。
+              : phase === 'invalid' || cleanupHolding ? 'lock' : 'error'
         }
         title={title}
         breathe={phase === 'loading' || (awaitingAck && !ackRetryable)}

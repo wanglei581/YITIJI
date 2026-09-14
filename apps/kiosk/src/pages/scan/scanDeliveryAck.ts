@@ -1,6 +1,7 @@
 import { SCAN_TASK_ACK_NOT_ALLOWED } from '@ai-job-print/shared'
 import { SCAN_ACK_CREDENTIALS_INCOMPLETE, ackScanSession } from '../../services/api/scanTasks'
 import { errorCodeOf } from '../../services/api/userErrorMessage'
+import { scanDeliveryAckBlocked } from './scanCleanupGate'
 import type { SessionFailure } from './scanRescanRecovery'
 
 /**
@@ -159,6 +160,17 @@ export async function acknowledgeScanDelivery(
   credentials: ScanAckCredentials,
   memberToken: string | null | undefined,
 ): Promise<ScanAckOutcome> {
+  /* 清场收尾还没走完：一个确认都不许发出去。
+   *
+   * 这一条是 2026-09-15 那条 P1 的另一半。ACK 成功那一刻服务端那条任务就变得可投递，
+   * 而收尾的全部目的正是让它**不可投递**；此刻放一次确认出去，等于本机一边撤一边
+   * 把它重新点亮，两个请求赛跑，赢家由网络决定。判据放在这里而不是各页面里：
+   * 确认只有这一个出口，挡在出口上才挡得住所有调用点（设置页、等待页、复水重试）。
+   *
+   * 不是确定的拒绝 —— 服务端没有说过任何话，这一场也没有被它否掉。 */
+  if (scanDeliveryAckBlocked()) {
+    return { ok: false, definitive: false, failure: SCAN_ACK_PENDING_FAILURE }
+  }
   try {
     const acked = await ackScanSession(credentials.scanTaskId, credentials.controlToken, memberToken)
     // 服务端回了 2xx 但没带时间戳：这不是一次可用的确认，按「还没确认」处理，

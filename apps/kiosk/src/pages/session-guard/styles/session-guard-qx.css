@@ -48,6 +48,31 @@
   gap: 18px; pointer-events: auto;
 }
 .qx-privacy-clearing p { margin: 0; font-size: 36px; font-weight: 700; }
+/* 「锁住等服务端确认」那一块。沿用清场遮罩自己的深色底与 sg-hero 的强调色，
+   不另起一套视觉：它是同一块屏的下半段，不是一个新页面。 */
+.qx-clearing-hold {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  max-width: 820px; padding: 0 44px; text-align: center;
+}
+.qx-clearing-hold h2 {
+  margin: 0; font-family: var(--qx-serif); font-size: 32px; font-weight: 700;
+  color: var(--qx-emerald);
+}
+.qx-privacy-clearing .qx-clearing-note {
+  margin: 0; font-size: 21px; line-height: 1.6; font-weight: 400;
+  color: rgba(242, 239, 228, 0.76);
+}
+.qx-privacy-clearing .qx-clearing-status {
+  margin: 0; font-size: 20px; line-height: 1.5; font-weight: 400;
+  color: rgba(242, 239, 228, 0.9); font-variant-numeric: tabular-nums;
+}
+/* 触控最小尺寸按 CLAUDE.md §9：主要按钮不小于 56px，可点击区域不小于 48px。 */
+.qx-clearing-retry {
+  margin-top: 6px; min-height: 56px; min-width: 240px; padding: 0 32px;
+  border-radius: 16px; border: 1px solid rgba(46, 230, 168, 0.4);
+  background: rgba(46, 230, 168, 0.14); color: var(--qx-paper);
+  font-size: 22px; font-weight: 700; cursor: pointer;
+}
 @media (prefers-reduced-motion: reduce) {
   .sg-page, .sg-page *, .qx-privacy-clearing { animation: none !important; }
 }

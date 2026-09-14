@@ -1,5 +1,5 @@
 import { hasKioskSensitiveSession } from './kioskSensitiveSession'
-import { revokeLiveScanSession } from '../pages/scan/scanSessionRevoke'
+import { beginScanSessionCleanup } from '../pages/scan/scanCleanupGate'
 import {
   clearScanWorkbenchSession,
   readScanWorkbenchSession,
@@ -86,10 +86,15 @@ export function clearGuestScanBeforeMemberLogin(): boolean {
     // 读不出来就按「可能有」处理：下面照样撤照样清，判断出错不能让清场少做一次。
     carriedScan = true
   }
-  // 顺序与 clearKioskSensitiveSession 一致：撤销要读本地登记里的 scanTaskId/controlToken，
+  // 顺序与 clearKioskSensitiveSession 一致：收尾要读本地登记里的 scanTaskId/controlToken，
   // 先清就再也找不到要撤谁。身份传 null —— 游客的任务在服务端 endUserId 就是 null，
   // 拿新登录这位的令牌去发只会被 403 顶回来，旧任务原地存活。
-  revokeLiveScanSession(null)
+  //
+  // 走的是和清场同一条收尾闸（重试到服务端确认为止），不是一次尽力而为：这一刻
+  // 上一位游客那条任务可能已经取得投递授权，而新登录这位马上就要用这台机器 ——
+  // 撤没撤掉必须有回执。收尾没走完之前，设置页会挡住他的新建会话
+  // （scanCleanupHolding），免得他扫出来的文件落进上一位那条 waiting。
+  beginScanSessionCleanup(null)
   // 这一句同时把扫描生命周期代次推进一格：换人那一刻还在飞的创建响应回来时会自己作废，
   // 既不回写登记，也不把服务端任务留成孤儿（见 scanWorkbenchSession 的代次注释）。
   clearScanWorkbenchSession()

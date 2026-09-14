@@ -6,7 +6,9 @@ import {
   type ScreensaverWarningRequest,
 } from '../hooks/useScreensaverController'
 import { isKioskClearNoOp } from './kioskClearScope'
+import { KioskClearingOverlay } from './KioskClearingOverlay'
 import { clearKioskSensitiveSession } from './kioskSensitiveSession'
+import { useKioskClearHold } from './useKioskClearHold'
 import {
   KioskSessionControlProvider,
   type KioskSessionClearDestination,
@@ -250,23 +252,6 @@ function scheduleSanitizedDestination(
   window.setTimeout(run, SANITIZED_DESTINATION_FALLBACK_MS)
 }
 
-function PrivacyClearingOverlay() {
-  return (
-    <div
-      className="qx-privacy-clearing pointer-events-auto"
-      data-kiosk-privacy-clearing="true"
-      data-screen="session-guard"
-      data-state="clearing"
-      data-testid="session-guard-state-clearing"
-      role="status"
-      aria-live="assertive"
-    >
-      <p>正在清除本机会话</p>
-      <span className="sr-only">正在清除本次使用记录</span>
-    </div>
-  )
-}
-
 /**
  * 公共终端会话安全根：统一普通 idle、屏保与硬隐私截止。
  * 硬截止在忙碌锁（语音 live/connecting、支付 pending、AI 生成中）期间暂停，顺延上限 15 分钟。
@@ -282,6 +267,9 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
   const kioskBusy = useKioskBusy()
   const busyRef = useRef(false)
   busyRef.current = kioskBusy
+  // 「清完本机之后什么时候才允许换人」。收尾已经结束时 hold() 是同步的，
+  // 所以没有扫描会话的那条最常见路径上，时序和这条闸出现之前一模一样。
+  const { cleanup, hold } = useKioskClearHold()
   const [clearing, setClearing] = useState(false)
   const [warning, setWarning] = useState<KioskWarningDescriptor | null>(null)
   const pendingWarningRef = useRef<PendingWarning | null>(null)
@@ -338,10 +326,19 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     pendingWarningRef.current = null
     setWarning(null)
 
-    // 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
-    // 页面不可见时 rAF 不会到，兜底定时器负责把这一步执行掉（否则永久黑屏）。
-    scheduleSanitizedDestination(nextBoundary, destination)
-  }, [claimClearing, establishPrivacyBoundary, getToken, logout])
+    /* 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
+     * 页面不可见时 rAF 不会到，兜底定时器负责把这一步执行掉（否则永久黑屏）。
+     *
+     * 但这一步**必须等服务端收完尾**才能跑：整页重载会把本页所有还在飞的补偿逻辑
+     * 一起干掉 —— 包括「投递确认回来之后补一次撤销」。一次在路上丢了的 DELETE 加上
+     * 一次随后成功的 ACK，就会给服务端留下一条已确认、仍 waiting 的任务：
+     * 60 秒未确认回收器收不到它，Agent 的 current-lease 看得见它，它会一直可投递到
+     * 自然过期 —— 下一位在面板上按下扫描，文件投给已经走掉的上一位（scanCleanupGate）。
+     *
+     * hold() 在收尾已经结束时是同步的，所以「本来就没有扫描会话」那条最常见的路径
+     * 一帧都不会多等；真要等的时候，遮罩会如实说在等什么、试了几次、最迟等到什么时候。 */
+    hold(() => scheduleSanitizedDestination(nextBoundary, destination))
+  }, [claimClearing, establishPrivacyBoundary, getToken, hold, logout])
 
   const hardClear = useCallback(() => {
     clearSessionTo({ path: '/' })
@@ -368,13 +365,18 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     const nextBoundary = establishPrivacyBoundary()
     pendingWarningRef.current = null
     setWarning(null)
-    navigate('/screensaver', {
-      state: {
-        playlist,
-        privacyBoundary: nextBoundary,
-      },
+    /* 和 hardClear 同一条硬规矩：进屏保也是「把机器交给下一位」——
+     * 屏保页一被触摸就唤醒成一台可用的机器，这一刻服务端那条扫描任务必须已经
+     * 收到确认。这条路径不重载，但它同样会把设置页拆掉（连同那段 ACK 补偿）。 */
+    hold(() => {
+      navigate('/screensaver', {
+        state: {
+          playlist,
+          privacyBoundary: nextBoundary,
+        },
+      })
     })
-  }, [claimClearing, establishPrivacyBoundary, getToken, hardClear, logout, navigate])
+  }, [claimClearing, establishPrivacyBoundary, getToken, hardClear, hold, logout, navigate])
 
   const startWarning = useCallback(
     (
@@ -656,7 +658,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
   return (
     <KioskSessionControlProvider value={sessionControlValue}>
       {clearing || isStaleHistoryEntry || isOrphanSessionTimeoutRoute ? (
-        <PrivacyClearingOverlay />
+        <KioskClearingOverlay cleanup={cleanup} />
       ) : (
         children
       )}

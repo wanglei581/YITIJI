@@ -73,6 +73,20 @@ export interface ScanCreateReplayOptions {
   sleep?: (ms: number) => Promise<void>
   /** 每次重放**发出之前**回调一次（1 起算），供页面如实改口说「正在确认」。 */
   onReplay?: (attempt: number) => void
+  /**
+   * 每一次重放**发出之前**问一句「这件事还值不值得做」。返回 false 就当场收手，
+   * 按「问不出结果」结束（抛 {@link SCAN_CREATE_REPLAY_UNRESOLVED}）。
+   *
+   * 唯一的调用场景是清场：这一位用户已经走了，把那条 child 领回来已经没有任何意义
+   * （没人会用它），而重放最长 24 秒 —— 那 24 秒里清场屏只能干等着，机器交不出去。
+   * 收手之后那条 child 仍然是安全的：本机从来不知道它的 id，也就**永远不会确认它**，
+   * 而 `getScanDeliveryLease()` 只签 `deliveryAckedAt: { not: null }` 的行，
+   * 未确认的 waiting 对 Agent 自始至终不可见，60 秒后还会被未确认回收器收成 expired。
+   *
+   * 不传就是「一直重放到有答案」—— 页内离开（leaveScanFlow）走的正是这一条：
+   * 那时执行环境还在，领回来的 child 会被当场撤掉，比留给回收器干净。
+   */
+  shouldContinue?: () => boolean
 }
 
 /**
@@ -99,6 +113,9 @@ export async function replayCreateUntilOutcomeKnown(
     const delays = options.delaysMs ?? SCAN_CREATE_REPLAY_DELAYS_MS
     const sleep = options.sleep ?? defaultSleep
     for (let attempt = 0; attempt < delays.length; attempt += 1) {
+      // 问在**发出之前**，不是发出之后：清场那一刻已经在飞的那一次仍然会回来
+      // （它的凭证照旧交给 scanCleanupGate 撤掉），但不会再有新的一次被发出去。
+      if (options.shouldContinue && !options.shouldContinue()) break
       options.onReplay?.(attempt + 1)
       await sleep(delays[attempt] ?? 0)
       try {

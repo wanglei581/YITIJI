@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
-import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
+import { createScanSession } from '../../services/api/scanTasks'
 import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
 import { acknowledgeScanDelivery, type ScanAckCredentials, type ScanAckState } from './scanDeliveryAck'
 import { ScanSettingsSessionFacts, ScanSettingsStatusView } from './ScanSettingsStatusView'
@@ -14,10 +14,17 @@ import {
   getCancellationCredentials,
   isValidCreatedSession,
   liveSessionStillValid,
+  SCAN_CLEANUP_HOLD_FAILURE,
   SCAN_LIVE_NOT_DURABLE_FAILURE,
   type SessionPhase,
 } from './scanSettingsModel'
-import { revokeCreatedScanSession, type ScanRevokeIntent } from './scanSessionRevoke'
+import {
+  scanCleanupHolding,
+  scanCleanupInProgress,
+  subscribeScanCleanup,
+  trackScanSessionCreation,
+} from './scanCleanupGate'
+import { createScanSessionTeardown } from './scanSettingsTeardown'
 import {
   subscribeTerminalSession,
   terminalSessionState,
@@ -170,6 +177,17 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   // POST /scan/sessions 挂着 TerminalIdentityGuard（scan-tasks.controller.ts）：
   // 没有终端会话令牌就是 401。和打印确认页同一口径 —— 订阅状态，不猜、不抢跑。
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
+  /**
+   * 上一位的扫描还没收完尾（scanCleanupGate 仍在等服务端确认那条任务已经取消）。
+   *
+   * 第五种 fail-closed，成因在**上一位**身上而不是这一场：服务端的租约取的是这台
+   * 终端最早那条「已确认 + waiting」的行，现在建会话，下一位扫出来的纸会落到上一位
+   * 名下。所以这一刻一个创建请求都不发，屏上也不出现任何面板指引。
+   *
+   * 和另外四位不同，它不需要用户按任何按钮：收尾是本机自己在重试，
+   * 订阅一变 false，本 effect 就会重跑并把这一次创建正常发出去。
+   */
+  const [cleanupHolding, setCleanupHolding] = useState(() => scanCleanupHolding())
 
   const confirmedRef = useRef(false)
   const createdIdRef = useRef<string | null>(restoredLive?.scanTaskId ?? null)
@@ -230,67 +248,34 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
 
   useBusyLock(phase === 'loading' || phase === 'success' || starting)
 
-  const cancelSessionOnce = (id: string, token: string) => {
-    if (cancelRequestedRef.current) return
-    cancelRequestedRef.current = true
-    void cancelScanSession(id, token, getToken()).catch(() => undefined)
-  }
-
   /**
-   * 丢弃一个刚建成、却已经没有人会使用的任务。
+   * 「这一场到此为止」的四种收场（取消 / 放弃 / 丢弃 / 投递授权被拒）。
    *
-   * 和 cancelSessionOnce 的分工：那条是**页面还在**时的正常取消（等得起一次 await、
-   * 用当前身份发）；这条发生在清场 / 卸载之后，页面随时可能被拆掉或整页重载，
-   * 所以走 keepalive 的撤销通道，并且用**创建时**那个身份。
-   * 共用 cancelRequestedRef：两条合起来对同一个任务只发一次 DELETE。
-   *
-   * @param intent `'ack-compensation'` 是这道去重**唯一**的例外，两层闸门一起放行
-   *   （本页的 cancelRequestedRef 与 scanSessionRevoke 的按 id 计数）。
-   *   只有「离开之后那次 ACK 才成功」那一支传它：那一刻服务端那条任务可能刚刚变得
-   *   可投递，而先前那次撤销已知没有生效（生效了的话 ACK 只会拿回 409）——
-   *   不放行就留下一个可投递却没人看着的收件箱，它连 60 秒未确认回收器都收不到。
-   *   完整理由见 scanSessionRevoke 的 REVOKE_ATTEMPT_CAP。
+   * 判据、顺序、注释原样搬进了 `scanSettingsTeardown.ts`，这里只做装配：它们要读的
+   * ref 和要改的 state 全在本组件里，所以按值传进去，而不是让那个文件自己去拿。
+   * 搬家的唯一理由是 CLAUDE.md §8 的 800 行硬线。
    */
-  const abandonCreatedSession = (
-    credentials: { scanTaskId: string; controlToken: string },
-    intent: ScanRevokeIntent = 'best-effort',
-  ) => {
-    if (cancelRequestedRef.current && intent !== 'ack-compensation') return
-    cancelRequestedRef.current = true
-    revokeCreatedScanSession(credentials, createTokenRef.current, intent)
-  }
-
-  /**
-   * 丢弃一个刚建成、但本机已经确定用不了的会话：撤服务端任务 → 抹本机登记
-   * （`live: undefined` 同时推进代次）→ 清空本页凭据并**放开撤销闸**（那次 DELETE
-   * 已发出、id 也已抹掉，不放开的话用户重开的下一场就永远撤不掉）→ 换结论屏。
-   *
-   * 两处调用（服务端不给投递授权 / 凭据没能落进登记）成因不同、结论屏不同，这四件事
-   * 一件都不能少：只抹本机不撤服务端，那条任务会占住终端的活动会话；只撤服务端不抹本机，
-   * 看门狗整页重载之后这一场会被复水成「有会话」。
-   */
-  const discardCreatedSession = (credentials: ScanAckCredentials, reason: SessionFailure) => {
-    abandonCreatedSession(credentials)
-    patchScanWorkbenchSession({ stage: 'settings', live: undefined })
-    createdIdRef.current = null
-    controlTokenRef.current = null
-    ackRequestedForRef.current = null
-    cancelRequestedRef.current = false
-    sessionPromiseRef.current = null
-    setScanTaskId(null)
-    setControlToken(null)
-    setInstructions(null)
-    setExpiresAt(null)
-    setAckState('idle')
-    setFailure(reason)
-    setPhase('error')
-  }
-
-  /** 服务端明确不认这一场的投递授权。哪些码算「明确不认」见 scanDeliveryAck。 */
-  const failClosedOnAckRefusal = (credentials: ScanAckCredentials, ackFailure: SessionFailure) => {
-    discardCreatedSession(credentials, ackFailure)
-    setAckRefused(true)
-  }
+  const { cancelSessionOnce, abandonCreatedSession, discardCreatedSession, failClosedOnAckRefusal } =
+    createScanSessionTeardown(
+      {
+        cancelRequestedRef,
+        createTokenRef,
+        createdIdRef,
+        controlTokenRef,
+        ackRequestedForRef,
+        sessionPromiseRef,
+      },
+      {
+        setScanTaskId,
+        setControlToken,
+        setInstructions,
+        setExpiresAt,
+        setAckState,
+        setAckRefused,
+        setFailure,
+        setPhase,
+      },
+    )
 
   useEffect(() => subscribeTerminalSession(setTerminalSession), [])
 
@@ -301,6 +286,21 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       unmountedRef.current = true
     }
   }, [])
+
+  /* 复水进来的那一场没走过创建，身份快照是空的。挂载这一刻补一份：撤销与确认都要用
+   * 「建这一场的那个身份」发（服务端按 endUserId 校验），而复水之后当前身份就是它 ——
+   * 换过人的话本机登记早就被清场抹掉了，根本复水不出来。补在这里而不是等确认 effect：
+   * 用户可能在确认回来之前就按下「返回（取消任务）」，那一刻 createTokenRef 不能是空的。 */
+  useEffect(() => {
+    if (restoredFromStorageRef.current && createTokenRef.current === null) {
+      createTokenRef.current = getToken()
+    }
+    // getToken 是 AuthContext 里的稳定回调（只读 ref），不构成重跑理由。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 收尾闸的状态只由它自己推进（重试成功 / 自然过期），所以订阅，不轮询。
+  useEffect(() => subscribeScanCleanup(() => setCleanupHolding(scanCleanupHolding())), [])
 
   useEffect(() => {
     if (!scanType) return
@@ -325,6 +325,16 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
      * 会悄悄发出去的普通创建。用户按下「重新开始一次扫描」之后，
      * rescanCredentialsLost 当帧变 false，本 effect 再跑一次，那时才创建。 */
     if (rescanCredentialsLost) return
+    /* fail-closed：上一位的扫描还没收完尾。排在终端会话那两个分支之前 —— 这一刻
+     * 要说的是「还在收上一场的尾」，不是「正在做终端安全校验」。一个请求都不发：
+     * 服务端的租约取的是这台终端最早那条「已确认 + waiting」的行，现在建会话，
+     * 这一位扫出来的纸会落到上一位名下。收完尾订阅会把这一位打回 false，
+     * effect 随之重跑并正常创建。 */
+    if (cleanupHolding) {
+      setFailure(SCAN_CLEANUP_HOLD_FAILURE)
+      setPhase('error')
+      return
+    }
     // 终端安全会话还在换票：什么都不发，页面停在等待态。抢跑只会拿回一个 401，
     // 还会把一次「本可以成功」的创建写成失败。
     if (terminalSession === 'checking') return
@@ -363,8 +373,17 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     if (!sessionPromiseRef.current) {
       setFailure(null)
       setPhase('loading')
+      /* 身份**只取一次**，此后这一场的创建、重放、撤销全用这一份快照。
+       *
+       * 此前是两处取值：这里写一次 `createTokenRef.current = getToken()`，下面的
+       * `sendCreate` 里又写一次 `getToken()` —— 中间隔着最长 24 秒的丢失响应重放。
+       * 用户在那 24 秒里退出 / 换人 / 会话过期的话，重放会用**新身份**去建任务
+       * （或者变成一次匿名创建），而 createTokenRef 里还是旧的那一个；撤销时服务端
+       * 按 endUserId 校验，只会 403。于是那条 child 以另一个人的名义活着，
+       * 谁都撤不掉，一直等到自然过期。所以三件事必须绑同一份身份。 */
       createGenerationRef.current = scanLifecycleGeneration()
-      createTokenRef.current = getToken()
+      const identityToken = getToken()
+      createTokenRef.current = identityToken
       // 授权只取一次，且必须和代次在同一个同步块里取（按代次校验，隔一次 await
       // 就可能取到属于上一场的那一份）。取到 null 有两种含义，下一行的闸门负责分开：
       // 用户从头新开一场 = 正常，发普通创建；意图还在却取不到 = 延迟取用，什么都不发。
@@ -383,7 +402,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
        * 那两半，而漏带的那一次是一个无签名的普通创建。 */
       const sendCreate = () => createScanSession(
         { scanType, terminalId: getTerminalId() },
-        getToken(),
+        identityToken,
         rescan,
       )
       /* 「结果未知」时把同一对请求重放到有答案为止（有界退避，只对配对请求）。
@@ -393,7 +412,19 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
        * 于是「离开 / 清场 / 换人 / 卸载之后领回来的 child」会被同一段代码撤掉。 */
       sessionPromiseRef.current = replayCreateUntilOutcomeKnown(sendCreate, rescan !== null, {
         onReplay: () => setReplayingLostCreate(true),
+        /* 清场开始之后不再发新的重放：这一位已经走了，把 child 领回来没有意义，
+         * 而重放最长 24 秒 —— 那段时间清场屏只能干等着。收手之后那条 child 仍然安全
+         * （本机不知道它的 id，永远不会确认它；未确认的 waiting 对 Agent 不可见）。
+         * 判据用 scanCleanupInProgress 而不是代次：页内离开（leaveScanFlow）也会推进
+         * 代次，而那条路径上执行环境还在，重放领回来的 child 会被当场撤掉，更干净。 */
+        shouldContinue: () => !scanCleanupInProgress(),
       })
+      /* 把这一次创建交给收尾闸看着，连同身份快照。
+       *
+       * 清场发生在创建在飞的那一刻时，本机登记里还没有 live —— 闸从登记里读不到任何
+       * 可撤的东西，而本页的 `.then` 会被整页重载连同执行环境一起干掉。交给闸之后，
+       * 响应落地那一刻由它按同一份身份把任务撤掉，并在此期间把重载按住。 */
+      trackScanSessionCreation(sessionPromiseRef.current, identityToken)
     }
 
     sessionPromiseRef.current
@@ -547,8 +578,12 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     //
     // `ackRefused` 是第三个 fail-closed 开关，同理：它 true→false 的那一下是用户按
     // 「重新开始一次扫描」，这一次创建必须发得出去。
+    //
+    // `cleanupHolding` 是第四个，唯一一个**不由用户按钮**复位的：上一场收完尾时
+    // 订阅把它打回 false，这一次创建才发得出去。不进依赖的话页面会永远停在
+    // 「还在收上一场的尾」，而收尾其实早就结束了。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused])
+  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused, cleanupHolding])
 
   /**
    * 投递确认（ACK）：唯一一处让这一场在服务端变得可投递的地方（见 scanDeliveryAck）。
@@ -573,10 +608,12 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       controlToken: pendingControlToken,
     }
     const ackGeneration = scanLifecycleGeneration()
-    const memberToken = getToken()
-    // 复水进来的那一场没走过创建，createTokenRef 还是空的。撤销要用「建这一场的那个
-    // 身份」发（服务端 cancel() 校验 endUserId），这里补上，否则待会儿真要撤时只会 403。
-    if (createTokenRef.current === null) createTokenRef.current = memberToken
+    /* 身份用**这一场建成时**那份快照，不是现取。创建 effect 在发请求之前写下它，
+     * 复水那一条由挂载 effect 补上，所以这里读到的永远是「建这一场的那个人」。
+     * 现取的坏处不是理论上的：ACK 与撤销在服务端都按 endUserId 校验，用户中途退出
+     * 或换人之后现取只会拿回 403，而页面会把那条 403 读成「服务端不认这一场」——
+     * 把本机的身份漂移说成服务端的结论。 */
+    const memberToken = createTokenRef.current
     let stale = false
 
     void acknowledgeScanDelivery(credentials, memberToken).then((outcome) => {
@@ -754,6 +791,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     return <ScanSettingsStatusView {...{
       phase, ackState, scanType, terminalSession, failure, replayingLostCreate,
       rescanRetryable, rescanCredentialsLost, rescanRefusedByServer, ackRefused, liveNotDurable,
+      cleanupHolding,
       handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry,
     }} />
   }
