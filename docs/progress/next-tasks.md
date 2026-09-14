@@ -5,10 +5,12 @@
 **当前总判定：扫描 R3 为 SOURCE / LOCAL GO；CI / DEVICE / PRODUCTION / COMMERCIAL 全部 NO-GO。**
 
 分支 `integration/scan-pickup-closeout-r3-20260915`，基线
-`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。R3 的实现证据锚点是**两个提交**：
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。R3 的功能实现证据锚点仍是**两个提交**：
 `b3d7c43d50d13b4527bad1d23bc8d44675419fea`（401 出口接入清场收尾闸）+
 `089b5b9adca40b6a6f669d46705e3ec0acd92f3a`（Grok 主对抗审查发现的 P1 修复：出口所有权跨 `<AuthProvider key>` 重挂唯一、
-`contractReview` 透传失败 token、`fusion-w6-contract` 接入 CI）。**推进只认后者这个精确 SHA。**
+`contractReview` 透传失败 token、`fusion-w6-contract` 接入 CI）。
+前一 HEAD 是 `c866c4156746c772e2657c3c768b0f97a3bb8f35`（补记精确 SHA 的文档提交）。
+**7 个 `docs/graph/**` 生成漂移已用 `pnpm graph` 消除；新的最终 HEAD 由这一次图谱刷新提交产生，提交前不得伪写未知 SHA。推进只认那次提交落地后的精确 HEAD。**
 
 口径更正，别再混用：
 
@@ -20,7 +22,7 @@
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | 集成 / 仓库 | 把 R3 推上去并**首次**取得 CI 绿：以 `089b5b9adca40b6a6f669d46705e3ec0acd92f3a` 为 PR head 开 PR（或并入 #1036 后重新等 CI），三项必需检查与 Windows installer 检查全绿后再谈合并 | PR 最终 head 的必需检查全绿；head 必须等于 `089b5b9adca40b6a6f669d46705e3ec0acd92f3a` 或其之后产生的新 HEAD（文档提交也会产生新 HEAD，不得沿用旧 SHA 绿灯）；合入后以 `merge-base --is-ancestor` 证明进入 `origin/main` 并记录新的 main SHA |
+| 1 | 集成 / 仓库 | 把 R3 推上去并**首次**取得 CI 绿：以图谱刷新提交落地后的精确 HEAD 为 PR head 开 PR（或并入 #1036 后重新等 CI），三项必需检查与 Windows installer 检查全绿后再谈合并 | PR 最终 head 的必需检查全绿；head 必须等于图谱刷新提交落地后的精确 SHA（提交前未知，不得沿用 `089b5b9ad` / `c866c4156` 的本地绿当 CI 绿灯）；合入后以 `merge-base --is-ancestor` 证明进入 `origin/main` 并记录新的 main SHA |
 | 2 | Windows / 奔图专用任务 | 在合入后的精确 SHA 上完成面板扫描、真实出纸、扫码枪、断网重连、Agent 重启、长驻 watcher 与连续多用户操作 | 记录任务/订单/文件 hash/状态回传/临时文件删除；重点证明旧文件不交给后来的用户，以及「401 过期 + 弱网」时下一位在面板上扫出来的文件不会投给上一位 |
 | 3 | Claude + 四端 | 从合入后的干净 `origin/main` 推进，不与 R3 候选混合；Claude 独占前端写入 | 同下面 R2 那一节第 3 项，口径不变 |
 | 4 | 运维 / 生产 | 具名维护窗口按精确 SHA 完成备份、迁移、部署、监控、回滚 | 同下面 R2 那一节第 4 项，口径不变 |
@@ -33,9 +35,10 @@ R3 已知遗留（不阻塞第 1 项，但要登记）：
   不构成泄露），但没有一屏告诉用户「在等什么、还要多久」。本轮按要求**不扩展** 401 overlay /
   hardClear 双出口 —— 两个出口同时登记会在闸 settle 时互相抢导航目的地，风险高于收益。
   做的话只允许低风险复用 `KioskClearingOverlay`，且必须先确定谁赢那次导航。
-- **P2：`pnpm graph:check` 红。** 在 `b3d7c43d5` 上就已经红（7 个 `docs/graph/**` 产物内容不一致），
-  R3 改动前后红的文件完全一致、未新增漂移。该命令未接入任何 CI workflow。修法是
-  `pnpm graph` 重跑生成，需要单独一轮（`docs/graph/**` 不在 R3 允许修改范围）。
+- **已关闭：7 个图谱漂移。** 前一 HEAD `c866c4156746c772e2657c3c768b0f97a3bb8f35` 上
+  `pnpm graph:check` 红（7 个 `docs/graph/**` 产物内容不一致）。本轮 `pnpm graph` 重跑生成，
+  未手改产物。新最终 HEAD 由该图谱刷新提交产生，提交前未知；R3 仍未 push，新 SHA 尚未跑过
+  任何 CI。`graph:check` 未接入任何 CI workflow。DEVICE / PRODUCTION / COMMERCIAL 仍全部 NO-GO。
 
 ## 2026-09-14 R2 候选后的唯一推进顺序
 

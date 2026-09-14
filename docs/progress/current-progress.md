@@ -1,5 +1,30 @@
 # 当前开发进度
 
+2026-09-15 **R3 图谱漂移收口（分支 `integration/scan-pickup-closeout-r3-20260915`，基线
+`origin/main@fea6f3705`）**。仅改 `docs/graph/**` 七个生成产物与本文件 / `next-tasks.md`。
+用仓库标准命令 `pnpm graph` 重跑生成，未手改产物。未触碰 `apps/**`、`services/**`、
+`packages/**`、`.github/**`、schema / 迁移、生产配置与密钥。**未推送 / 未开 PR / 未合并 / 未部署。**
+
+前一 HEAD 是 `c866c4156746c772e2657c3c768b0f97a3bb8f35`（补记 `089b5b9ad` 精确 SHA 的文档提交）。
+在该 SHA 上 `pnpm graph:check` 退出码 1，漂移正好 7 个文件：`docs/graph/README.md`、
+`routes.md`、`api.md`、`data-model.md`、`gates.md`、`orphans.md`、`graph.json`。
+重跑后与当前 R3 代码对齐：kiosk 路由 88→89（新增 `/scan` 工作台，旧四页改为重定向）、
+HTTP 端点 524→529（扫描 ACK / current-lease、小程序码、上传 scene/resolve）、门禁脚本
+451→464、Prisma 模型数仍 101。审查结论：这是 R3 既有代码相对过期图谱的补齐，不是异常的
+大规模业务 / 路由改写。
+
+**新的最终 HEAD 由本提交产生，提交前不得伪写未知 SHA。** 落地后再用 `git rev-parse HEAD` 读取。
+
+证据口径 —— 全部 LOCAL（本机 macOS 开发环境），SOURCE 为本工作树：
+`pnpm graph:check` 0（生成前在 `c866c4156` 上为 1，7 个文件漂移）；
+`pnpm verify:repository-integrity` 0；`pnpm verify:ci-gate-coverage` 0；
+`pnpm verify:deploy-gates-in-sync` 0；`git diff --check` 0。
+该新 SHA 尚未 push，也尚未跑过任何 CI。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；不得把本机 `graph:check` 绿写成 CI 通过。
+Windows 一体机、Terminal Agent、奔图 CM2800 真机与生产环境本轮一次都没碰。
+DEVICE / PRODUCTION / COMMERCIAL 全部 NO-GO。401 出口等待遮罩仍是 P2，本轮未做。
+
 2026-09-15 **R3 第二修复：401 出口的所有权必须跨 `<AuthProvider key>` 重挂唯一（Kiosk 侧，分支
 `integration/scan-pickup-closeout-r3-20260915`，基线 `origin/main@fea6f3705`）**。仅改
 `apps/kiosk/**`、`.github/workflows/ci.yml`（只加一个已有测试文件到已有步骤）与本文件 /
