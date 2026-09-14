@@ -20,8 +20,10 @@ null-opening、不同 inode 正例及 identity-flight 反向变异；API 在 Pos
 `postgresql://postgres@127.0.0.1:55439/scan_retry_verify` 上 `verify:scan-tasks` 与 typecheck 通过，
 包含 ACK-filter 反向变异；Kiosk `verify-scan-session-truth.mjs`、ACK 单测 9/9、typecheck 通过；
 shared typecheck 通过。最终只读复审：Grok 对原竞态复验为 GO，Claude 对 Kiosk durable ACK 与前端
-影响确认为 GO，Agy 架构复审为 GO；Hermes / DeepSeek V4 Pro 因 HTTP 402 余额不足失败，记
-`FAILED`，不计批准。证据边界：`ino === 0` / identity unavailable 的 Windows SMB 路径无法由本机
+影响确认为 GO，Agy 架构复审为 GO。Hermes / DeepSeek V4 Pro 首次因 HTTP 402 余额不足失败；随后
+Hermes 明确降级到已登录的 Nous `upstage/solar-pro4:free`，对同一候选完成隐私与恢复只读复审并给出
+GO。该结果只计作 Hermes / Nous 复审，不冒充 DeepSeek 结果。证据边界：`ino === 0` /
+identity unavailable 的 Windows SMB 路径无法由本机
 single-flight 证明，长驻 chokidar、Windows / 奔图、真实支付、小程序发布、生产部署、授权内容与客户
 UAT 均未完成。因此当前结论仅为 **LOCAL TESTED SOFTWARE GO（扫描 R2 候选边界）**，
 **PRODUCTION / COMMERCIAL NO-GO**。
