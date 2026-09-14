@@ -30,6 +30,14 @@ export interface ScreenAlertListProps {
   listedCount: number
   truncated: boolean
   emptyText: string
+  /**
+   * 本卡实际画得下几行。
+   *
+   * 定高舞台里 6 行会把说明行一起顶出去、被静默裁掉 —— 那是最坏的一种：
+   * 屏上看不出还有更多。所以这里主动截到画得下的行数，并且**按真正画出来的行数**
+   * 报「已列出 N / 共 M」，不照抄服务端的 listedCount。
+   */
+  maxRows?: number
 }
 
 function severityClass(severity: string): string {
@@ -44,13 +52,17 @@ export function ScreenAlertList({
   listedCount,
   truncated,
   emptyText,
+  maxRows = 4,
 }: ScreenAlertListProps) {
   if (rows.length === 0) {
     return <p className="ops-empty">{emptyText}</p>
   }
+  const shown = rows.slice(0, maxRows)
+  const hiddenByLayout = rows.length > shown.length
+  const total = Math.max(firingCount, listedCount)
   return (
     <div className="ops-list">
-      {rows.map((row) => (
+      {shown.map((row) => (
         <div className="ops-li" key={row.key}>
           <span className={cn('ops-sev', severityClass(row.severity))} aria-hidden="true" />
           <span className="ops-tx" title={row.text}>
@@ -60,8 +72,8 @@ export function ScreenAlertList({
           <span className="ops-tm">{row.time}</span>
         </div>
       ))}
-      {truncated ? (
-        <p className="ops-more">已列出 {listedCount} / 共 {firingCount} 条</p>
+      {truncated || hiddenByLayout ? (
+        <p className="ops-more">已列出 {shown.length} / 共 {total} 条</p>
       ) : null}
     </div>
   )
@@ -88,13 +100,13 @@ export function ScreenGapList({ entries, emptyText }: ScreenGapListProps) {
         const copy = screenReasonCopy(entry.reason)
         return (
           <div className="ops-gap-row" key={entry.reason}>
-            <div className="ops-gap-keys">
-              {copy.title} · {entry.labels.join('、')}
+            <div className="ops-gap-keys" title={`${copy.title} · ${entry.labels.join('、')}`}>
+              {copy.title} · {entry.labels.length} 项：{entry.labels.join('、')}
             </div>
             <div className="ops-gap-why">
-              {copy.detail}
-              {copy.howTo}
+              <span title={copy.detail}>{copy.detail}</span>
             </div>
+            <div className="ops-gap-how">{copy.howTo}</div>
           </div>
         )
       })}

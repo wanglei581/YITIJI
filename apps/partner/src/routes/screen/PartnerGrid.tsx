@@ -176,7 +176,7 @@ export function PartnerGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         title="本机构暂不可用的指标"
         tag={`${gapCount} 项`}
         span={8}
-        foot="这些指标不是被隐藏，是服务端确实给不出机构维度的数据。每一条都写明了原因与接入方式；数据层补齐后会自动出现在上方栅格里，不需要改页面。"
+        foot="这些指标不是被隐藏，是服务端确实给不出机构维度的数据。全屏演示只列「原因 · 指标名」，完整的原因与接入方式在后台页面里逐条可读。数据层补齐后会自动出现在上方栅格里，不需要改页面。"
       >
         <ScreenGapList
           entries={gaps}

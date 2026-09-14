@@ -266,11 +266,41 @@ for (const file of gridFiles) {
   const closes = (code.match(/<\/ScreenCard>|\/>\s*$/gm) ?? []).length
   check(opens > 0 && closes >= opens, `${file.path} 的卡片逐个闭合，没有卡片套卡片（${opens} 开 / ${closes} 闭）`)
 }
-const css = read('packages/ui/src/styles/ops-screen.css')
+// 样式按「壳 / 块 / 字阶」拆成三份（单文件曾到 1005 行）。
+// 门禁读的是三份的合集：拆分只许搬运，不许把规则搬丢。
+const CSS_FILES = [
+  'packages/ui/src/styles/ops-screen.css',
+  'packages/ui/src/styles/ops-screen-blocks.css',
+  'packages/ui/src/styles/ops-screen-scale.css',
+]
+const css = CSS_FILES.map(read).join('\n')
+for (const rel of CSS_FILES) {
+  const lines = read(rel).split('\n').length
+  check(lines < 800, `${rel} 行数 ${lines} < 800`)
+}
+for (const app of ['admin', 'partner']) {
+  const entry = read(`apps/${app}/src/index.css`)
+  check(
+    CSS_FILES.every((rel) => entry.includes(`@ai-job-print/ui/styles/${rel.split('/').pop()}`)),
+    `apps/${app} 入口引入了全部三份大屏样式（顺序即层叠顺序）`,
+  )
+}
 check(!/\.ops-card\s+\.ops-card/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), '样式里没有卡中卡选择器')
 
 // ── 13. 动效降级 ──────────────────────────────────────────────────────────
-check(/@media \(prefers-reduced-motion: reduce\)/.test(css), '样式提供 prefers-reduced-motion 降级')
+// M4 教训：只断言「字符串存在」是空转的 —— 壳层另有一处 reduced-motion
+// 只管按钮过渡，把点阵那条删掉门禁照样绿。所以断言要落到**被降级的那个选择器**上。
+const reducedBlocks = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/g)]
+  .map((m) => m[1])
+check(reducedBlocks.length > 0, '样式提供 prefers-reduced-motion 降级')
+check(
+  reducedBlocks.some((block) => /\.ops-d\b/.test(block) && /animation: none/.test(block)),
+  'reduced-motion 下终端矩阵的呼吸被关掉（不是只关按钮过渡）',
+)
+check(
+  reducedBlocks.some((block) => /\.ops-screen::before/.test(block)),
+  'reduced-motion 下屏底扫描光带被关掉',
+)
 check(/\[data-ops-motion='off'\]/.test(css), '样式提供显式关闭动效的通道')
 check(
   /animation: none !important/.test(css),

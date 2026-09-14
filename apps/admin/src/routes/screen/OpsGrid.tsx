@@ -79,7 +79,7 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         title="今日打印失败"
         metric={metrics.printFailedToday}
         span={2}
-        foot="按 Asia/Shanghai 自然日统计失败态打印任务。是否已退款需到订单页逐单核查，此处不代述。"
+        foot="按 Asia/Shanghai 自然日统计失败态打印任务。退款与否需到订单页逐单核查。"
         render={(value) => (
           <ScreenKpi
             value={screenCount(value.failed)}
@@ -94,7 +94,7 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         title="待审内容"
         metric={metrics.pendingReview}
         span={2}
-        foot="四类内容的 pending + reviewing 服务端计数，非前端截断后统计。"
+        foot="四类内容 pending + reviewing 的服务端计数，非前端截断后统计。"
         render={(value) => (
           <ScreenKpi
             value={screenCount(value.total)}
