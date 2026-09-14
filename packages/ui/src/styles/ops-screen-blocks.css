@@ -23,6 +23,12 @@
   min-width: 0;
 }
 
+/* 同上：KPI 的主数与副行也不许被压扁。 */
+.ops-kpi .ops-n,
+.ops-kpi .ops-lb {
+  flex: none;
+}
+
 .ops-kpi .ops-n {
   font-weight: 700;
   font-family: var(--ops-mono);
@@ -136,13 +142,18 @@
 }
 
 .ops-dots {
-  /* 这里刻意不用 grid。`repeat(auto-fill, minmax(44px,1fr))` 在十几条轨道上
-     会把分数宽度逐条向上取整，合计比内容盒宽 3–4px —— 探针报的是 dw 不是 dh，
-     我先按纵向找了两轮余量都没用，方向就是错的。flex-wrap 没有这种取整累积。 */
+  /* 格子必须**定尺**，不能 1fr 也不能 flex-grow：
+     - `minmax(44px,1fr)` 在十几条轨道上把分数宽度逐条向上取整，合计比内容盒宽 3–4px；
+     - 换成 flex-wrap 之后更糟 —— 最后一行item少，flex-grow 把它们撑到 max-width，
+       于是最后一行的格子比上面几行大一倍，截图上看像渲染坏了（机构侧只有一行时
+       整行被 align-content:stretch 拉成 110px 高的长方块）。
+     定尺 + align-content:flex-start 两个问题一起消失：格子等大、行高一致、不取整溢出。 */
   flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: stretch;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 36px);
+  grid-auto-rows: 36px;
+  justify-content: space-between;
+  align-content: flex-start;
   gap: 8px;
   overflow: hidden;
   min-width: 0;
@@ -156,9 +167,6 @@
 }
 
 .ops-d {
-  flex: 1 1 44px;
-  min-width: 44px;
-  max-width: 88px;
   border-radius: 6px;
   border: 1px solid transparent;
 }
@@ -243,13 +251,26 @@
 .ops-mini .ops-m {
   background: var(--ops-panel-2);
   border-radius: 10px;
-  padding: 14px 16px;
+  /* 内边距从 14px 收到 10px：轨道是 minmax(0,1fr)，压不下去的是内容本身，
+     截图上表现为标签与提示被拦腰切掉半行（justify-content:center 时上下都切）。 */
+  padding: 8px 14px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+/* 三个子元素一律 flex:none。
+   默认的 flex-shrink:1 会在容器不够高时把它们压到低于行高，
+   字就被切在自己的盒子里 —— 而容器 scrollHeight 仍等于 clientHeight，
+   任何「查容器溢出」的门禁都看不见。禁止收缩后，放不下就变成真溢出，
+   探针能抓到，人也能在截图上看出来。 */
+.ops-mini .ops-mv,
+.ops-mini .ops-mk,
+.ops-mini .ops-ms {
+  flex: none;
 }
 
 .ops-mini .ops-mv {
@@ -261,6 +282,9 @@
 .ops-mini .ops-mv.is-na {
   color: var(--ops-ink-3);
   font-family: inherit;
+  /* 主数那条 line-height:1.1 是给等宽数字的；中文字形在 1.1 下会被自己的行盒切掉
+     （探针报「文字被压扁 2px」）。未接入格写的是中文，单独给回正常行高。 */
+  line-height: 1.35;
 }
 
 .ops-mini .ops-mk {

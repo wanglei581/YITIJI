@@ -161,6 +161,28 @@ export async function geometry(page: Page, minFont: number): Promise<GeometryRep
         // 报清是横向还是纵向：上一版只报一个数字，害我按纵向找了两轮余量，方向是错的。
         if (by > 1) clipped.push({ card: `${title}/${el.className || el.tagName}`, by, dh, dw })
       }
+      // scrollHeight 有个盲点：flex 容器 justify-content:center 时内容向**上下两侧**
+      // 溢出，而 scrollHeight 只量 padding box 下方那一半，于是「标签被拦腰切掉」
+      // 这种最刺眼的问题门禁全绿。实测在信息归集分项格上漏过一次，是看截图发现的。
+      // 补上原型 probe.mjs 的那一条：任何后代元素的矩形超出卡片矩形即判裁切。
+      // 容器溢出查不出「文字被压在自己盒子里」：flex item 被 shrink 到低于行高时，
+      // 容器 scrollHeight 仍等于 clientHeight。实测在信息归集分项格上漏过一次
+      // （标签盒高 9px，行高 21px，截图上就是被拦腰切掉半行），是看截图发现的。
+      // 所以这里直接量叶子自己：内容比自己的盒子高就是被压扁了。
+      for (const el of [...card.querySelectorAll('*')] as HTMLElement[]) {
+        if (el.children.length > 0) continue
+        const text = (el.textContent ?? '').trim()
+        if (!text) continue
+        const squeeze = el.scrollHeight - el.clientHeight
+        if (squeeze > 1) {
+          clipped.push({
+            card: `${title}/文字被压扁 ${el.className || el.tagName}「${text.slice(0, 10)}」`,
+            by: squeeze,
+            dh: squeeze,
+            dw: 0,
+          })
+        }
+      }
       const kids = [...card.children].map((k) => ({ k, r: k.getBoundingClientRect() }))
       for (let i = 0; i < kids.length; i++) {
         for (let j = i + 1; j < kids.length; j++) {

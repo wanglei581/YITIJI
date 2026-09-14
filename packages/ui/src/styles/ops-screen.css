@@ -86,7 +86,8 @@
 
 [data-ops-screen='wall'] .ops-screen {
   height: 1080px;
-  padding: 22px 28px 18px;
+  padding: 20px 28px 16px;
+  gap: 12px;
 }
 
 [data-ops-screen='desk'] .ops-screen {
@@ -112,9 +113,9 @@
 }
 
 .ops-hd .ops-sub {
-  margin: 6px 0 0;
+  margin: 5px 0 0;
   color: var(--ops-ink-2);
-  max-width: 86ch;
+  max-width: 120ch;
 }
 
 .ops-stamp {
