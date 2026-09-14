@@ -78,7 +78,7 @@ const { ApiHttpError } = await import(HTTP_ADAPTER_STUB)
 
 /** 浏览器断网时 scanTasks.ts 造的就是这一个：code NETWORK_ERROR + status 0。 */
 const offline = () => new ApiHttpError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
-const CHILD = { scanTaskId: 'child-1', controlToken: 'prior-token', instructions: ['放好原件'], expiresAt: '2026-09-14T10:00:00.000Z' }
+const CHILD = { scanTaskId: 'child-1', controlToken: 'prior-token', instructions: ['放好原件'], expiresAt: '2099-01-01T00:00:00.000Z' }
 
 /** 把退避压到 0 并记录每次真正睡了多久：用例跑得快，退避表本身照样被断言。 */
 function harness() {
