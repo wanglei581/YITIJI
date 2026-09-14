@@ -522,6 +522,54 @@ interface ScanBusyRecorder {
   deleteRequests: () => number
 }
 
+/** 服务端写下投递授权的那一刻。固定值：用例断言的是「确认过」，不是具体几点。 */
+const SCAN_DELIVERY_ACKED_AT = '2026-09-14T00:00:00.000Z'
+// playwright.privacy-warning.config.ts 的 webServer 用 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN
+// 构建出这个值，terminalAuth 在 E2E 构建下拿它当终端会话票。
+const TERMINAL_SESSION_FIXTURE = 'playwright-terminal-session-fixture'
+
+interface ScanAckProbe {
+  /** 断言恰好确认过 `count` 次，且每一次都带齐服务端要校验的三样凭据。 */
+  expectAcked: (count: number) => Promise<void>
+}
+
+/**
+ * 注册这一场的投递确认端点（**按 taskId 精确注册**，不是通配）。
+ *
+ * 等待页 2026-09-14 起挂载即 `POST /scan/sessions/:id/ack`：服务端新建会话一律
+ * `deliveryAckedAt = null`，确认回来之前本页停在「正在确认投递授权」，既出不来
+ * 「等待打印机端扫描完成」，也没有那颗「取消扫描」可按（契约见
+ * src/pages/scan/scanDeliveryAck.ts）。所以下面每条走等待页的 busy 用例都必须
+ * 自己注册它 —— **不挂通配兜底**：未注册请求仍由 ApiRouter fail-closed，
+ * 「缺少任务 id / 控制凭据时一次确认都不许发生」那两条反面用例靠的正是这一层。
+ *
+ * 顺带记下每一次的凭据：只 respond 不看请求头的话，「本机漏带凭据」在夹具里永远
+ * 不会红，而真实服务端回的是 401（无终端会话票 / 终端 id）或 403（控制凭据对不上）。
+ */
+function registerScanBusyAck(page: Page, api: ApiRouter): ScanAckProbe {
+  const path = `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`
+  const calls: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== path) return
+    calls.push(request.headers())
+  })
+  api.respond('POST', path, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: SCAN_DELIVERY_ACKED_AT } },
+  })
+  return {
+    expectAcked: async (count) => {
+      await expect.poll(() => calls.length, { message: `期望恰好确认 ${count} 次投递授权` }).toBe(count)
+      for (const headers of calls) {
+        expect(headers['x-terminal-id']).toBe('KSK-001')
+        expect(headers['x-terminal-session-token']).toBe(TERMINAL_SESSION_FIXTURE)
+        expect(headers['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+      }
+    },
+  }
+}
+
 async function installScanProgressRoute(
   page: Page,
   options: ScanBusyOptions = {},
@@ -669,6 +717,7 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
   api,
 }) => {
   registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api)
 
   const waitingCount = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
@@ -715,6 +764,8 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   expect(networkRetryCount.statusRequests()).toBeGreaterThanOrEqual(1)
   expect(networkRetryCount.deleteRequests()).toBe(0)
+  // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
+  await ack.expectAcked(1)
 })
 
 test('completed poll status navigates to /scan/result without sending DELETE @scan-busy @warning-kiosk', async ({
@@ -722,6 +773,7 @@ test('completed poll status navigates to /scan/result without sending DELETE @sc
   api,
 }) => {
   registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api)
   const counts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -742,6 +794,8 @@ test('completed poll status navigates to /scan/result without sending DELETE @sc
   await expectWarningWithinThreeSeconds(page)
   // 终态由 poll 触发,页面走 unmount 而非 handleCancel,DELETE 不应被发送。
   expect(counts.deleteRequests()).toBe(0)
+  // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
+  await ack.expectAcked(1)
 })
 
 test('expired poll status navigates to /scan/result without sending DELETE @scan-busy @warning-kiosk', async ({
@@ -749,6 +803,7 @@ test('expired poll status navigates to /scan/result without sending DELETE @scan
   api,
 }) => {
   registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api)
   const counts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -761,6 +816,8 @@ test('expired poll status navigates to /scan/result without sending DELETE @scan
   await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(counts.deleteRequests()).toBe(0)
+  // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
+  await ack.expectAcked(1)
 })
 
 test('failed poll status navigates to /scan/result without sending DELETE @scan-busy @warning-kiosk', async ({
@@ -768,6 +825,7 @@ test('failed poll status navigates to /scan/result without sending DELETE @scan-
   api,
 }) => {
   registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api)
   const counts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -780,6 +838,8 @@ test('failed poll status navigates to /scan/result without sending DELETE @scan-
   await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(counts.deleteRequests()).toBe(0)
+  // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
+  await ack.expectAcked(1)
 })
 
 test('server-cancelled poll status navigates back to /scan/start without sending DELETE @scan-busy @warning-kiosk', async ({
@@ -787,6 +847,7 @@ test('server-cancelled poll status navigates back to /scan/start without sending
   api,
 }) => {
   registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api)
   const counts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -799,6 +860,8 @@ test('server-cancelled poll status navigates back to /scan/start without sending
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(counts.deleteRequests()).toBe(0)
+  // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
+  await ack.expectAcked(1)
 })
 
 test('explicit user cancel sends exactly one DELETE before navigating away @scan-busy @warning-kiosk', async ({
@@ -806,6 +869,7 @@ test('explicit user cancel sends exactly one DELETE before navigating away @scan
   api,
 }) => {
   registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api)
   const cancelCounts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -826,6 +890,8 @@ test('explicit user cancel sends exactly one DELETE before navigating away @scan
   // 每次 install 都 unroute 旧 handler,所以 cancelCounts 严格只数这一次
   // install 内收到的 DELETE 流量;不需要再去手工减去历史基准。
   expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
+  // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
+  await ack.expectAcked(1)
 })
 
 test('user cancel with a failing DELETE sends exactly one attempt and falls back to /scan/start @scan-busy @warning-kiosk', async ({
@@ -833,6 +899,7 @@ test('user cancel with a failing DELETE sends exactly one attempt and falls back
   api,
 }) => {
   registerKioskShell(api)
+  const ack = registerScanBusyAck(page, api)
   const cancelCounts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -855,6 +922,8 @@ test('user cancel with a failing DELETE sends exactly one attempt and falls back
   await expect(page).toHaveURL(/\/scan\?stage=start/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
+  // 等待页挂载确认了一次投递授权，且只此一次：这一屏走到哪个终态都不该再确认。
+  await ack.expectAcked(1)
 })
 
 // ── 待机 / 已退出态不得出现清场倒计时（公共设备现场反馈） ────────────────────
