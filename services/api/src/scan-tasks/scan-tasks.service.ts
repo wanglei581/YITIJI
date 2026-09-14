@@ -944,6 +944,11 @@ export class ScanTasksService {
         error: { code: 'NO_WAITING_SCAN_TASK', message: '扫描任务已过期' },
       })
     }
+    if (!task.deliveryAckedAt) {
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+      })
+    }
     if (task.createdAt.getTime() !== leasePayload.taskCreatedAtEpoch) {
       throw new ConflictException({
         error: { code: 'SCAN_LEASE_INVALID', message: '扫描租约绑定的任务版本不一致' },
@@ -1035,8 +1040,18 @@ export class ScanTasksService {
     }
 
     // 6. CAS：先把任务标记为 matched，并随 CAS 记录 lastAttemptHash 与 matchedFileMtime。
+    // ATOMIC_SCAN_DELIVER_CAS_ACK_EXPIRY: re-pin ACK + expiry (and signed
+    // task identity already in where) so mixed/raced state cannot go
+    // waiting → matched after ACK/expiry eligibility changed.
     const claimed = await this.prisma.scanTask.updateMany({
-      where: { id: task.id, status: 'waiting' },
+      where: {
+        id: task.id,
+        terminalId: args.terminalId,
+        status: 'waiting',
+        deliveryAckedAt: { not: null },
+        expiresAt: { gt: now },
+        createdAt: task.createdAt,
+      },
       data: { status: 'matched', matchedFileMtime: observedDate, lastAttemptHash: contentHash },
     })
     if (claimed.count === 0) {

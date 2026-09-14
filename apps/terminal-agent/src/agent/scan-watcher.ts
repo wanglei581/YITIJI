@@ -286,6 +286,14 @@ const inFlightPaths = new Set<string>()
  */
 const startupBacklogPaths = new Set<string>()
 const startupBacklogIdentities: ScanCaptureFileIdentity[] = []
+/**
+ * Runtime refuse-until-quarantined captures (foreign / no-lease / pre-existing /
+ * unprovable identity). Distinct from startup leftovers: same never-deliver
+ * rule, marked when we decide the bytes must not POST. Kept across EACCES /
+ * SMB-lock quarantine failures until the move succeeds.
+ */
+const refuseUntilQuarantinedPaths = new Set<string>()
+const refuseUntilQuarantinedIdentities: ScanCaptureFileIdentity[] = []
 
 function readStartupBacklogFileIdentity(filePath: string): ScanCaptureFileIdentity | undefined | 'unknown' {
   try {
@@ -340,6 +348,75 @@ export function isStartupBacklogCandidate(filePath: string, identity?: ScanCaptu
   return true
 }
 
+function refuseUntilQuarantinedHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  for (const marked of refuseUntilQuarantinedIdentities) {
+    if (isSameScanCaptureFile(marked, identity) === true) return true
+  }
+  return false
+}
+
+function markRefuseUntilQuarantined(filePath: string, identity?: ScanCaptureFileIdentity): void {
+  refuseUntilQuarantinedPaths.add(canonicalizeScanPath(filePath))
+  if (!identity || refuseUntilQuarantinedHasIdentity(identity)) return
+  refuseUntilQuarantinedIdentities.push(identity)
+}
+
+function forgetRefuseUntilQuarantined(filePath: string, identity?: ScanCaptureFileIdentity): void {
+  refuseUntilQuarantinedPaths.delete(canonicalizeScanPath(filePath))
+  if (!identity) return
+  for (let i = refuseUntilQuarantinedIdentities.length - 1; i >= 0; i -= 1) {
+    if (isSameScanCaptureFile(refuseUntilQuarantinedIdentities[i], identity) === true) {
+      refuseUntilQuarantinedIdentities.splice(i, 1)
+    }
+  }
+}
+
+export function isRefuseUntilQuarantinedCandidate(
+  filePath: string,
+  identity?: ScanCaptureFileIdentity,
+): boolean {
+  if (identity && refuseUntilQuarantinedHasIdentity(identity)) return true
+  if (!refuseUntilQuarantinedPaths.has(canonicalizeScanPath(filePath))) return false
+  if (identity) return false
+  return true
+}
+
+function isNeverDeliverCandidate(filePath: string, identity?: ScanCaptureFileIdentity): boolean {
+  return isStartupBacklogCandidate(filePath, identity)
+    || isRefuseUntilQuarantinedCandidate(filePath, identity)
+}
+
+/**
+ * ATOMIC_SCAN_CAPTURE_QUARANTINE_KEEP_LINEAGE: mark never-deliver first, move
+ * second, drop observation/marks only after the move succeeds. Removing the
+ * only lineage record before an EACCES/SMB-lock failure lets a later add/sweep
+ * re-bind the same bytes to a new waiting task.
+ */
+function tryQuarantineKeepingLineage(
+  filePath: string,
+  scanWatchFolder: string,
+  filename: string,
+  trusted: TrustedWindowsCandidate | undefined,
+  identity: ScanCaptureFileIdentity | undefined,
+  successLog: string,
+  failureLabel: 'startup backlog' | 'refuse-delivery' = 'refuse-delivery',
+): boolean {
+  markRefuseUntilQuarantined(filePath, identity)
+  try {
+    finalizeCandidate(filePath, scanWatchFolder, filename, trusted, 'quarantine')
+    globalDirectoryBaseline.remove(filename)
+    forgetRefuseUntilQuarantined(filePath, identity)
+    forgetStartupBacklog(filePath, identity)
+    warn(successLog)
+    return true
+  } catch (e) {
+    err(
+      `scan-watcher: ${failureLabel} quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
+    )
+    return false
+  }
+}
+
 let scanLifecycleActive = 0
 let scanLifecycleSkipped = 0
 let scanCandidateTestHooks: {
@@ -351,6 +428,8 @@ let scanCandidateTestHooks: {
 export function clearStartupBacklogForTest(): void {
   startupBacklogPaths.clear()
   startupBacklogIdentities.length = 0
+  refuseUntilQuarantinedPaths.clear()
+  refuseUntilQuarantinedIdentities.length = 0
   globalScanDeliveryBarrier.resetForTest()
   resetScanCaptureIdentityFlightsForTest()
   scanCandidateTestHooks = {}
@@ -617,6 +696,47 @@ export async function processCandidate(
     const initial = snapshotCandidate(filePath, filename)
     const openingIdentity = scanCaptureFileIdentity(initial.dev, initial.ino, initial.birthtimeMs)
     identityFlight = beginScanCaptureIdentityFlight(openingIdentity)
+    if (!openingIdentity) {
+      // ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY: ino===0 / missing lstat identity
+      // cannot prove sameness. Lock out (restart required), quarantine or refuse,
+      // and never let concurrent path keys bypass identity-flight.
+      if (identityFlight.previous) await identityFlight.previous
+      const alreadyLocked = globalScanDeliveryBarrier.getState() === 'locked_out'
+      globalScanDeliveryBarrier.lockOut('identity_unavailable')
+      if (!alreadyLocked) {
+        warn(`scan-watcher: unprovable capture identity — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+      }
+      markRefuseUntilQuarantined(filePath, undefined)
+      const liveNames = requireLiveBasenames(scanWatchFolder)
+      if (liveNames) {
+        globalDirectoryBaseline.bindCapture(
+          filename,
+          Date.now(),
+          null,
+          liveNames,
+          undefined,
+          (name) => liveNameIdentity(scanWatchFolder, name),
+        )
+      }
+      try {
+        if (existsSync(filePath) && classifyScanInputCandidate(initial) === 'accepted' && initial.nlink === 1) {
+          const verifiedUnprovable = readVerifiedCandidate(filePath, scanWatchFolder, filename, initial)
+          tryQuarantineKeepingLineage(
+            filePath,
+            scanWatchFolder,
+            filename,
+            verifiedUnprovable.trustedWindowsCandidate,
+            undefined,
+            `scan-watcher: unprovable capture identity quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`,
+          )
+        }
+      } catch (e) {
+        err(
+          `scan-watcher: refuse-delivery quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
+        )
+      }
+      return
+    }
     if (identityFlight.previous) {
       await identityFlight.previous
       if (!existsSync(filePath)) return
@@ -639,7 +759,7 @@ export async function processCandidate(
     if (
       !deliverFile
       && globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)
-      && !isStartupBacklogCandidate(filePath, openingIdentity)
+      && !isNeverDeliverCandidate(filePath, openingIdentity)
     ) {
       try {
         const openingLease = await fetchScanLease(client, config.terminalId)
@@ -708,21 +828,21 @@ export async function processCandidate(
     const lockoutAbort = abortDeliveryIfScanInputLockout(capturedGeneration)
     const candidateIdentity = scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino, finalSnapshot.birthtimeMs)
     const isBacklog = isStartupBacklogCandidate(filePath, candidateIdentity)
-    if (lockoutAbort || isBacklog) {
-      try {
-        globalDirectoryBaseline.remove(filename)
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        forgetStartupBacklog(filePath, candidateIdentity)
-        if (lockoutAbort) {
-          warn(`scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`)
-        } else {
-          warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(filename)}`)
-        }
-      } catch (e) {
-        err(
-          `scan-watcher: startup backlog quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
-        )
-      }
+    const isRefuse = isRefuseUntilQuarantinedCandidate(filePath, candidateIdentity)
+    if (lockoutAbort || isBacklog || isRefuse) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        lockoutAbort
+          ? `scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`
+          : isBacklog
+            ? `scan-watcher: startup backlog candidate quarantined — ${maskScanName(filename)}`
+            : `scan-watcher: refuse-delivery candidate quarantined — ${maskScanName(filename)}`,
+        isBacklog ? 'startup backlog' : 'refuse-delivery',
+      )
       return
     }
 
@@ -749,22 +869,26 @@ export async function processCandidate(
     }
     scanCandidateTestHooks.afterLease?.()
     if (abortDeliveryIfScanInputLockout(capturedGeneration)) {
-      try {
-        globalDirectoryBaseline.remove(filename)
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`)
-      } catch (e) {
-        err(
-          `scan-watcher: startup backlog quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
-        )
-      }
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        `scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`,
+      )
       return
     }
 
     if (!lease) {
-      globalDirectoryBaseline.remove(filename)
-      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-      warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`)
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        `scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`,
+      )
       return
     }
 
@@ -774,18 +898,26 @@ export async function processCandidate(
     // ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID: an unparsable notBefore cannot prove
     // the file is newer than the waiting task; fail closed and quarantine.
     if (!Number.isFinite(leaseNotBeforeMs)) {
-      globalDirectoryBaseline.remove(filename)
-      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-      warn(
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
         `scan-watcher: scan lease notBefore is invalid; refusing delivery, moved to _unclaimed — code=${SCAN_LEASE_NOT_BEFORE_INVALID}`,
       )
       return
     }
     const closingLiveNames = requireLiveBasenames(scanWatchFolder)
     if (!closingLiveNames) {
-      globalDirectoryBaseline.remove(filename)
-      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-      warn(`scan-watcher: unknown scan-folder listing; refusing delivery — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        `scan-watcher: unknown scan-folder listing; refusing delivery — code=${SCAN_INPUT_RESTART_REQUIRED}`,
+      )
       return
     }
     // ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE: a capture opened under waiting task A
@@ -801,15 +933,16 @@ export async function processCandidate(
       isPreExistingCandidate(finalSnapshot, lease.notBefore)
       || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
     if (foreignCapture || preExistingCapture) {
-      globalDirectoryBaseline.remove(filename)
-      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-      if (foreignCapture && !preExistingCapture) {
-        warn(
-          `scan-watcher: capture lineage belongs to a different waiting task; refusing cross-session bind, moved to _unclaimed — code=${SCAN_CAPTURE_FOREIGN_LEASE}`,
-        )
-      } else {
-        warn(`scan-watcher: candidate file existed prior to scan lease start; refusing pre-existing file binding, moved to _unclaimed — ${maskScanName(filename)}`)
-      }
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        foreignCapture && !preExistingCapture
+          ? `scan-watcher: capture lineage belongs to a different waiting task; refusing cross-session bind, moved to _unclaimed — code=${SCAN_CAPTURE_FOREIGN_LEASE}`
+          : `scan-watcher: candidate file existed prior to scan lease start; refusing pre-existing file binding, moved to _unclaimed — ${maskScanName(filename)}`,
+      )
       return
     }
 
@@ -846,15 +979,25 @@ export async function processCandidate(
       }
       const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       if (code === 'NO_WAITING_SCAN_TASK') {
-        globalDirectoryBaseline.remove(filename)
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
       if (code === 'SCAN_LEASE_INVALID' || code === 'SCAN_LEASE_EXPIRED') {
-        globalDirectoryBaseline.remove(filename)
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: scan lease invalid or expired; moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: scan lease invalid or expired; moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -868,8 +1011,14 @@ export async function processCandidate(
       // 必须像 NO_WAITING_SCAN_TASK 一样立即隔离，绝不重试；日志措辞与两个既有 _unclaimed
       // 归宿（无等待任务 / 重试超时）分别不同，避免运维排查时混淆三种不同的原因。
       if (code === 'SCAN_TASK_STATE_CHANGED') {
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -880,20 +1029,38 @@ export async function processCandidate(
       // 风险（重试会被匹配到该终端当前 waiting 任务，可能已经属于另一个用户）——
       // 同样必须立即隔离，不重试。
       if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
       if (code === 'SCAN_FILE_PREVIOUSLY_ATTEMPTED') {
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: file content was previously attempted but not completed; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: file content was previously attempted but not completed; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
       if (code === 'SCAN_FILE_STALE_CAPTURE') {
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: file capture is stale for current session; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: file capture is stale for current session; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -909,15 +1076,15 @@ export async function processCandidate(
         // 文件在此期间消失（已被其它路径处理/删除）——无需再决定去留。
       }
       if (mtimeMs !== undefined && Date.now() - mtimeMs > DELIVERY_RETRY_MAX_MS) {
-        try {
-          finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-          warn(
-            `scan-watcher: delivery retry timeout exceeded (idle ${formatDuration(Date.now() - mtimeMs)}), ` +
-              `abandoning retries and moved to _unclaimed — ${maskScanName(filename)}`,
-          )
-        } catch (moveErr) {
-          err(`scan-watcher: failed to quarantine file after retry timeout — ${maskScanName(filename)}: ${axiosErrorMessage(moveErr)}`)
-        }
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: delivery retry timeout exceeded (idle ${formatDuration(Date.now() - mtimeMs)}), ` +
+            `abandoning retries and moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -1338,6 +1505,8 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   globalDirectoryBaseline.clear()
   startupBacklogPaths.clear()
   startupBacklogIdentities.length = 0
+  refuseUntilQuarantinedPaths.clear()
+  refuseUntilQuarantinedIdentities.length = 0
 
   const next: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,

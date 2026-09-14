@@ -44,7 +44,12 @@ import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.d
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
-import { runScanLeaseContractTests, runUnackedLeaseContractCase } from './scan-lease-contract.helper'
+import {
+  runScanLeaseContractTests,
+  runUnackedLeaseContractCase,
+  runDeliverWithoutAckNegativeCase,
+  runDeliverCasAckExpiryRaceCase,
+} from './scan-lease-contract.helper'
 
 function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): void {
   execFileSync(
@@ -235,6 +240,29 @@ function assertLeaseRequiresDeliveryAck(apiRoot: string): void {
   assert.ok(
     /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(body),
     'getScanDeliveryLease() must hard-require deliveryAckedAt: { not: null }'
+  )
+}
+
+const DELIVER_CAS_ACK_EXPIRY_BLOCK = `    const claimed = await this.prisma.scanTask.updateMany({
+      where: {
+        id: task.id,
+        terminalId: args.terminalId,
+        status: 'waiting',
+        deliveryAckedAt: { not: null },
+        expiresAt: { gt: now },
+        createdAt: task.createdAt,
+      },`
+
+function assertDeliverCasRepinsAckAndExpiry(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  assert.ok(
+    source.includes('ATOMIC_SCAN_DELIVER_CAS_ACK_EXPIRY'),
+    'deliver CAS must declare ACK/expiry re-pin'
+  )
+  assert.equal(
+    source.includes(DELIVER_CAS_ACK_EXPIRY_BLOCK),
+    true,
+    'final deliver CAS must re-pin deliveryAckedAt not null and expiresAt > now'
   )
 }
 
@@ -683,6 +711,7 @@ function statusMatches(current: string, matcher: StatusMatcher): boolean {
 class FakePrisma {
   private seq = 1
   private txMutex: Promise<void> = Promise.resolve()
+  onBeforeUpdateMany?: () => void
   readonly scanTasksById = new Map<string, StoredScanTask>()
   readonly filesById = new Map<string, StoredFileObject>()
   readonly terminals = new Map<
@@ -900,11 +929,12 @@ class FakePrisma {
         retryAuthorityExpiresAt?: { gt: Date }
         updatedAt?: { gt?: Date; lt?: Date }
         expiresAt?: { lte?: Date; gt?: Date }
-        createdAt?: { lte?: Date }
+        createdAt?: Date | { lte?: Date }
         deliveryAckedAt?: Date | null | { not: null }
       }
       data: Partial<StoredScanTask>
     }) => {
+      this.onBeforeUpdateMany?.()
       const matches = Array.from(this.scanTasksById.values()).filter((t) => {
         if (where.id !== undefined && t.id !== where.id) return false
         if (where.status !== undefined && !statusMatches(t.status, where.status)) return false
@@ -955,7 +985,9 @@ class FakePrisma {
           !(t.expiresAt.getTime() > where.expiresAt.gt.getTime())
         )
           return false
-        if (
+        if (where.createdAt instanceof Date) {
+          if (t.createdAt.getTime() !== where.createdAt.getTime()) return false
+        } else if (
           where.createdAt?.lte !== undefined &&
           !(t.createdAt.getTime() <= where.createdAt.lte.getTime())
         )
@@ -1078,6 +1110,8 @@ function wrapServiceForTest(service: ScanTasksService): ScanTasksService {
       // Historical deliver tests omit lease and predate the ACK gate. Arm the
       // current waiting row only on this convenience path so they still exercise
       // deliverScanFile(); getScanDeliveryLease itself stays fail-closed.
+      // ACK-gate tests MUST pass exact scanTaskId + signed lease and must not
+      // use this auto-ACK convenience (see runDeliverWithoutAckNegativeCase).
       const prisma = (service as unknown as {
         prisma: {
           scanTask: {
@@ -2362,9 +2396,55 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
   )
 }
 
+function verifyDeliverCasAckExpiryMutationMakesRaceNonzero(): void {
+  const servicePath = path.join(__dirname, '..', 'src', 'scan-tasks', 'scan-tasks.service.ts')
+  const original = readFileSync(servicePath, 'utf8')
+  assert.equal(
+    original.includes(DELIVER_CAS_ACK_EXPIRY_BLOCK),
+    true,
+    'deliver CAS ACK/expiry block must exist before reverse mutation'
+  )
+  const mutated = original.replace(
+    DELIVER_CAS_ACK_EXPIRY_BLOCK,
+    `    const claimed = await this.prisma.scanTask.updateMany({
+      where: { id: task.id, status: 'waiting' },`
+  )
+  assert.notEqual(mutated, original, 'dropping deliver CAS ACK/expiry pins must actually change scan-tasks.service.ts')
+  try {
+    writeFileSync(servicePath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && path.resolve(process.argv[1]) !== path.resolve(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--deliver-cas-ack-race')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: path.join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping deliver CAS ACK/expiry pins must make the race case nonzero\n${output}`)
+    assert.match(
+      output,
+      /ACK race must not transition waiting to matched|deliver CAS must fail closed when ACK is cleared/,
+      `mutated deliver CAS test must fail on the ACK race, not an unrelated error\n${output}`
+    )
+    console.log('PASS deliver CAS ACK/expiry reverse mutation: ACK race becomes nonzero')
+  } finally {
+    writeFileSync(servicePath, original)
+  }
+  assert.equal(readFileSync(servicePath, 'utf8'), original, 'deliver CAS reverse mutation must restore scan-tasks.service.ts')
+}
+
 async function main(): Promise<void> {
   if (process.argv.includes('--unacked-lease-ack-filter')) {
     await runUnackedLeaseContractCase()
+    return
+  }
+  if (process.argv.includes('--deliver-cas-ack-race')) {
+    await runDeliverWithoutAckNegativeCase()
+    await runDeliverCasAckExpiryRaceCase()
     return
   }
 
@@ -2374,8 +2454,10 @@ async function main(): Promise<void> {
   assertDeliverScanFileRequiresBidirectionalLineage(apiRootForContracts)
   assertDeliveryAckMigrationContracts(apiRootForContracts)
   assertLeaseRequiresDeliveryAck(apiRootForContracts)
+  assertDeliverCasRepinsAckAndExpiry(apiRootForContracts)
   assertLeaseAckFilterReverseMutation(apiRootForContracts)
   verifyLeaseAckFilterMutationMakesUnackedCaseNonzero()
+  verifyDeliverCasAckExpiryMutationMakesRaceNonzero()
 
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
 

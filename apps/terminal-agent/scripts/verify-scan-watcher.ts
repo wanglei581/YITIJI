@@ -40,6 +40,8 @@ import {
   runRecycledInodeGenerationTests,
   runStartupBacklogGenerationPipelineTest,
   runVanishedPredecessorNewCaptureTest,
+  runForeignNoLeasePreExistingQuarantineFailureTests,
+  runUnprovableIdentityFailClosedTests,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -135,6 +137,24 @@ function verifySourceStructure(): void {
     /ATOMIC_SCAN_CAPTURE_IDENTITY_FLIGHT/,
     'proven same-inode captures must single-flight before any lease await',
   )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY_FLIGHT/,
+    'unprovable identity must take a reserved identity-flight key',
+  )
+  assert.match(source, /ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY/, 'unprovable lstat identity must fail closed in processCandidate')
+  assert.match(source, /ATOMIC_SCAN_CAPTURE_QUARANTINE_KEEP_LINEAGE/, 'quarantine must keep lineage until the move succeeds')
+  {
+    const helperStart = source.indexOf('function tryQuarantineKeepingLineage')
+    const helperEnd = source.indexOf('export function getScanLifecycleExclusiveStatsForTest')
+    assert.ok(helperStart >= 0 && helperEnd > helperStart, 'tryQuarantineKeepingLineage must exist')
+    const helperBody = source.slice(helperStart, helperEnd)
+    const markIdx = helperBody.indexOf('markRefuseUntilQuarantined')
+    const moveIdx = helperBody.indexOf('finalizeCandidate')
+    const removeIdx = helperBody.indexOf('globalDirectoryBaseline.remove')
+    assert.ok(markIdx >= 0 && moveIdx > markIdx, 'never-deliver mark must be recorded before the quarantine move')
+    assert.ok(removeIdx > moveIdx, 'must not drop the only observation before a successful quarantine move')
+  }
   {
     const procStart = source.indexOf('export async function processCandidate')
     const procEnd = source.indexOf('export function sweepUnclaimedDir')
@@ -207,7 +227,7 @@ function verifySourceStructure(): void {
   assert.match(source, /const startupBacklogIdentities:\s*ScanCaptureFileIdentity\[\]\s*=\s*\[\]/, 'must track startup leftover identities so rename cannot escape by basename')
   assert.match(source, /ATOMIC_SCAN_STARTUP_BACKLOG_GENERATION/, 'startup leftover matching must use capture generation, not the flight key')
   assert.match(source, /isStartupBacklogCandidate\(filePath, candidateIdentity\)/, 'processCandidate must treat renamed startup leftovers as backlog')
-  assert.match(source, /forgetStartupBacklog\(filePath, candidateIdentity\)/, 'must clear path and inode backlog marks upon successful quarantine')
+  assert.match(source, /forgetStartupBacklog\(filePath, identity\)/, 'must clear path and inode backlog marks upon successful quarantine')
   assert.match(source, /ATOMIC_STARTUP_BACKLOG_IDENTITY/, 'startup premark must record directory-entry identity')
   {
     const isolateStart = source.indexOf('export async function isolateStartupBacklog')
@@ -1113,9 +1133,12 @@ const CAPTURE_LEASE_LINEAGE_MUTATED = `    const foreignCapture = false
 const NOT_BEFORE_VALID_BLOCK = `    // ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID: an unparsable notBefore cannot prove
     // the file is newer than the waiting task; fail closed and quarantine.
     if (!Number.isFinite(leaseNotBeforeMs)) {
-      globalDirectoryBaseline.remove(filename)
-      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-      warn(
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
         \`scan-watcher: scan lease notBefore is invalid; refusing delivery, moved to _unclaimed — code=\${SCAN_LEASE_NOT_BEFORE_INVALID}\`,
       )
       return
@@ -1542,6 +1565,127 @@ function verifyUnknownLiveListingMutationMakesFailClosedNonzero(): void {
   assert.equal(readFileSync(watcherPath, 'utf8'), original, 'unknown live listing reverse mutation must restore scan-watcher.ts')
 }
 
+const QUARANTINE_KEEP_LINEAGE_BLOCK = `  markRefuseUntilQuarantined(filePath, identity)
+  try {
+    finalizeCandidate(filePath, scanWatchFolder, filename, trusted, 'quarantine')
+    globalDirectoryBaseline.remove(filename)
+    forgetRefuseUntilQuarantined(filePath, identity)
+    forgetStartupBacklog(filePath, identity)`
+
+const QUARANTINE_KEEP_LINEAGE_MUTATED = `  try {
+    globalDirectoryBaseline.remove(filename)
+    finalizeCandidate(filePath, scanWatchFolder, filename, trusted, 'quarantine')
+    forgetRefuseUntilQuarantined(filePath, identity)
+    forgetStartupBacklog(filePath, identity)`
+
+function verifyQuarantineKeepLineageMutationMakesRetryNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(QUARANTINE_KEEP_LINEAGE_BLOCK), true, 'quarantine keep-lineage block must exist before reverse mutation')
+  const mutated = original.replace(QUARANTINE_KEEP_LINEAGE_BLOCK, QUARANTINE_KEEP_LINEAGE_MUTATED)
+  assert.notEqual(mutated, original, 'dropping keep-lineage quarantine must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--nolease-eacces-quarantine')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing lineage-before-move must make no-lease EACCES retry nonzero\n${output}`)
+    assert.match(
+      output,
+      /null-opening lineage observation|never-deliver marker|retry sweeps must NEVER|zero lease\/delivery|NEVER deliver/,
+      `mutated keep-lineage test must fail on lost lineage or retry delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS quarantine keep-lineage reverse mutation: no-lease EACCES retry becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'keep-lineage reverse mutation must restore scan-watcher.ts')
+}
+
+const UNPROVABLE_IDENTITY_BLOCK = `    if (!openingIdentity) {
+      // ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY: ino===0 / missing lstat identity
+      // cannot prove sameness. Lock out (restart required), quarantine or refuse,
+      // and never let concurrent path keys bypass identity-flight.
+      if (identityFlight.previous) await identityFlight.previous
+      const alreadyLocked = globalScanDeliveryBarrier.getState() === 'locked_out'
+      globalScanDeliveryBarrier.lockOut('identity_unavailable')
+      if (!alreadyLocked) {
+        warn(\`scan-watcher: unprovable capture identity — code=\${SCAN_INPUT_RESTART_REQUIRED}\`)
+      }
+      markRefuseUntilQuarantined(filePath, undefined)
+      const liveNames = requireLiveBasenames(scanWatchFolder)
+      if (liveNames) {
+        globalDirectoryBaseline.bindCapture(
+          filename,
+          Date.now(),
+          null,
+          liveNames,
+          undefined,
+          (name) => liveNameIdentity(scanWatchFolder, name),
+        )
+      }
+      try {
+        if (existsSync(filePath) && classifyScanInputCandidate(initial) === 'accepted' && initial.nlink === 1) {
+          const verifiedUnprovable = readVerifiedCandidate(filePath, scanWatchFolder, filename, initial)
+          tryQuarantineKeepingLineage(
+            filePath,
+            scanWatchFolder,
+            filename,
+            verifiedUnprovable.trustedWindowsCandidate,
+            undefined,
+            \`scan-watcher: unprovable capture identity quarantined — code=\${SCAN_INPUT_RESTART_REQUIRED}\`,
+          )
+        }
+      } catch (e) {
+        err(
+          \`scan-watcher: refuse-delivery quarantine retry failed — code=\${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}\`,
+        )
+      }
+      return
+    }`
+
+function verifyUnprovableIdentityMutationMakesConcurrentNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(UNPROVABLE_IDENTITY_BLOCK), true, 'unprovable identity block must exist before reverse mutation')
+  const mutated = original.replace(UNPROVABLE_IDENTITY_BLOCK, '')
+  assert.notEqual(mutated, original, 'dropping unprovable identity lockout must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--unprovable-identity')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping unprovable identity lockout must make concurrent ino===0 test nonzero\n${output}`)
+    assert.match(
+      output,
+      /unprovable ino===0 must NEVER (?:request a scan lease|deliver)/,
+      `mutated unprovable-identity test must fail on lease/delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS unprovable identity reverse mutation: concurrent ino===0 test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'unprovable identity reverse mutation must restore scan-watcher.ts')
+}
+
 async function main(): Promise<void> {
   if (process.argv.includes('--scan-input-lockout')) {
     await runLockoutUntilRestartSafetyTest()
@@ -1591,6 +1735,14 @@ async function main(): Promise<void> {
     await runNullOpeningOverlappingInodeRenameTests()
     return
   }
+  if (process.argv.includes('--nolease-eacces-quarantine')) {
+    await runForeignNoLeasePreExistingQuarantineFailureTests()
+    return
+  }
+  if (process.argv.includes('--unprovable-identity')) {
+    await runUnprovableIdentityFailClosedTests()
+    return
+  }
   verifySourceStructure()
   verifyUnclaimedCleanup()
   await verifyRetryCapExpired()
@@ -1621,6 +1773,8 @@ async function main(): Promise<void> {
   verifyStartupBacklogIdentityMutationMakesRenameNonzero()
   verifyInvalidNotBeforeMutationMakesFailClosedNonzero()
   verifyUnknownLiveListingMutationMakesFailClosedNonzero()
+  verifyQuarantineKeepLineageMutationMakesRetryNonzero()
+  verifyUnprovableIdentityMutationMakesConcurrentNonzero()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

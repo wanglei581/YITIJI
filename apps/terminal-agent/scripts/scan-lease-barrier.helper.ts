@@ -24,6 +24,7 @@ import {
   finalizeCandidate,
   sweepFolder,
   isStartupBacklogCandidate,
+  isRefuseUntilQuarantinedCandidate,
   clearStartupBacklogForTest,
   noteScanInputUnavailableForTest,
   noteScanWatcherRebuildForTest,
@@ -56,8 +57,10 @@ import {
   beginScanCaptureIdentityFlight,
   getScanCaptureIdentityFlightClaimCountForTest,
   resetScanCaptureIdentityFlightsForTest,
+  setScanCaptureIdentityInoForTest,
   isSameScanCaptureFile,
   scanCaptureFileIdentity,
+  SCAN_INPUT_RESTART_REQUIRED,
 } from '../src/agent/scan-candidate-barrier'
 import type { AgentConfig } from '../src/agent/types'
 
@@ -382,8 +385,7 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
 
       const unknownA = beginScanCaptureIdentityFlight(undefined)
       const unknownB = beginScanCaptureIdentityFlight(undefined)
-      assert.equal(unknownA.previous, undefined, 'unknown identity cannot take a flight')
-      assert.equal(unknownB.previous, undefined, 'unknown identity flights must not serialize each other')
+      assert.equal(unknownB.previous !== undefined, true, 'unprovable identity must take the reserved flight so concurrent path keys cannot bypass')
       unknownA.release()
       unknownB.release()
       resetScanCaptureIdentityFlightsForTest()
@@ -902,6 +904,9 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
   await runNullOpeningOverlappingInodeRenameTests()
   await runOverlappingStartupBacklogRaceTest()
   await runScanInputLockoutTests()
+  await runForeignNoLeasePreExistingQuarantineFailureTests()
+  await runUnprovableIdentityFailClosedTests()
+  await runDistinctProvenFilesRemainConcurrentTest()
 
   console.log('PASS scan lease barrier helper checks')
 }
@@ -2883,4 +2888,271 @@ export async function runScanInputLockoutTests(): Promise<void> {
   await runIsolateStartupBacklogIdentityMissingLockoutTest()
   await runStartScanWatcherInitialHealthLockoutTest()
   await runSecondaryStartBlockedAcrossStatesTest()
+}
+
+async function startSwitchableLeaseServer(): Promise<{
+  baseUrl: string
+  close: () => Promise<void>
+  leaseCount: () => number
+  deliverCount: () => number
+  serveWaitingTaskB: () => void
+}> {
+  let leaseCount = 0
+  let deliverCount = 0
+  let serveB = false
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        leaseCount += 1
+        if (!serveB) {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({
+            statusCode: 409,
+            error: { code: 'NO_WAITING_SCAN_TASK', message: '当前终端没有等待扫描的任务' },
+          }))
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'task_B',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 5_000).toISOString(),
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            deliveryLease: 'lease_B_after_failed_quarantine',
+          },
+        }))
+        return
+      }
+      if (req.method === 'POST' && req.url?.includes('/scan-sessions/deliver')) {
+        deliverCount += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true, data: { scanTaskId: 'task_B', fileId: 'leaked' } }))
+        return
+      }
+      res.writeHead(404)
+      res.end()
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(typeof address === 'object' && address)
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}/api/v1`,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+    leaseCount: () => leaseCount,
+    deliverCount: () => deliverCount,
+    serveWaitingTaskB: () => { serveB = true },
+  }
+}
+
+export async function runForeignNoLeasePreExistingQuarantineFailureTests(): Promise<void> {
+  // 1) No-lease observation + EACCES quarantine: lineage/never-deliver must survive
+  // later add/sweep once task B is waiting. Zero lease/delivery on every retry sweep.
+  {
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+    const backend = await startSwitchableLeaseServer()
+    const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-nolease-eacces-'))
+    const filename = 'nolease-secret.pdf'
+    const secret = '%PDF-1.4 NOLEASE-EACCES-MUST-NOT-DELIVER'
+    const filePath = join(scanFolder, filename)
+    const unclaimedDir = join(scanFolder, '_unclaimed')
+    const config = makeHelperConfig(backend.baseUrl, scanFolder)
+    try {
+      beginScanWatchSessionForTest()
+      await isolateStartupBacklog(scanFolder)
+      mkdirSync(unclaimedDir, { recursive: true })
+      chmodSync(unclaimedDir, 0o555)
+      writeFileSync(filePath, secret)
+
+      const { stderr: firstStderr } = await captureLogsAsync(async () => {
+        await processCandidate(filePath, filename, config)
+      })
+      const leasesAfterFirst = backend.leaseCount()
+      assert.equal(existsSync(filePath), true, 'EACCES quarantine must leave the no-lease file in place')
+      assert.equal(existsSync(join(unclaimedDir, filename)), false)
+      assert.equal(
+        globalDirectoryBaseline.isForeignToLease(filename, 'task_B', new Set([filename])),
+        true,
+        'failed no-lease quarantine must retain the null-opening lineage observation',
+      )
+      assert.equal(
+        isRefuseUntilQuarantinedCandidate(filePath),
+        true,
+        'failed no-lease quarantine must retain the never-deliver marker',
+      )
+      assert.match(firstStderr, /quarantine retry failed — code=EACCES/)
+      assert.doesNotMatch(firstStderr, /nolease-secret\.pdf/)
+      assert.doesNotMatch(firstStderr, /NOLEASE-EACCES-MUST-NOT-DELIVER/)
+      assert.equal(backend.deliverCount(), 0)
+
+      backend.serveWaitingTaskB()
+      const { stderr: sweepStderr } = await captureLogsAsync(async () => {
+        await sweepFolder(scanFolder, config)
+        await sweepFolder(scanFolder, config)
+      })
+      assert.equal(backend.leaseCount(), leasesAfterFirst, 'retry sweeps must NEVER request another scan lease')
+      assert.equal(backend.deliverCount(), 0, 'retry sweeps must NEVER deliver after failed no-lease quarantine')
+      assert.equal(existsSync(filePath), true)
+      assert.equal(isRefuseUntilQuarantinedCandidate(filePath), true)
+      assert.match(sweepStderr, /quarantine retry failed — code=EACCES/)
+      assert.doesNotMatch(sweepStderr, /NOLEASE-EACCES-MUST-NOT-DELIVER/)
+
+      chmodSync(unclaimedDir, 0o755)
+      await captureLogsAsync(async () => {
+        await sweepFolder(scanFolder, config)
+      })
+      assert.equal(backend.leaseCount(), leasesAfterFirst, 'successful quarantine sweep must still NEVER request a lease')
+      assert.equal(backend.deliverCount(), 0)
+      assert.equal(existsSync(filePath), false)
+      assert.equal(existsSync(join(unclaimedDir, filename)), true)
+      assert.equal(isRefuseUntilQuarantinedCandidate(filePath), false)
+      console.log('PASS no-lease EACCES quarantine: lineage retained, zero lease/delivery across retry sweeps')
+    } finally {
+      try { chmodSync(unclaimedDir, 0o755) } catch {}
+      await backend.close()
+      rmSync(scanFolder, { recursive: true, force: true })
+      clearStartupBacklogForTest()
+      globalDirectoryBaseline.clear()
+    }
+  }
+
+  // 2) Pre-existing file + EACCES quarantine, then later waiting task still 0 lease/delivery.
+  {
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+    const backend = await startCountingLeaseServer()
+    const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-preexisting-eacces-'))
+    const filename = 'preexisting-secret.pdf'
+    const secret = '%PDF-1.4 PREEXISTING-EACCES-MUST-NOT-DELIVER'
+    const filePath = join(scanFolder, filename)
+    const unclaimedDir = join(scanFolder, '_unclaimed')
+    const config = makeHelperConfig(backend.baseUrl, scanFolder)
+    try {
+      beginScanWatchSessionForTest()
+      await isolateStartupBacklog(scanFolder)
+      mkdirSync(unclaimedDir, { recursive: true })
+      chmodSync(unclaimedDir, 0o555)
+      writeFileSync(filePath, secret)
+      const past = new Date(Date.now() - 60 * 60 * 1000)
+      utimesSync(filePath, past, past)
+
+      await captureLogsAsync(async () => {
+        await processCandidate(filePath, filename, config)
+      })
+      const leasesAfterFirst = backend.leaseCount()
+      assert.equal(existsSync(filePath), true, 'EACCES quarantine must leave the pre-existing file in place')
+      assert.equal(isRefuseUntilQuarantinedCandidate(filePath), true)
+      assert.equal(backend.deliverCount(), 0)
+
+      await captureLogsAsync(async () => {
+        await sweepFolder(scanFolder, config)
+        await processCandidate(filePath, filename, config)
+      })
+      assert.equal(backend.leaseCount(), leasesAfterFirst, 'pre-existing EACCES retry must NEVER request another lease')
+      assert.equal(backend.deliverCount(), 0, 'pre-existing EACCES retry must NEVER deliver')
+      assert.equal(existsSync(filePath), true)
+
+      chmodSync(unclaimedDir, 0o755)
+      await captureLogsAsync(async () => {
+        await sweepFolder(scanFolder, config)
+      })
+      assert.equal(backend.deliverCount(), 0)
+      assert.equal(existsSync(join(unclaimedDir, filename)), true)
+      console.log('PASS pre-existing EACCES quarantine: never-deliver retained, zero delivery across retry sweeps')
+    } finally {
+      try { chmodSync(unclaimedDir, 0o755) } catch {}
+      await backend.close()
+      rmSync(scanFolder, { recursive: true, force: true })
+      clearStartupBacklogForTest()
+      globalDirectoryBaseline.clear()
+    }
+  }
+}
+
+export async function runUnprovableIdentityFailClosedTests(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+  setScanCaptureIdentityInoForTest(0)
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-unprovable-ino-'))
+  const aName = 'unprovable-a.pdf'
+  const bName = 'unprovable-b.pdf'
+  const aPath = join(scanFolder, aName)
+  const bPath = join(scanFolder, bName)
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(aPath, '%PDF-1.4 UNPROVABLE-A-MUST-NOT-DELIVER')
+    writeFileSync(bPath, '%PDF-1.4 UNPROVABLE-B-MUST-NOT-DELIVER')
+
+    const { stdout, stderr } = await captureLogsAsync(async () => {
+      await Promise.all([
+        processCandidate(aPath, aName, config),
+        processCandidate(bPath, bName, config),
+      ])
+    })
+    assert.equal(backend.leaseCount(), 0, 'unprovable ino===0 must NEVER request a scan lease')
+    assert.equal(backend.deliverCount(), 0, 'unprovable ino===0 must NEVER deliver')
+    assert.equal(getScanInputStateForTest(), 'locked_out')
+    assert.equal(getScanInputLockOutReasonForTest(), 'identity_unavailable')
+    assert.match(`${stdout}\n${stderr}`, new RegExp(SCAN_INPUT_RESTART_REQUIRED))
+    assert.equal(
+      getScanCaptureIdentityFlightClaimCountForTest() >= 2,
+      true,
+      'concurrent unprovable path keys must still claim identity-flight',
+    )
+
+    await sweepFolder(scanFolder, config)
+    assert.equal(backend.leaseCount(), 0, 'locked-out unprovable retry must NEVER request a lease')
+    assert.equal(backend.deliverCount(), 0, 'locked-out unprovable retry must NEVER deliver')
+    console.log('PASS unprovable ino===0 identity: lockout, reserved flight, zero lease/delivery')
+  } finally {
+    setScanCaptureIdentityInoForTest(undefined)
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runDistinctProvenFilesRemainConcurrentTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+  const backend = await startCountingLeaseServer()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-distinct-proven-'))
+  const aName = 'proven-a.pdf'
+  const bName = 'proven-b.pdf'
+  const aPath = join(scanFolder, aName)
+  const bPath = join(scanFolder, bName)
+  const config = makeHelperConfig(backend.baseUrl, scanFolder)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(aPath, '%PDF-1.4 PROVEN-A')
+    writeFileSync(bPath, '%PDF-1.4 PROVEN-B')
+    const aId = scanCaptureFileIdentity(lstatSync(aPath).dev, lstatSync(aPath).ino, lstatSync(aPath).birthtimeMs)
+    const bId = scanCaptureFileIdentity(lstatSync(bPath).dev, lstatSync(bPath).ino, lstatSync(bPath).birthtimeMs)
+    assert.ok(aId && bId, 'distinct proven files must have provable identities')
+    assert.equal(isSameScanCaptureFile(aId, bId), false, 'the two files must be distinct directory entries')
+
+    await Promise.all([
+      processCandidate(aPath, aName, config),
+      processCandidate(bPath, bName, config),
+    ])
+    assert.equal(backend.deliverCount(), 2, 'distinct proven files must still deliver concurrently')
+    assert.equal(existsSync(aPath), false)
+    assert.equal(existsSync(bPath), false)
+    assert.equal(getScanInputStateForTest(), 'running')
+    console.log('PASS distinct proven files remain concurrent and still deliver')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
 }

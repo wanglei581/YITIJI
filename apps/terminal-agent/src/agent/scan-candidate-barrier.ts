@@ -39,19 +39,6 @@ interface ScanCaptureObservation {
   identity?: ScanCaptureFileIdentity
 }
 
-/** Non-zero ino is a real directory-entry id; 0/missing cannot prove sameness. */
-export function scanCaptureFileIdentity(
-  dev: number,
-  ino: number,
-  birthtimeMs?: number,
-): ScanCaptureFileIdentity | undefined {
-  if (!Number.isFinite(dev) || !Number.isFinite(ino) || ino === 0) return undefined
-  if (birthtimeMs === undefined || !Number.isFinite(birthtimeMs) || birthtimeMs <= 0) {
-    return { dev, ino }
-  }
-  return { dev, ino, birthtimeMs }
-}
-
 export function isSameScanCaptureFile(
   a: ScanCaptureFileIdentity | undefined,
   b: ScanCaptureFileIdentity | undefined,
@@ -95,19 +82,64 @@ interface ScanCaptureIdentityFlightEntry {
 
 const scanCaptureIdentityFlights = new Map<string, ScanCaptureIdentityFlightEntry>()
 let scanCaptureIdentityFlightClaims = 0
+/** Reserved flight key so ino===0 / missing identity cannot bypass via concurrent path keys. */
+const UNPROVABLE_SCAN_CAPTURE_FLIGHT_KEY = '__unprovable__'
+let scanCaptureIdentityInoForTest: number | undefined
 
 /**
- * Single-flight for a proven directory entry. Callers must invoke this
- * synchronously after lstat and before any lease await so a same-inode
- * rename cannot bind a later task while the opening observation is in flight.
- * Unknown identity (ino === 0 / missing) cannot prove sameness: this is a
- * no-op, not a Windows/SMB proof.
+ * Test-only: force scanCaptureFileIdentity to treat every lstat as this ino.
+ * `0` reproduces Windows/SMB unprovable identity. `undefined` restores real ino.
+ */
+export function setScanCaptureIdentityInoForTest(ino: number | undefined): void {
+  scanCaptureIdentityInoForTest = ino
+}
+
+/** Non-zero ino is a real directory-entry id; 0/missing cannot prove sameness. */
+export function scanCaptureFileIdentity(
+  dev: number,
+  ino: number,
+  birthtimeMs?: number,
+): ScanCaptureFileIdentity | undefined {
+  const effectiveIno = scanCaptureIdentityInoForTest !== undefined ? scanCaptureIdentityInoForTest : ino
+  if (!Number.isFinite(dev) || !Number.isFinite(effectiveIno) || effectiveIno === 0) return undefined
+  if (birthtimeMs === undefined || !Number.isFinite(birthtimeMs) || birthtimeMs <= 0) {
+    return { dev, ino: effectiveIno }
+  }
+  return { dev, ino: effectiveIno, birthtimeMs }
+}
+
+/**
+ * Single-flight for a directory entry. Callers must invoke this synchronously
+ * after lstat and before any lease await so a same-inode rename cannot bind a
+ * later task while the opening observation is in flight.
+ * Unprovable identity (ino === 0 / missing) cannot prove sameness, so it takes
+ * a reserved flight key: concurrent path keys must not bypass the flight.
+ * processCandidate must still lock out and refuse delivery for that capture.
  */
 export function beginScanCaptureIdentityFlight(
   identity: ScanCaptureFileIdentity | undefined,
 ): ScanCaptureIdentityFlight {
   if (!identity) {
-    return { previous: undefined, release() {} }
+    // ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY_FLIGHT: ino===0/missing cannot
+    // prove sameness, but concurrent path keys must still single-flight.
+    scanCaptureIdentityFlightClaims += 1
+    const key = UNPROVABLE_SCAN_CAPTURE_FLIGHT_KEY
+    const previous = scanCaptureIdentityFlights.get(key)?.done
+    let released = false
+    let resolve!: () => void
+    const done = new Promise<void>((r) => { resolve = r })
+    scanCaptureIdentityFlights.set(key, { done, resolve })
+    return {
+      previous,
+      release() {
+        if (released) return
+        released = true
+        resolve()
+        if (scanCaptureIdentityFlights.get(key)?.done === done) {
+          scanCaptureIdentityFlights.delete(key)
+        }
+      },
+    }
   }
   scanCaptureIdentityFlightClaims += 1
   // ATOMIC_SCAN_CAPTURE_IDENTITY_FLIGHT: proven dev/ino is owned before any
@@ -139,6 +171,7 @@ export function resetScanCaptureIdentityFlightsForTest(): void {
   for (const entry of scanCaptureIdentityFlights.values()) entry.resolve()
   scanCaptureIdentityFlights.clear()
   scanCaptureIdentityFlightClaims = 0
+  scanCaptureIdentityInoForTest = undefined
 }
 
 /**

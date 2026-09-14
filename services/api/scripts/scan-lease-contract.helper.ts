@@ -43,6 +43,7 @@ export class ScanContractTestPrisma {
   scanTasksById = new Map<string, FakeTask>()
   fileObjectsById = new Map<string, { id: string; sha256: string }>()
   private counter = 1
+  onBeforeUpdateMany?: () => void
 
   readonly $transaction = async <T>(callback: (tx: this) => Promise<T>): Promise<T> => callback(this)
 
@@ -139,13 +140,17 @@ export class ScanContractTestPrisma {
       where: {
         id: string
         status?: string | { in: string[] }
+        terminalId?: string
         deliveryAckedAt?: Date | null | { not: null }
         expiresAt?: { gt: Date }
+        createdAt?: Date | { lte?: Date }
       }
       data: Partial<FakeTask>
     }) => {
+      this.onBeforeUpdateMany?.()
       const task = this.scanTasksById.get(where.id)
       if (!task) return { count: 0 }
+      if (where.terminalId !== undefined && task.terminalId !== where.terminalId) return { count: 0 }
       if (where.status !== undefined) {
         const matches = typeof where.status === 'string' ? task.status === where.status : where.status.in.includes(task.status)
         if (!matches) return { count: 0 }
@@ -161,6 +166,18 @@ export class ScanContractTestPrisma {
         return { count: 0 }
       }
       if (where.expiresAt?.gt !== undefined && !(task.expiresAt.getTime() > where.expiresAt.gt.getTime())) {
+        return { count: 0 }
+      }
+      if (where.createdAt instanceof Date && task.createdAt.getTime() !== where.createdAt.getTime()) {
+        return { count: 0 }
+      }
+      if (
+        where.createdAt &&
+        typeof where.createdAt === 'object' &&
+        !(where.createdAt instanceof Date) &&
+        where.createdAt.lte !== undefined &&
+        !(task.createdAt.getTime() <= where.createdAt.lte.getTime())
+      ) {
         return { count: 0 }
       }
       const updated = { ...task, ...data, updatedAt: new Date() }
@@ -520,5 +537,126 @@ export async function runScanLeaseContractTests(): Promise<void> {
     )
   }
 
+  await runDeliverAckGateTests()
   console.log('PASS scan lease contract helper checks')
+}
+
+export async function runDeliverWithoutAckNegativeCase(): Promise<void> {
+  const { service, prisma } = makeContractHarness()
+  const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+  const stored = prisma.scanTasksById.get(task.scanTaskId)!
+  assert.equal(stored.deliveryAckedAt, null, 'negative deliver-without-ACK must start from a real unacked row')
+  const mixedVersionLease = buildScanDeliveryLease({
+    terminalId: 't_1',
+    scanTaskId: task.scanTaskId,
+    taskCreatedAt: stored.createdAt,
+    taskExpiresAt: stored.expiresAt,
+  })
+  await assert.rejects(
+    async () =>
+      service.deliverScanFile({
+        terminalId: 't_1',
+        scanTaskId: task.scanTaskId,
+        deliveryLease: mixedVersionLease.deliveryLease,
+        buffer: Buffer.from('%PDF-1.4 unacked mixed-version'),
+        filename: 'unacked.pdf',
+        mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
+      }),
+    (err: unknown) => leaseRejectCode(err) === 'NO_WAITING_SCAN_TASK',
+    'mixed-version signed lease must not deliver an unacked waiting task',
+  )
+  const after = prisma.scanTasksById.get(task.scanTaskId)!
+  assert.equal(after.status, 'waiting', 'unacked deliver must not leave waiting')
+  assert.equal(after.fileId, null, 'unacked deliver must not bind a file')
+}
+
+export async function runDeliverCasAckExpiryRaceCase(): Promise<void> {
+  const { service, prisma } = makeContractHarness()
+  const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+  await ackCreatedTask(service, task)
+  const lease = await service.getScanDeliveryLease('t_1')
+  prisma.onBeforeUpdateMany = () => {
+    const row = prisma.scanTasksById.get(task.scanTaskId)
+    if (row) row.deliveryAckedAt = null
+  }
+  await assert.rejects(
+    async () =>
+      service.deliverScanFile({
+        terminalId: 't_1',
+        scanTaskId: task.scanTaskId,
+        deliveryLease: lease.deliveryLease,
+        buffer: Buffer.from('%PDF-1.4 raced-unack'),
+        filename: 'raced-unack.pdf',
+        mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
+      }),
+    (err: unknown) => leaseRejectCode(err) === 'SCAN_TASK_STATE_CHANGED',
+    'deliver CAS must fail closed when ACK is cleared between read and CAS',
+  )
+  const afterAckRace = prisma.scanTasksById.get(task.scanTaskId)!
+  assert.equal(afterAckRace.status, 'waiting', 'ACK race must not transition waiting to matched')
+  assert.equal(afterAckRace.fileId, null)
+
+  const { service: service2, prisma: prisma2 } = makeContractHarness()
+  const task2 = await service2.create({ scanType: 'document', terminalId: 't_1' }, null)
+  await ackCreatedTask(service2, task2)
+  const lease2 = await service2.getScanDeliveryLease('t_1')
+  prisma2.onBeforeUpdateMany = () => {
+    const row = prisma2.scanTasksById.get(task2.scanTaskId)
+    if (row) row.expiresAt = new Date(Date.now() - 1000)
+  }
+  await assert.rejects(
+    async () =>
+      service2.deliverScanFile({
+        terminalId: 't_1',
+        scanTaskId: task2.scanTaskId,
+        deliveryLease: lease2.deliveryLease,
+        buffer: Buffer.from('%PDF-1.4 raced-expiry'),
+        filename: 'raced-expiry.pdf',
+        mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
+      }),
+    (err: unknown) => leaseRejectCode(err) === 'SCAN_TASK_STATE_CHANGED',
+    'deliver CAS must fail closed when expiresAt elapses between read and CAS',
+  )
+  const afterExpiryRace = prisma2.scanTasksById.get(task2.scanTaskId)!
+  assert.equal(afterExpiryRace.status, 'waiting', 'expiry race must not transition waiting to matched')
+  assert.equal(afterExpiryRace.fileId, null)
+}
+
+export async function runDeliverAckGateTests(): Promise<void> {
+  await runDeliverWithoutAckNegativeCase()
+
+  {
+    const { service, prisma } = makeContractHarness()
+    const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await ackCreatedTask(service, task)
+    const stored = prisma.scanTasksById.get(task.scanTaskId)!
+    stored.deliveryAckedAt = null
+    const rolledBackLease = buildScanDeliveryLease({
+      terminalId: 't_1',
+      scanTaskId: task.scanTaskId,
+      taskCreatedAt: stored.createdAt,
+      taskExpiresAt: stored.expiresAt,
+    })
+    await assert.rejects(
+      async () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          scanTaskId: task.scanTaskId,
+          deliveryLease: rolledBackLease.deliveryLease,
+          buffer: Buffer.from('%PDF-1.4 rollback-unack'),
+          filename: 'rollback.pdf',
+          mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
+        }),
+      (err: unknown) => leaseRejectCode(err) === 'NO_WAITING_SCAN_TASK',
+      'rollback-style null ACK must not deliver even with a still-valid signed lease',
+    )
+    assert.equal(prisma.scanTasksById.get(task.scanTaskId)?.status, 'waiting')
+  }
+
+  await runDeliverCasAckExpiryRaceCase()
+  console.log('PASS deliver ACK gate: unacked/mixed-version/rollback/CAS race fail closed')
 }
