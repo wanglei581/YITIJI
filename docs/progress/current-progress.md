@@ -1,5 +1,58 @@
 # 当前开发进度
 
+2026-09-15 **401 会话失效也要走清场收尾闸：确认之前不许跳回登录页（Kiosk 侧，分支
+`integration/scan-pickup-closeout-r3-20260915`，基线 `5561f4ea8`）**。仅改 `apps/kiosk/**`
+与本文件，未触碰 `services/api/**`、Terminal Agent、小程序、Admin / Partner、schema、
+工作流、生产配置与密钥。**未推送 / 未开 PR / 未合并 / 未部署。**
+
+过程如实记录：本轮第一次调用 Claude **超时中断**，当时工作树里已留下 6 个暂存文件 + 1 个未暂存
+的 Playwright 用例、HEAD 仍是 `5561f4ea8`。后续一次调用以那份工作树为唯一现状接着做完自审、
+反向变异与收尾，没有重做，也没有改写任何既有提交。
+
+修的缺陷（Agy 冷审查提出）：`AuthContext` 的 `onMemberSessionExpired` 处置在 `logout()` 之后
+**同一句就** `window.location.assign('/login?from=…')`。`logout()` 只是把要撤的那一场交给
+`beginScanSessionCleanup`，撤销本身是异步重试；那句硬跳转把重试连同执行环境一起干掉，这条路
+退化成 `pagehide` 的一次 keepalive beacon。弱网丢包 + 离开那一刻还在飞的投递确认成功 =
+服务端留下一条 `deliveryAckedAt` 非空、仍 `waiting` 的任务，可租赁到自然过期 —— 下一位扫出来的
+文件投给已经走掉的上一位。这是 2026-09-15 那条收尾闸没堵上的最后一个出口。
+
+改法（新增 `src/auth/memberSessionExpiryExit.ts`，复用既有 `whenScanCleanupSettled`，不另起第二套
+闸）：本机 PII / 令牌 / 登录态仍由 `logout()` **同步**清掉，一个网络往返都不等；变的只是回登录页
+那一步 —— 没有待清理扫描会话时 `whenScanCleanupSettled` 同步执行（一帧都不多等），有待清理会话时
+只在服务端确认撤销、或走到服务端给的 `expiresAt` 之后才跳。5xx / 断网 / 403 未走完 fallback 一律
+不算确认。生命周期上钉死三条：只有 `login()`（这一位换了有效令牌）有资格作废一次已登记的跳转，
+`logout()` 与 effect cleanup 都不撤销；重复 401 / StrictMode / 卸载都不重复跳；跳转地址只由
+站内安全回跳 helper 生成，不带令牌 / 控制凭据 / 任务号，也不写存储与 history。
+
+顺带修掉一条七周前就红了的测试：`scripts/tests/fusion-w6-contract.test.mjs` 仍断言验证器输出里的
+`86/86 routes` —— 那是 2026-07-25 那天 main 的路由条数快照，验证器早在 ebd9b9ba7（#1012）连同
+`PRODUCTION_ROUTE_QUOTA` 一起改成了集合相等。现在它改钉真实不变量（router 声明 ≡ 冻结的
+route manifest，重定向同理），不钉任何条数、不钉 check 文案，并自带阴性对照。**未恢复固定配额，
+也未放宽 `verify-fusion-w6.mjs`。**
+
+证据口径 —— 全部 LOCAL（本机 macOS 开发环境），SOURCE 为本工作树 `apps/kiosk/**`：
+Kiosk `typecheck` 0；`eslint src/` 0 error（17 warning，与改动前同数）；
+`verify:member-session-closure` 0（新增 3 条断言：AuthProvider 不得再有硬跳转、出口模块必须
+「先同步清本机再挂到收尾闸」、只有 `login()` 能作废待办跳转）；`verify:scan-session-truth` 0；
+`verify:ci-gate-coverage` 0；`verify:kiosk-browser-spec-coverage` 0；
+`verify:kiosk-frontend-debt` 0；`verify:contract-review-session` / `verify:job-material-library-ui` /
+`verify:profile-print-orders-login-smoke` 0；
+`node --test apps/kiosk/scripts/tests/*.test.mjs` 155/155（含新增 `member-session-expiry-exit.test.mjs`
+13 条真闸行为测试、修好的 `fusion-w6-contract.test.mjs` 3 条）；
+Playwright privacy 套件 1080×1920 **36/36**（35 条既有回归 + 1 条新增 401 用例，逐条 API 夹具、
+无 catch-all，未注册请求仍由 ApiRouter fail-closed）。
+
+反向变异（已实际执行，均以退出码为准，变异未提交）：把出口模块里的 `whenScanCleanupSettled`
+等待删掉、退回「`logout()` 之后立刻硬跳转」—— `node --test member-session-expiry-exit.test.mjs`
+exit 1（13 条挂 8 条），同一条 Playwright 401 用例 exit 1；恢复实现后两者分别 exit 0（13/13）与
+exit 0（1/1）。门禁侧另做两次源码变异：`logout()` 重新撤销待办跳转、`login()` 不再撤销，
+`verify:member-session-closure` 均 exit 1，恢复后 exit 0。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；本轮**没有任何 CI 运行**（结论只能说
+「本地通过」，不能说 CI 通过）；Windows 一体机、Terminal Agent、奔图 CM2800 真机与生产环境这一轮
+**一次都没有碰过**，不构成真机、生产或商用可用性结论。`fusion-w6-contract.test.mjs` 目前仍未进
+CI 执行闭包（接线需要改 `.github/workflows/ci.yml`，本轮禁止改工作流），这一条仍是欠账。
+
 2026-09-15 **清场收尾闸：服务端确认上一场扫描已取消之前，一体机不许换人（Kiosk 侧，分支
 `claude/kiosk-hardclear-failclosed-20260915`，基线 `206568f23`）**。仅改 `apps/kiosk/**`，
 未触碰 `services/api/**`、Terminal Agent、小程序、schema、生产配置与密钥，未推送 / 未开 PR。

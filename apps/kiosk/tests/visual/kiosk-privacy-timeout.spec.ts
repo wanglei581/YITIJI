@@ -1721,6 +1721,93 @@ test('a delivery ack that lands mid-clear still ends with a confirmed cancel @pr
   }, { timeout: 10_000 }).toBeNull()
 })
 
+/* 会员会话失效（401）那条出口 —— 它是清场链路上最后一个绕过收尾闸的口子。
+ *
+ * 缺陷原样（2026-09-15，Agy 冷审查）：AuthContext 在 `logout()` 之后**同一句就**
+ * `window.location.assign('/login?from=…')`。`logout()` 只是把要撤的那一场交给
+ * `beginScanSessionCleanup`，撤销本身是异步重试；那句硬跳转把重试连同执行环境一起
+ * 干掉，这条路退化成 `pagehide` 的一次 keepalive beacon —— 发一次，回执一律吞掉。
+ * 弱网丢包 + 离开那一刻还在飞的投递确认成功 = 服务端留下一条已确认、仍 waiting 的任务，
+ * 可投递到自然过期，下一位在面板上扫出来的文件投给已经走掉的上一位。
+ *
+ * 判据和上面三条完全一致：**服务端确认之前，那一步不许发生。** 这里的「那一步」
+ * 是回登录页的硬跳转，不是重载 / 进屏保，但后果是同一个 —— 机器交出去了。 */
+test('an expired member session waits for the confirmed cancel before leaving for /login @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  registerMemberLogin(api)
+  api.respond('POST', '/api/v1/member/auth/logout', {
+    status: 200,
+    json: { success: true, data: { loggedOut: true } },
+  })
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 200,
+    json: { success: true, data: { items: [], total: 0 } },
+  })
+  /* 「我的」一挂载就去读待办。把这一次**按在半路**，等扫描会话种好了再放它回来带 401
+   * —— 这才是真正触发会员会话失效广播的那一发（isMemberSessionInvalidError 要求
+   * 请求确实带了会员令牌）。逐条用例精确注册这一个路径，不挂 catch-all：
+   * 一条通配会把「第几次、带不带令牌」这些正要钉的事悄悄抹平。 */
+  let releaseExpiry: (() => void) | undefined
+  const expiryReleased = new Promise<void>((resolve) => { releaseExpiry = resolve })
+  let pendingTaskCalls = 0
+  let pendingTaskAuthorization: string | undefined
+  await routeExact(page, 'GET', '/api/v1/me/pending-tasks', async (route) => {
+    pendingTaskCalls += 1
+    pendingTaskAuthorization = route.request().headers().authorization
+    await expiryReleased
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'MEMBER_SESSION_EXPIRED', message: '登录已过期' } }),
+    })
+  })
+  const revoke = await gatedRevokeEndpoint(page)
+  const revokes = recordScanRevokes(page)
+
+  await loginThroughVisibleUi(page, '/profile')
+  await expect.poll(() => pendingTaskCalls).toBe(1)
+  expect(pendingTaskAuthorization).toBe(`Bearer ${MEMBER_TOKEN}`)
+  // 页内写入，不重载：会员令牌只在内存里，page.goto 会把这一位用户丢掉。
+  await seedLiveScanSession(page)
+
+  /* 这套件把隐私空闲压到了 3 秒（VITE_KIOSK_PRIVACY_IDLE_SEC=3）。本用例要观察的是
+   * **401 这条出口**，所以观察窗口内持续制造活动，别让隐私硬清场插进来 —— 它会走
+   * clearSessionTo，自己登记一条重载出口，最后跳的是 '/' 而不是 '/login'，
+   * 断言就测不到想测的东西了。 */
+  const awake = setInterval(() => { void page.mouse.move(540, 960).catch(() => undefined) }, 700)
+  try {
+    releaseExpiry?.()
+
+    // 1) 401 一到，本机这一份立刻清干净：登录态没了，扫描登记也没了，都不等网络。
+    await expect(page.getByTestId('profile-state-signed-out')).toBeVisible()
+    await expect
+      .poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SCAN_WORKBENCH_KEY))
+      .toBeNull()
+
+    // 2) 撤销带的是**正在失效的这位**的令牌（带错身份服务端只回 403，任务原地存活）。
+    await revoke.received(0)
+    await expect.poll(() => revokes().length).toBeGreaterThan(0)
+    expect(revokes()[0]?.authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
+    expect(revokes()[0]?.['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+
+    // 3) 服务端还没给结论：机器不许交出去，硬跳转一次都不许发生。
+    expect(new URL(page.url()).pathname).toBe('/profile')
+    revoke.release(0, 'server-error')
+    await revoke.received(1)
+    expect(new URL(page.url()).pathname).toBe('/profile')
+
+    // 4) 拿到确认，这一刻才轮到下一位 —— 并且回登录页的地址里不带任何凭据。
+    revoke.release(1, 'cancelled')
+    await page.waitForURL((url) => url.pathname === '/login', { timeout: 20_000 })
+  } finally {
+    clearInterval(awake)
+  }
+  const target = page.url()
+  expect(target).not.toContain(MEMBER_TOKEN)
+  expect(target).not.toContain(SCAN_CONTROL_TOKEN)
+  expect(target).not.toContain(SCAN_TASK_ID)
+})
+
 test('a member login cannot start a scan while the previous one is still being cancelled @privacy-kiosk', async ({ page, api }) => {
   registerKioskShell(api)
   registerMemberLogin(api)

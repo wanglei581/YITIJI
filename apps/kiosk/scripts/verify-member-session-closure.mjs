@@ -143,13 +143,64 @@ assert(
 
 assert(
   authContext.includes('onMemberSessionExpired') &&
-    authContext.includes('logout()') &&
-    authContext.includes('sessionExpiredRedirectingRef') &&
-    authContext.includes('!isLoginPath(window.location.pathname)') &&
-    authContext.includes('window.location.assign(loginPathForCurrentLocation())') &&
+    authContext.includes('sessionExpiryExit.expire(logout)') &&
     !authContext.includes('resetMemberAuthDevice') &&
     authContext.includes('userRef.current?.token !== failedToken'),
-  'AuthProvider 订阅会员 API 失效事件，只清空仍匹配失败 token 的内存会话，不重置风控 deviceId，并安全回到登录页',
+  'AuthProvider 订阅会员 API 失效事件，只清空仍匹配失败 token 的内存会话，不重置风控 deviceId，并把回登录页这一步交给 401 出口',
+)
+
+/* ── 401 之后不许绕过清场收尾闸（2026-09-15，P1）────────────────────────────
+ *
+ * 缺陷原样：`logout()` 只是把要撤的那一场**交给** `beginScanSessionCleanup`，
+ * 撤销本身是异步重试；紧接着那句 `window.location.assign()` 把重试连同执行环境一起
+ * 干掉，这条路退化成 `pagehide` 的一次 keepalive beacon。弱网丢包 + 离开那一刻还在飞的
+ * 投递确认（ACK）成功 = 服务端留下一条已确认、仍 waiting 的任务，可投递到自然过期 ——
+ * 下一位在面板上扫出来的文件投给已经走掉的上一位（跨用户串件）。
+ *
+ * 所以 AuthContext 自己不许再持有那句硬跳转：它必须整条交给 memberSessionExpiryExit，
+ * 由后者挂在 `whenScanCleanupSettled` 上。这两条一起钉，缺一条都能悄悄绕回去 ——
+ * 只钉「出口模块里有 whenScanCleanupSettled」的话，AuthContext 里再补一句 assign 照样绿。
+ *
+ * 行为本身（5xx / 断网 / 403 不放行、确认或自然过期之后只放行一次、本机清场不等网络）
+ * 由 scripts/tests/member-session-expiry-exit.test.mjs 跑真闸断言，源码断言证明不了。 */
+assert(
+  !/window\.location\.(assign|replace|href)/.test(authContext),
+  'AuthProvider 里不许再出现硬跳转：401 的出口必须整条走 memberSessionExpiryExit，否则会绕过清场收尾闸',
+)
+
+/* 谁有资格作废一次已经登记的跳转 —— 这条闸守的是三个具体的回归：
+ *   · `logout()` 撤销它 = 手工登出 / 隐私清场会把这一位停在一张过期页面上，既登不回去
+ *     也走不掉（旧代码那一句 `sessionExpiredRedirectingRef.current = false` 原本只影响
+ *     「下一次 401 还能不能跳」，搬到待办跳转上就变成了撤销，语义完全不同）；
+ *   · effect cleanup 撤销它 = terminalId 换了、<AuthProvider key> 重挂之后，这一位
+ *     再也回不到登录页；
+ *   · `login()` **不**撤销它 = 刚登进来的人会被上一次过期的跳转踢出去。 */
+const authLoginBlock = authContext.slice(
+  authContext.indexOf('const login = useCallback'),
+  authContext.indexOf('const logout = useCallback'),
+)
+const authAfterLogin = authContext.slice(authContext.indexOf('const logout = useCallback'))
+assert(
+  authLoginBlock.includes('sessionExpiryExit.cancel()') &&
+    !authAfterLogin.includes('sessionExpiryExit.cancel()'),
+  '只有 login() 作废待办的 401 跳转：logout() 与 effect cleanup 都不许撤销一条必须走完的跳转',
+)
+
+const sessionExpiryExit = read('src/auth/memberSessionExpiryExit.ts')
+assert(
+  /clearLocalSession\(\)[\s\S]*?whenScanCleanupSettled\(\(\) => \{[\s\S]*?window\.location\.assign\(loginPath\)/.test(
+    sessionExpiryExit,
+  ),
+  '401 出口顺序：本机会话先同步清掉（不等网络），回登录页那一步挂在清场收尾闸上',
+)
+assert(
+  sessionExpiryExit.includes('!isLoginPath(window.location.pathname)') &&
+    sessionExpiryExit.includes('const loginPath = loginPathForCurrentLocation()'),
+  '401 出口仍然拒绝登录页自循环，并且目的地只由站内安全回跳 helper 生成',
+)
+assert(
+  !/sessionStorage|localStorage|document\.cookie|history\.(pushState|replaceState)/.test(sessionExpiryExit),
+  '401 出口不许把令牌 / 控制凭据 / 任务号写进任何浏览器存储或 history',
 )
 
 assert(
