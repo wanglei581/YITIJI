@@ -289,7 +289,7 @@ const startupBacklogIdentities = new Set<string>()
 function readStartupBacklogFileIdentity(filePath: string): ScanCaptureFileIdentity | undefined | 'unknown' {
   try {
     const metadata = lstatSync(filePath)
-    return scanCaptureFileIdentity(metadata.dev, metadata.ino) ?? 'unknown'
+    return scanCaptureFileIdentity(metadata.dev, metadata.ino, metadata.birthtimeMs) ?? 'unknown'
   } catch (error) {
     const code = (error as NodeJS.ErrnoException | undefined)?.code
     if (code === 'ENOENT') return undefined
@@ -417,7 +417,7 @@ function requireLiveBasenames(scanWatchFolder: string): Set<string> | undefined 
 function liveNameIdentity(scanWatchFolder: string, name: string): ScanCaptureFileIdentity | undefined {
   try {
     const metadata = lstatSync(join(scanWatchFolder, name))
-    return scanCaptureFileIdentity(metadata.dev, metadata.ino)
+    return scanCaptureFileIdentity(metadata.dev, metadata.ino, metadata.birthtimeMs)
   } catch {
     return undefined
   }
@@ -597,13 +597,13 @@ export async function processCandidate(
     }
 
     const initial = snapshotCandidate(filePath, filename)
-    const openingIdentity = scanCaptureFileIdentity(initial.dev, initial.ino)
+    const openingIdentity = scanCaptureFileIdentity(initial.dev, initial.ino, initial.birthtimeMs)
     identityFlight = beginScanCaptureIdentityFlight(openingIdentity)
     if (identityFlight.previous) {
       await identityFlight.previous
       if (!existsSync(filePath)) return
       const resumed = snapshotCandidate(filePath, filename)
-      if (isSameScanCaptureFile(openingIdentity, scanCaptureFileIdentity(resumed.dev, resumed.ino)) !== true) {
+      if (isSameScanCaptureFile(openingIdentity, scanCaptureFileIdentity(resumed.dev, resumed.ino, resumed.birthtimeMs)) !== true) {
         return
       }
     }
@@ -688,7 +688,7 @@ export async function processCandidate(
     // 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
     // 后续 sweep 仅重试安全隔离；成功后清理标记；失败需高严重度但不泄露文件名/内容。
     const lockoutAbort = abortDeliveryIfScanInputLockout(capturedGeneration)
-    const candidateIdentity = scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino)
+    const candidateIdentity = scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino, finalSnapshot.birthtimeMs)
     const isBacklog = isStartupBacklogCandidate(filePath, candidateIdentity)
     if (lockoutAbort || isBacklog) {
       try {
@@ -1148,7 +1148,7 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     try {
       const snapshot = snapshotCandidate(fullPath, name)
       if (classifyScanInputCandidate(snapshot) !== 'accepted' || snapshot.nlink !== 1) {
-        const sweepIdentity = scanCaptureFileIdentity(snapshot.dev, snapshot.ino)
+        const sweepIdentity = scanCaptureFileIdentity(snapshot.dev, snapshot.ino, snapshot.birthtimeMs)
         const sweepFlight = beginScanCaptureIdentityFlight(sweepIdentity)
         try {
           if (sweepFlight.previous) await sweepFlight.previous
@@ -1249,7 +1249,7 @@ export async function isolateStartupBacklog(scanWatchFolder: string): Promise<nu
       const verified = readVerifiedCandidate(fullPath, folder, name, finalSnapshot)
       globalDirectoryBaseline.remove(name)
       finalizeCandidate(fullPath, folder, name, verified.trustedWindowsCandidate, 'quarantine')
-      forgetStartupBacklog(fullPath, scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino))
+      forgetStartupBacklog(fullPath, scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino, finalSnapshot.birthtimeMs))
       warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(name)}`)
       quarantined += 1
     } catch (e) {

@@ -56,6 +56,8 @@ import {
   beginScanCaptureIdentityFlight,
   getScanCaptureIdentityFlightClaimCountForTest,
   resetScanCaptureIdentityFlightsForTest,
+  isSameScanCaptureFile,
+  scanCaptureFileIdentity,
 } from '../src/agent/scan-candidate-barrier'
 import type { AgentConfig } from '../src/agent/types'
 
@@ -99,6 +101,48 @@ async function captureLogsAsync(fn: () => Promise<void>): Promise<{ stdout: stri
     process.stderr.write = originalStderr
   }
   return { stdout, stderr }
+}
+
+export function runRecycledInodeGenerationTests(): void {
+  const now = Date.now()
+  const recycled = new ScanDirectoryBaseline()
+  recycled.recordObservation('job.tmp', now, 'task_A', { dev: 1, ino: 10, birthtimeMs: 1000 })
+  recycled.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf']), { dev: 1, ino: 10, birthtimeMs: 2000 })
+  assert.equal(
+    recycled.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])),
+    false,
+    'recycled inode with a new birthtime must not inherit A',
+  )
+  const renamedBirth = new ScanDirectoryBaseline()
+  renamedBirth.recordObservation('job.tmp', now, 'task_A', { dev: 1, ino: 10, birthtimeMs: 1000 })
+  renamedBirth.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf']), { dev: 1, ino: 10, birthtimeMs: 1000 })
+  assert.equal(
+    renamedBirth.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])),
+    true,
+    'same inode and birthtime is a rename and must stay foreign to B',
+  )
+
+  assert.equal(
+    isSameScanCaptureFile(
+      { dev: 1, ino: 10, birthtimeMs: 1000 },
+      { dev: 1, ino: 10, birthtimeMs: 2000 },
+    ),
+    false,
+    'recycled inode with a proven-new birthtime is a new directory entry',
+  )
+  assert.equal(
+    isSameScanCaptureFile(
+      { dev: 1, ino: 10, birthtimeMs: 1000 },
+      { dev: 1, ino: 10, birthtimeMs: 1000 },
+    ),
+    true,
+    'same inode and birthtime is a rename of the same capture',
+  )
+  assert.equal(
+    isSameScanCaptureFile({ dev: 1, ino: 10 }, { dev: 1, ino: 10, birthtimeMs: 2000 }),
+    true,
+    'missing birthtime cannot prove a new generation; fail-closed to same capture',
+  )
 }
 
 export async function runScanLeaseBarrierTests(): Promise<void> {
@@ -188,6 +232,7 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
       false,
       'vanished stem with no live successor is dropped before a later B capture',
     )
+    runRecycledInodeGenerationTests()
 
     const transferred = new ScanDirectoryBaseline()
     transferred.recordObservation('job.tmp', now, 'task_A', sameEntry)
@@ -1222,20 +1267,32 @@ export async function runLateCrossSessionCaptureTests(): Promise<void> {
       const orphanPdf = 'reuse-orphan.pdf'
       writeFileSync(join(scanFolder, orphanTmp), 'orphan under A')
       const orphanStat = lstatSync(join(scanFolder, orphanTmp))
+      const orphanIdentity = scanCaptureFileIdentity(orphanStat.dev, orphanStat.ino, orphanStat.birthtimeMs)
       globalDirectoryBaseline.recordObservation(
         orphanTmp,
         Date.now(),
         'task_A',
-        { dev: orphanStat.dev, ino: orphanStat.ino },
+        orphanIdentity,
       )
       unlinkSync(join(scanFolder, orphanTmp))
       writeFileSync(join(scanFolder, orphanPdf), '%PDF-1.4 later B capture after A tmp vanished')
       const orphanPdfStat = lstatSync(join(scanFolder, orphanPdf))
-      assert.notEqual(
+      const laterIdentity = scanCaptureFileIdentity(
+        orphanPdfStat.dev,
         orphanPdfStat.ino,
-        orphanStat.ino,
-        'orphan reuse fixture must be a new directory entry',
+        orphanPdfStat.birthtimeMs,
       )
+      // Linux may recycle the inode number; that is not the same directory entry.
+      // A proven-new birthtime is a new capture generation. If the filesystem
+      // cannot prove that (missing birthtime), close the vanished observation
+      // with no live successor — the same path finishVanishedCapture takes.
+      if (isSameScanCaptureFile(orphanIdentity, laterIdentity) !== false) {
+        assert.equal(
+          globalDirectoryBaseline.closeVanishedCapture(orphanTmp, new Set(), () => undefined),
+          undefined,
+          'vanished A tmp with no live successor must close rather than wait for inode reuse',
+        )
+      }
       await processCandidate(join(scanFolder, orphanPdf), orphanPdf, makeHelperConfig(baseUrl, scanFolder))
       assert.equal(deliverTaskIds.length, 2, 'later B capture after vanished A tmp must deliver')
       assert.equal(existsSync(join(scanFolder, orphanPdf)), false)

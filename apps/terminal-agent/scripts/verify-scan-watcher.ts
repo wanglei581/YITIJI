@@ -37,6 +37,7 @@ import {
   runStartupBacklogTempRenameTest,
   runNullOpeningInodeRenameTests,
   runNullOpeningOverlappingInodeRenameTests,
+  runRecycledInodeGenerationTests,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -116,6 +117,11 @@ function verifySourceStructure(): void {
     barrierSource,
     /ATOMIC_SCAN_CAPTURE_INODE_LINEAGE/,
     'same-inode rename must inherit opening task across stem changes',
+  )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_INODE_GENERATION/,
+    'recycled inode with a proven-new birthtime must not inherit',
   )
   assert.match(
     barrierSource,
@@ -1239,6 +1245,63 @@ const INODE_LINEAGE_MUTATED = `      if (captureNameStem(name) !== stem) continu
       if (isSameScanCaptureFile(rec.identity, identity) === false) continue
       if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec`
 
+const INODE_GENERATION_BLOCK = `  if (a.dev !== b.dev || a.ino !== b.ino) return false
+  // ATOMIC_SCAN_CAPTURE_INODE_GENERATION: Linux may recycle the inode number
+  // after unlink. Proven-different birthtime is a new directory entry, not a
+  // rename of the same capture. Missing/zero birthtime cannot prove a new
+  // generation — fail-closed to same capture so a rename cannot bind to B.
+  const aBirth = a.birthtimeMs
+  const bBirth = b.birthtimeMs
+  if (
+    aBirth !== undefined
+    && bBirth !== undefined
+    && Number.isFinite(aBirth)
+    && Number.isFinite(bBirth)
+    && aBirth > 0
+    && bBirth > 0
+    && aBirth !== bBirth
+  ) {
+    return false
+  }
+  return true
+`
+
+const INODE_GENERATION_MUTATED = `  return a.dev === b.dev && a.ino === b.ino
+`
+
+function verifyInodeGenerationMutationMakesRecycledInodeNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(INODE_GENERATION_BLOCK), true, 'inode generation block must exist before reverse mutation')
+  const mutated = original.replace(INODE_GENERATION_BLOCK, INODE_GENERATION_MUTATED)
+  assert.notEqual(mutated, original, 'dropping birthtime generation check must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--recycled-inode-generation')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `ino-only identity must make recycled-inode generation test nonzero\n${output}`)
+    assert.match(
+      output,
+      /recycled inode with a new birthtime must not inherit A/,
+      `mutated inode generation test must fail on inheriting A, not an unrelated error\n${output}`,
+    )
+    console.log('PASS inode generation reverse mutation: recycled-inode test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'inode generation reverse mutation must restore scan-candidate-barrier.ts')
+}
+
 function verifyInodeLineageMutationMakesStemChangingRenameNonzero(): void {
   const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
   const original = readFileSync(barrierPath, 'utf8')
@@ -1447,6 +1510,10 @@ async function main(): Promise<void> {
     await runUnknownDirectoryListingFailClosedTest()
     return
   }
+  if (process.argv.includes('--recycled-inode-generation')) {
+    runRecycledInodeGenerationTests()
+    return
+  }
   if (process.argv.includes('--stem-changing-inode-rename')) {
     await runStemChangingInodeRenameTests()
     return
@@ -1486,6 +1553,7 @@ async function main(): Promise<void> {
   verifyEnterRunningGenerationMutationMakesIsolationTestNonzero()
   verifyCaptureLineageMutationMakesLateCrossSessionNonzero()
   verifyInodeLineageMutationMakesStemChangingRenameNonzero()
+  verifyInodeGenerationMutationMakesRecycledInodeNonzero()
   verifyNullOpeningMutationMakesRenameNonzero()
   verifyIdentityFlightMutationMakesOverlappingRenameNonzero()
   verifyStartupBacklogIdentityMutationMakesRenameNonzero()

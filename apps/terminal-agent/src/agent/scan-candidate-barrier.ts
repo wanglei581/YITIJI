@@ -29,6 +29,8 @@ export function captureNameStem(filename: string): string {
 export interface ScanCaptureFileIdentity {
   dev: number
   ino: number
+  /** Proven create generation. 0/missing cannot prove a recycled inode is new. */
+  birthtimeMs?: number
 }
 
 interface ScanCaptureObservation {
@@ -38,9 +40,16 @@ interface ScanCaptureObservation {
 }
 
 /** Non-zero ino is a real directory-entry id; 0/missing cannot prove sameness. */
-export function scanCaptureFileIdentity(dev: number, ino: number): ScanCaptureFileIdentity | undefined {
+export function scanCaptureFileIdentity(
+  dev: number,
+  ino: number,
+  birthtimeMs?: number,
+): ScanCaptureFileIdentity | undefined {
   if (!Number.isFinite(dev) || !Number.isFinite(ino) || ino === 0) return undefined
-  return { dev, ino }
+  if (birthtimeMs === undefined || !Number.isFinite(birthtimeMs) || birthtimeMs <= 0) {
+    return { dev, ino }
+  }
+  return { dev, ino, birthtimeMs }
 }
 
 export function isSameScanCaptureFile(
@@ -48,7 +57,25 @@ export function isSameScanCaptureFile(
   b: ScanCaptureFileIdentity | undefined,
 ): boolean | 'unknown' {
   if (!a || !b) return 'unknown'
-  return a.dev === b.dev && a.ino === b.ino
+  if (a.dev !== b.dev || a.ino !== b.ino) return false
+  // ATOMIC_SCAN_CAPTURE_INODE_GENERATION: Linux may recycle the inode number
+  // after unlink. Proven-different birthtime is a new directory entry, not a
+  // rename of the same capture. Missing/zero birthtime cannot prove a new
+  // generation — fail-closed to same capture so a rename cannot bind to B.
+  const aBirth = a.birthtimeMs
+  const bBirth = b.birthtimeMs
+  if (
+    aBirth !== undefined
+    && bBirth !== undefined
+    && Number.isFinite(aBirth)
+    && Number.isFinite(bBirth)
+    && aBirth > 0
+    && bBirth > 0
+    && aBirth !== bBirth
+  ) {
+    return false
+  }
+  return true
 }
 
 export function scanCaptureIdentityKey(identity: ScanCaptureFileIdentity): string {
@@ -135,9 +162,10 @@ export function resetScanCaptureIdentityFlightsForTest(): void {
  *      任何在当前任务租约开始前已经存在的文件（mtime 或 birthtime 早于 notBefore - 5s 容差），
  *      判定为上一会话残留的旧文件，直接移入 _unclaimed 隔离，绝不投递至当前新任务中。
  *    - 捕获血缘按本次 process 的 opening scanTaskId 绑定，不把 mtime 当用户身份，也不用
- *      模块级“最近租约”。同一目录项（rename，dev/ino 相同）跨 basename/stem 继承
- *      （job.pdf.tmp → job.pdf）；仅当 inode 无法证明时，同 stem 才 fail-closed 继承。
- *      隔离/删除后该条目关闭，文件名复用或不同 inode 不会继承已关闭捕获。
+ *      模块级“最近租约”。同一目录项（rename，dev/ino 相同且 birthtime 未证明不同）
+ *      跨 basename/stem 继承（job.pdf.tmp → job.pdf）；仅当 inode 无法证明时，
+ *      同 stem 才 fail-closed 继承。隔离/删除后该条目关闭，文件名复用、不同 inode、
+ *      或同 inode 但可证明的新 birthtime（内核复用）都不会继承已关闭捕获。
  *      notBefore 无法解析则 fail-closed。
  *    - 若 Agent 从未见过 A 期间的任何目录项（原子 create/rename 在 B 下才首次可见），被动
  *      SMB 无法证明归属；该物理歧义留给 Windows/奔图验收，不得声称完美归因。
