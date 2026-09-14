@@ -51,6 +51,7 @@ import { ScanTasksModule } from './scan-tasks/scan-tasks.module'
 import { PrintConversionModule } from './print-conversion/print-conversion.module'
 import { PrintSignModule } from './print-sign/print-sign.module'
 import { DeviceFleetModule } from './device-fleet/device-fleet.module'
+import { ConsoleScreenModule } from './console-screen/console-screen.module'
 import { OfflineAgenciesModule } from './offline-agencies/offline-agencies.module'
 import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
 import { HelpModule } from './help/help.module'
@@ -149,6 +150,7 @@ const redisUrl = process.env['REDIS_URL']
     PrintConversionModule,
     PrintSignModule,
     DeviceFleetModule,
+    ConsoleScreenModule,
     OfflineAgenciesModule,
     RecruitmentContentModule,
     KioskSessionModule,
