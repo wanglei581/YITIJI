@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import {
   SCREEN_CACHE_TTL_SECONDS,
+  SCREEN_UNAVAILABLE_REASON,
   type AdminScreenProfile,
   type ScreenAlertsValue,
   type ScreenSnapshot,
@@ -28,16 +29,10 @@ import {
   loadSyncSlice,
 } from './console-screen.queries'
 
-async function settle<T>(load: () => Promise<T>): Promise<Loaded<T>> {
-  try {
-    return { ok: true, value: await load() }
-  } catch {
-    return { ok: false }
-  }
-}
-
 @Injectable()
 export class ConsoleScreenService {
+  private readonly logger = new Logger(ConsoleScreenService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly fleet: DeviceFleetService,
@@ -50,7 +45,7 @@ export class ConsoleScreenService {
     const [realtime, counts, cumulative] = await Promise.all([
       this.cache.getOrLoad('admin:realtime', SCREEN_CACHE_TTL_SECONDS.realtime, () => this.loadAdminRealtime(now)),
       this.cache.getOrLoad('admin:counts', SCREEN_CACHE_TTL_SECONDS.counts, () => this.loadAdminCounts(now)),
-      this.cache.getOrLoad('admin:cumulative', SCREEN_CACHE_TTL_SECONDS.cumulative, () => settle(() => loadPrintCumulativeSlice(this.prisma, now))),
+      this.cache.getOrLoad('admin:cumulative', SCREEN_CACHE_TTL_SECONDS.cumulative, () => this.settle('printCumulative', () => loadPrintCumulativeSlice(this.prisma, now))),
     ])
     const all = assembleAdminMetrics({
       fleet: realtime.value.fleet,
@@ -99,13 +94,13 @@ export class ConsoleScreenService {
       this.cache.getOrLoad(
         `partner:${orgId}:realtime`,
         SCREEN_CACHE_TTL_SECONDS.realtime,
-        () => settle(() => loadPartnerFleet(this.prisma, now, orgId)),
+        () => this.settle('partnerFleet', () => loadPartnerFleet(this.prisma, now, orgId)),
       ),
       this.cache.getOrLoad(`partner:${orgId}:counts`, SCREEN_CACHE_TTL_SECONDS.counts, async () => {
         const [content, sync, fairs] = await Promise.all([
-          settle(() => loadContentSlice(this.prisma, now, orgId)),
-          settle(() => loadSyncSlice(this.prisma, now, orgId)),
-          settle(() => loadFairSlice(this.prisma, now, orgId)),
+          this.settle('partnerContent', () => loadContentSlice(this.prisma, now, orgId)),
+          this.settle('partnerSync', () => loadSyncSlice(this.prisma, now, orgId)),
+          this.settle('partnerFairs', () => loadFairSlice(this.prisma, now, orgId)),
         ])
         return { content, sync, fairs }
       }),
@@ -140,11 +135,23 @@ export class ConsoleScreenService {
     }
   }
 
+  private async settle<T>(slice: string, load: () => Promise<T>): Promise<Loaded<T>> {
+    try {
+      return { ok: true, value: await load() }
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError'
+      this.logger.warn(
+        `console_screen_slice_failed slice=${slice} reason=${SCREEN_UNAVAILABLE_REASON.sourceQueryFailed} errorName=${errorName}`,
+      )
+      return { ok: false, reason: SCREEN_UNAVAILABLE_REASON.sourceQueryFailed }
+    }
+  }
+
   private async loadAdminRealtime(now: Date) {
     const [fleet, alertsResult, printLive] = await Promise.all([
-      settle(() => this.fleet.getOverview()),
-      settle(() => this.ops.listDerivedAlerts('open', ALERT_LIST_LIMIT)),
-      settle(() => loadPrintLiveSlice(this.prisma, now)),
+      this.settle('adminFleet', () => this.fleet.getOverview()),
+      this.settle('adminAlerts', () => this.ops.listDerivedAlerts('open', ALERT_LIST_LIMIT)),
+      this.settle('adminPrintLive', () => loadPrintLiveSlice(this.prisma, now)),
     ])
     const alerts: Loaded<ScreenAlertsValue> = alertsResult.ok
       ? {
@@ -162,17 +169,17 @@ export class ConsoleScreenService {
             })),
           },
         }
-      : { ok: false }
+      : { ok: false, reason: alertsResult.reason }
     return { fleet, alerts, printLive }
   }
 
   private async loadAdminCounts(now: Date) {
     const [content, ai, sync, jumps, fairs] = await Promise.all([
-      settle(() => loadContentSlice(this.prisma, now)),
-      settle(() => loadAiSlice(this.prisma, now)),
-      settle(() => loadSyncSlice(this.prisma, now)),
-      settle(() => loadJumpRows(this.prisma, now)),
-      settle(() => loadFairSlice(this.prisma, now)),
+      this.settle('adminContent', () => loadContentSlice(this.prisma, now)),
+      this.settle('adminAi', () => loadAiSlice(this.prisma, now)),
+      this.settle('adminSync', () => loadSyncSlice(this.prisma, now)),
+      this.settle('adminJumps', () => loadJumpRows(this.prisma, now)),
+      this.settle('adminFairs', () => loadFairSlice(this.prisma, now)),
     ])
     return { content, ai, sync, jumps, fairs }
   }

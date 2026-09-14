@@ -66,12 +66,14 @@ export interface ScreenTerminalsOnlineValue {
   unknown: number
   neverReported: number
   onlineWindowSeconds: typeof SCREEN_ONLINE_WINDOW_SECONDS
+  sampledCount: number
+  matchedCount: number
+  truncated: boolean
+  sampleCap: number
 }
 
 export interface ScreenFleetWallValue extends ScreenTerminalsOnlineValue {
   cells: Array<{ health: ScreenFleetHealth }>
-  truncated: boolean
-  matchedCount: number
 }
 
 export interface ScreenPrintPagesValue {

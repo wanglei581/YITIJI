@@ -15,6 +15,7 @@ import {
 import {
   availableMetric,
   filterSourceEntryOpens,
+  PARTNER_FLEET_TAKE,
   unavailableMetric,
 } from './console-screen.metric'
 import type {
@@ -32,7 +33,10 @@ import type { ScreenMetric } from './console-screen.types'
 
 const MISSING_ORG = SCREEN_UNAVAILABLE_REASON.missingOrgIdOnAiAndOrders
 
-export type Loaded<T> = { ok: true; value: T } | { ok: false }
+export type SliceFailReason = typeof SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
+export type Loaded<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: SliceFailReason }
 
 function fromLoaded<T, U>(
   loaded: Loaded<T>,
@@ -41,7 +45,7 @@ function fromLoaded<T, U>(
   project: (value: T) => U,
 ): ScreenMetric<U> {
   if (!loaded.ok) {
-    return unavailableMetric(source, window, SCREEN_UNAVAILABLE_REASON.sourceQueryFailed)
+    return unavailableMetric(source, window, loaded.reason)
   }
   return availableMetric(source, window, project(loaded.value))
 }
@@ -171,6 +175,7 @@ export function assemblePartnerMetrics(input: {
     ? mapFleetOverview(input.fleet.value.overview, {
         matchedCount: input.fleet.value.matchedCount,
         truncated: input.fleet.value.truncated,
+        sampleCap: PARTNER_FLEET_TAKE,
       })
     : null
   const blocked = (source: string, reason: string) => unavailableMetric(source, 'current', reason)

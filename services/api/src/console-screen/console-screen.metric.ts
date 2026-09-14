@@ -15,6 +15,7 @@ const TZ_OFFSET_MS = 8 * 60 * 60 * 1000
 export const PRINT_TREND_DAY_COUNT = 14
 export const PRINT_TREND_ROW_CAP = 20_000
 export const PARTNER_FLEET_TAKE = 200
+export const JUMP_SOURCE_GROUP_TAKE = 32
 export const JUMP_LOOKBACK_DAYS = 30
 export const ALERT_LIST_LIMIT = 20
 const HOUR_MS = 60 * 60 * 1000

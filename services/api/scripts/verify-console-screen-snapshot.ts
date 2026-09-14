@@ -39,10 +39,11 @@ import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import { RedisService } from '../src/common/redis/redis.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
-import { AdminScreenController, PartnerScreenController } from '../src/console-screen/console-screen.controller'
+import { AdminScreenController } from '../src/console-screen/console-screen.admin.controller'
+import { PartnerScreenController } from '../src/console-screen/console-screen.partner.controller'
 import { ConsoleScreenService } from '../src/console-screen/console-screen.service'
-import { ScreenSnapshotCache, SCREEN_CACHE_MAX_KEYS } from '../src/console-screen/console-screen.cache'
-import { filterSourceEntryOpens, PARTNER_FLEET_TAKE, snapshotLoadStatus } from '../src/console-screen/console-screen.metric'
+import { ScreenSnapshotCache, SCREEN_CACHE_MAX_KEYS, containsFailedLoaded } from '../src/console-screen/console-screen.cache'
+import { filterSourceEntryOpens, JUMP_SOURCE_GROUP_TAKE, PARTNER_FLEET_TAKE, snapshotLoadStatus } from '../src/console-screen/console-screen.metric'
 import { metricKeysFor } from '../src/console-screen/console-screen.assemble'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
@@ -147,12 +148,14 @@ function assertSourceContract(): void {
       && SHARED_CACHE_TTL_SECONDS.cumulative === SCREEN_CACHE_TTL_SECONDS.cumulative
       && SCREEN_MIN_AGGREGATE_SAMPLE === 5,
   )
-  const controller = stripComments(readSrc('src/console-screen/console-screen.controller.ts'))
+  const adminController = stripComments(readSrc('src/console-screen/console-screen.admin.controller.ts'))
+  const partnerController = stripComments(readSrc('src/console-screen/console-screen.partner.controller.ts'))
   const dto = stripComments(readSrc('src/console-screen/console-screen.dto.ts'))
   const service = stripComments(readSrc('src/console-screen/console-screen.service.ts'))
   const queries = stripComments(readSrc('src/console-screen/console-screen.queries.ts'))
   const moduleDir = [
-    'console-screen.controller.ts',
+    'console-screen.admin.controller.ts',
+    'console-screen.partner.controller.ts',
     'console-screen.service.ts',
     'console-screen.queries.ts',
     'console-screen.assemble.ts',
@@ -164,18 +167,21 @@ function assertSourceContract(): void {
 
   assert(
     '1a. Admin 端点有 JwtAuthGuard + RolesGuard + @Roles(admin)',
-    /@UseGuards\(JwtAuthGuard, RolesGuard\)/.test(controller)
-      && /@Roles\('admin'\)/.test(controller)
-      && /@Get\('admin\/screen\/snapshot'\)/.test(controller),
+    /@UseGuards\(JwtAuthGuard, RolesGuard\)/.test(adminController)
+      && /@Roles\('admin'\)/.test(adminController)
+      && /@Get\('admin\/screen\/snapshot'\)/.test(adminController)
+      && !/@Roles\('partner'\)/.test(adminController),
   )
   assert(
     '1b. Partner 端点有 JwtAuthGuard + RolesGuard + @Roles(partner)',
-    /@Roles\('partner'\)/.test(controller) && /@Get\('partner\/screen\/snapshot'\)/.test(controller),
+    /@Roles\('partner'\)/.test(partnerController)
+      && /@Get\('partner\/screen\/snapshot'\)/.test(partnerController)
+      && !/@Roles\('admin'\)/.test(partnerController),
   )
   assert(
     '1c. Partner orgId 只从 CurrentUser 取，不读 query.orgId',
-    /user\.orgId/.test(controller)
-      && !/query\.orgId|_query\.orgId/.test(controller)
+    /user\.orgId/.test(partnerController)
+      && !/query\.orgId|_query\.orgId/.test(partnerController)
       && /class PartnerScreenQueryDto \{\s*\}/.test(dto),
   )
   assert(
@@ -187,7 +193,8 @@ function assertSourceContract(): void {
     !/BindCode|printer-status|terminals\/:id\/config/.test(moduleDir)
       && /displayToken: 'not_issued'/.test(readSrc('src/console-screen/console-screen.metric.ts'))
       && /access: 'authenticated_console'/.test(readSrc('src/console-screen/console-screen.metric.ts'))
-      && !/@Get\('.*screen\/token/.test(controller),
+      && !/@Get\('.*screen\/token/.test(adminController)
+      && !/@Get\('.*screen\/token/.test(partnerController),
   )
   assert(
     '1f. 大屏模块不扫 JobApplication，不复用 take:10000 的 AI usage',
@@ -202,6 +209,8 @@ function assertSourceContract(): void {
       && /aggregate\(/.test(queries)
       && /take:\s*PRINT_TREND_ROW_CAP/.test(queries)
       && /take:\s*PARTNER_FLEET_TAKE/.test(queries)
+      && /take:\s*JUMP_SOURCE_GROUP_TAKE/.test(queries)
+      && /orderBy:\s*\{\s*_count:\s*\{\s*sourceName:\s*'desc'\s*\}/.test(queries)
       && /prisma\.terminal\.count\(\{\s*where:\s*\{\s*orgId\s*\}/.test(queries)
       && /prisma\.jobFair\.count/.test(queries)
       && !/prisma\.jobFair\.findMany/.test(queries)
@@ -227,8 +236,11 @@ function assertSourceContract(): void {
       && SCREEN_CACHE_MAX_KEYS === 256
       && /pruneExpired/.test(readSrc('src/console-screen/console-screen.cache.ts'))
       && /evictOldestIfNeeded/.test(readSrc('src/console-screen/console-screen.cache.ts'))
+      && /inflight/.test(readSrc('src/console-screen/console-screen.cache.ts'))
+      && /containsFailedLoaded/.test(readSrc('src/console-screen/console-screen.cache.ts'))
       && /partner:\$\{orgId\}:realtime/.test(service)
-      && PARTNER_FLEET_TAKE === 200,
+      && PARTNER_FLEET_TAKE === 200
+      && JUMP_SOURCE_GROUP_TAKE === 32,
   )
   assert(
     '1j. 外部跳转文案是打开来源平台入口',
@@ -239,6 +251,13 @@ function assertSourceContract(): void {
     '1l. API 源码不 import @ai-job-print/shared（当前 tsc 解析不了）',
     !/@ai-job-print\/shared/.test(moduleDir)
       && !/from ['"]@ai-job-print\/shared['"]/.test(stripComments(apiTypes)),
+  )
+  const apiPkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as { scripts: Record<string, string> }
+  const ciYml = readFileSync(join(__dirname, '..', '..', '..', '.github/workflows/ci.yml'), 'utf8')
+  assert(
+    '1m. CI 直接执行 verify:console-screen-snapshot，不挂在 admin-ops 后面',
+    apiPkg.scripts['verify:admin-ops'] === 'node -r @swc-node/register scripts/verify-admin-ops.ts'
+      && /pnpm --filter @ai-job-print\/api verify:console-screen-snapshot/.test(ciYml),
   )
 }
 
@@ -300,6 +319,76 @@ async function assertPureHelpers(): Promise<void> {
   clock += 16_000
   await expiring.getOrLoad('new', 15, async () => 2)
   assert('2h. 过期 key 被清理', expiring.size() === 1)
+
+  let flightLoads = 0
+  let releaseFlight!: () => void
+  const flightGate = new Promise<void>((resolve) => {
+    releaseFlight = resolve
+  })
+  const flightCache = new ScreenSnapshotCache(() => 4_000)
+  const sharedLoad = async () => {
+    flightLoads += 1
+    await flightGate
+    return 77
+  }
+  const firstFlight = flightCache.getOrLoad('same', 15, sharedLoad)
+  while (flightLoads < 1) await Promise.resolve()
+  const secondFlight = flightCache.getOrLoad('same', 15, sharedLoad)
+  releaseFlight()
+  const [left, right] = await Promise.all([firstFlight, secondFlight])
+  assert(
+    '2i. 同一 key 并发 miss 只 load 一次且结果一致',
+    flightLoads === 1 && left.value === 77 && right.value === 77 && left.storedAt === right.storedAt,
+    `loads=${flightLoads}`,
+  )
+
+  let blocked = false
+  let releaseSlow!: () => void
+  const slowGate = new Promise<void>((resolve) => {
+    releaseSlow = resolve
+  })
+  const isolated = new ScreenSnapshotCache(() => 5_000)
+  const slow = isolated.getOrLoad('slow', 15, async () => {
+    await slowGate
+    return 'slow'
+  })
+  const fast = await isolated.getOrLoad('fast', 15, async () => 'fast')
+  blocked = fast.value !== 'fast'
+  releaseSlow()
+  await slow
+  assert('2j. 不同 key 不互相阻塞', !blocked && fast.value === 'fast')
+
+  let boomLoads = 0
+  let releaseBoom!: () => void
+  const boomGate = new Promise<void>((resolve) => {
+    releaseBoom = resolve
+  })
+  const boomCache = new ScreenSnapshotCache(() => 6_000)
+  const boom = async () => {
+    boomLoads += 1
+    await boomGate
+    throw new Error('loader-reject')
+  }
+  const boomOne = boomCache.getOrLoad('boom', 15, boom)
+  while (boomLoads < 1) await Promise.resolve()
+  const boomTwo = boomCache.getOrLoad('boom', 15, boom)
+  releaseBoom()
+  const boomSettled = await Promise.allSettled([boomOne, boomTwo])
+  assert(
+    '2k. loader reject 后 in-flight 清理且只跑一次',
+    boomLoads === 1
+      && boomSettled.every((item) => item.status === 'rejected')
+      && boomCache.inflightSize() === 0,
+    `loads=${boomLoads} inflight=${boomCache.inflightSize()}`,
+  )
+  let retryLoads = 0
+  const retried = await boomCache.getOrLoad('boom', 15, async () => {
+    retryLoads += 1
+    return 9
+  })
+  assert('2l. reject 之后可以重试', retryLoads === 1 && retried.value === 9)
+
+  assert('2m. 含 ok:false 的聚合判定为失败切片', containsFailedLoaded({ fleet: { ok: false, reason: 'source_query_failed' } }))
 }
 
 async function assertServiceContract(): Promise<void> {
@@ -354,8 +443,8 @@ async function assertServiceContract(): Promise<void> {
     await prisma.policyPost.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
     await prisma.companyProfile.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
     await prisma.jobSource.deleteMany({ where: { id: { in: [srcA, srcB] } } })
-    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [termA, termB] } } })
-    await prisma.terminal.deleteMany({ where: { id: { in: [termA, termB] } } })
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminal: { orgId: { in: [orgA, orgB] } } } })
+    await prisma.terminal.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
     await prisma.user.deleteMany({ where: { id: { in: [userA, userB, adminId] } } })
     await prisma.endUser.deleteMany({ where: { id: memberId } })
     await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } })
@@ -552,6 +641,71 @@ async function assertServiceContract(): Promise<void> {
         && degradedGov.metrics.terminalsOnline?.available === false
         && degradedGov.metrics.terminalsOnline.reason === SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
         && degradedGov.metrics.jobsOnShelf?.available === true,
+    )
+
+    cache.clear()
+    let fleetAttempts = 0
+    fleet.getOverview = async () => {
+      fleetAttempts += 1
+      if (fleetAttempts === 1) throw new Error('transient fleet down')
+      return originalOverview()
+    }
+    const failedThen = await screen.getAdminSnapshot('gov')
+    const recovered = await screen.getAdminSnapshot('gov')
+    fleet.getOverview = originalOverview
+    assert(
+      '3r. 失败切片不入缓存，第二次会重新 load 且成功才缓存',
+      failedThen.metrics.terminalsOnline?.available === false
+        && recovered.metrics.terminalsOnline?.available === true
+        && fleetAttempts === 2
+        && recovered.freshness.realtime === 'miss',
+      `attempts=${fleetAttempts}`,
+    )
+    cache.clear()
+    const cachedOk = await screen.getAdminSnapshot('gov')
+    const cachedOk2 = await screen.getAdminSnapshot('ops')
+    assert(
+      '3s. 成功结果才缓存',
+      cachedOk.freshness.realtime === 'miss' && cachedOk2.freshness.realtime === 'hit',
+    )
+
+    const extra = Array.from({ length: PARTNER_FLEET_TAKE }, (_, i) => ({
+      id: `term_scrn_cap_${suffix}_${i}`,
+      terminalCode: `SCRN-CAP-${suffix}-${String(i).padStart(3, '0')}`,
+      agentToken: `tok_cap_${suffix}_${i}`,
+      deviceFingerprint: `fp_cap_${suffix}_${i}`,
+      orgId: orgA,
+      enabled: true,
+    }))
+    await prisma.terminal.createMany({ data: extra })
+    await prisma.terminalHeartbeat.createMany({
+      data: extra.map((row) => ({ terminalId: row.id, status: 'online', createdAt: now })),
+    })
+    cache.clear()
+    const cappedPartner = await screen.getPartnerSnapshot(orgA)
+    const online = cappedPartner.metrics.terminalsOnline
+    const wall = cappedPartner.metrics.fleetWall
+    const sampleSum = online?.available === true
+      ? online.value.healthy + online.value.degraded + online.value.offline + online.value.unknown
+      : -1
+    assert(
+      '3q. Partner>200 时 total 是样本、matchedCount 是全量、分类加总等于样本',
+      online?.available === true
+        && wall?.available === true
+        && online.value.truncated
+        && wall.value.truncated
+        && online.value.sampledCount === PARTNER_FLEET_TAKE
+        && wall.value.sampledCount === PARTNER_FLEET_TAKE
+        && wall.value.cells.length === PARTNER_FLEET_TAKE
+        && online.value.total === online.value.sampledCount
+        && sampleSum === online.value.total
+        && online.value.matchedCount === PARTNER_FLEET_TAKE + 1
+        && wall.value.matchedCount === PARTNER_FLEET_TAKE + 1
+        && online.value.sampleCap === PARTNER_FLEET_TAKE
+        && online.value.matchedCount !== sampleSum,
+      online?.available === true
+        ? `total=${online.value.total} sampled=${online.value.sampledCount} matched=${online.value.matchedCount} sum=${sampleSum}`
+        : 'unavailable',
     )
 
     await assertHttp(prisma, ids)

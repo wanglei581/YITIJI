@@ -17,6 +17,7 @@ import { buildPublishedJobWhere } from '../jobs/jobs-shared'
 import type { PrismaService } from '../prisma/prisma.service'
 import {
   JUMP_LOOKBACK_DAYS,
+  JUMP_SOURCE_GROUP_TAKE,
   PARTNER_FLEET_TAKE,
   PRINT_TREND_DAY_COUNT,
   PRINT_TREND_ROW_CAP,
@@ -83,30 +84,34 @@ function orgWhere(orgId: string | undefined): { sourceOrgId: string } | Record<s
 
 export function mapFleetOverview(
   overview: DeviceFleetOverview,
-  listing?: { matchedCount: number; truncated: boolean },
+  listing?: { matchedCount: number; truncated: boolean; sampleCap: number },
 ): {
   online: ScreenTerminalsOnlineValue
   wall: ScreenFleetWallValue
 } {
   const neverReported = overview.terminals.filter((item) => item.healthReason === 'never_reported').length
-  const matchedCount = listing?.matchedCount ?? overview.summary.total
+  const sampledCount = overview.summary.total
+  const matchedCount = listing?.matchedCount ?? sampledCount
   const truncated = listing?.truncated ?? false
+  const sampleCap = listing?.sampleCap ?? sampledCount
   const online: ScreenTerminalsOnlineValue = {
     healthy: overview.summary.healthy,
-    total: matchedCount,
+    total: sampledCount,
     degraded: overview.summary.degraded,
     offline: overview.summary.offline,
     unknown: overview.summary.unknown,
     neverReported,
     onlineWindowSeconds: DEVICE_FLEET_ONLINE_WINDOW_SECONDS,
+    sampledCount,
+    matchedCount,
+    truncated,
+    sampleCap,
   }
   return {
     online,
     wall: {
       ...online,
       cells: overview.terminals.map((item) => ({ health: item.health as ScreenFleetHealth })),
-      truncated,
-      matchedCount,
     },
   }
 }
@@ -376,6 +381,8 @@ export async function loadJumpRows(prisma: PrismaService, now: Date): Promise<Ju
     by: ['sourceName'],
     where: { createdAt: { gte: daysAgoStart(now, JUMP_LOOKBACK_DAYS) } },
     _count: { _all: true },
+    orderBy: { _count: { sourceName: 'desc' } },
+    take: JUMP_SOURCE_GROUP_TAKE,
   })
   return rows.map((row) => ({ sourceName: row.sourceName, count: row._count._all }))
 }
