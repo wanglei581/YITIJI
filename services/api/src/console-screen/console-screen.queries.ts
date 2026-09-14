@@ -17,6 +17,7 @@ import { buildPublishedJobWhere } from '../jobs/jobs-shared'
 import type { PrismaService } from '../prisma/prisma.service'
 import {
   JUMP_LOOKBACK_DAYS,
+  PARTNER_FLEET_TAKE,
   PRINT_TREND_DAY_COUNT,
   PRINT_TREND_ROW_CAP,
   daysAgoStart,
@@ -80,14 +81,19 @@ function orgWhere(orgId: string | undefined): { sourceOrgId: string } | Record<s
   return orgId ? { sourceOrgId: orgId } : {}
 }
 
-export function mapFleetOverview(overview: DeviceFleetOverview): {
+export function mapFleetOverview(
+  overview: DeviceFleetOverview,
+  listing?: { matchedCount: number; truncated: boolean },
+): {
   online: ScreenTerminalsOnlineValue
   wall: ScreenFleetWallValue
 } {
   const neverReported = overview.terminals.filter((item) => item.healthReason === 'never_reported').length
+  const matchedCount = listing?.matchedCount ?? overview.summary.total
+  const truncated = listing?.truncated ?? false
   const online: ScreenTerminalsOnlineValue = {
     healthy: overview.summary.healthy,
-    total: overview.summary.total,
+    total: matchedCount,
     degraded: overview.summary.degraded,
     offline: overview.summary.offline,
     unknown: overview.summary.unknown,
@@ -99,19 +105,28 @@ export function mapFleetOverview(overview: DeviceFleetOverview): {
     wall: {
       ...online,
       cells: overview.terminals.map((item) => ({ health: item.health as ScreenFleetHealth })),
+      truncated,
+      matchedCount,
     },
   }
+}
+
+export interface PartnerFleetSlice {
+  overview: DeviceFleetOverview
+  matchedCount: number
+  truncated: boolean
 }
 
 export async function loadPartnerFleet(
   prisma: PrismaService,
   now: Date,
   orgId: string,
-): Promise<DeviceFleetOverview> {
-  // 只读本机构终端；健康态由 device-fleet 投影计算，不能改成无 where 的全表。
+): Promise<PartnerFleetSlice> {
+  const matchedCount = await prisma.terminal.count({ where: { orgId } })
   const terminals = await prisma.terminal.findMany({
     where: { orgId },
     orderBy: { terminalCode: 'asc' },
+    take: PARTNER_FLEET_TAKE,
     select: {
       id: true,
       terminalCode: true,
@@ -126,10 +141,14 @@ export async function loadPartnerFleet(
       },
     },
   })
-  return buildDeviceFleetOverview(
-    { terminals, screensaverConfigs: [], smartCampusConfigs: [], toolboxConfigs: [] },
-    now,
-  )
+  return {
+    overview: buildDeviceFleetOverview(
+      { terminals, screensaverConfigs: [], smartCampusConfigs: [], toolboxConfigs: [] },
+      now,
+    ),
+    matchedCount,
+    truncated: matchedCount > PARTNER_FLEET_TAKE,
+  }
 }
 
 export async function loadContentSlice(
@@ -392,4 +411,3 @@ export async function loadFairSlice(
     ),
   }
 }
-

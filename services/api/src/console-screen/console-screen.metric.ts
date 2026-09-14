@@ -6,6 +6,7 @@ import {
   SCREEN_UNAVAILABLE_REASON,
   type ScreenMetric,
   type ScreenSnapshotLimits,
+  type ScreenSnapshotStatus,
   type ScreenSnapshotWindow,
   type ScreenSourceEntryOpenItem,
 } from './console-screen.types'
@@ -13,6 +14,7 @@ import {
 const TZ_OFFSET_MS = 8 * 60 * 60 * 1000
 export const PRINT_TREND_DAY_COUNT = 14
 export const PRINT_TREND_ROW_CAP = 20_000
+export const PARTNER_FLEET_TAKE = 200
 export const JUMP_LOOKBACK_DAYS = 30
 export const ALERT_LIST_LIMIT = 20
 const HOUR_MS = 60 * 60 * 1000
@@ -32,7 +34,14 @@ export function screenLimits(): ScreenSnapshotLimits {
     minAggregateSample: SCREEN_MIN_AGGREGATE_SAMPLE,
     displayToken: 'not_issued',
     displayTokenReason: SCREEN_UNAVAILABLE_REASON.displayTokenNotIssued,
+    access: 'authenticated_console',
   }
+}
+
+export function snapshotLoadStatus(okCount: number, total: number): ScreenSnapshotStatus {
+  if (total <= 0 || okCount === total) return 'ok'
+  if (okCount <= 0) return 'unavailable'
+  return 'degraded'
 }
 
 export function availableMetric<T>(

@@ -3,10 +3,8 @@
  *
  * 契约源：packages/shared/src/types/consoleScreen.ts
  *
- * 不直接 import @ai-job-print/shared：API tsconfig 是 commonjs + 默认 node10
- * moduleResolution + rootDir=src。实测 tsc：相对路径 TS6059（超出 rootDir）；
- * 包导入 TS2307（exports 指向 .ts，当前 moduleResolution 解析不了）。
- * 字段变更必须两处同步，verify:console-screen-snapshot 比对去注释后的正文。
+ * 真源：packages/shared/src/types/consoleScreen.ts
+ * 本文件去掉文件头注释后必须与真源逐字节相同（verify 1z）。
  */
 
 export const SCREEN_TIMEZONE = 'Asia/Shanghai' as const
@@ -52,6 +50,7 @@ export const SCREEN_UNAVAILABLE_REASON = {
   windowRowCapExceeded: 'window_row_cap_exceeded',
   partnerAlertsUnscoped: 'alerts_not_org_scoped',
   displayTokenNotIssued: 'display_token_not_issued',
+  sourceQueryFailed: 'source_query_failed',
 } as const
 
 export type ScreenUnavailableReason =
@@ -71,6 +70,8 @@ export interface ScreenTerminalsOnlineValue {
 
 export interface ScreenFleetWallValue extends ScreenTerminalsOnlineValue {
   cells: Array<{ health: ScreenFleetHealth }>
+  truncated: boolean
+  matchedCount: number
 }
 
 export interface ScreenPrintPagesValue {
@@ -248,6 +249,7 @@ export interface ScreenSnapshotLimits {
   minAggregateSample: typeof SCREEN_MIN_AGGREGATE_SAMPLE
   displayToken: 'not_issued'
   displayTokenReason: typeof SCREEN_UNAVAILABLE_REASON.displayTokenNotIssued
+  access: 'authenticated_console'
 }
 
 export interface ScreenSnapshotWindow {
@@ -282,11 +284,23 @@ export interface ScreenSnapshotMetrics {
   reviewSlaAndOrgDimension?: ScreenMetric<never>
 }
 
+export type ScreenCacheState = 'hit' | 'miss'
+export type ScreenSnapshotStatus = 'ok' | 'degraded' | 'unavailable'
+
+export interface ScreenSnapshotFreshness {
+  realtime: ScreenCacheState
+  counts: ScreenCacheState
+  cumulative?: ScreenCacheState
+}
+
 export interface ScreenSnapshot {
   generatedAt: string
   audience: ScreenAudience
   profile: ScreenSnapshotProfile
+  status: ScreenSnapshotStatus
+  degraded: boolean
   window: ScreenSnapshotWindow
   limits: ScreenSnapshotLimits
+  freshness: ScreenSnapshotFreshness
   metrics: ScreenSnapshotMetrics
 }

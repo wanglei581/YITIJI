@@ -39,10 +39,10 @@ import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import { RedisService } from '../src/common/redis/redis.service'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
-import { ScreenSnapshotCache } from '../src/console-screen/console-screen.cache'
 import { AdminScreenController, PartnerScreenController } from '../src/console-screen/console-screen.controller'
 import { ConsoleScreenService } from '../src/console-screen/console-screen.service'
-import { filterSourceEntryOpens } from '../src/console-screen/console-screen.metric'
+import { ScreenSnapshotCache, SCREEN_CACHE_MAX_KEYS } from '../src/console-screen/console-screen.cache'
+import { filterSourceEntryOpens, PARTNER_FLEET_TAKE, snapshotLoadStatus } from '../src/console-screen/console-screen.metric'
 import { metricKeysFor } from '../src/console-screen/console-screen.assemble'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
@@ -71,8 +71,8 @@ function stripComments(text: string): string {
     .join('\n')
 }
 
-function normalizeContractSource(source: string): string {
-  return stripComments(source).replace(/\s+/g, '\n').trim()
+function contractBody(source: string): string {
+  return source.replace(/^\/\*\*[\s\S]*?\*\//, '').replace(/^\s+/, '')
 }
 
 function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
@@ -135,8 +135,8 @@ function assertSourceContract(): void {
   const sharedTypes = readFileSync(join(__dirname, '..', '..', '..', 'packages/shared/src/types/consoleScreen.ts'), 'utf8')
   const apiTypes = readSrc('src/console-screen/console-screen.types.ts')
   assert(
-    '1z. shared 与 API 类型副本去注释后正文一致',
-    normalizeContractSource(sharedTypes) === normalizeContractSource(apiTypes),
+    '1z. shared 真源与 API 副本去掉文件头注释后逐字节相同',
+    contractBody(sharedTypes) === contractBody(apiTypes),
   )
   assert(
     '1z2. 运行时常量与 shared 一致（API 无法 import 该包，见 tsc TS2307/TS6059）',
@@ -183,9 +183,10 @@ function assertSourceContract(): void {
     /@IsIn\(\['gov', 'ops'\]\)/.test(dto) && !/orgId/.test(dto),
   )
   assert(
-    '1e. 不签发只读展示令牌，不复用公开 terminal config',
+    '1e. 不签发只读展示令牌，展示只允许已登录后台',
     !/BindCode|printer-status|terminals\/:id\/config/.test(moduleDir)
       && /displayToken: 'not_issued'/.test(readSrc('src/console-screen/console-screen.metric.ts'))
+      && /access: 'authenticated_console'/.test(readSrc('src/console-screen/console-screen.metric.ts'))
       && !/@Get\('.*screen\/token/.test(controller),
   )
   assert(
@@ -196,10 +197,12 @@ function assertSourceContract(): void {
       && !/files\.service/.test(moduleDir),
   )
   assert(
-    '1g. 聚合走 count/groupBy/aggregate，打印趋势有行数上限，招聘会结构不 findMany',
+    '1g. 聚合走 count/groupBy/aggregate，打印趋势与 Partner 机队有 take 上限',
     /groupBy\(/.test(queries)
       && /aggregate\(/.test(queries)
       && /take:\s*PRINT_TREND_ROW_CAP/.test(queries)
+      && /take:\s*PARTNER_FLEET_TAKE/.test(queries)
+      && /prisma\.terminal\.count\(\{\s*where:\s*\{\s*orgId\s*\}/.test(queries)
       && /prisma\.jobFair\.count/.test(queries)
       && !/prisma\.jobFair\.findMany/.test(queries)
       && !/findMany\(\s*\{[^}]*where:\s*\{\s*deletedAt:\s*null/.test(queries),
@@ -217,11 +220,15 @@ function assertSourceContract(): void {
       && /where:\s*\{\s*orgId\s*\}/.test(queries),
   )
   assert(
-    '1i. 缓存三档 15/60/300 且 Partner 缓存键含 orgId',
+    '1i. 缓存三档 15/60/300、有 key 上限、Partner 缓存键含 orgId',
     SCREEN_CACHE_TTL_SECONDS.realtime === 15
       && SCREEN_CACHE_TTL_SECONDS.counts === 60
       && SCREEN_CACHE_TTL_SECONDS.cumulative === 300
-      && /partner:\$\{orgId\}:realtime/.test(service),
+      && SCREEN_CACHE_MAX_KEYS === 256
+      && /pruneExpired/.test(readSrc('src/console-screen/console-screen.cache.ts'))
+      && /evictOldestIfNeeded/.test(readSrc('src/console-screen/console-screen.cache.ts'))
+      && /partner:\$\{orgId\}:realtime/.test(service)
+      && PARTNER_FLEET_TAKE === 200,
   )
   assert(
     '1j. 外部跳转文案是打开来源平台入口',
@@ -281,6 +288,18 @@ async function assertPureHelpers(): Promise<void> {
   now += 16_000
   await cache.getOrLoad('k', 15, load)
   assert('2e. TTL 过期后重新加载', loads === 2)
+  assert('2f. 全失败/局部失败状态机', snapshotLoadStatus(4, 4) === 'ok' && snapshotLoadStatus(2, 4) === 'degraded' && snapshotLoadStatus(0, 4) === 'unavailable')
+  const capped = new ScreenSnapshotCache(() => 2_000, 3)
+  for (let i = 0; i < 5; i += 1) {
+    await capped.getOrLoad(`k${i}`, 15, async () => i)
+  }
+  assert('2g. 缓存活 key 不超过上限', capped.size() === 3, `size=${capped.size()}`)
+  let clock = 3_000
+  const expiring = new ScreenSnapshotCache(() => clock, 10)
+  await expiring.getOrLoad('old', 15, async () => 1)
+  clock += 16_000
+  await expiring.getOrLoad('new', 15, async () => 2)
+  assert('2h. 过期 key 被清理', expiring.size() === 1)
 }
 
 async function assertServiceContract(): Promise<void> {
@@ -467,13 +486,17 @@ async function assertServiceContract(): Promise<void> {
         && gov.metrics.printPagesCumulative.value.byColor.available === false,
     )
     assert(
-      '3i. 窗口与令牌 LIMIT 写在响应里',
+      '3i. 窗口、登录展示 LIMIT、freshness 写在响应里',
       gov.window.onlineWindowSeconds === 180
         && gov.window.realtimeTtlSeconds === 15
         && gov.window.countsTtlSeconds === 60
         && gov.window.cumulativeTtlSeconds === 300
         && gov.window.timezone === 'Asia/Shanghai'
         && gov.limits.displayToken === 'not_issued'
+        && gov.limits.access === 'authenticated_console'
+        && gov.status === 'ok'
+        && gov.degraded === false
+        && gov.freshness.realtime === 'miss'
         && /\d{4}-\d{2}-\d{2}T/.test(gov.generatedAt),
     )
     const payloadKeys = collectKeys({ gov, ops, partnerA, partnerB })
@@ -497,9 +520,39 @@ async function assertServiceContract(): Promise<void> {
       return original()
     }
     cache.clear()
-    await screen.getAdminSnapshot('gov')
-    await screen.getAdminSnapshot('ops')
+    const firstGov = await screen.getAdminSnapshot('gov')
+    const secondOps = await screen.getAdminSnapshot('ops')
     assert('3m. gov/ops 共享 realtime 缓存，fleet 只打一次', fleetCalls === 1, `calls=${fleetCalls}`)
+    assert('3n. 第二次命中 realtime 缓存', firstGov.freshness.realtime === 'miss' && secondOps.freshness.realtime === 'hit')
+
+    const orgEmpty = `org_scrn_empty_${suffix}`
+    await prisma.organization.create({
+      data: { id: orgEmpty, name: '大屏空机构', type: 'school_employment_center', sceneTemplate: 'school', enabled: true },
+    })
+    const emptyPartner = await screen.getPartnerSnapshot(orgEmpty)
+    assert(
+      '3o. 空机构在架岗位 available:true 且 published=0，不是未接入',
+      emptyPartner.status === 'ok'
+        && emptyPartner.metrics.jobsOnShelf?.available === true
+        && emptyPartner.metrics.jobsOnShelf.value.published === 0,
+    )
+    await prisma.organization.delete({ where: { id: orgEmpty } })
+
+    cache.clear()
+    const originalOverview = fleet.getOverview.bind(fleet)
+    fleet.getOverview = async () => {
+      throw new Error('fleet slice down')
+    }
+    const degradedGov = await screen.getAdminSnapshot('gov')
+    fleet.getOverview = originalOverview
+    assert(
+      '3p. 局部失败：机队 unavailable，其它计数仍在，status=degraded',
+      degradedGov.status === 'degraded'
+        && degradedGov.degraded
+        && degradedGov.metrics.terminalsOnline?.available === false
+        && degradedGov.metrics.terminalsOnline.reason === SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
+        && degradedGov.metrics.jobsOnShelf?.available === true,
+    )
 
     await assertHttp(prisma, ids)
   } finally {
@@ -593,6 +646,12 @@ async function assertHttp(
       partnerRes.status === 200 && partnerBody.audience === 'partner' && partnerBody.profile === 'partner' && partnerBody.success === undefined,
       JSON.stringify(partnerBody).slice(0, 200),
     )
+
+    const missingProfile = await fetch(`${base}/admin/screen/snapshot`, { headers: adminAuth })
+    assert('4i. 缺 profile 为 400', missingProfile.status === 400, `status=${missingProfile.status}`)
+
+    const displayMode = await fetch(`${base}/admin/screen/snapshot?profile=gov&mode=display`, { headers: adminAuth })
+    assert('4j. mode=display 不在白名单，400 fail-closed', displayMode.status === 400, `status=${displayMode.status}`)
 
     const spoofToken = jwt.sign({
       sub: ids.userA,

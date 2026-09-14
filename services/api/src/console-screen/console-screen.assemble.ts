@@ -17,11 +17,34 @@ import {
   filterSourceEntryOpens,
   unavailableMetric,
 } from './console-screen.metric'
-import type { AiSlice, ContentSlice, JumpRow, PrintCumulativeSlice, PrintLiveSlice, SyncSlice } from './console-screen.queries'
+import type {
+  AiSlice,
+  ContentSlice,
+  JumpRow,
+  PartnerFleetSlice,
+  PrintCumulativeSlice,
+  PrintLiveSlice,
+  SyncSlice,
+} from './console-screen.queries'
 import { mapFleetOverview } from './console-screen.queries'
 import type { DeviceFleetOverview } from '../device-fleet/device-fleet.types'
+import type { ScreenMetric } from './console-screen.types'
 
 const MISSING_ORG = SCREEN_UNAVAILABLE_REASON.missingOrgIdOnAiAndOrders
+
+export type Loaded<T> = { ok: true; value: T } | { ok: false }
+
+function fromLoaded<T, U>(
+  loaded: Loaded<T>,
+  source: string,
+  window: string,
+  project: (value: T) => U,
+): ScreenMetric<U> {
+  if (!loaded.ok) {
+    return unavailableMetric(source, window, SCREEN_UNAVAILABLE_REASON.sourceQueryFailed)
+  }
+  return availableMetric(source, window, project(loaded.value))
+}
 
 export function metricKeysFor(
   audience: 'admin' | 'partner',
@@ -44,78 +67,92 @@ export function pickMetrics(
 }
 
 export function assembleAdminMetrics(input: {
-  fleet: DeviceFleetOverview
-  content: ContentSlice
-  printLive: PrintLiveSlice
-  printCumulative: PrintCumulativeSlice
-  ai: AiSlice
-  sync: SyncSlice
-  jumps: JumpRow[]
-  fairs: ScreenFairStructureValue
-  alerts: ScreenAlertsValue
+  fleet: Loaded<DeviceFleetOverview>
+  content: Loaded<ContentSlice>
+  printLive: Loaded<PrintLiveSlice>
+  printCumulative: Loaded<PrintCumulativeSlice>
+  ai: Loaded<AiSlice>
+  sync: Loaded<SyncSlice>
+  jumps: Loaded<JumpRow[]>
+  fairs: Loaded<ScreenFairStructureValue>
+  alerts: Loaded<ScreenAlertsValue>
 }): ScreenSnapshotMetrics {
-  const fleet = mapFleetOverview(input.fleet)
-  const jump = filterSourceEntryOpens(input.jumps)
-  const sourceOpensValue: ScreenSourceEntryOpensValue = {
-    copy: SCREEN_JUMP_COPY,
-    minSampleThreshold: SCREEN_MIN_AGGREGATE_SAMPLE,
-    items: jump.items,
-  }
-  const sourceOpens = jump.belowThreshold
-    ? unavailableMetric<ScreenSourceEntryOpensValue>(
+  const fleet = input.fleet.ok ? mapFleetOverview(input.fleet.value) : null
+  const sourceOpens = input.jumps.ok
+    ? (() => {
+        const jump = filterSourceEntryOpens(input.jumps.value)
+        const sourceOpensValue: ScreenSourceEntryOpensValue = {
+          copy: SCREEN_JUMP_COPY,
+          minSampleThreshold: SCREEN_MIN_AGGREGATE_SAMPLE,
+          items: jump.items,
+        }
+        return jump.belowThreshold
+          ? unavailableMetric<ScreenSourceEntryOpensValue>(
+              'ExternalJumpLog.sourceName',
+              '30d',
+              SCREEN_UNAVAILABLE_REASON.sampleBelowThreshold,
+            )
+          : availableMetric('ExternalJumpLog.sourceName', '30d', sourceOpensValue)
+      })()
+    : unavailableMetric<ScreenSourceEntryOpensValue>(
         'ExternalJumpLog.sourceName',
         '30d',
-        SCREEN_UNAVAILABLE_REASON.sampleBelowThreshold,
+        SCREEN_UNAVAILABLE_REASON.sourceQueryFailed,
       )
-    : availableMetric('ExternalJumpLog.sourceName', '30d', sourceOpensValue)
   return {
-    terminalsOnline: availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.online),
-    fleetWall: availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.wall),
-    printPagesCumulative: availableMetric('Order.billablePages', 'cumulative', input.printCumulative.pages),
-    aiCallsCumulative: availableMetric('AiServiceLog.count', 'cumulative', {
-      totalCalls: input.ai.totalCalls,
-    }),
-    jobsOnShelf: availableMetric('Job approved+published+validThrough', 'current', {
-      published: input.content.jobsPublished,
-      sourceOrgCount: input.content.sourceOrgCount,
-    }),
-    contentInventory: availableMetric('Job/JobFair/PolicyPost/CompanyProfile counts', 'current', input.content.inventory),
-    aiBreakdown24h: availableMetric('AiServiceLog.groupBy(operation,status)', '24h', {
-      byOperation: input.ai.byOperation,
-      failedCalls: input.ai.windowFailed,
-      totalCalls: input.ai.windowCalls,
-    }),
-    printTrend14d: input.printCumulative.trend === 'capped'
-      ? unavailableMetric('Order.createdAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded)
-      : availableMetric('Order.createdAt+billablePages', '14d', input.printCumulative.trend),
+    terminalsOnline: fleet
+      ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.online)
+      : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
+    fleetWall: fleet
+      ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.wall)
+      : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
+    printPagesCumulative: fromLoaded(input.printCumulative, 'Order.billablePages', 'cumulative', (slice) => slice.pages),
+    aiCallsCumulative: fromLoaded(input.ai, 'AiServiceLog.count', 'cumulative', (slice) => ({
+      totalCalls: slice.totalCalls,
+    })),
+    jobsOnShelf: fromLoaded(input.content, 'Job approved+published+validThrough', 'current', (slice) => ({
+      published: slice.jobsPublished,
+      sourceOrgCount: slice.sourceOrgCount,
+    })),
+    contentInventory: fromLoaded(input.content, 'Job/JobFair/PolicyPost/CompanyProfile counts', 'current', (slice) => slice.inventory),
+    aiBreakdown24h: fromLoaded(input.ai, 'AiServiceLog.groupBy(operation,status)', '24h', (slice) => ({
+      byOperation: slice.byOperation,
+      failedCalls: slice.windowFailed,
+      totalCalls: slice.windowCalls,
+    })),
+    printTrend14d: !input.printCumulative.ok
+      ? unavailableMetric('Order.createdAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed)
+      : input.printCumulative.value.trend === 'capped'
+        ? unavailableMetric('Order.createdAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded)
+        : availableMetric('Order.createdAt+billablePages', '14d', input.printCumulative.value.trend),
     visitCount: unavailableMetric('KioskSession', 'current', SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten),
     suppliesAndMap: unavailableMetric('TerminalHeartbeat', 'current', SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo),
-    printInProgress: availableMetric('PrintTask.status', 'current', input.printLive.inProgress),
-    printFailedToday: availableMetric('PrintTask.status=failed', 'shanghai-day', {
-      failed: input.printLive.failedToday,
-    }),
-    pendingReview: availableMetric('reviewStatus pending+reviewing', 'current', input.content.pending),
-    aiSuccessRate24h: availableMetric('AiServiceLog.status', '24h', {
-      total: input.ai.windowCalls,
-      success: input.ai.windowSuccess,
-      failed: input.ai.windowFailed,
-      successRate: input.ai.windowCalls > 0
-        ? Math.round((input.ai.windowSuccess / input.ai.windowCalls) * 1000) / 10
+    printInProgress: fromLoaded(input.printLive, 'PrintTask.status', 'current', (slice) => slice.inProgress),
+    printFailedToday: fromLoaded(input.printLive, 'PrintTask.status=failed', 'shanghai-day', (slice) => ({
+      failed: slice.failedToday,
+    })),
+    pendingReview: fromLoaded(input.content, 'reviewStatus pending+reviewing', 'current', (slice) => slice.pending),
+    aiSuccessRate24h: fromLoaded(input.ai, 'AiServiceLog.status', '24h', (slice) => ({
+      total: slice.windowCalls,
+      success: slice.windowSuccess,
+      failed: slice.windowFailed,
+      successRate: slice.windowCalls > 0
+        ? Math.round((slice.windowSuccess / slice.windowCalls) * 1000) / 10
         : null,
-    }),
-    syncSuccessRate24h: availableMetric('SyncLog.result', '24h', input.sync.rate),
-    alertsRealtime: availableMetric('derived-alerts', 'current', input.alerts),
-    taskFlow24h: availableMetric('PrintTask/ScanTask.groupBy(status)', '24h', input.printLive.taskFlow),
+    })),
+    syncSuccessRate24h: fromLoaded(input.sync, 'SyncLog.result', '24h', (slice) => slice.rate),
+    alertsRealtime: fromLoaded(input.alerts, 'derived-alerts', 'current', (slice) => slice),
+    taskFlow24h: fromLoaded(input.printLive, 'PrintTask/ScanTask.groupBy(status)', '24h', (slice) => slice.taskFlow),
     sourceEntryOpensTop: sourceOpens,
-    fairStructure: availableMetric('FairCompany/FairZone/FairMaterial', 'ongoing', input.fairs),
-    aiCost24h: availableMetric('AiServiceLog.estimatedCostCny', '24h', {
-      estimatedCostCny: input.ai.estimatedCostCny,
-      measuredCalls: input.ai.measuredCalls,
-      unmeasuredCalls: input.ai.unmeasuredCalls,
-      avgLatencyMs: input.ai.avgLatencyMs,
+    fairStructure: fromLoaded(input.fairs, 'FairCompany/FairZone/FairMaterial', 'ongoing', (slice) => slice),
+    aiCost24h: fromLoaded(input.ai, 'AiServiceLog.estimatedCostCny', '24h', (slice) => ({
+      estimatedCostCny: slice.estimatedCostCny,
+      measuredCalls: slice.measuredCalls,
+      unmeasuredCalls: slice.unmeasuredCalls,
+      avgLatencyMs: slice.avgLatencyMs,
       tokenTotals: unavailableMetric('AiServiceLog.tokenUsageJson', '24h', SCREEN_UNAVAILABLE_REASON.tokenUsageNotNumeric),
       p95LatencyMs: unavailableMetric('AiServiceLog.latencyMs', '24h', SCREEN_UNAVAILABLE_REASON.percentileNotAggregated),
-    }),
+    })),
     reviewSlaAndOrgDimension: unavailableMetric(
       'ReviewDecision / Order.orgId / AiServiceLog.orgId',
       'current',
@@ -125,24 +162,33 @@ export function assembleAdminMetrics(input: {
 }
 
 export function assemblePartnerMetrics(input: {
-  fleet: DeviceFleetOverview
-  content: ContentSlice
-  sync: SyncSlice
-  fairs: ScreenFairStructureValue
+  fleet: Loaded<PartnerFleetSlice>
+  content: Loaded<ContentSlice>
+  sync: Loaded<SyncSlice>
+  fairs: Loaded<ScreenFairStructureValue>
 }): ScreenSnapshotMetrics {
-  const fleet = mapFleetOverview(input.fleet)
+  const fleet = input.fleet.ok
+    ? mapFleetOverview(input.fleet.value.overview, {
+        matchedCount: input.fleet.value.matchedCount,
+        truncated: input.fleet.value.truncated,
+      })
+    : null
   const blocked = (source: string, reason: string) => unavailableMetric(source, 'current', reason)
   return {
-    terminalsOnline: availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.online),
-    fleetWall: availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.wall),
-    jobsOnShelf: availableMetric('Job approved+published+validThrough', 'current', {
-      published: input.content.jobsPublished,
-      sourceOrgCount: input.content.sourceOrgCount,
-    }),
-    contentInventory: availableMetric('Job/JobFair/PolicyPost/CompanyProfile counts', 'current', input.content.inventory),
-    pendingReview: availableMetric('reviewStatus pending+reviewing', 'current', input.content.pending),
-    syncSuccessRate24h: availableMetric('SyncLog.result', '24h', input.sync.rate),
-    fairStructure: availableMetric('FairCompany/FairZone/FairMaterial', 'ongoing', input.fairs),
+    terminalsOnline: fleet
+      ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.online)
+      : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
+    fleetWall: fleet
+      ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.wall)
+      : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
+    jobsOnShelf: fromLoaded(input.content, 'Job approved+published+validThrough', 'current', (slice) => ({
+      published: slice.jobsPublished,
+      sourceOrgCount: slice.sourceOrgCount,
+    })),
+    contentInventory: fromLoaded(input.content, 'Job/JobFair/PolicyPost/CompanyProfile counts', 'current', (slice) => slice.inventory),
+    pendingReview: fromLoaded(input.content, 'reviewStatus pending+reviewing', 'current', (slice) => slice.pending),
+    syncSuccessRate24h: fromLoaded(input.sync, 'SyncLog.result', '24h', (slice) => slice.rate),
+    fairStructure: fromLoaded(input.fairs, 'FairCompany/FairZone/FairMaterial', 'ongoing', (slice) => slice),
     printInProgress: blocked('PrintTask', MISSING_ORG),
     printFailedToday: blocked('PrintTask', MISSING_ORG),
     printPagesCumulative: blocked('Order', MISSING_ORG),

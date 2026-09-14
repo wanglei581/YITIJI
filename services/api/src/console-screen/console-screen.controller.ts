@@ -14,6 +14,10 @@ import { ConsoleScreenService } from './console-screen.service'
 export class AdminScreenController {
   constructor(private readonly screen: ConsoleScreenService) {}
 
+  /**
+   * 领导/客户展示 = 已登录 admin 后台会话。不签发公开只读令牌。
+   * `?mode=` / `?token=` 不在白名单，forbidNonWhitelisted 直接 400。
+   */
   @Get('admin/screen/snapshot')
   async getAdminSnapshot(@Query() query: AdminScreenQueryDto): Promise<ApiResponse<ScreenSnapshot>> {
     return ApiResponse.ok(await this.screen.getAdminSnapshot(query.profile))

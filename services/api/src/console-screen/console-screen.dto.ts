@@ -6,5 +6,5 @@ export class AdminScreenQueryDto {
   profile!: AdminScreenProfile
 }
 
-/** 空白名单：forbidNonWhitelisted 会把 ?orgId= 等客户端机构参数直接 400。 */
+/** 空白名单：forbidNonWhitelisted 会把 ?orgId= / ?mode= / ?token= 直接 400。 */
 export class PartnerScreenQueryDto {}

@@ -9,14 +9,11 @@
  * - 外部跳转只能表述为「打开来源平台入口」，不得宣称投递成功。
  * - 用户行为只给聚合，分组样本 N&lt;5 不得给出数字。
  * - 大屏在线口径只认 device-fleet 的 180 秒窗口。
- * - 一期不签发只读展示令牌，必须已登录。
+ * - 领导/客户展示只允许已登录后台会话（access=authenticated_console）。
+ *   可吊销只读展示令牌是后续独立需求，本契约 fail-closed：displayToken=not_issued。
  *
- * 后端副本：services/api/src/console-screen/console-screen.types.ts
- *
- * API 不能直接 import @ai-job-print/shared：tsconfig 是 commonjs + 默认
- * node10 moduleResolution + rootDir=src。实测 tsc：相对路径 TS6059（超出
- * rootDir）；包导入 TS2307（exports 指向 .ts，当前 moduleResolution 解析不了）。
- * 字段变更必须两处同步，verify:console-screen-snapshot 比对去注释后的正文。
+ * 本文件是契约真源。API 因 tsc TS6059/TS2307 不能 import 本包，只保留一份
+ * 去掉文件头注释后必须逐字节相同的副本（verify:console-screen-snapshot 1z）。
  */
 
 export const SCREEN_TIMEZONE = 'Asia/Shanghai' as const
@@ -62,6 +59,7 @@ export const SCREEN_UNAVAILABLE_REASON = {
   windowRowCapExceeded: 'window_row_cap_exceeded',
   partnerAlertsUnscoped: 'alerts_not_org_scoped',
   displayTokenNotIssued: 'display_token_not_issued',
+  sourceQueryFailed: 'source_query_failed',
 } as const
 
 export type ScreenUnavailableReason =
@@ -81,6 +79,8 @@ export interface ScreenTerminalsOnlineValue {
 
 export interface ScreenFleetWallValue extends ScreenTerminalsOnlineValue {
   cells: Array<{ health: ScreenFleetHealth }>
+  truncated: boolean
+  matchedCount: number
 }
 
 export interface ScreenPrintPagesValue {
@@ -258,6 +258,7 @@ export interface ScreenSnapshotLimits {
   minAggregateSample: typeof SCREEN_MIN_AGGREGATE_SAMPLE
   displayToken: 'not_issued'
   displayTokenReason: typeof SCREEN_UNAVAILABLE_REASON.displayTokenNotIssued
+  access: 'authenticated_console'
 }
 
 export interface ScreenSnapshotWindow {
@@ -292,11 +293,23 @@ export interface ScreenSnapshotMetrics {
   reviewSlaAndOrgDimension?: ScreenMetric<never>
 }
 
+export type ScreenCacheState = 'hit' | 'miss'
+export type ScreenSnapshotStatus = 'ok' | 'degraded' | 'unavailable'
+
+export interface ScreenSnapshotFreshness {
+  realtime: ScreenCacheState
+  counts: ScreenCacheState
+  cumulative?: ScreenCacheState
+}
+
 export interface ScreenSnapshot {
   generatedAt: string
   audience: ScreenAudience
   profile: ScreenSnapshotProfile
+  status: ScreenSnapshotStatus
+  degraded: boolean
   window: ScreenSnapshotWindow
   limits: ScreenSnapshotLimits
+  freshness: ScreenSnapshotFreshness
   metrics: ScreenSnapshotMetrics
 }
