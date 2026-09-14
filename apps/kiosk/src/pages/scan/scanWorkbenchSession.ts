@@ -94,6 +94,18 @@ function endScanLifecycle(): void {
  *
  * 本机这一份只是那枚授权的**取用凭据**，用来发请求，判定权始终在服务端。
  *
+ * ## 2026-09-14 起：创建成功之后，这串字节就是新会话自己的 controlToken
+ *
+ * 服务端把配对创建做成了幂等，做法是把 child 的 controlToken **就设成上一场那份明文**
+ * （child.controlTokenHash 直接沿用 prior 的）。这是「回话丢了还能凭同一个头把 child
+ * 领回来」的实现方式，也是 `scanCreateReplay` 之所以安全的前提。
+ *
+ * 于是下面那句「一个字节都不落存储」要读准它的范围：它说的是**这枚授权本身**
+ * （槽位 / 寄存格 / rescanIntent 那一路）。创建成功之后同一串字节会以
+ * `live.controlToken` 的身份写进登记 —— 那时它已经不是「上一场的凭证」，
+ * 而是这一场的会话凭证，而会话凭证本来就要落 sessionStorage（看门狗整页重载之后
+ * 还要接着轮询同一场）。两者写的是同一串字节，身份不同，清场时一起被抹掉。
+ *
  * ## 为什么只活在内存里
  *
  * `priorControlToken` 是上一场任务的控制凭证明文。**这枚授权自己一个字节都不落存储**：
@@ -542,6 +554,35 @@ export function patchScanWorkbenchSession(
   }
   saveScanWorkbenchSession(next)
   return next
+}
+
+/**
+ * 写进本机登记，并**读回来逐字段核对**。只有核得上才算「这一场真的被记住了」。
+ *
+ * `saveScanWorkbenchSession` 把 setItem 的异常吞掉了，而更糟的一种是**根本不抛**：
+ * 隐私模式、配额写满、被扩展或夹具改写过的 sessionStorage 都可能静默什么也不做。
+ * 两种情况下调用方拿到的都是「看起来写成功了」。
+ *
+ * 这一条之所以不能将就：凭据没落地却照常 ACK，服务端那条任务就变得可投递，而本机
+ * 整页重载之后再也找不回它 —— 一个可投递却没有任何界面在看着的收件箱，正是 ACK
+ * 这道闸要消灭的东西。所以放行判据不是「写过了」，是「读回来还是同一串字节」。
+ *
+ * 只核 live 那四样：它们是撤销、轮询、复水全部要用的东西，少一样这一场就接不回来。
+ *
+ * @returns 读回来的 live 与要写的那份完全一致才为 true。
+ */
+export function patchScanWorkbenchSessionWithDurableLive(
+  patch: Partial<ScanWorkbenchSession> & { live: ScanLiveState },
+): boolean {
+  patchScanWorkbenchSession(patch)
+  const persisted = readScanWorkbenchSession()?.live
+  if (!persisted) return false
+  const { live } = patch
+  return persisted.scanTaskId === live.scanTaskId
+    && persisted.controlToken === live.controlToken
+    && persisted.expiresAt === live.expiresAt
+    && persisted.instructions.length === live.instructions.length
+    && persisted.instructions.every((line, index) => line === live.instructions[index])
 }
 
 export function clearScanWorkbenchSession(): void {

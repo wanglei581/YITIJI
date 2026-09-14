@@ -65,6 +65,81 @@ async function enterSettingsFromVisibleStart(page: Page): Promise<void> {
   await page.waitForURL(/\/scan\?stage=settings/)
 }
 
+// ── 投递确认（ACK）（2026-09-14） ─────────────────────────────────────────────
+//
+// 服务端把「建成」和「可投递」拆成了两段：新建会话一律 `deliveryAckedAt = null`，
+// 只有本机确认自己握着这一场的控制凭据之后，面板上扫出来的文件才会投给它
+// （契约见 src/pages/scan/scanDeliveryAck.ts）。设置页与等待页因此**挂载即确认**，
+// 确认之前两屏都停在「正在确认投递授权」—— 凡是要走到「扫描任务已创建」或
+// 「等待打印机端扫描完成」的用例，都必须自己把这个端点注册上。
+//
+// 仍然逐条用例注册，**不挂兜底路由**（同本文件其余部分的惯例）：ApiRouter 对未注册
+// 请求一律 abort 并在拆卸时报 Unhandled API，而「哪几条路径上一次确认都不许发生」
+// —— 创建失败、响应畸形、终端身份失效、用户已经走了 —— 正是这一层要钉的东西。
+// 一条 catch-all 会把这几条用例全部悄悄变绿。
+
+/** 这一场 ACK 端点的路径。反面用例只数它，不注册它。 */
+const ACK_PATH = `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`
+/** 服务端写下投递授权的那一刻。固定值：用例断言的是「确认过」，不是具体几点。 */
+const DELIVERY_ACKED_AT = '2026-09-14T00:00:00.000Z'
+
+interface ScanAckProbe {
+  /** 每一次 ACK 的请求头，按发生顺序。 */
+  calls: () => Array<Record<string, string>>
+  /**
+   * 断言恰好确认过 `count` 次，且**每一次**都带齐服务端要校验的三样凭据。
+   *
+   * 只 respond 不看请求头的话，「本机漏带凭据」在这里永远不会红：真实服务端回的是
+   * 401（没有终端会话票 / 终端 id）或 403（控制凭据对不上），而一份只按路径应答的
+   * 夹具会照样回 200，页面照样把「已确认」画出来。
+   */
+  expectAcked: (count: number) => Promise<void>
+}
+
+/**
+ * 注册这一场的投递确认端点（**按 taskId 精确注册**，不是通配），并记下每一次的凭据。
+ *
+ * 服务端在这个端点上同时校验终端会话票（TerminalIdentityGuard）、`x-terminal-id`
+ * 归属，以及这一场的 `X-Scan-Session-Control`（见 src/services/api/scanTasks.ts 的
+ * `ackScanSession`）。三样都记下来交给用例断言。
+ */
+function registerScanAck(
+  page: Page,
+  api: ApiRouter,
+  expected: { controlToken: string; scanTaskId?: string; terminalSessionToken?: string },
+): ScanAckProbe {
+  const scanTaskId = expected.scanTaskId ?? SCAN_TASK_ID
+  const path = `/api/v1/scan/sessions/${scanTaskId}/ack`
+  const calls: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== path) return
+    calls.push(request.headers())
+  })
+  api.respond('POST', path, {
+    status: 200,
+    json: { success: true, data: { scanTaskId, deliveryAckedAt: DELIVERY_ACKED_AT } },
+  })
+  return {
+    calls: () => [...calls],
+    expectAcked: async (count) => {
+      await expect.poll(() => calls.length).toBe(count)
+      for (const headers of calls) {
+        expect(headers['x-terminal-id']).toBe('KSK-001')
+        /* 给了具体值就按具体值断言。「非空」在换票场景里是不够的：本机拿**旧票**
+         * 发出去，这个字段照样非空，而真实服务端会 401 —— 会话停在不可投递，
+         * 用户照着指引扫出来的纸不会进他的记录。只有对上换回来的那一张才算过。 */
+        if (expected.terminalSessionToken !== undefined) {
+          expect(headers['x-terminal-session-token']).toBe(expected.terminalSessionToken)
+        } else {
+          expect(headers['x-terminal-session-token'] ?? '').not.toBe('')
+        }
+        expect(headers['x-scan-session-control']).toBe(expected.controlToken)
+      }
+    },
+  }
+}
+
 test('scan start does not probe a nonexistent device endpoint and carries explicit state @kiosk', async ({ page, api }) => {
   registerShell(api)
   const deviceRequests = countRequests(page, 'GET', '/api/v1/kiosk/device/status')
@@ -134,6 +209,7 @@ test('success renders only server instructions and creates and cancels once in S
   registerLegacyReadyDevice(api)
   const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
   const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
+  const ack = registerScanAck(page, api, { controlToken: CONTROL_TOKEN })
   api.respond('POST', '/api/v1/scan/sessions', {
     status: 200,
     json: createdSession(),
@@ -150,6 +226,8 @@ test('success renders only server instructions and creates and cancels once in S
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toBeVisible()
   await expect(page.getByText('\u626b\u63cf\u4efb\u52a1\u5df2\u521b\u5efa', { exact: true })).toBeVisible()
   expect(createRequests()).toBe(1)
+  // 建成不等于可投递：编号和服务端指引上屏之前，本机必须已经拿到投递授权。
+  await ack.expectAcked(1)
   const persisted = await page.evaluate((token) => {
     const inLocal = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
       .some((key) => key !== null && (window.localStorage.getItem(key) ?? '').includes(token))
@@ -172,6 +250,7 @@ test('success renders only server instructions and creates and cancels once in S
 test('a session that expires while visible is cancelled and can no longer continue @kiosk', async ({ page, api }) => {
   registerShell(api)
   const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
+  const ack = registerScanAck(page, api, { controlToken: CONTROL_TOKEN })
   api.respond('POST', '/api/v1/scan/sessions', {
     status: 200,
     json: {
@@ -192,11 +271,15 @@ test('a session that expires while visible is cancelled and can no longer contin
   await expect(page.getByText('扫描会话已过期', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
   await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
   await expect.poll(cancelRequests).toBe(1)
+  // 过期是确认之后才发生的事：这一场确认过一次，且只有那一次。
+  await ack.expectAcked(1)
 })
 
 test('a malformed success without a control token stays in the safe error state @kiosk', async ({ page, api }) => {
   registerShell(api)
   registerLegacyReadyDevice(api)
+  // 刻意不注册 ACK：这一场没有控制凭据，本机既不该也无从确认投递授权。
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
   api.respond('POST', '/api/v1/scan/sessions', {
     status: 200,
     json: {
@@ -216,11 +299,14 @@ test('a malformed success without a control token stays in the safe error state 
   await expect(page.getByText('\u626b\u63cf\u4efb\u52a1\u672a\u521b\u5efa', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('\u4e0d\u5e94\u663e\u793a\u7684\u670d\u52a1\u7aef\u6307\u5f15', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
+  expect(ackRequests()).toBe(0)
 })
 
 test('a malformed created session with cancellation credentials is cleaned up once @kiosk', async ({ page, api }) => {
   registerShell(api)
   const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
+  // 刻意不注册 ACK：响应缺字段，本页判这一场不成立并撤掉它，不该去确认投递授权。
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
   api.respond('POST', '/api/v1/scan/sessions', {
     status: 200,
     json: createdSession([]),
@@ -234,11 +320,15 @@ test('a malformed created session with cancellation credentials is cleaned up on
   await expect(page.getByText('\u626b\u63cf\u4efb\u52a1\u672a\u521b\u5efa', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await expect.poll(cancelRequests).toBe(1)
+  expect(ackRequests()).toBe(0)
 })
 
 test('leaving while creation is in flight cancels the late-created session once @kiosk', async ({ page, api }) => {
   registerShell(api)
   const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
+  // 刻意不注册 ACK：用户已经走了，这一场迟到的会话只该被撤掉 ——
+  // 确认它等于把一个没人看着的收件箱变成可投递的，那正是 ACK 要消灭的东西。
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
   api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
@@ -266,6 +356,7 @@ test('leaving while creation is in flight cancels the late-created session once 
   await page.waitForURL(/\/scan(\?stage=start)?$|\/scan\?stage=start/)
   releaseCreate?.()
   await expect.poll(cancelRequests).toBe(1)
+  expect(ackRequests()).toBe(0)
 })
 
 // ── 扫描会话撤销契约（2026-09-13） ─────────────────────────────────────────
@@ -326,6 +417,7 @@ test('creating a scan session carries the terminal session token, not just the t
   registerShell(api)
   registerLegacyReadyDevice(api)
   const createHeaders: Array<Record<string, string>> = []
+  const ack = registerScanAck(page, api, { controlToken: CONTROL_TOKEN })
   page.on('request', (request) => {
     if (request.method() !== 'POST') return
     if (new URL(request.url()).pathname !== '/api/v1/scan/sessions') return
@@ -341,6 +433,8 @@ test('creating a scan session carries the terminal session token, not just the t
   expect(createHeaders).toHaveLength(1)
   expect(createHeaders[0]?.['x-terminal-session-token']).toBe('playwright-terminal-session-fixture')
   expect(createHeaders[0]?.['x-terminal-id']).toBe('KSK-001')
+  // 投递确认挂的是同一道终端身份闸门，凭据要求只多不少（还要带这一场的控制凭证）。
+  await ack.expectAcked(1)
 })
 
 test('a revoked terminal session fails the creation closed and is not retried @kiosk', async ({ page, api }) => {
@@ -457,6 +551,13 @@ for (const stage of ['start', 'settings', 'progress', 'result'] as const) {
       registerScanExitDestinations(api)
       const revokes = recordRevokeRequests(page)
       const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
+      /* settings / progress 两屏挂载即确认投递授权（幂等，见 scanDeliveryAck）：
+       * 没确认之前它们停在「正在确认投递授权」，landmark 根本不会出现。
+       * start / result 不挂那两屏 —— 刻意不注册，一次确认都不该发生。 */
+      const ack = stage === 'settings' || stage === 'progress'
+        ? registerScanAck(page, api, { controlToken: REVOKE_CONTROL_TOKEN })
+        : null
+      const ackRequests = countRequests(page, 'POST', ACK_PATH)
       api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
         status: 200,
         json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
@@ -504,6 +605,9 @@ for (const stage of ['start', 'settings', 'progress', 'result'] as const) {
       expect(await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'))).toBeNull()
       // 3) 离开不等于重建：这条路径上不许出现新的创建请求。
       expect(createRequests()).toBe(0)
+      // 4) 投递确认只发生在真正挂起会话的那两屏，且带的是本机登记里那份控制凭证。
+      if (ack) await ack.expectAcked(1)
+      else expect(ackRequests()).toBe(0)
     })
   }
 }
@@ -512,6 +616,7 @@ test('leaving the whole scan flow from the top bar revokes the server task once 
   registerShell(api)
   registerPrintScanHub(api)
   const revokes = recordRevokeRequests(page)
+  const ack = registerScanAck(page, api, { controlToken: REVOKE_CONTROL_TOKEN })
   api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
@@ -525,6 +630,8 @@ test('leaving the whole scan flow from the top bar revokes the server task once 
   await page.getByRole('button', { name: '返回打印扫描' }).click()
   await page.waitForURL(/\/print-scan$/)
   await expect.poll(() => revokes().length).toBe(1)
+  // 复水进来的这一场也确认过一次：本机不知道当初确认过没有，而 ACK 幂等。
+  await ack.expectAcked(1)
   expect(revokes()[0]?.['x-scan-session-control']).toBe(REVOKE_CONTROL_TOKEN)
   // 撤销之后本机登记也必须清掉：留着它，下一次进 /scan 会复水到一个已经被撤的任务。
   expect(await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'))).toBeNull()
@@ -543,6 +650,8 @@ test('a scan session that arrives after the user left is revoked and never writt
   registerShell(api)
   registerScanExitDestinations(api)
   const revokes = recordRevokeRequests(page)
+  // 刻意不注册 ACK：清场已经落地，这份迟到的凭证只能用来撤销。
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
   api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
@@ -585,6 +694,8 @@ test('a scan session that arrives after the user left is revoked and never writt
     .toBeNull()
   // 3) 页面没有因为这个迟到的响应跳回扫描流程或宣告成功。
   expect(new URL(page.url()).pathname).toBe('/')
+  // 4) 也没有确认它：确认会让这条已经没人看着的任务在服务端变得可投递。
+  expect(ackRequests()).toBe(0)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
 })
 
@@ -595,6 +706,7 @@ test('confirming the created session and entering the wait stage cancels nothing
   registerShell(api)
   registerLegacyReadyDevice(api)
   const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
+  const ack = registerScanAck(page, api, { controlToken: CONTROL_TOKEN })
   api.respond('POST', '/api/v1/scan/sessions', { status: 200, json: createdSession() })
   api.respond('GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
     status: 200,
@@ -626,12 +738,16 @@ test('confirming the created session and entering the wait stage cancels nothing
   const stored = await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench'))
   expect(stored).not.toBeNull()
   expect(stored).toContain(SCAN_TASK_ID)
+  // 两屏各确认一次：设置页建成后一次，等待页挂载时再一次。ACK 幂等，所以再问一次
+  // 永远是对的 —— 等待页并不知道当初确认过没有（看门狗整页重载走的就是这条）。
+  await ack.expectAcked(2)
 })
 
 test('giving up on polling revokes the server task instead of orphaning it @kiosk', async ({ page, api }) => {
   test.setTimeout(120_000)
   registerShell(api)
   const revokes = recordRevokeRequests(page)
+  const ack = registerScanAck(page, api, { controlToken: REVOKE_CONTROL_TOKEN })
   api.respond('GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
     status: 500,
     json: { success: false, error: { code: 'INTERNAL_ERROR', message: '服务端暂时不可用' } },
@@ -659,6 +775,8 @@ test('giving up on polling revokes the server task instead of orphaning it @kios
   await expect(page).toHaveURL(/\/scan\?stage=result/, { timeout: 70_000 })
   await expect(page.getByText('长时间无法查询扫描状态', { exact: false }).first()).toBeVisible()
   await expect.poll(() => revokes().length).toBe(1)
+  // 「立即检查」只在拿到投递授权之后才画得出来，所以这条路径必然确认过、且只确认一次。
+  await ack.expectAcked(1)
   expect(revokes()[0]?.['x-scan-session-control']).toBe(REVOKE_CONTROL_TOKEN)
 })
 
@@ -705,6 +823,8 @@ test('a terminal session that recovers after the abandoned task was revoked neve
   registerShell(api)
   const revokes = recordRevokeRequests(page)
   const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
+  // 刻意不注册 ACK：这一场在创建还在飞时就被丢弃并撤掉了，终端身份恢复也不该接回来。
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
   api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
@@ -769,6 +889,8 @@ test('a terminal session that recovers after the abandoned task was revoked neve
   expect(stored).not.toContain(CONTROL_TOKEN)
   // 4) 只撤一次；也不因为终端恢复就自动重建一场（页面已经宣告失败，重不重扫由用户决定）。
   expect(revokes()).toHaveLength(1)
+  // 也一次都没确认过：确认会让一条已经撤掉的任务在服务端重新变得可投递。
+  expect(ackRequests()).toBe(0)
   expect(createRequests(), '恢复不等于重建：这条路径上不许出现第二次创建').toBe(1)
 })
 
@@ -779,6 +901,12 @@ test('a create deferred by a terminal refresh still goes out once the new ticket
   registerShell(api)
   const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
   const createHeaders: Array<Record<string, string>> = []
+  // 确认走的是同一道终端身份闸门，所以它也必须带**换回来的那一张**票，
+  // 不是「某一张非空的票」：带旧票发出去，服务端 401，这一场永远不会变得可投递。
+  const ack = registerScanAck(page, api, {
+    controlToken: CONTROL_TOKEN,
+    terminalSessionToken: ROTATED_TERMINAL_TOKEN,
+  })
   page.on('request', (request) => {
     if (request.method() !== 'POST') return
     if (new URL(request.url()).pathname !== '/api/v1/scan/sessions') return
@@ -812,4 +940,288 @@ test('a create deferred by a terminal refresh still goes out once the new ticket
   expect(createRequests(), '换票回来之后补发且只发一次').toBe(1)
   // 补发的这一次必须带换回来的新票：带旧票发出去，后端照样 401。
   expect(createHeaders[0]?.['x-terminal-session-token']).toBe(ROTATED_TERMINAL_TOKEN)
+  // 补发的创建之后紧跟着确认，它走的是同一道终端身份闸门，同样要带换回来的新票。
+  await ack.expectAcked(1)
+})
+
+/* ══ 一次确认失败之后，屏幕上说的是不是实话（2026-09-14） ═══════════════════════
+ *
+ * `scanDeliveryAck` 那份纯函数用例已经把「哪些码算确定结论」逐条跑过了，但它证明不了
+ * 这一层：**页面拿到那个结论之后做了什么**。判错的两个方向在屏幕上代价不对称 ——
+ *
+ *   · 把「没确认」画成「已确认」→ 用户照着面板指引扫一张纸，那份文件在服务端不会
+ *     投给任何会话，人在机器前白等到轮询上限，屏幕全程一句解释都没有；
+ *   · 把「服务端明确不认」画成「再试试」→ 页面对着一场自己根本碰不到的会话一直重试，
+ *     而那条任务还占着这台终端的活动会话。
+ *
+ * 所以下面三条都走真实的设置页接线（真发创建、真发确认、真看 CTA 和指引），
+ * 并且各自钉住「撤没撤」这一件最容易被文案掩盖的事：确定结论必须撤，
+ * 不确定结论**必须不撤**（撤了就把一场服务端并没有拒绝的会话白白作废）。 */
+
+/** 设置页四样「可以去面板操作了」的证据。一条都不许出现在没确认的那几屏上。 */
+async function expectNoPanelGuidance(page: Page): Promise<void> {
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('服务端指引：第一步', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
+  await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
+}
+
+test('a definitive ack refusal revokes the session and offers a plain restart, not a retry @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerLegacyReadyDevice(api)
+  const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
+  const revokes = recordRevokeRequests(page)
+  api.respond('POST', '/api/v1/scan/sessions', { status: 200, json: createdSession() })
+  // 服务端明确不认这一场：任务不是未过期的 waiting/matched，再问一百次也是同一个答案。
+  api.respond('POST', ACK_PATH, {
+    status: 409,
+    json: { success: false, error: { code: 'SCAN_TASK_ACK_NOT_ALLOWED', message: '当前扫描任务状态不允许确认投递' } },
+  })
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+
+  await enterSettingsFromVisibleStart(page)
+
+  // ① 屏幕如实说这一场没拿到投递授权，并且**明说别去面板按开始**。
+  await expect(page.getByText('这次扫描会话没能取得投递授权', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/现在请先别在面板上按开始/).first()).toBeVisible()
+  await expectNoPanelGuidance(page)
+
+  // ② 出路只有「重新开始一次扫描」。这一屏上「再确认一次」是错的主行动：
+  //    服务端已经把话说死了，再问只会拿回同一个 409。
+  await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '再确认一次' })).toHaveCount(0)
+
+  // ③ 服务端那条任务必须被撤掉，且用的是本机手里那份控制凭证。
+  //    只改屏幕不撤任务的话，它会留在终端上占住活动会话。
+  await expect.poll(() => revokes().length).toBe(1)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(CONTROL_TOKEN)
+
+  // ④ 本机登记里那一场也必须抹掉：留着它，看门狗整页重载之后会复水成「有会话」。
+  const stored = await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '')
+  expect(stored).not.toContain(CONTROL_TOKEN)
+
+  // ⑤ 确定结论不许自动重来：既不重发确认，也不顺手再建一场
+  //    （页面刚对用户宣告过结论，重不重开由他自己按那颗按钮决定）。
+  await page.waitForTimeout(1_500)
+  expect(ackRequests()).toBe(1)
+  expect(createRequests()).toBe(1)
+})
+
+test('a retryable ack failure keeps the session, says so honestly, and recovers on retry @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerLegacyReadyDevice(api)
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
+  const revokes = recordRevokeRequests(page)
+  api.respond('POST', '/api/v1/scan/sessions', { status: 200, json: createdSession() })
+  /* 第一次 5xx（服务端并没有拒绝这一场），第二次成功。
+   * 「再确认一次」按下去必须真的能把人救回来 —— 只画一颗按不出结果的按钮，
+   * 等于把用户困在一屏没有出路的诊断里。 */
+  let ackAttempts = 0
+  api.respondWith('POST', ACK_PATH, async () => {
+    ackAttempts += 1
+    if (ackAttempts === 1) {
+      return { status: 500, json: { success: false, error: { code: 'INTERNAL_ERROR', message: '服务异常' } } }
+    }
+    return { status: 200, json: { success: true, data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: DELIVERY_ACKED_AT } } }
+  })
+
+  await enterSettingsFromVisibleStart(page)
+
+  // ① 不把话说死：会话确实建成了，缺的只是那一次确认。
+  await expect(page.getByText('还没确认这台机器能收这份文件', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/现在按开始只会白扫一张纸/).first()).toBeVisible()
+  await expectNoPanelGuidance(page)
+
+  // ② 出路是「再确认一次」，不是「重新开始一次扫描」：重开一场只会白建一条任务。
+  await expect(page.getByRole('button', { name: '再确认一次', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新开始一次扫描' })).toHaveCount(0)
+
+  // ③ **不许撤**。服务端没有拒绝这一场，它仍然停在不可投递，谁都收不到那张纸；
+  //    这时候撤掉等于把一场还能救回来的会话白白作废。
+  await page.waitForTimeout(1_000)
+  expect(revokes(), '不确定的失败不是拒绝：撤掉它等于替服务端做了它没做的决定').toHaveLength(0)
+  expect(ackRequests(), '不确定的失败也不许自动重发：重发由用户按那颗按钮触发').toBe(1)
+
+  // ④ 用户按下「再确认一次」：这一次成功，指引与「我已操作」才随之上屏。
+  await page.getByRole('button', { name: '再确认一次', exact: true }).click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText('服务端指引：第一步', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toBeVisible()
+  await expect.poll(ackRequests).toBe(2)
+  expect(revokes()).toHaveLength(0)
+})
+
+test('a 2xx ack without a delivery timestamp is not treated as confirmed @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  registerLegacyReadyDevice(api)
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
+  const revokes = recordRevokeRequests(page)
+  api.respond('POST', '/api/v1/scan/sessions', { status: 200, json: createdSession() })
+  /* 200 但回执里没有那一笔 deliveryAckedAt。
+   *
+   * 这是最容易被放过去的一种：只看 HTTP 状态码的实现会当场放行，把用户支到面板上，
+   * 而服务端那条任务此刻仍然不可投递 —— 他扫出来的纸不会进任何会话。
+   * 放行的判据必须是「服务端真的写下了那一笔」。 */
+  api.respond('POST', ACK_PATH, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID } },
+  })
+
+  await enterSettingsFromVisibleStart(page)
+
+  await expect(page.getByText('还没确认这台机器能收这份文件', { exact: true }).first()).toBeVisible()
+  await expectNoPanelGuidance(page)
+  // 空回执不是「服务端明确不认」，所以出路仍然是再问一次，而且不许撤这一场。
+  await expect(page.getByRole('button', { name: '再确认一次', exact: true })).toBeVisible()
+  await page.waitForTimeout(1_000)
+  expect(revokes(), '空回执证明不了服务端拒绝，不许据此撤掉用户的会话').toHaveLength(0)
+  expect(ackRequests()).toBe(1)
+})
+
+test('the wait page tells the truth when the ack is definitively refused @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  const revokes = recordRevokeRequests(page)
+  const ackPath = `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`
+  const ackRequests = countRequests(page, 'POST', ackPath)
+  /* 等待页几乎总是从设置页确认成功之后走过来的，但看门狗整页重载会让它凭
+   * sessionStorage 里那份 live 直接挂起来 —— 那一场可能早就过期或被撤掉了。
+   * 这一屏此刻绝不能继续说「请在打印机面板完成扫描」：那是假话。 */
+  api.respond('POST', ackPath, {
+    status: 409,
+    json: { success: false, error: { code: 'SCAN_TASK_ACK_NOT_ALLOWED', message: '当前扫描任务状态不允许确认投递' } },
+  })
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+  /* 等待页挂载即开轮询（和确认并行，互不依赖）。给一个「还在等」的诚实回答：
+   * 这条用例要证明的是**确认被拒**这一支改判了这一屏，不是轮询替它改的判。 */
+  api.respond('GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        scanTaskId: SCAN_TASK_ID,
+        status: 'waiting',
+        scanType: 'resume',
+        file: null,
+        errorCode: null,
+        errorMessage: null,
+        expiresAt: LATER,
+      },
+    },
+  })
+
+  await page.goto('/scan')
+  await seedLiveScanSession(page, 'progress')
+  await page.goto('/scan?stage=progress')
+
+  // ① 如实落一个失败结果，不在这一屏继续假装还在等文件。
+  await expect(page.getByText(/服务端没有给这一场投递授权/).first()).toBeVisible({ timeout: 10_000 })
+  // ② 这一屏绝不许再出现那句把人支到面板上的话。
+  await expect(page.getByText(/请在打印机面板完成扫描/)).toHaveCount(0)
+  // ③ 服务端那条任务被撤掉（localGiveUp），用的是本机登记里那份控制凭证。
+  await expect.poll(() => revokes().length).toBe(1)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(REVOKE_CONTROL_TOKEN)
+  // ④ 确定结论不许自动重发确认。
+  await page.waitForTimeout(1_000)
+  expect(ackRequests()).toBe(1)
+})
+
+// ── 凭据没能真正落进本机登记（2026-09-14 P1）─────────────────────────────────
+//
+// 设置页原先的顺序是：`patchScanWorkbenchSession({ live })` → 立刻 ACK。可那一句
+// 是 void 的，底下的 `saveScanWorkbenchSession` 把 `setItem` 的异常吞掉了 ——
+// 而更糟的一种是**根本不抛**：隐私模式、配额写满、被扩展改写过的 sessionStorage
+// 都可能静默什么也不做。两种情况下页面都照旧往下走，把 ACK 发出去。
+//
+// ACK 一成功，服务端那条任务就变得可投递（deliveryAckedAt 非空，60 秒未确认回收器
+// 再也收不到它），而本机其实一个字节都没记住：看门狗整页重载之后没有任何界面找得回
+// 这一场，它会一直可投递到自然过期 —— 下一位走到面板前按下扫描，文件投给上一位。
+// 这正是 ACK 这道闸本来要消灭的那种收件箱，只是换了一条路重新长出来。
+//
+// 所以放行判据改成了「写完读回来还是同一串字节」（patchScanWorkbenchSessionWithDurableLive）。
+// 这条用例在**创建响应刚回来、正要落盘**的那一点上把写入静默掐掉，钉住四件事：
+// 一个 ACK 都不发、刚建的那条任务被撤掉、屏上不出现任何「已创建 / 去面板操作」、
+// 本机不留下任何凭据。
+
+/** 只掐带 live 的那一笔写入，其余照写 —— 这样「读回来对不上」不会被误读成「存储整个坏了」。 */
+async function silenceLiveSessionWrites(page: Page): Promise<void> {
+  await page.addInitScript((sessionKey) => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key: string, value: string): void {
+      // 静默丢弃（刻意不抛）：真实环境里配额写满 / 被扩展改写过的 storage 就是这样，
+      // 而 try/catch 对它一个字都读不到。抛异常那一支由单元测试覆盖。
+      if (key === sessionKey && String(value).includes('"live"')) return
+      originalSetItem.call(this, key, value)
+    }
+  }, 'ai-job-print:current-scan-workbench')
+}
+
+test('a created session whose credentials never reach storage is revoked, never acked @kiosk', async ({ page, api }) => {
+  await silenceLiveSessionWrites(page)
+  registerShell(api)
+  registerLegacyReadyDevice(api)
+  const createRequests = countRequests(page, 'POST', '/api/v1/scan/sessions')
+  const createHeaders: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== '/api/v1/scan/sessions') return
+    createHeaders.push(request.headers())
+  })
+  // 刻意**不注册** ACK：一次都不该发生。ApiRouter 对未注册请求一律 abort 并在拆卸时
+  // 报 Unhandled API，所以就算下面的计数被改坏，这一层也会把它抓出来。
+  const ackRequests = countRequests(page, 'POST', ACK_PATH)
+  const revokes = recordRevokeRequests(page)
+  api.respond('POST', '/api/v1/scan/sessions', { status: 200, json: createdSession() })
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+
+  await enterSettingsFromVisibleStart(page)
+
+  // ① 如实说「本机没能记住」，并且这一屏是**结论**，不是还在加载。
+  await expect(page.getByText('本机没能记住这次扫描会话', { exact: true }).first()).toBeVisible()
+  await expect(page.getByTestId('scan-live-not-durable-notice')).toBeVisible()
+  await expect(page.getByText(/先别在面板上按开始/).first()).toBeVisible()
+
+  // ② 屏上一个字都不许出现「已创建 / 去面板操作」。
+  await expectNoPanelGuidance(page)
+  await expect(page.getByText(CONTROL_TOKEN, { exact: false })).toHaveCount(0)
+
+  // ③ 刚建的那条任务必须被撤掉，用的是本机手里那份控制凭证 + **创建时那个身份**
+  //    （服务端 cancel() 按 endUserId 校验；身份对不上只会 403 —— 看起来撤了，其实没撤）。
+  await expect.poll(() => revokes().length).toBe(1)
+  expect(revokes()[0]?.['x-scan-session-control']).toBe(CONTROL_TOKEN)
+  expect(revokes()[0]?.['x-terminal-id']).toBe('KSK-001')
+  expect(revokes()[0]?.authorization ?? null).toBe(createHeaders[0]?.authorization ?? null)
+
+  // ④ 一个 ACK 都没发。这是这条修复的要害：ACK 一成功那条任务就可投递了，
+  //    而本机根本没记住它 —— 那就是一个没有任何界面在看着的收件箱。
+  await page.waitForTimeout(1_000)
+  expect(ackRequests(), '没记住凭据就不许确认投递授权').toBe(0)
+
+  // ⑤ 本机不留任何凭据；也没有被复水回来的 live。
+  const stored = await page.evaluate(() => window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '')
+  expect(stored).not.toContain(SCAN_TASK_ID)
+  expect(stored).not.toContain(CONTROL_TOKEN)
+  expect(stored).not.toContain('"live"')
+  // 阳性对照：不带 live 的那一笔写照样落了盘 —— 所以上面那些 false 是「这一场没记住」，
+  // 不是「这台机器的 storage 整个坏了，什么都写不进去」。
+  expect(stored).toContain('"scanType":"resume"')
+
+  // ⑥ 不自动重建：重来一次只会在同一处再失败，还多留一条要撤的服务端任务。
+  //    这一屏因此也不给「重新开始一次扫描」，只给安全返回 + 叫工作人员。
+  expect(createRequests(), '存储写不进去时不许自动再建一场').toBe(1)
+  await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '再确认一次' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '安全返回扫描首页', exact: true })).toBeVisible()
+  // 那颗禁用按钮也不许说「未创建扫描任务」：任务**建过**，随后被本页撤掉了。
+  await expect(page.getByRole('button', { name: '本机存储不可用，无法建会话', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '未创建扫描任务' })).toHaveCount(0)
 })

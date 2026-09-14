@@ -368,12 +368,105 @@ function installSameSheetScanServer(page: Page): {
    * outcomeUnknown（「服务端可能已经收到，结果未知」），和 HTTP 错误不是同一条分支。
    */
   failNextCreate: (failure: { kind: 'offline' } | { status: number; code: string; message: string }) => void
+  /**
+   * 让下一次配对创建**真的把 child 建出来**，然后把回话丢掉。
+   *
+   * 这是 P1 本体：服务端提交成功（一条 child 挂在这台终端上 waiting 等文件），
+   * 浏览器却只收到一个 TypeError。本机既不知道 child 的 id 也不知道它的 controlToken，
+   * 于是屏幕上什么都没有，而那条 waiting 会去接下一位用户的面板扫描。
+   *
+   * 和 `failNextCreate({kind:'offline'})` 的区别正是这条用例的全部要点：那一条是
+   * 「请求根本没落地」，这一条是「落地了、回话丢了」。浏览器侧两者一模一样。
+   */
+  dropNextCreateResponse: () => void
+  /**
+   * 让那条已经提交的 child 变成不可恢复（过期 / 被撤 / 已完成）。
+   * 服务端此后对同一枚授权回 409 `SCAN_RETRY_CHILD_NOT_RECOVERABLE`，且不开 grandchild。
+   */
+  makeChildUnrecoverable: () => void
+  /** 服务端侧真实存在的 child 任务 id（按创建顺序）。断言「只建了一条」用。 */
+  childIds: () => string[]
+  /** **生效过**的 DELETE 对应的 scanTaskId。断言「领回来的 child 被撤掉了」用。 */
+  deleted: () => string[]
+  /**
+   * 浏览器**发出过**的每一次 DELETE，含在路上丢掉的那些（按发生顺序，可重复）。
+   *
+   * 和 {@link deleted} 分开，是因为这两件事在「撤销丢了」那条路径上必须分得开：
+   * 前者是「本机确实又发了一次」，后者是「服务端那条任务真的没了」。
+   * 混成一个数组，补偿用例就只能证明其中一件。
+   */
+  deleteAttempts: () => string[]
+  /** 让下一次 DELETE 在路上丢掉：服务端从未收到，那条任务原地不动。 */
+  dropNextDelete: () => void
+  /** 已经收到投递确认（ACK）的 scanTaskId。没在这里面的任务对 Agent 不可见。 */
+  acked: () => string[]
+  /** 让下一次投递确认**永远不回话**：用来把页面钉在「正在确认投递授权」那一屏上。 */
+  hangNextAck: () => void
+  /**
+   * 让下一次投递确认**挂住，直到用例放行**；放行之后它照常处理（会真的确认成功）。
+   *
+   * 和 {@link hangNextAck} 的区别正是那条补偿用例的全部要点：hang 住不回话时
+   * 服务端那条任务永远不会变得可投递，怎么写都是安全的；而真实的危险场景是
+   * 「用户走了，那次确认**随后成功了**」—— 只有放得开的挂起才模拟得出来。
+   */
+  holdNextAck: () => void
+  /** 放行被 {@link holdNextAck} 挂住的那一次确认。 */
+  releaseHeldAck: () => void
+  /**
+   * 模拟一次 **Agent** 的 `GET /terminals/:id/scan-tasks/current-lease`。
+   *
+   * 这是整条链路上唯一能回答「面板上扫出来的文件会被投给谁」的地方。
+   * 服务端只把**已确认且仍在 waiting** 的任务签成租约；没确认的行在这里根本看不见
+   * （scan-tasks.service.ts 的 `deliveryAckedAt: { not: null }`）。
+   *
+   * 刻意走页面里的 fetch 而不是 `page.request`：`page.request` 不经过 `page.route`，
+   * 那样问到的就不是上面这份服务端模型，断言等于白做。
+   */
+  currentLease: () => Promise<{ status: number; code?: string; scanTaskId?: string }>
 } {
   const creates: CreateAttempt[] = []
   const authorized = new Set<string>()
   const known = new Set<string>()
+  const children: string[] = []
+  const deleted: string[] = []
+  /** 浏览器发出过的每一次 DELETE（含丢掉的）。补偿用例要数「第二次发了没有」。 */
+  const deleteAttempts: string[] = []
+  let dropNextDeleteRequest = false
+  /**
+   * 每条任务的 controlToken。ACK 要按它验身份（服务端比对 controlTokenHash）。
+   * 上一场那条预置进去：它走到过 matched（文件已经被取走），而只有**确认过**的任务
+   * 才可能被 Agent 租走并投递 —— 所以「上一场早就确认过」是这份模型唯一诚实的写法。
+   */
+  const controlTokens = new Map<string, string>([[PRIOR_TASK_ID, PRIOR_CONTROL_TOKEN]])
+  const acked = new Set<string>([PRIOR_TASK_ID])
+  let hangNextAckResponse = false
+  /**
+   * 被 `holdNextAck()` 挂起的那一次确认的闸门。
+   *
+   * promise 在 **`holdNextAck()` 那一刻**就建好，不是等路由跑到才建。
+   * 差别只在一种顺序上：`releaseHeldAck()` 赶在确认请求到达之前调用时 ——
+   *   · 把 resolve 留到路由里再赋值的写法，这一次放行会落到那个空的默认函数上，
+   *     被**静默丢掉**（当前这条用例仍然会过，因为后面还有一次真正的放行；
+   *     但用例一改动顺序，丢掉的那一次就变成一次挂到超时的偶发失败）；
+   *   · 先建后用的写法，闸门已经是开的，请求到了直接穿过去。
+   * 也就是说这份夹具的行为不再取决于「页面什么时候把那个请求发出来」——
+   * 而那件事恰恰不由用例控制。
+   */
+  let heldAckGate: Promise<void> | null = null
+  let releaseHeldAckGate: () => void = () => undefined
   let authorityConsumed = false
   let hangNext = false
+  let dropNextResponse = false
+  /**
+   * 那枚授权被消费之后，服务端记下它生出来的那条 child。
+   *
+   * 配对创建的幂等就靠它：同一对凭据再来一次，回的是**同一条**（id 不变、
+   * controlToken 就是上一场那份明文），而不是 403，也不是第二条 child。
+   * 这份模型逐条对着 scan-tasks.service.ts 的 recoverRetryChildIfPresent 写。
+   */
+  let retryChild: { id: string; instructions: string[]; expiresAt: string } | null = null
+  /** child 已经不在 waiting/matched（过期 / 被撤 / 已完成）：回 409，且不许再开 grandchild。 */
+  let childRecoverable = true
   let failNext: { kind: 'offline' } | { status: number; code: string; message: string } | null = null
 
   const json = (route: Route, status: number, body: unknown) =>
@@ -420,7 +513,33 @@ function installSameSheetScanServer(page: Page): {
     }
     if (retryId) {
       const pairOk = retryId === PRIOR_TASK_ID && retryToken === PRIOR_CONTROL_TOKEN
-      if (!pairOk || authorityConsumed) {
+      /* 身份不对一律 403，且**不泄露 child 存不存在** —— 和服务端
+       * assertRetryIdentity 同一口径：先验身份，再谈恢复。 */
+      if (!pairOk) {
+        await fail(route, 403, 'SCAN_RETRY_NOT_AUTHORIZED', '重扫授权无效、已过期或已使用')
+        return
+      }
+      /* 幂等重放：授权已经被消费、child 也还在 → 把**同一条**原样交回来。
+       * 这是 2026-09-14 的服务端契约，也是本机重放之所以安全的全部依据：
+       * 它不是「再建一个」，而是「把刚才那个领回来」。 */
+      if (authorityConsumed && retryChild) {
+        if (!childRecoverable) {
+          await fail(route, 409, 'SCAN_RETRY_CHILD_NOT_RECOVERABLE', '该重扫会话已不可恢复，请重新发起扫描')
+          return
+        }
+        await json(route, 200, {
+          success: true,
+          data: {
+            scanTaskId: retryChild.id,
+            // child 的 controlToken 就是上一场那份明文（服务端不新铸、不落明文）。
+            controlToken: PRIOR_CONTROL_TOKEN,
+            instructions: retryChild.instructions,
+            expiresAt: retryChild.expiresAt,
+          },
+        })
+        return
+      }
+      if (authorityConsumed) {
         await fail(route, 403, 'SCAN_RETRY_NOT_AUTHORIZED', '重扫授权无效、已过期或已使用')
         return
       }
@@ -429,14 +548,31 @@ function installSameSheetScanServer(page: Page): {
 
     const id = `scan-rescan-${creates.length}`
     known.add(id)
-    if (retryId) authorized.add(id)
+    children.push(id)
+    const instructions = ['放好原件', '在打印机面板选扫描到网络文件夹']
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    // child 的 controlToken 就是上一场那份明文（幂等重放靠的就是这一点）；
+    // 普通创建则各发各的。ACK 按这一份验身份。
+    controlTokens.set(id, retryId ? PRIOR_CONTROL_TOKEN : `session-control-${creates.length}`)
+    if (retryId) {
+      authorized.add(id)
+      retryChild = { id, instructions, expiresAt }
+    }
+    /* 提交成功之后才丢回话 —— 顺序就是 P1 的形状：服务端这边 child 已经落地并开始
+     * 等文件，客户端那边只看到一个 TypeError。放在提交之前 abort 就成了
+     * failNextCreate('offline')，测的是另一件事。 */
+    if (dropNextResponse) {
+      dropNextResponse = false
+      await route.abort('connectionfailed')
+      return
+    }
     await json(route, 200, {
       success: true,
       data: {
         scanTaskId: id,
-        controlToken: `session-control-${creates.length}`,
-        instructions: ['放好原件', '在打印机面板选扫描到网络文件夹'],
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        controlToken: retryId ? PRIOR_CONTROL_TOKEN : `session-control-${creates.length}`,
+        instructions,
+        expiresAt,
       },
     })
   })
@@ -445,6 +581,18 @@ function installSameSheetScanServer(page: Page): {
     const request = route.request()
     const id = new URL(request.url()).pathname.split('/').pop() ?? ''
     if (request.method() === 'DELETE') {
+      deleteAttempts.push(id)
+      /* 在途丢失：浏览器确实发了，服务端从未收到 —— 那条任务原地不动，
+       * 而本机永远不会知道（撤销是 fire-and-forget，回执一律吞掉）。
+       * 这正是 keepalive 请求随文档拆卸被掐断 / 网络抖动时的真实形状。 */
+      if (dropNextDeleteRequest) {
+        dropNextDeleteRequest = false
+        await route.abort('connectionfailed')
+        return
+      }
+      deleted.push(id)
+      // 撤掉的 child 随即不可恢复：服务端此后对同一枚授权回 409，不会再开 grandchild。
+      if (retryChild && retryChild.id === id) childRecoverable = false
       await json(route, 200, { success: true, data: { scanTaskId: id, status: 'cancelled' } })
       return
     }
@@ -474,6 +622,85 @@ function installSameSheetScanServer(page: Page): {
     })
   })
 
+  /* 投递确认。注册在 `sessions/*` **之后**（Playwright 后注册的先匹配），
+   * 所以 `/scan/sessions/:id/ack` 永远落在这里，不会被上面那条状态/取消路由接走。
+   *
+   * 逐条对着 scan-tasks.service.ts 的 ack() 写：
+   *   · 没有终端身份 → 401（服务端那边是 TerminalIdentityGuard + x-terminal-id 校验）；
+   *   · controlToken 对不上 → 403（assertTaskReadAccess）；
+   *   · 任务不存在 → 404；
+   *   · **已经确认过 → 原样回那一刻的时间戳**（幂等，而且这一条排在状态检查之前 ——
+   *     所以一条确认过的任务即使后来失败 / 过期，再确认仍然是 200）；
+   *   · 已被撤销 / 已终态 → 409 SCAN_TASK_ACK_NOT_ALLOWED。 */
+  void page.route('**/api/v1/scan/sessions/*/ack', async (route) => {
+    const request = route.request()
+    if (request.method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    if (hangNextAckResponse) {
+      hangNextAckResponse = false
+      await new Promise(() => {})
+      return
+    }
+    /* 挂住但放得开：用例放行之后这一次照常往下走，于是它**真的会确认成功**。
+     * 「用户已经走了，而那次确认随后成功了」只有这样才模拟得出来。 */
+    if (heldAckGate) {
+      const gate = heldAckGate
+      heldAckGate = null
+      await gate
+    }
+    const segments = new URL(request.url()).pathname.split('/')
+    const id = segments[segments.length - 2] ?? ''
+    const headers = request.headers()
+    if (!headers['x-terminal-id'] || !headers['x-terminal-session-token']) {
+      await fail(route, 401, 'TERMINAL_SESSION_INVALID', '终端安全会话无效')
+      return
+    }
+    if (!known.has(id) && id !== PRIOR_TASK_ID) {
+      await fail(route, 404, 'SCAN_TASK_NOT_FOUND', '扫描任务不存在')
+      return
+    }
+    if (headers['x-scan-session-control'] !== controlTokens.get(id)) {
+      await fail(route, 403, 'SCAN_TASK_FORBIDDEN', '无权确认该扫描任务')
+      return
+    }
+    if (acked.has(id)) {
+      await json(route, 200, {
+        success: true,
+        data: { scanTaskId: id, deliveryAckedAt: '2026-09-14T00:00:00.000Z' },
+      })
+      return
+    }
+    if (deleted.includes(id)) {
+      await fail(route, 409, 'SCAN_TASK_ACK_NOT_ALLOWED', '当前扫描任务状态不允许确认投递')
+      return
+    }
+    acked.add(id)
+    await json(route, 200, {
+      success: true,
+      data: { scanTaskId: id, deliveryAckedAt: new Date().toISOString() },
+    })
+  })
+
+  /* Agent 那一侧的租约端点。这份模型只做一件事，但它是整条链路的判据：
+   * **没确认的 waiting 行在这里看不见**。 */
+  void page.route('**/api/v1/terminals/*/scan-tasks/current-lease', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    const leasable = children.find((id) => acked.has(id) && !deleted.includes(id))
+    if (!leasable) {
+      await fail(route, 409, 'NO_WAITING_SCAN_TASK', '没有匹配的等待中扫描任务')
+      return
+    }
+    await json(route, 200, {
+      success: true,
+      data: { scanTaskId: leasable, deliveryLease: `lease-${leasable}` },
+    })
+  })
+
   // 结果页会真的把回执里那条签名内容链接加载进预览，别让它撞成未注册请求。
   void page.route(`**${SAME_SHEET_FILE.fileUrl.split('?')[0]}**`, async (route) => {
     await route.fulfill({
@@ -491,6 +718,32 @@ function installSameSheetScanServer(page: Page): {
     consumeAuthorityUpfront: () => { authorityConsumed = true },
     hangNextCreate: () => { hangNext = true },
     failNextCreate: (failure) => { failNext = failure },
+    dropNextCreateResponse: () => { dropNextResponse = true },
+    makeChildUnrecoverable: () => { childRecoverable = false },
+    childIds: () => [...children],
+    deleted: () => [...deleted],
+    deleteAttempts: () => [...deleteAttempts],
+    dropNextDelete: () => { dropNextDeleteRequest = true },
+    acked: () => [...acked],
+    hangNextAck: () => { hangNextAckResponse = true },
+    holdNextAck: () => {
+      heldAckGate = new Promise<void>((resolve) => { releaseHeldAckGate = resolve })
+    },
+    releaseHeldAck: () => { releaseHeldAckGate() },
+    currentLease: () => page.evaluate(async () => {
+      const response = await fetch('/api/v1/terminals/KSK-001/scan-tasks/current-lease', {
+        headers: { Accept: 'application/json' },
+      })
+      const payload = (await response.json()) as {
+        data?: { scanTaskId?: string }
+        error?: { code?: string }
+      }
+      return {
+        status: response.status,
+        code: payload.error?.code,
+        scanTaskId: payload.data?.scanTaskId,
+      }
+    }),
   }
 }
 
@@ -599,15 +852,34 @@ test('the safe rescan sends the prior task id in the body and its token only in 
   // ② 凭证只在头里：进了 body 就会跟着请求日志与回放一起留存。
   expect(JSON.stringify(attempt.body)).not.toContain(PRIOR_CONTROL_TOKEN)
 
-  // ③ 此刻本机登记里已经没有上一场的凭证了（live 被移交时抹掉），URL 里也没有 ——
-  //    它只活在页面内存里，却仍然把上面那次请求发对了。
+  /* ③ 这个凭证不许散落到 localStorage / URL / 请求 body 里。
+   *
+   * 2026-09-14 口径修正：sessionStorage 这一格从「必须没有」改成「只许以**本场会话自己的
+   * controlToken** 的身份出现，且只有那一处」。
+   *
+   * 变的不是前端，是服务端契约：配对创建现在把 child 的 controlToken **就设成上一场那份
+   * 明文**（scan-tasks.service.ts：`controlToken = retryControlToken`，child 的
+   * controlTokenHash 直接沿用 prior 的），这正是「丢了回话还能凭同一个头把 child 领回来」
+   * 的实现方式。于是这串字节在创建成功之后就是这一场的会话凭证，而会话凭证本来就要写进
+   * 登记（看门狗整页重载之后还要接着轮询同一场，见 scanWorkbenchSession）。
+   *
+   * 所以断言不能简单放宽成「随便出现在哪都行」——判据收紧成三条：
+   *   · 只出现在 live.controlToken 这一个位置；
+   *   · 整份登记里出现的次数恰好一次（别处再抄一份就是真的泄漏）；
+   *   · localStorage / URL / body 仍然一个字节都没有。 */
   const leak = await page.evaluate((token) => {
-    const session = window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? ''
+    const raw = window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? ''
+    const parsed = JSON.parse(raw || '{}') as { live?: { controlToken?: string } }
     const local = Array.from({ length: window.localStorage.length }, (_, i) => window.localStorage.key(i))
       .some((key) => key !== null && (window.localStorage.getItem(key) ?? '').includes(token))
-    return { inSession: session.includes(token), inLocal: local, inUrl: window.location.href.includes(token) }
+    return {
+      onlyAsLiveControlToken: parsed.live?.controlToken === token,
+      occurrences: raw.split(token).length - 1,
+      inLocal: local,
+      inUrl: window.location.href.includes(token),
+    }
   }, PRIOR_CONTROL_TOKEN)
-  expect(leak).toEqual({ inSession: false, inLocal: false, inUrl: false })
+  expect(leak).toEqual({ onlyAsLiveControlToken: true, occurrences: 1, inLocal: false, inUrl: false })
 
   // ④ 页面如实说明这一次是什么性质的会话。
   await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
@@ -814,22 +1086,25 @@ test('a reload after the retry intent never turns into a plain create @scan-safe
   await page.reload()
   await expect(page.getByText('扫描未完成', { exact: true }).first()).toBeVisible()
 
-  // 重载之后按主行动。无论落到哪一条（首屏 effect 按同一份 live 登记重新登记 →
-  // 安全重扫；或者根本没有凭据 → 显式普通会话），**绝不许**出现的是
-  // 「带着重扫意图跳过去，却发了一个不带两半的创建」。
-  await page.locator('.qx-ctabar .qx-btn[data-variant="primary"]').click()
+  /* 2026-09-14 收紧：这条断言原来接受「配对 或 明确声明的普通会话」两种结局。
+   * 那个析取在当时是保守写法，但它让用例证明不了**实际**走的是哪一条 —— 而两条
+   * 的代价完全不同（普通会话会让同一张纸撞上两小时的同字节去重）。
+   *
+   * 现在结局是确定的：结果页挂载时 `armIfPossible()` 按登记里那份 live
+   * （PRIOR_TASK_ID + PRIOR_CONTROL_TOKEN，整页重载带不走的只是模块内存里那一份）
+   * 重新登记授权，所以重载之后主行动必然是「重试扫描（同一份材料）」。
+   * 按名字取按钮而不是按 `[data-variant="primary"]` 取：名字对不上就当场红，
+   * 而不是顺手点到另一条分支再放行。
+   *
+   * 反向对照在上面那条「with no rescan credentials」用例里：登记里**没有** live 时
+   * 同一段代码只给「重新开始一次扫描」。两条合起来才说明这里测到的是真东西。 */
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
   expect(server.creates).toHaveLength(1)
   const attempt = server.creates[0]!
-  const paired = typeof attempt.body.retryOfScanTaskId === 'string'
-    && attempt.headers['x-scan-retry-control'] === PRIOR_CONTROL_TOKEN
-  const plainAndDeclared = attempt.body.retryOfScanTaskId === undefined
-    && attempt.headers['x-scan-retry-control'] === undefined
-  expect(paired || plainAndDeclared).toBe(true)
-  if (paired) {
-    expect(attempt.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
-    await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
-  }
+  expect(attempt.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
+  expect(attempt.headers['x-scan-retry-control']).toBe(PRIOR_CONTROL_TOKEN)
+  await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
 
   expect(errors).toEqual([])
 })
@@ -872,6 +1147,459 @@ test('a reload while the paired create is in flight fails closed @scan-safety', 
   expect(server.creates[1]!.body.retryOfScanTaskId).toBeUndefined()
   expect(server.creates[1]!.headers['x-scan-retry-control']).toBeUndefined()
   await expect(page.getByText('普通会话：你已确认这一次不是安全同字节重扫')).toBeVisible()
+
+  expect(errors).toEqual([])
+})
+
+/* ══ 丢失响应：把「看不见的收件箱」收回来（第三轮，P1） ══════════════════════
+ *
+ * 第一次配对创建**提交成功了**（服务端一条 child waiting 挂在这台终端上等文件），
+ * 而回话在路上丢了。浏览器侧只有一个 TypeError，本机既不知道 child 的 id，
+ * 也不知道它的 controlToken。旧实现到此为止：屏幕上落到「无法确认扫描任务状态」，
+ * 服务端那条 waiting 原地不动 —— 下一位走到面板前按下扫描，文件就投给了它。
+ * 公共一体机上，这就是一个没有任何界面在看着的收件箱。
+ *
+ * 服务端 2026-09-14 把配对创建做成了幂等：同一对凭据再发一次拿回**同一条** child。
+ * 所以本机对未知态的正确动作是重放同一对请求，把它领回来。
+ *
+ * 下面这组用例的服务端模型分得很清楚：`failNextCreate({kind:'offline'})` 是
+ * 「请求根本没落地」，`dropNextCreateResponse()` 是「落地了、回话丢了」——
+ * 浏览器侧两者一模一样，而后者正是这一轮要修的那一个。 */
+
+test('a lost create response is recovered into exactly one live session @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  // 这一次服务端**真的建出了 child**，然后把回话丢掉。
+  server.dropNextCreateResponse()
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+
+  // ① 等待屏必须改口。说「正在建扫描会话」在这一刻是假话：会话已经建成了，丢的是回话。
+  await expect(page.getByTestId('scan-create-replay-notice')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText('正在确认上一次请求').first()).toBeVisible()
+  // 屏幕必须劝阻面板操作 —— 这一刻服务端那条 child 正等着收纸。
+  // 取 testid 内部那一句：等待屏本来就另有一句「但先别在面板上按开始」，
+  // 用宽正则会同时命中两处，断言就证明不了到底是哪一句在起作用。
+  await expect(page.getByTestId('scan-create-replay-notice').getByText(/先别在面板上按开始/))
+    .toBeVisible()
+
+  // ② 重放把同一条 child 领了回来，页面据此落成**一个**真实会话。
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible({ timeout: 20_000 })
+
+  // ③ 发了两次请求，但服务端只建了**一条** child。这是幂等契约的全部意义：
+  //    重放不是「再建一个」，而是「把刚才那个领回来」。
+  expect(server.creates).toHaveLength(2)
+  expect(server.childIds()).toHaveLength(1)
+  const childId = server.childIds()[0]!
+  // ④ 两次都必须是成对的。任何一次退化成无签名的普通创建，同一张纸就会撞上
+  //    服务端两小时的同字节去重 —— 那正是这整条链路存在的理由。
+  for (const attempt of server.creates) {
+    expect(attempt.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
+    expect(attempt.headers['x-scan-retry-control']).toBe(PRIOR_CONTROL_TOKEN)
+  }
+
+  // ⑤ 本机登记里那一场就是服务端那条 child，不是本机编出来的第二个身份。
+  const live = await page.evaluate(
+    (key) => JSON.parse(window.sessionStorage.getItem(key) ?? '{}') as { live?: { scanTaskId?: string } },
+    SCAN_SESSION_KEY,
+  )
+  expect(live.live?.scanTaskId).toBe(childId)
+  // 屏幕上那个编号也必须是它 —— 用户拿着这个号去认领待会儿回传的文件。
+  await expect(page.getByText(childId, { exact: true })).toBeVisible()
+  // ⑥ 这一场的性质是「安全重扫」：服务端认了那一对，同一张纸可以原样放回去。
+  await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
+
+  /* ⑦ 领回来的那条 child **必须已经确认过投递授权**，而且确认的就是它本身。
+   *
+   * 这一条是这一轮新加的，它守的是一个很容易犯的错：重放把 child 领回来、屏幕上
+   * 画出了操作指引，但本机没有对这条 child 发确认 —— 于是用户照着指引扫出来的文件
+   * 对 Agent 是不可见的，人白等到轮询上限。指引已经出现（上面 ② 断言过），
+   * 所以这里断言 acked 里有它，等价于断言「确认排在指引之前」。 */
+  expect(server.acked()).toContain(childId)
+  // ⑧ 站到 Agent 的位置上：可投递的就是这一条，不是另一条、也不是零条。
+  const lease = await server.currentLease()
+  expect(lease.status).toBe(200)
+  expect(lease.scanTaskId).toBe(childId)
+
+  expect(errors).toEqual([])
+})
+
+test('leaving during the recovery window revokes the recovered child @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrintScanHub(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  server.dropNextCreateResponse()
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+  await expect(page.getByTestId('scan-create-replay-notice')).toBeVisible({ timeout: 10_000 })
+
+  /* 重放还在退避窗口里，用户就走了（顶栏返回 = leaveScanFlow：撤服务端 + 清本机登记 +
+   * 推进代次）。此刻本机登记里**还没有** live，所以那一次撤销无从下手 ——
+   * 真正要证明的是：随后领回来的那条 child 不许被写进任何状态，而且必须被撤掉。
+   * 这一步刻意用页内跳转，不用 page.goto：整页加载会把还在飞的重放一起干掉，
+   * 那样这条用例无论代码对不对都是绿的。 */
+  await page.locator('.qx-topbar-back').click()
+  await page.waitForURL(/\/print-scan$/)
+
+  // ① 领回来的 child 必须被撤掉。不撤它就停在 waiting 收下一位的面板扫描 ——
+  //    正是这一整轮要消灭的「看不见的收件箱」。
+  await expect.poll(
+    () => server.deleted(),
+    { timeout: 20_000, message: '离开之后领回来的 child 必须收到 DELETE' },
+  ).toContain(server.childIds()[0]!)
+
+  // ② 服务端仍然只有一条 child：离开不该让重放退化成「再建一个」。
+  expect(server.childIds()).toHaveLength(1)
+
+  /* ②' 这条 child **从来没被确认过**。
+   *
+   * 撤销可能失败（断网 / keepalive 被掐断），所以「撤了」不是这条路径上唯一的防线：
+   * 没确认过的任务在服务端本来就不可投递，还会被 60 秒未确认回收器收掉。
+   * 一旦本机在离开之后顺手对它确认一次，这层兜底就整个没了 ——
+   * 它会变成一条可投递、回收器也够不着的 waiting。 */
+  expect(
+    server.acked(),
+    '用户已经离开，这条领回来的 child 一次都不许被确认：确认等于把一个没人看着的收件箱变成可投递的',
+  ).not.toContain(server.childIds()[0]!)
+
+  /* ②'' 最终判据：站到 Agent 的位置上问「现在面板扫出来的文件投给谁」。
+   * 上面两条都是过程，这一条才是后果 —— 没有可投递的任务，也就没有跨用户串件。 */
+  expect((await server.currentLease()).code).toBe('NO_WAITING_SCAN_TASK')
+
+  // ③ 绝不许状态复活：本机登记必须是空的，也不许把上一场那份 controlToken 留下。
+  await page.waitForTimeout(1_000)
+  const residue = await page.evaluate(
+    ({ key, token }) => ({
+      session: window.sessionStorage.getItem(key),
+      leaked: (window.sessionStorage.getItem(key) ?? '').includes(token),
+    }),
+    { key: SCAN_SESSION_KEY, token: PRIOR_CONTROL_TOKEN },
+  )
+  expect(residue.session).toBeNull()
+  expect(residue.leaked).toBe(false)
+
+  // ④ 人还在打印扫描页，没有被那条迟到的响应拽回扫描流程。
+  await expect(page).toHaveURL(/\/print-scan$/)
+
+  expect(errors).toEqual([])
+})
+
+test('a child that is no longer recoverable offers only an honest plain restart @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  // child 提交了、回话丢了，而等到本机重放上来时它已经不在 waiting/matched
+  // （过期 / 被撤 / 已完成）。服务端回 409，并且**不会**再开一条 grandchild。
+  server.dropNextCreateResponse()
+  server.makeChildUnrecoverable()
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+
+  // ① 拿到 409 就当场收工，不再继续退避：确定的答案不许被拖成一屏无意义的等待。
+  await expect(page.getByText('那次安全重扫的会话已经失效', { exact: true }).first())
+    .toBeVisible({ timeout: 20_000 })
+  expect(server.creates).toHaveLength(2)
+
+  // ② 必须交代「服务端没有留下还在等文件的任务」—— 用户据此才知道自己那张纸安不安全。
+  //    同一句会在结论屏和工作台兜底里各渲染一次，取第一处即可。
+  await expect(page.getByText(/没有留下还在等文件的任务/).first()).toBeVisible()
+  //    顺带钉住：这些 description 是纯字符串，写成 markdown 会把星号打在屏幕上。
+  await expect(page.getByText(/\*\*/)).toHaveCount(0)
+
+  // ③ 出路只剩显式的普通重启：服务端不会为同一枚授权再开一条 child，
+  //    所以「再试一次安全重扫」在这一屏是一句假承诺，绝不许出现。
+  await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '再试一次安全重扫', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /重试扫描/ })).toHaveCount(0)
+
+  // ④ 按下去是一次**普通**会话，而且页面把这个选择如实记在「本次性质」里。
+  await page.getByRole('button', { name: '重新开始一次扫描', exact: true }).click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(server.creates).toHaveLength(3)
+  expect(server.creates[2]!.body.retryOfScanTaskId).toBeUndefined()
+  expect(server.creates[2]!.headers['x-scan-retry-control']).toBeUndefined()
+  await expect(page.getByText('普通会话：你已确认这一次不是安全同字节重扫')).toBeVisible()
+
+  expect(errors).toEqual([])
+})
+
+test('a 429 is answered by the server and must never be auto-replayed @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  /* 429 是一个**确定**的答案：服务端回过话了，而且它发生在消费那枚授权之前。
+   * 自动重放这一条会把整个大厅的创建额度烧掉（端点按出口 IP 限 12 次/分），
+   * 而正确处置本来就有 —— 原样放回授权，让用户自己按那颗仍然成对的按钮。 */
+  server.failNextCreate({ status: 429, code: 'RATE_LIMITED', message: '当前使用的人较多，请稍后再试' })
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+
+  await expect(page.getByText('请求过于频繁', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  // ① 一次都不许自动重发。旧的等待屏说「正在确认上一次请求」在这里就是假话。
+  expect(server.creates).toHaveLength(1)
+  await expect(page.getByTestId('scan-create-replay-notice')).toHaveCount(0)
+  // 再等一个退避周期，确认确实没有偷偷发第二个。
+  await page.waitForTimeout(2_000)
+  expect(server.creates).toHaveLength(1)
+
+  // ② 既有的手动安全重试必须原样保留：凭据还在，且有效期不因重试而延长。
+  await expect(page.getByTestId('scan-rescan-still-held')).toBeVisible()
+  await expect(page.getByRole('button', { name: '再试一次安全重扫', exact: true })).toBeVisible()
+
+  // ③ 按下去发出的仍然是成对的那一次，不是降级。
+  await page.getByRole('button', { name: '再试一次安全重扫', exact: true }).click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(server.creates).toHaveLength(2)
+  expect(server.creates[1]!.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
+  expect(server.creates[1]!.headers['x-scan-retry-control']).toBe(PRIOR_CONTROL_TOKEN)
+
+  expect(errors).toEqual([])
+})
+
+/* ── 整页重载打断重放：本机确实丢了那条 child，但它**领不走** ────────────────
+ *
+ * 这条用例接替了上一轮那个「documented local limit」。上一轮的结论是：
+ * 隐私清场最后一步是 `window.location.reload()`
+ * （KioskPrivacyGuard.pushSanitizedDestination），整页重载把还在退避窗口里的重放连同
+ * JS 上下文一起换掉，本机再没机会去领那条 child、也就没法撤它；于是服务端留下一条
+ * waiting，而当时那条 waiting 对 Agent 是**立刻可投递**的 —— 那才是真正的
+ * 「看不见的收件箱」。当时只能把它如实记成一个取舍。
+ *
+ * 服务端 2026-09-14 把那个取舍取消了：新建会话一律 `deliveryAckedAt = null`，
+ * current-lease 看不见未确认的行（60 秒没确认就回收）。本机在响应丢失的那条路径上
+ * 从来没拿到过 child 的 id，也就从来没确认过它 —— 所以这条 child 从诞生到过期
+ * **一秒都没有可投递过**。
+ *
+ * 于是判据换了，而且强了：不再问「本机撤没撤掉它」，而是直接站到 Agent 的位置上问
+ * 「面板上这一刻扫出来的文件会被投给谁」。答案必须是 NO_WAITING_SCAN_TASK。
+ * 一条留在库里但谁都领不走的行不是收件箱；一条**能被领走**的才是，
+ * 而这条用例不接受后者。 */
+test('a full reload during recovery leaves a child that no agent can lease @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  server.dropNextCreateResponse()
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+  await expect(page.getByTestId('scan-create-replay-notice')).toBeVisible({ timeout: 10_000 })
+
+  // 隐私清场的最后一步就是这个。整页重载 = 重放的执行环境没了。
+  await page.reload()
+  await page.waitForTimeout(2_000)
+
+  // ① 服务端那条 child 确实还在，本机也确实没撤掉它 —— 这一半和上一轮一样，不粉饰。
+  expect(server.childIds()).toHaveLength(1)
+  const orphan = server.childIds()[0]!
+  expect(server.deleted()).not.toContain(orphan)
+
+  // ② 但它从来没被确认过：本机在响应丢失那条路径上根本不知道它的 id。
+  expect(server.acked()).not.toContain(orphan)
+
+  // ③ **这一条才是真正的判据**：站到 Agent 的位置上问「现在扫出来的文件投给谁」。
+  //    没有可投递的任务 —— 也就没有任何跨用户串件的可能。
+  const lease = await server.currentLease()
+  expect(lease.status).toBe(409)
+  expect(lease.code).toBe('NO_WAITING_SCAN_TASK')
+  expect(lease.scanTaskId).toBeUndefined()
+
+  // ④ 本机绝不许因此说假话：重载之后凭据已经不在内存里，页面 fail-closed，
+  //    既不假装会话建成了，也不偷偷改发一个无签名的普通创建。
+  await expect(page.getByText('安全重扫凭据已经不在本机', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
+  // 重载之后不许再多发任何请求（那一次重放已经随上下文消失了）。
+  expect(server.creates).toHaveLength(1)
+
+  expect(errors).toEqual([])
+})
+
+/* ── 反向对照：确认过的会话，Agent 就该看得见 ──────────────────────────────
+ *
+ * 没有这一条，上面那条用例证明不了什么：一个永远回 NO_WAITING_SCAN_TASK 的桩
+ * 也能让它全绿。两条合起来才说明租约端点真的在按「确认过没有」分流。 */
+test('an acknowledged session is exactly what the agent may lease @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  // 建成之前 Agent 什么都领不到。
+  expect((await server.currentLease()).code).toBe('NO_WAITING_SCAN_TASK')
+
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+
+  const childId = server.childIds()[0]!
+  expect(server.acked()).toContain(childId)
+  const lease = await server.currentLease()
+  expect(lease.status).toBe(200)
+  expect(lease.scanTaskId).toBe(childId)
+
+  // 用户按「返回（取消任务）」之后它又该消失 —— 撤掉的任务不许还能被领走。
+  await page.getByRole('button', { name: '返回（取消任务）', exact: true }).click()
+  await expect.poll(() => server.deleted(), { timeout: 10_000 }).toContain(childId)
+  expect((await server.currentLease()).code).toBe('NO_WAITING_SCAN_TASK')
+
+  expect(errors).toEqual([])
+})
+
+/* ── 确认还没回来时用户就走了 ──────────────────────────────────────────────
+ *
+ * 这一刻最危险：会话已经建成、本机登记也写了，而那一次确认可能**正好在路上成功**——
+ * 成功的瞬间它就变成一条可投递的 waiting，而看着它的那个人已经走了。 */
+test('leaving while the delivery ack is in flight revokes the session @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrintScanHub(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  // 确认请求挂住不回：页面停在「正在确认投递授权」，指引与「我已操作」都不许出现。
+  server.hangNextAck()
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+
+  await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('放好原件', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
+  const childId = server.childIds()[0]!
+  expect(server.acked()).not.toContain(childId)
+
+  // 顶栏返回 = leaveScanFlow（撤服务端 + 清本机登记 + 推进代次）。用页内跳转，
+  // 不用 page.goto：整页加载会把还在飞的那次确认一起干掉，那样用例怎么写都是绿的。
+  await page.locator('.qx-topbar-back').click()
+  await page.waitForURL(/\/print-scan$/)
+
+  // ① 这一场必须被撤掉 —— 否则它就是一条没人看着的会话。
+  await expect.poll(
+    () => server.deleted(),
+    { timeout: 20_000, message: '确认途中离开之后，这一场必须收到 DELETE' },
+  ).toContain(childId)
+  // ② 站到 Agent 的位置上再确认一次：没有任何可投递的任务。
+  expect((await server.currentLease()).code).toBe('NO_WAITING_SCAN_TASK')
+  // ③ 本机登记必须干净，上一场那份 controlToken 也不许留下。
+  const residue = await page.evaluate(
+    ({ key, token }) => ({
+      session: window.sessionStorage.getItem(key),
+      leaked: (window.sessionStorage.getItem(key) ?? '').includes(token),
+    }),
+    { key: SCAN_SESSION_KEY, token: PRIOR_CONTROL_TOKEN },
+  )
+  expect(residue.session).toBeNull()
+  expect(residue.leaked).toBe(false)
+  await expect(page).toHaveURL(/\/print-scan$/)
+
+  expect(errors).toEqual([])
+})
+
+/* ── 走人时那次撤销丢了，而确认随后成功了（2026-09-14 P1） ─────────────────────
+ *
+ * 上面那条用例把确认**永远**挂住，所以服务端那条任务从头到尾不可投递 —— 它证明不了
+ * 这一条。真正的危险形状是两件事撞在一起：
+ *
+ *   ① 离开时发出的那次 DELETE 在路上丢了（keepalive 请求随文档拆卸被掐断 /
+ *      网络抖动）。撤销是 fire-and-forget、回执一律吞掉，本机永远不会知道；
+ *   ② 离开那一刻还在飞的那次 ACK **成功了**。
+ *
+ * 于是服务端那条任务同时满足：`deliveryAckedAt` 非空（60 秒未确认回收器再也收不到
+ * 它）、状态仍是 waiting（Agent 的 current-lease 看得见它）。它会一直可投递到自然
+ * 过期 —— 下一位走到面板前按下扫描，文件投给已经走掉的上一位。跨用户串件。
+ *
+ * 而「ACK 成功」恰恰是①的证据：服务端 ack() 只对未过期的 waiting/matched 放行，
+ * 那条 DELETE 真生效了的话这次确认只会拿回 409。所以确认回来的那一支必须能发出
+ * **第二次** DELETE，哪怕先前那次尽力而为的撤销已经登记过。
+ *
+ * 判据落在最后三行：本机第二次发了、服务端这次真收到了、Agent 领不到任何东西。 */
+test('an ack that succeeds after the user left forces a second revoke when the first was lost @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrintScanHub(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  // 挂住但放得开：用户离开之后再让它成功。
+  server.holdNextAck()
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+
+  await expect(page.getByTestId('scan-ack-pending-notice')).toBeVisible({ timeout: 20_000 })
+  const childId = server.childIds()[0]!
+  expect(server.acked()).not.toContain(childId)
+  // 没确认之前这一屏不许把人支到面板上去。
+  await expect(page.getByText('放好原件', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
+
+  // 离开时那一次撤销在路上丢了。页内跳转，不用 page.goto：整页加载会把还在飞的
+  // 那次确认一起干掉，那样这条用例无论代码对不对都是绿的。
+  server.dropNextDelete()
+  await page.locator('.qx-topbar-back').click()
+  await page.waitForURL(/\/print-scan$/)
+
+  // ① 本机确实按登记发了那一次，而它确实没生效 —— 前提成立，这条用例才测得到东西。
+  await expect.poll(
+    () => server.deleteAttempts(),
+    { timeout: 20_000, message: '离开时必须按本机登记发出第一次 DELETE' },
+  ).toContain(childId)
+  expect(
+    server.deleted(),
+    '第一次 DELETE 必须是无效的：它一旦生效，下面那次确认只会拿回 409，这条用例就空转了',
+  ).not.toContain(childId)
+
+  // ② 现在放行那次还在飞的确认。它会成功 —— 于是这条任务在服务端变得可投递，
+  //    而看着它的那个人已经走了。
+  server.releaseHeldAck()
+  await expect.poll(
+    () => server.acked(),
+    { timeout: 20_000, message: '这一次确认必须真的成功，否则测的还是上面那条用例' },
+  ).toContain(childId)
+
+  // ③ 判据一：本机必须**再发一次** DELETE。按「发过没有」去重的话这里永远是 1。
+  await expect.poll(
+    () => server.deleteAttempts().filter((id) => id === childId).length,
+    {
+      timeout: 20_000,
+      message: '确认成功之后必须补一次撤销：先前那次已知没生效，而任务此刻已经可投递，'
+        + '60 秒未确认回收器也收不到它了',
+    },
+  ).toBeGreaterThanOrEqual(2)
+  // ④ 判据二：这一次真的到了服务端。
+  await expect.poll(
+    () => server.deleted(),
+    { timeout: 20_000, message: '补发的那次撤销必须生效，否则任务会一直可投递到自然过期' },
+  ).toContain(childId)
+  // ⑤ 判据三（最终判据）：站到 Agent 的位置上问「现在面板扫出来的文件投给谁」。
+  await expect.poll(
+    async () => (await server.currentLease()).code,
+    { timeout: 10_000, message: '撤掉之后不许还有任何可投递的任务' },
+  ).toBe('NO_WAITING_SCAN_TASK')
+
+  // ⑥ 补偿不是「无限重试」：封顶两次，不许因为这条修复变成对服务端刷请求。
+  await page.waitForTimeout(1_500)
+  expect(server.deleteAttempts().filter((id) => id === childId).length).toBeLessThanOrEqual(2)
+  // ⑦ 本机登记必须干净，上一场那份 controlToken 也不许留下。
+  const compensationResidue = await page.evaluate(
+    ({ key, token }) => ({
+      session: window.sessionStorage.getItem(key),
+      leaked: (window.sessionStorage.getItem(key) ?? '').includes(token),
+    }),
+    { key: SCAN_SESSION_KEY, token: PRIOR_CONTROL_TOKEN },
+  )
+  expect(compensationResidue.session).toBeNull()
+  expect(compensationResidue.leaked).toBe(false)
+  await expect(page).toHaveURL(/\/print-scan$/)
 
   expect(errors).toEqual([])
 })
@@ -1361,11 +2089,14 @@ const INTERRUPTED_CREATES = [
     failure: { status: 409, code: 'SCAN_TERMINAL_BUSY', message: '该终端当前有正在进行的扫描' } as const,
     title: '本机正在扫描中',
   },
-  {
-    key: 'offline',
-    failure: { kind: 'offline' } as const,
-    title: '无法确认扫描任务状态',
-  },
+  /* 2026-09-14：'offline' 从这张表里搬走了，因为它**不再**属于这一类。
+   *
+   * 这张表管的是「服务端回过话」的失败（429 / 409）：结论确定，本机不许自动重发，
+   * 处置是原样放回授权 + 用户手动按那颗仍然成对的按钮。
+   *
+   * 断网是「连服务端收没收到都不知道」，而那正是本轮要主动收回的那条路径 ——
+   * 它现在会自动重放同一对请求。两条新用例在下面：一条证明重放把会话领了回来，
+   * 一条证明网络一直不通时它有界收工并如实说不知道。 */
 ] as const
 
 for (const attempt of INTERRUPTED_CREATES) {
@@ -1424,6 +2155,80 @@ for (const attempt of INTERRUPTED_CREATES) {
     expect(errors).toEqual([])
   })
 }
+
+/* ── 断网：唯一走自动重放的那一类（2026-09-14） ─────────────────────────────
+ *
+ * 这两条接替了上面那张表里原来的 'offline' 行。原来那一行断言的是「落到
+ * 无法确认扫描任务状态 + 等用户手动按」，那正是本轮判定为 P1 的旧行为：
+ * 第一次 POST 可能已经提交了 child，本机就此不管，服务端留下一条没人看着的
+ * waiting 去接下一位用户的面板扫描。 */
+
+test('an offline paired create is recovered automatically without any unsigned fallback @scan-safety', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  // 请求根本没落地那一种（route.abort）。浏览器侧和「落地了但回话丢了」一模一样，
+  // 所以本机的动作必须相同：重放同一对，问到有答案为止。
+  await landOnInterruptedRescan(page, server, { kind: 'offline' })
+
+  // ① 自动重放，并且屏幕如实改口（不说「正在建扫描会话」——那一刻这句可能是假的）。
+  await expect(page.getByTestId('scan-create-replay-notice')).toBeVisible({ timeout: 10_000 })
+  // ② 重放把这一场建了起来，用户不需要按任何东西。
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible({ timeout: 20_000 })
+  expect(server.creates).toHaveLength(2)
+  // ③ 两次都成对 —— 自动重放绝不许退化成无签名的普通创建。
+  for (const create of server.creates) {
+    expect(create.body.retryOfScanTaskId).toBe(PRIOR_TASK_ID)
+    expect(create.headers['x-scan-retry-control']).toBe(PRIOR_CONTROL_TOKEN)
+  }
+  // ④ 只落成一场，而且如实标注它是安全重扫。
+  expect(server.childIds()).toHaveLength(1)
+  await expect(page.getByText('安全重扫：服务端已放行同一份材料再扫一次')).toBeVisible()
+
+  // ⑤ 同一张纸真的扫得回来（桩只对配对创建回 completed）。
+  await page.getByRole('button', { name: '我已操作，开始等待' }).click()
+  await expect(page.getByText('扫描完成', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+
+  expect(errors).toEqual([])
+})
+
+test('a network that never comes back ends bounded and says so honestly @scan-safety', async ({ page, api }) => {
+  // 整张退避表跑满约 24.8 秒，这条用例要真的等完 —— 「有界」正是它要证明的东西。
+  test.setTimeout(90_000)
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapabilities(api)
+  const server = installSameSheetScanServer(page)
+
+  await landOnFailedPriorScan(page)
+  // 创建端点整条断掉：第一次和后续每一次重放都拿不到 HTTP 应答。
+  await page.route('**/api/v1/scan/sessions', async (route) => {
+    if (route.request().method() !== 'POST') { await route.fallback(); return }
+    await route.abort('connectionfailed')
+  })
+  await page.getByRole('button', { name: '重试扫描（同一份材料）', exact: true }).click()
+
+  // ① 重放到头就收工，不会一直转 —— 屏幕上给出确定的结论。
+  await expect(page.getByText('还是没能确认这次扫描会话', { exact: true }).first())
+    .toBeVisible({ timeout: 60_000 })
+
+  // ② 不许对一件本机并不知道的事下结论：既不说建成了，也不说没建成。
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
+  await expect(page.getByText('安全重扫授权已失效', { exact: true })).toHaveCount(0)
+
+  /* ③ 授权被**原样放回**（重放到头是 outcomeUnknown，不是服务端拒绝），
+   *    所以出路仍然是那颗成对的按钮，而不是把用户推去开一场注定撞去重的普通会话。 */
+  await expect(page.getByRole('button', { name: '再试一次安全重扫', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toHaveCount(0)
+  // ④ 必须解释为什么再按一次是安全的，并且不许再说「本页不会自动重发」——已经发过了。
+  await expect(page.getByText(/不会多建一场/).first()).toBeVisible()
+  await expect(page.getByText(/本页不会自动重发/)).toHaveCount(0)
+
+  expect(errors).toEqual([])
+})
 
 test('a server refusal after an interrupted create still only offers a plain restart @scan-safety', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)

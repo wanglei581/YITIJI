@@ -11,6 +11,8 @@ const PAYMENT_ORDER_ID = 'privacy-payment-order'
 const PRINT_TASK_ID = 'privacy-print-task'
 const SCAN_TASK_ID = 'privacy-scan-task'
 const SCAN_CONTROL_TOKEN = 'privacy-scan-control-token'
+/** 服务端写下投递授权的那一刻。固定值：用例断言的是「确认过」，不是具体几点。 */
+const SCAN_DELIVERY_ACKED_AT = '2026-09-14T00:00:00.000Z'
 /** idle 3s；忙碌锁顺延 2s（VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC），再加缓冲。 */
 const HARD_PRIVACY_SETTLE_MS = 6_500
 const POLL_CLEANUP_OBSERVATION_MS = 3_400
@@ -656,6 +658,23 @@ test('hard clear stops active scan polling and revokes the backend task once @pr
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
   })
+  // 设置页与等待页都「挂载即确认投递授权」：服务端新建会话一律 deliveryAckedAt = null，
+  // 确认回来之前本机停在「正在确认投递授权」，走不到本用例要清场的那一屏
+  // （契约见 src/pages/scan/scanDeliveryAck.ts）。所以本用例自己按 taskId 精确注册
+  // 这一场的 ACK —— **不挂通配兜底**（同本文件其余部分的惯例：未注册请求仍由
+  // ApiRouter fail-closed），并记下每一次的凭据：只 respond 不看请求头的话，
+  // 「本机漏带凭据」在夹具里永远不会红，而真实服务端回的是 401（无终端会话票 /
+  // 终端 id）或 403（控制凭据对不上）。
+  const ackCalls: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`) return
+    ackCalls.push(request.headers())
+  })
+  api.respond('POST', `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: SCAN_DELIVERY_ACKED_AT } },
+  })
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     pollRequests += 1
     await route.fulfill({
@@ -694,6 +713,12 @@ test('hard clear stops active scan polling and revokes the backend task once @pr
   )
   await page.goto('/scan?stage=progress')
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  await expect.poll(() => ackCalls.length).toBeGreaterThan(0)
+  for (const headers of ackCalls) {
+    expect(headers['x-terminal-id']).toBe('KSK-001')
+    expect(headers['x-terminal-session-token'] ?? '').not.toBe('')
+    expect(headers['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+  }
   await expect.poll(() => pollRequests).toBeGreaterThan(0)
   await markCurrentDocument(page, 'scan-progress-document')
 
@@ -738,6 +763,23 @@ test('hard clear revokes a created scan settings session @privacy-kiosk', async 
     status: 200,
     json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
   })
+  // 设置页与等待页都「挂载即确认投递授权」：服务端新建会话一律 deliveryAckedAt = null，
+  // 确认回来之前本机停在「正在确认投递授权」，走不到本用例要清场的那一屏
+  // （契约见 src/pages/scan/scanDeliveryAck.ts）。所以本用例自己按 taskId 精确注册
+  // 这一场的 ACK —— **不挂通配兜底**（同本文件其余部分的惯例：未注册请求仍由
+  // ApiRouter fail-closed），并记下每一次的凭据：只 respond 不看请求头的话，
+  // 「本机漏带凭据」在夹具里永远不会红，而真实服务端回的是 401（无终端会话票 /
+  // 终端 id）或 403（控制凭据对不上）。
+  const ackCalls: Array<Record<string, string>> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`) return
+    ackCalls.push(request.headers())
+  })
+  api.respond('POST', `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: SCAN_DELIVERY_ACKED_AT } },
+  })
 
   await page.goto('/scan')
   await page.evaluate(() => {
@@ -745,6 +787,12 @@ test('hard clear revokes a created scan settings session @privacy-kiosk', async 
   })
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  await expect.poll(() => ackCalls.length).toBeGreaterThan(0)
+  for (const headers of ackCalls) {
+    expect(headers['x-terminal-id']).toBe('KSK-001')
+    expect(headers['x-terminal-session-token'] ?? '').not.toBe('')
+    expect(headers['x-scan-session-control']).toBe(SCAN_CONTROL_TOKEN)
+  }
   expect(cancelRequests).toBe(0)
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)

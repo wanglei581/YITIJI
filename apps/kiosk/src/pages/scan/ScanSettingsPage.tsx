@@ -1,20 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ClockIcon } from 'lucide-react'
 import type { ScanSessionCreateResponse } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
-import { revokeCreatedScanSession } from './scanSessionRevoke'
+import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
+import { acknowledgeScanDelivery, type ScanAckCredentials, type ScanAckState } from './scanDeliveryAck'
+import { ScanSettingsSessionFacts, ScanSettingsStatusView } from './ScanSettingsStatusView'
+import {
+  formatCountdown,
+  getCancellationCredentials,
+  isValidCreatedSession,
+  liveSessionStillValid,
+  SCAN_LIVE_NOT_DURABLE_FAILURE,
+  type SessionPhase,
+} from './scanSettingsModel'
+import { revokeCreatedScanSession, type ScanRevokeIntent } from './scanSessionRevoke'
 import {
   subscribeTerminalSession,
   terminalSessionState,
   type TerminalSessionState,
 } from '../../services/terminalAuth'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
-import { SCAN_OUTPUT_FORMAT_PENDING } from './scanOutputFormat'
 import {
   classifyCreateFailure,
   isRescanRefusedByServer,
@@ -24,12 +33,8 @@ import {
 import {
   ScanChain,
   ScanCta,
-  ScanKvCard,
-  ScanNoteCard,
   ScanPanelMock,
-  ScanPlan,
   ScanSec,
-  ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
@@ -38,54 +43,20 @@ import {
   beginPlainScanRestart,
   discardTakenScanRescanAuthority,
   patchScanWorkbenchSession,
+  patchScanWorkbenchSessionWithDurableLive,
   readScanWorkbenchSession,
   restoreScanRescanAuthority,
   scanLifecycleGeneration,
   scanRescanCredentialsLost,
   takeScanRescanAuthority,
-  type ScanLiveState,
 } from './scanWorkbenchSession'
 
 function isScanType(value: unknown): value is ScanType {
   return value === 'resume' || value === 'id' || value === 'document'
 }
 
-type SessionPhase = 'invalid' | 'loading' | 'success' | 'expired' | 'error'
-
 interface LocationState {
   scanType?: unknown
-}
-
-function getCancellationCredentials(created: unknown): { scanTaskId: string; controlToken: string } | null {
-  if (!created || typeof created !== 'object') return null
-  const candidate = created as Partial<ScanSessionCreateResponse>
-  if (typeof candidate.scanTaskId !== 'string' || candidate.scanTaskId.trim().length === 0) return null
-  if (typeof candidate.controlToken !== 'string' || candidate.controlToken.trim().length === 0) return null
-  return { scanTaskId: candidate.scanTaskId, controlToken: candidate.controlToken }
-}
-
-function isValidCreatedSession(created: unknown): created is ScanSessionCreateResponse {
-  if (!created || typeof created !== 'object') return false
-  const candidate = created as Partial<ScanSessionCreateResponse>
-  return getCancellationCredentials(candidate) !== null
-    && typeof candidate.expiresAt === 'string'
-    && Number.isFinite(Date.parse(candidate.expiresAt))
-    && Date.parse(candidate.expiresAt) > Date.now()
-    && Array.isArray(candidate.instructions)
-    && candidate.instructions.length > 0
-    && candidate.instructions.every((instruction) => typeof instruction === 'string' && instruction.trim().length > 0)
-}
-
-function formatCountdown(expiresAt: string): string {
-  const seconds = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
-  const minutes = Math.floor(seconds / 60)
-  const remain = seconds % 60
-  return `${minutes}:${String(remain).padStart(2, '0')}`
-}
-
-function liveSessionStillValid(live: ScanLiveState | undefined): live is ScanLiveState {
-  if (!live) return false
-  return Date.parse(live.expiresAt) > Date.now() && live.instructions.length > 0
 }
 
 export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
@@ -166,6 +137,36 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
    * 同字节去重。所以 CTA 里它排在最前面。
    */
   const [rescanRetryable, setRescanRetryable] = useState(false)
+  /**
+   * 第一次配对创建的响应丢了，本机正在把**同一对**请求重放，去把可能已经建成的那条
+   * child 领回来（见 scanCreateReplay）。
+   *
+   * 只影响等待屏那句话怎么说：这一刻「正在建扫描会话」已经不准确了 —— 会话可能早就
+   * 建成，丢的只是回话。屏幕上必须说得出这个区别，否则用户会以为什么都没发生，
+   * 转身去面板上扫一张纸，而那条 child 正等着收它。
+   *
+   * 刻意**不**进 effect 依赖：它是同一次创建意图内部的进度，不是一次新的创建触发条件。
+   */
+  const [replayingLostCreate, setReplayingLostCreate] = useState(false)
+  /**
+   * 投递授权（ACK）的进度。这一位决定**面板操作指引出不出得来**：服务端 2026-09-14
+   * 起把「建成」和「可投递」拆开了，'acked' 之前扫出来的文件不会投到这一场
+   * （完整契约见 scanDeliveryAck）。复水进来的会话一开始就是 'pending'，理由同上。
+   */
+  const [ackState, setAckState] = useState<ScanAckState>(restoredLive && scanType ? 'pending' : 'idle')
+  /**
+   * 服务端明确不认这一场的投递授权（409 / 403 / 404）。
+   *
+   * 和 `rescanCredentialsLost` / `rescanRefusedByServer` 并列的第三种 fail-closed：
+   * 成因不同（这一条是「会话建出来了却拿不到投递授权」），出路同样只剩一个显式的
+   * 「重新开始一次扫描」。它必须进创建 effect 的依赖 —— 置位时让 effect 早退，
+   * 用户按下重启复位时让它重跑并发出那一次新的创建。
+   */
+  const [ackRefused, setAckRefused] = useState(false)
+  /* 会话建成了，本机却没能把它的凭据真正写进登记（写完读回来对不上）。第四种 fail-closed，
+   * 也是唯一**不给重来按钮**的：存储坏了 / 被禁用 / 写满，重建只会在同一处再失败一次。
+   * 不进 effect 依赖 —— 这一支同时立起 creationAbandonedRef，那道闸已经让 effect 到此为止。 */
+  const [liveNotDurable, setLiveNotDurable] = useState(false)
   // POST /scan/sessions 挂着 TerminalIdentityGuard（scan-tasks.controller.ts）：
   // 没有终端会话令牌就是 401。和打印确认页同一口径 —— 订阅状态，不猜、不抢跑。
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
@@ -206,6 +207,13 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   // 拿它发只会 403：看起来撤了，其实没撤。
   const createGenerationRef = useRef<number | null>(null)
   const createTokenRef = useRef<string | null>(null)
+  /**
+   * 已经为哪一条任务发起过投递确认。防的是一个真实的死循环：创建那段 `.then` 挂在
+   * `sessionPromiseRef` 上，effect 每次重跑都会给同一个**已经 resolve** 的 promise
+   * 再挂一遍处置并重跑成功分支 —— 无条件置位的话，那里的 `setAckState('pending')`
+   * 会把刚确认好的 'acked' 打回去，两个 effect 互相喂招，永不停。
+   */
+  const ackRequestedForRef = useRef<string | null>(restoredLive?.scanTaskId ?? null)
   // 「本页已经不在了」。刻意不复用 effect 的 cancelled：那个标志每次依赖变化
   // （终端会话 checking / ready 来回切）都会置位，拿它当卸载判据会把一次正常的
   // 终端重校验误判成「用户走了」，把一个好好的会话撤掉。
@@ -235,11 +243,53 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
    * 用当前身份发）；这条发生在清场 / 卸载之后，页面随时可能被拆掉或整页重载，
    * 所以走 keepalive 的撤销通道，并且用**创建时**那个身份。
    * 共用 cancelRequestedRef：两条合起来对同一个任务只发一次 DELETE。
+   *
+   * @param intent `'ack-compensation'` 是这道去重**唯一**的例外，两层闸门一起放行
+   *   （本页的 cancelRequestedRef 与 scanSessionRevoke 的按 id 计数）。
+   *   只有「离开之后那次 ACK 才成功」那一支传它：那一刻服务端那条任务可能刚刚变得
+   *   可投递，而先前那次撤销已知没有生效（生效了的话 ACK 只会拿回 409）——
+   *   不放行就留下一个可投递却没人看着的收件箱，它连 60 秒未确认回收器都收不到。
+   *   完整理由见 scanSessionRevoke 的 REVOKE_ATTEMPT_CAP。
    */
-  const abandonCreatedSession = (credentials: { scanTaskId: string; controlToken: string }) => {
-    if (cancelRequestedRef.current) return
+  const abandonCreatedSession = (
+    credentials: { scanTaskId: string; controlToken: string },
+    intent: ScanRevokeIntent = 'best-effort',
+  ) => {
+    if (cancelRequestedRef.current && intent !== 'ack-compensation') return
     cancelRequestedRef.current = true
-    revokeCreatedScanSession(credentials, createTokenRef.current)
+    revokeCreatedScanSession(credentials, createTokenRef.current, intent)
+  }
+
+  /**
+   * 丢弃一个刚建成、但本机已经确定用不了的会话：撤服务端任务 → 抹本机登记
+   * （`live: undefined` 同时推进代次）→ 清空本页凭据并**放开撤销闸**（那次 DELETE
+   * 已发出、id 也已抹掉，不放开的话用户重开的下一场就永远撤不掉）→ 换结论屏。
+   *
+   * 两处调用（服务端不给投递授权 / 凭据没能落进登记）成因不同、结论屏不同，这四件事
+   * 一件都不能少：只抹本机不撤服务端，那条任务会占住终端的活动会话；只撤服务端不抹本机，
+   * 看门狗整页重载之后这一场会被复水成「有会话」。
+   */
+  const discardCreatedSession = (credentials: ScanAckCredentials, reason: SessionFailure) => {
+    abandonCreatedSession(credentials)
+    patchScanWorkbenchSession({ stage: 'settings', live: undefined })
+    createdIdRef.current = null
+    controlTokenRef.current = null
+    ackRequestedForRef.current = null
+    cancelRequestedRef.current = false
+    sessionPromiseRef.current = null
+    setScanTaskId(null)
+    setControlToken(null)
+    setInstructions(null)
+    setExpiresAt(null)
+    setAckState('idle')
+    setFailure(reason)
+    setPhase('error')
+  }
+
+  /** 服务端明确不认这一场的投递授权。哪些码算「明确不认」见 scanDeliveryAck。 */
+  const failClosedOnAckRefusal = (credentials: ScanAckCredentials, ackFailure: SessionFailure) => {
+    discardCreatedSession(credentials, ackFailure)
+    setAckRefused(true)
   }
 
   useEffect(() => subscribeTerminalSession(setTerminalSession), [])
@@ -264,6 +314,11 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     //   · 也不在这里顺手重建一次 —— 页面已经对用户宣告过「终端安全校验失败」，
     //     恢复路径只有「安全返回扫描首页」重走一遍，扫不扫由用户自己决定。
     if (creationAbandonedRef.current) return
+    /* fail-closed：会话建出来了，服务端却明确不给它投递授权（409 / 403 / 404）。
+     * 那一场已经被撤掉、本机登记也清了，这条 effect 到此为止 —— 不许顺手重建一次：
+     * 页面刚刚对用户宣告过结论，重不重开由他按「重新开始一次扫描」决定。
+     * 那一按会把这一位复位，effect 随之重跑并发出那一次新的创建。 */
+    if (ackRefused) return
     /* fail-closed：带着安全重扫意图进来，凭据却已经不在内存里（整页重载抹掉的）。
      * 这一条必须排在终端会话那两个分支**之前** —— 页面此刻要说的是「凭据没了」，
      * 不是「正在做终端安全校验」。它是这次修复的核心：这里 return 掉的正是那一个
@@ -324,11 +379,21 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         return undefined
       }
       setRescanRequested(rescan !== null)
-      sessionPromiseRef.current = createScanSession(
+      /* 同一对请求的**唯一**发送口。重放必须复用这一个闭包 —— 另写一处调用就可能漏带
+       * 那两半，而漏带的那一次是一个无签名的普通创建。 */
+      const sendCreate = () => createScanSession(
         { scanType, terminalId: getTerminalId() },
         getToken(),
         rescan,
       )
+      /* 「结果未知」时把同一对请求重放到有答案为止（有界退避，只对配对请求）。
+       * 服务端对配对创建是幂等的：重放拿回的是**同一条** child，不会多建一条。
+       * 边界、退避表与「为什么只吃未知态」见 scanCreateReplay。
+       * 这里不另挂 then/catch：重放的结果照旧落进下面那一套生命周期闸门，
+       * 于是「离开 / 清场 / 换人 / 卸载之后领回来的 child」会被同一段代码撤掉。 */
+      sessionPromiseRef.current = replayCreateUntilOutcomeKnown(sendCreate, rescan !== null, {
+        onReplay: () => setReplayingLostCreate(true),
+      })
     }
 
     sessionPromiseRef.current
@@ -389,21 +454,39 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           return
         }
 
+        /* 先把凭据写进本机登记并**读回核对**，核不上就一步都不再往下走。「写过了」不是判据：
+         * setItem 可能抛（已被吞），更可能静默什么都不做（隐私模式 / 配额满 / 被改写过的
+         * storage）。没真正记住却照常 ACK，服务端那条任务就变得可投递，而整页重载之后本机
+         * 再也找不回它 —— 又一个「可投递却没人看着」的收件箱。 */
+        const live = {
+          scanTaskId: created.scanTaskId,
+          controlToken: created.controlToken,
+          instructions: created.instructions,
+          expiresAt: created.expiresAt,
+        }
+        if (!patchScanWorkbenchSessionWithDurableLive({ stage: 'settings', scanType, live })) {
+          /* 没记住 = 没有人看得住这一场。撤掉它（用**创建时**那个身份，服务端 cancel() 按
+           * endUserId 校验），一个 ACK 都不发，屏上也不许出现「已创建 / 去面板操作」。
+           * creationAbandonedRef 让 effect 到此为止：任务已 DELETE，终端恢复也接不回来。 */
+          creationAbandonedRef.current = true
+          discardCreatedSession(live, SCAN_LIVE_NOT_DURABLE_FAILURE)
+          setLiveNotDurable(true)
+          return
+        }
         setInstructions(created.instructions)
         setScanTaskId(created.scanTaskId)
         setControlToken(created.controlToken)
         setExpiresAt(created.expiresAt)
         setPhase('success')
-        patchScanWorkbenchSession({
-          stage: 'settings',
-          scanType,
-          live: {
-            scanTaskId: created.scanTaskId,
-            controlToken: created.controlToken,
-            instructions: created.instructions,
-            expiresAt: created.expiresAt,
-          },
-        })
+        /* 登记核对通过才**立刻**确认投递授权，顺序不能反：ACK 一旦成功，服务端那条
+         * 任务就变得可投递，这时候本机必须已经把凭据落到能跨重载存活的地方。
+         *
+         * 认 id 而不是无条件置位：这段 `.then` 挂在一个可能被重挂多次的 promise 上，
+         * 无条件置位会和确认 effect 互相喂招，把 'acked' 一次次打回 'pending'。 */
+        if (ackRequestedForRef.current !== created.scanTaskId) {
+          ackRequestedForRef.current = created.scanTaskId
+          setAckState('pending')
+        }
       })
       .catch((error: unknown) => {
         const code = errorCodeOf(error)
@@ -461,8 +544,77 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     // `rescanRetryable` 同理，是「再试一次安全重扫」那颗按钮的复跑开关：handleRescanRetry
     // 把它由 true 打回 false，effect 因此重跑，并在 sessionPromiseRef 已被置空的前提下
     // 重新取一次授权（那正是刚被原样放回去的同一份）→ 发出去的仍然是成对的重扫请求。
+    //
+    // `ackRefused` 是第三个 fail-closed 开关，同理：它 true→false 的那一下是用户按
+    // 「重新开始一次扫描」，这一次创建必须发得出去。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable])
+  }, [terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused])
+
+  /**
+   * 投递确认（ACK）：唯一一处让这一场在服务端变得可投递的地方（见 scanDeliveryAck）。
+   *
+   * 三条路汇到这同一段：新建成功、重放领回来的 child、以及**复水**（整页重载 / 从别处
+   * 回到本阶段）。复水那一条本机并不知道当初确认过没有，而 ACK 幂等，所以再问一次
+   * 永远是对的，猜「应该确认过了」才是错的。
+   *
+   * 生命周期闸门与创建那一段同一副判据（代次 / 卸载），但后果更重：ACK 成功那一刻
+   * 任务**已经可投递**，用户若已经走了或清过场，它就是一个没人看着的收件箱 ——
+   * 所以那一支必须撤，且绝不许写回状态。
+   */
+  useEffect(() => {
+    if (ackState !== 'pending') return undefined
+    const pendingScanTaskId = createdIdRef.current
+    const pendingControlToken = controlTokenRef.current
+    // 没有完整凭据就一个请求都不发：半对凭据发出去只会拿回 403，
+    // 而那条 403 在屏幕上会被读成「服务端不认这一场」—— 把本机的缺失说成服务端的结论。
+    if (!pendingScanTaskId || !pendingControlToken) return undefined
+    const credentials: ScanAckCredentials = {
+      scanTaskId: pendingScanTaskId,
+      controlToken: pendingControlToken,
+    }
+    const ackGeneration = scanLifecycleGeneration()
+    const memberToken = getToken()
+    // 复水进来的那一场没走过创建，createTokenRef 还是空的。撤销要用「建这一场的那个
+    // 身份」发（服务端 cancel() 校验 endUserId），这里补上，否则待会儿真要撤时只会 403。
+    if (createTokenRef.current === null) createTokenRef.current = memberToken
+    let stale = false
+
+    void acknowledgeScanDelivery(credentials, memberToken).then((outcome) => {
+      if (scanLifecycleGeneration() !== ackGeneration || unmountedRef.current) {
+        /* 用户走了 / 清场了 / 换人了。确认可能刚刚成功，也就是说服务端那条任务此刻
+         * 可能已经可投递 —— 必须撤掉，并且一个字节都不许写回本机。
+         *
+         * 这一次是**补偿**，不是又一次尽力而为：离开那条路径（leaveScanFlow /
+         * 清场）已经按本机登记发过一次 DELETE 了，按普通去重这里会被直接挡掉。
+         * 而「ACK 成功」正是那一次 DELETE 没生效的证据（生效了服务端只会回 409），
+         * 同时 deliveryAckedAt 已经非空 —— 60 秒未确认回收器再也收不到它，
+         * 它会一直可投递到自然过期。所以这一次必须越过去重发出去。 */
+        abandonCreatedSession(credentials, 'ack-compensation')
+        return
+      }
+      if (stale) return
+      if (outcome.ok) {
+        setFailure(null)
+        setAckState('acked')
+        return
+      }
+      if (outcome.definitive) {
+        failClosedOnAckRefusal(credentials, outcome.failure)
+        return
+      }
+      // 断网 / 5xx / 429 / 终端票失效：任务仍然停在不可投递，没有人会收到那张纸。
+      // 如实说还没确认，并保留重试；这一屏不许出现任何让用户去面板操作的话。
+      setFailure(outcome.failure)
+      setAckState('retryable')
+    })
+
+    return () => {
+      stale = true
+    }
+    // 只由 ackState 驱动：'pending' 进来、拿到结论出去。用户按「再确认一次」时
+    // handleAckRetry 把它打回 'pending'，这一段就再跑一次（服务端幂等）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ackState])
 
   useEffect(() => {
     if (!expiresAt) return
@@ -531,8 +683,27 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     // 否则这一屏会同时挂着两个互相矛盾的主行动。
     setRescanRetryable(false)
     setPlainRestartChosen(true)
+    // 这一次是用户新选的普通会话：上一次那场重放的进度不许留在等待屏上。
+    setReplayingLostCreate(false)
+    // 投递授权那条 fail-closed 也要一起复位（它是这一屏的第三种成因）：
+    // 不复位的话，创建 effect 会在 `if (ackRefused) return` 处早退，按钮按下去毫无反应。
+    setAckRefused(false)
+    setAckState('idle')
     setFailure(null)
     setPhase('loading')
+  }
+
+  /**
+   * 「再确认一次」——把那一次投递确认原样重发。
+   *
+   * 只对**不确定**的失败出现（断网 / 5xx / 429 / 终端票失效）：那时任务仍停在
+   * 不可投递，谁都收不到那张纸，重发一次是安全的，而且服务端对已确认的会话幂等。
+   * 服务端明确拒绝的那一支走 failClosedOnAckRefusal，不会走到这里。
+   */
+  const handleAckRetry = () => {
+    if (ackState !== 'retryable') return
+    setFailure(null)
+    setAckState('pending')
   }
 
   /**
@@ -548,6 +719,8 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     if (!scanType) return
     sessionPromiseRef.current = null
     setRescanRetryable(false)
+    // 新一轮请求从「还没开始重放」起算；上一轮的进度不许挂在这一轮的等待屏上。
+    setReplayingLostCreate(false)
     setFailure(null)
     setPhase('loading')
   }
@@ -573,155 +746,17 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     navigate('/scan?stage=progress', { state: { scanTaskId, scanType, controlToken } })
   }
 
-  if (phase !== 'success' || !scanType || !scanTaskId || !controlToken || !instructions || !expiresAt) {
-    const workbenchState = phase === 'invalid'
-      ? 'invalid'
-      : phase === 'loading'
-        ? 'create-loading'
-        : phase === 'expired'
-          ? 'expired'
-          : 'create-failed'
-    const title = phase === 'invalid'
-      ? '未创建扫描任务'
-      : phase === 'loading'
-        ? '正在创建扫描任务'
-        : failure?.title ?? '扫描任务未创建'
-    const description = phase === 'invalid'
-      ? '当前页面没有来自扫描首页的合法类型信息，本次不会发起创建请求。'
-      : phase === 'loading'
-        ? '正在等待服务端返回真实会话，成功前不会显示任务信息或操作指引。'
-        : failure?.description ?? '本次没有可用的扫描会话。'
-    const status = phase === 'loading'
-      ? {
-          tone: 'unknown' as const,
-          // 还在换终端票据时不能说「正在建扫描会话」—— 那一刻请求还没发出去。
-          label: terminalSession === 'checking' ? '正在做终端安全校验' : '正在建扫描会话',
-        }
-      : phase === 'expired'
-        ? { tone: 'warn' as const, label: '会话已过期' }
-        : { tone: 'bad' as const, label: '会话创建失败' }
-
-    return (
-      <ScanWorkbenchShell
-        page="scan-settings"
-        state={workbenchState}
-        title={title}
-        subtitle={description}
-        status={status}
-        ctabar={
-          <ScanCta reason={phase === 'loading' ? '请求还在路上 —— 这一刻页面不做任何判断，也不给你一个假的编号' : '未确认成功前不显示扫描操作步骤'}>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
-              安全返回扫描首页
-            </button>
-            {/* 三条分支，按「安全重扫这条路还通不通」排序，顺序不能反：还通的排最前
-                （再发一次成对的重扫，不是降级）—— 排在后面的话，一次限流就会把用户推去
-                开普通会话，同一张纸再撞上两小时的同字节去重。其次是两条 fail-closed 的
-                显式普通重启；最后是与重扫无关的失败：什么都不许按。 */}
-            {rescanRetryable ? (
-              <button type="button" className="qx-btn" data-variant="primary" onClick={handleRescanRetry}>
-                再试一次安全重扫
-              </button>
-            ) : rescanCredentialsLost || rescanRefusedByServer ? (
-              <button type="button" className="qx-btn" data-variant="primary" onClick={handlePlainRestart}>
-                重新开始一次扫描
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="qx-btn"
-                data-variant="primary"
-                disabled
-                aria-disabled="true"
-              >
-                {phase === 'loading' ? '等服务端返回会话' : '未创建扫描任务'}
-              </button>
-            )}
-          </ScanCta>
-        }
-      >
-        <ScanStatusPanel
-          tone={phase === 'loading' ? 'info' : phase === 'invalid' ? 'lock' : 'error'}
-          title={title}
-          breathe={phase === 'loading'}
-          chips={
-            phase === 'loading'
-              ? [
-                  { label: terminalSession === 'checking' ? '正在做终端安全校验' : '正在等服务端回话' },
-                  { label: scanType ? `选中类型：${SCAN_TYPE_LABELS[scanType]}` : '未选择类型' },
-                ]
-              : [
-                  { label: '没有任务编号', tone: 'warn' },
-                  { label: '本机没有文件' },
-                ]
-          }
-        >
-          <p>{description}</p>
-          {phase === 'loading' ? <p>这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
-          {/* 必须把「凭据还在」和「有效期不会因为重试而延长」都说出来：只给按钮不给这
-              两句，用户会以为同一份材料已经扫不成了，转头去开一场注定被去重拒收的会话。 */}
-          {rescanRetryable ? (
-            <p data-testid="scan-rescan-still-held">
-              <b>这次失败没有用掉你的安全重扫凭据</b> —— 本机把它原样留着，
-              有效期照旧从上一场算起（<b>重试不会延长</b>）。按「再试一次安全重扫」发出去的
-              仍然是同一份材料的授权；本页<b>不会</b>替你改发普通重扫。
-            </p>
-          ) : null}
-        </ScanStatusPanel>
-        {phase === 'loading' ? (
-          <div className="sw-grid2">
-            <ScanNoteCard title="会话建成之后会出现什么" foot="这三样都由服务端下发，本机一样都编不出来。">
-              <ScanPlan items={[
-                '服务端发的任务编号，用来认领待会儿回传的文件。',
-                '按扫描类型定制的面板操作指引，本机原样转达。',
-                '一枚只存在页面内存里的控制凭证，用来查询和取消。',
-              ]} />
-            </ScanNoteCard>
-            <ScanNoteCard title="这一刻你可以做什么" foot="这一刻页面还没有任何结论可写。">
-              <p>把要扫的纸先整理好、订书钉取掉，<b>但先别在面板上按开始</b> —— 会话还没建成，这时候扫出来的文件没人认领。</p>
-              <p>等待通常就是一两秒。一直转，多半是本机到服务端的网络有问题。</p>
-            </ScanNoteCard>
-          </div>
-        ) : (
-          <div className="sw-grid2">
-            <ScanNoteCard title="接下来怎么办" foot="本页不会自动重发，也不会自己变成成功。">
-              {/* 指路跟着 ctabar 的分支走：写死「返回扫描首页」时，拿着凭据的那一屏上
-                  最该按的那颗按钮反而没人提。 */}
-              <ScanPlan items={[
-                rescanRetryable
-                  ? '点右下角「再试一次安全重扫」：同一份材料的授权还在手上。'
-                  : '返回扫描首页，从选择类型重新走一遍。',
-                '连续失败就别在面板上扫了，扫了也没有会话认领。',
-                '叫工作人员看一眼这台机器到服务端的网络。',
-              ]} />
-            </ScanNoteCard>
-            <ScanNoteCard title="为什么不给你一个编号" foot="这一屏的空白是有意的，不是还没加载完。">
-              <p>编号是服务端发的，本机编不出来。<b>硬编一个给你看，你就会照着它去面板上操作</b>，扫出来的文件也没人认领。</p>
-            </ScanNoteCard>
-          </div>
-        )}
-      </ScanWorkbenchShell>
-    )
+  /* 「可以去面板操作了」的判据是两件事同时成立，不是一件：服务端回了一个可用的
+   * 会话（phase success + 四样字段齐全），**并且**它已经拿到投递授权（ackState acked）。
+   * 少了后半句，用户会照着指引去按开始，而那一刻服务端还不肯把文件投给这一场。 */
+  if (ackState !== 'acked' || phase !== 'success' || !scanType || !scanTaskId || !controlToken || !instructions || !expiresAt) {
+    // 这一整块只读值、不碰 ref/effect/请求，所以整份交出去（ScanSettingsStatusView）。
+    return <ScanSettingsStatusView {...{
+      phase, ackState, scanType, terminalSession, failure, replayingLostCreate,
+      rescanRetryable, rescanCredentialsLost, rescanRefusedByServer, ackRefused, liveNotDurable,
+      handleSafeReturn, handlePlainRestart, handleRescanRetry, handleAckRetry,
+    }} />
   }
-
-  /**
-   * 「本次性质」那一行说什么，取决于本机**确实知道**什么。null = 无可声明。
-   *
-   * 四种情况，一句都不许互相顶替：
-   *   · 这一次真的带了重扫两半且创建成功 —— 服务端已经把那枚授权消费掉了，
-   *     所以「已放行」在这一行是可以说的（结果页那边不行，它手里只有凭据）；
-   *   · 用户在 fail-closed 那一屏显式选了普通会话 —— 把这个选择记下来，
-   *     免得下一屏看起来像是本页悄悄降级的；
-   *   · 复水出来的会话 —— 授权只活在内存里，重载后本页说不出当初带没带，
-   *     就如实说无从判断，不猜；
-   *   · 普通新建 —— 不多这一行，没什么要声明的。
-   */
-  const natureRow: [string, string] | null = rescanRequested
-    ? ['本次性质', '安全重扫：服务端已放行同一份材料再扫一次']
-    : plainRestartChosen
-      ? ['本次性质', '普通会话：你已确认这一次不是安全同字节重扫']
-      : restoredFromStorageRef.current
-        ? ['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断']
-        : null
 
   return (
     <ScanWorkbenchShell
@@ -750,31 +785,13 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       <ScanSec no="02" title="现在在第一段" hint="链路位置，不是百分比">
         <ScanChain active={0} />
       </ScanSec>
-      <ScanSec no="03" title="这次会话">
-        <div className="sw-grid2">
-          <ScanKvCard
-            title="任务信息"
-            rows={[
-              ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-              ['任务编号', scanTaskId],
-              ['剩余时间', countdown],
-              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-              ...(natureRow ? [natureRow] : []),
-              ['控制凭证', '不上屏、不进链接；本次一体机会话内存里，换人清场会清掉'],
-            ]}
-          />
-          <ScanNoteCard title="按完面板之后" foot={<><ClockIcon size={16} aria-hidden /> 任务剩余 {countdown}。仅当前会话有效。点击返回会取消这个未确认的任务。</>}>
-            <ScanPlan items={[
-              ...(rescanRequested
-                ? ['把刚才那份原件照原样放回去 —— 这一次服务端认它，不会当成重复件拒掉。']
-                : []),
-              '点「我已操作，开始等待」。',
-              '进了等待页本机就每隔几秒自动查一次，你不用一直点。',
-              '文件回来之前不显示扫到第几张：链路上没有这种事件。',
-            ]} />
-          </ScanNoteCard>
-        </div>
-      </ScanSec>
+      {/* 「这次会话」整张卡是纯展示，已搬去 ScanSettingsStatusView。restoredFromStorage 必须喂
+          **挂载那一刻**那个 ref：每帧重算会把一个刚在本页建成的会话说成「本页重载过」。 */}
+      <ScanSettingsSessionFacts
+        scanType={scanType} scanTaskId={scanTaskId} countdown={countdown}
+        rescanRequested={rescanRequested} plainRestartChosen={plainRestartChosen}
+        restoredFromStorage={restoredFromStorageRef.current}
+      />
     </ScanWorkbenchShell>
   )
 }

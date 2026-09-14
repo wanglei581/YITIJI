@@ -1,5 +1,6 @@
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { SCAN_CREATE_REPLAY_UNRESOLVED } from './scanCreateReplay'
 
 /**
  * 扫描会话「创建失败之后说什么、那枚一次性重扫授权归谁」的纯判定。
@@ -10,18 +11,25 @@ import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
  */
 
 /**
- * 服务端（或本机成对校验）判「这次安全重扫不作数」的四个码。
+ * 服务端（或本机成对校验）判「这次安全重扫不作数」的五个码。
  *
  * 前三个来自 scan-tasks.service.ts：授权无效 / 已过期 / 已被消费（403）、
  * 授权正被并发处理或血缘已被占用（409）、只给了凭证没给原任务 id（400）。
  * 第四个来自本机 scanTasks.ts：拿到的是半对凭据，请求根本没发出去。
- * 四个的用户处置完全一样，所以合成一张表，页面不按码分叉。
+ *
+ * 第五个（2026-09-14）是丢失响应重放的终点：配对凭据被认了、child 也确实存在过，
+ * 但它已经不在 waiting/matched（过期 / 被撤 / 已完成）。服务端明确**不会**再开一条
+ * grandchild —— 也就是说这枚授权到此为止，和 403 同一个处置。
+ *
+ * 五个的用户处置完全一样（永久丢弃 + 只给显式普通重启），所以合成一张表，
+ * 页面不按码分叉；正文按码分两屏，因为成因不同（见下面两个常量）。
  */
 export const SCAN_RESCAN_REJECTION_CODES = new Set([
   'SCAN_RETRY_NOT_AUTHORIZED',
   'SCAN_RETRY_CONFLICT',
   'SCAN_RETRY_TASK_ID_MISSING',
   'SCAN_RESCAN_AUTHORITY_INCOMPLETE',
+  'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
 ])
 
 /**
@@ -83,6 +91,44 @@ export const RESCAN_REFUSED_FAILURE = {
     + '建议换一份材料或找工作人员；也可以安全返回扫描首页。',
 } as const
 
+/**
+ * 丢失响应的重放问到了确定答案：那条 child **存在过，但已经不能用了**
+ * （409 `SCAN_RETRY_CHILD_NOT_RECOVERABLE` —— 过期 / 被撤 / 已经完成）。
+ *
+ * 和上面两条的区别在于要向用户交代一件额外的事：服务端那边**没有**留下一个还在等文件
+ * 的收件箱。这一点必须说出来，否则用户不知道自己刚才那张纸到底还会不会被收走，
+ * 也就不知道现在能不能放心开一场新的。
+ *
+ * 出路仍然只有显式的普通重启：服务端明确不会再为这枚授权开第二条 child。
+ */
+export const RESCAN_CHILD_LOST_FAILURE = {
+  title: '那次安全重扫的会话已经失效',
+  // 这些 description 是**纯字符串**，直接渲染进 <p>，没有 markdown。
+  // 写 `**粗体**` 会把星号原样打在 27 寸公共屏上（2026-09-14 浏览器用例实测到过）。
+  description: '上一次请求没收到回话，本机用同一份凭据问过服务端了：那一场确实建成过，'
+    + '但它已经过期或被收走，现在不能再用，服务端也不会为同一枚授权再开一条。'
+    + '好消息是服务端那边没有留下还在等文件的任务，你刚才那张纸不会被谁悄悄收走。'
+    + '本页不会替你改发普通重扫。要继续请按「重新开始一次扫描」建一个普通会话：'
+    + '那不是同字节重扫，同一张纸可能按重复件拒收（两小时内），建议换一份材料或找工作人员。',
+} as const
+
+/**
+ * 重放到头仍然问不出结果（本机 `SCAN_CREATE_REPLAY_UNRESOLVED`）。
+ *
+ * 这一屏最要紧的是**不把话说死**：会话可能建成了、也可能没有，本机确实不知道。
+ * 但它不是死路 —— 那枚授权此刻已经被原样放回（失败码不在拒绝表里），
+ * 屏幕上那颗「再试一次安全重扫」发出去的仍然是同一对凭据，服务端会幂等地把
+ * 那条 child 领回来。所以这里要指的是那颗按钮，不是普通重启。
+ */
+export const RESCAN_REPLAY_UNRESOLVED_FAILURE = {
+  title: '还是没能确认这次扫描会话',
+  description: '本机已经用同一份凭据重试过几次，网络一直没通，所以到现在也说不准服务端'
+    + '那一场建成了没有。本页不会替你改发普通重扫，也不会假装它已经建成。'
+    + '网络恢复后可以按「再试一次安全重扫」：发出去的仍然是同一对凭据，'
+    + '服务端如果已经建过那一场，会把同一场原样交回来，不会多建一场。'
+    + '也可以安全返回扫描首页；这一刻请先别在面板上按开始。',
+} as const
+
 export interface CreateFailureVerdict {
   failure: SessionFailure
   /** 服务端明确不认这次安全重扫：那枚授权已经没了，出路只剩显式的普通新会话。 */
@@ -102,6 +148,18 @@ export interface CreateFailureVerdict {
  */
 export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
   const code = errorCodeOf(error)
+  /* 重放到头仍未知。必须排在下面那条通用 outcomeUnknown **之前**：两者都是 status 0，
+   * 但要说的话完全不同 —— 通用那条说「本页不会自动重发，要不要再发由你按」，
+   * 而这一条的重发已经发过五次了，说那句就是假话。
+   * 仍然 outcomeUnknown: true：本机证明不了服务端消费过那枚授权，所以它必须被原样放回，
+   * 用户那颗「再试一次安全重扫」发出去的才还是成对的（服务端据此幂等领回同一条 child）。 */
+  if (code === SCAN_CREATE_REPLAY_UNRESOLVED) {
+    return {
+      outcomeUnknown: true,
+      refusedRescan: false,
+      failure: RESCAN_REPLAY_UNRESOLVED_FAILURE,
+    }
+  }
   const outcomeUnknown = error instanceof ApiHttpError && (error.code === 'NETWORK_ERROR' || error.status === 0)
   if (outcomeUnknown) {
     return {
@@ -128,10 +186,12 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
     return {
       outcomeUnknown: false,
       refusedRescan: true,
-      failure: {
-        title: RESCAN_REFUSED_FAILURE.title,
-        description: userMessageOf(error, RESCAN_REFUSED_FAILURE.description),
-      },
+      /* 处置相同（永久丢弃 + 显式普通重启），但成因不同就必须分两屏说：
+       * child 不可恢复那一条要多交代「服务端没留下还在等文件的任务」，
+       * 而通用那一条的常见成因恰恰相反（上一场根本没走到取件，从来没有任务）。 */
+      failure: code === 'SCAN_RETRY_CHILD_NOT_RECOVERABLE'
+        ? RESCAN_CHILD_LOST_FAILURE
+        : { title: RESCAN_REFUSED_FAILURE.title, description: userMessageOf(error, RESCAN_REFUSED_FAILURE.description) },
     }
   }
   const failure = ((): SessionFailure => {

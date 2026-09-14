@@ -13,6 +13,17 @@ const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
  * 搬到了 scanRescanRecovery.ts（ScanSettingsPage 触到 800 行硬线）。搬的是无状态的
  * 那一半，副作用仍在页面里。下面凡是钉这些常量/文案的断言改钉这份源，**判据一个没减**。 */
 const rescanRecovery = read('src/pages/scan/scanRescanRecovery.ts')
+/* 2026-09-14 第三轮：丢失响应的有界重放，以及设置页里那几条无状态判定/文案。
+ * 两者都是因为 ScanSettingsPage 顶着 800 行硬线（CLAUDE.md §8）才分出去的，
+ * 搬的仍然只是无状态那一半 —— 下面凡是钉它们的断言改钉这两份源，**判据一个没减**。 */
+const scanCreateReplay = read('src/pages/scan/scanCreateReplay.ts')
+const scanSettingsModel = read('src/pages/scan/scanSettingsModel.ts')
+/* 2026-09-14 第四轮（投递确认 ACK）：设置页「还不能去面板操作」的那几屏整块搬到了
+ * ScanSettingsStatusView.tsx —— 同一条理由（800 行硬线），同一条边界：搬走的**只有
+ * 渲染**，它一个 ref / effect / 请求都不碰，判据一条没减，只是改钉这份源。
+ * 投递确认本身的码表与文案在 scanDeliveryAck.ts。 */
+const scanSettingsView = read('src/pages/scan/ScanSettingsStatusView.tsx')
+const scanDeliveryAck = read('src/pages/scan/scanDeliveryAck.ts')
 
 assert.doesNotMatch(
   scanStart,
@@ -95,13 +106,16 @@ assert.match(
  * 所以这一笔必须不可逆，且要在 effect 重新挂 promise 之前就把整条 effect 拦住。 */
 assert.match(
   scanSettings,
-  /if \(skipCreateRef\.current\) return[\s\S]{0,900}?if \(creationAbandonedRef\.current\) return[\s\S]{0,400}?if \(terminalSession === 'checking'\) return/,
+  /if \(skipCreateRef\.current\) return[\s\S]{0,900}?if \(creationAbandonedRef\.current\) return[\s\S]{0,600}?if \(ackRefused\) return[\s\S]{0,900}?if \(rescanCredentialsLost\) return[\s\S]{0,400}?if \(terminalSession === 'checking'\) return/,
   '丢弃之后创建 effect 必须整条停掉，且这道闸要排在终端状态分支之前：'
-    + '排在后面就会先被 ready 分支重新挂上那个已经 resolve 的 promise',
+    + '排在后面就会先被 ready 分支重新挂上那个已经 resolve 的 promise。\n'
+    + '2026-09-14 起同一串里还多一道：投递授权被服务端明确拒绝（ackRefused）之后，'
+    + '这一场已经撤掉、本机登记也清了，effect 同样必须整条停掉 —— 不停的话它会立刻'
+    + '重建一场，而页面刚刚才对用户宣告过「这次会话没能取得投递授权」。',
 )
 assert.match(
   scanSettings,
-  /if \(creationAbandonedRef\.current\) return[\s\S]*sessionPromiseRef\.current = createScanSession\(/,
+  /if \(creationAbandonedRef\.current\) return[\s\S]*const sendCreate = \(\) => createScanSession\(/,
   '这道闸也必须排在创建之前：丢弃之后页面不自动重建会话，重不重扫由用户自己决定',
 )
 assert.doesNotMatch(
@@ -112,7 +126,7 @@ assert.doesNotMatch(
 )
 assert.match(
   scanSettings,
-  /revokeCreatedScanSession\(credentials, createTokenRef\.current\)/,
+  /revokeCreatedScanSession\(credentials, createTokenRef\.current, intent\)/,
   '撤销要用**创建时**那个身份：清场之后 getToken() 已经空了，拿它发只会 403（看起来撤了，其实没撤）',
 )
 assert.doesNotMatch(
@@ -150,16 +164,20 @@ assert.match(
   /export function formatLabelFromMime/,
   'scan format label must be derived from mimeType, not hardcoded',
 )
+/* 「输出格式」那一行随「这次会话」整张卡搬进了 ScanSettingsStatusView（同一条 800 行
+ * 硬线，搬的仍然只有渲染）。两份一起核，判据一条没减。 */
 assert.match(
-  scanSettings,
+  scanSettingsView,
   /SCAN_OUTPUT_FORMAT_PENDING/,
   'settings must not promise a format before the file exists',
 )
-assert.doesNotMatch(
-  scanSettings,
-  /PDF（服务端生成）|PDF（自动生成）/,
-  'settings must not claim server-generated PDF',
-)
+for (const [label, source] of [['page', scanSettings], ['status view', scanSettingsView]]) {
+  assert.doesNotMatch(
+    source,
+    /PDF（服务端生成）|PDF（自动生成）/,
+    `settings ${label} must not claim server-generated PDF`,
+  )
+}
 assert.match(
   scanProgress,
   /formatLabelFromMime\(file\.mimeType\)/,
@@ -323,15 +341,50 @@ assert.match(
 assert.match(scanRevoke, /method:\s*'DELETE'/, '撤销走 DELETE /scan/sessions/:id')
 assert.match(scanRevoke, /'X-Scan-Session-Control'/, '撤销必须带控制凭证，否则服务端 403')
 assert.match(scanRevoke, /keepalive:\s*true/, '清场会拆掉页面：没有 keepalive 的请求会随文档一起被取消')
-assert.match(scanRevoke, /const attempted = new Set<string>\(\)/, '同一次页面生命周期内每个任务只尝试一次')
+/* ── 去重的判据必须是「发了几次」，不是「发过没有」（2026-09-14 P1） ──────────
+ *
+ * 旧写法是一个模块级 `attempted: Set<string>`：一个任务发过一次 DELETE 之后就再也
+ * 发不出第二次。它在下面这条路径上会留下一个跨用户串件的口子：
+ *
+ *   用户离开 → leaveScanFlow 按本机登记发第一次 DELETE → **那一次在路上丢了**
+ *   （keepalive 请求随文档拆卸被掐断 / 网络抖动，本机永远不会知道）→ 离开那一刻
+ *   还在飞的那次 ACK **成功了** → 服务端那条任务 deliveryAckedAt 非空
+ *   （60 秒未确认回收器再也收不到它）、状态仍是 waiting（Agent 的 current-lease
+ *   看得见它）→ 补偿那一次 DELETE 被 `attempted` 挡掉 → 它一直可投递到自然过期。
+ *
+ * 而且「ACK 成功」正是第一次 DELETE 没生效的**证据**：服务端 ack() 只对未过期的
+ * waiting/matched 放行，真撤掉了那一次确认只会拿回 409 SCAN_TASK_ACK_NOT_ALLOWED。
+ * 所以补偿不是「重试一个也许成功了的请求」，是对一个已知没生效的请求做一次补偿。
+ *
+ * 下面钉的是这件事的形状：按 id 计数 + 按意图取上限，且清场那一路仍然只许一次。 */
 assert.match(
   scanRevoke,
-  /if \(attempted\.has\(scanTaskId\)\) return false\s*\n\s*attempted\.add\(scanTaskId\)/,
-  '去重必须在发请求之前登记，失败也不再补发（撤销是尽力而为）',
+  /const attemptsByTask = new Map<string, number>\(\)/,
+  '去重要记「这个任务已经发了几次 DELETE」，不能退回布尔的「发过没有」：'
+    + '那样会把「离开之后 ACK 才成功」那一支唯一的补偿挡掉',
 )
-/* 两个入口共用同一条发送路径与同一个 attempted：读本机登记的那条够不着
+assert.match(
+  scanRevoke,
+  /const REVOKE_ATTEMPT_CAP: Record<ScanRevokeIntent, number> = \{\s*\n\s*'best-effort': 1,\s*\n\s*'ack-compensation': 2,\s*\n\s*\}/,
+  '上限必须是一张按意图取值的表：清场链路（hardClear → logout → '
+    + 'clearKioskSensitiveSession）合起来 1 次，ACK 补偿最多再补 1 次。'
+    + '两个数字都不许动 —— 调大就是无界重试，调小就是把那条串件路径放回去',
+)
+assert.match(
+  scanRevoke,
+  /const alreadySent = attemptsByTask\.get\(scanTaskId\) \?\? 0\s*\n\s*if \(alreadySent >= REVOKE_ATTEMPT_CAP\[intent\]\) return false\s*\n[\s\S]{0,200}?attemptsByTask\.set\(scanTaskId, alreadySent \+ 1\)/,
+  '判据是「已经发了几次」对上「这一次的意图允许几次」，而且计数必须在发请求之前登记：'
+    + '失败也不补发（撤销是尽力而为，不重试、不阻塞清场）',
+)
+assert.match(
+  scanRevoke,
+  /export type ScanRevokeIntent = 'best-effort' \| 'ack-compensation'/,
+  '意图只有两种，且必须是导出的联合类型：调用方写错字符串要在 tsc 就红，'
+    + '而不是在生产里悄悄退化成一个谁也匹配不上的上限',
+)
+/* 两个入口共用同一条发送路径与同一份计数：读本机登记的那条够不着
  * 「创建还在飞」的任务，所以另开一条由持有响应的一方交凭证；但同一个 scanTaskId
- * 合起来仍然只许发一次 DELETE。各写各的 fetch 就会对同一个任务发两次。 */
+ * 合起来仍然受同一个上限约束。各写各的 fetch 就会绕开整张上限表。 */
 assert.match(
   scanRevoke,
   /export function revokeCreatedScanSession\(\s*\n\s*credentials: \{ scanTaskId: string; controlToken: string \},/,
@@ -339,13 +392,15 @@ assert.match(
 )
 assert.match(
   scanRevoke,
-  /return sendRevoke\(live\.scanTaskId, live\.controlToken, outgoingMemberToken\)/,
-  '读本机登记的入口也走同一条发送路径，否则两条各自去重 = 同一个任务发两次',
+  /return sendRevoke\(live\.scanTaskId, live\.controlToken, outgoingMemberToken, 'best-effort'\)/,
+  '读本机登记的入口也走同一条发送路径，否则两条各自去重 = 绕开上限表。'
+    + '它永远是 best-effort：清场那一路（含 leaveScanFlow）合起来只许一次',
 )
 assert.match(
   scanRevoke,
-  /return sendRevoke\(credentials\.scanTaskId, credentials\.controlToken, creatingMemberToken\)/,
-  '交凭证的入口同上；身份参数是**创建时**那一个，不是当前的',
+  /intent: ScanRevokeIntent = 'best-effort',\s*\n\)[\s\S]{0,80}?return sendRevoke\(credentials\.scanTaskId, credentials\.controlToken, creatingMemberToken, intent\)/,
+  '交凭证的入口同上；身份参数是**创建时**那一个，不是当前的。'
+    + '意图默认 best-effort —— 补偿必须由调用方显式要，漏传只会少发一次，不会多发',
 )
 assert.match(
   scanRevoke,
@@ -472,9 +527,13 @@ assert.match(
 )
 assert.equal(
   (scanProgress.match(/\}, true\)/g) ?? []).length,
-  2,
-  '只有两条本机放弃路径传 localGiveUp=true（轮询总时长到点、连续查不动）；'
-    + '服务端自己报的 completed / expired / failed / cancelled 一律不得发 DELETE',
+  3,
+  '只有本机放弃的路径才传 localGiveUp=true：轮询总时长到点、连续查不动，'
+    + '以及 2026-09-14 起的第三条 —— 投递授权被服务端明确拒绝。\n'
+    + '第三条也算「本机放弃」而不是「服务端终态」：ACK 被拒时那条任务在服务端多半还'
+    + '停在 waiting（拒的是**确认**，不是任务本身的状态），不 DELETE 它就会留在原地'
+    + '收下一次面板扫描。\n'
+    + '服务端自己报的 completed / expired / failed / cancelled 一律不得发 DELETE。',
 )
 
 const scanTasksApi = read('src/services/api/scanTasks.ts')
@@ -596,7 +655,7 @@ assert.doesNotMatch(
 // ── B. 取用时机：和代次同一个同步块，且每次创建只取一次 ──────────────────────
 assert.match(
   scanSettings,
-  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,600}?const rescan = takeScanRescanAuthority\(scanType\)[\s\S]{0,400}?if \(!rescan && rescanIntentRef\.current\) \{[\s\S]{0,400}?return undefined\s*\n\s*\}[\s\S]{0,200}?sessionPromiseRef\.current = createScanSession\(/,
+  /createGenerationRef\.current = scanLifecycleGeneration\(\)[\s\S]{0,600}?const rescan = takeScanRescanAuthority\(scanType\)[\s\S]{0,400}?if \(!rescan && rescanIntentRef\.current\) \{[\s\S]{0,400}?return undefined\s*\n\s*\}[\s\S]{0,400}?const sendCreate = \(\) => createScanSession\(/,
   '三件事的**顺序**一起钉死：\n'
     + '  · 授权必须在「取代次」与「发创建请求」之间取 —— 授权本身按代次校验，'
     + '中间隔一次 await 就可能取到属于上一场的那一份；\n'
@@ -649,10 +708,102 @@ assert.match(
   '取到的授权必须真的传给创建请求；取了不传 = 白取一枚，重扫照旧退化',
 )
 
+/* ── B3. 丢失响应的重放：把「看不见的收件箱」收回来（2026-09-14 第三轮）───────
+ *
+ * POST /scan/sessions 的响应在回来的路上丢了，浏览器侧只有一个 TypeError。但服务端
+ * **可能已经提交了一条 child waiting 任务**，它挂在这台终端上等文件 —— 屏幕上什么都
+ * 没有，下一位走到面板前按下扫描，文件就投给了这条没有任何界面在看着的任务。
+ * 一体机是公共设备，这正是「看不见的收件箱」。
+ *
+ * 服务端把配对创建做成了幂等：同一对凭据再发一次拿回**同一条** child（controlToken
+ * 就是上一场那份明文），不会多建一条。所以本机对未知态的正确动作是重放同一对请求。
+ *
+ * 下面钉的是这件事的四条边界 —— 少任何一条，它就从「收回收件箱」变成别的东西。 */
+assert.match(
+  scanSettings,
+  /const sendCreate = \(\) => createScanSession\([\s\S]{0,600}?sessionPromiseRef\.current = replayCreateUntilOutcomeKnown\(sendCreate, rescan !== null, \{/,
+  '重放必须复用**同一个** sendCreate 闭包，并且 paired 位直接取 `rescan !== null`：\n'
+    + '  · 另写一处调用就可能漏带那两半，而漏带的那一次是一个无签名的普通创建；\n'
+    + '  · paired 位若写死 true，普通创建（没有幂等键）会被重发成真的第二条任务。\n'
+    + '  并且结果仍然存进 sessionPromiseRef —— StrictMode / effect 重跑共用同一个 promise，'
+    + '所以「一次创建意图只有一条重放循环」是结构保证的，不靠调用方自觉。',
+)
+assert.match(
+  scanCreateReplay,
+  /if \(!paired \|\| !isUnknownCreateOutcome\(firstError\)\) throw firstError/,
+  '两道闸必须在同一句里：非配对请求一个字节都不许重发（普通创建没有幂等键，'
+    + '重发就是真的多建一条）；拿到任何 HTTP 应答都说明服务端回过话了，'
+    + '429 / SCAN_TERMINAL_BUSY / 401 / 5xx / 403 一律原样抛出交给用户手动决定',
+)
+assert.match(
+  scanCreateReplay,
+  /export function isUnknownCreateOutcome\(error: unknown\): boolean \{\s*\n\s*return error instanceof ApiHttpError && \(error\.code === 'NETWORK_ERROR' \|\| error\.status === 0\)\s*\n\s*\}/,
+  '「未知」的判据只能是本仓既有的那一条（status 0 = 压根没拿到 HTTP 应答）。'
+    + '放宽它就会把一个**确定**的失败当成未知去重放 —— 比如 401 终端票失效，'
+    + '那是「请求根本没发出去」，重放五次只是白烧限流额度',
+)
+assert.match(
+  scanCreateReplay,
+  /if \(!isUnknownCreateOutcome\(replayError\)\) throw replayError/,
+  '重放途中拿到确定答案（含 409 SCAN_RETRY_CHILD_NOT_RECOVERABLE）必须当场收工：'
+    + '继续重放等于把一个已经有结论的失败拖成一屏无意义的等待',
+)
+assert.match(
+  scanCreateReplay,
+  /SCAN_CREATE_REPLAY_DELAYS_MS: readonly number\[\] = \[[\d, ]+\]/,
+  '退避表必须是一张**有界**的常量表：创建端点按出口 IP 限 12 次/分'
+    + '（scan-tasks.controller.ts 的 @Throttle，tracker 是纯 IP），'
+    + '一个大厅好几台机器共用一个桶，无界重放会把整个大厅的额度烧掉',
+)
+assert.ok(
+  (JSON.parse(
+    /SCAN_CREATE_REPLAY_DELAYS_MS: readonly number\[\] = (\[[\d, ]+\])/.exec(scanCreateReplay)?.[1] ?? '[]',
+  )).length <= 6,
+  '重放次数上限不许放大：最坏情况 1 次原始 + 5 次重放 = 6/12，'
+    + '必须给用户自己的动作留下另一半额度',
+)
+/* 这两条钉的是**代码**，不是注释里提到过什么，所以先剥注释
+ * （模块的文档注释本来就要把 retryOfScanTaskId / expiresAt 这些名字说清楚）。 */
+const replayCode = stripComments(scanCreateReplay)
+assert.doesNotMatch(
+  replayCode,
+  /createScanSession|X-Scan-Retry-Control|retryOfScanTaskId/,
+  '重放模块**从不**自己构造请求：它只会重放调用方给的那个闭包。'
+    + '一旦它自己拼 body / 头，就出现了第二条能退化成无签名普通创建的路径',
+)
+assert.doesNotMatch(
+  replayCode,
+  /expiresAt|armedAtMs|TTL_MS/,
+  '重放不许碰任何有效期：child 的 expiresAt 是服务端给的，本机那枚授权的 15 分钟'
+    + '也从上一场铸出来那一刻算起。重放把它们中任何一个延长，'
+    + '页面就会照着一句已经不成立的承诺让用户把纸放回去',
+)
+/* 重放窗口里屏幕上那句话。这一刻「正在建扫描会话」已经不准确 —— 会话可能早就建成，
+ * 丢的只是回话。不说这个区别，用户会以为什么都没发生，转身去面板上按开始，
+ * 而服务端那条 child 正等着收他这一张纸。 */
+assert.match(
+  scanSettingsView,
+  /replayingLostCreate\s*\n?\s*\? '正在确认上一次请求'/,
+  '重放期间必须改口：说「正在建扫描会话」是假话（会话可能已经建成）',
+)
+assert.match(
+  scanSettingsView,
+  /data-testid="scan-create-replay-notice"[\s\S]{0,400}?先别在面板上按开始/,
+  '重放窗口必须明说「会话可能已经建成」并劝阻面板操作：'
+    + '这是这条修复在屏幕上唯一看得见的部分，少了它，用户的动作依旧会撞上那条 child',
+)
+
 // ── C. 被拒不许静默降级 ────────────────────────────────────────────────────
 const rejectionCodeTable = /export const SCAN_RESCAN_REJECTION_CODES = new Set\(\[([\s\S]*?)\]\)/.exec(rescanRecovery)?.[1]
 assert.ok(rejectionCodeTable, '必须有一张显式的重扫拒绝码表（scanRescanRecovery）')
-for (const code of ['SCAN_RETRY_NOT_AUTHORIZED', 'SCAN_RETRY_CONFLICT', 'SCAN_RETRY_TASK_ID_MISSING']) {
+for (const code of [
+  'SCAN_RETRY_NOT_AUTHORIZED',
+  'SCAN_RETRY_CONFLICT',
+  'SCAN_RETRY_TASK_ID_MISSING',
+  // 2026-09-14：丢失响应重放的终点之一 —— child 存在过但已不在 waiting/matched。
+  // 服务端明确不会再开 grandchild，所以它和 403 同一个处置：永久丢弃那枚授权。
+  'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+]) {
   assert.match(
     apiScanService,
     new RegExp(`code: '${code}'`),
@@ -675,6 +826,50 @@ assert.match(
   rescanRecovery,
   /RESCAN_REFUSED_FAILURE = \{\s*\n\s*title: '安全重扫授权已失效'/,
   '重扫被拒要有自己的结论屏，不能和「服务端没能创建扫描会话」混成一句',
+)
+/* 那张表里的码必须和 shared 的常量是同一个字符串。分别硬写两处、其中一处被改掉，
+ * 表里那个码就永远匹配不上服务端回的那个 —— 闸门看起来还在，实际已经空转。 */
+assert.match(
+  readRepo('packages/shared/src/types/scanTask.ts'),
+  /export const SCAN_RETRY_CHILD_NOT_RECOVERABLE = 'SCAN_RETRY_CHILD_NOT_RECOVERABLE'/,
+  'shared 必须仍然导出这个码，且值与前端拒绝码表里那个字面量一致',
+)
+/* 处置相同、成因不同 → 必须是两屏。child 不可恢复那一条要多交代一件事：
+ * 服务端那边**没有**留下还在等文件的任务。不说这句，用户不知道刚才那张纸还会不会
+ * 被谁收走，也就不敢开新的一场。 */
+assert.match(
+  rescanRecovery,
+  /RESCAN_CHILD_LOST_FAILURE = \{\s*\n\s*title: '那次安全重扫的会话已经失效'/,
+  'child 已提交但不可恢复要有自己的结论屏：它和「上一场根本没走到取件」'
+    + '（从来没有任务）的成因正相反，混成一句就有一半的人读到假的诊断',
+)
+assert.match(
+  rescanRecovery,
+  /RESCAN_CHILD_LOST_FAILURE[\s\S]{0,600}?没有留下还在等文件的任务/,
+  '这一屏必须明说服务端没有留下等文件的任务：用户据此判断自己那张纸安不安全',
+)
+assert.match(
+  rescanRecovery,
+  /failure: code === 'SCAN_RETRY_CHILD_NOT_RECOVERABLE'\s*\n\s*\? RESCAN_CHILD_LOST_FAILURE/,
+  '分屏必须按码分，不能按「重放过没有」之类的本机状态分：'
+    + '本机状态证明不了服务端那条 child 到底存不存在过',
+)
+/* 重放到头仍未知：既不许说成「已经建成」，也不许说成「没建成」。它必须仍然是
+ * outcomeUnknown —— 那一位决定授权被**原样放回**，用户那颗「再试一次安全重扫」
+ * 发出去的才还是成对的，服务端才可能幂等地把那条 child 交回来。 */
+assert.match(
+  rescanRecovery,
+  /if \(code === SCAN_CREATE_REPLAY_UNRESOLVED\) \{\s*\n\s*return \{\s*\n\s*outcomeUnknown: true,\s*\n\s*refusedRescan: false,/,
+  '重放到头的结论必须 outcomeUnknown: true + refusedRescan: false：\n'
+    + '  · 判成 refused 会永久丢弃一枚服务端**可能还认**的授权，'
+    + '用户只能去开一场注定撞两小时去重的普通会话；\n'
+    + '  · 判成确定失败会让页面对一件本机并不知道的事下结论。',
+)
+assert.match(
+  rescanRecovery,
+  /if \(code === SCAN_CREATE_REPLAY_UNRESOLVED\)[\s\S]{0,400}?const outcomeUnknown = error instanceof ApiHttpError/,
+  '这一条必须排在通用 outcomeUnknown **之前**：两者都是 status 0，但通用那条说'
+    + '「本页不会自动重发，要不要再发由你按」—— 重发已经发过五次了，说那句就是假话',
 )
 /* 原来这一条用一个跨越「码表 → 置位 → 结论屏」的长正则钉在页面里。结构收敛之后
  * 翻译那一半在 helper、置位那一半在页面，所以拆成两条 —— 合起来的判据一个没减：
@@ -712,19 +907,22 @@ assert.equal(
  * 现在两种 fail-closed（本机取不到 / 服务端不认）共用同一个显式出路。
  * 它仍然不是自动降级：按钮由用户按下，文案写明它不是同字节重扫、同一张纸可能被拒收。 */
 assert.match(
-  scanSettings,
-  /rescanCredentialsLost \|\| rescanRefusedByServer \? \(\s*\n\s*<button[^>]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
-  '两种 fail-closed 都必须给出同一个显式主行动「重新开始一次扫描」：'
-    + '只给其中一种，另一种就是一条注定失败的死路',
+  scanSettingsView,
+  /rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused \? \(\s*\n\s*<button[^>]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  '三种 fail-closed（本机取不到凭据 / 服务端不认这次重扫 / 服务端不给投递授权）'
+    + '都必须给出同一个显式主行动「重新开始一次扫描」：'
+    + '少给其中任何一种，那一种就是一条注定失败的死路',
 )
 /* 第三条分支：安全重扫这条路**还通着**（失败码证明不了服务端消费过那枚授权）。
  * 它必须排在上面那两条 fail-closed 之前 —— 顺序反了的话，一次限流 / 断网就会把用户
  * 推到「重新开始一次扫描」上去，同一张纸随后撞上服务端两小时的同字节去重。 */
 assert.match(
-  scanSettings,
-  /\{rescanRetryable \? \(\s*\n\s*<button[^>]*onClick=\{handleRescanRetry\}>\s*\n\s*再试一次安全重扫\s*\n\s*<\/button>\s*\n\s*\) : rescanCredentialsLost \|\| rescanRefusedByServer \? \(/,
-  '「还能再试一次成对重扫」必须是 CTA 的第一条分支，且优先于两条 fail-closed 的普通重启：'
-    + '把它排在后面或干脆不给，等于让一次 429 永久烧掉用户那枚一次性授权',
+  scanSettingsView,
+  /\) : rescanRetryable \? \(\s*\n\s*<button[^>]*onClick=\{handleRescanRetry\}>\s*\n\s*再试一次安全重扫\s*\n\s*<\/button>\s*\n\s*\) : rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused \? \(/,
+  '「还能再试一次成对重扫」必须排在三条 fail-closed 的普通重启之前：'
+    + '把它排在后面或干脆不给，等于让一次 429 永久烧掉用户那枚一次性授权。\n'
+    + '（2026-09-14 起它前面还多一条 awaitingAck 分支 —— 见下面那条专门的断言：'
+    + '会话已经建成、只差一次确认时，重开一场只会白建一条任务。）',
 )
 assert.match(
   rescanRecovery,
@@ -933,7 +1131,7 @@ assert.match(
     + '要不要把同一张纸放回去',
 )
 assert.match(
-  scanSettings,
+  scanSettingsModel,
   /rescanRequested\s*\n?\s*\? \['本次性质', '安全重扫：服务端已放行同一份材料再扫一次'\]/,
   '「已放行」只许出现在创建成功之后的设置页：那一刻服务端确实已经消费掉那枚授权',
 )
@@ -944,14 +1142,36 @@ assert.match(
     + '而且必须锁在初次渲染（ref）—— 创建成功之后本页自己会把 live 写回登记，'
     + '每帧重算会把一个刚在本页建成的会话说成「本页重载过」',
 )
+/* 文案搬进 scanSettingsModel 之后，「必须喂那个 ref」这一位要单独钉一次：
+ * 只钉 model 里的三元，页面把 restoredLive 原样传进去照样绿 —— 而那正是
+ * 「一个刚在本页建成的会话被说成本页重载过」那句假话的来源。 */
 assert.match(
   scanSettings,
-  /restoredFromStorageRef\.current\s*\n?\s*\? \['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断'\]/,
+  /restoredFromStorage=\{restoredFromStorageRef\.current\}/,
+  '「本次性质」必须由挂载那一刻的 ref 喂：每帧重算会把一个刚在本页建成的会话'
+    + '说成「本页重载过」，那是一句假话。喂 restoredLive / storedLive 都会当场变成那句假话',
+)
+/* 那张卡搬进 ScanSettingsStatusView 之后，「页面喂对了」还不够：中间那一层必须**原样
+ * 透传**。只要它在组件里自己重算一次（比如读 readScanWorkbenchSession），上面那条
+ * 断言照样绿，而假话原封不动回来了。 */
+assert.match(
+  scanSettingsView,
+  /sessionNatureRow\(\{ rescanRequested, plainRestartChosen, restoredFromStorage \}\)/,
+  '「本次性质」那一行只能用调用方传进来的三个值算，不许在展示组件里自己重算',
+)
+assert.doesNotMatch(
+  scanSettingsView,
+  /readScanWorkbenchSession|liveSessionStillValid/,
+  '展示组件不许自己去读本机登记：它没有生命周期上下文，读出来的必然是「此刻」而不是「挂载那一刻」',
+)
+assert.match(
+  scanSettingsModel,
+  /restoredFromStorage\s*\n?\s*\? \['本次性质', '本页重载过；这一场当初是不是安全重扫，本机无从判断'\]/,
   '复水出来的会话只能如实说无从判断：猜「安全重扫」会让用户把同一张纸放回去'
     + '（可能被去重拒收），猜「普通会话」会让他白换一份材料',
 )
 assert.match(
-  scanSettings,
+  scanSettingsModel,
   /plainRestartChosen\s*\n?\s*\? \['本次性质', '普通会话：你已确认这一次不是安全同字节重扫'\]/,
   '用户在 fail-closed 那一屏选的普通会话要记在屏幕上：否则下一屏看起来像是本页悄悄降级的',
 )
@@ -984,12 +1204,14 @@ assert.match(
 )
 assert.match(
   scanSettings,
-  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable\]\)/,
-  '三个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
+  /\}, \[terminalSession, rescanCredentialsLost, rescanRefusedByServer, rescanRetryable, ackRefused\]\)/,
+  '四个标志都必须进依赖：用户显式选了「重新开始一次扫描」或「再试一次安全重扫」之后'
     + '它们变 false，这条 effect 要跟着跑一次，否则那个按钮按下去什么都不会发生。\n'
     + 'rescanRefusedByServer 这一位尤其容易被判成冗余 —— 服务端拒绝那条路径上'
     + 'rescanCredentialsLost 从头到尾都是 false，复位它不构成依赖变化。\n'
-    + 'rescanRetryable 是「再试一次安全重扫」唯一的复跑开关，同理。',
+    + 'rescanRetryable 是「再试一次安全重扫」唯一的复跑开关，同理。\n'
+    + 'ackRefused（2026-09-14）同理，而且它还多守一头：置位时让 effect 早退，'
+    + '否则这一场刚被撤掉，effect 转身就重建一条。',
 )
 assert.match(
   scanSettings,
@@ -998,9 +1220,10 @@ assert.match(
     + '并且当场把 fail-closed 那一位放下来 —— 否则按钮按下去什么都不会发生',
 )
 assert.match(
-  scanSettings,
-  /rescanCredentialsLost \|\| rescanRefusedByServer \? \([\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
-  '两种 fail-closed（本机取不到凭据 / 服务端不认）都要有同一个能按的主行动；'
+  scanSettingsView,
+  /rescanCredentialsLost \|\| rescanRefusedByServer \|\| ackRefused \? \([\s\S]{0,400}?onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/,
+  '三种 fail-closed（本机取不到凭据 / 服务端不认这次重扫 / 服务端不给投递授权）'
+    + '都要有同一个能按的主行动；'
     + '其余失败态仍然什么都不许按（本页不自动重发）。\n'
     + '只给其中一种就会留下一条死路：服务端拒绝那一屏最常见的来源是「上一场根本没走到取件」，'
     + '服务端那种情况从不铸授权、必然 403 —— 最常见的失败路径上主行动注定失败。',
@@ -1086,8 +1309,8 @@ assert.doesNotMatch(
     + '万一取用时授权已经过期，必须照旧 fail-closed，而不是放一个无签名的普通创建出去',
 )
 assert.match(
-  scanSettings,
-  /rescanRetryable \?[\s\S]{0,600}?这次失败没有用掉你的安全重扫凭据[\s\S]{0,300}?重试不会延长/,
+  scanSettingsView,
+  /rescanRetryable && !awaitingAck \?[\s\S]{0,600}?这次失败没有用掉你的安全重扫凭据[\s\S]{0,300}?重试不会延长/,
   '这一屏必须如实说明「凭据还在」与「有效期不会因为重试而延长」：'
     + '只给按钮不给这两句，用户会以为同一份材料已经扫不成了，转头去开一场'
     + '注定被同字节去重拒收的普通会话',
@@ -1161,6 +1384,308 @@ assert.match(
   '本地有效期与服务端取同一个值：短了会在服务端还认的时候静默降级，长了只是多发一次 403',
 )
 
+/* ══ D. 投递确认（ACK）：会话「建成」与「可投递」之间的那道闸 ══════════════════
+ *
+ * ## 它修的是哪一个缺陷
+ *
+ * 在这之前，`POST /scan/sessions` 一回 2xx，服务端那条任务就已经可投递了：Agent 的
+ * current-lease 立刻看得见它，面板上扫出来的文件会直接投过去。于是只要那份 2xx
+ * **没能变成屏幕上的一场会话**（回话在路上丢了、整页重载、清场把本机登记抹了），
+ * 服务端就留下一个可投递却没有任何界面在看着的收件箱 —— 下一位走到面板前按下扫描，
+ * 文件进的是上一位的任务。一体机是公共设备，这是这条链路上最后一个能跨用户串件的口子。
+ *
+ * 服务端 2026-09-14 起把它拆成两段：新建会话一律 `deliveryAckedAt = null`，
+ * current-lease 看不见未确认的行（60 秒没确认就回收）；只有本机确认自己确实握着这一场
+ * 的控制凭据之后，它才变得可投递。
+ *
+ * 下面钉的就是本机这一侧的四条边界。少任何一条，这道闸要么形同虚设，要么把用户骗去
+ * 面板上扫一张没人会收的纸。 */
+
+// ── D1. 确认请求本身：凭据齐全才发，且四样一个不少 ──────────────────────────
+assert.match(
+  scanTasksApi,
+  /scan\/sessions\/\$\{encodeURIComponent\(scanTaskId\)\}\/ack/,
+  '确认必须打到服务端那个专门的端点上（POST /scan/sessions/:id/ack）',
+)
+assert.match(
+  scanTasksApi,
+  /export function ackScanSession\([\s\S]{0,1200}?terminalProtected: true/,
+  'ACK 必须走终端身份闸门：服务端在这个端点上挂了 TerminalIdentityGuard，'
+    + '只带 x-terminal-id 会被 401 顶回来，而 401 在页面上会被读成「还没确认」——'
+    + '一个本可以成功的确认会被说成网络问题',
+)
+assert.match(
+  scanTasksApi,
+  /export function ackScanSession\([\s\S]{0,1200}?controlToken,/,
+  'controlToken 必须交给 requestJson（它组 X-Scan-Session-Control 头）：'
+    + '服务端按这一头比对任务的 controlTokenHash，不带就是 403',
+)
+assert.match(
+  scanTasksApi,
+  /if \(!hasId \|\| !hasControl\) \{\s*\n\s*return Promise\.reject\(new ApiHttpError\(\s*\n\s*SCAN_ACK_CREDENTIALS_INCOMPLETE,/,
+  '凭据不全时**一个请求都不发**：半对凭据发出去只会拿回 403，'
+    + '而那条 403 在页面上会被判成「服务端不认这一场」并把它撤掉 ——'
+    + '把本机自己的缺失说成了服务端的结论',
+)
+/* 发出去的必须是**原样**那一串。这两条钉的是代码，所以先剥注释（注释里要解释
+ * 为什么判空按 trim 算）。给凭据做 trim 再发，等于发了一份不同的凭据。 */
+assert.doesNotMatch(
+  stripComments(scanTasksApi).slice(
+    stripComments(scanTasksApi).indexOf('export function ackScanSession'),
+  ),
+  /controlToken: controlToken\.trim\(\)|encodeURIComponent\(scanTaskId\.trim\(\)\)/,
+  '判空可以按 trim 算，发出去的必须是原串：服务端按字节比对 hash，'
+    + '替用户「整理」一下凭据就是发了另一份凭据',
+)
+
+// ── D2. 「服务端明确不认」那张码表，字符串取自 shared，不许再打一遍 ─────────
+assert.match(
+  scanDeliveryAck,
+  /import \{ SCAN_TASK_ACK_NOT_ALLOWED \} from '@ai-job-print\/shared'/,
+  '这个码必须从 shared 取：两处各写一份、其中一处被改掉时，'
+    + '表就永远匹配不上服务端回的那个码 —— 闸门看起来还在，实际已经空转',
+)
+const ackCodeTable = /export const SCAN_ACK_DEFINITIVE_CODES = new Set<string>\(\[([\s\S]*?)\]\)/
+  .exec(scanDeliveryAck)?.[1]
+assert.ok(ackCodeTable, '必须有一张显式的「服务端明确不认」码表（scanDeliveryAck）')
+assert.match(ackCodeTable, /SCAN_TASK_ACK_NOT_ALLOWED/, '409：任务状态不允许确认投递')
+for (const code of ['SCAN_TASK_FORBIDDEN', 'SCAN_TASK_NOT_FOUND']) {
+  assert.match(
+    apiScanService,
+    new RegExp(`code: '${code}'`),
+    `服务端仍会在 ack 路径上抛 ${code}，前端必须继续认它`,
+  )
+  assert.match(
+    ackCodeTable,
+    new RegExp(`'${code}'`),
+    `${code} 必须在表**里面**：漏了它，一个本机根本操作不了的任务会被当成「还没确认，`
+      + `再试试」，页面对着一场自己碰不到的会话一直重试`,
+  )
+}
+assert.match(
+  readRepo('packages/shared/src/types/scanTask.ts'),
+  /export const SCAN_TASK_ACK_NOT_ALLOWED = 'SCAN_TASK_ACK_NOT_ALLOWED'/,
+  'shared 必须仍然导出这个码',
+)
+assert.match(
+  apiScanService,
+  /code: 'SCAN_TASK_ACK_NOT_ALLOWED'/,
+  '服务端仍会抛这个码；它一旦改名，上面那张表就空转了',
+)
+assert.match(
+  scanDeliveryAck,
+  /if \(typeof acked\?\.deliveryAckedAt !== 'string' \|\| acked\.deliveryAckedAt\.trim\(\)\.length === 0\) \{\s*\n\s*return \{ ok: false, definitive: false/,
+  '放行的判据必须是服务端**真的写下了那一笔**：2xx 但没带 deliveryAckedAt 时按'
+    + '「还没确认」处理。只看 HTTP 状态码就放行，等于凭一个空回执把用户支到面板上',
+)
+
+// ── D3. 设置页：写完登记立刻确认；没确认就不许出现面板指引 ──────────────────
+assert.match(
+  scanSettings,
+  /if \(!patchScanWorkbenchSessionWithDurableLive\(\{ stage: 'settings', scanType, live \}\)\) \{[\s\S]{0,900}?if \(ackRequestedForRef\.current !== created\.scanTaskId\) \{\s*\n\s*ackRequestedForRef\.current = created\.scanTaskId\s*\n\s*setAckState\('pending'\)/,
+  '顺序钉死：**先**把 live 写进本机登记并读回核对，**再**确认投递授权。反过来的话，'
+    + 'ACK 一成功服务端那条任务就可投递了，而这一刻本机还没把凭据落到能跨重载存活的'
+    + '地方 —— 又造出一个「可投递却没人看着」的收件箱，正是这道闸要消灭的东西。\n'
+    + '而且判据必须是**读回核对**那一条（2026-09-14 P1）：patchScanWorkbenchSession 是 void 的，'
+    + '底下的 setItem 可能抛（已被吞）也可能静默什么都不做 —— 「写过了」证明不了「记住了」。\n'
+    + '认 id 而不是无条件置位：那段 .then 挂在一个会被重挂多次的 promise 上，'
+    + '无条件置位会把刚确认好的 acked 一次次打回 pending，两个 effect 互相喂招。',
+)
+/* 核不上那一支：撤任务 + 立起「这一次创建已经丢弃」+ 换结论屏，**且不许 ACK**。
+ * 少了 creationAbandonedRef 那一行，终端身份 failed → ready 会让创建 effect 再跑一次，
+ * 把一场已经撤掉的会话重新建出来；少了 discardCreatedSession，服务端那条任务会留在
+ * 终端上占住活动会话，而本机连界面都不再提它。 */
+assert.match(
+  scanSettings,
+  /if \(!patchScanWorkbenchSessionWithDurableLive\([\s\S]{0,600}?creationAbandonedRef\.current = true\s*\n\s*discardCreatedSession\(live, SCAN_LIVE_NOT_DURABLE_FAILURE\)\s*\n\s*setLiveNotDurable\(true\)\s*\n\s*return\s*\n\s*\}/,
+  '凭据没能落进登记时必须 fail-closed：撤掉刚建的那条任务、宣告这一次创建已丢弃、'
+    + '如实换屏，并且**一个 ACK 都不发** —— ACK 一成功那条任务就可投递，'
+    + '而本机根本没记住它，那就是一个没有任何界面在看着的收件箱',
+)
+/* 顺序：撤销必须发生在 setPhase('success') / 置 ackState 之前。把成功态先画出来再撤，
+ * 屏幕上会闪过一次「扫描任务已创建」，用户可能就在那一帧转身去了面板。 */
+const durableGateIndex = scanSettings.indexOf('if (!patchScanWorkbenchSessionWithDurableLive(')
+assert.ok(durableGateIndex > 0, '设置页必须有那道「读回核对」闸')
+assert.ok(
+  scanSettings.indexOf("setPhase('success')") > durableGateIndex,
+  "setPhase('success') 必须排在读回核对之后：先画成功再撤销，屏上会闪过一次「扫描任务已创建」",
+)
+assert.match(
+  scanSettings,
+  /if \(!pendingScanTaskId \|\| !pendingControlToken\) return undefined/,
+  '没有完整凭据时一个确认请求都不发（理由同 D1）',
+)
+assert.match(
+  scanSettings,
+  /if \(scanLifecycleGeneration\(\) !== ackGeneration \|\| unmountedRef\.current\) \{[\s\S]{0,900}?abandonCreatedSession\(credentials, 'ack-compensation'\)/,
+  '确认回来时必须过同一副生命周期闸门（代次 / 卸载），而且这一支比创建那一支更要紧：'
+    + '确认成功的那一刻任务**已经可投递**，如果用户已经走了或清过场，'
+    + '它就是一个没有任何界面在看着的收件箱 —— 必须撤，且一个字节都不许写回本机。\n'
+    + "意图必须是 'ack-compensation'：离开那条路径已经按本机登记发过一次 DELETE，"
+    + '按普通去重这一次会被挡掉；而 ACK 成功恰恰证明那一次没生效（生效了只会回 409），'
+    + '同时 deliveryAckedAt 已经非空 —— 60 秒未确认回收器再也收不到它',
+)
+/* 双层闸门：本页的 cancelRequestedRef 也必须给补偿留口子。只放开 scanSessionRevoke
+ * 那一层是不够的 —— handleSafeReturn / 过期取消都会把这一位立起来，补偿照样发不出去。 */
+assert.match(
+  scanSettings,
+  /if \(cancelRequestedRef\.current && intent !== 'ack-compensation'\) return\s*\n\s*cancelRequestedRef\.current = true\s*\n\s*revokeCreatedScanSession\(credentials, createTokenRef\.current, intent\)/,
+  'abandonCreatedSession 自己那道去重也要认意图：只放开 scanSessionRevoke 那一层，'
+    + '本页这一层照样会把补偿挡掉（handleSafeReturn / 过期取消都会置位 cancelRequestedRef）',
+)
+assert.match(
+  scanSettings,
+  /const discardCreatedSession = \([\s\S]{0,600}?abandonCreatedSession\(credentials\)\s*\n\s*patchScanWorkbenchSession\(\{ stage: 'settings', live: undefined \}\)/,
+  'fail-closed 的公共那一半：撤服务端任务 + 抹本机登记（live: undefined 同时推进代次）。'
+    + '只抹本机不撤服务端，那条任务会留在终端上占住活动会话；'
+    + '只撤服务端不抹本机，看门狗整页重载之后这一场会被复水成「有会话」',
+)
+/* 两处成因（服务端不给投递授权 / 凭据没能落进登记）必须走同一段丢弃逻辑。
+ * 各写一份的话，改动其中一份时另一份会悄悄停在旧语义上 —— 那正是这四件事最容易漏掉的方式。 */
+assert.match(
+  scanSettings,
+  /const failClosedOnAckRefusal = \([^)]*\) => \{\s*\n\s*discardCreatedSession\(credentials, ackFailure\)\s*\n\s*setAckRefused\(true\)/,
+  '「服务端不认投递授权」这一支必须复用 discardCreatedSession，只额外立起它自己那位 fail-closed 标志',
+)
+assert.match(
+  scanSettings,
+  /if \(ackState !== 'acked' \|\| phase !== 'success' \|\| !scanType/,
+  '放行判据是两件事同时成立：服务端回了可用会话**并且**它已经拿到投递授权。'
+    + '少了后半句，用户会照着指引去按开始，而那一刻服务端还不肯把文件投给这一场',
+)
+/* 结构性判据，不靠读文案：面板指引与「我已操作，开始等待」必须整个排在那道
+ * 放行闸**之后**。排在前面的话，闸门写得再对也拦不住它们出现在屏幕上。 */
+const ackGateIndex = scanSettings.indexOf("if (ackState !== 'acked' || phase !== 'success'")
+assert.ok(ackGateIndex > 0, '设置页必须有那道放行闸')
+for (const marker of ['<ScanPanelMock', '我已操作，开始等待', 'instructions.map(', '<ScanSettingsSessionFacts']) {
+  const at = scanSettings.indexOf(marker)
+  assert.ok(at > ackGateIndex, `「${marker}」必须排在投递授权放行闸之后：`
+    + '没确认的会话在服务端是不可投递的，这时候让用户去面板按开始，那张纸不会进他的记录，'
+    + '人会在机器前白等到轮询上限')
+}
+
+// ── D4. 两屏的话都不许把人支到面板上去 ────────────────────────────────────
+assert.match(
+  scanSettingsView,
+  /const awaitingAck = phase === 'success' && ackState !== 'acked'/,
+  '「会话建成了但还没确认」必须是一个独立的屏，不能混进 create-loading：'
+    + '那一屏说的是「还没建成」，而这一刻它已经建成了 —— 混成一句话，'
+    + '用户读到的诊断是假的',
+)
+assert.match(
+  scanSettingsView,
+  /data-testid="scan-ack-pending-notice"[\s\S]{0,500}?先别在面板上按开始/,
+  '这一屏必须明说「现在扫也不会进这一场」并劝阻面板操作：'
+    + '这是这条修复在屏幕上唯一看得见的部分',
+)
+assert.match(
+  scanSettingsView,
+  /\{awaitingAck \? \(\s*\n\s*ackRetryable \? \(/,
+  'awaitingAck 必须是 CTA 的第一条分支：这一屏上「再试一次安全重扫」「重新开始一次扫描」'
+    + '都是错的主行动 —— 会话已经建成，缺的只是那一次确认，重开一场只会白建一条任务',
+)
+assert.match(
+  scanProgress,
+  /const \[ackState, setAckState\] = useState<ScanAckState>\('pending'\)/,
+  '等待页也必须从「还没确认」起算：它经常是整页重载之后凭 sessionStorage 里那份 live '
+    + '直接挂起来的，本机并不知道当初确认过没有。ACK 幂等，所以再问一次永远是对的，'
+    + '猜「应该确认过了」才是错的',
+)
+assert.match(
+  scanProgress,
+  /if \(scanLifecycleGeneration\(\) !== ackGeneration\) \{\s*\n\s*revokeCreatedScanSession\(credentials, memberToken, 'ack-compensation'\)/,
+  '等待页这一次确认同样要过生命周期闸门：它可能刚好把任务变成可投递的，'
+    + "而那一刻用户已经走了。意图同样必须是 'ack-compensation' —— "
+    + '离开那条路径已经按本机登记发过一次 DELETE，按普通去重这一次兜底会被整个挡掉',
+)
+assert.match(
+  scanProgress,
+  /finishWithResult\(\{ outcome: 'failed', success: false, reason: SCAN_ACK_REFUSED_PROGRESS_REASON \}, true\)/,
+  '等待页被明确拒绝时如实落一个失败结果并撤掉任务，不在这一屏继续假装还在等文件',
+)
+assert.match(
+  scanProgress,
+  /subtitle=\{deliveryAcked\s*\n\s*\? '请在打印机面板完成扫描到本机接收目录[^']*'\s*\n\s*: '[^']*先别在面板上按开始'\}/,
+  '等待页那句副标题必须跟着确认状态改口：没确认时说「请在打印机面板完成扫描」是假话 ——'
+    + '服务端此刻不肯把文件投给这一场',
+)
+
+// ── D5. 「写过了」不等于「记住了」：落地核对（2026-09-14 P1）──────────────────
+//
+// `saveScanWorkbenchSession` 把 `setItem` 的异常吞掉了，而更糟的一种是**根本不抛**：
+// 隐私模式、配额写满、被扩展改写过的 sessionStorage 都可能静默什么也不做。两种情况下
+// 调用方拿到的都是「看起来写成功了」，于是照常 ACK —— 服务端那条任务就变得可投递
+// （deliveryAckedAt 非空，60 秒未确认回收器再也收不到它），而本机其实一个字节都没记住：
+// 整页重载之后没有任何界面找得回这一场，它会一直可投递到自然过期，下一位在面板上按下
+// 扫描，文件投给上一位。ACK 那道闸本来就是为了消灭这种收件箱，不能被这条路重新绕开。
+assert.match(
+  workbenchSession,
+  /export function patchScanWorkbenchSessionWithDurableLive\([\s\S]{0,300}?\): boolean \{\s*\n\s*patchScanWorkbenchSession\(patch\)\s*\n\s*const persisted = readScanWorkbenchSession\(\)\?\.live\s*\n\s*if \(!persisted\) return false/,
+  '放行判据必须是「写完**读回来**」：只看 setItem 有没有抛，对静默吞掉的那一种一个字都读不到',
+)
+/* 四样一个不能少，而且必须逐字节比。少比 controlToken，一份被改写过的凭据会被当成
+ * 落地成功，拿它去 ACK / 撤销只会 403，而页面会把那条 403 读成「服务端不认这一场」；
+ * 少比 instructions，屏上会少一步，用户照着做不完还不知道为什么。 */
+for (const [field, why] of [
+  ['scanTaskId', '任务编号是认领回传文件的唯一键'],
+  ['controlToken', '控制凭据是查询 / 撤销 / 确认投递的唯一凭证'],
+  ['expiresAt', '倒计时与过期撤销都按它走'],
+]) {
+  assert.match(
+    workbenchSession,
+    new RegExp(`persisted\\.${field} === live\\.${field}`),
+    `读回核对必须逐字段比 ${field}：${why}`,
+  )
+}
+assert.match(
+  workbenchSession,
+  /persisted\.instructions\.length === live\.instructions\.length\s*\n\s*&& persisted\.instructions\.every\(\(line, index\) => line === live\.instructions\[index\]\)/,
+  '指引要连长度带逐条内容一起比：只比长度的话，被改写过的某一步会原样上屏',
+)
+assert.match(
+  scanSettingsModel,
+  /export const SCAN_LIVE_NOT_DURABLE_FAILURE: SessionFailure = \{/,
+  '「本机没能记住这一场」要有自己的结论文案：它的成因和「服务端不认」完全不同，'
+    + '共用一份文字就会对用户说错原因',
+)
+{
+  const notDurableText = /SCAN_LIVE_NOT_DURABLE_FAILURE: SessionFailure = \{([\s\S]*?)\n\}/.exec(scanSettingsModel)?.[1] ?? ''
+  assert.ok(notDurableText.length > 0, '取不到那份文案就谈不上核它')
+  assert.doesNotMatch(notDurableText, /\*\*/, '纯字符串直接渲染进 <p>：写 markdown 会把星号打在 27 寸公共屏上')
+  assert.match(notDurableText, /先别在面板上按开始/, '必须劝阻面板操作：这一刻没有任何会话会认领那份文件')
+  assert.match(notDurableText, /撤掉/, '必须说出「那条任务已经撤掉了」，否则用户会以为纸可能被谁悄悄收走')
+  assert.match(notDurableText, /工作人员/, '出路必须可执行：存储坏了用户自己修不了，只能安全返回 + 叫人')
+}
+/* 这一屏刻意**不给**「重新开始一次扫描」：写不进去是这台机器的存储坏了 / 被禁用 / 写满，
+ * 重建一次只会在同一处再失败，还多留一条要撤的服务端任务。给一颗按不出结果的按钮，
+ * 比不给更糟 —— 用户会反复按，每按一次就多一条要撤的任务。 */
+{
+  // 取「重新开始一次扫描」那颗按钮的**整个**判定条件再核，不按某一种写法去匹配：
+  // 写成 `liveNotDurable || rescanCredentialsLost || ...` 时，按顺序匹配的断言会漏过去。
+  const restartBranch = /\) : ([^?]*?)\? \(\s*\n\s*<button[^\n]*onClick=\{handlePlainRestart\}>\s*\n\s*重新开始一次扫描/
+    .exec(scanSettingsView)?.[1]
+  assert.ok(restartBranch, '取不到「重新开始一次扫描」那颗按钮的判定条件，后面的核对无从谈起')
+  assert.doesNotMatch(
+    restartBranch,
+    /liveNotDurable/,
+    '「本机记不住」不许并进那三种 fail-closed 的「重新开始一次扫描」：'
+      + '写不进去是这台机器的存储坏了 / 被禁用 / 写满，重建只会在同一处再失败一次，'
+      + '还多留一条要撤的服务端任务 —— 给一颗按不出结果的按钮比不给更糟，用户会反复按',
+  )
+}
+assert.match(
+  scanSettingsView,
+  /data-testid="scan-live-not-durable-notice"[\s\S]{0,400}?先别在面板上按开始/,
+  '这一屏必须自己说出「任务建过、已经撤掉、现在别去面板」：'
+    + '只显示 failure 正文的话，读屏的人分不清「没建成」和「建成了但本机记不住」',
+)
+assert.match(
+  scanSettingsView,
+  /liveNotDurable \? '本机存储不可用，无法建会话' : '未创建扫描任务'/,
+  '这一支上任务**建过**（随后被本页撤掉）：禁用按钮写死「未创建扫描任务」就是句假话，'
+    + '必须按 liveNotDurable 分开说',
+)
+
 const rescanAuthorityTest = spawnSync(
   process.execPath,
   ['--test', resolve(kioskRoot, 'scripts/tests/scan-rescan-authority.test.mjs')],
@@ -1181,6 +1706,54 @@ assert.equal(
   modelTest.status,
   0,
   `scan workbench model unit test failed: ${modelTest.stderr || modelTest.stdout}`,
+)
+
+const createReplayTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-create-replay.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  createReplayTest.status,
+  0,
+  `scan create replay behaviour test failed: ${createReplayTest.stderr || createReplayTest.stdout}`,
+)
+
+const deliveryAckTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-delivery-ack.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  deliveryAckTest.status,
+  0,
+  `scan delivery ack behaviour test failed: ${deliveryAckTest.stderr || deliveryAckTest.stdout}`,
+)
+
+/* 落地核对的「静默失败」那一支没法用文本断言证明：setItem 不抛、返回值也不变，
+ * 只有真的装起来跑一遍、把写入掐掉，才看得出它判 false。 */
+const durabilityTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-workbench-session-durability.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  durabilityTest.status,
+  0,
+  `scan workbench session durability test failed: ${durabilityTest.stderr || durabilityTest.stdout}`,
+)
+
+/* 上面那几条 assert.match 只能证明源码长这个样子；撤销的上限是**行为**
+ * （发几次、带什么、失败怎么吞），所以真的把模块装起来跑一遍。 */
+const revokeTest = spawnSync(
+  process.execPath,
+  ['--test', resolve(kioskRoot, 'scripts/tests/scan-session-revoke.test.mjs')],
+  { encoding: 'utf8' },
+)
+assert.equal(
+  revokeTest.status,
+  0,
+  `scan session revoke behaviour test failed: ${revokeTest.stderr || revokeTest.stdout}`,
 )
 
 console.log('ALL PASS scan session truth contract')

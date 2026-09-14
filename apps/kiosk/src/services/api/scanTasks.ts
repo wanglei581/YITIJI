@@ -1,5 +1,6 @@
 import type {
   ScanRescanAuthorization,
+  ScanSessionAckResponse,
   ScanSessionCancelResponse,
   ScanSessionCreateRequest,
   ScanSessionCreateResponse,
@@ -147,6 +148,62 @@ export async function createScanSession(
     headers,
     body: JSON.stringify(body),
   })
+}
+
+/** 本机凭据不全时抛的码。**不发请求**，所以 status 必须非 0（结论是确定的）。 */
+export const SCAN_ACK_CREDENTIALS_INCOMPLETE = 'SCAN_ACK_CREDENTIALS_INCOMPLETE'
+
+/**
+ * 告诉服务端：这一场的控制凭据**已经稳稳落在本机了**，可以开始投递。
+ *
+ * ## 它守的是哪一个缺陷
+ *
+ * 创建成功的那一瞬间，服务端那条任务就已经是 waiting —— 在这个 ACK 出现之前，
+ * Agent 的 current-lease 立刻就能看见它并把面板上扫出来的文件投过去。于是「响应在
+ * 回来的路上丢了」这一类故障会留下一个**可投递却没有任何界面在看着**的收件箱：
+ * 本机不知道它的 id，屏幕上什么都没有，下一位走到面板前按下扫描，文件就进去了。
+ *
+ * 服务端 2026-09-14 起把这条链路改成两段：新建会话一律 `deliveryAckedAt = null`，
+ * current-lease 看不见它（60 秒没 ACK 就回收）；只有本机**明确确认自己握着这一场的
+ * 控制凭据**之后，它才变得可投递。也就是说，这个 ACK 不是一次状态上报，
+ * 它是「这台机器上现在有一个人正看着这一场」的唯一证据。
+ *
+ * ## 为什么是这四样凭据，一样都不能少
+ *
+ * 服务端在这个端点上同时校验：`TerminalIdentityGuard`（终端会话票）、
+ * `X-Terminal-Id` 必须是任务所属终端、`X-Scan-Session-Control` 必须是这一场的
+ * controlToken、会员身份必须是任务的 owner。所以这里必须 `terminalProtected: true`
+ * （带上终端会话票，401 后换票重试一次），并把 controlToken 走
+ * `X-Scan-Session-Control` 头（不进 query string / 浏览器历史）。
+ *
+ * 凭据不全时**一个请求都不发**：半对凭据发出去只会拿回 403，而那条 403 在页面上
+ * 会被读成「服务端不认这一场」，把一个本机自己的错误说成服务端的结论。
+ */
+export function ackScanSession(
+  scanTaskId: string,
+  controlToken: string,
+  token?: string | null,
+): Promise<ScanSessionAckResponse> {
+  // 判空按 trim 算，**发出去的仍是原串**：服务端按字节比对 hash，
+  // 这里替它「整理」一下凭据就等于发了一份不同的凭据。
+  const hasId = typeof scanTaskId === 'string' && scanTaskId.trim().length > 0
+  const hasControl = typeof controlToken === 'string' && controlToken.trim().length > 0
+  if (!hasId || !hasControl) {
+    return Promise.reject(new ApiHttpError(
+      SCAN_ACK_CREDENTIALS_INCOMPLETE,
+      '扫描会话凭据不完整，本次不会确认投递',
+      400,
+    ))
+  }
+  return requestJson<ScanSessionAckResponse>(
+    `/scan/sessions/${encodeURIComponent(scanTaskId)}/ack`,
+    {
+      method: 'POST',
+      controlToken,
+      token,
+      terminalProtected: true,
+    },
+  )
 }
 
 export function getScanSessionStatus(
