@@ -33,6 +33,7 @@ interface FakeTask {
   errorCode: string | null
   errorMessage: string | null
   controlTokenHash: string | null
+  deliveryAckedAt: Date | null
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -46,21 +47,51 @@ export class ScanContractTestPrisma {
   readonly $transaction = async <T>(callback: (tx: this) => Promise<T>): Promise<T> => callback(this)
 
   terminal = {
-    findFirst: async ({ where }: { where: { id?: string; terminalCode?: string } }) => {
-      const id = where.id ?? where.terminalCode ?? 't_1'
-      return { id, terminalCode: id, enabled: true, lifecycleStatus: 'active' }
+    findFirst: async ({
+      where,
+    }: {
+      where: { id?: string; terminalCode?: string; OR?: Array<{ id?: string; terminalCode?: string }> }
+    }) => {
+      const refs = where.OR?.length ? where.OR : [where]
+      for (const ref of refs) {
+        const id = ref.id ?? ref.terminalCode
+        if (id) return { id, terminalCode: id, enabled: true, lifecycleStatus: 'active' }
+      }
+      return null
     },
     updateMany: async () => ({ count: 1 }),
   }
 
   scanTask = {
-    findFirst: async ({ where }: { where: { terminalId: string; status?: string; expiresAt?: { gt: Date }; lastAttemptHash?: string; updatedAt?: { gt: Date } } }) => {
+    findFirst: async ({
+      where,
+    }: {
+      where: {
+        terminalId: string
+        status?: string
+        expiresAt?: { gt: Date }
+        lastAttemptHash?: string
+        updatedAt?: { gt: Date }
+        deliveryAckedAt?: Date | null | { not: null }
+      }
+    }) => {
       for (const t of this.scanTasksById.values()) {
         if (t.terminalId !== where.terminalId) continue
         if (where.status !== undefined && t.status !== where.status) continue
         if (where.lastAttemptHash !== undefined && t.lastAttemptHash !== where.lastAttemptHash) continue
         if (where.expiresAt?.gt !== undefined && !(t.expiresAt.getTime() > where.expiresAt.gt.getTime())) continue
         if (where.updatedAt?.gt !== undefined && !(t.updatedAt.getTime() > where.updatedAt.gt.getTime())) continue
+        // ATOMIC_SCAN_LEASE_ACK_FILTER: unacked waiting rows are not leasable.
+        if (where.deliveryAckedAt === null && t.deliveryAckedAt !== null) continue
+        if (
+          where.deliveryAckedAt &&
+          typeof where.deliveryAckedAt === 'object' &&
+          'not' in where.deliveryAckedAt &&
+          where.deliveryAckedAt.not === null &&
+          t.deliveryAckedAt === null
+        ) {
+          continue
+        }
         return t
       }
       return null
@@ -93,6 +124,7 @@ export class ScanContractTestPrisma {
         errorCode: null,
         errorMessage: null,
         controlTokenHash: data.controlTokenHash ?? null,
+        deliveryAckedAt: data.deliveryAckedAt ?? null,
         expiresAt: data.expiresAt ?? new Date(now.getTime() + 10 * 60 * 1000),
         createdAt: now,
         updatedAt: now,
@@ -100,12 +132,36 @@ export class ScanContractTestPrisma {
       this.scanTasksById.set(id, task)
       return task
     },
-    updateMany: async ({ where, data }: { where: { id: string; status?: string | { in: string[] } }; data: Partial<FakeTask> }) => {
+    updateMany: async ({
+      where,
+      data,
+    }: {
+      where: {
+        id: string
+        status?: string | { in: string[] }
+        deliveryAckedAt?: Date | null | { not: null }
+        expiresAt?: { gt: Date }
+      }
+      data: Partial<FakeTask>
+    }) => {
       const task = this.scanTasksById.get(where.id)
       if (!task) return { count: 0 }
       if (where.status !== undefined) {
         const matches = typeof where.status === 'string' ? task.status === where.status : where.status.in.includes(task.status)
         if (!matches) return { count: 0 }
+      }
+      if (where.deliveryAckedAt === null && task.deliveryAckedAt !== null) return { count: 0 }
+      if (
+        where.deliveryAckedAt &&
+        typeof where.deliveryAckedAt === 'object' &&
+        'not' in where.deliveryAckedAt &&
+        where.deliveryAckedAt.not === null &&
+        task.deliveryAckedAt === null
+      ) {
+        return { count: 0 }
+      }
+      if (where.expiresAt?.gt !== undefined && !(task.expiresAt.getTime() > where.expiresAt.gt.getTime())) {
+        return { count: 0 }
       }
       const updated = { ...task, ...data, updatedAt: new Date() }
       this.scanTasksById.set(where.id, updated)
@@ -153,6 +209,39 @@ function makeContractHarness() {
   return { prisma, service }
 }
 
+async function ackCreatedTask(
+  service: ScanTasksService,
+  created: { scanTaskId: string; controlToken: string },
+  endUserId: string | null = null,
+  terminalId = 't_1',
+): Promise<{ scanTaskId: string; deliveryAckedAt: string }> {
+  const acked = await service.ack(created.scanTaskId, endUserId, created.controlToken, terminalId)
+  assert.ok(acked.deliveryAckedAt, 'ack() must persist deliveryAckedAt before a lease can be issued')
+  assert.equal(acked.scanTaskId, created.scanTaskId)
+  return acked
+}
+
+function leaseRejectCode(err: unknown): string | undefined {
+  const response = (err as ConflictException).getResponse?.()
+  if (!response || typeof response !== 'object') return undefined
+  return (response as { error?: { code?: string } }).error?.code
+}
+
+export async function runUnackedLeaseContractCase(): Promise<void> {
+  const { service, prisma } = makeContractHarness()
+  const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+  assert.equal(
+    prisma.scanTasksById.get(task.scanTaskId)?.deliveryAckedAt,
+    null,
+    'create must start unacked; do not paper over by setting fake ACK state',
+  )
+  await assert.rejects(
+    async () => service.getScanDeliveryLease('t_1'),
+    (err: unknown) => leaseRejectCode(err) === 'NO_WAITING_SCAN_TASK',
+    'unacked create must not be leasable before ACK',
+  )
+}
+
 export async function runScanLeaseContractTests(): Promise<void> {
   // 1. Controller 安全守卫断言：create 必须挂载 TerminalIdentityGuard
   const { ScanTasksController } = await import('../src/scan-tasks/scan-tasks.controller')
@@ -163,10 +252,15 @@ export async function runScanLeaseContractTests(): Promise<void> {
     'ScanTasksController.create must be guarded with TerminalIdentityGuard',
   )
 
-  // 2. 租约端点签发与参数校验
+  await runUnackedLeaseContractCase()
+
+  // 2. 租约端点签发与参数校验：必须先走真实 ack()，未确认 waiting 不可租
   {
     const { service, prisma } = makeContractHarness()
     const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    assert.equal(prisma.scanTasksById.get(task.scanTaskId)?.deliveryAckedAt, null)
+    const acked = await ackCreatedTask(service, task, null, 't_1')
+    assert.ok(prisma.scanTasksById.get(task.scanTaskId)?.deliveryAckedAt)
 
     const lease = await service.getScanDeliveryLease('t_1')
     assert.equal(lease.scanTaskId, task.scanTaskId)
@@ -174,11 +268,12 @@ export async function runScanLeaseContractTests(): Promise<void> {
     assert.ok(new Date(lease.serverNow).getTime() > 0)
     assert.ok(new Date(lease.notBefore).getTime() > 0)
     assert.ok(new Date(lease.expiresAt).getTime() > Date.now())
+    assert.equal(acked.scanTaskId, lease.scanTaskId)
 
     // 无 waiting 任务时请求租约抛 409 NO_WAITING_SCAN_TASK
     await assert.rejects(
       async () => service.getScanDeliveryLease('t_unknown'),
-      (err: unknown) => (err as ConflictException).getResponse?.()['error']?.code === 'NO_WAITING_SCAN_TASK',
+      (err: unknown) => leaseRejectCode(err) === 'NO_WAITING_SCAN_TASK',
     )
   }
 
@@ -186,6 +281,7 @@ export async function runScanLeaseContractTests(): Promise<void> {
   {
     const { service } = makeContractHarness()
     const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await ackCreatedTask(service, task)
     const lease = await service.getScanDeliveryLease('t_1')
 
     await assert.rejects(
@@ -221,6 +317,7 @@ export async function runScanLeaseContractTests(): Promise<void> {
   {
     const { service } = makeContractHarness()
     const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await ackCreatedTask(service, task)
     const lease = await service.getScanDeliveryLease('t_1')
 
     // 篡改签名
@@ -298,6 +395,7 @@ export async function runScanLeaseContractTests(): Promise<void> {
   {
     const { service } = makeContractHarness()
     const taskA = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await ackCreatedTask(service, taskA)
     const leaseA = await service.getScanDeliveryLease('t_1')
     await service.cancel(taskA.scanTaskId, null, taskA.controlToken)
 
@@ -329,6 +427,7 @@ export async function runScanLeaseContractTests(): Promise<void> {
   {
     const { service, prisma } = makeContractHarness()
     const task = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await ackCreatedTask(service, task)
     const lease = await service.getScanDeliveryLease('t_1')
     const taskRecord = prisma.scanTasksById.get(task.scanTaskId)!
 
@@ -369,6 +468,7 @@ export async function runScanLeaseContractTests(): Promise<void> {
   {
     const { service, prisma } = makeContractHarness()
     const task1 = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await ackCreatedTask(service, task1)
     const lease1 = await service.getScanDeliveryLease('t_1')
     const sharedBuffer = Buffer.from('%PDF-1.4 duplicate test content')
 
@@ -386,6 +486,7 @@ export async function runScanLeaseContractTests(): Promise<void> {
 
     // (a) 重放相同文件字节到新任务：即使新任务拥有合法租约，由于内容查重护栏，绝不能跨会话重复投递
     const task2 = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await ackCreatedTask(service, task2)
     const lease2 = await service.getScanDeliveryLease('t_1')
     await assert.rejects(
       async () =>

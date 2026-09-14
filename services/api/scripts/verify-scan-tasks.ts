@@ -4,7 +4,7 @@ process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-tasks-admin-secret'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-tasks-action-secret'
 
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   closeSync,
@@ -44,7 +44,7 @@ import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.d
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
-import { runScanLeaseContractTests } from './scan-lease-contract.helper'
+import { runScanLeaseContractTests, runUnackedLeaseContractCase } from './scan-lease-contract.helper'
 
 function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): void {
   execFileSync(
@@ -439,6 +439,59 @@ function assertLeaseAckFilterReverseMutation(apiRoot: string): void {
   assert.ok(
     /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(stripTypeScriptComments(source.slice(start, end))),
     'production getScanDeliveryLease must keep deliveryAckedAt: { not: null } (mutant without it is the red case)'
+  )
+}
+
+const SCAN_LEASE_ACK_FILTER_BLOCK = `        // ATOMIC_SCAN_LEASE_ACK_FILTER: unacked waiting rows are not leasable.
+        if (where.deliveryAckedAt === null && t.deliveryAckedAt !== null) continue
+        if (
+          where.deliveryAckedAt &&
+          typeof where.deliveryAckedAt === 'object' &&
+          'not' in where.deliveryAckedAt &&
+          where.deliveryAckedAt.not === null &&
+          t.deliveryAckedAt === null
+        ) {
+          continue
+        }`
+
+function verifyLeaseAckFilterMutationMakesUnackedCaseNonzero(): void {
+  const helperPath = path.join(__dirname, 'scan-lease-contract.helper.ts')
+  const original = readFileSync(helperPath, 'utf8')
+  assert.equal(
+    original.includes(SCAN_LEASE_ACK_FILTER_BLOCK),
+    true,
+    'canonical lease Fake findFirst must honor deliveryAckedAt before reverse mutation'
+  )
+  const mutated = original.replace(SCAN_LEASE_ACK_FILTER_BLOCK, '')
+  assert.notEqual(mutated, original, 'dropping ACK filtering must actually change scan-lease-contract.helper.ts')
+  try {
+    writeFileSync(helperPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && path.resolve(process.argv[1]) !== path.resolve(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--unacked-lease-ack-filter')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: path.join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping ACK filtering must make unacked lease case nonzero\n${output}`)
+    assert.match(
+      output,
+      /unacked create must not be leasable before ACK/,
+      `mutated ACK filter test must fail on the unacked lease assertion, not an unrelated error\n${output}`,
+    )
+    console.log('PASS lease ACK filter reverse mutation: unacked create case becomes nonzero')
+  } finally {
+    writeFileSync(helperPath, original)
+  }
+  assert.equal(
+    readFileSync(helperPath, 'utf8'),
+    original,
+    'ACK filter reverse mutation must restore scan-lease-contract.helper.ts',
   )
 }
 
@@ -2310,6 +2363,11 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes('--unacked-lease-ack-filter')) {
+    await runUnackedLeaseContractCase()
+    return
+  }
+
   const apiRootForContracts = path.resolve(__dirname, '..')
   assertRetryHardeningMigrationContracts(apiRootForContracts)
   assertRetryCreateRecoversLostResponse(apiRootForContracts)
@@ -2317,6 +2375,7 @@ async function main(): Promise<void> {
   assertDeliveryAckMigrationContracts(apiRootForContracts)
   assertLeaseRequiresDeliveryAck(apiRootForContracts)
   assertLeaseAckFilterReverseMutation(apiRootForContracts)
+  verifyLeaseAckFilterMutationMakesUnackedCaseNonzero()
 
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
 

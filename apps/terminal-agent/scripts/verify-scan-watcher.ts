@@ -35,6 +35,7 @@ import {
   runUnknownDirectoryListingFailClosedTest,
   runStemChangingInodeRenameTests,
   runStartupBacklogTempRenameTest,
+  runNullOpeningInodeRenameTests,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -115,6 +116,27 @@ function verifySourceStructure(): void {
     /ATOMIC_SCAN_CAPTURE_INODE_LINEAGE/,
     'same-inode rename must inherit opening task across stem changes',
   )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_NULL_OPENING/,
+    'observation under no waiting lease must be foreign to every later lease',
+  )
+  {
+    const foreignStart = barrierSource.indexOf('isForeignToLease(')
+    const foreignEnd = barrierSource.indexOf('export const globalDirectoryBaseline')
+    assert.ok(foreignStart >= 0 && foreignEnd > foreignStart, 'isForeignToLease must precede globalDirectoryBaseline')
+    const foreignBody = barrierSource.slice(foreignStart, foreignEnd)
+    assert.match(
+      foreignBody,
+      /if \(rec && rec\.seenUnderTaskId !== current\) return true/,
+      'explicit null opening must be foreign; a missing record is never-observed',
+    )
+    assert.equal(
+      foreignBody.includes('rec?.seenUnderTaskId && rec.seenUnderTaskId !== current'),
+      false,
+      'isForeignToLease must not ignore explicit null openings with a truthy-only check',
+    )
+  }
   {
     const listStart = source.indexOf('function listLiveBasenames')
     const listEnd = source.indexOf('function lockOutLiveListingUnknown')
@@ -1049,18 +1071,16 @@ const CAPTURE_LEASE_LINEAGE_BLOCK = `    // ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE: a
       : globalDirectoryBaseline.isForeignToLease(filename, lease.scanTaskId, closingLiveNames)
         || (typeof openingTaskId === 'string' && openingTaskId !== lease.scanTaskId)
         || openingTaskId === null
-    if (
-      foreignCapture
-      || isPreExistingCandidate(finalSnapshot, lease.notBefore)
+    const preExistingCapture =
+      isPreExistingCandidate(finalSnapshot, lease.notBefore)
       || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
-    ) {`
+    if (foreignCapture || preExistingCapture) {`
 
 const CAPTURE_LEASE_LINEAGE_MUTATED = `    const foreignCapture = false
-    if (
-      foreignCapture
-      || isPreExistingCandidate(finalSnapshot, lease.notBefore)
+    const preExistingCapture =
+      isPreExistingCandidate(finalSnapshot, lease.notBefore)
       || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
-    ) {`
+    if (foreignCapture || preExistingCapture) {`
 
 const NOT_BEFORE_VALID_BLOCK = `    // ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID: an unparsable notBefore cannot prove
     // the file is newer than the waiting task; fail closed and quarantine.
@@ -1173,6 +1193,28 @@ const INODE_LINEAGE_BLOCK = `      const sameEntry = isSameScanCaptureFile(rec.i
       this.observations.delete(name)
       if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec`
 
+const NULL_OPENING_FOREIGN_BLOCK = `    const rec = this.observations.get(filename)
+    // ATOMIC_SCAN_CAPTURE_NULL_OPENING: explicit observation under no waiting
+    // lease (seenUnderTaskId === null) is foreign to every later lease. A missing
+    // record is never-observed and is not foreign. Truthy-only checks would let
+    // a job.pdf.tmp seen with no lease rename onto B within the 5s window.
+    if (rec && rec.seenUnderTaskId !== current) return true
+    for (const [name, other] of this.observations) {
+      if (name === filename) continue
+      if (!liveNames.has(name)) continue
+      if (captureNameStem(name) !== captureNameStem(filename)) continue
+      if (other.seenUnderTaskId !== current) return true
+    }`
+
+const NULL_OPENING_FOREIGN_MUTATED = `    const rec = this.observations.get(filename)
+    if (rec?.seenUnderTaskId && rec.seenUnderTaskId !== current) return true
+    for (const [name, other] of this.observations) {
+      if (name === filename) continue
+      if (!liveNames.has(name)) continue
+      if (captureNameStem(name) !== captureNameStem(filename)) continue
+      if (other.seenUnderTaskId && other.seenUnderTaskId !== current) return true
+    }`
+
 const INODE_LINEAGE_MUTATED = `      if (captureNameStem(name) !== stem) continue
       this.observations.delete(name)
       if (isSameScanCaptureFile(rec.identity, identity) === false) continue
@@ -1209,6 +1251,39 @@ function verifyInodeLineageMutationMakesStemChangingRenameNonzero(): void {
     writeFileSync(barrierPath, original)
   }
   assert.equal(readFileSync(barrierPath, 'utf8'), original, 'inode lineage reverse mutation must restore scan-candidate-barrier.ts')
+}
+
+function verifyNullOpeningMutationMakesRenameNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(NULL_OPENING_FOREIGN_BLOCK), true, 'null-opening foreign block must exist before reverse mutation')
+  const mutated = original.replace(NULL_OPENING_FOREIGN_BLOCK, NULL_OPENING_FOREIGN_MUTATED)
+  assert.notEqual(mutated, original, 'restoring truthy-only foreign check must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--null-opening-inode-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `truthy-only foreign check must make null-opening rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /null-opening same-inode rename must NEVER upload to later lease B/,
+      `mutated null-opening test must fail on the job.pdf.tmp upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS null-opening reverse mutation: same-inode rename test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'null-opening reverse mutation must restore scan-candidate-barrier.ts')
 }
 
 function verifyStartupBacklogIdentityMutationMakesRenameNonzero(): void {
@@ -1306,6 +1381,10 @@ async function main(): Promise<void> {
     await runStartupBacklogTempRenameTest()
     return
   }
+  if (process.argv.includes('--null-opening-inode-rename')) {
+    await runNullOpeningInodeRenameTests()
+    return
+  }
   verifySourceStructure()
   verifyUnclaimedCleanup()
   await verifyRetryCapExpired()
@@ -1329,6 +1408,7 @@ async function main(): Promise<void> {
   verifyEnterRunningGenerationMutationMakesIsolationTestNonzero()
   verifyCaptureLineageMutationMakesLateCrossSessionNonzero()
   verifyInodeLineageMutationMakesStemChangingRenameNonzero()
+  verifyNullOpeningMutationMakesRenameNonzero()
   verifyStartupBacklogIdentityMutationMakesRenameNonzero()
   verifyInvalidNotBeforeMutationMakesFailClosedNonzero()
   verifyUnknownLiveListingMutationMakesFailClosedNonzero()

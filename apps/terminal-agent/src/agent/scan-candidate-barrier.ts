@@ -312,9 +312,11 @@ export class ScanDirectoryBaseline {
 
   /**
    * True when this name, or a still-live same-stem sibling, was first seen
-   * under a different waiting scanTaskId. Vanished same-inode predecessors
-   * must already have been adopted by `bindCapture`; this check does not
-   * consult a module-global last task.
+   * under a different waiting scanTaskId, or was explicitly observed while no
+   * waiting lease existed (`seenUnderTaskId === null`). A missing record is
+   * never-observed and is not foreign. Vanished same-inode predecessors must
+   * already have been adopted by `bindCapture`; this check does not consult a
+   * module-global last task.
    */
   isForeignToLease(
     filename: string,
@@ -324,12 +326,16 @@ export class ScanDirectoryBaseline {
     const current = currentTaskId.trim()
     if (current.length === 0) return false
     const rec = this.observations.get(filename)
-    if (rec?.seenUnderTaskId && rec.seenUnderTaskId !== current) return true
+    // ATOMIC_SCAN_CAPTURE_NULL_OPENING: explicit observation under no waiting
+    // lease (seenUnderTaskId === null) is foreign to every later lease. A missing
+    // record is never-observed and is not foreign. Truthy-only checks would let
+    // a job.pdf.tmp seen with no lease rename onto B within the 5s window.
+    if (rec && rec.seenUnderTaskId !== current) return true
     for (const [name, other] of this.observations) {
       if (name === filename) continue
       if (!liveNames.has(name)) continue
       if (captureNameStem(name) !== captureNameStem(filename)) continue
-      if (other.seenUnderTaskId && other.seenUnderTaskId !== current) return true
+      if (other.seenUnderTaskId !== current) return true
     }
     return false
   }

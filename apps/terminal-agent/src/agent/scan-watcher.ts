@@ -765,14 +765,13 @@ export async function processCandidate(
       : globalDirectoryBaseline.isForeignToLease(filename, lease.scanTaskId, closingLiveNames)
         || (typeof openingTaskId === 'string' && openingTaskId !== lease.scanTaskId)
         || openingTaskId === null
-    if (
-      foreignCapture
-      || isPreExistingCandidate(finalSnapshot, lease.notBefore)
+    const preExistingCapture =
+      isPreExistingCandidate(finalSnapshot, lease.notBefore)
       || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
-    ) {
+    if (foreignCapture || preExistingCapture) {
       globalDirectoryBaseline.remove(filename)
       finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-      if (foreignCapture) {
+      if (foreignCapture && !preExistingCapture) {
         warn(
           `scan-watcher: capture lineage belongs to a different waiting task; refusing cross-session bind, moved to _unclaimed — code=${SCAN_CAPTURE_FOREIGN_LEASE}`,
         )

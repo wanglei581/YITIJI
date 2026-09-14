@@ -238,6 +238,23 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
       'closeVanishedCapture must adopt a same-inode successor across stem changes',
     )
     assert.equal(transferredCross.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])), true)
+
+    const nullOpening = new ScanDirectoryBaseline()
+    nullOpening.recordObservation('job.pdf.tmp', now, null, sameEntry)
+    nullOpening.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf']), sameEntry)
+    assert.equal(
+      nullOpening.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])),
+      true,
+      'inherited observation under no waiting lease is foreign to every later lease',
+    )
+
+    const neverSeen = new ScanDirectoryBaseline()
+    neverSeen.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf']), sameEntry)
+    assert.equal(
+      neverSeen.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf'])),
+      false,
+      'never-observed capture bound under B is not foreign to B',
+    )
     baseline.clear()
   }
 
@@ -748,6 +765,7 @@ export async function runScanLeaseBarrierTests(): Promise<void> {
   }
 
   await runLateCrossSessionCaptureTests()
+  await runNullOpeningInodeRenameTests()
   await runOverlappingStartupBacklogRaceTest()
   await runScanInputLockoutTests()
 
@@ -1296,6 +1314,94 @@ export async function runStartupBacklogTempRenameTest(): Promise<void> {
     console.log('PASS later different-inode B file after startup leftover rename still delivers')
   } finally {
     await stub.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runNullOpeningInodeRenameTests(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+
+  let leaseReady = false
+  let deliverCount = 0
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        if (!leaseReady) {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({
+            statusCode: 409,
+            error: { code: 'NO_WAITING_SCAN_TASK', message: '当前终端没有等待扫描的任务' },
+          }))
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'task_B',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 30_000).toISOString(),
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+            deliveryLease: 'lease_B',
+          },
+        }))
+        return
+      }
+      if (req.method === 'POST' && req.url?.includes('/scan-sessions/deliver')) {
+        deliverCount += 1
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true, data: { scanTaskId: 'task_B', fileId: 'leaked' } }))
+        return
+      }
+      res.writeHead(404)
+      res.end()
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(typeof address === 'object' && address)
+  const baseUrl = `http://127.0.0.1:${address.port}/api/v1`
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-null-opening-pdf-tmp-'))
+  const tmpName = 'job.pdf.tmp'
+  const pdfName = 'job.pdf'
+  const tmpPath = join(scanFolder, tmpName)
+  const pdfPath = join(scanFolder, pdfName)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(tmpPath, '%PDF-1.4 bytes observed under no waiting lease')
+    const leftover = lstatSync(tmpPath)
+    const config = makeHelperConfig(baseUrl, scanFolder)
+    await processCandidate(tmpPath, tmpName, config)
+    assert.equal(existsSync(tmpPath), true, 'non-accepted temp observed under no lease must remain until rename')
+    assert.equal(deliverCount, 0)
+
+    leaseReady = true
+    renameSync(tmpPath, pdfPath)
+    const renamed = lstatSync(pdfPath)
+    assert.equal(renamed.dev, leftover.dev)
+    assert.equal(renamed.ino, leftover.ino)
+    const { stdout } = await captureLogsAsync(() => processCandidate(pdfPath, pdfName, config))
+    assert.equal(deliverCount, 0, 'null-opening same-inode rename must NEVER upload to later lease B')
+    assert.equal(existsSync(pdfPath), false)
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', pdfName)), true)
+    assert.match(stdout, new RegExp(SCAN_CAPTURE_FOREIGN_LEASE))
+    console.log('PASS null-opening job.pdf.tmp -> job.pdf rename: quarantined, 0 deliver')
+
+    writeFileSync(pdfPath, '%PDF-1.4 later legitimate B capture after null-opening quarantine')
+    const later = lstatSync(pdfPath)
+    const quarantined = lstatSync(join(scanFolder, '_unclaimed', pdfName))
+    assert.notEqual(later.ino, quarantined.ino, 'later B pdf must be a new directory entry')
+    await processCandidate(pdfPath, pdfName, config)
+    assert.equal(deliverCount, 1, 'later different-inode B capture after null-opening quarantine must still deliver')
+    assert.equal(existsSync(pdfPath), false)
+    console.log('PASS later different-inode B file after null-opening rename still delivers')
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
     rmSync(scanFolder, { recursive: true, force: true })
     clearStartupBacklogForTest()
     globalDirectoryBaseline.clear()
