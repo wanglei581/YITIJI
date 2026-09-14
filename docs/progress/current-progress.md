@@ -1,10 +1,11 @@
 # 当前开发进度
 
-2026-09-14 **扫描隐私 / 到机认证 R2 候选达到本地软件冻结标准，生产与商业仍为 NO-GO**。
-隔离分支 `integration/scan-pickup-closeout-r2-20260913` 已冻结
-`eca46857ceee58fe1e850f040a54a4adbda2e441`，基线为
-`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`；工作区干净，尚未 push、开 PR、合入
-`main`、部署、执行生产迁移或做 Windows / 奔图真机操作。
+2026-09-14 **扫描隐私 / 到机认证 R2 已推送并完成实现锚点 CI，等待合并决策；生产与商业仍为 NO-GO**。
+隔离分支 `integration/scan-pickup-closeout-r2-20260913` 基于
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，实现证据锚点为
+`5ebf73c056b3d71942923aa394acf3903df890a4`。分支工作区干净且已 push，唯一集成入口为
+PR #1036；PR 当前 `OPEN / MERGEABLE`，尚未合入 `main`、部署、执行生产迁移或做当前 SHA 的
+Windows / 奔图真机操作。
 
 R2 在既有签名重试、扫描输入锁死遥测、Kiosk 持久化凭据后 ACK、ACK 后才签发 Agent delivery
 lease 的基础上，又关闭两类最终审查缺口：① Agent 对“无 waiting lease 时已观察到的临时文件”保留
@@ -15,18 +16,25 @@ lease 的基础上，又关闭两类最终审查缺口：① Agent 对“无 wai
 建立 single-flight；原竞态复验从 `deliverCount=1` 变为 **0 POST、文件进入 `_unclaimed`**，之后新 inode
 的合法 B 文件仍可交付。对应反向变异会使并发用例退出非零。
 
-最终 SHA 上的本地证据：Terminal Agent `verify:scan-watcher` 与 typecheck 通过，包含顺序/并发
+实现锚点上的本地证据：Terminal Agent `verify:scan-watcher` 与 typecheck 通过，包含顺序/并发
 null-opening、不同 inode 正例及 identity-flight 反向变异；API 在 PostgreSQL 16
 `postgresql://postgres@127.0.0.1:55439/scan_retry_verify` 上 `verify:scan-tasks` 与 typecheck 通过，
 包含 ACK-filter 反向变异；Kiosk `verify-scan-session-truth.mjs`、ACK 单测 9/9、typecheck 通过；
-shared typecheck 通过。最终只读复审：Grok 对原竞态复验为 GO，Claude 对 Kiosk durable ACK 与前端
-影响确认为 GO，Agy 架构复审为 GO。Hermes / DeepSeek V4 Pro 首次因 HTTP 402 余额不足失败；随后
+shared typecheck 通过。GitHub Actions 对同一实现锚点的 CI run `34816672752` 已完成：
+`build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 全部通过；Windows installer run
+`34816673132` 的 `unsigned-exe-upgrade`、`unsigned-msi-candidate` 全部通过。`release-bundle` 因本次
+不是发布事件而按预期跳过，不计失败，也不构成已发布证据。
+
+最终只读复审：Grok 4.6 xhigh 对完整差异与真实 CI 接线给出软件合并 `GO`，未发现新的 P0/P1；
+Claude Opus xhigh 对 Kiosk 逐用例 ACK fixture、无共用兜底和页面影响给出 `GO`；Agy Gemini 3.8
+Flash High 对扫描 R2 / 到机认证契约给出 `GO`，对跨端商业闭环整体仍为 `PARTIAL`。Hermes /
+DeepSeek V4 Pro 首次因 HTTP 402 余额不足失败；随后
 Hermes 明确降级到已登录的 Nous `upstage/solar-pro4:free`，对同一候选完成隐私与恢复只读复审并给出
 GO。该结果只计作 Hermes / Nous 复审，不冒充 DeepSeek 结果。证据边界：`ino === 0` /
 identity unavailable 的 Windows SMB 路径无法由本机
 single-flight 证明，长驻 chokidar、Windows / 奔图、真实支付、小程序发布、生产部署、授权内容与客户
-UAT 均未完成。因此当前结论仅为 **LOCAL TESTED SOFTWARE GO（扫描 R2 候选边界）**，
-**PRODUCTION / COMMERCIAL NO-GO**。
+UAT 均未完成。因此当前结论为 **SOURCE / LOCAL / CI GO（PR #1036 实现锚点边界）**，
+**DEVICE / PRODUCTION / COMMERCIAL NO-GO**。
 
 2026-09-13 **扫描隐私与到机认证候选完成集成，商业结论仍为 NO-GO**。隔离分支
 `integration/scan-pickup-closeout-20260913` 已冻结候选

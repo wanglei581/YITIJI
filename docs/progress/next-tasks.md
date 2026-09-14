@@ -2,21 +2,26 @@
 
 ## 2026-09-14 R2 候选后的唯一推进顺序
 
-**当前总判定：扫描 R2 候选为 LOCAL TESTED SOFTWARE GO；PRODUCTION / COMMERCIAL NO-GO。**
-冻结候选是
-`integration/scan-pickup-closeout-r2-20260913@eca46857ceee58fe1e850f040a54a4adbda2e441`，
-尚未 push、开 PR、合入 `main`、部署或做生产迁移。不得用该本地结论替代 CI、Windows / 奔图、
-小程序、真实支付、生产或客户验收。
+**当前总判定：扫描 R2 在 PR #1036 实现锚点达到 SOURCE / LOCAL / CI GO；DEVICE / PRODUCTION /
+COMMERCIAL NO-GO。** 分支
+`integration/scan-pickup-closeout-r2-20260913` 的实现证据锚点为
+`5ebf73c056b3d71942923aa394acf3903df890a4`，基线为
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。PR #1036 已 push，当前
+`OPEN / MERGEABLE`；CI run `34816672752` 的三项必需检查与 Windows installer run
+`34816673132` 的 EXE / MSI 两项检查全部通过。尚未合入 `main`、部署、做生产迁移或当前 SHA 真机验收；
+不得用 CI 替代 Windows / 奔图、小程序、真实支付、生产或客户验收。
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | 集成 / 仓库 | 只读比较候选与最新 `origin/main`，确认无新冲突后，以最少 PR 推进 push、PR、CI、合入决策 | 精确 SHA 可追溯；相关 CI 实际执行且全绿；无未处理 P0/P1；不得把旧 PR 或旧 worktree 直接复活，历史 PR 按未合入/已合入/冲突分别更新、关闭或另做修复 |
+| 1 | 集成 / 仓库 | **当前只剩合并决策**：复核 PR #1036 仍以 `5ebf73c05` 为实现证据锚点且必需检查全绿，再由有权限者合入；文档提交产生的新 HEAD 必须重新等 CI，不得沿用旧 SHA 绿灯 | PR 最终 head 的必需检查全绿；无未处理 P0/P1；合入后以 `merge-base --is-ancestor` 证明进入 `origin/main`，记录新的 main SHA；不得把旧 PR 或旧 worktree 直接复活 |
 | 2 | Windows / 奔图专用任务 | 在同一候选或合入后的精确 SHA 上完成面板扫描、真实出纸、扫码枪、断网重连、Agent 重启、长驻 watcher 和连续多用户操作 | 记录任务/订单/文件 hash/状态回传/临时文件删除；重点证明 Windows / SMB `ino === 0` 或 file identity 行为、旧文件不交给后来用户、锁死与恢复可观察 |
-| 3 | Claude + 四端 | 以当前 `main` 做路由级盘点；Claude 负责一体机新 UI 缺页、旧页下架和最终前端确认；小程序、Admin、Partner 分别补齐真实闭环 | Kiosk 生产路由不再新旧交替；小程序完成下单/支付/到机码/认领/状态回流/本人资产；Admin 可做设备、订单退款、文件、告警、内容审核与审计；Partner 严格机构隔离且无候选人/简历招聘闭环 |
+| 3 | Claude + 四端 | 从合入后的干净 `origin/main` 分开推进，不与 #1036 混合：Claude 独占所有前端写入；先补小程序材料包订单列表/到机码找回并完成开闸判据，再做 Admin / Partner 数据大屏和一体机旧页统一 | Kiosk 生产路由不再新旧交替；小程序材料包不再 fail-closed 且下单后可从本人订单找回到机码，身份/文件/订单/支付/认领/状态/资产贯通；Admin 与 Partner 大屏只呈现真实可归属指标、完整六态和严格机构隔离，无候选人/简历招聘闭环 |
 | 4 | 运维 / 生产 | 在具名维护窗口按精确 SHA 完成备份、迁移、部署、PM2/nginx/健康、监控、回滚；对象文件走百度云对象存储，服务器磁盘仅保留程序、日志与有界缓存 | `DEPLOY_SOURCE.txt`、Web Root、PM2 与 API/四端版本一致；上传/签名下载/生命周期/失败补偿通过；40 GB 容量有告警；真实小额支付、退款、对账通过；曾暴露凭证已轮换 |
 | 5 | 产品负责人 / 运营 / 客户 | 完成微信类目与提审、授权内容冷启动、真实用户 UAT 与签字交付 | 小程序正式发布且到机码跨端可用；岗位 >=30（现场 >=50）、招聘会 >=3、政策 >=8，均有真实授权且无演示/过期数据；客户走通建单 -> 支付 -> 到机 -> 打印/扫描 -> 状态回流 -> 记录沉淀并签字 |
 
-执行边界：第 1 项前不宣称已合入，第 2-4 项前不宣称生产可用，第 5 项前不宣称商用收口。
+执行边界：第 1 项前不宣称已合入，第 2 项完成前不宣称真机通过，第 3-4 项前不宣称生产可用，
+第 5 项前不宣称商用收口。当前小程序材料包四页仍 fail-closed，`GET /orders/package` 虽已在 API，
+小程序订单列表尚未接入，属于跨端 P0；`claude/miniapp-lane` 的孤立提交必须拆包审查，不能整支复活。
 Hermes / DeepSeek V4 Pro 首次因余额不足为 `FAILED`；Hermes 随后明确使用 Nous
 `upstage/solar-pro4:free` 在相同候选上完成隐私与恢复只读复审并给出 GO。该结果不能写成 DeepSeek
 通过，也不得把模型票数替代上述真实验收。
