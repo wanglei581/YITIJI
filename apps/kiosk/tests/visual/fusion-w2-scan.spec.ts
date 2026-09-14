@@ -102,6 +102,85 @@ function registerCreatedScan(api: ApiRouter): void {
   })
 }
 
+// ── 投递确认（ACK）（2026-09-14） ─────────────────────────────────────────────
+//
+// 服务端把「建成」和「可投递」拆成了两段：新建会话一律 `deliveryAckedAt = null`，
+// 只有本机确认自己握着这一场的控制凭据之后，面板上扫出来的文件才会投给它
+// （契约见 src/pages/scan/scanDeliveryAck.ts）。设置页与等待页因此**挂载即确认**：
+// 确认之前设置页停在「正在确认投递授权」而不出「在打印机面板开始扫描」，
+// 等待页的标题是「正在确认投递授权」而不是「等待打印机端扫描完成」，
+// 主行动也从「立即检查」换成「再确认一次」。
+//
+// 所以本文件里凡是会走到这两屏的用例，都必须**自己**把这个端点注册上。
+// 仍然逐条用例注册、**不挂兜底路由**：ApiRouter 对未注册请求一律 abort 并在拆卸时
+// 报 Unhandled API，而「这几条路径上一次确认都不许发生」（能力不可用、直达设置页、
+// U 盘面板、结果页）正是这一层要钉的东西 —— 一条 catch-all 会把它们全部悄悄变绿。
+
+/** 这一场 ACK 端点的路径。反面用例只数它，不注册它。 */
+const ACK_PATH = `/api/v1/scan/sessions/${SCAN_TASK_ID}/ack`
+/** 服务端写下投递授权的那一刻。固定值：用例断言的是「确认过」，不是具体几点。 */
+const DELIVERY_ACKED_AT = '2026-09-14T00:00:00.000Z'
+// playwright.w2.config.ts 的 webServer 用 VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN 构建出这个值，
+// terminalAuth 在 E2E 构建下拿它当终端会话票。逐字对齐它而不是只判非空：判非空的话，
+// 只要将来有谁往请求里塞了同名但无关的头，用例照样绿。
+const TERMINAL_SESSION_FIXTURE = 'playwright-terminal-session-fixture'
+
+interface ScanAckProbe {
+  /** 到此刻为止确认过几次。 */
+  count: () => number
+  /**
+   * 断言恰好确认过 `count` 次，且**每一次**都带齐服务端要校验的三样凭据、且不带 body。
+   *
+   * 只 respond 不看请求的话，「本机漏带凭据」在这里永远不会红：真实服务端回的是
+   * 401（没有终端会话票 / 终端 id）或 403（控制凭据对不上），而一份只按路径应答的
+   * 夹具会照样回 200，页面照样把「已确认」画出来。
+   */
+  expectAcked: (count: number) => Promise<void>
+}
+
+/**
+ * 注册这一场的投递确认端点（**按 taskId 精确注册**，不是通配），并记下每一次的请求。
+ *
+ * 服务端在这个端点上同时校验终端会话票（TerminalIdentityGuard）、`x-terminal-id`
+ * 归属，以及这一场的 `X-Scan-Session-Control`（见 scan-tasks.controller.ts 的 `ack()`
+ * 与 src/services/api/scanTasks.ts 的 `ackScanSession`）。三样都记下来交给用例断言。
+ */
+function registerScanAck(page: Page, api: ApiRouter): ScanAckProbe {
+  const calls: Array<{ headers: Record<string, string>; postData: string | null }> = []
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return
+    if (new URL(request.url()).pathname !== ACK_PATH) return
+    calls.push({ headers: request.headers(), postData: request.postData() })
+  })
+  api.respond('POST', ACK_PATH, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, deliveryAckedAt: DELIVERY_ACKED_AT } },
+  })
+  return {
+    count: () => calls.length,
+    expectAcked: async (count) => {
+      await expect.poll(() => calls.length, {
+        message: `期望恰好确认 ${count} 次投递授权`,
+      }).toBe(count)
+      /* 数到了还要停一下再数一次。`expect.poll` 一够数就返回，而这条断言要钉的恰恰是
+       * 「不会再多」：确认 effect 与创建 effect 曾经能互相喂招，把刚确认好的 'acked'
+       * 打回 'pending' 并永不停（ackRequestedForRef 守的就是它）。那种循环的头几次
+       * 正好就是正确次数，不停一下的话它每次都绿。 */
+      await page.waitForTimeout(400)
+      expect(calls.length, `确认了 ${calls.length} 次，多出来的是 effect 在互相喂招`).toBe(count)
+      for (const call of calls) {
+        expect(call.headers['x-terminal-id']).toBe('KSK-001')
+        expect(call.headers['x-terminal-session-token']).toBe(TERMINAL_SESSION_FIXTURE)
+        expect(call.headers['x-scan-session-control']).toBe(CONTROL_TOKEN)
+        // 服务端这个端点一个 body 字段都不读（@Param + 两个 @Headers）。凭据写进 body
+        // 就会被网关 / 访问日志原样留下，而 header 那条路是刻意选的（同 controlToken
+        // 不进 query string 的理由）。所以「没有 body」本身是契约的一部分。
+        expect(call.postData, 'ACK 的凭据只走请求头，不许出现在请求体里').toBeNull()
+      }
+    },
+  }
+}
+
 function scanFile() {
   return {
     fileId: 'w2-scan-file',
@@ -199,6 +278,8 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   registerShell(api)
   registerScanCapability(api, 'available')
   registerCreatedScan(api)
+  // 建成之后设置页立刻确认投递授权；确认到 'acked' 之前那句面板指引不许出现。
+  const ack = registerScanAck(page, api)
   let legacyDeviceRequests = 0
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/v1/kiosk/device/status') legacyDeviceRequests += 1
@@ -220,6 +301,9 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
   expect(postedBody.terminalId, 'create session must bind the current terminal').toBeTruthy()
   await page.waitForURL(/\/scan\?stage=settings/)
   await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
+  // 这一场只建了一次，所以也只确认一次；多出来的一次意味着确认与创建两个 effect
+  // 互相喂招（ackRequestedForRef 守的就是它）。
+  await ack.expectAcked(1)
   await expectHealthy(page, errors)
 })
 
@@ -251,6 +335,9 @@ test('scan settings uses server instructions and waiting-to-completed polling re
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerCreatedScan(api)
+  // 设置页建成后确认一次；按下「我已操作，开始等待」切到等待页，那一屏挂载时再确认一次
+  // （幂等，见 scanDeliveryAck）。没有第二次的话等待页会停在「正在确认投递授权」。
+  const ack = registerScanAck(page, api)
   let polls = 0
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     const body = scanStatus(polls++ === 0 ? 'waiting' : 'completed')
@@ -270,12 +357,17 @@ test('scan settings uses server instructions and waiting-to-completed polling re
   expect(await page.evaluate(() => window.sessionStorage.getItem('w2-scan-control'))).toBeNull()
   await expect(page.locator('[data-file-preview-kind="pdf"]').locator('iframe')).toHaveAttribute('src', W2_FILE.fileUrl)
   expect(previewPaths.some((path) => path.includes('/preview-url'))).toBe(false)
+  // 设置页一次 + 等待页挂载一次。结果页不确认 —— 这一场已经结束，再确认只会拿回 409。
+  await ack.expectAcked(2)
   await expectHealthy(page, errors)
 })
 
 test('cancel-completed race rechecks status and recovers the real scan file @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
+  // 等待页是复水进来的（seedScanLive 直接写登记），挂载时本机并不知道当初确认过没有，
+  // 所以照样确认一次。
+  const ack = registerScanAck(page, api)
   let cancelled = false
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     const body = scanStatus(cancelled ? 'completed' : 'waiting')
@@ -295,6 +387,8 @@ test('cancel-completed race rechecks status and recovers the real scan file @w2'
   await page.getByRole('button', { name: '取消扫描' }).click()
   await page.waitForURL(/\/scan\?stage=result/)
   await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
+  // 等待页挂载那一次。走到结果页之后不许再确认。
+  await ack.expectAcked(1)
   await expectHealthy(page, errors)
 })
 
@@ -404,6 +498,8 @@ test('failed scan retry strips control fields but preserves scan parameters @w2'
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerCreatedScan(api)
+  // 「重新开始一次扫描」建出新会话后，设置页照例确认一次投递授权。
+  const ack = registerScanAck(page, api)
   const failureState = {
     scanType: 'document', source: 'feeder', pageMode: 'multi', color: 'gray', dpi: 300,
     success: false, reason: '合成扫描失败', simulateFailure: true, failReason: 'raw', file: resultState.file,
@@ -426,12 +522,14 @@ test('failed scan retry strips control fields but preserves scan parameters @w2'
   expect(retrySession).toMatchObject({ scanType: 'document', extras: { source: 'feeder', pageMode: 'multi', color: 'gray', dpi: 300 } })
   expect(retrySession.result).toBeUndefined()
   expect(retrySession.live).toMatchObject({ scanTaskId: SCAN_TASK_ID })
+  await ack.expectAcked(1)
   await expectHealthy(page, errors)
 })
 
 test('completed scan without a file is a terminal no-file state @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
+  const ack = registerScanAck(page, api)
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     await route.fulfill({
       status: 200,
@@ -457,12 +555,16 @@ test('completed scan without a file is a terminal no-file state @w2', async ({ p
   await expect(page.getByText('服务端说已完成，但这次回执里没有可用文件').first()).toBeVisible()
   await expect(page.getByText('w2-scan.pdf')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
+  await ack.expectAcked(1)
   await expectHealthy(page, errors)
 })
 
 test('poll requests send the in-memory control token header @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
+  // 「立即检查」只在拿到投递授权之后才出现（没确认时主行动是「再确认一次」），
+  // 所以这一条不注册 ACK 就根本走不到轮询断言。
+  const ack = registerScanAck(page, api)
   let seenControlHeader: string | null = null
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     seenControlHeader = route.request().headers()['x-scan-session-control'] ?? null
@@ -477,8 +579,22 @@ test('poll requests send the in-memory control token header @w2', async ({ page,
   await page.goto('/scan?stage=progress')
   await expect.poll(() => seenControlHeader).toBe(CONTROL_TOKEN)
   await expect(page.getByRole('button', { name: '立即检查' })).toBeEnabled()
+  await ack.expectAcked(1)
   await expectHealthy(page, errors)
 })
+
+/**
+ * 这一条取证用例横跨四屏，投递确认发生的次数不是一目了然的，所以把它拆开写清楚：
+ *
+ *   ① `/scan?stage=settings` + 路由态 scanType → 建成 → 设置页确认；
+ *   ② `seedScanLive` 里那次裸 `/scan` → 登记里还是 settings + live，设置页**复水**
+ *      挂载一次（复水进来的会话一律重新确认，本机不知道当初确认过没有）；
+ *   ③ `/scan?stage=progress` → 等待页挂载确认。
+ *
+ * 结果屏与两次 start 屏都不确认。数字变了就说明这条取证路径本身的挂载次序变了 ——
+ * 那时要回来重新数一遍，而不是把它调大。
+ */
+const ACK_COUNT_EVIDENCE_WALKTHROUGH = 3
 
 test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api }, testInfo) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
@@ -486,6 +602,9 @@ test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api
   await binary.install()
   registerShell(api)
   registerScanCapability(api, 'available')
+  // 取证要拍的是**已确认**的设置页与等待页：没确认的话两屏拍出来都是
+  // 「正在确认投递授权」，而那不是这份证据要留的东西。
+  const ack = registerScanAck(page, api)
   const shot = async (name: string) => {
     await page.screenshot({ path: testInfo.outputPath(name), fullPage: false })
   }
@@ -519,6 +638,7 @@ test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api
   await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
   await shot('qx-scan-result.png')
 
+  await ack.expectAcked(ACK_COUNT_EVIDENCE_WALKTHROUGH)
   await expectHealthy(page, errors)
 })
 
@@ -559,6 +679,9 @@ test('legacy scan routes redirect with stage intent @w2', async ({ page, api }) 
 test('progress stage survives reload from sessionStorage @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
+  // 整页重载之后本机不知道当初确认过没有，等待页会再确认一遍（服务端幂等）。
+  // 「等待打印机端扫描完成」这句话在两次挂载里都必须重新挣来。
+  const ack = registerScanAck(page, api)
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     await route.fulfill({
       status: 200,
@@ -574,12 +697,15 @@ test('progress stage survives reload from sessionStorage @w2', async ({ page, ap
   await expect(page).toHaveURL(/\/scan\?stage=progress/)
   await expect(page.locator('[data-scan-stage="progress"]')).toHaveCount(1)
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  // 挂载一次 + 重载后再挂载一次。
+  await ack.expectAcked(2)
   await expectHealthy(page, errors)
 })
 
 test('sensitive session clear returns the workbench to start without the previous task @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
+  const ack = registerScanAck(page, api)
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     await route.fulfill({
       status: 200,
@@ -600,5 +726,8 @@ test('sensitive session clear returns the workbench to start without the previou
   await expect(page.locator('[data-w2-page="scan-start"]')).toBeVisible()
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await expect(page.locator('[data-w2-page="scan-progress"]')).toHaveCount(0)
+  // 清场之前那一次挂载确认过一次；清场之后回到 start，**不许**再有第二次 ——
+  // 那等于本机替一个已经没人看着的会话重新挣来投递资格。
+  await ack.expectAcked(1)
   expect(errors).toEqual([])
 })
