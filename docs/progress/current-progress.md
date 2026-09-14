@@ -1,5 +1,68 @@
 # 当前开发进度
 
+2026-09-15 **R3 第二修复：401 出口的所有权必须跨 `<AuthProvider key>` 重挂唯一（Kiosk 侧，分支
+`integration/scan-pickup-closeout-r3-20260915`，基线 `origin/main@fea6f3705`）**。仅改
+`apps/kiosk/**`、`.github/workflows/ci.yml`（只加一个已有测试文件到已有步骤）与本文件 /
+`next-tasks.md`。未触碰 `services/api/**`、Terminal Agent、小程序、Admin / Partner、
+schema / 迁移、生产配置与密钥。**未推送 / 未开 PR / 未合并 / 未部署。**
+
+**这一条修的是我上一个提交 `b3d7c43d5` 自己引入的 P1**，由 Grok 主对抗审查发现（结论 PARTIAL）。
+`b3d7c43d5` 把 401 出口做成了 per-Provider 实例并挂在 AuthProvider 的 ref 上，而待办的跳转登记在
+**模块级**的 `scanCleanupGate` 上、活得比 React 树久。`main.tsx` 在 terminalId A→B 时用
+`key={identityRevision}` 重挂整棵树，于是出现两个 owner：E1 收到 401 登记了跳转（闸正按着），
+重挂后新 Provider 建 E2，新用户登录时 `login()` 调的是 E2.cancel()，E1 完全不知情 —— 闸一
+settle 就 `assign('/login')`，把**刚登进来的这一位**踢出去，而他在等待期间写的打印 / 简历
+sessionStorage 没有按新身份清过。已在本机用「两实例一 gate」复现脚本确认 `bug:true`
+（脚本未入库）；原有 13 条用例全是单实例，测不到。
+
+改法：出口收敛成**页面级单例** `getMemberSessionExpiryExit()`（实例存模块作用域，per-call 工厂
+不再对外导出），AuthProvider 只取不造。**没有新增第二套 cleanup gate** —— 撤销判据仍然只有
+`scanCleanupGate` 一处，这里只是把「谁在等它」收敛成一个。重挂后有人登录 → 取消得掉；重挂后
+没人登录 → 那条跳转仍然必须走完一次。同 Provider 内的既有行为全部保留：本机 PII 同步清、无 live
+同步跳、5xx / 断网 / 403 未确认不跳、确认或自然过期后只跳一次、`logout()` 与 effect cleanup
+都不撤销一条必须走完的跳转。
+
+同时修掉 `src/services/api/contractReview.ts` 的 `notifyMemberSessionExpired()` 无参调用：
+它有 `access.token` 却不透传，把 AuthProvider 第一句
+`if (failedToken && userRef.current?.token !== failedToken) return` 整个短路掉 —— 一次迟到的、
+用旧令牌发出去的合同审查请求拿回 401，会把当前这位已经重新登录的用户一起登出。2026-09-15 实测
+全仓仅此一处，因此门禁按**全仓零容忍**钉（遍历 `src/**`，剥注释后禁止空参调用），不做逐文件白名单。
+
+门禁侧把「只有 login 会 cancel」升级成真正的不变量，不再把错误的 per-Provider 实例锁死：
+新增两条 —— AuthProvider 只许取页面级单例（不许出现 `createMemberSessionExpiryExit`）、
+出口模块必须把实例存在模块作用域且不导出 per-call 工厂。另外把「禁止写存储 / history」那条改成
+先剥注释再判，否则文件头讲缺陷成因的那句话会被判成缺陷本身。
+
+CI 接线：`apps/kiosk/scripts/tests/fusion-w6-contract.test.mjs` 已加入 ci.yml 既有的
+「Run Kiosk fusion contract tests with coverage gates」步骤（与 `fusion-baseline-contract.test.mjs`
+同一行命令）。**没有改 `verify:fusion-w6`，也没有降低任何阈值**：合并后覆盖率为
+lines 98.32 / branches 89.24 / functions 100，全部高于该步骤的 80 门槛。改 workflow 前后各跑过
+`verify:repository-integrity`（均 0），改后 `verify:fusion-w6`、`verify:deploy-gates-in-sync`、
+`verify:ci-gate-coverage` 均 0。
+
+证据口径 —— 全部 LOCAL（本机 macOS 开发环境），SOURCE 为本工作树：
+kiosk `typecheck` 0；`eslint src/` 0 error；`verify:member-session-closure` 0（45 PASS）；
+`verify:scan-session-truth` 0；`verify:contract-review-session` / `contract-review-report-print` /
+`visible-actions-truth` / `job-material-library-ui` / `profile-print-orders-login-smoke` /
+`kiosk-browser-spec-coverage` / `fusion-w6` 均 0；根 `ci-gate-coverage` / `repository-integrity` /
+`deploy-gates-in-sync` 均 0；`node --test apps/kiosk/scripts/tests/*.test.mjs` **157/157**
+（401 出口行为测试 13 → 15，新增两条跨重挂用例）；Playwright privacy 401 定向用例 1/1。
+`git diff --check` 0。
+
+反向变异（实际执行，以退出码为准，变异未提交）：把 `getMemberSessionExpiryExit()` 退回
+「每次 `createMemberSessionExpiryExit()`」→ 出口行为测试 **exit 1**（15 条挂 2 条，正是两条跨重挂
+用例），恢复后 **exit 0**（15/15）。门禁侧另做三次源码变异：AuthContext 改回 per-Provider 造实例、
+`contractReview` 改回无参 notify、`logout()` 重新撤销待办跳转 —— `verify:member-session-closure`
+均 **exit 1**，恢复后 0。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；本轮**没有任何 CI 运行**，
+ci.yml 的接线只是把一条命令加进了文件，**没有在 CI 上跑过一次**，不得说成「CI 通过」。
+Windows 一体机、Terminal Agent、奔图 CM2800 真机与生产环境这一轮一次都没有碰过。
+已知遗留：`pnpm graph:check` 在 `b3d7c43d5` 上就已经红（7 个 `docs/graph/**` 产物内容不一致），
+本轮改动前后红的文件完全一致、未新增漂移；`docs/graph/**` 不在本轮允许修改范围，未重跑生成。
+401 出口目前仍没有自己的等待遮罩（清场遮罩只挂在 `KioskPrivacyGuard` 的 `clearing` 上），
+等待期间页面停留在原路由且已登出 —— 这一项按要求列为后续 P2，本轮未扩展双出口。
+
 2026-09-15 **401 会话失效也要走清场收尾闸：确认之前不许跳回登录页（Kiosk 侧，分支
 `integration/scan-pickup-closeout-r3-20260915`，基线 `5561f4ea8`）**。仅改 `apps/kiosk/**`
 与本文件，未触碰 `services/api/**`、Terminal Agent、小程序、Admin / Partner、schema、

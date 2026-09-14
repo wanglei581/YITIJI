@@ -43,6 +43,27 @@ import { isLoginPath, loginPathForCurrentLocation } from './returnPath'
  *     解得掉它，而全仓只有 `login()` 调它：这一位换了一张有效令牌之后，再把他踢去
  *     登录页是纯粹的打扰。`logout()` 和 Provider 卸载**都不撤销** —— 撤销的结果是
  *     这一位既登不回去、也走不掉，停在一张过期的页面上。
+ *
+ * ## 为什么它必须是**页面级**的唯一所有者（2026-09-15 第二轮，Grok 主对抗审查）
+ *
+ * 上面那三个旗子只在「全页只有一个 owner」时成立。第一版把实例挂在 AuthProvider 的
+ * ref 上，于是 `main.tsx` 的 `<AuthProvider key={identityRevision}>` 一重挂
+ * （terminalId 从 A 换成 B）就出现两个 owner，而它们登记的回调**挂在同一条模块级
+ * 收尾闸上**：
+ *
+ *   E1 收到 401 → 登记跳转（闸正按着，还没跑）→ terminalId 换了，Provider 重挂 →
+ *   新 Provider 建 E2 → 新用户登录，`login()` 调的是 **E2**.cancel() →
+ *   E1 完全不知情，闸一 settle 就 `assign('/login')`，把刚登进来的这一位踢出去，
+ *   而他在等待期间写的打印 / 简历 sessionStorage 没有按新身份清过。
+ *
+ * 判据因此上移一层：**出口的所有权跟着页面走，不跟着 React 树走。** 它要管的那件事
+ * （`window.location.assign`）本来就是页面级的，`exited`「一个页面生命周期里至多跳
+ * 一次」也只有在页面级 owner 上才说得通。所以实例存在模块作用域，
+ * {@link getMemberSessionExpiryExit} 全程返回同一个；重挂之后的 `login()` 拿到的
+ * 就是当初登记那一次的 owner，取消得掉。
+ *
+ * 不新增第二套 gate：撤销的判据仍然只有 `scanCleanupGate` 一处，这里只是把
+ * 「谁在等它」收敛成一个。
  */
 export interface MemberSessionExpiryExit {
   /**
@@ -62,7 +83,7 @@ export interface MemberSessionExpiryExit {
   cancel: () => void
 }
 
-export function createMemberSessionExpiryExit(): MemberSessionExpiryExit {
+function createMemberSessionExpiryExit(): MemberSessionExpiryExit {
   let armed = false
   let exited = false
   let dispose: (() => void) | null = null
@@ -95,4 +116,21 @@ export function createMemberSessionExpiryExit(): MemberSessionExpiryExit {
   }
 
   return { expire, cancel }
+}
+
+/**
+ * 全页唯一的那个 401 出口。
+ *
+ * **模块作用域，不是 per-Provider**：`<AuthProvider key={identityRevision}>` 重挂时，
+ * 新 Provider 必须拿到**当初登记那一次跳转**的同一个 owner，否则它的 `login()`
+ * 取消不了旧 owner，刚登进来的人会被上一次过期的跳转踢回登录页（成因见文件头）。
+ *
+ * 模块级状态在一体机上是安全的：这一整套的生命周期本来就是「一次页面加载」——
+ * 真正的换人靠整页重载 / `window.location.assign`，那一刻模块连同状态一起重建。
+ */
+let sharedExit: MemberSessionExpiryExit | null = null
+
+export function getMemberSessionExpiryExit(): MemberSessionExpiryExit {
+  sharedExit ??= createMemberSessionExpiryExit()
+  return sharedExit
 }

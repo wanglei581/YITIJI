@@ -4,7 +4,7 @@ import { onMemberSessionExpired } from '../services/auth/memberSessionEvents'
 import { AuthContext, deriveDisplayName, type AuthContextValue, type AuthUser } from './context'
 import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from './kioskSensitiveSession'
 import { clearGuestScanBeforeMemberLogin } from './kioskClearScope'
-import { createMemberSessionExpiryExit } from './memberSessionExpiryExit'
+import { getMemberSessionExpiryExit } from './memberSessionExpiryExit'
 
 /**
  * Kiosk C 端会话 Provider（纯内存）。
@@ -29,12 +29,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userRef = useRef<AuthUser | null>(null)
   /* 401 之后「回登录页」那一步。它在收尾闸确认服务端撤掉上一场扫描之前不许跳转，
    * 否则整页跳转会把闸的重试一起干掉，留下一条已确认、仍可投递的 waiting 任务
-   * ——下一位在面板上扫出来的文件会投给刚失效的这一位（memberSessionExpiryExit）。 */
-  const sessionExpiryExitRef = useRef<ReturnType<typeof createMemberSessionExpiryExit> | null>(null)
-  if (sessionExpiryExitRef.current === null) {
-    sessionExpiryExitRef.current = createMemberSessionExpiryExit()
-  }
-  const sessionExpiryExit = sessionExpiryExitRef.current
+   * ——下一位在面板上扫出来的文件会投给刚失效的这一位（memberSessionExpiryExit）。
+   *
+   * 取的是**页面级单例**，不是 per-Provider 实例：`main.tsx` 的
+   * `<AuthProvider key={identityRevision}>` 在 terminalId 换台时会重挂整棵树，而待办的
+   * 跳转登记在模块级的收尾闸上、活得比这棵树久。两个 owner 的后果是新 Provider 的
+   * `login()` 取消不了旧 owner，闸一 settle 就把刚登进来的这一位踢回登录页。 */
+  const sessionExpiryExit = getMemberSessionExpiryExit()
 
   // 纯内存方案：无需异步校验，挂载后立即标记 ready。
   useEffect(() => {

@@ -1,5 +1,42 @@
 # 下一步任务
 
+## 2026-09-15 R3 候选后的唯一推进顺序（取代下面 R2 那一节）
+
+**当前总判定：扫描 R3 为 SOURCE / LOCAL GO；CI / DEVICE / PRODUCTION / COMMERCIAL 全部 NO-GO。**
+
+分支 `integration/scan-pickup-closeout-r3-20260915`，基线
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。R3 的实现证据锚点是**两个提交**：
+`b3d7c43d50d13b4527bad1d23bc8d44675419fea`（401 出口接入清场收尾闸）+
+`__R3_HEAD_SHA__`（Grok 主对抗审查发现的 P1 修复：出口所有权跨 `<AuthProvider key>` 重挂唯一、
+`contractReview` 透传失败 token、`fusion-w6-contract` 接入 CI）。**推进只认后者这个精确 SHA。**
+
+口径更正，别再混用：
+
+- **PR #1036 与 CI run `34816672752` 只属于 R2**（分支
+  `integration/scan-pickup-closeout-r2-20260913`，实现锚点 `5ebf73c05`）。R3 的两个提交
+  **不在**那次 run 里，也不在任何 CI run 里 —— R3 至今**一次 CI 都没跑过**。
+- 因此不得用 #1036 的绿灯为 R3 背书，也不得把 R3 的本地绿写成「CI 通过」。
+- R2 的 `5ebf73c05` 是 R3 的祖先，R2 那一节的结论仍然有效，但**唯一推进路径以本节为准**。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 1 | 集成 / 仓库 | 把 R3 推上去并**首次**取得 CI 绿：以 `__R3_HEAD_SHA__` 为 PR head 开 PR（或并入 #1036 后重新等 CI），三项必需检查与 Windows installer 检查全绿后再谈合并 | PR 最终 head 的必需检查全绿；head 必须等于 `__R3_HEAD_SHA__` 或其之后产生的新 HEAD（文档提交也会产生新 HEAD，不得沿用旧 SHA 绿灯）；合入后以 `merge-base --is-ancestor` 证明进入 `origin/main` 并记录新的 main SHA |
+| 2 | Windows / 奔图专用任务 | 在合入后的精确 SHA 上完成面板扫描、真实出纸、扫码枪、断网重连、Agent 重启、长驻 watcher 与连续多用户操作 | 记录任务/订单/文件 hash/状态回传/临时文件删除；重点证明旧文件不交给后来的用户，以及「401 过期 + 弱网」时下一位在面板上扫出来的文件不会投给上一位 |
+| 3 | Claude + 四端 | 从合入后的干净 `origin/main` 推进，不与 R3 候选混合；Claude 独占前端写入 | 同下面 R2 那一节第 3 项，口径不变 |
+| 4 | 运维 / 生产 | 具名维护窗口按精确 SHA 完成备份、迁移、部署、监控、回滚 | 同下面 R2 那一节第 4 项，口径不变 |
+| 5 | 产品负责人 / 运营 / 客户 | 微信类目与提审、授权内容冷启动、真实用户 UAT 与签字交付 | 同下面 R2 那一节第 5 项，口径不变 |
+
+R3 已知遗留（不阻塞第 1 项，但要登记）：
+
+- **P2：401 出口没有自己的等待遮罩。** 清场遮罩只挂在 `KioskPrivacyGuard` 的 `clearing` 状态上，
+  401 这条路不触发它。等待服务端确认期间，页面停在原路由且已登出（本机 PII 已同步清掉，
+  不构成泄露），但没有一屏告诉用户「在等什么、还要多久」。本轮按要求**不扩展** 401 overlay /
+  hardClear 双出口 —— 两个出口同时登记会在闸 settle 时互相抢导航目的地，风险高于收益。
+  做的话只允许低风险复用 `KioskClearingOverlay`，且必须先确定谁赢那次导航。
+- **P2：`pnpm graph:check` 红。** 在 `b3d7c43d5` 上就已经红（7 个 `docs/graph/**` 产物内容不一致），
+  R3 改动前后红的文件完全一致、未新增漂移。该命令未接入任何 CI workflow。修法是
+  `pnpm graph` 重跑生成，需要单独一轮（`docs/graph/**` 不在 R3 允许修改范围）。
+
 ## 2026-09-14 R2 候选后的唯一推进顺序
 
 **当前总判定：扫描 R2 在 PR #1036 实现锚点达到 SOURCE / LOCAL / CI GO；DEVICE / PRODUCTION /

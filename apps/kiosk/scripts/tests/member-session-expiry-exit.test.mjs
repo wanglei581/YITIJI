@@ -14,6 +14,10 @@
  *
  * 每个 case 新装一份模块（模块级状态必须每次归零），时间与定时器是假的，
  * `fetch` 会记账，`window.location.assign` 只记账不跳转。
+ *
+ * 取实例一律走 `getMemberSessionExpiryExit()` —— 生产里 AuthProvider 走的就是它。
+ * 用一个 case 私有的工厂会把「全页只有一个 owner」这条判据测没了，而那正是
+ * 2026-09-15 第二轮被 Grok 抓到的那个 P1。
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -191,7 +195,7 @@ const jsonError = (status, code) => Promise.resolve({
 test('没有待清理扫描会话时，401 立即回登录页（同步跳一次，一个撤销请求都不发）', async () => {
   const harness = await loadExit({ session: null })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     // 一次 await 都没有：最常见的那条路径上时序必须和这条闸出现之前一模一样。
     assert.equal(harness.localClear.count, 1)
@@ -208,7 +212,7 @@ test('撤销还没拿到确认时不跳转，但本机 401 清场已经同步做
     fetchImpl: () => jsonError(500, 'INTERNAL_ERROR'),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     // 本机那一半是同步的：闸还按着，PII / 令牌 / 登录态一秒都不许多留。
     assert.equal(harness.localClear.count, 1, '本机清场不等网络')
@@ -231,7 +235,7 @@ test('断网（请求根本发不出去）同样不跳转', async () => {
     fetchImpl: () => Promise.reject(new TypeError('Failed to fetch')),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     await harness.advance(20_000)
     assert.equal(harness.localClear.count, 1)
@@ -248,7 +252,7 @@ test('403 之后 fallback 也被拒时不跳转（没走完 fallback 更不许�
     fetchImpl: () => jsonError(403, 'SCAN_TASK_FORBIDDEN'),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     await harness.flush()
     // 第一次带身份被 403 → 摘掉身份再试一次（服务端为「登出之后仍要撤得掉」留的路）。
@@ -271,7 +275,7 @@ test('服务端确认撤掉之后才跳，并且只跳一次', async () => {
       : jsonError(500, 'INTERNAL_ERROR')),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     await harness.advance(5_000)
     assert.deepEqual(harness.assigned, [])
@@ -294,7 +298,7 @@ test('服务端一直不回话时，走到真实 expiresAt 才放行，且只跳
     fetchImpl: () => Promise.reject(new TypeError('Failed to fetch')),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     await harness.advance(TEN_MINUTES - 1_000)
     assert.deepEqual(harness.assigned, [], '有效期之前一直等：这一场服务端还签得出租约')
@@ -316,7 +320,7 @@ test('等待期间重复 401 既不重复清本机，也不重复登记跳转', 
       : jsonError(503, 'SERVICE_UNAVAILABLE')),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     for (let i = 0; i < 5; i += 1) exit.expire(harness.clearLocalSession)
     await harness.advance(5_000)
@@ -339,7 +343,7 @@ test('clearLocalSession 自己调了 cancel()，这次跳转仍然登记得上�
       : jsonError(500, 'INTERNAL_ERROR')),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     /* AuthProvider 传进来的就是 `logout`，而 logout 是手工登出 / 隐私清场共用的那一个。
      * 只要有人往 logout 里加一句 cancel()，这条断言就要求「登记仍然发生」——
      * 登记必须排在清场之后，不能反过来被自己的清场撤掉。 */
@@ -363,7 +367,7 @@ test('等待期间这一位重新登录：cancel() 之后不再把他踢去登�
     fetchImpl: () => jsonError(500, 'INTERNAL_ERROR'),
   })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     await harness.advance(3_000)
     assert.deepEqual(harness.assigned, [])
@@ -378,7 +382,7 @@ test('等待期间这一位重新登录：cancel() 之后不再把他踢去登�
 test('卸载（cancel）之后的新一发 401 仍然能重新登记并跳一次', async () => {
   const harness = await loadExit({ session: null })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     // StrictMode：订阅建了又拆。拆的时候什么都还没发生。
     exit.cancel()
     exit.expire(harness.clearLocalSession)
@@ -391,7 +395,7 @@ test('卸载（cancel）之后的新一发 401 仍然能重新登记并跳一次
 test('跳过一次之后即使再 cancel，也不会跳第二次', async () => {
   const harness = await loadExit({ session: null })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     assert.equal(harness.assigned.length, 1)
     exit.cancel()
@@ -406,7 +410,7 @@ test('跳过一次之后即使再 cancel，也不会跳第二次', async () => {
 test('已经在登录页时不跳转，但本机 401 清场照做', async () => {
   const harness = await loadExit({ session: null, pathname: '/login', search: '?from=%2F' })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     assert.equal(harness.localClear.count, 1)
     assert.deepEqual(harness.assigned, [], '登录页自循环')
@@ -418,10 +422,82 @@ test('已经在登录页时不跳转，但本机 401 清场照做', async () => 
   }
 })
 
+// ── <AuthProvider key> 重挂：出口的所有权必须跟着页面走，不跟着 React 树走 ──────
+//
+// `main.tsx` 在 terminalId 从 A 换成 B 时用 `key={identityRevision}` 重挂整棵树。
+// 待办的跳转登记在**模块级**的收尾闸上，活得比那棵树久 —— 所以「谁能取消它」这件事
+// 必须跨重挂保持同一个答案。第一版把实例挂在 Provider 的 ref 上，重挂就多出一个
+// owner：新 Provider 的 login() 取消的是新 owner，旧 owner 照样在闸 settle 之后
+// 把刚登进来的这一位 assign 回登录页（2026-09-15 Grok 主对抗审查，bug:true）。
+//
+// 下面两条是一对，缺一条都测不出那个缺陷：
+//   · 重挂后有人登录 → 必须取消得掉（单实例测不到，因为根本没有第二个 owner）；
+//   · 重挂后没人登录 → 那条跳转仍然必须走完（只测「别跳」会把整条出口删掉也绿）。
+
+test('Provider 重挂后新用户登录：旧那次过期跳转必须取消得掉（跨重挂唯一 owner）', async () => {
+  let confirm = false
+  const harness = await loadExit({
+    session: liveSession(),
+    fetchImpl: () => (confirm
+      ? Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ success: true }) })
+      : jsonError(500, 'INTERNAL_ERROR')),
+  })
+  try {
+    // Provider #1（terminalId = A）收到 401 并登记跳转，闸这会儿正按着。
+    const first = harness.mod.getMemberSessionExpiryExit()
+    first.expire(harness.clearLocalSession)
+    await harness.advance(3_000)
+    assert.deepEqual(harness.assigned, [], '闸还按着就不许跳')
+
+    // terminalId A→B：<AuthProvider key> 重挂，新 Provider 取它自己那一份出口。
+    const second = harness.mod.getMemberSessionExpiryExit()
+    assert.equal(second, first, '重挂前后必须是同一个 owner，否则新 Provider 取消不了旧的那次登记')
+
+    // 新用户登录 —— AuthProvider.login() 调的就是这一句。
+    second.cancel()
+    confirm = true
+    await harness.advance(20_000)
+    assert.deepEqual(
+      harness.assigned,
+      [],
+      '刚登进来的这一位不许被上一次过期的跳转踢回登录页',
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
+test('Provider 重挂后没人登录：那次过期跳转仍然必须走完，且只走一次', async () => {
+  let confirm = false
+  const harness = await loadExit({
+    session: liveSession(),
+    fetchImpl: () => (confirm
+      ? Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ success: true }) })
+      : jsonError(500, 'INTERNAL_ERROR')),
+  })
+  try {
+    const first = harness.mod.getMemberSessionExpiryExit()
+    first.expire(harness.clearLocalSession)
+    await harness.advance(3_000)
+    // 重挂了，但没有人登录、也没有人取消。
+    const second = harness.mod.getMemberSessionExpiryExit()
+    assert.equal(second, first)
+    confirm = true
+    await harness.advance(20_000)
+    assert.deepEqual(
+      harness.assigned,
+      ['/login?from=%2Fprofile%2Fme'],
+      '没人接手时这条跳转是必须走完的承诺，不能被重挂悄悄吞掉',
+    )
+  } finally {
+    harness.restore()
+  }
+})
+
 test('跳转地址里不许出现令牌、控制凭据或任务号', async () => {
   const harness = await loadExit({ session: liveSession(), pathname: '/scan', search: '?stage=settings' })
   try {
-    const exit = harness.mod.createMemberSessionExpiryExit()
+    const exit = harness.mod.getMemberSessionExpiryExit()
     exit.expire(harness.clearLocalSession)
     await harness.advance(TEN_MINUTES + 10_000)
     assert.equal(harness.assigned.length, 1)
