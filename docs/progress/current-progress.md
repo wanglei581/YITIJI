@@ -22,6 +22,9 @@ sessionStorage 没有按新身份清过。已在本机用「两实例一 gate」
 同步跳、5xx / 断网 / 403 未确认不跳、确认或自然过期后只跳一次、`logout()` 与 effect cleanup
 都不撤销一条必须走完的跳转。
 
+本条的实现证据锚点是 `089b5b9adca40b6a6f669d46705e3ec0acd92f3a`（R3 第二个修复提交，紧随 `b3d7c43d5`）；
+该 SHA 由本提交之后的这一次文档提交补记，两个提交都不在任何 CI run 里。
+
 同时修掉 `src/services/api/contractReview.ts` 的 `notifyMemberSessionExpired()` 无参调用：
 它有 `access.token` 却不透传，把 AuthProvider 第一句
 `if (failedToken && userRef.current?.token !== failedToken) return` 整个短路掉 —— 一次迟到的、
