@@ -1,5 +1,31 @@
 # 当前开发进度
 
+2026-09-14 **扫描隐私 / 到机认证 R2 候选达到本地软件冻结标准，生产与商业仍为 NO-GO**。
+隔离分支 `integration/scan-pickup-closeout-r2-20260913` 已冻结
+`eca46857ceee58fe1e850f040a54a4adbda2e441`，基线为
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`；工作区干净，尚未 push、开 PR、合入
+`main`、部署、执行生产迁移或做 Windows / 奔图真机操作。
+
+R2 在既有签名重试、扫描输入锁死遥测、Kiosk 持久化凭据后 ACK、ACK 后才签发 Agent delivery
+lease 的基础上，又关闭两类最终审查缺口：① Agent 对“无 waiting lease 时已观察到的临时文件”保留
+显式 `null` 血缘，不能在同 inode 重命名后绑定给后来任务；② Canonical API 合约替身真实走
+`ScanTasksService.ack()`，未 ACK 的 waiting 任务返回 `NO_WAITING_SCAN_TASK`。Grok 随后在
+`4a92493ec` 复现了更窄的并发竞态：`.tmp` 请求仍等待 409 时，同 inode 的 `.pdf` 可从另一条路径
+抢先绑定任务 B。`eca46857c` 在首次 `lstat` 后、任何 lease await 之前按已证明的 `dev/ino`
+建立 single-flight；原竞态复验从 `deliverCount=1` 变为 **0 POST、文件进入 `_unclaimed`**，之后新 inode
+的合法 B 文件仍可交付。对应反向变异会使并发用例退出非零。
+
+最终 SHA 上的本地证据：Terminal Agent `verify:scan-watcher` 与 typecheck 通过，包含顺序/并发
+null-opening、不同 inode 正例及 identity-flight 反向变异；API 在 PostgreSQL 16
+`postgresql://postgres@127.0.0.1:55439/scan_retry_verify` 上 `verify:scan-tasks` 与 typecheck 通过，
+包含 ACK-filter 反向变异；Kiosk `verify-scan-session-truth.mjs`、ACK 单测 9/9、typecheck 通过；
+shared typecheck 通过。最终只读复审：Grok 对原竞态复验为 GO，Claude 对 Kiosk durable ACK 与前端
+影响确认为 GO，Agy 架构复审为 GO；Hermes / DeepSeek V4 Pro 因 HTTP 402 余额不足失败，记
+`FAILED`，不计批准。证据边界：`ino === 0` / identity unavailable 的 Windows SMB 路径无法由本机
+single-flight 证明，长驻 chokidar、Windows / 奔图、真实支付、小程序发布、生产部署、授权内容与客户
+UAT 均未完成。因此当前结论仅为 **LOCAL TESTED SOFTWARE GO（扫描 R2 候选边界）**，
+**PRODUCTION / COMMERCIAL NO-GO**。
+
 2026-09-13 **扫描隐私与到机认证候选完成集成，商业结论仍为 NO-GO**。隔离分支
 `integration/scan-pickup-closeout-20260913` 已冻结候选
 `f957c8a96474f1389f6de42c27ae47d5c73823c8`（基线
