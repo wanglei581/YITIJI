@@ -78,6 +78,7 @@ export function isSameScanCaptureFile(
   return true
 }
 
+/** Flight key only. Rename and recycled inodes share this lock. Leftover and successor matching must use isSameScanCaptureFile. */
 export function scanCaptureIdentityKey(identity: ScanCaptureFileIdentity): string {
   return `${identity.dev}:${identity.ino}`
 }
@@ -270,7 +271,7 @@ export class ScanDirectoryBaseline {
   ): void {
     const liveStems = new Set<string>()
     for (const name of liveNames) liveStems.add(captureNameStem(name))
-    const liveIdentityKeys = new Set<string>()
+    const liveIdentities: ScanCaptureFileIdentity[] = []
     let liveIdentitiesComplete = !identityOf
     if (identityOf) {
       liveIdentitiesComplete = true
@@ -280,13 +281,16 @@ export class ScanDirectoryBaseline {
           liveIdentitiesComplete = false
           continue
         }
-        liveIdentityKeys.add(scanCaptureIdentityKey(identity))
+        liveIdentities.push(identity)
       }
     }
     for (const [name, rec] of [...this.observations]) {
       if (liveNames.has(name)) continue
       if (liveStems.has(captureNameStem(name))) continue
-      if (rec.identity && liveIdentityKeys.has(scanCaptureIdentityKey(rec.identity))) continue
+      if (
+        rec.identity
+        && liveIdentities.some((id) => isSameScanCaptureFile(rec.identity, id) === true)
+      ) continue
       if (rec.identity && !liveIdentitiesComplete) continue
       this.observations.delete(name)
     }

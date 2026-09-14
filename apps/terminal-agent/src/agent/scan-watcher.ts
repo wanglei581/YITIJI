@@ -56,7 +56,6 @@ import {
   SCAN_CAPTURE_FOREIGN_LEASE,
   SCAN_LEASE_NOT_BEFORE_INVALID,
   scanCaptureFileIdentity,
-  scanCaptureIdentityKey,
   isSameScanCaptureFile,
   beginScanCaptureIdentityFlight,
   resetScanCaptureIdentityFlightsForTest,
@@ -280,11 +279,13 @@ const inFlightPaths = new Set<string>()
  * 在本进程生命周期内永久 never-deliver：绝不能进入服务端租约申请或正常投递；
  * 后续 sweep 仅重试安全隔离；成功隔离后清理标记；隔离失败记录高严重度日志但不泄露文件名或内容。
  *
- * `startupBacklogIdentities` 跟上同一批目录项的 dev/ino。rename 会换 basename，
- * 不能只靠新路径判断「这是不是启动时那份文件」。
+ * `startupBacklogIdentities` 跟上同一批目录项。rename 会换 basename，
+ * 不能只靠新路径判断「这是不是启动时那份文件」。匹配走 isSameScanCaptureFile：
+ * 同 inode 且 birthtime 未证明不同仍是 leftover；内核复用 inode 且 birthtime
+ * 可证明不同则不是。
  */
 const startupBacklogPaths = new Set<string>()
-const startupBacklogIdentities = new Set<string>()
+const startupBacklogIdentities: ScanCaptureFileIdentity[] = []
 
 function readStartupBacklogFileIdentity(filePath: string): ScanCaptureFileIdentity | undefined | 'unknown' {
   try {
@@ -305,19 +306,36 @@ function markStartupBacklogIdentity(filePath: string): void {
     return
   }
   if (!identity) return
-  startupBacklogIdentities.add(scanCaptureIdentityKey(identity))
+  if (startupBacklogHasIdentity(identity)) return
+  startupBacklogIdentities.push(identity)
 }
 
 function forgetStartupBacklog(filePath: string, identity?: ScanCaptureFileIdentity): void {
   startupBacklogPaths.delete(canonicalizeScanPath(filePath))
-  if (identity) startupBacklogIdentities.delete(scanCaptureIdentityKey(identity))
+  if (!identity) return
+  for (let i = startupBacklogIdentities.length - 1; i >= 0; i -= 1) {
+    if (isSameScanCaptureFile(startupBacklogIdentities[i], identity) === true) {
+      startupBacklogIdentities.splice(i, 1)
+    }
+  }
+}
+
+function startupBacklogHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  // ATOMIC_SCAN_STARTUP_BACKLOG_GENERATION: leftover matching uses
+  // isSameScanCaptureFile, not the flight key. Recycled ino + proven-new
+  // birthtime is not the leftover; missing birthtime stays leftover.
+  for (const marked of startupBacklogIdentities) {
+    if (isSameScanCaptureFile(marked, identity) === true) return true
+  }
+  return false
 }
 
 export function isStartupBacklogCandidate(filePath: string, identity?: ScanCaptureFileIdentity): boolean {
-  if (identity && startupBacklogIdentities.has(scanCaptureIdentityKey(identity))) return true
+  if (identity && startupBacklogHasIdentity(identity)) return true
   if (!startupBacklogPaths.has(canonicalizeScanPath(filePath))) return false
-  // Path mark without a matching inode: a later file reusing the basename after
-  // the original directory entry was renamed or quarantined is not that leftover.
+  // Path mark without a matching leftover identity: a later file reusing the
+  // basename after the original directory entry was renamed, quarantined, or
+  // replaced by a proven-new generation is not that leftover.
   if (identity) return false
   return true
 }
@@ -332,7 +350,7 @@ let scanCandidateTestHooks: {
 
 export function clearStartupBacklogForTest(): void {
   startupBacklogPaths.clear()
-  startupBacklogIdentities.clear()
+  startupBacklogIdentities.length = 0
   globalScanDeliveryBarrier.resetForTest()
   resetScanCaptureIdentityFlightsForTest()
   scanCandidateTestHooks = {}
@@ -1181,11 +1199,12 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
  * Agent 每次启动时，扫描目录下已存在的所有文件（启动前旧文件）
  * 均不能获得之后的新租约，必须立即安全隔离至 _unclaimed 目录。
  * readdir 之后、任何 await / watcher add / sweep / process 之前，必须同步把每个
- * 直接子路径记入 startupBacklogPaths，并把能证明的 dev/ino 记入
+ * 直接子路径记入 startupBacklogPaths，并把能证明的目录项身份记入
  * startupBacklogIdentities；随后才按既有 Windows trusted token 串行隔离。
  * 启动时识别为 backlog 的目录项，在本进程中必须永久 never-deliver（rename 换名
- * 也不行），隔离失败也不能进入正常投递。
- * 隔离失败保留标记；成功才清除路径和 inode。unsafe / symlink / hardlink 只保留 never-deliver 标记，绝不投递。
+ * 也不行），隔离失败也不能进入正常投递。内核复用 inode 且 birthtime 可证明不同
+ * 的新文件不是 leftover。隔离失败保留标记；成功才清除路径和身份。
+ * unsafe / symlink / hardlink 只保留 never-deliver 标记，绝不投递。
  * 在 Windows 平台上严格使用 readVerifiedCandidate 获取的 TrustedWindowsCandidate
  * 原生凭据执行隔离，绝不抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING。
  * 隔离后文件在 _unclaimed 目录中，下次重启或周期性 sweep 均不会再次尝试匹配或投递。
@@ -1318,7 +1337,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   }
   globalDirectoryBaseline.clear()
   startupBacklogPaths.clear()
-  startupBacklogIdentities.clear()
+  startupBacklogIdentities.length = 0
 
   const next: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,

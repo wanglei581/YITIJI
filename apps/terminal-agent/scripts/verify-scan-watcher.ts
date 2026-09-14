@@ -38,6 +38,8 @@ import {
   runNullOpeningInodeRenameTests,
   runNullOpeningOverlappingInodeRenameTests,
   runRecycledInodeGenerationTests,
+  runStartupBacklogGenerationPipelineTest,
+  runVanishedPredecessorNewCaptureTest,
 } from './scan-lease-barrier.helper'
 
 const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
@@ -202,7 +204,8 @@ function verifySourceStructure(): void {
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
   assert.match(source, /const startupBacklogPaths\s*=\s*new Set<string>\(\)/, 'must have a startup backlog path tracking Set for never-deliver enforcement')
-  assert.match(source, /const startupBacklogIdentities\s*=\s*new Set<string>\(\)/, 'must track startup leftover inodes so rename cannot escape by basename')
+  assert.match(source, /const startupBacklogIdentities:\s*ScanCaptureFileIdentity\[\]\s*=\s*\[\]/, 'must track startup leftover identities so rename cannot escape by basename')
+  assert.match(source, /ATOMIC_SCAN_STARTUP_BACKLOG_GENERATION/, 'startup leftover matching must use capture generation, not the flight key')
   assert.match(source, /isStartupBacklogCandidate\(filePath, candidateIdentity\)/, 'processCandidate must treat renamed startup leftovers as backlog')
   assert.match(source, /forgetStartupBacklog\(filePath, candidateIdentity\)/, 'must clear path and inode backlog marks upon successful quarantine')
   assert.match(source, /ATOMIC_STARTUP_BACKLOG_IDENTITY/, 'startup premark must record directory-entry identity')
@@ -1269,6 +1272,56 @@ const INODE_GENERATION_BLOCK = `  if (a.dev !== b.dev || a.ino !== b.ino) return
 const INODE_GENERATION_MUTATED = `  return a.dev === b.dev && a.ino === b.ino
 `
 
+const STARTUP_BACKLOG_GENERATION_BLOCK = `function startupBacklogHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  // ATOMIC_SCAN_STARTUP_BACKLOG_GENERATION: leftover matching uses
+  // isSameScanCaptureFile, not the flight key. Recycled ino + proven-new
+  // birthtime is not the leftover; missing birthtime stays leftover.
+  for (const marked of startupBacklogIdentities) {
+    if (isSameScanCaptureFile(marked, identity) === true) return true
+  }
+  return false
+}`
+
+const STARTUP_BACKLOG_GENERATION_MUTATED = `function startupBacklogHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  for (const marked of startupBacklogIdentities) {
+    if (marked.dev === identity.dev && marked.ino === identity.ino) return true
+  }
+  return false
+}`
+
+function verifyStartupBacklogGenerationMutationMakesPipelineNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(STARTUP_BACKLOG_GENERATION_BLOCK), true, 'startup backlog generation block must exist before reverse mutation')
+  const mutated = original.replace(STARTUP_BACKLOG_GENERATION_BLOCK, STARTUP_BACKLOG_GENERATION_MUTATED)
+  assert.notEqual(mutated, original, 'ino-only leftover matching must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--startup-backlog-generation')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `ino-only leftover matching must make startup generation pipeline nonzero\n${output}`)
+    assert.match(
+      output,
+      /recycled inode with proven-new birthtime is not the startup leftover/,
+      `mutated leftover matching must fail on recycled inode, not an unrelated error\n${output}`,
+    )
+    console.log('PASS startup backlog generation reverse mutation: leftover pipeline becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'startup backlog generation reverse mutation must restore scan-watcher.ts')
+}
+
 function verifyInodeGenerationMutationMakesRecycledInodeNonzero(): void {
   const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
   const original = readFileSync(barrierPath, 'utf8')
@@ -1514,6 +1567,14 @@ async function main(): Promise<void> {
     runRecycledInodeGenerationTests()
     return
   }
+  if (process.argv.includes('--startup-backlog-generation')) {
+    await runStartupBacklogGenerationPipelineTest()
+    return
+  }
+  if (process.argv.includes('--vanished-predecessor')) {
+    await runVanishedPredecessorNewCaptureTest()
+    return
+  }
   if (process.argv.includes('--stem-changing-inode-rename')) {
     await runStemChangingInodeRenameTests()
     return
@@ -1554,6 +1615,7 @@ async function main(): Promise<void> {
   verifyCaptureLineageMutationMakesLateCrossSessionNonzero()
   verifyInodeLineageMutationMakesStemChangingRenameNonzero()
   verifyInodeGenerationMutationMakesRecycledInodeNonzero()
+  verifyStartupBacklogGenerationMutationMakesPipelineNonzero()
   verifyNullOpeningMutationMakesRenameNonzero()
   verifyIdentityFlightMutationMakesOverlappingRenameNonzero()
   verifyStartupBacklogIdentityMutationMakesRenameNonzero()

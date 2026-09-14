@@ -143,6 +143,19 @@ export function runRecycledInodeGenerationTests(): void {
     true,
     'missing birthtime cannot prove a new generation; fail-closed to same capture',
   )
+
+  const crossStem = new ScanDirectoryBaseline()
+  crossStem.recordObservation('job.tmp', now, 'task_A', { dev: 1, ino: 10, birthtimeMs: 1000 })
+  crossStem.retainLiveEntries(
+    new Set(['other.pdf']),
+    (name) => (name === 'other.pdf' ? { dev: 1, ino: 10, birthtimeMs: 2000 } : undefined),
+  )
+  crossStem.bindCapture('job.pdf', now, 'task_B', new Set(['job.pdf', 'other.pdf']))
+  assert.equal(
+    crossStem.isForeignToLease('job.pdf', 'task_B', new Set(['job.pdf', 'other.pdf'])),
+    false,
+    'recycled inode on another stem must not keep A to poison a later unknown job.pdf',
+  )
 }
 
 export async function runScanLeaseBarrierTests(): Promise<void> {
@@ -1262,41 +1275,6 @@ export async function runLateCrossSessionCaptureTests(): Promise<void> {
       assert.equal(deliverTaskIds.length, 1, 'later B capture reusing the stem must deliver')
       assert.equal(existsSync(join(scanFolder, pdfName)), false)
       console.log('PASS stem reuse after A quarantine: later B capture is not poisoned')
-
-      const orphanTmp = 'reuse-orphan.tmp'
-      const orphanPdf = 'reuse-orphan.pdf'
-      writeFileSync(join(scanFolder, orphanTmp), 'orphan under A')
-      const orphanStat = lstatSync(join(scanFolder, orphanTmp))
-      const orphanIdentity = scanCaptureFileIdentity(orphanStat.dev, orphanStat.ino, orphanStat.birthtimeMs)
-      globalDirectoryBaseline.recordObservation(
-        orphanTmp,
-        Date.now(),
-        'task_A',
-        orphanIdentity,
-      )
-      unlinkSync(join(scanFolder, orphanTmp))
-      writeFileSync(join(scanFolder, orphanPdf), '%PDF-1.4 later B capture after A tmp vanished')
-      const orphanPdfStat = lstatSync(join(scanFolder, orphanPdf))
-      const laterIdentity = scanCaptureFileIdentity(
-        orphanPdfStat.dev,
-        orphanPdfStat.ino,
-        orphanPdfStat.birthtimeMs,
-      )
-      // Linux may recycle the inode number; that is not the same directory entry.
-      // A proven-new birthtime is a new capture generation. If the filesystem
-      // cannot prove that (missing birthtime), close the vanished observation
-      // with no live successor — the same path finishVanishedCapture takes.
-      if (isSameScanCaptureFile(orphanIdentity, laterIdentity) !== false) {
-        assert.equal(
-          globalDirectoryBaseline.closeVanishedCapture(orphanTmp, new Set(), () => undefined),
-          undefined,
-          'vanished A tmp with no live successor must close rather than wait for inode reuse',
-        )
-      }
-      await processCandidate(join(scanFolder, orphanPdf), orphanPdf, makeHelperConfig(baseUrl, scanFolder))
-      assert.equal(deliverTaskIds.length, 2, 'later B capture after vanished A tmp must deliver')
-      assert.equal(existsSync(join(scanFolder, orphanPdf)), false)
-      console.log('PASS stem reuse after vanished A temp: later B capture is not poisoned')
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()))
       rmSync(scanFolder, { recursive: true, force: true })
@@ -1305,6 +1283,7 @@ export async function runLateCrossSessionCaptureTests(): Promise<void> {
     }
   }
 
+  await runVanishedPredecessorNewCaptureTest()
   await runStemChangingInodeRenameTests()
   await runUnknownDirectoryListingFailClosedTest()
 }
@@ -1405,6 +1384,7 @@ export async function runStemChangingInodeRenameTests(): Promise<void> {
   }
 
   await runStartupBacklogTempRenameTest()
+  await runStartupBacklogGenerationPipelineTest()
 }
 
 export async function runStartupBacklogTempRenameTest(): Promise<void> {
@@ -1445,6 +1425,110 @@ export async function runStartupBacklogTempRenameTest(): Promise<void> {
     assert.equal(deliverCount, 1, 'new inode after startup leftover quarantine must deliver')
     assert.equal(existsSync(pdfPath), false)
     console.log('PASS later different-inode B file after startup leftover rename still delivers')
+  } finally {
+    await stub.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runStartupBacklogGenerationPipelineTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+  let deliverCount = 0
+  const stub = await listenScanStub(
+    () => ({ scanTaskId: 'task_B', notBeforeMs: Date.now() - 1_000 }),
+    () => { deliverCount += 1 },
+  )
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-startup-generation-'))
+  const tmpName = 'job.pdf.tmp'
+  const pdfName = 'job.pdf'
+  const tmpPath = join(scanFolder, tmpName)
+  const pdfPath = join(scanFolder, pdfName)
+  try {
+    writeFileSync(tmpPath, '%PDF-1.4 leftover from before this process')
+    const leftover = lstatSync(tmpPath)
+    const leftoverId = scanCaptureFileIdentity(leftover.dev, leftover.ino, leftover.birthtimeMs)
+    assert.ok(leftoverId, 'startup leftover must have a proven directory-entry identity')
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    assert.equal(isStartupBacklogCandidate(tmpPath, leftoverId), true, 'same leftover identity remains never-deliver')
+    assert.equal(
+      isStartupBacklogCandidate(tmpPath, scanCaptureFileIdentity(leftover.dev, leftover.ino)),
+      true,
+      'missing birthtime cannot prove a new generation against a leftover',
+    )
+    assert.ok(leftoverId.birthtimeMs, 'pipeline generation test requires a proven leftover birthtime')
+    const recycledId = scanCaptureFileIdentity(leftover.dev, leftover.ino, leftoverId.birthtimeMs + 1000)
+    assert.equal(
+      isStartupBacklogCandidate(tmpPath, recycledId),
+      false,
+      'recycled inode with proven-new birthtime is not the startup leftover',
+    )
+
+    unlinkSync(tmpPath)
+    writeFileSync(pdfPath, '%PDF-1.4 later legitimate B capture after leftover vanished')
+    const fresh = lstatSync(pdfPath)
+    const freshId = scanCaptureFileIdentity(fresh.dev, fresh.ino, fresh.birthtimeMs)
+    await processCandidate(pdfPath, pdfName, makeHelperConfig(stub.baseUrl, scanFolder))
+    if (isSameScanCaptureFile(leftoverId, freshId) === true) {
+      assert.equal(deliverCount, 0, 'unprovable new generation must fail-closed as leftover')
+      assert.equal(existsSync(join(scanFolder, '_unclaimed', pdfName)), true)
+      console.log('PASS vanished leftover with unprovable generation stays fail-closed')
+    } else {
+      assert.equal(deliverCount, 1, 'new capture after leftover vanished must deliver')
+      assert.equal(existsSync(pdfPath), false)
+      console.log('PASS vanished leftover then new capture delivers')
+    }
+  } finally {
+    await stub.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+    clearStartupBacklogForTest()
+    globalDirectoryBaseline.clear()
+  }
+}
+
+export async function runVanishedPredecessorNewCaptureTest(): Promise<void> {
+  clearStartupBacklogForTest()
+  globalDirectoryBaseline.clear()
+  let currentTaskId = 'task_A'
+  let deliverCount = 0
+  const stub = await listenScanStub(
+    () => ({ scanTaskId: currentTaskId, notBeforeMs: Date.now() - 30_000 }),
+    () => { deliverCount += 1 },
+  )
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-vanished-pred-'))
+  const tmpName = 'reuse-orphan.tmp'
+  const pdfName = 'reuse-orphan.pdf'
+  const tmpPath = join(scanFolder, tmpName)
+  const pdfPath = join(scanFolder, pdfName)
+  try {
+    beginScanWatchSessionForTest()
+    await isolateStartupBacklog(scanFolder)
+    writeFileSync(tmpPath, 'orphan under A')
+    const tmpStat = lstatSync(tmpPath)
+    const tmpId = scanCaptureFileIdentity(tmpStat.dev, tmpStat.ino, tmpStat.birthtimeMs)
+    await processCandidate(tmpPath, tmpName, makeHelperConfig(stub.baseUrl, scanFolder))
+    assert.equal(existsSync(tmpPath), true, 'non-accepted tmp observed under A must remain until it vanishes')
+    unlinkSync(tmpPath)
+    currentTaskId = 'task_B'
+    writeFileSync(pdfPath, '%PDF-1.4 later B capture after A tmp vanished')
+    const pdfStat = lstatSync(pdfPath)
+    const pdfId = scanCaptureFileIdentity(pdfStat.dev, pdfStat.ino, pdfStat.birthtimeMs)
+    const { stdout } = await captureLogsAsync(() =>
+      processCandidate(pdfPath, pdfName, makeHelperConfig(stub.baseUrl, scanFolder)),
+    )
+    if (isSameScanCaptureFile(tmpId, pdfId) === true) {
+      assert.equal(deliverCount, 0, 'unprovable new generation must not bind A leftover to B')
+      assert.equal(existsSync(join(scanFolder, '_unclaimed', pdfName)), true)
+      assert.match(stdout, new RegExp(SCAN_CAPTURE_FOREIGN_LEASE))
+      console.log('PASS vanished predecessor with unprovable generation stays fail-closed')
+    } else {
+      assert.equal(deliverCount, 1, 'later B capture after vanished A tmp must deliver')
+      assert.equal(existsSync(pdfPath), false)
+      console.log('PASS vanished predecessor without manual close: later B capture is not poisoned')
+    }
   } finally {
     await stub.close()
     rmSync(scanFolder, { recursive: true, force: true })
