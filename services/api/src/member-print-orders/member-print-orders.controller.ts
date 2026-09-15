@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Header, Headers, Param, Post, Query, UseGuards } from '@nestjs/common'
 import type { MemberPendingTaskItem, MemberPrintOrderItem } from './member-print-orders.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
@@ -7,7 +7,7 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
-import { MemberPrintOrderCreateService } from './member-print-order-create.service'
+import { assertMemberPrintOrderIdempotencyKey, MemberPrintOrderCreateService } from './member-print-order-create.service'
 
 /**
  * 会员「我的打印订单」接口（Phase C-2C 后续小步）。路由前缀 /api/v1/me/print-orders。
@@ -41,8 +41,13 @@ export class MemberPrintOrdersController {
 
   /** M2 第一片：创建 Order-only 待到机订单；不会提前创建 Agent 可领取的 PrintTask。 */
   @Post()
-  async create(@CurrentEndUser() user: AuthedEndUser, @Body() dto: CreateMemberPrintOrderDto) {
-    return ApiResponse.ok(await this.cloudOrders.create(user.endUserId, dto))
+  async create(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: CreateMemberPrintOrderDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+  ) {
+    assertMemberPrintOrderIdempotencyKey(idempotencyKey)
+    return ApiResponse.ok(await this.cloudOrders.create(user.endUserId, dto, idempotencyKey))
   }
 
   /** 小程序专用 Order-only 列表；与历史 PrintTask-first 列表分开，避免游标契约漂移。 */

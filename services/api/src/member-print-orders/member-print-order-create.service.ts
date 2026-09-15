@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
 // 取件码长度/字符集/签发/哈希的唯一定义。曾在本文件和 payment/order-status.service.ts
@@ -73,6 +73,90 @@ function printParams(dto: CreateMemberPrintOrderDto): PrintJobParamsDto {
   }
 }
 
+/** Prisma @@unique map name. P2002 matching must pin this constraint, not orderNo / pickupCodeHash. */
+export const MEMBER_PRINT_ORDER_IDEMPOTENCY_UNIQUE = 'Order_endUserId_idempotencyKey_key'
+const IDEMPOTENCY_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export function assertMemberPrintOrderIdempotencyKey(raw: unknown): string {
+  if (raw == null || (typeof raw === 'string' && raw.trim() === '')) {
+    throw new BadRequestException({
+      error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: '创建打印订单必须携带 Idempotency-Key' },
+    })
+  }
+  if (typeof raw !== 'string' || !IDEMPOTENCY_KEY_RE.test(raw)) {
+    throw new BadRequestException({
+      error: { code: 'IDEMPOTENCY_KEY_INVALID', message: 'Idempotency-Key 格式不合法' },
+    })
+  }
+  return raw
+}
+
+export function fingerprintMemberPrintOrderPayload(dto: Pick<CreateMemberPrintOrderDto, 'fileId' | 'terminalId' | 'copies' | 'colorMode' | 'duplex'>): string {
+  return crypto.createHash('sha256').update(JSON.stringify({
+    fileId: dto.fileId,
+    terminalId: dto.terminalId,
+    copies: dto.copies,
+    colorMode: dto.colorMode,
+    duplex: dto.duplex,
+  })).digest('hex')
+}
+
+function pushTargetTokens(tokens: string[], value: unknown): void {
+  if (typeof value === 'string' && value) tokens.push(value)
+  else if (Array.isArray(value)) {
+    for (const item of value) if (item != null && item !== '') tokens.push(String(item))
+  } else if (value && typeof value === 'object') {
+    tokens.push(...Object.keys(value))
+  }
+}
+
+/**
+ * Prisma 7 SQLite adapter puts fields on meta.driverAdapterError.cause.constraint.fields
+ * and often omits meta.target. PostgreSQL still uses meta.target / constraint name.
+ */
+function uniqueTargetTokens(error: object): string[] {
+  const err = error as {
+    message?: string
+    meta?: {
+      target?: unknown
+      driverAdapterError?: { cause?: { constraint?: unknown } }
+    }
+  }
+  const tokens: string[] = []
+  pushTargetTokens(tokens, err.meta?.target)
+  const constraint = err.meta?.driverAdapterError?.cause?.constraint
+  if (typeof constraint === 'string') pushTargetTokens(tokens, constraint)
+  else if (constraint && typeof constraint === 'object') {
+    const named = constraint as { fields?: unknown; name?: unknown }
+    pushTargetTokens(tokens, named.fields)
+    pushTargetTokens(tokens, named.name)
+  }
+  if (tokens.length === 0 && typeof err.message === 'string') {
+    const match = /fields:\s*\(([^)]+)\)/i.exec(err.message)
+    if (match) {
+      for (const part of match[1].split(',')) {
+        const field = part.replace(/[`'"\s]/g, '')
+        if (field) tokens.push(field)
+      }
+    }
+  }
+  return tokens
+}
+
+/** True only for the (endUserId, idempotencyKey) unique. Missing meta → false (do not swallow other uniques). */
+export function isMemberPrintOrderIdempotencyConflict(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const err = error as { code?: string }
+  if (err.code !== 'P2002') return false
+  const tokens = uniqueTargetTokens(error)
+  if (tokens.length === 0) return false
+  if (tokens.some((token) => token === MEMBER_PRINT_ORDER_IDEMPOTENCY_UNIQUE)) return true
+  const blob = tokens.join('\0')
+  if (/orderNo|pickupCode|printTaskId/i.test(blob) && !/idempotencyKey/i.test(blob)) return false
+  const fields = new Set(tokens)
+  return fields.has('idempotencyKey') && (fields.has('endUserId') || tokens.length === 1)
+}
+
 @Injectable()
 export class MemberPrintOrderCreateService {
   constructor(
@@ -83,7 +167,12 @@ export class MemberPrintOrderCreateService {
     private readonly audit: AuditService,
   ) {}
 
-  async create(endUserId: string, dto: CreateMemberPrintOrderDto) {
+  async create(endUserId: string, dto: CreateMemberPrintOrderDto, idempotencyKey?: string | null) {
+    const key = assertMemberPrintOrderIdempotencyKey(idempotencyKey)
+    const fingerprint = fingerprintMemberPrintOrderPayload(dto)
+    const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
+    if (existing) return this.replayOwned(endUserId, existing, fingerprint)
+
     const now = new Date()
     const file = await this.prisma.fileObject.findFirst({
       where: { id: dto.fileId, endUserId, deletedAt: null },
@@ -131,32 +220,43 @@ export class MemberPrintOrderCreateService {
     // 到机码绝不能活得比源文件更久；否则用户会拿到“码仍有效、文件已清理”的假承诺。
     const pickupDeadline = now.getTime() + PICKUP_TTL_MS
     const expiresAt = new Date(Math.min(pickupDeadline, file.expiresAt?.getTime() ?? pickupDeadline))
-    const order = await this.prisma.order.create({
-      data: {
-        orderNo: makeOrderNo(),
-        type: 'print',
-        // channel: 小程序云打印（到店取件）。小程序建单请求体不含该字段——
-        // 由服务端硬编，前端零改动（见 M1 任务卡事实 B/D/E）。
-        channel: 'miniapp_cloud',
-        endUserId,
-        terminalId: terminal.id,
-        sourceFileId: file.id,
-        sourceFileSha256: file.sha256,
-        sourceFileName: file.filename,
-        printParamsJson: JSON.stringify({ ...params, fileName: file.filename }),
-        amountCents: quote.amountCents,
-        billablePages: quote.billablePages,
-        billingPageSource: quote.billingPageSource,
-        itemsJson: JSON.stringify(quote.lines),
-        payStatus: 'unpaid',
-        taskStatus: 'pending_release',
-        pickupCodeHash: hashPickupCode(code),
-        pickupCodeEnc: encryptSecret(code),
-        pickupCodeCreatedAt: now,
-        pickupCodeExpiresAt: expiresAt,
-        pickupStatus: 'pending',
-      },
-    })
+    let order
+    try {
+      order = await this.prisma.order.create({
+        data: {
+          orderNo: makeOrderNo(),
+          type: 'print',
+          // channel: 小程序云打印（到店取件）。小程序建单请求体不含该字段——
+          // 由服务端硬编，前端零改动（见 M1 任务卡事实 B/D/E）。
+          channel: 'miniapp_cloud',
+          endUserId,
+          terminalId: terminal.id,
+          sourceFileId: file.id,
+          sourceFileSha256: file.sha256,
+          sourceFileName: file.filename,
+          printParamsJson: JSON.stringify({ ...params, fileName: file.filename }),
+          amountCents: quote.amountCents,
+          billablePages: quote.billablePages,
+          billingPageSource: quote.billingPageSource,
+          itemsJson: JSON.stringify(quote.lines),
+          payStatus: 'unpaid',
+          taskStatus: 'pending_release',
+          pickupCodeHash: hashPickupCode(code),
+          pickupCodeEnc: encryptSecret(code),
+          pickupCodeCreatedAt: now,
+          pickupCodeExpiresAt: expiresAt,
+          pickupStatus: 'pending',
+          idempotencyKey: key,
+          idempotencyPayloadHash: fingerprint,
+        },
+      })
+    } catch (error) {
+      if (isMemberPrintOrderIdempotencyConflict(error)) {
+        const raced = await this.findOwnedByIdempotencyKey(endUserId, key)
+        if (raced) return this.replayOwned(endUserId, raced, fingerprint)
+      }
+      throw error
+    }
     const settled = quote.amountCents === 0
       ? await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
       : order
@@ -169,7 +269,7 @@ export class MemberPrintOrderCreateService {
       targetId: order.id,
       payload: { terminalId: terminal.id, fileId: file.id, amountCents: quote.amountCents, billablePages: quote.billablePages },
     })
-    return this.toView(settled, code, terminal)
+    return this.toView(settled, this.visibleCode(settled) ?? code, terminal)
   }
 
   async listCloud(endUserId: string) {
@@ -251,6 +351,32 @@ export class MemberPrintOrderCreateService {
     const order = await this.prisma.order.findFirst({ where: { id: orderId, endUserId, sourceFileId: { not: null } } })
     if (!order) throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
     return order
+  }
+
+  private findOwnedByIdempotencyKey(endUserId: string, idempotencyKey: string) {
+    return this.prisma.order.findFirst({ where: { endUserId, idempotencyKey } })
+  }
+
+  private async replayOwned(endUserId: string, row: OrderRecord, fingerprint: string) {
+    if (row.endUserId !== endUserId) {
+      throw new NotFoundException({ error: { code: 'PRINT_ORDER_NOT_FOUND', message: '打印订单不存在' } })
+    }
+    if (!row.idempotencyPayloadHash || row.idempotencyPayloadHash !== fingerprint) {
+      throw new ConflictException({
+        error: { code: 'IDEMPOTENCY_KEY_REUSED', message: '该请求标识已用于另一次打印参数，请更换标识后重试' },
+      })
+    }
+    let order = row
+    if (order.amountCents === 0 && order.payStatus === 'unpaid') {
+      order = await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
+    }
+    const terminal = order.terminalId
+      ? await this.prisma.terminal.findFirst({
+          where: { id: order.terminalId },
+          select: { displayName: true, locationLabel: true },
+        })
+      : null
+    return this.toView(order, this.visibleCode(order), terminal ?? undefined)
   }
 
   private async expireIfNeeded(order: Awaited<ReturnType<MemberPrintOrderCreateService['requireOwned']>>) {

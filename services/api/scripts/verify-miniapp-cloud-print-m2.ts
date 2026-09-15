@@ -174,6 +174,8 @@ function assertCrossSurfaceWiring(): void {
       'takeaway-url 不得挂 TerminalIdentityGuard（会员/付款令牌救济路径）',
     ],
     [miniappApi.includes("request('/me/print-orders', { method: 'POST'") && miniappPay.includes('api.createCloudPrintOrder'), '小程序确实调用 Order-only 建单'],
+    [memberController.includes("@Headers('idempotency-key')"), '建单读取 Idempotency-Key 请求头'],
+    [memberController.includes('assertMemberPrintOrderIdempotencyKey(idempotencyKey)'), 'controller 在进 service 前校验幂等键'],
     [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
     [kioskCashier.includes('releasePickupOrder') && kioskCashier.includes('if (!state.taskId && orderId && paymentSessionToken)'), 'Kiosk 付款后才触发 Order-only release'],
     [kioskPaymentApi.includes("/print/jobs/${encodeURIComponent(input.orderId)}/release") && kioskPaymentApi.includes("'x-terminal-id': terminalId"), 'Kiosk release 请求携带终端与支付会话绑定'],
@@ -362,12 +364,12 @@ async function main(): Promise<void> {
     pass('隔离数据库、在线终端、真实两页 PDF、价目与隐私夹具已建立')
 
     await expectCode(
-      () => memberOrders.create(userId, { fileId: pendingPiiFileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
+      () => memberOrders.create(userId, { fileId: pendingPiiFileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID()),
       'PRINT_PII_DECISIONS_REQUIRED',
       '隐私命中未确认时拒绝建单',
     )
 
-    const created = await memberOrders.create(userId, { fileId, terminalId, copies: 2, colorMode: 'black_white', duplex: 'simplex' })
+    const created = await memberOrders.create(userId, { fileId, terminalId, copies: 2, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
     const stored = await prisma.order.findUnique({ where: { id: created.id } })
     const tasksBeforeClaim = await prisma.printTask.count({ where: { endUserId: userId } })
     if (!stored || tasksBeforeClaim !== 0 || stored.printTaskId || stored.pickupStatus !== 'pending' || stored.payStatus !== 'unpaid') {
@@ -402,7 +404,7 @@ async function main(): Promise<void> {
 
     const directForOrder = await seedTamperedDirectFile('直传建单篡改件')
     await expectCode(
-      () => memberOrders.create(userId, { fileId: directForOrder, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
+      () => memberOrders.create(userId, { fileId: directForOrder, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID()),
       'FILE_CONTENT_CHANGED',
       'RES-2 complete 后内容变化 → 建单 409 FILE_CONTENT_CHANGED',
     )
@@ -413,7 +415,7 @@ async function main(): Promise<void> {
       'RES-2 complete 后内容变化 → 读取 409 FILE_CONTENT_CHANGED',
     )
     await expectCode(
-      () => memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
+      () => memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID()),
       'PII_SCAN_STALE',
       'RES-1 member-print-order sha256 不一致 → 409 PII_SCAN_STALE',
     )
@@ -423,7 +425,7 @@ async function main(): Promise<void> {
       data: { paramsJson: JSON.stringify({ sourceSha256: sourceSha }) },
     })
 
-    const cancellable = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' })
+    const cancellable = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
     await memberOrders.cancel(userId, cancellable.id, { reason: 'verify cancellation' })
     const cancelled = await prisma.order.findUnique({ where: { id: cancellable.id } })
     if (cancelled?.pickupStatus !== 'cancelled' || cancelled.payStatus !== 'closed' || cancelled.printTaskId) {
@@ -561,7 +563,7 @@ async function main(): Promise<void> {
       '非 owner 会员不得签发带走 URL',
     )
 
-    const concurrent = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' })
+    const concurrent = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
     const concurrentClaim = await pickup.claim(concurrent.pickupCode, terminalId)
     await orderStatus.markPaid(concurrent.id, { paymentSource: 'offline', operatorId: 'verify-kiosk' })
     const races = await Promise.allSettled([
@@ -581,7 +583,7 @@ async function main(): Promise<void> {
 
     const expiringFileId = `file_m2_exp_${suffix}`
     await seedFile(expiringFileId, '短期文件', 'keep', 60 * 60 * 1000)
-    const expiring = await memberOrders.create(userId, { fileId: expiringFileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' })
+    const expiring = await memberOrders.create(userId, { fileId: expiringFileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' }, randomUUID())
     const expiringOrder = await prisma.order.findUnique({ where: { id: expiring.id } })
     if (!expiringOrder?.pickupCodeExpiresAt || expiringOrder.pickupCodeExpiresAt.getTime() > Date.now() + 61 * 60 * 1000) {
       fail('到机码有效期不得超过源文件有效期')
