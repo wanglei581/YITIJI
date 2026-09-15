@@ -86,13 +86,14 @@ function resolveOrderState(order) {
 }
 
 /**
- * 归属存疑时给用户的话。
+ * 服务端明确拒绝为当前这位确认归属（requireOwned 的 404）时给用户的话。
  *
- * 和"换了账号"分开写：那一句说的是"我知道换了人"，这一句说的是**"我认不出这一页
- * 该属于谁"** —— 后者更弱，也更该说实话。两句的落点都是「我的 · 打印订单」：
- * 那里会用当前这位的登录态重新列一遍，属于他的订单自然在，不属于他的自然不在。
+ * 和"换了账号"分开写：那一句说的是"我知道换了人"，这一句说的是**"服务端说这张订单
+ * 不是当前这位的"** —— 它是一个**已经被证明**的结论，不是一句猜测。
+ * 落点同样是「我的 · 打印订单」：那里会用当前这位的登录态重新列一遍。
  */
-const OWNER_AMBIGUOUS_MESSAGE = '这张到机码是用另一次登录打开的，现在无法确认它属于谁，已停止显示。请到「我的 · 打印订单」重新进入。'
+const OWNER_DENIED_MESSAGE = '这张到机码不属于当前登录的账号，已停止显示。请到「我的 · 打印订单」查看你自己的订单。'
+
 
 Page({
   _countdownTimer: null,
@@ -100,15 +101,14 @@ Page({
   _polling: false,
   _pageReady: false,
   _visible: true,
-  // 归属存疑（粘性）。见 _resolveIdentity 里 bindOwner 那一段。
-  _ownerAmbiguous: false,
+  // 服务端**明确拒绝**为哪个账号确认归属（requireOwned 的 404）。
+  // 它不是"我认不出人"（那要去问服务端），而是"问过了，服务端说这张订单不是他的"。
+  _ownerDeniedFor: '',
   // 请求代次。身份变化 / 归属存疑都会 +1，在途的那一发就此不再属于本页任何状态。
   _requestEpoch: 0,
   // 当前在途那一发的令牌（对象身份即标识）。它不等于 `_polling`：
   // `_polling` 只回答"要不要再打一发"，令牌回答"回来的这条是不是那一发"。
   _inflight: null,
-  // 本页自己把用户送去登录页之后的一次性回程标记。见 recover / onShow。
-  _loginHandoff: false,
 
   data: {
     statusBarHeight: 20,
@@ -151,10 +151,9 @@ Page({
     this._foreignBlocked = false
     // 归属存疑（粘性）、请求代次、在途令牌、登录回程标记：都必须在这里显式初始化 ——
     // 留成 undefined 时 `token.epoch !== this._requestEpoch` 会恒真，把本人的响应也挡掉。
-    this._ownerAmbiguous = false
+    this._ownerDeniedFor = ''
     this._requestEpoch = 0
     this._inflight = null
-    this._loginHandoff = false
 
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
@@ -210,26 +209,26 @@ Page({
     // R8-B3 钉住的三条判据一条都没救到它：那三条全在 `'resignable'` 分支里，
     // 而这条路走的是 `'ok'`。
     //
-    // 所以绑定只发生在两个**说得清因果**的时刻，由调用方传 bindOwner 指定：
-    //   ① `onLoad` 的第一次判定 —— 本页刚被导航打开，此刻确定登录着的那位就是它的主人；
-    //   ② 本页**自己打出去的那一发**（发出时归属未定）的回调里，且页面仍然可见 ——
-    //      那个身份是 request.js 为**这一发**静默补签回来的，因果落在本页自己身上；
-    //      页面不可见时不绑，那段时间里发生的登录与本页无关（用户已经去了别的页）。
-    // 外加一个一次性窗口：本页自己把用户送去登录页之后回来的第一次 onShow（见 onShow）。
+    // ── R10：R9 那套"两个说得清因果的时刻"里，第二个**其实说不清**。 ───────────
+    // R9 允许在"本页自己那一发（发出时归属未定）的回调里、且页面仍然可见"时绑定，
+    // 理由是"那个身份是 request.js 为这一发补签回来的"。但页面**无从知道**这件事：
+    // 它能读到的只有"回调这一刻本地是谁"，而那个身份也可能是**另一个人在这段时间里
+    // 登录进来的**。R9 靠"换人总会经过 onHide/onShow"来兜，可 `auth.saveSession` 根本
+    // 不需要任何生命周期回调 —— 于是：过期开页（三个账号键全是空串）→ 请求在途 →
+    // B 静默登录 → A 的 200 回来 → 回调里读到 `'u:B'` 就把 B 认作开页那位，
+    // `sameAccount('', 'u:B')` 一路放行，A 的到机码画在了 B 的屏幕上。
+    //
+    // 所以绑定不再从"回调时读到谁"推断，改由**服务端**回答。现在只剩两条路：
+    //   ① `onLoad` 的第一次判定（bindOwner === true）—— 本页刚被导航打开，此刻确定
+    //      登录着的那位就是把这张 orderId 带进来的那位；之后任何身份跳变都能被
+    //      `resolveAccountState`（快照非空时）与 foreign 判据看出来。
+    //   ② **一发"发出时就已经是确定账号"的确认请求**拿到 200（见 _confirmOwner）。
+    //      服务端的 requireOwned 是按发出这一发时的登录态校验归属的，而那是谁我们
+    //      在发出前就记进了令牌 —— 这条判据不依赖回调时读到的任何东西。
+    // 发出时归属未定的那一发（token.account === ''）**永远不能建立归属**：
+    // 它只负责把 request.js 的 401 静默补签触发出来，它的 200 什么都证明不了。
     if (isMemberIdentity(resolved.account) && !this._openerAccount && bindOwner === true) {
       this._openerAccount = resolved.account
-    }
-
-    // 认不出主人的时候冒出来的确定身份：**说不清**它是不是这张 orderId 的主人。
-    // 说不清就不写屏、不发请求，并把在途那一发的代次作废（它的归属同样说不清）。
-    //
-    // 粘性。本页此后一律 fail-closed —— 用户从「我的 · 打印订单」重新进来会拿到一页
-    // 干净的新实例，那时的绑定是说得清的（那条路已由 R9-A2 钉住）。代价是
-    // "开页时已过期、且恰好在那一发请求飞着的时候被切走/被别人登录"要多走一次导航；
-    // 收益是这一页从此不可能把一张取件凭证画给一个认不出来的会话。
-    if (isMemberIdentity(resolved.account) && !this._openerAccount && !this._ownerAmbiguous) {
-      this._ownerAmbiguous = true
-      this._invalidateInflight()
     }
 
     // 「换成了别人」的判据是**当前这位是不是开页那位**，不是"这一跳里身份变没变"。
@@ -250,11 +249,11 @@ Page({
       this._foreignBlocked = false
     }
 
-    if (this._ownerAmbiguous || foreign || resolved.state === 'changed') {
-      // 真的换了人，或主动登出（补签资格已被撤销），或归属根本说不清：
-      // **当场清掉屏幕上的码**。真实链路里这一步没有任何生命周期回调 ——
-      // request.js 续签失败时调 auth.logout()，页面还停在前台，而那张已经渲染好的码
-      // 属于一个已经不存在的会话。共用设备上就是下一位看到它。
+    if (foreign || resolved.state === 'changed') {
+      // 真的换了人，或主动登出（补签资格已被撤销）：**当场清掉屏幕上的码**。
+      // 真实链路里这一步没有任何生命周期回调 —— request.js 续签失败时调 auth.logout()，
+      // 页面还停在前台，而那张已经渲染好的码属于一个已经不存在的会话。
+      // 共用设备上就是下一位看到它。
       if (foreign) this._foreignBlocked = true
       // 身份一变，在途那一发就不再属于本页任何状态：代次作废 + **当场把去重锁交还**。
       // 只清屏不放锁的话，「重新加载」会是一个按不动的按钮，要等那发不属于任何人的
@@ -263,15 +262,13 @@ Page({
       this._account = ''
       this._stopTimers()
       this._clearCredentials()
-      const switched = this._ownerAmbiguous || foreign || isMemberIdentity(resolved.identity)
+      const switched = foreign || isMemberIdentity(resolved.identity)
       this.setData({
         state: 'error',
         refreshing: false,
-        errorMsg: this._ownerAmbiguous
-          ? OWNER_AMBIGUOUS_MESSAGE
-          : (switched
-            ? '当前账号与打开这张到机码时的不是同一个，已停止显示。请到「我的 · 打印订单」重新进入。'
-            : '登录已失效，请重新登录后再查看到机码。'),
+        errorMsg: switched
+          ? '当前账号与打开这张到机码时的不是同一个，已停止显示。请到「我的 · 打印订单」重新进入。'
+          : '登录已失效，请重新登录后再查看到机码。',
         errorAction: switched ? 'orders' : 'login',
       })
       return 'changed'
@@ -311,7 +308,7 @@ Page({
    * 四条判据，缺一不可（顺序即代价从低到高）：
    *   ① **代次**：`token.epoch` 仍是当前代次。身份变化 / 归属存疑都会 +1，
    *      在途那一发就此作废 —— 这是唯一一条不依赖"回调时读到谁"的判据。
-   *   ② **归属没存疑**（也没被粘性 foreign 封锁）。
+   *   ② 没被粘性 foreign 封锁，也不是服务端已经拒绝过的那个账号。
    *   ③ **当前这位**是一个确定的会员键，并且**就是开页那位** —— 本页的 orderId 属于他。
    *   ④ **发起这一发的那位**与**发出时的开页那位**都对得上当前这位。只放行一种不相等：
    *      `'' → 'u:<id>'`（`sameAccount`），也就是"发出时本地认不出人、回来时
@@ -326,9 +323,12 @@ Page({
   _ownsResponse(state, token) {
     if (state !== 'ok' && state !== 'resignable') return false
     if (!token || token.epoch !== this._requestEpoch) return false
-    if (this._ownerAmbiguous || this._foreignBlocked) return false
+    if (this._foreignBlocked) return false
     const account = this._account
     if (!isMemberIdentity(account)) return false
+    if (this._ownerDeniedFor && this._ownerDeniedFor === account) return false
+    // **无条件**比对开页那位。归属只由 onLoad 或一发确认请求的 200 建立，
+    // 所以 `_openerAccount === ''` 就是"这一页还没人认领"—— 那时任何响应都不许写屏。
     if (account !== this._openerAccount) return false
     return sameAccount(token.opener, account) && sameAccount(token.account, account)
   },
@@ -382,6 +382,66 @@ Page({
   },
 
   /**
+   * 归属由**服务端**认下来 —— 这是本页唯一能在 onLoad 之外建立 `_openerAccount` 的路。
+   *
+   * 判据是"这一发是**带着哪个已知账号**发出去的"，不是"回调这一刻本地是谁"。
+   * 后者是 R9 栽的那一跤：`auth.saveSession` 不需要任何生命周期回调，于是在途期间
+   * 静默登录进来的另一位会被读成"补签回来的本人"。而这一条不依赖回调时读到的任何东西：
+   *   ① `token.account` 在**发出请求之前**就是一个确定的会员键（`confirming` 的前提）；
+   *   ② 服务端的 requireOwned 按发出这一发时的登录态校验了归属，并返回了 200；
+   *   ③ 这中间没有发生过身份跳变 —— 快照非空时 `resolveAccountState` 看得见
+   *      `'u:A' → 'u:B'`，那一跳会先一步走 `'changed'` 清场，根本到不了这里；
+   *      这里再核一次 `this._account === token.account` 把它钉死。
+   *
+   * 三条都成立才写 `_openerAccount`，而且只写成 `token.account` —— **不是**当前读到的那位。
+   */
+  _confirmOwner(state, token) {
+    if (!isMemberIdentity(token.account)) return false
+    if (state !== 'ok' && state !== 'resignable') return false
+    if (this._account !== token.account) return false
+    if (this._openerAccount) return this._openerAccount === token.account
+    this._openerAccount = token.account
+    return true
+  },
+
+  /**
+   * 追一发确认请求。
+   *
+   * 调用时机只有一处：一发**发出时归属未定**的请求刚刚落定（它的 200 什么都证明不了，
+   * 但它已经把 request.js 的 401 静默补签触发过一次了）。如果此刻本地已经有了一个确定
+   * 账号，就拿它再问服务端一次 —— 那一发才是能定归属的那一发。
+   *
+   * 这就是"过期开页"要多走一个来回的地方。多出来的那一次往返换掉的是 R9 那条
+   * 永久 fail-closed：本人照常能恢复显示，而别人只会拿到服务端的 404。
+   */
+  _requestOwnerConfirmation() {
+    if (!this._visible) return
+    // 本地仍然认不出人（补签也没救回来）：没有账号可以拿去问，只能 fail-closed。
+    if (!isMemberIdentity(this._account)) { this._failClosedForIdentity(); return }
+    // 「已经被拒过的账号不再问」的守卫落在 _refreshOrder 发请求那一处
+    //（每一次 onShow 都会经过那里，只守这一条路会漏）。
+    this._refreshOrder(this.data.state === 'loading')
+  },
+
+  /**
+   * 服务端说这张订单不是这个账号的（requireOwned 404）。
+   *
+   * 记下**是哪个账号**被拒的，而不是简单地把页面钉死：换了人之后（比如本人登录回来）
+   * 还应该能再问一次。页面这一刻一个字节的凭证都不显示。
+   */
+  _denyOwner(account) {
+    this._ownerDeniedFor = account
+    this._stopTimers()
+    this._clearCredentials()
+    this.setData({
+      state: 'error',
+      refreshing: false,
+      errorMsg: OWNER_DENIED_MESSAGE,
+      errorAction: 'orders',
+    })
+  },
+
+  /**
    * 身份不可用：fail-closed 到一页**说得清、点得动**的错误态。
    *
    * 两句话分开：「没登录」和「登录了但会话缺会员标识」补救动作相同（重新登录一次），
@@ -409,18 +469,14 @@ Page({
 
   onShow() {
     this._visible = true
-    // 本页自己把用户送去登录页（`errorAction === 'login'` → recover）之后的**第一次**
-    // 回来：那次登录是本页发起的，因果说得清，所以允许把结果认作本页的主人 ——
-    // 否则"没登录 → 去登录 → 回来"这条最普通的路会永远停在 fail-closed 上。
+    // **onShow 永远不绑定开页那位。** R9 曾在这里开过一个"本页自己送用户去登录、
+    // 回来的第一次 onShow"的一次性窗口；R10 把它一并收掉了 —— 那条路现在由
+    // 确认请求覆盖（登录回来之后 `_account` 已经确定，下一发就是确认请求，
+    // 服务端 200 才认主人）。少一个口子，而且恢复路径反而更短。
     //
-    // 三重收窄，免得它变成一个常开的口子：**一次性**（读完即撤）、只在本页确实把人
-    // 送出去过时才有、并且**要求此刻没有任何请求在飞**（有在飞的就是 R9-A 那条路：
-    // 那一发的归属本来就说不清，不能让一次登录替它把主人认下来）。
-    const handoff = this._loginHandoff === true && !this._polling
-    this._loginHandoff = false
     // 每一次回到前台都交给 `_refreshOrder`，由它**先判身份再决定要不要发请求**
     //（顺序见那里的长注释）。没有 orderId 时它原地返回：那一页从来没显示过任何本人数据。
-    if (this.data.orderId) this._refreshOrder(false, handoff)
+    if (this.data.orderId) this._refreshOrder(false)
   },
 
   /**
@@ -477,7 +533,21 @@ Page({
     // 这一发是**带着谁的登录态、替哪一位、在哪一代次**发出去的。三样都绑在令牌上，
     // 过期清不掉它 —— 回调那一刻再去读身份，读到的可能是一个已经被 clearSession
     // 清空的会话，也可能是**在途期间刚登录进来的另一位**（R9-A 那条路）。
-    const token = { account: this._account, opener: this._openerAccount, epoch: this._requestEpoch }
+    //
+    // `confirming`：这一发**发出时就已经带着一个确定账号**，而本页还没有主人。
+    // 只有这种请求的 200 配建立归属 —— 服务端的 requireOwned 是按发出这一发时的
+    // 登录态校验的，而那是谁，我们在发出**之前**就记下来了（见 _confirmOwner）。
+    const confirming = !this._openerAccount && isMemberIdentity(this._account)
+    // 服务端已经拒绝过这个账号：别拿同一个账号再问一遍。守卫必须在**发请求这一处**，
+    // 不能只放在触发确认的那条路上 —— 每一次 onShow 都会走到这里，漏了它就是
+    // "用户每回到本页一次，就替他刷服务端一次"。
+    if (confirming && this._ownerDeniedFor === this._account) { this._denyOwner(this._account); return }
+    const token = {
+      account: this._account,
+      opener: this._openerAccount,
+      epoch: this._requestEpoch,
+      confirming,
+    }
     const requestAccount = token.account
     this._polling = true
     this._inflight = token
@@ -496,8 +566,16 @@ Page({
         // 可见时给 true：那个身份是 request.js 为这一发补签回来的，因果落在本页身上，
         // 这是本页唯一能把它认作主人的机会（见 _resolveIdentity）。页面不可见时不绑 ——
         // 那段时间里发生的登录与本页无关。
-        const state = this._resolveIdentity(token.opener === '' && this._visible)
+        const state = this._resolveIdentity(false)
         if (state === 'changed') return
+        // **发出时归属未定的那一发（token.account === ''）不许建立归属、也不许写屏。**
+        // 它的 200 只说明"服务端放行了某个登录态"，而那是谁页面无从得知：可能是
+        // request.js 为这一发补签回来的本人，也可能是这段时间里静默登录进来的另一位
+        // （`auth.saveSession` 不需要任何生命周期回调）。分不出来就不认 ——
+        // 改用一发"发出时就已经是确定账号"的确认请求去问服务端。
+        if (!token.confirming && !this._openerAccount) { this._requestOwnerConfirmation(); return }
+        // 确认请求的 200 = 服务端按**发出这一发时那个已知账号**的归属校验放行了它。
+        if (token.confirming && !this._confirmOwner(state, token)) return
         // 请求成功但归属说不清：不显示任何码。
         // 宁可多一次登录，不可把一张凭证显示给一个认不出来的会话。
         if (!this._ownsResponse(state, token)) { this._failClosedForIdentity(); return }
@@ -550,9 +628,15 @@ Page({
         // 与成功分支同一条 bindOwner 规则：失败的是这一次取数，而"身份是 request.js
         // 为这一发补签回来的"这件事同样成立。两边不一致的话，一次 500 就会把一页
         // 本来说得清归属的取件页永久判成"认不出主人"。
-        const state = this._resolveIdentity(token.opener === '' && this._visible)
+        const state = this._resolveIdentity(false)
         if (state === 'changed') return
         if (!this._visible) return
+        // 确认请求被服务端**明确拒绝**：这张订单不是我们问的那个账号的。
+        // 这不是"认不出人"，是一个已经被证明的结论 —— 记下来，别拿同一个账号反复问。
+        if (token.confirming && err && err.statusCode === 404 && err.code === 'PRINT_ORDER_NOT_FOUND') {
+          this._denyOwner(token.account)
+          return
+        }
         if (err && err.statusCode === 401) {
           // 走到这里说明 request.js 的静默续签也没救回来（它续签失败时会 auth.logout()），
           // 或者本来就没有补签资格。两种都必须**当场清掉屏幕上的码**：
@@ -636,7 +720,7 @@ Page({
       // 说成 ready 最贵：用户会照着一张作废的码去扫。
       if (this.data.codeRaw !== code || !this.data.showQr) return
       if (this._openerAccount !== owner || this._requestEpoch !== epoch) return
-      if (this._ownerAmbiguous || this._foreignBlocked) return
+      if (!this._openerAccount || this._foreignBlocked) return
       const target = result && result[0]
       if (!target || !target.node) {
         this.setData({ qrStatus: 'error' })
@@ -720,9 +804,7 @@ Page({
    */
   recover() {
     const target = this.data.errorAction
-    // 本页自己把用户送去登录：记一次性回程标记，回来的第一次 onShow 才允许
-    // 把登录结果认作本页的主人（见 onShow / _resolveIdentity）。
-    if (target === 'login') { this._loginHandoff = true; wx.navigateTo({ url: '/pages/launch/launch' }); return }
+    if (target === 'login') { wx.navigateTo({ url: '/pages/launch/launch' }); return }
     if (target === 'orders') { this.toOrders(); return }
     this.retry()
   },

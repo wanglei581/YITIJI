@@ -291,9 +291,15 @@ function formatUuidV4(randomValues) {
  */
 function loadAll() {
   const result = storage.read(STORE_KEY)
+  // 三分，不是二分。**只有"本机确实没有这一格"才是空表**（wx 在 key 不存在时返回 `''`）。
+  // 读抛异常、或者读出来是 `null` / 对象 / 字符串 / 数字，都只说明**这一次读到的东西
+  // 不是这张表** —— 它证明不了盘上没有记录。上一版把后者折进 `return []`，于是
+  // 三个写入口照样以"空表"为基底写回全量，盘上那条未落定的记录（POST 可能已经到了
+  // 服务端）被一次读异常抹掉，代价和读失败那一条一模一样。
   if (!result.ok) return null
+  if (!result.found) return []
+  if (!Array.isArray(result.value)) return null
   const raw = result.value
-  if (!Array.isArray(raw)) return []
   const now = Date.now()
   return raw.filter((row) => row
     && typeof row === 'object'

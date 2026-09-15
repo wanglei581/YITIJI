@@ -724,17 +724,25 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     assert(/const foreign = isMemberIdentity\(this\._openerAccount\)/.test(body)
       && /resolved\.identity !== this\._openerAccount/.test(body),
     'print-pickup 同样按"当前这位是不是开页那位"判定换人')
-    // R9：清场分支多了一支「归属存疑」—— 认不出主人时同样当场清码。
-    assert(/if \(this\._ownerAmbiguous \|\| foreign \|\| resolved\.state === 'changed'\)/.test(body)
+    assert(/if \(foreign \|\| resolved\.state === 'changed'\)/.test(body)
       && /this\._clearCredentials\(\)/.test(body),
-    'print-pickup 判成换人 / 归属存疑时当场清掉屏幕上的码（不只是丢弃这次响应）')
+    'print-pickup 判成换人时当场清掉屏幕上的码（不只是丢弃这次响应）')
     // R9：开页那位**什么时候**才算数，比"是不是他"更要紧。开页时 JWT 已过期的那条路上
     // 三个账号键全是空串，若此刻随便认一个确定身份作主人，后来登录的那位就成了这一页的
     // 主人，而在飞的那一发（属于原来那位）会被判成"属于当前这位"画到屏幕上。
     assert(/isMemberIdentity\(resolved\.account\) && !this\._openerAccount && bindOwner === true/.test(body),
       'print-pickup 只在调用方明确允许的时刻绑定开页那位（不是"看见一个确定身份就认"）')
-    assert(/this\._ownerAmbiguous = true/.test(body) && /this\._invalidateInflight\(\)/.test(body),
-      'print-pickup 认不出主人时标成归属存疑并作废在途那一发（fail-closed）')
+    // R10：认不出主人时不再「标成存疑然后永久 fail-closed」，而是**去问服务端** ——
+    // 拿一发发出时就带着已知账号的确认请求，由 requireOwned 回答归属。
+    // 归属只许写成令牌上那个账号，绝不许写成回调时读到的那位（R9 栽的就是这一跤）。
+    const pickupBare = src
+    assert(/_confirmOwner\(state, token\) \{/.test(pickupBare)
+      && /this\._openerAccount = token\.account/.test(pickupBare),
+    'print-pickup 的归属由「发出时已知账号 + 服务端 200」认下来（_confirmOwner）')
+    assert(/if \(!token\.confirming && !this\._openerAccount\) \{ this\._requestOwnerConfirmation\(\); return \}/.test(pickupBare),
+      'print-pickup 对「发出时归属未定」的那一发不写屏、改问服务端（它的 200 证不了归属）')
+    assert(!/_ownerAmbiguous/.test(pickupBare),
+      'print-pickup 不再有「归属存疑」那面粘性旗子（它既没堵住无生命周期回调那条路，又会把本人永久锁死）')
     assert(/if \(this\._foreignBlocked && isMemberIdentity\(resolved\.identity\) && !foreign\)[\s\S]{0,80}this\._foreignBlocked = false/.test(body),
       'print-pickup 的封锁同样只对"换成别人"生效，开页那位自己回来必须解除')
     assert(/this\._openerAccount = ''/.test(src) && /this\._foreignBlocked = false/.test(src),
@@ -918,8 +926,25 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   assert(/function read\(key\) \{[\s\S]{0,400}return \{ ok: true/.test(storageSrc)
     && /catch \(e\) \{\s*\n\s*return \{ ok: false/.test(storageSrc),
   'utils/storage.js 提供一个把「读失败」与「读到的是空」分开的读法（get 把两者压成同一个 fallback）')
-  assert(/const result = storage\.read\(STORE_KEY\)/.test(idem) && /if \(!result\.ok\) return null/.test(idem),
-    'loadAll 在读失败时返回 null，而不是一个假的空数组')
+  // R10：`ok` 与 `found` 是两件事。**只有「key 确实不存在」才是空表**；读出来是
+  // null / 对象 / 字符串 / 数字都只说明「这一次读到的东西不是这张表」—— 它证明不了
+  // 盘上没有记录，拿它当空表写回全量就会把那条未落定的记录抹掉。
+  // 这里钉的是三个**分支**，不是「有没有调 storage.read」。
+  assert(/if \(v === '' \|\| v === undefined\) return \{ ok: true, found: false, value: null \};/.test(storageSrc),
+    'storage.read 把「key 确实不存在」单独标成 found:false（那是唯一可以当空处理的形态）')
+  assert(/return \{ ok: true, found: true, value: v \};/.test(storageSrc)
+    && /return \{ ok: false, found: false, value: null \};/.test(storageSrc),
+  'storage.read 的另外两支（读到了东西 / 读抛异常）各自可分辨')
+  {
+    const load = /function loadAll\(\) \{[\s\S]*?\n\}/.exec(idem)
+    assert(!!load, '取得到 loadAll 的函数体')
+    assert(/if \(!result\.ok\) return null/.test(load[0]), 'loadAll：读失败 → null（fail-closed）')
+    assert(/if \(!result\.found\) return \[\]/.test(load[0]), 'loadAll：key 确实不存在 → 空表（不许修过头，第一条还得能落盘）')
+    assert(/if \(!Array\.isArray\(result\.value\)\) return null/.test(load[0]),
+      'loadAll：读到了但不是这张表 → null（上一版折进 return [] ，于是三个写入口照样覆盖全表）')
+    assert(!/if \(!Array\.isArray\(raw\)\) return \[\]/.test(load[0]),
+      'loadAll 不得再把「读出来不是数组」当成「本机没有记录」')
+  }
   assert(!/storage\.get\(STORE_KEY, null\)[\s\S]{0,120}if \(!Array\.isArray\(raw\)\) return \[\]/.test(idem),
     'loadAll 不得再把"读不到"当成"本机没有记录"')
   for (const [fn, guard, why] of [

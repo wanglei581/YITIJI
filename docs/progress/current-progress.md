@@ -1,5 +1,84 @@
 # 当前开发进度
 
+2026-09-15 **R10：撤回 `f7486bbe2ed0124da68350aaba1c859f846522ce` 的 `SOURCE / LOCAL: GO`。**
+Grok 独立复审（session `76417146-b557-4787-9f0a-8e90a6e430f4`）在那个提交上复现出两条 P1，
+**两条我都在本机独立复现过**（先写测试、确认判红，再动实现）。锚点是 `f7486bbe2` 的直接
+子提交（本分支 tip），基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+本轮只改前端，`services/**` 一行未动。
+
+- **P1-1：R9 的归属绑定仍然可以被冒认，而且不需要任何生命周期回调。** R9 允许在
+  「本页自己那一发（发出时归属未定）的回调里、且页面仍然可见」时把当前身份认作开页那位，
+  理由写的是"那个身份是 request.js 为这一发补签回来的"。**页面无从知道这件事。**
+  它能读到的只有"回调这一刻本地是谁"，而 `auth.saveSession` 不需要任何生命周期回调 ——
+  另一个人在别处登录，回调读到的就是他。于是：过期开页（快照 / 开页账号 / 发起账号
+  三个全是空串）→ 请求在途 → B 静默登录（**不经过 onHide / onShow**）→ A 的 200 回来 →
+  回调把 B 认作开页那位 → `sameAccount('', 'u:B')` 一路放行 → A 的到机码画在 B 的屏幕上。
+  R9-A / R9-A4 当时都靠 onShow / onHide 驱动，所以一条都没照见这个形态；我在
+  "剩余风险"里把它写成了"按微信导航模型应当不可达"的**推理**，而那条推理是错的。
+  **改法：归属不再从"回调时读到谁"推断，改由服务端回答。** 只剩两条来源：
+    ① `onLoad` 的第一次判定（本页刚被导航打开，此刻确定登录着的那位就是它的主人）；
+    ② 一发**发出时就带着确定账号**的确认请求拿到 200（`_confirmOwner`）——
+       服务端的 requireOwned 是按发出这一发时的登录态校验归属的，而那是谁，
+       我们在发出**之前**就记进了令牌（`token.account` / `token.confirming`）。
+  发出时归属未定的那一发（`token.account === ''`）**永远不能建立归属、也不许写屏**：
+  它只负责把 request.js 的 401 静默补签触发出来，它的 200 什么都不证明。
+  归属只写成 `token.account`，**不是**回调时读到的那位；中途换过人由
+  `resolveAccountState`（快照非空时看得见 `'u:A' → 'u:B'`）先一步走 `'changed'` 清场。
+  别人（B）拿到的是服务端的 404 `PRINT_ORDER_NOT_FOUND`，按账号记进 `_ownerDeniedFor`，
+  不再拿同一个账号反复问（守卫落在**发请求那一处**，因为每次 onShow 都经过那里）。
+- **P1-2：`storage.read` 只把"抛异常"算读失败，其余非数组形态照旧覆盖全表。**
+  R9 加的 `read()` 把 `''`/`undefined` 和真实存储的 `null` 一起折成 `value: null`，
+  于是 `null` / `{}` / `'bad'` / `42` 全都落进 `loadAll` 的 `if (!Array.isArray(raw)) return []`
+  ——三个读-改-写回全量的入口照样以"空表"为基底写回去，盘上那条未落定的记录
+  （POST 可能已经到了服务端）被一次读异常抹掉，代价和读失败那一条一模一样。
+  **本机实测：`{}` 时三个入口一共发生 3 次 `setStorageSync`。**
+  改法：`read()` 返回 `{ok, found, value}` 三分 —— **只有 `ok && !found`（wx 在 key 不存在时
+  返回 `''`）才是"本机确实没有这一格"**，那是唯一可以当空表处理的形态；`loadAll` 相应
+  三分（读失败 → `null`；key 不存在 → `[]`；读到了但不是数组 → `null`）。
+  `f` 那一侧同时钉住：**key 确实不存在时照常铸键落盘**，不许修过头。
+
+**R9 的"归属存疑（粘性）"整个撤掉。** 它既没堵住 P1-1（binding 仍在回调里发生），
+又会把本人永久锁死（我当时把它登记成"已知遗留：一次误伤"）。现在那条路由确认请求覆盖：
+本人经一次确认请求恢复显示，别人拿到服务端 404。同时撤掉的还有 R9 那个
+"本页送用户去登录、回来第一次 onShow"的一次性绑定窗口 —— 它和回调里那个窗口是同一类
+错误，而且现在不需要它了。**门禁相应收紧为"onShow 永远不传绑定参数"。**
+
+改动文件（5 个，全部在小程序内）：`apps/miniapp/pages/print-pickup/print-pickup.js`、
+`apps/miniapp/utils/storage.js`、`apps/miniapp/utils/print-order-idempotency.js`、
+`apps/miniapp/scripts/tests/page-lifecycle.test.mjs`、`apps/miniapp/scripts/verify-miniapp-static.mjs`、
+`apps/miniapp/scripts/verify-package-chain.mjs`。`docs/graph/` 本轮无变化（重跑后一致）。
+
+测试：142 → **148 条全绿**。新增 R10-a～f 六条（正是 Grok 点名要的六条）：
+a) 过期开页 + 请求在途 + **无任何生命周期回调**切 B + A 的 200 → B 的 `codeRaw` 为空、
+`showQr=false`、整份 data 一个字节的码都没有；b) 被服务端拒过的账号记在账上、
+反复 onShow 不再刷服务端；c) 确认请求认下的是**发出时那个已知账号**（在途静默换人 →
+谁都不认、当场清场）；d) 旧响应不得解锁、也不得掀掉正在飞的那发确认请求；
+e) `null` / `{}` / `'bad'` / `42` × 三个写入口 → `setStorageSync` 调用次数为 **0**，
+原未落定记录恢复读取后仍在；f) key 确实不存在时照常铸键落盘。
+另有 5 条 R9 测试按新设计逐条改写（R9-A / A2 / A3 / A4 / B）——
+它们原来编码的是"存疑就永久 fail-closed / 零请求"，那套口径已被 R10 取代；
+**安全断言一条没少**（B 不得成为 opener、不得显示任何码、迟到响应不得写屏），
+变的是"之后怎么恢复"：从"永久锁死"变成"问服务端，本人能回来、别人被 404 拒掉"。
+
+反向变异 **16 条，全部按退出码判红**（还原用 sha256 逐文件比对确认逐字节一致，
+未用 `git checkout` / `reset`）。其中 `N1` 就是把 R9 那行推断式绑定原样放回去 —— 测试与
+门禁同时判红，证明这一轮真的堵上了它。第一轮 `N6`（`_confirmOwner` 不限定 ok/resignable）
+未红：它今天与"中途没换过人"互相覆盖（`'changed'` 会先一步截掉、`'unusable'` 会把快照
+清成 `''`），属于真冗余；但它是**契约**的一部分，押在另一条判据的当前写法上那边一改
+这边就静默放行，所以补了门禁锚点，之后判红。`N4`（不核"中途没换过人"）同理只有门禁红。
+
+本机独立复跑（全部退出码 0）：`node --test …/page-lifecycle.test.mjs`（148 pass / 0 fail）、
+`@ai-job-print/miniapp` 的 `verify:static`（整条链）/ `verify:package-chain` / `verify:api-contract`、
+`@ai-job-print/api verify:miniapp-cloud-print-m2`（**未改任何后端文件**，仍 ALL PASS）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` /
+`graph:check`（`pnpm graph` 重跑后无变化）、`git diff --check`。
+
+**证据边界：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。
+**本轮新增一条必须真机验的**：过期开页现在要走**两个来回**（触发补签的那一发 + 确认那一发）
+才出码，慢网下的观感没有真机数据；确认请求的 404 判据钉的是
+`statusCode === 404 && code === 'PRINT_ORDER_NOT_FOUND'` 这一对，真实网络上没触发过。
+
 2026-09-15 **R9 收口：取件页的 P0 —— 后来登录的那位会被记成「开页那位」，于是上一位的到机码
 画到了他的屏幕上。** 锚点是 `b2fa6bad1` 的直接子提交（本分支 tip），基线仍是
 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。本轮只改前端，

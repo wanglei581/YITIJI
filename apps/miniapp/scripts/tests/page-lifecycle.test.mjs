@@ -3891,9 +3891,9 @@ test('R9-A 取件页：开页时 JWT 已过期 → 请求在飞 → B 登录并 
 
   assert.notEqual(page._openerAccount, 'u:B',
     '后来登录的那位不得被记成开页那位 —— 这一页的 orderId 是 A 带进来的')
-  assert.equal(pending.length, 1, 'B 的登录态一个 getCloudPrintOrder 都不许发')
+  assert.equal(pending.length, 1, '已经有一发在飞，onShow 不叠第二发')
 
-  // A 的 200 现在才回来。服务端当时确实按 A 的归属校验放行了它 —— 但屏幕前的人已经不是 A。
+  // A 的 200 现在才回来。它**发出时归属未定**，所以什么都证明不了：一个字节都不许写屏。
   pending[0].resolve(PICKUP_ORDER)
   await flush()
 
@@ -3901,29 +3901,49 @@ test('R9-A 取件页：开页时 JWT 已过期 → 请求在飞 → B 登录并 
   assert.equal(page.data.showQr, false)
   assert.equal(page.data.expiresAt, 0, '有效期是码的派生物，一起清')
   assert.ok(!JSON.stringify(page.data).includes('12345678'), '整份 data 里一个字节的码都不许留')
+  assert.notEqual(page._openerAccount, 'u:B', '那一发的 200 更不许把 B 认成主人')
+
+  // R10 起，归属由**服务端**回答：本页改发一发"发出时就带着确定账号"的确认请求。
+  // 这一发用的是 B 的登录态去要 A 的 orderId —— 服务端 requireOwned 必然 404。
+  assert.equal(pending.length, 2, '认不出主人时不是猜，是去问服务端')
+  pending[1].reject(Object.assign(new Error('not found'), { statusCode: 404, code: 'PRINT_ORDER_NOT_FOUND' }))
+  await flush()
+
+  assert.equal(page._openerAccount, '', 'B 被服务端拒了，绝不能成为 opener')
+  assert.equal(page.data.codeRaw, '')
+  assert.equal(page.data.showQr, false)
   assert.equal(page.data.state, 'error')
-  assert.equal(page.data.errorAction, 'orders', '落点是「我的 · 打印订单」：那里会用当前这位的登录态重新列')
-  assert.equal(pending.length, 1, '迟到的响应也不许触发新一轮轮询')
+  assert.equal(page.data.errorAction, 'orders', 'B 的落点是「我的 · 打印订单」，不是「去登录」')
 })
 
-test('R9-A2 取件页：归属存疑之后旧的 _polling 不得锁死本页，原用户重新进入照样能取回', async () => {
+test('R9-A2 取件页：身份变化作废在途那一发并当场交还去重锁，原用户重新进入照样能取回', async () => {
   const wx = createWx()
-  const auth = useRealAuth(wx, 'A')
-  expireNaturally(wx)
+  const auth = useRealAuth(wx, 'A')          // A 正常登录着 → onLoad 当场认下 A
   const pending = []
   const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
   const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
   page.onLoad({ orderId: 'ord-A' })
-  assert.equal(pending.length, 1)
+  page.onReady()
+  assert.equal(page._openerAccount, 'u:A', '前提：开这一页的是 A')
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+  assert.equal(page.data.codeRaw, '12345678', '前提：A 的码确实画在屏幕上了')
+
+  // 一发轮询正在飞，此时真的换了人。
+  firePoll(page)
+  assert.equal(pending.length, 2, '前提：有一发 A 的请求正在飞')
+  assert.equal(page._polling, true)
 
   switchAccount('B')
   page.onShow()
+  assert.equal(page.data.codeRaw, '', '换人当场清码，不能等在飞的请求回来')
   assert.equal(page._polling, false,
     '那发请求已经不属于本页任何状态了，锁必须当场释放 —— 留着它，「重新加载」就是个按不动的按钮')
+  assert.equal(pending.length, 2, '开页那位是 A、当前是 B：这一格认得出来，一个请求都不该发')
 
-  pending[0].resolve(PICKUP_ORDER)
+  pending[1].resolve(PICKUP_ORDER)
   await flush()
-  assert.equal(page.data.codeRaw, '')
+  assert.equal(page.data.codeRaw, '', '迟到的响应不得把码写回来')
   assert.equal(page._polling, false, '迟到的响应不得把锁重新按下去')
 
   // 原来那位重新从「我的 · 打印订单」进来：新的一页实例，照常取回自己的码。
@@ -3940,7 +3960,7 @@ test('R9-A2 取件页：归属存疑之后旧的 _polling 不得锁死本页，�
   assert.equal(fresh.data.codeRaw, '12345678', 'A 自己的码照常取回（守卫不得把活人一起挡掉）')
 })
 
-test('R9-A3 取件页：开页时已过期、补签成功 —— 这一发的响应仍要写得进来，并把 A 绑成开页那位', async () => {
+test('R9-A3 取件页：开页时已过期、补签成功 —— 经一次确认请求后恢复显示，并认下 A', async () => {
   const wx = createWx()
   const auth = useRealAuth(wx, 'A')
   expireNaturally(wx)
@@ -3953,14 +3973,24 @@ test('R9-A3 取件页：开页时已过期、补签成功 —— 这一发的响
   assert.equal(page._openerAccount, '')
 
   // request.js 拿到 401 静默补签成功：写回**同一位 A** 的会话，然后重发拿到响应。
-  // 这是取件链最常见的一条路，不能被上面那条 fail-closed 误伤。
+  // 这是取件链最常见的一条路，不能被 fail-closed 误伤。
   realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
   pending[0].resolve(PICKUP_ORDER)
   await flush()
 
-  assert.equal(page.data.state, 'ready', '补签救回来的响应必须能写进来')
+  // 但**这一发**发出时归属未定，它的 200 证不了归属（页面无从知道服务端是按谁放行的）。
+  assert.equal(page.data.codeRaw, '', '发出时归属未定的那一发不许直接写屏')
+  assert.equal(page._openerAccount, '', '这一刻这一页还没有人认领')
+  assert.equal(pending.length, 2, '改发一发"发出时就带着确定账号"的确认请求')
+
+  // 服务端按 A 的归属放行了确认请求 —— 到这里归属才算证出来。
+  pending[1].resolve(PICKUP_ORDER)
+  await flush()
+
+  assert.equal(page._openerAccount, 'u:A', '服务端确认过了，这一页属于 A')
+  assert.equal(page.data.state, 'ready', '补签救回来的这条链必须最终能显示（不得永久 fail-closed）')
   assert.equal(page.data.codeRaw, '12345678')
-  assert.equal(page._openerAccount, 'u:A', '这一发是本页自己打出去的，补签回来的那位就是它的主人')
+  assert.equal(page.data.showQr, true)
 })
 
 test('R9-B 取件页 _ownsResponse：ok 与 resignable 都要核发起账号 / 开页账号 / 当前账号 / 代次', async () => {
@@ -4019,11 +4049,12 @@ test('R9-B 取件页 _ownsResponse：ok 与 resignable 都要核发起账号 / �
   assert.equal(page._ownsResponse('ok', tok('u:A', 'u:A')), false,
     '开页那位从来没被绑定过，就证不出这一页属于谁（哪怕当前这位是个确定的会员）')
 
-  // 归属存疑是**粘性**的：一旦本页认不出主人，之后哪条响应都不许写屏。
+  // 服务端已经拒绝为这个账号确认过归属：之后哪条响应都不许写屏。
   page._openerAccount = 'u:A'
   page._account = 'u:A'
-  page._ownerAmbiguous = true
-  assert.equal(page._ownsResponse('ok', tok('u:A', 'u:A')), false, '存疑之后一律 fail-closed')
+  page._ownerDeniedFor = 'u:A'
+  assert.equal(page._ownsResponse('ok', tok('u:A', 'u:A')), false,
+    '服务端说过这张订单不是他的，本页不得再替他显示')
 })
 
 test('R9-B2 取件页 _settleRequest：迟到的那一发不得解锁、更不得掀掉另一发新请求的锁', async () => {
@@ -4072,19 +4103,23 @@ test('R9-A4 取件页：切后台期间别人登录 —— 迟到的回调不得
   assert.equal(page._openerAccount, '')
 
   // 用户切走（去别的页 / 被系统切走），这段时间里 B 登录了，然后 A 的响应才回来。
-  // 页面不可见，"这个身份是 request.js 为本页这一发补签回来的"这个因果**不成立**。
   page.onHide()
   switchAccount('B')
   pending[0].resolve(PICKUP_ORDER)
   await flush()
 
   assert.notEqual(page._openerAccount, 'u:B',
-    '切后台期间发生的登录与本页无关，不得被认作这一页的主人')
+    '切后台期间发生的登录与本页无关，更不得被这一发的 200 认作主人')
   assert.equal(page.data.codeRaw, '', '不可见时更不该把码写进去')
+  assert.equal(pending.length, 1, '页面不可见时不追确认请求（等回到前台再问）')
 
-  // 回到前台：本页认不出主人，必须 fail-closed，而且**一个 B 的请求都不发**。
+  // 回到前台：本页认不出主人，于是拿**当前这个确定账号**去问服务端 —— 由它拒绝。
   page.onShow()
-  assert.equal(pending.length, 1, '不得拿 B 的登录态去要 A 的那张订单')
+  assert.equal(pending.length, 2, '回到前台才去问服务端')
+  pending[1].reject(Object.assign(new Error('not found'), { statusCode: 404, code: 'PRINT_ORDER_NOT_FOUND' }))
+  await flush()
+
+  assert.equal(page._openerAccount, '', 'B 不得成为 opener')
   assert.equal(page.data.codeRaw, '')
   assert.equal(page.data.state, 'error')
   assert.equal(page.data.errorAction, 'orders')
@@ -4159,4 +4194,195 @@ test('R9-D 幂等记录：本机读失败时不得以"空"为基底写回去（�
   // 读恢复之后一切照常：这不是一条死路。
   const reuse = await idem.ensureKey('u:A', print)
   assert.equal(reuse.key, flying.key, '存储恢复后必须复用同一个键，而不是铸一个新的')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// R10. 归属**由服务端认**，不由"回调时读到谁"推断。
+//
+// R9 允许在"本页自己那一发（发出时归属未定）的回调里、页面仍然可见"时把当前身份
+// 认作开页那位，理由是"那是 request.js 为这一发补签回来的"。页面**无从知道**这件事：
+// `auth.saveSession` 不需要任何生命周期回调，于是在途期间静默登录进来的另一位
+// 会被原样读成"补签回来的本人"。R9-A / R9-A4 当时都靠 onShow / onHide 触发，
+// 所以一条都没照见这个形态。
+//
+// R10 的判据换成一条页面**证得出来**的事实：这一发是带着**哪个已知账号**发出去的，
+// 服务端的 requireOwned 又是否放行了它。发出时归属未定的那一发只负责触发补签，
+// 它的 200 什么都不证明。代价是"过期开页"多一个来回，换掉的是 R9 那条永久 fail-closed。
+// ══════════════════════════════════════════════════════════════════════
+
+/** 服务端 requireOwned 判定"这张订单不是这位的"时的那一对错误码。 */
+const notOwnedError = () => Object.assign(new Error('not found'), {
+  statusCode: 404, code: 'PRINT_ORDER_NOT_FOUND',
+})
+
+test('R10-a 无任何生命周期回调：B 静默登录后 A 的 200 回来，码不得画给 B', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onReady()
+  assert.equal(pending.length, 1)
+  assert.equal(page._openerAccount, '')
+
+  // **一个生命周期回调都不触发** —— 真机上 request.js 的补签就是这么写会话的，
+  // 另一个人在别处登录同样只是一次 auth.saveSession。页面看不到 onHide / onShow。
+  switchAccount('B')
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+
+  assert.notEqual(page._openerAccount, 'u:B', 'B 不得成为 opener（R9 在这里会认下 B）')
+  assert.equal(page.data.codeRaw, '', 'A 的码不得画给 B')
+  assert.equal(page.data.showQr, false)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+
+  // 改问服务端。这一发带的是 B 的登录态、要的是 A 的 orderId → requireOwned 404。
+  assert.equal(pending.length, 2)
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.equal(page._openerAccount, '', '服务端拒绝之后更不能认下 B')
+  assert.equal(page.data.codeRaw, '')
+  assert.equal(page.data.state, 'error')
+  assert.equal(page.data.errorAction, 'orders')
+})
+
+test('R10-b 被服务端拒过的那个账号：记在账上，不许拿它反复刷服务端', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  switchAccount('B')
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+  pending[1].reject(notOwnedError())
+  await flush()
+  assert.equal(page._ownerDeniedFor, 'u:B', '拒的是**哪个账号**要记下来')
+  assert.equal(pending.length, 2)
+
+  // 同一位 B 反复回到本页：不得每次都去问一遍服务端。
+  page.onShow()
+  page.onShow()
+  assert.equal(pending.length, 2, '同一个账号已经被拒过，不再反复问')
+  assert.equal(page.data.codeRaw, '')
+  assert.equal(page.data.state, 'error')
+  assert.equal(page.data.errorAction, 'orders')
+})
+
+test('R10-c 确认请求认下的是**发出时那个已知账号**，不是回调时读到的那位', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onReady()
+
+  // 补签回来的是 A，于是本页发出一发**带着 u:A** 的确认请求。
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+  assert.equal(pending.length, 2, '前提：确认请求已经发出去了')
+  assert.equal(page._inflight.account, 'u:A', '前提：它带的是 A')
+  assert.equal(page._inflight.confirming, true)
+
+  // 就在这一发飞着的时候，B **静默**登录（没有任何生命周期回调）。
+  switchAccount('B')
+  pending[1].resolve(PICKUP_ORDER)
+  await flush()
+
+  // 这一跳快照非空（'u:A' → 'u:B'），账号状态机看得见 —— 必须当场清场，谁都不认。
+  assert.equal(page._openerAccount, '', '既不许认 A（中途换过人），更不许认 B')
+  assert.equal(page.data.codeRaw, '')
+  assert.equal(page.data.showQr, false)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R10-d 旧响应不得解锁、也不得掀掉正在飞的那发确认请求', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  page.onReady()
+  const staleToken = page._inflight           // 第一发（归属未定）那一发的令牌
+
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+  const confirmToken = page._inflight
+  assert.ok(confirmToken && confirmToken !== staleToken, '前提：确认请求是另一个令牌')
+  assert.equal(page._polling, true, '前提：确认请求正在飞')
+
+  // 第一发的回调再回来一次（真机上不会，但判据必须站得住）：不许解锁、不许换令牌。
+  assert.equal(page._settleRequest(staleToken), false, '旧令牌不属于当前这一轮')
+  assert.equal(page._polling, true, '那把锁此刻锁的是确认请求，旧响应一个字段都不许碰')
+  assert.equal(page._inflight, confirmToken)
+
+  // onShow 也不许在确认请求飞着的时候叠第二发。
+  page.onShow()
+  assert.equal(pending.length, 2, '在飞时不重复问服务端')
+
+  // 确认请求自己回来：照常认下 A 并显示。
+  pending[1].resolve(PICKUP_ORDER)
+  await flush()
+  assert.equal(page._openerAccount, 'u:A')
+  assert.equal(page.data.codeRaw, '12345678')
+})
+
+test('R10-e 本机存储读出来不是这张表：三个写入口一个字节都不许写', async () => {
+  // null / {} / 字符串 / 数字：**都不是**"本机没有记录"的证据。上一版把它们和
+  // "key 不存在"一起折进 `return []`，于是三个读-改-写回全量的入口照样写回去，
+  // 盘上那条未落定的记录（POST 可能已经到了服务端）被一次读异常抹掉。
+  for (const corrupt of [null, {}, 'bad', 42]) {
+    const label = JSON.stringify(corrupt)
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const idem = freshIdem()
+    const print = idem.fingerprintOf(PAY_PAYLOAD)
+    const flying = await idem.ensureKey('u:A', print)
+    assert.ok(flying.key, `${label}: 前提是键落住了`)
+
+    let writes = 0
+    const realSet = wx.setStorageSync
+    const realGet = wx.getStorageSync
+    wx.setStorageSync = (k, v) => { writes += 1; realSet(k, v) }
+    wx.getStorageSync = (k) => (k === idem.STORE_KEY ? corrupt : realGet(k))
+
+    await assert.rejects(() => idem.ensureKey('u:A', 'other-fp'), /读不到|没能保存/, `${label}: ensureKey 必须拒绝`)
+    assert.equal(idem.rememberOrderId('u:A', 'other-fp', fakeKey(9), 'ord-x'), null, `${label}: rememberOrderId 必须返回 null`)
+    assert.equal(idem.clearRecord('u:A', 'other-fp'), false, `${label}: clearRecord 必须返回 false`)
+    assert.equal(writes, 0, `${label}: 读出来不是这张表时，一个 setStorageSync 都不许发生`)
+
+    wx.setStorageSync = realSet
+    wx.getStorageSync = realGet
+    const still = idem.findRecord('u:A', print)
+    assert.ok(still && still.key === flying.key, `${label}: 原来那条未落定记录必须还在`)
+  }
+})
+
+test('R10-f 本机确实没有这张表（key 不存在）：照常铸键落盘，不许修过头', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  assert.equal(wx.storage.has(idem.STORE_KEY), false, '前提：这一格本来就不存在')
+
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  const record = await idem.ensureKey('u:A', print)
+  assert.ok(record && idem.KEY_RE.test(record.key), 'key 不存在是一个确定的答案：本机确实没有记录')
+  const rows = wx.storage.get(idem.STORE_KEY)
+  assert.ok(Array.isArray(rows) && rows.length === 1, '第一条记录必须真的落盘')
+  assert.equal(idem.findRecord('u:A', print).key, record.key, '再读一次必须还是同一个键')
+
+  // 落定之后照常能写 orderId、也照常能清掉 —— 整条链不因这次收紧而僵住。
+  assert.ok(idem.rememberOrderId('u:A', print, record.key, 'ord-1'))
+  assert.equal(idem.clearRecord('u:A', print), true)
+  assert.equal(idem.findRecord('u:A', print), null)
 })

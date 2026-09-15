@@ -1194,19 +1194,15 @@ const PACKAGE_CHAIN_PAGES = [
     // 去重本身要留着：判完身份之后仍然不该对同一格重复打请求。
     if (pollingIdx < 0) misses.push('在飞去重没了（同一格会被重复打请求）')
   }
-  // onShow 必须真的走这条路，不能自己另判一套。
-  if (!/onShow\(\) \{[\s\S]{0,600}this\._refreshOrder\(false, handoff\)/.test(bare)) {
+  if (!/onShow\(\) \{[\s\S]{0,700}this\._refreshOrder\(false\)/.test(bare)) {
     misses.push('onShow 没有走 _refreshOrder（那是唯一一处"先判身份"的入口）')
   }
-  // R9：onShow 传进去的 bindOwner **只能**是那个一次性的登录回程标记，而且它必须
-  // 在读完的同一句里被撤掉、并要求此刻没有请求在飞。写成常量 true 就等于把
-  // "谁现在登录着谁就是这一页的主人"重新放了回来（那正是 R9-A 的缺口）。
-  if (!/const handoff = this\._loginHandoff === true && !this\._polling/.test(bare)
-    || !/this\._loginHandoff = false/.test(bare)) {
-    misses.push('onShow 的归属绑定窗口不是一次性的（或没有要求此刻没有请求在飞）')
-  }
-  if (/this\._refreshOrder\(false, true\)/.test(bare)) {
-    misses.push('onShow 无条件允许绑定开页那位（后来登录的那位会被认成这一页的主人）')
+  // R10 收紧：**onShow 永远不绑定开页那位**。R9 曾在这里开过一个「本页自己送用户去
+  // 登录、回来第一次 onShow」的一次性窗口；它和回调里那个窗口是同一类错误 ——
+  // 都在拿「这一刻本地是谁」当「这一页该属于谁」。现在归属只有两条来源：onLoad，
+  // 以及一发确认请求的 200。传任何第二个实参进来都算把口子重开。
+  if (/this\._refreshOrder\(false, [^)]/.test(bare)) {
+    misses.push('onShow 又给 _refreshOrder 传了绑定参数（谁现在登录着谁就是主人 = R9-A 的缺口）')
   }
   if (!misses.length) ok('取件页每一次 onShow 都先判身份再决定发不发请求（在途请求不得把清场推迟到网络之后）')
   else bad('取件页在途暴露窗口', misses.join('；'))
@@ -1242,7 +1238,9 @@ const PACKAGE_CHAIN_PAGES = [
       misses.push("只有 'ok' / 'resignable' 是放行路径（'changed' / 'unusable' 一律 fail-closed）")
     }
     if (!/token\.epoch !== this\._requestEpoch/.test(owns)) misses.push('没有核请求代次（身份一变，在途那一发就该作废）')
-    if (!/this\._ownerAmbiguous/.test(owns)) misses.push('归属存疑时没有 fail-closed')
+    if (!/this\._ownerDeniedFor && this\._ownerDeniedFor === account/.test(owns)) {
+      misses.push('服务端已经拒绝过的那个账号仍然可能被放行')
+    }
     if (!/isMemberIdentity\(account\)/.test(owns)) misses.push('没有要求快照仍是一个确定的会员键')
     if (!/\n\s*if \(account !== this\._openerAccount\) return false/.test(owns)) {
       // 必须是**无条件**的那一行。写成 `if (this._openerAccount && account !== ...)`
@@ -1254,8 +1252,13 @@ const PACKAGE_CHAIN_PAGES = [
   }
   // 发起那一刻的账号 / 开页账号 / 代次必须**绑在令牌上**：回调时再读一次，读到的可能是
   // 被 clearSession 清空的会话，也可能是在途期间刚登录进来的另一位。
-  if (!/const token = \{ account: this\._account, opener: this\._openerAccount, epoch: this\._requestEpoch \}/.test(bare)) {
-    misses.push('没有在发请求前把发起账号 / 开页账号 / 代次一起绑进令牌')
+  if (!/const token = \{\s*\n\s*account: this\._account,\s*\n\s*opener: this\._openerAccount,\s*\n\s*epoch: this\._requestEpoch,\s*\n\s*confirming,\s*\n\s*\}/.test(bare)) {
+    misses.push('没有在发请求前把发起账号 / 开页账号 / 代次 / 是否确认请求一起绑进令牌')
+  }
+  // R10：`confirming` 必须在**发请求之前**算出来，判据是「本页还没有主人，而此刻本地
+  // 有一个确定账号」。只有这种请求的 200 配建立归属。
+  if (!/const confirming = !this\._openerAccount && isMemberIdentity\(this\._account\)/.test(bare)) {
+    misses.push('没有在发请求前判定这一发是不是「带着已知账号去确认归属」的那一发')
   }
   const refresh = methodBody(bare, '_refreshOrder')
   if (refresh && refresh.indexOf('const token = {') > refresh.indexOf('api.getCloudPrintOrder(')) {
@@ -1286,26 +1289,63 @@ const PACKAGE_CHAIN_PAGES = [
   // 别人登录同样会被认作这一页的主人。
   if (!/this\._refreshOrder\(true, true\)/.test(bare)) misses.push('onLoad 没有作为绑定开页那位的那一刻')
   {
-    // then 与 catch **两个**回调各有一处，必须逐处都带 `this._visible`。只钉「存在」的话，
-    // 改坏其中一个、另一个照样让这条门禁绿着 —— 而改坏的那个就是「用户切走期间
-    // 别人登录，回来时这一页已经认了新主人」的入口。
-    const bound = (bare.match(/this\._resolveIdentity\(token\.opener === '' && this\._visible\)/g) || []).length
-    const anyToken = (bare.match(/this\._resolveIdentity\(token\.opener === ''/g) || []).length
-    if (bound !== 2 || anyToken !== bound) {
-      misses.push('回调里的绑定窗口没有逐处要求「发出时归属未定」与「页面仍然可见」（带 _visible 的 '
-        + bound + ' 处 / 共 ' + anyToken + ' 处，应为 2/2）')
+    // R10：**两个回调都不许再从「回调时读到谁」推断归属**。R9 在这里传
+    // `token.opener === '' && this._visible`，等于允许回调自己认主人 —— 而页面无从
+    // 知道服务端是按谁放行的（`auth.saveSession` 不需要任何生命周期回调，另一个人
+    // 在别处登录，回调读到的就是他）。
+    const inferring = (bare.match(/this\._resolveIdentity\(token\./g) || []).length
+    if (inferring > 0) {
+      misses.push('回调仍在用令牌/可见性推断归属（' + inferring + ' 处）—— 归属只能由 onLoad 或服务端确认建立')
+    }
+    const plain = (bare.match(/const state = this\._resolveIdentity\(false\)/g) || []).length
+    if (plain !== 2) {
+      misses.push('then / catch 两个回调没有各自以「不绑定」的方式重判身份（' + plain + ' 处，应为 2）')
     }
   }
   if (!/isMemberIdentity\(resolved\.account\) && !this\._openerAccount && bindOwner === true/.test(bare)) {
     misses.push('_resolveIdentity 又变回"看见一个确定身份就认作开页那位"')
   }
-  if (!/if \(isMemberIdentity\(resolved\.account\) && !this\._openerAccount && !this\._ownerAmbiguous\) \{\s*\n\s*this\._ownerAmbiguous = true\s*\n\s*this\._invalidateInflight\(\)/.test(bare)) {
-    misses.push('认不出主人时没有标成归属存疑并作废在途那一发（只留一行赋值不算，它可能根本到不了）')
+  // R10：发出时归属未定的那一发，它的 200 什么都不证明 —— 不许写屏，只能改问服务端。
+  if (!/if \(!token\.confirming && !this\._openerAccount\) \{ this\._requestOwnerConfirmation\(\); return \}/.test(bare)) {
+    misses.push('发出时归属未定的那一发仍然可能直接写屏（它的 200 证不了归属）')
+  }
+  if (!/if \(token\.confirming && !this\._confirmOwner\(state, token\)\) return/.test(bare)) {
+    misses.push('确认请求的 200 没有走 _confirmOwner（那是 onLoad 之外唯一能建立归属的路）')
+  }
+  {
+    // 归属只许写成**发出这一发时记下的那个账号**，不许写成回调时读到的那位。
+    const confirm = methodBody(bare, '_confirmOwner')
+    if (!/this\._openerAccount = token\.account/.test(confirm)) {
+      misses.push('_confirmOwner 没有把归属写成令牌上那个已知账号')
+    }
+    if (/this\._openerAccount = (resolved|this\._account)/.test(confirm)) {
+      misses.push('_confirmOwner 把归属写成了回调时读到的那位（正是 R9 栽的那一跤）')
+    }
+    if (!/this\._account !== token\.account/.test(confirm)) {
+      misses.push('_confirmOwner 没有核对「这中间没换过人」')
+    }
+    if (!/isMemberIdentity\(token\.account\)/.test(confirm)) {
+      misses.push('_confirmOwner 没有要求令牌上那个账号本身是确定的会员键')
+    }
+    // 这一条今天与「中途没换过人」互相覆盖（'changed' 会先一步在 _resolveIdentity 里
+    // 截掉，'unusable' 会把快照清成 ''）—— 但它是**契约**的一部分：认归属只在两种
+    // 说得清的状态下发生。押在另一条判据的当前写法上，那边一改这边就静默放行。
+    if (!/state !== 'ok' && state !== 'resignable'/.test(confirm)) {
+      misses.push('_confirmOwner 没有限定只在 ok / resignable 两种状态下认归属')
+    }
+  }
+  // 服务端明确拒绝（requireOwned 404）必须记在**账号**上，并且守卫落在发请求那一处 ——
+  // 每一次 onShow 都会经过那里，只守触发确认的那条路等于「回来一次刷一次服务端」。
+  if (!/token\.confirming && err && err\.statusCode === 404 && err\.code === 'PRINT_ORDER_NOT_FOUND'/.test(bare)) {
+    misses.push('确认请求被服务端拒绝时没有按 requireOwned 的 404 分流')
+  }
+  if (!/if \(confirming && this\._ownerDeniedFor === this\._account\) \{ this\._denyOwner\(this\._account\); return \}/.test(bare)) {
+    misses.push('被拒过的账号仍会在下一次 onShow 再问一遍服务端')
   }
   // 反面锚：401 与"真的换了人"两条 fail-closed 一个都不许被这次放宽带松。
   if (!/if \(err && err\.statusCode === 401\)/.test(bare)) misses.push('401 的清码分支没了')
-  if (!/if \(this\._ownerAmbiguous \|\| foreign \|\| resolved\.state === 'changed'\)/.test(bare)) {
-    misses.push('换人 / 登出 / 归属存疑的清场分支没了')
+  if (!/if \(foreign \|\| resolved\.state === 'changed'\)/.test(bare)) {
+    misses.push('换人 / 登出的清场分支没了')
   }
   if (!misses.length) ok("取件页：归属在请求发出前就绑定，'ok' 与 'resignable' 同一组判据 + 代次，其余 fail-closed")
   else bad('取件页不得把本人的有效码当成过期清掉，也不得把它画给一个认不出的会话', misses.join('；'))
@@ -1336,7 +1376,9 @@ const PACKAGE_CHAIN_PAGES = [
       if (!/this\.data\.codeRaw !== code/.test(after)) misses.push('回调里没有重认这张码还是不是当时那张')
       if (!/this\._openerAccount !== owner/.test(after)) misses.push('回调里没有重认归属')
       if (!/this\._requestEpoch !== epoch/.test(after)) misses.push('回调里没有重认请求代次')
-      if (!/this\._ownerAmbiguous \|\| this\._foreignBlocked/.test(after)) misses.push('归属存疑 / 已换人时仍然会画')
+      if (!/!this\._openerAccount \|\| this\._foreignBlocked/.test(after)) {
+        misses.push('这一页还没人认领 / 已换人时仍然会画')
+      }
       // 三道守卫必须排在**任何一次 setData 之前**：先写 'error' 再判等于已经改写了
       // 当前这张码的状态（把一张好码说成画不出来）。
       const guardEnd = after.indexOf('const target = result')

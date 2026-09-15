@@ -50,14 +50,25 @@ function get(key, fallback = null) {
  *
  * 所以这类调用方必须用本函数,并在 ok === false 时 fail-closed(什么都不写)。
  *
- * @returns {{ok: boolean, value: any}} ok=false 表示这一次根本没读到,value 无意义
+ * **`found` 与 `ok` 是两件事,必须分开。** 只有 `ok && !found`(wx 在 key 不存在时返回
+ * `''`,部分实现返回 `undefined`)才是一个确定的答案:本机确实没有这一格,调用方可以
+ * 放心地把它当成空集合、照常写第一条。其余一切形态——读抛异常、或者读出来是 `null` /
+ * 对象 / 字符串 / 数字——都**证明不了本机没有记录**:调用方拿它当空集合去写回全量,
+ * 盘上真实存在的记录就会被这一次"看起来是空"的读抹掉。
+ * 上一版把 `''`/`undefined` 和真实存储的 `null` 一起折成 `value: null`,两者就此不可分。
+ *
+ * @returns {{ok: boolean, found: boolean, value: any}}
+ *   ok=false  这一次根本没读到(抛异常),value/found 无意义;
+ *   found=false 本机确实没有这一格(唯一可以当"空"处理的形态);
+ *   found=true  读到了东西,形状对不对由调用方按自己的 schema 判断。
  */
 function read(key) {
   try {
     const v = wx.getStorageSync(key);
-    return { ok: true, value: v === '' || v === undefined ? null : v };
+    if (v === '' || v === undefined) return { ok: true, found: false, value: null };
+    return { ok: true, found: true, value: v };
   } catch (e) {
-    return { ok: false, value: null };
+    return { ok: false, found: false, value: null };
   }
 }
 
