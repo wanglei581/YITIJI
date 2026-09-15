@@ -173,7 +173,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     icon: ScanLineIcon,
     title: '材料扫描',
     description: '纸质材料扫描后按设备回传格式保存，可打印、可做简历识别',
-    to: '/scan/start',
+    to: '/scan',
     aiRole: 'ai',
     needsMfp: true,
     available: true,

@@ -238,8 +238,10 @@ assert.match(
 )
 assert.match(
   withoutComments(privacyGuard),
-  /clearKioskSensitiveSession\(\)/,
-  'KioskPrivacyGuard must clear sensitive session through the unified helper',
+  // The outgoing member token has to travel with the clear: the server-side scan task is
+  // cancelled by endUserId, so a no-arg clear leaves the previous user's task alive.
+  /clearKioskSensitiveSession\(getToken\(\)\)/,
+  'KioskPrivacyGuard must clear sensitive session through the unified helper with the outgoing token',
 )
 assert.match(
   withoutComments(privacyGuard),

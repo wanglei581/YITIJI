@@ -33,6 +33,34 @@ export interface ScanInputHealth {
   readonly reason: ScanInputHealthReason
 }
 
+/** Heartbeat-safe runtime state. No member may contain local or user data. */
+export type ScanInputRuntimeHealth = 'healthy' | 'locked_out' | 'unknown'
+export type ScanInputRequiredAction = 'none' | 'restart_required'
+export type ScanInputLockoutReason =
+  | 'not_configured'
+  | 'reparse_point_unverifiable'
+  | 'reparse_point'
+  | 'not_directory'
+  | 'unavailable'
+  | 'not_readable'
+  | 'watcher_rebuild'
+  | 'watcher_error'
+  | 'identity_unavailable'
+  | 'root_identity_changed'
+  | 'readdir_failed'
+  | 'watcher_ready_failed'
+  | 'startup_backlog_failed'
+  | 'startup_incomplete'
+  | 'unknown'
+
+export interface ScanInputRuntimeTelemetry {
+  readonly health: ScanInputRuntimeHealth
+  readonly requiredAction: ScanInputRequiredAction
+  readonly reason: ScanInputLockoutReason | null
+  /** First observation of the current latched state; repeated heartbeats do not move it. */
+  readonly observedAt: string
+}
+
 /** lstat-derived node shape supplied by a caller without triggering further IO. */
 export type ScanInputCandidateNodeKind = 'file' | 'directory' | 'symbolic_link' | 'other'
 
@@ -141,6 +169,10 @@ export interface HeartbeatPayload {
   wiredNetworkStatus?: 'connected' | 'disconnected' | 'unknown'
   /** TCP reachability of a configured Windows network-printer port, when discoverable. */
   printerNetworkStatus?: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown'
+  scanInputHealth?: ScanInputRuntimeHealth
+  scanInputAction?: ScanInputRequiredAction
+  scanInputReason?: ScanInputLockoutReason | null
+  scanInputObservedAt?: string
 }
 
 export interface HeartbeatResponse {

@@ -1,10 +1,22 @@
 import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcdef'
+process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-tasks-admin-secret'
+process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-tasks-action-secret'
 
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
+import {
+  closeSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -12,6 +24,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { Prisma } from '../src/generated/prisma/client'
 import { createPrismaClient, dbKindOf } from '../src/prisma/create-client'
@@ -19,6 +32,10 @@ import { ScanTaskReaperTask } from '../src/scan-tasks/scan-task-reaper.task'
 import {
   ScanTasksService,
   SCAN_CONTENT_DEDUP_WINDOW_MS,
+  SCAN_MAX_FUTURE_OBSERVATION_MS,
+  SCAN_RETRY_AUTHORITY_TTL_MS,
+  SCAN_STALE_CAPTURE_TOLERANCE_MS,
+  SCAN_UNACKED_WAITING_GRACE_MS,
 } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
 // B1-11 follow-up：真实 DB 端到端跑一遍 deliverScanFile() 的内容级去重护栏，需要真实
@@ -27,6 +44,12 @@ import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.d
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
+import {
+  runScanLeaseContractTests,
+  runUnackedLeaseContractCase,
+  runDeliverWithoutAckNegativeCase,
+  runDeliverCasAckExpiryRaceCase,
+} from './scan-lease-contract.helper'
 
 function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): void {
   execFileSync(
@@ -44,6 +67,592 @@ function ensureSqliteFile(dbPath: string): void {
   closeSync(openSync(dbPath, 'a'))
 }
 
+const RETRY_HARDENING_MIGRATION = '20260913223000_harden_scan_retry_authority'
+const RETRY_HARDENING_PREVIOUS_MIGRATION = '20260913210000_add_scan_input_lockout_telemetry'
+const DELIVERY_ACK_MIGRATION = '20260914120000_add_scan_task_delivery_ack'
+
+function runPrismaExpectFailure(
+  apiRoot: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  label: string
+): void {
+  let failed = false
+  try {
+    runPrisma(apiRoot, args, env)
+  } catch {
+    failed = true
+  }
+  assert.equal(failed, true, `${label}: duplicate-data migration must fail`)
+}
+
+function createMigrationSandbox(
+  apiRoot: string,
+  sourceMigrationsRoot: string,
+  schemaPath: string,
+  provider: 'sqlite' | 'postgresql'
+): { root: string; migrationsRoot: string; configPath: string } {
+  const root = mkdtempSync(path.join(tmpdir(), `verify-scan-retry-upgrade-${provider}-`))
+  const migrationsRoot = path.join(root, 'migrations')
+  mkdirSync(migrationsRoot)
+  for (const entry of readdirSync(sourceMigrationsRoot, { withFileTypes: true })) {
+    if (entry.name === RETRY_HARDENING_MIGRATION || entry.name === DELIVERY_ACK_MIGRATION) continue
+    cpSync(path.join(sourceMigrationsRoot, entry.name), path.join(migrationsRoot, entry.name), {
+      recursive: entry.isDirectory(),
+    })
+  }
+  const configPath = path.join(root, 'prisma.config.ts')
+  const prismaConfigModule = path.join(apiRoot, 'node_modules', 'prisma', 'config.js')
+  writeFileSync(
+    configPath,
+    `import { defineConfig } from ${JSON.stringify(prismaConfigModule)};\n` +
+      `export default defineConfig({ schema: ${JSON.stringify(schemaPath)}, migrations: { path: ${JSON.stringify(migrationsRoot)} }, datasource: { url: process.env[${JSON.stringify(provider === 'postgresql' ? 'POSTGRES_URL' : 'DATABASE_URL')}] } });\n`
+  )
+  return { root, migrationsRoot, configPath }
+}
+
+function addHardeningMigrationToSandbox(
+  sourceMigrationsRoot: string,
+  migrationsRoot: string
+): void {
+  cpSync(
+    path.join(sourceMigrationsRoot, RETRY_HARDENING_MIGRATION),
+    path.join(migrationsRoot, RETRY_HARDENING_MIGRATION),
+    { recursive: true }
+  )
+}
+
+function stripSqlComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, '\n').replace(/--[^\n]*/g, '')
+}
+
+function stripTypeScriptComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '\n').replace(/\/\/[^\n]*/g, '')
+}
+
+function assertRetryHardeningMigrationSql(
+  sql: string,
+  dialect: 'sqlite' | 'postgres',
+  label: string
+): void {
+  const body = stripSqlComments(sql)
+  const ddlMatch = body.match(/\b(?:ALTER|DROP|CREATE)\b/i)
+  assert.ok(ddlMatch && ddlMatch.index !== undefined, `${label}: hardening migration must contain DDL`)
+  const prefix = body.slice(0, ddlMatch.index)
+  assert.match(
+    prefix,
+    /retryOfScanTaskId/,
+    `${label}: duplicate-lineage preflight must inspect retryOfScanTaskId before any DDL`
+  )
+  assert.match(
+    prefix,
+    /retryConsumedByScanTaskId/,
+    `${label}: duplicate-lineage preflight must inspect retryConsumedByScanTaskId before any DDL`
+  )
+  assert.match(
+    prefix,
+    /HAVING\s+COUNT\s*\(\s*\*\s*\)\s*>\s*1/i,
+    `${label}: duplicate-lineage preflight must abort on grouped duplicates before any DDL`
+  )
+  if (dialect === 'sqlite') {
+    assert.match(
+      prefix,
+      /THEN\s+abs\s*\(\s*-9223372036854775808\s*\)/i,
+      `${label}: SQLite preflight must abort via integer overflow before any DDL`
+    )
+  } else {
+    assert.match(
+      prefix,
+      /RAISE\s+EXCEPTION\s+'SCAN_RETRY_LINEAGE_DUPLICATES'/i,
+      `${label}: PostgreSQL preflight must RAISE SCAN_RETRY_LINEAGE_DUPLICATES before any DDL`
+    )
+  }
+  assert.match(
+    body.slice(ddlMatch.index),
+    /^\s*ALTER\s+TABLE\s+"ScanTask"\s+ADD\s+COLUMN\s+"retryAuthorityExpiresAt"/i,
+    `${label}: first DDL after preflight must add retryAuthorityExpiresAt`
+  )
+  assert.match(
+    body,
+    /CREATE UNIQUE INDEX "ScanTask_retryOfScanTaskId_key"[\s\S]*?WHERE "retryOfScanTaskId" IS NOT NULL/,
+    `${label}: retryOfScanTaskId must be a partial unique index`
+  )
+  assert.match(
+    body,
+    /CREATE UNIQUE INDEX "ScanTask_retryConsumedByScanTaskId_key"[\s\S]*?WHERE "retryConsumedByScanTaskId" IS NOT NULL/,
+    `${label}: retryConsumedByScanTaskId must be a partial unique index`
+  )
+}
+
+function assertRetryHardeningMigrationContracts(apiRoot: string): void {
+  assertRetryHardeningMigrationSql(
+    readFileSync(
+      path.join(apiRoot, 'prisma', 'migrations', RETRY_HARDENING_MIGRATION, 'migration.sql'),
+      'utf8'
+    ),
+    'sqlite',
+    'SQLite harden_scan_retry_authority'
+  )
+  assertRetryHardeningMigrationSql(
+    readFileSync(
+      path.join(
+        apiRoot,
+        'prisma',
+        'postgres',
+        'migrations',
+        RETRY_HARDENING_MIGRATION,
+        'migration.sql'
+      ),
+      'utf8'
+    ),
+    'postgres',
+    'PostgreSQL harden_scan_retry_authority'
+  )
+}
+
+function assertRetryCreateRecoversLostResponse(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async create(')
+  const end = source.indexOf('async getStatus(')
+  assert.ok(start >= 0 && end > start, 'create() must exist in scan-tasks.service.ts')
+  const body = stripTypeScriptComments(source.slice(start, end))
+  const required = [
+    'recoverRetryChildIfPresent',
+    'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+    'RetryCreateRaceError',
+    'childControlTokenHash = prior.controlTokenHash',
+    'controlToken: args.retryControlToken',
+  ]
+  for (const needle of required) {
+    assert.ok(
+      body.includes(needle),
+      `create() lost-response recovery must keep ${needle}`
+    )
+  }
+}
+
+function assertLeaseRequiresDeliveryAck(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async getScanDeliveryLease')
+  const end = source.indexOf('async deliverScanFile', start)
+  assert.ok(start >= 0 && end > start, 'getScanDeliveryLease() must exist')
+  const body = stripTypeScriptComments(source.slice(start, end))
+  assert.ok(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(body),
+    'getScanDeliveryLease() must hard-require deliveryAckedAt: { not: null }'
+  )
+}
+
+const DELIVER_CAS_ACK_EXPIRY_BLOCK = `    const claimed = await this.prisma.scanTask.updateMany({
+      where: {
+        id: task.id,
+        terminalId: args.terminalId,
+        status: 'waiting',
+        deliveryAckedAt: { not: null },
+        expiresAt: { gt: now },
+        createdAt: task.createdAt,
+      },`
+
+function assertDeliverCasRepinsAckAndExpiry(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  assert.ok(
+    source.includes('ATOMIC_SCAN_DELIVER_CAS_ACK_EXPIRY'),
+    'deliver CAS must declare ACK/expiry re-pin'
+  )
+  assert.equal(
+    source.includes(DELIVER_CAS_ACK_EXPIRY_BLOCK),
+    true,
+    'final deliver CAS must re-pin deliveryAckedAt not null and expiresAt > now'
+  )
+}
+
+function assertDeliveryAckMigrationContracts(apiRoot: string): void {
+  for (const [relative, label] of [
+    [path.join('prisma', 'migrations', DELIVERY_ACK_MIGRATION, 'migration.sql'), 'SQLite'],
+    [path.join('prisma', 'postgres', 'migrations', DELIVERY_ACK_MIGRATION, 'migration.sql'), 'PostgreSQL'],
+  ] as const) {
+    const sql = stripSqlComments(readFileSync(path.join(apiRoot, relative), 'utf8'))
+    assert.match(sql, /ADD COLUMN "deliveryAckedAt"/, `${label} ACK migration must add deliveryAckedAt`)
+    assert.match(
+      sql,
+      /SET "deliveryAckedAt" = "createdAt"[\s\S]*"status" IN \('waiting', 'matched'\)/,
+      `${label} ACK migration must backfill waiting/matched rows to createdAt`
+    )
+  }
+}
+
+function addAckMigrationToSandbox(sourceMigrationsRoot: string, migrationsRoot: string): void {
+  cpSync(
+    path.join(sourceMigrationsRoot, DELIVERY_ACK_MIGRATION),
+    path.join(migrationsRoot, DELIVERY_ACK_MIGRATION),
+    { recursive: true }
+  )
+}
+
+function assertSqliteDeliveryAckBackfill(apiRoot: string): void {
+  const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'migrations')
+  const sandbox = createMigrationSandbox(
+    apiRoot,
+    sourceMigrationsRoot,
+    path.join(apiRoot, 'prisma', 'schema.prisma'),
+    'sqlite'
+  )
+  const dbPath = path.join(sandbox.root, 'ack-backfill.db')
+  try {
+    ensureSqliteFile(dbPath)
+    addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: `file:${dbPath}`,
+    })
+    sqliteQuery(
+      dbPath,
+      `
+        INSERT INTO "Terminal" ("id", "terminalCode", "agentToken", "deviceFingerprint", "lastSeenAt")
+        VALUES ('ack_backfill_terminal', 'ACK-BACKFILL', 'ack-backfill-token', 'ack-backfill-fp', CURRENT_TIMESTAMP);
+        INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "createdAt", "updatedAt")
+        VALUES (
+          'legacy_waiting',
+          'ack_backfill_terminal',
+          'document',
+          'waiting',
+          datetime('now', '+10 minutes'),
+          datetime('now', '-90 seconds'),
+          datetime('now', '-90 seconds')
+        );
+      `
+    )
+    const createdAt = sqliteQuery(dbPath, `SELECT createdAt FROM "ScanTask" WHERE id = 'legacy_waiting';`)
+    addAckMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: `file:${dbPath}`,
+    })
+    assert.equal(
+      sqliteQuery(dbPath, `SELECT COUNT(*) FROM pragma_table_info('ScanTask') WHERE name = 'deliveryAckedAt';`),
+      '1',
+      'SQLite ACK migration must add deliveryAckedAt'
+    )
+    assert.equal(
+      sqliteQuery(dbPath, `SELECT deliveryAckedAt FROM "ScanTask" WHERE id = 'legacy_waiting';`),
+      createdAt,
+      'SQLite ACK migration must backfill waiting rows to createdAt'
+    )
+    sqliteQuery(dbPath, `UPDATE "ScanTask" SET "status" = 'expired' WHERE id = 'legacy_waiting';`)
+    sqliteQuery(
+      dbPath,
+      `
+        INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "createdAt", "updatedAt")
+        VALUES (
+          'fresh_waiting',
+          'ack_backfill_terminal',
+          'document',
+          'waiting',
+          datetime('now', '+10 minutes'),
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
+        );
+      `
+    )
+    assert.equal(
+      sqliteQuery(dbPath, `SELECT deliveryAckedAt FROM "ScanTask" WHERE id = 'fresh_waiting';`),
+      '',
+      'new waiting rows after ACK migration must remain unacked (NULL)'
+    )
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
+async function assertRealDbDeliveryAckGate(dbUrl: string, label: string): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  const terminalId = `realdb_ack_${label}_${randomBytes(4).toString('hex')}`
+  try {
+    await client.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `ACK-${label}-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-delivery-ack',
+        enabled: true,
+      },
+    })
+    const service = new ScanTasksService(client as never, {} as never, passthroughCapabilities)
+    const created = await service.create({ scanType: 'document', terminalId }, null)
+    const stored = await client.scanTask.findUnique({ where: { id: created.scanTaskId } })
+    assert.equal(stored?.deliveryAckedAt, null, `real DB (${label}): new create must start unacked`)
+    await expectRejectCode(
+      () => service.getScanDeliveryLease(terminalId),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      `real DB (${label}): unacked waiting must not be leasable`
+    )
+    const acked = await service.ack(created.scanTaskId, null, created.controlToken, terminalId)
+    const lease = await service.getScanDeliveryLease(terminalId)
+    assert.equal(lease.scanTaskId, created.scanTaskId)
+    const ackedAgain = await service.ack(created.scanTaskId, null, created.controlToken, terminalId)
+    assert.equal(ackedAgain.deliveryAckedAt, acked.deliveryAckedAt)
+
+    await service.cancel(created.scanTaskId, null, created.controlToken)
+    const prior = await service.create({ scanType: 'document', terminalId }, null)
+    await client.scanTask.update({
+      where: { id: prior.scanTaskId },
+      data: {
+        status: 'failed',
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+      },
+    })
+    const child = await service.create(
+      { scanType: 'document', terminalId, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    const childRow = await client.scanTask.findUnique({ where: { id: child.scanTaskId } })
+    assert.equal(childRow?.deliveryAckedAt, null, `real DB (${label}): retry child must start unacked`)
+    const replay = await service.create(
+      { scanType: 'document', terminalId, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    assert.equal(replay.scanTaskId, child.scanTaskId)
+    assert.equal(
+      (await client.scanTask.findUnique({ where: { id: child.scanTaskId } }))?.deliveryAckedAt,
+      null,
+      `real DB (${label}): lost-response replay must keep the child unacked`
+    )
+    await expectRejectCode(
+      () => service.getScanDeliveryLease(terminalId),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      `real DB (${label}): replayed retry child must not be leasable before ACK`
+    )
+    await service.ack(child.scanTaskId, null, prior.controlToken, terminalId)
+    assert.equal((await service.getScanDeliveryLease(terminalId)).scanTaskId, child.scanTaskId)
+
+    await service.cancel(child.scanTaskId, null, prior.controlToken)
+    const unacked = await service.create({ scanType: 'document', terminalId }, null)
+    await client.scanTask.update({
+      where: { id: unacked.scanTaskId },
+      data: { createdAt: new Date(Date.now() - SCAN_UNACKED_WAITING_GRACE_MS - 1000) },
+    })
+    const reaper = new ScanTaskReaperTask(client as never)
+    assert.ok((await reaper.reapUnackedWaiting()).count >= 1)
+    const reaped = await client.scanTask.findUnique({ where: { id: unacked.scanTaskId } })
+    assert.equal(reaped?.status, 'expired')
+    assert.equal(reaped?.retryAuthorityExpiresAt, null)
+    const afterReap = await service.create({ scanType: 'document', terminalId }, null)
+    assert.ok(afterReap.scanTaskId)
+  } finally {
+    await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
+    await client.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await client.$disconnect()
+  }
+}
+
+function assertLeaseAckFilterReverseMutation(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async getScanDeliveryLease')
+  const end = source.indexOf('async deliverScanFile', start)
+  const mutant = stripTypeScriptComments(source.slice(start, end)).replace(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}\s*,?/,
+    ''
+  )
+  assert.equal(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(mutant),
+    false,
+    'reverse mutation must actually drop the deliveryAckedAt lease filter'
+  )
+  assert.ok(
+    /deliveryAckedAt\s*:\s*\{\s*not\s*:\s*null\s*\}/.test(stripTypeScriptComments(source.slice(start, end))),
+    'production getScanDeliveryLease must keep deliveryAckedAt: { not: null } (mutant without it is the red case)'
+  )
+}
+
+const SCAN_LEASE_ACK_FILTER_BLOCK = `        // ATOMIC_SCAN_LEASE_ACK_FILTER: unacked waiting rows are not leasable.
+        if (where.deliveryAckedAt === null && t.deliveryAckedAt !== null) continue
+        if (
+          where.deliveryAckedAt &&
+          typeof where.deliveryAckedAt === 'object' &&
+          'not' in where.deliveryAckedAt &&
+          where.deliveryAckedAt.not === null &&
+          t.deliveryAckedAt === null
+        ) {
+          continue
+        }`
+
+function verifyLeaseAckFilterMutationMakesUnackedCaseNonzero(): void {
+  const helperPath = path.join(__dirname, 'scan-lease-contract.helper.ts')
+  const original = readFileSync(helperPath, 'utf8')
+  assert.equal(
+    original.includes(SCAN_LEASE_ACK_FILTER_BLOCK),
+    true,
+    'canonical lease Fake findFirst must honor deliveryAckedAt before reverse mutation'
+  )
+  const mutated = original.replace(SCAN_LEASE_ACK_FILTER_BLOCK, '')
+  assert.notEqual(mutated, original, 'dropping ACK filtering must actually change scan-lease-contract.helper.ts')
+  try {
+    writeFileSync(helperPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && path.resolve(process.argv[1]) !== path.resolve(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--unacked-lease-ack-filter')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: path.join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping ACK filtering must make unacked lease case nonzero\n${output}`)
+    assert.match(
+      output,
+      /unacked create must not be leasable before ACK/,
+      `mutated ACK filter test must fail on the unacked lease assertion, not an unrelated error\n${output}`,
+    )
+    console.log('PASS lease ACK filter reverse mutation: unacked create case becomes nonzero')
+  } finally {
+    writeFileSync(helperPath, original)
+  }
+  assert.equal(
+    readFileSync(helperPath, 'utf8'),
+    original,
+    'ACK filter reverse mutation must restore scan-lease-contract.helper.ts',
+  )
+}
+
+function assertDeliverScanFileRequiresBidirectionalLineage(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src', 'scan-tasks', 'scan-tasks.service.ts'), 'utf8')
+  const start = source.indexOf('async deliverScanFile')
+  const end = source.indexOf('private effectiveStatus', start)
+  assert.ok(start >= 0 && end > start, 'deliverScanFile() must exist in scan-tasks.service.ts')
+  const body = stripTypeScriptComments(source.slice(start, end))
+  const required = [
+    'prior.retryConsumedByScanTaskId === task.id',
+    'prior.lastAttemptHash === contentHash',
+    'prior.endUserId === task.endUserId',
+    'prior.terminalId === task.terminalId',
+    'prior.scanType === task.scanType',
+    'prior.retryConsumedAt.getTime() <= prior.retryAuthorityExpiresAt.getTime()',
+  ]
+  for (const snippet of required) {
+    assert.ok(
+      body.includes(snippet),
+      `deliverScanFile() must keep bidirectional lineage check: ${snippet}`
+    )
+  }
+}
+
+function sqliteQuery(databasePath: string, sql: string): string {
+  return execFileSync('sqlite3', ['-batch', '-noheader', '-separator', '|', databasePath, sql], {
+    encoding: 'utf8',
+  }).trim()
+}
+
+function postgresQuery(databaseUrl: string, sql: string): string {
+  return execFileSync('psql', [databaseUrl, '-v', 'ON_ERROR_STOP=1', '-Atq', '-c', sql], {
+    encoding: 'utf8',
+  }).trim()
+}
+
+function retryUpgradeSeedSql(field: 'retryOfScanTaskId' | 'retryConsumedByScanTaskId'): string {
+  const duplicateValue = field === 'retryOfScanTaskId' ? 'prior_duplicate' : 'child_duplicate'
+  return `
+    INSERT INTO "Terminal" ("id", "terminalCode", "agentToken", "deviceFingerprint", "lastSeenAt")
+    VALUES ('upgrade_terminal', 'UPGRADE-TERMINAL', 'upgrade-agent-token', 'upgrade-fingerprint', CURRENT_TIMESTAMP);
+    INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "${field}", "expiresAt", "updatedAt")
+    VALUES
+      ('upgrade_scan_a', 'upgrade_terminal', 'document', 'failed', '${duplicateValue}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('upgrade_scan_b', 'upgrade_terminal', 'document', 'failed', '${duplicateValue}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  `
+}
+
+function assertSqliteHardeningStructure(
+  databasePath: string,
+  expected: 'previous' | 'hardened',
+  label: string
+): void {
+  const snapshot = sqliteQuery(
+    databasePath,
+    `
+      SELECT COUNT(*) FROM pragma_table_info('ScanTask') WHERE name = 'retryAuthorityExpiresAt';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryOfScanTaskId_idx';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryConsumedByScanTaskId_idx';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryOfScanTaskId_key';
+      SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ScanTask_retryConsumedByScanTaskId_key';
+      SELECT COUNT(*) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}' AND finished_at IS NOT NULL;
+      SELECT COALESCE(MAX(applied_steps_count), 0) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}';
+    `
+  ).split('\n')
+  assert.deepEqual(
+    snapshot,
+    expected === 'previous'
+      ? ['0', '1', '1', '0', '0', '0', '0']
+      : ['1', '0', '0', '1', '1', '1', '1'],
+    `${label}: schema/index/migration state must remain ${expected}`
+  )
+  if (expected === 'hardened') {
+    for (const [indexName, column] of [
+      ['ScanTask_retryOfScanTaskId_key', 'retryOfScanTaskId'],
+      ['ScanTask_retryConsumedByScanTaskId_key', 'retryConsumedByScanTaskId'],
+    ] as const) {
+      const indexSql = sqliteQuery(
+        databasePath,
+        `SELECT sql FROM sqlite_master WHERE type = 'index' AND name = '${indexName}';`
+      )
+      assert.match(
+        indexSql,
+        new RegExp(`UNIQUE[\\s\\S]*WHERE\\s+"${column}"\\s+IS\\s+NOT\\s+NULL`, 'i'),
+        `${label}: ${indexName} must remain a partial unique index`
+      )
+    }
+  }
+}
+
+function assertPostgresHardeningStructure(
+  databaseUrl: string,
+  expected: 'previous' | 'hardened',
+  label: string
+): void {
+  const snapshot = postgresQuery(
+    databaseUrl,
+    `
+      SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ScanTask' AND column_name = 'retryAuthorityExpiresAt';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryOfScanTaskId_idx';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryConsumedByScanTaskId_idx';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryOfScanTaskId_key';
+      SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ScanTask_retryConsumedByScanTaskId_key';
+      SELECT COUNT(*) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}' AND finished_at IS NOT NULL;
+      SELECT COALESCE(MAX(applied_steps_count), 0) FROM "_prisma_migrations" WHERE migration_name = '${RETRY_HARDENING_MIGRATION}';
+    `
+  ).split('\n')
+  assert.deepEqual(
+    snapshot,
+    expected === 'previous'
+      ? ['0', '1', '1', '0', '0', '0', '0']
+      : ['1', '0', '0', '1', '1', '1', '1'],
+    `${label}: schema/index/migration state must remain ${expected}`
+  )
+  if (expected === 'hardened') {
+    for (const [indexName, column] of [
+      ['ScanTask_retryOfScanTaskId_key', 'retryOfScanTaskId'],
+      ['ScanTask_retryConsumedByScanTaskId_key', 'retryConsumedByScanTaskId'],
+    ] as const) {
+      const indexSql = postgresQuery(
+        databaseUrl,
+        `SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = '${indexName}';`
+      )
+      assert.match(
+        indexSql,
+        new RegExp(`UNIQUE[\\s\\S]*WHERE[\\s\\S]*${column}[\\s\\S]*IS NOT NULL`, 'i'),
+        `${label}: ${indexName} must remain a partial unique index`
+      )
+    }
+  }
+}
+
 // Task 10 能力门禁直通 stub：门禁真实语义由 verify:admin-print-scan 覆盖，
 // 本脚本聚焦扫描任务状态机，不重复测门禁。
 const passthroughCapabilities = { assertUserTaskAllowed: async () => undefined } as never
@@ -56,9 +665,16 @@ interface StoredScanTask {
   endUserId: string | null
   fileId: string | null
   matchedFileMtime: Date | null
+  lastAttemptHash: string | null
   errorCode: string | null
   errorMessage: string | null
   controlTokenHash: string | null
+  retryOfScanTaskId: string | null
+  retryContentHash: string | null
+  retryConsumedAt: Date | null
+  retryConsumedByScanTaskId: string | null
+  retryAuthorityExpiresAt: Date | null
+  deliveryAckedAt: Date | null
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -94,6 +710,8 @@ function statusMatches(current: string, matcher: StatusMatcher): boolean {
 
 class FakePrisma {
   private seq = 1
+  private txMutex: Promise<void> = Promise.resolve()
+  onBeforeUpdateMany?: () => void
   readonly scanTasksById = new Map<string, StoredScanTask>()
   readonly filesById = new Map<string, StoredFileObject>()
   readonly terminals = new Map<
@@ -149,11 +767,36 @@ class FakePrisma {
     },
   }
 
-  readonly $transaction = async <T>(callback: (tx: this) => Promise<T>): Promise<T> =>
-    callback(this)
+  readonly $transaction = async <T>(callback: (tx: this) => Promise<T>): Promise<T> => {
+    let release!: () => void
+    const previous = this.txMutex
+    this.txMutex = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    try {
+      return await callback(this)
+    } finally {
+      release()
+    }
+  }
 
   readonly scanTask = {
     create: async ({ data }: { data: Partial<StoredScanTask> }) => {
+      if (data.retryOfScanTaskId) {
+        for (const existing of this.scanTasksById.values()) {
+          if (existing.retryOfScanTaskId === data.retryOfScanTaskId) {
+            throw new Prisma.PrismaClientKnownRequestError(
+              'Unique constraint failed on the fields: (`retryOfScanTaskId`)',
+              {
+                code: 'P2002',
+                clientVersion: 'verify-scan-tasks-fixture',
+                meta: { target: ['retryOfScanTaskId'] },
+              }
+            )
+          }
+        }
+      }
       const id = `scan_${this.seq++}`
       const now = new Date()
       const record: StoredScanTask = {
@@ -164,9 +807,16 @@ class FakePrisma {
         endUserId: data.endUserId ?? null,
         fileId: null,
         matchedFileMtime: null,
+        lastAttemptHash: data.lastAttemptHash ?? null,
         errorCode: null,
         errorMessage: null,
         controlTokenHash: data.controlTokenHash ?? null,
+        retryOfScanTaskId: data.retryOfScanTaskId ?? null,
+        retryContentHash: data.retryContentHash ?? null,
+        retryConsumedAt: data.retryConsumedAt ?? null,
+        retryConsumedByScanTaskId: data.retryConsumedByScanTaskId ?? null,
+        retryAuthorityExpiresAt: data.retryAuthorityExpiresAt ?? null,
+        deliveryAckedAt: data.deliveryAckedAt ?? null,
         expiresAt: data.expiresAt!,
         createdAt: now,
         updatedAt: now,
@@ -179,38 +829,176 @@ class FakePrisma {
     findFirst: async ({
       where,
     }: {
-      where: { terminalId: string; status: string; expiresAt: { gt: Date } }
+      where: {
+        id?: string | { not: string }
+        terminalId: string
+        status?: StatusMatcher
+        scanType?: string
+        endUserId?: string | null
+        controlTokenHash?: string
+        fileId?: null
+        retryConsumedAt?: Date | null
+        expiresAt?: { gt: Date }
+        lastAttemptHash?: string | null | { not: null }
+        retryAuthorityExpiresAt?: { gt: Date }
+        updatedAt?: { gt?: Date; lt?: Date }
+        deliveryAckedAt?: Date | null | { not: null }
+      }
     }) => {
-      const candidates = Array.from(this.scanTasksById.values())
-        .filter(
-          (t) =>
-            t.terminalId === where.terminalId &&
-            t.status === where.status &&
-            t.expiresAt.getTime() > where.expiresAt.gt.getTime()
+      const candidates = Array.from(this.scanTasksById.values()).filter((t) => {
+        if (typeof where.id === 'string' && t.id !== where.id) return false
+        if (typeof where.id === 'object' && t.id === where.id.not) return false
+        if (t.terminalId !== where.terminalId) return false
+        if (where.status !== undefined && !statusMatches(t.status, where.status)) return false
+        if (where.scanType !== undefined && t.scanType !== where.scanType) return false
+        if (where.endUserId !== undefined && t.endUserId !== where.endUserId) return false
+        if (where.controlTokenHash !== undefined && t.controlTokenHash !== where.controlTokenHash)
+          return false
+        if (where.fileId === null && t.fileId !== null) return false
+        if (where.retryConsumedAt === null && t.retryConsumedAt !== null) return false
+        if (
+          where.retryConsumedAt instanceof Date &&
+          t.retryConsumedAt?.getTime() !== where.retryConsumedAt.getTime()
         )
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          return false
+        if (where.lastAttemptHash !== undefined) {
+          if (where.lastAttemptHash === null) {
+            if (t.lastAttemptHash !== null) return false
+          } else if (typeof where.lastAttemptHash === 'object') {
+            if (t.lastAttemptHash === null) return false
+          } else if (t.lastAttemptHash !== where.lastAttemptHash) {
+            return false
+          }
+        }
+        if (
+          where.retryAuthorityExpiresAt?.gt !== undefined &&
+          !(t.retryAuthorityExpiresAt &&
+            t.retryAuthorityExpiresAt.getTime() > where.retryAuthorityExpiresAt.gt.getTime())
+        )
+          return false
+        if (
+          where.expiresAt?.gt !== undefined &&
+          !(t.expiresAt.getTime() > where.expiresAt.gt.getTime())
+        )
+          return false
+        if (
+          where.updatedAt?.gt !== undefined &&
+          !(t.updatedAt.getTime() > where.updatedAt.gt.getTime())
+        )
+          return false
+        if (
+          where.updatedAt?.lt !== undefined &&
+          !(t.updatedAt.getTime() < where.updatedAt.lt.getTime())
+        )
+          return false
+        if (where.deliveryAckedAt === null && t.deliveryAckedAt !== null) return false
+        if (
+          where.deliveryAckedAt &&
+          typeof where.deliveryAckedAt === 'object' &&
+          'not' in where.deliveryAckedAt &&
+          where.deliveryAckedAt.not === null &&
+          t.deliveryAckedAt === null
+        )
+          return false
+        return true
+      })
       return candidates[0] ?? null
     },
     // 服务层所有写路径都必须走 CAS 的 updateMany（无条件 update 会绕开状态匹配检查），
     // 这里刻意不提供 update() 方法——如果服务代码回退到无条件 update，测试会直接因方法不存在而报错，
     // 而不是悄悄通过。
     //
-    // 支持两种调用形态：
+    // 支持三种调用形态：
     //   1) 服务层的单行 CAS：{ where: { id, status } }（status 命中才更新，返回 count 0|1）
     //   2) B1-5 reaper 的批量收敛：{ where: { status, updatedAt: { lt } } }（无 id，可能命中多行）
+    //   3) waiting 过期 reaper：{ where: { status, expiresAt: { lte } } }（无 id，可能命中多行）
     updateMany: async ({
       where,
       data,
     }: {
-      where: { id?: string; status?: StatusMatcher; updatedAt?: { lt: Date } }
+      where: {
+        id?: string
+        status?: StatusMatcher
+        terminalId?: string
+        scanType?: string
+        endUserId?: string | null
+        controlTokenHash?: string
+        fileId?: null
+        retryConsumedAt?: Date | null
+        lastAttemptHash?: string | null | { not: null }
+        retryAuthorityExpiresAt?: { gt: Date }
+        updatedAt?: { gt?: Date; lt?: Date }
+        expiresAt?: { lte?: Date; gt?: Date }
+        createdAt?: Date | { lte?: Date }
+        deliveryAckedAt?: Date | null | { not: null }
+      }
       data: Partial<StoredScanTask>
     }) => {
+      this.onBeforeUpdateMany?.()
       const matches = Array.from(this.scanTasksById.values()).filter((t) => {
         if (where.id !== undefined && t.id !== where.id) return false
         if (where.status !== undefined && !statusMatches(t.status, where.status)) return false
+        if (where.terminalId !== undefined && t.terminalId !== where.terminalId) return false
+        if (where.scanType !== undefined && t.scanType !== where.scanType) return false
+        if (where.endUserId !== undefined && t.endUserId !== where.endUserId) return false
+        if (where.controlTokenHash !== undefined && t.controlTokenHash !== where.controlTokenHash)
+          return false
+        if (where.fileId === null && t.fileId !== null) return false
+        if (where.retryConsumedAt === null && t.retryConsumedAt !== null) return false
+        if (
+          where.retryConsumedAt instanceof Date &&
+          t.retryConsumedAt?.getTime() !== where.retryConsumedAt.getTime()
+        )
+          return false
+        if (where.lastAttemptHash !== undefined) {
+          if (where.lastAttemptHash === null) {
+            if (t.lastAttemptHash !== null) return false
+          } else if (typeof where.lastAttemptHash === 'object') {
+            if (t.lastAttemptHash === null) return false
+          } else if (t.lastAttemptHash !== where.lastAttemptHash) {
+            return false
+          }
+        }
+        if (
+          where.retryAuthorityExpiresAt?.gt !== undefined &&
+          !(t.retryAuthorityExpiresAt &&
+            t.retryAuthorityExpiresAt.getTime() > where.retryAuthorityExpiresAt.gt.getTime())
+        )
+          return false
         if (
           where.updatedAt?.lt !== undefined &&
           !(t.updatedAt.getTime() < where.updatedAt.lt.getTime())
+        )
+          return false
+        if (
+          where.updatedAt?.gt !== undefined &&
+          !(t.updatedAt.getTime() > where.updatedAt.gt.getTime())
+        )
+          return false
+        if (
+          where.expiresAt?.lte !== undefined &&
+          !(t.expiresAt.getTime() <= where.expiresAt.lte.getTime())
+        )
+          return false
+        if (
+          where.expiresAt?.gt !== undefined &&
+          !(t.expiresAt.getTime() > where.expiresAt.gt.getTime())
+        )
+          return false
+        if (where.createdAt instanceof Date) {
+          if (t.createdAt.getTime() !== where.createdAt.getTime()) return false
+        } else if (
+          where.createdAt?.lte !== undefined &&
+          !(t.createdAt.getTime() <= where.createdAt.lte.getTime())
+        )
+          return false
+        if (where.deliveryAckedAt === null && t.deliveryAckedAt !== null) return false
+        if (
+          where.deliveryAckedAt &&
+          typeof where.deliveryAckedAt === 'object' &&
+          'not' in where.deliveryAckedAt &&
+          where.deliveryAckedAt.not === null &&
+          t.deliveryAckedAt === null
         )
           return false
         return true
@@ -315,11 +1103,46 @@ class FakeFilesService {
   }
 }
 
+function wrapServiceForTest(service: ScanTasksService): ScanTasksService {
+  const originalDeliver = service.deliverScanFile.bind(service)
+  service.deliverScanFile = async (args: any) => {
+    if (args.scanTaskId === undefined && args.deliveryLease === undefined) {
+      // Historical deliver tests omit lease and predate the ACK gate. Arm the
+      // current waiting row only on this convenience path so they still exercise
+      // deliverScanFile(); getScanDeliveryLease itself stays fail-closed.
+      // ACK-gate tests MUST pass exact scanTaskId + signed lease and must not
+      // use this auto-ACK convenience (see runDeliverWithoutAckNegativeCase).
+      const prisma = (service as unknown as {
+        prisma: {
+          scanTask: {
+            updateMany: (args: {
+              where: { terminalId: string; status: string; deliveryAckedAt: null }
+              data: { deliveryAckedAt: Date }
+            }) => Promise<unknown>
+          }
+        }
+      }).prisma
+      await prisma.scanTask.updateMany({
+        where: { terminalId: args.terminalId, status: 'waiting', deliveryAckedAt: null },
+        data: { deliveryAckedAt: new Date() },
+      })
+      const lease = await service.getScanDeliveryLease(args.terminalId)
+      return await originalDeliver({
+        ...args,
+        scanTaskId: lease.scanTaskId,
+        deliveryLease: lease.deliveryLease,
+      })
+    }
+    return await originalDeliver(args)
+  }
+  return service
+}
+
 function makeService(): { service: ScanTasksService; prisma: FakePrisma; files: FakeFilesService } {
   const prisma = new FakePrisma()
   const files = new FakeFilesService(prisma)
   return {
-    service: new ScanTasksService(prisma as never, files as never, passthroughCapabilities),
+    service: wrapServiceForTest(new ScanTasksService(prisma as never, files as never, passthroughCapabilities)),
     prisma,
     files,
   }
@@ -341,6 +1164,45 @@ async function expectRejects<T extends Error>(
     )
   }
   assert.equal(rejected, true, `${label}: expected rejection`)
+}
+
+async function expectRejectCode(
+  action: () => Promise<unknown>,
+  errorType: new (...args: never[]) => Error,
+  code: string,
+  label: string
+): Promise<void> {
+  let caught: unknown
+  try {
+    await action()
+  } catch (error) {
+    caught = error
+  }
+  assert.ok(caught instanceof errorType, `${label}: expected ${errorType.name}`)
+  const response = (caught as { getResponse: () => unknown }).getResponse() as {
+    error?: { code?: string }
+  }
+  assert.equal(response.error?.code, code, `${label}: expected error code ${code}`)
+}
+
+function makeRetryAuthority(
+  prisma: FakePrisma,
+  scanTaskId: string,
+  content: Buffer,
+  overrides: Partial<StoredScanTask> = {}
+): StoredScanTask {
+  const task = prisma.scanTasksById.get(scanTaskId)
+  assert.ok(task, `retry authority ${scanTaskId} must exist`)
+  const authority: StoredScanTask = {
+    ...task,
+    status: 'failed',
+    lastAttemptHash: createHash('sha256').update(content).digest('hex'),
+    retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+    updatedAt: new Date(),
+    ...overrides,
+  }
+  prisma.scanTasksById.set(scanTaskId, authority)
+  return authority
 }
 
 function sleep(ms: number): Promise<void> {
@@ -560,6 +1422,534 @@ async function assertRealDbPartialUniqueIndex(
   }
 }
 
+async function assertRealDbRetryAuthorityCas(
+  dbUrl: string,
+  label: 'sqlite' | 'postgres'
+): Promise<void> {
+  const { client: clientA } = createPrismaClient(dbUrl)
+  const { client: clientB } = createPrismaClient(dbUrl)
+  await Promise.all([clientA.$connect(), clientB.$connect()])
+
+  const terminalId = `realdb_retry_cas_${label}_${randomBytes(4).toString('hex')}`
+  const taskId = `realdb_retry_authority_${label}_${randomBytes(4).toString('hex')}`
+  const tokenHash = createHash('sha256').update('real-db-retry-token').digest('hex')
+  const contentHash = createHash('sha256').update(tinyPdf()).digest('hex')
+  const retryAuthorityExpiresAt = new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
+
+  try {
+    await clientA.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `RDB-RETRY-${label}-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-retry-cas',
+        enabled: true,
+      },
+    })
+    await clientA.scanTask.create({
+      data: {
+        id: taskId,
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        controlTokenHash: tokenHash,
+        lastAttemptHash: contentHash,
+        retryAuthorityExpiresAt,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+
+    const consume = (client: typeof clientA) =>
+      client.scanTask.updateMany({
+        where: {
+          id: taskId,
+          terminalId,
+          scanType: 'document',
+          endUserId: null,
+          status: { in: ['failed', 'cancelled', 'expired'] },
+          controlTokenHash: tokenHash,
+          fileId: null,
+          lastAttemptHash: contentHash,
+          retryConsumedAt: null,
+          retryAuthorityExpiresAt: { gt: new Date() },
+        },
+        data: { retryConsumedAt: new Date() },
+      })
+    const results = await Promise.allSettled([consume(clientA), consume(clientB)])
+    const successfulCounts = results
+      .filter((result): result is PromiseFulfilledResult<{ count: number }> => result.status === 'fulfilled')
+      .map((result) => result.value.count)
+    assert.equal(
+      successfulCounts.filter((count) => count === 1).length,
+      1,
+      `real DB (${label}): concurrent retry-authority CAS must yield exactly one winner`
+    )
+    if (label === 'postgres') {
+      assert.deepEqual(
+        successfulCounts.sort(),
+        [0, 1],
+        'real DB (postgres): the losing concurrent CAS must complete with count=0'
+      )
+    } else {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          assert.equal(
+            (result.reason as { code?: string }).code,
+            'P1008',
+            'real DB (sqlite): a rejected parallel writer may only be the known database lock timeout'
+          )
+        }
+      }
+      const afterLockRelease = await consume(clientA)
+      assert.equal(
+        afterLockRelease.count,
+        0,
+        'real DB (sqlite): after the writer lock releases, replay of the consumed CAS must return count=0'
+      )
+    }
+    assert.ok(
+      (await clientA.scanTask.findUnique({ where: { id: taskId } }))?.retryConsumedAt,
+      `real DB (${label}): winning CAS must persist retryConsumedAt`
+    )
+  } finally {
+    await clientA.scanTask.deleteMany({ where: { id: taskId } }).catch(() => undefined)
+    await clientA.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await Promise.all([clientA.$disconnect(), clientB.$disconnect()])
+  }
+}
+
+async function assertRealDbRetryLineageIndexes(
+  dbUrl: string,
+  label: 'sqlite' | 'postgres'
+): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  const terminalId = `realdb_retry_lineage_${label}_${randomBytes(4).toString('hex')}`
+  try {
+    await client.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `RDB-LINEAGE-${label}-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-retry-lineage-indexes',
+        enabled: true,
+      },
+    })
+
+    const sourceA = await client.scanTask.create({
+      data: {
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    const sourceB = await client.scanTask.create({
+      data: {
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    const childA = await client.scanTask.create({
+      data: {
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        retryOfScanTaskId: sourceA.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+
+    await assert.rejects(
+      () =>
+        client.scanTask.create({
+          data: {
+            terminalId,
+            scanType: 'document',
+            status: 'failed',
+            retryOfScanTaskId: sourceA.id,
+            expiresAt: new Date(Date.now() + 60_000),
+          },
+        }),
+      (error: unknown) =>
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002',
+      `real DB (${label}): retryOfScanTaskId must be one-to-one`
+    )
+
+    await client.scanTask.update({
+      where: { id: sourceA.id },
+      data: { retryConsumedByScanTaskId: childA.id },
+    })
+    await assert.rejects(
+      () =>
+        client.scanTask.update({
+          where: { id: sourceB.id },
+          data: { retryConsumedByScanTaskId: childA.id },
+        }),
+      (error: unknown) =>
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002',
+      `real DB (${label}): retryConsumedByScanTaskId must be one-to-one`
+    )
+  } finally {
+    await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
+    await client.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await client.$disconnect()
+  }
+}
+
+function assertSqliteRetryHardeningUpgrade(apiRoot: string): void {
+  const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'migrations')
+  const sandbox = createMigrationSandbox(
+    apiRoot,
+    sourceMigrationsRoot,
+    path.join(apiRoot, 'prisma', 'schema.prisma'),
+    'sqlite'
+  )
+  const previousDbPath = path.join(sandbox.root, 'previous.db')
+  const previousDbUrl = `file:${previousDbPath}`
+  try {
+    ensureSqliteFile(previousDbPath)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: previousDbUrl,
+    })
+    assert.equal(
+      sqliteQuery(
+        previousDbPath,
+        'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC, migration_name DESC LIMIT 1;'
+      ),
+      RETRY_HARDENING_PREVIOUS_MIGRATION,
+      'SQLite template must be at the immediately previous migration'
+    )
+    assertSqliteHardeningStructure(previousDbPath, 'previous', 'SQLite previous-version template')
+    addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+
+    const cleanDbPath = path.join(sandbox.root, 'clean.db')
+    cpSync(previousDbPath, cleanDbPath)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: `file:${cleanDbPath}`,
+    })
+    assertSqliteHardeningStructure(cleanDbPath, 'hardened', 'SQLite clean upgrade')
+
+    for (const field of ['retryOfScanTaskId', 'retryConsumedByScanTaskId'] as const) {
+      const duplicateDbPath = path.join(sandbox.root, `duplicate-${field}.db`)
+      cpSync(previousDbPath, duplicateDbPath)
+      execFileSync('sqlite3', ['-bail', duplicateDbPath], {
+        input: retryUpgradeSeedSql(field),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      runPrismaExpectFailure(
+        apiRoot,
+        ['migrate', 'deploy', '--config', sandbox.configPath],
+        { ...process.env, DATABASE_URL: `file:${duplicateDbPath}` },
+        `SQLite duplicate ${field}`
+      )
+      assertSqliteHardeningStructure(
+        duplicateDbPath,
+        'previous',
+        `SQLite duplicate ${field} rejection`
+      )
+      assert.equal(
+        sqliteQuery(
+          duplicateDbPath,
+          `SELECT COUNT(*) FROM "ScanTask" WHERE "${field}" IS NOT NULL;`
+        ),
+        '2',
+        `SQLite duplicate ${field}: preflight must not delete or rewrite lineage rows`
+      )
+    }
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
+function postgresDatabaseUrl(baseUrl: string, databaseName: string): string {
+  const url = new URL(baseUrl)
+  url.pathname = `/${databaseName}`
+  return url.toString()
+}
+
+function assertPostgresRetryHardeningUpgrade(apiRoot: string, pgUrl: string): void {
+  const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'postgres', 'migrations')
+  const sandbox = createMigrationSandbox(
+    apiRoot,
+    sourceMigrationsRoot,
+    path.join(apiRoot, 'prisma', 'postgres', 'schema.prisma'),
+    'postgresql'
+  )
+  const base = new URL(pgUrl)
+  const maintenanceDatabase = base.pathname.slice(1) || 'postgres'
+  const suffix = randomBytes(4).toString('hex')
+  const templateName = `scan_retry_prev_${suffix}`
+  const cleanName = `scan_retry_clean_${suffix}`
+  const duplicateNames = {
+    retryOfScanTaskId: `scan_retry_dup_of_${suffix}`,
+    retryConsumedByScanTaskId: `scan_retry_dup_by_${suffix}`,
+  } as const
+  const connectionArgs = ['-h', base.hostname, '-p', base.port || '5432', '-U', base.username || 'postgres', '-w']
+  const postgresCommandEnv = { ...process.env, ...(base.password ? { PGPASSWORD: base.password } : {}) }
+  const createdDatabases: string[] = []
+
+  const createDatabase = (name: string, template?: string): void => {
+    execFileSync(
+      'createdb',
+      [...connectionArgs, '--maintenance-db', maintenanceDatabase, ...(template ? ['--template', template] : []), name],
+      { env: postgresCommandEnv, stdio: 'pipe' }
+    )
+    createdDatabases.push(name)
+  }
+
+  try {
+    createDatabase(templateName)
+    const templateUrl = postgresDatabaseUrl(pgUrl, templateName)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: templateUrl,
+      POSTGRES_URL: templateUrl,
+    })
+    assert.equal(
+      postgresQuery(
+        templateUrl,
+        'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC, migration_name DESC LIMIT 1;'
+      ),
+      RETRY_HARDENING_PREVIOUS_MIGRATION,
+      'PostgreSQL template must be at the immediately previous migration'
+    )
+    assertPostgresHardeningStructure(templateUrl, 'previous', 'PostgreSQL previous-version template')
+    addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+
+    createDatabase(cleanName, templateName)
+    const cleanUrl = postgresDatabaseUrl(pgUrl, cleanName)
+    runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+      ...process.env,
+      DATABASE_URL: cleanUrl,
+      POSTGRES_URL: cleanUrl,
+    })
+    assertPostgresHardeningStructure(cleanUrl, 'hardened', 'PostgreSQL clean upgrade')
+
+    for (const field of ['retryOfScanTaskId', 'retryConsumedByScanTaskId'] as const) {
+      const databaseName = duplicateNames[field]
+      createDatabase(databaseName, templateName)
+      const duplicateUrl = postgresDatabaseUrl(pgUrl, databaseName)
+      postgresQuery(duplicateUrl, retryUpgradeSeedSql(field))
+      runPrismaExpectFailure(
+        apiRoot,
+        ['migrate', 'deploy', '--config', sandbox.configPath],
+        { ...process.env, DATABASE_URL: duplicateUrl, POSTGRES_URL: duplicateUrl },
+        `PostgreSQL duplicate ${field}`
+      )
+      assertPostgresHardeningStructure(
+        duplicateUrl,
+        'previous',
+        `PostgreSQL duplicate ${field} rejection`
+      )
+      assert.equal(
+        postgresQuery(
+          duplicateUrl,
+          `SELECT COUNT(*) FROM "ScanTask" WHERE "${field}" IS NOT NULL;`
+        ),
+        '2',
+        `PostgreSQL duplicate ${field}: preflight must not delete or rewrite lineage rows`
+      )
+    }
+  } finally {
+    for (const databaseName of createdDatabases.reverse()) {
+      execFileSync(
+        'dropdb',
+        [...connectionArgs, '--maintenance-db', maintenanceDatabase, '--if-exists', '--force', databaseName],
+        { env: postgresCommandEnv, stdio: 'pipe' }
+      )
+    }
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
+async function assertRealDbRetryCreateAtomicity(dbUrl: string): Promise<void> {
+  const { client: setupClient } = createPrismaClient(dbUrl)
+  const { client: clientA } = createPrismaClient(dbUrl)
+  const { client: clientB } = createPrismaClient(dbUrl)
+  await Promise.all([setupClient.$connect(), clientA.$connect(), clientB.$connect()])
+
+  const terminalId = `realdb_retry_create_${randomBytes(4).toString('hex')}`
+  const endUserId = `realdb_retry_member_${randomBytes(4).toString('hex')}`
+  try {
+    await setupClient.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `RDB-RETRY-CREATE-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-retry-create',
+        enabled: true,
+      },
+    })
+    await setupClient.endUser.create({
+      data: { id: endUserId, phoneHash: `hash_${endUserId}`, phoneEnc: 'enc' },
+    })
+
+    const serviceA = new ScanTasksService(clientA as never, {} as never, passthroughCapabilities)
+    const serviceB = new ScanTasksService(clientB as never, {} as never, passthroughCapabilities)
+    const prior = await serviceA.create({ scanType: 'document', terminalId }, endUserId)
+    await setupClient.scanTask.update({
+      where: { id: prior.scanTaskId },
+      data: {
+        status: 'failed',
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+      },
+    })
+
+    const request = (service: ScanTasksService) =>
+      service.create(
+        { scanType: 'document', terminalId, retryOfScanTaskId: prior.scanTaskId },
+        endUserId,
+        prior.controlToken
+      )
+    const results = await Promise.allSettled([request(serviceA), request(serviceB)])
+    const winners = results.filter(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof serviceA.create>>> =>
+        result.status === 'fulfilled'
+    )
+    assert.ok(winners.length >= 1, 'real DB: at least one concurrent retry create must succeed')
+    const childId = winners[0].value.scanTaskId
+    for (const winner of winners) {
+      assert.equal(
+        winner.value.scanTaskId,
+        childId,
+        'real DB: concurrent retry creates must recover the same child'
+      )
+      assert.equal(
+        winner.value.controlToken,
+        prior.controlToken,
+        'real DB: retry child control token must be the prior token'
+      )
+    }
+    const replay = await request(serviceA)
+    assert.equal(replay.scanTaskId, childId, 'real DB: lost-response replay must return the same child')
+    assert.equal(replay.controlToken, prior.controlToken)
+    assert.equal(replay.expiresAt, winners[0].value.expiresAt, 'real DB: replay must not extend child TTL')
+    const rows = await setupClient.scanTask.findMany({ where: { terminalId } })
+    assert.equal(rows.length, 2, 'real DB: authority plus exactly one retry task must persist')
+    const authority = rows.find((row) => row.id === prior.scanTaskId)!
+    assert.ok(authority.retryConsumedAt)
+    assert.equal(authority.retryConsumedByScanTaskId, childId)
+
+    // Force the post-consumption create to fail on the active-session index. The transaction
+    // must roll back the authority consumption instead of leaving a consumed orphan.
+    await setupClient.scanTask.update({
+      where: { id: winners[0].value.scanTaskId },
+      data: { status: 'cancelled' },
+    })
+    const rollbackToken = randomBytes(24).toString('hex')
+    const rollbackAuthorityId = `rollback_authority_${randomBytes(4).toString('hex')}`
+    await setupClient.scanTask.create({
+      data: {
+        id: rollbackAuthorityId,
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        endUserId,
+        controlTokenHash: createHash('sha256').update(rollbackToken).digest('hex'),
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await setupClient.scanTask.create({
+      data: {
+        id: `active_blocker_${randomBytes(4).toString('hex')}`,
+        terminalId,
+        scanType: 'document',
+        status: 'waiting',
+        endUserId,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await expectRejectCode(
+      () =>
+        serviceA.create(
+          { scanType: 'document', terminalId, retryOfScanTaskId: rollbackAuthorityId },
+          endUserId,
+          rollbackToken
+        ),
+      ConflictException,
+      'SCAN_TERMINAL_BUSY',
+      'failed retry create transaction must remain atomic'
+    )
+    const rollbackAuthority = await setupClient.scanTask.findUnique({
+      where: { id: rollbackAuthorityId },
+    })
+    assert.equal(
+      rollbackAuthority?.retryConsumedAt,
+      null,
+      'real DB: failed retry create must roll back retryConsumedAt'
+    )
+    assert.equal(rollbackAuthority?.retryConsumedByScanTaskId, null)
+
+    // Force the child insert to collide on retryOfScanTaskId. This is a lineage conflict,
+    // not an active-session conflict, and the authority CAS must roll back with the insert.
+    await setupClient.scanTask.deleteMany({
+      where: { terminalId, status: { in: ['waiting', 'matched'] } },
+    })
+    const lineageToken = randomBytes(24).toString('hex')
+    const lineageAuthorityId = `lineage_authority_${randomBytes(4).toString('hex')}`
+    await setupClient.scanTask.create({
+      data: {
+        id: lineageAuthorityId,
+        terminalId,
+        scanType: 'document',
+        status: 'failed',
+        endUserId,
+        controlTokenHash: createHash('sha256').update(lineageToken).digest('hex'),
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await setupClient.scanTask.create({
+      data: {
+        id: `lineage_blocker_${randomBytes(4).toString('hex')}`,
+        terminalId,
+        scanType: 'document',
+        status: 'cancelled',
+        retryOfScanTaskId: lineageAuthorityId,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    await expectRejectCode(
+      () =>
+        serviceA.create(
+          { scanType: 'document', terminalId, retryOfScanTaskId: lineageAuthorityId },
+          endUserId,
+          lineageToken
+        ),
+      ConflictException,
+      'SCAN_RETRY_CONFLICT',
+      'retry lineage P2002 must not be misreported as terminal busy'
+    )
+    const lineageAuthority = await setupClient.scanTask.findUnique({
+      where: { id: lineageAuthorityId },
+    })
+    assert.equal(
+      lineageAuthority?.retryConsumedAt,
+      null,
+      'real DB: lineage-conflict retry create must roll back retryConsumedAt'
+    )
+    assert.equal(lineageAuthority?.retryConsumedByScanTaskId, null)
+  } finally {
+    await setupClient.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
+    await setupClient.endUser.deleteMany({ where: { id: endUserId } }).catch(() => undefined)
+    await setupClient.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await Promise.all([
+      setupClient.$disconnect(),
+      clientA.$disconnect(),
+      clientB.$disconnect(),
+    ])
+  }
+}
+
 /**
  * B1-11 follow-up：真实 DB 端到端验证 deliverScanFile() 的内容级去重护栏本体。
  *
@@ -630,7 +2020,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
     const audit = new AuditService(realPrisma)
     const storage = new StorageService()
     const files = new FilesService(realPrisma, audit, storage)
-    const service = new ScanTasksService(realPrisma, files, passthroughCapabilities)
+    const service = wrapServiceForTest(new ScanTasksService(realPrisma, files, passthroughCapabilities))
 
     const bufferA = tinyPdf()
     const contentHashA = createHash('sha256').update(bufferA).digest('hex')
@@ -642,6 +2032,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       buffer: bufferA,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredA.scanTaskId,
@@ -656,8 +2047,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       'real DB sanity precondition: the real FilesService.upload() must have stored the true content sha256 (not a placeholder)'
     )
 
-    // member_b 在同一物理终端开了一个全新等待任务——deliverScanFile() 匹配"该终端最早一条
-    // waiting 任务"完全不知道下一次投递的字节属于谁，这正是去重护栏要挡住的窗口。
+    // member_b 在同一物理终端开了一个全新等待任务——deliverScanFile() 匹配该终端唯一的 waiting 任务
     const taskB = await service.create({ scanType: 'document', terminalId }, endUserBId)
 
     let caught: unknown
@@ -667,6 +2057,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
         buffer: bufferA,
         filename: 'a-retry.pdf',
         mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
       })
     } catch (error) {
       caught = error
@@ -707,6 +2098,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       buffer: differentBuffer,
       filename: 'b.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredB.scanTaskId,
@@ -752,6 +2144,70 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       null,
       'real DB: an unrelated sha256 must not match any candidate row'
     )
+
+    // 真实 DB 下断言 SCAN_FILE_STALE_CAPTURE：观察时间早于任务创建边界时拒绝，任务保持 waiting 且无 FileObject
+    const taskC = await service.create({ scanType: 'document', terminalId }, endUserAId)
+    let caughtStaleRealDb: unknown
+    try {
+      await service.deliverScanFile({
+        terminalId,
+        buffer: Buffer.from('%PDF-1.4\nstale capture in real db\n%%EOF\n', 'latin1'),
+        filename: 'stale.pdf',
+        mimeType: 'application/pdf',
+        observedAt: new Date(Date.now() - 60_000).toISOString(),
+      })
+    } catch (e) {
+      caughtStaleRealDb = e
+    }
+    assert.ok(
+      caughtStaleRealDb instanceof ConflictException,
+      'real DB: stale capture must be rejected with ConflictException'
+    )
+    assert.equal(
+      ((caughtStaleRealDb as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_FILE_STALE_CAPTURE',
+      'real DB: stale capture rejection code must be SCAN_FILE_STALE_CAPTURE'
+    )
+    const taskCAfterStale = await client.scanTask.findUnique({ where: { id: taskC.scanTaskId } })
+    assert.equal(taskCAfterStale?.status, 'waiting', 'real DB: task C must remain waiting after stale delivery rejected')
+    assert.equal(taskCAfterStale?.fileId, null, 'real DB: task C must have no file attached')
+
+    // A failed task with an exact attempted hash and its prior control token can authorize one
+    // real new task, and that new task can deliver the otherwise-deduplicated identical bytes.
+    await client.scanTask.update({
+      where: { id: taskC.scanTaskId },
+      data: {
+        status: 'failed',
+        lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+        retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+      },
+    })
+    const safeRetry = await service.create(
+      {
+        scanType: 'document',
+        terminalId,
+        retryOfScanTaskId: taskC.scanTaskId,
+      },
+      endUserAId,
+      taskC.controlToken
+    )
+    const safeRetryDelivery = await service.deliverScanFile({
+      terminalId,
+      buffer: tinyPdf(),
+      filename: 'safe-identical-rescan.pdf',
+      mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
+    })
+    assert.equal(
+      safeRetryDelivery.scanTaskId,
+      safeRetry.scanTaskId,
+      'real DB: explicit one-time retry authority must permit its exact identical content'
+    )
+    const consumedAuthority = await client.scanTask.findUnique({
+      where: { id: taskC.scanTaskId },
+    })
+    assert.ok(consumedAuthority?.retryConsumedAt)
+    assert.equal(consumedAuthority?.retryConsumedByScanTaskId, safeRetry.scanTaskId)
   } finally {
     await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
     await client.fileObject
@@ -768,6 +2224,111 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       process.env['FILE_STORAGE_DIR'] = originalStorageDir
     }
     rmSync(tmpStorageDir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * waiting 过期 reaper 必须用条件更新把 expiresAt<=now 的 waiting 行收敛为 expired，
+ * 从而释放 B1-2 partial unique index，让同终端可以再 create()。getStatus() 的惰性过期
+ * 在无人查询时不会落盘，所以这条路径不能只靠读接口。
+ */
+async function assertRealDbWaitingExpiryReaperUnblocksTerminal(dbUrl: string): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  const terminalWaitingId = `realdb_wait_reap_w_${randomBytes(4).toString('hex')}`
+  const terminalMatchedId = `realdb_wait_reap_m_${randomBytes(4).toString('hex')}`
+  try {
+    for (const [id, suffix] of [
+      [terminalWaitingId, 'W'],
+      [terminalMatchedId, 'M'],
+    ] as const) {
+      await client.terminal.create({
+        data: {
+          id,
+          terminalCode: `RDB-WR-${suffix}-${randomBytes(3).toString('hex')}`,
+          agentToken: randomBytes(16).toString('hex'),
+          deviceFingerprint: 'verify-scan-tasks-realdb-waiting-reaper-fixture',
+          enabled: true,
+        },
+      })
+    }
+
+    const service = new ScanTasksService(client as never, {} as never, passthroughCapabilities)
+    const reaper = new ScanTaskReaperTask(client as never)
+
+    const expiredWaiting = await service.create(
+      { scanType: 'document', terminalId: terminalWaitingId },
+      null
+    )
+    await client.scanTask.updateMany({
+      where: { id: expiredWaiting.scanTaskId },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    })
+
+    const matchedPastExpiry = await client.scanTask.create({
+      data: {
+        terminalId: terminalMatchedId,
+        scanType: 'document',
+        status: 'matched',
+        expiresAt: new Date(Date.now() - 1000),
+      },
+      select: { id: true, updatedAt: true },
+    })
+
+    let blocked: unknown
+    try {
+      await service.create({ scanType: 'document', terminalId: terminalWaitingId }, null)
+    } catch (error) {
+      blocked = error
+    }
+    assert.ok(
+      blocked instanceof ConflictException,
+      `real DB: an expired-but-still-waiting row must keep the partial unique index closed before the waiting reaper runs, got ${(blocked as Error)?.constructor?.name}`
+    )
+    assert.equal(
+      ((blocked as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_TERMINAL_BUSY',
+      'real DB: same-terminal create before waiting reap must map to SCAN_TERMINAL_BUSY'
+    )
+
+    const reaped = await reaper.reapExpiredWaiting()
+    assert.ok(
+      reaped.count >= 1,
+      `real DB: waiting reaper must converge at least the expired waiting row, got ${reaped.count}`
+    )
+
+    const waitingAfter = await client.scanTask.findUnique({
+      where: { id: expiredWaiting.scanTaskId },
+    })
+    assert.equal(
+      waitingAfter?.status,
+      'expired',
+      'real DB: expired waiting row must be conditionally updated to expired'
+    )
+
+    const matchedAfter = await client.scanTask.findUnique({
+      where: { id: matchedPastExpiry.id },
+    })
+    assert.equal(
+      matchedAfter?.status,
+      'matched',
+      'real DB: waiting reaper must not rewrite a matched row even when expiresAt is in the past'
+    )
+
+    const second = await service.create({ scanType: 'document', terminalId: terminalWaitingId }, null)
+    assert.ok(
+      second.scanTaskId,
+      'real DB: same terminal must be able to create again after waiting expiry was reaped'
+    )
+    assert.notEqual(second.scanTaskId, expiredWaiting.scanTaskId)
+  } finally {
+    await client.scanTask.deleteMany({
+      where: { terminalId: { in: [terminalWaitingId, terminalMatchedId] } },
+    })
+    await client.terminal.deleteMany({
+      where: { id: { in: [terminalWaitingId, terminalMatchedId] } },
+    })
+    await client.$disconnect()
   }
 }
 
@@ -835,8 +2396,799 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
   )
 }
 
+function verifyDeliverCasAckExpiryMutationMakesRaceNonzero(): void {
+  const servicePath = path.join(__dirname, '..', 'src', 'scan-tasks', 'scan-tasks.service.ts')
+  const original = readFileSync(servicePath, 'utf8')
+  assert.equal(
+    original.includes(DELIVER_CAS_ACK_EXPIRY_BLOCK),
+    true,
+    'deliver CAS ACK/expiry block must exist before reverse mutation'
+  )
+  const mutated = original.replace(
+    DELIVER_CAS_ACK_EXPIRY_BLOCK,
+    `    const claimed = await this.prisma.scanTask.updateMany({
+      where: { id: task.id, status: 'waiting' },`
+  )
+  assert.notEqual(mutated, original, 'dropping deliver CAS ACK/expiry pins must actually change scan-tasks.service.ts')
+  try {
+    writeFileSync(servicePath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && path.resolve(process.argv[1]) !== path.resolve(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--deliver-cas-ack-race')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: path.join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping deliver CAS ACK/expiry pins must make the race case nonzero\n${output}`)
+    assert.match(
+      output,
+      /ACK race must not transition waiting to matched|deliver CAS must fail closed when ACK is cleared/,
+      `mutated deliver CAS test must fail on the ACK race, not an unrelated error\n${output}`
+    )
+    console.log('PASS deliver CAS ACK/expiry reverse mutation: ACK race becomes nonzero')
+  } finally {
+    writeFileSync(servicePath, original)
+  }
+  assert.equal(readFileSync(servicePath, 'utf8'), original, 'deliver CAS reverse mutation must restore scan-tasks.service.ts')
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes('--unacked-lease-ack-filter')) {
+    await runUnackedLeaseContractCase()
+    return
+  }
+  if (process.argv.includes('--deliver-cas-ack-race')) {
+    await runDeliverWithoutAckNegativeCase()
+    await runDeliverCasAckExpiryRaceCase()
+    return
+  }
+
+  const apiRootForContracts = path.resolve(__dirname, '..')
+  assertRetryHardeningMigrationContracts(apiRootForContracts)
+  assertRetryCreateRecoversLostResponse(apiRootForContracts)
+  assertDeliverScanFileRequiresBidirectionalLineage(apiRootForContracts)
+  assertDeliveryAckMigrationContracts(apiRootForContracts)
+  assertLeaseRequiresDeliveryAck(apiRootForContracts)
+  assertDeliverCasRepinsAckAndExpiry(apiRootForContracts)
+  assertLeaseAckFilterReverseMutation(apiRootForContracts)
+  verifyLeaseAckFilterMutationMakesUnackedCaseNonzero()
+  verifyDeliverCasAckExpiryMutationMakesRaceNonzero()
+
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
+
+  {
+    // Explicit safe rescan: an eligible failed task plus its prior control token authorizes
+    // exactly one new task for the same owner, terminal, scan type and content hash.
+    const { service, prisma } = makeService()
+    const bytes = tinyPdf()
+    const prior = await service.create(dto, 'member_retry')
+    makeRetryAuthority(prisma, prior.scanTaskId, bytes)
+
+    const retry = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_retry',
+      prior.controlToken
+    )
+    const priorRow = prisma.scanTasksById.get(prior.scanTaskId)!
+    const retryRow = prisma.scanTasksById.get(retry.scanTaskId)!
+    assert.ok(priorRow.retryConsumedAt, 'prior retry authority must record consumption time')
+    assert.equal(
+      priorRow.retryConsumedByScanTaskId,
+      retry.scanTaskId,
+      'prior retry authority must link to the newly created task'
+    )
+    assert.equal(retryRow.retryOfScanTaskId, prior.scanTaskId)
+    assert.equal(retryRow.retryContentHash, createHash('sha256').update(bytes).digest('hex'))
+    assert.equal(
+      retry.controlToken,
+      prior.controlToken,
+      'retry child must reuse the prior control token so a lost 2xx can be recovered'
+    )
+    assert.equal(
+      retryRow.controlTokenHash,
+      priorRow.controlTokenHash,
+      'retry child must store the prior control-token hash, never a second plaintext'
+    )
+
+    const delivered = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: bytes,
+      filename: 'legitimate-identical-retry.pdf',
+      mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
+    })
+    assert.equal(delivered.scanTaskId, retry.scanTaskId)
+  }
+
+  {
+    // Missing/wrong token, owner mismatch (including strict guest/null semantics), terminal,
+    // type, completed state and expiry must all reject without consuming the authority.
+    const cases: Array<{
+      label: string
+      priorOwner: string | null
+      retryOwner: string | null
+      retryDto?: CreateScanTaskDto
+      token?: string
+      mutate?: (task: StoredScanTask) => void
+    }> = [
+      { label: 'missing prior token', priorOwner: 'member_a', retryOwner: 'member_a' },
+      {
+        label: 'wrong prior token',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        token: 'wrong-token',
+      },
+      {
+        label: 'member-to-member owner mismatch',
+        priorOwner: 'member_a',
+        retryOwner: 'member_b',
+      },
+      { label: 'guest authority used by member', priorOwner: null, retryOwner: 'member_a' },
+      { label: 'member authority used as guest', priorOwner: 'member_a', retryOwner: null },
+      {
+        label: 'cross-terminal retry',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        retryDto: { scanType: 'document', terminalId: 't_2' },
+      },
+      {
+        label: 'mismatched scan type',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        retryDto: { scanType: 'resume', terminalId: 't_1' },
+      },
+      {
+        label: 'completed task denial',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        mutate: (task) => {
+          task.status = 'completed'
+        },
+      },
+      {
+        label: 'delivered row cannot masquerade as failed authority',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        mutate: (task) => {
+          task.fileId = 'already_delivered_file'
+        },
+      },
+      {
+        label: 'expired retry authority',
+        priorOwner: 'member_a',
+        retryOwner: 'member_a',
+        mutate: (task) => {
+          task.retryAuthorityExpiresAt = new Date(Date.now() - 1)
+          task.updatedAt = new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
+        },
+      },
+    ]
+
+    for (const testCase of cases) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, testCase.priorOwner)
+      const priorRow = makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+      testCase.mutate?.(priorRow)
+      await expectRejectCode(
+        () =>
+          service.create(
+            { ...(testCase.retryDto ?? dto), retryOfScanTaskId: prior.scanTaskId },
+            testCase.retryOwner,
+            testCase.token ?? (testCase.label === 'missing prior token' ? undefined : prior.controlToken)
+          ),
+        ForbiddenException,
+        'SCAN_RETRY_NOT_AUTHORIZED',
+        testCase.label
+      )
+      assert.equal(
+        prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedAt,
+        null,
+        `${testCase.label}: rejected attempt must not consume authority`
+      )
+    }
+  }
+
+  {
+    for (const eligibleStatus of ['cancelled', 'expired'] as const) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, 'member_terminal_state')
+      makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf(), { status: eligibleStatus })
+      const retry = await service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_terminal_state',
+        prior.controlToken
+      )
+      assert.equal(
+        prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedByScanTaskId,
+        retry.scanTaskId,
+        `${eligibleStatus} must be an explicitly eligible unsuccessful retry-authority state`
+      )
+    }
+  }
+
+  {
+    const { service, prisma } = makeService()
+    await expectRejectCode(
+      () => service.create(dto, null, 'orphan-retry-token'),
+      BadRequestException,
+      'SCAN_RETRY_TASK_ID_MISSING',
+      'retry token without retryOfScanTaskId'
+    )
+
+    const prior = await service.create(dto, null)
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const firstRetry = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    const lostResponseReplay = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    assert.equal(
+      lostResponseReplay.scanTaskId,
+      firstRetry.scanTaskId,
+      'lost-response replay must return the exact same child task'
+    )
+    assert.equal(
+      lostResponseReplay.controlToken,
+      prior.controlToken,
+      'lost-response replay must return the prior control token as the child credential'
+    )
+    assert.equal(
+      lostResponseReplay.expiresAt,
+      firstRetry.expiresAt,
+      'lost-response replay must not extend the child TTL'
+    )
+    assert.equal(
+      [...prisma.scanTasksById.values()].filter((task) => task.retryOfScanTaskId === prior.scanTaskId)
+        .length,
+      1,
+      'lost-response replay must not insert a second child'
+    )
+
+    const polled = await service.getStatus(firstRetry.scanTaskId, null, prior.controlToken)
+    assert.equal(polled.scanTaskId, firstRetry.scanTaskId)
+    assert.equal(polled.status, 'waiting')
+
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.status = 'matched'
+    const matchedReplay = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    assert.equal(
+      matchedReplay.scanTaskId,
+      firstRetry.scanTaskId,
+      'waiting/matched response-loss recovery must include matched children'
+    )
+
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.status = 'waiting'
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.expiresAt = new Date(Date.now() - 1)
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          null,
+          prior.controlToken
+        ),
+      ConflictException,
+      'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+      'expired waiting child recovery must fail closed'
+    )
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.expiresAt = new Date(Date.now() + 60_000)
+
+    prisma.scanTasksById.get(firstRetry.scanTaskId)!.status = 'cancelled'
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          null,
+          prior.controlToken
+        ),
+      ConflictException,
+      'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+      'consumed authority with a terminal child must fail closed'
+    )
+    assert.equal(
+      [...prisma.scanTasksById.values()].filter((task) => task.retryOfScanTaskId === prior.scanTaskId)
+        .length,
+      1,
+      'dead-child replay must not start a grandchild or second child'
+    )
+  }
+
+  {
+    // Two parallel consumers of one authority: CAS still has one writer, but the
+    // loser must recover the same child instead of 403-ing a lost inbox.
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_parallel')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const results = await Promise.allSettled([
+      service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_parallel',
+        prior.controlToken
+      ),
+      service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_parallel',
+        prior.controlToken
+      ),
+    ])
+    const fulfilled = results.filter(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof service.create>>> =>
+        result.status === 'fulfilled'
+    )
+    const rejected = results.filter((result) => result.status === 'rejected')
+    assert.equal(fulfilled.length, 2, 'parallel retry creates must both return the single child')
+    assert.equal(rejected.length, 0, 'parallel retry loser must recover, not reject')
+    assert.equal(fulfilled[0].value.scanTaskId, fulfilled[1].value.scanTaskId)
+    assert.equal(fulfilled[0].value.controlToken, prior.controlToken)
+    assert.equal(fulfilled[1].value.controlToken, prior.controlToken)
+    assert.equal(
+      prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedByScanTaskId,
+      fulfilled[0].value.scanTaskId,
+      'authority must link to the sole parallel child'
+    )
+    assert.equal(
+      [...prisma.scanTasksById.values()].filter((task) => task.retryOfScanTaskId === prior.scanTaskId)
+        .length,
+      1,
+      'parallel retry creates must persist exactly one child'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_a')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_a',
+      prior.controlToken
+    )
+    const isolation = [
+      {
+        label: 'wrong prior token',
+        owner: 'member_a' as string | null,
+        dto: { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        token: 'wrong-token',
+      },
+      {
+        label: 'member-to-member owner mismatch',
+        owner: 'member_b' as string | null,
+        dto: { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+      {
+        label: 'member authority used as guest',
+        owner: null,
+        dto: { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+      {
+        label: 'cross-terminal retry',
+        owner: 'member_a' as string | null,
+        dto: { scanType: 'document' as const, terminalId: 't_2', retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+      {
+        label: 'mismatched scan type',
+        owner: 'member_a' as string | null,
+        dto: { scanType: 'resume' as const, terminalId: 't_1', retryOfScanTaskId: prior.scanTaskId },
+        token: prior.controlToken,
+      },
+    ]
+    for (const testCase of isolation) {
+      await expectRejectCode(
+        () => service.create(testCase.dto, testCase.owner, testCase.token),
+        ForbiddenException,
+        'SCAN_RETRY_NOT_AUTHORIZED',
+        `${testCase.label}: must not discover or recover the child`
+      )
+    }
+    assert.equal(
+      prisma.scanTasksById.get(prior.scanTaskId)?.retryConsumedByScanTaskId,
+      child.scanTaskId
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_plain')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const unsigned = await service.create(dto, 'member_plain')
+    assert.notEqual(unsigned.scanTaskId, prior.scanTaskId)
+    assert.notEqual(
+      unsigned.controlToken,
+      prior.controlToken,
+      'plain create must keep minting a fresh control token'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(unsigned.scanTaskId)?.retryOfScanTaskId,
+      null,
+      'plain create must never obtain retry lineage or dedup exemption'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_reverse')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_reverse',
+      prior.controlToken
+    )
+    const access = service as unknown as {
+      recoverRetryChildIfPresent: (...args: unknown[]) => Promise<unknown>
+    }
+    const originalRecover = access.recoverRetryChildIfPresent.bind(service)
+    access.recoverRetryChildIfPresent = async () => null
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          'member_reverse',
+          prior.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'reverse mutation: dropping recoverRetryChildIfPresent must fail closed on replay'
+    )
+    access.recoverRetryChildIfPresent = originalRecover
+    const restored = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_reverse',
+      prior.controlToken
+    )
+    assert.equal(restored.scanTaskId, child.scanTaskId)
+  }
+
+  {
+    for (const deadStatus of ['failed', 'expired', 'completed'] as const) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, 'member_dead')
+      makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+      const child = await service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_dead',
+        prior.controlToken
+      )
+      prisma.scanTasksById.get(child.scanTaskId)!.status = deadStatus
+      await expectRejectCode(
+        () =>
+          service.create(
+            { ...dto, retryOfScanTaskId: prior.scanTaskId },
+            'member_dead',
+            prior.controlToken
+          ),
+        ConflictException,
+        'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+        `${deadStatus} child recovery must fail closed`
+      )
+    }
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const plain = await service.create(dto, null)
+    assert.equal(prisma.scanTasksById.get(plain.scanTaskId)?.deliveryAckedAt, null)
+    await expectRejectCode(
+      () => service.getScanDeliveryLease('t_1'),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      'plain create must not be leasable before ACK'
+    )
+    const acked = await service.ack(plain.scanTaskId, null, plain.controlToken, 't_1')
+    assert.ok(acked.deliveryAckedAt)
+    const lease = await service.getScanDeliveryLease('t_1')
+    assert.equal(lease.scanTaskId, plain.scanTaskId)
+    const ackedAgain = await service.ack(plain.scanTaskId, null, plain.controlToken, 't_1')
+    assert.equal(ackedAgain.deliveryAckedAt, acked.deliveryAckedAt, 'second ACK must be idempotent')
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, 'member_ack')
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_ack',
+      prior.controlToken
+    )
+    assert.equal(prisma.scanTasksById.get(child.scanTaskId)?.deliveryAckedAt, null)
+    await expectRejectCode(
+      () => service.getScanDeliveryLease('t_1'),
+      ConflictException,
+      'NO_WAITING_SCAN_TASK',
+      'retry create must not be leasable before ACK'
+    )
+    const replay = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_ack',
+      prior.controlToken
+    )
+    assert.equal(replay.scanTaskId, child.scanTaskId)
+    assert.equal(prisma.scanTasksById.get(child.scanTaskId)?.deliveryAckedAt, null)
+    await service.ack(child.scanTaskId, 'member_ack', prior.controlToken, 't_1')
+    const lease = await service.getScanDeliveryLease('t_1')
+    assert.equal(lease.scanTaskId, child.scanTaskId)
+  }
+
+  {
+    const { service } = makeService()
+    const memberTask = await service.create(dto, 'member_a')
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, 'member_a', 'wrong-token', 't_1'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'wrong control token must not ACK'
+    )
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, 'member_b', memberTask.controlToken, 't_1'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'wrong member must not ACK'
+    )
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, null, memberTask.controlToken, 't_1'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'guest must not ACK a member task'
+    )
+    await expectRejectCode(
+      () => service.ack(memberTask.scanTaskId, 'member_a', memberTask.controlToken, 't_2'),
+      ForbiddenException,
+      'SCAN_TASK_FORBIDDEN',
+      'wrong terminal must not ACK'
+    )
+    await expectRejectCode(
+      () => service.ack('missing-task', 'member_a', memberTask.controlToken, 't_1'),
+      NotFoundException,
+      'SCAN_TASK_NOT_FOUND',
+      'missing task ACK is 404 not a presence oracle via 403'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, null)
+    for (const deadStatus of ['cancelled', 'failed', 'completed', 'expired'] as const) {
+      prisma.scanTasksById.get(created.scanTaskId)!.status = deadStatus
+      await expectRejectCode(
+        () => service.ack(created.scanTaskId, null, created.controlToken, 't_1'),
+        ConflictException,
+        'SCAN_TASK_ACK_NOT_ALLOWED',
+        `${deadStatus} task must not ACK`
+      )
+    }
+    prisma.scanTasksById.get(created.scanTaskId)!.status = 'waiting'
+    prisma.scanTasksById.get(created.scanTaskId)!.expiresAt = new Date(Date.now() - 1)
+    await expectRejectCode(
+      () => service.ack(created.scanTaskId, null, created.controlToken, 't_1'),
+      ConflictException,
+      'SCAN_TASK_ACK_NOT_ALLOWED',
+      'expired waiting task must not ACK'
+    )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const prior = await service.create(dto, null)
+    makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+    const child = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      null,
+      prior.controlToken
+    )
+    const row = prisma.scanTasksById.get(child.scanTaskId)!
+    prisma.scanTasksById.set(child.scanTaskId, {
+      ...row,
+      createdAt: new Date(Date.now() - SCAN_UNACKED_WAITING_GRACE_MS - 1),
+    })
+    const reaper = new ScanTaskReaperTask(prisma as never)
+    const reaped = await reaper.reapUnackedWaiting()
+    assert.equal(reaped.count, 1)
+    const after = prisma.scanTasksById.get(child.scanTaskId)!
+    assert.equal(after.status, 'expired')
+    assert.equal(after.retryAuthorityExpiresAt, null, 'unacked reap must not mint retry authority')
+    const next = await service.create(dto, null)
+    assert.ok(next.scanTaskId)
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: prior.scanTaskId },
+          null,
+          prior.controlToken
+        ),
+      ConflictException,
+      'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+      'reaped unacked retry child must not open a second child'
+    )
+  }
+
+  {
+    // A retry authority for hash A is not a general terminal dedup exemption for hash B.
+    const { service, prisma } = makeService()
+    const hashABytes = tinyPdf()
+    const hashBBytes = Buffer.from('%PDF-1.4\nalready delivered hash B\n%%EOF\n', 'latin1')
+    const prior = await service.create(dto, 'member_scope')
+    makeRetryAuthority(prisma, prior.scanTaskId, hashABytes)
+    const retry = await service.create(
+      { ...dto, retryOfScanTaskId: prior.scanTaskId },
+      'member_scope',
+      prior.controlToken
+    )
+    const historicalFileId = 'file_hash_b'
+    prisma.filesById.set(historicalFileId, {
+      id: historicalFileId,
+      filename: 'hash-b.pdf',
+      sizeBytes: hashBBytes.length,
+      mimeType: 'application/pdf',
+      sha256: createHash('sha256').update(hashBBytes).digest('hex'),
+      purpose: 'print_doc',
+      endUserId: 'member_scope',
+      deletedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    const retryRow = prisma.scanTasksById.get(retry.scanTaskId)!
+    const historicalTask: StoredScanTask = {
+      ...retryRow,
+      id: 'historical_hash_b',
+      terminalId: 't_1',
+      status: 'completed',
+      fileId: historicalFileId,
+      endUserId: 'member_scope',
+      lastAttemptHash: createHash('sha256').update(hashBBytes).digest('hex'),
+      retryOfScanTaskId: null,
+      retryContentHash: null,
+      retryConsumedAt: null,
+      retryConsumedByScanTaskId: null,
+      updatedAt: new Date(),
+    }
+    prisma.scanTasksById.set(historicalTask.id, historicalTask)
+    await expectRejectCode(
+      () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          buffer: hashBBytes,
+          filename: 'wrong-hash-for-authority.pdf',
+          mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
+        }),
+      ConflictException,
+      'SCAN_FILE_ALREADY_DELIVERED',
+      'retry authorization must be scoped to its exact content hash'
+    )
+    assert.equal(prisma.scanTasksById.get(retry.scanTaskId)?.status, 'waiting')
+  }
+
+  {
+    // The child row is not self-authenticating. Every dedup bypass must be proven by a matching,
+    // consumed prior authority whose backlink points to this exact child.
+    const mutations: Array<{
+      label: string
+      mutate: (prior: StoredScanTask, child: StoredScanTask, prisma: FakePrisma) => void
+    }> = [
+      {
+        label: 'orphan child',
+        mutate: (_prior, child) => {
+          child.retryOfScanTaskId = 'missing-prior'
+        },
+      },
+      {
+        label: 'mismatched backlink',
+        mutate: (prior) => {
+          prior.retryConsumedByScanTaskId = 'different-child'
+        },
+      },
+      {
+        label: 'missing consumption time',
+        mutate: (prior) => {
+          prior.retryConsumedAt = null
+        },
+      },
+      {
+        label: 'missing authority expiry',
+        mutate: (prior) => {
+          prior.retryAuthorityExpiresAt = null
+        },
+      },
+      {
+        label: 'consumption after authority expiry',
+        mutate: (prior) => {
+          prior.retryAuthorityExpiresAt = new Date(prior.retryConsumedAt!.getTime() - 1)
+        },
+      },
+      {
+        label: 'ineligible prior status',
+        mutate: (prior) => {
+          prior.status = 'completed'
+        },
+      },
+      {
+        label: 'prior already has file',
+        mutate: (prior) => {
+          prior.fileId = 'forged-existing-file'
+        },
+      },
+      {
+        label: 'wrong owner',
+        mutate: (prior) => {
+          prior.endUserId = 'other-member'
+        },
+      },
+      {
+        label: 'wrong terminal',
+        mutate: (prior) => {
+          prior.terminalId = 't_2'
+        },
+      },
+      {
+        label: 'wrong scan type',
+        mutate: (prior) => {
+          prior.scanType = 'resume'
+        },
+      },
+      {
+        label: 'wrong content hash',
+        mutate: (prior) => {
+          prior.lastAttemptHash = 'f'.repeat(64)
+        },
+      },
+    ]
+
+    for (const mutation of mutations) {
+      const { service, prisma } = makeService()
+      const bytes = tinyPdf()
+      const prior = await service.create(dto, 'member_lineage')
+      makeRetryAuthority(prisma, prior.scanTaskId, bytes)
+      const retry = await service.create(
+        { ...dto, retryOfScanTaskId: prior.scanTaskId },
+        'member_lineage',
+        prior.controlToken
+      )
+      const priorRow = prisma.scanTasksById.get(prior.scanTaskId)!
+      const retryRow = prisma.scanTasksById.get(retry.scanTaskId)!
+      prisma.scanTasksById.set(`lineage-dedup-evidence-${mutation.label}`, {
+        ...priorRow,
+        id: `lineage-dedup-evidence-${mutation.label}`,
+        retryConsumedAt: null,
+        retryConsumedByScanTaskId: null,
+        retryAuthorityExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      mutation.mutate(priorRow, retryRow, prisma)
+
+      await expectRejectCode(
+        () =>
+          service.deliverScanFile({
+            terminalId: 't_1',
+            buffer: bytes,
+            filename: `forged-${mutation.label}.pdf`,
+            mimeType: 'application/pdf',
+            observedAt: new Date().toISOString(),
+          }),
+        ConflictException,
+        'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+        `${mutation.label} lineage must not bypass dedup`
+      )
+      assert.equal(
+        prisma.scanTasksById.get(retry.scanTaskId)?.status,
+        'waiting',
+        `${mutation.label}: forged lineage must leave the child waiting and unclaimed`
+      )
+    }
+  }
 
   {
     // contract scan 必须贯通专用高敏短期 purpose，不能退化到通用 print_doc。
@@ -847,6 +3199,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'contract.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(delivered.scanTaskId, created.scanTaskId)
     assert.equal(prisma.filesById.get(delivered.fileId)?.purpose, 'contract_upload')
@@ -916,6 +3269,7 @@ async function main(): Promise<void> {
       buffer: Buffer.from('%PDF-1.4 scan'),
       filename: 'scan.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(delivered.scanTaskId, created.scanTaskId)
     // scanType -> FilePurpose 映射:document 扫描必须落 print_doc（顺带覆盖，不单开一个测试块）
@@ -986,6 +3340,37 @@ async function main(): Promise<void> {
   }
 
   {
+    for (const target of [['retryOfScanTaskId'], 'ScanTask_retryConsumedByScanTaskId_key'] as const) {
+      const { service, prisma } = makeService()
+      const prior = await service.create(dto, 'member_lineage_p2002')
+      makeRetryAuthority(prisma, prior.scanTaskId, tinyPdf())
+      const originalCreate = prisma.scanTask.create.bind(prisma.scanTask)
+      prisma.scanTask.create = (async () => {
+        throw new Prisma.PrismaClientKnownRequestError(
+          `Unique constraint failed on ${String(target)}`,
+          {
+            code: 'P2002',
+            clientVersion: 'verify-scan-tasks-fixture',
+            meta: { target },
+          }
+        )
+      }) as typeof originalCreate
+      await expectRejectCode(
+        () =>
+          service.create(
+            { ...dto, retryOfScanTaskId: prior.scanTaskId },
+            'member_lineage_p2002',
+            prior.controlToken
+          ),
+        ConflictException,
+        'SCAN_RETRY_CONFLICT',
+        `P2002 target ${String(target)} must map to SCAN_RETRY_CONFLICT, not SCAN_TERMINAL_BUSY`
+      )
+      prisma.scanTask.create = originalCreate as typeof prisma.scanTask.create
+    }
+  }
+
+  {
     // create() 必须只把 P2002 映射成 SCAN_TERMINAL_BUSY；其它数据库错误码/未知错误必须原样透出
     // （不能被误吞成"终端繁忙"，否则会掩盖真实故障，误导排障方向）。
     //
@@ -1048,10 +3433,17 @@ async function main(): Promise<void> {
     const dbUrl = `file:${dbPath}`
 
     try {
+      assertSqliteRetryHardeningUpgrade(apiRoot)
       ensureSqliteFile(dbPath)
       runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
 
       await assertRealDbPartialUniqueIndex(dbUrl, 'sqlite')
+      await assertRealDbWaitingExpiryReaperUnblocksTerminal(dbUrl)
+      await assertRealDbRetryAuthorityCas(dbUrl, 'sqlite')
+      await assertRealDbRetryCreateAtomicity(dbUrl)
+      await assertRealDbRetryLineageIndexes(dbUrl, 'sqlite')
+      assertSqliteDeliveryAckBackfill(apiRoot)
+      await assertRealDbDeliveryAckGate(dbUrl, 'sqlite')
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }
@@ -1066,15 +3458,9 @@ async function main(): Promise<void> {
     // 真的对着那个连接跑两次 create() 去验证约束的 WHERE 子句在 Postgres 上语义正确——SQLite
     // 那半边测过不代表 Postgres 那半边也一定对（哪怕两份 .sql 文本几乎一样）。
     //
-    // 复用哪个数据库连接、要不要单独建库/建 schema：本仓库目前唯一存在的"对真实 Postgres 跑
-    // 测试"先例，是 postgres-readiness CI job 本身的架构——整个 job 起一个 Postgres service
-    // 容器、部署一次迁移、seed 一次，然后几十个 verify:* 脚本依次共用同一个数据库连接，靠各自
-    // 随机 ID + 用完自己清理来避免互相污染（见本文件其余 verify:* 脚本的调用方式：
-    // .github/workflows/ci.yml 的 postgres-readiness job）。这里跟随同一个约定：直接连到
-    // POSTGRES_URL（CI 场景）或退化到 DATABASE_URL（本地场景，与 prisma.postgres.config.ts
-    // 读取 env 的优先级一致），不额外发明"每个测试起一个独立 schema/database"的新隔离机制——
-    // assertRealDbPartialUniqueIndex() 内部沿用与 SQLite 块相同的随机 terminalId + finally
-    // 清理，不会残留数据。
+    // 普通行为断言继续复用 POSTGRES_URL 指向的专用库，并以随机 ID + finally 清理隔离。
+    // 上一版本升级断言需要同时保留 clean / duplicate 两种独立结构，因此只在同一临时集群内
+    // 创建随机测试数据库，验证完成后立即 drop；不会连接或修改 URL 指定集群之外的数据库。
     //
     // 没有配置 Postgres 环境时（例如本地开发者跑 `pnpm verify:scan-tasks` 没起 Postgres）优雅
     // 跳过，不失败——跟 scripts/verify-cos-live.ts 对未配置真实凭证时的处理方式一致（SKIPPED
@@ -1095,6 +3481,7 @@ async function main(): Promise<void> {
       )
     } else {
       const apiRoot = path.resolve(__dirname, '..')
+      assertPostgresRetryHardeningUpgrade(apiRoot, pgUrl)
       // 与 SQLite 块一致：不假设调用方已经在本进程之外部署过迁移，本块自己也跑一遍真实
       // `migrate deploy`（走 Postgres 专用配置/迁移目录，见 prisma.postgres.config.ts）。
       // migrate deploy 是幂等的，对已经部署过这条迁移的库（如 CI 提前 db:pg:deploy 过的库）
@@ -1106,6 +3493,86 @@ async function main(): Promise<void> {
       })
 
       await assertRealDbPartialUniqueIndex(pgUrl, 'postgres')
+      await assertRealDbRetryAuthorityCas(pgUrl, 'postgres')
+      await assertRealDbRetryCreateAtomicity(pgUrl)
+      await assertRealDbRetryLineageIndexes(pgUrl, 'postgres')
+      assert.equal(
+        postgresQuery(
+          pgUrl,
+          `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ScanTask' AND column_name = 'deliveryAckedAt';`
+        ),
+        '1',
+        'PostgreSQL ACK migration must add deliveryAckedAt'
+      )
+      await assertRealDbDeliveryAckGate(pgUrl, 'postgres')
+      {
+        const sourceMigrationsRoot = path.join(apiRoot, 'prisma', 'postgres', 'migrations')
+        const sandbox = createMigrationSandbox(
+          apiRoot,
+          sourceMigrationsRoot,
+          path.join(apiRoot, 'prisma', 'postgres', 'schema.prisma'),
+          'postgresql'
+        )
+        const base = new URL(pgUrl)
+        const maintenanceDatabase = base.pathname.slice(1) || 'postgres'
+        const suffix = randomBytes(4).toString('hex')
+        const dbName = `scan_ack_backfill_${suffix}`
+        const connectionArgs = [
+          '-h',
+          base.hostname,
+          '-p',
+          base.port || '5432',
+          '-U',
+          base.username || 'postgres',
+          '-w',
+        ]
+        const postgresCommandEnv = {
+          ...process.env,
+          ...(base.password ? { PGPASSWORD: base.password } : {}),
+        }
+        try {
+          execFileSync(
+            'createdb',
+            [...connectionArgs, '--maintenance-db', maintenanceDatabase, dbName],
+            { env: postgresCommandEnv, stdio: 'pipe' }
+          )
+          addHardeningMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+          const dbUrl = postgresDatabaseUrl(pgUrl, dbName)
+          runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+            ...process.env,
+            DATABASE_URL: dbUrl,
+            POSTGRES_URL: dbUrl,
+          })
+          postgresQuery(
+            dbUrl,
+            `
+              INSERT INTO "Terminal" ("id", "terminalCode", "agentToken", "deviceFingerprint", "lastSeenAt")
+              VALUES ('ack_backfill_terminal', 'ACK-BACKFILL', 'ack-backfill-token', 'ack-backfill-fp', NOW());
+              INSERT INTO "ScanTask" ("id", "terminalId", "scanType", "status", "expiresAt", "createdAt", "updatedAt")
+              VALUES ('legacy_waiting', 'ack_backfill_terminal', 'document', 'waiting', NOW() + INTERVAL '10 minutes', NOW() - INTERVAL '90 seconds', NOW() - INTERVAL '90 seconds');
+            `
+          )
+          const createdAt = postgresQuery(dbUrl, `SELECT "createdAt" FROM "ScanTask" WHERE id = 'legacy_waiting';`)
+          addAckMigrationToSandbox(sourceMigrationsRoot, sandbox.migrationsRoot)
+          runPrisma(apiRoot, ['migrate', 'deploy', '--config', sandbox.configPath], {
+            ...process.env,
+            DATABASE_URL: dbUrl,
+            POSTGRES_URL: dbUrl,
+          })
+          assert.equal(
+            postgresQuery(dbUrl, `SELECT "deliveryAckedAt" FROM "ScanTask" WHERE id = 'legacy_waiting';`),
+            createdAt,
+            'PostgreSQL ACK migration must backfill waiting rows to createdAt'
+          )
+        } finally {
+          execFileSync(
+            'dropdb',
+            [...connectionArgs, '--maintenance-db', maintenanceDatabase, '--if-exists', '--force', dbName],
+            { env: postgresCommandEnv, stdio: 'pipe' }
+          )
+          rmSync(sandbox.root, { recursive: true, force: true })
+        }
+      }
     }
   }
 
@@ -1139,6 +3606,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'stray.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'no waiting task rejected'
@@ -1146,23 +3614,21 @@ async function main(): Promise<void> {
   }
 
   {
-    // 最早一条 waiting 任务优先匹配（而不是最新一条）
+    // 按终端唯一定位 waiting 任务（DB 层面已有单终端至多一条活跃任务约束，移除了 FIFO 排序与叙述）
     const { service } = makeService()
-    const first = await service.create(dto, null)
-    await new Promise((r) => setTimeout(r, 5))
-    const second = await service.create(dto, null)
+    const task = await service.create(dto, null)
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
       buffer: tinyPdf(),
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       delivered.scanTaskId,
-      first.scanTaskId,
-      'must match the oldest waiting task, not the newest'
+      task.scanTaskId,
+      'must match the unique waiting task for the terminal'
     )
-    void second
   }
 
   {
@@ -1176,6 +3642,22 @@ async function main(): Promise<void> {
     })
     const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'expired')
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryAuthorityExpiresAt,
+      null,
+      'waiting lazy expiry without lastAttemptHash must not mint retry authority'
+    )
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: created.scanTaskId },
+          null,
+          created.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'waiting expiry must not authorize a content-bound retry'
+    )
     await expectRejects(
       () =>
         service.deliverScanFile({
@@ -1183,6 +3665,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'late.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'expired task must not be matched'
@@ -1228,15 +3711,22 @@ async function main(): Promise<void> {
     const { service, prisma } = makeService()
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
+    const attemptedHash = createHash('sha256').update(tinyPdf()).digest('hex')
     prisma.scanTasksById.set(created.scanTaskId, {
       ...task,
       status: 'matched',
+      lastAttemptHash: attemptedHash,
       expiresAt: new Date(Date.now() - 1000),
     })
 
     const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'expired')
-    assert.equal(prisma.scanTasksById.get(created.scanTaskId)?.status, 'expired')
+    const expiredRow = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.equal(expiredRow.status, 'expired')
+    assert.ok(
+      expiredRow.retryAuthorityExpiresAt && expiredRow.retryAuthorityExpiresAt.getTime() > Date.now(),
+      'matched lazy expiry with lastAttemptHash must atomically mint a dedicated retry authority'
+    )
   }
 
   {
@@ -1302,6 +3792,100 @@ async function main(): Promise<void> {
     )
     const cancelled = await service.cancel(created.scanTaskId, 'member_1', created.controlToken)
     assert.equal(cancelled.status, 'cancelled')
+  }
+
+  {
+    // 登出/会话失效后 optional endUserId 为 null：正确 controlToken 必须仍能取消
+    // waiting/matched 会员任务。getStatus 的会员归属校验不得一并放宽。
+    for (const liveStatus of ['waiting', 'matched'] as const) {
+      const { service, prisma } = makeService()
+      const created = await service.create(dto, 'member_logout')
+      if (liveStatus === 'matched') {
+        const task = prisma.scanTasksById.get(created.scanTaskId)!
+        prisma.scanTasksById.set(created.scanTaskId, { ...task, status: 'matched' })
+      }
+
+      await expectRejects(
+        () => service.getStatus(created.scanTaskId, null, created.controlToken),
+        ForbiddenException,
+        `anonymous getStatus must still be forbidden for a member ${liveStatus} task`
+      )
+      assert.equal(
+        prisma.scanTasksById.get(created.scanTaskId)?.status,
+        liveStatus,
+        `rejected anonymous status read must not mutate a member ${liveStatus} task`
+      )
+      assert.equal(
+        prisma.scanTasksById.get(created.scanTaskId)?.endUserId,
+        'member_logout',
+        'rejected anonymous status read must not clear stored ownership'
+      )
+
+      const cancelled = await service.cancel(created.scanTaskId, null, created.controlToken)
+      assert.equal(cancelled.status, 'cancelled')
+      const stored = prisma.scanTasksById.get(created.scanTaskId)!
+      assert.equal(stored.status, 'cancelled', `member ${liveStatus} task must cancel with a valid token after logout`)
+      assert.equal(
+        stored.endUserId,
+        'member_logout',
+        'token-authenticated anonymous cancel must not clear stored ownership'
+      )
+
+      await expectRejects(
+        () => service.getStatus(created.scanTaskId, null, created.controlToken),
+        ForbiddenException,
+        'anonymous getStatus must remain forbidden after token-authenticated cancel'
+      )
+      const ownerStatus = await service.getStatus(
+        created.scanTaskId,
+        'member_logout',
+        created.controlToken
+      )
+      assert.equal(ownerStatus.status, 'cancelled')
+    }
+  }
+
+  {
+    // 错/缺 controlToken 在 endUserId 为 null 时仍 403，不得取消会员任务，状态与读归属都不变。
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, 'member_logout')
+    const wrongToken = randomBytes(24).toString('hex')
+    assert.notEqual(
+      wrongToken,
+      created.controlToken,
+      'sanity: fixture must generate a genuinely different token'
+    )
+
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, null, wrongToken),
+      ForbiddenException,
+      'wrong controlToken must not cancel a member task after logout'
+    )
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, null, undefined),
+      ForbiddenException,
+      'missing controlToken must not cancel a member task after logout'
+    )
+
+    const stored = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.equal(stored.status, 'waiting', 'rejected anonymous cancel must leave status unchanged')
+    assert.equal(
+      stored.endUserId,
+      'member_logout',
+      'rejected anonymous cancel must leave stored ownership unchanged'
+    )
+
+    await expectRejects(
+      () => service.getStatus(created.scanTaskId, null, created.controlToken),
+      ForbiddenException,
+      'read ownership must stay closed to anonymous callers after a rejected cancel'
+    )
+    const ownerStatus = await service.getStatus(
+      created.scanTaskId,
+      'member_logout',
+      created.controlToken
+    )
+    assert.equal(ownerStatus.status, 'waiting')
   }
 
   {
@@ -1434,6 +4018,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     await expectRejects(
       () => service.cancel(created.scanTaskId, null, created.controlToken),
@@ -1467,6 +4052,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'id.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     const file = prisma.filesById.get(delivered.fileId)
     assert.equal(file?.purpose, 'id_scan')
@@ -1482,6 +4068,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'resume.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     const file = prisma.filesById.get(delivered.fileId)
     assert.equal(file?.purpose, 'resume_scan')
@@ -1503,19 +4090,20 @@ async function main(): Promise<void> {
 
   {
     // deliverScanFile 的 catch 分支:this.files.upload() 抛错时，任务落 failed +
-    // errorCode: 'SCAN_UPLOAD_FAILED'，原始错误信息存入 DB 的 errorMessage，然后原样 rethrow。
-    // getStatus() 对外必须把 errorCode 映射成 USER_FACING_SCAN_ERROR 里的白名单文案，
-    // 绝不能把原始错误信息透出给用户。
+    // errorCode: 'SCAN_UPLOAD_FAILED'。原始错误只 rethrow 给 Agent，DB 与 getStatus()
+    // 都只保留 USER_FACING_SCAN_ERROR 白名单文案，绝不能把原始错误信息透出给用户。
     const prisma = new FakePrisma()
     const throwingFiles = {
       upload: async (): Promise<never> => {
         throw new Error('ENOSPC: disk full — this raw detail must never reach the user')
       },
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      throwingFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        throwingFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
 
@@ -1526,6 +4114,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'broken.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       Error,
       'deliverScanFile must rethrow the original upload error'
@@ -1539,31 +4128,112 @@ async function main(): Promise<void> {
       '扫描文件处理失败，请重新扫描',
       'errorMessage must be the whitelisted user-facing string, not the raw thrown error message'
     )
+    const failedRow = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.equal(
+      failedRow.errorMessage,
+      '扫描文件处理失败，请重新扫描',
+      'DB errorMessage must store the whitelist text, not the raw upload error'
+    )
+    assert.ok(
+      failedRow.retryAuthorityExpiresAt && failedRow.retryAuthorityExpiresAt.getTime() > Date.now(),
+      'upload failure after matching must atomically mint retry authority'
+    )
+    const retryAfterUploadFailure = await service.create(
+      { ...dto, retryOfScanTaskId: created.scanTaskId },
+      null,
+      created.controlToken
+    )
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryConsumedByScanTaskId,
+      retryAfterUploadFailure.scanTaskId,
+      'matched upload failure must authorize exactly one identical-content retry'
+    )
+    const fixedAuthorityExpiry = failedRow.retryAuthorityExpiresAt!.getTime()
+    await prisma.scanTask.updateMany({
+      where: { id: created.scanTaskId, status: 'failed' },
+      data: { errorMessage: 'unrelated follow-up write' },
+    })
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryAuthorityExpiresAt?.getTime(),
+      fixedAuthorityExpiry,
+      'an unrelated update that bumps updatedAt must not extend retry authority expiry'
+    )
   }
 
   {
-    // cancel() 的 CAS 用 status:{in:['waiting','matched']}，已被投递匹配但尚未完成（matched）的任务同样可取消，
-    // 不能只认 waiting。
+    // cancel() only admits waiting/matched. Its CAS pins the exact state and hash snapshot,
+    // so a matched task remains cancellable without allowing terminal states to be rewritten.
     const { service, prisma } = makeService()
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
-    prisma.scanTasksById.set(created.scanTaskId, { ...task, status: 'matched' })
+    prisma.scanTasksById.set(created.scanTaskId, {
+      ...task,
+      status: 'matched',
+      lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
+    })
     const cancelled = await service.cancel(created.scanTaskId, null, created.controlToken)
     assert.equal(cancelled.status, 'cancelled')
+    assert.ok(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryAuthorityExpiresAt,
+      'cancelling a matched task with lastAttemptHash must atomically mint retry authority'
+    )
+    const retryAfterMatchedCancel = await service.create(
+      { ...dto, retryOfScanTaskId: created.scanTaskId },
+      null,
+      created.controlToken
+    )
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.retryConsumedByScanTaskId,
+      retryAfterMatchedCancel.scanTaskId,
+      'matched cancellation with lastAttemptHash must authorize exactly one retry'
+    )
+  }
+
+  {
+    for (const terminalStatus of ['failed', 'expired', 'cancelled'] as const) {
+      const { service, prisma } = makeService()
+      const created = await service.create(dto, null)
+      const task = prisma.scanTasksById.get(created.scanTaskId)!
+      prisma.scanTasksById.set(created.scanTaskId, { ...task, status: terminalStatus })
+      await expectRejectCode(
+        () => service.cancel(created.scanTaskId, null, created.controlToken),
+        ConflictException,
+        'SCAN_TASK_CANCEL_CONFLICT',
+        `${terminalStatus} task must not be rewritten by cancel()`
+      )
+      assert.equal(prisma.scanTasksById.get(created.scanTaskId)?.status, terminalStatus)
+    }
   }
 
   {
     // 取消后的任务不再是 waiting，不能被后续投递误撞；投递必须匹配到之后新建的会话。
-    const { service } = makeService()
+    const { service, prisma } = makeService()
     const first = await service.create(dto, null)
     const cancelled = await service.cancel(first.scanTaskId, null, first.controlToken)
     assert.equal(cancelled.status, 'cancelled')
+    assert.equal(
+      prisma.scanTasksById.get(first.scanTaskId)?.retryAuthorityExpiresAt,
+      null,
+      'waiting cancellation without lastAttemptHash must not mint retry authority'
+    )
+    await expectRejectCode(
+      () =>
+        service.create(
+          { ...dto, retryOfScanTaskId: first.scanTaskId },
+          null,
+          first.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'waiting cancellation must not authorize a content-bound retry'
+    )
     const second = await service.create(dto, null)
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
       buffer: tinyPdf(),
       filename: 'fresh.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       delivered.scanTaskId,
@@ -1594,10 +4264,12 @@ async function main(): Promise<void> {
       },
       systemDelete: (fileId: string, reason: string) => baseFiles.systemDelete(fileId, reason),
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      racyFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        racyFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
     raceScanTaskId = created.scanTaskId
@@ -1609,6 +4281,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'race.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'deliver must refuse to complete a task cancelled during upload'
@@ -1667,10 +4340,12 @@ async function main(): Promise<void> {
         })
       },
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      racyFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        racyFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
     raceScanTaskId = created.scanTaskId
@@ -1682,6 +4357,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'race-cleanup-fails.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
       'original SCAN_TASK_STATE_CHANGED conflict must still surface even when compensating systemDelete() itself throws'
@@ -1768,6 +4444,7 @@ async function main(): Promise<void> {
     // 4 分钟前——超过 reaper 的 3 分钟阈值。
     prisma.scanTasksById.set(stale.scanTaskId, {
       ...staleStored,
+      lastAttemptHash: createHash('sha256').update(tinyPdf()).digest('hex'),
       updatedAt: new Date(Date.now() - 4 * 60 * 1000),
     })
 
@@ -1795,6 +4472,10 @@ async function main(): Promise<void> {
       staleAfter.errorCode,
       'SCAN_MATCHED_TIMEOUT',
       'reaped task must carry errorCode SCAN_MATCHED_TIMEOUT'
+    )
+    assert.ok(
+      staleAfter.retryAuthorityExpiresAt && staleAfter.retryAuthorityExpiresAt.getTime() > Date.now(),
+      'matched timeout with lastAttemptHash must atomically mint retry authority'
     )
 
     // errorMessage 必须经 service.getStatus() 校验，而不是直接读裸 Prisma 行：getStatus() 会把
@@ -1840,6 +4521,28 @@ async function main(): Promise<void> {
       staleAfterSecondRun.errorCode,
       staleAfterFirstRun.errorCode,
       'second no-op run must not mutate an already-reaped task again'
+    )
+    assert.equal(
+      staleAfterSecondRun.retryAuthorityExpiresAt?.getTime(),
+      staleAfterFirstRun.retryAuthorityExpiresAt?.getTime(),
+      'a later reaper pass must not extend an already minted retry authority'
+    )
+
+    const noHash = await service.create(dto, null)
+    const noHashStored = prisma.scanTasksById.get(noHash.scanTaskId)!
+    prisma.scanTasksById.set(noHash.scanTaskId, {
+      ...noHashStored,
+      status: 'matched',
+      lastAttemptHash: null,
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000),
+    })
+    await reaper.reapStuckMatched()
+    const noHashAfter = prisma.scanTasksById.get(noHash.scanTaskId)!
+    assert.equal(noHashAfter.status, 'failed')
+    assert.equal(
+      noHashAfter.retryAuthorityExpiresAt,
+      null,
+      'matched timeout without lastAttemptHash must not mint usable retry authority'
     )
   }
 
@@ -1897,6 +4600,144 @@ async function main(): Promise<void> {
   }
 
   {
+    // waiting 过期 reaper：只把 expiresAt<=now 的 waiting 条件更新为 expired；
+    // 未到期 waiting、以及 matched/completed/cancelled/failed（即使 expiresAt 已过）都不得改写。
+    // 跑完 waiting reaper 后，matched stale reaper 仍必须能独立收敛卡死的 matched 行。
+    const { service, prisma } = makeService()
+    const reaper = new ScanTaskReaperTask(prisma as never)
+    const past = new Date(Date.now() - 1000)
+    const future = new Date(Date.now() + 60_000)
+
+    const expiredWaiting = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    prisma.scanTasksById.set(expiredWaiting.scanTaskId, {
+      ...prisma.scanTasksById.get(expiredWaiting.scanTaskId)!,
+      expiresAt: past,
+    })
+
+    const futureWaiting = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
+    prisma.scanTasksById.set(futureWaiting.scanTaskId, {
+      ...prisma.scanTasksById.get(futureWaiting.scanTaskId)!,
+      expiresAt: future,
+    })
+
+    const seed = async (
+      status: 'matched' | 'completed' | 'cancelled' | 'failed',
+      extra?: Partial<StoredScanTask>
+    ): Promise<string> => {
+      const created = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+      prisma.scanTasksById.set(created.scanTaskId, {
+        ...prisma.scanTasksById.get(created.scanTaskId)!,
+        status,
+        expiresAt: past,
+        ...extra,
+      })
+      return created.scanTaskId
+    }
+
+    const matchedPastExpiryId = await seed('matched')
+    const completedPastExpiryId = await seed('completed')
+    const cancelledPastExpiryId = await seed('cancelled')
+    const failedPastExpiryId = await seed('failed')
+    const staleMatchedId = await seed('matched', {
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000),
+      expiresAt: future,
+    })
+
+    const waitingResult = await reaper.reapExpiredWaiting()
+    assert.equal(
+      waitingResult.count,
+      1,
+      `waiting reaper must hit exactly the expired waiting row, got ${waitingResult.count}`
+    )
+    assert.equal(
+      prisma.scanTasksById.get(expiredWaiting.scanTaskId)?.status,
+      'expired',
+      'expired waiting row must be reaped to expired'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(expiredWaiting.scanTaskId)?.retryAuthorityExpiresAt,
+      null,
+      'waiting expiry reaper must not mint retry authority'
+    )
+    await expectRejectCode(
+      () =>
+        service.create(
+          { scanType: 'document', terminalId: 't_1', retryOfScanTaskId: expiredWaiting.scanTaskId },
+          null,
+          expiredWaiting.controlToken
+        ),
+      ForbiddenException,
+      'SCAN_RETRY_NOT_AUTHORIZED',
+      'waiting expiry reaper must not authorize a content-bound retry'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(futureWaiting.scanTaskId)?.status,
+      'waiting',
+      'future waiting row must not be touched by the waiting reaper'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(matchedPastExpiryId)?.status,
+      'matched',
+      'waiting reaper must not rewrite matched rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(completedPastExpiryId)?.status,
+      'completed',
+      'waiting reaper must not rewrite completed rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(cancelledPastExpiryId)?.status,
+      'cancelled',
+      'waiting reaper must not rewrite cancelled rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(failedPastExpiryId)?.status,
+      'failed',
+      'waiting reaper must not rewrite failed rows'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(staleMatchedId)?.status,
+      'matched',
+      'waiting reaper must leave stale matched rows for the matched reaper'
+    )
+
+    const secondOnSameTerminal = await service.create(
+      { scanType: 'document', terminalId: 't_1' },
+      null
+    )
+    assert.ok(
+      secondOnSameTerminal.scanTaskId,
+      'same terminal must be able to create after the expired waiting row was reaped'
+    )
+    assert.notEqual(secondOnSameTerminal.scanTaskId, expiredWaiting.scanTaskId)
+
+    const matchedResult = await reaper.reapStuckMatched()
+    assert.equal(
+      matchedResult.count,
+      1,
+      'matched stale reaper must still converge the stale matched row after waiting reap'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(staleMatchedId)?.status,
+      'failed',
+      'stale matched row must still be reaped to failed'
+    )
+    assert.equal(
+      prisma.scanTasksById.get(matchedPastExpiryId)?.status,
+      'matched',
+      'fresh matched row must remain unmatched by the matched stale reaper'
+    )
+
+    const waitingSecondRun = await reaper.reapExpiredWaiting()
+    assert.equal(waitingSecondRun.count, 0, 'second waiting reap must be a stable no-op')
+    assert.equal(
+      prisma.scanTasksById.get(expiredWaiting.scanTaskId)?.status,
+      'expired',
+      'already-expired waiting row must stay expired on a second waiting reap'
+    )
+  }
+
+  {
     // B1-10：deliverScanFile() 必须在 CAS-to-matched 成功后、上传真正开始前就武装
     // 'matched' 心跳，并且无论上传成功、还是抛异常，都必须在 finally 里清掉这个定时器——
     // 遗漏会让每一次扫描投递都泄漏一个 setInterval。
@@ -1926,10 +4767,12 @@ async function main(): Promise<void> {
             return baseFiles.upload(args)
           },
         }
-        const service = new ScanTasksService(
-          prisma as never,
-          observingFiles as never,
-          passthroughCapabilities
+        const service = wrapServiceForTest(
+          new ScanTasksService(
+            prisma as never,
+            observingFiles as never,
+            passthroughCapabilities
+          )
         )
         ;(service as unknown as HeartbeatTestAccess).startMatchedHeartbeat = (id: string) => {
           heartbeatCalls.push(id)
@@ -1942,6 +4785,7 @@ async function main(): Promise<void> {
           buffer: tinyPdf(),
           filename: 'heartbeat.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         })
 
         assert.equal(
@@ -1981,10 +4825,12 @@ async function main(): Promise<void> {
             throw new Error('simulated upload failure')
           },
         }
-        const service = new ScanTasksService(
-          prisma as never,
-          throwingFiles as never,
-          passthroughCapabilities
+        const service = wrapServiceForTest(
+          new ScanTasksService(
+            prisma as never,
+            throwingFiles as never,
+            passthroughCapabilities
+          )
         )
         ;(service as unknown as HeartbeatTestAccess).startMatchedHeartbeat = () => sentinelHandle
 
@@ -1996,6 +4842,7 @@ async function main(): Promise<void> {
               buffer: tinyPdf(),
               filename: 'heartbeat-fail.pdf',
               mimeType: 'application/pdf',
+              observedAt: new Date().toISOString(),
             }),
           Error,
           'upload failure must still propagate'
@@ -2114,6 +4961,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
 
@@ -2127,6 +4975,7 @@ async function main(): Promise<void> {
         buffer,
         filename: 'a-retry.pdf',
         mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
       })
     } catch (error) {
       caught = error
@@ -2168,6 +5017,7 @@ async function main(): Promise<void> {
       buffer: tinyPdf(),
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
 
@@ -2181,6 +5031,7 @@ async function main(): Promise<void> {
       buffer: differentBuffer,
       filename: 'b.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredB.scanTaskId,
@@ -2203,6 +5054,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
 
     // 把 taskA 的 updatedAt 手工回拨到去重窗口之外（2 小时 + 5 分钟前）。
@@ -2218,6 +5070,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a-retry-old.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredB.scanTaskId,
@@ -2238,6 +5091,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
 
     const taskT2 = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
@@ -2246,6 +5100,7 @@ async function main(): Promise<void> {
       buffer,
       filename: 'a-on-t2.pdf',
       mimeType: 'application/pdf',
+      observedAt: new Date().toISOString(),
     })
     assert.equal(
       deliveredT2.scanTaskId,
@@ -2255,17 +5110,10 @@ async function main(): Promise<void> {
   }
 
   {
-    // 设计边界验证：SCAN_TASK_STATE_CHANGED 分支（任务在上传期间被并发取消）永远不会给
-    // 对应任务写入 fileId（见 deliverScanFile() 的 CAS-to-completed 分支：
-    // completed.count === 0 时不落 fileId），因此本次新增的内容级去重（只查 fileId 非空
-    // 的任务）不会、也不应该拦住这类场景的重复投递——那条竞态的跨用户误挂载风险，是靠
-    // Agent 侧收到 SCAN_TASK_STATE_CHANGED 后立即隔离、绝不重试来防住的（见
-    // apps/terminal-agent/src/agent/scan-watcher.ts 的 B1-11 修复），不是本处内容去重
-    // 的职责。这里用真实 deliverScanFile() 复现一次 SCAN_TASK_STATE_CHANGED，然后证明
-    // "如果 Agent 没有照既定设计立即隔离、而是真的把同一份内容重试投递了"，服务端这层
-    // 内容去重确实拦不住（fileId 从未被写入）——这正是 Agent 侧必须绝不重试的理由，
-    // 不是服务端这层的漏网之鱼；防止未来有人误以为"反正服务端有去重了"就放宽 Agent
-    // 侧的立即隔离行为。
+    // 失败重试防御（codex/scan-binding-20260911）：SCAN_TASK_STATE_CHANGED 分支（任务在上传期间被并发取消）
+    // 虽然不会写入 fileId，但 CAS-to-matched 阶段已在 DB 中记录了 lastAttemptHash。
+    // 如果 Agent 或攻击者尝试将该失败文件重新投递，服务端 lastAttemptHash 防线将精准拦截，
+    // 抛出 409 SCAN_FILE_PREVIOUSLY_ATTEMPTED，绝不允许其误挂到后续新用户的 waiting 任务上。
     const prisma = new FakePrisma()
     const baseFiles = new FakeFilesService(prisma)
     let raceScanTaskId = ''
@@ -2278,10 +5126,12 @@ async function main(): Promise<void> {
       },
       systemDelete: (fileId: string, reason: string) => baseFiles.systemDelete(fileId, reason),
     }
-    const service = new ScanTasksService(
-      prisma as never,
-      racyFiles as never,
-      passthroughCapabilities
+    const service = wrapServiceForTest(
+      new ScanTasksService(
+        prisma as never,
+        racyFiles as never,
+        passthroughCapabilities
+      )
     )
     const created = await service.create(dto, null)
     raceScanTaskId = created.scanTaskId
@@ -2294,27 +5144,54 @@ async function main(): Promise<void> {
           buffer,
           filename: 'race.pdf',
           mimeType: 'application/pdf',
+          observedAt: new Date().toISOString(),
         }),
       ConflictException,
-      'first attempt must hit SCAN_TASK_STATE_CHANGED as before (unrelated to this new dedup check)'
+      'first attempt must hit SCAN_TASK_STATE_CHANGED as before'
     )
     assert.equal(
       prisma.scanTasksById.get(raceScanTaskId)?.fileId,
       null,
       'sanity precondition: the state-changed task must never have fileId populated'
     )
+    assert.ok(
+      prisma.scanTasksById.get(raceScanTaskId)?.lastAttemptHash,
+      'matched CAS must have recorded lastAttemptHash'
+    )
 
+    // 新用户在同一终端开立新会话
     const taskB = await service.create(dto, null)
-    const deliveredRetry = await service.deliverScanFile({
-      terminalId: 't_1',
-      buffer,
-      filename: 'race-retry.pdf',
-      mimeType: 'application/pdf',
-    })
+    let caughtRetry: unknown
+    try {
+      await service.deliverScanFile({
+        terminalId: 't_1',
+        buffer,
+        filename: 'race-retry.pdf',
+        mimeType: 'application/pdf',
+        observedAt: new Date().toISOString(),
+      })
+    } catch (e) {
+      caughtRetry = e
+    }
+    assert.ok(
+      caughtRetry instanceof ConflictException,
+      'previously attempted delivery must be rejected with ConflictException'
+    )
     assert.equal(
-      deliveredRetry.scanTaskId,
-      taskB.scanTaskId,
-      'content-hash dedup intentionally does NOT cover the SCAN_TASK_STATE_CHANGED scenario (fileId was never populated) — this gap is closed by the Agent-side immediate-quarantine fix instead, not here'
+      ((caughtRetry as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+      'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+      'previously attempted delivery must report SCAN_FILE_PREVIOUSLY_ATTEMPTED'
+    )
+    const taskBAfter = prisma.scanTasksById.get(taskB.scanTaskId)!
+    assert.equal(
+      taskBAfter.status,
+      'waiting',
+      'task B must remain waiting when previously attempted content is rejected'
+    )
+    assert.equal(
+      taskBAfter.fileId,
+      null,
+      'task B must not have any file attached'
     )
   }
 
@@ -2338,6 +5215,119 @@ async function main(): Promise<void> {
       rmSync(tmpDir, { recursive: true, force: true })
     }
   }
+
+  {
+    // 门禁护栏 1 校验：POST /scan/sessions 必须挂载 TerminalIdentityGuard，且严格校验 x-terminal-id
+    const { ScanTasksController } = await import('../src/scan-tasks/scan-tasks.controller')
+    const { TerminalIdentityGuard } = await import('../src/terminals/terminal-identity.guard')
+    const guards = Reflect.getMetadata('__guards__', ScanTasksController.prototype.create) || []
+    assert.ok(
+      Array.isArray(guards) && guards.includes(TerminalIdentityGuard),
+      'ScanTasksController.create must be guarded with TerminalIdentityGuard'
+    )
+
+    const createCalls: unknown[][] = []
+    const ackCalls: unknown[][] = []
+    const fakeScanTasksService = {
+      create: async (...args: unknown[]) => {
+        createCalls.push(args)
+        return {
+        scanTaskId: 'st_ok',
+        controlToken: 'token',
+        expiresAt: new Date().toISOString(),
+        instructions: [],
+        }
+      },
+      ack: async (...args: unknown[]) => {
+        ackCalls.push(args)
+        return { scanTaskId: 'st_ok', deliveryAckedAt: '2026-09-14T00:00:00.000Z' }
+      },
+    }
+    const fakeTerminalsService = {}
+    const fakeJwt = {}
+    const fakeRedis = {}
+    const fakePrisma = {}
+    const controller = new ScanTasksController(
+      fakeScanTasksService as any,
+      fakeTerminalsService as any,
+      fakeJwt as any,
+      fakeRedis as any,
+      fakePrisma as any
+    )
+
+    const dummyReq = {
+      headers: {},
+      header: () => undefined,
+    } as any
+
+    // 1) 匹配 terminalId：通过头部检查并进入创建流程
+    const okResult = await controller.create(
+      { scanType: 'document', terminalId: 't_1', retryOfScanTaskId: 'prior_scan' },
+      dummyReq,
+      't_1',
+      'prior-control-token'
+    )
+    assert.equal((okResult as any).data.scanTaskId, 'st_ok')
+    assert.deepEqual(
+      createCalls[0],
+      [
+        { scanType: 'document', terminalId: 't_1', retryOfScanTaskId: 'prior_scan' },
+        null,
+        'prior-control-token',
+      ],
+      'controller must pass retryOfScanTaskId in the DTO and prior control token separately from X-Scan-Retry-Control'
+    )
+
+    // 2) 终端 ID 不匹配：401 UnauthorizedException
+    await expectRejects(
+      () =>
+        controller.create(
+          { scanType: 'document', terminalId: 't_1' },
+          dummyReq,
+          't_2'
+        ),
+      UnauthorizedException,
+      'mismatched terminalId between header and body must throw UnauthorizedException'
+    )
+
+    // 3) 缺失 x-terminal-id 头部：401 UnauthorizedException
+    await expectRejects(
+      () =>
+        controller.create(
+          { scanType: 'document', terminalId: 't_1' },
+          dummyReq,
+          undefined
+        ),
+      UnauthorizedException,
+      'missing x-terminal-id header must throw UnauthorizedException'
+    )
+
+    const ackGuards = Reflect.getMetadata('__guards__', ScanTasksController.prototype.ack) || []
+    assert.ok(
+      Array.isArray(ackGuards) && ackGuards.includes(TerminalIdentityGuard),
+      'ScanTasksController.ack must be guarded with TerminalIdentityGuard'
+    )
+    const ackOk = await controller.ack('st_ok', dummyReq, 't_1', 'control-token')
+    assert.equal((ackOk as { data: { scanTaskId: string } }).data.scanTaskId, 'st_ok')
+    assert.deepEqual(ackCalls[0], ['st_ok', null, 'control-token', 't_1'])
+    await expectRejects(
+      () => controller.ack('st_ok', dummyReq, undefined, 'control-token'),
+      UnauthorizedException,
+      'ACK without x-terminal-id must throw UnauthorizedException'
+    )
+    const ackSource = readFileSync(
+      path.join(apiRootForContracts, 'src/scan-tasks/scan-tasks.controller.ts'),
+      'utf8'
+    )
+    assert.match(
+      ackSource,
+      /@Post\('scan\/sessions\/:id\/ack'\)[\s\S]{0,400}@UseGuards\(TerminalIdentityGuard\)/,
+      'ACK route must declare TerminalIdentityGuard in source'
+    )
+  }
+
+  // 门禁护栏：委托至 scan-lease-contract.helper 进行租约生命周期、精确任务绑定、陈旧捕获与契约核验
+  await runScanLeaseContractTests()
 
   console.log('PASS scan tasks verification')
 }

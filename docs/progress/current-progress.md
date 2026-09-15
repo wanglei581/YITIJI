@@ -1,5 +1,279 @@
 # 当前开发进度
 
+2026-09-15 **扫描 R3 已取得软件证据锚点的 SOURCE / LOCAL / CI GO；仍未合并、未做真机与生产，
+商业总判定继续 NO-GO。** 隔离分支 `integration/scan-pickup-closeout-r3-20260915` 基于
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，运行时代码与图谱证据锚点为
+`fd764164439c979919c24e87b5a249ba63c57417`。该 SHA 已推送到唯一集成入口 PR #1036；
+2026-09-15 复核时 PR 为 `OPEN / MERGEABLE`，head 正是 `fd7641644`，没有另开 PR。
+
+精确 SHA 的 GitHub 证据：CI run `34908123963` 中 `build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke` 全部成功，`release-bundle` 因非发布事件按预期跳过；Windows installer run
+`34908124004` 中 `unsigned-exe-upgrade` 与 `unsigned-msi-candidate` 全部成功。Windows installer CI
+只证明安装包构建，不是真实 Windows / 奔图验收。冻结运行时代码的 Grok、Claude、Agy 审查均未发现
+新的 P0 / P1；Agy 新账号又以 `gemini-3.8-flash-high` 对 `fd7641644` 完成独立只读复核，结论为
+软件层 GO、治理文档待同步、真机 / 生产 / 商业 NO-GO。
+
+本条只同步 `docs/progress/current-progress.md` 与 `docs/progress/next-tasks.md`，不会改变上述运行时代码。
+这次文档同步本身会产生一个后继 commit，因此**合并前仍必须以 GitHub 上 PR #1036 的实时最终 head
+为准，等待该最终 head 的必需 CI 与 Windows installer 检查重新全绿**；不得直接把 `fd7641644` 的
+历史绿灯写成任意后继 SHA 的绿灯。合入后还必须 fetch `origin/main` 并用
+`git merge-base --is-ancestor <PR-final-head> origin/main` 留下进入主线的证据。
+
+**未做 / 仍是 NO-GO**：PR 尚未合入 `main`，未部署生产，未执行当前候选的 Windows 一体机、
+奔图 CM2800、扫码枪与多用户连续真机验收；小程序材料包订单列表 / 到机码找回仍未接通；真实支付、
+对象存储生产回环、内容授权冷启动、微信提审与客户 UAT 均未完成。当前分层结论为
+`SOURCE: GO / LOCAL: GO / CI(fd7641644): GO / DEVICE: NO-GO / PRODUCTION: NO-GO /
+COMMERCIAL: NO-GO`。401 出口等待遮罩仍为已登记 P2，不阻塞本次软件集成。
+
+2026-09-15 **R3 图谱漂移收口（分支 `integration/scan-pickup-closeout-r3-20260915`，基线
+`origin/main@fea6f3705`）**。仅改 `docs/graph/**` 七个生成产物与本文件 / `next-tasks.md`。
+用仓库标准命令 `pnpm graph` 重跑生成，未手改产物。未触碰 `apps/**`、`services/**`、
+`packages/**`、`.github/**`、schema / 迁移、生产配置与密钥。**未推送 / 未开 PR / 未合并 / 未部署。**
+
+前一 HEAD 是 `c866c4156746c772e2657c3c768b0f97a3bb8f35`（补记 `089b5b9ad` 精确 SHA 的文档提交）。
+在该 SHA 上 `pnpm graph:check` 退出码 1，漂移正好 7 个文件：`docs/graph/README.md`、
+`routes.md`、`api.md`、`data-model.md`、`gates.md`、`orphans.md`、`graph.json`。
+重跑后与当前 R3 代码对齐：kiosk 路由 88→89（新增 `/scan` 工作台，旧四页改为重定向）、
+HTTP 端点 524→529（扫描 ACK / current-lease、小程序码、上传 scene/resolve）、门禁脚本
+451→464、Prisma 模型数仍 101。审查结论：这是 R3 既有代码相对过期图谱的补齐，不是异常的
+大规模业务 / 路由改写。
+
+**新的最终 HEAD 由本提交产生，提交前不得伪写未知 SHA。** 落地后再用 `git rev-parse HEAD` 读取。
+
+证据口径 —— 全部 LOCAL（本机 macOS 开发环境），SOURCE 为本工作树：
+`pnpm graph:check` 0（生成前在 `c866c4156` 上为 1，7 个文件漂移）；
+`pnpm verify:repository-integrity` 0；`pnpm verify:ci-gate-coverage` 0；
+`pnpm verify:deploy-gates-in-sync` 0；`git diff --check` 0。
+该新 SHA 尚未 push，也尚未跑过任何 CI。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；不得把本机 `graph:check` 绿写成 CI 通过。
+Windows 一体机、Terminal Agent、奔图 CM2800 真机与生产环境本轮一次都没碰。
+DEVICE / PRODUCTION / COMMERCIAL 全部 NO-GO。401 出口等待遮罩仍是 P2，本轮未做。
+
+2026-09-15 **R3 第二修复：401 出口的所有权必须跨 `<AuthProvider key>` 重挂唯一（Kiosk 侧，分支
+`integration/scan-pickup-closeout-r3-20260915`，基线 `origin/main@fea6f3705`）**。仅改
+`apps/kiosk/**`、`.github/workflows/ci.yml`（只加一个已有测试文件到已有步骤）与本文件 /
+`next-tasks.md`。未触碰 `services/api/**`、Terminal Agent、小程序、Admin / Partner、
+schema / 迁移、生产配置与密钥。**未推送 / 未开 PR / 未合并 / 未部署。**
+
+**这一条修的是我上一个提交 `b3d7c43d5` 自己引入的 P1**，由 Grok 主对抗审查发现（结论 PARTIAL）。
+`b3d7c43d5` 把 401 出口做成了 per-Provider 实例并挂在 AuthProvider 的 ref 上，而待办的跳转登记在
+**模块级**的 `scanCleanupGate` 上、活得比 React 树久。`main.tsx` 在 terminalId A→B 时用
+`key={identityRevision}` 重挂整棵树，于是出现两个 owner：E1 收到 401 登记了跳转（闸正按着），
+重挂后新 Provider 建 E2，新用户登录时 `login()` 调的是 E2.cancel()，E1 完全不知情 —— 闸一
+settle 就 `assign('/login')`，把**刚登进来的这一位**踢出去，而他在等待期间写的打印 / 简历
+sessionStorage 没有按新身份清过。已在本机用「两实例一 gate」复现脚本确认 `bug:true`
+（脚本未入库）；原有 13 条用例全是单实例，测不到。
+
+改法：出口收敛成**页面级单例** `getMemberSessionExpiryExit()`（实例存模块作用域，per-call 工厂
+不再对外导出），AuthProvider 只取不造。**没有新增第二套 cleanup gate** —— 撤销判据仍然只有
+`scanCleanupGate` 一处，这里只是把「谁在等它」收敛成一个。重挂后有人登录 → 取消得掉；重挂后
+没人登录 → 那条跳转仍然必须走完一次。同 Provider 内的既有行为全部保留：本机 PII 同步清、无 live
+同步跳、5xx / 断网 / 403 未确认不跳、确认或自然过期后只跳一次、`logout()` 与 effect cleanup
+都不撤销一条必须走完的跳转。
+
+本条的实现证据锚点是 `089b5b9adca40b6a6f669d46705e3ec0acd92f3a`（R3 第二个修复提交，紧随 `b3d7c43d5`）；
+该 SHA 由本提交之后的这一次文档提交补记，两个提交都不在任何 CI run 里。
+
+同时修掉 `src/services/api/contractReview.ts` 的 `notifyMemberSessionExpired()` 无参调用：
+它有 `access.token` 却不透传，把 AuthProvider 第一句
+`if (failedToken && userRef.current?.token !== failedToken) return` 整个短路掉 —— 一次迟到的、
+用旧令牌发出去的合同审查请求拿回 401，会把当前这位已经重新登录的用户一起登出。2026-09-15 实测
+全仓仅此一处，因此门禁按**全仓零容忍**钉（遍历 `src/**`，剥注释后禁止空参调用），不做逐文件白名单。
+
+门禁侧把「只有 login 会 cancel」升级成真正的不变量，不再把错误的 per-Provider 实例锁死：
+新增两条 —— AuthProvider 只许取页面级单例（不许出现 `createMemberSessionExpiryExit`）、
+出口模块必须把实例存在模块作用域且不导出 per-call 工厂。另外把「禁止写存储 / history」那条改成
+先剥注释再判，否则文件头讲缺陷成因的那句话会被判成缺陷本身。
+
+CI 接线：`apps/kiosk/scripts/tests/fusion-w6-contract.test.mjs` 已加入 ci.yml 既有的
+「Run Kiosk fusion contract tests with coverage gates」步骤（与 `fusion-baseline-contract.test.mjs`
+同一行命令）。**没有改 `verify:fusion-w6`，也没有降低任何阈值**：合并后覆盖率为
+lines 98.32 / branches 89.24 / functions 100，全部高于该步骤的 80 门槛。改 workflow 前后各跑过
+`verify:repository-integrity`（均 0），改后 `verify:fusion-w6`、`verify:deploy-gates-in-sync`、
+`verify:ci-gate-coverage` 均 0。
+
+证据口径 —— 全部 LOCAL（本机 macOS 开发环境），SOURCE 为本工作树：
+kiosk `typecheck` 0；`eslint src/` 0 error；`verify:member-session-closure` 0（45 PASS）；
+`verify:scan-session-truth` 0；`verify:contract-review-session` / `contract-review-report-print` /
+`visible-actions-truth` / `job-material-library-ui` / `profile-print-orders-login-smoke` /
+`kiosk-browser-spec-coverage` / `fusion-w6` 均 0；根 `ci-gate-coverage` / `repository-integrity` /
+`deploy-gates-in-sync` 均 0；`node --test apps/kiosk/scripts/tests/*.test.mjs` **157/157**
+（401 出口行为测试 13 → 15，新增两条跨重挂用例）；Playwright privacy 401 定向用例 1/1。
+`git diff --check` 0。
+
+反向变异（实际执行，以退出码为准，变异未提交）：把 `getMemberSessionExpiryExit()` 退回
+「每次 `createMemberSessionExpiryExit()`」→ 出口行为测试 **exit 1**（15 条挂 2 条，正是两条跨重挂
+用例），恢复后 **exit 0**（15/15）。门禁侧另做三次源码变异：AuthContext 改回 per-Provider 造实例、
+`contractReview` 改回无参 notify、`logout()` 重新撤销待办跳转 —— `verify:member-session-closure`
+均 **exit 1**，恢复后 0。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；本轮**没有任何 CI 运行**，
+ci.yml 的接线只是把一条命令加进了文件，**没有在 CI 上跑过一次**，不得说成「CI 通过」。
+Windows 一体机、Terminal Agent、奔图 CM2800 真机与生产环境这一轮一次都没有碰过。
+已知遗留：`pnpm graph:check` 在 `b3d7c43d5` 上就已经红（7 个 `docs/graph/**` 产物内容不一致），
+本轮改动前后红的文件完全一致、未新增漂移；`docs/graph/**` 不在本轮允许修改范围，未重跑生成。
+401 出口目前仍没有自己的等待遮罩（清场遮罩只挂在 `KioskPrivacyGuard` 的 `clearing` 上），
+等待期间页面停留在原路由且已登出 —— 这一项按要求列为后续 P2，本轮未扩展双出口。
+
+2026-09-15 **401 会话失效也要走清场收尾闸：确认之前不许跳回登录页（Kiosk 侧，分支
+`integration/scan-pickup-closeout-r3-20260915`，基线 `5561f4ea8`）**。仅改 `apps/kiosk/**`
+与本文件，未触碰 `services/api/**`、Terminal Agent、小程序、Admin / Partner、schema、
+工作流、生产配置与密钥。**未推送 / 未开 PR / 未合并 / 未部署。**
+
+过程如实记录：本轮第一次调用 Claude **超时中断**，当时工作树里已留下 6 个暂存文件 + 1 个未暂存
+的 Playwright 用例、HEAD 仍是 `5561f4ea8`。后续一次调用以那份工作树为唯一现状接着做完自审、
+反向变异与收尾，没有重做，也没有改写任何既有提交。
+
+修的缺陷（Agy 冷审查提出）：`AuthContext` 的 `onMemberSessionExpired` 处置在 `logout()` 之后
+**同一句就** `window.location.assign('/login?from=…')`。`logout()` 只是把要撤的那一场交给
+`beginScanSessionCleanup`，撤销本身是异步重试；那句硬跳转把重试连同执行环境一起干掉，这条路
+退化成 `pagehide` 的一次 keepalive beacon。弱网丢包 + 离开那一刻还在飞的投递确认成功 =
+服务端留下一条 `deliveryAckedAt` 非空、仍 `waiting` 的任务，可租赁到自然过期 —— 下一位扫出来的
+文件投给已经走掉的上一位。这是 2026-09-15 那条收尾闸没堵上的最后一个出口。
+
+改法（新增 `src/auth/memberSessionExpiryExit.ts`，复用既有 `whenScanCleanupSettled`，不另起第二套
+闸）：本机 PII / 令牌 / 登录态仍由 `logout()` **同步**清掉，一个网络往返都不等；变的只是回登录页
+那一步 —— 没有待清理扫描会话时 `whenScanCleanupSettled` 同步执行（一帧都不多等），有待清理会话时
+只在服务端确认撤销、或走到服务端给的 `expiresAt` 之后才跳。5xx / 断网 / 403 未走完 fallback 一律
+不算确认。生命周期上钉死三条：只有 `login()`（这一位换了有效令牌）有资格作废一次已登记的跳转，
+`logout()` 与 effect cleanup 都不撤销；重复 401 / StrictMode / 卸载都不重复跳；跳转地址只由
+站内安全回跳 helper 生成，不带令牌 / 控制凭据 / 任务号，也不写存储与 history。
+
+顺带修掉一条七周前就红了的测试：`scripts/tests/fusion-w6-contract.test.mjs` 仍断言验证器输出里的
+`86/86 routes` —— 那是 2026-07-25 那天 main 的路由条数快照，验证器早在 ebd9b9ba7（#1012）连同
+`PRODUCTION_ROUTE_QUOTA` 一起改成了集合相等。现在它改钉真实不变量（router 声明 ≡ 冻结的
+route manifest，重定向同理），不钉任何条数、不钉 check 文案，并自带阴性对照。**未恢复固定配额，
+也未放宽 `verify-fusion-w6.mjs`。**
+
+证据口径 —— 全部 LOCAL（本机 macOS 开发环境），SOURCE 为本工作树 `apps/kiosk/**`：
+Kiosk `typecheck` 0；`eslint src/` 0 error（17 warning，与改动前同数）；
+`verify:member-session-closure` 0（新增 3 条断言：AuthProvider 不得再有硬跳转、出口模块必须
+「先同步清本机再挂到收尾闸」、只有 `login()` 能作废待办跳转）；`verify:scan-session-truth` 0；
+`verify:ci-gate-coverage` 0；`verify:kiosk-browser-spec-coverage` 0；
+`verify:kiosk-frontend-debt` 0；`verify:contract-review-session` / `verify:job-material-library-ui` /
+`verify:profile-print-orders-login-smoke` 0；
+`node --test apps/kiosk/scripts/tests/*.test.mjs` 155/155（含新增 `member-session-expiry-exit.test.mjs`
+13 条真闸行为测试、修好的 `fusion-w6-contract.test.mjs` 3 条）；
+Playwright privacy 套件 1080×1920 **36/36**（35 条既有回归 + 1 条新增 401 用例，逐条 API 夹具、
+无 catch-all，未注册请求仍由 ApiRouter fail-closed）。
+
+反向变异（已实际执行，均以退出码为准，变异未提交）：把出口模块里的 `whenScanCleanupSettled`
+等待删掉、退回「`logout()` 之后立刻硬跳转」—— `node --test member-session-expiry-exit.test.mjs`
+exit 1（13 条挂 8 条），同一条 Playwright 401 用例 exit 1；恢复实现后两者分别 exit 0（13/13）与
+exit 0（1/1）。门禁侧另做两次源码变异：`logout()` 重新撤销待办跳转、`login()` 不再撤销，
+`verify:member-session-closure` 均 exit 1，恢复后 exit 0。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；本轮**没有任何 CI 运行**（结论只能说
+「本地通过」，不能说 CI 通过）；Windows 一体机、Terminal Agent、奔图 CM2800 真机与生产环境这一轮
+**一次都没有碰过**，不构成真机、生产或商用可用性结论。`fusion-w6-contract.test.mjs` 目前仍未进
+CI 执行闭包（接线需要改 `.github/workflows/ci.yml`，本轮禁止改工作流），这一条仍是欠账。
+
+2026-09-15 **清场收尾闸：服务端确认上一场扫描已取消之前，一体机不许换人（Kiosk 侧，分支
+`claude/kiosk-hardclear-failclosed-20260915`，基线 `206568f23`）**。仅改 `apps/kiosk/**`，
+未触碰 `services/api/**`、Terminal Agent、小程序、schema、生产配置与密钥，未推送 / 未开 PR。
+
+修的是一条跨用户串件：清场（隐私空闲 / 屏保 / 退出 / 游客换会员）此前发一次 fire-and-forget 的
+keepalive DELETE 就同步抹本机、`logout()`、一帧后整页重载。**那次 DELETE 在路上丢了（回执一律
+吞掉）+ 离开那一刻还在飞的 ACK 随后成功了 + 重载把「ACK 回来之后补一次撤销」的补偿代码连同执行
+环境一起杀掉**，三者一撞，服务端就留下一条 `deliveryAckedAt` 非空、状态仍 `waiting` 的任务：
+60 秒未确认回收器收不到它，Agent 的 current-lease 看得见它，它一直可投递到自然过期 ——
+下一位在奔图面板上按下扫描，文件投给已经走掉的上一位。
+
+改法（新增 `src/pages/scan/scanCleanupGate.ts` 一条收尾闸）：本机 PII 仍然**同步、立即、不等
+网络**地清掉；变的只是「把机器交给下一位」这一步 —— 整页重载 / 进屏保必须等到服务端**亲口**
+确认那条任务不可能再被领走（200 cancelled / 404 not-found / 400 已完成 / 409 撤销冲突），
+或者走到服务端给的那个 `expiresAt`（租约查询带 `expiresAt: { gt: now }`，过了就签不出）。
+403 / 5xx / 断网一律不算确认，按退避表重试；403 之后按服务端为「登出后仍要撤得掉」留的那条路
+摘掉身份再试一次。等待期间：一个 ACK 都不许发（`scanDeliveryAckBlocked`），设置页对下一位
+fail-closed（第五道闸 `cleanupHolding`，自带 `data-state="cleanup-holding"` 一屏，不冒充
+「会话创建失败」），创建重放收手（`shouldContinue`）。凭证只活在模块内存里，不落存储 / URL /
+history；清场遮罩多出一块诚实面板（在等什么、已发出几次、最迟等到几分几秒、「立即重试」56px），
+一个任务编号、一个控制凭证、一句服务端原文都不上屏。
+
+顺带修掉同一条链上的身份漂移：创建的身份此前取两次（effect 里一次、`sendCreate` 里再一次），
+中间隔着最长 24 秒的丢失响应重放 —— 用户在那期间退出 / 换人，重放就会用**新身份**建任务，
+而撤销按 `endUserId` 校验只会 403，那条 child 谁都撤不掉。现在创建 / 重放 / 撤销 / ACK 绑同一份
+创建时快照；复水进来的那一场在挂载时补一份。
+
+验证（本地，全部绿）：Kiosk typecheck、`eslint src/` 0 error、`verify:scan-session-truth`（新增
+清场闸契约断言 + 新行为测试 `scripts/tests/scan-cleanup-gate.test.mjs` 18/18）、
+`verify:member-session-closure`、`verify:fusion-w2`、`verify:fusion-shell`、
+`verify:kiosk-visual-unity`、`verify:kiosk-browser-spec-coverage`、`verify:kiosk-frontend-debt`、
+`verify:scan-input-safety`、根 `verify:no-raw-error-render` / `compliance-copy` /
+`datetime-honesty` / `fixture-time-bombs` / `ci-gate-coverage`；Playwright 1080×1920：
+privacy 35/35（含 4 条新用例：撤销未确认不交机器、失败后重试成功才交、ACK 在清场途中回来仍以
+确认取消收尾、会员登录在上一场收尾期间建不了会话）、privacy-warning 27/27、
+scan-session-truth 38/38、W2 94/94。反向变异逐条见下一段。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；Windows / 奔图真机与生产环境这一轮
+一次都没碰。`onMemberSessionExpired` 的 401 硬跳转（`window.location.assign`）没有接这条闸 ——
+那条路径是同一位用户去重新登录，不是换人，兜底是 `pagehide` 上那一发 keepalive 与服务端两条
+回收器；要不要接，留作 P1。
+
+2026-09-14 **扫描隐私 / 到机认证 R2 已推送并完成实现锚点 CI，等待合并决策；生产与商业仍为 NO-GO**。
+隔离分支 `integration/scan-pickup-closeout-r2-20260913` 基于
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，实现证据锚点为
+`5ebf73c056b3d71942923aa394acf3903df890a4`。分支工作区干净且已 push，唯一集成入口为
+PR #1036；PR 当前 `OPEN / MERGEABLE`，尚未合入 `main`、部署、执行生产迁移或做当前 SHA 的
+Windows / 奔图真机操作。
+
+R2 在既有签名重试、扫描输入锁死遥测、Kiosk 持久化凭据后 ACK、ACK 后才签发 Agent delivery
+lease 的基础上，又关闭两类最终审查缺口：① Agent 对“无 waiting lease 时已观察到的临时文件”保留
+显式 `null` 血缘，不能在同 inode 重命名后绑定给后来任务；② Canonical API 合约替身真实走
+`ScanTasksService.ack()`，未 ACK 的 waiting 任务返回 `NO_WAITING_SCAN_TASK`。Grok 随后在
+`4a92493ec` 复现了更窄的并发竞态：`.tmp` 请求仍等待 409 时，同 inode 的 `.pdf` 可从另一条路径
+抢先绑定任务 B。`eca46857c` 在首次 `lstat` 后、任何 lease await 之前按已证明的 `dev/ino`
+建立 single-flight；原竞态复验从 `deliverCount=1` 变为 **0 POST、文件进入 `_unclaimed`**，之后新 inode
+的合法 B 文件仍可交付。对应反向变异会使并发用例退出非零。
+
+实现锚点上的本地证据：Terminal Agent `verify:scan-watcher` 与 typecheck 通过，包含顺序/并发
+null-opening、不同 inode 正例及 identity-flight 反向变异；API 在 PostgreSQL 16
+`postgresql://postgres@127.0.0.1:55439/scan_retry_verify` 上 `verify:scan-tasks` 与 typecheck 通过，
+包含 ACK-filter 反向变异；Kiosk `verify-scan-session-truth.mjs`、ACK 单测 9/9、typecheck 通过；
+shared typecheck 通过。GitHub Actions 对同一实现锚点的 CI run `34816672752` 已完成：
+`build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 全部通过；Windows installer run
+`34816673132` 的 `unsigned-exe-upgrade`、`unsigned-msi-candidate` 全部通过。`release-bundle` 因本次
+不是发布事件而按预期跳过，不计失败，也不构成已发布证据。
+
+最终只读复审：Grok 4.6 xhigh 对完整差异与真实 CI 接线给出软件合并 `GO`，未发现新的 P0/P1；
+Claude Opus xhigh 对 Kiosk 逐用例 ACK fixture、无共用兜底和页面影响给出 `GO`；Agy Gemini 3.8
+Flash High 对扫描 R2 / 到机认证契约给出 `GO`，对跨端商业闭环整体仍为 `PARTIAL`。Hermes /
+DeepSeek V4 Pro 首次因 HTTP 402 余额不足失败；随后
+Hermes 明确降级到已登录的 Nous `upstage/solar-pro4:free`，对同一候选完成隐私与恢复只读复审并给出
+GO。该结果只计作 Hermes / Nous 复审，不冒充 DeepSeek 结果。证据边界：`ino === 0` /
+identity unavailable 的 Windows SMB 路径无法由本机
+single-flight 证明，长驻 chokidar、Windows / 奔图、真实支付、小程序发布、生产部署、授权内容与客户
+UAT 均未完成。因此当前结论为 **SOURCE / LOCAL / CI GO（PR #1036 实现锚点边界）**，
+**DEVICE / PRODUCTION / COMMERCIAL NO-GO**。
+
+2026-09-13 **扫描隐私与到机认证候选完成集成，商业结论仍为 NO-GO**。隔离分支
+`integration/scan-pickup-closeout-20260913` 已冻结候选
+`f957c8a96474f1389f6de42c27ae47d5c73823c8`（基线
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`），工作区干净；候选尚未合入、部署或做生产迁移。
+本轮把扫描文件交付改成精确签名 lease / task 绑定，补齐取消与过期 waiting 回收、上传/签名失败孤儿补偿，
+并为扫描创建、到机认领和出纸释放补终端身份闸门；Kiosk 在终端票据续期窗口等待并使用轮换后的票据，
+Terminal Agent 对启动积压、目录身份变化、初始化代际和输入异常 fail-closed，进程内锁死不可逆。
+冻结 SHA 上 API 的 `verify:file-delete-consistency`、`verify:scan-tasks`、typecheck，Kiosk 的
+`verify:terminal-session-self-heal`、`verify:runtime-terminal-identity`、`verify:fusion-w2`、typecheck 与定向
+Playwright 3/3，Agent 的 `verify:scan-watcher`、`verify:scan-input-health`、
+`verify:scan-deletion-audit`、`verify:print-truth-hardening`、`verify:agent-unauthorized`、typecheck 均通过；
+三条反向变异能把对应防线判红。**证据边界**：最终 SHA 没有可用 PostgreSQL URL，PostgreSQL 专属部分索引/
+迁移复验未在该 SHA 上执行；未做 Windows/奔图、真实扫码枪、生产或真实多用户验收。
+
+独立复核不按模型票数算：Agy 对前一冻结点 `78fe3eb37` 给出 GO；Claude 随后发现 Kiosk E2E
+固定 mock ticket 不能证明轮换票据被使用，已在 `3a087b5e2` 修复并用反向变异判红；Hermes 对该冻结点给
+`PARTIAL`，未发现 P0，但确认两个 P1：同终端两小时内字节完全相同的合法重扫会被全局内容去重拒绝，
+以及 Agent 扫描输入锁死虽保护隐私，却没有心跳/后台可见性。安全重试不能按同一用户、mtime、observedAt
+或内容 hash 放宽，必须使用 `retryOfScanTaskId + prior controlToken`、消费 lease nonce，或等价的服务端签名
+重试能力。Claude 对前端另发现“已撤销的扫描创建 Promise 在终端会话恢复后被重新写成成功”的 P2；
+已由 Claude 在 `f957c8a96` 补不可逆丢弃闸门、正常换票反例与浏览器回归。Codex 在集成 SHA 上复验
+`verify:scan-session-truth`、`verify:fusion-w2`、运行时错误边界、原始错误渲染、Kiosk typecheck 和扫描浏览器
+套件 33/33 均通过；删除闸门的反向变异退出码为 1。Grok 文档子审查已完成并确认正式文档陈旧；Grok
+API/Agent 实现与审查线因工具错误、轮次耗尽、超时或零写入未形成可用结果，Agy 本轮重审为空输出，均记
+`UNREVIEWED`，不算批准。结论：**候选安全性显著优于基线，
+但在安全重试协议、锁死遥测、最终 SHA PostgreSQL、Windows/奔图、生产和业务验收完成前，仍不得称商用收口。**
+
 2026-09-10 **生产内容取证 + CI 基础设施解堵（分支 `project-bug-review-optimization-d9eafd` 调度线）**。三条对生产的实测结论，都带阳性对照：①**公开价目在对外播假价** —— 匿名 `GET /print/price-config` 回 `print_color_page unitCents=100` 而 `description="免费试运营：彩色打印 0 元/页"`。后果范围不夸大：Kiosk `PrintConfirmPage` 走 `unitCentsFor` 只读 `unitCents`，小程序各 wxml 无一处渲染价目描述，**当前无终端用户看到假价**；但该接口匿名可读，彩色一旦开通它就是链上第一个说错话的地方。已修（#1026 已合）：管理端原样返回、公开端只摘描述不动金额，判据抽成 `services/api/src/payment/price-description.ts` 供写入闸门与公开视图共用。②**找企业板块三条全是演示数据** —— `GET /companies` 回 3 条，名字全带「（演示）」、`sourceName` 为「市人社公共就业平台（演示）」、`openJobCount` 全 0；而一体机 `CompaniesPage` 与小程序 `pages/companies/companies.wxml:50` 都把 `name` 原样渲染，**这三个名字现在就显示在用户眼前**。`prisma/seed-guard.ts` 只拦新写入，拦不住已在库的行 —— 与①同形状（闸门管未来不管过去）。已把这项补进既有的 `scripts/prod-readonly-probe.mjs`（不另起脚本，#1032），判 WARN 而非 FAIL：演示数据是内容问题不是故障。③**小程序契约 60 个 GET 端点全部在线**（阳性对照：乱编路径回 `404 code:"Not Found"`、公开端点 200、需鉴权端点 `401 MEMBER_MISSING_TOKEN`，三种回法互不混淆），**零路由缺失**；但 `/jobs`、`/job-fairs`、`/policies` 三个板块 `total=0`，链路已逐环核到底：`app.json` 四 Tab 的「求职」→ `pages/jobs/jobs.js:48` 调 `api.getJobs()` → 生产回 0 → `jobs.wxml:73` 渲染「暂无岗位」，**小程序主 Tab 之一提审时是一张空页**。这不是新阻塞，是 BL-06 的具体后果与位置。另：**CI 被一个从不使用的第三方 apt 源判红** —— `dl.google.com` 索引 Hash Sum mismatch 使 `apt-get update` exit 100，连带 `postgres-readiness`、`kiosk-browser-smoke`（`playwright install --with-deps` 内部也跑 apt）整 job 起不来。做了对照实验排除「索引自愈」这个混淆：17:24:15 前的 apt 步骤全绿、之后全红，无修复分支两次尝试（17:32、17:38）3/3 红，有修复分支夹在中间（17:36）3/3 绿。**接手会话注意：main 现在是红的，但不是代码问题** —— 09-09 17:44~18:00 的四次 main CI （`ee536d26` `8751de56` `9df58808` `8cfb944d`）全红，逐个查过：**12 个失败 job 无一例外挂在那两个 apt 步骤，零条测试/门禁失败**。#1030 合入前，新合的提交也会照样红；别去追代码回归。已修（#1030）：三个碰 apt 的步骤前先摘掉这类源（`scripts/ci/drop-unused-apt-sources.sh`，删的是源清单不是已装的包，`channel:'chrome'` 那条用例不受影响）。判定 **PRODUCTION NO-GO 不变**，BL-06 仍是唯一理由。
 
 2026-09-10 **图片转 PDF 完成态不再用本机 token 声称已进「我的文档」（分支 `grok/convert-honest`）**。`POST /print/convert/images-to-pdf` 响应补 `hasEndUser: Boolean(endUserId)`（与打印链路同名）。结果页 chips / 「你现在没登录」只认 `typeof hasEndUser === 'boolean'`，缺省时第三格不渲染、两句都不说。`Retention` 仍按 `getToken()`——那是转换前规则说明，不是完成态声称。未 commit、未部署、未真机。

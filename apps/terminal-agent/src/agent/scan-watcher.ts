@@ -16,6 +16,11 @@
  *
  * 启动时 + 之后每 5 分钟做一次目录清点，处理 Agent 重启期间到达、
  * 或此前投递失败但文件本身未再变化的文件（不会有新的 chokidar change 事件）。
+ *
+ * 运行中 SMB/Windows 扫描目录不可用、watcher error、根身份变化或明确 rebuild
+ * 请求时：本进程立即 generation++ 并 LOCKED_OUT，禁止自动恢复为 RUNNING。
+ * 只能 stop + 新进程启动后重新初始化。不得把刷新过 mtime/birthtime 的旧文件
+ * 挂到后一用户。
  */
 
 import {
@@ -39,6 +44,26 @@ import FormData from 'form-data'
 import type { AgentConfig } from './types'
 import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError, NO_RETRY_CONFIG } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
+import {
+  fetchScanLease,
+  isPreExistingCandidate,
+  globalDirectoryBaseline,
+  globalScanDeliveryBarrier,
+  canonicalizeScanPath,
+  readScanFolderIdentity,
+  scanFolderIdentityChanged,
+  SCAN_INPUT_RESTART_REQUIRED,
+  SCAN_CAPTURE_FOREIGN_LEASE,
+  SCAN_LEASE_NOT_BEFORE_INVALID,
+  scanCaptureFileIdentity,
+  isSameScanCaptureFile,
+  beginScanCaptureIdentityFlight,
+  resetScanCaptureIdentityFlightsForTest,
+  type ScanCaptureFileIdentity,
+  type ScanCaptureIdentityFlight,
+  type ScanFolderIdentity,
+  type ScanTaskLease,
+} from './scan-candidate-barrier'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import {
   classifyScanInputCandidate,
@@ -129,6 +154,7 @@ function snapshotCandidate(filePath: string, filename: string): ScanInputCandida
   dev: number
   ino: number
   nlink: number
+  birthtimeMs?: number
 } {
   const metadata = lstatSync(filePath)
   const nodeKind = metadata.isSymbolicLink()
@@ -142,6 +168,7 @@ function snapshotCandidate(filePath: string, filename: string): ScanInputCandida
     name: filename,
     size: metadata.size,
     mtimeMs: metadata.mtimeMs,
+    birthtimeMs: metadata.birthtimeMs,
     nodeKind,
     dev: metadata.dev,
     ino: metadata.ino,
@@ -153,7 +180,7 @@ function isDirectChild(filePath: string, filename: string, scanWatchFolder: stri
   return basename(filePath) === filename
     && !filename.includes('/')
     && !filename.includes('\\')
-    && resolve(dirname(filePath)) === resolve(scanWatchFolder)
+    && canonicalizeScanPath(dirname(filePath)) === canonicalizeScanPath(scanWatchFolder)
 }
 
 /** 等待候选文件的 lstat 快照连续两次一致，不跟随符号链接。 */
@@ -179,7 +206,7 @@ async function waitForStableFile(
   return undefined
 }
 
-function readVerifiedCandidate(
+export function readVerifiedCandidate(
   filePath: string,
   scanWatchFolder: string,
   filename: string,
@@ -210,7 +237,7 @@ function readVerifiedCandidate(
   }
 }
 
-function finalizeCandidate(
+export function finalizeCandidate(
   filePath: string,
   scanWatchFolder: string,
   filename: string,
@@ -247,6 +274,394 @@ function guessMimeType(filename: string): string {
  */
 const inFlightPaths = new Set<string>()
 
+/**
+ * 启动时识别出的历史 backlog 文件路径集合（resolved absolute path）。
+ * 在本进程生命周期内永久 never-deliver：绝不能进入服务端租约申请或正常投递；
+ * 后续 sweep 仅重试安全隔离；成功隔离后清理标记；隔离失败记录高严重度日志但不泄露文件名或内容。
+ *
+ * `startupBacklogIdentities` 跟上同一批目录项。rename 会换 basename，
+ * 不能只靠新路径判断「这是不是启动时那份文件」。匹配走 isSameScanCaptureFile：
+ * 同 inode 且 birthtime 未证明不同仍是 leftover；内核复用 inode 且 birthtime
+ * 可证明不同则不是。
+ */
+const startupBacklogPaths = new Set<string>()
+const startupBacklogIdentities: ScanCaptureFileIdentity[] = []
+/**
+ * Runtime refuse-until-quarantined captures (foreign / no-lease / pre-existing /
+ * unprovable identity). Distinct from startup leftovers: same never-deliver
+ * rule, marked when we decide the bytes must not POST. Kept across EACCES /
+ * SMB-lock quarantine failures until the move succeeds.
+ */
+const refuseUntilQuarantinedPaths = new Set<string>()
+const refuseUntilQuarantinedIdentities: ScanCaptureFileIdentity[] = []
+
+function readStartupBacklogFileIdentity(filePath: string): ScanCaptureFileIdentity | undefined | 'unknown' {
+  try {
+    const metadata = lstatSync(filePath)
+    return scanCaptureFileIdentity(metadata.dev, metadata.ino, metadata.birthtimeMs) ?? 'unknown'
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code
+    if (code === 'ENOENT') return undefined
+    return 'unknown'
+  }
+}
+
+function markStartupBacklogIdentity(filePath: string): void {
+  const identity = readStartupBacklogFileIdentity(filePath)
+  if (identity === 'unknown') {
+    globalScanDeliveryBarrier.lockOut('identity_unavailable')
+    warn(`scan-watcher: startup backlog file identity unavailable — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return
+  }
+  if (!identity) return
+  if (startupBacklogHasIdentity(identity)) return
+  startupBacklogIdentities.push(identity)
+}
+
+function forgetStartupBacklog(filePath: string, identity?: ScanCaptureFileIdentity): void {
+  startupBacklogPaths.delete(canonicalizeScanPath(filePath))
+  if (!identity) return
+  for (let i = startupBacklogIdentities.length - 1; i >= 0; i -= 1) {
+    if (isSameScanCaptureFile(startupBacklogIdentities[i], identity) === true) {
+      startupBacklogIdentities.splice(i, 1)
+    }
+  }
+}
+
+function startupBacklogHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  // ATOMIC_SCAN_STARTUP_BACKLOG_GENERATION: leftover matching uses
+  // isSameScanCaptureFile, not the flight key. Recycled ino + proven-new
+  // birthtime is not the leftover; missing birthtime stays leftover.
+  for (const marked of startupBacklogIdentities) {
+    if (isSameScanCaptureFile(marked, identity) === true) return true
+  }
+  return false
+}
+
+export function isStartupBacklogCandidate(filePath: string, identity?: ScanCaptureFileIdentity): boolean {
+  if (identity && startupBacklogHasIdentity(identity)) return true
+  if (!startupBacklogPaths.has(canonicalizeScanPath(filePath))) return false
+  // Path mark without a matching leftover identity: a later file reusing the
+  // basename after the original directory entry was renamed, quarantined, or
+  // replaced by a proven-new generation is not that leftover.
+  if (identity) return false
+  return true
+}
+
+function refuseUntilQuarantinedHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  for (const marked of refuseUntilQuarantinedIdentities) {
+    if (isSameScanCaptureFile(marked, identity) === true) return true
+  }
+  return false
+}
+
+function markRefuseUntilQuarantined(filePath: string, identity?: ScanCaptureFileIdentity): void {
+  refuseUntilQuarantinedPaths.add(canonicalizeScanPath(filePath))
+  if (!identity || refuseUntilQuarantinedHasIdentity(identity)) return
+  refuseUntilQuarantinedIdentities.push(identity)
+}
+
+function forgetRefuseUntilQuarantined(filePath: string, identity?: ScanCaptureFileIdentity): void {
+  refuseUntilQuarantinedPaths.delete(canonicalizeScanPath(filePath))
+  if (!identity) return
+  for (let i = refuseUntilQuarantinedIdentities.length - 1; i >= 0; i -= 1) {
+    if (isSameScanCaptureFile(refuseUntilQuarantinedIdentities[i], identity) === true) {
+      refuseUntilQuarantinedIdentities.splice(i, 1)
+    }
+  }
+}
+
+export function isRefuseUntilQuarantinedCandidate(
+  filePath: string,
+  identity?: ScanCaptureFileIdentity,
+): boolean {
+  if (identity && refuseUntilQuarantinedHasIdentity(identity)) return true
+  if (!refuseUntilQuarantinedPaths.has(canonicalizeScanPath(filePath))) return false
+  if (identity) return false
+  return true
+}
+
+function isNeverDeliverCandidate(filePath: string, identity?: ScanCaptureFileIdentity): boolean {
+  return isStartupBacklogCandidate(filePath, identity)
+    || isRefuseUntilQuarantinedCandidate(filePath, identity)
+}
+
+/**
+ * ATOMIC_SCAN_CAPTURE_QUARANTINE_KEEP_LINEAGE: mark never-deliver first, move
+ * second, drop observation/marks only after the move succeeds. Removing the
+ * only lineage record before an EACCES/SMB-lock failure lets a later add/sweep
+ * re-bind the same bytes to a new waiting task.
+ */
+function tryQuarantineKeepingLineage(
+  filePath: string,
+  scanWatchFolder: string,
+  filename: string,
+  trusted: TrustedWindowsCandidate | undefined,
+  identity: ScanCaptureFileIdentity | undefined,
+  successLog: string,
+  failureLabel: 'startup backlog' | 'refuse-delivery' = 'refuse-delivery',
+): boolean {
+  markRefuseUntilQuarantined(filePath, identity)
+  try {
+    finalizeCandidate(filePath, scanWatchFolder, filename, trusted, 'quarantine')
+    globalDirectoryBaseline.remove(filename)
+    forgetRefuseUntilQuarantined(filePath, identity)
+    forgetStartupBacklog(filePath, identity)
+    warn(successLog)
+    return true
+  } catch (e) {
+    err(
+      `scan-watcher: ${failureLabel} quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
+    )
+    return false
+  }
+}
+
+let scanLifecycleActive = 0
+let scanLifecycleSkipped = 0
+let scanCandidateTestHooks: {
+  afterStable?: (filename: string) => void | Promise<void>
+  afterLease?: () => void
+  duringStartupIsolation?: () => void
+} = {}
+
+export function clearStartupBacklogForTest(): void {
+  startupBacklogPaths.clear()
+  startupBacklogIdentities.length = 0
+  refuseUntilQuarantinedPaths.clear()
+  refuseUntilQuarantinedIdentities.length = 0
+  globalScanDeliveryBarrier.resetForTest()
+  resetScanCaptureIdentityFlightsForTest()
+  scanCandidateTestHooks = {}
+  scanLifecycleSkipped = 0
+}
+
+export function noteScanInputUnavailableForTest(): void {
+  globalScanDeliveryBarrier.noteUnavailable()
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+export function noteScanWatcherRebuildForTest(): void {
+  globalScanDeliveryBarrier.noteWatcherRebuild()
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+export function isScanDeliveryPausedForTest(): boolean {
+  return globalScanDeliveryBarrier.isPaused()
+}
+
+export function beginScanWatchSessionForTest(): boolean {
+  return globalScanDeliveryBarrier.beginWatchSession()
+}
+
+export function enterRunningForTest(identity: ScanFolderIdentity): boolean {
+  return globalScanDeliveryBarrier.enterRunning(identity)
+}
+
+export function getScanInputStateForTest(): string {
+  return globalScanDeliveryBarrier.getState()
+}
+
+export function getScanInputGenerationForTest(): number {
+  return globalScanDeliveryBarrier.getGeneration()
+}
+
+export function getScanInputLockOutReasonForTest(): string | undefined {
+  return globalScanDeliveryBarrier.lockOutCode()
+}
+
+export function lockOutScanInputForTest(reason = 'test_lockout'): void {
+  globalScanDeliveryBarrier.lockOut(reason)
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+export function stopScanWatchSessionForTest(): void {
+  globalScanDeliveryBarrier.stop()
+}
+
+export function setScanCandidateTestHooks(hooks: {
+  afterStable?: (filename: string) => void | Promise<void>
+  afterLease?: () => void
+  duringStartupIsolation?: () => void
+}): void {
+  scanCandidateTestHooks = { ...hooks }
+}
+
+function listLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  try {
+    return new Set(readdirSync(scanWatchFolder).filter((name) => name !== UNCLAIMED_DIRNAME))
+  } catch {
+    // ATOMIC_SCAN_LIVE_LISTING_KNOWN: failure is unknown, not an empty folder.
+    return undefined
+  }
+}
+
+function lockOutLiveListingUnknown(): void {
+  if (globalScanDeliveryBarrier.getState() === 'locked_out' || globalScanDeliveryBarrier.getState() === 'stopped') {
+    return
+  }
+  globalScanDeliveryBarrier.lockOut('readdir_failed')
+  warn(`scan-watcher: failed to read scanWatchFolder — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+function requireLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  const names = listLiveBasenames(scanWatchFolder)
+  if (names !== undefined) return names
+  lockOutLiveListingUnknown()
+  return undefined
+}
+
+function liveNameIdentity(scanWatchFolder: string, name: string): ScanCaptureFileIdentity | undefined {
+  try {
+    const metadata = lstatSync(join(scanWatchFolder, name))
+    return scanCaptureFileIdentity(metadata.dev, metadata.ino, metadata.birthtimeMs)
+  } catch {
+    return undefined
+  }
+}
+
+function findLiveSameInodeSuccessor(
+  scanWatchFolder: string,
+  vanishedName: string,
+  identity: ScanCaptureFileIdentity | undefined,
+  liveNames: ReadonlySet<string>,
+): string | undefined {
+  if (!identity) return undefined
+  for (const name of liveNames) {
+    if (name === vanishedName) continue
+    if (isSameScanCaptureFile(identity, liveNameIdentity(scanWatchFolder, name)) === true) return name
+  }
+  return undefined
+}
+
+function finishVanishedCapture(
+  filePath: string,
+  filename: string,
+  scanWatchFolder: string | undefined,
+): void {
+  if (!scanWatchFolder) return
+  try {
+    if (existsSync(filePath)) return
+  } catch {
+    lockOutLiveListingUnknown()
+    return
+  }
+  const liveNames = listLiveBasenames(scanWatchFolder)
+  if (liveNames === undefined) {
+    lockOutLiveListingUnknown()
+    return
+  }
+  globalDirectoryBaseline.closeVanishedCapture(
+    filename,
+    liveNames,
+    (name) => liveNameIdentity(scanWatchFolder, name),
+  )
+}
+
+async function observeNonAcceptedCapture(
+  filePath: string,
+  filename: string,
+  config: AgentConfig,
+  capturedGeneration: number,
+  identity?: ScanCaptureFileIdentity,
+): Promise<void> {
+  const scanWatchFolder = config.scanWatchFolder?.trim()
+  if (!scanWatchFolder) return
+  let taskId: string | null = null
+  if (
+    globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)
+    && !isStartupBacklogCandidate(filePath, identity)
+  ) {
+    try {
+      const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+      const lease = await fetchScanLease(client, config.terminalId)
+      taskId = lease?.scanTaskId ?? null
+    } catch (error) {
+      if (preserveScanFileForUnauthorized(error)) return
+      throw error
+    }
+  }
+  const liveNames = requireLiveBasenames(scanWatchFolder)
+  if (!liveNames) return
+  let bindName = filename
+  try {
+    if (!existsSync(filePath)) {
+      bindName = findLiveSameInodeSuccessor(scanWatchFolder, filename, identity, liveNames) ?? filename
+    }
+  } catch {
+    lockOutLiveListingUnknown()
+    return
+  }
+  globalDirectoryBaseline.bindCapture(
+    bindName,
+    Date.now(),
+    taskId,
+    liveNames,
+    identity,
+    (name) => liveNameIdentity(scanWatchFolder, name),
+  )
+}
+
+export function getScanLifecycleExclusiveStatsForTest(): { active: number; skipped: number } {
+  return { active: scanLifecycleActive, skipped: scanLifecycleSkipped }
+}
+
+async function runScanLifecycleExclusive(task: () => Promise<void>): Promise<'ran' | 'skipped'> {
+  if (scanLifecycleActive > 0) {
+    scanLifecycleSkipped += 1
+    return 'skipped'
+  }
+  scanLifecycleActive += 1
+  try {
+    await task()
+    return 'ran'
+  } finally {
+    scanLifecycleActive -= 1
+  }
+}
+
+export async function holdScanLifecycleExclusiveForTest(hold: Promise<void>): Promise<void> {
+  await runScanLifecycleExclusive(() => hold)
+}
+
+export async function runPeriodicScanSweepForTest(folder: string, config: AgentConfig): Promise<'ran' | 'skipped'> {
+  return runScanLifecycleExclusive(async () => {
+    if (globalScanDeliveryBarrier.getState() === 'stopped') return
+    await sweepFolder(folder, config)
+  })
+}
+
+function logScanInputRestartRequired(): void {
+  warn(`scan-watcher: scan input locked out — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+}
+
+export function observeScanInputOrLockOut(folder: string): void {
+  if (globalScanDeliveryBarrier.getState() === 'stopped') return
+  const health = inspectScanInputFolder(folder)
+  if (health.status !== 'ready') {
+    const alreadyLocked = globalScanDeliveryBarrier.getState() === 'locked_out'
+    globalScanDeliveryBarrier.lockOut(health.reason)
+    if (!alreadyLocked) logScanInputRestartRequired()
+    return
+  }
+  const before = globalScanDeliveryBarrier.getState()
+  globalScanDeliveryBarrier.observeIdentityOrLockOut(readScanFolderIdentity(folder))
+  if (before !== 'locked_out' && globalScanDeliveryBarrier.getState() === 'locked_out') {
+    logScanInputRestartRequired()
+  }
+}
+
+export function abortDeliveryIfScanInputLockout(capturedGeneration: number): boolean {
+  // ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION: in-flight candidates must not lease or POST
+  // after lockout or a generation change; only a new process may run again.
+  if (!globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)) {
+    warn(`scan-watcher: delivery aborted — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return true
+  }
+
+  return false
+}
+
 /** 处理单个候选文件：稳定性检查 → 投递 → 成功删除 / 未匹配隔离 / 其它错误留原地重试。 */
 export async function processCandidate(
   filePath: string,
@@ -260,11 +675,17 @@ export async function processCandidate(
     return
   }
   inFlightPaths.add(filePath)
+  const capturedGeneration = globalScanDeliveryBarrier.getGeneration()
+  let watchFolderForFinally: string | undefined
+  let identityFlight: ScanCaptureIdentityFlight | undefined
   try {
     const scanWatchFolder = config.scanWatchFolder?.trim()
-    const health = inspectScanInputFolder(scanWatchFolder)
-    if (health.status !== 'ready' || !scanWatchFolder) {
-      warn(`scan-watcher: scan input blocked before candidate read — ${health.reason}`)
+    watchFolderForFinally = scanWatchFolder
+    if (!scanWatchFolder) {
+      return
+    }
+    observeScanInputOrLockOut(scanWatchFolder)
+    if (globalScanDeliveryBarrier.getState() === 'stopped') {
       return
     }
     if (!isDirectChild(filePath, filename, scanWatchFolder)) {
@@ -273,18 +694,110 @@ export async function processCandidate(
     }
 
     const initial = snapshotCandidate(filePath, filename)
+    const openingIdentity = scanCaptureFileIdentity(initial.dev, initial.ino, initial.birthtimeMs)
+    identityFlight = beginScanCaptureIdentityFlight(openingIdentity)
+    if (!openingIdentity) {
+      // ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY: ino===0 / missing lstat identity
+      // cannot prove sameness. Lock out (restart required), quarantine or refuse,
+      // and never let concurrent path keys bypass identity-flight.
+      if (identityFlight.previous) await identityFlight.previous
+      const alreadyLocked = globalScanDeliveryBarrier.getState() === 'locked_out'
+      globalScanDeliveryBarrier.lockOut('identity_unavailable')
+      if (!alreadyLocked) {
+        warn(`scan-watcher: unprovable capture identity — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+      }
+      markRefuseUntilQuarantined(filePath, undefined)
+      const liveNames = requireLiveBasenames(scanWatchFolder)
+      if (liveNames) {
+        globalDirectoryBaseline.bindCapture(
+          filename,
+          Date.now(),
+          null,
+          liveNames,
+          undefined,
+          (name) => liveNameIdentity(scanWatchFolder, name),
+        )
+      }
+      try {
+        if (existsSync(filePath) && classifyScanInputCandidate(initial) === 'accepted' && initial.nlink === 1) {
+          const verifiedUnprovable = readVerifiedCandidate(filePath, scanWatchFolder, filename, initial)
+          tryQuarantineKeepingLineage(
+            filePath,
+            scanWatchFolder,
+            filename,
+            verifiedUnprovable.trustedWindowsCandidate,
+            undefined,
+            `scan-watcher: unprovable capture identity quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`,
+          )
+        }
+      } catch (e) {
+        err(
+          `scan-watcher: refuse-delivery quarantine retry failed — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`,
+        )
+      }
+      return
+    }
+    if (identityFlight.previous) {
+      await identityFlight.previous
+      if (!existsSync(filePath)) return
+      const resumed = snapshotCandidate(filePath, filename)
+      if (isSameScanCaptureFile(openingIdentity, scanCaptureFileIdentity(resumed.dev, resumed.ino, resumed.birthtimeMs)) !== true) {
+        return
+      }
+    }
     const classification = classifyScanInputCandidate(initial)
     if (classification !== 'accepted' || initial.nlink !== 1) {
       const reason = initial.nlink !== 1 ? 'rejected_multiple_links' : classification
+      await observeNonAcceptedCapture(filePath, filename, config, capturedGeneration, openingIdentity)
       warn(`scan-watcher: unsafe scan input candidate rejected before read (${reason}) — ${maskScanName(filename)}`)
       return
     }
+
+    const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+    // Per-file opening identity for THIS path only. Never a module-global last lease.
+    let openingTaskId: string | null | undefined
+    if (
+      !deliverFile
+      && globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)
+      && !isNeverDeliverCandidate(filePath, openingIdentity)
+    ) {
+      try {
+        const openingLease = await fetchScanLease(client, config.terminalId)
+        openingTaskId = openingLease?.scanTaskId ?? null
+      } catch (error) {
+        if (preserveScanFileForUnauthorized(error)) {
+          warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${maskScanName(filename)}`)
+          return
+        }
+        throw error
+      }
+    }
+    const liveNames = requireLiveBasenames(scanWatchFolder)
+    if (!liveNames) return
+    let bindName = filename
+    try {
+      if (!existsSync(filePath)) {
+        bindName = findLiveSameInodeSuccessor(scanWatchFolder, filename, openingIdentity, liveNames) ?? filename
+      }
+    } catch {
+      lockOutLiveListingUnknown()
+      return
+    }
+    globalDirectoryBaseline.bindCapture(
+      bindName,
+      Date.now(),
+      deliverFile ? null : openingTaskId ?? null,
+      liveNames,
+      openingIdentity,
+      (name) => liveNameIdentity(scanWatchFolder, name),
+    )
 
     const stable = await waitForStableFile(filePath, filename)
     if (!stable) {
       warn(`scan-watcher: file did not stabilize in time, skipping this round — ${maskScanName(filename)}`)
       return
     }
+    await Promise.resolve(scanCandidateTestHooks.afterStable?.(filename))
 
     // 重新确认文件仍存在:稳定性检查通过后、真正处理前,文件有可能已被
     // 另一条并发路径处理完删除(理论上 inFlightPaths 已经防住了这种情况,
@@ -305,11 +818,142 @@ export async function processCandidate(
       return
     }
 
+    // 先通过 readVerifiedCandidate 获取真实安全候选对象与 verified bytes，
+    // 确保在 Windows 平台获得真实 TrustedWindowsCandidate 变异凭据，避免无租约或旧文件隔离抛出
+    // SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING；同时复用同一份字节完成正常投递，避免双重读取。
     const verified = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
+
+    // 启动时识别为 backlog 的路径，在本进程中必须永久 never-deliver，隔离失败也不能进入正常投递。
+    // 后续 sweep 仅重试安全隔离；成功后清理标记；失败需高严重度但不泄露文件名/内容。
+    const lockoutAbort = abortDeliveryIfScanInputLockout(capturedGeneration)
+    const candidateIdentity = scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino, finalSnapshot.birthtimeMs)
+    const isBacklog = isStartupBacklogCandidate(filePath, candidateIdentity)
+    const isRefuse = isRefuseUntilQuarantinedCandidate(filePath, candidateIdentity)
+    if (lockoutAbort || isBacklog || isRefuse) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        lockoutAbort
+          ? `scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`
+          : isBacklog
+            ? `scan-watcher: startup backlog candidate quarantined — ${maskScanName(filename)}`
+            : `scan-watcher: refuse-delivery candidate quarantined — ${maskScanName(filename)}`,
+        isBacklog ? 'startup backlog' : 'refuse-delivery',
+      )
+      return
+    }
+
+    // 1. 投递前再取一次当前租约。opening fetch 只用于血缘；closing 才是投递身份。
+    let lease: ScanTaskLease | null = null
+    if (deliverFile) {
+      lease = {
+        scanTaskId: 'test-scan-task-id',
+        serverNow: new Date().toISOString(),
+        notBefore: new Date(Date.now() - 60_000).toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        deliveryLease: 'test-delivery-lease',
+      }
+    } else {
+      try {
+        lease = await fetchScanLease(client, config.terminalId)
+      } catch (e) {
+        if (preserveScanFileForUnauthorized(e)) {
+          warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${maskScanName(filename)}`)
+          return
+        }
+        throw e
+      }
+    }
+    scanCandidateTestHooks.afterLease?.()
+    if (abortDeliveryIfScanInputLockout(capturedGeneration)) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        `scan-watcher: locked-out candidate quarantined — code=${SCAN_INPUT_RESTART_REQUIRED}`,
+      )
+      return
+    }
+
+    if (!lease) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        `scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`,
+      )
+      return
+    }
+
+    // 2. 血缘与陈旧捕获：mtime 不能单独当身份。等待中任务 A 上打开的捕获，
+    // 即使 PDF 在 B.notBefore 之后才稳定/可见，也不得 POST 给 B。
+    const leaseNotBeforeMs = new Date(lease.notBefore).getTime()
+    // ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID: an unparsable notBefore cannot prove
+    // the file is newer than the waiting task; fail closed and quarantine.
+    if (!Number.isFinite(leaseNotBeforeMs)) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        `scan-watcher: scan lease notBefore is invalid; refusing delivery, moved to _unclaimed — code=${SCAN_LEASE_NOT_BEFORE_INVALID}`,
+      )
+      return
+    }
+    const closingLiveNames = requireLiveBasenames(scanWatchFolder)
+    if (!closingLiveNames) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        `scan-watcher: unknown scan-folder listing; refusing delivery — code=${SCAN_INPUT_RESTART_REQUIRED}`,
+      )
+      return
+    }
+    // ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE: a capture opened under waiting task A
+    // (or with no waiting task) must not POST to a later waiting task B, even when
+    // mtime/observedAt is after B.notBefore. Recovery is a new panel file or
+    // server-authorized safe rescan of a fresh capture, not this bytes-on-disk.
+    const foreignCapture = deliverFile
+      ? false
+      : globalDirectoryBaseline.isForeignToLease(filename, lease.scanTaskId, closingLiveNames)
+        || (typeof openingTaskId === 'string' && openingTaskId !== lease.scanTaskId)
+        || openingTaskId === null
+    const preExistingCapture =
+      isPreExistingCandidate(finalSnapshot, lease.notBefore)
+      || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
+    if (foreignCapture || preExistingCapture) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        foreignCapture && !preExistingCapture
+          ? `scan-watcher: capture lineage belongs to a different waiting task; refusing cross-session bind, moved to _unclaimed — code=${SCAN_CAPTURE_FOREIGN_LEASE}`
+          : `scan-watcher: candidate file existed prior to scan lease start; refusing pre-existing file binding, moved to _unclaimed — ${maskScanName(filename)}`,
+      )
+      return
+    }
+
+    // 3. 构建可信快照时间（传原始 finalSnapshot.mtimeMs，严禁使用 Math.max 夹值伪造时间证据）
+    const candidateSnapshotAt = new Date(finalSnapshot.mtimeMs).toISOString()
     const form = new FormData()
     form.append('file', verified.bytes, { filename, contentType: guessMimeType(filename) })
-
-    const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
+    form.append('scanTaskId', lease.scanTaskId)
+    form.append('deliveryLease', lease.deliveryLease)
+    form.append('candidateSnapshotAt', candidateSnapshotAt)
+    form.append('observedAt', candidateSnapshotAt)
 
     try {
       // NO_RETRY_CONFIG: `form` 是一次性消费的流，axios 拦截器的自动重试会复用
@@ -325,6 +969,7 @@ export async function processCandidate(
           ...NO_RETRY_CONFIG,
         })
       }
+      globalDirectoryBaseline.remove(filename)
       finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'delete')
       log(`scan-watcher: delivered and removed source file — ${maskScanName(filename)}`)
     } catch (e) {
@@ -334,8 +979,25 @@ export async function processCandidate(
       }
       const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       if (code === 'NO_WAITING_SCAN_TASK') {
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: no waiting scan task, moved to _unclaimed — ${maskScanName(filename)}`,
+        )
+        return
+      }
+      if (code === 'SCAN_LEASE_INVALID' || code === 'SCAN_LEASE_EXPIRED') {
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: scan lease invalid or expired; moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -344,13 +1006,19 @@ export async function processCandidate(
       // 状态变化——服务端已经用 systemDelete() 补偿删掉了那次真实上传出的孤儿文件，见
       // scan-tasks.service.ts deliverScanFile() 的 SCAN_TASK_STATE_CHANGED 分支）。这次"匹配"
       // 已经明确、永久失效——不是网络抖动，绝不能留给下一轮 sweep 重试：重试时该终端"当前
-      // 最早一条 waiting 任务"完全可能已经变成另一个用户的新会话（原用户的任务已经不在，
+      // waiting 任务"完全可能已经变成另一个用户的新会话（原用户的任务已经不在，
       // 终端已经空出来），继续重试会把这份文件错误地挂到那个新用户身上——跨用户 PII 误挂载。
       // 必须像 NO_WAITING_SCAN_TASK 一样立即隔离，绝不重试；日志措辞与两个既有 _unclaimed
       // 归宿（无等待任务 / 重试超时）分别不同，避免运维排查时混淆三种不同的原因。
       if (code === 'SCAN_TASK_STATE_CHANGED') {
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -358,11 +1026,41 @@ export async function processCandidate(
       // 真正投递成功过——最可能的原因是上一次投递其实已经在服务端完成，只是 HTTP 响应在
       // 回传给本 Agent 的路上丢失，本 Agent 才把它误当成失败留在原地准备重试。继续重试
       // 没有意义（内容已经交付过），而且和 SCAN_TASK_STATE_CHANGED 一样有跨用户误挂载
-      // 风险（重试会被匹配到该终端当前最早一条 waiting 任务，可能已经属于另一个用户）——
+      // 风险（重试会被匹配到该终端当前 waiting 任务，可能已经属于另一个用户）——
       // 同样必须立即隔离，不重试。
       if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
-        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-        warn(`scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${maskScanName(filename)}`)
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${maskScanName(filename)}`,
+        )
+        return
+      }
+
+      if (code === 'SCAN_FILE_PREVIOUSLY_ATTEMPTED') {
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: file content was previously attempted but not completed; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`,
+        )
+        return
+      }
+
+      if (code === 'SCAN_FILE_STALE_CAPTURE') {
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: file capture is stale for current session; refusing cross-session rebind, moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -378,15 +1076,15 @@ export async function processCandidate(
         // 文件在此期间消失（已被其它路径处理/删除）——无需再决定去留。
       }
       if (mtimeMs !== undefined && Date.now() - mtimeMs > DELIVERY_RETRY_MAX_MS) {
-        try {
-          finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
-          warn(
-            `scan-watcher: delivery retry timeout exceeded (idle ${formatDuration(Date.now() - mtimeMs)}), ` +
-              `abandoning retries and moved to _unclaimed — ${maskScanName(filename)}`,
-          )
-        } catch (moveErr) {
-          err(`scan-watcher: failed to quarantine file after retry timeout — ${maskScanName(filename)}: ${axiosErrorMessage(moveErr)}`)
-        }
+        tryQuarantineKeepingLineage(
+          filePath,
+          scanWatchFolder,
+          filename,
+          verified.trustedWindowsCandidate,
+          candidateIdentity,
+          `scan-watcher: delivery retry timeout exceeded (idle ${formatDuration(Date.now() - mtimeMs)}), ` +
+            `abandoning retries and moved to _unclaimed — ${maskScanName(filename)}`,
+        )
         return
       }
 
@@ -399,6 +1097,8 @@ export async function processCandidate(
     err(`scan-watcher: unexpected error processing candidate, leaving file in place for retry — ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
   } finally {
     inFlightPaths.delete(filePath)
+    finishVanishedCapture(filePath, filename, watchFolderForFinally)
+    identityFlight?.release()
   }
 }
 
@@ -587,28 +1287,45 @@ export function sweepUnclaimedDir(
 /** Store/log only bounded machine-readable codes, never exception messages containing paths. */
 function sanitizedErrorCode(error: unknown, fallback: string): string {
   const code = (error as NodeJS.ErrnoException | undefined)?.code
-  return typeof code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(code)
-    ? code.toUpperCase()
-    : fallback
+  if (typeof code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(code)) {
+    return code.toUpperCase()
+  }
+  const message = (error as Error | undefined)?.message
+  if (typeof message === 'string' && /^[A-Z0-9_]{1,64}$/.test(message)) {
+    return message
+  }
+  return fallback
 }
 
 /** 目录清点：处理当前已存在、不在 _unclaimed 子目录里的文件；同时清理 _unclaimed 里的过期文件。 */
 export async function sweepFolder(scanWatchFolder: string, config: AgentConfig): Promise<void> {
   sweepUnclaimedDir(scanWatchFolder)
   if (isUnauthorized()) return
-
-  const health = inspectScanInputFolder(scanWatchFolder)
-  if (health.status !== 'ready') {
-    warn(`scan-watcher: scan input sweep blocked — ${health.reason}`)
-    return
-  }
+  if (globalScanDeliveryBarrier.getState() === 'stopped') return
+  observeScanInputOrLockOut(scanWatchFolder)
+  if (globalScanDeliveryBarrier.getState() === 'stopped') return
 
   let entries: string[]
   try {
     entries = readdirSync(scanWatchFolder)
-  } catch (e) {
-    warn(`scan-watcher: failed to read scanWatchFolder — ${axiosErrorMessage(e)}`)
+  } catch {
+    globalScanDeliveryBarrier.lockOut('readdir_failed')
+    warn(`scan-watcher: failed to read scanWatchFolder — code=${SCAN_INPUT_RESTART_REQUIRED}`)
     return
+  }
+  const liveNames = new Set(entries.filter((name) => name !== UNCLAIMED_DIRNAME))
+  globalDirectoryBaseline.retainLiveEntries(
+    liveNames,
+    (name) => liveNameIdentity(scanWatchFolder, name),
+  )
+  if (globalScanDeliveryBarrier.getState() === 'locked_out' || globalScanDeliveryBarrier.getState() === 'initializing') {
+    for (const name of entries) {
+      if (name === UNCLAIMED_DIRNAME) continue
+      const fullPath = join(scanWatchFolder, name)
+      if (!isDirectChild(fullPath, name, scanWatchFolder)) continue
+      startupBacklogPaths.add(canonicalizeScanPath(fullPath))
+      markStartupBacklogIdentity(fullPath)
+    }
   }
   for (const name of entries) {
     if (name === UNCLAIMED_DIRNAME) continue
@@ -616,6 +1333,20 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     try {
       const snapshot = snapshotCandidate(fullPath, name)
       if (classifyScanInputCandidate(snapshot) !== 'accepted' || snapshot.nlink !== 1) {
+        const sweepIdentity = scanCaptureFileIdentity(snapshot.dev, snapshot.ino, snapshot.birthtimeMs)
+        const sweepFlight = beginScanCaptureIdentityFlight(sweepIdentity)
+        try {
+          if (sweepFlight.previous) await sweepFlight.previous
+          await observeNonAcceptedCapture(
+            fullPath,
+            name,
+            config,
+            globalScanDeliveryBarrier.getGeneration(),
+            sweepIdentity,
+          )
+        } finally {
+          sweepFlight.release()
+        }
         warn(`scan-watcher: unsafe scan input candidate skipped during sweep — ${maskScanName(name)}`)
         continue
       }
@@ -631,50 +1362,221 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
 }
 
 /**
+ * 启动时安全隔离目录内已有文件（fail-closed startup backlog）。
+ * Agent 每次启动时，扫描目录下已存在的所有文件（启动前旧文件）
+ * 均不能获得之后的新租约，必须立即安全隔离至 _unclaimed 目录。
+ * readdir 之后、任何 await / watcher add / sweep / process 之前，必须同步把每个
+ * 直接子路径记入 startupBacklogPaths，并把能证明的目录项身份记入
+ * startupBacklogIdentities；随后才按既有 Windows trusted token 串行隔离。
+ * 启动时识别为 backlog 的目录项，在本进程中必须永久 never-deliver（rename 换名
+ * 也不行），隔离失败也不能进入正常投递。内核复用 inode 且 birthtime 可证明不同
+ * 的新文件不是 leftover。隔离失败保留标记；成功才清除路径和身份。
+ * unsafe / symlink / hardlink 只保留 never-deliver 标记，绝不投递。
+ * 在 Windows 平台上严格使用 readVerifiedCandidate 获取的 TrustedWindowsCandidate
+ * 原生凭据执行隔离，绝不抛 SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING。
+ * 隔离后文件在 _unclaimed 目录中，下次重启或周期性 sweep 均不会再次尝试匹配或投递。
+ */
+export async function isolateStartupBacklog(scanWatchFolder: string): Promise<number> {
+  const folder = scanWatchFolder?.trim()
+  if (!folder) return 0
+
+  const health = inspectScanInputFolder(folder)
+  if (health.status !== 'ready') {
+    globalScanDeliveryBarrier.lockOut(health.reason)
+    warn(`scan-watcher: scan input startup backlog check blocked — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return 0
+  }
+
+  let entries: string[]
+  try {
+    entries = readdirSync(folder)
+  } catch {
+    globalScanDeliveryBarrier.lockOut('readdir_failed')
+    warn(`scan-watcher: failed to read scanWatchFolder for startup backlog — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return 0
+  }
+
+  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
+  // await so watcher add/sweep/process cannot deliver a later sibling.
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    startupBacklogPaths.add(canonicalizeScanPath(fullPath))
+    // ATOMIC_STARTUP_BACKLOG_IDENTITY: never-deliver follows the directory
+    // entry (dev/ino) across a later rename; a new basename is not a new capture.
+    markStartupBacklogIdentity(fullPath)
+  }
+
+  const identity = readScanFolderIdentity(folder)
+  if (!identity) {
+    globalScanDeliveryBarrier.lockOut('identity_unavailable')
+    warn(`scan-watcher: scan input startup identity unavailable — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+  }
+
+  let quarantined = 0
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    const resolvedPath = canonicalizeScanPath(fullPath)
+    startupBacklogPaths.add(resolvedPath)
+    if (inFlightPaths.has(fullPath)) continue
+    inFlightPaths.add(fullPath)
+    try {
+      const initial = snapshotCandidate(fullPath, name)
+      if (classifyScanInputCandidate(initial) !== 'accepted' || initial.nlink !== 1) {
+        continue
+      }
+      const stable = await waitForStableFile(fullPath, name)
+      if (!stable || !existsSync(fullPath)) continue
+
+      const finalSnapshot = snapshotCandidate(fullPath, name)
+      const verified = readVerifiedCandidate(fullPath, folder, name, finalSnapshot)
+      globalDirectoryBaseline.remove(name)
+      finalizeCandidate(fullPath, folder, name, verified.trustedWindowsCandidate, 'quarantine')
+      forgetStartupBacklog(fullPath, scanCaptureFileIdentity(finalSnapshot.dev, finalSnapshot.ino, finalSnapshot.birthtimeMs))
+      warn(`scan-watcher: startup backlog candidate quarantined — ${maskScanName(name)}`)
+      quarantined += 1
+    } catch (e) {
+      err(`scan-watcher: failed to isolate startup backlog candidate — code=${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}`)
+    } finally {
+      inFlightPaths.delete(fullPath)
+    }
+  }
+  scanCandidateTestHooks.duringStartupIsolation?.()
+  const postIsolationIdentity = readScanFolderIdentity(folder)
+  if (!postIsolationIdentity) {
+    globalScanDeliveryBarrier.lockOut('identity_unavailable')
+    logScanInputRestartRequired()
+  } else if (!identity || scanFolderIdentityChanged(identity, postIsolationIdentity)) {
+    globalScanDeliveryBarrier.lockOut('root_identity_changed')
+    logScanInputRestartRequired()
+  } else if (globalScanDeliveryBarrier.getState() === 'initializing') {
+    globalScanDeliveryBarrier.enterRunning(postIsolationIdentity)
+  }
+  return quarantined
+}
+
+/**
  * 启动扫描监听。未配置 config.scanWatchFolder 时直接返回 undefined，
  * 不影响心跳 / claim 等其余 Agent 功能。
  */
+function waitForWatcherReady(watcher: FSWatcher, timeoutMs = 10_000): Promise<boolean> {
+  return new Promise((resolveReady) => {
+    let settled = false
+    const finish = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolveReady(ok)
+    }
+    const timer = setTimeout(() => finish(false), timeoutMs)
+    watcher.once('ready', () => finish(true))
+    watcher.once('error', () => finish(false))
+  })
+}
+
 export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undefined {
   const folder = config.scanWatchFolder?.trim()
   if (!folder) {
     log('scan-watcher: scanWatchFolder 未配置，跳过扫描监听')
     return undefined
   }
+  if (!globalScanDeliveryBarrier.allowsAttach()) {
+    warn(`scan-watcher: session stopped; watcher not started — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return undefined
+  }
 
   const health = inspectScanInputFolder(folder)
   if (health.status !== 'ready') {
+    globalScanDeliveryBarrier.lockOut(health.reason)
+    logScanInputRestartRequired()
     warn(`scan-watcher: scan input blocked; watcher not started — ${health.reason}`)
     return undefined
   }
 
   log(`scan-watcher: watching ${folder}`)
 
-  const watcher: FSWatcher = chokidar.watch(folder, {
+  if (!globalScanDeliveryBarrier.beginWatchSession()) {
+    warn(`scan-watcher: session stopped; watcher not started — code=${SCAN_INPUT_RESTART_REQUIRED}`)
+    return undefined
+  }
+  globalDirectoryBaseline.clear()
+  startupBacklogPaths.clear()
+  startupBacklogIdentities.length = 0
+  refuseUntilQuarantinedPaths.clear()
+  refuseUntilQuarantinedIdentities.length = 0
+
+  const next: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,
     depth: 0,
     ignored: (path: string) => path.includes(UNCLAIMED_DIRNAME),
   })
-
-  watcher.on('add', (filePath: string) => {
+  let watcher: FSWatcher | undefined = next
+  next.on('add', (filePath: string) => {
     const filename = filePath.split(/[\\/]/).pop() ?? filePath
+    if (globalScanDeliveryBarrier.getState() !== 'running' && globalScanDeliveryBarrier.getState() !== 'idle') {
+      startupBacklogPaths.add(canonicalizeScanPath(filePath))
+      markStartupBacklogIdentity(filePath)
+    }
     processCandidate(filePath, filename, config).catch((e) => {
       err(`scan-watcher: processCandidate threw unexpectedly for ${maskScanName(filename)}: ${axiosErrorMessage(e)}`)
     })
   })
-
-  watcher.on('error', (error: unknown) => {
+  next.on('error', (error: unknown) => {
     err(`scan-watcher: watcher error — ${axiosErrorMessage(error)}`)
+    globalScanDeliveryBarrier.noteWatcherError()
+    logScanInputRestartRequired()
   })
 
-  // 启动时清点一次（处理 Agent 重启期间到达、被 ignoreInitial 跳过的文件）
-  void sweepFolder(folder, config)
+  const runPeriodicScanSweep = async (): Promise<void> => {
+    await runScanLifecycleExclusive(async () => {
+      if (globalScanDeliveryBarrier.getState() === 'stopped') return
+      await sweepFolder(folder, config)
+    })
+  }
 
-  const sweepTimer = setInterval(() => void sweepFolder(folder, config), SWEEP_INTERVAL_MS)
+  // 启动：quarantine-only until watcher ready + complete enum/premark/isolate.
+  // Failure lockouts this process; no automatic watcher rebuild or remount recovery.
+  void runScanLifecycleExclusive(async () => {
+    const ready = await waitForWatcherReady(next)
+    if (!ready || globalScanDeliveryBarrier.getState() === 'stopped') {
+      if (globalScanDeliveryBarrier.getState() !== 'stopped') {
+        globalScanDeliveryBarrier.lockOut('watcher_ready_failed')
+        logScanInputRestartRequired()
+      }
+      return
+    }
+    try {
+      await isolateStartupBacklog(folder)
+    } catch (e) {
+      globalScanDeliveryBarrier.lockOut('startup_backlog_failed')
+      err(`scan-watcher: startup backlog isolation threw unexpectedly: ${sanitizedErrorCode(e, 'STARTUP_BACKLOG_FAILED')}`)
+      logScanInputRestartRequired()
+      return
+    }
+    if (globalScanDeliveryBarrier.getState() === 'initializing') {
+      globalScanDeliveryBarrier.lockOut('startup_incomplete')
+      logScanInputRestartRequired()
+    }
+  })
+
+  const sweepTimer = setInterval(() => void runPeriodicScanSweep(), SWEEP_INTERVAL_MS)
 
   return {
     stop: async () => {
+      globalScanDeliveryBarrier.stop()
       clearInterval(sweepTimer)
-      await watcher.close()
+      const deadline = Date.now() + 15_000
+      while (scanLifecycleActive > 0 && Date.now() < deadline) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, 20))
+      }
+      if (watcher) {
+        const closing = watcher
+        watcher = undefined
+        await closing.close()
+      }
     },
   }
 }

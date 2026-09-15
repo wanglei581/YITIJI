@@ -1,10 +1,26 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 
 function read(path) {
   return readFileSync(resolve(root, path), 'utf8')
+}
+
+/** 递归列出一个目录下所有 .ts / .tsx 源文件。 */
+function listSourceFiles(dir) {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...listSourceFiles(full))
+    else if (/\.tsx?$/.test(entry.name)) out.push(full)
+  }
+  return out
+}
+
+/** 剥掉 // 与 块注释，只留代码。用于「禁止出现某调用」这类断言：讲缺陷的注释不该判红。 */
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
 function assert(condition, message) {
@@ -143,13 +159,103 @@ assert(
 
 assert(
   authContext.includes('onMemberSessionExpired') &&
-    authContext.includes('logout()') &&
-    authContext.includes('sessionExpiredRedirectingRef') &&
-    authContext.includes('!isLoginPath(window.location.pathname)') &&
-    authContext.includes('window.location.assign(loginPathForCurrentLocation())') &&
+    authContext.includes('sessionExpiryExit.expire(logout)') &&
     !authContext.includes('resetMemberAuthDevice') &&
     authContext.includes('userRef.current?.token !== failedToken'),
-  'AuthProvider 订阅会员 API 失效事件，只清空仍匹配失败 token 的内存会话，不重置风控 deviceId，并安全回到登录页',
+  'AuthProvider 订阅会员 API 失效事件，只清空仍匹配失败 token 的内存会话，不重置风控 deviceId，并把回登录页这一步交给 401 出口',
+)
+
+/* ── 401 之后不许绕过清场收尾闸（2026-09-15，P1）────────────────────────────
+ *
+ * 缺陷原样：`logout()` 只是把要撤的那一场**交给** `beginScanSessionCleanup`，
+ * 撤销本身是异步重试；紧接着那句 `window.location.assign()` 把重试连同执行环境一起
+ * 干掉，这条路退化成 `pagehide` 的一次 keepalive beacon。弱网丢包 + 离开那一刻还在飞的
+ * 投递确认（ACK）成功 = 服务端留下一条已确认、仍 waiting 的任务，可投递到自然过期 ——
+ * 下一位在面板上扫出来的文件投给已经走掉的上一位（跨用户串件）。
+ *
+ * 所以 AuthContext 自己不许再持有那句硬跳转：它必须整条交给 memberSessionExpiryExit，
+ * 由后者挂在 `whenScanCleanupSettled` 上。这两条一起钉，缺一条都能悄悄绕回去 ——
+ * 只钉「出口模块里有 whenScanCleanupSettled」的话，AuthContext 里再补一句 assign 照样绿。
+ *
+ * 行为本身（5xx / 断网 / 403 不放行、确认或自然过期之后只放行一次、本机清场不等网络）
+ * 由 scripts/tests/member-session-expiry-exit.test.mjs 跑真闸断言，源码断言证明不了。 */
+assert(
+  !/window\.location\.(assign|replace|href)/.test(authContext),
+  'AuthProvider 里不许再出现硬跳转：401 的出口必须整条走 memberSessionExpiryExit，否则会绕过清场收尾闸',
+)
+
+/* ── 出口的所有权必须跨 <AuthProvider key> 重挂唯一（2026-09-15 R3，Grok 主对抗审查）──
+ *
+ * 真正的不变量是**「全页只有一个 401 出口」**，不是「某个 Provider 实例上只有 login
+ * 会 cancel」。第一版把实例挂在 Provider 的 ref 上，`main.tsx` 的
+ * `<AuthProvider key={identityRevision}>` 一重挂（terminalId A→B）就出现两个 owner，
+ * 而它们的回调挂在同一条模块级收尾闸上：旧 owner 登记的跳转，新 Provider 的 `login()`
+ * 取消不了，闸一 settle 就把刚登进来的这一位 assign 回登录页。
+ *
+ * 所以这里钉两层，缺任何一层都能悄悄退回去：
+ *   ① AuthContext 只许**取**那个页面级单例，不许自己造实例；
+ *   ② 出口模块把实例存在模块作用域，且不对外暴露 per-call 工厂
+ *      （暴露了，下一个人就会在别处再造一个）。
+ * 跨重挂的**行为**（重挂后登录必须取消得掉、重挂后没人登录仍必须跳一次）由
+ * scripts/tests/member-session-expiry-exit.test.mjs 两条用例跑真闸断言。 */
+assert(
+  authContext.includes('getMemberSessionExpiryExit()') &&
+    !/createMemberSessionExpiryExit/.test(authContext),
+  'AuthProvider 取的是页面级单例 401 出口，不许 per-Provider 造实例：'
+    + '<AuthProvider key> 重挂后会出现两个 owner，新 Provider 的 login() 取消不了旧的那次登记',
+)
+
+const sessionExpiryExit = read('src/auth/memberSessionExpiryExit.ts')
+assert(
+  /^let sharedExit: MemberSessionExpiryExit \| null = null$/m.test(sessionExpiryExit) &&
+    /export function getMemberSessionExpiryExit\(\)[\s\S]*?sharedExit \?\?= createMemberSessionExpiryExit\(\)/.test(
+      sessionExpiryExit,
+    ) &&
+    !/export function createMemberSessionExpiryExit/.test(sessionExpiryExit),
+  '401 出口实例存在模块作用域并只经 getMemberSessionExpiryExit() 取用，不对外暴露 per-call 工厂',
+)
+
+/* 谁有资格作废一次已经登记的跳转 —— 这条闸守的是三个具体的回归：
+ *   · `logout()` 撤销它 = 手工登出 / 隐私清场会把这一位停在一张过期页面上，既登不回去
+ *     也走不掉（旧代码那一句 `sessionExpiredRedirectingRef.current = false` 原本只影响
+ *     「下一次 401 还能不能跳」，搬到待办跳转上就变成了撤销，语义完全不同）；
+ *   · effect cleanup 撤销它 = 卸载之后这一位再也回不到登录页；
+ *   · `login()` **不**撤销它 = 刚登进来的人会被上一次过期的跳转踢出去。
+ * 单例化之后这一条才真正生效：cancel 必须打在**同一个** owner 上。 */
+const authLoginBlock = authContext.slice(
+  authContext.indexOf('const login = useCallback'),
+  authContext.indexOf('const logout = useCallback'),
+)
+const authAfterLogin = authContext.slice(authContext.indexOf('const logout = useCallback'))
+assert(
+  authLoginBlock.includes('sessionExpiryExit.cancel()') &&
+    !authAfterLogin.includes('sessionExpiryExit.cancel()'),
+  '只有 login() 作废待办的 401 跳转：logout() 与 effect cleanup 都不许撤销一条必须走完的跳转',
+)
+assert(
+  /clearLocalSession\(\)[\s\S]*?whenScanCleanupSettled\(\(\) => \{[\s\S]*?window\.location\.assign\(loginPath\)/.test(
+    sessionExpiryExit,
+  ),
+  '401 出口顺序：本机会话先同步清掉（不等网络），回登录页那一步挂在清场收尾闸上',
+)
+assert(
+  sessionExpiryExit.includes('!isLoginPath(window.location.pathname)') &&
+    sessionExpiryExit.includes('const loginPath = loginPathForCurrentLocation()'),
+  '401 出口仍然拒绝登录页自循环，并且目的地只由站内安全回跳 helper 生成',
+)
+/* 这一条只能看**代码**：文件头要讲清「新身份的 sessionStorage 没被清过」这类成因，
+ * 带注释一起 test 会把讲缺陷的那句话判成缺陷本身。先剥注释再判，两头都不冤。 */
+const sessionExpiryExitCode = stripComments(sessionExpiryExit)
+assert(
+  sessionExpiryExitCode.includes('whenScanCleanupSettled') &&
+    sessionExpiryExitCode.includes('window.location.assign'),
+  '注释剥离器没把代码一起剥掉（否则下面那条禁令会变成永远为真）',
+)
+assert(
+  !/sessionStorage|localStorage|document\.cookie|history\.(pushState|replaceState)/.test(
+    sessionExpiryExitCode,
+  ),
+  '401 出口不许把令牌 / 控制凭据 / 任务号写进任何浏览器存储或 history',
 )
 
 assert(
@@ -189,6 +295,7 @@ const memberServiceFiles = [
   'src/services/api/interview.ts',
   'src/services/api/materials.ts',
   'src/services/api/pendingTasks.ts',
+  'src/services/api/contractReview.ts',
 ]
 
 for (const file of memberServiceFiles) {
@@ -200,6 +307,28 @@ for (const file of memberServiceFiles) {
     `${file} 对带会员 token 的会话失效错误触发统一通知`,
   )
 }
+
+/* ── 会话失效通知必须带上「这次用的那张令牌」（2026-09-15 R3）─────────────────
+ *
+ * AuthProvider 的第一句就是
+ * `if (failedToken && userRef.current?.token !== failedToken) return`。
+ * 无参调用会把这句短路掉：一次**迟到的、用旧令牌发出去的**请求拿回 401，会把当前这位
+ * 已经重新登录的用户一起登出、并（经 401 出口）踢回登录页。
+ *
+ * 2026-09-15 实测全仓只有 src/services/api/contractReview.ts 一处这么写，其余 30 处
+ * 都老老实实传了。所以这条按**全仓零容忍**钉，不逐文件白名单 —— 白名单只会让下一个
+ * 新文件重新踩一遍。 */
+const bareNotifyCallers = listSourceFiles(resolve(root, 'src'))
+  .filter((file) => /notifyMemberSessionExpired\s*\(\s*\)/.test(stripComments(readFileSync(file, 'utf8'))))
+  .map((file) => relative(root, file))
+assert(
+  listSourceFiles(resolve(root, 'src')).length > 100,
+  '源码遍历器没扫到东西（否则下面那条零容忍会变成永远为真）',
+)
+assert(
+  bareNotifyCallers.length === 0,
+  `notifyMemberSessionExpired() 必须透传失败 token，否则会误伤已经重新登录的用户：${bareNotifyCallers.join(', ')}`,
+)
 
 assert(
   pendingTasksApi.includes('/me/pending-tasks') &&

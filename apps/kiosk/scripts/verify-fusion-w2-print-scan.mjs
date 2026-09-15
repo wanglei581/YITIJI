@@ -497,7 +497,8 @@ assert.match(
 )
 assert.match(
   printUploadPage,
-  /navigate\('\/scan\/start'\)/,
+  // 2026-09-13：扫描入口统一指向工作台 /scan（/scan/start 只保留为兼容重定向）。
+  /navigate\('\/scan'\)/,
   'print upload keeps scan as an independent CTA'
 )
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
@@ -1001,7 +1002,8 @@ assert.match(scanStart, /改用面板扫描到 U 盘/, 'scan start keeps the USB
 assert.match(scanStart, /mode=usb-panel/, 'USB-panel path is a real query mode, not a fake scan session')
 assert.match(
   scanStart,
-  /navigate\(["']\/scan\/settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
+  // 2026-09-13：四页合并后的真地址是 /scan?stage=settings（/scan/settings 只剩兼容重定向）。
+  /navigate\(["']\/scan\?stage=settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
   'scan start carries a validated scan type into settings'
 )
 const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
@@ -1053,7 +1055,8 @@ for (const marker of [
 assertNoStorageAccess('src/pages/scan/ScanSettingsPage.tsx')
 assert.match(
   scanSettings,
-  /navigate\(["']\/scan\/progress["'][\s\S]*scanTaskId[\s\S]*scanType[\s\S]*controlToken/,
+  // 2026-09-13：真地址是 /scan?stage=progress（/scan/progress 只剩兼容重定向）。
+  /navigate\(["']\/scan\?stage=progress["'][\s\S]*scanTaskId[\s\S]*scanType[\s\S]*controlToken/,
   'scan settings passes the control token through route state'
 )
 

@@ -186,9 +186,18 @@ model ScanTask {
   endUser          EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
   fileId           String?
   matchedFileMtime DateTime?
+  lastAttemptHash  String?
   errorCode        String?
   errorMessage     String?
   controlTokenHash String?
+  retryOfScanTaskId         String?
+  retryContentHash          String?
+  retryConsumedAt           DateTime?
+  retryConsumedByScanTaskId String?   @unique
+  retryAuthorityExpiresAt   DateTime?
+  // Null until Kiosk ACKs that it durably holds this task's control credentials.
+  // Agent current-lease must not see waiting rows while this is null.
+  deliveryAckedAt  DateTime?
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -197,8 +206,16 @@ model ScanTask {
   // 20260713160000_add_scan_task_active_session_unique），约束同一 terminalId 同时只能有
   // 一条 status IN ('waiting','matched') 的活跃记录；Prisma `@@unique` 不支持条件索引，故不在此声明。
   // create() 调用方需预期违反该约束时抛出 P2002。
+  //
+  // retryOfScanTaskId / retryConsumedByScanTaskId 的一对一血缘在 SQL 迁移里是
+  // `WHERE IS NOT NULL` 的 partial unique index。Prisma `@@unique` 表达不了 WHERE，
+  // 这里的声明只用于 client 识别 P2002；SQLite/PostgreSQL 的 UNIQUE 对 NULL 本就
+  // 互不冲突，与 partial 语义等价。
   @@index([terminalId, status, createdAt])
   @@index([endUserId])
+  @@index([terminalId, lastAttemptHash, updatedAt])
+  @@index([terminalId, deliveryAckedAt])
+  @@unique([retryOfScanTaskId])
 }
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
@@ -234,6 +251,10 @@ model TerminalHeartbeat {
   wiredNetworkStatus         String?
   printerNetworkStatus       String?
   localTaskDatabaseAvailable Boolean?
+  scanInputHealth            String?
+  scanInputAction            String?
+  scanInputReason            String?
+  scanInputObservedAt        DateTime?
   agentVersion               String?
   ipAddress                  String?
   diskFreeGb                 Float?

@@ -123,7 +123,12 @@ async function call<T>(
     const code: string = json?.error?.code ?? json?.code ?? 'UNKNOWN'
     const msg: string = json?.error?.message ?? json?.message ?? `请求失败（${res.status}）`
     if (isMemberSessionInvalidError(res.status, code, !!access.token)) {
-      notifyMemberSessionExpired()
+      /* 必须透传**这次用的那张**令牌。不带的话 AuthProvider 那句
+       * `if (failedToken && userRef.current?.token !== failedToken) return` 整个失效：
+       * 一次迟到的、用旧令牌发出去的合同审查请求拿回 401，会把**当前这位已经重新登录的
+       * 用户**一起登出并踢回登录页。匿名那一支（只有 accessToken）本来就进不到这里 ——
+       * isMemberSessionInvalidError 的第三个参数就是「这次带没带会员令牌」。 */
+      notifyMemberSessionExpired(access.token ?? undefined)
     }
     throw new ContractReviewApiError(code, msg, res.status)
   }

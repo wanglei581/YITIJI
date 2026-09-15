@@ -1,8 +1,104 @@
 # 下一步任务
 
+## 2026-09-15 R3 候选后的唯一推进顺序（取代下面 R2 那一节）
+
+**当前总判定：扫描 R3 的运行时代码与图谱证据锚点 `fd7641644` 已达到 SOURCE / LOCAL / CI GO；
+DEVICE / PRODUCTION / COMMERCIAL 全部 NO-GO。PR 尚未合并，文档同步产生的最终 head 仍须独立跑绿。**
+
+分支 `integration/scan-pickup-closeout-r3-20260915`，基线
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。R3 的功能实现证据锚点仍是**两个提交**：
+`b3d7c43d50d13b4527bad1d23bc8d44675419fea`（401 出口接入清场收尾闸）+
+`089b5b9adca40b6a6f669d46705e3ec0acd92f3a`（Grok 主对抗审查发现的 P1 修复：出口所有权跨 `<AuthProvider key>` 重挂唯一、
+`contractReview` 透传失败 token、`fusion-w6-contract` 接入 CI）。
+前一 HEAD 是 `c866c4156746c772e2657c3c768b0f97a3bb8f35`（补记精确 SHA 的文档提交）。
+7 个 `docs/graph/**` 生成漂移已用 `pnpm graph` 消除，落地后的精确证据锚点是
+`fd764164439c979919c24e87b5a249ba63c57417`。
+
+口径更正，别再混用：
+
+- R2 的 CI run `34816672752` / Windows installer run `34816673132` 仍只属于 R2 实现锚点
+  `5ebf73c05`，不得拿来为 R3 背书。
+- R3 自己的证据锚点 `fd7641644` 已在 PR #1036 上取得 CI run `34908123963` 三项必需检查全绿，
+  Windows installer run `34908124004` 的 EXE / MSI 两项检查也全绿；`release-bundle` 因非发布事件
+  按预期跳过。
+- 本次进度文档同步会产生一个只改文档的后继 commit。最终合并只认 GitHub 上 PR #1036 的实时
+  final head 及其对应检查，不得把 `fd7641644` 的绿灯自动继承给后继 SHA。
+- R2 的 `5ebf73c05` 是 R3 的祖先；后续唯一推进路径以本节为准。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 1 | 集成 / 仓库 | **当前只剩最终 head CI 与合并**：把本次两份进度文档同步推到现有 PR #1036，不新开 PR；等待文档后继 SHA 的三项必需 CI 与 Windows installer 检查全绿后合入 | PR final head 的必需检查全绿且无未处理 P0 / P1；合入后 fetch `origin/main`，以 `merge-base --is-ancestor <PR-final-head> origin/main` 证明进入主线并记录新的 main SHA；不得沿用 `fd7641644` 的绿灯给后继 SHA 背书 |
+| 2 | Windows / 奔图专用任务 | 在合入后的精确 SHA 上完成面板扫描、真实出纸、扫码枪、断网重连、Agent 重启、长驻 watcher 与连续多用户操作 | 记录任务/订单/文件 hash/状态回传/临时文件删除；重点证明旧文件不交给后来的用户，以及「401 过期 + 弱网」时下一位在面板上扫出来的文件不会投给上一位 |
+| 3 | Claude + 四端 | 从合入后的干净 `origin/main` 推进，不与 R3 候选混合；Claude 独占前端写入 | 同下面 R2 那一节第 3 项，口径不变 |
+| 4 | 运维 / 生产 | 具名维护窗口按精确 SHA 完成备份、迁移、部署、监控、回滚 | 同下面 R2 那一节第 4 项，口径不变 |
+| 5 | 产品负责人 / 运营 / 客户 | 微信类目与提审、授权内容冷启动、真实用户 UAT 与签字交付 | 同下面 R2 那一节第 5 项，口径不变 |
+
+R3 已知遗留（不阻塞第 1 项，但要登记）：
+
+- **P2：401 出口没有自己的等待遮罩。** 清场遮罩只挂在 `KioskPrivacyGuard` 的 `clearing` 状态上，
+  401 这条路不触发它。等待服务端确认期间，页面停在原路由且已登出（本机 PII 已同步清掉，
+  不构成泄露），但没有一屏告诉用户「在等什么、还要多久」。本轮按要求**不扩展** 401 overlay /
+  hardClear 双出口 —— 两个出口同时登记会在闸 settle 时互相抢导航目的地，风险高于收益。
+  做的话只允许低风险复用 `KioskClearingOverlay`，且必须先确定谁赢那次导航。
+- **已关闭：7 个图谱漂移。** 前一 HEAD `c866c4156746c772e2657c3c768b0f97a3bb8f35` 上
+  `pnpm graph:check` 红（7 个 `docs/graph/**` 产物内容不一致）。本轮 `pnpm graph` 重跑生成，
+  未手改产物，落地锚点为 `fd7641644`，已推到 PR #1036 并取得上述两组 CI 全绿。
+  `graph:check` 未接入任何 CI workflow。DEVICE / PRODUCTION / COMMERCIAL 仍全部 NO-GO。
+
+## 2026-09-14 R2 候选后的唯一推进顺序
+
+**当前总判定：扫描 R2 在 PR #1036 实现锚点达到 SOURCE / LOCAL / CI GO；DEVICE / PRODUCTION /
+COMMERCIAL NO-GO。** 分支
+`integration/scan-pickup-closeout-r2-20260913` 的实现证据锚点为
+`5ebf73c056b3d71942923aa394acf3903df890a4`，基线为
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。PR #1036 已 push，当前
+`OPEN / MERGEABLE`；CI run `34816672752` 的三项必需检查与 Windows installer run
+`34816673132` 的 EXE / MSI 两项检查全部通过。尚未合入 `main`、部署、做生产迁移或当前 SHA 真机验收；
+不得用 CI 替代 Windows / 奔图、小程序、真实支付、生产或客户验收。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 1 | 集成 / 仓库 | **当前只剩合并决策**：复核 PR #1036 仍以 `5ebf73c05` 为实现证据锚点且必需检查全绿，再由有权限者合入；文档提交产生的新 HEAD 必须重新等 CI，不得沿用旧 SHA 绿灯 | PR 最终 head 的必需检查全绿；无未处理 P0/P1；合入后以 `merge-base --is-ancestor` 证明进入 `origin/main`，记录新的 main SHA；不得把旧 PR 或旧 worktree 直接复活 |
+| 2 | Windows / 奔图专用任务 | 在同一候选或合入后的精确 SHA 上完成面板扫描、真实出纸、扫码枪、断网重连、Agent 重启、长驻 watcher 和连续多用户操作 | 记录任务/订单/文件 hash/状态回传/临时文件删除；重点证明 Windows / SMB `ino === 0` 或 file identity 行为、旧文件不交给后来用户、锁死与恢复可观察 |
+| 3 | Claude + 四端 | 从合入后的干净 `origin/main` 分开推进，不与 #1036 混合：Claude 独占所有前端写入；先补小程序材料包订单列表/到机码找回并完成开闸判据，再做 Admin / Partner 数据大屏和一体机旧页统一 | Kiosk 生产路由不再新旧交替；小程序材料包不再 fail-closed 且下单后可从本人订单找回到机码，身份/文件/订单/支付/认领/状态/资产贯通；Admin 与 Partner 大屏只呈现真实可归属指标、完整六态和严格机构隔离，无候选人/简历招聘闭环 |
+| 4 | 运维 / 生产 | 在具名维护窗口按精确 SHA 完成备份、迁移、部署、PM2/nginx/健康、监控、回滚；对象文件走百度云对象存储，服务器磁盘仅保留程序、日志与有界缓存 | `DEPLOY_SOURCE.txt`、Web Root、PM2 与 API/四端版本一致；上传/签名下载/生命周期/失败补偿通过；40 GB 容量有告警；真实小额支付、退款、对账通过；曾暴露凭证已轮换 |
+| 5 | 产品负责人 / 运营 / 客户 | 完成微信类目与提审、授权内容冷启动、真实用户 UAT 与签字交付 | 小程序正式发布且到机码跨端可用；岗位 >=30（现场 >=50）、招聘会 >=3、政策 >=8，均有真实授权且无演示/过期数据；客户走通建单 -> 支付 -> 到机 -> 打印/扫描 -> 状态回流 -> 记录沉淀并签字 |
+
+执行边界：第 1 项前不宣称已合入，第 2 项完成前不宣称真机通过，第 3-4 项前不宣称生产可用，
+第 5 项前不宣称商用收口。当前小程序材料包四页仍 fail-closed，`GET /orders/package` 虽已在 API，
+小程序订单列表尚未接入，属于跨端 P0；`claude/miniapp-lane` 的孤立提交必须拆包审查，不能整支复活。
+Hermes / DeepSeek V4 Pro 首次因余额不足为 `FAILED`；Hermes 随后明确使用 Nous
+`upstage/solar-pro4:free` 在相同候选上完成隐私与恢复只读复审并给出 GO。该结果不能写成 DeepSeek
+通过，也不得把模型票数替代上述真实验收。
+
+## 2026-09-13 扫描隐私 / 到机认证候选的收口顺序（历史，已被上节 R2 结果取代）
+
+**当前总判定：LOCAL TESTED SOFTWARE PARTIAL，PRODUCTION / COMMERCIAL NO-GO。**
+候选为 `integration/scan-pickup-closeout-20260913@f957c8a96474f1389f6de42c27ae47d5c73823c8`，
+尚未合入 `main`、部署或做生产迁移。下面按判据完成，不能用 mock、CI 或旧真机证据互相替代。
+
+| 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
+|---|---|---|---|
+| 1 | API + Agent | 设计并实现安全的失败扫描重试能力；不得按同一用户、mtime、observedAt 或内容 hash 放宽 | 新扫描持有服务端签名重试能力（如 `retryOfScanTaskId + prior controlToken` 或消费 lease nonce）；旧文件不能重绑，合法相同字节重扫可成功；正常/失败/重放/跨用户用例及反向变异通过 |
+| 2 | Agent + Admin | 上报扫描输入 `healthy / locked_out / restart_required` 及原因、时间，后台可见且可审计 | 制造目录读取失败、目录身份变化和 watcher error 后，Agent 仍 fail-closed；Admin 能看到锁死状态，重启恢复有记录，不提供远程放宽隐私闸门 |
+| 2a | Claude / Kiosk | **已完成于 `f957c8a96`**：已放弃并撤销的扫描创建 Promise 永久失效，终端恢复不再把已取消任务写回成功态 | `creating -> terminal failed -> create late success -> revoke -> terminal ready` 与正常 `checking -> ready` 两条浏览器回归通过；完整扫描套件 33/33；删除闸门的反向变异退出码 1 |
+| 3 | API / PostgreSQL | 在最终候选 SHA 上跑两套 migration、partial index 与并发约束 | PostgreSQL 16 干净库和升级库均通过，索引/约束存在，并发 create/deliver/reap 无重复活跃任务或错绑 |
+| 4 | 集成 | 冻结新的单一候选 SHA，重跑 API/Kiosk/Agent 全套相关门禁和反向变异 | 工作区干净；所有检查绑定同一 SHA；Claude 最终确认所有 Kiosk 前端变化；至少一名独立安全 reviewer 给出可用报告且无 P0/P1 |
+| 5 | Windows / 奔图专用任务 | 同一 SHA 做面板扫描、打印、扫码枪、断网重连、Agent 重启和多用户连续操作 | 真实奔图 + Windows 逐项留任务/订单/文件 hash/状态回传/临时文件删除证据；旧文件不交给后来用户；锁死与恢复可观察 |
+| 6 | 产品负责人 + 运维 | 完成小程序、真实支付退款、内容授权、生产发布、回滚监控和客户 UAT | 小程序正式发布并打通到机码；真实支付/退款；jobs/job-fairs/policies 有授权内容且无演示数据；生产 provenance/健康/回滚通过；客户签字验收 |
+
+审查账本：Agy 对 `78fe3eb37` 的架构冷审为 GO；Claude 的前端 P1 已在 `3a087b5e2` 修复，后续前端冷审
+新增的 P2 已在 `f957c8a96` 修复；Hermes 对 `3a087b5e2` 为 `PARTIAL`，确认相同字节重扫和锁死遥测两个 P1。
+Grok 文档子审查已完成并确认文档陈旧，API/Agent 子审查仍为 `UNREVIEWED`；Agy 本轮重审为空输出。
+不得写成五模型一致通过。
+在第 1-4 项完成前不要合并为商用候选；第 5-6 项完成前不要发布商用结论。
+
 ## 2026-09-10 商业收口还差什么（给接手会话的判据，不是待办堆）
 
-**一句话：代码侧没有已知的上线阻塞了，卡住商用的是三件「只有产品负责人能做」的事 + 两件真机验收。**
+> 历史快照：该节形成于扫描隐私候选之前。当前优先级与判据以 2026-09-13 顶部清单为准；
+> 其中“代码侧没有已知上线阻塞”的旧结论已失效。
+
+**当时结论：代码侧没有已知的上线阻塞了，卡住商用的是三件「只有产品负责人能做」的事 + 两件真机验收。**
 
 ### 只有产品负责人能做（外部依赖，越早开始越好）
 

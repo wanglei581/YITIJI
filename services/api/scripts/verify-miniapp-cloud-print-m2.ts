@@ -20,6 +20,7 @@ import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
+import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -154,9 +155,24 @@ function assertCrossSurfaceWiring(): void {
   const kioskCashier = readFileSync(path.join(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx'), 'utf8')
   const kioskPaymentApi = readFileSync(path.join(repoRoot, 'apps/kiosk/src/services/print/paymentApi.ts'), 'utf8')
 
+  const routeBlock = (decorator: string): string => {
+    const match = new RegExp(`${decorator}([\\s\\S]*?)(?=\\n\\s*@(?:Get|Post|Put|Patch|Delete)\\(|$)`).exec(pickupController)
+    return match?.[0] ?? ''
+  }
+  const takeawayBlock = routeBlock("@Post\\(':taskId/takeaway-url'\\)")
+
   const checks: Array<[boolean, string]> = [
     [memberController.includes("@Controller('me/print-orders')") && memberController.includes('@Post()'), '会员 Order-only 建单路由已注册'],
     [pickupController.includes("@Post('claim-pickup')") && pickupController.includes("@Post(':orderId/release')"), '到机认领/release 路由已注册'],
+    [
+      routeBlock("@Post\\('claim-pickup'\\)").includes('@UseGuards(TerminalIdentityGuard)')
+        && routeBlock("@Post\\(':orderId/release'\\)").includes('@UseGuards(TerminalIdentityGuard)'),
+      'claim-pickup / release 挂 TerminalIdentityGuard',
+    ],
+    [
+      Boolean(takeawayBlock) && !takeawayBlock.includes('@UseGuards(TerminalIdentityGuard)'),
+      'takeaway-url 不得挂 TerminalIdentityGuard（会员/付款令牌救济路径）',
+    ],
     [miniappApi.includes("request('/me/print-orders', { method: 'POST'") && miniappPay.includes('api.createCloudPrintOrder'), '小程序确实调用 Order-only 建单'],
     [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],
     [kioskCashier.includes('releasePickupOrder') && kioskCashier.includes('if (!state.taskId && orderId && paymentSessionToken)'), 'Kiosk 付款后才触发 Order-only release'],
@@ -264,11 +280,14 @@ async function main(): Promise<void> {
   const audit = new AuditService(prisma)
   const capabilities = new TerminalCapabilitiesService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
-  const quote = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma))
+  const pageCount = new PrintPageCountService(prisma, storage)
+  const pricing = new PricingService(prisma)
+  const quote = new OrderQuoteService(pageCount, pricing)
   const files = new FilesService(prisma, audit, storage)
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
   const redis = new FakeRedis()
   const pickup = new PickupOrderService(prisma, capabilities, audit, redis as unknown as RedisService, storage)
+  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, capabilities)
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const userId = `eu_m2_${suffix}`
   const terminalId = `terminal_m2_${suffix}`
@@ -516,6 +535,31 @@ async function main(): Promise<void> {
       fail('释放后的订单/任务状态不一致')
     }
     pass('现场付款后原子释放唯一 PrintTask；响应丢失场景用旧 token 重试仍幂等')
+
+    const takeawayTaskId = released.taskId
+    if (!takeawayTaskId) fail('release 必须返回 taskId，否则无法验证带走 URL')
+    const memberTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, { endUserId: userId })
+    if (!memberTakeaway.signedUrl.includes('/files/') || memberTakeaway.orderId !== created.id) {
+      fail(`会员带走 URL 签发失败: ${JSON.stringify(memberTakeaway)}`)
+    }
+    pass('会员 owner 无需终端会话即可签发带走 URL')
+    const boundTakeaway = await printJobs.issueTakeawayUrl(takeawayTaskId, {
+      paymentSessionToken: released.paymentSessionToken,
+    })
+    if (!boundTakeaway.signedUrl.includes('/files/') || boundTakeaway.orderId !== created.id) {
+      fail(`绑定支付令牌带走 URL 签发失败: ${JSON.stringify(boundTakeaway)}`)
+    }
+    pass('绑定 printTaskId 的 paymentSessionToken 无需终端会话即可签发带走 URL')
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(takeawayTaskId, {}),
+      'PRINT_TASK_NOT_FOUND',
+      '无会员身份且无支付令牌不得签发带走 URL',
+    )
+    await expectCode(
+      () => printJobs.issueTakeawayUrl(takeawayTaskId, { endUserId: `eu_other_${suffix}` }),
+      'PRINT_TASK_NOT_FOUND',
+      '非 owner 会员不得签发带走 URL',
+    )
 
     const concurrent = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' })
     const concurrentClaim = await pickup.claim(concurrent.pickupCode, terminalId)

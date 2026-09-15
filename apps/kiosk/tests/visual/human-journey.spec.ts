@@ -577,6 +577,20 @@ test.describe('真人走查（模拟数据）', () => {
     api.respond('DELETE', `/api/v1/scan/sessions/${TASK}`, {
       status: 200, json: { success: true, data: { scanTaskId: TASK, status: 'cancelled' } },
     })
+    // 投递确认（2026-09-14）：服务端新建会话一律 deliveryAckedAt = null，设置页与等待页
+    // 挂载即 POST /scan/sessions/:id/ack，确认回来之前两屏都停在「正在确认投递授权」——
+    // 没有它这趟走查在设置页就走不动（契约见 src/pages/scan/scanDeliveryAck.ts）。
+    // 按 taskId 精确注册，不挂通配兜底：未注册请求仍由 ApiRouter fail-closed。
+    const ackCalls: Array<Record<string, string>> = []
+    page.on('request', (request) => {
+      if (request.method() !== 'POST') return
+      if (new URL(request.url()).pathname !== `/api/v1/scan/sessions/${TASK}/ack`) return
+      ackCalls.push(request.headers())
+    })
+    api.respond('POST', `/api/v1/scan/sessions/${TASK}/ack`, {
+      status: 200,
+      json: { success: true, data: { scanTaskId: TASK, deliveryAckedAt: '2026-09-14T00:00:00.000Z' } },
+    })
 
     const pageErrors: string[] = []
     page.on('pageerror', (e) => pageErrors.push(`${e.message}\n${(e.stack ?? '').split('\n').slice(0, 4).join('\n')}`))
@@ -611,7 +625,17 @@ test.describe('真人走查（模拟数据）', () => {
       await page.waitForTimeout(2000)
       await step(page, s, 'F-scan-done')
     }
-    console.log(`\n  旅程 F 终点：${new URL(page.url()).pathname}   轮询次数：${polls}`)
+    console.log(`\n  旅程 F 终点：${new URL(page.url()).pathname}   轮询次数：${polls}   投递确认：${ackCalls.length} 次`)
+    // 这趟是走查：下一步点哪颗按钮由页面当时的可见按钮决定，所以**不钉**确认的确切次数
+    // （钉了就是在钉走查的路线，路线一变就假红）。要钉的是另外两件：这条链路上确实
+    // 确认过，且每一次都带齐服务端要校验的三样凭据 —— 只 respond 不看请求头的话，
+    // 「本机漏带凭据」在夹具里永远不会红，而真实服务端回的是 401 或 403。
+    expect(ackCalls.length, '扫描链路必须向服务端确认过投递授权').toBeGreaterThanOrEqual(1)
+    for (const headers of ackCalls) {
+      expect(headers['x-terminal-id']).toBe('KSK-001')
+      expect(headers['x-terminal-session-token'] ?? '').not.toBe('')
+      expect(headers['x-scan-session-control']).toBe('journey-scan-control')
+    }
     if (pageErrors.length) console.log(`\n  ⚠ 运行错误 ${pageErrors.length} 条：\n${pageErrors.slice(0, 3).join('\n---\n')}`)
   })
 })

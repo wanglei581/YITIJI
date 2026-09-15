@@ -18,7 +18,7 @@ const ALTS = [
     title: '材料扫描',
     d: '把纸质材料扫成电子件。',
     f: '要扫描仪就绪',
-    to: '/scan/start',
+    to: '/scan',
     tone: 'clay' as const,
     Icon: ImageIcon,
   },

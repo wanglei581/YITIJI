@@ -34,6 +34,7 @@ export class PrintJobsController {
   @Post('claim-pickup')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @UseGuards(TerminalIdentityGuard)
   claimPickup(@Body() dto: ClaimPickupDto, @Headers('x-terminal-id') terminalId: string | undefined) {
     return this.pickupOrders.claim(dto.code, terminalId)
   }
@@ -41,6 +42,7 @@ export class PrintJobsController {
   @Post(':orderId/release')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @UseGuards(TerminalIdentityGuard)
   releasePickup(
     @Param('orderId') orderId: string,
     @Headers('x-terminal-id') terminalId: string | undefined,

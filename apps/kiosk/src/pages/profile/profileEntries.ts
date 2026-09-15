@@ -18,7 +18,7 @@ const SERVICES: Entry[] = [
   { icon: 'book', tone: 'plum', label: '简历模板', desc: '选择正式模板', route: '/resume/templates' },
   { icon: 'printer', tone: 'slate', label: '文档打印', desc: '上传与参数设置', route: '/print/upload' },
   { icon: 'swap', tone: 'ink', label: '打印扫描', desc: '查看服务中心', route: '/print-scan' },
-  { icon: 'scan', tone: 'slate', label: '扫描文件', desc: '进入扫描流程', route: '/scan/start' },
+  { icon: 'scan', tone: 'slate', label: '扫描文件', desc: '进入扫描流程', route: '/scan' },
   { icon: 'briefcase', tone: 'clay', label: '岗位信息', desc: '第三方或官方来源', route: '/jobs' },
   { icon: 'fair', tone: 'wheat', label: '招聘会', desc: '第三方或官方场次', route: '/job-fairs' },
   { icon: 'robot', tone: 'teal', label: 'AI顾问', desc: '文字与语音咨询', route: '/assistant' },

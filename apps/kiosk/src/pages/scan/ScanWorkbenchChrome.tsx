@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { useAuth } from '../../auth/useAuth'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
+import { revokeLiveScanSession } from './scanSessionRevoke'
+import { clearScanWorkbenchSession } from './scanWorkbenchSession'
 import {
   SCAN_ASK,
   SCAN_CHAIN,
@@ -38,25 +41,45 @@ export function ScanWorkbenchShell({
   children: ReactNode
 }) {
   const navigate = useNavigate()
+  const { getToken } = useAuth()
   const ask = SCAN_ASK[state]
+  /**
+   * 离开整条扫描流程。四个阶段、四个出口（顶栏返回 + 底栏三项主导航）共用这一条。
+   *
+   * 2026-09-13 起「离开」要连服务端一起收掉。此前这里只是 navigate：本机不再显示
+   * 这场扫描，服务端那个任务却还停在 waiting 等文件 —— 下一位用户走到面板前按下
+   * 扫描，文件会被投递给已经离开的这一位。撤销发不出去（断网 / 已终态）也不拦着走人。
+   *
+   * 底栏三项当天只做了 `navigate(...)`：顶栏返回收得干干净净，而按「首页 / AI 顾问 /
+   * 我的」离开的用户，服务端任务和本机登记**两样都留在原地**——同一屏上两个出口
+   * 两种命运。所以出口有几个不重要，离开的语义只能有一份：一律
+   * 撤服务端 → 清本机登记 → 走人，只有落点不同。
+   */
+  const leaveScanFlow = (destination: string): void => {
+    revokeLiveScanSession(getToken())
+    clearScanWorkbenchSession()
+    navigate(destination)
+  }
   return (
     <QxPageFrame
       /* 稿 18-scan-workbench 原文：data-route="/print-scan" aria-label="返回打印扫描"。
        *  一张工作台四个阶段共用这一个返回键，落点是打印扫描 Hub，不是「上一阶段」——
        *  稿就是这么画的：阶段之间用 CTA 前进/后退，顶栏返回是「离开这条流程」。
-       *  返回 ≠ 取消：扫描会话在服务端，离开这一屏不会终止它。
-       *  取消是 progress 阶段单独的动作（稿里 cancel-* 是独立状态）。 */
-      back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
+       *  离开整条流程会撤掉这次扫描会话（服务端任务 + 本机登记）；阶段之间来回走不会。
+       *  progress 阶段另有一个显式「取消扫描」，它等服务端回执再改判（稿里 cancel-* 是独立状态）。 */
+      back={{ label: '返回打印扫描', onBack: () => leaveScanFlow('/print-scan') }}
       title={title}
       subtitle={subtitle}
       status={status}
       terminalLabel={scanTerminalLabel()}
       ctabar={ctabar}
       navbar={
+        /* 底栏三项也是「离开整条扫描流程」，不是页内切换：走同一条 leaveScanFlow，
+         *  只有落点不同。任何一个改回裸 navigate，这一屏就又会留下孤儿任务。 */
         <QxAppNavbar
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
+          onHome={() => leaveScanFlow('/')}
+          onAdvisor={() => leaveScanFlow('/assistant')}
+          onProfile={() => leaveScanFlow('/profile')}
         />
       }
     >

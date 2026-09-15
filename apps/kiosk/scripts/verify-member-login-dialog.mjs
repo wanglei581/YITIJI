@@ -572,8 +572,9 @@ expectMatches(
 )
 expectMatches(
   privacyGuard,
-  /clearKioskSensitiveSession\(\)/,
-  'KioskPrivacyGuard 经统一 helper 清理敏感会话',
+  // 带上正在失效的会员令牌：清本地扫描会话之前要先撤服务端那个还活着的扫描任务。
+  /clearKioskSensitiveSession\(getToken\(\)\)/,
+  'KioskPrivacyGuard 经统一 helper 清理敏感会话并交出即将失效的会员令牌',
 )
 expectMatches(privacyGuard, /\bhardClear\b/, 'KioskPrivacyGuard 保留 fail-closed hardClear 路径')
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import http from 'node:http'
 import {
   mkdtempSync,
@@ -13,16 +14,63 @@ import {
   symlinkSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve as resolvePath } from 'node:path'
 import {
   sweepUnclaimedDir,
   processCandidate,
   startScanWatcher,
   maskScanName,
+  clearStartupBacklogForTest,
+  getScanInputStateForTest,
   UNCLAIMED_MAX_AGE_MS,
   DELIVERY_RETRY_MAX_MS,
 } from '../src/agent/scan-watcher'
 import type { AgentConfig } from '../src/agent/types'
+import {
+  runOverlappingStartupBacklogRaceTest,
+  runScanLeaseBarrierTests,
+  runLockoutUntilRestartSafetyTest,
+  runEnterRunningGenerationIsolationTest,
+  runLateCrossSessionCaptureTests,
+  runUnknownDirectoryListingFailClosedTest,
+  runStemChangingInodeRenameTests,
+  runStartupBacklogTempRenameTest,
+  runNullOpeningInodeRenameTests,
+  runNullOpeningOverlappingInodeRenameTests,
+  runRecycledInodeGenerationTests,
+  runStartupBacklogGenerationPipelineTest,
+  runVanishedPredecessorNewCaptureTest,
+  runForeignNoLeasePreExistingQuarantineFailureTests,
+  runUnprovableIdentityFailClosedTests,
+} from './scan-lease-barrier.helper'
+
+const STARTUP_BACKLOG_PREMARK_BLOCK = `  // ATOMIC_STARTUP_BACKLOG_PREMARK: every direct-child path is marked before any
+  // await so watcher add/sweep/process cannot deliver a later sibling.
+  for (const name of entries) {
+    if (name === UNCLAIMED_DIRNAME) continue
+    const fullPath = join(folder, name)
+    if (!isDirectChild(fullPath, name, folder)) continue
+    startupBacklogPaths.add(canonicalizeScanPath(fullPath))
+    // ATOMIC_STARTUP_BACKLOG_IDENTITY: never-deliver follows the directory
+    // entry (dev/ino) across a later rename; a new basename is not a new capture.
+    markStartupBacklogIdentity(fullPath)
+  }
+
+`
+
+const STARTUP_BACKLOG_IDENTITY_BLOCK = `    // ATOMIC_STARTUP_BACKLOG_IDENTITY: never-deliver follows the directory
+    // entry (dev/ino) across a later rename; a new basename is not a new capture.
+    markStartupBacklogIdentity(fullPath)
+`
+
+const LOCKOUT_GENERATION_BLOCK = `  // ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION: in-flight candidates must not lease or POST
+  // after lockout or a generation change; only a new process may run again.
+  if (!globalScanDeliveryBarrier.generationAllowsDelivery(capturedGeneration)) {
+    warn(\`scan-watcher: delivery aborted — code=\${SCAN_INPUT_RESTART_REQUIRED}\`)
+    return true
+  }
+
+`
 
 // 本脚本分两部分：
 //   Part 1：源码结构性断言（chokidar 实时监听 wiring——ignoreInitial / ignored /
@@ -35,16 +83,179 @@ import type { AgentConfig } from '../src/agent/types'
 // 长驻进程验收覆盖，不在本脚本中伪装通过。
 
 const source = readFileSync(join(__dirname, '../src/agent/scan-watcher.ts'), 'utf8')
+const barrierSource = readFileSync(join(__dirname, '../src/agent/scan-candidate-barrier.ts'), 'utf8')
 
 function verifySourceStructure(): void {
   assert.match(source, /export function startScanWatcher/, 'must export startScanWatcher')
   assert.match(source, /scanWatchFolder\?\.trim\(\)/, 'must treat unconfigured scanWatchFolder as a no-op, not a crash')
   assert.match(source, /ignoreInitial:\s*true/, 'chokidar watch must ignore pre-existing files at boot (handled separately by sweepFolder)')
-  assert.match(source, /setInterval\(\(\) => void sweepFolder/, 'must periodically re-sweep the folder, not rely solely on chokidar change events for retries')
+  assert.match(
+    source,
+    /setInterval\(\(\) => void runPeriodicScanSweep/,
+    'must periodically re-sweep the folder, not rely solely on chokidar change events for retries',
+  )
+  assert.match(source, /await sweepFolder\(folder, config\)/, 'periodic sweep wrapper must still invoke sweepFolder')
+  assert.match(source, /abortDeliveryIfScanInputLockout/, 'must abort lease/POST on lockout or generation change')
+  assert.match(source, /ATOMIC_SCAN_INPUT_LOCKOUT_GENERATION/, 'lockout generation check must be explicit')
+  assert.match(source, /ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE/, 'capture lineage must bind to waiting-task identity, not mtime alone')
+  assert.match(source, /ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID/, 'invalid lease notBefore must fail closed')
+  assert.match(source, /let openingTaskId: string \| null \| undefined/, 'opening task identity must be per-file, not module-global')
+  assert.doesNotMatch(
+    source,
+    /lastKnownScanTaskId|rememberObservedScanTaskId|lastObservedScanTaskId/,
+    'must not keep a module-global last-known scan task id',
+  )
+  assert.doesNotMatch(
+    barrierSource,
+    /lastKnownScanTaskId|rememberObservedScanTaskId|lastObservedScanTaskId/,
+    'lease fetch must not stash capture identity on the module',
+  )
+  assert.match(
+    barrierSource,
+    /recordObservation\(\s*filename: string,\s*nowMs: number,\s*taskId: string \| null/,
+    'recordObservation must take an explicit observed task id',
+  )
+  assert.match(barrierSource, /retainLiveEntries/, 'stem observations must be bounded to live directory entries')
+  assert.match(barrierSource, /closeVanishedCapture/, 'vanished paths must adopt same-inode successors before dropping')
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_INODE_LINEAGE/,
+    'same-inode rename must inherit opening task across stem changes',
+  )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_INODE_GENERATION/,
+    'recycled inode with a proven-new birthtime must not inherit',
+  )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_NULL_OPENING/,
+    'observation under no waiting lease must be foreign to every later lease',
+  )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_IDENTITY_FLIGHT/,
+    'proven same-inode captures must single-flight before any lease await',
+  )
+  assert.match(
+    barrierSource,
+    /ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY_FLIGHT/,
+    'unprovable identity must take a reserved identity-flight key',
+  )
+  assert.match(source, /ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY/, 'unprovable lstat identity must fail closed in processCandidate')
+  assert.match(source, /ATOMIC_SCAN_CAPTURE_QUARANTINE_KEEP_LINEAGE/, 'quarantine must keep lineage until the move succeeds')
+  {
+    const helperStart = source.indexOf('function tryQuarantineKeepingLineage')
+    const helperEnd = source.indexOf('export function getScanLifecycleExclusiveStatsForTest')
+    assert.ok(helperStart >= 0 && helperEnd > helperStart, 'tryQuarantineKeepingLineage must exist')
+    const helperBody = source.slice(helperStart, helperEnd)
+    const markIdx = helperBody.indexOf('markRefuseUntilQuarantined')
+    const moveIdx = helperBody.indexOf('finalizeCandidate')
+    const removeIdx = helperBody.indexOf('globalDirectoryBaseline.remove')
+    assert.ok(markIdx >= 0 && moveIdx > markIdx, 'never-deliver mark must be recorded before the quarantine move')
+    assert.ok(removeIdx > moveIdx, 'must not drop the only observation before a successful quarantine move')
+  }
+  {
+    const procStart = source.indexOf('export async function processCandidate')
+    const procEnd = source.indexOf('export function sweepUnclaimedDir')
+    assert.ok(procStart >= 0 && procEnd > procStart, 'processCandidate must precede sweepUnclaimedDir')
+    const procBody = source.slice(procStart, procEnd)
+    const flightIdx = procBody.indexOf('beginScanCaptureIdentityFlight(openingIdentity)')
+    const observeIdx = procBody.indexOf('await observeNonAcceptedCapture')
+    const leaseIdx = procBody.indexOf('await fetchScanLease')
+    assert.ok(flightIdx >= 0, 'processCandidate must claim identity flight after lstat')
+    assert.ok(observeIdx > flightIdx, 'identity flight must be claimed before observeNonAcceptedCapture lease fetch')
+    assert.ok(leaseIdx > flightIdx, 'identity flight must be claimed before opening fetchScanLease')
+    assert.match(procBody, /if \(identityFlight\.previous\) \{/, 'successor must wait for the in-flight same-inode owner')
+  }
+  {
+    const foreignStart = barrierSource.indexOf('isForeignToLease(')
+    const foreignEnd = barrierSource.indexOf('export const globalDirectoryBaseline')
+    assert.ok(foreignStart >= 0 && foreignEnd > foreignStart, 'isForeignToLease must precede globalDirectoryBaseline')
+    const foreignBody = barrierSource.slice(foreignStart, foreignEnd)
+    assert.match(
+      foreignBody,
+      /if \(rec && rec\.seenUnderTaskId !== current\) return true/,
+      'explicit null opening must be foreign; a missing record is never-observed',
+    )
+    assert.equal(
+      foreignBody.includes('rec?.seenUnderTaskId && rec.seenUnderTaskId !== current'),
+      false,
+      'isForeignToLease must not ignore explicit null openings with a truthy-only check',
+    )
+  }
+  {
+    const listStart = source.indexOf('function listLiveBasenames')
+    const listEnd = source.indexOf('function lockOutLiveListingUnknown')
+    assert.ok(listStart >= 0 && listEnd > listStart, 'listLiveBasenames must precede lockOutLiveListingUnknown')
+    const listBody = source.slice(listStart, listEnd)
+    assert.match(listBody, /ATOMIC_SCAN_LIVE_LISTING_KNOWN/, 'readdir failure must be marked unknown, not empty')
+    assert.match(listBody, /return undefined/, 'readdir failure must return undefined')
+    assert.equal(listBody.includes('return new Set()'), false, 'readdir failure must not substitute an empty listing')
+  }
+  assert.match(source, /finishVanishedCapture/, 'finally must reconcile vanished paths, not blindly remove')
+  assert.doesNotMatch(
+    source,
+    /if \(!existsSync\(filePath\)\) globalDirectoryBaseline\.remove\(filename\)/,
+    'finally must not drop capture identity before same-inode adoption',
+  )
+  {
+    const fetchStart = barrierSource.indexOf('export async function fetchScanLease')
+    const fetchEnd = barrierSource.indexOf('export function isPreExistingCandidate')
+    assert.ok(fetchStart >= 0 && fetchEnd > fetchStart, 'fetchScanLease must precede isPreExistingCandidate')
+    const fetchBody = barrierSource.slice(fetchStart, fetchEnd)
+    assert.equal(fetchBody.includes('globalDirectoryBaseline'), false, 'fetchScanLease must not touch capture observations')
+    assert.equal(fetchBody.includes('recordObservation'), false, 'fetchScanLease must not record capture identity')
+  }
+  assert.match(source, /SCAN_CAPTURE_FOREIGN_LEASE/, 'foreign-lease quarantine must use a machine-readable code')
+  assert.match(source, /SCAN_LEASE_NOT_BEFORE_INVALID/, 'invalid notBefore quarantine must use a machine-readable code')
+  assert.match(source, /SCAN_INPUT_RESTART_REQUIRED/, 'lockout logs must use SCAN_INPUT_RESTART_REQUIRED')
+  assert.match(source, /globalScanDeliveryBarrier\.beginWatchSession/, 'watcher startup must begin initializing')
+  assert.match(source, /globalScanDeliveryBarrier\.noteWatcherError/, 'watcher errors must lock out, not rebuild')
+  assert.match(source, /allowsAttach\(\)/, 'stop must prevent a later attach in this process')
+  assert.doesNotMatch(source, /watcher = attachWatcher/, 'must not auto-rebuild a replacement watcher')
+  assert.equal(
+    source.includes(LOCKOUT_GENERATION_BLOCK),
+    true,
+    'abortDeliveryIfScanInputLockout must refuse lease/POST after lockout or generation change',
+  )
   assert.match(source, /ignored:\s*\(path: string\) => path\.includes\(UNCLAIMED_DIRNAME\)/, 'chokidar watch must also exclude the _unclaimed quarantine directory from live-watch events')
   assert.match(source, /if \(name === UNCLAIMED_DIRNAME\) continue/, 'sweepFolder must skip the _unclaimed quarantine directory itself in its main-file loop')
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
+  assert.match(source, /const startupBacklogPaths\s*=\s*new Set<string>\(\)/, 'must have a startup backlog path tracking Set for never-deliver enforcement')
+  assert.match(source, /const startupBacklogIdentities:\s*ScanCaptureFileIdentity\[\]\s*=\s*\[\]/, 'must track startup leftover identities so rename cannot escape by basename')
+  assert.match(source, /ATOMIC_SCAN_STARTUP_BACKLOG_GENERATION/, 'startup leftover matching must use capture generation, not the flight key')
+  assert.match(source, /isStartupBacklogCandidate\(filePath, candidateIdentity\)/, 'processCandidate must treat renamed startup leftovers as backlog')
+  assert.match(source, /forgetStartupBacklog\(filePath, identity\)/, 'must clear path and inode backlog marks upon successful quarantine')
+  assert.match(source, /ATOMIC_STARTUP_BACKLOG_IDENTITY/, 'startup premark must record directory-entry identity')
+  {
+    const isolateStart = source.indexOf('export async function isolateStartupBacklog')
+    const isolateEnd = source.indexOf('export function startScanWatcher')
+    assert.ok(isolateStart >= 0 && isolateEnd > isolateStart, 'isolateStartupBacklog must precede startScanWatcher')
+    const isolateBody = source.slice(isolateStart, isolateEnd)
+    const readdirIdx = isolateBody.indexOf('readdirSync(folder)')
+    const premarkIdx = isolateBody.indexOf('ATOMIC_STARTUP_BACKLOG_PREMARK')
+    const firstAwaitIdx = isolateBody.indexOf('await waitForStableFile')
+    assert.ok(readdirIdx >= 0, 'isolateStartupBacklog must readdirSync the folder')
+    assert.ok(premarkIdx > readdirIdx, 'premark-all must run after readdir')
+    assert.ok(firstAwaitIdx > premarkIdx, 'premark-all must complete before any await')
+    assert.equal(
+      isolateBody.slice(readdirIdx, premarkIdx).includes('await'),
+      false,
+      'no await may appear between readdir and premark-all',
+    )
+    assert.equal(
+      isolateBody.includes(STARTUP_BACKLOG_PREMARK_BLOCK),
+      true,
+      'isolateStartupBacklog must synchronously premark every direct-child path before the first await',
+    )
+    assert.match(
+      isolateBody,
+      /globalScanDeliveryBarrier\.lockOut/,
+      'startup inspection/enumeration failure must lock out delivery',
+    )
+  }
   assert.match(
     source,
     /const trustedWindowsCandidate = readTrustedWindowsCandidate\(\s*scanWatchFolder,\s*filename,\s*stableSnapshot\s*\)/,
@@ -226,6 +437,25 @@ async function startFailingBackendStub(errorCode: string): Promise<{ baseUrl: st
     // 消费请求体，避免连接挂起。
     req.on('data', () => undefined)
     req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        if (errorCode === 'NO_WAITING_SCAN_TASK') {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ statusCode: 409, error: { code: 'NO_WAITING_SCAN_TASK', message: '当前终端没有等待扫描的任务' } }))
+          return
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'scan-task-verify-1',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 24 * 3600_000).toISOString(),
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            deliveryLease: 'test-delivery-lease-token',
+          },
+        }))
+        return
+      }
       res.writeHead(400, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: false, error: { code: errorCode, message: 'simulated failure' } }))
     })
@@ -239,25 +469,24 @@ async function startFailingBackendStub(errorCode: string): Promise<{ baseUrl: st
   }
 }
 
-/**
- * B1-11：模拟一次真实的、无法识别 error.code 的服务端 5xx 错误——响应没有 JSON
- * body（axios 侧 `response.data.error.code` 读取会拿到 `undefined`）。用来证明
- * 新增的 SCAN_TASK_STATE_CHANGED / SCAN_FILE_ALREADY_DELIVERED 立即隔离分支是靠
- * 精确匹配 error.code 触发的，不会被一个"看起来像失败但没有可识别 code"的通用
- * 网络/5xx 错误意外带上——那类错误必须继续走既有的 2 小时重试窗口，不能被误伤。
- *
- * 起一个真实返回 500 的监听服务器（而不是 ECONNREFUSED 那种连接层错误）：
- * 之前这里必须用 ECONNREFUSED 规避一个独立的既有问题——deliver POST 未配置
- * api-client.ts 的 `NO_RETRY_CONFIG` 时，真实 5xx 会触发 axios 拦截器自己的 3 次
- * 内部重试，且重试复用同一个已被消费过一次的 FormData 流对象，导致 Content-Length
- * 与实际重发字节不匹配、服务端请求 `end` 事件永不触发、客户端每次都等满 30s 超时。
- * 该问题已修复（processCandidate 的 deliver 调用现在带 NO_RETRY_CONFIG，禁用了
- * axios 层的自动重试），一次真实 500 现在会快速失败，不再需要用连接层错误规避。
- */
 async function startGenericServerErrorStub(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = http.createServer((req, res) => {
     req.on('data', () => undefined)
     req.on('end', () => {
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'scan-task-verify-1',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 24 * 3600_000).toISOString(),
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            deliveryLease: 'test-delivery-lease-token',
+          },
+        }))
+        return
+      }
       res.writeHead(500, { 'Content-Type': 'application/json' })
       res.end()
     })
@@ -271,20 +500,28 @@ async function startGenericServerErrorStub(): Promise<{ baseUrl: string; close: 
   }
 }
 
-/**
- * 成功投递的 stub 后端——响应体形状对齐真实端点
- * `POST /terminals/:id/scan-sessions/deliver` 的成功返回值
- * （services/api/src/scan-tasks/scan-tasks.controller.ts 用 `ApiResponse.ok(result)`
- * 包装 `deliverScanFile()` 的 `{ scanTaskId, fileId }`）。`onRequest` 可选，用于统计
- * 收到几次请求（in-flight 去重测试要用它证明"只投递了一次"）。
- */
 async function startSuccessBackendStub(
-  onRequest?: () => void,
+  onRequest?: (rawBody: string) => void,
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = http.createServer((req, res) => {
-    req.on('data', () => undefined)
+    const chunks: Buffer[] = []
+    req.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
     req.on('end', () => {
-      onRequest?.()
+      if (req.method === 'GET' && req.url?.includes('/scan-tasks/current-lease')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: true,
+          data: {
+            scanTaskId: 'scan-task-verify-1',
+            serverNow: new Date().toISOString(),
+            notBefore: new Date(Date.now() - 60_000).toISOString(),
+            expiresAt: new Date(Date.now() + 600_000).toISOString(),
+            deliveryLease: 'test-delivery-lease-token',
+          },
+        }))
+        return
+      }
+      onRequest?.(Buffer.concat(chunks).toString('utf8'))
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: true, data: { scanTaskId: 'scan-task-verify-1', fileId: 'file-verify-1' } }))
     })
@@ -315,7 +552,10 @@ function makeConfig(apiBaseUrl: string, scanWatchFolder: string): AgentConfig {
 // 投递（200 OK），也就没有任何用例验证过 unlinkSync(filePath) 这条"投递成功后删除
 // 源文件"的核心隐私契约（扫描件不应该在共享目录里残留）。补上。
 async function verifySuccessfulDeliveryDeletesSourceFile(): Promise<void> {
-  const backend = await startSuccessBackendStub()
+  let capturedBody = ''
+  const backend = await startSuccessBackendStub((body) => {
+    capturedBody = body
+  })
   const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-success-'))
   try {
     const filename = 'success-delivery.pdf'
@@ -336,8 +576,12 @@ async function verifySuccessfulDeliveryDeletesSourceFile(): Promise<void> {
       'a successfully delivered file must NOT end up quarantined in _unclaimed',
     )
     assert.match(stdout, /delivered and removed source file/, 'success path must log that the source file was removed')
+    assert.match(capturedBody, /name="scanTaskId"/, 'successful delivery multipart body must include scanTaskId field')
+    assert.match(capturedBody, /name="deliveryLease"/, 'successful delivery multipart body must include deliveryLease field')
+    assert.match(capturedBody, /name="candidateSnapshotAt"/, 'successful delivery multipart body must include candidateSnapshotAt field')
+    assert.match(capturedBody, /name="observedAt"/, 'successful delivery multipart body must include observedAt field')
 
-    console.log('PASS processCandidate success path: 200 OK delivery unlinkSync-es the source file and does not quarantine it')
+    console.log('PASS processCandidate success path: 200 OK delivery unlinkSync-es the source file and sends signed lease')
   } finally {
     await backend.close()
     rmSync(scanFolder, { recursive: true, force: true })
@@ -442,8 +686,14 @@ function verifyWindowsUnverifiableFolderBlocksWatcherStartup(): void {
       )
     })
     assert.match(stdout, /scan input blocked; watcher not started — reparse_point_unverifiable/)
+    assert.equal(
+      getScanInputStateForTest(),
+      'locked_out',
+      'unverifiable reparse point must immediately lock out scan input',
+    )
     console.log('PASS startScanWatcher Windows boundary: unverifiable reparse-point safety blocks startup')
   } finally {
+    clearStartupBacklogForTest()
     Object.defineProperty(process, 'platform', platformDescriptor)
     rmSync(scanFolder, { recursive: true, force: true })
   }
@@ -619,83 +869,81 @@ async function verifyNoWaitingTaskStillDistinctFromRetryTimeout(): Promise<void>
   }
 }
 
-// ── Part 2f: B1-11 — SCAN_TASK_STATE_CHANGED 必须像 NO_WAITING_SCAN_TASK 一样立即隔离 ──
-// Critical code-review 发现：SCAN_TASK_STATE_CHANGED 说明这份文件在服务端已经被匹配、
-// CAS 到过 'matched'，只是最终 CAS-to-completed 落空（任务在上传期间被取消）——这次
-// "匹配"已经明确、永久失效，绝不能像通用网络错误一样留给下一轮 sweep 重试：重试时该
-// 终端"当前最早一条 waiting 任务"完全可能已经变成另一个用户的新会话，会把这份文件
-// 错误地挂到那个新用户身上——跨用户 PII 误挂载。
-async function verifyScanTaskStateChangedQuarantinesImmediately(): Promise<void> {
-  const backend = await startFailingBackendStub('SCAN_TASK_STATE_CHANGED')
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-state-changed-'))
+async function verifyImmediateQuarantineForCode(
+  errorCode: string,
+  filename: string,
+  content: string,
+  expectedLog: RegExp,
+  forbiddenLogs: RegExp[],
+  scenarioLabel: string,
+): Promise<void> {
+  const backend = await startFailingBackendStub(errorCode)
+  const scanFolder = mkdtempSync(join(tmpdir(), `scan-watcher-verify-${errorCode.toLowerCase()}-`))
   try {
-    const filename = 'state-changed.pdf'
     const filePath = join(scanFolder, filename)
-    writeFileSync(filePath, '%PDF-1.4 matched-then-cancelled scan')
-    // mtime 几乎是现在——必须立即隔离，不依赖文件年龄（不能等到 2 小时重试窗口耗尽才隔离）。
+    writeFileSync(filePath, content)
 
     const config = makeConfig(backend.baseUrl, scanFolder)
     const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
 
-    assert.equal(existsSync(filePath), false, 'a SCAN_TASK_STATE_CHANGED file must be moved out of the main scan folder')
+    assert.equal(existsSync(filePath), false, `a ${errorCode} file must be moved out of the main scan folder`)
     const unclaimedPath = join(scanFolder, '_unclaimed', filename)
-    assert.equal(
-      existsSync(unclaimedPath),
-      true,
-      'SCAN_TASK_STATE_CHANGED must quarantine to _unclaimed immediately, not leave the file for retry — reusing/re-matching it later risks cross-user PII leakage',
-    )
-    assert.equal(
-      readFileSync(unclaimedPath, 'utf8'),
-      '%PDF-1.4 matched-then-cancelled scan',
-      'quarantined file content must be preserved (renameSync, not a lossy copy)',
-    )
+    assert.equal(existsSync(unclaimedPath), true, `${errorCode} must quarantine to _unclaimed immediately`)
+    assert.equal(readFileSync(unclaimedPath, 'utf8'), content)
 
-    assert.match(capturedStdout, /scan task state changed after match/, 'log must clearly say the match became invalid, distinguishable from the other three _unclaimed causes')
-    assert.doesNotMatch(capturedStdout, /no waiting scan task/, 'SCAN_TASK_STATE_CHANGED log wording must not be confused with NO_WAITING_SCAN_TASK')
-    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/, 'SCAN_TASK_STATE_CHANGED must be quarantined immediately, not via the retry-timeout path (wording must not overlap)')
-    assert.doesNotMatch(capturedStdout, /already delivered previously/, 'SCAN_TASK_STATE_CHANGED log wording must not be confused with SCAN_FILE_ALREADY_DELIVERED')
-
-    console.log('PASS processCandidate: SCAN_TASK_STATE_CHANGED is quarantined immediately (not left for retry), with distinguishable log wording')
+    assert.match(capturedStdout, expectedLog)
+    for (const forbidden of forbiddenLogs) {
+      assert.doesNotMatch(capturedStdout, forbidden)
+    }
+    console.log(`PASS processCandidate: ${scenarioLabel} is quarantined immediately, with distinguishable log wording`)
   } finally {
     await backend.close()
     rmSync(scanFolder, { recursive: true, force: true })
   }
 }
 
-// ── Part 2g: B1-11 point-4 edge case — SCAN_FILE_ALREADY_DELIVERED 同样立即隔离 ──────
-// 覆盖"投递其实已经在服务端成功，只是响应在回传给 Agent 途中丢失"这种场景：Agent 完全
-// 没有错误信号，只会把它当普通失败留在原地重试；服务端用内容 sha256 识破重复投递后
-// 返回 SCAN_FILE_ALREADY_DELIVERED，Agent 必须立即隔离，不能继续重试（同样有跨用户
-// 误挂载风险）。
+async function verifyScanTaskStateChangedQuarantinesImmediately(): Promise<void> {
+  await verifyImmediateQuarantineForCode(
+    'SCAN_TASK_STATE_CHANGED',
+    'state-changed.pdf',
+    '%PDF-1.4 matched-then-cancelled scan',
+    /scan task state changed after match/,
+    [/no waiting scan task/, /retry timeout exceeded/, /already delivered previously/],
+    'SCAN_TASK_STATE_CHANGED',
+  )
+}
+
 async function verifyScanFileAlreadyDeliveredQuarantinesImmediately(): Promise<void> {
-  const backend = await startFailingBackendStub('SCAN_FILE_ALREADY_DELIVERED')
-  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-already-delivered-'))
-  try {
-    const filename = 'already-delivered.pdf'
-    const filePath = join(scanFolder, filename)
-    writeFileSync(filePath, '%PDF-1.4 lost-response duplicate retry')
+  await verifyImmediateQuarantineForCode(
+    'SCAN_FILE_ALREADY_DELIVERED',
+    'already-delivered.pdf',
+    '%PDF-1.4 lost-response duplicate retry',
+    /already delivered previously/,
+    [/no waiting scan task/, /retry timeout exceeded/, /scan task state changed after match/],
+    'SCAN_FILE_ALREADY_DELIVERED',
+  )
+}
 
-    const config = makeConfig(backend.baseUrl, scanFolder)
-    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+async function verifyScanFilePreviouslyAttemptedQuarantinesImmediately(): Promise<void> {
+  await verifyImmediateQuarantineForCode(
+    'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+    'prev-attempt.pdf',
+    '%PDF-1.4 previously attempted scan',
+    /file content was previously attempted but not completed/,
+    [/no waiting scan task/, /retry timeout exceeded/, /scan task state changed after match/, /already delivered previously/],
+    'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+  )
+}
 
-    assert.equal(existsSync(filePath), false, 'a SCAN_FILE_ALREADY_DELIVERED file must be moved out of the main scan folder')
-    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
-    assert.equal(
-      existsSync(unclaimedPath),
-      true,
-      'SCAN_FILE_ALREADY_DELIVERED must quarantine to _unclaimed immediately, not leave the file for retry',
-    )
-
-    assert.match(capturedStdout, /already delivered previously/, 'log must clearly say this content was already delivered, distinguishable from the other three _unclaimed causes')
-    assert.doesNotMatch(capturedStdout, /no waiting scan task/, 'SCAN_FILE_ALREADY_DELIVERED log wording must not be confused with NO_WAITING_SCAN_TASK')
-    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/, 'SCAN_FILE_ALREADY_DELIVERED must be quarantined immediately, not via the retry-timeout path')
-    assert.doesNotMatch(capturedStdout, /scan task state changed after match/, 'SCAN_FILE_ALREADY_DELIVERED log wording must not be confused with SCAN_TASK_STATE_CHANGED')
-
-    console.log('PASS processCandidate: SCAN_FILE_ALREADY_DELIVERED (lost-response duplicate) is quarantined immediately, with distinguishable log wording')
-  } finally {
-    await backend.close()
-    rmSync(scanFolder, { recursive: true, force: true })
-  }
+async function verifyScanFileStaleCaptureQuarantinesImmediately(): Promise<void> {
+  await verifyImmediateQuarantineForCode(
+    'SCAN_FILE_STALE_CAPTURE',
+    'stale-capture.pdf',
+    '%PDF-1.4 stale capture scan',
+    /file capture is stale for current session/,
+    [/no waiting scan task/, /retry timeout exceeded/, /scan task state changed after match/, /already delivered previously/],
+    'SCAN_FILE_STALE_CAPTURE',
+  )
 }
 
 // ── Part 2h: B1-11 回归护栏 — 真正无法识别的 5xx（无 error.code）必须继续走既有重试路径 ──
@@ -742,7 +990,759 @@ function verifyPlatformGapDisclosure(): void {
   )
 }
 
+function verifyLockoutGenerationMutationMakesSafetyTestNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(
+    original.includes(LOCKOUT_GENERATION_BLOCK),
+    true,
+    'lockout generation block must exist before reverse mutation',
+  )
+  const mutated = original.replace(LOCKOUT_GENERATION_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing lockout generation check must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--scan-input-lockout')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing lockout generation check must make safety test nonzero\n${output}`)
+    assert.match(
+      output,
+      /must NEVER (?:request a scan lease|bind to the later waiting task|deliver)/,
+      `mutated lockout test must fail on lease/delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS lockout generation reverse mutation: lockout safety test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'lockout reverse mutation must restore scan-watcher.ts')
+}
+
+function verifyPremarkAllMutationMakesOverlappingTestNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(
+    original.includes(STARTUP_BACKLOG_PREMARK_BLOCK),
+    true,
+    'premark-all block must exist before reverse mutation',
+  )
+  const mutated = original.replace(STARTUP_BACKLOG_PREMARK_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing premark-all must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--overlapping-startup-backlog-race')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing premark-all must make overlapping test nonzero\n${output}`)
+    assert.match(
+      output,
+      /overlapping two-file race must NEVER request scan lease for the second file/,
+      `mutated overlapping test must fail on nonzero lease, not an unrelated error\n${output}`,
+    )
+    console.log('PASS premark-all reverse mutation: overlapping test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'premark-all reverse mutation must restore scan-watcher.ts')
+}
+
+const ENTER_RUNNING_GENERATION_BLOCK = `  enterRunning(identity: ScanFolderIdentity): boolean {
+    if (this.state !== 'initializing') return false
+    this.generation += 1`
+
+function verifyEnterRunningGenerationMutationMakesIsolationTestNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(
+    original.includes(ENTER_RUNNING_GENERATION_BLOCK),
+    true,
+    'enterRunning generation block must exist before reverse mutation',
+  )
+  const mutated = original.replace(
+    ENTER_RUNNING_GENERATION_BLOCK,
+    `  enterRunning(identity: ScanFolderIdentity): boolean {
+    if (this.state !== 'initializing') return false
+    // this.generation += 1`,
+  )
+  assert.notEqual(mutated, original, 'removing enterRunning generation bump must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--enter-running-isolation')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing enterRunning generation bump must make isolation test nonzero\n${output}`)
+    assert.match(
+      output,
+      /candidate captured during initializing must NEVER request a scan lease or deliver/,
+      `mutated isolation test must fail on nonzero lease/delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS enterRunning generation reverse mutation: initializing candidate isolation test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'enterRunning reverse mutation must restore scan-candidate-barrier.ts')
+}
+
+const CAPTURE_LEASE_LINEAGE_BLOCK = `    // ATOMIC_SCAN_CAPTURE_LEASE_LINEAGE: a capture opened under waiting task A
+    // (or with no waiting task) must not POST to a later waiting task B, even when
+    // mtime/observedAt is after B.notBefore. Recovery is a new panel file or
+    // server-authorized safe rescan of a fresh capture, not this bytes-on-disk.
+    const foreignCapture = deliverFile
+      ? false
+      : globalDirectoryBaseline.isForeignToLease(filename, lease.scanTaskId, closingLiveNames)
+        || (typeof openingTaskId === 'string' && openingTaskId !== lease.scanTaskId)
+        || openingTaskId === null
+    const preExistingCapture =
+      isPreExistingCandidate(finalSnapshot, lease.notBefore)
+      || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
+    if (foreignCapture || preExistingCapture) {`
+
+const CAPTURE_LEASE_LINEAGE_MUTATED = `    const foreignCapture = false
+    const preExistingCapture =
+      isPreExistingCandidate(finalSnapshot, lease.notBefore)
+      || globalDirectoryBaseline.isPreExisting(filename, leaseNotBeforeMs)
+    if (foreignCapture || preExistingCapture) {`
+
+const NOT_BEFORE_VALID_BLOCK = `    // ATOMIC_SCAN_LEASE_NOT_BEFORE_VALID: an unparsable notBefore cannot prove
+    // the file is newer than the waiting task; fail closed and quarantine.
+    if (!Number.isFinite(leaseNotBeforeMs)) {
+      tryQuarantineKeepingLineage(
+        filePath,
+        scanWatchFolder,
+        filename,
+        verified.trustedWindowsCandidate,
+        candidateIdentity,
+        \`scan-watcher: scan lease notBefore is invalid; refusing delivery, moved to _unclaimed — code=\${SCAN_LEASE_NOT_BEFORE_INVALID}\`,
+      )
+      return
+    }`
+
+function verifyCaptureLineageMutationMakesLateCrossSessionNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(CAPTURE_LEASE_LINEAGE_BLOCK), true, 'capture lineage block must exist before reverse mutation')
+  const mutated = original.replace(CAPTURE_LEASE_LINEAGE_BLOCK, CAPTURE_LEASE_LINEAGE_MUTATED)
+  assert.notEqual(mutated, original, 'removing capture lineage check must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--late-cross-session')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing capture lineage must make late A-to-B test nonzero\n${output}`)
+    assert.match(
+      output,
+      /A-to-B late appearance must NEVER upload|temp-to-pdf rename from A must NEVER upload to B/,
+      `mutated lineage test must fail on cross-session upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS capture lineage reverse mutation: late A-to-B test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'capture lineage reverse mutation must restore scan-watcher.ts')
+}
+
+function verifyInvalidNotBeforeMutationMakesFailClosedNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(NOT_BEFORE_VALID_BLOCK), true, 'invalid notBefore block must exist before reverse mutation')
+  const mutated = original.replace(NOT_BEFORE_VALID_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing invalid notBefore check must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--invalid-not-before')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing invalid notBefore check must make fail-closed test nonzero\n${output}`)
+    assert.match(
+      output,
+      /SCAN_LEASE_NOT_BEFORE_INVALID|invalid notBefore must NEVER upload/,
+      `mutated notBefore test must fail on the invalid-notBefore assertion\n${output}`,
+    )
+    console.log('PASS invalid notBefore reverse mutation: fail-closed test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'invalid notBefore reverse mutation must restore scan-watcher.ts')
+}
+
+const LIVE_LISTING_KNOWN_BLOCK = `function listLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  try {
+    return new Set(readdirSync(scanWatchFolder).filter((name) => name !== UNCLAIMED_DIRNAME))
+  } catch {
+    // ATOMIC_SCAN_LIVE_LISTING_KNOWN: failure is unknown, not an empty folder.
+    return undefined
+  }
+}`
+
+const LIVE_LISTING_KNOWN_MUTATED = `function listLiveBasenames(scanWatchFolder: string): Set<string> | undefined {
+  try {
+    return new Set(readdirSync(scanWatchFolder).filter((name) => name !== UNCLAIMED_DIRNAME))
+  } catch {
+    return new Set()
+  }
+}`
+
+const INODE_LINEAGE_BLOCK = `      const sameEntry = isSameScanCaptureFile(rec.identity, identity)
+      // ATOMIC_SCAN_CAPTURE_INODE_LINEAGE: a vanished directory entry is the
+      // same capture when dev/ino match, even if the basename stem changed
+      // (job.pdf.tmp -> job.pdf). Stem-only matching cannot prove sameness.
+      if (sameEntry === true) {
+        this.observations.delete(name)
+        if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec
+        continue
+      }
+      if (sameEntry === false) {
+        if (captureNameStem(name) === stem) this.observations.delete(name)
+        continue
+      }
+      if (captureNameStem(name) !== stem) continue
+      this.observations.delete(name)
+      if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec`
+
+const NULL_OPENING_FOREIGN_BLOCK = `    const rec = this.observations.get(filename)
+    // ATOMIC_SCAN_CAPTURE_NULL_OPENING: explicit observation under no waiting
+    // lease (seenUnderTaskId === null) is foreign to every later lease. A missing
+    // record is never-observed and is not foreign. Truthy-only checks would let
+    // a job.pdf.tmp seen with no lease rename onto B within the 5s window.
+    if (rec && rec.seenUnderTaskId !== current) return true
+    for (const [name, other] of this.observations) {
+      if (name === filename) continue
+      if (!liveNames.has(name)) continue
+      if (captureNameStem(name) !== captureNameStem(filename)) continue
+      if (other.seenUnderTaskId !== current) return true
+    }`
+
+const NULL_OPENING_FOREIGN_MUTATED = `    const rec = this.observations.get(filename)
+    if (rec?.seenUnderTaskId && rec.seenUnderTaskId !== current) return true
+    for (const [name, other] of this.observations) {
+      if (name === filename) continue
+      if (!liveNames.has(name)) continue
+      if (captureNameStem(name) !== captureNameStem(filename)) continue
+      if (other.seenUnderTaskId && other.seenUnderTaskId !== current) return true
+    }`
+
+const INODE_LINEAGE_MUTATED = `      if (captureNameStem(name) !== stem) continue
+      this.observations.delete(name)
+      if (isSameScanCaptureFile(rec.identity, identity) === false) continue
+      if (!inherited || rec.firstSeenMs < inherited.firstSeenMs) inherited = rec`
+
+const INODE_GENERATION_BLOCK = `  if (a.dev !== b.dev || a.ino !== b.ino) return false
+  // ATOMIC_SCAN_CAPTURE_INODE_GENERATION: Linux may recycle the inode number
+  // after unlink. Proven-different birthtime is a new directory entry, not a
+  // rename of the same capture. Missing/zero birthtime cannot prove a new
+  // generation — fail-closed to same capture so a rename cannot bind to B.
+  const aBirth = a.birthtimeMs
+  const bBirth = b.birthtimeMs
+  if (
+    aBirth !== undefined
+    && bBirth !== undefined
+    && Number.isFinite(aBirth)
+    && Number.isFinite(bBirth)
+    && aBirth > 0
+    && bBirth > 0
+    && aBirth !== bBirth
+  ) {
+    return false
+  }
+  return true
+`
+
+const INODE_GENERATION_MUTATED = `  return a.dev === b.dev && a.ino === b.ino
+`
+
+const STARTUP_BACKLOG_GENERATION_BLOCK = `function startupBacklogHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  // ATOMIC_SCAN_STARTUP_BACKLOG_GENERATION: leftover matching uses
+  // isSameScanCaptureFile, not the flight key. Recycled ino + proven-new
+  // birthtime is not the leftover; missing birthtime stays leftover.
+  for (const marked of startupBacklogIdentities) {
+    if (isSameScanCaptureFile(marked, identity) === true) return true
+  }
+  return false
+}`
+
+const STARTUP_BACKLOG_GENERATION_MUTATED = `function startupBacklogHasIdentity(identity: ScanCaptureFileIdentity): boolean {
+  for (const marked of startupBacklogIdentities) {
+    if (marked.dev === identity.dev && marked.ino === identity.ino) return true
+  }
+  return false
+}`
+
+function verifyStartupBacklogGenerationMutationMakesPipelineNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(STARTUP_BACKLOG_GENERATION_BLOCK), true, 'startup backlog generation block must exist before reverse mutation')
+  const mutated = original.replace(STARTUP_BACKLOG_GENERATION_BLOCK, STARTUP_BACKLOG_GENERATION_MUTATED)
+  assert.notEqual(mutated, original, 'ino-only leftover matching must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--startup-backlog-generation')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `ino-only leftover matching must make startup generation pipeline nonzero\n${output}`)
+    assert.match(
+      output,
+      /recycled inode with proven-new birthtime is not the startup leftover/,
+      `mutated leftover matching must fail on recycled inode, not an unrelated error\n${output}`,
+    )
+    console.log('PASS startup backlog generation reverse mutation: leftover pipeline becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'startup backlog generation reverse mutation must restore scan-watcher.ts')
+}
+
+function verifyInodeGenerationMutationMakesRecycledInodeNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(INODE_GENERATION_BLOCK), true, 'inode generation block must exist before reverse mutation')
+  const mutated = original.replace(INODE_GENERATION_BLOCK, INODE_GENERATION_MUTATED)
+  assert.notEqual(mutated, original, 'dropping birthtime generation check must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--recycled-inode-generation')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `ino-only identity must make recycled-inode generation test nonzero\n${output}`)
+    assert.match(
+      output,
+      /recycled inode with a new birthtime must not inherit A/,
+      `mutated inode generation test must fail on inheriting A, not an unrelated error\n${output}`,
+    )
+    console.log('PASS inode generation reverse mutation: recycled-inode test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'inode generation reverse mutation must restore scan-candidate-barrier.ts')
+}
+
+function verifyInodeLineageMutationMakesStemChangingRenameNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(INODE_LINEAGE_BLOCK), true, 'inode lineage block must exist before reverse mutation')
+  const mutated = original.replace(INODE_LINEAGE_BLOCK, INODE_LINEAGE_MUTATED)
+  assert.notEqual(mutated, original, 'restoring stem-only adoption must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--stem-changing-inode-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `stem-only adoption must make stem-changing rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /stem-changing temp rename from A must NEVER upload to B/,
+      `mutated inode lineage test must fail on the job.pdf.tmp upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS inode lineage reverse mutation: stem-changing rename test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'inode lineage reverse mutation must restore scan-candidate-barrier.ts')
+}
+
+function verifyNullOpeningMutationMakesRenameNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(NULL_OPENING_FOREIGN_BLOCK), true, 'null-opening foreign block must exist before reverse mutation')
+  const mutated = original.replace(NULL_OPENING_FOREIGN_BLOCK, NULL_OPENING_FOREIGN_MUTATED)
+  assert.notEqual(mutated, original, 'restoring truthy-only foreign check must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--null-opening-inode-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `truthy-only foreign check must make null-opening rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /null-opening same-inode rename must NEVER upload to later lease B/,
+      `mutated null-opening test must fail on the job.pdf.tmp upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS null-opening reverse mutation: same-inode rename test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'null-opening reverse mutation must restore scan-candidate-barrier.ts')
+}
+
+const IDENTITY_FLIGHT_BLOCK = `  // ATOMIC_SCAN_CAPTURE_IDENTITY_FLIGHT: proven dev/ino is owned before any
+  // lease await. A missing identity cannot take a lock.
+  const key = scanCaptureIdentityKey(identity)
+  const previous = scanCaptureIdentityFlights.get(key)?.done
+  let released = false
+  let resolve!: () => void
+  const done = new Promise<void>((r) => { resolve = r })
+  scanCaptureIdentityFlights.set(key, { done, resolve })
+  return {
+    previous,
+    release() {
+      if (released) return
+      released = true
+      resolve()
+      if (scanCaptureIdentityFlights.get(key)?.done === done) {
+        scanCaptureIdentityFlights.delete(key)
+      }
+    },
+  }`
+
+const IDENTITY_FLIGHT_MUTATED = `  return { previous: undefined, release() {} }`
+
+function verifyIdentityFlightMutationMakesOverlappingRenameNonzero(): void {
+  const barrierPath = join(__dirname, '../src/agent/scan-candidate-barrier.ts')
+  const original = readFileSync(barrierPath, 'utf8')
+  assert.equal(original.includes(IDENTITY_FLIGHT_BLOCK), true, 'identity flight block must exist before reverse mutation')
+  const mutated = original.replace(IDENTITY_FLIGHT_BLOCK, IDENTITY_FLIGHT_MUTATED)
+  assert.notEqual(mutated, original, 'dropping proven-identity single-flight must actually change scan-candidate-barrier.ts')
+  try {
+    writeFileSync(barrierPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--null-opening-overlapping-inode-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping identity single-flight must make overlapping rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /overlapping same-inode tmp->pdf rename must NEVER upload to later lease B/,
+      `mutated identity flight test must fail on the overlapping upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS identity flight reverse mutation: overlapping same-inode rename test becomes nonzero')
+  } finally {
+    writeFileSync(barrierPath, original)
+  }
+  assert.equal(readFileSync(barrierPath, 'utf8'), original, 'identity flight reverse mutation must restore scan-candidate-barrier.ts')
+}
+
+function verifyStartupBacklogIdentityMutationMakesRenameNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(STARTUP_BACKLOG_IDENTITY_BLOCK), true, 'startup identity block must exist before reverse mutation')
+  const mutated = original.replace(STARTUP_BACKLOG_IDENTITY_BLOCK, '')
+  assert.notEqual(mutated, original, 'removing startup identity mark must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--startup-backlog-identity-rename')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing startup identity mark must make leftover rename test nonzero\n${output}`)
+    assert.match(
+      output,
+      /startup leftover temp renamed to pdf must NEVER upload/,
+      `mutated startup identity test must fail on leftover upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS startup backlog identity reverse mutation: leftover rename test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'startup identity reverse mutation must restore scan-watcher.ts')
+}
+
+function verifyUnknownLiveListingMutationMakesFailClosedNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(LIVE_LISTING_KNOWN_BLOCK), true, 'unknown live listing block must exist before reverse mutation')
+  const mutated = original.replace(LIVE_LISTING_KNOWN_BLOCK, LIVE_LISTING_KNOWN_MUTATED)
+  assert.notEqual(mutated, original, 'substituting empty listing must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--unknown-live-listing')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `empty listing substitution must make unknown-listing test nonzero\n${output}`)
+    assert.match(
+      output,
+      /unknown directory listing must NEVER upload/,
+      `mutated listing test must fail on upload, not an unrelated error\n${output}`,
+    )
+    console.log('PASS unknown live listing reverse mutation: fail-closed test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'unknown live listing reverse mutation must restore scan-watcher.ts')
+}
+
+const QUARANTINE_KEEP_LINEAGE_BLOCK = `  markRefuseUntilQuarantined(filePath, identity)
+  try {
+    finalizeCandidate(filePath, scanWatchFolder, filename, trusted, 'quarantine')
+    globalDirectoryBaseline.remove(filename)
+    forgetRefuseUntilQuarantined(filePath, identity)
+    forgetStartupBacklog(filePath, identity)`
+
+const QUARANTINE_KEEP_LINEAGE_MUTATED = `  try {
+    globalDirectoryBaseline.remove(filename)
+    finalizeCandidate(filePath, scanWatchFolder, filename, trusted, 'quarantine')
+    forgetRefuseUntilQuarantined(filePath, identity)
+    forgetStartupBacklog(filePath, identity)`
+
+function verifyQuarantineKeepLineageMutationMakesRetryNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(QUARANTINE_KEEP_LINEAGE_BLOCK), true, 'quarantine keep-lineage block must exist before reverse mutation')
+  const mutated = original.replace(QUARANTINE_KEEP_LINEAGE_BLOCK, QUARANTINE_KEEP_LINEAGE_MUTATED)
+  assert.notEqual(mutated, original, 'dropping keep-lineage quarantine must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--nolease-eacces-quarantine')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `removing lineage-before-move must make no-lease EACCES retry nonzero\n${output}`)
+    assert.match(
+      output,
+      /null-opening lineage observation|never-deliver marker|retry sweeps must NEVER|zero lease\/delivery|NEVER deliver/,
+      `mutated keep-lineage test must fail on lost lineage or retry delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS quarantine keep-lineage reverse mutation: no-lease EACCES retry becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'keep-lineage reverse mutation must restore scan-watcher.ts')
+}
+
+const UNPROVABLE_IDENTITY_BLOCK = `    if (!openingIdentity) {
+      // ATOMIC_SCAN_CAPTURE_UNPROVABLE_IDENTITY: ino===0 / missing lstat identity
+      // cannot prove sameness. Lock out (restart required), quarantine or refuse,
+      // and never let concurrent path keys bypass identity-flight.
+      if (identityFlight.previous) await identityFlight.previous
+      const alreadyLocked = globalScanDeliveryBarrier.getState() === 'locked_out'
+      globalScanDeliveryBarrier.lockOut('identity_unavailable')
+      if (!alreadyLocked) {
+        warn(\`scan-watcher: unprovable capture identity — code=\${SCAN_INPUT_RESTART_REQUIRED}\`)
+      }
+      markRefuseUntilQuarantined(filePath, undefined)
+      const liveNames = requireLiveBasenames(scanWatchFolder)
+      if (liveNames) {
+        globalDirectoryBaseline.bindCapture(
+          filename,
+          Date.now(),
+          null,
+          liveNames,
+          undefined,
+          (name) => liveNameIdentity(scanWatchFolder, name),
+        )
+      }
+      try {
+        if (existsSync(filePath) && classifyScanInputCandidate(initial) === 'accepted' && initial.nlink === 1) {
+          const verifiedUnprovable = readVerifiedCandidate(filePath, scanWatchFolder, filename, initial)
+          tryQuarantineKeepingLineage(
+            filePath,
+            scanWatchFolder,
+            filename,
+            verifiedUnprovable.trustedWindowsCandidate,
+            undefined,
+            \`scan-watcher: unprovable capture identity quarantined — code=\${SCAN_INPUT_RESTART_REQUIRED}\`,
+          )
+        }
+      } catch (e) {
+        err(
+          \`scan-watcher: refuse-delivery quarantine retry failed — code=\${sanitizedErrorCode(e, 'QUARANTINE_FAILED')}\`,
+        )
+      }
+      return
+    }`
+
+function verifyUnprovableIdentityMutationMakesConcurrentNonzero(): void {
+  const watcherPath = join(__dirname, '../src/agent/scan-watcher.ts')
+  const original = readFileSync(watcherPath, 'utf8')
+  assert.equal(original.includes(UNPROVABLE_IDENTITY_BLOCK), true, 'unprovable identity block must exist before reverse mutation')
+  const mutated = original.replace(UNPROVABLE_IDENTITY_BLOCK, '')
+  assert.notEqual(mutated, original, 'dropping unprovable identity lockout must actually change scan-watcher.ts')
+  try {
+    writeFileSync(watcherPath, mutated)
+    const childArgs = [...process.execArgv]
+    if (process.argv[1] && resolvePath(process.argv[1]) !== resolvePath(__filename)) {
+      childArgs.push(process.argv[1])
+    }
+    childArgs.push(__filename, '--unprovable-identity')
+    const result = spawnSync(process.execPath, childArgs, {
+      encoding: 'utf8',
+      cwd: join(__dirname, '..'),
+      timeout: 60_000,
+      env: process.env,
+    })
+    const output = `${result.stdout}\n${result.stderr}`
+    assert.notEqual(result.status, 0, `dropping unprovable identity lockout must make concurrent ino===0 test nonzero\n${output}`)
+    assert.match(
+      output,
+      /unprovable ino===0 must NEVER (?:request a scan lease|deliver)/,
+      `mutated unprovable-identity test must fail on lease/delivery, not an unrelated error\n${output}`,
+    )
+    console.log('PASS unprovable identity reverse mutation: concurrent ino===0 test becomes nonzero')
+  } finally {
+    writeFileSync(watcherPath, original)
+  }
+  assert.equal(readFileSync(watcherPath, 'utf8'), original, 'unprovable identity reverse mutation must restore scan-watcher.ts')
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes('--scan-input-lockout')) {
+    await runLockoutUntilRestartSafetyTest()
+    return
+  }
+  if (process.argv.includes('--overlapping-startup-backlog-race')) {
+    await runOverlappingStartupBacklogRaceTest()
+    return
+  }
+  if (process.argv.includes('--enter-running-isolation')) {
+    await runEnterRunningGenerationIsolationTest()
+    return
+  }
+  if (process.argv.includes('--late-cross-session') || process.argv.includes('--invalid-not-before')) {
+    await runLateCrossSessionCaptureTests()
+    return
+  }
+  if (process.argv.includes('--unknown-live-listing')) {
+    await runUnknownDirectoryListingFailClosedTest()
+    return
+  }
+  if (process.argv.includes('--recycled-inode-generation')) {
+    runRecycledInodeGenerationTests()
+    return
+  }
+  if (process.argv.includes('--startup-backlog-generation')) {
+    await runStartupBacklogGenerationPipelineTest()
+    return
+  }
+  if (process.argv.includes('--vanished-predecessor')) {
+    await runVanishedPredecessorNewCaptureTest()
+    return
+  }
+  if (process.argv.includes('--stem-changing-inode-rename')) {
+    await runStemChangingInodeRenameTests()
+    return
+  }
+  if (process.argv.includes('--startup-backlog-identity-rename')) {
+    await runStartupBacklogTempRenameTest()
+    return
+  }
+  if (process.argv.includes('--null-opening-inode-rename')) {
+    await runNullOpeningInodeRenameTests()
+    return
+  }
+  if (process.argv.includes('--null-opening-overlapping-inode-rename')) {
+    await runNullOpeningOverlappingInodeRenameTests()
+    return
+  }
+  if (process.argv.includes('--nolease-eacces-quarantine')) {
+    await runForeignNoLeasePreExistingQuarantineFailureTests()
+    return
+  }
+  if (process.argv.includes('--unprovable-identity')) {
+    await runUnprovableIdentityFailClosedTests()
+    return
+  }
   verifySourceStructure()
   verifyUnclaimedCleanup()
   await verifyRetryCapExpired()
@@ -750,6 +1750,8 @@ async function main(): Promise<void> {
   await verifyNoWaitingTaskStillDistinctFromRetryTimeout()
   await verifyScanTaskStateChangedQuarantinesImmediately()
   await verifyScanFileAlreadyDeliveredQuarantinesImmediately()
+  await verifyScanFilePreviouslyAttemptedQuarantinesImmediately()
+  await verifyScanFileStaleCaptureQuarantinesImmediately()
   await verifyGenericServerErrorStillRetriesNormally()
   await verifySymbolicLinkCandidateNeverReachesDelivery()
   await verifyAlternateOutsideFileBypassesAreRejected()
@@ -758,6 +1760,21 @@ async function main(): Promise<void> {
   await verifySuccessfulDeliveryDeletesSourceFile()
   await verifyInFlightDedupSkipsConcurrentDuplicate()
   await verifyUnexpectedErrorOuterCatch()
+  await runScanLeaseBarrierTests()
+  verifyPremarkAllMutationMakesOverlappingTestNonzero()
+  verifyLockoutGenerationMutationMakesSafetyTestNonzero()
+  verifyEnterRunningGenerationMutationMakesIsolationTestNonzero()
+  verifyCaptureLineageMutationMakesLateCrossSessionNonzero()
+  verifyInodeLineageMutationMakesStemChangingRenameNonzero()
+  verifyInodeGenerationMutationMakesRecycledInodeNonzero()
+  verifyStartupBacklogGenerationMutationMakesPipelineNonzero()
+  verifyNullOpeningMutationMakesRenameNonzero()
+  verifyIdentityFlightMutationMakesOverlappingRenameNonzero()
+  verifyStartupBacklogIdentityMutationMakesRenameNonzero()
+  verifyInvalidNotBeforeMutationMakesFailClosedNonzero()
+  verifyUnknownLiveListingMutationMakesFailClosedNonzero()
+  verifyQuarantineKeepLineageMutationMakesRetryNonzero()
+  verifyUnprovableIdentityMutationMakesConcurrentNonzero()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }

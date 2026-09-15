@@ -1097,7 +1097,8 @@ jobs:
             --test-coverage-lines=80 \
             --test-coverage-functions=80 \
             --test-coverage-branches=80 \
-            apps/kiosk/scripts/tests/fusion-baseline-contract.test.mjs
+            apps/kiosk/scripts/tests/fusion-baseline-contract.test.mjs \
+            apps/kiosk/scripts/tests/fusion-w6-contract.test.mjs
 
       - name: Verify Kiosk fusion baseline
         run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline

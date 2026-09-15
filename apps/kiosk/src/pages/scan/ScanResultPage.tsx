@@ -1,4 +1,5 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useLocation, type NavigateOptions } from 'react-router-dom'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
   FileTextIcon,
@@ -21,8 +22,14 @@ import {
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
+import { revokeLiveScanSession } from './scanSessionRevoke'
 import {
-  patchScanWorkbenchSession,
+  armScanRescanAuthority,
+  beginPlainScanRestart,
+  beginScanRescan,
+  clearScanRescanAuthority,
+  clearScanWorkbenchSession,
+  hasScanRescanAuthority,
   readScanWorkbenchSession,
   type ScanOutcome,
 } from './scanWorkbenchSession'
@@ -51,6 +58,15 @@ interface ScanResultState {
 
 const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'file', 'outcome'])
 
+/**
+ * 多久重问一次「现在还有没有可用的重扫凭据」。
+ *
+ * 只影响按钮上那句话什么时候改口，不参与任何放行判断（放行由点击那一刻的
+ * `beginScanRescan` 和服务端说了算）。取 5 秒：本地有效期是 15 分钟，
+ * 用户在这一屏读完两段话再抬手也不止 5 秒，误导窗口足够小；再密就是白烧一体机的 CPU。
+ */
+const RESCAN_AUTHORITY_RECHECK_MS = 5_000
+
 function deriveOutcome(state: ScanResultState): ScanOutcome {
   if (state.outcome) return state.outcome
   if (state.success === true && state.file) return 'completed'
@@ -62,7 +78,7 @@ function deriveOutcome(state: ScanResultState): ScanOutcome {
 export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) => void } = {}) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, getToken } = useAuth()
   const stored = readScanWorkbenchSession()
   const locationState = (location.state ?? {}) as ScanResultState
   const state: ScanResultState = {
@@ -82,33 +98,164 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   const reason = state.reason
   const file = state.file
   const outcome = deriveOutcome(state)
+  // 刚结束那一场的凭证还留在本机登记里（finishWithResult 刻意不抹 live）。
+  // 这里只读，不改：它是「向服务端取用那枚一次性重扫授权」的唯一来源。
+  const priorScanTaskId = stored?.live?.scanTaskId ?? null
+  const priorControlToken = stored?.live?.controlToken ?? null
+  const [rescanAuthorized, setRescanAuthorized] = useState(false)
+  // 用户按过「重试扫描（同一份材料）」，而那一刻已经没有可用的成对授权了。
+  // 只用于**把这件事说出来**：本页没有替他改发普通重扫，出路是他自己按的那一个。
+  const [safeRescanLost, setSafeRescanLost] = useState(false)
 
-  const handleRetry = () => {
-    const retryState = Object.fromEntries(
-      Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)),
-    )
-    patchScanWorkbenchSession({
-      stage: 'settings',
-      scanType,
-      extras: {
-        source: state.source,
-        pageMode: state.pageMode,
-        color: state.color,
-        dpi: state.dpi,
-      },
-      live: undefined,
-      result: undefined,
-    })
+  /**
+   * 登记这一场可能存在的重扫授权。幂等（同一场不会重新计时），所以可以被调用两次：
+   * 一次在下面的 effect 里（决定按钮说什么），一次在点击那一刻（首屏那一帧 effect
+   * 还没跑，而按钮已经可以点了 —— 少了那一次，快点两下就会落进「没有授权」分支）。
+   */
+  const armIfPossible = useCallback((): boolean => {
+    if (outcome !== 'failed' && outcome !== 'expired') return false
+    if (!priorScanTaskId || !priorControlToken) return false
+    return armScanRescanAuthority({ priorScanTaskId, priorControlToken, scanType })
+  }, [outcome, priorScanTaskId, priorControlToken, scanType])
+
+  /* ── 这一场结束了：要不要留一枚安全重扫授权 ────────────────────────────
+   *
+   * 服务端只在任务**已经取到文件**（matched，内容 hash 已落 lastAttemptHash）之后
+   * 才落到 failed / cancelled / expired 的那几条路径上铸授权。前端能看见的对应终态
+   * 就是 failed 和 expired —— 只有这两种登记。
+   *
+   * 另外两种终态必须**反过来**：completed 和「完成但没带文件」的任务服务端已经建了档
+   * （fileId 非空），按契约根本不会有授权，所以这里显式扔掉。
+   *
+   * 说清这一句的性质，免得下一个人误判它的分量：它是**纵深**，不是当前唯一的防线。
+   * 今天走到成功终态之前必然先经过一次创建，而创建那一步是一次性取用
+   * （`takeScanRescanAuthority`），槽位那时已经空了；离开这一屏的几个出口也各自
+   * 清场。它守的是那些前提被改坏的将来 —— 比如 `deriveOutcome` 的兜底分支被调整、
+   * 或者哪天成功终态不再必须经过一次创建。
+   *
+   * 登记本身不代表授权真的存在（本机看不见服务端有没有铸）。它只是「可以去取用一次」，
+   * 取不取得到由服务端 403 说了算，页面不替它下结论。 */
+  useEffect(() => {
+    if (outcome !== 'failed' && outcome !== 'expired') {
+      clearScanRescanAuthority()
+      setRescanAuthorized(false)
+      return undefined
+    }
+    armIfPossible()
+    setRescanAuthorized(hasScanRescanAuthority(scanType))
+    /* 本地有效期会走完（15 分钟，与服务端同一个值），清场也可能在别处发生。
+     * 不重新采样的话，按钮会一直挂着「（同一份材料）」那句话 —— 用户照着它把同一张纸
+     * 放回去，而那一刻本机其实已经没有可用凭据了。所以隔几秒重问一次：
+     * 这是「状态不许误导」的那一半，另一半是点击时再验一遍（handleRetry）。 */
+    const timer = window.setInterval(() => {
+      setRescanAuthorized(hasScanRescanAuthority(scanType))
+    }, RESCAN_AUTHORITY_RECHECK_MS)
+    return () => window.clearInterval(timer)
+  }, [armIfPossible, outcome, scanType])
+
+  const retryExtras = {
+    source: state.source,
+    pageMode: state.pageMode,
+    color: state.color,
+    dpi: state.dpi,
+  }
+  /** 带去设置页的路由 state：只有扫描参数，控制字段（凭证 / 结果）一律剥掉。 */
+  const retryState = Object.fromEntries(
+    Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)),
+  )
+
+  const goToSettings = () => {
     if (onGoStage) {
       onGoStage('settings')
       return
     }
-    navigate('/scan/settings', { state: retryState })
+    navigate('/scan?stage=settings', { state: retryState })
   }
 
+  /**
+   * 「重试扫描（同一份材料）」。**只有安全重扫这一条路**，拿不到授权就不走。
+   *
+   * 三件事按序：
+   *   1. 幂等再登记一次 —— 补上首屏那一帧 effect 还没跑完的窗口；
+   *   2. `beginScanRescan` 判有没有可用的成对授权：没有就**什么都不动**（不销毁
+   *      本机那份 live/结果快照，也不跳页），返回 false；
+   *   3. 只有拿到了才跳设置页 —— 那边取用一次，body 的 id 与重扫头成对发出。
+   *
+   * 忽略第 2 步的返回值就是这次修的缺陷：跳过去之后设置页照样会建会话，而手里没有
+   * 授权，发出去的是一个**普通**创建。用户按的是「同一份材料」，随后把同一张纸放回
+   * 面板，服务端按两小时同字节去重把文件拒掉，任务停在 waiting 直到过期 ——
+   * 人在机器前白等十分钟，屏幕上全程没有一句话解释。
+   */
+  const handleRetry = () => {
+    armIfPossible()
+    if (!beginScanRescan({ scanType, extras: retryExtras })) {
+      setSafeRescanLost(true)
+      setRescanAuthorized(false)
+      return
+    }
+    setSafeRescanLost(false)
+    goToSettings()
+  }
+
+  /**
+   * 「重新开始一次扫描」——用户显式选择的普通新会话，**不是**安全同字节重扫。
+   *
+   * 成功页上的「重新扫描」走的也是这一条：上一场已经建档，服务端那条去重管的是
+   * 「取过件但没建档成功」的字节，所以那里本来就没有安全重扫可言。
+   */
+  const handlePlainRestart = () => {
+    beginPlainScanRestart({ scanType, extras: retryExtras })
+    goToSettings()
+  }
+
+  /**
+   * 离开整条扫描流程 —— 结果页 ctabar / 底部那几个出口。
+   *
+   * 语义必须和 `ScanWorkbenchChrome` 的 `leaveScanFlow` 一模一样（顶栏返回、底栏三项
+   * 走的是那一条）。此前这几个出口只是裸 `navigate`，同一屏上就成了两种命运：从顶栏
+   * 走的人本机登记被清干净，从这里走的人把 live 登记（含刚结束那一场的 controlToken
+   * 明文）和那枚一次性重扫授权**一起留在原地**，下一位用户走到这台机器前就继承了 ——
+   * 授权会被他拿去对一个不属于他的任务发重扫请求，登记里那份凭证则一直躺到下次清场。
+   *
+   * 撤销那一句对已终态的任务是 no-op：`revokeLiveScanSession` 见到结果快照就不发 DELETE
+   * （scanSessionRevoke 的 hasResult 分支）。留着它是为了「离开的语义只有一份」——
+   * 结果页也可能在只有 live、还没写进结果快照的那一帧被按下出口。
+   *
+   * ## 为什么一律 replace，不 push
+   *
+   * 清 sessionStorage 只清掉了「下一位进 /scan 会复水到哪一屏」。**历史条目本身还在**：
+   * push 之后 `/scan?stage=result` 仍是浏览器历史里的一条，它带着当时那笔 `location.state`
+   * （结果页的 `file` 与 `scanType` 会经由 `ScanProgressPage.finishWithResult` 的
+   * 非工作台路径写进去），而结果页取数是 `stored?.result?.file ?? locationState.file` ——
+   * 存储清了，路由 state 还能把上一位那份文件名与签名内容链接补回来。
+   * 一体机没有可见的后退键，但 Kiosk 浏览器的手势/外设、以及隐私清场自己的
+   * back/forward 编排都能走到这条历史条目上。
+   *
+   * replace 把**这一条**直接换成落点：
+   *   · 后退：越过整条扫描流程，落在进 /scan 之前那一页，永远回不到结果屏；
+   *   · 前进：那条结果条目已经不存在，前进也无从复现。
+   * 落点自己那一条仍然带着 `file`（打印确认页 / 解析页靠它工作，这是「保留落点
+   * 立即可用文件」的要求），它由各自页面的生命周期与隐私边界管，不在本页职责内。
+   */
+  const leaveScanFlow = (destination: string, options?: NavigateOptions): void => {
+    revokeLiveScanSession(getToken())
+    clearScanWorkbenchSession()
+    navigate(destination, { ...options, replace: true })
+  }
+
+  /* ── 成功页那三个去向也是「离开整条扫描流程」 ──────────────────────────────
+   *
+   * 直接打印 / AI 简历识别 / 前往我的文档，此前都是裸 navigate：本机登记原封不动留在
+   * sessionStorage 里 —— 里面有上一位的 `live.controlToken` 明文，还有
+   * `result.file`（文件名 + 那条签名内容链接）。下一位在这台机器上进 /scan，
+   * 阶段直接从登记复水到 result，他看到的是**上一位的扫描件**。
+   *
+   * 所以三个都走 leaveScanFlow：撤服务端任务（已终态时是 no-op）→ 清本机登记 →
+   * 带着文件跳过去。打印页与解析页读的都是路由 state（`location.state.file` /
+   * `state.fileId`），不读扫描登记，所以清掉登记不影响它们拿到这份文件。 */
   const handlePrint = () => {
     if (!file) return
-    navigate('/print/confirm', {
+    leaveScanFlow('/print/confirm', {
       state: {
         file: { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, pages: file.pages, mimeType: file.mimeType },
         params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
@@ -118,14 +265,14 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
 
   const handleDocuments = () => {
     if (!file || !isLoggedIn) return
-    navigate('/me/documents')
+    leaveScanFlow('/me/documents')
   }
 
   const displayFormat = formatLabelFromMime(file?.mimeType)
 
   const handleResumeAI = () => {
     if (!file) return
-    navigate('/resume/parse', {
+    leaveScanFlow('/resume/parse', {
       state: {
         source: 'scan',
         // ResumeParsePage 只读顶层 state.fileId 发起解析请求，file 内的 fileId/fileUrl
@@ -148,22 +295,31 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
         status={{ tone: isNoFile || isExpired ? 'warn' : 'bad', label: isNoFile ? '已完成 · 回执里没有文件' : isExpired ? '会话已过期' : '扫描未完成' }}
         ctabar={
           <ScanCta>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/print-scan')}>
               返回打印扫描
             </button>
             {isNoFile ? (
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/help')}>
                 <HeadphonesIcon aria-hidden />
                 联系工作人员
               </button>
             ) : (
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>
+              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/')}>
                 返回首页
               </button>
             )}
-            <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry}>
-              重试扫描
-            </button>
+            {/* 两个按钮，不是一个按钮两种文案：拿到凭据时它是「同一份材料」的安全重扫，
+                拿不到时它是一次普通新会话 —— 后者会让同一张纸撞上服务端两小时的重复件
+                拒收，代价完全不同，所以文案必须分开，并且由用户自己按下那一个。 */}
+            {rescanAuthorized ? (
+              <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry}>
+                重试扫描（同一份材料）
+              </button>
+            ) : (
+              <button type="button" className="qx-btn" data-variant="primary" onClick={handlePlainRestart}>
+                重新开始一次扫描
+              </button>
+            )}
           </ScanCta>
         }
       >
@@ -183,12 +339,38 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           ) : (
             <p>{reason ?? '扫描任务未能完成，请重试或联系工作人员'}</p>
           )}
+          {safeRescanLost ? (
+            <p data-testid="scan-safe-rescan-lost">
+              <b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。
+              本页<b>没有</b>替你改发一次普通重扫 —— 同一张纸走普通会话，服务端会按重复件拒收，
+              你会在机器前白等到会话过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，
+              并且换一份材料或找工作人员。
+            </p>
+          ) : null}
         </ScanStatusPanel>
         <div className="sw-grid2">
           <ScanNoteCard title="现在能做什么" foot="重扫是另建一个会话，不是接着这一次。">
             <ScanPlan items={[
-              '点右下角重试扫描：那是另一次任务。',
+              /* 按钮文案是两条分支（见 ctabar），这句指路也必须跟着分支走。
+               * 写死「点右下角重试扫描」时，没有凭据的那一屏上根本没有叫这个名字的按钮
+               * —— 同一屏两个名字，用户会以为自己少看见了一个控件。 */
+              rescanAuthorized
+                ? '点右下角「重试扫描（同一份材料）」：那是另一次任务。'
+                : '点右下角「重新开始一次扫描」：那是另一次任务，也不是同字节重扫。',
               '重扫之前把纸取回来抚平、订书钉取掉。',
+              /* 服务端对「取过件但没建档成功」的同一份字节有两小时去重（它挡的是把上一位的
+               * 扫描件误挂到下一位头上）。所以这句必须按手里有没有那份凭据分开说。
+               *
+               * 措辞上有一条不能越过：**本机不知道服务端到底铸没铸过那枚授权**。服务端只在
+               * 任务已经取到文件（matched + 内容 hash 已落 lastAttemptHash）之后落到
+               * failed / cancelled / expired 时才铸；而本机在一个还停在 waiting 的任务上
+               * 放弃轮询，也会走到这一屏 —— 那种情况根本没有授权，凭据照样在手里。
+               * 所以这里只能说「会带着凭据去申请」，不能说「服务端已经放行」。
+               * 真正有资格说「已放行」的是设置页：那一行只在创建成功之后才出现，
+               * 而带着重扫两半的创建能成功，等于服务端已经把授权消费掉了。 */
+              rescanAuthorized
+                ? '这一次会带上上一场的凭据去申请安全重扫放行：服务端认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。'
+                : '本机没有可用的安全重扫凭据：同一张纸原样再扫，服务端可能按重复件拒收（两小时内），换一次扫描或找工作人员。',
               isNoFile ? '这个编号问不出文件，反复点也是同一句回执。' : '同一份材料连续失败两次，就找工作人员。',
             ]} />
           </ScanNoteCard>
@@ -216,7 +398,10 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
       status={{ tone: 'ok', label: '服务端已回完成并带回文件' }}
       ctabar={
         <ScanCta reason="未选择去向的临时文件会按服务端策略清理；本页不会伪造“已保存”">
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={handleRetry}>
+          {/* 成功页上的「重新扫描」本来就没有安全重扫可言：上一场已经建档，服务端那条
+              两小时去重只管「取过件但没建档成功」的字节。所以它是一次普通新会话，
+              走显式的那一条，不碰重扫授权。 */}
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={handlePlainRestart}>
             <RotateCcwIcon aria-hidden />
             重新扫描
           </button>
@@ -311,7 +496,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           </span>
         </button>
       </div>
-      <button type="button" className="sw-exit sw-home-exit" onClick={() => navigate('/')}>
+      <button type="button" className="sw-exit sw-home-exit" onClick={() => leaveScanFlow('/')}>
         <span className="sw-exit-ic"><HomeIcon size={20} aria-hidden /></span>
         <span className="sw-exit-body">
           <span className="sw-exit-title">返回首页</span>

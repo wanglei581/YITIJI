@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
+import { SCAN_RETRY_AUTHORITY_TTL_MS, SCAN_UNACKED_WAITING_GRACE_MS } from './scan-tasks.service'
 
 /**
  * `deliverScanFile()` 上传期间会通过 `startMatchedHeartbeat()`
@@ -30,6 +31,10 @@ const MATCHED_STUCK_TIMEOUT_MS = 3 * 60 * 1000
  * reaper 会把任务标记 failed，但已经建好的 FileObject 不会被自动关联或删除，
  * 会变成孤儿文件，等它自己的 TTL 到期被 `FilesCleanupTask` 处理掉——这是可接受的，
  * 孤儿文件仍然受 id_scan/resume_scan/print_doc 短留存策略约束。
+ *
+ * 另见 reapExpiredWaiting：expiresAt 已到的 'waiting' 行若无人查询，getStatus() 的
+ * 惰性过期不会落盘，同一条 partial unique index 会继续把该终端锁死。那条路径只匹配
+ * waiting + expiresAt<=now，不得改写 matched 或其他终态。
  */
 @Injectable()
 export class ScanTaskReaperTask {
@@ -42,17 +47,94 @@ export class ScanTaskReaperTask {
   @Cron(CronExpression.EVERY_MINUTE)
   async reapStuckMatched(): Promise<{ count: number }> {
     const staleThreshold = new Date(Date.now() - MATCHED_STUCK_TIMEOUT_MS)
+    const retryAuthorityExpiresAt = new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
+    try {
+      const retryable = await this.prisma.scanTask.updateMany({
+        where: {
+          status: 'matched',
+          updatedAt: { lt: staleThreshold },
+          lastAttemptHash: { not: null },
+        },
+        data: {
+          status: 'failed',
+          errorCode: 'SCAN_MATCHED_TIMEOUT',
+          errorMessage: '扫描处理超时未完成',
+          retryAuthorityExpiresAt,
+        },
+      })
+      const nonRetryable = await this.prisma.scanTask.updateMany({
+        where: {
+          status: 'matched',
+          updatedAt: { lt: staleThreshold },
+          lastAttemptHash: null,
+        },
+        data: {
+          status: 'failed',
+          errorCode: 'SCAN_MATCHED_TIMEOUT',
+          errorMessage: '扫描处理超时未完成',
+          retryAuthorityExpiresAt: null,
+        },
+      })
+      const count = retryable.count + nonRetryable.count
+      if (count > 0) {
+        this.logger.warn(`reaped ${count} scan task(s) stuck in 'matched' beyond timeout`)
+      }
+      return { count }
+    } catch (err) {
+      this.logger.error(`matched-state reaper failed: ${(err as Error).message}`)
+      return { count: 0 }
+    }
+  }
+
+  /**
+   * 每分钟把已经过期但仍停在 'waiting' 的扫描任务条件更新为 'expired'。
+   *
+   * where 必须同时钉死 status='waiting' 与 expiresAt<=now：不得把 matched / completed /
+   * cancelled / failed / 未到期 waiting 改写成 expired。matched 卡死仍只由
+   * reapStuckMatched() 按 updatedAt 收敛为 failed。
+   */
+  /**
+   * Expire waiting rows that Kiosk never ACKed. Must not mint retry authority:
+   * these rows never matched, so there is no content-bound retry to preserve.
+   * Parent retry lineage stays consumed; replay of a dead child is
+   * SCAN_RETRY_CHILD_NOT_RECOVERABLE (no second child).
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async reapUnackedWaiting(): Promise<{ count: number }> {
+    const staleThreshold = new Date(Date.now() - SCAN_UNACKED_WAITING_GRACE_MS)
     try {
       const result = await this.prisma.scanTask.updateMany({
-        where: { status: 'matched', updatedAt: { lt: staleThreshold } },
-        data: { status: 'failed', errorCode: 'SCAN_MATCHED_TIMEOUT', errorMessage: '扫描处理超时未完成' },
+        where: {
+          status: 'waiting',
+          deliveryAckedAt: null,
+          createdAt: { lte: staleThreshold },
+        },
+        data: { status: 'expired', retryAuthorityExpiresAt: null },
       })
       if (result.count > 0) {
-        this.logger.warn(`reaped ${result.count} scan task(s) stuck in 'matched' beyond timeout`)
+        this.logger.warn(`reaped ${result.count} unacked waiting scan task(s) past ack grace`)
       }
       return { count: result.count }
     } catch (err) {
-      this.logger.error(`matched-state reaper failed: ${(err as Error).message}`)
+      this.logger.error(`unacked-waiting reaper failed: ${(err as Error).message}`)
+      return { count: 0 }
+    }
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async reapExpiredWaiting(): Promise<{ count: number }> {
+    const now = new Date()
+    try {
+      const result = await this.prisma.scanTask.updateMany({
+        where: { status: 'waiting', expiresAt: { lte: now } },
+        data: { status: 'expired', retryAuthorityExpiresAt: null },
+      })
+      if (result.count > 0) {
+        this.logger.warn(`reaped ${result.count} waiting scan task(s) past expiresAt`)
+      }
+      return { count: result.count }
+    } catch (err) {
+      this.logger.error(`waiting-expiry reaper failed: ${(err as Error).message}`)
       return { count: 0 }
     }
   }

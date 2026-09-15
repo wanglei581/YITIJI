@@ -58,7 +58,7 @@ export const HOME_V6_ROUTES: Readonly<Record<HomeV6ActionId, string>> = {
   'print-local': '/print/upload?source=document&tab=file',
   'print-phone': '/print/upload?source=document&tab=qr&mode=transfer',
   'print-usb': '/print/upload?source=document&tab=usb&mode=transfer',
-  'scan-paper': '/scan/start',
+  'scan-paper': '/scan',
   'file-tools': '/print-scan/convert',
   'resume-hub': '/resume-service',
   'resume-diagnose': '/resume/source?intent=diagnose',

@@ -69,7 +69,7 @@ const ALL_FAQ: QA[] = [
     categoryKey: 'print', category: '打印与扫描',
     q: '扫描的文件保存在哪里？',
     a: '扫描结果仅用于本次打印或保存到本次会话记录，敏感文件设置短期有效期，到期自动删除。',
-    link: { label: '扫描文件', route: '/scan/start' },
+    link: { label: '扫描文件', route: '/scan' },
   },
   {
     categoryKey: 'policy', category: '政策服务',

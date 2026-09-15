@@ -21,8 +21,56 @@ import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 import { ReleaseObservationPanel } from './ReleaseObservationPanel'
 
-const TABLE_COLS = 15
+const TABLE_COLS = 16
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
+
+// ─── 扫描输入闸门（Agent fail-closed 状态，只读）────────────────────────────
+//
+// Agent 在目录身份变化 / 读取失败 / watcher 异常时会把扫描输入锁死，并且**进程内不可逆**
+// ——只有重启 Agent 才恢复。这道闸门保护的是「上一位的扫描件不会投给下一位」，
+// 所以后台只呈现，不提供任何远程解除入口（远程放宽 = 把隐私闸门交给网络）。
+//
+// 原因码来自服务端白名单枚举 SCAN_INPUT_REASONS（heartbeat.dto.ts），不是自由文本；
+// 查不到的码原样显示，既不猜也不拼接任意载荷。
+
+const SCAN_INPUT_REASON_LABELS: Readonly<Record<string, string>> = {
+  not_configured: '未配置扫描目录',
+  reparse_point_unverifiable: '目录重解析点无法核验',
+  reparse_point: '目录是重解析点',
+  not_directory: '目标不是目录',
+  unavailable: '目录不可用',
+  not_readable: '目录不可读',
+  watcher_rebuild: '监听器重建',
+  watcher_error: '监听器异常',
+  identity_unavailable: '目录身份取不到',
+  root_identity_changed: '目录身份已变化',
+  readdir_failed: '目录读取失败',
+  watcher_ready_failed: '监听器启动失败',
+  startup_backlog_failed: '启动积压处理失败',
+  startup_incomplete: '启动检查未完成',
+  unknown: '未知原因',
+}
+
+function scanInputView(t: AdminTerminalRecord) {
+  const health = t.scanInputHealth ?? null
+  // 四个字段同生同死：一个都没有 = 这台 Agent 还没上报这一组（旧版本 / mock）。
+  // 必须说「未上报」——把没测到说成正常，正是这条遥测要防的事。
+  if (!health) return { badge: 'default' as const, label: '未上报', detail: null, restart: false }
+  if (health === 'locked_out') {
+    const reason = t.scanInputReason
+      ? SCAN_INPUT_REASON_LABELS[t.scanInputReason] ?? t.scanInputReason
+      : '原因未上报'
+    return {
+      badge: 'error' as const,
+      label: '已锁死',
+      detail: reason,
+      // 服务端强制 locked_out ⇒ action=restart_required，这里仍按上报值判，不替它断言。
+      restart: t.scanInputAction === 'restart_required',
+    }
+  }
+  if (health === 'healthy') return { badge: 'success' as const, label: '正常', detail: null, restart: false }
+  return { badge: 'warning' as const, label: '未知', detail: null, restart: false }
+}
 
 // ─── 打印机状态映射(契约 C1 printerStatus 枚举)──────────────────────────────
 
@@ -421,7 +469,7 @@ export default function TerminalsPage() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
-                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '链路诊断', '打印机状态', '最近心跳', 'Agent 版本', '更新观察', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
+                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '链路诊断', '打印机状态', '扫描输入', '最近心跳', 'Agent 版本', '更新观察', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
@@ -455,6 +503,7 @@ export default function TerminalsPage() {
                   const runtimeView = runtimeStatusView(t)
                   const printerView = printerStatusView(t.printerStatus ?? null)
                   const releaseView = releaseObservationView(t)
+                  const scanInput = scanInputView(t)
                   const canCreateBindCode = t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'
                   const bindCodeTitle = !t.enabled
                     ? '停用终端不可生成绑定码'
@@ -699,6 +748,22 @@ export default function TerminalsPage() {
                         />
                       </td>
                       <td className="px-4 py-3"><StatusBadge dot status={printerView.badge} label={printerView.label} /></td>
+                      {/* 扫描输入闸门：只呈现，不提供远程解除。锁死时必须同时看得见
+                          「为什么」和「什么时候」，否则运维只知道坏了、不知道该不该跑一趟。 */}
+                      <td className="px-4 py-3" data-testid="terminal-scan-input">
+                        <div className="flex flex-col gap-1" aria-label="只读扫描输入闸门状态">
+                          <StatusBadge dot status={scanInput.badge} label={scanInput.label} />
+                          {scanInput.detail && (
+                            <span className="text-xs text-warning-fg">{scanInput.detail}</span>
+                          )}
+                          {scanInput.restart && (
+                            <span className="text-xs text-warning-fg">需重启 Agent 恢复（不支持远程解除）</span>
+                          )}
+                          {t.scanInputObservedAt && (
+                            <span className="text-[11px] text-neutral-500">{relativeTime(t.scanInputObservedAt)}</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.agentVersion ?? '—'}</td>
                       <td className="px-4 py-3">
@@ -721,8 +786,13 @@ export default function TerminalsPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-500">
-        终端在线状态、链路诊断、打印机状态、版本、IP、磁盘均来自 Windows Terminal Agent 的心跳上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址
+        终端在线状态、链路诊断、打印机状态、扫描输入、版本、IP、磁盘均来自 Windows Terminal Agent 的心跳上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址
         {API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}
+      </p>
+      <p className="mt-1 text-xs text-neutral-500">
+        「扫描输入」是 Agent 的 fail-closed 闸门：目录身份变化、读取失败或监听器异常时它会锁死扫描输入，
+        保证上一位的扫描件不会投给下一位。锁死在 Agent 进程内不可逆，<b>只能到现场重启 Agent 恢复，后台不提供远程解除</b>。
+        显示「未上报」表示这台 Agent 还没报这一组字段（旧版本或尚未接入），不等于正常。
       </p>
       <p className="mt-1 text-xs text-neutral-500">
         「所属机构」决定该终端归哪所学校；学校账号在合作机构后台只能配置归属本校的智慧校园开关。绑定/解绑仅管理员可操作，变更写入审计日志。

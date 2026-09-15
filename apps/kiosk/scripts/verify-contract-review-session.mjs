@@ -26,7 +26,9 @@ assert.match(cleanup, /clearKioskSharedDeviceResidue/)
 assert.match(cleanup, /hasLocalFavorites\(\)/)
 assert.match(
   auth,
-  /const login = useCallback\([\s\S]*?clearKioskSensitiveSession\(\)[\s\S]*?setUser\(next\)/,
+  // 换人清场必须带**上一位**的令牌（current.token）：服务端按 endUserId 校验扫描任务
+  // 取消权限，用新登录这位的令牌只会 403，旧任务原地存活等着收下一次面板扫描。
+  /const login = useCallback\([\s\S]*?clearKioskSensitiveSession\(current\.token\)[\s\S]*?setUser\(next\)/,
 )
 
 assert.match(home, /startContractReviewSession\(\{/)

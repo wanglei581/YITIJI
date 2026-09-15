@@ -14,6 +14,11 @@ import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.
 import { signFileUrl } from '../files/signing'
 import type { FilePurpose } from '../files/file.types'
 import type { CreateScanTaskDto } from './dto/create-scan-task.dto'
+import {
+  buildScanDeliveryLease,
+  verifyScanDeliveryLease,
+  type ScanDeliveryLeaseResult,
+} from './scan-lease'
 
 /**
  * 契约本地副本。
@@ -38,6 +43,8 @@ export type ScanTaskStatus =
   | 'cancelled'
 
 const SCAN_TASK_TTL_MS = 10 * 60 * 1000
+/** Unacked waiting rows older than this are expired; must exceed kiosk lost-response replay (~25s). */
+export const SCAN_UNACKED_WAITING_GRACE_MS = 60 * 1000
 /** 建档后签发的内容 URL 有效期，与打印/上传会话链路同一惯例（30 分钟）。 */
 const SCAN_FILE_URL_TTL_MS = 30 * 60 * 1000
 
@@ -55,10 +62,8 @@ const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
  * Agent 的路上丢失（进程被杀在响应写出之后 / 连接被重置在 Agent 收完之前）——这种情况下
  * Agent 完全没有任何错误信号，只会把它当成一次普通网络失败，留在原地交给下一轮 sweep
  * 按既有 2 小时窗口重试（scan-watcher.ts DELIVERY_RETRY_MAX_MS，这段"网络错误默认重试"
- * 行为本身没问题，不能改）。问题是：重试投递的还是同一份物理文件字节，而 deliverScanFile()
- * 本身对"这份内容是否已经交付过"没有任何记忆——它只会重新去找该终端"当前"最早一条
- * waiting 任务去匹配。如果原任务对应的用户会话已经结束、同一物理终端上有新用户开了
- * 新的等待中任务，这次重试就会把第一个用户的扫描内容错误地挂到第二个用户身上——
+ * 行为本身没问题，不能改）。问题是：重试投递的还是同一份物理文件字节，如果原任务对应的用户会话已经结束、
+ * 同一物理终端上有新用户开了新的等待中任务，若重试请求未能与原精确任务隔离，就会把第一个用户的扫描内容错误地挂到第二个用户身上——
  * 和 SCAN_TASK_STATE_CHANGED 那条竞态是同一类"跨用户 PII 误挂载"风险，只是触发路径
  * 不同（这里是"响应丢失"而不是"CAS 冲突"），而且完全没有错误信号可以让 Agent 察觉。
  *
@@ -83,6 +88,54 @@ const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
  * 而另一侧未同步都会让 verify:scan-tasks 直接失败（而不是静默出现文档描述的跨用户误挂载）。
  */
 export const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
+
+/**
+ * An unsuccessful task can authorize one explicit rescan for only a short period.
+ * The authority is bound to the prior task's owner, terminal, scan type and content hash.
+ */
+export const SCAN_RETRY_AUTHORITY_TTL_MS = 15 * 60 * 1000
+
+const SCAN_RETRY_ELIGIBLE_STATUSES = ['failed', 'cancelled', 'expired'] as const
+const SCAN_RETRY_RECOVERABLE_CHILD_STATUSES = ['waiting', 'matched'] as const
+
+/**
+ * First-time retry create lost the race on consume/link. The caller must try
+ * to recover an already-committed child rather than mint a second authority.
+ * Not an HTTP exception — must not leak out of create().
+ */
+class RetryCreateRaceError extends Error {
+  constructor() {
+    super('SCAN_RETRY_CREATE_RACE')
+    this.name = 'RetryCreateRaceError'
+  }
+}
+
+type ScanRetryCreateResult = {
+  scanTaskId: string
+  controlToken: string
+  expiresAt: string
+  instructions: string[]
+}
+
+/**
+ * 观察时间未来容差（5 秒）。
+ *
+ * 终端 PC 与 API 服务端通过 NTP 同步，正常网络与时钟抖动在百毫秒级。
+ * 允许最大 5 秒的未来容差覆盖 NTP 微漂移，超出即视为伪造或严重时钟错乱。
+ */
+export const SCAN_MAX_FUTURE_OBSERVATION_MS = 5_000
+
+/**
+ * 扫描捕获时间陈旧性时钟容差（5 秒）。
+ *
+ * 理由：
+ * 1. 终端 PC（Agent 所在机）与 API 服务端之间存在由 NTP 同步微小抖动带来的时钟偏差（通常 < 1s）。
+ * 2. 真实用户在 Kiosk 创建扫描任务后，需要走到打印机、按键、扫描、SMB 传输、Agent 连续快照稳定性
+ *    检测（至少 2 秒采样窗），端到端物理耗时必定在 5-10 秒以上。
+ * 3. 5 秒容差既能避免正常极速扫描被 NTP 微抖动误拒，又能严格阻止跨用户陈旧扫描件（前一用户的残留文件，
+ *    观察时间早于新用户任务创建边界）错误归属到后续用户的新任务中（用户间操作间隔远大于 5 秒）。
+ */
+export const SCAN_STALE_CAPTURE_TOLERANCE_MS = 5_000
 
 export const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
   resume: 'resume_scan',
@@ -147,17 +200,35 @@ export interface ScanTaskStatusResult {
   expiresAt: string
 }
 
-/**
- * 判断是否命中 ScanTask 的活跃会话唯一约束（Prisma P2002）。
- *
- * `ScanTask` 模型目前只有一个数据库层唯一约束——B1-2 加的 partial unique index
- * `ScanTask_terminalId_active_unique`（同一 terminalId 同时只能有一条 waiting/matched
- * 记录，见 schema.prisma 里 ScanTask 模型上的注释）——create() 的 insert 里没有其它
- * 可能触发唯一冲突的列，因此不需要像 order-status.service.ts 的
- * isPickupCodeUniqueConflict() 那样再去比对 meta.target 区分多个候选唯一约束。
- */
+/** ScanTask has distinct active-session and retry-lineage unique constraints. */
+function uniqueConflictTargetsField(e: unknown, field: string): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2002') return false
+  const target = e.meta?.['target']
+  if (typeof target === 'string') return target.includes(field)
+  if (Array.isArray(target)) return target.some((value) => String(value).includes(field))
+  return e.message.includes(field)
+}
+
 function isScanTaskActiveSessionConflict(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
+  return (
+    e instanceof Prisma.PrismaClientKnownRequestError &&
+    e.code === 'P2002' &&
+    !isScanRetryLineageConflict(e)
+  )
+}
+
+function isScanRetryLineageConflict(e: unknown): boolean {
+  return (
+    uniqueConflictTargetsField(e, 'retryOfScanTaskId') ||
+    uniqueConflictTargetsField(e, 'retryConsumedByScanTaskId')
+  )
+}
+
+function isScanRetryTransactionConflict(e: unknown): boolean {
+  return (
+    e instanceof Prisma.PrismaClientKnownRequestError &&
+    ['P1008', 'P2028', 'P2034'].includes(e.code)
+  )
 }
 
 /**
@@ -192,13 +263,9 @@ export class ScanTasksService {
 
   async create(
     dto: CreateScanTaskDto,
-    endUserId: string | null
-  ): Promise<{
-    scanTaskId: string
-    controlToken: string
-    expiresAt: string
-    instructions: string[]
-  }> {
+    endUserId: string | null,
+    retryControlToken?: string
+  ): Promise<ScanRetryCreateResult> {
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
@@ -225,12 +292,45 @@ export class ScanTasksService {
     // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'scan')
 
-    // 与 mock-interview.service.ts / materials.service.ts 的匿名 accessToken 同款惯例：
-    // randomBytes(24) 铸 192-bit 随机 token，DB 只存 sha256 hash，明文只在本次响应里返回一次。
-    const controlToken = randomBytes(24).toString('hex')
-    const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
+    const retryOfScanTaskId = dto.retryOfScanTaskId?.trim() || undefined
+    if (!retryOfScanTaskId && retryControlToken) {
+      throw new BadRequestException({
+        error: {
+          code: 'SCAN_RETRY_TASK_ID_MISSING',
+          message: '重扫控制凭证缺少对应的原扫描任务',
+        },
+      })
+    }
+    if (retryOfScanTaskId && !retryControlToken) {
+      this.throwRetryNotAuthorized()
+    }
 
+    // Lost-response replay: a paired retry whose child already committed must
+    // return that same child and the prior control token. Do this before the
+    // first-time CAS so a second POST never consumes a second authority.
+    if (retryOfScanTaskId && retryControlToken) {
+      const recovered = await this.recoverRetryChildIfPresent({
+        retryOfScanTaskId,
+        retryControlToken,
+        endUserId,
+        terminalId: terminal.id,
+        scanType: dto.scanType,
+      })
+      if (recovered) return recovered
+    }
+
+    // Plain create: mint a new 192-bit token (hash only in DB).
+    // Retry create: reuse the prior token as the child's control credential so a
+    // lost 2xx can be recovered from the same header the client already holds.
+    // Scope is still scanTaskId + hash; TTL is the child's expiresAt, not extended
+    // on replay. The prior row is already terminal, so the secret now names the child.
+    const controlToken =
+      retryOfScanTaskId && retryControlToken
+        ? retryControlToken
+        : randomBytes(24).toString('hex')
+    const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
+
     let task: { id: string }
     try {
       task = await this.prisma.$transaction(async (tx) => {
@@ -246,24 +346,125 @@ export class ScanTasksService {
             },
           })
         }
-        return tx.scanTask.create({
+
+        let retryContentHash: string | null = null
+        let retryConsumedAt: Date | null = null
+        let childControlTokenHash = controlTokenHash
+        if (retryOfScanTaskId) {
+          const prior = await tx.scanTask.findUnique({ where: { id: retryOfScanTaskId } })
+          this.assertRetryIdentity(
+            prior,
+            endUserId,
+            terminal.id,
+            dto.scanType,
+            retryControlToken
+          )
+          if (!prior) this.throwRetryNotAuthorized()
+          if (prior.retryConsumedAt) {
+            throw new RetryCreateRaceError()
+          }
+          const retryConsumedAtCandidate = new Date()
+          if (
+            !SCAN_RETRY_ELIGIBLE_STATUSES.includes(
+              prior.status as (typeof SCAN_RETRY_ELIGIBLE_STATUSES)[number]
+            ) ||
+            !prior.retryAuthorityExpiresAt ||
+            prior.retryAuthorityExpiresAt.getTime() <= retryConsumedAtCandidate.getTime() ||
+            prior.fileId !== null ||
+            !prior.lastAttemptHash
+          ) {
+            this.throwRetryNotAuthorized()
+          }
+
+          retryConsumedAt = retryConsumedAtCandidate
+          const consumed = await tx.scanTask.updateMany({
+            where: {
+              id: prior.id,
+              terminalId: terminal.id,
+              scanType: dto.scanType,
+              endUserId,
+              status: { in: [...SCAN_RETRY_ELIGIBLE_STATUSES] },
+              controlTokenHash: prior.controlTokenHash!,
+              fileId: null,
+              lastAttemptHash: prior.lastAttemptHash,
+              retryConsumedAt: null,
+              retryAuthorityExpiresAt: { gt: retryConsumedAt },
+            },
+            data: { retryConsumedAt },
+          })
+          if (consumed.count !== 1) {
+            throw new RetryCreateRaceError()
+          }
+          retryContentHash = prior.lastAttemptHash
+          childControlTokenHash = prior.controlTokenHash!
+        }
+
+        const created = await tx.scanTask.create({
           data: {
             terminalId: terminal.id,
             scanType: dto.scanType,
             endUserId,
             expiresAt,
-            controlTokenHash,
+            controlTokenHash: childControlTokenHash,
+            retryOfScanTaskId: retryOfScanTaskId ?? null,
+            retryContentHash,
+            deliveryAckedAt: null,
           },
           select: { id: true },
         })
+        if (retryOfScanTaskId && retryConsumedAt) {
+          const linked = await tx.scanTask.updateMany({
+            where: { id: retryOfScanTaskId, retryConsumedAt },
+            data: { retryConsumedByScanTaskId: created.id },
+          })
+          if (linked.count !== 1) {
+            throw new RetryCreateRaceError()
+          }
+        }
+        return created
       })
     } catch (e) {
+      if (
+        retryOfScanTaskId &&
+        retryControlToken &&
+        (e instanceof RetryCreateRaceError ||
+          isScanRetryLineageConflict(e) ||
+          isScanRetryTransactionConflict(e))
+      ) {
+        const recovered = await this.recoverRetryChildIfPresent({
+          retryOfScanTaskId,
+          retryControlToken,
+          endUserId,
+          terminalId: terminal.id,
+          scanType: dto.scanType,
+        })
+        if (recovered) return recovered
+        if (e instanceof RetryCreateRaceError) {
+          this.throwRetryNotAuthorized()
+        }
+      }
+      if (retryOfScanTaskId && isScanRetryLineageConflict(e)) {
+        throw new ConflictException({
+          error: {
+            code: 'SCAN_RETRY_CONFLICT',
+            message: '重扫授权血缘已被占用，请重新发起扫描',
+          },
+        })
+      }
       if (isScanTaskActiveSessionConflict(e)) {
         // B1-2 的 partial unique index 命中：该终端已有一个 waiting/matched 中的会话。
         throw new ConflictException({
           error: {
             code: 'SCAN_TERMINAL_BUSY',
             message: '该终端当前有正在进行的扫描，请稍后重试或联系工作人员',
+          },
+        })
+      }
+      if (retryOfScanTaskId && isScanRetryTransactionConflict(e)) {
+        throw new ConflictException({
+          error: {
+            code: 'SCAN_RETRY_CONFLICT',
+            message: '重扫授权正在被处理，请重新发起扫描',
           },
         })
       }
@@ -276,6 +477,173 @@ export class ScanTasksService {
       expiresAt: expiresAt.toISOString(),
       instructions: SCAN_TYPE_INSTRUCTIONS[dto.scanType],
     }
+  }
+
+  /**
+   * Recover a committed retry child after a lost 2xx / concurrent loser.
+   *
+   * Identity failure (wrong token/user/terminal/type, missing prior) is always
+   * 403 SCAN_RETRY_NOT_AUTHORIZED — no oracle that a child exists.
+   * A proven owner whose child is gone or terminal is 409 SCAN_RETRY_CHILD_NOT_RECOVERABLE.
+   * Not-yet-consumed authority returns null so the caller can CAS-create.
+   */
+  private async recoverRetryChildIfPresent(args: {
+    retryOfScanTaskId: string
+    retryControlToken: string
+    endUserId: string | null
+    terminalId: string
+    scanType: string
+  }): Promise<ScanRetryCreateResult | null> {
+    const prior = await this.prisma.scanTask.findUnique({
+      where: { id: args.retryOfScanTaskId },
+    })
+    this.assertRetryIdentity(
+      prior,
+      args.endUserId,
+      args.terminalId,
+      args.scanType,
+      args.retryControlToken
+    )
+    if (!prior) this.throwRetryNotAuthorized()
+    if (!prior.retryConsumedAt) return null
+    if (!prior.retryConsumedByScanTaskId) return null
+
+    const child = await this.prisma.scanTask.findUnique({
+      where: { id: prior.retryConsumedByScanTaskId },
+    })
+    if (
+      !child ||
+      child.retryOfScanTaskId !== prior.id ||
+      child.endUserId !== args.endUserId ||
+      child.terminalId !== args.terminalId ||
+      child.scanType !== args.scanType ||
+      child.retryContentHash !== prior.lastAttemptHash ||
+      !timingSafeEqualHex(args.retryControlToken, child.controlTokenHash)
+    ) {
+      this.throwRetryChildNotRecoverable()
+    }
+    if (
+      !SCAN_RETRY_RECOVERABLE_CHILD_STATUSES.includes(
+        child.status as (typeof SCAN_RETRY_RECOVERABLE_CHILD_STATUSES)[number]
+      ) ||
+      child.expiresAt.getTime() <= Date.now()
+    ) {
+      this.throwRetryChildNotRecoverable()
+    }
+
+    return {
+      scanTaskId: child.id,
+      controlToken: args.retryControlToken,
+      expiresAt: child.expiresAt.toISOString(),
+      instructions: SCAN_TYPE_INSTRUCTIONS[args.scanType as ScanType],
+    }
+  }
+
+  private assertRetryIdentity(
+    prior: {
+      endUserId: string | null
+      terminalId: string
+      scanType: string
+      controlTokenHash: string | null
+    } | null,
+    endUserId: string | null,
+    terminalId: string,
+    scanType: string,
+    retryControlToken: string | undefined
+  ): void {
+    if (
+      !prior ||
+      prior.endUserId !== endUserId ||
+      prior.terminalId !== terminalId ||
+      prior.scanType !== scanType ||
+      !timingSafeEqualHex(retryControlToken, prior.controlTokenHash)
+    ) {
+      this.throwRetryNotAuthorized()
+    }
+  }
+
+  private throwRetryNotAuthorized(): never {
+    throw new ForbiddenException({
+      error: {
+        code: 'SCAN_RETRY_NOT_AUTHORIZED',
+        message: '重扫授权无效、已过期或已使用',
+      },
+    })
+  }
+
+  private throwRetryChildNotRecoverable(): never {
+    throw new ConflictException({
+      error: {
+        code: 'SCAN_RETRY_CHILD_NOT_RECOVERABLE',
+        message: '重扫任务已结束，无法恢复该次安全重扫',
+      },
+    })
+  }
+
+  /**
+   * Kiosk confirms it durably holds this task's control credentials.
+   * Until this CAS succeeds, Agent current-lease must not return the row.
+   */
+  async ack(
+    scanTaskId: string,
+    endUserId: string | null,
+    controlToken: string | undefined,
+    terminalRef: string
+  ): Promise<{ scanTaskId: string; deliveryAckedAt: string }> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
+      select: { id: true },
+    })
+    const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+    if (!task) {
+      throw new NotFoundException({
+        error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
+      })
+    }
+    this.assertTaskReadAccess(task, endUserId, controlToken)
+    if (!terminal || task.terminalId !== terminal.id) {
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权确认该扫描任务' },
+      })
+    }
+    if (task.deliveryAckedAt) {
+      return { scanTaskId: task.id, deliveryAckedAt: task.deliveryAckedAt.toISOString() }
+    }
+    const now = new Date()
+    if (
+      (task.status !== 'waiting' && task.status !== 'matched') ||
+      task.expiresAt.getTime() <= now.getTime()
+    ) {
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_TASK_ACK_NOT_ALLOWED',
+          message: '当前扫描任务状态不允许确认投递',
+        },
+      })
+    }
+    const ackedAt = now
+    const updated = await this.prisma.scanTask.updateMany({
+      where: {
+        id: task.id,
+        status: { in: ['waiting', 'matched'] },
+        deliveryAckedAt: null,
+        expiresAt: { gt: ackedAt },
+      },
+      data: { deliveryAckedAt: ackedAt },
+    })
+    if (updated.count === 0) {
+      const latest = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+      if (latest?.deliveryAckedAt) {
+        return { scanTaskId: latest.id, deliveryAckedAt: latest.deliveryAckedAt.toISOString() }
+      }
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_TASK_ACK_NOT_ALLOWED',
+          message: '当前扫描任务状态不允许确认投递',
+        },
+      })
+    }
+    return { scanTaskId: task.id, deliveryAckedAt: ackedAt.toISOString() }
   }
 
   async getStatus(
@@ -296,9 +664,13 @@ export class ScanTasksService {
       // CAS：只在状态仍与本次读取一致时落盘，避免与并发的 cancel()/deliverScanFile() 竞态时
       // 用无条件 update 把已经被其它请求改成 cancelled/matched/completed 的行覆盖回 expired。
       // CAS 成功时返回逻辑 expired；失败时必须重读竞态胜者，不能继续返回旧快照。
+      const retryAuthorityExpiresAt =
+        task.status === 'matched' && task.lastAttemptHash
+          ? new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
+          : null
       const expired = await this.prisma.scanTask.updateMany({
-        where: { id: scanTaskId, status: task.status },
-        data: { status: 'expired' },
+        where: { id: scanTaskId, status: task.status, lastAttemptHash: task.lastAttemptHash },
+        data: { status: 'expired', retryAuthorityExpiresAt },
       })
       if (expired.count === 0) {
         const latest = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
@@ -367,8 +739,10 @@ export class ScanTasksService {
         error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
       })
     }
-    // 同 getStatus()：controlToken 校验叠加在 endUserId 校验之上，会员+游客一视同仁；
-    // 历史行（controlTokenHash 为 null）一律拒绝。
+    // controlToken 仍是硬门槛（会员+游客一视同仁；历史行 controlTokenHash 为 null 一律拒绝）。
+    // 登出/会话失效后 optional endUserId 会变成 null：此时只要 token 正确，仍必须允许取消
+    // waiting/matched 会员任务，否则 B1-2 活跃唯一约束会把同终端下一场扫描永久挡住。
+    // 非空且错配的调用方身份（另一个仍登录的会员）继续 403。getStatus 的归属校验不走这条放宽。
     if (
       !task.controlTokenHash ||
       !controlToken ||
@@ -378,7 +752,7 @@ export class ScanTasksService {
         error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' },
       })
     }
-    if (task.endUserId && task.endUserId !== endUserId) {
+    if (endUserId !== null && task.endUserId && task.endUserId !== endUserId) {
       throw new ForbiddenException({
         error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' },
       })
@@ -388,9 +762,25 @@ export class ScanTasksService {
         error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' },
       })
     }
+    if (task.status !== 'waiting' && task.status !== 'matched') {
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_TASK_CANCEL_CONFLICT',
+          message: '任务状态已变化，取消失败，请刷新重试',
+        },
+      })
+    }
+    const retryAuthorityExpiresAt =
+      task.status === 'matched' && task.lastAttemptHash
+        ? new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS)
+        : null
     const cancelled = await this.prisma.scanTask.updateMany({
-      where: { id: scanTaskId, status: { in: ['waiting', 'matched'] } },
-      data: { status: 'cancelled' },
+      where: {
+        id: scanTaskId,
+        status: task.status,
+        lastAttemptHash: task.lastAttemptHash,
+      },
+      data: { status: 'cancelled', retryAuthorityExpiresAt },
     })
     if (cancelled.count === 0) {
       // 状态在读取之后、CAS 之前发生了变化（多半是并发投递刚好完成），
@@ -454,22 +844,142 @@ export class ScanTasksService {
   }
 
   /**
-   * Agent 投递入口：找该终端最早一条仍在 waiting 且未过期的任务，建 FileObject，
-   * 标记任务完成。找不到匹配任务时抛 409，调用方（Agent）据此把文件移入隔离目录，
-   * 绝不猜测归属。
+   * Agent 专用扫描租约签发：校验目标终端当前 waiting 任务，签发短期 deliveryLease。
+   * Unacked waiting rows are invisible here until Kiosk POSTs /ack.
+   */
+  async getScanDeliveryLease(terminalId: string): Promise<ScanDeliveryLeaseResult> {
+    const now = new Date()
+    const task = await this.prisma.scanTask.findFirst({
+      where: {
+        terminalId,
+        status: 'waiting',
+        expiresAt: { gt: now },
+        deliveryAckedAt: { not: null },
+      },
+    })
+    if (!task) {
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+      })
+    }
+    return buildScanDeliveryLease({
+      terminalId,
+      scanTaskId: task.id,
+      taskCreatedAt: task.createdAt,
+      taskExpiresAt: task.expiresAt,
+      now,
+    })
+  }
+
+  /**
+   * Agent 投递入口：严格按精确 scanTaskId 和 deliveryLease 校验签名归属，
+   * 彻底删除“find current waiting task并猜归属”。校验本地快照时间/基线证据、
+   * 查重已投递与已尝试内容、CAS 抢占并建档完成。
    */
   async deliverScanFile(args: {
     terminalId: string
+    scanTaskId: string
+    deliveryLease: string
     buffer: Buffer
     filename: string
     mimeType: string
+    candidateSnapshotAt?: unknown
+    observedAt?: unknown
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
 
-    // B1-11：内容级去重防"响应丢失后的重复投递"跨用户误挂载——见上方 SCAN_CONTENT_DEDUP_WINDOW_MS
-    // 注释。只看 fileId 非空的任务（真正建档完成过的），不影响 SCAN_TASK_STATE_CHANGED 那条
-    // 从未写入 fileId 的取消/竞态路径。
+    // 1. 严格校验精确任务 ID 与扫描租约签名
+    if (!args.scanTaskId || typeof args.scanTaskId !== 'string' || !args.scanTaskId.trim()) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_TASK_ID_MISSING', message: '缺少扫描任务ID(scanTaskId)' },
+      })
+    }
+    const leasePayload = verifyScanDeliveryLease(
+      args.deliveryLease,
+      args.terminalId,
+      args.scanTaskId,
+      now.getTime()
+    )
+
+    // 2. 严格校验候选本地快照观察时间
+    const rawObservedAt = args.candidateSnapshotAt ?? args.observedAt
+    if (
+      rawObservedAt === undefined ||
+      rawObservedAt === null ||
+      typeof rawObservedAt !== 'string' ||
+      !rawObservedAt.trim()
+    ) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '缺少有效的文件观察时间(observedAt)' },
+      })
+    }
+    const observedDate = new Date(rawObservedAt)
+    if (!Number.isFinite(observedDate.getTime())) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '文件观察时间(observedAt)格式无效' },
+      })
+    }
+    if (observedDate.getTime() > now.getTime() + SCAN_MAX_FUTURE_OBSERVATION_MS) {
+      throw new BadRequestException({
+        error: { code: 'SCAN_OBSERVED_AT_INVALID', message: '文件观察时间(observedAt)超出合理未来范围' },
+      })
+    }
+
+    // 3. 精确按 scanTaskId 查询任务，彻底删除“find current waiting task并猜归属”
+    const task = await this.prisma.scanTask.findUnique({
+      where: { id: args.scanTaskId },
+    })
+    if (!task || task.terminalId !== args.terminalId) {
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '指定的扫描任务不存在或不属于该终端' },
+      })
+    }
+    if (task.status !== 'waiting') {
+      throw new ConflictException({
+        error: { code: 'SCAN_TASK_STATE_CHANGED', message: '扫描任务状态已改变，请重新发起扫描' },
+      })
+    }
+    if (task.expiresAt.getTime() <= now.getTime()) {
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '扫描任务已过期' },
+      })
+    }
+    if (!task.deliveryAckedAt) {
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+      })
+    }
+    if (task.createdAt.getTime() !== leasePayload.taskCreatedAtEpoch) {
+      throw new ConflictException({
+        error: { code: 'SCAN_LEASE_INVALID', message: '扫描租约绑定的任务版本不一致' },
+      })
+    }
+
+    // 4. 内容级去重防跨用户误挂载。只有创建事务绑定到本任务的精确内容 hash
+    // 可以绕过一次；其它内容、其它任务和普通创建都继续执行完整的终端级去重。
+    // (a) 已完成建档的任务去重（防响应丢失重试）
     const contentHash = createHash('sha256').update(args.buffer).digest('hex')
+    let authorizedIdenticalRetry = false
+    if (task.retryOfScanTaskId && task.retryContentHash === contentHash) {
+      const prior = await this.prisma.scanTask.findUnique({
+        where: { id: task.retryOfScanTaskId },
+      })
+      authorizedIdenticalRetry = Boolean(
+        prior &&
+          SCAN_RETRY_ELIGIBLE_STATUSES.includes(
+            prior.status as (typeof SCAN_RETRY_ELIGIBLE_STATUSES)[number]
+          ) &&
+          prior.fileId === null &&
+          prior.retryConsumedAt &&
+          prior.retryAuthorityExpiresAt &&
+          prior.retryConsumedAt.getTime() <= prior.retryAuthorityExpiresAt.getTime() &&
+          prior.retryConsumedByScanTaskId === task.id &&
+          prior.lastAttemptHash === contentHash &&
+          prior.endUserId === task.endUserId &&
+          prior.terminalId === task.terminalId &&
+          prior.scanType === task.scanType
+      )
+    }
     const recentlyDeliveredForTerminal = await this.prisma.scanTask.findMany({
       where: {
         terminalId: args.terminalId,
@@ -486,7 +996,7 @@ export class ScanTasksService {
         where: { id: { in: candidateFileIds }, sha256: contentHash },
         select: { id: true },
       })
-      if (duplicate) {
+      if (duplicate && !authorizedIdenticalRetry) {
         throw new ConflictException({
           error: {
             code: 'SCAN_FILE_ALREADY_DELIVERED',
@@ -496,24 +1006,57 @@ export class ScanTasksService {
       }
     }
 
-    const task = await this.prisma.scanTask.findFirst({
-      where: { terminalId: args.terminalId, status: 'waiting', expiresAt: { gt: now } },
-      orderBy: { createdAt: 'asc' },
+    // (b) 失败尝试内容去重：通过 lastAttemptHash 防止曾匹配过但未完成建档（如 upload 阶段失败、
+    // 或并发取消）的文件重试时被错误挂到该终端后续新用户的 waiting 会话上。
+    const previouslyAttempted = await this.prisma.scanTask.findFirst({
+      where: {
+        terminalId: args.terminalId,
+        lastAttemptHash: contentHash,
+        updatedAt: { gt: new Date(now.getTime() - SCAN_CONTENT_DEDUP_WINDOW_MS) },
+      },
+      select: { id: true },
     })
-    if (!task) {
+    if (previouslyAttempted && !authorizedIdenticalRetry) {
       throw new ConflictException({
-        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+        error: {
+          code: 'SCAN_FILE_PREVIOUSLY_ATTEMPTED',
+          message: '该扫描文件此前已尝试投递但未完成，请勿重复上传',
+        },
       })
     }
 
-    // CAS：先把任务标记为 matched，防止同一文件的重复投递请求并发匹配到同一任务。
+    // 5. 陈旧捕获拦截：只信任终端 PC 本地最终观察时间；若早于任务创建/租约生效边界（允许极小时钟容差），
+    // 判定为陈旧捕获，拒绝绑定。当前 waiting 任务保持原样，不落任何文件。
+    if (
+      observedDate.getTime() < leasePayload.notBeforeEpoch - SCAN_STALE_CAPTURE_TOLERANCE_MS ||
+      observedDate.getTime() < task.createdAt.getTime() - SCAN_STALE_CAPTURE_TOLERANCE_MS
+    ) {
+      throw new ConflictException({
+        error: {
+          code: 'SCAN_FILE_STALE_CAPTURE',
+          message: '扫描文件观察时间早于当前任务创建时间，可能属于先前的扫描会话，已拒绝绑定',
+        },
+      })
+    }
+
+    // 6. CAS：先把任务标记为 matched，并随 CAS 记录 lastAttemptHash 与 matchedFileMtime。
+    // ATOMIC_SCAN_DELIVER_CAS_ACK_EXPIRY: re-pin ACK + expiry (and signed
+    // task identity already in where) so mixed/raced state cannot go
+    // waiting → matched after ACK/expiry eligibility changed.
     const claimed = await this.prisma.scanTask.updateMany({
-      where: { id: task.id, status: 'waiting' },
-      data: { status: 'matched', matchedFileMtime: now },
+      where: {
+        id: task.id,
+        terminalId: args.terminalId,
+        status: 'waiting',
+        deliveryAckedAt: { not: null },
+        expiresAt: { gt: now },
+        createdAt: task.createdAt,
+      },
+      data: { status: 'matched', matchedFileMtime: observedDate, lastAttemptHash: contentHash },
     })
     if (claimed.count === 0) {
       throw new ConflictException({
-        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+        error: { code: 'SCAN_TASK_STATE_CHANGED', message: '扫描任务状态已变化，请重新发起扫描' },
       })
     }
 
@@ -562,10 +1105,14 @@ export class ScanTasksService {
       }
       return { scanTaskId: task.id, fileId: uploaded.fileId }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
       await this.prisma.scanTask.updateMany({
         where: { id: task.id, status: 'matched' },
-        data: { status: 'failed', errorCode: 'SCAN_UPLOAD_FAILED', errorMessage: message },
+        data: {
+          status: 'failed',
+          errorCode: 'SCAN_UPLOAD_FAILED',
+          errorMessage: USER_FACING_SCAN_ERROR.SCAN_UPLOAD_FAILED,
+          retryAuthorityExpiresAt: new Date(Date.now() + SCAN_RETRY_AUTHORITY_TTL_MS),
+        },
       })
       throw error
     } finally {

@@ -8,7 +8,9 @@ import {
   Param,
   Post,
   Req,
+  UnauthorizedException,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -20,6 +22,7 @@ import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { TerminalIdentityGuard } from '../terminals/terminal-identity.guard'
 import { TerminalsService } from '../terminals/terminals.service'
 import { CreateScanTaskDto } from './dto/create-scan-task.dto'
 import { ScanTasksService } from './scan-tasks.service'
@@ -35,10 +38,25 @@ export class ScanTasksController {
   ) {}
 
   @Post('scan/sessions')
+  @UseGuards(TerminalIdentityGuard)
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
-  async create(@Body() dto: CreateScanTaskDto, @Req() req: Request) {
+  async create(
+    @Body() dto: CreateScanTaskDto,
+    @Req() req: Request,
+    @Headers('x-terminal-id') headerTerminalId?: string,
+    @Headers('x-scan-retry-control') retryControlToken?: string,
+  ) {
+    if (!headerTerminalId || headerTerminalId !== dto.terminalId) {
+      throw new UnauthorizedException({
+        error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' },
+      })
+    }
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
-    const result = await this.scanTasks.create(dto, endUser?.endUserId ?? null)
+    const result = await this.scanTasks.create(
+      dto,
+      endUser?.endUserId ?? null,
+      retryControlToken
+    )
     return ApiResponse.ok(result)
   }
 
@@ -70,6 +88,49 @@ export class ScanTasksController {
     return ApiResponse.ok(result)
   }
 
+  /**
+   * Kiosk confirms it durably holds this session's control credentials.
+   * Agent current-lease stays empty until this succeeds.
+   */
+  @Post('scan/sessions/:id/ack')
+  @UseGuards(TerminalIdentityGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async ack(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Headers('x-terminal-id') headerTerminalId?: string,
+    @Headers('x-scan-session-control') controlToken?: string,
+  ) {
+    if (!headerTerminalId) {
+      throw new UnauthorizedException({
+        error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' },
+      })
+    }
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
+    const result = await this.scanTasks.ack(
+      id,
+      endUser?.endUserId ?? null,
+      controlToken,
+      headerTerminalId,
+    )
+    return ApiResponse.ok(result)
+  }
+
+  /**
+   * 仅 Terminal Agent Bearer 调用：获取当前终端的精确扫描租约。
+   * 返回包含精确 scanTaskId、serverNow、notBefore、expiresAt 以及短期签名 deliveryLease。
+   */
+  @Get('terminals/:terminalId/scan-tasks/current-lease')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  async getLease(
+    @Param('terminalId') terminalId: string,
+    @Headers('authorization') authHeader: string | undefined,
+  ) {
+    await this.terminals.assertAgentAuthorized(terminalId, authHeader)
+    const result = await this.scanTasks.getScanDeliveryLease(terminalId)
+    return ApiResponse.ok(result)
+  }
+
   /** 仅 Terminal Agent 调用：投递扫描到共享目录后产生的文件。 */
   @Post('terminals/:terminalId/scan-sessions/deliver')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
@@ -77,6 +138,10 @@ export class ScanTasksController {
   async deliver(
     @Param('terminalId') terminalId: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('scanTaskId') scanTaskId: unknown,
+    @Body('deliveryLease') deliveryLease: unknown,
+    @Body('candidateSnapshotAt') candidateSnapshotAt: unknown,
+    @Body('observedAt') observedAt: unknown,
     @Headers('authorization') authHeader: string | undefined,
   ) {
     await this.terminals.assertAgentAuthorized(terminalId, authHeader)
@@ -85,9 +150,13 @@ export class ScanTasksController {
     }
     const result = await this.scanTasks.deliverScanFile({
       terminalId,
+      scanTaskId: typeof scanTaskId === 'string' ? scanTaskId : '',
+      deliveryLease: typeof deliveryLease === 'string' ? deliveryLease : '',
       buffer: file.buffer,
       filename: file.originalname,
       mimeType: file.mimetype,
+      candidateSnapshotAt,
+      observedAt,
     })
     return ApiResponse.ok(result)
   }

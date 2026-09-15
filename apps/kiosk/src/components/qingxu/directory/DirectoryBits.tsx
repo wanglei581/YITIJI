@@ -173,7 +173,7 @@ export function DirQrHero({
 
 export const OFFLINE_PREP_ITEMS = [
   { icon: PrinterIcon, title: '打印自备材料', desc: '登记表、复印件、自带简历，A4 黑白', to: '/print/upload' },
-  { icon: ScanLineIcon, title: '纸质材料扫成 PDF', desc: '在奔图面板上扫，文件回本机取', to: '/scan/start' },
+  { icon: ScanLineIcon, title: '纸质材料扫成 PDF', desc: '在奔图面板上扫，文件回本机取', to: '/scan' },
 ] as const
 
 type AiStep = 'need-input' | 'resume-missing' | 'goal' | 'unavailable'

@@ -136,7 +136,7 @@ flowchart TD
 | **RedemptionRecord** | 11 | — | 3 个文件<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`member-benefits/member-benefits.service.ts` |
 | **Refund** | 12 | Order | 2 个文件<br/>`payment/reconciliation.service.ts`<br/>`payment/refund.service.ts` |
 | **ReviewDecision** | 18 | User | **无代码读写** |
-| **ScanTask** | 15 | EndUser、Terminal | 5 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`scan-tasks/scan-task-reaper.task.ts`<br/>… |
+| **ScanTask** | 22 | EndUser、Terminal | 5 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`member-feedback/kiosk-feedback.service.ts`<br/>`scan-tasks/scan-task-reaper.task.ts`<br/>… |
 | **ScreensaverContent** | 9 | — | **无代码读写** |
 | **SyncLog** | 15 | JobSource | 5 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>`jobs/jobs-partner.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
@@ -144,7 +144,7 @@ flowchart TD
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 1 个文件<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalHeartbeat** | 12 | Terminal | 4 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`terminals/printer-availability.ts`<br/>`terminals/terminal-heartbeat-retention.task.ts`<br/>… |
+| **TerminalHeartbeat** | 16 | Terminal | 4 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`terminals/printer-availability.ts`<br/>`terminals/terminal-heartbeat-retention.task.ts`<br/>… |
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |

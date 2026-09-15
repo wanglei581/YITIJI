@@ -32,7 +32,12 @@ const FROZEN = new Map([
   // 冻结契约本身不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
   ['src/pages/auth/hooks/useMemberPhoneLogin.ts', '8f60d06f1e9d0dc2825882f64095d7cf4263b5aa61f32ea2e6736ecef11c40f8'],
   ['src/pages/profile/assets/useMemberProfileOverview.ts', '3679de500e38d9d84b5f77680090997dc27eabca861af58c3d407eeb9e420395'],
-  ['src/pages/profile/profileEntries.ts', 'dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae'],
+  // 哈希随「扫描入口统一到 /scan」同步更新（2026-09-13）：唯一改动是「扫描文件」这条
+  // 入口的 route 从兼容重定向地址 '/scan/start' 改成工作台真地址 '/scan'，不增不减入口。
+  // 冻结契约不放宽，仍逐字节校验；入口标签与地址另有 verify:profile-inkpaper-home /
+  // verify:lightflow-profile-entry 的 22 条对照表钉死。
+  // 旧哈希 dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae。
+  ['src/pages/profile/profileEntries.ts', '3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],

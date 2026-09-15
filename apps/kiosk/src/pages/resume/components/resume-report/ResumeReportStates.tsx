@@ -44,7 +44,7 @@ const COPY: Record<StateView, { h: string; p: string; exits: Exit[] }> = {
     p: '没有接通真实 AI 服务时，读取报告会被直接拒绝，不会返回任何「读过你简历」的结论 —— 这是有意为之，避免把演示分数当成真实评价。',
     exits: [
       { title: '打印简历或材料', desc: '选好份数和单双面就能出纸', to: '/print-scan', testid: 'resume-report-exit-print' },
-      { title: '扫描纸质简历', desc: '在奔图面板扫描，回传成 PDF', to: '/scan/start', testid: 'resume-report-exit-scan' },
+      { title: '扫描纸质简历', desc: '在奔图面板扫描，回传成 PDF', to: '/scan', testid: 'resume-report-exit-scan' },
       { title: '打开我的简历', desc: '查看和整理已保存的版本', to: '/me/ai-records', testid: 'resume-report-exit-records' },
     ],
   },

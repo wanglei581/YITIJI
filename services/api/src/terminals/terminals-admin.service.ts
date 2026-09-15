@@ -62,6 +62,10 @@ export interface AdminTerminalView {
   printerStatus: string | null
   wiredNetworkStatus: string | null
   printerNetworkStatus: string | null
+  scanInputHealth: string | null
+  scanInputAction: string | null
+  scanInputReason: string | null
+  scanInputObservedAt: string | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
@@ -270,6 +274,10 @@ export class TerminalAdminService {
             wiredNetworkStatus: true,
             printerNetworkStatus: true,
             localTaskDatabaseAvailable: true,
+            scanInputHealth: true,
+            scanInputAction: true,
+            scanInputReason: true,
+            scanInputObservedAt: true,
             agentVersion: true,
             ipAddress: true,
             diskFreeGb: true,
@@ -317,6 +325,10 @@ export class TerminalAdminService {
         printerStatus: hb?.printerStatus ?? null,
         wiredNetworkStatus: hb?.wiredNetworkStatus ?? null,
         printerNetworkStatus: hb?.printerNetworkStatus ?? null,
+        scanInputHealth: hb?.scanInputHealth ?? null,
+        scanInputAction: hb?.scanInputAction ?? null,
+        scanInputReason: hb?.scanInputReason ?? null,
+        scanInputObservedAt: hb?.scanInputObservedAt?.toISOString() ?? null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,
         diskFreeGb: hb?.diskFreeGb ?? null,

@@ -8,6 +8,9 @@
 //   POST /payment/sandbox/simulate    — 沙箱模拟支付（**仅非生产**；DEV 构建 + 后端非 production 才可用）
 //
 // 鉴权口径：与 printJobsApi 一致 —— Kiosk 匿名层，orderId 为不可猜 cuid，不带登录态。
+// 例外是 `releasePickupOrder`：它落到 /print/jobs/:orderId/release，后端由
+// TerminalIdentityGuard 把守（释放会在本机原子创建打印任务、直接决定谁家的纸从哪台机器出来），
+// 因此那一条必须经 terminalProtectedFetch 发出，见函数上的注释。
 // 仅在 API_MODE === 'http' 下调用（mock 模式打印流程走 SIM，不进收银页）。
 // 调用方需处理错误（网络/404/ONLINE_PAYMENT_DISABLED 等），不得静默伪造已支付。
 //
@@ -19,6 +22,7 @@ import { ApiHttpError } from '../api/httpAdapter'
 import { networkError, throwHttpError } from '../api/throwHttpError'
 import type { CodePayAttemptView, PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
 import { getTerminalId } from '../api/screensaver'
+import { terminalProtectedFetch } from '../terminalAuth'
 
 export interface PaymentSessionInput {
   orderId: string
@@ -122,7 +126,17 @@ export interface PickupReleaseView {
   paymentSessionToken: string
 }
 
-/** Order-only 订单付款成功后，绑定本机并原子创建唯一 PrintTask。 */
+/**
+ * Order-only 订单付款成功后，绑定本机并原子创建唯一 PrintTask。
+ *
+ * 走 terminalProtectedFetch 而不是裸 fetch：后端 release 由 TerminalIdentityGuard 把守，
+ * 只认经过服务端签发的终端会话票。两个头各管一件事，都不能省——
+ *   x-terminal-id           ：这一单绑到哪台机器（下面显式写出，也是跨端门禁的取证锚点；
+ *                             terminalProtectedFetch 会用 getTerminalId() 设同一个值）
+ *   x-payment-session-token ：这张短期支付会话票证明「付这一单的人就是现在站在机器前的人」
+ * 终端会话票失效时由 terminalProtectedFetch 刷新一次；刷不出来就抛
+ * TERMINAL_SESSION_INVALID，由收银页落到 releaseFailed 提示重试，绝不拿旧票重放。
+ */
 export async function releasePickupOrder(input: PaymentSessionInput): Promise<PickupReleaseView> {
   const terminalId = getTerminalId()
   if (!terminalId) {
@@ -130,7 +144,7 @@ export async function releasePickupOrder(input: PaymentSessionInput): Promise<Pi
   }
   let res: Response
   try {
-    res = await fetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`, {
+    res = await terminalProtectedFetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

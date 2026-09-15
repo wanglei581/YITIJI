@@ -105,6 +105,42 @@ check(
   )
 }
 
+// ── 六、换回来的新票必须真的被发出去 ──────────────────────────────────────
+// 前五节保证「能换到新票」，这一节保证「换到的票真的用上」。缺了这一节，恢复只是表面的：
+// 票换成功、state 置 ready，请求却仍带着换掉的旧票，服务端照样 401，屏幕上还是那句
+// 「终端安全校验失败，请联系现场工作人员」。
+//
+// 这两条同时也是浏览器用例的可观察性前提。2026-09-13 之前 token() 把 E2E mock 排在最前面
+// 短路返回，E2E 构建里它恒为同一个固定值 —— 于是 fusion-w2-print 的两条续期窗口用例
+// 无论 headers() 组在等待之前还是之后都拿到同样的头，顺序缺陷被原样盖住。
+{
+  const fn = src.slice(src.indexOf('function token(): string | null'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  const storageAt = body.indexOf('sessionStorage.getItem(STORAGE_KEY)')
+  const mockAt = body.indexOf('HAS_E2E_MOCK_TOKEN')
+  check(
+    'token() 读 sessionStorage 里的当前票',
+    storageAt > -1,
+    '不读存量票就读不到续期刚写进去的新票',
+  )
+  check(
+    'E2E mock 票只作兜底初始票，排在 sessionStorage 之后',
+    storageAt > -1 && (mockAt === -1 || mockAt > storageAt),
+    'mock 短路排在前面时 token() 恒返回固定值：换票后仍发旧票，且浏览器用例观察不到任何差异',
+  )
+}
+{
+  const fn = src.slice(src.indexOf('export async function terminalProtectedFetch'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  const awaitAt = body.indexOf('await awaitReadySessionOrFailClosed()')
+  const headersAt = body.indexOf('headers(init.headers)')
+  check(
+    '业务请求先等会话闸门，再组 headers',
+    awaitAt > -1 && headersAt > -1 && awaitAt < headersAt,
+    'headers 排在 await 之前会把刚被换掉的旧票发出去：等到了也没用',
+  )
+}
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${failed.length === 0 ? '✅ ALL PASS' : `❌ ${failed.length} 项失败`} — 终端会话自愈`)
 process.exit(failed.length === 0 ? 0 : 1)
