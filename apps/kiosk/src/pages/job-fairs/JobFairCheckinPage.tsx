@@ -1,116 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { formatDateTime, type ExternalJobFairDTO } from '@ai-job-print/shared'
-import { CalendarIcon, MapPinIcon, QrCodeIcon, SmartphoneIcon, XIcon } from 'lucide-react'
+import { AlertTriangleIcon, CalendarIcon, InfoIcon, QrCodeIcon } from 'lucide-react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { getJobFairs, getTerminalId } from '../../services/api'
 import { recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { isValidSourceUrl } from '../../lib/url'
-import { FusionBadge, FusionNotice, FusionStepStrip, KioskPageFrame } from '../jobs/components/W4Presentation'
+import {
+  QxFairCta,
+  QxFairNavRow,
+  QxFairNotice,
+  QxFairQrDialog,
+  QxFairShell,
+  QxFairSkel,
+  QxFairState,
+} from './qx/qxFairChrome'
 
 function formatFairDateTime(iso: string): string {
   return formatDateTime(iso, { fallback: iso })
-}
-
-function CheckinQrOverlay({ fair, onClose }: { fair: ExternalJobFairDTO; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="relative w-80 rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
-          aria-label="关闭"
-        >
-          <XIcon className="h-5 w-5" aria-hidden="true" />
-        </button>
-        <p className="text-center text-base font-semibold text-neutral-800">扫码前往来源平台签到</p>
-        <p className="mt-1 line-clamp-1 text-center text-sm text-neutral-500">{fair.name}</p>
-        <div className="mt-5 flex justify-center">
-          <SourceUrlQr value={fair.checkinUrl} size={180} />
-        </div>
-        <div className="mt-5 space-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-          <div className="flex justify-between">
-            <span className="text-neutral-400">来源机构</span>
-            <span className="font-medium">{fair.sourceName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-neutral-400">外部编号</span>
-            <span className="font-mono">{fair.externalId}</span>
-          </div>
-        </div>
-        <div className="mt-4 flex items-start gap-2">
-          <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden="true" />
-          <p className="text-xs leading-relaxed text-neutral-500">
-            请使用手机扫码到来源平台办理现场签到。本系统不记录签到结果、不接收报名信息或简历。
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function CheckinEntryCard({ fair, onOpenQr }: { fair: ExternalJobFairDTO; onOpenQr: () => void }) {
-  const sourceUrlAvailable = isValidSourceUrl(fair.checkinUrl ?? '')
-  const navigate = useNavigate()
-
-  return (
-    <div className="grid grid-cols-[1fr_280px] gap-6 rounded-[var(--r-md)] border border-[var(--line)] border-t-4 border-t-[var(--wheat)] bg-[var(--surface)] p-7 shadow-sm">
-      <div className="min-w-0">
-        <div className="jf-meta-chips">
-          <span className={`jf-chip ${fair.status === 'ongoing' ? 'ok' : 'warn'}`}>
-            {fair.status === 'ongoing' ? '进行中' : '即将开始'}
-          </span>
-          <span className="jf-chip src">来源 · {fair.sourceName}</span>
-        </div>
-        <h2 className="mt-4 font-serif text-[30px] font-bold tracking-[1px]">{fair.name}</h2>
-        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[20px] text-[var(--muted)]">
-          <span className="inline-flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
-            {formatFairDateTime(fair.startTime)}
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <MapPinIcon className="h-5 w-5" />
-            {fair.city ? `${fair.city} · ` : ''}{fair.venue}
-          </span>
-        </div>
-        <p className="mt-4 rounded-xl bg-[var(--paper)] px-5 py-3.5 text-[18px] leading-relaxed text-[var(--muted)]">
-          请使用手机扫码前往来源平台签到。本系统不记录签到结果，请以来源平台显示为准。
-        </p>
-        <div className="jf-meta-chips mt-4">
-          <span className="jf-chip">外部ID <b>{fair.externalId}</b></span>
-          <button type="button" className="jf-btn sm ghost" onClick={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}>
-          查看详情
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-col items-center justify-center gap-3 rounded-[var(--r-sm)] border border-[var(--line)] bg-[var(--paper)] p-5">
-        {sourceUrlAvailable ? (
-          <>
-            <button
-              type="button"
-              onClick={onOpenQr}
-              className="flex h-[190px] w-[190px] flex-col items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--wheat-deep)]"
-            >
-              <QrCodeIcon className="h-14 w-14" aria-hidden="true" />
-              <span className="mt-3 text-[20px] font-bold">来源平台签到码</span>
-            </button>
-            <p className="flex items-center gap-1.5 text-[16px] font-semibold text-[var(--muted)]">
-              <SmartphoneIcon className="h-3.5 w-3.5" />
-              扫码前往来源平台签到
-            </p>
-          </>
-        ) : (
-          <div className="flex h-[168px] w-[168px] items-center justify-center rounded-xl bg-neutral-50 text-center text-sm font-medium text-neutral-400">
-            来源链接暂不可用
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 export function JobFairCheckinPage() {
@@ -166,62 +74,151 @@ export function JobFairCheckinPage() {
     setQrFair(fair)
   }
 
-  if (loading) return <LoadingState className="h-full" />
+  const viewState = loading ? 'loading' : error ? 'error' : qrFair ? 'qr' : availableFairs.length === 0 ? 'empty' : 'guide'
+  const pill = viewState === 'qr'
+    ? { tone: 'ok' as const, label: '来源入场码已就绪' }
+    : viewState === 'guide'
+      ? { tone: 'warn' as const, label: '本机不做签到，只给到场指引' }
+      : viewState === 'error'
+        ? { tone: 'bad' as const, label: '入场入口列表这次没取到' }
+        : viewState === 'empty'
+          ? { tone: 'unknown' as const, label: '暂无配置 checkinUrl 的可用场次' }
+          : { tone: 'unknown' as const, label: '正在取入场入口' }
 
   return (
-    <KioskPageFrame
-      tone="wheat"
-      title="来源平台入场入口"
-      subtitle="展示招聘会官方 / 第三方来源签到二维码，本系统不记录签到结果"
-      backLabel="返回"
-      onBack={() => navigate('/')}
-      badge={<FusionBadge icon={QrCodeIcon}>{availableFairs.length} 场可签到</FusionBadge>}
-      actionBar={
-        <>
-          <button type="button" className="jf-btn ghost" onClick={() => navigate('/')}>
-            返回首页
-          </button>
-          <div className="jf-spacer" />
-          <button type="button" className="jf-btn dark" onClick={() => navigate('/job-fairs')}>
-            查看招聘会
-          </button>
-        </>
+    <QxFairShell
+      title="到场指引"
+      subtitle="本机不做签到，也拿不到签到结果；这一页只帮你找凭证、讲清路线。"
+      status={pill}
+      screen="checkin"
+      state={viewState}
+      ctabar={
+        viewState === 'qr' ? (
+          <>
+            <QxFairCta onClick={() => setQrFair(null)}>选择其他场次</QxFairCta>
+            <QxFairCta variant="primary" testId="checkin-primary" onClick={() => navigate('/job-fairs')}>
+              返回场次列表
+            </QxFairCta>
+          </>
+        ) : viewState === 'error' ? (
+          <>
+            <QxFairCta onClick={() => navigate('/help')}>找现场工作人员</QxFairCta>
+            <QxFairCta variant="primary" testId="checkin-primary" onClick={() => setRetryKey((value) => value + 1)}>
+              重新加载
+            </QxFairCta>
+          </>
+        ) : (
+          <QxFairCta variant="primary" testId="checkin-primary" onClick={() => navigate('/job-fairs')}>
+            {viewState === 'empty' ? '查看招聘会' : '返回场次列表'}
+          </QxFairCta>
+        )
       }
     >
-      {qrFair && <CheckinQrOverlay fair={qrFair} onClose={() => setQrFair(null)} />}
-      {error ? (
-        <ErrorState message="入口加载失败，请检查网络后重试" onRetry={() => setRetryKey((value) => value + 1)} />
-      ) : availableFairs.length === 0 ? (
-        <EmptyState
-          icon={QrCodeIcon}
-          title="暂无可展示的来源入口"
-          description="当前没有配置来源签到链接的进行中或即将开始招聘会"
-          className="py-20"
-        />
+      {viewState === 'loading' ? (
+        <QxFairSkel rows={2} />
+      ) : viewState === 'error' ? (
+        <QxFairState screen="checkin" tone="error" icon={AlertTriangleIcon} title="入场入口列表这次没取到">
+          招聘会列表请求失败，所以无法判断哪些场次有可用的 checkinUrl。本机不显示缓存二维码，也不判断你的预约或签到状态。
+        </QxFairState>
+      ) : viewState === 'empty' ? (
+        <QxFairState screen="checkin" tone="empty" icon={QrCodeIcon} title="暂无可展示的来源入场入口">
+          当前没有进行中或即将开始、且配置了 checkinUrl 的招聘会。<b>这不代表你未预约</b>，本机不查个人记录。
+        </QxFairState>
+      ) : viewState === 'qr' && qrFair ? (
+        <>
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">
+              <QrCodeIcon size={24} aria-hidden />
+              来源平台入场码
+              <span className="hint">仅在 checkinUrl 合法时生成</span>
+            </div>
+            <div className="qx-fair-qr-slot">
+              <SourceUrlQr value={qrFair.checkinUrl} size={220} />
+            </div>
+          </section>
+          <section className="qx-card qx-fair-src">
+            <div className="qx-fair-blk-h">场次与来源</div>
+            <dl className="qx-fair-kv">
+              <div className="qx-fair-kv-row"><dt>招聘会</dt><dd>{qrFair.name}</dd></div>
+              <div className="qx-fair-kv-row"><dt>来源机构</dt><dd>{qrFair.sourceName}</dd></div>
+              <div className="qx-fair-kv-row"><dt>外部编号</dt><dd>{qrFair.externalId}</dd></div>
+            </dl>
+          </section>
+          <QxFairNotice />
+        </>
       ) : (
-        availableFairs.map((fair) => (
-          <CheckinEntryCard key={fair.id} fair={fair} onOpenQr={() => openCheckinQr(fair)} />
-        ))
-      )}
-      <section className="jf-card accented">
-        <div className="jf-card-head">
-          <span className="jf-g-icon">
-            <QrCodeIcon aria-hidden="true" />
-          </span>
-          <div>
-            <h2>签到步骤</h2>
-            <div className="sub">三步完成来源平台现场签到</div>
+        <>
+          <div className="qx-fair-aibar off">
+            <span className="qx-fair-ai-ic"><InfoIcon size={26} aria-hidden /></span>
+            <span>
+              <span className="qx-fair-ai-t">本机不做签到，也拿不到签到结果</span>
+              <span className="qx-fair-ai-d">这里只列出进行中或即将开始、且服务端已返回 checkinUrl 的场次；不查个人预约记录。</span>
+            </span>
           </div>
-        </div>
-        <FusionStepStrip
-          steps={[
-            { title: '手机扫描签到码', desc: '扫描上方对应场次的二维码' },
-            { title: '来源平台完成签到', desc: '在来源平台页面按提示办理' },
-            { title: '出示入场凭证', desc: '向现场工作人员出示凭证进场' },
+          {availableFairs.map((fair) => {
+            const sourceUrlAvailable = isValidSourceUrl(fair.checkinUrl ?? '')
+            return (
+              <article key={fair.id} className="qx-fair-card">
+                <span className="qx-fair-card-ic" aria-hidden><QrCodeIcon size={28} /></span>
+                <div className="qx-fair-card-main">
+                  <h2 className="qx-fair-card-title">
+                    {fair.name}
+                    <span className={`qx-fair-tag ${fair.status === 'ongoing' ? 'teal' : 'warn'}`}>
+                      {fair.status === 'ongoing' ? '进行中' : '即将开始'}
+                    </span>
+                  </h2>
+                  <div className="qx-fair-card-meta">
+                    <span><CalendarIcon size={19} aria-hidden />{formatFairDateTime(fair.startTime)}</span>
+                    <span>来源 · {fair.sourceName}</span>
+                    <span>外部ID {fair.externalId}</span>
+                  </div>
+                  <p className="qx-fair-local-note">
+                    请使用手机扫码前往来源平台签到。本系统不记录签到结果，请以来源平台显示为准。
+                  </p>
+                </div>
+                <div className="qx-fair-card-actions">
+                  {sourceUrlAvailable ? (
+                    <button type="button" className="qx-fair-mini" data-variant="primary" onClick={() => openCheckinQr(fair)}>
+                      来源平台签到码
+                    </button>
+                  ) : (
+                    <span className="qx-fair-blocked">来源链接暂不可用</span>
+                  )}
+                  <button type="button" className="qx-fair-mini" onClick={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}>
+                    查看详情
+                  </button>
+                </div>
+              </article>
+            )
+          })}
+          <section className="qx-card">
+            <div className="qx-fair-blk-h">到场当天怎么走</div>
+            <div className="qx-fair-rules">
+              <p className="qx-fair-rule"><i>1</i><span>点对应场次的来源签到码，用手机前往来源平台。</span></p>
+              <p className="qx-fair-rule"><i>2</i><span>按主办方现场指引排队登记；<b>登记结果以主办方为准</b>，本机查不到。</span></p>
+              <p className="qx-fair-rule"><i>3</i><span>带好纸质简历；忘带可以在这台机器上打印，价格以现场公示为准。</span></p>
+            </div>
+          </section>
+          <QxFairNotice />
+          <div className="qx-rows">
+            <QxFairNavRow icon={QrCodeIcon} title="现在去打印简历" description="A4 黑白或彩色，参数在打印页选。" onClick={() => navigate('/print-scan')} testId="checkin-print" />
+            <QxFairNavRow icon={CalendarIcon} title="回场次列表" description="换一场看看时间地点和参展名单。" onClick={() => navigate('/job-fairs')} testId="checkin-back" />
+          </div>
+        </>
+      )}
+      {qrFair && viewState !== 'qr' ? (
+        <QxFairQrDialog
+          title="扫码前往来源平台签到"
+          subtitle={qrFair.name}
+          value={qrFair.checkinUrl}
+          meta={[
+            { label: '来源机构', value: qrFair.sourceName },
+            { label: '外部编号', value: qrFair.externalId },
           ]}
+          note="请使用手机扫码到来源平台办理现场签到。本系统不记录签到结果、不接收报名信息或简历。"
+          onClose={() => setQrFair(null)}
         />
-      </section>
-      <FusionNotice>签到与入场由主办方管理，本系统不记录签到结果、不接收报名信息或简历。</FusionNotice>
-    </KioskPageFrame>
+      ) : null}
+    </QxFairShell>
   )
 }

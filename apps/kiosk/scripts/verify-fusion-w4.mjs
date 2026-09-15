@@ -257,6 +257,30 @@ check('fair source, mock-stat and print contracts remain intact', () => {
   assert.doesNotMatch(fairMaterials, /fileUrl:\s*material\.fileUrl/)
   assert.match(fairStats, /stats\.isMockData/)
 })
+check('job-fair migrated pages have left the V6 frame', () => {
+  const fairList = read('src/pages/job-fairs/JobFairsPage.tsx')
+  const fairCheckin = read('src/pages/job-fairs/JobFairCheckinPage.tsx')
+  const fairCompanies = read('src/pages/job-fairs/FairCompaniesPage.tsx')
+  const fairMap = read('src/pages/job-fairs/FairMapPage.tsx')
+  const fairPlan = read('src/pages/job-fairs/FairVisitPlanPage.tsx')
+  const fairChrome = read('src/pages/job-fairs/qx/qxFairChrome.tsx')
+  for (const [label, src] of [
+    ['list', fairList],
+    ['checkin', fairCheckin],
+    ['detail', fairDetail],
+    ['companies', fairCompanies],
+    ['map', fairMap],
+    ['materials', fairMaterials],
+    ['visit-plan', fairPlan],
+    ['stats', fairStats],
+  ]) {
+    assert.match(src, /QxFairShell/, `${label} uses the QX fair shell`)
+    assert.doesNotMatch(src, /KioskPageFrame/, `${label} has left the V6 frame`)
+  }
+  assert.match(fairChrome, /QxPageFrame/)
+  assert.match(fairChrome, /QxAppNavbar/)
+  assert.doesNotMatch(fairChrome, /KioskPageFrame/, 'fair chrome has left the V6 frame')
+})
 
 // Phase 0 S0-A A1b：招聘会统计 Kiosk 消费面诚实化（nullable metrics）
 const fairDataScreen = read('src/pages/job-fairs/components/FairDataScreen.tsx')

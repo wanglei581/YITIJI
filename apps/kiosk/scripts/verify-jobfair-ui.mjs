@@ -121,8 +121,13 @@ mustContain(
 // ── B. /job-fairs 列表页 ──────────────────────────────────────────────────
 mustContain(
   'src/pages/job-fairs/JobFairsPage.tsx',
-  ['RegionPicker', 'FairCalendarPopover', 'function FairRow(', 'className={`jf-row', '扫码预约'],
-  'B1. 列表页保持新版结构(地区筛选+日历+招聘会行卡+合规按钮)',
+  ['RegionPicker', 'FairCalendarPopover', 'function FairRow(', 'qx-fair-card', '扫码预约', 'QxFairShell'],
+  'B1. 列表页保持新版结构(地区筛选+日历+招聘会行卡+合规按钮)并迁入青序壳',
+)
+mustNotContain(
+  'src/pages/job-fairs/JobFairsPage.tsx',
+  ['KioskPageFrame'],
+  'B1b. 列表页 has left the V6 frame',
 )
 const jobFairCss = readImportedCss(
   'src/pages/jobs-fairs-prototype.css',
@@ -145,8 +150,18 @@ mustNotContain(
 // ── C. /job-fairs/:id 详情页 ──────────────────────────────────────────────
 mustContain(
   'src/pages/job-fairs/JobFairDetailPage.tsx',
-  ['详情与特色', '参展企业与岗位', '场馆导览', '数据大屏', 'FairDataScreen', 'buildNavUrl', 'getFairVenueGuide'],
-  'C1. 详情页保持 4 Tab(含场馆导览) + 数据大屏 + 场馆导航',
+  ['参展企业名单', '展位分布', '活动物料', '现场统计', 'buildNavUrl', 'getFairVenueGuide', 'QxFairShell'],
+  'C1. 详情页保持子路由入口(企业/展位/物料/统计/准备单) + 来源导航并迁入青序壳',
+)
+mustNotContain(
+  'src/pages/job-fairs/JobFairDetailPage.tsx',
+  ['KioskPageFrame'],
+  'C1b. 详情页 has left the V6 frame',
+)
+mustContain(
+  'src/pages/job-fairs/qx/qxFairChrome.tsx',
+  ['QxPageFrame', 'QxAppNavbar'],
+  'C1c. 招聘会青序壳使用 QxPageFrame + 共享底栏',
 )
 mustNotContain(
   'src/pages/job-fairs/JobFairDetailPage.tsx',
