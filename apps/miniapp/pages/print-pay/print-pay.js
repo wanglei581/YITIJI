@@ -13,6 +13,7 @@
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
+const idem = require('../../utils/print-order-idempotency')
 
 // MP-07 改法 (a)：标签只显示即将建单的真实参数，不从 query 猜彩色/双面。
 // 与 print-upload.verifiedPrintParams 锁死同一组（verify-miniapp-static 抽取字面量）。
@@ -68,7 +69,12 @@ Page({
     // 报价状态：idle | loading | ready | error。金额与页数只有 ready 时才是真的。
     quoteState: 'idle',
     quoteError: '',
-    // 订单已建成后的锁。再 POST 一次就是第二张订单（/me/print-orders 没有幂等键）。
+    // 报价失败时的**可执行下一步**，取值 '' | 'login' | 'retry'。
+    // 用状态字段而不是去认文案里有没有「登录」两个字：文案是给人读的，会被改写、
+    // 会被翻译，拿它当判据就是把一条控制流挂在一句话上。
+    quoteRecover: '',
+    // 订单已建成后的锁。服务端会按幂等键回放同一张单，所以这把锁不再是「防重复扣款」
+    // 的最后一道 —— 它现在的职责是**把这件事告诉用户**：订单已经在了，去找它，别再提交。
     createdLocked: false,
   },
 
@@ -93,6 +99,42 @@ Page({
     })
     this._loadQuote()
     this._loadFileName()
+    // 进页面就先看一眼：这一组参数在本机有没有一张**已经建成**的订单。
+    // 有就直接进恢复态，连第一次提交都不该发生。
+    this._restoreCreatedOrder()
+  },
+
+  /** 本次下单的 payload。指纹与幂等键都按它算，发给服务端的也是它。 */
+  _orderPayload() {
+    const q = this.data.q
+    return {
+      fileId: q.fileId,
+      terminalId: q.storeId,
+      copies: Math.max(1, Number(q.copies) || 1),
+      // 与上面 quoteParams 逐字同源（同两个常量）：报价与计价不会分叉。
+      colorMode: ORDER_COLOR_MODE,
+      duplex: ORDER_DUPLEX,
+    }
+  },
+
+  /**
+   * 恢复「这一单已经建成」的锁。
+   *
+   * 触发它的是三种真实处境：上一次 200 回来时页面已经换了人（记录写给了 A，
+   * A 重新登录回来要看得见）、跳转失败后用户退出又进来、以及小程序被杀掉重进。
+   * 三种的共同点是**服务端那张订单已经存在**，而页面自己什么都不记得了 ——
+   * 不恢复就会再提交一次。
+   *
+   * 只读**当前这位**的记录：findRecord 要求账号逐字相等且是确定的会员键。
+   */
+  _restoreCreatedOrder() {
+    if (!isMemberIdentity(this._account)) return
+    const q = this.data.q
+    if (!q.fileId || !q.storeId) return
+    const record = idem.findRecord(this._account, idem.fingerprintOf(this._orderPayload()))
+    if (!record || !record.orderId) return
+    this._createdOrderId = record.orderId
+    this.setData({ submitting: false, createdLocked: true })
   },
 
   /**
@@ -103,8 +145,8 @@ Page({
    * 过期时会先 `clearSession()` 把 token 与 user 一起清掉，于是回调那一刻读到的是
    * `''`，与发起时的 `'u:A'` 不等 —— 被判成"换了人"。对建单链来说这是要命的：
    * 服务端那张订单已经建出来了，而本页**不锁 `_createdOrderId`、还把按钮解开**，
-   * 用户以为没下成，再点一次就是第二张订单和第二笔钱（`POST /me/print-orders`
-   * 没有幂等键）。
+   * 用户以为没下成，再点一次。服务端补上幂等键之后那一次会回放同一张单、不会多扣，
+   * 但前提是**前端把同一个键带过去** —— 而"判成换了人"这条路径连键都不会复用。
    *
    * @returns {'changed'|'unusable'|'resignable'|'ok'} changed 时本函数已经复位了本页
    *   与上一位绑定的全部状态（建单锁 / 提交锁 / 报价 / 文件名），调用方不要再覆盖。
@@ -153,6 +195,7 @@ Page({
       quoteError: switched
         ? '当前账号与打开这一页时的不是同一个，已停止显示上一位的文件与金额。请返回重新选择文件。'
         : '登录状态已失效，请重新登录后返回重新选择文件。',
+      quoteRecover: 'login',
     })
   },
 
@@ -192,7 +235,15 @@ Page({
       quoteError: auth.isLoggedIn()
         ? '当前会话缺少会员标识，无法核定本人订单金额。请重新登录一次。'
         : '登录状态已失效，请重新登录后再核价。',
+      // 这一支是**补签已经失败**之后才到的：再点一百次「重新核价」也只会再
+      // fail-closed 一百次。必须给出登录这条真正有效的路。
+      quoteRecover: 'login',
     })
+  },
+
+  /** 报价失效态的登录出口。与其它页同一落点（pages/launch/launch）。 */
+  toLogin() {
+    wx.navigateTo({ url: '/pages/launch/launch' })
   },
 
   /**
@@ -204,7 +255,17 @@ Page({
    */
   onShow() {
     this._guard.activate()
-    this._resolveAccount()
+    // 先判一次：换人 / 登出时 _resolveAccount 会把上一位的建单锁、提交锁、文件名与金额
+    // 全部清干净。
+    if (this._resolveAccount() === 'changed') {
+      // 清场之后**再判一次**，采纳当前这位的身份。他对这组参数完全可能自己也有一张
+      // 已经建成的订单 —— 上一次就是在这一页下的单，只是 200 回来那会儿页面已经换了人，
+      // 于是订单只落进了他的恢复记录、没落进页面。不再判一次的话，他回到本页看到的是
+      // 一张干净的确认页，然后再提交一次（服务端会按同一个幂等键回放，但页面会白跑一趟，
+      // 而且"已经下过单了"这件事始终没告诉他）。
+      this._resolveAccount()
+    }
+    this._restoreCreatedOrder()
   },
 
   // 只在真正离开本页时作废在途的报价。**不在 onHide 作废**：建单成功后本页会
@@ -236,6 +297,9 @@ Page({
         quoteError: auth.isLoggedIn()
           ? '当前会话缺少会员标识，无法核定本人订单金额。请重新登录一次。'
           : '金额由服务端按本人订单核定，请登录后再核价。',
+        // 认不出人时「重新核价」是个死循环：再点一次还是同一条 fail-closed。
+        // 真正有效的下一步是重新登录，所以这里必须给出登录出口。
+        quoteRecover: 'login',
       })
       return
     }
@@ -245,7 +309,7 @@ Page({
     // 令牌是 R5 补上的第二层：此前这条链只比对身份，同一位用户连点两次「重新核价」
     // 时，先发的那次若后回来就会把后发那次的金额盖掉（服务端识别页数的耗时并不固定）。
     const token = this._guard.issue('quote')
-    this.setData({ quoteState: 'loading', quoteError: '' })
+    this.setData({ quoteState: 'loading', quoteError: '', quoteRecover: '' })
     api.quoteMyPrintOrder(fileId, quoteParams(this.data.copiesLabel))
       .then((quote) => {
         if (!this._accepts(token)) return
@@ -260,6 +324,7 @@ Page({
         this.setData({
           quoteState: 'ready',
           quoteError: '',
+          quoteRecover: '',
           isFreeOrder,
           pageCountLabel: `${billablePages} 页`,
           'fee.total': total,
@@ -271,6 +336,8 @@ Page({
         this.setData({
           quoteState: 'error',
           quoteError: (err && err.message) || '暂时取不到服务端报价，金额将在到机时以服务端核定为准。',
+          // 普通失败（网络 / 服务端）重试是有意义的，这里不给登录出口。
+          quoteRecover: 'retry',
         })
       })
   },
@@ -323,7 +390,8 @@ Page({
   /**
    * 订单已经建出来之后的统一出口。
    *
-   * 存在的唯一理由：**再 POST 一次就是第二张订单**（`POST /me/print-orders` 没有幂等键）。
+   * 服务端现在按 `(endUserId, idempotency-key)` 回放同一张单，所以再 POST 一次不会多
+   * 一张订单；但本页仍然到此为止 —— 用户需要的是「它在哪」，不是再提交一次。
    * 所以一旦拿到 orderId，本页就不再是一个可以下单的页面 —— 按钮变灰，
    * 并把恢复动作指向「我的 · 打印订单」，那里能找回这张订单、点进去就是到机码页。
    */
@@ -368,20 +436,37 @@ Page({
     // 回调那一刻的本地身份完全可能已经不可用（enduser JWT 只签 30 分钟，
     // 用户在确认页上多看两眼就到点了）。判据若是"回调时再读一次身份"，
     // 自然过期会被读成换人：订单其实已经建出来了，本页却不锁、还把按钮解开 ——
-    // 用户以为没下成，再点一次就是第二张订单和第二笔钱（没有幂等键）。
+    // 用户以为没下成，再点一次 —— 那一次会带着同一个幂等键回放同一张单（不会多扣），
+    // 但页面得先把「已经建成」这件事显示出来，否则用户只会一直点。
     // 绑在尝试上的账号是发出那一刻的真值，过期清不掉它。
-    const attempt = { account: this._account, settled: false, loading: true }
+    const payload = this._orderPayload()
+    const fingerprint = idem.fingerprintOf(payload)
+    // 尝试锁必须**同步**设上。取幂等键要等 wx.getRandomValues 的回调，
+    // 这中间用户完全来得及再点一次；锁排在异步之后就等于没锁。
+    const attempt = { account: this._account, fingerprint, key: '', settled: false, loading: true }
     this._createAttempt = attempt
     this.setData({ submitting: true })
     wx.showLoading({ title: '正在提交…', mask: true })
-    api.createCloudPrintOrder({
-      fileId: q.fileId,
-      terminalId: q.storeId,
-      copies: Math.max(1, Number(q.copies) || 1),
-      // 与上面 quoteParams 逐字同源（同两个常量）：报价与计价不会分叉。
-      colorMode: 'black_white',
-      duplex: 'simplex',
+    // 先拿键、先落盘，**然后**才 POST。
+    //
+    // 同账号 + 同参数一律复用同一个键：请求失败、补签失败、响应丢在路上、页面被杀掉
+    // 重进 —— 下一次提交带着同一个键过去，服务端按 (endUserId, key) 回放**同一张**订单。
+    // 顺序反过来（先发请求、成功了再记键）会把"响应丢了"这一种原样留着，
+    // 而那正是最需要幂等键的时刻。参数变了指纹就变，会铸一个新键 ——
+    // 否则同键不同参数在服务端是 409 IDEMPOTENCY_KEY_REUSED。
+    idem.ensureKey(attempt.account, fingerprint).then((record) => {
+      attempt.key = record.key
+      return api.createCloudPrintOrder(payload, { idempotencyKey: record.key })
     }).then(order => {
+      const orderId = (order && order.id) || ''
+      // **先把 orderId 落进"发起这次提交的那位"的恢复记录，再判当前页面还接不接收它。**
+      //
+      // 这两件事的对象根本不同：记录属于 attempt.account，而页面此刻可能已经换人了。
+      // 先判页面、后落盘的话，"A 的回调晚于换人"这一支会直接 return ——
+      // 服务端那张订单已经建成，A 手上却一条线索都没有，A 重新登录回来只会再提交一次。
+      // 服务端回放一张已 cancelled / expired 的原单时也走这里：orderId 是什么就记什么，
+      // 本页不自己判断该不该换个新键（那等于伪造一次"重新下单"）。
+      if (orderId) idem.rememberOrderId(attempt.account, fingerprint, attempt.key, orderId)
       // 归属判定必须排在 hideLoading **之前**：hideLoading 无条件掀掉当前那张遮罩，
       // A 的迟到回调一旦先调它，掀掉的就是 B 正在进行的那次提交的遮罩。
       if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) {
@@ -389,7 +474,6 @@ Page({
         return
       }
       this._releaseLoading(attempt)
-      const orderId = (order && order.id) || ''
       if (!orderId) throw new Error('服务端未返回订单号')
       // 走到这里账号仍是发起时那位（含"JWT 刚好在途中自然过期"这一种）。
       // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
@@ -401,6 +485,9 @@ Page({
       // print-pickup 自己带登录态向 GET /me/print-orders/:orderId 取（requireOwned 归属校验）。
       wx.redirectTo({
         url: '/pages/print-pickup/print-pickup?orderId=' + encodeURIComponent(orderId),
+        // **确实跳走了才清恢复记录。** 拿到 200 就清的话，跳转失败会把唯一能找回
+        // 这张订单的线索一起丢掉，而页面还留在原地 —— 用户只会再点一次。
+        success: () => idem.clearRecord(attempt.account, fingerprint),
         fail: () => this._lockAfterCreated(orderId),
       })
     }).catch(err => {

@@ -46,6 +46,9 @@
 /* 实测 ≥48px 触控下限（CLAUDE.md §9） */
 .qf-retry { flex-shrink: 0; display: inline-flex; min-height: 96rpx; padding: 0 28rpx; border-radius: 20rpx; border: 1rpx solid var(--line); background: var(--surface); color: var(--ink-soft); font-size: 24rpx; font-weight: 600; align-items: center; justify-content: center; }
 
+/* 报价 fail-closed 的登录出口：与「重新核价」同一尺寸，主色以示这是有效的那一条。 */
+.qf-login { flex-shrink: 0; display: inline-flex; min-height: 96rpx; padding: 0 28rpx; border-radius: 20rpx; border: 1rpx solid var(--teal); background: var(--surface); color: var(--teal); font-size: 24rpx; font-weight: 600; align-items: center; justify-content: center; }
+
 /* 订单已建成但没跳走：说清它在哪，并给出唯一正确的下一步（去找回它，而不是再提交一次）。 */
 .locked-main { flex: 1; }
 .locked-t { font-size: 27rpx; font-weight: 700; color: var(--ink); }

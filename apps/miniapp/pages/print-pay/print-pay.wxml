@@ -42,7 +42,11 @@
          下单本身不被挡住——建单时服务端会自己计价。 -->
     <view class="fee-row quote-fail" wx:if="{{quoteState === 'error'}}">
       <text class="qf-text">{{quoteError}}</text>
-      <view class="qf-retry tap" hover-class="tap-press" bindtap="retryQuote" role="button">重新核价</view>
+      <!-- 按 quoteRecover 这个**状态字段**分流，不按文案里有没有「登录」两个字。
+           认不出人时「重新核价」是个死循环：再点一次还是同一条 fail-closed，
+           真正有效的下一步是重新登录。 -->
+      <view wx:if="{{quoteRecover === 'login'}}" class="qf-login tap" hover-class="tap-press" bindtap="toLogin" role="button">去登录</view>
+      <view wx:else class="qf-retry tap" hover-class="tap-press" bindtap="retryQuote" role="button">重新核价</view>
     </view>
     <view class="fee-row" wx:elif="{{quoteState === 'loading'}}"><text class="qf-text">正在向服务端核定页数与金额…</text></view>
   </view>
@@ -65,7 +69,9 @@
 
 <view class="actionbar">
   <view class="ab-price"><text class="ab-label">{{isFreeOrder ? '免费试运营' : (quoteState === 'ready' ? '到机应付' : '金额待核定')}}</text><text class="ab-amt">{{isFreeOrder ? '免费' : (quoteState === 'ready' ? '¥' + fee.total : '—')}}</text></view>
-  <!-- 订单建成后按钮永久变灰：再点一次就是第二张订单（服务端没有幂等键）。 -->
+  <!-- 订单建成后按钮永久变灰。服务端现在按 (endUserId, idempotency-key) 回放，
+       再点一次不会多出一张单；但页面仍必须变灰 —— 让一个已经下过单的人反复点
+       「提交」本身就是在骗他，而且那次回放对他毫无意义。 -->
   <view class="btn wx lg {{submitting || createdLocked ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : '提交并生成到机码')}}</view>
 </view>
 </view>

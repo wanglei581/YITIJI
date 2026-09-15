@@ -55,11 +55,13 @@ function fakeCanvasNode() {
 
 /** 最小 wx 替身：只实现被测页面真正用到的那几个。storage 是一个普通 Map。 */
 function createWx(storage = new Map()) {
-  const calls = { navigateTo: [], redirectTo: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [], showLoading: [], hideLoading: [] }
+  const calls = { navigateTo: [], redirectTo: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [], showLoading: [], hideLoading: [], getRandomValues: [] }
   // wx.showLoading / hideLoading 不是栈：hideLoading 无条件掀掉当前那一张遮罩，
   // 不管它是谁挂上去的。所以替身用一个布尔记"现在屏幕上有没有遮罩"——
   // 这正是 A 的迟到回调能掀掉 B 的遮罩那个缺陷的形状。
   const loading = { visible: false }
+  // 每个 wx 替身一条独立的随机序列。
+  const randomSeed = { n: 0 }
   // navFail=true 时 redirectTo / navigateTo 走 fail 回调（模拟跳转失败）。
   const control = { navFail: false }
   return {
@@ -99,6 +101,17 @@ function createWx(storage = new Map()) {
       }),
     }),
     getWindowInfo: () => ({ pixelRatio: 1 }),
+    // wx.getRandomValues 是异步的（只有回调形态，没有同步版）。替身按调用序号灌字节，
+    // 于是每次 mint 出来的 UUID 都不同 —— "复用了同一个键"和"又铸了一个新键"
+    // 在断言里才分得开。**不是** Math.random：被测代码里也不许有。
+    getRandomValues: (opts) => {
+      const length = (opts && opts.length) || 16
+      randomSeed.n += 1
+      const bytes = new Uint8Array(length)
+      for (let i = 0; i < length; i += 1) bytes[i] = (randomSeed.n * 37 + i * 11) & 0xff
+      calls.getRandomValues.push(length)
+      if (opts && opts.success) opts.success({ randomValues: bytes.buffer })
+    },
   }
 }
 
@@ -245,6 +258,11 @@ function instantiate(def) {
 }
 
 function makePage(relPath, { auth, api, wx }) {
+  // 真机上只有**一个**全局 wx，页面和 utils 共用它。替身必须照做：
+  // utils/storage.js、utils/print-order-idempotency.js 走的是 globalThis.wx，
+  // 而页面走的是沙箱 wx —— 两者不是同一个对象的话，工具模块会读到一个空的
+  // （或上一条测试遗留的）存储，随机数能力也会凭空消失。
+  ACTIVE_WX = wx
   const timers = []
   const def = loadPageDefinition(relPath, { wx, modules: { api, auth }, timers })
   const page = instantiate(def)
@@ -2004,6 +2022,7 @@ test('R4-7 print-pay 报价失败：不本地补一个金额，也不把下单�
 
   page.continueFlow()
   await flush()
+  await flush()
   assert.equal(wx.calls.redirectTo.length, 1, '展示失败不该取消一次真实的下单能力')
 })
 
@@ -2023,6 +2042,7 @@ test('R4-7 print-pay 建单成功但跳转失败：锁住页面并指路，不�
   wx.control.navFail = true
   page.continueFlow()
   await flush()
+  await flush()
 
   assert.equal(posts, 1)
   assert.equal(page.data.createdLocked, true, '订单已建成必须锁页面，否则用户会以为没下成再点一次')
@@ -2030,7 +2050,8 @@ test('R4-7 print-pay 建单成功但跳转失败：锁住页面并指路，不�
 
   page.continueFlow()
   await flush()
-  assert.equal(posts, 1, '再点一次不得发第二次 POST（/me/print-orders 没有幂等键）')
+  await flush()
+  assert.equal(posts, 1, '再点一次不得发第二次 POST（同一个幂等键也只会回放同一张单）')
 
   page.toOrders()
   assert.ok(wx.calls.navigateTo.some((u) => u.includes('/pages/orders/orders')), '要能去找回这张订单')
@@ -2051,6 +2072,7 @@ test('R4-7 print-pay 跳转到取件页只带 orderId，凭证一个都不进 UR
   page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
   await flush()
   page.continueFlow()
+  await flush()
   await flush()
 
   const url = wx.calls.redirectTo[0]
@@ -2074,6 +2096,7 @@ test('R4-7 print-pay 建单在途换了人：不锁当前这位的页面，也�
   page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
   await flush()
   page.continueFlow()
+  await flush()
 
   auth.setUser('B')
   submit.resolve({ id: 'ord-A', pickupCode: '12345678' })
@@ -2331,6 +2354,7 @@ test('R5-3 确认支付页：建单在途时 JWT 自然过期 —— 只 POST �
 
   wx.control.navFail = true            // 跳转失败时页面还留在这里，锁不锁得住看得最清楚
   page.continueFlow()
+  await flush()                        // 幂等键要等 wx.getRandomValues 回调，POST 排在它之后
   assert.equal(creates.length, 1)
 
   // 用户在确认页上多看了两眼，30 分钟的 JWT 正好在 POST 在途期间到点。没人登出。
@@ -2361,12 +2385,14 @@ test('R5-3 确认支付页：POST 在途时连点三次 —— 只能有一次 P
   page.continueFlow()
   page.continueFlow()
   page.continueFlow()
-  assert.equal(creates.length, 1, '在途期间的重复点击一次都不许穿透')
+  await flush()
+  assert.equal(creates.length, 1, '在途期间的重复点击一次都不许穿透（锁必须跨过取幂等键那一步）')
 
   // 就算有别的路径把 submitting 写回 false（R5 之前"换了人"那一支就是这么干的），
   // 绑在这次尝试上的锁仍然挡得住 —— 服务端那张订单可能已经建出来了。
   page.setData({ submitting: false })
   page.continueFlow()
+  await flush()
   assert.equal(creates.length, 1, '尝试锁不能只依赖 setData 出去的 submitting')
 })
 
@@ -2377,6 +2403,7 @@ test('R5-3 确认支付页：建单在途时真的换了人 —— 不跳 A 的�
   page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
   await flush()
   page.continueFlow()
+  await flush()
   assert.equal(creates.length, 1)
 
   switchAccount('B')
@@ -2392,6 +2419,7 @@ test('R5-3 确认支付页：建单在途时真的换了人 —— 不跳 A 的�
   // B 自己的那一次：必须是一次**新的** POST，并且跳的是 B 自己的订单。
   const before = wx.calls.redirectTo.length
   page.continueFlow()
+  await flush()
   assert.equal(creates.length, 2, 'B 必须能安全地发起自己的建单')
   creates[1].resolve({ id: 'ord-B' })
   await flush()
@@ -2408,6 +2436,7 @@ test('R5-3 确认支付页：建单锁定后换账号回到本页 —— onShow 
 
   wx.control.navFail = true
   page.continueFlow()
+  await flush()
   creates[0].resolve({ id: 'ord-A' })
   await flush()
   assert.equal(page.data.createdLocked, true)
@@ -2426,6 +2455,7 @@ test('R5-3 确认支付页：建单锁定后换账号回到本页 —— onShow 
   wx.control.navFail = false
   const before = wx.calls.redirectTo.length
   page.continueFlow()
+  await flush()
   assert.equal(creates.length, 2)
   creates[1].resolve({ id: 'ord-B' })
   await flush()
@@ -2439,6 +2469,7 @@ test('R5-3 确认支付页：建单在途时**主动登出** —— 不得跳 A 
   page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
   await flush()
   page.continueFlow()
+  await flush()
   assert.equal(creates.length, 1)
 
   // 与「自然过期」在 token 维度上完全同形（都是没有可用 token 了），
@@ -2457,6 +2488,7 @@ test('R5-3 确认支付页：建单在途时**主动登出** —— 不得跳 A 
   // 而且登出状态下再点提交必须 fail-closed：建单会在服务端落一张带钱的订单，
   // 不像报价那样可以放行 'resignable'。
   page.continueFlow()
+  await flush()
   await flush()
   assert.equal(creates.length, 1, '没有确定身份时不得建单')
   assert.ok(wx.calls.showModal.some((m) => m && m.title === '请先登录'), '要说清下一步是重新登录')
@@ -2665,6 +2697,7 @@ test('R5-6 确认支付页：A 的迟到建单回调不得掀掉 B 正在进行�
   await flush()
 
   page.continueFlow()                       // A 提交，遮罩挂上
+  await flush()
   assert.equal(creates.length, 1)
   assert.equal(wx.loading.visible, true, '前提：A 的遮罩确实挂上了')
 
@@ -2673,6 +2706,7 @@ test('R5-6 确认支付页：A 的迟到建单回调不得掀掉 B 正在进行�
   assert.equal(wx.loading.visible, false, '换人复位时不该把上一位的遮罩留在屏幕上')
 
   page.continueFlow()                       // B 自己提交，遮罩再次挂上
+  await flush()
   assert.equal(creates.length, 2, 'B 必须能发起自己的那一次')
   assert.equal(wx.loading.visible, true)
 
@@ -2689,4 +2723,303 @@ test('R5-6 确认支付页：A 的迟到建单回调不得掀掉 B 正在进行�
   await flush()
   assert.equal(wx.loading.visible, false, 'B 自己的回调必须收起遮罩，不能永远挂着')
   assert.equal(wx.calls.redirectTo[0], '/pages/print-pickup/print-pickup?orderId=ord-B')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// Y. 幂等建单：一次「下单意图」一个 UUID，跨失败 / 跨重进 / 跨换人都认同一张订单
+//
+// 服务端（ed576f3cb）现在要求 `POST /me/print-orders` 必带 Header `idempotency-key`，
+// 并按 (endUserId, key) 回放同一张 Order，同键不同参数则 409 IDEMPOTENCY_KEY_REUSED。
+// 前端要做对的不是"传一个 UUID"，而是**什么时候该复用、什么时候该换、以及键和
+// 已建成的 orderId 归谁**。下面每条都对应一个会真的多扣一笔钱的处境。
+// ══════════════════════════════════════════════════════════════════════
+
+/** 用**真** utils/api.js + utils/request.js 发一次请求，把 wx.request 的入参截下来。 */
+function captureRequest(wx, run) {
+  ACTIVE_WX = wx
+  const seen = []
+  wx.request = (opts) => {
+    seen.push(opts)
+    opts.success({ statusCode: 200, data: { data: { id: 'ord-A' } } })
+  }
+  const realApi = requireMiniapp('../utils/api.js')
+  return Promise.resolve(run(realApi)).then(() => seen, (err) => { seen.error = err; return seen })
+}
+
+test('R6-1 建单请求把幂等键放在 Header `idempotency-key` 上，**不在 body 里**', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const key = '11111111-2222-4333-8444-555555555555'
+  const seen = await captureRequest(wx, (realApi) => realApi.createCloudPrintOrder(
+    { fileId: 'f-1', terminalId: 'term-1', copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+    { idempotencyKey: key },
+  ))
+
+  assert.equal(seen.length, 1, '真的发出去了一次请求')
+  const sent = seen[0]
+  assert.ok(String(sent.url).endsWith('/me/print-orders'), sent.url)
+  assert.equal(sent.method, 'POST')
+  // 服务端从 Header 取（assertMemberPrintOrderIdempotencyKey），大小写不敏感但字段名固定。
+  const headerKey = Object.keys(sent.header).find((k) => k.toLowerCase() === 'idempotency-key')
+  assert.ok(headerKey, `Header 里没有 idempotency-key：${JSON.stringify(sent.header)}`)
+  assert.equal(sent.header[headerKey], key)
+  // body 里出现它有两个后果：服务端读不到（照样 400），且 DTO 会把多出来的字段判成非法参数。
+  assert.ok(!('idempotencyKey' in sent.data) && !('idempotency-key' in sent.data),
+    `幂等键不得进 body：${JSON.stringify(sent.data)}`)
+  assert.ok(!JSON.stringify(sent.data).includes(key))
+})
+
+test('R6-1 没带幂等键时本地就挡下来，不发一个必然 400 的请求', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const seen = await captureRequest(wx, (realApi) => realApi.createCloudPrintOrder({ fileId: 'f-1' }, {}))
+  assert.equal(seen.length, 0, '缺键时不该发请求')
+  assert.ok(seen.error, '必须 reject，而不是静默成功')
+})
+
+test('R6-2 同一位用户、同一组参数：失败重试复用同一个键；参数一变就换键', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = requireMiniapp('../utils/print-order-idempotency.js')
+  const payload = { fileId: 'f-1', terminalId: 'term-1', copies: 1, colorMode: 'black_white', duplex: 'simplex' }
+  const print = idem.fingerprintOf(payload)
+
+  const first = await idem.ensureKey('u:A', print)
+  const again = await idem.ensureKey('u:A', print)
+  assert.ok(idem.KEY_RE.test(first.key), `不是合法 UUID：${first.key}`)
+  assert.equal(again.key, first.key, '同账号同参数必须复用 —— 换一个键就是第二张订单、第二笔钱')
+
+  // 参数变了必须换键：同键不同参数在服务端是 409 IDEMPOTENCY_KEY_REUSED。
+  const other = await idem.ensureKey('u:A', idem.fingerprintOf({ ...payload, copies: 3 }))
+  assert.notEqual(other.key, first.key, '份数变了就是另一单')
+  const otherTerminal = await idem.ensureKey('u:A', idem.fingerprintOf({ ...payload, terminalId: 'term-2' }))
+  assert.notEqual(otherTerminal.key, first.key, '换了终端也是另一单')
+
+  // B 绝不能读到 / 复用 A 的记录。
+  const bKey = await idem.ensureKey('u:B', print)
+  assert.notEqual(bKey.key, first.key, 'B 不得复用 A 的幂等键')
+  assert.equal(idem.findRecord('u:B', print).key, bKey.key)
+  assert.equal(idem.findRecord('u:A', print).key, first.key, 'B 的写入不得动 A 的记录')
+  // 认不出人的会话一条都不给。
+  await assert.rejects(() => idem.ensureKey('', print))
+  await assert.rejects(() => idem.ensureKey('!', print))
+  assert.equal(idem.findRecord('', print), null)
+})
+
+test('R6-2 幂等键是 UUID v4 形态，且不存到机码 / 文件名 / 金额', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = requireMiniapp('../utils/print-order-idempotency.js')
+  const print = idem.fingerprintOf({ fileId: 'f-1', terminalId: 'term-1', copies: 1, colorMode: 'black_white', duplex: 'simplex' })
+  const record = await idem.ensureKey('u:A', print)
+  idem.rememberOrderId('u:A', print, record.key, 'ord-A')
+
+  const raw = JSON.stringify(wx.storage.get(idem.STORE_KEY))
+  assert.ok(raw.includes('ord-A'), '恢复要用的 orderId 必须留下')
+  for (const forbidden of ['12345678', '张三', 'pickupCode', 'amountCents', 'filename']) {
+    assert.ok(!raw.includes(forbidden), `本机存储里不得出现 ${forbidden}：${raw}`)
+  }
+  assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(), ['account', 'createdAt', 'fingerprint', 'key', 'orderId'])
+})
+
+test('R6-3 A 的 200 晚于换人：orderId 落进 A 的恢复记录，但一个字都不写进 B 的页面', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = requireMiniapp('../utils/print-order-idempotency.js')
+  const { page, creates } = payPage(wx)
+  const query = { fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' }
+  page.onLoad(query)
+  await flush()
+  page.continueFlow()
+  await flush()
+  assert.equal(creates.length, 1)
+
+  switchAccount('B')
+  page.onShow()
+  creates[0].resolve({ id: 'ord-A' })          // A 的 200 这才到
+  await flush()
+
+  // 写给 A 的那条恢复记录必须存在 —— 服务端那张订单已经建成了。
+  const print = idem.fingerprintOf({ fileId: 'f-1', terminalId: 'term-1', copies: 1, colorMode: 'black_white', duplex: 'simplex' })
+  assert.equal(idem.findRecord('u:A', print).orderId, 'ord-A', 'A 的订单必须能被找回')
+  assert.equal(idem.findRecord('u:B', print), null, 'B 不得看到 A 的记录')
+  // 但 B 的页面一个字都不许被写。
+  assert.ok(!page._createdOrderId)
+  assert.equal(page.data.createdLocked, false)
+  assert.equal(wx.calls.redirectTo.length, 0)
+  assert.ok(!JSON.stringify(page.data).includes('ord-A'))
+
+  // A 重新登录回到本页：看得见「订单已创建」，而且再点也不会发第二次 POST。
+  switchAccount('A')
+  page.onShow()
+  assert.equal(page._createdOrderId, 'ord-A', 'A 回来必须能恢复成已创建')
+  assert.equal(page.data.createdLocked, true)
+  page.continueFlow()
+  await flush()
+  assert.equal(creates.length, 1, '恢复态下再点一次不得发第二次 POST')
+})
+
+test('R6-4 响应丢在路上：第二次提交带**同一个键**回放，不是第二张订单', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const sentKeys = []
+  const creates = []
+  const api = {
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    createCloudPrintOrder: (data, opts) => {
+      sentKeys.push(opts && opts.idempotencyKey)
+      const d = deferred(); creates.push(d); return d.promise
+    },
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth: realAuth, api, wx })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  await flush()
+
+  page.continueFlow()
+  await flush()
+  creates[0].reject(Object.assign(new Error('网络连接失败'), { statusCode: -1 }))   // 200 丢了
+  await flush()
+  assert.equal(page.data.submitting, false, '失败之后要能重试')
+
+  page.continueFlow()                         // 用户再点一次
+  await flush()
+  assert.equal(sentKeys.length, 2)
+  assert.equal(sentKeys[1], sentKeys[0], '第二次必须带同一个键，由服务端回放同一张订单')
+  assert.ok(sentKeys[0], '键不能是空的')
+
+  // 服务端回放回来（哪怕原单已 cancelled / expired，前端也照它给的 orderId 处理）。
+  creates[1].resolve({ id: 'ord-A', pickupStatus: 'cancelled' })
+  await flush()
+  assert.equal(page._createdOrderId, 'ord-A', '按服务端返回的 orderId 处理，不自己另铸一个键')
+  assert.equal(sentKeys.length, 2, '不得为了"重新下单"偷偷再发一次')
+})
+
+test('R6-5 跳转成功才清恢复记录；跳转失败要留着 orderId 并锁页', async () => {
+  const idem = requireMiniapp('../utils/print-order-idempotency.js')
+  const print = idem.fingerprintOf({ fileId: 'f-1', terminalId: 'term-1', copies: 1, colorMode: 'black_white', duplex: 'simplex' })
+  const query = { fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' }
+
+  // ① 跳转失败：记录必须留着 —— 它是唯一能找回这张订单的线索，页面还留在原地。
+  const wxFail = createWx()
+  useRealAuth(wxFail, 'A')
+  const failPage = payPage(wxFail)
+  failPage.page.onLoad(query)
+  await flush()
+  wxFail.control.navFail = true
+  failPage.page.continueFlow()
+  await flush()
+  failPage.creates[0].resolve({ id: 'ord-A' })
+  await flush()
+  assert.equal(failPage.page.data.createdLocked, true, '跳转失败必须锁页并指路')
+  assert.equal(idem.findRecord('u:A', print).orderId, 'ord-A', '跳转失败不得清掉恢复记录')
+
+  // ② 跳转成功：人已经在到机码页了，这条记录可以退休。
+  const wxOk = createWx()
+  useRealAuth(wxOk, 'A')
+  const okPage = payPage(wxOk)
+  okPage.page.onLoad(query)
+  await flush()
+  okPage.page.continueFlow()
+  await flush()
+  okPage.creates[0].resolve({ id: 'ord-A' })
+  await flush()
+  assert.equal(wxOk.calls.redirectTo[0], '/pages/print-pickup/print-pickup?orderId=ord-A')
+  assert.equal(idem.findRecord('u:A', print), null, '确实跳走之后才清')
+})
+
+test('R6-6 材料包码页换到 B：第一次和第二次 onShow 都零新增请求，说明不变', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  const pending = []
+  const api = { getPackageOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+  page.onLoad({ orderId: 'pkg-A' })
+  page.onShow()
+  pending[0].resolve(A_PACKAGE)
+  await flush()
+  assert.equal(page._codeRaw, '87654321')
+  const before = pending.length
+
+  switchAccount('B')
+  page.onShow()
+  assert.equal(pending.length, before, '第一次 onShow：不得拿 B 的 token 去要 A 的 orderId')
+  assert.equal(page.data.loadErrorTitle, '账号已切换')
+
+  // 第二次才是此前漏掉的那一支：`_account` 已经被清成 ''，`'' → 'u:B'` 在状态机眼里
+  // 是一次正常的补签升级 = 'ok'，于是本页又会拿着上一位的 orderId 发请求。
+  page.onShow()
+  assert.equal(pending.length, before, '第二次 onShow 同样不许发请求')
+  page.onShow()
+  assert.equal(pending.length, before, '第三次也一样')
+  assert.equal(page.data.loadErrorTitle, '账号已切换', '说明必须一直在，不许被 loading 覆盖')
+  assert.equal(page.data.loadRecover, 'orders')
+  assert.ok(!JSON.stringify(page.data).includes('87654321'))
+
+  // 开页那位自己回来：必须解除封锁，能重新加载。
+  switchAccount('A')
+  page.onShow()
+  assert.equal(pending.length, before + 1, '本人回来必须能再取一次')
+})
+
+test('R6-6 材料包码页显式登出后同一位 A 重新登录：仍能恢复加载（登出不粘）', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  const pending = []
+  const api = { getPackageOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+  page.onLoad({ orderId: 'pkg-A' })
+  page.onShow()
+  pending[0].resolve(A_PACKAGE)
+  await flush()
+  const before = pending.length
+
+  auth.logout()
+  page.onShow()
+  assert.equal(pending.length, before, '登出后不得再发请求')
+  assert.equal(page.data.loadRecover, 'login')
+
+  // 同一位 A 重新登录 —— 这不是换人，不该被粘性封锁挡住。
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'A' } })
+  page.onShow()
+  assert.equal(pending.length, before + 1, '同一位重新登录必须能恢复加载')
+  pending[before].resolve(A_PACKAGE)
+  await flush()
+  assert.equal(page._codeRaw, '87654321')
+})
+
+test('R6-7 报价失效态给的是**去登录**按钮，点了真的跳 launch', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const { page, quotes } = payPage(wx, { quote: 'defer' })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  realAuth.logout()                            // 补签失败
+  quotes[0].reject(Object.assign(new Error('unauthorized'), { statusCode: 401 }))
+  await flush()
+
+  assert.equal(page.data.quoteState, 'error')
+  // 判据是**状态字段**，不是文案里有没有「登录」两个字。
+  assert.equal(page.data.quoteRecover, 'login', '认不出人时必须指向登录，而不是「重新核价」死循环')
+
+  // **从模板里把处理函数名读出来再调它**，而不是直接 page.toLogin()。
+  // 直接调等于绕过接线：把 wxml 里那个按钮整个删掉，测试照样绿，而用户屏幕上
+  // 只剩一个「重新核价」死循环。模板才是真正发货的那一份，所以由它决定调谁。
+  const payWxml = fs.readFileSync(path.join(MINIAPP, 'pages/print-pay/print-pay.wxml'), 'utf8')
+  const loginBranch = /wx:if="\{\{quoteRecover === 'login'\}\}"[^>]*bindtap="([A-Za-z_$][\w$]*)"/.exec(payWxml)
+  assert.ok(loginBranch, '模板里没有按 quoteRecover === \'login\' 分流的可点按钮')
+  const handler = loginBranch[1]
+  assert.equal(typeof page[handler], 'function', `模板绑了 ${handler}，页面却没有这个方法`)
+  page[handler]()
+  assert.ok(wx.calls.navigateTo.some((u) => u === '/pages/launch/launch'), wx.calls.navigateTo.join(','))
+
+  // 普通的报价失败仍然是「重试」，不能一律推去登录。
+  const wx2 = createWx()
+  useRealAuth(wx2, 'A')
+  const second = payPage(wx2, { quote: 'defer' })
+  second.page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  second.quotes[0].reject(Object.assign(new Error('网络连接失败'), { statusCode: -1 }))
+  await flush()
+  assert.equal(second.page.data.quoteState, 'error')
+  assert.equal(second.page.data.quoteRecover, 'retry', '网络失败重试是有意义的，不该推去登录')
 })

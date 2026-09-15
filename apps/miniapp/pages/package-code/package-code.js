@@ -54,6 +54,9 @@ Page({
     // 稳定账号快照。**只放内存**，并且必须在任何一次破坏性 token 读取之前就存在：
     // auth.getToken() 在 JWT 过期时会连 user 一起清掉，事后再去读就没有账号 id 了。
     this._account = ''
+    // 开页那位（不随清场销毁）与"已经换给别人了"的粘性标记。见 _enforceIdentity。
+    this._openerAccount = ''
+    this._foreignBlocked = false
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       orderId,
@@ -84,7 +87,31 @@ Page({
    */
   _enforceIdentity() {
     const resolved = resolveAccountState(auth, this._account)
+
+    // 开这一页的是谁，单独记一份，**不随清场销毁**。
+    // this._account 在换人时必须清空（它是"上一次见到谁"的快照，留着会把下一位的
+    // 自然过期误判成换人），但清空之后 `'' → 'u:B'` 在状态机眼里就是一次正常的
+    // "补签升级"= 'ok' —— 于是**第二次** onShow 本页又会拿着上一位的 orderId
+    // 用 B 的 token 去发请求。第一次挡住、第二次放过，等于没挡。
+    if (isMemberIdentity(resolved.account) && !this._openerAccount) {
+      this._openerAccount = resolved.account
+    }
+
+    // 换到**别人**之后粘住，直到开页那位自己回来。
+    // 登出不粘（identity 为 `''`）：同一位 A 重新登录必须还能恢复这一页。
+    if (this._foreignBlocked) {
+      if (isMemberIdentity(resolved.identity) && resolved.identity === this._openerAccount) {
+        this._foreignBlocked = false        // 开页那位回来了，解除
+      } else {
+        this._account = ''
+        return 'changed'                    // 保持已经写好的「账号已切换」，不再取数
+      }
+    }
+
     if (resolved.state === 'changed') {
+      if (isMemberIdentity(resolved.identity) && resolved.identity !== this._openerAccount) {
+        this._foreignBlocked = true
+      }
       // 真的换了人，或主动登出。setIdentity 会 +1 代次，把上一位在途的请求一并作废 ——
       // 只清 data 不作废请求的话，那几个迟到的响应会把刚清掉的码原样写回来。
       this._account = ''

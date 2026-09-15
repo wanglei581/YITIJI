@@ -683,8 +683,22 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     '模板确实是一份「已阅读并同意 + 可查看原文」的法律同意，不是普通确认')
 
   const codeCode = stripComments(codeJs)
-  assert(/_enforceIdentity\(\)\s*\{[\s\S]{0,500}this\._clearCredentials\(\)/.test(codeCode),
-    'package-code 发现身份变化时当场清掉凭证（request.js 续签失败会 auth.logout()，全程没有生命周期回调）')
+  {
+    // 又一处定长窗口：`_enforceIdentity` 前面多了粘性封锁那一段，`_clearCredentials()`
+    // 就被顶出 500 字符，断言在没变坏的代码上转红。取函数体。
+    const at = codeCode.indexOf('_enforceIdentity() {')
+    const body = at < 0 ? '' : codeCode.slice(at, codeCode.indexOf('\n  },', at))
+    assert(body.includes('this._clearCredentials()'),
+      'package-code 发现身份变化时当场清掉凭证（request.js 续签失败会 auth.logout()，全程没有生命周期回调）')
+    // 换到**别人**之后必须粘住：this._account 在清场时被设成 ''，下一次 `'' → 'u:B'`
+    // 在状态机眼里是一次正常的补签升级 = 'ok'，于是**第二次** onShow 本页又会拿着
+    // 上一位的 orderId 用 B 的 token 发请求。第一次挡住、第二次放过等于没挡。
+    assert(/this\._foreignBlocked = true/.test(body) && /_openerAccount/.test(body),
+      'package-code 换到别人之后粘住（按开页账号判定），不是只挡第一次 onShow')
+    // 但登出**不粘**：同一位 A 重新登录必须还能恢复这一页。
+    assert(/resolved\.identity === this\._openerAccount/.test(body),
+      'package-code 的封锁只对"换成别人"生效，开页那位自己回来必须解除')
+  }
   assert(/_accepts\(token\)\s*\{\s*const state = this\._enforceIdentity\(\)/.test(codeCode),
     '每个异步回调都先**执行**一遍身份判定（不是只查询它）')
   assert(/state === 'changed' \|\| state === 'unusable'\) \{/.test(codeCode),

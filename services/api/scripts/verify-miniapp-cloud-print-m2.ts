@@ -173,7 +173,22 @@ function assertCrossSurfaceWiring(): void {
       Boolean(takeawayBlock) && !takeawayBlock.includes('@UseGuards(TerminalIdentityGuard)'),
       'takeaway-url 不得挂 TerminalIdentityGuard（会员/付款令牌救济路径）',
     ],
-    [miniappApi.includes("request('/me/print-orders', { method: 'POST'") && miniappPay.includes('api.createCloudPrintOrder'), '小程序确实调用 Order-only 建单'],
+    [
+      /request\(\s*'\/me\/print-orders',\s*\{[\s\S]{0,400}method: 'POST'/.test(miniappApi)
+        && miniappPay.includes('api.createCloudPrintOrder'),
+      '小程序确实调用 Order-only 建单',
+    ],
+    [
+      // 本控制器的 create() 从 **Header** `idempotency-key` 取键，
+      // assertMemberPrintOrderIdempotencyKey 缺了就 400 IDEMPOTENCY_KEY_REQUIRED。
+      // 小程序若把它放进 body：服务端读不到（照样 400），而 CreateMemberPrintOrderDto
+      // 又会把这个多出来的字段判成非法参数 —— 两头都不通，且页面会把它显示成
+      // 「下单失败，请稍后重试」。所以这条跨端断言钉的是**放在哪**，不只是"有没有"。
+      /header: \{ 'idempotency-key': idempotencyKey \}/.test(miniappApi)
+        && !/data: \{[\s\S]{0,200}idempotencyKey/.test(miniappApi)
+        && memberController.includes("@Headers('idempotency-key')"),
+      '小程序把幂等键放在 Header 上，与服务端取值位置一致',
+    ],
     [memberController.includes("@Headers('idempotency-key')"), '建单读取 Idempotency-Key 请求头'],
     [memberController.includes('assertMemberPrintOrderIdempotencyKey(idempotencyKey)'), 'controller 在进 service 前校验幂等键'],
     [kioskClaim.includes("result.released ? '/print/progress' : '/print/cashier'") && kioskClaim.includes("'x-terminal-id': terminalId"), 'Kiosk 核验后按释放状态进收银或进度'],

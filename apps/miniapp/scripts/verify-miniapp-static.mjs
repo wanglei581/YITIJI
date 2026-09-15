@@ -682,7 +682,11 @@ if (
   printUploadJs.includes('api.createPrintPiiScan') &&
   printUploadJs.includes("privacyStatus !== 'ready'") &&
   printPayJs.includes('api.createCloudPrintOrder') &&
-  apiJs.includes("request('/me/print-orders', { method: 'POST'") &&
+  /request\(\s*'\/me\/print-orders',\s*\{[\s\S]{0,400}method: 'POST'/.test(apiJs) &&
+  // 服务端（member-print-orders.controller.ts）从 **Header** 取幂等键，缺了直接 400。
+  // 放 body 里服务端读不到，而 CreateMemberPrintOrderDto 又会判成非法参数。
+  /header: \{ 'idempotency-key': idempotencyKey \}/.test(apiJs) &&
+  !/data: \{[\s\S]{0,200}idempotencyKey/.test(apiJs) &&
   !/createCloudPrintOrder\(\{[\s\S]{0,500}\b(?:amountCents|billablePages|pages)\s*:/.test(printPayJs) &&
   !printPayJs.includes('预提交接口尚未开通')
 ) ok('文档真实上传、隐私确认且由服务端建单计价')
@@ -758,7 +762,24 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
     return { label, color: color && color[1], duplex: duplex && duplex[1] }
   }
   const quote = grab(printUploadJs, 'print-upload/verifiedPrintParams')
-  const order = grab(printPayJs, 'print-pay/createCloudPrintOrder')
+  // print-pay 把两个值收成了模块常量，报价与建单都引用它 —— 页内分叉在结构上已经不可能。
+  // 所以这里读常量声明，并额外钉住"两条链都只许引用常量、不许再写死第二份字面量"，
+  // 否则本断言会退化成"只要文件里有过这个字符串就算数"。
+  const order = {
+    label: 'print-pay/ORDER_COLOR_MODE+ORDER_DUPLEX',
+    color: (/const ORDER_COLOR_MODE = '([a-z_]+)'/.exec(printPayJs) || [])[1],
+    duplex: (/const ORDER_DUPLEX = '([a-z]+)'/.exec(printPayJs) || [])[1],
+  }
+  {
+    const bare = stripComments(printPayJs)
+    const payloadBody = methodBody(bare, '_orderPayload')
+    const quoteBody = bare.slice(bare.indexOf('function quoteParams('), bare.indexOf('function colorLabelOf('))
+    const usesConst = (body) => body.includes('colorMode: ORDER_COLOR_MODE') && body.includes('duplex: ORDER_DUPLEX')
+    if (!usesConst(payloadBody)) bad('建单参数同源', '_orderPayload 没有引用 ORDER_COLOR_MODE / ORDER_DUPLEX')
+    else if (!usesConst(quoteBody)) bad('报价参数同源', 'quoteParams 没有引用 ORDER_COLOR_MODE / ORDER_DUPLEX')
+    else if (/colorMode: '[a-z_]+'/.test(bare)) bad('建单参数同源', 'print-pay 又出现写死的 colorMode 字面量，页内会再分叉')
+    else ok('print-pay 报价与建单共用同两个常量，页内不可能分叉')
+  }
   if (!quote.color || !quote.duplex || !order.color || !order.duplex) {
     bad('报价与下单打印参数一致', '取不到 colorMode / duplex 字面量——抽取失效，不要当作通过')
   } else if (quote.color !== order.color || quote.duplex !== order.duplex) {
@@ -774,8 +795,10 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
 {
   const guessesQuery = /q\.color\s*===\s*'color'/.test(printPayJs)
     || /q\.duplex\s*===\s*'double'/.test(printPayJs)
-  const labelsFromCreate = printPayJs.includes("colorMode: 'black_white'")
-    && printPayJs.includes("duplex: 'simplex'")
+  const labelsFromCreate = /const ORDER_COLOR_MODE = 'black_white'/.test(printPayJs)
+    && /const ORDER_DUPLEX = 'simplex'/.test(printPayJs)
+    && /colorLabel: colorLabelOf\(ORDER_COLOR_MODE\)/.test(printPayJs)
+    && /duplexLabel: duplexLabelOf\(ORDER_DUPLEX\)/.test(printPayJs)
     && printPayJs.includes('colorLabel')
     && printPayJs.includes('duplexLabel')
     && printPayWxml.includes('{{colorLabel}}')
@@ -1224,7 +1247,8 @@ const PACKAGE_CHAIN_PAGES = [
   // R5：判据不再是"回调时再读一次身份"。同一个人的 30 分钟 JWT 在 POST 在途期间到点，
   // getToken() 会先 clearSession()，回调读到的身份是 `''` —— 逐字比对会把它判成换人，
   // 于是订单已经在服务端建出来了，页面却不锁 orderId、还把按钮解开。再点一次就是
-  // 第二张订单和第二笔钱（POST /me/print-orders 没有幂等键）。
+  // 第二张订单和第二笔钱 —— 服务端的幂等键只有在**前端复用同一个键**时才救得回来，
+  // 而"判成换了人"这条路径连键都不会复用。
   if (/_sameIdentity\(identity\)/.test(payBare)) {
     misses.push('建单回调仍按"回调时重读身份"判定（同一账号的自然过期会被判成换人 → 重复下单）')
   }
@@ -1240,7 +1264,7 @@ const PACKAGE_CHAIN_PAGES = [
   if (!(lockIdx > 0 && redirectIdx > lockIdx)) misses.push('orderId 必须在 redirectTo 之前锁住（跳转失败时页面还留在这里）')
   if (!/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(printPayJs)) misses.push('redirectTo 没有失败兜底')
   if (!/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(printPayJs)) {
-    misses.push('已建过单仍可能再 POST 一次（/me/print-orders 没有幂等键）')
+    misses.push('已建过单仍可能再 POST 一次（服务端虽会按幂等键回放，页面也不该让用户白点）')
   }
   // 换人 / 登出必须当场复位与上一位绑定的全部状态，onShow 也要过一遍
   //（用户完全可能在别的页换了账号再切回来，本页收不到任何通知）。

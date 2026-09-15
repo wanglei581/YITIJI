@@ -1454,9 +1454,29 @@ const api = {
   },
 
   /** M2 第一片：本人文件预提交为 Order-only，付款前不会创建 PrintTask。 */
-  createCloudPrintOrder(data) {
+  /**
+   * 创建 Order-only 待到机订单。
+   *
+   * `opts.idempotencyKey` **必填**，且只走 Header `idempotency-key`：
+   * 服务端 `assertMemberPrintOrderIdempotencyKey` 从 Header 取，缺了就 400
+   * `IDEMPOTENCY_KEY_REQUIRED`。放进 body 有两个后果：服务端根本读不到（照样 400），
+   * 而 `CreateMemberPrintOrderDto` 又会把这个多出来的字段判成非法参数。
+   * 键从哪来、什么时候复用，见 utils/print-order-idempotency.js。
+   */
+  createCloudPrintOrder(data, opts) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印预提交'));
-    return request('/me/print-orders', { method: 'POST', data, needAuth: true });
+    const idempotencyKey = opts && opts.idempotencyKey;
+    if (typeof idempotencyKey !== 'string' || !idempotencyKey) {
+      // 本地就挡下来，不把一个必然 400 的请求发出去 —— 那会让页面把
+      // 「你少带了一个 Header」显示成「下单失败，请稍后重试」。
+      return Promise.reject(new Error('创建打印订单必须携带幂等键'));
+    }
+    return request('/me/print-orders', {
+      method: 'POST',
+      data,
+      needAuth: true,
+      header: { 'idempotency-key': idempotencyKey },
+    });
   },
 
   /** Order-only 待到机订单列表。 */

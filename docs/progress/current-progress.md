@@ -12,6 +12,122 @@
 生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
 此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
 
+2026-09-15 **幂等建单接线：撤回 `cf2e12d93ac480929d3abcfb546c584f4deb1722` 的收口结论。**
+该 SHA 上「重复下单已经收口」这句话当时**不成立** —— 它靠的全是页面内的一把内存锁
+（`_createAttempt` / `_createdOrderId`），而那把锁挡不住真正会多扣一笔钱的那一种：
+**200 丢在路上**。用户点了提交，服务端把订单建好了，响应没回来；用户再点一次 ——
+页面的锁早就随着失败分支解开了，于是第二次 POST 到达一个**没有幂等键**的端点，
+第二张订单、第二笔钱。锁只挡得住"同一个页面实例里的并发点击"，挡不住"页面被杀掉重进"，
+更挡不住"这一次到底是不是上一次的重试"。那需要服务端先有一个可回放的键。
+
+现在有了：`ed576f3cb6c54e691bb85b5f06f91f1c39e86245`（Grok，服务端）给
+`POST /me/print-orders` 加了必填 `Idempotency-Key` 与耐久回放 ——
+按 `(endUserId, idempotencyKey)` 落库，同键 + 同 payload 指纹回放**同一张** Order，
+同键 + 不同参数 409 `IDEMPOTENCY_KEY_REUSED`。本轮把小程序接上去，并修掉冷审的三个页面问题。
+锚点是 `ed576f3cb` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+**新增 `apps/miniapp/utils/print-order-idempotency.js`（独立 utility）。** 键的取舍：
+
+- **UUID v4 走 `wx.getRandomValues`，不用 `Math.random`。** 后者不是密码学随机，
+  多个端在同一毫秒进本页有真实碰撞面，而碰撞意味着两个人共用一个幂等键：
+  第二个人会被服务端当成第一个人的重试 —— 同指纹就拿到**别人的订单**，不同指纹就 409。
+  `wx.getRandomValues` 只有异步形态，所以取键是异步的；取不到就**失败**，
+  不退回任何弱随机（没有可靠的键就不该发这个请求，服务端也会 400 挡下来）。
+- **按 `会员 id + canonical fingerprint(fileId, terminalId, copies, colorMode, duplex)` 持久化**
+  `{account, fingerprint, key, orderId, createdAt}`，TTL 7 天、最多 20 条。
+  指纹字段集与服务端 `fingerprintMemberPrintOrderPayload` **逐字同一组**：少看一项，
+  用户改了那一项再提交必然 409；多看一项，服务端认为没变时本地却换了新键 ——
+  "响应丢了再点一次"又变回两张订单。两个方向都有代价，所以字段集本身由常量钉住。
+- **不存到机码、不存文件名、不存金额**（取件凭证 / 常含本人姓名的材料标题 / 本人订单状态，
+  CLAUDE.md §11）。恢复一张订单只需要 orderId，页面会自己带登录态去服务端回读。
+- **B 绝不能读或复用 A 的记录**：每次查找都要求账号逐字相等且是确定的会员键（`'u:<id>'`），
+  `''` / `'!'` 一条都不给。
+
+**接线要点（每一条都对应一个会多扣钱的处境）：**
+
+- `api.createCloudPrintOrder(data, opts)` 强制从 `opts.idempotencyKey` 走 **Header**
+  `idempotency-key`。放进 body 两头不通：服务端从 Header 取（读不到照样 400），
+  而 `CreateMemberPrintOrderDto` 又会把多出来的字段判成非法参数。缺键时本地直接 reject，
+  不把一个必然 400 的请求发出去（那会让页面把"你少带了一个 Header"显示成"下单失败"）。
+- **先拿键、先落盘，然后才 POST。** 顺序反过来就把"响应丢了"这一种原样留着 ——
+  而那正是最需要幂等键的时刻。尝试锁仍然**同步**设上：取键要等回调，锁排在异步之后等于没锁。
+- **拿到 orderId 先写进"发起这次提交的那位"的恢复记录，再判当前页面还接不接收这条响应。**
+  这两件事的对象根本不同：记录属于 `attempt.account`，页面此刻可能已经换人。
+  先判页面、后落盘的话，"A 的回调晚于换人"会直接 return —— 服务端那张订单已经建成，
+  A 手上一条线索都没有，A 重新登录回来只会再提交一次。
+- **确实跳走了才清恢复记录**（`wx.redirectTo` 的 `success`）。拿到 200 就清的话，
+  跳转失败会把唯一能找回这张订单的线索一起丢掉，而页面还留在原地。
+- 进入 / 回到本页时按当前账号恢复 `_createdOrderId` + `createdLocked`，并指向
+  「我的 · 打印订单」。换人清场之后**再判一次账号**，因为当前这位对这组参数完全可能
+  自己也有一张已建成的订单。
+- 服务端回放一张已 `cancelled` / `expired` 的原单时，前端**照它给的 orderId 处理**，
+  不自己另铸一个键（那等于伪造一次"重新下单"）。要真的重新下单必须改参数或从上游重进。
+
+**冷审的三个页面问题一并修掉：**
+
+- **材料包到机码页换到 B 之后只挡住了第一次 `onShow`。** `this._account` 在清场时被设成
+  `''`，于是**第二次** `'' → 'u:B'` 在状态机眼里是一次正常的补签升级 = `'ok'` ——
+  本页又会拿着上一位的 orderId 用 B 的 token 发请求。第一次挡住、第二次放过等于没挡。
+  改法：另记一份**不随清场销毁**的开页账号 `_openerAccount` + 粘性 `_foreignBlocked`。
+  **登出不粘**（同一位 A 重新登录必须还能恢复这一页），只有换成别人才粘，
+  直到开页那位自己回来。
+- **报价 fail-closed 只给「重新核价」，是个死循环。** 补签已经失败之后再点一百次也只会
+  再 fail-closed 一百次。改法：新增**状态字段** `quoteRecover`（`'' | 'login' | 'retry'`），
+  模板按它分流出「去登录」。判据是状态字段而不是文案里有没有「登录」两个字 ——
+  文案会被改写、会被翻译，拿它当判据就是把一条控制流挂在一句话上。
+- 上一条附带：普通网络失败仍然给「重新核价」，不一律把人推去登录。
+
+**测试 108/108**（比上一轮多 10 条），其中一条用**真** `utils/api.js` + `utils/request.js`
+把 `wx.request` 的入参截下来，断言键在 Header、且**不在 body**（不是源码正则）。
+测试替身同时补上 `wx.getRandomValues` 与 `showLoading/hideLoading` 可见性；
+`makePage` 现在把全局 `wx` 指向该条测试的沙箱 `wx` —— 真机上只有一个全局 `wx`，
+页面与 utils 共用它，替身不照做的话工具模块会读到一个空的存储。
+
+**反向变异 8 条，全部判红**（逐字节还原，未用 checkout / reset）：
+`N1` 每次点击都铸新 UUID `tests=1`、`N2` 忽略 member id `tests=1`、
+`N3` 200 后先验身份再持久化 `tests=1`、`N3b` 持久化改用当前页面账号 `tests=1`、
+`N4` 跳转失败也清记录 `tests=1`、`N5` package-code 换人后清 `_account` `tests=1`、
+`N6` 去掉登录按钮接线 `tests=1`、`N7` 幂等键塞进 body `tests=1`。
+
+`N6` 第一次跑是 **GREEN** —— 测试直接调 `page.toLogin()`，绕过了模板接线，
+把 wxml 里那个按钮整个删掉照样绿。改成**从模板里读出处理函数名再调它**之后才判红。
+记在这里是因为它是本轮唯一一次"测试写得像覆盖、其实没覆盖"，与 R5 那条假覆盖同源。
+
+**门禁修了四处「写了但管不住」**（都是我这轮的重构把它们暴露出来的，不是放宽）：
+`verify-miniapp-static` 三处按**单行字面量**匹配的断言（`request('/me/print-orders', { method: 'POST'`、
+`colorMode: 'black_white'`）—— 换行或提取成常量就转红，而代码并没有变坏；
+改成容忍格式的结构匹配，并额外钉住"报价与建单必须共用同两个常量、页内不许再写死第二份"。
+`verify-package-chain` 一处定长窗口 `[\s\S]{0,500}`（本轮是第三次被同一个模式咬）
+换成取函数体，并补上粘性封锁的断言。
+`verify-miniapp-cloud-print-m2` 的跨端断言同样按单行字面量匹配，已改成结构匹配，
+并**新增一条跨端断言**：小程序把键放 Header、不放 body，与服务端 `@Headers('idempotency-key')`
+的取值位置一致。这条只动前端契约的静态断言，**没有改任何后端行为**。
+
+本机独立复跑（全部退出码 0）：`node --test page-lifecycle.test.mjs`（108/108）、
+小程序 `verify:static` / `verify:package-chain` / `verify:api-contract`（135 端点 0 缺口）、
+API `verify:member-print-order-idempotency` / `verify:miniapp-cloud-print-m2` / `typecheck`、
+根 `verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync`、
+`git diff --check`。`docs/graph/**` 用标准命令 `pnpm graph` 重生成（本轮漂移主要来自
+`ed576f3cb` 新增的 `verify-member-print-order-idempotency.ts` 尚未入图，加上本轮新增的
+util），重跑 `graph:check` 为 0，未手改生成物。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION /
+COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、
+未接真实 API、未真机、未部署。**「幂等」这一条尤其不要外推**：本轮证明的是
+"前端在正确的时机复用正确的键"，服务端回放由 `verify:member-print-order-idempotency`
+在隔离库上证明；**两端拼起来在真实网络上的行为一次都没跑过**。
+
+**本轮新增登记的遗留：**
+
+- **取键是异步的**（`wx.getRandomValues` 没有同步形态），于是"点击 → POST"之间多了一跳。
+  尝试锁是同步设的，已有测试钉住"连点三次只发一次"；但这一跳在真机上的表现
+  （慢设备上遮罩与按钮的观感）没有验过。
+- **`wx.getRandomValues` 不可用时本页直接失败**，不降级。这是刻意的 fail-closed，
+  代价是老基础库上无法下单 —— 未在真机核对过该 API 的最低基础库版本。
+- 恢复记录只在本机。换手机、清缓存之后 A 仍然要靠「我的 · 打印订单」找回订单，
+  页面不会再显示"已创建"。这是本地缓存的固有边界，不是缺陷，但要说清。
+
 2026-09-15 **R5 收口：撤回 `c42818c115a0d57e33e94b41eb63aa8a275b37db` 的「可进入三方复审 / 开 PR」
 结论 —— 该 SHA 上仍有 1 个 P1 + 3 个 P2，已在本地修完并追加一个提交（不 amend）。**
 锚点是 `c42818c11` 的直接子提交（本分支 tip），基线仍是
