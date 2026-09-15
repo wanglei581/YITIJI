@@ -18926,6 +18926,7 @@
     ],
     "apps/miniapp/pages/print-pay/print-pay.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/miniapp/pages/print-pickup/print-pickup.js": [
@@ -26832,6 +26833,7 @@
           "apps/miniapp/pages/package-code/package-code.js",
           "apps/miniapp/pages/package-confirm/package-confirm.js",
           "apps/miniapp/pages/package-create/package-create.js",
+          "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/pages/print-pickup/print-pickup.js",
           "apps/miniapp/pages/store-select/store-select.js",
           "apps/miniapp/scripts/tests/page-lifecycle.test.mjs",

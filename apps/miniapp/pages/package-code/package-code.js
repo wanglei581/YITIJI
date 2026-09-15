@@ -15,7 +15,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
 const { createPickupQrMatrix, PICKUP_CODE_RE } = require('../../utils/pickup-qrcode')
-const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 
 const QR_SIZE_PX = 180
 
@@ -51,18 +51,13 @@ Page({
     const orderId = options.orderId ? decodeURIComponent(options.orderId) : ''
     this._guard = createLifecycleGuard()
     this._guard.activate()
+    // 稳定账号快照。**只放内存**，并且必须在任何一次破坏性 token 读取之前就存在：
+    // auth.getToken() 在 JWT 过期时会连 user 一起清掉，事后再去读就没有账号 id 了。
+    this._account = ''
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       orderId,
     })
-  },
-
-  /**
-   * 当前身份的稳定快照。三态：`''` 未登录 / `'!'` 登录但无 id（不可用）/ `'u:<id>'`。
-   * 不可用时本页一个到机码都不显示 —— 见 page-guard.memberIdentityKey。
-   */
-  _identityKey() {
-    return memberIdentityKey(auth)
   },
 
   /**
@@ -74,42 +69,64 @@ Page({
    * 生命周期回调，页面还停在前台，而屏幕上那张已经渲染好的到机码属于一个
    * 已经不存在的会话。只"丢弃响应"的话它会一直留在那儿（共用设备上就是下一位看到它）。
    *
-   * 不动 request.js 的续签设计：续签成功时身份不变，这里什么都不会发生。
+   * R5 修的是它漏掉的另一半：判据此前是 `_guard.setIdentity(memberIdentityKey(auth))`，
+   * 而 `auth.getToken()` 在 JWT 自然过期时会先 `clearSession()`（token 与 user 一起清）。
+   * 于是「同一个人的 30 分钟 JWT 到点了」与「用户主动登出」在这里完全同形，都是
+   * `'u:A' → ''` —— 本页把前者也判成换人：清掉码、写「登录已失效」、**一个请求都不发**，
+   * request.js 的静默补签永远没机会跑。用户手上那张码服务端其实还认。
    *
-   * @returns {'changed'|'unusable'|'ok'} changed 时本函数已经写好了说明，调用方不要覆盖
+   * 现在改用 page-guard.resolveAccountState：稳定账号快照 + RESIGNIN_ELIGIBLE 这面
+   * 持久旗子（`clearSession()` 不动它，只有 `auth.logout()` 撤销它，页面造不出来）。
+   * 仍然不动 request.js 的续签设计。
+   *
+   * @returns {'changed'|'unusable'|'resignable'|'ok'} changed 时本函数已经写好了说明，
+   *   调用方不要覆盖；resignable 要**照常发请求**，交给 request.js 去补签。
    */
   _enforceIdentity() {
-    const identity = this._identityKey()
-    if (this._guard.setIdentity(identity)) {
-      // setIdentity 返回 true = 身份变了，并且已经 +1 代次（在途请求全部作废）。
+    const resolved = resolveAccountState(auth, this._account)
+    if (resolved.state === 'changed') {
+      // 真的换了人，或主动登出。setIdentity 会 +1 代次，把上一位在途的请求一并作废 ——
+      // 只清 data 不作废请求的话，那几个迟到的响应会把刚清掉的码原样写回来。
+      this._account = ''
+      this._guard.setIdentity('')
       this._clearCredentials()
+      const switched = isMemberIdentity(resolved.identity)
       this.setData({
         loading: false,
-        loadErrorTitle: identity ? '账号已切换' : '登录已失效',
-        loadError: identity
+        loadErrorTitle: switched ? '账号已切换' : '登录已失效',
+        loadError: switched
           ? '当前账号与打开这张到机码时的不是同一个，已停止显示。可以到「我的 · 打印订单」里找回自己的材料包订单。'
           : '到机码只对订单本人显示，登录状态已失效，请重新登录后再查看。',
-        loadRecover: identity ? 'orders' : 'login',
+        loadRecover: switched ? 'orders' : 'login',
       })
       return 'changed'
     }
-    return isMemberIdentity(identity) ? 'ok' : 'unusable'
+    this._account = resolved.account
+    // 补签升级（`''` → `'u:<id>'`）**不得** +1 代次：那条刚被 request.js 救回来的响应
+    // 正在路上，作废它就又变成一页转不完的 loading。adoptIdentity 只放行这一个方向。
+    this._guard.adoptIdentity(resolved.account)
+    return resolved.state
   },
 
   /**
    * 这个响应还能不能写进 data。
    *
    * 四层缺一不可：页面仍在前台（onHide/onUnload 之后一律拒绝，否则刚清掉的到机码
-   * 会被迟到的响应原样写回去）、身份没变、是本通道最新一次请求（重复刷新 latest-wins，
+   * 会被迟到的响应原样写回去）、账号没变、是本通道最新一次请求（重复刷新 latest-wins，
    * 旧响应不得把终态改回去）、并且查的是**当前这张**订单。
    *
    * 顺带**执行**身份判定而不只是查询它：每个异步回调都会经过这里，于是前台静默登出
    * 会在下一个回调到达时被当场发现并清场。
+   *
+   * 账号那一层走 sameAccount 而不是 `accepts(token, identity)` 的逐字比对：后者会把
+   * "发起时 JWT 刚过期、回调时补签已成功"（`''` → `'u:<id>'`）判成换人。
    */
   _accepts(token) {
-    if (this._enforceIdentity() !== 'ok') return false
+    const state = this._enforceIdentity()
+    if (state === 'changed' || state === 'unusable') return false
     if (!token || token.orderId !== this.data.orderId) return false
-    return this._guard.accepts(token, this._identityKey())
+    if (!sameAccount(token.identity, this._account)) return false
+    return this._guard.accepts(token)
   },
 
   onReady() {
@@ -168,7 +185,10 @@ Page({
     // 'changed' 时 _enforceIdentity 已经清场并写好了说明，不要再覆盖成「请先登录」。
     const identityState = this._enforceIdentity()
     if (identityState === 'changed') return
-    if (identityState !== 'ok') {
+    // 'resignable' 与 'ok' 一样**真的发请求**：本地 token 自然过期但没人登出时，
+    // 必须让它进 request.js —— 那里拿到 401 会静默补签一次再重发，用户全程无感。
+    // 在本页先拦下来，等于把一个能自己修好的过期会话变成一页转不完的 loading。
+    if (identityState === 'unusable') {
       this.setData({
         ready: false, loading: false, pickupCode: '', showQr: false,
         // 登录了却拿不到会员 id 时不说「请先登录」——那句话会让用户以为自己没登录。

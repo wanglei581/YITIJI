@@ -12,7 +12,7 @@
 // 把这些渲染出来。与 package-confirm → package-code、orders → print-pickup 同一口径。
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
-const { memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 
 // MP-07 改法 (a)：标签只显示即将建单的真实参数，不从 query 猜彩色/双面。
 // 与 print-upload.verifiedPrintParams 锁死同一组（verify-miniapp-static 抽取字面量）。
@@ -75,6 +75,13 @@ Page({
   onLoad(opts) {
     const q = opts || {}
     const copies = Number(q.copies) > 0 ? Number(q.copies) : 1
+    // 稳定账号快照。**只放内存**，并且必须在任何一次破坏性 token 读取之前就存在：
+    // auth.getToken() 在 JWT 过期时会连 user 一起清掉，事后再去读就没有账号 id 了。
+    this._account = ''
+    // 报价链的代次守卫（latest-wins）。**建单链不走它** —— 见 continueFlow：
+    // 建单的判据只能是"这次尝试绑给了哪位账号"，切后台绝不能让已经建成的订单丢掉。
+    this._guard = createLifecycleGuard()
+    this._guard.activate()
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
@@ -88,14 +95,90 @@ Page({
     this._loadFileName()
   },
 
-  /** 当前身份的稳定快照。三态；见 page-guard.memberIdentityKey。 */
-  _identityKey() {
-    return memberIdentityKey(auth)
+  /**
+   * 账号判定。判据是 page-guard.resolveAccountState 那一份（见那里的长注释）。
+   *
+   * 本页此前用的是「发起时记一个 `memberIdentityKey()`，回调时再读一次逐字比对」。
+   * 它挡得住换人，**挡不住同一个人的 JWT 在这条链在途期间到点**：`auth.getToken()`
+   * 过期时会先 `clearSession()` 把 token 与 user 一起清掉，于是回调那一刻读到的是
+   * `''`，与发起时的 `'u:A'` 不等 —— 被判成"换了人"。对建单链来说这是要命的：
+   * 服务端那张订单已经建出来了，而本页**不锁 `_createdOrderId`、还把按钮解开**，
+   * 用户以为没下成，再点一次就是第二张订单和第二笔钱（`POST /me/print-orders`
+   * 没有幂等键）。
+   *
+   * @returns {'changed'|'unusable'|'resignable'|'ok'} changed 时本函数已经复位了本页
+   *   与上一位绑定的全部状态（建单锁 / 提交锁 / 报价 / 文件名），调用方不要再覆盖。
+   */
+  _resolveAccount() {
+    const resolved = resolveAccountState(auth, this._account)
+    if (resolved.state === 'changed') {
+      this._account = ''
+      this._resetForAccountChange(isMemberIdentity(resolved.identity))
+      return 'changed'
+    }
+    this._account = resolved.account
+    // 补签升级（`''` → `'u:<id>'`）不 +1 代次：那条刚被 request.js 救回来的报价响应
+    // 正在路上，作废它只会让金额永远停在「正在核定」。adoptIdentity 只放行这一个方向。
+    this._guard.adoptIdentity(resolved.account)
+    return resolved.state
   },
 
-  /** 这条异步链的结果还能不能落到当前这位头上。换人了一律停手。 */
-  _sameIdentity(identity) {
-    return this._identityKey() === identity
+  /**
+   * 换了人 / 主动登出：把与上一位绑定的一切当场复位。
+   *
+   * 三件事缺一不可：
+   *   ① 建单锁（`_createdOrderId` / `_createAttempt` / `createdLocked`）—— 留着的话
+   *      B 的页面要么被 A 的订单锁死按不动，要么点「订单已创建」被带去 A 的到机码页。
+   *   ② 提交锁（`submitting`）—— 留着 B 的按钮永远按不动。
+   *   ③ 屏幕上属于 A 的展示（文件名常常就写着本人姓名、金额是本人订单状态）。
+   *
+   * `_guard.setIdentity('')` 会 +1 代次，把 A 在途的报价 / 文件名请求一并作废。
+   */
+  _resetForAccountChange(switched) {
+    this._guard.setIdentity('')
+    this._createdOrderId = null
+    this._createAttempt = null
+    this.setData({
+      submitting: false,
+      createdLocked: false,
+      isFreeOrder: false,
+      pageCountLabel: '待服务端核定',
+      'fee.total': '—',
+      'files[0].name': '本人文件',
+      'files[0].price': '—',
+      quoteState: 'error',
+      quoteError: switched
+        ? '当前账号与打开这一页时的不是同一个，已停止显示上一位的文件与金额。请返回重新选择文件。'
+        : '登录状态已失效，请重新登录后返回重新选择文件。',
+    })
+  },
+
+  /** 异步响应还能不能写进 data：账号没变（含补签升级）+ 本通道最新一次。 */
+  _accepts(token) {
+    const state = this._resolveAccount()
+    if (state === 'changed' || state === 'unusable') return false
+    if (!sameAccount(token && token.identity, this._account)) return false
+    return this._guard.accepts(token)
+  },
+
+  /**
+   * 切后台 / 回前台。
+   *
+   * 回前台必须重新核一次账号：用户完全可能在这一页停留期间被静默登出，或者在另一页
+   * 换了账号 —— 全程没有任何回调会通知本页，而屏幕上还挂着上一位的文件名、金额，
+   * 以及一把指向上一位订单的建单锁。
+   */
+  onShow() {
+    this._guard.activate()
+    this._resolveAccount()
+  },
+
+  // 只在真正离开本页时作废在途的报价。**不在 onHide 作废**：建单成功后本页会
+  // redirectTo 到取件页，而报价链断在半路只会让金额停在「正在核定」——
+  // 切后台对一次报价来说不是安全边界（金额是本人自己的），换人才是，那条由
+  // _resolveAccount 的 setIdentity 管。
+  onUnload() {
+    this._guard.deactivate()
   },
 
   /**
@@ -110,11 +193,28 @@ Page({
       this.setData({ quoteState: 'error', quoteError: '这条链接没有带文件，请返回重新选择。' })
       return
     }
-    const identity = this._identityKey()
+    const state = this._resolveAccount()
+    // 'changed' 时 _resolveAccount 已经复位并写好说明，不要再覆盖它。
+    if (state === 'changed') return
+    if (state === 'unusable') {
+      this.setData({
+        quoteState: 'error',
+        quoteError: auth.isLoggedIn()
+          ? '当前会话缺少会员标识，无法核定本人订单金额。请重新登录一次。'
+          : '金额由服务端按本人订单核定，请登录后再核价。',
+      })
+      return
+    }
+    // 'resignable'（JWT 自然过期但没人登出）照常发：request.js 拿到 401 会静默补签
+    // 一次再重发。在本页先拦下来，金额就永远停在「正在核定」。
+    //
+    // 令牌是 R5 补上的第二层：此前这条链只比对身份，同一位用户连点两次「重新核价」
+    // 时，先发的那次若后回来就会把后发那次的金额盖掉（服务端识别页数的耗时并不固定）。
+    const token = this._guard.issue('quote')
     this.setData({ quoteState: 'loading', quoteError: '' })
     api.quoteMyPrintOrder(fileId, quoteParams(this.data.copiesLabel))
       .then((quote) => {
-        if (!this._sameIdentity(identity)) return
+        if (!this._accepts(token)) return
         const amountCents = Number(quote && quote.amountCents)
         const billablePages = Number(quote && quote.billablePages)
         if (!Number.isSafeInteger(amountCents) || amountCents < 0
@@ -133,7 +233,7 @@ Page({
         })
       })
       .catch((err) => {
-        if (!this._sameIdentity(identity)) return
+        if (!this._accepts(token)) return
         this.setData({
           quoteState: 'error',
           quoteError: (err && err.message) || '暂时取不到服务端报价，金额将在到机时以服务端核定为准。',
@@ -154,11 +254,13 @@ Page({
   _loadFileName() {
     const { fileId } = this.data.q
     if (!fileId) return
-    const identity = this._identityKey()
-    if (!isMemberIdentity(identity)) return
+    const state = this._resolveAccount()
+    // 与报价同口径：'resignable' 照常发，交给 request.js 补签。
+    if (state === 'changed' || state === 'unusable') return
+    const token = this._guard.issue('filename')
     api.getMyDocuments({ pageSize: 20 })
       .then((page) => {
-        if (!this._sameIdentity(identity)) return
+        if (!this._accepts(token)) return
         const items = Array.isArray(page && page.items) ? page.items : (Array.isArray(page) ? page : [])
         const hit = items.find((doc) => doc && doc.id === fileId)
         if (hit && hit.filename) this.setData({ 'files[0].name': hit.filename })
@@ -177,6 +279,7 @@ Page({
    */
   _lockAfterCreated(orderId) {
     this._createdOrderId = orderId
+    if (this._createAttempt) this._createAttempt.settled = true
     this.setData({ submitting: false, createdLocked: true })
   },
 
@@ -189,11 +292,35 @@ Page({
     if (this.data.submitting) return
     // 已经建过单：不再发第二次 POST，直接把人送去找那张订单。
     if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }
+    // 上一次尝试还没落定：POST 可能已经到了服务端，订单可能已经建出来了。
+    // 这一条不能只靠 data.submitting —— 它是 setData 出去的，任何一条路径把它写回
+    // false（R5 之前"换了人"那一支就是这么干的）按钮就又能按了，而服务端那张订单还在。
+    if (this._createAttempt && !this._createAttempt.settled) return
     if (!q.fileId || !q.storeId) {
       wx.showModal({ title: '参数不完整', content: '请返回重新选择文件和终端。', showCancel: false })
       return
     }
-    const identity = this._identityKey()
+    const state = this._resolveAccount()
+    if (state === 'changed') return
+    if (state !== 'ok') {
+      // 建单必须有一个确定的会员身份：它会在服务端落一张带钱的订单。
+      // 不像报价那样放行 'resignable' —— 报价拿错身份只是显示错，建单拿错身份是错账。
+      wx.showModal({
+        title: '请先登录',
+        content: '下单前需要确认是本人账号，请重新登录一次再提交。',
+        showCancel: false,
+      })
+      return
+    }
+    // **在 POST 发出之前**就把这一次尝试绑给当前这位账号。
+    //
+    // 回调那一刻的本地身份完全可能已经不可用（enduser JWT 只签 30 分钟，
+    // 用户在确认页上多看两眼就到点了）。判据若是"回调时再读一次身份"，
+    // 自然过期会被读成换人：订单其实已经建出来了，本页却不锁、还把按钮解开 ——
+    // 用户以为没下成，再点一次就是第二张订单和第二笔钱（没有幂等键）。
+    // 绑在尝试上的账号是发出那一刻的真值，过期清不掉它。
+    const attempt = { account: this._account, settled: false }
+    this._createAttempt = attempt
     this.setData({ submitting: true })
     wx.showLoading({ title: '正在提交…', mask: true })
     api.createCloudPrintOrder({
@@ -207,13 +334,17 @@ Page({
       wx.hideLoading()
       const orderId = (order && order.id) || ''
       if (!orderId) throw new Error('服务端未返回订单号')
-      // 换了人：这张订单属于上一位，不锁当前这位的页面、也不把他带去别人的到机码。
-      // 上一位的订单不会丢，它已落库，本人可从「我的 · 打印订单」找回。
-      if (!this._sameIdentity(identity)) { this.setData({ submitting: false }); return }
+      // 真的换了人 / 登出：这张订单属于上一位，不锁当前这位的页面、也不把他带去别人的
+      // 到机码。上一位的订单不会丢，它已落库，本人可从「我的 · 打印订单」找回。
+      // _resolveAccount 在 'changed' 时已经把这次尝试连同建单锁一起复位了，
+      // 所以这里用"尝试还是不是刚才那一次"判定，B 因此可以安全地发起自己的那一次。
+      if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) return
+      // 走到这里账号仍是发起时那位（含"JWT 刚好在途中自然过期"这一种）。
       // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
       // 锁必须在 redirectTo **之前**设 —— 跳转失败（或同步抛）时页面还留在这里，
       // 不设锁的话用户只会以为没下成，然后再点一次，于是多出一张订单和一笔钱。
       this._createdOrderId = orderId
+      attempt.settled = true
       // 只把 orderId 交给下一页。到机码 / 金额 / 有效期 / 订单号 / 任务状态一律由
       // print-pickup 自己带登录态向 GET /me/print-orders/:orderId 取（requireOwned 归属校验）。
       wx.redirectTo({
@@ -222,10 +353,13 @@ Page({
       })
     }).catch(err => {
       wx.hideLoading()
-      if (!this._sameIdentity(identity)) { this.setData({ submitting: false }); return }
+      if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) return
       // 订单已经建成、只是后续动作抛错（例如 redirectTo 同步抛）：
       // 不能当成"下单失败"让用户重来 —— 重来就是第二张订单。
       if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }
+      // 这一次确实没建成（网络失败 / 服务端拒绝）：解开尝试锁，让用户可以重试。
+      attempt.settled = true
+      this._createAttempt = null
       this.setData({ submitting: false })
       wx.showModal({ title: '提交失败', content: (err && err.message) || '请稍后重试', showCancel: false })
     })

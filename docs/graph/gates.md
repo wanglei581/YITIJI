@@ -852,7 +852,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/pages/package-confirm/package-confirm.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
 | `apps/miniapp/pages/package-create/package-create.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/pages/policies/policies.js` | `verify-empty-state-honesty.mjs` |
-| `apps/miniapp/pages/print-pay/print-pay.js` | `verify-miniapp-static.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
+| `apps/miniapp/pages/print-pay/print-pay.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
 | `apps/miniapp/pages/print-pickup/print-pickup.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
 | `apps/miniapp/pages/print-store/print-store.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/print-upload/print-upload.js` | `verify-miniapp-static.mjs` |

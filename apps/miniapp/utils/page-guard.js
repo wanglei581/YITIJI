@@ -83,7 +83,9 @@ function createLifecycleGuard() {
 
   const normalize = (value) => (value === null || value === undefined ? '' : String(value))
 
-  return {
+  // 具名而不是直接 `return {}`：adoptIdentity 要在守卫内部回落到 setIdentity，
+  // 走 `this.` 会在守卫被解构出去时断掉。
+  const guard = {
     /** onLoad / onShow：页面可以接收响应了。 */
     activate() {
       active = true
@@ -125,6 +127,27 @@ function createLifecycleGuard() {
     },
 
     /**
+     * **补签升级**：`''` → `'u:<id>'`，不 +1 代次。
+     *
+     * 这不是换人，而是「请求发出时本地恰好没有可用会话（enduser JWT 只签 30 分钟），
+     * request.js 拿到 401 静默补签成功后写回了同一位」的正常形态。走 setIdentity 会
+     * +1 代次，把那条**刚刚被救回来**的响应连同页面一起作废 —— 页面就停在 loading 上，
+     * 既没有请求在跑也没有出口（这正是 R4-1 修过、R5 又在别的页上重现的那个形态）。
+     *
+     * 只接受这一个方向。其余一律退回 setIdentity（照常 +1 代次作废在途请求），
+     * 免得有人拿它把 `'u:A'` 悄悄换成 `'u:B'` 而 A 的在途响应仍然有效。
+     *
+     * @returns {boolean} 身份是否被改写
+     */
+    adoptIdentity(next) {
+      const key = normalize(next)
+      if (key === identity) return false
+      if (identity !== '' || !isMemberIdentity(key)) return guard.setIdentity(key)
+      identity = key
+      return true
+    },
+
+    /**
      * 发起一次请求前领一个令牌。回调里拿它去 accepts() 换"能不能写"。
      * @param {string} channel 通道名（同通道后发起的会让先发起的失效）
      * @param {object} [meta] 附加到令牌上的字段（例如 orderId），由调用方自行比对
@@ -155,6 +178,88 @@ function createLifecycleGuard() {
       return true
     },
   }
+
+  return guard
 }
 
-module.exports = { createLifecycleGuard, memberIdentityKey, isMemberIdentity, IDENTITY_UNUSABLE }
+/**
+ * 账号状态机：把「同一个账号的 JWT 自然过期」与「主动登出 / 换了人」分开。
+ *
+ * 为什么非分开不可 —— `auth.getToken()` 在 JWT 过期时会先 `clearSession()`（token 与
+ * user 一起清）再返回 null。于是从 `memberIdentityKey()` 看出去，**自然过期与主动登出
+ * 完全同形**：两者都是 `'u:A' → ''`。凭证页只要把这一跳判成"换了人"，就会当场清掉
+ * 屏幕上那张到机码、写一句「登录已失效」、并且**一个请求都不发** —— 于是
+ * `utils/request.js` 里那套 401 静默补签永远没有机会执行。而这恰好是取件链最关键的
+ * 一刻：enduser JWT 只签 30 分钟，中午下单、下午走到一体机前打开取件页，命中的就是
+ * 这一跳。用户手上有一张服务端仍然认的码，页面却告诉他"登录已失效"。
+ *
+ * 唯一能把两者分开的是 `RESIGNIN_ELIGIBLE`：`clearSession()` 不动它，只有
+ * `auth.logout()`（用户主动登出 / 补签失败）才撤销它。它写在本机存储里，页面**无法
+ * 凭空制造**（只有 `auth.saveSession()` 会写），所以它是一个可信的持久判据。
+ *
+ * 调用方必须自己持有 `snapshot`（上一次见到的稳定账号键），并且**在任何一次破坏性
+ * token 读取之前**就已经持有它 —— 过期发生之后再去读，账号 id 已经被清掉了。
+ * 快照只放内存（Page 实例字段），不落 storage：它本身就是"这台设备上刚才是谁"，
+ * 而且必须在换人/登出时当场销毁（`account: ''`）。
+ *
+ * @param {{isLoggedIn:()=>boolean, getUser:()=>any, canSilentResignin:()=>boolean}} auth utils/auth.js
+ * @param {string} snapshot 调用方持有的稳定账号键（`'u:<id>'`），没有则 `''`
+ * @returns {{state:'ok'|'resignable'|'changed'|'unusable', identity:string, account:string, changed:boolean}}
+ *   - `ok`         当前是一个确定的会员身份，且与快照是同一位（或快照本来就为空）。
+ *   - `resignable` 本地已无可用会话，但没有主动登出、补签资格仍在：
+ *                  **必须放行真实请求**，让 request.js 去静默补签一次。已经显示出来的
+ *                  本人凭证照常留着 —— 没有任何人登出，它仍然属于当前这位。
+ *   - `changed`    真的换了人（`u:A → u:B`）、主动登出、或掉成 `'!'`（登录着却没有会员 id）：
+ *                  调用方必须当场清场，并且**不得**自动补签。
+ *   - `unusable`   从没登录 / 已登出 / 无会员 id，且屏幕上本来也没有本人数据。fail-closed。
+ *   `account` 是调用方应当继续持有的快照；`changed` / `unusable` 时为 `''`（快照销毁）。
+ */
+function resolveAccountState(auth, snapshot) {
+  const identity = memberIdentityKey(auth)
+  const previous = isMemberIdentity(snapshot) ? snapshot : ''
+
+  if (isMemberIdentity(identity)) {
+    // 快照为空 → 确定的本人：这是**补签成功后的正常形态**，不是换人。
+    // 不可用态下调用方一个字节的本人数据都没显示过，没有旧内容会被下一位"继承"。
+    if (previous && previous !== identity) {
+      return { state: 'changed', identity, account: '', changed: true }
+    }
+    return { state: 'ok', identity, account: identity, changed: false }
+  }
+
+  // 拿不到确定身份。`'!'`（登录着却没有会员 id）**一律不给补签资格**：那是一个认不出
+  // 人的会话，放行请求等于拿一个所有 id 缺失会话共享的键去要本人数据。
+  const resignable = identity === '' && !!(auth && auth.canSilentResignin && auth.canSilentResignin())
+  if (previous) {
+    return resignable
+      ? { state: 'resignable', identity, account: previous, changed: false }
+      : { state: 'changed', identity, account: '', changed: true }
+  }
+  return resignable
+    ? { state: 'resignable', identity, account: '', changed: false }
+    : { state: 'unusable', identity, account: '', changed: false }
+}
+
+/**
+ * 令牌上的账号键与**回调那一刻**的账号键是不是同一位。
+ *
+ * 只放行一种不相等：`''` → `'u:<id>'`。那是"请求发出时本地恰好没有可用会话、
+ * 回调时补签已经成功"，见 adoptIdentity。反方向（`'u:A'` → `''`）不在这里放行 ——
+ * 调用方在 resolveAccountState 里已经用 RESIGNIN_ELIGIBLE 把自然过期与主动登出分开，
+ * 自然过期时快照原样是 `'u:A'`，根本不会走到这一步。
+ */
+function sameAccount(tokenAccount, currentAccount) {
+  const from = tokenAccount === null || tokenAccount === undefined ? '' : String(tokenAccount)
+  const to = currentAccount === null || currentAccount === undefined ? '' : String(currentAccount)
+  if (from === to) return true
+  return from === '' && isMemberIdentity(to)
+}
+
+module.exports = {
+  createLifecycleGuard,
+  memberIdentityKey,
+  isMemberIdentity,
+  IDENTITY_UNUSABLE,
+  resolveAccountState,
+  sameAccount,
+}

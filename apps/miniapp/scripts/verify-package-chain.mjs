@@ -31,9 +31,13 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// page-guard.js 是纯函数模块（不依赖 wx / auth），可以在本门禁里**真跑一遍**。
+// 正则只能证明"某段守卫代码存在"，证明不了状态机的判定本身是对的。
+const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
 const read = (rel) => fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
 const exists = (rel) => fs.existsSync(path.join(MINIAPP, rel))
 
@@ -354,6 +358,11 @@ for (const [label, wxml] of [['package-create', createWxml], ['store-select', st
 console.log('\n⑨ 身份快照 + 请求代次 + 生命周期：迟到的响应不得落地')
 {
   const GUARDED_PAGES = ['orders', 'package-create', 'package-confirm', 'package-code']
+  // 会显示到机码 / 会落一张带钱订单的页：判据必须是账号状态机，不能是"上一次读到的身份键"。
+  // 后者把「同一个人的 JWT 自然过期」（getToken() 过期时先 clearSession，'u:A' → ''）
+  // 与「主动登出」判成同一件事 —— 前者当场清码且一个请求都不发，静默补签永远跑不到；
+  // 建单页更狠：订单已在服务端建成，页面却不锁 orderId 还解开按钮 = 第二张订单、第二笔钱。
+  const ACCOUNT_STATE_PAGES = ['package-code']
   assert(exists('utils/page-guard.js'),
     'utils/page-guard.js 存在（三层判据的唯一实现：身份快照 / 代次 / 逐通道序号）')
   const guardSrc = read('utils/page-guard.js')
@@ -374,6 +383,60 @@ console.log('\n⑨ 身份快照 + 请求代次 + 生命周期：迟到的响应�
   assert(/arguments\.length > 1 && normalize\(currentIdentity\) !== token\.identity/.test(guardSrc),
     'page-guard.accepts() 逐字比对回调时刻的当前身份（不依赖任何生命周期回调先触发）')
 
+  // ── R5：账号状态机。把「同一个人的 JWT 自然过期」与「主动登出 / 换人」分开 ──
+  //
+  // 这两件事在 token 维度上完全同形（getToken() 过期时先 clearSession，token 与 user
+  // 一起没）。唯一能分开它们的是 RESIGNIN_ELIGIBLE：clearSession() 不动它，只有
+  // auth.logout() 撤销它。判据一旦退回"有没有 token"或"身份键变没变"，两个方向都会错：
+  //   合成"都算登出" → 取件页当场清掉一张服务端还认的码，且一个请求都不发（补签跑不到）；
+  //   合成"都算过期" → 主动登出的人会被自动登回来（共用设备上的隐私问题）。
+  for (const api of ['resolveAccountState', 'sameAccount', 'adoptIdentity']) {
+    assert(new RegExp(`\\b${api}\\s*\\(`).test(guardSrc), `page-guard 提供 ${api}()`)
+  }
+  assert(/function resolveAccountState[\s\S]{0,900}auth\.canSilentResignin\(\)/.test(guardSrc),
+    "resolveAccountState 用 canSilentResignin（RESIGNIN_ELIGIBLE）区分自然过期与主动登出")
+  assert(/function resolveAccountState[\s\S]{0,900}getToken\(/.test(guardSrc) === false,
+    'resolveAccountState 不拿 token 当判据（token 在两种情况下同形）')
+  {
+    // 真执行一遍：静态正则证明不了状态机本身是对的。
+    const guard = requireMiniapp('./page-guard.js')
+    const authOf = (id, eligible) => ({
+      isLoggedIn: () => !!id,
+      getUser: () => (id ? { id } : null),
+      canSilentResignin: () => eligible,
+    })
+    const cases = [
+      ['自然过期（快照仍是本人、补签资格还在）', authOf(null, true), 'u:A', 'resignable', 'u:A'],
+      ['主动登出（补签资格已撤销）', authOf(null, false), 'u:A', 'changed', ''],
+      ['换了人', authOf('B', true), 'u:A', 'changed', ''],
+      ['补签成功后写回同一位', authOf('A', true), 'u:A', 'ok', 'u:A'],
+      ['过期时打开页面（还没显示过任何本人数据）', authOf(null, true), '', 'resignable', ''],
+      ['从没登录过', authOf(null, false), '', 'unusable', ''],
+    ]
+    for (const [label, a, snapshot, state, account] of cases) {
+      const got = guard.resolveAccountState(a, snapshot)
+      assert(got.state === state && got.account === account,
+        `resolveAccountState：${label} → ${state}/${account || "''"}（实得 ${got.state}/${got.account || "''"}）`)
+    }
+    // 登录着却拿不到会员 id：一律不给补签资格（那是一个认不出人的会话）。
+    const idless = { isLoggedIn: () => true, getUser: () => ({}), canSilentResignin: () => true }
+    assert(guard.resolveAccountState(idless, 'u:A').state === 'changed'
+      && guard.resolveAccountState(idless, '').state === 'unusable',
+    'resolveAccountState：登录了却没有会员 id 一律 fail-closed，不许补签')
+    // sameAccount 只放行"发起时没会话 → 回调时补签成功"这一个方向。
+    assert(guard.sameAccount('', 'u:A') && guard.sameAccount('u:A', 'u:A')
+      && !guard.sameAccount('u:A', 'u:B') && !guard.sameAccount('u:A', ''),
+    'sameAccount 只放行 "" → u:<id> 这一种升级，不放行反向与换人')
+    // adoptIdentity 只在 '' → u:<id> 时不 +1 代次；其余一律退回 setIdentity。
+    const g1 = guard.createLifecycleGuard()
+    g1.activate()
+    const gen0 = g1.generation()
+    assert(g1.adoptIdentity('u:A') === true && g1.generation() === gen0,
+      'adoptIdentity：补签升级不得 +1 代次（作废掉的正是那条刚被救回来的响应）')
+    assert(g1.adoptIdentity('u:B') === true && g1.generation() === gen0 + 1,
+      'adoptIdentity：换人时必须退回 setIdentity 并 +1 代次，不许被当成升级')
+  }
+
   for (const page of GUARDED_PAGES) {
     const src = stripComments(read(`pages/${page}/${page}.js`))
     assert(src.includes("require('../../utils/page-guard')"), `${page} 接入 page-guard`)
@@ -387,8 +450,13 @@ console.log('\n⑨ 身份快照 + 请求代次 + 生命周期：迟到的响应�
       const body = start < 0 ? '' : src.slice(start, src.indexOf('\n  },', start))
       assert(body.includes('_guard.deactivate()'), `${page} ${hook} 作废在途请求`)
     }
-    assert(/_identityKey\(\)\s*\{[\s\S]{0,200}memberIdentityKey\(auth\)/.test(src),
-      `${page} 的身份快照走 page-guard.memberIdentityKey（唯一实现，三态 fail-closed）`)
+    // 身份判据只许有 page-guard 那一份实现。凭证页 / 建单页走的是它上面那层
+    // **账号状态机**（resolveAccountState），别的页仍直接用 memberIdentityKey。
+    // 两者都在 page-guard 里，不得每页再抄一份。
+    assert(ACCOUNT_STATE_PAGES.includes(page)
+      ? /resolveAccountState\(auth, this\._account\)/.test(src)
+      : /_identityKey\(\)\s*\{[\s\S]{0,200}memberIdentityKey\(auth\)/.test(src),
+    `${page} 的身份快照走 page-guard 的唯一实现（三态 fail-closed）`)
   }
 
   // package-code：凭证页的判定比别人多两条 —— 必须认订单，必须先 deactivate 再清。
@@ -511,15 +579,25 @@ console.log('\n⑪ 身份三态 fail-closed（未登录 / 无 id / 正常）')
     'id 缺失时返回不可用哨兵，而不是退化成所有人共享的 "u:"')
   assert(/function isMemberIdentity\(key\)[\s\S]{0,240}key\.length > 2/.test(guardSrc),
     'isMemberIdentity 拒绝空串、哨兵与裸 u:')
-  for (const page of ['orders', 'package-create', 'package-confirm', 'package-code', 'store-select']) {
+  for (const page of ['orders', 'package-create', 'package-confirm', 'store-select']) {
     const src = stripComments(read(`pages/${page}/${page}.js`))
     assert(/memberIdentityKey\(auth\)/.test(src), `${page} 的身份键来自 page-guard.memberIdentityKey`)
     assert(!/'u:' \+ String\(/.test(src), `${page} 不再自己拼 'u:' + id（那会在 id 缺失时退化成共享键）`)
     assert(/isMemberIdentity\(/.test(src), `${page} 用 isMemberIdentity 判定身份能不能用`)
   }
   const pickupSrc = stripComments(read('pages/print-pickup/print-pickup.js'))
-  assert(/memberIdentityKey\(auth\)/.test(pickupSrc) && /isMemberIdentity\(/.test(pickupSrc),
-    'print-pickup 也按同一套身份判据')
+  assert(/resolveAccountState\(auth, this\._account\)/.test(pickupSrc) && /isMemberIdentity\(/.test(pickupSrc),
+    'print-pickup 也按同一套身份判据（账号状态机 + 三态身份键，都在 page-guard 里）')
+  // 到机码页与建单页都不得自己制造补签资格，也不得把账号快照落地。
+  for (const [label, rel] of [['print-pickup', 'pages/print-pickup/print-pickup.js'],
+    ['package-code', 'pages/package-code/package-code.js'],
+    ['print-pay', 'pages/print-pay/print-pay.js']]) {
+    const src = stripComments(read(rel))
+    assert(!/RESIGNIN_ELIGIBLE|resignin_eligible/.test(src),
+      `${label} 不得直接碰补签资格标记（它是 auth 的持久判据，页面造得出来就等于自己给自己发通行证）`)
+    assert(/this\._account/.test(src) && !/storage\.set\(|setStorageSync/.test(src),
+      `${label} 的账号快照只放内存，不落本机存储`)
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -595,8 +673,14 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
   const codeCode = stripComments(codeJs)
   assert(/_enforceIdentity\(\)\s*\{[\s\S]{0,500}this\._clearCredentials\(\)/.test(codeCode),
     'package-code 发现身份变化时当场清掉凭证（request.js 续签失败会 auth.logout()，全程没有生命周期回调）')
-  assert(/_accepts\(token\)\s*\{[\s\S]{0,240}_enforceIdentity\(\) !== 'ok'/.test(codeCode),
-    '每个异步回调都过一遍身份判定')
+  assert(/_accepts\(token\)\s*\{\s*const state = this\._enforceIdentity\(\)/.test(codeCode),
+    '每个异步回调都先**执行**一遍身份判定（不是只查询它）')
+  assert(/state === 'changed' \|\| state === 'unusable'\) return false/.test(codeCode),
+    "只有 'changed' / 'unusable' 才拒收；'resignable'（同一个人的 JWT 自然过期）必须放行，否则补签救回来的响应也进不来")
+  assert(/sameAccount\(token\.identity, this\._account\)/.test(codeCode),
+    '账号那一层走 page-guard.sameAccount（逐字比对会把"发起时刚过期、回调时补签成功"判成换人）')
+  assert(/identityState === 'unusable'/.test(codeCode) && !/identityState !== 'ok'/.test(codeCode),
+    "loadOrder 不得把 'resignable' 和 'unusable' 一起拦掉（那是一页转不完的 loading）")
   assert(/loading: true, ready: false/.test(codeCode),
     '重新加载时把 ready 打回 false（模板里 loading 与成功块是两个独立 wx:if，会同时显示）')
   assert(/this\._codeRaw !== code\) return/.test(codeCode),

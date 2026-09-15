@@ -11,7 +11,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
-const { memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const { isMemberIdentity, resolveAccountState } = require('../../utils/page-guard')
 const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('../../utils/pickup-qrcode')
 
 const POLL_INTERVAL_MS = 3000
@@ -125,7 +125,9 @@ Page({
     const orderId = q.orderId ? decodeURIComponent(q.orderId) : ''
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
     const qrSizePx = Math.round(Math.max(188, Math.min(232, windowInfo.windowWidth * 0.56)))
-    this._identity = this._identityKey()
+    // 稳定账号快照。**只放内存**，并且要在任何一次破坏性 token 读取之前就存在 ——
+    // auth.getToken() 在 JWT 过期时会连 user 一起清掉，事后再去读就没有账号 id 了。
+    this._account = ''
 
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
@@ -141,61 +143,54 @@ Page({
     if (orderId) this._refreshOrder(true)
   },
 
-  /** 当前身份的稳定快照。三态；不可用时本页不取也不显示任何码。 */
-  _identityKey() {
-    return memberIdentityKey(auth)
-  },
-
   /**
-   * 身份判定。**四态，不能压成布尔** —— 压成布尔就是本轮修掉的那个缺陷的成因。
+   * 身份判定。**四态，不能压成布尔**，判据是 page-guard.resolveAccountState 那一份。
    *
-   *   'changed'    换了人 / 登出。本函数已经清场并写好说明，调用方直接返回。
+   *   'changed'    真的换了人（u:A → u:B）/ 主动登出 / 掉成「登录着却没有会员 id」。
+   *                本函数已经清场并写好说明，调用方直接返回。
    *   'ok'         当前是一个确定的会员身份：可以取数，可以显示码。
    *   'resignable' 本地已经没有可用 token（enduser JWT 只签 30 分钟，中午下单下午到机器
    *                前打开必然已经过期），但**仍有补签资格**（曾登录过且没有主动登出）。
-   *   'unusable'   从没登录 / 主动登出 / 登录了却拿不到会员 id。fail-closed。
+   *   'unusable'   从没登录 / 已登出 / 无会员 id，且本页本来也没显示过任何本人数据。
    *
-   * 此前这里返回 `isMemberIdentity(identity)`，于是未登录、无 id、JWT 过期三种情况
-   * 走的是**同一条**路径：与快照一致（都等于 `''`）→ 不算换人 → 返回 false →
-   * `_refreshOrder` 直接 return，`state` 原地停在 `'loading'`。结果是一页永远转不完的
-   * 「正在读取订单实时状态…」：既没有请求在跑，也没有任何出口，用户只能杀掉小程序。
-   * 而其中"JWT 过期"那一种本来是能自己修好的。
+   * R4 修掉了"未登录/无 id/过期三种情况合流成永久 loading"；**R5 修的是它的另一半**：
+   * 当时 'resignable' 只在「当前身份与快照**相等**」时才可能出现，而快照存的是上一次
+   * 读到的原始身份键。于是"码已经显示出来之后 JWT 才自然过期"这条真实路径 ——
+   * 快照 `'u:A'`、当前 `''`（getToken() 过期时先 clearSession 把 user 一起清了）——
+   * 恰好落进最后那条「从确定的本人掉成不可用」，被当成主动登出：当场清码、写一句
+   * 「登录已失效」、**一个请求都不发**，于是 request.js 的 401 静默补签永远没机会跑。
+   * 用户手上那张码服务端其实还认。
+   *
+   * 现在快照改成**稳定账号快照** `this._account`（只放内存，换人/登出时当场销毁），
+   * 自然过期与主动登出由 RESIGNIN_ELIGIBLE 这面持久旗子区分 —— 页面造不出这面旗子。
    */
   _resolveIdentity() {
-    const identity = this._identityKey()
-    const previous = this._identity
+    const resolved = resolveAccountState(auth, this._account)
 
-    if (identity === previous) {
-      if (isMemberIdentity(identity)) return 'ok'
-      // 没有可用身份，但能补签：交给 request.js 的 401 静默续签。
-      return auth.canSilentResignin() ? 'resignable' : 'unusable'
+    if (resolved.state === 'changed') {
+      // 真的换了人，或主动登出（补签资格已被撤销）：**当场清掉屏幕上的码**。
+      // 真实链路里这一步没有任何生命周期回调 —— request.js 续签失败时调 auth.logout()，
+      // 页面还停在前台，而那张已经渲染好的码属于一个已经不存在的会话。
+      // 共用设备上就是下一位看到它。
+      this._account = ''
+      this._stopTimers()
+      this._clearCredentials()
+      const switched = isMemberIdentity(resolved.identity)
+      this.setData({
+        state: 'error',
+        refreshing: false,
+        errorMsg: switched
+          ? '当前账号与打开这张到机码时的不是同一个，已停止显示。请到「我的 · 打印订单」重新进入。'
+          : '登录已失效，请重新登录后再查看到机码。',
+        errorAction: switched ? 'orders' : 'login',
+      })
+      return 'changed'
     }
 
-    // 不可用 → 确定的本人：这是**补签成功后的正常形态**（request.js 续签后
-    // auth.saveSession 写回带 id 的会话），不是换人。不可用态下本页一个字节的订单数据
-    // 都没显示过，没有旧内容会被下一位"继承"，所以直接采纳新身份继续。
-    // 把它判成换人的代价：用户刚被静默救回来，却看到一句「当前账号与打开时的不是同一个」。
-    if (!isMemberIdentity(previous) && isMemberIdentity(identity)) {
-      this._identity = identity
-      return 'ok'
-    }
-
-    // 真的换了人（u:A → u:B），或从确定的本人掉成不可用（登出 / 补签失败后的 logout）：
-    // **当场清掉屏幕上的码**。真实链路里这一步没有任何生命周期回调 ——
-    // request.js 续签失败时调 auth.logout()，页面还停在前台，而那张已经渲染好的码
-    // 属于一个已经不存在的会话。共用设备上就是下一位看到它。
-    this._identity = identity
-    this._stopTimers()
-    this._clearCredentials()
-    this.setData({
-      state: 'error',
-      refreshing: false,
-      errorMsg: identity
-        ? '当前账号与打开这张到机码时的不是同一个，已停止显示。请到「我的 · 打印订单」重新进入。'
-        : '登录已失效，请重新登录后再查看到机码。',
-      errorAction: identity ? 'orders' : 'login',
-    })
-    return 'changed'
+    // 'ok' 采纳新账号；'resignable' 原样留住上一位的快照（那正是"还是同一位"的凭据，
+    // 丢了它下一次就会把自然过期误判成登出）；'unusable' 快照本来就是空。
+    this._account = resolved.account
+    return resolved.state
   },
 
   /**
