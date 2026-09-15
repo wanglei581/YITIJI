@@ -19017,7 +19017,8 @@
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/utils/storage.js": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/partner/scripts/verify-excel-template-download-ui.mjs": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
@@ -26880,6 +26881,7 @@
           "apps/miniapp/utils/package-order.js",
           "apps/miniapp/utils/page-guard.js",
           "apps/miniapp/utils/print-order-idempotency.js",
+          "apps/miniapp/utils/storage.js",
           "services/api/src/member-print-orders/member-print-order-create.service.ts"
         ],
         "missing": []

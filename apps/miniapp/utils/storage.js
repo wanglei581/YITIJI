@@ -39,6 +39,28 @@ function get(key, fallback = null) {
   }
 }
 
+/**
+ * 读一次，并且**把「读失败」和「读到的是空」分开**。
+ *
+ * get() 把两者压成同一个 fallback,对"读出来渲染一下"的调用方没有区别;对**读-改-写
+ * 全量**的调用方则是一个静默的数据丢失口子——它拿到一个假的空集合,把差集写回去,
+ * 盘上原有的记录就此消失,而返回值一路都是"成功"。
+ * utils/print-order-idempotency.js 的幂等键就是这种形态:丢一条未落定的记录 =
+ * 下一次提交铸一个新键 = 服务端再建一张订单、再扣一笔钱。
+ *
+ * 所以这类调用方必须用本函数,并在 ok === false 时 fail-closed(什么都不写)。
+ *
+ * @returns {{ok: boolean, value: any}} ok=false 表示这一次根本没读到,value 无意义
+ */
+function read(key) {
+  try {
+    const v = wx.getStorageSync(key);
+    return { ok: true, value: v === '' || v === undefined ? null : v };
+  } catch (e) {
+    return { ok: false, value: null };
+  }
+}
+
 function set(key, value) {
   try {
     wx.setStorageSync(key, value);
@@ -57,4 +79,4 @@ function remove(key) {
   }
 }
 
-module.exports = { KEYS, get, set, remove };
+module.exports = { KEYS, get, read, set, remove };

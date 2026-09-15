@@ -69,6 +69,20 @@
 //    时钟回跳之后自己写的记录落在"未来"、被整条丢掉 —— 又是一个新键、一张新订单。
 //    现在未来时间戳一律按**未过期**处理（形状不对的 createdAt 仍然作废，那是坏数据
 //    不是时钟问题），存储上界改由**条数**兜住，不依赖任何关于时间方向的假设。
+//
+// ── 2026-09-15 R9：上面六条全部假设"读得出来" ─────────────────────────────
+//
+// ⑦ **一次读失败会把别人那条未落定的记录抹掉。** `utils/storage.js` 的 `get()` 在
+//    `wx.getStorageSync` 抛异常时吞掉异常返回 fallback —— 于是"这一次根本没读到"和
+//    "本机确实没有记录"在 `loadAll` 里压成了同一个 `[]`。而本模块**每一次写入都是
+//    读-改-写回全量**：以一个假的空数组为基底写回去，盘上那条未落定的记录（它的 POST
+//    可能已经到了服务端、只是响应丢在路上）就此消失。代价和 ③ 完全一样 —— 下一次同参数
+//    提交铸一个新键，服务端再建一张订单、再扣一笔钱 —— 而且这一次连"名额满了拒绝"
+//    那道闸都绕过去了：数出来的未落定条数同样是 0。
+//    三个写入口（`ensureKey` / `rememberOrderId` / `clearRecord`）各自都能触发：
+//    `clearRecord` 最狠，它会把**整张表**写成空。
+//    现在 `loadAll()` 在读失败时返回 `null`（不是 `[]`），三个写入口一律 fail-closed：
+//    一个字节都不写、如实返回失败，让调用方保持锁定。读恢复之后同一条链照常继续。
 
 const storage = require('./storage')
 const { isMemberIdentity } = require('./page-guard')
@@ -114,6 +128,18 @@ const MAX_SETTLED_RECORDS = 20
  * 超时按**失败**处理（fail-closed）：宁可让用户重试一次，也不拿一个来路不明的键去建单。
  */
 const RANDOM_TIMEOUT_MS = 8000
+
+/**
+ * 本机存储这一刻读不出来时给用户的话。
+ *
+ * 和"名额满了"分成两句：那一句说的是"你之前提交过太多次"，这一句说的是"本机现在
+ * 读不了"。压成一句会让用户去「我的 · 打印订单」找一批根本不存在的历史提交。
+ * 两句都指向同一个可执行的下一步 —— 因为无论哪种，再点一次都不会好。
+ */
+const STORE_UNREADABLE_MESSAGE = '读不到本机的下单记录，为避免重复下单已中止提交。请稍后重试，或先到「我的 · 打印订单」确认之前的提交结果'
+
+/** 未落定名额用尽。见 MAX_PENDING_RECORDS。 */
+const PENDING_FULL_MESSAGE = '本机还有太多没有落定的下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果'
 
 /** 与服务端 assertMemberPrintOrderIdempotencyKey 的 IDEMPOTENCY_KEY_RE 同形。 */
 const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -255,9 +281,18 @@ function formatUuidV4(randomValues) {
  * 是坏数据 —— 拿它算任何时间差都得不到可信的结论。
  *
  * 存储上界不靠时间兜（见 `retain`），所以这里放宽不会让记录无限堆积。
+ *
+ * **读失败返回 `null`，不是 `[]`。** 两者在 `storage.get` 那一层是同一个 fallback，
+ * 而本模块每一次写入都是"读 → 改 → 写回全量"：以一个假的空数组为基底写回去，盘上
+ * 那条未落定的记录（POST 可能已经到了服务端）就此消失 —— 下一次同参数提交铸一个新键，
+ * 服务端再建一张订单。所以调用方必须先判 `null`，判不出来就一个字节都不许写。
+ *
+ * @returns {?Array} 读到了返回（已过滤的）记录数组；**这一次根本没读到**返回 null
  */
 function loadAll() {
-  const raw = storage.get(STORE_KEY, null)
+  const result = storage.read(STORE_KEY)
+  if (!result.ok) return null
+  const raw = result.value
   if (!Array.isArray(raw)) return []
   const now = Date.now()
   return raw.filter((row) => row
@@ -346,6 +381,9 @@ function slotAbsent(account, fingerprint) {
  * @returns {?Array} 成功返回实际保留下来的那份；失败返回 null（调用方必须当失败处理）
  */
 function persist(rows, verify) {
+  // 基底必须是**真的读出来的那一份**。调用方读不到时会传 null 进来（而不是硬凑一个
+  // 空数组），这里一并挡住：写回一个凭空造出来的全量 = 抹掉盘上所有在飞的键。
+  if (!Array.isArray(rows)) return null
   const kept = retain(rows, Date.now(), verify)
   if (storage.set(STORE_KEY, kept) !== true) return null
   if (!verify) return kept
@@ -370,17 +408,26 @@ function persist(rows, verify) {
  */
 function findRecord(account, fingerprint) {
   if (!isMemberIdentity(account) || !fingerprint) return null
-  return loadAll().find((row) => row.account === account && row.fingerprint === fingerprint) || null
+  const rows = loadAll()
+  // 读不到时返回 null（= "没有可复用的记录"）。这一格是**只读**用途，返回 null 不会
+  // 写坏任何东西；真正危险的是写入口，它们各自单独判（见 ensureKey / rememberOrderId /
+  // clearRecord），绝不拿一个"读不到"当成"本机没有"。
+  if (!rows) return null
+  return rows.find((row) => row.account === account && row.fingerprint === fingerprint) || null
 }
 
 /**
- * 此刻本机还有几条**未落定**的记录（`orderId === ''`）。
+ * 这一批记录里有几条是**未落定**的（`orderId === ''`）。
  *
  * 跨账号一起数：名额守的是"这台设备上的存储"，而存储是所有人共用的。按账号分别计数
  * 等于给每个登录过的账号各开一份名额，共用设备上就没有上界了。
+ *
+ * 参数是**调用方已经确认读得出来**的那一份，不在这里自己读：自己读就得自己决定
+ * "读不到算几条"，而那个问题没有安全答案 —— 算 0 会放行铸键（正是要防的），
+ * 算满会把一次普通的读抖动说成"本机记录太多"。判据留在调用方那里。
  */
-function pendingCount() {
-  return loadAll().filter((row) => !row.orderId).length
+function pendingCount(rows) {
+  return rows.filter((row) => !row.orderId).length
 }
 
 /**
@@ -401,7 +448,13 @@ function ensureKey(account, fingerprint) {
     return Promise.reject(new Error('没有确定的会员身份，不能建立幂等键'))
   }
   if (!fingerprint) return Promise.reject(new Error('缺少订单参数指纹'))
-  const hit = findRecord(account, fingerprint)
+  // 先确认本机这一刻**读得动**。读不到时下面每一步都会得出一个假结论：
+  // "没有可复用的记录"（→ 铸新键）、"未落定 0 条"（→ 名额闸失效）、
+  // "全量就是这一条"（→ 写回去把别人在飞的那条抹掉）。三个假结论叠起来正好是
+  // "服务端再建一张订单、再扣一笔钱"。
+  const rows = loadAll()
+  if (!rows) return Promise.reject(new Error(STORE_UNREADABLE_MESSAGE))
+  const hit = rows.find((row) => row.account === account && row.fingerprint === fingerprint)
   if (hit) return Promise.resolve(hit)
   // 未落定的名额满了：**拒绝铸新键**，一条既有记录都不删。
   //
@@ -410,8 +463,8 @@ function ensureKey(account, fingerprint) {
   // 删掉任何一条，下一次同参数提交就会铸一个新键，服务端于是再建一张订单、再扣一笔。
   // 被拒绝的用户重试一次就好；被挤掉的那一单，用户永远不知道自己被扣了两次。
   // 注意这一段排在 findRecord 命中之后：同一格已经有记录时照常复用，名额满了也不影响。
-  if (pendingCount() >= MAX_PENDING_RECORDS) {
-    return Promise.reject(new Error('本机还有太多没有落定的下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果'))
+  if (pendingCount(rows) >= MAX_PENDING_RECORDS) {
+    return Promise.reject(new Error(PENDING_FULL_MESSAGE))
   }
   const slot = slotOf(account, fingerprint)
   const running = minting.get(slot)
@@ -421,17 +474,21 @@ function ensureKey(account, fingerprint) {
     if (typeof key !== 'string' || !KEY_RE.test(key)) {
       throw new Error('生成的订单标识不合法，订单没有提交，请稍后重试')
     }
+    // 取随机数这段时间里存储可能已经读不动了（也可能刚才那一次只是侥幸读到）。
+    // 写之前必须**重新读一次并确认读得动**：这是写回全量的基底，基底假了就是抹别人的记录。
+    const base = loadAll()
+    if (!base) throw new Error(STORE_UNREADABLE_MESSAGE)
     // 取随机数这段时间里，别的路径完全可能已经把这一格写好了（例如一次失败重试的
     // 回退路径）。真有就用它，不覆盖 —— 覆盖等于换一个键。
-    const settled = findRecord(account, fingerprint)
+    const settled = base.find((row) => row.account === account && row.fingerprint === fingerprint)
     if (settled) return settled
     // 取随机数期间别的**槽位**也可能把名额占满（不同参数、另一个页面实例）。
     // 再判一次：这一步的代价只是白铸一个键，而放行的代价是挤掉一条在飞的记录。
-    if (pendingCount() >= MAX_PENDING_RECORDS) {
-      throw new Error('本机还有太多没有落定的下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果')
+    if (pendingCount(base) >= MAX_PENDING_RECORDS) {
+      throw new Error(PENDING_FULL_MESSAGE)
     }
     const record = { account, fingerprint, key, orderId: '', createdAt: Date.now() }
-    if (!persist(loadAll().concat([record]), record)) {
+    if (!persist(base.concat([record]), record)) {
       throw new Error('订单标识没能保存到本机，为避免重复下单已中止提交，请重试一次')
     }
     return record
@@ -465,6 +522,10 @@ function rememberOrderId(account, fingerprint, key, orderId) {
   if (!isMemberIdentity(account) || !fingerprint || !orderId) return null
   if (typeof key !== 'string' || !KEY_RE.test(key)) return null
   const rows = loadAll()
+  // 读不到就一个字节都不写。这里写回去的是**全量**：拿一条孤零零的新记录当全量写下去，
+  // 盘上别人那条未落定的记录（POST 可能已经到了服务端）就没了。返回 null 的代价是
+  // 调用方按"没存住"处理（页面锁定并指向「我的 · 打印订单」）—— 那正是正确的处置。
+  if (!rows) return null
   const at = rows.findIndex((row) => row.account === account && row.fingerprint === fingerprint)
   const record = at >= 0
     ? Object.assign({}, rows[at], { key, orderId: String(orderId) })
@@ -496,6 +557,11 @@ function rememberOrderId(account, fingerprint, key, orderId) {
 function clearRecord(account, fingerprint) {
   if (!isMemberIdentity(account) || !fingerprint) return false
   const rows = loadAll()
+  // 读不到就**什么都不写**。这一处是三个写入口里最狠的一个：读失败时 `rows` 会是
+  // 一个假的空数组，`kept` 也是空，于是它把**整张表**写成空 —— 这台设备上所有账号
+  // 所有在飞的幂等键一起没了。返回 false（"证不出它不在"）让调用方保持锁定，
+  // 读恢复之后同一个按钮能真的把它清掉。
+  if (!rows) return false
   const kept = rows.filter((row) => !(row.account === account && row.fingerprint === fingerprint))
   if (storage.set(STORE_KEY, retain(kept, Date.now(), null)) !== true) return false
   return slotAbsent(account, fingerprint)

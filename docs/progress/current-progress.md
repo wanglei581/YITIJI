@@ -1,5 +1,102 @@
 # 当前开发进度
 
+2026-09-15 **R9 收口：取件页的 P0 —— 后来登录的那位会被记成「开页那位」，于是上一位的到机码
+画到了他的屏幕上。** 锚点是 `b2fa6bad1` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。本轮只改前端，
+`services/**` 一行未动（改动清单见文末）。
+
+R8 打的是「响应回来那一刻身份对不对」；R9 打的是它**前面那一步** ——「这一页到底是谁的」
+什么时候才算数。五条全部在本机独立复现过（复现证据：新增的 6 条测试在修改前逐条判红，
+其中 `R9-A3` 是反向对照、修改前就是绿的，用来挡住"修过头把本人也挡掉"）：
+
+- **P0 归属可以被后来者认领。** 打开取件页时 A 的 enduser JWT（只签 30 分钟）**已经**
+  自然到点 —— 中午下单、下午走到一体机前打开，命中的就是这一条。此时 `_account` /
+  `_openerAccount` / `requestAccount` **三个全是空串**，请求照常带着补签资格发出去
+  （R4-1 起就是这么设计的，不能改）。在途期间 B 登录、回到本页：`onShow` 走到绑定那一行时
+  `_openerAccount` 还空着，于是**后来登录的 B 被记成开页那位**；A 的迟到 200 回来时，
+  开页那位、当前这位全都指向 B，`_ownsResponse` 第一行 `if (state === 'ok') return true`
+  无条件放行 —— A 的取件凭证就画在了 B 的屏幕上。R8-B3 钉住的三条判据一条都没救到它：
+  那三条全在 `'resignable'` 分支里，而这条路走的是 `'ok'`。
+  改法：绑定只发生在两个**说得清因果**的时刻 —— ① `onLoad` 的第一次判定（本页刚被导航
+  打开）；② 本页**自己打出去的那一发**（发出时归属未定）的回调里，且**页面仍然可见**
+  （那个身份是 request.js 为这一发补签回来的，因果落在本页自己身上）。外加一个一次性窗口：
+  本页自己把用户送去登录页之后回来的第一次 `onShow`，且此刻没有任何请求在飞。
+  其余时刻冒出来的确定身份一律判**归属存疑**（粘性）→ 清码 + fail-closed。
+- **`_ownsResponse` 对 `'ok'` 无条件放行。** 现在 `'ok'` 与 `'resignable'` **走同一组判据**，
+  四条缺一不可：请求代次仍是当前代次、归属没存疑、当前这位是确定会员键且**就是开页那位**、
+  发起这一发的那位与发出时的开页那位都对得上（只放行 `'' → 'u:<id>'` 这一种不相等，
+  也就是 request.js 为这一发补签成功；而它能被采信靠的正是代次那一条）。
+- **身份变了，在途那一发的代次不作废、旧 `_polling` 还锁着本页。** 清完场之后
+  「重新加载」是个按不动的按钮，要等那发已经不属于任何人的请求自己落定 —— 而什么时候落定
+  是网络说了算。现在 `_invalidateInflight()` 代次 +1 **并当场交还去重锁**；迟到的响应由
+  `_settleRequest(token)` 按**令牌对象身份**挡住（不是比代次：同一代次里也有先后两发），
+  挡住时连锁都不碰 —— 那把锁此刻可能正锁着另一发新请求。
+- **画码的 `exec` 回调不重认任何东西。** 它跨帧才回来，中间那张码完全可能已经被换掉
+  （核销后重取）、被撤下（过期 / 轮询失联 / 换人清场）。上一版照样把画布写成
+  `qrStatus: 'ready'` —— 用户会照着一张作废的、或者根本不属于当前这位的码去扫。
+  现在码 / 归属 / 代次三样在**进入异步之前**钉进局部变量，回调里逐条重认，且守卫排在
+  任何一次 `setData` 之前（先写 `'error'` 再判等于已经替当前这张码下了结论）。
+  package-code 早就有这三道，取件页一直没有。
+- **幂等记录：一次读失败会把别人那条未落定的记录抹掉。** `utils/storage.js` 的 `get()`
+  吞掉 `wx.getStorageSync` 的异常返回 fallback，于是"这一次根本没读到"和"本机确实没有
+  记录"在 `loadAll` 里压成同一个 `[]`；而本模块每一次写入都是**读-改-写回全量**，
+  以一个假的空数组为基底写回去，盘上那条未落定的记录（POST 可能已经到了服务端、
+  只是响应丢在路上）就此消失 —— 下一次同参数提交铸新键、服务端再建一张订单、再扣一笔钱，
+  而且连"名额满了拒绝"那道闸都绕过去了（数出来的未落定条数同样是 0）。`clearRecord`
+  最狠：它把**整张表**写成空，这台设备上所有账号所有在飞的键一起没了。
+  改法：新增 `storage.read(key) → {ok, value}` 把两者分开；`loadAll()` 读失败返回
+  `null`（不是 `[]`），三个写入口（`ensureKey` / `rememberOrderId` / `clearRecord`）
+  一律 fail-closed，一个字节都不写、如实返回失败让调用方保持锁定；`persist` 自己再挡一道。
+  读恢复之后同一条链照常继续（这不是一条死路，已由 R9-D 末段钉住）。
+
+改动文件（6 个，全部在小程序内）：`apps/miniapp/pages/print-pickup/print-pickup.js`、
+`apps/miniapp/utils/print-order-idempotency.js`、`apps/miniapp/utils/storage.js`、
+`apps/miniapp/scripts/tests/page-lifecycle.test.mjs`、`apps/miniapp/scripts/verify-miniapp-static.mjs`、
+`apps/miniapp/scripts/verify-package-chain.mjs`，外加 `docs/graph/` 标准重跑产物。
+
+测试：`page-lifecycle.test.mjs` 从 134 条加到 **142 条，全绿**，原 134 条一条没删
+（`R8-B3` 因 `_ownsResponse` 换成令牌签名而**逐条改写**、断言含义一条不减，不是删除）。
+门禁：`verify:static` 135 → **136 PASS / 0 FAIL**（新增「画码的异步回调必须重认码 / 归属 /
+代次」一条），`verify:package-chain` 新增 7 条断言（storage.read 的存在、loadAll 读失败返回
+null、三个写入口各自 fail-closed、persist 自挡一道）。
+
+反向变异 **19 条，全部判红**（判据是被测命令的**退出码**，不是数 FAIL 行；还原方式是把原始
+字节读进内存、`finally` 写回，并用 **sha256 逐文件比对**确认与变异前逐字节一致，
+**未使用 `git checkout` / `git reset`**）。第一轮 19 条里有 6 条没能全红，**这 6 条本身就是
+本轮最有价值的产出**，因为它们指的不是实现而是**检测器**：
+`M3`（`_ownsResponse` 的"就是开页那位"弱化成"绑上了才比"）门禁与测试**双绿** ——
+门禁正则只钉了 `account !== this._openerAccount` 这段字面量，弱化后照样匹配；测试则从没驱动过
+"开页那位从来没被绑定过"那一格。两边都补了。
+`M6` / `M7` / `M10` 三条是门禁锚点的老毛病：钉字面量（包进 `if (false)` 照样匹配）、
+正则跨出函数体撞上 `_settleRequest` 里的同名赋值、以及 `then` / `catch` 两处只钉"存在"
+（改坏一处另一处照样绿）。三条锚点分别改成：钉完整条件、用 `methodBody` 限定在函数体内、
+**数出现次数必须是 2/2**。
+`M8`（`_settleRequest` 无条件放行迟到响应）只有门禁红：页面层被"归属存疑"那面旗子兜住了，
+测试看不出差别 —— 但那是**另一个函数的实现细节**，契约不能押在它身上，所以补了一条直接驱动
+`_settleRequest` 的契约测试（R9-B2）。
+`M16`（`ensureKey` 第一次读不判失败）至今**只有门禁红、测试绿，而这一条是对的**：
+铸键前还有第二道 `const base = loadAll(); if (!base) throw`，它排在任何一次写入之前，
+所以第一道纯属快路径/可读性，删掉它在行为上确实没有差别（已用 R9-D 实测确认那条在飞的记录
+仍然活着）。**不为了让变异转红而去编一条测不出真差别的断言。**
+
+本机独立复跑（全部退出码 0）：`node --test apps/miniapp/scripts/tests/page-lifecycle.test.mjs`
+（142 pass / 0 fail）、`@ai-job-print/miniapp` 的 `verify:static`（整条链，含
+`verify-pickup-qrcode` / `api-contract` / `visual-scale` / `user-error` / `package-chain` /
+`package-helpers` / `page-lifecycle` / `empty-state`）、`verify:package-chain`、`verify:api-contract`、
+`@ai-job-print/api verify:miniapp-cloud-print-m2`（**未改任何后端文件**，仍 ALL PASS，
+含串行拉起的 `verify:member-print-order-idempotency-http`）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` /
+`graph:check`（`pnpm graph` 标准重跑后一致）、`git diff --check`。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。
+上面所有结论都来自本机静态执行与沙箱内真跑页面源码（`node:vm` + 真实 `page-guard` / `auth` /
+`storage`）。**本轮有一处权衡必须在真机上验过才算数**：归属存疑是**粘性**的，
+于是"开页时 JWT 已过期、且恰好在那第一发请求飞着的时候被切走或被别人登录"会让本页永久
+fail-closed，用户要照提示回「我的 · 打印订单」重新进一次。这条路换来的是"这一页从此
+不可能把取件凭证画给一个认不出来的会话"；代价一次导航，收益是一张凭证 —— 但它在真机上
+多久触发一次、提示文案够不够清楚，本机证不了。
+
 2026-09-15 **R8 收口：撤回 `638ea71baeb8556d4327241e7a9221bee4ee15e1` 与
 `103adb9e7899f620104f6abf3443e666a076fe8d` 的「可以进最终复审 / 前端幂等链已收口」结论 ——
 那两条各自都成立，但合起来不足以支撑「这条链已经收口」。六个缺陷活过了它们。**

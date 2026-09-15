@@ -596,7 +596,11 @@ if (
   // 不得出现 scanTerminal / 不得调 `/pickup` 四条，未做任何放宽。
   pickupWxml.includes('二维码只包含本订单的到机码') &&
   pickupJs.includes("require('../../utils/pickup-qrcode')") &&
-  pickupJs.includes('createPickupQrMatrix(this.data.codeRaw)') &&
+  // R9 收紧：码必须在**进入异步之前**被钉进局部变量，再拿它去编码。
+  // 原锚点钉的是 `createPickupQrMatrix(this.data.codeRaw)` —— 那等于要求在 exec 之前
+  // 现读一次 data，而 exec 的回调跨帧才回来，回来时那张码可能已经被换掉或撤下。
+  pickupJs.includes('const code = this.data.codeRaw') &&
+  pickupJs.includes('createPickupQrMatrix(code)') &&
   pickupQr.includes('LEGACY_PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/') &&
   pickupQr.includes('CURRENT_PICKUP_CODE_RE = /^[0-9]{8}$/') &&
   pickupQr.includes('PICKUP_CODE_RE = /^(?:[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}|[0-9]{8})$/') &&
@@ -1122,7 +1126,7 @@ const PACKAGE_CHAIN_PAGES = [
 // request.js 拿到 401 会静默续签一次再重发，页面必须**放行真实请求**才轮得到它。
 {
   const misses = []
-  if (!/_resolveIdentity\(\)\s*\{/.test(pickupJs)) misses.push('缺 _resolveIdentity（四态判定）')
+  if (!/_resolveIdentity\(bindOwner\)\s*\{/.test(pickupJs)) misses.push('缺 _resolveIdentity(bindOwner)（四态判定 + 归属绑定时机）')
   // R5：判据必须是**稳定账号快照 + page-guard 的那一份状态机**，不是"上一次读到的身份键"。
   // 后者会把「同一个人的 JWT 自然过期」（'u:A' → ''，因为 getToken() 过期时先 clearSession）
   // 与「主动登出」判成同一件事：当场清码 + 一个请求都不发 = 静默补签永远跑不到。
@@ -1178,7 +1182,7 @@ const PACKAGE_CHAIN_PAGES = [
   const refresh = methodBody(bare, '_refreshOrder')
   if (!refresh) misses.push('取不到 _refreshOrder 的函数体')
   else {
-    const identityIdx = refresh.indexOf('this._resolveIdentity()')
+    const identityIdx = refresh.indexOf('this._resolveIdentity(bindOwner === true)')
     const pollingIdx = refresh.indexOf('this._polling) return')
     if (identityIdx < 0) misses.push('_refreshOrder 里没有身份判定')
     else if (pollingIdx >= 0 && pollingIdx < identityIdx) {
@@ -1191,8 +1195,18 @@ const PACKAGE_CHAIN_PAGES = [
     if (pollingIdx < 0) misses.push('在飞去重没了（同一格会被重复打请求）')
   }
   // onShow 必须真的走这条路，不能自己另判一套。
-  if (!/onShow\(\) \{[\s\S]{0,400}this\._refreshOrder\(false\)/.test(bare)) {
+  if (!/onShow\(\) \{[\s\S]{0,600}this\._refreshOrder\(false, handoff\)/.test(bare)) {
     misses.push('onShow 没有走 _refreshOrder（那是唯一一处"先判身份"的入口）')
+  }
+  // R9：onShow 传进去的 bindOwner **只能**是那个一次性的登录回程标记，而且它必须
+  // 在读完的同一句里被撤掉、并要求此刻没有请求在飞。写成常量 true 就等于把
+  // "谁现在登录着谁就是这一页的主人"重新放了回来（那正是 R9-A 的缺口）。
+  if (!/const handoff = this\._loginHandoff === true && !this\._polling/.test(bare)
+    || !/this\._loginHandoff = false/.test(bare)) {
+    misses.push('onShow 的归属绑定窗口不是一次性的（或没有要求此刻没有请求在飞）')
+  }
+  if (/this\._refreshOrder\(false, true\)/.test(bare)) {
+    misses.push('onShow 无条件允许绑定开页那位（后来登录的那位会被认成这一页的主人）')
   }
   if (!misses.length) ok('取件页每一次 onShow 都先判身份再决定发不发请求（在途请求不得把清场推迟到网络之后）')
   else bad('取件页在途暴露窗口', misses.join('；'))
@@ -1202,41 +1216,137 @@ const PACKAGE_CHAIN_PAGES = [
 //
 // enduser JWT 只签 30 分钟，而取件页会一直轮询。于是这条路径每天都在发生：请求在 'ok'
 // 状态下带着 A 的登录态发出去 → 服务端按 requireOwned 校验过归属、返回 200 → 响应回来的
-// 路上 A 的 JWT 到点（getToken() 过期时先 clearSession，身份于是读成 ''）。上一版成功分支
+// 路上 A 的 JWT 到点（getToken() 过期时先 clearSession，身份于是读成 ''）。R5 之前的成功分支
 // 只认 `state === 'ok'`，把这条**刚刚被服务端确认过属于 A** 的响应判成"身份说不清"，
 // 当场清掉屏幕上那张码、写一句「请登录」——用户站在一体机前，手里的码没了，而它一直有效。
 //
-// 放行的前提是归属**证得出来**，不是"过期就放行"：三条缺一不可，少一条就 fail-closed。
+// ── R9 收紧：`'ok'` 也不许无条件放行 ────────────────────────────────────────
+//
+// 上一版这个函数的第一行是 `if (state === 'ok') return true`，三条归属判据全在
+// `'resignable'` 分支里。而真实链路上有一条路走的是 `'ok'`：打开本页时 A 的 JWT 已经
+// 自然到点（快照 / 开页账号 / 发起账号三个全是空串），请求照常发出去；在途期间 B 登录、
+// 回到本页 —— `_openerAccount` 此刻还是空的，于是 B 被记成开页那位，`_resolveIdentity`
+// 返回 `'ok'`，A 的迟到 200 就被判成"属于当前这位"，画在了 B 的屏幕上。
+// 所以现在 `'ok'` 与 `'resignable'` **走同一组判据**，而且多一条代次：
+// 身份一变、归属一存疑，在途那一发当场作废。
 {
   const misses = []
   const bare = stripComments(pickupJs)
   const owns = methodBody(bare, '_ownsResponse')
   if (!owns) misses.push('缺 _ownsResponse（成功响应的归属判定）')
   else {
-    if (!/if \(state === 'ok'\) return true/.test(owns)) misses.push("'ok' 必须直接放行")
-    if (!/if \(state !== 'resignable'\) return false/.test(owns)) {
-      misses.push("只有 'resignable' 才是第二条放行路径（'changed' / 'unusable' 一律 fail-closed）")
+    if (/if \(state === 'ok'\) return true/.test(owns)) {
+      misses.push("'ok' 又变回无条件放行（它只说\"此刻有个确定身份\"，不说这一发属于谁）")
     }
+    if (!/if \(state !== 'ok' && state !== 'resignable'\) return false/.test(owns)) {
+      misses.push("只有 'ok' / 'resignable' 是放行路径（'changed' / 'unusable' 一律 fail-closed）")
+    }
+    if (!/token\.epoch !== this\._requestEpoch/.test(owns)) misses.push('没有核请求代次（身份一变，在途那一发就该作废）')
+    if (!/this\._ownerAmbiguous/.test(owns)) misses.push('归属存疑时没有 fail-closed')
     if (!/isMemberIdentity\(account\)/.test(owns)) misses.push('没有要求快照仍是一个确定的会员键')
-    if (!/this\._openerAccount/.test(owns)) misses.push('没有比对开页那位（本页的 orderId 属于他）')
-    if (!/account === requestAccount/.test(owns)) misses.push('没有比对发出这一发请求的那位')
+    if (!/\n\s*if \(account !== this\._openerAccount\) return false/.test(owns)) {
+      // 必须是**无条件**的那一行。写成 `if (this._openerAccount && account !== ...)`
+      // 等于「开页那位没绑上时一律放行」—— 而「没绑上」正是 R9-A 那条路的形状。
+      misses.push('没有无条件比对开页那位（本页的 orderId 属于他）')
+    }
+    if (!/sameAccount\(token\.account, account\)/.test(owns)) misses.push('没有比对发出这一发请求的那位')
+    if (!/sameAccount\(token\.opener, account\)/.test(owns)) misses.push('没有比对发出这一发时的开页那位')
   }
-  // 发起那一刻的账号必须**绑在局部变量上**：回调时再读一次读到的是被 clearSession 清空的会话。
-  if (!/const requestAccount = this\._account/.test(bare)) {
-    misses.push('没有在发请求前绑定发起账号（过期会把它清掉，事后读不回来）')
+  // 发起那一刻的账号 / 开页账号 / 代次必须**绑在令牌上**：回调时再读一次，读到的可能是
+  // 被 clearSession 清空的会话，也可能是在途期间刚登录进来的另一位。
+  if (!/const token = \{ account: this\._account, opener: this\._openerAccount, epoch: this\._requestEpoch \}/.test(bare)) {
+    misses.push('没有在发请求前把发起账号 / 开页账号 / 代次一起绑进令牌')
   }
   const refresh = methodBody(bare, '_refreshOrder')
-  if (refresh && refresh.indexOf('const requestAccount') > refresh.indexOf('api.getCloudPrintOrder(')) {
-    misses.push('发起账号绑在请求之后（那就不是"发出那一刻的真值"了）')
+  if (refresh && refresh.indexOf('const token = {') > refresh.indexOf('api.getCloudPrintOrder(')) {
+    misses.push('令牌绑在请求之后（那就不是"发出那一刻的真值"了）')
   }
-  if (!/if \(!this\._ownsResponse\(state, requestAccount\)\) \{ this\._failClosedForIdentity\(\); return \}/.test(bare)) {
+  // 迟到的响应必须**在判身份之前**就被挡住，而且挡住时连去重锁都不许碰
+  //（那把锁此刻可能正锁着另一发新的请求）。
+  if (!/if \(!this\._settleRequest\(token\)\) return/.test(bare)) {
+    misses.push('成功 / 失败分支没有先按令牌确认"这一发还属于当前这一轮"')
+  }
+  if (!/_settleRequest\(token\) \{[\s\S]{0,400}this\._inflight !== token\) return false/.test(bare)) {
+    misses.push('_settleRequest 不是按令牌对象身份比对（比代次挡不住同代次的先后两发）')
+  }
+  {
+    // 必须在**这个函数自己的函数体里**找，不能让正则跨出去撞上 _settleRequest 里
+    // 那句同名赋值 —— 跨出去之后这条门禁对「只 +1 代次、不放锁」是瞎的。
+    const invalidate = methodBody(bare, '_invalidateInflight')
+    if (!/this\._requestEpoch \+= 1/.test(invalidate) || !/this\._polling = false/.test(invalidate)
+      || !/this\._inflight = null/.test(invalidate)) {
+      misses.push('作废在途请求时没有同时 +1 代次并交还去重锁（锁不放 = 「重新加载」按不动）')
+    }
+  }
+  if (!/if \(!this\._ownsResponse\(state, token\)\) \{ this\._failClosedForIdentity\(\); return \}/.test(bare)) {
     misses.push('成功分支没有按 _ownsResponse 分流，或证不出归属时没有 fail-closed')
+  }
+  // 归属只许在两个说得清因果的时刻绑定：onLoad 的第一次判定、以及本页自己那一发
+  // （发出时归属未定）的回调里且页面仍可见。少了 `this._visible` 那一半，用户切走期间
+  // 别人登录同样会被认作这一页的主人。
+  if (!/this\._refreshOrder\(true, true\)/.test(bare)) misses.push('onLoad 没有作为绑定开页那位的那一刻')
+  {
+    // then 与 catch **两个**回调各有一处，必须逐处都带 `this._visible`。只钉「存在」的话，
+    // 改坏其中一个、另一个照样让这条门禁绿着 —— 而改坏的那个就是「用户切走期间
+    // 别人登录，回来时这一页已经认了新主人」的入口。
+    const bound = (bare.match(/this\._resolveIdentity\(token\.opener === '' && this\._visible\)/g) || []).length
+    const anyToken = (bare.match(/this\._resolveIdentity\(token\.opener === ''/g) || []).length
+    if (bound !== 2 || anyToken !== bound) {
+      misses.push('回调里的绑定窗口没有逐处要求「发出时归属未定」与「页面仍然可见」（带 _visible 的 '
+        + bound + ' 处 / 共 ' + anyToken + ' 处，应为 2/2）')
+    }
+  }
+  if (!/isMemberIdentity\(resolved\.account\) && !this\._openerAccount && bindOwner === true/.test(bare)) {
+    misses.push('_resolveIdentity 又变回"看见一个确定身份就认作开页那位"')
+  }
+  if (!/if \(isMemberIdentity\(resolved\.account\) && !this\._openerAccount && !this\._ownerAmbiguous\) \{\s*\n\s*this\._ownerAmbiguous = true\s*\n\s*this\._invalidateInflight\(\)/.test(bare)) {
+    misses.push('认不出主人时没有标成归属存疑并作废在途那一发（只留一行赋值不算，它可能根本到不了）')
   }
   // 反面锚：401 与"真的换了人"两条 fail-closed 一个都不许被这次放宽带松。
   if (!/if \(err && err\.statusCode === 401\)/.test(bare)) misses.push('401 的清码分支没了')
-  if (!/if \(foreign \|\| resolved\.state === 'changed'\)/.test(bare)) misses.push('换人 / 登出的清场分支没了')
-  if (!misses.length) ok("取件页：请求发出后才自然过期的 200 仍按本人处理（归属证得出来才放行，其余 fail-closed）")
-  else bad('取件页不得把本人的有效码当成过期清掉', misses.join('；'))
+  if (!/if \(this\._ownerAmbiguous \|\| foreign \|\| resolved\.state === 'changed'\)/.test(bare)) {
+    misses.push('换人 / 登出 / 归属存疑的清场分支没了')
+  }
+  if (!misses.length) ok("取件页：归属在请求发出前就绑定，'ok' 与 'resignable' 同一组判据 + 代次，其余 fail-closed")
+  else bad('取件页不得把本人的有效码当成过期清掉，也不得把它画给一个认不出的会话', misses.join('；'))
+}
+
+// R9 收口：取件页画码的 **exec 回调**必须重新确认码 / 归属 / 代次。
+//
+// `wx.createSelectorQuery().exec()` 的回调跨帧才回来，中间这张码完全可能已经被换掉
+// （核销后重取）、被撤下（过期 / 轮询失联 / 换人清场），或者整页已经换了人。上一版
+// 这个回调什么都不重认，照样把画布写成 `qrStatus: 'ready'` —— 用户会照着一张作废的、
+// 或者根本不属于当前这位的码去一体机扫。package-code 早就有这三道，取件页一直没有。
+{
+  const misses = []
+  const bare = stripComments(pickupJs)
+  const draw = methodBody(bare, '_drawPickupQr')
+  if (!draw) misses.push('取不到 _drawPickupQr 的函数体')
+  else {
+    const execIdx = draw.indexOf('.exec((result)')
+    if (execIdx < 0) misses.push('取不到 exec 的回调')
+    else {
+      const before = draw.slice(0, execIdx)
+      const after = draw.slice(execIdx)
+      // 三样都必须在**进入异步之前**钉进局部变量：回调里现读 this.data 就是在读"现在"，
+      // 而这一笔画的是"当时"。
+      if (!/const code = this\.data\.codeRaw/.test(before)) misses.push('画哪个码没有在进入异步前钉死')
+      if (!/const owner = this\._openerAccount/.test(before)) misses.push('画给谁没有在进入异步前钉死')
+      if (!/const epoch = this\._requestEpoch/.test(before)) misses.push('属于哪一轮没有在进入异步前钉死')
+      if (!/this\.data\.codeRaw !== code/.test(after)) misses.push('回调里没有重认这张码还是不是当时那张')
+      if (!/this\._openerAccount !== owner/.test(after)) misses.push('回调里没有重认归属')
+      if (!/this\._requestEpoch !== epoch/.test(after)) misses.push('回调里没有重认请求代次')
+      if (!/this\._ownerAmbiguous \|\| this\._foreignBlocked/.test(after)) misses.push('归属存疑 / 已换人时仍然会画')
+      // 三道守卫必须排在**任何一次 setData 之前**：先写 'error' 再判等于已经改写了
+      // 当前这张码的状态（把一张好码说成画不出来）。
+      const guardEnd = after.indexOf('const target = result')
+      if (guardEnd < 0 || after.slice(0, guardEnd).includes('setData')) {
+        misses.push('守卫排在 setData 之后（那一笔已经替当前这张码下了结论）')
+      }
+    }
+  }
+  if (!misses.length) ok('取件页画码：迟到的 exec 回调不得画、也不得把画布说成已就绪')
+  else bad('取件页画码的异步回调没有重认码 / 归属 / 代次', misses.join('；'))
 }
 
 // R4 收口 ②：取件页凭证的**新鲜度**。

@@ -719,14 +719,22 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
   // A 登出 → B 登录之后照样会拿着 A 的 orderId 用 B 的登录态去 GET /me/print-orders/:id。
   {
     const src = stripComments(read('pages/print-pickup/print-pickup.js'))
-    const at = src.indexOf('_resolveIdentity() {')
+    const at = src.indexOf('_resolveIdentity(bindOwner) {')
     const body = at < 0 ? '' : src.slice(at, src.indexOf('\n  },', at))
     assert(/const foreign = isMemberIdentity\(this\._openerAccount\)/.test(body)
       && /resolved\.identity !== this\._openerAccount/.test(body),
     'print-pickup 同样按"当前这位是不是开页那位"判定换人')
-    assert(/if \(foreign \|\| resolved\.state === 'changed'\)/.test(body)
+    // R9：清场分支多了一支「归属存疑」—— 认不出主人时同样当场清码。
+    assert(/if \(this\._ownerAmbiguous \|\| foreign \|\| resolved\.state === 'changed'\)/.test(body)
       && /this\._clearCredentials\(\)/.test(body),
-    'print-pickup 判成换人时当场清掉屏幕上的码（不只是丢弃这次响应）')
+    'print-pickup 判成换人 / 归属存疑时当场清掉屏幕上的码（不只是丢弃这次响应）')
+    // R9：开页那位**什么时候**才算数，比"是不是他"更要紧。开页时 JWT 已过期的那条路上
+    // 三个账号键全是空串，若此刻随便认一个确定身份作主人，后来登录的那位就成了这一页的
+    // 主人，而在飞的那一发（属于原来那位）会被判成"属于当前这位"画到屏幕上。
+    assert(/isMemberIdentity\(resolved\.account\) && !this\._openerAccount && bindOwner === true/.test(body),
+      'print-pickup 只在调用方明确允许的时刻绑定开页那位（不是"看见一个确定身份就认"）')
+    assert(/this\._ownerAmbiguous = true/.test(body) && /this\._invalidateInflight\(\)/.test(body),
+      'print-pickup 认不出主人时标成归属存疑并作废在途那一发（fail-closed）')
     assert(/if \(this\._foreignBlocked && isMemberIdentity\(resolved\.identity\) && !foreign\)[\s\S]{0,80}this\._foreignBlocked = false/.test(body),
       'print-pickup 的封锁同样只对"换成别人"生效，开页那位自己回来必须解除')
     assert(/this\._openerAccount = ''/.test(src) && /this\._foreignBlocked = false/.test(src),
@@ -834,8 +842,13 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     && /String\(row\.orderId \|\| ''\) === String\(verify\.orderId \|\| ''\)/.test(idem),
   'persist 写完把记录读回来逐字核对 account/fingerprint/key/**orderId**（漏掉 orderId 那一项，'
   + 'rememberOrderId 那次写入要落的恰恰就是它：没写进去也照样核得上）')
-  assert(/if \(!persist\(loadAll\(\)\.concat\(\[record\]\), record\)\) \{[\s\S]{0,200}throw new Error/.test(idem),
+  assert(/if \(!persist\(base\.concat\(\[record\]\), record\)\) \{[\s\S]{0,200}throw new Error/.test(idem),
     'ensureKey 落不住就 reject —— 调用方一个 POST 都不许发（那张订单建成就再也找不回来）')
+  // R9：写回全量的**基底**必须是真的读出来的那一份。`loadAll()` 在读失败时返回 null，
+  // 这里必须先判掉；判不掉就是拿一个假的空数组当全量写下去 —— 盘上那条未落定的记录
+  // （POST 可能已经到了服务端）就此消失，下一次同参数提交铸新键、服务端再建一张订单。
+  assert(/const base = loadAll\(\)\s*\n\s*if \(!base\) throw new Error\(STORE_UNREADABLE_MESSAGE\)/.test(idem),
+    'ensureKey 铸键前重新读一次并确认读得动（基底假了就是抹掉别人在飞的键）')
 
   // ② 同一格不得并发铸出两个键。取随机数是异步的，两次重叠的调用（两个页面实例、
   //    或"重进 + 重试"）会各自走到"没有记录 → 铸一个"，后落盘的还会把先落盘的挤掉。
@@ -862,8 +875,12 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   '未落定的那一档**整份留下**，一条都不淘汰（丢一条 = 下一次提交铸新键 = 第二张订单）')
   assert(/keptSettled\.length >= MAX_SETTLED_RECORDS/.test(idem),
     '已落定的那一档仍然有界（它可以淘汰：服务端确有其单，最坏只是再下一张）')
-  assert(/if \(pendingCount\(\) >= MAX_PENDING_RECORDS\) \{[\s\S]{0,240}(reject|throw)/.test(idem),
+  assert(/if \(pendingCount\((rows|base)\) >= MAX_PENDING_RECORDS\) \{[\s\S]{0,240}(reject|throw)/.test(idem),
     '未落定的名额用尽时 ensureKey **拒绝铸新键**（fail-closed），而不是挤掉一条在飞的')
+  // R9：数未落定条数必须数**调用方已经确认读得出来**的那一份，不许自己再读一次 ——
+  // 自己读就得自己决定"读不到算几条"，而算 0 正好把上面这道闸整个绕过去。
+  assert(/function pendingCount\(rows\) \{/.test(idem) && !/function pendingCount\(\) \{/.test(idem),
+    'pendingCount 的入参是已确认读到的记录，不在函数内部自己读')
   assert(/const isProtected = \(row\) =>/.test(idem) && /retain\(rows, Date\.now\(\), verify\)/.test(idem),
     '这一次正在写的那条记录不参与淘汰（否则读回核对会失败在一个与存储好坏无关的原因上）')
 
@@ -888,6 +905,37 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   'clearRecord 的每一条失败路径都返回 false（返回 undefined 会被调用方当成"清掉了"）')
   assert(/function slotAbsent\(account, fingerprint\) \{[\s\S]{0,400}if \(!Array\.isArray\(back\)\) return false/.test(idem),
     '读不回一个数组就一律判"还在"（证明不了它不在，就不许解锁）')
+
+  // ③''' **一次读失败不得把别人那条未落定的记录抹掉。**
+  //
+  //     utils/storage.js 的 get() 吞掉 wx.getStorageSync 的异常返回 fallback，于是
+  //     "这一次根本没读到"和"本机确实没有记录"在 loadAll 里压成了同一个 []。而本模块
+  //     每一次写入都是**读-改-写回全量**：以一个假的空数组为基底写回去，盘上那条未落定的
+  //     记录（POST 可能已经到了服务端、只是响应丢在路上）就此消失 —— 下一次同参数提交
+  //     铸一个新键，服务端再建一张订单、再扣一笔钱，而且连"名额满了拒绝"那道闸都绕过去了
+  //     （数出来的未落定条数同样是 0）。clearRecord 最狠：它会把**整张表**写成空。
+  const storageSrc = stripComments(read('utils/storage.js'))
+  assert(/function read\(key\) \{[\s\S]{0,400}return \{ ok: true/.test(storageSrc)
+    && /catch \(e\) \{\s*\n\s*return \{ ok: false/.test(storageSrc),
+  'utils/storage.js 提供一个把「读失败」与「读到的是空」分开的读法（get 把两者压成同一个 fallback）')
+  assert(/const result = storage\.read\(STORE_KEY\)/.test(idem) && /if \(!result\.ok\) return null/.test(idem),
+    'loadAll 在读失败时返回 null，而不是一个假的空数组')
+  assert(!/storage\.get\(STORE_KEY, null\)[\s\S]{0,120}if \(!Array\.isArray\(raw\)\) return \[\]/.test(idem),
+    'loadAll 不得再把"读不到"当成"本机没有记录"')
+  for (const [fn, guard, why] of [
+    ['ensureKey', /const rows = loadAll\(\)\s*\n\s*if \(!rows\) return Promise\.reject\(new Error\(STORE_UNREADABLE_MESSAGE\)\)/,
+      '读不到就拒绝铸键（否则"没有可复用的记录"是个假结论，直接铸出第二个键）'],
+    ['rememberOrderId', /const rows = loadAll\(\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!rows\) return null/,
+      '读不到就返回 null（调用方按"没存住"锁页指路，那正是正确处置）'],
+    ['clearRecord', /const rows = loadAll\(\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!rows\) return false/,
+      '读不到就返回 false（它写回去的是全量，读不到时会把整张表清空）'],
+  ]) {
+    const at = idem.indexOf(`function ${fn}(`)
+    const body = at < 0 ? '' : idem.slice(at, at + 1400)
+    assert(!!body && guard.test(body), `${fn}：${why}`)
+  }
+  assert(/function persist\(rows, verify\) \{\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!Array\.isArray\(rows\)\) return null/.test(idem),
+    'persist 自己也挡一道：基底不是真的读出来的那一份就一个字节都不写')
 
   // ④ 取随机数必须有上限。它只有回调形态，两个回调一个都不来时页面会永远停在
   //    「正在提交…」——既没有订单，也没有出口。超时按失败处理，绝不退回弱随机。

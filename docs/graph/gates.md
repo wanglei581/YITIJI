@@ -903,7 +903,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/utils/pickup-qrcode.js` | `verify-miniapp-static.mjs`<br/>`verify-pickup-qrcode.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/miniapp/utils/print-order-idempotency.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/utils/request.js` | `verify-miniapp-static.mjs` |
-| `apps/miniapp/utils/storage.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/utils/storage.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
 
 </details>
 
