@@ -43,47 +43,182 @@
       </view>
     </block>
 
-    <block wx:elif="{{filtered.length}}">
-      <view class="ord-card" wx:for="{{filtered}}" wx:key="id">
-        <view class="oc-top">
-          <view class="oc-store">
-            <text class="ficon i-location oc-store-ic"></text>
-            <text>{{item.store}}</text>
-          </view>
-          <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
-        </view>
-        <view class="oc-body">
-          <view class="oc-thumb"><text class="ficon i-file-text"></text></view>
-          <view class="oc-info">
-            <view class="oc-title">{{item.title}}</view>
-            <view class="oc-spec">{{item.spec}}</view>
-          </view>
-        </view>
-        <view class="pk-strip" wx:if="{{item.pickup}}">
-          <view class="pk-label">到机码</view>
-          <view class="pk-code">{{item.pickup}}</view>
-          <view class="pk-hint">到店在终端「到机码核销」扫码或手输</view>
-        </view>
-        <view class="oc-foot">
-          <view class="oc-price">{{item.price}}</view>
-          <view class="oc-btns">
-            <view wx:if="{{item.cloudOrder}}" class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
-            <!-- 一体机上产生的历史任务没有线上详情端点，不放会 404 的按钮。 -->
-            <text wx:else class="oc-note">一体机任务，详情请在一体机「我的打印订单」查看</text>
-            <view wx:if="{{item.canCancel}}" class="oc-btn cancel tap {{item.cancelling ? 'disabled' : ''}}" hover-class="tap-press" data-id="{{item.id}}" bindtap="cancelOrder">{{item.cancelling ? '正在取消…' : '取消订单'}}</view>
-            <view wx:if="{{item.action}}" class="oc-btn pri tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="primary">{{item.actionLabel}}</view>
-          </view>
-        </view>
-      </view>
-    </block>
+    <block wx:else>
 
-    <view class="card" wx:else>
-      <view class="empty-slot">
-        <text class="ficon i-printer es-ic"></text>
-        <view class="es-t">暂无订单</view>
-        <view class="es-d">发起打印后可在此查看到机码与出纸状态</view>
+      <!-- ── 材料包订单：独立来源 GET /orders/package，独立游标与失败态 ───────── -->
+      <view class="sec-head">
+        <view class="sh-t">材料包订单</view>
+        <view class="sh-n" wx:if="{{pkgState === 'ready'}}">共 {{pkgTotal}} 笔</view>
       </view>
-    </view>
+
+      <!-- 分支顺序是刻意的：已经拿到的订单永远先渲染。
+           把「加载中 / 失败」放在前面会让一次下拉刷新或一次翻页失败，
+           把用户已经看到的订单整段顶掉 —— 数据还在，只是被错误态挡住了。 -->
+      <view class="card" wx:if="{{pkgState === 'loading' && !pkgRows.length}}">
+        <view class="empty-slot">
+          <view class="es-t">正在加载材料包订单…</view>
+        </view>
+      </view>
+
+      <block wx:elif="{{pkgFiltered.length}}">
+        <view
+          class="ord-card pkg tap"
+          wx:for="{{pkgFiltered}}"
+          wx:key="orderId"
+          hover-class="tap-press"
+          data-id="{{item.orderId}}"
+          bindtap="openPackage"
+        >
+          <view class="oc-top">
+            <view class="oc-store">
+              <text class="ficon i-folder oc-store-ic"></text>
+              <text>材料包 · {{item.fileCount}} 个文件</text>
+            </view>
+            <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="pkg-meta">
+            <view class="pm-row">
+              <text class="pm-k">订单号</text>
+              <text class="pm-v">{{item.orderNo}}</text>
+            </view>
+            <view class="pm-row">
+              <text class="pm-k">金额</text>
+              <text class="pm-v">{{item.amountText}}</text>
+            </view>
+            <view class="pm-row" wx:if="{{item.expiresText}}">
+              <text class="pm-k">到机码有效期至</text>
+              <text class="pm-v">{{item.expiresText}}</text>
+            </view>
+            <view class="pm-row">
+              <text class="pm-k">状态</text>
+              <text class="pm-v">{{item.statusDetail}}</text>
+            </view>
+          </view>
+          <view class="pk-strip" wx:if="{{item.hasPickupCode}}">
+            <view class="pk-label">到机码</view>
+            <view class="pk-code">{{item.pickupCode}}</view>
+            <view class="pk-hint">到店在终端「到机码核销」扫码或手输</view>
+          </view>
+          <view class="oc-foot">
+            <view class="oc-price">{{item.amountText}}</view>
+            <view class="oc-btns">
+              <view class="oc-btn pri">查看到机码</view>
+            </view>
+          </view>
+        </view>
+        <view
+          wx:if="{{pkgCursor}}"
+          class="btn ghost block tap load-more"
+          hover-class="tap-press"
+          bindtap="loadMorePackages"
+        >{{pkgLoadingMore ? '正在加载…' : '加载更多材料包订单'}}</view>
+        <!-- 刷新 / 翻页失败时如实说一句，但不清掉上面已加载的订单 -->
+        <view class="list-foot warn" wx:if="{{pkgMoreErrorText}}">
+          {{pkgMoreErrorText}}
+          <text class="lf-retry tap" hover-class="tap-press" bindtap="loadMorePackages">重试</text>
+        </view>
+        <view class="list-foot warn" wx:elif="{{pkgState === 'error'}}">
+          {{pkgErrorText}}
+          <text class="lf-retry tap" hover-class="tap-press" bindtap="retryPackages">重试</text>
+        </view>
+      </block>
+
+      <view class="card" wx:elif="{{pkgState === 'error'}}">
+        <view class="empty-slot">
+          <text class="ficon i-warning es-ic"></text>
+          <view class="es-t">{{pkgErrorTitle}}</view>
+          <view class="es-d">{{pkgErrorText}}</view>
+          <view class="btn ghost block tap" hover-class="tap-press" bindtap="retryPackages">重新加载材料包订单</view>
+        </view>
+      </view>
+
+      <view class="card" wx:elif="{{pkgRows.length}}">
+        <view class="empty-slot">
+          <view class="es-t">当前筛选下没有材料包订单</view>
+          <view class="es-d">切到「全部」可以看到这 {{pkgRows.length}} 笔材料包订单</view>
+        </view>
+      </view>
+
+      <view class="card" wx:else>
+        <view class="empty-slot">
+          <text class="ficon i-folder es-ic"></text>
+          <view class="es-t">还没有材料包订单</view>
+          <view class="es-d">{{pkgOnsiteNotice}}</view>
+          <view class="btn ghost block tap" hover-class="tap-press" bindtap="toPackageCreate">创建材料包</view>
+        </view>
+      </view>
+
+      <!-- ── 单件打印订单：云打印 Order + 一体机历史任务，走触底分页 ─────────── -->
+      <view class="sec-head">
+        <view class="sh-t">单件打印订单</view>
+      </view>
+
+      <view class="card" wx:if="{{loading && !filtered.length}}">
+        <view class="empty-slot">
+          <view class="es-t">正在加载打印订单…</view>
+        </view>
+      </view>
+
+      <block wx:elif="{{filtered.length}}">
+        <view class="ord-card" wx:for="{{filtered}}" wx:key="id">
+          <view class="oc-top">
+            <view class="oc-store">
+              <text class="ficon i-location oc-store-ic"></text>
+              <text>{{item.store}}</text>
+            </view>
+            <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="oc-body">
+            <view class="oc-thumb"><text class="ficon i-file-text"></text></view>
+            <view class="oc-info">
+              <view class="oc-title">{{item.title}}</view>
+              <view class="oc-spec">{{item.spec}}</view>
+            </view>
+          </view>
+          <view class="pk-strip" wx:if="{{item.pickup}}">
+            <view class="pk-label">到机码</view>
+            <view class="pk-code">{{item.pickup}}</view>
+            <view class="pk-hint">到店在终端「到机码核销」扫码或手输</view>
+          </view>
+          <view class="oc-foot">
+            <view class="oc-price">{{item.price}}</view>
+            <view class="oc-btns">
+              <view wx:if="{{item.cloudOrder}}" class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
+              <!-- 一体机上产生的历史任务没有线上详情端点，不放会 404 的按钮。 -->
+              <text wx:else class="oc-note">一体机任务，详情请在一体机「我的打印订单」查看</text>
+              <view wx:if="{{item.canCancel}}" class="oc-btn cancel tap {{item.cancelling ? 'disabled' : ''}}" hover-class="tap-press" data-id="{{item.id}}" bindtap="cancelOrder">{{item.cancelling ? '正在取消…' : '取消订单'}}</view>
+              <view wx:if="{{item.action}}" class="oc-btn pri tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="primary">{{item.actionLabel}}</view>
+            </view>
+          </view>
+        </view>
+        <view class="list-foot" wx:if="{{loadingMore}}">正在加载更多…</view>
+        <view class="list-foot warn" wx:elif="{{error}}">{{error}}</view>
+      </block>
+
+      <view class="card" wx:elif="{{error}}">
+        <view class="empty-slot">
+          <text class="ficon i-warning es-ic"></text>
+          <view class="es-t">打印订单加载失败</view>
+          <view class="es-d">{{error}}</view>
+        </view>
+      </view>
+
+      <view class="card" wx:elif="{{orders.length}}">
+        <view class="empty-slot">
+          <view class="es-t">当前筛选下没有单件打印订单</view>
+          <view class="es-d">切到「全部」可以看到这 {{orders.length}} 笔单件打印订单</view>
+        </view>
+      </view>
+
+      <view class="card" wx:else>
+        <view class="empty-slot">
+          <text class="ficon i-printer es-ic"></text>
+          <view class="es-t">暂无单件打印订单</view>
+          <view class="es-d">发起打印后可在此查看到机码与出纸状态</view>
+        </view>
+      </view>
+
+    </block>
 
     <view class="compliance-note">
       订单状态实时同步终端设备。取件前请确认设备在线、纸张与耗材充足。

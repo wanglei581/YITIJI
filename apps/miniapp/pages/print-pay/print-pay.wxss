@@ -39,3 +39,20 @@
 
 /* 门店迷你卡主内容区 */
 .sm-main { flex: 1; }
+
+/* 报价失败 / 核价中：如实说明 + 一条可执行的重试。绝不在这里补一个本地算出来的金额。 */
+.fee-row.quote-fail { align-items: flex-start; gap: 20rpx; }
+.qf-text { flex: 1; font-size: 23rpx; line-height: 1.6; color: var(--muted); }
+/* 实测 ≥48px 触控下限（CLAUDE.md §9） */
+.qf-retry { flex-shrink: 0; display: inline-flex; min-height: 96rpx; padding: 0 28rpx; border-radius: 20rpx; border: 1rpx solid var(--line); background: var(--surface); color: var(--ink-soft); font-size: 24rpx; font-weight: 600; align-items: center; justify-content: center; }
+
+/* 报价 fail-closed 的登录出口：与「重新核价」同一尺寸，主色以示这是有效的那一条。 */
+.qf-login { flex-shrink: 0; display: inline-flex; min-height: 96rpx; padding: 0 28rpx; border-radius: 20rpx; border: 1rpx solid var(--teal); background: var(--surface); color: var(--teal); font-size: 24rpx; font-weight: 600; align-items: center; justify-content: center; }
+
+/* 订单已建成但没跳走：说清它在哪，并给出唯一正确的下一步（去找回它，而不是再提交一次）。 */
+.locked-main { flex: 1; }
+.locked-t { font-size: 27rpx; font-weight: 700; color: var(--ink); }
+.locked-d { margin-top: 8rpx; font-size: 23rpx; line-height: 1.65; color: var(--muted); }
+.locked-btn { display: flex; width: fit-content; min-height: 96rpx; margin-top: 18rpx; padding: 0 32rpx; border-radius: 22rpx; background: var(--teal); color: #fff; font-size: 26rpx; font-weight: 650; align-items: center; justify-content: center; }
+/* 同时出现两个动作时（重新下单 / 重新核对 + 去我的打印订单），第二个降为次要样式：两个同样重的实心按钮会让用户分不清该点哪个。尺寸不降，触控面积与主按钮一致。 */
+.locked-btn.ghost { background: transparent; color: var(--teal); border: 2rpx solid var(--teal); }

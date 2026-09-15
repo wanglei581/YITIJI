@@ -58,11 +58,11 @@
          直接渲染在卡片上），用户在点之前就知道这条路走不通，而不是走进去撞墙。
          aria-disabled 让读屏软件也播报「不可用」；但卡片仍可点、可聚焦，
          点开是完整解释——点了没反应的死按钮会让用户以为是自己点错了。 -->
-    <view class="grp-head">
+    <view class="grp-head" wx:if="{{pending.length}}">
       <view class="section-t">尚未开放</view>
       <view class="grp-sub">页面已完成，等服务端接口上线后开放</view>
     </view>
-    <view class="tiles">
+    <view class="tiles" wx:if="{{pending.length}}">
       <view
         class="tile pending sheen tap"
         wx:for="{{pending}}"

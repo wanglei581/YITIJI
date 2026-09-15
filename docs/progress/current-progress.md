@@ -1,5 +1,1005 @@
 # 当前开发进度
 
+2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
+失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
+`34984568841`。`postgres-readiness / Core verify suites on PG` 与
+`build-and-verify / Verify suites` 的决定性失败相同：`verify:scan-tasks` 构造
+`20260913223000_harden_scan_retry_authority` 的“上一版本”数据库时，只排除了扫描硬化和 ACK
+迁移，却把本 PR 新增、时间更晚的
+`20260915170000_add_member_print_order_idempotency` 也复制进沙箱；所以最新已应用迁移不再是脚本
+明确要求的 `20260913210000_add_scan_input_lockout_telemetry`。这不是小程序身份、订单或幂等运行时
+逻辑回归，而是后续迁移进入后暴露出的测试夹具边界错误。
+
+- **修复：** `createMigrationSandbox()` 现在只复制到
+  `RETRY_HARDENING_PREVIOUS_MIGRATION` 为止的迁移目录；测试随后仍按原流程单独加入扫描硬化迁移和
+  delivery ACK 迁移。`migration_lock.toml` 等非目录文件继续保留。未改小程序、API 业务逻辑、
+  Prisma schema、迁移 SQL 或前端文件。
+- **本机证据：** 修复前 `pnpm --filter @ai-job-print/api verify:scan-tasks` 稳定退出 `1`，实际最新
+  迁移为 `20260915170000_add_member_print_order_idempotency`；修复后退出 `0`，完整输出到
+  `PASS scan tasks verification`。反向删除截止条件后同一命令重新退出 `1`、同一断言复现；恢复后
+  再次退出 `0`。本机没有 PostgreSQL URL，因此脚本里的真实 PG 分支仍由下一轮
+  `postgres-readiness` CI 负责证明。
+- **审查：** Grok MCP session `3bc8b398-3cde-4472-bc14-c429d36b656d` 只读定位到
+  `[67/103] verify:scan-tasks` 及“后续迁移污染上一版本模板”；Codex 独立复现并核对 PR diff 后修复。
+- **证据边界：** `SOURCE / LOCAL: GO`；新 head 的 `CI: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。旧 run `34984568841` 不得重用为新提交结论。
+
+2026-09-15 **R10：撤回 `f7486bbe2ed0124da68350aaba1c859f846522ce` 的 `SOURCE / LOCAL: GO`。**
+Grok 独立复审（session `76417146-b557-4787-9f0a-8e90a6e430f4`）在那个提交上复现出两条 P1，
+**两条我都在本机独立复现过**（先写测试、确认判红，再动实现）。锚点是 `f7486bbe2` 的直接
+子提交（本分支 tip），基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+本轮只改前端，`services/**` 一行未动。
+
+- **P1-1：R9 的归属绑定仍然可以被冒认，而且不需要任何生命周期回调。** R9 允许在
+  「本页自己那一发（发出时归属未定）的回调里、且页面仍然可见」时把当前身份认作开页那位，
+  理由写的是"那个身份是 request.js 为这一发补签回来的"。**页面无从知道这件事。**
+  它能读到的只有"回调这一刻本地是谁"，而 `auth.saveSession` 不需要任何生命周期回调 ——
+  另一个人在别处登录，回调读到的就是他。于是：过期开页（快照 / 开页账号 / 发起账号
+  三个全是空串）→ 请求在途 → B 静默登录（**不经过 onHide / onShow**）→ A 的 200 回来 →
+  回调把 B 认作开页那位 → `sameAccount('', 'u:B')` 一路放行 → A 的到机码画在 B 的屏幕上。
+  R9-A / R9-A4 当时都靠 onShow / onHide 驱动，所以一条都没照见这个形态；我在
+  "剩余风险"里把它写成了"按微信导航模型应当不可达"的**推理**，而那条推理是错的。
+  **改法：归属不再从"回调时读到谁"推断，改由服务端回答。** 只剩两条来源：
+    ① `onLoad` 的第一次判定（本页刚被导航打开，此刻确定登录着的那位就是它的主人）；
+    ② 一发**发出时就带着确定账号**的确认请求拿到 200（`_confirmOwner`）——
+       服务端的 requireOwned 是按发出这一发时的登录态校验归属的，而那是谁，
+       我们在发出**之前**就记进了令牌（`token.account` / `token.confirming`）。
+  发出时归属未定的那一发（`token.account === ''`）**永远不能建立归属、也不许写屏**：
+  它只负责把 request.js 的 401 静默补签触发出来，它的 200 什么都不证明。
+  归属只写成 `token.account`，**不是**回调时读到的那位；中途换过人由
+  `resolveAccountState`（快照非空时看得见 `'u:A' → 'u:B'`）先一步走 `'changed'` 清场。
+  别人（B）拿到的是服务端的 404 `PRINT_ORDER_NOT_FOUND`，按账号记进 `_ownerDeniedFor`，
+  不再拿同一个账号反复问（守卫落在**发请求那一处**，因为每次 onShow 都经过那里）。
+- **P1-2：`storage.read` 只把"抛异常"算读失败，其余非数组形态照旧覆盖全表。**
+  R9 加的 `read()` 把 `''`/`undefined` 和真实存储的 `null` 一起折成 `value: null`，
+  于是 `null` / `{}` / `'bad'` / `42` 全都落进 `loadAll` 的 `if (!Array.isArray(raw)) return []`
+  ——三个读-改-写回全量的入口照样以"空表"为基底写回去，盘上那条未落定的记录
+  （POST 可能已经到了服务端）被一次读异常抹掉，代价和读失败那一条一模一样。
+  **本机实测：`{}` 时三个入口一共发生 3 次 `setStorageSync`。**
+  改法：`read()` 返回 `{ok, found, value}` 三分 —— **只有 `ok && !found`（wx 在 key 不存在时
+  返回 `''`）才是"本机确实没有这一格"**，那是唯一可以当空表处理的形态；`loadAll` 相应
+  三分（读失败 → `null`；key 不存在 → `[]`；读到了但不是数组 → `null`）。
+  `f` 那一侧同时钉住：**key 确实不存在时照常铸键落盘**，不许修过头。
+
+**R9 的"归属存疑（粘性）"整个撤掉。** 它既没堵住 P1-1（binding 仍在回调里发生），
+又会把本人永久锁死（我当时把它登记成"已知遗留：一次误伤"）。现在那条路由确认请求覆盖：
+本人经一次确认请求恢复显示，别人拿到服务端 404。同时撤掉的还有 R9 那个
+"本页送用户去登录、回来第一次 onShow"的一次性绑定窗口 —— 它和回调里那个窗口是同一类
+错误，而且现在不需要它了。**门禁相应收紧为"onShow 永远不传绑定参数"。**
+
+改动文件（5 个，全部在小程序内）：`apps/miniapp/pages/print-pickup/print-pickup.js`、
+`apps/miniapp/utils/storage.js`、`apps/miniapp/utils/print-order-idempotency.js`、
+`apps/miniapp/scripts/tests/page-lifecycle.test.mjs`、`apps/miniapp/scripts/verify-miniapp-static.mjs`、
+`apps/miniapp/scripts/verify-package-chain.mjs`。`docs/graph/` 本轮无变化（重跑后一致）。
+
+测试：142 → **148 条全绿**。新增 R10-a～f 六条（正是 Grok 点名要的六条）：
+a) 过期开页 + 请求在途 + **无任何生命周期回调**切 B + A 的 200 → B 的 `codeRaw` 为空、
+`showQr=false`、整份 data 一个字节的码都没有；b) 被服务端拒过的账号记在账上、
+反复 onShow 不再刷服务端；c) 确认请求认下的是**发出时那个已知账号**（在途静默换人 →
+谁都不认、当场清场）；d) 旧响应不得解锁、也不得掀掉正在飞的那发确认请求；
+e) `null` / `{}` / `'bad'` / `42` × 三个写入口 → `setStorageSync` 调用次数为 **0**，
+原未落定记录恢复读取后仍在；f) key 确实不存在时照常铸键落盘。
+另有 5 条 R9 测试按新设计逐条改写（R9-A / A2 / A3 / A4 / B）——
+它们原来编码的是"存疑就永久 fail-closed / 零请求"，那套口径已被 R10 取代；
+**安全断言一条没少**（B 不得成为 opener、不得显示任何码、迟到响应不得写屏），
+变的是"之后怎么恢复"：从"永久锁死"变成"问服务端，本人能回来、别人被 404 拒掉"。
+
+反向变异 **16 条，全部按退出码判红**（还原用 sha256 逐文件比对确认逐字节一致，
+未用 `git checkout` / `reset`）。其中 `N1` 就是把 R9 那行推断式绑定原样放回去 —— 测试与
+门禁同时判红，证明这一轮真的堵上了它。第一轮 `N6`（`_confirmOwner` 不限定 ok/resignable）
+未红：它今天与"中途没换过人"互相覆盖（`'changed'` 会先一步截掉、`'unusable'` 会把快照
+清成 `''`），属于真冗余；但它是**契约**的一部分，押在另一条判据的当前写法上那边一改
+这边就静默放行，所以补了门禁锚点，之后判红。`N4`（不核"中途没换过人"）同理只有门禁红。
+
+本机独立复跑（全部退出码 0）：`node --test …/page-lifecycle.test.mjs`（148 pass / 0 fail）、
+`@ai-job-print/miniapp` 的 `verify:static`（整条链）/ `verify:package-chain` / `verify:api-contract`、
+`@ai-job-print/api verify:miniapp-cloud-print-m2`（**未改任何后端文件**，仍 ALL PASS）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` /
+`graph:check`（`pnpm graph` 重跑后无变化）、`git diff --check`。
+
+**证据边界：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。
+**本轮新增一条必须真机验的**：过期开页现在要走**两个来回**（触发补签的那一发 + 确认那一发）
+才出码，慢网下的观感没有真机数据；确认请求的 404 判据钉的是
+`statusCode === 404 && code === 'PRINT_ORDER_NOT_FOUND'` 这一对，真实网络上没触发过。
+
+2026-09-15 **R9 收口：取件页的 P0 —— 后来登录的那位会被记成「开页那位」，于是上一位的到机码
+画到了他的屏幕上。** 锚点是 `b2fa6bad1` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。本轮只改前端，
+`services/**` 一行未动（改动清单见文末）。
+
+R8 打的是「响应回来那一刻身份对不对」；R9 打的是它**前面那一步** ——「这一页到底是谁的」
+什么时候才算数。五条全部在本机独立复现过（复现证据：新增的 6 条测试在修改前逐条判红，
+其中 `R9-A3` 是反向对照、修改前就是绿的，用来挡住"修过头把本人也挡掉"）：
+
+- **P0 归属可以被后来者认领。** 打开取件页时 A 的 enduser JWT（只签 30 分钟）**已经**
+  自然到点 —— 中午下单、下午走到一体机前打开，命中的就是这一条。此时 `_account` /
+  `_openerAccount` / `requestAccount` **三个全是空串**，请求照常带着补签资格发出去
+  （R4-1 起就是这么设计的，不能改）。在途期间 B 登录、回到本页：`onShow` 走到绑定那一行时
+  `_openerAccount` 还空着，于是**后来登录的 B 被记成开页那位**；A 的迟到 200 回来时，
+  开页那位、当前这位全都指向 B，`_ownsResponse` 第一行 `if (state === 'ok') return true`
+  无条件放行 —— A 的取件凭证就画在了 B 的屏幕上。R8-B3 钉住的三条判据一条都没救到它：
+  那三条全在 `'resignable'` 分支里，而这条路走的是 `'ok'`。
+  改法：绑定只发生在两个**说得清因果**的时刻 —— ① `onLoad` 的第一次判定（本页刚被导航
+  打开）；② 本页**自己打出去的那一发**（发出时归属未定）的回调里，且**页面仍然可见**
+  （那个身份是 request.js 为这一发补签回来的，因果落在本页自己身上）。外加一个一次性窗口：
+  本页自己把用户送去登录页之后回来的第一次 `onShow`，且此刻没有任何请求在飞。
+  其余时刻冒出来的确定身份一律判**归属存疑**（粘性）→ 清码 + fail-closed。
+- **`_ownsResponse` 对 `'ok'` 无条件放行。** 现在 `'ok'` 与 `'resignable'` **走同一组判据**，
+  四条缺一不可：请求代次仍是当前代次、归属没存疑、当前这位是确定会员键且**就是开页那位**、
+  发起这一发的那位与发出时的开页那位都对得上（只放行 `'' → 'u:<id>'` 这一种不相等，
+  也就是 request.js 为这一发补签成功；而它能被采信靠的正是代次那一条）。
+- **身份变了，在途那一发的代次不作废、旧 `_polling` 还锁着本页。** 清完场之后
+  「重新加载」是个按不动的按钮，要等那发已经不属于任何人的请求自己落定 —— 而什么时候落定
+  是网络说了算。现在 `_invalidateInflight()` 代次 +1 **并当场交还去重锁**；迟到的响应由
+  `_settleRequest(token)` 按**令牌对象身份**挡住（不是比代次：同一代次里也有先后两发），
+  挡住时连锁都不碰 —— 那把锁此刻可能正锁着另一发新请求。
+- **画码的 `exec` 回调不重认任何东西。** 它跨帧才回来，中间那张码完全可能已经被换掉
+  （核销后重取）、被撤下（过期 / 轮询失联 / 换人清场）。上一版照样把画布写成
+  `qrStatus: 'ready'` —— 用户会照着一张作废的、或者根本不属于当前这位的码去扫。
+  现在码 / 归属 / 代次三样在**进入异步之前**钉进局部变量，回调里逐条重认，且守卫排在
+  任何一次 `setData` 之前（先写 `'error'` 再判等于已经替当前这张码下了结论）。
+  package-code 早就有这三道，取件页一直没有。
+- **幂等记录：一次读失败会把别人那条未落定的记录抹掉。** `utils/storage.js` 的 `get()`
+  吞掉 `wx.getStorageSync` 的异常返回 fallback，于是"这一次根本没读到"和"本机确实没有
+  记录"在 `loadAll` 里压成同一个 `[]`；而本模块每一次写入都是**读-改-写回全量**，
+  以一个假的空数组为基底写回去，盘上那条未落定的记录（POST 可能已经到了服务端、
+  只是响应丢在路上）就此消失 —— 下一次同参数提交铸新键、服务端再建一张订单、再扣一笔钱，
+  而且连"名额满了拒绝"那道闸都绕过去了（数出来的未落定条数同样是 0）。`clearRecord`
+  最狠：它把**整张表**写成空，这台设备上所有账号所有在飞的键一起没了。
+  改法：新增 `storage.read(key) → {ok, value}` 把两者分开；`loadAll()` 读失败返回
+  `null`（不是 `[]`），三个写入口（`ensureKey` / `rememberOrderId` / `clearRecord`）
+  一律 fail-closed，一个字节都不写、如实返回失败让调用方保持锁定；`persist` 自己再挡一道。
+  读恢复之后同一条链照常继续（这不是一条死路，已由 R9-D 末段钉住）。
+
+改动文件（6 个，全部在小程序内）：`apps/miniapp/pages/print-pickup/print-pickup.js`、
+`apps/miniapp/utils/print-order-idempotency.js`、`apps/miniapp/utils/storage.js`、
+`apps/miniapp/scripts/tests/page-lifecycle.test.mjs`、`apps/miniapp/scripts/verify-miniapp-static.mjs`、
+`apps/miniapp/scripts/verify-package-chain.mjs`，外加 `docs/graph/` 标准重跑产物。
+
+测试：`page-lifecycle.test.mjs` 从 134 条加到 **142 条，全绿**，原 134 条一条没删
+（`R8-B3` 因 `_ownsResponse` 换成令牌签名而**逐条改写**、断言含义一条不减，不是删除）。
+门禁：`verify:static` 135 → **136 PASS / 0 FAIL**（新增「画码的异步回调必须重认码 / 归属 /
+代次」一条），`verify:package-chain` 新增 7 条断言（storage.read 的存在、loadAll 读失败返回
+null、三个写入口各自 fail-closed、persist 自挡一道）。
+
+反向变异 **19 条，全部判红**（判据是被测命令的**退出码**，不是数 FAIL 行；还原方式是把原始
+字节读进内存、`finally` 写回，并用 **sha256 逐文件比对**确认与变异前逐字节一致，
+**未使用 `git checkout` / `git reset`**）。第一轮 19 条里有 6 条没能全红，**这 6 条本身就是
+本轮最有价值的产出**，因为它们指的不是实现而是**检测器**：
+`M3`（`_ownsResponse` 的"就是开页那位"弱化成"绑上了才比"）门禁与测试**双绿** ——
+门禁正则只钉了 `account !== this._openerAccount` 这段字面量，弱化后照样匹配；测试则从没驱动过
+"开页那位从来没被绑定过"那一格。两边都补了。
+`M6` / `M7` / `M10` 三条是门禁锚点的老毛病：钉字面量（包进 `if (false)` 照样匹配）、
+正则跨出函数体撞上 `_settleRequest` 里的同名赋值、以及 `then` / `catch` 两处只钉"存在"
+（改坏一处另一处照样绿）。三条锚点分别改成：钉完整条件、用 `methodBody` 限定在函数体内、
+**数出现次数必须是 2/2**。
+`M8`（`_settleRequest` 无条件放行迟到响应）只有门禁红：页面层被"归属存疑"那面旗子兜住了，
+测试看不出差别 —— 但那是**另一个函数的实现细节**，契约不能押在它身上，所以补了一条直接驱动
+`_settleRequest` 的契约测试（R9-B2）。
+`M16`（`ensureKey` 第一次读不判失败）至今**只有门禁红、测试绿，而这一条是对的**：
+铸键前还有第二道 `const base = loadAll(); if (!base) throw`，它排在任何一次写入之前，
+所以第一道纯属快路径/可读性，删掉它在行为上确实没有差别（已用 R9-D 实测确认那条在飞的记录
+仍然活着）。**不为了让变异转红而去编一条测不出真差别的断言。**
+
+本机独立复跑（全部退出码 0）：`node --test apps/miniapp/scripts/tests/page-lifecycle.test.mjs`
+（142 pass / 0 fail）、`@ai-job-print/miniapp` 的 `verify:static`（整条链，含
+`verify-pickup-qrcode` / `api-contract` / `visual-scale` / `user-error` / `package-chain` /
+`package-helpers` / `page-lifecycle` / `empty-state`）、`verify:package-chain`、`verify:api-contract`、
+`@ai-job-print/api verify:miniapp-cloud-print-m2`（**未改任何后端文件**，仍 ALL PASS，
+含串行拉起的 `verify:member-print-order-idempotency-http`）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` /
+`graph:check`（`pnpm graph` 标准重跑后一致）、`git diff --check`。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。
+上面所有结论都来自本机静态执行与沙箱内真跑页面源码（`node:vm` + 真实 `page-guard` / `auth` /
+`storage`）。**本轮有一处权衡必须在真机上验过才算数**：归属存疑是**粘性**的，
+于是"开页时 JWT 已过期、且恰好在那第一发请求飞着的时候被切走或被别人登录"会让本页永久
+fail-closed，用户要照提示回「我的 · 打印订单」重新进一次。这条路换来的是"这一页从此
+不可能把取件凭证画给一个认不出来的会话"；代价一次导航，收益是一张凭证 —— 但它在真机上
+多久触发一次、提示文案够不够清楚，本机证不了。
+
+2026-09-15 **R8 收口：撤回 `638ea71baeb8556d4327241e7a9221bee4ee15e1` 与
+`103adb9e7899f620104f6abf3443e666a076fe8d` 的「可以进最终复审 / 前端幂等链已收口」结论 ——
+那两条各自都成立，但合起来不足以支撑「这条链已经收口」。六个缺陷活过了它们。**
+锚点是 `103adb9e7` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。本轮只改前端，
+`services/**` 一行未动。
+
+R7（`638ea71ba`）证明的是「键落住了、只有一个、还留着」；R8 打的是它们各自**被绕过的那条路**。
+六条全部在本机独立复现过，都不需要换人竞态或构造畸形数据，普通使用就会踩到：
+
+- **P1-A 取件页有一个只由网络快慢决定长短的凭证暴露窗口。** `_refreshOrder` 的第一行是
+  `if (!this.data.orderId || this._polling) return`，身份判定排在这个早退**之后**。于是
+  「A 的码已经画在屏幕上 + 一发轮询正在飞 → A 登出 → B 登录 → 回到本页」这一跳里，
+  `onShow` 第一行就 return，身份**根本没被判过**：清场没发生，A 的取件凭证原样留在屏幕上，
+  一直留到那发请求自己落定。慢响应 / 弱网重试 / 服务端卡住都能把它拉到几十秒以上。
+  改法：身份判定提到 `_polling` 早退之前，判完再谈去重。迟到的 A 响应仍被粘性 foreign 挡住。
+- **P1-B 反过来，一张服务端仍然认的码会被当成「登录失效」清掉。** 请求在 `'ok'` 状态下带着
+  A 的登录态发出、服务端按 `requireOwned` 校验过归属返回 200，而响应回来的路上 A 的
+  enduser JWT（只签 30 分钟）自然到点。成功分支此前只认 `state === 'ok'`，于是把这条
+  **刚刚被服务端确认属于 A** 的响应判成"身份说不清"，当场清码 + 写「请登录」。
+  用户站在一体机前，手里的码没了，而它一直有效。改法：新增 `_ownsResponse(state, requestAccount)`,
+  `'resignable'` 只在**三条同时成立**时放行 —— 快照仍是确定的会员键、就是开页那位、
+  就是发出这一发请求的那位。`'changed'` / `'unusable'` 与 401 一律不走这条路。
+- **P1-C `clearRecord` 只写不读、什么都不返回，调用方照着"清掉了"解锁。** `storage.set`
+  在"没抛异常也没写进去"时同样返回 `true`。于是 `startNewOrder` 会在记录其实还在时解锁，
+  下一次提交复用那个**旧键** —— 服务端按 `(endUserId, key)` 回放的正是那张早已取消 / 过期的
+  订单，用户面对一个能按的按钮却永远打不出东西。改法：`clearRecord` 写完**读回来确认那一格
+  真的不在了**并返回布尔；`startNewOrder` 只在 `true` 时解锁，否则保持锁定 + 保留旧键 +
+  零 POST + 一句说得清、点得动的说明（存储恢复后同一个按钮能真的解开）。
+  同一层还补了两处：`persist` 的读回核对补上 **`orderId`**（漏掉它时 `rememberOrderId`
+  那次写入要落的恰恰就是它，没写进去也照样核得上）；`rememberOrderId` 返回 `null` 时
+  `continueFlow` **不跳转、不解锁、不重试**，改为原地锁定并指向「我的 · 打印订单」——
+  跳转成功的回调会 `clearRecord` 把仅剩的那个键也清掉，而它是唯一还能让服务端回放同一张
+  订单的东西。redirect 成功那一处的 `clearRecord` 仍是 best effort（页面已经在跳走，
+  写任何错误态都是写给一个看不见的页面），这一点在代码里写明了为什么它不驱动 UI。
+- **P1-D 淘汰保护挂在内存里，进程重启就一条不剩。** 上一版"铸键时把这一格钉住"用的是模块级
+  `pins` Map。小程序被杀掉重进（切走、系统回收、扫码跳回来）之后钉子全没了，那条**未落定**的
+  记录退回成"最旧的、没有 orderId 的"一条，正好排在淘汰队列最前面 —— 保护只存在于不需要它的
+  那段时间里。改法：判据只看落盘字段（`orderId === ''` = 未落定），TTL 之内**一条都不淘汰**；
+  上界改成两条独立名额（`MAX_PENDING_RECORDS` / `MAX_SETTLED_RECORDS`），未落定名额用尽时
+  `ensureKey` **拒绝铸新键**（fail-closed）而不是挤掉一条在飞的。`pins` / `PIN_TTL_MS` /
+  `isPinned` 整个删掉。同一格已有的未落定记录仍照常复用。
+- **P2-E「这张订单还活着」被缓存成永久结论。** `_verifyCreatedOrder` 在分类之前就写
+  `_verifiedOrderId`，于是用户照着提示去「我的 · 打印订单」把订单取消了再回到本页，
+  第一行就原地返回 —— 页面永远说"它还在"，那一组参数被一张作废订单锁死到本机记录过期（7 天）为止。
+  改法：只缓存终态与 `requireOwned` 明确的 404；`'live'` / `'unknown'` 每次 `onShow` 重核，
+  同一张订单在飞时由 `_verifyingOrderId` 挡重复 GET。
+- **P2-F 设备时钟往回拨会让本机自己写的键当场作废。** `loadAll` 要求 `now - createdAt >= 0`，
+  时钟回跳后那条记录落在"未来"被整条丢掉 → 新键 → 第二张订单。而"看起来来自未来"从来不是
+  "这个键不该再用"的证据。改法：未来时间戳一律按未过期处理（不设上界，最保守）；
+  形状不对的 `createdAt`（NaN / Infinity / 非数字）仍然一律作废；真正过期的仍然过期；
+  存储上界完全由**条数**兜住，不依赖任何关于时间方向的假设。
+- **P2-G 指纹字段集的跨层分叉两边都自己看不出来。** 少看一项 → 用户改了那一项再提交会被服务端
+  409 `IDEMPOTENCY_KEY_REUSED`；多看一项 → 服务端认为没变而本地换了新键，"响应丢了再点一次"
+  又变回两张订单。两侧各自的测试都会全绿。新增门禁**只读**服务端源码
+  （`services/api/src/member-print-orders/member-print-order-create.service.ts`），
+  抽出 `fingerprintMemberPrintOrderPayload` 里真正参与 sha256 的那个对象字面量，
+  与前端 `FINGERPRINT_FIELDS`（从真实模块读，不抄字面量）逐字比对。**未改任何后端文件。**
+
+改动文件（6 个，全部在小程序内）：`apps/miniapp/pages/print-pickup/print-pickup.js`、
+`apps/miniapp/pages/print-pay/print-pay.js`、`apps/miniapp/utils/print-order-idempotency.js`、
+`apps/miniapp/scripts/tests/page-lifecycle.test.mjs`、`apps/miniapp/scripts/verify-miniapp-static.mjs`、
+`apps/miniapp/scripts/verify-package-chain.mjs`，外加 `docs/graph/` 标准重跑产物。
+
+测试：`page-lifecycle.test.mjs` 从 123 条加到 **134 条，全绿**，原 123 条一条没删。
+新增 11 条覆盖：P1-A 的完整复现（码已显示 + 轮询在飞 + A 登出 + B 登录 + `onShow` →
+码当场清零 / 状态切换 / 零 B 请求 / 迟到 A 响应不回写）、请求发出后才自然过期的 200 仍按本人处理、
+主动登出仍 fail-closed、`_ownsResponse` 的契约逐条、`clearRecord` 抛异常与静默 no-op 两种形态、
+`rememberOrderId` no-op 被识别且页面保持锁定、模块重新 require（模拟杀进程重进）后未落定记录
+仍受保护、未落定名额用尽 fail-closed 且不删既有行、`'live'` 在第二次 `onShow` 被重核并转终态、
+在飞时连续 `onShow` 只打一发 GET、未来 `createdAt` 复用同一个键（且 NaN / 非数字 / 真过期仍作废）。
+R7-3 那条原测试保留，只把两处上界断言从 `MAX_RECORDS` 换成新的两档名额 —— 它证明的性质不变，
+而且现在连"重启之后还成立吗"也一并证了。
+
+反向变异 **15 条（另加 M3 家族 4 条共 19 次），全部判红**（判据是被测命令退出码，不是数 FAIL 行）：
+`M1` 把 `_polling` 早退挪回身份判定之前、`M2` 成功分支只认 `'ok'`、`M3` `'resignable'` 无条件放行
+（含 M3a–M3d 四种拆解：分别去掉 opener / requester / 会员键三条中的任意一条）、
+`M4` `clearRecord` 不读回、`M5` `startNewOrder` 无条件解锁、`M6` 忽略 `rememberOrderId` 的失败、
+`M7` `persist` 不核 `orderId`、`M8` 未落定记录可被淘汰、`M9` 名额用尽改成挤掉而非拒绝、
+`M10` 缓存 `'live'` 结论、`M11` 恢复 `now - createdAt >= 0`、`M12` 前端指纹少一个字段、
+`M13`/`M14`/`M15` 三条走静态门禁而非测试（证明门禁自己也测得出红，不是只靠单测）。
+还原方式是把原始字节读进内存、`finally` 写回，并用 **sha256 逐文件比对**确认与变异前逐字节一致；
+**未使用 `git checkout` / `git reset`**。
+
+**M3 第一次是活的（退出码 0），没有就这么算过。** 原因是那三条归属判据在页面当前的状态机里
+到不了 —— `_resolveIdentity` 的粘性 foreign 标记会先一步截掉换人那条路。但那是**那个函数的
+实现细节**，而"什么样的响应才配画到屏幕上"是 `_ownsResponse` 的**契约**：只测到得了的那条路，
+等于把契约的正确性押在另一个函数的当前写法上，那边哪天被重构掉，这边就会静默放行一张不属于
+当前这位的取件凭证，而所有门禁全绿。所以补了一条直接驱动 `_ownsResponse` 的契约测试，
+M3 家族四种拆解此后全部判红。
+
+本机独立复跑（全部退出码 0）：`node --test apps/miniapp/scripts/tests/page-lifecycle.test.mjs`（134 pass）、
+`verify:static`（135 PASS / 0 FAIL）、`verify:package-chain`、`verify:api-contract`、
+`@ai-job-print/api verify:miniapp-cloud-print-m2`（未改后端，仍 ALL PASS）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` /
+`graph:check`（`pnpm graph` 标准重跑后一致）、`git diff --check`。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。
+上面所有结论都来自本机静态执行与沙箱内真跑页面源码；**`onHide` 不清凭证是一个权衡后的选择**
+（回前台时 `onShow` 会在同一个同步调用里判身份并清场，而切后台就清码会让站在一体机前的用户
+每次切回来都要等一次网络往返），这条取舍只有在真机上走一遍才算被验证过。
+
+2026-09-15 **R3 已合入 `main`：PR #1036 的 merge commit 是
+`ddef936def46e9220a25e44ffe33dcc3458ed00b`，`main` CI run `34917887442` 四个 job 全部 success。**
+本机独立复核（不是转述 PR 页面）：`git merge-base --is-ancestor ddef936def46e9220a25e44ffe33dcc3458ed00b origin/main`
+退出码 0，且 `git rev-parse origin/main` 当前就等于该 SHA；`gh run view 34917887442` 返回
+`status=completed / conclusion=success`，`headSha` 正是 `ddef936de`，四个 job 分别为
+`build-and-verify` success、`kiosk-browser-smoke` success、`postgres-readiness` success、
+**`release-bundle` success（本次是发布类事件，产物已生成）**。
+
+**`release-bundle` 生成 ≠ 已部署。** 该 job 只产出发布包，没有任何 SSH、迁移、pm2 或 nginx 动作。
+生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
+此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
+
+2026-09-15 **后端幂等 P1/P2 收口：`POST /me/print-orders` 回放不再对已关闭取件窗口 `markPaid`，P2002 改为一次 scoped lookup，并补了进程内 Nest HTTP 契约。**
+Claude 前端提交 `638ea71baeb8556d4327241e7a9221bee4ee15e1` 保持不动。锚点是本后端提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+`ed576f3cb` 把键做成了耐久回放，但回放路径上还剩几条会在一次普通重试里踩到的洞：
+
+- **P1 过期窗口上的免费半完成单会抛错而不是回放。** `replayOwned` 见到 `amountCents=0 && payStatus=unpaid` 就调 `markPaid`；`markPaid` 对已过 `pickupCodeExpiresAt` 的单抛 `ORDER_PICKUP_WINDOW_CLOSED`。插入已落库、原请求在 `markPaid` 前失败、用户过了截止再带同一把键重试，得到的是 400 而不是同一张 Order 的诚实终态。改法：回放先走既有 `expireIfNeeded`，再 `requireOwned` 重读；只有窗口仍开才 `markPaid`。截止后收敛 `expired/closed`，不入账、不另铸到机码。
+- **P2 取消/过期回放与前端「清记录再铸新键」对齐。** 同键继续回放同一张终态 Order（不建第二张、不露码）。新的商业意图只表现为一把新键。本轮补了「取消后新 key → 新单」「过期后新 key → 新单」。
+- **P1 P2002 不得只靠 provider meta。** Prisma 7 SQLite adapter 把字段放在 `meta.driverAdapterError.cause.constraint.fields`，缺 meta 时 matcher 必须 false。catch 改为：凡 P2002 都按 `(endUserId, key)` 查一次；有行且指纹匹配才回放；没有 scoped 行就把**原来那只**错误原样抛出。`orderNo` / `pickupCodeHash` / `printTaskId` 冲突的负例仍在。本机用跳过预查的方式打到了真实 SQLite `UNIQUE constraint failed: Order.endUserId, Order.idempotencyKey`（adapter `originalCode=2067`）。
+- **P2 HTTP 契约此前只在 service 直调上。** 新增 `verify:member-print-order-idempotency-http`：进程内 Nest + 隔离 SQLite + 真 `EndUserAuthGuard`（Jwt + 内存会话桩）。证明缺/空白/非法 header 400 且零行；body-only `idempotencyKey` 是 `VALIDATION_FAILED` 不能代替 header；`Idempotency-Key` / `IDEMPOTENCY-KEY` / `idempotency-key` 都能打到 controller；丢响应再 POST 回放同一张单；不同 payload 409 且不泄露 id/code。由 `verify:miniapp-cloud-print-m2` 串行拉起，进入既有 CI 闭包。
+
+本机独立复跑（全部退出码 0）：`verify:member-print-order-idempotency`（T1–T13e）、`verify:member-print-order-idempotency-http`（H1–H5）、`verify:miniapp-cloud-print-m2`、`verify:backend-p0-contracts`、`VERIFICATION_DATABASE_TARGET=isolated verify:member-print-orders`、`typecheck`、根 `verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` / `graph:check`、`git diff --check`。
+
+反向变异 5 条全部判红（按被测命令退出码，还原用内存字节写回 + sha256 逐文件比对，未用 `git checkout` / `reset`）：`M1` 回放重新无条件 `markPaid`、`M2` catch 只认 matcher、`M3` 无 scoped 行时吞掉 P2002、`M4` controller 改读 `x-idempotency-key`、`M5` DTO 放行 body `idempotencyKey`。跨用户隔离与已 paid 免费单的 CAS/审计不重复，原 T6/T7/T9 仍绿。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。PostgreSQL 唯一冲突形态本机没有配置实例，只在 SQLite 上打过真实 P2002。前端 `638ea71ba` 一行未改。
+
+2026-09-15 **R7 收口：撤回 `124398c9f169af45a5a594618feeddc2a77e5e33` 的「幂等建单已接线」结论 ——
+那一句当时只对了一半，三个缺陷活过了它。** 锚点是 `124398c9f` 的直接子提交（本分支 tip），
+基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+R6 证明的是「键被用对了」（该复用时复用、该换时换、归谁就写给谁）。独立复现打的是它
+**下面那一层**：键到底在不在。三条都不需要换人、不需要竞态，只要一次普通的下单就会踩到：
+
+- **P1 落盘从来没被确认过。** `ensureKey` 铸完键调一次 `saveAll`，而 `utils/storage.js`
+  的 `set()` 在 `wx.setStorageSync` 抛异常时吞掉异常返回 `false`（存储满、被系统清理、
+  被隐私策略拦截都会命中），这个返回值当时被整个忽略 —— 于是键一个字节都没落本机，
+  POST 照发。订单在服务端建成、响应一丢，下一次提交铸一个**新键**，服务端按新键再建一张。
+  幂等键的全部价值就在"它落住了"这一件事上。改法：`persist()` 既查 `storage.set` 的返回值，
+  又把记录**读回来逐字核对** `account/fingerprint/key`（"没抛异常也没写进去"从返回值上
+  根本看不出来）；核不上就 `reject`，调用方一个 POST 都不许发。
+- **P1 同一格可以并发铸出两个键。** 取随机数是异步的，两次重叠的 `ensureKey`（两个页面
+  实例、或"重进 + 重试"）会各自走到"没有记录 → 铸一个"，后落盘的还把先落盘的挤掉。
+  两个键 = 两张订单 = 两笔钱。改法：模块级 `minting` 按 `account+fingerprint` 串行化，
+  重叠调用共用同一个在途 Promise；无论成败都摘掉在途项（失败缓存在里面，存储恢复之后
+  也再铸不出键）。
+- **P1 淘汰会把"正在飞"的那条挤掉。** 淘汰只按 `createdAt` 留最新 20 条，而最需要留住的
+  恰恰不是最新那条，是**已经 POST 出去、还没落定**的那条 —— 它只要后面再有 20 条更新的
+  写入就是最旧的那一条。改法：铸键时把这一格**钉住**（`pins`，最长 30 分钟，照 enduser JWT
+  的 `expiresIn:'30m'`；拿到 orderId 或被清掉时提前释放），钉住的不参与淘汰；名额只在
+  没钉住的那批里回收，且先丢"既没钉住、又没有 orderId"的最旧那些。存储总量仍然有界
+  （`MAX_RECORDS` + 当前钉住数，钉子自带上限与释放）。
+- **P2 `wx.getRandomValues` 两个回调一个都不来时，页面永远停在「正在提交…」。** 它只有回调
+  形态，"至少来一个"是约定不是保证（低版本基础库、被拦截的 API、宿主异常）。改法：加一个
+  有界超时（`RANDOM_TIMEOUT_MS = 8000`）按**失败**处理，并接住"只回 `complete`、不回
+  `success`/`fail`"那种实现；`settled` 保证落定一次就不再落定（正常路径上 `complete`
+  晚于 `success`，不得把成功覆盖成失败）。仍然 fail-closed，仍然**不退回 `Math.random`**。
+- **P1 换人只认得 A→B 这一种跳变。** R6 给材料包到机码页加的粘性封锁挂在
+  `resolved.state === 'changed'` 里，而真实链路里更常见的是 **A 登出（快照当场被清成 `''`）
+  之后 B 才登录** —— 那一跳在账号状态机眼里是 `'' → 'u:B'` = 一次正常的补签升级 = `'ok'`，
+  粘性标记一次都不会置起来。于是页面拿着**开页那位**的 orderId、带着 B 的登录态去 GET。
+  `print-pickup` 更直接：它当时连 `_openerAccount` 都没有。改法：两页判据统一换成
+  **当前这位是不是开页那位**（一条独立判据，不是 `changed` 分支里的一个 `if`），
+  中间隔了几跳、隔了多久都一样；**登出仍然不粘**，开页那位自己回来必须解除封锁。
+- **P2 一条七天前的恢复记录会把这一组参数锁死七天。** `print-pay` 进页面发现本机有
+  `orderId` 就 `createdLocked`，而服务端的幂等键是**永久**挂在那张 Order 行上的
+  （`Order_endUserId_idempotencyKey_key`，没有过期清理，`verify:miniapp-cloud-print-m2`
+  的 T10 正是"取消态回放原单、不建第二张"）。订单早就取消 / 过期 / 打完 / 打印失败了，
+  用户面对的却是一个按不动的按钮和一句「订单已创建」，那份材料永远打不出来。
+  改法：恢复出锁之后**用既有的本人端点** `GET /me/print-orders/:orderId`（requireOwned）
+  核一次真实状态 —— 终态（取消 / 过期 / 完成 / 失败 / 终止，或 requireOwned 明确的
+  404 `PRINT_ORDER_NOT_FOUND`）才给出一个**用户自己点**的「重新下单」，点了才清记录、
+  下一次才铸新键；**核不上（网络 / 401 / 5xx）一律保持锁定**（查询失败证明不了任何事，
+  更不许因为查不到就换新键 —— 那会让服务端连回放的机会都没有）。页面自始至终不自动换键。
+
+R6 已经做对的两件事本轮**原样保留并各自变异验过**：orderId 先写进发起那位的恢复记录、
+再判当前页面收不收（`M7` 判红）；只有 `wx.redirectTo` 的 `success` 才清记录（`M8` 判红）。
+
+**测试 123/123**（比 R6 多 15 条）。反向变异 **13 条行为变异全部判红**，每条都用
+`node --test page-lifecycle.test.mjs` 的**退出码**判定（exit=1），不是数 FAIL 行：
+`M1` 忽略落盘失败（红 2 条）、`M1b` 不读回来核对（1）、`M2` 去掉串行化（1）、
+`M3` 淘汰回到"只留最新 N 条"（1）、`M4a` 去掉取随机数超时（7）、
+`M4b` 去掉 `complete` 兜底（3）、`M5a` package-code 回到"只看这一跳变没变"（2）、
+`M5b` print-pickup 同上（1）、`M6a` 恢复出锁后不核状态（6）、`M6b` 核不上也放行重新
+下单（1）、`M6c` 证明终态后自动清记录换新键（1）、`M7` orderId 先判页面归属再落盘（2）、
+`M8` 在 `redirectTo` 之前就清记录（1）。后两条是 R6 已做对、本轮**原样保留**的行为。
+还原方式是把原始字节读进内存、`finally` 写回，并用 **sha256 逐文件比对**确认与变异前
+完全一致（未用 `git checkout` / `reset`）。
+
+`M8` 第一次跑是 **GREEN** —— 我把变异写成了给 `wx.redirectTo` 多加一个 `complete` 回调，
+而测试替身根本不调 `complete`，那是一个在测试环境里等于没改的变异，不是测试漏了。
+重新表述成"在 `redirectTo` **之前**就清记录"之后判红（`R6-5 ①`）。如实记在这里。
+
+**门禁：新增一段 `⑭`（`verify-package-chain`），12 条静态断言逐条变异验过、全部判红**
+（`G1`–`G12`，同样按 `node scripts/verify-package-chain.mjs` 的退出码判定，exit=1）。
+连同上面 13 条行为变异，本轮共 **25 条变异、25 条判红、0 条 GREEN**。
+覆盖：`storage.set` 返回值检查 / 读回来核对 / `ensureKey` 落不住就 reject / 串行化与在途项
+摘除 / 钉子与按价值淘汰 / 取随机数超时与 `complete` 兜底 / 禁 `Math.random` / `print-pay`
+恢复后必须核状态 / 终态判据五项齐全 / 核不上 fail-closed / 只认 requireOwned 的 404 /
+`startNewOrder` 的终态守卫与模板接线 / 换账号时核对结论一起复位 / `print-pickup` 同一套
+开页账号判定。**同时改了一条旧断言的锚点**：`package-code` 那条原本钉
+`resolved.identity === this._openerAccount`（只证明"开页那位回来能解除"），
+现在钉的是 `foreign` 这条独立判据本身与 `foreign || changed` 的清场分支 ——
+是收紧不是放宽，旧锚点证明不了"A 登出→B 登录也会被挡住"。
+
+本机独立复跑（全部退出码 0）：`node --test page-lifecycle.test.mjs`（123/123）、
+小程序 `verify:static`（含 `verify:package-chain` / `verify:api-contract` / `verify:page-lifecycle`）、
+API `verify:miniapp-cloud-print-m2`（T1–T11 ALL PASS）、根 `verify:repository-integrity` /
+`verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` / `graph:check`、`git diff --check`。
+`docs/graph/**` 用标准命令重生成（漂移只有 3 处计数：新增的门禁断言让
+`utils/print-order-idempotency.js` 第一次进入"被门禁断言的文件"），未手改生成物。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION /
+COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、
+未接真实 API、未真机、未部署。本轮**没有改任何后端行为**（`services/**`、Prisma、迁移
+一个字节都没动）；`print-pay` 新调的 `GET /me/print-orders/:orderId` 是 `print-pickup`
+早就在用的既有端点。
+
+**本轮新增登记的遗留：**
+
+- **恢复记录的核状态多打一发请求。** 进入 `print-pay` 时若本机存着一张已建成的订单，
+  会额外发一次 `GET /me/print-orders/:orderId`。同一张订单一轮只核一次，但这条链在
+  慢网下的观感（「正在向服务端核对…」停留多久）没有在真机上看过。
+- **`PIN_TTL_MS = 30 分钟` 是照 enduser JWT 时长取的，不是实测值。** 超过它之后一条
+  仍未落定的记录会重新参与淘汰。现实里 POST 不可能飞 30 分钟，但这个数没有被任何
+  真机数据支撑，只被"超过这个时长用户无论如何都要重新登录一次"这条推理支撑。
+- **`RANDOM_TIMEOUT_MS = 8000` 同样未在真机标定。** 取值偏保守（宁可等），慢设备上
+  是否会先被用户当成卡死而退出，没有验过。
+- **requireOwned 的 404 被当成"这张订单没了"。** 这是本轮唯一一条把服务端错误当作
+  状态证据的判据。它只认 `statusCode === 404 && code === 'PRINT_ORDER_NOT_FOUND'`
+  这一对，不认任何其它失败；但如果服务端将来在别的原因下也返回这一对，前端会允许
+  用户重新下一单。真实网络上没有触发过这条分支。
+
+2026-09-15 **幂等建单接线：撤回 `cf2e12d93ac480929d3abcfb546c584f4deb1722` 的收口结论。**
+该 SHA 上「重复下单已经收口」这句话当时**不成立** —— 它靠的全是页面内的一把内存锁
+（`_createAttempt` / `_createdOrderId`），而那把锁挡不住真正会多扣一笔钱的那一种：
+**200 丢在路上**。用户点了提交，服务端把订单建好了，响应没回来；用户再点一次 ——
+页面的锁早就随着失败分支解开了，于是第二次 POST 到达一个**没有幂等键**的端点，
+第二张订单、第二笔钱。锁只挡得住"同一个页面实例里的并发点击"，挡不住"页面被杀掉重进"，
+更挡不住"这一次到底是不是上一次的重试"。那需要服务端先有一个可回放的键。
+
+现在有了：`ed576f3cb6c54e691bb85b5f06f91f1c39e86245`（Grok，服务端）给
+`POST /me/print-orders` 加了必填 `Idempotency-Key` 与耐久回放 ——
+按 `(endUserId, idempotencyKey)` 落库，同键 + 同 payload 指纹回放**同一张** Order，
+同键 + 不同参数 409 `IDEMPOTENCY_KEY_REUSED`。本轮把小程序接上去，并修掉冷审的三个页面问题。
+锚点是 `ed576f3cb` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+**新增 `apps/miniapp/utils/print-order-idempotency.js`（独立 utility）。** 键的取舍：
+
+- **UUID v4 走 `wx.getRandomValues`，不用 `Math.random`。** 后者不是密码学随机，
+  多个端在同一毫秒进本页有真实碰撞面，而碰撞意味着两个人共用一个幂等键：
+  第二个人会被服务端当成第一个人的重试 —— 同指纹就拿到**别人的订单**，不同指纹就 409。
+  `wx.getRandomValues` 只有异步形态，所以取键是异步的；取不到就**失败**，
+  不退回任何弱随机（没有可靠的键就不该发这个请求，服务端也会 400 挡下来）。
+- **按 `会员 id + canonical fingerprint(fileId, terminalId, copies, colorMode, duplex)` 持久化**
+  `{account, fingerprint, key, orderId, createdAt}`，TTL 7 天、最多 20 条。
+  指纹字段集与服务端 `fingerprintMemberPrintOrderPayload` **逐字同一组**：少看一项，
+  用户改了那一项再提交必然 409；多看一项，服务端认为没变时本地却换了新键 ——
+  "响应丢了再点一次"又变回两张订单。两个方向都有代价，所以字段集本身由常量钉住。
+- **不存到机码、不存文件名、不存金额**（取件凭证 / 常含本人姓名的材料标题 / 本人订单状态，
+  CLAUDE.md §11）。恢复一张订单只需要 orderId，页面会自己带登录态去服务端回读。
+- **B 绝不能读或复用 A 的记录**：每次查找都要求账号逐字相等且是确定的会员键（`'u:<id>'`），
+  `''` / `'!'` 一条都不给。
+
+**接线要点（每一条都对应一个会多扣钱的处境）：**
+
+- `api.createCloudPrintOrder(data, opts)` 强制从 `opts.idempotencyKey` 走 **Header**
+  `idempotency-key`。放进 body 两头不通：服务端从 Header 取（读不到照样 400），
+  而 `CreateMemberPrintOrderDto` 又会把多出来的字段判成非法参数。缺键时本地直接 reject，
+  不把一个必然 400 的请求发出去（那会让页面把"你少带了一个 Header"显示成"下单失败"）。
+- **先拿键、先落盘，然后才 POST。** 顺序反过来就把"响应丢了"这一种原样留着 ——
+  而那正是最需要幂等键的时刻。尝试锁仍然**同步**设上：取键要等回调，锁排在异步之后等于没锁。
+- **拿到 orderId 先写进"发起这次提交的那位"的恢复记录，再判当前页面还接不接收这条响应。**
+  这两件事的对象根本不同：记录属于 `attempt.account`，页面此刻可能已经换人。
+  先判页面、后落盘的话，"A 的回调晚于换人"会直接 return —— 服务端那张订单已经建成，
+  A 手上一条线索都没有，A 重新登录回来只会再提交一次。
+- **确实跳走了才清恢复记录**（`wx.redirectTo` 的 `success`）。拿到 200 就清的话，
+  跳转失败会把唯一能找回这张订单的线索一起丢掉，而页面还留在原地。
+- 进入 / 回到本页时按当前账号恢复 `_createdOrderId` + `createdLocked`，并指向
+  「我的 · 打印订单」。换人清场之后**再判一次账号**，因为当前这位对这组参数完全可能
+  自己也有一张已建成的订单。
+- 服务端回放一张已 `cancelled` / `expired` 的原单时，前端**照它给的 orderId 处理**，
+  不自己另铸一个键（那等于伪造一次"重新下单"）。要真的重新下单必须改参数或从上游重进。
+
+**冷审的三个页面问题一并修掉：**
+
+- **材料包到机码页换到 B 之后只挡住了第一次 `onShow`。** `this._account` 在清场时被设成
+  `''`，于是**第二次** `'' → 'u:B'` 在状态机眼里是一次正常的补签升级 = `'ok'` ——
+  本页又会拿着上一位的 orderId 用 B 的 token 发请求。第一次挡住、第二次放过等于没挡。
+  改法：另记一份**不随清场销毁**的开页账号 `_openerAccount` + 粘性 `_foreignBlocked`。
+  **登出不粘**（同一位 A 重新登录必须还能恢复这一页），只有换成别人才粘，
+  直到开页那位自己回来。
+- **报价 fail-closed 只给「重新核价」，是个死循环。** 补签已经失败之后再点一百次也只会
+  再 fail-closed 一百次。改法：新增**状态字段** `quoteRecover`（`'' | 'login' | 'retry'`），
+  模板按它分流出「去登录」。判据是状态字段而不是文案里有没有「登录」两个字 ——
+  文案会被改写、会被翻译，拿它当判据就是把一条控制流挂在一句话上。
+- 上一条附带：普通网络失败仍然给「重新核价」，不一律把人推去登录。
+
+**测试 108/108**（比上一轮多 10 条），其中一条用**真** `utils/api.js` + `utils/request.js`
+把 `wx.request` 的入参截下来，断言键在 Header、且**不在 body**（不是源码正则）。
+测试替身同时补上 `wx.getRandomValues` 与 `showLoading/hideLoading` 可见性；
+`makePage` 现在把全局 `wx` 指向该条测试的沙箱 `wx` —— 真机上只有一个全局 `wx`，
+页面与 utils 共用它，替身不照做的话工具模块会读到一个空的存储。
+
+**反向变异 8 条，全部判红**（逐字节还原，未用 checkout / reset）：
+`N1` 每次点击都铸新 UUID `tests=1`、`N2` 忽略 member id `tests=1`、
+`N3` 200 后先验身份再持久化 `tests=1`、`N3b` 持久化改用当前页面账号 `tests=1`、
+`N4` 跳转失败也清记录 `tests=1`、`N5` package-code 换人后清 `_account` `tests=1`、
+`N6` 去掉登录按钮接线 `tests=1`、`N7` 幂等键塞进 body `tests=1`。
+
+`N6` 第一次跑是 **GREEN** —— 测试直接调 `page.toLogin()`，绕过了模板接线，
+把 wxml 里那个按钮整个删掉照样绿。改成**从模板里读出处理函数名再调它**之后才判红。
+记在这里是因为它是本轮唯一一次"测试写得像覆盖、其实没覆盖"，与 R5 那条假覆盖同源。
+
+**门禁修了四处「写了但管不住」**（都是我这轮的重构把它们暴露出来的，不是放宽）：
+`verify-miniapp-static` 三处按**单行字面量**匹配的断言（`request('/me/print-orders', { method: 'POST'`、
+`colorMode: 'black_white'`）—— 换行或提取成常量就转红，而代码并没有变坏；
+改成容忍格式的结构匹配，并额外钉住"报价与建单必须共用同两个常量、页内不许再写死第二份"。
+`verify-package-chain` 一处定长窗口 `[\s\S]{0,500}`（本轮是第三次被同一个模式咬）
+换成取函数体，并补上粘性封锁的断言。
+`verify-miniapp-cloud-print-m2` 的跨端断言同样按单行字面量匹配，已改成结构匹配，
+并**新增一条跨端断言**：小程序把键放 Header、不放 body，与服务端 `@Headers('idempotency-key')`
+的取值位置一致。这条只动前端契约的静态断言，**没有改任何后端行为**。
+
+本机独立复跑（全部退出码 0）：`node --test page-lifecycle.test.mjs`（108/108）、
+小程序 `verify:static` / `verify:package-chain` / `verify:api-contract`（135 端点 0 缺口）、
+API `verify:member-print-order-idempotency` / `verify:miniapp-cloud-print-m2` / `typecheck`、
+根 `verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync`、
+`git diff --check`。`docs/graph/**` 用标准命令 `pnpm graph` 重生成（本轮漂移主要来自
+`ed576f3cb` 新增的 `verify-member-print-order-idempotency.ts` 尚未入图，加上本轮新增的
+util），重跑 `graph:check` 为 0，未手改生成物。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION /
+COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、
+未接真实 API、未真机、未部署。**「幂等」这一条尤其不要外推**：本轮证明的是
+"前端在正确的时机复用正确的键"，服务端回放由 `verify:member-print-order-idempotency`
+在隔离库上证明；**两端拼起来在真实网络上的行为一次都没跑过**。
+
+**本轮新增登记的遗留：**
+
+- **取键是异步的**（`wx.getRandomValues` 没有同步形态），于是"点击 → POST"之间多了一跳。
+  尝试锁是同步设的，已有测试钉住"连点三次只发一次"；但这一跳在真机上的表现
+  （慢设备上遮罩与按钮的观感）没有验过。
+- **`wx.getRandomValues` 不可用时本页直接失败**，不降级。这是刻意的 fail-closed，
+  代价是老基础库上无法下单 —— 未在真机核对过该 API 的最低基础库版本。
+- 恢复记录只在本机。换手机、清缓存之后 A 仍然要靠「我的 · 打印订单」找回订单，
+  页面不会再显示"已创建"。这是本地缓存的固有边界，不是缺陷，但要说清。
+
+2026-09-15 **R5 收口：撤回 `c42818c115a0d57e33e94b41eb63aa8a275b37db` 的「可进入三方复审 / 开 PR」
+结论 —— 该 SHA 上仍有 1 个 P1 + 3 个 P2，已在本地修完并追加一个提交（不 amend）。**
+锚点是 `c42818c11` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+R5 主体只证明了「补签**成功**那条路走得通」。最终只读复审补上了另一半：`utils/request.js`
+静默补签**失败**时会 `auth.logout()` **撤销补签资格**，于是回调那一刻账号状态从
+`'resignable'` 掉成 `'unusable'`。而这一跳里账号快照**始终是 `''`**（打开页面时 JWT 就已经
+过期，本页还没显示过任何本人数据）—— 不算换人，`changed` 分支不会执行，**没有任何人把页面
+从 loading 里解出来**。屏幕上留下一个既没有请求在跑、也没有任何出口的圈：这与 R4-1 修过的
+那个形态是同一种病，只是换了触发点。四条：
+
+- **P1 · 材料包到机码页永久转圈。** 过期 → 发请求 → 补签失败 → 401 reject → `catch` 里
+  `_accepts` 因 `'unusable'` 返回 false → `return`，`loading: true` 就此留在屏幕上。
+  修法：`'unusable'` 时走 `_failClosedForIdentity(token)` —— 清凭证、`loading: false`、
+  写清原因并给 `loadRecover: 'login'`。**只在这条请求仍是本页当前那一条时才写**
+  （`_guard.accepts(token)` 一次问掉「切后台」与「latest-wins」两种，在那两种情况下写错误态
+  会把接手者的 loading 顶掉）。`loadOrder` 的同类分支也改成调用同一个出口，不维护第二份文案。
+- **P2 · 确认支付页报价永久「正在核定」。** 同一形态。停在 `'loading'` 会**同时锁死展示和
+  重试**：模板只在 `quoteState === 'error'` 时才给「重新核价」，而 `retryQuote` 又只在
+  `quoteState !== 'loading'` 时才动。修法：`_failClosedQuote(token)` 落到 `error` 并说清要
+  重新登录；**只管报价通道**（文件名那条链失败本来就是静默的，替它写一个金额错误会答非所问）。
+- **P2 · 材料包到机码页 `onShow` 身份判了两次。** 判成 `'changed'` 后仍无条件再调
+  `loadOrder`，而 `loadOrder` 自己那次判定对上「快照已清空」，把 B 判成 `'ok'` —— 于是本页
+  拿着**上一位的 orderId** 用 B 的 token 发请求（服务端 `requireOwned` 必然 404），
+  并把刚写好的「账号已切换」覆盖成 loading。修法：`onShow` 只判一次，判成换人就到此为止。
+  模板在 `loadRecover === 'orders'` 时只给「去我的打印订单」一个按钮，没有可点的重试，
+  所以这条自动路径关掉之后，B 已无路径拿 A 的 orderId 发请求。
+- **P2 · 确认支付页 `wx.hideLoading()` 排在归属判定之前。** `hideLoading` 不是栈，它**无条件
+  掀掉当前屏幕上那一张遮罩，不管是谁挂的**。A 的迟到回调先调它，掀掉的就是 B 正在进行的那次
+  提交的遮罩 —— B 的按钮还锁着、请求还在飞，屏幕上却什么都没有了。修法：遮罩认主
+  （`attempt.loading`），归属判定排在前面，换人复位时由复位方收起上一位的遮罩，
+  谁挂的谁收；尝试被换掉之后就不再碰它。
+
+**四条都是先写测试证明缺陷存在、再修。** 新增 4 条真执行测试（真实顺序：真 `utils/auth.js`
++ 真 JWT + 真 storage，`realAuth.logout()` 模拟补签失败），在修之前逐条判红
+（`not ok 95 / 96 / 97 / 98`），修完 98/98 全绿。`wx` 替身补上 `showLoading` / `hideLoading`
+的可见性跟踪（用布尔而不是计数 —— 这正是「谁都能掀掉遮罩」那个缺陷的形状）。
+
+**反向变异 8 条，全部判红**（逐字节还原，未用 checkout / reset）：
+`N1` unusable 只 return（永久转圈）`tests=1`、`N2` fail-closed 不写 `loading:false` `tests=1`、
+`N3` `onShow` 判完仍无条件 `loadOrder` `tests=1`、`N4` 报价 unusable 只 return `tests=1`、
+`N5` `hideLoading` 排在归属判定之前 `tests=1`、`N6` 遮罩不认主 `verify:static=1`（纵深防御，
+`attempt.loading` 先挡住了，行为上不可观测，如实登记）。另把 R5 主体里因本轮改动而失配的
+两条变异按新代码**重新表述**并重跑：`M6'` 建单回调改回读缓存快照 `tests=1`、
+`M11'` `_accepts` 放行 changed/unusable `tests=1` —— **`M11'` 本轮从「只被门禁判红」升级成
+被可执行测试判红**（`'unusable'` 这一支现在是载荷路径，不再只是一个 return）。
+R5 主体其余 9 条变异原样重跑，仍全部判红。
+
+门禁侧只做了**补强**，没有替代行为测试：`verify-package-chain` 里 package-code `onShow` 那条
+断言的定长窗口 `[\s\S]{0,200}`（多写几行注释就把 `loadOrder()` 顶出窗口）换成配对闭合取函数体，
+并补上「判成换人就到此为止」；`_accepts` 那条补上「`'unusable'` 必须解出 loading」与
+「只在当前那条请求上写」。`verify-miniapp-static` 补上 print-pay 的「建单链不得直接
+`wx.hideLoading()`」「遮罩要让位」「报价 fail-closed 落到 error 且只管报价通道」。
+
+本机独立复跑（全部退出码 0）：生命周期测试 **98/98**、小程序 `verify:static`（132 PASS）、
+`verify:package-chain`、API `verify:miniapp-cloud-print-m2`（隔离库跑完删除）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync`、
+`git diff --check`、`pnpm graph:check`（**本轮无漂移，`docs/graph/**` 未改动**）。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION /
+COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、
+未接真实 API、未真机、未部署。写入范围只有 `apps/miniapp/pages/package-code/**`、
+`apps/miniapp/pages/print-pay/**`、`apps/miniapp/scripts/**` 与本文件 / `next-tasks.md`；
+`utils/auth.js`、`utils/request.js`、`orders.js`、`utils/page-guard.js` 本轮**一行未改**
+（前三者是禁改项且现有范围足以收口，`page-guard` 的状态机本身没有问题 —— 问题在页面拿到
+`'unusable'` 之后没有人写终态）。
+
+**本轮新增登记的遗留：**
+
+- `_releaseLoading` 的「遮罩已归后来那次提交就让开」是**纵深防御**，行为上不可观测
+  （`attempt.loading` 已经先挡住了）。只被静态门禁钉住，没有为了凑数去编一条测试。
+- 其余 R5 遗留（`orders.js` 自然过期仍按清场处理、账号快照销毁依赖页面下一次判定）
+  本轮**未动**，仍按上一节原样登记。
+
+2026-09-15 **小程序 R5：R4 那条「四态身份判定」只修对了一半，本轮补齐；同时撤回 R4 的一处
+过度声明。锚点是 `35385f2cddd9f6735dc840e7904479ceedd5d2c0` 的直接子提交（本分支 tip），
+基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。**
+
+**先撤回 R4 的过度声明。** 下一节写着「单件取件页区分可静默补签、真未登录、会员 id 不可用与
+换人四态，不再永久卡在 loading」。这句话在**打开页面时就已经过期**那一种情况下成立，在
+**码已经显示出来之后才过期**那一种情况下不成立 —— 而后者正是这条链最常见的真实形态
+（中午下单、下午走到一体机前打开取件页）。成因：R4 的快照存的是「上一次读到的原始身份键」，
+而 `auth.getToken()` 发现 JWT 过期时会先 `clearSession()` 把 token 与 user 一起清掉，于是
+`'u:A' → ''`；R4 的判定里 `'resignable'` 只在「当前身份与快照**相等**」时才可能出现，
+这一跳因为不相等，落进了最后那条「从本人掉成不可用」＝按主动登出处理：**当场清掉一张服务端
+仍然认的到机码、写一句「登录已失效」、并且一个请求都不发**，于是 `utils/request.js` 里那套
+401 静默补签永远没有机会执行。同一个形态在材料包到机码页、确认支付页各自重现一次。
+
+R5 的判据收敛成一份共享实现 `apps/miniapp/utils/page-guard.js`：
+
+- `resolveAccountState(auth, snapshot)` —— 四态状态机。快照改成**稳定账号快照**（只放内存的
+  Page 实例字段，换人 / 登出时当场销毁，不写 storage），并且必须在任何一次破坏性 token 读取
+  之前就已经持有。「自然过期」与「主动登出」在 token 维度完全同形，唯一能分开它们的是
+  `RESIGNIN_ELIGIBLE`：`auth.clearSession()` 不动它，只有 `auth.logout()` 撤销它。
+  **`utils/auth.js` 本轮一行未改** —— 这个持久判据它早就提供了（本机实跑确认：自然过期后
+  `getToken()` 返回 null、token 与 user 都被清、`canSilentResignin()` 仍为 true；
+  `logout()` 后为 false）。缺陷全在页面侧的比较方式，不在 auth。页面也造不出这面旗子
+  （只有 `saveSession()` 会写），所以它不可能自己给自己发补签通行证。
+- `sameAccount(tokenAccount, currentAccount)` —— 只放行 `'' → 'u:<id>'` 这一种升级
+  （发起时本地刚好没有可用会话、回调时补签已成功），不放行反向与换人。
+- `createLifecycleGuard().adoptIdentity()` —— 补签升级不 +1 代次；其余一律退回 `setIdentity()`
+  照常作废在途请求。少了这一条，被补签救回来的那条响应会被自己的代次守卫作废，页面停在
+  一页转不完的 loading（即 R4 想修的那个形态换个地方复发）。
+
+三页的行为口径（都有可执行测试钉住）：
+
+- **取件页 / 材料包到机码页**：同一账号自然过期 → 照常发**恰好一次**请求交给 request.js 补签，
+  屏幕上那张码不撤（没有人登出，它仍属于当前这位）；补签成功后响应写得进来。
+  **主动登出 / 换账号 → 一个请求都不发、不自动补签、码与明文副本与有效期一起清掉**，
+  并按「换人」给「去我的打印订单」、按「登出」给「去登录」两个不同出口。
+- **确认支付页**：建单尝试在 `POST` **发出之前**就绑定到当前账号（`_createAttempt`），不再靠
+  回调时重读身份。此前那条路径的后果是实打实的错账：JWT 在 POST 在途期间到点 → 回调读到 `''`
+  → 判成换人 → **不锁 `_createdOrderId` 还把按钮解开** → 用户以为没下成再点一次 = 第二张订单、
+  第二笔钱（`POST /me/print-orders` 没有幂等键）。现在自然过期照常锁 orderId 并跳转；
+  真的换人 / 登出则复位建单锁、提交锁、A 的文件名与金额，B 可以安全发起自己的那一次，
+  且不会被带去 A 的到机码页。`onShow` 也过一遍账号（在别的页换账号再切回来时没有任何回调）。
+  建单**不**放行 `'resignable'`：报价拿错身份只是显示错，建单拿错身份是错账。
+- **报价链**补上代次令牌（latest-wins）：A 的旧报价迟到不得盖掉 B 的金额，同一位用户两次核价
+  乱序返回只认最新那一次。
+
+**另外撤回一处假覆盖：R4 的 `R4-2` 回调清场测试证明不了它要证明的东西。** 它先 `auth.logout()`
+再调 `page._load()`，入口守卫当场就把场清了，回调里那次身份判定根本没被执行到。本机实测：把
+`orders.js` 四个异步回调里的 `this._enforceIdentity()` 全部删掉，三条 `R4-2` **全绿**，只有
+R5 新增的那条判红。新测试按真实顺序走：**请求发出时人还登录着**（入口守卫照常放行）→ 之后
+request.js 才在补签失败时 `auth.logout()`（全程没有任何生命周期回调）→ 再让 promise 落定，
+其中材料包那一条是**成功**返回的（清场不能只挂在失败分支上）。`orders.js` 本轮**运行时代码
+一行未改**，改的是证明它的方式。
+
+**门禁侧同时修掉两处「写了但管不住」**：`verify-miniapp-static.mjs` 里 orders 的
+`hooked < 6` 计数断言换成逐条回调取函数体、并检查「先判身份后判令牌」的顺序（计数可以六次
+全落在入口守卫上，也可以在无关位置多写一次直接喂饱）；print-pay 的
+`/print-pickup\?[^`'"]*/` 只匹配到第一个引号就停 —— 本页地址是字符串拼接出来的，它只看得到
+`orderId=`，后面再拼一个 `&pickupCode=` 一个字都抓不到，换成取 `wx.redirectTo(...)` 的**配对
+闭合实参段**并断言参数恰好只有 `?orderId=` 一个。定长窗口 `slice(idx, idx+N)` 一并换成配对闭合
+提取（窗口开小漏守卫、开大抓到隔壁函数，两种都真实发生过）。
+
+本机独立复跑（全部退出码 0）：小程序 `verify:static`（132 PASS，生命周期测试
+**94/94**，比 R4 的 77 条多 17 条）、`verify:package-chain`（301 PASS）、API
+`verify:miniapp-cloud-print-m2`（ALL PASS，隔离库 `file:./prisma/verify-r5.db`，跑完删除）、
+根 `verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync`、
+`git diff --check`。`pnpm graph:check` 首次因 print-pay 新进入 `verify-package-chain.mjs`
+覆盖而漂移，已用标准命令 `pnpm graph` 重生成（只动 `gates.md` 一行 + `graph.json` 两行），
+未手改生成物，重跑 `graph:check` 为 0。
+
+**反向变异取证（11 条，全部判红；改完逐字节还原，未用 checkout / reset）：**
+把守卫按「缺陷原样」改回去，看检测器是不是真的红（用退出码，不数 FAIL 行）。
+`resolveAccountState` 忽略补签资格 / 无条件可补签、`adoptIdentity` 退化成 `setIdentity`、
+`sameAccount` 退回逐字相等、print-pay 去掉在途尝试锁 / 改回回调时重读身份 / 去掉 `onShow`
+复核 / 报价去掉代次令牌、orders 四个回调去掉 `_enforceIdentity`、print-pickup 换人分支不清凭证
+—— 这 10 条都被**可执行测试**判红。第 11 条（package-code `_accepts` 放行 `changed`/`unusable`）
+只被门禁判红：代次守卫已经在 `_enforceIdentity` 里 +1 过，那条响应无论如何都写不进来，
+所以它在行为上不可观测。如实记为「纵深防御生效、非独立可观测」，没有为了凑数去改测试。
+
+**证据边界（只到这里，不要外推）：** `SOURCE / LOCAL: GO`。未 push、未开 PR、未合并、
+**未跑 GitHub CI**、未进微信开发者工具、未接真实 API、未真机、未部署。写入范围只有
+`apps/miniapp/**` 与本文件 / `next-tasks.md` 与 `docs/graph/**` 生成物；没有碰 `services/**`、
+`packages/**`、其它端、`.github/**`、schema / 迁移、生产配置或密钥。
+
+**本轮已知遗留（登记，不假装修过）：**
+
+- **`orders.js` 的自然过期没有一并改成「放行补签」。** 它现在仍然把「拿不到会员 id」一律当作
+  清场信号：JWT 自然过期后进「我的 · 打印订单」会看到空列表 + 请登录，而不是静默补签救回来。
+  这是**fail-closed 的**（不会把上一位的订单显示给下一位），属于能力退化不是安全缺口，
+  与本轮三条凭证 / 下单链的定性不同，所以没有顺手改 —— 改它要动 `isLoggedIn` 的模板分支与
+  两个分区的加载入口，属独立任务。
+- **账号快照的销毁依赖「页面下一次判定」**，仓库里没有全局会话事件总线。取件页每 3 秒轮询、
+  材料包码页与确认支付页在 `onShow` 与每个回调上判定，所以前台都会当场发现；但一个**切到后台
+  且没有在途请求**的页面，要到切回前台才清。已如实记录，不当作已闭环。
+- 微信开发者工具真机形态、真实 API 联调、Windows / 奔图出纸、生产部署仍全部未做。
+
+2026-09-15 **小程序材料包 R4 本地候选已完成三方审查后的 P1 收口；运行时代码证据锚点为
+`70bc85f10a11dbeb62206a055fcdd2c500654060`，基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。** 该提交只改
+`apps/miniapp/**`，没有改 API、schema、其它端、工作流、生产配置或密钥。当前仍是
+**未 push / 未开 PR / 未合并 / 未跑 GitHub CI / 未进微信开发者工具 / 未真机 / 未部署**；
+因此只能判 `SOURCE / LOCAL: GO`，不能写成小程序、生产或商业可用。
+
+R4 修掉最终只读复审发现的真实生命周期缺陷：单件取件页区分可静默补签、真未登录、会员 id
+不可用与换人四态，不再永久卡在 loading；打印订单页在前台 401 / 登出时立即清掉已渲染的订单与
+到机码；文件选择变化会作废在途隐私扫描与逐条确认；材料包确认页的建单锁、提交锁和协议同意不再
+跨身份继承；协议原文链接移出 checkbox 的 label，必须由用户显式勾选；双面 / 彩色未登记能力的
+真实服务端错误码会引导用户更换服务点；单件 `print-store -> print-pay -> print-pickup` URL 只保留
+必要的非敏感参数，金额与页数从服务端重新报价，建单成功后先锁 orderId，跳转失败可从本人订单找回
+且不得重复 POST；取件页仅在最近一次服务端状态仍可信时短暂保留凭证，持续失联或终态立即撤码。
+
+本机独立复跑：小程序 `verify:static` 退出码 0（132 PASS，生命周期测试 **77/77**）；API
+`verify:miniapp-cloud-print-m2` 退出码 0；根 `verify:repository-integrity`、
+`verify:ci-gate-coverage`、`verify:deploy-gates-in-sync` 均为 0；`git diff --check` 为 0。
+`pnpm graph:check` 首次因新增门禁覆盖产生 3 个生成文件漂移，已用标准命令 `pnpm graph` 重生成
+`docs/graph/README.md`、`gates.md`、`graph.json`，未手改生成物。该图谱 / 文档收尾会形成
+`70bc85f10` 之后的 PR final head；**最终 CI 必须绑定那个 final head，不能沿用运行时代码提交的
+本地结果。**
+
+独立审查账本：Grok 对 `faae6c6b` 判 `PARTIAL` 并给出能力码、前台清场、取件页 loading、
+跨身份建单锁、协议 label 与单件 URL 等 P1；Claude 判 `NO-GO`，另复现静默补签被截断与隐私扫描
+代次缺口；Agy 判 `PARTIAL`，确认未登录取件页永久 loading。上述问题已收敛进 `70bc85f10`，但
+该新 SHA 仍需 Grok / Claude / Agy 最终只读复审，且微信开发者工具、真实 API、Windows / 奔图与
+生产证据均未完成。
+
+2026-09-15 **材料包候选：Grok 对抗审查（NO-GO）判出的 1 个 P0 + 10 个 P1 已在本地修完
+（本地候选：未 push / 未开 PR / 未合并 / 未跑 CI / 未进微信开发者工具 / 未真机 / 未部署）。**
+基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`；在冻结审查点
+`23089517756d103994ecd535298a1d1c874d2c8b` 之上再追加一个修复提交，**不 amend**。
+写入范围只有 `apps/miniapp/**` 与本文件 / `next-tasks.md`。
+
+**P0：双面材料包从来没有真正工作过。** UI 的 `duplex: 'double'` 被报价与建单**原样发出**，
+而服务端两个 `@IsIn` 白名单里都没有这个取值 ——
+`PrintJobParamsDto.duplex ∈ simplex | duplex_long_edge | duplex_short_edge`（报价）、
+`PackagePrintParamsDto.duplex ∈ single | 上述三项`（建单）。也就是说选了双面就必然在
+报价那一步 400。更糟的是 `verify-package-chain.mjs` 有一条断言**把这个缺陷钉死**
+（要求代码写 `duplex === 'double' ? 'double' : 'simplex'`），门禁照现状抄，于是这条链
+一边红都不红地坏着。修法不是新定口径，而是接回仓库里**已有的**那一份：
+`packages/shared/src/types/print.ts` 的 `normalizeDuplex()` 写着 `'double' → 'duplex_long_edge'`，
+`print-param-suggestion.rules.ts` 也按 `duplex_long_edge` 建议并据它判 `verifiedDuplexModes`。
+新增 `pkg.toWireDuplex` / `toWireColorMode` 作为**报价与建单唯一共用的出口**，
+两条链逐字同源。该机没登记 `duplex_print` 能力时服务端 fail-closed 拒绝
+（`CAPABILITY_NOT_CONFIGURED`），页面已把它翻成「换一个服务点」—— 不静默降级成单面。
+
+P1（逐条）：
+
+1. **身份三态 fail-closed**：`'u:' + (user.id || '')` 在 id 缺失时退化成 `'u:'` ——
+   一个**所有 id 缺失会话共享**的键。共用设备上第二个人会拿第一个人的 `ownerKey` 对上草稿。
+   收敛为 `page-guard.memberIdentityKey(auth)`：`''` 未登录 / `'!'` 不可用 / `'u:<id>'`；
+   不可用时不拉列表、不读写草稿、不显示到机码，页面按未登录渲染（补救动作正是重新登录）。
+2. **首次进入不再被当成换用户**：`package-create` 此前把 `''→本人` 也算换人并
+   `removeStorageSync`，于是用户从服务点 / 确认页 `redirectTo` 兜底回来时，自己刚做好的
+   草稿被自己的"登录"删掉。改为只有**从另一个确定会员身份**切过来才清；另设
+   `_dropForeignDraft()` 只清别人的。
+3. **`draftId` 改为内容指纹**（`ownerKey|colorMode|duplex|copies|fileIds`）：没改东西
+   再按一次「继续」是同一份草稿，已选服务点不丢；改了任何文件或参数指纹就变，旧绑定自动失效。
+   `createPackage` 也只在确实对不上时才清 `temp_selected_store`。
+4. **建单成功**：先判身份再清本地草稿（此前无条件删两个 key，换人时会删掉**当前这位**的草稿）；
+   `redirectTo` 补 `fail` 兜底 → `_lockAfterCreated()` 解开 `submitting`、把报价打成 error
+   （按钮随之变灰）、恢复动作指向「我的 · 打印订单」；`_createdOrderId` 之后一律不再 POST
+   第二次（服务端 `CreatePackageOrder` 没有幂等键），`_loadQuote` 也不再把按钮点亮。
+5. **前台静默登出 / 换账号当场清场**：`utils/request.js` 在 401 时静默续签一次，**续签失败会
+   `auth.logout()`** —— 全程没有任何生命周期回调，页面还停在前台，而屏幕上那张码属于一个
+   已经不存在的会话。`package-code` 与 `print-pickup` 都加了 `_enforceIdentity()`：每个异步
+   回调都过一遍，变了就清 `pickupCode` / `_codeRaw` / `ready` 并给出可执行的下一步。
+   **没有动 request.js 的续签设计**（续签成功时身份不变，这条判定什么都不会触发）。
+   另修：重新加载时把 `ready` 打回 `false` —— 模板里 loading 与成功块是**两个独立的 wx:if**，
+   不打回去会同时显示旧码与「正在核对」。
+6. **文件列表翻页失败**不再打 `docState: 'error'`（那会把整段已加载的文件连同用户勾好的选择
+   换成错误卡片），改为独立的 `docMoreErrorText` 页脚 + 重试；模板已同步渲染。
+   切后台作废在途翻页后，回前台解开 `docLoadingMore`，否则「加载更多」永远点不动。
+7. **单件取件页不再经 URL 传凭证**：`orders.js` 进 `print-pickup` 只带 `orderId`（+`source`）。
+   此前把 `pickupCode` 明文、`amountCents`、`expiresAt`、`taskStatus`、`orderNo` 全拼进 URL。
+   `print-pickup` 本来就有 `api.getCloudPrintOrder`（`GET /me/print-orders/:orderId`，
+   needAuth + requireOwned），改为**只认服务端**：URL 兜底全部删除，首次失败诚实进错误态，
+   码也只认本次响应（`|| this.data.codeRaw` 会让已撤码的订单继续显示旧码）。
+8. **锁状态复核**：取消链改按身份判定（用 active 判定会让那一行永远停在「取消中…」）；
+   上传、隐私检查、翻页、提交的锁均已确认可解开。
+9. **首次 `onLoad+onShow` 不再重复报价**（只看 `quoteState === 'loading'` 会把 onLoad 刚发出
+   的那次重发一遍）；画码的 `exec` 回调绑定当时那个码与那次请求；`store-select` 列表 latest-wins；
+   `copyCode` 改复制**原始 8 位码** —— 服务端 `pickup-order.service.claim` 只做
+   `trim().toUpperCase()`，**不去分隔符**，带横杠的串算出来的 hash 对不上任何订单
+   （一体机自己的输入框会 `normalizeInput` 去分隔符，但剪贴板会被粘到哪儿不由我们决定）。
+10. **《打印服务协议》默认不勾选**（`agreedToTerms: true → false`）。模板那句是
+    「我已阅读并同意《打印服务协议》」并链到 `/pages/legal/legal`，是法律文件的同意；
+    本仓库同类既有口径就是显式勾选（`pages/launch/launch.js` 的 `agreed: false`、
+    `self-explore` 的「（必选）」），本页此前是唯一例外。
+11. **关键反向变异已等价自动化进 CI 路径**：删掉 `deactivate()` 的代次 +1、删掉
+    `setIdentity` 的代次 +1、身份三态退化，都有对应的可执行断言。
+
+验证（本机，逐条记退出码）：12 个改动文件的 `project-graph-query` 全部 0；
+`verify:page-lifecycle` 0（**53 个用例**）；`verify:package-chain` 0（269 PASS，新增 ⑩⑪⑫⑬ 四段）；
+`verify:static` 0（128 PASS / 0 FAIL）；`verify:repository-integrity` 0；`verify:ci-gate-coverage` 0；
+`verify:deploy-gates-in-sync` 0；`git diff --check` 与 `origin/main...HEAD` 均 0。
+
+**反向变异 22 类，全部判红**（精确反向替换还原，不走 `git checkout`；还原后全套复跑仍为 0）：
+上一轮 5 类回归 + 本轮 17 类（P0 双面退回 `'double'`、id 缺失退化成共享 `'u:'`、首次进入当换人、
+建单后不判身份就删草稿、`redirectTo` 失败不兜底、`_accepts` 不执行身份判定、重载不打回 `ready`、
+翻页失败打 `docState=error`、凭证重新进 URL、取消链改回按前台判定、首次进入重复报价、
+画码回调不绑码、复制分组串、协议默认勾选、`deactivate` 不 +1 代次、`draftId` 退回时间戳、
+`print-pickup` 恢复读 URL 码）。其中 N6 / N12 第一轮**只有静态门禁判红、真执行测试没红** ——
+说明那两条路径当时没有被任何用例走到；补了两个用例（在途响应遇到前台登出、进入异步后码被换掉）
+之后两者都红。
+
+三条既有静态断言随之更新，均属**锚点过时而非能力丢失**（逐条复核过）：取件页失败兜底的
+**来源**从「URL 里的码」变成「上一次从服务端取到的状态」并补了"不得再有 URL 兜底"的正面禁令；
+免费试运营判定改为只认服务端金额；401 分支从"只停轮询"收紧成"停全部定时器**并清掉屏幕上的码**"。
+
+**已知未处理（登记，不阻塞）**：`package-create.js` 537 行，越过 `.ccg` 的 500 行「评估拆分」线。
+本轮是缺陷修复不是加功能，且小程序 Page 配置对象拆分需要动方法挂载方式，风险高于收益，
+列入上线后重构清单，不在修复提交里做。
+`print-upload / print-store / print-pay` 那条**单文件下单预览链**仍在 URL 里传 `amountCents` 等
+报价预览值 —— 那不是凭证（下单前的本地报价预览，服务端仍会重算），与本轮 P1-7 修的
+「取件页凭证」不是同一类，未一并改动。
+
+**明确未做**：未 push、未开 PR、未合并、未跑 CI、未进微信开发者工具、未真机、未部署；
+`docs/graph/**` 未重跑（本轮授权范围不含该目录，且 `ci.yml` 没有图谱新鲜度门禁）。
+
+2026-09-15 **材料包候选的身份生命周期与异步竞态收口（本地候选：未 push / 未开 PR /
+未合并 / 未跑 CI / 未进微信开发者工具 / 未真机 / 未部署）。** 基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`；在下面那条材料包候选
+（`45f8a56731a4bfee14616e88ebcb1ed655c42997`）之上追加一个修复提交，**不 amend 原提交**。
+写入范围只有 `apps/miniapp/**` 与本文件 / `next-tasks.md`；`services/**`、
+`apps/kiosk|admin|partner|terminal-agent/**`、`.github/**`、schema / 迁移、生产配置与密钥
+**一个字都没动**。
+
+修的是同一类缺陷的六种形态：**异步请求发出之后，页面可能已经换了人、切了后台、卸载了，
+或者同一条链已经被重新发起过一次 —— 而旧响应的 then / catch 照常执行**，把上一位用户的
+订单、到机码、文件名写回 `data`。`loading` 布尔锁挡不住它：锁在请求发出时是开的，
+回调执行时早被别的路径清掉了。
+
+- **P1-01 跨用户 / 登出时在途请求回写**（`orders`、`package-create`）：原实现只在 `onShow`
+  比对 `_identityKey` 并清空 data，**没有作废在途请求**；A 的响应晚到时会把 A 的订单、
+  到机码、文件名写进 B 的界面。会话被后端判失效（登出但页面仍在前台、`onHide` 根本不触发）
+  时更是一条都拦不住。
+- **P1-02 `package-code` 迟到响应复活凭证**：`onHide/onUnload` 已清 `pickupCode` 与 `_codeRaw`，
+  但在途的 `GET /orders/package/:id` 回来时页面已重新 `activate`，会把刚清掉的码原样写回，
+  并据此重绘出一张可扫的二维码。
+- **P1-03 `package-code` 重复加载乱序**：先发的那次晚到，会把"已核销、码已撤下"的终态
+  改回"待到机"，用户拿着一张作废的码去机器前。
+- **P2-01 `temp_package_data` 未绑定用户**：本机存储谁都读得到，跨账号会显示上一位的文件名。
+- **P2-02 未登录打开 `package-confirm` 先解析并显示草稿**。
+- **P2-03 `temp_selected_store` 生命周期跨草稿残留**：上一份草稿选的机器会被接到这一份上，
+  而下单真的会下到那台机器。
+
+怎么修的：新增 `apps/miniapp/utils/page-guard.js`（纯函数，**无 wx / auth 依赖**，因此测试里
+用的是同一份真实实现而不是替身），三层判据缺一不可 ——
+① **身份快照**：请求发出时记下会员 id，回调时与**当时的**当前 id 逐字比对，不依赖任何生命周期
+回调先触发；② **代次**：身份变化与 `onHide/onUnload` 都 +1，后台期间发出的响应切回前台后也进不来；
+③ **逐通道序号**：同一条链重复发起只认最新一次（latest-wins），旧响应不得覆盖终态。
+「打印订单」页的单件与材料包各占一个通道，各自 latest-wins、互不牵连。
+草稿改为绑定 `ownerKey`（派生自 `auth.getUser().id`）+ `draftId`；`package-confirm`
+**先验登录再碰草稿**，归属对不上就**同步删除**草稿与已选服务点并进 honest missing 状态，
+一个文件名都不渲染；`store-select` 写服务点时绑同一 `ownerKey` / `draftId`，
+建单成功后在跳转**之前**清草稿（原先放在 `redirectTo` 的 `success` 回调里，跳转没触发就永远留着）。
+顺带补了两处会卡死的状态：切后台作废在途请求后，`docState:'loading'` / `quoteState:'loading'` /
+`piiPhase:'scanning'` 会在回到前台时重发或退回 idle，不再永远显示"加载中"而其实没有请求在跑。
+`paymentSessionToken` / 到机码 / 金额仍然不进 URL、不落存储、不进日志（门禁 ③ 原样保留）。
+
+验证（本机，逐条记退出码）：`node scripts/project-graph-query.mjs file <9 个文件>` 全部 0；
+`pnpm --filter @ai-job-print/miniapp verify:static` 0（234 PASS）；
+`verify:package-chain` 0（198 PASS，新增 ⑨ 段 41 条）；`pnpm verify:repository-integrity` 0；
+`pnpm verify:ci-gate-coverage` 0；`pnpm verify:deploy-gates-in-sync` 0；
+`git diff --check` 与 `git diff --check origin/main...HEAD` 均 0。
+
+新增真执行测试 `apps/miniapp/scripts/tests/page-lifecycle.test.mjs`（18 个用例，`node:vm` 沙箱里
+真实执行页面源码、真按乱序 resolve），已接 `verify:page-lifecycle` 并串进 `verify:static` 进 CI。
+**反向变异 5 类全部被判红**（退出码非 0），精确反向替换还原、不走 `git checkout`：
+M1 `package-code` onHide 不再作废在途请求、M2 丢掉 latest-wins、M3 丢掉回调时刻的身份比对、
+M4 `package-confirm` 不再核草稿归属、M5 翻页失败清空已加载订单。M1 第一轮**只有真执行测试判红、
+静态门禁没红**——原因是那条断言用固定长度窗口，漏进了紧跟其后的 `onUnload`；已改成按函数体切片，
+复跑后 M1 两条检测器都红。还原后全套复跑仍为 0。
+
+**明确未做**：未 push、未开 PR、未合并、未跑 CI、未进微信开发者工具、未真机、未部署；
+`docs/graph/**` 未重跑（本轮授权范围不含该目录，且 `ci.yml` 没有图谱新鲜度门禁）。
+
+2026-09-15 **小程序材料包 P0 候选：订单可找回 + 到机码可再看 + 四页从硬编码关闭改为真实运行期 fail-closed
+（本地候选，未 push / 未开 PR / 未合并 / 未部署）。** 基线为 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+写入范围只有 `apps/miniapp/**` 与本文件 / `next-tasks.md`；`services/**`、`apps/kiosk|admin|partner/**`、
+`.github/**`、schema / 迁移、生产配置与密钥**一个字都没动**（`packages/shared/**` 只读未改）。
+
+这一轮解决的是 2026-09-08 走查留下的那个**代码缺口**，不是配置问题：材料包下完单之后
+**没有任何界面能再给出 orderId**，用户手上只剩一个到机码，而到机码不能反查订单。
+服务端 `GET /orders/package`（本人隔离、游标分页、`visibleCode` 判据与详情一致）早已存在，
+小程序侧没接。因此 `utils/package-feature.js` 的 `guardPackageChain()` 当时把四页整体关掉是对的 ——
+那条链的最后一步在代码层确实不存在。
+
+实际改了什么：
+
+- **列表接入**：`utils/api.js` 新增 `getPackageOrders({cursor,pageSize})`（`GET /orders/package`，
+  `needAuth: true`，mock 模式诚实 `mockUnavailable`）。同时新增 `quotePackageOrder({terminalId,files,params})`，
+  走既有 `POST /orders/quote` 的 `lines` 多行契约（DTO 注释原文即「材料包多行报价」），
+  逐文件先换本人短签名 `printFileUrl` 再报价。**删除**了 `utils/package-feature.js`。
+- **「打印订单」页成为本人打印订单统一视图**：材料包单独成区，带自己的 `pkgCursor`、自己的
+  「加载更多」、自己的 total 与失败态；单件打印（cloud + PrintTask）仍走原来的触底分页。
+  两个游标结构上不可能被当成一个用 —— 合成一页就必须在触底时二选一，推错会静默丢掉一整段订单。
+  材料包卡片点进去**只带 orderId**。
+- **四页改运行期 fail-closed**：新增 `utils/package-order.js`（纯函数，无 wx 依赖）把服务端错误码翻译成
+  「可执行的下一步」：`PRINT_TERMINAL_OFFLINE` / `PRINT_TERMINAL_NOT_ACTIVE` / `CAPABILITY_*` → 换服务点；
+  `PRINT_PII_SCAN_REQUIRED` / `PII_SCAN_STALE` → 去做隐私检查；`PRINT_FILE_*` / `VALIDATION_FAILED` → 重选文件；
+  `PACKAGE_ORDER_NOT_FOUND` → 去我的打印订单找回；401 → 去登录；`PRICE_CONFIG_UNAVAILABLE` → 只能等运营配置。
+  未登记的错误码 fail-closed 落到调用方兜底句，绝不宣称成功。
+- **`package-create` 从「必然失败」改成真实可用**：原实现用 `wx.chooseMessageFile` 选本地文件，
+  给每个文件编一个 `local_<时间戳>` 的 id 和写死的 `pages: 1`，再把这个 id 当 `fileId` 提交 ——
+  服务端必回 `PRINT_FILE_NOT_FOUND`。现在文件来自 `GET /me/documents`（按服务端 `ALLOWED_PURPOSES`
+  过滤、`reprintable: false` 的高敏报告不列出），「从微信聊天添加」走真实上传拿服务端 `fileId`
+  （保留改版前的 `count: 9` 多选，逐个串行上传，部分成功如实反映）；打印隐私检查在本页完成
+  （服务端 `assertPiiReady` 硬性要求，不做就在下单那一步被拒）。本页**一个金额数字都不给**。
+- **`package-confirm` 去掉两处伪造能力**：默认选中的「微信支付 / 余额支付」选择器（材料包全链没有在线支付，
+  钱在一体机上现场付）和「合计 待确认」占位金额。金额改为服务端多行报价，报价参数逐字对齐服务端
+  `normalizeParams`（`bw→black_white`、`single→simplex`）以免预览价与实收价分叉。
+  报价这一步就是建单前的 fail-closed 关口。
+- **`package-code` 只认服务端**：凭登录态查 `GET /orders/package/:id`（`requireOwned`：非本人 404、未登录 401）；
+  原先那个写死「二维码」三个字的虚线占位框换成 `utils/pickup-qrcode.js` 本地离线编码的**真码**；
+  `onHide/onUnload` 同时清 data 里的码和画码用的 `_codeRaw` 明文副本，`onShow` 重新向服务端取；
+  「查看订单」原先跳 `order-detail`（读 `/me/print-orders/:id`，材料包被 `requireOwned` 过滤，点了只会 404），
+  改为跳「我的打印订单」。
+- **`store-select`**：补齐 loading / 失败 / 空 / 无草稿四态（原先 `loading`、`error` 只存在 data 里、
+  模板从不渲染）；按服务端心跳标出离线服务点并说明服务端仍会再校验一次；删掉后端从不下发的
+  假电话、假坐标、以及替所有机器宣称「打印/扫描/复印」的设施标签。
+- **`pages/ai`**：「材料包」从 `pending`（未开放）移入「到机器前办」分组，desc 写明「现场付款」；
+  `pending` 现为空数组，模板对空数组隐藏该分区。旧 `why` 写的是「服务端下单接口尚未上线」，
+  而 `POST /orders/package` 早已可用 —— 注释已改写，防止有人照旧文案把入口关回去。
+
+门禁（判据按「为什么该这样」写，不是照现状抄）：
+
+- `verify-package-chain.mjs` 整体重写：钉死列表端点接入且 `needAuth`、材料包能从本人订单重新进入、
+  URL 不携带 `pickupCode` / 金额 / `paymentSessionToken`、`package-code` 仍服务端核验、
+  四页不再无条件 guard（连 `utils/package-feature.js` 都不许存在）、全链无 `wx.requestPayment`、
+  前端不计价不报页数、六态齐全、翻页失败不清空已加载内容、换用户清干净。
+- `verify-miniapp-static.mjs` 的材料包段同步换判据（旧判据是「四页必须有守卫」，会与本轮直接冲突）。
+- 新增 `scripts/tests/package-order.test.mjs`（17 个 `node:test` 用例）+ `verify:package-helpers`，
+  串进 `verify:static`。放在 `scripts/tests/` 是刻意的：`scripts/project-graph/gates.mjs` 把该目录
+  排除在门禁脚本之外，因此不会被 `verify-ci-gate-coverage` 判成「写完没接线的门禁」。
+- `scripts/api-contract.json` 新增 `GET /orders/package`（135 端点、0 已知缺口）。
+
+复核时改掉的三个真实缺陷（都是本候选自己引入或漏掉的，不是既有代码的问题）：
+
+1. **`pickupStatus: 'used'` 没处理。** `pickup-order.service.ts:221` 在释放打印任务的同一事务里写
+   `pickupStatus:'used' + taskStatus:'pending'`。首版 `resolvePackageStatus` 只认 pending/claimed/expired/cancelled，
+   于是 `used + pending` 落到兜底分支被判成 `key:'done'`、`label:'pending'`（英文串）——
+   订单在**真正出纸的那一段**会从「打印中」筛选里整批消失。已按服务端状态机补齐，并加了单测与门禁断言。
+2. **翻页 / 刷新失败会把已经看到的订单顶掉。** 首版模板把「加载中 / 失败」排在「已有内容」之前，
+   且 append 失败也写 `pkgState:'error'`。现在 append 失败只写 `pkgMoreErrorText` 降为页脚一条，
+   模板分支顺序也改成已有内容优先；单件打印段同样处理。
+3. **`package-create` 刷新会丢勾选。** 非追加重载（首屏 / 重试 / 上传后刷新）重建了行对象，
+   用户勾了 A 再上传 B 时 A 的勾选被悄悄丢掉，而界面只显示 B 被选中。已按 id 把 `selected` 带过来。
+   同时 `package-confirm` 从登录页回来会自动重新核价（否则用户照要求登录完，页面还停在「登录已失效」），
+   且「回到选择文件」优先 `navigateBack` 退回**原来那个**实例以保住选择，只在深链直进时才 `redirectTo`。
+
+本机验证（全部 LOCAL，macOS 开发环境）：`pnpm --filter @ai-job-print/miniapp verify:static` 0
+（128 PASS / 0 FAIL，注册页面 64；API 契约 135 端点 / 后端 530 路由 / 0 已知缺口；
+材料包侧链门禁全部通过；17 个纯函数用例全过；视觉刻度偏离 422/439 字阶、169/181 圆角阶，未新增）；
+`pnpm verify:repository-integrity` 0；`pnpm verify:ci-gate-coverage` 0；`pnpm verify:deploy-gates-in-sync` 0；
+`git diff --check` 0。另跑了图谱指出会读到本轮改动文件的 kiosk 侧门禁：
+`verify:profile-documents-inkpaper` 0、`verify:word-conversion-ui` 0、`verify:profile-commercial-first-batch` 0。
+反向变异两组（均已恢复并复跑通过）：把 `openPackage` 的 `pickupCode` 拼进 URL → `verify:package-chain` 退出码 1；
+恢复 `package-create` 的无条件 `guardPackageChain()` → `verify:miniapp-static` 与 `verify:package-chain` 均退出码 1；
+另删掉 `getPackageOrders` 的 `needAuth: true` → `verify:package-chain` 退出码 1。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；**没有在微信开发者工具里打开过**
+（本轮全部是静态门禁 + 纯函数单测，没有真机截图、没有真实后端联调、没有 Trial 版）；
+材料包端到端（真实上传 → 隐私检查 → 服务端报价 → 建单 → 一体机核销 → 现场付款 → 出纸 → 状态回流）
+一次都没在真机或真实后端上跑过；真实支付、微信类目与提审、生产环境、Windows 一体机与奔图 CM2800 真机
+本轮一次都没碰。`DEVICE / PRODUCTION / COMMERCIAL` 全部 NO-GO。
+
+已知未做（登记，不阻塞本候选）：材料包**没有在线取消端点**（服务端 `PackageOrdersController` 只有
+`@Post()`、`@Get()`、`@Get(':id')`），因此未付款订单只能等有效期结束自动失效 —— 这一点已如实写在
+下单页与到机码页上，不做成「可以撤单」的假象。视觉刻度棘轮当前比基线低 17（字阶）/ 12（圆角阶），
+未触发门禁要求的调低阈值（20），故未动 `BASELINE`；调低是独立的治理动作，会影响其他 lane 在途分支。
+
 2026-09-15 **扫描 R3 已取得软件证据锚点的 SOURCE / LOCAL / CI GO；仍未合并、未做真机与生产，
 商业总判定继续 NO-GO。** 隔离分支 `integration/scan-pickup-closeout-r3-20260915` 基于
 `origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，运行时代码与图谱证据锚点为

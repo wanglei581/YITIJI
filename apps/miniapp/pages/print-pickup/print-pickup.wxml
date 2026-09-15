@@ -16,7 +16,12 @@
   <view class="state-center" wx:elif="{{state === 'error'}}">
     <view class="state-icon"><text class="ficon i-warning"></text></view>
     <text class="state-label">{{errorMsg}}</text>
-    <view class="btn-retry tap" hover-class="tap-press" bindtap="retry">重新加载</view>
+    <!-- 按钮文案必须和 errorAction 指的动作一致：登录已失效时写「重新加载」，
+         用户会一直按一个不可能成功的按钮。 -->
+    <view class="btn-retry tap" hover-class="tap-press" bindtap="recover" role="button">
+      {{errorAction === 'login' ? '去登录' : errorAction === 'orders' ? '去我的打印订单' : '重新加载'}}
+    </view>
+    <view class="btn-retry-sub tap" hover-class="tap-press" wx:if="{{errorAction === 'login'}}" bindtap="toOrders" role="button">先去我的打印订单</view>
   </view>
 
   <block wx:elif="{{state === 'ready'}}">

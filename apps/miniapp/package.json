@@ -7,13 +7,15 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:empty-state",
+    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs && pnpm run verify:api-contract && pnpm run verify:visual-scale && pnpm run verify:user-error && pnpm run verify:package-chain && pnpm run verify:package-helpers && pnpm run verify:page-lifecycle && pnpm run verify:empty-state",
     "verify:api-contract": "node scripts/verify-miniapp-api-contract.mjs",
     "contract:update": "node scripts/verify-miniapp-api-contract.mjs --write",
     "verify:visual-scale": "node scripts/verify-miniapp-visual-scale.mjs",
     "verify:user-error": "node scripts/verify-user-error-message.mjs",
     "verify:package-chain": "node scripts/verify-package-chain.mjs",
-    "verify:empty-state": "node scripts/verify-empty-state-honesty.mjs"
+    "verify:empty-state": "node scripts/verify-empty-state-honesty.mjs",
+    "verify:package-helpers": "node --test scripts/tests/package-order.test.mjs",
+    "verify:page-lifecycle": "node --test scripts/tests/page-lifecycle.test.mjs"
   },
   "main": "app.js",
   "keywords": [],

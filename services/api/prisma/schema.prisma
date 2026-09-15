@@ -495,12 +495,18 @@ model Order {
   // 前端显示「未标注」而非 0 或「一体机」。
   channel String?
 
+  // 小程序 POST /me/print-orders 耐久幂等。存量行保持 NULL，不回填。
+  // 唯一约束按 (endUserId, key) 作用域，禁止按 key 全局取单。
+  idempotencyKey         String?
+  idempotencyPayloadHash String?
+
   paymentAttempts PaymentAttempt[]
   refunds         Refund[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([endUserId, idempotencyKey], map: "Order_endUserId_idempotencyKey_key")
   @@index([type])
   @@index([payStatus])
   @@index([taskStatus])

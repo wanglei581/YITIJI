@@ -596,7 +596,11 @@ if (
   // 不得出现 scanTerminal / 不得调 `/pickup` 四条，未做任何放宽。
   pickupWxml.includes('二维码只包含本订单的到机码') &&
   pickupJs.includes("require('../../utils/pickup-qrcode')") &&
-  pickupJs.includes('createPickupQrMatrix(this.data.codeRaw)') &&
+  // R9 收紧：码必须在**进入异步之前**被钉进局部变量，再拿它去编码。
+  // 原锚点钉的是 `createPickupQrMatrix(this.data.codeRaw)` —— 那等于要求在 exec 之前
+  // 现读一次 data，而 exec 的回调跨帧才回来，回来时那张码可能已经被换掉或撤下。
+  pickupJs.includes('const code = this.data.codeRaw') &&
+  pickupJs.includes('createPickupQrMatrix(code)') &&
   pickupQr.includes('LEGACY_PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/') &&
   pickupQr.includes('CURRENT_PICKUP_CODE_RE = /^[0-9]{8}$/') &&
   pickupQr.includes('PICKUP_CODE_RE = /^(?:[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}|[0-9]{8})$/') &&
@@ -618,12 +622,20 @@ if (
 ) ok('取件页轮询真实订单状态并在扫码/终态撤码')
 else bad('取件页实时状态', '缺少订单详情轮询、待支付/完成状态或二维码撤下')
 
+// 2026-09-15：兜底的**来源**变了。以前首次请求失败可以退回 URL 里的到机码离线绘码；
+// 现在 URL 不再携带任何凭证（到机码进 URL = 一条构造出来的链接就能在别人手机上渲染出
+// 带码的取件页），于是唯一合法的兜底只剩「上一次真的从服务端取到的状态」。
+// 能力没丢：后续失败仍保留已显示内容、重新绘码、恢复倒计时与轮询；
+// 首次就失败时诚实进错误态 —— 本来也没有任何可保留的东西。
 if (
   pickupJs.includes('const fallbackAvailable = this.data.state === \'ready\'') &&
   pickupJs.includes('if (this.data.showQr) this._drawPickupQr()') &&
-  pickupJs.includes('if (fallbackAvailable) this._resumeVisibleWork()')
-) ok('取件页首次状态请求失败仍能绘制真实到机码二维码')
-else bad('取件页首次请求失败二维码兜底', '回退为 ready 后必须重新绘码并恢复倒计时与轮询')
+  pickupJs.includes('this._resumeVisibleWork()') &&
+  // 正面禁令：不许任何一条路径再从 URL 取码兜底。
+  !/q\.pickupCode\b/.test(pickupJs) &&
+  !/codeRaw: PICKUP_CODE_RE\.test\(pickupCode\)/.test(pickupJs)
+) ok('取件页失败兜底只保留服务端取到的状态，不再退回 URL 里的码')
+else bad('取件页失败兜底', '后续失败须保留已显示状态并重新绘码；且任何路径都不得从 URL 取到机码兜底')
 
 // ── 两个码不许再混名 ────────────────────────────────────────────
 // 系统里有两个 10 位、同字符集但完全不同的码：
@@ -674,7 +686,11 @@ if (
   printUploadJs.includes('api.createPrintPiiScan') &&
   printUploadJs.includes("privacyStatus !== 'ready'") &&
   printPayJs.includes('api.createCloudPrintOrder') &&
-  apiJs.includes("request('/me/print-orders', { method: 'POST'") &&
+  /request\(\s*'\/me\/print-orders',\s*\{[\s\S]{0,400}method: 'POST'/.test(apiJs) &&
+  // 服务端（member-print-orders.controller.ts）从 **Header** 取幂等键，缺了直接 400。
+  // 放 body 里服务端读不到，而 CreateMemberPrintOrderDto 又会判成非法参数。
+  /header: \{ 'idempotency-key': idempotencyKey \}/.test(apiJs) &&
+  !/data: \{[\s\S]{0,200}idempotencyKey/.test(apiJs) &&
   !/createCloudPrintOrder\(\{[\s\S]{0,500}\b(?:amountCents|billablePages|pages)\s*:/.test(printPayJs) &&
   !printPayJs.includes('预提交接口尚未开通')
 ) ok('文档真实上传、隐私确认且由服务端建单计价')
@@ -750,7 +766,24 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
     return { label, color: color && color[1], duplex: duplex && duplex[1] }
   }
   const quote = grab(printUploadJs, 'print-upload/verifiedPrintParams')
-  const order = grab(printPayJs, 'print-pay/createCloudPrintOrder')
+  // print-pay 把两个值收成了模块常量，报价与建单都引用它 —— 页内分叉在结构上已经不可能。
+  // 所以这里读常量声明，并额外钉住"两条链都只许引用常量、不许再写死第二份字面量"，
+  // 否则本断言会退化成"只要文件里有过这个字符串就算数"。
+  const order = {
+    label: 'print-pay/ORDER_COLOR_MODE+ORDER_DUPLEX',
+    color: (/const ORDER_COLOR_MODE = '([a-z_]+)'/.exec(printPayJs) || [])[1],
+    duplex: (/const ORDER_DUPLEX = '([a-z]+)'/.exec(printPayJs) || [])[1],
+  }
+  {
+    const bare = stripComments(printPayJs)
+    const payloadBody = methodBody(bare, '_orderPayload')
+    const quoteBody = bare.slice(bare.indexOf('function quoteParams('), bare.indexOf('function colorLabelOf('))
+    const usesConst = (body) => body.includes('colorMode: ORDER_COLOR_MODE') && body.includes('duplex: ORDER_DUPLEX')
+    if (!usesConst(payloadBody)) bad('建单参数同源', '_orderPayload 没有引用 ORDER_COLOR_MODE / ORDER_DUPLEX')
+    else if (!usesConst(quoteBody)) bad('报价参数同源', 'quoteParams 没有引用 ORDER_COLOR_MODE / ORDER_DUPLEX')
+    else if (/colorMode: '[a-z_]+'/.test(bare)) bad('建单参数同源', 'print-pay 又出现写死的 colorMode 字面量，页内会再分叉')
+    else ok('print-pay 报价与建单共用同两个常量，页内不可能分叉')
+  }
   if (!quote.color || !quote.duplex || !order.color || !order.duplex) {
     bad('报价与下单打印参数一致', '取不到 colorMode / duplex 字面量——抽取失效，不要当作通过')
   } else if (quote.color !== order.color || quote.duplex !== order.duplex) {
@@ -766,8 +799,10 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
 {
   const guessesQuery = /q\.color\s*===\s*'color'/.test(printPayJs)
     || /q\.duplex\s*===\s*'double'/.test(printPayJs)
-  const labelsFromCreate = printPayJs.includes("colorMode: 'black_white'")
-    && printPayJs.includes("duplex: 'simplex'")
+  const labelsFromCreate = /const ORDER_COLOR_MODE = 'black_white'/.test(printPayJs)
+    && /const ORDER_DUPLEX = 'simplex'/.test(printPayJs)
+    && /colorLabel: colorLabelOf\(ORDER_COLOR_MODE\)/.test(printPayJs)
+    && /duplexLabel: duplexLabelOf\(ORDER_DUPLEX\)/.test(printPayJs)
     && printPayJs.includes('colorLabel')
     && printPayJs.includes('duplexLabel')
     && printPayWxml.includes('{{colorLabel}}')
@@ -854,29 +889,49 @@ if (
   printUploadJs.includes('amountCents=${encodeURIComponent(amountCents)}') &&
   printUploadWxml.includes("amountCents === 0 ? '免费试运营' : '精确报价'") &&
   printStoreJs.includes('isFreeOrder: hasAmount && amountCents === 0') &&
-  printStoreJs.includes("q.amountCents === undefined ? '' : q.amountCents") &&
   printStoreWxml.includes("isFreeOrder ? '现场打印' : '机端支付'") &&
-  printPayJs.includes("'files[0].price': isFreeOrder ? '免费' : total") &&
+  // 2026-09-15（第二轮）：支付页的免费判定同样改为**只**来自服务端。
+  // 此前这里要求 print-store 把 amountCents 透传进 print-pay 的 URL，而它与文件名
+  // 走的是同一条 URL —— 求职材料的文件名里常写着本人姓名，金额是本人订单状态，
+  // 两者都不该由调用方"告诉"下一页。能力没丢：print-pay 现在自己调 /orders/quote
+  // 拿真值，下面那条 `const isFreeOrder = amountCents === 0` 就是同一个判据的新落点。
+  printPayJs.includes('api.quoteMyPrintOrder(') &&
+  printPayJs.includes('const isFreeOrder = amountCents === 0') &&
+  printPayJs.includes("const total = isFreeOrder ? '免费' : formatYuan(amountCents)") &&
+  printPayJs.includes("'files[0].price': total") &&
+  // 负面锚：这四项一个都不许再进 print-store → print-pay 的 URL。
+  !/print-pay\?[^`'"]*\b(?:amountCents|total|name|pickupCode|expiresAt)=/.test(printStoreJs) &&
   printPayWxml.includes('免费试运营：到机核验后直接进入打印队列') &&
   pickupJs.includes("key: 'awaiting_release'") &&
   pickupJs.includes('parseAmountCents(order.amountCents) === 0') &&
   pickupWxml.includes('核销后无需付款，直接等待进入打印队列') &&
   ordersJs.includes("label: '正在进入队列'") &&
   ordersJs.includes('const amountCents = parseAmountCents(item.amountCents)') &&
-  ordersJs.includes("amountCents=${encodeURIComponent(item.amountCents == null ? '' : item.amountCents)}")
-) ok('免费试运营订单全流程不再误导用户现场支付')
+  // 2026-09-15：取件页的免费判定改为**只**来自服务端金额。此前这里要求 orders.js
+  // 把 item.amountCents 拼进取件页 URL —— 金额是本人订单状态，不该由调用方"告诉"下一页，
+  // 而且那条 URL 同时还带着到机码明文。能力没丢：pickupJs 那条
+  // `parseAmountCents(order.amountCents) === 0` 仍在，判据从服务端响应里取。
+  !/amountCents=\$\{encodeURIComponent\(item\.amountCents/.test(ordersJs)
+) ok('免费试运营订单全流程不再误导用户现场支付（免费判定取自服务端金额）')
 else bad('免费试运营文案分流', '零元订单必须显示免费、现场打印和直接排队；付费订单仍保留机端支付')
 
+// 2026-09-15：`source=orders` 现在拼在模板串里（URL 只剩 orderId + source），
+// 所以锚点从带引号的字面量改成 `source=orders` 本身；401 分支从只停轮询
+// 收紧成停全部定时器 **并清掉屏幕上的码**（登录已失效还留着码，就是共用设备上的泄漏）。
 if (
   ordersJs.includes("!item.status && item.pickupStatus === 'pending'") &&
-  ordersJs.includes("'source=orders'") &&
+  ordersJs.includes('source=orders') &&
   ordersWxml.includes('wx:if="{{item.pickup}}"') &&
   pickupJs.includes('err && err.statusCode === 401') &&
-  pickupJs.includes('this._stopPoll()') &&
+  pickupJs.includes('this._stopTimers()') &&
+  // 401 分支必须**调用清场**，而清场函数必须真的把码清零。两头都钉：
+  // 只钉调用点，helper 被掏空也绿；只钉 helper，401 不调它也绿。
+  /statusCode === 401[\s\S]{0,400}this\._clearCredentials\(\)/.test(pickupJs) &&
+  /_clearCredentials\(\)\s*\{[\s\S]{0,400}codeRaw: ''/.test(pickupJs) &&
   pickupJs.includes('if (this.data.fromOrders)') &&
   pickupJs.includes("taskStatus === 'abandoned'")
-) ok('扫码后撤下订单列表到机码且登录失效停止状态轮询')
-else bad('到机码撤下与轮询停机', 'claimed/PrintTask 阶段不得继续展示旧码，401 后不得持续轮询')
+) ok('扫码后撤下订单列表到机码；登录失效停止轮询并清掉已显示的码')
+else bad('到机码撤下与轮询停机', 'claimed/PrintTask 阶段不得继续展示旧码，401 后不得持续轮询，且须清掉屏幕上的码')
 
 const aiRecordsJs = read('pages/ai-records/ai-records.js')
 const jobFitJs = read('pages/job-fit/job-fit.js')
@@ -950,12 +1005,82 @@ function stripComments(src) {
     .join('\n')
 }
 
-// ---- 材料包侧链 fail-closed（P0-3）----
+/**
+ * 从 `openIdx`（必须落在一个 `{` 或 `(` 上）起取一段**配对闭合**的源码。
+ *
+ * 存在的理由：本文件此前大量使用「从这里往后数 N 个字符」的定长窗口。它有两种失败
+ * 方向，而且都真实发生过 —— 窗口开太小会漏掉本该抓到的代码（于是变异删掉守卫仍然
+ * 全绿），窗口开太大会把紧随其后的另一个函数一起抓进来（于是断言在错的函数体上成立）。
+ * 配对闭合没有这个自由度。
+ */
+function balancedFrom(src, openIdx) {
+  const open = src[openIdx]
+  const close = open === '{' ? '}' : ')'
+  let depth = 0
+  for (let i = openIdx; i < src.length; i += 1) {
+    const ch = src[i]
+    if (ch === open) depth += 1
+    else if (ch === close) {
+      depth -= 1
+      if (depth === 0) return src.slice(openIdx, i + 1)
+    }
+  }
+  return ''
+}
+
+/**
+ * 取一个具名方法的完整函数体（`name(...) {` 之后那对大括号）。
+ *
+ * 必须锚在**行首**：`\b_refreshOrder\s*\(` 会先命中 onLoad 里那句
+ * `this._refreshOrder(true)` 调用，然后从它后面找第一个 `{` —— 抓到的是下一个方法。
+ */
+function methodBody(src, name) {
+  const head = new RegExp(`^\\s*${name}\\s*\\(`, 'm').exec(src)
+  if (!head) return ''
+  const brace = src.indexOf('{', head.index + head[0].length)
+  return brace < 0 ? '' : balancedFrom(src, brace)
+}
+
+/** 取某个调用的完整实参段（含外层圆括号），例如 `wx.redirectTo(...)`。 */
+function callArgs(src, callee) {
+  const idx = src.indexOf(callee)
+  if (idx < 0) return ''
+  return balancedFrom(src, idx + callee.length - 1)
+}
+
+/** 取一段源码里第 n 个 `.then(` / `.catch(` 回调的函数体。 */
+function promiseCallbackBodies(src, kind) {
+  const bodies = []
+  const needle = `.${kind}(`
+  let from = 0
+  for (;;) {
+    const idx = src.indexOf(needle, from)
+    if (idx < 0) break
+    from = idx + needle.length
+    const brace = src.indexOf('{', idx)
+    if (brace < 0) break
+    const body = balancedFrom(src, brace)
+    if (body) bodies.push(body)
+  }
+  return bodies
+}
+
+// ---- 材料包侧链：运行期 fail-closed（取代 2026-09-08 的硬编码守卫）----
 //
-// 这四页可以被深链和分享卡片直接打开，而服务端 POST /orders/package 不存在。
-// package-code 更是把到机码、订单号、金额全部从 URL query 读出来就渲染，
-// 一条构造出来的链接就能显示一张带到机码的「创建成功」页。守卫必须在 onLoad 首行，
-// 且不许有任何一页漏掉 —— 漏一页，那一页就是完整的绕过入口。
+// 这四页曾在 onLoad 首行无条件 `guardPackageChain()` 弹窗 + reLaunch。当时是对的：
+// 材料包下完单**没有任何界面能再给出 orderId**，用户手上只剩一个到机码，而到机码不能
+// 反查订单 —— 那条链的最后一步在代码层根本不存在。
+//
+// 缺的那一块已经补上：服务端 `GET /orders/package` 提供本人材料包订单列表，小程序
+// 「打印订单」页接入它并可只带 orderId 重新进入到机码页。于是硬关闭的理由消失，
+// 关闭方式换成运行期 fail-closed（服务端错误码）。
+//
+// 本段断言的是「为什么该这样」，不是照现状抄：
+//   ① 硬编码守卫必须**真的没了** —— 连模块文件都不许留着等人 require 回来；
+//   ② 关闭能力的判据必须落在服务端错误码上，页面要有可执行的恢复动作；
+//   ③ 找回路径必须存在且只走 orderId（凭证不进 URL）；
+//   ④ 全链不得出现在线支付：材料包是到机器现场付款，wx.requestPayment 一出现
+//      就意味着有人在小程序里扣款，而这条链没有任何支付闭环。
 const PACKAGE_CHAIN_PAGES = [
   'pages/package-create/package-create',
   'pages/store-select/store-select',
@@ -963,37 +1088,517 @@ const PACKAGE_CHAIN_PAGES = [
   'pages/package-code/package-code',
 ]
 
-const packageGuardMisses = []
-for (const page of PACKAGE_CHAIN_PAGES) {
-  const src = read(`${page}.js`)
-  if (!src.includes("require('../../utils/package-feature')")) {
-    packageGuardMisses.push(`${page}.js 未引入 package-feature 守卫`)
-    continue
+{
+  const guardMisses = []
+  if (fs.existsSync(path.join(ROOT, 'utils/package-feature.js'))) {
+    guardMisses.push('utils/package-feature.js 仍然存在（硬编码 fail-closed 模块必须删除，留着就会被 require 回来）')
   }
-  // 钉在 onLoad 之后的第一条语句：放到 setData 之后就等于先把 URL 参数渲染出去了。
-  if (!/onLoad\s*\([^)]*\)\s*\{\s*(\/\/[^\n]*\n\s*)*if\s*\(guardPackageChain\(\)\)\s*return/.test(src)) {
-    packageGuardMisses.push(`${page}.js 的 guardPackageChain() 不在 onLoad 首行`)
+  for (const page of PACKAGE_CHAIN_PAGES) {
+    // 先剥注释：抓的是真实代码，不是「说明当初为什么有这个守卫」的那几行注释
+    // （本门禁同族的 PACKAGE_FAKE_DATA 早就是这么做的，这里沿用同一判据）。
+    const src = stripComments(read(`${page}.js`))
+    if (src.includes('package-feature')) guardMisses.push(`${page}.js 仍引用 package-feature`)
+    if (src.includes('guardPackageChain')) guardMisses.push(`${page}.js 仍调用 guardPackageChain`)
   }
+  if (!guardMisses.length) ok(`材料包四页已移除硬编码 fail-closed 守卫（${PACKAGE_CHAIN_PAGES.length} 页）`)
+  else bad('材料包硬编码守卫已移除', guardMisses.join('；'))
 }
-if (!packageGuardMisses.length) ok(`材料包四页均在 onLoad 首行 fail-closed（${PACKAGE_CHAIN_PAGES.length} 页）`)
-else bad('材料包侧链守卫', packageGuardMisses.join('；'))
 
-// onLoad 守卫挡不住首屏那一帧：「材料包创建成功」写死在 wxml 里，不受 data 控制。
-// 必须由一个默认 false 的开关把它关在门外，否则深链打开时会先闪出一句无订单支撑的成功宣告。
+// 找回路径：列表端点接入 + 从本人订单只带 orderId 重新进入。
+// 这是整条链能开放的前提条件，缺任何一环都必须红。
+{
+  const misses = []
+  if (!/getPackageOrders\(\{\s*cursor,\s*pageSize\s*\}\s*=\s*\{\}\)/.test(apiJs)) misses.push('api.js 缺 getPackageOrders({cursor,pageSize})')
+  if (!/request\('\/orders\/package',\s*\{\s*method:\s*'GET',\s*data,\s*needAuth:\s*true\s*\}\)/.test(apiJs)) misses.push("getPackageOrders 未以 GET + needAuth:true 调 /orders/package")
+  if (!ordersJs.includes('api.getPackageOrders(')) misses.push('orders.js 未接入材料包列表')
+  if (!ordersWxml.includes('bindtap="openPackage"')) misses.push('orders.wxml 没有进入材料包到机码页的入口')
+  if (!ordersJs.includes('/pages/package-code/package-code?orderId=')) misses.push('orders.js 进入到机码页时未使用 orderId')
+  if (!misses.length) ok('材料包订单可从本人打印订单列表找回并重新查看到机码')
+  else bad('材料包订单找回路径', misses.join('；'))
+}
+
+// R4 收口 ①：取件页身份判定必须是四态，不能压成布尔。
+//
+// 压成布尔就是本轮修掉的那个缺陷的成因：未登录 / 无会员 id / JWT 过期 / 换了人
+// 全都落到「与快照一致 → 不算换人 → 返回 false → 直接 return」，而 state 原地停在
+// 'loading' —— 一页永远转不完的「正在读取订单实时状态…」，既没有请求在跑也没有出口。
+// 其中「JWT 过期但仍有补签资格」那一种本来能自己修好：enduser JWT 只签 30 分钟，
+// request.js 拿到 401 会静默续签一次再重发，页面必须**放行真实请求**才轮得到它。
+{
+  const misses = []
+  if (!/_resolveIdentity\(bindOwner\)\s*\{/.test(pickupJs)) misses.push('缺 _resolveIdentity(bindOwner)（四态判定 + 归属绑定时机）')
+  // R5：判据必须是**稳定账号快照 + page-guard 的那一份状态机**，不是"上一次读到的身份键"。
+  // 后者会把「同一个人的 JWT 自然过期」（'u:A' → ''，因为 getToken() 过期时先 clearSession）
+  // 与「主动登出」判成同一件事：当场清码 + 一个请求都不发 = 静默补签永远跑不到。
+  if (!/resolveAccountState\(auth, this\._account\)/.test(pickupJs)) {
+    misses.push('身份判定没有走 page-guard.resolveAccountState（自然过期会被误判成登出）')
+  }
+  {
+    const body = methodBody(stripComments(pickupJs), '_resolveIdentity')
+    if (!body) misses.push('取不到 _resolveIdentity 的函数体')
+    // 快照只许放内存，且必须在 'changed' 时当场销毁。
+    else if (!/this\._account = ''/.test(body)) misses.push('换人 / 登出时没有销毁账号快照')
+    else if (!/this\._account = resolved\.account/.test(body)) misses.push('没有沿用状态机给出的账号快照')
+    // 反面：页面不得自己制造补签资格，也不得把快照落地（落地就是"这台设备上刚才是谁"）。
+    const bare = stripComments(pickupJs)
+    if (/RESIGNIN_ELIGIBLE|resignin_eligible/.test(bare)) misses.push('页面直接碰了补签资格标记')
+    if (/setStorageSync|storage\.set\(/.test(bare)) misses.push('账号快照 / 凭证被写进了本机存储')
+  }
+  // 正面：'resignable' 必须和 'ok' 一样走到真实请求那一行，不能被提前 return 掉。
+  {
+    const refresh = methodBody(stripComments(pickupJs), '_refreshOrder')
+    const failIdx = refresh.indexOf('_failClosedForIdentity()')
+    const reqIdx = refresh.indexOf('api.getCloudPrintOrder(')
+    if (!(failIdx > 0 && reqIdx > failIdx)) {
+      misses.push("'unusable' fail-closed 之后 'ok'/'resignable' 必须继续发请求")
+    }
+    if (/identityState !== 'ok'/.test(refresh)) {
+      misses.push("'resignable' 被和 'unusable' 一起拦掉了（那是一页转不完的 loading）")
+    }
+  }
+  if (!/_failClosedForIdentity\(\)\s*\{[\s\S]{0,600}errorAction: 'login'/.test(pickupJs)) {
+    misses.push('fail-closed 态没有给登录出口')
+  }
+  if (!pickupWxml.includes("errorAction === 'login' ? '去登录'")) misses.push('模板没有按 errorAction 分流按钮文案')
+  // 反面：不许再出现「身份判定返回布尔」的老形态。
+  if (/_enforceIdentity\(\)[\s\S]{0,400}return isMemberIdentity\(identity\)/.test(pickupJs)) {
+    misses.push('身份判定又被压回布尔（未登录/无 id/过期会重新合流成永久 loading）')
+  }
+  if (!misses.length) ok('取件页身份判定四态：可补签放行真实请求，真不可用 fail-closed 并给登录出口')
+  else bad('取件页不得永久 loading', misses.join('；'))
+}
+
+// R8 收口 ①：取件页**每一次 onShow 都必须先判身份，再谈别的**。
+//
+// 上一版 `_refreshOrder` 第一行是 `if (!this.data.orderId || this._polling) return`——
+// 身份判定排在这个早退**之后**。于是这条真实链路上有一个只由网络快慢决定长短的暴露窗口：
+// A 的码已经画在屏幕上、一发轮询正在飞（_polling === true），此时 A 登出、B 登录、
+// 回到本页 —— onShow 调进来第一行就 return，身份根本没被判过，清场没发生，
+// A 的取件凭证原样留在屏幕上，一直留到那发请求自己落定。慢响应 / 弱网重试 / 服务端卡住
+// 都能把它拉到几十秒以上，而这几十秒里看着它的是共用设备上的下一位。
+{
+  const misses = []
+  const bare = stripComments(pickupJs)
+  const refresh = methodBody(bare, '_refreshOrder')
+  if (!refresh) misses.push('取不到 _refreshOrder 的函数体')
+  else {
+    const identityIdx = refresh.indexOf('this._resolveIdentity(bindOwner === true)')
+    const pollingIdx = refresh.indexOf('this._polling) return')
+    if (identityIdx < 0) misses.push('_refreshOrder 里没有身份判定')
+    else if (pollingIdx >= 0 && pollingIdx < identityIdx) {
+      misses.push('"已经有一发在飞"的早退排在身份判定之前（A 的码会一直留到那发请求落定）')
+    }
+    if (/if \(!this\.data\.orderId \|\| this\._polling\) return/.test(refresh)) {
+      misses.push('第一行又把 orderId 与 _polling 合并成一个早退（身份判定会被它整个跳过）')
+    }
+    // 去重本身要留着：判完身份之后仍然不该对同一格重复打请求。
+    if (pollingIdx < 0) misses.push('在飞去重没了（同一格会被重复打请求）')
+  }
+  if (!/onShow\(\) \{[\s\S]{0,700}this\._refreshOrder\(false\)/.test(bare)) {
+    misses.push('onShow 没有走 _refreshOrder（那是唯一一处"先判身份"的入口）')
+  }
+  // R10 收紧：**onShow 永远不绑定开页那位**。R9 曾在这里开过一个「本页自己送用户去
+  // 登录、回来第一次 onShow」的一次性窗口；它和回调里那个窗口是同一类错误 ——
+  // 都在拿「这一刻本地是谁」当「这一页该属于谁」。现在归属只有两条来源：onLoad，
+  // 以及一发确认请求的 200。传任何第二个实参进来都算把口子重开。
+  if (/this\._refreshOrder\(false, [^)]/.test(bare)) {
+    misses.push('onShow 又给 _refreshOrder 传了绑定参数（谁现在登录着谁就是主人 = R9-A 的缺口）')
+  }
+  if (!misses.length) ok('取件页每一次 onShow 都先判身份再决定发不发请求（在途请求不得把清场推迟到网络之后）')
+  else bad('取件页在途暴露窗口', misses.join('；'))
+}
+
+// R8 收口 ②：**请求合法发出之后才自然过期**的那条 200，仍然属于本人。
+//
+// enduser JWT 只签 30 分钟，而取件页会一直轮询。于是这条路径每天都在发生：请求在 'ok'
+// 状态下带着 A 的登录态发出去 → 服务端按 requireOwned 校验过归属、返回 200 → 响应回来的
+// 路上 A 的 JWT 到点（getToken() 过期时先 clearSession，身份于是读成 ''）。R5 之前的成功分支
+// 只认 `state === 'ok'`，把这条**刚刚被服务端确认过属于 A** 的响应判成"身份说不清"，
+// 当场清掉屏幕上那张码、写一句「请登录」——用户站在一体机前，手里的码没了，而它一直有效。
+//
+// ── R9 收紧：`'ok'` 也不许无条件放行 ────────────────────────────────────────
+//
+// 上一版这个函数的第一行是 `if (state === 'ok') return true`，三条归属判据全在
+// `'resignable'` 分支里。而真实链路上有一条路走的是 `'ok'`：打开本页时 A 的 JWT 已经
+// 自然到点（快照 / 开页账号 / 发起账号三个全是空串），请求照常发出去；在途期间 B 登录、
+// 回到本页 —— `_openerAccount` 此刻还是空的，于是 B 被记成开页那位，`_resolveIdentity`
+// 返回 `'ok'`，A 的迟到 200 就被判成"属于当前这位"，画在了 B 的屏幕上。
+// 所以现在 `'ok'` 与 `'resignable'` **走同一组判据**，而且多一条代次：
+// 身份一变、归属一存疑，在途那一发当场作废。
+{
+  const misses = []
+  const bare = stripComments(pickupJs)
+  const owns = methodBody(bare, '_ownsResponse')
+  if (!owns) misses.push('缺 _ownsResponse（成功响应的归属判定）')
+  else {
+    if (/if \(state === 'ok'\) return true/.test(owns)) {
+      misses.push("'ok' 又变回无条件放行（它只说\"此刻有个确定身份\"，不说这一发属于谁）")
+    }
+    if (!/if \(state !== 'ok' && state !== 'resignable'\) return false/.test(owns)) {
+      misses.push("只有 'ok' / 'resignable' 是放行路径（'changed' / 'unusable' 一律 fail-closed）")
+    }
+    if (!/token\.epoch !== this\._requestEpoch/.test(owns)) misses.push('没有核请求代次（身份一变，在途那一发就该作废）')
+    if (!/this\._ownerDeniedFor && this\._ownerDeniedFor === account/.test(owns)) {
+      misses.push('服务端已经拒绝过的那个账号仍然可能被放行')
+    }
+    if (!/isMemberIdentity\(account\)/.test(owns)) misses.push('没有要求快照仍是一个确定的会员键')
+    if (!/\n\s*if \(account !== this\._openerAccount\) return false/.test(owns)) {
+      // 必须是**无条件**的那一行。写成 `if (this._openerAccount && account !== ...)`
+      // 等于「开页那位没绑上时一律放行」—— 而「没绑上」正是 R9-A 那条路的形状。
+      misses.push('没有无条件比对开页那位（本页的 orderId 属于他）')
+    }
+    if (!/sameAccount\(token\.account, account\)/.test(owns)) misses.push('没有比对发出这一发请求的那位')
+    if (!/sameAccount\(token\.opener, account\)/.test(owns)) misses.push('没有比对发出这一发时的开页那位')
+  }
+  // 发起那一刻的账号 / 开页账号 / 代次必须**绑在令牌上**：回调时再读一次，读到的可能是
+  // 被 clearSession 清空的会话，也可能是在途期间刚登录进来的另一位。
+  if (!/const token = \{\s*\n\s*account: this\._account,\s*\n\s*opener: this\._openerAccount,\s*\n\s*epoch: this\._requestEpoch,\s*\n\s*confirming,\s*\n\s*\}/.test(bare)) {
+    misses.push('没有在发请求前把发起账号 / 开页账号 / 代次 / 是否确认请求一起绑进令牌')
+  }
+  // R10：`confirming` 必须在**发请求之前**算出来，判据是「本页还没有主人，而此刻本地
+  // 有一个确定账号」。只有这种请求的 200 配建立归属。
+  if (!/const confirming = !this\._openerAccount && isMemberIdentity\(this\._account\)/.test(bare)) {
+    misses.push('没有在发请求前判定这一发是不是「带着已知账号去确认归属」的那一发')
+  }
+  const refresh = methodBody(bare, '_refreshOrder')
+  if (refresh && refresh.indexOf('const token = {') > refresh.indexOf('api.getCloudPrintOrder(')) {
+    misses.push('令牌绑在请求之后（那就不是"发出那一刻的真值"了）')
+  }
+  // 迟到的响应必须**在判身份之前**就被挡住，而且挡住时连去重锁都不许碰
+  //（那把锁此刻可能正锁着另一发新的请求）。
+  if (!/if \(!this\._settleRequest\(token\)\) return/.test(bare)) {
+    misses.push('成功 / 失败分支没有先按令牌确认"这一发还属于当前这一轮"')
+  }
+  if (!/_settleRequest\(token\) \{[\s\S]{0,400}this\._inflight !== token\) return false/.test(bare)) {
+    misses.push('_settleRequest 不是按令牌对象身份比对（比代次挡不住同代次的先后两发）')
+  }
+  {
+    // 必须在**这个函数自己的函数体里**找，不能让正则跨出去撞上 _settleRequest 里
+    // 那句同名赋值 —— 跨出去之后这条门禁对「只 +1 代次、不放锁」是瞎的。
+    const invalidate = methodBody(bare, '_invalidateInflight')
+    if (!/this\._requestEpoch \+= 1/.test(invalidate) || !/this\._polling = false/.test(invalidate)
+      || !/this\._inflight = null/.test(invalidate)) {
+      misses.push('作废在途请求时没有同时 +1 代次并交还去重锁（锁不放 = 「重新加载」按不动）')
+    }
+  }
+  if (!/if \(!this\._ownsResponse\(state, token\)\) \{ this\._failClosedForIdentity\(\); return \}/.test(bare)) {
+    misses.push('成功分支没有按 _ownsResponse 分流，或证不出归属时没有 fail-closed')
+  }
+  // 归属只许在两个说得清因果的时刻绑定：onLoad 的第一次判定、以及本页自己那一发
+  // （发出时归属未定）的回调里且页面仍可见。少了 `this._visible` 那一半，用户切走期间
+  // 别人登录同样会被认作这一页的主人。
+  if (!/this\._refreshOrder\(true, true\)/.test(bare)) misses.push('onLoad 没有作为绑定开页那位的那一刻')
+  {
+    // R10：**两个回调都不许再从「回调时读到谁」推断归属**。R9 在这里传
+    // `token.opener === '' && this._visible`，等于允许回调自己认主人 —— 而页面无从
+    // 知道服务端是按谁放行的（`auth.saveSession` 不需要任何生命周期回调，另一个人
+    // 在别处登录，回调读到的就是他）。
+    const inferring = (bare.match(/this\._resolveIdentity\(token\./g) || []).length
+    if (inferring > 0) {
+      misses.push('回调仍在用令牌/可见性推断归属（' + inferring + ' 处）—— 归属只能由 onLoad 或服务端确认建立')
+    }
+    const plain = (bare.match(/const state = this\._resolveIdentity\(false\)/g) || []).length
+    if (plain !== 2) {
+      misses.push('then / catch 两个回调没有各自以「不绑定」的方式重判身份（' + plain + ' 处，应为 2）')
+    }
+  }
+  if (!/isMemberIdentity\(resolved\.account\) && !this\._openerAccount && bindOwner === true/.test(bare)) {
+    misses.push('_resolveIdentity 又变回"看见一个确定身份就认作开页那位"')
+  }
+  // R10：发出时归属未定的那一发，它的 200 什么都不证明 —— 不许写屏，只能改问服务端。
+  if (!/if \(!token\.confirming && !this\._openerAccount\) \{ this\._requestOwnerConfirmation\(\); return \}/.test(bare)) {
+    misses.push('发出时归属未定的那一发仍然可能直接写屏（它的 200 证不了归属）')
+  }
+  if (!/if \(token\.confirming && !this\._confirmOwner\(state, token\)\) return/.test(bare)) {
+    misses.push('确认请求的 200 没有走 _confirmOwner（那是 onLoad 之外唯一能建立归属的路）')
+  }
+  {
+    // 归属只许写成**发出这一发时记下的那个账号**，不许写成回调时读到的那位。
+    const confirm = methodBody(bare, '_confirmOwner')
+    if (!/this\._openerAccount = token\.account/.test(confirm)) {
+      misses.push('_confirmOwner 没有把归属写成令牌上那个已知账号')
+    }
+    if (/this\._openerAccount = (resolved|this\._account)/.test(confirm)) {
+      misses.push('_confirmOwner 把归属写成了回调时读到的那位（正是 R9 栽的那一跤）')
+    }
+    if (!/this\._account !== token\.account/.test(confirm)) {
+      misses.push('_confirmOwner 没有核对「这中间没换过人」')
+    }
+    if (!/isMemberIdentity\(token\.account\)/.test(confirm)) {
+      misses.push('_confirmOwner 没有要求令牌上那个账号本身是确定的会员键')
+    }
+    // 这一条今天与「中途没换过人」互相覆盖（'changed' 会先一步在 _resolveIdentity 里
+    // 截掉，'unusable' 会把快照清成 ''）—— 但它是**契约**的一部分：认归属只在两种
+    // 说得清的状态下发生。押在另一条判据的当前写法上，那边一改这边就静默放行。
+    if (!/state !== 'ok' && state !== 'resignable'/.test(confirm)) {
+      misses.push('_confirmOwner 没有限定只在 ok / resignable 两种状态下认归属')
+    }
+  }
+  // 服务端明确拒绝（requireOwned 404）必须记在**账号**上，并且守卫落在发请求那一处 ——
+  // 每一次 onShow 都会经过那里，只守触发确认的那条路等于「回来一次刷一次服务端」。
+  if (!/token\.confirming && err && err\.statusCode === 404 && err\.code === 'PRINT_ORDER_NOT_FOUND'/.test(bare)) {
+    misses.push('确认请求被服务端拒绝时没有按 requireOwned 的 404 分流')
+  }
+  if (!/if \(confirming && this\._ownerDeniedFor === this\._account\) \{ this\._denyOwner\(this\._account\); return \}/.test(bare)) {
+    misses.push('被拒过的账号仍会在下一次 onShow 再问一遍服务端')
+  }
+  // 反面锚：401 与"真的换了人"两条 fail-closed 一个都不许被这次放宽带松。
+  if (!/if \(err && err\.statusCode === 401\)/.test(bare)) misses.push('401 的清码分支没了')
+  if (!/if \(foreign \|\| resolved\.state === 'changed'\)/.test(bare)) {
+    misses.push('换人 / 登出的清场分支没了')
+  }
+  if (!misses.length) ok("取件页：归属在请求发出前就绑定，'ok' 与 'resignable' 同一组判据 + 代次，其余 fail-closed")
+  else bad('取件页不得把本人的有效码当成过期清掉，也不得把它画给一个认不出的会话', misses.join('；'))
+}
+
+// R9 收口：取件页画码的 **exec 回调**必须重新确认码 / 归属 / 代次。
+//
+// `wx.createSelectorQuery().exec()` 的回调跨帧才回来，中间这张码完全可能已经被换掉
+// （核销后重取）、被撤下（过期 / 轮询失联 / 换人清场），或者整页已经换了人。上一版
+// 这个回调什么都不重认，照样把画布写成 `qrStatus: 'ready'` —— 用户会照着一张作废的、
+// 或者根本不属于当前这位的码去一体机扫。package-code 早就有这三道，取件页一直没有。
+{
+  const misses = []
+  const bare = stripComments(pickupJs)
+  const draw = methodBody(bare, '_drawPickupQr')
+  if (!draw) misses.push('取不到 _drawPickupQr 的函数体')
+  else {
+    const execIdx = draw.indexOf('.exec((result)')
+    if (execIdx < 0) misses.push('取不到 exec 的回调')
+    else {
+      const before = draw.slice(0, execIdx)
+      const after = draw.slice(execIdx)
+      // 三样都必须在**进入异步之前**钉进局部变量：回调里现读 this.data 就是在读"现在"，
+      // 而这一笔画的是"当时"。
+      if (!/const code = this\.data\.codeRaw/.test(before)) misses.push('画哪个码没有在进入异步前钉死')
+      if (!/const owner = this\._openerAccount/.test(before)) misses.push('画给谁没有在进入异步前钉死')
+      if (!/const epoch = this\._requestEpoch/.test(before)) misses.push('属于哪一轮没有在进入异步前钉死')
+      if (!/this\.data\.codeRaw !== code/.test(after)) misses.push('回调里没有重认这张码还是不是当时那张')
+      if (!/this\._openerAccount !== owner/.test(after)) misses.push('回调里没有重认归属')
+      if (!/this\._requestEpoch !== epoch/.test(after)) misses.push('回调里没有重认请求代次')
+      if (!/!this\._openerAccount \|\| this\._foreignBlocked/.test(after)) {
+        misses.push('这一页还没人认领 / 已换人时仍然会画')
+      }
+      // 三道守卫必须排在**任何一次 setData 之前**：先写 'error' 再判等于已经改写了
+      // 当前这张码的状态（把一张好码说成画不出来）。
+      const guardEnd = after.indexOf('const target = result')
+      if (guardEnd < 0 || after.slice(0, guardEnd).includes('setData')) {
+        misses.push('守卫排在 setData 之后（那一笔已经替当前这张码下了结论）')
+      }
+    }
+  }
+  if (!misses.length) ok('取件页画码：迟到的 exec 回调不得画、也不得把画布说成已就绪')
+  else bad('取件页画码的异步回调没有重认码 / 归属 / 代次', misses.join('；'))
+}
+
+// R4 收口 ②：取件页凭证的**新鲜度**。
+// 核销之后服务端不再下发 pickupCode / pickupCodeExpiresAt。若前端从旧 data 继承，
+// 一张已经被消费掉的码会继续挂着倒计时留在屏幕上；而轮询一直失败时我们根本不知道
+// 它是否已被扫掉，所以只在「最近一次服务端确认还够新」时保留。
+{
+  const misses = []
+  if (/pickupCodeExpiresAt[\s\S]{0,120}:\s*this\.data\.expiresAt/.test(pickupJs)) {
+    misses.push('有效期仍从旧 data 继承（核销后会继续显示上一轮那个时间）')
+  }
+  if (!/const CODE_TRUST_WINDOW_MS = \d+/.test(pickupJs)) misses.push('缺凭证信任窗口常量')
+  if (!/const codeStale = this\.data\.showQr[\s\S]{0,200}CODE_TRUST_WINDOW_MS/.test(pickupJs)) {
+    misses.push('轮询失败时没有按新鲜度判定是否撤码')
+  }
+  if (!/if \(codeStale\) \{[\s\S]{0,160}this\._clearCredentials\(\)/.test(pickupJs)) {
+    misses.push('判定为过期后没有真的清掉凭证')
+  }
+  if (!/_clearCredentials\(\)\s*\{[\s\S]{0,400}expiresAt: 0/.test(pickupJs)) {
+    misses.push('清凭证时没有一起清掉有效期（它是那张码的说明文字）')
+  }
+  if (!misses.length) ok('取件页凭证只在服务端确认仍新鲜时保留，核销 / 失联后连有效期一起清零')
+  else bad('取件页凭证新鲜度', misses.join('；'))
+}
+
+// R4 收口 ③：打印订单页在**前台**失效时必须当场清列表凭证。
+//
+// 真实失效链路里根本没有 onShow：request.js 拿到 401 会静默续签一次，续签失败就
+// auth.logout()，全程没有任何生命周期回调，页面还停在前台。只在 onShow 里清，
+// 等于让一份带着到机码的订单列表停在一个已经不存在的会话上，等下一位来看。
+{
+  const misses = []
+  const src = stripComments(ordersJs)
+  if (!/_enforceIdentity\(\)\s*\{[\s\S]{0,700}this\._resetAll\(\)/.test(src)) {
+    misses.push('_enforceIdentity 没有真的清场')
+  }
+  // 每一条**敏感异步回调**都必须先执行身份判定、再判这条响应能不能写。
+  //
+  // 此前这里数的是 `_enforceIdentity()` 出现了几次（`hooked < 6`）。计数挡不住这批缺陷：
+  // 六次可以全落在入口守卫上，回调里一次都没有，断言照样绿 —— 而真实失效链路
+  //（request.js 补签失败 → auth.logout()，页面还在前台）根本没有入口可走，
+  // 能清掉屏幕的只剩回调里那一次。计数还会被"在无关位置多写一次"直接喂饱。
+  // 现在逐条回调取函数体，并检查**顺序**：先判定，后决定能不能写。
+  for (const [method, kind, count] of [['_load', 'then', 1], ['_load', 'catch', 1],
+    ['_loadPackages', 'then', 1], ['_loadPackages', 'catch', 1],
+    ['_submitCancel', 'then', 1], ['_submitCancel', 'catch', 1]]) {
+    const bodies = promiseCallbackBodies(methodBody(src, method), kind)
+    if (bodies.length < count) { misses.push(`${method} 的 .${kind}() 回调取不到`); continue }
+    const body = bodies[0]
+    const enforceAt = body.indexOf('this._enforceIdentity()')
+    const decideAt = Math.min(
+      ...[body.indexOf('this._accepts('), body.indexOf('this._sameIdentity(')].filter((i) => i >= 0),
+    )
+    if (enforceAt < 0) misses.push(`${method} 的 .${kind}() 回调没有执行身份判定（前台静默登出时无人清场）`)
+    else if (!Number.isFinite(decideAt)) misses.push(`${method} 的 .${kind}() 回调没有用令牌判定能不能写`)
+    else if (enforceAt > decideAt) misses.push(`${method} 的 .${kind}() 回调先判令牌后判身份（换人时只丢响应、不清屏幕）`)
+  }
+  if (!/onPullDownRefresh\(\)\s*\{[\s\S]{0,400}if \(!this\._enforceIdentity\(\)\) \{ stop\(\); return \}/.test(src)) {
+    misses.push('下拉刷新没有先核身份（会"刷新"出仍属于上一个会话的订单与到机码）')
+  }
+  if (!/_resetAll\(\)\s*\{[\s\S]{0,400}pkgRows: \[\]/.test(src)) misses.push('_resetAll 没清材料包分区')
+  if (!misses.length) ok('打印订单页在前台静默登出 / 401 时当场清掉列表与到机码，不依赖离页再回来')
+  else bad('打印订单页前台失效清场', misses.join('；'))
+}
+
+// R4 收口 ④：单件链 print-store → print-pay → print-pickup 的 URL 只传非敏感/必要参数，
+// 且建单成功后先锁 orderId。
+{
+  const misses = []
+  // print-pay 不得再从 URL 读金额 / 页数 / 文件名 —— 它们现在一律向服务端取。
+  for (const field of ['amountCents', 'total', 'pages', 'name', 'pickupCode', 'expiresAt']) {
+    if (new RegExp(`q\\.${field}\\b`).test(printPayJs)) misses.push(`print-pay 仍从 URL 读 ${field}`)
+  }
+  if (!printPayJs.includes('api.getMyDocuments(')) misses.push('print-pay 没有从本人文件库取文件名')
+  // 建单成功 → 先锁 orderId 再跳转；跳转失败有兜底；再点一次不许重复 POST。
+  const payBare = stripComments(printPayJs)
+  const flow = methodBody(payBare, 'continueFlow')
+  if (!flow) misses.push('取不到 continueFlow 的函数体')
+  const createIdx = flow.indexOf('api.createCloudPrintOrder(')
+  const chain = createIdx >= 0 ? flow.slice(createIdx) : ''
+  const lockIdx = chain.indexOf('this._createdOrderId = orderId')
+  const redirectIdx = chain.indexOf('wx.redirectTo(')
+  // R5：判据不再是"回调时再读一次身份"。同一个人的 30 分钟 JWT 在 POST 在途期间到点，
+  // getToken() 会先 clearSession()，回调读到的身份是 `''` —— 逐字比对会把它判成换人，
+  // 于是订单已经在服务端建出来了，页面却不锁 orderId、还把按钮解开。再点一次就是
+  // 第二张订单和第二笔钱 —— 服务端的幂等键只有在**前端复用同一个键**时才救得回来，
+  // 而"判成换了人"这条路径连键都不会复用。
+  if (/_sameIdentity\(identity\)/.test(payBare)) {
+    misses.push('建单回调仍按"回调时重读身份"判定（同一账号的自然过期会被判成换人 → 重复下单）')
+  }
+  const bindIdx = flow.indexOf('this._createAttempt = attempt')
+  if (!(bindIdx > 0 && createIdx > bindIdx)) {
+    misses.push('这次建单尝试必须在 POST **发出之前**就绑定（发出后服务端那张订单就可能已经存在）')
+  }
+  if (!/if \(this\._createAttempt && !this\._createAttempt\.settled\) return/.test(flow)) {
+    misses.push('在途尝试没有独立的锁（只靠 setData 的 submitting，任何一条路径写回 false 就能重复 POST）')
+  }
+  const guardIdx = chain.indexOf('this._createAttempt !== attempt')
+  if (!(guardIdx > 0 && lockIdx > guardIdx)) misses.push('建单成功回调没有先判这次尝试还属不属于当前账号，再锁 orderId')
+  if (!(lockIdx > 0 && redirectIdx > lockIdx)) misses.push('orderId 必须在 redirectTo 之前锁住（跳转失败时页面还留在这里）')
+  if (!/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(printPayJs)) misses.push('redirectTo 没有失败兜底')
+  if (!/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(printPayJs)) {
+    misses.push('已建过单仍可能再 POST 一次（服务端虽会按幂等键回放，页面也不该让用户白点）')
+  }
+  // 换人 / 登出必须当场复位与上一位绑定的全部状态，onShow 也要过一遍
+  //（用户完全可能在别的页换了账号再切回来，本页收不到任何通知）。
+  const reset = methodBody(payBare, '_resetForAccountChange')
+  for (const [needle, why] of [
+    ['this._createdOrderId = null', 'A 的订单号'],
+    ['this._createAttempt = null', 'A 的建单尝试锁'],
+    ['createdLocked: false', '锁定态'],
+    ['submitting: false', '提交锁（留着 B 的按钮永远按不动）'],
+    ["'files[0].name': '本人文件'", 'A 的文件名（常含本人姓名）'],
+  ]) {
+    if (!reset.includes(needle)) misses.push(`换账号没有复位${why}`)
+  }
+  if (!methodBody(payBare, 'onShow').includes('_resolveAccount()')) {
+    misses.push('onShow 没有重新核账号（换账号后回到本页，A 的建单锁会锁死 B）')
+  }
+  // R5 收口：`wx.hideLoading()` 不是栈 —— 它无条件掀掉当前屏幕上那一张遮罩，不管是谁挂的。
+  // 放在归属判定之前，A 的迟到回调就会掀掉 B 正在进行的那次提交的遮罩：B 的按钮还锁着、
+  // 请求还在飞，屏幕上却什么都没有了。遮罩必须认主：谁挂的谁收。
+  if (/wx\.hideLoading\(/.test(flow)) {
+    misses.push('建单链直接调了 wx.hideLoading()（遮罩不认主，A 的迟到回调会掀掉 B 的）')
+  }
+  if (!/_releaseLoading\(attempt\)/.test(flow)) misses.push('建单回调没有按尝试归属收遮罩')
+  const release = methodBody(payBare, '_releaseLoading')
+  if (!/this\._createAttempt !== attempt\) return/.test(release)) {
+    misses.push('_releaseLoading 没有在遮罩已归后来那次提交时让开')
+  }
+  // 报价：补签**失败**后账号从 'resignable' 掉成 'unusable'，这一跳快照始终是空、不算换人，
+  // 没有人写终态。停在 'loading' 会同时锁死展示与重试（模板只在 error 时给「重新核价」，
+  // retryQuote 又只在非 loading 时才动）。
+  if (!/if \(state === 'unusable'\) this\._failClosedQuote\(token\)/.test(payBare)) {
+    misses.push("报价 'unusable' 时没有把金额从「正在核定」里解出来（永久 loading）")
+  }
+  const failQuote = methodBody(payBare, '_failClosedQuote')
+  if (!/token\.channel !== 'quote'\) return/.test(failQuote)) {
+    misses.push('_failClosedQuote 没有只管报价通道（文件名那条链失败本来就是静默的）')
+  }
+  if (!/quoteState: 'error'/.test(failQuote)) misses.push('fail-closed 报价没有落到 error（「重新核价」会是死按钮）')
+  if (!printPayWxml.includes('createdLocked')) misses.push('模板没有反映「订单已创建」的锁定态')
+  if (!printPayJs.includes("wx.navigateTo({ url: '/pages/orders/orders'")) misses.push('锁定后没有给出找回订单的出口')
+  // print-pay → print-pickup 只带 orderId。
+  //
+  // 取的是 `wx.redirectTo(...)` 的**整个实参段**，不是 `/print-pickup\?[^`'"]*/`。
+  // 那条正则在第一个引号处就停 —— 本页的地址是 `'…?orderId=' + encodeURIComponent(id)`
+  // 拼出来的，它只看得到 `orderId=`，后面再 `+ '&pickupCode=' + code` 一个字都抓不到。
+  // 也就是说这条「凭证不进 URL」的断言，对本页真正的写法从来没有约束力。
+  const navArgs = callArgs(payBare, 'wx.redirectTo(')
+  if (!navArgs.includes('print-pickup')) misses.push('找不到 print-pay 进取件页的跳转')
+  else {
+    for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'taskStatus', 'orderNo', 'name', 'store']) {
+      if (new RegExp(`${field}=`).test(navArgs)) misses.push(`print-pay 进取件页时携带 ${field}`)
+    }
+    const params = navArgs.match(/[?&][A-Za-z_]+=/g) || []
+    if (params.length !== 1 || params[0] !== '?orderId=') {
+      misses.push(`进取件页只许带 orderId，实际带了 ${params.join(',') || '(未识别到参数)'}`)
+    }
+  }
+  if (!misses.length) ok('单件链 URL 只传非敏感参数，建单后先锁 orderId 且可从本人订单找回')
+  else bad('单件打印链凭证与幂等', misses.join('；'))
+}
+
+// 凭证不进 URL：列表拿到的 pickupCode 只用于展示，绝不拼进跳转地址。
+// 一条构造出来的链接或一张转发出去的卡片就能在别人手机上渲染出带码的成功页。
+{
+  const offenders = []
+  const openIdx = ordersJs.indexOf('openPackage(e)')
+  const openBlock = openIdx >= 0 ? ordersJs.slice(openIdx, openIdx + 500) : ''
+  if (!openBlock) offenders.push('orders.js 找不到 openPackage 实现')
+  for (const field of ['pickupCode', 'amountCents', 'paymentSessionToken', 'expiresAt', 'price']) {
+    if (openBlock.includes(`${field}=`)) offenders.push(`orders.js openPackage 把 ${field} 拼进了 URL`)
+  }
+  const confirmJs = read('pages/package-confirm/package-confirm.js')
+  const navIdx = confirmJs.indexOf("'/pages/package-code/package-code?orderId='")
+  if (navIdx < 0) offenders.push('package-confirm 建单后未以 orderId 单参跳转到机码页')
+  for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'paymentSessionToken', 'storeName']) {
+    if (navIdx >= 0 && confirmJs.slice(navIdx, navIdx + 400).includes(`${field}=`)) {
+      offenders.push(`package-confirm 跳转 URL 携带 ${field}`)
+    }
+  }
+  if (!offenders.length) ok('材料包到机码页跳转只带 orderId，凭证与金额不进 URL')
+  else bad('材料包凭证不进 URL', offenders.join('；'))
+}
+
+// 全链禁止在线支付：材料包的钱在一体机上现场付，小程序侧没有任何支付闭环。
+{
+  const payHits = jsFiles.filter((f) => stripComments(read(f)).includes('wx.requestPayment'))
+  if (!payHits.length) ok('全仓不出现 wx.requestPayment（材料包为到机现场付款）')
+  else bad('小程序不得发起在线支付', payHits.join(','))
+}
+
+// onLoad 挡不住首屏那一帧：成功横幅写死在 wxml 里，不受 data 控制。
+// 必须由一个默认 false 的开关把它关在门外，否则深链打开时会先闪出一句无订单支撑的宣告。
 const codeWxml = read('pages/package-code/package-code.wxml')
 const codeJs = read('pages/package-code/package-code.js')
 if (
   /wx:if="\{\{ready\}\}"/.test(codeWxml) &&
-  /材料包创建成功/.test(codeWxml.split('wx:if="{{ready}}"')[1] || '') &&
-  /\bready:\s*false\b/.test(codeJs)
-) ok('到机码页成功横幅由默认关闭的开关控制，首屏不闪假成功')
-else bad('到机码页首屏', 'package-code 的「材料包创建成功」必须在 wx:if="{{ready}}" 之内，且 ready 默认 false')
+  /材料包订单/.test(codeWxml.split('wx:if="{{ready}}"').slice(-1)[0] || '') &&
+  /\bready:\s*false\b/.test(codeJs) &&
+  codeJs.includes('api.getPackageOrder(')
+) ok('到机码页整块成功内容由默认关闭的开关控制，且只在服务端确认订单后打开')
+else bad('到机码页首屏', 'package-code 的成功内容必须在 wx:if="{{ready}}" 之内、ready 默认 false，且数据来自 api.getPackageOrder')
 
-// 分享会把这条未开放的链继续散出去，package-code 的分享标题原本就是「材料包创建成功」。
+// 分享会把本人凭证继续散出去，package-code 的分享标题原本就是「材料包创建成功」。
 const packageShare = PACKAGE_CHAIN_PAGES
   .filter((page) => /onShare(AppMessage|Timeline)\s*\(/.test(read(`${page}.js`)))
 if (!packageShare.length) ok('材料包四页均未开放分享')
-else bad('材料包侧链分享', `${packageShare.join(',')} 在功能开放前不得提供 onShareAppMessage/onShareTimeline`)
+else bad('材料包侧链分享', `${packageShare.join(',')} 不得提供 onShareAppMessage/onShareTimeline（到机码是本人取件凭证）`)
 
 // 假数据即使被守卫挡住也不能留在唯一发布源里：守卫可能被回退或漏页。
 const PACKAGE_FAKE_DATA = [

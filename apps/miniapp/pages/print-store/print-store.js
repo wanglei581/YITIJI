@@ -68,9 +68,20 @@ Page({
       })
       return
     }
-    const amountCents = q.amountCents === undefined ? '' : q.amountCents
+    // 只把**非敏感且下一页确实需要**的四项交出去：本人文件 id、终端 id、
+    // 终端公开显示名（/terminals/public 的公开字段）、份数。
+    //
+    // 拿掉的是 pickupCode / expiresAt / amountCents / total / name / bundleId：
+    //   - pickupCode / expiresAt 在这一步**根本还不存在**（订单还没建），
+    //     它们是从上游原样转发下来的空壳参数，却给了一条"到机码可以走 URL"的现成路子；
+    //   - amountCents / total 是金额：下一页现在向服务端 /orders/quote 要真值，
+    //     不再由调用方"告诉"它该显示多少钱；
+    //   - name 是文件名，而求职材料的文件名里常常就写着本人姓名
+    //     （「张三的简历.pdf」）。一条构造出来或转发出去的链接就能把它渲染在别人手机上。
+    //   - bundleId 下一页从来没读过，是纯粹的死参数。
+    // 同 package-confirm → package-code 的口径：凭证与金额只能来自带登录态的服务端响应。
     wx.navigateTo({
-      url: `/pages/print-pay/print-pay?fileId=${encodeURIComponent(q.fileId || '')}&pages=${encodeURIComponent(q.pages || '')}&color=${encodeURIComponent(q.color || '')}&duplex=${encodeURIComponent(q.duplex || '')}&copies=${encodeURIComponent(q.copies || '')}&total=${encodeURIComponent(q.total || '')}&amountCents=${encodeURIComponent(amountCents)}&store=${encodeURIComponent(store.displayName)}&storeId=${encodeURIComponent(store.id)}&name=${encodeURIComponent(q.name || '')}&bundleId=${encodeURIComponent(q.bundleId || '')}&pickupCode=${encodeURIComponent(q.pickupCode || '')}&expiresAt=${encodeURIComponent(q.expiresAt || '')}`,
+      url: `/pages/print-pay/print-pay?fileId=${encodeURIComponent(q.fileId || '')}&storeId=${encodeURIComponent(store.id)}&store=${encodeURIComponent(store.displayName)}&copies=${encodeURIComponent(q.copies || '')}`,
     })
   },
 

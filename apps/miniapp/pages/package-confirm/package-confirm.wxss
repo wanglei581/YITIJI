@@ -128,84 +128,19 @@
   color: var(--text, #2c3e50);
 }
 
-/* 支付方式 */
-.payment-methods {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
+/* 六态文本块：未登录 / 草稿缺失 / 报价中 / 报价失败 / 建单失败都走这一套。
+   原先这里是一整套「微信支付 / 余额支付」单选样式 —— 材料包没有在线支付
+   （钱在一体机上现场付），一个默认选中的「微信支付」等于暗示这一步会扣款，
+   所以那套样式随元素一起删掉，不留着等人复活。 */
+.state-block { display: flex; flex-direction: column; gap: 14rpx; }
+.state-t { font-size: var(--fs-md); font-weight: 650; color: var(--ink, #2c3e50); }
+.state-d {
+  margin-top: 8rpx;
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  color: var(--muted, #8d98a9);
 }
-
-/* 支付方式行是可点选项，实测 47px → min-height 96rpx(48px) */
-.payment-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 96rpx;
-  padding: 24rpx;
-  background: var(--bg, #f5f7fa);
-  border-radius: var(--r-sm, 8rpx);
-  border: 2rpx solid transparent;
-  transition: all 0.2s ease;
-}
-
-.payment-item.selected {
-  background: rgba(22, 119, 255, 0.05);
-  border-color: var(--teal, #1677ff);
-}
-
-.payment-item.disabled {
-  opacity: 0.5;
-}
-
-.payment-left {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.payment-radio {
-  width: 36rpx;
-  height: 36rpx;
-  border: 2rpx solid var(--border, #e5e8ed);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.payment-item.selected .payment-radio {
-  border-color: var(--teal, #1677ff);
-}
-
-.radio-inner {
-  width: 20rpx;
-  height: 20rpx;
-  background: var(--teal, #1677ff);
-  border-radius: 50%;
-  animation: radioIn 0.2s ease;
-}
-
-@keyframes radioIn {
-  0% { transform: scale(0); }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); }
-}
-
-.payment-left .ficon {
-  font-size: 36rpx;
-  color: var(--text-secondary, #5c6b7a);
-}
-
-.payment-name {
-  font-size: 28rpx;
-  color: var(--text, #2c3e50);
-}
-
-.payment-tip {
-  font-size: 24rpx;
-  color: var(--text-tertiary, #8d98a9);
-}
+.section-card .btn { min-height: 48px; margin-top: 16rpx; }
 
 /* 优惠券选择器 */
 .coupon-selector {
@@ -277,8 +212,12 @@
   color: var(--clay, #f06a3c);
 }
 
-/* 服务协议 */
+/* 服务协议。链接与勾选框是**两个独立可点区**（链接不在 label 里，否则点开协议
+   会顺手把同意勾上），所以这里用一行 flex 把它们排成视觉上的同一句话。 */
 .agreement-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   padding: 32rpx 24rpx;
 }
 
@@ -295,10 +234,20 @@
 }
 
 /* 协议链接实测 104x20：文字链补纵向内边距把可点区撑到 48px，视觉不变 */
-.agreement-label .link {
+.agreement-section .link {
   color: var(--teal, #1677ff);
   display: inline-block;
+  font-size: 26rpx;
   padding: 30rpx 6rpx;
+}
+
+/* 未勾协议时说清主按钮为什么是灰的（按钮 disabled 后 bindtap 不会触发，
+   没有这行提示用户只会反复去点一个不响应的按钮）。 */
+.agreement-hint {
+  margin: -16rpx 24rpx 8rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--warn, #b5643c);
 }
 
 /* 底部提交栏 */
@@ -358,4 +307,10 @@
 
 .submit-btn:active {
   transform: scale(0.98);
+}
+
+/* 报价未就绪时提交按钮必须明确不可点：此时下单一定被服务端拒绝。 */
+.submit-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
 }

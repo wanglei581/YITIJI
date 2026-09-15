@@ -97,6 +97,7 @@ function createMigrationSandbox(
   mkdirSync(migrationsRoot)
   for (const entry of readdirSync(sourceMigrationsRoot, { withFileTypes: true })) {
     if (entry.name === RETRY_HARDENING_MIGRATION || entry.name === DELIVERY_ACK_MIGRATION) continue
+    if (entry.isDirectory() && entry.name > RETRY_HARDENING_PREVIOUS_MIGRATION) continue
     cpSync(path.join(sourceMigrationsRoot, entry.name), path.join(migrationsRoot, entry.name), {
       recursive: entry.isDirectory(),
     })

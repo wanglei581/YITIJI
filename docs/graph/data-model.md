@@ -19,7 +19,7 @@ flowchart TD
   User["User<br/><small>26 字段</small>"]
   PrintTask["PrintTask<br/><small>22 字段</small>"]
   AgentReleaseTarget["AgentReleaseTarget<br/><small>10 字段</small>"]
-  Order["Order<br/><small>40 字段</small>"]
+  Order["Order<br/><small>42 字段</small>"]
   ActiveReleaseObservationAssignment["ActiveReleaseObservationAssignment<br/><small>7 字段</small>"]
   AgentReleasePlan["AgentReleasePlan<br/><small>18 字段</small>"]
   BenefitClaim["BenefitClaim<br/><small>8 字段</small>"]
@@ -120,7 +120,7 @@ flowchart TD
 | **OfflineAgencyProfile** | 19 | OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **OfflineJob** | 22 | Job、OfflineAgency | 1 个文件<br/>`offline-agencies/offline-agencies.service.ts` |
 | **OnlinePlatformDirectory** | 33 | FileObject、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
-| **Order** | 40 | OrderItem、PaymentAttempt、PrintTask、Refund | 19 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
+| **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 19 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 3 个文件<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`print-jobs/pickup-order.service.ts`<br/>`terminals/terminals-agent.service.ts` |
 | **Organization** | 26 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 16 个文件<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>`auth/partner-phone-rebind.service.ts`<br/>… |
 | **PaymentAttempt** | 13 | Order | 3 个文件<br/>`payment/online-payment.service.ts`<br/>`payment/reconciliation.service.ts`<br/>`payment/refund.service.ts` |
