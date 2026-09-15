@@ -2,7 +2,8 @@
 
 ## 2026-09-15 R3 候选后的唯一推进顺序（取代下面 R2 那一节）
 
-**当前总判定：扫描 R3 为 SOURCE / LOCAL GO；CI / DEVICE / PRODUCTION / COMMERCIAL 全部 NO-GO。**
+**当前总判定：扫描 R3 的运行时代码与图谱证据锚点 `fd7641644` 已达到 SOURCE / LOCAL / CI GO；
+DEVICE / PRODUCTION / COMMERCIAL 全部 NO-GO。PR 尚未合并，文档同步产生的最终 head 仍须独立跑绿。**
 
 分支 `integration/scan-pickup-closeout-r3-20260915`，基线
 `origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`。R3 的功能实现证据锚点仍是**两个提交**：
@@ -10,19 +11,23 @@
 `089b5b9adca40b6a6f669d46705e3ec0acd92f3a`（Grok 主对抗审查发现的 P1 修复：出口所有权跨 `<AuthProvider key>` 重挂唯一、
 `contractReview` 透传失败 token、`fusion-w6-contract` 接入 CI）。
 前一 HEAD 是 `c866c4156746c772e2657c3c768b0f97a3bb8f35`（补记精确 SHA 的文档提交）。
-**7 个 `docs/graph/**` 生成漂移已用 `pnpm graph` 消除；新的最终 HEAD 由这一次图谱刷新提交产生，提交前不得伪写未知 SHA。推进只认那次提交落地后的精确 HEAD。**
+7 个 `docs/graph/**` 生成漂移已用 `pnpm graph` 消除，落地后的精确证据锚点是
+`fd764164439c979919c24e87b5a249ba63c57417`。
 
 口径更正，别再混用：
 
-- **PR #1036 与 CI run `34816672752` 只属于 R2**（分支
-  `integration/scan-pickup-closeout-r2-20260913`，实现锚点 `5ebf73c05`）。R3 的两个提交
-  **不在**那次 run 里，也不在任何 CI run 里 —— R3 至今**一次 CI 都没跑过**。
-- 因此不得用 #1036 的绿灯为 R3 背书，也不得把 R3 的本地绿写成「CI 通过」。
-- R2 的 `5ebf73c05` 是 R3 的祖先，R2 那一节的结论仍然有效，但**唯一推进路径以本节为准**。
+- R2 的 CI run `34816672752` / Windows installer run `34816673132` 仍只属于 R2 实现锚点
+  `5ebf73c05`，不得拿来为 R3 背书。
+- R3 自己的证据锚点 `fd7641644` 已在 PR #1036 上取得 CI run `34908123963` 三项必需检查全绿，
+  Windows installer run `34908124004` 的 EXE / MSI 两项检查也全绿；`release-bundle` 因非发布事件
+  按预期跳过。
+- 本次进度文档同步会产生一个只改文档的后继 commit。最终合并只认 GitHub 上 PR #1036 的实时
+  final head 及其对应检查，不得把 `fd7641644` 的绿灯自动继承给后继 SHA。
+- R2 的 `5ebf73c05` 是 R3 的祖先；后续唯一推进路径以本节为准。
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | 集成 / 仓库 | 把 R3 推上去并**首次**取得 CI 绿：以图谱刷新提交落地后的精确 HEAD 为 PR head 开 PR（或并入 #1036 后重新等 CI），三项必需检查与 Windows installer 检查全绿后再谈合并 | PR 最终 head 的必需检查全绿；head 必须等于图谱刷新提交落地后的精确 SHA（提交前未知，不得沿用 `089b5b9ad` / `c866c4156` 的本地绿当 CI 绿灯）；合入后以 `merge-base --is-ancestor` 证明进入 `origin/main` 并记录新的 main SHA |
+| 1 | 集成 / 仓库 | **当前只剩最终 head CI 与合并**：把本次两份进度文档同步推到现有 PR #1036，不新开 PR；等待文档后继 SHA 的三项必需 CI 与 Windows installer 检查全绿后合入 | PR final head 的必需检查全绿且无未处理 P0 / P1；合入后 fetch `origin/main`，以 `merge-base --is-ancestor <PR-final-head> origin/main` 证明进入主线并记录新的 main SHA；不得沿用 `fd7641644` 的绿灯给后继 SHA 背书 |
 | 2 | Windows / 奔图专用任务 | 在合入后的精确 SHA 上完成面板扫描、真实出纸、扫码枪、断网重连、Agent 重启、长驻 watcher 与连续多用户操作 | 记录任务/订单/文件 hash/状态回传/临时文件删除；重点证明旧文件不交给后来的用户，以及「401 过期 + 弱网」时下一位在面板上扫出来的文件不会投给上一位 |
 | 3 | Claude + 四端 | 从合入后的干净 `origin/main` 推进，不与 R3 候选混合；Claude 独占前端写入 | 同下面 R2 那一节第 3 项，口径不变 |
 | 4 | 运维 / 生产 | 具名维护窗口按精确 SHA 完成备份、迁移、部署、监控、回滚 | 同下面 R2 那一节第 4 项，口径不变 |
@@ -37,8 +42,8 @@ R3 已知遗留（不阻塞第 1 项，但要登记）：
   做的话只允许低风险复用 `KioskClearingOverlay`，且必须先确定谁赢那次导航。
 - **已关闭：7 个图谱漂移。** 前一 HEAD `c866c4156746c772e2657c3c768b0f97a3bb8f35` 上
   `pnpm graph:check` 红（7 个 `docs/graph/**` 产物内容不一致）。本轮 `pnpm graph` 重跑生成，
-  未手改产物。新最终 HEAD 由该图谱刷新提交产生，提交前未知；R3 仍未 push，新 SHA 尚未跑过
-  任何 CI。`graph:check` 未接入任何 CI workflow。DEVICE / PRODUCTION / COMMERCIAL 仍全部 NO-GO。
+  未手改产物，落地锚点为 `fd7641644`，已推到 PR #1036 并取得上述两组 CI 全绿。
+  `graph:check` 未接入任何 CI workflow。DEVICE / PRODUCTION / COMMERCIAL 仍全部 NO-GO。
 
 ## 2026-09-14 R2 候选后的唯一推进顺序
 

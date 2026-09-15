@@ -1,5 +1,30 @@
 # 当前开发进度
 
+2026-09-15 **扫描 R3 已取得软件证据锚点的 SOURCE / LOCAL / CI GO；仍未合并、未做真机与生产，
+商业总判定继续 NO-GO。** 隔离分支 `integration/scan-pickup-closeout-r3-20260915` 基于
+`origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，运行时代码与图谱证据锚点为
+`fd764164439c979919c24e87b5a249ba63c57417`。该 SHA 已推送到唯一集成入口 PR #1036；
+2026-09-15 复核时 PR 为 `OPEN / MERGEABLE`，head 正是 `fd7641644`，没有另开 PR。
+
+精确 SHA 的 GitHub 证据：CI run `34908123963` 中 `build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke` 全部成功，`release-bundle` 因非发布事件按预期跳过；Windows installer run
+`34908124004` 中 `unsigned-exe-upgrade` 与 `unsigned-msi-candidate` 全部成功。Windows installer CI
+只证明安装包构建，不是真实 Windows / 奔图验收。冻结运行时代码的 Grok、Claude、Agy 审查均未发现
+新的 P0 / P1；Agy 新账号又以 `gemini-3.8-flash-high` 对 `fd7641644` 完成独立只读复核，结论为
+软件层 GO、治理文档待同步、真机 / 生产 / 商业 NO-GO。
+
+本条只同步 `docs/progress/current-progress.md` 与 `docs/progress/next-tasks.md`，不会改变上述运行时代码。
+这次文档同步本身会产生一个后继 commit，因此**合并前仍必须以 GitHub 上 PR #1036 的实时最终 head
+为准，等待该最终 head 的必需 CI 与 Windows installer 检查重新全绿**；不得直接把 `fd7641644` 的
+历史绿灯写成任意后继 SHA 的绿灯。合入后还必须 fetch `origin/main` 并用
+`git merge-base --is-ancestor <PR-final-head> origin/main` 留下进入主线的证据。
+
+**未做 / 仍是 NO-GO**：PR 尚未合入 `main`，未部署生产，未执行当前候选的 Windows 一体机、
+奔图 CM2800、扫码枪与多用户连续真机验收；小程序材料包订单列表 / 到机码找回仍未接通；真实支付、
+对象存储生产回环、内容授权冷启动、微信提审与客户 UAT 均未完成。当前分层结论为
+`SOURCE: GO / LOCAL: GO / CI(fd7641644): GO / DEVICE: NO-GO / PRODUCTION: NO-GO /
+COMMERCIAL: NO-GO`。401 出口等待遮罩仍为已登记 P2，不阻塞本次软件集成。
+
 2026-09-15 **R3 图谱漂移收口（分支 `integration/scan-pickup-closeout-r3-20260915`，基线
 `origin/main@fea6f3705`）**。仅改 `docs/graph/**` 七个生成产物与本文件 / `next-tasks.md`。
 用仓库标准命令 `pnpm graph` 重跑生成，未手改产物。未触碰 `apps/**`、`services/**`、
