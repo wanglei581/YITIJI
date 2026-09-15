@@ -229,6 +229,34 @@ Page({
   },
 
   /**
+   * 这条**成功**响应的归属说得清吗 —— 它属于当前还在看这一页的这位吗。
+   *
+   * `'ok'`：说得清。`_resolveIdentity` 已经把"换成了别人"挡在外面了。
+   *
+   * `'resignable'`：**也说得清，而且必须放行。** 这是一条真实且高频的路径：请求在
+   * `'ok'` 状态下带着 A 的登录态发出去 → 服务端按 requireOwned 校验过归属、返回 200 →
+   * 而就在响应回来的路上，A 的 enduser JWT（只签 30 分钟）自然到点。没有任何人登出，
+   * 服务端那张码也还是好的，可上一版在这里只认 `state === 'ok'`，于是把这条**刚刚被
+   * 服务端确认过属于 A** 的响应当成"身份说不清"，当场清掉屏幕上那张码、写一句
+   * 「请登录」。用户站在一体机前，手里的码没了，而它其实一直有效。
+   *
+   * 放行的前提是归属**证得出来**，不是"过期就放行"：
+   *   ① 快照仍然是一个确定的会员键（`'u:<id>'`）—— `resolveAccountState` 只在
+   *      「没有主动登出、补签资格还在」时才把它原样留住；
+   *   ② 它就是**开这一页的那位**（`_openerAccount`）—— 本页的 orderId 属于他；
+   *   ③ 它就是**发出这一发请求的那位**（`requestAccount`）—— 响应确实是他要来的。
+   * 三条里少一条就 fail-closed。`'changed'` / `'unusable'` 与 401 一律不走这里。
+   */
+  _ownsResponse(state, requestAccount) {
+    if (state === 'ok') return true
+    if (state !== 'resignable') return false
+    const account = this._account
+    if (!isMemberIdentity(account)) return false
+    if (isMemberIdentity(this._openerAccount) && account !== this._openerAccount) return false
+    return account === requestAccount
+  },
+
+  /**
    * 把凭证与它的一切派生物清零。
    *
    * `expiresAt` / `countdown` 必须跟着清：留着它们，下一次 `_resumeVisibleWork()`
@@ -272,9 +300,25 @@ Page({
 
   onShow() {
     this._visible = true
+    // 每一次回到前台都交给 `_refreshOrder`，由它**先判身份再决定要不要发请求**
+    //（顺序见那里的长注释）。没有 orderId 时它原地返回：那一页从来没显示过任何本人数据。
     if (this.data.orderId) this._refreshOrder(false)
   },
 
+  /**
+   * 切后台。**不清凭证**，只停掉定时器。
+   *
+   * 这一条是权衡过的，不是漏掉的：
+   *   - 清掉的收益几乎为零。页面不可见的这段时间里没有人能看到那张码；而"看得见"的
+   *     那一刻（回前台）`onShow` 的第一件事就是 `_refreshOrder` → `_resolveIdentity`，
+   *     换人 / 登出会在同一个同步调用里把码清掉，根本轮不到渲染出来给下一位看。
+   *   - 清掉的代价是实打实的能力退化。用户正站在一体机前，切出去看一眼短信验证码、
+   *     接个电话、被系统切走 —— 回来时那张码没了，要等一次网络往返才重新出现，
+   *     而这条链最关键的场景恰恰就是"人已经在机器前了"。
+   *
+   * 凭证的新鲜度另有一道防线（`CODE_TRUST_WINDOW_MS`）：后台停留久了，
+   * `_codeConfirmedAt` 自然变旧，回来第一次轮询失败就会撤码并说清原因。
+   */
   onHide() {
     this._visible = false
     this._stopTimers()
@@ -286,11 +330,24 @@ Page({
   },
 
   _refreshOrder(initial) {
-    if (!this.data.orderId || this._polling) return
+    if (!this.data.orderId) return
+    // **身份判定必须排在"已经有一发在飞"的早退之前。**
+    //
+    // 反过来（上一版）会留下一个只靠网络快慢决定长短的暴露窗口：A 的码已经画在屏幕上、
+    // 一发轮询正在飞（`_polling === true`），此时 A 登出、B 登录、回到本页 ——
+    // `onShow` 调进来，第一行就因为 `_polling` 直接 return，于是身份**根本没被判过**：
+    // 清场没发生、码原样留在屏幕上，一直留到那发请求自己落定为止。而"自己落定"什么时候
+    // 发生是网络说了算：慢响应、弱网重试、服务端卡住，都能把这个窗口拉到几十秒以上，
+    // 而这几十秒里屏幕上挂着的是**上一位的取件凭证**，就在共用设备的下一位面前。
+    //
+    // 判完再早退：'changed' / 'unusable' 两支都会把码清干净，'ok' / 'resignable'
+    // 才轮到"已经有一发在飞就不重复发"这条纯粹的去重逻辑。
     const identityState = this._resolveIdentity()
     // 'changed' 时 _resolveIdentity 已经清场并写好了说明，不要再覆盖它。
     if (identityState === 'changed') return
     if (identityState === 'unusable') { this._failClosedForIdentity(); return }
+    // 身份没问题，但这一格已经有一发在飞：不重复打，等它回来。
+    if (this._polling) return
     // 'ok' 与 'resignable' 都真的发请求。
     //
     // 'resignable' 这一条是本轮的关键：本地 token 已经自然过期（enduser JWT 只签 30 分钟），
@@ -299,6 +356,9 @@ Page({
     // 变成一页永远转不完的 loading；而这恰好是取件这条链最关键的一刻
     //（中午下单、下午走到一体机前打开取件页，命中的就是这一条）。
     this._polling = true
+    // 这一发是**带着谁的登录态**发出去的。绑在局部变量上，过期清不掉它 ——
+    // 回调那一刻再去读身份，读到的可能是一个已经被 clearSession 清空的会话。
+    const requestAccount = this._account
     if (initial) this.setData({ state: 'loading', errorMsg: '' })
     else this.setData({ refreshing: true })
 
@@ -309,9 +369,9 @@ Page({
         // 换人 / 登出可以完全不经过 onHide。
         const state = this._resolveIdentity()
         if (state === 'changed') return
-        // 请求成功但身份仍然说不清（补签后会话缺 id，或补签资格已被撤销）：
-        // 不显示任何码。宁可多一次登录，不可把一张凭证显示给一个认不出来的会话。
-        if (state !== 'ok') { this._failClosedForIdentity(); return }
+        // 请求成功但归属说不清：不显示任何码。
+        // 宁可多一次登录，不可把一张凭证显示给一个认不出来的会话。
+        if (!this._ownsResponse(state, requestAccount)) { this._failClosedForIdentity(); return }
         // 走到这里身份要么全程没变，要么是"不可用 → 本人"这一种升级
         //（补签成功后重发拿回来的响应，就是当前这位的）。两种都可以写。
         if (!this._visible || !order) return

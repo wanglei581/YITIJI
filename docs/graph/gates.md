@@ -2208,7 +2208,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/member-notifications/admin-member-notifications.controller.ts` | `verify-feedback-notifications.ts` |
 | `services/api/src/member-notifications/member-notifications.controller.ts` | `verify-feedback-notifications.ts` |
 | `services/api/src/member-notifications/member-notifications.service.ts` | `verify-feedback-notifications.ts` |
-| `services/api/src/member-print-orders/member-print-order-create.service.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-print-color-duplex-capability.ts` |
+| `services/api/src/member-print-orders/member-print-order-create.service.ts` | `verify-package-chain.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-print-color-duplex-capability.ts` |
 | `services/api/src/member-print-orders/member-print-orders.controller.ts` | `verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-miniapp-cloud-print-m2.ts` |
 | `services/api/src/member-print-orders/member-print-orders.service.ts` | `verify-profile-print-orders-inkpaper.mjs`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-order.ts` |
 | `services/api/src/member-print-orders/member-print-orders.types.ts` | `verify-profile-print-orders-inkpaper.mjs` |

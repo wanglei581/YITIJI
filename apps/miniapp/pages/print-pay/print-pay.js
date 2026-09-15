@@ -189,14 +189,18 @@ Page({
    *   - 终态（取消 / 过期 / 完成 / 失败 / 终止，或 requireOwned 明确查不到这张订单）
    *     → 允许重新下一单，但**必须由用户自己点**那个按钮（startNewOrder）。
    *     页面不自动换键：那等于替用户做了一次下单决定，而他可能只是想找回原来那张。
-   *   - 活着 → 继续锁着，指路「我的 · 打印订单」。
+   *   - 活着 → 继续锁着，指路「我的 · 打印订单」。**这一条结论不缓存**：见下面
+   *     `_verifiedOrderId` 的写入时机。
    *   - 查不出来（网络失败 / 401 / 5xx）→ **继续锁着**。查询失败证明不了任何事，
    *     而这里只要放开一格，代价就是同一份材料的第二张订单、第二笔钱。
    *     更不许因为"查不到"就铸一个新键 —— 那会让服务端连回放的机会都没有。
    */
   _verifyCreatedOrder(orderId) {
     if (!orderId) return
-    // 同一张订单只核一次：onShow 每次都会调 _restoreCreatedOrder。
+    // 两道去重，管的是两件不同的事：
+    //   `_verifiedOrderId` —— 已经拿到**终态**结论，不必再问（终态不可逆）。
+    //   `_verifyingOrderId` —— 这张订单已经有一发在飞，onShow 连着触发两次也只打一发。
+    // 'live' / 'unknown' 都不进 `_verifiedOrderId`：它们是会变的结论。
     if (this._verifiedOrderId === orderId || this._verifyingOrderId === orderId) return
     this._verifyingOrderId = orderId
     const token = this._guard.issue('restore', { orderId })
@@ -209,9 +213,11 @@ Page({
       .then((order) => {
         if (!this._accepts(token) || this._createdOrderId !== orderId) return
         this._verifyingOrderId = ''
-        this._verifiedOrderId = orderId
         const reason = terminalReasonOf(order)
         if (reason) {
+          // **终态才缓存。** 取消 / 过期 / 完成 / 失败 / 终止都是不可逆的：再问一百次
+          // 服务端也是同一个答案，缓存它只省请求，不会让页面停在一个过期的结论上。
+          this._verifiedOrderId = orderId
           this.setData({
             createdState: 'terminal',
             createdNotice: `${reason}，这一组参数可以重新下一单。原来那张仍可在「我的 · 打印订单」里查看。`,
@@ -219,6 +225,13 @@ Page({
           })
           return
         }
+        // **「还活着」不缓存。** 上一版在分类之前就把 `_verifiedOrderId` 写死了，于是
+        // 'live' 也被当成一个永久结论：用户照着提示去「我的 · 打印订单」把那张订单取消
+        // （或它的到机码在这期间过期了），再回到本页 —— `_verifyCreatedOrder` 第一行
+        // 就因为 `_verifiedOrderId === orderId` 原地返回，页面永远停在「这张订单还在」，
+        // 那一组参数于是被一张早已作废的订单锁死到本机记录过期（7 天）为止。
+        // "活着"本来就是一个会到期的结论，只能每次回到本页重新问一遍。
+        // 重复请求由 `_verifyingOrderId` 挡（同一张订单在途时不再打第二发）。
         this.setData({
           createdState: 'live',
           createdNotice: '这张订单还在，到「我的 · 打印订单」就能找回它，点进去即是到机码。',
@@ -262,11 +275,27 @@ Page({
    * 做的事只有一件：把本机那条恢复记录丢掉，于是下一次 continueFlow 会铸一个新的
    * 幂等键 —— 服务端因此认得出这是一次**新的下单意图**，而不是上一次的重试。
    * 顺序不能反：记录还在就换键 = 同键不同参数的 409，或者干脆两条记录对不上。
+   *
+   * **而"丢掉了"必须由 clearRecord 读回来证明，不能假设。** 上一版无论清没清掉都照常
+   * 解锁：存储写不进去（存满 / 被系统回收 / 被隐私策略拦截）时那条记录原样还在，
+   * 于是下一次 continueFlow 的 `ensureKey` 命中它、复用那个**旧键** —— 服务端按
+   * `(endUserId, key)` 回放的正是那张早已取消 / 过期的订单。用户面对的是一个能按的
+   * 按钮、一句「订单已创建」，而他要的那份材料永远打不出来。清不掉就保持锁定，
+   * 并且把"为什么"和"能做什么"一起写在屏幕上。
    */
   startNewOrder() {
     if (this.data.createdState !== 'terminal' || !this.data.createdCanReorder) return
     if (this._resolveAccount() !== 'ok') return
-    idem.clearRecord(this._account, idem.fingerprintOf(this._orderPayload()))
+    if (!idem.clearRecord(this._account, idem.fingerprintOf(this._orderPayload()))) {
+      // 保持锁定、保留旧键、一个 POST 都不发。按钮留着（createdCanReorder 不动），
+      // 因为"再点一次"正是这条错误对应的可执行下一步 —— 存储压力常常是一过性的。
+      this.setData({
+        createdNotice: '本机没能清掉上一张订单的记录（手机存储可能已满或被系统清理），'
+          + '为避免重复下单，这一步先锁着。请清理一些存储空间后再点一次「重新下单」；'
+          + '原来那张订单仍可在「我的 · 打印订单」里查看。',
+      })
+      return
+    }
     this._createdOrderId = null
     this._createAttempt = null
     this._verifyingOrderId = ''
@@ -545,7 +574,7 @@ Page({
    * 所以一旦拿到 orderId，本页就不再是一个可以下单的页面 —— 按钮变灰，
    * 并把恢复动作指向「我的 · 打印订单」，那里能找回这张订单、点进去就是到机码页。
    */
-  _lockAfterCreated(orderId) {
+  _lockAfterCreated(orderId, notice) {
     // 模板里那个「提交」是一个加了 disabled **样式**的 view —— bindtap 照样会触发，
     // 于是 continueFlow 会把这里当作"已建过单"的出口再走一遍。这一路进来时页面对那张
     // 订单可能已经有结论了（'terminal' / 'unknown' / 还在 'checking'），无条件写成
@@ -553,7 +582,7 @@ Page({
     // 一起消失（用户点一下反而把自己唯一的出口点没了），'checking' 则被伪造成一个
     // 我们还没拿到的结论。
     // 只有一种情况该写 'live'：这一次是刚刚才建成的 —— 此前没有任何结论，createdState 为空。
-    const justCreated = this.data.createdState === ''
+    const justCreated = this.data.createdState === '' || !!notice
     this._createdOrderId = orderId
     if (this._createAttempt) this._createAttempt.settled = true
     this._releaseLoading(this._createAttempt)
@@ -567,7 +596,8 @@ Page({
       submitting: false,
       createdLocked: true,
       createdState: 'live',
-      createdNotice: '到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。',
+      createdNotice: notice
+        || '到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。',
       createdCanReorder: false,
     })
   },
@@ -636,7 +666,11 @@ Page({
       // 服务端那张订单已经建成，A 手上却一条线索都没有，A 重新登录回来只会再提交一次。
       // 服务端回放一张已 cancelled / expired 的原单时也走这里：orderId 是什么就记什么，
       // 本页不自己判断该不该换个新键（那等于伪造一次"重新下单"）。
-      if (orderId) idem.rememberOrderId(attempt.account, fingerprint, attempt.key, orderId)
+      // **落盘失败必须当真。** rememberOrderId 写完会把 orderId 一起读回来核对，
+      // 核不上就返回 null —— 那时服务端那张订单是真的（它刚刚把 orderId 给了我们），
+      // 而本机已经指不回它了。处置见下面 `recoveryUnsaved` 那一支。
+      const recoveryUnsaved = !!orderId
+        && !idem.rememberOrderId(attempt.account, fingerprint, attempt.key, orderId)
       // 归属判定必须排在 hideLoading **之前**：hideLoading 无条件掀掉当前那张遮罩，
       // A 的迟到回调一旦先调它，掀掉的就是 B 正在进行的那次提交的遮罩。
       if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) {
@@ -651,12 +685,36 @@ Page({
       // 不设锁的话用户只会以为没下成，然后再点一次，于是多出一张订单和一笔钱。
       this._createdOrderId = orderId
       attempt.settled = true
+      if (recoveryUnsaved) {
+        // orderId 没能落进本机恢复记录。**这一支不跳转**，而且不解锁、不重试。
+        //
+        // 为什么不跳：跳转成功的回调会 `clearRecord` 把整条记录清掉 —— 而此刻那条记录
+        // 里剩下的正是**唯一还有用的东西**：那个幂等键（`orderId` 是 `''`，键还在）。
+        // 清掉它，用户下次带着同一组参数回到本页时会铸一个新键，服务端于是再建一张订单、
+        // 再扣一笔。留在本页并保持锁定，那个键就还在：真要再提交，也是同键回放同一张单。
+        //
+        // 为什么不解锁、不重试：订单在服务端已经建成了。重试一次 POST 最好的结果也只是
+        // 回放同一张单，而解锁等于告诉用户"没下成"—— 他会以为要重来。
+        // 能给的唯一真实出口是「我的 · 打印订单」：那张订单在那里，点进去就是到机码。
+        this._lockAfterCreated(orderId,
+          '订单已经建成，但这台手机没能把它记下来（存储可能已满或被系统清理），'
+          + '所以没有自动跳转到机码页。请到「我的 · 打印订单」找回这张订单，点进去即是到机码；'
+          + '不要重复提交。')
+        return
+      }
       // 只把 orderId 交给下一页。到机码 / 金额 / 有效期 / 订单号 / 任务状态一律由
       // print-pickup 自己带登录态向 GET /me/print-orders/:orderId 取（requireOwned 归属校验）。
       wx.redirectTo({
         url: '/pages/print-pickup/print-pickup?orderId=' + encodeURIComponent(orderId),
         // **确实跳走了才清恢复记录。** 拿到 200 就清的话，跳转失败会把唯一能找回
         // 这张订单的线索一起丢掉，而页面还留在原地 —— 用户只会再点一次。
+        //
+        // 这一处**刻意不看 clearRecord 的返回值**（它是布尔，见那里的说明）：
+        // 到这一行页面已经在跳走了，本页的 data 不会再被渲染，写任何错误态都只是写给
+        // 一个看不见的页面。而清不掉的后果也已经被别处兜住：那条记录里的 orderId 指向
+        // 的是这张真实存在的订单，用户带同一组参数回来时会被 `_restoreCreatedOrder`
+        // 锁住并向服务端核一次状态 —— 终态就给「重新下单」，活着就指路去找它。
+        // 换句话说这一步失败只多一次核对，不会多一张订单，所以是 best effort。
         success: () => idem.clearRecord(attempt.account, fingerprint),
         fail: () => this._lockAfterCreated(orderId),
       })

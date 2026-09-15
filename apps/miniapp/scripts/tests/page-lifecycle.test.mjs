@@ -3189,10 +3189,13 @@ test('R7-3 淘汰不得挤掉"已经 POST 出去、还没落定"的那条记录'
   const still = idem.findRecord('u:A', print)
   assert.ok(still, '在飞的那条记录被淘汰掉了 —— 响应一丢，下一次提交就是第二张订单')
   assert.equal(still.key, flying.key)
-  // 但存储仍然有界：没被钉住的那批照样只留 MAX_RECORDS 条。
+  // 但存储仍然有界：**已落定**的那一档（有 orderId）照样只留 MAX_SETTLED_RECORDS 条。
+  // 未落定的那一档一条都不淘汰，它的上界由 ensureKey 在入口处 fail-closed 兜住（R8-6）。
   const kept = wx.storage.get(idem.STORE_KEY)
-  assert.ok(kept.length <= idem.MAX_RECORDS + 1, `存储必须有界，实际留了 ${kept.length} 条`)
-  assert.ok(kept.length >= idem.MAX_RECORDS, `不该把该留的也丢了，实际只留了 ${kept.length} 条`)
+  const settled = kept.filter((r) => r.orderId)
+  const pending = kept.filter((r) => !r.orderId)
+  assert.equal(settled.length, idem.MAX_SETTLED_RECORDS, `已落定的那批必须有界，实际留了 ${settled.length} 条`)
+  assert.equal(pending.length, 1, `未落定的那一条必须原样留着，实际 ${pending.length} 条`)
 })
 
 test('R7-4 wx.getRandomValues 不存在 / 回 fail / 字节不足：都干净失败，零 POST', async () => {
@@ -3480,4 +3483,363 @@ test('R7-6 核对在途时换了人：结论不得落到 B 头上，B 的页面�
   assert.equal(page.data.createdState, '', 'A 的迟到结论一个字都不许写进 B 的页面')
   assert.equal(page.data.createdCanReorder, false, '更不得给 B 一个「重新下单」按钮')
   assert.equal(creates.length, 0)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// R8. 幂等/凭证链的复审：上一轮"修好了"的六件事，各自还差最后一步
+//
+// R7 修的是"键在不在、锁对不对"。这一批修的是它们各自被绕过的那条路 ——
+// 每一条都不是理论上的，都是把上一轮的代码原样跑一遍就能复现的：
+//   A 取件页 onShow 在判身份**之前**就因为"已经有一发在飞"early-return，
+//     于是 A 的码留在屏幕上，一直留到那发请求自己落定（多久由网络决定）；
+//   B 请求合法发出之后 JWT 才自然到点，成功分支只认 'ok'，把一张服务端仍然认的码清掉；
+//   C clearRecord 不读回、不返回，调用方照着"清掉了"解锁 —— 而它可能一个字节都没写；
+//   D 淘汰保护挂在**内存**里的钉子上，小程序被杀掉重进之后一条都不剩；
+//   E 'live' 被缓存成永久结论，用户去把订单取消了再回来，页面永远说"它还在"；
+//   F 设备时钟往回拨，自己刚写的记录落在"未来"被整条丢掉 → 新键 → 第二张订单。
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * 重新 require 一份幂等模块 —— 模拟**小程序被杀掉重进**。
+ *
+ * 这是 R8-5 的全部要害：新实例的 `minting` 是空的、内存里任何"钉子"也都不在了。
+ * 于是"那条未落定的记录还受不受保护"这件事，只能由**已经落盘的数据本身**回答。
+ */
+function freshIdem() {
+  const resolved = requireMiniapp.resolve('../utils/print-order-idempotency.js')
+  delete requireMiniapp.cache[resolved]
+  return requireMiniapp(resolved)
+}
+
+const fakeKey = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`
+
+test('R8-A 取件页：码已显示 + 轮询在飞 → A 登出 → B 登录 → onShow：码当场清掉，零 B 请求', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+  assert.equal(page.data.codeRaw, '12345678', '前提：A 的码确实画在屏幕上了')
+
+  // 轮询真的打出去一发，并且**停在半路**（服务端慢 / 弱网 / 卡住）。
+  firePoll(page)
+  assert.equal(pending.length, 2, '前提：有一发 A 的请求正在飞')
+  const inflight = pending.length
+
+  // 共用设备上的真实一跳：A 登出、B 登录、回到本页。全程没有任何 onHide。
+  realAuth.logout()
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  page.onShow()
+
+  // 这一刻屏幕上就必须是干净的。**不能等那发请求落定**：什么时候落定是网络说了算，
+  // 而这段时间里 B 正拿着手机看着 A 的取件凭证。
+  assert.equal(page.data.codeRaw, '', 'A 的码必须在 onShow 当场清掉，不能等在飞的请求回来')
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.expiresAt, 0, '有效期跟着码一起清（留着就是替一张不显示的码宣称"还有效"）')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'), '整份 data 里一个字节的码都不许留')
+  assert.equal(page.data.state, 'error')
+  assert.equal(page.data.errorAction, 'orders', 'B 的落点是「我的 · 打印订单」，不是「去登录」')
+  assert.equal(pending.length, inflight, 'B 的登录态一个请求都不许发（服务端 requireOwned 会 404，但请求已经代表 B 发出去了）')
+
+  // 迟到的 A 响应不得把码复活。
+  pending[inflight - 1].resolve(PICKUP_ORDER)
+  await flush()
+  assert.equal(page.data.codeRaw, '', '迟到的 A 响应不得把码写回来')
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.state, 'error')
+  assert.equal(pending.length, inflight, '迟到的响应也不许触发新一轮轮询')
+})
+
+test('R8-B 取件页：请求发出后、200 回来前 JWT 自然到点 —— 这条响应仍是本人的，码不得被清', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  assert.equal(pending.length, 1, '前提：这一发是带着 A 的登录态、在 A 还没过期时发出去的')
+
+  // 请求在飞的这段时间里 enduser JWT（只签 30 分钟）自然到点。**没有任何人登出**，
+  // 服务端那张码也还是好的 —— 它刚刚按 A 的归属校验放行了这条响应。
+  expireNaturally(wx)
+
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+  assert.equal(page.data.state, 'ready')
+  assert.equal(page.data.codeRaw, '12345678', '服务端刚刚确认过这条响应属于 A，不能反手把码清掉')
+  assert.equal(page.data.showQr, true)
+  assert.notEqual(page.data.errorAction, 'login', '不得把一张服务端仍然认的码换成一句「请登录」')
+
+  // 但 fail-closed 的那几条一个都不许松：真的换了人仍然当场清场。
+  switchAccount('B')
+  page.onShow()
+  assert.equal(page.data.codeRaw, '', '「过期可放行」不得外溢成「换人也放行」')
+  assert.equal(page.data.errorAction, 'orders')
+})
+
+test('R8-B2 取件页：请求在飞时主动登出 —— 归属证不出来，码照样清掉（fail-closed 不松）', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  const pending = []
+  const api = { getCloudPrintOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  pending[0].resolve(PICKUP_ORDER)
+  await flush()
+  firePoll(page)
+  assert.equal(pending.length, 2)
+
+  realAuth.logout()          // 主动登出：补签资格一起撤销
+  pending[1].resolve(PICKUP_ORDER)
+  await flush()
+  assert.equal(page.data.codeRaw, '', '主动登出之后那张码不属于任何还在的会话')
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.errorAction, 'login')
+})
+
+test('R8-C 清不掉恢复记录：startNewOrder 保持锁定、保留旧键、零 POST，并说清下一步', async () => {
+  for (const [label, breakStorage] of [
+    ['set 抛异常（存储满）', (wx) => { wx.setStorageSync = () => { throw new Error('storage full') } }],
+    ['set 不抛也不写（被系统回收 / 隐私策略拦截）', (wx) => { wx.setStorageSync = () => {} }],
+  ]) {
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const { page, creates, lookups, idem, print, oldKey } = await payPageWithStoredOrder(wx, 'ord-old')
+    lookups[0].resolve({ id: 'ord-old', pickupStatus: 'cancelled', taskStatus: 'cancelled' })
+    await flush()
+    assert.equal(page.data.createdCanReorder, true, `${label}：前提是服务端已经证明它是终态`)
+
+    const realSet = wx.setStorageSync
+    breakStorage(wx)
+    const handler = handlerFor(payWxmlSrc(), 'wx:if="\\{\\{createdCanReorder\\}\\}"')
+    page[handler]()
+
+    assert.equal(page.data.createdLocked, true,
+      `${label}：记录没清掉就解锁 = 下一次提交复用旧键，服务端一遍遍回放那张已取消的订单`)
+    assert.equal(page.data.createdState, 'terminal', `${label}：结论不变`)
+    assert.ok(page.data.createdNotice.includes('存储'), `${label}：${page.data.createdNotice}`)
+    assert.ok(page.data.createdNotice.includes('重新下单'), `${label}：必须给出可执行的下一步`)
+
+    page.continueFlow()
+    await flush(); await flush()
+    assert.equal(creates.length, 0, `${label}：一个 POST 都不许发`)
+    const held = idem.findRecord('u:A', print)
+    assert.ok(held && held.key === oldKey, `${label}：旧键必须原样留着（丢了它服务端连回放的机会都没有）`)
+
+    // 存储恢复之后，同一个按钮必须真的能把锁解开 —— 这不是一条死路。
+    wx.setStorageSync = realSet
+    page[handler]()
+    assert.equal(page.data.createdLocked, false, `${label}：存储恢复后必须真的能重新下单`)
+    assert.equal(idem.findRecord('u:A', print), null, `${label}：这一次记录是真的清掉了`)
+  }
+})
+
+test('R8-C2 orderId 没能落进恢复记录：页面保持锁定并指路，不跳转、不解锁、不重试', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = requireMiniapp('../utils/print-order-idempotency.js')
+  const { page, creates, sentKeys } = payPage(wx)
+  page.onLoad(PAY_QUERY)
+  await flush()
+  page.continueFlow()
+  await flush(); await flush()
+  assert.equal(creates.length, 1, '前提：键落住了，POST 真的发出去了')
+  const mintedKey = sentKeys[0]
+
+  // 200 回来这一刻本机已经写不进去了（不抛异常，也不真的写进去）。
+  wx.setStorageSync = () => {}
+  creates[0].resolve({ id: 'ord-new' })
+  await flush()
+
+  assert.equal(wx.calls.redirectTo.length, 0,
+    'orderId 没落住还跳走 = 跳转成功回调 clearRecord 把仅剩的那个键也清掉，回来就是第二张订单')
+  assert.equal(page.data.createdLocked, true)
+  assert.equal(page.data.submitting, false, '不得把用户留在「正在提交…」里')
+  assert.ok(page.data.createdNotice.includes('打印订单'), page.data.createdNotice)
+  assert.ok(page.data.createdNotice.includes('不要重复提交'), page.data.createdNotice)
+
+  page.continueFlow()
+  await flush(); await flush()
+  assert.equal(creates.length, 1, '不得重试 POST（订单在服务端已经建成了）')
+
+  // 键必须还在：真要再提交，也只能是同键回放同一张单。
+  const held = idem.findRecord('u:A', idem.fingerprintOf(PAY_PAYLOAD))
+  assert.ok(held && held.key === mintedKey, '那个键是唯一还能指回这张订单的东西，不许丢')
+})
+
+test('R8-D 小程序被杀掉重进：未落定的那条记录仍然受保护（钉子在内存里，重进就没了）', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = requireMiniapp('../utils/print-order-idempotency.js')
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  const flying = await idem.ensureKey('u:A', print)   // 这一条的 POST 正在飞，还没拿到 orderId
+
+  // 杀掉重进：模块换一份新的，内存里的 minting / 钉子全是空的。
+  const reloaded = freshIdem()
+  assert.notEqual(reloaded, idem, '前提：确实拿到了一份全新的模块实例')
+
+  // 重进之后又发生了一批**已经落定**的下单（改份数、换终端、别的文件）。
+  const now = Date.now()
+  const rows = wx.storage.get(idem.STORE_KEY).map((r) => Object.assign({}, r, { createdAt: now - 60000 }))
+  for (let i = 0; i < 40; i += 1) {
+    rows.push({ account: 'u:A', fingerprint: `done-${i}`, key: fakeKey(i), orderId: `ord-${i}`, createdAt: now - i })
+  }
+  wx.storage.set(idem.STORE_KEY, rows)
+  reloaded.rememberOrderId('u:A', 'done-0', fakeKey(0), 'ord-0')   // 任何一次写入都会走一遍淘汰
+
+  const still = reloaded.findRecord('u:A', print)
+  assert.ok(still, '重进之后那条未落定的记录被挤掉了 —— 响应一丢，下一次提交就是第二张订单')
+  assert.equal(still.key, flying.key, '而且必须是同一个键')
+
+  const kept = wx.storage.get(idem.STORE_KEY)
+  assert.equal(kept.filter((r) => r.orderId).length, reloaded.MAX_SETTLED_RECORDS,
+    '已落定的那一档照样有界（它丢了最多多一张订单，不像未落定那档会多一张且无从判断）')
+  assert.equal(kept.filter((r) => !r.orderId).length, 1, '未落定的那一条一直在')
+})
+
+test('R8-D2 未落定的名额用尽：拒绝铸新键（fail-closed），一条既有记录都不删', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const now = Date.now()
+  const rows = []
+  for (let i = 0; i < idem.MAX_PENDING_RECORDS; i += 1) {
+    rows.push({ account: 'u:A', fingerprint: `flying-${i}`, key: fakeKey(i), orderId: '', createdAt: now - i })
+  }
+  wx.storage.set(idem.STORE_KEY, rows)
+  const randomsBefore = wx.calls.getRandomValues.length
+
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  await assert.rejects(() => idem.ensureKey('u:A', print), /没有落定/,
+    '名额满了就必须拒绝，而不是挤掉一条在飞的记录')
+  assert.equal(wx.calls.getRandomValues.length, randomsBefore, '拒绝要发生在铸键之前，不必白取一次随机数')
+
+  const after = wx.storage.get(idem.STORE_KEY)
+  assert.equal(after.length, rows.length, '拒绝的代价是用户重试一次；挤掉的代价是第二张订单、第二笔钱')
+  for (let i = 0; i < idem.MAX_PENDING_RECORDS; i += 1) {
+    assert.equal(idem.findRecord('u:A', `flying-${i}`).key, fakeKey(i), `flying-${i} 必须原样还在`)
+  }
+
+  // 名额满**不该把自己也挡住**：同一格已经有记录时照常复用它。
+  const reuse = await idem.ensureKey('u:A', 'flying-0')
+  assert.equal(reuse.key, fakeKey(0), '复用既有记录不占新名额，挡掉它等于把已经在飞的那一单也废了')
+})
+
+test('R8-E 恢复出来的订单当时还活着：回到本页必须重新核一次（它可能已经被取消 / 过期）', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const { page, lookups, creates } = await payPageWithStoredOrder(wx, 'ord-live')
+  lookups[0].resolve({ id: 'ord-live', pickupStatus: 'pending', taskStatus: 'pending' })
+  await flush()
+  assert.equal(page.data.createdState, 'live', '前提：这一刻它确实还活着')
+  assert.equal(page.data.createdCanReorder, false)
+
+  // 用户照着提示去「我的 · 打印订单」，把那张订单取消了，然后回到本页。
+  page.onShow()
+  assert.equal(lookups.length, 2, '「还活着」是一个会到期的结论，不能缓存成永久判定')
+  assert.equal(page.data.createdState, 'checking', '重新核的时候要如实说在核，不能继续显示上一次的结论')
+  lookups[1].resolve({ id: 'ord-live', pickupStatus: 'cancelled', taskStatus: 'cancelled' })
+  await flush()
+  assert.equal(page.data.createdState, 'terminal')
+  assert.equal(page.data.createdCanReorder, true, '服务端已经证明它作废了：必须给出一条重新下单的路')
+
+  // 终态可以缓存：它不会再变回活的。
+  page.onShow()
+  assert.equal(lookups.length, 2, '终态不必反复问服务端')
+  assert.equal(page.data.createdCanReorder, true)
+  assert.equal(creates.length, 0, '整个过程一个 POST 都不许发')
+})
+
+test('R8-E2 同一张订单在核的时候连着 onShow 两次：只打一发 GET', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const { page, lookups } = await payPageWithStoredOrder(wx, 'ord-live')
+  assert.equal(lookups.length, 1)
+  page.onShow()
+  page.onShow()
+  assert.equal(lookups.length, 1, '在飞时不得重复打（_verifyingOrderId 就是为这个在的）')
+  lookups[0].resolve({ id: 'ord-live', pickupStatus: 'pending', taskStatus: 'pending' })
+  await flush()
+  assert.equal(page.data.createdState, 'live')
+})
+
+test('R8-F 设备时钟往回拨：未来时间戳的记录仍然有效，不得因此铸第二个键', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const idem = freshIdem()
+  const print = idem.fingerprintOf(PAY_PAYLOAD)
+  const first = await idem.ensureKey('u:A', print)
+
+  // 时钟回跳（用户手动改时间 / NTP 回退 / 换运营商时间）：这台设备自己刚写下的那条
+  // 记录于是落在"未来"。它不是坏数据 —— 键是好的，服务端也认。
+  const future = wx.storage.get(idem.STORE_KEY).map((r) => Object.assign({}, r, { createdAt: Date.now() + 86400e3 }))
+  wx.storage.set(idem.STORE_KEY, future)
+  const randomsBefore = wx.calls.getRandomValues.length
+  const again = await idem.ensureKey('u:A', print)
+  assert.equal(again.key, first.key, '把"未来"当无效 = 铸一个新键 = 服务端按新键再建一张订单')
+  assert.equal(wx.calls.getRandomValues.length, randomsBefore, '连一次新的铸键都不该发生')
+
+  // 但形状不对的 createdAt 仍然一律作废：那不是时钟问题，是坏数据。
+  wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, { createdAt: Number.NaN })))
+  assert.equal(idem.findRecord('u:A', print), null, 'NaN 时间戳算不出任何可信结论，必须作废')
+  wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, { createdAt: '昨天' })))
+  assert.equal(idem.findRecord('u:A', print), null, '非数字时间戳同样作废')
+
+  // 真正过期的（7 天以上）照常淘汰 —— 放宽的只有未来那一侧。
+  wx.storage.set(idem.STORE_KEY, future.map((r) => Object.assign({}, r, { createdAt: Date.now() - idem.TTL_MS - 1000 })))
+  assert.equal(idem.findRecord('u:A', print), null, '真的过期了还是要过期')
+})
+
+test('R8-B3 取件页 _ownsResponse 的放行条件：三条缺一不可，其余一律 fail-closed', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  const api = { getCloudPrintOrder: () => deferred().promise }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  assert.equal(page._openerAccount, 'u:A', '前提：开这一页的是 A')
+  assert.equal(page._account, 'u:A')
+
+  // 这一条**直接测判定函数本身**，而不是绕着页面摆一个能触发它的状态。
+  // 理由：今天这几条里有两条在页面上暂时到不了 —— `_resolveIdentity` 的粘性 foreign
+  // 标记会先一步把换人那条路截掉。但那是**那个函数的实现细节**（一面内存里的旗子），
+  // 而"什么样的响应才配画到屏幕上"是**这个函数的契约**。只测得到的那条路，等于把契约
+  // 的正确性押在另一个函数的当前写法上：那边哪天被重构掉，这边就会静默地放行一张
+  // 不属于当前这位的取件凭证，而所有门禁全绿。所以契约自己钉自己。
+  assert.equal(page._ownsResponse('ok', 'u:A'), true, "'ok' 是确定的本人，直接放行")
+  assert.equal(page._ownsResponse('resignable', 'u:A'), true,
+    '同一位 A 在请求在途期间自然过期：服务端刚确认过这条响应属于他，必须放行')
+
+  assert.equal(page._ownsResponse('changed', 'u:A'), false, "'changed' 一律 fail-closed")
+  assert.equal(page._ownsResponse('unusable', 'u:A'), false, "'unusable' 一律 fail-closed")
+
+  assert.equal(page._ownsResponse('resignable', 'u:B'), false,
+    '这一发是别人的登录态发出去的，它的响应不属于屏幕上这位')
+
+  page._openerAccount = 'u:B'
+  assert.equal(page._ownsResponse('resignable', 'u:A'), false,
+    '开这一页、也就是这张 orderId 所属的那位，不是当前这位')
+
+  page._openerAccount = 'u:A'
+  page._account = ''
+  assert.equal(page._ownsResponse('resignable', ''), false,
+    '没有一个确定的会员键就证不出归属（宁可多一次登录，不可把凭证给一个认不出的会话）')
+  page._account = '!'
+  assert.equal(page._ownsResponse('resignable', '!'), false,
+    "登录着却拿不到会员 id（'!'）是所有无 id 会话共享的键，一律不算本人")
+
+  // **开页那位也认不出来**的那一种，单独钉一次。
+  // 它是真实形态：打开本页时本地 JWT 已经过期（快照为空、`_openerAccount` 从来没被写过），
+  // 请求照常带着补签资格发出去。此时"当前这位 === 发起那位 === 开页那位"三个条件
+  // 全部退化成 `'' === ''` —— 全都成立，而屏幕上其实一个能认出来的人都没有。
+  // 唯一挡得住的就是「快照必须是一个确定的会员键」那一条。
+  page._openerAccount = ''
+  page._account = ''
+  assert.equal(page._ownsResponse('resignable', ''), false,
+    '三个"相等"全是空串相等，证明不了任何归属；这一格必须靠"是不是会员键"挡住')
+  page._account = '!'
+  assert.equal(page._ownsResponse('resignable', '!'), false,
+    '无 id 会话同理：认不出人就不显示凭证')
 })

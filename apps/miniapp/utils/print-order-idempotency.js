@@ -36,10 +36,39 @@
 //    account+fingerprint 在模块内串行化：重叠的调用共用同一个在途 Promise。
 // ③ **淘汰会把"正在飞"的那条记录挤掉。** 淘汰此前只按 createdAt 留最新 20 条，
 //    而最需要留住的恰恰不是最新的那条，是**已经 POST 出去、还没落定**的那条。
-//    现在铸键时把它钉住（pin），钉住的不参与淘汰；名额只在没钉住的那批里回收，
-//    并且优先丢"既没有 orderId、又没被钉住"的最旧那些。
 //
 // 三件事共同的形状：代码都在，但都没走到"确认它生效"那一步。
+//
+// ── 2026-09-15 复审：③ 的第一版只在**这个进程活着**的时候成立 ──────────────
+//
+// ③ 当时的做法是"铸键时把这一格钉住（pin），钉住的不参与淘汰"，而钉子是一个模块级
+//    的内存 Map。小程序被杀掉重进（真实链路里最常见的那一种：用户切走、系统回收、
+//    扫码跳转回来）之后，内存里的钉子一个都不剩，那条**未落定**的记录于是退回成
+//    "最旧的、没有 orderId 的" 一条 —— 正好排在淘汰队列最前面。它一旦被挤掉，
+//    下一次提交就会铸一个新键，服务端按新键再建一张订单、再扣一笔钱。
+//    换句话说：保护只存在于"不需要保护的那段时间"里。
+//
+//    现在保护**只由落盘的数据本身**决定，与内存无关：一条记录的 `orderId === ''`
+//    就是"这次提交还没落定"，`orderId` 非空就是"服务端确有其单"。前者在 TTL 之内
+//    **一条都不淘汰**；总量由两条独立的名额分别兜住（MAX_PENDING_RECORDS /
+//    MAX_SETTLED_RECORDS）。未落定的名额用尽时**拒绝铸新键**（fail-closed），
+//    而不是挤掉一条在飞的 —— 拒绝的代价是用户重试一次，挤掉的代价是第二张订单。
+//    钉子（pins / PIN_TTL_MS / isPinned）随之整个删掉：它已经不承担任何判据了。
+//
+// ④ **clearRecord 只写不读、而且什么都不返回。** 调用方（print-pay.startNewOrder）
+//    照着它"清掉了"的假设把页面解锁，而存储可能一个字节都没写进去 —— 于是下一次提交
+//    复用那个旧键，服务端一遍遍回放那张早已作废的订单，用户永远打不出东西。
+//    现在它写完**读回来确认那一格真的不在了**，并返回布尔；清不掉就保持锁定。
+//
+// ⑤ **落盘核对漏了 orderId。** persist 此前只核 account/fingerprint/key 三项，
+//    而 rememberOrderId 要写进去的恰恰是第四项。写失败（记录被淘汰、存储被拦截）时
+//    前三项照样核得上，于是"orderId 没存住"被当成存住了 —— 页面跳走、跳转成功回调
+//    又把整条记录清掉，用户回到这一页时既没有锁也没有键。
+//
+// ⑥ **设备时钟往回拨会让一条好记录当场作废。** loadAll 此前要求 `now - createdAt >= 0`，
+//    时钟回跳之后自己写的记录落在"未来"、被整条丢掉 —— 又是一个新键、一张新订单。
+//    现在未来时间戳一律按**未过期**处理（形状不对的 createdAt 仍然作废，那是坏数据
+//    不是时钟问题），存储上界改由**条数**兜住，不依赖任何关于时间方向的假设。
 
 const storage = require('./storage')
 const { isMemberIdentity } = require('./page-guard')
@@ -54,22 +83,26 @@ const STORE_KEY = 'zyd_print_order_idem'
 const TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * 没被钉住的记录最多留几条。**这不是存储总上限** —— 上限是本值加上当前被钉住的条数，
- * 见 `retain()`。钉住的那些每条最多活 `PIN_TTL_MS`，并且在 `rememberOrderId` /
- * `clearRecord` 落定时立刻释放，所以总量仍然有界。
+ * **未落定**（`orderId === ''`）的记录最多留几条。
+ *
+ * 这一档一条都不淘汰 —— 它们各自代表一次"POST 可能已经到了服务端、而响应丢在路上"
+ * 的提交，丢掉任何一条都等于让下一次提交铸一个新键、让服务端再建一张订单。
+ * 所以名额用尽时的处置是**拒绝铸新的键**（见 `ensureKey` 的 fail-closed 分支），
+ * 不是挤掉一条在飞的：拒绝的代价是用户重试一次，挤掉的代价是第二张订单、第二笔钱。
+ *
+ * 取 20 是一个够宽的上界：它要在同一台设备、同一个 TTL（7 天）窗口里被填满，
+ * 得有 20 次"提交出去了但从来没拿到过 orderId"的尝试。真到了那一步，用户面对的
+ * 本来就不是一个能靠再提交一次解决的问题。
  */
-const MAX_RECORDS = 20
+const MAX_PENDING_RECORDS = 20
 
 /**
- * 一条刚铸出来的记录被钉住多久。
+ * **已落定**（`orderId` 非空）的记录最多留几条。
  *
- * 钉住期间它不参与淘汰：这段时间里它的 POST 可能正在飞，也可能已经到了服务端而响应
- * 丢在路上 —— 两种情况下把它淘汰掉，都等于让下一次提交铸一个新键，服务端于是再建
- * 一张订单。取 30 分钟是照 enduser JWT 的签发时长（`member-print-orders.module.ts`
- * 的 `expiresIn:'30m'`）：超过这个时长用户无论如何都得重新登录一次，本页那次在途的
- * 提交早已不可能还在飞。落定（拿到 orderId 或被清掉）时会提前释放，不必等满。
+ * 这一档可以淘汰：服务端确有其单，最坏结果是用户在同一组参数上再下一张 —— 而不是
+ * 像未落定那一档那样，丢掉之后连"上一次到底建没建成"都无从判断。同档内留最新的。
  */
-const PIN_TTL_MS = 30 * 60 * 1000
+const MAX_SETTLED_RECORDS = 20
 
 /**
  * 等 `wx.getRandomValues` 回调的上限。
@@ -97,12 +130,6 @@ const FINGERPRINT_FIELDS = ['fileId', 'terminalId', 'copies', 'colorMode', 'dupl
  * 铸完（成功或失败）立刻删掉，失败不缓存 —— 存储恢复之后下一次必须能重新试。
  */
 const minting = new Map()
-
-/**
- * 被钉住的 `slot → 到期时间戳`。钉住的记录不参与淘汰，见 `retain()` 与 `PIN_TTL_MS`。
- * 只放内存：进程重启后本来也不会再有"正在飞的那次 POST"。
- */
-const pins = new Map()
 
 /**
  * 规范化指纹。数字与字符串统一成字符串再拼，`copies: 2` 与 `copies: '2'`
@@ -133,17 +160,6 @@ function fingerprintOf(payload) {
  */
 function slotOf(account, fingerprint) {
   return `${String(account).length}:${account}|${fingerprint}`
-}
-
-/** 这个槽位此刻是不是被钉住的（顺带清掉已经到期的钉子）。 */
-function isPinned(slot, now) {
-  const until = pins.get(slot)
-  if (until === undefined) return false
-  if (until <= now) {
-    pins.delete(slot)
-    return false
-  }
-  return true
 }
 
 /**
@@ -225,7 +241,21 @@ function formatUuidV4(randomValues) {
   ].join('-')
 }
 
-/** 读全量并就地丢掉过期 / 形状不对的条目。 */
+/**
+ * 读全量并就地丢掉过期 / 形状不对的条目。
+ *
+ * **未来的 createdAt 一律当作未过期**，不当作坏数据。判据此前是
+ * `now - createdAt >= 0 && now - createdAt < TTL_MS`，那条 `>= 0` 假设了设备时钟只会
+ * 往前走。真实设备上它会往回跳（用户手动改时间、时区/NTP 同步回退、双卡切换运营商
+ * 时间），跳完之后**这台设备自己刚写下的那条记录**就落在"未来"，被整条丢掉 ——
+ * 于是下一次提交铸一个新键，服务端按新键再建一张订单。而"记录看起来来自未来"这件事
+ * 本身，从来不是"这个键不该再用"的证据。
+ *
+ * 形状不对的 createdAt（NaN / Infinity / 非数字）仍然一律作废：那不是时钟问题，
+ * 是坏数据 —— 拿它算任何时间差都得不到可信的结论。
+ *
+ * 存储上界不靠时间兜（见 `retain`），所以这里放宽不会让记录无限堆积。
+ */
 function loadAll() {
   const raw = storage.get(STORE_KEY, null)
   if (!Array.isArray(raw)) return []
@@ -236,42 +266,66 @@ function loadAll() {
     && typeof row.key === 'string' && KEY_RE.test(row.key)
     && typeof row.fingerprint === 'string' && row.fingerprint !== ''
     && typeof row.createdAt === 'number' && Number.isFinite(row.createdAt)
-    && now - row.createdAt >= 0 && now - row.createdAt < TTL_MS)
+    && now - row.createdAt < TTL_MS)
 }
 
 /**
  * 淘汰。**判据不是"谁最新"，是"丢了会不会多出一张订单"。**
  *
- * 按这条判据排出来的三档，从最不能丢到最可以丢：
- *   ① 被钉住的（刚铸出来、POST 很可能正在飞）—— 一条都不淘汰。它们的数量由用户在
- *      一次会话里真实发起过几次提交决定，且每条最多活 PIN_TTL_MS，所以不会无限增长。
- *   ② 有 orderId 的 —— 服务端确有其单。丢了它，用户回到同一组参数时会铸一个新键，
- *      服务端认不出这是同一次意图，于是再建一张。
- *   ③ 既没被钉住、又没有 orderId 的 —— 一次没发出去 / 已经失败的提交意图，可以丢。
+ * 而这条判据必须只看**落盘的数据本身**，不能看任何内存状态。上一版看的是一个模块级
+ * 的钉子 Map（铸键时钉住、落定时释放），于是"保护"在小程序被杀掉重进之后一个都不剩 ——
+ * 而那恰恰是最需要它的时刻：进程都没了，那条未落定的记录是唯一还知道"上一次提交用的是
+ * 哪个键"的东西。重进之后它退回成"最旧的、没有 orderId 的"一条，正好排在淘汰队列最前面。
  *
- * 只按 createdAt 留最新 N 条（本函数的上一版）恰好把 ① 排在最前面淘汰：一条刚发出
- * POST 的记录只要后面又有 N 条更新的写入（重进页面、改参数、另一个页面实例），
- * 它就是最旧的那条。
+ * 现在只有两档，判据就写在记录里：
+ *   ① `orderId === ''` —— **未落定**：POST 可能正在飞，也可能已经到了服务端而响应丢在
+ *      路上。**一条都不淘汰**（TTL 之内）。这一档的总量由 `ensureKey` 在入口处
+ *      fail-closed 兜住（名额满了就拒绝铸新键），不靠淘汰兜。
+ *   ② `orderId` 非空 —— **已落定**：服务端确有其单，最坏结果是用户在同一组参数上再下
+ *      一张。可以淘汰，同档内留最新的 MAX_SETTLED_RECORDS 条。
+ *
+ * `protect` 是"这一次正在写的那条记录"。它必须留下来，否则 `persist` 的读回核对会
+ * 失败在一个与存储好坏无关的原因上（刚写进去就被自己的淘汰挤掉），而调用方只能把它
+ * 报成"本机写不进去"。
  *
  * @param {Array} rows 已经过 loadAll 过滤的记录
- * @param {number} now
+ * @param {number} now 仅用于稳定排序的时间基准
+ * @param {?{account:string, fingerprint:string}} protect 本次写入的目标记录
  */
-function retain(rows, now) {
+function retain(rows, now, protect) {
   const sorted = rows.slice().sort((a, b) => b.createdAt - a.createdAt)
-  const pinned = []
-  const evictable = []
+  const pending = []
+  const settled = []
   for (const row of sorted) {
-    if (isPinned(slotOf(row.account, row.fingerprint), now)) pinned.push(row)
-    else evictable.push(row)
+    if (row.orderId) settled.push(row)
+    else pending.push(row)
   }
-  if (evictable.length <= MAX_RECORDS) return sorted
-  const budgeted = []
-  // 名额先给有 orderId 的（同档内仍然留最新），剩下的才轮到没有 orderId 的。
-  for (const row of evictable.filter((r) => r.orderId).concat(evictable.filter((r) => !r.orderId))) {
-    if (budgeted.length >= MAX_RECORDS) break
-    budgeted.push(row)
+  const isProtected = (row) => !!protect
+    && row.account === protect.account
+    && row.fingerprint === protect.fingerprint
+  const keptSettled = []
+  // 名额先留给这一次正在写的那条，其余按最新排。未落定的那一档整份留下，不参与。
+  for (const row of settled.filter(isProtected).concat(settled.filter((r) => !isProtected(r)))) {
+    if (keptSettled.length >= MAX_SETTLED_RECORDS) break
+    keptSettled.push(row)
   }
-  return pinned.concat(budgeted).sort((a, b) => b.createdAt - a.createdAt)
+  return pending.concat(keptSettled).sort((a, b) => b.createdAt - a.createdAt)
+}
+
+/**
+ * 这一格**确实不在**存储里了吗。
+ *
+ * 判据只能是"再读一遍，raw 里没有任何一条 account+fingerprint 对得上的记录"。
+ * 读不回一个数组（存储被清、被拦截、读出来是别的东西）一律返回 false ——
+ * 证明不了它不在，就当它还在。调用方据此保持锁定，而不是解锁后铸一个新键。
+ */
+function slotAbsent(account, fingerprint) {
+  const back = storage.get(STORE_KEY, null)
+  if (!Array.isArray(back)) return false
+  return !back.some((row) => row
+    && typeof row === 'object'
+    && row.account === account
+    && row.fingerprint === fingerprint)
 }
 
 /**
@@ -282,12 +336,17 @@ function retain(rows, now) {
  * 从返回值上完全看不出来。这条链的全部价值就在于键**真的还在**，所以判据只能是
  * 「再读一遍，那条记录逐字还在」。
  *
+ * **四项都核，`orderId` 不能漏。** 只核 account/fingerprint/key 时，
+ * `rememberOrderId` 那一次写入要落的恰恰是第四项：写没写进去，前三项照样核得上。
+ * 于是"orderId 没存住"会被当成存住了 —— 页面照常跳走，跳转成功回调又把整条记录清掉，
+ * 用户回到这一页时既没有锁也没有键。
+ *
  * @param {Array} rows 要保存的全量记录
- * @param {?{account:string, fingerprint:string, key:string}} verify 必须能读回来的那条
+ * @param {?{account:string, fingerprint:string, key:string, orderId:string}} verify 必须能读回来的那条
  * @returns {?Array} 成功返回实际保留下来的那份；失败返回 null（调用方必须当失败处理）
  */
 function persist(rows, verify) {
-  const kept = retain(rows, Date.now())
+  const kept = retain(rows, Date.now(), verify)
   if (storage.set(STORE_KEY, kept) !== true) return null
   if (!verify) return kept
   const back = storage.get(STORE_KEY, null)
@@ -296,12 +355,9 @@ function persist(rows, verify) {
     && typeof row === 'object'
     && row.account === verify.account
     && row.fingerprint === verify.fingerprint
-    && row.key === verify.key)
+    && row.key === verify.key
+    && String(row.orderId || '') === String(verify.orderId || ''))
   return hit ? kept : null
-}
-
-function saveAll(rows) {
-  return persist(rows, null)
 }
 
 /**
@@ -315,6 +371,16 @@ function saveAll(rows) {
 function findRecord(account, fingerprint) {
   if (!isMemberIdentity(account) || !fingerprint) return null
   return loadAll().find((row) => row.account === account && row.fingerprint === fingerprint) || null
+}
+
+/**
+ * 此刻本机还有几条**未落定**的记录（`orderId === ''`）。
+ *
+ * 跨账号一起数：名额守的是"这台设备上的存储"，而存储是所有人共用的。按账号分别计数
+ * 等于给每个登录过的账号各开一份名额，共用设备上就没有上界了。
+ */
+function pendingCount() {
+  return loadAll().filter((row) => !row.orderId).length
 }
 
 /**
@@ -337,6 +403,16 @@ function ensureKey(account, fingerprint) {
   if (!fingerprint) return Promise.reject(new Error('缺少订单参数指纹'))
   const hit = findRecord(account, fingerprint)
   if (hit) return Promise.resolve(hit)
+  // 未落定的名额满了：**拒绝铸新键**，一条既有记录都不删。
+  //
+  // 这是本模块唯一一处"宁可不让用户下单"的地方，因为另一条路更贵：腾名额只能从
+  // 未落定那一档里腾，而那一档每一条都代表一次"POST 可能已经到了服务端"的提交 ——
+  // 删掉任何一条，下一次同参数提交就会铸一个新键，服务端于是再建一张订单、再扣一笔。
+  // 被拒绝的用户重试一次就好；被挤掉的那一单，用户永远不知道自己被扣了两次。
+  // 注意这一段排在 findRecord 命中之后：同一格已经有记录时照常复用，名额满了也不影响。
+  if (pendingCount() >= MAX_PENDING_RECORDS) {
+    return Promise.reject(new Error('本机还有太多没有落定的下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果'))
+  }
   const slot = slotOf(account, fingerprint)
   const running = minting.get(slot)
   if (running) return running
@@ -349,12 +425,13 @@ function ensureKey(account, fingerprint) {
     // 回退路径）。真有就用它，不覆盖 —— 覆盖等于换一个键。
     const settled = findRecord(account, fingerprint)
     if (settled) return settled
+    // 取随机数期间别的**槽位**也可能把名额占满（不同参数、另一个页面实例）。
+    // 再判一次：这一步的代价只是白铸一个键，而放行的代价是挤掉一条在飞的记录。
+    if (pendingCount() >= MAX_PENDING_RECORDS) {
+      throw new Error('本机还有太多没有落定的下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果')
+    }
     const record = { account, fingerprint, key, orderId: '', createdAt: Date.now() }
-    // 先钉住再落盘：钉住的记录不参与淘汰，否则这条刚写进去的记录可能在同一次
-    // persist 里就被挤掉，然后 persist 的读回核对失败 —— 症状会被记成"存储写不进去"。
-    pins.set(slot, Date.now() + PIN_TTL_MS)
     if (!persist(loadAll().concat([record]), record)) {
-      pins.delete(slot)
       throw new Error('订单标识没能保存到本机，为避免重复下单已中止提交，请重试一次')
     }
     return record
@@ -377,8 +454,12 @@ function ensureKey(account, fingerprint) {
  * 就会在"A 的回调晚于换人"时直接 return，于是服务端那张订单已经建成、
  * 而 A 手上一条线索都没有，A 重进本页只会再提交一次。
  *
- * 落盘成功才释放钉子：这一刻起这条记录靠 orderId 自己挣到了第二档的名额（见 retain），
- * 不再需要占着钉子。落盘失败则保持钉住 —— 那条记录仍然是"在飞的那次提交"。
+ * 落盘成功，这条记录就从"未落定"那一档挪进"已落定"那一档（见 retain）：它不再需要
+ * 被无条件保护，因为它已经能指回服务端那张真实存在的订单了。
+ *
+ * @returns {?object} 成功返回落住的那条记录；**失败返回 null，调用方必须当真**：
+ *   订单在服务端是真的，但本机已经指不回它了。此时既不能解锁重试（那是第二张订单），
+ *   也不能当没事发生 —— 见 print-pay.continueFlow 的 `_lockAfterCreated` 分支。
  */
 function rememberOrderId(account, fingerprint, key, orderId) {
   if (!isMemberIdentity(account) || !fingerprint || !orderId) return null
@@ -390,8 +471,9 @@ function rememberOrderId(account, fingerprint, key, orderId) {
     : { account, fingerprint, key, orderId: String(orderId), createdAt: Date.now() }
   if (at >= 0) rows[at] = record
   else rows.push(record)
+  // persist 现在连 orderId 一起核回来。核不上就返回 null —— 调用方必须当"没存住"处理：
+  // 服务端那张订单是真的（它刚刚返回了 orderId），但本机已经指不回它了。
   if (!persist(rows, record)) return null
-  pins.delete(slotOf(account, fingerprint))
   return record
 }
 
@@ -399,22 +481,32 @@ function rememberOrderId(account, fingerprint, key, orderId) {
  * 丢掉这条记录。**只有在用户确实被送到了到机码页、或服务端已经证明原单走到终态之后
  * 才该调**：200 一到就清的话，跳转失败就把唯一能找回这张订单的线索也一起丢了，
  * 而页面还留在原地 —— 用户只会再点一次。
+ *
+ * **返回布尔，而且判据是读回来那一格真的不在了。** 上一版只调一次 `saveAll` 就当清掉了，
+ * 什么都不返回；而 `utils/storage.js` 的 `set()` 在"没抛异常也没写进去"时同样返回 true。
+ * 调用方（print-pay.startNewOrder）照着这个假设把页面解锁，于是下一次提交复用那个旧键，
+ * 服务端一遍遍回放那张早已取消 / 过期的订单 —— 用户面对一个能按的按钮，却永远打不出东西。
+ *
+ * 无条件写一次（而不是"有变化才写"）：raw 里可能还留着 loadAll 已经滤掉、但
+ * `slotAbsent` 仍然看得见的同槽位残留（过期的、形状不对的）。写的是 loadAll 的结果，
+ * 它们本来也该一起被清掉。
+ *
+ * @returns {boolean} true = 读回来确认这一格不在了；false = 没清掉，调用方必须保持锁定。
  */
 function clearRecord(account, fingerprint) {
-  if (!isMemberIdentity(account) || !fingerprint) return
+  if (!isMemberIdentity(account) || !fingerprint) return false
   const rows = loadAll()
   const kept = rows.filter((row) => !(row.account === account && row.fingerprint === fingerprint))
-  if (kept.length !== rows.length && saveAll(kept)) {
-    pins.delete(slotOf(account, fingerprint))
-  }
+  if (storage.set(STORE_KEY, retain(kept, Date.now(), null)) !== true) return false
+  return slotAbsent(account, fingerprint)
 }
 
 module.exports = {
   FINGERPRINT_FIELDS,
   KEY_RE,
   TTL_MS,
-  MAX_RECORDS,
-  PIN_TTL_MS,
+  MAX_PENDING_RECORDS,
+  MAX_SETTLED_RECORDS,
   RANDOM_TIMEOUT_MS,
   STORE_KEY,
   fingerprintOf,

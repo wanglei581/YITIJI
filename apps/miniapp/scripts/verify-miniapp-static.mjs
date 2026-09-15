@@ -1164,6 +1164,81 @@ const PACKAGE_CHAIN_PAGES = [
   else bad('取件页不得永久 loading', misses.join('；'))
 }
 
+// R8 收口 ①：取件页**每一次 onShow 都必须先判身份，再谈别的**。
+//
+// 上一版 `_refreshOrder` 第一行是 `if (!this.data.orderId || this._polling) return`——
+// 身份判定排在这个早退**之后**。于是这条真实链路上有一个只由网络快慢决定长短的暴露窗口：
+// A 的码已经画在屏幕上、一发轮询正在飞（_polling === true），此时 A 登出、B 登录、
+// 回到本页 —— onShow 调进来第一行就 return，身份根本没被判过，清场没发生，
+// A 的取件凭证原样留在屏幕上，一直留到那发请求自己落定。慢响应 / 弱网重试 / 服务端卡住
+// 都能把它拉到几十秒以上，而这几十秒里看着它的是共用设备上的下一位。
+{
+  const misses = []
+  const bare = stripComments(pickupJs)
+  const refresh = methodBody(bare, '_refreshOrder')
+  if (!refresh) misses.push('取不到 _refreshOrder 的函数体')
+  else {
+    const identityIdx = refresh.indexOf('this._resolveIdentity()')
+    const pollingIdx = refresh.indexOf('this._polling) return')
+    if (identityIdx < 0) misses.push('_refreshOrder 里没有身份判定')
+    else if (pollingIdx >= 0 && pollingIdx < identityIdx) {
+      misses.push('"已经有一发在飞"的早退排在身份判定之前（A 的码会一直留到那发请求落定）')
+    }
+    if (/if \(!this\.data\.orderId \|\| this\._polling\) return/.test(refresh)) {
+      misses.push('第一行又把 orderId 与 _polling 合并成一个早退（身份判定会被它整个跳过）')
+    }
+    // 去重本身要留着：判完身份之后仍然不该对同一格重复打请求。
+    if (pollingIdx < 0) misses.push('在飞去重没了（同一格会被重复打请求）')
+  }
+  // onShow 必须真的走这条路，不能自己另判一套。
+  if (!/onShow\(\) \{[\s\S]{0,400}this\._refreshOrder\(false\)/.test(bare)) {
+    misses.push('onShow 没有走 _refreshOrder（那是唯一一处"先判身份"的入口）')
+  }
+  if (!misses.length) ok('取件页每一次 onShow 都先判身份再决定发不发请求（在途请求不得把清场推迟到网络之后）')
+  else bad('取件页在途暴露窗口', misses.join('；'))
+}
+
+// R8 收口 ②：**请求合法发出之后才自然过期**的那条 200，仍然属于本人。
+//
+// enduser JWT 只签 30 分钟，而取件页会一直轮询。于是这条路径每天都在发生：请求在 'ok'
+// 状态下带着 A 的登录态发出去 → 服务端按 requireOwned 校验过归属、返回 200 → 响应回来的
+// 路上 A 的 JWT 到点（getToken() 过期时先 clearSession，身份于是读成 ''）。上一版成功分支
+// 只认 `state === 'ok'`，把这条**刚刚被服务端确认过属于 A** 的响应判成"身份说不清"，
+// 当场清掉屏幕上那张码、写一句「请登录」——用户站在一体机前，手里的码没了，而它一直有效。
+//
+// 放行的前提是归属**证得出来**，不是"过期就放行"：三条缺一不可，少一条就 fail-closed。
+{
+  const misses = []
+  const bare = stripComments(pickupJs)
+  const owns = methodBody(bare, '_ownsResponse')
+  if (!owns) misses.push('缺 _ownsResponse（成功响应的归属判定）')
+  else {
+    if (!/if \(state === 'ok'\) return true/.test(owns)) misses.push("'ok' 必须直接放行")
+    if (!/if \(state !== 'resignable'\) return false/.test(owns)) {
+      misses.push("只有 'resignable' 才是第二条放行路径（'changed' / 'unusable' 一律 fail-closed）")
+    }
+    if (!/isMemberIdentity\(account\)/.test(owns)) misses.push('没有要求快照仍是一个确定的会员键')
+    if (!/this\._openerAccount/.test(owns)) misses.push('没有比对开页那位（本页的 orderId 属于他）')
+    if (!/account === requestAccount/.test(owns)) misses.push('没有比对发出这一发请求的那位')
+  }
+  // 发起那一刻的账号必须**绑在局部变量上**：回调时再读一次读到的是被 clearSession 清空的会话。
+  if (!/const requestAccount = this\._account/.test(bare)) {
+    misses.push('没有在发请求前绑定发起账号（过期会把它清掉，事后读不回来）')
+  }
+  const refresh = methodBody(bare, '_refreshOrder')
+  if (refresh && refresh.indexOf('const requestAccount') > refresh.indexOf('api.getCloudPrintOrder(')) {
+    misses.push('发起账号绑在请求之后（那就不是"发出那一刻的真值"了）')
+  }
+  if (!/if \(!this\._ownsResponse\(state, requestAccount\)\) \{ this\._failClosedForIdentity\(\); return \}/.test(bare)) {
+    misses.push('成功分支没有按 _ownsResponse 分流，或证不出归属时没有 fail-closed')
+  }
+  // 反面锚：401 与"真的换了人"两条 fail-closed 一个都不许被这次放宽带松。
+  if (!/if \(err && err\.statusCode === 401\)/.test(bare)) misses.push('401 的清码分支没了')
+  if (!/if \(foreign \|\| resolved\.state === 'changed'\)/.test(bare)) misses.push('换人 / 登出的清场分支没了')
+  if (!misses.length) ok("取件页：请求发出后才自然过期的 200 仍按本人处理（归属证得出来才放行，其余 fail-closed）")
+  else bad('取件页不得把本人的有效码当成过期清掉', misses.join('；'))
+}
+
 // R4 收口 ②：取件页凭证的**新鲜度**。
 // 核销之后服务端不再下发 pickupCode / pickupCodeExpiresAt。若前端从旧 data 继承，
 // 一张已经被消费掉的码会继续挂着倒计时留在屏幕上；而轮询一直失败时我们根本不知道

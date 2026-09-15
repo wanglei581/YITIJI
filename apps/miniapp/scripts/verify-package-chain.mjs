@@ -830,8 +830,10 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   assert(/const back = storage\.get\(STORE_KEY, null\)/.test(idem)
     && /row\.account === verify\.account/.test(idem)
     && /row\.fingerprint === verify\.fingerprint/.test(idem)
-    && /row\.key === verify\.key/.test(idem),
-  'persist 写完把记录读回来逐字核对 account/fingerprint/key（set 返回 true ≠ 真的写进去了）')
+    && /row\.key === verify\.key/.test(idem)
+    && /String\(row\.orderId \|\| ''\) === String\(verify\.orderId \|\| ''\)/.test(idem),
+  'persist 写完把记录读回来逐字核对 account/fingerprint/key/**orderId**（漏掉 orderId 那一项，'
+  + 'rememberOrderId 那次写入要落的恰恰就是它：没写进去也照样核得上）')
   assert(/if \(!persist\(loadAll\(\)\.concat\(\[record\]\), record\)\) \{[\s\S]{0,200}throw new Error/.test(idem),
     'ensureKey 落不住就 reject —— 调用方一个 POST 都不许发（那张订单建成就再也找不回来）')
 
@@ -844,15 +846,48 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   assert(/minting\.delete\(slot\); return record/.test(idem) && /minting\.delete\(slot\); throw err/.test(idem),
     '在途项无论成败都摘掉（失败缓存在里面，存储恢复之后也再铸不出键）')
 
-  // ③ 淘汰不得挤掉"正在飞"的那条。只按 createdAt 留最新 N 条，最先被挤掉的恰恰是它。
-  assert(/const pins = new Map\(\)/.test(idem) && /pins\.set\(slot, Date\.now\(\) \+ PIN_TTL_MS\)/.test(idem),
-    '铸键时把这一格钉住（钉住的不参与淘汰）')
-  assert(/if \(isPinned\(slotOf\(row\.account, row\.fingerprint\), now\)\) pinned\.push\(row\)/.test(idem),
-    'retain 把钉住的那些整体排除在淘汰之外')
-  assert(/evictable\.filter\(\(r\) => r\.orderId\)\.concat\(evictable\.filter\(\(r\) => !r\.orderId\)\)/.test(idem),
-    '没钉住的那批也按价值淘汰：有 orderId 的（服务端确有其单）排在没有的前面')
-  assert(/pins\.delete\(slotOf\(account, fingerprint\)\)/.test(idem),
-    '落定（拿到 orderId / 被清掉）时释放钉子，存储总量才有界')
+  // ③ 淘汰不得挤掉"正在飞"的那条 —— 而且这份保护必须**跨进程重启**成立。
+  //
+  //    上一版把保护挂在一个模块级的内存钉子 Map 上（铸键时钉住、落定时释放）。
+  //    小程序被杀掉重进之后（真实链路里最常见的那一种：切走、系统回收、扫码跳回来）
+  //    钉子一个都不剩，那条**未落定**的记录于是退回成"最旧的、没有 orderId 的"一条，
+  //    正好排在淘汰队列最前面 —— 保护只存在于不需要它的那段时间里。
+  //    现在判据只看落盘的数据本身：`orderId === ''` 就是未落定，TTL 之内一条都不淘汰。
+  assert(!/\bpins\b\s*=\s*new Map\(\)/.test(idem) && !/PIN_TTL_MS/.test(idem),
+    '内存钉子已经整个删掉（它在进程重启后一个都不剩，而那正是最需要保护的时刻）')
+  assert(/if \(row\.orderId\) settled\.push\(row\)\s*\n\s*else pending\.push\(row\)/.test(idem),
+    'retain 只按落盘字段分档：orderId 为空 = 未落定，非空 = 已落定')
+  assert(/return pending\.concat\(keptSettled\)/.test(idem)
+    && !/keptPending|pending\.slice\(0, MAX_PENDING_RECORDS\)/.test(idem),
+  '未落定的那一档**整份留下**，一条都不淘汰（丢一条 = 下一次提交铸新键 = 第二张订单）')
+  assert(/keptSettled\.length >= MAX_SETTLED_RECORDS/.test(idem),
+    '已落定的那一档仍然有界（它可以淘汰：服务端确有其单，最坏只是再下一张）')
+  assert(/if \(pendingCount\(\) >= MAX_PENDING_RECORDS\) \{[\s\S]{0,240}(reject|throw)/.test(idem),
+    '未落定的名额用尽时 ensureKey **拒绝铸新键**（fail-closed），而不是挤掉一条在飞的')
+  assert(/const isProtected = \(row\) =>/.test(idem) && /retain\(rows, Date\.now\(\), verify\)/.test(idem),
+    '这一次正在写的那条记录不参与淘汰（否则读回核对会失败在一个与存储好坏无关的原因上）')
+
+  // ③' 时钟往回拨不得让一条好记录当场作废。`now - createdAt >= 0` 假设了设备时钟只会
+  //     往前走；真实设备上它会回跳，回跳之后这台设备自己刚写下的记录就落在"未来"、
+  //     被整条丢掉 —— 又是一个新键、一张新订单。而"看起来来自未来"从来不是"键不该再用"
+  //     的证据。形状不对的 createdAt 仍然一律作废（那是坏数据，不是时钟问题）。
+  assert(!/now - row\.createdAt >= 0/.test(idem),
+    '未来时间戳不得再被当成无效（设备时钟回跳会让本机自己写的键当场作废）')
+  assert(/Number\.isFinite\(row\.createdAt\)/.test(idem) && /now - row\.createdAt < TTL_MS/.test(idem),
+    '形状不对的 createdAt 仍然作废，真正过期的仍然过期（放宽的只有未来那一侧）')
+
+  // ③'' clearRecord 必须**读回来证明那一格不在了**，并把结论返回给调用方。
+  //     上一版只调一次 saveAll 就当清掉了、什么都不返回；而 storage.set 在"没抛异常也
+  //     没写进去"时同样返回 true。调用方照着这个假设解锁，下一次提交就复用那个旧键，
+  //     服务端一遍遍回放那张早已作废的订单 —— 用户面对一个能按的按钮，永远打不出东西。
+  const clearFn = /function clearRecord\(account, fingerprint\) \{[\s\S]*?\n\}/.exec(idem)
+  assert(!!clearFn && /return slotAbsent\(account, fingerprint\)/.test(clearFn[0]),
+    'clearRecord 写完读回来确认那一格真的不在了，并返回布尔')
+  assert(!!clearFn && /if \(!isMemberIdentity\(account\) \|\| !fingerprint\) return false/.test(clearFn[0])
+    && /!== true\) return false/.test(clearFn[0]),
+  'clearRecord 的每一条失败路径都返回 false（返回 undefined 会被调用方当成"清掉了"）')
+  assert(/function slotAbsent\(account, fingerprint\) \{[\s\S]{0,400}if \(!Array\.isArray\(back\)\) return false/.test(idem),
+    '读不回一个数组就一律判"还在"（证明不了它不在，就不许解锁）')
 
   // ④ 取随机数必须有上限。它只有回调形态，两个回调一个都不来时页面会永远停在
   //    「正在提交…」——既没有订单，也没有出口。超时按失败处理，绝不退回弱随机。
@@ -890,8 +925,50 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   const startNew = /startNewOrder\(\)\s*\{[\s\S]*?\n  \},/.exec(pay)
   assert(!!startNew && /this\.data\.createdState !== 'terminal' \|\| !this\.data\.createdCanReorder/.test(startNew[0]),
     'startNewOrder 只在服务端已证明终态时才可达（其余一律原地返回）')
-  assert(!!startNew && /idem\.clearRecord\(this\._account, idem\.fingerprintOf\(this\._orderPayload\(\)\)\)/.test(startNew[0]),
-    'startNewOrder 清掉旧记录，下一次 continueFlow 才会铸一个新键')
+  assert(!!startNew && /if \(!idem\.clearRecord\(this\._account, idem\.fingerprintOf\(this\._orderPayload\(\)\)\)\) \{/.test(startNew[0]),
+    'startNewOrder 清掉旧记录，**并且只在真的清掉（clearRecord 返回 true）之后**才解锁')
+  assert(!!startNew && /createdNotice: '本机没能清掉[\s\S]{0,300}\n      \}\)\n      return\n    \}/.test(startNew[0]),
+    '清不掉时保持锁定 + 说清为什么 + 给出可执行的下一步（不是一句「失败了」）')
+  // 回放那张作废订单的唯一原因就是"旧键还在却解了锁"，所以解锁那几行必须排在 return 之后。
+  assert(!!startNew && startNew[0].indexOf('createdLocked: false') > startNew[0].indexOf('return\n    }'),
+    '解锁排在"清不掉就 return"之后（顺序反过来等于那个判断根本不存在）')
+
+  // ⑤' orderId 没能落进恢复记录时，页面不许跳走 —— 跳转成功回调会 clearRecord 把仅剩的
+  //     那个键也清掉，而它是唯一还能让服务端回放同一张订单的东西。
+  assert(/const recoveryUnsaved = !!orderId\s*\n\s*&& !idem\.rememberOrderId\(/.test(pay),
+    'rememberOrderId 的失败被当真（它返回 null 就是"本机已经指不回这张订单了"）')
+  assert(/if \(recoveryUnsaved\) \{[\s\S]{0,1400}this\._lockAfterCreated\(orderId,[\s\S]{0,400}return\n      \}/.test(pay),
+    '没落住就保持锁定并指路「我的 · 打印订单」，**不跳转、不解锁、不重试**')
+  {
+    const flow = /continueFlow\(\) \{[\s\S]*?\n  \},/.exec(pay)
+    assert(!!flow && flow[0].indexOf('if (recoveryUnsaved)') < flow[0].indexOf('wx.redirectTo('),
+      '这一支必须排在 redirectTo 之前（排在后面就等于没有）')
+  }
+
+  // ⑥ "还活着"是一个会到期的结论，不能缓存成永久判定。缓存它的代价：用户照着提示去
+  //    「我的 · 打印订单」把那张订单取消了，再回到本页，`_verifyCreatedOrder` 第一行就
+  //    原地返回 —— 页面永远说"这张订单还在"，那一组参数被一张作废订单锁死到记录过期为止。
+  {
+    const verify = /_verifyCreatedOrder\(orderId\) \{[\s\S]*?\n  \},/.exec(pay)
+    assert(!!verify, '取不到 _verifyCreatedOrder 的函数体')
+    const body = verify ? verify[0] : ''
+    // 成功分支里 `_verifiedOrderId` 只许出现一次，而且只许在终态那一支里。
+    const thenBlock = /\.then\(\(order\) => \{[\s\S]*?\n      \}\)\n      \.catch/.exec(body)
+    assert(!!thenBlock, '取不到 _verifyCreatedOrder 的成功分支')
+    const ok200 = thenBlock ? thenBlock[0] : ''
+    assert((ok200.match(/this\._verifiedOrderId = orderId/g) || []).length === 1
+      && ok200.indexOf('this._verifiedOrderId = orderId') > ok200.indexOf('if (reason) {')
+      && ok200.indexOf('this._verifiedOrderId = orderId') < ok200.indexOf("createdState: 'live'"),
+    "终态才写 _verifiedOrderId；'live' 那一支一个字都不许写（写了就再也不会重核）")
+    assert(/if \(err && err\.statusCode === 404 && err\.code === 'PRINT_ORDER_NOT_FOUND'\) \{\s*\n\s*this\._verifiedOrderId = orderId/.test(body),
+      "requireOwned 的 404 也是终态，同样可以缓存（那个 orderId 再也换不出任何东西）")
+    assert(!/createdState: 'unknown'[\s\S]{0,200}_verifiedOrderId/.test(body),
+      "'unknown'（网络 / 5xx）不得缓存：它恰恰是下一次必须重试的那一种")
+    assert(!/this\._verifyingOrderId = ''\s*\n\s*this\._verifiedOrderId = orderId\s*\n\s*const reason/.test(body),
+      "_verifiedOrderId 不得在分类之前就写死（上一版正是这么把 'live' 也缓存了）")
+    assert(/if \(this\._verifiedOrderId === orderId \|\| this\._verifyingOrderId === orderId\) return/.test(body),
+      '同一张订单在飞时不重复打 GET（_verifyingOrderId），终态则直接跳过（_verifiedOrderId）')
+  }
   assert(payWxml.includes('bindtap="startNewOrder"') && payWxml.includes('createdCanReorder'),
     '模板真的把「重新下单」接到 startNewOrder 上，并按 createdCanReorder 分流（写了不接线等于没写）')
   assert(payWxml.includes('bindtap="retryCreatedCheck"') && payWxml.includes("createdState === 'unknown'"),
@@ -899,6 +976,39 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
   // 换人时这套结论必须跟着复位：它属于上一位。
   assert(/_resetForAccountChange\([\s\S]{0,900}createdState: ''[\s\S]{0,200}createdCanReorder: false/.test(pay),
     '换账号时把上一位那张订单的核对结论一起复位（否则 B 会看到 A 的「可以重新下单」）')
+
+  // ⑦ 指纹字段集必须与**服务端那一组逐字相同**。
+  //
+  //    这一条是唯一一处跨层断言，因为这一处的分叉两边都自己看不出来：
+  //      少看一项 —— 用户改了那一项再提交，本地认为"没变"于是复用同一个键，
+  //                  服务端算出不同指纹 → 409 IDEMPOTENCY_KEY_REUSED，
+  //                  用户只看到一句下单失败，重试多少次都一样；
+  //      多看一项 —— 服务端认为没变而本地认为变了，于是白白铸一个新键，
+  //                  "响应丢了再点一次"又变回两张订单、两笔钱 —— 正是幂等键要防的那件事。
+  //    两边各自的单测都会全绿：它们各自都自洽，只是对不上。所以判据只能是**直接比对
+  //    两份源码里那两组字段**，而不是在任何一侧抄一份常量再断言它等于自己。
+  //
+  //    读服务端源码是**只读**的（本门禁不写 services/ 下任何文件），取的是
+  //    `fingerprintMemberPrintOrderPayload` 里真正参与 sha256 的那个对象字面量 ——
+  //    不是它的类型签名，也不是注释：注释会过期，类型会被 Pick 放宽，只有那几行赋值
+  //    决定服务端到底 hash 了什么。
+  {
+    const SERVER = path.resolve(MINIAPP, '../../services/api/src/member-print-orders/member-print-order-create.service.ts')
+    const serverSrc = fs.existsSync(SERVER) ? fs.readFileSync(SERVER, 'utf8') : ''
+    assert(!!serverSrc, `服务端建单 service 读得到（${path.relative(path.resolve(MINIAPP, '../..'), SERVER)}）`)
+    const fn = /export function fingerprintMemberPrintOrderPayload\([\s\S]*?\n\}/.exec(serverSrc)
+    assert(!!fn, 'fingerprintMemberPrintOrderPayload 仍然存在（它是服务端"参数变没变"的唯一判据）')
+    const hashed = fn ? Array.from(fn[0].matchAll(/^\s+(\w+):\s*dto\.\w+,?$/gm)).map((m) => m[1]) : []
+    // 前端那一组从**真实模块**里读（不是把字面量再抄一遍），两边都取实际生效的值。
+    const clientFields = requireMiniapp('../utils/print-order-idempotency.js').FINGERPRINT_FIELDS
+    assert(hashed.length > 0, '抽得出服务端真正参与 hash 的字段（抽不出就等于这条门禁在空转）')
+    assert(hashed.join(',') === Array.from(clientFields).join(','),
+      `指纹字段集两侧逐字相同：服务端 [${hashed.join(', ')}] / 小程序 [${Array.from(clientFields).join(', ')}]`)
+    // 顺带钉住"前端不得自己发明一组字段"：常量必须是模块里那一个，不是页面里散落的字面量。
+    assert(/const FINGERPRINT_FIELDS = \[/.test(idem)
+      && !/FINGERPRINT_FIELDS/.test(stripComments(paySrc)),
+    '指纹字段集只有 utils/print-order-idempotency.js 一处定义，页面不自己拼一组')
+  }
 }
 
 console.log(failed === 0 ? '\n全部通过\n' : `\n${failed} 条失败\n`)

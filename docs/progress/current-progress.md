@@ -1,5 +1,108 @@
 # 当前开发进度
 
+2026-09-15 **R8 收口：撤回 `638ea71baeb8556d4327241e7a9221bee4ee15e1` 与
+`103adb9e7899f620104f6abf3443e666a076fe8d` 的「可以进最终复审 / 前端幂等链已收口」结论 ——
+那两条各自都成立，但合起来不足以支撑「这条链已经收口」。六个缺陷活过了它们。**
+锚点是 `103adb9e7` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。本轮只改前端，
+`services/**` 一行未动。
+
+R7（`638ea71ba`）证明的是「键落住了、只有一个、还留着」；R8 打的是它们各自**被绕过的那条路**。
+六条全部在本机独立复现过，都不需要换人竞态或构造畸形数据，普通使用就会踩到：
+
+- **P1-A 取件页有一个只由网络快慢决定长短的凭证暴露窗口。** `_refreshOrder` 的第一行是
+  `if (!this.data.orderId || this._polling) return`，身份判定排在这个早退**之后**。于是
+  「A 的码已经画在屏幕上 + 一发轮询正在飞 → A 登出 → B 登录 → 回到本页」这一跳里，
+  `onShow` 第一行就 return，身份**根本没被判过**：清场没发生，A 的取件凭证原样留在屏幕上，
+  一直留到那发请求自己落定。慢响应 / 弱网重试 / 服务端卡住都能把它拉到几十秒以上。
+  改法：身份判定提到 `_polling` 早退之前，判完再谈去重。迟到的 A 响应仍被粘性 foreign 挡住。
+- **P1-B 反过来，一张服务端仍然认的码会被当成「登录失效」清掉。** 请求在 `'ok'` 状态下带着
+  A 的登录态发出、服务端按 `requireOwned` 校验过归属返回 200，而响应回来的路上 A 的
+  enduser JWT（只签 30 分钟）自然到点。成功分支此前只认 `state === 'ok'`，于是把这条
+  **刚刚被服务端确认属于 A** 的响应判成"身份说不清"，当场清码 + 写「请登录」。
+  用户站在一体机前，手里的码没了，而它一直有效。改法：新增 `_ownsResponse(state, requestAccount)`,
+  `'resignable'` 只在**三条同时成立**时放行 —— 快照仍是确定的会员键、就是开页那位、
+  就是发出这一发请求的那位。`'changed'` / `'unusable'` 与 401 一律不走这条路。
+- **P1-C `clearRecord` 只写不读、什么都不返回，调用方照着"清掉了"解锁。** `storage.set`
+  在"没抛异常也没写进去"时同样返回 `true`。于是 `startNewOrder` 会在记录其实还在时解锁，
+  下一次提交复用那个**旧键** —— 服务端按 `(endUserId, key)` 回放的正是那张早已取消 / 过期的
+  订单，用户面对一个能按的按钮却永远打不出东西。改法：`clearRecord` 写完**读回来确认那一格
+  真的不在了**并返回布尔；`startNewOrder` 只在 `true` 时解锁，否则保持锁定 + 保留旧键 +
+  零 POST + 一句说得清、点得动的说明（存储恢复后同一个按钮能真的解开）。
+  同一层还补了两处：`persist` 的读回核对补上 **`orderId`**（漏掉它时 `rememberOrderId`
+  那次写入要落的恰恰就是它，没写进去也照样核得上）；`rememberOrderId` 返回 `null` 时
+  `continueFlow` **不跳转、不解锁、不重试**，改为原地锁定并指向「我的 · 打印订单」——
+  跳转成功的回调会 `clearRecord` 把仅剩的那个键也清掉，而它是唯一还能让服务端回放同一张
+  订单的东西。redirect 成功那一处的 `clearRecord` 仍是 best effort（页面已经在跳走，
+  写任何错误态都是写给一个看不见的页面），这一点在代码里写明了为什么它不驱动 UI。
+- **P1-D 淘汰保护挂在内存里，进程重启就一条不剩。** 上一版"铸键时把这一格钉住"用的是模块级
+  `pins` Map。小程序被杀掉重进（切走、系统回收、扫码跳回来）之后钉子全没了，那条**未落定**的
+  记录退回成"最旧的、没有 orderId 的"一条，正好排在淘汰队列最前面 —— 保护只存在于不需要它的
+  那段时间里。改法：判据只看落盘字段（`orderId === ''` = 未落定），TTL 之内**一条都不淘汰**；
+  上界改成两条独立名额（`MAX_PENDING_RECORDS` / `MAX_SETTLED_RECORDS`），未落定名额用尽时
+  `ensureKey` **拒绝铸新键**（fail-closed）而不是挤掉一条在飞的。`pins` / `PIN_TTL_MS` /
+  `isPinned` 整个删掉。同一格已有的未落定记录仍照常复用。
+- **P2-E「这张订单还活着」被缓存成永久结论。** `_verifyCreatedOrder` 在分类之前就写
+  `_verifiedOrderId`，于是用户照着提示去「我的 · 打印订单」把订单取消了再回到本页，
+  第一行就原地返回 —— 页面永远说"它还在"，那一组参数被一张作废订单锁死到本机记录过期（7 天）为止。
+  改法：只缓存终态与 `requireOwned` 明确的 404；`'live'` / `'unknown'` 每次 `onShow` 重核，
+  同一张订单在飞时由 `_verifyingOrderId` 挡重复 GET。
+- **P2-F 设备时钟往回拨会让本机自己写的键当场作废。** `loadAll` 要求 `now - createdAt >= 0`，
+  时钟回跳后那条记录落在"未来"被整条丢掉 → 新键 → 第二张订单。而"看起来来自未来"从来不是
+  "这个键不该再用"的证据。改法：未来时间戳一律按未过期处理（不设上界，最保守）；
+  形状不对的 `createdAt`（NaN / Infinity / 非数字）仍然一律作废；真正过期的仍然过期；
+  存储上界完全由**条数**兜住，不依赖任何关于时间方向的假设。
+- **P2-G 指纹字段集的跨层分叉两边都自己看不出来。** 少看一项 → 用户改了那一项再提交会被服务端
+  409 `IDEMPOTENCY_KEY_REUSED`；多看一项 → 服务端认为没变而本地换了新键，"响应丢了再点一次"
+  又变回两张订单。两侧各自的测试都会全绿。新增门禁**只读**服务端源码
+  （`services/api/src/member-print-orders/member-print-order-create.service.ts`），
+  抽出 `fingerprintMemberPrintOrderPayload` 里真正参与 sha256 的那个对象字面量，
+  与前端 `FINGERPRINT_FIELDS`（从真实模块读，不抄字面量）逐字比对。**未改任何后端文件。**
+
+改动文件（6 个，全部在小程序内）：`apps/miniapp/pages/print-pickup/print-pickup.js`、
+`apps/miniapp/pages/print-pay/print-pay.js`、`apps/miniapp/utils/print-order-idempotency.js`、
+`apps/miniapp/scripts/tests/page-lifecycle.test.mjs`、`apps/miniapp/scripts/verify-miniapp-static.mjs`、
+`apps/miniapp/scripts/verify-package-chain.mjs`，外加 `docs/graph/` 标准重跑产物。
+
+测试：`page-lifecycle.test.mjs` 从 123 条加到 **134 条，全绿**，原 123 条一条没删。
+新增 11 条覆盖：P1-A 的完整复现（码已显示 + 轮询在飞 + A 登出 + B 登录 + `onShow` →
+码当场清零 / 状态切换 / 零 B 请求 / 迟到 A 响应不回写）、请求发出后才自然过期的 200 仍按本人处理、
+主动登出仍 fail-closed、`_ownsResponse` 的契约逐条、`clearRecord` 抛异常与静默 no-op 两种形态、
+`rememberOrderId` no-op 被识别且页面保持锁定、模块重新 require（模拟杀进程重进）后未落定记录
+仍受保护、未落定名额用尽 fail-closed 且不删既有行、`'live'` 在第二次 `onShow` 被重核并转终态、
+在飞时连续 `onShow` 只打一发 GET、未来 `createdAt` 复用同一个键（且 NaN / 非数字 / 真过期仍作废）。
+R7-3 那条原测试保留，只把两处上界断言从 `MAX_RECORDS` 换成新的两档名额 —— 它证明的性质不变，
+而且现在连"重启之后还成立吗"也一并证了。
+
+反向变异 **15 条（另加 M3 家族 4 条共 19 次），全部判红**（判据是被测命令退出码，不是数 FAIL 行）：
+`M1` 把 `_polling` 早退挪回身份判定之前、`M2` 成功分支只认 `'ok'`、`M3` `'resignable'` 无条件放行
+（含 M3a–M3d 四种拆解：分别去掉 opener / requester / 会员键三条中的任意一条）、
+`M4` `clearRecord` 不读回、`M5` `startNewOrder` 无条件解锁、`M6` 忽略 `rememberOrderId` 的失败、
+`M7` `persist` 不核 `orderId`、`M8` 未落定记录可被淘汰、`M9` 名额用尽改成挤掉而非拒绝、
+`M10` 缓存 `'live'` 结论、`M11` 恢复 `now - createdAt >= 0`、`M12` 前端指纹少一个字段、
+`M13`/`M14`/`M15` 三条走静态门禁而非测试（证明门禁自己也测得出红，不是只靠单测）。
+还原方式是把原始字节读进内存、`finally` 写回，并用 **sha256 逐文件比对**确认与变异前逐字节一致；
+**未使用 `git checkout` / `git reset`**。
+
+**M3 第一次是活的（退出码 0），没有就这么算过。** 原因是那三条归属判据在页面当前的状态机里
+到不了 —— `_resolveIdentity` 的粘性 foreign 标记会先一步截掉换人那条路。但那是**那个函数的
+实现细节**，而"什么样的响应才配画到屏幕上"是 `_ownsResponse` 的**契约**：只测到得了的那条路，
+等于把契约的正确性押在另一个函数的当前写法上，那边哪天被重构掉，这边就会静默放行一张不属于
+当前这位的取件凭证，而所有门禁全绿。所以补了一条直接驱动 `_ownsResponse` 的契约测试，
+M3 家族四种拆解此后全部判红。
+
+本机独立复跑（全部退出码 0）：`node --test apps/miniapp/scripts/tests/page-lifecycle.test.mjs`（134 pass）、
+`verify:static`（135 PASS / 0 FAIL）、`verify:package-chain`、`verify:api-contract`、
+`@ai-job-print/api verify:miniapp-cloud-print-m2`（未改后端，仍 ALL PASS）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` /
+`graph:check`（`pnpm graph` 标准重跑后一致）、`git diff --check`。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。
+上面所有结论都来自本机静态执行与沙箱内真跑页面源码；**`onHide` 不清凭证是一个权衡后的选择**
+（回前台时 `onShow` 会在同一个同步调用里判身份并清场，而切后台就清码会让站在一体机前的用户
+每次切回来都要等一次网络往返），这条取舍只有在真机上走一遍才算被验证过。
+
 2026-09-15 **R3 已合入 `main`：PR #1036 的 merge commit 是
 `ddef936def46e9220a25e44ffe33dcc3458ed00b`，`main` CI run `34917887442` 四个 job 全部 success。**
 本机独立复核（不是转述 PR 页面）：`git merge-base --is-ancestor ddef936def46e9220a25e44ffe33dcc3458ed00b origin/main`

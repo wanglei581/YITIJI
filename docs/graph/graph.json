@@ -22045,6 +22045,7 @@
       "services/api/scripts/verify-feedback-notifications.ts"
     ],
     "services/api/src/member-print-orders/member-print-order-create.service.ts": [
+      "apps/miniapp/scripts/verify-package-chain.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
@@ -26863,7 +26864,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps"
+        ],
         "files": [
           "apps/miniapp/pages/orders/orders.js",
           "apps/miniapp/pages/package-code/package-code.js",
@@ -26876,7 +26879,8 @@
           "apps/miniapp/utils/api.js",
           "apps/miniapp/utils/package-order.js",
           "apps/miniapp/utils/page-guard.js",
-          "apps/miniapp/utils/print-order-idempotency.js"
+          "apps/miniapp/utils/print-order-idempotency.js",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts"
         ],
         "missing": []
       },
