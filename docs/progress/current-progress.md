@@ -1,5 +1,29 @@
 # 当前开发进度
 
+2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
+失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
+`34984568841`。`postgres-readiness / Core verify suites on PG` 与
+`build-and-verify / Verify suites` 的决定性失败相同：`verify:scan-tasks` 构造
+`20260913223000_harden_scan_retry_authority` 的“上一版本”数据库时，只排除了扫描硬化和 ACK
+迁移，却把本 PR 新增、时间更晚的
+`20260915170000_add_member_print_order_idempotency` 也复制进沙箱；所以最新已应用迁移不再是脚本
+明确要求的 `20260913210000_add_scan_input_lockout_telemetry`。这不是小程序身份、订单或幂等运行时
+逻辑回归，而是后续迁移进入后暴露出的测试夹具边界错误。
+
+- **修复：** `createMigrationSandbox()` 现在只复制到
+  `RETRY_HARDENING_PREVIOUS_MIGRATION` 为止的迁移目录；测试随后仍按原流程单独加入扫描硬化迁移和
+  delivery ACK 迁移。`migration_lock.toml` 等非目录文件继续保留。未改小程序、API 业务逻辑、
+  Prisma schema、迁移 SQL 或前端文件。
+- **本机证据：** 修复前 `pnpm --filter @ai-job-print/api verify:scan-tasks` 稳定退出 `1`，实际最新
+  迁移为 `20260915170000_add_member_print_order_idempotency`；修复后退出 `0`，完整输出到
+  `PASS scan tasks verification`。反向删除截止条件后同一命令重新退出 `1`、同一断言复现；恢复后
+  再次退出 `0`。本机没有 PostgreSQL URL，因此脚本里的真实 PG 分支仍由下一轮
+  `postgres-readiness` CI 负责证明。
+- **审查：** Grok MCP session `3bc8b398-3cde-4472-bc14-c429d36b656d` 只读定位到
+  `[67/103] verify:scan-tasks` 及“后续迁移污染上一版本模板”；Codex 独立复现并核对 PR diff 后修复。
+- **证据边界：** `SOURCE / LOCAL: GO`；新 head 的 `CI: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。旧 run `34984568841` 不得重用为新提交结论。
+
 2026-09-15 **R10：撤回 `f7486bbe2ed0124da68350aaba1c859f846522ce` 的 `SOURCE / LOCAL: GO`。**
 Grok 独立复审（session `76417146-b557-4787-9f0a-8e90a6e430f4`）在那个提交上复现出两条 P1，
 **两条我都在本机独立复现过**（先写测试、确认判红，再动实现）。锚点是 `f7486bbe2` 的直接
