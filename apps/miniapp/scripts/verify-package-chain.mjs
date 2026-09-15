@@ -162,8 +162,20 @@ assert(/onHide\(\)\s*\{[\s\S]{0,120}_clearCredentials\(\)/.test(codeJs) &&
 // 只清 data 的话，切后台再回来那一帧会用上一位用户的码重绘出一张可扫的二维码。
 assert(/_clearCredentials\(\)\s*\{[\s\S]{0,400}this\._codeRaw = ''/.test(codeJs),
   'package-code 同时清掉画码用的 _codeRaw 明文副本')
-assert(/onShow\(\)\s*\{[\s\S]{0,200}this\.loadOrder\(\)/.test(codeJs),
-  '回到 package-code 时重新向服务端取一次（订单可能已核销/过期/换了账号）')
+{
+  // 定长窗口 `[\s\S]{0,200}` 在这里第二次咬人了：onShow 里多写几行注释就会把
+  // `loadOrder()` 顶出窗口，断言在一段没变坏的代码上转红。取配对闭合的函数体。
+  const bare = stripComments(codeJs)
+  const at = bare.indexOf('onShow() {')
+  const body = at < 0 ? '' : bare.slice(at, bare.indexOf('\n  },', at))
+  assert(body.includes('this.loadOrder()'),
+    '回到 package-code 时重新向服务端取一次（订单可能已核销/过期/换了账号）')
+  // 但身份**只判一次**：判完还无条件再调一次 loadOrder，会让 loadOrder 自己那次判定
+  // 对上"快照已清空"，把 B 判成 'ok'，于是拿**上一位的 orderId** 用 B 的 token 发请求
+  //（服务端 requireOwned 必然 404），并把刚写好的「账号已切换」覆盖成 loading。
+  assert(/_enforceIdentity\(\) === 'changed'\) return/.test(body),
+    'package-code onShow 判成换人就到此为止，不得再调 loadOrder')
+}
 
 // ─────────────────────────────────────────────────────────────────────
 console.log('\n④ 提交载荷与服务端 DTO 一致，前端不计价不报页数')
@@ -675,8 +687,18 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     'package-code 发现身份变化时当场清掉凭证（request.js 续签失败会 auth.logout()，全程没有生命周期回调）')
   assert(/_accepts\(token\)\s*\{\s*const state = this\._enforceIdentity\(\)/.test(codeCode),
     '每个异步回调都先**执行**一遍身份判定（不是只查询它）')
-  assert(/state === 'changed' \|\| state === 'unusable'\) return false/.test(codeCode),
+  assert(/state === 'changed' \|\| state === 'unusable'\) \{/.test(codeCode),
     "只有 'changed' / 'unusable' 才拒收；'resignable'（同一个人的 JWT 自然过期）必须放行，否则补签救回来的响应也进不来")
+  // 补签**失败**那条路：request.js 补签不成时 auth.logout() 撤销资格，回调这一刻从
+  // 'resignable' 掉成 'unusable'。这一跳里快照始终是 ''，**不算换人**，所以 changed
+  // 分支不会执行 —— 没有任何人把 loading 写回 false，屏幕上留下一个既没有请求在跑
+  // 也没有出口的圈。
+  assert(/if \(state === 'unusable'\) this\._failClosedForIdentity\(token\)/.test(codeCode),
+    "package-code 'unusable' 时必须把页面从 loading 里解出来，不能只 return")
+  assert(/_failClosedForIdentity\(token\)\s*\{\s*if \(token && !this\._guard\.accepts\(token\)\) return/.test(codeCode),
+    '只在这条请求仍是本页当前那一条时才写错误态（切后台与 latest-wins 各有接手路径，写了会顶掉人家的 loading）')
+  assert(/loading: false/.test(codeCode) && /loadRecover: 'login'/.test(codeCode),
+    'fail-closed 态写 loading:false 并给出可执行的登录出口')
   assert(/sameAccount\(token\.identity, this\._account\)/.test(codeCode),
     '账号那一层走 page-guard.sameAccount（逐字比对会把"发起时刚过期、回调时补签成功"判成换人）')
   assert(/identityState === 'unusable'/.test(codeCode) && !/identityState !== 'ok'/.test(codeCode),

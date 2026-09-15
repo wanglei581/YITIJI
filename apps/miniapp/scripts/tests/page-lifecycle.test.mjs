@@ -55,13 +55,18 @@ function fakeCanvasNode() {
 
 /** 最小 wx 替身：只实现被测页面真正用到的那几个。storage 是一个普通 Map。 */
 function createWx(storage = new Map()) {
-  const calls = { navigateTo: [], redirectTo: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [] }
+  const calls = { navigateTo: [], redirectTo: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [], showLoading: [], hideLoading: [] }
+  // wx.showLoading / hideLoading 不是栈：hideLoading 无条件掀掉当前那一张遮罩，
+  // 不管它是谁挂上去的。所以替身用一个布尔记"现在屏幕上有没有遮罩"——
+  // 这正是 A 的迟到回调能掀掉 B 的遮罩那个缺陷的形状。
+  const loading = { visible: false }
   // navFail=true 时 redirectTo / navigateTo 走 fail 回调（模拟跳转失败）。
   const control = { navFail: false }
   return {
     storage,
     calls,
     control,
+    loading,
     getStorageSync: (key) => (storage.has(key) ? storage.get(key) : ''),
     setStorageSync: (key, value) => { storage.set(key, value) },
     removeStorageSync: (key) => { storage.delete(key) },
@@ -79,8 +84,8 @@ function createWx(storage = new Map()) {
     navigateBack: (opts) => { if (opts && opts.fail) opts.fail({ errMsg: 'no page' }) },
     showToast: (opts) => { calls.showToast.push(opts.title) },
     showModal: (opts) => { calls.showModal.push(opts); if (opts && opts.success) opts.success({ confirm: false }) },
-    showLoading: () => {},
-    hideLoading: () => {},
+    showLoading: (opts) => { calls.showLoading.push((opts && opts.title) || ''); loading.visible = true },
+    hideLoading: () => { calls.hideLoading.push(1); loading.visible = false },
     stopPullDownRefresh: () => {},
     setClipboardData: (opts) => { calls.clipboard.push(opts.data); if (opts.success) opts.success() },
     createSelectorQuery: () => ({
@@ -2562,4 +2567,126 @@ test('R5-5 打印订单页：请求在途时换账号（成功响应）—— A 
   assert.equal(page.data.pkgRows.length, 0)
   assert.ok(!JSON.stringify(page.data).includes('12345678'))
   assert.ok(!JSON.stringify(page.data).includes('87654321'))
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// X. R5 收口：补签**失败**之后的残留态，以及遮罩 / 请求的归属
+//
+// R5 主体证明的是「补签成功那条路走得通」。最终只读复审发现它漏了另一半：
+// request.js 补签**失败**时会 auth.logout() 撤销补签资格，于是回调那一刻账号状态从
+// 'resignable' 掉成 'unusable' —— 而 'unusable' 这一支只是让 _accepts 返回 false，
+// **没有任何人把页面从 loading 里解出来**。屏幕上留下一个永远转不完的圈：
+// 既没有请求在跑，也没有任何出口。这与 R4-1 修过的那个形态是同一种病，换了个触发点。
+// ══════════════════════════════════════════════════════════════════════
+
+test('R5-6 材料包码页：过期后补签也失败 —— 不得留下永久转圈，要给可执行的登录出口', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  expireNaturally(wx)                 // 打开之前 30 分钟的 JWT 就已经到点
+  const pending = []
+  const api = { getPackageOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+  page.onLoad({ orderId: 'pkg-A' })
+  page.onShow()
+  assert.equal(pending.length, 1, '前提：有补签资格时照常发请求')
+  assert.equal(page.data.loading, true, '前提：页面正为这条请求转着圈')
+
+  // request.js 的静默补签失败时会 auth.logout()（**撤销补签资格**），
+  // 然后把原始 401 抛给页面。于是回调这一刻账号状态从 resignable 掉成 unusable。
+  realAuth.logout()
+  pending[0].reject(Object.assign(new Error('unauthorized'), { statusCode: 401 }))
+  await flush()
+
+  assert.equal(page.data.loading, false, '不得停在「正在向服务端核对订单」上转不完')
+  assert.equal(page.data.ready, false)
+  assert.equal(page._codeRaw, '', '认不出人的会话不许留着到机码的明文副本')
+  assert.equal(page.data.pickupCode, '')
+  assert.equal(page.data.loadRecover, 'login', '必须给一条真正有效的下一步')
+  assert.ok(page.data.loadError, '必须说清为什么，不能只是空白')
+})
+
+test('R5-6 确认支付页报价：过期后补签也失败 —— 金额不得永远停在「正在核定」', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  expireNaturally(wx)
+  const { page, quotes } = payPage(wx, { quote: 'defer' })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  assert.equal(quotes.length, 1, '前提：有补签资格时照常发报价')
+  assert.equal(page.data.quoteState, 'loading', '前提：金额那一块正在转圈')
+
+  realAuth.logout()
+  quotes[0].reject(Object.assign(new Error('unauthorized'), { statusCode: 401 }))
+  await flush()
+
+  // 必须落到 error：模板只在 quoteState === 'error' 时才给出「重新核价」，
+  // 而 retryQuote 又只在 quoteState !== 'loading' 时才动 —— 停在 loading
+  // 等于同时锁死了展示和重试两条路。
+  assert.equal(page.data.quoteState, 'error', '不得永远停在 loading（那会让「重新核价」变成死按钮）')
+  assert.ok(page.data.quoteError, page.data.quoteError)
+  assert.equal(page.data.fee.total, '—', '取不到报价时不得编一个金额出来')
+
+  // 重试这条路必须是活的，且在没有身份时不得真的再打一次接口。
+  page.retryQuote()
+  assert.equal(quotes.length, 1, '认不出人的会话不该再发本人金额请求')
+  assert.equal(page.data.quoteState, 'error')
+})
+
+test('R5-6 材料包码页：换账号后回到本页 —— 不得拿 B 的 token 去要 A 的订单，说明也不许被覆盖', async () => {
+  const wx = createWx()
+  const auth = useRealAuth(wx, 'A')
+  const pending = []
+  const api = { getPackageOrder: () => { const d = deferred(); pending.push(d); return d.promise } }
+  const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+  page.onLoad({ orderId: 'pkg-A' })
+  page.onShow()
+  pending[0].resolve(A_PACKAGE)
+  await flush()
+  assert.equal(page._codeRaw, '87654321', '前提：A 的码确实取回来了')
+  const before = pending.length
+
+  switchAccount('B')
+  page.onShow()
+
+  // 身份只判一次。判成 changed 之后再调一次 loadOrder，会用 B 的 token 去要 A 的
+  // orderId（服务端 requireOwned 必然 404），并且把「账号已切换」覆盖成 loading。
+  assert.equal(pending.length, before, 'B 的 token 不得拿去要 A 的 orderId')
+  assert.equal(page.data.loadErrorTitle, '账号已切换', '这句说明不许被紧随其后的 loadOrder 覆盖掉')
+  assert.equal(page.data.loadRecover, 'orders', 'B 的落点是「我的 · 打印订单」，不是重试')
+  assert.equal(page.data.loading, false)
+  assert.equal(page._codeRaw, '')
+  assert.ok(!JSON.stringify(page.data).includes('87654321'))
+})
+
+test('R5-6 确认支付页：A 的迟到建单回调不得掀掉 B 正在进行的提交遮罩', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const { page, creates } = payPage(wx)
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  await flush()
+
+  page.continueFlow()                       // A 提交，遮罩挂上
+  assert.equal(creates.length, 1)
+  assert.equal(wx.loading.visible, true, '前提：A 的遮罩确实挂上了')
+
+  switchAccount('B')
+  page.onShow()                             // B 回到本页：A 的一切被复位
+  assert.equal(wx.loading.visible, false, '换人复位时不该把上一位的遮罩留在屏幕上')
+
+  page.continueFlow()                       // B 自己提交，遮罩再次挂上
+  assert.equal(creates.length, 2, 'B 必须能发起自己的那一次')
+  assert.equal(wx.loading.visible, true)
+
+  // A 的响应这才回来。hideLoading 无条件掀掉当前那一张遮罩，所以它必须排在归属判定之后。
+  creates[0].resolve({ id: 'ord-A' })
+  await flush()
+  assert.equal(wx.loading.visible, true,
+    'A 的迟到回调不得掀掉 B 的遮罩 —— B 的按钮还锁着、请求还在飞，屏幕却什么都没有了')
+  assert.equal(wx.calls.redirectTo.length, 0, '更不得把 B 带去 A 的到机码页')
+  assert.ok(!page._createdOrderId)
+
+  // B 的响应回来时才收起遮罩，并且跳的是 B 自己的订单。
+  creates[1].resolve({ id: 'ord-B' })
+  await flush()
+  assert.equal(wx.loading.visible, false, 'B 自己的回调必须收起遮罩，不能永远挂着')
+  assert.equal(wx.calls.redirectTo[0], '/pages/print-pickup/print-pickup?orderId=ord-B')
 })

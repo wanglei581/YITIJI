@@ -1257,6 +1257,28 @@ const PACKAGE_CHAIN_PAGES = [
   if (!methodBody(payBare, 'onShow').includes('_resolveAccount()')) {
     misses.push('onShow 没有重新核账号（换账号后回到本页，A 的建单锁会锁死 B）')
   }
+  // R5 收口：`wx.hideLoading()` 不是栈 —— 它无条件掀掉当前屏幕上那一张遮罩，不管是谁挂的。
+  // 放在归属判定之前，A 的迟到回调就会掀掉 B 正在进行的那次提交的遮罩：B 的按钮还锁着、
+  // 请求还在飞，屏幕上却什么都没有了。遮罩必须认主：谁挂的谁收。
+  if (/wx\.hideLoading\(/.test(flow)) {
+    misses.push('建单链直接调了 wx.hideLoading()（遮罩不认主，A 的迟到回调会掀掉 B 的）')
+  }
+  if (!/_releaseLoading\(attempt\)/.test(flow)) misses.push('建单回调没有按尝试归属收遮罩')
+  const release = methodBody(payBare, '_releaseLoading')
+  if (!/this\._createAttempt !== attempt\) return/.test(release)) {
+    misses.push('_releaseLoading 没有在遮罩已归后来那次提交时让开')
+  }
+  // 报价：补签**失败**后账号从 'resignable' 掉成 'unusable'，这一跳快照始终是空、不算换人，
+  // 没有人写终态。停在 'loading' 会同时锁死展示与重试（模板只在 error 时给「重新核价」，
+  // retryQuote 又只在非 loading 时才动）。
+  if (!/if \(state === 'unusable'\) this\._failClosedQuote\(token\)/.test(payBare)) {
+    misses.push("报价 'unusable' 时没有把金额从「正在核定」里解出来（永久 loading）")
+  }
+  const failQuote = methodBody(payBare, '_failClosedQuote')
+  if (!/token\.channel !== 'quote'\) return/.test(failQuote)) {
+    misses.push('_failClosedQuote 没有只管报价通道（文件名那条链失败本来就是静默的）')
+  }
+  if (!/quoteState: 'error'/.test(failQuote)) misses.push('fail-closed 报价没有落到 error（「重新核价」会是死按钮）')
   if (!printPayWxml.includes('createdLocked')) misses.push('模板没有反映「订单已创建」的锁定态')
   if (!printPayJs.includes("wx.navigateTo({ url: '/pages/orders/orders'")) misses.push('锁定后没有给出找回订单的出口')
   // print-pay → print-pickup 只带 orderId。

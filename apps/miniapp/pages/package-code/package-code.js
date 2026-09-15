@@ -123,10 +123,44 @@ Page({
    */
   _accepts(token) {
     const state = this._enforceIdentity()
-    if (state === 'changed' || state === 'unusable') return false
+    if (state === 'changed' || state === 'unusable') {
+      // 'changed' 时 _enforceIdentity 已经写好终态。'unusable' 没有人写 ——
+      // 而页面很可能正**为这条请求**转着圈，只 return 就是一个永远转不完的圈。
+      if (state === 'unusable') this._failClosedForIdentity(token)
+      return false
+    }
     if (!token || token.orderId !== this.data.orderId) return false
     if (!sameAccount(token.identity, this._account)) return false
     return this._guard.accepts(token)
+  },
+
+  /**
+   * 身份不可用时把页面从 loading 里解出来，fail-closed 到一页**说得清、点得动**的错误态。
+   *
+   * 触发它的是补签**失败**那条路：打开页面时 JWT 已经过期（快照还是空的），本页因为仍有
+   * 补签资格而照常发请求；`utils/request.js` 补签失败时调 `auth.logout()` **撤销资格**，
+   * 再把原始 401 抛回来。于是回调这一刻账号状态从 `'resignable'` 掉成 `'unusable'` ——
+   * 这一跳里快照始终是 `''`，不算"换人"，所以 `_enforceIdentity` 的 changed 分支不会执行，
+   * 没有任何人把 `loading` 写回 false。屏幕上就留下一个既没有请求在跑、也没有出口的圈。
+   *
+   * 只在这条请求**仍然是本页当前那一条**时才写。`_accepts` 返回 false 还有另外两个原因，
+   * 它们各自有接手的路径，在这里写错误态反而会把人家的 loading 顶掉：
+   *   - 切后台 / 卸载（`isActive()` 为 false）：回到前台时 onShow 会重新取一次；
+   *   - 被更新一次请求顶掉（latest-wins）：那一次自己会写终态。
+   * `_guard.accepts(token)` 一次就把这两条都问掉了（它查的正是 active + 代次 + 本通道最新）。
+   */
+  _failClosedForIdentity(token) {
+    if (token && !this._guard.accepts(token)) return
+    this._clearCredentials()
+    this.setData({
+      ready: false, loading: false, pickupCode: '', showQr: false,
+      // 登录了却拿不到会员 id 时不说「请先登录」——那句话会让用户以为自己没登录。
+      loadErrorTitle: auth.isLoggedIn() ? '登录状态不完整' : '请先登录',
+      loadError: auth.isLoggedIn()
+        ? '当前会话缺少会员标识，无法确认这张订单是不是本人的。请重新登录一次再查看。'
+        : '到机码只对订单本人显示，请登录后再查看。',
+      loadRecover: 'login',
+    })
   },
 
   onReady() {
@@ -137,7 +171,13 @@ Page({
   onShow() {
     // 每次回到本页都重新向服务端核一遍：订单可能已被核销、已过期，或者换了登录账号。
     this._guard.activate()
-    this._enforceIdentity()
+    // 身份**只判一次**，并且判成 'changed' 就到此为止。
+    //
+    // 此前这里判完还无条件再调一次 loadOrder，而 loadOrder 自己又判一次 —— 那时快照
+    // 已经被清空，B 的身份对上"快照为空"就成了 'ok'，于是本页拿着**上一位的 orderId**
+    // 用 B 的 token 发请求（服务端 requireOwned 必然 404），并且把刚写好的
+    // 「账号已切换」覆盖成 loading。B 的落点是「我的 · 打印订单」，不是这一页。
+    if (this._enforceIdentity() === 'changed') return
     this.loadOrder()
   },
 
@@ -188,18 +228,8 @@ Page({
     // 'resignable' 与 'ok' 一样**真的发请求**：本地 token 自然过期但没人登出时，
     // 必须让它进 request.js —— 那里拿到 401 会静默补签一次再重发，用户全程无感。
     // 在本页先拦下来，等于把一个能自己修好的过期会话变成一页转不完的 loading。
-    if (identityState === 'unusable') {
-      this.setData({
-        ready: false, loading: false, pickupCode: '', showQr: false,
-        // 登录了却拿不到会员 id 时不说「请先登录」——那句话会让用户以为自己没登录。
-        loadErrorTitle: auth.isLoggedIn() ? '登录状态不完整' : '请先登录',
-        loadError: auth.isLoggedIn()
-          ? '当前会话缺少会员标识，无法确认这张订单是不是本人的。请重新登录一次再查看。'
-          : '到机码只对订单本人显示，请登录后再查看。',
-        loadRecover: 'login',
-      })
-      return
-    }
+    // 与回调里那条路共用同一个出口（同一句文案、同一个恢复动作），不维护第二份。
+    if (identityState === 'unusable') { this._failClosedForIdentity(); return }
     // 令牌带上 orderId：重复刷新只认最新一次，旧响应既不能把终态改回去，
     // 也不能拿另一张订单的数据覆盖当前这张。
     const token = this._guard.issue('order', { orderId })

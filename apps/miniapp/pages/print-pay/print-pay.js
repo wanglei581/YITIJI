@@ -135,6 +135,9 @@ Page({
    * `_guard.setIdentity('')` 会 +1 代次，把 A 在途的报价 / 文件名请求一并作废。
    */
   _resetForAccountChange(switched) {
+    // 上一位的提交遮罩必须当场收起：本页已经复位成一张空白确认页，屏幕上却还盖着
+    // 一张「正在提交…」——而那次提交已经不属于任何人了。
+    this._releaseLoading(this._createAttempt)
     this._guard.setIdentity('')
     this._createdOrderId = null
     this._createAttempt = null
@@ -156,9 +159,40 @@ Page({
   /** 异步响应还能不能写进 data：账号没变（含补签升级）+ 本通道最新一次。 */
   _accepts(token) {
     const state = this._resolveAccount()
-    if (state === 'changed' || state === 'unusable') return false
+    if (state === 'changed' || state === 'unusable') {
+      // 'changed' 时 _resolveAccount 已经复位并写好说明。'unusable' 没有人写 ——
+      // 而金额那一块很可能正**为这条报价**转着圈，只 return 就是永远「正在核定」。
+      if (state === 'unusable') this._failClosedQuote(token)
+      return false
+    }
     if (!sameAccount(token && token.identity, this._account)) return false
     return this._guard.accepts(token)
+  },
+
+  /**
+   * 报价因身份不可用被拒收时，把金额那一块从「正在核定」里解出来。
+   *
+   * 触发它的是补签**失败**那条路：进入本页时 JWT 已经过期（快照还是空的），报价因为仍有
+   * 补签资格而照常发出；`utils/request.js` 补签失败时调 `auth.logout()` **撤销资格**，
+   * 再把原始 401 抛回来 —— 于是回调这一刻从 `'resignable'` 掉成 `'unusable'`，
+   * 这一跳里快照始终是 `''`，不算换人，没有任何人把 `quoteState` 写回去。
+   * 停在 `'loading'` 会同时锁死两条路：模板只在 `'error'` 时才给「重新核价」，
+   * 而 `retryQuote` 又只在 `quoteState !== 'loading'` 时才动。
+   *
+   * 只管报价通道：文件名那条链失败本来就是静默的（它只是一个让用户确认"我选的是哪一份"
+   * 的标签），在这里替它写一个金额错误会答非所问。
+   * 也只在这条报价仍是当前那一条时才写 —— 切后台与 latest-wins 各有接手路径，
+   * `_guard.accepts(token)` 一次把这两条都问掉。
+   */
+  _failClosedQuote(token) {
+    if (!token || token.channel !== 'quote') return
+    if (!this._guard.accepts(token)) return
+    this.setData({
+      quoteState: 'error',
+      quoteError: auth.isLoggedIn()
+        ? '当前会话缺少会员标识，无法核定本人订单金额。请重新登录一次。'
+        : '登录状态已失效，请重新登录后再核价。',
+    })
   },
 
   /**
@@ -271,6 +305,22 @@ Page({
   },
 
   /**
+   * 收起**这次尝试自己挂上去的**那张遮罩。
+   *
+   * `wx.hideLoading()` 不是栈，它无条件掀掉当前屏幕上那一张，不管是谁挂的。于是
+   * A 的迟到回调只要先调一次，就会把 B 正在进行的那次提交的遮罩掀掉 —— B 的按钮还锁着、
+   * 请求还在飞，屏幕上却什么都没有了，用户会以为已经结束。所以遮罩要认主：
+   * 谁挂的谁收，尝试被换掉之后就不再碰它。
+   */
+  _releaseLoading(attempt) {
+    if (!attempt || !attempt.loading) return
+    attempt.loading = false
+    // 遮罩已经归后来那次提交了（换人复位之后 B 又点了一次）：不许碰。
+    if (this._createAttempt && this._createAttempt !== attempt) return
+    wx.hideLoading()
+  },
+
+  /**
    * 订单已经建出来之后的统一出口。
    *
    * 存在的唯一理由：**再 POST 一次就是第二张订单**（`POST /me/print-orders` 没有幂等键）。
@@ -280,6 +330,7 @@ Page({
   _lockAfterCreated(orderId) {
     this._createdOrderId = orderId
     if (this._createAttempt) this._createAttempt.settled = true
+    this._releaseLoading(this._createAttempt)
     this.setData({ submitting: false, createdLocked: true })
   },
 
@@ -319,7 +370,7 @@ Page({
     // 自然过期会被读成换人：订单其实已经建出来了，本页却不锁、还把按钮解开 ——
     // 用户以为没下成，再点一次就是第二张订单和第二笔钱（没有幂等键）。
     // 绑在尝试上的账号是发出那一刻的真值，过期清不掉它。
-    const attempt = { account: this._account, settled: false }
+    const attempt = { account: this._account, settled: false, loading: true }
     this._createAttempt = attempt
     this.setData({ submitting: true })
     wx.showLoading({ title: '正在提交…', mask: true })
@@ -331,14 +382,15 @@ Page({
       colorMode: 'black_white',
       duplex: 'simplex',
     }).then(order => {
-      wx.hideLoading()
+      // 归属判定必须排在 hideLoading **之前**：hideLoading 无条件掀掉当前那张遮罩，
+      // A 的迟到回调一旦先调它，掀掉的就是 B 正在进行的那次提交的遮罩。
+      if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) {
+        this._releaseLoading(attempt)
+        return
+      }
+      this._releaseLoading(attempt)
       const orderId = (order && order.id) || ''
       if (!orderId) throw new Error('服务端未返回订单号')
-      // 真的换了人 / 登出：这张订单属于上一位，不锁当前这位的页面、也不把他带去别人的
-      // 到机码。上一位的订单不会丢，它已落库，本人可从「我的 · 打印订单」找回。
-      // _resolveAccount 在 'changed' 时已经把这次尝试连同建单锁一起复位了，
-      // 所以这里用"尝试还是不是刚才那一次"判定，B 因此可以安全地发起自己的那一次。
-      if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) return
       // 走到这里账号仍是发起时那位（含"JWT 刚好在途中自然过期"这一种）。
       // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
       // 锁必须在 redirectTo **之前**设 —— 跳转失败（或同步抛）时页面还留在这里，
@@ -352,8 +404,17 @@ Page({
         fail: () => this._lockAfterCreated(orderId),
       })
     }).catch(err => {
-      wx.hideLoading()
-      if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) return
+      // 同上：先判归属，再动遮罩。
+      // 真的换了人 / 登出：这张订单（如果建成了）属于上一位，不锁当前这位的页面、
+      // 也不把他带去别人的到机码。上一位的订单不会丢，它已落库，本人可从
+      // 「我的 · 打印订单」找回。_resolveAccount 在 'changed' 时已经把这次尝试连同
+      // 建单锁一起复位了，所以这里用"尝试还是不是刚才那一次"判定，
+      // B 因此可以安全地发起自己的那一次。
+      if (this._resolveAccount() === 'changed' || this._createAttempt !== attempt) {
+        this._releaseLoading(attempt)
+        return
+      }
+      this._releaseLoading(attempt)
       // 订单已经建成、只是后续动作抛错（例如 redirectTo 同步抛）：
       // 不能当成"下单失败"让用户重来 —— 重来就是第二张订单。
       if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }

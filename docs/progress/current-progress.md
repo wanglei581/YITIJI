@@ -12,6 +12,81 @@
 生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
 此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
 
+2026-09-15 **R5 收口：撤回 `c42818c115a0d57e33e94b41eb63aa8a275b37db` 的「可进入三方复审 / 开 PR」
+结论 —— 该 SHA 上仍有 1 个 P1 + 3 个 P2，已在本地修完并追加一个提交（不 amend）。**
+锚点是 `c42818c11` 的直接子提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+R5 主体只证明了「补签**成功**那条路走得通」。最终只读复审补上了另一半：`utils/request.js`
+静默补签**失败**时会 `auth.logout()` **撤销补签资格**，于是回调那一刻账号状态从
+`'resignable'` 掉成 `'unusable'`。而这一跳里账号快照**始终是 `''`**（打开页面时 JWT 就已经
+过期，本页还没显示过任何本人数据）—— 不算换人，`changed` 分支不会执行，**没有任何人把页面
+从 loading 里解出来**。屏幕上留下一个既没有请求在跑、也没有任何出口的圈：这与 R4-1 修过的
+那个形态是同一种病，只是换了触发点。四条：
+
+- **P1 · 材料包到机码页永久转圈。** 过期 → 发请求 → 补签失败 → 401 reject → `catch` 里
+  `_accepts` 因 `'unusable'` 返回 false → `return`，`loading: true` 就此留在屏幕上。
+  修法：`'unusable'` 时走 `_failClosedForIdentity(token)` —— 清凭证、`loading: false`、
+  写清原因并给 `loadRecover: 'login'`。**只在这条请求仍是本页当前那一条时才写**
+  （`_guard.accepts(token)` 一次问掉「切后台」与「latest-wins」两种，在那两种情况下写错误态
+  会把接手者的 loading 顶掉）。`loadOrder` 的同类分支也改成调用同一个出口，不维护第二份文案。
+- **P2 · 确认支付页报价永久「正在核定」。** 同一形态。停在 `'loading'` 会**同时锁死展示和
+  重试**：模板只在 `quoteState === 'error'` 时才给「重新核价」，而 `retryQuote` 又只在
+  `quoteState !== 'loading'` 时才动。修法：`_failClosedQuote(token)` 落到 `error` 并说清要
+  重新登录；**只管报价通道**（文件名那条链失败本来就是静默的，替它写一个金额错误会答非所问）。
+- **P2 · 材料包到机码页 `onShow` 身份判了两次。** 判成 `'changed'` 后仍无条件再调
+  `loadOrder`，而 `loadOrder` 自己那次判定对上「快照已清空」，把 B 判成 `'ok'` —— 于是本页
+  拿着**上一位的 orderId** 用 B 的 token 发请求（服务端 `requireOwned` 必然 404），
+  并把刚写好的「账号已切换」覆盖成 loading。修法：`onShow` 只判一次，判成换人就到此为止。
+  模板在 `loadRecover === 'orders'` 时只给「去我的打印订单」一个按钮，没有可点的重试，
+  所以这条自动路径关掉之后，B 已无路径拿 A 的 orderId 发请求。
+- **P2 · 确认支付页 `wx.hideLoading()` 排在归属判定之前。** `hideLoading` 不是栈，它**无条件
+  掀掉当前屏幕上那一张遮罩，不管是谁挂的**。A 的迟到回调先调它，掀掉的就是 B 正在进行的那次
+  提交的遮罩 —— B 的按钮还锁着、请求还在飞，屏幕上却什么都没有了。修法：遮罩认主
+  （`attempt.loading`），归属判定排在前面，换人复位时由复位方收起上一位的遮罩，
+  谁挂的谁收；尝试被换掉之后就不再碰它。
+
+**四条都是先写测试证明缺陷存在、再修。** 新增 4 条真执行测试（真实顺序：真 `utils/auth.js`
++ 真 JWT + 真 storage，`realAuth.logout()` 模拟补签失败），在修之前逐条判红
+（`not ok 95 / 96 / 97 / 98`），修完 98/98 全绿。`wx` 替身补上 `showLoading` / `hideLoading`
+的可见性跟踪（用布尔而不是计数 —— 这正是「谁都能掀掉遮罩」那个缺陷的形状）。
+
+**反向变异 8 条，全部判红**（逐字节还原，未用 checkout / reset）：
+`N1` unusable 只 return（永久转圈）`tests=1`、`N2` fail-closed 不写 `loading:false` `tests=1`、
+`N3` `onShow` 判完仍无条件 `loadOrder` `tests=1`、`N4` 报价 unusable 只 return `tests=1`、
+`N5` `hideLoading` 排在归属判定之前 `tests=1`、`N6` 遮罩不认主 `verify:static=1`（纵深防御，
+`attempt.loading` 先挡住了，行为上不可观测，如实登记）。另把 R5 主体里因本轮改动而失配的
+两条变异按新代码**重新表述**并重跑：`M6'` 建单回调改回读缓存快照 `tests=1`、
+`M11'` `_accepts` 放行 changed/unusable `tests=1` —— **`M11'` 本轮从「只被门禁判红」升级成
+被可执行测试判红**（`'unusable'` 这一支现在是载荷路径，不再只是一个 return）。
+R5 主体其余 9 条变异原样重跑，仍全部判红。
+
+门禁侧只做了**补强**，没有替代行为测试：`verify-package-chain` 里 package-code `onShow` 那条
+断言的定长窗口 `[\s\S]{0,200}`（多写几行注释就把 `loadOrder()` 顶出窗口）换成配对闭合取函数体，
+并补上「判成换人就到此为止」；`_accepts` 那条补上「`'unusable'` 必须解出 loading」与
+「只在当前那条请求上写」。`verify-miniapp-static` 补上 print-pay 的「建单链不得直接
+`wx.hideLoading()`」「遮罩要让位」「报价 fail-closed 落到 error 且只管报价通道」。
+
+本机独立复跑（全部退出码 0）：生命周期测试 **98/98**、小程序 `verify:static`（132 PASS）、
+`verify:package-chain`、API `verify:miniapp-cloud-print-m2`（隔离库跑完删除）、根
+`verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync`、
+`git diff --check`、`pnpm graph:check`（**本轮无漂移，`docs/graph/**` 未改动**）。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION /
+COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、
+未接真实 API、未真机、未部署。写入范围只有 `apps/miniapp/pages/package-code/**`、
+`apps/miniapp/pages/print-pay/**`、`apps/miniapp/scripts/**` 与本文件 / `next-tasks.md`；
+`utils/auth.js`、`utils/request.js`、`orders.js`、`utils/page-guard.js` 本轮**一行未改**
+（前三者是禁改项且现有范围足以收口，`page-guard` 的状态机本身没有问题 —— 问题在页面拿到
+`'unusable'` 之后没有人写终态）。
+
+**本轮新增登记的遗留：**
+
+- `_releaseLoading` 的「遮罩已归后来那次提交就让开」是**纵深防御**，行为上不可观测
+  （`attempt.loading` 已经先挡住了）。只被静态门禁钉住，没有为了凑数去编一条测试。
+- 其余 R5 遗留（`orders.js` 自然过期仍按清场处理、账号快照销毁依赖页面下一次判定）
+  本轮**未动**，仍按上一节原样登记。
+
 2026-09-15 **小程序 R5：R4 那条「四态身份判定」只修对了一半，本轮补齐；同时撤回 R4 的一处
 过度声明。锚点是 `35385f2cddd9f6735dc840e7904479ceedd5d2c0` 的直接子提交（本分支 tip），
 基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。**
