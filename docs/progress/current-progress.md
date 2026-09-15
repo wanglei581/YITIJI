@@ -12,6 +12,35 @@
 生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
 此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
 
+2026-09-15 **小程序材料包 R4 本地候选已完成三方审查后的 P1 收口；运行时代码证据锚点为
+`70bc85f10a11dbeb62206a055fcdd2c500654060`，基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。** 该提交只改
+`apps/miniapp/**`，没有改 API、schema、其它端、工作流、生产配置或密钥。当前仍是
+**未 push / 未开 PR / 未合并 / 未跑 GitHub CI / 未进微信开发者工具 / 未真机 / 未部署**；
+因此只能判 `SOURCE / LOCAL: GO`，不能写成小程序、生产或商业可用。
+
+R4 修掉最终只读复审发现的真实生命周期缺陷：单件取件页区分可静默补签、真未登录、会员 id
+不可用与换人四态，不再永久卡在 loading；打印订单页在前台 401 / 登出时立即清掉已渲染的订单与
+到机码；文件选择变化会作废在途隐私扫描与逐条确认；材料包确认页的建单锁、提交锁和协议同意不再
+跨身份继承；协议原文链接移出 checkbox 的 label，必须由用户显式勾选；双面 / 彩色未登记能力的
+真实服务端错误码会引导用户更换服务点；单件 `print-store -> print-pay -> print-pickup` URL 只保留
+必要的非敏感参数，金额与页数从服务端重新报价，建单成功后先锁 orderId，跳转失败可从本人订单找回
+且不得重复 POST；取件页仅在最近一次服务端状态仍可信时短暂保留凭证，持续失联或终态立即撤码。
+
+本机独立复跑：小程序 `verify:static` 退出码 0（132 PASS，生命周期测试 **77/77**）；API
+`verify:miniapp-cloud-print-m2` 退出码 0；根 `verify:repository-integrity`、
+`verify:ci-gate-coverage`、`verify:deploy-gates-in-sync` 均为 0；`git diff --check` 为 0。
+`pnpm graph:check` 首次因新增门禁覆盖产生 3 个生成文件漂移，已用标准命令 `pnpm graph` 重生成
+`docs/graph/README.md`、`gates.md`、`graph.json`，未手改生成物。该图谱 / 文档收尾会形成
+`70bc85f10` 之后的 PR final head；**最终 CI 必须绑定那个 final head，不能沿用运行时代码提交的
+本地结果。**
+
+独立审查账本：Grok 对 `faae6c6b` 判 `PARTIAL` 并给出能力码、前台清场、取件页 loading、
+跨身份建单锁、协议 label 与单件 URL 等 P1；Claude 判 `NO-GO`，另复现静默补签被截断与隐私扫描
+代次缺口；Agy 判 `PARTIAL`，确认未登录取件页永久 loading。上述问题已收敛进 `70bc85f10`，但
+该新 SHA 仍需 Grok / Claude / Agy 最终只读复审，且微信开发者工具、真实 API、Windows / 奔图与
+生产证据均未完成。
+
 2026-09-15 **材料包候选：Grok 对抗审查（NO-GO）判出的 1 个 P0 + 10 个 P1 已在本地修完
 （本地候选：未 push / 未开 PR / 未合并 / 未跑 CI / 未进微信开发者工具 / 未真机 / 未部署）。**
 基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`；在冻结审查点

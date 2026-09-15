@@ -67,7 +67,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1460 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1464 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -828,7 +828,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/miniapp/pages/</code> — 32 个文件</summary>
+<summary><code>apps/miniapp/pages/</code> — 34 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -847,12 +847,13 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/pages/membership/membership.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/notifications/notifications.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/order-detail/order-detail.js` | `verify-miniapp-static.mjs` |
-| `apps/miniapp/pages/orders/orders.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/pages/orders/orders.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
 | `apps/miniapp/pages/package-code/package-code.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
-| `apps/miniapp/pages/package-confirm/package-confirm.js` | `verify-package-chain.mjs` |
+| `apps/miniapp/pages/package-confirm/package-confirm.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
+| `apps/miniapp/pages/package-create/package-create.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/pages/policies/policies.js` | `verify-empty-state-honesty.mjs` |
 | `apps/miniapp/pages/print-pay/print-pay.js` | `verify-miniapp-static.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
-| `apps/miniapp/pages/print-pickup/print-pickup.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/pages/print-pickup/print-pickup.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
 | `apps/miniapp/pages/print-store/print-store.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/print-upload/print-upload.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/print/print.js` | `verify-miniapp-static.mjs` |
@@ -864,6 +865,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/pages/self-explore/append-print.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/self-explore/self-explore.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/settings/settings.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/pages/store-select/store-select.js` | `verify-package-chain.mjs` |
 
 </details>
 
@@ -877,17 +879,18 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/miniapp/scripts/</code> — 2 个文件</summary>
+<summary><code>apps/miniapp/scripts/</code> — 3 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/miniapp/scripts/api-contract.json` | `verify-profile-documents-inkpaper.mjs` |
+| `apps/miniapp/scripts/tests/page-lifecycle.test.mjs` | `verify-package-chain.mjs` |
 | `apps/miniapp/scripts/verify-miniapp-static.mjs` | `verify-miniapp-static.mjs` |
 
 </details>
 
 <details>
-<summary><code>apps/miniapp/utils/</code> — 8 个文件</summary>
+<summary><code>apps/miniapp/utils/</code> — 9 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -895,7 +898,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/utils/auth.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/config.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/normalize.js` | `verify-miniapp-static.mjs` |
-| `apps/miniapp/utils/package-feature.js` | `verify-package-chain.mjs` |
+| `apps/miniapp/utils/package-order.js` | `verify-package-chain.mjs` |
+| `apps/miniapp/utils/page-guard.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/utils/pickup-qrcode.js` | `verify-miniapp-static.mjs`<br/>`verify-pickup-qrcode.mjs`<br/>`verify-backend-p0-contracts.mjs` |
 | `apps/miniapp/utils/request.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/storage.js` | `verify-miniapp-static.mjs` |

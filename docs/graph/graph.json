@@ -18907,13 +18907,18 @@
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/pages/orders/orders.js": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/pages/package-code/package-code.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/pages/package-confirm/package-confirm.js": [
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
+    "apps/miniapp/pages/package-create/package-create.js": [
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/pages/policies/policies.js": [
@@ -18924,7 +18929,8 @@
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts"
     ],
     "apps/miniapp/pages/print-pickup/print-pickup.js": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/pages/print-store/print-store.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
@@ -18959,11 +18965,17 @@
     "apps/miniapp/pages/settings/settings.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/pages/store-select/store-select.js": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
     "apps/miniapp/project.config.json": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/scripts/api-contract.json": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+    ],
+    "apps/miniapp/scripts/tests/page-lifecycle.test.mjs": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/scripts/verify-miniapp-static.mjs": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
@@ -18986,7 +18998,10 @@
     "apps/miniapp/utils/normalize.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
-    "apps/miniapp/utils/package-feature.js": [
+    "apps/miniapp/utils/package-order.js": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
+    "apps/miniapp/utils/page-guard.js": [
       "apps/miniapp/scripts/verify-package-chain.mjs"
     ],
     "apps/miniapp/utils/pickup-qrcode.js": [
@@ -26757,6 +26772,7 @@
           "apps/miniapp/pages/order-detail/order-detail.js",
           "apps/miniapp/pages/orders/orders.js",
           "apps/miniapp/pages/package-code/package-code.js",
+          "apps/miniapp/pages/package-confirm/package-confirm.js",
           "apps/miniapp/pages/print-pay/print-pay.js",
           "apps/miniapp/pages/print-pickup/print-pickup.js",
           "apps/miniapp/pages/print-store/print-store.js",
@@ -26812,10 +26828,16 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/miniapp/pages/orders/orders.js",
           "apps/miniapp/pages/package-code/package-code.js",
           "apps/miniapp/pages/package-confirm/package-confirm.js",
+          "apps/miniapp/pages/package-create/package-create.js",
+          "apps/miniapp/pages/print-pickup/print-pickup.js",
+          "apps/miniapp/pages/store-select/store-select.js",
+          "apps/miniapp/scripts/tests/page-lifecycle.test.mjs",
           "apps/miniapp/utils/api.js",
-          "apps/miniapp/utils/package-feature.js"
+          "apps/miniapp/utils/package-order.js",
+          "apps/miniapp/utils/page-guard.js"
         ],
         "missing": []
       },
