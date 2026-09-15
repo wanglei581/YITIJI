@@ -15,6 +15,7 @@
 //   - 营业时间与「打印/扫描/复印」设施标签：能力是逐台登记在管理员后台的，
 //     统一贴三个标签等于替所有机器宣称它们都能扫描复印。
 const api = require('../../utils/api')
+const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
 
 Page({
@@ -32,15 +33,37 @@ Page({
 
   onLoad() {
     const app = getApp()
-    // 深链直接打开本页时 storage 里没有材料包草稿，选完服务点也无从下单。
-    // 不能假装流程正常：直接给一个说得清、能恢复的状态。
+    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 44 })
+    this._syncDraft()
+    this._loadStores()
+  },
+
+  onShow() {
+    // 换了账号之后，上一位的草稿不再算数 —— 它里面的 fileId 属于别人，
+    // 拿它继续选服务点只会在下一步被服务端拒（PRINT_FILE_NOT_FOUND）。
+    this._syncDraft()
+  },
+
+  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  _identityKey() {
+    if (!auth.isLoggedIn()) return ''
+    return 'u:' + String((auth.getUser() || {}).id || '')
+  },
+
+  /**
+   * 本页只做一件与身份有关的事：确认草稿是**当前这位**留下的。
+   *
+   * 深链直接打开本页、或者换了账号时 storage 里那份草稿都不该算数，
+   * 选完服务点也无从下单。不能假装流程正常：直接给一个说得清、能恢复的状态。
+   * 服务点列表本身是公开数据（GET /terminals/public，无需登录），
+   * 不含任何个人信息，因此本页不需要按代次丢弃它的响应。
+   */
+  _syncDraft() {
+    const identity = this._identityKey()
     const draft = wx.getStorageSync('temp_package_data')
     const files = draft && Array.isArray(draft.files) ? draft.files.filter((f) => f && f.fileId) : []
-    this.setData({
-      statusBarHeight: app.globalData.statusBarHeight || 44,
-      hasPackageData: files.length > 0,
-    })
-    this._loadStores()
+    const owned = !!identity && !!draft && String(draft.ownerKey || '') === identity
+    this.setData({ hasPackageData: owned && files.length > 0 })
   },
 
   _loadStores() {
@@ -114,8 +137,25 @@ Page({
     }
     const store = stores.find((s) => s.id === selectedStore)
     if (!store) return
+    // 现读草稿而不是用 onLoad 时的快照：这中间可能已经换了人，或草稿已被清掉。
+    const draft = wx.getStorageSync('temp_package_data') || {}
+    const identity = this._identityKey()
+    if (!identity || String(draft.ownerKey || '') !== identity) {
+      this.setData({ hasPackageData: false })
+      this.backToFiles()
+      return
+    }
+    // 服务点跟着草稿走：绑同一个 ownerKey 与 draftId，确认页会逐字核对。
+    // 不绑的话，上一份草稿选的机器会被接到这一份上 —— 用户在确认页看到的是
+    // 一台他这次根本没选过的一体机，而下单真的会下到那台上。
     // 先落存储再跳转：跳转 success 里再写会在慢设备上出现下一页读到空值的窗口。
-    wx.setStorageSync('temp_selected_store', { id: store.id, name: store.name, address: store.address })
+    wx.setStorageSync('temp_selected_store', {
+      id: store.id,
+      name: store.name,
+      address: store.address,
+      ownerKey: identity,
+      draftId: String(draft.draftId || ''),
+    })
     wx.navigateTo({ url: '/pages/package-confirm/package-confirm' })
   },
 })

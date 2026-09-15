@@ -289,9 +289,10 @@ console.log('\n⑥ 六态齐全：loading / empty / error / 未登录 / 分页 /
   assert(singleRowsIdx > 0 && singleErrIdx > singleRowsIdx, '单件打印已有内容的分支排在失败分支之前')
 }
 // 换用户必须清干净：共用设备上上一位的材料包列表与到机码不能留在页面数据里。
-assert(/_identityKey/.test(ordersJs) && /_resetAll\(\)/.test(ordersJs),
+assert(/_identityKey\(\)/.test(ordersJs) && /_resetAll\(\)/.test(ordersJs),
   'orders.js 按会员 id 判断换用户并整体清空两个分区')
-assert(/_identityKey/.test(createJs), 'package-create 按会员 id 判断换用户并清空文件列表与草稿')
+assert(/_identityKey\(\)/.test(createJs) && /_resetForIdentity\(\)/.test(createJs),
+  'package-create 按会员 id 判断换用户并清空文件列表与草稿')
 
 // ─────────────────────────────────────────────────────────────────────
 console.log('\n⑦ 不得出现在线支付，也不得留下只会 404 的死方法')
@@ -328,6 +329,118 @@ for (const [label, wxml] of [['package-create', createWxml], ['store-select', st
   const banned = ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理', '一键打印材料包'].filter((w) => wxml.includes(w))
   assert(banned.length === 0, `${label} 无违规文案（命中：${banned.join(',') || '无'}）`)
   assert(!wxml.includes('取件码'), `${label} 不把到机码叫「取件码」（那是付款后才生成的另一个码）`)
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ⑨ 身份生命周期与请求代次：迟到的响应不得污染新身份、不得复活已清掉的凭证
+//
+// 本段钉的是**机制存在**，真正证明"旧响应写不进来"的是
+// scripts/tests/page-lifecycle.test.mjs（真跑页面生命周期与乱序 resolve）。
+// 两者缺一不可：静态断言防止有人把守卫顺手删掉，真执行测试防止守卫写了但不生效。
+//
+// 为什么必须有这一层（2026-09-15 修的 P1/P2）：
+//   - `loading` 布尔锁只能挡"并发发起第二次"，挡不住"迟到的第一次"——
+//     请求发出时锁是开的，回调执行时早被别的路径清掉了。
+//   - package-code 的 onHide 已经清了凭证，但在途的 getPackageOrder 回来时
+//     页面已重新 activate，它会把刚清掉的到机码原样写回去，码就这么"复活"。
+//   - 同一条链重复刷新时旧响应晚到，会把已经核销的终态改回"待到机"，
+//     用户拿着一张作废的码去机器前。
+console.log('\n⑨ 身份快照 + 请求代次 + 生命周期：迟到的响应不得落地')
+{
+  const GUARDED_PAGES = ['orders', 'package-create', 'package-confirm', 'package-code']
+  assert(exists('utils/page-guard.js'),
+    'utils/page-guard.js 存在（三层判据的唯一实现：身份快照 / 代次 / 逐通道序号）')
+  const guardSrc = read('utils/page-guard.js')
+  for (const api of ['setIdentity', 'deactivate', 'issue', 'accepts', 'isActive']) {
+    assert(new RegExp(`\\b${api}\\s*\\(`).test(guardSrc), `page-guard 提供 ${api}()`)
+  }
+  // deactivate 必须 +1 代次。只置 active=false 不够：切回来会重新 activate，
+  // 后台期间发出的响应就又"合法"了 —— 到机码正是这么复活的。
+  assert(/deactivate\(\)\s*\{[\s\S]{0,200}generation \+= 1/.test(guardSrc),
+    'page-guard.deactivate() 递增代次（只置 active=false 挡不住切回前台后的迟到响应）')
+  assert(/setIdentity\([\s\S]{0,400}generation \+= 1/.test(guardSrc),
+    'page-guard.setIdentity() 变化时递增代次（换人即作废上一位的在途请求）')
+  // 逐通道 latest-wins：重复刷新时旧响应不得覆盖新响应。
+  assert(/latest\[token\.channel\] !== token\.seq/.test(guardSrc),
+    'page-guard.accepts() 只认本通道最新一次请求（latest-wins，旧响应不得覆盖终态）')
+  // 身份这一层必须**在回调执行那一刻重读**，不能只依赖 onHide 先触发 ——
+  // 会话被后端判失效时页面还停在前台，onHide 根本不会来。
+  assert(/arguments\.length > 1 && normalize\(currentIdentity\) !== token\.identity/.test(guardSrc),
+    'page-guard.accepts() 逐字比对回调时刻的当前身份（不依赖任何生命周期回调先触发）')
+
+  for (const page of GUARDED_PAGES) {
+    const src = stripComments(read(`pages/${page}/${page}.js`))
+    assert(src.includes("require('../../utils/page-guard')"), `${page} 接入 page-guard`)
+    assert(/_guard\.issue\(/.test(src), `${page} 发请求前领代次令牌`)
+    assert(/_accepts\(token\)|_sameIdentity\(token\)/.test(src), `${page} 在回调里用令牌判定能不能写 data`)
+    // 只取函数**自己的**函数体。用固定长度窗口会漏进紧跟其后的 onUnload，
+    // 于是"把 onHide 里的 deactivate 删掉"这条变异检测不出来（2026-09-15 实测过：
+    // 删掉后本断言仍然 PASS，只有真执行测试判红）。
+    for (const hook of ['onHide', 'onUnload']) {
+      const start = src.indexOf(`${hook}() {`)
+      const body = start < 0 ? '' : src.slice(start, src.indexOf('\n  },', start))
+      assert(body.includes('_guard.deactivate()'), `${page} ${hook} 作废在途请求`)
+    }
+    assert(/_identityKey\(\)\s*\{[\s\S]{0,200}auth\.getUser\(\)/.test(src),
+      `${page} 的身份快照取自 auth.getUser()（而不是 token —— 同一个人重登不该清空）`)
+  }
+
+  // package-code：凭证页的判定比别人多两条 —— 必须认订单，必须先 deactivate 再清。
+  {
+    const src = stripComments(codeJs)
+    assert(/_accepts\(token\)\s*\{[\s\S]{0,300}token\.orderId !== this\.data\.orderId/.test(src),
+      'package-code 的令牌带 orderId，另一张订单的响应覆盖不了当前这张')
+    const hideIdx = src.indexOf('onHide()')
+    const hideBlock = src.slice(hideIdx, src.indexOf('\n  },', hideIdx))
+    assert(hideBlock.indexOf('_guard.deactivate()') < hideBlock.indexOf('_clearCredentials()'),
+      'package-code onHide 先 deactivate 再清凭证（否则迟到的响应会把刚清掉的码写回来）')
+    // setData 的回调在下一帧，这中间可能已经 onHide：动 _codeRaw 之前必须再核一次。
+    assert(/if \(!this\._accepts\(token\)\) return\s*\n\s*this\._codeRaw =/.test(src),
+      'package-code 在 setData 回调里再核一次才写 _codeRaw（画码用的明文副本）')
+    assert(/exec\(\(result\) => \{[\s\S]{0,200}_guard\.isActive\(\)/.test(src),
+      'package-code 画码的 exec 回调也检查页面是否仍在前台（不在就不画、也不报 ready）')
+  }
+
+  // 草稿必须绑定稳定身份：temp_package_data 是本机存储，同一台手机上谁都读得到。
+  {
+    const create = stripComments(createJs)
+    assert(/setStorageSync\('temp_package_data',\s*\{[\s\S]{0,200}ownerKey/.test(create),
+      'package-create 写草稿时绑定 ownerKey（派生自 auth.getUser().id）')
+    assert(/setStorageSync\('temp_package_data',\s*\{[\s\S]{0,200}draftId/.test(create),
+      'package-create 写草稿时带 draftId（让已选服务点能跟这份草稿对上）')
+    assert(/_resetForIdentity\(\)\s*\{[\s\S]{0,700}removeStorageSync\('temp_package_data'\)[\s\S]{0,200}removeStorageSync\('temp_selected_store'\)/.test(create),
+      '换用户时草稿与已选服务点一起清（只清一半会留下带着上一位文件名的半截草稿）')
+
+    const confirm = stripComments(confirmJs)
+    // 未登录一律不解析草稿：否则深链直进本页就能把上一位留下的文件名渲染出来。
+    assert(/_loadOrderData\(\)\s*\{[\s\S]{0,400}const identity = this\._identityKey\(\)[\s\S]{0,200}if \(!identity\)/.test(confirm),
+      'package-confirm 先验登录再碰草稿（未登录不解析、不渲染文件名）')
+    assert(/ownerKey !== identity[\s\S]{0,300}removeStorageSync\('temp_package_data'\)/.test(confirm),
+      'package-confirm 发现草稿不属于本人时**同步删除**（留着等于把洞原样留给下一次打开）')
+    assert(/storeData\.draftId[\s\S]{0,120}packageData\.draftId/.test(confirm),
+      'package-confirm 核对服务点与草稿的 draftId（不把上一份草稿选的机器接到这一份上）')
+    assert(/_clearDraftView\(\)\s*\{[\s\S]{0,600}files: \[\]/.test(confirm),
+      'package-confirm 进 missing 时把 files 一起清空（只改 draftState 仍可能渲染出旧文件名）')
+
+    const store = stripComments(storeJs)
+    assert(/setStorageSync\('temp_selected_store',\s*\{[\s\S]{0,240}ownerKey/.test(store),
+      'store-select 写服务点时绑定 ownerKey')
+    assert(/setStorageSync\('temp_selected_store',\s*\{[\s\S]{0,240}draftId/.test(store),
+      'store-select 写服务点时绑定 draftId')
+    assert(/draft\.ownerKey \|\| ''\) !== identity/.test(store),
+      'store-select 不把服务点接到不属于当前这位的草稿上')
+  }
+
+  // 真执行测试必须存在并接线。少了它，上面全部退化成"代码长得像"。
+  assert(exists('scripts/tests/page-lifecycle.test.mjs'),
+    '生命周期/竞态的真执行测试存在（静态断言证明不了"旧响应真的写不进来"）')
+  {
+    const pkgJson = JSON.parse(read('package.json'))
+    assert(/page-lifecycle\.test\.mjs/.test(pkgJson.scripts['verify:page-lifecycle'] || ''),
+      'verify:page-lifecycle 指向该测试')
+    assert(/verify:page-lifecycle/.test(pkgJson.scripts['verify:static'] || ''),
+      'verify:page-lifecycle 串在 verify:static 里（CI 直接跑 verify:static）')
+  }
 }
 
 console.log(failed === 0 ? '\n全部通过\n' : `\n${failed} 条失败\n`)

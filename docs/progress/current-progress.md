@@ -12,6 +12,64 @@
 生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
 此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
 
+2026-09-15 **材料包候选的身份生命周期与异步竞态收口（本地候选：未 push / 未开 PR /
+未合并 / 未跑 CI / 未进微信开发者工具 / 未真机 / 未部署）。** 基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`；在下面那条材料包候选
+（`45f8a56731a4bfee14616e88ebcb1ed655c42997`）之上追加一个修复提交，**不 amend 原提交**。
+写入范围只有 `apps/miniapp/**` 与本文件 / `next-tasks.md`；`services/**`、
+`apps/kiosk|admin|partner|terminal-agent/**`、`.github/**`、schema / 迁移、生产配置与密钥
+**一个字都没动**。
+
+修的是同一类缺陷的六种形态：**异步请求发出之后，页面可能已经换了人、切了后台、卸载了，
+或者同一条链已经被重新发起过一次 —— 而旧响应的 then / catch 照常执行**，把上一位用户的
+订单、到机码、文件名写回 `data`。`loading` 布尔锁挡不住它：锁在请求发出时是开的，
+回调执行时早被别的路径清掉了。
+
+- **P1-01 跨用户 / 登出时在途请求回写**（`orders`、`package-create`）：原实现只在 `onShow`
+  比对 `_identityKey` 并清空 data，**没有作废在途请求**；A 的响应晚到时会把 A 的订单、
+  到机码、文件名写进 B 的界面。会话被后端判失效（登出但页面仍在前台、`onHide` 根本不触发）
+  时更是一条都拦不住。
+- **P1-02 `package-code` 迟到响应复活凭证**：`onHide/onUnload` 已清 `pickupCode` 与 `_codeRaw`，
+  但在途的 `GET /orders/package/:id` 回来时页面已重新 `activate`，会把刚清掉的码原样写回，
+  并据此重绘出一张可扫的二维码。
+- **P1-03 `package-code` 重复加载乱序**：先发的那次晚到，会把"已核销、码已撤下"的终态
+  改回"待到机"，用户拿着一张作废的码去机器前。
+- **P2-01 `temp_package_data` 未绑定用户**：本机存储谁都读得到，跨账号会显示上一位的文件名。
+- **P2-02 未登录打开 `package-confirm` 先解析并显示草稿**。
+- **P2-03 `temp_selected_store` 生命周期跨草稿残留**：上一份草稿选的机器会被接到这一份上，
+  而下单真的会下到那台机器。
+
+怎么修的：新增 `apps/miniapp/utils/page-guard.js`（纯函数，**无 wx / auth 依赖**，因此测试里
+用的是同一份真实实现而不是替身），三层判据缺一不可 ——
+① **身份快照**：请求发出时记下会员 id，回调时与**当时的**当前 id 逐字比对，不依赖任何生命周期
+回调先触发；② **代次**：身份变化与 `onHide/onUnload` 都 +1，后台期间发出的响应切回前台后也进不来；
+③ **逐通道序号**：同一条链重复发起只认最新一次（latest-wins），旧响应不得覆盖终态。
+「打印订单」页的单件与材料包各占一个通道，各自 latest-wins、互不牵连。
+草稿改为绑定 `ownerKey`（派生自 `auth.getUser().id`）+ `draftId`；`package-confirm`
+**先验登录再碰草稿**，归属对不上就**同步删除**草稿与已选服务点并进 honest missing 状态，
+一个文件名都不渲染；`store-select` 写服务点时绑同一 `ownerKey` / `draftId`，
+建单成功后在跳转**之前**清草稿（原先放在 `redirectTo` 的 `success` 回调里，跳转没触发就永远留着）。
+顺带补了两处会卡死的状态：切后台作废在途请求后，`docState:'loading'` / `quoteState:'loading'` /
+`piiPhase:'scanning'` 会在回到前台时重发或退回 idle，不再永远显示"加载中"而其实没有请求在跑。
+`paymentSessionToken` / 到机码 / 金额仍然不进 URL、不落存储、不进日志（门禁 ③ 原样保留）。
+
+验证（本机，逐条记退出码）：`node scripts/project-graph-query.mjs file <9 个文件>` 全部 0；
+`pnpm --filter @ai-job-print/miniapp verify:static` 0（234 PASS）；
+`verify:package-chain` 0（198 PASS，新增 ⑨ 段 41 条）；`pnpm verify:repository-integrity` 0；
+`pnpm verify:ci-gate-coverage` 0；`pnpm verify:deploy-gates-in-sync` 0；
+`git diff --check` 与 `git diff --check origin/main...HEAD` 均 0。
+
+新增真执行测试 `apps/miniapp/scripts/tests/page-lifecycle.test.mjs`（18 个用例，`node:vm` 沙箱里
+真实执行页面源码、真按乱序 resolve），已接 `verify:page-lifecycle` 并串进 `verify:static` 进 CI。
+**反向变异 5 类全部被判红**（退出码非 0），精确反向替换还原、不走 `git checkout`：
+M1 `package-code` onHide 不再作废在途请求、M2 丢掉 latest-wins、M3 丢掉回调时刻的身份比对、
+M4 `package-confirm` 不再核草稿归属、M5 翻页失败清空已加载订单。M1 第一轮**只有真执行测试判红、
+静态门禁没红**——原因是那条断言用固定长度窗口，漏进了紧跟其后的 `onUnload`；已改成按函数体切片，
+复跑后 M1 两条检测器都红。还原后全套复跑仍为 0。
+
+**明确未做**：未 push、未开 PR、未合并、未跑 CI、未进微信开发者工具、未真机、未部署；
+`docs/graph/**` 未重跑（本轮授权范围不含该目录，且 `ci.yml` 没有图谱新鲜度门禁）。
+
 2026-09-15 **小程序材料包 P0 候选：订单可找回 + 到机码可再看 + 四页从硬编码关闭改为真实运行期 fail-closed
 （本地候选，未 push / 未开 PR / 未合并 / 未部署）。** 基线为 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
 写入范围只有 `apps/miniapp/**` 与本文件 / `next-tasks.md`；`services/**`、`apps/kiosk|admin|partner/**`、

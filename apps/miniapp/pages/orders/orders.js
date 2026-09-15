@@ -17,6 +17,7 @@ const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
+const { createLifecycleGuard } = require('../../utils/page-guard')
 
 const PAGE_SIZE = 20
 
@@ -158,23 +159,48 @@ Page({
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     this._toUiItem = toUiItem
     this._cancelLocks = {}
-    this._identityKey = ''
+    // 两个分区各占一个通道（single / package）：各自 latest-wins，互不牵连 ——
+    // 一个分区的重新加载不该让另一个分区在途的响应失效。
+    this._guard = createLifecycleGuard()
+    this._guard.activate()
+  },
+
+  /**
+   * 当前身份的稳定快照。判据是会员 id 而不是「有没有 token」：token 每次登录都换，
+   * 但同一个人重登不该清空他自己的列表。每次都现读，不缓存。
+   */
+  _identityKey() {
+    if (!auth.isLoggedIn()) return ''
+    return 'u:' + String((auth.getUser() || {}).id || '')
+  },
+
+  /** 这个响应还能不能写进 data：身份没变 + 页面在前台 + 是本通道最新一次请求。 */
+  _accepts(token) {
+    return this._guard.accepts(token, this._identityKey())
   },
 
   onShow() {
     const loggedIn = auth.isLoggedIn()
+    this._guard.activate()
     // A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
-    // 判据是会员 id 而不是「有没有 token」：token 每次登录都换，但同一个人重登不该清空。
-    const identityKey = loggedIn ? String((auth.getUser() || {}).id || '') : ''
-    if (identityKey !== this._identityKey) {
-      this._identityKey = identityKey
-      this._resetAll()
-    }
+    // setIdentity 变化时会 +1 代次，于是上一位**在途**的请求一并作废 ——
+    // 只清 data 不作废请求的话，那几个迟到的响应会把上一位的订单又写回来。
+    if (this._guard.setIdentity(this._identityKey())) this._resetAll()
     this.setData({ isLoggedIn: loggedIn })
     if (loggedIn) {
       this._load()
       this._loadPackages()
     }
+  },
+
+  // 切后台 / 离开本页：在途请求全部作废。
+  // 只靠 loading 布尔锁挡不住这件事 —— 锁在请求发出时是开的，回调执行时早被清掉了。
+  onHide() {
+    this._guard.deactivate()
+  },
+
+  onUnload() {
+    this._guard.deactivate()
   },
 
   /** 清空两个分区的全部数据与游标。跨用户、登出、下拉刷新前都必须走这里。 */
@@ -190,12 +216,15 @@ Page({
   // 提前 stopPullDownRefresh 会让「下拉刷新重试」看起来刷过但其实什么都没等到。
   _load(append = false) {
     if (!auth.isLoggedIn()) return Promise.resolve()
+    const token = this._guard.issue('single')
     const cursor = append ? this.data.nextCursor : null
     this.setData({ [append ? 'loadingMore' : 'loading']: true, error: '' })
     const legacyPromise = api.getMyPrintOrders({ pageSize: PAGE_SIZE, ...(cursor ? { cursor } : {}) })
     const requestPromise = append ? legacyPromise.then(items => [[], items]) : Promise.all([api.getMyCloudPrintOrders(), legacyPromise])
     return requestPromise
       .then(([cloudItems, items]) => {
+        // 迟到的响应到此为止：换了人、切了后台，或本通道已被重新发起过一次。
+        if (!this._accepts(token)) return
         const combined = [...(Array.isArray(cloudItems) ? cloudItems : []), ...(Array.isArray(items) ? items : [])]
         const seen = new Set()
         const uiItems = combined.filter(item => {
@@ -214,7 +243,11 @@ Page({
         this._filterTab(this.data.activeTab, orders)
       })
       .catch(err => {
+        if (!this._accepts(token)) return
         console.error('getMyPrintOrders error', err)
+        // 失败只写 error，**绝不清空 orders / filtered**：刷新或翻页失败不该让用户
+        // 已经看到的订单消失（模板里「已有内容」的分支排在失败分支之前，
+        // 错误落在列表页脚，既看得见又不顶掉内容）。
         this.setData({ loading: false, loadingMore: false, error: '加载失败，下拉刷新重试' })
       })
   },
@@ -228,12 +261,14 @@ Page({
   _loadPackages(append = false) {
     if (!auth.isLoggedIn()) return Promise.resolve()
     if (append && !this.data.pkgCursor) return Promise.resolve()
+    const token = this._guard.issue('package')
     const cursor = append ? this.data.pkgCursor : null
     this.setData(append
       ? { pkgLoadingMore: true, pkgMoreErrorText: '' }
       : { pkgState: 'loading', pkgErrorTitle: '', pkgErrorText: '', pkgMoreErrorText: '' })
     return api.getPackageOrders({ pageSize: PAGE_SIZE, ...(cursor ? { cursor } : {}) })
       .then(page => {
+        if (!this._accepts(token)) return
         const incoming = (Array.isArray(page && page.items) ? page.items : []).map(row => pkg.toPackageRow(row))
         const rows = append ? pkg.mergePackageRows(this.data.pkgRows, incoming) : incoming
         const total = Number(page && page.total)
@@ -248,6 +283,7 @@ Page({
         this._filterTab(this.data.activeTab)
       })
       .catch(err => {
+        if (!this._accepts(token)) return
         const shown = pkg.describePackageError(err, '材料包订单加载失败，请稍后重试。')
         // 下一页失败只写 pkgMoreErrorText，已加载的那几页照常留在屏幕上；
         // 首屏/刷新失败才进 pkgState=error（此时本来也没有可保留的内容）。
@@ -376,9 +412,13 @@ Page({
     const current = this.data.orders.find(o => o.id === id)
     if (!current || !current.canCancel) return
     this._cancelLocks[id] = true
+    // 取消也是一条会回写列表的异步链：换了人 / 离开了本页之后，它的结果
+    // 同样不能落到新身份的列表上。
+    const token = this._guard.issue('cancel:' + id)
     this._patchOrder(id, { cancelling: true })
     api.cancelCloudPrintOrder(id)
       .then((raw) => {
+        if (!this._accepts(token)) return
         // 用服务端回读整行替换，不在本地写「已取消」。
         const next = toUiItem(raw)
         const orders = this.data.orders.map(o => o.id === id ? next : o)
@@ -386,6 +426,7 @@ Page({
         this._filterTab(this.data.activeTab, orders)
       })
       .catch((err) => {
+        if (!this._accepts(token)) return
         this._patchOrder(id, { cancelling: false })
         wx.showModal({
           title: '取消失败',

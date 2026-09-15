@@ -23,6 +23,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
+const { createLifecycleGuard } = require('../../utils/page-guard')
 
 const DOC_PAGE_SIZE = 20
 
@@ -72,22 +73,66 @@ Page({
 
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._guard = createLifecycleGuard()
+    this._guard.activate()
+  },
+
+  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  _identityKey() {
+    if (!auth.isLoggedIn()) return ''
+    return 'u:' + String((auth.getUser() || {}).id || '')
+  },
+
+  /** 这个响应还能不能回写文件状态：身份没变 + 页面在前台 + 是本通道最新一次请求。 */
+  _accepts(token) {
+    return this._guard.accepts(token, this._identityKey())
   },
 
   onShow() {
     const loggedIn = auth.isLoggedIn()
+    this._guard.activate()
     // 换用户后不能残留上一位的文件列表与选择。判据是会员 id。
-    const identityKey = loggedIn ? String((auth.getUser() || {}).id || '') : ''
-    if (identityKey !== this._identityKey) {
-      this._identityKey = identityKey
-      this.setData({
-        docs: [], docCursor: null, docState: 'idle',
-        selectedCount: 0, piiPhase: 'idle', piiGroups: [], piiFindingCount: 0, piiError: '',
-      })
-      wx.removeStorageSync('temp_package_data')
-    }
+    // setIdentity 变化时 +1 代次：上一位在途的文档请求、上传链、隐私检查一并作废，
+    // 它们的迟到响应不会把上一位的文件名再写回来。
+    if (this._guard.setIdentity(this._identityKey())) this._resetForIdentity()
     this.setData({ isLoggedIn: loggedIn })
-    if (loggedIn && this.data.docState === 'idle') this._loadDocs()
+    // 切后台会作废在途的隐私检查与逐条确认链。回来后必须把它们从「进行中」拉回来：
+    // 否则页面会一直显示「文件仍在隐私检查中」，而其实一个请求都没有在跑，
+    // 用户既等不到结果也点不了下一步。回到 idle 是 fail-closed 的方向 ——
+    // 重新扫一遍，而不是替服务端宣布已经扫过。
+    if (this.data.piiPhase === 'scanning' || this.data.piiSubmitting) {
+      this.setData({ piiPhase: 'idle', piiSubmitting: false, piiGroups: [], piiFindingCount: 0, piiError: '' })
+    }
+    // docState 还停在 'loading'，说明上一次请求在切后台时被作废了。这里必须重发，
+    // 否则页面会永远卡在「正在读取我的文件」——重发的新令牌序号更大，旧响应即使
+    // 之后到达也覆盖不了新结果。
+    if (loggedIn && (this.data.docState === 'idle' || this.data.docState === 'loading')) this._loadDocs()
+  },
+
+  onHide() {
+    this._guard.deactivate()
+  },
+
+  onUnload() {
+    this._guard.deactivate()
+  },
+
+  /**
+   * 身份变化（含首次进入、登出、换账号）：清空上一位的文件列表、勾选、隐私检查结论，
+   * 并把草稿整份作废。
+   *
+   * 草稿与已选服务点**必须一起清**：只清一半会让下一位在 package-confirm 上看到
+   * 「有服务点没文件」或反过来的半截草稿，而那半截里就带着上一位的文件名。
+   */
+  _resetForIdentity() {
+    this.setData({
+      docs: [], docCursor: null, docState: 'idle', docLoadingMore: false,
+      docErrorTitle: '', docErrorText: '', uploading: false,
+      selectedCount: 0, piiPhase: 'idle', piiGroups: [], piiFindingCount: 0, piiError: '',
+      piiSubmitting: false,
+    })
+    wx.removeStorageSync('temp_package_data')
+    wx.removeStorageSync('temp_selected_store')
   },
 
   /**
@@ -97,10 +142,13 @@ Page({
   _loadDocs(append = false) {
     if (!auth.isLoggedIn()) return Promise.resolve()
     if (append && !this.data.docCursor) return Promise.resolve()
+    const token = this._guard.issue('docs')
     const cursor = append ? this.data.docCursor : null
     this.setData(append ? { docLoadingMore: true } : { docState: 'loading', docErrorTitle: '', docErrorText: '' })
     return api.getMyDocuments({ pageSize: DOC_PAGE_SIZE, ...(cursor ? { cursor } : {}) })
       .then((page) => {
+        // 迟到的响应到此为止：换了人、切了后台，或本通道已被重新发起过一次。
+        if (!this._accepts(token)) return
         const raw = Array.isArray(page && page.items) ? page.items : (Array.isArray(page) ? page : [])
         const usable = raw.filter((doc) => pkg.isPackagePrintable(doc)).map(toDocRow)
         const kept = new Map(this.data.docs.map((row) => [row.id, row]))
@@ -122,6 +170,7 @@ Page({
         this._syncSelection()
       })
       .catch((err) => {
+        if (!this._accepts(token)) return
         const shown = pkg.describePackageError(err, '文件列表加载失败，请稍后重试。')
         this.setData({
           docState: 'error',
@@ -208,14 +257,26 @@ Page({
         const picked = (res.tempFiles || []).filter((f) => f && f.path)
         if (!picked.length) return
         this.setData({ uploading: true })
+        // 上传链自己一个通道：整条链（含上传后的列表刷新与自动勾选）都按这个令牌判定。
+        // 换了人或离开了本页之后，剩下的文件不再上传，也不回写任何文件状态 ——
+        // 否则 B 的界面上会冒出 A 刚上传的文件名，并且已经被自动勾选。
+        const token = this._guard.issue('upload')
         wx.showLoading({ title: `正在上传 1/${picked.length}…`, mask: true })
         const uploadedIds = []
         const failures = []
         const step = (index) => {
+          if (!this._accepts(token)) {
+            wx.hideLoading()
+            // uploading 是本页的按钮锁，不是上一位用户的数据 —— 必须解开，
+            // 否则切后台再回来时「从微信聊天添加」会永久失灵。
+            this.setData({ uploading: false })
+            return Promise.resolve()
+          }
           if (index >= picked.length) {
             wx.hideLoading()
             this.setData({ uploading: false })
             return this._loadDocs().then(() => {
+              if (!this._accepts(token)) return
               if (uploadedIds.length) {
                 const docs = this.data.docs.map((row) => uploadedIds.indexOf(row.id) >= 0
                   ? Object.assign({}, row, { selected: true })
@@ -271,8 +332,12 @@ Page({
       return
     }
     this.setData({ piiPhase: 'scanning', piiGroups: [], piiFindingCount: 0, piiError: '' })
+    // 隐私检查结论直接决定「能不能下单」。换了人之后它必须回到未做，
+    // 绝不能让上一位扫过的结论替当前这位放行。
+    const token = this._guard.issue('pii')
     const groups = []
     const step = (index) => {
+      if (!this._accepts(token)) return
       if (index >= targets.length) {
         const count = groups.reduce((sum, g) => sum + g.findings.length, 0)
         this.setData({
@@ -285,6 +350,7 @@ Page({
       const row = targets[index]
       api.createPrintPiiScan(row.id)
         .then((task) => {
+          if (!this._accepts(token)) return
           const findings = Array.isArray(task && task.piiFindings)
             ? task.piiFindings.filter((f) => f.action === 'pending')
             : []
@@ -292,6 +358,7 @@ Page({
           step(index + 1)
         })
         .catch((err) => {
+          if (!this._accepts(token)) return
           const shown = pkg.describePackageError(err, '隐私检查失败，请稍后重试。')
           this.setData({ piiPhase: 'error', piiError: `${row.name}：${shown.text}` })
         })
@@ -309,7 +376,9 @@ Page({
     const groups = this.data.piiGroups.filter((g) => g.taskId && g.findings.length)
     if (!groups.length) { this.setData({ piiPhase: 'ready' }); return }
     this.setData({ piiSubmitting: true })
+    const token = this._guard.issue('pii-decide')
     const step = (index) => {
+      if (!this._accepts(token)) return
       if (index >= groups.length) {
         this.setData({ piiSubmitting: false, piiPhase: 'ready', piiGroups: [], piiFindingCount: 0 })
         wx.showToast({ title: '已确认', icon: 'success' })
@@ -320,6 +389,7 @@ Page({
       api.decidePrintPiiFindings(group.taskId, decisions)
         .then(() => step(index + 1))
         .catch((err) => {
+          if (!this._accepts(token)) return
           const shown = pkg.describePackageError(err, '确认失败，请稍后重试。')
           this.setData({ piiSubmitting: false })
           wx.showModal({ title: shown.title, content: shown.text, showCancel: false })
@@ -349,12 +419,27 @@ Page({
       })
       return
     }
+    // 草稿绑定到稳定的会员身份 + 一个本次草稿的 id。
+    //
+    // 不绑的话，`temp_package_data` 就是一份**谁都能读**的本机数据：共用设备上
+    // A 走到一半离开，B 登录后深链打开 package-confirm，会直接看到 A 的文件名。
+    // package-confirm 读取前会逐字核对 ownerKey，不匹配就同步删掉再进失败态。
+    //
+    // draftId 让「已选服务点」能跟这份草稿对上 —— 服务点是另一个 storage key，
+    // 没有这个绑定就可能把上一份草稿选的机器接到这一份上。
+    const ownerKey = this._identityKey()
+    const draftId = ownerKey + ':' + Date.now()
     wx.setStorageSync('temp_package_data', {
+      ownerKey,
+      draftId,
       files: selected.map((row) => ({ fileId: row.id, name: row.name })),
       colorMode: this.data.colorMode,
       duplex: this.data.duplex,
       copies: this.data.copies,
     })
+    // 新草稿开始：上一次选好的服务点属于上一份草稿，先清掉再去选，
+    // 免得用户在确认页看到一台自己这次没选过的机器。
+    wx.removeStorageSync('temp_selected_store')
     wx.navigateTo({ url: '/pages/store-select/store-select?from=package-create' })
   },
 

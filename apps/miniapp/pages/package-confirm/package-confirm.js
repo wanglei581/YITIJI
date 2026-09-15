@@ -19,6 +19,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
+const { createLifecycleGuard } = require('../../utils/page-guard')
 
 /**
  * 报价用的打印参数。
@@ -77,30 +78,127 @@ Page({
   },
 
   onLoad() {
-    // 登录态的「上一次取值」存在实例字段而不是 data 上：data 的初值恒为 false，
-    // 用它做对比会让首次 onShow 把 false→true 当成「刚登录」，于是每次进页面都多发一次报价。
-    this._wasLoggedIn = auth.isLoggedIn()
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 44, isLoggedIn: this._wasLoggedIn })
+    // 身份快照存在守卫里而不是 data 上：data 的初值恒为未登录，用它做对比会让
+    // 首次 onShow 把「未登录→已登录」当成刚登录，于是每次进页面都多发一次报价。
+    this._guard = createLifecycleGuard()
+    this._guard.activate()
+    this._guard.setIdentity(this._identityKey())
+    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 44, isLoggedIn: auth.isLoggedIn() })
     this._loadOrderData()
   },
 
-  onShow() {
-    const loggedIn = auth.isLoggedIn()
-    const wasLoggedIn = this._wasLoggedIn
-    this._wasLoggedIn = loggedIn
-    this.setData({ isLoggedIn: loggedIn })
-    // 从登录页回来后必须自动重新核价。否则用户按了「去登录」、登录成功、返回本页，
-    // 看到的还是那条「登录已失效」——他已经做完了我们要求的事，页面却没反应。
-    if (loggedIn && wasLoggedIn === false && this.data.draftState === 'draft') this._loadQuote()
+  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  _identityKey() {
+    if (!auth.isLoggedIn()) return ''
+    return 'u:' + String((auth.getUser() || {}).id || '')
   },
 
-  _loadOrderData() {
-    const packageData = wx.getStorageSync('temp_package_data') || {}
-    const storeData = wx.getStorageSync('temp_selected_store') || {}
-    const files = (Array.isArray(packageData.files) ? packageData.files : []).filter((f) => f && f.fileId)
+  /** 报价这类「只影响本页显示」的链：身份没变 + 页面在前台 + 是最新一次请求。 */
+  _accepts(token) {
+    return this._guard.accepts(token, this._identityKey())
+  },
 
-    if (!files.length || !storeData.id) {
-      this.setData({ draftState: 'missing', quoteState: 'idle' })
+  /**
+   * 建单这条链只按**身份**判定，不看前台/后台。
+   *
+   * 因为订单已经在服务端建出来了：切后台不该让本页永远卡在「提交中…」，
+   * 更不该让用户以为没下成又下一单。只有换了人才必须停手。
+   */
+  _sameIdentity(token) {
+    return !!token && this._identityKey() === token.identity
+  },
+
+  onShow() {
+    this._guard.activate()
+    const loggedIn = auth.isLoggedIn()
+    // 身份变了（刚登录 / 刚登出 / 换了账号）：草稿必须按**新**身份重新核一遍归属，
+    // 不能沿用上一次解析出来的文件列表。setIdentity 同时 +1 代次，
+    // 上一位在途的报价与建单响应一并作废。
+    //
+    // 「从登录页回来自动重新核价」也落在这条路径上：用户按了「去登录」、登录成功、
+    // 返回本页，身份从空串变成会员 id，这里会重新解析草稿并重新核价 ——
+    // 他已经做完了我们要求的事，页面不能还停在那条「登录已失效」。
+    if (this._guard.setIdentity(this._identityKey())) {
+      this.setData({ isLoggedIn: loggedIn })
+      this._loadOrderData()
+      return
+    }
+    this.setData({ isLoggedIn: loggedIn })
+    // 切后台会作废在途的报价。回来后若还停在「正在核价」，必须重发 ——
+    // 否则页面永远显示核价中，而其实一个请求都没有在跑，「确认下单」也一直是灰的。
+    if (this.data.draftState === 'draft' && this.data.quoteState === 'loading') this._loadQuote()
+  },
+
+  onHide() {
+    this._guard.deactivate()
+  },
+
+  onUnload() {
+    this._guard.deactivate()
+  },
+
+  /**
+   * 进入「没有可确认的材料包」，并把已经渲染出来的文件名、服务点与金额一起清干净。
+   * 只改 draftState 不清 files 的话，模板某一帧仍可能拿旧数组渲染。
+   */
+  _clearDraftView() {
+    this._packageData = null
+    this._storeData = null
+    this.setData({
+      draftState: 'missing',
+      quoteState: 'idle',
+      files: [],
+      storeName: '',
+      storeAddress: '',
+      orderSummary: { fileCount: 0, copies: 1, colorLabel: '黑白', duplexLabel: '单面' },
+      quoteAmountText: '',
+      quotePages: 0,
+      quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '',
+      submitErrorTitle: '', submitErrorText: '', submitRecover: '',
+      submitting: false,
+    })
+  },
+
+  /**
+   * 解析草稿。**先验身份，再碰草稿。**
+   *
+   * `temp_package_data` 是本机存储，同一台手机上谁都读得到。不先核归属就解析，
+   * 会出现两种越界：未登录深链打开本页，直接把上一位留下的文件名渲染出来；
+   * 或者 B 登录后打开本页，看到的是 A 的材料清单。
+   * 所以：未登录一律不解析；归属对不上就**同步删掉**再进失败态 ——
+   * 留着它等于把同一个洞原样留给下一次打开。
+   */
+  _loadOrderData() {
+    this._packageData = null
+    this._storeData = null
+    const identity = this._identityKey()
+    if (!identity) {
+      this._clearDraftView()
+      return
+    }
+    const packageData = wx.getStorageSync('temp_package_data') || {}
+    const files = (Array.isArray(packageData.files) ? packageData.files : []).filter((f) => f && f.fileId)
+    const ownerKey = String(packageData.ownerKey || '')
+    // 归属对不上，或者是旧版本留下的、根本没有归属标记的草稿：删掉，一个文件名都不渲染。
+    if (!ownerKey || ownerKey !== identity) {
+      wx.removeStorageSync('temp_package_data')
+      wx.removeStorageSync('temp_selected_store')
+      this._clearDraftView()
+      return
+    }
+    const storeData = wx.getStorageSync('temp_selected_store') || {}
+    // 服务点必须属于**同一个人的同一份草稿**，否则这一单会下到用户这次没选过的机器上。
+    const storeBound = !!storeData.id
+      && String(storeData.ownerKey || '') === identity
+      && String(storeData.draftId || '') === String(packageData.draftId || '')
+    if (!storeBound) {
+      if (storeData.id) wx.removeStorageSync('temp_selected_store')
+      this._clearDraftView()
+      return
+    }
+
+    if (!files.length) {
+      this._clearDraftView()
       return
     }
 
@@ -108,6 +206,7 @@ Page({
     this._storeData = storeData
     this.setData({
       draftState: 'draft',
+      submitErrorTitle: '', submitErrorText: '', submitRecover: '',
       storeName: storeData.name || '',
       storeAddress: storeData.address || '',
       files: files.map((f) => ({ fileId: f.fileId, name: f.name || '打印文件' })),
@@ -134,6 +233,7 @@ Page({
     const packageData = this._packageData
     const storeData = this._storeData
     if (!packageData || !storeData) return
+    const token = this._guard.issue('quote')
     this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '' })
     api.quotePackageOrder({
       terminalId: storeData.id,
@@ -141,6 +241,9 @@ Page({
       params: quoteParams(packageData),
     })
       .then((quote) => {
+        // 迟到的报价到此为止：换了人、切了后台，或已经重新核过一次价。
+        // 旧报价写进来就是"按别人的文件算出来的金额显示给当前这位"。
+        if (!this._accepts(token)) return
         const amountCents = pkg.parseAmountCents(quote && quote.amountCents)
         const billablePages = Number(quote && quote.billablePages)
         if (amountCents === null || !Number.isSafeInteger(billablePages) || billablePages < 1) {
@@ -153,6 +256,7 @@ Page({
         })
       })
       .catch((err) => {
+        if (!this._accepts(token)) return
         const shown = pkg.describePackageError(err, '服务端报价失败，请稍后重试。')
         this.setData({
           quoteState: 'error',
@@ -239,6 +343,7 @@ Page({
       return
     }
 
+    const token = this._guard.issue('submit')
     this.setData({ submitting: true, submitErrorTitle: '', submitErrorText: '', submitRecover: '' })
     wx.showLoading({ title: '创建订单中…', mask: true })
     api.createPackageOrder({
@@ -254,19 +359,24 @@ Page({
         wx.hideLoading()
         const orderId = (order && order.orderId) || ''
         if (!orderId) throw new Error('服务端未返回订单号')
+        // 订单已经在服务端落库了，这份草稿就此作废 —— 无论本页还能不能继续。
+        // 清理放在跳转**之前**：原先放在 redirectTo 的 success 回调里，跳转一旦没触发
+        // （异常路径、页面已被替换），草稿就永远留在本机，下一位打开确认页还能看到。
+        wx.removeStorageSync('temp_package_data')
+        wx.removeStorageSync('temp_selected_store')
+        // 换了人就不跳：不该把上一位的 orderId 推给当前这位（服务端 requireOwned 也会 404）。
+        // 订单不会丢 —— 它已落库，本人可从「我的 · 打印订单」材料包分区找回。
+        if (!this._sameIdentity(token)) return
         // 只把 orderId 交给下一页。到机码 / 金额 / 有效期一律由 package-code 自己带登录态
         // 向服务端查（GET /orders/package/:id 有 requireOwned 归属校验），不经 URL 传递 ——
         // 否则一条构造出来的链接或一张转发出去的卡片就能渲染出一张带到机码的「创建成功」页。
         wx.redirectTo({
           url: '/pages/package-code/package-code?orderId=' + encodeURIComponent(orderId),
-          success() {
-            wx.removeStorageSync('temp_package_data')
-            wx.removeStorageSync('temp_selected_store')
-          },
         })
       })
       .catch((err) => {
         wx.hideLoading()
+        if (!this._sameIdentity(token)) return
         const shown = pkg.describePackageError(err, '创建订单失败，请稍后重试。')
         this.setData({
           submitting: false,

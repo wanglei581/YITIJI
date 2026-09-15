@@ -15,6 +15,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
 const { createPickupQrMatrix, PICKUP_CODE_RE } = require('../../utils/pickup-qrcode')
+const { createLifecycleGuard } = require('../../utils/page-guard')
 
 const QR_SIZE_PX = 180
 
@@ -48,10 +49,30 @@ Page({
 
   onLoad(options) {
     const orderId = options.orderId ? decodeURIComponent(options.orderId) : ''
+    this._guard = createLifecycleGuard()
+    this._guard.activate()
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       orderId,
     })
+  },
+
+  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  _identityKey() {
+    if (!auth.isLoggedIn()) return ''
+    return 'u:' + String((auth.getUser() || {}).id || '')
+  },
+
+  /**
+   * 这个响应还能不能写进 data。
+   *
+   * 四层缺一不可：页面仍在前台（onHide/onUnload 之后一律拒绝，否则刚清掉的到机码
+   * 会被迟到的响应原样写回去）、身份没变、是本通道最新一次请求（重复刷新 latest-wins，
+   * 旧响应不得把终态改回去）、并且查的是**当前这张**订单。
+   */
+  _accepts(token) {
+    if (!token || token.orderId !== this.data.orderId) return false
+    return this._guard.accepts(token, this._identityKey())
   },
 
   onReady() {
@@ -61,6 +82,8 @@ Page({
 
   onShow() {
     // 每次回到本页都重新向服务端核一遍：订单可能已被核销、已过期，或者换了登录账号。
+    this._guard.activate()
+    this._guard.setIdentity(this._identityKey())
     this.loadOrder()
   },
 
@@ -71,11 +94,17 @@ Page({
    * 下一位用户从后台切回来就能看到上一位的码。回到本页时会重新向服务端取。
    * paymentSessionToken 虽然在详情响应里，但本页**从不 setData**，因此也不会被持久化。
    */
+  // deactivate() 必须排在 _clearCredentials() 之前，而且两者都不能少：
+  // 只清 data 的话，切后台那一刻仍在途的 getPackageOrder 响应回来时页面已经
+  // 重新 activate，它会把刚清掉的到机码原样写回去 —— 码就这么"复活"了。
+  // deactivate 会 +1 代次，让那条响应连 setData 的机会都没有。
   onHide() {
+    this._guard.deactivate()
     this._clearCredentials()
   },
 
   onUnload() {
+    this._guard.deactivate()
     this._clearCredentials()
   },
 
@@ -106,9 +135,13 @@ Page({
       })
       return
     }
+    // 令牌带上 orderId：重复刷新只认最新一次，旧响应既不能把终态改回去，
+    // 也不能拿另一张订单的数据覆盖当前这张。
+    const token = this._guard.issue('order', { orderId })
     this.setData({ loading: true, loadError: '', loadErrorTitle: '', loadRecover: '' })
     api.getPackageOrder(orderId)
       .then((order) => {
+        if (!this._accepts(token)) return
         const status = pkg.resolvePackageStatus(order)
         // 服务端的 visibleCode 判据（pending 且未过期）已经决定了给不给码；
         // 前端不做第二套判据，只忠实反映「有没有拿到」。
@@ -130,11 +163,15 @@ Page({
           showQr: codeUsable,
           qrStatus: codeUsable ? 'loading' : 'error',
         }, () => {
+          // setData 的回调在下一帧：这中间可能已经 onHide。再核一次才动
+          // _codeRaw —— 它是画二维码用的明文副本，写回去等于把码复活。
+          if (!this._accepts(token)) return
           this._codeRaw = codeUsable ? code : ''
           if (codeUsable) this._drawPickupQr()
         })
       })
       .catch((err) => {
+        if (!this._accepts(token)) return
         // 不把服务端错误体当文案（utils/user-error.js 的判据），也绝不在查不到订单时
         // 退回 URL 里的值渲染成功页 —— 那等于把洞原样留着。
         const shown = pkg.describePackageError(err, '订单信息加载失败，请稍后重试。')
@@ -156,6 +193,7 @@ Page({
    * 只能手输。没有真码时明确说「二维码不可用，请手输下方到机码」。
    */
   _drawPickupQr() {
+    if (!this._guard.isActive()) return
     if (!this._pageReady || !this.data.showQr || !this._codeRaw) return
     let matrix
     try {
@@ -165,6 +203,9 @@ Page({
       return
     }
     wx.createSelectorQuery().in(this).select('#package-qr').fields({ node: true, size: true }).exec((result) => {
+      // exec 是异步的：回调执行时可能已经 onHide 并清掉了 _codeRaw。
+      // 此时既不该画，也不该把 qrStatus 写成 ready（那会让空画布显示成"码已就绪"）。
+      if (!this._guard.isActive() || !this._codeRaw) return
       const target = result && result[0]
       if (!target || !target.node) {
         this.setData({ qrStatus: 'error' })
