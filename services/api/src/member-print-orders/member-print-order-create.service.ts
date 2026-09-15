@@ -7,7 +7,7 @@ import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService } from '../payment/order-quote.service'
-import { OrderStatusService } from '../payment/order-status.service'
+import { isPickupWindowClosed, OrderStatusService } from '../payment/order-status.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
@@ -145,9 +145,7 @@ function uniqueTargetTokens(error: object): string[] {
 
 /** True only for the (endUserId, idempotencyKey) unique. Missing meta → false (do not swallow other uniques). */
 export function isMemberPrintOrderIdempotencyConflict(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-  const err = error as { code?: string }
-  if (err.code !== 'P2002') return false
+  if (!isPrismaUniqueConflict(error)) return false
   const tokens = uniqueTargetTokens(error)
   if (tokens.length === 0) return false
   if (tokens.some((token) => token === MEMBER_PRINT_ORDER_IDEMPOTENCY_UNIQUE)) return true
@@ -155,6 +153,10 @@ export function isMemberPrintOrderIdempotencyConflict(error: unknown): boolean {
   if (/orderNo|pickupCode|printTaskId/i.test(blob) && !/idempotencyKey/i.test(blob)) return false
   const fields = new Set(tokens)
   return fields.has('idempotencyKey') && (fields.has('endUserId') || tokens.length === 1)
+}
+
+function isPrismaUniqueConflict(error: unknown): error is object & { code: 'P2002' } {
+  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'P2002')
 }
 
 @Injectable()
@@ -251,7 +253,10 @@ export class MemberPrintOrderCreateService {
         },
       })
     } catch (error) {
-      if (isMemberPrintOrderIdempotencyConflict(error)) {
+      // Any P2002: one scoped lookup by (endUserId, key). Replay only when that
+      // row exists (fingerprint checked in replayOwned). No row → rethrow the
+      // exact original error. Do not classify solely by provider meta tokens.
+      if (isPrismaUniqueConflict(error)) {
         const raced = await this.findOwnedByIdempotencyKey(endUserId, key)
         if (raced) return this.replayOwned(endUserId, raced, fingerprint)
       }
@@ -366,8 +371,11 @@ export class MemberPrintOrderCreateService {
         error: { code: 'IDEMPOTENCY_KEY_REUSED', message: '该请求标识已用于另一次打印参数，请更换标识后重试' },
       })
     }
-    let order = row
-    if (order.amountCents === 0 && order.payStatus === 'unpaid') {
+    await this.expireIfNeeded(row)
+    let order = await this.requireOwned(endUserId, row.id)
+    // Never markPaid on a closed pickup window: unpaid free rows whose deadline
+    // already passed must converge expired/closed, not throw ORDER_PICKUP_WINDOW_CLOSED.
+    if (order.amountCents === 0 && order.payStatus === 'unpaid' && !isPickupWindowClosed(order)) {
       order = await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
     }
     const terminal = order.terminalId

@@ -34,6 +34,11 @@
   调低是独立治理动作，会让其他 lane 在途分支转红，不在本候选范围内。
 - **小程序至今从未发布。** 本候选没有改变这一点：没有进过微信开发者工具、没有 Trial 版、没有提审。
 
+2026-09-15 **后端幂等 P1/P2 已在本地收口（不改上表第 1 项的达标判据）。**
+`ed576f3cb` 的耐久 `POST /me/print-orders` 回放还剩：过期窗口上对免费半完成单 `markPaid` 会抛错、P2002 只靠 provider meta、取消/过期与「清记录再铸新键」只在 T10 点过、HTTP 头契约没有进程内 Nest 证明。本轮只动允许的后端文件：回放先 `expireIfNeeded` 再决定是否 `markPaid`；任何 P2002 都按 `(endUserId, key)` 查一次，没有 scoped 行就原样抛出；同键回放终态原单，新键才是新的商业意图；新增 `verify:member-print-order-idempotency-http` 并由 `verify:miniapp-cloud-print-m2` 串行拉起。
+
+本地证据见 `docs/progress/current-progress.md` 本条。**`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。** 三方只读复审要对包含本后端提交的新 tip 做，不得沿用 `638ea71ba` 的前端绿灯当作服务端也收口。Claude 前端提交保持不动。
+
 2026-09-15 **R7 收口：撤回 `124398c9f` 的「幂等建单已接线」结论。**
 
 R6（`124398c9f`）证明的是「键被用对了」；独立复现打的是它**下面那一层**——键到底在不在。

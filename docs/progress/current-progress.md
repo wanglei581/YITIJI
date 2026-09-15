@@ -12,6 +12,23 @@
 生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
 此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
 
+2026-09-15 **后端幂等 P1/P2 收口：`POST /me/print-orders` 回放不再对已关闭取件窗口 `markPaid`，P2002 改为一次 scoped lookup，并补了进程内 Nest HTTP 契约。**
+Claude 前端提交 `638ea71baeb8556d4327241e7a9221bee4ee15e1` 保持不动。锚点是本后端提交（本分支 tip），基线仍是
+`origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+`ed576f3cb` 把键做成了耐久回放，但回放路径上还剩几条会在一次普通重试里踩到的洞：
+
+- **P1 过期窗口上的免费半完成单会抛错而不是回放。** `replayOwned` 见到 `amountCents=0 && payStatus=unpaid` 就调 `markPaid`；`markPaid` 对已过 `pickupCodeExpiresAt` 的单抛 `ORDER_PICKUP_WINDOW_CLOSED`。插入已落库、原请求在 `markPaid` 前失败、用户过了截止再带同一把键重试，得到的是 400 而不是同一张 Order 的诚实终态。改法：回放先走既有 `expireIfNeeded`，再 `requireOwned` 重读；只有窗口仍开才 `markPaid`。截止后收敛 `expired/closed`，不入账、不另铸到机码。
+- **P2 取消/过期回放与前端「清记录再铸新键」对齐。** 同键继续回放同一张终态 Order（不建第二张、不露码）。新的商业意图只表现为一把新键。本轮补了「取消后新 key → 新单」「过期后新 key → 新单」。
+- **P1 P2002 不得只靠 provider meta。** Prisma 7 SQLite adapter 把字段放在 `meta.driverAdapterError.cause.constraint.fields`，缺 meta 时 matcher 必须 false。catch 改为：凡 P2002 都按 `(endUserId, key)` 查一次；有行且指纹匹配才回放；没有 scoped 行就把**原来那只**错误原样抛出。`orderNo` / `pickupCodeHash` / `printTaskId` 冲突的负例仍在。本机用跳过预查的方式打到了真实 SQLite `UNIQUE constraint failed: Order.endUserId, Order.idempotencyKey`（adapter `originalCode=2067`）。
+- **P2 HTTP 契约此前只在 service 直调上。** 新增 `verify:member-print-order-idempotency-http`：进程内 Nest + 隔离 SQLite + 真 `EndUserAuthGuard`（Jwt + 内存会话桩）。证明缺/空白/非法 header 400 且零行；body-only `idempotencyKey` 是 `VALIDATION_FAILED` 不能代替 header；`Idempotency-Key` / `IDEMPOTENCY-KEY` / `idempotency-key` 都能打到 controller；丢响应再 POST 回放同一张单；不同 payload 409 且不泄露 id/code。由 `verify:miniapp-cloud-print-m2` 串行拉起，进入既有 CI 闭包。
+
+本机独立复跑（全部退出码 0）：`verify:member-print-order-idempotency`（T1–T13e）、`verify:member-print-order-idempotency-http`（H1–H5）、`verify:miniapp-cloud-print-m2`、`verify:backend-p0-contracts`、`VERIFICATION_DATABASE_TARGET=isolated verify:member-print-orders`、`typecheck`、根 `verify:repository-integrity` / `verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` / `graph:check`、`git diff --check`。
+
+反向变异 5 条全部判红（按被测命令退出码，还原用内存字节写回 + sha256 逐文件比对，未用 `git checkout` / `reset`）：`M1` 回放重新无条件 `markPaid`、`M2` catch 只认 matcher、`M3` 无 scoped 行时吞掉 P2002、`M4` controller 改读 `x-idempotency-key`、`M5` DTO 放行 body `idempotencyKey`。跨用户隔离与已 paid 免费单的 CAS/审计不重复，原 T6/T7/T9 仍绿。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、未接真实 API、未真机、未部署。PostgreSQL 唯一冲突形态本机没有配置实例，只在 SQLite 上打过真实 P2002。前端 `638ea71ba` 一行未改。
+
 2026-09-15 **R7 收口：撤回 `124398c9f169af45a5a594618feeddc2a77e5e33` 的「幂等建单已接线」结论 ——
 那一句当时只对了一半，三个缺陷活过了它。** 锚点是 `124398c9f` 的直接子提交（本分支 tip），
 基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。

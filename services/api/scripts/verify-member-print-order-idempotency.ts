@@ -104,6 +104,8 @@ function assertMatcher(): void {
   if (isMemberPrintOrderIdempotencyConflict(p2002(['pickupCodeHash']))) fail('pickupCodeHash P2002 不得当幂等回放')
   if (isMemberPrintOrderIdempotencyConflict(p2002('Order_orderNo_key'))) fail('orderNo 约束名不得当幂等回放')
   if (isMemberPrintOrderIdempotencyConflict(p2002(['pickupCode']))) fail('pickupCode P2002 不得当幂等回放')
+  if (isMemberPrintOrderIdempotencyConflict(p2002(['printTaskId']))) fail('printTaskId P2002 不得当幂等回放')
+  if (isMemberPrintOrderIdempotencyConflict(p2002('Order_printTaskId_key'))) fail('printTaskId 约束名不得当幂等回放')
   if (isMemberPrintOrderIdempotencyConflict({ code: 'P2002' })) fail('缺 meta.target 不得吞掉唯一冲突')
   if (isMemberPrintOrderIdempotencyConflict({ code: 'P2003', meta: { target: ['idempotencyKey'] } })) {
     fail('非 P2002 不得当幂等冲突')
@@ -165,7 +167,7 @@ async function main(): Promise<void> {
   const orderStatus = new OrderStatusService(prisma, audit)
   const pageCount = new PrintPageCountService(prisma, storage)
   const pricing = new PricingService(prisma)
-  const quote = new OrderQuoteService(pageCount, pricing)
+  const quote = new OrderQuoteService(pageCount, pricing, capabilities, prisma)
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const userA = `eu_idem_a_${suffix}`
@@ -174,8 +176,43 @@ async function main(): Promise<void> {
   const fileA = `file_idem_a_${suffix}`
   const fileB = `file_idem_b_${suffix}`
   const storageKeys: string[] = []
+  const extraPrintTaskIds: string[] = []
 
   const dtoA = { fileId: fileA, terminalId, copies: 1, colorMode: 'black_white' as const, duplex: 'simplex' as const }
+  const futureExpiry = (): Date => new Date(Date.now() + 60 * 60 * 1000)
+  const pastExpiry = (): Date => new Date(Date.now() - 60 * 1000)
+
+  type OrderMut = {
+    create: typeof prisma.order.create
+    findFirst: typeof prisma.order.findFirst
+  }
+  const orderMut = prisma.order as unknown as OrderMut
+
+  async function withOrderMutations<T>(
+    apply: (delegate: OrderMut, original: OrderMut) => void,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const original: OrderMut = { create: orderMut.create, findFirst: orderMut.findFirst }
+    try {
+      apply(orderMut, original)
+      return await run()
+    } finally {
+      orderMut.create = original.create
+      orderMut.findFirst = original.findFirst
+    }
+  }
+
+  function skipIdempotencyLookupOnce(key: string, original: OrderMut): void {
+    let skipped = false
+    orderMut.findFirst = ((args?: Parameters<typeof prisma.order.findFirst>[0]) => {
+      const where = args?.where as { idempotencyKey?: string } | undefined
+      if (!skipped && where?.idempotencyKey === key) {
+        skipped = true
+        return Promise.resolve(null)
+      }
+      return original.findFirst(args)
+    }) as typeof prisma.order.findFirst
+  }
 
   async function seedUser(id: string): Promise<void> {
     await prisma.endUser.create({ data: { id, phoneHash: `hash-${id}`, phoneEnc: `enc-${id}` } })
@@ -208,6 +245,50 @@ async function main(): Promise<void> {
   }
   async function markPaidAuditCount(orderId: string): Promise<number> {
     return prisma.auditLog.count({ where: { action: 'order.mark_paid', targetId: orderId } })
+  }
+
+  async function insertCloudOrder(opts: {
+    id: string
+    orderNo: string
+    key: string
+    code: string
+    expiresAt: Date
+    amountCents?: number
+    payStatus?: string
+    paymentSource?: string | null
+    paidAt?: Date | null
+    pickupStatus?: string
+    printTaskId?: string | null
+    pickupCodeHash?: string
+  }): Promise<void> {
+    await prisma.order.create({
+      data: {
+        id: opts.id,
+        orderNo: opts.orderNo,
+        type: 'print',
+        channel: 'miniapp_cloud',
+        endUserId: userA,
+        terminalId,
+        sourceFileId: fileA,
+        sourceFileName: 'A简历.pdf',
+        printParamsJson: JSON.stringify({ copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
+        amountCents: opts.amountCents ?? 0,
+        billablePages: 2,
+        itemsJson: '[]',
+        payStatus: opts.payStatus ?? 'unpaid',
+        paymentSource: opts.paymentSource ?? null,
+        paidAt: opts.paidAt ?? null,
+        taskStatus: 'pending_release',
+        pickupCodeHash: opts.pickupCodeHash ?? hashPickupCode(opts.code),
+        pickupCodeEnc: encryptSecret(opts.code),
+        pickupCodeCreatedAt: new Date(),
+        pickupCodeExpiresAt: opts.expiresAt,
+        pickupStatus: opts.pickupStatus ?? 'pending',
+        printTaskId: opts.printTaskId ?? null,
+        idempotencyKey: opts.key,
+        idempotencyPayloadHash: fingerprintMemberPrintOrderPayload(dtoA),
+      },
+    })
   }
 
   try {
@@ -298,19 +379,10 @@ async function main(): Promise<void> {
     pass('T7 B 拿 A 的 fileId → PRINT_FILE_NOT_FOUND，不泄露 A 的码')
 
     const halfKey = randomUUID()
-    const halfHash = fingerprintMemberPrintOrderPayload(dtoA)
     const halfCode = randomPickupCode()
     const halfId = `ord_half_${suffix}`
-    await prisma.order.create({
-      data: {
-        id: halfId, orderNo: `ORD-HALF-${suffix}`, type: 'print', channel: 'miniapp_cloud',
-        endUserId: userA, terminalId, sourceFileId: fileA, sourceFileName: 'A简历.pdf',
-        printParamsJson: JSON.stringify({ copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
-        amountCents: 0, billablePages: 2, itemsJson: '[]', payStatus: 'unpaid', taskStatus: 'pending_release',
-        pickupCodeHash: hashPickupCode(halfCode), pickupCodeEnc: encryptSecret(halfCode),
-        pickupCodeCreatedAt: new Date(), pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        pickupStatus: 'pending', idempotencyKey: halfKey, idempotencyPayloadHash: halfHash,
-      },
+    await insertCloudOrder({
+      id: halfId, orderNo: `ORD-HALF-${suffix}`, key: halfKey, code: halfCode, expiresAt: futureExpiry(),
     })
     const halfView = await memberOrders.create(userA, dtoA, halfKey)
     if (halfView.id !== halfId) fail('半完成免费单必须回放到原行')
@@ -318,23 +390,55 @@ async function main(): Promise<void> {
     if (halfRow.payStatus !== 'paid' || halfRow.paymentSource !== 'free') fail('半完成免费单必须经 markPaid 收敛')
     if (halfView.pickupCode !== halfCode) fail('回放必须解出同一到机码')
     if (await prisma.order.count({ where: { idempotencyKey: halfKey } }) !== 1) fail('半完成收敛不得第二张单')
-    pass('T8 免费半完成 unpaid/0 → markPaid 收敛，同码')
+    pass('T8 截止前免费半完成 unpaid/0 → markPaid 收敛，同码')
+
+    const lateKey = randomUUID()
+    const lateCode = randomPickupCode()
+    const lateId = `ord_late_${suffix}`
+    const lateHash = hashPickupCode(lateCode)
+    await insertCloudOrder({
+      id: lateId, orderNo: `ORD-LATE-${suffix}`, key: lateKey, code: lateCode, expiresAt: pastExpiry(),
+    })
+    const latePaidBefore = await markPaidAuditCount(lateId)
+    const lateReplay = await capture(() => memberOrders.create(userA, dtoA, lateKey))
+    if (lateReplay.thrown) fail(`截止后半完成不得抛错: ${JSON.stringify(lateReplay)}`)
+    const lateView = lateReplay.body as { id: string; pickupStatus: string; payStatus: string; pickupCode: string | null }
+    if (lateView.id !== lateId) fail('截止后半完成必须回放原单')
+    if (lateView.pickupStatus !== 'expired' || lateView.payStatus !== 'closed') {
+      fail(`截止后半完成应为 expired/closed，实际 ${lateView.pickupStatus}/${lateView.payStatus}`)
+    }
+    if (lateView.pickupCode) fail('截止后半完成不得再露出到机码')
+    const lateRow = await prisma.order.findUniqueOrThrow({ where: { id: lateId } })
+    if (lateRow.pickupCodeHash !== lateHash) fail('截止后半完成不得另铸到机码')
+    if (lateRow.payStatus !== 'closed' || lateRow.paymentSource) fail('截止后半完成不得入账')
+    if (await markPaidAuditCount(lateId) !== latePaidBefore) fail('截止后半完成不得写 order.mark_paid')
+    if (await prisma.order.count({ where: { idempotencyKey: lateKey } }) !== 1) fail('截止后半完成不得第二张单')
+    pass('T8b 截止后免费半完成 → expired/closed，无支付副作用、无新码')
+
+    const claimedKey = randomUUID()
+    const claimedCode = randomPickupCode()
+    const claimedId = `ord_claimed_${suffix}`
+    await insertCloudOrder({
+      id: claimedId, orderNo: `ORD-CLAIMED-${suffix}`, key: claimedKey, code: claimedCode,
+      expiresAt: pastExpiry(), pickupStatus: 'claimed',
+    })
+    const claimedReplay = await capture(() => memberOrders.create(userA, dtoA, claimedKey))
+    if (claimedReplay.thrown) fail(`过期 claimed 半完成不得抛错: ${JSON.stringify(claimedReplay)}`)
+    const claimedView = claimedReplay.body as { id: string; pickupStatus: string; payStatus: string; pickupCode: string | null }
+    if (claimedView.id !== claimedId) fail('过期 claimed 必须回放原单')
+    if (claimedView.pickupStatus !== 'expired' || claimedView.payStatus !== 'closed') {
+      fail(`过期 claimed 应为 expired/closed，实际 ${claimedView.pickupStatus}/${claimedView.payStatus}`)
+    }
+    if (claimedView.pickupCode) fail('过期 claimed 不得再露出到机码')
+    if (await markPaidAuditCount(claimedId) !== 0) fail('过期 claimed 不得 markPaid')
+    pass('T8c pending/claimed 过期窗口走 expireIfNeeded，不 markPaid')
 
     const paidKey = randomUUID()
-    const paidHash = fingerprintMemberPrintOrderPayload(dtoA)
     const paidCode = randomPickupCode()
     const paidId = `ord_paid_${suffix}`
-    await prisma.order.create({
-      data: {
-        id: paidId, orderNo: `ORD-PAID-${suffix}`, type: 'print', channel: 'miniapp_cloud',
-        endUserId: userA, terminalId, sourceFileId: fileA, sourceFileName: 'A简历.pdf',
-        printParamsJson: JSON.stringify({ copies: 1, colorMode: 'black_white', duplex: 'simplex' }),
-        amountCents: 0, billablePages: 2, itemsJson: '[]', payStatus: 'paid', paymentSource: 'free',
-        paidAt: new Date(), taskStatus: 'pending_release',
-        pickupCodeHash: hashPickupCode(paidCode), pickupCodeEnc: encryptSecret(paidCode),
-        pickupCodeCreatedAt: new Date(), pickupCodeExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        pickupStatus: 'pending', idempotencyKey: paidKey, idempotencyPayloadHash: paidHash,
-      },
+    await insertCloudOrder({
+      id: paidId, orderNo: `ORD-PAID-${suffix}`, key: paidKey, code: paidCode, expiresAt: futureExpiry(),
+      payStatus: 'paid', paymentSource: 'free', paidAt: new Date(),
     })
     const paidBefore = await markPaidAuditCount(paidId)
     const paidView = await memberOrders.create(userA, dtoA, paidKey)
@@ -353,6 +457,132 @@ async function main(): Promise<void> {
     if (await prisma.order.count({ where: { idempotencyKey: cancelKey } }) !== 1) fail('取消后再打同 key 不得第二张单')
     pass('T10 取消态回放原单，不建第二张')
 
+    const reorderAfterCancel = await memberOrders.create(userA, dtoA, randomUUID())
+    if (reorderAfterCancel.id === cancellable.id) fail('取消后新 key 必须是新的商业意图')
+    if (reorderAfterCancel.pickupStatus !== 'pending') fail('取消后新 key 应建出 pending 新单')
+    pass('T10b 取消后新 key = 新单（前端清记录再铸键）')
+
+    const expiredPaidKey = randomUUID()
+    const expiredPaidCode = randomPickupCode()
+    const expiredPaidId = `ord_exp_paid_${suffix}`
+    const expiredPaidHash = hashPickupCode(expiredPaidCode)
+    await insertCloudOrder({
+      id: expiredPaidId, orderNo: `ORD-EXPPAID-${suffix}`, key: expiredPaidKey, code: expiredPaidCode,
+      expiresAt: pastExpiry(), payStatus: 'paid', paymentSource: 'free', paidAt: new Date(),
+    })
+    const expiredPaidBefore = await markPaidAuditCount(expiredPaidId)
+    const expiredPaidView = await memberOrders.create(userA, dtoA, expiredPaidKey)
+    if (expiredPaidView.id !== expiredPaidId) fail('过期已付必须回放原单')
+    if (expiredPaidView.pickupStatus !== 'expired') fail('过期已付回放应为 expired')
+    if (expiredPaidView.pickupCode) fail('过期已付不得再露出到机码')
+    const expiredPaidRow = await prisma.order.findUniqueOrThrow({ where: { id: expiredPaidId } })
+    if (expiredPaidRow.pickupCodeHash !== expiredPaidHash) fail('过期已付不得另铸到机码')
+    if (expiredPaidRow.payStatus !== 'paid') fail('过期已付不得改支付态')
+    if (await markPaidAuditCount(expiredPaidId) !== expiredPaidBefore) fail('过期已付不得再 markPaid')
+    pass('T12 过期已付回放原单终态，无新码、无支付副作用')
+
+    const reorderAfterExpire = await memberOrders.create(userA, dtoA, randomUUID())
+    if (reorderAfterExpire.id === expiredPaidId) fail('过期后新 key 必须是新单')
+    pass('T12b 过期后新 key = 新单（前端清记录再铸键）')
+
+    const collideKey = randomUUID()
+    const collideCode = randomPickupCode()
+    const collideId = `ord_collide_${suffix}`
+    await insertCloudOrder({
+      id: collideId, orderNo: `ORD-COLLIDE-${suffix}`, key: collideKey, code: collideCode,
+      expiresAt: futureExpiry(), payStatus: 'paid', paymentSource: 'free', paidAt: new Date(),
+    })
+    let seenSqliteP2002: { code?: string; meta?: unknown } | null = null
+    const collideView = await withOrderMutations((delegate, original) => {
+      skipIdempotencyLookupOnce(collideKey, original)
+      delegate.create = (async (args: Parameters<typeof prisma.order.create>[0]) => {
+        try {
+          return await original.create(args)
+        } catch (error) {
+          seenSqliteP2002 = error as { code?: string; meta?: unknown }
+          throw error
+        }
+      }) as typeof prisma.order.create
+    }, () => memberOrders.create(userA, dtoA, collideKey))
+    if (!seenSqliteP2002 || seenSqliteP2002.code !== 'P2002') {
+      fail(`T13 必须打到真实 SQLite P2002，实际 ${JSON.stringify(seenSqliteP2002)}`)
+    }
+    if (collideView.id !== collideId) fail('真实 P2002 必须 scoped lookup 后回放原单')
+    if (await prisma.order.count({ where: { idempotencyKey: collideKey } }) !== 1) fail('真实 P2002 回放不得第二张单')
+    pass(`T13 真实 SQLite (endUserId,key) 冲突 → scoped lookup 回放（meta=${JSON.stringify(seenSqliteP2002.meta ?? null)}）`)
+
+    const metaKey = randomUUID()
+    const metaCode = randomPickupCode()
+    const metaId = `ord_meta_${suffix}`
+    await insertCloudOrder({
+      id: metaId, orderNo: `ORD-META-${suffix}`, key: metaKey, code: metaCode,
+      expiresAt: futureExpiry(), payStatus: 'paid', paymentSource: 'free', paidAt: new Date(),
+    })
+    let missingMetaCreateCalls = 0
+    const metaView = await withOrderMutations((delegate, original) => {
+      skipIdempotencyLookupOnce(metaKey, original)
+      delegate.create = (async () => {
+        missingMetaCreateCalls += 1
+        throw { code: 'P2002' }
+      }) as typeof prisma.order.create
+    }, () => memberOrders.create(userA, dtoA, metaKey))
+    if (missingMetaCreateCalls !== 1) fail('缺 meta 的 P2002 必须走过 create catch')
+    if (metaView.id !== metaId) fail('缺 meta P2002 有 scoped 行时必须回放')
+    if (isMemberPrintOrderIdempotencyConflict({ code: 'P2002' })) fail('matcher 对缺 meta 仍须 false')
+    pass('T13b P2002 缺 meta + scoped 行存在 → 回放（不靠 matcher）')
+
+    async function assertUnrelatedUniqueRethrown(
+      label: string,
+      mutate: (data: Record<string, unknown>) => Record<string, unknown>,
+    ): Promise<void> {
+      const newKey = randomUUID()
+      let originalError: unknown
+      try {
+        await withOrderMutations((delegate, original) => {
+          delegate.create = (async (args: Parameters<typeof prisma.order.create>[0]) => {
+            const data = mutate({ ...(args.data as Record<string, unknown>) })
+            try {
+              return await original.create({ ...args, data } as Parameters<typeof prisma.order.create>[0])
+            } catch (error) {
+              originalError = error
+              throw error
+            }
+          }) as typeof prisma.order.create
+        }, () => memberOrders.create(userA, dtoA, newKey))
+        fail(`${label} 应抛出原 P2002`)
+      } catch (error) {
+        if (error !== originalError) fail(`${label} 必须原样 rethrow，不能包一层`)
+        if ((error as { code?: string }).code !== 'P2002') fail(`${label} 应为 P2002，实际 ${(error as { code?: string }).code}`)
+      }
+      if (await prisma.order.count({ where: { idempotencyKey: newKey } }) !== 0) {
+        fail(`${label} 不得留下带该 key 的行`)
+      }
+      pass(label)
+    }
+
+    await assertUnrelatedUniqueRethrown('T13c orderNo P2002 无 scoped 行 → 原样抛出', (data) => ({
+      ...data, orderNo: 'ORD-HALF-' + suffix,
+    }))
+    await assertUnrelatedUniqueRethrown('T13d pickupCodeHash P2002 无 scoped 行 → 原样抛出', (data) => ({
+      ...data, pickupCodeHash: lateHash,
+    }))
+
+    const taskId = `ptask_idem_${suffix}`
+    extraPrintTaskIds.push(taskId)
+    await prisma.printTask.create({
+      data: { id: taskId, fileUrl: 'sig://verify-idem', fileMd5: '0'.repeat(64), paramsJson: '{}' },
+    })
+    await prisma.order.create({
+      data: {
+        orderNo: `ORD-PTASK-${suffix}`, type: 'print', channel: 'miniapp_cloud',
+        endUserId: userA, printTaskId: taskId, amountCents: 0, itemsJson: '[]', printParamsJson: '{}',
+        payStatus: 'unpaid', taskStatus: 'pending',
+      },
+    })
+    await assertUnrelatedUniqueRethrown('T13e printTaskId P2002 无 scoped 行 → 原样抛出', (data) => ({
+      ...data, printTaskId: taskId,
+    }))
+
     pass('T11 M2 直调已全部显式给 key（本文件缺 key 用例覆盖 400）')
   } finally {
     setPrintScanCapabilityModeForTest(null)
@@ -362,6 +592,7 @@ async function main(): Promise<void> {
     })).map((row) => row.id)
     if (orderIds.length) await prisma.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
     await prisma.order.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
+    if (extraPrintTaskIds.length) await prisma.printTask.deleteMany({ where: { id: { in: extraPrintTaskIds } } })
     await prisma.piiFinding.deleteMany({ where: { task: { endUserId: { in: [userA, userB] } } } })
     await prisma.documentProcessTask.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
     await prisma.fileObject.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
