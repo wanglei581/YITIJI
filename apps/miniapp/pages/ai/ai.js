@@ -59,6 +59,9 @@ Page({
         title: '到机器前办',
         sub: '到机码、扫码登录、U盘',
         items: [
+          // desc 必须写「现场付款」：材料包在小程序只完成组包与拿到机码，钱是在
+          // 一体机上付的。不写清楚，用户会以为点进去是在手机上下单付款。
+          { id: 'package',   icon: 'folder',  title: '材料包',     desc: '多份材料一次组包，现场付款打印', accent: 'clay'  },
           { id: 'orders',    icon: 'history', title: '打印订单',   desc: '到机码与出纸状态',   accent: 'clay'  },
           { id: 'kiosk',     icon: 'scan',    title: '扫码登录',   desc: '连接现场服务终端',   accent: 'teal'  },
           { id: 'usb',       icon: 'printer', title: 'U盘打印指引', desc: '现场导入与打印步骤', accent: 'wheat' },
@@ -68,16 +71,14 @@ Page({
 
     // 页面已经做完、但服务端接口还不存在的能力。
     // 既不能伪装成可用（点下去必然失败），也不该悄悄删掉入口假装从没规划过。
-    pending: [
-      {
-        id: 'package',
-        icon: 'folder',
-        title: '材料包',
-        desc: '一次备齐多份材料再到机器打印',
-        why: '服务端下单接口尚未上线',
-        reason: '页面已完成，但服务端 POST /orders/package 尚未实现，现在下单必然失败，所以入口不放开。接口上线后本功能会直接开放。',
-      },
-    ],
+    //
+    // 当前为空：最后一条「材料包」已于本轮开放。原因写清楚，避免有人照旧注释把它加回来 ——
+    // 那条 why 写的是「服务端下单接口尚未上线」，而 POST /orders/package 早已可用，
+    // 真正缺的是「下完单找不回订单」（没有列表端点）。现在 GET /orders/package 已接入
+    // 「我的 · 打印订单」的材料包分区，下单后可凭 orderId 重新查回到机码，
+    // 因此入口改为真实可用，运行期由服务端错误码 fail-closed（终端离线 / 隐私检查未过 /
+    // 价目未配置都会在报价或建单那一步被拒并给出可执行的下一步）。
+    pending: [],
   },
 
   onLoad() {
@@ -109,6 +110,7 @@ Page({
       // 删掉这条会怎样：上面 groups.prepare 的「生成简历」磁贴点下去 url 取到
       // undefined，wx.navigateTo 不会被调用，卡片变成静默死按钮（用户会以为是
       // 自己没点准，反复去戳）。id 与 groups 里的 id 必须逐字对应。
+      package:   '/pages/package-create/package-create',
       build:     '/pages/resume-build/resume-build',
       voice:     '/pages/resume-voice/resume-voice',
       diagnose:  '/pages/resume-diagnose/resume-diagnose',

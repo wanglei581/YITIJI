@@ -1,8 +1,24 @@
 // pages/orders/orders.js
-// 本人打印订单列表。接真实 GET /api/v1/me/print-orders。
+// 本人打印订单的统一视图。三个来源，各自独立请求、独立失败、独立分页：
+//   ① 云打印订单        GET /me/print-orders/cloud   （Order-only，单文件）
+//   ② 一体机历史任务    GET /me/print-orders         （PrintTask，游标分页）
+//   ③ 材料包订单        GET /orders/package          （多文件，游标分页）
+//
+// 为什么要分区而不是合成一条列表：①② 与 ③ 是**两套 id 空间和两个独立游标**。
+// 合成一页就必须把两个 cursor 当成一个用 —— 触底时不知道该推进哪一个，推错就会
+// 静默丢掉一整段订单（用户看到的是「我的订单少了」，而页面一切正常）。
+// 所以材料包单独成区，带自己的 total、自己的「加载更多」和自己的失败态；
+// ①② 仍走原来的触底分页。
+//
+// 材料包卡片点进去**只带 orderId**：到机码是去一体机取件的凭证，经 URL 传递等于
+// 一条构造出来的链接或一张转发出去的卡片就能在别人手机上渲染出带码的成功页。
+// package-code 自己带登录态去 GET /orders/package/:id 核一次（服务端 requireOwned）。
 const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
+const pkg = require('../../utils/package-order')
+
+const PAGE_SIZE = 20
 
 // PrintTask.status (后端) → UI 展示状态映射
 const STATUS_MAP = {
@@ -14,11 +30,10 @@ const STATUS_MAP = {
   cancelled: { key: 'done',     label: '已取消', tone: 'neutral'},
 }
 
-function parseAmountCents(value) {
-  if (value === undefined || value === null || value === '') return null
-  const amountCents = Number(value)
-  return Number.isSafeInteger(amountCents) && amountCents >= 0 ? amountCents : null
-}
+// 分 → 元、到机码分组：与材料包区共用 utils/package-order 的同一份实现，
+// 不再在本页维护第二份（同一函数曾在全仓有三份拷贝，改一处漂一处）。
+const parseAmountCents = pkg.parseAmountCents
+const fmtCode = pkg.formatPickupCode
 
 // payStatus 门控：未付款时覆盖显示
 function resolveDisplayStatus(item) {
@@ -56,18 +71,7 @@ function formatPrice(cents) {
   return '¥' + (amountCents / 100).toFixed(2)
 }
 
-// 到机码格式化：每 2 位一组方便阅读，如 "AB-C3-9M"
-function fmtCode(raw) {
-  // 与 print-pickup 的 formatCode 同形：String() 包装 + groups 判空。
-  // 原版对纯空白串（replace 后为空，match 返回 null）和数字入参直接 THROW，
-  // 一行数据异常会中断整个列表渲染。同一函数全仓三份实现，以 print-pickup 版为准。
-  if (!raw) return ''
-  const s = String(raw).replace(/\s/g, '').toUpperCase()
-  const groups = s.match(/.{1,2}/g)
-  return groups ? groups.join('-') : ''
-}
-
-// MP-05：仅云打印 Order-only，且拍板第 5 条 unpaid + pending。材料包取消端点仍 knownMissing。
+// MP-05：仅云打印 Order-only，且拍板第 5 条 unpaid + pending。材料包没有取消端点，不放该按钮。
 function canCancelCloudOrder(item) {
   return !item.status
     && item.payStatus === 'unpaid'
@@ -127,29 +131,59 @@ Page({
       { key: 'printing', label: '打印中' },
       { key: 'done',     label: '已完成' },
     ],
-    orders: [],    // 全量（已转换为 uiItem）
-    filtered: [],  // 当前 tab 显示
+    orders: [],    // 单件打印：全量（已转换为 uiItem）
+    filtered: [],  // 单件打印：当前 tab 显示
     loading: false,
     error: '',
     nextCursor: null,
     loadingMore: false,
     isLoggedIn: false,
+
+    // ── 材料包分区（独立来源、独立游标、独立失败态）──────────────────
+    pkgRows: [],
+    pkgFiltered: [],
+    pkgState: 'idle',      // idle | loading | ready | error
+    pkgErrorTitle: '',
+    pkgErrorText: '',
+    pkgCursor: null,
+    pkgLoadingMore: false,
+    // 「加载更多」失败单独成一个字段：写进 pkgState 会让整段已加载的订单被错误态顶掉 ——
+    // 用户已经看到的订单不该因为下一页失败而消失。
+    pkgMoreErrorText: '',
+    pkgTotal: 0,
+    pkgOnsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
   },
 
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     this._toUiItem = toUiItem
     this._cancelLocks = {}
+    this._identityKey = ''
   },
 
   onShow() {
     const loggedIn = auth.isLoggedIn()
+    // A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
+    // 判据是会员 id 而不是「有没有 token」：token 每次登录都换，但同一个人重登不该清空。
+    const identityKey = loggedIn ? String((auth.getUser() || {}).id || '') : ''
+    if (identityKey !== this._identityKey) {
+      this._identityKey = identityKey
+      this._resetAll()
+    }
     this.setData({ isLoggedIn: loggedIn })
     if (loggedIn) {
       this._load()
-    } else {
-      this.setData({ orders: [], filtered: [], error: '' })
+      this._loadPackages()
     }
+  },
+
+  /** 清空两个分区的全部数据与游标。跨用户、登出、下拉刷新前都必须走这里。 */
+  _resetAll() {
+    this.setData({
+      orders: [], filtered: [], error: '', nextCursor: null, loadingMore: false,
+      pkgRows: [], pkgFiltered: [], pkgState: 'idle', pkgErrorTitle: '', pkgErrorText: '',
+      pkgCursor: null, pkgLoadingMore: false, pkgMoreErrorText: '', pkgTotal: 0,
+    })
   },
 
   // 始终返回 Promise：下拉刷新要等真实请求结束才能收起指示器，
@@ -158,7 +192,7 @@ Page({
     if (!auth.isLoggedIn()) return Promise.resolve()
     const cursor = append ? this.data.nextCursor : null
     this.setData({ [append ? 'loadingMore' : 'loading']: true, error: '' })
-    const legacyPromise = api.getMyPrintOrders({ pageSize: 20, ...(cursor ? { cursor } : {}) })
+    const legacyPromise = api.getMyPrintOrders({ pageSize: PAGE_SIZE, ...(cursor ? { cursor } : {}) })
     const requestPromise = append ? legacyPromise.then(items => [[], items]) : Promise.all([api.getMyCloudPrintOrders(), legacyPromise])
     return requestPromise
       .then(([cloudItems, items]) => {
@@ -185,10 +219,57 @@ Page({
       })
   },
 
+  /**
+   * 材料包订单分区。
+   *
+   * 游标只推进自己的 pkgCursor，与单件打印的 nextCursor 完全隔离。
+   * 失败只染红本分区：单件打印那一段照常显示 —— 一个来源挂掉不该让整页订单消失。
+   */
+  _loadPackages(append = false) {
+    if (!auth.isLoggedIn()) return Promise.resolve()
+    if (append && !this.data.pkgCursor) return Promise.resolve()
+    const cursor = append ? this.data.pkgCursor : null
+    this.setData(append
+      ? { pkgLoadingMore: true, pkgMoreErrorText: '' }
+      : { pkgState: 'loading', pkgErrorTitle: '', pkgErrorText: '', pkgMoreErrorText: '' })
+    return api.getPackageOrders({ pageSize: PAGE_SIZE, ...(cursor ? { cursor } : {}) })
+      .then(page => {
+        const incoming = (Array.isArray(page && page.items) ? page.items : []).map(row => pkg.toPackageRow(row))
+        const rows = append ? pkg.mergePackageRows(this.data.pkgRows, incoming) : incoming
+        const total = Number(page && page.total)
+        this.setData({
+          pkgRows: rows,
+          pkgCursor: (page && page.nextCursor) || null,
+          pkgTotal: Number.isFinite(total) && total >= 0 ? total : rows.length,
+          pkgState: 'ready',
+          pkgLoadingMore: false,
+          pkgErrorTitle: '', pkgErrorText: '', pkgMoreErrorText: '',
+        })
+        this._filterTab(this.data.activeTab)
+      })
+      .catch(err => {
+        const shown = pkg.describePackageError(err, '材料包订单加载失败，请稍后重试。')
+        // 下一页失败只写 pkgMoreErrorText，已加载的那几页照常留在屏幕上；
+        // 首屏/刷新失败才进 pkgState=error（此时本来也没有可保留的内容）。
+        if (append) {
+          this.setData({ pkgLoadingMore: false, pkgMoreErrorText: shown.text })
+          return
+        }
+        this.setData({
+          pkgState: 'error',
+          pkgLoadingMore: false,
+          pkgErrorTitle: shown.title,
+          pkgErrorText: shown.text,
+        })
+      })
+  },
+
   _filterTab(key, orders) {
     const all = orders || this.data.orders
     const filtered = key === 'all' ? all : all.filter(o => o.status === key)
-    this.setData({ activeTab: key, filtered })
+    const pkgAll = this.data.pkgRows
+    const pkgFiltered = key === 'all' ? pkgAll : pkgAll.filter(o => o.statusKey === key)
+    this.setData({ activeTab: key, filtered, pkgFiltered })
   },
 
   back() {
@@ -201,13 +282,38 @@ Page({
 
   onPullDownRefresh() {
     const stop = () => wx.stopPullDownRefresh()
-    this._load().then(stop, stop)
+    // 两个来源并行重拉；任一失败只写自己的失败态，不会互相牵连。
+    Promise.all([this._load(), this._loadPackages()]).then(stop, stop)
   },
 
   onReachBottom() {
+    // 触底只推进单件打印的游标。材料包用本分区自己的「加载更多」按钮，
+    // 两个游标结构上不可能被当成一个用。
     if (this.data.nextCursor && !this.data.loadingMore) {
       this._load(true)
     }
+  },
+
+  loadMorePackages() {
+    if (this.data.pkgCursor && !this.data.pkgLoadingMore) this._loadPackages(true)
+  },
+
+  retryPackages() {
+    this._loadPackages()
+  },
+
+  /**
+   * 进入材料包到机码页。**只带 orderId**：到机码、金额、有效期由下一页凭登录态向
+   * 服务端查（requireOwned 归属校验），不经 URL 传递。
+   */
+  openPackage(e) {
+    const orderId = e.currentTarget.dataset.id
+    if (!orderId) return
+    wx.navigateTo({ url: `/pages/package-code/package-code?orderId=${encodeURIComponent(orderId)}` })
+  },
+
+  toPackageCreate() {
+    wx.navigateTo({ url: '/pages/package-create/package-create' })
   },
 
   // 主操作按钮

@@ -54,6 +54,7 @@
     "GET /mock-interviews/:p",
     "GET /mock-interviews/:p/report",
     "GET /mock-interviews/capabilities/voice",
+    "GET /orders/package",
     "GET /orders/package/:p",
     "GET /policies",
     "GET /policies/:p",

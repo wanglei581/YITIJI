@@ -1533,9 +1533,72 @@ const api = {
     return request(`/orders/package/${encodeURIComponent(orderId)}`, { method: 'GET', needAuth: true });
   },
 
+  /**
+   * 材料包下单前的**服务端**报价（多行）。
+   *
+   * 走既有的 `POST /orders/quote` 多行契约（DTO 的 `lines` 注释写明「材料包多行报价」）：
+   * 服务端逐行识别真实页数、按 PriceConfig 计价再聚合，前端一个数字都不参与。
+   * 报价用的 params 必须与建单时服务端 `normalizeParams` 的产物一致（bw→black_white、
+   * single→simplex、A4/auto/standard/fit/1），否则预览价和实收价会分叉。
+   *
+   * terminalId 必传：一旦请求彩色 / 双面，服务端要先证明这台机器验过该能力
+   * （fail-closed，缺终端直接拒，不会悄悄按黑白计价）。这也让 CAPABILITY_* /
+   * 打印机离线等问题在**建单之前**就暴露出来。
+   *
+   * @param {object} p { terminalId, files: [{ fileId, pageRange? }], params }
+   * @returns {Promise<{ amountCents, billablePages, billingPageSource, lines }>}
+   */
+  quotePackageOrder({ terminalId, files, params }) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包报价'));
+    const list = Array.isArray(files) ? files.filter((f) => f && f.fileId) : [];
+    if (!list.length) return Promise.reject(new Error('缺少打印文件'));
+    // 逐个换取本人文件的短时签名 printFileUrl：归属校验在 preview-url 那一层
+    // （会员只认 record.endUserId === requester.endUserId），前端不构造、不缓存。
+    return Promise.all(list.map((file) =>
+      request(`/files/${encodeURIComponent(file.fileId)}/preview-url`, { method: 'GET', needAuth: true })
+        .then((access) => {
+          const fileUrl = access && access.printFileUrl;
+          if (!fileUrl) throw new Error('服务端未返回可打印文件凭证');
+          return file.pageRange ? { fileUrl, pageRange: String(file.pageRange) } : { fileUrl };
+        })
+    )).then((lines) => request('/orders/quote', {
+      method: 'POST',
+      data: { terminalId, lines, params },
+      needAuth: false,
+    }));
+  },
+
+  /**
+   * 我的材料包订单列表（本人，游标分页）。
+   *
+   * 为什么必须走这个独立端点：材料包订单在既有的会员订单列表里**一条都看不到**。
+   * `/me/print-orders` 查的是 PrintTask（材料包派发前 printTaskId 为 null），
+   * `/me/print-orders/cloud` 的 where 带 `sourceFileId: { not: null }`（材料包多文件、
+   * 该字段本就为 null）。服务端 `PackageOrdersController` 的 `@Get()` 声明在 `@Get(':id')`
+   * **之前**，所以 `GET /orders/package` 不会被 `:id` 吃掉。
+   *
+   * 列表与详情的两点差异是服务端刻意的，前端必须照此理解，不要自己补：
+   *   1. 列表**不下发** `paymentSessionToken`（付款令牌由详情现取，列表一次发 N 个
+   *      只会放大暴露面）；
+   *   2. 列表**不下发** `items` 逐文件明细，只给 `itemCount`。
+   * 到机码照常返回，判据与详情完全一致（pickupStatus === 'pending' 且未过期）。
+   *
+   * @param {object} p { cursor?, pageSize? }
+   * @returns {Promise<{ items: Array<{ orderId, orderNo, pickupCode, expiresAt,
+   *          pickupStatus, payStatus, taskStatus, amountCents, itemCount, createdAt }>,
+   *          nextCursor: string|null, total: number }>}
+   */
+  getPackageOrders({ cursor, pageSize } = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包订单'));
+    const data = {};
+    if (cursor) data.cursor = cursor;
+    if (pageSize) data.pageSize = pageSize;
+    return request('/orders/package', { method: 'GET', data, needAuth: true });
+  },
+
   // 这里曾有 cancelPackageOrder()，调 POST /orders/package/:id/cancel。
-  // 2026-09-08 实测：该端点在服务端不存在（PackageOrdersController 只有 @Post() 与
-  // @Get(':id')），任何调用必得 404。全仓无人调用，故删除而不是留着当哑弹。
+  // 2026-09-08 实测：该端点在服务端不存在（PackageOrdersController 只有 @Post()、
+  // @Get() 与 @Get(':id')），任何调用必得 404。全仓无人调用，故删除而不是留着当哑弹。
   // 材料包取消能力要开放的话，先在服务端补端点，再在此处按真实返回补方法。
 
   // ---------- 最新动态 / 今日提醒 ----------

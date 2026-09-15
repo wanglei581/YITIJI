@@ -1,186 +1,121 @@
 // pages/store-select/store-select.js
+//
+// 材料包第二步：选一台真实的一体机。数据来自 GET /terminals/public（公开、无需登录）。
+//
+// 这页只做**预筛**，权威判定仍在服务端：下单时 PackageOrderService 会重新核
+// 「最近 5 分钟有心跳 + 本地任务库可用 + 终端 enabled/active + 已登记 document_print
+// 能力」，任何一条不满足就 PRINT_TERMINAL_OFFLINE / PRINT_TERMINAL_NOT_ACTIVE /
+// CAPABILITY_* 拒单。所以离线终端这里不让选，不是因为前端说了算，而是为了不让用户
+// 走进一条已知会被拒的路；页面同时写明服务端还会再校验一次。
+//
+// 本页刻意不提供的东西（都曾经在这里假装存在过）：
+//   - 服务点电话：后端不下发。曾写死 '010-00000000'，用户真拨过去只会打空号。
+//   - 地图坐标与距离：后端不下发坐标，也没有接地图距离服务。曾塞一个北大附近的固定
+//     坐标当「用户位置」，任何人打开都被当成在北大。
+//   - 营业时间与「打印/扫描/复印」设施标签：能力是逐台登记在管理员后台的，
+//     统一贴三个标签等于替所有机器宣称它们都能扫描复印。
 const api = require('../../utils/api')
-const { guardPackageChain } = require('../../utils/package-feature')
+const pkg = require('../../utils/package-order')
 
 Page({
   data: {
     statusBarHeight: 44,
-    userLocation: null,
     selectedStore: null,
     stores: [],
-    loading: true,
-    error: null
+    onlineCount: 0,
+    state: 'loading',   // loading | ready | error
+    errorTitle: '',
+    errorText: '',
+    hasPackageData: true,
+    onsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
   },
 
-  onLoad(options) {
-    if (guardPackageChain()) return
+  onLoad() {
     const app = getApp()
+    // 深链直接打开本页时 storage 里没有材料包草稿，选完服务点也无从下单。
+    // 不能假装流程正常：直接给一个说得清、能恢复的状态。
+    const draft = wx.getStorageSync('temp_package_data')
+    const files = draft && Array.isArray(draft.files) ? draft.files.filter((f) => f && f.fileId) : []
     this.setData({
-      statusBarHeight: app.globalData.statusBarHeight || 44
+      statusBarHeight: app.globalData.statusBarHeight || 44,
+      hasPackageData: files.length > 0,
     })
-
-    // 如果从材料包创建页面传来了数据，保存到临时存储
-    if (options.from === 'package-create') {
-      const packageData = wx.getStorageSync('temp_package_data')
-      if (packageData) {
-        console.log('接收到材料包数据:', packageData)
-      }
-    }
-
-    // 加载真实服务点数据
     this._loadStores()
   },
 
-  // 加载服务点列表
   _loadStores() {
-    this.setData({ loading: true, error: null })
-    
+    this.setData({ state: 'loading', errorTitle: '', errorText: '' })
     api.getPublicTerminals()
-      .then(list => {
-        console.log('获取到服务点列表:', list)
-        
-        // 转换数据格式
-        const stores = list.map(terminal => ({
+      .then((list) => {
+        const rows = (Array.isArray(list) ? list : []).map((terminal) => ({
           id: terminal.id,
           name: terminal.displayName || '服务点',
-          address: terminal.locationLabel || '地址待补充',
-          // 「计算中…」会一直停在那里：没有定位、也没有接地图距离服务，没有任何东西在算。
-          distance: '距离待接入',
-          distanceValue: 999999, // 默认排最后
-          hours: '营业时间待补充',
-          status: terminal.isOnline ? 'open' : 'closed',
-          // 服务点电话后端尚未下发。原先写死 '010-00000000' 让页面看起来有联系方式，
-          // 用户真拨过去只会打空号；接口补齐前留空，由 wxml 显示「电话待补充」。
-          phone: '',
-          facilities: ['打印', '扫描', '复印'] // 默认设施
+          address: terminal.locationLabel || '位置待补充',
+          isOnline: terminal.isOnline === true,
+          // 心跳时间是服务端给的事实，直接展示比「营业中/已打烊」这种推断更诚实。
+          lastSeenText: pkg.formatExpireAt(terminal.lastSeenAt),
         }))
-        
-        this.setData({ 
-          stores,
-          loading: false 
+        this.setData({
+          stores: rows,
+          onlineCount: rows.filter((r) => r.isOnline).length,
+          state: 'ready',
         })
-        
-        // 获取用户位置并计算距离
-        this._getUserLocation()
       })
-      .catch(err => {
-        console.error('加载服务点失败:', err)
-        this.setData({ 
-          loading: false,
-          error: err.message || '加载失败，请稍后重试'
-        })
+      .catch((err) => {
+        const shown = pkg.describePackageError(err, '服务点列表加载失败，请稍后重试。')
+        this.setData({ state: 'error', errorTitle: shown.title, errorText: shown.text })
       })
   },
 
-  // 获取用户位置
-  _getUserLocation() {
-    // 原先在这里塞了一个北京大学附近的固定坐标当作「用户位置」，任何人打开都被当成在北大。
-    // 真实定位要走 wx.getLocation（需要 app.json 的 permission.scope.userLocation 与用户授权），
-    // 距离计算还要接地图服务；这些都没有做，所以不假装有位置：不设 userLocation，
-    // 列表上的距离保持 wxml 的「距离待计算」，不排序成看起来是按远近排的。
+  retryStores() {
+    this._loadStores()
   },
 
-  // 计算距离（实际使用时调用地图API）
-  _calculateDistances() {
-    // 实际使用时调用腾讯地图或高德地图API计算真实距离
-    // 这里使用Mock数据
-    const stores = this.data.stores.sort((a, b) => a.distanceValue - b.distanceValue)
-    this.setData({ stores })
-  },
-
-  // 选择服务点
   selectStore(e) {
     const { id } = e.currentTarget.dataset
-    const store = this.data.stores.find(s => s.id === id)
-    
-    this.setData({ selectedStore: id })
-    
-    // 保存选择的服务点到临时存储
-    wx.setStorageSync('temp_selected_store', store)
-    
-    wx.showToast({
-      title: '已选择服务点',
-      icon: 'success',
-      duration: 1500
-    })
-  },
-
-  // 查看服务点详情
-  viewStoreDetail(e) {
-    const { id } = e.currentTarget.dataset
-    wx.showToast({
-      title: `查看服务点 ${id} 详情`,
-      icon: 'none'
-    })
-    // 实际使用时跳转到服务点详情页或弹出详情弹窗
-  },
-
-  // 拨打电话
-  callStore(e) {
-    const { phone } = e.currentTarget.dataset
-    // 电话为空时不要走 makePhoneCall —— 它失败后弹的是「拨打失败」，
-    // 会被理解成网络或权限问题，而真实原因是后端根本没下发这个号码。
-    if (!phone) {
-      wx.showToast({ title: '该服务点暂未提供联系电话', icon: 'none' })
-      return
-    }
-    wx.makePhoneCall({
-      phoneNumber: phone,
-      fail: () => {
-        wx.showToast({
-          title: '拨打失败',
-          icon: 'none'
-        })
-      }
-    })
-  },
-
-  // 在地图中查看
-  viewInMap(e) {
-    const { id } = e.currentTarget.dataset
-    const store = this.data.stores.find(s => s.id === id)
-    
-    // store.lat / store.lng 从来没有被赋值过（上面的 map 里没有这两个字段，
-    // 后端 getPublicTerminals 也不下发坐标），原实现等于用 undefined 调 openLocation。
-    if (!store || typeof store.lat !== 'number' || typeof store.lng !== 'number') {
-      wx.showToast({ title: '该服务点暂未提供地图坐标', icon: 'none' })
-      return
-    }
-    wx.openLocation({
-      latitude: store.lat,
-      longitude: store.lng,
-      name: store.name,
-      address: store.address,
-      scale: 15
-    })
-  },
-
-  // 确认并继续
-  confirmAndContinue() {
-    const { selectedStore, stores } = this.data
-    
-    if (!selectedStore) {
-      wx.showToast({
-        title: '请先选择服务点',
-        icon: 'none'
+    const store = this.data.stores.find((s) => s.id === id)
+    if (!store) return
+    if (!store.isOnline) {
+      wx.showModal({
+        title: '该服务点当前离线',
+        content: '这台一体机最近 5 分钟没有上报心跳，服务端会拒绝向它下单。请选一台在线的服务点，或稍后重试。',
+        showCancel: false,
+        confirmText: '知道了',
       })
       return
     }
-    
-    const store = stores.find(s => s.id === selectedStore)
-    
-    // 跳转到订单确认页面
-    wx.navigateTo({
-      url: '/pages/package-confirm/package-confirm',
-      success: () => {
-        // 传递数据通过storage（实际项目中可使用全局状态管理）
-        wx.setStorageSync('temp_selected_store', store)
-      }
+    this.setData({ selectedStore: id })
+  },
+
+  goBack() {
+    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })
+  },
+
+  /**
+   * 回到第一步。优先退回**原来那个** package-create 实例（它还拿着用户勾好的文件）；
+   * redirectTo 会换一个全新实例、选择全部丢失，只在没有上一页时才用它兜底。
+   */
+  backToFiles() {
+    wx.navigateBack({
+      delta: 1,
+      fail() { wx.redirectTo({ url: '/pages/package-create/package-create' }) },
     })
   },
 
-  // 返回上一页
-  goBack() {
-    wx.navigateBack()
-  }
+  confirmAndContinue() {
+    const { selectedStore, stores, hasPackageData } = this.data
+    if (!hasPackageData) {
+      this.backToFiles()
+      return
+    }
+    if (!selectedStore) {
+      wx.showToast({ title: '请先选择服务点', icon: 'none' })
+      return
+    }
+    const store = stores.find((s) => s.id === selectedStore)
+    if (!store) return
+    // 先落存储再跳转：跳转 success 里再写会在慢设备上出现下一页读到空值的窗口。
+    wx.setStorageSync('temp_selected_store', { id: store.id, name: store.name, address: store.address })
+    wx.navigateTo({ url: '/pages/package-confirm/package-confirm' })
+  },
 })

@@ -1,63 +1,74 @@
 <view class="page-wrap">
   <view style="height:{{statusBarHeight}}px"></view>
-  
+
   <view class="navbar col">
-    <view class="nav-back icon-action tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+    <view class="nav-back icon-action tap" hover-class="tap-press" bindtap="goHome" role="button" aria-label="返回首页">
       <text class="ficon i-right nav-back-ic"></text>
     </view>
     <text class="nav-title">到机码</text>
   </view>
 
-  <!-- ready 只在服务端确认订单存在且属于当前账号后才为 true。「材料包创建成功」是写死
-       在模板里的，不加这层 wx:if 的话，深链/分享打开时首屏会先闪出一句没有订单支撑的
+  <!-- ready 只在服务端确认订单存在且属于当前账号后才为 true。整块成功内容是写死在
+       模板里的，不加这层 wx:if 的话，深链/分享打开时首屏会先闪出一句没有订单支撑的
        成功宣告。查不到订单时走下面的失败态，绝不退回 URL 里的值渲染。 -->
   <view wx:if="{{loading}}" class="code-body">
-    <view class="section-t">正在核对订单…</view>
+    <view class="section-t">正在向服务端核对订单…</view>
   </view>
 
   <view wx:if="{{!ready && !loading}}" class="code-body">
-    <view class="section-t">未能显示到机码</view>
-    <view class="qr-hint">{{loadError || '材料包尚未开放，本页不展示任何到机码。'}}</view>
-    <view wx:if="{{orderId && loadError}}" class="tap retry-btn" hover-class="tap-press" bindtap="retryLoad" role="button">重新加载</view>
+    <view class="section-t">{{loadErrorTitle || '未能显示到机码'}}</view>
+    <view class="qr-hint">{{loadError || '本页不展示任何到机码。'}}</view>
+    <view wx:if="{{loadRecover}}" class="tap retry-btn" hover-class="tap-press" bindtap="recover" data-recover="{{loadRecover}}" role="button">
+      {{loadRecover === 'login' ? '去登录' : loadRecover === 'orders' ? '去我的打印订单' : '重新加载'}}
+    </view>
+    <view wx:elif="{{orderId}}" class="tap retry-btn" hover-class="tap-press" bindtap="retryLoad" role="button">重新加载</view>
   </view>
 
   <scroll-view wx:if="{{ready}}" class="code-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="code-body">
-      <!-- 成功提示 -->
+      <!-- 状态横幅：写的是服务端返回的真实状态，不是一句固定的「成功」 -->
       <view class="success-banner">
-        <view class="success-icon"><text class="ficon i-check"></text></view>
+        <view class="success-icon"><text class="ficon i-folder"></text></view>
         <view class="success-copy">
-          <text class="success-title">材料包创建成功</text>
-          <text class="success-desc">请到服务点扫码取件</text>
+          <text class="success-title">材料包订单</text>
+          <text class="success-desc">{{statusLabel}}</text>
         </view>
       </view>
 
-      <!-- 二维码 -->
-      <view class="qr-card">
+      <!-- 二维码：本地离线编码真实到机码；没有可用码时说清只能手输 -->
+      <view class="qr-card" wx:if="{{showQr}}">
         <view class="qr-box">
-          <view class="qr-placeholder">
-            <view class="qr-icon"><text class="ficon i-scan"></text>
-            <text class="qr-text">二维码</text>
-          </view>
+          <canvas
+            wx:if="{{qrStatus !== 'error'}}"
+            type="2d"
+            id="package-qr"
+            class="package-qr"
+            style="width:{{qrSizePx}}px;height:{{qrSizePx}}px"
+            aria-label="材料包到机码核销二维码"
+          ></canvas>
+          <view wx:else class="qr-placeholder-text">二维码暂不可用，请使用下方到机码</view>
         </view>
-        <text class="qr-hint">请在一体机上扫描此码</text>
+        <text class="qr-hint">请将此二维码对准一体机扫码器；二维码只包含本订单的到机码</text>
       </view>
+
+      <view class="qr-card" wx:else>
+        <text class="qr-hint">该订单当前没有可用的到机码（已核销、已过期或已取消）。状态见下方订单信息。</text>
       </view>
 
       <!-- 数字码 -->
-      <view class="digital-code tap" hover-class="tap-press" bindtap="copyCode" role="button" aria-label="复制到机码">
+      <view wx:if="{{pickupCode}}" class="digital-code tap" hover-class="tap-press" bindtap="copyCode" role="button" aria-label="复制到机码">
         <text class="code-label">到机码</text>
         <text class="pickup-code big">{{pickupCode}}</text>
-        <text class="code-hint">也可以在一体机上手动输入</text>
+        <text class="code-hint">也可以在一体机「到机码核销」里手动输入</text>
       </view>
 
       <!-- 订单信息 -->
       <view class="section-t">订单信息</view>
       <view class="card flat">
         <view class="card-inner">
-          <view class="info-row tap" hover-class="tap-press" bindtap="copyOrderId">
-            <text class="info-label">订单编号</text>
-            <text class="info-val">{{orderId}}</text>
+          <view class="info-row tap" hover-class="tap-press" bindtap="copyOrderNo">
+            <text class="info-label">订单号</text>
+            <text class="info-val">{{orderNo}}</text>
           </view>
           <view class="divider"></view>
           <view class="info-row">
@@ -66,48 +77,57 @@
           </view>
           <view class="divider"></view>
           <view class="info-row">
-            <text class="info-label">服务点</text>
-            <text class="info-val">{{storeName}}</text>
+            <text class="info-label">到机应付</text>
+            <text class="info-val">{{amountText}}</text>
           </view>
           <view class="divider"></view>
-          <view class="info-row">
-            <text class="info-label">有效期</text>
+          <view class="info-row" wx:if="{{expireTime}}">
+            <text class="info-label">到机码有效期至</text>
             <text class="info-val">{{expireTime}}</text>
+          </view>
+          <view class="divider" wx:if="{{expireTime}}"></view>
+          <view class="info-row">
+            <text class="info-label">状态</text>
+            <text class="info-val">取件 {{pickupStatus}} · 付款 {{payStatus}} · 任务 {{taskStatus}}</text>
           </view>
         </view>
       </view>
 
-      <!-- 使用说明 -->
+      <!-- 使用说明：写的是真实流程，付款在机器上 -->
       <view class="section-t">使用说明</view>
       <view class="card flat">
         <view class="card-inner">
           <view class="step-list">
             <view class="step-item">
               <view class="step-num">1</view>
-              <text class="step-text">前往选择的服务点</text>
+              <text class="step-text">前往所选服务点的一体机</text>
             </view>
             <view class="step-item">
               <view class="step-num">2</view>
-              <text class="step-text">在一体机上扫描二维码或输入到机码</text>
+              <text class="step-text">在一体机「到机码核销」里扫码或手动输入到机码</text>
             </view>
             <view class="step-item">
               <view class="step-num">3</view>
-              <text class="step-text">确认打印参数后开始打印</text>
+              <text class="step-text">在机器上现场支付</text>
             </view>
             <view class="step-item">
               <view class="step-num">4</view>
-              <text class="step-text">取走打印好的材料</text>
+              <text class="step-text">付款后开始打印，取走材料</text>
             </view>
           </view>
         </view>
       </view>
+
+      <view class="compliance-note">{{onsiteNotice}}</view>
+      <view class="compliance-note">{{noCancelNotice}}</view>
+      <view class="compliance-note">到机码只在本页向本人显示，不会保存在本机，也不随链接或分享传出去。</view>
 
       <view class="spacer-lg"></view>
     </view>
   </scroll-view>
 
   <view class="actionbar">
-    <view class="btn ghost tap" hover-class="tap-press" bindtap="viewOrder" role="button" aria-label="查看订单详情">查看订单</view>
+    <view class="btn ghost tap" hover-class="tap-press" bindtap="viewOrders" role="button" aria-label="去我的打印订单">我的打印订单</view>
     <view class="btn primary tap" hover-class="tap-press" bindtap="goHome" role="button" aria-label="返回首页">返回首页</view>
   </view>
 </view>

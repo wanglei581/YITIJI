@@ -950,12 +950,22 @@ function stripComments(src) {
     .join('\n')
 }
 
-// ---- 材料包侧链 fail-closed（P0-3）----
+// ---- 材料包侧链：运行期 fail-closed（取代 2026-09-08 的硬编码守卫）----
 //
-// 这四页可以被深链和分享卡片直接打开，而服务端 POST /orders/package 不存在。
-// package-code 更是把到机码、订单号、金额全部从 URL query 读出来就渲染，
-// 一条构造出来的链接就能显示一张带到机码的「创建成功」页。守卫必须在 onLoad 首行，
-// 且不许有任何一页漏掉 —— 漏一页，那一页就是完整的绕过入口。
+// 这四页曾在 onLoad 首行无条件 `guardPackageChain()` 弹窗 + reLaunch。当时是对的：
+// 材料包下完单**没有任何界面能再给出 orderId**，用户手上只剩一个到机码，而到机码不能
+// 反查订单 —— 那条链的最后一步在代码层根本不存在。
+//
+// 缺的那一块已经补上：服务端 `GET /orders/package` 提供本人材料包订单列表，小程序
+// 「打印订单」页接入它并可只带 orderId 重新进入到机码页。于是硬关闭的理由消失，
+// 关闭方式换成运行期 fail-closed（服务端错误码）。
+//
+// 本段断言的是「为什么该这样」，不是照现状抄：
+//   ① 硬编码守卫必须**真的没了** —— 连模块文件都不许留着等人 require 回来；
+//   ② 关闭能力的判据必须落在服务端错误码上，页面要有可执行的恢复动作；
+//   ③ 找回路径必须存在且只走 orderId（凭证不进 URL）；
+//   ④ 全链不得出现在线支付：材料包是到机器现场付款，wx.requestPayment 一出现
+//      就意味着有人在小程序里扣款，而这条链没有任何支付闭环。
 const PACKAGE_CHAIN_PAGES = [
   'pages/package-create/package-create',
   'pages/store-select/store-select',
@@ -963,37 +973,81 @@ const PACKAGE_CHAIN_PAGES = [
   'pages/package-code/package-code',
 ]
 
-const packageGuardMisses = []
-for (const page of PACKAGE_CHAIN_PAGES) {
-  const src = read(`${page}.js`)
-  if (!src.includes("require('../../utils/package-feature')")) {
-    packageGuardMisses.push(`${page}.js 未引入 package-feature 守卫`)
-    continue
+{
+  const guardMisses = []
+  if (fs.existsSync(path.join(ROOT, 'utils/package-feature.js'))) {
+    guardMisses.push('utils/package-feature.js 仍然存在（硬编码 fail-closed 模块必须删除，留着就会被 require 回来）')
   }
-  // 钉在 onLoad 之后的第一条语句：放到 setData 之后就等于先把 URL 参数渲染出去了。
-  if (!/onLoad\s*\([^)]*\)\s*\{\s*(\/\/[^\n]*\n\s*)*if\s*\(guardPackageChain\(\)\)\s*return/.test(src)) {
-    packageGuardMisses.push(`${page}.js 的 guardPackageChain() 不在 onLoad 首行`)
+  for (const page of PACKAGE_CHAIN_PAGES) {
+    // 先剥注释：抓的是真实代码，不是「说明当初为什么有这个守卫」的那几行注释
+    // （本门禁同族的 PACKAGE_FAKE_DATA 早就是这么做的，这里沿用同一判据）。
+    const src = stripComments(read(`${page}.js`))
+    if (src.includes('package-feature')) guardMisses.push(`${page}.js 仍引用 package-feature`)
+    if (src.includes('guardPackageChain')) guardMisses.push(`${page}.js 仍调用 guardPackageChain`)
   }
+  if (!guardMisses.length) ok(`材料包四页已移除硬编码 fail-closed 守卫（${PACKAGE_CHAIN_PAGES.length} 页）`)
+  else bad('材料包硬编码守卫已移除', guardMisses.join('；'))
 }
-if (!packageGuardMisses.length) ok(`材料包四页均在 onLoad 首行 fail-closed（${PACKAGE_CHAIN_PAGES.length} 页）`)
-else bad('材料包侧链守卫', packageGuardMisses.join('；'))
 
-// onLoad 守卫挡不住首屏那一帧：「材料包创建成功」写死在 wxml 里，不受 data 控制。
-// 必须由一个默认 false 的开关把它关在门外，否则深链打开时会先闪出一句无订单支撑的成功宣告。
+// 找回路径：列表端点接入 + 从本人订单只带 orderId 重新进入。
+// 这是整条链能开放的前提条件，缺任何一环都必须红。
+{
+  const misses = []
+  if (!/getPackageOrders\(\{\s*cursor,\s*pageSize\s*\}\s*=\s*\{\}\)/.test(apiJs)) misses.push('api.js 缺 getPackageOrders({cursor,pageSize})')
+  if (!/request\('\/orders\/package',\s*\{\s*method:\s*'GET',\s*data,\s*needAuth:\s*true\s*\}\)/.test(apiJs)) misses.push("getPackageOrders 未以 GET + needAuth:true 调 /orders/package")
+  if (!ordersJs.includes('api.getPackageOrders(')) misses.push('orders.js 未接入材料包列表')
+  if (!ordersWxml.includes('bindtap="openPackage"')) misses.push('orders.wxml 没有进入材料包到机码页的入口')
+  if (!ordersJs.includes('/pages/package-code/package-code?orderId=')) misses.push('orders.js 进入到机码页时未使用 orderId')
+  if (!misses.length) ok('材料包订单可从本人打印订单列表找回并重新查看到机码')
+  else bad('材料包订单找回路径', misses.join('；'))
+}
+
+// 凭证不进 URL：列表拿到的 pickupCode 只用于展示，绝不拼进跳转地址。
+// 一条构造出来的链接或一张转发出去的卡片就能在别人手机上渲染出带码的成功页。
+{
+  const offenders = []
+  const openIdx = ordersJs.indexOf('openPackage(e)')
+  const openBlock = openIdx >= 0 ? ordersJs.slice(openIdx, openIdx + 500) : ''
+  if (!openBlock) offenders.push('orders.js 找不到 openPackage 实现')
+  for (const field of ['pickupCode', 'amountCents', 'paymentSessionToken', 'expiresAt', 'price']) {
+    if (openBlock.includes(`${field}=`)) offenders.push(`orders.js openPackage 把 ${field} 拼进了 URL`)
+  }
+  const confirmJs = read('pages/package-confirm/package-confirm.js')
+  const navIdx = confirmJs.indexOf("'/pages/package-code/package-code?orderId='")
+  if (navIdx < 0) offenders.push('package-confirm 建单后未以 orderId 单参跳转到机码页')
+  for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'paymentSessionToken', 'storeName']) {
+    if (navIdx >= 0 && confirmJs.slice(navIdx, navIdx + 400).includes(`${field}=`)) {
+      offenders.push(`package-confirm 跳转 URL 携带 ${field}`)
+    }
+  }
+  if (!offenders.length) ok('材料包到机码页跳转只带 orderId，凭证与金额不进 URL')
+  else bad('材料包凭证不进 URL', offenders.join('；'))
+}
+
+// 全链禁止在线支付：材料包的钱在一体机上现场付，小程序侧没有任何支付闭环。
+{
+  const payHits = jsFiles.filter((f) => stripComments(read(f)).includes('wx.requestPayment'))
+  if (!payHits.length) ok('全仓不出现 wx.requestPayment（材料包为到机现场付款）')
+  else bad('小程序不得发起在线支付', payHits.join(','))
+}
+
+// onLoad 挡不住首屏那一帧：成功横幅写死在 wxml 里，不受 data 控制。
+// 必须由一个默认 false 的开关把它关在门外，否则深链打开时会先闪出一句无订单支撑的宣告。
 const codeWxml = read('pages/package-code/package-code.wxml')
 const codeJs = read('pages/package-code/package-code.js')
 if (
   /wx:if="\{\{ready\}\}"/.test(codeWxml) &&
-  /材料包创建成功/.test(codeWxml.split('wx:if="{{ready}}"')[1] || '') &&
-  /\bready:\s*false\b/.test(codeJs)
-) ok('到机码页成功横幅由默认关闭的开关控制，首屏不闪假成功')
-else bad('到机码页首屏', 'package-code 的「材料包创建成功」必须在 wx:if="{{ready}}" 之内，且 ready 默认 false')
+  /材料包订单/.test(codeWxml.split('wx:if="{{ready}}"').slice(-1)[0] || '') &&
+  /\bready:\s*false\b/.test(codeJs) &&
+  codeJs.includes('api.getPackageOrder(')
+) ok('到机码页整块成功内容由默认关闭的开关控制，且只在服务端确认订单后打开')
+else bad('到机码页首屏', 'package-code 的成功内容必须在 wx:if="{{ready}}" 之内、ready 默认 false，且数据来自 api.getPackageOrder')
 
-// 分享会把这条未开放的链继续散出去，package-code 的分享标题原本就是「材料包创建成功」。
+// 分享会把本人凭证继续散出去，package-code 的分享标题原本就是「材料包创建成功」。
 const packageShare = PACKAGE_CHAIN_PAGES
   .filter((page) => /onShare(AppMessage|Timeline)\s*\(/.test(read(`${page}.js`)))
 if (!packageShare.length) ok('材料包四页均未开放分享')
-else bad('材料包侧链分享', `${packageShare.join(',')} 在功能开放前不得提供 onShareAppMessage/onShareTimeline`)
+else bad('材料包侧链分享', `${packageShare.join(',')} 不得提供 onShareAppMessage/onShareTimeline（到机码是本人取件凭证）`)
 
 // 假数据即使被守卫挡住也不能留在唯一发布源里：守卫可能被回退或漏页。
 const PACKAGE_FAKE_DATA = [

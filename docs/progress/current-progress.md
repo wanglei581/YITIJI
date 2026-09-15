@@ -1,5 +1,112 @@
 # 当前开发进度
 
+2026-09-15 **R3 已合入 `main`：PR #1036 的 merge commit 是
+`ddef936def46e9220a25e44ffe33dcc3458ed00b`，`main` CI run `34917887442` 四个 job 全部 success。**
+本机独立复核（不是转述 PR 页面）：`git merge-base --is-ancestor ddef936def46e9220a25e44ffe33dcc3458ed00b origin/main`
+退出码 0，且 `git rev-parse origin/main` 当前就等于该 SHA；`gh run view 34917887442` 返回
+`status=completed / conclusion=success`，`headSha` 正是 `ddef936de`，四个 job 分别为
+`build-and-verify` success、`kiosk-browser-smoke` success、`postgres-readiness` success、
+**`release-bundle` success（本次是发布类事件，产物已生成）**。
+
+**`release-bundle` 生成 ≠ 已部署。** 该 job 只产出发布包，没有任何 SSH、迁移、pm2 或 nginx 动作。
+生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
+此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
+
+2026-09-15 **小程序材料包 P0 候选：订单可找回 + 到机码可再看 + 四页从硬编码关闭改为真实运行期 fail-closed
+（本地候选，未 push / 未开 PR / 未合并 / 未部署）。** 基线为 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+写入范围只有 `apps/miniapp/**` 与本文件 / `next-tasks.md`；`services/**`、`apps/kiosk|admin|partner/**`、
+`.github/**`、schema / 迁移、生产配置与密钥**一个字都没动**（`packages/shared/**` 只读未改）。
+
+这一轮解决的是 2026-09-08 走查留下的那个**代码缺口**，不是配置问题：材料包下完单之后
+**没有任何界面能再给出 orderId**，用户手上只剩一个到机码，而到机码不能反查订单。
+服务端 `GET /orders/package`（本人隔离、游标分页、`visibleCode` 判据与详情一致）早已存在，
+小程序侧没接。因此 `utils/package-feature.js` 的 `guardPackageChain()` 当时把四页整体关掉是对的 ——
+那条链的最后一步在代码层确实不存在。
+
+实际改了什么：
+
+- **列表接入**：`utils/api.js` 新增 `getPackageOrders({cursor,pageSize})`（`GET /orders/package`，
+  `needAuth: true`，mock 模式诚实 `mockUnavailable`）。同时新增 `quotePackageOrder({terminalId,files,params})`，
+  走既有 `POST /orders/quote` 的 `lines` 多行契约（DTO 注释原文即「材料包多行报价」），
+  逐文件先换本人短签名 `printFileUrl` 再报价。**删除**了 `utils/package-feature.js`。
+- **「打印订单」页成为本人打印订单统一视图**：材料包单独成区，带自己的 `pkgCursor`、自己的
+  「加载更多」、自己的 total 与失败态；单件打印（cloud + PrintTask）仍走原来的触底分页。
+  两个游标结构上不可能被当成一个用 —— 合成一页就必须在触底时二选一，推错会静默丢掉一整段订单。
+  材料包卡片点进去**只带 orderId**。
+- **四页改运行期 fail-closed**：新增 `utils/package-order.js`（纯函数，无 wx 依赖）把服务端错误码翻译成
+  「可执行的下一步」：`PRINT_TERMINAL_OFFLINE` / `PRINT_TERMINAL_NOT_ACTIVE` / `CAPABILITY_*` → 换服务点；
+  `PRINT_PII_SCAN_REQUIRED` / `PII_SCAN_STALE` → 去做隐私检查；`PRINT_FILE_*` / `VALIDATION_FAILED` → 重选文件；
+  `PACKAGE_ORDER_NOT_FOUND` → 去我的打印订单找回；401 → 去登录；`PRICE_CONFIG_UNAVAILABLE` → 只能等运营配置。
+  未登记的错误码 fail-closed 落到调用方兜底句，绝不宣称成功。
+- **`package-create` 从「必然失败」改成真实可用**：原实现用 `wx.chooseMessageFile` 选本地文件，
+  给每个文件编一个 `local_<时间戳>` 的 id 和写死的 `pages: 1`，再把这个 id 当 `fileId` 提交 ——
+  服务端必回 `PRINT_FILE_NOT_FOUND`。现在文件来自 `GET /me/documents`（按服务端 `ALLOWED_PURPOSES`
+  过滤、`reprintable: false` 的高敏报告不列出），「从微信聊天添加」走真实上传拿服务端 `fileId`
+  （保留改版前的 `count: 9` 多选，逐个串行上传，部分成功如实反映）；打印隐私检查在本页完成
+  （服务端 `assertPiiReady` 硬性要求，不做就在下单那一步被拒）。本页**一个金额数字都不给**。
+- **`package-confirm` 去掉两处伪造能力**：默认选中的「微信支付 / 余额支付」选择器（材料包全链没有在线支付，
+  钱在一体机上现场付）和「合计 待确认」占位金额。金额改为服务端多行报价，报价参数逐字对齐服务端
+  `normalizeParams`（`bw→black_white`、`single→simplex`）以免预览价与实收价分叉。
+  报价这一步就是建单前的 fail-closed 关口。
+- **`package-code` 只认服务端**：凭登录态查 `GET /orders/package/:id`（`requireOwned`：非本人 404、未登录 401）；
+  原先那个写死「二维码」三个字的虚线占位框换成 `utils/pickup-qrcode.js` 本地离线编码的**真码**；
+  `onHide/onUnload` 同时清 data 里的码和画码用的 `_codeRaw` 明文副本，`onShow` 重新向服务端取；
+  「查看订单」原先跳 `order-detail`（读 `/me/print-orders/:id`，材料包被 `requireOwned` 过滤，点了只会 404），
+  改为跳「我的打印订单」。
+- **`store-select`**：补齐 loading / 失败 / 空 / 无草稿四态（原先 `loading`、`error` 只存在 data 里、
+  模板从不渲染）；按服务端心跳标出离线服务点并说明服务端仍会再校验一次；删掉后端从不下发的
+  假电话、假坐标、以及替所有机器宣称「打印/扫描/复印」的设施标签。
+- **`pages/ai`**：「材料包」从 `pending`（未开放）移入「到机器前办」分组，desc 写明「现场付款」；
+  `pending` 现为空数组，模板对空数组隐藏该分区。旧 `why` 写的是「服务端下单接口尚未上线」，
+  而 `POST /orders/package` 早已可用 —— 注释已改写，防止有人照旧文案把入口关回去。
+
+门禁（判据按「为什么该这样」写，不是照现状抄）：
+
+- `verify-package-chain.mjs` 整体重写：钉死列表端点接入且 `needAuth`、材料包能从本人订单重新进入、
+  URL 不携带 `pickupCode` / 金额 / `paymentSessionToken`、`package-code` 仍服务端核验、
+  四页不再无条件 guard（连 `utils/package-feature.js` 都不许存在）、全链无 `wx.requestPayment`、
+  前端不计价不报页数、六态齐全、翻页失败不清空已加载内容、换用户清干净。
+- `verify-miniapp-static.mjs` 的材料包段同步换判据（旧判据是「四页必须有守卫」，会与本轮直接冲突）。
+- 新增 `scripts/tests/package-order.test.mjs`（17 个 `node:test` 用例）+ `verify:package-helpers`，
+  串进 `verify:static`。放在 `scripts/tests/` 是刻意的：`scripts/project-graph/gates.mjs` 把该目录
+  排除在门禁脚本之外，因此不会被 `verify-ci-gate-coverage` 判成「写完没接线的门禁」。
+- `scripts/api-contract.json` 新增 `GET /orders/package`（135 端点、0 已知缺口）。
+
+复核时改掉的三个真实缺陷（都是本候选自己引入或漏掉的，不是既有代码的问题）：
+
+1. **`pickupStatus: 'used'` 没处理。** `pickup-order.service.ts:221` 在释放打印任务的同一事务里写
+   `pickupStatus:'used' + taskStatus:'pending'`。首版 `resolvePackageStatus` 只认 pending/claimed/expired/cancelled，
+   于是 `used + pending` 落到兜底分支被判成 `key:'done'`、`label:'pending'`（英文串）——
+   订单在**真正出纸的那一段**会从「打印中」筛选里整批消失。已按服务端状态机补齐，并加了单测与门禁断言。
+2. **翻页 / 刷新失败会把已经看到的订单顶掉。** 首版模板把「加载中 / 失败」排在「已有内容」之前，
+   且 append 失败也写 `pkgState:'error'`。现在 append 失败只写 `pkgMoreErrorText` 降为页脚一条，
+   模板分支顺序也改成已有内容优先；单件打印段同样处理。
+3. **`package-create` 刷新会丢勾选。** 非追加重载（首屏 / 重试 / 上传后刷新）重建了行对象，
+   用户勾了 A 再上传 B 时 A 的勾选被悄悄丢掉，而界面只显示 B 被选中。已按 id 把 `selected` 带过来。
+   同时 `package-confirm` 从登录页回来会自动重新核价（否则用户照要求登录完，页面还停在「登录已失效」），
+   且「回到选择文件」优先 `navigateBack` 退回**原来那个**实例以保住选择，只在深链直进时才 `redirectTo`。
+
+本机验证（全部 LOCAL，macOS 开发环境）：`pnpm --filter @ai-job-print/miniapp verify:static` 0
+（128 PASS / 0 FAIL，注册页面 64；API 契约 135 端点 / 后端 530 路由 / 0 已知缺口；
+材料包侧链门禁全部通过；17 个纯函数用例全过；视觉刻度偏离 422/439 字阶、169/181 圆角阶，未新增）；
+`pnpm verify:repository-integrity` 0；`pnpm verify:ci-gate-coverage` 0；`pnpm verify:deploy-gates-in-sync` 0；
+`git diff --check` 0。另跑了图谱指出会读到本轮改动文件的 kiosk 侧门禁：
+`verify:profile-documents-inkpaper` 0、`verify:word-conversion-ui` 0、`verify:profile-commercial-first-batch` 0。
+反向变异两组（均已恢复并复跑通过）：把 `openPackage` 的 `pickupCode` 拼进 URL → `verify:package-chain` 退出码 1；
+恢复 `package-create` 的无条件 `guardPackageChain()` → `verify:miniapp-static` 与 `verify:package-chain` 均退出码 1；
+另删掉 `getPackageOrders` 的 `needAuth: true` → `verify:package-chain` 退出码 1。
+
+**未做 / 仍是 NO-GO**：未 push、未开 PR、未合并、未部署；**没有在微信开发者工具里打开过**
+（本轮全部是静态门禁 + 纯函数单测，没有真机截图、没有真实后端联调、没有 Trial 版）；
+材料包端到端（真实上传 → 隐私检查 → 服务端报价 → 建单 → 一体机核销 → 现场付款 → 出纸 → 状态回流）
+一次都没在真机或真实后端上跑过；真实支付、微信类目与提审、生产环境、Windows 一体机与奔图 CM2800 真机
+本轮一次都没碰。`DEVICE / PRODUCTION / COMMERCIAL` 全部 NO-GO。
+
+已知未做（登记，不阻塞本候选）：材料包**没有在线取消端点**（服务端 `PackageOrdersController` 只有
+`@Post()`、`@Get()`、`@Get(':id')`），因此未付款订单只能等有效期结束自动失效 —— 这一点已如实写在
+下单页与到机码页上，不做成「可以撤单」的假象。视觉刻度棘轮当前比基线低 17（字阶）/ 12（圆角阶），
+未触发门禁要求的调低阈值（20），故未动 `BASELINE`；调低是独立的治理动作，会影响其他 lane 在途分支。
+
 2026-09-15 **扫描 R3 已取得软件证据锚点的 SOURCE / LOCAL / CI GO；仍未合并、未做真机与生产，
 商业总判定继续 NO-GO。** 隔离分支 `integration/scan-pickup-closeout-r3-20260915` 基于
 `origin/main@fea6f3705df49720d288bb2e5b26e3e9f5e6f331`，运行时代码与图谱证据锚点为

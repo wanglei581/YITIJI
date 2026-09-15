@@ -166,3 +166,49 @@
 .es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
 .es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
 .empty-slot .btn { margin-top: 28rpx; }
+
+/* ── 分区头：材料包 / 单件打印是两个独立来源，标题必须把这件事说清楚，
+   否则用户会以为「材料包订单」只是同一列表的一段，看不到就以为丢了。 */
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 28rpx 4rpx 12rpx;
+}
+.sh-t { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
+.sh-n { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* 材料包卡片整卡可点（只带 orderId 进到机码页），左侧留一条色带作区分。 */
+.ord-card.pkg { border-left: 6rpx solid var(--teal); }
+
+.pkg-meta { margin-top: 16rpx; display: flex; flex-direction: column; gap: 10rpx; }
+.pm-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
+.pm-k { flex: 0 0 auto; font-size: var(--fs-sm); color: var(--muted); }
+.pm-v {
+  flex: 1;
+  text-align: right;
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  word-break: break-all;
+}
+
+/* 「加载更多」是材料包分区自己的游标出口，48px 触控高度。 */
+.load-more { min-height: 48px; margin-top: 16rpx; }
+.list-foot {
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* 失败页脚：分区已经有内容时，失败信息降为一条页脚，不把已加载的订单顶掉。 */
+.list-foot.warn { color: var(--clay); }
+.lf-retry {
+  display: inline-block;
+  margin-left: 12rpx;
+  min-height: 48px;
+  line-height: 48px;
+  padding: 0 24rpx;
+  color: var(--teal);
+  font-weight: 600;
+}
