@@ -17,7 +17,7 @@ const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
-const { createLifecycleGuard } = require('../../utils/page-guard')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 const PAGE_SIZE = 20
 
@@ -167,11 +167,16 @@ Page({
 
   /**
    * 当前身份的稳定快照。判据是会员 id 而不是「有没有 token」：token 每次登录都换，
-   * 但同一个人重登不该清空他自己的列表。每次都现读，不缓存。
+   * 但同一个人重登不该清空他自己的列表。三态：`''` 未登录 / `'!'` 登录但无 id（不可用）/
+   * `'u:<id>'`。每次都现读，不缓存。见 page-guard.memberIdentityKey。
    */
   _identityKey() {
-    if (!auth.isLoggedIn()) return ''
-    return 'u:' + String((auth.getUser() || {}).id || '')
+    return memberIdentityKey(auth)
+  },
+
+  /** 当前身份能不能用来拉本人订单。登录了但拿不到会员 id 时一律不拉。 */
+  _identityUsable() {
+    return isMemberIdentity(this._identityKey())
   },
 
   /** 这个响应还能不能写进 data：身份没变 + 页面在前台 + 是本通道最新一次请求。 */
@@ -179,15 +184,27 @@ Page({
     return this._guard.accepts(token, this._identityKey())
   },
 
+  /**
+   * 只按身份判定，不看前台/后台。
+   *
+   * 给"结果必须落地、否则会留下一个解不开的锁"的链用（取消订单）：
+   * 切后台不该让那一行永远停在「取消中…」，只有换了人才必须停手。
+   */
+  _sameIdentity(token) {
+    return !!token && this._identityKey() === token.identity
+  },
+
   onShow() {
-    const loggedIn = auth.isLoggedIn()
     this._guard.activate()
+    const usable = this._identityUsable()
     // A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
     // setIdentity 变化时会 +1 代次，于是上一位**在途**的请求一并作废 ——
     // 只清 data 不作废请求的话，那几个迟到的响应会把上一位的订单又写回来。
     if (this._guard.setIdentity(this._identityKey())) this._resetAll()
-    this.setData({ isLoggedIn: loggedIn })
-    if (loggedIn) {
+    // 登录了却拿不到会员 id 时按未登录渲染：那种会话无法确认"我的"是谁的，
+    // 拉列表等于拿一个所有人共享的身份键去要本人数据。用户的补救动作恰好就是重新登录。
+    this.setData({ isLoggedIn: usable })
+    if (usable) {
       this._load()
       this._loadPackages()
     }
@@ -215,7 +232,7 @@ Page({
   // 始终返回 Promise：下拉刷新要等真实请求结束才能收起指示器，
   // 提前 stopPullDownRefresh 会让「下拉刷新重试」看起来刷过但其实什么都没等到。
   _load(append = false) {
-    if (!auth.isLoggedIn()) return Promise.resolve()
+    if (!this._identityUsable()) return Promise.resolve()
     const token = this._guard.issue('single')
     const cursor = append ? this.data.nextCursor : null
     this.setData({ [append ? 'loadingMore' : 'loading']: true, error: '' })
@@ -259,7 +276,7 @@ Page({
    * 失败只染红本分区：单件打印那一段照常显示 —— 一个来源挂掉不该让整页订单消失。
    */
   _loadPackages(append = false) {
-    if (!auth.isLoggedIn()) return Promise.resolve()
+    if (!this._identityUsable()) return Promise.resolve()
     if (append && !this.data.pkgCursor) return Promise.resolve()
     const token = this._guard.issue('package')
     const cursor = append ? this.data.pkgCursor : null
@@ -357,16 +374,15 @@ Page({
     const item = this.data.filtered.find(o => o.id === e.currentTarget.dataset.id)
     if (!item) return
     if (item.action === 'pickup') {
-      // 取件页先用列表字段首屏渲染，再按 orderId 轮询本人订单详情实时撤码/更新状态。
-      const query = [
-        `pickupCode=${encodeURIComponent(item.pickupRaw)}`,
-        `orderId=${encodeURIComponent(item.orderId)}`,
-        `orderNo=${encodeURIComponent(item.orderNo)}`,
-        `taskStatus=${encodeURIComponent(item.taskStatus)}`,
-        `expiresAt=${encodeURIComponent(item.expiresAt)}`,
-        `amountCents=${encodeURIComponent(item.amountCents == null ? '' : item.amountCents)}`,
-        'source=orders',
-      ].join('&')
+      // **只带 orderId**（`source` 只是返回路径的提示，不是任何凭证或状态）。
+      //
+      // 此前这里把 pickupCode / amountCents / expiresAt / taskStatus / orderNo 一起拼进 URL。
+      // 到机码是去一体机取件的凭证：进了 URL，一条构造出来的链接或一张转发出去的卡片
+      // 就能在别人手机上渲染出一张带码的取件页；金额与有效期同样是本人订单状态，
+      // 不该由调用方"告诉"下一页。print-pickup 自己带登录态查
+      // GET /me/print-orders/:orderId（requireOwned 归属校验）拿真值。
+      if (!item.orderId) return
+      const query = `orderId=${encodeURIComponent(item.orderId)}&source=orders`
       wx.navigateTo({ url: `/pages/print-pickup/print-pickup?${query}` })
     } else if (item.action === 'reprint') {
       wx.navigateTo({ url: '/pages/documents/documents' })
@@ -418,7 +434,8 @@ Page({
     this._patchOrder(id, { cancelling: true })
     api.cancelCloudPrintOrder(id)
       .then((raw) => {
-        if (!this._accepts(token)) return
+        // 按身份而不是按前台判定：切后台不该让这一行永远停在「取消中…」。
+        if (!this._sameIdentity(token)) return
         // 用服务端回读整行替换，不在本地写「已取消」。
         const next = toUiItem(raw)
         const orders = this.data.orders.map(o => o.id === id ? next : o)
@@ -426,7 +443,8 @@ Page({
         this._filterTab(this.data.activeTab, orders)
       })
       .catch((err) => {
-        if (!this._accepts(token)) return
+        if (!this._sameIdentity(token)) return
+        // 先解锁再弹窗：早返回会把这一行永远留在「取消中…」，而它其实没有在取消。
         this._patchOrder(id, { cancelling: false })
         wx.showModal({
           title: '取消失败',

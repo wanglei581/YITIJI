@@ -12,6 +12,99 @@
 生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
 此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
 
+2026-09-15 **材料包候选：Grok 对抗审查（NO-GO）判出的 1 个 P0 + 10 个 P1 已在本地修完
+（本地候选：未 push / 未开 PR / 未合并 / 未跑 CI / 未进微信开发者工具 / 未真机 / 未部署）。**
+基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`；在冻结审查点
+`23089517756d103994ecd535298a1d1c874d2c8b` 之上再追加一个修复提交，**不 amend**。
+写入范围只有 `apps/miniapp/**` 与本文件 / `next-tasks.md`。
+
+**P0：双面材料包从来没有真正工作过。** UI 的 `duplex: 'double'` 被报价与建单**原样发出**，
+而服务端两个 `@IsIn` 白名单里都没有这个取值 ——
+`PrintJobParamsDto.duplex ∈ simplex | duplex_long_edge | duplex_short_edge`（报价）、
+`PackagePrintParamsDto.duplex ∈ single | 上述三项`（建单）。也就是说选了双面就必然在
+报价那一步 400。更糟的是 `verify-package-chain.mjs` 有一条断言**把这个缺陷钉死**
+（要求代码写 `duplex === 'double' ? 'double' : 'simplex'`），门禁照现状抄，于是这条链
+一边红都不红地坏着。修法不是新定口径，而是接回仓库里**已有的**那一份：
+`packages/shared/src/types/print.ts` 的 `normalizeDuplex()` 写着 `'double' → 'duplex_long_edge'`，
+`print-param-suggestion.rules.ts` 也按 `duplex_long_edge` 建议并据它判 `verifiedDuplexModes`。
+新增 `pkg.toWireDuplex` / `toWireColorMode` 作为**报价与建单唯一共用的出口**，
+两条链逐字同源。该机没登记 `duplex_print` 能力时服务端 fail-closed 拒绝
+（`CAPABILITY_NOT_CONFIGURED`），页面已把它翻成「换一个服务点」—— 不静默降级成单面。
+
+P1（逐条）：
+
+1. **身份三态 fail-closed**：`'u:' + (user.id || '')` 在 id 缺失时退化成 `'u:'` ——
+   一个**所有 id 缺失会话共享**的键。共用设备上第二个人会拿第一个人的 `ownerKey` 对上草稿。
+   收敛为 `page-guard.memberIdentityKey(auth)`：`''` 未登录 / `'!'` 不可用 / `'u:<id>'`；
+   不可用时不拉列表、不读写草稿、不显示到机码，页面按未登录渲染（补救动作正是重新登录）。
+2. **首次进入不再被当成换用户**：`package-create` 此前把 `''→本人` 也算换人并
+   `removeStorageSync`，于是用户从服务点 / 确认页 `redirectTo` 兜底回来时，自己刚做好的
+   草稿被自己的"登录"删掉。改为只有**从另一个确定会员身份**切过来才清；另设
+   `_dropForeignDraft()` 只清别人的。
+3. **`draftId` 改为内容指纹**（`ownerKey|colorMode|duplex|copies|fileIds`）：没改东西
+   再按一次「继续」是同一份草稿，已选服务点不丢；改了任何文件或参数指纹就变，旧绑定自动失效。
+   `createPackage` 也只在确实对不上时才清 `temp_selected_store`。
+4. **建单成功**：先判身份再清本地草稿（此前无条件删两个 key，换人时会删掉**当前这位**的草稿）；
+   `redirectTo` 补 `fail` 兜底 → `_lockAfterCreated()` 解开 `submitting`、把报价打成 error
+   （按钮随之变灰）、恢复动作指向「我的 · 打印订单」；`_createdOrderId` 之后一律不再 POST
+   第二次（服务端 `CreatePackageOrder` 没有幂等键），`_loadQuote` 也不再把按钮点亮。
+5. **前台静默登出 / 换账号当场清场**：`utils/request.js` 在 401 时静默续签一次，**续签失败会
+   `auth.logout()`** —— 全程没有任何生命周期回调，页面还停在前台，而屏幕上那张码属于一个
+   已经不存在的会话。`package-code` 与 `print-pickup` 都加了 `_enforceIdentity()`：每个异步
+   回调都过一遍，变了就清 `pickupCode` / `_codeRaw` / `ready` 并给出可执行的下一步。
+   **没有动 request.js 的续签设计**（续签成功时身份不变，这条判定什么都不会触发）。
+   另修：重新加载时把 `ready` 打回 `false` —— 模板里 loading 与成功块是**两个独立的 wx:if**，
+   不打回去会同时显示旧码与「正在核对」。
+6. **文件列表翻页失败**不再打 `docState: 'error'`（那会把整段已加载的文件连同用户勾好的选择
+   换成错误卡片），改为独立的 `docMoreErrorText` 页脚 + 重试；模板已同步渲染。
+   切后台作废在途翻页后，回前台解开 `docLoadingMore`，否则「加载更多」永远点不动。
+7. **单件取件页不再经 URL 传凭证**：`orders.js` 进 `print-pickup` 只带 `orderId`（+`source`）。
+   此前把 `pickupCode` 明文、`amountCents`、`expiresAt`、`taskStatus`、`orderNo` 全拼进 URL。
+   `print-pickup` 本来就有 `api.getCloudPrintOrder`（`GET /me/print-orders/:orderId`，
+   needAuth + requireOwned），改为**只认服务端**：URL 兜底全部删除，首次失败诚实进错误态，
+   码也只认本次响应（`|| this.data.codeRaw` 会让已撤码的订单继续显示旧码）。
+8. **锁状态复核**：取消链改按身份判定（用 active 判定会让那一行永远停在「取消中…」）；
+   上传、隐私检查、翻页、提交的锁均已确认可解开。
+9. **首次 `onLoad+onShow` 不再重复报价**（只看 `quoteState === 'loading'` 会把 onLoad 刚发出
+   的那次重发一遍）；画码的 `exec` 回调绑定当时那个码与那次请求；`store-select` 列表 latest-wins；
+   `copyCode` 改复制**原始 8 位码** —— 服务端 `pickup-order.service.claim` 只做
+   `trim().toUpperCase()`，**不去分隔符**，带横杠的串算出来的 hash 对不上任何订单
+   （一体机自己的输入框会 `normalizeInput` 去分隔符，但剪贴板会被粘到哪儿不由我们决定）。
+10. **《打印服务协议》默认不勾选**（`agreedToTerms: true → false`）。模板那句是
+    「我已阅读并同意《打印服务协议》」并链到 `/pages/legal/legal`，是法律文件的同意；
+    本仓库同类既有口径就是显式勾选（`pages/launch/launch.js` 的 `agreed: false`、
+    `self-explore` 的「（必选）」），本页此前是唯一例外。
+11. **关键反向变异已等价自动化进 CI 路径**：删掉 `deactivate()` 的代次 +1、删掉
+    `setIdentity` 的代次 +1、身份三态退化，都有对应的可执行断言。
+
+验证（本机，逐条记退出码）：12 个改动文件的 `project-graph-query` 全部 0；
+`verify:page-lifecycle` 0（**53 个用例**）；`verify:package-chain` 0（269 PASS，新增 ⑩⑪⑫⑬ 四段）；
+`verify:static` 0（128 PASS / 0 FAIL）；`verify:repository-integrity` 0；`verify:ci-gate-coverage` 0；
+`verify:deploy-gates-in-sync` 0；`git diff --check` 与 `origin/main...HEAD` 均 0。
+
+**反向变异 22 类，全部判红**（精确反向替换还原，不走 `git checkout`；还原后全套复跑仍为 0）：
+上一轮 5 类回归 + 本轮 17 类（P0 双面退回 `'double'`、id 缺失退化成共享 `'u:'`、首次进入当换人、
+建单后不判身份就删草稿、`redirectTo` 失败不兜底、`_accepts` 不执行身份判定、重载不打回 `ready`、
+翻页失败打 `docState=error`、凭证重新进 URL、取消链改回按前台判定、首次进入重复报价、
+画码回调不绑码、复制分组串、协议默认勾选、`deactivate` 不 +1 代次、`draftId` 退回时间戳、
+`print-pickup` 恢复读 URL 码）。其中 N6 / N12 第一轮**只有静态门禁判红、真执行测试没红** ——
+说明那两条路径当时没有被任何用例走到；补了两个用例（在途响应遇到前台登出、进入异步后码被换掉）
+之后两者都红。
+
+三条既有静态断言随之更新，均属**锚点过时而非能力丢失**（逐条复核过）：取件页失败兜底的
+**来源**从「URL 里的码」变成「上一次从服务端取到的状态」并补了"不得再有 URL 兜底"的正面禁令；
+免费试运营判定改为只认服务端金额；401 分支从"只停轮询"收紧成"停全部定时器**并清掉屏幕上的码**"。
+
+**已知未处理（登记，不阻塞）**：`package-create.js` 537 行，越过 `.ccg` 的 500 行「评估拆分」线。
+本轮是缺陷修复不是加功能，且小程序 Page 配置对象拆分需要动方法挂载方式，风险高于收益，
+列入上线后重构清单，不在修复提交里做。
+`print-upload / print-store / print-pay` 那条**单文件下单预览链**仍在 URL 里传 `amountCents` 等
+报价预览值 —— 那不是凭证（下单前的本地报价预览，服务端仍会重算），与本轮 P1-7 修的
+「取件页凭证」不是同一类，未一并改动。
+
+**明确未做**：未 push、未开 PR、未合并、未跑 CI、未进微信开发者工具、未真机、未部署；
+`docs/graph/**` 未重跑（本轮授权范围不含该目录，且 `ci.yml` 没有图谱新鲜度门禁）。
+
 2026-09-15 **材料包候选的身份生命周期与异步竞态收口（本地候选：未 push / 未开 PR /
 未合并 / 未跑 CI / 未进微信开发者工具 / 未真机 / 未部署）。** 基线仍是
 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`；在下面那条材料包候选

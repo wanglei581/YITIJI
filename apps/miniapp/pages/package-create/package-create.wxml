@@ -85,6 +85,11 @@
             bindtap="loadMoreDocs"
             role="button"
           >{{docLoadingMore ? '正在加载…' : '加载更多文件'}}</view>
+          <!-- 翻页失败只在页脚说一句：已经加载出来的文件（和用户勾好的选择）必须留在屏幕上 -->
+          <view class="state-d" wx:if="{{docMoreErrorText}}">
+            {{docMoreErrorText}}
+            <text class="link tap" hover-class="tap-press" bindtap="retryMoreDocs" role="button">重试</text>
+          </view>
         </block>
 
         <view wx:else class="card flat">

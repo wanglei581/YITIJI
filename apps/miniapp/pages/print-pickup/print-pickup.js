@@ -1,5 +1,17 @@
+// pages/print-pickup/print-pickup.js
+//
+// 单件云打印订单的取件页。**唯一数据来源是 GET /me/print-orders/:orderId**
+// （needAuth + requireOwned 归属校验）。
+//
+// 此前本页从 URL 读 pickupCode / expiresAt / amountCents / taskStatus / orderNo
+// 做首屏渲染与失败兜底。到机码是去一体机取件的凭证：它进了 URL，一条构造出来的链接、
+// 或一张转发出去的卡片，就能在别人手机上渲染出一张带码的取件页 —— 而金额与有效期
+// 同样是本人订单状态，不该由调用方"告诉"本页。现在只收 orderId，其余一律向服务端取。
+// 与材料包的 package-code 同一口径。
 const app = getApp()
 const api = require('../../utils/api')
+const auth = require('../../utils/auth')
+const { memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('../../utils/pickup-qrcode')
 
 const POLL_INTERVAL_MS = 3000
@@ -92,42 +104,59 @@ Page({
 
   onLoad(opts) {
     const q = opts || {}
+    // 只认 orderId；source 只是返回路径提示，不是凭证也不是状态。
     const orderId = q.orderId ? decodeURIComponent(q.orderId) : ''
-    const pickupCode = normalizePickupCode(q.pickupCode ? decodeURIComponent(q.pickupCode) : '')
-    const expiresAt = q.expiresAt ? new Date(decodeURIComponent(q.expiresAt)).getTime() : 0
-    const initialAmountCents = parseAmountCents(q.amountCents)
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
     const qrSizePx = Math.round(Math.max(188, Math.min(232, windowInfo.windowWidth * 0.56)))
-    const initial = resolveOrderState({
-      pickupStatus: PICKUP_CODE_RE.test(pickupCode) ? 'pending' : '',
-      taskStatus: q.taskStatus ? decodeURIComponent(q.taskStatus) : '',
-      amountCents: q.amountCents,
-    })
+    this._identity = this._identityKey()
 
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       orderId,
       fromOrders: q.source === 'orders',
-      orderNo: q.orderNo ? decodeURIComponent(q.orderNo) : '',
-      taskStatus: q.taskStatus ? decodeURIComponent(q.taskStatus) : '',
-      pickupStatus: PICKUP_CODE_RE.test(pickupCode) ? 'pending' : '',
-      code: formatCode(pickupCode),
-      codeRaw: PICKUP_CODE_RE.test(pickupCode) ? pickupCode : '',
-      expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
-      amountCents: initialAmountCents,
-      isFreeOrder: initialAmountCents === 0,
       qrSizePx,
       qrStatus: 'loading',
-      state: orderId ? 'loading' : (PICKUP_CODE_RE.test(pickupCode) ? 'ready' : 'error'),
-      errorMsg: orderId || PICKUP_CODE_RE.test(pickupCode) ? '' : '订单信息不完整，请返回订单列表刷新状态',
-      statusKey: initial.key,
-      statusTitle: initial.title,
-      statusDetail: initial.detail,
-      showQr: initial.showQr && PICKUP_CODE_RE.test(pickupCode),
+      state: orderId ? 'loading' : 'error',
+      errorMsg: orderId ? '' : '这条链接没有带订单号，本页不展示任何到机码。请回到「我的 · 打印订单」重新进入。',
     })
 
     if (orderId) this._refreshOrder(true)
-    else this._resumeVisibleWork()
+  },
+
+  /** 当前身份的稳定快照。三态；不可用时本页不取也不显示任何码。 */
+  _identityKey() {
+    return memberIdentityKey(auth)
+  },
+
+  /**
+   * 身份在本页停留期间变了就**当场清掉屏幕上的码**。
+   *
+   * 真实链路：`utils/request.js` 在 401 且仍有补签资格时静默续签一次，
+   * 续签失败会 `auth.logout()` —— 全程没有任何生命周期回调，页面还停在前台，
+   * 而那张已经渲染好的码属于一个已经不存在的会话。共用设备上就是下一位看到它。
+   * 续签**成功**时身份不变，这里什么都不会发生（不影响 request.js 的续签设计）。
+   *
+   * @returns {boolean} 身份是否仍然可用且未变
+   */
+  _enforceIdentity() {
+    const identity = this._identityKey()
+    if (identity !== this._identity) {
+      this._identity = identity
+      this._stopTimers()
+      this.setData({
+        state: 'error',
+        refreshing: false,
+        showQr: false,
+        code: '',
+        codeRaw: '',
+        qrStatus: 'loading',
+        errorMsg: identity
+          ? '当前账号与打开这张到机码时的不是同一个，已停止显示。请到「我的 · 打印订单」重新进入。'
+          : '登录已失效，请重新登录后再查看到机码。',
+      })
+      return false
+    }
+    return isMemberIdentity(identity)
   },
 
   onReady() {
@@ -137,8 +166,8 @@ Page({
 
   onShow() {
     this._visible = true
+    if (!this._enforceIdentity()) return
     if (this.data.orderId) this._refreshOrder(false)
-    else this._resumeVisibleWork()
   },
 
   onHide() {
@@ -153,6 +182,8 @@ Page({
 
   _refreshOrder(initial) {
     if (!this.data.orderId || this._polling) return
+    if (!this._enforceIdentity()) return
+    const identity = this._identity
     this._polling = true
     if (initial) this.setData({ state: 'loading', errorMsg: '' })
     else this.setData({ refreshing: true })
@@ -160,8 +191,12 @@ Page({
     api.getCloudPrintOrder(this.data.orderId)
       .then((order) => {
         this._polling = false
+        // 换了人 / 登出：这条响应属于上一个会话，一个字都不能写进来。
+        if (this._identityKey() !== identity) { this._enforceIdentity(); return }
         if (!this._visible || !order) return
-        const pickupCode = normalizePickupCode(order.pickupCode || this.data.codeRaw)
+        // 码只认服务端这一次给的值。`|| this.data.codeRaw` 会让服务端已经撤码
+        // （核销后 pickupCode 不再下发）的订单继续显示上一次那张码。
+        const pickupCode = normalizePickupCode(order.pickupCode)
         const hasCode = PICKUP_CODE_RE.test(pickupCode)
         const status = resolveOrderState(order)
         const expiresAt = order.pickupCodeExpiresAt ? new Date(order.pickupCodeExpiresAt).getTime() : this.data.expiresAt
@@ -192,33 +227,35 @@ Page({
       })
       .catch((err) => {
         this._polling = false
+        if (this._identityKey() !== identity) { this._enforceIdentity(); return }
         if (!this._visible) return
         if (err && err.statusCode === 401) {
-          const fallbackAvailable = this.data.state === 'ready' || Boolean(this.data.showQr && this.data.codeRaw)
+          // 走到这里说明 request.js 的静默续签也没救回来（它续签失败时会 auth.logout()），
+          // 身份检查上面已经做过一次；能落到这行只剩"本来就没登录"这一种。
+          this._stopTimers()
           this.setData({
-            state: fallbackAvailable ? 'ready' : 'error',
+            state: 'error',
             refreshing: false,
-            errorMsg: '登录已失效，请返回订单页重新登录后查看实时状态',
-          }, () => {
-            // 已经显示在本机的真实到机码仍可在有效期内使用，但停止无意义的 401 轮询。
-            this._stopPoll()
-            if (this.data.showQr) {
-              this._drawPickupQr()
-              if (this.data.expiresAt > 0) this._startCountdown()
-            }
+            showQr: false,
+            code: '',
+            codeRaw: '',
+            errorMsg: '登录已失效，请重新登录后再查看到机码',
           })
           return
         }
-        // 首次请求失败时仍可使用 URL 中的真实到机码离线绘码；后续失败保留最近一次状态。
-        const fallbackAvailable = this.data.state === 'ready' || Boolean(this.data.showQr && this.data.codeRaw)
+        // 网络/服务端失败：**保留最近一次从服务端取到的状态**（那是真值，不是 URL 里的值），
+        // 只把失败说清楚。首次就失败时没有任何可保留的东西，进错误态 —— 不再有
+        // "退回 URL 里的码离线绘码"这条路，因为 URL 里已经不带码了。
+        const fallbackAvailable = this.data.state === 'ready'
         this.setData({
           state: fallbackAvailable ? 'ready' : 'error',
           refreshing: false,
           errorMsg: (err && err.message) || '订单状态加载失败，请稍后重试',
         }, () => {
-          // onReady 可能早于首次请求失败；回退到 URL 里的真实到机码后必须主动补画。
-          if (this.data.showQr) this._drawPickupQr()
-          if (fallbackAvailable) this._resumeVisibleWork()
+          if (fallbackAvailable) {
+            if (this.data.showQr) this._drawPickupQr()
+            this._resumeVisibleWork()
+          }
         })
       })
   },

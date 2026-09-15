@@ -198,9 +198,15 @@ assert(/fileId: row\.id/.test(createJs),
   '交给下一步的 fileId 是服务端文件 id')
 // 报价必须是服务端多行报价，且参数与建单口径一致，否则预览价与实收价会分叉。
 assert(confirmJs.includes('api.quotePackageOrder('), 'package-confirm 使用服务端多行报价')
-assert(/colorMode === 'color' \? 'color' : 'black_white'/.test(confirmJs) &&
-       /duplex === 'double' \? 'double' : 'simplex'/.test(confirmJs),
-  '报价参数按服务端 normalizeParams 口径归一（bw→black_white、single→simplex）')
+// ⚠ 本条 2026-09-15 改写。它此前钉的是
+//   `/duplex === 'double' \? 'double' : 'simplex'/`
+// —— 也就是把缺陷本身当成了验收标准：`'double'` 在服务端**两个 DTO 里都不存在**
+// （报价 PrintJobParamsDto ∈ simplex|duplex_long_edge|duplex_short_edge，
+//  建单 PackagePrintParamsDto 额外多一个 single），选了双面的材料包在报价那一步
+// 就必然 400。门禁照着现状抄，于是这条链一边红都不红地坏了整整一轮。
+// 现在改钉「必须经同一个 wire 映射出去」，并在 ⑩ 段正面禁掉 'double'。
+assert(/colorMode: pkg\.toWireColorMode\(/.test(confirmJs) && /duplex: pkg\.toWireDuplex\(/.test(confirmJs),
+  '报价参数经 pkg.toWireColorMode / toWireDuplex 归一到服务端 DTO 真正接受的取值')
 assert(/request\('\/orders\/quote',[\s\S]{0,200}data: \{ terminalId, lines, params \}/.test(api),
   'quotePackageOrder 带 terminalId 走 lines 多行契约（彩色/双面须先证明该机验过，fail-closed）')
 assert(!/quotePackageOrder\([\s\S]{0,600}\b(?:pages|billablePages|amountCents)\s*:/.test(confirmJs),
@@ -381,8 +387,8 @@ console.log('\n⑨ 身份快照 + 请求代次 + 生命周期：迟到的响应�
       const body = start < 0 ? '' : src.slice(start, src.indexOf('\n  },', start))
       assert(body.includes('_guard.deactivate()'), `${page} ${hook} 作废在途请求`)
     }
-    assert(/_identityKey\(\)\s*\{[\s\S]{0,200}auth\.getUser\(\)/.test(src),
-      `${page} 的身份快照取自 auth.getUser()（而不是 token —— 同一个人重登不该清空）`)
+    assert(/_identityKey\(\)\s*\{[\s\S]{0,200}memberIdentityKey\(auth\)/.test(src),
+      `${page} 的身份快照走 page-guard.memberIdentityKey（唯一实现，三态 fail-closed）`)
   }
 
   // package-code：凭证页的判定比别人多两条 —— 必须认订单，必须先 deactivate 再清。
@@ -413,8 +419,8 @@ console.log('\n⑨ 身份快照 + 请求代次 + 生命周期：迟到的响应�
 
     const confirm = stripComments(confirmJs)
     // 未登录一律不解析草稿：否则深链直进本页就能把上一位留下的文件名渲染出来。
-    assert(/_loadOrderData\(\)\s*\{[\s\S]{0,400}const identity = this\._identityKey\(\)[\s\S]{0,200}if \(!identity\)/.test(confirm),
-      'package-confirm 先验登录再碰草稿（未登录不解析、不渲染文件名）')
+    assert(/_loadOrderData\(\)\s*\{[\s\S]{0,500}const identity = this\._identityKey\(\)[\s\S]{0,300}if \(!isMemberIdentity\(identity\)\)[\s\S]{0,200}return/.test(confirm),
+      'package-confirm 先验身份可用再碰草稿（未登录、或登录但无 id，都不解析、不渲染文件名）')
     assert(/ownerKey !== identity[\s\S]{0,300}removeStorageSync\('temp_package_data'\)/.test(confirm),
       'package-confirm 发现草稿不属于本人时**同步删除**（留着等于把洞原样留给下一次打开）')
     assert(/storeData\.draftId[\s\S]{0,120}packageData\.draftId/.test(confirm),
@@ -441,6 +447,162 @@ console.log('\n⑨ 身份快照 + 请求代次 + 生命周期：迟到的响应�
     assert(/verify:page-lifecycle/.test(pkgJson.scripts['verify:static'] || ''),
       'verify:page-lifecycle 串在 verify:static 里（CI 直接跑 verify:static）')
   }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
+// ⑩ 打印参数：发出去的取值必须是服务端 DTO 真正接受的那一组
+//
+// 判据不取自本仓库前端的现状，取自服务端两个 @IsIn 白名单：
+//   报价 services/api/src/print-jobs/dto/create-print-job.dto.ts
+//        duplex ∈ simplex | duplex_long_edge | duplex_short_edge
+//        colorMode ∈ black_white | color
+//   建单 services/api/src/member-print-orders/dto/create-package-order.dto.ts
+//        duplex ∈ single | simplex | duplex_long_edge | duplex_short_edge
+//        colorMode ∈ bw | black_white | color
+// 交集就是这里钉的那一组。UI 的 'double' / 'bw' 只能活在页面 data 里，不许上线路。
+console.log('\n⑩ 打印参数取值与服务端 DTO 白名单一致')
+{
+  const WIRE_DUPLEX = ['simplex', 'duplex_long_edge', 'duplex_short_edge']
+  assert(/const PACKAGE_WIRE_DUPLEX_MODES = \['simplex', 'duplex_long_edge', 'duplex_short_edge'\]/.test(helper),
+    `package-order.js 登记的 wire 取值就是服务端白名单的交集（${WIRE_DUPLEX.join(' / ')}）`)
+  assert(/toWireDuplex\(uiDuplex\)[\s\S]{0,300}'double' \? 'duplex_long_edge' : 'simplex'/.test(helper),
+    'toWireDuplex 把 UI 的 double 映射成 duplex_long_edge（口径来自 packages/shared 的 normalizeDuplex，不是本文件新定的）')
+  assert(/toWireColorMode\(uiColorMode\)[\s\S]{0,200}'color' \? 'color' : 'black_white'/.test(helper),
+    'toWireColorMode 归一到 black_white / color（报价 DTO 不接受 bw）')
+
+  // 报价与建单必须同源：各写一份映射迟早会出现「按一种参数报价、按另一种参数计价」。
+  const confirmCode = stripComments(confirmJs)
+  const quoteIdx = confirmCode.indexOf('function quoteParams(')
+  const quoteBlock = quoteIdx >= 0 ? confirmCode.slice(quoteIdx, confirmCode.indexOf('\n}', quoteIdx)) : ''
+  assert(quoteBlock.includes('pkg.toWireDuplex(') && quoteBlock.includes('pkg.toWireColorMode('),
+    '报价参数经同一对 wire 映射函数出去')
+  const createIdx = confirmCode.indexOf('api.createPackageOrder(')
+  const createBlock = createIdx >= 0 ? confirmCode.slice(createIdx, createIdx + 700) : ''
+  assert(createBlock.includes('pkg.toWireDuplex(') && createBlock.includes('pkg.toWireColorMode('),
+    '建单参数经**同一对**函数出去（与报价逐字同源）')
+
+  // 正面禁令：四页的代码里不许再出现把 UI 取值直接当 wire 值发的写法。
+  for (const page of CHAIN_PAGES) {
+    const src = stripComments(read(`pages/${page}/${page}.js`))
+    assert(!/duplex:\s*'double'/.test(src), `${page} 不把 'double' 当打印参数发出去（服务端两个 DTO 都不接受）`)
+    assert(!/duplex:\s*(this\.)?_packageData\.duplex/.test(src),
+      `${page} 不把 UI 的单双面取值原样透传给服务端`)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ⑪ 身份三态：登录了但拿不到会员 id 一律 fail-closed
+//
+// `'u:' + (user.id || '')` 会在 id 缺失时退化成 `'u:'` —— 一个**所有 id 缺失会话
+// 共享**的键。共用设备上两个人先后遇到这种会话，第二个人会拿第一个人的 ownerKey
+// 对上草稿，直接读到别人的文件名；请求代次也会认为「没换人」，于是上一位在途的
+// 响应照常写进来。所以 id 缺失必须与「未登录」、与任何真实会员都不相等。
+console.log('\n⑪ 身份三态 fail-closed（未登录 / 无 id / 正常）')
+{
+  const guardSrc = read('utils/page-guard.js')
+  assert(/function memberIdentityKey\(auth\)/.test(guardSrc), 'page-guard 提供 memberIdentityKey(auth)')
+  // 判据是会员 id 而不是 token：token 每次登录都换，同一个人重登不该被判成换人。
+  assert(/function memberIdentityKey\(auth\)[\s\S]{0,400}auth\.getUser\(\)/.test(guardSrc),
+    '身份快照取自 auth.getUser().id（不是 token —— 同一个人重登不该清空他自己的数据）')
+  assert(!/function memberIdentityKey\(auth\)[\s\S]{0,400}getToken\(/.test(guardSrc),
+    'memberIdentityKey 不拿 token 当身份')
+  assert(/if \(!id\) return IDENTITY_UNUSABLE/.test(guardSrc),
+    'id 缺失时返回不可用哨兵，而不是退化成所有人共享的 "u:"')
+  assert(/function isMemberIdentity\(key\)[\s\S]{0,240}key\.length > 2/.test(guardSrc),
+    'isMemberIdentity 拒绝空串、哨兵与裸 u:')
+  for (const page of ['orders', 'package-create', 'package-confirm', 'package-code', 'store-select']) {
+    const src = stripComments(read(`pages/${page}/${page}.js`))
+    assert(/memberIdentityKey\(auth\)/.test(src), `${page} 的身份键来自 page-guard.memberIdentityKey`)
+    assert(!/'u:' \+ String\(/.test(src), `${page} 不再自己拼 'u:' + id（那会在 id 缺失时退化成共享键）`)
+    assert(/isMemberIdentity\(/.test(src), `${page} 用 isMemberIdentity 判定身份能不能用`)
+  }
+  const pickupSrc = stripComments(read('pages/print-pickup/print-pickup.js'))
+  assert(/memberIdentityKey\(auth\)/.test(pickupSrc) && /isMemberIdentity\(/.test(pickupSrc),
+    'print-pickup 也按同一套身份判据')
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ⑫ 单件取件页：到机码与金额不经 URL（与材料包同一口径）
+console.log('\n⑫ 单件取件页只带 orderId')
+{
+  const ordersCode = stripComments(ordersJs)
+  const primaryIdx = ordersCode.indexOf('primary(e)')
+  const primaryBlock = primaryIdx >= 0 ? ordersCode.slice(primaryIdx, ordersCode.indexOf('\n  },', primaryIdx)) : ''
+  assert(primaryBlock.includes('print-pickup?'), 'orders.js 有进入取件页的实现')
+  for (const field of ['pickupCode', 'amountCents', 'expiresAt', 'taskStatus', 'orderNo', 'paymentSessionToken']) {
+    assert(!primaryBlock.includes(`${field}=`), `进入取件页的 URL 不携带 ${field}`)
+  }
+  assert(/orderId=\$\{encodeURIComponent\(item\.orderId\)\}&source=orders/.test(primaryBlock),
+    '只带 orderId（source 只是返回路径提示，不是凭证也不是状态）')
+
+  const pickupSrc = stripComments(read('pages/print-pickup/print-pickup.js'))
+  for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'taskStatus', 'orderNo', 'paymentSessionToken']) {
+    assert(!new RegExp(`q\\.${field}\\b`).test(pickupSrc),
+      `print-pickup 不从 URL 读 ${field}（凭证与本人订单状态只能来自服务端）`)
+  }
+  assert(/api\.getCloudPrintOrder\(/.test(pickupSrc),
+    'print-pickup 带登录态向服务端回读本人订单（GET /me/print-orders/:orderId，requireOwned）')
+  assert(/normalizePickupCode\(order\.pickupCode\)/.test(pickupSrc),
+    '码只认服务端这一次给的值（|| this.data.codeRaw 会让已撤码的订单继续显示旧码）')
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ⑬ 守卫不得制造解不开的锁，也不得替用户预先同意协议
+console.log('\n⑬ 锁状态、草稿归属与协议同意')
+{
+  const createCode = stripComments(createJs)
+  const confirmCode = stripComments(confirmJs)
+
+  assert(/isMemberIdentity\(previous\) && previous !== identity/.test(createCode),
+    'package-create 只在「从另一个确定会员身份切换」时才清空（首次进入 / 刚登录不算换人）')
+  assert(/_dropForeignDraft\(\)/.test(createCode),
+    'package-create 另有一条只清「别人的草稿」的路径，不误伤本人的')
+  assert(/function draftFingerprint\(/.test(createCode) && /draftId = draftFingerprint\(/.test(createCode),
+    'draftId 由内容指纹算出（时间戳会让「退回来再继续」每次都丢掉已选服务点）')
+  assert(/previousStore\.draftId \|\| ''\) !== draftId/.test(createCode),
+    '只在服务点确实对不上当前草稿时才清它')
+  assert(/if \(append\) \{[\s\S]{0,260}docMoreErrorText: shown\.text/.test(createCode),
+    'package-create 翻页失败只写 docMoreErrorText，不把 docState 打成 error（那会顶掉整段文件列表）')
+  assert(read('pages/package-create/package-create.wxml').includes('docMoreErrorText'),
+    '模板真的渲染了 docMoreErrorText（只写进 data 不渲染等于没说）')
+  assert(/docLoadingMore && !this\._guard\.accepts\(this\._docsToken\)/.test(createCode),
+    '切后台作废翻页请求后，回前台要解开 docLoadingMore（否则「加载更多」永远点不动）')
+
+  const sameIdIdx = confirmCode.indexOf('if (!this._sameIdentity(token)) return')
+  const afterSameId = sameIdIdx >= 0 ? confirmCode.slice(sameIdIdx, sameIdIdx + 400) : ''
+  assert(sameIdIdx >= 0 && afterSameId.includes("removeStorageSync('temp_package_data')"),
+    '建单成功后**先判身份再清草稿**（换人时不得删掉当前这位的草稿）')
+  assert(/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(confirmCode),
+    'redirectTo 失败有兜底（不接住的话页面永远停在「提交中…」，而订单其实已经建好了）')
+  assert(/_lockAfterCreated\(orderId\)\s*\{[\s\S]{0,700}submitting: false/.test(confirmCode),
+    '兜底状态解开 submitting')
+  assert(/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(confirmCode),
+    '已建过单就不再 POST 第二次（服务端 CreatePackageOrder 没有幂等键）')
+  assert(/_loadQuote\(\)\s*\{[\s\S]{0,240}if \(this\._createdOrderId\) return/.test(confirmCode),
+    '建单之后不再核价（再变 ready 等于把「确认下单」重新点亮）')
+  assert(/quoteState === 'loading'\s*\n\s*&& !this\._guard\.accepts\(this\._quoteToken\)/.test(confirmCode),
+    'onShow 只在「在途报价确已作废」时才重发（只看 quoteState 会让首次进入连报两次价）')
+
+  assert(/_sameIdentity\(token\)/.test(stripComments(ordersJs)),
+    'orders 的取消链按身份判定（用 active 判定会把这一行锁死在「取消中…」）')
+
+  assert(/agreedToTerms: false/.test(confirmCode),
+    '《打印服务协议》默认不勾选（本仓库同类口径：pages/launch/launch.js 的 agreed: false）')
+  assert(confirmWxml.includes('我已阅读并同意') && confirmWxml.includes('viewTerms'),
+    '模板确实是一份「已阅读并同意 + 可查看原文」的法律同意，不是普通确认')
+
+  const codeCode = stripComments(codeJs)
+  assert(/_enforceIdentity\(\)\s*\{[\s\S]{0,500}this\._clearCredentials\(\)/.test(codeCode),
+    'package-code 发现身份变化时当场清掉凭证（request.js 续签失败会 auth.logout()，全程没有生命周期回调）')
+  assert(/_accepts\(token\)\s*\{[\s\S]{0,240}_enforceIdentity\(\) !== 'ok'/.test(codeCode),
+    '每个异步回调都过一遍身份判定')
+  assert(/loading: true, ready: false/.test(codeCode),
+    '重新加载时把 ready 打回 false（模板里 loading 与成功块是两个独立 wx:if，会同时显示）')
+  assert(/this\._codeRaw !== code\) return/.test(codeCode),
+    '画码的 exec 回调绑定当时那个码（迟到的回调不得把旧码的画布说成新码已就绪）')
+  assert(/data: this\._codeRaw,/.test(codeCode),
+    '复制的是原始到机码（服务端 claim 只 trim().toUpperCase()，不去分隔符）')
 }
 
 console.log(failed === 0 ? '\n全部通过\n' : `\n${failed} 条失败\n`)

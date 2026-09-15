@@ -19,22 +19,26 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
-const { createLifecycleGuard } = require('../../utils/page-guard')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 /**
  * 报价用的打印参数。
  *
- * **必须逐字对齐服务端 PackageOrderService.normalizeParams 的产物**：
- * bw→black_white、single→simplex，其余固定 A4 / auto / standard / fit / 1。
- * 对不上就会出现「预览按一种参数报价、建单按另一种参数计价」的分叉。
+ * 单双面与色彩**只能**经 `pkg.toWireDuplex` / `pkg.toWireColorMode` 出去，
+ * 建单那一步用的是同一对函数 —— 两条链共用一个出口，就不可能出现
+ * 「预览按一种参数报价、建单按另一种参数计价」的分叉。
+ *
+ * 此前这里写的是 `duplex === 'double' ? 'double' : 'simplex'`，
+ * 而报价 DTO 的 `@IsIn` 白名单里**根本没有 `'double'`**（simplex /
+ * duplex_long_edge / duplex_short_edge），建单 DTO 也没有。也就是说选了双面的
+ * 材料包在报价那一步就必然 400 —— 双面这个选项从来没有真正工作过。
+ * 其余固定 A4 / auto / standard / fit / 1，与服务端 normalizeParams 的产物一致。
  */
 function quoteParams(packageData) {
-  const colorMode = packageData.colorMode === 'color' ? 'color' : 'black_white'
-  const duplex = packageData.duplex === 'double' ? 'double' : 'simplex'
   return {
     copies: packageData.copies || 1,
-    colorMode,
-    duplex,
+    colorMode: pkg.toWireColorMode(packageData.colorMode),
+    duplex: pkg.toWireDuplex(packageData.duplex),
     paperSize: 'A4',
     orientation: 'auto',
     quality: 'standard',
@@ -74,7 +78,11 @@ Page({
 
     onsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
     noCancelNotice: pkg.PACKAGE_NO_CANCEL_NOTICE,
-    agreedToTerms: true,
+    // 默认**不勾选**。模板里那句是「我已阅读并同意《打印服务协议》」并链到
+    // /pages/legal/legal —— 那是一份法律文件的同意，预先替用户勾上等于替他声明
+    // 「已阅读」。本仓库同类同意的既有口径就是显式勾选：`pages/launch/launch.js`
+    // 的 `agreed: false`、`pages/self-explore` 的「（必选）」。本页此前是唯一的例外。
+    agreedToTerms: false,
   },
 
   onLoad() {
@@ -87,10 +95,17 @@ Page({
     this._loadOrderData()
   },
 
-  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  /**
+   * 当前身份的稳定快照。三态：`''` 未登录 / `'!'` 登录但无 id（不可用）/ `'u:<id>'`。
+   * 不可用时本页一个字节的草稿都不读、不写、不报价 —— 见 page-guard.memberIdentityKey。
+   */
   _identityKey() {
-    if (!auth.isLoggedIn()) return ''
-    return 'u:' + String((auth.getUser() || {}).id || '')
+    return memberIdentityKey(auth)
+  },
+
+  /** 当前身份能不能用来读写本人数据。 */
+  _identityUsable() {
+    return isMemberIdentity(this._identityKey())
   },
 
   /** 报价这类「只影响本页显示」的链：身份没变 + 页面在前台 + 是最新一次请求。 */
@@ -124,9 +139,15 @@ Page({
       return
     }
     this.setData({ isLoggedIn: loggedIn })
-    // 切后台会作废在途的报价。回来后若还停在「正在核价」，必须重发 ——
-    // 否则页面永远显示核价中，而其实一个请求都没有在跑，「确认下单」也一直是灰的。
-    if (this.data.draftState === 'draft' && this.data.quoteState === 'loading') this._loadQuote()
+    // 切后台会作废在途的报价。回来后若还停在「正在核价」**且那次确实已经作废**，
+    // 才重发；否则页面会永远显示核价中，而其实一个请求都没有在跑。
+    //
+    // 「确实已经作废」这半句不能省：onLoad 刚发出的那次报价也是 loading，
+    // 而紧随其后的首次 onShow 必然跑到这里 —— 只看 quoteState 会把同一份材料包
+    // 连报两次价（服务端要真去识别一遍页数，白算一次）。
+    if (this.data.draftState === 'draft'
+      && this.data.quoteState === 'loading'
+      && !this._guard.accepts(this._quoteToken)) this._loadQuote()
   },
 
   onHide() {
@@ -172,7 +193,9 @@ Page({
     this._packageData = null
     this._storeData = null
     const identity = this._identityKey()
-    if (!identity) {
+    // 未登录、或登录了却拿不到会员 id：一律不碰草稿。后者尤其要拦 ——
+    // 那种会话的身份键在所有人之间共享，照它比对 ownerKey 会直接放行别人的草稿。
+    if (!isMemberIdentity(identity)) {
       this._clearDraftView()
       return
     }
@@ -226,14 +249,24 @@ Page({
    * 打印机离线、文件已失效，都会在这里先暴露，而不是等用户按下「确认下单」。
    */
   _loadQuote() {
-    if (!auth.isLoggedIn()) {
-      this.setData({ quoteState: 'error', quoteErrorTitle: '登录已失效', quoteErrorText: '请重新登录后再核价下单。', quoteRecover: 'login' })
+    // 订单已经建出来了就不再核价：留着一条会重新变 ready 的路径，等于把
+    // 「确认下单」按钮再点亮一次，而再点一次就是第二张订单（服务端没有幂等键）。
+    if (this._createdOrderId) return
+    if (!this._identityUsable()) {
+      this.setData({
+        quoteState: 'error',
+        quoteErrorTitle: auth.isLoggedIn() ? '登录状态不完整' : '登录已失效',
+        quoteErrorText: '请重新登录后再核价下单。',
+        quoteRecover: 'login',
+      })
       return
     }
     const packageData = this._packageData
     const storeData = this._storeData
     if (!packageData || !storeData) return
     const token = this._guard.issue('quote')
+    // 留痕给 onShow 判「这次报价是不是已经作废」，避免首次进入重复报价。
+    this._quoteToken = token
     this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '' })
     api.quotePackageOrder({
       terminalId: storeData.id,
@@ -317,13 +350,37 @@ Page({
     wx.navigateTo({ url: '/pages/legal/legal' })
   },
 
+  /**
+   * 订单已经建出来之后的统一出口。
+   *
+   * 这条路径存在的唯一理由：**再 POST 一次就是第二张订单**（服务端 CreatePackageOrder
+   * 没有幂等键）。所以一旦拿到 orderId，本页就不再是一个可以下单的页面 ——
+   * 把报价打成 error（按钮随之变灰），并把恢复动作指到「我的 · 打印订单」，
+   * 那里的材料包分区能找回这张订单、点进去就是到机码页。
+   */
+  _lockAfterCreated(orderId) {
+    this._createdOrderId = orderId
+    this.setData({
+      submitting: false,
+      quoteState: 'error',
+      quoteErrorTitle: '订单已创建，请不要重复下单',
+      quoteErrorText: '材料包订单已经建好了，只是这一步没能自动跳转。到「我的 · 打印订单」的材料包分区就能找回它，点进去即是到机码。',
+      quoteRecover: 'orders',
+      submitErrorTitle: '',
+      submitErrorText: '',
+      submitRecover: '',
+    })
+  },
+
   submitOrder() {
     if (this.data.submitting) return
+    // 已经建过单：不再发第二次 POST，直接把人送去找那张订单。
+    if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }
     if (!this.data.agreedToTerms) {
       wx.showToast({ title: '请阅读并同意服务协议', icon: 'none' })
       return
     }
-    if (!auth.isLoggedIn()) { this.toLogin(); return }
+    if (!this._identityUsable()) { this.toLogin(); return }
     if (this.data.draftState === 'missing') { this.backToFiles(); return }
     if (this.data.quoteState !== 'ready') {
       wx.showModal({
@@ -349,9 +406,11 @@ Page({
     api.createPackageOrder({
       terminalId: this._storeData.id,
       files,
+      // **与报价逐字同源**：同一对 pkg.toWire* 函数。两条链各写一份映射，
+      // 迟早会出现"按一种参数报价、按另一种参数计价"。
       params: {
-        colorMode: this._packageData.colorMode || 'bw',
-        duplex: this._packageData.duplex || 'single',
+        colorMode: pkg.toWireColorMode(this._packageData.colorMode),
+        duplex: pkg.toWireDuplex(this._packageData.duplex),
         copies: this._packageData.copies || 1,
       },
     })
@@ -359,23 +418,33 @@ Page({
         wx.hideLoading()
         const orderId = (order && order.orderId) || ''
         if (!orderId) throw new Error('服务端未返回订单号')
-        // 订单已经在服务端落库了，这份草稿就此作废 —— 无论本页还能不能继续。
+        // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
+        this._createdOrderId = orderId
+        // 换了人：**不碰当前这位的 storage**。此前这里无条件删两个 key ——
+        // 若在途期间换成了 B 并且 B 已经做好了自己的草稿，那就把 B 的草稿删了。
+        // 上一位的订单不会丢：它已落库，本人可从「我的 · 打印订单」材料包分区找回。
+        if (!this._sameIdentity(token)) return
+        // 同一个人：这份草稿已被这张订单消费掉，清干净。
         // 清理放在跳转**之前**：原先放在 redirectTo 的 success 回调里，跳转一旦没触发
         // （异常路径、页面已被替换），草稿就永远留在本机，下一位打开确认页还能看到。
         wx.removeStorageSync('temp_package_data')
         wx.removeStorageSync('temp_selected_store')
-        // 换了人就不跳：不该把上一位的 orderId 推给当前这位（服务端 requireOwned 也会 404）。
-        // 订单不会丢 —— 它已落库，本人可从「我的 · 打印订单」材料包分区找回。
-        if (!this._sameIdentity(token)) return
         // 只把 orderId 交给下一页。到机码 / 金额 / 有效期一律由 package-code 自己带登录态
         // 向服务端查（GET /orders/package/:id 有 requireOwned 归属校验），不经 URL 传递 ——
         // 否则一条构造出来的链接或一张转发出去的卡片就能渲染出一张带到机码的「创建成功」页。
+        //
+        // 跳转失败必须接住：不接的话页面会永远停在「提交中…」，而订单其实已经建好了 ——
+        // 用户只会以为没下成，然后再点一次。
         wx.redirectTo({
           url: '/pages/package-code/package-code?orderId=' + encodeURIComponent(orderId),
+          fail: () => this._lockAfterCreated(orderId),
         })
       })
       .catch((err) => {
         wx.hideLoading()
+        // 订单已经建成、只是后续动作抛错（例如 redirectTo 同步抛）：
+        // 同样不能当成"下单失败"让用户重来。
+        if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }
         if (!this._sameIdentity(token)) return
         const shown = pkg.describePackageError(err, '创建订单失败，请稍后重试。')
         this.setData({

@@ -15,7 +15,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
 const { createPickupQrMatrix, PICKUP_CODE_RE } = require('../../utils/pickup-qrcode')
-const { createLifecycleGuard } = require('../../utils/page-guard')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 const QR_SIZE_PX = 180
 
@@ -57,10 +57,43 @@ Page({
     })
   },
 
-  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  /**
+   * 当前身份的稳定快照。三态：`''` 未登录 / `'!'` 登录但无 id（不可用）/ `'u:<id>'`。
+   * 不可用时本页一个到机码都不显示 —— 见 page-guard.memberIdentityKey。
+   */
   _identityKey() {
-    if (!auth.isLoggedIn()) return ''
-    return 'u:' + String((auth.getUser() || {}).id || '')
+    return memberIdentityKey(auth)
+  },
+
+  /**
+   * 身份若在本页停留期间变了，**当场把凭证清掉**，而不只是丢弃这次响应。
+   *
+   * 这里是 P1-5 的落点，也是本页与其它三页判据不同的地方。真实触发链路：
+   * `utils/request.js` 在 401 且 `auth.canSilentResignin()` 时会静默续签一次；
+   * 续签**失败**时它调 `auth.logout()` 清掉 token 与 user —— 全程没有任何
+   * 生命周期回调，页面还停在前台，而屏幕上那张已经渲染好的到机码属于一个
+   * 已经不存在的会话。只"丢弃响应"的话它会一直留在那儿（共用设备上就是下一位看到它）。
+   *
+   * 不动 request.js 的续签设计：续签成功时身份不变，这里什么都不会发生。
+   *
+   * @returns {'changed'|'unusable'|'ok'} changed 时本函数已经写好了说明，调用方不要覆盖
+   */
+  _enforceIdentity() {
+    const identity = this._identityKey()
+    if (this._guard.setIdentity(identity)) {
+      // setIdentity 返回 true = 身份变了，并且已经 +1 代次（在途请求全部作废）。
+      this._clearCredentials()
+      this.setData({
+        loading: false,
+        loadErrorTitle: identity ? '账号已切换' : '登录已失效',
+        loadError: identity
+          ? '当前账号与打开这张到机码时的不是同一个，已停止显示。可以到「我的 · 打印订单」里找回自己的材料包订单。'
+          : '到机码只对订单本人显示，登录状态已失效，请重新登录后再查看。',
+        loadRecover: identity ? 'orders' : 'login',
+      })
+      return 'changed'
+    }
+    return isMemberIdentity(identity) ? 'ok' : 'unusable'
   },
 
   /**
@@ -69,8 +102,12 @@ Page({
    * 四层缺一不可：页面仍在前台（onHide/onUnload 之后一律拒绝，否则刚清掉的到机码
    * 会被迟到的响应原样写回去）、身份没变、是本通道最新一次请求（重复刷新 latest-wins，
    * 旧响应不得把终态改回去）、并且查的是**当前这张**订单。
+   *
+   * 顺带**执行**身份判定而不只是查询它：每个异步回调都会经过这里，于是前台静默登出
+   * 会在下一个回调到达时被当场发现并清场。
    */
   _accepts(token) {
+    if (this._enforceIdentity() !== 'ok') return false
     if (!token || token.orderId !== this.data.orderId) return false
     return this._guard.accepts(token, this._identityKey())
   },
@@ -83,7 +120,7 @@ Page({
   onShow() {
     // 每次回到本页都重新向服务端核一遍：订单可能已被核销、已过期，或者换了登录账号。
     this._guard.activate()
-    this._guard.setIdentity(this._identityKey())
+    this._enforceIdentity()
     this.loadOrder()
   },
 
@@ -112,6 +149,7 @@ Page({
     // `_codeRaw` 是画二维码用的明文副本，必须和 data 里的码一起清 ——
     // 只清 data 的话，切后台再回来那一帧会用上一位用户的码重绘出一张可扫的二维码。
     this._codeRaw = ''
+    this._drawToken = null
     this.setData({ pickupCode: '', showQr: false, qrStatus: 'loading', ready: false })
   },
 
@@ -126,11 +164,18 @@ Page({
       })
       return
     }
-    if (!auth.isLoggedIn()) {
+    // 每个入口都过一遍身份：用户点「重新加载」时也可能已经被静默登出了。
+    // 'changed' 时 _enforceIdentity 已经清场并写好了说明，不要再覆盖成「请先登录」。
+    const identityState = this._enforceIdentity()
+    if (identityState === 'changed') return
+    if (identityState !== 'ok') {
       this.setData({
-        ready: false, loading: false,
-        loadErrorTitle: '请先登录',
-        loadError: '到机码只对订单本人显示，请登录后再查看。',
+        ready: false, loading: false, pickupCode: '', showQr: false,
+        // 登录了却拿不到会员 id 时不说「请先登录」——那句话会让用户以为自己没登录。
+        loadErrorTitle: auth.isLoggedIn() ? '登录状态不完整' : '请先登录',
+        loadError: auth.isLoggedIn()
+          ? '当前会话缺少会员标识，无法确认这张订单是不是本人的。请重新登录一次再查看。'
+          : '到机码只对订单本人显示，请登录后再查看。',
         loadRecover: 'login',
       })
       return
@@ -138,7 +183,10 @@ Page({
     // 令牌带上 orderId：重复刷新只认最新一次，旧响应既不能把终态改回去，
     // 也不能拿另一张订单的数据覆盖当前这张。
     const token = this._guard.issue('order', { orderId })
-    this.setData({ loading: true, loadError: '', loadErrorTitle: '', loadRecover: '' })
+    // `ready: false` 不能省：模板里 loading 块与 ready 成功块是**两个独立的 wx:if**，
+    // 不是一条 if/elif 链。重新加载时若把 ready 留成 true，屏幕上会同时出现
+    // 「正在向服务端核对订单」和上一轮那张到机码 —— 而那张码正等着被核销撤下。
+    this.setData({ loading: true, ready: false, loadError: '', loadErrorTitle: '', loadRecover: '' })
     api.getPackageOrder(orderId)
       .then((order) => {
         if (!this._accepts(token)) return
@@ -167,6 +215,7 @@ Page({
           // _codeRaw —— 它是画二维码用的明文副本，写回去等于把码复活。
           if (!this._accepts(token)) return
           this._codeRaw = codeUsable ? code : ''
+          this._drawToken = codeUsable ? token : null
           if (codeUsable) this._drawPickupQr()
         })
       })
@@ -195,17 +244,24 @@ Page({
   _drawPickupQr() {
     if (!this._guard.isActive()) return
     if (!this._pageReady || !this.data.showQr || !this._codeRaw) return
+    // 把"要画哪个码、属于哪次请求"在进入异步之前就钉死。
+    // exec 的回调可能跨好几帧才回来，中间这张码完全可能已经被换掉或撤下。
+    const code = this._codeRaw
+    const token = this._drawToken
     let matrix
     try {
-      matrix = createPickupQrMatrix(this._codeRaw)
+      matrix = createPickupQrMatrix(code)
     } catch (_) {
       this.setData({ qrStatus: 'error' })
       return
     }
     wx.createSelectorQuery().in(this).select('#package-qr').fields({ node: true, size: true }).exec((result) => {
-      // exec 是异步的：回调执行时可能已经 onHide 并清掉了 _codeRaw。
-      // 此时既不该画，也不该把 qrStatus 写成 ready（那会让空画布显示成"码已就绪"）。
+      // exec 是异步的：回调执行时可能已经 onHide 并清掉了 _codeRaw，
+      // 也可能已经取回了**另一张**码。此时既不该画，也不该把 qrStatus 写成 ready
+      // （那会把上一张码的画布说成"新码已就绪"，用户扫到的是一张作废的码）。
       if (!this._guard.isActive() || !this._codeRaw) return
+      if (this._codeRaw !== code) return
+      if (token && !this._accepts(token)) return
       const target = result && result[0]
       if (!target || !target.node) {
         this.setData({ qrStatus: 'error' })
@@ -264,10 +320,20 @@ Page({
     wx.switchTab({ url: '/pages/home/home' })
   },
 
+  /**
+   * 复制**原始**到机码（未分组的 8 位），不是屏幕上那串 `12-34-56-78`。
+   *
+   * 服务端 `pickup-order.service.ts` 的 claim 只做 `codeInput.trim().toUpperCase()`，
+   * **不去分隔符**，然后拿它算 `hashPickupCode` 去查 `pickupCodeHash` ——
+   * 带横杠的串根本匹配不上。一体机自己的输入框会 `normalizeInput` 去掉分隔符，
+   * 所以粘到一体机上没事；但剪贴板里的东西会被粘到哪儿不归我们决定。
+   * 屏幕仍显示分组形式（好念好核对），复制走真值。
+   */
   copyCode() {
-    if (!this.data.pickupCode) return
+    // 已被清场 / 尚未取到：不复制一个残留在 data 里的旧串。
+    if (!this._codeRaw || !this.data.pickupCode) return
     wx.setClipboardData({
-      data: this.data.pickupCode,
+      data: this._codeRaw,
       success() { wx.showToast({ title: '到机码已复制', icon: 'success' }) },
     })
   },

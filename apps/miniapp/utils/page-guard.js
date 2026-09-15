@@ -26,6 +26,40 @@
 // 有各自的游标，一个的重发不该让另一个的在途响应失效。
 
 /**
+ * 会员身份键。**三态，必须分清**，不能合并成布尔：
+ *
+ *   未登录              → `''`
+ *   登录了但拿不到 id   → `'!'`（不可用；fail-closed）
+ *   正常                → `'u:<id>'`
+ *
+ * 中间那一态是这里存在的全部理由。`'u:' + (user.id || '')` 会在 id 缺失时退化成
+ * `'u:'` —— 一个**所有 id 缺失会话共享**的键。共用设备上两个人先后遇到这种会话，
+ * 第二个人会拿第一个人的 `ownerKey` 对上草稿，直接读到别人的文件名；
+ * 请求代次也会认为"没换人"，于是上一位在途的响应照常写进来。
+ *
+ * 所以 id 缺失一律判为不可用：不发本人数据的请求、不读不写草稿、不显示到机码，
+ * 让用户重新登录一次（那会重新签发带 id 的会话）。宁可多一次登录，不可错认一个人。
+ *
+ * @param {{isLoggedIn: () => boolean, getUser: () => any}} auth utils/auth.js
+ * @returns {string}
+ */
+function memberIdentityKey(auth) {
+  if (!auth || !auth.isLoggedIn()) return ''
+  const user = auth.getUser()
+  const id = user && user.id !== undefined && user.id !== null ? String(user.id) : ''
+  if (!id) return IDENTITY_UNUSABLE
+  return 'u:' + id
+}
+
+/** 登录了但拿不到会员 id。见 memberIdentityKey。 */
+const IDENTITY_UNUSABLE = '!'
+
+/** 这个身份键能不能用来读写本人数据。`''`（未登录）与 `'!'`（无 id）都不能。 */
+function isMemberIdentity(key) {
+  return typeof key === 'string' && key.slice(0, 2) === 'u:' && key.length > 2
+}
+
+/**
  * 建一个页面级守卫。每个 Page 实例一个，放在实例字段上（不要放 data —— setData
  * 会把它序列化，而它持有闭包状态）。
  *
@@ -123,4 +157,4 @@ function createLifecycleGuard() {
   }
 }
 
-module.exports = { createLifecycleGuard }
+module.exports = { createLifecycleGuard, memberIdentityKey, isMemberIdentity, IDENTITY_UNUSABLE }

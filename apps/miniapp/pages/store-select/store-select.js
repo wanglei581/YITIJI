@@ -17,6 +17,7 @@
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 Page({
   data: {
@@ -33,21 +34,39 @@ Page({
 
   onLoad() {
     const app = getApp()
+    // 本页的守卫**不登记身份**（服务点列表是公开数据，换不换人都是同一份），
+    // 只用它的代次与逐通道序号：离开本页后作废在途请求、重复加载只认最新一次。
+    this._guard = createLifecycleGuard()
+    this._guard.activate()
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 44 })
     this._syncDraft()
     this._loadStores()
   },
 
   onShow() {
+    this._guard.activate()
     // 换了账号之后，上一位的草稿不再算数 —— 它里面的 fileId 属于别人，
     // 拿它继续选服务点只会在下一步被服务端拒（PRINT_FILE_NOT_FOUND）。
     this._syncDraft()
+    // 切后台会作废在途的列表请求。回来后若还停在 loading 且那次确实已作废，重发一次，
+    // 否则页面会永远显示「正在读取服务点」而其实没有请求在跑。
+    if (this.data.state === 'loading' && !this._guard.accepts(this._storesToken)) this._loadStores()
   },
 
-  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  onHide() {
+    this._guard.deactivate()
+  },
+
+  onUnload() {
+    this._guard.deactivate()
+  },
+
+  /**
+   * 当前身份的稳定快照。三态：`''` 未登录 / `'!'` 登录但无 id（不可用）/ `'u:<id>'`。
+   * 不可用时一律按「没有可下单的材料包」处理 —— 见 page-guard.memberIdentityKey。
+   */
   _identityKey() {
-    if (!auth.isLoggedIn()) return ''
-    return 'u:' + String((auth.getUser() || {}).id || '')
+    return memberIdentityKey(auth)
   },
 
   /**
@@ -62,14 +81,18 @@ Page({
     const identity = this._identityKey()
     const draft = wx.getStorageSync('temp_package_data')
     const files = draft && Array.isArray(draft.files) ? draft.files.filter((f) => f && f.fileId) : []
-    const owned = !!identity && !!draft && String(draft.ownerKey || '') === identity
+    const owned = isMemberIdentity(identity) && !!draft && String(draft.ownerKey || '') === identity
     this.setData({ hasPackageData: owned && files.length > 0 })
   },
 
   _loadStores() {
+    // 逐通道 latest-wins：连点两次「重新加载」时，先发的那次晚到不得盖掉新结果。
+    const token = this._guard.issue('stores')
+    this._storesToken = token
     this.setData({ state: 'loading', errorTitle: '', errorText: '' })
     api.getPublicTerminals()
       .then((list) => {
+        if (!this._guard.accepts(token)) return
         const rows = (Array.isArray(list) ? list : []).map((terminal) => ({
           id: terminal.id,
           name: terminal.displayName || '服务点',
@@ -85,6 +108,7 @@ Page({
         })
       })
       .catch((err) => {
+        if (!this._guard.accepts(token)) return
         const shown = pkg.describePackageError(err, '服务点列表加载失败，请稍后重试。')
         this.setData({ state: 'error', errorTitle: shown.title, errorText: shown.text })
       })
@@ -140,7 +164,7 @@ Page({
     // 现读草稿而不是用 onLoad 时的快照：这中间可能已经换了人，或草稿已被清掉。
     const draft = wx.getStorageSync('temp_package_data') || {}
     const identity = this._identityKey()
-    if (!identity || String(draft.ownerKey || '') !== identity) {
+    if (!isMemberIdentity(identity) || String(draft.ownerKey || '') !== identity) {
       this.setData({ hasPackageData: false })
       this.backToFiles()
       return

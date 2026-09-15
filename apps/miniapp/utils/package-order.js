@@ -322,8 +322,54 @@ function describePackageError(err, fallbackText) {
   }
 }
 
+// ── 打印参数：UI 取值 → 服务端 wire 取值 ──────────────────────────────────
+//
+// **这两个函数是报价与建单的唯一出口，两条链必须用同一个。**
+//
+// 服务端的两个 DTO 都是 `@IsIn` 白名单，取值不同但有交集：
+//   - 报价 `PrintJobParamsDto.duplex` ∈ simplex | duplex_long_edge | duplex_short_edge
+//   - 建单 `PackagePrintParamsDto.duplex` ∈ single | simplex | duplex_long_edge | duplex_short_edge
+// 本页 UI 用的是 `single` / `double` 两档。`double` **两边都不接受** ——
+// 此前报价与建单都原样发 `'double'`，双面材料包在报价那一步就必然 400，
+// 也就是说"双面"这个选项从来没有真正工作过。
+//
+// 为什么 double → duplex_long_edge（而不是 short_edge、也不是把双面藏起来）：
+// 这是仓库里**已有的产品口径**，不是本文件新定的 ——
+//   ① `packages/shared/src/types/print.ts` 的 `normalizeDuplex()` 就写着
+//      `if (d === 'double') return 'duplex_long_edge'`，那是跨端共用的归一函数；
+//   ② `services/api/src/materials/print-param-suggestion.rules.ts` 的参数建议
+//      也按 `duplex_long_edge` 给，并按它判定 `verifiedDuplexModes`；
+//   ③ 同一份 shared 类型的注释：`duplex_long_edge = 长边翻页（竖排文档）`，
+//      而材料包里装的是简历 / 求职材料，本来就是竖排。
+//
+// 选了双面但这台机器没登记 `duplex_print` 能力时会怎样：服务端 fail-closed，
+// 报价直接回 `CAPABILITY_NOT_CONFIGURED` / `CAPABILITY_UNAVAILABLE`，
+// 本文件已把它翻译成「换一个服务点」。这是**诚实的拒绝**，不是静默降级成单面 ——
+// 悄悄按单面出纸会让用户拿到一叠和他选的不一样的纸。
+
+/** 服务端两个 DTO 都接受的单双面取值（交集）。 */
+const PACKAGE_WIRE_DUPLEX_MODES = ['simplex', 'duplex_long_edge', 'duplex_short_edge']
+
+/** UI 单双面 → 服务端 wire 取值。未知一律落到 simplex（最保守：单面一定能打）。 */
+function toWireDuplex(uiDuplex) {
+  if (PACKAGE_WIRE_DUPLEX_MODES.indexOf(uiDuplex) >= 0) return uiDuplex
+  return uiDuplex === 'double' ? 'duplex_long_edge' : 'simplex'
+}
+
+/**
+ * UI 色彩 → 服务端 wire 取值。
+ * 报价 DTO 只接受 black_white | color；建单 DTO 额外兼容 bw，但两条链统一用
+ * black_white，省得"报价按一种取值、建单按另一种"埋一个将来才炸的分叉。
+ */
+function toWireColorMode(uiColorMode) {
+  return uiColorMode === 'color' ? 'color' : 'black_white'
+}
+
 module.exports = {
   PACKAGE_ALLOWED_PURPOSES,
+  PACKAGE_WIRE_DUPLEX_MODES,
+  toWireDuplex,
+  toWireColorMode,
   PACKAGE_PII_PURPOSES,
   PACKAGE_ONSITE_NOTICE,
   PACKAGE_NO_CANCEL_NOTICE,

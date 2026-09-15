@@ -618,12 +618,20 @@ if (
 ) ok('取件页轮询真实订单状态并在扫码/终态撤码')
 else bad('取件页实时状态', '缺少订单详情轮询、待支付/完成状态或二维码撤下')
 
+// 2026-09-15：兜底的**来源**变了。以前首次请求失败可以退回 URL 里的到机码离线绘码；
+// 现在 URL 不再携带任何凭证（到机码进 URL = 一条构造出来的链接就能在别人手机上渲染出
+// 带码的取件页），于是唯一合法的兜底只剩「上一次真的从服务端取到的状态」。
+// 能力没丢：后续失败仍保留已显示内容、重新绘码、恢复倒计时与轮询；
+// 首次就失败时诚实进错误态 —— 本来也没有任何可保留的东西。
 if (
   pickupJs.includes('const fallbackAvailable = this.data.state === \'ready\'') &&
   pickupJs.includes('if (this.data.showQr) this._drawPickupQr()') &&
-  pickupJs.includes('if (fallbackAvailable) this._resumeVisibleWork()')
-) ok('取件页首次状态请求失败仍能绘制真实到机码二维码')
-else bad('取件页首次请求失败二维码兜底', '回退为 ready 后必须重新绘码并恢复倒计时与轮询')
+  pickupJs.includes('this._resumeVisibleWork()') &&
+  // 正面禁令：不许任何一条路径再从 URL 取码兜底。
+  !/q\.pickupCode\b/.test(pickupJs) &&
+  !/codeRaw: PICKUP_CODE_RE\.test\(pickupCode\)/.test(pickupJs)
+) ok('取件页失败兜底只保留服务端取到的状态，不再退回 URL 里的码')
+else bad('取件页失败兜底', '后续失败须保留已显示状态并重新绘码；且任何路径都不得从 URL 取到机码兜底')
 
 // ── 两个码不许再混名 ────────────────────────────────────────────
 // 系统里有两个 10 位、同字符集但完全不同的码：
@@ -863,20 +871,28 @@ if (
   pickupWxml.includes('核销后无需付款，直接等待进入打印队列') &&
   ordersJs.includes("label: '正在进入队列'") &&
   ordersJs.includes('const amountCents = parseAmountCents(item.amountCents)') &&
-  ordersJs.includes("amountCents=${encodeURIComponent(item.amountCents == null ? '' : item.amountCents)}")
-) ok('免费试运营订单全流程不再误导用户现场支付')
+  // 2026-09-15：取件页的免费判定改为**只**来自服务端金额。此前这里要求 orders.js
+  // 把 item.amountCents 拼进取件页 URL —— 金额是本人订单状态，不该由调用方"告诉"下一页，
+  // 而且那条 URL 同时还带着到机码明文。能力没丢：pickupJs 那条
+  // `parseAmountCents(order.amountCents) === 0` 仍在，判据从服务端响应里取。
+  !/amountCents=\$\{encodeURIComponent\(item\.amountCents/.test(ordersJs)
+) ok('免费试运营订单全流程不再误导用户现场支付（免费判定取自服务端金额）')
 else bad('免费试运营文案分流', '零元订单必须显示免费、现场打印和直接排队；付费订单仍保留机端支付')
 
+// 2026-09-15：`source=orders` 现在拼在模板串里（URL 只剩 orderId + source），
+// 所以锚点从带引号的字面量改成 `source=orders` 本身；401 分支从只停轮询
+// 收紧成停全部定时器 **并清掉屏幕上的码**（登录已失效还留着码，就是共用设备上的泄漏）。
 if (
   ordersJs.includes("!item.status && item.pickupStatus === 'pending'") &&
-  ordersJs.includes("'source=orders'") &&
+  ordersJs.includes('source=orders') &&
   ordersWxml.includes('wx:if="{{item.pickup}}"') &&
   pickupJs.includes('err && err.statusCode === 401') &&
-  pickupJs.includes('this._stopPoll()') &&
+  pickupJs.includes('this._stopTimers()') &&
+  /statusCode === 401[\s\S]{0,400}codeRaw: ''/.test(pickupJs) &&
   pickupJs.includes('if (this.data.fromOrders)') &&
   pickupJs.includes("taskStatus === 'abandoned'")
-) ok('扫码后撤下订单列表到机码且登录失效停止状态轮询')
-else bad('到机码撤下与轮询停机', 'claimed/PrintTask 阶段不得继续展示旧码，401 后不得持续轮询')
+) ok('扫码后撤下订单列表到机码；登录失效停止轮询并清掉已显示的码')
+else bad('到机码撤下与轮询停机', 'claimed/PrintTask 阶段不得继续展示旧码，401 后不得持续轮询，且须清掉屏幕上的码')
 
 const aiRecordsJs = read('pages/ai-records/ai-records.js')
 const jobFitJs = read('pages/job-fit/job-fit.js')

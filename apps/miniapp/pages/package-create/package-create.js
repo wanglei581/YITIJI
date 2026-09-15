@@ -23,9 +23,30 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
-const { createLifecycleGuard } = require('../../utils/page-guard')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 const DOC_PAGE_SIZE = 20
+
+/**
+ * 草稿指纹。**内容变了才算新草稿。**
+ *
+ * 用它当 draftId 而不是 `Date.now()`，解决的是一对互相拉扯的要求：
+ *   - 不能串草稿：上一份草稿选好的服务点不许接到这一份上（换了文件或参数，
+ *     那台机器可能根本没验过新参数要的能力）。
+ *   - 不能无故丢选择：用户从确认页退回来看一眼又继续，选择完全没变，
+ *     却被迫重选一次服务点 —— 那是纯粹的能力退化。
+ * 指纹让这两件事自然成立：内容没变 → id 不变 → 服务点绑定照常有效；
+ * 改了任何一个文件或参数 → id 变 → 旧绑定自动失效，确认页会要求重选。
+ */
+function draftFingerprint(ownerKey, files, colorMode, duplex, copies) {
+  return [
+    ownerKey,
+    colorMode,
+    duplex,
+    String(copies),
+    files.map((row) => row.id).join(','),
+  ].join('|')
+}
 
 /** 服务端文档行 → 本页展示行。不补任何服务端没给的字段（尤其是页数）。 */
 function toDocRow(doc) {
@@ -53,6 +74,8 @@ Page({
     docs: [],
     docCursor: null,
     docLoadingMore: false,
+    // 「加载更多」失败单独成一个字段：写进 docState 会让整段已加载的文件被错误态顶掉。
+    docMoreErrorText: '',
 
     uploading: false,
 
@@ -77,10 +100,17 @@ Page({
     this._guard.activate()
   },
 
-  /** 当前身份的稳定快照（会员 id）；未登录为空串。每次现读，不缓存。 */
+  /**
+   * 当前身份的稳定快照。三态：`''` 未登录 / `'!'` 登录但无 id（不可用）/ `'u:<id>'`。
+   * 不可用时本页不拉文件列表、不写草稿 —— 见 page-guard.memberIdentityKey。
+   */
   _identityKey() {
-    if (!auth.isLoggedIn()) return ''
-    return 'u:' + String((auth.getUser() || {}).id || '')
+    return memberIdentityKey(auth)
+  },
+
+  /** 当前身份能不能用来读写本人数据。 */
+  _identityUsable() {
+    return isMemberIdentity(this._identityKey())
   },
 
   /** 这个响应还能不能回写文件状态：身份没变 + 页面在前台 + 是本通道最新一次请求。 */
@@ -89,13 +119,28 @@ Page({
   },
 
   onShow() {
-    const loggedIn = auth.isLoggedIn()
     this._guard.activate()
-    // 换用户后不能残留上一位的文件列表与选择。判据是会员 id。
+    const previous = this._guard.identity()
+    const identity = this._identityKey()
+    const usable = isMemberIdentity(identity)
     // setIdentity 变化时 +1 代次：上一位在途的文档请求、上传链、隐私检查一并作废，
     // 它们的迟到响应不会把上一位的文件名再写回来。
-    if (this._guard.setIdentity(this._identityKey())) this._resetForIdentity()
-    this.setData({ isLoggedIn: loggedIn })
+    if (this._guard.setIdentity(identity)) {
+      // **只有从另一个确定的会员身份切过来才算换人。**
+      // 首次进入（''→本人）和刚登录（未登录→本人）都不是换人 —— 此前这里一律当成
+      // 换人并 removeStorageSync，于是用户从服务点/确认页用 redirectTo 兜底回到本页时，
+      // 自己刚做好的草稿会被自己的"登录"顺手删掉。
+      if (isMemberIdentity(previous) && previous !== identity) this._resetForIdentity()
+    }
+    // 不管换没换人，都确认一次 storage 里那份草稿确实属于当前这位。
+    // 本人的草稿原样保留；别人的（或身份不可用时的任何草稿）直接清掉。
+    this._dropForeignDraft()
+    this.setData({ isLoggedIn: usable })
+    // 切后台会作废在途的翻页请求，docLoadingMore 会一直停在 true，
+    // 「加载更多文件」从此点不动。回到前台先把这个按钮锁解开。
+    if (this.data.docLoadingMore && !this._guard.accepts(this._docsToken)) {
+      this.setData({ docLoadingMore: false })
+    }
     // 切后台会作废在途的隐私检查与逐条确认链。回来后必须把它们从「进行中」拉回来：
     // 否则页面会一直显示「文件仍在隐私检查中」，而其实一个请求都没有在跑，
     // 用户既等不到结果也点不了下一步。回到 idle 是 fail-closed 的方向 ——
@@ -106,7 +151,28 @@ Page({
     // docState 还停在 'loading'，说明上一次请求在切后台时被作废了。这里必须重发，
     // 否则页面会永远卡在「正在读取我的文件」——重发的新令牌序号更大，旧响应即使
     // 之后到达也覆盖不了新结果。
-    if (loggedIn && (this.data.docState === 'idle' || this.data.docState === 'loading')) this._loadDocs()
+    // docState 还停在 'loading' **且那次请求确实已经作废**时才重发：
+    // 只看 docState 会在同一轮里把刚发出的那次重发一遍。
+    if (usable && (this.data.docState === 'idle'
+      || (this.data.docState === 'loading' && !this._guard.accepts(this._docsToken)))) this._loadDocs()
+  },
+
+  /**
+   * 只清理**不属于**当前这位的草稿；本人的原样保留。
+   *
+   * 与 `_resetForIdentity()` 的分工：那个是"换人了，屏幕上的一切都要换掉"；
+   * 这个是"屏幕不动，只把本机 storage 里别人的东西清走"。混成一个就会出现
+   * 本轮修的那个缺陷 —— 用户自己的登录把自己的草稿删了。
+   */
+  _dropForeignDraft() {
+    const draft = wx.getStorageSync('temp_package_data')
+    if (!draft) return
+    const identity = this._identityKey()
+    const ownerKey = draft && draft.ownerKey ? String(draft.ownerKey) : ''
+    if (!isMemberIdentity(identity) || ownerKey !== identity) {
+      wx.removeStorageSync('temp_package_data')
+      wx.removeStorageSync('temp_selected_store')
+    }
   },
 
   onHide() {
@@ -127,7 +193,7 @@ Page({
   _resetForIdentity() {
     this.setData({
       docs: [], docCursor: null, docState: 'idle', docLoadingMore: false,
-      docErrorTitle: '', docErrorText: '', uploading: false,
+      docErrorTitle: '', docErrorText: '', docMoreErrorText: '', uploading: false,
       selectedCount: 0, piiPhase: 'idle', piiGroups: [], piiFindingCount: 0, piiError: '',
       piiSubmitting: false,
     })
@@ -140,11 +206,14 @@ Page({
    * 不能合成一句（docs/product/content-onboarding-runbook.md §5C）。
    */
   _loadDocs(append = false) {
-    if (!auth.isLoggedIn()) return Promise.resolve()
+    if (!this._identityUsable()) return Promise.resolve()
     if (append && !this.data.docCursor) return Promise.resolve()
     const token = this._guard.issue('docs')
+    this._docsToken = token
     const cursor = append ? this.data.docCursor : null
-    this.setData(append ? { docLoadingMore: true } : { docState: 'loading', docErrorTitle: '', docErrorText: '' })
+    this.setData(append
+      ? { docLoadingMore: true, docMoreErrorText: '' }
+      : { docState: 'loading', docErrorTitle: '', docErrorText: '', docMoreErrorText: '' })
     return api.getMyDocuments({ pageSize: DOC_PAGE_SIZE, ...(cursor ? { cursor } : {}) })
       .then((page) => {
         // 迟到的响应到此为止：换了人、切了后台，或本通道已被重新发起过一次。
@@ -166,12 +235,21 @@ Page({
           docCursor: (page && page.nextCursor) || null,
           docState: 'ready',
           docLoadingMore: false,
+          docErrorTitle: '', docErrorText: '', docMoreErrorText: '',
         })
         this._syncSelection()
       })
       .catch((err) => {
         if (!this._accepts(token)) return
         const shown = pkg.describePackageError(err, '文件列表加载失败，请稍后重试。')
+        // 翻页失败只写 docMoreErrorText，**不碰 docState**：模板里 docState === 'error'
+        // 那一支会把整段文件列表换成错误卡片，用户已经勾好的文件会连同列表一起消失，
+        // 而失败的其实只是下一页。首屏 / 重试失败才进 docState=error（此时本来也没有
+        // 可保留的内容）。与「打印订单」页材料包分区的 pkgMoreErrorText 同一口径。
+        if (append) {
+          this.setData({ docLoadingMore: false, docMoreErrorText: shown.text })
+          return
+        }
         this.setData({
           docState: 'error',
           docLoadingMore: false,
@@ -186,6 +264,10 @@ Page({
   },
 
   loadMoreDocs() {
+    if (!this.data.docLoadingMore) this._loadDocs(true)
+  },
+
+  retryMoreDocs() {
     if (!this.data.docLoadingMore) this._loadDocs(true)
   },
 
@@ -248,7 +330,7 @@ Page({
    */
   addFile() {
     if (this.data.uploading) return
-    if (!auth.isLoggedIn()) { this.toLogin(); return }
+    if (!this._identityUsable()) { this.toLogin(); return }
     wx.chooseMessageFile({
       count: 9,
       type: 'file',
@@ -402,7 +484,7 @@ Page({
    * 进入服务点选择。只把**服务端 fileId** 和打印参数交给下一步，不带任何金额或页数。
    */
   createPackage() {
-    if (!auth.isLoggedIn()) { this.toLogin(); return }
+    if (!this._identityUsable()) { this.toLogin(); return }
     const selected = this.data.docs.filter((row) => row.selected)
     if (!selected.length) {
       wx.showToast({ title: '请先选择文件', icon: 'none' })
@@ -428,7 +510,10 @@ Page({
     // draftId 让「已选服务点」能跟这份草稿对上 —— 服务点是另一个 storage key，
     // 没有这个绑定就可能把上一份草稿选的机器接到这一份上。
     const ownerKey = this._identityKey()
-    const draftId = ownerKey + ':' + Date.now()
+    // draftId 是**内容指纹**，不是时间戳：同样的文件与参数再按一次「继续」，
+    // 算出来的还是同一个 id，于是上一次选好的服务点仍然对得上、不用重选；
+    // 改了任何一个文件或参数，id 自然就变了，旧的服务点绑定随之失效。
+    const draftId = draftFingerprint(ownerKey, selected, this.data.colorMode, this.data.duplex, this.data.copies)
     wx.setStorageSync('temp_package_data', {
       ownerKey,
       draftId,
@@ -437,9 +522,13 @@ Page({
       duplex: this.data.duplex,
       copies: this.data.copies,
     })
-    // 新草稿开始：上一次选好的服务点属于上一份草稿，先清掉再去选，
-    // 免得用户在确认页看到一台自己这次没选过的机器。
-    wx.removeStorageSync('temp_selected_store')
+    // 只在**确实对不上**时才清已选服务点。
+    // 无条件清会让"退回来看一眼再继续"的用户每次都重选一台机器 —— 那是纯粹的能力退化；
+    // 完全不清又会把上一份草稿选的机器接到这一份上，而那台机器未必验过新参数要的能力。
+    const previousStore = wx.getStorageSync('temp_selected_store') || {}
+    if (String(previousStore.ownerKey || '') !== ownerKey || String(previousStore.draftId || '') !== draftId) {
+      wx.removeStorageSync('temp_selected_store')
+    }
     wx.navigateTo({ url: '/pages/store-select/store-select?from=package-create' })
   },
 
