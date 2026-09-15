@@ -52,6 +52,30 @@ function formatYuan(amountCents) {
   return (amountCents / 100).toFixed(2)
 }
 
+/**
+ * 服务端这张订单是不是**已经走到头**了 —— 返回一句给用户看的原因，不是终态返回 `''`。
+ *
+ * 为什么必须问服务端、而且必须问清楚：本机那条恢复记录活 7 天，而它锁住的东西是
+ * 「这一组参数不许再下单」。订单在这 7 天里完全可能已经取消、到机码已经过期、
+ * 已经打完、或者打印失败 —— 服务端的幂等键是**永久**挂在那张 Order 行上的
+ *（`Order_endUserId_idempotencyKey_key`，没有过期清理），所以继续拿同一个键去 POST
+ * 只会一遍遍回放那张作废的订单。用户看到的是一个按不动的按钮和一句「订单已创建」，
+ * 而他要的那份东西永远打不出来。
+ *
+ * 取值与 print-pickup 的 TERMINAL_STATES / resolveOrderState 同一组，判据也同源
+ *（服务端 toView 同时给出 pickupStatus 与 taskStatus，两者任一到终态即终态）。
+ */
+function terminalReasonOf(order) {
+  const pickupStatus = String((order && order.pickupStatus) || '')
+  const taskStatus = String((order && order.taskStatus) || '')
+  if (taskStatus === 'completed') return '上一张订单已经打印完成'
+  if (taskStatus === 'failed') return '上一张订单打印失败'
+  if (taskStatus === 'abandoned') return '上一张订单的打印任务已终止'
+  if (pickupStatus === 'cancelled' || taskStatus === 'cancelled') return '上一张订单已取消'
+  if (pickupStatus === 'expired' || taskStatus === 'expired') return '上一张订单的到机码已过期'
+  return ''
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -76,6 +100,14 @@ Page({
     // 订单已建成后的锁。服务端会按幂等键回放同一张单，所以这把锁不再是「防重复扣款」
     // 的最后一道 —— 它现在的职责是**把这件事告诉用户**：订单已经在了，去找它，别再提交。
     createdLocked: false,
+    // 那张已建成的订单**现在**是什么状态，取值 '' | 'checking' | 'live' | 'unknown' | 'terminal'。
+    // 只有 'terminal' 是"服务端证明它已经走到头了"，也只有它才允许重新下一单。
+    // 'unknown' 是查不出来（网络 / 401 / 5xx）：fail-closed，继续锁着。
+    createdState: '',
+    createdNotice: '',
+    // 「重新下单」按钮的开关。与 createdState 分开一个字段，是为了让模板不必再解析
+    // 状态语义，也让"能不能重新下单"这件事只有一个出口（startNewOrder 自己再判一次）。
+    createdCanReorder: false,
   },
 
   onLoad(opts) {
@@ -88,6 +120,9 @@ Page({
     // 建单的判据只能是"这次尝试绑给了哪位账号"，切后台绝不能让已经建成的订单丢掉。
     this._guard = createLifecycleGuard()
     this._guard.activate()
+    // 「那张已建成的订单核过了吗」。只放内存：换人 / 重进都必须重新核一次。
+    this._verifyingOrderId = ''
+    this._verifiedOrderId = ''
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
@@ -126,15 +161,123 @@ Page({
    * 不恢复就会再提交一次。
    *
    * 只读**当前这位**的记录：findRecord 要求账号逐字相等且是确定的会员键。
+   *
+   * **恢复出来的锁必须再向服务端核一次。** 那条记录活 7 天，而它锁住的是「这一组参数
+   * 不许再下单」；这 7 天里订单完全可能已经取消 / 到机码过期 / 打完 / 打印失败。
+   * 服务端的幂等键永久挂在那张 Order 行上，所以继续拿同一个键去 POST 只会一遍遍回放
+   * 那张作废的订单 —— 用户面对的是一个按不动的按钮和一句「订单已创建」，而他要的
+   * 那份材料永远打不出来。核对结果由 `_verifyCreatedOrder` 写进 createdState。
    */
   _restoreCreatedOrder() {
     if (!isMemberIdentity(this._account)) return
     const q = this.data.q
     if (!q.fileId || !q.storeId) return
-    const record = idem.findRecord(this._account, idem.fingerprintOf(this._orderPayload()))
+    const fingerprint = idem.fingerprintOf(this._orderPayload())
+    const record = idem.findRecord(this._account, fingerprint)
     if (!record || !record.orderId) return
     this._createdOrderId = record.orderId
+    // 先按「已建成」锁住，再去核状态：核对期间同样一次 POST 都不许发 —— 这一刻我们
+    // 恰恰**还不知道**那张订单是不是活的，放开按钮就是在不确定时多建一张。
     this.setData({ submitting: false, createdLocked: true })
+    this._verifyCreatedOrder(record.orderId)
+  },
+
+  /**
+   * 向服务端核一次「那张已建成的订单现在怎么样了」。
+   *
+   * 三种结局，判据只认服务端：
+   *   - 终态（取消 / 过期 / 完成 / 失败 / 终止，或 requireOwned 明确查不到这张订单）
+   *     → 允许重新下一单，但**必须由用户自己点**那个按钮（startNewOrder）。
+   *     页面不自动换键：那等于替用户做了一次下单决定，而他可能只是想找回原来那张。
+   *   - 活着 → 继续锁着，指路「我的 · 打印订单」。
+   *   - 查不出来（网络失败 / 401 / 5xx）→ **继续锁着**。查询失败证明不了任何事，
+   *     而这里只要放开一格，代价就是同一份材料的第二张订单、第二笔钱。
+   *     更不许因为"查不到"就铸一个新键 —— 那会让服务端连回放的机会都没有。
+   */
+  _verifyCreatedOrder(orderId) {
+    if (!orderId) return
+    // 同一张订单只核一次：onShow 每次都会调 _restoreCreatedOrder。
+    if (this._verifiedOrderId === orderId || this._verifyingOrderId === orderId) return
+    this._verifyingOrderId = orderId
+    const token = this._guard.issue('restore', { orderId })
+    this.setData({
+      createdState: 'checking',
+      createdNotice: '正在向服务端核对这张订单现在的状态…',
+      createdCanReorder: false,
+    })
+    api.getCloudPrintOrder(orderId)
+      .then((order) => {
+        if (!this._accepts(token) || this._createdOrderId !== orderId) return
+        this._verifyingOrderId = ''
+        this._verifiedOrderId = orderId
+        const reason = terminalReasonOf(order)
+        if (reason) {
+          this.setData({
+            createdState: 'terminal',
+            createdNotice: `${reason}，这一组参数可以重新下一单。原来那张仍可在「我的 · 打印订单」里查看。`,
+            createdCanReorder: true,
+          })
+          return
+        }
+        this.setData({
+          createdState: 'live',
+          createdNotice: '这张订单还在，到「我的 · 打印订单」就能找回它，点进去即是到机码。',
+          createdCanReorder: false,
+        })
+      })
+      .catch((err) => {
+        if (!this._accepts(token) || this._createdOrderId !== orderId) return
+        this._verifyingOrderId = ''
+        // 服务端明确说"这位用户没有这张订单"（requireOwned 的 404 PRINT_ORDER_NOT_FOUND）。
+        // 这是**服务端状态**，不是网络问题：那个 orderId 再也换不出任何东西，
+        // 继续锁着只会把这一组参数封死到本机记录过期为止。
+        if (err && err.statusCode === 404 && err.code === 'PRINT_ORDER_NOT_FOUND') {
+          this._verifiedOrderId = orderId
+          this.setData({
+            createdState: 'terminal',
+            createdNotice: '服务端已经查不到上一张订单了，这一组参数可以重新下一单。',
+            createdCanReorder: true,
+          })
+          return
+        }
+        this.setData({
+          createdState: 'unknown',
+          createdNotice: '暂时核对不上这张订单的状态。为避免重复下单，这一步先锁着；请恢复网络后重新核对。',
+          createdCanReorder: false,
+        })
+      })
+  },
+
+  /** 'unknown' 态的可执行下一步：再核一次。核不上就还是 'unknown'，不会假装好了。 */
+  retryCreatedCheck() {
+    if (this.data.createdState !== 'unknown' || !this._createdOrderId) return
+    this._verifyingOrderId = ''
+    this._verifiedOrderId = ''
+    this._verifyCreatedOrder(this._createdOrderId)
+  },
+
+  /**
+   * 重新下一单。**只有服务端已经证明原单走到终态时才可达**。
+   *
+   * 做的事只有一件：把本机那条恢复记录丢掉，于是下一次 continueFlow 会铸一个新的
+   * 幂等键 —— 服务端因此认得出这是一次**新的下单意图**，而不是上一次的重试。
+   * 顺序不能反：记录还在就换键 = 同键不同参数的 409，或者干脆两条记录对不上。
+   */
+  startNewOrder() {
+    if (this.data.createdState !== 'terminal' || !this.data.createdCanReorder) return
+    if (this._resolveAccount() !== 'ok') return
+    idem.clearRecord(this._account, idem.fingerprintOf(this._orderPayload()))
+    this._createdOrderId = null
+    this._createAttempt = null
+    this._verifyingOrderId = ''
+    this._verifiedOrderId = ''
+    this.setData({
+      submitting: false,
+      createdLocked: false,
+      createdState: '',
+      createdNotice: '',
+      createdCanReorder: false,
+    })
   },
 
   /**
@@ -183,9 +326,16 @@ Page({
     this._guard.setIdentity('')
     this._createdOrderId = null
     this._createAttempt = null
+    // 上一位那张订单的核对结论同样属于上一位：留着它，B 的页面会显示 A 那张订单
+    // 「已取消，可以重新下单」，或者更糟 —— 带着一个对 B 毫无意义的「重新下单」按钮。
+    this._verifyingOrderId = ''
+    this._verifiedOrderId = ''
     this.setData({
       submitting: false,
       createdLocked: false,
+      createdState: '',
+      createdNotice: '',
+      createdCanReorder: false,
       isFreeOrder: false,
       pageCountLabel: '待服务端核定',
       'fee.total': '—',
@@ -396,10 +546,30 @@ Page({
    * 并把恢复动作指向「我的 · 打印订单」，那里能找回这张订单、点进去就是到机码页。
    */
   _lockAfterCreated(orderId) {
+    // 模板里那个「提交」是一个加了 disabled **样式**的 view —— bindtap 照样会触发，
+    // 于是 continueFlow 会把这里当作"已建过单"的出口再走一遍。这一路进来时页面对那张
+    // 订单可能已经有结论了（'terminal' / 'unknown' / 还在 'checking'），无条件写成
+    // 'live' 会把它们全盖掉：终态那句「上一张已取消，可以重新下一单」连同它旁边的按钮
+    // 一起消失（用户点一下反而把自己唯一的出口点没了），'checking' 则被伪造成一个
+    // 我们还没拿到的结论。
+    // 只有一种情况该写 'live'：这一次是刚刚才建成的 —— 此前没有任何结论，createdState 为空。
+    const justCreated = this.data.createdState === ''
     this._createdOrderId = orderId
     if (this._createAttempt) this._createAttempt.settled = true
     this._releaseLoading(this._createAttempt)
-    this.setData({ submitting: false, createdLocked: true })
+    if (!justCreated) {
+      this.setData({ submitting: false, createdLocked: true })
+      return
+    }
+    // 刚刚才建成的订单当然是活的，不必为它打一发查询。但**不**写进 _verifiedOrderId：
+    // 用户停在本页期间到机码照样会过期，下一次 onShow 该重新核一遍。
+    this.setData({
+      submitting: false,
+      createdLocked: true,
+      createdState: 'live',
+      createdNotice: '到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。',
+      createdCanReorder: false,
+    })
   },
 
   toOrders() {

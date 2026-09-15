@@ -695,9 +695,42 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     // 上一位的 orderId 用 B 的 token 发请求。第一次挡住、第二次放过等于没挡。
     assert(/this\._foreignBlocked = true/.test(body) && /_openerAccount/.test(body),
       'package-code 换到别人之后粘住（按开页账号判定），不是只挡第一次 onShow')
+    // 2026-09-15：判据必须是**当前这位是不是开页那位**，不能是"这一跳里身份变没变"。
+    //
+    // 本断言此前钉的是 `resolved.identity === this._openerAccount`（解除封锁那一支），
+    // 它只证明"开页那位回来能解除"，证明不了"换成别人真的会被挡住"的**全部形态**：
+    // 粘性标记当时只在 `resolved.state === 'changed'` 分支里才置起来，而 changed 只认得
+    // A→B 这一种连续跳变。真实链路里更常见的是 A 登出（快照当场被清成 ''）之后 B 才登录
+    // —— 那一跳在账号状态机眼里是 `'' → 'u:B'` = 一次正常的补签升级 = 'ok'，
+    // 粘性标记一次都不会置起来，于是本页拿着**开页那位**的 orderId、带着 B 的登录态
+    // 去 GET（服务端 requireOwned 必然 404，但请求已经代表 B 发出去了）。
+    // 所以现在钉的是这条独立判据本身。
+    assert(/const foreign = isMemberIdentity\(this\._openerAccount\)/.test(body)
+      && /resolved\.identity !== this\._openerAccount/.test(body),
+    'package-code 的换人判定是一条独立判据：当前这位不是开页那位就算换人（不只看这一跳变没变）')
+    assert(/if \(foreign \|\| resolved\.state === 'changed'\)/.test(body),
+      'package-code 的清场分支同时接住 foreign 与 changed（只接 changed 会漏掉 A 登出→B 登录）')
     // 但登出**不粘**：同一位 A 重新登录必须还能恢复这一页。
-    assert(/resolved\.identity === this\._openerAccount/.test(body),
+    assert(/if \(this\._foreignBlocked && isMemberIdentity\(resolved\.identity\) && !foreign\)[\s\S]{0,80}this\._foreignBlocked = false/.test(body),
       'package-code 的封锁只对"换成别人"生效，开页那位自己回来必须解除')
+  }
+
+  // print-pickup 是同一个缺陷的同一份修法：它此前连 _openerAccount 都没有，
+  // A 登出 → B 登录之后照样会拿着 A 的 orderId 用 B 的登录态去 GET /me/print-orders/:id。
+  {
+    const src = stripComments(read('pages/print-pickup/print-pickup.js'))
+    const at = src.indexOf('_resolveIdentity() {')
+    const body = at < 0 ? '' : src.slice(at, src.indexOf('\n  },', at))
+    assert(/const foreign = isMemberIdentity\(this\._openerAccount\)/.test(body)
+      && /resolved\.identity !== this\._openerAccount/.test(body),
+    'print-pickup 同样按"当前这位是不是开页那位"判定换人')
+    assert(/if \(foreign \|\| resolved\.state === 'changed'\)/.test(body)
+      && /this\._clearCredentials\(\)/.test(body),
+    'print-pickup 判成换人时当场清掉屏幕上的码（不只是丢弃这次响应）')
+    assert(/if \(this\._foreignBlocked && isMemberIdentity\(resolved\.identity\) && !foreign\)[\s\S]{0,80}this\._foreignBlocked = false/.test(body),
+      'print-pickup 的封锁同样只对"换成别人"生效，开页那位自己回来必须解除')
+    assert(/this\._openerAccount = ''/.test(src) && /this\._foreignBlocked = false/.test(src),
+      'print-pickup 在 onLoad 初始化开页账号与粘性标记（不初始化则首个 undefined 会把判定短路掉）')
   }
   assert(/_accepts\(token\)\s*\{\s*const state = this\._enforceIdentity\(\)/.test(codeCode),
     '每个异步回调都先**执行**一遍身份判定（不是只查询它）')
@@ -773,6 +806,99 @@ console.log('\n⑫ R4 身份 / 代次收口')
     'submitOrder 里的协议守卫仍在（按钮变灰不是唯一防线）')
   assert(confirmWxml.includes('agreement-hint'),
     '未勾协议时说清主按钮为什么是灰的（disabled 后 bindtap 不触发，没有提示用户只会反复点）')
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ⑭ 幂等键：落住了、只有一个、还留着；以及一条七天前的恢复记录不得把页面锁死
+//
+// R6 证明的是「键被用对了」。这一段钉的是它下面那一层——「键到底在不在」。
+// 每条都对应一次真的会多扣一笔钱的处境，不是照现状抄：
+console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记录')
+{
+  const idemSrc = read('utils/print-order-idempotency.js')
+  const idem = stripComments(idemSrc)
+  const paySrc = read('pages/print-pay/print-pay.js')
+  const pay = stripComments(paySrc)
+  const payWxml = read('pages/print-pay/print-pay.wxml')
+
+  // ① 落盘必须被确认。utils/storage.js 的 set() 在 wx.setStorageSync 抛异常时吞掉异常
+  //    返回 false（存储满 / 被系统清理 / 被隐私策略拦截都会命中）；而"没抛异常也没写进去"
+  //    从返回值上根本看不出来。忽略这一步的代价很具体：订单在服务端建成了、键一个字节都
+  //    没落在本机——响应一丢，下一次提交铸一个新键，服务端按新键再建一张。
+  assert(/if \(storage\.set\(STORE_KEY, kept\) !== true\) return null/.test(idem),
+    'persist 检查 storage.set 的返回值（吞掉的失败等于"以为存住了"）')
+  assert(/const back = storage\.get\(STORE_KEY, null\)/.test(idem)
+    && /row\.account === verify\.account/.test(idem)
+    && /row\.fingerprint === verify\.fingerprint/.test(idem)
+    && /row\.key === verify\.key/.test(idem),
+  'persist 写完把记录读回来逐字核对 account/fingerprint/key（set 返回 true ≠ 真的写进去了）')
+  assert(/if \(!persist\(loadAll\(\)\.concat\(\[record\]\), record\)\) \{[\s\S]{0,200}throw new Error/.test(idem),
+    'ensureKey 落不住就 reject —— 调用方一个 POST 都不许发（那张订单建成就再也找不回来）')
+
+  // ② 同一格不得并发铸出两个键。取随机数是异步的，两次重叠的调用（两个页面实例、
+  //    或"重进 + 重试"）会各自走到"没有记录 → 铸一个"，后落盘的还会把先落盘的挤掉。
+  assert(/const minting = new Map\(\)/.test(idem)
+    && /const running = minting\.get\(slot\)/.test(idem)
+    && /if \(running\) return running/.test(idem),
+  'ensureKey 按 account+fingerprint 串行化，重叠的调用共用同一个在途铸键')
+  assert(/minting\.delete\(slot\); return record/.test(idem) && /minting\.delete\(slot\); throw err/.test(idem),
+    '在途项无论成败都摘掉（失败缓存在里面，存储恢复之后也再铸不出键）')
+
+  // ③ 淘汰不得挤掉"正在飞"的那条。只按 createdAt 留最新 N 条，最先被挤掉的恰恰是它。
+  assert(/const pins = new Map\(\)/.test(idem) && /pins\.set\(slot, Date\.now\(\) \+ PIN_TTL_MS\)/.test(idem),
+    '铸键时把这一格钉住（钉住的不参与淘汰）')
+  assert(/if \(isPinned\(slotOf\(row\.account, row\.fingerprint\), now\)\) pinned\.push\(row\)/.test(idem),
+    'retain 把钉住的那些整体排除在淘汰之外')
+  assert(/evictable\.filter\(\(r\) => r\.orderId\)\.concat\(evictable\.filter\(\(r\) => !r\.orderId\)\)/.test(idem),
+    '没钉住的那批也按价值淘汰：有 orderId 的（服务端确有其单）排在没有的前面')
+  assert(/pins\.delete\(slotOf\(account, fingerprint\)\)/.test(idem),
+    '落定（拿到 orderId / 被清掉）时释放钉子，存储总量才有界')
+
+  // ④ 取随机数必须有上限。它只有回调形态，两个回调一个都不来时页面会永远停在
+  //    「正在提交…」——既没有订单，也没有出口。超时按失败处理，绝不退回弱随机。
+  assert(/const RANDOM_TIMEOUT_MS = \d+/.test(idem) && /setTimeout\(\(\) => \{[\s\S]{0,200}RANDOM_TIMEOUT_MS/.test(idem),
+    'wx.getRandomValues 有一个有界的超时，超时按失败处理')
+  assert(/complete: \(\) => failed\(/.test(idem),
+    '只回 complete、不回 success/fail 的实现也被接住（走到 complete 还没落定 = 一个字节都没拿到）')
+  assert(/let settled = false/.test(idem) && /if \(settled\) return/.test(idem),
+    '落定一次就不再落定（success 之后的 complete 不得把成功覆盖成失败）')
+  assert(!/Math\.random/.test(idem),
+    '幂等键不得退回 Math.random（碰撞意味着两个人的两次下单共用一个键）')
+
+  // ⑤ 一条七天前的恢复记录不得把这一组参数锁死。服务端的幂等键**永久**挂在那张 Order
+  //    行上（Order_endUserId_idempotencyKey_key，没有过期清理），所以继续拿同一个键去
+  //    POST 只会一遍遍回放那张早已取消 / 过期 / 打完的订单：用户面对一个按不动的按钮，
+  //    而他要的那份材料永远打不出来。
+  const restore = /_restoreCreatedOrder\(\)\s*\{[\s\S]*?\n  \},/.exec(pay)
+  assert(!!restore && /this\._verifyCreatedOrder\(record\.orderId\)/.test(restore[0]),
+    'print-pay 恢复出"已建成"的锁之后，必须向服务端核一次那张订单现在什么状态')
+  assert(/api\.getCloudPrintOrder\(orderId\)/.test(pay),
+    '核状态走的是既有的本人订单端点（GET /me/print-orders/:orderId，requireOwned 归属校验）')
+  assert(/function terminalReasonOf\(order\)/.test(pay)
+    && /taskStatus === 'completed'/.test(pay) && /taskStatus === 'failed'/.test(pay)
+    && /taskStatus === 'abandoned'/.test(pay)
+    && /pickupStatus === 'cancelled' \|\| taskStatus === 'cancelled'/.test(pay)
+    && /pickupStatus === 'expired' \|\| taskStatus === 'expired'/.test(pay),
+  '终态判据覆盖取消 / 过期 / 完成 / 失败 / 终止（漏一项就是同一份材料再也打不了第二次）')
+  // fail-closed：查询失败**证明不了**那张订单已经作废。放开一格的代价是第二张订单、
+  // 第二笔钱；因为查不到就铸一个新键更糟——服务端连回放的机会都没有。
+  assert(/createdState: 'unknown'[\s\S]{0,200}createdCanReorder: false/.test(pay),
+    "核不上（网络 / 401 / 5xx）时保持锁定，不给「重新下单」（fail-closed）")
+  assert(/err\.statusCode === 404 && err\.code === 'PRINT_ORDER_NOT_FOUND'/.test(pay),
+    "只有 requireOwned 明确的 404 才算'服务端证明它没了'，不是任意一个失败")
+  // 解锁必须是**用户自己点**的一个动作：页面不自动换键，那等于替他做了一次下单决定。
+  const startNew = /startNewOrder\(\)\s*\{[\s\S]*?\n  \},/.exec(pay)
+  assert(!!startNew && /this\.data\.createdState !== 'terminal' \|\| !this\.data\.createdCanReorder/.test(startNew[0]),
+    'startNewOrder 只在服务端已证明终态时才可达（其余一律原地返回）')
+  assert(!!startNew && /idem\.clearRecord\(this\._account, idem\.fingerprintOf\(this\._orderPayload\(\)\)\)/.test(startNew[0]),
+    'startNewOrder 清掉旧记录，下一次 continueFlow 才会铸一个新键')
+  assert(payWxml.includes('bindtap="startNewOrder"') && payWxml.includes('createdCanReorder'),
+    '模板真的把「重新下单」接到 startNewOrder 上，并按 createdCanReorder 分流（写了不接线等于没写）')
+  assert(payWxml.includes('bindtap="retryCreatedCheck"') && payWxml.includes("createdState === 'unknown'"),
+    "核不上时给一条可执行的「重新核对」，而不是一句「加载失败」")
+  // 换人时这套结论必须跟着复位：它属于上一位。
+  assert(/_resetForAccountChange\([\s\S]{0,900}createdState: ''[\s\S]{0,200}createdCanReorder: false/.test(pay),
+    '换账号时把上一位那张订单的核对结论一起复位（否则 B 会看到 A 的「可以重新下单」）')
 }
 
 console.log(failed === 0 ? '\n全部通过\n' : `\n${failed} 条失败\n`)

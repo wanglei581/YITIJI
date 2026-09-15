@@ -128,6 +128,9 @@ Page({
     // 稳定账号快照。**只放内存**，并且要在任何一次破坏性 token 读取之前就存在 ——
     // auth.getToken() 在 JWT 过期时会连 user 一起清掉，事后再去读就没有账号 id 了。
     this._account = ''
+    // 开页那位（不随清场销毁）与"已经换给别人了"的粘性标记。见 _resolveIdentity。
+    this._openerAccount = ''
+    this._foreignBlocked = false
 
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
@@ -167,15 +170,40 @@ Page({
   _resolveIdentity() {
     const resolved = resolveAccountState(auth, this._account)
 
-    if (resolved.state === 'changed') {
+    // 开这一页的是谁，单独记一份，**不随清场销毁**（this._account 在换人/登出时必须
+    // 当场销毁，它是"上一次见到谁"的快照）。
+    if (isMemberIdentity(resolved.account) && !this._openerAccount) {
+      this._openerAccount = resolved.account
+    }
+
+    // 「换成了别人」的判据是**当前这位是不是开页那位**，不是"这一跳里身份变没变"。
+    //
+    // 后者只认得 A→B 这一种连续跳变，认不出真实链路里更常见的那一种：
+    // A 登出（`'u:A' → ''`，快照被清成 `''`）→ B 登录 → 回到本页 onShow。
+    // 那一跳在状态机眼里是 `'' → 'u:B'` = 一次正常的补签升级 = `'ok'`，
+    // 于是本页会拿着**开页那位**的 orderId、带着 B 的登录态去
+    // GET /me/print-orders/:orderId（服务端 requireOwned 必然 404，但请求已经代表 B
+    // 发出去了）。按"当前这位是谁"判就没有这个缺口：中间隔了几跳都一样。
+    const foreign = isMemberIdentity(this._openerAccount)
+      && isMemberIdentity(resolved.identity)
+      && resolved.identity !== this._openerAccount
+
+    // 开页那位自己回来了：解除粘性封锁。登出不粘（identity 为 `''`），
+    // 所以同一位 A 登出再登回来照样能恢复这一页。
+    if (this._foreignBlocked && isMemberIdentity(resolved.identity) && !foreign) {
+      this._foreignBlocked = false
+    }
+
+    if (foreign || resolved.state === 'changed') {
       // 真的换了人，或主动登出（补签资格已被撤销）：**当场清掉屏幕上的码**。
       // 真实链路里这一步没有任何生命周期回调 —— request.js 续签失败时调 auth.logout()，
       // 页面还停在前台，而那张已经渲染好的码属于一个已经不存在的会话。
       // 共用设备上就是下一位看到它。
+      if (foreign) this._foreignBlocked = true
       this._account = ''
       this._stopTimers()
       this._clearCredentials()
-      const switched = isMemberIdentity(resolved.identity)
+      const switched = foreign || isMemberIdentity(resolved.identity)
       this.setData({
         state: 'error',
         refreshing: false,
@@ -184,6 +212,13 @@ Page({
           : '登录已失效，请重新登录后再查看到机码。',
         errorAction: switched ? 'orders' : 'login',
       })
+      return 'changed'
+    }
+
+    // 已经换给别人、而现在既不是开页那位也不是别人（登出 / 会话缺 id）：
+    // 保持已经写好的说明，一个请求都不发。
+    if (this._foreignBlocked) {
+      this._account = ''
       return 'changed'
     }
 

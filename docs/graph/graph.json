@@ -19010,6 +19010,9 @@
       "apps/miniapp/scripts/verify-pickup-qrcode.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
+    "apps/miniapp/utils/print-order-idempotency.js": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
     "apps/miniapp/utils/request.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
@@ -26854,7 +26857,8 @@
           "apps/miniapp/scripts/tests/page-lifecycle.test.mjs",
           "apps/miniapp/utils/api.js",
           "apps/miniapp/utils/package-order.js",
-          "apps/miniapp/utils/page-guard.js"
+          "apps/miniapp/utils/page-guard.js",
+          "apps/miniapp/utils/print-order-idempotency.js"
         ],
         "missing": []
       },

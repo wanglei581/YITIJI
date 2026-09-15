@@ -54,3 +54,5 @@
 .locked-t { font-size: 27rpx; font-weight: 700; color: var(--ink); }
 .locked-d { margin-top: 8rpx; font-size: 23rpx; line-height: 1.65; color: var(--muted); }
 .locked-btn { display: flex; width: fit-content; min-height: 96rpx; margin-top: 18rpx; padding: 0 32rpx; border-radius: 22rpx; background: var(--teal); color: #fff; font-size: 26rpx; font-weight: 650; align-items: center; justify-content: center; }
+/* 同时出现两个动作时（重新下单 / 重新核对 + 去我的打印订单），第二个降为次要样式：两个同样重的实心按钮会让用户分不清该点哪个。尺寸不降，触控面积与主按钮一致。 */
+.locked-btn.ghost { background: transparent; color: var(--teal); border: 2rpx solid var(--teal); }

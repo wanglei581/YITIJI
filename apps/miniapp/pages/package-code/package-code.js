@@ -91,33 +91,38 @@ Page({
     // 开这一页的是谁，单独记一份，**不随清场销毁**。
     // this._account 在换人时必须清空（它是"上一次见到谁"的快照，留着会把下一位的
     // 自然过期误判成换人），但清空之后 `'' → 'u:B'` 在状态机眼里就是一次正常的
-    // "补签升级"= 'ok' —— 于是**第二次** onShow 本页又会拿着上一位的 orderId
-    // 用 B 的 token 去发请求。第一次挡住、第二次放过，等于没挡。
+    // "补签升级"= 'ok'。
     if (isMemberIdentity(resolved.account) && !this._openerAccount) {
       this._openerAccount = resolved.account
     }
 
-    // 换到**别人**之后粘住，直到开页那位自己回来。
-    // 登出不粘（identity 为 `''`）：同一位 A 重新登录必须还能恢复这一页。
-    if (this._foreignBlocked) {
-      if (isMemberIdentity(resolved.identity) && resolved.identity === this._openerAccount) {
-        this._foreignBlocked = false        // 开页那位回来了，解除
-      } else {
-        this._account = ''
-        return 'changed'                    // 保持已经写好的「账号已切换」，不再取数
-      }
+    // 「换成了别人」的判据是**当前这位是不是开页那位**，不是"这一跳里身份变没变"。
+    //
+    // 后者只认得 A→B 这一种连续跳变，认不出真实链路里更常见的那一种：
+    // A 登出（`'u:A' → ''`，本页把快照清成 `''`）→ B 登录 → 回到本页 onShow。
+    // 那一跳在状态机眼里是 `'' → 'u:B'` = 一次正常的补签升级 = `'ok'`，
+    // 于是本页会拿着**开页那位**的 orderId、带着 B 的登录态去 GET
+    //（服务端 requireOwned 必然 404，但请求已经代表 B 发出去了，而"A 有这样一张
+    // 订单"这件事也就顺着 404/200 的差别漏给了 B 这个会话）。
+    // 按"当前这位是谁"判就没有这个缺口：中间隔了几跳、隔了多久都一样。
+    const foreign = isMemberIdentity(this._openerAccount)
+      && isMemberIdentity(resolved.identity)
+      && resolved.identity !== this._openerAccount
+
+    // 开页那位自己回来了：解除粘性封锁。登出不粘（identity 为 `''`），
+    // 所以同一位 A 登出再登回来照样能恢复这一页。
+    if (this._foreignBlocked && isMemberIdentity(resolved.identity) && !foreign) {
+      this._foreignBlocked = false
     }
 
-    if (resolved.state === 'changed') {
-      if (isMemberIdentity(resolved.identity) && resolved.identity !== this._openerAccount) {
-        this._foreignBlocked = true
-      }
+    if (foreign || resolved.state === 'changed') {
+      if (foreign) this._foreignBlocked = true
       // 真的换了人，或主动登出。setIdentity 会 +1 代次，把上一位在途的请求一并作废 ——
       // 只清 data 不作废请求的话，那几个迟到的响应会把刚清掉的码原样写回来。
       this._account = ''
       this._guard.setIdentity('')
       this._clearCredentials()
-      const switched = isMemberIdentity(resolved.identity)
+      const switched = foreign || isMemberIdentity(resolved.identity)
       this.setData({
         loading: false,
         loadErrorTitle: switched ? '账号已切换' : '登录已失效',
@@ -128,6 +133,14 @@ Page({
       })
       return 'changed'
     }
+
+    // 已经换给别人、而现在既不是开页那位也不是别人（登出 / 会话缺 id）：
+    // 保持已经写好的说明，一个请求都不发。
+    if (this._foreignBlocked) {
+      this._account = ''
+      return 'changed'
+    }
+
     this._account = resolved.account
     // 补签升级（`''` → `'u:<id>'`）**不得** +1 代次：那条刚被 request.js 救回来的响应
     // 正在路上，作废它就又变成一页转不完的 loading。adoptIdentity 只放行这一个方向。

@@ -12,6 +12,112 @@
 生产环境本轮一次都没碰，`DEVICE / PRODUCTION / COMMERCIAL` 仍全部 NO-GO。
 此前进度里「R3 尚未合入」「必须等文档后继 SHA 再跑一次 CI」的表述到此关闭：那两件事都已完成。
 
+2026-09-15 **R7 收口：撤回 `124398c9f169af45a5a594618feeddc2a77e5e33` 的「幂等建单已接线」结论 ——
+那一句当时只对了一半，三个缺陷活过了它。** 锚点是 `124398c9f` 的直接子提交（本分支 tip），
+基线仍是 `origin/main@ddef936def46e9220a25e44ffe33dcc3458ed00b`。
+
+R6 证明的是「键被用对了」（该复用时复用、该换时换、归谁就写给谁）。独立复现打的是它
+**下面那一层**：键到底在不在。三条都不需要换人、不需要竞态，只要一次普通的下单就会踩到：
+
+- **P1 落盘从来没被确认过。** `ensureKey` 铸完键调一次 `saveAll`，而 `utils/storage.js`
+  的 `set()` 在 `wx.setStorageSync` 抛异常时吞掉异常返回 `false`（存储满、被系统清理、
+  被隐私策略拦截都会命中），这个返回值当时被整个忽略 —— 于是键一个字节都没落本机，
+  POST 照发。订单在服务端建成、响应一丢，下一次提交铸一个**新键**，服务端按新键再建一张。
+  幂等键的全部价值就在"它落住了"这一件事上。改法：`persist()` 既查 `storage.set` 的返回值，
+  又把记录**读回来逐字核对** `account/fingerprint/key`（"没抛异常也没写进去"从返回值上
+  根本看不出来）；核不上就 `reject`，调用方一个 POST 都不许发。
+- **P1 同一格可以并发铸出两个键。** 取随机数是异步的，两次重叠的 `ensureKey`（两个页面
+  实例、或"重进 + 重试"）会各自走到"没有记录 → 铸一个"，后落盘的还把先落盘的挤掉。
+  两个键 = 两张订单 = 两笔钱。改法：模块级 `minting` 按 `account+fingerprint` 串行化，
+  重叠调用共用同一个在途 Promise；无论成败都摘掉在途项（失败缓存在里面，存储恢复之后
+  也再铸不出键）。
+- **P1 淘汰会把"正在飞"的那条挤掉。** 淘汰只按 `createdAt` 留最新 20 条，而最需要留住的
+  恰恰不是最新那条，是**已经 POST 出去、还没落定**的那条 —— 它只要后面再有 20 条更新的
+  写入就是最旧的那一条。改法：铸键时把这一格**钉住**（`pins`，最长 30 分钟，照 enduser JWT
+  的 `expiresIn:'30m'`；拿到 orderId 或被清掉时提前释放），钉住的不参与淘汰；名额只在
+  没钉住的那批里回收，且先丢"既没钉住、又没有 orderId"的最旧那些。存储总量仍然有界
+  （`MAX_RECORDS` + 当前钉住数，钉子自带上限与释放）。
+- **P2 `wx.getRandomValues` 两个回调一个都不来时，页面永远停在「正在提交…」。** 它只有回调
+  形态，"至少来一个"是约定不是保证（低版本基础库、被拦截的 API、宿主异常）。改法：加一个
+  有界超时（`RANDOM_TIMEOUT_MS = 8000`）按**失败**处理，并接住"只回 `complete`、不回
+  `success`/`fail`"那种实现；`settled` 保证落定一次就不再落定（正常路径上 `complete`
+  晚于 `success`，不得把成功覆盖成失败）。仍然 fail-closed，仍然**不退回 `Math.random`**。
+- **P1 换人只认得 A→B 这一种跳变。** R6 给材料包到机码页加的粘性封锁挂在
+  `resolved.state === 'changed'` 里，而真实链路里更常见的是 **A 登出（快照当场被清成 `''`）
+  之后 B 才登录** —— 那一跳在账号状态机眼里是 `'' → 'u:B'` = 一次正常的补签升级 = `'ok'`，
+  粘性标记一次都不会置起来。于是页面拿着**开页那位**的 orderId、带着 B 的登录态去 GET。
+  `print-pickup` 更直接：它当时连 `_openerAccount` 都没有。改法：两页判据统一换成
+  **当前这位是不是开页那位**（一条独立判据，不是 `changed` 分支里的一个 `if`），
+  中间隔了几跳、隔了多久都一样；**登出仍然不粘**，开页那位自己回来必须解除封锁。
+- **P2 一条七天前的恢复记录会把这一组参数锁死七天。** `print-pay` 进页面发现本机有
+  `orderId` 就 `createdLocked`，而服务端的幂等键是**永久**挂在那张 Order 行上的
+  （`Order_endUserId_idempotencyKey_key`，没有过期清理，`verify:miniapp-cloud-print-m2`
+  的 T10 正是"取消态回放原单、不建第二张"）。订单早就取消 / 过期 / 打完 / 打印失败了，
+  用户面对的却是一个按不动的按钮和一句「订单已创建」，那份材料永远打不出来。
+  改法：恢复出锁之后**用既有的本人端点** `GET /me/print-orders/:orderId`（requireOwned）
+  核一次真实状态 —— 终态（取消 / 过期 / 完成 / 失败 / 终止，或 requireOwned 明确的
+  404 `PRINT_ORDER_NOT_FOUND`）才给出一个**用户自己点**的「重新下单」，点了才清记录、
+  下一次才铸新键；**核不上（网络 / 401 / 5xx）一律保持锁定**（查询失败证明不了任何事，
+  更不许因为查不到就换新键 —— 那会让服务端连回放的机会都没有）。页面自始至终不自动换键。
+
+R6 已经做对的两件事本轮**原样保留并各自变异验过**：orderId 先写进发起那位的恢复记录、
+再判当前页面收不收（`M7` 判红）；只有 `wx.redirectTo` 的 `success` 才清记录（`M8` 判红）。
+
+**测试 123/123**（比 R6 多 15 条）。反向变异 **13 条行为变异全部判红**，每条都用
+`node --test page-lifecycle.test.mjs` 的**退出码**判定（exit=1），不是数 FAIL 行：
+`M1` 忽略落盘失败（红 2 条）、`M1b` 不读回来核对（1）、`M2` 去掉串行化（1）、
+`M3` 淘汰回到"只留最新 N 条"（1）、`M4a` 去掉取随机数超时（7）、
+`M4b` 去掉 `complete` 兜底（3）、`M5a` package-code 回到"只看这一跳变没变"（2）、
+`M5b` print-pickup 同上（1）、`M6a` 恢复出锁后不核状态（6）、`M6b` 核不上也放行重新
+下单（1）、`M6c` 证明终态后自动清记录换新键（1）、`M7` orderId 先判页面归属再落盘（2）、
+`M8` 在 `redirectTo` 之前就清记录（1）。后两条是 R6 已做对、本轮**原样保留**的行为。
+还原方式是把原始字节读进内存、`finally` 写回，并用 **sha256 逐文件比对**确认与变异前
+完全一致（未用 `git checkout` / `reset`）。
+
+`M8` 第一次跑是 **GREEN** —— 我把变异写成了给 `wx.redirectTo` 多加一个 `complete` 回调，
+而测试替身根本不调 `complete`，那是一个在测试环境里等于没改的变异，不是测试漏了。
+重新表述成"在 `redirectTo` **之前**就清记录"之后判红（`R6-5 ①`）。如实记在这里。
+
+**门禁：新增一段 `⑭`（`verify-package-chain`），12 条静态断言逐条变异验过、全部判红**
+（`G1`–`G12`，同样按 `node scripts/verify-package-chain.mjs` 的退出码判定，exit=1）。
+连同上面 13 条行为变异，本轮共 **25 条变异、25 条判红、0 条 GREEN**。
+覆盖：`storage.set` 返回值检查 / 读回来核对 / `ensureKey` 落不住就 reject / 串行化与在途项
+摘除 / 钉子与按价值淘汰 / 取随机数超时与 `complete` 兜底 / 禁 `Math.random` / `print-pay`
+恢复后必须核状态 / 终态判据五项齐全 / 核不上 fail-closed / 只认 requireOwned 的 404 /
+`startNewOrder` 的终态守卫与模板接线 / 换账号时核对结论一起复位 / `print-pickup` 同一套
+开页账号判定。**同时改了一条旧断言的锚点**：`package-code` 那条原本钉
+`resolved.identity === this._openerAccount`（只证明"开页那位回来能解除"），
+现在钉的是 `foreign` 这条独立判据本身与 `foreign || changed` 的清场分支 ——
+是收紧不是放宽，旧锚点证明不了"A 登出→B 登录也会被挡住"。
+
+本机独立复跑（全部退出码 0）：`node --test page-lifecycle.test.mjs`（123/123）、
+小程序 `verify:static`（含 `verify:package-chain` / `verify:api-contract` / `verify:page-lifecycle`）、
+API `verify:miniapp-cloud-print-m2`（T1–T11 ALL PASS）、根 `verify:repository-integrity` /
+`verify:ci-gate-coverage` / `verify:deploy-gates-in-sync` / `graph:check`、`git diff --check`。
+`docs/graph/**` 用标准命令重生成（漂移只有 3 处计数：新增的门禁断言让
+`utils/print-order-idempotency.js` 第一次进入"被门禁断言的文件"），未手改生成物。
+
+**证据边界（只到这里，不要外推）：`SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION /
+COMMERCIAL: NO-GO`。** 未 push、未开 PR、未合并、未跑 GitHub CI、未进微信开发者工具、
+未接真实 API、未真机、未部署。本轮**没有改任何后端行为**（`services/**`、Prisma、迁移
+一个字节都没动）；`print-pay` 新调的 `GET /me/print-orders/:orderId` 是 `print-pickup`
+早就在用的既有端点。
+
+**本轮新增登记的遗留：**
+
+- **恢复记录的核状态多打一发请求。** 进入 `print-pay` 时若本机存着一张已建成的订单，
+  会额外发一次 `GET /me/print-orders/:orderId`。同一张订单一轮只核一次，但这条链在
+  慢网下的观感（「正在向服务端核对…」停留多久）没有在真机上看过。
+- **`PIN_TTL_MS = 30 分钟` 是照 enduser JWT 时长取的，不是实测值。** 超过它之后一条
+  仍未落定的记录会重新参与淘汰。现实里 POST 不可能飞 30 分钟，但这个数没有被任何
+  真机数据支撑，只被"超过这个时长用户无论如何都要重新登录一次"这条推理支撑。
+- **`RANDOM_TIMEOUT_MS = 8000` 同样未在真机标定。** 取值偏保守（宁可等），慢设备上
+  是否会先被用户当成卡死而退出，没有验过。
+- **requireOwned 的 404 被当成"这张订单没了"。** 这是本轮唯一一条把服务端错误当作
+  状态证据的判据。它只认 `statusCode === 404 && code === 'PRINT_ORDER_NOT_FOUND'`
+  这一对，不认任何其它失败；但如果服务端将来在别的原因下也返回这一对，前端会允许
+  用户重新下一单。真实网络上没有触发过这条分支。
+
 2026-09-15 **幂等建单接线：撤回 `cf2e12d93ac480929d3abcfb546c584f4deb1722` 的收口结论。**
 该 SHA 上「重复下单已经收口」这句话当时**不成立** —— 它靠的全是页面内的一把内存锁
 （`_createAttempt` / `_createdOrderId`），而那把锁挡不住真正会多扣一笔钱的那一种：

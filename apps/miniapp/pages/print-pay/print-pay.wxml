@@ -51,13 +51,18 @@
     <view class="fee-row" wx:elif="{{quoteState === 'loading'}}"><text class="qf-text">正在向服务端核定页数与金额…</text></view>
   </view>
 
-  <!-- 订单已经建成、只是没能自动跳转：必须说清楚它在哪、并且不许再提交一次。 -->
+  <!-- 订单已经建成、只是没能自动跳转：必须说清楚它在哪、并且不许再提交一次。
+       但「已经建成」不等于「还能用」——那张订单可能早就取消 / 过期 / 打完了，
+       而本机那条恢复记录活 7 天。所以标题与下一步都跟着 createdState 走，
+       只有服务端证明它走到终态（createdCanReorder）时才给出「重新下单」。 -->
   <view class="notice warn rise-d5" wx:if="{{createdLocked}}">
     <text class="ficon i-info n-ic"></text>
     <view class="locked-main">
-      <view class="locked-t">订单已创建，请不要重复提交</view>
-      <view class="locked-d">到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。</view>
-      <view class="locked-btn tap" hover-class="tap-press" bindtap="toOrders" role="button">去我的打印订单</view>
+      <view class="locked-t">{{createdState === 'terminal' ? '上一张订单已经结束' : (createdState === 'unknown' ? '暂时核对不上上一张订单' : '订单已创建，请不要重复提交')}}</view>
+      <view class="locked-d">{{createdNotice || '到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。'}}</view>
+      <view wx:if="{{createdCanReorder}}" class="locked-btn tap" hover-class="tap-press" bindtap="startNewOrder" role="button">重新下单</view>
+      <view wx:elif="{{createdState === 'unknown'}}" class="locked-btn tap" hover-class="tap-press" bindtap="retryCreatedCheck" role="button">重新核对订单状态</view>
+      <view class="locked-btn tap {{createdCanReorder || createdState === 'unknown' ? 'ghost' : ''}}" hover-class="tap-press" bindtap="toOrders" role="button">去我的打印订单</view>
     </view>
   </view>
 
