@@ -862,9 +862,18 @@ if (
   printUploadJs.includes('amountCents=${encodeURIComponent(amountCents)}') &&
   printUploadWxml.includes("amountCents === 0 ? '免费试运营' : '精确报价'") &&
   printStoreJs.includes('isFreeOrder: hasAmount && amountCents === 0') &&
-  printStoreJs.includes("q.amountCents === undefined ? '' : q.amountCents") &&
   printStoreWxml.includes("isFreeOrder ? '现场打印' : '机端支付'") &&
-  printPayJs.includes("'files[0].price': isFreeOrder ? '免费' : total") &&
+  // 2026-09-15（第二轮）：支付页的免费判定同样改为**只**来自服务端。
+  // 此前这里要求 print-store 把 amountCents 透传进 print-pay 的 URL，而它与文件名
+  // 走的是同一条 URL —— 求职材料的文件名里常写着本人姓名，金额是本人订单状态，
+  // 两者都不该由调用方"告诉"下一页。能力没丢：print-pay 现在自己调 /orders/quote
+  // 拿真值，下面那条 `const isFreeOrder = amountCents === 0` 就是同一个判据的新落点。
+  printPayJs.includes('api.quoteMyPrintOrder(') &&
+  printPayJs.includes('const isFreeOrder = amountCents === 0') &&
+  printPayJs.includes("const total = isFreeOrder ? '免费' : formatYuan(amountCents)") &&
+  printPayJs.includes("'files[0].price': total") &&
+  // 负面锚：这四项一个都不许再进 print-store → print-pay 的 URL。
+  !/print-pay\?[^`'"]*\b(?:amountCents|total|name|pickupCode|expiresAt)=/.test(printStoreJs) &&
   printPayWxml.includes('免费试运营：到机核验后直接进入打印队列') &&
   pickupJs.includes("key: 'awaiting_release'") &&
   pickupJs.includes('parseAmountCents(order.amountCents) === 0') &&
@@ -888,7 +897,10 @@ if (
   ordersWxml.includes('wx:if="{{item.pickup}}"') &&
   pickupJs.includes('err && err.statusCode === 401') &&
   pickupJs.includes('this._stopTimers()') &&
-  /statusCode === 401[\s\S]{0,400}codeRaw: ''/.test(pickupJs) &&
+  // 401 分支必须**调用清场**，而清场函数必须真的把码清零。两头都钉：
+  // 只钉调用点，helper 被掏空也绿；只钉 helper，401 不调它也绿。
+  /statusCode === 401[\s\S]{0,400}this\._clearCredentials\(\)/.test(pickupJs) &&
+  /_clearCredentials\(\)\s*\{[\s\S]{0,400}codeRaw: ''/.test(pickupJs) &&
   pickupJs.includes('if (this.data.fromOrders)') &&
   pickupJs.includes("taskStatus === 'abandoned'")
 ) ok('扫码后撤下订单列表到机码；登录失效停止轮询并清掉已显示的码')
@@ -1016,6 +1028,113 @@ const PACKAGE_CHAIN_PAGES = [
   if (!ordersJs.includes('/pages/package-code/package-code?orderId=')) misses.push('orders.js 进入到机码页时未使用 orderId')
   if (!misses.length) ok('材料包订单可从本人打印订单列表找回并重新查看到机码')
   else bad('材料包订单找回路径', misses.join('；'))
+}
+
+// R4 收口 ①：取件页身份判定必须是四态，不能压成布尔。
+//
+// 压成布尔就是本轮修掉的那个缺陷的成因：未登录 / 无会员 id / JWT 过期 / 换了人
+// 全都落到「与快照一致 → 不算换人 → 返回 false → 直接 return」，而 state 原地停在
+// 'loading' —— 一页永远转不完的「正在读取订单实时状态…」，既没有请求在跑也没有出口。
+// 其中「JWT 过期但仍有补签资格」那一种本来能自己修好：enduser JWT 只签 30 分钟，
+// request.js 拿到 401 会静默续签一次再重发，页面必须**放行真实请求**才轮得到它。
+{
+  const misses = []
+  if (!/_resolveIdentity\(\)\s*\{/.test(pickupJs)) misses.push('缺 _resolveIdentity（四态判定）')
+  if (!/auth\.canSilentResignin\(\) \? 'resignable' : 'unusable'/.test(pickupJs)) {
+    misses.push('没有把「可补签」与「真不可用」分开')
+  }
+  // 正面：'resignable' 必须和 'ok' 一样走到真实请求那一行，不能被提前 return 掉。
+  if (!/identityState === 'unusable'[\s\S]{0,200}_failClosedForIdentity\(\)[\s\S]{0,900}api\.getCloudPrintOrder\(/.test(pickupJs)) {
+    misses.push("'unusable' fail-closed 之后 'ok'/'resignable' 必须继续发请求")
+  }
+  if (!/_failClosedForIdentity\(\)\s*\{[\s\S]{0,600}errorAction: 'login'/.test(pickupJs)) {
+    misses.push('fail-closed 态没有给登录出口')
+  }
+  if (!pickupWxml.includes("errorAction === 'login' ? '去登录'")) misses.push('模板没有按 errorAction 分流按钮文案')
+  // 反面：不许再出现「身份判定返回布尔」的老形态。
+  if (/_enforceIdentity\(\)[\s\S]{0,400}return isMemberIdentity\(identity\)/.test(pickupJs)) {
+    misses.push('身份判定又被压回布尔（未登录/无 id/过期会重新合流成永久 loading）')
+  }
+  if (!misses.length) ok('取件页身份判定四态：可补签放行真实请求，真不可用 fail-closed 并给登录出口')
+  else bad('取件页不得永久 loading', misses.join('；'))
+}
+
+// R4 收口 ②：取件页凭证的**新鲜度**。
+// 核销之后服务端不再下发 pickupCode / pickupCodeExpiresAt。若前端从旧 data 继承，
+// 一张已经被消费掉的码会继续挂着倒计时留在屏幕上；而轮询一直失败时我们根本不知道
+// 它是否已被扫掉，所以只在「最近一次服务端确认还够新」时保留。
+{
+  const misses = []
+  if (/pickupCodeExpiresAt[\s\S]{0,120}:\s*this\.data\.expiresAt/.test(pickupJs)) {
+    misses.push('有效期仍从旧 data 继承（核销后会继续显示上一轮那个时间）')
+  }
+  if (!/const CODE_TRUST_WINDOW_MS = \d+/.test(pickupJs)) misses.push('缺凭证信任窗口常量')
+  if (!/const codeStale = this\.data\.showQr[\s\S]{0,200}CODE_TRUST_WINDOW_MS/.test(pickupJs)) {
+    misses.push('轮询失败时没有按新鲜度判定是否撤码')
+  }
+  if (!/if \(codeStale\) \{[\s\S]{0,160}this\._clearCredentials\(\)/.test(pickupJs)) {
+    misses.push('判定为过期后没有真的清掉凭证')
+  }
+  if (!/_clearCredentials\(\)\s*\{[\s\S]{0,400}expiresAt: 0/.test(pickupJs)) {
+    misses.push('清凭证时没有一起清掉有效期（它是那张码的说明文字）')
+  }
+  if (!misses.length) ok('取件页凭证只在服务端确认仍新鲜时保留，核销 / 失联后连有效期一起清零')
+  else bad('取件页凭证新鲜度', misses.join('；'))
+}
+
+// R4 收口 ③：打印订单页在**前台**失效时必须当场清列表凭证。
+//
+// 真实失效链路里根本没有 onShow：request.js 拿到 401 会静默续签一次，续签失败就
+// auth.logout()，全程没有任何生命周期回调，页面还停在前台。只在 onShow 里清，
+// 等于让一份带着到机码的订单列表停在一个已经不存在的会话上，等下一位来看。
+{
+  const misses = []
+  const src = stripComments(ordersJs)
+  if (!/_enforceIdentity\(\)\s*\{[\s\S]{0,700}this\._resetAll\(\)/.test(src)) {
+    misses.push('_enforceIdentity 没有真的清场')
+  }
+  // 四个异步回调（单件 then/catch、材料包 then/catch）都必须先过一遍它。
+  const hooked = (src.match(/this\._enforceIdentity\(\)/g) || []).length
+  if (hooked < 6) misses.push(`只有 ${hooked} 处调用 _enforceIdentity，入口与四个异步回调都要过一遍`)
+  if (!/onPullDownRefresh\(\)\s*\{[\s\S]{0,400}if \(!this\._enforceIdentity\(\)\) \{ stop\(\); return \}/.test(src)) {
+    misses.push('下拉刷新没有先核身份（会"刷新"出仍属于上一个会话的订单与到机码）')
+  }
+  if (!/_resetAll\(\)\s*\{[\s\S]{0,400}pkgRows: \[\]/.test(src)) misses.push('_resetAll 没清材料包分区')
+  if (!misses.length) ok('打印订单页在前台静默登出 / 401 时当场清掉列表与到机码，不依赖离页再回来')
+  else bad('打印订单页前台失效清场', misses.join('；'))
+}
+
+// R4 收口 ④：单件链 print-store → print-pay → print-pickup 的 URL 只传非敏感/必要参数，
+// 且建单成功后先锁 orderId。
+{
+  const misses = []
+  // print-pay 不得再从 URL 读金额 / 页数 / 文件名 —— 它们现在一律向服务端取。
+  for (const field of ['amountCents', 'total', 'pages', 'name', 'pickupCode', 'expiresAt']) {
+    if (new RegExp(`q\\.${field}\\b`).test(printPayJs)) misses.push(`print-pay 仍从 URL 读 ${field}`)
+  }
+  if (!printPayJs.includes('api.getMyDocuments(')) misses.push('print-pay 没有从本人文件库取文件名')
+  // 建单成功 → 先锁 orderId 再跳转；跳转失败有兜底；再点一次不许重复 POST。
+  const createIdx = printPayJs.indexOf('api.createCloudPrintOrder(')
+  const chain = createIdx >= 0 ? printPayJs.slice(createIdx, createIdx + 1600) : ''
+  const lockIdx = chain.indexOf('this._createdOrderId = orderId')
+  const redirectIdx = chain.indexOf('wx.redirectTo(')
+  const guardIdx = chain.indexOf('if (!this._sameIdentity(identity))')
+  if (!(guardIdx > 0 && lockIdx > guardIdx)) misses.push('建单成功回调没有先判身份再锁 orderId')
+  if (!(lockIdx > 0 && redirectIdx > lockIdx)) misses.push('orderId 必须在 redirectTo 之前锁住（跳转失败时页面还留在这里）')
+  if (!/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(printPayJs)) misses.push('redirectTo 没有失败兜底')
+  if (!/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(printPayJs)) {
+    misses.push('已建过单仍可能再 POST 一次（/me/print-orders 没有幂等键）')
+  }
+  if (!printPayWxml.includes('createdLocked')) misses.push('模板没有反映「订单已创建」的锁定态')
+  if (!printPayJs.includes("wx.navigateTo({ url: '/pages/orders/orders'")) misses.push('锁定后没有给出找回订单的出口')
+  // print-pay → print-pickup 只带 orderId。
+  const pickupNav = /print-pickup\?[^`'"]*/.exec(printPayJs)
+  if (!pickupNav) misses.push('找不到 print-pay 进取件页的跳转')
+  else for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'taskStatus', 'orderNo', 'name', 'store']) {
+    if (pickupNav[0].includes(`${field}=`)) misses.push(`print-pay 进取件页时携带 ${field}`)
+  }
+  if (!misses.length) ok('单件链 URL 只传非敏感参数，建单后先锁 orderId 且可从本人订单找回')
+  else bad('单件打印链凭证与幂等', misses.join('；'))
 }
 
 // 凭证不进 URL：列表拿到的 pickupCode 只用于展示，绝不拼进跳转地址。

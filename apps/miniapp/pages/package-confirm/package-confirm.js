@@ -135,6 +135,7 @@ Page({
     // 他已经做完了我们要求的事，页面不能还停在那条「登录已失效」。
     if (this._guard.setIdentity(this._identityKey())) {
       this.setData({ isLoggedIn: loggedIn })
+      this._resetForIdentity()
       this._loadOrderData()
       return
     }
@@ -156,6 +157,26 @@ Page({
 
   onUnload() {
     this._guard.deactivate()
+  },
+
+  /**
+   * 身份变了（刚登录 / 刚登出 / 换了账号）：把**属于上一位**的页面状态复位。
+   *
+   * 这三样都不在 `_loadOrderData()` / `_clearDraftView()` 的清理范围里，
+   * 而每一样留给下一位都会造成一个具体的坏结果：
+   *
+   *   `_createdOrderId` —— 它是实例字段，不是 data。一旦设上，本页就永久锁成
+   *      「订单已创建，请不要重复下单」：`_loadQuote()` 首行直接 return，
+   *      于是新用户看到的是一张**他从没下过的订单**的提示，而且他自己的材料包
+   *      再也走不到「确认下单」——报价永远不会变成 ready。
+   *   `submitting`      —— 上一位按下「确认下单」那一刻的按钮锁。留着就是一个
+   *      写着「提交中…」且按不动的页面，而并没有任何请求在跑。
+   *   `agreedToTerms`   —— 那是**上一位本人**对《打印服务协议》的同意。替下一位
+   *      保留这个勾选，等于替他声明「我已阅读并同意」——与本页默认不勾选同一条理由。
+   */
+  _resetForIdentity() {
+    this._createdOrderId = null
+    this.setData({ submitting: false, agreedToTerms: false })
   },
 
   /**
@@ -418,12 +439,16 @@ Page({
         wx.hideLoading()
         const orderId = (order && order.orderId) || ''
         if (!orderId) throw new Error('服务端未返回订单号')
-        // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
-        this._createdOrderId = orderId
-        // 换了人：**不碰当前这位的 storage**。此前这里无条件删两个 key ——
-        // 若在途期间换成了 B 并且 B 已经做好了自己的草稿，那就把 B 的草稿删了。
+        // 换了人：**不碰当前这位的任何东西** —— storage 不动，`_createdOrderId` 也不设。
+        //
+        // 此前这里先无条件 `this._createdOrderId = orderId` 再判身份，两个后果：
+        // ① B 的页面被 A 的订单永久锁死（见 _resetForIdentity 里对这个字段的说明）；
+        // ② 下面那两个 removeStorageSync 会删掉 B 自己刚做好的草稿。
         // 上一位的订单不会丢：它已落库，本人可从「我的 · 打印订单」材料包分区找回。
         if (!this._sameIdentity(token)) return
+        // 从这一行起，这张订单在服务端已经存在：本页永远不许再 POST 第二次。
+        // 放在 redirectTo 之前，是为了让下面 catch 里那条「跳转同步抛」的兜底能认出它。
+        this._createdOrderId = orderId
         // 同一个人：这份草稿已被这张订单消费掉，清干净。
         // 清理放在跳转**之前**：原先放在 redirectTo 的 success 回调里，跳转一旦没触发
         // （异常路径、页面已被替换），草稿就永远留在本机，下一位打开确认页还能看到。
@@ -442,10 +467,13 @@ Page({
       })
       .catch((err) => {
         wx.hideLoading()
+        // **先判身份再谈锁**。顺序反过来就是一个新缺陷：换了人之后迟到的那条失败
+        // （或"订单已建成但跳转抛错"）会把 `_lockAfterCreated` 打在 B 的页面上，
+        // 让 B 看到一张他没下过的订单，并且再也下不了自己的单。
+        if (!this._sameIdentity(token)) return
         // 订单已经建成、只是后续动作抛错（例如 redirectTo 同步抛）：
         // 同样不能当成"下单失败"让用户重来。
         if (this._createdOrderId) { this._lockAfterCreated(this._createdOrderId); return }
-        if (!this._sameIdentity(token)) return
         const shown = pkg.describePackageError(err, '创建订单失败，请稍后重试。')
         this.setData({
           submitting: false,

@@ -193,12 +193,34 @@ test('错误码 → 可执行的下一步：每条都不是「请稍后重试」
     ['PACKAGE_FILE_DUPLICATED', 'files'],
     ['PACKAGE_ORDER_NOT_FOUND', 'orders'],
     ['VALIDATION_FAILED', 'files'],
+    // 按终端逐台判定的彩色 / 自动双面门禁（terminal-capabilities.service.ts 的
+    // assertPrintParamsAllowed，未登记即拒绝）。放行路径只有一条 —— 管理员在那台机器
+    // 真机验过后把 color_print / duplex_print 配成 available，所以恢复动作是换服务点。
+    ['PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL', 'store'],
+    ['PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL', 'store'],
   ]
   for (const [code, recover] of cases) {
     const shown = pkg.describePackageError({ code, statusCode: 400, message: '' }, '兜底句')
     assert.equal(shown.recover, recover, `${code} 的恢复动作`)
     assert.ok(shown.title && shown.text, `${code} 必须有标题与说明`)
     assert.notEqual(shown.text, '兜底句', `${code} 不该落到兜底句`)
+  }
+})
+
+test('错误码：彩色/双面未在该机验过，必须说清是「这台机器」而不是「稍后重试」', () => {
+  // 服务端为这两个码写的是 403 ForbiddenException。它们与 CAPABILITY_* 不是同一回事：
+  // 那两条说的是「这台机器开不开放文档打印」，这两条说的是「这台机器的彩色/双面没验过」。
+  // 没有映射时它们会落到 describePackageError 末尾的「操作未完成 / 请稍后重试」——
+  // 而这件事重试一万次也不会变，用户只会反复点同一个按钮。
+  for (const [code, keyword] of [
+    ['PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL', '彩色'],
+    ['PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL', '双面'],
+  ]) {
+    const shown = pkg.describePackageError({ code, statusCode: 403, message: '' }, '创建订单失败，请稍后重试。')
+    assert.equal(shown.recover, 'store', `${code} 的恢复动作必须是换服务点`)
+    assert.match(shown.title, new RegExp(keyword), `${code} 的标题要点名是哪一项能力`)
+    assert.ok(shown.text.includes('服务点'), `${code} 的说明必须指向「换一个服务点」这个按钮真正会做的事`)
+    assert.notEqual(shown.title, '操作未完成', `${code} 不得落到未知码兜底`)
   }
 })
 

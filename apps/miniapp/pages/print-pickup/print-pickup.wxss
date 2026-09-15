@@ -112,3 +112,7 @@
 
 .action-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1rpx solid var(--line-soft); }
 .ab-btn { min-height: 88rpx; border-radius: 25rpx; background: var(--teal); color: #fff; font-size: 30rpx; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 24rpx rgba(22,119,255,.16); }
+
+/* 次要出口：登录已失效时，用户仍然可以先回到自己的打印订单列表。
+   高度与主按钮同档（触控最小 48px ≈ 96rpx，CLAUDE.md §9）。 */
+.btn-retry-sub { display: flex; width: fit-content; min-height: 96rpx; margin: 20rpx auto 0; padding: 0 40rpx; border-radius: 22rpx; background: var(--surface); border: 1rpx solid var(--line); color: var(--ink-soft); font-size: 26rpx; font-weight: 600; align-items: center; justify-content: center; }

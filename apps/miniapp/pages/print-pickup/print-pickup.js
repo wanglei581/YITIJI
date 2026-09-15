@@ -17,6 +17,20 @@ const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('.
 const POLL_INTERVAL_MS = 3000
 const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 'abandoned'])
 
+/**
+ * 屏幕上那张码还能被信任多久（毫秒）。
+ *
+ * 轮询失败时的取舍：用户此刻正站在一体机前，一次网络抖动就把码撤下是实打实的能力退化；
+ * 可**一旦他把码扫掉**，服务端就不再下发 pickupCode，而我们恰好因为拉不到状态而不知道
+ * 这件事 —— 继续显示的是一张已经被核销的码。它还会带着倒计时和"等待终端扫码"的说明，
+ * 用户会反复去扫一张不可能再被受理的码。
+ *
+ * 所以只在「最近一次**服务端确认**还够新」时保留：抖动（3 秒一轮，容得下四五次失败）
+ * 照常显示，持续拉不到状态则把凭证清零并说清原因。判据是「多久没被确认过」，
+ * 不是「失败了几次」—— 后者会被一次成功的空响应重置，而我们要的是新鲜度。
+ */
+const CODE_TRUST_WINDOW_MS = 15000
+
 function parseAmountCents(value) {
   if (value === undefined || value === null || value === '') return null
   const amountCents = Number(value)
@@ -82,6 +96,9 @@ Page({
     statusBarHeight: 20,
     state: 'loading', // loading | ready | error
     errorMsg: '',
+    // 错误态的可执行下一步：'login' 去登录 / 'retry' 重新加载 / 'orders' 去我的打印订单。
+    // 只给一句「加载失败」等于把解法藏起来 —— 登录已失效时按一百次「重新加载」也不会好。
+    errorAction: 'retry',
     orderId: '',
     fromOrders: false,
     orderNo: '',
@@ -118,6 +135,7 @@ Page({
       qrStatus: 'loading',
       state: orderId ? 'loading' : 'error',
       errorMsg: orderId ? '' : '这条链接没有带订单号，本页不展示任何到机码。请回到「我的 · 打印订单」重新进入。',
+      errorAction: orderId ? 'retry' : 'orders',
     })
 
     if (orderId) this._refreshOrder(true)
@@ -129,34 +147,92 @@ Page({
   },
 
   /**
-   * 身份在本页停留期间变了就**当场清掉屏幕上的码**。
+   * 身份判定。**四态，不能压成布尔** —— 压成布尔就是本轮修掉的那个缺陷的成因。
    *
-   * 真实链路：`utils/request.js` 在 401 且仍有补签资格时静默续签一次，
-   * 续签失败会 `auth.logout()` —— 全程没有任何生命周期回调，页面还停在前台，
-   * 而那张已经渲染好的码属于一个已经不存在的会话。共用设备上就是下一位看到它。
-   * 续签**成功**时身份不变，这里什么都不会发生（不影响 request.js 的续签设计）。
+   *   'changed'    换了人 / 登出。本函数已经清场并写好说明，调用方直接返回。
+   *   'ok'         当前是一个确定的会员身份：可以取数，可以显示码。
+   *   'resignable' 本地已经没有可用 token（enduser JWT 只签 30 分钟，中午下单下午到机器
+   *                前打开必然已经过期），但**仍有补签资格**（曾登录过且没有主动登出）。
+   *   'unusable'   从没登录 / 主动登出 / 登录了却拿不到会员 id。fail-closed。
    *
-   * @returns {boolean} 身份是否仍然可用且未变
+   * 此前这里返回 `isMemberIdentity(identity)`，于是未登录、无 id、JWT 过期三种情况
+   * 走的是**同一条**路径：与快照一致（都等于 `''`）→ 不算换人 → 返回 false →
+   * `_refreshOrder` 直接 return，`state` 原地停在 `'loading'`。结果是一页永远转不完的
+   * 「正在读取订单实时状态…」：既没有请求在跑，也没有任何出口，用户只能杀掉小程序。
+   * 而其中"JWT 过期"那一种本来是能自己修好的。
    */
-  _enforceIdentity() {
+  _resolveIdentity() {
     const identity = this._identityKey()
-    if (identity !== this._identity) {
-      this._identity = identity
-      this._stopTimers()
-      this.setData({
-        state: 'error',
-        refreshing: false,
-        showQr: false,
-        code: '',
-        codeRaw: '',
-        qrStatus: 'loading',
-        errorMsg: identity
-          ? '当前账号与打开这张到机码时的不是同一个，已停止显示。请到「我的 · 打印订单」重新进入。'
-          : '登录已失效，请重新登录后再查看到机码。',
-      })
-      return false
+    const previous = this._identity
+
+    if (identity === previous) {
+      if (isMemberIdentity(identity)) return 'ok'
+      // 没有可用身份，但能补签：交给 request.js 的 401 静默续签。
+      return auth.canSilentResignin() ? 'resignable' : 'unusable'
     }
-    return isMemberIdentity(identity)
+
+    // 不可用 → 确定的本人：这是**补签成功后的正常形态**（request.js 续签后
+    // auth.saveSession 写回带 id 的会话），不是换人。不可用态下本页一个字节的订单数据
+    // 都没显示过，没有旧内容会被下一位"继承"，所以直接采纳新身份继续。
+    // 把它判成换人的代价：用户刚被静默救回来，却看到一句「当前账号与打开时的不是同一个」。
+    if (!isMemberIdentity(previous) && isMemberIdentity(identity)) {
+      this._identity = identity
+      return 'ok'
+    }
+
+    // 真的换了人（u:A → u:B），或从确定的本人掉成不可用（登出 / 补签失败后的 logout）：
+    // **当场清掉屏幕上的码**。真实链路里这一步没有任何生命周期回调 ——
+    // request.js 续签失败时调 auth.logout()，页面还停在前台，而那张已经渲染好的码
+    // 属于一个已经不存在的会话。共用设备上就是下一位看到它。
+    this._identity = identity
+    this._stopTimers()
+    this._clearCredentials()
+    this.setData({
+      state: 'error',
+      refreshing: false,
+      errorMsg: identity
+        ? '当前账号与打开这张到机码时的不是同一个，已停止显示。请到「我的 · 打印订单」重新进入。'
+        : '登录已失效，请重新登录后再查看到机码。',
+      errorAction: identity ? 'orders' : 'login',
+    })
+    return 'changed'
+  },
+
+  /**
+   * 把凭证与它的一切派生物清零。
+   *
+   * `expiresAt` / `countdown` 必须跟着清：留着它们，下一次 `_resumeVisibleWork()`
+   * 会照着一个早就不属于当前状态的时间重新起倒计时，而那行倒计时说的是"这张码还有效"。
+   */
+  _clearCredentials() {
+    this._codeConfirmedAt = 0
+    this.setData({
+      showQr: false,
+      code: '',
+      codeRaw: '',
+      qrStatus: 'loading',
+      expiresAt: 0,
+      countdown: '',
+    })
+  },
+
+  /**
+   * 身份不可用：fail-closed 到一页**说得清、点得动**的错误态。
+   *
+   * 两句话分开：「没登录」和「登录了但会话缺会员标识」补救动作相同（重新登录一次），
+   * 但说成同一句会让后者以为自己没登录、反复确认自己已经登录着。
+   */
+  _failClosedForIdentity() {
+    this._stopTimers()
+    this._clearCredentials()
+    this.setData({
+      state: 'error',
+      refreshing: false,
+      errorMsg: auth.isLoggedIn()
+        ? '当前会话缺少会员标识，无法确认这张订单是不是本人的。请重新登录一次再查看到机码。'
+        : '到机码只对订单本人显示，请登录后再查看。',
+      errorAction: 'login',
+    })
   },
 
   onReady() {
@@ -166,7 +242,6 @@ Page({
 
   onShow() {
     this._visible = true
-    if (!this._enforceIdentity()) return
     if (this.data.orderId) this._refreshOrder(false)
   },
 
@@ -182,8 +257,17 @@ Page({
 
   _refreshOrder(initial) {
     if (!this.data.orderId || this._polling) return
-    if (!this._enforceIdentity()) return
-    const identity = this._identity
+    const identityState = this._resolveIdentity()
+    // 'changed' 时 _resolveIdentity 已经清场并写好了说明，不要再覆盖它。
+    if (identityState === 'changed') return
+    if (identityState === 'unusable') { this._failClosedForIdentity(); return }
+    // 'ok' 与 'resignable' 都真的发请求。
+    //
+    // 'resignable' 这一条是本轮的关键：本地 token 已经自然过期（enduser JWT 只签 30 分钟），
+    // 但用户并没有登出。**必须让请求真的进 request.js** —— 那里拿到 401 会静默续签一次
+    // 再重发，用户全程无感。在本页先把它拦下来，等于把一个能自己修好的过期会话，
+    // 变成一页永远转不完的 loading；而这恰好是取件这条链最关键的一刻
+    //（中午下单、下午走到一体机前打开取件页，命中的就是这一条）。
     this._polling = true
     if (initial) this.setData({ state: 'loading', errorMsg: '' })
     else this.setData({ refreshing: true })
@@ -191,17 +275,31 @@ Page({
     api.getCloudPrintOrder(this.data.orderId)
       .then((order) => {
         this._polling = false
-        // 换了人 / 登出：这条响应属于上一个会话，一个字都不能写进来。
-        if (this._identityKey() !== identity) { this._enforceIdentity(); return }
+        // 回调执行**那一刻**重新判一次身份。这一层不依赖任何生命周期回调：
+        // 换人 / 登出可以完全不经过 onHide。
+        const state = this._resolveIdentity()
+        if (state === 'changed') return
+        // 请求成功但身份仍然说不清（补签后会话缺 id，或补签资格已被撤销）：
+        // 不显示任何码。宁可多一次登录，不可把一张凭证显示给一个认不出来的会话。
+        if (state !== 'ok') { this._failClosedForIdentity(); return }
+        // 走到这里身份要么全程没变，要么是"不可用 → 本人"这一种升级
+        //（补签成功后重发拿回来的响应，就是当前这位的）。两种都可以写。
         if (!this._visible || !order) return
         // 码只认服务端这一次给的值。`|| this.data.codeRaw` 会让服务端已经撤码
         // （核销后 pickupCode 不再下发）的订单继续显示上一次那张码。
         const pickupCode = normalizePickupCode(order.pickupCode)
         const hasCode = PICKUP_CODE_RE.test(pickupCode)
         const status = resolveOrderState(order)
-        const expiresAt = order.pickupCodeExpiresAt ? new Date(order.pickupCodeExpiresAt).getTime() : this.data.expiresAt
+        // 有效期同样只认这一次服务端给的值。`|| this.data.expiresAt` 会在核销后
+        //（服务端不再下发 pickupCodeExpiresAt）保留上一轮那个时间，于是一张已经被
+        // 消费掉的码还挂着"还有 47 分钟过期"的倒计时 —— 与上面那条"码只认服务端"
+        // 是同一条理由，漏掉它等于只关了半扇门。
+        const expiresAtMs = order.pickupCodeExpiresAt ? new Date(order.pickupCodeExpiresAt).getTime() : 0
+        const expiresAt = Number.isFinite(expiresAtMs) ? expiresAtMs : 0
         const shouldRedraw = status.showQr && hasCode && pickupCode !== this.data.codeRaw
         const amountCents = parseAmountCents(order.amountCents)
+        // 这一刻服务端确认过这张码。轮询失败时的信任窗口从这里起算。
+        this._codeConfirmedAt = Date.now()
 
         this.setData({
           state: 'ready',
@@ -218,7 +316,10 @@ Page({
           showQr: status.showQr && hasCode,
           codeRaw: status.showQr && hasCode ? pickupCode : '',
           code: status.showQr && hasCode ? formatCode(pickupCode) : '',
-          expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
+          expiresAt,
+          // 码撤下时倒计时也必须跟着撤：它是这张码的说明文字，留着就是在替一张
+          // 已经不显示（或已经被核销）的码继续宣称"还有效"。
+          countdown: status.showQr && hasCode ? this.data.countdown : '',
           qrStatus: shouldRedraw ? 'loading' : this.data.qrStatus,
         }, () => {
           if (this.data.showQr) this._drawPickupQr()
@@ -227,30 +328,45 @@ Page({
       })
       .catch((err) => {
         this._polling = false
-        if (this._identityKey() !== identity) { this._enforceIdentity(); return }
+        const state = this._resolveIdentity()
+        if (state === 'changed') return
         if (!this._visible) return
         if (err && err.statusCode === 401) {
           // 走到这里说明 request.js 的静默续签也没救回来（它续签失败时会 auth.logout()），
-          // 身份检查上面已经做过一次；能落到这行只剩"本来就没登录"这一种。
+          // 或者本来就没有补签资格。两种都必须**当场清掉屏幕上的码**：
+          // 401 之后我们既证明不了这张码还有效，也证明不了会话还是原来那位。
           this._stopTimers()
+          this._clearCredentials()
           this.setData({
             state: 'error',
             refreshing: false,
-            showQr: false,
-            code: '',
-            codeRaw: '',
             errorMsg: '登录已失效，请重新登录后再查看到机码',
+            errorAction: 'login',
           })
           return
         }
+        if (state === 'unusable') { this._failClosedForIdentity(); return }
         // 网络/服务端失败：**保留最近一次从服务端取到的状态**（那是真值，不是 URL 里的值），
         // 只把失败说清楚。首次就失败时没有任何可保留的东西，进错误态 —— 不再有
         // "退回 URL 里的码离线绘码"这条路，因为 URL 里已经不带码了。
         const fallbackAvailable = this.data.state === 'ready'
+        // 但凭证不跟着"保留"无限久：见 CODE_TRUST_WINDOW_MS。用户在机器前扫掉码之后，
+        // 服务端就不再下发它；我们恰好因为拉不到状态而不知道，于是继续显示一张
+        // 已经被核销的码 —— 还带着倒计时和「等待终端扫码」。超过信任窗口就清零并说明，
+        // 页面其余部分（最近一次的状态标题、订单号）照常留着。
+        const codeStale = this.data.showQr
+          && Date.now() - (this._codeConfirmedAt || 0) > CODE_TRUST_WINDOW_MS
+        if (codeStale) {
+          this._stopTimers()
+          this._clearCredentials()
+        }
         this.setData({
           state: fallbackAvailable ? 'ready' : 'error',
           refreshing: false,
-          errorMsg: (err && err.message) || '订单状态加载失败，请稍后重试',
+          errorMsg: codeStale
+            ? '已经有一会儿没能和服务端确认这张到机码了。为避免你拿着一张可能已被核销的码去扫，先撤下显示，请恢复网络后重新加载。'
+            : ((err && err.message) || '订单状态加载失败，请稍后重试'),
+          errorAction: 'retry',
         }, () => {
           if (fallbackAvailable) {
             if (this.data.showQr) this._drawPickupQr()
@@ -325,11 +441,10 @@ Page({
     const tick = () => {
       const ms = this.data.expiresAt - Date.now()
       if (ms <= 0) {
+        // 过期与核销走同一个出口：凭证连同有效期一起清零，再写状态说明。
+        this._clearCredentials()
         this.setData({
           countdown: '已过期',
-          showQr: false,
-          codeRaw: '',
-          code: '',
           statusKey: 'expired',
           statusTitle: '到机码已过期',
           statusDetail: '请返回打印订单重新发起打印。',
@@ -361,6 +476,18 @@ Page({
   retry() {
     if (this.data.orderId) this._refreshOrder(true)
     else this.toOrders()
+  },
+
+  /**
+   * 错误态的可执行下一步。与 package-code / package-confirm 同一口径：
+   * 按 `errorAction` 分流，不给「请重试」一条死路 —— 登录已失效时，
+   * 按一百次「重新加载」也只会再失败一百次。
+   */
+  recover() {
+    const target = this.data.errorAction
+    if (target === 'login') { wx.navigateTo({ url: '/pages/launch/launch' }); return }
+    if (target === 'orders') { this.toOrders(); return }
+    this.retry()
   },
 
   toOrders() {

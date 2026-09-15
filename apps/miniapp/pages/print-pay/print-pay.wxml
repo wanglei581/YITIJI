@@ -35,9 +35,26 @@
     </view>
   </view>
 
-  <view class="section-t rise-d4">预估费用</view>
+  <view class="section-t rise-d4">费用（服务端核定）</view>
   <view class="card flat fee rise-d4">
-    <view class="fee-row total"><text>{{isFreeOrder ? '免费试运营' : '服务端价目估算'}}</text><text class="amt">{{isFreeOrder ? '免费' : (fee.total === '—' ? '—' : '¥' + fee.total)}}</text></view>
+    <view class="fee-row total"><text>{{isFreeOrder ? '免费试运营' : (quoteState === 'ready' ? '服务端核定金额' : '金额待服务端核定')}}</text><text class="amt">{{isFreeOrder ? '免费' : (quoteState === 'ready' ? '¥' + fee.total : '—')}}</text></view>
+    <!-- 报价拿不到时**不本地补一个数字**：只说清楚，并给一条可执行的重试。
+         下单本身不被挡住——建单时服务端会自己计价。 -->
+    <view class="fee-row quote-fail" wx:if="{{quoteState === 'error'}}">
+      <text class="qf-text">{{quoteError}}</text>
+      <view class="qf-retry tap" hover-class="tap-press" bindtap="retryQuote" role="button">重新核价</view>
+    </view>
+    <view class="fee-row" wx:elif="{{quoteState === 'loading'}}"><text class="qf-text">正在向服务端核定页数与金额…</text></view>
+  </view>
+
+  <!-- 订单已经建成、只是没能自动跳转：必须说清楚它在哪、并且不许再提交一次。 -->
+  <view class="notice warn rise-d5" wx:if="{{createdLocked}}">
+    <text class="ficon i-info n-ic"></text>
+    <view class="locked-main">
+      <view class="locked-t">订单已创建，请不要重复提交</view>
+      <view class="locked-d">到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。</view>
+      <view class="locked-btn tap" hover-class="tap-press" bindtap="toOrders" role="button">去我的打印订单</view>
+    </view>
   </view>
 
   <view class="notice info rise-d6">
@@ -47,7 +64,8 @@
 </view>
 
 <view class="actionbar">
-  <view class="ab-price"><text class="ab-label">{{isFreeOrder ? '免费试运营' : '预估'}}</text><text class="ab-amt">{{isFreeOrder ? '免费' : (fee.total === '—' ? '—' : '¥' + fee.total)}}</text></view>
-  <view class="btn wx lg {{submitting ? 'disabled' : ''}}" bindtap="continueFlow">{{submitting ? '正在提交…' : '提交并生成到机码'}}</view>
+  <view class="ab-price"><text class="ab-label">{{isFreeOrder ? '免费试运营' : (quoteState === 'ready' ? '到机应付' : '金额待核定')}}</text><text class="ab-amt">{{isFreeOrder ? '免费' : (quoteState === 'ready' ? '¥' + fee.total : '—')}}</text></view>
+  <!-- 订单建成后按钮永久变灰：再点一次就是第二张订单（服务端没有幂等键）。 -->
+  <view class="btn wx lg {{submitting || createdLocked ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : '提交并生成到机码')}}</view>
 </view>
 </view>

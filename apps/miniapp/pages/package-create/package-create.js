@@ -292,12 +292,27 @@ Page({
    *
    * 不这么做会出现一种假成功：用户勾了 A、扫完 A、再加勾 B，页面仍显示「隐私检查已完成」，
    * 而 B 从没扫过 —— 下单会被服务端拒，用户却已经被告知一切就绪。
+   *
+   * **把 piiPhase 打回 idle 只挡住了一半。** 另一半是那两条**已经发出去**的请求链：
+   * 扫描（'pii'）和逐条确认（'pii-decide'）都是递归的 step()，它们各自持有一个
+   * 在选择变化之前领的令牌。选择一变，它们照常跑到最后一步，然后把 piiPhase 写成
+   * `'ready'` —— 于是新加勾的那个文件从没扫过，页面却显示「隐私检查已完成」，
+   * `createPackage()` 的 `piiPhase !== 'ready'` 闸门直接放行。这正是上面那句注释
+   * 想防、却没防住的那种假成功，只是触发时机从"扫描之后"挪到了"扫描期间"。
+   *
+   * 同通道再 issue 一次即让旧令牌失效（latest-wins，见 page-guard 的逐通道序号）：
+   * 两条链的下一次 `_accepts(token)` 就会是 false，当场停在那里。
+   * `piiSubmitting` 必须一起解开 —— 它是确认链的按钮锁，被作废的那条链不会再走到
+   * 解锁那一行，留着会让重扫之后的「确认并继续」永远点不动。
    */
   _syncSelection() {
     const selected = this.data.docs.filter((row) => row.selected)
+    this._guard.issue('pii')
+    this._guard.issue('pii-decide')
     this.setData({
       selectedCount: selected.length,
       piiPhase: 'idle',
+      piiSubmitting: false,
       piiGroups: [],
       piiFindingCount: 0,
       piiError: '',

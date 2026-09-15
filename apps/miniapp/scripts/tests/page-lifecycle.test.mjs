@@ -101,13 +101,21 @@ function createWx(storage = new Map()) {
 function createAuth(initialId) {
   let user = initialId ? { id: initialId } : null
   let loggedIn = !!user
+  // 补签资格与「当前有没有 token」解耦，和 utils/auth.js 一样：
+  // JWT 自然过期时 getToken() 会先 clearSession 再返回 null，于是「过期」与「登出」
+  // 在 token 维度上完全同形；只有这面独立的旗子能把两者分开。
+  let resigninEligible = !!user
   return {
-    setUser(id) { user = id ? { id } : null; loggedIn = !!user },
+    setUser(id) { user = id ? { id } : null; loggedIn = !!user; if (id) resigninEligible = true },
     /** 登录态为真但 getUser() 拿不到 id —— request.js 静默续签后 user 字段缺失时的真实形态。 */
     setIdlessSession() { user = {}; loggedIn = true },
+    /** JWT 自然过期：本地没有可用会话了，但没主动登出，仍可静默补签。 */
+    expireToken() { user = null; loggedIn = false; resigninEligible = true },
+    setResigninEligible(v) { resigninEligible = !!v },
+    canSilentResignin: () => resigninEligible,
     isLoggedIn: () => loggedIn,
     getUser: () => user,
-    logout() { user = null; loggedIn = false },
+    logout() { user = null; loggedIn = false; resigninEligible = false },
   }
 }
 
@@ -147,12 +155,34 @@ function loadPageDefinition(relPath, { wx, modules, timers = [] }) {
   return pageDef
 }
 
+/**
+ * 写一个带路径的 setData 键，例如 `'fee.total'` / `'files[0].name'`。
+ * 真机 setData 支持这种写法；替身若只做 Object.assign，就会在 data 上造出一个
+ * **名字里带点的普通键**，页面读 `data.fee.total` 永远是旧值 —— 测试会把一个
+ * 好端端的实现判成"金额没写进去"。
+ */
+function setByPath(target, path, value) {
+  const keys = String(path).replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean)
+  let cursor = target
+  for (let i = 0; i < keys.length - 1; i += 1) {
+    const key = keys[i]
+    if (cursor[key] === null || typeof cursor[key] !== 'object') {
+      cursor[key] = /^\d+$/.test(keys[i + 1]) ? [] : {}
+    }
+    cursor = cursor[key]
+  }
+  cursor[keys[keys.length - 1]] = value
+}
+
 /** Page 配置 → 可调用的页面实例（带一个真会合并的 setData）。 */
 function instantiate(def) {
   const page = Object.assign(Object.create(null), def)
   page.data = JSON.parse(JSON.stringify(def.data || {}))
   page.setData = function setData(patch, callback) {
-    Object.assign(this.data, patch)
+    for (const key of Object.keys(patch || {})) {
+      if (key.indexOf('.') >= 0 || key.indexOf('[') >= 0) setByPath(this.data, key, patch[key])
+      else this.data[key] = patch[key]
+    }
     if (typeof callback === 'function') callback()
   }
   return page
@@ -1371,4 +1401,630 @@ test('P1-9 画码：进入异步后码被换掉，旧 exec 回调不得把画布
   page.setData({ pickupCode: '11-11-22-22', qrStatus: 'loading' })
   staleExec([fakeCanvasNode()])
   assert.notEqual(page.data.qrStatus, 'ready', '旧回调画的是旧码，不得标成新码已就绪')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// Q. R4-1 print-pickup：身份不可用不得永久 loading；可补签态必须放行真实请求
+//
+// 修的是把四种处境压成一个布尔的那段判定：未登录 / 无会员 id / JWT 过期 / 换了人，
+// 此前统统落到「与快照一致 → 不算换人 → 返回 false → 直接 return」，
+// 而 state 原地停在 'loading'。用户看到的是一页永远转不完的「正在读取订单实时状态…」：
+// 既没有请求在跑，也没有任何出口。
+// ══════════════════════════════════════════════════════════════════════
+
+test('R4-1 未登录且无补签资格打开取件页：不得停在 loading，要给登录出口', async () => {
+  const auth = createAuth(null)
+  auth.setResigninEligible(false)
+  const wx = createWx()
+  const calls = []
+  const api = { getCloudPrintOrder: (id) => { calls.push(id); return deferred().promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  await flush()
+
+  assert.notEqual(page.data.state, 'loading', '未登录时不得把页面永久停在 loading')
+  assert.equal(page.data.state, 'error')
+  assert.equal(page.data.errorAction, 'login', '必须给出「去登录」这个真正有效的下一步')
+  assert.equal(calls.length, 0, '没有可用身份时不发本人订单请求')
+  assert.equal(page.data.codeRaw, '')
+})
+
+test('R4-1 登录了却拿不到会员 id：同样不得停在 loading，且不显示任何码', async () => {
+  const auth = createAuth(null)
+  auth.setIdlessSession()
+  auth.setResigninEligible(false)
+  const wx = createWx()
+  const calls = []
+  const api = { getCloudPrintOrder: (id) => { calls.push(id); return deferred().promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  await flush()
+
+  assert.equal(page.data.state, 'error')
+  assert.equal(page.data.errorAction, 'login')
+  assert.equal(calls.length, 0)
+  // 「登录状态不完整」和「请先登录」是两句话：后者会让一个明明登录着的人反复确认自己登录了。
+  assert.ok(page.data.errorMsg.includes('会员标识'), page.data.errorMsg)
+})
+
+test('R4-1 JWT 过期但可补签：请求必须真的发出去（交给 request.js 静默续签）', async () => {
+  const auth = createAuth('A')
+  auth.expireToken()            // 本地 token 没了，但没主动登出
+  const wx = createWx()
+  const detail = deferred()
+  const calls = []
+  const api = { getCloudPrintOrder: (id) => { calls.push(id); return detail.promise } }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+
+  assert.equal(calls.length, 1, '可补签态必须放行真实请求，不能在本页先把它拦下来')
+  assert.equal(page.data.state, 'loading')
+
+  // request.js 补签成功 → auth.saveSession 写回带 id 的会话，然后重发拿到响应。
+  auth.setUser('A')
+  detail.resolve({ orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 100 })
+  await flush()
+
+  assert.equal(page.data.state, 'ready', '补签救回来的响应必须能写进来')
+  assert.equal(page.data.codeRaw, '12345678')
+  assert.notEqual(page.data.errorAction, 'login')
+  assert.ok(!String(page.data.errorMsg).includes('不是同一个'), '补签成功不是换人，不得说成换了账号')
+})
+
+test('R4-1 补签也没救回来（401）：当场清码并指向登录', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  let detail = deferred()
+  const api = { getCloudPrintOrder: () => detail.promise }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  detail.resolve({ orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 100 })
+  await flush()
+  assert.equal(page.data.codeRaw, '12345678')
+
+  // request.js 续签失败会 auth.logout()，随后把原始 401 抛给页面。
+  detail = deferred()
+  page._polling = false
+  auth.logout()
+  page._refreshOrder(false)
+  detail.reject(Object.assign(new Error('unauthorized'), { statusCode: 401 }))
+  await flush()
+
+  assert.equal(page.data.codeRaw, '', '401 之后屏幕上那张码必须当场清掉')
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.expiresAt, 0, '有效期是码的派生物，要一起清')
+  assert.equal(page.data.state, 'error')
+  assert.equal(page.data.errorAction, 'login')
+})
+
+test('R4-1 在途响应遇到前台换账号：一个字都不许写进来，并当场清场', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const detail = deferred()
+  const api = { getCloudPrintOrder: () => detail.promise }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  auth.setUser('B')             // 没有经过任何生命周期回调
+  detail.resolve({ orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 100 })
+  await flush()
+
+  assert.equal(page.data.codeRaw, '', 'A 的码不得渲染给 B')
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.state, 'error')
+  assert.equal(page.data.errorAction, 'orders')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// R. R4-8 print-pickup：核销 / 失联之后不得继续显示旧码与旧有效期
+// ══════════════════════════════════════════════════════════════════════
+
+test('R4-8 成功响应不再从旧 data 继承有效期（核销后服务端不再下发它）', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  let detail = deferred()
+  const api = { getCloudPrintOrder: () => detail.promise }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  const future = new Date(Date.now() + 3600e3).toISOString()
+  detail.resolve({ pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 100, pickupCodeExpiresAt: future })
+  await flush()
+  assert.ok(page.data.expiresAt > Date.now(), '第一轮应该拿到服务端下发的有效期')
+
+  // 到机核销：服务端撤码，也不再下发 pickupCodeExpiresAt。
+  detail = deferred()
+  page._polling = false
+  page._refreshOrder(false)
+  detail.resolve({ pickupStatus: 'claimed', taskStatus: 'awaiting_payment', amountCents: 100 })
+  await flush()
+
+  assert.equal(page.data.codeRaw, '', '核销后不得继续显示旧码')
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.expiresAt, 0, '核销后不得继续挂着上一轮那个有效期')
+  assert.equal(page.data.countdown, '', '倒计时是那张码的说明文字，码撤下它也要撤')
+})
+
+test('R4-8 轮询短暂失败：码仍留在屏幕上（一次抖动不该让用户当场没码可扫）', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  let detail = deferred()
+  const api = { getCloudPrintOrder: () => detail.promise }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  detail.resolve({ pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 100 })
+  await flush()
+
+  detail = deferred()
+  page._polling = false
+  page._refreshOrder(false)
+  detail.reject(Object.assign(new Error('network down'), { statusCode: -1 }))
+  await flush()
+
+  assert.equal(page.data.codeRaw, '12345678', '信任窗口内的一次失败不得撤码')
+  assert.equal(page.data.state, 'ready')
+})
+
+test('R4-8 持续拉不到状态：超过信任窗口必须撤码并说清为什么', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  let detail = deferred()
+  const api = { getCloudPrintOrder: () => detail.promise }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  detail.resolve({ pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 100 })
+  await flush()
+  assert.equal(page.data.codeRaw, '12345678')
+
+  // 用户在机器上把码扫掉了，而手机这边从那以后一直拉不到状态。
+  page._codeConfirmedAt = Date.now() - 60000
+  detail = deferred()
+  page._polling = false
+  page._refreshOrder(false)
+  detail.reject(Object.assign(new Error('network down'), { statusCode: -1 }))
+  await flush()
+
+  assert.equal(page.data.codeRaw, '', '长时间无法与服务端确认时，这张码可能已被核销，必须撤下')
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.expiresAt, 0)
+  assert.ok(page.data.errorMsg.includes('确认'), page.data.errorMsg)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// S. R4-2 orders：前台失效时立即清列表凭证，不依赖「离页再回来」
+// ══════════════════════════════════════════════════════════════════════
+
+test('R4-2 列表渲染好之后前台登出：下一条响应到达时必须当场清掉列表与到机码', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  let cloud = deferred(); let legacy = deferred(); let pkgList = deferred()
+  const api = {
+    getMyCloudPrintOrders: () => cloud.promise,
+    getMyPrintOrders: () => legacy.promise,
+    getPackageOrders: () => pkgList.promise,
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  cloud.resolve([A_ORDER]); legacy.resolve([]); pkgList.resolve({ items: [A_PACKAGE], total: 1 })
+  await flush()
+  assert.equal(page.data.orders.length, 1)
+  assert.ok(JSON.stringify(page.data).includes('12345678'), '前提：到机码确实渲染出来了')
+
+  // request.js 补签失败 → auth.logout()。页面仍在前台，没有任何生命周期回调。
+  auth.logout()
+  cloud = deferred(); legacy = deferred(); pkgList = deferred()
+  page._load()
+  cloud.reject(Object.assign(new Error('unauthorized'), { statusCode: 401 }))
+  legacy.reject(Object.assign(new Error('unauthorized'), { statusCode: 401 }))
+  await flush()
+
+  assert.equal(page.data.orders.length, 0, '登出后列表必须当场清空，不能等离页再回来')
+  assert.equal(page.data.pkgRows.length, 0)
+  assert.equal(page.data.isLoggedIn, false)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'), '到机码不得残留')
+  assert.ok(!JSON.stringify(page.data).includes('87654321'))
+})
+
+test('R4-2 下拉刷新时已被静默登出：必须当场清场，而不是"刷新"出上一位的订单', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([A_ORDER]),
+    getMyPrintOrders: () => Promise.resolve([]),
+    getPackageOrders: () => Promise.resolve({ items: [A_PACKAGE], total: 1 }),
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  assert.equal(page.data.orders.length, 1)
+
+  auth.logout()
+  page.onPullDownRefresh()
+  await flush()
+
+  assert.equal(page.data.orders.length, 0, '下拉刷新必须先核身份并清场')
+  assert.equal(page.data.pkgRows.length, 0)
+  assert.equal(page.data.isLoggedIn, false)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+})
+
+test('R4-2 会话仍然是本人时，下拉刷新照常刷新（守卫不得把活人挡掉）', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  let rows = [A_ORDER]
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve(rows),
+    getMyPrintOrders: () => Promise.resolve([]),
+    getPackageOrders: () => Promise.resolve({ items: [], total: 0 }),
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+
+  rows = [A_ORDER, { id: 'ord-A2', orderNo: 'NO-A2', payStatus: 'paid', pickupStatus: 'claimed' }]
+  page.onPullDownRefresh()
+  await flush()
+  assert.equal(page.data.orders.length, 2, '本人刷新必须真的刷出新内容')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// T. R4-3 package-create：选择一变，在途的隐私检查与逐条确认必须当场作废
+// ══════════════════════════════════════════════════════════════════════
+
+const TWO_DOCS = {
+  items: [
+    { id: 'f-1', filename: '简历.pdf', purpose: 'print_doc', sizeBytes: 100 },
+    { id: 'f-2', filename: '证明.pdf', purpose: 'print_doc', sizeBytes: 100 },
+  ],
+}
+
+async function createPageWithTwoDocs(auth, wx, api) {
+  const page = makePage('pages/package-create/package-create.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  return page
+}
+
+test('R4-3 扫描在途时加勾新文件：迟到的扫描完成不得把隐私检查说成「已完成」', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const scan = deferred()
+  const scanned = []
+  const api = {
+    getMyDocuments: () => Promise.resolve(TWO_DOCS),
+    createPrintPiiScan: (id) => { scanned.push(id); return scan.promise },
+  }
+  const page = await createPageWithTwoDocs(auth, wx, api)
+
+  page.toggleDoc({ currentTarget: { dataset: { id: 'f-1' } } })
+  page.runPrivacyScan()
+  assert.equal(page.data.piiPhase, 'scanning')
+  assert.deepEqual(scanned, ['f-1'])
+
+  // 扫描还在跑，用户又加勾了 f-2 —— 它从来没有被扫过。
+  page.toggleDoc({ currentTarget: { dataset: { id: 'f-2' } } })
+  assert.equal(page.data.piiPhase, 'idle')
+
+  scan.resolve({ id: 't-1', piiFindings: [] })
+  await flush()
+
+  assert.equal(page.data.piiPhase, 'idle',
+    '被作废的扫描不得把 piiPhase 写成 ready —— f-2 从没扫过，那是一个假成功')
+  assert.equal(page.data.selectedCount, 2)
+
+  // 而 createPackage 的闸门必须真的拦住它（不是只有 data 好看）。
+  page.createPackage()
+  assert.equal(wx.calls.navigateTo.length, 0, '隐私检查未完成时不得进入下一步')
+  assert.ok(wx.calls.showModal.some((m) => String(m.content).includes('隐私检查')), '要说清为什么不能继续')
+})
+
+test('R4-3 逐条确认在途时改选择：不得写成 ready，且按钮锁必须解开', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const scan = deferred()
+  const decide = deferred()
+  const api = {
+    getMyDocuments: () => Promise.resolve(TWO_DOCS),
+    createPrintPiiScan: () => scan.promise,
+    decidePrintPiiFindings: () => decide.promise,
+  }
+  const page = await createPageWithTwoDocs(auth, wx, api)
+
+  page.toggleDoc({ currentTarget: { dataset: { id: 'f-1' } } })
+  page.runPrivacyScan()
+  scan.resolve({ id: 't-1', piiFindings: [{ id: 'fd-1', action: 'pending' }] })
+  await flush()
+  assert.equal(page.data.piiPhase, 'review')
+
+  page.confirmPrivacy()
+  assert.equal(page.data.piiSubmitting, true)
+
+  // 确认请求还在途，用户又加勾了 f-2。
+  page.toggleDoc({ currentTarget: { dataset: { id: 'f-2' } } })
+  assert.equal(page.data.piiSubmitting, false, '作废那条链之后按钮锁必须解开，否则重扫完也点不动')
+  assert.equal(page.data.piiPhase, 'idle')
+
+  decide.resolve({})
+  await flush()
+  assert.equal(page.data.piiPhase, 'idle', '被作废的确认链不得把页面写成「隐私检查已完成」')
+})
+
+test('R4-3 选择没变时，扫描照常走到 ready（守卫不得把正常流程挡掉）', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const api = {
+    getMyDocuments: () => Promise.resolve(TWO_DOCS),
+    createPrintPiiScan: () => Promise.resolve({ id: 't-1', piiFindings: [] }),
+  }
+  const page = await createPageWithTwoDocs(auth, wx, api)
+  page.toggleDoc({ currentTarget: { dataset: { id: 'f-1' } } })
+  page.runPrivacyScan()
+  await flush()
+  assert.equal(page.data.piiPhase, 'ready', '没有任何选择变动时扫描必须能正常完成')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// U. R4-4 package-confirm：身份切换必须复位建单锁 / 提交锁 / 协议同意
+// ══════════════════════════════════════════════════════════════════════
+
+
+test('R4-4 A 的建单响应迟到时已经换成 B：不得锁死 B，也不得动 B 的草稿', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  seedDraft(wx, 'u:A', 'd-1')
+  const submit = deferred()
+  const api = {
+    quotePackageOrder: () => Promise.resolve({ amountCents: 200, billablePages: 2 }),
+    createPackageOrder: () => submit.promise,
+  }
+  const page = makePage('pages/package-confirm/package-confirm.js', { auth, api, wx })
+  page.onLoad()
+  await flush()
+  page.setData({ agreedToTerms: true })
+  page.submitOrder()
+  assert.equal(page.data.submitting, true)
+
+  // 换成 B，B 做好了自己的草稿并重新进入本页。
+  auth.setUser('B')
+  seedDraft(wx, 'u:B', 'd-2')
+  page.onShow()
+  await flush()
+
+  submit.resolve({ orderId: 'ord-A' })     // A 的响应现在才到
+  await flush()
+
+  assert.ok(!page._createdOrderId, 'A 的订单号不得写到 B 的页面上（写了就永久锁死 B）')
+  assert.ok(wx.storage.get('temp_package_data'), 'B 自己的草稿不得被 A 的响应删掉')
+  assert.equal(page.data.quoteState, 'ready', 'B 必须还能正常核价下单')
+  assert.ok(!String(page.data.quoteErrorTitle).includes('订单已创建'))
+})
+
+test('R4-4 A 的建单失败迟到时已经换成 B：不得把失败/锁定打在 B 头上', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  seedDraft(wx, 'u:A', 'd-1')
+  const submit = deferred()
+  const api = {
+    quotePackageOrder: () => Promise.resolve({ amountCents: 200, billablePages: 2 }),
+    createPackageOrder: () => submit.promise,
+  }
+  const page = makePage('pages/package-confirm/package-confirm.js', { auth, api, wx })
+  page.onLoad()
+  await flush()
+  page.setData({ agreedToTerms: true })
+  page._createdOrderId = null
+  page.submitOrder()
+
+  auth.setUser('B')
+  seedDraft(wx, 'u:B', 'd-2')
+  page.onShow()
+  await flush()
+
+  submit.reject(Object.assign(new Error('boom'), { code: 'PRINT_TERMINAL_OFFLINE' }))
+  await flush()
+
+  assert.equal(page.data.submitErrorTitle, '', 'A 的失败不得显示给 B')
+  assert.equal(page.data.quoteState, 'ready')
+  assert.ok(!page._createdOrderId)
+})
+
+test('R4-4 建单锁定后换用户：建单锁 / 提交锁 / 协议同意必须一起复位', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  seedDraft(wx, 'u:A', 'd-1')
+  const api = {
+    quotePackageOrder: () => Promise.resolve({ amountCents: 200, billablePages: 2 }),
+    createPackageOrder: () => Promise.resolve({ orderId: 'ord-A' }),
+  }
+  const page = makePage('pages/package-confirm/package-confirm.js', { auth, api, wx })
+  page.onLoad()
+  await flush()
+  page.setData({ agreedToTerms: true })
+  wx.control.navFail = true               // 跳转失败 → 走 _lockAfterCreated
+  page.submitOrder()
+  await flush()
+  assert.equal(page._createdOrderId, 'ord-A')
+  assert.ok(page.data.quoteErrorTitle.includes('订单已创建'))
+
+  wx.control.navFail = false
+  auth.setUser('B')
+  seedDraft(wx, 'u:B', 'd-2')
+  page.onShow()
+  await flush()
+
+  assert.ok(!page._createdOrderId, 'B 不该继承 A 的「已建单」锁')
+  assert.equal(page.data.submitting, false, 'B 不该继承 A 的提交锁')
+  assert.equal(page.data.agreedToTerms, false, '协议同意是本人行为，不得替下一位保留')
+  assert.equal(page.data.quoteState, 'ready', 'B 必须能正常核价')
+  assert.ok(!page.data.quoteErrorTitle.includes('订单已创建'))
+})
+
+test('R4-4 同一个人建单成功：锁照常生效，再点一次不得发第二次 POST', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  seedDraft(wx, 'u:A', 'd-1')
+  let posts = 0
+  const api = {
+    quotePackageOrder: () => Promise.resolve({ amountCents: 200, billablePages: 2 }),
+    createPackageOrder: () => { posts += 1; return Promise.resolve({ orderId: 'ord-A' }) },
+  }
+  const page = makePage('pages/package-confirm/package-confirm.js', { auth, api, wx })
+  page.onLoad()
+  await flush()
+  page.setData({ agreedToTerms: true })
+  wx.control.navFail = true
+  page.submitOrder()
+  await flush()
+  assert.equal(posts, 1)
+
+  page.submitOrder()
+  await flush()
+  assert.equal(posts, 1, '已建过单就不许再 POST（服务端没有幂等键，第二次就是第二张订单）')
+  assert.equal(page.data.submitting, false)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// V. R4-7 单件链：URL 只传非敏感/必要参数；建单后先锁 orderId
+// ══════════════════════════════════════════════════════════════════════
+
+test('R4-7 print-store 进支付页只带 fileId/storeId/store/copies，敏感项一个都不带', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const api = { getPublicTerminals: () => Promise.resolve([{ id: 'term-1', displayName: '一号店', isOnline: true }]) }
+  const page = makePage('pages/print-store/print-store.js', { auth, api, wx })
+  page.onLoad({ fileId: 'f-1', copies: '2', name: '张三的简历.pdf', total: '1.50', amountCents: '150', pages: '3' })
+  await flush()
+  page.toPay()
+
+  const url = wx.calls.navigateTo[0]
+  assert.ok(url.indexOf('/pages/print-pay/print-pay?') === 0, url)
+  for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'total', 'name', 'bundleId']) {
+    assert.ok(!url.includes(`${field}=`), `支付页 URL 不得携带 ${field}：${url}`)
+  }
+  assert.ok(!url.includes('%E5%BC%A0%E4%B8%89'), '文件名（常含本人姓名）绝不进 URL')
+  assert.ok(url.includes('fileId=f-1') && url.includes('storeId=term-1') && url.includes('copies=2'), url)
+})
+
+test('R4-7 print-pay 金额与页数来自服务端报价，不来自 URL', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const quoted = []
+  const api = {
+    quoteMyPrintOrder: (fileId, params) => { quoted.push({ fileId, params }); return Promise.resolve({ amountCents: 150, billablePages: 3 }) },
+    getMyDocuments: () => Promise.resolve({ items: [{ id: 'f-1', filename: '张三的简历.pdf' }] }),
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth, api, wx })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '2' })
+  await flush()
+
+  assert.equal(quoted.length, 1)
+  assert.equal(quoted[0].params.colorMode, 'black_white')
+  assert.equal(quoted[0].params.duplex, 'simplex')
+  assert.equal(quoted[0].params.copies, 2)
+  assert.equal(page.data.quoteState, 'ready')
+  assert.equal(page.data.fee.total, '1.50')
+  assert.equal(page.data.pageCountLabel, '3 页')
+  assert.equal(page.data.files[0].name, '张三的简历.pdf', '文件名从本人文件库取，不从 URL 取')
+})
+
+test('R4-7 print-pay 报价失败：不本地补一个金额，也不把下单挡死', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const api = {
+    quoteMyPrintOrder: () => Promise.reject(Object.assign(new Error(''), { statusCode: -1 })),
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    createCloudPrintOrder: () => Promise.resolve({ id: 'ord-A' }),
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth, api, wx })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  await flush()
+
+  assert.equal(page.data.quoteState, 'error')
+  assert.equal(page.data.fee.total, '—', '取不到报价时不得编一个金额出来')
+  assert.equal(page.data.isFreeOrder, false, '取不到报价不等于免费')
+  assert.equal(page.data.files[0].name, '本人文件', '取不到文件名时用中性标签，不回显 URL 里的值')
+
+  page.continueFlow()
+  await flush()
+  assert.equal(wx.calls.redirectTo.length, 1, '展示失败不该取消一次真实的下单能力')
+})
+
+test('R4-7 print-pay 建单成功但跳转失败：锁住页面并指路，不得重复 POST', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  let posts = 0
+  const api = {
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    createCloudPrintOrder: () => { posts += 1; return Promise.resolve({ id: 'ord-A', pickupCode: '12345678' }) },
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth, api, wx })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  await flush()
+
+  wx.control.navFail = true
+  page.continueFlow()
+  await flush()
+
+  assert.equal(posts, 1)
+  assert.equal(page.data.createdLocked, true, '订单已建成必须锁页面，否则用户会以为没下成再点一次')
+  assert.equal(page.data.submitting, false, '不得卡在「正在提交…」')
+
+  page.continueFlow()
+  await flush()
+  assert.equal(posts, 1, '再点一次不得发第二次 POST（/me/print-orders 没有幂等键）')
+
+  page.toOrders()
+  assert.ok(wx.calls.navigateTo.some((u) => u.includes('/pages/orders/orders')), '要能去找回这张订单')
+})
+
+test('R4-7 print-pay 跳转到取件页只带 orderId，凭证一个都不进 URL', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const api = {
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    createCloudPrintOrder: () => Promise.resolve({
+      id: 'ord-A', orderNo: 'NO-A', pickupCode: '12345678',
+      pickupCodeExpiresAt: '2030-01-01T00:00:00.000Z', taskStatus: 'pending_release', amountCents: 150,
+    }),
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth, api, wx })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  await flush()
+  page.continueFlow()
+  await flush()
+
+  const url = wx.calls.redirectTo[0]
+  assert.equal(url, '/pages/print-pickup/print-pickup?orderId=ord-A')
+  for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'taskStatus', 'orderNo', 'name', 'store']) {
+    assert.ok(!url.includes(`${field}=`), `取件页 URL 不得携带 ${field}`)
+  }
+  assert.ok(!url.includes('12345678'))
+})
+
+test('R4-7 print-pay 建单在途换了人：不锁当前这位的页面，也不把他带去别人的到机码', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const submit = deferred()
+  const api = {
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+    getMyDocuments: () => Promise.resolve({ items: [] }),
+    createCloudPrintOrder: () => submit.promise,
+  }
+  const page = makePage('pages/print-pay/print-pay.js', { auth, api, wx })
+  page.onLoad({ fileId: 'f-1', storeId: 'term-1', store: '一号店', copies: '1' })
+  await flush()
+  page.continueFlow()
+
+  auth.setUser('B')
+  submit.resolve({ id: 'ord-A', pickupCode: '12345678' })
+  await flush()
+
+  assert.ok(!page._createdOrderId, 'A 的订单不得锁住 B 的页面')
+  assert.equal(page.data.createdLocked, false)
+  assert.equal(page.data.submitting, false, '按钮锁必须解开，否则 B 的页面永远按不动')
+  assert.equal(wx.calls.redirectTo.length, 0, '不得把 B 带去 A 的到机码页')
 })

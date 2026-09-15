@@ -605,5 +605,55 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
     '复制的是原始到机码（服务端 claim 只 trim().toUpperCase()，不去分隔符）')
 }
 
+// ⑫ R4 收口：三处「代码看着都在、顺序一换就漏」的守卫
+//
+// 这一组每条都对应一个真实可复现的后果，不是照现状抄：
+console.log('\n⑫ R4 身份 / 代次收口')
+{
+  const createCode = stripComments(createJs)
+  const confirmCode = stripComments(confirmJs)
+
+  // ① 选择一变，在途的隐私检查与逐条确认必须当场作废。
+  //    只把 piiPhase 打回 idle 挡不住已经发出去的那两条递归链：它们照常跑到最后
+  //    并把 piiPhase 写成 'ready'，于是新加勾的文件从没扫过，createPackage 的
+  //    `piiPhase !== 'ready'` 闸门却直接放行 —— 一个会被服务端拒的"已就绪"。
+  assert(/_syncSelection\(\)\s*\{[\s\S]{0,400}issue\('pii'\)[\s\S]{0,120}issue\('pii-decide'\)/.test(createCode),
+    '选择变化时同通道重新 issue，作废在途的 pii / pii-decide（latest-wins）')
+  assert(/_syncSelection\(\)\s*\{[\s\S]{0,600}piiSubmitting: false/.test(createCode),
+    '作废确认链的同时解开 piiSubmitting（被作废的链不会再走到解锁那一行）')
+
+  // ② 建单成功 / 失败的迟到响应都必须**先判身份**。顺序反过来，
+  //    A 的订单号会写进 B 的 _createdOrderId，把 B 的页面永久锁成「订单已创建」。
+  // 只看 submitOrder 那条链，不看全文件：`_lockAfterCreated` 里也有一条同样的赋值，
+  // 按全文件判会永远命中它，断言就变成恒真（那是一条测不出任何东西的门禁）。
+  const createIdx = confirmCode.indexOf('api.createPackageOrder(')
+  const chain = createIdx >= 0 ? confirmCode.slice(createIdx, createIdx + 1200) : ''
+  const guardIdx = chain.indexOf('if (!this._sameIdentity(token)) return')
+  const assignIdx = chain.indexOf('this._createdOrderId = orderId')
+  assert(createIdx >= 0 && guardIdx > 0 && assignIdx > guardIdx,
+    '建单成功回调里 `_createdOrderId = orderId` 排在身份判定之后（换人时一个字节都不写）')
+  assert(/catch\(\(err\) => \{[\s\S]{0,400}if \(!this\._sameIdentity\(token\)\) return[\s\S]{0,200}if \(this\._createdOrderId\)/.test(confirmCode),
+    '建单失败回调同样先判身份再谈锁（迟到的失败不得锁死新用户）')
+  assert(/_resetForIdentity\(\)\s*\{[\s\S]{0,200}this\._createdOrderId = null[\s\S]{0,200}submitting: false[\s\S]{0,120}agreedToTerms: false/.test(confirmCode),
+    '身份切换时建单锁 / 提交锁 / 协议同意一起复位（协议同意是本人行为，不得继承）')
+  assert(/setIdentity\(this\._identityKey\(\)\)\) \{[\s\S]{0,200}this\._resetForIdentity\(\)/.test(confirmCode),
+    'onShow 发现身份变化时真的调用了 _resetForIdentity（写了不接线等于没写）')
+
+  // ③ 《打印服务协议》：链接不得靠 label 冒充勾选，按钮 disabled 与提交守卫一致。
+  //    label 包住 checkbox 时，label 内任意点击都会切换它 —— "点开协议看一眼"
+  //    会被同时记成"我已阅读并同意"，而这份同意用户从没做过。
+  const labelBlock = /<label class="agreement-label">[\s\S]*?<\/label>/.exec(confirmWxml)
+  assert(!!labelBlock && !labelBlock[0].includes('viewTerms'),
+    '《打印服务协议》链接在 <label> 之外（label 内点击会把同意一起勾上）')
+  assert(confirmWxml.includes('bindtap="viewTerms"'),
+    '协议原文仍然可查看（不能因为挪出 label 就把入口弄丢）')
+  assert(/disabled="\{\{quoteState !== 'ready' \|\| !agreedToTerms \|\| submitting\}\}"/.test(confirmWxml),
+    '提交按钮 disabled 与 submitOrder 守卫逐条对齐（报价就绪 + 已同意 + 不在提交中）')
+  assert(/if \(!this\.data\.agreedToTerms\)/.test(confirmCode),
+    'submitOrder 里的协议守卫仍在（按钮变灰不是唯一防线）')
+  assert(confirmWxml.includes('agreement-hint'),
+    '未勾协议时说清主按钮为什么是灰的（disabled 后 bindtap 不触发，没有提示用户只会反复点）')
+}
+
 console.log(failed === 0 ? '\n全部通过\n' : `\n${failed} 条失败\n`)
 process.exit(failed === 0 ? 0 : 1)

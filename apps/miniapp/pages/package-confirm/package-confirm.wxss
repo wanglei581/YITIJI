@@ -212,8 +212,12 @@
   color: var(--clay, #f06a3c);
 }
 
-/* 服务协议 */
+/* 服务协议。链接与勾选框是**两个独立可点区**（链接不在 label 里，否则点开协议
+   会顺手把同意勾上），所以这里用一行 flex 把它们排成视觉上的同一句话。 */
 .agreement-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   padding: 32rpx 24rpx;
 }
 
@@ -230,10 +234,20 @@
 }
 
 /* 协议链接实测 104x20：文字链补纵向内边距把可点区撑到 48px，视觉不变 */
-.agreement-label .link {
+.agreement-section .link {
   color: var(--teal, #1677ff);
   display: inline-block;
+  font-size: 26rpx;
   padding: 30rpx 6rpx;
+}
+
+/* 未勾协议时说清主按钮为什么是灰的（按钮 disabled 后 bindtap 不会触发，
+   没有这行提示用户只会反复去点一个不响应的按钮）。 */
+.agreement-hint {
+  margin: -16rpx 24rpx 8rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--warn, #b5643c);
 }
 
 /* 底部提交栏 */

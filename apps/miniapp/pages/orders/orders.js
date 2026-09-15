@@ -174,9 +174,36 @@ Page({
     return memberIdentityKey(auth)
   },
 
-  /** 当前身份能不能用来拉本人订单。登录了但拿不到会员 id 时一律不拉。 */
-  _identityUsable() {
-    return isMemberIdentity(this._identityKey())
+  /**
+   * 身份判定 + **当场清场**。每个入口和每个异步回调都要过这里。
+   *
+   * 此前本页只在 `onShow` 里清：`_accepts()` 发现身份变了只是**丢弃那条响应**，
+   * 屏幕上已经渲染出来的订单与到机码原样留着。可真实的失效链路里根本没有 onShow ——
+   * `utils/request.js` 拿到 401 时会静默续签一次，续签失败就 `auth.logout()`，
+   * 全程没有任何生命周期回调，页面还停在前台。于是共用设备上，一份带着到机码的
+   * 订单列表就这么停在一个已经不存在的会话上，等着下一位来看。
+   *
+   * setIdentity 变化时会 +1 代次，上一位**在途**的请求一并作废 —— 只清 data 不作废请求，
+   * 那几个迟到的响应会把上一位的订单又写回来。
+   *
+   * @returns {boolean} 现在还能不能用当前身份读写本人数据
+   */
+  _enforceIdentity() {
+    const identity = this._identityKey()
+    const usable = isMemberIdentity(identity)
+    if (this._guard.setIdentity(identity)) {
+      this._resetAll()
+      this.setData({ isLoggedIn: usable })
+      return usable
+    }
+    // 身份"没变"但本来就不可用（未登录 / 登录了却拿不到会员 id），而屏幕上还留着
+    // 上一轮渲染出来的内容：同样要清。setIdentity 在这种情况下返回 false，
+    // 只靠它判定会漏掉这一支。
+    if (!usable && (this.data.orders.length || this.data.pkgRows.length || this.data.isLoggedIn)) {
+      this._resetAll()
+      this.setData({ isLoggedIn: false })
+    }
+    return usable
   },
 
   /** 这个响应还能不能写进 data：身份没变 + 页面在前台 + 是本通道最新一次请求。 */
@@ -196,13 +223,10 @@ Page({
 
   onShow() {
     this._guard.activate()
-    const usable = this._identityUsable()
     // A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
-    // setIdentity 变化时会 +1 代次，于是上一位**在途**的请求一并作废 ——
-    // 只清 data 不作废请求的话，那几个迟到的响应会把上一位的订单又写回来。
-    if (this._guard.setIdentity(this._identityKey())) this._resetAll()
     // 登录了却拿不到会员 id 时按未登录渲染：那种会话无法确认"我的"是谁的，
     // 拉列表等于拿一个所有人共享的身份键去要本人数据。用户的补救动作恰好就是重新登录。
+    const usable = this._enforceIdentity()
     this.setData({ isLoggedIn: usable })
     if (usable) {
       this._load()
@@ -232,7 +256,7 @@ Page({
   // 始终返回 Promise：下拉刷新要等真实请求结束才能收起指示器，
   // 提前 stopPullDownRefresh 会让「下拉刷新重试」看起来刷过但其实什么都没等到。
   _load(append = false) {
-    if (!this._identityUsable()) return Promise.resolve()
+    if (!this._enforceIdentity()) return Promise.resolve()
     const token = this._guard.issue('single')
     const cursor = append ? this.data.nextCursor : null
     this.setData({ [append ? 'loadingMore' : 'loading']: true, error: '' })
@@ -240,6 +264,9 @@ Page({
     const requestPromise = append ? legacyPromise.then(items => [[], items]) : Promise.all([api.getMyCloudPrintOrders(), legacyPromise])
     return requestPromise
       .then(([cloudItems, items]) => {
+        // 先**执行**身份判定再判能不能写：换了人 / 前台静默登出时，光丢弃这条响应
+        // 不够 —— 屏幕上已经渲染出来的订单与到机码要在这一刻就清掉。
+        this._enforceIdentity()
         // 迟到的响应到此为止：换了人、切了后台，或本通道已被重新发起过一次。
         if (!this._accepts(token)) return
         const combined = [...(Array.isArray(cloudItems) ? cloudItems : []), ...(Array.isArray(items) ? items : [])]
@@ -260,6 +287,10 @@ Page({
         this._filterTab(this.data.activeTab, orders)
       })
       .catch(err => {
+        // 401 走到这里说明 request.js 连静默续签都没救回来（它续签失败时会 auth.logout()）。
+        // 那一刻起列表里的到机码属于一个已经不存在的会话，必须当场清掉，
+        // 不能等用户离开本页再回来才清。
+        this._enforceIdentity()
         if (!this._accepts(token)) return
         console.error('getMyPrintOrders error', err)
         // 失败只写 error，**绝不清空 orders / filtered**：刷新或翻页失败不该让用户
@@ -276,7 +307,7 @@ Page({
    * 失败只染红本分区：单件打印那一段照常显示 —— 一个来源挂掉不该让整页订单消失。
    */
   _loadPackages(append = false) {
-    if (!this._identityUsable()) return Promise.resolve()
+    if (!this._enforceIdentity()) return Promise.resolve()
     if (append && !this.data.pkgCursor) return Promise.resolve()
     const token = this._guard.issue('package')
     const cursor = append ? this.data.pkgCursor : null
@@ -285,6 +316,7 @@ Page({
       : { pkgState: 'loading', pkgErrorTitle: '', pkgErrorText: '', pkgMoreErrorText: '' })
     return api.getPackageOrders({ pageSize: PAGE_SIZE, ...(cursor ? { cursor } : {}) })
       .then(page => {
+        this._enforceIdentity()
         if (!this._accepts(token)) return
         const incoming = (Array.isArray(page && page.items) ? page.items : []).map(row => pkg.toPackageRow(row))
         const rows = append ? pkg.mergePackageRows(this.data.pkgRows, incoming) : incoming
@@ -300,6 +332,7 @@ Page({
         this._filterTab(this.data.activeTab)
       })
       .catch(err => {
+        this._enforceIdentity()
         if (!this._accepts(token)) return
         const shown = pkg.describePackageError(err, '材料包订单加载失败，请稍后重试。')
         // 下一页失败只写 pkgMoreErrorText，已加载的那几页照常留在屏幕上；
@@ -335,6 +368,11 @@ Page({
 
   onPullDownRefresh() {
     const stop = () => wx.stopPullDownRefresh()
+    // 下拉刷新也要先核一次身份。用户完全可能在本页停留期间被静默登出
+    //（request.js 补签失败 → auth.logout()，没有任何生命周期回调），
+    // 此时不核就会"刷新"出一页仍然属于上一个会话的订单与到机码：
+    // 两个 _load 会各自早返回，而屏幕一个字都没变，看起来像刷新成功了。
+    if (!this._enforceIdentity()) { stop(); return }
     // 两个来源并行重拉；任一失败只写自己的失败态，不会互相牵连。
     Promise.all([this._load(), this._loadPackages()]).then(stop, stop)
   },
@@ -434,6 +472,7 @@ Page({
     this._patchOrder(id, { cancelling: true })
     api.cancelCloudPrintOrder(id)
       .then((raw) => {
+        this._enforceIdentity()
         // 按身份而不是按前台判定：切后台不该让这一行永远停在「取消中…」。
         if (!this._sameIdentity(token)) return
         // 用服务端回读整行替换，不在本地写「已取消」。
@@ -443,6 +482,7 @@ Page({
         this._filterTab(this.data.activeTab, orders)
       })
       .catch((err) => {
+        this._enforceIdentity()
         if (!this._sameIdentity(token)) return
         // 先解锁再弹窗：早返回会把这一行永远留在「取消中…」，而它其实没有在取消。
         this._patchOrder(id, { cancelling: false })

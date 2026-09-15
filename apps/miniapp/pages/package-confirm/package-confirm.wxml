@@ -115,16 +115,22 @@
           </view>
         </view>
 
-        <!-- 服务协议 -->
+        <!-- 服务协议。
+             **《打印服务协议》这个链接必须留在 <label> 之外。** 小程序里 label 包住
+             checkbox 时，label 内任意一次点击都会切换那个 checkbox —— 于是"点开协议
+             看一眼"会被同时记成"我已阅读并同意"，而这份同意用户从来没做过；更糟的是
+             返回本页时它已经勾上了，用户不会知道自己什么时候勾的。
+             同意只能由用户**点中那个勾选框（或它前面那句话）**产生。 -->
         <view class="agreement-section">
           <checkbox-group bindchange="toggleAgreement">
             <label class="agreement-label">
               <checkbox value="agreed" checked="{{agreedToTerms}}" color="#1677ff" />
               <text>我已阅读并同意</text>
-              <text class="link" bindtap="viewTerms">《打印服务协议》</text>
             </label>
           </checkbox-group>
+          <text class="link agreement-link" bindtap="viewTerms">《打印服务协议》</text>
         </view>
+        <view class="agreement-hint" wx:if="{{quoteState === 'ready' && !agreedToTerms}}">勾选上面的《打印服务协议》后才能下单。</view>
       </block>
 
       <!-- 底部占位 -->
@@ -138,6 +144,9 @@
       <text class="label">{{quoteState === 'ready' ? '到机应付' : '金额待服务端核定'}}</text>
       <text class="amount" wx:if="{{quoteState === 'ready'}}">{{quoteAmountText}}</text>
     </view>
-    <button class="submit-btn {{quoteState === 'ready' && !submitting ? '' : 'disabled'}}" bindtap="submitOrder" disabled="{{quoteState !== 'ready' || submitting}}">{{submitting ? '提交中…' : '确认下单'}}</button>
+    <!-- disabled 与 submitOrder() 的守卫**逐条对齐**（报价就绪 + 已同意协议 + 不在提交中）。
+         此前按钮只按报价与提交中两条变灰，未勾协议时它是亮的，点下去只弹一句 toast ——
+         一个看起来能用、按下去却不做事的主按钮。上面那行 agreement-hint 负责说清原因。 -->
+    <button class="submit-btn {{quoteState === 'ready' && agreedToTerms && !submitting ? '' : 'disabled'}}" bindtap="submitOrder" disabled="{{quoteState !== 'ready' || !agreedToTerms || submitting}}">{{submitting ? '提交中…' : '确认下单'}}</button>
   </view>
 </view>

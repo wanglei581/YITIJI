@@ -292,6 +292,19 @@ const PACKAGE_ERROR_COPY = {
   PRINT_TERMINAL_NOT_FOUND: { title: '服务点不存在', text: '服务点信息已失效，请返回重新选择。', recover: 'store' },
   CAPABILITY_NOT_CONFIGURED: { title: '该服务点未开通文档打印', text: '这台一体机的文档打印能力尚未由管理员登记，暂不能接材料包。请换一个服务点。', recover: 'store' },
   CAPABILITY_UNAVAILABLE: { title: '该服务点文档打印不可用', text: '这台一体机的文档打印当前不可用，请换一个服务点或稍后重试。', recover: 'store' },
+  // 彩色 / 自动双面是**按终端逐台**判定的第二层能力门禁
+  // （terminal-capabilities.service.ts 的 assertPrintParamsAllowed，未登记即拒绝）。
+  // 它与上面两条 CAPABILITY_* 不是同一回事：那两条说的是「这台机器开不开放文档打印」，
+  // 这两条说的是「这台机器的彩色/双面没验过」——EV-013 验过的是那一台，新机器各自要验。
+  // 缺了这两条映射，服务端明确说出的拒绝理由会落到 describePackageError 末尾那个
+  // 「操作未完成 / 请稍后重试」——而这件事重试一万次也不会变，用户只会反复点。
+  //
+  // recover 是 'store' 而不是 'files'：放行路径只有一条 —— 管理员在该终端真机验过后
+  // 把 color_print / duplex_print 配成 available。用户当下能做的就是换一台验过的机器。
+  // （改黑白/单面也能过，但那要回到第一步改参数，不是本页错误卡片这个按钮的动作；
+  //  文案里说出来，按钮仍与 recover 一致。）
+  PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL: { title: '该服务点未验过彩色打印', text: '这台一体机的彩色打印还没在真机上验过，服务端不会受理彩色材料包。请换一个服务点；也可以回到第一步改成黑白再下单。', recover: 'store' },
+  PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL: { title: '该服务点未验过自动双面', text: '这台一体机的自动双面还没在真机上验过，服务端不会受理双面材料包。请换一个服务点；也可以回到第一步改成单面再下单。', recover: 'store' },
   PRICE_CONFIG_UNAVAILABLE: { title: '打印价目未配置', text: '服务端还没有配置打印价目，无法核定金额，因此不能下单。这需要运营方在后台配置，请稍后再试。', recover: 'none' },
   PRINT_PII_SCAN_REQUIRED: { title: '请先完成隐私检查', text: '材料包里有文件还没做完打印隐私检查。回到上一步逐个完成后再下单。', recover: 'privacy' },
   PII_SCAN_STALE: { title: '文件在检查后又变了', text: '有文件在隐私检查之后被改动过，需要重新检查一次。', recover: 'privacy' },
