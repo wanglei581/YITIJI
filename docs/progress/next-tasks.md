@@ -2,11 +2,10 @@
 
 ## 2026-09-17 当前唯一集成顺序
 
-1. **数据大屏 Nest DI P0 已在本分支修完，接着跑完整本地总门禁。**
-   复现锚点 `55f19899eecf557556e1b24e40ea2ee03367f8c8`（`ScreenSnapshotCache`
-   constructor 被 Nest 当成 `Function`/`Number` 注入，进程起不来）。修复后
-   `verify:console-screen-snapshot` 为 72/72，含 class provider 实构。下一步仍是
-   受影响的 CI gate coverage、deploy gate sync、compliance copy、Admin / Partner
+1. **数据大屏 Nest DI P0 与三条 P2 已在本分支修完，接着跑完整本地总门禁。**
+   复现锚点 `55f19899eecf557556e1b24e40ea2ee03367f8c8`。`verify:console-screen-snapshot`
+   现为 80/80（含 class provider 实构、gov 不拉告警、趋势 cap+1、敏感值/机队隔离）。
+   下一步仍是 CI gate coverage、deploy gate sync、compliance copy、Admin / Partner
    build 和大屏专项浏览器门禁。只处理第一条真实失败，不弱化门禁。不得把
    `55f19899` 的 70/70 再写成 SOURCE/LOCAL GO。
 2. **单一 PR，不拆多条。** 本地总门禁通过后，再申请一次 push / 开 PR 授权；PR只承载数据大屏

@@ -1,5 +1,24 @@
 # 当前开发进度
 
+2026-09-17 **数据大屏三条 P2：gov 告警热路径、趋势溢出、快照敏感值。**
+父提交 `63bda793a275700a16f508d2cda81498e1494cc4`。只改 API 大屏聚合与
+`verify:console-screen-snapshot`（图谱：该门禁是这几个文件的唯一 CI 断言）。
+
+- **gov 不跑 `listDerivedAlerts`。** `admin:realtime` 只缓存机队+打印活数据，
+  `admin:alerts` 仅 `profile=ops` 加载。gov 状态不因未使用的告警源失败而
+  `degraded`，返回里没有假告警数字。
+- **14 日趋势 `take=cap+1` + `paidAt,id` 排序。** 溢出返回既有 `capped` /
+  `window_row_cap_exceeded`；累计页数口径不变。
+- **快照序列化禁敏感种子值；Partner A 机队 matchedCount 不含 B。**
+- **本机：** `verify:console-screen-snapshot` **80/80**。反向：gov 强制加载告警
+  → 1q/3a2/3v 红；`take=cap` → 1g/3h6 红；机队去 org 过滤 + 把内部 URL 写进
+  未接入 source → 3d2/3j2 红。均已恢复。`build`、`verify:repository-integrity`、
+  `graph:check`、`git diff --check` 退出 0。
+- **未动：** `AiServiceLog.count()` 全表、PG `CONCURRENTLY`、未绑定 partner 的
+  401 vs `ORG_REQUIRED`、`DeviceFleetModule` 多余 export、缓存 LRU。
+- **证据边界：** 相对这三条 P2，`SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。未 push、未开 PR。
+
 2026-09-17 **数据大屏 P0：Nest 无法构造 `ScreenSnapshotCache`，已修。**
 独立复审在 `55f19899eecf557556e1b24e40ea2ee03367f8c8` 复现：
 `NestFactory.createApplicationContext({ providers: [ScreenSnapshotCache] })`

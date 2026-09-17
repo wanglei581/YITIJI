@@ -277,32 +277,34 @@ export async function loadPrintLiveSlice(prisma: PrismaService, now: Date): Prom
 export async function loadPrintCumulativeSlice(
   prisma: PrismaService,
   now: Date,
+  options?: { trendRowCap?: number },
 ): Promise<PrintCumulativeSlice> {
   const trendFrom = daysAgoStart(now, PRINT_TREND_DAY_COUNT)
+  const trendRowCap = options?.trendRowCap ?? PRINT_TREND_ROW_CAP
   const paidTrendWhere = {
     ...PAID_BILLABLE,
     paidAt: { not: null, gte: trendFrom },
   }
-  const [pageSum, trendCount] = await Promise.all([
+  const [pageSum, trendRows] = await Promise.all([
     prisma.order.aggregate({
       where: PAID_BILLABLE,
       _sum: { billablePages: true },
     }),
-    prisma.order.count({ where: paidTrendWhere }),
-  ])
-  let trend: ScreenPrintTrendValue | 'capped' = 'capped'
-  if (trendCount <= PRINT_TREND_ROW_CAP) {
-    const rows = await prisma.order.findMany({
+    prisma.order.findMany({
       where: paidTrendWhere,
       select: { paidAt: true, billablePages: true },
-      take: PRINT_TREND_ROW_CAP,
-    })
+      orderBy: [{ paidAt: 'asc' }, { id: 'asc' }],
+      take: trendRowCap + 1,
+    }),
+  ])
+  let trend: ScreenPrintTrendValue | 'capped' = 'capped'
+  if (trendRows.length <= trendRowCap) {
     const buckets = new Map<string, number>()
     for (let i = 0; i < PRINT_TREND_DAY_COUNT; i++) {
       const day = shanghaiDayKey(new Date(trendFrom.getTime() + i * 24 * 60 * 60 * 1000))
       buckets.set(day, 0)
     }
-    for (const row of rows) {
+    for (const row of trendRows) {
       if (!row.paidAt) continue
       const key = shanghaiDayKey(row.paidAt)
       if (!buckets.has(key)) continue

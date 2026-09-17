@@ -42,10 +42,14 @@ export class ConsoleScreenService {
 
   async getAdminSnapshot(profile: AdminScreenProfile): Promise<ScreenSnapshot> {
     const now = new Date()
-    const [realtime, counts, cumulative] = await Promise.all([
-      this.cache.getOrLoad('admin:realtime', SCREEN_CACHE_TTL_SECONDS.realtime, () => this.loadAdminRealtime(now)),
+    const includeAlerts = profile === 'ops'
+    const [realtime, counts, cumulative, alerts] = await Promise.all([
+      this.cache.getOrLoad('admin:realtime', SCREEN_CACHE_TTL_SECONDS.realtime, () => this.loadAdminRealtimeCore(now)),
       this.cache.getOrLoad('admin:counts', SCREEN_CACHE_TTL_SECONDS.counts, () => this.loadAdminCounts(now)),
       this.cache.getOrLoad('admin:cumulative', SCREEN_CACHE_TTL_SECONDS.cumulative, () => this.settle('printCumulative', () => loadPrintCumulativeSlice(this.prisma, now))),
+      includeAlerts
+        ? this.cache.getOrLoad('admin:alerts', SCREEN_CACHE_TTL_SECONDS.realtime, () => this.loadAdminAlerts())
+        : Promise.resolve(undefined),
     ])
     const all = assembleAdminMetrics({
       fleet: realtime.value.fleet,
@@ -56,11 +60,10 @@ export class ConsoleScreenService {
       sync: counts.value.sync,
       jumps: counts.value.jumps,
       fairs: counts.value.fairs,
-      alerts: realtime.value.alerts,
+      ...(alerts ? { alerts: alerts.value } : {}),
     })
     const loadFlags = [
       realtime.value.fleet.ok,
-      realtime.value.alerts.ok,
       realtime.value.printLive.ok,
       counts.value.content.ok,
       counts.value.ai.ok,
@@ -68,11 +71,18 @@ export class ConsoleScreenService {
       counts.value.jumps.ok,
       counts.value.fairs.ok,
       cumulative.value.ok,
+      ...(alerts ? [alerts.value.ok] : []),
     ]
     const okCount = loadFlags.filter(Boolean).length
     const status = snapshotLoadStatus(okCount, loadFlags.length)
+    const generatedMs = Math.min(
+      realtime.storedAt,
+      counts.storedAt,
+      cumulative.storedAt,
+      ...(alerts ? [alerts.storedAt] : []),
+    )
     return {
-      generatedAt: new Date(Math.min(realtime.storedAt, counts.storedAt, cumulative.storedAt)).toISOString(),
+      generatedAt: new Date(generatedMs).toISOString(),
       audience: 'admin',
       profile,
       status,
@@ -149,30 +159,32 @@ export class ConsoleScreenService {
     }
   }
 
-  private async loadAdminRealtime(now: Date) {
-    const [fleet, alertsResult, printLive] = await Promise.all([
+  private async loadAdminRealtimeCore(now: Date) {
+    const [fleet, printLive] = await Promise.all([
       this.settle('adminFleet', () => loadAdminFleet(this.prisma, now)),
-      this.settle('adminAlerts', () => this.ops.listDerivedAlerts('open', ALERT_LIST_LIMIT)),
       this.settle('adminPrintLive', () => loadPrintLiveSlice(this.prisma, now)),
     ])
-    const alerts: Loaded<ScreenAlertsValue> = alertsResult.ok
-      ? {
-          ok: true,
-          value: {
-            firingCount: alertsResult.value.firingCount,
-            listedCount: alertsResult.value.listedCount,
-            truncated: alertsResult.value.truncated,
-            items: alertsResult.value.data.map((item) => ({
-              type: item.type,
-              severity: item.severity,
-              title: item.title,
-              occurredAt: item.occurredAt,
-              terminalCode: item.terminalCode,
-            })),
-          },
-        }
-      : { ok: false, reason: alertsResult.reason }
-    return { fleet, alerts, printLive }
+    return { fleet, printLive }
+  }
+
+  private async loadAdminAlerts(): Promise<Loaded<ScreenAlertsValue>> {
+    const alertsResult = await this.settle('adminAlerts', () => this.ops.listDerivedAlerts('open', ALERT_LIST_LIMIT))
+    if (!alertsResult.ok) return { ok: false, reason: alertsResult.reason }
+    return {
+      ok: true,
+      value: {
+        firingCount: alertsResult.value.firingCount,
+        listedCount: alertsResult.value.listedCount,
+        truncated: alertsResult.value.truncated,
+        items: alertsResult.value.data.map((item) => ({
+          type: item.type,
+          severity: item.severity,
+          title: item.title,
+          occurredAt: item.occurredAt,
+          terminalCode: item.terminalCode,
+        })),
+      },
+    }
   }
 
   private async loadAdminCounts(now: Date) {

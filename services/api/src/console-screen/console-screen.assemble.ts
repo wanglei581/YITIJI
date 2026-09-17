@@ -78,7 +78,7 @@ export function assembleAdminMetrics(input: {
   sync: Loaded<SyncSlice>
   jumps: Loaded<JumpRow[]>
   fairs: Loaded<ScreenFairStructureValue>
-  alerts: Loaded<ScreenAlertsValue>
+  alerts?: Loaded<ScreenAlertsValue>
 }): ScreenSnapshotMetrics {
   const fleet = input.fleet.ok
     ? mapFleetOverview(input.fleet.value.overview, {
@@ -150,7 +150,9 @@ export function assembleAdminMetrics(input: {
         : null,
     })),
     syncSuccessRate24h: fromLoaded(input.sync, 'SyncLog.result', '24h', (slice) => slice.rate),
-    alertsRealtime: fromLoaded(input.alerts, 'derived-alerts', 'current', (slice) => slice),
+    ...(input.alerts
+      ? { alertsRealtime: fromLoaded(input.alerts, 'derived-alerts', 'current', (slice) => slice) }
+      : {}),
     taskFlow24h: fromLoaded(input.printLive, 'PrintTask/ScanTask.groupBy(status)', '24h', (slice) => slice.taskFlow),
     sourceEntryOpensTop: sourceOpens,
     fairStructure: fromLoaded(input.fairs, 'FairCompany/FairZone/FairMaterial', 'ongoing', (slice) => slice),

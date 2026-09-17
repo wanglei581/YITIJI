@@ -223,7 +223,9 @@ function assertSourceContract(): void {
     '1g. 聚合走 count/groupBy/aggregate，打印趋势与机队有 take 上限',
     /groupBy\(/.test(queries)
       && /aggregate\(/.test(queries)
-      && /take:\s*PRINT_TREND_ROW_CAP/.test(queries)
+      && /take:\s*trendRowCap\s*\+\s*1/.test(queries)
+      && /trendRowCap \?\? PRINT_TREND_ROW_CAP/.test(queries)
+      && /orderBy:\s*\[\s*\{\s*paidAt:\s*'asc'\s*\},\s*\{\s*id:\s*'asc'\s*\}/.test(queries)
       && /take:\s*FLEET_SAMPLE_TAKE/.test(queries)
       && /take:\s*JUMP_SOURCE_GROUP_TAKE/.test(queries)
       && /orderBy:\s*\{\s*_count:\s*\{\s*sourceName:\s*'desc'\s*\}/.test(queries)
@@ -316,6 +318,13 @@ function assertSourceContract(): void {
       && !/select:\s*\{\s*createdAt:\s*true,\s*billablePages:\s*true/.test(queries)
       && !/\bcopies\b/.test(queries)
       && /PartnerOrgRequiredError/.test(service),
+  )
+  assert(
+    '1q. gov 不加载 derived alerts；ops 才打 admin:alerts',
+    /includeAlerts = profile === 'ops'/.test(service)
+      && /'admin:alerts'/.test(service)
+      && /loadAdminRealtimeCore/.test(service)
+      && /listDerivedAlerts/.test(service),
   )
   const cacheSrc = readSrc('src/console-screen/console-screen.cache.ts')
   const moduleSrc = readSrc('src/console-screen/console-screen.module.ts')
@@ -531,8 +540,14 @@ async function assertServiceContract(): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const cache = new ScreenSnapshotCache()
-  const ops = new AdminOpsService(prisma)
-  const screen = new ConsoleScreenService(prisma, ops, cache)
+  const opsService = new AdminOpsService(prisma)
+  let alertCalls = 0
+  const originalListDerivedAlerts = opsService.listDerivedAlerts.bind(opsService)
+  opsService.listDerivedAlerts = (async (view, limit) => {
+    alertCalls += 1
+    return originalListDerivedAlerts(view, limit)
+  }) as AdminOpsService['listDerivedAlerts']
+  const screen = new ConsoleScreenService(prisma, opsService, cache)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const orgA = `org_scrn_a_${suffix}`
@@ -596,8 +611,10 @@ async function assertServiceContract(): Promise<void> {
         { id: userBlank, username: `scrn_nb_${suffix}`, name: 'scrn partner blank', passwordHash: 'hash', role: 'partner', orgId: null, enabled: true, tokenVersion: 0 },
       ],
     })
+    const phoneEnc = `penc_${suffix}`
+    const pickupCode = `pck_${suffix}`
     await prisma.endUser.create({
-      data: { id: memberId, phoneHash: `ph_${suffix}`, phoneEnc: 'enc' },
+      data: { id: memberId, phoneHash: `ph_${suffix}`, phoneEnc },
     })
     await prisma.terminal.createMany({
       data: [
@@ -658,6 +675,7 @@ async function assertServiceContract(): Promise<void> {
         payStatus: 'paid',
         taskStatus: 'printing',
         paidAt: now,
+        pickupCode,
         printParamsJson: JSON.stringify({ copies: 9 }),
       },
     })
@@ -754,7 +772,9 @@ async function assertServiceContract(): Promise<void> {
     })
 
     const gov = await screen.getAdminSnapshot('gov')
+    assert('3a2. gov 不调用 listDerivedAlerts', alertCalls === 0, `alertCalls=${alertCalls}`)
     const ops = await screen.getAdminSnapshot('ops')
+    assert('3a3. ops 才加载 derived alerts', alertCalls === 1, `alertCalls=${alertCalls}`)
     const partnerA = await screen.getPartnerSnapshot(orgA)
     const partnerB = await screen.getPartnerSnapshot(orgB)
 
@@ -771,6 +791,19 @@ async function assertServiceContract(): Promise<void> {
       partnerA.metrics.jobsOnShelf?.available === true
         && partnerA.metrics.jobsOnShelf.value.published === 1,
       partnerA.metrics.jobsOnShelf?.available ? `published=${partnerA.metrics.jobsOnShelf.value.published}` : 'unavailable',
+    )
+    assert(
+      '3d2. Partner A 机队不含 B 的终端',
+      partnerA.metrics.terminalsOnline?.available === true
+        && partnerB.metrics.terminalsOnline?.available === true
+        && partnerA.metrics.terminalsOnline.value.matchedCount === 1
+        && partnerA.metrics.terminalsOnline.value.sampledCount === 1
+        && partnerB.metrics.terminalsOnline.value.matchedCount === 1
+        && partnerB.metrics.terminalsOnline.value.sampledCount === 1
+        && partnerA.metrics.terminalsOnline.value.matchedCount !== 2,
+      partnerA.metrics.terminalsOnline?.available && partnerB.metrics.terminalsOnline?.available
+        ? `A matched=${partnerA.metrics.terminalsOnline.value.matchedCount} B matched=${partnerB.metrics.terminalsOnline.value.matchedCount}`
+        : 'unavailable',
     )
     assert(
       '3e. Partner B 同步成功率按本机构聚合（1 成功 1 失败）',
@@ -877,6 +910,21 @@ async function assertServiceContract(): Promise<void> {
         && cumulativeDays.some((day) => day.date === todayKey && day.pages === 10)
         && cumulativeDays.some((day) => day.date === yesterdayKey && day.pages === 5),
     )
+    const overflow = await loadPrintCumulativeSlice(prisma, now, { trendRowCap: 2 })
+    const atCap = await loadPrintCumulativeSlice(prisma, now, { trendRowCap: 3 })
+    const atCapDays = atCap.trend === 'capped' ? [] : atCap.trend.days
+    assert(
+      '3h6. 趋势 take=cap+1 溢出则 capped，未溢出则仍按 paidAt 窗口可算',
+      overflow.trend === 'capped'
+        && overflow.pages.totalPages === 15
+        && atCap.trend !== 'capped'
+        && atCap.pages.totalPages === 15
+        && atCapDays.some((day) => day.date === todayKey && day.pages === 10)
+        && atCapDays.some((day) => day.date === yesterdayKey && day.pages === 5),
+      overflow.trend === 'capped'
+        ? `overflow=capped atCapToday=${String(atCapDays.find((day) => day.date === todayKey)?.pages)}`
+        : 'overflow-not-capped',
+    )
     assert(
       '3i. 窗口、登录展示 LIMIT、freshness 写在响应里',
       gov.window.onlineWindowSeconds === 180
@@ -901,7 +949,37 @@ async function assertServiceContract(): Promise<void> {
       !banned.some((key) => payloadKeys.has(key)),
       `命中 ${banned.filter((key) => payloadKeys.has(key)).join(',')}`,
     )
+    const secrets = [
+      'https://internal/secret',
+      'https://internal/hist1',
+      'https://internal/hist2',
+      'https://internal/hist3',
+      'https://internal/ok',
+      `tok_a_${suffix}`,
+      `tok_b_${suffix}`,
+      `ph_${suffix}`,
+      phoneEnc,
+      pickupCode,
+      memberId,
+      userA,
+      userB,
+      adminId,
+      userBlank,
+      `fp_a_${suffix}`,
+      `fp_b_${suffix}`,
+      `file_scrn_${suffix}`,
+      'md5h1',
+      'md5h2',
+      'md5h3',
+      'md5ok',
+    ]
     const asText = JSON.stringify({ gov, ops, partnerA, partnerB })
+    const leaked = secrets.filter((secret) => asText.includes(secret))
+    assert(
+      '3j2. 序列化快照不含敏感种子值',
+      leaked.length === 0,
+      `命中 ${leaked.join(',')}`,
+    )
     assert('3k. 响应不含投递成功等违禁文案', !/投递成功|一键投递|立即投递|平台投递/.test(asText))
     assert('3l. Partner 响应 audience=partner 且 generatedAt 为 ISO', partnerA.audience === 'partner' && /\d{4}-\d{2}-\d{2}T/.test(partnerA.generatedAt))
 
@@ -978,6 +1056,28 @@ async function assertServiceContract(): Promise<void> {
       cachedOk.freshness.realtime === 'miss' && cachedOk2.freshness.realtime === 'hit',
     )
 
+    cache.clear()
+    opsService.listDerivedAlerts = (async () => {
+      throw new Error('alerts slice down')
+    }) as AdminOpsService['listDerivedAlerts']
+    const govAlertsDown = await screen.getAdminSnapshot('gov')
+    const opsAlertsDown = await screen.getAdminSnapshot('ops')
+    opsService.listDerivedAlerts = (async (view, limit) => {
+      alertCalls += 1
+      return originalListDerivedAlerts(view, limit)
+    }) as AdminOpsService['listDerivedAlerts']
+    assert(
+      '3v. gov 不因未加载的告警源降级；ops 告警失败才 degraded',
+      govAlertsDown.status === 'ok'
+        && govAlertsDown.degraded === false
+        && !govAlertsDown.metrics.alertsRealtime
+        && opsAlertsDown.status === 'degraded'
+        && opsAlertsDown.metrics.alertsRealtime?.available === false
+        && opsAlertsDown.metrics.alertsRealtime?.reason === SCREEN_UNAVAILABLE_REASON.sourceQueryFailed
+        && opsAlertsDown.metrics.terminalsOnline?.available === true,
+      `gov=${govAlertsDown.status} ops=${opsAlertsDown.status}`,
+    )
+
     const extra = Array.from({ length: PARTNER_FLEET_TAKE }, (_, i) => ({
       id: `term_scrn_cap_${suffix}_${i}`,
       terminalCode: `SCRN-CAP-${suffix}-${String(i).padStart(3, '0')}`,
@@ -1015,6 +1115,10 @@ async function assertServiceContract(): Promise<void> {
       online?.available === true
         ? `total=${online.value.total} sampled=${online.value.sampledCount} matched=${online.value.matchedCount} sum=${sampleSum}`
         : 'unavailable',
+    )
+    assert(
+      '3j3. 截断机队快照仍不含 agentToken 种子',
+      !JSON.stringify(cappedPartner).includes(`tok_cap_${suffix}`),
     )
 
     cache.clear()
