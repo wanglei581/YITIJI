@@ -9,6 +9,8 @@ closed/unpaid + `ONLINE_PAID_PENDING_REFUND`，`RefundService` / 对账 / Admin 
 **本轮范围：** 只改 `services/api/src/payment/**`、必要的 Admin 订单只读路径、对应 verify 与两份进度文档。
 不改 schema / 前端 / CI / 部署 / 真实支付。本候选已 rebase 到 `origin/main@eb0f20341`（含 PR #1040/#1041）。
 
+**本候选当前状态：** 已 rebase 到 `origin/main@eb0f20341`，图谱已按标准命令刷新，聚焦支付门禁与仓库/CI/deploy/graph 门禁本机全 0。仍只是本地候选。
+
 **下一阶段（本轮之后才做）：** 独立只读复审 → 如需再开 PR；CI 全绿前不得合入；合入前不得部署或跑真实退款。
 本条是支付候选自己的下一步，不替代下面生产 API-only 发布阻塞。
 

@@ -10,7 +10,13 @@
   重复请求幂等；明确拒绝后同号可重试。
 - **可见性：** 对账差异 `ONLINE_COLLECTED_PENDING_REFUND`（金额计入 gross，不伪装 paid）；
   Admin `refundRequired` / `refundEligible` 覆盖该态。
-- **证据边界：** `SOURCE / LOCAL` 以本机 verify 为准；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
+- **rebase 后本机复跑：** `verify:admin-orders-refund`（含 `verify:api20-manual-refund`）、
+  `verify:reconciliation`、`verify:admin-orders-readonly`、`verify:refund-real-channels`（36）、
+  `verify:payment-flow`、`verify:refund-idempotent`（31）、`verify:wechat-refund-notify`（14）、
+  `verify:refund-convergence`（6）、API `typecheck` / `build`、`verify:repository-integrity`、
+  `verify:ci-gate-coverage`、`verify:deploy-gates-in-sync`、`git diff --check`、`pnpm graph` +
+  `graph:check` 均为 0。图谱只刷新 `docs/graph/gates.md` 与 `docs/graph/graph.json`。
+- **证据边界：** `SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
   未 push、未开 PR、未合并、未跑真实支付。
 
 2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent

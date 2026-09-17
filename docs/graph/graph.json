@@ -22340,7 +22340,8 @@
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
-      "services/api/scripts/verify-member-print-orders.ts"
+      "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-refund-real-channels.ts"
     ],
     "services/api/src/payment/price-config.seed.ts": [
       "services/api/scripts/verify-admin-billing.ts",
@@ -33879,6 +33880,7 @@
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/payment-provider.factory.ts",
           "services/api/src/payment/payment-provider.types.ts",
+          "services/api/src/payment/pending-refund-signal.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/providers/alipay.provider.ts",
