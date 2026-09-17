@@ -1,5 +1,24 @@
 # 当前开发进度
 
+2026-09-17 **生产 API-only 发布控制面候选：阻止 API 修复连带覆盖三端前端。** Windows Agent
+`0.4.11` 在精确候选 `50483cd28096780c5e6c4260dde86dec36e7d99f` 上安装后，心跳因生产 API
+仍缺少 `55c32296f` 新增的 `scanInput*` DTO 白名单字段而返回
+`400 VALIDATION_FAILED`；Agent 已停止，本任务不启动 Agent、不执行打印或扫描。目标 SHA 对应的
+main CI 是 `34992685756`（success），不是 Windows 安装包工作流 `35002676954`。生产只读预检
+run `35229197747` 已通过：默认 API 目录、PM2 进程名、回环健康检查、Redis 均正常，备份盘可用
+20 GiB，当前 `DEPLOY_SOURCE` 仍为 `a8a521cb...`。
+
+- **发布控制面：** 手动 `workflow_dispatch` 新增必填 `deploy_scope`，默认 `api-only`；自动
+  `workflow_run` 继续使用原有 `full` 语义。`api-only` 仍校验 main CI 精确 SHA，并执行既有
+  API 发布脚本的 PostgreSQL 全库备份、运行目录备份、additive migrations、API 构建、PM2 重启和
+  健康检查；它明确跳过发布工作流的三端前端预构建和 API 脚本的三端 `dist` 前置校验，并在 API
+  健康后立即退出；运行目录同步时额外排除 `apps/{kiosk,admin,partner}/dist`，因此不删除或替换
+  前端产物副本，也不覆盖 Kiosk/Admin/Partner nginx 目录、不重载 nginx、不回写静态
+  `latest-deployed.txt`。
+- **当前证据边界：** 本条仅是源码候选，尚未 push、PR、合并或生产执行；
+  `DEPLOY_API_ENABLED=false` 未打开。完成本地验证和 PR CI 后，才允许短时打开门禁，以
+  `ci_run_id=34992685756`、`deploy_scope=api-only` 部署精确 `50483cd...`，随后立即关闭门禁。
+
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
 `34984568841`。`postgres-readiness / Core verify suites on PG` 与

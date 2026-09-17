@@ -15,6 +15,15 @@ fi
 : "${TARGET_SHA:?TARGET_SHA is required}"
 : "${CI_RUN:?CI_RUN is required}"
 : "${DEPLOY_PATH:?DEPLOY_PATH is required}"
+: "${DEPLOY_SCOPE:?DEPLOY_SCOPE is required}"
+
+case "$DEPLOY_SCOPE" in
+  api-only | full) ;;
+  *)
+    echo "::error::invalid DEPLOY_SCOPE: $DEPLOY_SCOPE" >&2
+    exit 1
+    ;;
+esac
 
 if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then
   echo "::error::PRINT_REQUIRE_PII_SCAN must be explicitly true before production release" >&2
@@ -232,25 +241,41 @@ if [ ! -f "$DEPLOY_PATH/services/api/dist/config/production-runtime-gates.js" ];
 fi
 test -f "$DEPLOY_PATH/services/api/dist/config/production-runtime-gates.js"
 
-echo "=== 4b. 校验三端前端 dist 均已构建（防止 rsync --delete 误删运行目录）==="
-for app in kiosk admin partner; do
-  if [ ! -f "$DEPLOY_PATH/apps/$app/dist/index.html" ]; then
-    echo "::error::missing $DEPLOY_PATH/apps/$app/dist/index.html; build all frontends before release" >&2
-    exit 1
-  fi
-done
+if [ "$DEPLOY_SCOPE" = "full" ]; then
+  echo "=== 4b. 校验三端前端 dist 均已构建（防止 rsync --delete 误删运行目录）==="
+  for app in kiosk admin partner; do
+    if [ ! -f "$DEPLOY_PATH/apps/$app/dist/index.html" ]; then
+      echo "::error::missing $DEPLOY_PATH/apps/$app/dist/index.html; build all frontends before release" >&2
+      exit 1
+    fi
+  done
+else
+  echo "=== 4b. API-only：跳过三端前端 dist 校验 ==="
+fi
 
 echo "=== 5. 同步运行目录（保留 .env / storage）==="
+RSYNC_EXCLUDES=(
+  --exclude '.git'
+  --exclude '.claude'
+  --exclude '.ccg'
+  --exclude 'node_modules'
+  --exclude '.env.local'
+  --exclude '.env.production'
+  --exclude '.env.development'
+  --exclude 'services/api/.env'
+  --exclude 'services/api/storage'
+)
+if [ "$DEPLOY_SCOPE" = "api-only" ]; then
+  # --delete 会删除 source 中不存在的 receiver 文件。API-only 不构建前端，
+  # 因此必须保护运行目录已有 dist，避免 API 发布改变任何前端产物副本。
+  RSYNC_EXCLUDES+=(
+    --exclude 'apps/kiosk/dist'
+    --exclude 'apps/admin/dist'
+    --exclude 'apps/partner/dist'
+  )
+fi
 rsync -a --delete \
-  --exclude '.git' \
-  --exclude '.claude' \
-  --exclude '.ccg' \
-  --exclude 'node_modules' \
-  --exclude '.env.local' \
-  --exclude '.env.production' \
-  --exclude '.env.development' \
-  --exclude 'services/api/.env' \
-  --exclude 'services/api/storage' \
+  "${RSYNC_EXCLUDES[@]}" \
   "$DEPLOY_PATH/" "$RUNTIME_ROOT/"
 
 echo "=== 6. 收敛运行目录依赖并执行 additive 迁移 ==="
