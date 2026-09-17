@@ -2269,7 +2269,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/providers/sandbox-payment.provider.ts` | `verify-admin-print-scan.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-payment-codepay.ts`<br/>`verify-payment-flow.ts`<br/>`verify-refund-idempotent.ts` |
 | `services/api/src/payment/providers/wechat-pay.provider.ts` | `verify-payment-codepay.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/qr-payment-expiry.task.ts` | `verify-payment-codepay.ts` |
-| `services/api/src/payment/reconciliation.service.ts` | `verify-reconciliation.ts`<br/>`verify-wechat-refund-regression.ts` |
+| `services/api/src/payment/reconciliation.service.ts` | `verify-admin-billing-ui.mjs`<br/>`verify-reconciliation.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/refund-convergence.task.ts` | `verify-api20-manual-refund.ts`<br/>`verify-refund-convergence.ts` |
 | `services/api/src/payment/refund.service.ts` | `verify-admin-orders-refund.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-order.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/policies/dto/policy.dto.ts` | `verify-policies.ts`<br/>`verify-policy-eligibility.ts` |
