@@ -193,7 +193,13 @@ Page({
   },
 
   /** 这条响应还能不能写进 data：账号没变（含补签升级）+ 页面在前台 + 本通道最新一次。 */
-  _accepts(token) {
+  /**
+   * 代次 / 通道 / 账号三层。**不回答"这一页是谁的"** —— 那是 _confirmOwner 的事。
+   *
+   * 失败响应只走这一层：写一句错误文案不涉及任何本人数据，不该要求归属；
+   * 更要紧的是失败**不得**建立归属 —— 服务端恰恰拒绝了这个账号。
+   */
+  _verifyChannel(token) {
     const state = this._resolveAccount()
     if (state === 'changed') return false
     if (state === 'unusable') {
@@ -204,6 +210,64 @@ Page({
     }
     if (!sameAccount(token && token.identity, this._account)) return false
     return this._guard.accepts(token)
+  },
+
+  /**
+   * 成功响应能不能写屏。'accept' | 'confirm' | 'drop'
+   *
+   * 比 _verifyChannel 多问一句**这一页到底是谁的** —— 而这一句恰恰是代次 / 通道 /
+   * 账号三层合起来也回答不了的（见 R12 的长注释）。
+   */
+  _verify(token) {
+    if (!this._verifyChannel(token)) return 'drop'
+    if (this._confirmOwner(token)) return 'accept'
+
+    // 归属没能建立。只有「发出时归属未定」那一发值得追一发确认请求：它已经把
+    // request.js 的 401 静默补签触发过一次，此刻本地可能已经有确定账号了。
+    // 发出时就带着确定账号的那一发走到这里只说明归属对不上（比如开页那位不是这位），
+    // 一律丢弃 —— 否则确认请求自己又会触发确认，成为一个打不完的循环。
+    return isMemberIdentity(token && token.identity) ? 'drop' : 'confirm'
+  },
+
+  /**
+   * 归属由**服务端**认下来 —— 这是本页唯一能在 onLoad 之外建立 `_openerAccount` 的路。
+   *
+   * 判据是"这一发是**带着哪个已知账号**发出去的"，不是"回调这一刻本地是谁"。后者是
+   * R10 栽的那一跤：`auth.saveSession` 不需要任何生命周期回调，于是在途期间静默登录
+   * 进来的另一位会被原样读成"补签回来的本人"。这一条不依赖回调时读到的任何东西：
+   *   ① `token.identity` 在**发出请求之前**就是一个确定的会员键；
+   *   ② 服务端的 requireOwned 按发出这一发时的登录态校验了归属，并返回了 200；
+   *   ③ 这中间没有发生过身份跳变 —— 快照非空时 `resolveAccountState` 看得见
+   *      `'u:A' → 'u:B'`，那一跳会先一步走 'changed' 清场，根本到不了这里；
+   *      这里再核一次 `token.identity === this._account` 把它钉死。
+   *
+   * `_openerAccount === ''` 就是"这一页还没有人认领"—— 那时任何响应都不许写屏。
+   * 这一句必须**无条件**问，不能挪到成功之后"顺手补登记"：R11 就是那么写的，
+   * 于是归属未定那一发照样先把 A 的到机码渲染给了 B。
+   */
+  _confirmOwner(token) {
+    if (this._openerAccount) return this._openerAccount === this._account
+    if (!isMemberIdentity(token && token.identity)) return false
+    if (token.identity !== this._account) return false
+    this._openerAccount = token.identity
+    return true
+  },
+
+  /**
+   * 追一发确认请求。
+   *
+   * 调用时机只有一处：一发**发出时归属未定**的请求刚刚成功落定。它的 200 什么都
+   * 证明不了，但它已经把 request.js 的 401 静默补签触发过一次；如果此刻本地已经有了
+   * 确定账号，就拿它再问服务端一次 —— 那一发才是能定归属的那一发。
+   *
+   * 这就是"过期开页"要多走一个来回的地方。多出来的那一次往返换掉的是一条永久
+   * fail-closed：本人照常能恢复显示，而别人只会拿到服务端的 404。
+   */
+  _requestOwnerConfirmation() {
+    if (!this._guard.isActive()) return
+    // 本地仍然认不出人（补签也没救回来）：没有账号可以拿去问，只能 fail-closed。
+    if (!isMemberIdentity(this._account)) { this._failClosed(); return }
+    this._load()
   },
 
   /**
@@ -244,12 +308,20 @@ Page({
   // 下一次 onShow 会重新取数，真属于当前这位的详情会再写回来。
   onHide() {
     this._guard.deactivate()
+    // 页面还活着，切回来时会**先按 data 渲染一帧**再走 onShow —— 所以这里必须走
+    // setData 让视图层真的清掉，否则回到本页的第一帧就是上一位的到机码。
     this._clearSensitive({ loading: true, error: '', errorTitle: ERROR_TITLE_DEFAULT })
   },
 
   onUnload() {
     this._guard.deactivate()
-    this._clearSensitive({ loading: true, error: '', errorTitle: ERROR_TITLE_DEFAULT })
+    // **这里不走 setData。** 页面正在销毁：视图不会再渲染一帧，而真机上对已卸载的
+    // 页面调 setData 会被框架告警（也确实没有意义）。这一步要的只是"别让这个页面
+    // 对象继续持有上一位的凭证"—— 直接把内存里那一份清掉即可，效果与 setData 等价。
+    // 「迟到的响应不得复活凭证」由上一行的 deactivate() 保证（active=false 且代次 +1），
+    // 不依赖这里清没清。
+    this.data.detail = null
+    this.data.cancelling = false
   },
 
   _load() {
@@ -264,16 +336,13 @@ Page({
     this.setData({ loading: true, error: '', errorTitle: ERROR_TITLE_DEFAULT })
     api.getCloudPrintOrder(this._orderId)
       .then((raw) => {
-        // _accepts 内部会**先执行**账号判定：换人 / 前台静默登出时，光丢弃这条响应
+        // _verify 内部会**先执行**账号判定：换人 / 前台静默登出时，光丢弃这条响应
         // 不够 —— 屏幕上已经渲染出来的到机码要在这一刻就清掉。
-        if (!this._accepts(token)) return
-        // 归属由**服务端**认下来：requireOwned 是按发出这一发时的登录态校验的，
-        // 而那是谁在发出前就记进了令牌。发出时归属未定的那一发（token.identity 为 ''，
-        // 也就是"开页时 JWT 恰好已过期、靠 request.js 补签救回来"那条路）什么都
-        // 证明不了 —— 那段时间里完全可能是**另一个人**登录了进来。
-        if (!this._openerAccount && isMemberIdentity(token.identity) && token.identity === this._account) {
-          this._openerAccount = this._account
-        }
+        const verdict = this._verify(token)
+        // 这一发发出时归属未定：它的 200 证明不了这一页是谁的。追一发带着确定账号的
+        // 确认请求，由服务端来回答归属；在那之前一个字节都不写屏。
+        if (verdict === 'confirm') { this._requestOwnerConfirmation(); return }
+        if (verdict !== 'accept') return
         this.setData({
           loading: false,
           cancelling: false,
@@ -282,9 +351,13 @@ Page({
       })
       .catch((err) => {
         // 401 走到这里说明 request.js 连静默续签都没救回来（它续签失败时会 auth.logout()）。
-        // 那一刻起页面上的到机码属于一个已经不存在的会话 —— _accepts 里的账号判定
+        // 那一刻起页面上的到机码属于一个已经不存在的会话 —— _verify 里的账号判定
         // 会当场把它清掉，不必等用户离开本页再回来。
-        if (!this._accepts(token)) return
+        //
+        // 失败**不追确认请求、也不建立归属**：确认请求是为"归属未定那一发成功了、
+        // 但证明不了归属"准备的。失败时既没有归属可证，也没有内容可写；照追就会在
+        // 服务端持续 404（B 拿着 A 的 orderId）时变成一个打不完的循环。
+        if (!this._verifyChannel(token)) return
         this.setData({
           loading: false,
           errorTitle: ERROR_TITLE_DEFAULT,
@@ -336,14 +409,23 @@ Page({
     this.setData({ cancelling: true })
     api.cancelCloudPrintOrder(this._orderId)
       .then((raw) => {
-        if (!this._accepts(token)) return
+        if (this._verify(token) !== 'accept') return
+        // **跨通道因果**：取消成功意味着服务端此刻已经把到机码作废了（本页自己那句
+        // 「取消后到机码立即失效，且不能恢复」说的就是这件事）。而**更早发出、
+        // 仍在途**的那一发详情带着取消之前的 pending + 到机码，它在自己通道上还是
+        // "最新一次"，逐通道 latest-wins 拦不住它 —— 落地就是把一张已经失效的码
+        // 重新画回屏幕，连「取消订单」按钮都会跟着解开。
+        //
+        // 在 detail 通道上空领一个序号（不发请求）：latest-wins 随即把所有更早的
+        // 详情响应判成过期。用的是守卫本来就有的那套判据，不另起一个状态。
+        this._guard.issue('detail')
         this.setData({
           cancelling: false,
           detail: toDetail(raw),
         })
       })
       .catch((err) => {
-        if (!this._accepts(token)) return
+        if (!this._verifyChannel(token)) return
         this.setData({ cancelling: false })
         wx.showModal({
           title: '取消失败',
