@@ -4,9 +4,15 @@
 
 **当前候选判定：** 基线 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，已验证代码 / 手册
 锚点 `d71d022545d9ff56da155615710ce99851130753`。`SOURCE / LOCAL: GO`；
-`CI: NO-GO (PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。当前已 push 并创建 PR，但未合并、
+`CI: NO-GO (OLD HEAD FAILED / NEW HEAD PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。当前已 push 并创建 PR，但未合并、
 未部署，也未执行 Windows / 奔图动作。PR #1039 已于 2026-09-17 创建，首个包含测试装置隔离修复的 head 为
-`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`；候选 CI 正在运行，未完成前继续保持 `CI: NO-GO (PENDING)`。
+`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`。旧 head
+`3bf53a61ff974391363de41d696fcdd0fb58a1bf` 的 run `35229230129` 已完成，除
+`build-and-verify / verify:print-scan-first-release` 外，该 run 的 `postgres-readiness`、
+`kiosk-browser-smoke` 成功，`release-bundle` 按 PR 条件跳过；同 head 的 `windows-agent-installer` run
+`35229230120` 两个 job 均成功。288 条串行门禁中仅该一条失败，
+根因是 Task 11 验收索引在切换到 Agent 运行时 identity 口径时漏写“文字助手模式不豁免”。当前候选已只补
+该文档映射且定向门禁全绿；新 head CI 未完成前继续保持 `CI: NO-GO`。
 下表优先于后面的历史推进表；后续 main 若前进，所有现场和生产证据都要
 重新绑定实际候选或部署 SHA。
 

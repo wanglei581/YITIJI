@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-09-17 **Windows / 奔图现场验收前 R3 候选已完成本地收口并进入 PR #1039；候选 CI 正在运行，尚未合并、上 Windows、部署或操作硬件。**
+2026-09-17 **Windows / 奔图现场验收前 R3 候选已进入 PR #1039；旧 head 的必需 CI 首轮失败，修复后的新 head CI 待运行，尚未合并、上 Windows、部署或操作硬件。**
 集成基线为 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，分支
 `codex/windows-pantum-field-readiness-r3-20260917`，已验证的代码 / 手册锚点为
 `d71d022545d9ff56da155615710ce99851130753`。该锚点无冲突地汇入 7 个提交：小程序 / Kiosk
@@ -9,7 +9,13 @@
 `0ac3b4ab04a77dcf32995d87d930d79a136f7b7f`、Agent
 `f21c5246a9ab38670759027973dc8de975105337`；根 checkout 的脏状态和冲突未被修改。分支已推送为
 PR #1039，首个包含测试装置隔离与官方 DeepSeek 复审跟进的 head 为
-`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`；该 head 的必需 CI 尚未完成，不得沿用本地结果写成
+`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`。后续 head
+`3bf53a61ff974391363de41d696fcdd0fb58a1bf` 的 run `35229230129` 已完成：
+`postgres-readiness`、`kiosk-browser-smoke` 全绿，`release-bundle` 按 PR 条件跳过；同 head 的
+`windows-agent-installer` run `35229230120` 中 `unsigned-exe-upgrade`、`unsigned-msi-candidate` 全绿；
+`build-and-verify` 在 `Verify suites` 的 288 条串行命令中通过 287 条，唯一失败为
+`verify:print-scan-first-release` 仍要求验收索引保留“文字助手模式不豁免”映射。当前候选已把该句补到
+新的运行时终端身份口径中，定向门禁本地重新全绿；修复后的新 head 必需 CI 未完成前不得写成
 `CI: GO`。
 
 - **小程序 / Kiosk：** 订单详情在换人、登出、隐藏、卸载、迟到响应时清理详情与到机码；发出时
@@ -38,7 +44,13 @@ PR #1039，首个包含测试装置隔离与官方 DeepSeek 复审跟进的 head
   已改为只在 `agent-lock-mutation-*` 临时镜像中写入变异版 `instance-lock.ts`。可靠性门禁继续判杀六条
   反向变异，受控源码测试前后 SHA-256 一致；Hermes 对修复 diff 再复核为 `GO`，无新增 P0 / P1 / P2。
   该锚点仍表示运行时代码 / 现场手册；其上的跟进只改测试装置、进度文档和设计文案真值。
-- **证据边界：`SOURCE / LOCAL: GO`；`CI: NO-GO (PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+- **CI 首轮失败与最小修复：** GitHub 日志确认失败不是 Fast Refresh warning 造成的（Lint 步骤以
+  0 error 通过；日志中的 17 条 Fast Refresh warning 不构成失败），也不是 Kiosk browser smoke；
+  唯一决定性失败是验收索引把旧的构建期 `VITE_TERMINAL_ID` 门禁改成 Agent 运行时 identity 后，漏迁移
+  “文字助手模式不豁免”这条 Task 11 映射。只在
+  `docs/device/print-scan-first-release-acceptance.md` 的运行时身份行补回该约束，未改运行时代码、构建
+  门禁或硬件协议；`pnpm --filter @ai-job-print/api verify:print-scan-first-release` 已重新全绿。
+- **证据边界：`SOURCE / LOCAL: GO`；`CI: NO-GO (OLD HEAD FAILED / NEW HEAD PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
   macOS / 本地 CI 形态的 watcher、锁和清理测试不能证明 Windows `tasklist` CSV、NTFS `wx` 与删除
   共享、reparse point、`ProgramData` 路径、真实双进程启动或奔图物理结果。ACK 后任务存活协议、
   `lastAttemptHash` 作为采集归属、微信真机、生产部署与商业闭环也未在本候选中证明。
