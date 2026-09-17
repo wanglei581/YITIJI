@@ -3,7 +3,7 @@
 2026-09-17 **Windows / 奔图现场验收前 R3 候选已在独立集成分支完成本地收口；尚未 push、开 PR、跑候选 CI、上 Windows 或操作硬件。**
 集成基线为 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，分支
 `codex/windows-pantum-field-readiness-r3-20260917`，已验证的代码 / 手册锚点为
-`d71d0225483991f945f11e5b25c8dba0253c3697`。该锚点无冲突地汇入 7 个提交：小程序 / Kiosk
+`d71d022545d9ff56da155615710ce99851130753`。该锚点无冲突地汇入 7 个提交：小程序 / Kiosk
 `f8f46b6d2`、`69efe47a2`、`5fd69d56b`，Terminal Agent `5097a89d5`、`78d4ec054`，进度与
 现场手册 `0d08f7c72`、`d71d02254`。来源分支最终锚点分别为前端
 `0ac3b4ab04a77dcf32995d87d930d79a136f7b7f`、Agent
@@ -27,6 +27,14 @@
   Nous（`nous/upstage/solar-pro4:free`，session `20260917_204744_ea012f`）结论为 `PARTIAL`，未提出
   新的明确 P0 / P1 代码缺陷，主要要求保留 Windows、真机与后端证据边界。其提出的两个测试疑问已由
   R12-D 和 Kiosk “真实 taskId / payment session 重试”用例覆盖；`PARTIAL` 不等于代码 `NO-GO`。
+- **官方 DeepSeek 复审与跟进：** Hermes 使用官方 `provider=deepseek`、
+  `model=deepseek-v4-flash`、`reasoning=xhigh`（session `20260917_211325_74213a`）复审
+  `5baea09e4`，结论为源码 / 本地候选 `GO`，未发现 P0 / P1。其 P2-1 指出两份正式进度文档中的
+  `d71d02254` 完整 SHA 写错，已更正为可解析的
+  `d71d022545d9ff56da155615710ce99851130753`；P2-2 指出 Agent 反向变异测试会原地改写受控源码，
+  已改为只在 `agent-lock-mutation-*` 临时镜像中写入变异版 `instance-lock.ts`。可靠性门禁继续判杀六条
+  反向变异，受控源码测试前后 SHA-256 一致；Hermes 对修复 diff 再复核为 `GO`，无新增 P0 / P1 / P2。
+  该锚点仍表示运行时代码 / 现场手册；其上的跟进只改测试装置、进度文档和设计文案真值。
 - **证据边界：`SOURCE / LOCAL: GO`；`CI: NO-GO (PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
   macOS / 本地 CI 形态的 watcher、锁和清理测试不能证明 Windows `tasklist` CSV、NTFS `wx` 与删除
   共享、reparse point、`ProgramData` 路径、真实双进程启动或奔图物理结果。ACK 后任务存活协议、

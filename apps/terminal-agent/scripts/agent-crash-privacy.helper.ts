@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import {
   existsSync,
@@ -13,19 +12,40 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import {
+import { basename, dirname, join } from 'node:path'
+import { cleanupCrashLeftoverPrintTaskTemps } from '../src/agent/print-task-temp-cleanup'
+
+type InstanceLockModule = typeof import('../src/agent/instance-lock')
+
+const instanceLockOverride = process.env['AGENT_INSTANCE_LOCK_SOURCE_OVERRIDE']
+const instanceLockModulePath = instanceLockOverride ?? '../src/agent/instance-lock'
+const resolvedInstanceLockModulePath = require.resolve(instanceLockModulePath)
+if (instanceLockOverride) {
+  const mutationRoot = dirname(dirname(dirname(resolvedInstanceLockModulePath)))
+  assert.equal(
+    basename(mutationRoot).startsWith('agent-lock-mutation-'),
+    true,
+    'instance-lock override must point into an isolated mutation mirror',
+  )
+} else {
+  assert.equal(
+    resolvedInstanceLockModulePath,
+    require.resolve('../src/agent/instance-lock'),
+    'default instance-lock tests must load the tracked module',
+  )
+}
+const {
   __resetInstanceLockForTests,
   __setInstanceLockHooksForTests,
   getLockPath,
   releaseLock,
   tryAcquireLock,
-} from '../src/agent/instance-lock'
-import { cleanupCrashLeftoverPrintTaskTemps } from '../src/agent/print-task-temp-cleanup'
+} = require(resolvedInstanceLockModulePath) as InstanceLockModule
 
 const agentRoot = join(__dirname, '..')
 const helperPath = join(__dirname, 'agent-crash-privacy.helper.ts')
 const lockSourcePath = join(__dirname, '../src/agent/instance-lock.ts')
+const loggerSourcePath = join(__dirname, '../src/logger.ts')
 const indexSourcePath = join(__dirname, '../src/index.ts')
 const taskRunnerSourcePath = join(__dirname, '../src/agent/task-runner.ts')
 const cleanupSourcePath = join(__dirname, '../src/agent/print-task-temp-cleanup.ts')
@@ -72,10 +92,6 @@ const PUBLICATION_FAIL_UNLINK = `    // PUBLICATION_FAIL_NO_UNLINK: never path-u
     const code = (e as NodeJS.ErrnoException).code
     if (code === 'EEXIST' || code === 'EISDIR') return 'exists'
     return 'publication-failed'`
-
-function sha256(filePath: string): string {
-  return createHash('sha256').update(readFileSync(filePath)).digest('hex')
-}
 
 function sleepSync(ms: number): void {
   if (ms <= 0) return
@@ -431,9 +447,16 @@ function mutateAndRun(label: string, original: string, mutated: string, flag: st
   assert.equal(source.includes(original), true, `${label}: original block must exist`)
   const next = source.replace(original, mutated)
   assert.notEqual(next, source, `${label}: mutation must change the file`)
-  const before = sha256(lockSourcePath)
+  const mutationRoot = mkdtempSync(join(tmpdir(), 'agent-lock-mutation-'))
+  const mutationSrc = join(mutationRoot, 'src')
+  const mutationAgent = join(mutationSrc, 'agent')
+  const mutationLockPath = join(mutationAgent, 'instance-lock.ts')
   try {
-    writeFileSync(lockSourcePath, next)
+    mkdirSync(mutationAgent, { recursive: true })
+    // instance-lock.ts currently has one relative dependency: ../logger.
+    // A future dependency change should fail loudly until this mirror is extended.
+    writeFileSync(mutationLockPath, next)
+    writeFileSync(join(mutationSrc, 'logger.ts'), readFileSync(loggerSourcePath))
     const child = spawnSync(
       process.execPath,
       ['-r', 'ts-node/register', helperPath, flag],
@@ -441,16 +464,24 @@ function mutateAndRun(label: string, original: string, mutated: string, flag: st
         cwd: agentRoot,
         encoding: 'utf8',
         timeout: 30_000,
-        env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
+        env: {
+          ...process.env,
+          TS_NODE_TRANSPILE_ONLY: '1',
+          AGENT_INSTANCE_LOCK_SOURCE_OVERRIDE: mutationLockPath,
+        },
       },
     )
     const output = `${child.stdout ?? ''}\n${child.stderr ?? ''}`
     assert.notEqual(child.status, 0, `${label}: mutated code must make the child nonzero\n${output}`)
     assert.match(output, mustFailOn, `${label}: child must fail on the intended assertion\n${output}`)
   } finally {
-    writeFileSync(lockSourcePath, source)
+    rmSync(mutationRoot, { recursive: true, force: true })
   }
-  assert.equal(sha256(lockSourcePath), before, `${label}: source must be restored byte-for-byte`)
+  assert.equal(
+    readFileSync(lockSourcePath, 'utf8'),
+    source,
+    `${label}: tracked source must remain byte-for-byte unchanged`,
+  )
 }
 
 function verifyReverseMutations(): void {

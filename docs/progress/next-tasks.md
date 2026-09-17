@@ -3,7 +3,7 @@
 ## 2026-09-17 Windows / 奔图现场候选 R3 本地收口后的唯一推进顺序
 
 **当前候选判定：** 基线 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，已验证代码 / 手册
-锚点 `d71d0225483991f945f11e5b25c8dba0253c3697`。`SOURCE / LOCAL: GO`；
+锚点 `d71d022545d9ff56da155615710ce99851130753`。`SOURCE / LOCAL: GO`；
 `CI: NO-GO (PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。当前未 push、未开 PR、未部署，
 也未执行 Windows / 奔图动作。下表优先于后面的历史推进表；后续 main 若前进，所有现场和生产证据都要
 重新绑定实际候选或部署 SHA。
