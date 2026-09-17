@@ -2,8 +2,9 @@
 
 ## 2026-09-18 Windows / 奔图现场候选 R3 当前推进顺序
 
-**当前候选判定：** `origin/main@3d35759ee2ae810716d08734752f0a3d1d9d7a66` 已在本地通过
-`145fde67d` 合入，安全修复代码锚点为 `6243fab25`。`SOURCE / LOCAL / REVIEW: GO`；
+**当前候选判定：** `origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7` 已在本地通过
+`145fde67d` 合入 PR 分支，安全修复代码锚点为 `8542b0973`。`SOURCE / LOCAL: GO`；
+`REVIEW: PARTIAL`（自 PID / release 遭外部路径替换的 P2 分歧待 Windows 证据）；
 `CI: NO-GO (CURRENT MERGED TREE NOT RUN)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
 PR #1039 的远端仍停在旧 head；`792a9f987` 的绿 CI 绑定旧 merge ref，不能复用。当前本地提交尚未
 推送；未获得行动时授权前不 push、不合并、不部署、不操作 Windows / 奔图。

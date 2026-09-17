@@ -1,32 +1,37 @@
 # 当前开发进度
 
-2026-09-18 **PR #1039 已在本地合入当前 `main` 并关闭实例锁 P1；新合并树尚未推送或跑 CI，未上 Windows、未部署、未操作硬件。**
-当前 `origin/main@3d35759ee2ae810716d08734752f0a3d1d9d7a66` 已由合并提交
+2026-09-18 **当前 `main` 已在本地合入 PR #1039 分支，并关闭实例锁与订单详情粘性拒绝 P1；新合并树尚未推送或跑 CI，未上 Windows、未部署、未操作硬件。**
+当前 `origin/main@eb0f20341cb9e1d174e26d73bac8e89f12ad50e7` 已由合并提交
 `145fde67d` 纳入分支 `codex/windows-pantum-field-readiness-r3-20260917`，安全修复代码锚点为
-`6243fab25`。`main` 新增的 API-only 发布控制面治理完整保留；本轮没有打开生产闸门。
+`8542b0973`。`main` 中 PR #1041 的 API-only 发布 helper 固定与 SHA-256 校验治理完整保留；本轮没有
+打开生产闸门。
 
 - **旧 CI 只作历史证据：** `792a9f987af84a795431747248e546bf2f1abbb6` 的 CI run
   `35235786133` 已完成 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 全绿，
   288/288 verify 通过；installer run `35235786159` 两个 job 全绿。但该结果绑定 GitHub merge ref
-  `792a9f987 × main@50483cd28`，不能外推到当前 `main@3d35759ee` 的本地合并树。
+  `792a9f987 × main@50483cd28`，不能外推到当前 `main@eb0f20341` 的本地合并树。
 - **实例锁 P1：** 复审确认旧实现的“检查 inode/PID 后再按路径 unlink”存在真实 TOCTOU；Grok 首版
   只增加二次检查仍未关闭窗口，Agy 判 `NO-GO`，官方 DeepSeek Hermes 在注入抢占下 4/4 复现两个
   进程同时 `acquired`。最终方案删除外来陈旧锁的自动接管：活外来 PID 返回 `duplicate`；严格解析但
   已死亡的外来 PID 返回 `stale_lock_requires_operator`，不删除、重命名、截断或覆盖。操作者必须先
   确认服务停止且锁内 PID 不存在，再删除精确 `agent.pid`；设计与现场手册已同步该可用性代价。
-- **小程序 R12-F/H：** 服务端已接受的取消结果跨 hide/show 保存，并使更早详情响应失效；后台到达
+- **小程序 R12-F/L：** 服务端已接受的取消结果跨 hide/show 保存，并使更早详情响应失效；后台到达
   不写屏，回前台也不能复活到机码；A 的取消不能修改 B 的页面。服务端已按归属拒绝的账号会粘性
-  停止重复确认请求。生命周期测试由 166 增至 **170/170**。
+  停止重复确认请求，但只接受同时满足 `404 + PRINT_ORDER_NOT_FOUND` 的当前通道响应；网关 404、
+  缺状态码的业务码、hide 后或换人后迟到的拒绝都不能盖章。生命周期测试由 166 增至 **174/174**。
 - **现场文档：** 两份验收文档的 Agent 运行时身份端点已从不存在的 `/local/identity` 更正为
   `/local/terminal-identity`；“文字助手模式不豁免”约束继续保留。
 - **本地验证：** Agent typecheck、`verify:print-scan-agent`、`verify:task-reliability`；miniapp
-  `verify:static`（含 170/170）；API `verify:print-scan-first-release`；仓库完整性、CI 门禁覆盖、部署
+  `verify:static`（静态门禁 **137/137**、生命周期 **174/174**）；API `verify:print-scan-first-release`；仓库完整性、CI 门禁覆盖、部署
   门禁同步、图谱一致性与 `git diff --check` 全部通过。
 - **独立复审：** Grok 完成实现；Agy 对最终 fail-closed 方案为本地集成 `GO`；Hermes 使用官方
   `provider=deepseek`、`model=deepseek-v4-flash`、`reasoning=xhigh`（session
-  `20260918_003747_5a4be4`）确认原 P1 已结构性不可达、代码 `GO`；Claude Haiku 仅复核订单详情
-  两个前端文件（session `aaa48843-f010-4ad1-85f9-ca6e09889171`），结论 `GO`、170/170。
-- **证据边界：`SOURCE / LOCAL / REVIEW: GO`；`CI: NO-GO (CURRENT MERGED TREE NOT RUN)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
+  `20260918_003747_5a4be4`）确认原锁 P1 已结构性不可达、代码 `GO`。Grok 对合并树总审又发现
+  order-detail 的 OR 条件与守卫前盖章 P1，已由 `8542b0973` 修复并补四条判红用例及静态门禁。
+  Claude Haiku 对该最终前端修复（session `534d2397-0e17-4392-a4b2-f563b6f8f7f6`）结论为通过。
+  Grok 仍把“自 PID 回收 / 正常释放时路径被外部删除并替换”的窗口列为 P2；Agy / Hermes 认为在
+  外来启动者不再自动删锁的协议内可本地集成。该分歧留到 Windows 现场验证，不压成一致批准。
+- **证据边界：`SOURCE / LOCAL: GO`；`REVIEW: PARTIAL`；`CI: NO-GO (CURRENT MERGED TREE NOT RUN)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。**
   macOS / 本地探针不能证明 Windows `tasklist` CSV、NTFS、ProgramData ACL、服务异常退出后的人工清锁、
   真实双进程、奔图出纸/扫描或微信真机。ACK 后任务存活协议与 `lastAttemptHash` 归属口径未修改。
 
