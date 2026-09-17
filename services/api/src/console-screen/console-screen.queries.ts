@@ -16,9 +16,9 @@ import type { DeviceFleetOverview } from '../device-fleet/device-fleet.types'
 import { buildPublishedJobWhere } from '../jobs/jobs-shared'
 import type { PrismaService } from '../prisma/prisma.service'
 import {
+  FLEET_SAMPLE_TAKE,
   JUMP_LOOKBACK_DAYS,
   JUMP_SOURCE_GROUP_TAKE,
-  PARTNER_FLEET_TAKE,
   PRINT_TREND_DAY_COUNT,
   PRINT_TREND_ROW_CAP,
   daysAgoStart,
@@ -28,10 +28,32 @@ import {
   shanghaiDayStart,
   unavailableMetric,
 } from './console-screen.metric'
+import {
+  type PartnerOrgId,
+  partnerOrgIdWhere,
+  partnerSourceOrgWhere,
+  requirePartnerOrgId,
+} from './console-screen.org'
 
 const PENDING = { in: ['pending', 'reviewing'] }
 const PUBLISHED = { reviewStatus: 'approved', publishStatus: 'published' }
 const ACTIVE_PRINT = ['pending', 'claimed', 'printing']
+/** 累计只加已支付订单的内容页；不乘 copies，也不把 unpaid/refunded 算进去。 */
+const PAID_BILLABLE = { payStatus: 'paid', billablePages: { not: null } } as const
+
+const FLEET_TERMINAL_SELECT = {
+  id: true,
+  terminalCode: true,
+  displayName: true,
+  locationLabel: true,
+  enabled: true,
+  org: { select: { name: true } },
+  heartbeats: {
+    orderBy: { createdAt: 'desc' as const },
+    take: 1,
+    select: { status: true, agentVersion: true, createdAt: true },
+  },
+}
 
 export interface ContentSlice {
   inventory: ScreenContentInventoryValue
@@ -78,8 +100,9 @@ function countMap(rows: Array<{ status: string; _count: { _all: number } }>): Re
   return out
 }
 
-function orgWhere(orgId: string | undefined): { sourceOrgId: string } | Record<string, never> {
-  return orgId ? { sourceOrgId: orgId } : {}
+function sourceOrgFilter(orgId: PartnerOrgId | undefined): { sourceOrgId: string } | Record<string, never> {
+  if (orgId === undefined) return {}
+  return partnerSourceOrgWhere(orgId)
 }
 
 export function mapFleetOverview(
@@ -116,35 +139,25 @@ export function mapFleetOverview(
   }
 }
 
-export interface PartnerFleetSlice {
+export interface FleetSlice {
   overview: DeviceFleetOverview
   matchedCount: number
   truncated: boolean
 }
 
-export async function loadPartnerFleet(
+export type PartnerFleetSlice = FleetSlice
+
+async function loadFleetSlice(
   prisma: PrismaService,
   now: Date,
-  orgId: string,
-): Promise<PartnerFleetSlice> {
-  const matchedCount = await prisma.terminal.count({ where: { orgId } })
+  where: { orgId: string } | Record<string, never>,
+): Promise<FleetSlice> {
+  const matchedCount = await prisma.terminal.count({ where })
   const terminals = await prisma.terminal.findMany({
-    where: { orgId },
+    where,
     orderBy: { terminalCode: 'asc' },
-    take: PARTNER_FLEET_TAKE,
-    select: {
-      id: true,
-      terminalCode: true,
-      displayName: true,
-      locationLabel: true,
-      enabled: true,
-      org: { select: { name: true } },
-      heartbeats: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-        select: { status: true, agentVersion: true, createdAt: true },
-      },
-    },
+    take: FLEET_SAMPLE_TAKE,
+    select: FLEET_TERMINAL_SELECT,
   })
   return {
     overview: buildDeviceFleetOverview(
@@ -152,19 +165,31 @@ export async function loadPartnerFleet(
       now,
     ),
     matchedCount,
-    truncated: matchedCount > PARTNER_FLEET_TAKE,
+    truncated: matchedCount > FLEET_SAMPLE_TAKE,
   }
+}
+
+export async function loadAdminFleet(prisma: PrismaService, now: Date): Promise<FleetSlice> {
+  return loadFleetSlice(prisma, now, {})
+}
+
+export async function loadPartnerFleet(
+  prisma: PrismaService,
+  now: Date,
+  orgId: string,
+): Promise<FleetSlice> {
+  return loadFleetSlice(prisma, now, partnerOrgIdWhere(requirePartnerOrgId(orgId)))
 }
 
 export async function loadContentSlice(
   prisma: PrismaService,
   now: Date,
-  orgId?: string,
+  orgId?: PartnerOrgId,
 ): Promise<ContentSlice> {
-  const scoped = orgWhere(orgId)
-  const jobPublishedWhere = orgId
-    ? { ...buildPublishedJobWhere({ sourceOrgId: orgId }, now) }
-    : buildPublishedJobWhere(undefined, now)
+  const scoped = sourceOrgFilter(orgId)
+  const jobPublishedWhere = orgId === undefined
+    ? buildPublishedJobWhere(undefined, now)
+    : buildPublishedJobWhere(partnerSourceOrgWhere(orgId), now)
   const fairPublishedWhere = {
     ...PUBLISHED,
     ...scoped,
@@ -224,7 +249,10 @@ export async function loadPrintLiveSlice(prisma: PrismaService, now: Date): Prom
       where: { status: { in: [...ACTIVE_PRINT] } },
       _count: { _all: true },
     }),
-    prisma.printTask.count({ where: { status: 'failed', updatedAt: { gte: dayStart } } }),
+    prisma.printTaskStatusLog.count({
+      // 按失败事件发生日计，不用 PrintTask.updatedAt，避免历史失败被改行复活。
+      where: { toStatus: 'failed', createdAt: { gte: dayStart } },
+    }),
     prisma.printTask.groupBy({
       by: ['status'],
       where: { createdAt: { gte: since24h } },
@@ -251,20 +279,22 @@ export async function loadPrintCumulativeSlice(
   now: Date,
 ): Promise<PrintCumulativeSlice> {
   const trendFrom = daysAgoStart(now, PRINT_TREND_DAY_COUNT)
+  const paidTrendWhere = {
+    ...PAID_BILLABLE,
+    paidAt: { not: null, gte: trendFrom },
+  }
   const [pageSum, trendCount] = await Promise.all([
     prisma.order.aggregate({
-      where: { billablePages: { not: null } },
+      where: PAID_BILLABLE,
       _sum: { billablePages: true },
     }),
-    prisma.order.count({
-      where: { createdAt: { gte: trendFrom }, billablePages: { not: null } },
-    }),
+    prisma.order.count({ where: paidTrendWhere }),
   ])
   let trend: ScreenPrintTrendValue | 'capped' = 'capped'
   if (trendCount <= PRINT_TREND_ROW_CAP) {
     const rows = await prisma.order.findMany({
-      where: { createdAt: { gte: trendFrom }, billablePages: { not: null } },
-      select: { createdAt: true, billablePages: true },
+      where: paidTrendWhere,
+      select: { paidAt: true, billablePages: true },
       take: PRINT_TREND_ROW_CAP,
     })
     const buckets = new Map<string, number>()
@@ -273,7 +303,8 @@ export async function loadPrintCumulativeSlice(
       buckets.set(day, 0)
     }
     for (const row of rows) {
-      const key = shanghaiDayKey(row.createdAt)
+      if (!row.paidAt) continue
+      const key = shanghaiDayKey(row.paidAt)
       if (!buckets.has(key)) continue
       buckets.set(key, (buckets.get(key) ?? 0) + (row.billablePages ?? 0))
     }
@@ -352,13 +383,13 @@ export async function loadAiSlice(prisma: PrismaService, now: Date): Promise<AiS
 export async function loadSyncSlice(
   prisma: PrismaService,
   now: Date,
-  orgId?: string,
+  orgId?: PartnerOrgId,
 ): Promise<SyncSlice> {
   const rows = await prisma.syncLog.groupBy({
     by: ['result'],
     where: {
       createdAt: { gte: hoursAgo(now, 24) },
-      ...(orgId ? { orgId } : {}),
+      ...(orgId === undefined ? {} : partnerOrgIdWhere(orgId)),
     },
     _count: { _all: true },
   })
@@ -390,11 +421,11 @@ export async function loadJumpRows(prisma: PrismaService, now: Date): Promise<Ju
 export async function loadFairSlice(
   prisma: PrismaService,
   now: Date,
-  orgId?: string,
+  orgId?: PartnerOrgId,
 ): Promise<ScreenFairStructureValue> {
   const fairWhere = {
     ...PUBLISHED,
-    ...orgWhere(orgId),
+    ...sourceOrgFilter(orgId),
     startAt: { lte: now },
     endAt: { gte: now },
   }

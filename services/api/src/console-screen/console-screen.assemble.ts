@@ -15,20 +15,19 @@ import {
 import {
   availableMetric,
   filterSourceEntryOpens,
-  PARTNER_FLEET_TAKE,
+  FLEET_SAMPLE_TAKE,
   unavailableMetric,
 } from './console-screen.metric'
 import type {
   AiSlice,
   ContentSlice,
+  FleetSlice,
   JumpRow,
-  PartnerFleetSlice,
   PrintCumulativeSlice,
   PrintLiveSlice,
   SyncSlice,
 } from './console-screen.queries'
 import { mapFleetOverview } from './console-screen.queries'
-import type { DeviceFleetOverview } from '../device-fleet/device-fleet.types'
 import type { ScreenMetric } from './console-screen.types'
 
 const MISSING_ORG = SCREEN_UNAVAILABLE_REASON.missingOrgIdOnAiAndOrders
@@ -71,7 +70,7 @@ export function pickMetrics(
 }
 
 export function assembleAdminMetrics(input: {
-  fleet: Loaded<DeviceFleetOverview>
+  fleet: Loaded<FleetSlice>
   content: Loaded<ContentSlice>
   printLive: Loaded<PrintLiveSlice>
   printCumulative: Loaded<PrintCumulativeSlice>
@@ -81,7 +80,13 @@ export function assembleAdminMetrics(input: {
   fairs: Loaded<ScreenFairStructureValue>
   alerts: Loaded<ScreenAlertsValue>
 }): ScreenSnapshotMetrics {
-  const fleet = input.fleet.ok ? mapFleetOverview(input.fleet.value) : null
+  const fleet = input.fleet.ok
+    ? mapFleetOverview(input.fleet.value.overview, {
+        matchedCount: input.fleet.value.matchedCount,
+        truncated: input.fleet.value.truncated,
+        sampleCap: FLEET_SAMPLE_TAKE,
+      })
+    : null
   const sourceOpens = input.jumps.ok
     ? (() => {
         const jump = filterSourceEntryOpens(input.jumps.value)
@@ -110,7 +115,7 @@ export function assembleAdminMetrics(input: {
     fleetWall: fleet
       ? availableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', fleet.wall)
       : unavailableMetric('Terminal+TerminalHeartbeat / device-fleet', '180s', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed),
-    printPagesCumulative: fromLoaded(input.printCumulative, 'Order.billablePages', 'cumulative', (slice) => slice.pages),
+    printPagesCumulative: fromLoaded(input.printCumulative, 'Order.payStatus=paid,billablePages', 'cumulative', (slice) => slice.pages),
     aiCallsCumulative: fromLoaded(input.ai, 'AiServiceLog.count', 'cumulative', (slice) => ({
       totalCalls: slice.totalCalls,
     })),
@@ -125,14 +130,14 @@ export function assembleAdminMetrics(input: {
       totalCalls: slice.windowCalls,
     })),
     printTrend14d: !input.printCumulative.ok
-      ? unavailableMetric('Order.createdAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed)
+      ? unavailableMetric('Order.payStatus=paid,paidAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.sourceQueryFailed)
       : input.printCumulative.value.trend === 'capped'
-        ? unavailableMetric('Order.createdAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded)
-        : availableMetric('Order.createdAt+billablePages', '14d', input.printCumulative.value.trend),
+        ? unavailableMetric('Order.payStatus=paid,paidAt+billablePages', '14d', SCREEN_UNAVAILABLE_REASON.windowRowCapExceeded)
+        : availableMetric('Order.payStatus=paid,paidAt+billablePages', '14d', input.printCumulative.value.trend),
     visitCount: unavailableMetric('KioskSession', 'current', SCREEN_UNAVAILABLE_REASON.kioskSessionUnwritten),
     suppliesAndMap: unavailableMetric('TerminalHeartbeat', 'current', SCREEN_UNAVAILABLE_REASON.noConsumableOrGeo),
     printInProgress: fromLoaded(input.printLive, 'PrintTask.status', 'current', (slice) => slice.inProgress),
-    printFailedToday: fromLoaded(input.printLive, 'PrintTask.status=failed', 'shanghai-day', (slice) => ({
+    printFailedToday: fromLoaded(input.printLive, 'PrintTaskStatusLog.toStatus=failed', 'shanghai-day', (slice) => ({
       failed: slice.failedToday,
     })),
     pendingReview: fromLoaded(input.content, 'reviewStatus pending+reviewing', 'current', (slice) => slice.pending),
@@ -166,7 +171,7 @@ export function assembleAdminMetrics(input: {
 }
 
 export function assemblePartnerMetrics(input: {
-  fleet: Loaded<PartnerFleetSlice>
+  fleet: Loaded<FleetSlice>
   content: Loaded<ContentSlice>
   sync: Loaded<SyncSlice>
   fairs: Loaded<ScreenFairStructureValue>
@@ -175,7 +180,7 @@ export function assemblePartnerMetrics(input: {
     ? mapFleetOverview(input.fleet.value.overview, {
         matchedCount: input.fleet.value.matchedCount,
         truncated: input.fleet.value.truncated,
-        sampleCap: PARTNER_FLEET_TAKE,
+        sampleCap: FLEET_SAMPLE_TAKE,
       })
     : null
   const blocked = (source: string, reason: string) => unavailableMetric(source, 'current', reason)

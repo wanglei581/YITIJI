@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto'
 import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BadRequestException, Module, ValidationPipe } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Module, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtModule, JwtService } from '@nestjs/jwt'
 import { Reflector } from '@nestjs/core'
@@ -34,7 +34,6 @@ import {
 } from '../../../packages/shared/src/types/consoleScreen'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
-import { DeviceFleetService } from '../src/device-fleet/device-fleet.service'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import { RedisService } from '../src/common/redis/redis.service'
@@ -43,8 +42,24 @@ import { AdminScreenController } from '../src/console-screen/console-screen.admi
 import { PartnerScreenController } from '../src/console-screen/console-screen.partner.controller'
 import { ConsoleScreenService } from '../src/console-screen/console-screen.service'
 import { ScreenSnapshotCache, SCREEN_CACHE_MAX_KEYS, containsFailedLoaded } from '../src/console-screen/console-screen.cache'
-import { filterSourceEntryOpens, JUMP_SOURCE_GROUP_TAKE, PARTNER_FLEET_TAKE, snapshotLoadStatus } from '../src/console-screen/console-screen.metric'
+import {
+  filterSourceEntryOpens,
+  FLEET_SAMPLE_TAKE,
+  JUMP_SOURCE_GROUP_TAKE,
+  PARTNER_FLEET_TAKE,
+  shanghaiDayKey,
+  shanghaiDayStart,
+  snapshotLoadStatus,
+} from '../src/console-screen/console-screen.metric'
 import { metricKeysFor } from '../src/console-screen/console-screen.assemble'
+import {
+  loadAdminFleet,
+  loadContentSlice,
+  loadPartnerFleet,
+  loadPrintCumulativeSlice,
+  loadPrintLiveSlice,
+} from '../src/console-screen/console-screen.queries'
+import { PartnerOrgRequiredError, requirePartnerOrgId } from '../src/console-screen/console-screen.org'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 let passed = 0
@@ -163,6 +178,7 @@ function assertSourceContract(): void {
     'console-screen.dto.ts',
     'console-screen.metric.ts',
     'console-screen.module.ts',
+    'console-screen.org.ts',
   ].map((name) => stripComments(readSrc(`src/console-screen/${name}`))).join('\n')
 
   assert(
@@ -204,29 +220,40 @@ function assertSourceContract(): void {
       && !/files\.service/.test(moduleDir),
   )
   assert(
-    '1g. 聚合走 count/groupBy/aggregate，打印趋势与 Partner 机队有 take 上限',
+    '1g. 聚合走 count/groupBy/aggregate，打印趋势与机队有 take 上限',
     /groupBy\(/.test(queries)
       && /aggregate\(/.test(queries)
       && /take:\s*PRINT_TREND_ROW_CAP/.test(queries)
-      && /take:\s*PARTNER_FLEET_TAKE/.test(queries)
+      && /take:\s*FLEET_SAMPLE_TAKE/.test(queries)
       && /take:\s*JUMP_SOURCE_GROUP_TAKE/.test(queries)
       && /orderBy:\s*\{\s*_count:\s*\{\s*sourceName:\s*'desc'\s*\}/.test(queries)
-      && /prisma\.terminal\.count\(\{\s*where:\s*\{\s*orgId\s*\}/.test(queries)
+      && /prisma\.terminal\.count\(\{\s*where\s*\}/.test(queries)
+      && (queries.match(/prisma\.terminal\.findMany/g) ?? []).length === 1
+      && /loadAdminFleet/.test(queries)
+      && /loadPartnerFleet/.test(queries)
       && /prisma\.jobFair\.count/.test(queries)
       && !/prisma\.jobFair\.findMany/.test(queries)
+      && !/this\.fleet\.getOverview/.test(service)
+      && !/DeviceFleetModule/.test(readSrc('src/console-screen/console-screen.module.ts'))
       && !/findMany\(\s*\{[^}]*where:\s*\{\s*deletedAt:\s*null/.test(queries),
   )
   assert(
-    '1h. 在线窗口复用 device-fleet 180 秒',
-    service.includes('DeviceFleetService')
-      && queries.includes('DEVICE_FLEET_ONLINE_WINDOW_SECONDS')
+    '1h. 在线窗口复用 device-fleet 180 秒投影，不走无界 getOverview',
+    queries.includes('DEVICE_FLEET_ONLINE_WINDOW_SECONDS')
+      && queries.includes('buildDeviceFleetOverview')
+      && !service.includes('DeviceFleetService')
       && SCREEN_ONLINE_WINDOW_SECONDS === 180,
   )
   assert(
-    '1k. Partner 内容聚合在 orgId 存在时下推 sourceOrgId',
-    /buildPublishedJobWhere\(\{\s*sourceOrgId:\s*orgId/.test(queries)
-      && /orgId \? \{ orgId \}/.test(queries)
-      && /where:\s*\{\s*orgId\s*\}/.test(queries),
+    '1k. Partner 机构范围 fail-closed，空 orgId 不得退化成全局查询',
+    /partnerSourceOrgWhere\(orgId\)/.test(queries)
+      && /partnerOrgIdWhere\(/.test(queries)
+      && /requirePartnerOrgId/.test(service)
+      && /requirePartnerOrgId\(user\.orgId\)/.test(partnerController)
+      && /PartnerOrgRequiredError/.test(partnerController)
+      && !/orgId \? \{ sourceOrgId: orgId \}/.test(queries)
+      && !/orgId \? \{ orgId \}/.test(queries)
+      && !/orgId \? \{\.\.\.\}/.test(queries),
   )
   assert(
     '1i. 缓存三档 15/60/300、有 key 上限、Partner 缓存键含 orgId',
@@ -238,8 +265,9 @@ function assertSourceContract(): void {
       && /evictOldestIfNeeded/.test(readSrc('src/console-screen/console-screen.cache.ts'))
       && /inflight/.test(readSrc('src/console-screen/console-screen.cache.ts'))
       && /containsFailedLoaded/.test(readSrc('src/console-screen/console-screen.cache.ts'))
-      && /partner:\$\{orgId\}:realtime/.test(service)
-      && PARTNER_FLEET_TAKE === 200
+      && /partner:\$\{scopedOrgId\}:realtime/.test(service)
+      && PARTNER_FLEET_TAKE === FLEET_SAMPLE_TAKE
+      && FLEET_SAMPLE_TAKE === 200
       && JUMP_SOURCE_GROUP_TAKE === 32,
   )
   assert(
@@ -258,6 +286,36 @@ function assertSourceContract(): void {
     '1m. CI 直接执行 verify:console-screen-snapshot，不挂在 admin-ops 后面',
     apiPkg.scripts['verify:admin-ops'] === 'node -r @swc-node/register scripts/verify-admin-ops.ts'
       && /pnpm --filter @ai-job-print\/api verify:console-screen-snapshot/.test(ciYml),
+  )
+  const sqliteSchema = readSrc('prisma/schema.prisma')
+  const pgSchema = readSrc('prisma/postgres/schema.prisma')
+  const sqliteIndexMigration = readSrc('prisma/migrations/20260917120000_add_console_screen_query_indexes/migration.sql')
+  const pgIndexMigration = readSrc('prisma/postgres/migrations/20260917120000_add_console_screen_query_indexes/migration.sql')
+  assert(
+    '1n. SQLite/PG schema 与双迁移都声明 toStatus+createdAt、createdAt+sourceName 索引',
+    /@@index\(\[toStatus, createdAt\]\)/.test(sqliteSchema)
+      && /@@index\(\[toStatus, createdAt\]\)/.test(pgSchema)
+      && /@@index\(\[createdAt, sourceName\]\)/.test(sqliteSchema)
+      && /@@index\(\[createdAt, sourceName\]\)/.test(pgSchema)
+      && sqliteIndexMigration.includes('PrintTaskStatusLog_toStatus_createdAt_idx')
+      && sqliteIndexMigration.includes('ExternalJumpLog_createdAt_sourceName_idx')
+      && pgIndexMigration.includes('PrintTaskStatusLog_toStatus_createdAt_idx')
+      && pgIndexMigration.includes('ExternalJumpLog_createdAt_sourceName_idx')
+      && sqliteIndexMigration.includes('CREATE INDEX')
+      && pgIndexMigration.includes('CREATE INDEX')
+      && !/DROP INDEX/.test(sqliteIndexMigration)
+      && !/DROP INDEX/.test(pgIndexMigration),
+  )
+  assert(
+    '1o. 累计只计 paid 内容页，趋势按 paidAt，今日失败按状态日志 createdAt',
+    /payStatus:\s*'paid'/.test(queries)
+      && /select:\s*\{\s*paidAt:\s*true,\s*billablePages:\s*true/.test(queries)
+      && /printTaskStatusLog\.count/.test(queries)
+      && /toStatus:\s*'failed'/.test(queries)
+      && !/status:\s*'failed',\s*updatedAt/.test(queries)
+      && !/select:\s*\{\s*createdAt:\s*true,\s*billablePages:\s*true/.test(queries)
+      && !/\bcopies\b/.test(queries)
+      && /PartnerOrgRequiredError/.test(service),
   )
 }
 
@@ -389,6 +447,20 @@ async function assertPureHelpers(): Promise<void> {
   assert('2l. reject 之后可以重试', retryLoads === 1 && retried.value === 9)
 
   assert('2m. 含 ok:false 的聚合判定为失败切片', containsFailedLoaded({ fleet: { ok: false, reason: 'source_query_failed' } }))
+
+  const rejectedOrgIds: unknown[] = [null, undefined, '', '   ', '\n\t', 0, {}, []]
+  assert(
+    '2n. Partner orgId 空/空白/不可解析一律 throw，不得当成全局',
+    rejectedOrgIds.every((value) => {
+      try {
+        requirePartnerOrgId(value)
+        return false
+      } catch (error) {
+        return error instanceof PartnerOrgRequiredError
+      }
+    })
+      && requirePartnerOrgId(' org_ok ') === 'org_ok',
+  )
 }
 
 async function assertServiceContract(): Promise<void> {
@@ -414,9 +486,8 @@ async function assertServiceContract(): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const cache = new ScreenSnapshotCache()
-  const fleet = new DeviceFleetService(prisma)
   const ops = new AdminOpsService(prisma)
-  const screen = new ConsoleScreenService(prisma, fleet, ops, cache)
+  const screen = new ConsoleScreenService(prisma, ops, cache)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const orgA = `org_scrn_a_${suffix}`
@@ -430,12 +501,19 @@ async function assertServiceContract(): Promise<void> {
   const adminId = `user_scrn_ad_${suffix}`
   const memberId = `eu_scrn_${suffix}`
   const taskA = `pt_scrn_a_${suffix}`
-  const ids = { orgA, orgB, srcA, srcB, termA, termB, userA, userB, adminId, memberId, taskA }
+  const taskHist1 = `pt_scrn_h1_${suffix}`
+  const taskHist2 = `pt_scrn_h2_${suffix}`
+  const taskHist3 = `pt_scrn_h3_${suffix}`
+  const taskRecovered = `pt_scrn_ok_${suffix}`
+  const userBlank = `user_scrn_nb_${suffix}`
+  const printTaskIds = [taskA, taskHist1, taskHist2, taskHist3, taskRecovered]
+  const ids = { orgA, orgB, srcA, srcB, termA, termB, userA, userB, adminId, memberId, taskA, userBlank }
 
   const cleanup = async () => {
     await prisma.externalJumpLog.deleteMany({ where: { endUserId: memberId } })
     await prisma.aiServiceLog.deleteMany({ where: { terminalId: { in: [termA, termB] } } })
-    await prisma.printTask.deleteMany({ where: { id: taskA } })
+    await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: printTaskIds } } })
+    await prisma.printTask.deleteMany({ where: { id: { in: printTaskIds } } })
     await prisma.order.deleteMany({ where: { terminalId: { in: [termA, termB] } } })
     await prisma.syncLog.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
     await prisma.job.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
@@ -445,7 +523,7 @@ async function assertServiceContract(): Promise<void> {
     await prisma.jobSource.deleteMany({ where: { id: { in: [srcA, srcB] } } })
     await prisma.terminalHeartbeat.deleteMany({ where: { terminal: { orgId: { in: [orgA, orgB] } } } })
     await prisma.terminal.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
-    await prisma.user.deleteMany({ where: { id: { in: [userA, userB, adminId] } } })
+    await prisma.user.deleteMany({ where: { id: { in: [userA, userB, adminId, userBlank] } } })
     await prisma.endUser.deleteMany({ where: { id: memberId } })
     await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } })
   }
@@ -470,6 +548,7 @@ async function assertServiceContract(): Promise<void> {
         { id: adminId, username: `scrn_admin_${suffix}`, name: 'scrn admin', passwordHash: 'hash', role: 'admin', enabled: true, tokenVersion: 0 },
         { id: userA, username: `scrn_pa_${suffix}`, name: 'scrn partner a', passwordHash: 'hash', role: 'partner', orgId: orgA, enabled: true, tokenVersion: 0 },
         { id: userB, username: `scrn_pb_${suffix}`, name: 'scrn partner b', passwordHash: 'hash', role: 'partner', orgId: orgB, enabled: true, tokenVersion: 0 },
+        { id: userBlank, username: `scrn_nb_${suffix}`, name: 'scrn partner blank', passwordHash: 'hash', role: 'partner', orgId: null, enabled: true, tokenVersion: 0 },
       ],
     })
     await prisma.endUser.create({
@@ -502,11 +581,111 @@ async function assertServiceContract(): Promise<void> {
         { sourceId: srcB, orgId: orgB, dataType: 'job', syncMode: 'manual', result: 'failed', addedCount: 0, createdAt: now },
       ],
     })
+    const yesterdayInstant = new Date(shanghaiDayStart(now).getTime() - 60_000)
+    const todayKey = shanghaiDayKey(now)
+    const yesterdayKey = shanghaiDayKey(yesterdayInstant)
     await prisma.printTask.create({
       data: { id: taskA, terminalId: termA, fileUrl: 'https://internal/secret', fileMd5: 'md5', paramsJson: '{}', status: 'printing' },
     })
-    await prisma.order.create({
-      data: { orderNo: `SCRN-${suffix}`, type: 'print', terminalId: termA, amountCents: 50, billablePages: 3, payStatus: 'paid', taskStatus: 'printing' },
+    await prisma.printTask.createMany({
+      data: [
+        { id: taskHist1, terminalId: termA, fileUrl: 'https://internal/hist1', fileMd5: 'md5h1', paramsJson: '{}', status: 'failed', createdAt: yesterdayInstant },
+        { id: taskHist2, terminalId: termA, fileUrl: 'https://internal/hist2', fileMd5: 'md5h2', paramsJson: '{}', status: 'failed', createdAt: yesterdayInstant },
+        { id: taskHist3, terminalId: termA, fileUrl: 'https://internal/hist3', fileMd5: 'md5h3', paramsJson: '{}', status: 'failed', createdAt: yesterdayInstant },
+        { id: taskRecovered, terminalId: termA, fileUrl: 'https://internal/ok', fileMd5: 'md5ok', paramsJson: '{}', status: 'completed', createdAt: now },
+      ],
+    })
+    await prisma.printTaskStatusLog.createMany({
+      data: [
+        { taskId: taskHist1, fromStatus: 'printing', toStatus: 'failed', createdAt: yesterdayInstant },
+        { taskId: taskHist2, fromStatus: 'printing', toStatus: 'failed', createdAt: yesterdayInstant },
+        { taskId: taskHist3, fromStatus: 'printing', toStatus: 'failed', createdAt: yesterdayInstant },
+        { taskId: taskRecovered, fromStatus: 'printing', toStatus: 'failed', createdAt: now },
+      ],
+    })
+    const paidSeed = await prisma.order.create({
+      data: {
+        orderNo: `SCRN-${suffix}`,
+        type: 'print',
+        terminalId: termA,
+        amountCents: 50,
+        billablePages: 3,
+        payStatus: 'paid',
+        taskStatus: 'printing',
+        paidAt: now,
+        printParamsJson: JSON.stringify({ copies: 9 }),
+      },
+    })
+    await prisma.orderItem.create({
+      data: {
+        orderId: paidSeed.id,
+        seq: 1,
+        fileId: `file_scrn_${suffix}`,
+        colorMode: 'bw',
+        duplex: 'one_sided',
+        copies: 9,
+        billablePages: 3,
+        amountCents: 50,
+      },
+    })
+    await prisma.order.createMany({
+      data: [
+        {
+          orderNo: `SCRN-Y-${suffix}`,
+          type: 'print',
+          terminalId: termA,
+          amountCents: 10,
+          billablePages: 5,
+          payStatus: 'paid',
+          taskStatus: 'completed',
+          createdAt: now,
+          paidAt: yesterdayInstant,
+          printParamsJson: JSON.stringify({ copies: 13 }),
+        },
+        {
+          orderNo: `SCRN-T-${suffix}`,
+          type: 'print',
+          terminalId: termA,
+          amountCents: 10,
+          billablePages: 7,
+          payStatus: 'paid',
+          taskStatus: 'completed',
+          createdAt: yesterdayInstant,
+          paidAt: now,
+          printParamsJson: JSON.stringify({ copies: 11 }),
+        },
+        {
+          orderNo: `SCRN-U-${suffix}`,
+          type: 'print',
+          terminalId: termA,
+          amountCents: 10,
+          billablePages: 100,
+          payStatus: 'unpaid',
+          taskStatus: 'pending',
+          printParamsJson: JSON.stringify({ copies: 2 }),
+        },
+        {
+          orderNo: `SCRN-R-${suffix}`,
+          type: 'print',
+          terminalId: termA,
+          amountCents: 10,
+          billablePages: 80,
+          payStatus: 'refunded',
+          taskStatus: 'completed',
+          paidAt: now,
+          printParamsJson: JSON.stringify({ copies: 4 }),
+        },
+        {
+          orderNo: `SCRN-P-${suffix}`,
+          type: 'print',
+          terminalId: termA,
+          amountCents: 10,
+          billablePages: 40,
+          payStatus: 'paying',
+          taskStatus: 'pending',
+          printParamsJson: JSON.stringify({ copies: 3 }),
+        },
+      ],
     })
     await prisma.aiServiceLog.createMany({
       data: [
@@ -568,11 +747,90 @@ async function assertServiceContract(): Promise<void> {
         && ops.metrics.sourceEntryOpensTop.value.items.some((item) => item.sourceName === jumpQualified && item.count >= 20)
         && !ops.metrics.sourceEntryOpensTop.value.items.some((item) => item.sourceName === jumpSmall),
     )
+    const trendDays = gov.metrics.printTrend14d?.available === true
+      ? gov.metrics.printTrend14d.value.days
+      : []
+    const todayPages = trendDays.find((day) => day.date === todayKey)?.pages
+    const yesterdayPages = trendDays.find((day) => day.date === yesterdayKey)?.pages
+    const copiesProduct = 3 * 9 + 5 * 13 + 7 * 11
     assert(
-      '3h. 累计打印页来自 Order.billablePages 聚合',
+      '3h. 累计只计当前 paid 的内容页，不乘 copies，unpaid/refunded/paying 不计',
       gov.metrics.printPagesCumulative?.available === true
-        && gov.metrics.printPagesCumulative.value.totalPages >= 3
+        && gov.metrics.printPagesCumulative.value.totalPages === 15
+        && gov.metrics.printPagesCumulative.value.totalPages !== copiesProduct
         && gov.metrics.printPagesCumulative.value.byColor.available === false,
+      gov.metrics.printPagesCumulative?.available
+        ? `totalPages=${gov.metrics.printPagesCumulative.value.totalPages}`
+        : 'unavailable',
+    )
+    assert(
+      '3h2. 趋势按 paidAt 落入上海自然日，不按 createdAt',
+      gov.metrics.printTrend14d?.available === true
+        && todayPages === 10
+        && yesterdayPages === 5,
+      `today=${String(todayPages)} yesterday=${String(yesterdayPages)} key=${todayKey}/${yesterdayKey}`,
+    )
+    assert(
+      '3h3. 今日失败按状态日志 createdAt，历史失败不因 updatedAt 复活',
+      ops.metrics.printFailedToday?.available === true
+        && ops.metrics.printFailedToday.value.failed === 1,
+      ops.metrics.printFailedToday?.available
+        ? `failed=${ops.metrics.printFailedToday.value.failed}`
+        : 'unavailable',
+    )
+
+    let blankCaught: unknown
+    try {
+      await screen.getPartnerSnapshot('   ')
+    } catch (error) {
+      blankCaught = error
+    }
+    let emptySliceCaught: unknown
+    try {
+      await loadContentSlice(prisma, now, '' as never)
+    } catch (error) {
+      emptySliceCaught = error
+    }
+    let emptyFleetCaught: unknown
+    try {
+      await loadPartnerFleet(prisma, now, '\t')
+    } catch (error) {
+      emptyFleetCaught = error
+    }
+    const partnerController = new PartnerScreenController(screen)
+    let controllerBlank: unknown
+    try {
+      await partnerController.getPartnerSnapshot({ userId: userA, role: 'partner', orgId: null }, {})
+    } catch (error) {
+      controllerBlank = error
+    }
+    let controllerWhitespace: unknown
+    try {
+      await partnerController.getPartnerSnapshot({ userId: userA, role: 'partner', orgId: '  ' }, {})
+    } catch (error) {
+      controllerWhitespace = error
+    }
+    assert(
+      '3h4. 空白/空 orgId fail-closed，不泄露跨机构数据',
+      blankCaught instanceof PartnerOrgRequiredError
+        && emptySliceCaught instanceof PartnerOrgRequiredError
+        && emptyFleetCaught instanceof PartnerOrgRequiredError
+        && controllerBlank instanceof ForbiddenException
+        && controllerWhitespace instanceof ForbiddenException
+        && JSON.stringify((controllerBlank as ForbiddenException).getResponse()).includes('ORG_REQUIRED')
+        && JSON.stringify((controllerWhitespace as ForbiddenException).getResponse()).includes('ORG_REQUIRED'),
+    )
+
+    const live = await loadPrintLiveSlice(prisma, now)
+    const cumulative = await loadPrintCumulativeSlice(prisma, now)
+    const cumulativeDays = cumulative.trend === 'capped' ? [] : cumulative.trend.days
+    assert(
+      '3h5. 查询函数与快照口径一致：paid 内容页=15、今日失败日志=1',
+      live.failedToday === 1
+        && cumulative.pages.totalPages === 15
+        && cumulative.trend !== 'capped'
+        && cumulativeDays.some((day) => day.date === todayKey && day.pages === 10)
+        && cumulativeDays.some((day) => day.date === yesterdayKey && day.pages === 5),
     )
     assert(
       '3i. 窗口、登录展示 LIMIT、freshness 写在响应里',
@@ -603,16 +861,23 @@ async function assertServiceContract(): Promise<void> {
     assert('3l. Partner 响应 audience=partner 且 generatedAt 为 ISO', partnerA.audience === 'partner' && /\d{4}-\d{2}-\d{2}T/.test(partnerA.generatedAt))
 
     let fleetCalls = 0
-    const original = fleet.getOverview.bind(fleet)
-    fleet.getOverview = async () => {
+    let seenFleetTake: unknown
+    const originalFindMany = prisma.terminal.findMany.bind(prisma.terminal)
+    prisma.terminal.findMany = (async (args?: unknown) => {
       fleetCalls += 1
-      return original()
-    }
+      seenFleetTake = args && typeof args === 'object' ? (args as { take?: unknown }).take : undefined
+      return originalFindMany(args as never)
+    }) as typeof prisma.terminal.findMany
     cache.clear()
     const firstGov = await screen.getAdminSnapshot('gov')
     const secondOps = await screen.getAdminSnapshot('ops')
-    assert('3m. gov/ops 共享 realtime 缓存，fleet 只打一次', fleetCalls === 1, `calls=${fleetCalls}`)
+    assert(
+      '3m. gov/ops 共享 realtime 缓存，fleet 只打一次且 take 有界',
+      fleetCalls === 1 && seenFleetTake === FLEET_SAMPLE_TAKE,
+      `calls=${fleetCalls} take=${String(seenFleetTake)}`,
+    )
     assert('3n. 第二次命中 realtime 缓存', firstGov.freshness.realtime === 'miss' && secondOps.freshness.realtime === 'hit')
+    prisma.terminal.findMany = originalFindMany
 
     const orgEmpty = `org_scrn_empty_${suffix}`
     await prisma.organization.create({
@@ -628,12 +893,11 @@ async function assertServiceContract(): Promise<void> {
     await prisma.organization.delete({ where: { id: orgEmpty } })
 
     cache.clear()
-    const originalOverview = fleet.getOverview.bind(fleet)
-    fleet.getOverview = async () => {
+    prisma.terminal.findMany = (async () => {
       throw new Error('fleet slice down')
-    }
+    }) as typeof prisma.terminal.findMany
     const degradedGov = await screen.getAdminSnapshot('gov')
-    fleet.getOverview = originalOverview
+    prisma.terminal.findMany = originalFindMany
     assert(
       '3p. 局部失败：机队 unavailable，其它计数仍在，status=degraded',
       degradedGov.status === 'degraded'
@@ -645,14 +909,14 @@ async function assertServiceContract(): Promise<void> {
 
     cache.clear()
     let fleetAttempts = 0
-    fleet.getOverview = async () => {
+    prisma.terminal.findMany = (async (args?: unknown) => {
       fleetAttempts += 1
       if (fleetAttempts === 1) throw new Error('transient fleet down')
-      return originalOverview()
-    }
+      return originalFindMany(args as never)
+    }) as typeof prisma.terminal.findMany
     const failedThen = await screen.getAdminSnapshot('gov')
     const recovered = await screen.getAdminSnapshot('gov')
-    fleet.getOverview = originalOverview
+    prisma.terminal.findMany = originalFindMany
     assert(
       '3r. 失败切片不入缓存，第二次会重新 load 且成功才缓存',
       failedThen.metrics.terminalsOnline?.available === false
@@ -708,6 +972,50 @@ async function assertServiceContract(): Promise<void> {
         : 'unavailable',
     )
 
+    cache.clear()
+    const adminFleet = await loadAdminFleet(prisma, now)
+    const adminMapped = await screen.getAdminSnapshot('ops')
+    const adminOnline = adminMapped.metrics.terminalsOnline
+    assert(
+      '3t. Admin 机队同样 count + 有界 sample，禁止无界 findMany',
+      adminFleet.truncated
+        && adminFleet.matchedCount === PARTNER_FLEET_TAKE + 2
+        && adminFleet.overview.summary.total === FLEET_SAMPLE_TAKE
+        && adminOnline?.available === true
+        && adminOnline.value.truncated
+        && adminOnline.value.sampledCount === FLEET_SAMPLE_TAKE
+        && adminOnline.value.matchedCount === PARTNER_FLEET_TAKE + 2
+        && adminOnline.value.sampleCap === FLEET_SAMPLE_TAKE,
+      adminOnline?.available
+        ? `sampled=${adminOnline.value.sampledCount} matched=${adminOnline.value.matchedCount}`
+        : `slice matched=${adminFleet.matchedCount} total=${adminFleet.overview.summary.total}`,
+    )
+
+    cache.clear()
+    let inflightFleetLoads = 0
+    let releaseFleet!: () => void
+    const fleetGate = new Promise<void>((resolve) => {
+      releaseFleet = resolve
+    })
+    prisma.terminal.findMany = (async (args?: unknown) => {
+      inflightFleetLoads += 1
+      await fleetGate
+      return originalFindMany(args as never)
+    }) as typeof prisma.terminal.findMany
+    const inflightGov = screen.getAdminSnapshot('gov')
+    while (inflightFleetLoads < 1) await Promise.resolve()
+    const inflightOps = screen.getAdminSnapshot('ops')
+    releaseFleet()
+    const [leftSnap, rightSnap] = await Promise.all([inflightGov, inflightOps])
+    prisma.terminal.findMany = originalFindMany
+    assert(
+      '3u. 服务层同一 realtime key 并发 miss 只 load 机队一次',
+      inflightFleetLoads === 1
+        && leftSnap.metrics.terminalsOnline?.available === true
+        && rightSnap.metrics.terminalsOnline?.available === true,
+      `loads=${inflightFleetLoads}`,
+    )
+
     await assertHttp(prisma, ids)
   } finally {
     await cleanup()
@@ -718,7 +1026,7 @@ async function assertServiceContract(): Promise<void> {
 
 async function assertHttp(
   prisma: PrismaService,
-  ids: { adminId: string; userA: string; orgA: string },
+  ids: { adminId: string; userA: string; orgA: string; userBlank: string },
 ): Promise<void> {
   if (process.env['CONSOLE_SCREEN_SKIP_HTTP'] === '1') {
     console.log('  SKIP HTTP（CONSOLE_SCREEN_SKIP_HTTP=1）')
@@ -737,7 +1045,6 @@ async function assertHttp(
     controllers: [AdminScreenController, PartnerScreenController],
     providers: [
       { provide: PrismaService, useValue: prisma },
-      DeviceFleetService,
       AdminOpsService,
       ConsoleScreenService,
       { provide: ScreenSnapshotCache, useValue: cache },
@@ -828,6 +1135,20 @@ async function assertHttp(
         && spoofBody.metrics?.jobsOnShelf?.available === true
         && spoofBody.metrics.jobsOnShelf.value?.published === 1,
       JSON.stringify(spoofBody).slice(0, 240),
+    )
+
+    const blankToken = jwt.sign({ sub: ids.userBlank, ver: 0, jti: randomUUID() })
+    const blankRes = await fetch(`${base}/partner/screen/snapshot`, {
+      headers: { Authorization: `Bearer ${blankToken}`, Accept: 'application/json' },
+    })
+    const blankText = await blankRes.text()
+    assert(
+      '4k. 未绑定机构的 partner 请求 fail-closed，响应不含跨机构岗位',
+      blankRes.status === 401
+        && !blankText.includes('A岗1')
+        && !blankText.includes('B岗1')
+        && !/"published":\s*[1-9]/.test(blankText),
+      `status=${blankRes.status} body=${blankText.slice(0, 200)}`,
     )
   } finally {
     await app.close()

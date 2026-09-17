@@ -7,7 +7,6 @@ import {
   type ScreenSnapshot,
 } from './console-screen.types'
 import { AdminOpsService } from '../admin-ops/admin-ops.service'
-import { DeviceFleetService } from '../device-fleet/device-fleet.service'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   assembleAdminMetrics,
@@ -19,6 +18,7 @@ import {
 import { ScreenSnapshotCache } from './console-screen.cache'
 import { ALERT_LIST_LIMIT, screenLimits, screenWindowMeta, snapshotLoadStatus } from './console-screen.metric'
 import {
+  loadAdminFleet,
   loadAiSlice,
   loadContentSlice,
   loadFairSlice,
@@ -28,6 +28,7 @@ import {
   loadPrintLiveSlice,
   loadSyncSlice,
 } from './console-screen.queries'
+import { PartnerOrgRequiredError, requirePartnerOrgId } from './console-screen.org'
 
 @Injectable()
 export class ConsoleScreenService {
@@ -35,7 +36,6 @@ export class ConsoleScreenService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fleet: DeviceFleetService,
     private readonly ops: AdminOpsService,
     private readonly cache: ScreenSnapshotCache,
   ) {}
@@ -89,18 +89,19 @@ export class ConsoleScreenService {
   }
 
   async getPartnerSnapshot(orgId: string): Promise<ScreenSnapshot> {
+    const scopedOrgId = requirePartnerOrgId(orgId)
     const now = new Date()
     const [realtime, counts] = await Promise.all([
       this.cache.getOrLoad(
-        `partner:${orgId}:realtime`,
+        `partner:${scopedOrgId}:realtime`,
         SCREEN_CACHE_TTL_SECONDS.realtime,
-        () => this.settle('partnerFleet', () => loadPartnerFleet(this.prisma, now, orgId)),
+        () => this.settle('partnerFleet', () => loadPartnerFleet(this.prisma, now, scopedOrgId)),
       ),
-      this.cache.getOrLoad(`partner:${orgId}:counts`, SCREEN_CACHE_TTL_SECONDS.counts, async () => {
+      this.cache.getOrLoad(`partner:${scopedOrgId}:counts`, SCREEN_CACHE_TTL_SECONDS.counts, async () => {
         const [content, sync, fairs] = await Promise.all([
-          this.settle('partnerContent', () => loadContentSlice(this.prisma, now, orgId)),
-          this.settle('partnerSync', () => loadSyncSlice(this.prisma, now, orgId)),
-          this.settle('partnerFairs', () => loadFairSlice(this.prisma, now, orgId)),
+          this.settle('partnerContent', () => loadContentSlice(this.prisma, now, scopedOrgId)),
+          this.settle('partnerSync', () => loadSyncSlice(this.prisma, now, scopedOrgId)),
+          this.settle('partnerFairs', () => loadFairSlice(this.prisma, now, scopedOrgId)),
         ])
         return { content, sync, fairs }
       }),
@@ -139,6 +140,7 @@ export class ConsoleScreenService {
     try {
       return { ok: true, value: await load() }
     } catch (error) {
+      if (error instanceof PartnerOrgRequiredError) throw error
       const errorName = error instanceof Error ? error.name : 'UnknownError'
       this.logger.warn(
         `console_screen_slice_failed slice=${slice} reason=${SCREEN_UNAVAILABLE_REASON.sourceQueryFailed} errorName=${errorName}`,
@@ -149,7 +151,7 @@ export class ConsoleScreenService {
 
   private async loadAdminRealtime(now: Date) {
     const [fleet, alertsResult, printLive] = await Promise.all([
-      this.settle('adminFleet', () => this.fleet.getOverview()),
+      this.settle('adminFleet', () => loadAdminFleet(this.prisma, now)),
       this.settle('adminAlerts', () => this.ops.listDerivedAlerts('open', ALERT_LIST_LIMIT)),
       this.settle('adminPrintLive', () => loadPrintLiveSlice(this.prisma, now)),
     ])

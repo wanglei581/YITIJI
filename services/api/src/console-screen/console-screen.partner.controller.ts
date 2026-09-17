@@ -5,6 +5,7 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { PartnerScreenQueryDto } from './console-screen.dto'
+import { PartnerOrgRequiredError, requirePartnerOrgId } from './console-screen.org'
 import { ConsoleScreenService } from './console-screen.service'
 
 @Controller()
@@ -25,11 +26,15 @@ export class PartnerScreenController {
     @CurrentUser() user: AuthedUser,
     @Query() _query: PartnerScreenQueryDto,
   ): Promise<ScreenSnapshot> {
-    if (!user.orgId) {
-      throw new ForbiddenException({
-        error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' },
-      })
+    try {
+      return this.screen.getPartnerSnapshot(requirePartnerOrgId(user.orgId))
+    } catch (error) {
+      if (error instanceof PartnerOrgRequiredError) {
+        throw new ForbiddenException({
+          error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' },
+        })
+      }
+      throw error
     }
-    return this.screen.getPartnerSnapshot(user.orgId)
   }
 }

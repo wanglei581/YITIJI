@@ -370,6 +370,7 @@ model PrintTaskStatusLog {
   createdAt  DateTime  @default(now())
 
   @@index([taskId, createdAt])
+  @@index([toStatus, createdAt])
 }
 
 // ── AlertDisposition ──────────────────────────────────────────────────────────
@@ -2392,6 +2393,7 @@ model ExternalJumpLog {
   @@index([endUserId, createdAt])
   @@index([endUserId, targetType, createdAt])
   @@index([expiresAt])
+  @@index([createdAt, sourceName])
 }
 
 // ── TerminalSmartCampusConfig ─────────────────────────────────────────────────
