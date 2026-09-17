@@ -4454,18 +4454,52 @@ test('R11-A2 order-detail：A 的请求在途时切到 B，A 的响应一个字�
   assert.ok(!JSON.stringify(page.data).includes('12345678'))
 })
 
-test('R11-B order-detail：请求在途时 onHide，迟到的响应不得把到机码写回来', async () => {
+test('R11-A3 order-detail：A 登出 → B 登录 → 回到本页，不得拿 B 的登录态去要 A 的订单', async () => {
   const wx = createWx()
   useRealAuth(wx, 'A')
   const pending = []
   const page = makeOrderDetail(wx, pending)
   page.onLoad({ orderId: 'ord-A' })
   page.onShow()
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：A 的码确实渲染出来了')
 
+  // 这条路径**看起来不像换人**：A 登出把快照清成 ''，B 登录之后这一跳在状态机眼里是
+  // '' → 'u:B' = 一次正常的补签升级 = 'ok'。只按"这一跳里身份变没变"判就会一路放行，
+  // 拿着**开页那位**的 orderId、带着 B 的登录态发请求。真正认得出它的只有
+  // 「当前这位是不是开页那位」这一条判据。
+  realAuth.logout()
+  page.onShow()
+  assert.equal(page.data.detail, null, '登出这一跳就该清场')
+
+  realAuth.saveSession({ token: jwt(Date.now() + JWT_TTL_MS), user: { id: 'B' } })
+  page.onShow()
+
+  assert.equal(pending.length, 1, '不得代表 B 去请求 A 的订单（服务端 requireOwned 必然 404，但请求已经发出去了）')
+  assert.equal(page.data.detail, null)
+  assert.ok(!JSON.stringify(page.data).includes('12345678'))
+  assert.equal(page.data.errorTitle, '账号已切换', page.data.error)
+})
+
+test('R11-B order-detail：已渲染后 onHide，迟到的响应不得把到机码写回来', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const pending = []
+  const page = makeOrderDetail(wx, pending)
+  page.onLoad({ orderId: 'ord-A' })
+  page.onShow()
+  // **必须先把码渲染出来**再切后台：请求还在途时 detail 本来就是 null，
+  // 那时断言"onHide 清掉了" 恒真 —— 等于给"onHide 根本不清场"发一张通行证。
+  pending[0].resolve(A_ORDER)
+  await flush()
+  assert.equal(page.data.detail.pickup, '12-34-56-78', '前提：码确实渲染出来了')
+
+  page.retry()
   page.onHide()
   assert.equal(page.data.detail, null, 'onHide 必须当场把凭证从 data 里清掉，不是只丢弃响应')
 
-  pending[0].resolve(A_ORDER)
+  pending[1].resolve(A_ORDER)
   await flush()
   assert.equal(page.data.detail, null, '切后台期间到达的响应不得复活凭证')
   assert.ok(!JSON.stringify(page.data).includes('12345678'))
