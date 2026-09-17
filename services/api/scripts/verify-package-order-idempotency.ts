@@ -98,7 +98,9 @@ type PackageView = {
   orderId: string
   orderNo: string
   pickupCode: string | null
+  pickupStatus: string
   payStatus: string
+  taskStatus: string
   amountCents: number
   items: Array<{ fileId: string; copies: number; colorMode: string; duplex: string; pageRange: string | null }>
 }
@@ -203,6 +205,7 @@ async function main(): Promise<void> {
   type OrderMut = {
     create: typeof prisma.order.create
     findFirst: typeof prisma.order.findFirst
+    updateMany: typeof prisma.order.updateMany
   }
   const orderMut = prisma.order as unknown as OrderMut
 
@@ -210,7 +213,7 @@ async function main(): Promise<void> {
     apply: (delegate: OrderMut, original: OrderMut) => void,
     run: () => Promise<T>,
   ): Promise<T> {
-    const original: OrderMut = { create: orderMut.create, findFirst: orderMut.findFirst }
+    const original: OrderMut = { create: orderMut.create, findFirst: orderMut.findFirst, updateMany: orderMut.updateMany }
     try {
       apply(orderMut, original)
       return await run()
@@ -273,6 +276,10 @@ async function main(): Promise<void> {
     amountCents?: number
     pickupCodeExpiresAt?: Date
     pickupStatus?: string
+    payStatus?: string
+    paymentSource?: string | null
+    paidAt?: Date | null
+    taskStatus?: string
   }): Promise<void> {
     const now = new Date()
     const amountCents = opts.amountCents ?? 80
@@ -287,8 +294,10 @@ async function main(): Promise<void> {
         amountCents,
         billablePages: 4,
         itemsJson: '[]',
-        payStatus: 'unpaid',
-        taskStatus: 'pending_release',
+        payStatus: opts.payStatus ?? 'unpaid',
+        paymentSource: opts.paymentSource ?? null,
+        paidAt: opts.paidAt ?? null,
+        taskStatus: opts.taskStatus ?? 'pending_release',
         pickupCodeHash: hashPickupCode(opts.code),
         pickupCodeEnc: encryptSecret(opts.code),
         pickupCodeCreatedAt: now,
@@ -310,6 +319,10 @@ async function main(): Promise<void> {
         },
       },
     })
+  }
+
+  async function markPaidAuditCount(orderId: string): Promise<number> {
+    return prisma.auditLog.count({ where: { action: 'order.mark_paid', targetId: orderId } })
   }
 
   try {
@@ -511,6 +524,149 @@ async function main(): Promise<void> {
     if (lateRow.payStatus !== 'closed' || lateRow.paymentSource) fail('截止后免费半完成不得入账')
     if (await prisma.order.count({ where: { idempotencyKey: lateKey } }) !== 1) fail('截止后免费半完成不得第二张单')
     pass('T8b 截止后免费半完成 → expired/closed，无新码、无第二张单')
+
+    const halfKey = randomUUID()
+    const halfCode = randomPickupCode()
+    const halfId = `ord_pkg_half_${suffix}`
+    await insertPackageOrder({
+      id: halfId, orderNo: `ORD-PKG-HALF-${suffix}`, key: halfKey, code: halfCode,
+      ownerId: userA, dto: dtoA, amountCents: 0,
+    })
+    await prisma.auditLog.create({
+      data: {
+        actorRole: 'system',
+        action: 'member.package_order.create',
+        targetType: 'order',
+        targetId: halfId,
+        payloadJson: '{}',
+      },
+    })
+    const halfCreateBefore = await createAuditCount(halfId)
+    const halfPaidBefore = await markPaidAuditCount(halfId)
+    const halfView = await packages.create(userA, dtoA, halfKey) as PackageView
+    if (halfView.orderId !== halfId) fail('截止前免费半完成必须回放原单')
+    if (halfView.payStatus !== 'paid' || halfView.pickupCode !== halfCode) {
+      fail(`截止前免费半完成应为 paid 且同码，实际 ${halfView.payStatus}/${halfView.pickupCode}`)
+    }
+    const halfRow = await prisma.order.findUniqueOrThrow({ where: { id: halfId } })
+    if (halfRow.payStatus !== 'paid' || halfRow.paymentSource !== 'free') fail('截止前免费半完成必须经 markPaid 收敛')
+    if (await createAuditCount(halfId) !== halfCreateBefore) fail('截止前免费半完成回放不得补写 create 审计')
+    if (await markPaidAuditCount(halfId) !== halfPaidBefore + 1) fail('截止前免费半完成必须写一笔 order.mark_paid')
+    if (await prisma.order.count({ where: { idempotencyKey: halfKey } }) !== 1) fail('截止前免费半完成不得第二张单')
+    pass('T8c 截止前免费半完成 unpaid/0 → paid/free，create 审计仍为 1')
+
+    const detailKey = randomUUID()
+    const detailCode = randomPickupCode()
+    const detailId = `ord_pkg_detail_${suffix}`
+    await insertPackageOrder({
+      id: detailId, orderNo: `ORD-PKG-DETAIL-${suffix}`, key: detailKey, code: detailCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+    })
+    const detailed = await packages.detail(userA, detailId) as PackageView
+    if (detailed.orderId !== detailId) fail('过期详情必须回同一张单')
+    if (detailed.pickupStatus !== 'expired' || detailed.payStatus !== 'closed') {
+      fail(`过期详情应为 expired/closed，实际 ${detailed.pickupStatus}/${detailed.payStatus}`)
+    }
+    if (detailed.pickupCode) fail('过期详情不得再露出到机码')
+    const detailRow = await prisma.order.findUniqueOrThrow({ where: { id: detailId } })
+    if (detailRow.pickupStatus !== 'expired' || detailRow.payStatus !== 'closed') {
+      fail('过期详情必须把终态落库，不能只在 view 里藏码')
+    }
+
+    const listKey = randomUUID()
+    const listCode = randomPickupCode()
+    const listId = `ord_pkg_list_${suffix}`
+    await insertPackageOrder({
+      id: listId, orderNo: `ORD-PKG-LIST-${suffix}`, key: listKey, code: listCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+    })
+    const listed = await packages.list(userA, { cursor: null, pageSize: 20 })
+    const listedRow = listed.items.find((row) => row.orderId === listId)
+    if (!listedRow) fail('过期列表必须仍能找回该单')
+    if (listedRow.pickupStatus !== 'expired' || listedRow.payStatus !== 'closed') {
+      fail(`过期列表应为 expired/closed，实际 ${listedRow.pickupStatus}/${listedRow.payStatus}`)
+    }
+    if (listedRow.pickupCode) fail('过期列表不得再露出到机码')
+    const listDb = await prisma.order.findUniqueOrThrow({ where: { id: listId } })
+    if (listDb.pickupStatus !== 'expired' || listDb.payStatus !== 'closed') {
+      fail('过期列表必须把终态落库')
+    }
+    pass('T8d 过期详情/列表与回放同一终态 expired/closed，无活码')
+
+    const casKey = randomUUID()
+    const casCode = randomPickupCode()
+    const casId = `ord_pkg_cas_${suffix}`
+    await insertPackageOrder({
+      id: casId, orderNo: `ORD-PKG-CAS-${suffix}`, key: casKey, code: casCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+    })
+    type UpdateMany = typeof prisma.order.updateMany
+    const originalUpdateMany = orderMut.updateMany.bind(prisma.order) as UpdateMany
+    let paidBeforeExpire = false
+    orderMut.updateMany = (async (args: Parameters<UpdateMany>[0]) => {
+      const where = args?.where as { id?: string; payStatus?: { in?: string[] } } | undefined
+      if (!paidBeforeExpire && where?.id === casId && Array.isArray(where.payStatus?.in) && where.payStatus.in.includes('unpaid')) {
+        paidBeforeExpire = true
+        await originalUpdateMany({
+          where: { id: casId, payStatus: 'unpaid' },
+          data: { payStatus: 'paid', paymentSource: 'offline', paidAt: new Date(), paidBy: 'system' },
+        })
+      }
+      return originalUpdateMany(args)
+    }) as UpdateMany
+    try {
+      const casReplay = await packages.create(userA, dtoA, casKey) as PackageView
+      if (casReplay.orderId !== casId) fail('过期回放并发入账必须仍是原单')
+      if (casReplay.pickupStatus !== 'expired') fail(`并发入账后 pickup 应为 expired，实际 ${casReplay.pickupStatus}`)
+      if (casReplay.pickupCode) fail('并发入账后过期回放不得再露出到机码')
+      const casRow = await prisma.order.findUniqueOrThrow({ where: { id: casId } })
+      if (casRow.payStatus !== 'paid' || casRow.paymentSource !== 'offline') {
+        fail(`并发 unpaid→paid 不得被过期写成 closed，实际 ${casRow.payStatus}/${casRow.paymentSource}`)
+      }
+      if (casRow.pickupStatus !== 'expired' || casRow.taskStatus !== 'expired') {
+        fail('并发入账后仍应过期 pickup/task')
+      }
+      if (!paidBeforeExpire) fail('T8e 必须先打到「过期写 unpaid 之前已被入账」这条竞态')
+      if (await prisma.order.count({ where: { idempotencyKey: casKey } }) !== 1) fail('并发入账过期不得第二张单')
+    } finally {
+      orderMut.updateMany = originalUpdateMany
+    }
+    pass('T8e 过期 CAS：并发 unpaid→paid 保留 paid，只过期 pickup/task')
+
+    const claimedKey = randomUUID()
+    const claimedCode = randomPickupCode()
+    const claimedId = `ord_pkg_claimed_${suffix}`
+    await insertPackageOrder({
+      id: claimedId, orderNo: `ORD-PKG-CLAIMED-${suffix}`, key: claimedKey, code: claimedCode,
+      ownerId: userA, dto: dtoA, pickupStatus: 'claimed',
+    })
+    const claimedView = await packages.create(userA, dtoA, claimedKey) as PackageView
+    if (claimedView.orderId !== claimedId) fail('claimed 回放必须原单')
+    if (claimedView.pickupStatus !== 'claimed') fail(`claimed 回放应保持 claimed，实际 ${claimedView.pickupStatus}`)
+    if (claimedView.pickupCode) fail('claimed 回放不得再露出活码')
+    if (await prisma.order.count({ where: { idempotencyKey: claimedKey } }) !== 1) fail('claimed 回放不得第二张单')
+    pass('T8f claimed 回放原单、无第二张、无活码')
+
+    const usedKey = randomUUID()
+    const usedCode = randomPickupCode()
+    const usedId = `ord_pkg_used_${suffix}`
+    await insertPackageOrder({
+      id: usedId, orderNo: `ORD-PKG-USED-${suffix}`, key: usedKey, code: usedCode,
+      ownerId: userA, dto: dtoA, pickupStatus: 'used', taskStatus: 'pending',
+      payStatus: 'paid', paymentSource: 'offline', paidAt: new Date(),
+    })
+    const usedPaidBefore = await markPaidAuditCount(usedId)
+    const usedView = await packages.create(userA, dtoA, usedKey) as PackageView
+    if (usedView.orderId !== usedId) fail('used 回放必须原单')
+    if (usedView.pickupStatus !== 'used') fail(`used 回放应保持 used，实际 ${usedView.pickupStatus}`)
+    if (usedView.payStatus !== 'paid') fail('used 回放不得改写已付')
+    if (usedView.pickupCode) fail('used 回放不得再露出活码')
+    if (await markPaidAuditCount(usedId) !== usedPaidBefore) fail('used 回放不得再 markPaid')
+    if (await prisma.order.count({ where: { idempotencyKey: usedKey } }) !== 1) fail('used 回放不得第二张单')
+    pass('T8g used 回放原单、无第二张、无活码')
 
     const collideKey = randomUUID()
     const collideCode = randomPickupCode()

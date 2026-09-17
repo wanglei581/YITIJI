@@ -204,7 +204,9 @@ export class PackageOrderService {
 
   async detail(endUserId: string, orderId: string) {
     const order = await this.requireOwned(endUserId, orderId)
-    return this.toView(order, this.visibleCode(order))
+    await this.expireIfNeeded(order)
+    const fresh = await this.requireOwned(endUserId, orderId)
+    return this.toView(fresh, this.visibleCode(fresh))
   }
 
   /**
@@ -226,6 +228,7 @@ export class PackageOrderService {
    * （visibleCode：pending 且未过期才给），不另开一套口径。
    */
   async list(endUserId: string, page: MemberPageQuery) {
+    await this.expireExpiredForUser(endUserId)
     const where = { endUserId, orderItems: { some: {} } }
     const total = await this.prisma.order.count({ where })
     const rows = await this.prisma.order.findMany({
@@ -276,21 +279,45 @@ export class PackageOrderService {
     return this.toView(order, this.visibleCode(order))
   }
 
+  /**
+   * Persist expired pickup windows. Two CAS writes so a concurrent unpaid→paid
+   * cannot be closed from a stale in-memory payStatus: unpaid/paying rows close;
+   * already-paid rows expire pickup/task only.
+   */
+  private async expireExpiredRows(scope: {
+    id?: string
+    endUserId?: string
+  }): Promise<void> {
+    const now = new Date()
+    const expiredPickup = ['pending', 'claimed']
+    const window = {
+      ...scope,
+      pickupStatus: { in: expiredPickup },
+      printTaskId: null,
+      pickupCodeExpiresAt: { lte: now },
+      ...(scope.endUserId ? { orderItems: { some: {} } } : {}),
+    }
+    await this.prisma.order.updateMany({
+      where: { ...window, payStatus: { in: ['unpaid', 'paying'] } },
+      data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
+    })
+    await this.prisma.order.updateMany({
+      where: { ...window, payStatus: { notIn: ['unpaid', 'paying'] } },
+      data: { pickupStatus: 'expired', taskStatus: 'expired' },
+    })
+  }
+
   private async expireIfNeeded(order: {
     id: string
     pickupStatus: string
     pickupCodeExpiresAt: Date | null
-    payStatus: string
   }): Promise<void> {
     if (!['pending', 'claimed'].includes(order.pickupStatus) || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
-    await this.prisma.order.updateMany({
-      where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
-      data: {
-        pickupStatus: 'expired',
-        taskStatus: 'expired',
-        payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
-      },
-    })
+    await this.expireExpiredRows({ id: order.id })
+  }
+
+  private async expireExpiredForUser(endUserId: string): Promise<void> {
+    await this.expireExpiredRows({ endUserId })
   }
 
   private async requireOwned(endUserId: string, orderId: string) {

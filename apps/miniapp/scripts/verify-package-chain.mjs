@@ -709,7 +709,7 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
   assert(/_lockAfterCreated\(orderId\)\s*\{[\s\S]{0,700}submitting: false/.test(confirmCode),
     '兜底状态解开 submitting')
   assert(/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(confirmCode),
-    '已建过单就不再 POST 第二次（服务端 CreatePackageOrder 没有幂等键）')
+    '已建过单就不再 POST 第二次（同键回放原单，页面不得把已存在的订单说成新单）')
   assert(/_loadQuote\(\)\s*\{[\s\S]{0,240}if \(this\._createdOrderId\) return/.test(confirmCode),
     '建单之后不再核价（再变 ready 等于把「确认下单」重新点亮）')
   assert(/quoteState === 'loading'\s*\n\s*&& !this\._guard\.accepts\(this\._quoteToken\)/.test(confirmCode),

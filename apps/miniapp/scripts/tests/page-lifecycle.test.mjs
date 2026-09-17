@@ -985,7 +985,7 @@ test('P1-4 跳转失败：不得卡在「提交中」，也不得让已创建的
   assert.equal(page.data.quoteRecover, 'orders', '必须给出找回这张订单的出口')
   assert.notEqual(page.data.quoteState, 'ready', '「确认下单」必须变灰，防止再下一单')
 
-  // 再点一次「确认下单」：绝不许再 POST（服务端没有幂等键，那就是第二张订单）
+  // 再点一次「确认下单」：绝不许再 POST（同键会回放原单，页面不得把旧单说成新单）
   page.submitOrder()
   await flush()
   assert.equal(creates, 1, '跳转失败后重复点击不得再次建单')
@@ -1955,7 +1955,7 @@ test('R4-4 同一个人建单成功：锁照常生效，再点一次不得发第
 
   page.submitOrder()
   await flush()
-  assert.equal(posts, 1, '已建过单就不许再 POST（服务端没有幂等键，第二次就是第二张订单）')
+  assert.equal(posts, 1, '已建过单就不许再 POST（同键会回放原单，页面不得把旧单说成新单）')
   assert.equal(page.data.submitting, false)
 })
 
