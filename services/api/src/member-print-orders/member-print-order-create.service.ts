@@ -75,7 +75,8 @@ function printParams(dto: CreateMemberPrintOrderDto): PrintJobParamsDto {
 
 /** Prisma @@unique map name. P2002 matching must pin this constraint, not orderNo / pickupCodeHash. */
 export const MEMBER_PRINT_ORDER_IDEMPOTENCY_UNIQUE = 'Order_endUserId_idempotencyKey_key'
-const IDEMPOTENCY_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+/** Lowercase UUID only. The Order unique is case-sensitive TEXT; `/i` would accept AAAA… as a new key. Do not toLowerCase(). */
+const IDEMPOTENCY_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 export function assertMemberPrintOrderIdempotencyKey(raw: unknown): string {
   if (raw == null || (typeof raw === 'string' && raw.trim() === '')) {

@@ -114,7 +114,7 @@ function assertKeyFormat(): void {
       if (codeOf(error) !== 'IDEMPOTENCY_KEY_REQUIRED') fail(`缺 key 错误码: ${codeOf(error)}`)
     }
   }
-  for (const raw of ['nope', '123', good.slice(0, 8), 'g'.repeat(36)]) {
+  for (const raw of ['nope', '123', good.slice(0, 8), 'g'.repeat(36), good.toUpperCase()]) {
     try {
       assertMemberPrintOrderIdempotencyKey(raw)
       fail(`非法 key 应拒绝: ${raw}`)
@@ -122,7 +122,7 @@ function assertKeyFormat(): void {
       if (codeOf(error) !== 'IDEMPOTENCY_KEY_INVALID') fail(`非法 key 错误码: ${codeOf(error)}`)
     }
   }
-  pass('缺/非法 Idempotency-Key 分别是 REQUIRED / INVALID')
+  pass('缺/非法 Idempotency-Key 分别是 REQUIRED / INVALID；大写 UUID 为 INVALID')
 }
 
 function assertCanonicalFingerprint(): void {
@@ -270,8 +270,12 @@ async function main(): Promise<void> {
     code: string
     ownerId: string
     dto: PackageDto
+    amountCents?: number
+    pickupCodeExpiresAt?: Date
+    pickupStatus?: string
   }): Promise<void> {
     const now = new Date()
+    const amountCents = opts.amountCents ?? 80
     await prisma.order.create({
       data: {
         id: opts.id,
@@ -280,7 +284,7 @@ async function main(): Promise<void> {
         channel: 'miniapp_cloud',
         endUserId: opts.ownerId,
         terminalId,
-        amountCents: 80,
+        amountCents,
         billablePages: 4,
         itemsJson: '[]',
         payStatus: 'unpaid',
@@ -288,8 +292,8 @@ async function main(): Promise<void> {
         pickupCodeHash: hashPickupCode(opts.code),
         pickupCodeEnc: encryptSecret(opts.code),
         pickupCodeCreatedAt: now,
-        pickupCodeExpiresAt: new Date(now.getTime() + 60 * 60 * 1000),
-        pickupStatus: 'pending',
+        pickupCodeExpiresAt: opts.pickupCodeExpiresAt ?? new Date(now.getTime() + 60 * 60 * 1000),
+        pickupStatus: opts.pickupStatus ?? 'pending',
         idempotencyKey: opts.key,
         idempotencyPayloadHash: fingerprintPackageOrderPayload(opts.dto),
         orderItems: {
@@ -301,7 +305,7 @@ async function main(): Promise<void> {
             copies: opts.dto.params.copies,
             pageRange: file.pageRange ? file.pageRange : null,
             billablePages: 2,
-            amountCents: 40,
+            amountCents: Math.floor(amountCents / Math.max(opts.dto.files.length, 1)),
           })),
         },
       },
@@ -339,6 +343,12 @@ async function main(): Promise<void> {
     if (!invalid.thrown || invalid.code !== 'IDEMPOTENCY_KEY_INVALID') {
       fail(`非法 key 应为 IDEMPOTENCY_KEY_INVALID，实际 ${JSON.stringify(invalid)}`)
     }
+    const upperOnly = randomUUID().toUpperCase()
+    const upperMissing = await capture(() => packages.create(userA, dtoA, upperOnly))
+    if (!upperMissing.thrown || upperMissing.code !== 'IDEMPOTENCY_KEY_INVALID') {
+      fail(`大写 UUID 应为 IDEMPOTENCY_KEY_INVALID，实际 ${JSON.stringify(upperMissing)}`)
+    }
+    if (await prisma.order.count({ where: { endUserId: userA } }) !== 0) fail('大写 key 不得建单')
     pass('T1 缺/非法 key → 400，零行 Order')
 
     const keyReplay = randomUUID()
@@ -352,7 +362,16 @@ async function main(): Promise<void> {
     if (await prisma.orderItem.count({ where: { orderId: first.orderId } }) !== 2) fail('回放不得新增 OrderItem')
     if (await prisma.printTask.count({ where: { orderId: first.orderId } }) !== 0) fail('建单/回放都不得预建 PrintTask')
     if (await createAuditCount(first.orderId) !== 1) fail('顺序回放不得重复 member.package_order.create 审计')
+    const upperReplay = await capture(() => packages.create(userA, dtoA, keyReplay.toUpperCase()))
+    if (!upperReplay.thrown || upperReplay.code !== 'IDEMPOTENCY_KEY_INVALID') {
+      fail(`已有小写 key 后再打大写应为 INVALID，实际 ${JSON.stringify(upperReplay)}`)
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: keyReplay } }) !== 1) fail('大写重试不得改小写那一行')
+    if (await prisma.order.count({ where: { idempotencyKey: keyReplay.toUpperCase() } }) !== 0) {
+      fail('大写 UUID 不得另建一行')
+    }
     pass('T2 同 key 同 payload 顺序回放：一行、同码、同 items、审计 1')
+    pass('T2b 大写 UUID 拒绝且零额外 Order')
 
     const keyConcurrent = randomUUID()
     const raced = await Promise.all([
@@ -470,6 +489,28 @@ async function main(): Promise<void> {
       data: { terminalId, status: 'online', localTaskDatabaseAvailable: true, createdAt: new Date() },
     })
     pass('T8 终端离线后同 key 仍回放原单')
+
+    const lateKey = randomUUID()
+    const lateCode = randomPickupCode()
+    const lateId = `ord_pkg_late_${suffix}`
+    const lateHash = hashPickupCode(lateCode)
+    await insertPackageOrder({
+      id: lateId, orderNo: `ORD-PKG-LATE-${suffix}`, key: lateKey, code: lateCode,
+      ownerId: userA, dto: dtoA, amountCents: 0, pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+    })
+    const lateReplay = await capture(() => packages.create(userA, dtoA, lateKey))
+    if (lateReplay.thrown) fail(`截止后免费半完成不得抛错: ${JSON.stringify(lateReplay)}`)
+    const lateView = lateReplay.body as PackageView & { pickupStatus: string }
+    if (lateView.orderId !== lateId) fail('截止后免费半完成必须回放原单')
+    if (lateView.pickupStatus !== 'expired' || lateView.payStatus !== 'closed') {
+      fail(`截止后免费半完成应为 expired/closed，实际 ${lateView.pickupStatus}/${lateView.payStatus}`)
+    }
+    if (lateView.pickupCode) fail('截止后免费半完成不得再露出到机码')
+    const lateRow = await prisma.order.findUniqueOrThrow({ where: { id: lateId } })
+    if (lateRow.pickupCodeHash !== lateHash) fail('截止后免费半完成不得另铸到机码')
+    if (lateRow.payStatus !== 'closed' || lateRow.paymentSource) fail('截止后免费半完成不得入账')
+    if (await prisma.order.count({ where: { idempotencyKey: lateKey } }) !== 1) fail('截止后免费半完成不得第二张单')
+    pass('T8b 截止后免费半完成 → expired/closed，无新码、无第二张单')
 
     const collideKey = randomUUID()
     const collideCode = randomPickupCode()

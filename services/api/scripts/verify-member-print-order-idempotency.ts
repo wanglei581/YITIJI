@@ -142,7 +142,7 @@ function assertKeyFormat(): void {
       if (codeOf(error) !== 'IDEMPOTENCY_KEY_REQUIRED') fail(`缺 key 错误码: ${codeOf(error)}`)
     }
   }
-  for (const raw of ['nope', '123', good.slice(0, 8), 'g'.repeat(36)]) {
+  for (const raw of ['nope', '123', good.slice(0, 8), 'g'.repeat(36), good.toUpperCase()]) {
     try {
       assertMemberPrintOrderIdempotencyKey(raw)
       fail(`非法 key 应拒绝: ${raw}`)
@@ -150,7 +150,7 @@ function assertKeyFormat(): void {
       if (codeOf(error) !== 'IDEMPOTENCY_KEY_INVALID') fail(`非法 key 错误码: ${codeOf(error)}`)
     }
   }
-  pass('缺/非法 Idempotency-Key 分别是 REQUIRED / INVALID')
+  pass('缺/非法 Idempotency-Key 分别是 REQUIRED / INVALID；大写 UUID 为 INVALID')
 }
 
 async function main(): Promise<void> {
