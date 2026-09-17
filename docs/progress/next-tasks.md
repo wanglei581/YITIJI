@@ -2,13 +2,15 @@
 
 ## 2026-09-17 当前唯一集成顺序
 
-1. **完成数据大屏候选的本地总门禁。** 锚点为
-   `codex/console-data-screen-r2-20260917@3fa8152dc39280c500f807bfe822f422eef8f69a`；先提交本轮图谱与
-   两份进度文档，再运行受影响的 repository-integrity、CI gate coverage、deploy gate sync、
-   compliance copy、API / Admin / Partner build 和大屏专项浏览器门禁。只处理第一条真实失败，
-   不弱化门禁。
+1. **数据大屏 Nest DI P0 已在本分支修完，接着跑完整本地总门禁。**
+   复现锚点 `55f19899eecf557556e1b24e40ea2ee03367f8c8`（`ScreenSnapshotCache`
+   constructor 被 Nest 当成 `Function`/`Number` 注入，进程起不来）。修复后
+   `verify:console-screen-snapshot` 为 72/72，含 class provider 实构。下一步仍是
+   受影响的 CI gate coverage、deploy gate sync、compliance copy、Admin / Partner
+   build 和大屏专项浏览器门禁。只处理第一条真实失败，不弱化门禁。不得把
+   `55f19899` 的 70/70 再写成 SOURCE/LOCAL GO。
 2. **单一 PR，不拆多条。** 本地总门禁通过后，再申请一次 push / 开 PR 授权；PR只承载数据大屏
-   9 个运行时提交及图谱/进度收尾。final-head CI 全绿后才能合并，合并后用
+   运行时提交及图谱/进度收尾。final-head CI 全绿后才能合并，合并后用
    `git merge-base --is-ancestor <final-head> origin/main` 留证。当前不得写成已合并或已上线。
 3. **PR #1038 单独完成合并闭环。** 材料包幂等候选
    `d9d79f2689dddd0614a76b71a2252a96d7468a69` 的 CI run `35206540195` 已成功；合并仍需即时授权。

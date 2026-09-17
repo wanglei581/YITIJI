@@ -19,16 +19,27 @@ type CacheLoadResult<T> = { storedAt: number; value: T; hit: boolean }
  * 过期项在读写时清理；活 key 超过 SCREEN_CACHE_MAX_KEYS 时淘汰最旧 storedAt。
  * 同一 key 并发 miss/expired 只跑一次 loader（single-flight）；loader reject
  * 后清 in-flight，允许重试。含 ok:false 切片的聚合默认不入缓存。
+ *
+ * clock / maxKeys 不能放进 constructor 参数：tsc `emitDecoratorMetadata`
+ * 会把它们标成 Function / Number，Nest 按 token 注入，进程起不来。
+ * 生产走字段默认值；单测用 `forTest` 注入确定钟和上限。
  */
 @Injectable()
 export class ScreenSnapshotCache {
   private readonly store = new Map<string, CacheEntry<unknown>>()
   private readonly inflight = new Map<string, Promise<CacheLoadResult<unknown>>>()
+  private clock: () => number = () => Date.now()
+  private maxKeys: number = SCREEN_CACHE_MAX_KEYS
 
-  constructor(
-    private readonly clock: () => number = () => Date.now(),
-    private readonly maxKeys: number = SCREEN_CACHE_MAX_KEYS,
-  ) {}
+  static forTest(
+    clock: () => number = () => Date.now(),
+    maxKeys: number = SCREEN_CACHE_MAX_KEYS,
+  ): ScreenSnapshotCache {
+    const cache = new ScreenSnapshotCache()
+    cache.clock = clock
+    cache.maxKeys = maxKeys
+    return cache
+  }
 
   size(): number {
     return this.store.size

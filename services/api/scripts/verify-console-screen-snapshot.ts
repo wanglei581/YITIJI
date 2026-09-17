@@ -13,7 +13,7 @@ import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync } fr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BadRequestException, ForbiddenException, Module, ValidationPipe } from '@nestjs/common'
-import { NestFactory } from '@nestjs/core'
+import { NestFactory, type INestApplicationContext } from '@nestjs/core'
 import { JwtModule, JwtService } from '@nestjs/jwt'
 import { Reflector } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
@@ -317,6 +317,15 @@ function assertSourceContract(): void {
       && !/\bcopies\b/.test(queries)
       && /PartnerOrgRequiredError/.test(service),
   )
+  const cacheSrc = readSrc('src/console-screen/console-screen.cache.ts')
+  const moduleSrc = readSrc('src/console-screen/console-screen.module.ts')
+  assert(
+    '1p. ScreenSnapshotCache 无 constructor 注入；ConsoleScreenModule 用 class provider 登记',
+    !/constructor\s*\([^)]*clock/.test(cacheSrc)
+      && /static forTest\(/.test(cacheSrc)
+      && /providers:\s*\[\s*ConsoleScreenService,\s*ScreenSnapshotCache\s*\]/.test(moduleSrc)
+      && !/useValue|useFactory/.test(moduleSrc),
+  )
 }
 
 async function assertPureHelpers(): Promise<void> {
@@ -353,7 +362,7 @@ async function assertPureHelpers(): Promise<void> {
   )
 
   let now = 1_000
-  const cache = new ScreenSnapshotCache(() => now)
+  const cache = ScreenSnapshotCache.forTest(() => now)
   let loads = 0
   const load = async () => {
     loads += 1
@@ -366,13 +375,13 @@ async function assertPureHelpers(): Promise<void> {
   await cache.getOrLoad('k', 15, load)
   assert('2e. TTL 过期后重新加载', loads === 2)
   assert('2f. 全失败/局部失败状态机', snapshotLoadStatus(4, 4) === 'ok' && snapshotLoadStatus(2, 4) === 'degraded' && snapshotLoadStatus(0, 4) === 'unavailable')
-  const capped = new ScreenSnapshotCache(() => 2_000, 3)
+  const capped = ScreenSnapshotCache.forTest(() => 2_000, 3)
   for (let i = 0; i < 5; i += 1) {
     await capped.getOrLoad(`k${i}`, 15, async () => i)
   }
   assert('2g. 缓存活 key 不超过上限', capped.size() === 3, `size=${capped.size()}`)
   let clock = 3_000
-  const expiring = new ScreenSnapshotCache(() => clock, 10)
+  const expiring = ScreenSnapshotCache.forTest(() => clock, 10)
   await expiring.getOrLoad('old', 15, async () => 1)
   clock += 16_000
   await expiring.getOrLoad('new', 15, async () => 2)
@@ -383,7 +392,7 @@ async function assertPureHelpers(): Promise<void> {
   const flightGate = new Promise<void>((resolve) => {
     releaseFlight = resolve
   })
-  const flightCache = new ScreenSnapshotCache(() => 4_000)
+  const flightCache = ScreenSnapshotCache.forTest(() => 4_000)
   const sharedLoad = async () => {
     flightLoads += 1
     await flightGate
@@ -405,7 +414,7 @@ async function assertPureHelpers(): Promise<void> {
   const slowGate = new Promise<void>((resolve) => {
     releaseSlow = resolve
   })
-  const isolated = new ScreenSnapshotCache(() => 5_000)
+  const isolated = ScreenSnapshotCache.forTest(() => 5_000)
   const slow = isolated.getOrLoad('slow', 15, async () => {
     await slowGate
     return 'slow'
@@ -421,7 +430,7 @@ async function assertPureHelpers(): Promise<void> {
   const boomGate = new Promise<void>((resolve) => {
     releaseBoom = resolve
   })
-  const boomCache = new ScreenSnapshotCache(() => 6_000)
+  const boomCache = ScreenSnapshotCache.forTest(() => 6_000)
   const boom = async () => {
     boomLoads += 1
     await boomGate
@@ -461,6 +470,42 @@ async function assertPureHelpers(): Promise<void> {
     })
       && requirePartnerOrgId(' org_ok ') === 'org_ok',
   )
+
+  await assertNestConstructsCache()
+}
+
+async function assertNestConstructsCache(): Promise<void> {
+  const paramtypes = (Reflect.getMetadata('design:paramtypes', ScreenSnapshotCache) ?? []) as unknown[]
+  const injectableTypes = paramtypes.filter((item) => item === Function || item === Number)
+
+  @Module({ providers: [ScreenSnapshotCache] })
+  class ScreenCacheNestProbeModule {}
+
+  let app: INestApplicationContext | undefined
+  try {
+    app = await NestFactory.createApplicationContext(ScreenCacheNestProbeModule, {
+      logger: false,
+      abortOnError: false,
+    })
+    const cache = app.get(ScreenSnapshotCache)
+    const loaded = await cache.getOrLoad('nest-boot', 15, async () => 7)
+    assert(
+      '2o. Nest class provider 能构造 ScreenSnapshotCache，不依赖 Function/Number token',
+      injectableTypes.length === 0
+        && loaded.value === 7
+        && loaded.hit === false
+        && cache.size() === 1,
+      `paramtypes=${paramtypes.map((item) => (typeof item === 'function' ? item.name : String(item))).join(',') || '(empty)'}`,
+    )
+  } catch (error) {
+    assert(
+      '2o. Nest class provider 能构造 ScreenSnapshotCache，不依赖 Function/Number token',
+      false,
+      error instanceof Error ? error.message : String(error),
+    )
+  } finally {
+    await app?.close()
+  }
 }
 
 async function assertServiceContract(): Promise<void> {

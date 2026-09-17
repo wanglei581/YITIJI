@@ -1,9 +1,34 @@
 # 当前开发进度
 
+2026-09-17 **数据大屏 P0：Nest 无法构造 `ScreenSnapshotCache`，已修。**
+独立复审在 `55f19899eecf557556e1b24e40ea2ee03367f8c8` 复现：
+`NestFactory.createApplicationContext({ providers: [ScreenSnapshotCache] })`
+因 `emitDecoratorMetadata` 把 constructor 的 `clock` / `maxKeys` 标成
+`Function` / `Number` 而抛 `UnknownDependenciesException`。当时
+`verify:console-screen-snapshot` 70/70 是假绿——HTTP 夹具用 `useValue`
+绕过了真实 class provider。那一笔不得再写成 `SOURCE / LOCAL: GO`。
+
+- **修复：** constructor 不再接收可被 Nest 注入的参数。生产用字段默认值
+  （`Date.now()` / 256）。单测走 `ScreenSnapshotCache.forTest(clock, maxKeys)`。
+  `ConsoleScreenModule` 仍是 `providers: [ConsoleScreenService, ScreenSnapshotCache]`，
+  没有改成 `useFactory` / `useValue`。
+- **门禁：** 新增 `1p`（源码禁止 constructor 注入 + 禁止模块用 factory 绕过）
+  和 `2o`（`createApplicationContext` 实构 class provider，禁止 `Function`/`Number`
+  token）。本机 `verify:console-screen-snapshot` **72/72**；`tsc` 产物
+  `design:paramtypes` 为 `undefined`，dist 上 Nest 实构 `getOrLoad` 成功。
+  `pnpm --filter @ai-job-print/api build`、`verify:repository-integrity`、
+  `pnpm graph:check`、`git diff --check` 均退出 0。
+- **未修（复审留下的 P2/P3，本轮故意不动）：** gov realtime 仍会跑无界
+  `listDerivedAlerts`；14 日趋势 `count` 后再无序 `findMany`；`AiServiceLog.count()`
+  全表；`3j` 只禁 JSON 键名；未绑定 partner HTTP 是 401 不是 403 `ORG_REQUIRED`。
+- **证据边界：** 相对该 P0，`SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。未 push、未开 PR、未合并、未部署。
+
 2026-09-17 **Admin / Partner 数据大屏 R2 已完成本地集成，等待完整门禁与单一 PR。**
 候选分支 `codex/console-data-screen-r2-20260917` 基于
 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，运行时代码 tip 为
 `3fa8152dc39280c500f807bfe822f422eef8f69a`，未 push、未开 PR、未合并、未部署。
+上一笔把 `55f19899` 写成 `SOURCE / LOCAL: GO` 不成立，见本节顶部 P0 修正。
 
 - **后端口径与隔离：** `1957fadd4a8ce934c7b15f0a81bd934a02f12fb9` 将累计指标收口为当前
   `payStatus='paid'` 的 `billablePages` 内容页（不乘 `copies`），14 日趋势按 `paidAt` 落入
