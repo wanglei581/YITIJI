@@ -67,7 +67,16 @@ async function main(): Promise<void> {
 
     // 健康 refunded 单（150 分实付、已退 150、有 success Refund）
     const refundedOk = await mk('refok', { amountCents: 150, payStatus: 'refunded', paymentSource: 'alipay', payChannel: 'alipay', paidAt: new Date(), refundedAmountCents: 150, refundedAt: new Date() })
-    await prisma.paymentAttempt.create({ data: { orderId: refundedOk, channel: 'alipay', amountCents: 150, status: 'success', channelTxnNo: `ali_${suffix}_r` } })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: refundedOk,
+        channel: 'alipay',
+        amountCents: 150,
+        status: 'success',
+        channelTxnNo: `ali_${suffix}_r`,
+        createdAt: new Date(Date.now() - 120_000),
+      },
+    })
     await prisma.refund.create({ data: { orderId: refundedOk, refundNo: `RFD-${suffix}-refok`, amountCents: 150, status: 'success', channel: 'alipay', reason: 't' } })
 
     // 差异：paid 无 success attempt（100 分）
@@ -98,6 +107,68 @@ async function main(): Promise<void> {
     })
     await prisma.paymentAttempt.create({
       data: { orderId: collected, channel: 'wechat', amountCents: 330, status: 'success', channelTxnNo: `wx_${suffix}_c` },
+    })
+
+    // 已退款后再出现第二条 success 尝试：必须检出，不得当健康单；gross 按两次实收合计
+    const extra = await mk('extra', {
+      amountCents: 150,
+      payStatus: 'refunded',
+      paymentSource: 'wechat',
+      payChannel: 'wechat',
+      paidAt: new Date(Date.now() - 180_000),
+      refundedAmountCents: 150,
+      refundedAt: new Date(Date.now() - 60_000),
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extra,
+        channel: 'wechat',
+        amountCents: 150,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_e1`,
+        createdAt: new Date(Date.now() - 170_000),
+      },
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extra,
+        channel: 'wechat',
+        amountCents: 150,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_e2`,
+        createdAt: new Date(),
+      },
+    })
+    await prisma.refund.create({
+      data: { orderId: extra, refundNo: `RFD-${suffix}-extra`, amountCents: 150, status: 'success', channel: 'wechat', reason: 't' },
+    })
+
+    const extraRefunding = await mk('extrf', {
+      amountCents: 80,
+      payStatus: 'refunding',
+      paymentSource: 'wechat',
+      payChannel: 'wechat',
+      paidAt: new Date(Date.now() - 90_000),
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extraRefunding,
+        channel: 'wechat',
+        amountCents: 80,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_rf1`,
+        createdAt: new Date(Date.now() - 80_000),
+      },
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: extraRefunding,
+        channel: 'wechat',
+        amountCents: 80,
+        status: 'success',
+        channelTxnNo: `wx_${suffix}_rf2`,
+        createdAt: new Date(),
+      },
     })
 
     // 专项：LATE_PAID（healthy 单加 late 审计）+ RECONCILED（refundedOk 单加 reconcile 审计）
@@ -143,6 +214,20 @@ async function main(): Promise<void> {
       pass('检出 ONLINE_COLLECTED_PENDING_REFUND，金额计入 gross（不伪装 payStatus=paid）')
     } else {
       fail(`missed ONLINE_COLLECTED_PENDING_REFUND: ${JSON.stringify(disc)} summary=${JSON.stringify(rep.summary)}`)
+    }
+    if (
+      find(disc, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', extra) &&
+      find(disc, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', extraRefunding) &&
+      !find(disc, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', refundedOk)
+    ) {
+      pass('检出 ORDER_EXTRA_COLLECTION_AFTER_REFUND（refunded/refunding）；单笔已退健康单不误报')
+    } else {
+      fail(`extra collection mismatch: ${JSON.stringify(disc)}`)
+    }
+    if (rep.summary.grossPaidCents >= 200 + 100 + 90 + 330 + 150 + 150 + 80 + 80) {
+      pass('额外成功尝试按实收合计计入 gross')
+    } else {
+      fail(`extra collection gross missing: ${JSON.stringify(rep.summary)}`)
     }
 
     if (find(mine(rep.attention.latePaid), 'LATE_PAID', healthy)) pass('LATE_PAID 进 attention 专项')

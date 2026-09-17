@@ -8,14 +8,19 @@
 - **退款：** 复用 canonical `RefundService`。渠道与金额只来自该单唯一 success 尝试；0 条 / 多条 /
   金额不一致 / 不支持通道 / 已核查出纸 / 明文取件码一律 fail-closed。失败回滚 `closed` 而非 `paid`。
   重复请求幂等；明确拒绝后同号可重试。
-- **可见性：** 对账差异 `ONLINE_COLLECTED_PENDING_REFUND`（金额计入 gross，不伪装 paid）；
-  Admin `refundRequired` / `refundEligible` 覆盖该态。
+- **可见性：** API/对账可见（`ONLINE_COLLECTED_PENDING_REFUND`、Admin 只读 `refundRequired` /
+  `refundEligible`，不伪装 paid）。订单页直接筛选入口待 Claude；本轮不改 `apps/admin`。
+- **复审 Medium：** M-1 collected 失败回滚 `closed` 后，微信 SUCCESS 退款通知把同一 `refundNo`
+  从 failed 收敛 success、订单 closed→refunded，不抛 `ORDER_INVALID_TRANSITION`、不打第二笔渠道。
+  M-3 检测面：对账 `ORDER_EXTRA_COLLECTION_AFTER_REFUND`（按成功尝试金额计入 gross）；已 success
+  的 `refund()` 遇到额外成功尝试 `REFUND_PATH_EXHAUSTED`。不实现自动逐笔退款或已退款回调入账。
+  M-2 不改 `apps/admin`。
 - **rebase 后本机复跑：** `verify:admin-orders-refund`（含 `verify:api20-manual-refund`）、
   `verify:reconciliation`、`verify:admin-orders-readonly`、`verify:refund-real-channels`（36）、
-  `verify:payment-flow`、`verify:refund-idempotent`（31）、`verify:wechat-refund-notify`（14）、
+  `verify:payment-flow`、`verify:refund-idempotent`（31）、`verify:wechat-refund-notify`（17）、
   `verify:refund-convergence`（6）、API `typecheck` / `build`、`verify:repository-integrity`、
   `verify:ci-gate-coverage`、`verify:deploy-gates-in-sync`、`git diff --check`、`pnpm graph` +
-  `graph:check` 均为 0。图谱只刷新 `docs/graph/gates.md` 与 `docs/graph/graph.json`。
+  `graph:check` 均为 0。M-1 回归放在已接线的 `verify:wechat-refund-notify`（通知路径，无第二套引擎）。
 - **证据边界：** `SOURCE / LOCAL: GO`；`CI / DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。
   未 push、未开 PR、未合并、未跑真实支付。
 

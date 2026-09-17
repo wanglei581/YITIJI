@@ -15,6 +15,8 @@
  * - REFUND_SUCCESS_ORDER_NOT_REFUNDED：存在 success Refund 但订单未处于 refunded。
  * - STUCK_REFUNDING：订单停留 refunding（退款受理中/半态），超龄需人工跟进（W-B 自动收敛前的人工兜底）。
  * - ONLINE_COLLECTED_PENDING_REFUND：渠道已收款但订单未转 paid（取件窗口已关），须走 canonical 退款。
+ * - ORDER_EXTRA_COLLECTION_AFTER_REFUND：refunded/refunding 单出现第二条 success PaymentAttempt
+ *   （或 refundedAt 之后新建的成功尝试）。gross 按成功尝试金额合计，不自动逐笔退。
  * - LATE_PAID / RECONCILED：迟到入账 / 主动查单入账专项清单（非错误，运营需知晓复核）。
  */
 import { Injectable } from '@nestjs/common'
@@ -52,6 +54,18 @@ export interface ReconciliationReport {
 }
 
 type OrderRow = NonNullable<Awaited<ReturnType<PrismaService['order']['findFirst']>>>
+type SuccessAttemptSnap = { amountCents: number; createdAt: Date }
+
+function isExtraCollectionAfterRefund(
+  order: { payStatus: string; refundedAt: Date | null },
+  attempts: SuccessAttemptSnap[],
+): boolean {
+  if (order.payStatus !== 'refunded' && order.payStatus !== 'refunding') return false
+  if (attempts.length >= 2) return true
+  const refundedAt = order.refundedAt
+  if (refundedAt && attempts.some((row) => row.createdAt.getTime() > refundedAt.getTime())) return true
+  return false
+}
 
 @Injectable()
 export class ReconciliationService {
@@ -84,8 +98,12 @@ export class ReconciliationService {
       }),
     ])
 
-    const successAttemptByOrder = new Map<string, number>()
-    for (const a of attempts) successAttemptByOrder.set(a.orderId, (successAttemptByOrder.get(a.orderId) ?? 0) + 1)
+    const successAttemptsByOrder = new Map<string, { amountCents: number; createdAt: Date }[]>()
+    for (const a of attempts) {
+      const list = successAttemptsByOrder.get(a.orderId) ?? []
+      list.push({ amountCents: a.amountCents, createdAt: a.createdAt })
+      successAttemptsByOrder.set(a.orderId, list)
+    }
 
     const successRefundSumByOrder = new Map<string, number>()
     for (const r of refunds) {
@@ -126,12 +144,14 @@ export class ReconciliationService {
     for (const o of orders) {
       const netCaptured = Math.max(0, o.amountCents - o.discountCents) // 实收资金（抵扣不入资金流）
       const refundSum = successRefundSumByOrder.get(o.id) ?? 0
+      const successAttempts = successAttemptsByOrder.get(o.id) ?? []
+      const extraCollection = isExtraCollectionAfterRefund(o, successAttempts)
 
       if (o.payStatus === 'paid') {
         paidOrderCount += 1
         grossPaidCents += netCaptured
         // 线上通道 paid 单必须有 success 支付尝试（对账取原单/退款定位依据）。
-        if (o.paymentSource && ONLINE_CHANNELS.has(o.paymentSource) && (successAttemptByOrder.get(o.id) ?? 0) === 0) {
+        if (o.paymentSource && ONLINE_CHANNELS.has(o.paymentSource) && successAttempts.length === 0) {
           push(discrepancies, 'PAID_WITHOUT_SUCCESS_ATTEMPT', o, { paymentSource: o.paymentSource, amountCents: netCaptured })
         }
         // paid 单不应有 success 退款记录（退款成功必转 refunded）。
@@ -161,7 +181,18 @@ export class ReconciliationService {
         push(discrepancies, 'ONLINE_COLLECTED_PENDING_REFUND', o, {
           payStatus: o.payStatus,
           amountCents: netCaptured,
-          successAttempts: successAttemptByOrder.get(o.id) ?? 0,
+          successAttempts: successAttempts.length,
+        })
+      }
+
+      if (extraCollection) {
+        const attemptSum = successAttempts.reduce((sum, row) => sum + row.amountCents, 0)
+        grossPaidCents += attemptSum
+        push(discrepancies, 'ORDER_EXTRA_COLLECTION_AFTER_REFUND', o, {
+          payStatus: o.payStatus,
+          successAttempts: successAttempts.length,
+          attemptSumCents: attemptSum,
+          refundedAmountCents: o.refundedAmountCents,
         })
       }
 

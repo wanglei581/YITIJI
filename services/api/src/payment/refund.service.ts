@@ -193,8 +193,22 @@ export class RefundService {
           data: { status: 'success', channelRefundNo: event.channelRefundNo ?? refund.channelRefundNo },
         })
         if (casRefund.count === 0) return { completed: false } // 并发下他方已完成
+        // paid/refunding：普通退款。closed/unpaid/paying + ONLINE_PAID_PENDING_REFUND：
+        // 迟到回调待退曾明确失败回滚 closed 后，渠道 SUCCESS 通知仍须收敛同一 refundNo，
+        // 不得因 payStatus=closed 抛 ORDER_INVALID_TRANSITION，也不得再打渠道。
         await tx.order.updateMany({
-          where: { id: refund.orderId, payStatus: { in: ['refunding', 'paid'] } },
+          where: {
+            id: refund.orderId,
+            OR: [
+              { payStatus: { in: ['refunding', 'paid'] } },
+              {
+                payStatus: { in: [...ONLINE_COLLECTED_UNSETTLED_PAY_STATUSES] },
+                refundReason: ONLINE_PAID_PENDING_REFUND_REASON,
+                paymentSource: null,
+                paidAt: null,
+              },
+            ],
+          },
           data: {
             payStatus: 'refunded',
             refundedAt: new Date(),
@@ -273,6 +287,24 @@ export class RefundService {
         const existingOrder = await this.requireOrder(existing.orderId)
         if (isOnlineCollectedRefundLock(existingOrder) && isOnlineCollectedPendingRefund(existingOrder)) {
           return this.retryFailedRefund(existing, opts.operatorId)
+        }
+      }
+      if (existing.status === 'success') {
+        const existingOrder = await this.requireOrder(existing.orderId)
+        if (await this.hasExtraSuccessAttempt(existing.orderId, existingOrder.refundedAt)) {
+          await this.audit.write({
+            actorId: null,
+            actorRole: 'system',
+            action: 'refund.blocked',
+            targetType: 'order',
+            targetId: existing.orderId,
+            payload: {
+              refundNo: existing.refundNo,
+              code: 'REFUND_PATH_EXHAUSTED',
+              operatorId: opts.operatorId ?? null,
+            },
+          })
+          throw new BadRequestException('REFUND_PATH_EXHAUSTED')
         }
       }
       return this.toView(existing, await this.requireOrder(existing.orderId), true)
@@ -694,6 +726,21 @@ export class RefundService {
     })
     const pendingRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
     return this.executeProviderRefund(pendingRefund ?? refund, operatorId)
+  }
+
+  /**
+   * 已退款后再出现第二条（或退款完成后新建的）success 尝试：本 refundNo 无法覆盖第二笔实收。
+   * 不自动逐笔退、不打渠道；对账用 ORDER_EXTRA_COLLECTION_AFTER_REFUND 留痕。
+   */
+  private async hasExtraSuccessAttempt(orderId: string, refundedAt: Date | null): Promise<boolean> {
+    const successes = await this.prisma.paymentAttempt.findMany({
+      where: { orderId, status: 'success' },
+      select: { createdAt: true },
+    })
+    if (successes.length >= 2) return true
+    const cutoff = refundedAt
+    if (cutoff && successes.some((row) => row.createdAt.getTime() > cutoff.getTime())) return true
+    return false
   }
 
   /**

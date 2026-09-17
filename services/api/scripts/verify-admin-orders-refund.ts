@@ -230,6 +230,24 @@ async function main(): Promise<void> {
     } else {
       fail(`迟到回调待退重复请求非幂等：idempotent=${pendingRepeat.idempotent} calls=${sandboxRefundCalls}`)
     }
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: ordPending,
+        channel: 'sandbox',
+        amountCents: 300,
+        status: 'success',
+        prepayId: `prepay_${ordPending}_extra`,
+        channelTxnNo: `txn_${ordPending}_extra`,
+      },
+    })
+    await expectCode('已退款后再出现第二条 success 尝试 → REFUND_PATH_EXHAUSTED', 'REFUND_PATH_EXHAUSTED', () =>
+      refundService.refund(ordPending, { reason: '第二笔实收不得静默幂等', operatorId }),
+    )
+    if (sandboxRefundCalls === 1 && (await prisma.refund.count({ where: { orderId: ordPending } })) === 1) {
+      pass('REFUND_PATH_EXHAUSTED 不新增渠道请求、不新建 Refund')
+    } else {
+      fail(`REFUND_PATH_EXHAUSTED 仍打渠道或新建账本：calls=${sandboxRefundCalls}`)
+    }
 
     await seedCollected(ordDup, `ORD-AREF-DUP-${suffix.toUpperCase()}`)
     await prisma.paymentAttempt.create({

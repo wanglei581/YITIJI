@@ -13,6 +13,8 @@
  * 9. CLOSED/ABNORMAL → Refund failed + 订单回 paid（可重试）
  * 10. 已 SUCCESS 不得被 CLOSED 通知回退
  * 11. 不影响 PrintTask.status（退款回调全程不触碰打印任务）
+ * 12. 迟到回调待退失败回滚 closed 后，SUCCESS 通知把同一 refundNo 从 failed 收敛为
+ *     success、订单 closed→refunded，不抛 ORDER_INVALID_TRANSITION、不打第二笔渠道
  */
 // 生产门禁环境变量设置（测试专用占位，不含真实密钥）
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-wxrn-terminal-admin-secret-0123456789'
@@ -331,6 +333,96 @@ async function main(): Promise<void> {
     if (r1Task?.status === 'pending') {
       pass('退款回调全程不影响 PrintTask.status（打印域与支付域解耦）')
     } else fail(`R1 PrintTask status changed: ${r1Task?.status}`)
+
+    // ── 11. collected 失败回滚 closed 后，SUCCESS 通知收敛同一 refundNo ────────
+    const collOrderNo = `ORD-WXRN-COLL-${suffix}`
+    const collOrder = await prisma.order.create({
+      data: {
+        orderNo: collOrderNo,
+        type: 'print',
+        terminalId,
+        amountCents: 300,
+        currency: 'CNY',
+        payStatus: 'closed',
+        taskStatus: 'expired',
+        pickupStatus: 'expired',
+        refundReason: 'ONLINE_PAID_PENDING_REFUND',
+        discountCents: 0,
+      },
+    })
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: collOrder.id,
+        channel: 'wechat',
+        amountCents: 300,
+        status: 'success',
+        prepayId: `prepay_coll_${suffix}`,
+        channelTxnNo: `wxtxn_coll_${suffix}`,
+      },
+    })
+    const collRefundNo = `RFD-${collOrderNo}`
+    await prisma.refund.create({
+      data: {
+        orderId: collOrder.id,
+        refundNo: collRefundNo,
+        amountCents: 300,
+        status: 'failed',
+        reason: '迟到回调待退',
+        channel: 'wechat',
+      },
+    })
+    const collRefundId = `wxrfd_coll_${randomBytes(6).toString('hex')}`
+    const collNotify = buildRefundNotify({
+      mchid: MCH_ID,
+      out_trade_no: `attempt_coll_${suffix}`,
+      out_refund_no: collRefundNo,
+      refund_id: collRefundId,
+      refund_status: 'SUCCESS',
+      amount: { refund: 300, total: 300 },
+    })
+    const collResult = await refundSvc.processWechatRefundNotify(collNotify.rawBody, collNotify.headers)
+    const collOrderAfter = await prisma.order.findUnique({ where: { id: collOrder.id } })
+    const collRefundAfter = await prisma.refund.findUnique({ where: { refundNo: collRefundNo } })
+    const collRefundCount = await prisma.refund.count({ where: { orderId: collOrder.id } })
+    if (
+      collResult.ok &&
+      !collResult.idempotent &&
+      collRefundAfter?.status === 'success' &&
+      collRefundAfter.channelRefundNo === collRefundId &&
+      collRefundCount === 1 &&
+      collOrderAfter?.payStatus === 'refunded' &&
+      collOrderAfter.refundedAmountCents === 300 &&
+      collOrderAfter.pickupCode == null &&
+      collOrderAfter.paymentSource == null &&
+      collOrderAfter.printTaskId == null
+    ) {
+      pass('collected 失败回滚 closed 后 SUCCESS 通知：同一 refundNo 收敛 refunded，无幽灵码、不新建 Refund')
+    } else {
+      fail(
+        `collected notify mismatch: ok=${collResult.ok} refund=${JSON.stringify(collRefundAfter)} order=${JSON.stringify(collOrderAfter)}`,
+      )
+    }
+    const collAudit = await prisma.auditLog.findFirst({ where: { action: 'refund.created', targetId: collOrder.id } })
+    const collPayload = collAudit ? (JSON.parse(collAudit.payloadJson ?? '{}') as Record<string, unknown>) : null
+    if (collPayload?.['viaRefundNotify'] === true && collPayload?.['repairedFromFailed'] === true) {
+      pass('collected SUCCESS 通知审计：viaRefundNotify + repairedFromFailed，未走第二笔渠道退款')
+    } else {
+      fail(`collected notify audit mismatch: ${JSON.stringify(collPayload)}`)
+    }
+    const collDup = buildRefundNotify({
+      mchid: MCH_ID,
+      out_trade_no: `attempt_coll_${suffix}`,
+      out_refund_no: collRefundNo,
+      refund_id: collRefundId,
+      refund_status: 'SUCCESS',
+      amount: { refund: 300, total: 300 },
+    })
+    const collDupResult = await refundSvc.processWechatRefundNotify(collDup.rawBody, collDup.headers)
+    if (collDupResult.idempotent && (await prisma.refund.count({ where: { orderId: collOrder.id } })) === 1) {
+      pass('collected SUCCESS 通知重复幂等：不新增 Refund')
+    } else {
+      fail(`collected notify dup: idempotent=${collDupResult.idempotent}`)
+    }
 
     console.log(`\n  ✅ verify:wechat-refund-notify 全部通过（${passCount} checks）\n`)
   } finally {

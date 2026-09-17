@@ -3,13 +3,18 @@
 ## 2026-09-18：迟到线上回调待退单的 canonical 退款（本候选）
 
 **问题：** 取件窗口关闭后的有效线上回调会把 `PaymentAttempt` 打成 success，订单却保持
-closed/unpaid + `ONLINE_PAID_PENDING_REFUND`，`RefundService` / 对账 / Admin `refundRequired`
-都看不见，渠道已收款没有出款路径。
+closed/unpaid + `ONLINE_PAID_PENDING_REFUND`，`RefundService` / 对账 / Admin 只读
+`refundRequired` 都看不见，渠道已收款没有出款路径。订单页直接筛选入口待 Claude（本轮不改 `apps/admin`）。
 
 **本轮范围：** 只改 `services/api/src/payment/**`、必要的 Admin 订单只读路径、对应 verify 与两份进度文档。
 不改 schema / 前端 / CI / 部署 / 真实支付。本候选已 rebase 到 `origin/main@eb0f20341`（含 PR #1040/#1041）。
 
 **本候选当前状态：** 已 rebase 到 `origin/main@eb0f20341`，图谱已按标准命令刷新，聚焦支付门禁与仓库/CI/deploy/graph 门禁本机全 0。仍只是本地候选。
+
+**已知缺口（本轮不实现，登记 SOP）：**
+- 第二条成功 `PaymentAttempt` 不会自动逐笔退款。已 success 的同一 `refundNo` 再遇到额外成功尝试会
+  `REFUND_PATH_EXHAUSTED`；对账出 `ORDER_EXTRA_COLLECTION_AFTER_REFUND`，gross 按成功尝试金额合计。
+- 已退款订单的迟到支付回调仍不自动入账或再退；只靠对账差异留痕。运营需人工核对渠道账单后再处置。
 
 **下一阶段（本轮之后才做）：** 独立只读复审 → 如需再开 PR；CI 全绿前不得合入；合入前不得部署或跑真实退款。
 本条是支付候选自己的下一步，不替代下面生产 API-only 发布阻塞。
