@@ -560,3 +560,145 @@ test('材料包四页与两个 utils 都不调 wx.requestPayment（钱在一体�
   assert.ok(!code('utils/package-order-idempotency.js').includes('Math.random'))
   assert.ok(!code('pages/package-confirm/package-confirm.js').includes('Math.random'))
 })
+
+// ══════════════════════════════════════════════════════════════════════
+// F. 小写契约（2026-09-17 daa1f5484）
+//
+// 服务端去掉了 IDEMPOTENCY_KEY_RE 的 `/i`，因为**大小写不在唯一键里**：
+// `Order @@unique(endUserId, idempotencyKey)` 是区分大小写的 TEXT，同一个 UUID 的
+// 大写写法在服务端是**另一个键** —— 它不会回放原单，会再建一张、再收一次钱。
+// 服务端选择 400 IDEMPOTENCY_KEY_INVALID 而不是 toLowerCase()，所以本地必须同样收紧：
+// 大写键一旦走到 wx.request，用户看到的只是一句被翻译过的「请稍后重试」。
+//
+// 这一组同时覆盖单件链（print-order-idempotency + createCloudPrintOrder）——
+// 两条链共用同一条服务端判据，只在一侧收紧等于留着另一半的洞。
+// ══════════════════════════════════════════════════════════════════════
+
+const printIdem = requireMiniapp('../utils/print-order-idempotency.js')
+const UPPER_KEY = 'AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE'
+const LOWER_KEY = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+
+test('两份 KEY_RE 都只认小写；宽判据（KEY_SHAPE_RE）仍认得出大写，两者不是同一把尺子', () => {
+  for (const [name, mod] of [['package', idem], ['print', printIdem]]) {
+    assert.ok(mod.KEY_RE.test(LOWER_KEY), `${name}: 小写 UUID 必须通过`)
+    assert.ok(!mod.KEY_RE.test(UPPER_KEY), `${name}: 大写 UUID 必须被拒（服务端把它当另一个键）`)
+    assert.ok(!mod.KEY_RE.test(LOWER_KEY.toUpperCase()), `${name}: 全大写同样被拒`)
+    assert.ok(!mod.KEY_RE.test('aaaaaaaa-bbbb-4Ccc-8ddd-eeeeeeeeeeee'), `${name}: 混大小写同样被拒`)
+    // 宽判据只决定"要不要留在盘上"，必须仍然认得出大写那一种，否则一条带 orderId 的
+    // 旧记录会在下一次写回全量时被整条抹掉 —— 那是唯一还指得回那张真实订单的线索。
+    assert.ok(mod.KEY_SHAPE_RE.test(UPPER_KEY), `${name}: 宽判据仍认得出大写`)
+    assert.equal(mod.isReusableKey(UPPER_KEY), false)
+    assert.equal(mod.isReusableKey(LOWER_KEY), true)
+    // 正则不带 /g，不会有 lastIndex 粘连；连测两次必须同一个答案。
+    assert.equal(mod.KEY_RE.test(LOWER_KEY), mod.KEY_RE.test(LOWER_KEY))
+  }
+})
+
+test('两条链铸出来的键都是小写（toString(16) 的产物），且逐字通过各自的 KEY_RE', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  const pkgKey = (await idem.ensureKey('u:A', 'fp-case')).key
+  assert.equal(pkgKey, pkgKey.toLowerCase())
+  assert.match(pkgKey, idem.KEY_RE)
+  const printKey = (await printIdem.ensureKey('u:A', 'fp-case')).key
+  assert.equal(printKey, printKey.toLowerCase())
+  assert.match(printKey, printIdem.KEY_RE)
+  // 两条链在本机各自一张表，互不相认。**服务端那一侧的键空间是共用的** —— 两条链都写
+  // `Order.idempotencyKey`，共用同一个 `@@unique([endUserId, idempotencyKey])`；分表
+  // 是本地的需要（指纹字段集不同，且未落定名额/恢复记录按表计，共用会互相挤掉）。
+  assert.notEqual(idem.STORE_KEY, printIdem.STORE_KEY)
+  assert.notEqual(pkgKey, printKey)
+})
+
+test('大写键到不了请求层：两个建单入口都在本地 reject，wx.request 一次都不发', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  const requests = []
+  wx.request = (opts) => { requests.push(opts); opts.success({ statusCode: 200, data: { data: { orderId: 'x' } } }) }
+  const api = requireMiniapp('../utils/api.js')
+  const bad = [UPPER_KEY, LOWER_KEY.toUpperCase(), 'aaaaaaaa-bbbb-4Ccc-8ddd-eeeeeeeeeeee']
+  for (const key of bad) {
+    await assert.rejects(api.createPackageOrder(PAYLOAD, { idempotencyKey: key }), /必须携带幂等键/)
+    await assert.rejects(
+      api.createCloudPrintOrder({ fileId: 'f1', terminalId: 't-1' }, { idempotencyKey: key }),
+      /必须携带幂等键/)
+  }
+  assert.equal(requests.length, 0, '一个必然 400 的请求都不许发出去')
+  // 对照：小写键必须照常发得出去 —— 收紧不能把活人一起挡掉。
+  await api.createPackageOrder(PAYLOAD, { idempotencyKey: LOWER_KEY })
+  await api.createCloudPrintOrder({ fileId: 'f1', terminalId: 't-1' }, { idempotencyKey: LOWER_KEY })
+  assert.equal(requests.length, 2)
+  assert.equal(requests[0].header['idempotency-key'], LOWER_KEY)
+  assert.equal(requests[1].header['idempotency-key'], LOWER_KEY)
+})
+
+test('盘上留着的大写键：未落定的一条不被复用（就地铸一个新的小写键），别人的记录一条不动', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  const fp = idem.fingerprintOf(PAYLOAD)
+  // 别人的（另一个槽位、另一位账号）好记录：全程必须原封不动。
+  const otherA = await idem.ensureKey('u:A', 'fp-other')
+  const otherB = await idem.ensureKey('u:B', fp)
+  // 手工摆一条旧版留下的大写未落定记录（本模块自己铸不出大写，只可能来自数据损坏
+  // 或旧构建）。它既复用不了（服务端 400），也没有 orderId 可指。
+  const rows = wx.storage.get(STORE_KEY)
+  rows.push({ account: 'u:A', fingerprint: fp, key: UPPER_KEY, orderId: '', createdAt: Date.now() })
+  wx.storage.set(STORE_KEY, rows)
+
+  assert.equal(idem.findRecord('u:A', fp), null, '不可用又没落定的记录不许被当成"可复用的记录"交出去')
+  const minted = await idem.ensureKey('u:A', fp)
+  assert.notEqual(minted.key, UPPER_KEY)
+  assert.match(minted.key, idem.KEY_RE)
+  assert.equal(minted.key, minted.key.toLowerCase())
+
+  const after = wx.storage.get(STORE_KEY)
+  assert.equal(after.filter((r) => r.account === 'u:A' && r.fingerprint === fp).length, 1,
+    '同一格只留一条：大写那条被换掉，不是再加一条（两条就是两个键、两张订单）')
+  assert.equal(after.find((r) => r.key === UPPER_KEY), undefined)
+  // 不相干的记录一条都不许动。
+  assert.equal(after.find((r) => r.account === 'u:A' && r.fingerprint === 'fp-other').key, otherA.key)
+  assert.equal(after.find((r) => r.account === 'u:B' && r.fingerprint === fp).key, otherB.key)
+})
+
+test('盘上留着的大写键：**已落定**的一条 fail-closed —— 不复用、不铸新键、也不抹掉它', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  const fp = idem.fingerprintOf(PAYLOAD)
+  const other = await idem.ensureKey('u:A', 'fp-other')
+  const rows = wx.storage.get(STORE_KEY)
+  rows.push({ account: 'u:A', fingerprint: fp, key: UPPER_KEY, orderId: 'ord-old', createdAt: Date.now() })
+  wx.storage.set(STORE_KEY, rows)
+
+  // 这一条还指得回一张真实存在的订单：recovery 必须还看得见它。
+  const found = idem.findRecord('u:A', fp)
+  assert.equal(found.orderId, 'ord-old')
+  // 但那个键换不回原单（400），而铸一个新键就是第二张订单 —— 只能拒绝。
+  await assert.rejects(idem.ensureKey('u:A', fp), /订单可能已经建好了/)
+  assert.equal(wx.calls.random, 1, '拒绝的那一次不许去取随机数（取了就意味着准备铸新键）')
+
+  const after = wx.storage.get(STORE_KEY)
+  assert.ok(after.find((r) => r.key === UPPER_KEY), '带 orderId 的那条不许被抹掉（它是唯一还指得回那张订单的线索）')
+  assert.equal(after.find((r) => r.fingerprint === 'fp-other').key, other.key)
+  // 用户的显式出口仍然有效：清掉之后才可以铸新键。
+  assert.equal(idem.clearRecord('u:A', fp), true)
+  const fresh = await idem.ensureKey('u:A', fp)
+  assert.match(fresh.key, idem.KEY_RE)
+  assert.equal(wx.storage.get(STORE_KEY).find((r) => r.fingerprint === 'fp-other').key, other.key)
+})
+
+test('单件链同一套：大写未落定不复用、大写已落定 fail-closed，rememberOrderId 也不收大写键', async () => {
+  const wx = createWx(); ACTIVE_WX = wx
+  const KEY = printIdem.STORE_KEY
+  const good = await printIdem.ensureKey('u:A', 'fp-keep')
+  const rows = wx.storage.get(KEY)
+  rows.push({ account: 'u:A', fingerprint: 'fp-upper', key: UPPER_KEY, orderId: '', createdAt: Date.now() })
+  rows.push({ account: 'u:A', fingerprint: 'fp-upper-settled', key: UPPER_KEY, orderId: 'ord-old', createdAt: Date.now() })
+  wx.storage.set(KEY, rows)
+
+  const minted = await printIdem.ensureKey('u:A', 'fp-upper')
+  assert.notEqual(minted.key, UPPER_KEY)
+  assert.match(minted.key, printIdem.KEY_RE)
+  await assert.rejects(printIdem.ensureKey('u:A', 'fp-upper-settled'), /订单可能已经建好了/)
+  // 大写键永远不该被记成"我们发出去的那个键"。
+  assert.equal(printIdem.rememberOrderId('u:A', 'fp-keep', UPPER_KEY, 'ord-1'), null)
+  assert.ok(printIdem.rememberOrderId('u:A', 'fp-keep', good.key, 'ord-1'))
+  const after = wx.storage.get(KEY)
+  assert.equal(after.find((r) => r.fingerprint === 'fp-keep').orderId, 'ord-1')
+  assert.ok(after.find((r) => r.fingerprint === 'fp-upper-settled'), '已落定的那条仍然留着')
+})

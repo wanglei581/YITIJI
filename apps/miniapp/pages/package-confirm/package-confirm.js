@@ -11,10 +11,16 @@
 //   ② 「合计 待确认」这种占位金额。金额现在来自服务端多行报价（POST /orders/quote
 //      的 lines 契约），前端不做任何单价乘法。
 //
-// 提交载荷仍然只有 fileId / pageRange：服务端 CreatePackageOrderDto 是白名单校验
-// （forbidNonWhitelisted），多带一个 filename / pageCount / totalAmount 就整单 400。
-// 这不是接口疏漏而是刻意的 —— DTO 注释写明「页数、金额与文件名全部由服务端查证，
-// 前端传值不作为事实」，让前端报页数报金额本身就是错的（那会成为计费口径被前端左右的入口）。
+// 提交载荷**当前只有 fileId**。`pageRange` 是服务端 `CreatePackageOrderDto` 预留的
+// 可选字段（后端已按有序 pageRange 计费并入幂等指纹），但这条链上还没有任何一处让用户
+// 选页码 —— 所以现在发出去的每一个 file 都只带 fileId，`pageRange` 属于将来才会用上的
+// 契约，不是本页此刻的行为。（此处旧注释写的是「只有 fileId / pageRange」，会被读成
+// 本页已经在传页码；本轮只更正这句话，不为此新增任何页码 UI 或行为。）
+//
+// 载荷之所以这么窄：服务端 DTO 是白名单校验（forbidNonWhitelisted），多带一个
+// filename / pageCount / totalAmount 就整单 400。这不是接口疏漏而是刻意的 ——
+// DTO 注释写明「页数、金额与文件名全部由服务端查证，前端传值不作为事实」，
+// 让前端报页数报金额本身就是错的（那会成为计费口径被前端左右的入口）。
 //
 // 2026-09-17：这一页此前**一个幂等键都不带**。服务端 `POST /orders/package` 补上
 // Idempotency-Key 之后（dd1434d89），不带就是 400；补上之前，它的代价是"响应丢在路上、

@@ -15,9 +15,13 @@
 // **为什么不复用 utils/print-order-idempotency.js**：那一份服务的是单件云打印
 // （POST /me/print-orders），指纹是 `{fileId, terminalId, copies, colorMode, duplex}`——
 // 一个文件、没有 pageRange。材料包是多文件有序，服务端 hash 的是
-// `{terminalId, fileIds[], pageRanges[], copies, colorMode, duplex}`；两个端点的
-// `(endUserId, key)` 唯一约束也各自独立。共用一张本机表会让两条链互相挤名额。
-// 所以这里是独立命名空间（见 STORE_KEY），行为口径则逐条照抄那一份已经收口过的
+// `{terminalId, fileIds[], pageRanges[], copies, colorMode, duplex}`。
+// **服务端那一侧的键空间是共用的**：两条链都把键写进 `Order.idempotencyKey`，共用同一个
+// `@@unique([endUserId, idempotencyKey])` —— 不存在"每条链一个独立唯一约束"这回事。
+// 本机分两张表的理由与服务端约束无关，是本地这一侧的两件事：① 两条链的指纹**字段集
+// 不同**，混在一张表里就得靠字段形状去猜"这一格属于哪条链"；② 未落定名额与恢复记录
+// 是按表计的，共用一张表会让一条链的在途提交挤掉另一条链的（挤掉 = 下一次铸新键 =
+// 第二张订单）。所以这里是独立命名空间（见 STORE_KEY），行为口径则逐条照抄那一份已经收口过的
 // 硬化结论（读失败 fail-closed、写完读回核对、未落定不淘汰、并发铸键串行化、
 // 随机数有界超时）—— 每一条都对应一次真实的「多一张订单、多收一次钱」。
 //
@@ -30,8 +34,14 @@ const storage = require('./storage')
 const { isMemberIdentity } = require('./page-guard')
 
 /**
- * 本机存储键。**与单件链的 `zyd_print_order_idem` 是两格，不是一格**：
- * 两条链的服务端唯一约束各自独立，混在一张表里会互相挤名额。
+ * 本机存储键。**与单件链的 `zyd_print_order_idem` 是两格，不是一格。**
+ *
+ * 理由**不是**"服务端有两个唯一约束" —— 服务端只有一个：两条链的键都落在
+ * `Order.idempotencyKey` 上，共用 `@@unique([endUserId, idempotencyKey])`。
+ * 分表是本地这一侧的需要：两条链的指纹字段集不同（单件是单文件、没有 pageRange），
+ * 而未落定名额与恢复记录都是按表计的 —— 共用一张表，一条链的在途提交会挤掉另一条链的，
+ * 而挤掉一条未落定记录就是下一次铸新键、服务端再建一张订单。
+ *
  * 也不进 utils/storage.js 的 KEYS 表 —— 那张表是"跨页共享的业务状态"，
  * 而这条记录只服务于材料包建单这一条链，由本模块独占读写。
  */
@@ -78,8 +88,41 @@ const STORE_UNREADABLE_MESSAGE = '读不到本机的下单记录，为避免重�
 /** 未落定名额用尽。见 MAX_PENDING_RECORDS。 */
 const PENDING_FULL_MESSAGE = '本机还有太多没有落定的材料包下单记录，为避免重复下单已中止提交。请先到「我的 · 打印订单」确认之前几次提交的结果'
 
-/** 与服务端 assertMemberPrintOrderIdempotencyKey 的 IDEMPOTENCY_KEY_RE 同形。 */
-const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+/**
+ * 盘上这一格的键**服务端已经不接受了**（大写 / 形状被改坏），而它已经带着 orderId。
+ *
+ * 这一种只能 fail-closed：那个键换不回原单（400），而铸一个新键就是第二张订单、
+ * 第二笔钱。记录**不清**（orderId 还指得回那张真实存在的订单），页面照它锁住并指路。
+ */
+const STALE_KEY_SETTLED_MESSAGE = '本机这一单的下单标识已经不是服务端接受的形态，但它对应的订单可能已经建好了。为避免重复下单已中止提交，请到「我的 · 打印订单」确认后再操作'
+
+/**
+ * 服务端接受的键形态：**只认小写十六进制**。
+ *
+ * 2026-09-17 `daa1f5484` 把服务端的 `IDEMPOTENCY_KEY_RE` 去掉了 `/i`，理由是
+ * **大小写不在唯一键里**：`Order` 的 `@@unique(endUserId, idempotencyKey)` 是
+ * 区分大小写的 TEXT，于是同一个 UUID 的大写写法在服务端是**另一个键** —— 它不会
+ * 回放原单，会再建一张、再收一次钱。服务端选择直接 400 `IDEMPOTENCY_KEY_INVALID`
+ * 而**不** `toLowerCase()`（悄悄改写请求会让"我发的键"和"服务端记的键"不是一个东西）。
+ * 本地这一份必须跟着收紧到同一形态，否则大写键会一路走到 wx.request，
+ * 用户看到的只是一句被翻译过的「请稍后重试」，重试多少次都一样。
+ */
+const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+/**
+ * 「这一格看起来是本模块写下的一条记录」的**宽**判据（大小写不敏感）。
+ *
+ * 它只决定一件事：这条记录**要不要留在盘上**。不决定那个键还能不能拿去 POST ——
+ * 那个判据是上面的 `KEY_RE`。两者必须分开：只用 `KEY_RE` 过滤的话，一条键形态不合
+ * （大写 / 被改坏）但**已经带着 orderId** 的记录会在下一次读-改-写回全量时被整条抹掉，
+ * 而它恰恰是唯一还指得回那张真实订单的线索 —— 抹掉它，用户同参数再提交一次就是第二张单。
+ */
+const KEY_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** 这个键还能不能拿去 POST（服务端只认小写）。 */
+function isReusableKey(key) {
+  return typeof key === 'string' && KEY_RE.test(key)
+}
 
 /**
  * 参与指纹的字段，**与服务端 fingerprintPackageOrderPayload 逐字同一组**。
@@ -154,7 +197,13 @@ function slotOf(account, fingerprint) {
   return `${seg(account)}|${fingerprint}`
 }
 
-/** ArrayBuffer(16) → `xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx`。 */
+/**
+ * ArrayBuffer(16) → `xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx`。
+ *
+ * **产物一定是小写**：`Number.prototype.toString(16)` 只吐小写十六进制，而服务端的
+ * 唯一键区分大小写（见 KEY_RE）。铸完还会被 `KEY_RE.test()` 再核一遍 —— 那一道既挡
+ * 形状，也挡大小写，所以这条性质不是靠注释维持的。
+ */
 function formatUuidV4(randomValues) {
   const bytes = new Uint8Array(randomValues)
   if (bytes.length < 16) throw new Error('安全随机数长度不足')
@@ -243,7 +292,11 @@ function loadAll() {
   return result.value.filter((row) => row
     && typeof row === 'object'
     && isMemberIdentity(row.account)
-    && typeof row.key === 'string' && KEY_RE.test(row.key)
+    // 键形态按**宽**判据留，按**严**判据用（见 KEY_SHAPE_RE）。
+    // 唯一被当场丢掉的是「键已经不可用、而且还没落定」那一种：它既复用不了
+    // （服务端 400），也没有 orderId 可指 —— 留着只会把这一格永久堵死。
+    && typeof row.key === 'string' && KEY_SHAPE_RE.test(row.key)
+    && (isReusableKey(row.key) || !!row.orderId)
     && typeof row.fingerprint === 'string' && row.fingerprint !== ''
     && typeof row.createdAt === 'number' && Number.isFinite(row.createdAt)
     && now - row.createdAt < TTL_MS)
@@ -354,7 +407,11 @@ function ensureKey(account, fingerprint) {
   const rows = loadAll()
   if (!rows) return Promise.reject(new Error(STORE_UNREADABLE_MESSAGE))
   const hit = rows.find((row) => row.account === account && row.fingerprint === fingerprint)
-  if (hit) return Promise.resolve(hit)
+  if (hit && isReusableKey(hit.key)) return Promise.resolve(hit)
+  // 走到这里只有一种可能：这一格已经落定（有 orderId），而它的键是服务端已经不接受的
+  // 形态 —— loadAll 只让这一种活下来（键不可用且未落定的那一种当场就丢掉了，见那里）。
+  // 不复用（400 换不回原单），也不铸新键（那是第二张订单），更不清记录（orderId 还有用）。
+  if (hit) return Promise.reject(new Error(STALE_KEY_SETTLED_MESSAGE))
   // 未落定的名额满了：**拒绝铸新键**，一条既有记录都不删。腾名额只能从未落定那一档腾，
   // 而那一档每一条都代表一次"POST 可能已经到了服务端"的提交。被拒绝的用户重试一次就好；
   // 被挤掉的那一单，用户永远不知道自己被收了两次钱。
@@ -375,7 +432,9 @@ function ensureKey(account, fingerprint) {
     if (!base) throw new Error(STORE_UNREADABLE_MESSAGE)
     // 这段时间里别的路径完全可能已经把这一格写好了。真有就用它，不覆盖 —— 覆盖等于换键。
     const settled = base.find((row) => row.account === account && row.fingerprint === fingerprint)
-    if (settled) return settled
+    if (settled && isReusableKey(settled.key)) return settled
+    // 同上：这段时间里冒出来的那一格若带着一个服务端不接受的键，一样只能 fail-closed。
+    if (settled) throw new Error(STALE_KEY_SETTLED_MESSAGE)
     // 别的**槽位**也可能把名额占满。再判一次：这一步的代价只是白铸一个键，
     // 而放行的代价是挤掉一条在飞的记录。
     if (pendingCount(base) >= MAX_PENDING_RECORDS) throw new Error(PENDING_FULL_MESSAGE)
@@ -448,6 +507,9 @@ function clearRecord(account, fingerprint) {
 module.exports = {
   STORE_KEY,
   KEY_RE,
+  KEY_SHAPE_RE,
+  isReusableKey,
+  STALE_KEY_SETTLED_MESSAGE,
   TTL_MS,
   MAX_PENDING_RECORDS,
   MAX_SETTLED_RECORDS,
