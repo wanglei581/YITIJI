@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react'
 import type { ScreenSnapshot } from '@ai-job-print/shared'
 import { ScreenBanner, ScreenBody, ScreenHeader } from '@ai-job-print/ui'
+import type { ScreenHeadingLevel } from '@ai-job-print/ui'
 import { accessText, countFailedSlices, freshnessText, generatedAtText, windowText } from './screenMeta'
 
 /** 大屏页眉 + 整屏级横幅。取数口径的计算在 screenMeta.ts，本文件只出组件。 */
 
 export interface ScreenShellProps {
   title: string
+  /** 页眉标题层级：嵌在 Page 里是 2（外层 PageHeader 占 h1），全屏演示是 1。 */
+  headingLevel: ScreenHeadingLevel
   subtitle: string
   snapshot: ScreenSnapshot
   pollSeconds: number
@@ -20,6 +23,7 @@ export interface ScreenShellProps {
 
 export function ScreenShell({
   title,
+  headingLevel,
   subtitle,
   snapshot,
   pollSeconds,
@@ -33,6 +37,7 @@ export function ScreenShell({
     <ScreenBody>
       <ScreenHeader
         title={title}
+        headingLevel={headingLevel}
         subtitle={subtitle}
         generatedAtText={generatedAtText(snapshot)}
         windowText={`${windowText(snapshot, pollSeconds)} · ${freshnessText(snapshot)} · ${accessText(snapshot)}`}

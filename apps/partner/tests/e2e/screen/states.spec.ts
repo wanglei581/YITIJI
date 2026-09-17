@@ -75,4 +75,42 @@ test.describe('partner data screen states', () => {
     const digits = await visibleDigits(page)
     expect(digits).toEqual([])
   })
+
+  test('标题层级：嵌入态全页唯一 h1，全屏演示态大屏标题升为 h1', async ({ page }) => {
+    await serveJson(page, partnerFull())
+    await open(page, '/screen')
+
+    // 嵌入态：外层 PageHeader 占 h1，大屏页眉让位到 h2。
+    // 这正是 route-sweep「已登录访问 /screen」此前 strict mode violation 的根因。
+    await expect(page.locator('h1')).toHaveCount(1)
+    await expect(page.locator('h1')).toHaveText('数据大屏')
+    await expect(page.locator('.ops-hd h2')).toHaveText('本机构运营概览')
+    await expect(page.locator('.ops-hd h1')).toHaveCount(0)
+
+    // 降级成 h2 不能掉回浏览器默认字号 / 默认外边距 —— 那会是一次真实的像素回归。
+    // 字阶由 `.ops-hd :is(h1, h2)` 覆盖，这里按两档实测值钉住。
+    const deskStyle = await page.locator('.ops-hd h2').evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { fontSize: style.fontSize, marginTop: style.marginTop, marginBottom: style.marginBottom }
+    })
+    expect(deskStyle, '桌面档标题仍是 22px 且外边距被重置').toEqual({
+      fontSize: '22px',
+      marginTop: '0px',
+      marginBottom: '0px',
+    })
+
+    // 全屏演示：标题回到 h1，且仍是可访问标题
+    await page.getByRole('button', { name: '全屏演示' }).click()
+    await expect(page.locator("[data-ops-screen='wall']")).toBeVisible()
+    await expect(page.locator('h1')).toHaveCount(1)
+    await expect(
+      page.getByRole('heading', { level: 1, name: '本机构运营概览' }),
+    ).toBeVisible()
+
+    const wallFontSize = await page
+      .locator('.ops-hd h1')
+      .evaluate((el) => getComputedStyle(el).fontSize)
+    expect(wallFontSize, '舞台档标题仍是 34px').toBe('34px')
+  })
+
 })

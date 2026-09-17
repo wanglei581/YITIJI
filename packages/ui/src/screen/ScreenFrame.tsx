@@ -125,8 +125,24 @@ export function ScreenGrid({ layout, children }: ScreenGridProps) {
   return <div className={cn('ops-grid', `ops-grid-${layout}`)}>{children}</div>
 }
 
+/**
+ * 页眉标题的层级。只开放 1 / 2 两档。
+ *
+ * 大屏有两种寄居方式，标题该是几级由**外面是谁**决定，不是样式偏好：
+ *   - 嵌在 Admin / Partner 的普通 Page 里：外层 PageHeader 已经占了 h1，
+ *     大屏页眉必须降为 h2，否则一页两个 h1 —— 读屏器读不出主次，
+ *     partner 的 route-sweep 也会因 `locator('h1')` 命中两个而报 strict mode violation。
+ *   - 进入 ScreenStage 全屏演示：覆盖层就是整份文档，标题回到 h1。
+ */
+export type ScreenHeadingLevel = 1 | 2
+
 export interface ScreenHeaderProps {
   title: string
+  /**
+   * 标题渲染成 h1 还是 h2。**必填，刻意不给默认值** —— 只有调用方知道
+   * 此刻大屏嵌在谁里面；给了默认值，下一个接入点就会静默多出一个 h1。
+   */
+  headingLevel: ScreenHeadingLevel
   subtitle: string
   /** 已格式化的数据时间戳文案；缺省时不渲染时间行。 */
   generatedAtText?: string
@@ -140,6 +156,7 @@ export interface ScreenHeaderProps {
 
 export function ScreenHeader({
   title,
+  headingLevel,
   subtitle,
   generatedAtText,
   windowText,
@@ -147,10 +164,11 @@ export function ScreenHeader({
   staleText,
   actions,
 }: ScreenHeaderProps) {
+  const Heading = headingLevel === 1 ? 'h1' : 'h2'
   return (
     <div className="ops-hd">
       <div>
-        <h1>{title}</h1>
+        <Heading>{title}</Heading>
         <p className="ops-sub">{subtitle}</p>
       </div>
       <div className="ops-hd-actions">

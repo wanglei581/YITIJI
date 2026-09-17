@@ -211,11 +211,21 @@ export default function AdminScreenPage() {
     </>
   )
 
+  // 标题层级随寄居方式变：嵌在 Page 里外层 PageHeader 已是 h1，这里降 h2；
+  // 全屏演示时覆盖层就是整份文档，标题回到 h1。不做条件 CSS 隐藏 —— 那只骗眼睛，
+  // 读屏器与 locator('h1') 照样看见两个。
+  const headingLevel = presenting ? 1 : 2
+
   let content: JSX.Element
   if (!data && failure) {
     content = (
       <ScreenBody>
-        <ScreenHeader title={meta.title} subtitle={meta.subtitle} actions={actions} />
+        <ScreenHeader
+          title={meta.title}
+          headingLevel={headingLevel}
+          subtitle={meta.subtitle}
+          actions={actions}
+        />
         <FailurePanel
           result={failure}
           onRetry={() => {
@@ -229,6 +239,7 @@ export default function AdminScreenPage() {
       <ScreenBody>
         <ScreenHeader
           title={meta.title}
+          headingLevel={headingLevel}
           subtitle={meta.subtitle}
           windowText="正在取数，未取到之前不显示任何数值"
           actions={actions}
@@ -240,6 +251,7 @@ export default function AdminScreenPage() {
     content = (
       <ScreenShell
         title={meta.title}
+        headingLevel={headingLevel}
         subtitle={meta.subtitle}
         snapshot={data}
         pollSeconds={meta.pollSeconds}

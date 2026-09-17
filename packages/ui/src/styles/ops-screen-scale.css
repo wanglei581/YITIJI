@@ -15,7 +15,7 @@
 
 /* ---------- 字阶：wall 3 米可读，下限 13px ---------- */
 [data-ops-screen='wall'] { font-size: 16px; }
-[data-ops-screen='wall'] .ops-hd h1 { font-size: 34px; }
+[data-ops-screen='wall'] .ops-hd :is(h1, h2) { font-size: 34px; }
 [data-ops-screen='wall'] .ops-hd .ops-sub { font-size: 15px; }
 [data-ops-screen='wall'] .ops-stamp { font-size: 15px; }
 [data-ops-screen='wall'] .ops-stamp .ops-win { font-size: 14px; }
@@ -54,7 +54,7 @@
 
 /* ---------- 字阶：desk 60cm 可读，下限 12px ---------- */
 [data-ops-screen='desk'] { font-size: 14px; }
-[data-ops-screen='desk'] .ops-hd h1 { font-size: 22px; }
+[data-ops-screen='desk'] .ops-hd :is(h1, h2) { font-size: 22px; }
 [data-ops-screen='desk'] .ops-hd .ops-sub { font-size: 13px; }
 [data-ops-screen='desk'] .ops-stamp { font-size: 13px; }
 [data-ops-screen='desk'] .ops-stamp .ops-win { font-size: 12px; }

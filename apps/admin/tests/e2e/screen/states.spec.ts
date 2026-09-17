@@ -170,6 +170,43 @@ test.describe('admin data screen states', () => {
     expect(z).not.toBe('none')
   })
 
+  test('标题层级：嵌入态全页唯一 h1，全屏演示态大屏标题升为 h1', async ({ page }) => {
+    await serveJson(page, govFull())
+    await open(page, '/screen?profile=gov')
+
+    // 嵌入态：外层 PageHeader 占 h1，大屏页眉必须让位到 h2。
+    // 一页两个 h1 读屏器分不出主次，partner 的 route-sweep 也会 strict mode violation。
+    await expect(page.locator('h1')).toHaveCount(1)
+    await expect(page.locator('h1')).toHaveText('数据大屏')
+    await expect(page.locator('.ops-hd h2')).toHaveText('就业服务终端 · 运行概览')
+    await expect(page.locator('.ops-hd h1')).toHaveCount(0)
+
+    // 降级成 h2 不能掉回浏览器默认字号 / 默认外边距 —— 那会是一次真实的像素回归。
+    // 字阶由 `.ops-hd :is(h1, h2)` 覆盖，这里按两档实测值钉住。
+    const deskStyle = await page.locator('.ops-hd h2').evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { fontSize: style.fontSize, marginTop: style.marginTop, marginBottom: style.marginBottom }
+    })
+    expect(deskStyle, '桌面档标题仍是 22px 且外边距被重置').toEqual({
+      fontSize: '22px',
+      marginTop: '0px',
+      marginBottom: '0px',
+    })
+
+    // 全屏演示：覆盖层就是整份文档，标题回到 h1，且必须仍是可访问的标题而不是普通文字
+    await page.getByRole('button', { name: '全屏演示' }).click()
+    await expect(page.locator("[data-ops-screen='wall']")).toBeVisible()
+    await expect(page.locator('h1')).toHaveCount(1)
+    await expect(
+      page.getByRole('heading', { level: 1, name: '就业服务终端 · 运行概览' }),
+    ).toBeVisible()
+
+    const wallFontSize = await page
+      .locator('.ops-hd h1')
+      .evaluate((el) => getComputedStyle(el).fontSize)
+    expect(wallFontSize, '舞台档标题仍是 34px').toBe('34px')
+  })
+
   test('全屏演示进入 1920×1080 舞台', async ({ page }) => {
     await serveJson(page, govFull())
     await open(page, '/screen?profile=gov')

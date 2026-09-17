@@ -328,6 +328,63 @@ const deskSizes = [...css.matchAll(/\[data-ops-screen='desk'\][^{]*\{[^}]*font-s
 check(wallSizes.length > 20 && Math.min(...wallSizes) >= 13, `舞台档最小字号 ${Math.min(...wallSizes)}px ≥ 13px`)
 check(deskSizes.length > 20 && Math.min(...deskSizes) >= 12, `桌面档最小字号 ${Math.min(...deskSizes)}px ≥ 12px`)
 
+// ── 14A. 页眉标题层级 ─────────────────────────────────────────────────────
+// 大屏嵌在 Admin / Partner 的 Page 里时，外层 PageHeader 已经是 h1；
+// 大屏页眉再渲染一个 h1 就是一页两个 h1 —— 读屏器读不出主次，
+// partner 的 route-sweep 也会因 locator('h1') 命中两个而 strict mode violation。
+// 这一组守的是「层级由调用方显式决定」，而不是靠 CSS 把其中一个藏起来。
+const frame = read('packages/ui/src/screen/ScreenFrame.tsx')
+check(
+  /export type ScreenHeadingLevel = 1 \| 2/.test(frame),
+  '页眉标题层级是受限联合类型（只开放 h1 / h2，不是任意字符串）',
+)
+check(
+  /^\s{2}headingLevel: ScreenHeadingLevel$/m.test(frame),
+  'headingLevel 是必填 prop（没有 ?，漏传就是编译错误而不是静默多一个 h1）',
+)
+check(
+  !/headingLevel\s*=\s*[12]/.test(stripComments(frame)),
+  'headingLevel 没有默认值（给了默认值，下一个接入点会静默多出一个 h1）',
+)
+check(
+  /const Heading = headingLevel === 1 \? 'h1' : 'h2'/.test(frame)
+    && /<Heading>\{title\}<\/Heading>/.test(frame),
+  '页眉按层级渲染真实的 h1 / h2 标签',
+)
+check(
+  !/<h1>\{title\}<\/h1>/.test(frame),
+  '页眉不再无条件渲染 h1',
+)
+// 两端都必须按「是否全屏演示」决定层级，且三个调用点一个都不能漏
+for (const app of ['admin', 'partner']) {
+  const page = read(`apps/${app}/src/routes/screen/index.tsx`)
+  const view = read(`apps/${app}/src/routes/screen/screenView.tsx`)
+  check(
+    /const headingLevel = presenting \? 1 : 2/.test(page),
+    `apps/${app} 按是否全屏演示决定标题层级（嵌入 h2 / 全屏 h1）`,
+  )
+  const headerOpens = (page.match(/<Screen(Header|Shell)\b/g) ?? []).length
+  const headerLevels = (page.match(/headingLevel=\{headingLevel\}/g) ?? []).length
+  check(
+    headerOpens > 0 && headerLevels === headerOpens,
+    `apps/${app} 的 ${headerOpens} 个页眉调用点都显式传了 headingLevel（实际 ${headerLevels} 处）`,
+  )
+  check(
+    /headingLevel: ScreenHeadingLevel/.test(view) && /headingLevel=\{headingLevel\}/.test(view),
+    `apps/${app} 的 ScreenShell 把 headingLevel 透传下去，不自己决定层级`,
+  )
+}
+// 不许用 CSS 把多出来的 h1 藏掉：那只骗眼睛，读屏器和 locator 照样看得见
+check(
+  !/\.ops-hd\s+h1\s*\{[^}]*display:\s*none/.test(css),
+  '没有用 display:none 隐藏多余标题（层级要真的改，不是藏起来）',
+)
+// 字阶要同时覆盖 h1 与 h2，否则降级成 h2 后字号掉回浏览器默认
+check(
+  (css.match(/\.ops-hd :is\(h1, h2\)/g) ?? []).length >= 3,
+  '页眉字阶三处（基础 / wall / desk）都同时覆盖 h1 与 h2',
+)
+
 // ── 15. 路由与侧栏接线 ────────────────────────────────────────────────────
 const adminRoutes = read('apps/admin/src/routes/index.tsx')
 const adminLayout = read('apps/admin/src/layouts/AdminLayoutWrapper.tsx')

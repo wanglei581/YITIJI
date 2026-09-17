@@ -112,6 +112,7 @@ export type {
   ScreenBodyProps,
   ScreenGridProps,
   ScreenHeaderProps,
+  ScreenHeadingLevel,
   ScreenMode,
   ScreenStageProps,
   ScreenStatePanelProps,
