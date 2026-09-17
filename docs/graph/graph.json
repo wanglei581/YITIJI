@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 529,
+    "endpointCount": 530,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -7101,6 +7101,26 @@
           "TerminalCapability"
         ],
         "path": "/api/v1/me/print-orders/cloud",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-print-orders/member-print-order-create.service.ts"
+        ],
+        "services": [
+          "MemberPrintOrderCreateService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
+        "handler": "MemberPrintOrdersController.resolveSubmissions",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FileObject",
+          "Order",
+          "Terminal",
+          "TerminalCapability"
+        ],
+        "path": "/api/v1/me/print-orders/submissions/resolve",
         "roles": [],
         "serviceFiles": [
           "services/api/src/member-print-orders/member-print-order-create.service.ts"
@@ -14770,7 +14790,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 101,
+    "modelCount": 102,
     "models": [
       {
         "fieldCount": 7,
@@ -15663,6 +15683,12 @@
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
+      },
+      {
+        "fieldCount": 11,
+        "name": "OrderSubmissionLedger",
+        "relations": [],
+        "usedBy": []
       },
       {
         "fieldCount": 26,
@@ -32197,7 +32223,9 @@
           "services/api/src/storage/storage.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
         ],
-        "missing": []
+        "missing": [
+          "src/member-print-orders/order-submission-ledger.ts"
+        ]
       },
       "file": "services/api/scripts/verify-member-print-order-idempotency.ts",
       "helper": false,
