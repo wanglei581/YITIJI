@@ -96,8 +96,8 @@ async function main(): Promise<void> {
   const audit = new AuditService(prisma)
   const capabilities = new TerminalCapabilitiesService(prisma)
   const quotes = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma), capabilities, prisma)
-  const packages = new PackageOrderService(prisma, quotes, capabilities, audit)
   const statuses = new OrderStatusService(prisma, audit)
+  const packages = new PackageOrderService(prisma, quotes, capabilities, audit, statuses)
   const pickup = new PickupOrderService(prisma, capabilities, audit, new FakeRedis() as unknown as RedisService, storage)
   const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
   const agent = new TerminalAgentService(prisma, audit)
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
         terminalId,
         files: fileIds.map((fileId) => ({ fileId })),
         params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
-      }),
+      }, randomUUID()),
       'PII_SCAN_STALE',
       'RES-1 package-order sha256 不一致 → 409 PII_SCAN_STALE',
     )
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
       terminalId,
       files: fileIds.map((fileId) => ({ fileId })),
       params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
-    })
+    }, randomUUID())
     const beforeRelease = await prisma.order.findUnique({
       where: { id: created.orderId }, include: { orderItems: { orderBy: { seq: 'asc' } } },
     })

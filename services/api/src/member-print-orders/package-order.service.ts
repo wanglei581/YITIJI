@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CreatePackageOrderDto } from './dto/create-package-order.dto'
+import { assertMemberPrintOrderIdempotencyKey } from './member-print-order-create.service'
 import { assertPiiScanned } from '../print-jobs/pii-scan-gate'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
@@ -38,6 +39,36 @@ function normalizeParams(dto: CreatePackageOrderDto): PrintJobParamsDto {
   }
 }
 
+/**
+ * Canonical package fingerprint: terminalId, ordered file IDs, ordered
+ * pageRange, copies, colorMode, duplex.
+ *
+ * pageRange uses the same truthiness as quote/fulfillment
+ * (`entry.pageRange ? pageRange : omit`): missing / '' → null. A changed
+ * pageRange changes billed pages, so it must 409 on the same key.
+ * colorMode/duplex aliases (bw/single) are normalized so a lost-response
+ * retry with the other alias still replays.
+ */
+function canonicalizePackagePageRange(pageRange: string | undefined | null): string | null {
+  return pageRange ? pageRange : null
+}
+
+export function fingerprintPackageOrderPayload(dto: CreatePackageOrderDto): string {
+  const params = normalizeParams(dto)
+  return crypto.createHash('sha256').update(JSON.stringify({
+    terminalId: dto.terminalId,
+    fileIds: dto.files.map((file) => file.fileId),
+    pageRanges: dto.files.map((file) => canonicalizePackagePageRange(file.pageRange)),
+    copies: params.copies,
+    colorMode: params.colorMode,
+    duplex: params.duplex,
+  })).digest('hex')
+}
+
+function isPrismaUniqueConflict(error: unknown): error is object & { code: 'P2002' } {
+  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'P2002')
+}
+
 @Injectable()
 export class PackageOrderService {
   constructor(
@@ -48,7 +79,12 @@ export class PackageOrderService {
     private readonly orderStatus: OrderStatusService,
   ) {}
 
-  async create(endUserId: string, dto: CreatePackageOrderDto) {
+  async create(endUserId: string, dto: CreatePackageOrderDto, idempotencyKey?: string | null) {
+    const key = assertMemberPrintOrderIdempotencyKey(idempotencyKey)
+    const fingerprint = fingerprintPackageOrderPayload(dto)
+    const existing = await this.findOwnedByIdempotencyKey(endUserId, key)
+    if (existing) return this.replayOwned(endUserId, existing, fingerprint)
+
     const now = new Date()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: dto.terminalId }, { terminalCode: dto.terminalId }] },
@@ -103,38 +139,51 @@ export class PackageOrderService {
 
     const amountCents = items.reduce((total, item) => total + item.amountCents, 0)
     const code = randomPickupCode()
-    const order = await this.prisma.order.create({
-      data: {
-        orderNo: makeOrderNo(),
-        type: 'print',
-        channel: 'miniapp_cloud',
-        endUserId,
-        terminalId: terminal.id,
-        amountCents,
-        billablePages: items.reduce((total, item) => total + item.billablePages, 0),
-        billingPageSource: items.every((item) => item.billingPageSource === items[0]?.billingPageSource) ? items[0]?.billingPageSource : 'mixed',
-        payStatus: 'unpaid',
-        taskStatus: 'pending_release',
-        pickupCodeHash: hashPickupCode(code),
-        pickupCodeEnc: encryptSecret(code),
-        pickupCodeCreatedAt: now,
-        pickupCodeExpiresAt: expiresAt,
-        pickupStatus: 'pending',
-        orderItems: {
-          create: items.map((item, seq) => ({
-            seq,
-            fileId: item.fileId,
-            colorMode: params.colorMode,
-            duplex: params.duplex,
-            copies: params.copies,
-            pageRange: item.pageRange,
-            billablePages: item.billablePages,
-            amountCents: item.amountCents,
-          })),
+    let order
+    try {
+      order = await this.prisma.order.create({
+        data: {
+          orderNo: makeOrderNo(),
+          type: 'print',
+          channel: 'miniapp_cloud',
+          endUserId,
+          terminalId: terminal.id,
+          amountCents,
+          billablePages: items.reduce((total, item) => total + item.billablePages, 0),
+          billingPageSource: items.every((item) => item.billingPageSource === items[0]?.billingPageSource) ? items[0]?.billingPageSource : 'mixed',
+          payStatus: 'unpaid',
+          taskStatus: 'pending_release',
+          pickupCodeHash: hashPickupCode(code),
+          pickupCodeEnc: encryptSecret(code),
+          pickupCodeCreatedAt: now,
+          pickupCodeExpiresAt: expiresAt,
+          pickupStatus: 'pending',
+          idempotencyKey: key,
+          idempotencyPayloadHash: fingerprint,
+          orderItems: {
+            create: items.map((item, seq) => ({
+              seq,
+              fileId: item.fileId,
+              colorMode: params.colorMode,
+              duplex: params.duplex,
+              copies: params.copies,
+              pageRange: item.pageRange,
+              billablePages: item.billablePages,
+              amountCents: item.amountCents,
+            })),
+          },
         },
-      },
-      include: { orderItems: { orderBy: { seq: 'asc' } } },
-    })
+        include: { orderItems: { orderBy: { seq: 'asc' } } },
+      })
+    } catch (error) {
+      // Any P2002: one scoped lookup by (endUserId, key). Replay only that
+      // member's row. No row → rethrow. Never replay another member.
+      if (isPrismaUniqueConflict(error)) {
+        const raced = await this.findOwnedByIdempotencyKey(endUserId, key)
+        if (raced) return this.replayOwned(endUserId, raced, fingerprint)
+      }
+      throw error
+    }
     if (amountCents === 0) await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
     const settled = amountCents === 0
       ? await this.prisma.order.findUniqueOrThrow({
@@ -196,6 +245,33 @@ export class PackageOrderService {
       itemCount: order.orderItems.length,
       createdAt: order.createdAt.toISOString(),
     }))
+  }
+
+  private findOwnedByIdempotencyKey(endUserId: string, idempotencyKey: string) {
+    return this.prisma.order.findFirst({
+      where: { endUserId, idempotencyKey },
+      include: { orderItems: { orderBy: { seq: 'asc' } } },
+    })
+  }
+
+  private async replayOwned(
+    endUserId: string,
+    row: NonNullable<Awaited<ReturnType<PackageOrderService['findOwnedByIdempotencyKey']>>>,
+    fingerprint: string,
+  ) {
+    if (row.endUserId !== endUserId) {
+      throw new NotFoundException({ error: { code: 'PACKAGE_ORDER_NOT_FOUND', message: '材料包订单不存在' } })
+    }
+    if (!row.idempotencyPayloadHash || row.idempotencyPayloadHash !== fingerprint) {
+      throw new ConflictException({
+        error: { code: 'IDEMPOTENCY_KEY_REUSED', message: '该请求标识已用于另一次打印参数，请更换标识后重试' },
+      })
+    }
+    if (row.amountCents === 0 && row.payStatus === 'unpaid') {
+      await this.orderStatus.markPaid(row.id, { paymentSource: 'free' })
+    }
+    const order = await this.requireOwned(endUserId, row.id)
+    return this.toView(order, this.visibleCode(order))
   }
 
   private async requireOwned(endUserId: string, orderId: string) {
