@@ -1,0 +1,95 @@
+/* 青序流光 · 动效层
+ *
+ * 三层设计系统（tokens 配色 / shell 外壳 / primitives 控件）此前缺了这一层，
+ * 于是迁过来的页面「结构对、质感不对」。数据：52 张稿里 31 张用 @keyframes、
+ * 38 张用 transition、25 张用 cubic-bezier、17 张用 backdrop-filter；
+ * 而运行时青序 CSS 里 cubic-bezier 和 backdrop-filter **各出现 0 次**。
+ * 缓动曲线决定手感，毛玻璃决定层次——正是「精致 vs 粗糙」的分界。
+ *
+ * 本文件的曲线与关键帧**逐条取自稿**，不是新设计的：
+ *   cubic-bezier(.22,1,.36,1)  稿里用了 21 次，是主曲线
+ *   cubic-bezier(.2,.8,.2,1)   6 次，用于较克制的位移
+ *   breathe / drift / rise / sweep / ring  取自 07 / 00 / 01 / master / 33 稿
+ *
+ * 一体机是公共终端、长时间连续运行，所以：
+ *  - 常驻动画一律低频低幅（呼吸 3.6s、漂移 18s），不做抢眼的循环特效
+ *  - 一律尊重 prefers-reduced-motion
+ *  - 不用 will-change 常驻提升图层（27 寸屏长跑会累积显存）
+ */
+
+:root {
+  /* 主曲线：稿里 21 处用它。收尾极缓，是「重物落定」的手感 */
+  --qx-ease: cubic-bezier(.22, 1, .36, 1);
+  /* 克制曲线：用于小位移、状态切换 */
+  --qx-ease-soft: cubic-bezier(.2, .8, .2, 1);
+  /* 对称曲线：用于往返型动作（展开/收起） */
+  --qx-ease-inout: cubic-bezier(.45, 0, .55, 1);
+
+  --qx-dur-fast: 160ms;   /* 按下反馈 */
+  --qx-dur: 260ms;        /* 常规状态切换 */
+  --qx-dur-slow: 420ms;   /* 入场 */
+}
+
+/* ── 关键帧：逐条取自稿 ───────────────────────────────── */
+
+/* 07-session-resume：等待态的呼吸点 */
+@keyframes qx-breathe { 0%, 100% { opacity: 1; transform: scale(1) } 50% { opacity: .45; transform: scale(.78) } }
+/* 03-login-gate：更克制的一版，只呼吸不缩放 */
+@keyframes qx-breathe-soft { 0%, 100% { opacity: .5 } 50% { opacity: 1 } }
+/* 01-home：入场升起 */
+@keyframes qx-rise { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: translateY(0) } }
+/* master-v2：扫光，用于强调条 */
+@keyframes qx-sweep { 0% { transform: translateX(-160%) skewX(-18deg) } 55%, 100% { transform: translateX(320%) skewX(-18deg) } }
+/* 33-pickup-code：成功/到达时的扩散环 */
+@keyframes qx-ring { 0% { transform: scale(.92); opacity: .9 } 70% { transform: scale(1.12); opacity: 0 } 100% { opacity: 0 } }
+/* 00-standby：背景漂移，超低频 */
+@keyframes qx-drift { 0%, 100% { transform: translateX(-90px) rotate(-12deg) } 50% { transform: translateX(90px) rotate(-12deg) } }
+
+/* ── 通用行为：所有青序页面自动获得 ───────────────────── */
+
+/* 入场：内容区首屏升起一次。用 animation 而不是 transition，
+   避免路由切换时因为初值相同而不触发。 */
+[data-qx-frame='true'] .qx-scroll > * {
+  animation: qx-rise var(--qx-dur-slow) var(--qx-ease) both;
+}
+/* 依次错开，稿里首页磁贴就是这个节奏 */
+[data-qx-frame='true'] .qx-scroll > *:nth-child(2) { animation-delay: 40ms }
+[data-qx-frame='true'] .qx-scroll > *:nth-child(3) { animation-delay: 80ms }
+[data-qx-frame='true'] .qx-scroll > *:nth-child(4) { animation-delay: 120ms }
+[data-qx-frame='true'] .qx-scroll > *:nth-child(n+5) { animation-delay: 160ms }
+
+/* 按下反馈：一体机是触控，按下必须立刻有回应，否则用户会重复点 */
+[data-qx-frame='true'] button:not(:disabled),
+[data-qx-frame='true'] [role='button']:not([aria-disabled='true']) {
+  transition: transform var(--qx-dur-fast) var(--qx-ease-soft),
+              background-color var(--qx-dur) var(--qx-ease-soft),
+              border-color var(--qx-dur) var(--qx-ease-soft),
+              box-shadow var(--qx-dur) var(--qx-ease-soft);
+}
+[data-qx-frame='true'] button:not(:disabled):active,
+[data-qx-frame='true'] [role='button']:not([aria-disabled='true']):active {
+  transform: scale(.985);
+}
+
+/* 状态药丸切换 */
+[data-qx-frame='true'] .qx-status { transition: color var(--qx-dur) var(--qx-ease-soft), background-color var(--qx-dur) var(--qx-ease-soft) }
+
+/* 等待态的呼吸点：给 aria-busy 或显式标记的元素 */
+[data-qx-frame='true'] [aria-busy='true'] .qx-dot,
+[data-qx-frame='true'] .qx-breathe {
+  animation: qx-breathe-soft 3.6s var(--qx-ease-inout) infinite;
+}
+
+/* ── 无障碍与公共终端约束 ─────────────────────────────── */
+
+/* 尊重系统设置。一体机上也可能有前庭敏感的用户。 */
+@media (prefers-reduced-motion: reduce) {
+  [data-qx-frame='true'] *,
+  [data-qx-frame='true'] *::before,
+  [data-qx-frame='true'] *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
