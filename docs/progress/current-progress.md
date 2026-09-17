@@ -1,5 +1,22 @@
 # 当前开发进度
 
+2026-09-17 **扫描隐私 R3 与小程序跨端 R11 已进入当前主干；代码 / CI 证据已闭合，设备、生产与商业仍为 NO-GO。**
+当前 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`。扫描候选 PR #1036 已于
+2026-09-15 合入：最终 head `a3db5f4165725f8f1a2365dfe7e1ce34a3e928dd`，merge commit
+`ddef936def46e9220a25e44ffe33dcc3458ed00b`；`build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke`、`unsigned-exe-upgrade`、`unsigned-msi-candidate` 全部成功。随后 PR #1037
+以 head `7d070c22f3bf0c9f7406fa39f351795478a5228c` 合入当前 main，补齐小程序跨端身份 / 幂等收口及
+扫描迁移升级夹具隔离；该 head 的 `build-and-verify`、`postgres-readiness`、
+`kiosk-browser-smoke` 全部成功。`merge-base --is-ancestor` 已确认两个最终 head 均为当前 main 祖先。
+
+扫描链的软件结论限定为 **SOURCE / CI: GO**：一次性安全重扫授权、任务 / owner / terminal / scan type /
+状态 / 过期 / replay 约束、Kiosk 持久 ACK、Agent delivery lease、同 inode single-flight、锁死遥测和
+反向变异已进入主干。不得把这些结果写成当前 Windows / 奔图已通过：Windows SMB 上
+`ino === 0` / identity unavailable、长驻 chokidar、面板扫描、连续多用户、断网 / 重启恢复、真实出纸、
+扫码枪、真实支付退款、生产迁移部署、小程序正式发布、授权内容与客户 UAT 均未在当前 main SHA 上完成。
+因此 **DEVICE / PRODUCTION / COMMERCIAL: NO-GO**，下一步转入精确 SHA 的现场与发布验收，不再继续复活
+已删除远端分支或沿用 PR 合并前 worktree 作为交付源。
+
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
 `34984568841`。`postgres-readiness / Core verify suites on PG` 与
