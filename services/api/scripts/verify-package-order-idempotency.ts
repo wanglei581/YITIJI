@@ -102,6 +102,7 @@ type PackageView = {
   payStatus: string
   taskStatus: string
   amountCents: number
+  paymentSessionToken?: string
   items: Array<{ fileId: string; copies: number; colorMode: string; duplex: string; pageRange: string | null }>
 }
 
@@ -276,6 +277,7 @@ async function main(): Promise<void> {
     amountCents?: number
     pickupCodeExpiresAt?: Date
     pickupStatus?: string
+    pickupClaimedAt?: Date | null
     payStatus?: string
     paymentSource?: string | null
     paidAt?: Date | null
@@ -303,6 +305,7 @@ async function main(): Promise<void> {
         pickupCodeCreatedAt: now,
         pickupCodeExpiresAt: opts.pickupCodeExpiresAt ?? new Date(now.getTime() + 60 * 60 * 1000),
         pickupStatus: opts.pickupStatus ?? 'pending',
+        pickupClaimedAt: opts.pickupClaimedAt ?? null,
         idempotencyKey: opts.key,
         idempotencyPayloadHash: fingerprintPackageOrderPayload(opts.dto),
         orderItems: {
@@ -649,6 +652,62 @@ async function main(): Promise<void> {
     if (claimedView.pickupCode) fail('claimed 回放不得再露出活码')
     if (await prisma.order.count({ where: { idempotencyKey: claimedKey } }) !== 1) fail('claimed 回放不得第二张单')
     pass('T8f claimed 回放原单、无第二张、无活码')
+
+    const leaseUnpaidKey = randomUUID()
+    const leaseUnpaidCode = randomPickupCode()
+    const leaseUnpaidId = `ord_pkg_lease_unpaid_${suffix}`
+    const claimedAt = new Date(Date.now() - 30 * 1000)
+    await insertPackageOrder({
+      id: leaseUnpaidId, orderNo: `ORD-PKG-LEASE-U-${suffix}`, key: leaseUnpaidKey, code: leaseUnpaidCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupStatus: 'claimed', pickupClaimedAt: claimedAt, taskStatus: 'awaiting_payment',
+      pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+    })
+    const leaseUnpaidReplay = await packages.create(userA, dtoA, leaseUnpaidKey) as PackageView
+    if (leaseUnpaidReplay.orderId !== leaseUnpaidId) fail('过期窗口内已认领回放必须原单')
+    if (leaseUnpaidReplay.pickupStatus !== 'claimed') fail(`已认领不得被手机过期写成 expired，实际 ${leaseUnpaidReplay.pickupStatus}`)
+    if (leaseUnpaidReplay.payStatus !== 'unpaid') fail(`已认领未付不得被关单，实际 ${leaseUnpaidReplay.payStatus}`)
+    if (leaseUnpaidReplay.pickupCode) fail('已认领回放不得再露出活码')
+    if (!leaseUnpaidReplay.paymentSessionToken) fail('已认领回放仍须签发 paymentSessionToken，一体机才能继续收款/释放')
+    const leaseUnpaidDetail = await packages.detail(userA, leaseUnpaidId) as PackageView
+    if (leaseUnpaidDetail.pickupStatus !== 'claimed' || leaseUnpaidDetail.payStatus !== 'unpaid' || leaseUnpaidDetail.pickupCode) {
+      fail('已认领详情不得过期关单或露出活码')
+    }
+    if (!leaseUnpaidDetail.paymentSessionToken) fail('已认领详情仍须签发 paymentSessionToken')
+    const leaseUnpaidListed = (await packages.list(userA, { cursor: null, pageSize: 20 })).items.find((row) => row.orderId === leaseUnpaidId)
+    if (!leaseUnpaidListed) fail('已认领过期窗口订单必须仍能在列表找回')
+    if (leaseUnpaidListed.pickupStatus !== 'claimed' || leaseUnpaidListed.payStatus !== 'unpaid' || leaseUnpaidListed.pickupCode) {
+      fail('已认领列表不得过期关单或露出活码')
+    }
+    const leaseUnpaidRow = await prisma.order.findUniqueOrThrow({ where: { id: leaseUnpaidId } })
+    if (leaseUnpaidRow.pickupStatus !== 'claimed' || leaseUnpaidRow.payStatus !== 'unpaid' || leaseUnpaidRow.printTaskId) {
+      fail('已认领落库必须仍是 claimed/unpaid、printTaskId null（release 前置条件）')
+    }
+    if (!leaseUnpaidRow.pickupClaimedAt) fail('已认领落库必须保留 pickupClaimedAt')
+    if (await prisma.order.count({ where: { idempotencyKey: leaseUnpaidKey } }) !== 1) fail('已认领过期窗口回放不得第二张单')
+
+    const leasePaidKey = randomUUID()
+    const leasePaidCode = randomPickupCode()
+    const leasePaidId = `ord_pkg_lease_paid_${suffix}`
+    await insertPackageOrder({
+      id: leasePaidId, orderNo: `ORD-PKG-LEASE-P-${suffix}`, key: leasePaidKey, code: leasePaidCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupStatus: 'claimed', pickupClaimedAt: claimedAt, taskStatus: 'awaiting_payment',
+      payStatus: 'paid', paymentSource: 'offline', paidAt: new Date(),
+      pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+    })
+    const leasePaidReplay = await packages.create(userA, dtoA, leasePaidKey) as PackageView
+    if (leasePaidReplay.pickupStatus !== 'claimed' || leasePaidReplay.payStatus !== 'paid') {
+      fail(`已认领已付必须保持 claimed/paid 才能 release，实际 ${leasePaidReplay.pickupStatus}/${leasePaidReplay.payStatus}`)
+    }
+    if (leasePaidReplay.pickupCode) fail('已认领已付回放不得再露出活码')
+    if (!leasePaidReplay.paymentSessionToken) fail('已认领已付回放仍须签发 paymentSessionToken 给 release')
+    const leasePaidRow = await prisma.order.findUniqueOrThrow({ where: { id: leasePaidId } })
+    if (leasePaidRow.pickupStatus !== 'claimed' || leasePaidRow.payStatus !== 'paid' || leasePaidRow.paymentSource !== 'offline' || leasePaidRow.printTaskId) {
+      fail('已认领已付落库必须仍满足 release：claimed + paid + printTaskId null')
+    }
+    if (await prisma.order.count({ where: { idempotencyKey: leasePaidKey } }) !== 1) fail('已认领已付回放不得第二张单')
+    pass('T8h claimed+过期窗口：认领租约不被手机过期；不关单、无活码、无第二张；token 仍签发')
 
     const usedKey = randomUUID()
     const usedCode = randomPickupCode()

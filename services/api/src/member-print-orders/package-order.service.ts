@@ -280,19 +280,27 @@ export class PackageOrderService {
   }
 
   /**
-   * Persist expired pickup windows. Two CAS writes so a concurrent unpaid→paid
-   * cannot be closed from a stale in-memory payStatus: unpaid/paying rows close;
-   * already-paid rows expire pickup/task only.
+   * Persist expired pickup windows for **unclaimed** rows only.
+   *
+   * `pickupStatus: claimed` is the terminal's live fulfillment lease
+   * (`pickup-order.service` writes it on successful claim; `release` requires it
+   * and does not re-check `pickupCodeExpiresAt`). Phone list/detail/replay must
+   * not expire that lease. Predicate is `pending` — the pre-claim state — not
+   * `pickupClaimedAt: null`, so a claimed row with a missing timestamp is still
+   * left alone.
+   *
+   * Two CAS writes so a concurrent unpaid→paid cannot be closed from a stale
+   * in-memory payStatus: unpaid/paying pending rows close; already-paid pending
+   * rows expire pickup/task only.
    */
   private async expireExpiredRows(scope: {
     id?: string
     endUserId?: string
   }): Promise<void> {
     const now = new Date()
-    const expiredPickup = ['pending', 'claimed']
     const window = {
       ...scope,
-      pickupStatus: { in: expiredPickup },
+      pickupStatus: 'pending',
       printTaskId: null,
       pickupCodeExpiresAt: { lte: now },
       ...(scope.endUserId ? { orderItems: { some: {} } } : {}),
@@ -312,7 +320,7 @@ export class PackageOrderService {
     pickupStatus: string
     pickupCodeExpiresAt: Date | null
   }): Promise<void> {
-    if (!['pending', 'claimed'].includes(order.pickupStatus) || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
+    if (order.pickupStatus !== 'pending' || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
     await this.expireExpiredRows({ id: order.id })
   }
 
