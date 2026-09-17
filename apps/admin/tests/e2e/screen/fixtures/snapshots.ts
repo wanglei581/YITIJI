@@ -109,7 +109,7 @@ export function govFull() {
     metrics: {
       terminalsOnline: ok('Terminal+TerminalHeartbeat / device-fleet', '180s', FLEET),
       fleetWall: ok('Terminal+TerminalHeartbeat / device-fleet', '180s', FLEET),
-      printPagesCumulative: ok('Order.billablePages', 'cumulative', {
+      printPagesCumulative: ok('Order.payStatus=paid,billablePages', 'cumulative', {
         totalPages: 128431,
         byColor: na('Order.itemsJson', 'cumulative', 'color_split_not_indexed'),
       }),
@@ -134,7 +134,7 @@ export function govFull() {
         totalCalls: 671,
       }),
       printTrend14d: ok(
-        'Order.createdAt+billablePages',
+        'Order.payStatus=paid,paidAt+billablePages',
         '14d',
         trendDays([620, 780, 720, 1180, 1040, 1480, 1320, 1640, 1390, 1750, 1520, 1842, 1610, 1780]),
       ),
@@ -157,7 +157,7 @@ export function opsFull() {
     metrics: {
       terminalsOnline: ok('Terminal+TerminalHeartbeat / device-fleet', '180s', FLEET),
       printInProgress: ok('PrintTask.status', 'current', { queued: 2, printing: 4, total: 6 }),
-      printFailedToday: ok('PrintTask.status=failed', 'shanghai-day', { failed: 3 }),
+      printFailedToday: ok('PrintTaskStatusLog.toStatus=failed', 'shanghai-day', { failed: 3 }),
       pendingReview: ok('reviewStatus pending+reviewing', 'current', {
         total: 86,
         jobs: 58,
@@ -237,7 +237,7 @@ export function govEmpty() {
   })
   base.metrics.terminalsOnline = ok('Terminal+TerminalHeartbeat / device-fleet', '180s', emptyFleet)
   base.metrics.fleetWall = ok('Terminal+TerminalHeartbeat / device-fleet', '180s', emptyFleet)
-  base.metrics.printPagesCumulative = ok('Order.billablePages', 'cumulative', {
+  base.metrics.printPagesCumulative = ok('Order.payStatus=paid,billablePages', 'cumulative', {
     totalPages: 0,
     byColor: na('Order.itemsJson', 'cumulative', 'color_split_not_indexed'),
   })
@@ -252,7 +252,7 @@ export function govEmpty() {
     totalCalls: 0,
   })
   base.metrics.printTrend14d = ok(
-    'Order.createdAt+billablePages',
+    'Order.payStatus=paid,paidAt+billablePages',
     '14d',
     trendDays(Array.from({ length: 14 }, () => 0)),
   )
@@ -292,9 +292,9 @@ export function govDegraded() {
   const base = govFull()
   base.status = 'degraded'
   base.degraded = true
-  base.metrics.printPagesCumulative = na('Order.billablePages', 'cumulative', 'source_query_failed')
+  base.metrics.printPagesCumulative = na('Order.payStatus=paid,billablePages', 'cumulative', 'source_query_failed')
   base.metrics.aiBreakdown24h = na('AiServiceLog.groupBy(operation,status)', '24h', 'source_query_failed')
-  base.metrics.printTrend14d = na('Order.createdAt+billablePages', '14d', 'source_query_failed')
+  base.metrics.printTrend14d = na('Order.payStatus=paid,paidAt+billablePages', '14d', 'source_query_failed')
   return base
 }
 

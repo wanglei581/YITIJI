@@ -44,7 +44,7 @@ export function GovGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
             <ScreenKpi
               value={text.value}
               unit={text.unit}
-              label={`最近 ${value.onlineWindowSeconds} 秒有心跳`}
+              label={`最近 ${value.onlineWindowSeconds} 秒有心跳${value.truncated ? '（分母为样本台数）' : ''}`}
             />
           )
         }}
@@ -54,7 +54,7 @@ export function GovGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         title="累计打印"
         metric={metrics.printPagesCumulative}
         span={3}
-        foot="打印订单的计费页数求和。双面不单独计价，故不拆双面。"
+        foot="已支付打印订单的内容页数求和：算的是单份文档页，不乘打印份数，不代表物理出纸张数。双面不单独计价，故不拆双面。"
         render={(value) => (
           <ScreenKpi
             value={screenCount(value.totalPages)}
@@ -172,8 +172,8 @@ export function GovGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         foot={
           metrics.printTrend14d?.available
             ? metrics.printTrend14d.value.peak
-              ? `按自然日聚合，Asia/Shanghai。峰值 ${screenCount(metrics.printTrend14d.value.peak.pages)} 页 / 日（${metrics.printTrend14d.value.peak.date}）。`
-              : '按自然日聚合，Asia/Shanghai。近 14 日无打印记录，折线为真实的零线。'
+              ? `按订单支付时间 paidAt 落入的 Asia/Shanghai 自然日聚合。峰值 ${screenCount(metrics.printTrend14d.value.peak.pages)} 页 / 日（${metrics.printTrend14d.value.peak.date}）。`
+              : '按订单支付时间 paidAt 落入的 Asia/Shanghai 自然日聚合。近 14 日无打印记录，折线为真实的零线。'
             : ''
         }
         render={(value) => <ScreenSparkline days={value.days} seriesLabel="每日打印页数" />}

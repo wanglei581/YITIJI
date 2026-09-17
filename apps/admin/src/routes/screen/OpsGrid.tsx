@@ -56,7 +56,11 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         render={(value) => {
           const text = screenFleetOnlineText(value)
           return (
-            <ScreenKpi value={text.value} unit={text.unit} label={`${value.onlineWindowSeconds} 秒内有心跳`} />
+            <ScreenKpi
+              value={text.value}
+              unit={text.unit}
+              label={`${value.onlineWindowSeconds} 秒内有心跳${value.truncated ? '（分母为样本台数）' : ''}`}
+            />
           )
         }}
       />
@@ -79,13 +83,13 @@ export function OpsGrid({ metrics }: { metrics: ScreenSnapshotMetrics }) {
         title="今日打印失败"
         metric={metrics.printFailedToday}
         span={2}
-        foot="按 Asia/Shanghai 自然日统计失败态打印任务。退款与否需到订单页逐单核查。"
+        foot="按 Asia/Shanghai 自然日统计转入失败的事件次数，不是当前失败任务存量。退款与否需到订单页逐单核查。"
         render={(value) => (
           <ScreenKpi
             value={screenCount(value.failed)}
-            unit="个"
+            unit="次"
             tone={value.failed > 0 ? 'error' : 'normal'}
-            label={value.failed > 0 ? '请到打印扫描运维页逐单核查' : '今日无失败任务'}
+            label={value.failed > 0 ? '请到打印扫描运维页逐单核查' : '今日无失败事件'}
           />
         )}
       />
