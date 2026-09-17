@@ -80,6 +80,25 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
+      # workflow_dispatch 可以发布较早、但已经通过 main CI 的精确 SHA。发布 helper 属于
+      # 当前工作流的控制面，不能在服务器检出旧目标后再从目标提交里读取，否则旧 helper
+      # 会丢失后来新增的发布范围和保护规则。
+      - name: Checkout deploy control plane
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/scripts/deploy-api-release.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Package deploy helper
+        id: deploy_helper
+        run: |
+          set -euo pipefail
+          HELPER=.github/scripts/deploy-api-release.sh
+          test -f "$HELPER"
+          echo "sha256=$(sha256sum "$HELPER" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "payload=$(gzip -c "$HELPER" | base64 -w 0)" >> "$GITHUB_OUTPUT"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -90,13 +109,18 @@ jobs:
           # fetch 单次预算 600s × 2 次 = 最坏 20m，其后仍需 pnpm install、
           # 三端前端构建、prisma migrate、pm2 重启，30m 不够，提到 45m。
           command_timeout: 45m
-          envs: TARGET_SHA,CI_RUN,DEPLOY_SCOPE,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN,PRINT_REQUIRE_PII_SCAN
+          envs: TARGET_SHA,CI_RUN,DEPLOY_SCOPE,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN,PRINT_REQUIRE_PII_SCAN,CONTROL_PLANE_DEPLOY_HELPER_B64,CONTROL_PLANE_DEPLOY_HELPER_SHA256
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
 
             if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then
               echo "::error::PRINT_REQUIRE_PII_SCAN 必须通过仓库变量显式设置为 true，禁止进入生产发布" >&2
+              exit 1
+            fi
+
+            if [ "${API_RELEASE_ENABLED:-}" != "true" ]; then
+              echo "::error::API 发布授权闸门未开启" >&2
               exit 1
             fi
 
@@ -109,6 +133,22 @@ jobs:
                 ;;
             esac
             echo "DEPLOY_SCOPE=$DEPLOY_SCOPE"
+
+            PREVIOUS_UMASK="$(umask)"
+            umask 077
+            CONTROL_PLANE_HELPER="$(mktemp /tmp/deploy-api-release-XXXXXXXX.sh)"
+            umask "$PREVIOUS_UMASK"
+            cleanup_control_plane_helper() {
+              rm -f -- "$CONTROL_PLANE_HELPER"
+            }
+            trap cleanup_control_plane_helper EXIT
+            if [ -z "${CONTROL_PLANE_DEPLOY_HELPER_B64:-}" ] || [ -z "${CONTROL_PLANE_DEPLOY_HELPER_SHA256:-}" ]; then
+              echo "::error::当前工作流未携带受审核的 API 发布 helper" >&2
+              exit 1
+            fi
+            printf '%s' "$CONTROL_PLANE_DEPLOY_HELPER_B64" | base64 --decode | gzip -d > "$CONTROL_PLANE_HELPER"
+            printf '%s  %s\n' "$CONTROL_PLANE_DEPLOY_HELPER_SHA256" "$CONTROL_PLANE_HELPER" | sha256sum -c -
+            chmod 700 "$CONTROL_PLANE_HELPER"
 
             echo "=== 拉取并检出 CI 已验证提交 ==="
             EXPECTED_SHA='${{ steps.target.outputs.sha }}'
@@ -213,7 +253,7 @@ jobs:
               API_RELEASE_ENABLED="$API_RELEASE_ENABLED" \
               DEPLOY_API_DIR="${DEPLOY_API_DIR:-/srv/ai-job-print}" \
               DEPLOY_PM2_NAME="${DEPLOY_PM2_NAME:-ai-job-print-api}" \
-              bash .github/scripts/deploy-api-release.sh
+              bash "$CONTROL_PLANE_HELPER"
             else
               echo "=== API 发布未启用：校验运行版本与目标一致，防止继续错位 ==="
               RUNNING_SOURCE="$(sed -n 's/^source=origin\/main@\([0-9a-f]\{40\}\)/\1/p' "${DEPLOY_API_DIR:-/srv/ai-job-print}/DEPLOY_SOURCE.txt" | head -n1)"
@@ -279,3 +319,5 @@ jobs:
           DEPLOY_PARTNER_WEB_ROOT: ${{ secrets.DEPLOY_PARTNER_WEB_ROOT }}
           KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN: ${{ secrets.KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN }}
           PRINT_REQUIRE_PII_SCAN: ${{ vars.PRINT_REQUIRE_PII_SCAN }}
+          CONTROL_PLANE_DEPLOY_HELPER_B64: ${{ steps.deploy_helper.outputs.payload }}
+          CONTROL_PLANE_DEPLOY_HELPER_SHA256: ${{ steps.deploy_helper.outputs.sha256 }}
