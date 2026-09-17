@@ -66,7 +66,10 @@ assert.doesNotMatch(
 
 for (const [pattern, message] of [
   [/\.name'\)"?\s*$/m, 'resolve step must read the run workflow name'],
-  [/if \[ "\$NAME" != "CI" \] \|\| \[ "\$BRANCH" != "main" \] \|\| \[ "\$CONCL" != "success" \]/, 'dispatch path must reject runs that are not a successful main CI'],
+  [
+    /if \[ "\$NAME" != "CI" \] \|\| \[ "\$BRANCH" != "main" \] \|\| \[ "\$CONCL" != "success" \]/,
+    'dispatch path must reject runs that are not a successful main CI',
+  ],
   [/grep -Eq '\^\[0-9a-f\]\{40\}\$'/, 'resolved SHA must be validated as a 40-hex commit id'],
   [/grep -Eq '\^\[0-9\]\+\$'/, 'resolved CI run id must be validated as digits'],
 ]) {
@@ -112,8 +115,27 @@ assert.match(
   'deploy must source the PII scan gate from an explicit repository variable'
 )
 const piiGateOffset = deployJob.indexOf('if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then')
+const remoteAuthorizationOffset = deployJob.indexOf(
+  'if [ "${API_RELEASE_ENABLED:-}" != "true" ]; then'
+)
+const deployScopeOffset = deployJob.indexOf('case "$DEPLOY_SCOPE" in')
+const helperWriteOffset = deployJob.indexOf(
+  'printf \'%s\' "$CONTROL_PLANE_DEPLOY_HELPER_B64" | base64 --decode | gzip -d'
+)
 const fetchOffset = deployJob.indexOf('fetch exact CI SHA attempt')
 assert.ok(piiGateOffset > gateOffset, 'production PII scan gate must follow deploy authorization')
+assert.ok(
+  remoteAuthorizationOffset > gateOffset && helperWriteOffset > remoteAuthorizationOffset,
+  'remote deploy authorization must fail before writing the control-plane helper'
+)
+assert.ok(
+  deployScopeOffset > gateOffset && helperWriteOffset > deployScopeOffset,
+  'deploy scope must be validated before writing the control-plane helper'
+)
+assert.ok(
+  helperWriteOffset > piiGateOffset,
+  'production PII scan gate must fail before writing the control-plane helper'
+)
 assert.ok(
   fetchOffset > piiGateOffset,
   'production PII scan gate must fail before server fetch/build'
@@ -139,9 +161,7 @@ assert.match(
   'REQUIRED_PRODUCTION_GATES must still contain the PII scan gate'
 )
 assert.ok(
-  releaseScript.includes(
-    '$0 ~ ("^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=") {'
-  ),
+  releaseScript.includes('$0 ~ ("^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=") {'),
   'release script must canonicalize exact, spaced, exported, and duplicate gate entries for every required key'
 )
 assert.match(

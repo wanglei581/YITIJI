@@ -219,7 +219,7 @@
 > ```
 >
 > **为什么**：手改的键若触发生产启动闸门，故障会推迟到下次发布的 PM2 重启那一步才爆 —— 那是最糟的失败位置（新代码已落盘、旧进程已死）。干跑把它提前一整个发布周期暴露。
-> **干跑结论的有效期**：只在「闸门代码与部署脚本自已部署 SHA 起零变更」时成立，用 `git diff --stat <已部署SHA> origin/main -- services/api/src/config/production-runtime-gates.ts scripts/deploy-api-release.sh` 为空来确认。
+> **干跑结论的有效期**：应用闸门代码自已部署 SHA 起零变更时才可沿用，用 `git diff --stat <已部署SHA> <目标SHA> -- services/api/src/config/production-runtime-gates.ts` 为空来确认。发布 helper 自 2026-09-17 起属于工作流控制面，取自工作流自身提交而非待部署目标；它会在任何目标构建、备份或迁移前，比对 `.github/scripts/deploy-api-release.sh` 的生产闸门清单与目标 `production-runtime-gates.ts`，不一致即中止。
 > **手改的键能否在发布中存活**：`rsync` 排除 `services/api/.env`，发布步骤 3b 逐行 awk 只改 `PRINT_REQUIRE_PII_SCAN`，其余键原样透传 —— 2026-09-07 核实。
 
 
