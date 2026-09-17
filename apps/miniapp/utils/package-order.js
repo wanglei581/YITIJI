@@ -195,6 +195,56 @@ function resolvePackageStatus(order, now) {
   return { key: 'done', label: taskStatus || pickupStatus || '状态未知', tone: 'neutral' }
 }
 
+/**
+ * 服务端**是否已经证明**这张材料包订单再也不会出纸了。证明了就返回一句给用户看的
+ * 原因，没证明（含"这个状态还看不懂"）一律返回 `''`。
+ *
+ * **为什么不复用上面的 `resolvePackageStatus().key === 'done'`。** 两者问的是不同的
+ * 问题，默认值正好相反：`resolvePackageStatus` 要回答"这一行给用户显示什么标签"，
+ * 遇到没登记的状态它**原样回显并归到 done**（对显示是安全的）；本函数要回答
+ * "能不能让用户就这一份材料包再下一张单、再付一次钱"，遇到没登记的状态必须
+ * **fail-closed 当成还活着**。拿显示用的那一档来授权重新下单，等于把每一个将来新增的
+ * 服务端状态都默认解释成"这单已经作废，可以再来一张"。
+ *
+ * 判据只认服务端下发的 `taskStatus` / `pickupStatus`，逐条对着服务端写入点：
+ *   - `taskStatus: completed`  —— package-order-fulfillment.service.ts:43，纸已经出完；
+ *   - `taskStatus: failed`     —— terminals-agent.service.ts:866；
+ *   - `taskStatus: abandoned`  —— admin-print-jobs-abandon.service.ts（与 failed 明确区分）；
+ *   - `taskStatus: cancelled`  —— 管理端处置（admin-print-scan / closed-pending disposition）；
+ *   - `taskStatus | pickupStatus: expired` —— package-order.service.ts:310/314 的到期落库；
+ *   - `pickupStatus: cancelled`。
+ *
+ * **刻意不算终态的三种**，每一种都对应一次真实的"再下一单 = 再打一次、再收一次钱"：
+ *   - `pickupStatus: claimed` —— 一体机已经把这单**领走**（pickup-order.service.ts:123），
+ *     用户正站在机器前付款。它还是可逆的：online-payment.service.ts:800 关单时会把它
+ *     退回 pending。
+ *   - `pickupStatus: used` —— 服务端是和 `taskStatus: 'pending'` + `printTaskId` 一起写的
+ *     （pickup-order.service.ts:221，且 CAS 要求 `payStatus: 'paid'`）：钱已经付了、任务
+ *     刚进队列。这一刻放开重新下单，就是同一份材料包打两遍、收两次钱。它真正的终态
+ *     由随后的 `taskStatus` 给出（completed / failed / abandoned），已经在上面那一组里。
+ *   - `payStatus: closed` 单独出现 —— online-payment.service.ts:799 关掉付款的同时会把
+ *     `claimed` 退回 `pending`，并在注释里写明"迟到回调若取件窗口仍开仍可入账履约"。
+ *     也就是说 closed 完全可能配着一张**仍然活着**的到机码。它只有和上面那些状态一起
+ *     出现时才是终态，而那时已经被上面命中了。
+ *
+ * 到机码"看着已经过期"同样不在这里自行判定：服务端 detail 每次都会先跑
+ * `expireIfNeeded` 再回读，真过期了它自己会给 `expired`。前端按本地时钟抢答，只会在
+ * 时钟不准时把一张还能用的码判死。
+ *
+ * @param {object} order PackageOrderView（服务端 toView 的产物）
+ * @returns {string} 终态原因（可直接展示）；`''` = 没有证明，调用方必须继续 fail-closed
+ */
+function terminalPackageReason(order) {
+  const taskStatus = String((order && order.taskStatus) || '')
+  const pickupStatus = String((order && order.pickupStatus) || '')
+  if (taskStatus === 'completed') return '这张材料包订单已经打印完成'
+  if (taskStatus === 'failed') return '这张材料包订单打印失败'
+  if (taskStatus === 'abandoned') return '这张材料包订单的打印任务已终止'
+  if (taskStatus === 'cancelled' || pickupStatus === 'cancelled') return '这张材料包订单已取消'
+  if (taskStatus === 'expired' || pickupStatus === 'expired') return '这张材料包订单的到机码已过期'
+  return ''
+}
+
 /** 单个状态字段 → 中文；未登记取值原样回显（不编造理解）。 */
 function statusText(kind, value) {
   const raw = String(value || '')
@@ -395,6 +445,7 @@ module.exports = {
   needsPiiScan,
   isPackagePrintable,
   resolvePackageStatus,
+  terminalPackageReason,
   statusText,
   statusDetail,
   toPackageRow,

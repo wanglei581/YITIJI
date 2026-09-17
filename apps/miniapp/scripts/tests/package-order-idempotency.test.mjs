@@ -577,6 +577,14 @@ test('页面：核对遇到网络 / 5xx 会释放 _verifyingOrderId，后续显�
   assert.equal(page.data.quoteRecover, 'orders', '网络 / 5xx 不给登录出口，仍是默认锁定文案')
   assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-x')
 
+  // 「重新下单」在这一态**必须按不动**：服务端根本没有证明这张订单走到头了。
+  // 按得动的代价是换一个新键、再建一张 —— 而原来那张可能还好端端活着。
+  assert.equal(page.data.canStartNewOrder, false)
+  page.startNewOrder(); await flush()
+  assert.equal(idem.findRecord('u:A', fp).key, minted.key, '没有终态证明就不许清掉那一格')
+  assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-x')
+  assert.equal(page.data.quoteRecover, 'orders', '也不许解锁')
+
   // 显式重试同一个 orderId：如果 _verifyingOrderId 没被释放，这一发在入口就会被挡掉。
   page._verifyCreatedOrder('ord-x')
   await flush()
@@ -704,6 +712,235 @@ test('页面：提交在途时会话静默失效（无生命周期回调）—�
     assert.match(bKey, idem.KEY_RE)
     assert.equal(idem.findRecord('u:A', fp).key, aKey, '全程 A 的那一格一个字节都没被动过')
   }
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// D2. 恢复出来的那张订单：200 回来之后**看状态再决定去哪**
+//
+// 本机那条记录活 7 天，而服务端的幂等键是**永久**挂在那张 Order 行上的
+// （`@@unique(endUserId, idempotencyKey)`，没有过期清理）。这 7 天里订单完全可能
+// 已经打完 / 打印失败 / 被终止 / 被取消 / 到机码过期 —— 继续拿同一个键去 POST
+// 只会一遍遍回放那张作废的订单。上一版无条件 redirectTo，还顺手删草稿、并在跳转
+// 成功回调里清掉本机记录：用户落在一张打不出东西的到机码页上，材料包也没了。
+// ══════════════════════════════════════════════════════════════════════
+
+/** 本机记着一张已建成的订单 → 打开本页 → 那一发核对 GET 已经发出去了。 */
+async function openRestoredPage(orderId) {
+  const wx = createWx(); seedDraft(wx); ACTIVE_WX = wx
+  const fp = idem.fingerprintOf(PAYLOAD)
+  const minted = await idem.ensureKey('u:A', fp)
+  assert.ok(idem.rememberOrderId('u:A', fp, minted.key, orderId))
+  const { api, calls } = createApi(wx)
+  const auth = createAuth('A')
+  const page = makePage(wx, { api, auth })
+  page.onLoad(); await flush()
+  assert.equal(calls.create.length, 0, '恢复路径一个 POST 都不发')
+  assert.equal(calls.get.length, 1, '恢复路径先向服务端核一次')
+  assert.equal(calls.get[0].orderId, orderId)
+  return { wx, api, calls, auth, page, fp, key: minted.key }
+}
+
+const LIVE_ORDER = { pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'unpaid' }
+
+test('页面：核对的 200 回来时会话已经静默失效 —— 不跳转、不泄露订单数据、释放核对守卫，登录回来自动重核', async () => {
+  const { wx, calls, auth, page, fp, key } = await openRestoredPage('ord-live')
+
+  // 真机上这一跳没有任何生命周期回调：enduser JWT 只签 30 分钟，auth.getToken() 到点时
+  // 先 clearSession() 再返回 null，_identityKey() 于是从 'u:A' 静默掉成 ''。
+  // 服务端那一发**成功了**（它的 token 还在窗口内 / 本地判过期有 5 秒安全余量）。
+  auth.setUser(null)
+  calls.get[0].resolve({
+    orderId: 'ord-live', orderNo: 'ORD-20260917-AAAA', pickupCode: '135790',
+    expiresAt: '2026-09-24T12:00:00.000Z', ...LIVE_ORDER,
+  })
+  await flush()
+
+  assert.equal(wx.calls.redirectTo.length, 0, '到机码页同样要登录，跳过去只会得到一页 401')
+  assert.equal(page.data.quoteState, 'error')
+  assert.equal(page.data.quoteRecover, 'login', '给一条走得通的出口，而不是停在「去我的打印订单」')
+  assert.equal(page.data.canStartNewOrder, false, '核不上的时候不许把「重新下单」点亮')
+  // **一个字节的订单数据都不许落到屏幕上**：这一刻页面上的身份已经不是本人了。
+  const painted = JSON.stringify(page.data)
+  assert.ok(!painted.includes('135790'), '到机码不许写进 data')
+  assert.ok(!painted.includes('ORD-20260917-AAAA'), '订单号不许写进 data')
+  // 草稿与幂等记录原样保留。
+  assert.equal(wx.storage.has('temp_package_data'), true, '草稿不许在这一支被消费掉')
+  assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-live')
+  assert.equal(idem.findRecord('u:A', fp).key, key)
+
+  // 「去登录」必须真的走得通。真机顺序：navigateTo 登录页（onHide）→ 登录成功 →
+  // 返回（onShow）。注意这一跳**不算身份变化** —— 守卫的快照始终是 'u:A'，它从没
+  // 见过中间那个 ''，所以 setIdentity 返回 false。页面必须自己认出"我还锁着一张单"。
+  page.onHide(); auth.setUser('A'); page.onShow(); await flush()
+  assert.equal(calls.get.length, 2, '登录回来必须重新核对，而不是让那句「登录已失效」原地不动')
+  assert.equal(calls.create.length, 0, '重新核对期间仍然一个 POST 都不发')
+  calls.get[1].resolve({ orderId: 'ord-live', ...LIVE_ORDER })
+  await flush()
+  assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-live'])
+})
+
+test('页面：核对的 200 回来时已经换成了 B —— B 的屏幕上不出现 A 的订单，核对守卫照样释放，A 的记录不动', async () => {
+  const { wx, calls, auth, page, fp, key } = await openRestoredPage('ord-A')
+
+  auth.setUser('B')
+  calls.get[0].resolve({
+    orderId: 'ord-A', orderNo: 'ORD-20260917-BBBB', pickupCode: '246802', ...LIVE_ORDER,
+  })
+  await flush()
+
+  assert.equal(wx.calls.redirectTo.length, 0, 'A 的订单不许把 B 带去别人的到机码页')
+  const painted = JSON.stringify(page.data)
+  assert.ok(!painted.includes('246802') && !painted.includes('ORD-20260917-BBBB'),
+    'A 的到机码 / 订单号一个字节都不许画到 B 的屏幕上')
+  assert.equal(page.data.canStartNewOrder, false)
+  assert.equal(page.data.quoteRecover, 'orders', '仍是进页面时那条默认锁定文案，这一支什么都不写')
+  assert.equal(idem.findRecord('u:A', fp).key, key, 'A 的那一格一个字节都不许动')
+  assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-A')
+  assert.equal(wx.storage.has('temp_package_data'), true, 'A 的草稿也不在这条路上被删')
+
+  // **在途标记必须已经释放**，而这件事只有拿**同一张订单**再核一次才看得见：
+  // 换一张订单去核根本不会碰到 `_verifyingOrderId === orderId` 那道闸。
+  // 场景是 A 把手机拿回去、重新登录：身份回到 'u:A'（守卫快照始终是 'u:A'，这一跳
+  // 不算身份变化），页面还锁着 ord-A —— 它必须能重新核一次，而不是被上一发的
+  // 标记永久钉死在「订单已创建」上。
+  auth.setUser('A')
+  page.onHide(); page.onShow(); await flush()
+  assert.equal(calls.get.length, 2, '同一张订单必须能重新核对（在途标记没释放的话这一发会被入口吞掉）')
+  assert.equal(calls.get[1].orderId, 'ord-A')
+  calls.get[1].resolve({ orderId: 'ord-A', ...LIVE_ORDER })
+  await flush()
+  assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-A'])
+})
+
+test('页面：核对的失败回来时已经换成了 B —— 同样什么都不写，在途标记同样释放', async () => {
+  const { wx, calls, auth, page, fp, key } = await openRestoredPage('ord-A')
+
+  auth.setUser('B')
+  calls.get[0].reject(httpError(500, 'INTERNAL_ERROR'))
+  await flush()
+  assert.equal(page.data.quoteRecover, 'orders', '这一支什么都不写，仍是进页面时那条默认锁定文案')
+  assert.equal(page.data.canStartNewOrder, false)
+  assert.equal(idem.findRecord('u:A', fp).key, key, 'A 的那一格一个字节都不许动')
+
+  // 与成功那一路同一条判据：拿同一张订单再核一次，才验得到标记确实释放了。
+  auth.setUser('A')
+  page.onHide(); page.onShow(); await flush()
+  assert.equal(calls.get.length, 2, '失败那一路同样不许把在途标记永久钉在这个 orderId 上')
+  assert.equal(calls.get[1].orderId, 'ord-A')
+  assert.equal(wx.calls.redirectTo.length, 0, '还没核出结果之前不跳转')
+})
+
+test('页面：服务端说这张订单已经走到终态 —— 不跳转、不删草稿、不动记录，只点亮一个由用户自己按的「重新下单」', async () => {
+  // 服务端真实会写出来的每一种终态，逐一走一遍整页。
+  const TERMINALS = [
+    { taskStatus: 'completed', pickupStatus: 'used' },        // 纸已经出完
+    { taskStatus: 'failed', pickupStatus: 'used' },           // 出纸失败
+    { taskStatus: 'abandoned', pickupStatus: 'used' },        // 管理端终止
+    { taskStatus: 'cancelled', pickupStatus: 'cancelled' },   // 已取消
+    { taskStatus: 'expired', pickupStatus: 'expired' },       // 到机码过期
+    { taskStatus: 'pending_release', pickupStatus: 'expired' }, // 只有取件侧到期
+  ]
+  for (const status of TERMINALS) {
+    const label = `${status.pickupStatus}/${status.taskStatus}`
+    const { wx, calls, page, fp, key } = await openRestoredPage('ord-dead')
+    calls.get[0].resolve({ orderId: 'ord-dead', payStatus: 'closed', ...status })
+    await flush()
+
+    assert.equal(wx.calls.redirectTo.length, 0, `${label}: 不许把人送去一张打不出东西的到机码页`)
+    assert.equal(page.data.quoteState, 'error', label)
+    assert.equal(page.data.quoteRecover, 'reorder', label)
+    assert.equal(page.data.canStartNewOrder, true, `${label}: 服务端已经证明它走到头了`)
+    assert.ok(page.data.quoteErrorTitle, `${label}: 要把"为什么"写在屏幕上`)
+    // 草稿是他重新下单要用的东西；记录里那个 orderId 是他回订单列表核对旧单的线索。
+    assert.equal(wx.storage.has('temp_package_data'), true, `${label}: 草稿不许删`)
+    assert.equal(wx.storage.has('temp_selected_store'), true, `${label}: 服务点也不许删`)
+    assert.equal(idem.findRecord('u:A', fp).key, key, `${label}: 页面自己绝不换键`)
+    assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-dead', label)
+    // 点亮按钮 ≠ 已经重新下单：一个 POST 都还没发。
+    assert.equal(calls.create.length, 0, `${label}: 换键必须由用户自己按下去`)
+  }
+})
+
+test('页面：还活着 / 正在履约 / 看不懂的状态 —— 一律送到机码页，绝不点亮「重新下单」', async () => {
+  // 这三档每一档放开重新下单，都是同一份材料包打两遍、收两次钱。
+  const LIVE = [
+    { pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'unpaid' },      // 待到机
+    { pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'unpaid' },     // 一体机领走了，正在付款
+    { pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'closed' },     // 付款关了，码会被退回 pending
+    { pickupStatus: 'used', taskStatus: 'pending', payStatus: 'paid' },                   // 已付款，任务刚进队列
+    { pickupStatus: 'used', taskStatus: 'printing', payStatus: 'paid' },                  // 正在出纸
+    { pickupStatus: 'quantum', taskStatus: 'schrodinger', payStatus: 'maybe' },           // 将来新增的状态：fail-closed
+  ]
+  for (const status of LIVE) {
+    const label = `${status.pickupStatus}/${status.taskStatus}`
+    const { wx, calls, page, fp } = await openRestoredPage('ord-live')
+    calls.get[0].resolve({ orderId: 'ord-live', ...status })
+    await flush()
+    assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-live'],
+      `${label}: 送到机码页，那里会忠实显示服务端给的状态`)
+    assert.equal(page.data.canStartNewOrder, false, `${label}: 绝不放开第二张订单`)
+    assert.equal(calls.create.length, 0, label)
+    // 确实跳走了，草稿与记录才随之清掉（既有口径，不在本轮改）。
+    assert.equal(wx.storage.has('temp_package_data'), false, label)
+    assert.equal(idem.findRecord('u:A', fp), null, label)
+  }
+})
+
+test('页面：「重新下单」清不掉本机那格就保持锁定 —— 一个 POST 都不发，旧键原样留着', async () => {
+  const { wx, calls, page, fp, key } = await openRestoredPage('ord-dead')
+  calls.get[0].resolve({ orderId: 'ord-dead', pickupStatus: 'expired', taskStatus: 'expired' })
+  await flush()
+  assert.equal(page.data.canStartNewOrder, true)
+
+  // 存储写不进去（存满 / 被系统回收 / 被隐私策略拦截）：storage.set 照样返回 true，
+  // 只有 clearRecord 的读回核对发现得了。
+  wx.control.writeSilentlyDrops = true
+  page.recover({ currentTarget: { dataset: { recover: 'reorder' } } })
+  await flush()
+  wx.control.writeSilentlyDrops = false
+
+  assert.equal(idem.findRecord('u:A', fp).key, key, '没清掉就是没清掉，旧键原样还在')
+  assert.equal(idem.findRecord('u:A', fp).orderId, 'ord-dead')
+  assert.equal(page.data.quoteState, 'error', '保持锁定')
+  assert.equal(page.data.canStartNewOrder, true, '按钮留着：存储压力常是一过性的，「再点一次」正是下一步')
+  assert.match(page.data.quoteErrorText, /没能清掉/, '把"为什么"和"能做什么"一起写在屏幕上')
+  assert.equal(calls.create.length, 0, '清不掉就复用旧键 = 服务端回放那张作废的订单，所以一个 POST 都不许发')
+
+  // 清得掉的那一次：解锁并重新报价，但**仍然不发 POST**。
+  page.recover({ currentTarget: { dataset: { recover: 'reorder' } } })
+  await flush()
+  assert.equal(idem.findRecord('u:A', fp), null, '这一次那一格真的没了')
+  assert.equal(page.data.canStartNewOrder, false)
+  assert.equal(page.data.quoteState, 'ready', '解锁后重新向服务端要一次报价，不沿用旧订单的金额')
+  assert.equal(calls.create.length, 0, '换键之后仍要用户自己按「确认下单」')
+})
+
+test('页面：「重新下单」之后用户自己再按一次 —— 铸的是新键，只发一个 POST，别人那几格不动', async () => {
+  const { wx, calls, page, fp, key } = await openRestoredPage('ord-dead')
+  // 另一格（同账号另一份材料包）的在途记录：全程必须原封不动。
+  const otherKey = await idem.ensureKey('u:A', 'fp-other-package')
+
+  calls.get[0].resolve({ orderId: 'ord-dead', pickupStatus: 'used', taskStatus: 'completed', payStatus: 'paid' })
+  await flush()
+  assert.equal(page.data.canStartNewOrder, true)
+
+  page.startNewOrder(); await flush()
+  assert.equal(idem.findRecord('u:A', fp), null)
+  assert.equal(idem.findRecord('u:A', 'fp-other-package').key, otherKey.key,
+    '只清 (当前账号, 当前指纹) 那一格：别的那几格都可能正绑着一次在途提交')
+
+  page.toggleAgreement({ detail: { value: ['agreed'] } })
+  page.submitOrder(); await flush()
+  assert.equal(calls.create.length, 1, '只发一个 POST')
+  const fresh = calls.create[0].opts.idempotencyKey
+  assert.notEqual(fresh, key, '必须是新键 —— 复用旧键只会让服务端回放那张已经打完的订单')
+  assert.match(fresh, idem.KEY_RE)
+  assert.equal(idem.findRecord('u:A', fp).key, fresh, '新键在 POST 发出之前就已经落住')
+  assert.equal(idem.findRecord('u:A', 'fp-other-package').key, otherKey.key)
+
+  calls.create[0].resolve({ orderId: 'ord-new' })
+  await flush()
+  assert.deepEqual(wx.calls.redirectTo, ['/pages/package-code/package-code?orderId=ord-new'])
 })
 
 test('页面：409 IDEMPOTENCY_KEY_REUSED 不重试旧键；换新键必须由用户再按一次，且先清掉旧记录', async () => {

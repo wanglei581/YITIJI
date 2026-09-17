@@ -733,47 +733,143 @@ console.log('\n⑬ 锁状态、草稿归属与协议同意')
   assert(/quoteState === 'loading'\s*\n\s*&& !this\._guard\.accepts\(this\._quoteToken\)/.test(confirmCode),
     'onShow 只在「在途报价确已作废」时才重发（只看 quoteState 会让首次进入连报两次价）')
 
-  // 「那张已建成的订单还在不在」核不上时的分流。三条出口各自对应一种真实处境，
-  // 混成一条就必然错一头：要么把用户永久停在一个走不通的出口上，要么在证明不了
-  // 任何事的时候放开按钮 —— 后者的代价是同一份材料包的第二张订单、第二笔钱。
+  // 「那张已建成的订单**现在**怎么样了」的分流。成功与失败各有几条出口，每一条都对应
+  // 一种真实处境；混成一条就必然错一头：要么把用户永久停在一个走不通的出口上，要么在
+  // 证明不了任何事的时候放开按钮 —— 后者的代价是同一份材料包的第二张订单、第二笔钱。
   {
     const verifyAt = confirmCode.indexOf('_verifyCreatedOrder(orderId) {')
     const verifyBody = verifyAt >= 0
       ? confirmCode.slice(verifyAt, confirmCode.indexOf('\n  },', verifyAt))
       : ''
     assert(!!verifyBody, '取不到 package-confirm 的 _verifyCreatedOrder 函数体')
+    const thenAt = verifyBody.indexOf('.then((order) => {')
     const catchAt = verifyBody.indexOf('.catch((err) => {')
+    const thenBody = thenAt >= 0 && catchAt > thenAt ? verifyBody.slice(thenAt, catchAt) : ''
     const catchBody = catchAt >= 0 ? verifyBody.slice(catchAt) : ''
+    assert(!!thenBody, '取不到 _verifyCreatedOrder 的成功分支（它必须拿到 order 本体才谈得上看状态）')
     assert(!!catchBody, '取不到 _verifyCreatedOrder 的失败分支')
 
-    // ① 核对守卫必须在分流**之前**释放。不释放的话，这一发失败之后
-    //    `_verifyingOrderId` 仍旧钉着这个 orderId，后续任何一次重新核对
-    //    （显式重试、或登录回来 onShow 触发的那一次）都会在函数第一行被挡掉，
-    //    页面于是永久停在「订单已创建」且再也核不了第二次。
-    const releaseAt = catchBody.indexOf("this._verifyingOrderId = ''")
-    const notFoundAt = catchBody.indexOf('PACKAGE_ORDER_NOT_FOUND')
-    assert(releaseAt > 0 && notFoundAt > releaseAt,
-      '核对失败时先释放 _verifyingOrderId 再分流（不释放 = 后续重试在入口就被吞掉）')
+    // ① 在途标记必须**无条件**释放，而且排在归属判定之前 —— 两条回调都是。
+    //    `_verifyingOrderId` 记的是"这张订单有一发在飞"，回调一到那件事就不成立了。
+    //    放在归属判定后面（或只在某一支里释放），换人 / 会话过期那两条路会把它永久钉在
+    //    这个 orderId 上，之后每一次重新核对都在函数第一行被吞掉，页面永久锁死。
+    const RELEASE = "if (this._verifyingOrderId === orderId) this._verifyingOrderId = ''"
+    for (const [label, body] of [['成功', thenBody], ['失败', catchBody]]) {
+      const releaseAt = body.indexOf(RELEASE)
+      const ownsAt = body.indexOf('this._ownsVerify(token, orderId)')
+      assert(releaseAt >= 0 && ownsAt > releaseAt,
+        `核对${label}分支先无条件释放在途标记再判归属（不释放 = 后续每一次重新核对都被入口吞掉）`)
+    }
+    // ② 归属判据只有**一处**定义，两条回调共用。各写一套迟早分叉成
+    //    "失败认得出会话过期、成功认不出"——而成功那一路认错的代价是跳转到一页 401。
+    assert(confirmCode.split('this._ownsVerify(token, orderId)').length - 1 === 2,
+      '成功与失败两条回调用的是同一个归属判据（_ownsVerify），不是各写一套')
+    assert(/_ownsVerify\(token, orderId\) \{[\s\S]{0,400}this\._createdOrderId !== orderId[\s\S]{0,400}this\._sameIdentity\(token\) \|\| !this\._identityUsable\(\)/.test(confirmCode),
+      '归属判据把「这台设备自己登出了」算作仍属发起者，只有"换成另一个可用会员身份"才算换人')
 
-    // ② 401：登录状态没了，核对不了 —— 但核不上**证明不了订单不存在**。
-    //    锁与键原样保留，只把恢复动作换成一条走得通的路（默认那条是「去我的打印订单」，
-    //    而订单列表同样需要登录，等于把人堵死在一个进不去的出口上）。
-    assert(/if \(err && err\.statusCode === 401\) \{[\s\S]{0,600}quoteRecover: 'login'/.test(catchBody),
-      '核对遇到 401 时给出「去登录」这条走得通的恢复动作')
-    assert(/if \(err && err\.statusCode === 401\) \{[\s\S]{0,600}quoteState: 'error'/.test(catchBody),
-      "401 那一支自己写全 quoteState（模板只在 error 分支渲染这段文案，不写就是一段看不见的话）")
+    // ③ 成功 200 **必须看状态再决定去哪**。上一版无条件 redirectTo：终态订单也照跳，
+    //    而跳之前它删草稿、跳成功回调里还清掉本机记录 —— 用户落在一张打不出东西的
+    //    到机码页上，材料包也没了，而幂等键还锁着"这一组参数不许再下单"。
+    const dropAt = thenBody.indexOf("removeStorageSync('temp_package_data')")
+    const redirectAt = thenBody.indexOf('wx.redirectTo(')
+    const terminalAt = thenBody.indexOf('this._lockAfterCreatedTerminal(')
+    const expiredAt = thenBody.indexOf('this._lockAfterCreatedLoginExpired()')
+    assert(/const terminalReason = pkg\.terminalPackageReason\(order\)/.test(thenBody),
+      '成功分支拿服务端下发的状态判终态（判据是 pkg.terminalPackageReason，不是页面自己认字段）')
+    assert(terminalAt > 0 && dropAt > terminalAt && redirectAt > terminalAt,
+      '终态那一支排在删草稿与跳转**之前**（排在后面等于草稿和记录已经没了才发现是终态）')
+    assert(expiredAt > 0 && terminalAt > expiredAt,
+      '会话已失效时连状态都不看：不跳转（到机码页同样要登录），先给一条去登录的出口')
+    assert(!thenBody.includes('idem.clearRecord('),
+      '成功分支自己不清幂等记录（只有确实跳走了才由 _forgetIdempotencyRecord 清）')
 
-    // ③ 整条失败分支一个字节的幂等记录都不许清。那个键此刻可能正绑着一张已经建成、
+    // ④ 401 / 会话失效：核不上**证明不了订单不存在**。锁与键原样保留，只把恢复动作
+    //    换成一条走得通的路（默认那条是「去我的打印订单」，而订单列表同样需要登录，
+    //    等于把人堵死在一个进不去的出口上）。两条回调共用同一条出口，不维护两份文案。
+    assert(/if \(\(err && err\.statusCode === 401\) \|\| !this\._identityUsable\(\)\) \{[\s\S]{0,200}_lockAfterCreatedLoginExpired\(\)/.test(catchBody),
+      '核对失败遇到 401 / 会话已失效时走同一条「去登录」出口')
+    assert(/_lockAfterCreatedLoginExpired\(\) \{[\s\S]{0,600}quoteState: 'error'[\s\S]{0,400}quoteRecover: 'login'/.test(confirmCode),
+      "「登录已失效」那一支自己写全 quoteState（模板只在 error 分支渲染这段文案，不写就是一段看不见的话）")
+    assert(/_lockAfterCreatedLoginExpired\(\) \{[\s\S]{0,600}canStartNewOrder: false/.test(confirmCode),
+      '核不上的时候不许把「重新下单」点亮（那是在证明不了任何事的时候放开了第二张订单）')
+
+    // ⑤ 整条失败分支一个字节的幂等记录都不许清。那个键此刻可能正绑着一张已经建成、
     //    只是核不上的订单；清掉它，下一次同参数提交会铸新键、服务端再建一张。
     assert(!catchBody.includes('idem.clearRecord('),
       '核对失败的任何一支都不清幂等记录（清掉 = 下一次铸新键 = 第二张订单）')
-    // ④ 只有服务端 requireOwned 明确的 404 才算「它真的没了」，才可以解锁重来。
+    // ⑥ 只有服务端 requireOwned 明确的 404 才算「它真的没了」，才可以解锁重来。
+    const notFoundAt = catchBody.indexOf('PACKAGE_ORDER_NOT_FOUND')
     assert(/statusCode === 404 && err\.code === 'PACKAGE_ORDER_NOT_FOUND'/.test(catchBody),
       "解锁的判据是 404 + PACKAGE_ORDER_NOT_FOUND 两项俱全，不是任意一个失败")
     const unlockAt = catchBody.indexOf('this._createdOrderId = null')
     assert(unlockAt > notFoundAt && notFoundAt > 0,
       '解锁排在那个判据之后（顺序反过来等于任何一次核不上都解锁）')
   }
+
+  // 终态判据本身：它决定的是「能不能让用户就这一份材料包再下一张单、再付一次钱」，
+  // 所以默认必须 fail-closed，而且必须和服务端真实写入点对得上。
+  {
+    const pkgUtil = stripComments(read('utils/package-order.js'))
+    const at = pkgUtil.indexOf('function terminalPackageReason(order) {')
+    const body = at >= 0 ? pkgUtil.slice(at, pkgUtil.indexOf('\n}', at)) : ''
+    assert(!!body, '取不到 terminalPackageReason 的函数体')
+    // 判据只有这一处定义：页面不许再抄一份字段表（两份迟早只改一边）。
+    // 用 includes 而不是正则：`scripts/project-graph/repo.mjs` 的 stripComments 是逐字符
+    // 扫描的，它把**正则字面量里的单引号**也当成字符串开头，一个落单的 `'` 会让它之后
+    // 的解析整体错位 —— 实测代价是本门禁对 utils/storage.js 与
+    // member-print-order-create.service.ts 的两条图谱边凭空消失（代码一个字没改）。
+    assert(!confirmCode.includes("pickupStatus === '") && !confirmCode.includes("taskStatus === '"),
+      'package-confirm 不自己认订单状态字段，只调 pkg.terminalPackageReason（两份状态表只会改一边）')
+    for (const status of ['completed', 'failed', 'abandoned', 'cancelled', 'expired']) {
+      assert(body.includes(`'${status}'`), `终态表覆盖 ${status}（服务端确有这个写入点，漏掉就是把作废订单永久锁着）`)
+    }
+    // **fail-closed 的三处刻意排除**，每一处都对应一次"再下一单 = 再打一次、再收一次钱"：
+    //   used   —— 服务端和 taskStatus:'pending' + printTaskId 一起写（且 CAS 要 payStatus:'paid'）：
+    //             钱已付、任务刚进队列，此刻放开就是同一份材料包打两遍。
+    //   claimed—— 一体机领走了这一单，用户正站在机器前付款；online-payment 关单时还会把它退回 pending。
+    //   closed —— payStatus 单独 closed 完全可能配着一张仍然活着的到机码（见 online-payment.service.ts:799 附近）。
+    for (const notTerminal of ['used', 'claimed', 'closed']) {
+      assert(!body.includes(`'${notTerminal}'`),
+        `${notTerminal} 不得算终态（它对应的是"还在履约 / 码还活着"，算进去就是第二次打印、第二笔钱）`)
+    }
+    assert(/return ''\n?\s*\}$/.test(body.trimEnd()) || body.trimEnd().endsWith("return ''"),
+      '没认出来的状态一律返回 空串（fail-closed）：不能把将来新增的服务端状态默认解释成"这单作废了"')
+    assert(!body.includes('payStatus'),
+      '终态判据不看 payStatus（closed 会配着活码出现，看它就是误判终态）')
+  }
+
+  // 「重新下单」：唯一一条会换幂等键的用户动作，必须由用户自己按，且清不掉就不许解锁。
+  {
+    const at = confirmCode.indexOf('startNewOrder() {')
+    const body = at >= 0 ? confirmCode.slice(at, confirmCode.indexOf('\n  },', at)) : ''
+    assert(!!body, '取不到 startNewOrder 的函数体')
+    assert(body.startsWith('startNewOrder() {\n    if (!this.data.canStartNewOrder) return'),
+      '只有服务端已证明原单终态时才可达（第一行就挡，不靠模板是否画了那个按钮）')
+    assert(/_lockAfterCreatedTerminal\(orderId, reason\) \{[\s\S]{0,700}canStartNewOrder: true/.test(confirmCode)
+      && confirmCode.split('canStartNewOrder: true').length - 1 === 1,
+      '这个开关有且只有终态那一处打开（多一处就是一条没被服务端证明过的解锁路径）')
+    assert(/idem\.clearRecord\(account, fingerprint\)/.test(body),
+      '只清 (当前账号, 当前载荷指纹) 这一格，不是整张表（别的那几格都可能正绑着一次在途提交）')
+    const clearAt = body.indexOf('if (!idem.clearRecord(')
+    const unlockAt = body.indexOf('this._createdOrderId = null')
+    assert(clearAt > 0 && unlockAt > clearAt,
+      '解锁排在"清不掉就 return"之后（顺序反过来等于那个判断根本不存在：复用旧键只会回放那张作废的订单）')
+    assert(!/api\./.test(body), 'startNewOrder 自己不发任何请求（换键是本地动作，POST 由用户再按一次「确认下单」）')
+    assert(/this\._loadQuote\(\)/.test(body),
+      '解锁后重新向服务端要一次报价（沿用上一张订单的金额就是拿一个可能已经变了的价去下单）')
+  }
+
+  // 模板必须真的把这个动作接出去，而且材料包**没有取消端点**，不许凭空造一个。
+  assert(/quoteRecover === 'reorder' \? '重新下单'/.test(confirmWxml),
+    '模板给 reorder 这一态画了按钮文案（只写进 data 不渲染等于没写）')
+  assert(/if \(target === 'reorder'\) return this\.startNewOrder\(\)/.test(confirmCode),
+    'recover 把 reorder 接到 startNewOrder 上')
+  // 材料包**没有取消端点**：PackageOrdersController 只有 @Post() / @Get() / @Get(':id')。
+  // 上面 ③ 已经钉住「api.js 里不许再出现 cancelPackageOrder 这个方法」；这里补的是按
+  // URL 走的那一种（绕开方法名直接拼路径）。单件云打印那条链确实有 /cancel，别顺手抄
+  // 过来 —— 造一个不存在的端点，用户点下去只会拿到 404，而页面把它翻译成「请稍后重试」。
+  assert(!/orders\/package[^\n]{0,60}cancel/.test(confirmCode + stripComments(read('utils/api.js'))),
+    '没有任何一处向 /orders/package/**/cancel 发请求（材料包不提供取消，那个端点不存在）')
 
   assert(/_sameIdentity\(token\)/.test(stripComments(ordersJs)),
     'orders 的取消链按身份判定（用 active 判定会把这一行锁死在「取消中…」）')

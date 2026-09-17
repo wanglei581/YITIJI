@@ -84,6 +84,10 @@ Page({
     quoteErrorTitle: '',
     quoteErrorText: '',
     quoteRecover: '',
+    // 「重新下单」这一个动作的总开关。与 quoteRecover 分成两个字段，是为了让模板不必
+    // 去解析状态语义，也让"能不能重新下单"只有一个出口（startNewOrder 自己再判一次）。
+    // 默认 false，且只由 _lockAfterCreatedTerminal 一处打开 —— 服务端证明原单终态之后。
+    canStartNewOrder: false,
 
     submitErrorTitle: '',
     submitErrorText: '',
@@ -153,6 +157,20 @@ Page({
       return
     }
     this.setData({ isLoggedIn: loggedIn })
+    // 已经锁在一张已建成的订单上：每次回到前台都**重新核一次它现在什么状态**。
+    //
+    // 这一条不能并进上面那个「身份变了」分支里，因为最需要它的那一跳恰恰不算身份变化：
+    // JWT 到点时 `_identityKey()` 会静默掉成 `''`，而守卫的快照**从没见过**这一跳
+    // （它是在读取那一刻才发生的，没有任何生命周期回调）。用户按了「去登录」、登录成功、
+    // 返回本页 —— 身份回到 `'u:A'`，与守卫快照逐字相同，`setIdentity` 返回 false。
+    // 少了这一条，他会看到那句「登录已失效」原地不动：他已经做完了我们要求的事，
+    // 页面却不再核对，也不再有任何出口。
+    //
+    // 顺带也覆盖另外两种回到前台：上一次核对卡在网络 / 5xx（锁着但状态未知），
+    // 以及已经判过终态（再问一遍是同一个答案，代价只是一发 GET）。
+    // 「这张订单还活着」本来就是一个会到期的结论，只能每次回来重新问。
+    // 同一张订单在途时由 `_verifyingOrderId` 挡住，不会连打两发。
+    if (this._createdOrderId && this._identityUsable()) this._verifyCreatedOrder(this._createdOrderId)
     // 切后台会作废在途的报价。回来后若还停在「正在核价」**且那次确实已经作废**，
     // 才重发；否则页面会永远显示核价中，而其实一个请求都没有在跑。
     //
@@ -193,7 +211,7 @@ Page({
     this._verifyingOrderId = ''
     this._needsFreshKey = false
     this._serverLostOrder = false
-    this.setData({ submitting: false, agreedToTerms: false })
+    this.setData({ submitting: false, agreedToTerms: false, canStartNewOrder: false })
   },
 
   /**
@@ -213,6 +231,7 @@ Page({
       quoteAmountText: '',
       quotePages: 0,
       quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '',
+      canStartNewOrder: false,
       submitErrorTitle: '', submitErrorText: '', submitRecover: '',
       submitting: false,
     })
@@ -338,13 +357,44 @@ Page({
   },
 
   /**
-   * 向服务端核一次「那张已建成的订单还在不在」，判据只认服务端。
+   * 这一发核对的回调，还归不归**发起它的那一位**管。成功与失败两条回调共用它 ——
+   * 两边各写一套判据，迟早会分叉成"失败认得出会话过期、成功认不出"。
+   *
+   * **不能只按 `_sameIdentity` 判**。这一发是 `needAuth:true`，而 enduser JWT 只签
+   * 30 分钟：`auth.getToken()` 到点时先 `clearSession()` 再返回 null，身份于是从
+   * `'u:<id>'` 静默掉成 `''`（`utils/request.js` 补签失败时调的 `auth.logout()` 也一样），
+   * 全程没有任何生命周期回调。这不是"换了人接管了页面"，是这台设备自己退出了登录，
+   * 这一发仍然属于发起它的那一位。真正"换了人"（对方登录成一个**不同且可用**的会员
+   * 身份）才必须原样退出，半个字都不写、一步都不跳。
+   *
+   * `_createdOrderId !== orderId` 那一条管的是另一件事：本页当前锁的已经不是这张订单了
+   *（被 404 解锁、被 startNewOrder 放掉、或被换人复位），这条响应已经没有归属。
+   */
+  _ownsVerify(token, orderId) {
+    if (this._createdOrderId !== orderId) return false
+    return this._sameIdentity(token) || !this._identityUsable()
+  },
+
+  /**
+   * 向服务端核一次「那张已建成的订单**现在**怎么样了」，判据只认服务端。
    *
    * 走既有的 `GET /orders/package/:id`（requireOwned：非本人 404、未登录 401），
    * **不信任任何经 URL 传进来的到机码或金额** —— 那条路一张构造出来的链接就能伪造。
-   *   - 查到了 → 直接把人送到机码页，**不再 POST 第二次**；
+   *
+   * 200 回来之后**必须看状态再决定去哪**，不能一律跳到机码页。本机那条记录活 7 天，
+   * 而服务端的幂等键是**永久**挂在那张 Order 行上的（`@@unique(endUserId, idempotencyKey)`，
+   * 没有过期清理）。这 7 天里那张订单完全可能已经打完、打印失败、被终止、被取消，
+   * 或者到机码已经过期 —— 继续拿同一个键去 POST 只会一遍遍回放那张作废的订单。
+   * 上一版无条件 `redirectTo` 还会顺手做两件更糟的事：把草稿删掉、并在跳转成功回调里
+   * 把本机记录一起清掉，于是用户落在一张打不出东西的到机码页上，材料包也没了。
+   *
+   *   - **终态**（服务端已证明它再也不会出纸，判据见 pkg.terminalPackageReason）
+   *     → 不跳转、不删草稿、不动记录，把原因写在屏幕上，并给出一个**由用户自己按**的
+   *       「重新下单」；页面自己绝不换键（那等于替用户做了一次下单决定）。
+   *   - **还活着 / 正在履约**（待到机、已核销、排队出纸，以及任何还看不懂的状态）
+   *     → 送到机码页，那里会忠实显示服务端给的状态；**不再 POST 第二次**。
    *   - 服务端明确说本人没有这张订单（404） → 那个 orderId 再也换不出东西，解开锁，
-   *     让用户可以用**同一个键**重新提交（服务端查不到该键就会正常建一张新单）；
+   *     让用户可以用**同一个键**重新提交（服务端查不到该键就会正常建一张新单）。
    *   - 查不出来（网络 / 401 / 5xx） → **继续锁着**。查询失败证明不了任何事，
    *     而这里只要放开一格，代价就是同一份材料包的第二张订单、第二次收款。
    */
@@ -358,9 +408,18 @@ Page({
     this._verifyingOrderId = orderId
     const token = this._guard.issue('restore')
     api.getPackageOrder(orderId)
-      .then(() => {
-        if (!this._sameIdentity(token) || this._createdOrderId !== orderId) return
-        this._verifyingOrderId = ''
+      .then((order) => {
+        // **无论这条响应归谁，这一发都已经落地了**：`_verifyingOrderId` 记的是
+        // "这张订单有一发在飞"，那件事此刻已经不成立。放在归属判定之前无条件释放，
+        // 否则换人 / 会话过期那两条路会把它永久钉在这个 orderId 上，之后每一次
+        // 重新核对（显式重试、登录回来、onShow 复位后重建）都会在函数第一行被吞掉。
+        if (this._verifyingOrderId === orderId) this._verifyingOrderId = ''
+        if (!this._ownsVerify(token, orderId)) return
+        // 归属还是我们，但这台设备已经登录不了了：**不跳转**。到机码页同样要登录，
+        // 跳过去只会得到一页 401；而这一刻屏幕上还挂着上一位的订单锁。
+        if (!this._identityUsable()) { this._lockAfterCreatedLoginExpired(); return }
+        const terminalReason = pkg.terminalPackageReason(order)
+        if (terminalReason) { this._lockAfterCreatedTerminal(orderId, terminalReason); return }
         // 草稿已被这张订单消费掉，清干净再跳：留着它，用户从到机码页回到本页还能
         // 再下一单，而那一单是真的第二张（记录已随跳转成功清掉，键也换新了）。
         wx.removeStorageSync('temp_package_data')
@@ -372,16 +431,9 @@ Page({
         })
       })
       .catch((err) => {
-        // **不能只按 `_sameIdentity` 判**。这一发本身就是 `needAuth:true`：401 时
-        // `utils/request.js` 会先试静默补签，补签失败才把 401 抛回来 ——
-        // 而抛回来之前它已经调过 `auth.logout()`，身份从 `'u:<id>'` 掉成 `''`。
-        // 这不是"换了人接管了页面"，是这一发自己的失败把登录状态弄没了，
-        // 仍然属于发起它的那一位，只是这台设备现在退出了登录。真正"换了人"
-        // （对方登录成一个不同的、可用的身份）才必须原样退出，半个字都不写。
-        const stillOurs = this._createdOrderId === orderId
-          && (this._sameIdentity(token) || !this._identityUsable())
-        if (!stillOurs) return
-        this._verifyingOrderId = ''
+        // 与成功那一路**逐字同一套顺序**：先无条件释放在途标记，再判归属。
+        if (this._verifyingOrderId === orderId) this._verifyingOrderId = ''
+        if (!this._ownsVerify(token, orderId)) return
         if (err && err.statusCode === 404 && err.code === 'PACKAGE_ORDER_NOT_FOUND') {
           // **本机那条记录里的键留着不动。** 它现在没有绑住任何订单，下一次同参数提交
           // 带着它过去，服务端按 (endUserId, key) 查不到就会正常建一张新单 —— 而不是
@@ -391,23 +443,8 @@ Page({
           this._loadQuote()
           return
         }
-        if (err && err.statusCode === 401) {
-          // 订单锁与幂等键原样保留：核对不了不代表订单不存在，只是这台设备现在登录
-          // 不了了。不能让用户永远停在「订单已创建，请不要重复下单」——那条文案的
-          // 恢复动作是去订单列表，而订单列表同样需要登录。给一条走得通的路：去登录；
-          // 登录回来 onShow 会走身份变化那条分支（_resetForIdentity → _loadOrderData
-          // → _restoreCreatedOrder），重新锁住并重新核对这张订单。
-          //
-          // `quoteState` 一起写死成 error：本页现有的两个调用点都先 _lockAfterCreated
-          // 才 _verifyCreatedOrder（那里已经把它打成 error），但这一支的文案要真的显示
-          // 出来，靠的正是 quoteState === 'error' 那个分支 —— 让这条出口自己写全，
-          // 才不会在将来多一个"不先锁就核对"的调用点时变成一段看不见的文案。
-          this.setData({
-            quoteState: 'error',
-            quoteErrorTitle: '登录已失效',
-            quoteErrorText: '订单可能已经建好，但当前登录状态已过期，无法核对。请重新登录后再查看。',
-            quoteRecover: 'login',
-          })
+        if ((err && err.statusCode === 401) || !this._identityUsable()) {
+          this._lockAfterCreatedLoginExpired()
           return
         }
         // 其余（网络 / 5xx）一律保持锁定：_lockAfterCreated 已经把「订单已创建」
@@ -452,7 +489,7 @@ Page({
     const token = this._guard.issue('quote')
     // 留痕给 onShow 判「这次报价是不是已经作废」，避免首次进入重复报价。
     this._quoteToken = token
-    this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '' })
+    this.setData({ quoteState: 'loading', quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '', canStartNewOrder: false })
     api.quotePackageOrder({
       terminalId: storeData.id,
       files: this.data.files.map((f) => ({ fileId: f.fileId })),
@@ -520,6 +557,7 @@ Page({
   /** 报价 / 提交失败后的恢复动作，按服务端错误码分流，不给「请重试」一条死路。 */
   recover(e) {
     const target = e.currentTarget.dataset.recover
+    if (target === 'reorder') return this.startNewOrder()
     if (target === 'login') return this.toLogin()
     if (target === 'files' || target === 'privacy') return this.backToFiles()
     if (target === 'store') return this.backToStore()
@@ -551,6 +589,9 @@ Page({
       quoteErrorTitle: '订单已创建，请不要重复下单',
       quoteErrorText: '材料包订单已经建好了，只是这一步没能自动跳转。到「我的 · 打印订单」的材料包分区就能找回它，点进去即是到机码。',
       quoteRecover: 'orders',
+      // 默认关掉「重新下单」。所有换文案的锁都从这条出口走，于是这个开关有且只有一个
+      // 默认值：**关**。只有服务端已经证明原单走到终态的那一支才会把它打开。
+      canStartNewOrder: false,
       submitErrorTitle: '',
       submitErrorText: '',
       submitRecover: '',
@@ -572,6 +613,99 @@ Page({
     this.setData({
       quoteErrorText: '材料包订单已经建好了，但这台手机没能把它记下来（存储可能已满或被系统清理），所以没有自动跳转。请到「我的 · 打印订单」的材料包分区找回这张订单，点进去即是到机码；不要重复提交。',
     })
+  },
+
+  /**
+   * 同一把锁，只换一句解释：核对不了，因为这台设备的登录状态没了。
+   *
+   * 订单锁与幂等键**原样保留** —— 核不上证明不了订单不存在。不能让用户停在默认那句
+   *「订单已创建，请不要重复下单」：它的恢复动作是去订单列表，而订单列表同样需要登录，
+   * 等于把人堵死在一个进不去的出口上。这里给一条走得通的：去登录。登录回来 onShow
+   * 会走身份变化那条分支（_resetForIdentity → _loadOrderData → _restoreCreatedOrder），
+   * 重新锁住并重新核对这张订单。
+   *
+   * **不传 orderId、也不动 `_createdOrderId`**：这一支唯一确定的事实就是"现在核不了"，
+   * 而 `_createdOrderId` 此刻已经是对的（`_ownsVerify` 刚刚逐字核过它等于这张订单）。
+   */
+  _lockAfterCreatedLoginExpired() {
+    this.setData({
+      submitting: false,
+      quoteState: 'error',
+      quoteErrorTitle: '登录已失效',
+      quoteErrorText: '订单可能已经建好，但当前登录状态已过期，无法核对。请重新登录后再查看。',
+      quoteRecover: 'login',
+      canStartNewOrder: false,
+    })
+  },
+
+  /**
+   * 服务端已经证明那张订单**再也不会出纸了**（打完 / 打印失败 / 已终止 / 已取消 /
+   * 到机码已过期，判据见 pkg.terminalPackageReason）。
+   *
+   * 这是本页唯一一条会把「重新下单」点亮的路径，而它仍然**只是点亮按钮**：
+   * 换键、清记录、重新报价一律等用户自己按下去（startNewOrder）。页面不自动换键 ——
+   * 那等于替用户做了一次下单决定，而他完全可能只是想回头找那张旧订单。
+   *
+   * 草稿**不删**、记录**不清**、一步都不跳：草稿是他重新下单要用的东西，记录里那个
+   * orderId 是他回「我的 · 打印订单」核对旧单的线索。上一版无条件跳到机码页，恰好
+   * 把这两样一起弄没了。
+   */
+  _lockAfterCreatedTerminal(orderId, reason) {
+    this._lockAfterCreated(orderId)
+    this.setData({
+      quoteErrorTitle: reason,
+      quoteErrorText: '这一份材料包可以重新下一单：点下面的「重新下单」，本机会换一个新的下单标识重新报价。原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。',
+      quoteRecover: 'reorder',
+      canStartNewOrder: true,
+    })
+  },
+
+  /**
+   * 重新下一单。**只有服务端已经证明原单走到终态时才可达**（canStartNewOrder）。
+   *
+   * 做的事只有一件：把本机那条**恰好这一格**的恢复记录丢掉，于是下一次 submitOrder
+   * 的 `ensureKey` 会铸一个新的幂等键 —— 服务端因此认得出这是一次**新的下单意图**，
+   * 而不是上一次的重试（同一个键只会一遍遍回放那张已经作废的订单）。
+   *
+   * **而"丢掉了"必须由 clearRecord 读回来证明，不能假设。** `storage.set` 在"没抛异常
+   * 也没写进去"（存储满 / 被系统回收 / 被隐私策略拦截）时同样返回 true；照着"清掉了"
+   * 的假设解锁，下一次 `ensureKey` 会命中那条还在的记录、复用**旧键**，服务端按
+   * `(endUserId, key)` 回放的正是那张作废的订单。用户面对一个能按的按钮、一句
+   *「订单已创建」，而他要的那份材料永远打不出来。清不掉就保持锁定，并把"为什么"和
+   * "能做什么"一起写在屏幕上；按钮留着（canStartNewOrder 不动）—— 存储压力常是一过性的，
+   * "再点一次"正是这条错误对应的可执行下一步。
+   *
+   * 清的是 `(当前账号, 当前载荷指纹)` 这一格，不是整张表：别的材料包、别的账号那几格
+   * 每一条都可能正绑着一次"响应丢在路上"的提交（见 package-order-idempotency.js 顶部
+   * 那条不变量）。
+   */
+  startNewOrder() {
+    if (!this.data.canStartNewOrder) return
+    const account = this._identityKey()
+    if (!isMemberIdentity(account)) { this.toLogin(); return }
+    const payload = this._orderPayload()
+    const fingerprint = payload ? idem.fingerprintOf(payload) : ''
+    // 草稿没了就没有"这一份材料包"可言，也算不出该清哪一格：回第一步，不碰记录。
+    if (!fingerprint) { this._clearDraftView(); return }
+    if (!idem.clearRecord(account, fingerprint)) {
+      this.setData({
+        quoteErrorText: '本机没能清掉上一张订单的下单标识（手机存储可能已满或被系统清理），为避免重复下单，这一步先锁着。请清理一些存储空间后再点一次「重新下单」；原来那张订单仍可在「我的 · 打印订单」里查看。',
+      })
+      return
+    }
+    this._createdOrderId = null
+    this._submitAttempt = null
+    this._verifyingOrderId = ''
+    this._serverLostOrder = false
+    this._needsFreshKey = false
+    this.setData({
+      submitting: false,
+      canStartNewOrder: false,
+      quoteErrorTitle: '', quoteErrorText: '', quoteRecover: '',
+      submitErrorTitle: '', submitErrorText: '', submitRecover: '',
+    })
+    // 重新报价：金额与页数一律现问服务端，不沿用上一张订单的任何数字。
+    this._loadQuote()
   },
 
   /**

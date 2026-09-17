@@ -77,8 +77,11 @@
             <view class="state-t">{{quoteErrorTitle}}</view>
             <view class="state-d">{{quoteErrorText}}</view>
             <view class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{quoteRecover}}" role="button">
-              {{quoteRecover === 'login' ? '去登录' : quoteRecover === 'store' ? '换一个服务点' : quoteRecover === 'files' || quoteRecover === 'privacy' ? '回到选择文件' : quoteRecover === 'orders' ? '去我的打印订单' : '重新核价'}}
+              {{quoteRecover === 'login' ? '去登录' : quoteRecover === 'reorder' ? '重新下单' : quoteRecover === 'store' ? '换一个服务点' : quoteRecover === 'files' || quoteRecover === 'privacy' ? '回到选择文件' : quoteRecover === 'orders' ? '去我的打印订单' : '重新核价'}}
             </view>
+            <!-- 服务端已证明原单走到终态时，另给一条「去看看原来那张」——「重新下单」占了
+                 主恢复位，但用户常常先想确认一下上一张到底怎么了。只在那一态出现。 -->
+            <view wx:if="{{canStartNewOrder}}" class="state-d">原来那张订单仍可在「我的 · 打印订单」的材料包分区里查看。</view>
           </view>
 
           <view wx:elif="{{quoteState === 'ready'}}" class="price-rows">

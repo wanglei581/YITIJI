@@ -106,6 +106,62 @@ test('状态：used 是已付款交付打印，不能落到终态兜底分支', 
   assert.equal(pkg.resolvePackageStatus({ pickupStatus: 'used', payStatus: 'paid', taskStatus: 'failed' }, NOW).tone, 'danger')
 })
 
+/**
+ * terminalPackageReason 决定的不是"显示什么标签"，而是**能不能让用户就这一份材料包
+ * 再下一张单、再付一次钱**。所以它的默认值必须和 resolvePackageStatus 相反：
+ * 认不出来的状态一律当"还活着"。下面每一条都对着服务端的真实写入点。
+ */
+test('终态判据：服务端确实会写的五种终态，每一种都给得出一句能给用户看的原因', () => {
+  const reasons = [
+    { taskStatus: 'completed' },   // package-order-fulfillment.service.ts:43
+    { taskStatus: 'failed' },      // terminals-agent.service.ts:866
+    { taskStatus: 'abandoned' },   // admin-print-jobs-abandon.service.ts
+    { taskStatus: 'cancelled' },   // 管理端处置
+    { taskStatus: 'expired' },     // package-order.service.ts:310/314
+    { pickupStatus: 'cancelled' },
+    { pickupStatus: 'expired' },
+  ].map((order) => pkg.terminalPackageReason(order))
+  for (const reason of reasons) assert.ok(reason && typeof reason === 'string', '终态必须给得出原因')
+  // 原因是给用户看的一句话，不是状态码原样回显。
+  for (const reason of reasons) assert.ok(!/^[a-z_]+$/.test(reason), `不能把状态码当文案：${reason}`)
+})
+
+test('终态判据：still-live 的三种绝不能算终态（算进去 = 同一份材料包打两遍、收两次钱）', () => {
+  // pickup-order.service.ts:123 —— 一体机领走了这一单，用户正站在机器前付款。
+  // 它还是可逆的：online-payment.service.ts:800 关单时会把 claimed 退回 pending。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'unpaid' }), '')
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'claimed', taskStatus: 'awaiting_payment', payStatus: 'paid' }), '')
+  // pickup-order.service.ts:221 —— used 是和 taskStatus:'pending' + printTaskId 一起写的，
+  // 且 CAS 要求 payStatus:'paid'：钱已付、任务刚进队列。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'used', taskStatus: 'pending', payStatus: 'paid' }), '')
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'used', taskStatus: 'printing', payStatus: 'paid' }), '')
+  // 刚建成，码还活着。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'unpaid' }), '')
+  // payStatus 单独 closed：online-payment.service.ts:799 关掉付款的同时把 claimed 退回
+  // pending，并注明"迟到回调若取件窗口仍开仍可入账履约"—— 码可能还活着。
+  assert.equal(pkg.terminalPackageReason({ pickupStatus: 'pending', taskStatus: 'pending_release', payStatus: 'closed' }), '')
+  // 但 used 一旦走到真正的终态，就该算终态了（终态信号在 taskStatus 上）。
+  assert.ok(pkg.terminalPackageReason({ pickupStatus: 'used', taskStatus: 'completed', payStatus: 'paid' }))
+})
+
+test('终态判据：认不出来的状态 fail-closed，而 resolvePackageStatus 对同一个值是 done —— 两者默认值相反是有意的', () => {
+  const weird = { pickupStatus: 'quantum', taskStatus: 'schrodinger', payStatus: 'maybe' }
+  assert.equal(pkg.terminalPackageReason(weird), '', '将来新增的服务端状态不得被默认解释成"这单作废了"')
+  assert.equal(pkg.resolvePackageStatus(weird).key, 'done', '显示那一档仍然把它归到 done（原样回显，对显示是安全的）')
+  // 空 / 脏输入同样不得被当成终态。
+  for (const bad of [null, undefined, {}, { taskStatus: '' }, { taskStatus: 0 }, []]) {
+    assert.equal(pkg.terminalPackageReason(bad), '')
+  }
+})
+
+test('终态判据：本地时钟不参与 —— 到机码看着过期也要等服务端说 expired', () => {
+  // 服务端 detail 每次都先跑 expireIfNeeded 再回读；前端按本地时钟抢答，只会在时钟
+  // 不准时把一张还能用的码判死。注意 resolvePackageStatus（显示用）确实会看本地时间。
+  const looksExpired = { pickupStatus: 'pending', taskStatus: 'pending_release', expiresAt: new Date(NOW - 1000).toISOString() }
+  assert.equal(pkg.terminalPackageReason(looksExpired), '')
+  assert.equal(pkg.resolvePackageStatus(looksExpired, NOW).label, '到机码已过期')
+})
+
 test('状态：未登记的服务端状态原样回显，不编一个好看的标签', () => {
   const unknown = pkg.resolvePackageStatus({ pickupStatus: 'weird_state', payStatus: 'paid', taskStatus: '' }, NOW)
   assert.equal(unknown.label, 'weird_state')
