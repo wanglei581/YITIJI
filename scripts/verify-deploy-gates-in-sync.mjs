@@ -23,47 +23,64 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const GATES_TS = 'services/api/src/config/production-runtime-gates.ts'
 const DEPLOY_SH = '.github/scripts/deploy-api-release.sh'
+const DEPLOY_YML = '.github/workflows/deploy.yml'
 
 const gatesSource = readFileSync(join(repoRoot, GATES_TS), 'utf8')
 const deploySource = readFileSync(join(repoRoot, DEPLOY_SH), 'utf8')
+const deployWorkflow = readFileSync(join(repoRoot, DEPLOY_YML), 'utf8')
 
 let failures = 0
 const pass = (m) => console.log(`  PASS ${m}`)
-const fail = (m) => { failures += 1; console.error(`  FAIL ${m}`) }
+const fail = (m) => {
+  failures += 1
+  console.error(`  FAIL ${m}`)
+}
 
 console.log('\n=== 生产运行闸门 ↔ 部署脚本持久化清单 同步门禁 ===')
 
 // 一、闸门源码里「必须显式为 true」的键
 const requiredByGates = new Set(
-  [...gatesSource.matchAll(/env\.([A-Z][A-Z0-9_]*)\s*!==\s*'true'/g)].map((m) => m[1]),
+  [...gatesSource.matchAll(/env\.([A-Z][A-Z0-9_]*)\s*!==\s*'true'/g)].map((m) => m[1])
 )
-if (requiredByGates.size === 0) fail(`${GATES_TS} 里没找到任何 env.KEY !== 'true' 形态的闸门 —— 提取正则失效或文件被重构，本门禁需要跟着改`)
+if (requiredByGates.size === 0)
+  fail(
+    `${GATES_TS} 里没找到任何 env.KEY !== 'true' 形态的闸门 —— 提取正则失效或文件被重构，本门禁需要跟着改`
+  )
 else pass(`${GATES_TS} 要求显式为 true 的键：${[...requiredByGates].sort().join(', ')}`)
 
 // 二、部署脚本 3b 持久化的键（bash 数组 REQUIRED_PRODUCTION_GATES=( ... )）
 const arrayMatch = deploySource.match(/REQUIRED_PRODUCTION_GATES=\(([\s\S]*?)\)/)
 if (!arrayMatch) {
-  fail(`${DEPLOY_SH} 里没找到 REQUIRED_PRODUCTION_GATES=( ... ) 数组 —— 3b 步骤被改成别的形状了，本门禁需要跟着改`)
+  fail(
+    `${DEPLOY_SH} 里没找到 REQUIRED_PRODUCTION_GATES=( ... ) 数组 —— 3b 步骤被改成别的形状了，本门禁需要跟着改`
+  )
 } else {
   const persisted = new Set(
     arrayMatch[1]
       .split('\n')
       .map((line) => line.replace(/#.*$/, '').trim())
-      .filter(Boolean),
+      .filter(Boolean)
   )
   pass(`${DEPLOY_SH} 3b 持久化的键：${[...persisted].sort().join(', ')}`)
 
   // 三、两边必须相等 —— 少一个线上起不来，多一个说明脚本在盲设一个闸门没要求的值
   const missingInScript = [...requiredByGates].filter((k) => !persisted.has(k))
   const extraInScript = [...persisted].filter((k) => !requiredByGates.has(k))
-  if (missingInScript.length === 0) pass('闸门要求的键部署脚本都会持久化（发布后 API 不会因缺 env 拒绝启动）')
-  else fail(`闸门要求但部署脚本不持久化：${missingInScript.join(', ')} —— 发布会在 PM2 重启后失败，而那时迁移已执行`)
+  if (missingInScript.length === 0)
+    pass('闸门要求的键部署脚本都会持久化（发布后 API 不会因缺 env 拒绝启动）')
+  else
+    fail(
+      `闸门要求但部署脚本不持久化：${missingInScript.join(', ')} —— 发布会在 PM2 重启后失败，而那时迁移已执行`
+    )
   if (extraInScript.length === 0) pass('部署脚本没有多持久化闸门未要求的键')
-  else fail(`部署脚本持久化了闸门并未要求的键：${extraInScript.join(', ')} —— 要么闸门被删了脚本没跟，要么脚本在盲设不该盲设的值`)
+  else
+    fail(
+      `部署脚本持久化了闸门并未要求的键：${extraInScript.join(', ')} —— 要么闸门被删了脚本没跟，要么脚本在盲设不该盲设的值`
+    )
 
   // 四、每个键真的会写成 KEY=true（不是写成别的值）
   const writesTrue = /print key "=true"/.test(deploySource) || /print key"=true"/.test(deploySource)
-  if (writesTrue) pass('3b 把每个键写成 KEY=true，与闸门的精确 === \'true\' 判定一致')
+  if (writesTrue) pass("3b 把每个键写成 KEY=true，与闸门的精确 === 'true' 判定一致")
   else fail('3b 写入的值不是 "=true" —— 闸门用精确 === \'true\' 判定，带空格或大小写变体会通不过')
 
   // 五、PM2 重启前每个键都要 export（--update-env 把 shell 环境带进进程；与 .env 持久化互为兜底）
@@ -71,7 +88,9 @@ if (!arrayMatch) {
   if (restartAt < 0) fail(`${DEPLOY_SH} 里没找到 pm2 restart "$PM2_NAME" --update-env`)
   else {
     const beforeRestart = deploySource.slice(0, restartAt)
-    const notExported = [...requiredByGates].filter((k) => !new RegExp(`^export ${k}=true$`, 'm').test(beforeRestart))
+    const notExported = [...requiredByGates].filter(
+      (k) => !new RegExp(`^export ${k}=true$`, 'm').test(beforeRestart)
+    )
     if (notExported.length === 0) pass('PM2 重启前每个闸门键都已 export KEY=true')
     else fail(`PM2 重启前未 export：${notExported.join(', ')} —— 进程环境与 .env 持久化不一致`)
   }
@@ -107,12 +126,73 @@ else if (pgDumpAt < 0) fail(`${DEPLOY_SH} 里没找到 pg_dump "$DBURL"`)
 else if (preflightCmdAt < pgDumpAt) pass('3c 预检位于 pg_dump 之前（失败时线上未动）')
 else fail('3c 预检必须位于 pg_dump 之前 —— 否则失败时备份可能已开始')
 
-if (
-  deploySource.includes('--force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")"')
-) {
+if (deploySource.includes('--force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")"')) {
   pass('预检命令引用 REQUIRED_PRODUCTION_GATES（与 3b 同一份清单）')
 } else {
   fail('预检命令必须引用 REQUIRED_PRODUCTION_GATES（与 3b 同一份清单）')
+}
+
+// 七、API-only 发布范围必须 fail-closed，且不得触碰三端静态资源。
+// 生产 API 与前端之间可能存在数日版本差；修复 API 契约时不能顺带把未经生产验收的
+// Kiosk/Admin/Partner 覆盖到 nginx。手动发布默认 API-only，自动 main CI 发布保持 full。
+{
+  const manualInput =
+    /deploy_scope:\n\s+description:[^\n]+\n\s+required: true\n\s+default: api-only\n\s+type: choice\n\s+options:\n\s+- api-only\n\s+- full/.test(
+      deployWorkflow
+    )
+  if (manualInput) pass('手动发布 deploy_scope 必填且默认 api-only（选项仅 api-only/full）')
+  else fail(`${DEPLOY_YML} 的 deploy_scope 输入必须必填、默认 api-only，且仅允许 api-only/full`)
+
+  const automaticFull = deployWorkflow.includes(
+    "DEPLOY_SCOPE: ${{ github.event_name == 'workflow_run' && 'full' || inputs.deploy_scope }}"
+  )
+  if (automaticFull) pass('workflow_run 自动发布显式保持 full，手动发布原样传入 deploy_scope')
+  else fail('DEPLOY_SCOPE 表达式必须仅给 workflow_run 回退 full；手动空输入不得回退 full')
+
+  if (deployWorkflow.includes('DEPLOY_SCOPE="${DEPLOY_SCOPE:-}"')) {
+    pass('远端 workflow 对空 deploy_scope fail-closed（不默认 full）')
+  } else {
+    fail('远端 workflow 不得用 ${DEPLOY_SCOPE:-full}；空手动输入会误触发全量静态发布')
+  }
+
+  if (deploySource.includes(': "${DEPLOY_SCOPE:?DEPLOY_SCOPE is required}"')) {
+    pass('API 发布脚本再次要求 DEPLOY_SCOPE，绕过 workflow 也会 fail-closed')
+  } else {
+    fail(`${DEPLOY_SH} 必须要求 DEPLOY_SCOPE，不得接受未声明范围的直接调用`)
+  }
+
+  const distGate =
+    /if \[ "\$DEPLOY_SCOPE" = "full" \]; then\n\s+echo "=== 4b\.[\s\S]*?for app in kiosk admin partner; do[\s\S]*?else\n\s+echo "=== 4b\. API-only：跳过三端前端 dist 校验 ==="\nfi/.test(
+      deploySource
+    )
+  if (distGate) pass('三端 dist 前置校验只在 full 执行，API-only 不依赖服务器残留前端产物')
+  else fail(`${DEPLOY_SH} 的三端 dist 校验必须仅在 DEPLOY_SCOPE=full 时执行`)
+
+  const apiOnlyRsyncGuard = deploySource.match(
+    /if \[ "\$DEPLOY_SCOPE" = "api-only" \]; then\n([\s\S]*?)\nfi\nrsync -a --delete/
+  )
+  const apiOnlyDistExcludes =
+    apiOnlyRsyncGuard &&
+    ['kiosk', 'admin', 'partner'].every((app) =>
+      apiOnlyRsyncGuard[1].includes(`--exclude 'apps/${app}/dist'`)
+    )
+  if (apiOnlyDistExcludes) {
+    pass('API-only rsync --delete 保护 Kiosk/Admin/Partner 现有 dist 副本')
+  } else {
+    fail('API-only 必须在 rsync --delete 前排除 apps/{kiosk,admin,partner}/dist')
+  }
+
+  const apiOnlyExitAt = deployWorkflow.indexOf('✅ API-only 部署完成')
+  const staticMarkers = [
+    'rm -rf ${{ secrets.DEPLOY_WEB_ROOT }}/*',
+    'nginx -s reload',
+    'latest-deployed.txt',
+  ]
+  const staticAfterExit =
+    apiOnlyExitAt >= 0 &&
+    staticMarkers.every((marker) => deployWorkflow.indexOf(marker) > apiOnlyExitAt)
+  if (staticAfterExit) pass('API-only 在 nginx/static/latest-deployed 操作之前退出')
+  else fail('API-only 必须在所有 nginx/static/latest-deployed 操作之前 exit 0')
 }
 
 // ── 前端版的同一形态：部署脚本传 VITE_API_MODE=http，前端必须在没传时炸掉 ──────
@@ -143,23 +223,24 @@ if (
     { app: 'admin', client: 'apps/admin/src/services/api/client.ts' },
     { app: 'partner', client: 'apps/partner/src/services/api/client.ts' },
   ]
-  const deployYml = readFileSync(join(repoRoot, '.github/workflows/deploy.yml'), 'utf8')
-
   for (const { app, client } of FRONTENDS) {
     const src = readFileSync(join(repoRoot, client), 'utf8')
     // 判据只看「PROD 且非 http 就抛」这一条，不看注释里怎么解释。
     const failsClosed =
       /import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/.test(src) &&
-      /throw new Error\(/.test(src.slice(src.search(/import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/)))
+      /throw new Error\(/.test(
+        src.slice(src.search(/import\.meta\.env\.PROD\s*&&\s*API_MODE\s*!==\s*'http'/))
+      )
     if (app === 'kiosk') {
-      if (failsClosed) pass('kiosk 运行时对 mock 模式 fail-closed（它的 E2E 走 http，这条守卫不会误伤）')
+      if (failsClosed)
+        pass('kiosk 运行时对 mock 模式 fail-closed（它的 E2E 走 http，这条守卫不会误伤）')
       else fail(`kiosk 运行时守卫丢了（${client}）`)
     } else if (failsClosed) {
       fail(
-        `${app} 不得有 import.meta.env.PROD 运行时守卫（${client}）：`
-        + 'vite build 把 PROD 折成 true，而本 app 的 E2E 走 mock，'
-        + '这条会变成无条件 throw 把浏览器用例整段挂死（2026-09-10 实测 36.6 分钟未完成）。'
-        + '生产侧的防线是 vite.config 的 assertProdApiMode。',
+        `${app} 不得有 import.meta.env.PROD 运行时守卫（${client}）：` +
+          'vite build 把 PROD 折成 true，而本 app 的 E2E 走 mock，' +
+          '这条会变成无条件 throw 把浏览器用例整段挂死（2026-09-10 实测 36.6 分钟未完成）。' +
+          '生产侧的防线是 vite.config 的 assertProdApiMode。'
       )
     } else {
       pass(`${app} 没有会误伤 mock E2E 的运行时守卫（生产侧由 vite.config 闸门把关）`)
@@ -186,15 +267,22 @@ if (
     const cfg = readFileSync(join(repoRoot, `apps/${app}/vite.config.ts`), 'utf8')
     const hasGuard =
       /function\s+assertProdApiMode|const\s+assertProdApiMode/.test(cfg) &&
-      /assertProdApiMode\s*\(/.test(cfg.replace(/function\s+assertProdApiMode|const\s+assertProdApiMode/g, ''))
+      /assertProdApiMode\s*\(/.test(
+        cfg.replace(/function\s+assertProdApiMode|const\s+assertProdApiMode/g, '')
+      )
     if (hasGuard) pass(`${app}/vite.config.ts 有构建期闸门 assertProdApiMode 且被调用`)
-    else fail(`${app}/vite.config.ts 缺少构建期闸门 assertProdApiMode（或定义了没调用）—— 漏传 VITE_API_MODE 会静默产出 mock 版本`)
+    else
+      fail(
+        `${app}/vite.config.ts 缺少构建期闸门 assertProdApiMode（或定义了没调用）—— 漏传 VITE_API_MODE 会静默产出 mock 版本`
+      )
   }
 
   // 另一半：部署脚本必须真的传。三个构建各出现一次，别只传其中一两个。
-  const modeCount = (deployYml.match(/VITE_API_MODE=http/g) ?? []).length
+  const modeCount = (deployWorkflow.match(/VITE_API_MODE=http/g) ?? []).length
   if (modeCount >= FRONTENDS.length) {
-    pass(`deploy.yml 为 ${FRONTENDS.length} 个前端都传了 VITE_API_MODE=http（实测 ${modeCount} 处）`)
+    pass(
+      `deploy.yml 为 ${FRONTENDS.length} 个前端都传了 VITE_API_MODE=http（实测 ${modeCount} 处）`
+    )
   } else {
     fail(`deploy.yml 只有 ${modeCount} 处 VITE_API_MODE=http，少于前端个数 ${FRONTENDS.length}`)
   }
