@@ -4,13 +4,15 @@
 
 **当前候选判定：** 基线 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，已验证代码 / 手册
 锚点 `d71d022545d9ff56da155615710ce99851130753`。`SOURCE / LOCAL: GO`；
-`CI: NO-GO (PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。当前未 push、未开 PR、未部署，
-也未执行 Windows / 奔图动作。下表优先于后面的历史推进表；后续 main 若前进，所有现场和生产证据都要
+`CI: NO-GO (PENDING)`；`DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。当前已 push 并创建 PR，但未合并、
+未部署，也未执行 Windows / 奔图动作。PR #1039 已于 2026-09-17 创建，首个包含测试装置隔离修复的 head 为
+`6e56a17d7d4f1b78c2418f16dc8eab1b8c366770`；候选 CI 正在运行，未完成前继续保持 `CI: NO-GO (PENDING)`。
+下表优先于后面的历史推进表；后续 main 若前进，所有现场和生产证据都要
 重新绑定实际候选或部署 SHA。
 
 | 顺序 | 负责人 / 层 | 必做事项 | 达标判据 |
 |---|---|---|---|
-| 1 | Codex 集成 + Claude / Grok 只读复核 | 获得外部动作授权后，以当前独立分支的最终 tip 开单一 PR，跑候选 head 的必需 CI；只处理新日志第一条决定性失败 | final head 无新增 P0 / P1；必需 CI 全绿；合并后以 `merge-base --is-ancestor` 证明进入 main。未完成前保持 `CI: NO-GO (PENDING)` |
+| 1 | Codex 集成 + reviewer 复核 | 等待 PR #1039 最终 head 的必需 CI；若失败只处理新日志第一条决定性失败。CI 全绿后复核 exact head，未获得单独合并授权前不得合并 | final head 无新增 P0 / P1；必需 CI 全绿后才可写 `CI: GO`。若之后获准合并，必须以 `merge-base --is-ancestor` 证明进入 main |
 | 2 | Windows / 奔图专用任务 | 在隔离目录冻结精确候选 / main SHA，先验 Agent 实例锁与临时文件清理，再走面板扫描、真实出纸、扫码枪、长驻 watcher、断网、Agent / 浏览器重启和连续多用户 | 覆盖 `tasklist` CSV、NTFS `wx` / 删除共享、reparse point、`ProgramData`、真实双进程启动；记录 Agent 版本、终端、打印机 / 扫描设备、任务 / 订单 / 文件 hash、状态回传和临时文件删除。`ino === 0` / identity unavailable、锁归属不明、清理失败均须 fail-closed |
 | 3 | 微信小程序 / 跨端真机 | 用已发布或明确标注为 Trial 的版本验证订单详情换人 / 登出 / 401 / 取消乱序、材料包找回、到机码和弱网补签确认 | 发出时身份未知的首个 200 不显示详情；本人经确认请求恢复，非本人被服务端拒绝；慢网双往返文案可用；不得用开发者工具截图或 mock 代替真机 |
 | 4 | 运维 / 生产 | 在具名维护窗口按精确 SHA 做备份、迁移、部署、PM2 / nginx / Web Root / provenance / 健康 / 监控 / 回滚 | 生产版本一致；真实支付、退款、对账与对象存储生命周期可核；无明确授权不得执行 |
