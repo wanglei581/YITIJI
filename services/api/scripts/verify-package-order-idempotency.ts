@@ -17,7 +17,8 @@ import {
   PackageOrderService,
 } from '../src/member-print-orders/package-order.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
-import { isPickupWindowClosed, OrderStatusService } from '../src/payment/order-status.service'
+import { isLiveKioskPickupLease, isPickupWindowClosed, OrderStatusService } from '../src/payment/order-status.service'
+import { paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
@@ -660,7 +661,7 @@ async function main(): Promise<void> {
     const claimedId = `ord_pkg_claimed_${suffix}`
     await insertPackageOrder({
       id: claimedId, orderNo: `ORD-PKG-CLAIMED-${suffix}`, key: claimedKey, code: claimedCode,
-      ownerId: userA, dto: dtoA, pickupStatus: 'claimed',
+      ownerId: userA, dto: dtoA, pickupStatus: 'claimed', pickupClaimedAt: new Date(),
     })
     const claimedView = await packages.create(userA, dtoA, claimedKey) as PackageView
     if (claimedView.orderId !== claimedId) fail('claimed 回放必须原单')
@@ -802,6 +803,58 @@ async function main(): Promise<void> {
       fail(`已认领已付再 claim 必须 used，实际 ${paidReclaimRow.pickupStatus}/${paidReclaimRow.printTaskId}`)
     }
     pass('T8h claimed+过期窗口：认领租约不被手机过期；同机可 markPaid/release；未认领过期仍拒绝入账')
+
+    const staleClaimedAt = new Date(Date.now() - paymentSessionTtlMs() - 1000)
+    const outerKey = randomUUID()
+    const outerCode = randomPickupCode()
+    const outerId = `ord_pkg_lease_outer_${suffix}`
+    await insertPackageOrder({
+      id: outerId, orderNo: `ORD-PKG-LEASE-OUTER-${suffix}`, key: outerKey, code: outerCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupStatus: 'claimed', pickupClaimedAt: staleClaimedAt, taskStatus: 'awaiting_payment',
+      pickupCodeExpiresAt: pastExpiry,
+    })
+    const outerPay = await capture(() => orderStatus.markPaid(outerId, { paymentSource: 'offline' }))
+    if (!outerPay.thrown || outerPay.code !== 'ORDER_PICKUP_WINDOW_CLOSED') {
+      fail(`lease 外未付 markPaid 必须拒绝，实际 ${JSON.stringify(outerPay)}`)
+    }
+    const outerReplay = await packages.create(userA, dtoA, outerKey) as PackageView
+    if (outerReplay.pickupStatus !== 'expired' || outerReplay.payStatus !== 'closed' || outerReplay.pickupCode) {
+      fail(`lease 外回放必须收敛 expired/closed/无码，实际 ${outerReplay.pickupStatus}/${outerReplay.payStatus}`)
+    }
+    const outerDetail = await packages.detail(userA, outerId) as PackageView
+    if (outerDetail.pickupStatus !== 'expired' || outerDetail.payStatus !== 'closed') fail('lease 外 detail 必须收敛')
+    const outerListed = (await packages.list(userA, { cursor: null, pageSize: 20 })).items.find((row) => row.orderId === outerId)
+    if (!outerListed || outerListed.pickupStatus !== 'expired' || outerListed.payStatus !== 'closed') {
+      fail('lease 外 list 必须收敛')
+    }
+    const outerClaim = await capture(() => pickup.claim(outerCode, terminalId))
+    if (!outerClaim.thrown || outerClaim.code !== 'PICKUP_CODE_EXPIRED') {
+      fail(`lease 外同机 reclaim 必须拒绝，实际 ${JSON.stringify(outerClaim)}`)
+    }
+    const outerRow = await prisma.order.findUniqueOrThrow({ where: { id: outerId } })
+    if (outerRow.pickupStatus !== 'expired' || outerRow.payStatus !== 'closed') {
+      fail(`lease 外 reclaim 必须落 expired/closed，实际 ${outerRow.pickupStatus}/${outerRow.payStatus}`)
+    }
+    if (isLiveKioskPickupLease(outerRow)) fail('lease 外收敛后不得再算活租约')
+
+    const paidOuterKey = randomUUID()
+    const paidOuterCode = randomPickupCode()
+    const paidOuterId = `ord_pkg_lease_paid_outer_${suffix}`
+    await insertPackageOrder({
+      id: paidOuterId, orderNo: `ORD-PKG-LEASE-PAID-OUTER-${suffix}`, key: paidOuterKey, code: paidOuterCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupStatus: 'claimed', pickupClaimedAt: staleClaimedAt, taskStatus: 'awaiting_payment',
+      payStatus: 'paid', paymentSource: 'offline', paidAt: new Date(),
+      pickupCodeExpiresAt: pastExpiry,
+    })
+    const paidOuterReplay = await packages.create(userA, dtoA, paidOuterKey) as PackageView
+    if (paidOuterReplay.pickupStatus !== 'claimed' || paidOuterReplay.payStatus !== 'paid') {
+      fail(`claimed+paid 跨 lease 回放不得关单，实际 ${paidOuterReplay.pickupStatus}/${paidOuterReplay.payStatus}`)
+    }
+    const paidOuterRelease = await pickup.claim(paidOuterCode, terminalId)
+    if (!paidOuterRelease.released || !paidOuterRelease.taskId) fail('claimed+paid 跨 lease 同机仍须 release')
+    pass('T8i claimed 租约过期：未付 reclaim/markPaid 拒绝并收敛；已付跨 lease 仍 release')
 
     const usedKey = randomUUID()
     const usedCode = randomPickupCode()

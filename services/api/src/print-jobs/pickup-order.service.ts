@@ -3,7 +3,11 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { hashPickupCode } from '../common/pickup-code'
-import { isPickupWindowClosed } from '../payment/order-status.service'
+import {
+  CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
+  claimedUnpaidExpiredLeaseWhere,
+  isPickupWindowClosed,
+} from '../payment/order-status.service'
 import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment/payment-session-token'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
@@ -78,9 +82,19 @@ export class PickupOrderService {
       await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
-    // 未认领且窗口已关：落 expired 并拒绝。已 claimed 的同机租约不算关窗
-    // （isPickupWindowClosed），必须落到下面的幂等认领 / 付款 / release，
-    // 不能在这里把租约写成 expired。过期写只打 pending，避免并发认领后被误关。
+    // 退款态必须先于关窗判断：claimed + refunding 不再算活租约，否则会先被写成
+    // PICKUP_CODE_EXPIRED，把「钱已退」说成「码过期」。
+    if (REFUNDED_PAY_STATUSES.has(order.payStatus)) {
+      throw new BadRequestException({
+        error: {
+          code: 'ORDER_REFUNDED',
+          message: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度。',
+        },
+      })
+    }
+    // 未认领过期、或 claimed 未付租约已过：落 expired 并拒绝。
+    // 活着的 claimed 租约（含已付）不算关窗，落到下面的幂等认领 / 付款 / release。
+    // pending 过期写只打 pending，避免并发认领后被误关；claimed 未付过期另走租约 CAS。
     if (isPickupWindowClosed(order)) {
       await this.prisma.order.updateMany({
         where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
@@ -90,6 +104,10 @@ export class PickupOrderService {
           payStatus: order.payStatus === 'unpaid' || order.payStatus === 'paying' ? 'closed' : order.payStatus,
         },
       })
+      await this.prisma.order.updateMany({
+        where: { id: order.id, ...claimedUnpaidExpiredLeaseWhere() },
+        data: { ...CLAIMED_UNPAID_LEASE_EXPIRE_DATA },
+      })
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
     }
     // 走到这里说明用户手里拿的是一枚**属于本终端的真码**，即他是真实用户而非枚举者。
@@ -97,20 +115,6 @@ export class PickupOrderService {
     // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
     await clearPickupClaimFailures(this.redis, terminal.id)
 
-    // 已退款 / 退款中的订单：在任何状态写入之前拦住。
-    // 2026-09-07 产品裁决：「如果退款的话就不出文件」。此前这里没有退款判断，
-    // 一枚已退款订单的到机码仍会先被写成 pickupStatus='claimed' + taskStatus='awaiting_payment'，
-    // 然后才以 ORDER_PAYMENT_UNAVAILABLE「订单当前无法付款」报错 —— 既污染了订单状态
-    // （对账与待退款信号都会读到一个假的「已认领待付款」），也把「钱已退给你」
-    // 说成了「你付不了款」。用户是来取文件的，不是来付款的。
-    if (REFUNDED_PAY_STATUSES.has(order.payStatus)) {
-      throw new BadRequestException({
-        error: {
-          code: 'ORDER_REFUNDED',
-          message: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度。',
-        },
-      })
-    }
     if (order.pickupStatus === 'used' && order.printTaskId) return this.releasedView(order)
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })

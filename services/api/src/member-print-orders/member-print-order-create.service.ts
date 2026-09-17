@@ -7,7 +7,13 @@ import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService } from '../payment/order-quote.service'
-import { isLiveKioskPickupLease, isPickupWindowClosed, OrderStatusService } from '../payment/order-status.service'
+import {
+  CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
+  claimedUnpaidExpiredLeaseWhere,
+  isLiveKioskPickupLease,
+  isPickupWindowClosed,
+  OrderStatusService,
+} from '../payment/order-status.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
@@ -389,34 +395,41 @@ export class MemberPrintOrderCreateService {
   }
 
   private async expireIfNeeded(order: Awaited<ReturnType<MemberPrintOrderCreateService['requireOwned']>>) {
-    if (isLiveKioskPickupLease(order)) return
-    if (order.pickupStatus !== 'pending' || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
-    await this.prisma.order.updateMany({
-      where: { id: order.id, pickupStatus: 'pending', printTaskId: null, payStatus: { in: ['unpaid', 'paying'] } },
-      data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
-    })
-    await this.prisma.order.updateMany({
-      where: { id: order.id, pickupStatus: 'pending', printTaskId: null, payStatus: { notIn: ['unpaid', 'paying'] } },
-      data: { pickupStatus: 'expired', taskStatus: 'expired' },
-    })
+    const now = new Date()
+    if (isLiveKioskPickupLease(order, now)) return
+    const pendingExpired = order.pickupStatus === 'pending'
+      && !!order.pickupCodeExpiresAt
+      && order.pickupCodeExpiresAt <= now
+    const claimedLeaseExpired = order.pickupStatus === 'claimed'
+      && !order.printTaskId
+      && (order.payStatus === 'unpaid' || order.payStatus === 'paying')
+    if (!pendingExpired && !claimedLeaseExpired) return
+    await this.expirePendingForUser(order.endUserId ?? '', order.id)
   }
 
-  private async expirePendingForUser(endUserId: string): Promise<void> {
+  private async expirePendingForUser(endUserId: string, orderId?: string): Promise<void> {
     const now = new Date()
-    const window = {
-      endUserId,
+    const scope = {
+      ...(orderId ? { id: orderId } : { endUserId }),
       sourceFileId: { not: null } as const,
-      pickupStatus: 'pending',
       printTaskId: null,
+    }
+    const pendingWindow = {
+      ...scope,
+      pickupStatus: 'pending',
       pickupCodeExpiresAt: { lte: now },
     }
     await this.prisma.order.updateMany({
-      where: { ...window, payStatus: { in: ['unpaid', 'paying'] } },
+      where: { ...pendingWindow, payStatus: { in: ['unpaid', 'paying'] } },
       data: { pickupStatus: 'expired', taskStatus: 'expired', payStatus: 'closed' },
     })
     await this.prisma.order.updateMany({
-      where: { ...window, payStatus: { notIn: ['unpaid', 'paying'] } },
+      where: { ...pendingWindow, payStatus: { notIn: ['unpaid', 'paying'] } },
       data: { pickupStatus: 'expired', taskStatus: 'expired' },
+    })
+    await this.prisma.order.updateMany({
+      where: { ...scope, ...claimedUnpaidExpiredLeaseWhere(now) },
+      data: { ...CLAIMED_UNPAID_LEASE_EXPIRE_DATA },
     })
   }
 

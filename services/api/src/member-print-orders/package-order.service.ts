@@ -6,7 +6,13 @@ import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService } from '../payment/order-quote.service'
 import { createPaymentSessionToken } from '../payment/payment-session-token'
-import { isPickupWindowClosed, OrderStatusService } from '../payment/order-status.service'
+import {
+  CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
+  claimedUnpaidExpiredLeaseWhere,
+  isLiveKioskPickupLease,
+  isPickupWindowClosed,
+  OrderStatusService,
+} from '../payment/order-status.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
@@ -280,30 +286,31 @@ export class PackageOrderService {
   }
 
   /**
-   * Persist expired pickup windows for **unclaimed** rows only.
+   * Persist expired pickup windows.
    *
-   * `pickupStatus: claimed` is the terminal's live fulfillment lease
-   * (`pickup-order.service` writes it on successful claim; `release` requires it
-   * and does not re-check `pickupCodeExpiresAt`). Phone list/detail/replay must
-   * not expire that lease. Predicate is `pending` — the pre-claim state — not
-   * `pickupClaimedAt: null`, so a claimed row with a missing timestamp is still
-   * left alone.
+   * Unclaimed (`pending`) rows expire by `pickupCodeExpiresAt`.
+   * Claimed unpaid/paying rows expire only when the kiosk lease itself is over
+   * (`pickupClaimedAt` older than payment-session TTL, or timestamp missing).
+   * Live claimed leases and claimed+paid rows are left alone so the terminal
+   * can still collect / release.
    *
-   * Two CAS writes so a concurrent unpaid→paid cannot be closed from a stale
-   * in-memory payStatus: unpaid/paying pending rows close; already-paid pending
-   * rows expire pickup/task only.
+   * Two CAS writes on pending so a concurrent unpaid→paid cannot be closed
+   * from a stale in-memory payStatus.
    */
   private async expireExpiredRows(scope: {
     id?: string
     endUserId?: string
   }): Promise<void> {
     const now = new Date()
-    const window = {
+    const packageScope = {
       ...scope,
+      ...(scope.endUserId ? { orderItems: { some: {} } } : {}),
+    }
+    const window = {
+      ...packageScope,
       pickupStatus: 'pending',
       printTaskId: null,
       pickupCodeExpiresAt: { lte: now },
-      ...(scope.endUserId ? { orderItems: { some: {} } } : {}),
     }
     await this.prisma.order.updateMany({
       where: { ...window, payStatus: { in: ['unpaid', 'paying'] } },
@@ -313,14 +320,29 @@ export class PackageOrderService {
       where: { ...window, payStatus: { notIn: ['unpaid', 'paying'] } },
       data: { pickupStatus: 'expired', taskStatus: 'expired' },
     })
+    await this.prisma.order.updateMany({
+      where: { ...packageScope, ...claimedUnpaidExpiredLeaseWhere(now) },
+      data: { ...CLAIMED_UNPAID_LEASE_EXPIRE_DATA },
+    })
   }
 
   private async expireIfNeeded(order: {
     id: string
     pickupStatus: string
     pickupCodeExpiresAt: Date | null
+    payStatus?: string | null
+    printTaskId?: string | null
+    pickupClaimedAt?: Date | null
   }): Promise<void> {
-    if (order.pickupStatus !== 'pending' || !order.pickupCodeExpiresAt || order.pickupCodeExpiresAt > new Date()) return
+    const now = new Date()
+    if (isLiveKioskPickupLease(order, now)) return
+    const pendingExpired = order.pickupStatus === 'pending'
+      && !!order.pickupCodeExpiresAt
+      && order.pickupCodeExpiresAt <= now
+    const claimedLeaseExpired = order.pickupStatus === 'claimed'
+      && !order.printTaskId
+      && (order.payStatus === 'unpaid' || order.payStatus === 'paying')
+    if (!pendingExpired && !claimedLeaseExpired) return
     await this.expireExpiredRows({ id: order.id })
   }
 

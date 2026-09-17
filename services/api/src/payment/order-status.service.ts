@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service'
 // member-print-orders/member-print-order-create.service.ts 各写一份 PICKUP_CODE_LEN=10。
 import { randomPickupCode } from '../common/pickup-code'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import { paymentSessionTtlMs } from './payment-session-token'
 import { ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
 
 /** Order 行类型（从 prisma delegate 推导，避免直接 import 生成 client 类型）。 */
@@ -24,28 +25,63 @@ const PICKUP_MAX_ATTEMPTS = 6
 export const ONLINE_PAID_PENDING_REFUND_REASON = 'ONLINE_PAID_PENDING_REFUND'
 
 /**
- * 一体机现场履约租约：`pickup-order.service` 在窗口仍开时把 pending CAS 成 claimed，
- * 并绑死 `Order.terminalId`。release 不再核对 `pickupCodeExpiresAt`。
+ * 一体机现场履约租约：pending→claimed 时写下 `pickupClaimedAt`。
+ * 时钟只看该时间戳，不看新签的 payment-session token（手机 detail 会刷新 token）。
  *
- * 因此 claimed + printTaskId null 不是「过期未认领」，而是机器上正在收款/出纸的租约。
- * 预认领截止已过也必须能 markPaid / 同机再 claim / release；未认领过期单仍走资损防线。
+ * - claimed + 无任务 + paid：始终 live，允许 release（钱已收，不能靠状态机自动关掉）。
+ * - unpaid/paying：仅当 pickupClaimedAt 存在且仍在 payment-session TTL 内才 live。
+ * - 缺 pickupClaimedAt：不得永久豁免。
  */
-export function isLiveKioskPickupLease(order: {
-  pickupStatus: string
-  printTaskId?: string | null
-}): boolean {
-  return order.pickupStatus === 'claimed' && !order.printTaskId
+export function isLiveKioskPickupLease(
+  order: {
+    pickupStatus: string
+    printTaskId?: string | null
+    payStatus?: string | null
+    pickupClaimedAt?: Date | null
+  },
+  now: Date = new Date(),
+): boolean {
+  if (order.pickupStatus !== 'claimed' || order.printTaskId) return false
+  if (order.payStatus === 'paid') return true
+  if (order.payStatus !== 'unpaid' && order.payStatus !== 'paying') return false
+  if (!order.pickupClaimedAt) return false
+  return now.getTime() - order.pickupClaimedAt.getTime() < paymentSessionTtlMs()
 }
 
-/** 取件窗口已关：过期截止已到，或到机码已被标 expired/cancelled。活着的 claimed 租约不算关。 */
-export function isPickupWindowClosed(order: {
-  pickupCodeExpiresAt: Date | null
-  pickupStatus: string
-  printTaskId?: string | null
-}): boolean {
-  if (isLiveKioskPickupLease(order)) return false
+/** CAS 条件：claimed 未付/支付中，且租约已过期或从未写下 pickupClaimedAt。 */
+export function claimedUnpaidExpiredLeaseWhere(now: Date = new Date()) {
+  return {
+    pickupStatus: 'claimed' as const,
+    printTaskId: null,
+    payStatus: { in: ['unpaid', 'paying'] },
+    OR: [
+      { pickupClaimedAt: null },
+      { pickupClaimedAt: { lte: new Date(now.getTime() - paymentSessionTtlMs()) } },
+    ],
+  }
+}
+
+export const CLAIMED_UNPAID_LEASE_EXPIRE_DATA = {
+  pickupStatus: 'expired',
+  taskStatus: 'expired',
+  payStatus: 'closed',
+} as const
+
+/** 取件窗口已关。claimed 只看履约租约本身，过期后不再退回原 pickupCodeExpiresAt。 */
+export function isPickupWindowClosed(
+  order: {
+    pickupCodeExpiresAt: Date | null
+    pickupStatus: string
+    printTaskId?: string | null
+    payStatus?: string | null
+    pickupClaimedAt?: Date | null
+  },
+  now: Date = new Date(),
+): boolean {
   if (order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled') return true
-  return Boolean(order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= new Date())
+  if (isLiveKioskPickupLease(order, now)) return false
+  if (order.pickupStatus === 'claimed') return true
+  return Boolean(order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= now)
 }
 
 /** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。markPaid 的 update data 中唯一带唯一索引的列即 pickupCode。 */
@@ -123,8 +159,8 @@ export class OrderStatusService {
     //
     // 只拒「有截止时间且已过」：一体机现场单不写 pickupCodeExpiresAt（为 null），
     // 按 null 也拒会误伤现场收款这条主链路。
-    // claimed 租约除外：窗口关闭前已经在本机认领，release 不再核对截止时间，
-    // 这里再拒入账会把人卡在机器前（钱没收、纸不出）。
+    // claimed 短租约除外：认领发生在原到机码截止之前，TTL 内必须还能收款/出纸。
+    // 租约过期的未付 claimed 与未认领过期一样拒绝，避免文件失效很久后仍能入账。
     if (isPickupWindowClosed(order)) {
       throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
     }

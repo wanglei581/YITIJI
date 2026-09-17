@@ -28,7 +28,7 @@ import { AdminOrderActionsController } from '../src/payment/admin-order-actions.
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { ONLINE_PAID_PENDING_REFUND_REASON, OrderStatusService } from '../src/payment/order-status.service'
-import { createPaymentSessionToken } from '../src/payment/payment-session-token'
+import { createPaymentSessionToken, paymentSessionTtlMs } from '../src/payment/payment-session-token'
 import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
@@ -912,6 +912,44 @@ async function main(): Promise<void> {
       fail(`claimed lease must still accept online payment: pay=${claimedLeasePaid.payStatus} source=${claimedLeasePaid.paymentSource} pickup=${claimedLeasePaid.pickupStatus}`)
     }
     pass('markPaidOnline accepts claimed kiosk lease after pickupCodeExpiresAt')
+
+    const expiredClaimedId = await makeOrder(190, 'unpaid')
+    await prisma.order.update({
+      where: { id: expiredClaimedId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(Date.now() - paymentSessionTtlMs() - 1000),
+        pickupCodeHash: `hash_claimed_expired_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    await expectCode(
+      'markPaidOnline refuses claimed unpaid after kiosk lease TTL (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(expiredClaimedId, {
+          channel: CHANNEL,
+          attemptId: 'pa_claimed_expired_lease',
+          channelTxnNo: `txn_claimed_expired_lease_${suffix}`,
+          late: true,
+        }),
+    )
+    const expiredClaimed = await prisma.order.findUnique({ where: { id: expiredClaimedId } })
+    const expiredClaimedRefundAudit = await prisma.auditLog.findFirst({
+      where: { action: 'order.online_payment_pending_refund', targetType: 'order', targetId: expiredClaimedId },
+    })
+    if (
+      expiredClaimed?.payStatus === 'unpaid'
+      && expiredClaimed.refundReason === ONLINE_PAID_PENDING_REFUND_REASON
+      && expiredClaimedRefundAudit
+    ) {
+      pass('claimed unpaid past lease online late payment records ONLINE_PAID_PENDING_REFUND, does not turn paid')
+    } else {
+      fail(
+        `claimed-lease pending-refund mismatch: pay=${expiredClaimed?.payStatus} reason=${expiredClaimed?.refundReason} audit=${expiredClaimedRefundAudit?.payloadJson}`,
+      )
+    }
 
     const cancelledCloudId = await makeOrder(180, 'unpaid')
     await prisma.order.update({
