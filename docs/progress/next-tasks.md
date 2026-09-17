@@ -2,10 +2,11 @@
 
 ## 2026-09-17 当前唯一集成顺序
 
-1. **数据大屏完整本地总门禁已通过，冻结 `93eed6c6`。** `verify:console-screen-snapshot`
-   80/80、Admin screen 40/40、Partner screen 18/18、两端生产构建、CI/deploy/合规/图谱门禁
-   均退出 0；Agy 判 `GO`，官方 DeepSeek Hermes 判“可开 PR、不可直接部署”。不得把本地证据
-   写成 CI、合并或生产证据。
+1. **数据大屏已机械同步到 `origin/main@3d35759`（PR #1040），本地总门禁重跑通过。**
+   不得把 rebase 前冻结 SHA `93eed6c6` 当成当前 tip。`verify:console-screen-snapshot`
+   80/80、Admin screen 40/40、Partner screen 18/18、两端生产 http 构建、CI/deploy/合规/图谱
+   门禁均退出 0；Agy 判 `GO`，官方 DeepSeek Hermes 判“可开 PR、不可直接部署”。不得把本地
+   证据写成 CI、合并或生产证据。未 push、未开 PR。
 2. **取得即时授权后只开一个数据大屏 PR，不拆多条。** PR 只承载数据大屏运行时提交及
    图谱/进度收尾。final-head CI 全绿，且 PostgreSQL job 实际应用新增索引后才能合并；合并后用
    `git merge-base --is-ancestor <final-head> origin/main` 留证。当前不得写成已合并或已上线。

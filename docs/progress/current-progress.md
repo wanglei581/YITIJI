@@ -1,5 +1,27 @@
 # 当前开发进度
 
+2026-09-17 **数据大屏候选已机械 rebase 到 `origin/main@3d35759`（PR #1040），本地总门禁重跑通过。**
+候选分支 `codex/console-data-screen-r2-20260917` 现为
+`origin/main@3d35759ee2ae810716d08734752f0a3d1d9d7a66` 的后代；rebase 前 tip
+`5a4cbfdbe0082573ff3a152fc1598f29de39fddd`，13 个未推送提交全部 replay。仅
+`docs/progress/current-progress.md` 一处内容冲突：数据大屏既有记录保留，主线
+PR #1040 / API-only 发布控制面记录原文保留（与 `origin/main` 该段逐字节相同），
+未改写、未删除。`apps/admin` / `apps/partner` / `packages/ui` 树哈希与 rebase 前
+一致（`fa1e679d6fca6ab652e01c3e947afabeac1e3884` /
+`b28256f6ce241dbf36c5fd2465b3513380761e2f` /
+`de68adb1efb206f0b02e7b361f90258b916f3c8d`）。未改前端、未新增功能、未 push、
+未开 PR、未合并、未部署。
+
+- **本机重跑：** `verify:console-screen-snapshot` **80/80**；Admin screen Playwright
+  **40/40**；Partner screen Playwright **18/18**；`verify:console-screen-ui` 0 条未通过；
+  `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 的 Admin / Partner production build、
+  API `build`、`verify:repository-integrity`、`verify:deploy-gates-in-sync`、
+  `verify:compliance-copy`、`graph:check`、`verify:ci-gate-coverage`、
+  `git diff --check origin/main...HEAD` 均退出 0。
+- **证据边界：** 相对本轮机械同步，`SOURCE / LOCAL: GO`；`CI / MERGE: PENDING`；
+  `DEVICE / PRODUCTION / COMMERCIAL: NO-GO`。rebase 前冻结 SHA `93eed6c6` 不得再
+  写成当前 tip。下一步仍只允许一个数据大屏 PR。
+
 2026-09-17 **Admin / Partner 数据大屏冻结到 `93eed6c6`，完整本地总门禁已通过。**
 候选分支 `codex/console-data-screen-r2-20260917` 基于
 `origin/main@50483cd28096780c5e6c4260dde86dec36e7d99f`，当前 tip 为
@@ -123,7 +145,6 @@ run `35229197747` 已通过：默认 API 目录、PM2 进程名、回环健康�
 - **当前证据边界：** 本条仅是源码候选，尚未 push、PR、合并或生产执行；
   `DEPLOY_API_ENABLED=false` 未打开。完成本地验证和 PR CI 后，才允许短时打开门禁，以
   `ci_run_id=34992685756`、`deploy_scope=api-only` 部署精确 `50483cd...`，随后立即关闭门禁。
-
 
 2026-09-15 **R11：PR #1037 的首轮 CI 暴露扫描迁移验证夹具未隔离后续迁移，已完成最小修复。**
 失败锚点是 `c05adc2f2c41eeee695775fdd2d86556833675e7`、GitHub Actions run
