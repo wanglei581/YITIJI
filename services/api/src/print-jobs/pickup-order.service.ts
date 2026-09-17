@@ -3,6 +3,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { hashPickupCode } from '../common/pickup-code'
+import { isPickupWindowClosed } from '../payment/order-status.service'
 import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment/payment-session-token'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
@@ -77,9 +78,12 @@ export class PickupOrderService {
       await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
       throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
-    if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date()) {
+    // 未认领且窗口已关：落 expired 并拒绝。已 claimed 的同机租约不算关窗
+    // （isPickupWindowClosed），必须落到下面的幂等认领 / 付款 / release，
+    // 不能在这里把租约写成 expired。过期写只打 pending，避免并发认领后被误关。
+    if (isPickupWindowClosed(order)) {
       await this.prisma.order.updateMany({
-        where: { id: order.id, pickupStatus: { in: ['pending', 'claimed'] }, printTaskId: null },
+        where: { id: order.id, pickupStatus: 'pending', printTaskId: null },
         data: {
           pickupStatus: 'expired',
           taskStatus: 'expired',

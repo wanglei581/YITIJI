@@ -23,13 +23,29 @@ const PICKUP_MAX_ATTEMPTS = 6
 /** 线上入账时取件窗口已关：渠道钱已到、本单无法出纸，记待退而不转 paid。 */
 export const ONLINE_PAID_PENDING_REFUND_REASON = 'ONLINE_PAID_PENDING_REFUND'
 
-/** 取件窗口已关：过期截止已到，或到机码已被标 expired/cancelled。 */
+/**
+ * 一体机现场履约租约：`pickup-order.service` 在窗口仍开时把 pending CAS 成 claimed，
+ * 并绑死 `Order.terminalId`。release 不再核对 `pickupCodeExpiresAt`。
+ *
+ * 因此 claimed + printTaskId null 不是「过期未认领」，而是机器上正在收款/出纸的租约。
+ * 预认领截止已过也必须能 markPaid / 同机再 claim / release；未认领过期单仍走资损防线。
+ */
+export function isLiveKioskPickupLease(order: {
+  pickupStatus: string
+  printTaskId?: string | null
+}): boolean {
+  return order.pickupStatus === 'claimed' && !order.printTaskId
+}
+
+/** 取件窗口已关：过期截止已到，或到机码已被标 expired/cancelled。活着的 claimed 租约不算关。 */
 export function isPickupWindowClosed(order: {
   pickupCodeExpiresAt: Date | null
   pickupStatus: string
+  printTaskId?: string | null
 }): boolean {
-  if (order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= new Date()) return true
-  return order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled'
+  if (isLiveKioskPickupLease(order)) return false
+  if (order.pickupStatus === 'expired' || order.pickupStatus === 'cancelled') return true
+  return Boolean(order.pickupCodeExpiresAt && order.pickupCodeExpiresAt <= new Date())
 }
 
 /** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。markPaid 的 update data 中唯一带唯一索引的列即 pickupCode。 */
@@ -95,18 +111,20 @@ export class OrderStatusService {
     // 只允许 unpaid → paid；refunded / failed 不可再转 paid。
     if (order.payStatus !== 'unpaid') throw new BadRequestException('ORDER_INVALID_TRANSITION')
 
-    // 取件窗口已关的单不得入账 —— 这是一条资损防线，不是状态洁癖。
+    // 取件窗口已关的**未认领**单不得入账 —— 这是一条资损防线，不是状态洁癖。
     //
     // 场景（2026-09-03 对抗性审查实证）：小程序云打印单 pickupCodeExpiresAt 过期后，
     // 惰性关单只在会员 listCloud 时跑，Admin 订单列表不跑它，于是该单在后台仍显示
     // unpaid、仍出现「确认收款」。现场收了现金标记已付后，用户到机认领时
-    // pickup-order.service.ts:69 判过期，而那里的 payStatus 写的是
-    // `=== 'unpaid' ? 'closed' : payStatus` —— 已 paid 的单保持 paid，同时
+    // pickup-order.service.ts 判过期，而那里的 payStatus 写的是
+    // `unpaid/paying → closed` —— 已 paid 的单保持 paid，同时
     // pickupStatus 变 expired 且 printTaskId 仍为 null，Agent 的 claimableWhere
     // 永远看不到它。结果是钱记下了、纸永远出不来，只能退款重下单。
     //
     // 只拒「有截止时间且已过」：一体机现场单不写 pickupCodeExpiresAt（为 null），
     // 按 null 也拒会误伤现场收款这条主链路。
+    // claimed 租约除外：窗口关闭前已经在本机认领，release 不再核对截止时间，
+    // 这里再拒入账会把人卡在机器前（钱没收、纸不出）。
     if (isPickupWindowClosed(order)) {
       throw new BadRequestException('ORDER_PICKUP_WINDOW_CLOSED')
     }
@@ -209,7 +227,8 @@ export class OrderStatusService {
       if (order.paymentSource === channel) return order
       throw new BadRequestException('ORDER_ALREADY_PAID')
     }
-    // 取件窗口已关：渠道钱可能已入账，但本单无法出纸。拒绝转 paid，记「已收款待退」。
+    // 取件窗口已关（未认领过期 / expired / cancelled）：渠道钱可能已入账，但本单无法出纸。
+    // 拒绝转 paid，记「已收款待退」。claimed 租约除外，与 markPaid 同一条判据。
     // 迟到回调仍走这条：closed 且窗口仍开才能入账履约；过期/已取消的云打印单不能再铸幽灵码。
     if (isPickupWindowClosed(order)) {
       await this.recordOnlinePaidPendingRefund(order, opts)

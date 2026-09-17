@@ -9,6 +9,7 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { AuditService } from '../src/audit/audit.service'
 import { encryptSecret } from '../src/common/crypto/secret-cipher'
+import type { RedisService } from '../src/common/redis/redis.service'
 import { hashPickupCode, randomPickupCode } from '../src/common/pickup-code'
 import { assertMemberPrintOrderIdempotencyKey } from '../src/member-print-orders/member-print-order-create.service'
 import {
@@ -16,9 +17,10 @@ import {
   PackageOrderService,
 } from '../src/member-print-orders/package-order.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
-import { OrderStatusService } from '../src/payment/order-status.service'
+import { isPickupWindowClosed, OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
@@ -44,10 +46,23 @@ function fail(message: string): never { throw new Error(message) }
 
 function codeOf(error: unknown): string {
   const ex = error as { getResponse?: () => unknown; response?: unknown; message?: string }
-  const response = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
-    | { error?: { code?: string }; message?: string }
-    | undefined
-  return response?.error?.code ?? response?.message ?? ex.message ?? 'UNKNOWN'
+  const response = typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response
+  if (typeof response === 'string' && response) return response
+  const body = response as { error?: { code?: string }; message?: string } | undefined
+  return body?.error?.code ?? body?.message ?? ex.message ?? 'UNKNOWN'
+}
+
+class FakeRedis {
+  private readonly values = new Map<string, string>()
+
+  async get(key: string): Promise<string | null> { return this.values.get(key) ?? null }
+  async setEx(key: string, _ttl: number, value: string): Promise<void> { this.values.set(key, value) }
+  async del(key: string): Promise<number> { return this.values.delete(key) ? 1 : 0 }
+  async incrWithTtl(key: string, _ttl: number): Promise<number> {
+    const value = Number(this.values.get(key) ?? '0') + 1
+    this.values.set(key, String(value))
+    return value
+  }
 }
 
 async function capture(action: () => Promise<unknown>): Promise<{
@@ -189,6 +204,7 @@ async function main(): Promise<void> {
   const orderStatus = new OrderStatusService(prisma, audit)
   const quotes = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma), capabilities, prisma)
   const packages = new PackageOrderService(prisma, quotes, capabilities, audit, orderStatus)
+  const pickup = new PickupOrderService(prisma, capabilities, audit, new FakeRedis() as unknown as RedisService, storage)
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const userA = `eu_pkg_idem_a_${suffix}`
   const userB = `eu_pkg_idem_b_${suffix}`
@@ -657,11 +673,12 @@ async function main(): Promise<void> {
     const leaseUnpaidCode = randomPickupCode()
     const leaseUnpaidId = `ord_pkg_lease_unpaid_${suffix}`
     const claimedAt = new Date(Date.now() - 30 * 1000)
+    const pastExpiry = new Date(Date.now() - 60 * 1000)
     await insertPackageOrder({
       id: leaseUnpaidId, orderNo: `ORD-PKG-LEASE-U-${suffix}`, key: leaseUnpaidKey, code: leaseUnpaidCode,
       ownerId: userA, dto: dtoA, amountCents: 80,
       pickupStatus: 'claimed', pickupClaimedAt: claimedAt, taskStatus: 'awaiting_payment',
-      pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+      pickupCodeExpiresAt: pastExpiry,
     })
     const leaseUnpaidReplay = await packages.create(userA, dtoA, leaseUnpaidKey) as PackageView
     if (leaseUnpaidReplay.orderId !== leaseUnpaidId) fail('过期窗口内已认领回放必须原单')
@@ -685,6 +702,77 @@ async function main(): Promise<void> {
     }
     if (!leaseUnpaidRow.pickupClaimedAt) fail('已认领落库必须保留 pickupClaimedAt')
     if (await prisma.order.count({ where: { idempotencyKey: leaseUnpaidKey } }) !== 1) fail('已认领过期窗口回放不得第二张单')
+    if (isPickupWindowClosed(leaseUnpaidRow)) {
+      fail('claimed 是一体机履约租约：预认领窗口已过也不得判定窗口关闭')
+    }
+
+    const unclaimedExpireKey = randomUUID()
+    const unclaimedExpireCode = randomPickupCode()
+    const unclaimedExpireId = `ord_pkg_unclaimed_exp_${suffix}`
+    await insertPackageOrder({
+      id: unclaimedExpireId, orderNo: `ORD-PKG-UNCLAIMED-EXP-${suffix}`, key: unclaimedExpireKey,
+      code: unclaimedExpireCode, ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupCodeExpiresAt: pastExpiry,
+    })
+    const unclaimedExpireRow = await prisma.order.findUniqueOrThrow({ where: { id: unclaimedExpireId } })
+    if (!isPickupWindowClosed(unclaimedExpireRow)) fail('未认领且窗口已过必须判定关闭（资损防线）')
+    const unclaimedPay = await capture(() => orderStatus.markPaid(unclaimedExpireId, { paymentSource: 'offline' }))
+    if (!unclaimedPay.thrown || unclaimedPay.code !== 'ORDER_PICKUP_WINDOW_CLOSED') {
+      fail(`未认领过期窗口 markPaid 必须拒绝，实际 ${JSON.stringify(unclaimedPay)}`)
+    }
+    const unclaimedOnline = await capture(() => orderStatus.markPaidOnline(unclaimedExpireId, {
+      channel: 'sandbox', attemptId: `pa_unclaimed_${suffix}`, channelTxnNo: `txn_unclaimed_${suffix}`, late: false,
+    }))
+    if (!unclaimedOnline.thrown || unclaimedOnline.code !== 'ORDER_PICKUP_WINDOW_CLOSED') {
+      fail(`未认领过期窗口 markPaidOnline 必须拒绝，实际 ${JSON.stringify(unclaimedOnline)}`)
+    }
+    const unclaimedClaim = await capture(() => pickup.claim(unclaimedExpireCode, terminalId))
+    if (!unclaimedClaim.thrown || unclaimedClaim.code !== 'PICKUP_CODE_EXPIRED') {
+      fail(`未认领过期码 re-claim 必须 PICKUP_CODE_EXPIRED，实际 ${JSON.stringify(unclaimedClaim)}`)
+    }
+    const unclaimedAfterClaim = await prisma.order.findUniqueOrThrow({ where: { id: unclaimedExpireId } })
+    if (unclaimedAfterClaim.pickupStatus !== 'expired' || unclaimedAfterClaim.payStatus !== 'closed') {
+      fail(`未认领过期 re-claim 必须落 expired/closed，实际 ${unclaimedAfterClaim.pickupStatus}/${unclaimedAfterClaim.payStatus}`)
+    }
+
+    const reclaimUnpaid = await pickup.claim(leaseUnpaidCode, terminalId)
+    if (reclaimUnpaid.released !== false || reclaimUnpaid.orderId !== leaseUnpaidId || !reclaimUnpaid.paymentSessionToken) {
+      fail('已认领过期窗口同机再 claim 必须走幂等租约，不得过期，必须仍给付款令牌')
+    }
+    const afterReclaim = await prisma.order.findUniqueOrThrow({ where: { id: leaseUnpaidId } })
+    if (afterReclaim.pickupStatus !== 'claimed' || afterReclaim.payStatus !== 'unpaid' || afterReclaim.printTaskId) {
+      fail(`已认领再 claim 不得拆租约，实际 ${afterReclaim.pickupStatus}/${afterReclaim.payStatus}`)
+    }
+    const leasePaidOffline = await orderStatus.markPaid(leaseUnpaidId, { paymentSource: 'offline', operatorId: 'verify-t8h' })
+    if (leasePaidOffline.payStatus !== 'paid' || leasePaidOffline.paymentSource !== 'offline') {
+      fail(`已认领过期窗口必须能线下入账，实际 ${leasePaidOffline.payStatus}/${leasePaidOffline.paymentSource}`)
+    }
+    if (leasePaidOffline.pickupStatus !== 'claimed') fail('线下入账不得把 claimed 租约写成 expired')
+    const releasedLease = await pickup.release(leaseUnpaidId, terminalId, reclaimUnpaid.paymentSessionToken)
+    if (!releasedLease.taskId) fail('已认领过期窗口入账后必须能 release')
+    const releasedLeaseRow = await prisma.order.findUniqueOrThrow({ where: { id: leaseUnpaidId } })
+    if (releasedLeaseRow.pickupStatus !== 'used' || releasedLeaseRow.printTaskId !== releasedLease.taskId) {
+      fail(`release 后必须 used 且挂任务，实际 ${releasedLeaseRow.pickupStatus}/${releasedLeaseRow.printTaskId}`)
+    }
+
+    const leaseOnlineKey = randomUUID()
+    const leaseOnlineCode = randomPickupCode()
+    const leaseOnlineId = `ord_pkg_lease_online_${suffix}`
+    await insertPackageOrder({
+      id: leaseOnlineId, orderNo: `ORD-PKG-LEASE-ON-${suffix}`, key: leaseOnlineKey, code: leaseOnlineCode,
+      ownerId: userA, dto: dtoA, amountCents: 80,
+      pickupStatus: 'claimed', pickupClaimedAt: claimedAt, taskStatus: 'awaiting_payment',
+      pickupCodeExpiresAt: pastExpiry,
+    })
+    const leaseOnlinePaid = await orderStatus.markPaidOnline(leaseOnlineId, {
+      channel: 'sandbox', attemptId: `pa_lease_${suffix}`, channelTxnNo: `txn_lease_${suffix}`, late: false,
+    })
+    if (leaseOnlinePaid.payStatus !== 'paid' || leaseOnlinePaid.paymentSource !== 'sandbox') {
+      fail(`已认领过期窗口必须能线上入账，实际 ${leaseOnlinePaid.payStatus}/${leaseOnlinePaid.paymentSource}`)
+    }
+    if (leaseOnlinePaid.pickupStatus !== 'claimed' || leaseOnlinePaid.printTaskId) {
+      fail('线上入账不得拆 claimed 租约')
+    }
 
     const leasePaidKey = randomUUID()
     const leasePaidCode = randomPickupCode()
@@ -694,7 +782,7 @@ async function main(): Promise<void> {
       ownerId: userA, dto: dtoA, amountCents: 80,
       pickupStatus: 'claimed', pickupClaimedAt: claimedAt, taskStatus: 'awaiting_payment',
       payStatus: 'paid', paymentSource: 'offline', paidAt: new Date(),
-      pickupCodeExpiresAt: new Date(Date.now() - 60 * 1000),
+      pickupCodeExpiresAt: pastExpiry,
     })
     const leasePaidReplay = await packages.create(userA, dtoA, leasePaidKey) as PackageView
     if (leasePaidReplay.pickupStatus !== 'claimed' || leasePaidReplay.payStatus !== 'paid') {
@@ -707,7 +795,13 @@ async function main(): Promise<void> {
       fail('已认领已付落库必须仍满足 release：claimed + paid + printTaskId null')
     }
     if (await prisma.order.count({ where: { idempotencyKey: leasePaidKey } }) !== 1) fail('已认领已付回放不得第二张单')
-    pass('T8h claimed+过期窗口：认领租约不被手机过期；不关单、无活码、无第二张；token 仍签发')
+    const paidReclaim = await pickup.claim(leasePaidCode, terminalId)
+    if (!paidReclaim.released || !paidReclaim.taskId) fail('已认领已付过期窗口同机再 claim 必须直接 release，不得先写成 expired')
+    const paidReclaimRow = await prisma.order.findUniqueOrThrow({ where: { id: leasePaidId } })
+    if (paidReclaimRow.pickupStatus !== 'used' || paidReclaimRow.printTaskId !== paidReclaim.taskId) {
+      fail(`已认领已付再 claim 必须 used，实际 ${paidReclaimRow.pickupStatus}/${paidReclaimRow.printTaskId}`)
+    }
+    pass('T8h claimed+过期窗口：认领租约不被手机过期；同机可 markPaid/release；未认领过期仍拒绝入账')
 
     const usedKey = randomUUID()
     const usedCode = randomPickupCode()
@@ -826,8 +920,11 @@ async function main(): Promise<void> {
       select: { id: true },
     })).map((row) => row.id)
     if (orderIds.length) {
-      await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } })
       await prisma.auditLog.deleteMany({ where: { targetId: { in: orderIds } } })
+      await prisma.order.updateMany({ where: { id: { in: orderIds } }, data: { printTaskId: null } })
+      await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } })
+      await prisma.printTaskStatusLog.deleteMany({ where: { task: { endUserId: { in: [userA, userB] } } } }).catch(() => undefined)
+      await prisma.printTask.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
     }
     await prisma.order.deleteMany({ where: { endUserId: { in: [userA, userB] } } })
     await prisma.piiFinding.deleteMany({ where: { task: { endUserId: { in: [userA, userB] } } } })

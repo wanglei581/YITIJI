@@ -870,6 +870,49 @@ async function main(): Promise<void> {
       )
     }
 
+    const pendingClockClosedId = await makeOrder(210, 'unpaid')
+    await prisma.order.update({
+      where: { id: pendingClockClosedId },
+      data: {
+        pickupStatus: 'pending',
+        pickupCodeHash: `hash_pending_clock_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+      },
+    })
+    await expectCode(
+      'markPaidOnline refuses unclaimed clock-expired pickup (ORDER_PICKUP_WINDOW_CLOSED)',
+      'ORDER_PICKUP_WINDOW_CLOSED',
+      () =>
+        orderStatus.markPaidOnline(pendingClockClosedId, {
+          channel: CHANNEL,
+          attemptId: 'pa_pending_clock',
+          channelTxnNo: `txn_pending_clock_${suffix}`,
+          late: false,
+        }),
+    )
+
+    const claimedLeaseId = await makeOrder(200, 'unpaid')
+    await prisma.order.update({
+      where: { id: claimedLeaseId },
+      data: {
+        pickupStatus: 'claimed',
+        pickupClaimedAt: new Date(),
+        pickupCodeHash: `hash_claimed_lease_${suffix}`,
+        pickupCodeExpiresAt: new Date(Date.now() - 60_000),
+        taskStatus: 'awaiting_payment',
+      },
+    })
+    const claimedLeasePaid = await orderStatus.markPaidOnline(claimedLeaseId, {
+      channel: CHANNEL,
+      attemptId: 'pa_claimed_lease',
+      channelTxnNo: `txn_claimed_lease_${suffix}`,
+      late: false,
+    })
+    if (claimedLeasePaid.payStatus !== 'paid' || claimedLeasePaid.paymentSource !== CHANNEL || claimedLeasePaid.pickupStatus !== 'claimed') {
+      fail(`claimed lease must still accept online payment: pay=${claimedLeasePaid.payStatus} source=${claimedLeasePaid.paymentSource} pickup=${claimedLeasePaid.pickupStatus}`)
+    }
+    pass('markPaidOnline accepts claimed kiosk lease after pickupCodeExpiresAt')
+
     const cancelledCloudId = await makeOrder(180, 'unpaid')
     await prisma.order.update({
       where: { id: cancelledCloudId },
