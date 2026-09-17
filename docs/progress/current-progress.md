@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-09-18 **小程序与一体机跨端联动收口：源码冻结 `33751df4a`，`SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。**
+2026-09-17 **小程序与一体机跨端联动收口：源码冻结 `33751df4a`，`SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。**
 
 - **冻结候选：** 分支 `codex/material-package-idempotency-closeout-20260917`，源码冻结点
   `33751df4af9eae0cbfc912e4ad123a07e83031cd`，基线
@@ -16,7 +16,7 @@
 - **多模型记录：** Grok 主修并提交本冻结 SHA。Claude 只对小程序增量 `92b67fe84` 最终确认 `GO`，未对后续 API 租约/CAS 增量做前端终审。Agy / Hermes 对 `fecd64d65`（claimed 租约 TTL）与 `33751df4a`（late-callback CAS）增量 `GO`。Codex 协调核验。商业发布仍 `NO-GO`。
 - **证据矩阵：** `SOURCE / LOCAL: GO`。下列一律 `NO-GO`：`CI`、`MAIN`、微信开发者工具、Trial、微信真机、Windows / 奔图真机、production / server、真实支付 / 退款 / 对账、业务 UAT。本地绿、HTTP 200、历史设备记录和多模型同意都不能替代这些证据。
 
-2026-09-17 **小程序与一体机跨端联动收口（历史快照）：当时代码冻结点是 rebase 前的 `d30d2f965`，本地材料包耐久幂等已到 `SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。当前冻结点已前移到 2026-09-18 的 `33751df4a`，不要把本节 SHA 当成现 tip。**
+2026-09-17 **小程序与一体机跨端联动收口（历史快照）：当时代码冻结点是 rebase 前的 `d30d2f965`，本地材料包耐久幂等已到 `SOURCE / LOCAL: GO`，商业整体仍 `NO-GO`。当前冻结点已前移到 2026-09-17 的 `33751df4a`，不要把本节 SHA 当成现 tip。**
 
 - **当时冻结候选：** 分支 `codex/material-package-idempotency-closeout-20260917`，代码冻结点
   `d30d2f965`，当时基线

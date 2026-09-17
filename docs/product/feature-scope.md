@@ -1,6 +1,6 @@
 # 功能范围文档
 
-> 最后更新：2026-09-18（§1.2 当前跨端候选 `33751df4a` 与线上历史记录分开写）；2026-08-22（补 1.2 实现与上线状态：代码事实，不是宣传）；2026-09-07 取回被 9d3bc4789 覆盖的 §4.4A / §2.7.1
+> 最后更新：2026-09-17（§1.2 当前跨端候选 `33751df4a` 与线上历史记录分开写）；2026-08-22（补 1.2 实现与上线状态：代码事实，不是宣传）；2026-09-07 取回被 9d3bc4789 覆盖的 §4.4A / §2.7.1
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [compliance-boundary.md](../compliance/compliance-boundary.md) | [current-progress.md](../progress/current-progress.md) | [next-tasks.md](../progress/next-tasks.md)
 
 ---
